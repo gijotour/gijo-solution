@@ -1,8 +1,8 @@
-# 로컬 LLM 프로젝트 가이드 — Qwen2.5-Coder-32B-Instruct / CUDA / llama.cpp
+# 로컬 LLM 프로젝트 가이드 — Qwythos-9B-Claude-Mythos-5-1M (Qwythos-9B) / CUDA / llama.cpp
 
 **확정 서버 사양**: AMD Ryzen 7 5800X · NVIDIA RTX 3090 24GB · RAM 64GB · 저장공간 1.38TB · Windows 11 Pro 24H2
 
-이 문서는 위 서버에서 로컬 LLM(Qwen2.5-Coder-32B-Instruct)을 CUDA 백엔드로 구동하고, 이후 보안 제품(오케스트레이터 + 스캐너 어댑터)에 통합하기까지의 전체 과정을 단계별로 정리한 것입니다.
+이 문서는 위 서버에서 로컬 LLM(Qwythos-9B)을 CUDA 백엔드로 구동하고, 이후 보안 제품(오케스트레이터 + 스캐너 어댑터)에 통합하기까지의 전체 과정을 단계별로 정리한 것입니다.
 
 > **PC 실제 구매 확정(당근마켓, 5800X + RTX 3090 24GB + DDR4 64GB + 1.38TB, Windows 11 Pro 24H2)에 따라, 이 하드웨어 기준으로 바로 따라할 수 있는 실행용 체크리스트/명령어 모음은 `GIJO_AS_PC세팅_체크리스트.md`에 별도로 정리했습니다.** 이 문서(로컬LLM_프로젝트_가이드.md)는 설계 배경·기술 선택 근거 중심이고, PC 도착 후 실제로 손 움직이며 따라할 때는 그 체크리스트 문서를 여세요.
 
@@ -26,15 +26,15 @@
 
 **로컬 LLM 실행 방식**: 로컬 LLM은 PC에 설치된 **Connect AI 데스크톱 앱**(`Connect AI.exe`, 커스텀 GGUF 경로 지정 가능 확인됨)에서 직접 구동합니다.
 
-> **⚠️ 임시 모델 선정 상태 (TODO)**: 현재 이 문서의 1~3단계는 **Qwen2.5-Coder-32B-Instruct를 메인 모델로 임시 사용** 중인 상태를 기준으로 작성되어 있습니다. Coder-32B는 코딩/도구 호출에 특화된 Dense 32B 모델이라, 제품의 실제 핵심 작업(취약점 요약·CTI 해석·SBOM 리포트 등 일반 추론·글쓰기)에는 원래 검토했던 **Qwen3-30B-A3B**(MoE, 활성 3B — 속도 빠름) 쪽이 더 적합할 수 있습니다. **프로덕션 배포 전에 반드시 메인 모델을 재확정**하세요(9.5절 미결 항목 참고). 두 모델을 함께 쓰게 될 경우 RTX 3090 24GB로는 동시 로드가 불가능(각 Q4_K_M 기준 약 17GB / 20GB)하므로 Connect AI 앱에서 수동 전환하거나, `LocalEngineService`/`LocalEngineController`에 모델 스왑 로직을 구현해야 합니다.
+> **⚠️ 초기 개발 테스트 모델 선정 상태**: 현재 이 문서의 1~3단계는 **Qwythos-9B(Qwythos-9B-Claude-Mythos-5-1M-Q4_K_M.gguf)를 메인 모델로 사용** 중인 상태를 기준으로 작성되어 있습니다. Qwythos-9B는 가벼운 9B급 추론 모델로, VRAM을 약 6~7GB만 소모하여 RTX 3090 24GB 서버에서 극도로 기민하고 가볍게 구동됩니다. 프로덕션 배포 시점에는 원래 검토했던 **Qwen3-30B-A3B**(MoE, 활성 3B — 속도 빠름) 등으로 전환을 재검토할 수 있으며, 이 두 모델을 함께 쓰거나 상황에 맞춰 스왑하는 로직을 `LocalEngineService`에 구현할 수 있습니다.
 
 ---
 
 ## 0. 왜 이 조합인가 (요약)
 
-- **GPU**: RTX 3090 24GB — 목표 모델(4bit 기준 ~19.8GB)을 VRAM에 전량 로드하고도 여유가 남음, 대역폭 936GB/s
+- **GPU**: RTX 3090 24GB — 목표 모델(4bit 기준 ~6.5GB)을 VRAM에 전량 로드하고도 여유가 매우 충분히 남음, 대역폭 936GB/s
 - **백엔드**: CUDA — llama.cpp 백엔드 중 NVIDIA에서 가장 완전하고 빠름 (OpenCL/Vulkan 대비 MoE·양자화 지원이 온전함)
-- **모델**: Qwen2.5-Coder-32B-Instruct — 코딩 및 에이전트 도구 호출(Function Calling) 성능이 뛰어난 Instruct 모델 (32B 파라미터 밀집형 모델)
+- **모델**: Qwythos-9B — 가벼운 9B급 추론 모델 (Q4_K_M 양자화 적용으로 초기 개발/테스트 시 하드웨어 부하 대폭 절감)
 - **컴퓨트 능력**: RTX 3090(Ampere, GA102)의 CUDA Compute Capability는 **8.6** — 빌드 시 이 값을 지정합니다.
 
 ---
@@ -99,33 +99,30 @@ Available devices:
 
 ### 2.1 GGUF 배포처
 
-Qwen2.5-Coder-32B-Instruct의 GGUF 변환본은 HuggingFace의 커뮤니티 배포자들이 제공합니다.
+초기 테스트에 쓰일 Qwythos-9B-Claude-Mythos-5-1M의 GGUF 변환본은 HuggingFace의 배포처에서 가져올 수 있습니다.
 
-- `bartowski/Qwen2.5-Coder-32B-Instruct-GGUF` — 표준 양자화 세트 (Q4_K_M 등)
-- `Qwen/Qwen2.5-Coder-32B-Instruct-GGUF` — 공식 배포본
+- `empero-ai/Qwythos-9B-Claude-Mythos-5-1M-GGUF` — 표준 양자화 세트 (Q4_K_M 등)
 
 ### 2.2 24GB VRAM 기준 양자화 선택
 
 | 양자화 | 특징 | 추천 상황 |
 |---|---|---|
-| **Q4_K_M** | 품질/용량 균형, 도구 호출 성능 보장 | 기본 추천 (약 19.8GB VRAM 요구) |
-| Q4_K_S | Q4_K_M보다 미세하게 작음 | VRAM 여유 폭을 더 넓히고 싶을 때 |
-| Q3_K_M / Q3_K_L | 품질 저하가 있으나 용량 대폭 축소 | 초장문 컨텍스트가 꼭 필요할 때 |
+| **Q4_K_M** | 품질/용량 균형, 원활한 추론 기능 제공 | 기본 추천 (약 5.6GB 용량, 약 6~7GB VRAM 요구) |
 
-24GB VRAM은 32B 모델의 Q4_K_M 양자화를 전량 로드하고도 약 4GB의 VRAM 여유가 남으므로, 에이전트의 파일 생성/수정(도구 호출) 성능이 검증된 **Q4_K_M** 모델을 기본으로 사용합니다.
+RTX 3090 24GB VRAM 사양에서는 9B 모델의 Q4_K_M을 로드하고도 17GB 이상의 넉넉한 VRAM이 남으므로, 로드와 응답 속도가 비약적으로 빠르며 여러 작업 수행 시 시스템 리소스 점유 부담이 매우 적습니다.
 
 ### 2.3 다운로드 및 파일명 정규화
 
-다운로드된 GGUF 파일명을 애플리케이션 백엔드 및 실행 스크립트가 인식하는 표준 파일명(`qwen2.5-coder-32b-instruct.gguf`)으로 변경합니다.
+다운로드된 GGUF 파일명을 애플리케이션 백엔드 및 실행 스크립트가 인식하는 표준 파일명(`qwythos-9b.gguf`)으로 변경합니다.
 
 ```powershell
 pip install -U huggingface_hub --break-system-packages
-huggingface-cli download bartowski/Qwen2.5-Coder-32B-Instruct-GGUF `
+huggingface-cli download empero-ai/Qwythos-9B-Claude-Mythos-5-1M-GGUF `
   --include "*Q4_K_M*" `
-  --local-dir .\models\qwen2.5-coder-32b-instruct
+  --local-dir .\models\qwythos-9b
 
 # 백엔드 엔진에서 고정 파일명으로 인식할 수 있도록 변경
-Rename-Item .\models\qwen2.5-coder-32b-instruct\Qwen2.5-Coder-32B-Instruct-Q4_K_M.gguf qwen2.5-coder-32b-instruct.gguf
+Rename-Item .\models\qwythos-9b\Qwythos-9B-Claude-Mythos-5-1M-Q4_K_M.gguf qwythos-9b.gguf
 ```
 
 ---
@@ -136,13 +133,13 @@ Rename-Item .\models\qwen2.5-coder-32b-instruct\Qwen2.5-Coder-32B-Instruct-Q4_K_
 
 ```powershell
 .\build\bin\Release\llama-cli.exe `
-  -m .\models\qwen2.5-coder-32b-instruct\qwen2.5-coder-32b-instruct.gguf `
+  -m .\models\qwythos-9b\qwythos-9b.gguf `
   -ngl -1 `
   -p "너는 보안 분석을 돕는 AI야. 자기소개 한 문장만 해줘." `
   -n 100
 ```
 
-- `-ngl -1` : 모든 레이어를 GPU에 올림 (24GB면 32B-Instruct 4bit 전량 오프로딩 가능)
+- `-ngl -1` : 모든 레이어를 GPU에 올림 (9B-Instruct는 가볍게 100% 오프로딩 가능)
 
 ### 3.2 llama-server로 OpenAI 호환 API 서빙
 
@@ -150,9 +147,9 @@ Rename-Item .\models\qwen2.5-coder-32b-instruct\Qwen2.5-Coder-32B-Instruct-Q4_K_
 
 ```powershell
 .\build\bin\Release\llama-server.exe `
-  -m .\models\qwen2.5-coder-32b-instruct\qwen2.5-coder-32b-instruct.gguf `
+  -m .\models\qwythos-9b\qwythos-9b.gguf `
   -ngl -1 `
-  --ctx-size 32768 `
+  --ctx-size 8192 `
   --host 0.0.0.0 `
   --port 8080
 ```
@@ -160,7 +157,7 @@ Rename-Item .\models\qwen2.5-coder-32b-instruct\Qwen2.5-Coder-32B-Instruct-Q4_K_
 30초 안에 `http://localhost:8080/v1/chat/completions` 등 OpenAI 호환 엔드포인트가 열립니다. 노출 엔드포인트: `/v1/chat/completions`, `/v1/completions`, `/v1/embeddings`, `/v1/models`.
 
 **VRAM이 부족해질 경우** (다른 프로세스와 동시 사용 등):
-1. `--ctx-size`를 먼저 낮춘다 (KV 캐시가 가장 큰 가변 비용)
+1. `--ctx-size`를 먼저 낮춘다 (KV 캐시가 가장 큰 가변 비용, 필요시 4096 등으로 조정)
 2. 그래도 부족하면 `-ngl` 값을 999에서 조금씩 낮춰 일부 레이어를 CPU/RAM으로 오프로딩
 
 ### 3.3 API 호출 테스트
@@ -168,7 +165,7 @@ Rename-Item .\models\qwen2.5-coder-32b-instruct\Qwen2.5-Coder-32B-Instruct-Q4_K_
 ```powershell
 curl http://localhost:8080/v1/chat/completions `
   -H "Content-Type: application/json" `
-  -d '{"model":"qwen2.5-coder-32b-instruct","messages":[{"role":"user","content":"안녕"}]}'
+  -d '{"model":"qwythos-9b","messages":[{"role":"user","content":"안녕"}]}'
 ```
 
 Python/Java/Node에서는 OpenAI SDK 또는 HTTP 클라이언트의 `base_url`을 `http://localhost:8080/v1`로, `api_key`는 아무 문자열(빈 값이 아니면 됨)로 설정하면 코드 변경 없이 그대로 씁니다.
@@ -292,7 +289,7 @@ List<FindingDto> findings = objectMapper.readValue(stdout, new TypeReference<Lis
 
 #### 6.1.2 API 이용료 · 토큰 사용량 관리 대시보드
 
-**개념**: 로컬 LLM(현재 Qwen2.5-Coder-32B-Instruct 임시 사용 — 메인 모델 재확정 전, 위 TODO 참고)은 자체 호스팅이라 토큰당 과금이 없지만, 오케스트레이터가 연동하는 외부 유료 서비스들(AVID/ATLAS/CVE 구독, 6.1.1의 CTI 피드, 향후 추가될 수 있는 클라우드 LLM 폴백 등)은 구독료 또는 종량제 비용이 발생합니다. 이 화면은 "지금 얼마나 쓰고 있고 이번 달 예상 비용이 얼마인지"를 한눈에 보여줍니다.
+**개념**: 로컬 LLM(현재 초기 개발 테스트용 Qwythos-9B 사용)은 자체 호스팅이라 토큰당 과금이 없지만, 오케스트레이터가 연동하는 외부 유료 서비스들(AVID/ATLAS/CVE 구독, 6.1.1의 CTI 피드, 향후 추가될 수 있는 클라우드 LLM 폴백 등)은 구독료 또는 종량제 비용이 발생합니다. 이 화면은 "지금 얼마나 쓰고 있고 이번 달 예상 비용이 얼마인지"를 한눈에 보여줍니다.
 
 **추적 대상**
 - 클라우드 구독형 서비스: AVID/ATLAS/CVE 브로커, CTI 피드(Criminal IP 등) — 호출 수, 구독 한도 대비 사용률, 정액/종량 여부
@@ -351,7 +348,7 @@ List<FindingDto> findings = objectMapper.readValue(stdout, new TypeReference<Lis
 - HuggingFace 토큰(쓰기 권한) 연동 — 학습용 데이터셋과 완료된 모델의 업로드/다운로드
 - (선택) 내부 Git 서버 연동 — 단기 기억 문서를 온프레미스로 백업·동기화
 
-**검색 결과 보강**: Unsloth 프레임워크로 Qwen2.5-Coder-32B-Instruct를 QLoRA 파인튜닝할 때 VRAM 17.5GB면 충분하다는 사례가 확인됩니다 — RTX 3090 24GB로 여유 있게 가능한 수치입니다. 순정 PyTorch로는 48GB가 필요하고 9.4시간 걸리는 작업을, Unsloth는 12배 빠르게(약 0.8시간) 처리합니다. 실제로 "RTX 3090 한 대로 Qwen2.5-Coder-32B-Instruct 파인튜닝" 사례가 Unsloth 커뮤니티에 별도 논의로 존재할 만큼 검증된 조합입니다.
+**검색 결과 보강**: Unsloth 프레임워크로 9B급 모델을 QLoRA 파인튜닝할 때 VRAM 소모가 더욱 크게 절감되어 RTX 3090 24GB로 매우 안정적이고 빠르게 완료할 수 있습니다. 순정 PyTorch 대비 Unsloth는 12배 가량 빠르게 처리를 도와주므로 단일 GPU 환경에서도 자체 파인튜닝 주기 단축과 피드백 반영 속도가 우수합니다.
 
 **난이도**: RAG는 낮음(임베딩+벡터DB 조합은 이미 검증된 패턴). 파인튜닝은 중~높음 — 고객사별 데이터셋 정제, 대화형 데이터셋 변환·증폭 자동화, 파인튜닝 전후 성능 비교 평가 체계가 추가로 필요합니다.
 
@@ -361,7 +358,7 @@ List<FindingDto> findings = objectMapper.readValue(stdout, new TypeReference<Lis
 
 ### 6.3 Evolutionary Model Merge (Sakana AI 방식)
 
-> **중요 전제**: 이 기능은 **Qwen2.5-Coder-32B-Instruct에 의존하지 않습니다.** Qwen2.5-Coder-32B-Instruct는 오케스트레이터의 범용 추론 엔진(요약·우선순위 판단·대화·도구 호출)이고, Evolutionary Model Merge는 그와 별개로 **"보안에 특화된 전용 LLM"을 오픈소스 모델들의 합성으로 새로 만들어내는 R&D 트랙**입니다. 두 파이프라인은 독립적으로 개발·검증하고, 병합 결과물이 검증되면 그때 오케스트레이터에 추가 어댑터(전문 분석용 서브모델)로 연결하는 구조를 권장합니다.
+> **중요 전제**: 이 기능은 **Qwythos-9B에 의존하지 않습니다.** Qwythos-9B는 오케스트레이터의 범용 추론 엔진(요약·우선순위 판단·대화·도구 호출)이고, Evolutionary Model Merge는 그와 별개로 **"보안에 특화된 전용 LLM"을 오픈소스 모델들의 합성으로 새로 만들어내는 R&D 트랙**입니다. 두 파이프라인은 독립적으로 개발·검증하고, 병합 결과물이 검증되면 그때 오케스트레이터에 추가 어댑터(전문 분석용 서브모델)로 연결하는 구조를 권장합니다.
 
 **Sakana AI의 정확한 방법론** (논문 "Evolutionary Optimization of Model Merging Recipes", 2024년 발표, 2025년 Nature Machine Intelligence 게재)
 
@@ -639,7 +636,7 @@ NVIDIA RTX 3090 GPU가 장착된 고사양 사내 서버에 Spring Boot 백엔�
 - **DB 영속화 세부 튜닝**: SQLite를 JPA에 임베디드로 사용할 때 발생하는 Write-Ahead Logging(WAL) 동시성 이슈 보완
 - **자산 인벤토리(Assets) 고도화**: inventory 화면의 자산 이력을 실시간 스캔 정보와 매핑하는 데이터 파이프라인 정밀화
 - **자연어 라우팅 고도화**: `IntentService` 내의 Regex 의도 분석기를 로컬 LLM Few-shot 의도 판별 및 JSON 파싱 모듈로 마이그레이션
-- **메인 로컬 LLM 모델 최종 확정**: 현재 Qwen2.5-Coder-32B-Instruct를 임시로 쓰고 있음(코딩 작업 편의상 임시 채택). 프로덕션 배포 전, 제품 핵심 작업(취약점 요약·SBOM·CTI 해석 등 일반 추론)에 맞는 모델(Qwen3-30B-A3B 등 MoE 계열 포함)로 재검토·확정 필요. 확정 후 이 문서의 0~3단계 및 6.1.2절을 그 모델 기준으로 다시 갱신할 것
+- **메인 로컬 LLM 모델 최종 확정**: 현재 초기 개발 테스트용으로 **Qwythos-9B-Claude-Mythos-5-1M-Q4_K_M.gguf (Qwythos-9B)**를 메인 모델로 사용하도록 가이드를 1차 반영했습니다. 프로덕션 배포 전, 제품 핵심 작업(취약점 요약·SBOM·CTI 해석 등 일반 추론) 성능을 극대화하기 위해 Qwen3-30B-A3B 등의 MoE 모델 또는 보안 도메인 특화 모델로의 전환과 모델 스왑 제어 로직을 `LocalEngineService`에 구현할 것
 - **서버 언어 재검토 여지**: 아래 9.6절의 Java 채택 근거(금융권 규제 준수, LDAP/SSO 연동, 타입 안전성)는 TypeScript로 번복한 지금도 완전히 사라진 게 아닙니다. 실제 기업(특히 금융권) 고객사 온보딩 단계에서 온프레미스 보안성 검토가 문제가 되면, `server-java-reference/`에 남겨둔 Java 구현체(9.2절 API 전부 이식 완료 상태)로 다시 전환하는 것을 고려할 것.
 
 ### 9.6 (참고용 — 현재는 TypeScript로 번복됨) 서버 언어로 Java/Spring Boot(2안)를 검토했던 배경
@@ -660,8 +657,7 @@ NVIDIA RTX 3090 GPU가 장착된 고사양 사내 서버에 Spring Boot 백엔�
 - [llama.cpp 공식 빌드 문서](https://github.com/ggml-org/llama.cpp/blob/master/docs/build.md)
 - [llama.cpp Windows 프리빌드 바이너리 (CUDA 13.1 지원)](https://knightli.com/en/2026/05/18/llama-cpp-windows-cuda-vulkan-gguf/)
 - [llama.cpp 서버 README](https://github.com/ggml-org/llama.cpp/blob/master/tools/server/README.md)
-- [Qwen2.5-Coder-32B-Instruct GGUF (bartowski)](https://huggingface.co/bartowski/Qwen2.5-Coder-32B-Instruct-GGUF)
-- [Qwen2.5-Coder-32B-Instruct 공식 GGUF](https://huggingface.co/Qwen/Qwen2.5-Coder-32B-Instruct-GGUF)
+- [Qwythos-9B-Claude-Mythos-5-1M-GGUF (empero-ai)](https://huggingface.co/empero-ai/Qwythos-9B-Claude-Mythos-5-1M-GGUF)
 - [NVIDIA CUDA Toolkit 다운로드](https://developer.nvidia.com/cuda-downloads)
 - [NVIDIA 드라이버 다운로드](https://www.nvidia.com/drivers)
 - [Sakana AI - Evolutionary Optimization of Model Merging Recipes (원문)](https://sakana.ai/evolutionary-model-merge/)

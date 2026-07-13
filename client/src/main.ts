@@ -55,6 +55,9 @@ function createMainWindow(): void {
     },
   });
 
+  // 상단 기본 메뉴바(File, Edit, View, Window, Help) 제거
+  mainWindow.removeMenu();
+
   // 최초 화면은 로그인. 인증 성공 후 renderer/core.ts가 대시보드로 전환한다.
   mainWindow.loadFile(path.join(__dirname, "../src/renderer/pages/login.html"));
 
