@@ -1,0 +1,37 @@
+{
+  "name": "gijo-as-server",
+  "version": "0.1.0",
+  "description": "GIJO AS — 보안 오케스트레이터 서버 (엔진 모듈 전부 호스팅)",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "npm run build && node dist/index.js",
+    "watch": "tsc -p tsconfig.json --watch",
+    "test": "vitest run"
+  },
+  "author": "GIJO Technology",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@cyclonedx/cyclonedx-library": "^10.1.0",
+    "@lancedb/lancedb": "^0.31.0",
+    "@types/nodemailer": "^8.0.1",
+    "apache-arrow": "^18.1.0",
+    "cors": "^2.8.5",
+    "docx": "^9.7.1",
+    "express": "^4.19.2",
+    "node-fetch": "^3.3.2",
+    "nodemailer": "^9.0.3",
+    "simple-git": "^3.36.0",
+    "ws": "^8.17.0"
+  },
+  "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.14.0",
+    "@types/supertest": "^7.2.0",
+    "@types/ws": "^8.5.10",
+    "supertest": "^7.2.2",
+    "typescript": "^5.5.0",
+    "vitest": "^4.1.10"
+  }
+}

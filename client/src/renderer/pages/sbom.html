@@ -1,0 +1,406 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — SBOM 관리</title>
+<style>
+:root{
+  --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 32px;background:var(--panel-2);border-bottom:1px solid var(--border);}
+.brand{display:flex;align-items:center;gap:14px;}
+.brand img{height:26px;width:auto;}
+.brand-divider{width:1px;height:22px;background:var(--border-strong);}
+.product-name{font-size:17px;font-weight:800;letter-spacing:0.3px;}
+.product-name span{color:var(--blue-light);}
+.product-tag{font-size:10.5px;color:var(--muted-2);font-weight:700;letter-spacing:1.4px;margin-top:1px;}
+.topnav{display:flex;gap:28px;}
+.topnav a{color:var(--muted);text-decoration:none;font-size:13.5px;font-weight:600;padding:6px 2px;border-bottom:2px solid transparent;}
+.topnav a.active{color:var(--white);border-bottom-color:var(--blue);}
+.user-chip{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);}
+.avatar{width:30px;height:30px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+.app{display:grid;grid-template-columns:220px 1fr;}
+.sidebar{padding:22px 14px;border-right:1px solid var(--border);min-height:900px;}
+.nav-section{font-size:10.5px;font-weight:700;color:var(--muted-2);letter-spacing:1.2px;margin:18px 10px 8px;}
+.nav-section:first-child{margin-top:0;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:2px;}
+.nav-item .ic{width:18px;text-align:center;font-size:14px;}
+.nav-item.active{background:rgba(59,130,246,0.12);color:var(--white);box-shadow:inset 3px 0 0 var(--blue);}
+.nav-item:hover:not(.active){background:rgba(255,255,255,0.04);color:var(--white);}
+.nav-badge{margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:800;padding:1px 6px;border-radius:20px;}
+.main{padding:28px 32px 48px;}
+.topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;}
+.page-title{font-size:21px;font-weight:800;color:#fff;}
+.page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;}
+.btn-primary{background:var(--blue);color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;}
+.btn-ghost{background:transparent;border:1px solid var(--border-strong);color:var(--text);padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;}
+.kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.kpi-strip.c5{grid-template-columns:repeat(5,1fr);}
+.kpi-mini{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+.kpi-mini-label{font-size:11px;color:var(--muted);font-weight:600;margin-bottom:6px;}
+.kpi-mini-value{font-size:19px;font-weight:800;color:#fff;}
+.toolbar{display:flex;justify-content:space-between;align-items:center;background:var(--panel);border:1px solid var(--border);border-radius:12px 12px 0 0;padding:14px 18px;border-bottom:none;}
+.search{display:flex;align-items:center;gap:10px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:8px 14px;width:280px;}
+.search input{background:transparent;border:none;outline:none;color:var(--text);font-size:13px;width:100%;}
+.search input::placeholder{color:var(--muted-2);}
+.filters{display:flex;gap:8px;}
+.filter-chip{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);padding:7px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;}
+.filter-chip.active{background:rgba(59,130,246,0.15);border-color:var(--blue);color:var(--blue-light);}
+.table-panel{background:var(--panel);border:1px solid var(--border);border-radius:0 0 12px 12px;padding:0 18px 10px;margin-bottom:16px;}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;}
+.panel-title{font-size:14.5px;font-weight:800;color:#fff;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;}
+.panel-sub{font-size:11.5px;color:var(--muted);margin-bottom:14px;}
+.panel-link{font-size:12px;color:var(--blue-light);font-weight:700;cursor:pointer;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{text-align:left;font-size:10.5px;font-weight:700;padding:12px 10px;color:var(--muted-2);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);}
+td{padding:13px 10px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+.asset-name{font-weight:700;color:#fff;}
+.asset-sub{font-size:11px;color:var(--muted-2);margin-top:2px;}
+.badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;}
+.b-blue{background:rgba(59,130,246,0.15);color:var(--blue-light);}
+.b-teal{background:rgba(30,185,128,0.15);color:var(--teal);}
+.b-amber{background:rgba(240,160,32,0.15);color:var(--amber);}
+.b-red{background:rgba(226,72,61,0.15);color:#f5928a;}
+.b-purple{background:rgba(139,124,240,0.15);color:var(--purple);}
+.row-actions{color:var(--blue-light);font-size:12px;font-weight:700;cursor:pointer;}
+.pagination{display:flex;justify-content:space-between;align-items:center;padding:14px 4px 4px;font-size:12px;color:var(--muted);}
+.page-btns{display:flex;gap:6px;}
+.page-btn{width:28px;height:28px;border-radius:6px;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--muted);display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;}
+.page-btn.active{background:var(--blue);border-color:var(--blue);color:#fff;}
+.footer{margin-top:8px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted-2);}
+.footer img{height:16px;opacity:0.6;}
+.progress-track{height:7px;border-radius:20px;background:rgba(255,255,255,0.08);overflow:hidden;margin-top:8px;}
+.progress-fill{height:100%;border-radius:20px;}
+.content-grid{display:grid;grid-template-columns:1.7fr 1fr;gap:16px;}
+
+.titlebar{display:flex;align-items:center;justify-content:space-between;background:#0d1220;padding:6px 12px;border-bottom:1px solid var(--border);font-size:11.5px;color:var(--muted);}
+.titlebar-left{display:flex;align-items:center;gap:8px;}
+.titlebar-left img{height:14px;}
+.win-dots{display:flex;gap:14px;color:var(--muted-2);font-size:13px;}
+.menubar{display:flex;gap:18px;background:#0a0e1a;padding:6px 14px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);}
+.header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2);}
+.header-left{display:flex;align-items:center;gap:12px;}
+.header-left img{height:22px;}
+.app-title{font-size:15px;font-weight:800;color:#fff;}
+.clock{font-size:12px;color:var(--blue-light);font-weight:600;}
+.header-right{display:flex;align-items:center;gap:10px;}
+.status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
+.status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
+.beta-tag{background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
+.icon-row{display:flex;gap:6px;}
+.icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
+.icon-btn.on{background:rgba(59,130,246,0.18);border-color:var(--blue);color:var(--blue-light);}
+.avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+</style>
+</head>
+<body>
+
+<div class="titlebar">
+  <div class="titlebar-left"><img src="https://gijo.ai/_nuxt/logo_gijo_only_white.ATZVOJtw.svg" alt="GIJO"><span>GIJO AS — AI Security Manager OS</span></div>
+  <div class="win-dots">− &nbsp; □ &nbsp; ×</div>
+</div>
+<div class="menubar"><span>File</span><span>Edit</span><span>View</span><span>Window</span><span>Help</span></div>
+
+<div class="header">
+  <div class="header-left">
+    <img src="https://gijo.ai/_nuxt/logo_gijo_white.CCh2YXJe.svg" alt="GIJO">
+    <div class="app-title">GIJO AS</div>
+    <div class="clock" id="clockEl">-</div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill" id="statusPill"><span class="dot"></span>연결 확인 중<span class="beta-tag">LIVE</span></div>
+    <div class="icon-row">
+      <div class="icon-btn">▤</div>
+      <div class="icon-btn">▢</div>
+      <div class="icon-btn">●</div>
+      <div class="icon-btn">◉</div>
+      <div class="icon-btn">⬡</div>
+      <div class="icon-btn">$</div>
+      <div class="icon-btn">+</div>
+    </div>
+    <div class="avatar-btn" id="avatarBtn">-</div>
+    <div class="icon-btn">⚙</div>
+  </div>
+</div>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="nav-section">AI 팀</div>
+<div class="nav-item"><span class="ic">◉</span>에이전트 AI</div>
+<div class="nav-section">모니터링</div>
+<div class="nav-item"><span class="ic">◆</span>대시보드</div>
+<div class="nav-item"><span class="ic">◇</span>AI 자산 인벤토리</div>
+<div class="nav-item active"><span class="ic">▢</span>SBOM 관리<span class="nav-badge">3</span></div>
+<div class="nav-item"><span class="ic">△</span>취약점 · 위협</div>
+<div class="nav-section">거버넌스</div>
+<div class="nav-item"><span class="ic">✓</span>컴플라이언스</div>
+<div class="nav-item"><span class="ic">▣</span>내부 리포트</div>
+<div class="nav-item"><span class="ic">◈</span>승인 워크플로우</div>
+<div class="nav-section">고급 기능</div>
+<div class="nav-item"><span class="ic">⬡</span>모델 머지 랩</div>
+<div class="nav-item"><span class="ic">⛁</span>단기 · 장기 기억</div>
+<div class="nav-item"><span class="ic">$</span>사용량 · 요금</div>
+<div class="nav-section">시스템</div>
+<div class="nav-item"><span class="ic">⚙</span>설정</div>
+
+  </div>
+
+  <div class="main">
+    <div class="topbar-row">
+      <div>
+        <div class="page-title">SBOM 관리</div>
+        <div class="page-sub">AI 자산별 소프트웨어 구성요소 명세서(SBOM) 생성 · 관리 · 내보내기</div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-ghost" id="bulkRegenBtn">전체 SBOM 없는 자산 일괄 생성</button>
+      </div>
+    </div>
+
+
+<div class="kpi-strip">
+  <div class="kpi-mini"><div class="kpi-mini-label">생성된 SBOM</div><div class="kpi-mini-value" id="kpiGenerated">-</div></div>
+  <div class="kpi-mini"><div class="kpi-mini-label">총 컴포넌트</div><div class="kpi-mini-value" id="kpiComponents">-</div></div>
+  <div class="kpi-mini"><div class="kpi-mini-label">미생성</div><div class="kpi-mini-value" id="kpiMissing" style="color:var(--amber)">-</div></div>
+  <div class="kpi-mini"><div class="kpi-mini-label">고유 라이선스 종류</div><div class="kpi-mini-value" id="kpiLicenses">-</div></div>
+</div>
+
+<div class="toolbar">
+  <div class="search"><span style="color:var(--muted-2)">⌕</span><input id="searchInput" placeholder="자산명으로 검색"></div>
+  <div class="filters" id="filterChips">
+    <div class="filter-chip active" data-filter="all">전체</div>
+    <div class="filter-chip" data-filter="generated">생성됨</div>
+    <div class="filter-chip" data-filter="missing">미생성</div>
+  </div>
+</div>
+
+<div class="table-panel">
+  <table>
+    <tr><th>자산명</th><th>소유부서</th><th>포맷</th><th>컴포넌트 수</th><th>생성일</th><th>상태</th><th></th></tr>
+    <tbody id="sbomRows">
+      <tr><td colspan="7" style="color:var(--muted)">불러오는 중...</td></tr>
+    </tbody>
+  </table>
+  <div class="pagination">
+    <span id="paginationLabel">-</span>
+  </div>
+</div>
+
+<div class="content-grid">
+  <div class="panel">
+    <div class="panel-title" id="detailTitle">컴포넌트 상세</div>
+    <div class="panel-sub" id="detailSub">테이블에서 자산명을 클릭하면 컴포넌트 목록을 확인할 수 있습니다.</div>
+    <table>
+      <tr><th>컴포넌트</th><th>버전</th><th>라이선스</th><th>알려진 취약점</th></tr>
+      <tbody id="componentRows"></tbody>
+    </table>
+  </div>
+  <div class="panel">
+    <div class="panel-title">내보내기 로그</div>
+    <div class="panel-sub">이번 세션에서 실제로 실행한 생성 · 내보내기 기록</div>
+    <div id="exportLog" style="font-size:12px;color:var(--muted-2)">아직 이번 세션에서 실행한 작업이 없습니다.</div>
+  </div>
+</div>
+
+
+    <div class="footer">
+      <img src="https://gijo.ai/_nuxt/logo_gijo_only_white.ATZVOJtw.svg" alt="GIJO">
+      <span>© 2026 GIJO Technology · GIJO AS Platform · Confidential</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  const clockEl = document.getElementById("clockEl");
+  const statusPill = document.getElementById("statusPill");
+  const avatarBtn = document.getElementById("avatarBtn");
+  const sbomRows = document.getElementById("sbomRows");
+  const searchInput = document.getElementById("searchInput");
+  const filterChips = document.getElementById("filterChips");
+  const paginationLabel = document.getElementById("paginationLabel");
+  const detailTitle = document.getElementById("detailTitle");
+  const detailSub = document.getElementById("detailSub");
+  const componentRows = document.getElementById("componentRows");
+  const exportLogEl = document.getElementById("exportLog");
+
+  let allAssets = [];
+  let activeFilter = "all";
+  const exportLog = [];
+
+  function tick() {
+    clockEl.textContent = new Date().toLocaleString("ko-KR", {
+      hour: "2-digit", minute: "2-digit", hour12: true, year: "numeric", month: "2-digit", day: "2-digit",
+    });
+  }
+
+  async function loadHealth() {
+    try {
+      await window.gijo.checkServerHealth();
+      statusPill.innerHTML = '<span class="dot"></span>운영중<span class="beta-tag">LIVE</span>';
+    } catch (e) {
+      statusPill.innerHTML = '<span class="dot" style="background:#e2483d"></span>서버 연결 끊김';
+    }
+  }
+
+  async function loadUser() {
+    try {
+      const user = await window.gijo.me();
+      avatarBtn.textContent = (user.displayName || user.username || "-").charAt(0);
+    } catch (e) {}
+  }
+
+  function fmtDate(ts) {
+    if (!ts) return "—";
+    return new Date(ts).toLocaleDateString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit" });
+  }
+
+  function applyFilters(assets) {
+    const q = searchInput.value.trim().toLowerCase();
+    return assets.filter((a) => {
+      if (q && !a.name.toLowerCase().includes(q)) return false;
+      if (activeFilter === "generated" && !a.sbomGeneratedAt) return false;
+      if (activeFilter === "missing" && a.sbomGeneratedAt) return false;
+      return true;
+    });
+  }
+
+  function logExport(action, assetId, detail) {
+    exportLog.unshift({ action, assetId, detail, at: Date.now() });
+    exportLogEl.innerHTML = exportLog
+      .slice(0, 8)
+      .map((e) => `<div style="padding:6px 0;border-bottom:1px solid var(--border)">
+        <div style="color:var(--text)">${e.action} — ${e.assetId}</div>
+        <div style="color:var(--muted-2);font-size:11px">${e.detail}</div>
+      </div>`)
+      .join("");
+  }
+
+  async function showComponents(asset) {
+    detailTitle.textContent = `${asset.name} — 컴포넌트 상세`;
+    if (!asset.sbomGeneratedAt) {
+      detailSub.textContent = "이 자산은 아직 SBOM이 생성되지 않았습니다.";
+      componentRows.innerHTML = "";
+      return;
+    }
+    detailSub.textContent = "불러오는 중...";
+    try {
+      const sbom = await window.gijo.generateSbom(asset.id);
+      detailSub.textContent = `CycloneDX 1.5 · ${sbom.components.length}개 컴포넌트`;
+      componentRows.innerHTML = sbom.components.length
+        ? sbom.components
+            .map(
+              (c) => `<tr>
+                <td>${c.name}</td><td>${c.version || "—"}</td>
+                <td>${c.license ? `<span class="badge b-teal">${c.license}</span>` : "—"}</td>
+                <td>${c.knownVulns.length ? c.knownVulns.join(", ") : "—"}</td>
+              </tr>`
+            )
+            .join("")
+        : '<tr><td colspan="4" style="color:var(--muted)">등록된 컴포넌트가 없습니다</td></tr>';
+    } catch (e) {
+      detailSub.textContent = "컴포넌트 정보를 불러오지 못했습니다.";
+    }
+  }
+
+  function render() {
+    const filtered = applyFilters(allAssets);
+    if (filtered.length === 0) {
+      sbomRows.innerHTML = '<tr><td colspan="7" style="color:var(--muted)">조건에 맞는 자산이 없습니다</td></tr>';
+    } else {
+      sbomRows.innerHTML = filtered
+        .map((a) => {
+          const statusCell = a.sbomGeneratedAt
+            ? '<span class="badge b-teal">생성됨</span>'
+            : '<span class="badge b-amber">미생성</span>';
+          const actionCell = a.sbomGeneratedAt
+            ? `<span data-export="${a.id}">내보내기 →</span>`
+            : `<span data-generate="${a.id}">지금 생성 →</span>`;
+          return `<tr>
+            <td><div class="asset-name" style="cursor:pointer" data-select="${a.id}">${a.name}</div></td>
+            <td class="owner">${a.owner}</td>
+            <td>${a.sbomGeneratedAt ? '<span class="badge b-blue">CycloneDX 1.5</span>' : "—"}</td>
+            <td>${a.components.length}</td>
+            <td>${fmtDate(a.sbomGeneratedAt)}</td>
+            <td>${statusCell}</td>
+            <td class="row-actions">${actionCell}</td>
+          </tr>`;
+        })
+        .join("");
+    }
+    paginationLabel.textContent = `전체 ${allAssets.length}건 중 ${filtered.length}건 표시`;
+    document.getElementById("kpiGenerated").textContent = allAssets.filter((a) => a.sbomGeneratedAt).length;
+    document.getElementById("kpiComponents").textContent = allAssets.reduce((sum, a) => sum + (a.sbomGeneratedAt ? a.components.length : 0), 0);
+    document.getElementById("kpiMissing").textContent = allAssets.filter((a) => !a.sbomGeneratedAt).length;
+    const licenses = new Set();
+    allAssets.forEach((a) => a.components.forEach((c) => c.license && licenses.add(c.license)));
+    document.getElementById("kpiLicenses").textContent = licenses.size;
+  }
+
+  async function refresh() {
+    allAssets = await window.gijo.listAssets();
+    render();
+  }
+
+  async function bulkGenerate() {
+    const targets = allAssets.filter((a) => !a.sbomGeneratedAt);
+    for (const a of targets) {
+      await window.gijo.generateSbom(a.id);
+      logExport("일괄 생성", a.id, "SBOM 생성 완료");
+    }
+    await refresh();
+  }
+
+  async function init() {
+    tick();
+    setInterval(tick, 30000);
+    await loadUser();
+    await loadHealth();
+    await refresh();
+
+    searchInput.addEventListener("input", render);
+    filterChips.addEventListener("click", (e) => {
+      const chip = e.target.closest(".filter-chip");
+      if (!chip) return;
+      filterChips.querySelectorAll(".filter-chip").forEach((c) => c.classList.remove("active"));
+      chip.classList.add("active");
+      activeFilter = chip.dataset.filter;
+      render();
+    });
+
+    sbomRows.addEventListener("click", async (e) => {
+      const selectId = e.target.dataset.select;
+      const genId = e.target.dataset.generate;
+      const exportId = e.target.dataset.export;
+      if (selectId) {
+        const asset = allAssets.find((a) => a.id === selectId);
+        if (asset) await showComponents(asset);
+      } else if (genId) {
+        e.target.textContent = "생성 중...";
+        await window.gijo.generateSbom(genId);
+        logExport("생성", genId, "SBOM 생성 완료");
+        await refresh();
+      } else if (exportId) {
+        e.target.textContent = "내보내는 중...";
+        const result = await window.gijo.exportSbom(exportId, "cyclonedx");
+        logExport("내보내기", exportId, `서버에 저장됨: ${result.path}`);
+        await refresh();
+      }
+    });
+
+    document.getElementById("bulkRegenBtn").addEventListener("click", bulkGenerate);
+  }
+
+  if (!window.gijo.isAuthenticated()) {
+    window.gijo.navigateTo("login.html");
+  } else {
+    init();
+  }
+</script>
+
+</body>
+</html>

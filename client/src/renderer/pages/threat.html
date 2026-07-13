@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 위협 인텔리전스</title>
+<style>
+:root{
+  --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 32px;background:var(--panel-2);border-bottom:1px solid var(--border);}
+.brand{display:flex;align-items:center;gap:14px;}
+.brand img{height:26px;width:auto;}
+.brand-divider{width:1px;height:22px;background:var(--border-strong);}
+.product-name{font-size:17px;font-weight:800;letter-spacing:0.3px;}
+.product-name span{color:var(--blue-light);}
+.product-tag{font-size:10.5px;color:var(--muted-2);font-weight:700;letter-spacing:1.4px;margin-top:1px;}
+.topnav{display:flex;gap:28px;}
+.topnav a{color:var(--muted);text-decoration:none;font-size:13.5px;font-weight:600;padding:6px 2px;border-bottom:2px solid transparent;}
+.topnav a.active{color:var(--white);border-bottom-color:var(--blue);}
+.user-chip{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);}
+.avatar{width:30px;height:30px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+.app{display:grid;grid-template-columns:220px 1fr;}
+.sidebar{padding:22px 14px;border-right:1px solid var(--border);min-height:900px;}
+.nav-section{font-size:10.5px;font-weight:700;color:var(--muted-2);letter-spacing:1.2px;margin:18px 10px 8px;}
+.nav-section:first-child{margin-top:0;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:2px;}
+.nav-item .ic{width:18px;text-align:center;font-size:14px;}
+.nav-item.active{background:rgba(59,130,246,0.12);color:var(--white);box-shadow:inset 3px 0 0 var(--blue);}
+.nav-item:hover:not(.active){background:rgba(255,255,255,0.04);color:var(--white);}
+.nav-badge{margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:800;padding:1px 6px;border-radius:20px;}
+.main{padding:28px 32px 48px;}
+.topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;}
+.page-title{font-size:21px;font-weight:800;color:#fff;}
+.page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;}
+.btn-primary{background:var(--blue);color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;}
+.btn-ghost{background:transparent;border:1px solid var(--border-strong);color:var(--text);padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;}
+.kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.kpi-strip.c5{grid-template-columns:repeat(5,1fr);}
+.kpi-mini{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+.kpi-mini-label{font-size:11px;color:var(--muted);font-weight:600;margin-bottom:6px;}
+.kpi-mini-value{font-size:19px;font-weight:800;color:#fff;}
+.toolbar{display:flex;justify-content:space-between;align-items:center;background:var(--panel);border:1px solid var(--border);border-radius:12px 12px 0 0;padding:14px 18px;border-bottom:none;}
+.search{display:flex;align-items:center;gap:10px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:8px 14px;width:280px;}
+.search input{background:transparent;border:none;outline:none;color:var(--text);font-size:13px;width:100%;}
+.search input::placeholder{color:var(--muted-2);}
+.filters{display:flex;gap:8px;}
+.filter-chip{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);padding:7px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;}
+.filter-chip.active{background:rgba(59,130,246,0.15);border-color:var(--blue);color:var(--blue-light);}
+.table-panel{background:var(--panel);border:1px solid var(--border);border-radius:0 0 12px 12px;padding:0 18px 10px;margin-bottom:16px;}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;}
+.panel-title{font-size:14.5px;font-weight:800;color:#fff;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;}
+.panel-sub{font-size:11.5px;color:var(--muted);margin-bottom:14px;}
+.panel-link{font-size:12px;color:var(--blue-light);font-weight:700;cursor:pointer;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{text-align:left;font-size:10.5px;font-weight:700;padding:12px 10px;color:var(--muted-2);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);}
+td{padding:13px 10px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+.asset-name{font-weight:700;color:#fff;}
+.asset-sub{font-size:11px;color:var(--muted-2);margin-top:2px;}
+.badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;}
+.b-blue{background:rgba(59,130,246,0.15);color:var(--blue-light);}
+.b-teal{background:rgba(30,185,128,0.15);color:var(--teal);}
+.b-amber{background:rgba(240,160,32,0.15);color:var(--amber);}
+.b-red{background:rgba(226,72,61,0.15);color:#f5928a;}
+.b-purple{background:rgba(139,124,240,0.15);color:var(--purple);}
+.row-actions{color:var(--blue-light);font-size:12px;font-weight:700;cursor:pointer;}
+.pagination{display:flex;justify-content:space-between;align-items:center;padding:14px 4px 4px;font-size:12px;color:var(--muted);}
+.page-btns{display:flex;gap:6px;}
+.page-btn{width:28px;height:28px;border-radius:6px;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--muted);display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;}
+.page-btn.active{background:var(--blue);border-color:var(--blue);color:#fff;}
+.footer{margin-top:8px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted-2);}
+.footer img{height:16px;opacity:0.6;}
+.progress-track{height:7px;border-radius:20px;background:rgba(255,255,255,0.08);overflow:hidden;margin-top:8px;}
+.progress-fill{height:100%;border-radius:20px;}
+.content-grid{display:grid;grid-template-columns:1.7fr 1fr;gap:16px;}
+
+.titlebar{display:flex;align-items:center;justify-content:space-between;background:#0d1220;padding:6px 12px;border-bottom:1px solid var(--border);font-size:11.5px;color:var(--muted);}
+.titlebar-left{display:flex;align-items:center;gap:8px;}
+.titlebar-left img{height:14px;}
+.win-dots{display:flex;gap:14px;color:var(--muted-2);font-size:13px;}
+.menubar{display:flex;gap:18px;background:#0a0e1a;padding:6px 14px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);}
+.header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2);}
+.header-left{display:flex;align-items:center;gap:12px;}
+.header-left img{height:22px;}
+.app-title{font-size:15px;font-weight:800;color:#fff;}
+.clock{font-size:12px;color:var(--blue-light);font-weight:600;}
+.header-right{display:flex;align-items:center;gap:10px;}
+.status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
+.status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
+.beta-tag{background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
+.icon-row{display:flex;gap:6px;}
+.icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
+.icon-btn.on{background:rgba(59,130,246,0.18);border-color:var(--blue);color:var(--blue-light);}
+.avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);align-items:center;justify-content:center;z-index:100;}
+.modal-overlay.open{display:flex;}
+.modal{width:400px;background:var(--panel);border:1px solid var(--border-strong);border-radius:14px;padding:24px;}
+.modal-title{font-size:16px;font-weight:800;color:#fff;margin-bottom:4px;}
+.modal-sub{font-size:12px;color:var(--muted);margin-bottom:18px;}
+.modal label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:6px;font-weight:600;}
+.modal select,.modal input{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;margin-bottom:16px;outline:none;}
+.modal select:focus,.modal input:focus{border-color:var(--blue);}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;}
+.modal-err{font-size:12px;color:#f5928a;min-height:16px;margin-bottom:4px;}
+.feed-row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--border);}
+.feed-row:last-child{border-bottom:none;}
+.feed-actions{display:flex;align-items:center;gap:8px;}
+.link-btn{background:none;border:none;color:var(--blue-light);font-size:11.5px;font-weight:700;cursor:pointer;padding:0;}
+</style>
+</head>
+<body>
+
+<div class="titlebar">
+  <div class="titlebar-left"><img src="https://gijo.ai/_nuxt/logo_gijo_only_white.ATZVOJtw.svg" alt="GIJO"><span>GIJO AS — AI Security Manager OS</span></div>
+  <div class="win-dots">− &nbsp; □ &nbsp; ×</div>
+</div>
+<div class="menubar"><span>File</span><span>Edit</span><span>View</span><span>Window</span><span>Help</span></div>
+
+<div class="header">
+  <div class="header-left">
+    <img src="https://gijo.ai/_nuxt/logo_gijo_white.CCh2YXJe.svg" alt="GIJO">
+    <div class="app-title">GIJO AS</div>
+    <div class="clock">오후 07:46 · 2026-07-12</div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill"><span class="dot"></span>운영중<span class="beta-tag">LIVE</span></div>
+    <div class="icon-row">
+      <div class="icon-btn">▤</div>
+      <div class="icon-btn">▢</div>
+      <div class="icon-btn">●</div>
+      <div class="icon-btn">◉</div>
+      <div class="icon-btn">⬡</div>
+      <div class="icon-btn">$</div>
+      <div class="icon-btn">+</div>
+    </div>
+    <div class="avatar-btn">정</div>
+    <div class="icon-btn">⚙</div>
+  </div>
+</div>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="nav-section">AI 팀</div>
+<div class="nav-item"><span class="ic">◉</span>에이전트 AI</div>
+<div class="nav-section">모니터링</div>
+<div class="nav-item"><span class="ic">◆</span>대시보드</div>
+<div class="nav-item"><span class="ic">◇</span>AI 자산 인벤토리</div>
+<div class="nav-item"><span class="ic">▢</span>SBOM 관리<span class="nav-badge">3</span></div>
+<div class="nav-item active"><span class="ic">△</span>취약점 · 위협</div>
+<div class="nav-section">거버넌스</div>
+<div class="nav-item"><span class="ic">✓</span>컴플라이언스</div>
+<div class="nav-item"><span class="ic">▣</span>내부 리포트</div>
+<div class="nav-item"><span class="ic">◈</span>승인 워크플로우</div>
+<div class="nav-section">고급 기능</div>
+<div class="nav-item"><span class="ic">⬡</span>모델 머지 랩</div>
+<div class="nav-item"><span class="ic">⛁</span>단기 · 장기 기억</div>
+<div class="nav-item"><span class="ic">$</span>사용량 · 요금</div>
+<div class="nav-section">시스템</div>
+<div class="nav-item"><span class="ic">⚙</span>설정</div>
+
+  </div>
+
+  <div class="main">
+    <div class="topbar-row">
+      <div>
+        <div class="page-title">위협 인텔리전스</div>
+        <div class="page-sub">딥웹 · 다크웹 CTI 피드 구독 기반 유출정보 · 위협 모니터링</div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-primary" id="addFeedBtn">+ 피드 구독 추가</button>
+      </div>
+    </div>
+
+
+<div class="kpi-strip">
+  <div class="kpi-mini"><div class="kpi-mini-label">연동된 CTI 벤더</div><div class="kpi-mini-value" id="connectedFeedCount">-</div></div>
+  <div class="kpi-mini"><div class="kpi-mini-label">이번 주 탐지</div><div class="kpi-mini-value" style="color:#f5928a">14</div></div>
+  <div class="kpi-mini"><div class="kpi-mini-label">유출 자격증명</div><div class="kpi-mini-value" style="color:var(--amber)">6</div></div>
+  <div class="kpi-mini"><div class="kpi-mini-label">조치 완료율</div><div class="kpi-mini-value" style="color:var(--teal)">78%</div></div>
+</div>
+
+<div class="content-grid">
+  <div>
+    <div class="panel">
+      <div class="panel-title">최근 탐지 내역<span class="panel-link">전체 보기</span></div>
+      <div class="panel-sub">구독 중인 딥웹 · 다크웹 CTI 피드 기반 자동 탐지</div>
+      <table>
+        <tr><th>탐지일</th><th>유형</th><th>대상 자산 · 도메인</th><th>출처</th><th>심각도</th><th></th></tr>
+        <tr><td>07-12 08:40</td><td>유출 자격증명</td><td>gijo.ai 임직원 계정 2건</td><td>Criminal IP</td><td><span class="badge b-red">긴급</span></td><td class="row-actions">조사 →</td></tr>
+        <tr><td>07-12 03:15</td><td>해킹포럼 언급</td><td>fraud-detect-llm 관련 키워드</td><td>Criminal IP</td><td><span class="badge b-amber">주의</span></td><td class="row-actions">조사 →</td></tr>
+        <tr><td>07-11 22:02</td><td>랜섬웨어 유출목록</td><td>협력사 도메인 매칭</td><td>Flashpoint</td><td><span class="badge b-red">긴급</span></td><td class="row-actions">조사 →</td></tr>
+        <tr><td>07-11 14:30</td><td>유출 자격증명</td><td>고객포털 테스트 계정 1건</td><td>SpyCloud</td><td><span class="badge b-amber">주의</span></td><td class="row-actions">조사 →</td></tr>
+        <tr><td>07-10 09:12</td><td>브랜드 사칭 도메인</td><td>gij0.ai (유사 도메인)</td><td>Criminal IP</td><td><span class="badge b-blue">정보</span></td><td class="row-actions">조사 →</td></tr>
+      </table>
+    </div>
+  </div>
+  <div>
+    <div class="panel">
+      <div class="panel-title">구독 중인 CTI 피드</div>
+      <div class="panel-sub">딥웹 · 다크웹 데이터는 라이선스 벤더 API로만 수집. API 키는 서버에만 저장되며 이 화면에는 노출되지 않습니다.</div>
+      <div id="feedList"><div style="font-size:12px;color:var(--muted)">불러오는 중...</div></div>
+      <div style="margin-top:14px"><button class="btn-ghost" style="width:100%" id="addFeedBtn2">+ 피드 구독 추가</button></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">모니터링 대상</div>
+      <div class="panel-sub">등록된 도메인 · 이메일 패턴</div>
+      <div style="font-size:12.5px;color:var(--text);line-height:2">
+        gijo.ai · *@gijo.ai<br>
+        gijohome.ai<br>
+        고객포털 연동 도메인 3건
+      </div>
+    </div>
+  </div>
+</div>
+
+
+    <div class="footer">
+      <img src="https://gijo.ai/_nuxt/logo_gijo_only_white.ATZVOJtw.svg" alt="GIJO">
+      <span>© 2026 GIJO Technology · GIJO AS Platform · Confidential</span>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="apiKeyModal">
+  <div class="modal">
+    <div class="modal-title">CTI 피드 API 키 연동</div>
+    <div class="modal-sub">벤더에서 발급받은 API 키를 입력하면 서버가 해당 피드를 구독 상태로 표시합니다. 키는 서버에만 저장됩니다.</div>
+    <label for="feedSelect">벤더</label>
+    <select id="feedSelect"></select>
+    <label for="apiKeyInput">API 키</label>
+    <input id="apiKeyInput" type="password" placeholder="벤더 API 키 붙여넣기" autocomplete="off" />
+    <div class="modal-err" id="modalErr"></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="modalCancelBtn">취소</button>
+      <button class="btn-primary" id="modalSaveBtn">저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const feedListEl = document.getElementById("feedList");
+  const connectedCountEl = document.getElementById("connectedFeedCount");
+  const modal = document.getElementById("apiKeyModal");
+  const feedSelect = document.getElementById("feedSelect");
+  const apiKeyInput = document.getElementById("apiKeyInput");
+  const modalErr = document.getElementById("modalErr");
+  const modalSaveBtn = document.getElementById("modalSaveBtn");
+
+  let feeds = [];
+
+  function renderFeeds() {
+    connectedCountEl.textContent = feeds.filter((f) => f.connected).length;
+    feedListEl.innerHTML = feeds
+      .map(
+        (f) => `
+      <div class="feed-row">
+        <div><div class="asset-name">${f.name}</div><div class="asset-sub">${f.hasApiKey ? "API 키 등록됨" : "API 키 미등록"}</div></div>
+        <div class="feed-actions">
+          <span class="badge ${f.connected ? "b-teal" : "b-amber"}">${f.connected ? "연결됨" : "미연결"}</span>
+          ${
+            f.connected
+              ? `<button class="link-btn" data-disconnect="${f.id}">연결 해제</button>`
+              : `<button class="link-btn" data-configure="${f.id}">키 설정</button>`
+          }
+        </div>
+      </div>`
+      )
+      .join("");
+  }
+
+  async function loadFeeds() {
+    feeds = await window.gijo.listCtiFeeds();
+    feedSelect.innerHTML = feeds.map((f) => `<option value="${f.id}">${f.name}</option>`).join("");
+    renderFeeds();
+  }
+
+  function openModal(feedId) {
+    modalErr.textContent = "";
+    apiKeyInput.value = "";
+    if (feedId) feedSelect.value = feedId;
+    modal.classList.add("open");
+    apiKeyInput.focus();
+  }
+
+  function closeModal() {
+    modal.classList.remove("open");
+  }
+
+  feedListEl.addEventListener("click", async (e) => {
+    const configureId = e.target.dataset.configure;
+    const disconnectId = e.target.dataset.disconnect;
+    if (configureId) {
+      openModal(configureId);
+    } else if (disconnectId) {
+      await window.gijo.disconnectCtiFeed(disconnectId);
+      await loadFeeds();
+    }
+  });
+
+  document.getElementById("addFeedBtn").addEventListener("click", () => openModal());
+  document.getElementById("addFeedBtn2").addEventListener("click", () => openModal());
+  document.getElementById("modalCancelBtn").addEventListener("click", closeModal);
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) closeModal();
+  });
+
+  modalSaveBtn.addEventListener("click", async () => {
+    if (!apiKeyInput.value.trim()) {
+      modalErr.textContent = "API 키를 입력하세요.";
+      return;
+    }
+    modalSaveBtn.disabled = true;
+    modalSaveBtn.textContent = "저장 중...";
+    try {
+      await window.gijo.configureCtiFeed(feedSelect.value, apiKeyInput.value.trim());
+      closeModal();
+      await loadFeeds();
+    } catch (e) {
+      modalErr.textContent = "저장 실패: 서버 연결 상태를 확인하세요.";
+    } finally {
+      modalSaveBtn.disabled = false;
+      modalSaveBtn.textContent = "저장";
+    }
+  });
+
+  loadFeeds();
+</script>
+
+</body>
+</html>

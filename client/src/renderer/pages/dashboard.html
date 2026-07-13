@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — AI Security Manager OS</title>
+<style>
+  :root{
+    --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+    --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+    --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:#05070d;color:var(--text);}
+
+  .titlebar{display:flex;align-items:center;justify-content:space-between;background:#0d1220;padding:6px 12px;border-bottom:1px solid var(--border);font-size:11.5px;color:var(--muted);}
+  .titlebar-left{display:flex;align-items:center;gap:8px;}
+  .titlebar-left img{height:14px;}
+  .win-dots{display:flex;gap:14px;color:var(--muted-2);font-size:13px;}
+  .menubar{display:flex;gap:18px;background:#0a0e1a;padding:6px 14px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);}
+
+  .app-shell{background:var(--bg);min-height:820px;}
+  .header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);}
+  .header-left{display:flex;align-items:center;gap:12px;}
+  .header-left img{height:22px;}
+  .app-title{font-size:15px;font-weight:800;color:#fff;}
+  .clock{font-size:12.5px;color:var(--blue-light);font-weight:600;}
+  .header-right{display:flex;align-items:center;gap:10px;}
+  .status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
+  .status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
+  .beta-tag{background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
+  .icon-row{display:flex;gap:6px;}
+  .icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
+  .icon-btn.on{background:rgba(59,130,246,0.18);border-color:var(--blue);color:var(--blue-light);}
+  .avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+
+  .body-grid{display:grid;grid-template-columns:220px 1fr 300px;min-height:640px;}
+  .explorer{padding:18px 14px;border-right:1px solid var(--border);}
+  .explorer-title{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:700;color:var(--text);margin-bottom:4px;}
+  .explorer-sub{font-size:11px;color:var(--blue-light);margin-bottom:24px;}
+  .explorer-tree{font-size:12.5px;color:var(--muted);line-height:2.1;}
+  .explorer-tree .folder{color:var(--text);font-weight:600;}
+  .explorer-hint{margin-top:28px;font-size:12px;color:var(--muted-2);text-align:center;line-height:1.7;font-style:italic;}
+
+  .center-stage{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;position:relative;}
+  .network-svg{width:100%;max-width:460px;}
+  .agent-bubble{display:flex;align-items:flex-start;gap:10px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 18px;max-width:420px;margin-top:8px;}
+  .agent-avatar{width:28px;height:28px;border-radius:8px;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;}
+  .agent-bubble-text{font-size:12.5px;color:var(--text);line-height:1.6;}
+  .agent-bubble-name{font-size:11.5px;font-weight:800;color:var(--blue-light);margin-bottom:4px;}
+
+  .today-panel{padding:18px 16px;border-left:1px solid var(--border);display:flex;flex-direction:column;}
+  .today-title{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:800;color:#fff;margin-bottom:14px;}
+  .today-input{display:flex;gap:8px;margin-bottom:14px;}
+  .today-input input{flex:1;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:0 12px;height:34px;color:var(--text);font-size:12.5px;outline:none;}
+  .today-add{width:34px;height:34px;border-radius:8px;background:var(--teal);color:#06281c;border:none;font-weight:800;cursor:pointer;font-size:16px;}
+  .today-item{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:12px;}
+  .today-p{padding:2px 7px;border-radius:5px;font-size:10.5px;font-weight:800;}
+  .p0{background:rgba(226,72,61,0.18);color:#f5928a;}
+  .p1{background:rgba(240,160,32,0.18);color:#f7c777;}
+  .today-cta{margin-top:auto;background:var(--teal);color:#06281c;border:none;border-radius:8px;padding:13px;font-size:13px;font-weight:800;cursor:pointer;}
+
+  .chatbar{display:flex;flex-direction:column;gap:6px;padding:14px 20px;border-top:1px solid var(--border);}
+  .chatbar input{width:100%;background:var(--panel);border:1px solid var(--border-strong);border-radius:10px;padding:14px 16px;color:var(--text);font-size:13px;outline:none;}
+  .chatbar-hint{font-size:11px;color:var(--muted-2);}
+</style>
+</head>
+<body>
+
+<div class="titlebar">
+  <div class="titlebar-left"><img src="https://gijo.ai/_nuxt/logo_gijo_only_white.ATZVOJtw.svg" alt="GIJO"><span>GIJO AS — AI Security Manager OS</span></div>
+  <div class="win-dots">─ &nbsp; □ &nbsp; ×</div>
+</div>
+<div class="menubar"><span>File</span><span>Edit</span><span>View</span><span>Window</span><span>Help</span></div>
+
+<div class="app-shell">
+  <div class="header">
+    <div class="header-left">
+      <img src="https://gijo.ai/_nuxt/logo_gijo_white.CCh2YXJe.svg" alt="GIJO">
+      <div class="app-title">GIJO AS</div>
+      <div class="clock" id="clockEl">-</div>
+    </div>
+    <div class="header-right">
+      <div class="status-pill" id="statusPill"><span class="dot"></span>연결 확인 중<span class="beta-tag">LIVE</span></div>
+      <div class="icon-row">
+        <div class="icon-btn on">▤</div>
+        <div class="icon-btn">▢</div>
+        <div class="icon-btn">💬</div>
+        <div class="icon-btn">◉</div>
+        <div class="icon-btn">⬡</div>
+        <div class="icon-btn">$</div>
+        <div class="icon-btn">+</div>
+      </div>
+      <div class="avatar-btn" id="avatarBtn">-</div>
+      <div class="icon-btn">⚙</div>
+    </div>
+  </div>
+
+  <div class="body-grid">
+    <div class="explorer">
+      <div class="explorer-title"><span>자산 탐색기</span><span style="color:var(--muted-2);cursor:pointer" id="refreshAssetsBtn">⟳</span></div>
+      <div class="explorer-sub">GIJO AS Desktop</div>
+      <div class="explorer-tree" id="explorerTree">불러오는 중...</div>
+      <div class="explorer-hint">에이전트에게<br>"fraud-detect-llm 재스캔해줘"<br>라고 지시해보세요.</div>
+    </div>
+
+    <div class="center-stage">
+      <svg class="network-svg" viewBox="0 0 600 440" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="300" cy="220" r="60" fill="none" stroke="#1a2c52" stroke-width="1"/>
+<circle cx="300" cy="220" r="105" fill="none" stroke="#1a2c52" stroke-width="1"/>
+<circle cx="300" cy="220" r="150" fill="none" stroke="#1a2c52" stroke-width="1"/>
+<line x1="300" y1="220" x2="300.0" y2="70.0" stroke="#2a4a8a" stroke-width="1.2" opacity="0.7"/>
+<line x1="300" y1="220" x2="406.1" y2="113.9" stroke="#2a4a8a" stroke-width="1.2" opacity="0.7"/>
+<line x1="300" y1="220" x2="450.0" y2="220.0" stroke="#2a4a8a" stroke-width="1.2" opacity="0.7"/>
+<line x1="300" y1="220" x2="406.1" y2="326.1" stroke="#2a4a8a" stroke-width="1.2" opacity="0.7"/>
+<line x1="300" y1="220" x2="300.0" y2="370.0" stroke="#2a4a8a" stroke-width="1.2" opacity="0.7"/>
+<line x1="300" y1="220" x2="193.9" y2="326.1" stroke="#2a4a8a" stroke-width="1.2" opacity="0.7"/>
+<line x1="300" y1="220" x2="150.0" y2="220.0" stroke="#2a4a8a" stroke-width="1.2" opacity="0.7"/>
+<line x1="300" y1="220" x2="193.9" y2="113.9" stroke="#2a4a8a" stroke-width="1.2" opacity="0.7"/>
+<line x1="300.0" y1="70.0" x2="406.1" y2="113.9" stroke="#1f3868" stroke-width="0.8" opacity="0.5"/>
+<line x1="406.1" y1="113.9" x2="406.1" y2="326.1" stroke="#1f3868" stroke-width="0.8" opacity="0.5"/>
+<line x1="406.1" y1="326.1" x2="300.0" y2="370.0" stroke="#1f3868" stroke-width="0.8" opacity="0.5"/>
+<line x1="300.0" y1="70.0" x2="193.9" y2="326.1" stroke="#1f3868" stroke-width="0.8" opacity="0.5"/>
+<line x1="193.9" y1="326.1" x2="150.0" y2="220.0" stroke="#1f3868" stroke-width="0.8" opacity="0.5"/>
+<line x1="150.0" y1="220.0" x2="193.9" y2="113.9" stroke="#1f3868" stroke-width="0.8" opacity="0.5"/>
+<line x1="193.9" y1="113.9" x2="450.0" y2="220.0" stroke="#1f3868" stroke-width="0.8" opacity="0.5"/>
+<line x1="450.0" y1="220.0" x2="300.0" y2="70.0" stroke="#1f3868" stroke-width="0.8" opacity="0.5"/>
+<line x1="406.1" y1="326.1" x2="150.0" y2="220.0" stroke="#1f3868" stroke-width="0.8" opacity="0.5"/>
+<circle cx="300.0" cy="70.0" r="4.5" fill="#5fa1ff"/>
+<circle cx="406.1" cy="113.9" r="4.5" fill="#5fa1ff"/>
+<circle cx="450.0" cy="220.0" r="4.5" fill="#5fa1ff"/>
+<circle cx="406.1" cy="326.1" r="4.5" fill="#5fa1ff"/>
+<circle cx="300.0" cy="370.0" r="4.5" fill="#5fa1ff"/>
+<circle cx="193.9" cy="326.1" r="4.5" fill="#5fa1ff"/>
+<circle cx="150.0" cy="220.0" r="4.5" fill="#5fa1ff"/>
+<circle cx="193.9" cy="113.9" r="4.5" fill="#5fa1ff"/>
+<circle cx="300" cy="220" r="9" fill="#3b82f6"/>
+      </svg>
+      <div class="agent-bubble">
+        <div class="agent-avatar">◆</div>
+        <div>
+          <div class="agent-bubble-name" id="agentBubbleName">오케스트레이터</div>
+          <div class="agent-bubble-text" id="agentBubbleText">불러오는 중...</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="today-panel">
+      <div class="today-title">⦿ 오늘 확인할 항목</div>
+      <div class="today-input"><input id="todoInput" placeholder="할일 추가..."><button class="today-add" id="todoAddBtn">+</button></div>
+      <div id="todayItems"><div style="font-size:12px;color:var(--muted)">불러오는 중...</div></div>
+      <button class="today-cta" id="todayCtaBtn">▶ 운영 시작 — 에이전트 팀에게 맡기기</button>
+    </div>
+  </div>
+
+  <div class="chatbar">
+    <input id="chatInput" placeholder="에이전트에게 무엇이든 지시하세요… 예: fraud-detect-llm 전체 재스캔하고 리포트까지 작성해줘">
+    <div class="chatbar-hint" id="chatHint">Enter 전송 · Shift+Enter 줄바꿈 · ⌘ 끌어다 놓기</div>
+  </div>
+</div>
+
+<script>
+  const clockEl = document.getElementById("clockEl");
+  const statusPill = document.getElementById("statusPill");
+  const avatarBtn = document.getElementById("avatarBtn");
+  const explorerTree = document.getElementById("explorerTree");
+  const todayItems = document.getElementById("todayItems");
+  const agentBubbleName = document.getElementById("agentBubbleName");
+  const agentBubbleText = document.getElementById("agentBubbleText");
+  const chatInput = document.getElementById("chatInput");
+  const todoInput = document.getElementById("todoInput");
+
+  let displayName = "";
+
+  function tick() {
+    const now = new Date();
+    clockEl.textContent = now.toLocaleString("ko-KR", {
+      hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true,
+      year: "numeric", month: "2-digit", day: "2-digit",
+    });
+  }
+
+  const PRIORITY_ORDER = { P0: 0, P1: 1, P2: 2, P3: 3 };
+  const PRIORITY_CLASS = { P0: "p0", P1: "p1", P2: "p1", P3: "p1" };
+
+  async function loadHealth() {
+    try {
+      await window.gijo.checkServerHealth();
+      statusPill.innerHTML = '<span class="dot"></span>운영중<span class="beta-tag">LIVE</span>';
+    } catch (e) {
+      statusPill.innerHTML = '<span class="dot" style="background:#e2483d"></span>서버 연결 끊김';
+      statusPill.style.background = "rgba(226,72,61,0.15)";
+      statusPill.style.borderColor = "rgba(226,72,61,0.4)";
+      statusPill.style.color = "#f5928a";
+    }
+  }
+
+  async function loadUser() {
+    try {
+      const user = await window.gijo.me();
+      displayName = user.displayName || user.username || "사용자";
+      avatarBtn.textContent = displayName.charAt(0);
+    } catch (e) {
+      displayName = "";
+    }
+  }
+
+  async function loadAssets() {
+    try {
+      const assets = await window.gijo.listAssets();
+      if (assets.length === 0) {
+        explorerTree.innerHTML = '<div class="folder">▸ AI 자산 (0)</div><div style="padding-left:14px;color:var(--muted-2)">등록된 자산이 없습니다</div>';
+        return;
+      }
+      const rows = assets
+        .map((a) => `<div style="padding-left:14px">${a.name}${a.findings.length ? ` <span style="color:var(--amber)">(${a.findings.length})</span>` : ""}</div>`)
+        .join("");
+      explorerTree.innerHTML = `<div class="folder">▸ AI 자산 (${assets.length})</div>${rows}`;
+    } catch (e) {
+      explorerTree.innerHTML = '<div style="color:var(--muted-2)">자산 목록을 불러오지 못했습니다</div>';
+    }
+  }
+
+  async function loadTasks() {
+    try {
+      const tasks = await window.gijo.listTasks();
+      const open = tasks.filter((t) => !t.done).sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 9) - (PRIORITY_ORDER[b.priority] ?? 9));
+      if (open.length === 0) {
+        todayItems.innerHTML = '<div style="font-size:12px;color:var(--muted-2);padding:10px 0">오늘 확인할 항목이 없습니다</div>';
+        return;
+      }
+      todayItems.innerHTML = open
+        .map(
+          (t) => `<div class="today-item"><span class="today-p ${PRIORITY_CLASS[t.priority] || "p1"}">${t.priority}</span>${t.text}</div>`
+        )
+        .join("");
+    } catch (e) {
+      todayItems.innerHTML = '<div style="color:var(--muted-2);font-size:12px">작업 목록을 불러오지 못했습니다</div>';
+    }
+  }
+
+  async function addTodo() {
+    const text = todoInput.value.trim();
+    if (!text) return;
+    todoInput.value = "";
+    await window.gijo.addTask(text);
+    await loadTasks();
+  }
+
+  async function sendToOrchestrator(text) {
+    agentBubbleText.textContent = "처리 중...";
+    try {
+      const result = await window.gijo.sendInstruction(text);
+      agentBubbleName.textContent = result.route.agentId;
+      agentBubbleText.textContent = result.output;
+      await loadTasks();
+      if (result.route.action === "scan") await loadAssets();
+    } catch (e) {
+      agentBubbleText.textContent = "지시 처리 중 오류가 발생했습니다: " + e.message;
+    }
+  }
+
+  function greet() {
+    const hour = new Date().getHours();
+    const greeting = hour < 12 ? "좋은 아침입니다" : hour < 18 ? "안녕하세요" : "좋은 저녁입니다";
+    agentBubbleText.textContent = `${greeting}${displayName ? ", " + displayName + "님" : ""}. 아래에 지시를 입력하시면 바로 처리합니다.`;
+  }
+
+  async function init() {
+    tick();
+    setInterval(tick, 1000);
+    await loadUser();
+    greet();
+    await Promise.all([loadHealth(), loadAssets(), loadTasks()]);
+
+    document.getElementById("refreshAssetsBtn").addEventListener("click", loadAssets);
+    document.getElementById("todoAddBtn").addEventListener("click", addTodo);
+    todoInput.addEventListener("keydown", (e) => { if (e.key === "Enter") addTodo(); });
+
+    chatInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter" && !e.shiftKey) {
+        e.preventDefault();
+        const text = chatInput.value.trim();
+        if (!text) return;
+        chatInput.value = "";
+        sendToOrchestrator(text);
+      }
+    });
+
+    document.getElementById("todayCtaBtn").addEventListener("click", () => {
+      sendToOrchestrator("오늘 확인할 항목을 우선순위대로 에이전트 팀에게 위임해서 처리해줘");
+    });
+
+    window.gijo.onCollaborationEvent((evt) => {
+      agentBubbleName.textContent = evt.to;
+      agentBubbleText.textContent = evt.message;
+    });
+  }
+
+  if (!window.gijo.isAuthenticated()) {
+    window.gijo.navigateTo("login.html");
+  } else {
+    window.gijoRealtime.connect();
+    init();
+  }
+</script>
+
+</body>
+</html>

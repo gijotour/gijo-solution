@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS (AI SBOM) — 대시보드 시안</title>
+<style>
+  :root{
+    --navy:#0c2c6b;
+    --navy-dark:#0a1f4d;
+    --navy-darker:#0f1c33;
+    --orange:#dd5a1c;
+    --orange-dark:#b8480f;
+    --cyan:#4a9eff;
+    --gray-bg:#f4f6fa;
+    --gray-border:#e2e6ee;
+    --gray-text:#5a6478;
+    --danger:#e2483d;
+    --warning:#dd8f1c;
+    --success:#1d9e75;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:#dfe4ec;color:#1a1f2e;}
+
+  .picker{
+    display:flex;gap:10px;padding:20px;background:#151a2b;justify-content:center;flex-wrap:wrap;
+    position:sticky;top:0;z-index:100;
+  }
+  .picker button{
+    background:transparent;border:1px solid #3a4260;color:#c4cadd;padding:10px 20px;border-radius:8px;
+    font-size:14px;font-weight:600;cursor:pointer;transition:all .15s;
+  }
+  .picker button.active{background:var(--orange);border-color:var(--orange);color:#fff;}
+  .picker button:hover:not(.active){border-color:var(--cyan);color:#fff;}
+
+  .view{display:none;}
+  .view.active{display:block;}
+
+  /* ===== LOGO ===== */
+  .logo{display:flex;align-items:center;gap:10px;}
+  .logo-mark{width:32px;height:32px;flex-shrink:0;}
+  .logo-text{font-weight:800;font-size:17px;letter-spacing:0.5px;line-height:1;}
+  .logo-text .sub{display:block;font-size:8px;font-weight:600;letter-spacing:1.5px;opacity:0.75;margin-top:2px;}
+
+  /* ================= SHARED LAYOUT ================= */
+  .app{display:grid;grid-template-columns:230px 1fr;min-height:900px;}
+  .sidebar{padding:24px 16px;}
+  .sidebar-header{padding:0 8px 28px;}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:11px 12px;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;margin-bottom:3px;}
+  .main{padding:28px 32px;}
+  .topbar{display:flex;justify-content:space-between;align-items:center;margin-bottom:24px;}
+  .page-title{font-size:22px;font-weight:800;}
+  .page-sub{font-size:13px;color:var(--gray-text);margin-top:3px;}
+  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px;}
+  .kpi-card{padding:18px 20px;border-radius:12px;}
+  .kpi-label{font-size:12.5px;font-weight:600;opacity:0.7;margin-bottom:8px;}
+  .kpi-value{font-size:26px;font-weight:800;}
+  .kpi-delta{font-size:12px;margin-top:6px;font-weight:600;}
+  .content-grid{display:grid;grid-template-columns:1.6fr 1fr;gap:16px;}
+  .panel{border-radius:12px;padding:20px;}
+  .panel-title{font-size:15px;font-weight:800;margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{text-align:left;font-size:11.5px;font-weight:700;padding:8px 10px;opacity:0.6;text-transform:uppercase;letter-spacing:0.4px;}
+  td{padding:11px 10px;}
+  .badge{display:inline-block;padding:3px 10px;border-radius:20px;font-size:11.5px;font-weight:700;}
+  .risk-high{background:#fdeceb;color:var(--danger);}
+  .risk-mid{background:#fdf3e4;color:var(--warning);}
+  .risk-low{background:#e6f5ee;color:var(--success);}
+  .activity-item{display:flex;gap:10px;padding:11px 0;font-size:13px;border-bottom:1px solid rgba(0,0,0,0.06);}
+  .activity-item:last-child{border-bottom:none;}
+  .dot{width:7px;height:7px;border-radius:50%;margin-top:5px;flex-shrink:0;}
+  .btn-primary{background:var(--orange);color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;}
+  .progress-track{height:8px;border-radius:20px;background:rgba(0,0,0,0.08);overflow:hidden;margin-top:8px;}
+  .progress-fill{height:100%;border-radius:20px;}
+
+  /* ================= VIEW A: 클래식 네이비 ================= */
+  #viewA .app{background:var(--gray-bg);}
+  #viewA .sidebar{background:var(--navy-dark);color:#fff;}
+  #viewA .sidebar-header .logo-text{color:#fff;}
+  #viewA .nav-item{color:#aebbdc;}
+  #viewA .nav-item.active{background:var(--orange);color:#fff;}
+  #viewA .nav-item:hover:not(.active){background:rgba(255,255,255,0.08);color:#fff;}
+  #viewA .kpi-card{background:#fff;border:1px solid var(--gray-border);}
+  #viewA .kpi-card .kpi-label{color:var(--navy);}
+  #viewA .kpi-card .kpi-value{color:#12172a;}
+  #viewA .panel{background:#fff;border:1px solid var(--gray-border);}
+  #viewA th{border-bottom:1px solid var(--gray-border);color:var(--gray-text);}
+  #viewA td{border-bottom:1px solid #f0f2f7;}
+  #viewA .kpi-accent-1{border-top:3px solid var(--navy);}
+  #viewA .kpi-accent-2{border-top:3px solid var(--danger);}
+  #viewA .kpi-accent-3{border-top:3px solid var(--orange);}
+  #viewA .kpi-accent-4{border-top:3px solid var(--success);}
+
+  /* ================= VIEW B: 다크 테크 ================= */
+  #viewB .app{background:var(--navy-darker);}
+  #viewB body,#viewB{color:#e4e8f5;}
+  #viewB .sidebar{background:#0a1428;border-right:1px solid #1f2a45;}
+  #viewB .sidebar-header .logo-text{color:#fff;}
+  #viewB .nav-item{color:#7c88ad;}
+  #viewB .nav-item.active{background:linear-gradient(90deg,rgba(221,90,28,0.25),transparent);color:#fff;border-left:3px solid var(--orange);padding-left:9px;}
+  #viewB .nav-item:hover:not(.active){background:rgba(255,255,255,0.05);color:#fff;}
+  #viewB .page-title{color:#fff;}
+  #viewB .page-sub{color:#7c88ad;}
+  #viewB .kpi-card{background:#101c38;border:1px solid #1f2a45;}
+  #viewB .kpi-label{color:#7c88ad;}
+  #viewB .kpi-value{color:#fff;}
+  #viewB .panel{background:#101c38;border:1px solid #1f2a45;}
+  #viewB .panel-title{color:#fff;}
+  #viewB th{border-bottom:1px solid #1f2a45;color:#7c88ad;}
+  #viewB td{border-bottom:1px solid #182444;color:#dfe4f5;}
+  #viewB .risk-high{background:rgba(226,72,61,0.15);}
+  #viewB .risk-mid{background:rgba(221,143,28,0.15);}
+  #viewB .risk-low{background:rgba(29,158,117,0.15);}
+  #viewB .kpi-accent-1{box-shadow:inset 3px 0 0 var(--cyan);}
+  #viewB .kpi-accent-2{box-shadow:inset 3px 0 0 var(--danger);}
+  #viewB .kpi-accent-3{box-shadow:inset 3px 0 0 var(--orange);}
+  #viewB .kpi-accent-4{box-shadow:inset 3px 0 0 var(--success);}
+  #viewB .activity-item{border-bottom:1px solid #182444;color:#c4cadd;}
+
+  /* ================= VIEW C: 미니멀 화이트 ================= */
+  #viewC .app{background:#fbfbfd;}
+  #viewC .sidebar{background:#fff;border-right:1px solid var(--gray-border);}
+  #viewC .sidebar-header .logo-text{color:var(--navy);}
+  #viewC .nav-item{color:#4a5064;}
+  #viewC .nav-item.active{background:var(--navy);color:#fff;}
+  #viewC .nav-item:hover:not(.active){background:var(--gray-bg);}
+  #viewC .kpi-card{background:#fff;border:1px solid var(--gray-border);}
+  #viewC .kpi-label{color:var(--gray-text);}
+  #viewC .kpi-value{color:var(--navy);}
+  #viewC .panel{background:#fff;border:1px solid var(--gray-border);}
+  #viewC th{border-bottom:2px solid var(--navy);color:var(--gray-text);}
+  #viewC td{border-bottom:1px solid #f0f2f7;}
+  #viewC .btn-primary{background:var(--navy);}
+</style>
+</head>
+<body>
+
+<div class="picker">
+  <button class="active" onclick="showView('A', this)">시안 A · 클래식 네이비</button>
+  <button onclick="showView('B', this)">시안 B · 다크 테크</button>
+  <button onclick="showView('C', this)">시안 C · 미니멀 화이트</button>
+</div>
+
+<!-- ===================== VIEW A ===================== -->
+<div id="viewA" class="view active">
+<div class="app">
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <svg class="logo-mark" viewBox="0 0 40 40"><polygon points="20,3 35,12 35,28 20,37 5,28 5,12" fill="none" stroke="#dd5a1c" stroke-width="2.5"/><polygon points="20,11 28,15.5 28,24.5 20,29 12,24.5 12,15.5" fill="#dd5a1c"/></svg>
+        <div class="logo-text">GIJO AS<span class="sub">AI SBOM PLATFORM</span></div>
+      </div>
+    </div>
+    <div class="nav-item active">📊 대시보드</div>
+    <div class="nav-item">🧬 AI 자산 인벤토리</div>
+    <div class="nav-item">📋 SBOM 관리</div>
+    <div class="nav-item">🌐 위협 인텔리전스</div>
+    <div class="nav-item">🧪 모델 머지 랩</div>
+    <div class="nav-item">📑 내부 리포트</div>
+    <div class="nav-item">💳 사용량 · 요금</div>
+    <div class="nav-item">⚙️ 설정</div>
+  </div>
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <div class="page-title">AI SBOM 대시보드</div>
+        <div class="page-sub">전사 AI 모델 자산 현황 · 2026년 7월 12일 기준</div>
+      </div>
+      <button class="btn-primary">+ SBOM 내보내기</button>
+    </div>
+    <div class="kpi-grid">
+      <div class="kpi-card kpi-accent-1"><div class="kpi-label">등록된 AI 모델</div><div class="kpi-value">47</div><div class="kpi-delta" style="color:var(--success)">▲ 3 신규 (이번 주)</div></div>
+      <div class="kpi-card kpi-accent-2"><div class="kpi-label">미해결 취약점</div><div class="kpi-value">12</div><div class="kpi-delta" style="color:var(--danger)">긴급 2건</div></div>
+      <div class="kpi-card kpi-accent-3"><div class="kpi-label">SBOM 생성 완료율</div><div class="kpi-value">89%</div><div class="progress-track"><div class="progress-fill" style="width:89%;background:var(--orange)"></div></div></div>
+      <div class="kpi-card kpi-accent-4"><div class="kpi-label">컴플라이언스 점수</div><div class="kpi-value">92<span style="font-size:14px">/100</span></div><div class="kpi-delta" style="color:var(--success)">양호</div></div>
+    </div>
+    <div class="content-grid">
+      <div class="panel">
+        <div class="panel-title">AI 모델 자산 목록<span style="font-size:12px;font-weight:600;color:var(--gray-text)">전체 47건</span></div>
+        <table>
+          <tr><th>모델명</th><th>버전</th><th>위험도</th><th>최근 스캔</th><th>SBOM</th></tr>
+          <tr><td>fraud-detect-llm</td><td>v2.3.1</td><td><span class="badge risk-high">높음</span></td><td>10분 전</td><td>완료</td></tr>
+          <tr><td>customer-chat-agent</td><td>v1.8.0</td><td><span class="badge risk-mid">중간</span></td><td>2시간 전</td><td>완료</td></tr>
+          <tr><td>doc-classifier</td><td>v3.0.2</td><td><span class="badge risk-low">낮음</span></td><td>1일 전</td><td>완료</td></tr>
+          <tr><td>internal-code-review</td><td>v1.1.4</td><td><span class="badge risk-mid">중간</span></td><td>1일 전</td><td>대기중</td></tr>
+          <tr><td>security-orchestrator</td><td>v0.9.5</td><td><span class="badge risk-low">낮음</span></td><td>3일 전</td><td>완료</td></tr>
+        </table>
+      </div>
+      <div class="panel">
+        <div class="panel-title">최근 활동</div>
+        <div class="activity-item"><div class="dot" style="background:var(--danger)"></div>fraud-detect-llm에서 프롬프트 인젝션 취약점 발견</div>
+        <div class="activity-item"><div class="dot" style="background:var(--orange)"></div>doc-classifier SBOM(CycloneDX) 내보내기 완료</div>
+        <div class="activity-item"><div class="dot" style="background:var(--success)"></div>customer-chat-agent 정기 스캔 통과</div>
+        <div class="activity-item"><div class="dot" style="background:var(--navy)"></div>내부 분기 리포트 자동 생성됨</div>
+        <div class="activity-item"><div class="dot" style="background:var(--danger)"></div>CTI 피드: 유출 자격증명 1건 탐지</div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ===================== VIEW B ===================== -->
+<div id="viewB" class="view">
+<div class="app">
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <svg class="logo-mark" viewBox="0 0 40 40"><polygon points="20,3 35,12 35,28 20,37 5,28 5,12" fill="none" stroke="#4a9eff" stroke-width="2.5"/><polygon points="20,11 28,15.5 28,24.5 20,29 12,24.5 12,15.5" fill="#dd5a1c"/></svg>
+        <div class="logo-text">GIJO AS<span class="sub">AI SBOM PLATFORM</span></div>
+      </div>
+    </div>
+    <div class="nav-item active">📊 대시보드</div>
+    <div class="nav-item">🧬 AI 자산 인벤토리</div>
+    <div class="nav-item">📋 SBOM 관리</div>
+    <div class="nav-item">🌐 위협 인텔리전스</div>
+    <div class="nav-item">🧪 모델 머지 랩</div>
+    <div class="nav-item">📑 내부 리포트</div>
+    <div class="nav-item">💳 사용량 · 요금</div>
+    <div class="nav-item">⚙️ 설정</div>
+  </div>
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <div class="page-title">AI SBOM 대시보드</div>
+        <div class="page-sub">전사 AI 모델 자산 현황 · 2026년 7월 12일 기준</div>
+      </div>
+      <button class="btn-primary">+ SBOM 내보내기</button>
+    </div>
+    <div class="kpi-grid">
+      <div class="kpi-card kpi-accent-1"><div class="kpi-label">등록된 AI 모델</div><div class="kpi-value">47</div><div class="kpi-delta" style="color:#5dcaa5">▲ 3 신규 (이번 주)</div></div>
+      <div class="kpi-card kpi-accent-2"><div class="kpi-label">미해결 취약점</div><div class="kpi-value">12</div><div class="kpi-delta" style="color:#f09595">긴급 2건</div></div>
+      <div class="kpi-card kpi-accent-3"><div class="kpi-label">SBOM 생성 완료율</div><div class="kpi-value">89%</div><div class="progress-track" style="background:#1f2a45"><div class="progress-fill" style="width:89%;background:var(--orange)"></div></div></div>
+      <div class="kpi-card kpi-accent-4"><div class="kpi-label">컴플라이언스 점수</div><div class="kpi-value">92<span style="font-size:14px">/100</span></div><div class="kpi-delta" style="color:#5dcaa5">양호</div></div>
+    </div>
+    <div class="content-grid">
+      <div class="panel">
+        <div class="panel-title">AI 모델 자산 목록<span style="font-size:12px;font-weight:600;color:#7c88ad">전체 47건</span></div>
+        <table>
+          <tr><th>모델명</th><th>버전</th><th>위험도</th><th>최근 스캔</th><th>SBOM</th></tr>
+          <tr><td>fraud-detect-llm</td><td>v2.3.1</td><td><span class="badge risk-high" style="color:#f09595">높음</span></td><td>10분 전</td><td>완료</td></tr>
+          <tr><td>customer-chat-agent</td><td>v1.8.0</td><td><span class="badge risk-mid" style="color:#efc27f">중간</span></td><td>2시간 전</td><td>완료</td></tr>
+          <tr><td>doc-classifier</td><td>v3.0.2</td><td><span class="badge risk-low" style="color:#5dcaa5">낮음</span></td><td>1일 전</td><td>완료</td></tr>
+          <tr><td>internal-code-review</td><td>v1.1.4</td><td><span class="badge risk-mid" style="color:#efc27f">중간</span></td><td>1일 전</td><td>대기중</td></tr>
+          <tr><td>security-orchestrator</td><td>v0.9.5</td><td><span class="badge risk-low" style="color:#5dcaa5">낮음</span></td><td>3일 전</td><td>완료</td></tr>
+        </table>
+      </div>
+      <div class="panel">
+        <div class="panel-title">최근 활동</div>
+        <div class="activity-item"><div class="dot" style="background:var(--danger)"></div>fraud-detect-llm에서 프롬프트 인젝션 취약점 발견</div>
+        <div class="activity-item"><div class="dot" style="background:var(--orange)"></div>doc-classifier SBOM(CycloneDX) 내보내기 완료</div>
+        <div class="activity-item"><div class="dot" style="background:var(--success)"></div>customer-chat-agent 정기 스캔 통과</div>
+        <div class="activity-item"><div class="dot" style="background:var(--cyan)"></div>내부 분기 리포트 자동 생성됨</div>
+        <div class="activity-item"><div class="dot" style="background:var(--danger)"></div>CTI 피드: 유출 자격증명 1건 탐지</div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ===================== VIEW C ===================== -->
+<div id="viewC" class="view">
+<div class="app">
+  <div class="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">
+        <svg class="logo-mark" viewBox="0 0 40 40"><polygon points="20,3 35,12 35,28 20,37 5,28 5,12" fill="none" stroke="#0c2c6b" stroke-width="2.5"/><polygon points="20,11 28,15.5 28,24.5 20,29 12,24.5 12,15.5" fill="#dd5a1c"/></svg>
+        <div class="logo-text">GIJO AS<span class="sub" style="color:var(--gray-text)">AI SBOM PLATFORM</span></div>
+      </div>
+    </div>
+    <div class="nav-item active">📊 대시보드</div>
+    <div class="nav-item">🧬 AI 자산 인벤토리</div>
+    <div class="nav-item">📋 SBOM 관리</div>
+    <div class="nav-item">🌐 위협 인텔리전스</div>
+    <div class="nav-item">🧪 모델 머지 랩</div>
+    <div class="nav-item">📑 내부 리포트</div>
+    <div class="nav-item">💳 사용량 · 요금</div>
+    <div class="nav-item">⚙️ 설정</div>
+  </div>
+  <div class="main">
+    <div class="topbar">
+      <div>
+        <div class="page-title" style="color:var(--navy)">AI SBOM 대시보드</div>
+        <div class="page-sub">전사 AI 모델 자산 현황 · 2026년 7월 12일 기준</div>
+      </div>
+      <button class="btn-primary">+ SBOM 내보내기</button>
+    </div>
+    <div class="kpi-grid">
+      <div class="kpi-card"><div class="kpi-label">등록된 AI 모델</div><div class="kpi-value">47</div><div class="kpi-delta" style="color:var(--success)">▲ 3 신규 (이번 주)</div></div>
+      <div class="kpi-card"><div class="kpi-label">미해결 취약점</div><div class="kpi-value">12</div><div class="kpi-delta" style="color:var(--danger)">긴급 2건</div></div>
+      <div class="kpi-card"><div class="kpi-label">SBOM 생성 완료율</div><div class="kpi-value">89%</div><div class="progress-track"><div class="progress-fill" style="width:89%;background:var(--navy)"></div></div></div>
+      <div class="kpi-card"><div class="kpi-label">컴플라이언스 점수</div><div class="kpi-value">92<span style="font-size:14px">/100</span></div><div class="kpi-delta" style="color:var(--success)">양호</div></div>
+    </div>
+    <div class="content-grid">
+      <div class="panel">
+        <div class="panel-title" style="color:var(--navy)">AI 모델 자산 목록<span style="font-size:12px;font-weight:600;color:var(--gray-text)">전체 47건</span></div>
+        <table>
+          <tr><th>모델명</th><th>버전</th><th>위험도</th><th>최근 스캔</th><th>SBOM</th></tr>
+          <tr><td>fraud-detect-llm</td><td>v2.3.1</td><td><span class="badge risk-high">높음</span></td><td>10분 전</td><td>완료</td></tr>
+          <tr><td>customer-chat-agent</td><td>v1.8.0</td><td><span class="badge risk-mid">중간</span></td><td>2시간 전</td><td>완료</td></tr>
+          <tr><td>doc-classifier</td><td>v3.0.2</td><td><span class="badge risk-low">낮음</span></td><td>1일 전</td><td>완료</td></tr>
+          <tr><td>internal-code-review</td><td>v1.1.4</td><td><span class="badge risk-mid">중간</span></td><td>1일 전</td><td>대기중</td></tr>
+          <tr><td>security-orchestrator</td><td>v0.9.5</td><td><span class="badge risk-low">낮음</span></td><td>3일 전</td><td>완료</td></tr>
+        </table>
+      </div>
+      <div class="panel">
+        <div class="panel-title" style="color:var(--navy)">최근 활동</div>
+        <div class="activity-item"><div class="dot" style="background:var(--danger)"></div>fraud-detect-llm에서 프롬프트 인젝션 취약점 발견</div>
+        <div class="activity-item"><div class="dot" style="background:var(--orange)"></div>doc-classifier SBOM(CycloneDX) 내보내기 완료</div>
+        <div class="activity-item"><div class="dot" style="background:var(--success)"></div>customer-chat-agent 정기 스캔 통과</div>
+        <div class="activity-item"><div class="dot" style="background:var(--navy)"></div>내부 분기 리포트 자동 생성됨</div>
+        <div class="activity-item"><div class="dot" style="background:var(--danger)"></div>CTI 피드: 유출 자격증명 1건 탐지</div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+
+<script>
+function showView(id, btn){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view'+id).classList.add('active');
+  document.querySelectorAll('.picker button').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+}
+</script>
+
+</body>
+</html>

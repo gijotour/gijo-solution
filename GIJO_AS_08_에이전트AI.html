@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 에이전트 AI</title>
+<style>
+:root{
+  --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 32px;background:var(--panel-2);border-bottom:1px solid var(--border);}
+.brand{display:flex;align-items:center;gap:14px;}
+.brand img{height:26px;width:auto;}
+.brand-divider{width:1px;height:22px;background:var(--border-strong);}
+.product-name{font-size:17px;font-weight:800;letter-spacing:0.3px;}
+.product-name span{color:var(--blue-light);}
+.product-tag{font-size:10.5px;color:var(--muted-2);font-weight:700;letter-spacing:1.4px;margin-top:1px;}
+.topnav{display:flex;gap:28px;}
+.topnav a{color:var(--muted);text-decoration:none;font-size:13.5px;font-weight:600;padding:6px 2px;border-bottom:2px solid transparent;}
+.topnav a.active{color:var(--white);border-bottom-color:var(--blue);}
+.user-chip{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);}
+.avatar{width:30px;height:30px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+.app{display:grid;grid-template-columns:220px 1fr;}
+.sidebar{padding:22px 14px;border-right:1px solid var(--border);min-height:900px;}
+.nav-section{font-size:10.5px;font-weight:700;color:var(--muted-2);letter-spacing:1.2px;margin:18px 10px 8px;}
+.nav-section:first-child{margin-top:0;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:2px;}
+.nav-item .ic{width:18px;text-align:center;font-size:14px;}
+.nav-item.active{background:rgba(59,130,246,0.12);color:var(--white);box-shadow:inset 3px 0 0 var(--blue);}
+.nav-item:hover:not(.active){background:rgba(255,255,255,0.04);color:var(--white);}
+.nav-badge{margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:800;padding:1px 6px;border-radius:20px;}
+.main{padding:28px 32px 48px;}
+.topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;}
+.page-title{font-size:21px;font-weight:800;color:#fff;}
+.page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;}
+.btn-primary{background:var(--blue);color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;}
+.btn-ghost{background:transparent;border:1px solid var(--border-strong);color:var(--text);padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;}
+.kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.kpi-strip.c5{grid-template-columns:repeat(5,1fr);}
+.kpi-mini{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+.kpi-mini-label{font-size:11px;color:var(--muted);font-weight:600;margin-bottom:6px;}
+.kpi-mini-value{font-size:19px;font-weight:800;color:#fff;}
+.toolbar{display:flex;justify-content:space-between;align-items:center;background:var(--panel);border:1px solid var(--border);border-radius:12px 12px 0 0;padding:14px 18px;border-bottom:none;}
+.search{display:flex;align-items:center;gap:10px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:8px 14px;width:280px;}
+.search input{background:transparent;border:none;outline:none;color:var(--text);font-size:13px;width:100%;}
+.search input::placeholder{color:var(--muted-2);}
+.filters{display:flex;gap:8px;}
+.filter-chip{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);padding:7px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;}
+.filter-chip.active{background:rgba(59,130,246,0.15);border-color:var(--blue);color:var(--blue-light);}
+.table-panel{background:var(--panel);border:1px solid var(--border);border-radius:0 0 12px 12px;padding:0 18px 10px;margin-bottom:16px;}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;}
+.panel-title{font-size:14.5px;font-weight:800;color:#fff;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;}
+.panel-sub{font-size:11.5px;color:var(--muted);margin-bottom:14px;}
+.panel-link{font-size:12px;color:var(--blue-light);font-weight:700;cursor:pointer;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{text-align:left;font-size:10.5px;font-weight:700;padding:12px 10px;color:var(--muted-2);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);}
+td{padding:13px 10px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+.asset-name{font-weight:700;color:#fff;}
+.asset-sub{font-size:11px;color:var(--muted-2);margin-top:2px;}
+.badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;}
+.b-blue{background:rgba(59,130,246,0.15);color:var(--blue-light);}
+.b-teal{background:rgba(30,185,128,0.15);color:var(--teal);}
+.b-amber{background:rgba(240,160,32,0.15);color:var(--amber);}
+.b-red{background:rgba(226,72,61,0.15);color:#f5928a;}
+.b-purple{background:rgba(139,124,240,0.15);color:var(--purple);}
+.row-actions{color:var(--blue-light);font-size:12px;font-weight:700;cursor:pointer;}
+.pagination{display:flex;justify-content:space-between;align-items:center;padding:14px 4px 4px;font-size:12px;color:var(--muted);}
+.page-btns{display:flex;gap:6px;}
+.page-btn{width:28px;height:28px;border-radius:6px;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--muted);display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;}
+.page-btn.active{background:var(--blue);border-color:var(--blue);color:#fff;}
+.footer{margin-top:8px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted-2);}
+.footer img{height:16px;opacity:0.6;}
+.progress-track{height:7px;border-radius:20px;background:rgba(255,255,255,0.08);overflow:hidden;margin-top:8px;}
+.progress-fill{height:100%;border-radius:20px;}
+.content-grid{display:grid;grid-template-columns:1.7fr 1fr;gap:16px;}
+
+.terminal{background:#05070d;border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-family:"Consolas","Menlo",monospace;font-size:11.5px;line-height:1.9;color:#8fd6a8;margin-top:8px;}
+.terminal .prompt{color:var(--blue-light);}
+.terminal .out{color:var(--muted);}
+.model-search{display:flex;gap:8px;margin-bottom:12px;}
+.model-search input{flex:1;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:0 12px;height:34px;color:var(--text);font-size:12px;outline:none;}
+.model-search button{background:var(--blue);color:#fff;border:none;border-radius:8px;padding:0 16px;font-size:12px;font-weight:700;cursor:pointer;}
+.hf-result{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);font-size:12px;}
+.hf-result:last-child{border-bottom:none;}
+.hf-load{background:transparent;border:1px solid var(--border-strong);color:var(--blue-light);padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;}
+
+.titlebar{display:flex;align-items:center;justify-content:space-between;background:#0d1220;padding:6px 12px;border-bottom:1px solid var(--border);font-size:11.5px;color:var(--muted);}
+.titlebar-left{display:flex;align-items:center;gap:8px;}
+.titlebar-left img{height:14px;}
+.win-dots{display:flex;gap:14px;color:var(--muted-2);font-size:13px;}
+.menubar{display:flex;gap:18px;background:#0a0e1a;padding:6px 14px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);}
+.header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2);}
+.header-left{display:flex;align-items:center;gap:12px;}
+.header-left img{height:22px;}
+.app-title{font-size:15px;font-weight:800;color:#fff;}
+.clock{font-size:12px;color:var(--blue-light);font-weight:600;}
+.header-right{display:flex;align-items:center;gap:10px;}
+.status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
+.status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
+.beta-tag{background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
+.icon-row{display:flex;gap:6px;}
+.icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
+.icon-btn.on{background:rgba(59,130,246,0.18);border-color:var(--blue);color:var(--blue-light);}
+.avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+
+.task-bar{display:flex;gap:10px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:20px;}
+.task-bar input{flex:1;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:0 16px;color:var(--text);font-size:13.5px;outline:none;}
+.btn-cta{background:var(--teal);color:#06281c;border:none;padding:0 22px;border-radius:8px;font-size:13.5px;font-weight:800;cursor:pointer;white-space:nowrap;}
+.agent-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.agent-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;position:relative;}
+.agent-top{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+.agent-icon{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
+.agent-name{font-size:13.5px;font-weight:800;color:#fff;}
+.agent-role{font-size:11px;color:var(--muted);margin-top:1px;}
+.agent-model{font-size:11px;color:var(--muted-2);margin-top:8px;padding-top:8px;border-top:1px solid var(--border);}
+.agent-status{position:absolute;top:14px;right:14px;display:flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;}
+.st-dot{width:7px;height:7px;border-radius:50%;}
+.st-working .st-dot{background:var(--teal);}
+.st-working{color:var(--teal);}
+.st-idle .st-dot{background:var(--muted-2);}
+.st-idle{color:var(--muted-2);}
+.st-watch .st-dot{background:var(--blue-light);}
+.st-watch{color:var(--blue-light);}
+.chat-feed{display:flex;flex-direction:column;gap:8px;}
+.chat-row{display:flex;align-items:center;gap:8px;font-size:12.5px;background:var(--panel-2);border-radius:8px;padding:9px 12px;}
+.chat-from{font-weight:800;color:#fff;}
+.chat-arrow{color:var(--muted-2);}
+.chat-to{font-weight:800;color:var(--blue-light);}
+.chat-msg{color:var(--muted);margin-left:2px;}
+.brain-row{display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);font-size:12.5px;}
+.brain-row:last-child{border-bottom:none;}
+.brain-path{font-size:11px;color:var(--muted-2);margin-top:2px;}
+</style>
+</head>
+<body>
+
+<div class="titlebar">
+  <div class="titlebar-left"><img src="https://gijo.ai/_nuxt/logo_gijo_only_white.ATZVOJtw.svg" alt="GIJO"><span>GIJO AS — AI Security Manager OS</span></div>
+  <div class="win-dots">− &nbsp; □ &nbsp; ×</div>
+</div>
+<div class="menubar"><span>File</span><span>Edit</span><span>View</span><span>Window</span><span>Help</span></div>
+
+<div class="header">
+  <div class="header-left">
+    <img src="https://gijo.ai/_nuxt/logo_gijo_white.CCh2YXJe.svg" alt="GIJO">
+    <div class="app-title">GIJO AS</div>
+    <div class="clock">오후 07:46 · 2026-07-12</div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill"><span class="dot"></span>운영중<span class="beta-tag">LIVE</span></div>
+    <div class="icon-row">
+      <div class="icon-btn">▤</div>
+      <div class="icon-btn">▢</div>
+      <div class="icon-btn">●</div>
+      <div class="icon-btn">◉</div>
+      <div class="icon-btn">⬡</div>
+      <div class="icon-btn">$</div>
+      <div class="icon-btn">+</div>
+    </div>
+    <div class="avatar-btn">정</div>
+    <div class="icon-btn">⚙</div>
+  </div>
+</div>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="nav-section">AI 팀</div>
+<div class="nav-item active"><span class="ic">◉</span>에이전트 AI</div>
+<div class="nav-section">모니터링</div>
+<div class="nav-item"><span class="ic">◆</span>대시보드</div>
+<div class="nav-item"><span class="ic">◇</span>AI 자산 인벤토리</div>
+<div class="nav-item"><span class="ic">▢</span>SBOM 관리<span class="nav-badge">3</span></div>
+<div class="nav-item"><span class="ic">△</span>취약점 · 위협</div>
+<div class="nav-section">거버넌스</div>
+<div class="nav-item"><span class="ic">✓</span>컴플라이언스</div>
+<div class="nav-item"><span class="ic">▣</span>내부 리포트</div>
+<div class="nav-item"><span class="ic">◈</span>승인 워크플로우</div>
+<div class="nav-section">고급 기능</div>
+<div class="nav-item"><span class="ic">⬡</span>모델 머지 랩</div>
+<div class="nav-item"><span class="ic">⛁</span>단기 · 장기 기억</div>
+<div class="nav-item"><span class="ic">$</span>사용량 · 요금</div>
+<div class="nav-section">시스템</div>
+<div class="nav-item"><span class="ic">⚙</span>설정</div>
+
+  </div>
+
+  <div class="main">
+    <div class="topbar-row">
+      <div>
+        <div class="page-title">에이전트 AI</div>
+        <div class="page-sub">여러 보안 특화 LLM 에이전트가 역할을 나눠 협업하고, 작업을 지시하면 팀이 알아서 처리합니다</div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-ghost">에이전트 설정</button><button class="btn-primary">+ 에이전트 추가</button>
+      </div>
+    </div>
+
+    
+<div class="task-bar">
+  <input placeholder="예: fraud-detect-llm 취약점 전체 재스캔하고 우선순위 정리해서 리포트까지 작성해줘">
+  <button class="btn-cta">▶ 에이전트 팀에게 지시하기</button>
+</div>
+
+<div class="kpi-strip">
+  <div class="kpi-mini"><div class="kpi-mini-label">활성 에이전트</div><div class="kpi-mini-value">8</div></div>
+  <div class="kpi-mini"><div class="kpi-mini-label">오늘 처리한 작업</div><div class="kpi-mini-value">23</div></div>
+  <div class="kpi-mini"><div class="kpi-mini-label">진행 중인 협업</div><div class="kpi-mini-value" style="color:var(--teal)">3</div></div>
+  <div class="kpi-mini"><div class="kpi-mini-label">평균 응답 시간</div><div class="kpi-mini-value">4.2초</div></div>
+</div>
+
+<div class="panel">
+  <div class="panel-title">우리 팀 — 보안 에이전트 로스터</div>
+  <div class="panel-sub">각 에이전트는 역할에 맞는 전용 모델을 사용하며, 오케스트레이터가 작업을 나누고 결과를 취합합니다</div>
+  <div class="agent-grid">
+    <div class="agent-card">
+      <div class="agent-status st-watch"><span class="st-dot"></span>총괄중</div>
+      <div class="agent-top"><div class="agent-icon" style="background:rgba(59,130,246,0.18);color:var(--blue-light)">◆</div><div><div class="agent-name">오케스트레이터</div><div class="agent-role">작업 분배 · 결과 취합</div></div></div>
+      <div class="agent-model">Qwen3-30B-A3B · 로컬</div>
+    </div>
+    <div class="agent-card">
+      <div class="agent-status st-working"><span class="st-dot"></span>작업중</div>
+      <div class="agent-top"><div class="agent-icon" style="background:rgba(139,124,240,0.18);color:var(--purple)">▤</div><div><div class="agent-name">스캔 에이전트</div><div class="agent-role">정적분석 실행</div></div></div>
+      <div class="agent-model">ModelScan 어댑터</div>
+    </div>
+    <div class="agent-card">
+      <div class="agent-status st-idle"><span class="st-dot"></span>대기중</div>
+      <div class="agent-top"><div class="agent-icon" style="background:rgba(226,72,61,0.18);color:#f5928a">⚔</div><div><div class="agent-name">침투테스트 에이전트</div><div class="agent-role">익스플로잇 검증</div></div></div>
+      <div class="agent-model">Penligent 어댑터</div>
+    </div>
+    <div class="agent-card">
+      <div class="agent-status st-working"><span class="st-dot"></span>작업중</div>
+      <div class="agent-top"><div class="agent-icon" style="background:rgba(240,160,32,0.18);color:var(--amber)">◈</div><div><div class="agent-name">분석 에이전트</div><div class="agent-role">우선순위 판단 · 설명</div></div></div>
+      <div class="agent-model">Foundation-Sec-8B</div>
+    </div>
+    <div class="agent-card">
+      <div class="agent-status st-idle"><span class="st-dot"></span>대기중</div>
+      <div class="agent-top"><div class="agent-icon" style="background:rgba(30,185,128,0.18);color:var(--teal)">▢</div><div><div class="agent-name">SBOM 에이전트</div><div class="agent-role">SBOM 생성 · 정리</div></div></div>
+      <div class="agent-model">CycloneDX/SPDX 생성기</div>
+    </div>
+    <div class="agent-card">
+      <div class="agent-status st-watch"><span class="st-dot"></span>모니터링</div>
+      <div class="agent-top"><div class="agent-icon" style="background:rgba(59,130,246,0.18);color:var(--blue-light)">◎</div><div><div class="agent-name">CTI 에이전트</div><div class="agent-role">딥웹 · 다크웹 감시</div></div></div>
+      <div class="agent-model">Criminal IP 피드</div>
+    </div>
+    <div class="agent-card">
+      <div class="agent-status st-idle"><span class="st-dot"></span>대기중</div>
+      <div class="agent-top"><div class="agent-icon" style="background:rgba(139,124,240,0.18);color:var(--purple)">▣</div><div><div class="agent-name">리포트 에이전트</div><div class="agent-role">내부 보고서 작성</div></div></div>
+      <div class="agent-model">Qwen3-30B-A3B · 로컬</div>
+    </div>
+    <div class="agent-card">
+      <div class="agent-status st-working"><span class="st-dot"></span>실험중</div>
+      <div class="agent-top"><div class="agent-icon" style="background:rgba(226,72,61,0.18);color:#f5928a">⬡</div><div><div class="agent-name">모델 진화 에이전트</div><div class="agent-role">보안 특화 LLM 병합</div></div></div>
+      <div class="agent-model">DeepHat-V1-7B + Foundation-Sec-8B</div>
+    </div>
+  </div>
+</div>
+
+<div class="content-grid">
+  <div class="panel">
+    <div class="panel-title">실시간 협업 현황<span class="panel-link">전체 로그</span></div>
+    <div class="panel-sub">에이전트 간 작업 위임 · 메시지 전달</div>
+    <div class="chat-feed">
+      <div class="chat-row"><span class="chat-from">스캔 에이전트</span><span class="chat-arrow">→</span><span class="chat-to">분석 에이전트</span><span class="chat-msg">fraud-detect-llm 스캔결과 187건 전달</span></div>
+      <div class="chat-row"><span class="chat-from">분석 에이전트</span><span class="chat-arrow">→</span><span class="chat-to">리포트 에이전트</span><span class="chat-msg">P0 등급 2건 요약 요청</span></div>
+      <div class="chat-row"><span class="chat-from">CTI 에이전트</span><span class="chat-arrow">→</span><span class="chat-to">오케스트레이터</span><span class="chat-msg">유출 자격증명 탐지 — 즉시 판단 필요</span></div>
+      <div class="chat-row"><span class="chat-from">오케스트레이터</span><span class="chat-arrow">→</span><span class="chat-to">침투테스트 에이전트</span><span class="chat-msg">customer-chat-agent 검증 대기열 등록</span></div>
+      <div class="chat-row"><span class="chat-from">리포트 에이전트</span><span class="chat-arrow">→</span><span class="chat-to">전체</span><span class="chat-msg">경영진 요약 초안 생성 완료</span></div>
+    </div>
+  </div>
+  <div>
+    <div class="panel">
+      <div class="panel-title">공통 두뇌</div>
+      <div class="panel-sub">전용 모델이 없는 에이전트의 기본 브레인</div>
+      <div class="brain-row"><span>Qwen3-30B-A3B · UD-Q4_K_M</span><span class="badge b-teal">사용중</span></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">로컬 모델 관리</div>
+      <div class="panel-sub">C:\Users\Admin\AppData\Roaming\gijo-as\models</div>
+      <div class="brain-row"><span>Qwen3-30B-A3B-UD-Q4_K_M<div class="brain-path">18.2GB</div></span><span class="badge b-teal">사용중</span></div>
+      <div class="brain-row"><span>Foundation-Sec-8B-Instruct-Q4_K_M<div class="brain-path">4.9GB</div></span><span class="badge b-teal">사용중</span></div>
+      <div class="brain-row"><span>DeepHat-V1-7B-Q4_K_M<div class="brain-path">4.3GB</div></span><span class="badge b-teal">사용중</span></div>
+      <div class="brain-row"><span>Titus-CybersecurityLLM-v1.0<div class="brain-path">21.2GB</div></span><span class="badge b-amber">미사용</span></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">AI 엔진 상태</div>
+      <div class="brain-row"><span>llama-server · :8080</span><span class="badge b-teal">● 실행중</span></div>
+      <div class="brain-row" style="border-bottom:none"><span>모델 진화소 — 두 모델을 하나로 합치기</span><span class="row-actions">모델 머지 랩 →</span></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">HuggingFace 모델 검색 · 불러오기</div>
+      <div class="panel-sub">보안 특화 오픈소스 모델을 검색해 에이전트 브레인으로 바로 등록</div>
+      <div class="model-search"><input placeholder="예: cybersecurity, WhiteRabbitNeo, Foundation-Sec"><button>검색</button></div>
+      <div class="hf-result"><span>AlicanKiraz0/Titus-CybersecurityLLM-v1.0<div class="brain-path">21.2GB · GGUF Q4_K_M</div></span><button class="hf-load">불러오기</button></div>
+      <div class="hf-result"><span>segolilylabs/Lily-Cybersecurity-7B-v0.2<div class="brain-path">4.1GB · GGUF</div></span><button class="hf-load">불러오기</button></div>
+      <div class="hf-result"><span>fdtn-ai/Foundation-Sec-8B-Instruct<div class="brain-path">4.9GB · GGUF Q4_K_M</div></span><button class="hf-load">불러오기</button></div>
+    </div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-title">터미널 — 실행 로그</div>
+  <div class="panel-sub">에이전트가 실행한 명령·스캔 도구 원본 출력을 그대로 확인</div>
+  <div class="terminal">
+    <div><span class="prompt">$</span> modelscan --model fraud-detect-llm.gguf</div>
+    <div class="out">[스캔 에이전트] 187개 컴포넌트 분석 중… 완료 (12.4초)</div>
+    <div class="out">[스캔 에이전트] 위험 발견: PROMPT_INJECTION_RISK (심각도: 높음)</div>
+    <div><span class="prompt">$</span> llama-server --model foundation-sec-8b --port 8081</div>
+    <div class="out">[분석 에이전트] ggml_cuda_init: found 1 CUDA devices — RTX 3090</div>
+    <div class="out">[분석 에이전트] 서버 기동 완료, /v1/chat/completions 응답 대기 중</div>
+    <div><span class="prompt">$</span> <span style="opacity:0.5">명령어 입력 후 Enter…</span></div>
+  </div>
+</div>
+
+
+    <div class="footer">
+      <img src="https://gijo.ai/_nuxt/logo_gijo_only_white.ATZVOJtw.svg" alt="GIJO">
+      <span>© 2026 GIJO Technology · GIJO AS Platform · Confidential</span>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

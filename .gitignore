@@ -1,0 +1,47 @@
+# dependencies / build output
+node_modules/
+dist/
+*.tsbuildinfo
+
+# runtime data (SBOM exports, generated reports, LanceDB vector store, session state)
+server/data/
+data/
+
+# local LLM assets — huge binaries, never belong in git
+server/models/
+server/llama.cpp/
+
+# pre-installed "Connect AI" desktop app redistributable (not part of the GIJO AS project)
+Connect AI.exe
+Uninstall Connect AI.exe
+*.dll
+*.pak
+*.bin
+*.dat
+LICENSE.electron.txt
+LICENSES.chromium.html
+locales/
+resources/
+chrome_100_percent.pak
+chrome_200_percent.pak
+
+# unrelated scratch/experiment folders (not part of the GIJO AS client/server project)
+antigravit-pro-app/
+crud-app/
+flask-app/
+temp/
+
+# logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# personal/local tool settings, not meant to be shared
+.claude/settings.local.json
+
+# leftover Electron redistributable file and an accidental scratch file
+vk_swiftshader_icd.json
+경로

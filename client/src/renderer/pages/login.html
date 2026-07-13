@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<title>GIJO AS — 로그인</title>
+<style>
+  :root {
+    --navy: #0a0e1a;
+    --navy2: #0c2c6b;
+    --orange: #dd5a1c;
+    --blue: #5fa1ff;
+    --text: #e6ecf5;
+    --muted: #8a97ad;
+    --border: #1c2740;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(circle at 30% 20%, #101a33 0%, var(--navy) 60%);
+    font-family: "Pretendard", "Segoe UI", -apple-system, sans-serif;
+    color: var(--text);
+  }
+  .card {
+    width: 380px;
+    background: rgba(14, 20, 36, 0.85);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 36px 32px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.45);
+  }
+  .logo { display: flex; align-items: center; gap: 10px; margin-bottom: 22px; }
+  .logo img { height: 26px; }
+  .logo span { font-size: 13px; color: var(--muted); letter-spacing: 0.04em; }
+  h1 { font-size: 19px; margin: 0 0 6px; }
+  p.sub { color: var(--muted); font-size: 13px; margin: 0 0 24px; }
+  label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+  input {
+    width: 100%;
+    background: #0d1526;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 12px;
+    color: var(--text);
+    font-size: 14px;
+    margin-bottom: 16px;
+    outline: none;
+  }
+  input:focus { border-color: var(--blue); }
+  .server-row { display: flex; gap: 8px; align-items: center; margin-bottom: 18px; }
+  .server-row input { margin-bottom: 0; font-size: 12px; color: var(--muted); }
+  button {
+    width: 100%;
+    background: var(--orange);
+    border: none;
+    border-radius: 8px;
+    padding: 11px;
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: default; }
+  .err {
+    margin-top: 12px;
+    font-size: 12.5px;
+    color: #ff8080;
+    min-height: 16px;
+  }
+  .hint { margin-top: 18px; font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">
+      <img src="https://gijo.ai/_nuxt/logo_gijo_white.CCh2YXJe.svg" alt="GIJO.AI" />
+      <span>AI SECURITY MANAGER</span>
+    </div>
+    <h1>GIJO AS 로그인</h1>
+    <p class="sub">보안담당자 계정으로 서버에 연결합니다.</p>
+
+    <div class="server-row">
+      <input id="serverUrl" placeholder="서버 주소 (예: http://localhost:4000)" />
+    </div>
+
+    <label for="username">아이디</label>
+    <input id="username" placeholder="아이디" autocomplete="username" />
+
+    <label for="password">비밀번호</label>
+    <input id="password" type="password" placeholder="비밀번호" autocomplete="current-password" />
+
+    <button id="loginBtn">로그인</button>
+    <div class="err" id="errMsg"></div>
+    <div class="hint">
+      단일 데스크톱 모드: 서버가 이 PC에 동봉되어 있다면 기본 주소(localhost:4000)를 그대로 사용하세요.<br />
+      분산 모드: 사내망 GPU 서버 주소를 입력하세요.
+    </div>
+  </div>
+
+  <script>
+    const serverInput = document.getElementById("serverUrl");
+    const userInput = document.getElementById("username");
+    const passInput = document.getElementById("password");
+    const btn = document.getElementById("loginBtn");
+    const errMsg = document.getElementById("errMsg");
+
+    serverInput.value = window.gijo.getServerUrl();
+
+    async function doLogin() {
+      errMsg.textContent = "";
+      btn.disabled = true;
+      btn.textContent = "연결 중...";
+      try {
+        if (serverInput.value.trim()) window.gijo.setServerUrl(serverInput.value.trim());
+        await window.gijo.login(userInput.value.trim(), passInput.value);
+        window.gijoRealtime.connect();
+        await window.gijo.navigateTo("dashboard.html");
+      } catch (e) {
+        errMsg.textContent = "로그인 실패: 아이디/비밀번호 또는 서버 주소를 확인하세요.";
+        btn.disabled = false;
+        btn.textContent = "로그인";
+      }
+    }
+
+    btn.addEventListener("click", doLogin);
+    passInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+  </script>
+</body>
+</html>

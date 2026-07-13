@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 사용량 · 요금</title>
+<style>
+:root{
+  --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 32px;background:var(--panel-2);border-bottom:1px solid var(--border);}
+.brand{display:flex;align-items:center;gap:14px;}
+.brand img{height:26px;width:auto;}
+.brand-divider{width:1px;height:22px;background:var(--border-strong);}
+.product-name{font-size:17px;font-weight:800;letter-spacing:0.3px;}
+.product-name span{color:var(--blue-light);}
+.product-tag{font-size:10.5px;color:var(--muted-2);font-weight:700;letter-spacing:1.4px;margin-top:1px;}
+.topnav{display:flex;gap:28px;}
+.topnav a{color:var(--muted);text-decoration:none;font-size:13.5px;font-weight:600;padding:6px 2px;border-bottom:2px solid transparent;}
+.topnav a.active{color:var(--white);border-bottom-color:var(--blue);}
+.user-chip{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);}
+.avatar{width:30px;height:30px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+.app{display:grid;grid-template-columns:220px 1fr;}
+.sidebar{padding:22px 14px;border-right:1px solid var(--border);min-height:900px;}
+.nav-section{font-size:10.5px;font-weight:700;color:var(--muted-2);letter-spacing:1.2px;margin:18px 10px 8px;}
+.nav-section:first-child{margin-top:0;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:2px;}
+.nav-item .ic{width:18px;text-align:center;font-size:14px;}
+.nav-item.active{background:rgba(59,130,246,0.12);color:var(--white);box-shadow:inset 3px 0 0 var(--blue);}
+.nav-item:hover:not(.active){background:rgba(255,255,255,0.04);color:var(--white);}
+.nav-badge{margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:800;padding:1px 6px;border-radius:20px;}
+.main{padding:28px 32px 48px;}
+.topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;}
+.page-title{font-size:21px;font-weight:800;color:#fff;}
+.page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;}
+.btn-primary{background:var(--blue);color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;}
+.btn-ghost{background:transparent;border:1px solid var(--border-strong);color:var(--text);padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;}
+.kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.kpi-strip.c5{grid-template-columns:repeat(5,1fr);}
+.kpi-mini{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+.kpi-mini-label{font-size:11px;color:var(--muted);font-weight:600;margin-bottom:6px;}
+.kpi-mini-value{font-size:19px;font-weight:800;color:#fff;}
+.toolbar{display:flex;justify-content:space-between;align-items:center;background:var(--panel);border:1px solid var(--border);border-radius:12px 12px 0 0;padding:14px 18px;border-bottom:none;}
+.search{display:flex;align-items:center;gap:10px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:8px 14px;width:280px;}
+.search input{background:transparent;border:none;outline:none;color:var(--text);font-size:13px;width:100%;}
+.search input::placeholder{color:var(--muted-2);}
+.filters{display:flex;gap:8px;}
+.filter-chip{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);padding:7px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;}
+.filter-chip.active{background:rgba(59,130,246,0.15);border-color:var(--blue);color:var(--blue-light);}
+.table-panel{background:var(--panel);border:1px solid var(--border);border-radius:0 0 12px 12px;padding:0 18px 10px;margin-bottom:16px;}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;}
+.panel-title{font-size:14.5px;font-weight:800;color:#fff;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;}
+.panel-sub{font-size:11.5px;color:var(--muted);margin-bottom:14px;}
+.panel-link{font-size:12px;color:var(--blue-light);font-weight:700;cursor:pointer;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{text-align:left;font-size:10.5px;font-weight:700;padding:12px 10px;color:var(--muted-2);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);}
+td{padding:13px 10px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+.asset-name{font-weight:700;color:#fff;}
+.asset-sub{font-size:11px;color:var(--muted-2);margin-top:2px;}
+.badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;}
+.b-blue{background:rgba(59,130,246,0.15);color:var(--blue-light);}
+.b-teal{background:rgba(30,185,128,0.15);color:var(--teal);}
+.b-amber{background:rgba(240,160,32,0.15);color:var(--amber);}
+.b-red{background:rgba(226,72,61,0.15);color:#f5928a;}
+.b-purple{background:rgba(139,124,240,0.15);color:var(--purple);}
+.row-actions{color:var(--blue-light);font-size:12px;font-weight:700;cursor:pointer;}
+.pagination{display:flex;justify-content:space-between;align-items:center;padding:14px 4px 4px;font-size:12px;color:var(--muted);}
+.page-btns{display:flex;gap:6px;}
+.page-btn{width:28px;height:28px;border-radius:6px;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--muted);display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;}
+.page-btn.active{background:var(--blue);border-color:var(--blue);color:#fff;}
+.footer{margin-top:8px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted-2);}
+.footer img{height:16px;opacity:0.6;}
+.progress-track{height:7px;border-radius:20px;background:rgba(255,255,255,0.08);overflow:hidden;margin-top:8px;}
+.progress-fill{height:100%;border-radius:20px;}
+.content-grid{display:grid;grid-template-columns:1.7fr 1fr;gap:16px;}
+
+.titlebar{display:flex;align-items:center;justify-content:space-between;background:#0d1220;padding:6px 12px;border-bottom:1px solid var(--border);font-size:11.5px;color:var(--muted);}
+.titlebar-left{display:flex;align-items:center;gap:8px;}
+.titlebar-left img{height:14px;}
+.win-dots{display:flex;gap:14px;color:var(--muted-2);font-size:13px;}
+.menubar{display:flex;gap:18px;background:#0a0e1a;padding:6px 14px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);}
+.header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2);}
+.header-left{display:flex;align-items:center;gap:12px;}
+.header-left img{height:22px;}
+.app-title{font-size:15px;font-weight:800;color:#fff;}
+.clock{font-size:12px;color:var(--blue-light);font-weight:600;}
+.header-right{display:flex;align-items:center;gap:10px;}
+.status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
+.status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
+.beta-tag{background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
+.icon-row{display:flex;gap:6px;}
+.icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
+.icon-btn.on{background:rgba(59,130,246,0.18);border-color:var(--blue);color:var(--blue-light);}
+.avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+</style>
+</head>
+<body>
+
+<div class="titlebar">
+  <div class="titlebar-left"><img src="https://gijo.ai/_nuxt/logo_gijo_only_white.ATZVOJtw.svg" alt="GIJO"><span>GIJO AS — AI Security Manager OS</span></div>
+  <div class="win-dots">− &nbsp; □ &nbsp; ×</div>
+</div>
+<div class="menubar"><span>File</span><span>Edit</span><span>View</span><span>Window</span><span>Help</span></div>
+
+<div class="header">
+  <div class="header-left">
+    <img src="https://gijo.ai/_nuxt/logo_gijo_white.CCh2YXJe.svg" alt="GIJO">
+    <div class="app-title">GIJO AS</div>
+    <div class="clock">오후 07:46 · 2026-07-12</div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill"><span class="dot"></span>운영중<span class="beta-tag">LIVE</span></div>
+    <div class="icon-row">
+      <div class="icon-btn">▤</div>
+      <div class="icon-btn">▢</div>
+      <div class="icon-btn">●</div>
+      <div class="icon-btn">◉</div>
+      <div class="icon-btn">⬡</div>
+      <div class="icon-btn">$</div>
+      <div class="icon-btn">+</div>
+    </div>
+    <div class="avatar-btn">정</div>
+    <div class="icon-btn">⚙</div>
+  </div>
+</div>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="nav-section">AI 팀</div>
+<div class="nav-item"><span class="ic">◉</span>에이전트 AI</div>
+<div class="nav-section">모니터링</div>
+<div class="nav-item"><span class="ic">◆</span>대시보드</div>
+<div class="nav-item"><span class="ic">◇</span>AI 자산 인벤토리</div>
+<div class="nav-item"><span class="ic">▢</span>SBOM 관리<span class="nav-badge">3</span></div>
+<div class="nav-item"><span class="ic">△</span>취약점 · 위협</div>
+<div class="nav-section">거버넌스</div>
+<div class="nav-item"><span class="ic">✓</span>컴플라이언스</div>
+<div class="nav-item"><span class="ic">▣</span>내부 리포트</div>
+<div class="nav-item"><span class="ic">◈</span>승인 워크플로우</div>
+<div class="nav-section">고급 기능</div>
+<div class="nav-item"><span class="ic">⬡</span>모델 머지 랩</div>
+<div class="nav-item"><span class="ic">⛁</span>단기 · 장기 기억</div>
+<div class="nav-item active"><span class="ic">$</span>사용량 · 요금</div>
+<div class="nav-section">시스템</div>
+<div class="nav-item"><span class="ic">⚙</span>설정</div>
+
+  </div>
+
+  <div class="main">
+    <div class="topbar-row">
+      <div>
+        <div class="page-title">사용량 · 요금</div>
+        <div class="page-sub">외부 API 이용료와 로컬 LLM 자원 사용량을 한 화면에서 관리</div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-ghost">인보이스 내보내기</button>
+      </div>
+    </div>
+
+    
+<div class="kpi-strip">
+  <div class="kpi-mini"><div class="kpi-mini-label">이번 달 예상 비용</div><div class="kpi-mini-value">₩1,240,000</div></div>
+  <div class="kpi-mini"><div class="kpi-mini-label">로컬 LLM 토큰 처리</div><div class="kpi-mini-value">18.4M</div></div>
+  <div class="kpi-mini"><div class="kpi-mini-label">CTI 피드 호출</div><div class="kpi-mini-value">2,140</div></div>
+  <div class="kpi-mini"><div class="kpi-mini-label">GPU 평균 사용률</div><div class="kpi-mini-value" style="color:var(--teal)">61%</div></div>
+</div>
+
+<div class="content-grid">
+  <div>
+    <div class="panel">
+      <div class="panel-title">서비스별 이용료 · 사용량</div>
+      <div class="panel-sub">구독형 외부 서비스 기준 · 로컬 LLM은 자체 호스팅으로 과금 없음</div>
+      <table>
+        <tr><th>서비스</th><th>유형</th><th>이번 달 사용량</th><th>한도 대비</th><th>예상 비용</th></tr>
+        <tr><td><div class="asset-name">Criminal IP</div></td><td>정액 구독</td><td>2,140건 호출</td><td>
+          <div class="progress-track" style="width:100px"><div class="progress-fill" style="width:71%;background:var(--blue)"></div></div>
+        </td><td>₩600,000</td></tr>
+        <tr><td><div class="asset-name">Flashpoint</div></td><td>종량 구독</td><td>480건 호출</td><td>
+          <div class="progress-track" style="width:100px"><div class="progress-fill" style="width:32%;background:var(--blue)"></div></div>
+        </td><td>₩340,000</td></tr>
+        <tr><td><div class="asset-name">SpyCloud</div></td><td>정액 구독</td><td>320건 호출</td><td>
+          <div class="progress-track" style="width:100px"><div class="progress-fill" style="width:22%;background:var(--blue)"></div></div>
+        </td><td>₩300,000</td></tr>
+        <tr><td><div class="asset-name">로컬 LLM (Qwen3-30B-A3B)</div></td><td>자체 호스팅</td><td>18.4M 토큰</td><td>—</td><td><span class="badge b-teal">₩0</span></td></tr>
+      </table>
+    </div>
+    <div class="panel">
+      <div class="panel-title">월별 비용 추이</div>
+      <table>
+        <tr><th>월</th><th>클라우드 구독 비용</th><th>전월 대비</th></tr>
+        <tr><td>2026-05</td><td>₩1,080,000</td><td style="color:var(--muted)">—</td></tr>
+        <tr><td>2026-06</td><td>₩1,150,000</td><td style="color:var(--amber)">▲ 6.5%</td></tr>
+        <tr><td>2026-07 (예상)</td><td>₩1,240,000</td><td style="color:var(--amber)">▲ 7.8%</td></tr>
+      </table>
+    </div>
+  </div>
+  <div>
+    <div class="panel">
+      <div class="panel-title">로컬 LLM 처리량</div>
+      <div class="panel-sub">RTX 3090 24GB 서버 기준</div>
+      <div style="font-size:11.5px;color:var(--muted);margin-bottom:6px;">GPU 사용률 (일 평균)</div>
+      <div class="progress-track"><div class="progress-fill" style="width:61%;background:var(--teal)"></div></div>
+      <div style="font-size:11.5px;color:var(--muted);margin:14px 0 6px;">VRAM 사용량 (18.2 / 24GB)</div>
+      <div class="progress-track"><div class="progress-fill" style="width:76%;background:var(--amber)"></div></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">한도 알림 설정</div>
+      <table>
+        <tr><td style="padding-left:0">Criminal IP 한도 80%</td><td style="text-align:right"><span class="badge b-teal">활성</span></td></tr>
+        <tr><td style="padding-left:0;border-bottom:none">월 예산 초과 경고</td><td style="text-align:right;border-bottom:none"><span class="badge b-teal">활성</span></td></tr>
+      </table>
+      <div style="margin-top:14px"><button class="btn-ghost" style="width:100%">알림 규칙 관리</button></div>
+    </div>
+  </div>
+</div>
+
+
+    <div class="footer">
+      <img src="https://gijo.ai/_nuxt/logo_gijo_only_white.ATZVOJtw.svg" alt="GIJO">
+      <span>© 2026 GIJO Technology · GIJO AS Platform · Confidential</span>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

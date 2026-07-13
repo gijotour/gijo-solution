@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 내부 리포트</title>
+<style>
+:root{
+  --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
+.topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 32px;background:var(--panel-2);border-bottom:1px solid var(--border);}
+.brand{display:flex;align-items:center;gap:14px;}
+.brand img{height:26px;width:auto;}
+.brand-divider{width:1px;height:22px;background:var(--border-strong);}
+.product-name{font-size:17px;font-weight:800;letter-spacing:0.3px;}
+.product-name span{color:var(--blue-light);}
+.product-tag{font-size:10.5px;color:var(--muted-2);font-weight:700;letter-spacing:1.4px;margin-top:1px;}
+.topnav{display:flex;gap:28px;}
+.topnav a{color:var(--muted);text-decoration:none;font-size:13.5px;font-weight:600;padding:6px 2px;border-bottom:2px solid transparent;}
+.topnav a.active{color:var(--white);border-bottom-color:var(--blue);}
+.user-chip{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);}
+.avatar{width:30px;height:30px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+.app{display:grid;grid-template-columns:220px 1fr;}
+.sidebar{padding:22px 14px;border-right:1px solid var(--border);min-height:900px;}
+.nav-section{font-size:10.5px;font-weight:700;color:var(--muted-2);letter-spacing:1.2px;margin:18px 10px 8px;}
+.nav-section:first-child{margin-top:0;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:2px;}
+.nav-item .ic{width:18px;text-align:center;font-size:14px;}
+.nav-item.active{background:rgba(59,130,246,0.12);color:var(--white);box-shadow:inset 3px 0 0 var(--blue);}
+.nav-item:hover:not(.active){background:rgba(255,255,255,0.04);color:var(--white);}
+.nav-badge{margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:800;padding:1px 6px;border-radius:20px;}
+.main{padding:28px 32px 48px;}
+.topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;}
+.page-title{font-size:21px;font-weight:800;color:#fff;}
+.page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;}
+.btn-primary{background:var(--blue);color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;}
+.btn-ghost{background:transparent;border:1px solid var(--border-strong);color:var(--text);padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;}
+.kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.kpi-strip.c5{grid-template-columns:repeat(5,1fr);}
+.kpi-mini{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+.kpi-mini-label{font-size:11px;color:var(--muted);font-weight:600;margin-bottom:6px;}
+.kpi-mini-value{font-size:19px;font-weight:800;color:#fff;}
+.toolbar{display:flex;justify-content:space-between;align-items:center;background:var(--panel);border:1px solid var(--border);border-radius:12px 12px 0 0;padding:14px 18px;border-bottom:none;}
+.search{display:flex;align-items:center;gap:10px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:8px 14px;width:280px;}
+.search input{background:transparent;border:none;outline:none;color:var(--text);font-size:13px;width:100%;}
+.search input::placeholder{color:var(--muted-2);}
+.filters{display:flex;gap:8px;}
+.filter-chip{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);padding:7px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;}
+.filter-chip.active{background:rgba(59,130,246,0.15);border-color:var(--blue);color:var(--blue-light);}
+.table-panel{background:var(--panel);border:1px solid var(--border);border-radius:0 0 12px 12px;padding:0 18px 10px;margin-bottom:16px;}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;}
+.panel-title{font-size:14.5px;font-weight:800;color:#fff;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;}
+.panel-sub{font-size:11.5px;color:var(--muted);margin-bottom:14px;}
+.panel-link{font-size:12px;color:var(--blue-light);font-weight:700;cursor:pointer;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{text-align:left;font-size:10.5px;font-weight:700;padding:12px 10px;color:var(--muted-2);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);}
+td{padding:13px 10px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+.asset-name{font-weight:700;color:#fff;}
+.asset-sub{font-size:11px;color:var(--muted-2);margin-top:2px;}
+.badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;}
+.b-blue{background:rgba(59,130,246,0.15);color:var(--blue-light);}
+.b-teal{background:rgba(30,185,128,0.15);color:var(--teal);}
+.b-amber{background:rgba(240,160,32,0.15);color:var(--amber);}
+.b-red{background:rgba(226,72,61,0.15);color:#f5928a;}
+.b-purple{background:rgba(139,124,240,0.15);color:var(--purple);}
+.row-actions{color:var(--blue-light);font-size:12px;font-weight:700;cursor:pointer;}
+.pagination{display:flex;justify-content:space-between;align-items:center;padding:14px 4px 4px;font-size:12px;color:var(--muted);}
+.page-btns{display:flex;gap:6px;}
+.page-btn{width:28px;height:28px;border-radius:6px;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--muted);display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;}
+.page-btn.active{background:var(--blue);border-color:var(--blue);color:#fff;}
+.footer{margin-top:8px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted-2);}
+.footer img{height:16px;opacity:0.6;}
+.progress-track{height:7px;border-radius:20px;background:rgba(255,255,255,0.08);overflow:hidden;margin-top:8px;}
+.progress-fill{height:100%;border-radius:20px;}
+.content-grid{display:grid;grid-template-columns:1.7fr 1fr;gap:16px;}
+
+.titlebar{display:flex;align-items:center;justify-content:space-between;background:#0d1220;padding:6px 12px;border-bottom:1px solid var(--border);font-size:11.5px;color:var(--muted);}
+.titlebar-left{display:flex;align-items:center;gap:8px;}
+.titlebar-left img{height:14px;}
+.win-dots{display:flex;gap:14px;color:var(--muted-2);font-size:13px;}
+.menubar{display:flex;gap:18px;background:#0a0e1a;padding:6px 14px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);}
+.header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2);}
+.header-left{display:flex;align-items:center;gap:12px;}
+.header-left img{height:22px;}
+.app-title{font-size:15px;font-weight:800;color:#fff;}
+.clock{font-size:12px;color:var(--blue-light);font-weight:600;}
+.header-right{display:flex;align-items:center;gap:10px;}
+.status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
+.status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
+.beta-tag{background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
+.icon-row{display:flex;gap:6px;}
+.icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
+.icon-btn.on{background:rgba(59,130,246,0.18);border-color:var(--blue);color:var(--blue-light);}
+.avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);align-items:center;justify-content:center;z-index:100;}
+.modal-overlay.open{display:flex;}
+.modal{width:420px;background:var(--panel);border:1px solid var(--border-strong);border-radius:14px;padding:24px;}
+.modal-title{font-size:16px;font-weight:800;color:#fff;margin-bottom:18px;}
+.modal label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:6px;font-weight:600;}
+.modal select{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;margin-bottom:14px;outline:none;}
+.modal-checklist{max-height:160px;overflow-y:auto;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;margin-bottom:14px;}
+.modal-checklist label{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text);font-weight:400;margin-bottom:8px;}
+.modal-err{font-size:12px;color:#f5928a;min-height:16px;margin-bottom:4px;}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;}
+</style>
+</head>
+<body>
+
+<div class="titlebar">
+  <div class="titlebar-left"><img src="https://gijo.ai/_nuxt/logo_gijo_only_white.ATZVOJtw.svg" alt="GIJO"><span>GIJO AS — AI Security Manager OS</span></div>
+  <div class="win-dots">− &nbsp; □ &nbsp; ×</div>
+</div>
+<div class="menubar"><span>File</span><span>Edit</span><span>View</span><span>Window</span><span>Help</span></div>
+
+<div class="header">
+  <div class="header-left">
+    <img src="https://gijo.ai/_nuxt/logo_gijo_white.CCh2YXJe.svg" alt="GIJO">
+    <div class="app-title">GIJO AS</div>
+    <div class="clock" id="clockEl">-</div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill" id="statusPill"><span class="dot"></span>연결 확인 중<span class="beta-tag">LIVE</span></div>
+    <div class="icon-row">
+      <div class="icon-btn">▤</div>
+      <div class="icon-btn">▢</div>
+      <div class="icon-btn">●</div>
+      <div class="icon-btn">◉</div>
+      <div class="icon-btn">⬡</div>
+      <div class="icon-btn">$</div>
+      <div class="icon-btn">+</div>
+    </div>
+    <div class="avatar-btn" id="avatarBtn">-</div>
+    <div class="icon-btn">⚙</div>
+  </div>
+</div>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="nav-section">AI 팀</div>
+<div class="nav-item"><span class="ic">◉</span>에이전트 AI</div>
+<div class="nav-section">모니터링</div>
+<div class="nav-item"><span class="ic">◆</span>대시보드</div>
+<div class="nav-item"><span class="ic">◇</span>AI 자산 인벤토리</div>
+<div class="nav-item"><span class="ic">▢</span>SBOM 관리<span class="nav-badge">3</span></div>
+<div class="nav-item"><span class="ic">△</span>취약점 · 위협</div>
+<div class="nav-section">거버넌스</div>
+<div class="nav-item"><span class="ic">✓</span>컴플라이언스</div>
+<div class="nav-item active"><span class="ic">▣</span>내부 리포트</div>
+<div class="nav-item"><span class="ic">◈</span>승인 워크플로우</div>
+<div class="nav-section">고급 기능</div>
+<div class="nav-item"><span class="ic">⬡</span>모델 머지 랩</div>
+<div class="nav-item"><span class="ic">⛁</span>단기 · 장기 기억</div>
+<div class="nav-item"><span class="ic">$</span>사용량 · 요금</div>
+<div class="nav-section">시스템</div>
+<div class="nav-item"><span class="ic">⚙</span>설정</div>
+
+  </div>
+
+  <div class="main">
+    <div class="topbar-row">
+      <div>
+        <div class="page-title">내부 리포트</div>
+        <div class="page-sub">내부 SBOM · 자산 데이터 기반 경영진 · 실무자용 보고서</div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-ghost" id="templateBtn">템플릿 관리</button><button class="btn-primary" id="genReportBtn">+ 리포트 생성</button>
+      </div>
+    </div>
+
+
+<div class="kpi-strip">
+  <div class="kpi-mini"><div class="kpi-mini-label">이번 세션 생성</div><div class="kpi-mini-value" id="kpiSessionCount">0</div></div>
+  <div class="kpi-mini"><div class="kpi-mini-label">자동 생성 예약</div><div class="kpi-mini-value" style="color:var(--muted)">미구현</div></div>
+  <div class="kpi-mini"><div class="kpi-mini-label">평균 생성 시간</div><div class="kpi-mini-value" id="kpiAvgTime">-</div></div>
+  <div class="kpi-mini"><div class="kpi-mini-label">최근 생성</div><div class="kpi-mini-value" id="kpiLastGen">-</div></div>
+</div>
+
+<div class="content-grid">
+  <div>
+    <div class="panel">
+      <div class="panel-title">리포트 이력 (이번 세션)</div>
+      <div class="panel-sub">서버가 리포트 이력을 저장하지 않아, 이번 세션에서 실제로 생성한 리포트만 표시합니다.</div>
+      <table>
+        <tr><th>유형</th><th>대상 자산</th><th>생성일시</th><th></th></tr>
+        <tbody id="reportRows">
+          <tr><td colspan="4" style="color:var(--muted)">이번 세션에서 생성한 리포트가 없습니다</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div>
+    <div class="panel">
+      <div class="panel-title">경영진 요약 미리보기</div>
+      <div class="panel-sub" id="summarySub">아직 생성된 리포트가 없습니다</div>
+      <div style="font-size:12.5px;line-height:1.8;color:var(--text)" id="summaryText">
+        "+ 리포트 생성"으로 새 리포트를 만들면 LLM이 작성한 경영진 요약이 여기 표시됩니다.
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">예약 설정</div>
+      <div style="font-size:12.5px;color:var(--muted-2);line-height:1.7">
+        정기 리포트 자동 생성(스케줄링)은 아직 구현되지 않았습니다. 현재는 "+ 리포트 생성"으로 그때그때 온디맨드 생성만 가능합니다.
+      </div>
+    </div>
+  </div>
+</div>
+
+
+    <div class="footer">
+      <img src="https://gijo.ai/_nuxt/logo_gijo_only_white.ATZVOJtw.svg" alt="GIJO">
+      <span>© 2026 GIJO Technology · GIJO AS Platform · Confidential</span>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="genModal">
+  <div class="modal">
+    <div class="modal-title">리포트 생성</div>
+    <label for="reportTypeInput">유형</label>
+    <select id="reportTypeInput">
+      <option value="ondemand">온디맨드</option>
+      <option value="weekly">주간</option>
+      <option value="quarterly">분기</option>
+    </select>
+    <label>대상 자산 (선택 안 하면 전체 자산 대상)</label>
+    <div class="modal-checklist" id="assetChecklist"></div>
+    <div class="modal-err" id="modalErr"></div>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="modalCancelBtn">취소</button>
+      <button class="btn-primary" id="modalSaveBtn">생성</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const clockEl = document.getElementById("clockEl");
+  const statusPill = document.getElementById("statusPill");
+  const avatarBtn = document.getElementById("avatarBtn");
+  const reportRows = document.getElementById("reportRows");
+  const modal = document.getElementById("genModal");
+  const modalErr = document.getElementById("modalErr");
+  const assetChecklist = document.getElementById("assetChecklist");
+  const modalSaveBtn = document.getElementById("modalSaveBtn");
+
+  const sessionReports = [];
+  let allAssets = [];
+
+  function tick() {
+    clockEl.textContent = new Date().toLocaleString("ko-KR", {
+      hour: "2-digit", minute: "2-digit", hour12: true, year: "numeric", month: "2-digit", day: "2-digit",
+    });
+  }
+
+  async function loadHealth() {
+    try {
+      await window.gijo.checkServerHealth();
+      statusPill.innerHTML = '<span class="dot"></span>운영중<span class="beta-tag">LIVE</span>';
+    } catch (e) {
+      statusPill.innerHTML = '<span class="dot" style="background:#e2483d"></span>서버 연결 끊김';
+    }
+  }
+
+  async function loadUser() {
+    try {
+      const user = await window.gijo.me();
+      avatarBtn.textContent = (user.displayName || user.username || "-").charAt(0);
+    } catch (e) {}
+  }
+
+  const TYPE_LABEL = { weekly: "정기 · 주간", quarterly: "정기 · 분기", ondemand: "온디맨드" };
+
+  function renderReportRows() {
+    if (sessionReports.length === 0) {
+      reportRows.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">이번 세션에서 생성한 리포트가 없습니다</td></tr>';
+      return;
+    }
+    reportRows.innerHTML = sessionReports
+      .map(
+        (r) => `<tr>
+          <td><span class="badge b-blue">${TYPE_LABEL[r.type]}</span></td>
+          <td>${r.assetIds.length ? r.assetIds.join(", ") : "전체 자산"}</td>
+          <td>${new Date(r.at).toLocaleString("ko-KR")}</td>
+          <td class="row-actions">${r.filePath}</td>
+        </tr>`
+      )
+      .join("");
+
+    document.getElementById("kpiSessionCount").textContent = sessionReports.length;
+    const avgMs = sessionReports.reduce((sum, r) => sum + r.durationMs, 0) / sessionReports.length;
+    document.getElementById("kpiAvgTime").textContent = `${(avgMs / 1000).toFixed(1)}초`;
+    document.getElementById("kpiLastGen").textContent = new Date(sessionReports[0].at).toLocaleTimeString("ko-KR");
+
+    document.getElementById("summarySub").textContent = `${TYPE_LABEL[sessionReports[0].type]} · LLM 자동 생성`;
+    document.getElementById("summaryText").textContent = sessionReports[0].executiveSummary;
+  }
+
+  function openModal() {
+    modalErr.textContent = "";
+    assetChecklist.innerHTML = allAssets.length
+      ? allAssets
+          .map((a) => `<label><input type="checkbox" value="${a.id}"> ${a.name}</label>`)
+          .join("")
+      : '<div style="color:var(--muted-2)">등록된 자산이 없습니다</div>';
+    modal.classList.add("open");
+  }
+
+  function closeModal() {
+    modal.classList.remove("open");
+  }
+
+  async function generate() {
+    const type = document.getElementById("reportTypeInput").value;
+    const assetIds = [...assetChecklist.querySelectorAll("input:checked")].map((el) => el.value);
+    modalSaveBtn.disabled = true;
+    modalSaveBtn.textContent = "생성 중...";
+    const startedAt = Date.now();
+    try {
+      const result = await window.gijo.generateReport({ type, assetIds: assetIds.length ? assetIds : undefined });
+      sessionReports.unshift({
+        type, assetIds, filePath: result.filePath, executiveSummary: result.executiveSummary,
+        at: Date.now(), durationMs: Date.now() - startedAt,
+      });
+      renderReportRows();
+      closeModal();
+    } catch (e) {
+      modalErr.textContent = "생성 실패: " + e.message;
+    } finally {
+      modalSaveBtn.disabled = false;
+      modalSaveBtn.textContent = "생성";
+    }
+  }
+
+  async function init() {
+    tick();
+    setInterval(tick, 30000);
+    await loadUser();
+    await loadHealth();
+    allAssets = await window.gijo.listAssets();
+
+    document.getElementById("genReportBtn").addEventListener("click", openModal);
+    document.getElementById("modalCancelBtn").addEventListener("click", closeModal);
+    modalSaveBtn.addEventListener("click", generate);
+    modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
+    document.getElementById("templateBtn").addEventListener("click", () => {
+      alert("템플릿 관리 기능은 아직 구현되지 않았습니다.");
+    });
+  }
+
+  if (!window.gijo.isAuthenticated()) {
+    window.gijo.navigateTo("login.html");
+  } else {
+    init();
+  }
+</script>
+
+</body>
+</html>

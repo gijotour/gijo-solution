@@ -1,0 +1,34 @@
+{
+  "name": "gijo-as-client",
+  "productName": "GIJO AS",
+  "version": "0.1.0",
+  "description": "GIJO AS — AI Security Manager Platform (Electron client, connects to gijo-as-server)",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json && npm run bundle:preload",
+    "bundle:preload": "esbuild src/preload.ts --bundle --platform=node --target=node18 --format=cjs --external:electron --outfile=dist/preload.js",
+    "start": "npm run build && electron .",
+    "watch": "tsc -p tsconfig.json --watch",
+    "dist": "npm run build && electron-builder"
+  },
+  "author": "GIJO Technology",
+  "license": "UNLICENSED",
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3",
+    "esbuild": "^0.28.1",
+    "typescript": "^5.5.0"
+  },
+  "build": {
+    "appId": "ai.gijo.as",
+    "productName": "GIJO AS",
+    "files": [
+      "dist/**/*",
+      "src/renderer/**/*"
+    ],
+    "win": {
+      "target": "nsis"
+    }
+  }
+}

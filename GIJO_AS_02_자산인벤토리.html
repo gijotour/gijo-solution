@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — AI 자산 인벤토리</title>
+<style>
+  :root{
+    --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+    --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+    --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
+  .topbar{display:flex;align-items:center;justify-content:space-between;padding:14px 32px;background:var(--panel-2);border-bottom:1px solid var(--border);}
+  .brand{display:flex;align-items:center;gap:14px;}
+  .brand img{height:26px;width:auto;}
+  .brand-divider{width:1px;height:22px;background:var(--border-strong);}
+  .product-name{font-size:17px;font-weight:800;letter-spacing:0.3px;}
+  .product-name span{color:var(--blue-light);}
+  .product-tag{font-size:10.5px;color:var(--muted-2);font-weight:700;letter-spacing:1.4px;margin-top:1px;}
+  .topnav{display:flex;gap:28px;}
+  .topnav a{color:var(--muted);text-decoration:none;font-size:13.5px;font-weight:600;padding:6px 2px;border-bottom:2px solid transparent;}
+  .topnav a.active{color:var(--white);border-bottom-color:var(--blue);}
+  .user-chip{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);}
+  .avatar{width:30px;height:30px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+  .app{display:grid;grid-template-columns:220px 1fr;}
+  .sidebar{padding:22px 14px;border-right:1px solid var(--border);min-height:900px;}
+  .nav-section{font-size:10.5px;font-weight:700;color:var(--muted-2);letter-spacing:1.2px;margin:18px 10px 8px;}
+  .nav-section:first-child{margin-top:0;}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:2px;}
+  .nav-item .ic{width:18px;text-align:center;font-size:14px;}
+  .nav-item.active{background:rgba(59,130,246,0.12);color:var(--white);box-shadow:inset 3px 0 0 var(--blue);}
+  .nav-item:hover:not(.active){background:rgba(255,255,255,0.04);color:var(--white);}
+  .nav-badge{margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:800;padding:1px 6px;border-radius:20px;}
+  .main{padding:28px 32px 48px;}
+  .topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;}
+  .page-title{font-size:21px;font-weight:800;color:#fff;}
+  .page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;}
+  .btn-primary{background:var(--blue);color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;}
+  .btn-ghost{background:transparent;border:1px solid var(--border-strong);color:var(--text);padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;}
+
+  .kpi-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px;}
+  .kpi-mini{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+  .kpi-mini-label{font-size:11px;color:var(--muted);font-weight:600;margin-bottom:6px;}
+  .kpi-mini-value{font-size:19px;font-weight:800;color:#fff;}
+
+  .toolbar{display:flex;justify-content:space-between;align-items:center;background:var(--panel);border:1px solid var(--border);border-radius:12px 12px 0 0;padding:14px 18px;border-bottom:none;}
+  .search{display:flex;align-items:center;gap:10px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:8px 14px;width:280px;}
+  .search input{background:transparent;border:none;outline:none;color:var(--text);font-size:13px;width:100%;}
+  .search input::placeholder{color:var(--muted-2);}
+  .filters{display:flex;gap:8px;}
+  .filter-chip{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);padding:7px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;}
+  .filter-chip.active{background:rgba(59,130,246,0.15);border-color:var(--blue);color:var(--blue-light);}
+
+  .table-panel{background:var(--panel);border:1px solid var(--border);border-radius:0 0 12px 12px;padding:0 18px 10px;margin-bottom:16px;}
+  table{width:100%;border-collapse:collapse;font-size:13px;}
+  th{text-align:left;font-size:10.5px;font-weight:700;padding:12px 10px;color:var(--muted-2);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);}
+  td{padding:13px 10px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;}
+  tr:last-child td{border-bottom:none;}
+  .asset-name{font-weight:700;color:#fff;}
+  .asset-sub{font-size:11px;color:var(--muted-2);margin-top:2px;}
+  .type-badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;background:rgba(139,124,240,0.15);color:var(--purple);}
+  .risk-badge{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;}
+  .risk-dot{width:8px;height:8px;border-radius:50%;}
+  .risk-high{color:#f5928a;}
+  .risk-high .risk-dot{background:var(--red);}
+  .risk-mid{color:#f7c777;}
+  .risk-mid .risk-dot{background:var(--amber);}
+  .risk-low{color:#6fdcb5;}
+  .risk-low .risk-dot{background:var(--teal);}
+  .sbom-ok{color:var(--teal);font-weight:700;font-size:12px;}
+  .sbom-pending{color:var(--amber);font-weight:700;font-size:12px;}
+  .owner{font-size:12px;color:var(--muted);}
+  .row-actions{color:var(--blue-light);font-size:12px;font-weight:700;cursor:pointer;}
+
+  .pagination{display:flex;justify-content:space-between;align-items:center;padding:14px 4px 4px;font-size:12px;color:var(--muted);}
+  .page-btns{display:flex;gap:6px;}
+  .page-btn{width:28px;height:28px;border-radius:6px;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--muted);display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;}
+  .page-btn.active{background:var(--blue);border-color:var(--blue);color:#fff;}
+
+  .footer{margin-top:8px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted-2);}
+  .footer img{height:16px;opacity:0.6;}
+
+  .titlebar{display:flex;align-items:center;justify-content:space-between;background:#0d1220;padding:6px 12px;border-bottom:1px solid var(--border);font-size:11.5px;color:var(--muted);}
+  .titlebar-left{display:flex;align-items:center;gap:8px;}
+  .titlebar-left img{height:14px;}
+  .win-dots{display:flex;gap:14px;color:var(--muted-2);font-size:13px;}
+  .menubar{display:flex;gap:18px;background:#0a0e1a;padding:6px 14px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);}
+  .header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2);}
+  .header-left{display:flex;align-items:center;gap:12px;}
+  .header-left img{height:22px;}
+  .app-title{font-size:15px;font-weight:800;color:#fff;}
+  .clock{font-size:12px;color:var(--blue-light);font-weight:600;}
+  .header-right{display:flex;align-items:center;gap:10px;}
+  .status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
+  .status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
+  .beta-tag{background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
+  .icon-row{display:flex;gap:6px;}
+  .icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
+  .avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+</style>
+</head>
+<body>
+
+<div class="titlebar">
+  <div class="titlebar-left"><img src="https://gijo.ai/_nuxt/logo_gijo_only_white.ATZVOJtw.svg" alt="GIJO"><span>GIJO AS — AI Security Manager OS</span></div>
+  <div class="win-dots">− &nbsp; □ &nbsp; ×</div>
+</div>
+<div class="menubar"><span>File</span><span>Edit</span><span>View</span><span>Window</span><span>Help</span></div>
+
+<div class="header">
+  <div class="header-left">
+    <img src="https://gijo.ai/_nuxt/logo_gijo_white.CCh2YXJe.svg" alt="GIJO">
+    <div class="app-title">GIJO AS</div>
+    <div class="clock">오후 07:46 · 2026-07-12</div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill"><span class="dot"></span>운영중<span class="beta-tag">LIVE</span></div>
+    <div class="icon-row">
+      <div class="icon-btn">▤</div>
+      <div class="icon-btn">▢</div>
+      <div class="icon-btn">●</div>
+      <div class="icon-btn">◉</div>
+      <div class="icon-btn">⬡</div>
+      <div class="icon-btn">$</div>
+      <div class="icon-btn">+</div>
+    </div>
+    <div class="avatar-btn">정</div>
+    <div class="icon-btn">⚙</div>
+  </div>
+</div>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="nav-section">AI 팀</div>
+    <div class="nav-item"><span class="ic">◉</span>에이전트 AI</div>
+    <div class="nav-section">모니터링</div>
+    <div class="nav-item"><span class="ic">◆</span>대시보드</div>
+    <div class="nav-item active"><span class="ic">◇</span>AI 자산 인벤토리</div>
+    <div class="nav-item"><span class="ic">▢</span>SBOM 관리<span class="nav-badge">3</span></div>
+    <div class="nav-item"><span class="ic">△</span>취약점 · 위협</div>
+    <div class="nav-section">거버넌스</div>
+    <div class="nav-item"><span class="ic">✓</span>컴플라이언스</div>
+    <div class="nav-item"><span class="ic">▣</span>내부 리포트</div>
+    <div class="nav-item"><span class="ic">◈</span>승인 워크플로우</div>
+    <div class="nav-section">고급 기능</div>
+    <div class="nav-item"><span class="ic">⬡</span>모델 머지 랩</div>
+    <div class="nav-item"><span class="ic">⛁</span>단기·장기 기억</div>
+    <div class="nav-item"><span class="ic">$</span>사용량 · 요금</div>
+    <div class="nav-section">시스템</div>
+    <div class="nav-item"><span class="ic">⚙</span>설정</div>
+  </div>
+
+  <div class="main">
+    <div class="topbar-row">
+      <div>
+        <div class="page-title">AI 자산 인벤토리</div>
+        <div class="page-sub">전사에 배포된 AI 모델 · 에이전트 자산 전수 목록 · 총 47건</div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn-ghost">CSV 내보내기</button>
+        <button class="btn-primary">+ 자산 등록</button>
+      </div>
+    </div>
+
+    <div class="kpi-strip">
+      <div class="kpi-mini"><div class="kpi-mini-label">전체 자산</div><div class="kpi-mini-value">47</div></div>
+      <div class="kpi-mini"><div class="kpi-mini-label">고위험</div><div class="kpi-mini-value" style="color:#f5928a">6</div></div>
+      <div class="kpi-mini"><div class="kpi-mini-label">중위험</div><div class="kpi-mini-value" style="color:#f7c777">14</div></div>
+      <div class="kpi-mini"><div class="kpi-mini-label">저위험</div><div class="kpi-mini-value" style="color:#6fdcb5">27</div></div>
+      <div class="kpi-mini"><div class="kpi-mini-label">SBOM 미생성</div><div class="kpi-mini-value" style="color:var(--amber)">5</div></div>
+    </div>
+
+    <div class="toolbar">
+      <div class="search">
+        <span style="color:var(--muted-2)">⌕</span>
+        <input placeholder="모델명, 소유부서로 검색">
+      </div>
+      <div class="filters">
+        <div class="filter-chip active">전체</div>
+        <div class="filter-chip">고위험</div>
+        <div class="filter-chip">SBOM 미생성</div>
+        <div class="filter-chip">1등급 자산</div>
+        <div class="filter-chip">최근 등록</div>
+      </div>
+    </div>
+
+    <div class="table-panel">
+      <table>
+        <tr><th>자산명</th><th>유형</th><th>소유부서</th><th>위험도</th><th>최근 스캔</th><th>SBOM</th><th></th></tr>
+        <tr>
+          <td><div class="asset-name">fraud-detect-llm</div><div class="asset-sub">Qwen3-30B-A3B 기반 · v2.3.1</div></td>
+          <td><span class="type-badge">파운데이션 모델</span></td>
+          <td class="owner">여신심사부</td>
+          <td><span class="risk-badge risk-high"><span class="risk-dot"></span>높음 · CVSS 9.1</span></td>
+          <td>10분 전</td>
+          <td><span class="sbom-ok">완료</span></td>
+          <td class="row-actions">상세 →</td>
+        </tr>
+        <tr>
+          <td><div class="asset-name">customer-chat-agent</div><div class="asset-sub">RAG 에이전트 · v1.8.0</div></td>
+          <td><span class="type-badge">에이전트</span></td>
+          <td class="owner">고객경험팀</td>
+          <td><span class="risk-badge risk-high"><span class="risk-dot"></span>높음 · CVSS 8.7</span></td>
+          <td>2시간 전</td>
+          <td><span class="sbom-ok">완료</span></td>
+          <td class="row-actions">상세 →</td>
+        </tr>
+        <tr>
+          <td><div class="asset-name">internal-code-review</div><div class="asset-sub">파인튜닝 모델 · v1.1.4</div></td>
+          <td><span class="type-badge">파인튜닝 모델</span></td>
+          <td class="owner">플랫폼개발팀</td>
+          <td><span class="risk-badge risk-mid"><span class="risk-dot"></span>중간 · CVSS 7.2</span></td>
+          <td>1일 전</td>
+          <td><span class="sbom-pending">대기중</span></td>
+          <td class="row-actions">상세 →</td>
+        </tr>
+        <tr>
+          <td><div class="asset-name">doc-classifier</div><div class="asset-sub">경량 분류 모델 · v3.0.2</div></td>
+          <td><span class="type-badge">임베딩/분류</span></td>
+          <td class="owner">정보보안팀</td>
+          <td><span class="risk-badge risk-low"><span class="risk-dot"></span>낮음 · CVSS 3.1</span></td>
+          <td>1일 전</td>
+          <td><span class="sbom-ok">완료</span></td>
+          <td class="row-actions">상세 →</td>
+        </tr>
+        <tr>
+          <td><div class="asset-name">security-orchestrator</div><div class="asset-sub">오케스트레이터 · v0.9.5</div></td>
+          <td><span class="type-badge">오케스트레이터</span></td>
+          <td class="owner">정보보안팀</td>
+          <td><span class="risk-badge risk-low"><span class="risk-dot"></span>낮음 · CVSS 3.4</span></td>
+          <td>3일 전</td>
+          <td><span class="sbom-ok">완료</span></td>
+          <td class="row-actions">상세 →</td>
+        </tr>
+        <tr>
+          <td><div class="asset-name">hr-resume-screener</div><div class="asset-sub">파인튜닝 모델 · v1.0.0</div></td>
+          <td><span class="type-badge">파인튜닝 모델</span></td>
+          <td class="owner">인사팀</td>
+          <td><span class="risk-badge risk-mid"><span class="risk-dot"></span>중간 · CVSS 6.5</span></td>
+          <td>4일 전</td>
+          <td><span class="sbom-pending">대기중</span></td>
+          <td class="row-actions">상세 →</td>
+        </tr>
+      </table>
+      <div class="pagination">
+        <span>47건 중 1-6건 표시</span>
+        <div class="page-btns">
+          <div class="page-btn">‹</div>
+          <div class="page-btn active">1</div>
+          <div class="page-btn">2</div>
+          <div class="page-btn">3</div>
+          <div class="page-btn">›</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <img src="https://gijo.ai/_nuxt/logo_gijo_only_white.ATZVOJtw.svg" alt="GIJO">
+      <span>© 2026 GIJO Technology · GIJO AS Platform · Confidential</span>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
+       

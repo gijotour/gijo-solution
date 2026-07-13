@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — AI Security Manager OS</title>
+<style>
+  :root{
+    --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+    --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+    --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:#05070d;color:var(--text);}
+
+  .titlebar{display:flex;align-items:center;justify-content:space-between;background:#0d1220;padding:6px 12px;border-bottom:1px solid var(--border);font-size:11.5px;color:var(--muted);}
+  .titlebar-left{display:flex;align-items:center;gap:8px;}
+  .titlebar-left img{height:14px;}
+  .win-dots{display:flex;gap:14px;color:var(--muted-2);font-size:13px;}
+  .menubar{display:flex;gap:18px;background:#0a0e1a;padding:6px 14px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);}
+
+  .app-shell{background:var(--bg);min-height:820px;}
+  .header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);}
+  .header-left{display:flex;align-items:center;gap:12px;}
+  .header-left img{height:22px;}
+  .app-title{font-size:15px;font-weight:800;color:#fff;}
+  .clock{font-size:12.5px;color:var(--blue-light);font-weight:600;}
+  .header-right{display:flex;align-items:center;gap:10px;}
+  .status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
+  .status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
+  .beta-tag{background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
+  .icon-row{display:flex;gap:6px;}
+  .icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
+  .icon-btn.on{background:rgba(59,130,246,0.18);border-color:var(--blue);color:var(--blue-light);}
+  .avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+
+  .body-grid{display:grid;grid-template-columns:220px 1fr 300px;min-height:640px;}
+  .explorer{padding:18px 14px;border-right:1px solid var(--border);}
+  .explorer-title{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:700;color:var(--text);margin-bottom:4px;}
+  .explorer-sub{font-size:11px;color:var(--blue-light);margin-bottom:24px;}
+  .explorer-tree{font-size:12.5px;color:var(--muted);line-height:2.1;}
+  .explorer-tree .folder{color:var(--text);font-weight:600;}
+  .explorer-hint{margin-top:28px;font-size:12px;color:var(--muted-2);text-align:center;line-height:1.7;font-style:italic;}
+
+  .center-stage{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;position:relative;}
+  .network-svg{width:100%;max-width:460px;}
+  .agent-bubble{display:flex;align-items:flex-start;gap:10px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 18px;max-width:420px;margin-top:8px;}
+  .agent-avatar{width:28px;height:28px;border-radius:8px;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;}
+  .agent-bubble-text{font-size:12.5px;color:var(--text);line-height:1.6;}
+  .agent-bubble-name{font-size:11.5px;font-weight:800;color:var(--blue-light);margin-bottom:4px;}
+
+  .today-panel{padding:18px 16px;border-left:1px solid var(--border);display:flex;flex-direction:column;}
+  .today-title{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:800;color:#fff;margin-bottom:14px;}
+  .today-input{display:flex;gap:8px;margin-bottom:14px;}
+  .today-input input{flex:1;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:0 12px;height:34px;color:var(--text);font-size:12.5px;outline:none;}
+  .today-add{width:34px;height:34px;border-radius:8px;background:var(--teal);color:#06281c;border:none;font-weight:800;cursor:pointer;font-size:16px;}
+  .today-item{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:12px;}
+  .today-p{padding:2px 7px;border-radius:5px;font-size:10.5px;font-weight:800;}
+  .p0{background:rgba(226,72,61,0.18);color:#f5928a;}
+  .p1{background:rgba(240,160,32,0.18);color:#f7c777;}
+  .today-cta{margin-top:auto;background:var(--teal);color:#06281c;border:none;border-radius:8px;padding:13px;font-size:13px;font-weight:800;cursor:pointer;}
+
+  .chatbar{display:flex;flex-direction:column;gap:6px;padding:14px 20px;border-top:1px solid var(--border);}
+  .chatbar input{width:100%;background:var(--panel);border:1px solid var(--border-strong);border-radius:10px;padding:14px 16px;color:var(--text);font-size:13px;outline:none;}
+  .chatbar-hint{font-size:11px;color:var(--muted-2);}
+</style>
+</head>
+<body>
+
+<div class="titlebar">
+  <div class="titlebar-left"><img src="https://gijo.ai/_nuxt/logo_gijo_only_white.ATZVOJtw.svg" alt="GIJO"><span>GIJO AS — AI Security Manager OS</span></div>
+  <div class="win-dots">─ &nbsp; □ &nbsp; ×</div>
+</div>
+<div class="menubar"><span>File</span><span>Edit</span><span>View</span><span>Window</span><span>Help</span></div>
+
+<div class="app-shell">
+  <div class="header">
+    <div class="header-left">
+      <img src="https://gijo.ai/_nuxt/logo_gijo_white.CCh2YXJe.svg" alt="GIJO">
+      <div class="app-title">GIJO AS</div>
+      <div class="clock">오후 07:46:36 · 2026-07-12</div>
+    </div>
+    <div class="header-right">
+      <div class="status-pill"><span class="dot"></span>운영중<span class="beta-tag">LIVE</span></div>
+      <div class="icon-row">
+        <div class="icon-btn on">▤</div>
+        <div class="icon-btn">▢</div>
+        <div class="icon-btn">💬</div>
+        <div class="icon-btn">◉</div>
+        <div class="icon-btn">⬡</div>
+        <div class="icon-btn">$</div>
+        <div class="icon-btn">+</div>
+      </div>
+      <div class="avatar-btn">정</div>
+      <div class="icon-btn">⚙</div>
+    </div>
+  </div>
+
+  <div class="body-grid">
+    <div class="explorer">
+      <div class="explorer-title"><span>자산 탐색기</span><span style="color:var(--muted-2)">⟳</span></div>
+      <div class="explorer-sub">GIJO AS Desktop</div>
+      <div class="explorer-tree">
+        <div class="folder">▸ AI 자산 (47)</div>
+        <div style="padding-left:14px">fraud-detect-llm</div>
+        <div style="padding-left:14px">customer-chat-agent</div>
+        <div style="padding-left:14px">doc-classifier</div>
+        <div class="folder">▸ SBOM (42)</div>
+        <div class="folder">▸ 에이전트 팀 (8)</div>
+        <div class="folder">▸ 리포트</div>
+      </div>
+      <div class="explorer-hint">에이전트에게<br>"fraud-detect-llm 재스캔해줘"<br>라고 지시해보세요.</div>
+    </div>
+
+    <div class="center-stage">
+      <svg class="network-svg" viewBox="0 0 600 440" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="300" cy="220" r="60" fill="none" stroke="#1a2c52" stroke-width="1"/>
+<circle cx="300" cy="220" r="105" fill="none" stroke="#1a2c52" stroke-width="1"/>
+<circle cx="300" cy="220" r="150" fill="none" stroke="#1a2c52" stroke-width="1"/>
+<line x1="300" y1="220" x2="300.0" y2="70.0" stroke="#2a4a8a" stroke-width="1.2" opacity="0.7"/>
+<line x1="300" y1="220" x2="406.1" y2="113.9" stroke="#2a4a8a" stroke-width="1.2" opacity="0.7"/>
+<line x1="300" y1="220" x2="450.0" y2="220.0" stroke="#2a4a8a" stroke-width="1.2" opacity="0.7"/>
+<line x1="300" y1="220" x2="406.1" y2="326.1" stroke="#2a4a8a" stroke-width="1.2" opacity="0.7"/>
+<line x1="300" y1="220" x2="300.0" y2="370.0" stroke="#2a4a8a" stroke-width="1.2" opacity="0.7"/>
+<line x1="300" y1="220" x2="193.9" y2="326.1" stroke="#2a4a8a" stroke-width="1.2" opacity="0.7"/>
+<line x1="300" y1="220" x2="150.0" y2="220.0" stroke="#2a4a8a" stroke-width="1.2" opacity="0.7"/>
+<line x1="300" y1="220" x2="193.9" y2="113.9" stroke="#2a4a8a" stroke-width="1.2" opacity="0.7"/>
+<line x1="300.0" y1="70.0" x2="406.1" y2="113.9" stroke="#1f3868" stroke-width="0.8" opacity="0.5"/>
+<line x1="406.1" y1="113.9" x2="406.1" y2="326.1" stroke="#1f3868" stroke-width="0.8" opacity="0.5"/>
+<line x1="406.1" y1="326.1" x2="300.0" y2="370.0" stroke="#1f3868" stroke-width="0.8" opacity="0.5"/>
+<line x1="300.0" y1="70.0" x2="193.9" y2="326.1" stroke="#1f3868" stroke-width="0.8" opacity="0.5"/>
+<line x1="193.9" y1="326.1" x2="150.0" y2="220.0" stroke="#1f3868" stroke-width="0.8" opacity="0.5"/>
+<line x1="150.0" y1="220.0" x2="193.9" y2="113.9" stroke="#1f3868" stroke-width="0.8" opacity="0.5"/>
+<line x1="193.9" y1="113.9" x2="450.0" y2="220.0" stroke="#1f3868" stroke-width="0.8" opacity="0.5"/>
+<line x1="450.0" y1="220.0" x2="300.0" y2="70.0" stroke="#1f3868" stroke-width="0.8" opacity="0.5"/>
+<line x1="406.1" y1="326.1" x2="150.0" y2="220.0" stroke="#1f3868" stroke-width="0.8" opacity="0.5"/>
+<circle cx="300.0" cy="70.0" r="4.5" fill="#5fa1ff"/>
+<circle cx="406.1" cy="113.9" r="4.5" fill="#5fa1ff"/>
+<circle cx="450.0" cy="220.0" r="4.5" fill="#5fa1ff"/>
+<circle cx="406.1" cy="326.1" r="4.5" fill="#5fa1ff"/>
+<circle cx="300.0" cy="370.0" r="4.5" fill="#5fa1ff"/>
+<circle cx="193.9" cy="326.1" r="4.5" fill="#5fa1ff"/>
+<circle cx="150.0" cy="220.0" r="4.5" fill="#5fa1ff"/>
+<circle cx="193.9" cy="113.9" r="4.5" fill="#5fa1ff"/>
+<circle cx="300" cy="220" r="9" fill="#3b82f6"/>
+      </svg>
+      <div class="agent-bubble">
+        <div class="agent-avatar">◆</div>
+        <div>
+          <div class="agent-bubble-name">오케스트레이터</div>
+          <div class="agent-bubble-text">좋은 저녁입니다, 정요한님. 오늘 확인이 필요한 P0 항목이 2건 있습니다. 오른쪽에서 확인하거나, 아래에 바로 지시해주세요.</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="today-panel">
+      <div class="today-title">⦿ 오늘 확인할 항목</div>
+      <div class="today-input"><input placeholder="할일 추가..."><button class="today-add">+</button></div>
+      <div class="today-item"><span class="today-p p0">P0</span>fraud-detect-llm — 프롬프트 인젝션</div>
+      <div class="today-item"><span class="today-p p0">P0</span>customer-chat-agent — 학습데이터 유출위험</div>
+      <div class="today-item"><span class="today-p p1">P1</span>internal-code-review — 취약 라이브러리</div>
+      <button class="today-cta">▶ 운영 시작 — 에이전트 팀에게 맡기기</button>
+    </div>
+  </div>
+
+  <div class="chatbar">
+    <input placeholder="에이전트에게 무엇이든 지시하세요… 예: fraud-detect-llm 전체 재스캔하고 리포트까지 작성해줘">
+    <div class="chatbar-hint">Enter 전송 · Shift+Enter 줄바꿈 · ⌘ 끌어다 놓기</div>
+  </div>
+</div>
+
+</body>
+</html>
