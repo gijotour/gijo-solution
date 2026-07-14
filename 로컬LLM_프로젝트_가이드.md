@@ -624,6 +624,8 @@ public class DispatcherService {
 **분산 온프레미스 모드 (기업/금융권 고객)**
 NVIDIA RTX 3090 GPU가 장착된 고사양 사내 서버에 Spring Boot 백엔드 애플리케이션(`gijo-as-server.jar`)을 상시 서비스(`systemd` 또는 Windows Service)로 구동합니다. 각 보안담당자는 자신의 PC에 설치된 얇은 Electron 클라이언트를 실행하고, 로그인 화면에서 서버의 사내 IP와 포트(`http://192.168.x.x:4000`)를 지정하여 중앙 서버에 동시 접속합니다. 이 경우 모든 GPU 연산과 취약점 자산 데이터가 GPU 서버 내부에서 통제 및 보존됩니다.
 
+> **알려진 문제(2026-07-14 발견) — 단일 데스크톱 모드의 네이티브 모듈 ABI 불일치**: `main.ts`가 서버를 `ELECTRON_RUN_AS_NODE`로 스폰하면 Electron에 내장된 Node 런타임(예: Electron 31 → Node 20 ABI)이 쓰이는데, `server`의 `better-sqlite3`(db.ts, SQLite 영속화)는 네이티브 애드온이라 `npm install`로 받은 기본 바이너리는 *시스템* Node ABI(예: 이 개발 환경은 Node 24)로 컴파일돼 있다. 두 ABI가 달라 서버가 `ERR_DLOPEN_FAILED`로 즉시 죽고 로그인 화면에서 "서버 연결 끊김"으로만 보인다. **임시 조치**: `client/scripts/rebuild-server-native.mjs`(`npm run rebuild-server-native`)가 `@electron/rebuild`로 `better-sqlite3`를 Electron ABI로 재빌드해준다 — 단, 같은 `node_modules`가 두 ABI를 동시에 지원 못 하므로 이후 `server/`의 `npm test`/`node dist/index.js`(시스템 Node 직접 실행)를 쓰려면 `cd server && npm rebuild better-sqlite3`로 되돌려야 한다. **진짜 해결책(미착수)**: 패키징 파이프라인(`electron-builder`)에서 배포용 서버 사본에만 리빌드를 적용하는 것 — 지금은 `client/package.json`의 `build.files`에 `server/`가 아예 포함돼 있지 않아 실제 `npm run dist` 패키징 자체가 아직 이 흐름을 타지 않는다. 즉 9.3절 단일 데스크톱 모드는 현재 "dev 환경에서 sibling 폴더로 실행" 전제로만 검증됐고, 실제 설치형 배포판 패키징은 별도 작업이 필요하다.
+
 ### 9.4 보안 및 인증 (Spring Security)
 
 - **인증 구조**: Spring Security 구성에서 `SessionCreationPolicy.STATELESS`를 정의하여 무상태(Stateless) 아키텍처로 세션을 관리하며, 대신 JWT(Json Web Token)를 발급하여 인증 상태를 유지합니다.
