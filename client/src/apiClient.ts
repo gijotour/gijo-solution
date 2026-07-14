@@ -272,6 +272,17 @@ export const healthApi = {
   check: () => request<{ ok: boolean; service: string }>("/api/health"),
 };
 
+// ── 서버 로그 ─────────────────────────────────────────────────────────
+export interface LogEntry {
+  level: "log" | "warn" | "error";
+  message: string;
+  timestamp: number;
+}
+
+export const logsApi = {
+  list: () => request<LogEntry[]>("/api/logs"),
+};
+
 // ── 자산 인벤토리 ─────────────────────────────────────────────────────
 export interface AssetComponent {
   name: string;

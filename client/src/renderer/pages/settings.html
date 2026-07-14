@@ -42,6 +42,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .status-line{font-size:12.5px;margin-top:10px;}
 .status-ok{color:var(--teal);}
 .status-err{color:#f5928a;}
+.log-console{background:#05070d;border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;height:260px;overflow-y:auto;font-family:"Consolas","Cascadia Mono",monospace;font-size:11.5px;line-height:1.6;}
+.log-line{white-space:pre-wrap;word-break:break-all;}
+.log-line.log-warn{color:var(--amber);}
+.log-line.log-error{color:#f5928a;}
+.log-ts{color:var(--muted-2);margin-right:6px;}
 .kv{display:grid;grid-template-columns:100px 1fr;gap:8px 12px;font-size:13px;margin-bottom:16px;}
 .kv dt{color:var(--muted);}
 .kv dd{color:var(--text);font-weight:600;}
@@ -146,6 +151,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div class="hint">모델을 바꿔 다시 "시작"하면 기존 프로세스를 정상 종료한 뒤 새 모델로 교체합니다(모델 스왑).</div>
     </div>
 
+    <div class="panel">
+      <div class="panel-title">서버 로그</div>
+      <div class="panel-sub">서버 콘솔 출력을 실시간으로 표시합니다(최근 500줄).</div>
+      <div class="log-console" id="logConsole"></div>
+    </div>
+
     <div class="footer">
       <img src="https://gijo.ai/_nuxt/logo_gijo_only_white.ATZVOJtw.svg" alt="GIJO">
       <span>© 2026 GIJO Technology · GIJO AS Platform · Confidential</span>
@@ -246,12 +257,34 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     await window.gijo.navigateTo("login.html");
   }
 
+  const logConsole = document.getElementById("logConsole");
+
+  function appendLogEntry(entry) {
+    const line = document.createElement("div");
+    line.className = "log-line" + (entry.level === "warn" ? " log-warn" : entry.level === "error" ? " log-error" : "");
+    const time = new Date(entry.timestamp).toLocaleTimeString("ko-KR", { hour12: false });
+    line.innerHTML = `<span class="log-ts">${time}</span>${entry.message.replace(/</g, "&lt;")}`;
+    logConsole.appendChild(line);
+    while (logConsole.childElementCount > 500) logConsole.removeChild(logConsole.firstChild);
+    logConsole.scrollTop = logConsole.scrollHeight;
+  }
+
+  async function loadLogs() {
+    try {
+      const entries = await window.gijo.listLogs();
+      logConsole.innerHTML = "";
+      entries.forEach(appendLogEntry);
+    } catch (e) {
+      logConsole.textContent = "로그를 불러오지 못했습니다: " + e.message;
+    }
+  }
+
   async function init() {
     tick();
     setInterval(tick, 30000);
     serverUrlInput.value = window.gijo.getServerUrl();
     await loadUser();
-    await Promise.all([loadHealth(), loadEngineStatus()]);
+    await Promise.all([loadHealth(), loadEngineStatus(), loadLogs()]);
 
     document.getElementById("testConnectionBtn").addEventListener("click", testConnection);
     document.getElementById("saveServerUrlBtn").addEventListener("click", saveServerUrl);
@@ -263,6 +296,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.querySelectorAll(".nav-item[data-page]").forEach((el) => {
       el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
     });
+
+    if (window.gijoRealtime) window.gijoRealtime.connect();
+    window.gijo.onLogEvent(appendLogEntry);
   }
 
   if (!window.gijo.isAuthenticated()) {

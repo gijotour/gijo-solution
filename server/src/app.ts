@@ -25,6 +25,7 @@ import { registerSbomRoutes } from "./engine/sbom";
 import { registerCtiRoutes } from "./engine/cti";
 import { registerReportRoutes } from "./engine/report";
 import { registerUsageRoutes, usageLoggingMiddleware } from "./engine/usage";
+import { registerLogsRoutes } from "./engine/logs";
 
 export function createApp(): Express {
   const app = express();
@@ -53,6 +54,7 @@ export function createApp(): Express {
   registerCtiRoutes(app);
   registerReportRoutes(app);
   registerUsageRoutes(app);
+  registerLogsRoutes(app);
 
   app.get("/api/health", (_req, res) => res.json({ ok: true, service: "gijo-as-server" }));
 
