@@ -1,7 +1,8 @@
-// engine/tasks.ts — 작업 큐 (서버 측, 전 클라이언트 공유)
+// engine/tasks.ts — 작업 큐 (서버 측, 전 클라이언트 공유, SQLite 영속화)
 
 import type { Express } from "express";
 import { authMiddleware } from "../auth/auth";
+import { db } from "../db";
 
 export interface TaskItem {
   id: string;
@@ -12,7 +13,32 @@ export interface TaskItem {
   createdAt: number;
 }
 
-let tasks: TaskItem[] = [];
+interface TaskRow {
+  id: string;
+  priority: TaskItem["priority"];
+  text: string;
+  agentId: string | null;
+  done: number;
+  createdAt: number;
+}
+
+function fromRow(row: TaskRow): TaskItem {
+  return {
+    id: row.id,
+    priority: row.priority,
+    text: row.text,
+    agentId: row.agentId ?? undefined,
+    done: row.done === 1,
+    createdAt: row.createdAt,
+  };
+}
+
+const insertStmt = db.prepare(
+  "INSERT INTO tasks (id, priority, text, agentId, done, createdAt) VALUES (@id, @priority, @text, @agentId, @done, @createdAt)"
+);
+const completeStmt = db.prepare("UPDATE tasks SET done = 1 WHERE id = ?");
+const updatePriorityStmt = db.prepare("UPDATE tasks SET priority = ? WHERE id = ?");
+const listStmt = db.prepare("SELECT * FROM tasks ORDER BY createdAt ASC");
 
 export function createTask(args: { text: string; agentId?: string; priority?: TaskItem["priority"] }): TaskItem {
   const item: TaskItem = {
@@ -23,22 +49,27 @@ export function createTask(args: { text: string; agentId?: string; priority?: Ta
     done: false,
     createdAt: Date.now(),
   };
-  tasks.push(item);
+  insertStmt.run({ ...item, agentId: item.agentId ?? null, done: item.done ? 1 : 0 });
   return item;
 }
 
 export function completeTask(id: string): TaskItem[] {
-  tasks = tasks.map((t) => (t.id === id ? { ...t, done: true } : t));
-  return tasks;
+  completeStmt.run(id);
+  return listTasks();
 }
 
 export function updateTaskPriority(id: string, priority: TaskItem["priority"]): TaskItem[] {
-  tasks = tasks.map((t) => (t.id === id ? { ...t, priority } : t));
-  return tasks;
+  updatePriorityStmt.run(priority, id);
+  return listTasks();
 }
 
 export function listTasks(): TaskItem[] {
-  return tasks;
+  return (listStmt.all() as TaskRow[]).map(fromRow);
+}
+
+// 테스트 전용: db는 모듈 싱글턴이라 createApp()을 새로 호출해도 초기화되지 않는다.
+export function resetTasksForTests(): void {
+  db.exec("DELETE FROM tasks");
 }
 
 export function registerTasksRoutes(app: Express): void {

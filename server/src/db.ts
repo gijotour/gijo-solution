@@ -1,0 +1,56 @@
+// db.ts — 서버 상태 영속화 (SQLite, better-sqlite3)
+// 9.5절 "DB 영속화" 항목의 전제 조건 자체가 빠져 있었다: assets.ts/tasks.ts가 순수
+// 인메모리(Map/배열)라 서버를 재시작하면 등록된 자산·스캔 이력·작업 큐가 전부 사라졌다.
+// 이제 로컬 파일 기반 SQLite(data/gijo-as.sqlite, .gitignore에 이미 있던 경로)에 저장해
+// 재시작 후에도 살아남는다. 프로세스당 동기 연결 1개(better-sqlite3, 커넥션 풀 없음)라
+// 9.5절이 언급한 "JPA 커넥션 풀 WAL 동시성 이슈"는 이 스택에서는 애초에 발생하지 않는다.
+//
+// 테스트는 vitest.config.ts에서 GIJO_DB_PATH=:memory:로 실행해 디스크에 아무것도 남기지 않는다.
+// agents.ts는 의도적으로 여기 포함하지 않았다 — 에이전트 상태(idle/working/watching)는
+// "지금 누가 뭘 하고 있는지"를 나타내는 휘발성 라이브 신호라, 재시작 후에도 "working"이
+// 남아있으면 오히려 죽은 작업을 살아있는 것처럼 보이게 하는 오해를 만든다.
+
+import Database from "better-sqlite3";
+import * as fs from "fs";
+import * as path from "path";
+
+const DB_PATH = process.env.GIJO_DB_PATH ?? path.join("data", "gijo-as.sqlite");
+
+if (DB_PATH !== ":memory:") {
+  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
+}
+
+export const db = new Database(DB_PATH);
+db.pragma("journal_mode = WAL"); // :memory: DB는 이 pragma를 조용히 무시하고 memory 저널을 유지한다.
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS assets (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    path TEXT NOT NULL,
+    assetType TEXT NOT NULL,
+    owner TEXT NOT NULL,
+    components TEXT NOT NULL,
+    findings TEXT NOT NULL,
+    registeredAt INTEGER NOT NULL,
+    lastScannedAt INTEGER,
+    sbomGeneratedAt INTEGER
+  );
+
+  CREATE TABLE IF NOT EXISTS scan_runs (
+    id TEXT PRIMARY KEY,
+    assetId TEXT NOT NULL REFERENCES assets(id),
+    scannedAt INTEGER NOT NULL,
+    findings TEXT NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_scan_runs_assetId ON scan_runs(assetId);
+
+  CREATE TABLE IF NOT EXISTS tasks (
+    id TEXT PRIMARY KEY,
+    priority TEXT NOT NULL,
+    text TEXT NOT NULL,
+    agentId TEXT,
+    done INTEGER NOT NULL,
+    createdAt INTEGER NOT NULL
+  );
+`);

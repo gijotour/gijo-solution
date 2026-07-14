@@ -14,8 +14,10 @@ export interface AgentDefinition {
   defaultStatus: AgentStatus;
 }
 
-// TODO: sqlite 등으로 영속화. 현재는 인메모리 — 서버 프로세스가 살아있는 동안만 유지되며
-// 모든 클라이언트(보안담당자)가 이 하나의 상태를 공유해서 본다 (CS 전환의 핵심 이점).
+// 의도적으로 영속화하지 않는다(db.ts 도입 이후에도 그대로 인메모리) — status(idle/working/watching)는
+// "지금 누가 뭘 하고 있는지"를 나타내는 휘발성 라이브 신호라, 재시작 후에도 남아있으면 죽은 작업을
+// 살아있는 것처럼 보이게 한다. 서버 프로세스가 살아있는 동안만 유지되며 모든 클라이언트(보안담당자)가
+// 이 하나의 상태를 공유해서 본다 (CS 전환의 핵심 이점).
 const agents: AgentDefinition[] = [
   { id: "orchestrator", name: "오케스트레이터", role: "작업 분배 · 결과 취합", brainModelId: "qwen3-30b-a3b", status: "watching", defaultStatus: "watching" },
   { id: "scan", name: "스캔 에이전트", role: "정적분석 실행 (ModelScan)", brainModelId: "qwen3-30b-a3b", status: "idle", defaultStatus: "idle" },
