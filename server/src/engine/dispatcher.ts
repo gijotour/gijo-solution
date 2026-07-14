@@ -6,10 +6,10 @@ import type { Express } from "express";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { routeIntent, RoutedIntent } from "./intent";
-import { createTask, completeTask, TaskItem } from "./tasks";
+import { createTask, completeTask, updateTaskPriority, TaskItem } from "./tasks";
 import { setAgentStatus, resetAgentToDefault, getAgentById } from "./agents";
 import { emitCollaboration } from "./collaboration";
-import { runAdapter } from "./bridge";
+import { runAdapter, StandardFinding } from "./bridge";
 import { chat } from "./llm";
 import { analyzeFindings } from "./analysis";
 import { recordFindings, getAsset } from "./assets";
@@ -26,7 +26,22 @@ function priorityForAction(action: RoutedIntent["action"]): TaskItem["priority"]
   return "P2";
 }
 
-async function executeRoutedAction(route: RoutedIntent, instructionText: string): Promise<string> {
+// 실시간 CVSS/EPSS/KEV 스코어링은 CTI 벤더 API 연동(cti.ts의 TODO) 전까지는 데이터 소스가 없어 보류.
+// 지금 확보 가능한 신호는 스캔 어댑터가 돌려주는 finding.severity뿐이므로, 스캔이 끝나면
+// 발견된 findings 중 가장 심각한 등급을 근거로 액션 기반 초기 우선순위를 덮어쓴다.
+function priorityForFindings(findings: StandardFinding[]): TaskItem["priority"] {
+  if (findings.some((f) => f.severity === "critical")) return "P0";
+  if (findings.some((f) => f.severity === "high")) return "P1";
+  if (findings.some((f) => f.severity === "medium")) return "P2";
+  return "P3";
+}
+
+interface ActionResult {
+  output: string;
+  findings?: StandardFinding[];
+}
+
+async function executeRoutedAction(route: RoutedIntent, instructionText: string): Promise<ActionResult> {
   switch (route.action) {
     case "scan": {
       const assetId = route.targetAssetId ?? "unknown-asset";
@@ -36,13 +51,13 @@ async function executeRoutedAction(route: RoutedIntent, instructionText: string)
       ]);
       recordFindings(assetId, findings);
       const analysis = await analyzeFindings(findings);
-      return analysis.summary;
+      return { output: analysis.summary, findings };
     }
     case "analyze":
     case "report":
     case "chat":
     default:
-      return chat({ agentId: route.agentId, message: instructionText });
+      return { output: await chat({ agentId: route.agentId, message: instructionText }) };
   }
 }
 
@@ -57,7 +72,11 @@ export async function dispatchInstruction(instructionText: string): Promise<Disp
 
   let output: string;
   try {
-    output = await executeRoutedAction(route, instructionText);
+    const result = await executeRoutedAction(route, instructionText);
+    output = result.output;
+    if (result.findings) {
+      updateTaskPriority(task.id, priorityForFindings(result.findings));
+    }
   } catch (err) {
     output = `실행 실패: ${err instanceof Error ? err.message : String(err)}`;
   }

@@ -562,10 +562,10 @@ public class DispatcherService {
 
 클라이언트(Electron) UI의 채팅바에서 `POST /api/dispatch` API를 호출하면 Spring Boot 백엔드 서버의 `DispatcherController`가 이 파이프라인을 비동기로 호출하고, 진행 로그 및 완료 상태는 WebSocket(`/ws`)을 통해 각 접속 클라이언트로 전파됩니다.
 
-**아직 남은 TODO**
-- `IntentService.routeIntent()`는 현재 정규식 기반 임시 라우팅 — 로컬 LLM에 few-shot 프롬프트로 의도 분류를 맡기는 것으로 교체 필요
-- `DispatcherService`의 `targetAssetId` → 실제 자산 파일 경로 조회는 별도의 자산 레지스트리 서비스가 구현되면 연동
-- 우선순위(P0~P3) 산정은 현재 액션 종류 기반 단순 휴리스틱 — CVSS/EPSS/KEV 등 실제 스코어링과 연결 필요
+**완료 (2026-07-14)**
+- `intent.ts`의 `routeIntent()`를 로컬 LLM few-shot 분류(JSON 출력, 등록된 자산 목록을 프롬프트에 포함해 개체명 인식까지 겸함)로 교체. LLM 응답이 파싱 불가하거나 로컬 LLM이 꺼져 있으면 기존 정규식 라우팅으로 자동 폴백 (`server/test/intent.test.ts`).
+- `dispatcher.ts`의 scan 실행 경로가 `targetAssetId`를 `assets.ts` 레지스트리에서 조회해 실제 자산 파일 경로(`asset.path`)로 스캔 어댑터를 호출하도록 수정 (이전에는 자산 ID 문자열을 경로로 그대로 사용).
+- 우선순위 산정을 스캔 완료 후 finding 심각도 기반으로 보강: `critical→P0, high→P1, medium→P2, low→P3`로 작업 생성 시점의 액션 기반 초기값을 덮어씀 (`priorityForFindings()`). CVSS/EPSS/KEV 등 외부 스코어링 연동은 6.1.1절 CTI 벤더 계약 체결 전까지는 데이터 소스가 없어 보류 (`cti.ts`의 TODO와 동일 사유).
 
 ---
 
@@ -635,8 +635,8 @@ NVIDIA RTX 3090 GPU가 장착된 고사양 사내 서버에 Spring Boot 백엔�
 - **JWT 만료/갱신 정책**: Access Token 및 Refresh Token 이중화 설계 필요
 - **DB 영속화 세부 튜닝**: SQLite를 JPA에 임베디드로 사용할 때 발생하는 Write-Ahead Logging(WAL) 동시성 이슈 보완
 - **자산 인벤토리(Assets) 고도화**: inventory 화면의 자산 이력을 실시간 스캔 정보와 매핑하는 데이터 파이프라인 정밀화
-- **자연어 라우팅 고도화**: `IntentService` 내의 Regex 의도 분석기를 로컬 LLM Few-shot 의도 판별 및 JSON 파싱 모듈로 마이그레이션
-- **메인 로컬 LLM 모델 최종 확정**: 현재 초기 개발 테스트용으로 **Qwythos-9B-Claude-Mythos-5-1M-Q4_K_M.gguf (Qwythos-9B)**를 메인 모델로 사용하도록 가이드를 1차 반영했습니다. 프로덕션 배포 전, 제품 핵심 작업(취약점 요약·SBOM·CTI 해석 등 일반 추론) 성능을 극대화하기 위해 Qwen3-30B-A3B 등의 MoE 모델 또는 보안 도메인 특화 모델로의 전환과 모델 스왑 제어 로직을 `LocalEngineService`에 구현할 것
+- ~~**자연어 라우팅 고도화**: `IntentService` 내의 Regex 의도 분석기를 로컬 LLM Few-shot 의도 판별 및 JSON 파싱 모듈로 마이그레이션~~ → 완료 (2026-07-14), `server/src/engine/intent.ts` 참고
+- **메인 로컬 LLM 모델 최종 확정**: 현재 초기 개발 테스트용으로 **Qwythos-9B-Claude-Mythos-5-1M-Q4_K_M.gguf (Qwythos-9B)**를 메인 모델로 사용하도록 가이드를 1차 반영했습니다. 프로덕션 배포 전, 제품 핵심 작업(취약점 요약·SBOM·CTI 해석 등 일반 추론) 성능을 극대화하기 위해 Qwen3-30B-A3B 등의 MoE 모델 또는 보안 도메인 특화 모델로의 전환을 검토할 것. (모델 스왑 제어 로직 자체는 `server/src/engine/localengine.ts`에 이미 구현되어 있음 — 남은 건 "어떤 모델을 최종 채택할지"의 제품 판단만.)
 - **서버 언어 재검토 여지**: 아래 9.6절의 Java 채택 근거(금융권 규제 준수, LDAP/SSO 연동, 타입 안전성)는 TypeScript로 번복한 지금도 완전히 사라진 게 아닙니다. 실제 기업(특히 금융권) 고객사 온보딩 단계에서 온프레미스 보안성 검토가 문제가 되면, `server-java-reference/`에 남겨둔 Java 구현체(9.2절 API 전부 이식 완료 상태)로 다시 전환하는 것을 고려할 것.
 
 ### 9.6 (참고용 — 현재는 TypeScript로 번복됨) 서버 언어로 Java/Spring Boot(2안)를 검토했던 배경

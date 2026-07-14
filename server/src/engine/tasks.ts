@@ -32,6 +32,11 @@ export function completeTask(id: string): TaskItem[] {
   return tasks;
 }
 
+export function updateTaskPriority(id: string, priority: TaskItem["priority"]): TaskItem[] {
+  tasks = tasks.map((t) => (t.id === id ? { ...t, priority } : t));
+  return tasks;
+}
+
 export function listTasks(): TaskItem[] {
   return tasks;
 }

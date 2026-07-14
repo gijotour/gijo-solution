@@ -9,6 +9,12 @@ vi.mock("../src/engine/llm", () => ({
   registerLlmRoutes: vi.fn(),
 }));
 
+const mockRunAdapter = vi.fn();
+vi.mock("../src/engine/bridge", () => ({
+  runAdapter: (...args: unknown[]) => mockRunAdapter(...args),
+  registerBridgeRoutes: vi.fn(),
+}));
+
 import { createApp } from "../src/app";
 import { resetAssetsForTests } from "../src/engine/assets";
 
@@ -23,6 +29,10 @@ describe("dispatcher + intent + assets integration", () => {
 
   beforeEach(async () => {
     resetAssetsForTests();
+    mockRunAdapter.mockReset();
+    mockRunAdapter.mockResolvedValue([
+      { finding_type: "outdated_dependency", severity: "low", evidence: "stub finding", source_tool: "modelscan" },
+    ]);
     app = createApp();
     token = await login(app);
   });
@@ -84,5 +94,37 @@ describe("dispatcher + intent + assets integration", () => {
     expect(res.body.route.action).toBe("chat");
     expect(res.body.output).toBe("[mock] LLM 응답");
     expect(res.body.task.done).toBe(true);
+  });
+
+  it("scans the asset's registered file path, not its id", async () => {
+    await request(app)
+      .post("/api/assets")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ id: "fraud-detect-llm", name: "fraud-detect-llm", path: "models/fraud.gguf" });
+
+    await request(app)
+      .post("/api/dispatch")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ text: "fraud-detect-llm 스캔해줘" });
+
+    expect(mockRunAdapter).toHaveBeenCalledWith("modelscan", "models/fraud.gguf");
+  });
+
+  it.each([
+    ["critical", "P0"],
+    ["high", "P1"],
+    ["medium", "P2"],
+    ["low", "P3"],
+  ] as const)("escalates task priority to %s -> %s based on the worst finding severity", async (severity, expectedPriority) => {
+    mockRunAdapter.mockResolvedValue([
+      { finding_type: "test_finding", severity, evidence: "stub", source_tool: "modelscan" },
+    ]);
+
+    const res = await request(app)
+      .post("/api/dispatch")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ text: "아무거나 스캔해줘" });
+
+    expect(res.body.task.priority).toBe(expectedPriority);
   });
 });
