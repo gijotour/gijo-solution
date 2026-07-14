@@ -129,22 +129,22 @@ tr:last-child td{border-bottom:none;}
 <div class="app">
   <div class="sidebar">
     <div class="nav-section">AI 팀</div>
-<div class="nav-item"><span class="ic">◉</span>에이전트 AI</div>
+<div class="nav-item" data-page="agent.html"><span class="ic">◉</span>에이전트 AI</div>
 <div class="nav-section">모니터링</div>
-<div class="nav-item"><span class="ic">◆</span>대시보드</div>
-<div class="nav-item"><span class="ic">◇</span>AI 자산 인벤토리</div>
-<div class="nav-item"><span class="ic">▢</span>SBOM 관리<span class="nav-badge">3</span></div>
-<div class="nav-item"><span class="ic">△</span>취약점 · 위협</div>
+<div class="nav-item" data-page="dashboard.html"><span class="ic">◆</span>대시보드</div>
+<div class="nav-item" data-page="inventory.html"><span class="ic">◇</span>AI 자산 인벤토리</div>
+<div class="nav-item" data-page="sbom.html"><span class="ic">▢</span>SBOM 관리<span class="nav-badge">3</span></div>
+<div class="nav-item" data-page="threat.html"><span class="ic">△</span>취약점 · 위협</div>
 <div class="nav-section">거버넌스</div>
 <div class="nav-item"><span class="ic">✓</span>컴플라이언스</div>
-<div class="nav-item"><span class="ic">▣</span>내부 리포트</div>
+<div class="nav-item" data-page="report.html"><span class="ic">▣</span>내부 리포트</div>
 <div class="nav-item"><span class="ic">◈</span>승인 워크플로우</div>
 <div class="nav-section">고급 기능</div>
-<div class="nav-item"><span class="ic">⬡</span>모델 머지 랩</div>
+<div class="nav-item" data-page="merge.html"><span class="ic">⬡</span>모델 머지 랩</div>
 <div class="nav-item"><span class="ic">⛁</span>단기 · 장기 기억</div>
 <div class="nav-item active"><span class="ic">$</span>사용량 · 요금</div>
 <div class="nav-section">시스템</div>
-<div class="nav-item"><span class="ic">⚙</span>설정</div>
+<div class="nav-item" data-page="settings.html"><span class="ic">⚙</span>설정</div>
 
   </div>
 
@@ -297,6 +297,9 @@ tr:last-child td{border-bottom:none;}
     await Promise.all([loadUsage(), loadEngineStatus()]);
 
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
+    document.querySelectorAll(".nav-item[data-page]").forEach((el) => {
+      el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
+    });
     document.getElementById("csvExportBtn").addEventListener("click", csvExport);
   }
 

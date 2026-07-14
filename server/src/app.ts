@@ -27,9 +27,18 @@ import { registerReportRoutes } from "./engine/report";
 import { registerUsageRoutes, usageLoggingMiddleware } from "./engine/usage";
 import { registerLogsRoutes } from "./engine/logs";
 
+// 온프레미스 배포 시 GIJO_CORS_ORIGINS(콤마 구분)로 허용 오리진을 사내망으로 제한할 수 있다.
+// 미지정 시(기본 개발/단일 데스크톱 모드)는 이전과 동일하게 모든 오리진을 허용한다.
+function corsOptions(): cors.CorsOptions | undefined {
+  const raw = process.env.GIJO_CORS_ORIGINS;
+  if (!raw) return undefined;
+  const origins = raw.split(",").map((o) => o.trim()).filter(Boolean);
+  return { origin: origins };
+}
+
 export function createApp(): Express {
   const app = express();
-  app.use(cors()); // TODO: 온프레미스 배포 시 허용 오리진을 사내망으로 제한
+  app.use(cors(corsOptions()));
   app.use(express.json());
   app.use(usageLoggingMiddleware);
 

@@ -1,7 +1,14 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import request from "supertest";
 import { createApp } from "../src/app";
 import { registerTool } from "../src/engine/tools";
+
+const mockRunAdapter = vi.fn();
+vi.mock("../src/engine/bridge", () => ({
+  runAdapter: (...args: unknown[]) => mockRunAdapter(...args),
+  listAdapters: () => [{ id: "modelscan", name: "ModelScan" }],
+  registerBridgeRoutes: vi.fn(),
+}));
 
 async function login(app: ReturnType<typeof createApp>) {
   const res = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" });
@@ -13,6 +20,7 @@ describe("tools registry", () => {
   let token: string;
 
   beforeEach(async () => {
+    mockRunAdapter.mockReset();
     app = createApp();
     token = await login(app);
     registerTool({
@@ -42,5 +50,25 @@ describe("tools registry", () => {
       .set("Authorization", `Bearer ${token}`)
       .send({ name: "nonexistent", params: {} });
     expect(res.status).toBe(404);
+  });
+
+  it("registers bridge.ts scan adapters as tools automatically", async () => {
+    const res = await request(app).get("/api/tools").set("Authorization", `Bearer ${token}`);
+    const modelscanTool = res.body.find((t: { name: string }) => t.name === "modelscan");
+    expect(modelscanTool).toBeTruthy();
+    expect(modelscanTool.description).toContain("ModelScan");
+  });
+
+  it("running a bridge adapter tool calls through to runAdapter with the given assetPath", async () => {
+    mockRunAdapter.mockResolvedValue([{ finding_type: "x", severity: "low", evidence: "e", source_tool: "modelscan" }]);
+
+    const res = await request(app)
+      .post("/api/tools/run")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ name: "modelscan", params: { assetPath: "models/fraud.gguf" } });
+
+    expect(res.status).toBe(200);
+    expect(mockRunAdapter).toHaveBeenCalledWith("modelscan", "models/fraud.gguf");
+    expect(res.body).toEqual([{ finding_type: "x", severity: "low", evidence: "e", source_tool: "modelscan" }]);
   });
 });

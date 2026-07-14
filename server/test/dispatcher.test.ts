@@ -12,6 +12,7 @@ vi.mock("../src/engine/llm", () => ({
 const mockRunAdapter = vi.fn();
 vi.mock("../src/engine/bridge", () => ({
   runAdapter: (...args: unknown[]) => mockRunAdapter(...args),
+  listAdapters: () => [{ id: "modelscan", name: "ModelScan" }],
   registerBridgeRoutes: vi.fn(),
 }));
 
