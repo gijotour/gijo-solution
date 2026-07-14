@@ -53,4 +53,12 @@ db.exec(`
     done INTEGER NOT NULL,
     createdAt INTEGER NOT NULL
   );
+
+  -- encryptedApiKey: cryptopack.ts로 암호화된 JSON(iv/ciphertext/authTag, hex) — 평문 저장 안 함.
+  CREATE TABLE IF NOT EXISTS cti_feeds (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    encryptedApiKey TEXT,
+    connected INTEGER NOT NULL
+  );
 `);

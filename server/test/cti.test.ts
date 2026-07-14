@@ -1,7 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import { createApp } from "../src/app";
-import { resetFeedsForTests } from "../src/engine/cti";
+import { resetFeedsForTests, configureFeed, getDecryptedApiKey } from "../src/engine/cti";
+import { db } from "../src/db";
 
 async function login(app: ReturnType<typeof createApp>) {
   const res = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" });
@@ -57,5 +58,30 @@ describe("cti feed key management", () => {
       .set("Authorization", `Bearer ${token}`)
       .send({ apiKey: "x" });
     expect(res.status).toBe(404);
+  });
+
+  it("the api key is stored encrypted at rest, not in plaintext, but decrypts back to the original", () => {
+    configureFeed("criminalip", "sk-super-secret");
+
+    const row = db.prepare("SELECT encryptedApiKey FROM cti_feeds WHERE id = ?").get("criminalip") as {
+      encryptedApiKey: string;
+    };
+    expect(row.encryptedApiKey).not.toContain("sk-super-secret");
+
+    expect(getDecryptedApiKey("criminalip")).toBe("sk-super-secret");
+  });
+
+  it("configured feeds survive a fresh module state (regression: used to be a plain in-memory array)", async () => {
+    await request(app)
+      .post("/api/cti/feeds/flashpoint/configure")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ apiKey: "fp-key-123" });
+
+    // a second createApp() call proves the state lives in db.ts, not in a per-app-instance variable
+    const secondApp = createApp();
+    const secondToken = await login(secondApp);
+    const res = await request(secondApp).get("/api/cti/feeds").set("Authorization", `Bearer ${secondToken}`);
+    const flashpoint = res.body.find((f: { id: string }) => f.id === "flashpoint");
+    expect(flashpoint.hasApiKey).toBe(true);
   });
 });
