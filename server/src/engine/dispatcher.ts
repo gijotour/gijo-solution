@@ -12,7 +12,7 @@ import { emitCollaboration } from "./collaboration";
 import { runAdapter } from "./bridge";
 import { chat } from "./llm";
 import { analyzeFindings } from "./analysis";
-import { recordFindings } from "./assets";
+import { recordFindings, getAsset } from "./assets";
 
 export interface DispatchResult {
   task: TaskItem;
@@ -29,11 +29,12 @@ function priorityForAction(action: RoutedIntent["action"]): TaskItem["priority"]
 async function executeRoutedAction(route: RoutedIntent, instructionText: string): Promise<string> {
   switch (route.action) {
     case "scan": {
-      const assetPath = route.targetAssetId ?? "unknown-asset";
-      const findings = await runAdapter("modelscan", assetPath).catch((err) => [
+      const assetId = route.targetAssetId ?? "unknown-asset";
+      const scanPath = getAsset(assetId)?.path ?? assetId;
+      const findings = await runAdapter("modelscan", scanPath).catch((err) => [
         { finding_type: "scan_error", severity: "low" as const, evidence: String(err), source_tool: "modelscan" },
       ]);
-      recordFindings(assetPath, findings);
+      recordFindings(assetId, findings);
       const analysis = await analyzeFindings(findings);
       return analysis.summary;
     }
