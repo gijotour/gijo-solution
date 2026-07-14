@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GIJO AS — 설정</title>
+<title>GIJO AS — 단기·장기 기억</title>
 <style>
 :root{
   --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
@@ -27,32 +27,25 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;}
 .btn-primary{background:var(--blue);color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;}
 .btn-primary:disabled{opacity:0.5;cursor:not-allowed;}
-.btn-ghost{background:transparent;border:1px solid var(--border-strong);color:var(--text);padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;}
-.btn-danger{background:transparent;border:1px solid rgba(226,72,61,0.5);color:#f5928a;padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;}
-.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;max-width:640px;}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;max-width:720px;}
 .panel-title{font-size:14.5px;font-weight:800;color:#fff;margin-bottom:4px;}
 .panel-sub{font-size:11.5px;color:var(--muted);margin-bottom:16px;}
 .field{margin-bottom:14px;}
 .field label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:6px;font-weight:600;}
 .field input{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;outline:none;}
-.field input:disabled{color:var(--muted);}
-.field-row{display:flex;gap:8px;align-items:center;}
-.field-row input{flex:1;}
-.hint{font-size:11.5px;color:var(--muted-2);margin-top:8px;line-height:1.6;}
+.field-row{display:flex;gap:8px;align-items:flex-end;}
+.field-row .field{flex:1;margin-bottom:0;}
+.result-box{background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:12px;font-size:12.5px;color:var(--text);max-height:220px;overflow-y:auto;}
+.result-chunk{padding:8px 0;border-bottom:1px solid var(--border);line-height:1.6;}
+.result-chunk:last-child{border-bottom:none;}
 .status-line{font-size:12.5px;margin-top:10px;}
 .status-ok{color:var(--teal);}
 .status-err{color:#f5928a;}
-.log-console{background:#05070d;border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;height:260px;overflow-y:auto;font-family:"Consolas","Cascadia Mono",monospace;font-size:11.5px;line-height:1.6;}
-.log-line{white-space:pre-wrap;word-break:break-all;}
-.log-line.log-warn{color:var(--amber);}
-.log-line.log-error{color:#f5928a;}
-.log-ts{color:var(--muted-2);margin-right:6px;}
-.kv{display:grid;grid-template-columns:100px 1fr;gap:8px 12px;font-size:13px;margin-bottom:16px;}
-.kv dt{color:var(--muted);}
-.kv dd{color:var(--text);font-weight:600;}
+.hint{font-size:11.5px;color:var(--muted-2);margin-top:8px;line-height:1.6;}
 .badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;}
-.b-teal{background:rgba(30,185,128,0.15);color:var(--teal);}
 .b-amber{background:rgba(240,160,32,0.15);color:var(--amber);}
+.progress-track{height:7px;border-radius:20px;background:rgba(255,255,255,0.08);overflow:hidden;margin-top:10px;}
+.progress-fill{height:100%;border-radius:20px;background:var(--blue);width:0%;}
 .footer{margin-top:8px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted-2);}
 .footer img{height:16px;opacity:0.6;}
 .header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2);}
@@ -98,63 +91,61 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     <div class="nav-item" data-page="approvals.html"><span class="ic">◈</span>승인 워크플로우</div>
     <div class="nav-section">고급 기능</div>
     <div class="nav-item" data-page="merge.html"><span class="ic">⬡</span>모델 머지 랩</div>
-    <div class="nav-item" data-page="memory.html"><span class="ic">⛁</span>단기 · 장기 기억</div>
+    <div class="nav-item active"><span class="ic">⛁</span>단기 · 장기 기억</div>
     <div class="nav-item" data-page="billing.html"><span class="ic">$</span>사용량 · 요금</div>
     <div class="nav-section">시스템</div>
-    <div class="nav-item active"><span class="ic">⚙</span>설정</div>
+    <div class="nav-item" data-page="settings.html"><span class="ic">⚙</span>설정</div>
   </div>
 
   <div class="main">
     <div class="topbar-row">
       <div>
-        <div class="page-title">설정</div>
-        <div class="page-sub">서버 연결 · 계정 · 로컬 LLM 엔진 관리</div>
+        <div class="page-title">단기 · 장기 기억</div>
+        <div class="page-sub">6.2절 — 단기 기억(RAG)과 장기 기억(파인튜닝) 두 단계로 고객사 데이터를 학습시킵니다.</div>
       </div>
     </div>
 
     <div class="panel">
-      <div class="panel-title">서버 연결</div>
-      <div class="panel-sub">단일 데스크톱 모드: 기본 주소(localhost:4000) 그대로 사용 · 분산 모드: 사내망 GPU 서버 주소로 변경</div>
+      <div class="panel-title">단기 기억 — 문서 수집 (RAG)</div>
+      <div class="panel-sub">서버가 LanceDB에 청크·임베딩해서 저장합니다 (여러 클라이언트가 같은 지식 베이스를 공유).</div>
       <div class="field">
-        <label for="serverUrlInput">서버 주소</label>
-        <div class="field-row">
-          <input id="serverUrlInput" placeholder="http://localhost:4000">
-          <button class="btn-ghost" id="testConnectionBtn">연결 테스트</button>
-          <button class="btn-primary" id="saveServerUrlBtn">저장</button>
-        </div>
+        <label for="ingestPathInput">문서 경로</label>
+        <input id="ingestPathInput" placeholder="예: data/docs/incident-policy.txt">
       </div>
-      <div class="status-line" id="serverStatusLine"></div>
+      <button class="btn-primary" id="ingestBtn">수집</button>
+      <div class="status-line" id="ingestStatusLine"></div>
     </div>
 
     <div class="panel">
-      <div class="panel-title">계정</div>
-      <dl class="kv" id="accountKv">
-        <dt>아이디</dt><dd id="accountUsername">-</dd>
-        <dt>이름</dt><dd id="accountDisplayName">-</dd>
-        <dt>역할</dt><dd id="accountRole">-</dd>
-      </dl>
-      <button class="btn-danger" id="logoutBtn">로그아웃</button>
-    </div>
-
-    <div class="panel">
-      <div class="panel-title">로컬 LLM 엔진</div>
-      <div class="panel-sub">서버가 보유한 GPU 머신의 llama.cpp 프로세스를 원격으로 제어합니다.</div>
-      <div id="engineStatusLine" style="font-size:12.5px;color:var(--muted);margin-bottom:14px">불러오는 중...</div>
-      <div class="field">
-        <label for="modelIdInput">모델 ID</label>
-        <div class="field-row">
-          <input id="modelIdInput" placeholder="예: Qwen3-30B-A3B">
-          <button class="btn-ghost" id="startEngineBtn">시작</button>
-          <button class="btn-danger" id="stopEngineBtn">중지</button>
+      <div class="panel-title">단기 기억 — 지식 질의</div>
+      <div class="panel-sub">수집된 문서에서 질문과 가장 관련 있는 구절을 검색합니다.</div>
+      <div class="field-row">
+        <div class="field">
+          <label for="queryInput">질문</label>
+          <input id="queryInput" placeholder="예: 랜섬웨어 감염 시 초동 조치는?">
         </div>
+        <button class="btn-primary" id="queryBtn">검색</button>
       </div>
-      <div class="hint">모델을 바꿔 다시 "시작"하면 기존 프로세스를 정상 종료한 뒤 새 모델로 교체합니다(모델 스왑).</div>
+      <div class="result-box" id="queryResults" style="display:none"></div>
     </div>
 
     <div class="panel">
-      <div class="panel-title">서버 로그</div>
-      <div class="panel-sub">서버 콘솔 출력을 실시간으로 표시합니다(최근 500줄).</div>
-      <div class="log-console" id="logConsole"></div>
+      <div class="panel-title">장기 기억 — 파인튜닝<span class="badge b-amber" style="margin-left:8px">Unsloth QLoRA</span></div>
+      <div class="panel-sub">에이전트를 특정 데이터셋으로 파인튜닝해 내재화된 지식으로 만듭니다.</div>
+      <div class="field-row">
+        <div class="field">
+          <label for="ftAgentInput">에이전트 ID</label>
+          <input id="ftAgentInput" placeholder="예: analysis">
+        </div>
+        <div class="field">
+          <label for="ftDatasetInput">데이터셋 ID</label>
+          <input id="ftDatasetInput" placeholder="예: incident-qa-v1">
+        </div>
+        <button class="btn-primary" id="ftStartBtn">파인튜닝 시작</button>
+      </div>
+      <div class="status-line" id="ftStatusLine"></div>
+      <div class="progress-track"><div class="progress-fill" id="ftProgressFill"></div></div>
+      <div class="hint">서버가 <code>scripts/finetune_unsloth.py</code>를 실행해 진행률을 WebSocket으로 스트리밍합니다 — 학습 스크립트 자체는 벤더/데이터셋 계약에 맞춰 별도로 준비해야 합니다.</div>
     </div>
 
     <div class="footer">
@@ -168,10 +159,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   const clockEl = document.getElementById("clockEl");
   const statusPill = document.getElementById("statusPill");
   const avatarBtn = document.getElementById("avatarBtn");
-  const serverUrlInput = document.getElementById("serverUrlInput");
-  const serverStatusLine = document.getElementById("serverStatusLine");
-  const engineStatusLine = document.getElementById("engineStatusLine");
-  const modelIdInput = document.getElementById("modelIdInput");
 
   function tick() {
     clockEl.textContent = new Date().toLocaleString("ko-KR", {
@@ -192,113 +179,77 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     try {
       const user = await window.gijo.me();
       avatarBtn.textContent = (user.displayName || user.username || "-").charAt(0);
-      document.getElementById("accountUsername").textContent = user.username || "-";
-      document.getElementById("accountDisplayName").textContent = user.displayName || "-";
-      document.getElementById("accountRole").textContent = user.role || "-";
     } catch (e) {}
   }
 
-  async function testConnection() {
-    serverStatusLine.textContent = "연결 확인 중...";
-    serverStatusLine.className = "status-line";
+  async function ingest() {
+    const path = document.getElementById("ingestPathInput").value.trim();
+    const line = document.getElementById("ingestStatusLine");
+    if (!path) return;
+    line.textContent = "수집 중...";
+    line.className = "status-line";
     try {
-      await window.gijo.checkServerHealth();
-      serverStatusLine.textContent = "✓ 서버에 정상적으로 연결됩니다.";
-      serverStatusLine.className = "status-line status-ok";
+      const result = await window.gijo.ingestDocument(path);
+      line.textContent = `✓ ${result.documentId} — ${result.chunks}개 청크 저장됨 (${result.embeddingModel})`;
+      line.className = "status-line status-ok";
     } catch (e) {
-      serverStatusLine.textContent = "✗ 서버에 연결할 수 없습니다: " + e.message;
-      serverStatusLine.className = "status-line status-err";
+      line.textContent = "✗ 수집 실패: " + e.message;
+      line.className = "status-line status-err";
     }
   }
 
-  function saveServerUrl() {
-    const url = serverUrlInput.value.trim();
-    if (!url) return;
-    window.gijo.setServerUrl(url);
-    testConnection();
-    loadHealth();
-  }
-
-  async function loadEngineStatus() {
+  async function query() {
+    const question = document.getElementById("queryInput").value.trim();
+    const box = document.getElementById("queryResults");
+    if (!question) return;
+    box.style.display = "block";
+    box.textContent = "검색 중...";
     try {
-      const status = await window.gijo.getLocalEngineStatus();
-      engineStatusLine.innerHTML = status.running
-        ? `<span class="badge b-teal">기동중</span> · 모델: ${status.modelId} · 포트 ${status.port}`
-        : `<span class="badge b-amber">중지됨</span>`;
+      const results = await window.gijo.queryMemory(question, 5);
+      box.innerHTML = results.length
+        ? results.map((r) => `<div class="result-chunk">${r.replace(/</g, "&lt;")}</div>`).join("")
+        : '<div style="color:var(--muted)">관련 문서가 없습니다 — 먼저 문서를 수집하세요.</div>';
     } catch (e) {
-      engineStatusLine.textContent = "엔진 상태를 불러오지 못했습니다";
+      box.textContent = "검색 실패: " + e.message;
     }
   }
 
-  async function startEngine() {
-    const modelId = modelIdInput.value.trim();
-    if (!modelId) return;
-    engineStatusLine.textContent = "기동 중...";
+  async function startFinetune() {
+    const agentId = document.getElementById("ftAgentInput").value.trim();
+    const datasetId = document.getElementById("ftDatasetInput").value.trim();
+    const line = document.getElementById("ftStatusLine");
+    if (!agentId || !datasetId) return;
     try {
-      await window.gijo.startLocalEngine(modelId);
-      await loadEngineStatus();
+      await window.gijo.startFinetune(agentId, datasetId);
+      line.textContent = "파인튜닝 시작됨 — 진행률 대기 중...";
+      line.className = "status-line status-ok";
     } catch (e) {
-      engineStatusLine.textContent = "기동 실패: " + e.message;
-    }
-  }
-
-  async function stopEngine() {
-    engineStatusLine.textContent = "중지 중...";
-    try {
-      await window.gijo.stopLocalEngine();
-      await loadEngineStatus();
-    } catch (e) {
-      engineStatusLine.textContent = "중지 실패: " + e.message;
-    }
-  }
-
-  async function logout() {
-    await window.gijo.logout();
-    await window.gijo.navigateTo("login.html");
-  }
-
-  const logConsole = document.getElementById("logConsole");
-
-  function appendLogEntry(entry) {
-    const line = document.createElement("div");
-    line.className = "log-line" + (entry.level === "warn" ? " log-warn" : entry.level === "error" ? " log-error" : "");
-    const time = new Date(entry.timestamp).toLocaleTimeString("ko-KR", { hour12: false });
-    line.innerHTML = `<span class="log-ts">${time}</span>${entry.message.replace(/</g, "&lt;")}`;
-    logConsole.appendChild(line);
-    while (logConsole.childElementCount > 500) logConsole.removeChild(logConsole.firstChild);
-    logConsole.scrollTop = logConsole.scrollHeight;
-  }
-
-  async function loadLogs() {
-    try {
-      const entries = await window.gijo.listLogs();
-      logConsole.innerHTML = "";
-      entries.forEach(appendLogEntry);
-    } catch (e) {
-      logConsole.textContent = "로그를 불러오지 못했습니다: " + e.message;
+      line.textContent = "시작 실패: " + e.message;
+      line.className = "status-line status-err";
     }
   }
 
   async function init() {
     tick();
     setInterval(tick, 30000);
-    serverUrlInput.value = window.gijo.getServerUrl();
     await loadUser();
-    await Promise.all([loadHealth(), loadEngineStatus(), loadLogs()]);
+    await loadHealth();
 
-    document.getElementById("testConnectionBtn").addEventListener("click", testConnection);
-    document.getElementById("saveServerUrlBtn").addEventListener("click", saveServerUrl);
-    document.getElementById("startEngineBtn").addEventListener("click", startEngine);
-    document.getElementById("stopEngineBtn").addEventListener("click", stopEngine);
-    document.getElementById("logoutBtn").addEventListener("click", logout);
-    document.getElementById("settingsBtn").addEventListener("click", () => {}); // 이미 설정 화면
-
+    document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll(".nav-item[data-page]").forEach((el) => {
       el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
     });
+    document.getElementById("ingestBtn").addEventListener("click", ingest);
+    document.getElementById("queryBtn").addEventListener("click", query);
+    document.getElementById("ftStartBtn").addEventListener("click", startFinetune);
 
     if (window.gijoRealtime) window.gijoRealtime.connect();
-    window.gijo.onLogEvent(appendLogEntry);
+    window.gijo.onFinetuneProgress((p) => {
+      const pct = p.maxSteps ? Math.round((p.step / p.maxSteps) * 100) : 0;
+      document.getElementById("ftProgressFill").style.width = pct + "%";
+      document.getElementById("ftStatusLine").textContent = `학습 중 — step ${p.step}/${p.maxSteps}, loss ${p.loss}`;
+      document.getElementById("ftStatusLine").className = "status-line status-ok";
+    });
   }
 
   if (!window.gijo.isAuthenticated()) {

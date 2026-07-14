@@ -53,6 +53,7 @@ const gijoApi = {
 
   // 메모리(RAG) / 파인튜닝(장기 기억)
   ingestDocument: (path: string) => api.memoryApi.ingest(path),
+  queryMemory: (question: string, topK?: number) => api.memoryApi.query(question, topK),
   startFinetune: (agentId: string, datasetId: string) => api.finetuneApi.start(agentId, datasetId),
   onFinetuneProgress: (cb: (p: unknown) => void) => onChannel("finetune:progress", cb),
 
