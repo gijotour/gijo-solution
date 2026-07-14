@@ -28,6 +28,7 @@ describe("assets", () => {
     expect(res.body.assetType).toBe("기타");
     expect(res.body.owner).toBe("-");
     expect(res.body.findings).toEqual([]);
+    expect(res.body.scanHistory).toEqual([]);
     expect(res.body.lastScannedAt).toBeNull();
     expect(res.body.sbomGeneratedAt).toBeNull();
   });
@@ -67,5 +68,23 @@ describe("assets", () => {
       .send({ id: "a1", name: "a1", path: "x" });
     const after = await request(app).get("/api/assets/a1").set("Authorization", `Bearer ${token}`);
     expect(after.body.findings).toEqual([]);
+  });
+
+  it("findings reflect only the latest scan, while scanHistory keeps every past run (regression: used to append findings forever)", async () => {
+    await request(app)
+      .post("/api/assets")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ id: "a1", name: "a1", path: "x" });
+
+    await request(app).post("/api/dispatch").set("Authorization", `Bearer ${token}`).send({ text: "a1 스캔해줘" });
+    const afterFirstScan = await request(app).get("/api/assets/a1").set("Authorization", `Bearer ${token}`);
+    expect(afterFirstScan.body.scanHistory).toHaveLength(1);
+    const findingsAfterOneScan = afterFirstScan.body.findings.length;
+
+    await request(app).post("/api/dispatch").set("Authorization", `Bearer ${token}`).send({ text: "a1 스캔해줘" });
+    const afterSecondScan = await request(app).get("/api/assets/a1").set("Authorization", `Bearer ${token}`);
+    expect(afterSecondScan.body.scanHistory).toHaveLength(2);
+    // findings must stay at "one scan's worth", not double up across the two runs
+    expect(afterSecondScan.body.findings.length).toBe(findingsAfterOneScan);
   });
 });

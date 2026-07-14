@@ -9,6 +9,7 @@ import { WebSocketServer } from "ws";
 import { createApp } from "./app";
 import { attachCollaborationSocket } from "./engine/collaboration";
 import { attachFinetuneSocket } from "./engine/finetune";
+import { attachAssetsSocket } from "./engine/assets";
 import { stopLocalEngine } from "./engine/localengine";
 
 const PORT = Number(process.env.GIJO_SERVER_PORT ?? 4000);
@@ -16,10 +17,11 @@ const PORT = Number(process.env.GIJO_SERVER_PORT ?? 4000);
 const app = createApp();
 const httpServer = createServer(app);
 
-// 실시간 채널: collaboration:event, finetune:progress 등을 모든 접속 클라이언트에 브로드캐스트
+// 실시간 채널: collaboration:event, finetune:progress, asset:updated 등을 모든 접속 클라이언트에 브로드캐스트
 const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
 attachCollaborationSocket(wss);
 attachFinetuneSocket(wss);
+attachAssetsSocket(wss);
 
 httpServer.listen(PORT, () => {
   console.log(`GIJO AS 서버 기동 — http://localhost:${PORT} (WebSocket: /ws)`);

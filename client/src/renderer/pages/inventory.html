@@ -356,6 +356,18 @@
     render();
   }
 
+  // 서버가 스캔 완료 · SBOM 생성 · 자산 등록 시점마다 WebSocket으로 밀어주는 asset:updated를
+  // 받아 목록을 제자리에서 갱신한다 — 다른 사용자/에이전트가 트리거한 스캔도 새로고침 없이 반영된다.
+  function subscribeToLiveUpdates() {
+    if (window.gijoRealtime) window.gijoRealtime.connect();
+    window.gijo.onAssetUpdated((asset) => {
+      const idx = allAssets.findIndex((a) => a.id === asset.id);
+      if (idx >= 0) allAssets[idx] = asset;
+      else allAssets.push(asset);
+      render();
+    });
+  }
+
   function csvExport() {
     const rows = [["자산명", "유형", "소유부서", "위험도", "최근 스캔", "SBOM"]];
     for (const a of applyFilters(allAssets)) {
@@ -405,6 +417,7 @@
     await loadUser();
     await loadHealth();
     await refresh();
+    subscribeToLiveUpdates();
 
     searchInput.addEventListener("input", render);
     filterChips.addEventListener("click", (e) => {

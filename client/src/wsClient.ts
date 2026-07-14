@@ -1,5 +1,5 @@
 // GIJO AS 클라이언트 — WebSocket 클라이언트
-// 서버가 브로드캐스트하는 실시간 이벤트(collaboration:event, finetune:progress)를 구독한다.
+// 서버가 브로드캐스트하는 실시간 이벤트(collaboration:event, finetune:progress, asset:updated)를 구독한다.
 // 과거(단일 앱) 버전의 ipcRenderer.on() 패턴을 대체한다.
 
 import { getServerUrl } from "./apiClient";
