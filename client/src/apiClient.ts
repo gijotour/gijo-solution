@@ -2,23 +2,30 @@
 // 서버(gijo-as-server)와의 모든 통신은 이 모듈을 통해서만 이루어진다.
 // preload.ts가 이 모듈을 사용해 window.gijo.* 표면을 구성한다.
 //
-// 인증: 로그인 성공 시 서버가 발급한 Bearer 토큰을 보관한다.
+// 인증: 로그인 성공 시 서버가 발급한 access token(짧은 만료, JWT) + refresh token(회전형)을 보관한다.
 // [실기동 검증 중 발견된 버그] 이 페이지들은 SPA가 아니라 매번 mainWindow.loadFile()로
 // 전체 페이지 네비게이션을 한다 — Electron은 네비게이션마다 preload 스크립트를 처음부터
-// 다시 실행하므로, 모듈 내부 변수(let authToken)에만 저장하면 로그인 직후 다음 페이지로
+// 다시 실행하므로, 모듈 내부 변수에만 저장하면 로그인 직후 다음 페이지로
 // 이동하는 순간 토큰이 사라져 즉시 로그인 화면으로 튕기는 무한 루프가 발생했다.
 // 그래서 메인 프로세스(페이지 이동에도 살아있는 유일한 곳)에 상태를 동기 IPC로 위임한다.
 import { ipcRenderer } from "electron";
 
 const DEFAULT_SERVER_URL = process.env.GIJO_SERVER_URL ?? "http://localhost:4000";
 
-const persisted = ipcRenderer.sendSync("auth:getState") as { token: string | null; serverUrl: string | null };
+interface AuthState {
+  accessToken: string | null;
+  refreshToken: string | null;
+  serverUrl: string | null;
+}
+
+const persisted = ipcRenderer.sendSync("auth:getState") as AuthState;
 
 let serverUrl = persisted.serverUrl ?? DEFAULT_SERVER_URL;
-let authToken: string | null = persisted.token;
+let accessToken: string | null = persisted.accessToken;
+let refreshToken: string | null = persisted.refreshToken;
 
 function persist(): void {
-  ipcRenderer.send("auth:setState", { token: authToken, serverUrl });
+  ipcRenderer.send("auth:setState", { accessToken, refreshToken, serverUrl });
 }
 
 export function setServerUrl(url: string): void {
@@ -30,29 +37,54 @@ export function getServerUrl(): string {
   return serverUrl;
 }
 
-export function setAuthToken(token: string | null): void {
-  authToken = token;
+export function setAuthTokens(tokens: { accessToken: string; refreshToken: string } | null): void {
+  accessToken = tokens?.accessToken ?? null;
+  refreshToken = tokens?.refreshToken ?? null;
   persist();
 }
 
 export function isAuthenticated(): boolean {
-  return authToken !== null;
+  return accessToken !== null;
 }
 
 interface RequestOpts {
   method?: "GET" | "POST" | "PUT" | "DELETE";
   body?: unknown;
+  skipAuthRetry?: boolean;
+}
+
+// access token이 만료돼 401이 오면, refresh token으로 한 번만 조용히 재발급받고 원 요청을 재시도한다.
+// refresh도 실패하면(만료/폐기) 토큰을 지워서 다음 API 호출들이 즉시 401로 실패 -> 각 페이지의
+// isAuthenticated() 가드가 로그인 화면으로 돌려보낸다.
+async function tryRefresh(): Promise<boolean> {
+  if (!refreshToken) return false;
+  const res = await fetch(`${serverUrl}/api/auth/refresh`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ refreshToken }),
+  }).catch(() => null);
+  if (!res || !res.ok) {
+    setAuthTokens(null);
+    return false;
+  }
+  const result = (await res.json()) as { accessToken: string; refreshToken: string };
+  setAuthTokens(result);
+  return true;
 }
 
 async function request<T = unknown>(path: string, opts: RequestOpts = {}): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (authToken) headers["Authorization"] = `Bearer ${authToken}`;
+  if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
 
   const res = await fetch(`${serverUrl}${path}`, {
     method: opts.method ?? "GET",
     headers,
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
   });
+
+  if (res.status === 401 && !opts.skipAuthRetry && (await tryRefresh())) {
+    return request<T>(path, { ...opts, skipAuthRetry: true });
+  }
 
   if (!res.ok) {
     let detail = "";
@@ -70,16 +102,16 @@ async function request<T = unknown>(path: string, opts: RequestOpts = {}): Promi
 // ── 인증 ──────────────────────────────────────────────────────────────
 export const authApi = {
   login: async (username: string, password: string) => {
-    const result = await request<{ token: string; user: unknown }>("/api/auth/login", {
+    const result = await request<{ accessToken: string; refreshToken: string; user: unknown }>("/api/auth/login", {
       method: "POST",
       body: { username, password },
     });
-    setAuthToken(result.token);
+    setAuthTokens(result);
     return result;
   },
   logout: async () => {
-    await request("/api/auth/logout", { method: "POST" });
-    setAuthToken(null);
+    await request("/api/auth/logout", { method: "POST", body: { refreshToken } });
+    setAuthTokens(null);
   },
   me: () => request("/api/auth/me"),
 };

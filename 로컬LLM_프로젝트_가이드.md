@@ -632,7 +632,7 @@ NVIDIA RTX 3090 GPU가 장착된 고사양 사내 서버에 Spring Boot 백엔�
 
 ### 9.5 알려진 미결 항목
 
-- **JWT 만료/갱신 정책**: Access Token 및 Refresh Token 이중화 설계 필요
+- ~~**JWT 만료/갱신 정책**: Access Token 및 Refresh Token 이중화 설계 필요~~ → 완료 (2026-07-14). `server/src/auth/auth.ts`: 서명된 JWT access token(기본 15분, `GIJO_ACCESS_TOKEN_TTL`)과 서버 측에 남는 opaque refresh token(기본 7일, `GIJO_REFRESH_TOKEN_TTL_MS`, 사용 시마다 회전)으로 분리. `POST /api/auth/refresh` 신설, 로그아웃은 refresh token만 즉시 폐기(발급된 access token은 JWT 설계상 무상태라 자연 만료까지는 유효 — 9.4절의 stateless 설계 의도 그대로). 클라이언트(`apiClient.ts`)는 401 응답 시 refresh token으로 한 번 조용히 재발급받아 원 요청을 재시도하도록 연동.
 - **DB 영속화 세부 튜닝**: SQLite를 JPA에 임베디드로 사용할 때 발생하는 Write-Ahead Logging(WAL) 동시성 이슈 보완
 - **자산 인벤토리(Assets) 고도화**: inventory 화면의 자산 이력을 실시간 스캔 정보와 매핑하는 데이터 파이프라인 정밀화
 - ~~**자연어 라우팅 고도화**: `IntentService` 내의 Regex 의도 분석기를 로컬 LLM Few-shot 의도 판별 및 JSON 파싱 모듈로 마이그레이션~~ → 완료 (2026-07-14), `server/src/engine/intent.ts` 참고

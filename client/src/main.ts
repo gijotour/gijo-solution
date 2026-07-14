@@ -12,12 +12,17 @@ let bundledServerProcess: ChildProcess | null = null;
 
 // 페이지 전체 네비게이션(loadFile) 시마다 preload가 재실행되어 사라지는 인증 토큰/서버 주소를
 // 여기(메인 프로세스, 앱 생명주기 동안 유지됨)에 보관한다 — apiClient.ts가 동기 IPC로 읽고 쓴다.
-let authState: { token: string | null; serverUrl: string | null } = { token: null, serverUrl: null };
+interface AuthState {
+  accessToken: string | null;
+  refreshToken: string | null;
+  serverUrl: string | null;
+}
+let authState: AuthState = { accessToken: null, refreshToken: null, serverUrl: null };
 
 ipcMain.on("auth:getState", (event) => {
   event.returnValue = authState;
 });
-ipcMain.on("auth:setState", (_event, state: { token: string | null; serverUrl: string | null }) => {
+ipcMain.on("auth:setState", (_event, state: AuthState) => {
   authState = state;
 });
 

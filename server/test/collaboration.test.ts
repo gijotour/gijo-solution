@@ -5,7 +5,7 @@ import { emitCollaboration, resetCollaborationForTests } from "../src/engine/col
 
 async function login(app: ReturnType<typeof createApp>) {
   const res = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" });
-  return res.body.token as string;
+  return res.body.accessToken as string;
 }
 
 describe("collaboration", () => {
