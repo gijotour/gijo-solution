@@ -7,6 +7,7 @@
 import type { Request, Response, NextFunction, Express } from "express";
 import * as crypto from "crypto";
 import * as jwt from "jsonwebtoken";
+import * as bcrypt from "bcryptjs";
 import { findUserByUsername, findUserById, GijoUser } from "./users";
 
 // TODO: 프로덕션에서는 시크릿을 환경변수(GIJO_JWT_SECRET)로 반드시 주입할 것 — 기본값은 개발용.
@@ -74,8 +75,7 @@ export function registerAuthRoutes(app: Express): void {
   app.post("/api/auth/login", (req, res) => {
     const { username, password } = req.body as { username: string; password: string };
     const user = findUserByUsername(username);
-    // TODO: bcrypt.compare(password, user.passwordHash)로 교체
-    if (!user || user.passwordHash !== password) {
+    if (!user || !bcrypt.compareSync(password, user.passwordHash)) {
       res.status(401).json({ error: "invalid credentials" });
       return;
     }
