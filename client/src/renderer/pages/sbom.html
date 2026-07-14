@@ -122,7 +122,7 @@ tr:last-child td{border-bottom:none;}
       <div class="icon-btn">+</div>
     </div>
     <div class="avatar-btn" id="avatarBtn">-</div>
-    <div class="icon-btn">⚙</div>
+    <div class="icon-btn" id="settingsBtn">⚙</div>
   </div>
 </div>
 
@@ -389,6 +389,7 @@ tr:last-child td{border-bottom:none;}
       }
     });
 
+    document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.getElementById("bulkRegenBtn").addEventListener("click", bulkGenerate);
   }
 

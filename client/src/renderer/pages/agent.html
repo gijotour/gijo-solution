@@ -160,7 +160,7 @@ tr:last-child td{border-bottom:none;}
       <div class="icon-btn">+</div>
     </div>
     <div class="avatar-btn" id="avatarBtn">-</div>
-    <div class="icon-btn">⚙</div>
+    <div class="icon-btn" id="settingsBtn">⚙</div>
   </div>
 </div>
 
@@ -434,6 +434,7 @@ tr:last-child td{border-bottom:none;}
     if (window.gijoRealtime) window.gijoRealtime.connect();
     window.gijo.onCollaborationEvent(appendLiveEvent);
 
+    document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.getElementById("taskBarBtn").addEventListener("click", sendInstruction);
     taskBarInput.addEventListener("keydown", (e) => { if (e.key === "Enter") sendInstruction(); });
 

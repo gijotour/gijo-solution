@@ -133,7 +133,7 @@
       <div class="icon-btn">+</div>
     </div>
     <div class="avatar-btn" id="avatarBtn">-</div>
-    <div class="icon-btn">⚙</div>
+    <div class="icon-btn" id="settingsBtn">⚙</div>
   </div>
 </div>
 
@@ -441,6 +441,7 @@
       }
     });
 
+    document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.getElementById("addAssetBtn").addEventListener("click", openModal);
     document.getElementById("modalCancelBtn").addEventListener("click", closeModal);
     document.getElementById("modalSaveBtn").addEventListener("click", saveAsset);

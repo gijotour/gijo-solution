@@ -89,7 +89,7 @@
         <div class="icon-btn">+</div>
       </div>
       <div class="avatar-btn" id="avatarBtn">-</div>
-      <div class="icon-btn">⚙</div>
+      <div class="icon-btn" id="settingsBtn">⚙</div>
     </div>
   </div>
 
@@ -270,6 +270,7 @@
     greet();
     await Promise.all([loadHealth(), loadAssets(), loadTasks()]);
 
+    document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.getElementById("refreshAssetsBtn").addEventListener("click", loadAssets);
     document.getElementById("todoAddBtn").addEventListener("click", addTodo);
     todoInput.addEventListener("keydown", (e) => { if (e.key === "Enter") addTodo(); });
