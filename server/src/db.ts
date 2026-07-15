@@ -61,4 +61,16 @@ db.exec(`
     encryptedApiKey TEXT,
     connected INTEGER NOT NULL
   );
+
+  -- 단일 행(id='default')만 쓴다 — 이메일 발송용 SMTP 서버 1개 설정. encryptedPassword는
+  -- cti_feeds.encryptedApiKey와 동일한 방식으로 암호화 저장(평문 저장 안 함).
+  CREATE TABLE IF NOT EXISTS smtp_config (
+    id TEXT PRIMARY KEY,
+    host TEXT NOT NULL,
+    port INTEGER NOT NULL,
+    secure INTEGER NOT NULL,
+    user TEXT,
+    encryptedPassword TEXT,
+    fromAddress TEXT NOT NULL
+  );
 `);

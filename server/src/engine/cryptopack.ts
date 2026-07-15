@@ -28,6 +28,28 @@ export function decryptBuffer(payload: EncryptedPayload, key: Buffer): Buffer {
   return Buffer.concat([decipher.update(payload.ciphertext), decipher.final()]);
 }
 
+// 문자열 하나를 SQLite TEXT 컬럼에 그대로 넣을 수 있는 JSON으로 암호화/복호화한다 —
+// cti.ts(벤더 API 키), email.ts(SMTP 비밀번호)처럼 "짧은 비밀 문자열 하나를 DB에 저장" 패턴의
+// 공통 헬퍼. iv/ciphertext/authTag는 Buffer라 JSON.stringify가 안 되므로 hex로 인코딩한다.
+export function encryptString(plain: string, key: Buffer): string {
+  const payload = encryptBuffer(Buffer.from(plain, "utf-8"), key);
+  return JSON.stringify({
+    iv: payload.iv.toString("hex"),
+    ciphertext: payload.ciphertext.toString("hex"),
+    authTag: payload.authTag.toString("hex"),
+  });
+}
+
+export function decryptString(serialized: string, key: Buffer): string {
+  const raw = JSON.parse(serialized) as { iv: string; ciphertext: string; authTag: string };
+  const payload: EncryptedPayload = {
+    iv: Buffer.from(raw.iv, "hex"),
+    ciphertext: Buffer.from(raw.ciphertext, "hex"),
+    authTag: Buffer.from(raw.authTag, "hex"),
+  };
+  return decryptBuffer(payload, key).toString("utf-8");
+}
+
 const KEY_PATH = path.join("data", "encryption.key");
 let cachedKey: Buffer | null = null;
 

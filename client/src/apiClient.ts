@@ -228,9 +228,29 @@ export const toolsApi = {
 };
 
 // ── 이메일 리포트 발송 ────────────────────────────────────────────────
+export interface SmtpConfig {
+  host: string;
+  port: number;
+  secure: boolean;
+  user: string | null;
+  hasPassword: boolean;
+  fromAddress: string;
+}
+
+export interface SmtpConfigInput {
+  host: string;
+  port: number;
+  secure: boolean;
+  user?: string;
+  password?: string;
+  fromAddress: string;
+}
+
 export const emailApi = {
   sendReport: (to: string[], subject: string, attachmentPath: string) =>
     request("/api/email/sendReport", { method: "POST", body: { to, subject, attachmentPath } }),
+  getConfig: () => request<SmtpConfig | null>("/api/email/config"),
+  saveConfig: (config: SmtpConfigInput) => request<SmtpConfig>("/api/email/config", { method: "POST", body: config }),
 };
 
 // ── SBOM ─────────────────────────────────────────────────────────────

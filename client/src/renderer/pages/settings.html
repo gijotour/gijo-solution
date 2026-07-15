@@ -152,6 +152,40 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     </div>
 
     <div class="panel">
+      <div class="panel-title">이메일(SMTP) 설정</div>
+      <div class="panel-sub">내부 리포트를 이메일로 보낼 때 쓰는 사내 SMTP 서버 정보입니다. 비밀번호는 암호화되어 저장됩니다.</div>
+      <div class="field-row">
+        <div class="field">
+          <label for="smtpHostInput">SMTP 호스트</label>
+          <input id="smtpHostInput" placeholder="예: smtp.office365.com">
+        </div>
+        <div class="field" style="max-width:110px">
+          <label for="smtpPortInput">포트</label>
+          <input id="smtpPortInput" placeholder="587" type="number">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="smtpUserInput">계정</label>
+          <input id="smtpUserInput" placeholder="예: gijo-as@company.com">
+        </div>
+        <div class="field">
+          <label for="smtpPasswordInput">비밀번호</label>
+          <input id="smtpPasswordInput" type="password" placeholder="변경하지 않으려면 비워두세요">
+        </div>
+      </div>
+      <div class="field">
+        <label for="smtpFromInput">발신 주소</label>
+        <input id="smtpFromInput" placeholder="예: gijo-as@company.com">
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);margin-bottom:14px;cursor:pointer">
+        <input type="checkbox" id="smtpSecureInput" style="width:auto">SSL/TLS 사용(포트 465 등)
+      </label>
+      <button class="btn-primary" id="saveSmtpBtn">저장</button>
+      <div class="status-line" id="smtpStatusLine"></div>
+    </div>
+
+    <div class="panel">
       <div class="panel-title">서버 로그</div>
       <div class="panel-sub">서버 콘솔 출력을 실시간으로 표시합니다(최근 500줄).</div>
       <div class="log-console" id="logConsole"></div>
@@ -257,6 +291,51 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     await window.gijo.navigateTo("login.html");
   }
 
+  async function loadSmtpConfig() {
+    try {
+      const config = await window.gijo.getSmtpConfig();
+      if (!config) return;
+      document.getElementById("smtpHostInput").value = config.host;
+      document.getElementById("smtpPortInput").value = config.port;
+      document.getElementById("smtpSecureInput").checked = config.secure;
+      document.getElementById("smtpUserInput").value = config.user || "";
+      document.getElementById("smtpFromInput").value = config.fromAddress;
+      document.getElementById("smtpPasswordInput").placeholder = config.hasPassword
+        ? "설정됨 — 변경하지 않으려면 비워두세요"
+        : "변경하지 않으려면 비워두세요";
+    } catch (e) {}
+  }
+
+  async function saveSmtp() {
+    const smtpStatusLine = document.getElementById("smtpStatusLine");
+    const host = document.getElementById("smtpHostInput").value.trim();
+    const port = Number(document.getElementById("smtpPortInput").value || 587);
+    const fromAddress = document.getElementById("smtpFromInput").value.trim();
+    if (!host || !fromAddress) {
+      smtpStatusLine.textContent = "SMTP 호스트와 발신 주소는 필수입니다.";
+      smtpStatusLine.className = "status-line status-err";
+      return;
+    }
+    const config = {
+      host,
+      port,
+      secure: document.getElementById("smtpSecureInput").checked,
+      user: document.getElementById("smtpUserInput").value.trim() || undefined,
+      password: document.getElementById("smtpPasswordInput").value || undefined,
+      fromAddress,
+    };
+    try {
+      await window.gijo.saveSmtpConfig(config);
+      document.getElementById("smtpPasswordInput").value = "";
+      smtpStatusLine.textContent = "✓ 저장되었습니다.";
+      smtpStatusLine.className = "status-line status-ok";
+      await loadSmtpConfig();
+    } catch (e) {
+      smtpStatusLine.textContent = "✗ 저장 실패: " + e.message;
+      smtpStatusLine.className = "status-line status-err";
+    }
+  }
+
   const logConsole = document.getElementById("logConsole");
 
   function appendLogEntry(entry) {
@@ -284,12 +363,13 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     setInterval(tick, 30000);
     serverUrlInput.value = window.gijo.getServerUrl();
     await loadUser();
-    await Promise.all([loadHealth(), loadEngineStatus(), loadLogs()]);
+    await Promise.all([loadHealth(), loadEngineStatus(), loadLogs(), loadSmtpConfig()]);
 
     document.getElementById("testConnectionBtn").addEventListener("click", testConnection);
     document.getElementById("saveServerUrlBtn").addEventListener("click", saveServerUrl);
     document.getElementById("startEngineBtn").addEventListener("click", startEngine);
     document.getElementById("stopEngineBtn").addEventListener("click", stopEngine);
+    document.getElementById("saveSmtpBtn").addEventListener("click", saveSmtp);
     document.getElementById("logoutBtn").addEventListener("click", logout);
     document.getElementById("settingsBtn").addEventListener("click", () => {}); // 이미 설정 화면
 

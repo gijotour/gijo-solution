@@ -71,6 +71,12 @@ const gijoApi = {
   generateReport: (opts: { type: "weekly" | "quarterly" | "ondemand"; assetIds?: string[] }) =>
     api.reportApi.generate(opts.type, opts.assetIds),
 
+  // 이메일(SMTP) 설정
+  getSmtpConfig: () => api.emailApi.getConfig(),
+  saveSmtpConfig: (config: api.SmtpConfigInput) => api.emailApi.saveConfig(config),
+  sendReportEmail: (to: string[], subject: string, attachmentPath: string) =>
+    api.emailApi.sendReport(to, subject, attachmentPath),
+
   // 사용량 · 요금
   getUsageSummary: (sinceMs?: number) => api.usageApi.summary(sinceMs),
 

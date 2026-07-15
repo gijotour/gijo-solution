@@ -7,7 +7,7 @@ import type { Express } from "express";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { db } from "../db";
-import { encryptBuffer, decryptBuffer, getEncryptionKey, EncryptedPayload } from "./cryptopack";
+import { encryptString, decryptString, getEncryptionKey } from "./cryptopack";
 
 // 클라이언트에는 원본 키를 절대 내려주지 않는다 — 등록 여부만 노출.
 export interface CtiFeedPublic {
@@ -33,12 +33,6 @@ interface CtiFeedRow {
   connected: number;
 }
 
-interface SerializedPayload {
-  iv: string;
-  ciphertext: string;
-  authTag: string;
-}
-
 const SEED_FEEDS: { id: string; name: string }[] = [
   { id: "criminalip", name: "Criminal IP" },
   { id: "flashpoint", name: "Flashpoint" },
@@ -55,14 +49,6 @@ seedFeeds();
 const listStmt = db.prepare("SELECT * FROM cti_feeds");
 const getStmt = db.prepare("SELECT * FROM cti_feeds WHERE id = ?");
 const updateStmt = db.prepare("UPDATE cti_feeds SET encryptedApiKey = ?, connected = ? WHERE id = ?");
-
-function serializePayload(p: EncryptedPayload): SerializedPayload {
-  return { iv: p.iv.toString("hex"), ciphertext: p.ciphertext.toString("hex"), authTag: p.authTag.toString("hex") };
-}
-
-function deserializePayload(s: SerializedPayload): EncryptedPayload {
-  return { iv: Buffer.from(s.iv, "hex"), ciphertext: Buffer.from(s.ciphertext, "hex"), authTag: Buffer.from(s.authTag, "hex") };
-}
 
 function toPublic(row: CtiFeedRow): CtiFeedPublic {
   return { id: row.id, name: row.name, hasApiKey: row.encryptedApiKey !== null, connected: row.connected === 1 };
@@ -86,8 +72,7 @@ export function configureFeed(feedId: string, apiKey: string): CtiFeedPublic {
   if (trimmed.length === 0) {
     updateStmt.run(null, 0, feedId);
   } else {
-    const encrypted = encryptBuffer(Buffer.from(trimmed, "utf-8"), getEncryptionKey());
-    updateStmt.run(JSON.stringify(serializePayload(encrypted)), 1, feedId);
+    updateStmt.run(encryptString(trimmed, getEncryptionKey()), 1, feedId);
   }
   return toPublic(getStmt.get(feedId) as CtiFeedRow);
 }
@@ -102,8 +87,7 @@ export function disconnectFeed(feedId: string): CtiFeedPublic {
 export function getDecryptedApiKey(feedId: string): string | undefined {
   const row = getStmt.get(feedId) as CtiFeedRow | undefined;
   if (!row?.encryptedApiKey) return undefined;
-  const payload = deserializePayload(JSON.parse(row.encryptedApiKey) as SerializedPayload);
-  return decryptBuffer(payload, getEncryptionKey()).toString("utf-8");
+  return decryptString(row.encryptedApiKey, getEncryptionKey());
 }
 
 export async function listFindings(): Promise<CtiFinding[]> {
