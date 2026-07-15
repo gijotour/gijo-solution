@@ -86,9 +86,17 @@ export async function chat(args: ChatArgs): Promise<string> {
   // 실시간 스트림용: 어느 에이전트가 지금 로컬 LLM으로 추론하는지 눈에 보이게 한다.
   const agentName = getAgentById(args.agentId)?.name ?? args.agentId ?? "에이전트";
   const started = Date.now();
+
+  // 멀티모델 풀: 에이전트에 할당된 모델을 (필요하면 로드하고) 그 모델이 서빙되는 URL을 받는다.
+  // 이렇게 해야 서로 다른 모델을 쓰는 에이전트들이 스왑 없이 각자 포트에서 병렬로 답한다.
+  // (순환참조 회피 위해 동적 import. localengine을 못 불러오면 기본 URL로 폴백.)
+  const baseUrl = await import("./localengine.js")
+    .then((m) => m.ensureAgentModel(args.agentId))
+    .catch(() => LOCAL_LLM_BASE_URL);
+
   emitLlmActivity({ kind: "chat", phase: "start", agent: agentName, detail: "추론 요청" });
 
-  const res = await fetch(`${LOCAL_LLM_BASE_URL}/chat/completions`, {
+  const res = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ model: "local", messages, ...(args.maxTokens ? { max_tokens: args.maxTokens } : {}) }),
@@ -158,9 +166,7 @@ export function registerLlmRoutes(app: Express): void {
     "/api/llm/chat",
     authMiddleware,
     asyncRoute(async (req, res) => {
-      // 에이전트에 전용 모델이 할당돼 있으면 채팅 전에 그 모델로 스왑한다(없으면 전역 모델 유지).
-      const { ensureAgentModel } = await import("./localengine.js");
-      await ensureAgentModel(String(req.body.agentId ?? ""));
+      // 모델 라우팅(에이전트 할당 모델 로드·URL 선택)은 chat() 안에서 처리한다.
       // 대화형 라우트는 단기 기억(이력) + 장기 기억(RAG) 주입을 켠다.
       res.json({ reply: await chat({ ...req.body, remember: true }) });
     })

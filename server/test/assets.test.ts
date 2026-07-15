@@ -1,5 +1,14 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import request from "supertest";
+
+// 스캔 dispatch가 findings 상태를 어떻게 다루는지만 검증한다. 실제 로컬 LLM/모델 로딩에
+// 의존하지 않도록 llm을 목킹한다(라우팅·분석 요약용 chat 호출이 실제 모델을 띄우지 않게).
+vi.mock("../src/engine/llm", () => ({
+  chat: vi.fn(async () => "요약: 스캔 결과 정리."),
+  embed: vi.fn(async (texts: string[]) => texts.map(() => [0.1, 0.2, 0.3])),
+  registerLlmRoutes: vi.fn(),
+}));
+
 import { createApp } from "../src/app";
 import { resetAssetsForTests } from "../src/engine/assets";
 

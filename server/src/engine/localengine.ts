@@ -1,13 +1,14 @@
-// engine/localengine.ts — 로컬 LLM 엔진(llama-server) 프로세스 관리
-// 서버가 GPU(RTX 3090)가 있는 머신에서 실행되며, 이 프로세스를 단독 소유한다.
+// engine/localengine.ts — 로컬 LLM 엔진(llama-server) 프로세스 관리 (VRAM 예산 멀티모델 풀)
+// 서버가 GPU(RTX 3090)가 있는 머신에서 실행되며, 이 프로세스들을 단독 소유한다.
 //
-// 모델 스왑: RTX 3090 24GB로는 대형 모델 여러 개를 동시에 올릴 수 없으므로,
-// startLocalEngine()에 요청된 modelId가 현재 떠 있는 모델과 다르면 기존 프로세스를
-// graceful shutdown 한 뒤 새로 띄운다 — server-java-reference의
-// LocalEngineService.java와 동일한 스왑 방식.
+// 멀티모델 풀: 예전엔 채팅 모델을 1개만 올리고 다른 모델이 필요하면 스왑(기존 종료 후 재기동)했다.
+// 하지만 7~9B 양자화 모델은 24GB에 2~3개가 동시에 들어가므로(실측: lily-7b+qwythos-9b+bge-m3 = 16GB),
+// 이제 각 모델을 자기 포트에 상주시키는 풀로 관리한다. 새 모델을 올릴 VRAM이 모자라면(대형 30B 등)
+// nvidia-smi로 실측한 여유 VRAM을 보고 가장 오래 안 쓴 모델부터 내려 자리를 만든다.
+// nvidia-smi가 없으면 개수 상한(MAX_LOADED_MODELS)으로 폴백한다.
 
 import type { Express } from "express";
-import { spawn, ChildProcess } from "child_process";
+import { spawn, execFile, ChildProcess } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
 import { authMiddleware } from "../auth/auth";
@@ -24,17 +25,35 @@ const DEFAULT_CTX_SIZE = Number(process.env.GIJO_LOCAL_LLM_CTX_SIZE ?? 32768);
 // Java 참고 구현(LocalEngineService)과 동일하게 10초까지 정상 종료를 기다린 뒤 강제 종료한다.
 const STOP_TIMEOUT_MS = Number(process.env.GIJO_LOCAL_LLM_STOP_TIMEOUT_MS ?? 10000);
 
-// 제품 확정 모델 (다음단계 가이드 3.3, 2026-07-15). 최초 기동처럼 "마지막 사용 모델" 기록이
-// 없을 때의 자동 시작 후보다.
+// 제품 확정 모델 (다음단계 가이드 3.3, 2026-07-15). "마지막 사용 모델" 기록이 없을 때의 기본.
 const DEFAULT_MODEL_ID = process.env.GIJO_DEFAULT_MODEL_ID ?? "lily-cybersecurity-7b-v0.2";
 
-// RAG 임베딩용 별도 llama-server (llm.ts의 EMBEDDING_SERVER_URL과 짝). 채팅 모델과 달리
-// 스왑 개념이 없어 부팅 시 1회 자동 기동만 관리한다.
+// RAG 임베딩용 별도 llama-server (llm.ts의 EMBEDDING_SERVER_URL과 짝). 스왑/풀 대상이 아니라
+// 부팅 시 1회 자동 기동만 관리한다.
 const EMBEDDING_MODEL_ID = process.env.GIJO_EMBEDDING_MODEL_ID ?? "bge-m3";
 const EMBEDDING_PORT = Number(process.env.GIJO_EMBEDDING_PORT ?? 8081);
 
-let serverProcess: ChildProcess | null = null;
-let currentModelId: string | null = null;
+// 풀 파라미터
+const READY_TIMEOUT_MS = Number(process.env.GIJO_MODEL_READY_TIMEOUT_MS ?? 120000);
+// 새 모델 로드에 필요하다고 보는 VRAM(MB) = 파일 크기 + 이 오버헤드(KV 캐시·런타임). 32K 컨텍스트
+// 7~9B 기준 여유 있게 잡는다. GIJO_MODEL_VRAM_OVERHEAD_MB로 조정.
+const MODEL_VRAM_OVERHEAD_MB = Number(process.env.GIJO_MODEL_VRAM_OVERHEAD_MB ?? 5000);
+// nvidia-smi를 못 쓸 때의 폴백: 동시에 올려둘 채팅 모델 최대 개수.
+const MAX_LOADED_MODELS = Number(process.env.GIJO_MAX_LOADED_MODELS ?? 2);
+// 풀이 쓸 포트 범위(EMBEDDING_PORT는 건너뛴다). 첫 모델은 PORT(8080)를 받아 하위호환.
+const PORT_RANGE_END = PORT + 12;
+
+interface LoadedModel {
+  modelId: string;
+  port: number;
+  process: ChildProcess;
+  ready: boolean;
+  lastUsed: number;
+  loadingPromise?: Promise<boolean>;
+}
+
+// 채팅 모델 풀 (modelId -> 로드된 llama-server). 임베딩은 별도 단일 프로세스.
+const pool = new Map<string, LoadedModel>();
 let embeddingProcess: ChildProcess | null = null;
 let embeddingModelId: string | null = null;
 
@@ -43,18 +62,28 @@ const setStateStmt = db.prepare(
   "INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
 );
 
+export interface LoadedModelInfo {
+  modelId: string;
+  port: number;
+  ready: boolean;
+}
+
 export interface LocalEngineStatus {
   running: boolean;
   port: number;
-  modelId: string | null;
+  modelId: string | null; // 하위호환: 대표(8080) 또는 첫 모델
+  loaded: LoadedModelInfo[]; // 풀에 상주 중인 모든 채팅 모델
   embedding: { running: boolean; port: number; modelId: string | null };
 }
 
 export function getLocalEngineStatus(): LocalEngineStatus {
+  const loaded: LoadedModelInfo[] = [...pool.values()].map((m) => ({ modelId: m.modelId, port: m.port, ready: m.ready }));
+  const primary = loaded.find((m) => m.port === PORT) ?? loaded[0];
   return {
-    running: !!serverProcess,
-    port: PORT,
-    modelId: currentModelId,
+    running: pool.size > 0,
+    port: primary?.port ?? PORT,
+    modelId: primary?.modelId ?? null,
+    loaded,
     embedding: { running: !!embeddingProcess, port: EMBEDDING_PORT, modelId: embeddingModelId },
   };
 }
@@ -63,14 +92,22 @@ function modelFilePath(modelId: string): string {
   return path.join(MODELS_DIR, modelId, `${modelId}.gguf`);
 }
 
-// models/ 아래 실제로 배치된 채팅 모델 목록 (models/<id>/<id>.gguf 패턴). 임베딩 모델은
-// 채팅용이 아니므로 제외한다. 에이전트 모델 할당 드롭다운·검증의 단일 진실 소스.
+function modelFileSizeMb(modelId: string): number {
+  try {
+    return fs.statSync(modelFilePath(modelId)).size / (1024 * 1024);
+  } catch {
+    return 0;
+  }
+}
+
+// models/ 아래 실제로 배치된 채팅 모델 목록 (models/<id>/<id>.gguf 패턴). 임베딩 모델은 제외.
+// running = 지금 풀에 상주 중인지.
 export function listAvailableModels(): { id: string; running: boolean }[] {
   if (!fs.existsSync(MODELS_DIR)) return [];
   return fs
     .readdirSync(MODELS_DIR, { withFileTypes: true })
     .filter((d) => d.isDirectory() && d.name !== EMBEDDING_MODEL_ID && fs.existsSync(modelFilePath(d.name)))
-    .map((d) => ({ id: d.name, running: d.name === currentModelId }));
+    .map((d) => ({ id: d.name, running: pool.has(d.name) }));
 }
 
 export function isModelAvailable(modelId: string): boolean {
@@ -78,7 +115,6 @@ export function isModelAvailable(modelId: string): boolean {
 }
 
 // 부팅 자동 시작 후보: 마지막 사용 모델 → 제품 기본 모델 순으로, 실제 .gguf가 있는 첫 번째.
-// 없으면 null (자동 시작 안 함 — 파일도 없는데 spawn 에러를 내지 않는다).
 export function pickAutoStartModelId(): string | null {
   const last = (getStateStmt.get("lastModelId") as { value: string } | undefined)?.value;
   for (const candidate of [last, DEFAULT_MODEL_ID]) {
@@ -87,17 +123,68 @@ export function pickAutoStartModelId(): string | null {
   return null;
 }
 
-// 스왑/기동 직후엔 llama-server가 아직 모델을 VRAM에 올리는 중이라, 곧바로 추론을 보내면
-// 연결 거부로 첫 요청이 실패한다(모델을 오가는 에이전트 협업에서 특히 잦음). /health가 200(ok)을
-// 돌려줄 때까지 기다렸다가 startLocalEngine을 반환해, 뒤이은 chat()이 바로 성공하게 한다.
-// (llama.cpp: 로딩 중 503, 준비되면 200. 프로세스가 죽거나 교체되면 즉시 중단.)
-const READY_TIMEOUT_MS = Number(process.env.GIJO_MODEL_READY_TIMEOUT_MS ?? 120000);
+// ── VRAM 예산 & 포트 할당 ────────────────────────────────────────────────────
+function getFreeVramMb(): Promise<number | null> {
+  return new Promise((resolve) => {
+    execFile("nvidia-smi", ["--query-gpu=memory.free", "--format=csv,noheader,nounits"], (err, stdout) => {
+      if (err) return resolve(null);
+      const mb = parseInt(String(stdout).trim().split("\n")[0], 10);
+      resolve(Number.isFinite(mb) ? mb : null);
+    });
+  });
+}
 
-async function waitForModelReady(proc: ChildProcess, timeoutMs = READY_TIMEOUT_MS): Promise<boolean> {
-  const url = `http://localhost:${PORT}/health`;
+function allocPort(): number {
+  const used = new Set<number>([EMBEDDING_PORT, ...[...pool.values()].map((m) => m.port)]);
+  for (let p = PORT; p <= PORT_RANGE_END; p++) {
+    if (!used.has(p)) return p;
+  }
+  throw new Error("사용 가능한 llama-server 포트가 없습니다");
+}
+
+// 내릴 후보: exceptId를 제외하고 가장 오래 안 쓴(lastUsed 최소) 모델.
+function lruVictim(exceptId: string): string | null {
+  let victim: LoadedModel | null = null;
+  for (const m of pool.values()) {
+    if (m.modelId === exceptId) continue;
+    if (!victim || m.lastUsed < victim.lastUsed) victim = m;
+  }
+  return victim?.modelId ?? null;
+}
+
+// modelId를 새로 올릴 자리를 만든다. nvidia-smi 실측 여유가 필요량보다 작으면 LRU부터 내린다.
+async function makeRoomFor(modelId: string): Promise<void> {
+  const needMb = modelFileSizeMb(modelId) + MODEL_VRAM_OVERHEAD_MB;
+  const free = await getFreeVramMb();
+  if (free === null) {
+    // nvidia-smi 없음 → 개수 상한 폴백
+    while (pool.size >= MAX_LOADED_MODELS) {
+      const victim = lruVictim(modelId);
+      if (!victim) break;
+      emitLlmActivity({ kind: "swap", phase: "start", model: modelBasename(victim), detail: `VRAM 확보 위해 내림: ${modelBasename(victim)}` });
+      await unloadModel(victim);
+    }
+    return;
+  }
+  let freeMb = free;
+  while (freeMb < needMb) {
+    const victim = lruVictim(modelId);
+    if (!victim) break; // 더 내릴 게 없음 — 그냥 시도(정말 부족하면 llama가 실패)
+    const reclaimed = modelFileSizeMb(victim) + MODEL_VRAM_OVERHEAD_MB;
+    emitLlmActivity({ kind: "swap", phase: "start", model: modelBasename(victim), detail: `VRAM 확보 위해 내림: ${modelBasename(victim)}` });
+    await unloadModel(victim);
+    freeMb = (await getFreeVramMb()) ?? freeMb + reclaimed;
+  }
+}
+
+// ── 모델 준비 대기 (health 폴링) ─────────────────────────────────────────────
+// 스폰 직후엔 아직 VRAM 로딩 중이라 곧바로 추론하면 연결 거부로 실패한다. /health가 200이 될
+// 때까지 기다렸다가 반환해 첫 추론이 바로 성공하게 한다. 프로세스가 죽으면 즉시 중단.
+async function waitForReady(model: LoadedModel, timeoutMs = READY_TIMEOUT_MS): Promise<boolean> {
+  const url = `http://localhost:${model.port}/health`;
   const start = Date.now();
   while (Date.now() - start < timeoutMs) {
-    if (serverProcess !== proc) return false; // 기동 실패로 죽었거나 다른 모델로 교체됨
+    if (pool.get(model.modelId) !== model) return false; // 죽었거나 교체됨
     const ok = await fetch(url)
       .then((r) => r.ok)
       .catch(() => false);
@@ -107,71 +194,62 @@ async function waitForModelReady(proc: ChildProcess, timeoutMs = READY_TIMEOUT_M
   return false;
 }
 
-export async function startLocalEngine(modelId: string): Promise<LocalEngineStatus> {
-  if (serverProcess) {
-    if (modelId === currentModelId) {
-      return getLocalEngineStatus();
-    }
-    console.log(`[localengine] swapping local LLM: ${currentModelId} -> ${modelId}`);
-    emitLlmActivity({
-      kind: "swap",
-      phase: "start",
-      model: modelBasename(modelId),
-      detail: `모델 교체: ${modelBasename(currentModelId ?? "")} → ${modelBasename(modelId)}`,
-    });
-    await stopLocalEngine();
+// modelId를 풀에 로드(또는 이미 있으면 재사용)하고 준비될 때까지 기다린다.
+async function ensureModelLoaded(modelId: string): Promise<LoadedModel> {
+  const existing = pool.get(modelId);
+  if (existing) {
+    existing.lastUsed = Date.now();
+    if (existing.loadingPromise) await existing.loadingPromise; // 로딩 중이면 완료 대기
+    return existing;
   }
 
-  const modelPath = modelFilePath(modelId);
+  await makeRoomFor(modelId);
+
+  const port = allocPort();
   const spawned = spawn(
     LLAMA_SERVER_PATH,
-    ["-m", modelPath, "-ngl", "-1", "--ctx-size", String(DEFAULT_CTX_SIZE), "--port", String(PORT)],
+    ["-m", modelFilePath(modelId), "-ngl", "-1", "--ctx-size", String(DEFAULT_CTX_SIZE), "--port", String(port)],
     { stdio: "pipe" }
   );
-  serverProcess = spawned;
-  currentModelId = modelId;
+  const model: LoadedModel = { modelId, port, process: spawned, ready: false, lastUsed: Date.now() };
+  pool.set(modelId, model);
   setStateStmt.run("lastModelId", modelId);
   const loadStart = Date.now();
-  emitLlmActivity({ kind: "load", phase: "start", model: modelBasename(modelId), detail: "모델 로드 중 (llama-server 기동)" });
+  emitLlmActivity({ kind: "load", phase: "start", model: modelBasename(modelId), detail: `모델 로드 중 (포트 ${port})` });
 
   spawned.on("exit", () => {
-    if (serverProcess === spawned) {
-      serverProcess = null;
-      currentModelId = null;
-    }
+    if (pool.get(modelId) === model) pool.delete(modelId);
   });
   spawned.on("error", (err) => {
     console.error(`[localengine] llama-server 기동 실패 (model=${modelId}):`, err);
-    if (serverProcess === spawned) {
-      serverProcess = null;
-      currentModelId = null;
-    }
+    if (pool.get(modelId) === model) pool.delete(modelId);
   });
 
-  // 모델이 실제로 응답 가능해질 때까지 기다렸다가 반환 — 이후 첫 추론이 바로 성공한다.
-  const ready = await waitForModelReady(spawned);
+  model.loadingPromise = waitForReady(model);
+  const ready = await model.loadingPromise;
+  model.ready = ready;
+  model.loadingPromise = undefined;
   emitLlmActivity({
     kind: "load",
     phase: ready ? "done" : "error",
     model: modelBasename(modelId),
-    detail: ready ? "모델 준비 완료" : "모델 준비 대기 시간 초과",
+    detail: ready ? `모델 준비 완료 (포트 ${port})` : "모델 준비 대기 시간 초과",
     latencyMs: Date.now() - loadStart,
   });
-
-  return getLocalEngineStatus();
+  return model;
 }
 
-// graceful shutdown: 먼저 정상 종료 신호를 보내고, STOP_TIMEOUT_MS 안에 죽지 않으면 강제 종료한다.
-export async function stopLocalEngine(): Promise<void> {
-  const proc = serverProcess;
-  if (!proc) return;
-
+// 풀에서 모델 하나를 graceful 종료 후 제거한다.
+async function unloadModel(modelId: string): Promise<void> {
+  const model = pool.get(modelId);
+  if (!model) return;
+  pool.delete(modelId);
+  const proc = model.process;
   await new Promise<void>((resolve) => {
     let settled = false;
     const forceKillTimer = setTimeout(() => {
       if (!settled) proc.kill("SIGKILL");
     }, STOP_TIMEOUT_MS);
-
     proc.once("exit", () => {
       settled = true;
       clearTimeout(forceKillTimer);
@@ -179,21 +257,26 @@ export async function stopLocalEngine(): Promise<void> {
     });
     proc.kill();
   });
+}
 
-  if (serverProcess === proc) {
-    serverProcess = null;
-    currentModelId = null;
-  }
+// 명시적 모델 로드 (수동 /start 라우트·부팅 자동 시작). 이미 있으면 재사용.
+export async function startLocalEngine(modelId: string): Promise<LocalEngineStatus> {
+  if (isModelAvailable(modelId)) await ensureModelLoaded(modelId);
+  return getLocalEngineStatus();
+}
+
+// 풀의 모든 채팅 모델을 종료한다 (앱 종료 시).
+export async function stopLocalEngine(): Promise<void> {
+  await Promise.all([...pool.keys()].map((id) => unloadModel(id)));
 }
 
 // ── 부팅 자동 시작 (index.ts에서 1회 호출) ──────────────────────────────────
-// createApp()에서 부르지 않는다 — 테스트가 실제 llama-server를 스폰하면 안 되므로
-// 부트스트랩(index.ts) 전용이다.
+// createApp()에서 부르지 않는다 — 테스트가 실제 llama-server를 스폰하면 안 되므로 부트 전용.
 export async function autoStartLocalEngines(): Promise<void> {
   const chatModelId = pickAutoStartModelId();
   if (chatModelId) {
     console.log(`[localengine] 부팅 자동 시작: ${chatModelId} (마지막 사용 모델 또는 기본 모델)`);
-    await startLocalEngine(chatModelId);
+    await ensureModelLoaded(chatModelId);
   } else {
     console.log(
       `[localengine] 자동 시작 건너뜀 — ${MODELS_DIR}/ 에 모델 파일 없음 (기본: ${DEFAULT_MODEL_ID}). 에이전트 AI 화면에서 수동 시작하거나 모델을 배치하세요.`
@@ -249,18 +332,19 @@ export async function stopEmbeddingEngine(): Promise<void> {
   }
 }
 
-// 채팅 진입점(llm route, dispatcher)에서 호출 — 에이전트에 전용 모델이 할당돼 있고 그게 지금
-// 떠 있는 모델과 다르면 스왑한다. 할당이 없으면(대부분) 전역 모델을 그대로 쓴다. 3090 1대라
-// 스왑은 수십 초 걸리므로, 모델이 다른 에이전트를 오가면 매번 재로딩이 발생한다는 점에 유의.
-export async function ensureAgentModel(agentId: string): Promise<void> {
+// 채팅 진입점(llm.ts chat)에서 호출 — 에이전트에 할당된 모델(없으면 기본 모델)을 풀에 보장하고
+// 그 모델이 서빙되는 base URL을 돌려준다. 모델 파일 자체가 없으면 기본 포트 URL로 폴백한다.
+export async function ensureAgentModel(agentId: string): Promise<string> {
   const { getAgentModel } = await import("./agents.js");
   const modelId = getAgentModel(agentId);
-  if (!modelId || modelId === currentModelId) return;
-  if (!isModelAvailable(modelId)) {
-    console.warn(`[localengine] 에이전트 ${agentId}의 할당 모델 ${modelId} 파일이 없어 전역 모델을 유지합니다`);
-    return;
+  // 전용 모델 할당이 없으면(대부분의 에이전트·테스트) 부팅 시 로드된 기본 모델(기본 포트)을 그대로
+  // 쓴다 — 여기서 새 모델을 로드하지 않는다. 할당이 있을 때만 그 모델을 풀에 보장한다.
+  if (!modelId || !isModelAvailable(modelId)) {
+    if (modelId) console.warn(`[localengine] 에이전트 ${agentId}의 할당 모델 ${modelId} 파일이 없어 기본 모델을 씁니다`);
+    return `http://localhost:${PORT}/v1`;
   }
-  await startLocalEngine(modelId);
+  const model = await ensureModelLoaded(modelId);
+  return `http://localhost:${model.port}/v1`;
 }
 
 export function registerLocalEngineRoutes(app: Express): void {
@@ -280,8 +364,11 @@ export function registerLocalEngineRoutes(app: Express): void {
   app.post(
     "/api/localengine/stop",
     authMiddleware,
-    asyncRoute(async (_req, res) => {
-      await stopLocalEngine();
+    asyncRoute(async (req, res) => {
+      // 특정 모델만 내리거나(modelId 지정) 전체 종료.
+      const modelId = req.body?.modelId as string | undefined;
+      if (modelId) await unloadModel(modelId);
+      else await stopLocalEngine();
       res.json({ ok: true });
     })
   );

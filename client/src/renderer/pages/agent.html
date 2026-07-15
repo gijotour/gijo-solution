@@ -513,9 +513,15 @@ tr:last-child td{border-bottom:none;}
     const row = document.getElementById("engineStatusRow");
     try {
       const status = await window.gijo.getLocalEngineStatus();
-      row.innerHTML = status.running
-        ? `<span>llama-server · :${status.port}</span><span class="badge b-teal">● 실행중 (${status.modelId})</span>`
-        : `<span>llama-server</span><span class="badge b-amber">중지됨</span>`;
+      if (!status.running) {
+        row.innerHTML = `<span>llama-server</span><span class="badge b-amber">중지됨</span>`;
+        return;
+      }
+      const loaded = status.loaded && status.loaded.length ? status.loaded : [{ modelId: status.modelId, port: status.port, ready: true }];
+      const list = loaded
+        .map((m) => `<span class="badge b-teal" style="margin:1px 0">● ${m.modelId}${m.ready ? "" : " (로딩중)"} · :${m.port}</span>`)
+        .join(" ");
+      row.innerHTML = `<span>llama-server · ${loaded.length}개 상주</span><span style="display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end">${list}</span>`;
     } catch (e) {
       row.innerHTML = `<span>llama-server</span><span class="badge b-amber">상태 조회 실패</span>`;
     }

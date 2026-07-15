@@ -57,8 +57,7 @@ async function executeRoutedAction(route: RoutedIntent, instructionText: string)
     case "report":
     case "chat":
     default: {
-      const { ensureAgentModel } = await import("./localengine.js");
-      await ensureAgentModel(route.agentId);
+      // 모델 로드·선택은 chat() 내부(ensureAgentModel)에서 처리된다.
       return { output: await chat({ agentId: route.agentId, message: instructionText, remember: true }) };
     }
   }

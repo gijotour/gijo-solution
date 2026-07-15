@@ -1,5 +1,14 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import request from "supertest";
+
+// 이 테스트는 dispatch가 협업 이벤트 2개를 내는지(오케스트레이션)만 검증한다. 실제 로컬 LLM/
+// 모델 로딩에 의존하지 않도록 llm을 목킹한다(다른 dispatch 테스트와 동일한 격리).
+vi.mock("../src/engine/llm", () => ({
+  chat: vi.fn(async () => "상태 양호합니다."),
+  embed: vi.fn(async (texts: string[]) => texts.map(() => [0.1, 0.2, 0.3])),
+  registerLlmRoutes: vi.fn(),
+}));
+
 import { createApp } from "../src/app";
 import { emitCollaboration, resetCollaborationForTests } from "../src/engine/collaboration";
 
