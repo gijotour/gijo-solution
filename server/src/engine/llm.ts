@@ -13,6 +13,44 @@ const EMBEDDING_SERVER_URL = process.env.GIJO_EMBEDDING_URL ?? "http://localhost
 export interface ChatArgs {
   agentId: string;
   message: string;
+  // true면 단기 기억(대화 이력)과 장기 기억(RAG) 자동 주입을 켠다 — 대화형 채팅 라우트 전용.
+  // dispatcher/analysis 같은 프로그램적 단발 호출은 기본값(false)으로 이력에 끼어들지 않는다.
+  remember?: boolean;
+}
+
+// ── 단기 기억: 에이전트별 최근 대화 이력 ─────────────────────────────────────
+// 의도적으로 인메모리·휘발성이다(agents.ts의 status와 같은 원칙) — 서버 재시작이면 사라진다.
+// 영속 대화방 개념이 생기기 전까지는 에이전트당 하나의 공유 이력이며, 최근 HISTORY_LIMIT개
+// 메시지만 유지해 컨텍스트 창을 보호한다.
+const HISTORY_LIMIT = 20; // 10턴 (user+assistant 쌍 기준)
+
+interface ChatTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+const histories = new Map<string, ChatTurn[]>();
+
+export function resetChatHistoryForTests(): void {
+  histories.clear();
+}
+
+// ── 장기 기억: LanceDB 지식 베이스 검색 결과를 참고 자료로 주입 ──────────────
+// 임베딩 서버가 없거나 지식 베이스가 비어 있으면 조용히 생략한다 — RAG가 안 된다고
+// 채팅 자체가 죽으면 안 된다. (memory.ts가 llm.ts의 embed를 쓰므로 순환 참조를 피해
+// 호출 시점에 동적 import.)
+async function ragContextFor(message: string): Promise<string | null> {
+  try {
+    const { queryMemory } = await import("./memory.js");
+    const chunks = await queryMemory(message, 4);
+    if (chunks.length === 0) return null;
+    return (
+      "참고 자료 — 사내 지식 베이스(장기 기억)에서 검색된 관련 내용입니다. 답변에 활용하되, 질문과 무관하면 무시하세요.\n" +
+      chunks.map((c, i) => `[${i + 1}] ${c}`).join("\n")
+    );
+  } catch {
+    return null;
+  }
 }
 
 // 시스템 프롬프트가 아예 없으면 모델이 역할·언어 지시를 전혀 못 받아 주제 이탈·영어 혼용·환각이
@@ -34,23 +72,33 @@ export function systemPromptFor(agentId: string): string {
 }
 
 export async function chat(args: ChatArgs): Promise<string> {
+  const history = args.remember ? (histories.get(args.agentId) ?? []) : [];
+  const rag = args.remember ? await ragContextFor(args.message) : null;
+
+  const messages = [
+    { role: "system", content: systemPromptFor(args.agentId) },
+    ...(rag ? [{ role: "system", content: rag }] : []),
+    ...history,
+    { role: "user", content: args.message },
+  ];
+
   const res = await fetch(`${LOCAL_LLM_BASE_URL}/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      model: "local",
-      messages: [
-        { role: "system", content: systemPromptFor(args.agentId) },
-        { role: "user", content: args.message },
-      ],
-    }),
+    body: JSON.stringify({ model: "local", messages }),
   }).catch(() => null);
 
   if (!res || !res.ok) {
     return "[로컬 LLM 서버에 연결할 수 없습니다. /api/localengine/start 로 먼저 기동하세요.]";
   }
   const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-  return data.choices?.[0]?.message?.content ?? "";
+  const reply = data.choices?.[0]?.message?.content ?? "";
+
+  if (args.remember && reply) {
+    const updated = [...history, { role: "user" as const, content: args.message }, { role: "assistant" as const, content: reply }];
+    histories.set(args.agentId, updated.slice(-HISTORY_LIMIT));
+  }
+  return reply;
 }
 
 export async function embed(texts: string[]): Promise<number[][]> {
@@ -75,7 +123,8 @@ export function registerLlmRoutes(app: Express): void {
     "/api/llm/chat",
     authMiddleware,
     asyncRoute(async (req, res) => {
-      res.json({ reply: await chat(req.body) });
+      // 대화형 라우트는 단기 기억(이력) + 장기 기억(RAG) 주입을 켠다.
+      res.json({ reply: await chat({ ...req.body, remember: true }) });
     })
   );
 }

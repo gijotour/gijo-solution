@@ -1,4 +1,4 @@
-// engine/gitsync.ts — 단기 기억(문서) 온프레미스 Git 동기화 (공개 GitHub 대신, 6.2절 참고)
+// engine/gitsync.ts — 장기 기억(RAG 문서) 온프레미스 Git 동기화 (공개 GitHub 대신, 6.2절 참고)
 // 고객사 내부 Git 서버 주소는 요청마다 파라미터로 받는다 — 이 서버는 기본 remote를 하드코딩하지 않는다.
 
 import type { Express } from "express";

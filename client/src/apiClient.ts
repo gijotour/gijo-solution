@@ -185,7 +185,7 @@ export const localEngineApi = {
   stop: () => request("/api/localengine/stop", { method: "POST" }),
 };
 
-// ── 파인튜닝(장기 기억) ───────────────────────────────────────────────
+// ── 파인튜닝(학습 — 모델 가중치에 지식 내재화) ───────────────────────────
 export const finetuneApi = {
   start: (agentId: string, datasetId: string) =>
     request("/api/finetune/start", { method: "POST", body: { agentId, datasetId } }),

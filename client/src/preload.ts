@@ -58,7 +58,7 @@ const gijoApi = {
   stopLocalEngine: () => api.localEngineApi.stop(),
   chat: (agentId: string, message: string) => api.llmApi.chat(agentId, message),
 
-  // 메모리(RAG) / 파인튜닝(장기 기억)
+  // 장기 기억(RAG) / 파인튜닝(학습)
   ingestDocument: (path: string) => api.memoryApi.ingest(path),
   queryMemory: (question: string, topK?: number) => api.memoryApi.query(question, topK),
   startFinetune: (agentId: string, datasetId: string) => api.finetuneApi.start(agentId, datasetId),

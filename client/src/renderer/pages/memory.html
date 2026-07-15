@@ -59,6 +59,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .beta-tag{background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
 .avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
 .icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{text-align:left;font-size:10.5px;font-weight:700;padding:12px 10px;color:var(--muted-2);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);}
+td{padding:13px 10px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;line-height:1.5;}
+tr:last-child td{border-bottom:none;}
 </style>
 </head>
 <body>
@@ -101,13 +105,54 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     <div class="topbar-row">
       <div>
         <div class="page-title">단기 · 장기 기억</div>
-        <div class="page-sub">6.2절 — 단기 기억(RAG)과 장기 기억(파인튜닝) 두 단계로 고객사 데이터를 학습시킵니다.</div>
+        <div class="page-sub">단기 기억(대화 이력) · 장기 기억(RAG 지식 베이스) · 학습(파인튜닝) — 세 단계로 고객사 데이터를 기억하고 학습합니다.</div>
       </div>
     </div>
 
+    <div class="panel" style="max-width:800px">
+      <div class="panel-title">기억 및 학습 개념 비교</div>
+      <div class="panel-sub">대화 컨텍스트(단기), 로컬 벡터 DB(장기), QLoRA 파인튜닝(뇌 학습)의 아키텍처적 차이점</div>
+      <table style="margin-top:10px">
+        <thead>
+          <tr>
+            <th style="width:15%">구분</th>
+            <th style="width:28%">단기 기억 (Conversation Context)</th>
+            <th style="width:28%">장기 기억 (RAG / LanceDB)</th>
+            <th style="width:29%">파인튜닝 (QLoRA / 학습)</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="font-weight:700">핵심 개념</td>
+            <td>현재 진행 중인 대화 내용을 기억</td>
+            <td>외부 도서관에서 문서를 찾아보기</td>
+            <td>뇌 세포(모델 가중치)를 직접 훈련하여 암기</td>
+          </tr>
+          <tr>
+            <td style="font-weight:700">대상 기술</td>
+            <td>서버 인메모리 대화 이력 (에이전트별 최근 10턴, 채팅 시 자동 주입)</td>
+            <td><code>LanceDB</code> (로컬 벡터 데이터베이스)</td>
+            <td>모델 가중치(Weights) 자체 업데이트</td>
+          </tr>
+          <tr>
+            <td style="font-weight:700">현실 비유</td>
+            <td>메모장에 받아적으며 대화하기</td>
+            <td>필요할 때 서가에서 백과사전 찾기</td>
+            <td>지식을 완전히 학습하여 머릿속에 내재화</td>
+          </tr>
+          <tr>
+            <td style="font-weight:700">정보 업데이트</td>
+            <td style="color:var(--muted)">서버 재시작 시 휘발됨 (의도된 설계)</td>
+            <td style="color:var(--teal)">DB에 파일 추가 시 즉시 반영 (매우 쉬움)</td>
+            <td style="color:var(--amber)">데이터셋을 구축하여 재학습 필요 (시간 소요)</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
     <div class="panel">
-      <div class="panel-title">단기 기억 — 문서 수집 (RAG)</div>
-      <div class="panel-sub">서버가 LanceDB에 청크·임베딩해서 저장합니다 (여러 클라이언트가 같은 지식 베이스를 공유).</div>
+      <div class="panel-title">장기 기억 — 문서 수집 (RAG)</div>
+      <div class="panel-sub">서버가 LanceDB에 청크·임베딩해서 저장합니다 (여러 클라이언트가 같은 지식 베이스를 공유). 수집된 지식은 채팅 시 관련 내용이 자동으로 참고 자료로 주입됩니다.</div>
       <div class="field">
         <label for="ingestPathInput">문서 경로</label>
         <input id="ingestPathInput" placeholder="예: data/docs/incident-policy.txt">
@@ -117,7 +162,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     </div>
 
     <div class="panel">
-      <div class="panel-title">단기 기억 — 지식 질의</div>
+      <div class="panel-title">장기 기억 — 지식 질의</div>
       <div class="panel-sub">수집된 문서에서 질문과 가장 관련 있는 구절을 검색합니다.</div>
       <div class="field-row">
         <div class="field">
@@ -130,7 +175,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     </div>
 
     <div class="panel">
-      <div class="panel-title">장기 기억 — 파인튜닝<span class="badge b-amber" style="margin-left:8px">Unsloth QLoRA</span></div>
+      <div class="panel-title">학습 — 파인튜닝<span class="badge b-amber" style="margin-left:8px">Unsloth QLoRA</span></div>
       <div class="panel-sub">에이전트를 특정 데이터셋으로 파인튜닝해 내재화된 지식으로 만듭니다.</div>
       <div class="field-row">
         <div class="field">
