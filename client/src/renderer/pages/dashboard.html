@@ -63,6 +63,17 @@
   .chatbar{display:flex;flex-direction:column;gap:6px;padding:14px 20px;border-top:1px solid var(--border);}
   .chatbar input{width:100%;background:var(--panel);border:1px solid var(--border-strong);border-radius:10px;padding:14px 16px;color:var(--text);font-size:13px;outline:none;}
   .chatbar-hint{font-size:11px;color:var(--muted-2);}
+
+  .docsearch{padding:14px 20px;border-top:1px solid var(--border);}
+  .docsearch-head{display:flex;align-items:baseline;gap:10px;margin-bottom:8px;flex-wrap:wrap;}
+  .docsearch-title{font-size:13px;font-weight:800;color:#fff;}
+  .docsearch-sub{font-size:11px;color:var(--muted-2);}
+  .docsearch-row{display:flex;gap:8px;}
+  .docsearch-row input{flex:1;background:var(--panel);border:1px solid var(--border-strong);border-radius:10px;padding:11px 14px;color:var(--text);font-size:13px;outline:none;}
+  .docsearch-row select{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:10px;padding:0 12px;color:var(--text);font-size:12.5px;outline:none;min-width:150px;}
+  .docsearch-row button{background:var(--blue);color:#fff;border:none;border-radius:10px;padding:0 22px;font-size:13px;font-weight:800;cursor:pointer;}
+  .docsearch-results{margin-top:10px;max-height:220px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;}
+  .docsearch-results .chunk{background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:12px;color:var(--text);line-height:1.7;}
 </style>
 </head>
 <body>
@@ -158,6 +169,19 @@
         </div>
       </div>
     </div>
+  </div>
+
+  <div class="docsearch">
+    <div class="docsearch-head">
+      <span class="docsearch-title">🔍 올린 문서 검색</span>
+      <span class="docsearch-sub">장기 기억(RAG)에 올린 사내 문서에서 관련 내용을 찾아봅니다 — 채팅에 자동 주입되는 것과 같은 검색. 에이전트를 고르면 그 에이전트가 보는 범위로 검색합니다.</span>
+    </div>
+    <div class="docsearch-row">
+      <input id="docQueryInput" placeholder="예: 랜섬웨어 감염 시 초동 조치는?">
+      <select id="docQueryScope"><option value="">전체 공유만</option></select>
+      <button id="docQueryBtn">검색</button>
+    </div>
+    <div id="docQueryResults" class="docsearch-results" style="display:none"></div>
   </div>
 
   <div class="chatbar">
@@ -403,12 +427,38 @@
     } catch (e) {}
   }
 
+  // 장기 기억(RAG) 문서 검색 — 에이전트별 검색 범위 옵션을 채운다.
+  async function loadDocSearchScopes() {
+    try {
+      const agents = await window.gijo.listAgents();
+      const sel = document.getElementById("docQueryScope");
+      for (const a of agents) sel.insertAdjacentHTML("beforeend", `<option value="${a.id}">${a.name} 관점</option>`);
+    } catch (e) {}
+  }
+
+  async function docQuery() {
+    const question = document.getElementById("docQueryInput").value.trim();
+    const box = document.getElementById("docQueryResults");
+    if (!question) return;
+    const agentId = document.getElementById("docQueryScope").value || undefined;
+    box.style.display = "block";
+    box.innerHTML = '<div style="color:var(--muted);font-size:12px">검색 중...</div>';
+    try {
+      const results = await window.gijo.queryMemory(question, 5, agentId);
+      box.innerHTML = results.length
+        ? results.map((r) => `<div class="chunk">${r.replace(/</g, "&lt;")}</div>`).join("")
+        : '<div style="color:var(--muted);font-size:12px">관련 문서가 없습니다 — 먼저 문서를 올리세요(왼쪽 파일 탐색기에서 문서 클릭 또는 AI 기억·학습 화면).</div>';
+    } catch (e) {
+      box.innerHTML = '<div style="color:#f87171;font-size:12px">검색 실패: ' + e.message + '</div>';
+    }
+  }
+
   async function init() {
     tick();
     setInterval(tick, 1000);
     await loadUser();
     greet();
-    await Promise.all([loadHealth(), loadAssets(), loadTasks(), loadCollaboration(), loadFiles()]);
+    await Promise.all([loadHealth(), loadAssets(), loadTasks(), loadCollaboration(), loadFiles(), loadDocSearchScopes()]);
 
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
@@ -417,6 +467,8 @@
     document.getElementById("pickFolderBtn").addEventListener("click", pickFolder);
     document.getElementById("todoAddBtn").addEventListener("click", addTodo);
     todoInput.addEventListener("keydown", (e) => { if (e.key === "Enter") addTodo(); });
+    document.getElementById("docQueryBtn").addEventListener("click", docQuery);
+    document.getElementById("docQueryInput").addEventListener("keydown", (e) => { if (e.key === "Enter") docQuery(); });
 
     chatInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
