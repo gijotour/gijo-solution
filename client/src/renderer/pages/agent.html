@@ -328,11 +328,18 @@ tr:last-child td{border-bottom:none;}
     agentGrid.innerHTML = agents
       .map((a) => {
         const style = AGENT_STYLE[a.id] || { icon: "●", color: "var(--muted)", bg: "var(--panel-2)" };
+        const renamed = a.name !== a.defaultName;
         return `<div class="agent-card">
           <div class="agent-status ${STATUS_CLASS[a.status]}"><span class="st-dot"></span>${STATUS_LABEL[a.status]}</div>
           <div class="agent-top">
             <div class="agent-icon" style="background:${style.bg};color:${style.color}">${style.icon}</div>
-            <div><div class="agent-name">${a.name}</div><div class="agent-role">${a.role}</div></div>
+            <div style="flex:1;min-width:0;">
+              <div style="display:flex;align-items:center;gap:6px;">
+                <div class="agent-name" style="cursor:text;" data-rename="${a.id}" title="클릭해서 이름 변경">${String(a.name).replace(/</g, "&lt;")}</div>
+                <span data-rename="${a.id}" style="cursor:pointer;color:var(--muted-2);font-size:11px;">✏️</span>
+              </div>
+              <div class="agent-role">${a.role}${renamed ? ` · <span style="color:var(--muted-2)">기본: ${String(a.defaultName).replace(/</g, "&lt;")}</span>` : ""}</div>
+            </div>
           </div>
           ${modelSelectHtml(a)}
         </div>`;
@@ -350,6 +357,21 @@ tr:last-child td{border-bottom:none;}
         } catch (err) {
           alert("모델 할당 실패: " + err.message);
           e.target.disabled = false;
+        }
+      });
+    });
+
+    agentGrid.querySelectorAll("[data-rename]").forEach((el) => {
+      el.addEventListener("click", async () => {
+        const agentId = el.dataset.rename;
+        const cur = agents.find((a) => a.id === agentId);
+        const input = prompt(`"${cur.name}" 에이전트의 새 이름 (비우면 기본 이름 "${cur.defaultName}"로 되돌림):`, cur.name);
+        if (input === null) return; // 취소
+        try {
+          await window.gijo.setAgentName(agentId, input.trim() || null);
+          await loadAgents();
+        } catch (err) {
+          alert("이름 변경 실패: " + err.message);
         }
       });
     });

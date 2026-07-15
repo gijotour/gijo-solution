@@ -27,7 +27,7 @@ describe("agent model assignment (A)", () => {
   let token: string;
 
   beforeEach(async () => {
-    db.exec("DELETE FROM app_state WHERE key LIKE 'agentModel:%'");
+    db.exec("DELETE FROM app_state WHERE key LIKE 'agentModel:%' OR key LIKE 'agentName:%'");
     app = createApp();
     token = await login(app);
   });
@@ -78,6 +78,33 @@ describe("agent model assignment (A)", () => {
       .send({ modelId: "ghost-model-9000" });
     expect(res.status).toBe(400);
     expect(res.body.error).toContain("배치되지 않은");
+  });
+
+  it("renames an agent (팀 로스터) and exposes defaultName; empty resets to default", async () => {
+    const before = await request(app).get("/api/agents").set("Authorization", `Bearer ${token}`);
+    const orch = before.body.find((a: { id: string }) => a.id === "orchestrator");
+    expect(orch.name).toBe("오케스트레이터");
+    expect(orch.defaultName).toBe("오케스트레이터");
+
+    const put = await request(app).post("/api/agents/orchestrator/name").set("Authorization", `Bearer ${token}`).send({ name: "우리 보안반장" });
+    expect(put.status).toBe(200);
+    expect(put.body.name).toBe("우리 보안반장");
+    expect(put.body.defaultName).toBe("오케스트레이터");
+
+    const list = await request(app).get("/api/agents").set("Authorization", `Bearer ${token}`);
+    expect(list.body.find((a: { id: string }) => a.id === "orchestrator").name).toBe("우리 보안반장");
+
+    // 빈 이름 → 기본으로 되돌림
+    await request(app).post("/api/agents/orchestrator/name").set("Authorization", `Bearer ${token}`).send({ name: "" });
+    const reset = await request(app).get("/api/agents").set("Authorization", `Bearer ${token}`);
+    expect(reset.body.find((a: { id: string }) => a.id === "orchestrator").name).toBe("오케스트레이터");
+  });
+
+  it("rejects a too-long agent name and an unknown agent", async () => {
+    const long = await request(app).post("/api/agents/scan/name").set("Authorization", `Bearer ${token}`).send({ name: "x".repeat(31) });
+    expect(long.status).toBe(400);
+    const ghost = await request(app).post("/api/agents/ghost/name").set("Authorization", `Bearer ${token}`).send({ name: "y" });
+    expect(ghost.status).toBe(400);
   });
 
   it("non-admin cannot assign models (403)", async () => {

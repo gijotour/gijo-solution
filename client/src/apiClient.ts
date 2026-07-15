@@ -120,6 +120,7 @@ export const authApi = {
 export interface AgentInfo {
   id: string;
   name: string;
+  defaultName: string;
   role: string;
   assignedModelId: string | null;
   status: "idle" | "working" | "watching";
@@ -130,6 +131,8 @@ export const agentsApi = {
   list: () => request<AgentInfo[]>("/api/agents"),
   setModel: (agentId: string, modelId: string | null) =>
     request<AgentInfo>(`/api/agents/${agentId}/model`, { method: "POST", body: { modelId } }),
+  setName: (agentId: string, name: string | null) =>
+    request<AgentInfo>(`/api/agents/${agentId}/name`, { method: "POST", body: { name } }),
 };
 
 // ── 지시(디스패처) ────────────────────────────────────────────────────

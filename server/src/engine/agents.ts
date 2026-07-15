@@ -9,7 +9,8 @@ export type AgentStatus = "idle" | "working" | "watching";
 
 export interface AgentDefinition {
   id: string;
-  name: string;
+  name: string; // 표시 이름(커스텀 이름이 있으면 그것, 없으면 기본)
+  defaultName: string; // 원래 기본 이름
   role: string;
   status: AgentStatus;
   defaultStatus: AgentStatus;
@@ -49,9 +50,26 @@ const setModelStmt = db.prepare(
 );
 const delModelStmt = db.prepare("DELETE FROM app_state WHERE key = ?");
 const modelKey = (agentId: string) => `agentModel:${agentId}`;
+const nameKey = (agentId: string) => `agentName:${agentId}`;
 
 export function getAgentModel(agentId: string): string | null {
   return (getModelStmt.get(modelKey(agentId)) as { value: string } | undefined)?.value ?? null;
+}
+
+// 팀 커스터마이징: 에이전트 표시 이름을 조직이 원하는 대로 바꾼다("우리 팀" 로스터). 비우면 기본 이름.
+export function getAgentName(agentId: string): string | null {
+  return (getModelStmt.get(nameKey(agentId)) as { value: string } | undefined)?.value ?? null;
+}
+
+export function setAgentName(agentId: string, name: string | null): void {
+  if (!AGENT_DEFS.some((a) => a.id === agentId)) throw new Error(`존재하지 않는 에이전트: ${agentId}`);
+  const trimmed = (name ?? "").trim();
+  if (trimmed === "") {
+    delModelStmt.run(nameKey(agentId));
+    return;
+  }
+  if (trimmed.length > 30) throw new Error("이름은 30자 이내여야 합니다");
+  setModelStmt.run(nameKey(agentId), trimmed);
 }
 
 // modelId=null 이면 할당 해제(전역 모델 따름). 존재하지 않는 모델은 거부한다.
@@ -68,7 +86,8 @@ export function setAgentModel(agentId: string, modelId: string | null): void {
 function toAgent(base: AgentBase): AgentDefinition {
   return {
     id: base.id,
-    name: base.name,
+    name: getAgentName(base.id) ?? base.name, // 커스텀 이름이 있으면 우선
+    defaultName: base.name, // 원래 기본 이름(되돌리기·비교용)
     role: base.role,
     defaultStatus: base.defaultStatus,
     status: liveStatus.get(base.id) ?? base.defaultStatus,
@@ -105,6 +124,16 @@ export function registerAgentsRoutes(app: Express): void {
   app.post("/api/agents/:id/model", authMiddleware, adminMiddleware, (req, res) => {
     try {
       setAgentModel(String(req.params.id), req.body.modelId ?? null);
+      res.json(getAgentById(String(req.params.id)));
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+
+  // 에이전트 표시 이름 변경("우리 팀" 로스터). body.name=null/빈값이면 기본 이름으로 되돌림.
+  app.post("/api/agents/:id/name", authMiddleware, (req, res) => {
+    try {
+      setAgentName(String(req.params.id), req.body.name ?? null);
       res.json(getAgentById(String(req.params.id)));
     } catch (err) {
       res.status(400).json({ error: err instanceof Error ? err.message : String(err) });

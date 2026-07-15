@@ -33,6 +33,7 @@ const gijoApi = {
   // 에이전트 AI / 지시(디스패처)
   listAgents: () => api.agentsApi.list(),
   setAgentModel: (agentId: string, modelId: string | null) => api.agentsApi.setModel(agentId, modelId),
+  setAgentName: (agentId: string, name: string | null) => api.agentsApi.setName(agentId, name),
   listModels: () => api.localEngineApi.models(),
   sendInstruction: (text: string) => api.dispatchApi.send(text),
   onCollaborationEvent: (cb: (evt: unknown) => void) => onChannel("collaboration:event", cb),
