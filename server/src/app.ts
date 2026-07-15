@@ -5,6 +5,7 @@ import express, { Express } from "express";
 import cors from "cors";
 
 import { registerAuthRoutes } from "./auth/auth";
+import { registerUsersRoutes } from "./auth/users";
 import { registerAgentsRoutes } from "./engine/agents";
 import { registerAssetsRoutes } from "./engine/assets";
 import { registerDispatcherRoutes } from "./engine/dispatcher";
@@ -43,6 +44,7 @@ export function createApp(): Express {
   app.use(usageLoggingMiddleware);
 
   registerAuthRoutes(app);
+  registerUsersRoutes(app);
   registerAgentsRoutes(app);
   registerAssetsRoutes(app);
   registerDispatcherRoutes(app);

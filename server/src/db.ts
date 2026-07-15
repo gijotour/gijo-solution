@@ -73,4 +73,16 @@ db.exec(`
     encryptedPassword TEXT,
     fromAddress TEXT NOT NULL
   );
+
+  -- 보안담당자 계정. passwordHash는 bcrypt 해시(평문 저장 안 함). 최초 기동 시 이 테이블이
+  -- 비어 있으면 auth/users.ts가 기본 관리자 계정 1개를 시드한다(9.5절 "설치 마법사" 전까지의
+  -- 최소 조치 — 다음단계 가이드 1.3절).
+  CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    username TEXT NOT NULL UNIQUE,
+    passwordHash TEXT NOT NULL,
+    displayName TEXT NOT NULL,
+    role TEXT NOT NULL,
+    createdAt INTEGER NOT NULL
+  );
 `);

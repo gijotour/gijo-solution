@@ -20,6 +20,13 @@ const gijoApi = {
   me: () => api.authApi.me(),
   isAuthenticated: () => api.isAuthenticated(),
 
+  // 계정 관리(admin 전용 목록/생성/삭제 — 본인 비밀번호 변경은 누구나)
+  listUsers: () => api.usersApi.list(),
+  createUser: (args: { username: string; password: string; displayName: string; role: "security_officer" | "admin" }) =>
+    api.usersApi.create(args),
+  deleteUser: (id: string) => api.usersApi.remove(id),
+  changeUserPassword: (id: string, password: string) => api.usersApi.changePassword(id, password),
+
   // 네비게이션(렌더러 내 페이지 전환은 메인 프로세스에 위임)
   navigateTo: (page: string) => ipcRenderer.invoke("navigate:to", page),
 

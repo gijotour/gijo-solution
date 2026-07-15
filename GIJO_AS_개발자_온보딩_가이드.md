@@ -71,12 +71,12 @@ D:\Connect AI\
 │  ├─ src/
 │  │  ├─ index.ts                # 부트스트랩: HTTP 리스닝 + WS 부착 + 종료 시 llama-server 정리
 │  │  ├─ app.ts                  # Express 앱 조립 — 모든 라우트 등록이 여기 한 곳에 모임
-│  │  ├─ db.ts                   # SQLite 스키마 단독 소유 (assets, scan_runs, tasks, cti_feeds, smtp_config)
+│  │  ├─ db.ts                   # SQLite 스키마 단독 소유 (assets, scan_runs, tasks, cti_feeds, smtp_config, users)
 │  │  ├─ auth/
-│  │  │  ├─ auth.ts              # JWT access + refresh 토큰, authMiddleware
-│  │  │  └─ users.ts             # 계정 저장소 — 아직 인메모리 시드 (DB 아님, TODO)
+│  │  │  ├─ auth.ts              # JWT access + refresh 토큰, authMiddleware, adminMiddleware
+│  │  │  └─ users.ts             # 계정 SQLite CRUD + admin 전용 라우트 (최초 기동 시 admin 자동 시드)
 │  │  └─ engine/                 # 엔진 모듈 ~20개. 1모듈 = 1 register*Routes() 함수
-│  ├─ test/                      # Vitest + supertest, 17개 파일 약 69개 테스트
+│  ├─ test/                      # Vitest + supertest, 19개 파일 83개 테스트
 │  └─ vitest.config.ts           # GIJO_DB_PATH=:memory: + 더미 암호화 키 주입
 ├─ client/                       # Electron 얇은 클라이언트
 │  ├─ src/
@@ -163,8 +163,9 @@ npm start       # = npm run build && node dist/index.js → http://localhost:400
 ```
 
 - 기본 포트 4000 (`GIJO_SERVER_PORT`). WS는 같은 포트의 `/ws`.
-- **개발용 시드 계정: `jyh` / `changeme`** (`auth/users.ts` 인메모리 시드 — 사용자 계정은 아직
-  SQLite에 없다. 설치 마법사로 교체 예정 TODO).
+- **기본 시드 계정: `jyh` / `changeme`** — `users` 테이블(SQLite)이 비어 있을 때 최초 기동 시
+  자동 생성되는 admin 계정. 이후 admin이 settings.html의 "계정 관리" 패널 또는
+  `POST /api/users`로 팀원 계정을 추가할 수 있다.
 - 첫 기동 시 `data/gijo-as.sqlite`(WAL 모드)와 `data/encryption.key`(미지정 시 자동 생성)가 생긴다.
 - `NODE_ENV=production`에서는 `GIJO_JWT_SECRET` 없이 **부팅 자체가 거부된다**(auth.ts 상단 throw).
   개발 모드에서는 기본 dev 시크릿으로 뜬다.
@@ -272,7 +273,6 @@ llama.cpp가 있어야 한다:
 | 컴플라이언스 (compliance.html) | 서버 측 로직 전무, 플레이스홀더 | — |
 | 승인 워크플로우 (approvals.html) | 서버 측 로직 전무, 플레이스홀더 | — |
 | threat.html "최근 탐지 내역" 표 | **하드코딩된 정적 목업 HTML**이다. 어떤 API에도 연결돼 있지 않다 — 화면만 보면 CTI가 도는 것처럼 보이니 속지 말 것 (피드 키 설정 UI는 진짜) | `listFindings()` 구현과 함께 연결 예정 |
-| 사용자 계정 저장소 | `auth/users.ts` 인메모리 시드 1개 (`jyh`) — SQLite 테이블 없음 | 설치 마법사에서 관리자 생성으로 교체 TODO |
 | `engine/mcp.ts` | MCP 서버 스캐폴드가 있으나 `app.ts`/`index.ts` 어디에도 연결 안 됨 | 실험 단계 |
 | Penligent 어댑터 | `bridge.ts`에 TODO 주석만 존재 | 로드맵 Phase 5 |
 
@@ -325,7 +325,7 @@ llama.cpp가 있어야 한다:
 ## 9. 테스트 컨벤션
 
 ```bash
-cd server && npm test    # Vitest, test/**/*.test.ts — 17개 파일 약 69개 테스트
+cd server && npm test    # Vitest, test/**/*.test.ts — 19개 파일 83개 테스트
 ```
 
 - **HTTP 레벨 테스트**: `supertest`로 `createApp()`이 반환한 Express 앱을 포트 바인딩 없이 직접

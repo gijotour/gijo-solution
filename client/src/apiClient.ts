@@ -292,6 +292,24 @@ export const healthApi = {
   check: () => request<{ ok: boolean; service: string }>("/api/health"),
 };
 
+// ── 계정 관리 (admin 전용 목록/생성/삭제, 본인 비밀번호 변경은 누구나) ──────
+export interface GijoUserPublic {
+  id: string;
+  username: string;
+  displayName: string;
+  role: "security_officer" | "admin";
+  createdAt: number;
+}
+
+export const usersApi = {
+  list: () => request<GijoUserPublic[]>("/api/users"),
+  create: (args: { username: string; password: string; displayName: string; role: "security_officer" | "admin" }) =>
+    request<GijoUserPublic>("/api/users", { method: "POST", body: args }),
+  remove: (id: string) => request(`/api/users/${id}`, { method: "DELETE" }),
+  changePassword: (id: string, password: string) =>
+    request(`/api/users/${id}/password`, { method: "POST", body: { password } }),
+};
+
 // ── 서버 로그 ─────────────────────────────────────────────────────────
 export interface LogEntry {
   level: "log" | "warn" | "error";

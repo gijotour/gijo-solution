@@ -77,6 +77,17 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
   }
 }
 
+// authMiddleware 다음에 붙여 쓴다 — 계정 관리(users.ts)처럼 admin만 허용해야 하는 라우트용.
+// 역할 계층은 admin/security_officer 이분법이 전부다(다음단계 가이드 1.3절 — RBAC은 범위 밖).
+export function adminMiddleware(req: Request, res: Response, next: NextFunction): void {
+  const user = (req as Request & { user?: GijoUser }).user;
+  if (user?.role !== "admin") {
+    res.status(403).json({ error: "관리자만 접근할 수 있습니다" });
+    return;
+  }
+  next();
+}
+
 export function registerAuthRoutes(app: Express): void {
   app.post("/api/auth/login", (req, res) => {
     const { username, password } = req.body as { username: string; password: string };

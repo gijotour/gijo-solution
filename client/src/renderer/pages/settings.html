@@ -53,6 +53,13 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;}
 .b-teal{background:rgba(30,185,128,0.15);color:var(--teal);}
 .b-amber{background:rgba(240,160,32,0.15);color:var(--amber);}
+.b-purple{background:rgba(139,124,240,0.15);color:var(--purple);}
+.user-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);font-size:12.5px;}
+.user-row:last-child{border-bottom:none;}
+.user-row-name{font-weight:700;color:#fff;}
+.user-row-sub{font-size:11px;color:var(--muted-2);margin-top:2px;}
+.user-row-del{color:#f5928a;font-size:12px;font-weight:700;cursor:pointer;}
+.user-row-del.disabled{color:var(--muted-2);cursor:default;}
 .footer{margin-top:8px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted-2);}
 .footer img{height:16px;opacity:0.6;}
 .header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2);}
@@ -133,7 +140,46 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         <dt>이름</dt><dd id="accountDisplayName">-</dd>
         <dt>역할</dt><dd id="accountRole">-</dd>
       </dl>
+      <div class="field">
+        <label for="myPasswordInput">비밀번호 변경</label>
+        <div class="field-row">
+          <input id="myPasswordInput" type="password" placeholder="새 비밀번호 (4자 이상)">
+          <button class="btn-ghost" id="changeMyPasswordBtn">변경</button>
+        </div>
+      </div>
+      <div class="status-line" id="myPasswordStatusLine"></div>
       <button class="btn-danger" id="logoutBtn">로그아웃</button>
+    </div>
+
+    <div class="panel" id="userManagementPanel" style="display:none">
+      <div class="panel-title">계정 관리<span class="badge b-teal" style="margin-left:8px">admin 전용</span></div>
+      <div class="panel-sub">보안팀 계정을 추가·삭제합니다. 역할 계층은 admin/security_officer 둘뿐입니다.</div>
+      <div id="userListBox" style="margin-bottom:16px"></div>
+      <div class="field-row">
+        <div class="field">
+          <label for="newUsernameInput">아이디</label>
+          <input id="newUsernameInput" placeholder="예: officer1">
+        </div>
+        <div class="field">
+          <label for="newDisplayNameInput">이름</label>
+          <input id="newDisplayNameInput" placeholder="예: 김담당">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="newPasswordInput">초기 비밀번호</label>
+          <input id="newPasswordInput" type="password" placeholder="4자 이상">
+        </div>
+        <div class="field" style="max-width:160px">
+          <label for="newRoleInput">역할</label>
+          <select id="newRoleInput" style="width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px">
+            <option value="security_officer">담당자</option>
+            <option value="admin">관리자</option>
+          </select>
+        </div>
+        <button class="btn-primary" id="addUserBtn">추가</button>
+      </div>
+      <div class="status-line" id="userManagementStatusLine"></div>
     </div>
 
     <div class="panel">
@@ -222,14 +268,103 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     }
   }
 
+  let currentUser = null;
+
   async function loadUser() {
     try {
       const user = await window.gijo.me();
+      currentUser = user;
       avatarBtn.textContent = (user.displayName || user.username || "-").charAt(0);
       document.getElementById("accountUsername").textContent = user.username || "-";
       document.getElementById("accountDisplayName").textContent = user.displayName || "-";
       document.getElementById("accountRole").textContent = user.role || "-";
+      if (user.role === "admin") {
+        document.getElementById("userManagementPanel").style.display = "";
+        await loadUserList();
+      }
     } catch (e) {}
+  }
+
+  async function changeMyPassword() {
+    const line = document.getElementById("myPasswordStatusLine");
+    const password = document.getElementById("myPasswordInput").value;
+    if (!currentUser) return;
+    if (password.length < 4) {
+      line.textContent = "비밀번호는 4자 이상이어야 합니다.";
+      line.className = "status-line status-err";
+      return;
+    }
+    try {
+      await window.gijo.changeUserPassword(currentUser.id, password);
+      document.getElementById("myPasswordInput").value = "";
+      line.textContent = "✓ 비밀번호가 변경되었습니다.";
+      line.className = "status-line status-ok";
+    } catch (e) {
+      line.textContent = "✗ 변경 실패: " + e.message;
+      line.className = "status-line status-err";
+    }
+  }
+
+  const ROLE_LABEL = { admin: "관리자", security_officer: "담당자" };
+
+  async function loadUserList() {
+    const box = document.getElementById("userListBox");
+    try {
+      const users = await window.gijo.listUsers();
+      box.innerHTML = users
+        .map((u) => {
+          const isSelf = currentUser && u.id === currentUser.id;
+          const delAction = isSelf
+            ? `<span class="user-row-del disabled">본인 계정</span>`
+            : `<span class="user-row-del" data-del-user="${u.id}">삭제</span>`;
+          return `<div class="user-row">
+            <div>
+              <div class="user-row-name">${u.displayName} <span class="badge ${u.role === "admin" ? "b-purple" : "b-teal"}" style="margin-left:4px">${ROLE_LABEL[u.role] || u.role}</span></div>
+              <div class="user-row-sub">${u.username}</div>
+            </div>
+            ${delAction}
+          </div>`;
+        })
+        .join("");
+    } catch (e) {
+      box.innerHTML = '<div style="color:var(--muted)">계정 목록을 불러오지 못했습니다</div>';
+    }
+  }
+
+  async function addUser() {
+    const line = document.getElementById("userManagementStatusLine");
+    const username = document.getElementById("newUsernameInput").value.trim();
+    const displayName = document.getElementById("newDisplayNameInput").value.trim();
+    const password = document.getElementById("newPasswordInput").value;
+    const role = document.getElementById("newRoleInput").value;
+    if (!username || !displayName || password.length < 4) {
+      line.textContent = "아이디·이름을 입력하고 비밀번호는 4자 이상으로 설정하세요.";
+      line.className = "status-line status-err";
+      return;
+    }
+    try {
+      await window.gijo.createUser({ username, password, displayName, role });
+      document.getElementById("newUsernameInput").value = "";
+      document.getElementById("newDisplayNameInput").value = "";
+      document.getElementById("newPasswordInput").value = "";
+      line.textContent = "✓ 계정이 추가되었습니다.";
+      line.className = "status-line status-ok";
+      await loadUserList();
+    } catch (e) {
+      line.textContent = "✗ 추가 실패: " + e.message;
+      line.className = "status-line status-err";
+    }
+  }
+
+  async function deleteUserRow(id) {
+    const line = document.getElementById("userManagementStatusLine");
+    try {
+      await window.gijo.deleteUser(id);
+      await loadUserList();
+    } catch (e) {
+      line.textContent = "✗ 삭제 실패: " + e.message;
+      line.className = "status-line status-err";
+    }
   }
 
   async function testConnection() {
@@ -370,6 +505,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.getElementById("startEngineBtn").addEventListener("click", startEngine);
     document.getElementById("stopEngineBtn").addEventListener("click", stopEngine);
     document.getElementById("saveSmtpBtn").addEventListener("click", saveSmtp);
+    document.getElementById("changeMyPasswordBtn").addEventListener("click", changeMyPassword);
+    document.getElementById("addUserBtn").addEventListener("click", addUser);
+    document.getElementById("userListBox").addEventListener("click", (e) => {
+      const id = e.target.dataset.delUser;
+      if (id) deleteUserRow(id);
+    });
     document.getElementById("logoutBtn").addEventListener("click", logout);
     document.getElementById("settingsBtn").addEventListener("click", () => {}); // 이미 설정 화면
 
