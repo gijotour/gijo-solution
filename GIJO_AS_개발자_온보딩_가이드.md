@@ -354,9 +354,24 @@ cd server && npm test    # Vitest, test/**/*.test.ts — 19개 파일 83개 테�
 이유는 네이티브 `.node` 파일이 asar 내부에서 로드되지 않기 때문이다. 실행 시 `main.ts`가
 `ELECTRON_RUN_AS_NODE`로 이 서버를 스폰하고(사용자 PC에 Node 설치 불필요), `cwd`를 서버 위치로
 고정해 `data/`가 `resources/server-dist/data/`에 예측 가능하게 생기도록 한다.
-`dist/win-unpacked/GIJO AS.exe` 직접 실행 → 로그인까지 검증 완료. 알려진 흠: NSIS 최종 설치
-파일 생성이 winCodeSign 심볼릭 링크 권한 문제로 실패할 수 있음(개발자 모드 활성화 또는
-`CSC_IDENTITY_AUTO_DISCOVERY=false`로 우회 가능할 것으로 보이나 미검증).
+`dist/win-unpacked/GIJO AS.exe` 직접 실행 → 로그인까지 검증 완료. NSIS 설치 파일
+(`dist/GIJO AS Setup 0.1.0.exe`) 생성도 검증 완료 (2026-07-15).
+
+**winCodeSign 심볼릭 링크 오류 대처** (개발자 모드 꺼진 머신에서 처음 빌드할 때):
+electron-builder가 winCodeSign 캐시를 압축해제하며 darwin용 dylib 심볼릭 링크 2개를
+만들려다 권한 오류로 죽는다. `CSC_IDENTITY_AUTO_DISCOVERY=false`만으로는 **해결 안 됨**
+(서명을 안 해도 압축해제는 수행됨 — 검증으로 기각). 해결책 둘 중 하나:
+- Windows 개발자 모드 활성화 (심볼릭 링크 권한 부여), 또는
+- 캐시 수동 압축해제 — darwin 심볼릭 링크 2개는 Windows 빌드에 불필요하므로 무시:
+  ```
+  cd %LOCALAPPDATA%\electron-builder\Cache\winCodeSign
+  (실패한 시도가 남긴 임의 숫자 폴더/7z 전부 삭제 후, 7z 하나만 남겨서)
+  <repo>\client\node_modules\7zip-bin\win\x64\7za.exe x -y <다운로드된>.7z -owinCodeSign-2.6.0
+  ```
+  이후 재빌드하면 electron-builder가 캐시를 그대로 쓴다. 이 방법으로 검증 완료.
+
+잔여 폴리시 항목: 앱 아이콘 미설정(기본 Electron 아이콘 사용 중), 코드 서명 없음(고객 PC
+SmartScreen 경고 예상 — 인증서 구매는 별도 결정).
 
 ### 분산 온프레미스 모드 (기업)
 

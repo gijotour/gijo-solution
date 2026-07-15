@@ -117,6 +117,16 @@ New-Item -ItemType Directory -Path .\models\qwen2.5-coder-32b-instruct -Force
 huggingface-cli download bartowski/Qwen2.5-Coder-32B-Instruct-GGUF --include "*Q4_K_M*" --local-dir .\models\qwen2.5-coder-32b-instruct
 ```
 
+> **`huggingface-cli`는 이 단계의 수동 다운로드용이면서 동시에 GIJO AS 서버의 런타임 의존성입니다.**
+> 서버의 HF 모델 다운로드 기능(`loadHfModel()`)이 `huggingface-cli`를 셸로 직접 호출하므로,
+> **GIJO AS 서버를 실행하는 계정의 PATH**에서 아래 명령이 동작해야 합니다(없으면 앱 내
+> 모델 검색은 되는데 다운로드만 실패합니다):
+> ```powershell
+> huggingface-cli --version
+> ```
+> 새 PowerShell 창에서도 인식되는지 확인하세요. pip가 Scripts 경로를 PATH에 안 넣어줬다면
+> `python -m pip show huggingface_hub`로 위치를 찾아 해당 `Scripts` 폴더를 PATH에 추가합니다.
+
 다운로드된 파일명이 `Qwen2.5-Coder-32B-Instruct-Q4_K_M.gguf` 형태이므로, GIJO AS가 찾는 이름으로 **정확히** 바꿔줍니다:
 
 ```powershell
@@ -209,6 +219,7 @@ npm start
 | `npm install`(client) 중 electron 다운로드 실패 | 사내망/방화벽이 GitHub Releases 차단 | 방화벽 예외 등록 또는 `ELECTRON_MIRROR` 환경변수로 국내 미러 지정 |
 | 로그인 401 unauthorized | 잘못된 ID/PW 입력 또는 만료된 JWT 토큰 | 계정 정보 재확인 및 다시 로그인 |
 | 로컬 엔진 시작 요청이 실패/무응답 | 모델 파일 경로·이름 불일치 또는 java 서브프로세스 권한 차단 | STEP 6 경로(`server\models\qwen2.5-coder-32b-instruct\qwen2.5-coder-32b-instruct.gguf`)와 파일명이 정확히 일치하는지 확인 |
+| 앱에서 HF 모델 검색은 되는데 다운로드만 실패 | 서버 실행 계정 PATH에 `huggingface-cli` 없음 | STEP 6의 `huggingface-cli --version` 확인 절차 수행 (pip Scripts 경로를 PATH에 추가) |
 | VRAM 부족 경고 | 컨텍스트 크기 과다 설정 | STEP 7/10에서 `--ctx-size`를 32768보다 낮춰 재시도 |
 
 ---
