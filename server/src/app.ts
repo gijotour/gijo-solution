@@ -9,6 +9,7 @@ import { registerUsersRoutes } from "./auth/users";
 import { registerAgentsRoutes } from "./engine/agents";
 import { registerAssetsRoutes } from "./engine/assets";
 import { registerAssetImportRoutes } from "./engine/assetimport";
+import { registerRepoScanRoutes } from "./engine/reposcan";
 import { registerDispatcherRoutes } from "./engine/dispatcher";
 import { registerMemoryRoutes } from "./engine/memory";
 import { registerBridgeRoutes } from "./engine/bridge";
@@ -50,6 +51,7 @@ export function createApp(): Express {
   registerAgentsRoutes(app);
   registerAssetsRoutes(app);
   registerAssetImportRoutes(app);
+  registerRepoScanRoutes(app);
   registerDispatcherRoutes(app);
   registerMemoryRoutes(app);
   registerBridgeRoutes(app);

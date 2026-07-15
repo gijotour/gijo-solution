@@ -364,4 +364,6 @@ export const assetsApi = {
       method: "POST",
       body: { content, format, source },
     }),
+  scanRepos: (args: { provider: string; owner: string; token?: string; baseUrl?: string; maxRepos?: number }) =>
+    request<{ scanned: number; registered: number; assets: Asset[] }>("/api/reposcan", { method: "POST", body: args }),
 };

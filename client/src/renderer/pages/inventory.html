@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GIJO AS — AI 자산 인벤토리</title>
+<title>GIJO AS — AI 자산 스캐닝 & 업로드</title>
 <style>
   :root{
     --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
@@ -143,8 +143,8 @@
     <div class="nav-item" data-page="agent.html"><span class="ic">◉</span>에이전트 AI</div>
     <div class="nav-section">모니터링</div>
     <div class="nav-item" data-page="dashboard.html"><span class="ic">◆</span>대시보드</div>
-    <div class="nav-item active"><span class="ic">◇</span>AI 자산 인벤토리</div>
-    <div class="nav-item" data-page="sbom.html"><span class="ic">▢</span>SBOM 관리</div>
+    <div class="nav-item active"><span class="ic">◇</span>AI 자산 스캐닝 & 업로드</div>
+    <div class="nav-item" data-page="sbom.html"><span class="ic">▢</span>AI-BOM 보안 및 리스크 관리</div>
     <div class="nav-item" data-page="threat.html"><span class="ic">△</span>취약점 · 위협</div>
     <div class="nav-section">거버넌스</div>
     <div class="nav-item"><span class="ic">✓</span>컴플라이언스</div>
@@ -162,8 +162,8 @@
   <div class="main">
     <div class="topbar-row">
       <div>
-        <div class="page-title">AI 자산 인벤토리</div>
-        <div class="page-sub">전사에 배포된 AI 모델 · 에이전트 자산 전수 목록 · 총 <span id="pageSubCount">-</span>건</div>
+        <div class="page-title">AI 자산 스캐닝 & 업로드</div>
+        <div class="page-sub">코드 저장소 자동 스캔 · 외부 탐지 결과 업로드 · 수동 등록으로 전사 AI 자산을 전수 파악 · 총 <span id="pageSubCount">-</span>건</div>
       </div>
       <div style="display:flex;gap:8px;">
         <button class="btn-ghost" id="csvExportBtn">CSV 내보내기</button>
@@ -171,6 +171,18 @@
         <input type="file" id="importFileInput" accept=".json,.csv" style="display:none">
         <button class="btn-primary" id="addAssetBtn">+ 자산 등록</button>
       </div>
+    </div>
+
+    <div class="panel" style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:16px;">
+      <div style="font-size:14.5px;font-weight:800;color:#fff;margin-bottom:4px;">코드 저장소 스캔 <span style="font-size:10.5px;font-weight:700;color:var(--teal);background:rgba(30,185,128,0.15);padding:2px 8px;border-radius:10px;margin-left:6px;">온프레미스 · 자체 탐지</span></div>
+      <div style="font-size:11.5px;color:var(--muted);margin-bottom:14px;">GitHub 조직/사용자의 저장소를 훑어 AI 라이브러리(openai·langchain·transformers 등) 의존성이 있는 repo를 개발형 AI 자산으로 자동 등록합니다. 토큰은 저장하지 않고 이 스캔에만 사용합니다. 온프레미스 GitHub Enterprise는 Base URL로 지정하세요.</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+        <input id="repoOwnerInput" placeholder="조직 또는 사용자명 (예: my-company)" style="flex:1;min-width:200px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;">
+        <input id="repoTokenInput" type="password" placeholder="액세스 토큰 (선택 — 없으면 rate limit 낮음)" style="flex:1;min-width:200px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;">
+        <input id="repoBaseUrlInput" placeholder="Base URL (선택 — GitHub Enterprise)" style="flex:1;min-width:180px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;">
+        <button class="btn-primary" id="repoScanBtn">스캔</button>
+      </div>
+      <div class="status-line" id="repoScanStatus" style="font-size:12.5px;margin-top:10px;"></div>
     </div>
 
     <div class="kpi-strip">
@@ -414,6 +426,34 @@
     }
   }
 
+  async function scanRepos() {
+    const owner = document.getElementById("repoOwnerInput").value.trim();
+    const token = document.getElementById("repoTokenInput").value.trim();
+    const baseUrl = document.getElementById("repoBaseUrlInput").value.trim();
+    const status = document.getElementById("repoScanStatus");
+    const btn = document.getElementById("repoScanBtn");
+    if (!owner) {
+      status.textContent = "조직 또는 사용자명을 입력하세요.";
+      status.className = "status-line status-err";
+      return;
+    }
+    btn.disabled = true;
+    status.textContent = "저장소 스캔 중... (저장소 수에 따라 수십 초 걸릴 수 있습니다)";
+    status.className = "status-line";
+    try {
+      const r = await window.gijo.scanRepos({ provider: "github", owner, token: token || undefined, baseUrl: baseUrl || undefined });
+      status.textContent = `✓ 스캔 완료 — 저장소 ${r.scanned}개 중 ${r.registered}개를 AI 자산으로 등록했습니다.`;
+      status.className = "status-line status-ok";
+      document.getElementById("repoTokenInput").value = "";
+      await refresh();
+    } catch (e) {
+      status.textContent = "✗ 스캔 실패: " + e.message;
+      status.className = "status-line status-err";
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
   async function handleImportFile(e) {
     const file = e.target.files && e.target.files[0];
     if (!file) return;
@@ -471,6 +511,7 @@
     document.getElementById("csvExportBtn").addEventListener("click", csvExport);
     document.getElementById("importAssetsBtn").addEventListener("click", () => document.getElementById("importFileInput").click());
     document.getElementById("importFileInput").addEventListener("change", handleImportFile);
+    document.getElementById("repoScanBtn").addEventListener("click", scanRepos);
   }
 
   if (!window.gijo.isAuthenticated()) {
