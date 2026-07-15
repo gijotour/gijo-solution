@@ -165,6 +165,24 @@ export const collaborationApi = {
   history: () => request<CollaborationEvent[]>("/api/collaboration/history"),
 };
 
+// ── 로컬 LLM 실동작 스트림 (llm:event) ────────────────────────────────
+export interface LlmActivityEvent {
+  kind: "chat" | "embed" | "load" | "swap";
+  phase: "start" | "done" | "error";
+  agent?: string;
+  model?: string;
+  detail?: string;
+  promptTokens?: number;
+  completionTokens?: number;
+  tokensPerSec?: number;
+  latencyMs?: number;
+  timestamp: number;
+}
+
+export const llmActivityApi = {
+  history: () => request<LlmActivityEvent[]>("/api/llm-activity/history"),
+};
+
 // ── 장기 기억(RAG) ────────────────────────────────────────────────────
 export const memoryApi = {
   ingest: (path: string, scope?: string) => request("/api/memory/ingest", { method: "POST", body: { path, scope } }),

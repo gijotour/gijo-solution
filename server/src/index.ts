@@ -11,6 +11,7 @@ import { attachCollaborationSocket } from "./engine/collaboration";
 import { attachFinetuneSocket } from "./engine/finetune";
 import { attachAssetsSocket } from "./engine/assets";
 import { attachLogsSocket, installConsoleCapture } from "./engine/logs";
+import { attachLlmActivitySocket } from "./engine/llmactivity";
 import { stopLocalEngine, stopEmbeddingEngine, autoStartLocalEngines } from "./engine/localengine";
 
 // 가능한 한 이른 시점에 설치해야 이후의 console.log/warn/error가 전부 캡처된다.
@@ -27,6 +28,7 @@ attachCollaborationSocket(wss);
 attachFinetuneSocket(wss);
 attachAssetsSocket(wss);
 attachLogsSocket(wss);
+attachLlmActivitySocket(wss);
 
 httpServer.listen(PORT, () => {
   console.log(`GIJO AS 서버 기동 — http://localhost:${PORT} (WebSocket: /ws)`);

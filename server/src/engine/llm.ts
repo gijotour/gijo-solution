@@ -5,6 +5,7 @@ import type { Express } from "express";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { getAgentById } from "./agents";
+import { emitLlmActivity, modelBasename } from "./llmactivity";
 
 const LOCAL_LLM_BASE_URL = process.env.GIJO_LOCAL_LLM_URL ?? "http://localhost:8080/v1";
 // 6.2절: 임베딩 모델(BGE-M3 등)은 채팅용 LLM과 별도 llama-server 프로세스로 동시 서빙한다 (RTX 3090 VRAM 여유 활용).
@@ -82,6 +83,11 @@ export async function chat(args: ChatArgs): Promise<string> {
   const systemContent = rag ? `${systemPromptFor(args.agentId)}\n\n${rag}` : systemPromptFor(args.agentId);
   const messages = [{ role: "system", content: systemContent }, ...history, { role: "user", content: args.message }];
 
+  // 실시간 스트림용: 어느 에이전트가 지금 로컬 LLM으로 추론하는지 눈에 보이게 한다.
+  const agentName = getAgentById(args.agentId)?.name ?? args.agentId ?? "에이전트";
+  const started = Date.now();
+  emitLlmActivity({ kind: "chat", phase: "start", agent: agentName, detail: "추론 요청" });
+
   const res = await fetch(`${LOCAL_LLM_BASE_URL}/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -89,10 +95,29 @@ export async function chat(args: ChatArgs): Promise<string> {
   }).catch(() => null);
 
   if (!res || !res.ok) {
+    emitLlmActivity({ kind: "chat", phase: "error", agent: agentName, detail: "로컬 LLM 연결 실패" });
     return "[로컬 LLM 서버에 연결할 수 없습니다. /api/localengine/start 로 먼저 기동하세요.]";
   }
-  const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+  const data = (await res.json()) as {
+    choices?: { message?: { content?: string } }[];
+    model?: string;
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
+    timings?: { predicted_per_second?: number };
+  };
   const reply = data.choices?.[0]?.message?.content ?? "";
+
+  // llama.cpp 실측치(usage·timings)를 그대로 실어 보낸다 — 값이 나오면 실제 추론이 일어난 것.
+  emitLlmActivity({
+    kind: "chat",
+    phase: "done",
+    agent: agentName,
+    model: modelBasename(data.model),
+    promptTokens: data.usage?.prompt_tokens,
+    completionTokens: data.usage?.completion_tokens,
+    tokensPerSec: data.timings?.predicted_per_second ? Math.round(data.timings.predicted_per_second) : undefined,
+    latencyMs: Date.now() - started,
+    detail: "응답 완료",
+  });
 
   if (args.remember && reply) {
     const updated = [...history, { role: "user" as const, content: args.message }, { role: "assistant" as const, content: reply }];
@@ -102,6 +127,7 @@ export async function chat(args: ChatArgs): Promise<string> {
 }
 
 export async function embed(texts: string[]): Promise<number[][]> {
+  const started = Date.now();
   const res = await fetch(`${EMBEDDING_SERVER_URL}/embeddings`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -109,12 +135,21 @@ export async function embed(texts: string[]): Promise<number[][]> {
   }).catch(() => null);
 
   if (!res || !res.ok) {
+    emitLlmActivity({ kind: "embed", phase: "error", model: "임베딩", detail: "임베딩 서버 연결 실패" });
     throw new Error(
       "임베딩 서버에 연결할 수 없습니다. 별도 llama-server를 --embedding 플래그로 " + EMBEDDING_SERVER_URL + " 에 기동하세요."
     );
   }
   const data = (await res.json()) as { data?: { embedding: number[] }[] };
   if (!data.data) throw new Error("임베딩 서버 응답 형식이 올바르지 않습니다.");
+  // 장기 기억 검색·수집 때 임베딩이 실제로 도는 것도 보이게 한다(추론 파이프라인의 일부).
+  emitLlmActivity({
+    kind: "embed",
+    phase: "done",
+    model: "임베딩 서버",
+    detail: `${texts.length}개 임베딩`,
+    latencyMs: Date.now() - started,
+  });
   return data.data.map((d) => d.embedding);
 }
 

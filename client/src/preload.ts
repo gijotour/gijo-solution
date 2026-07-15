@@ -41,6 +41,8 @@ const gijoApi = {
   sendInstruction: (text: string) => api.dispatchApi.send(text),
   onCollaborationEvent: (cb: (evt: unknown) => void) => onChannel("collaboration:event", cb),
   listCollaborationHistory: () => api.collaborationApi.history(),
+  onLlmActivity: (cb: (evt: unknown) => void) => onChannel("llm:event", cb),
+  listLlmActivity: () => api.llmActivityApi.history(),
 
   // 작업 큐
   listTasks: () => api.tasksApi.list(),

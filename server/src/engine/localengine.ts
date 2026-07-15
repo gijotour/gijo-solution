@@ -13,6 +13,7 @@ import * as fs from "fs";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { db } from "../db";
+import { emitLlmActivity, modelBasename } from "./llmactivity";
 
 const LLAMA_SERVER_PATH =
   process.env.GIJO_LLAMA_SERVER_PATH ??
@@ -92,6 +93,12 @@ export async function startLocalEngine(modelId: string): Promise<LocalEngineStat
       return getLocalEngineStatus();
     }
     console.log(`[localengine] swapping local LLM: ${currentModelId} -> ${modelId}`);
+    emitLlmActivity({
+      kind: "swap",
+      phase: "start",
+      model: modelBasename(modelId),
+      detail: `모델 교체: ${modelBasename(currentModelId ?? "")} → ${modelBasename(modelId)}`,
+    });
     await stopLocalEngine();
   }
 
@@ -104,6 +111,7 @@ export async function startLocalEngine(modelId: string): Promise<LocalEngineStat
   serverProcess = spawned;
   currentModelId = modelId;
   setStateStmt.run("lastModelId", modelId);
+  emitLlmActivity({ kind: "load", phase: "start", model: modelBasename(modelId), detail: "모델 로드 중 (llama-server 기동)" });
 
   spawned.on("exit", () => {
     if (serverProcess === spawned) {

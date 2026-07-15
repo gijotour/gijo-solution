@@ -223,7 +223,7 @@ tr:last-child td{border-bottom:none;}
 <div class="content-grid">
   <div class="panel">
     <div class="panel-title">실시간 협업 현황<span class="panel-link" id="clearFeedBtn">지우기</span></div>
-    <div class="panel-sub">에이전트 간 작업 위임 · 메시지 전달 (WebSocket 실시간 수신)</div>
+    <div class="panel-sub">에이전트 간 작업 위임 · 🧠 로컬 LLM 추론 실황 (WebSocket 실시간 수신 — 모델·토큰·생성속도 실측)</div>
     <div class="chat-feed" id="chatFeed">
       <div style="color:var(--muted);font-size:12px">불러오는 중...</div>
     </div>
@@ -248,8 +248,8 @@ tr:last-child td{border-bottom:none;}
 </div>
 
 <div class="panel">
-  <div class="panel-title">터미널 — 협업 이벤트 로그</div>
-  <div class="panel-sub">에이전트 간 협업 이벤트 스트림입니다. 서버가 실제로 실행한 명령(모델 스캔·파인튜닝 등)의 stdout/stderr는 좌측 "로그" 메뉴에서 실시간으로 확인할 수 있습니다.</div>
+  <div class="panel-title">터미널 — 협업 · LLM 실동작 로그</div>
+  <div class="panel-sub">에이전트 협업 이벤트와 로컬 LLM 실동작(추론·임베딩·모델 로드/스왑)을 시간순으로 스트리밍합니다. 각 추론의 모델·토큰 수·생성속도(tok/s)는 llama.cpp 실측치입니다. llama-server 자체 stdout/stderr는 좌측 "로그" 메뉴에서 확인할 수 있습니다.</div>
   <div class="terminal" id="terminalLog">
     <div class="out">이벤트 대기 중...</div>
   </div>
@@ -438,16 +438,63 @@ tr:last-child td{border-bottom:none;}
     return `<div class="out">[${time}] ${evt.from} → ${evt.to}: ${evt.message}</div>`;
   }
 
+  // ── 로컬 LLM 실동작 이벤트(llm:event) — 실제 추론/임베딩/모델 로드를 사람이 읽는 한 줄로 ──
+  function fmtLlm(evt) {
+    const icon = evt.kind === "embed" ? "🔎" : (evt.kind === "load" || evt.kind === "swap") ? "⚙️" : "🧠";
+    const who = evt.agent ? `[${evt.agent}] ` : "";
+    const model = evt.model ? evt.model + " · " : "";
+    let tail = evt.detail || "";
+    if (evt.phase === "done" && evt.kind === "chat") {
+      const toks = (evt.promptTokens != null && evt.completionTokens != null) ? ` · ${evt.promptTokens}→${evt.completionTokens}토큰` : "";
+      const tps = evt.tokensPerSec != null ? ` · ${evt.tokensPerSec} tok/s` : "";
+      const lat = evt.latencyMs != null ? ` · ${(evt.latencyMs / 1000).toFixed(1)}s` : "";
+      tail = `응답 완료${toks}${tps}${lat}`;
+    } else if (evt.phase === "done" && evt.kind === "embed") {
+      const lat = evt.latencyMs != null ? ` · ${(evt.latencyMs / 1000).toFixed(1)}s` : "";
+      tail = `${evt.detail || "임베딩"}${lat}`;
+    }
+    return { icon, text: `${who}${model}${tail}`, phase: evt.phase, kind: evt.kind };
+  }
+
+  function llmRowHtml(evt) {
+    const f = fmtLlm(evt);
+    const dim = f.phase === "start" ? "opacity:.65;" : "";
+    const color = f.phase === "error" ? "#e2483d" : (f.kind === "chat" ? "var(--blue-light)" : "var(--teal)");
+    return `<div class="chat-row" style="${dim}"><span style="color:${color};font-weight:700">${f.icon} LLM</span><span class="chat-msg">${f.text.replace(/</g, "&lt;")}</span></div>`;
+  }
+
+  function llmTerminalHtml(evt) {
+    const f = fmtLlm(evt);
+    const time = new Date(evt.timestamp).toLocaleTimeString("ko-KR");
+    return `<div class="out">[${time}] ${f.icon} ${f.text.replace(/</g, "&lt;")}</div>`;
+  }
+
+  function appendLlmEvent(evt) {
+    if (chatFeed.textContent.includes("없습니다") || chatFeed.textContent.includes("불러오는 중")) chatFeed.innerHTML = "";
+    chatFeed.insertAdjacentHTML("afterbegin", llmRowHtml(evt));
+    if (terminalLog.textContent.includes("이벤트 없음") || terminalLog.textContent.includes("대기 중")) terminalLog.innerHTML = "";
+    terminalLog.insertAdjacentHTML("beforeend", llmTerminalHtml(evt));
+    terminalLog.scrollTop = terminalLog.scrollHeight;
+  }
+
   async function loadCollaboration() {
     try {
-      const history = await window.gijo.listCollaborationHistory();
-      if (history.length === 0) {
-        chatFeed.innerHTML = '<div style="color:var(--muted);font-size:12px">아직 협업 이벤트가 없습니다</div>';
-        terminalLog.innerHTML = '<div class="out">이벤트 없음</div>';
-        return;
-      }
-      chatFeed.innerHTML = history.slice(-20).reverse().map(collabRowHtml).join("");
-      terminalLog.innerHTML = history.slice(-20).map(terminalRowHtml).join("");
+      const [collab, llm] = await Promise.all([
+        window.gijo.listCollaborationHistory(),
+        window.gijo.listLlmActivity().catch(() => []),
+      ]);
+      // 피드: 협업 이벤트 위주(최신이 위). LLM 실동작은 이후 라이브로 흘러든다.
+      chatFeed.innerHTML = collab.length
+        ? collab.slice(-20).reverse().map(collabRowHtml).join("")
+        : '<div style="color:var(--muted);font-size:12px">아직 협업 이벤트가 없습니다 — 지시를 내리면 여기에 실시간으로 표시됩니다</div>';
+      // 터미널: 협업 이벤트 + 로컬 LLM 실동작을 시간순으로 병합해 최근 40줄.
+      const merged = [
+        ...collab.map((e) => ({ t: e.timestamp, html: terminalRowHtml(e) })),
+        ...llm.map((e) => ({ t: e.timestamp, html: llmTerminalHtml(e) })),
+      ]
+        .sort((a, b) => a.t - b.t)
+        .slice(-40);
+      terminalLog.innerHTML = merged.length ? merged.map((m) => m.html).join("") : '<div class="out">이벤트 없음</div>';
       terminalLog.scrollTop = terminalLog.scrollHeight;
     } catch (e) {
       chatFeed.innerHTML = '<div style="color:var(--muted);font-size:12px">협업 로그를 불러오지 못했습니다</div>';
@@ -515,6 +562,7 @@ tr:last-child td{border-bottom:none;}
 
     if (window.gijoRealtime) window.gijoRealtime.connect();
     window.gijo.onCollaborationEvent(appendLiveEvent);
+    window.gijo.onLlmActivity(appendLlmEvent);
 
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll(".nav-item[data-page]").forEach((el) => {
