@@ -100,6 +100,7 @@
       <div class="explorer-tree" id="explorerTree" style="margin-bottom:16px;">불러오는 중...</div>
       <div class="explorer-title"><span>📁 파일</span><span><span style="color:var(--muted-2);cursor:pointer;margin-right:8px;" id="pickFolderBtn" title="작업 폴더 선택">📂</span><span style="color:var(--muted-2);cursor:pointer" id="refreshFilesBtn" title="새로고침">⟳</span></span></div>
       <div class="explorer-sub" id="fileRootLabel">프로젝트 폴더 (읽기 전용)</div>
+      <div style="font-size:10.5px;color:var(--muted-2);margin-bottom:6px;line-height:1.5;">📄 문서(PDF·HWPX·텍스트)를 클릭하면 <b style="color:var(--teal)">장기 기억에 올리기</b></div>
       <div class="explorer-tree" id="fileTree" style="font-size:12px;">불러오는 중...</div>
     </div>
 
@@ -235,10 +236,12 @@
     try { data = await window.gijo.listDir(relPath); } catch (e) { return; }
     for (const item of data.items) {
       const itemPath = (relPath ? relPath + "/" : "") + item.name;
+      const canIngest = !item.dir && /\.(pdf|hwpx|hwp|txt|md|csv|json|log)$/i.test(item.name);
       const row = document.createElement("div");
-      row.style.cssText = `padding:2px 0 2px ${depth * 12 + 4}px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${item.dir ? "cursor:pointer;" : "color:var(--muted);"}`;
+      row.style.cssText = `padding:2px 0 2px ${depth * 12 + 4}px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${item.dir || canIngest ? "cursor:pointer;" : "color:var(--muted);"}`;
       const caret = item.dir ? (openDirs.has(itemPath) ? "▾ " : "▸ ") : "";
       row.innerHTML = `<span style="color:var(--muted-2)">${caret}</span>${fileIcon(item.dir, item.name)} ${item.name.replace(/</g, "&lt;")}`;
+      if (canIngest) row.title = "클릭 → 장기 기억에 올리기";
       container.appendChild(row);
       if (item.dir) {
         const childBox = document.createElement("div");
@@ -248,6 +251,35 @@
           e.stopPropagation();
           if (openDirs.has(itemPath)) { openDirs.delete(itemPath); childBox.innerHTML = ""; row.querySelector("span").textContent = "▸ "; }
           else { openDirs.add(itemPath); await renderDir(itemPath, depth + 1, childBox); row.querySelector("span").textContent = "▾ "; }
+        });
+      } else if (canIngest) {
+        // 담당자가 대시보드 탐색기에서 문서를 클릭하면 바로 장기 기억(RAG)에 올릴 수 있게 한다.
+        const actionBox = document.createElement("div");
+        container.appendChild(actionBox);
+        row.addEventListener("click", (e) => {
+          e.stopPropagation();
+          if (actionBox.innerHTML) { actionBox.innerHTML = ""; return; }
+          actionBox.innerHTML =
+            `<div style="padding:2px 0 6px ${depth * 12 + 20}px;">` +
+            `<button class="mem-ingest-btn" style="font-size:11px;background:var(--teal);color:#04211d;border:none;border-radius:6px;padding:3px 9px;cursor:pointer;font-weight:800">📥 장기 기억에 올리기</button> ` +
+            `<span class="mem-ingest-status" style="font-size:11px;color:var(--muted)"></span></div>`;
+          const btn = actionBox.querySelector(".mem-ingest-btn");
+          const st = actionBox.querySelector(".mem-ingest-status");
+          btn.addEventListener("click", async (ev) => {
+            ev.stopPropagation();
+            btn.disabled = true;
+            st.textContent = "추출·저장 중...";
+            try {
+              const f = await window.gijo.readFile(itemPath);
+              const r = await window.gijo.ingestMemoryFile(f.name, f.content, "global");
+              st.textContent = `✓ ${r.chunks}개 청크 저장됨 · 전체 공유`;
+              st.style.color = "var(--teal)";
+            } catch (err) {
+              st.textContent = "✗ " + err.message;
+              st.style.color = "#f87171";
+              btn.disabled = false;
+            }
+          });
         });
       }
     }

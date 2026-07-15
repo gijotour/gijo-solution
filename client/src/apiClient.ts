@@ -168,6 +168,8 @@ export const collaborationApi = {
 // ── 장기 기억(RAG) ────────────────────────────────────────────────────
 export const memoryApi = {
   ingest: (path: string, scope?: string) => request("/api/memory/ingest", { method: "POST", body: { path, scope } }),
+  ingestFile: (filename: string, content: string, scope?: string) =>
+    request("/api/memory/ingest-file", { method: "POST", body: { filename, content, scope } }),
   query: (question: string, topK?: number, agentId?: string) =>
     request<string[]>("/api/memory/query", { method: "POST", body: { question, topK, agentId } }),
 };

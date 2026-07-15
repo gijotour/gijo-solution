@@ -45,11 +45,16 @@ function chunkText(text: string, size = CHUNK_SIZE, overlap = CHUNK_OVERLAP): st
 
 export async function ingestDocument(filePath: string, scope: string = GLOBAL_SCOPE): Promise<IngestResult> {
   const raw = await fs.readFile(filePath, "utf-8");
+  return ingestText(path.basename(filePath), raw, scope);
+}
+
+// 이미 추출된 텍스트를 지식 베이스에 직접 넣는다 — 파일 업로드(PDF/HWPX 추출 후)나
+// 서버 밖 클라이언트에서 올린 문서용. ingestDocument는 파일을 읽어 이 함수로 위임한다.
+export async function ingestText(documentId: string, raw: string, scope: string = GLOBAL_SCOPE): Promise<IngestResult> {
   const chunks = chunkText(raw);
-  if (chunks.length === 0) return { documentId: filePath, chunks: 0, embeddingModel: "none", scope };
+  if (chunks.length === 0) return { documentId, chunks: 0, embeddingModel: "none", scope };
 
   const vectors = await embed(chunks);
-  const documentId = path.basename(filePath);
   const rows: MemoryRow[] = chunks.map((text, i) => ({ documentId, chunkIndex: i, text, scope, vector: vectors[i] }));
 
   const db = await lancedb.connect(DB_PATH);
@@ -57,20 +62,32 @@ export async function ingestDocument(filePath: string, scope: string = GLOBAL_SC
   const records = rows as unknown as Record<string, unknown>[];
   if (names.includes(TABLE_NAME)) {
     const table = await db.openTable(TABLE_NAME);
-    // 임베딩 모델이 바뀌면 벡터 차원이 달라진다. LanceDB의 add()는 이때 에러를 내는 게
-    // 아니라 벡터를 기존 차원으로 잘라 저장해버리므로(조용한 데이터 오염), 차원을 직접
-    // 비교해서 다르면 테이블을 재생성한다. 다른 모델의 벡터끼리는 검색이 성립하지 않으므로
-    // 기존 지식 베이스는 폐기가 맞다 — 문서만 다시 수집하면 된다.
+    // 기존 테이블이 현재 스키마와 호환되는지 확인하고, 두 가지 드리프트를 자가 복구한다:
+    //  (1) 벡터 차원 불일치 — 임베딩 모델 교체. add()가 에러 대신 벡터를 기존 차원으로 잘라
+    //      저장해버리므로(조용한 데이터 오염) 반드시 재생성한다.
+    //  (2) 컬럼 드리프트 — scope 등 필드가 추가되기 전에 만들어진 옛 테이블. add()가
+    //      "Found field not in schema" 스키마 에러로 거부한다.
+    // 둘 다 기존 벡터를 그대로 쓸 수 없어 테이블을 재생성한다(문서만 다시 수집하면 됨).
     const existing = (await table.query().limit(1).toArray()) as MemoryRow[];
     const existingDim = existing[0]?.vector?.length;
-    if (existingDim !== undefined && existingDim !== vectors[0].length) {
+    const dimDrift = existingDim !== undefined && existingDim !== vectors[0].length;
+    const schemaDrift = existing[0] !== undefined && !("scope" in existing[0]);
+    if (dimDrift || schemaDrift) {
       console.warn(
-        `[memory] 벡터 차원 불일치(기존 ${existingDim} ↔ 새 ${vectors[0].length} — 임베딩 모델 교체?) — 지식 베이스를 재생성합니다. 기존 문서는 재수집하세요.`
+        `[memory] 지식 베이스 불일치로 재생성합니다 (기존 문서는 재수집 필요) — 차원드리프트=${dimDrift} 스키마드리프트=${schemaDrift}`
       );
       await db.dropTable(TABLE_NAME);
       await db.createTable(TABLE_NAME, records);
     } else {
-      await table.add(records);
+      try {
+        await table.add(records);
+      } catch (err) {
+        // 최후의 안전망: 위 검사로 못 잡은 스키마 불일치로 add가 실패해도 채팅/수집이
+        // 죽지 않게 재생성한다(빈 테이블이 옛 스키마인 경우 등).
+        console.warn(`[memory] add() 실패 — 지식 베이스를 재생성합니다: ${err instanceof Error ? err.message : String(err)}`);
+        await db.dropTable(TABLE_NAME);
+        await db.createTable(TABLE_NAME, records);
+      }
     }
   } else {
     await db.createTable(TABLE_NAME, records);
@@ -113,6 +130,30 @@ export function registerMemoryRoutes(app: Express): void {
     authMiddleware,
     asyncRoute(async (req, res) => {
       res.json(await ingestDocument(req.body.path, req.body.scope ?? GLOBAL_SCOPE));
+    })
+  );
+  // 파일 업로드 → 텍스트 추출(PDF/HWPX/TXT) → 지식 베이스 수집. 담당자가 경로를 타이핑하지 않고
+  // 파일 탐색기로 골라 바로 장기 기억에 넣을 수 있게 한다. { filename, content(base64), scope } → IngestResult
+  app.post(
+    "/api/memory/ingest-file",
+    authMiddleware,
+    asyncRoute(async (req, res) => {
+      const { filename, content, scope } = req.body as { filename?: string; content?: string; scope?: string };
+      if (!filename || !content) {
+        res.status(400).json({ error: "filename과 content(base64)가 필요합니다" });
+        return;
+      }
+      try {
+        const { extractDocumentText } = await import("./dataset.js");
+        const text = await extractDocumentText(filename, content);
+        if (!text.trim()) {
+          res.status(400).json({ error: "문서에서 텍스트를 추출하지 못했습니다 (빈 문서이거나 지원하지 않는 형식)" });
+          return;
+        }
+        res.json(await ingestText(filename, text, scope ?? GLOBAL_SCOPE));
+      } catch (err) {
+        res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+      }
     })
   );
   app.post(

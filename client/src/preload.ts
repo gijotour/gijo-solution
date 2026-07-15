@@ -31,6 +31,7 @@ const gijoApi = {
   navigateTo: (page: string) => ipcRenderer.invoke("navigate:to", page),
   listDir: (relPath: string) => ipcRenderer.invoke("fs:list", relPath) as Promise<{ root: string; rootName: string; path: string; items: { name: string; dir: boolean }[] }>,
   pickWorkFolder: () => ipcRenderer.invoke("fs:pickRoot") as Promise<{ cancelled: boolean; root?: string; rootName?: string }>,
+  readFile: (relPath: string) => ipcRenderer.invoke("fs:readFile", relPath) as Promise<{ name: string; size: number; content: string }>,
 
   // 에이전트 AI / 지시(디스패처)
   listAgents: () => api.agentsApi.list(),
@@ -72,6 +73,7 @@ const gijoApi = {
 
   // 장기 기억(RAG) / 파인튜닝(학습)
   ingestDocument: (path: string, scope?: string) => api.memoryApi.ingest(path, scope),
+  ingestMemoryFile: (filename: string, content: string, scope?: string) => api.memoryApi.ingestFile(filename, content, scope),
   queryMemory: (question: string, topK?: number, agentId?: string) => api.memoryApi.query(question, topK, agentId),
   startFinetune: (agentId: string, datasetId: string) => api.finetuneApi.start(agentId, datasetId),
   onFinetuneProgress: (cb: (p: unknown) => void) => onChannel("finetune:progress", cb),

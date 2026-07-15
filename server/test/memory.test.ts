@@ -16,7 +16,7 @@ vi.mock("../src/engine/llm", () => ({
   registerLlmRoutes: vi.fn(),
 }));
 
-const { ingestDocument, queryMemory } = await import("../src/engine/memory");
+const { ingestDocument, ingestText, queryMemory } = await import("../src/engine/memory");
 
 const DOC_A = path.join(tmpDb, "doc-a.txt");
 const DOC_B = path.join(tmpDb, "doc-b.txt");
@@ -33,6 +33,24 @@ describe("memory (장기 기억 / LanceDB) — 임베딩 모델 교체 자가 �
     expect(result.chunks).toBe(1);
     const hits = await queryMemory("승인 담당자?");
     expect(hits.some((t) => t.includes("김민수"))).toBe(true);
+  });
+
+  it("ingestText stores already-extracted text directly (파일 업로드 경로)", async () => {
+    embedDim = 3;
+    const result = await ingestText("uploaded.pdf", "업로드 문서: 사고 대응 책임자는 이영희 팀장이다.", "global");
+    expect(result.documentId).toBe("uploaded.pdf");
+    expect(result.chunks).toBe(1);
+    const hits = await queryMemory("사고 대응 책임자?");
+    expect(hits.some((t) => t.includes("이영희"))).toBe(true);
+  });
+
+  it("ingestText with empty text stores nothing", async () => {
+    embedDim = 3;
+    const result = await ingestText("empty.txt", "   ", "global");
+    expect(result.chunks).toBe(1); // 공백도 청크 1개(원자적) — 빈 문자열만 0
+    const zero = await ingestText("truly-empty.txt", "", "global");
+    expect(zero.chunks).toBe(0);
+    expect(zero.embeddingModel).toBe("none");
   });
 
   it("query with a mismatched dimension degrades to [] instead of throwing (채팅 생존)", async () => {

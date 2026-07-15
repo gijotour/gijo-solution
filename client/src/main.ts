@@ -136,6 +136,21 @@ ipcMain.handle("fs:list", async (_e, relPath: string) => {
   return { root: explorerRoot, rootName: path.basename(explorerRoot), path: path.relative(explorerRoot, target), items };
 });
 
+// 탐색기에서 고른 파일 하나를 읽어 base64로 돌려준다(장기 기억에 올리기 등). 읽기 전용 원칙에 맞게
+// 파일 내용을 읽기만 하며, fs:list와 같은 루트 이탈 방지 + 크기 상한(50MB)을 건다.
+const FS_READ_MAX_BYTES = 50 * 1024 * 1024;
+ipcMain.handle("fs:readFile", async (_e, relPath: string) => {
+  const target = path.resolve(explorerRoot, relPath || ".");
+  if (target !== explorerRoot && !target.startsWith(explorerRoot + path.sep)) {
+    throw new Error("루트 밖 경로는 접근할 수 없습니다");
+  }
+  const stat = await fs.promises.stat(target);
+  if (!stat.isFile()) throw new Error("파일이 아닙니다");
+  if (stat.size > FS_READ_MAX_BYTES) throw new Error("파일이 너무 큽니다 (50MB 초과)");
+  const buf = await fs.promises.readFile(target);
+  return { name: path.basename(target), size: stat.size, content: buf.toString("base64") };
+});
+
 // 사용자가 작업 폴더를 직접 고른다(폴더 선택 다이얼로그). 선택하면 그 폴더가 새 루트가 된다.
 ipcMain.handle("fs:pickRoot", async () => {
   if (!mainWindow) return { cancelled: true };
