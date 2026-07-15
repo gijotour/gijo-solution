@@ -361,18 +361,37 @@ tr:last-child td{border-bottom:none;}
       });
     });
 
+    // Electron 렌더러는 window.prompt를 지원하지 않으므로, 이름을 그 자리에서 input으로 인라인 편집한다.
     agentGrid.querySelectorAll("[data-rename]").forEach((el) => {
-      el.addEventListener("click", async () => {
+      el.addEventListener("click", () => {
         const agentId = el.dataset.rename;
         const cur = agents.find((a) => a.id === agentId);
-        const input = prompt(`"${cur.name}" 에이전트의 새 이름 (비우면 기본 이름 "${cur.defaultName}"로 되돌림):`, cur.name);
-        if (input === null) return; // 취소
-        try {
-          await window.gijo.setAgentName(agentId, input.trim() || null);
+        const nameDiv = agentGrid.querySelector(`.agent-name[data-rename="${agentId}"]`);
+        if (!nameDiv || nameDiv.querySelector("input")) return; // 이미 편집 중이면 무시
+        const input = document.createElement("input");
+        input.value = cur.name;
+        input.style.cssText = "width:100%;background:var(--panel-2);border:1px solid var(--blue);border-radius:5px;padding:2px 6px;color:#fff;font-size:13px;font-weight:700;outline:none;";
+        nameDiv.innerHTML = "";
+        nameDiv.appendChild(input);
+        input.focus();
+        input.select();
+        let done = false;
+        const commit = async (save) => {
+          if (done) return;
+          done = true;
+          if (!save) { await loadAgents(); return; }
+          try {
+            await window.gijo.setAgentName(agentId, input.value.trim() || null);
+          } catch (err) {
+            alert("이름 변경 실패: " + err.message);
+          }
           await loadAgents();
-        } catch (err) {
-          alert("이름 변경 실패: " + err.message);
-        }
+        };
+        input.addEventListener("keydown", (e) => {
+          if (e.key === "Enter") { e.preventDefault(); commit(true); }
+          else if (e.key === "Escape") commit(false);
+        });
+        input.addEventListener("blur", () => commit(true));
       });
     });
 
