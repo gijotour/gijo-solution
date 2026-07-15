@@ -382,3 +382,23 @@ export const assetsApi = {
       body: { content, format, source },
     }),
 };
+
+export interface ThreatCompliance {
+  code: string;
+  category: string;
+  categoryLabel: string;
+  name: string;
+  aibomAreas: string[];
+  owasp: string[];
+  nist: string[];
+  mitre: string[];
+  status: "covered" | "partial" | "na" | "open";
+  note: string;
+  updatedAt: number | null;
+}
+
+export const complianceApi = {
+  list: () => request<ThreatCompliance[]>("/api/compliance"),
+  setStatus: (code: string, status: string, note: string) =>
+    request<ThreatCompliance>(`/api/compliance/${code}`, { method: "PUT", body: { status, note } }),
+};

@@ -1,0 +1,117 @@
+// engine/compliance.ts — KISA AI 보안 위협 대응 매뉴얼 기반 규제 프레임워크 대응 현황
+//
+// 출처: 한국인터넷진흥원(KISA) AI Security Red Team, 「AI 보안 위협 대응 매뉴얼」(2026.7),
+// 별첨1 "LLM 보안 위협 및 국제 프레임워크 매핑표". 매뉴얼의 위협 분류 코드(D/M/A/S/H)를
+// OWASP LLM Top 10 · NIST AML · MITRE ATLAS에 매핑한 정적 카탈로그다.
+// 각 위협은 우리 AI-BOM 5영역(assets.ts의 AiBom)과도 연결해, 자산 구성명세 → 노출 위협 →
+// 국제 프레임워크 → 대응 현황이 하나로 이어지게 한다. threat.html 가짜 데이터와 달리 실제
+// 규제기관 문서 기반이라 그대로 신뢰 가능하다.
+
+import type { Express } from "express";
+import { authMiddleware } from "../auth/auth";
+import { db } from "../db";
+
+export type ThreatCategory = "data" | "model" | "agent" | "supplychain" | "highperf";
+export type AiBomArea = "model" | "dataset" | "prompt" | "agentTool" | "infrastructure";
+export type ComplianceStatus = "covered" | "partial" | "na" | "open";
+
+export interface ThreatEntry {
+  code: string;
+  category: ThreatCategory;
+  name: string;
+  aibomAreas: AiBomArea[]; // 이 위협이 관련되는 AI-BOM 영역(주 영역)
+  owasp: string[];
+  nist: string[];
+  mitre: string[];
+}
+
+// 별첨1 매핑표를 그대로 옮긴 카탈로그(20개 위협).
+export const THREAT_CATALOG: ThreatEntry[] = [
+  { code: "D01", category: "data", name: "불균형 데이터", aibomAreas: ["dataset"], owasp: ["LLM04:2025 Data and Model Poisoning"], nist: ["AML.013 Data Poisoning"], mitre: ["AML.T0020 Poison Training Data"] },
+  { code: "D02", category: "data", name: "부정확한 데이터", aibomAreas: ["dataset"], owasp: ["LLM04:2025 Data and Model Poisoning"], nist: ["AML.013 Data Poisoning"], mitre: ["AML.T0019 Publish Poisoned Datasets", "AML.T0020 Poison Training Data"] },
+  { code: "D03", category: "data", name: "개인정보 비식별화 미흡", aibomAreas: ["dataset"], owasp: ["LLM02:2025 Sensitive Information Disclosure"], nist: [], mitre: [] },
+  { code: "M01", category: "model", name: "학습 데이터 유출", aibomAreas: ["model", "dataset"], owasp: ["LLM02:2025 Sensitive Information Disclosure", "LLM10:2025 Unbounded Consumption"], nist: ["AML.032 Reconstruction", "AML.033 Membership Inference"], mitre: ["AML.T0024.002 Extract AI Model"] },
+  { code: "M02", category: "model", name: "벡터 DB·임베딩 유출", aibomAreas: ["dataset"], owasp: ["LLM08:2025 Vector and Embedding Weaknesses"], nist: ["AML.035 Prompt Extraction", "AML.038 Data Extraction"], mitre: ["AML.T0057 LLM Data Leakage", "AML.T0085.000 RAG Databases"] },
+  { code: "M03", category: "model", name: "시스템 프롬프트 유출", aibomAreas: ["prompt"], owasp: ["LLM07:2025 System Prompt Leakage"], nist: ["AML.038 Data Extraction"], mitre: ["AML.T0056 Extract LLM System Prompt"] },
+  { code: "M04", category: "model", name: "모델 유출", aibomAreas: ["model"], owasp: ["LLM10:2023 Model Theft"], nist: ["AML.031 Model Extraction"], mitre: ["AML.T0024.002 Extract AI Model"] },
+  { code: "M05", category: "model", name: "환각", aibomAreas: ["model", "prompt"], owasp: ["LLM09:2025 Misinformation"], nist: [], mitre: ["AML.T0062 Discover LLM Hallucinations"] },
+  { code: "M06", category: "model", name: "탈옥", aibomAreas: ["prompt"], owasp: ["LLM01:2025 Prompt Injection"], nist: ["AML.018 Prompt Injection"], mitre: ["AML.T0054 LLM Jailbreak"] },
+  { code: "M07", category: "model", name: "부적절한 출력 처리", aibomAreas: ["model", "agentTool"], owasp: ["LLM05:2025 Improper Output Handling"], nist: ["AML.027 Misaligned Outputs"], mitre: ["AML.T0067 LLM Trusted Output Components Manipulation"] },
+  { code: "M08", category: "model", name: "모델 DoS", aibomAreas: ["infrastructure"], owasp: ["LLM10:2025 Unbounded Consumption"], nist: ["AML.016 Availability Attacks"], mitre: ["AML.T0029 Denial of AI Service"] },
+  { code: "A01", category: "agent", name: "부적절한 도구 설계", aibomAreas: ["agentTool"], owasp: ["LLM06:2025 Excessive Agency"], nist: ["AML.018 Prompt Injection"], mitre: ["AML.T0053", "AML.T0081", "AML.T0086"] },
+  { code: "A02", category: "agent", name: "에이전트 하이재킹", aibomAreas: ["prompt", "agentTool"], owasp: ["LLM01:2025 Prompt Injection", "LLM06:2025 Excessive Agency"], nist: ["AML.015 Indirect Prompt Injection"], mitre: ["AML.T0051.001 LLM Prompt Injection - Indirect"] },
+  { code: "A03", category: "agent", name: "에이전트 DoS", aibomAreas: ["agentTool", "infrastructure"], owasp: ["LLM10:2025 Unbounded Consumption"], nist: ["AML.01 Availability Violations"], mitre: ["AML.T0029 Denial of AI Service", "AML.T0034 Cost Harvesting"] },
+  { code: "A04", category: "agent", name: "에이전트 메모리 오염", aibomAreas: ["agentTool", "dataset"], owasp: ["LLM01:2025 Prompt Injection", "LLM08:2025 Vector and Embedding Weaknesses"], nist: ["AML.023 Backdoor Poisoning"], mitre: ["AML.T0080.001 AI Agent Context Poisoning: Memory"] },
+  { code: "S01", category: "supplychain", name: "데이터 포이즈닝", aibomAreas: ["dataset"], owasp: ["LLM03:2025 Supply Chain", "LLM04:2025 Data and Model Poisoning"], nist: ["AML.05 Supply Chain Attacks"], mitre: ["AML.T0010.002 AI Supply Chain Compromise: Data"] },
+  { code: "S02", category: "supplychain", name: "모델 포이즈닝", aibomAreas: ["model"], owasp: ["LLM03:2025 Supply Chain", "LLM04:2025 Data and Model Poisoning"], nist: ["AML.05 Supply Chain Attacks"], mitre: ["AML.T0018", "AML.T0031", "AML.T0058"] },
+  { code: "S03", category: "supplychain", name: "취약한 버전의 추론 엔진 사용", aibomAreas: ["infrastructure"], owasp: ["LLM03:2025 Supply Chain"], nist: ["AML.05 Supply Chain Attacks"], mitre: ["AML.T0010.001 AI Supply Chain Compromise: AI Software"] },
+  { code: "S04", category: "supplychain", name: "취약한 버전의 에이전트 확장요소 사용", aibomAreas: ["agentTool"], owasp: ["LLM03:2025 Supply Chain"], nist: ["AML.05 Supply Chain Attacks"], mitre: ["AML.T0010.005 AI Supply Chain Compromise: AI Agent Tool"] },
+  { code: "H01", category: "highperf", name: "고도화된 사이버 공격 지원", aibomAreas: ["infrastructure"], owasp: [], nist: [], mitre: ["AML.T0048 External Harms"] },
+  { code: "H02", category: "highperf", name: "자율성으로 인한 통제 상실", aibomAreas: ["agentTool"], owasp: ["LLM06:2025 Excessive Agency"], nist: [], mitre: [] },
+];
+
+export const CATEGORY_LABEL: Record<ThreatCategory, string> = {
+  data: "데이터 위협",
+  model: "모델 위협",
+  agent: "에이전트 위협",
+  supplychain: "공급망 위협",
+  highperf: "고성능 모델 위협",
+};
+
+// 조직 차원의 위협별 대응 현황. 위협 코드별로 상태/메모를 저장한다.
+const getStatusStmt = db.prepare("SELECT threatCode, status, note, updatedAt FROM compliance_status");
+const upsertStatusStmt = db.prepare(
+  "INSERT INTO compliance_status (threatCode, status, note, updatedAt) VALUES (@threatCode, @status, @note, @updatedAt) ON CONFLICT(threatCode) DO UPDATE SET status = excluded.status, note = excluded.note, updatedAt = excluded.updatedAt"
+);
+
+interface StatusRow {
+  threatCode: string;
+  status: ComplianceStatus;
+  note: string | null;
+  updatedAt: number;
+}
+
+export interface ThreatWithStatus extends ThreatEntry {
+  categoryLabel: string;
+  status: ComplianceStatus;
+  note: string;
+  updatedAt: number | null;
+}
+
+export function listCompliance(): ThreatWithStatus[] {
+  const statusMap = new Map((getStatusStmt.all() as StatusRow[]).map((r) => [r.threatCode, r]));
+  return THREAT_CATALOG.map((t) => {
+    const s = statusMap.get(t.code);
+    return {
+      ...t,
+      categoryLabel: CATEGORY_LABEL[t.category],
+      status: s?.status ?? "open",
+      note: s?.note ?? "",
+      updatedAt: s?.updatedAt ?? null,
+    };
+  });
+}
+
+const VALID_STATUS: ComplianceStatus[] = ["covered", "partial", "na", "open"];
+
+export function setComplianceStatus(threatCode: string, status: ComplianceStatus, note: string): void {
+  if (!THREAT_CATALOG.some((t) => t.code === threatCode)) throw new Error(`알 수 없는 위협 코드: ${threatCode}`);
+  if (!VALID_STATUS.includes(status)) throw new Error(`알 수 없는 상태: ${status}`);
+  upsertStatusStmt.run({ threatCode, status, note: note || null, updatedAt: Date.now() });
+}
+
+export function resetComplianceForTests(): void {
+  db.exec("DELETE FROM compliance_status");
+}
+
+export function registerComplianceRoutes(app: Express): void {
+  app.get("/api/compliance", authMiddleware, (_req, res) => res.json(listCompliance()));
+  app.put("/api/compliance/:code", authMiddleware, (req, res) => {
+    try {
+      setComplianceStatus(String(req.params.code), req.body.status, String(req.body.note ?? ""));
+      res.json(listCompliance().find((t) => t.code === String(req.params.code)));
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+}

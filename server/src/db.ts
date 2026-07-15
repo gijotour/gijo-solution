@@ -115,6 +115,17 @@ db.exec(`
   );
 `);
 
+db.exec(`
+  -- KISA 매뉴얼 위협 코드별 조직의 대응 현황(engine/compliance.ts). 위협 카탈로그 자체는
+  -- 코드에 정적으로 있고, 여기엔 사용자가 지정한 상태/메모만 저장한다.
+  CREATE TABLE IF NOT EXISTS compliance_status (
+    threatCode TEXT PRIMARY KEY,
+    status TEXT NOT NULL,
+    note TEXT,
+    updatedAt INTEGER NOT NULL
+  );
+`);
+
 // 마이그레이션: assets.aibom (AI-BOM 5영역 메타 JSON). CREATE TABLE에 직접 넣지 않고 ALTER로
 // 추가해 기존 DB에도 적용되게 한다. 이미 있으면 SQLite가 duplicate column 에러를 던지므로 무시한다.
 try {

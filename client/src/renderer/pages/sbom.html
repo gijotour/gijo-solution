@@ -315,6 +315,16 @@ tr:last-child td{border-bottom:none;}
   ];
 
   let aibomAssetId = null;
+  let threatsByArea = { model: [], dataset: [], prompt: [], agentTool: [], infrastructure: [] };
+
+  async function loadThreatMap() {
+    try {
+      const catalog = await window.gijo.listCompliance();
+      const map = { model: [], dataset: [], prompt: [], agentTool: [], infrastructure: [] };
+      catalog.forEach((t) => t.aibomAreas.forEach((a) => { if (map[a]) map[a].push(t.code); }));
+      threatsByArea = map;
+    } catch (e) {}
+  }
 
   function esc(s) { return String(s == null ? "" : s).replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
 
@@ -330,9 +340,12 @@ tr:last-child td{border-bottom:none;}
         <label style="display:block;font-size:11px;color:var(--muted);margin:8px 0 4px">${f.label}</label>
         <textarea data-area="${area.key}" data-field="${f.k}" rows="1"
           style="width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:6px;padding:7px 10px;color:var(--text);font-size:12px;outline:none;resize:vertical">${esc(areaVal[f.k])}</textarea>`).join("");
+      const codes = threatsByArea[area.key] || [];
+      const threatTag = codes.length ? `<div style="font-size:10px;color:var(--muted);margin-bottom:6px">관련 KISA 위협: ${codes.map((c) => `<span style="background:rgba(226,72,61,0.14);color:#f5928a;border-radius:4px;padding:0 5px;margin-right:2px;font-weight:700">${c}</span>`).join("")}</div>` : "";
       return `<div style="background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:14px 16px">
         <div style="font-size:13px;font-weight:800;color:#fff;margin-bottom:2px">${area.label}</div>
         <div style="font-size:10.5px;color:var(--amber);margin-bottom:6px">🛡 ${area.purpose}</div>
+        ${threatTag}
         ${fields}
       </div>`;
     }).join("");
@@ -443,6 +456,7 @@ tr:last-child td{border-bottom:none;}
     setInterval(tick, 30000);
     await loadUser();
     await loadHealth();
+    await loadThreatMap();
     await refresh();
 
     searchInput.addEventListener("input", render);

@@ -80,27 +80,26 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     <div class="nav-item" data-page="billing.html"><span class="ic">$</span>사용량 · 요금</div>
     <div class="nav-section">시스템</div>
     <div class="nav-item" data-page="logs.html"><span class="ic">▤</span>로그</div>
-    <div class="nav-item" data-page="settings.html"><span class="ic">â</span>ì¤ì </div>
+    <div class="nav-item" data-page="settings.html"><span class="ic">⚙</span>설정</div>
   </div>
 
   <div class="main">
     <div class="topbar-row">
       <div>
         <div class="page-title">컴플라이언스</div>
-        <div class="page-sub">규제 프레임워크 대응 현황</div>
+        <div class="page-sub">KISA 「AI 보안 위협 대응 매뉴얼」(2026.7) 위협 분류 × 국제 프레임워크(OWASP·NIST·MITRE) 대응 현황</div>
       </div>
     </div>
 
-    <div class="panel">
-      <div class="panel-title">아직 구현되지 않은 기능입니다<span class="badge b-amber">기획 단계</span></div>
-      <div class="panel-sub">규제 프레임워크 매핑 · 통제 항목 체크리스트 · 감사 증적 관리</div>
-      <div style="font-size:12.5px;color:var(--text);line-height:1.8;max-width:640px">
-        컴플라이언스 화면에 대응하는 서버 엔진 모듈이 아직 없습니다(자산/SBOM/CTI처럼 별도 백엔드가
-        구현돼야 실제 데이터를 표시할 수 있습니다). 사이드바에는 처음부터 자리가 마련돼 있었지만
-        구체적인 요구사항(어떤 규제 프레임워크? 통제 항목은 누가 정의? 증적은 어디서 수집?)이
-        프로젝트 문서에 아직 정리되지 않아 우선순위 결정 전 단계입니다.
-      </div>
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px;">
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;"><div style="font-size:11px;color:var(--muted);margin-bottom:6px;">전체 위협</div><div style="font-size:19px;font-weight:800;color:#fff;" id="kpiTotal">-</div></div>
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;"><div style="font-size:11px;color:var(--muted);margin-bottom:6px;">대응 완료</div><div style="font-size:19px;font-weight:800;color:var(--teal);" id="kpiCovered">-</div></div>
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;"><div style="font-size:11px;color:var(--muted);margin-bottom:6px;">부분 대응</div><div style="font-size:19px;font-weight:800;color:var(--amber);" id="kpiPartial">-</div></div>
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;"><div style="font-size:11px;color:var(--muted);margin-bottom:6px;">미대응</div><div style="font-size:19px;font-weight:800;color:#f5928a;" id="kpiOpen">-</div></div>
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;"><div style="font-size:11px;color:var(--muted);margin-bottom:6px;">대응률</div><div style="font-size:19px;font-weight:800;color:var(--blue-light);" id="kpiRate">-</div></div>
     </div>
+
+    <div id="catalog"><div style="color:var(--muted)">불러오는 중...</div></div>
 
     <div class="footer">
       <img src="https://gijo.ai/_nuxt/logo_gijo_only_white.ATZVOJtw.svg" alt="GIJO">
@@ -120,6 +119,81 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     });
   }
 
+  const STATUS_OPTS = [
+    { v: "open", label: "미대응", color: "#f5928a" },
+    { v: "partial", label: "부분 대응", color: "var(--amber)" },
+    { v: "covered", label: "대응 완료", color: "var(--teal)" },
+    { v: "na", label: "해당 없음", color: "var(--muted)" },
+  ];
+  const AREA_LABEL = { model: "모델", dataset: "데이터", prompt: "프롬프트", agentTool: "에이전트 도구", infrastructure: "인프라" };
+  const CATEGORY_ORDER = ["data", "model", "agent", "supplychain", "highperf"];
+
+  let catalog = [];
+
+  function esc(s) { return String(s == null ? "" : s).replace(/</g, "&lt;"); }
+
+  function fwBadges(items, cls) {
+    return (items || []).map((x) => `<span style="display:inline-block;background:${cls};border-radius:4px;padding:1px 6px;font-size:10px;margin:1px 2px 1px 0;">${esc(x)}</span>`).join("");
+  }
+
+  function threatRow(t) {
+    const areas = t.aibomAreas.map((a) => `<span style="background:rgba(59,130,246,0.15);color:var(--blue-light);border-radius:4px;padding:1px 6px;font-size:10px;margin-right:3px;">${AREA_LABEL[a] || a}</span>`).join("");
+    const opts = STATUS_OPTS.map((o) => `<option value="${o.v}" ${t.status === o.v ? "selected" : ""}>${o.label}</option>`).join("");
+    return `<div style="border-bottom:1px solid var(--border);padding:12px 0;display:grid;grid-template-columns:64px 1fr 150px;gap:12px;align-items:start;">
+      <div><span style="font-weight:800;color:#fff;font-size:13px;">${t.code}</span></div>
+      <div>
+        <div style="font-weight:700;color:#fff;font-size:13px;margin-bottom:4px;">${esc(t.name)} ${areas}</div>
+        <div style="font-size:11px;color:var(--muted);line-height:1.9;">
+          ${t.owasp.length ? `<b style="color:var(--muted-2)">OWASP</b> ${fwBadges(t.owasp, "rgba(139,124,240,0.15)")}` : ""}
+          ${t.nist.length ? `<b style="color:var(--muted-2)">NIST</b> ${fwBadges(t.nist, "rgba(30,185,128,0.13)")}` : ""}
+          ${t.mitre.length ? `<b style="color:var(--muted-2)">MITRE</b> ${fwBadges(t.mitre, "rgba(240,160,32,0.13)")}` : ""}
+          ${!t.owasp.length && !t.nist.length && !t.mitre.length ? '<span style="color:var(--muted-2)">매핑된 국제 프레임워크 없음 (KISA 자체 분류)</span>' : ""}
+        </div>
+        <input data-note="${t.code}" value="${esc(t.note)}" placeholder="대응 근거·메모 (선택)"
+          style="width:100%;margin-top:6px;background:var(--panel-2);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:11.5px;outline:none;">
+      </div>
+      <div><select data-status="${t.code}" style="width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:6px;padding:7px 8px;color:var(--text);font-size:12px;outline:none;cursor:pointer;">${opts}</select></div>
+    </div>`;
+  }
+
+  function render() {
+    const covered = catalog.filter((t) => t.status === "covered").length;
+    const partial = catalog.filter((t) => t.status === "partial").length;
+    const open = catalog.filter((t) => t.status === "open").length;
+    const applicable = catalog.filter((t) => t.status !== "na").length;
+    document.getElementById("kpiTotal").textContent = catalog.length;
+    document.getElementById("kpiCovered").textContent = covered;
+    document.getElementById("kpiPartial").textContent = partial;
+    document.getElementById("kpiOpen").textContent = open;
+    document.getElementById("kpiRate").textContent = applicable ? Math.round((covered / applicable) * 100) + "%" : "—";
+
+    const cats = document.getElementById("catalog");
+    cats.innerHTML = CATEGORY_ORDER.map((cat) => {
+      const items = catalog.filter((t) => t.category === cat);
+      if (items.length === 0) return "";
+      return `<div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:16px;">
+        <div style="font-size:13.5px;font-weight:800;color:#fff;margin-bottom:6px;">${items[0].categoryLabel} <span style="color:var(--muted-2);font-weight:600;font-size:11px;">(${items.length})</span></div>
+        ${items.map(threatRow).join("")}
+      </div>`;
+    }).join("");
+
+    cats.querySelectorAll("select[data-status]").forEach((sel) => {
+      sel.addEventListener("change", async (e) => {
+        const code = e.target.dataset.status;
+        const note = cats.querySelector(`input[data-note="${code}"]`).value;
+        try { await window.gijo.setComplianceStatus(code, e.target.value, note); catalog = await window.gijo.listCompliance(); render(); } catch (err) { alert("저장 실패: " + err.message); }
+      });
+    });
+    cats.querySelectorAll("input[data-note]").forEach((inp) => {
+      inp.addEventListener("blur", async (e) => {
+        const code = e.target.dataset.note;
+        const t = catalog.find((x) => x.code === code);
+        if (t && t.note === e.target.value) return;
+        try { await window.gijo.setComplianceStatus(code, t.status, e.target.value); catalog = await window.gijo.listCompliance(); } catch (err) { alert("저장 실패: " + err.message); }
+      });
+    });
+  }
+
   async function init() {
     tick();
     setInterval(tick, 30000);
@@ -133,6 +207,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       const user = await window.gijo.me();
       avatarBtn.textContent = (user.displayName || user.username || "-").charAt(0);
     } catch (e) {}
+    try {
+      catalog = await window.gijo.listCompliance();
+      render();
+    } catch (e) {
+      document.getElementById("catalog").innerHTML = '<div style="color:#f5928a">위협 카탈로그를 불러오지 못했습니다: ' + e.message + "</div>";
+    }
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll(".nav-item[data-page]").forEach((el) => {
       el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
