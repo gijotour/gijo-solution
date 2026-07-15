@@ -98,6 +98,24 @@ ipcMain.handle("navigate:to", async (_e, page: string) => {
   await mainWindow.loadFile(path.join(__dirname, `../src/renderer/pages/${page}`));
 });
 
+// 읽기 전용 파일 탐색기 — 대시보드에서 프로젝트 폴더 트리를 본다. 명령 실행은 없다.
+// 루트를 벗어나는 경로(.. 등)는 거부해 시스템 전체가 노출되지 않게 한다.
+// 기본 루트는 프로젝트 폴더(client/dist → client → 프로젝트 루트). 배포/다른 경로는 GIJO_EXPLORER_ROOT로.
+const EXPLORER_ROOT = path.resolve(process.env.GIJO_EXPLORER_ROOT ?? path.join(__dirname, "..", ".."));
+ipcMain.handle("fs:list", async (_e, relPath: string) => {
+  const target = path.resolve(EXPLORER_ROOT, relPath || ".");
+  // 경로 이탈 방지: target이 EXPLORER_ROOT 하위가 아니면 거부
+  if (target !== EXPLORER_ROOT && !target.startsWith(EXPLORER_ROOT + path.sep)) {
+    throw new Error("루트 밖 경로는 접근할 수 없습니다");
+  }
+  const entries = await fs.promises.readdir(target, { withFileTypes: true });
+  const items = entries
+    .filter((e) => !e.name.startsWith(".") && e.name !== "node_modules")
+    .map((e) => ({ name: e.name, dir: e.isDirectory() }))
+    .sort((a, b) => (a.dir === b.dir ? a.name.localeCompare(b.name) : a.dir ? -1 : 1));
+  return { root: path.basename(EXPLORER_ROOT), path: path.relative(EXPLORER_ROOT, target), items };
+});
+
 app.whenReady().then(() => {
   maybeStartBundledServer();
   createMainWindow();

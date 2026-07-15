@@ -100,8 +100,10 @@
       <div class="explorer-tree" id="teamTree" style="margin-bottom:16px;">불러오는 중...</div>
       <div class="explorer-title"><span>자산 탐색기</span><span style="color:var(--muted-2);cursor:pointer" id="refreshAssetsBtn">⟳</span></div>
       <div class="explorer-sub">GIJO AS Desktop</div>
-      <div class="explorer-tree" id="explorerTree">불러오는 중...</div>
-      <div class="explorer-hint">에이전트에게<br>"fraud-detect-llm 재스캔해줘"<br>라고 지시해보세요.</div>
+      <div class="explorer-tree" id="explorerTree" style="margin-bottom:16px;">불러오는 중...</div>
+      <div class="explorer-title"><span>📁 파일</span><span style="color:var(--muted-2);cursor:pointer" id="refreshFilesBtn">⟳</span></div>
+      <div class="explorer-sub" id="fileRootLabel">프로젝트 폴더 (읽기 전용)</div>
+      <div class="explorer-tree" id="fileTree" style="font-size:12px;">불러오는 중...</div>
     </div>
 
     <div class="center-stage">
@@ -221,6 +223,53 @@
   const STATUS_LABEL = { idle: "대기중", working: "작업중", watching: "모니터링" };
   const STATUS_DOT = { idle: "var(--muted-2)", working: "var(--amber)", watching: "var(--teal)" };
 
+  const openDirs = new Set();
+
+  function fileIcon(dir, name) {
+    if (dir) return "📁";
+    if (/\.(md|txt|log)$/i.test(name)) return "📄";
+    if (/\.(html|htm)$/i.test(name)) return "🌐";
+    if (/\.(json|js|ts|py)$/i.test(name)) return "📜";
+    if (/\.(png|jpg|jpeg|svg|gif|ico)$/i.test(name)) return "🖼️";
+    if (/\.(zip|gz|7z)$/i.test(name)) return "🗜️";
+    return "📄";
+  }
+
+  async function renderDir(relPath, depth, container) {
+    let data;
+    try { data = await window.gijo.listDir(relPath); } catch (e) { return; }
+    for (const item of data.items) {
+      const itemPath = (relPath ? relPath + "/" : "") + item.name;
+      const row = document.createElement("div");
+      row.style.cssText = `padding:2px 0 2px ${depth * 12 + 4}px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${item.dir ? "cursor:pointer;" : "color:var(--muted);"}`;
+      const caret = item.dir ? (openDirs.has(itemPath) ? "▾ " : "▸ ") : "";
+      row.innerHTML = `<span style="color:var(--muted-2)">${caret}</span>${fileIcon(item.dir, item.name)} ${item.name.replace(/</g, "&lt;")}`;
+      container.appendChild(row);
+      if (item.dir) {
+        const childBox = document.createElement("div");
+        container.appendChild(childBox);
+        if (openDirs.has(itemPath)) await renderDir(itemPath, depth + 1, childBox);
+        row.addEventListener("click", async (e) => {
+          e.stopPropagation();
+          if (openDirs.has(itemPath)) { openDirs.delete(itemPath); childBox.innerHTML = ""; row.querySelector("span").textContent = "▸ "; }
+          else { openDirs.add(itemPath); await renderDir(itemPath, depth + 1, childBox); row.querySelector("span").textContent = "▾ "; }
+        });
+      }
+    }
+  }
+
+  async function loadFiles() {
+    const el = document.getElementById("fileTree");
+    el.innerHTML = "";
+    try {
+      const root = await window.gijo.listDir("");
+      document.getElementById("fileRootLabel").textContent = root.root + " (읽기 전용)";
+      await renderDir("", 0, el);
+    } catch (e) {
+      el.innerHTML = '<div style="color:var(--muted-2)">파일을 불러오지 못했습니다 (데스크톱 앱에서만 동작)</div>';
+    }
+  }
+
   async function loadTeam() {
     const el = document.getElementById("teamTree");
     try {
@@ -338,11 +387,12 @@
     setInterval(tick, 1000);
     await loadUser();
     greet();
-    await Promise.all([loadHealth(), loadTeam(), loadAssets(), loadTasks(), loadCollaboration()]);
+    await Promise.all([loadHealth(), loadTeam(), loadAssets(), loadTasks(), loadCollaboration(), loadFiles()]);
 
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
     document.getElementById("refreshAssetsBtn").addEventListener("click", loadAssets);
+    document.getElementById("refreshFilesBtn").addEventListener("click", loadFiles);
     document.getElementById("todoAddBtn").addEventListener("click", addTodo);
     todoInput.addEventListener("keydown", (e) => { if (e.key === "Enter") addTodo(); });
 
