@@ -63,6 +63,9 @@ const gijoApi = {
   queryMemory: (question: string, topK?: number) => api.memoryApi.query(question, topK),
   startFinetune: (agentId: string, datasetId: string) => api.finetuneApi.start(agentId, datasetId),
   onFinetuneProgress: (cb: (p: unknown) => void) => onChannel("finetune:progress", cb),
+  convertDataset: (rawText: string) => api.datasetApi.convert(rawText),
+  saveDataset: (id: string, examples: { question: string; answer: string }[]) => api.datasetApi.save(id, examples),
+  listDatasets: () => api.datasetApi.list(),
 
   // HuggingFace 모델 검색
   searchHfModels: (query: string) => api.hfModelsApi.search(query),

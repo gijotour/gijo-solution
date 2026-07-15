@@ -29,7 +29,7 @@ GRC 플랫폼도 아니다. 이 전제가 아래 모든 우선순위를 결정�
 | **2. 다음으로** | ~~NSIS 설치본 생성 검증~~ | ✅ 완료 (2026-07-15, 설치 스모크 테스트는 남음) |
 | | ~~`huggingface-cli` 설치 (배포 환경)~~ | ✅ 완료 (2026-07-15, 체크리스트에 반영) |
 | **3. 여유 있을 때** | CTI 연동 — ~~OTX~~ ✅ 완료(2026-07-15) → C-TAS는 기관 가입 대기, 상용은 계약 후 | 첫 실데이터가 흐르는 중 |
-| | 파인튜닝 스크립트 (`finetune_unsloth.py`) | 지금 개발 가능하나 급하지 않음 |
+| | ~~파인튜닝 스크립트 (`finetune_unsloth.py`)~~ | ✅ 파이프라인 완성 (2026-07-16, 실 GPU 학습 1회 검증만 남음) |
 | | ~~최종 LLM 모델 선정~~ | ✅ 결정 (2026-07-15): Lily-Cybersecurity-7B-v0.2 |
 | | ~~`server-java-reference/` 존폐~~ | ✅ 폐기 결정·삭제 (2026-07-15) |
 | **4. 재검토 제안** | 컴플라이언스/승인 워크플로우 페이지 | 만들지 않기를 제안 |
@@ -163,17 +163,27 @@ GRC 플랫폼도 아니다. 이 전제가 아래 모든 우선순위를 결정�
 - **상용 벤더**(Criminal IP / Flashpoint / SpyCloud / Recorded Future)는 기존대로 계약
   후 추가. 넷 다 동시에 붙일 필요 없다는 조언은 유효하다.
 
-### 3.2 파인튜닝 스크립트 (`scripts/finetune_unsloth.py`)
+### 3.2 파인튜닝 스크립트 (`scripts/finetune_unsloth.py`) — ✅ 파이프라인 완성 (2026-07-16)
 
-- **현황**: 트리거 API와 `finetune:progress` WS 배관은 실제 코드, 학습 스크립트만 없다.
-- **왜 급하지 않은가**: 장기 기억(RAG)은 이미 동작한다. 보안담당자의 일상 사용에서
-  파인튜닝(학습 — 모델 가중치에 지식 내재화)이 없어서 막히는 시나리오는 당장 없다.
-  (용어 정리 2026-07-16: 대화 이력=단기 기억, RAG/LanceDB=장기 기억, 파인튜닝=학습.
-  예전 문서는 RAG를 "단기"라고 불렀다.) 지금 개발 가능한 항목이지만,
-  1단계를 제치고 GPU 학습 파이프라인을 만들 이유가 없다.
-- **작업 성격**: 지금 개발 가능. Unsloth QLoRA 스크립트 + progress 출력 포맷을 기존
-  파서에 맞추기. 착수 전에 "고객이 실제로 파인튜닝을 돌릴 것인가"를 한 번 물어볼 것 —
-  답이 불확실하면 3단계에 그대로 둔다.
+- **한 일**: 전체 파이프라인이 코드로 연결됐다 —
+  ① memory.html "데이터셋 만들기" 패널: 문서 붙여넣기 → 로컬 LLM Q&A 변환(기존
+  `/api/dataset/convert`) → 미리보기 검토 → `/api/dataset/save`(신규)로
+  `data/datasets/<id>.json` 저장 (id는 경로 조작 방지 검증).
+  ② `scripts/finetune_unsloth.py`(신규): Unsloth QLoRA — 베이스 모델 4bit 로드(기본:
+  확정 모델 Lily, `GIJO_FT_BASE_MODEL`로 변경), LoRA r=16, 채팅 템플릿 포맷, LoRA 어댑터
+  `outputs/<id>/lora-adapter` 저장. stdout `step N/M loss=X` 계약을 TrainerCallback으로 보장.
+  ③ `finetune.ts` 강화: 동시 실행 방지(GPU 1대 독점), stderr 캡처, `status:
+  running/done/error` 브로드캐스트, `GET /api/finetune/status`, Windows cp949 파이프
+  인코딩 함정 대응(`PYTHONUTF8=1` — modelscan 때와 같은 문제).
+- **검증**: `--smoke` 모드(unsloth/GPU 불필요, 동일한 stdout 계약)로 실제 python 스폰 →
+  진행률 파싱 → done/error 브로드캐스트까지 테스트 통과. **실 GPU 학습은 아직 미실행** —
+  GPU 머신에 `pip install unsloth`(CUDA torch 포함, 수 GB)가 선행돼야 하며 의도적으로
+  `requirements.txt`에 넣지 않았다(서버 필수 의존성이 아니고 GPU 전용이므로).
+- **용어 정리 (2026-07-16)**: 대화 이력=단기 기억, RAG/LanceDB=장기 기억, 파인튜닝=학습.
+  예전 문서는 RAG를 "단기"라고 불렀다.
+- **남은 판단**: "고객이 실제로 파인튜닝을 돌릴 것인가"는 여전히 미검증 — 파이프라인은
+  준비됐지만, 실학습 검증(unsloth 설치 + 소규모 데이터셋 1회 학습)은 고객 수요가
+  보이면 진행.
 
 ### 3.3 최종 로컬 LLM 모델 선정 — ✅ 결정됨 (2026-07-15)
 

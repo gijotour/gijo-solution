@@ -71,4 +71,47 @@ describe("dataset", () => {
     expect(res.body).toEqual([]);
     expect(mockChat).not.toHaveBeenCalled();
   });
+
+  it("save persists a dataset to data/datasets/<id>.json and list sees it", async () => {
+    const id = `vitest-ds-${Date.now().toString(36)}`;
+    const save = await request(app)
+      .post("/api/dataset/save")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        examples: [
+          { question: "q1", answer: "a1" },
+          { question: "", answer: "무시돼야 함" }, // 빈 question은 걸러진다
+          { question: "q2", answer: "a2" },
+        ],
+        id,
+      });
+    expect(save.status).toBe(200);
+    expect(save.body).toEqual({ id, examples: 2 });
+
+    const list = await request(app).get("/api/dataset/list").set("Authorization", `Bearer ${token}`);
+    expect(list.body).toContainEqual({ id, examples: 2 });
+
+    const fs = await import("fs");
+    const filePath = `data/datasets/${id}.json`;
+    const rows = JSON.parse(fs.readFileSync(filePath, "utf-8"));
+    expect(rows).toHaveLength(2);
+    fs.unlinkSync(filePath);
+  });
+
+  it("save rejects a path-traversal-shaped id", async () => {
+    const res = await request(app)
+      .post("/api/dataset/save")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ id: "../evil", examples: [{ question: "q", answer: "a" }] });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("데이터셋 ID");
+  });
+
+  it("save rejects an empty example set", async () => {
+    const res = await request(app)
+      .post("/api/dataset/save")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ id: "valid-id", examples: [{ question: "", answer: "" }] });
+    expect(res.status).toBe(400);
+  });
 });

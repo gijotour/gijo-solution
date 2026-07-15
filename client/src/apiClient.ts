@@ -202,6 +202,9 @@ export const datasetApi = {
     request<ConversationExample[]>("/api/dataset/convert", { method: "POST", body: { rawText } }),
   amplify: (examples: ConversationExample[], factor?: number) =>
     request<ConversationExample[]>("/api/dataset/amplify", { method: "POST", body: { examples, factor } }),
+  save: (id: string, examples: ConversationExample[]) =>
+    request<{ id: string; examples: number }>("/api/dataset/save", { method: "POST", body: { id, examples } }),
+  list: () => request<{ id: string; examples: number }[]>("/api/dataset/list"),
 };
 
 // ── HuggingFace 모델 ──────────────────────────────────────────────────

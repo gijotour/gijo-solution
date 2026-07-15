@@ -175,7 +175,27 @@ tr:last-child td{border-bottom:none;}
     </div>
 
     <div class="panel">
-      <div class="panel-title">학습 — 파인튜닝<span class="badge b-amber" style="margin-left:8px">Unsloth QLoRA</span></div>
+      <div class="panel-title">학습 — ① 데이터셋 만들기</div>
+      <div class="panel-sub">보안 문서를 붙여넣으면 로컬 LLM이 Q&A 쌍으로 변환합니다. 검토 후 저장하면 파인튜닝 입력(<code>data/datasets/&lt;ID&gt;.json</code>)이 됩니다.</div>
+      <div class="field">
+        <label for="dsRawInput">원문 (보안 규정, CVE 분석 등)</label>
+        <textarea id="dsRawInput" rows="5" style="width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;outline:none;resize:vertical"></textarea>
+      </div>
+      <button class="btn-primary" id="dsConvertBtn">Q&amp;A 변환</button>
+      <div class="status-line" id="dsConvertStatusLine"></div>
+      <div class="result-box" id="dsPreview" style="display:none"></div>
+      <div class="field-row" style="margin-top:10px">
+        <div class="field">
+          <label for="dsIdInput">데이터셋 ID (영문 소문자·숫자·하이픈)</label>
+          <input id="dsIdInput" placeholder="예: incident-qa-v1">
+        </div>
+        <button class="btn-primary" id="dsSaveBtn" disabled>저장</button>
+      </div>
+      <div class="status-line" id="dsSaveStatusLine"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">학습 — ② 파인튜닝<span class="badge b-amber" style="margin-left:8px">Unsloth QLoRA</span></div>
       <div class="panel-sub">에이전트를 특정 데이터셋으로 파인튜닝해 내재화된 지식으로 만듭니다.</div>
       <div class="field-row">
         <div class="field">
@@ -190,7 +210,7 @@ tr:last-child td{border-bottom:none;}
       </div>
       <div class="status-line" id="ftStatusLine"></div>
       <div class="progress-track"><div class="progress-fill" id="ftProgressFill"></div></div>
-      <div class="hint">서버가 <code>scripts/finetune_unsloth.py</code>를 실행해 진행률을 WebSocket으로 스트리밍합니다 — 학습 스크립트 자체는 벤더/데이터셋 계약에 맞춰 별도로 준비해야 합니다.</div>
+      <div class="hint">서버가 <code>scripts/finetune_unsloth.py</code>(Unsloth QLoRA, 베이스: 제품 확정 모델)를 실행해 진행률을 WebSocket으로 스트리밍합니다. GPU 머신에 <code>pip install unsloth</code>가 선행돼야 하며, 결과물은 <code>outputs/&lt;데이터셋ID&gt;/lora-adapter</code>에 저장됩니다.</div>
     </div>
 
     <div class="footer">
@@ -259,6 +279,52 @@ tr:last-child td{border-bottom:none;}
     }
   }
 
+  let convertedExamples = [];
+
+  async function convertDataset() {
+    const raw = document.getElementById("dsRawInput").value.trim();
+    const line = document.getElementById("dsConvertStatusLine");
+    const preview = document.getElementById("dsPreview");
+    if (!raw) return;
+    line.textContent = "로컬 LLM으로 변환 중... (모델 속도에 따라 수십 초 걸릴 수 있음)";
+    line.className = "status-line";
+    try {
+      convertedExamples = await window.gijo.convertDataset(raw);
+      if (convertedExamples.length === 0) {
+        line.textContent = "✗ 변환 결과가 비어 있습니다 — 로컬 LLM이 켜져 있는지 확인하고 다시 시도하세요.";
+        line.className = "status-line status-err";
+        preview.style.display = "none";
+        document.getElementById("dsSaveBtn").disabled = true;
+        return;
+      }
+      line.textContent = `✓ ${convertedExamples.length}개 Q&A 쌍 생성됨 — 아래 미리보기 검토 후 저장하세요.`;
+      line.className = "status-line status-ok";
+      preview.style.display = "block";
+      preview.innerHTML = convertedExamples
+        .map((e) => `<div class="result-chunk"><b>Q.</b> ${String(e.question).replace(/</g, "&lt;")}<br><b>A.</b> ${String(e.answer).replace(/</g, "&lt;")}</div>`)
+        .join("");
+      document.getElementById("dsSaveBtn").disabled = false;
+    } catch (e) {
+      line.textContent = "✗ 변환 실패: " + e.message;
+      line.className = "status-line status-err";
+    }
+  }
+
+  async function saveDataset() {
+    const id = document.getElementById("dsIdInput").value.trim();
+    const line = document.getElementById("dsSaveStatusLine");
+    if (!id || convertedExamples.length === 0) return;
+    try {
+      const result = await window.gijo.saveDataset(id, convertedExamples);
+      line.textContent = `✓ 저장됨: ${result.id} (${result.examples}쌍) — 아래 파인튜닝 패널에서 이 ID를 사용하세요.`;
+      line.className = "status-line status-ok";
+      document.getElementById("ftDatasetInput").value = result.id;
+    } catch (e) {
+      line.textContent = "✗ 저장 실패: " + e.message;
+      line.className = "status-line status-err";
+    }
+  }
+
   async function startFinetune() {
     const agentId = document.getElementById("ftAgentInput").value.trim();
     const datasetId = document.getElementById("ftDatasetInput").value.trim();
@@ -286,14 +352,26 @@ tr:last-child td{border-bottom:none;}
     });
     document.getElementById("ingestBtn").addEventListener("click", ingest);
     document.getElementById("queryBtn").addEventListener("click", query);
+    document.getElementById("dsConvertBtn").addEventListener("click", convertDataset);
+    document.getElementById("dsSaveBtn").addEventListener("click", saveDataset);
     document.getElementById("ftStartBtn").addEventListener("click", startFinetune);
 
     if (window.gijoRealtime) window.gijoRealtime.connect();
     window.gijo.onFinetuneProgress((p) => {
+      const line = document.getElementById("ftStatusLine");
       const pct = p.maxSteps ? Math.round((p.step / p.maxSteps) * 100) : 0;
       document.getElementById("ftProgressFill").style.width = pct + "%";
-      document.getElementById("ftStatusLine").textContent = `학습 중 — step ${p.step}/${p.maxSteps}, loss ${p.loss}`;
-      document.getElementById("ftStatusLine").className = "status-line status-ok";
+      if (p.status === "done") {
+        document.getElementById("ftProgressFill").style.width = "100%";
+        line.textContent = `✓ 학습 완료 — 최종 loss ${p.loss}`;
+        line.className = "status-line status-ok";
+      } else if (p.status === "error") {
+        line.textContent = `✗ 학습 실패${p.message ? ": " + p.message : ""}`;
+        line.className = "status-line status-err";
+      } else {
+        line.textContent = `학습 중 — step ${p.step}/${p.maxSteps}, loss ${p.loss}`;
+        line.className = "status-line status-ok";
+      }
     });
   }
 
