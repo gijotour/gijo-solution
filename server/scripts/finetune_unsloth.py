@@ -111,6 +111,10 @@ def run_real(examples: list, args) -> None:
             logging_steps=1,
             output_dir=args.output,
             report_to="none",
+            # Trainer의 자동 체크포인트는 끈다 — unsloth가 SFTConfig 클래스를 패치해
+            # torch.save(pickle)가 "not the same object" 에러로 죽는다. 산출물(LoRA 어댑터)은
+            # 아래에서 save_pretrained로 직접 저장한다.
+            save_strategy="no",
         ),
     )
     trainer.train()

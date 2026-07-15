@@ -46,3 +46,8 @@ Thumbs.db
 # leftover Electron redistributable file and an accidental scratch file
 vk_swiftshader_icd.json
 경로
+
+# 파인튜닝 산출물(LoRA 어댑터)과 unsloth 컴파일 캐시 — 커밋 대상 아님
+server/outputs/
+unsloth_compiled_cache/
+server/unsloth_compiled_cache/

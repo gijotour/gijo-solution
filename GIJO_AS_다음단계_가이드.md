@@ -29,7 +29,7 @@ GRC 플랫폼도 아니다. 이 전제가 아래 모든 우선순위를 결정�
 | **2. 다음으로** | ~~NSIS 설치본 생성 검증~~ | ✅ 완료 (2026-07-15, 설치 스모크 테스트는 남음) |
 | | ~~`huggingface-cli` 설치 (배포 환경)~~ | ✅ 완료 (2026-07-15, 체크리스트에 반영) |
 | **3. 여유 있을 때** | CTI 연동 — ~~OTX~~ ✅ 완료(2026-07-15) → C-TAS는 기관 가입 대기, 상용은 계약 후 | 첫 실데이터가 흐르는 중 |
-| | ~~파인튜닝 스크립트 (`finetune_unsloth.py`)~~ | ✅ 파이프라인 완성 (2026-07-16, 실 GPU 학습 1회 검증만 남음) |
+| | ~~파인튜닝 스크립트 (`finetune_unsloth.py`)~~ | ✅ 완료 (2026-07-16, 실 GPU 학습 검증까지 통과) |
 | | ~~최종 LLM 모델 선정~~ | ✅ 결정 (2026-07-15): Lily-Cybersecurity-7B-v0.2 |
 | | ~~`server-java-reference/` 존폐~~ | ✅ 폐기 결정·삭제 (2026-07-15) |
 | **4. 재검토 제안** | 컴플라이언스/승인 워크플로우 페이지 | 만들지 않기를 제안 |
@@ -175,10 +175,16 @@ GRC 플랫폼도 아니다. 이 전제가 아래 모든 우선순위를 결정�
   ③ `finetune.ts` 강화: 동시 실행 방지(GPU 1대 독점), stderr 캡처, `status:
   running/done/error` 브로드캐스트, `GET /api/finetune/status`, Windows cp949 파이프
   인코딩 함정 대응(`PYTHONUTF8=1` — modelscan 때와 같은 문제).
-- **검증**: `--smoke` 모드(unsloth/GPU 불필요, 동일한 stdout 계약)로 실제 python 스폰 →
-  진행률 파싱 → done/error 브로드캐스트까지 테스트 통과. **실 GPU 학습은 아직 미실행** —
-  GPU 머신에 `pip install unsloth`(CUDA torch 포함, 수 GB)가 선행돼야 하며 의도적으로
-  `requirements.txt`에 넣지 않았다(서버 필수 의존성이 아니고 GPU 전용이므로).
+- **검증**: `--smoke` 테스트에 더해 **실 GPU QLoRA 학습까지 완료** (2026-07-16, RTX 3090):
+  한국어 보안 Q&A 10쌍(`gijo-sec-qa-v0`) × 10스텝, loss 5.01→3.02 하강, LoRA 어댑터
+  45MB 저장. 제품 경로 전체(POST /api/finetune/start → 서버 스폰 → WebSocket 진행률
+  10건 + done 이벤트)로도 확인. 검증은 소형 베이스(unsloth/Llama-3.2-1B 4bit)로 했고,
+  Lily 본판 학습은 fp16 전체(~14GB) 다운로드가 필요해 같은 명령에 기본값으로 돌리면 된다.
+- **설치 주의** (GPU 머신 셋업 시): `pip install unsloth`가 **CUDA torch를 CPU 빌드로
+  다운그레이드**한다(버전 핀). unsloth 설치 후 반드시
+  `pip install torch==<핀 버전> torchvision==<핀 버전> --index-url
+  https://download.pytorch.org/whl/cu126 --force-reinstall --no-deps` 로 CUDA 빌드를
+  복원할 것. unsloth는 GPU 전용 학습 의존성이라 `requirements.txt`에는 의도적으로 없다.
 - **용어 정리 (2026-07-16)**: 대화 이력=단기 기억, RAG/LanceDB=장기 기억, 파인튜닝=학습.
   예전 문서는 RAG를 "단기"라고 불렀다.
 - **남은 판단**: "고객이 실제로 파인튜닝을 돌릴 것인가"는 여전히 미검증 — 파이프라인은
