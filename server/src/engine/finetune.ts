@@ -5,6 +5,7 @@ import type { Express } from "express";
 import type { WebSocketServer } from "ws";
 import { spawn } from "child_process";
 import { authMiddleware } from "../auth/auth";
+import { recordProcessOutput } from "./logs";
 
 export interface FinetuneArgs {
   agentId: string;
@@ -54,7 +55,9 @@ export function startFinetune(args: FinetuneArgs): { started: boolean; error?: s
   const proc = spawn("python", scriptArgs, { env: { ...process.env, PYTHONUTF8: "1" } });
   let stderrTail = "";
 
+  recordProcessOutput("finetune", "log", `$ python ${scriptArgs.join(" ")}`);
   proc.stdout.on("data", (chunk: Buffer) => {
+    recordProcessOutput("finetune", "log", chunk.toString());
     for (const line of chunk.toString().split("\n")) {
       const match = /step\s+(\d+)\/(\d+)\s+loss=([\d.]+)/.exec(line);
       if (match) {
@@ -65,7 +68,7 @@ export function startFinetune(args: FinetuneArgs): { started: boolean; error?: s
   });
   proc.stderr.on("data", (chunk: Buffer) => {
     stderrTail = (stderrTail + chunk.toString()).slice(-2000);
-    console.error(`[finetune] ${chunk.toString().trimEnd()}`);
+    recordProcessOutput("finetune", "warn", chunk.toString());
   });
   proc.on("error", (err) => {
     // python 자체가 없을 때 등 — exit 이벤트가 안 올 수 있으므로 여기서 종결한다

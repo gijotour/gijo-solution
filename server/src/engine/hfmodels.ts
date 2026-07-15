@@ -5,6 +5,7 @@ import { spawn } from "child_process";
 import * as path from "path";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
+import { attachProcessLogging, recordProcessOutput } from "./logs";
 
 const HF_API_BASE = "https://huggingface.co/api";
 
@@ -32,7 +33,9 @@ export async function searchHfModels(query: string): Promise<HfModelResult[]> {
 export async function loadHfModel(modelId: string): Promise<{ localPath: string }> {
   const localDir = path.join("models", modelId.replace("/", "__"));
   await new Promise<void>((resolve, reject) => {
+    recordProcessOutput("hf-download", "log", `$ huggingface-cli download ${modelId} --local-dir ${localDir}`);
     const proc = spawn("huggingface-cli", ["download", modelId, "--local-dir", localDir]);
+    attachProcessLogging(proc, "hf-download");
     proc.on("exit", (code) => (code === 0 ? resolve() : reject(new Error(`huggingface-cli exited with code ${code}`))));
     proc.on("error", reject);
   });

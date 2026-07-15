@@ -108,6 +108,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     <div class="nav-item" data-page="memory.html"><span class="ic">⛁</span>단기 · 장기 기억</div>
     <div class="nav-item" data-page="billing.html"><span class="ic">$</span>사용량 · 요금</div>
     <div class="nav-section">시스템</div>
+    <div class="nav-item" data-page="logs.html"><span class="ic">▤</span>로그</div>
     <div class="nav-item active"><span class="ic">⚙</span>설정</div>
   </div>
 
@@ -229,12 +230,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       </label>
       <button class="btn-primary" id="saveSmtpBtn">저장</button>
       <div class="status-line" id="smtpStatusLine"></div>
-    </div>
-
-    <div class="panel">
-      <div class="panel-title">서버 로그</div>
-      <div class="panel-sub">서버 콘솔 출력을 실시간으로 표시합니다(최근 500줄).</div>
-      <div class="log-console" id="logConsole"></div>
     </div>
 
     <div class="footer">
@@ -471,34 +466,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     }
   }
 
-  const logConsole = document.getElementById("logConsole");
-
-  function appendLogEntry(entry) {
-    const line = document.createElement("div");
-    line.className = "log-line" + (entry.level === "warn" ? " log-warn" : entry.level === "error" ? " log-error" : "");
-    const time = new Date(entry.timestamp).toLocaleTimeString("ko-KR", { hour12: false });
-    line.innerHTML = `<span class="log-ts">${time}</span>${entry.message.replace(/</g, "&lt;")}`;
-    logConsole.appendChild(line);
-    while (logConsole.childElementCount > 500) logConsole.removeChild(logConsole.firstChild);
-    logConsole.scrollTop = logConsole.scrollHeight;
-  }
-
-  async function loadLogs() {
-    try {
-      const entries = await window.gijo.listLogs();
-      logConsole.innerHTML = "";
-      entries.forEach(appendLogEntry);
-    } catch (e) {
-      logConsole.textContent = "로그를 불러오지 못했습니다: " + e.message;
-    }
-  }
-
   async function init() {
     tick();
     setInterval(tick, 30000);
     serverUrlInput.value = window.gijo.getServerUrl();
     await loadUser();
-    await Promise.all([loadHealth(), loadEngineStatus(), loadLogs(), loadSmtpConfig()]);
+    await Promise.all([loadHealth(), loadEngineStatus(), loadSmtpConfig()]);
 
     document.getElementById("testConnectionBtn").addEventListener("click", testConnection);
     document.getElementById("saveServerUrlBtn").addEventListener("click", saveServerUrl);
@@ -517,9 +490,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.querySelectorAll(".nav-item[data-page]").forEach((el) => {
       el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
     });
-
-    if (window.gijoRealtime) window.gijoRealtime.connect();
-    window.gijo.onLogEvent(appendLogEntry);
   }
 
   if (!window.gijo.isAuthenticated()) {

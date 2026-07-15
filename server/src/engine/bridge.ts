@@ -4,6 +4,7 @@ import type { Express } from "express";
 import { execFile } from "child_process";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
+import { recordProcessOutput } from "./logs";
 
 export interface ScanAdapter {
   id: string;
@@ -24,10 +25,17 @@ const adapters: Record<string, ScanAdapter> = {
     name: "ModelScan",
     run: (assetPath) =>
       new Promise((resolve, reject) => {
-        execFile("python", ["modelscan_wrapper.py", assetPath], (err, stdout) => {
-          if (err) return reject(err);
+        recordProcessOutput("modelscan", "log", `$ python modelscan_wrapper.py ${assetPath}`);
+        execFile("python", ["modelscan_wrapper.py", assetPath], (err, stdout, stderr) => {
+          if (stderr) recordProcessOutput("modelscan", "warn", stderr);
+          if (err) {
+            recordProcessOutput("modelscan", "error", err.message);
+            return reject(err);
+          }
           try {
-            resolve(JSON.parse(stdout) as StandardFinding[]);
+            const findings = JSON.parse(stdout) as StandardFinding[];
+            recordProcessOutput("modelscan", "log", `스캔 완료 — ${findings.length}건 발견`);
+            resolve(findings);
           } catch (e) {
             reject(e);
           }
