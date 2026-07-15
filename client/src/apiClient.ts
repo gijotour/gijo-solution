@@ -211,6 +211,8 @@ export const datasetApi = {
   save: (id: string, examples: ConversationExample[]) =>
     request<{ id: string; examples: number }>("/api/dataset/save", { method: "POST", body: { id, examples } }),
   list: () => request<{ id: string; examples: number }[]>("/api/dataset/list"),
+  extract: (filename: string, content: string) =>
+    request<{ text: string }>("/api/dataset/extract", { method: "POST", body: { filename, content } }),
 };
 
 // ── HuggingFace 모델 ──────────────────────────────────────────────────

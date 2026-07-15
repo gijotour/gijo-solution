@@ -3,12 +3,42 @@
 
 import type { Express } from "express";
 import * as fs from "fs";
+import * as os from "os";
 import * as path from "path";
+import { execFile } from "child_process";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { chat } from "./llm";
+import { recordProcessOutput } from "./logs";
 
 const DATASETS_DIR = path.join("data", "datasets");
+
+// 업로드된 문서(PDF/HWPX/TXT 등)에서 학습용 텍스트를 추출한다 — scripts/extract_doc.py(python) 사용.
+// 파일을 임시 폴더에 쓴 뒤 확장자를 유지해 스크립트가 형식을 판별하게 한다. PYTHONUTF8=1(한국어).
+export async function extractDocumentText(filename: string, base64: string): Promise<string> {
+  const ext = path.extname(filename).toLowerCase() || ".txt";
+  const tmp = path.join(os.tmpdir(), `gijo-doc-${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
+  await fs.promises.writeFile(tmp, Buffer.from(base64, "base64"));
+  recordProcessOutput("extract-doc", "log", `$ extract_doc.py ${filename} (${ext})`);
+  try {
+    const text = await new Promise<string>((resolve, reject) => {
+      execFile(
+        "python",
+        ["scripts/extract_doc.py", tmp],
+        { env: { ...process.env, PYTHONUTF8: "1" }, maxBuffer: 64 * 1024 * 1024 },
+        (err, stdout, stderr) => {
+          if (stderr) recordProcessOutput("extract-doc", "warn", stderr);
+          if (err) return reject(new Error(stderr.trim() || err.message));
+          resolve(stdout);
+        }
+      );
+    });
+    recordProcessOutput("extract-doc", "log", `${filename} — ${text.length.toLocaleString()}자 추출`);
+    return text;
+  } finally {
+    fs.promises.unlink(tmp).catch(() => {});
+  }
+}
 
 export interface ConversationExample {
   question: string;
@@ -110,4 +140,22 @@ export function registerDatasetRoutes(app: Express): void {
     }
   });
   app.get("/api/dataset/list", authMiddleware, (_req, res) => res.json(listDatasets()));
+
+  // 문서 업로드 → 텍스트 추출 (PDF/HWPX/TXT 등). { filename, content(base64) } → { text }
+  app.post(
+    "/api/dataset/extract",
+    authMiddleware,
+    asyncRoute(async (req, res) => {
+      const { filename, content } = req.body as { filename?: string; content?: string };
+      if (!filename || !content) {
+        res.status(400).json({ error: "filename과 content(base64)가 필요합니다" });
+        return;
+      }
+      try {
+        res.json({ text: await extractDocumentText(filename, content) });
+      } catch (err) {
+        res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+      }
+    })
+  );
 }

@@ -1,3 +1,4 @@
+import { spawnSync } from "child_process";
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import request from "supertest";
 
@@ -113,5 +114,26 @@ describe("dataset", () => {
       .set("Authorization", `Bearer ${token}`)
       .send({ id: "valid-id", examples: [{ question: "", answer: "" }] });
     expect(res.status).toBe(400);
+  });
+
+  it("extract rejects missing filename/content", async () => {
+    const res = await request(app).post("/api/dataset/extract").set("Authorization", `Bearer ${token}`).send({ filename: "x.pdf" });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("dataset document extraction (real python)", () => {
+  const python = spawnSync(process.env.GIJO_TEST_PYTHON ?? "python", ["--version"]).status === 0;
+
+  it.runIf(python)("extracts text from a base64 .txt via the python script", async () => {
+    const { extractDocumentText } = await import("../src/engine/dataset");
+    const b64 = Buffer.from("사고대응 규정: 랜섬웨어 감염 시 즉시 격리한다.", "utf-8").toString("base64");
+    const text = await extractDocumentText("policy.txt", b64);
+    expect(text).toContain("즉시 격리");
+  });
+
+  it.runIf(python)("rejects an unsupported extension", async () => {
+    const { extractDocumentText } = await import("../src/engine/dataset");
+    await expect(extractDocumentText("x.exe", Buffer.from("bin").toString("base64"))).rejects.toThrow();
   });
 });

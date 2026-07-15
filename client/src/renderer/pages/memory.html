@@ -184,14 +184,28 @@ tr:last-child td{border-bottom:none;}
     </div>
 
     <div class="panel">
+      <details style="margin-bottom:14px;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
+        <summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:var(--blue-light);">💡 이 문서들, RAG로 쓸까 학습(파인튜닝)으로 쓸까? — 활용 가이드</summary>
+        <div style="font-size:12px;color:var(--text);line-height:1.8;margin-top:10px;">
+          <div style="margin-bottom:8px;"><b style="color:var(--teal);">📚 그냥 참고만 하면 됨 → 장기 기억(RAG)이 더 쉬움</b><br>최신 위협 전망·침해사고 사례처럼 "찾아보게만" 하면 되는 자료는 위 <b>문서 올리기</b>에 넣으세요. 재학습 없이 즉시 반영되고, 문서가 바뀌면 다시 올리면 끝입니다.</div>
+          <div style="margin-bottom:8px;"><b style="color:var(--amber);">🎓 AI가 체화하게 하려면 → 학습(파인튜닝)</b><br>한국식 사고대응 문체, 보고서 서식, 판단 방식 자체를 AI에 각인시키려면 아래 학습을 쓰세요. GPU와 시간이 필요합니다.</div>
+          <div style="border-top:1px solid var(--border);padding-top:8px;">
+            <b style="color:#fff;">문서별 추천 대상 에이전트</b> (학습 후 → 모델 내보내기 → 에이전트 AI 화면에서 그 에이전트에 할당)<br>
+            · 해킹진단 사례·침해사고 분석 → <b>침투테스트·분석</b> 에이전트<br>
+            · 사이버 위협 전망·동향 보고서 → <b>CTI·분석</b> 에이전트<br>
+            · 침해사고 대응 보고서 → <b>리포트</b> 에이전트 (보고서 문체 학습)
+          </div>
+        </div>
+      </details>
+
       <div class="panel-title">🎓 학습 · ① 데이터셋 만들기</div>
-      <div class="panel-sub">기술문서·보안 규정을 넣으면 로컬 LLM이 학습용 Q&A 쌍으로 자동 변환합니다. 파일을 올리거나 직접 붙여넣으세요. 검토 후 저장하면 파인튜닝 입력이 됩니다.</div>
+      <div class="panel-sub">기술문서·보안 규정을 넣으면 로컬 LLM이 학습용 Q&A 쌍으로 자동 변환합니다. PDF·HWPX·텍스트 파일을 여러 개 올리거나 직접 붙여넣으세요. 검토 후 저장하면 파인튜닝 입력이 됩니다.</div>
       <div class="field">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
           <label for="dsRawInput" style="margin:0;">기술문서 원문 (보안 규정, CVE 분석, 운영 매뉴얼 등)</label>
           <span>
-            <input type="file" id="dsFileInput" accept=".txt,.md,.csv,.json,.log" style="display:none">
-            <button class="btn-ghost" id="dsFileBtn" style="padding:5px 12px;font-size:12px;">📄 문서 파일 올리기</button>
+            <input type="file" id="dsFileInput" accept=".pdf,.hwpx,.txt,.md,.csv,.json,.log" multiple style="display:none">
+            <button class="btn-ghost" id="dsFileBtn" style="padding:5px 12px;font-size:12px;">📄 문서 올리기 (PDF·HWPX·여러 개 가능)</button>
           </span>
         </div>
         <textarea id="dsRawInput" rows="5" placeholder="여기에 문서를 붙여넣거나, 위 '문서 파일 올리기'로 .txt/.md/.csv 파일을 불러오세요" style="width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;outline:none;resize:vertical"></textarea>
@@ -312,21 +326,41 @@ tr:last-child td{border-bottom:none;}
 
   let convertedExamples = [];
 
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(String(r.result).split(",")[1] || "");
+      r.onerror = () => reject(new Error("파일 읽기 실패"));
+      r.readAsDataURL(file);
+    });
+  }
+
   async function handleDsFile(e) {
-    const file = e.target.files && e.target.files[0];
-    if (!file) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
     const status = document.getElementById("dsFileStatus");
-    try {
-      const text = await file.text();
-      const ta = document.getElementById("dsRawInput");
-      // 기존 내용이 있으면 이어 붙임 (여러 문서 누적 가능)
-      ta.value = ta.value.trim() ? ta.value.trim() + "\n\n---\n\n" + text : text;
-      status.textContent = `✓ ${file.name} 불러옴 (${text.length.toLocaleString()}자). 'Q&A 변환'을 누르세요.`;
-      status.className = "status-line status-ok";
-    } catch (err) {
-      status.textContent = "✗ 파일 읽기 실패: " + err.message;
-      status.className = "status-line status-err";
+    const ta = document.getElementById("dsRawInput");
+    let ok = 0;
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      status.textContent = `문서 추출 중... (${i + 1}/${files.length}) ${file.name}`;
+      status.className = "status-line";
+      try {
+        const isText = /\.(txt|md|csv|json|log)$/i.test(file.name);
+        // 텍스트 파일은 브라우저에서 바로, PDF/HWPX는 서버가 추출
+        const text = isText ? await file.text() : (await window.gijo.extractDocument(file.name, await fileToBase64(file))).text;
+        const header = `# 문서: ${file.name}\n`;
+        ta.value = ta.value.trim() ? ta.value.trim() + "\n\n---\n\n" + header + text : header + text;
+        ok++;
+      } catch (err) {
+        status.textContent = `✗ ${file.name} 추출 실패: ${err.message}`;
+        status.className = "status-line status-err";
+        e.target.value = "";
+        return;
+      }
     }
+    status.textContent = `✓ ${ok}개 문서 불러옴 (총 ${ta.value.length.toLocaleString()}자). 'Q&A 변환'을 누르세요.`;
+    status.className = "status-line status-ok";
     e.target.value = "";
   }
 

@@ -78,6 +78,7 @@ const gijoApi = {
   convertDataset: (rawText: string) => api.datasetApi.convert(rawText),
   saveDataset: (id: string, examples: { question: string; answer: string }[]) => api.datasetApi.save(id, examples),
   listDatasets: () => api.datasetApi.list(),
+  extractDocument: (filename: string, content: string) => api.datasetApi.extract(filename, content),
 
   // HuggingFace 모델 검색
   searchHfModels: (query: string) => api.hfModelsApi.search(query),
