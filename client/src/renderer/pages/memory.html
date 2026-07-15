@@ -152,10 +152,18 @@ tr:last-child td{border-bottom:none;}
 
     <div class="panel">
       <div class="panel-title">장기 기억 — 문서 수집 (RAG)</div>
-      <div class="panel-sub">서버가 LanceDB에 청크·임베딩해서 저장합니다 (여러 클라이언트가 같은 지식 베이스를 공유). 수집된 지식은 채팅 시 관련 내용이 자동으로 참고 자료로 주입됩니다.</div>
-      <div class="field">
-        <label for="ingestPathInput">문서 경로</label>
-        <input id="ingestPathInput" placeholder="예: data/docs/incident-policy.txt">
+      <div class="panel-sub">서버가 LanceDB에 청크·임베딩해서 저장합니다. 대상을 "전체 공유"로 두면 모든 에이전트가, 특정 에이전트로 지정하면 그 에이전트만 채팅 시 참고합니다.</div>
+      <div class="field-row">
+        <div class="field">
+          <label for="ingestPathInput">문서 경로</label>
+          <input id="ingestPathInput" placeholder="예: data/docs/incident-policy.txt">
+        </div>
+        <div class="field">
+          <label for="ingestScopeSelect">대상 에이전트</label>
+          <select id="ingestScopeSelect" style="width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;outline:none">
+            <option value="global">전체 공유 (모든 에이전트)</option>
+          </select>
+        </div>
       </div>
       <button class="btn-primary" id="ingestBtn">수집</button>
       <div class="status-line" id="ingestStatusLine"></div>
@@ -163,11 +171,17 @@ tr:last-child td{border-bottom:none;}
 
     <div class="panel">
       <div class="panel-title">장기 기억 — 지식 질의</div>
-      <div class="panel-sub">수집된 문서에서 질문과 가장 관련 있는 구절을 검색합니다.</div>
+      <div class="panel-sub">수집된 문서에서 질문과 가장 관련 있는 구절을 검색합니다. 대상 에이전트를 고르면 그 에이전트가 실제 채팅에서 보는 범위(전용 + 전체 공유)로 검색합니다.</div>
       <div class="field-row">
         <div class="field">
           <label for="queryInput">질문</label>
           <input id="queryInput" placeholder="예: 랜섬웨어 감염 시 초동 조치는?">
+        </div>
+        <div class="field">
+          <label for="queryScopeSelect">검색 범위</label>
+          <select id="queryScopeSelect" style="width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;outline:none">
+            <option value="">전체 공유만</option>
+          </select>
         </div>
         <button class="btn-primary" id="queryBtn">검색</button>
       </div>
@@ -247,15 +261,29 @@ tr:last-child td{border-bottom:none;}
     } catch (e) {}
   }
 
+  async function loadAgentScopes() {
+    try {
+      const agents = await window.gijo.listAgents();
+      const ingestSel = document.getElementById("ingestScopeSelect");
+      const querySel = document.getElementById("queryScopeSelect");
+      for (const a of agents) {
+        ingestSel.insertAdjacentHTML("beforeend", `<option value="${a.id}">${a.name} 전용</option>`);
+        querySel.insertAdjacentHTML("beforeend", `<option value="${a.id}">${a.name} 관점</option>`);
+      }
+    } catch (e) {}
+  }
+
   async function ingest() {
     const path = document.getElementById("ingestPathInput").value.trim();
+    const scope = document.getElementById("ingestScopeSelect").value;
     const line = document.getElementById("ingestStatusLine");
     if (!path) return;
     line.textContent = "수집 중...";
     line.className = "status-line";
     try {
-      const result = await window.gijo.ingestDocument(path);
-      line.textContent = `✓ ${result.documentId} — ${result.chunks}개 청크 저장됨 (${result.embeddingModel})`;
+      const result = await window.gijo.ingestDocument(path, scope);
+      const scopeLabel = result.scope === "global" ? "전체 공유" : `${result.scope} 전용`;
+      line.textContent = `✓ ${result.documentId} — ${result.chunks}개 청크 저장됨 · ${scopeLabel}`;
       line.className = "status-line status-ok";
     } catch (e) {
       line.textContent = "✗ 수집 실패: " + e.message;
@@ -267,10 +295,11 @@ tr:last-child td{border-bottom:none;}
     const question = document.getElementById("queryInput").value.trim();
     const box = document.getElementById("queryResults");
     if (!question) return;
+    const agentId = document.getElementById("queryScopeSelect").value || undefined;
     box.style.display = "block";
     box.textContent = "검색 중...";
     try {
-      const results = await window.gijo.queryMemory(question, 5);
+      const results = await window.gijo.queryMemory(question, 5, agentId);
       box.innerHTML = results.length
         ? results.map((r) => `<div class="result-chunk">${r.replace(/</g, "&lt;")}</div>`).join("")
         : '<div style="color:var(--muted)">관련 문서가 없습니다 — 먼저 문서를 수집하세요.</div>';
@@ -345,6 +374,7 @@ tr:last-child td{border-bottom:none;}
     setInterval(tick, 30000);
     await loadUser();
     await loadHealth();
+    await loadAgentScopes();
 
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll(".nav-item[data-page]").forEach((el) => {

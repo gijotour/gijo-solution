@@ -121,13 +121,15 @@ export interface AgentInfo {
   id: string;
   name: string;
   role: string;
-  brainModelId: string;
+  assignedModelId: string | null;
   status: "idle" | "working" | "watching";
   defaultStatus: "idle" | "working" | "watching";
 }
 
 export const agentsApi = {
   list: () => request<AgentInfo[]>("/api/agents"),
+  setModel: (agentId: string, modelId: string | null) =>
+    request<AgentInfo>(`/api/agents/${agentId}/model`, { method: "POST", body: { modelId } }),
 };
 
 // ── 지시(디스패처) ────────────────────────────────────────────────────
@@ -160,11 +162,11 @@ export const collaborationApi = {
   history: () => request<CollaborationEvent[]>("/api/collaboration/history"),
 };
 
-// ── 메모리(RAG) ───────────────────────────────────────────────────────
+// ── 장기 기억(RAG) ────────────────────────────────────────────────────
 export const memoryApi = {
-  ingest: (path: string) => request("/api/memory/ingest", { method: "POST", body: { path } }),
-  query: (question: string, topK?: number) =>
-    request<string[]>("/api/memory/query", { method: "POST", body: { question, topK } }),
+  ingest: (path: string, scope?: string) => request("/api/memory/ingest", { method: "POST", body: { path, scope } }),
+  query: (question: string, topK?: number, agentId?: string) =>
+    request<string[]>("/api/memory/query", { method: "POST", body: { question, topK, agentId } }),
 };
 
 // ── LLM 브리지 / 채팅 ─────────────────────────────────────────────────
@@ -181,6 +183,7 @@ export const llmApi = {
 // ── 로컬 엔진(llama.cpp 서버) ─────────────────────────────────────────
 export const localEngineApi = {
   status: () => request("/api/localengine/status"),
+  models: () => request<{ id: string; running: boolean }[]>("/api/localengine/models"),
   start: (modelId: string) => request("/api/localengine/start", { method: "POST", body: { modelId } }),
   stop: () => request("/api/localengine/stop", { method: "POST" }),
 };

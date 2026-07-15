@@ -302,7 +302,24 @@ tr:last-child td{border-bottom:none;}
     try {
       const user = await window.gijo.me();
       avatarBtn.textContent = (user.displayName || user.username || "-").charAt(0);
+      isAdmin = user.role === "admin";
     } catch (e) {}
+  }
+
+  let availableModels = [];
+  let isAdmin = false;
+
+  function modelSelectHtml(a) {
+    const opts = [`<option value="">전역 모델 따름</option>`]
+      .concat(
+        availableModels.map(
+          (m) => `<option value="${m.id}" ${a.assignedModelId === m.id ? "selected" : ""}>${m.id}${m.running ? " (실행중)" : ""}</option>`
+        )
+      )
+      .join("");
+    const disabled = isAdmin ? "" : "disabled";
+    return `<select class="agent-model-select" data-agent="${a.id}" ${disabled}
+      style="width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:6px;padding:6px 8px;color:var(--text);font-size:11.5px;outline:none;cursor:pointer">${opts}</select>`;
   }
 
   function renderAgents(agents) {
@@ -315,23 +332,45 @@ tr:last-child td{border-bottom:none;}
             <div class="agent-icon" style="background:${style.bg};color:${style.color}">${style.icon}</div>
             <div><div class="agent-name">${a.name}</div><div class="agent-role">${a.role}</div></div>
           </div>
-          <div class="agent-model">${a.brainModelId}</div>
+          ${modelSelectHtml(a)}
         </div>`;
       })
       .join("");
 
+    agentGrid.querySelectorAll(".agent-model-select").forEach((sel) => {
+      sel.addEventListener("change", async (e) => {
+        const agentId = e.target.dataset.agent;
+        const modelId = e.target.value || null;
+        e.target.disabled = true;
+        try {
+          await window.gijo.setAgentModel(agentId, modelId);
+          await loadAgents();
+        } catch (err) {
+          alert("모델 할당 실패: " + err.message);
+          e.target.disabled = false;
+        }
+      });
+    });
+
     document.getElementById("kpiAgents").textContent = agents.length;
     document.getElementById("kpiWorking").textContent = agents.filter((a) => a.status === "working").length;
 
-    const brains = [...new Set(agents.map((a) => a.brainModelId))];
-    document.getElementById("brainList").innerHTML = brains
-      .map((b) => `<div class="brain-row"><span>${b}</span><span class="badge b-teal">${agents.filter((a) => a.brainModelId === b).length}개 에이전트</span></div>`)
-      .join("");
+    // 할당 현황 요약: 전용 모델을 가진 에이전트만, 나머지는 "전역 모델 따름"
+    const assigned = agents.filter((a) => a.assignedModelId);
+    const brainList = document.getElementById("brainList");
+    if (assigned.length === 0) {
+      brainList.innerHTML = '<div class="brain-row"><span style="color:var(--muted)">모든 에이전트가 전역 모델을 공유합니다</span></div>';
+    } else {
+      brainList.innerHTML = assigned
+        .map((a) => `<div class="brain-row"><span>${a.name}</span><span class="badge b-teal">${a.assignedModelId}</span></div>`)
+        .join("");
+    }
   }
 
   async function loadAgents() {
     try {
-      const agents = await window.gijo.listAgents();
+      const [agents, models] = await Promise.all([window.gijo.listAgents(), window.gijo.listModels().catch(() => [])]);
+      availableModels = models;
       renderAgents(agents);
     } catch (e) {
       agentGrid.innerHTML = '<div style="color:var(--muted)">에이전트 목록을 불러오지 못했습니다</div>';

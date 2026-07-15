@@ -56,8 +56,11 @@ async function executeRoutedAction(route: RoutedIntent, instructionText: string)
     case "analyze":
     case "report":
     case "chat":
-    default:
-      return { output: await chat({ agentId: route.agentId, message: instructionText }) };
+    default: {
+      const { ensureAgentModel } = await import("./localengine.js");
+      await ensureAgentModel(route.agentId);
+      return { output: await chat({ agentId: route.agentId, message: instructionText, remember: true }) };
+    }
   }
 }
 

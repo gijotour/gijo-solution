@@ -39,10 +39,11 @@ export function resetChatHistoryForTests(): void {
 // 임베딩 서버가 없거나 지식 베이스가 비어 있으면 조용히 생략한다 — RAG가 안 된다고
 // 채팅 자체가 죽으면 안 된다. (memory.ts가 llm.ts의 embed를 쓰므로 순환 참조를 피해
 // 호출 시점에 동적 import.)
-async function ragContextFor(message: string): Promise<string | null> {
+async function ragContextFor(message: string, agentId: string): Promise<string | null> {
   try {
     const { queryMemory } = await import("./memory.js");
-    const chunks = await queryMemory(message, 4);
+    // 에이전트 전용 지식 + 전역 지식만 검색 (다른 에이전트 전용 문서는 제외).
+    const chunks = await queryMemory(message, 4, agentId);
     if (chunks.length === 0) return null;
     return (
       "참고 자료 — 사내 지식 베이스(장기 기억)에서 검색된 관련 내용입니다. 답변에 활용하되, 질문과 무관하면 무시하세요.\n" +
@@ -73,7 +74,7 @@ export function systemPromptFor(agentId: string): string {
 
 export async function chat(args: ChatArgs): Promise<string> {
   const history = args.remember ? (histories.get(args.agentId) ?? []) : [];
-  const rag = args.remember ? await ragContextFor(args.message) : null;
+  const rag = args.remember ? await ragContextFor(args.message, args.agentId) : null;
 
   // RAG 참고자료는 별도 system 메시지가 아니라 시스템 프롬프트에 합친다 — Mistral 계열
   // (Lily 포함) 채팅 템플릿은 system 메시지 2개를 "roles must alternate" 에러로 거부한다.
@@ -121,6 +122,9 @@ export function registerLlmRoutes(app: Express): void {
     "/api/llm/chat",
     authMiddleware,
     asyncRoute(async (req, res) => {
+      // 에이전트에 전용 모델이 할당돼 있으면 채팅 전에 그 모델로 스왑한다(없으면 전역 모델 유지).
+      const { ensureAgentModel } = await import("./localengine.js");
+      await ensureAgentModel(String(req.body.agentId ?? ""));
       // 대화형 라우트는 단기 기억(이력) + 장기 기억(RAG) 주입을 켠다.
       res.json({ reply: await chat({ ...req.body, remember: true }) });
     })

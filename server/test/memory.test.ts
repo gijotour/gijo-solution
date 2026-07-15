@@ -27,10 +27,6 @@ describe("memory (장기 기억 / LanceDB) — 임베딩 모델 교체 자가 �
     fs.writeFileSync(DOC_B, "승인된 모델은 VAULT-9에 보관한다.", "utf-8");
   });
 
-  afterAll(() => {
-    fs.rmSync(tmpDb, { recursive: true, force: true });
-  });
-
   it("ingest and query round-trip with a consistent embedding dimension", async () => {
     embedDim = 3;
     const result = await ingestDocument(DOC_A);
@@ -53,5 +49,46 @@ describe("memory (장기 기억 / LanceDB) — 임베딩 모델 교체 자가 �
     const hits = await queryMemory("모델 보관 위치?");
     expect(hits.some((t) => t.includes("VAULT-9"))).toBe(true);
     expect(hits.some((t) => t.includes("김민수"))).toBe(false);
+  });
+});
+
+describe("memory scope (B — 에이전트별 지식 격리)", () => {
+  const GLOBAL_DOC = path.join(tmpDb, "global-policy.txt");
+  const PENTEST_DOC = path.join(tmpDb, "pentest-playbook.txt");
+
+  afterAll(() => {
+    fs.rmSync(tmpDb, { recursive: true, force: true });
+  });
+
+  beforeAll(async () => {
+    embedDim = 3;
+    // 앞 describe와 같은 tmpDb를 쓰되(GIJO_MEMORY_DB_PATH 고정), 앞 테스트가 5차원으로
+    // 재생성해 둔 테이블은 첫 ingest(3차원)에서 다시 재생성되므로 깨끗이 시작한다.
+    fs.mkdirSync(tmpDb, { recursive: true });
+    fs.writeFileSync(GLOBAL_DOC, "전 직원 공통: 사고 발생 시 보안팀에 즉시 신고한다.", "utf-8");
+    fs.writeFileSync(PENTEST_DOC, "침투테스트 전용: Metasploit 모듈 사용 시 사전 승인 필수.", "utf-8");
+    await ingestDocument(GLOBAL_DOC, "global");
+    await ingestDocument(PENTEST_DOC, "pentest");
+  });
+
+  it("an agent sees its own scope plus global", async () => {
+    const hits = await queryMemory("Metasploit 사용 규정", 10, "pentest");
+    const joined = hits.join(" ");
+    expect(joined).toContain("Metasploit"); // pentest 전용 문서
+    expect(joined).toContain("보안팀에 즉시 신고"); // 전역 문서도 포함
+  });
+
+  it("a different agent does NOT see another agent's private docs", async () => {
+    const hits = await queryMemory("Metasploit 사용 규정", 10, "analysis");
+    const joined = hits.join(" ");
+    expect(joined).not.toContain("Metasploit"); // pentest 전용은 analysis에 안 보임
+    expect(joined).toContain("보안팀에 즉시 신고"); // 전역은 보임
+  });
+
+  it("no agentId (dashboard/orchestrator) sees only global", async () => {
+    const hits = await queryMemory("Metasploit 사용 규정", 10);
+    const joined = hits.join(" ");
+    expect(joined).not.toContain("Metasploit");
+    expect(joined).toContain("보안팀에 즉시 신고");
   });
 });

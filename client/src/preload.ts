@@ -32,6 +32,8 @@ const gijoApi = {
 
   // 에이전트 AI / 지시(디스패처)
   listAgents: () => api.agentsApi.list(),
+  setAgentModel: (agentId: string, modelId: string | null) => api.agentsApi.setModel(agentId, modelId),
+  listModels: () => api.localEngineApi.models(),
   sendInstruction: (text: string) => api.dispatchApi.send(text),
   onCollaborationEvent: (cb: (evt: unknown) => void) => onChannel("collaboration:event", cb),
   listCollaborationHistory: () => api.collaborationApi.history(),
@@ -59,8 +61,8 @@ const gijoApi = {
   chat: (agentId: string, message: string) => api.llmApi.chat(agentId, message),
 
   // 장기 기억(RAG) / 파인튜닝(학습)
-  ingestDocument: (path: string) => api.memoryApi.ingest(path),
-  queryMemory: (question: string, topK?: number) => api.memoryApi.query(question, topK),
+  ingestDocument: (path: string, scope?: string) => api.memoryApi.ingest(path, scope),
+  queryMemory: (question: string, topK?: number, agentId?: string) => api.memoryApi.query(question, topK, agentId),
   startFinetune: (agentId: string, datasetId: string) => api.finetuneApi.start(agentId, datasetId),
   onFinetuneProgress: (cb: (p: unknown) => void) => onChannel("finetune:progress", cb),
   convertDataset: (rawText: string) => api.datasetApi.convert(rawText),

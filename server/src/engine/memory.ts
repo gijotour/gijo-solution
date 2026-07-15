@@ -20,12 +20,17 @@ export interface IngestResult {
   documentId: string;
   chunks: number;
   embeddingModel: string;
+  scope: string;
 }
+
+// scope: "global"이면 모든 에이전트가 검색, 그 외에는 해당 agentId 전용 문서.
+export const GLOBAL_SCOPE = "global";
 
 interface MemoryRow {
   documentId: string;
   chunkIndex: number;
   text: string;
+  scope: string;
   vector: number[];
 }
 
@@ -38,14 +43,14 @@ function chunkText(text: string, size = CHUNK_SIZE, overlap = CHUNK_OVERLAP): st
   return chunks;
 }
 
-export async function ingestDocument(filePath: string): Promise<IngestResult> {
+export async function ingestDocument(filePath: string, scope: string = GLOBAL_SCOPE): Promise<IngestResult> {
   const raw = await fs.readFile(filePath, "utf-8");
   const chunks = chunkText(raw);
-  if (chunks.length === 0) return { documentId: filePath, chunks: 0, embeddingModel: "none" };
+  if (chunks.length === 0) return { documentId: filePath, chunks: 0, embeddingModel: "none", scope };
 
   const vectors = await embed(chunks);
   const documentId = path.basename(filePath);
-  const rows: MemoryRow[] = chunks.map((text, i) => ({ documentId, chunkIndex: i, text, vector: vectors[i] }));
+  const rows: MemoryRow[] = chunks.map((text, i) => ({ documentId, chunkIndex: i, text, scope, vector: vectors[i] }));
 
   const db = await lancedb.connect(DB_PATH);
   const names = await db.tableNames();
@@ -71,18 +76,29 @@ export async function ingestDocument(filePath: string): Promise<IngestResult> {
     await db.createTable(TABLE_NAME, records);
   }
 
-  return { documentId, chunks: chunks.length, embeddingModel: "local-embedding-server" };
+  return { documentId, chunks: chunks.length, embeddingModel: "local-embedding-server", scope };
 }
 
-export async function queryMemory(question: string, topK = 5): Promise<string[]> {
+// SQL 문자열 injection 방지 — scope는 LanceDB where 절에 문자열로 들어간다. 에이전트 id와
+// "global"만 허용되는 값이지만 방어적으로 이스케이프한다.
+function safeScope(s: string): string {
+  return s.replace(/[^a-zA-Z0-9_-]/g, "");
+}
+
+// agentId를 주면 "그 에이전트 전용 문서 + 전역 문서"만 검색한다. 없으면(대시보드/오케스트레이터)
+// 전역 문서만. 특정 에이전트에 귀속된 지식이 다른 에이전트로 새지 않도록 하는 게 목적.
+export async function queryMemory(question: string, topK = 5, agentId?: string): Promise<string[]> {
   const db = await lancedb.connect(DB_PATH);
   const names = await db.tableNames();
   if (!names.includes(TABLE_NAME)) return [];
 
   const table = await db.openTable(TABLE_NAME);
   const [queryVector] = await embed([question]);
+  const scopes =
+    agentId && agentId !== GLOBAL_SCOPE ? [GLOBAL_SCOPE, safeScope(agentId)] : [GLOBAL_SCOPE];
+  const whereClause = `scope IN (${scopes.map((s) => `'${s}'`).join(", ")})`;
   try {
-    const results = (await table.search(queryVector).limit(topK).toArray()) as MemoryRow[];
+    const results = (await table.search(queryVector).where(whereClause).limit(topK).toArray()) as MemoryRow[];
     return results.map((r) => r.text);
   } catch (err) {
     // 차원 불일치(임베딩 모델 교체 후 재수집 전) 등 — 검색 실패가 채팅을 죽이면 안 된다.
@@ -96,14 +112,14 @@ export function registerMemoryRoutes(app: Express): void {
     "/api/memory/ingest",
     authMiddleware,
     asyncRoute(async (req, res) => {
-      res.json(await ingestDocument(req.body.path));
+      res.json(await ingestDocument(req.body.path, req.body.scope ?? GLOBAL_SCOPE));
     })
   );
   app.post(
     "/api/memory/query",
     authMiddleware,
     asyncRoute(async (req, res) => {
-      res.json(await queryMemory(req.body.question, req.body.topK));
+      res.json(await queryMemory(req.body.question, req.body.topK, req.body.agentId));
     })
   );
 }

@@ -62,6 +62,20 @@ function modelFilePath(modelId: string): string {
   return path.join(MODELS_DIR, modelId, `${modelId}.gguf`);
 }
 
+// models/ 아래 실제로 배치된 채팅 모델 목록 (models/<id>/<id>.gguf 패턴). 임베딩 모델은
+// 채팅용이 아니므로 제외한다. 에이전트 모델 할당 드롭다운·검증의 단일 진실 소스.
+export function listAvailableModels(): { id: string; running: boolean }[] {
+  if (!fs.existsSync(MODELS_DIR)) return [];
+  return fs
+    .readdirSync(MODELS_DIR, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && d.name !== EMBEDDING_MODEL_ID && fs.existsSync(modelFilePath(d.name)))
+    .map((d) => ({ id: d.name, running: d.name === currentModelId }));
+}
+
+export function isModelAvailable(modelId: string): boolean {
+  return fs.existsSync(modelFilePath(modelId));
+}
+
 // 부팅 자동 시작 후보: 마지막 사용 모델 → 제품 기본 모델 순으로, 실제 .gguf가 있는 첫 번째.
 // 없으면 null (자동 시작 안 함 — 파일도 없는데 spawn 에러를 내지 않는다).
 export function pickAutoStartModelId(): string | null {
@@ -196,9 +210,26 @@ export async function stopEmbeddingEngine(): Promise<void> {
   }
 }
 
+// 채팅 진입점(llm route, dispatcher)에서 호출 — 에이전트에 전용 모델이 할당돼 있고 그게 지금
+// 떠 있는 모델과 다르면 스왑한다. 할당이 없으면(대부분) 전역 모델을 그대로 쓴다. 3090 1대라
+// 스왑은 수십 초 걸리므로, 모델이 다른 에이전트를 오가면 매번 재로딩이 발생한다는 점에 유의.
+export async function ensureAgentModel(agentId: string): Promise<void> {
+  const { getAgentModel } = await import("./agents.js");
+  const modelId = getAgentModel(agentId);
+  if (!modelId || modelId === currentModelId) return;
+  if (!isModelAvailable(modelId)) {
+    console.warn(`[localengine] 에이전트 ${agentId}의 할당 모델 ${modelId} 파일이 없어 전역 모델을 유지합니다`);
+    return;
+  }
+  await startLocalEngine(modelId);
+}
+
 export function registerLocalEngineRoutes(app: Express): void {
   app.get("/api/localengine/status", authMiddleware, (_req, res) => {
     res.json(getLocalEngineStatus());
+  });
+  app.get("/api/localengine/models", authMiddleware, (_req, res) => {
+    res.json(listAvailableModels());
   });
   app.post(
     "/api/localengine/start",
