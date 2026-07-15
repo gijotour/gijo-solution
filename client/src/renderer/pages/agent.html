@@ -582,13 +582,23 @@ tr:last-child td{border-bottom:none;}
     document.getElementById("hfResults").addEventListener("click", async (e) => {
       const modelId = e.target.dataset.load;
       if (!modelId) return;
-      e.target.textContent = "다운로드 중...";
-      e.target.disabled = true;
+      const btn = e.target;
+      btn.textContent = "다운로드 중...";
+      btn.disabled = true;
       try {
-        await window.gijo.loadHfModel(modelId);
-        e.target.textContent = "완료";
+        const r = await window.gijo.loadHfModel(modelId);
+        btn.textContent = "완료";
+        await loadEngineStatus();
+        alert(`다운로드 완료: ${(r && r.file) || modelId}\n에이전트 카드의 모델 드롭다운에서 선택할 수 있습니다.`);
       } catch (err) {
-        e.target.textContent = "실패";
+        btn.textContent = "실패";
+        btn.disabled = false;
+        // 서버가 보낸 에러 본문({error:"..."})을 뽑아 사람이 읽게 표시
+        let msg = (err && err.message) || String(err);
+        const brace = msg.indexOf("{");
+        if (brace >= 0) { try { const j = JSON.parse(msg.slice(brace)); if (j.error) msg = j.error; } catch (_) {} }
+        btn.title = msg;
+        alert("다운로드 실패: " + msg);
       }
     });
 
