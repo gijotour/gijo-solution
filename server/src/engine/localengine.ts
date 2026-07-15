@@ -87,6 +87,26 @@ export function pickAutoStartModelId(): string | null {
   return null;
 }
 
+// 스왑/기동 직후엔 llama-server가 아직 모델을 VRAM에 올리는 중이라, 곧바로 추론을 보내면
+// 연결 거부로 첫 요청이 실패한다(모델을 오가는 에이전트 협업에서 특히 잦음). /health가 200(ok)을
+// 돌려줄 때까지 기다렸다가 startLocalEngine을 반환해, 뒤이은 chat()이 바로 성공하게 한다.
+// (llama.cpp: 로딩 중 503, 준비되면 200. 프로세스가 죽거나 교체되면 즉시 중단.)
+const READY_TIMEOUT_MS = Number(process.env.GIJO_MODEL_READY_TIMEOUT_MS ?? 120000);
+
+async function waitForModelReady(proc: ChildProcess, timeoutMs = READY_TIMEOUT_MS): Promise<boolean> {
+  const url = `http://localhost:${PORT}/health`;
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (serverProcess !== proc) return false; // 기동 실패로 죽었거나 다른 모델로 교체됨
+    const ok = await fetch(url)
+      .then((r) => r.ok)
+      .catch(() => false);
+    if (ok) return true;
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  return false;
+}
+
 export async function startLocalEngine(modelId: string): Promise<LocalEngineStatus> {
   if (serverProcess) {
     if (modelId === currentModelId) {
@@ -111,6 +131,7 @@ export async function startLocalEngine(modelId: string): Promise<LocalEngineStat
   serverProcess = spawned;
   currentModelId = modelId;
   setStateStmt.run("lastModelId", modelId);
+  const loadStart = Date.now();
   emitLlmActivity({ kind: "load", phase: "start", model: modelBasename(modelId), detail: "모델 로드 중 (llama-server 기동)" });
 
   spawned.on("exit", () => {
@@ -125,6 +146,16 @@ export async function startLocalEngine(modelId: string): Promise<LocalEngineStat
       serverProcess = null;
       currentModelId = null;
     }
+  });
+
+  // 모델이 실제로 응답 가능해질 때까지 기다렸다가 반환 — 이후 첫 추론이 바로 성공한다.
+  const ready = await waitForModelReady(spawned);
+  emitLlmActivity({
+    kind: "load",
+    phase: ready ? "done" : "error",
+    model: modelBasename(modelId),
+    detail: ready ? "모델 준비 완료" : "모델 준비 대기 시간 초과",
+    latencyMs: Date.now() - loadStart,
   });
 
   return getLocalEngineStatus();
