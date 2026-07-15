@@ -29,7 +29,8 @@ const gijoApi = {
 
   // 네비게이션(렌더러 내 페이지 전환은 메인 프로세스에 위임)
   navigateTo: (page: string) => ipcRenderer.invoke("navigate:to", page),
-  listDir: (relPath: string) => ipcRenderer.invoke("fs:list", relPath) as Promise<{ root: string; path: string; items: { name: string; dir: boolean }[] }>,
+  listDir: (relPath: string) => ipcRenderer.invoke("fs:list", relPath) as Promise<{ root: string; rootName: string; path: string; items: { name: string; dir: boolean }[] }>,
+  pickWorkFolder: () => ipcRenderer.invoke("fs:pickRoot") as Promise<{ cancelled: boolean; root?: string; rootName?: string }>,
 
   // 에이전트 AI / 지시(디스패처)
   listAgents: () => api.agentsApi.list(),

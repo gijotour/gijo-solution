@@ -101,7 +101,7 @@
       <div class="explorer-title"><span>자산 탐색기</span><span style="color:var(--muted-2);cursor:pointer" id="refreshAssetsBtn">⟳</span></div>
       <div class="explorer-sub">GIJO AS Desktop</div>
       <div class="explorer-tree" id="explorerTree" style="margin-bottom:16px;">불러오는 중...</div>
-      <div class="explorer-title"><span>📁 파일</span><span style="color:var(--muted-2);cursor:pointer" id="refreshFilesBtn">⟳</span></div>
+      <div class="explorer-title"><span>📁 파일</span><span><span style="color:var(--muted-2);cursor:pointer;margin-right:8px;" id="pickFolderBtn" title="작업 폴더 선택">📂</span><span style="color:var(--muted-2);cursor:pointer" id="refreshFilesBtn" title="새로고침">⟳</span></span></div>
       <div class="explorer-sub" id="fileRootLabel">프로젝트 폴더 (읽기 전용)</div>
       <div class="explorer-tree" id="fileTree" style="font-size:12px;">불러오는 중...</div>
     </div>
@@ -261,12 +261,23 @@
   async function loadFiles() {
     const el = document.getElementById("fileTree");
     el.innerHTML = "";
+    openDirs.clear();
     try {
       const root = await window.gijo.listDir("");
-      document.getElementById("fileRootLabel").textContent = root.root + " (읽기 전용)";
+      document.getElementById("fileRootLabel").textContent = (root.rootName || root.root) + " (읽기 전용)";
       await renderDir("", 0, el);
     } catch (e) {
       el.innerHTML = '<div style="color:var(--muted-2)">파일을 불러오지 못했습니다 (데스크톱 앱에서만 동작)</div>';
+    }
+  }
+
+  async function pickFolder() {
+    try {
+      const r = await window.gijo.pickWorkFolder();
+      if (r.cancelled) return;
+      await loadFiles();
+    } catch (e) {
+      alert("폴더 선택 실패: " + e.message);
     }
   }
 
@@ -393,6 +404,7 @@
     document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
     document.getElementById("refreshAssetsBtn").addEventListener("click", loadAssets);
     document.getElementById("refreshFilesBtn").addEventListener("click", loadFiles);
+    document.getElementById("pickFolderBtn").addEventListener("click", pickFolder);
     document.getElementById("todoAddBtn").addEventListener("click", addTodo);
     todoInput.addEventListener("keydown", (e) => { if (e.key === "Enter") addTodo(); });
 

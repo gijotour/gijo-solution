@@ -2,7 +2,7 @@
 // [CS 구조 변경] engine/ 모듈을 더 이상 임포트하지 않는다(전부 서버로 이전됨).
 // main.ts는 창 관리와 페이지 네비게이션만 담당하는 얇은 셸이다.
 
-import { app, BrowserWindow, ipcMain } from "electron";
+import { app, BrowserWindow, ipcMain, dialog } from "electron";
 import * as path from "path";
 import { spawn, ChildProcess } from "child_process";
 import * as fs from "fs";
@@ -98,14 +98,14 @@ ipcMain.handle("navigate:to", async (_e, page: string) => {
   await mainWindow.loadFile(path.join(__dirname, `../src/renderer/pages/${page}`));
 });
 
-// 읽기 전용 파일 탐색기 — 대시보드에서 프로젝트 폴더 트리를 본다. 명령 실행은 없다.
-// 루트를 벗어나는 경로(.. 등)는 거부해 시스템 전체가 노출되지 않게 한다.
-// 기본 루트는 프로젝트 폴더(client/dist → client → 프로젝트 루트). 배포/다른 경로는 GIJO_EXPLORER_ROOT로.
-const EXPLORER_ROOT = path.resolve(process.env.GIJO_EXPLORER_ROOT ?? path.join(__dirname, "..", ".."));
+// 읽기 전용 파일 탐색기 — 대시보드에서 폴더 트리를 본다. 명령 실행은 없다.
+// 루트를 벗어나는 경로(.. 등)는 거부해 선택한 루트 밖이 노출되지 않게 한다.
+// 기본 루트는 프로젝트 폴더. 사용자가 "폴더 선택"으로 런타임에 바꿀 수 있다(fs:pickRoot).
+let explorerRoot = path.resolve(process.env.GIJO_EXPLORER_ROOT ?? path.join(__dirname, "..", ".."));
+
 ipcMain.handle("fs:list", async (_e, relPath: string) => {
-  const target = path.resolve(EXPLORER_ROOT, relPath || ".");
-  // 경로 이탈 방지: target이 EXPLORER_ROOT 하위가 아니면 거부
-  if (target !== EXPLORER_ROOT && !target.startsWith(EXPLORER_ROOT + path.sep)) {
+  const target = path.resolve(explorerRoot, relPath || ".");
+  if (target !== explorerRoot && !target.startsWith(explorerRoot + path.sep)) {
     throw new Error("루트 밖 경로는 접근할 수 없습니다");
   }
   const entries = await fs.promises.readdir(target, { withFileTypes: true });
@@ -113,7 +113,20 @@ ipcMain.handle("fs:list", async (_e, relPath: string) => {
     .filter((e) => !e.name.startsWith(".") && e.name !== "node_modules")
     .map((e) => ({ name: e.name, dir: e.isDirectory() }))
     .sort((a, b) => (a.dir === b.dir ? a.name.localeCompare(b.name) : a.dir ? -1 : 1));
-  return { root: path.basename(EXPLORER_ROOT), path: path.relative(EXPLORER_ROOT, target), items };
+  return { root: explorerRoot, rootName: path.basename(explorerRoot), path: path.relative(explorerRoot, target), items };
+});
+
+// 사용자가 작업 폴더를 직접 고른다(폴더 선택 다이얼로그). 선택하면 그 폴더가 새 루트가 된다.
+ipcMain.handle("fs:pickRoot", async () => {
+  if (!mainWindow) return { cancelled: true };
+  const result = await dialog.showOpenDialog(mainWindow, {
+    title: "작업 폴더 선택",
+    properties: ["openDirectory"],
+    defaultPath: explorerRoot,
+  });
+  if (result.canceled || result.filePaths.length === 0) return { cancelled: true };
+  explorerRoot = path.resolve(result.filePaths[0]);
+  return { cancelled: false, root: explorerRoot, rootName: path.basename(explorerRoot) };
 });
 
 app.whenReady().then(() => {
