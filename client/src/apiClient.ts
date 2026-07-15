@@ -359,4 +359,9 @@ export const assetsApi = {
   get: (id: string) => request<Asset>(`/api/assets/${id}`),
   register: (args: { id: string; name: string; path: string; assetType?: string; owner?: string; components?: AssetComponent[] }) =>
     request<Asset>("/api/assets", { method: "POST", body: args }),
+  import: (content: string, format: "json" | "csv", source: string) =>
+    request<{ imported: number; skipped: number; assets: Asset[] }>("/api/assets/import", {
+      method: "POST",
+      body: { content, format, source },
+    }),
 };

@@ -8,6 +8,7 @@ import { registerAuthRoutes } from "./auth/auth";
 import { registerUsersRoutes } from "./auth/users";
 import { registerAgentsRoutes } from "./engine/agents";
 import { registerAssetsRoutes } from "./engine/assets";
+import { registerAssetImportRoutes } from "./engine/assetimport";
 import { registerDispatcherRoutes } from "./engine/dispatcher";
 import { registerMemoryRoutes } from "./engine/memory";
 import { registerBridgeRoutes } from "./engine/bridge";
@@ -40,13 +41,15 @@ function corsOptions(): cors.CorsOptions | undefined {
 export function createApp(): Express {
   const app = express();
   app.use(cors(corsOptions()));
-  app.use(express.json());
+  // 자산 탐지 결과 파일 업로드(/api/assets/import)가 클 수 있어 기본 100kb 제한을 올린다.
+  app.use(express.json({ limit: "20mb" }));
   app.use(usageLoggingMiddleware);
 
   registerAuthRoutes(app);
   registerUsersRoutes(app);
   registerAgentsRoutes(app);
   registerAssetsRoutes(app);
+  registerAssetImportRoutes(app);
   registerDispatcherRoutes(app);
   registerMemoryRoutes(app);
   registerBridgeRoutes(app);

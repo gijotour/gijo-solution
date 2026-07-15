@@ -167,6 +167,8 @@
       </div>
       <div style="display:flex;gap:8px;">
         <button class="btn-ghost" id="csvExportBtn">CSV 내보내기</button>
+        <button class="btn-ghost" id="importAssetsBtn">탐지 결과 가져오기</button>
+        <input type="file" id="importFileInput" accept=".json,.csv" style="display:none">
         <button class="btn-primary" id="addAssetBtn">+ 자산 등록</button>
       </div>
     </div>
@@ -412,6 +414,22 @@
     }
   }
 
+  async function handleImportFile(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const format = file.name.toLowerCase().endsWith(".csv") ? "csv" : "json";
+      const source = file.name.replace(/\.(json|csv)$/i, "");
+      const r = await window.gijo.importAssets(text, format, source);
+      alert(`탐지 결과 가져오기 완료: ${r.imported}건 자산 등록${r.skipped ? ` (${r.skipped}건 중복 건너뜀)` : ""}.\n등록된 자산은 스캔·분석 대상에 포함됩니다.`);
+      await refresh();
+    } catch (err) {
+      alert("가져오기 실패: " + err.message);
+    }
+    e.target.value = "";
+  }
+
   async function init() {
     tick();
     setInterval(tick, 30000);
@@ -451,6 +469,8 @@
     document.getElementById("modalSaveBtn").addEventListener("click", saveAsset);
     modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
     document.getElementById("csvExportBtn").addEventListener("click", csvExport);
+    document.getElementById("importAssetsBtn").addEventListener("click", () => document.getElementById("importFileInput").click());
+    document.getElementById("importFileInput").addEventListener("change", handleImportFile);
   }
 
   if (!window.gijo.isAuthenticated()) {

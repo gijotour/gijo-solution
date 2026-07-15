@@ -48,6 +48,7 @@ const gijoApi = {
   getAsset: (id: string) => api.assetsApi.get(id),
   registerAsset: (args: { id: string; name: string; path: string; assetType?: string; owner?: string }) =>
     api.assetsApi.register(args),
+  importAssets: (content: string, format: "json" | "csv", source: string) => api.assetsApi.import(content, format, source),
   onAssetUpdated: (cb: (asset: unknown) => void) => onChannel("asset:updated", cb),
 
   // SBOM
