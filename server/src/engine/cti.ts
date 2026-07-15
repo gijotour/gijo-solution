@@ -15,6 +15,7 @@ export interface CtiFeedPublic {
   name: string;
   hasApiKey: boolean;
   connected: boolean;
+  planned?: boolean; // 지원 예정 벤더 — 키 설정 불가, UI에는 로드맵 안내용으로만 노출
 }
 
 export interface CtiFinding {
@@ -40,6 +41,19 @@ const SEED_FEEDS: { id: string; name: string }[] = [
   { id: "recordedfuture", name: "Recorded Future" },
 ];
 
+// 지원 예정 벤더 — DB에 시드하지 않고 코드에만 둔다. 실제 연동을 구현하는 날 SEED_FEEDS로
+// 옮기면 그때부터 키 설정이 열린다. threat.html의 가짜 데이터를 지운 것과 같은 원칙:
+// "지원할 계획"이라는 사실만 노출하고, 동작하는 척은 하지 않는다.
+// C-TAS는 키가 3종(expKey/colKey/orgCode)이라 연동 시 저장 형식 확장도 함께 필요하다.
+const PLANNED_FEEDS: { id: string; name: string }[] = [
+  { id: "kisa-ctas", name: "KISA C-TAS (공유형)" },
+  { id: "levelblue-otx", name: "LevelBlue OTX" },
+];
+
+export function isPlannedFeed(feedId: string): boolean {
+  return PLANNED_FEEDS.some((f) => f.id === feedId);
+}
+
 const seedStmt = db.prepare("INSERT OR IGNORE INTO cti_feeds (id, name, encryptedApiKey, connected) VALUES (?, ?, NULL, 0)");
 function seedFeeds(): void {
   for (const feed of SEED_FEEDS) seedStmt.run(feed.id, feed.name);
@@ -61,7 +75,15 @@ export function resetFeedsForTests(): void {
 }
 
 export function listFeeds(): CtiFeedPublic[] {
-  return (listStmt.all() as CtiFeedRow[]).map(toPublic);
+  const real = (listStmt.all() as CtiFeedRow[]).map(toPublic);
+  const planned = PLANNED_FEEDS.map((f) => ({
+    id: f.id,
+    name: f.name,
+    hasApiKey: false,
+    connected: false,
+    planned: true,
+  }));
+  return [...real, ...planned];
 }
 
 export function configureFeed(feedId: string, apiKey: string): CtiFeedPublic {
@@ -100,6 +122,10 @@ export async function listFindings(): Promise<CtiFinding[]> {
 export function registerCtiRoutes(app: Express): void {
   app.get("/api/cti/feeds", authMiddleware, (_req, res) => res.json(listFeeds()));
   app.post("/api/cti/feeds/:id/configure", authMiddleware, (req, res) => {
+    if (isPlannedFeed(String(req.params.id))) {
+      res.status(400).json({ error: "지원 예정 벤더입니다 — 아직 키를 설정할 수 없습니다" });
+      return;
+    }
     try {
       res.json(configureFeed(String(req.params.id), String(req.body.apiKey ?? "")));
     } catch (err) {

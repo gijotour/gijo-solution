@@ -52,6 +52,28 @@ describe("cti feed key management", () => {
     expect(res.body.connected).toBe(false);
   });
 
+  it("lists planned feeds (KISA C-TAS, LevelBlue OTX) flagged as planned, never connected", async () => {
+    const res = await request(app).get("/api/cti/feeds").set("Authorization", `Bearer ${token}`);
+    const planned = res.body.filter((f: { planned?: boolean }) => f.planned);
+    expect(planned.map((f: { id: string }) => f.id).sort()).toEqual(["kisa-ctas", "levelblue-otx"]);
+    for (const feed of planned) {
+      expect(feed.hasApiKey).toBe(false);
+      expect(feed.connected).toBe(false);
+    }
+    // 실동작 피드에는 planned 플래그가 붙지 않는다
+    const real = res.body.filter((f: { planned?: boolean }) => !f.planned);
+    expect(real.length).toBeGreaterThan(0);
+  });
+
+  it("rejects configuring a planned feed with 400", async () => {
+    const res = await request(app)
+      .post("/api/cti/feeds/kisa-ctas/configure")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ apiKey: "should-not-be-accepted" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("지원 예정");
+  });
+
   it("returns 404 for an unknown feed id", async () => {
     const res = await request(app)
       .post("/api/cti/feeds/nonexistent/configure")

@@ -296,8 +296,15 @@ tr:last-child td{border-bottom:none;}
   function renderFeeds() {
     connectedCountEl.textContent = feeds.filter((f) => f.connected).length;
     feedListEl.innerHTML = feeds
-      .map(
-        (f) => `
+      .map((f) => {
+        if (f.planned) {
+          return `
+      <div class="feed-row">
+        <div><div class="asset-name">${f.name}</div><div class="asset-sub">향후 연동 계획</div></div>
+        <div class="feed-actions"><span class="badge b-purple">지원 예정</span></div>
+      </div>`;
+        }
+        return `
       <div class="feed-row">
         <div><div class="asset-name">${f.name}</div><div class="asset-sub">${f.hasApiKey ? "API 키 등록됨" : "API 키 미등록"}</div></div>
         <div class="feed-actions">
@@ -308,14 +315,17 @@ tr:last-child td{border-bottom:none;}
               : `<button class="link-btn" data-configure="${f.id}">키 설정</button>`
           }
         </div>
-      </div>`
-      )
+      </div>`;
+      })
       .join("");
   }
 
   async function loadFeeds() {
     feeds = await window.gijo.listCtiFeeds();
-    feedSelect.innerHTML = feeds.map((f) => `<option value="${f.id}">${f.name}</option>`).join("");
+    feedSelect.innerHTML = feeds
+      .filter((f) => !f.planned)
+      .map((f) => `<option value="${f.id}">${f.name}</option>`)
+      .join("");
     renderFeeds();
   }
 
