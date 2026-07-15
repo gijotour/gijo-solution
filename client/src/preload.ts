@@ -2,7 +2,7 @@
 // contextIsolation 환경에서 렌더러가 접근 가능한 안전한 API 표면을 정의한다.
 // [CS 구조 변경] 기존에는 ipcRenderer.invoke()가 메인 프로세스의 로컬 엔진을 직접 호출했으나,
 // 지금은 apiClient.ts를 통해 원격 GIJO AS 서버(REST)를 호출한다.
-// 실시간 이벤트(collaboration:event, finetune:progress, asset:updated, log:event)는 WebSocket(wsClient.ts)으로 수신한다.
+// 실시간 이벤트(collaboration:event, finetune:progress, asset:updated, log:event, hf-download:progress)는 WebSocket(wsClient.ts)으로 수신한다.
 
 import { contextBridge, ipcRenderer } from "electron";
 import * as api from "./apiClient";
@@ -87,9 +87,12 @@ const gijoApi = {
   listDatasets: () => api.datasetApi.list(),
   extractDocument: (filename: string, content: string) => api.datasetApi.extract(filename, content),
 
-  // HuggingFace 모델 검색
+  // HuggingFace 모델 검색 · 다운로드(백그라운드 큐 — load()는 잡을 반환하고 즉시 끝난다)
   searchHfModels: (query: string) => api.hfModelsApi.search(query),
   loadHfModel: (modelId: string) => api.hfModelsApi.load(modelId),
+  listHfDownloadJobs: () => api.hfModelsApi.jobs(),
+  getHfDownloadJob: (id: string) => api.hfModelsApi.job(id),
+  onHfDownloadProgress: (cb: (job: unknown) => void) => onChannel("hf-download:progress", cb),
 
   // CTI(딥웹/다크웹 피드)
   listCtiFeeds: () => api.ctiApi.feeds(),

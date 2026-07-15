@@ -238,9 +238,24 @@ export const datasetApi = {
 };
 
 // ── HuggingFace 모델 ──────────────────────────────────────────────────
+// 다운로드는 서버가 백그라운드 큐로 처리한다 — load()는 잡을 큐에 넣고 즉시 반환하며,
+// 실제 진행률은 hf-download:progress WebSocket 채널(또는 jobs() 폴링)로 따라간다.
+export interface HfDownloadJob {
+  id: string;
+  modelId: string;
+  file?: string;
+  status: "queued" | "downloading" | "done" | "error";
+  progress: number;
+  error?: string;
+  localPath?: string;
+  createdAt: number;
+  updatedAt: number;
+}
 export const hfModelsApi = {
   search: (query: string) => request(`/api/hfmodels/search?q=${encodeURIComponent(query)}`),
-  load: (modelId: string) => request("/api/hfmodels/load", { method: "POST", body: { modelId } }),
+  load: (modelId: string) => request<HfDownloadJob>("/api/hfmodels/load", { method: "POST", body: { modelId } }),
+  jobs: () => request<HfDownloadJob[]>("/api/hfmodels/jobs"),
+  job: (id: string) => request<HfDownloadJob>(`/api/hfmodels/jobs/${encodeURIComponent(id)}`),
 };
 
 // ── Git 동기화 ────────────────────────────────────────────────────────

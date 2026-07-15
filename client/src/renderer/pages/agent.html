@@ -246,6 +246,7 @@ tr:last-child td{border-bottom:none;}
       <div class="panel-sub">보안 특화 오픈소스 모델을 검색해 로컬로 내려받습니다. 뭘 받아야 할지 모르겠다면 <b style="color:var(--blue-light);cursor:pointer" id="llmGuideLink">❓ 도움(추천 LLM 가이드)</b>에서 용도별 추천 모델을 확인하세요.</div>
       <div class="model-search"><input id="hfSearchInput" placeholder="예: cybersecurity, WhiteRabbitNeo, Foundation-Sec"><button id="hfSearchBtn">검색</button></div>
       <div id="hfResults" style="font-size:12px;color:var(--muted-2)">검색어를 입력하고 검색 버튼을 눌러주세요.</div>
+      <div id="hfJobs" style="font-size:12px;margin-top:8px"></div>
     </div>
   </div>
 </div>
@@ -542,6 +543,31 @@ tr:last-child td{border-bottom:none;}
     }
   }
 
+  // HF 다운로드는 서버 백그라운드 큐에서 처리된다 — 이 목록은 현재 세션에서 본 잡들을 보여줄 뿐,
+  // 페이지를 벗어나거나 재검색으로 hfResults가 갈아치워져도 다운로드 자체는 서버에서 계속된다.
+  const hfJobs = new Map();
+  function renderHfJobs() {
+    const el = document.getElementById("hfJobs");
+    const items = Array.from(hfJobs.values()).sort((a, b) => b.createdAt - a.createdAt).slice(0, 5);
+    if (!items.length) { el.innerHTML = ""; return; }
+    el.innerHTML = items
+      .map((j) => {
+        const label =
+          j.status === "queued" ? "대기 중…" :
+          j.status === "downloading" ? `받는 중… ${j.progress || 0}%` :
+          j.status === "done" ? "✓ 완료 — 모델 드롭다운에서 선택 가능" :
+          "✗ 실패: " + (j.error || "");
+        const color = j.status === "error" ? "#f5928a" : j.status === "done" ? "var(--teal)" : "var(--muted-2)";
+        return `<div style="color:${color};padding:2px 0">${j.modelId} — ${label}</div>`;
+      })
+      .join("");
+  }
+  function onHfJobUpdate(job) {
+    hfJobs.set(job.id, job);
+    renderHfJobs();
+    if (job.status === "done") loadEngineStatus();
+  }
+
   async function searchHf() {
     const q = document.getElementById("hfSearchInput").value.trim();
     const resultsEl = document.getElementById("hfResults");
@@ -572,6 +598,11 @@ tr:last-child td{border-bottom:none;}
     if (window.gijoRealtime) window.gijoRealtime.connect();
     window.gijo.onCollaborationEvent(appendLiveEvent);
     window.gijo.onLlmActivity(appendLlmEvent);
+    window.gijo.onHfDownloadProgress(onHfJobUpdate);
+    window.gijo
+      .listHfDownloadJobs()
+      .then((jobs) => jobs.filter((j) => j.status === "queued" || j.status === "downloading").forEach(onHfJobUpdate))
+      .catch(() => {});
 
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll(".nav-item[data-page]").forEach((el) => {
@@ -589,13 +620,12 @@ tr:last-child td{border-bottom:none;}
       const modelId = e.target.dataset.load;
       if (!modelId) return;
       const btn = e.target;
-      btn.textContent = "다운로드 중...";
+      btn.textContent = "대기열에 추가...";
       btn.disabled = true;
       try {
-        const r = await window.gijo.loadHfModel(modelId);
-        btn.textContent = "완료";
-        await loadEngineStatus();
-        alert(`다운로드 완료: ${(r && r.file) || modelId}\n에이전트 카드의 모델 드롭다운에서 선택할 수 있습니다.`);
+        const job = await window.gijo.loadHfModel(modelId);
+        onHfJobUpdate(job);
+        btn.textContent = "대기열에 추가됨 ↓";
       } catch (err) {
         btn.textContent = "실패";
         btn.disabled = false;

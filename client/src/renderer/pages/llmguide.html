@@ -191,6 +191,42 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     }
   }
 
+  // 다운로드는 서버 백그라운드 큐에서 진행된다 — 잡 상태를 modelId로 카드에 매핑해서 반영한다.
+  // 이 페이지를 벗어났다가 돌아와도(resumeActiveJobs) 진행 중인 다운로드를 이어서 보여준다.
+  function applyJobToCard(job) {
+    const card = document.querySelector(`.model-card[data-dir="${dirNameOf(job.modelId)}"]`);
+    if (!card) return;
+    const btn = card.querySelector(".mc-dl");
+    const status = card.querySelector(".mc-status");
+    if (!status) return;
+    if (job.status === "queued") {
+      if (btn) { btn.disabled = true; btn.textContent = "대기 중..."; }
+      status.className = "mc-status";
+      status.textContent = "대기열에 추가됨…";
+    } else if (job.status === "downloading") {
+      if (btn) { btn.disabled = true; btn.textContent = "다운로드 중..."; }
+      status.className = "mc-status";
+      status.textContent = job.progress > 0
+        ? `받는 중… ${job.progress}% (다른 화면으로 이동해도 계속됩니다)`
+        : "받는 중… 큰 모델은 수 분 걸립니다.";
+    } else if (job.status === "done") {
+      if (btn) { btn.textContent = "완료"; btn.disabled = true; }
+      status.className = "mc-status ok";
+      status.textContent = `✓ 설치됨: ${job.file || job.modelId}`;
+    } else if (job.status === "error") {
+      if (btn) { btn.disabled = false; btn.textContent = "다시 시도"; }
+      status.className = "mc-status err";
+      status.textContent = "✗ " + (job.error || "다운로드 실패");
+    }
+  }
+
+  async function resumeActiveJobs() {
+    try {
+      const jobs = await window.gijo.listHfDownloadJobs();
+      jobs.filter((j) => j.status === "queued" || j.status === "downloading").forEach(applyJobToCard);
+    } catch (e) {}
+  }
+
   async function onDownloadClick(e) {
     const btn = e.target.closest(".mc-dl");
     if (!btn) return;
@@ -198,14 +234,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const card = btn.closest(".model-card");
     const status = card.querySelector(".mc-status");
     btn.disabled = true;
-    btn.textContent = "다운로드 중...";
+    btn.textContent = "대기열에 추가...";
     status.className = "mc-status";
-    status.textContent = "받는 중… 큰 모델은 수 분 걸립니다 (로그 메뉴에서 진행 확인).";
+    status.textContent = "대기열에 추가하는 중...";
     try {
-      const r = await window.gijo.loadHfModel(id);
-      btn.textContent = "완료";
-      status.className = "mc-status ok";
-      status.textContent = `✓ 설치됨: ${(r && r.file) || id}`;
+      const job = await window.gijo.loadHfModel(id);
+      applyJobToCard(job);
     } catch (err) {
       btn.disabled = false;
       btn.textContent = "다시 시도";
@@ -222,7 +256,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     setInterval(tick, 30000);
     loadUser();
     loadHealth();
-    loadGuide();
+    loadGuide().then(resumeActiveJobs);
+    if (window.gijoRealtime) window.gijoRealtime.connect();
+    window.gijo.onHfDownloadProgress(applyJobToCard);
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll(".nav-item[data-page]").forEach((el) => {
       el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));

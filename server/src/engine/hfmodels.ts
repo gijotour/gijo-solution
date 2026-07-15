@@ -4,8 +4,14 @@
 // `hf`를 우선 사용하고, 없으면(구버전) `huggingface-cli`로 폴백한다.
 // GGUF 저장소는 여러 양자화본이 들어 있으므로 저장소 전체가 아니라 단일 파일(Q4_K_M 우선) 하나만
 // 받고, 로컬 LLM 로더가 인식하는 이름(models/<id>/<id>.gguf)으로 배치한다.
+//
+// 다운로드는 비동기 큐로 처리한다(finetune.ts와 같은 패턴): POST /load는 큐에 넣고 즉시
+// 잡을 반환하며, 실제 전송은 백그라운드에서 진행되고 진행률은 WebSocket(hf-download:progress)으로
+// 브로드캐스트한다. HTTP 요청 하나에 다운로드 전체를 묶어두지 않으므로 클라이언트가 페이지를
+// 이동하거나 다른 작업을 해도 다운로드는 계속된다. 동시 대역폭 경쟁을 피하려고 한 번에 하나씩만 받는다.
 
 import type { Express } from "express";
+import type { WebSocketServer } from "ws";
 import { spawn, spawnSync } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
@@ -88,7 +94,12 @@ function hfDownloadError(code: number | null, stderr: string): string {
   return `다운로드 실패 (code ${code}). ${tail}`;
 }
 
-export async function loadHfModel(modelId: string): Promise<{ localPath: string; file: string }> {
+// tqdm 진행률 바 형식(예: "model.Q4_K_M.gguf: 34%|███▍ | 512M/1.50G [00:20<00:38, 25.1MB/s]")에서
+// 퍼센트만 뽑는다. \r로 같은 줄을 반복 갱신하므로 청크 하나에 여러 갱신이 들어있을 수 있어
+// 마지막 값을 쓴다.
+const PROGRESS_RE = /(\d{1,3})%\|/g;
+
+async function runHfDownload(modelId: string, onProgress: (pct: number) => void): Promise<{ localPath: string; file: string }> {
   const dirName = modelId.replace(/\//g, "__");
   const localDir = path.join("models", dirName);
 
@@ -108,7 +119,13 @@ export async function loadHfModel(modelId: string): Promise<{ localPath: string;
     const proc = spawn(cli, ["download", modelId, chosen, "--local-dir", localDir]);
     attachProcessLogging(proc, "hf-download");
     proc.stderr?.on("data", (d) => {
-      stderr += String(d);
+      const text = String(d);
+      stderr += text;
+      let lastPct: number | null = null;
+      let match: RegExpExecArray | null;
+      PROGRESS_RE.lastIndex = 0;
+      while ((match = PROGRESS_RE.exec(text))) lastPct = Number(match[1]);
+      if (lastPct !== null) onProgress(Math.min(99, lastPct)); // 100%는 배치까지 끝나야 확정
     });
     proc.on("exit", (code) => (code === 0 ? resolve() : reject(new Error(hfDownloadError(code, stderr)))));
     proc.on("error", (err) =>
@@ -136,6 +153,86 @@ export async function loadHfModel(modelId: string): Promise<{ localPath: string;
   return { localPath: target, file: chosen };
 }
 
+// ── 다운로드 큐 ───────────────────────────────────────────────────────
+// finetune.ts와 같은 패턴: 백그라운드에서 실행하고 WebSocket으로 진행률을 밀어준다.
+// 다만 다운로드는 여러 개를 요청받을 수 있으므로(검색 결과에서 연달아 클릭 등) 잡 큐를 둔다.
+
+export type HfDownloadStatus = "queued" | "downloading" | "done" | "error";
+
+export interface HfDownloadJob {
+  id: string;
+  modelId: string;
+  file?: string;
+  status: HfDownloadStatus;
+  progress: number;
+  error?: string;
+  localPath?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+let wss: WebSocketServer | null = null;
+export function attachHfModelsSocket(server: WebSocketServer): void {
+  wss = server;
+}
+
+function broadcastJob(job: HfDownloadJob): void {
+  wss?.clients.forEach((client) => {
+    if (client.readyState === 1 /* OPEN */) {
+      client.send(JSON.stringify({ channel: "hf-download:progress", payload: job }));
+    }
+  });
+}
+
+const jobs = new Map<string, HfDownloadJob>();
+const queue: string[] = [];
+let processingQueue = false;
+
+function updateJob(job: HfDownloadJob, patch: Partial<HfDownloadJob>): void {
+  Object.assign(job, patch, { updatedAt: Date.now() });
+  broadcastJob(job);
+}
+
+export function enqueueHfDownload(modelId: string): HfDownloadJob {
+  const id = `hf-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const job: HfDownloadJob = { id, modelId, status: "queued", progress: 0, createdAt: Date.now(), updatedAt: Date.now() };
+  jobs.set(id, job);
+  queue.push(id);
+  broadcastJob(job);
+  void processQueue();
+  return job;
+}
+
+export function getHfDownloadJob(id: string): HfDownloadJob | undefined {
+  return jobs.get(id);
+}
+
+export function listHfDownloadJobs(): HfDownloadJob[] {
+  return Array.from(jobs.values()).sort((a, b) => b.createdAt - a.createdAt);
+}
+
+// 대역폭 경쟁을 피하려고 한 번에 하나씩만 받는다 — GPU 1대를 독점하는 finetune과 같은 이유.
+async function processQueue(): Promise<void> {
+  if (processingQueue) return;
+  processingQueue = true;
+  try {
+    let nextId: string | undefined;
+    while ((nextId = queue.shift()) !== undefined) {
+      const job = jobs.get(nextId);
+      if (!job) continue;
+      updateJob(job, { status: "downloading" });
+      try {
+        const result = await runHfDownload(job.modelId, (progress) => updateJob(job, { progress }));
+        updateJob(job, { status: "done", progress: 100, file: result.file, localPath: result.localPath });
+      } catch (err) {
+        updateJob(job, { status: "error", error: err instanceof Error ? err.message : String(err) });
+      }
+    }
+  } finally {
+    processingQueue = false;
+  }
+}
+
 // localDir(하위 포함)에서 첫 .gguf 파일 경로를 찾는다.
 function findGgufIn(dir: string): string | null {
   if (!fs.existsSync(dir)) return null;
@@ -159,15 +256,25 @@ export function registerHfModelsRoutes(app: Express): void {
       res.json(await searchHfModels(String(req.query.q ?? "")));
     })
   );
-  app.post(
-    "/api/hfmodels/load",
-    authMiddleware,
-    asyncRoute(async (req, res) => {
-      try {
-        res.json(await loadHfModel(req.body.modelId));
-      } catch (err) {
-        res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
-      }
-    })
-  );
+  // 큐에 넣고 즉시 잡을 반환한다 — 실제 다운로드는 백그라운드에서 진행되며 진행률은
+  // hf-download:progress WebSocket 채널로 밀어준다. 진행 중 페이지를 이동해도 계속된다.
+  app.post("/api/hfmodels/load", authMiddleware, (req, res) => {
+    const modelId = String(req.body?.modelId ?? "").trim();
+    if (!modelId) {
+      res.status(400).json({ error: "modelId가 필요합니다" });
+      return;
+    }
+    res.status(202).json(enqueueHfDownload(modelId));
+  });
+  app.get("/api/hfmodels/jobs", authMiddleware, (_req, res) => {
+    res.json(listHfDownloadJobs());
+  });
+  app.get("/api/hfmodels/jobs/:id", authMiddleware, (req, res) => {
+    const job = getHfDownloadJob(req.params.id);
+    if (!job) {
+      res.status(404).json({ error: "해당 다운로드 작업을 찾을 수 없습니다" });
+      return;
+    }
+    res.json(job);
+  });
 }

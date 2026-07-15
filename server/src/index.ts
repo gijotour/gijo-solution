@@ -12,6 +12,7 @@ import { attachFinetuneSocket } from "./engine/finetune";
 import { attachAssetsSocket } from "./engine/assets";
 import { attachLogsSocket, installConsoleCapture } from "./engine/logs";
 import { attachLlmActivitySocket } from "./engine/llmactivity";
+import { attachHfModelsSocket } from "./engine/hfmodels";
 import { stopLocalEngine, stopEmbeddingEngine, autoStartLocalEngines } from "./engine/localengine";
 
 // 가능한 한 이른 시점에 설치해야 이후의 console.log/warn/error가 전부 캡처된다.
@@ -22,13 +23,14 @@ const PORT = Number(process.env.GIJO_SERVER_PORT ?? 4000);
 const app = createApp();
 const httpServer = createServer(app);
 
-// 실시간 채널: collaboration:event, finetune:progress, asset:updated, log:event 등을 모든 접속 클라이언트에 브로드캐스트
+// 실시간 채널: collaboration:event, finetune:progress, asset:updated, log:event, hf-download:progress 등을 모든 접속 클라이언트에 브로드캐스트
 const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
 attachCollaborationSocket(wss);
 attachFinetuneSocket(wss);
 attachAssetsSocket(wss);
 attachLogsSocket(wss);
 attachLlmActivitySocket(wss);
+attachHfModelsSocket(wss);
 
 httpServer.listen(PORT, () => {
   console.log(`GIJO AS 서버 기동 — http://localhost:${PORT} (WebSocket: /ws)`);
