@@ -46,4 +46,20 @@ console.log("[build-server-dist] 4/4 네이티브 모듈을 Electron ABI로 재�
 const electronVersion = require("electron/package.json").version;
 await rebuild({ buildPath: outDir, electronVersion, onlyModules: ["better-sqlite3"], force: true });
 
+console.log("[build-server-dist] 5/5 불필요한 파일 정리 (용량 최적화)...");
+const prunePaths = [
+  path.join(outDir, "node_modules", "onnxruntime-web"),
+  path.join(outDir, "node_modules", "onnxruntime-node", "bin", "napi-v3", "darwin"),
+  path.join(outDir, "node_modules", "onnxruntime-node", "bin", "napi-v3", "linux"),
+  path.join(outDir, "node_modules", "onnxruntime-node", "bin", "napi-v3", "win32", "arm64")
+];
+
+for (const prunePath of prunePaths) {
+  if (fs.existsSync(prunePath)) {
+    console.log(`[build-server-dist] 삭제 중: ${prunePath}`);
+    fs.rmSync(prunePath, { recursive: true, force: true });
+  }
+}
+
 console.log(`[build-server-dist] 완료: ${outDir}`);
+

@@ -26,6 +26,9 @@
   "build": {
     "appId": "ai.gijo.as",
     "productName": "GIJO AS",
+    "directories": {
+      "output": "release"
+    },
     "files": [
       "dist/**/*",
       "src/renderer/**/*"
