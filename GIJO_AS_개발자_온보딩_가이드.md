@@ -370,7 +370,10 @@ electron-builder가 winCodeSign 캐시를 압축해제하며 darwin용 dylib 심
   ```
   이후 재빌드하면 electron-builder가 캐시를 그대로 쓴다. 이 방법으로 검증 완료.
 
-잔여 폴리시 항목: 앱 아이콘 미설정(기본 Electron 아이콘 사용 중), 코드 서명 없음(고객 PC
+앱 아이콘은 `client/build/icon.png`(GIJO 로고 심볼, electron-builder가 ico 자동 변환) 적용
+완료. 설치 스모크 테스트 통과 (2026-07-15): 사일런트 설치(`/S`) →
+`%LOCALAPPDATA%\Programs\gijo-as-client\` 설치 확인 → 앱 기동 → 번들 서버 health/로그인 →
+계정 관리·CTI 피드 등 최신 라우트 포함 확인. 잔여 폴리시 항목: 코드 서명 없음(고객 PC
 SmartScreen 경고 예상 — 인증서 구매는 별도 결정).
 
 ### 분산 온프레미스 모드 (기업)

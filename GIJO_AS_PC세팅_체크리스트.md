@@ -122,13 +122,13 @@ cmake --build build --config Release -j
 
 ## STEP 6 — 모델 다운로드 및 배치
 
-GIJO AS 서버가 찾는 경로는 `server\models\<modelId>\<modelId>.gguf` 고정 패턴입니다. `modelId`는 앞으로 **`qwen2.5-coder-32b-instruct`**로 고정해서 씁니다(에이전트 AI 화면에서 모델을 켤 때도 이 이름을 그대로 사용).
+GIJO AS 서버가 찾는 경로는 `server\models\<modelId>\<modelId>.gguf` 고정 패턴입니다. 최종 모델은 **`segolilylabs/Lily-Cybersecurity-7B-v0.2`**로 확정됐고(다음단계 가이드 3.3, 2026-07-15), `modelId`는 **`lily-cybersecurity-7b-v0.2`**로 고정해서 씁니다(에이전트 AI 화면에서 모델을 켤 때도 이 이름을 그대로 사용).
 
 ```powershell
 cd C:\GIJO-AS\server
 pip install -U huggingface_hub --break-system-packages
-New-Item -ItemType Directory -Path .\models\qwen2.5-coder-32b-instruct -Force
-huggingface-cli download bartowski/Qwen2.5-Coder-32B-Instruct-GGUF --include "*Q4_K_M*" --local-dir .\models\qwen2.5-coder-32b-instruct
+New-Item -ItemType Directory -Path .\models\lily-cybersecurity-7b-v0.2 -Force
+huggingface-cli download segolilylabs/Lily-Cybersecurity-7B-v0.2-GGUF Lily-7B-Instruct-v0.2.Q5_K_M.gguf --local-dir .\models\lily-cybersecurity-7b-v0.2
 ```
 
 > **`huggingface-cli`는 이 단계의 수동 다운로드용이면서 동시에 GIJO AS 서버의 런타임 의존성입니다.**
@@ -141,17 +141,17 @@ huggingface-cli download bartowski/Qwen2.5-Coder-32B-Instruct-GGUF --include "*Q
 > 새 PowerShell 창에서도 인식되는지 확인하세요. pip가 Scripts 경로를 PATH에 안 넣어줬다면
 > `python -m pip show huggingface_hub`로 위치를 찾아 해당 `Scripts` 폴더를 PATH에 추가합니다.
 
-다운로드된 파일명이 `Qwen2.5-Coder-32B-Instruct-Q4_K_M.gguf` 형태이므로, GIJO AS가 찾는 이름으로 **정확히** 바꿔줍니다:
+다운로드된 파일명을 GIJO AS가 찾는 이름으로 **정확히** 바꿔줍니다:
 
 ```powershell
-Rename-Item .\models\qwen2.5-coder-32b-instruct\Qwen2.5-Coder-32B-Instruct-Q4_K_M.gguf qwen2.5-coder-32b-instruct.gguf
+Rename-Item .\models\lily-cybersecurity-7b-v0.2\Lily-7B-Instruct-v0.2.Q5_K_M.gguf lily-cybersecurity-7b-v0.2.gguf
 ```
 
 **확인**:
 ```powershell
-dir .\models\qwen2.5-coder-32b-instruct\
+dir .\models\lily-cybersecurity-7b-v0.2\
 ```
-`qwen2.5-coder-32b-instruct.gguf` 파일이 존재하고 용량이 약 19.8GB인지 확인.
+`lily-cybersecurity-7b-v0.2.gguf` 파일이 존재하고 용량이 약 5GB인지 확인. (7B Q5_K_M — 24GB VRAM 대비 여유가 크므로 `--ctx-size` 상향 여지가 큽니다. 영어 중심 모델이라 **한국어 응답 품질은 STEP 10에서 반드시 확인**하세요.)
 
 ---
 
@@ -159,7 +159,7 @@ dir .\models\qwen2.5-coder-32b-instruct\
 
 ```powershell
 cd C:\GIJO-AS\server\llama.cpp
-.\build\bin\Release\llama-server.exe -m ..\models\qwen2.5-coder-32b-instruct\qwen2.5-coder-32b-instruct.gguf -ngl -1 --ctx-size 32768 --host 0.0.0.0 --port 8080
+.\build\bin\Release\llama-server.exe -m ..\models\lily-cybersecurity-7b-v0.2\lily-cybersecurity-7b-v0.2.gguf -ngl -1 --ctx-size 32768 --host 0.0.0.0 --port 8080
 ```
 
 새 터미널에서:
@@ -223,7 +223,8 @@ npm start
 
 - [ ] 로그인 성공, 대시보드 진입
 - [ ] 대시보드에 에이전트 목록 표시 (`GET /api/agents` 정상 응답 확인용)
-- [ ] 에이전트 AI 화면에서 로컬 엔진 시작(`modelId: qwen2.5-coder-32b-instruct`) → 새 터미널에서 `nvidia-smi` 실행 시 VRAM 사용량이 올라가는지 확인 (llama-server 프로세스가 실제로 GIJO AS 서버에 의해 기동됐는지 검증)
+- [ ] 에이전트 AI 화면에서 로컬 엔진 시작(`modelId: lily-cybersecurity-7b-v0.2`) → 새 터미널에서 `nvidia-smi` 실행 시 VRAM 사용량이 올라가는지 확인 (llama-server 프로세스가 실제로 GIJO AS 서버에 의해 기동됐는지 검증)
+- [ ] 채팅바에 **한국어** 지시문을 넣어 응답 품질 확인 (Lily는 영어 중심 모델 — 한국어 응답이 부적절하면 다음단계 가이드 3.3의 결정을 재검토할 근거가 된다)
 - [ ] 채팅바에 아무 지시문 입력 → 화면에 협업 로그(할당/완료)가 실시간으로 찍히는지 확인 (WebSocket 정상 동작 검증)
 - [ ] `nvidia-smi` 기준 VRAM 사용량이 24GB 이내인지 확인 (여유 있으면 `--ctx-size` 상향 여지 있음 — STEP 7 방식으로 재검증)
 
@@ -240,7 +241,7 @@ npm start
 | 로그인 401 unauthorized | 잘못된 ID/PW 입력 또는 만료된 JWT 토큰 | 계정 정보 재확인 및 다시 로그인 (최초 계정은 `jyh`/`changeme`) |
 | RAG/문서 검색에서 임베딩 에러 | 8081 임베딩 llama-server 미기동 | STEP 8 하단의 `--embedding` 서버를 별도로 띄웠는지 확인 |
 | 모델 스캔이 `scan_error`로 끝남 | Python 또는 modelscan 미설치 | STEP 4의 `pip install -r requirements.txt` 재확인 |
-| 로컬 엔진 시작 요청이 실패/무응답 | 모델 파일 경로·이름 불일치 또는 llama-server 실행 파일 미존재 | STEP 6 경로(`server\models\qwen2.5-coder-32b-instruct\qwen2.5-coder-32b-instruct.gguf`)와 STEP 5 빌드 산출물(`llama-server.exe`) 존재 확인 |
+| 로컬 엔진 시작 요청이 실패/무응답 | 모델 파일 경로·이름 불일치 또는 llama-server 실행 파일 미존재 | STEP 6 경로(`server\models\lily-cybersecurity-7b-v0.2\lily-cybersecurity-7b-v0.2.gguf`)와 STEP 5 빌드 산출물(`llama-server.exe`) 존재 확인 |
 | 앱에서 HF 모델 검색은 되는데 다운로드만 실패 | 서버 실행 계정 PATH에 `huggingface-cli` 없음 | STEP 6의 `huggingface-cli --version` 확인 절차 수행 (pip Scripts 경로를 PATH에 추가) |
 | VRAM 부족 경고 | 컨텍스트 크기 과다 설정 | STEP 7/10에서 `--ctx-size`를 32768보다 낮춰 재시도 |
 
