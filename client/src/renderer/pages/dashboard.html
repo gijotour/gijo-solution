@@ -60,11 +60,13 @@
   .p1{background:rgba(240,160,32,0.18);color:#f7c777;}
   .today-cta{margin-top:auto;background:var(--teal);color:#06281c;border:none;border-radius:8px;padding:13px;font-size:13px;font-weight:800;cursor:pointer;}
 
-  .chatbar{display:flex;flex-direction:column;gap:6px;padding:14px 20px;border-top:1px solid var(--border);}
-  .chatbar input{width:100%;background:var(--panel);border:1px solid var(--border-strong);border-radius:10px;padding:14px 16px;color:var(--text);font-size:13px;outline:none;}
-  .chatbar-hint{font-size:11px;color:var(--muted-2);}
+  /* 에이전트 지시창 — 중앙 열(오케스트레이터) 아래에 놓아 양쪽 사이드바에 걸치지 않게 폭을 제한한다. */
+  .agent-chat{width:100%;max-width:460px;margin-top:22px;display:flex;flex-direction:column;gap:6px;}
+  .agent-chat input{width:100%;background:var(--panel);border:1px solid var(--border-strong);border-radius:10px;padding:13px 16px;color:var(--text);font-size:13px;outline:none;}
+  .agent-chat input:focus{border-color:var(--blue);}
+  .agent-chat-hint{font-size:11px;color:var(--muted-2);text-align:center;}
 
-  .docsearch{padding:14px 20px;border-top:1px solid var(--border);}
+  .docsearch{padding:14px 20px;border-bottom:1px solid var(--border);background:var(--panel-2);}
   .docsearch-head{display:flex;align-items:baseline;gap:10px;margin-bottom:8px;flex-wrap:wrap;}
   .docsearch-title{font-size:13px;font-weight:800;color:#fff;}
   .docsearch-sub{font-size:11px;color:var(--muted-2);}
@@ -102,6 +104,19 @@
       <div class="avatar-btn" id="avatarBtn">-</div>
       <div class="icon-btn" id="settingsBtn">⚙</div>
     </div>
+  </div>
+
+  <div class="docsearch">
+    <div class="docsearch-head">
+      <span class="docsearch-title">🔍 올린 문서 검색</span>
+      <span class="docsearch-sub">장기 기억(RAG)에 올린 사내 문서에서 관련 내용을 찾아봅니다 — 채팅에 자동 주입되는 것과 같은 검색. 에이전트를 고르면 그 에이전트가 보는 범위로 검색합니다.</span>
+    </div>
+    <div class="docsearch-row">
+      <input id="docQueryInput" placeholder="예: 랜섬웨어 감염 시 초동 조치는?">
+      <select id="docQueryScope"><option value="">전체 공유만</option></select>
+      <button id="docQueryBtn">검색</button>
+    </div>
+    <div id="docQueryResults" class="docsearch-results" style="display:none"></div>
   </div>
 
   <div class="body-grid">
@@ -154,6 +169,10 @@
           <div class="agent-bubble-text" id="agentBubbleText">불러오는 중...</div>
         </div>
       </div>
+      <div class="agent-chat">
+        <input id="chatInput" placeholder="오케스트레이터에게 지시하세요… 예: fraud-detect-llm 전체 재스캔하고 리포트까지 작성해줘">
+        <div class="agent-chat-hint" id="chatHint">Enter 전송 · Shift+Enter 줄바꿈</div>
+      </div>
     </div>
 
     <div class="today-panel">
@@ -171,23 +190,6 @@
     </div>
   </div>
 
-  <div class="docsearch">
-    <div class="docsearch-head">
-      <span class="docsearch-title">🔍 올린 문서 검색</span>
-      <span class="docsearch-sub">장기 기억(RAG)에 올린 사내 문서에서 관련 내용을 찾아봅니다 — 채팅에 자동 주입되는 것과 같은 검색. 에이전트를 고르면 그 에이전트가 보는 범위로 검색합니다.</span>
-    </div>
-    <div class="docsearch-row">
-      <input id="docQueryInput" placeholder="예: 랜섬웨어 감염 시 초동 조치는?">
-      <select id="docQueryScope"><option value="">전체 공유만</option></select>
-      <button id="docQueryBtn">검색</button>
-    </div>
-    <div id="docQueryResults" class="docsearch-results" style="display:none"></div>
-  </div>
-
-  <div class="chatbar">
-    <input id="chatInput" placeholder="에이전트에게 무엇이든 지시하세요… 예: fraud-detect-llm 전체 재스캔하고 리포트까지 작성해줘">
-    <div class="chatbar-hint" id="chatHint">Enter 전송 · Shift+Enter 줄바꿈 · ⌘ 끌어다 놓기</div>
-  </div>
 </div>
 
 <script>
