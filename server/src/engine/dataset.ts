@@ -45,31 +45,94 @@ export interface ConversationExample {
   answer: string;
 }
 
+function isExample(item: unknown): item is ConversationExample {
+  return typeof item === "object" && item !== null && "question" in item && "answer" in item;
+}
+
+// LLM 응답에서 Q&A 쌍을 최대한 견고하게 뽑는다. 로컬 7B 모델은 종종 배열 앞뒤에 설명을 붙이거나
+// 응답이 잘리므로: (1) 코드펜스 제거 (2) 첫 '['~마지막 ']' 슬라이스 후 JSON.parse
+// (3) 그래도 실패하면 개별 {"question":..,"answer":..} 객체를 정규식으로 긁어낸다(잘린 배열도 앞부분은 살림).
 function parseExamples(raw: string): ConversationExample[] {
-  const cleaned = raw.replace(/^```(json)?/i, "").replace(/```$/, "").trim();
+  let s = raw.replace(/```(?:json)?/gi, "").trim();
+  const start = s.indexOf("[");
+  const end = s.lastIndexOf("]");
+  if (start >= 0 && end > start) s = s.slice(start, end + 1);
   try {
-    const parsed = JSON.parse(cleaned) as unknown;
+    const parsed = JSON.parse(s) as unknown;
     if (Array.isArray(parsed)) {
-      return parsed.filter(
-        (item): item is ConversationExample =>
-          typeof item === "object" && item !== null && "question" in item && "answer" in item
-      );
+      const items = parsed.filter(isExample);
+      if (items.length > 0) return items;
     }
   } catch {
-    // LLM이 JSON 포맷을 지키지 못한 경우 빈 배열 반환 — 호출부에서 재시도/사용자 검수 필요
+    /* 아래 정규식 폴백으로 */
   }
-  return [];
+  // 폴백: 완전한 객체만 하나씩 추출 (배열이 잘렸어도 앞의 완성된 쌍은 건진다)
+  const out: ConversationExample[] = [];
+  const re = /\{\s*"question"\s*:\s*"((?:[^"\\]|\\.)*)"\s*,\s*"answer"\s*:\s*"((?:[^"\\]|\\.)*)"\s*\}/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(raw)) !== null) {
+    try {
+      out.push({ question: JSON.parse(`"${m[1]}"`), answer: JSON.parse(`"${m[2]}"`) });
+    } catch {
+      out.push({ question: m[1], answer: m[2] });
+    }
+  }
+  return out;
+}
+
+// 긴 문서는 로컬 7B의 컨텍스트/안정성을 넘겨 변환이 실패하므로, 문단 경계 기준으로 청크를 나눠
+// 각각 변환한 뒤 합친다. 청크 하나가 실패해도 나머지는 살린다.
+const CONVERT_CHUNK_SIZE = 2500;
+
+function chunkForConvert(text: string, size = CONVERT_CHUNK_SIZE): string[] {
+  if (text.length <= size) return [text];
+  const chunks: string[] = [];
+  const paras = text.split(/\n\s*\n/);
+  let buf = "";
+  for (const p of paras) {
+    if (buf && (buf + "\n\n" + p).length > size) {
+      chunks.push(buf);
+      buf = p;
+    } else {
+      buf = buf ? buf + "\n\n" + p : p;
+    }
+    // 한 문단이 통째로 size를 넘으면 강제로 자른다
+    while (buf.length > size) {
+      chunks.push(buf.slice(0, size));
+      buf = buf.slice(size);
+    }
+  }
+  if (buf.trim()) chunks.push(buf);
+  return chunks;
+}
+
+async function convertChunk(chunk: string): Promise<ConversationExample[]> {
+  const prompt = [
+    "아래 보안 문서를 파인튜닝용 질문-답변(Q&A) 쌍으로 변환해줘.",
+    '출력은 JSON 배열만: [{"question":"...","answer":"..."}, ...] 형식, 다른 텍스트 없이.',
+    "문서 내용을 근거로 3~8개의 Q&A 쌍을 만들어줘.",
+    "문서:",
+    chunk,
+  ].join("\n\n");
+  // 긴 출력이 잘리지 않게 max_tokens를 넉넉히.
+  return parseExamples(await chat({ agentId: "analysis", message: prompt, maxTokens: 2048 }));
 }
 
 export async function convertToConversationFormat(rawText: string): Promise<ConversationExample[]> {
-  const prompt = [
-    "아래 보안 문서를 파인튜닝용 질문-답변(Q&A) 쌍으로 변환해줘.",
-    "출력은 JSON 배열만: [{\"question\":\"...\",\"answer\":\"...\"}, ...] 형식, 다른 텍스트 없이.",
-    "문서 내용을 근거로 3~8개의 Q&A 쌍을 만들어줘.",
-    "문서:",
-    rawText,
-  ].join("\n\n");
-  return parseExamples(await chat({ agentId: "analysis", message: prompt }));
+  const chunks = chunkForConvert(rawText.trim());
+  const all: ConversationExample[] = [];
+  const seen = new Set<string>();
+  for (const chunk of chunks) {
+    if (!chunk.trim()) continue;
+    for (const ex of await convertChunk(chunk)) {
+      const key = ex.question.trim();
+      if (key && !seen.has(key)) {
+        seen.add(key);
+        all.push(ex);
+      }
+    }
+  }
+  return all;
 }
 
 export async function amplifyDataset(examples: ConversationExample[], factor = 3): Promise<ConversationExample[]> {

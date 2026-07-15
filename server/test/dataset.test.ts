@@ -63,6 +63,31 @@ describe("dataset", () => {
     expect(res.body).toEqual([]);
   });
 
+  it("extracts Q&A pairs even with prose wrapped around the JSON array", async () => {
+    mockChat.mockResolvedValue('다음은 요청하신 JSON입니다:\n[{"question":"q1","answer":"a1"}]\n참고하세요.');
+    const res = await request(app).post("/api/dataset/convert").set("Authorization", `Bearer ${token}`).send({ rawText: "문서" });
+    expect(res.body).toEqual([{ question: "q1", answer: "a1" }]);
+  });
+
+  it("recovers complete pairs from a truncated JSON array (regex fallback)", async () => {
+    // 배열이 중간에 잘림 — 앞의 완성된 쌍들은 살려야 한다
+    mockChat.mockResolvedValue('[{"question":"q1","answer":"a1"},{"question":"q2","answer":"a2"},{"question":"q3","answer":"불완');
+    const res = await request(app).post("/api/dataset/convert").set("Authorization", `Bearer ${token}`).send({ rawText: "문서" });
+    expect(res.body).toEqual([
+      { question: "q1", answer: "a1" },
+      { question: "q2", answer: "a2" },
+    ]);
+  });
+
+  it("chunks a long document into multiple convert calls and dedupes by question", async () => {
+    // 각 청크마다 같은 mock을 쓰되 question이 겹치면 1개로 합쳐진다
+    mockChat.mockResolvedValue('[{"question":"공통질문","answer":"a"}]');
+    const longText = Array.from({ length: 20 }, (_, i) => `문단 ${i} `.repeat(60)).join("\n\n"); // 2500자↑
+    const res = await request(app).post("/api/dataset/convert").set("Authorization", `Bearer ${token}`).send({ rawText: longText });
+    expect(mockChat.mock.calls.length).toBeGreaterThan(1); // 여러 청크
+    expect(res.body).toEqual([{ question: "공통질문", answer: "a" }]); // 중복 제거
+  });
+
   it("amplify returns an empty array for an empty input without calling the LLM", async () => {
     const res = await request(app)
       .post("/api/dataset/amplify")

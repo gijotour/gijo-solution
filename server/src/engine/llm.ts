@@ -13,6 +13,7 @@ const EMBEDDING_SERVER_URL = process.env.GIJO_EMBEDDING_URL ?? "http://localhost
 export interface ChatArgs {
   agentId: string;
   message: string;
+  maxTokens?: number; // 지정 시 응답 길이 상한(데이터셋 변환처럼 긴 JSON 출력이 필요할 때)
   // true면 단기 기억(대화 이력)과 장기 기억(RAG) 자동 주입을 켠다 — 대화형 채팅 라우트 전용.
   // dispatcher/analysis 같은 프로그램적 단발 호출은 기본값(false)으로 이력에 끼어들지 않는다.
   remember?: boolean;
@@ -84,7 +85,7 @@ export async function chat(args: ChatArgs): Promise<string> {
   const res = await fetch(`${LOCAL_LLM_BASE_URL}/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "local", messages }),
+    body: JSON.stringify({ model: "local", messages, ...(args.maxTokens ? { max_tokens: args.maxTokens } : {}) }),
   }).catch(() => null);
 
   if (!res || !res.ok) {
