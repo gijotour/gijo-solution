@@ -96,6 +96,12 @@ db.exec(`
     lastError TEXT
   );
 
+  -- 소소한 서버 상태 저장용 key-value (예: localengine.ts의 마지막 사용 모델).
+  CREATE TABLE IF NOT EXISTS app_state (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );
+
   -- 보안담당자 계정. passwordHash는 bcrypt 해시(평문 저장 안 함). 최초 기동 시 이 테이블이
   -- 비어 있으면 auth/users.ts가 기본 관리자 계정 1개를 시드한다(9.5절 "설치 마법사" 전까지의
   -- 최소 조치 — 다음단계 가이드 1.3절).

@@ -389,6 +389,6 @@ RTX 3090 GPU 사내 서버에 서버를 상시 구동하고, 각 담당자 PC의
 2. **threat 페이지의 탐지 내역 표가 비어 있다** → OTX 피드에 API 키를 등록했는지 확인(무료 키). 키 등록 전까지는 빈 표 + 안내 문구가 정상이다. 등록 후에도 최대 30분 캐시 게이트가 있다(6절).
 3. **`.gguf` 자산을 스캔했는데 finding이 `scan_not_supported`뿐이다** → 버그 아님, modelscan이 gguf를 지원하지 않아서다(6절). pickle/PyTorch/Keras 등은 실제로 스캔된다.
 4. **에이전트 상태가 재시작마다 리셋된다** → 버그 아님, 의도된 설계 (4절).
-5. **RAG가 임베딩 에러를 낸다** → 8081에 `--embedding` llama-server를 따로 띄웠는지 확인 (5.4절).
+5. **RAG가 임베딩 에러를 낸다** → `models/bge-m3/bge-m3.gguf`를 배치하면 서버 기동 시 임베딩 llama-server(8081)가 자동으로 뜬다(`GIJO_EMBEDDING_MODEL_ID`로 변경 가능). 파일이 없으면 자동 시작을 건너뛰므로 수동으로 `--embedding` 서버를 띄우거나 모델을 배치할 것 (5.4절).
 6. **rebuild-server-native를 돌린 뒤 `npm test`가 깨진다** → `cd server && npm rebuild better-sqlite3`로 복구.
 7. 페이지 전환마다 preload가 재실행된다 — 렌더러 전역 상태에 의존하지 말고, 유지해야 하는 값은 메인 프로세스 `authState` 패턴을 따를 것.

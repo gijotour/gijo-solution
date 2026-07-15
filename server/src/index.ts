@@ -11,7 +11,7 @@ import { attachCollaborationSocket } from "./engine/collaboration";
 import { attachFinetuneSocket } from "./engine/finetune";
 import { attachAssetsSocket } from "./engine/assets";
 import { attachLogsSocket, installConsoleCapture } from "./engine/logs";
-import { stopLocalEngine } from "./engine/localengine";
+import { stopLocalEngine, stopEmbeddingEngine, autoStartLocalEngines } from "./engine/localengine";
 
 // 가능한 한 이른 시점에 설치해야 이후의 console.log/warn/error가 전부 캡처된다.
 installConsoleCapture();
@@ -31,12 +31,14 @@ attachLogsSocket(wss);
 httpServer.listen(PORT, () => {
   console.log(`GIJO AS 서버 기동 — http://localhost:${PORT} (WebSocket: /ws)`);
   console.log("standalone 모드: 클라이언트 GIJO_SERVER_URL을 http://localhost:" + PORT + " 로 설정하면 같은 머신에서 붙습니다.");
+  // 모델 파일이 있으면 채팅 LLM + 임베딩 서버를 자동 기동 — 실패해도 서버 자체는 계속 뜬다.
+  void autoStartLocalEngines().catch((err) => console.error("[index] 로컬 LLM 자동 시작 실패:", err));
 });
 
 // 서버 프로세스 종료 시 자식으로 띄운 llama-server가 고아 프로세스로 남지 않도록 함께 정리한다.
 async function shutdown(signal: string): Promise<void> {
   console.log(`[index] ${signal} 수신 — 로컬 LLM 엔진 정리 후 종료`);
-  await stopLocalEngine();
+  await Promise.all([stopLocalEngine(), stopEmbeddingEngine()]);
   httpServer.close(() => process.exit(0));
 }
 

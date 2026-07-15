@@ -197,7 +197,12 @@ curl http://localhost:4000/api/health
 ```
 `{"ok":true,"service":"gijo-as-server"}` 응답 확인.
 
-**RAG(단기 기억) 사용 시 추가**: 임베딩 모델은 채팅용과 **별도의** llama-server 프로세스로 8081 포트에 띄워야 합니다 (`--embedding` 플래그). 안 띄우면 채팅은 되고 RAG 기능만 임베딩 에러가 납니다:
+**로컬 LLM 자동 시작**: 서버 기동 시 `models\` 아래에 모델 파일이 있으면 채팅 LLM(마지막
+사용 모델, 없으면 기본 `lily-cybersecurity-7b-v0.2`)이 **자동으로 올라갑니다** — 에이전트 AI
+화면에서 수동 시작할 필요 없음. 임베딩 서버(8081, RAG용)도 `models\bge-m3\bge-m3.gguf`가
+있으면 자동 기동됩니다(다른 모델을 쓰려면 `GIJO_EMBEDDING_MODEL_ID` 설정). 모델 파일이
+없으면 건너뛰고 로그에 안내가 남습니다 — 그 경우 RAG 기능만 임베딩 에러가 나며, 임시로는
+수동 기동도 가능합니다:
 ```powershell
 cd C:\GIJO-AS\server\llama.cpp
 .\build\bin\Release\llama-server.exe -m ..\models\<임베딩모델>\<임베딩모델>.gguf --embedding --host 0.0.0.0 --port 8081
@@ -223,7 +228,7 @@ npm start
 
 - [ ] 로그인 성공, 대시보드 진입
 - [ ] 대시보드에 에이전트 목록 표시 (`GET /api/agents` 정상 응답 확인용)
-- [ ] 에이전트 AI 화면에서 로컬 엔진 시작(`modelId: lily-cybersecurity-7b-v0.2`) → 새 터미널에서 `nvidia-smi` 실행 시 VRAM 사용량이 올라가는지 확인 (llama-server 프로세스가 실제로 GIJO AS 서버에 의해 기동됐는지 검증)
+- [ ] 서버 기동 로그에 `[localengine] 부팅 자동 시작: lily-cybersecurity-7b-v0.2`가 찍히고, 새 터미널에서 `nvidia-smi` 실행 시 VRAM 사용량이 올라가는지 확인 (STEP 6 모델 배치가 됐다면 수동 시작 불필요 — 안 올라오면 에이전트 AI 화면에서 수동 시작으로 폴백)
 - [ ] 채팅바에 **한국어** 지시문을 넣어 응답 품질 확인 (Lily는 영어 중심 모델 — 한국어 응답이 부적절하면 다음단계 가이드 3.3의 결정을 재검토할 근거가 된다)
 - [ ] 채팅바에 아무 지시문 입력 → 화면에 협업 로그(할당/완료)가 실시간으로 찍히는지 확인 (WebSocket 정상 동작 검증)
 - [ ] `nvidia-smi` 기준 VRAM 사용량이 24GB 이내인지 확인 (여유 있으면 `--ctx-size` 상향 여지 있음 — STEP 7 방식으로 재검증)
