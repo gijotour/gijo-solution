@@ -44,9 +44,9 @@ llama-server 프로세스다.
 - **클라이언트**(`client/`)는 Electron 데스크톱 앱이지만 렌더러에서 아무 로직도 소유하지 않는다.
   `preload.ts`가 `window.gijo.*` API를 노출하고, 전부 `apiClient.ts`를 통해 서버 REST를 호출한다.
   실시간 이벤트는 `wsClient.ts`가 `/ws` 하나로 받아 채널별로 분배한다.
-- **`server-java-reference/`는 현재 스택이 아니다.** Java/Spring Boot로 재작성을 검토했다가
-  TypeScript로 번복한 뒤, 금융권 고객 온프레미스 보안성 검토가 문제될 경우의 폴백으로만 남겨둔
-  참고용 구현체다. 신규 기능은 절대 여기에 넣지 말 것. (배경: 가이드 9.5~9.6절)
+- **`server-java-reference/`는 폐기·삭제됐다** (2026-07-15, 다음단계 가이드 3.4 결정).
+  Java/Spring Boot 재작성 검토의 산물이었고 금융권 폴백 명목으로 보관했었으나 제거함.
+  필요해지면 git 히스토리에서 복구 가능 (`git log --diff-filter=D -- server-java-reference`).
 
 ### 실시간 채널 (WebSocket)
 
@@ -88,7 +88,6 @@ D:\Connect AI\
 │  └─ scripts/
 │     ├─ rebuild-server-native.mjs   # dev용: ../server를 Electron ABI로 재빌드 (주의: 5.3절)
 │     └─ build-server-dist.mjs       # 패키징용: client/server-dist/ 프로덕션 사본 생성
-├─ server-java-reference/        # (참고용) 폐기된 Java/Spring 재작성 — 건드리지 말 것
 ├─ 로컬LLM_프로젝트_가이드.md      # 프로젝트 전체 히스토리 + 인프라/모델 가이드 (방대함, 필요한 절만)
 └─ GIJO_AS_*.html                # 초기 UI 시안 (참고용 정적 목업)
 ```
@@ -391,6 +390,5 @@ RTX 3090 GPU 사내 서버에 서버를 상시 구동하고, 각 담당자 PC의
 3. **`.gguf` 자산을 스캔했는데 finding이 `scan_not_supported`뿐이다** → 버그 아님, modelscan이 gguf를 지원하지 않아서다(6절). pickle/PyTorch/Keras 등은 실제로 스캔된다.
 4. **에이전트 상태가 재시작마다 리셋된다** → 버그 아님, 의도된 설계 (4절).
 5. **RAG가 임베딩 에러를 낸다** → 8081에 `--embedding` llama-server를 따로 띄웠는지 확인 (5.4절).
-6. **`server-java-reference/`를 참고 구현이라고 수정하지 말 것** — 폐기된 폴백이다.
-7. **rebuild-server-native를 돌린 뒤 `npm test`가 깨진다** → `cd server && npm rebuild better-sqlite3`로 복구.
-8. 페이지 전환마다 preload가 재실행된다 — 렌더러 전역 상태에 의존하지 말고, 유지해야 하는 값은 메인 프로세스 `authState` 패턴을 따를 것.
+6. **rebuild-server-native를 돌린 뒤 `npm test`가 깨진다** → `cd server && npm rebuild better-sqlite3`로 복구.
+7. 페이지 전환마다 preload가 재실행된다 — 렌더러 전역 상태에 의존하지 말고, 유지해야 하는 값은 메인 프로세스 `authState` 패턴을 따를 것.

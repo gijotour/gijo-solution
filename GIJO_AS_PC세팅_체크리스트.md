@@ -77,8 +77,8 @@ winget install --id OpenJS.NodeJS.LTS -e --source winget
 winget install --id Python.Python.3.12 -e --source winget
 ```
 
-> Java(JDK)는 더 이상 설치하지 않습니다 — 서버가 Node/TypeScript입니다(`server-java-reference/`는
-> 폐기된 폴백). Python 3.12는 모델 스캐너(modelscan)가 서버 런타임에 필요합니다.
+> Java(JDK)는 더 이상 설치하지 않습니다 — 서버가 Node/TypeScript입니다(Java 재작성안은
+> 폐기·삭제됨, 2026-07-15). Python 3.12는 모델 스캐너(modelscan)가 서버 런타임에 필요합니다.
 
 **확인**:
 ```powershell
@@ -172,7 +172,7 @@ JSON 응답이 오면 정상. 확인 끝나면 원래 터미널에서 `Ctrl+C`�
 
 ## STEP 8 — GIJO AS 서버 빌드 및 최초 설정 (Node/TypeScript)
 
-> 예전 문서의 Spring Boot/Gradle 절차는 폐기된 `server-java-reference/` 기준이었습니다.
+> 예전 문서의 Spring Boot/Gradle 절차는 폐기·삭제된 Java 재작성안 기준이었습니다.
 > 실제 서버는 Node/TypeScript입니다.
 
 ```powershell

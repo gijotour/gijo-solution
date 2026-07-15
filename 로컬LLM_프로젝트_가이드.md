@@ -571,7 +571,7 @@ public class DispatcherService {
 
 ## 9단계 — CS(클라이언트-서버) 구조 전환
 
-> **⚠️ 번복 (2026-07-13): 서버 언어는 최종적으로 TypeScript/Node.js로 확정되었습니다.** 아래 9단계 본문은 한때 "Java/Spring Boot 최종 확정"으로 작성됐으나, 실제로는 `gijo-as-cs-scaffold.zip`(Express + `ws` 기반, 엔진 모듈 15종을 그대로 이식)을 그대로 채택해 `server/`에 풀어 넣었고 npm install + `tsc --noEmit` 타입체크까지 통과 확인했습니다. Java/Spring Boot로 새로 작성했던 버전은 폐기하지 않고 `server-java-reference/`에 참고용으로만 남겨뒀습니다(재검토 시 대비). 아래 9.1~9.6절의 "Java" 언급은 **역사적 기록**이며, 실제 구현 기준으로는 `com.gijo.as.engine.service.*` 패키지 → `server/src/engine/*.ts`, Spring Bean → Express 라우트 핸들러, Spring WebSocket → `ws.WebSocketServer`로 각각 대응한다고 읽으면 됩니다.
+> **⚠️ 번복 (2026-07-13): 서버 언어는 최종적으로 TypeScript/Node.js로 확정되었습니다.** 아래 9단계 본문은 한때 "Java/Spring Boot 최종 확정"으로 작성됐으나, 실제로는 `gijo-as-cs-scaffold.zip`(Express + `ws` 기반, 엔진 모듈 15종을 그대로 이식)을 그대로 채택해 `server/`에 풀어 넣었고 npm install + `tsc --noEmit` 타입체크까지 통과 확인했습니다. Java/Spring Boot로 새로 작성했던 버전은 한동안 `server-java-reference/`에 참고용으로 보관했으나, **2026-07-15 폐기 결정으로 저장소에서 삭제**했습니다(git 히스토리에서 복구 가능 — 다음단계 가이드 3.4). 아래 9.1~9.6절의 "Java" 언급은 **역사적 기록**이며, 실제 구현 기준으로는 `com.gijo.as.engine.service.*` 패키지 → `server/src/engine/*.ts`, Spring Bean → Express 라우트 핸들러, Spring WebSocket → `ws.WebSocketServer`로 각각 대응한다고 읽으면 됩니다.
 
 > ~~상태: Java/Spring Boot(2안) 최종 확정 및 반영.~~ (위 번복 공지로 대체됨) 8단계까지의 단일 Electron 앱 구조를 서버와 얇은 클라이언트로 분리하고, 서버 백엔드를 엔터프라이즈 적합성 및 사내 컴플라이언스 준수를 위해 Java/Spring Boot 3.x 스택으로 검토했던 기록입니다. 오케스트레이터가 "보안 AI 중계서버"로 기능한다는 설계 의도 자체는 TS 버전에서도 그대로 유지됩니다.
 
@@ -638,8 +638,8 @@ NVIDIA RTX 3090 GPU가 장착된 고사양 사내 서버에 Spring Boot 백엔�
 - ~~**DB 영속화 세부 튜닝**: SQLite를 JPA에 임베디드로 사용할 때 발생하는 Write-Ahead Logging(WAL) 동시성 이슈 보완~~ → 완료 (2026-07-14), 단 전제 자체가 없어서 "튜닝"이 아니라 "도입"이었음. `server/src/db.ts` 신설(`better-sqlite3`, `data/gijo-as.sqlite`) — 그 전까지 `assets.ts`/`tasks.ts`가 순수 인메모리라 서버 재시작 한 번에 등록된 자산·스캔 이력·작업 큐가 전부 사라졌다. 프로세스당 동기 연결 1개(커넥션 풀 없음)라 원래 항목이 걱정하던 "JPA 커넥션 풀의 WAL 동시성 이슈"는 이 스택 구조상 애초에 발생하지 않는다. `agents.ts`(휘발성 라이브 상태라 재시작 시 초기화가 오히려 맞음)와 `cti.ts`(API 키 평문 저장 문제를 먼저 풀어야 함 — 별도 미결)는 의도적으로 이번 범위에서 제외. 테스트는 `GIJO_DB_PATH=:memory:`(`vitest.config.ts`)로 격리, `server/test/db.test.ts`가 실제 파일 기반 영속성(연결 재개 후에도 데이터 유지)을 별도로 검증. 실서버 기동 → 자산 등록 → 프로세스 강제 종료 → 재기동 → 자산 유지 확인까지 수동으로도 실증함.
 - ~~**자산 인벤토리(Assets) 고도화**: inventory 화면의 자산 이력을 실시간 스캔 정보와 매핑하는 데이터 파이프라인 정밀화~~ → 완료 (2026-07-14). `server/src/engine/assets.ts`: 예전엔 재스캔마다 findings를 무한 append해서 해결된 취약점도 위험도에 영구히 남는 버그가 있었음 — 이제 스캔 1회 = `scanHistory`에 남는 `ScanRun` 1개이고, `asset.findings`는 항상 최신 스캔 결과만 반영(현재 위험 상태). 자산 등록/스캔 완료/SBOM 생성마다 `asset:updated`를 WebSocket으로 브로드캐스트(collaboration.ts/finetune.ts와 동일 패턴)해 `inventory.html`이 수동 새로고침 없이 실시간으로 갱신되도록 연동.
 - ~~**자연어 라우팅 고도화**: `IntentService` 내의 Regex 의도 분석기를 로컬 LLM Few-shot 의도 판별 및 JSON 파싱 모듈로 마이그레이션~~ → 완료 (2026-07-14), `server/src/engine/intent.ts` 참고
-- **메인 로컬 LLM 모델 최종 확정**: 현재 초기 개발 테스트용으로 **Qwythos-9B-Claude-Mythos-5-1M-Q4_K_M.gguf (Qwythos-9B)**를 메인 모델로 사용하도록 가이드를 1차 반영했습니다. 프로덕션 배포 전, 제품 핵심 작업(취약점 요약·SBOM·CTI 해석 등 일반 추론) 성능을 극대화하기 위해 Qwen3-30B-A3B 등의 MoE 모델 또는 보안 도메인 특화 모델로의 전환을 검토할 것. (모델 스왑 제어 로직 자체는 `server/src/engine/localengine.ts`에 이미 구현되어 있음 — 남은 건 "어떤 모델을 최종 채택할지"의 제품 판단만.)
-- **서버 언어 재검토 여지**: 아래 9.6절의 Java 채택 근거(금융권 규제 준수, LDAP/SSO 연동, 타입 안전성)는 TypeScript로 번복한 지금도 완전히 사라진 게 아닙니다. 실제 기업(특히 금융권) 고객사 온보딩 단계에서 온프레미스 보안성 검토가 문제가 되면, `server-java-reference/`에 남겨둔 Java 구현체(9.2절 API 전부 이식 완료 상태)로 다시 전환하는 것을 고려할 것.
+- ~~**메인 로컬 LLM 모델 최종 확정**~~ → 결정 완료 (2026-07-15): **`segolilylabs/Lily-Cybersecurity-7B-v0.2`** (보안 도메인 특화, modelId `lily-cybersecurity-7b-v0.2`, 공식 GGUF Q5_K_M). 상세와 트레이드오프 기록은 `GIJO_AS_다음단계_가이드.md` 3.3절, 다운로드 절차는 `GIJO_AS_PC세팅_체크리스트.md` STEP 6 참고. (개발 테스트용 Qwythos-9B 관련 아래 서술은 결정 이전의 기록.)
+- ~~**서버 언어 재검토 여지**~~ → 종결 (2026-07-15): `server-java-reference/`는 다음단계 가이드 3.4 결정에 따라 저장소에서 삭제됨. Java 채택 근거(9.6절)는 역사 기록으로만 유효하며, 되살릴 일이 생기면 git 히스토리에서 복구(단, 삭제 이후 추가된 서버 기능은 Java 쪽에 없음).
 
 ### 9.6 (참고용 — 현재는 TypeScript로 번복됨) 서버 언어로 Java/Spring Boot(2안)를 검토했던 배경
 
