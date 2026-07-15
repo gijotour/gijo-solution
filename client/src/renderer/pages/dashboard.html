@@ -55,8 +55,15 @@
   .today-input{display:flex;gap:8px;margin-bottom:14px;}
   .today-input input{flex:1;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:0 12px;height:34px;color:var(--text);font-size:12.5px;outline:none;}
   .today-add{width:34px;height:34px;border-radius:8px;background:var(--teal);color:#06281c;border:none;font-weight:800;cursor:pointer;font-size:16px;}
-  .today-item{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px;font-size:12px;}
-  .today-p{padding:2px 7px;border-radius:5px;font-size:10.5px;font-weight:800;}
+  .today-item{display:flex;align-items:center;gap:9px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:9px 11px;margin-bottom:8px;font-size:12px;}
+  .today-item .today-text{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .today-item.done{opacity:.55;}
+  .today-item.done .today-text{text-decoration:line-through;color:var(--muted);}
+  .today-check{width:15px;height:15px;flex-shrink:0;cursor:pointer;accent-color:var(--teal);margin:0;}
+  .today-del{flex-shrink:0;background:none;border:none;color:var(--muted-2);cursor:pointer;font-size:13px;line-height:1;padding:2px 5px;border-radius:4px;}
+  .today-del:hover{color:#f5928a;background:rgba(226,72,61,0.14);}
+  #todayItems{max-height:260px;overflow-y:auto;}
+  .today-p{padding:2px 7px;border-radius:5px;font-size:10.5px;font-weight:800;flex-shrink:0;}
   .p0{background:rgba(226,72,61,0.18);color:#f5928a;}
   .p1{background:rgba(240,160,32,0.18);color:#f7c777;}
   .today-cta{margin-top:auto;background:var(--teal);color:#06281c;border:none;border-radius:8px;padding:13px;font-size:13px;font-weight:800;cursor:pointer;}
@@ -364,21 +371,46 @@
     }
   }
 
+  function taskRowHtml(t) {
+    const cls = PRIORITY_CLASS[t.priority] || "p1";
+    const text = String(t.text).replace(/</g, "&lt;");
+    return (
+      `<div class="today-item ${t.done ? "done" : ""}" data-id="${t.id}">` +
+      `<input type="checkbox" class="today-check" ${t.done ? "checked" : ""} title="완료 표시">` +
+      `<span class="today-p ${cls}">${t.priority}</span>` +
+      `<span class="today-text" title="${text}">${text}</span>` +
+      `<button class="today-del" title="삭제">✕</button>` +
+      `</div>`
+    );
+  }
+
   async function loadTasks() {
     try {
       const tasks = await window.gijo.listTasks();
-      const open = tasks.filter((t) => !t.done).sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 9) - (PRIORITY_ORDER[b.priority] ?? 9));
-      if (open.length === 0) {
+      if (tasks.length === 0) {
         todayItems.innerHTML = '<div style="font-size:12px;color:var(--muted-2);padding:10px 0">오늘 확인할 항목이 없습니다</div>';
         return;
       }
-      todayItems.innerHTML = open
-        .map(
-          (t) => `<div class="today-item"><span class="today-p ${PRIORITY_CLASS[t.priority] || "p1"}">${t.priority}</span>${t.text}</div>`
-        )
-        .join("");
+      // 미완료(우선순위 순) 먼저, 완료(최근 순)는 아래에 흐리게 — 진행 상황이 보이도록.
+      const open = tasks.filter((t) => !t.done).sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 9) - (PRIORITY_ORDER[b.priority] ?? 9));
+      const done = tasks.filter((t) => t.done).sort((a, b) => b.createdAt - a.createdAt);
+      todayItems.innerHTML = [...open, ...done].map(taskRowHtml).join("");
     } catch (e) {
       todayItems.innerHTML = '<div style="color:var(--muted-2);font-size:12px">작업 목록을 불러오지 못했습니다</div>';
+    }
+  }
+
+  // 체크박스=완료 토글, ✕=삭제. todayItems가 재렌더돼도 유지되게 부모에 위임(init에서 1회 바인딩).
+  async function onTaskAction(e) {
+    const item = e.target.closest(".today-item");
+    if (!item) return;
+    const id = item.dataset.id;
+    if (e.target.classList.contains("today-del")) {
+      await window.gijo.deleteTask(id);
+      await loadTasks();
+    } else if (e.target.classList.contains("today-check")) {
+      await window.gijo.toggleTask(id, e.target.checked);
+      await loadTasks();
     }
   }
 
@@ -475,6 +507,7 @@
     document.getElementById("pickFolderBtn").addEventListener("click", pickFolder);
     document.getElementById("todoAddBtn").addEventListener("click", addTodo);
     todoInput.addEventListener("keydown", (e) => { if (e.key === "Enter") addTodo(); });
+    todayItems.addEventListener("click", onTaskAction);
     document.getElementById("docQueryBtn").addEventListener("click", docQuery);
     document.getElementById("docQueryInput").addEventListener("keydown", (e) => { if (e.key === "Enter") docQuery(); });
 

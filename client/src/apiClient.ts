@@ -151,6 +151,8 @@ export const tasksApi = {
   list: () => request("/api/tasks"),
   add: (text: string) => request("/api/tasks", { method: "POST", body: { text } }),
   complete: (id: string) => request(`/api/tasks/${id}/complete`, { method: "POST" }),
+  toggle: (id: string, done: boolean) => request(`/api/tasks/${id}/toggle`, { method: "POST", body: { done } }),
+  remove: (id: string) => request(`/api/tasks/${id}`, { method: "DELETE" }),
 };
 
 // ── 협업 로그 ─────────────────────────────────────────────────────────

@@ -48,6 +48,8 @@ const gijoApi = {
   listTasks: () => api.tasksApi.list(),
   addTask: (text: string) => api.tasksApi.add(text),
   completeTask: (id: string) => api.tasksApi.complete(id),
+  toggleTask: (id: string, done: boolean) => api.tasksApi.toggle(id, done),
+  deleteTask: (id: string) => api.tasksApi.remove(id),
 
   // 자산 인벤토리
   listAssets: () => api.assetsApi.list(),
