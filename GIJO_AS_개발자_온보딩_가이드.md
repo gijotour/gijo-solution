@@ -250,13 +250,21 @@ llama.cpp가 있어야 한다:
 - CTI **키 관리**(AES-256-GCM 암호화 저장/해제), HF 모델 **검색**(실제 공개 API 호출)
 - git 동기화, 사용량 로깅, 서버 로그 캡처/스트리밍, 협업 이벤트 브로드캐스트
 - 페이지 간 네비게이션(사이드바/⚙ 아이콘) — 최근 수정 완료, 정상 동작
+- **ModelScan 실제 스캔** (2026-07-15 완료) — `server/modelscan_wrapper.py`가 pip 패키지 `modelscan`을
+  파이썬 API로 직접 호출해(CLI 아님 — rich 콘솔 렌더러가 stdout에 줄바꿈을 끼워넣어 JSON이 깨진다)
+  `StandardFinding[]`으로 변환한다. 실제 안전하지 않은 pickle 페이로드로 critical finding 탐지,
+  디스패처의 severity 기반 우선순위 재산정(P0 승격)까지 실API로 검증됨. **주의**: modelscan은
+  pickle/PyTorch/Keras/H5/SavedModel/NumPy만 스캔한다 — 이 프로젝트의 실제 자산 포맷인 `.gguf`는
+  지원 목록에 없어서, gguf 자산을 스캔하면 "안전함"이 아니라 `scan_not_supported`(low) finding이
+  뜬다(빈 배열을 반환하면 "스캔해서 깨끗함"과 구분이 안 돼 오해를 부르므로 의도적으로 이렇게 함).
+  `server/test/modelscan-wrapper.test.ts`가 실제 Python으로 검증(로컬에 Python 없으면 자동 skip),
+  CI는 `actions/setup-python` + `server/requirements.txt`로 이 테스트를 계속 돈다.
 
 ### 스텁 / 알려진 공백
 
 | 항목 | 현재 상태 | 막힌 이유 |
 |---|---|---|
 | CTI 탐지 내역 | `cti.ts`의 `listFindings()`가 **항상 `[]` 반환**. 키 저장·암호화·복호화(`getDecryptedApiKey`)까지는 완성 | 벤더(Criminal IP, Flashpoint, SpyCloud, Recorded Future) 계약 후 벤더별 HTTP 클라이언트 구현 예정 |
-| ModelScan 스캔 | `bridge.ts`가 `python modelscan_wrapper.py`를 실행하는데 **이 파일이 저장소에 없다.** 실제 스캔은 전부 실패하고 catch 경로에서 low severity의 합성 `scan_error` finding이 생긴다 | 래퍼 스크립트 미작성. 어댑터 레지스트리/`StandardFinding` 포맷/파이프라인 자체는 완성 |
 | 파인튜닝 | `finetune.ts`가 `scripts/finetune_unsloth.py`를 스폰하는데 **역시 저장소에 없다.** 트리거 API와 `finetune:progress` WS 파싱/브로드캐스트 배관은 실제 코드 | Unsloth 학습 스크립트 미작성 |
 | HF 모델 다운로드 | `loadHfModel()`이 `huggingface-cli`를 셸로 호출하는데 dev 환경에 **미설치** (검색은 정상) | CLI 설치 필요 |
 | SPDX 내보내기 | `exportSbom(format:"spdx")`는 **명시적으로 throw** ("아직 미구현") — CycloneDX만 지원 | 별도 라이브러리 연동 필요 |
@@ -362,7 +370,7 @@ RTX 3090 GPU 사내 서버에 서버를 상시 구동하고, 각 담당자 PC의
 
 1. **`ERR_DLOPEN_FAILED` → 5.3절.** Electron이 스폰한 서버가 조용히 죽고 "서버 연결 끊김"만 보인다.
 2. **threat 페이지의 탐지 내역 표는 목업이다.** CTI가 동작하는 게 아니다.
-3. **스캔이 항상 low severity `scan_error` 하나만 낸다** → `modelscan_wrapper.py`가 없어서다. 파이프라인 버그가 아니다.
+3. **`.gguf` 자산을 스캔했는데 finding이 `scan_not_supported`뿐이다** → 버그 아님, modelscan이 gguf를 지원하지 않아서다(6절). pickle/PyTorch/Keras 등은 실제로 스캔된다.
 4. **에이전트 상태가 재시작마다 리셋된다** → 버그 아님, 의도된 설계 (4절).
 5. **RAG가 임베딩 에러를 낸다** → 8081에 `--embedding` llama-server를 따로 띄웠는지 확인 (5.4절).
 6. **`server-java-reference/`를 참고 구현이라고 수정하지 말 것** — 폐기된 폴백이다.
