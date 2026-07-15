@@ -153,6 +153,15 @@ dir .\models\lily-cybersecurity-7b-v0.2\
 ```
 `lily-cybersecurity-7b-v0.2.gguf` 파일이 존재하고 용량이 약 5GB인지 확인. (7B Q5_K_M — 24GB VRAM 대비 여유가 크므로 `--ctx-size` 상향 여지가 큽니다. 영어 중심 모델이라 **한국어 응답 품질은 STEP 10에서 반드시 확인**하세요.)
 
+**임베딩 모델(RAG용)도 함께 배치합니다** — 이게 있어야 서버가 부팅 시 임베딩 서버(8081)를 자동 기동하고, 장기 기억(문서 수집·채팅 참고자료 주입)이 동작합니다:
+
+```powershell
+huggingface-cli download CompendiumLabs/bge-m3-gguf bge-m3-f16.gguf --local-dir .\models\bge-m3
+Rename-Item .\models\bge-m3\bge-m3-f16.gguf bge-m3.gguf
+```
+
+**확인**: `dir .\models\bge-m3\` 에 `bge-m3.gguf`(약 1.2GB) 존재.
+
 ---
 
 ## STEP 7 — llama-server 단독 실행 검증 (선택, 문제 생기면 디버깅용) `[VS Dev PowerShell]`

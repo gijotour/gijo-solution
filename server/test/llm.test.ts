@@ -92,7 +92,7 @@ describe("llm chat system prompt (한국어 기본 처리)", () => {
     expect(body.messages.map((m: { role: string }) => m.role)).toEqual(["system", "user"]);
   });
 
-  it("injects RAG context from the knowledge base as a second system message (장기 기억)", async () => {
+  it("injects RAG context into the single system prompt (장기 기억 — Mistral 템플릿은 system 2개를 거부)", async () => {
     vi.doMock("../src/engine/memory", () => ({
       queryMemory: vi.fn().mockResolvedValue(["사내 규정: pickle 파일은 반드시 스캔 후 반입한다."]),
     }));
@@ -101,9 +101,12 @@ describe("llm chat system prompt (한국어 기본 처리)", () => {
     await chat({ agentId: "orchestrator", message: "pickle 파일 반입 규정 알려줘", remember: true });
 
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
-    expect(body.messages[1].role).toBe("system");
-    expect(body.messages[1].content).toContain("참고 자료");
-    expect(body.messages[1].content).toContain("pickle 파일은 반드시 스캔 후 반입");
+    const systemMessages = body.messages.filter((m: { role: string }) => m.role === "system");
+    expect(systemMessages).toHaveLength(1);
+    expect(systemMessages[0].content).toContain("반드시 한국어로");
+    expect(systemMessages[0].content).toContain("참고 자료");
+    expect(systemMessages[0].content).toContain("pickle 파일은 반드시 스캔 후 반입");
+    expect(body.messages[1]).toEqual({ role: "user", content: "pickle 파일 반입 규정 알려줘" });
   });
 
   it("chat still works when the embedding server / knowledge base is unavailable", async () => {

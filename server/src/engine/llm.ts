@@ -75,12 +75,10 @@ export async function chat(args: ChatArgs): Promise<string> {
   const history = args.remember ? (histories.get(args.agentId) ?? []) : [];
   const rag = args.remember ? await ragContextFor(args.message) : null;
 
-  const messages = [
-    { role: "system", content: systemPromptFor(args.agentId) },
-    ...(rag ? [{ role: "system", content: rag }] : []),
-    ...history,
-    { role: "user", content: args.message },
-  ];
+  // RAG 참고자료는 별도 system 메시지가 아니라 시스템 프롬프트에 합친다 — Mistral 계열
+  // (Lily 포함) 채팅 템플릿은 system 메시지 2개를 "roles must alternate" 에러로 거부한다.
+  const systemContent = rag ? `${systemPromptFor(args.agentId)}\n\n${rag}` : systemPromptFor(args.agentId);
+  const messages = [{ role: "system", content: systemContent }, ...history, { role: "user", content: args.message }];
 
   const res = await fetch(`${LOCAL_LLM_BASE_URL}/chat/completions`, {
     method: "POST",

@@ -11,7 +11,7 @@ import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { embed } from "./llm";
 
-const DB_PATH = path.join("data", "memory.lancedb");
+const DB_PATH = process.env.GIJO_MEMORY_DB_PATH ?? path.join("data", "memory.lancedb");
 const TABLE_NAME = "documents";
 const CHUNK_SIZE = 800;
 const CHUNK_OVERLAP = 100;
@@ -52,7 +52,21 @@ export async function ingestDocument(filePath: string): Promise<IngestResult> {
   const records = rows as unknown as Record<string, unknown>[];
   if (names.includes(TABLE_NAME)) {
     const table = await db.openTable(TABLE_NAME);
-    await table.add(records);
+    // 임베딩 모델이 바뀌면 벡터 차원이 달라진다. LanceDB의 add()는 이때 에러를 내는 게
+    // 아니라 벡터를 기존 차원으로 잘라 저장해버리므로(조용한 데이터 오염), 차원을 직접
+    // 비교해서 다르면 테이블을 재생성한다. 다른 모델의 벡터끼리는 검색이 성립하지 않으므로
+    // 기존 지식 베이스는 폐기가 맞다 — 문서만 다시 수집하면 된다.
+    const existing = (await table.query().limit(1).toArray()) as MemoryRow[];
+    const existingDim = existing[0]?.vector?.length;
+    if (existingDim !== undefined && existingDim !== vectors[0].length) {
+      console.warn(
+        `[memory] 벡터 차원 불일치(기존 ${existingDim} ↔ 새 ${vectors[0].length} — 임베딩 모델 교체?) — 지식 베이스를 재생성합니다. 기존 문서는 재수집하세요.`
+      );
+      await db.dropTable(TABLE_NAME);
+      await db.createTable(TABLE_NAME, records);
+    } else {
+      await table.add(records);
+    }
   } else {
     await db.createTable(TABLE_NAME, records);
   }
@@ -67,8 +81,14 @@ export async function queryMemory(question: string, topK = 5): Promise<string[]>
 
   const table = await db.openTable(TABLE_NAME);
   const [queryVector] = await embed([question]);
-  const results = (await table.search(queryVector).limit(topK).toArray()) as MemoryRow[];
-  return results.map((r) => r.text);
+  try {
+    const results = (await table.search(queryVector).limit(topK).toArray()) as MemoryRow[];
+    return results.map((r) => r.text);
+  } catch (err) {
+    // 차원 불일치(임베딩 모델 교체 후 재수집 전) 등 — 검색 실패가 채팅을 죽이면 안 된다.
+    console.warn(`[memory] 지식 베이스 검색 실패 (문서 재수집 필요할 수 있음): ${err instanceof Error ? err.message : String(err)}`);
+    return [];
+  }
 }
 
 export function registerMemoryRoutes(app: Express): void {
