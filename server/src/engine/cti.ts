@@ -39,6 +39,7 @@ const SEED_FEEDS: { id: string; name: string }[] = [
   { id: "flashpoint", name: "Flashpoint" },
   { id: "spycloud", name: "SpyCloud" },
   { id: "recordedfuture", name: "Recorded Future" },
+  { id: "levelblue-otx", name: "LevelBlue OTX" },
 ];
 
 // 지원 예정 벤더 — DB에 시드하지 않고 코드에만 둔다. 실제 연동을 구현하는 날 SEED_FEEDS로
@@ -47,7 +48,6 @@ const SEED_FEEDS: { id: string; name: string }[] = [
 // C-TAS는 키가 3종(expKey/colKey/orgCode)이라 연동 시 저장 형식 확장도 함께 필요하다.
 const PLANNED_FEEDS: { id: string; name: string }[] = [
   { id: "kisa-ctas", name: "KISA C-TAS (공유형)" },
-  { id: "levelblue-otx", name: "LevelBlue OTX" },
 ];
 
 export function isPlannedFeed(feedId: string): boolean {
@@ -70,7 +70,7 @@ function toPublic(row: CtiFeedRow): CtiFeedPublic {
 
 // 테스트 전용: db는 모듈 싱글턴이라 createApp()을 새로 호출해도 초기화되지 않는다.
 export function resetFeedsForTests(): void {
-  db.exec("DELETE FROM cti_feeds");
+  db.exec("DELETE FROM cti_feeds; DELETE FROM cti_findings; DELETE FROM cti_sync");
   seedFeeds();
 }
 
@@ -112,11 +112,87 @@ export function getDecryptedApiKey(feedId: string): string | undefined {
   return decryptString(row.encryptedApiKey, getEncryptionKey());
 }
 
+// ── 탐지 내역 수집 (다음단계 가이드 3.1) ─────────────────────────────────────
+// 요청마다 벤더 API를 때리지 않는다: 피드별 30분 게이트로 동기화하고 결과를 cti_findings에
+// 캐시한다. 벤더 API가 죽어 있으면 캐시를 그대로 반환한다(경량 서킷 브레이커 — 별도 상태
+// 머신 없이 "실패해도 응답은 나간다"까지만). 90일 지난 캐시는 TTL로 정리.
+
+const SYNC_INTERVAL_MS = 30 * 60 * 1000;
+const FINDINGS_TTL_MS = 90 * 24 * 60 * 60 * 1000;
+const FETCH_TIMEOUT_MS = 10_000;
+const FINDINGS_LIMIT = 100;
+
+const pruneFindingsStmt = db.prepare("DELETE FROM cti_findings WHERE collectedAt < ?");
+const deleteFeedFindingsStmt = db.prepare("DELETE FROM cti_findings WHERE feedId = ?");
+const insertFindingStmt = db.prepare(
+  "INSERT OR REPLACE INTO cti_findings (id, feedId, detectedAt, type, target, source, severity, collectedAt) VALUES (@id, @feedId, @detectedAt, @type, @target, @source, @severity, @collectedAt)"
+);
+const listFindingsStmt = db.prepare("SELECT * FROM cti_findings ORDER BY detectedAt DESC LIMIT ?");
+const getSyncStmt = db.prepare("SELECT * FROM cti_sync WHERE feedId = ?");
+const upsertSyncStmt = db.prepare(
+  "INSERT INTO cti_sync (feedId, lastFetchAt, lastError) VALUES (@feedId, @lastFetchAt, @lastError) ON CONFLICT(feedId) DO UPDATE SET lastFetchAt = excluded.lastFetchAt, lastError = excluded.lastError"
+);
+
+interface OtxPulse {
+  id: string;
+  name: string;
+  created?: string;
+  modified?: string;
+  adversary?: string;
+}
+
+// OTX Pulse에는 심각도 개념이 없으므로 전부 info로 둔다 — 없는 정보를 지어내지 않는다.
+async function fetchOtxFindings(apiKey: string): Promise<CtiFinding[]> {
+  const res = await fetch("https://otx.alienvault.com/api/v1/pulses/subscribed?limit=50", {
+    headers: { "X-OTX-API-KEY": apiKey },
+    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+  });
+  if (!res.ok) throw new Error(`OTX API ${res.status}`);
+  const body = (await res.json()) as { results?: OtxPulse[] };
+  return (body.results ?? []).map((p) => ({
+    id: `otx-${p.id}`,
+    detectedAt: (p.modified ?? p.created ?? "").slice(0, 16).replace("T", " "),
+    type: p.adversary ? `위협 캠페인 · ${p.adversary}` : "위협 인텔 Pulse",
+    target: p.name,
+    source: "LevelBlue OTX",
+    severity: "info" as const,
+  }));
+}
+
+// 피드 id → 수집 어댑터. 새 벤더 연동 = 여기에 한 줄 + 어댑터 함수 하나.
+const FEED_ADAPTERS: Record<string, (apiKey: string) => Promise<CtiFinding[]>> = {
+  "levelblue-otx": fetchOtxFindings,
+};
+
+async function syncFeedIfStale(feedId: string, now: number): Promise<void> {
+  const adapter = FEED_ADAPTERS[feedId];
+  if (!adapter) return; // 어댑터 없는 벤더(상용 계약 대기)는 키가 등록돼 있어도 수집하지 않는다
+  const sync = getSyncStmt.get(feedId) as { lastFetchAt: number } | undefined;
+  if (sync && now - sync.lastFetchAt < SYNC_INTERVAL_MS) return;
+  const apiKey = getDecryptedApiKey(feedId);
+  if (!apiKey) return;
+  try {
+    const findings = await adapter(apiKey);
+    const replaceAll = db.transaction((rows: CtiFinding[]) => {
+      deleteFeedFindingsStmt.run(feedId);
+      for (const f of rows) insertFindingStmt.run({ ...f, feedId, collectedAt: now });
+      upsertSyncStmt.run({ feedId, lastFetchAt: now, lastError: null });
+    });
+    replaceAll(findings);
+  } catch (err) {
+    // 실패해도 던지지 않는다 — 캐시된 내역이 그대로 응답이 된다. 다음 요청에서 재시도.
+    upsertSyncStmt.run({ feedId, lastFetchAt: now, lastError: err instanceof Error ? err.message : String(err) });
+  }
+}
+
 export async function listFindings(): Promise<CtiFinding[]> {
-  // TODO: 연결된(connected=true) 각 피드의 REST API를 getDecryptedApiKey(feed.id)로 호출해 최근 탐지 내역 취합.
-  // API 키 입력 화면(6.1.1절)이 이 함수가 실제로 호출할 대상을 채워주는 역할이며,
-  // 벤더별 HTTP 클라이언트 구현은 계약 체결 후 벤더 스펙에 맞춰 추가한다.
-  return [];
+  const now = Date.now();
+  pruneFindingsStmt.run(now - FINDINGS_TTL_MS);
+  const connected = (listStmt.all() as CtiFeedRow[]).filter((r) => r.connected === 1);
+  await Promise.all(connected.map((r) => syncFeedIfStale(r.id, now)));
+  return (listFindingsStmt.all(FINDINGS_LIMIT) as (CtiFinding & { feedId: string; collectedAt: number })[]).map(
+    ({ id, detectedAt, type, target, source, severity }) => ({ id, detectedAt, type, target, source, severity })
+  );
 }
 
 export function registerCtiRoutes(app: Express): void {

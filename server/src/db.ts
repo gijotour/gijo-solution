@@ -74,6 +74,28 @@ db.exec(`
     fromAddress TEXT NOT NULL
   );
 
+  -- CTI 탐지 내역 캐시. 벤더 API를 요청마다 때리지 않도록 30분 게이트로 동기화하고(cti.ts),
+  -- 외부 API 장애 시엔 이 캐시가 그대로 응답이 된다(경량 서킷 브레이커). collectedAt 인덱스는
+  -- 90일 TTL 정리용 — 다음단계 가이드 3.1의 채택 항목.
+  CREATE TABLE IF NOT EXISTS cti_findings (
+    id TEXT PRIMARY KEY,
+    feedId TEXT NOT NULL,
+    detectedAt TEXT NOT NULL,
+    type TEXT NOT NULL,
+    target TEXT NOT NULL,
+    source TEXT NOT NULL,
+    severity TEXT NOT NULL,
+    collectedAt INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_cti_findings_collectedAt ON cti_findings (collectedAt);
+
+  -- 피드별 마지막 동기화 시각/에러 (cti_findings와 세트).
+  CREATE TABLE IF NOT EXISTS cti_sync (
+    feedId TEXT PRIMARY KEY,
+    lastFetchAt INTEGER NOT NULL,
+    lastError TEXT
+  );
+
   -- 보안담당자 계정. passwordHash는 bcrypt 해시(평문 저장 안 함). 최초 기동 시 이 테이블이
   -- 비어 있으면 auth/users.ts가 기본 관리자 계정 1개를 시드한다(9.5절 "설치 마법사" 전까지의
   -- 최소 조치 — 다음단계 가이드 1.3절).

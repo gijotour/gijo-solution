@@ -15,7 +15,7 @@
 - **자산 인벤토리** — AI 모델/코드 자산 등록, 스캔 이력, 실시간 상태 갱신
 - **SBOM** — CycloneDX 형식의 소프트웨어 자재명세서 생성
 - **취약점 스캔** — 스캔 어댑터(ModelScan 등)를 브릿지로 연결
-- **CTI** — 딥웹/다크웹 위협 인텔리전스 벤더 피드 연동 (키 관리까지 구현, 벤더 호출은 미구현 — 6절 참고)
+- **CTI** — 딥웹/다크웹 위협 인텔리전스 벤더 피드 연동 (키 관리 + LevelBlue OTX 실연동 구현, 상용 벤더 호출은 미구현 — 6절 참고)
 - **로컬 LLM 에이전트 팀** — 8개 고정 에이전트가 GPU 머신의 llama.cpp(llama-server)를 두뇌로 사용
 - **RAG 메모리 / 파인튜닝** — LanceDB 기반 지식베이스, QLoRA 파인튜닝 파이프라인(트리거만 구현)
 - **리포트 · 이메일** — DOCX 보고서 생성(LLM이 경영진 요약 작성), SMTP 발송
@@ -115,7 +115,7 @@ D:\Connect AI\
 | `finetune.ts` | `POST /api/finetune/start` | QLoRA 파인튜닝 트리거 + `finetune:progress` 스트리밍 |
 | `dataset.ts` | `POST /api/dataset/convert` `/amplify` | 파인튜닝용 데이터셋 변환/증폭 |
 | `sbom.ts` | `POST /api/sbom/:assetId/generate` `/export` | CycloneDX SBOM 생성 (SPDX는 미구현 — throw) |
-| `cti.ts` | `GET /api/cti/feeds` `/findings`, `POST /api/cti/feeds/:id/configure` `/disconnect` | CTI 벤더 키 암호화 저장 (findings는 스텁) |
+| `cti.ts` | `GET /api/cti/feeds` `/findings`, `POST /api/cti/feeds/:id/configure` `/disconnect` | CTI 벤더 키 암호화 저장. findings는 OTX 실연동(30분 캐시·90일 TTL·장애 시 캐시 반환), 상용 벤더는 어댑터 미구현 |
 | `report.ts` | `POST /api/report/generate` | DOCX 보고서 생성 (경영진 요약은 LLM이 작성) |
 | `email.ts` | `GET/POST /api/email/config`, `POST /api/email/sendReport` | SMTP 설정(DB 저장, 비밀번호 암호화) + 발송 |
 | `hfmodels.ts` | `GET /api/hfmodels/search`, `POST /api/hfmodels/load` | HF 공개 API 모델 검색 / 다운로드(스텁성 — 6절) |
@@ -248,7 +248,7 @@ llama.cpp가 있어야 한다:
 - llama-server 프로세스 생명주기 + 모델 스왑 + 서버 종료 시 자식 정리
 - RAG (LanceDB ingest/query — 임베딩 서버가 떠 있을 때)
 - CycloneDX SBOM 생성, DOCX 리포트 생성(LLM 요약 포함), SMTP 설정 저장/발송
-- CTI **키 관리**(AES-256-GCM 암호화 저장/해제), HF 모델 **검색**(실제 공개 API 호출)
+- CTI **키 관리**(AES-256-GCM 암호화 저장/해제) + **LevelBlue OTX 탐지 내역 수집**(실 API 호출, 2026-07-15), HF 모델 **검색**(실제 공개 API 호출)
 - git 동기화, 사용량 로깅, 서버 로그 캡처/스트리밍, 협업 이벤트 브로드캐스트
 - 페이지 간 네비게이션(사이드바/⚙ 아이콘) — 최근 수정 완료, 정상 동작
 - **ModelScan 실제 스캔** (2026-07-15 완료) — `server/modelscan_wrapper.py`가 pip 패키지 `modelscan`을
@@ -265,7 +265,7 @@ llama.cpp가 있어야 한다:
 
 | 항목 | 현재 상태 | 막힌 이유 |
 |---|---|---|
-| CTI 탐지 내역 | `cti.ts`의 `listFindings()`가 **항상 `[]` 반환**. 키 저장·암호화·복호화(`getDecryptedApiKey`)까지는 완성 | 벤더(Criminal IP, Flashpoint, SpyCloud, Recorded Future) 계약 후 벤더별 HTTP 클라이언트 구현 예정 |
+| CTI 탐지 내역 | ~~항상 `[]`~~ → **LevelBlue OTX 실연동됨** (2026-07-15). `FEED_ADAPTERS`에 어댑터가 있는 피드만 수집(현재 OTX 하나). 30분 동기화 게이트 + `cti_findings` 캐시 + 90일 TTL + 장애 시 캐시 반환 | 상용 벤더(Criminal IP, Flashpoint, SpyCloud, Recorded Future)는 계약 후 `FEED_ADAPTERS`에 어댑터 추가. KISA C-TAS는 기관 승인 후 |
 | 파인튜닝 | `finetune.ts`가 `scripts/finetune_unsloth.py`를 스폰하는데 **역시 저장소에 없다.** 트리거 API와 `finetune:progress` WS 파싱/브로드캐스트 배관은 실제 코드 | Unsloth 학습 스크립트 미작성 |
 | HF 모델 다운로드 | `loadHfModel()`이 `huggingface-cli`를 셸로 호출하는데 dev 환경에 **미설치** (검색은 정상) | CLI 설치 필요 |
 | SPDX 내보내기 | `exportSbom(format:"spdx")`는 **명시적으로 throw** ("아직 미구현") — CycloneDX만 지원 | 별도 라이브러리 연동 필요 |
@@ -384,7 +384,7 @@ RTX 3090 GPU 사내 서버에 서버를 상시 구동하고, 각 담당자 PC의
 ## 11. 신규 개발자가 자주 밟는 지뢰 요약
 
 1. **`ERR_DLOPEN_FAILED` → 5.3절.** Electron이 스폰한 서버가 조용히 죽고 "서버 연결 끊김"만 보인다.
-2. **threat 페이지의 탐지 내역 표가 항상 비어 있다** → 버그 아님. 표 자체는 `/api/cti/findings`에 실연결돼 있지만, 서버 `listFindings()`가 CTI 벤더 계약 전까지 `[]`를 반환한다(6절).
+2. **threat 페이지의 탐지 내역 표가 비어 있다** → OTX 피드에 API 키를 등록했는지 확인(무료 키). 키 등록 전까지는 빈 표 + 안내 문구가 정상이다. 등록 후에도 최대 30분 캐시 게이트가 있다(6절).
 3. **`.gguf` 자산을 스캔했는데 finding이 `scan_not_supported`뿐이다** → 버그 아님, modelscan이 gguf를 지원하지 않아서다(6절). pickle/PyTorch/Keras 등은 실제로 스캔된다.
 4. **에이전트 상태가 재시작마다 리셋된다** → 버그 아님, 의도된 설계 (4절).
 5. **RAG가 임베딩 에러를 낸다** → 8081에 `--embedding` llama-server를 따로 띄웠는지 확인 (5.4절).
