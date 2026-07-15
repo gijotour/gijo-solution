@@ -210,7 +210,7 @@ tr:last-child td{border-bottom:none;}
       </div>
       <div class="status-line" id="ftStatusLine"></div>
       <div class="progress-track"><div class="progress-fill" id="ftProgressFill"></div></div>
-      <div class="hint">서버가 <code>scripts/finetune_unsloth.py</code>(Unsloth QLoRA, 베이스: 제품 확정 모델)를 실행해 진행률을 WebSocket으로 스트리밍합니다. GPU 머신에 <code>pip install unsloth</code>가 선행돼야 하며, 결과물은 <code>outputs/&lt;데이터셋ID&gt;/lora-adapter</code>에 저장됩니다.</div>
+      <div class="hint">서버가 <code>scripts/finetune_unsloth.py</code>(Unsloth QLoRA, 베이스: 제품 확정 모델)를 실행해 진행률을 WebSocket으로 스트리밍합니다. GPU 머신에 <code>pip install unsloth</code>가 선행돼야 하며, 결과물은 <code>outputs/&lt;데이터셋ID&gt;/lora-adapter</code>에 저장됩니다. 학습 후 서빙 반영은 서버에서 <code>python scripts/export_gguf.py --adapter outputs/&lt;데이터셋ID&gt;/lora-adapter --model-id &lt;새모델ID&gt;</code> 실행 → 에이전트 AI 화면에서 그 모델 ID로 엔진 시작.</div>
     </div>
 
     <div class="footer">
