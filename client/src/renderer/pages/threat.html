@@ -123,7 +123,7 @@ tr:last-child td{border-bottom:none;}
   <div class="header-left">
     <img src="https://gijo.ai/_nuxt/logo_gijo_white.CCh2YXJe.svg" alt="GIJO">
     <div class="app-title">GIJO AS</div>
-    <div class="clock">오후 07:46 · 2026-07-12</div>
+    <div class="clock" id="clockEl">-</div>
   </div>
   <div class="header-right">
     <div class="status-pill"><span class="dot"></span>운영중<span class="beta-tag">LIVE</span></div>
@@ -148,7 +148,7 @@ tr:last-child td{border-bottom:none;}
 <div class="nav-section">모니터링</div>
 <div class="nav-item" data-page="dashboard.html"><span class="ic">◆</span>대시보드</div>
 <div class="nav-item" data-page="inventory.html"><span class="ic">◇</span>AI 자산 인벤토리</div>
-<div class="nav-item" data-page="sbom.html"><span class="ic">▢</span>SBOM 관리<span class="nav-badge">3</span></div>
+<div class="nav-item" data-page="sbom.html"><span class="ic">▢</span>SBOM 관리</div>
 <div class="nav-item active"><span class="ic">△</span>취약점 · 위협</div>
 <div class="nav-section">거버넌스</div>
 <div class="nav-item" data-page="compliance.html"><span class="ic">✓</span>컴플라이언스</div>
@@ -175,25 +175,22 @@ tr:last-child td{border-bottom:none;}
     </div>
 
 
-<div class="kpi-strip">
+<div class="kpi-strip" style="grid-template-columns:repeat(3,1fr)">
   <div class="kpi-mini"><div class="kpi-mini-label">연동된 CTI 벤더</div><div class="kpi-mini-value" id="connectedFeedCount">-</div></div>
-  <div class="kpi-mini"><div class="kpi-mini-label">이번 주 탐지</div><div class="kpi-mini-value" style="color:#f5928a">14</div></div>
-  <div class="kpi-mini"><div class="kpi-mini-label">유출 자격증명</div><div class="kpi-mini-value" style="color:var(--amber)">6</div></div>
-  <div class="kpi-mini"><div class="kpi-mini-label">조치 완료율</div><div class="kpi-mini-value" style="color:var(--teal)">78%</div></div>
+  <div class="kpi-mini"><div class="kpi-mini-label">탐지 내역</div><div class="kpi-mini-value" id="findingCount">-</div></div>
+  <div class="kpi-mini"><div class="kpi-mini-label">긴급 탐지</div><div class="kpi-mini-value" style="color:#f5928a" id="criticalCount">-</div></div>
 </div>
 
 <div class="content-grid">
   <div>
     <div class="panel">
-      <div class="panel-title">최근 탐지 내역<span class="panel-link">전체 보기</span></div>
+      <div class="panel-title">최근 탐지 내역</div>
       <div class="panel-sub">구독 중인 딥웹 · 다크웹 CTI 피드 기반 자동 탐지</div>
       <table>
-        <tr><th>탐지일</th><th>유형</th><th>대상 자산 · 도메인</th><th>출처</th><th>심각도</th><th></th></tr>
-        <tr><td>07-12 08:40</td><td>유출 자격증명</td><td>gijo.ai 임직원 계정 2건</td><td>Criminal IP</td><td><span class="badge b-red">긴급</span></td><td class="row-actions">조사 →</td></tr>
-        <tr><td>07-12 03:15</td><td>해킹포럼 언급</td><td>fraud-detect-llm 관련 키워드</td><td>Criminal IP</td><td><span class="badge b-amber">주의</span></td><td class="row-actions">조사 →</td></tr>
-        <tr><td>07-11 22:02</td><td>랜섬웨어 유출목록</td><td>협력사 도메인 매칭</td><td>Flashpoint</td><td><span class="badge b-red">긴급</span></td><td class="row-actions">조사 →</td></tr>
-        <tr><td>07-11 14:30</td><td>유출 자격증명</td><td>고객포털 테스트 계정 1건</td><td>SpyCloud</td><td><span class="badge b-amber">주의</span></td><td class="row-actions">조사 →</td></tr>
-        <tr><td>07-10 09:12</td><td>브랜드 사칭 도메인</td><td>gij0.ai (유사 도메인)</td><td>Criminal IP</td><td><span class="badge b-blue">정보</span></td><td class="row-actions">조사 →</td></tr>
+        <thead><tr><th>탐지일</th><th>유형</th><th>대상 자산 · 도메인</th><th>출처</th><th>심각도</th></tr></thead>
+        <tbody id="findingsBody">
+          <tr><td colspan="5" style="color:var(--muted);text-align:center;padding:28px 10px">불러오는 중...</td></tr>
+        </tbody>
       </table>
     </div>
   </div>
@@ -207,10 +204,8 @@ tr:last-child td{border-bottom:none;}
     <div class="panel">
       <div class="panel-title">모니터링 대상</div>
       <div class="panel-sub">등록된 도메인 · 이메일 패턴</div>
-      <div style="font-size:12.5px;color:var(--text);line-height:2">
-        gijo.ai · *@gijo.ai<br>
-        gijohome.ai<br>
-        고객포털 연동 도메인 3건
+      <div style="font-size:12.5px;color:var(--muted);line-height:1.7">
+        모니터링 대상 관리 기능은 아직 제공되지 않습니다. CTI 벤더 연동 시 벤더 측 콘솔에서 설정한 대상이 적용됩니다.
       </div>
     </div>
   </div>
@@ -243,6 +238,53 @@ tr:last-child td{border-bottom:none;}
 <script>
   const feedListEl = document.getElementById("feedList");
   const connectedCountEl = document.getElementById("connectedFeedCount");
+  const findingsBodyEl = document.getElementById("findingsBody");
+  const findingCountEl = document.getElementById("findingCount");
+  const criticalCountEl = document.getElementById("criticalCount");
+  const clockEl = document.getElementById("clockEl");
+
+  function tick() {
+    clockEl.textContent = new Date().toLocaleString("ko-KR", {
+      hour: "2-digit", minute: "2-digit", hour12: true, year: "numeric", month: "2-digit", day: "2-digit",
+    });
+  }
+  tick();
+  setInterval(tick, 30000);
+
+  const SEVERITY_BADGE = {
+    critical: { cls: "b-red", label: "긴급" },
+    warning: { cls: "b-amber", label: "주의" },
+    info: { cls: "b-blue", label: "정보" },
+  };
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  function renderFindings(findings) {
+    findingCountEl.textContent = findings.length;
+    criticalCountEl.textContent = findings.filter((f) => f.severity === "critical").length;
+    if (findings.length === 0) {
+      findingsBodyEl.innerHTML =
+        '<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:28px 10px">탐지 내역이 없습니다. 연동된 CTI 피드가 없거나 아직 탐지된 항목이 없습니다.</td></tr>';
+      return;
+    }
+    findingsBodyEl.innerHTML = findings
+      .map((f) => {
+        const badge = SEVERITY_BADGE[f.severity] || SEVERITY_BADGE.info;
+        return `<tr><td>${esc(f.detectedAt)}</td><td>${esc(f.type)}</td><td>${esc(f.target)}</td><td>${esc(f.source)}</td><td><span class="badge ${badge.cls}">${badge.label}</span></td></tr>`;
+      })
+      .join("");
+  }
+
+  async function loadFindings() {
+    try {
+      renderFindings(await window.gijo.listCtiFindings());
+    } catch (e) {
+      findingsBodyEl.innerHTML =
+        '<tr><td colspan="5" style="color:#f5928a;text-align:center;padding:28px 10px">탐지 내역을 불러오지 못했습니다. 서버 연결 상태를 확인하세요.</td></tr>';
+    }
+  }
   const modal = document.getElementById("apiKeyModal");
   const feedSelect = document.getElementById("feedSelect");
   const apiKeyInput = document.getElementById("apiKeyInput");
@@ -331,6 +373,7 @@ tr:last-child td{border-bottom:none;}
   });
 
   loadFeeds();
+  loadFindings();
 </script>
 
 </body>

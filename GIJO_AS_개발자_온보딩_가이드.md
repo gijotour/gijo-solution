@@ -272,7 +272,7 @@ llama.cpp가 있어야 한다:
 | 모델 머지 (merge.html) | 서버 측 로직 **전무**. 클라이언트에 "미구현" 명시된 플레이스홀더 페이지 | Evolutionary Model Merge는 로드맵 단계 |
 | 컴플라이언스 (compliance.html) | 서버 측 로직 전무, 플레이스홀더 | — |
 | 승인 워크플로우 (approvals.html) | 서버 측 로직 전무, 플레이스홀더 | — |
-| threat.html "최근 탐지 내역" 표 | **하드코딩된 정적 목업 HTML**이다. 어떤 API에도 연결돼 있지 않다 — 화면만 보면 CTI가 도는 것처럼 보이니 속지 말 것 (피드 키 설정 UI는 진짜) | `listFindings()` 구현과 함께 연결 예정 |
+| threat.html "최근 탐지 내역" 표 | ~~하드코딩 목업~~ → **`/api/cti/findings`에 실연결됨** (2026-07-15). 다만 서버의 `listFindings()`가 벤더 계약 전까지 항상 `[]`를 반환하므로 화면에는 빈 표 + 안내 문구가 뜬다 | 벤더별 HTTP 클라이언트는 계약 후 구현 |
 | `engine/mcp.ts` | MCP 서버 스캐폴드가 있으나 `app.ts`/`index.ts` 어디에도 연결 안 됨 | 실험 단계 |
 | Penligent 어댑터 | `bridge.ts`에 TODO 주석만 존재 | 로드맵 Phase 5 |
 
@@ -290,7 +290,7 @@ llama.cpp가 있어야 한다:
 | `dashboard.html` | 실동작 | 허브 — 채팅형 지시 입력바(`/api/dispatch`) + 자산 탐색 + 작업 목록 |
 | `inventory.html` | 실동작 | `asset:updated`로 실시간 갱신 |
 | `sbom.html` | 실동작 | CycloneDX만 (SPDX 버튼은 서버에서 에러) |
-| `threat.html` | **부분** | 피드 키 설정은 진짜 / "최근 탐지 내역" 표는 정적 목업 (6절) |
+| `threat.html` | 실동작 | 피드 키 설정 + 탐지 내역 표 모두 실 API 연결. 표는 `listFindings()`가 벤더 연동 전이라 빈 상태 (6절) |
 | `agent.html` | 실동작 | 8개 에이전트 상태 |
 | `merge.html` | 플레이스홀더 | "미구현" 명시 |
 | `report.html` | 실동작 | DOCX 생성 + 이메일 발송 |
@@ -369,7 +369,7 @@ RTX 3090 GPU 사내 서버에 서버를 상시 구동하고, 각 담당자 PC의
 ## 11. 신규 개발자가 자주 밟는 지뢰 요약
 
 1. **`ERR_DLOPEN_FAILED` → 5.3절.** Electron이 스폰한 서버가 조용히 죽고 "서버 연결 끊김"만 보인다.
-2. **threat 페이지의 탐지 내역 표는 목업이다.** CTI가 동작하는 게 아니다.
+2. **threat 페이지의 탐지 내역 표가 항상 비어 있다** → 버그 아님. 표 자체는 `/api/cti/findings`에 실연결돼 있지만, 서버 `listFindings()`가 CTI 벤더 계약 전까지 `[]`를 반환한다(6절).
 3. **`.gguf` 자산을 스캔했는데 finding이 `scan_not_supported`뿐이다** → 버그 아님, modelscan이 gguf를 지원하지 않아서다(6절). pickle/PyTorch/Keras 등은 실제로 스캔된다.
 4. **에이전트 상태가 재시작마다 리셋된다** → 버그 아님, 의도된 설계 (4절).
 5. **RAG가 임베딩 에러를 낸다** → 8081에 `--embedding` llama-server를 따로 띄웠는지 확인 (5.4절).
