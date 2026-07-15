@@ -398,6 +398,13 @@ export interface ThreatCompliance {
   criteria: { impact: string; good: string; weak: string; diagnosis: string };
 }
 
+export interface DexModel {
+  id: string; name: string; base: string; arch: string; size: string; focus: string; note?: string; lang: string;
+}
+export const modelDexApi = {
+  list: () => request<{ models: DexModel[]; groups: { arch: string; models: DexModel[] }[] }>("/api/modeldex"),
+};
+
 export const complianceApi = {
   list: () => request<ThreatCompliance[]>("/api/compliance"),
   setStatus: (code: string, status: string, note: string) =>

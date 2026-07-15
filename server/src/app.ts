@@ -12,6 +12,7 @@ import { registerAssetImportRoutes } from "./engine/assetimport";
 import { registerRepoScanRoutes } from "./engine/reposcan";
 import { registerVulnScanRoutes } from "./engine/vulnscan";
 import { registerComplianceRoutes } from "./engine/compliance";
+import { registerModelDexRoutes } from "./engine/modeldex";
 import { registerDispatcherRoutes } from "./engine/dispatcher";
 import { registerMemoryRoutes } from "./engine/memory";
 import { registerBridgeRoutes } from "./engine/bridge";
@@ -56,6 +57,7 @@ export function createApp(): Express {
   registerRepoScanRoutes(app);
   registerVulnScanRoutes(app);
   registerComplianceRoutes(app);
+  registerModelDexRoutes(app);
   registerDispatcherRoutes(app);
   registerMemoryRoutes(app);
   registerBridgeRoutes(app);
