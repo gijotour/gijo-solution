@@ -47,6 +47,11 @@
   .network-svg{width:100%;max-width:560px;}
   .network-svg .spark{animation:twinkle 3.2s ease-in-out infinite;}
   @keyframes twinkle{0%,100%{opacity:.3}50%{opacity:1}}
+  /* 작업 중: 기본 스파크는 더 빨리 반짝이고, 숨겨둔 추가 스파크가 켜진다 */
+  .network-svg .spark-extra{opacity:0;}
+  .network-svg.busy .spark{animation-duration:1s;}
+  .network-svg.busy .spark-extra{animation:twinkle 0.8s ease-in-out infinite;}
+  .network-svg.busy{filter:drop-shadow(0 0 6px rgba(95,161,255,0.25));}
   .agent-bubble{display:flex;align-items:flex-start;gap:10px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 18px;max-width:420px;margin-top:8px;}
   .agent-avatar{width:28px;height:28px;border-radius:8px;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;}
   .agent-bubble-text{font-size:12.5px;color:var(--text);line-height:1.6;}
@@ -214,6 +219,19 @@
 <circle class="spark" cx="72" cy="158" r="1.7" fill="#cfe4ff" filter="url(#sparkGlow)" style="animation-delay:1.3s"/>
 <circle class="spark" cx="148" cy="70" r="2.3" fill="#cfe4ff" filter="url(#sparkGlow)" style="animation-delay:.5s"/>
 <circle class="spark" cx="300" cy="406" r="1.9" fill="#cfe4ff" filter="url(#sparkGlow)" style="animation-delay:1.8s"/>
+<!-- 추가 스파크 — 평소엔 숨겨지고, 작업 중(busy)일 때만 켜져 반짝임이 많아진다 -->
+<circle class="spark-extra" cx="345" cy="118" r="2.2" fill="#dcebff" filter="url(#sparkGlow)"/>
+<circle class="spark-extra" cx="255" cy="118" r="1.9" fill="#dcebff" filter="url(#sparkGlow)" style="animation-delay:.15s"/>
+<circle class="spark-extra" cx="188" cy="165" r="2.3" fill="#dcebff" filter="url(#sparkGlow)" style="animation-delay:.3s"/>
+<circle class="spark-extra" cx="412" cy="165" r="2.0" fill="#dcebff" filter="url(#sparkGlow)" style="animation-delay:.45s"/>
+<circle class="spark-extra" cx="455" cy="205" r="2.2" fill="#dcebff" filter="url(#sparkGlow)" style="animation-delay:.1s"/>
+<circle class="spark-extra" cx="145" cy="205" r="1.8" fill="#dcebff" filter="url(#sparkGlow)" style="animation-delay:.55s"/>
+<circle class="spark-extra" cx="455" cy="245" r="2.1" fill="#dcebff" filter="url(#sparkGlow)" style="animation-delay:.35s"/>
+<circle class="spark-extra" cx="145" cy="245" r="2.3" fill="#dcebff" filter="url(#sparkGlow)" style="animation-delay:.2s"/>
+<circle class="spark-extra" cx="412" cy="300" r="1.9" fill="#dcebff" filter="url(#sparkGlow)" style="animation-delay:.5s"/>
+<circle class="spark-extra" cx="188" cy="300" r="2.2" fill="#dcebff" filter="url(#sparkGlow)" style="animation-delay:.05s"/>
+<circle class="spark-extra" cx="345" cy="345" r="2.0" fill="#dcebff" filter="url(#sparkGlow)" style="animation-delay:.4s"/>
+<circle class="spark-extra" cx="255" cy="345" r="2.3" fill="#dcebff" filter="url(#sparkGlow)" style="animation-delay:.25s"/>
 <image href="assets/gijo-center.png" x="196" y="116" width="208" height="208" preserveAspectRatio="xMidYMid meet"/>
       </svg>
       <div class="agent-bubble">
@@ -463,7 +481,17 @@
     await loadTasks();
   }
 
+  // 작업 중이면 중앙 그래프에 busy를 켜 반짝임을 빠르게·많게 한다. 마지막 활동 후 4초 지나면 잦아든다.
+  const networkSvg = document.querySelector(".network-svg");
+  let busyTimer = null;
+  function pulseBusy() {
+    if (networkSvg) networkSvg.classList.add("busy");
+    clearTimeout(busyTimer);
+    busyTimer = setTimeout(() => networkSvg && networkSvg.classList.remove("busy"), 4000);
+  }
+
   async function sendToOrchestrator(text) {
+    pulseBusy();
     agentBubbleText.textContent = "처리 중...";
     try {
       const result = await window.gijo.sendInstruction(text);
@@ -570,7 +598,10 @@
       agentBubbleName.textContent = evt.to;
       agentBubbleText.textContent = evt.message;
       appendCollabRow(evt);
+      pulseBusy();
     });
+    // 로컬 LLM이 실제로 추론/임베딩할 때마다도 작업 중으로 간주해 반짝임을 살린다.
+    if (window.gijo.onLlmActivity) window.gijo.onLlmActivity(pulseBusy);
   }
 
   if (!window.gijo.isAuthenticated()) {
