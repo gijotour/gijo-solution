@@ -100,8 +100,28 @@ ipcMain.handle("navigate:to", async (_e, page: string) => {
 
 // 읽기 전용 파일 탐색기 — 대시보드에서 폴더 트리를 본다. 명령 실행은 없다.
 // 루트를 벗어나는 경로(.. 등)는 거부해 선택한 루트 밖이 노출되지 않게 한다.
-// 기본 루트는 프로젝트 폴더. 사용자가 "폴더 선택"으로 런타임에 바꿀 수 있다(fs:pickRoot).
-let explorerRoot = path.resolve(process.env.GIJO_EXPLORER_ROOT ?? path.join(__dirname, "..", ".."));
+// 기본 루트는 마지막에 고른 폴더 → (없으면) 프로젝트 폴더. 폴더 선택 시 파일로 영속 저장한다.
+const DEFAULT_EXPLORER_ROOT = path.resolve(process.env.GIJO_EXPLORER_ROOT ?? path.join(__dirname, "..", ".."));
+let explorerRoot = DEFAULT_EXPLORER_ROOT;
+
+function rootStateFile(): string {
+  return path.join(app.getPath("userData"), "explorer-root.txt");
+}
+function loadSavedRoot(): void {
+  try {
+    const saved = fs.readFileSync(rootStateFile(), "utf-8").trim();
+    if (saved && fs.existsSync(saved) && fs.statSync(saved).isDirectory()) explorerRoot = path.resolve(saved);
+  } catch {
+    /* 저장된 위치 없음/삭제됨 — 기본 루트 유지 */
+  }
+}
+function saveRoot(dir: string): void {
+  try {
+    fs.writeFileSync(rootStateFile(), dir, "utf-8");
+  } catch {
+    /* 저장 실패는 무시(다음 실행 때 기본으로) */
+  }
+}
 
 ipcMain.handle("fs:list", async (_e, relPath: string) => {
   const target = path.resolve(explorerRoot, relPath || ".");
@@ -126,10 +146,12 @@ ipcMain.handle("fs:pickRoot", async () => {
   });
   if (result.canceled || result.filePaths.length === 0) return { cancelled: true };
   explorerRoot = path.resolve(result.filePaths[0]);
+  saveRoot(explorerRoot); // 다음 실행 때 이 폴더로 시작
   return { cancelled: false, root: explorerRoot, rootName: path.basename(explorerRoot) };
 });
 
 app.whenReady().then(() => {
+  loadSavedRoot(); // 마지막에 고른 파일 탐색기 폴더 복원 (userData는 ready 이후 접근)
   maybeStartBundledServer();
   createMainWindow();
 
