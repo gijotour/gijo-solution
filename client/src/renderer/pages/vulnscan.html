@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 취약점 스캐닝 & 업로드</title>
+<style>
+:root{
+  --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
+.app{display:grid;grid-template-columns:220px 1fr;}
+.sidebar{padding:22px 14px;border-right:1px solid var(--border);min-height:900px;}
+.nav-section{font-size:10.5px;font-weight:700;color:var(--muted-2);letter-spacing:1.2px;margin:18px 10px 8px;}
+.nav-section:first-child{margin-top:0;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:2px;}
+.nav-item .ic{width:18px;text-align:center;font-size:14px;}
+.nav-item.active{background:rgba(59,130,246,0.12);color:var(--white);box-shadow:inset 3px 0 0 var(--blue);cursor:default;}
+.nav-item:hover:not(.active){background:rgba(255,255,255,0.04);color:var(--white);}
+.main{padding:28px 32px 48px;}
+.topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;}
+.page-title{font-size:21px;font-weight:800;color:#fff;}
+.page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;}
+.btn-primary{background:var(--blue);color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;}
+.btn-ghost{background:transparent;border:1px solid var(--border-strong);color:var(--text);padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:16px;}
+.kpi-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:20px;}
+.kpi-mini{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+.kpi-mini-label{font-size:11px;color:var(--muted);font-weight:600;margin-bottom:6px;}
+.kpi-mini-value{font-size:19px;font-weight:800;color:#fff;}
+.table-panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:0 18px 10px;margin-bottom:16px;}
+table{width:100%;border-collapse:collapse;font-size:13px;}
+th{text-align:left;font-size:10.5px;font-weight:700;padding:12px 10px;color:var(--muted-2);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);}
+td{padding:13px 10px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;}
+tr:last-child td{border-bottom:none;}
+.host-name{font-weight:700;color:#fff;}
+.sev{display:inline-block;min-width:26px;text-align:center;padding:1px 7px;border-radius:6px;font-size:11px;font-weight:800;margin-right:4px;}
+.sev-c{background:rgba(226,72,61,0.18);color:#f5928a;}
+.sev-h{background:rgba(240,120,40,0.18);color:#f7a86a;}
+.sev-m{background:rgba(240,160,32,0.15);color:var(--amber);}
+.sev-l{background:rgba(139,147,171,0.15);color:var(--muted);}
+.status-line{font-size:12.5px;margin-top:10px;}
+.footer{margin-top:8px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted-2);}
+.footer img{height:16px;opacity:0.6;}
+.header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2);}
+.header-left{display:flex;align-items:center;gap:12px;}
+.header-left img{height:22px;}
+.app-title{font-size:15px;font-weight:800;color:#fff;}
+.clock{font-size:12px;color:var(--blue-light);font-weight:600;}
+.header-right{display:flex;align-items:center;gap:10px;}
+.status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
+.status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
+.beta-tag{background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
+.avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+.icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <img src="https://gijo.ai/_nuxt/logo_gijo_white.CCh2YXJe.svg" alt="GIJO">
+    <div class="app-title">GIJO AS</div>
+    <div class="clock" id="clockEl">-</div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill" id="statusPill"><span class="dot"></span>연결 확인 중<span class="beta-tag">LIVE</span></div>
+    <div class="avatar-btn" id="avatarBtn">-</div>
+    <div class="icon-btn" id="settingsBtn">⚙</div>
+  </div>
+</div>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="nav-section">AI 팀</div>
+    <div class="nav-item" data-page="agent.html"><span class="ic">◉</span>에이전트 AI</div>
+    <div class="nav-section">모니터링</div>
+    <div class="nav-item" data-page="dashboard.html"><span class="ic">◆</span>대시보드</div>
+    <div class="nav-item" data-page="inventory.html"><span class="ic">◇</span>AI 자산</div>
+    <div class="nav-item" data-page="sbom.html"><span class="ic">▢</span>AI-BOM</div>
+    <div class="nav-item" data-page="threat.html"><span class="ic">△</span>위협 인텔리전스</div>
+    <div class="nav-item active"><span class="ic">⊘</span>취약점 스캐닝 & 업로드</div>
+    <div class="nav-section">거버넌스</div>
+    <div class="nav-item" data-page="compliance.html"><span class="ic">✓</span>컴플라이언스</div>
+    <div class="nav-item" data-page="report.html"><span class="ic">▣</span>내부 리포트</div>
+    <div class="nav-item" data-page="approvals.html"><span class="ic">◈</span>승인 워크플로우</div>
+    <div class="nav-section">고급 기능</div>
+    <div class="nav-item" data-page="merge.html"><span class="ic">⬡</span>모델 머지 랩</div>
+    <div class="nav-item" data-page="memory.html"><span class="ic">⛁</span>단기 · 장기 기억</div>
+    <div class="nav-item" data-page="billing.html"><span class="ic">$</span>사용량 · 요금</div>
+    <div class="nav-section">시스템</div>
+    <div class="nav-item" data-page="logs.html"><span class="ic">▤</span>로그</div>
+    <div class="nav-item" data-page="settings.html"><span class="ic">⚙</span>설정</div>
+  </div>
+
+  <div class="main">
+    <div class="topbar-row">
+      <div>
+        <div class="page-title">취약점 스캐닝 & 업로드</div>
+        <div class="page-sub">Tenable Nessus 등 취약점 도구의 스캔 결과(CSV/JSON)를 업로드하면 호스트(IP)별로 자산 등록하고 발견 취약점을 반영합니다. 데이터는 사내에서만 이동합니다.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div style="font-size:14.5px;font-weight:800;color:#fff;margin-bottom:4px;">스캔 결과 업로드</div>
+      <div style="font-size:11.5px;color:var(--muted);margin-bottom:14px;">Nessus는 "Export → CSV" 결과를 그대로 올리면 됩니다. Host/IP, Name, Risk, CVE 컬럼을 자동 인식합니다.</div>
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <input id="sourceInput" placeholder="스캔 출처 라벨 (예: nessus-2026-07)" style="flex:1;min-width:200px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;">
+        <input type="file" id="vulnFileInput" accept=".json,.csv" style="display:none">
+        <button class="btn-primary" id="uploadBtn">파일 선택 & 업로드</button>
+      </div>
+      <div class="status-line" id="uploadStatus"></div>
+    </div>
+
+    <div class="kpi-strip">
+      <div class="kpi-mini"><div class="kpi-mini-label">스캔 호스트</div><div class="kpi-mini-value" id="kpiHosts">-</div></div>
+      <div class="kpi-mini"><div class="kpi-mini-label">Critical</div><div class="kpi-mini-value" id="kpiCrit" style="color:#f5928a">-</div></div>
+      <div class="kpi-mini"><div class="kpi-mini-label">High</div><div class="kpi-mini-value" id="kpiHigh" style="color:#f7a86a">-</div></div>
+      <div class="kpi-mini"><div class="kpi-mini-label">Medium</div><div class="kpi-mini-value" id="kpiMed" style="color:var(--amber)">-</div></div>
+      <div class="kpi-mini"><div class="kpi-mini-label">Low/Info</div><div class="kpi-mini-value" id="kpiLow" style="color:var(--muted)">-</div></div>
+    </div>
+
+    <div class="table-panel">
+      <table>
+        <thead><tr><th>호스트 / IP</th><th>출처</th><th>취약점(심각도별)</th><th>최근 스캔</th></tr></thead>
+        <tbody id="hostRows">
+          <tr><td colspan="4" style="color:var(--muted)">불러오는 중...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="footer">
+      <img src="https://gijo.ai/_nuxt/logo_gijo_only_white.ATZVOJtw.svg" alt="GIJO">
+      <span>© 2026 GIJO Technology · GIJO AS Platform · Confidential</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  const clockEl = document.getElementById("clockEl");
+  const statusPill = document.getElementById("statusPill");
+  const avatarBtn = document.getElementById("avatarBtn");
+  const hostRows = document.getElementById("hostRows");
+
+  function tick() {
+    clockEl.textContent = new Date().toLocaleString("ko-KR", {
+      hour: "2-digit", minute: "2-digit", hour12: true, year: "numeric", month: "2-digit", day: "2-digit",
+    });
+  }
+
+  async function loadHealth() {
+    try {
+      await window.gijo.checkServerHealth();
+      statusPill.innerHTML = '<span class="dot"></span>운영중<span class="beta-tag">LIVE</span>';
+    } catch (e) {
+      statusPill.innerHTML = '<span class="dot" style="background:#e2483d"></span>서버 연결 끊김';
+    }
+  }
+
+  async function loadUser() {
+    try {
+      const user = await window.gijo.me();
+      avatarBtn.textContent = (user.displayName || user.username || "-").charAt(0);
+    } catch (e) {}
+  }
+
+  function sevCounts(findings) {
+    const c = { critical: 0, high: 0, medium: 0, low: 0 };
+    (findings || []).forEach((f) => { c[f.severity] = (c[f.severity] || 0) + 1; });
+    return c;
+  }
+
+  function fmtDate(ts) {
+    return ts ? new Date(ts).toLocaleString("ko-KR", { year: "2-digit", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
+  }
+
+  async function refresh() {
+    let assets = [];
+    try {
+      assets = (await window.gijo.listAssets()).filter((a) => a.assetType === "infra-host");
+    } catch (e) {
+      hostRows.innerHTML = '<tr><td colspan="4" style="color:#f5928a">자산을 불러오지 못했습니다</td></tr>';
+      return;
+    }
+    const totals = { critical: 0, high: 0, medium: 0, low: 0 };
+    if (assets.length === 0) {
+      hostRows.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">업로드된 취약점 스캔 결과가 없습니다. 위에서 Nessus 등의 결과 파일을 올려주세요.</td></tr>';
+    } else {
+      hostRows.innerHTML = assets.map((a) => {
+        const c = sevCounts(a.findings);
+        totals.critical += c.critical; totals.high += c.high; totals.medium += c.medium; totals.low += c.low;
+        const badges =
+          (c.critical ? `<span class="sev sev-c">C ${c.critical}</span>` : "") +
+          (c.high ? `<span class="sev sev-h">H ${c.high}</span>` : "") +
+          (c.medium ? `<span class="sev sev-m">M ${c.medium}</span>` : "") +
+          (c.low ? `<span class="sev sev-l">L ${c.low}</span>` : "") || '<span style="color:var(--muted)">—</span>';
+        return `<tr>
+          <td><div class="host-name">${String(a.name).replace(/</g, "&lt;")}</div></td>
+          <td style="color:var(--muted)">${String(a.owner).replace(/</g, "&lt;")}</td>
+          <td>${badges}</td>
+          <td style="color:var(--muted)">${fmtDate(a.lastScannedAt)}</td>
+        </tr>`;
+      }).join("");
+    }
+    document.getElementById("kpiHosts").textContent = assets.length;
+    document.getElementById("kpiCrit").textContent = totals.critical;
+    document.getElementById("kpiHigh").textContent = totals.high;
+    document.getElementById("kpiMed").textContent = totals.medium;
+    document.getElementById("kpiLow").textContent = totals.low;
+  }
+
+  async function handleUpload(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const status = document.getElementById("uploadStatus");
+    try {
+      const text = await file.text();
+      const format = file.name.toLowerCase().endsWith(".csv") ? "csv" : "json";
+      const source = document.getElementById("sourceInput").value.trim() || file.name.replace(/\.(json|csv)$/i, "");
+      status.textContent = "분석 중...";
+      status.style.color = "var(--muted)";
+      const r = await window.gijo.importVulnScan(text, format, source);
+      status.textContent = `✓ ${r.hosts}개 호스트 · 취약점 ${r.findings}건을 등록했습니다.`;
+      status.style.color = "var(--teal)";
+      await refresh();
+    } catch (err) {
+      status.textContent = "✗ 업로드 실패: " + err.message;
+      status.style.color = "#f5928a";
+    }
+    e.target.value = "";
+  }
+
+  async function init() {
+    tick();
+    setInterval(tick, 30000);
+    await loadUser();
+    await loadHealth();
+    await refresh();
+
+    document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
+    document.querySelectorAll(".nav-item[data-page]").forEach((el) => {
+      el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
+    });
+    document.getElementById("uploadBtn").addEventListener("click", () => document.getElementById("vulnFileInput").click());
+    document.getElementById("vulnFileInput").addEventListener("change", handleUpload);
+  }
+
+  if (!window.gijo.isAuthenticated()) {
+    window.gijo.navigateTo("login.html");
+  } else {
+    init();
+  }
+</script>
+
+</body>
+</html>

@@ -208,6 +208,13 @@
     }
   }
 
+  function assetRow(a, showPath) {
+    const nm = String(a.name).replace(/</g, "&lt;");
+    const sub = showPath && a.path && a.path !== a.name ? ` <span style="color:var(--muted-2);font-size:10.5px">${String(a.path).replace(/</g, "&lt;")}</span>` : "";
+    const vulns = a.findings.length ? ` <span style="color:var(--amber)">(${a.findings.length})</span>` : "";
+    return `<div style="padding-left:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nm}${sub}${vulns}</div>`;
+  }
+
   async function loadAssets() {
     try {
       const assets = await window.gijo.listAssets();
@@ -215,10 +222,18 @@
         explorerTree.innerHTML = '<div class="folder">▸ AI 자산 (0)</div><div style="padding-left:14px;color:var(--muted-2)">등록된 자산이 없습니다</div>';
         return;
       }
-      const rows = assets
-        .map((a) => `<div style="padding-left:14px">${a.name}${a.findings.length ? ` <span style="color:var(--amber)">(${a.findings.length})</span>` : ""}</div>`)
-        .join("");
-      explorerTree.innerHTML = `<div class="folder">▸ AI 자산 (${assets.length})</div>${rows}`;
+      const hosts = assets.filter((a) => a.assetType === "infra-host");
+      const ai = assets.filter((a) => a.assetType !== "infra-host");
+      let html = "";
+      html += `<div class="folder">▸ AI 자산 (${ai.length})</div>`;
+      html += ai.slice(0, 8).map((a) => assetRow(a, false)).join("");
+      if (ai.length > 8) html += `<div style="padding-left:14px;color:var(--muted-2);font-size:11px">…외 ${ai.length - 8}건</div>`;
+      if (hosts.length) {
+        html += `<div class="folder" style="margin-top:8px">▸ 인프라 호스트 (${hosts.length})</div>`;
+        html += hosts.slice(0, 8).map((a) => assetRow(a, true)).join("");
+        if (hosts.length > 8) html += `<div style="padding-left:14px;color:var(--muted-2);font-size:11px">…외 ${hosts.length - 8}건</div>`;
+      }
+      explorerTree.innerHTML = html;
     } catch (e) {
       explorerTree.innerHTML = '<div style="color:var(--muted-2)">자산 목록을 불러오지 못했습니다</div>';
     }

@@ -51,6 +51,7 @@ const gijoApi = {
   importAssets: (content: string, format: "json" | "csv", source: string) => api.assetsApi.import(content, format, source),
   scanRepos: (args: { provider: string; owner: string; token?: string; baseUrl?: string; maxRepos?: number }) => api.assetsApi.scanRepos(args),
   updateAiBom: (id: string, aibom: unknown) => api.assetsApi.updateAiBom(id, aibom as import("./apiClient").AiBom),
+  importVulnScan: (content: string, format: "json" | "csv", source: string) => api.assetsApi.importVulnScan(content, format, source),
   onAssetUpdated: (cb: (asset: unknown) => void) => onChannel("asset:updated", cb),
 
   // SBOM

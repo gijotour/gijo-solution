@@ -376,4 +376,9 @@ export const assetsApi = {
   scanRepos: (args: { provider: string; owner: string; token?: string; baseUrl?: string; maxRepos?: number }) =>
     request<{ scanned: number; registered: number; assets: Asset[] }>("/api/reposcan", { method: "POST", body: args }),
   updateAiBom: (id: string, aibom: AiBom) => request<Asset>(`/api/assets/${id}/aibom`, { method: "PUT", body: { aibom } }),
+  importVulnScan: (content: string, format: "json" | "csv", source: string) =>
+    request<{ hosts: number; findings: number; assets: Asset[] }>("/api/vulnscan/import", {
+      method: "POST",
+      body: { content, format, source },
+    }),
 };
