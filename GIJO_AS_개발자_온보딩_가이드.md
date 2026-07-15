@@ -132,9 +132,14 @@ D:\Connect AI\
 ### 에이전트 8개 (agents.ts)
 
 `orchestrator`(watching) / `scan` / `pentest` / `analysis` / `sbom` / `cti`(watching) / `report` /
-`model-evolution`. 각자 `brainModelId`(qwen3-30b-a3b, deephat-v1-7b, foundation-sec-8b 등)를 갖는다.
+`model-evolution`. 각 에이전트는 `assignedModelId`(전용 모델 할당, null이면 전역 모델 따름)를
+가지며 이건 `app_state`에 영속화된다 — 채팅 시 `localengine.ensureAgentModel`이 필요하면 그
+모델로 스왑한다. (예전엔 하드코딩 `brainModelId`가 있었으나 배치도 안 된 모델명을 보여주는
+"동작하는 척"이라 실제 할당으로 교체했다 — 2026-07-16.)
 **에이전트 status(idle/working/watching)는 의도적으로 DB에 저장하지 않는다** — 재시작 후에도
 "working"이 남아 있으면 죽은 작업이 살아있는 것처럼 보이기 때문. 재시작 시 초기화가 정상 동작이다.
+지식(RAG)도 에이전트별 스코프를 가진다 — 문서 수집 시 `global` 또는 특정 agentId로 귀속하고,
+채팅 시 그 에이전트는 "전용 + 전역"만 참조한다(`memory.ts`의 scope).
 
 ### 디스패치 파이프라인 (dispatcher.ts)
 
