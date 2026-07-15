@@ -10,11 +10,15 @@
 
 ---
 
-## STEP 0 — 압축 해제
+## STEP 0 — 소스 받기 (git clone)
+
+> 예전 방식(`gijo-as-cs-scaffold.zip` 압축 해제)은 폐기 — zip은 낡은 Java 스캐폴드 시절
+> 산출물입니다. 지금은 git 저장소가 유일한 소스입니다. (private 저장소이므로 GitHub 계정에
+> SSH 키 등록 또는 HTTPS 토큰이 먼저 필요합니다. git은 STEP 4에서 설치하므로, 순서상
+> STEP 4를 먼저 실행한 뒤 여기로 돌아와도 됩니다.)
 
 ```powershell
-New-Item -ItemType Directory -Path C:\GIJO-AS -Force
-Expand-Archive -Path "$HOME\Downloads\gijo-as-cs-scaffold.zip" -DestinationPath C:\GIJO-AS
+git clone git@github.com:gijotour/AS-Private.git C:\GIJO-AS
 ```
 
 **확인**: `C:\GIJO-AS\server`와 `C:\GIJO-AS\client` 폴더가 나란히 존재해야 합니다. (서버 코드가 `server` 폴더를 기준으로 상대경로를 쓰므로, 이 둘의 위치 관계가 중요합니다.)
@@ -70,8 +74,11 @@ winget install --id Git.Git -e --source winget
 winget install --id Kitware.CMake -e --source winget
 winget install --id Microsoft.VisualStudio.2022.BuildTools -e --override "--wait --quiet --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
 winget install --id OpenJS.NodeJS.LTS -e --source winget
-winget install --id EclipseAdoptium.Temurin.17.JDK -e --source winget
+winget install --id Python.Python.3.12 -e --source winget
 ```
+
+> Java(JDK)는 더 이상 설치하지 않습니다 — 서버가 Node/TypeScript입니다(`server-java-reference/`는
+> 폐기된 폴백). Python 3.12는 모델 스캐너(modelscan)가 서버 런타임에 필요합니다.
 
 **확인**:
 ```powershell
@@ -79,15 +86,22 @@ git --version
 cmake --version
 node --version
 npm --version
-java -version
+python --version
 ```
-Node는 v20.x 이상(클라이언트 Electron용), Java는 OpenJDK 17.x 이상(서버 Spring Boot용)이어야 합니다. 추가로 시작 메뉴에서 "Visual Studio 2022 Developer PowerShell"이 검색되는지 확인(다음 단계에서 이 셸을 씁니다).
+Node는 v20.x 이상(서버·클라이언트 공통), Python은 3.12.x여야 합니다. 추가로 시작 메뉴에서 "Visual Studio 2022 Developer PowerShell"이 검색되는지 확인(다음 단계에서 이 셸을 씁니다).
+
+**모델 스캐너 의존성 설치** (새 PowerShell 창에서 — python PATH 갱신 필요):
+```powershell
+cd C:\GIJO-AS\server
+pip install -r requirements.txt
+python -c "import modelscan; print('modelscan OK')"
+```
 
 ---
 
 ## STEP 5 — llama.cpp 클론 + CUDA 빌드 `[VS Dev PowerShell]`
 
-GIJO AS 서버(`com.gijo.as.engine.service.LocalEngineService` 등)가 `server\llama.cpp\build\bin\Release\llama-server.exe`를 상대경로로 찾기 때문에, **반드시 `server` 폴더 안에** 클론해야 합니다.
+GIJO AS 서버(`server/src/engine/localengine.ts`)가 기본값으로 `server\llama.cpp\build\bin\Release\llama-server.exe`를 상대경로로 찾기 때문에(`GIJO_LLAMA_SERVER_PATH` 환경변수로 변경 가능), **반드시 `server` 폴더 안에** 클론해야 합니다.
 
 ```powershell
 cd C:\GIJO-AS\server
@@ -156,32 +170,38 @@ JSON 응답이 오면 정상. 확인 끝나면 원래 터미널에서 `Ctrl+C`�
 
 ---
 
-## STEP 8 — GIJO AS 서버 빌드 및 최초 설정 (Spring Boot)
+## STEP 8 — GIJO AS 서버 빌드 및 최초 설정 (Node/TypeScript)
+
+> 예전 문서의 Spring Boot/Gradle 절차는 폐기된 `server-java-reference/` 기준이었습니다.
+> 실제 서버는 Node/TypeScript입니다.
 
 ```powershell
 cd C:\GIJO-AS\server
+npm install
+npm run start     # tsc 빌드 후 node dist/index.js 실행
 ```
 
-**최초 1회 설정**:
-서버 설정 파일 `src/main/resources/application.yml` (또는 `application.properties`)을 열어 기본 관리자 비밀번호 및 데이터베이스 파일 경로 등을 환경에 맞게 편집합니다. (비밀번호는 구동 시 Spring Security의 `BCryptPasswordEncoder`에 의해 자동 해싱되어 보안 적용됩니다.)
+**최초 기동 시 자동으로 되는 것** (수동 설정 파일 없음):
+- SQLite DB(`data\gijo-as.sqlite`)와 암호화 키(`data\encryption.key`) 자동 생성 — **`data\` 폴더가 백업 대상입니다** (DB + 키가 여기 있음)
+- 기본 관리자 계정 `jyh` / `changeme` 자동 시드 → **로그인 직후 설정 화면에서 비밀번호부터 변경**
 
-**Gradle 빌드 및 실행**:
-```powershell
-# 빌드 (Windows 환경이므로 gradlew.bat 자동 활용)
-.\gradlew.bat build -x test
+**운영 배포 시 환경변수** (개발 PC에서는 생략 가능):
+- `GIJO_JWT_SECRET` — `NODE_ENV=production`이면 **필수** (미설정 시 기동 거부)
+- `GIJO_ENCRYPTION_KEY` — 64자리 hex(32바이트). 미설정 시 `data\encryption.key` 파일 자동 생성으로 대체
+- 그 외 조정용: `GIJO_SERVER_PORT`(기본 4000), `GIJO_DB_PATH`, `GIJO_MODELS_DIR`, `GIJO_LLAMA_SERVER_PATH`, `GIJO_LOCAL_LLM_CTX_SIZE`
 
-# 애플리케이션 실행
-java -jar build/libs/server-0.0.1-SNAPSHOT.jar
-# 또는 개발 모드 실행:
-# .\gradlew.bat bootRun
-```
-
-**확인**: 콘솔에 Spring Boot 기동 배너와 함께 포트 4000(또는 지정 포트)과 WebSocket 관련 로그가 정상 출력되는지 확인합니다.
+**확인**: 콘솔에 서버 기동 로그와 포트 4000이 출력되는지 확인합니다.
 새 터미널에서:
 ```powershell
 curl http://localhost:4000/api/health
 ```
 `{"ok":true,"service":"gijo-as-server"}` 응답 확인.
+
+**RAG(단기 기억) 사용 시 추가**: 임베딩 모델은 채팅용과 **별도의** llama-server 프로세스로 8081 포트에 띄워야 합니다 (`--embedding` 플래그). 안 띄우면 채팅은 되고 RAG 기능만 임베딩 에러가 납니다:
+```powershell
+cd C:\GIJO-AS\server\llama.cpp
+.\build\bin\Release\llama-server.exe -m ..\models\<임베딩모델>\<임베딩모델>.gguf --embedding --host 0.0.0.0 --port 8081
+```
 
 ---
 
@@ -195,7 +215,7 @@ npm run build
 npm start
 ```
 
-**확인**: Electron 창이 뜨고 로그인 화면이 표시됩니다. 서버 주소 입력란은 기본값(`http://localhost:4000`)을 그대로 두고, 아이디 `jyh` / STEP 8에서 바꾼 비밀번호로 로그인 → 대시보드 화면으로 넘어가면 성공.
+**확인**: Electron 창이 뜨고 로그인 화면이 표시됩니다. 서버 주소 입력란은 기본값(`http://localhost:4000`)을 그대로 두고, 최초 계정 `jyh` / `changeme`로 로그인 → 대시보드로 넘어가면 성공. **로그인 직후 설정 화면에서 비밀번호를 변경**하고, 필요하면 같은 화면의 계정 관리 패널에서 담당자 계정을 추가하세요.
 
 ---
 
@@ -213,12 +233,14 @@ npm start
 
 | 증상 | 원인 | 조치 |
 |---|---|---|
-| `nvcc` 또는 `java` 명령을 찾을 수 없음 | 설치 후 환경변수 미갱신 | 새 PowerShell 창 열기, 안되면 재부팅 |
+| `nvcc`/`python`/`node` 명령을 찾을 수 없음 | 설치 후 환경변수 미갱신 | 새 PowerShell 창 열기, 안되면 재부팅 |
 | llama.cpp 빌드 중 CUDA/MSVC 관련 오류 | VS Build Tools에 C++ 워크로드 누락, 또는 일반 PowerShell에서 빌드 시도 | STEP 4 명령 재실행 + 반드시 `[VS Dev PowerShell]`에서 빌드 |
-| Gradle 빌드 중 JDK 미인식 또는 버전 오류 | JAVA_HOME 환경변수 누락 또는 다른 자바 버전 충돌 | JDK 17/21 설치 경로를 JAVA_HOME 환경변수에 추가하고 Path에 `%JAVA_HOME%\bin` 확인 |
+| 서버 기동 시 `ERR_DLOPEN_FAILED` (better-sqlite3) | 네이티브 모듈이 다른 ABI(Electron용)로 빌드된 상태 | `cd server && npm rebuild better-sqlite3` (온보딩 가이드 5.3절 — Electron 클라이언트용 rebuild-server-native를 돌린 뒤 서버를 Node로 직접 띄우면 발생) |
 | `npm install`(client) 중 electron 다운로드 실패 | 사내망/방화벽이 GitHub Releases 차단 | 방화벽 예외 등록 또는 `ELECTRON_MIRROR` 환경변수로 국내 미러 지정 |
-| 로그인 401 unauthorized | 잘못된 ID/PW 입력 또는 만료된 JWT 토큰 | 계정 정보 재확인 및 다시 로그인 |
-| 로컬 엔진 시작 요청이 실패/무응답 | 모델 파일 경로·이름 불일치 또는 java 서브프로세스 권한 차단 | STEP 6 경로(`server\models\qwen2.5-coder-32b-instruct\qwen2.5-coder-32b-instruct.gguf`)와 파일명이 정확히 일치하는지 확인 |
+| 로그인 401 unauthorized | 잘못된 ID/PW 입력 또는 만료된 JWT 토큰 | 계정 정보 재확인 및 다시 로그인 (최초 계정은 `jyh`/`changeme`) |
+| RAG/문서 검색에서 임베딩 에러 | 8081 임베딩 llama-server 미기동 | STEP 8 하단의 `--embedding` 서버를 별도로 띄웠는지 확인 |
+| 모델 스캔이 `scan_error`로 끝남 | Python 또는 modelscan 미설치 | STEP 4의 `pip install -r requirements.txt` 재확인 |
+| 로컬 엔진 시작 요청이 실패/무응답 | 모델 파일 경로·이름 불일치 또는 llama-server 실행 파일 미존재 | STEP 6 경로(`server\models\qwen2.5-coder-32b-instruct\qwen2.5-coder-32b-instruct.gguf`)와 STEP 5 빌드 산출물(`llama-server.exe`) 존재 확인 |
 | 앱에서 HF 모델 검색은 되는데 다운로드만 실패 | 서버 실행 계정 PATH에 `huggingface-cli` 없음 | STEP 6의 `huggingface-cli --version` 확인 절차 수행 (pip Scripts 경로를 PATH에 추가) |
 | VRAM 부족 경고 | 컨텍스트 크기 과다 설정 | STEP 7/10에서 `--ctx-size`를 32768보다 낮춰 재시도 |
 
@@ -227,4 +249,4 @@ npm start
 ## 참고
 
 - 기술 배경·설계 근거: `로컬LLM_프로젝트_가이드.md` (특히 1~3단계, 9단계 CS 구조)
-- 서버/클라이언트 구조 상세: `gijo-as-cs-scaffold.zip` 안의 최상위 `README.md`, `server/README.md`(있는 경우), `client/README.md`
+- 서버/클라이언트 구조 상세·실제 코드 기준 안내: `GIJO_AS_개발자_온보딩_가이드.md` (아키텍처, 라우트 맵, 함정 목록 포함 — 이 체크리스트보다 상세)
