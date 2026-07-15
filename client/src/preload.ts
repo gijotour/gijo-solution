@@ -61,6 +61,7 @@ const gijoApi = {
   updateAiBom: (id: string, aibom: unknown) => api.assetsApi.updateAiBom(id, aibom as import("./apiClient").AiBom),
   importVulnScan: (content: string, format: "json" | "csv", source: string) => api.assetsApi.importVulnScan(content, format, source),
   listModelDex: () => api.modelDexApi.list(),
+  listLlmGuide: () => api.modelDexApi.guide(),
   listCompliance: () => api.complianceApi.list(),
   setComplianceStatus: (code: string, status: string, note: string) => api.complianceApi.setStatus(code, status, note),
   onAssetUpdated: (cb: (asset: unknown) => void) => onChannel("asset:updated", cb),

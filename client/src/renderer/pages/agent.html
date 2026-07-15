@@ -239,8 +239,11 @@ tr:last-child td{border-bottom:none;}
       <div id="engineStatusRow" class="brain-row"><span>llama-server</span><span>불러오는 중...</span></div>
     </div>
     <div class="panel">
-      <div class="panel-title">HuggingFace 모델 검색 · 불러오기</div>
-      <div class="panel-sub">보안 특화 오픈소스 모델을 검색해 로컬로 내려받습니다 (huggingface-cli 필요)</div>
+      <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+        <span>HuggingFace 모델 검색 · 불러오기</span>
+        <span class="panel-link" id="llmGuideBtn" title="용도별 추천 LLM 가이드 열기" style="cursor:pointer">❓ 도움</span>
+      </div>
+      <div class="panel-sub">보안 특화 오픈소스 모델을 검색해 로컬로 내려받습니다. 뭘 받아야 할지 모르겠다면 <b style="color:var(--blue-light);cursor:pointer" id="llmGuideLink">❓ 도움(추천 LLM 가이드)</b>에서 용도별 추천 모델을 확인하세요.</div>
       <div class="model-search"><input id="hfSearchInput" placeholder="예: cybersecurity, WhiteRabbitNeo, Foundation-Sec"><button id="hfSearchBtn">검색</button></div>
       <div id="hfResults" style="font-size:12px;color:var(--muted-2)">검색어를 입력하고 검색 버튼을 눌러주세요.</div>
     </div>
@@ -579,6 +582,9 @@ tr:last-child td{border-bottom:none;}
 
     document.getElementById("hfSearchBtn").addEventListener("click", searchHf);
     document.getElementById("hfSearchInput").addEventListener("keydown", (e) => { if (e.key === "Enter") searchHf(); });
+    const goGuide = () => window.gijo.navigateTo("llmguide.html");
+    document.getElementById("llmGuideBtn").addEventListener("click", goGuide);
+    document.getElementById("llmGuideLink").addEventListener("click", goGuide);
     document.getElementById("hfResults").addEventListener("click", async (e) => {
       const modelId = e.target.dataset.load;
       if (!modelId) return;

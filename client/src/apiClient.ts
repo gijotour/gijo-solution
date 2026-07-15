@@ -430,6 +430,7 @@ export interface DexModel {
 }
 export const modelDexApi = {
   list: () => request<{ models: DexModel[]; groups: { arch: string; models: DexModel[] }[] }>("/api/modeldex"),
+  guide: () => request("/api/llmguide"),
 };
 
 export const complianceApi = {
