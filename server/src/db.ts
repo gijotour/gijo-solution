@@ -113,6 +113,26 @@ db.exec(`
     role TEXT NOT NULL,
     createdAt INTEGER NOT NULL
   );
+
+  -- 보안제품 유지보수 일정 · 점검서 · 승인(engine/maintenance.ts). scheduleDate는 "YYYY-MM-DD"
+  -- 일 단위 예정일. intervalDays가 있으면 승인 시 같은 title로 다음 회차를 자동 생성한다.
+  CREATE TABLE IF NOT EXISTS maintenance_items (
+    id TEXT PRIMARY KEY,
+    title TEXT NOT NULL,
+    productName TEXT NOT NULL,
+    scheduleDate TEXT NOT NULL,
+    intervalDays INTEGER,
+    status TEXT NOT NULL,
+    reportNote TEXT,
+    reportDocName TEXT,
+    reportedBy TEXT,
+    reportedAt INTEGER,
+    reviewedBy TEXT,
+    reviewedAt INTEGER,
+    reviewNote TEXT,
+    createdAt INTEGER NOT NULL,
+    updatedAt INTEGER NOT NULL
+  );
 `);
 
 db.exec(`

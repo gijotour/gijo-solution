@@ -155,6 +155,37 @@ export const tasksApi = {
   remove: (id: string) => request(`/api/tasks/${id}`, { method: "DELETE" }),
 };
 
+// ── 유지보수 일정 · 점검서 · 승인(거버넌스 검증) ──────────────────────
+export interface MaintenanceItem {
+  id: string;
+  title: string;
+  productName: string;
+  scheduleDate: string;
+  intervalDays?: number;
+  status: "scheduled" | "reported" | "approved" | "rejected";
+  reportNote?: string;
+  reportDocName?: string;
+  reportedBy?: string;
+  reportedAt?: number;
+  reviewedBy?: string;
+  reviewedAt?: number;
+  reviewNote?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export const maintenanceApi = {
+  list: () => request<MaintenanceItem[]>("/api/maintenance"),
+  due: () => request<MaintenanceItem[]>("/api/maintenance/due"),
+  create: (args: { title: string; productName: string; scheduleDate: string; intervalDays?: number }) =>
+    request<MaintenanceItem>("/api/maintenance", { method: "POST", body: args }),
+  report: (id: string, args: { note: string; filename?: string; content?: string }) =>
+    request<MaintenanceItem>(`/api/maintenance/${id}/report`, { method: "POST", body: args }),
+  approve: (id: string) => request<MaintenanceItem>(`/api/maintenance/${id}/approve`, { method: "POST" }),
+  reject: (id: string, reason: string) =>
+    request<MaintenanceItem>(`/api/maintenance/${id}/reject`, { method: "POST", body: { reason } }),
+};
+
 // ── 협업 로그 ─────────────────────────────────────────────────────────
 export interface CollaborationEvent {
   from: string;

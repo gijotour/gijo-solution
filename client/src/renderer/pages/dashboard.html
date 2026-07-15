@@ -73,6 +73,9 @@
   .today-p{padding:2px 7px;border-radius:5px;font-size:10.5px;font-weight:800;flex-shrink:0;}
   .p0{background:rgba(226,72,61,0.18);color:#f5928a;}
   .p1{background:rgba(240,160,32,0.18);color:#f7c777;}
+  .today-item.maint-due{cursor:pointer;border-color:rgba(59,130,246,0.35);}
+  .today-item.maint-due:hover{border-color:var(--blue-light);}
+  .today-p.maint{background:rgba(59,130,246,0.18);color:var(--blue-light);}
   .today-cta{margin-top:auto;background:var(--teal);color:#06281c;border:none;border-radius:8px;padding:13px;font-size:13px;font-weight:800;cursor:pointer;}
 
   /* 에이전트 지시창 — 중앙 열(오케스트레이터) 아래에 놓아 양쪽 사이드바에 걸치지 않게 폭을 제한한다. */
@@ -116,6 +119,7 @@
         <div class="icon-btn" data-page="compliance.html" title="컴플라이언스">✓</div>
         <div class="icon-btn" data-page="report.html" title="내부 리포트">▣</div>
         <div class="icon-btn" data-page="approvals.html" title="승인 워크플로우">◈</div>
+        <div class="icon-btn" data-page="opsguide.html" title="보안제품 운영 가이드">🛠</div>
         <div class="icon-btn" data-page="merge.html" title="보안 LLM 합성">⬡</div>
         <div class="icon-btn" data-page="memory.html" title="AI 기억·학습">⛁</div>
         <div class="icon-btn" data-page="billing.html" title="사용량·요금">$</div>
@@ -443,24 +447,42 @@
     );
   }
 
+  // 유지보수 점검 중 오늘 마감이거나 지연된 건 — 클릭하면 운영 가이드(opsguide.html)로 이동해서
+  // 점검 결과를 등록한다. 체크박스/삭제는 없다(완료 처리는 opsguide.html의 점검 워크플로우에서).
+  function maintDueRowHtml(m) {
+    const overdue = m.scheduleDate < new Date().toISOString().slice(0, 10);
+    const text = `${String(m.title).replace(/</g, "&lt;")} · ${String(m.productName).replace(/</g, "&lt;")}${overdue ? " (지연)" : ""}`;
+    return (
+      `<div class="today-item maint-due" data-maint-id="${m.id}" title="점검 예정일 ${m.scheduleDate} — 클릭하면 운영 가이드로 이동">` +
+      `<span class="today-p maint">🔧</span>` +
+      `<span class="today-text">${text}</span>` +
+      `</div>`
+    );
+  }
+
   async function loadTasks() {
     try {
-      const tasks = await window.gijo.listTasks();
-      if (tasks.length === 0) {
+      const [tasks, dueMaint] = await Promise.all([window.gijo.listTasks(), window.gijo.listDueMaintenance().catch(() => [])]);
+      if (tasks.length === 0 && dueMaint.length === 0) {
         todayItems.innerHTML = '<div style="font-size:12px;color:var(--muted-2);padding:10px 0">오늘 확인할 항목이 없습니다</div>';
         return;
       }
-      // 미완료(우선순위 순) 먼저, 완료(최근 순)는 아래에 흐리게 — 진행 상황이 보이도록.
+      // 지연/마감 점검(있으면) 맨 위, 그다음 미완료 할 일(우선순위 순), 완료(최근 순)는 아래에 흐리게.
       const open = tasks.filter((t) => !t.done).sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 9) - (PRIORITY_ORDER[b.priority] ?? 9));
       const done = tasks.filter((t) => t.done).sort((a, b) => b.createdAt - a.createdAt);
-      todayItems.innerHTML = [...open, ...done].map(taskRowHtml).join("");
+      todayItems.innerHTML = [...dueMaint.map(maintDueRowHtml), ...open.map(taskRowHtml), ...done.map(taskRowHtml)].join("");
     } catch (e) {
       todayItems.innerHTML = '<div style="color:var(--muted-2);font-size:12px">작업 목록을 불러오지 못했습니다</div>';
     }
   }
 
-  // 체크박스=완료 토글, ✕=삭제. todayItems가 재렌더돼도 유지되게 부모에 위임(init에서 1회 바인딩).
+  // 체크박스=완료 토글, ✕=삭제, 점검 항목 클릭=운영 가이드로 이동. todayItems가 재렌더돼도
+  // 유지되게 부모에 위임(init에서 1회 바인딩).
   async function onTaskAction(e) {
+    if (e.target.closest(".maint-due")) {
+      window.gijo.navigateTo("opsguide.html");
+      return;
+    }
     const item = e.target.closest(".today-item");
     if (!item) return;
     const id = item.dataset.id;

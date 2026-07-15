@@ -51,6 +51,16 @@ const gijoApi = {
   toggleTask: (id: string, done: boolean) => api.tasksApi.toggle(id, done),
   deleteTask: (id: string) => api.tasksApi.remove(id),
 
+  // 유지보수 일정 · 점검서 · 승인(거버넌스 검증)
+  listMaintenance: () => api.maintenanceApi.list(),
+  listDueMaintenance: () => api.maintenanceApi.due(),
+  createMaintenance: (args: { title: string; productName: string; scheduleDate: string; intervalDays?: number }) =>
+    api.maintenanceApi.create(args),
+  reportMaintenance: (id: string, args: { note: string; filename?: string; content?: string }) =>
+    api.maintenanceApi.report(id, args),
+  approveMaintenance: (id: string) => api.maintenanceApi.approve(id),
+  rejectMaintenance: (id: string, reason: string) => api.maintenanceApi.reject(id, reason),
+
   // 자산 인벤토리
   listAssets: () => api.assetsApi.list(),
   getAsset: (id: string) => api.assetsApi.get(id),

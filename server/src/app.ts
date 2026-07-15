@@ -26,6 +26,7 @@ import { registerLocalEngineRoutes } from "./engine/localengine";
 import { registerFinetuneRoutes } from "./engine/finetune";
 import { registerToolsRoutes } from "./engine/tools";
 import { registerTasksRoutes } from "./engine/tasks";
+import { registerMaintenanceRoutes } from "./engine/maintenance";
 import { registerEmailRoutes } from "./engine/email";
 import { registerSbomRoutes } from "./engine/sbom";
 import { registerCtiRoutes } from "./engine/cti";
@@ -72,6 +73,7 @@ export function createApp(): Express {
   registerFinetuneRoutes(app);
   registerToolsRoutes(app);
   registerTasksRoutes(app);
+  registerMaintenanceRoutes(app);
   registerEmailRoutes(app);
   registerSbomRoutes(app);
   registerCtiRoutes(app);
