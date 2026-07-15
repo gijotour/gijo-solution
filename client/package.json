@@ -9,8 +9,9 @@
     "bundle:preload": "esbuild src/preload.ts --bundle --platform=node --target=node18 --format=cjs --external:electron --outfile=dist/preload.js",
     "start": "npm run build && electron .",
     "watch": "tsc -p tsconfig.json --watch",
-    "dist": "npm run build && electron-builder",
-    "rebuild-server-native": "node scripts/rebuild-server-native.mjs"
+    "dist": "npm run build && npm run build-server-dist && electron-builder",
+    "rebuild-server-native": "node scripts/rebuild-server-native.mjs",
+    "build-server-dist": "node scripts/build-server-dist.mjs"
   },
   "author": "GIJO Technology",
   "license": "UNLICENSED",
@@ -28,6 +29,9 @@
     "files": [
       "dist/**/*",
       "src/renderer/**/*"
+    ],
+    "extraResources": [
+      { "from": "server-dist", "to": "server-dist" }
     ],
     "win": {
       "target": "nsis"

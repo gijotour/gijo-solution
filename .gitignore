@@ -30,6 +30,7 @@ antigravit-pro-app/
 crud-app/
 flask-app/
 temp/
+.agents/
 
 # logs
 *.log
