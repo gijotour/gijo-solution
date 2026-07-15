@@ -29,8 +29,9 @@
   .status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
   .status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
   .beta-tag{background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
-  .icon-row{display:flex;gap:6px;}
-  .icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
+  .icon-row{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
+  .icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;transition:background .12s,border-color .12s,color .12s;}
+  .icon-btn:hover{background:rgba(59,130,246,0.18);border-color:var(--blue);color:var(--blue-light);}
   .icon-btn.on{background:rgba(59,130,246,0.18);border-color:var(--blue);color:var(--blue-light);}
   .avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
 
@@ -93,13 +94,18 @@
     <div class="header-right">
       <div class="status-pill" id="statusPill"><span class="dot"></span>연결 확인 중<span class="beta-tag">LIVE</span></div>
       <div class="icon-row">
-        <div class="icon-btn on">▤</div>
-        <div class="icon-btn">▢</div>
-        <div class="icon-btn">💬</div>
-        <div class="icon-btn">◉</div>
-        <div class="icon-btn">⬡</div>
-        <div class="icon-btn">$</div>
-        <div class="icon-btn">+</div>
+        <div class="icon-btn" data-page="agent.html" title="에이전트 AI">◉</div>
+        <div class="icon-btn" data-page="inventory.html" title="AI 자산">◇</div>
+        <div class="icon-btn" data-page="sbom.html" title="AI-BOM">▢</div>
+        <div class="icon-btn" data-page="threat.html" title="위협 인텔리전스">△</div>
+        <div class="icon-btn" data-page="vulnscan.html" title="취약 자산관리">⊘</div>
+        <div class="icon-btn" data-page="compliance.html" title="컴플라이언스">✓</div>
+        <div class="icon-btn" data-page="report.html" title="내부 리포트">▣</div>
+        <div class="icon-btn" data-page="approvals.html" title="승인 워크플로우">◈</div>
+        <div class="icon-btn" data-page="merge.html" title="보안 LLM 합성">⬡</div>
+        <div class="icon-btn" data-page="memory.html" title="AI 기억·학습">⛁</div>
+        <div class="icon-btn" data-page="billing.html" title="사용량·요금">$</div>
+        <div class="icon-btn" data-page="logs.html" title="로그">▤</div>
       </div>
       <div class="avatar-btn" id="avatarBtn">-</div>
       <div class="icon-btn" id="settingsBtn">⚙</div>
