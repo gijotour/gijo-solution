@@ -159,7 +159,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
           <div style="color:var(--text);">${critList(c.weak)}</div>
         </div>
       </div>
-      <div style="color:var(--muted-2);margin-top:10px;font-size:10.5px;">출처: KISA 「AI 보안 위협 대응 매뉴얼」(2026.7) 별첨2. 위 기준에 자사 환경을 대조해 대응 상태를 정하세요.</div>
+      ${c.diagnosis ? `<div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;"><div style="color:var(--blue-light);font-weight:800;margin-bottom:3px;">🔍 진단 방법 · 공격 예시</div><div style="color:var(--muted);white-space:pre-wrap;">${esc(c.diagnosis)}</div></div>` : ""}
+      <div style="color:var(--muted-2);margin-top:10px;font-size:10.5px;">출처: KISA 「AI 보안 위협 대응 매뉴얼」(2026.7) 별첨2. 위 기준·진단 방법에 자사 환경을 대조해 대응 상태를 정하세요.</div>
     </div>`;
   }
 

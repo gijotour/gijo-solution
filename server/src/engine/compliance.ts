@@ -77,8 +77,8 @@ export interface ThreatWithStatus extends ThreatEntry {
   status: ComplianceStatus;
   note: string;
   updatedAt: number | null;
-  // 별첨2 평가기준 — 위협을 펼쳤을 때 대응 상태 판단의 근거로 보여준다.
-  criteria: { impact: string; good: string; weak: string };
+  // 별첨2 평가기준·진단방법 — 위협을 펼쳤을 때 대응 상태 판단의 근거로 보여준다.
+  criteria: { impact: string; good: string; weak: string; diagnosis: string };
 }
 
 export function listCompliance(): ThreatWithStatus[] {
@@ -91,7 +91,7 @@ export function listCompliance(): ThreatWithStatus[] {
       status: s?.status ?? "open",
       note: s?.note ?? "",
       updatedAt: s?.updatedAt ?? null,
-      criteria: THREAT_CRITERIA[t.code] ?? { impact: "", good: "", weak: "" },
+      criteria: THREAT_CRITERIA[t.code] ?? { impact: "", good: "", weak: "", diagnosis: "" },
     };
   });
 }
