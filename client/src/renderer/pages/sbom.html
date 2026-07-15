@@ -153,7 +153,7 @@ tr:last-child td{border-bottom:none;}
     <div class="topbar-row">
       <div>
         <div class="page-title">AI-BOM 보안 및 리스크 관리</div>
-        <div class="page-sub">AI 자산별 소프트웨어 구성요소 명세서(SBOM) 생성 · 관리 · 내보내기</div>
+        <div class="page-sub">코드 의존성(SBOM)을 넘어 모델 · 데이터 · 프롬프트 · 에이전트 도구 · 인프라 5영역을 명세해 블랙박스 AI 자산의 보안 리스크를 관리합니다.</div>
       </div>
       <div style="display:flex;gap:8px;">
         <button class="btn-ghost" id="bulkRegenBtn">전체 SBOM 없는 자산 일괄 생성</button>
@@ -189,9 +189,19 @@ tr:last-child td{border-bottom:none;}
   </div>
 </div>
 
+<div class="panel" id="aibomPanel" style="display:none;margin-bottom:16px">
+  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+    <div style="font-size:14.5px;font-weight:800;color:#fff">AI-BOM 구성 명세 — <span id="aibomAssetName" style="color:var(--blue-light)"></span></div>
+    <button class="btn-primary" id="aibomSaveBtn">저장</button>
+  </div>
+  <div style="font-size:11.5px;color:var(--muted);margin-bottom:14px">각 영역의 관리 항목을 채워 두면 미검증 모델 유입·데이터 오염·프롬프트 인젝션·권한 남용·섀도우 인프라 리스크를 추적·차단하는 근거가 됩니다.</div>
+  <div id="aibomAreas" style="display:grid;grid-template-columns:1fr 1fr;gap:12px"></div>
+  <div id="aibomStatus" style="font-size:12px;margin-top:10px"></div>
+</div>
+
 <div class="content-grid">
   <div class="panel">
-    <div class="panel-title" id="detailTitle">컴포넌트 상세</div>
+    <div class="panel-title" id="detailTitle">컴포넌트 상세 (코드 의존성 SBOM)</div>
     <div class="panel-sub" id="detailSub">테이블에서 자산명을 클릭하면 컴포넌트 목록을 확인할 수 있습니다.</div>
     <table>
       <tr><th>컴포넌트</th><th>버전</th><th>라이선스</th><th>알려진 취약점</th></tr>
@@ -278,7 +288,81 @@ tr:last-child td{border-bottom:none;}
       .join("");
   }
 
+  const AIBOM_AREAS = [
+    { key: "model", label: "Model (모델)", purpose: "미검증 모델의 무단 유입 차단 · 가중치 위변조(Tampering) 방지", fields: [
+      { k: "foundationModel", label: "기초 모델 (Foundation Model)" },
+      { k: "architecture", label: "아키텍처 정보" },
+      { k: "finetuneHistory", label: "파인튜닝 이력" },
+      { k: "weightsHash", label: "가중치(Weights) 파일 해시" },
+    ] },
+    { key: "dataset", label: "Dataset (데이터)", purpose: "저작권/라이선스 침해 · 개인정보(PII) 유출 및 오염 데이터 추적", fields: [
+      { k: "sources", label: "학습/파인튜닝 데이터셋 출처" },
+      { k: "vectorDbLocation", label: "RAG가 참조하는 Vector DB 위치" },
+    ] },
+    { key: "prompt", label: "Prompt (프롬프트)", purpose: "프롬프트 인젝션 취약점 대응 · 편향성 및 탈옥(Jailbreak) 방어", fields: [
+      { k: "systemPrompt", label: "시스템 프롬프트 및 안전 템플릿" },
+      { k: "guardrails", label: "가드레일(Guardrail) 규칙" },
+    ] },
+    { key: "agentTool", label: "Agent Tool (에이전트 도구)", purpose: "권한 남용 방지 · 비인가 시스템 제어(RCE 등) 리스크 차단", fields: [
+      { k: "apis", label: "호출 가능 API 및 권한 목록" },
+      { k: "mcpServers", label: "MCP 연동 서버" },
+    ] },
+    { key: "infrastructure", label: "Infrastructure (인프라)", purpose: "리소스 비용 최적화 · 섀도우 AI 차단 · 인프라 취약점 패치 관리", fields: [
+      { k: "compute", label: "GPU/CPU 서빙 환경 사양" },
+      { k: "hostingProvider", label: "호스팅 공급업체 (AWS/OpenAI/Azure 등)" },
+    ] },
+  ];
+
+  let aibomAssetId = null;
+
+  function esc(s) { return String(s == null ? "" : s).replace(/"/g, "&quot;").replace(/</g, "&lt;"); }
+
+  function renderAiBom(asset) {
+    aibomAssetId = asset.id;
+    document.getElementById("aibomPanel").style.display = "";
+    document.getElementById("aibomAssetName").textContent = asset.name;
+    document.getElementById("aibomStatus").textContent = "";
+    const bom = asset.aibom || {};
+    document.getElementById("aibomAreas").innerHTML = AIBOM_AREAS.map((area) => {
+      const areaVal = bom[area.key] || {};
+      const fields = area.fields.map((f) => `
+        <label style="display:block;font-size:11px;color:var(--muted);margin:8px 0 4px">${f.label}</label>
+        <textarea data-area="${area.key}" data-field="${f.k}" rows="1"
+          style="width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:6px;padding:7px 10px;color:var(--text);font-size:12px;outline:none;resize:vertical">${esc(areaVal[f.k])}</textarea>`).join("");
+      return `<div style="background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:14px 16px">
+        <div style="font-size:13px;font-weight:800;color:#fff;margin-bottom:2px">${area.label}</div>
+        <div style="font-size:10.5px;color:var(--amber);margin-bottom:6px">🛡 ${area.purpose}</div>
+        ${fields}
+      </div>`;
+    }).join("");
+  }
+
+  function collectAiBom() {
+    const bom = { model: {}, dataset: {}, prompt: {}, agentTool: {}, infrastructure: {} };
+    document.querySelectorAll("#aibomAreas textarea").forEach((t) => {
+      bom[t.dataset.area][t.dataset.field] = t.value.trim();
+    });
+    return bom;
+  }
+
+  async function saveAiBom() {
+    if (!aibomAssetId) return;
+    const status = document.getElementById("aibomStatus");
+    status.textContent = "저장 중...";
+    status.style.color = "var(--muted)";
+    try {
+      await window.gijo.updateAiBom(aibomAssetId, collectAiBom());
+      status.textContent = "✓ AI-BOM이 저장되었습니다.";
+      status.style.color = "var(--teal)";
+      await refresh();
+    } catch (e) {
+      status.textContent = "✗ 저장 실패: " + e.message;
+      status.style.color = "#f5928a";
+    }
+  }
+
   async function showComponents(asset) {
+    renderAiBom(asset);
     detailTitle.textContent = `${asset.name} — 컴포넌트 상세`;
     if (!asset.sbomGeneratedAt) {
       detailSub.textContent = "이 자산은 아직 SBOM이 생성되지 않았습니다.";
@@ -395,6 +479,7 @@ tr:last-child td{border-bottom:none;}
       el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
     });
     document.getElementById("bulkRegenBtn").addEventListener("click", bulkGenerate);
+    document.getElementById("aibomSaveBtn").addEventListener("click", saveAiBom);
   }
 
   if (!window.gijo.isAuthenticated()) {

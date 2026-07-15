@@ -23,6 +23,40 @@ export interface AssetComponent {
   license: string;
 }
 
+// AI-BOM 5영역 — 코드 의존성(SBOM)을 넘어 모델·데이터·프롬프트·도구·인프라까지의 구성명세.
+// 각 항목은 자유 텍스트(보안담당자가 채워 넣는 관리 항목)다. 값이 비면 "미기재"로 간주.
+export interface AiBom {
+  model: { foundationModel: string; finetuneHistory: string; architecture: string; weightsHash: string };
+  dataset: { sources: string; vectorDbLocation: string };
+  prompt: { systemPrompt: string; guardrails: string };
+  agentTool: { apis: string; mcpServers: string };
+  infrastructure: { compute: string; hostingProvider: string };
+}
+
+export function emptyAiBom(): AiBom {
+  return {
+    model: { foundationModel: "", finetuneHistory: "", architecture: "", weightsHash: "" },
+    dataset: { sources: "", vectorDbLocation: "" },
+    prompt: { systemPrompt: "", guardrails: "" },
+    agentTool: { apis: "", mcpServers: "" },
+    infrastructure: { compute: "", hostingProvider: "" },
+  };
+}
+
+// 저장된 부분 JSON을 빈 기본값 위에 병합해 항상 완전한 5영역 구조를 돌려준다(스키마 진화 대비).
+function mergeAiBom(raw: string): AiBom {
+  const base = emptyAiBom();
+  try {
+    const parsed = JSON.parse(raw || "{}") as Partial<AiBom>;
+    for (const area of Object.keys(base) as (keyof AiBom)[]) {
+      Object.assign(base[area], parsed[area] ?? {});
+    }
+  } catch {
+    /* 손상된 JSON이면 빈 기본값 유지 */
+  }
+  return base;
+}
+
 export interface ScanRun {
   id: string;
   scannedAt: number;
@@ -38,6 +72,7 @@ export interface Asset {
   components: AssetComponent[];
   findings: StandardFinding[]; // 가장 최근 스캔 결과만 — 현재 위험 상태
   scanHistory: ScanRun[]; // 스캔 전체 이력, 오래된 순
+  aibom: AiBom; // AI-BOM 5영역 메타
   registeredAt: number;
   lastScannedAt: number | null;
   sbomGeneratedAt: number | null;
@@ -51,6 +86,7 @@ interface AssetRow {
   owner: string;
   components: string;
   findings: string;
+  aibom: string;
   registeredAt: number;
   lastScannedAt: number | null;
   sbomGeneratedAt: number | null;
@@ -80,6 +116,7 @@ const insertScanRunStmt = db.prepare(
 const listScanRunsStmt = db.prepare("SELECT * FROM scan_runs WHERE assetId = ? ORDER BY scannedAt ASC");
 const updateFindingsStmt = db.prepare("UPDATE assets SET findings = ?, lastScannedAt = ? WHERE id = ?");
 const updateSbomStmt = db.prepare("UPDATE assets SET sbomGeneratedAt = ? WHERE id = ?");
+const updateAiBomStmt = db.prepare("UPDATE assets SET aibom = ? WHERE id = ?");
 
 function scanHistoryOf(assetId: string): ScanRun[] {
   return (listScanRunsStmt.all(assetId) as ScanRunRow[]).map((row) => ({
@@ -99,6 +136,7 @@ function fromRow(row: AssetRow): Asset {
     components: JSON.parse(row.components) as AssetComponent[],
     findings: JSON.parse(row.findings) as StandardFinding[],
     scanHistory: scanHistoryOf(row.id),
+    aibom: mergeAiBom(row.aibom),
     registeredAt: row.registeredAt,
     lastScannedAt: row.lastScannedAt,
     sbomGeneratedAt: row.sbomGeneratedAt,
@@ -163,6 +201,17 @@ export function recordFindings(assetId: string, findings: StandardFinding[]): As
   return asset;
 }
 
+export function updateAiBom(assetId: string, aibom: AiBom): Asset | undefined {
+  const existing = getAssetRowStmt.get(assetId) as AssetRow | undefined;
+  if (!existing) return undefined;
+  // 들어온 부분값을 빈 기본값 위에 병합해 저장(항상 완전한 5영역 유지).
+  const merged = mergeAiBom(JSON.stringify(aibom ?? {}));
+  updateAiBomStmt.run(JSON.stringify(merged), assetId);
+  const asset = getAsset(assetId)!;
+  broadcastAssetUpdated(asset);
+  return asset;
+}
+
 export function markSbomGenerated(assetId: string): Asset | undefined {
   const existing = getAssetRowStmt.get(assetId) as AssetRow | undefined;
   if (!existing) return undefined;
@@ -196,5 +245,10 @@ export function registerAssetsRoutes(app: Express): void {
   });
   app.post("/api/assets", authMiddleware, (req, res) => {
     res.json(registerAsset(req.body));
+  });
+  app.put("/api/assets/:id/aibom", authMiddleware, (req, res) => {
+    const asset = updateAiBom(String(req.params.id), req.body.aibom);
+    if (!asset) return res.status(404).json({ error: "asset not found" });
+    res.json(asset);
   });
 }

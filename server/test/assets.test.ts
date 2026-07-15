@@ -87,4 +87,38 @@ describe("assets", () => {
     // findings must stay at "one scan's worth", not double up across the two runs
     expect(afterSecondScan.body.findings.length).toBe(findingsAfterOneScan);
   });
+
+  it("new assets carry an empty 5-area AI-BOM", async () => {
+    const res = await request(app)
+      .post("/api/assets")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ id: "a1", name: "a1", path: "x" });
+    expect(Object.keys(res.body.aibom).sort()).toEqual(["agentTool", "dataset", "infrastructure", "model", "prompt"]);
+    expect(res.body.aibom.model.foundationModel).toBe("");
+  });
+
+  it("PUT /api/assets/:id/aibom persists and merges partial AI-BOM data", async () => {
+    await request(app).post("/api/assets").set("Authorization", `Bearer ${token}`).send({ id: "a1", name: "a1", path: "x" });
+
+    const put = await request(app)
+      .put("/api/assets/a1/aibom")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ aibom: { model: { foundationModel: "Lily-7B", weightsHash: "sha256:abc" }, prompt: { guardrails: "탈옥 차단 규칙" } } });
+    expect(put.status).toBe(200);
+    expect(put.body.aibom.model.foundationModel).toBe("Lily-7B");
+    expect(put.body.aibom.model.weightsHash).toBe("sha256:abc");
+    expect(put.body.aibom.prompt.guardrails).toBe("탈옥 차단 규칙");
+    // 지정 안 한 영역은 빈 문자열로 유지(완전한 5영역 보장)
+    expect(put.body.aibom.dataset.sources).toBe("");
+    expect(put.body.aibom.infrastructure.hostingProvider).toBe("");
+
+    // 영속 확인: 다시 조회해도 남아 있다
+    const get = await request(app).get("/api/assets/a1").set("Authorization", `Bearer ${token}`);
+    expect(get.body.aibom.model.foundationModel).toBe("Lily-7B");
+  });
+
+  it("returns 404 when setting AI-BOM on a nonexistent asset", async () => {
+    const res = await request(app).put("/api/assets/ghost/aibom").set("Authorization", `Bearer ${token}`).send({ aibom: {} });
+    expect(res.status).toBe(404);
+  });
 });

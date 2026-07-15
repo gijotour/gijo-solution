@@ -341,6 +341,14 @@ export interface Finding {
   source_tool: string;
 }
 
+export interface AiBom {
+  model: { foundationModel: string; finetuneHistory: string; architecture: string; weightsHash: string };
+  dataset: { sources: string; vectorDbLocation: string };
+  prompt: { systemPrompt: string; guardrails: string };
+  agentTool: { apis: string; mcpServers: string };
+  infrastructure: { compute: string; hostingProvider: string };
+}
+
 export interface Asset {
   id: string;
   name: string;
@@ -349,6 +357,7 @@ export interface Asset {
   owner: string;
   components: AssetComponent[];
   findings: Finding[];
+  aibom: AiBom;
   registeredAt: number;
   lastScannedAt: number | null;
   sbomGeneratedAt: number | null;
@@ -366,4 +375,5 @@ export const assetsApi = {
     }),
   scanRepos: (args: { provider: string; owner: string; token?: string; baseUrl?: string; maxRepos?: number }) =>
     request<{ scanned: number; registered: number; assets: Asset[] }>("/api/reposcan", { method: "POST", body: args }),
+  updateAiBom: (id: string, aibom: AiBom) => request<Asset>(`/api/assets/${id}/aibom`, { method: "PUT", body: { aibom } }),
 };

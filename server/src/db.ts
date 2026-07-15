@@ -114,3 +114,11 @@ db.exec(`
     createdAt INTEGER NOT NULL
   );
 `);
+
+// 마이그레이션: assets.aibom (AI-BOM 5영역 메타 JSON). CREATE TABLE에 직접 넣지 않고 ALTER로
+// 추가해 기존 DB에도 적용되게 한다. 이미 있으면 SQLite가 duplicate column 에러를 던지므로 무시한다.
+try {
+  db.exec("ALTER TABLE assets ADD COLUMN aibom TEXT NOT NULL DEFAULT '{}'");
+} catch {
+  /* 컬럼이 이미 있으면 정상 — 무시 */
+}
