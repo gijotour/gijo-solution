@@ -10,7 +10,13 @@ import * as jwt from "jsonwebtoken";
 import * as bcrypt from "bcryptjs";
 import { findUserByUsername, findUserById, GijoUser } from "./users";
 
-// TODO: 프로덕션에서는 시크릿을 환경변수(GIJO_JWT_SECRET)로 반드시 주입할 것 — 기본값은 개발용.
+// 프로덕션에서 기본 개발용 시크릿이 그대로 쓰이면(토큰 위조 가능) 서버가 아예 뜨지 않게 막는다 —
+// "설정을 깜빡했다"가 "취약한 상태로 조용히 운영 중이었다"보다 훨씬 안전한 실패 모드다.
+if (process.env.NODE_ENV === "production" && !process.env.GIJO_JWT_SECRET) {
+  throw new Error(
+    "GIJO_JWT_SECRET이 설정되지 않았습니다. 프로덕션(NODE_ENV=production)에서는 기본 개발용 시크릿을 쓸 수 없습니다."
+  );
+}
 const JWT_SECRET = process.env.GIJO_JWT_SECRET ?? "gijo-as-dev-secret-change-me";
 const ACCESS_TOKEN_TTL = process.env.GIJO_ACCESS_TOKEN_TTL ?? "15m";
 const REFRESH_TOKEN_TTL_MS = Number(process.env.GIJO_REFRESH_TOKEN_TTL_MS ?? 7 * 24 * 60 * 60 * 1000); // 7일
