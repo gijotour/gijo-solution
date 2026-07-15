@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GIJO AS — 단기·장기 기억</title>
+<title>GIJO AS — AI 기억 · 학습</title>
 <style>
 :root{
   --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
@@ -96,65 +96,58 @@ tr:last-child td{border-bottom:none;}
     <div class="nav-item" data-page="approvals.html"><span class="ic">◈</span>승인 워크플로우</div>
     <div class="nav-section">고급 기능</div>
     <div class="nav-item" data-page="merge.html"><span class="ic">⬡</span>보안 LLM 합성</div>
-    <div class="nav-item active"><span class="ic">⛁</span>단기 · 장기 기억</div>
+    <div class="nav-item active"><span class="ic">⛁</span>AI 기억 · 학습</div>
     <div class="nav-item" data-page="billing.html"><span class="ic">$</span>사용량 · 요금</div>
     <div class="nav-section">시스템</div>
     <div class="nav-item" data-page="logs.html"><span class="ic">▤</span>로그</div>
-    <div class="nav-item" data-page="settings.html"><span class="ic">â</span>ì¤ì </div>
+    <div class="nav-item" data-page="settings.html"><span class="ic">⚙</span>설정</div>
   </div>
 
   <div class="main">
     <div class="topbar-row">
       <div>
-        <div class="page-title">단기 · 장기 기억</div>
-        <div class="page-sub">단기 기억(대화 이력) · 장기 기억(RAG 지식 베이스) · 학습(파인튜닝) — 세 단계로 고객사 데이터를 기억하고 학습합니다.</div>
+        <div class="page-title">AI 기억 · 학습</div>
+        <div class="page-sub">AI에게 우리 회사 지식을 주는 3가지 방법입니다. 쉬운 것부터 시작하세요.</div>
       </div>
     </div>
 
-    <div class="panel" style="max-width:800px">
-      <div class="panel-title">기억 및 학습 개념 비교</div>
-      <div class="panel-sub">대화 컨텍스트(단기), 로컬 벡터 DB(장기), QLoRA 파인튜닝(뇌 학습)의 아키텍처적 차이점</div>
-      <table style="margin-top:10px">
-        <thead>
-          <tr>
-            <th style="width:15%">구분</th>
-            <th style="width:28%">단기 기억 (Conversation Context)</th>
-            <th style="width:28%">장기 기억 (RAG / LanceDB)</th>
-            <th style="width:29%">파인튜닝 (QLoRA / 학습)</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td style="font-weight:700">핵심 개념</td>
-            <td>현재 진행 중인 대화 내용을 기억</td>
-            <td>외부 도서관에서 문서를 찾아보기</td>
-            <td>뇌 세포(모델 가중치)를 직접 훈련하여 암기</td>
-          </tr>
-          <tr>
-            <td style="font-weight:700">대상 기술</td>
-            <td>서버 인메모리 대화 이력 (에이전트별 최근 10턴, 채팅 시 자동 주입)</td>
-            <td><code>LanceDB</code> (로컬 벡터 데이터베이스)</td>
-            <td>모델 가중치(Weights) 자체 업데이트</td>
-          </tr>
-          <tr>
-            <td style="font-weight:700">현실 비유</td>
-            <td>메모장에 받아적으며 대화하기</td>
-            <td>필요할 때 서가에서 백과사전 찾기</td>
-            <td>지식을 완전히 학습하여 머릿속에 내재화</td>
-          </tr>
-          <tr>
-            <td style="font-weight:700">정보 업데이트</td>
-            <td style="color:var(--muted)">서버 재시작 시 휘발됨 (의도된 설계)</td>
-            <td style="color:var(--teal)">DB에 파일 추가 시 즉시 반영 (매우 쉬움)</td>
-            <td style="color:var(--amber)">데이터셋을 구축하여 재학습 필요 (시간 소요)</td>
-          </tr>
-        </tbody>
-      </table>
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;max-width:900px;">
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;">
+        <div style="font-size:22px;margin-bottom:6px;">⚡</div>
+        <div style="font-weight:800;color:#fff;font-size:14px;margin-bottom:4px;">단기 기억</div>
+        <div style="font-size:12px;color:var(--text);line-height:1.6;">방금 나눈 대화를 기억해요. 대화하는 동안만 유효하고, 서버를 끄면 잊어버립니다.</div>
+        <div style="font-size:11px;color:var(--muted-2);margin-top:8px;">✅ 자동 · 설정 필요 없음</div>
+      </div>
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;">
+        <div style="font-size:22px;margin-bottom:6px;">📚</div>
+        <div style="font-weight:800;color:#fff;font-size:14px;margin-bottom:4px;">장기 기억 <span style="font-size:10px;color:var(--teal);">· 가장 쉬움</span></div>
+        <div style="font-size:12px;color:var(--text);line-height:1.6;">사내 문서를 올려두면 채팅할 때 알아서 찾아 참고해요. 파일만 올리면 끝, 계속 쌓입니다.</div>
+        <div style="font-size:11px;color:var(--muted-2);margin-top:8px;">👇 아래 "문서 올리기"에서 시작</div>
+      </div>
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;">
+        <div style="font-size:22px;margin-bottom:6px;">🎓</div>
+        <div style="font-weight:800;color:#fff;font-size:14px;margin-bottom:4px;">학습 <span style="font-size:10px;color:var(--amber);">· 고급</span></div>
+        <div style="font-size:12px;color:var(--text);line-height:1.6;">문서로 AI를 직접 훈련시켜 아예 외우게 해요. 시간과 GPU가 필요하지만 가장 강력합니다.</div>
+        <div style="font-size:11px;color:var(--muted-2);margin-top:8px;">👇 아래 "학습" 섹션 (GPU 필요)</div>
+      </div>
     </div>
 
+    <details style="max-width:900px;margin-bottom:16px;">
+      <summary style="cursor:pointer;font-size:12px;color:var(--muted);padding:6px 0;">🔧 기술 상세 보기 (단기=대화 이력, 장기=LanceDB RAG, 학습=QLoRA 파인튜닝)</summary>
+      <div class="panel" style="margin-top:8px;">
+        <table>
+          <thead><tr><th style="width:15%">구분</th><th style="width:28%">단기 기억</th><th style="width:28%">장기 기억</th><th style="width:29%">학습</th></tr></thead>
+          <tbody>
+            <tr><td style="font-weight:700">기술</td><td>서버 인메모리 대화 이력 (에이전트별 최근 10턴, 채팅 시 자동 주입)</td><td><code>LanceDB</code> 로컬 벡터 DB (RAG)</td><td>QLoRA 파인튜닝 (모델 가중치 업데이트)</td></tr>
+            <tr><td style="font-weight:700">지속성</td><td style="color:var(--muted)">서버 재시작 시 휘발</td><td style="color:var(--teal)">파일 추가 시 즉시 반영</td><td style="color:var(--amber)">데이터셋 구축 후 재학습 필요</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </details>
+
     <div class="panel">
-      <div class="panel-title">장기 기억 — 문서 수집 (RAG)</div>
-      <div class="panel-sub">서버가 LanceDB에 청크·임베딩해서 저장합니다. 대상을 "전체 공유"로 두면 모든 에이전트가, 특정 에이전트로 지정하면 그 에이전트만 채팅 시 참고합니다.</div>
+      <div class="panel-title">📚 장기 기억 · 문서 올리기</div>
+      <div class="panel-sub">사내 문서를 올리면 채팅할 때 자동으로 참고합니다. "전체 공유"는 모든 에이전트가, 특정 에이전트를 고르면 그 에이전트만 봅니다. (기술: LanceDB에 청크·임베딩 저장)</div>
       <div class="field-row">
         <div class="field">
           <label for="ingestPathInput">문서 경로</label>
@@ -172,8 +165,8 @@ tr:last-child td{border-bottom:none;}
     </div>
 
     <div class="panel">
-      <div class="panel-title">장기 기억 — 지식 질의</div>
-      <div class="panel-sub">수집된 문서에서 질문과 가장 관련 있는 구절을 검색합니다. 대상 에이전트를 고르면 그 에이전트가 실제 채팅에서 보는 범위(전용 + 전체 공유)로 검색합니다.</div>
+      <div class="panel-title">🔍 올린 문서 검색해 보기</div>
+      <div class="panel-sub">올린 문서에서 질문과 관련된 내용을 미리 찾아봅니다 (채팅에 자동 주입되는 것과 같은 검색). 에이전트를 고르면 그 에이전트가 보는 범위로 검색합니다.</div>
       <div class="field-row">
         <div class="field">
           <label for="queryInput">질문</label>
@@ -191,11 +184,18 @@ tr:last-child td{border-bottom:none;}
     </div>
 
     <div class="panel">
-      <div class="panel-title">학습 — ① 데이터셋 만들기</div>
-      <div class="panel-sub">보안 문서를 붙여넣으면 로컬 LLM이 Q&A 쌍으로 변환합니다. 검토 후 저장하면 파인튜닝 입력(<code>data/datasets/&lt;ID&gt;.json</code>)이 됩니다.</div>
+      <div class="panel-title">🎓 학습 · ① 데이터셋 만들기</div>
+      <div class="panel-sub">기술문서·보안 규정을 넣으면 로컬 LLM이 학습용 Q&A 쌍으로 자동 변환합니다. 파일을 올리거나 직접 붙여넣으세요. 검토 후 저장하면 파인튜닝 입력이 됩니다.</div>
       <div class="field">
-        <label for="dsRawInput">원문 (보안 규정, CVE 분석 등)</label>
-        <textarea id="dsRawInput" rows="5" style="width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;outline:none;resize:vertical"></textarea>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <label for="dsRawInput" style="margin:0;">기술문서 원문 (보안 규정, CVE 분석, 운영 매뉴얼 등)</label>
+          <span>
+            <input type="file" id="dsFileInput" accept=".txt,.md,.csv,.json,.log" style="display:none">
+            <button class="btn-ghost" id="dsFileBtn" style="padding:5px 12px;font-size:12px;">📄 문서 파일 올리기</button>
+          </span>
+        </div>
+        <textarea id="dsRawInput" rows="5" placeholder="여기에 문서를 붙여넣거나, 위 '문서 파일 올리기'로 .txt/.md/.csv 파일을 불러오세요" style="width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;outline:none;resize:vertical"></textarea>
+        <div class="status-line" id="dsFileStatus" style="font-size:11.5px;"></div>
       </div>
       <button class="btn-primary" id="dsConvertBtn">Q&amp;A 변환</button>
       <div class="status-line" id="dsConvertStatusLine"></div>
@@ -211,8 +211,8 @@ tr:last-child td{border-bottom:none;}
     </div>
 
     <div class="panel">
-      <div class="panel-title">학습 — ② 파인튜닝<span class="badge b-amber" style="margin-left:8px">Unsloth QLoRA</span></div>
-      <div class="panel-sub">에이전트를 특정 데이터셋으로 파인튜닝해 내재화된 지식으로 만듭니다.</div>
+      <div class="panel-title">🎓 학습 · ② 파인튜닝<span class="badge b-amber" style="margin-left:8px">GPU 필요 · Unsloth QLoRA</span></div>
+      <div class="panel-sub">①에서 만든 데이터셋으로 AI를 훈련시켜 지식을 아예 외우게 합니다. 진행률이 실시간으로 표시됩니다.</div>
       <div class="field-row">
         <div class="field">
           <label for="ftAgentInput">에이전트 ID</label>
@@ -312,6 +312,24 @@ tr:last-child td{border-bottom:none;}
 
   let convertedExamples = [];
 
+  async function handleDsFile(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const status = document.getElementById("dsFileStatus");
+    try {
+      const text = await file.text();
+      const ta = document.getElementById("dsRawInput");
+      // 기존 내용이 있으면 이어 붙임 (여러 문서 누적 가능)
+      ta.value = ta.value.trim() ? ta.value.trim() + "\n\n---\n\n" + text : text;
+      status.textContent = `✓ ${file.name} 불러옴 (${text.length.toLocaleString()}자). 'Q&A 변환'을 누르세요.`;
+      status.className = "status-line status-ok";
+    } catch (err) {
+      status.textContent = "✗ 파일 읽기 실패: " + err.message;
+      status.className = "status-line status-err";
+    }
+    e.target.value = "";
+  }
+
   async function convertDataset() {
     const raw = document.getElementById("dsRawInput").value.trim();
     const line = document.getElementById("dsConvertStatusLine");
@@ -385,6 +403,8 @@ tr:last-child td{border-bottom:none;}
     document.getElementById("ingestBtn").addEventListener("click", ingest);
     document.getElementById("queryBtn").addEventListener("click", query);
     document.getElementById("dsConvertBtn").addEventListener("click", convertDataset);
+    document.getElementById("dsFileBtn").addEventListener("click", () => document.getElementById("dsFileInput").click());
+    document.getElementById("dsFileInput").addEventListener("change", handleDsFile);
     document.getElementById("dsSaveBtn").addEventListener("click", saveDataset);
     document.getElementById("ftStartBtn").addEventListener("click", startFinetune);
 
