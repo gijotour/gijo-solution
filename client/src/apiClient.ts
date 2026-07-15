@@ -395,6 +395,7 @@ export interface ThreatCompliance {
   status: "covered" | "partial" | "na" | "open";
   note: string;
   updatedAt: number | null;
+  criteria: { impact: string; good: string; weak: string };
 }
 
 export const complianceApi = {

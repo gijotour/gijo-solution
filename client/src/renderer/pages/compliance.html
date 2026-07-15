@@ -136,19 +136,48 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     return (items || []).map((x) => `<span style="display:inline-block;background:${cls};border-radius:4px;padding:1px 6px;font-size:10px;margin:1px 2px 1px 0;">${esc(x)}</span>`).join("");
   }
 
+  const expanded = new Set();
+
+  function critList(text) {
+    // "• a • b" → 항목별 줄
+    return String(text || "").split("•").map((s) => s.trim()).filter(Boolean)
+      .map((s) => `<div style="padding:2px 0 2px 12px;text-indent:-8px;">· ${esc(s)}</div>`).join("") || '<div style="color:var(--muted-2)">기준 없음</div>';
+  }
+
+  function criteriaPanel(t) {
+    const c = t.criteria || {};
+    return `<div style="margin-top:10px;padding:12px 14px;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;font-size:11.5px;line-height:1.7;">
+      <div style="color:var(--muted-2);font-weight:700;margin-bottom:3px;">영향</div>
+      <div style="color:var(--text);margin-bottom:10px;">${critList(c.impact)}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+        <div>
+          <div style="color:var(--teal);font-weight:800;margin-bottom:3px;">✓ 양호 판정 기준</div>
+          <div style="color:var(--text);">${critList(c.good)}</div>
+        </div>
+        <div>
+          <div style="color:#f5928a;font-weight:800;margin-bottom:3px;">✕ 취약 판정 기준</div>
+          <div style="color:var(--text);">${critList(c.weak)}</div>
+        </div>
+      </div>
+      <div style="color:var(--muted-2);margin-top:10px;font-size:10.5px;">출처: KISA 「AI 보안 위협 대응 매뉴얼」(2026.7) 별첨2. 위 기준에 자사 환경을 대조해 대응 상태를 정하세요.</div>
+    </div>`;
+  }
+
   function threatRow(t) {
     const areas = t.aibomAreas.map((a) => `<span style="background:rgba(59,130,246,0.15);color:var(--blue-light);border-radius:4px;padding:1px 6px;font-size:10px;margin-right:3px;">${AREA_LABEL[a] || a}</span>`).join("");
     const opts = STATUS_OPTS.map((o) => `<option value="${o.v}" ${t.status === o.v ? "selected" : ""}>${o.label}</option>`).join("");
+    const isOpen = expanded.has(t.code);
     return `<div style="border-bottom:1px solid var(--border);padding:12px 0;display:grid;grid-template-columns:64px 1fr 150px;gap:12px;align-items:start;">
-      <div><span style="font-weight:800;color:#fff;font-size:13px;">${t.code}</span></div>
+      <div><span data-toggle="${t.code}" style="font-weight:800;color:#fff;font-size:13px;cursor:pointer;user-select:none;">${isOpen ? "▾" : "▸"} ${t.code}</span></div>
       <div>
-        <div style="font-weight:700;color:#fff;font-size:13px;margin-bottom:4px;">${esc(t.name)} ${areas}</div>
+        <div data-toggle="${t.code}" style="font-weight:700;color:#fff;font-size:13px;margin-bottom:4px;cursor:pointer;">${esc(t.name)} ${areas}</div>
         <div style="font-size:11px;color:var(--muted);line-height:1.9;">
           ${t.owasp.length ? `<b style="color:var(--muted-2)">OWASP</b> ${fwBadges(t.owasp, "rgba(139,124,240,0.15)")}` : ""}
           ${t.nist.length ? `<b style="color:var(--muted-2)">NIST</b> ${fwBadges(t.nist, "rgba(30,185,128,0.13)")}` : ""}
           ${t.mitre.length ? `<b style="color:var(--muted-2)">MITRE</b> ${fwBadges(t.mitre, "rgba(240,160,32,0.13)")}` : ""}
           ${!t.owasp.length && !t.nist.length && !t.mitre.length ? '<span style="color:var(--muted-2)">매핑된 국제 프레임워크 없음 (KISA 자체 분류)</span>' : ""}
         </div>
+        ${isOpen ? criteriaPanel(t) : ""}
         <input data-note="${t.code}" value="${esc(t.note)}" placeholder="대응 근거·메모 (선택)"
           style="width:100%;margin-top:6px;background:var(--panel-2);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:11.5px;outline:none;">
       </div>
@@ -177,6 +206,13 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       </div>`;
     }).join("");
 
+    cats.querySelectorAll("[data-toggle]").forEach((el) => {
+      el.addEventListener("click", () => {
+        const code = el.dataset.toggle;
+        if (expanded.has(code)) expanded.delete(code); else expanded.add(code);
+        render();
+      });
+    });
     cats.querySelectorAll("select[data-status]").forEach((sel) => {
       sel.addEventListener("change", async (e) => {
         const code = e.target.dataset.status;

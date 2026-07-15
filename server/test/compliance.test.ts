@@ -57,6 +57,18 @@ describe("compliance (KISA 매뉴얼 위협 × 프레임워크 대응 현황)", 
     expect(m03.note).toContain("미노출");
   });
 
+  it("includes KISA 별첨2 evaluation criteria (impact/good/weak) for each threat", async () => {
+    const res = await request(app).get("/api/compliance").set("Authorization", `Bearer ${token}`);
+    const m03 = res.body.find((t: { code: string }) => t.code === "M03");
+    expect(m03.criteria.good).toContain("거절");
+    expect(m03.criteria.weak).toContain("프롬프트 주입");
+    // 모든 위협이 양호/취약 판정 기준을 갖는다
+    for (const t of res.body) {
+      expect(t.criteria.good.length).toBeGreaterThan(0);
+      expect(t.criteria.weak.length).toBeGreaterThan(0);
+    }
+  });
+
   it("rejects an unknown threat code or invalid status", async () => {
     const badCode = await request(app).put("/api/compliance/ZZ9").set("Authorization", `Bearer ${token}`).send({ status: "covered" });
     expect(badCode.status).toBe(400);
