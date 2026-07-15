@@ -393,7 +393,7 @@ DeepHat(공격 관점)과 Foundation-Sec(분석/방어 관점)을 병합하면, 
 |---|---|---|
 | **AlicanKiraz0/Titus-CybersecurityLLM-v1.0** | `Qwen/Qwen3.6-35B-A3B` 기반, 50만+ 건 보안 지시문 데이터셋으로 LoRA 학습 후 병합·GGUF 변환 완료 | 목표 모델(Qwen2.5-Coder-32B-Instruct)과 다른 계열 MoE 구조이나 우리 llama.cpp/CUDA 환경에 그대로 로드 가능. SOC/DFIR/IAM/K8s/AppSec/**SBOM·CVE 레코드**까지 학습 태스크에 포함되어 6.4(SBOM 정리) 기능과도 맞닿음. GGUF Q4_K_M 기준 21.2GB — RTX 3090 24GB에 들어가나 여유가 크지 않아 컨텍스트는 보수적으로 설정 필요. **주의**: "터키어 우선(Turkish-first)" 모델이라 한국어 설명 품질은 별도 검증 필요 |
 | `hotdogs/qwen3.6-27b-cybersecurity-lora` | Qwen3.6-27B용 보안 특화 LoRA 어댑터 | 어댑터만 얹는 방식이라 실험 비용이 가장 낮음 |
-| `segolilylabs/Lily-Cybersecurity-7B-v0.2` (+ GGUF) | 검증된 7B급 보안 특화 모델, 커뮤니티 다운로드·좋아요 수 높음 | DeepHat/Foundation-Sec과 같은 체급의 병합 재료 후보 |
+| `segolilylabs/Lily-Cybersecurity-7B-v0.2` (+ GGUF) | 검증된 7B급 보안 특화 모델, 커뮤니티 다운로드·좋아요 수 높음 | DeepHat/Foundation-Sec과 같은 체급의 병합 재료 후보. **경량 옵션으로 2026-07-15 다운로드 완료**(`segolilylabs/Lily-Cybersecurity-7B-v0.2-GGUF`, Q4_K_M 4.37GB → `server/models/lily-cybersecurity-7b/lily-cybersecurity-7b.gguf`) — Qwythos-9B보다도 가벼워 VRAM 여유가 필요한 상황에서 스왑용으로 바로 쓸 수 있음. `localengine.ts`의 기존 스왑 로직으로 `POST /api/localengine/start {"modelId":"lily-cybersecurity-7b"}`처럼 기동 가능. 아직 특정 에이전트의 `brainModelId`로 고정 배정하지는 않음 — 9.5절의 "메인 모델 최종 확정"과 마찬가지로 어느 에이전트에 쓸지는 제품 판단 영역이라 코드에는 반영 안 함. **실기동 검증(2026-07-15)**: `/api/localengine/start`로 정상 기동(`llama-server` `/health` OK) 및 `/api/llm/chat`으로 SQL injection 설명 요청 → 내용 자체는 정확했으나 한국어로 "한 문장으로" 요청했음에도 영어로 장문 답변 — 한국어 지시 준수도가 낮아 보임, 실사용 전 한국어 품질 추가 검증 필요 |
 
 **이 서버로 실현 가능성**
 - 후보 모델들이 모두 7B~8B급이라 30B급을 병합하는 것보다 훨씬 가볍습니다. 파라미터 공간 병합(linear/SLERP/TIES) 자체는 훈련이 아니라 가중치 산술 연산이라 GPU 없이도 가능하고, RTX 3090 + RAM 64GB로 충분합니다.
