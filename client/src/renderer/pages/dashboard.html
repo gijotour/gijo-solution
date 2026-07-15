@@ -95,9 +95,6 @@
 
   <div class="body-grid">
     <div class="explorer">
-      <div class="explorer-title"><span>우리 팀</span><span style="color:var(--muted-2);cursor:pointer" data-page="agent.html" title="에이전트 AI 화면">↗</span></div>
-      <div class="explorer-sub">보안 에이전트 로스터</div>
-      <div class="explorer-tree" id="teamTree" style="margin-bottom:16px;">불러오는 중...</div>
       <div class="explorer-title"><span>자산 탐색기</span><span style="color:var(--muted-2);cursor:pointer" id="refreshAssetsBtn">⟳</span></div>
       <div class="explorer-sub">GIJO AS Desktop</div>
       <div class="explorer-tree" id="explorerTree" style="margin-bottom:16px;">불러오는 중...</div>
@@ -221,9 +218,6 @@
     return `<div style="padding-left:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nm}${sub}${vulns}</div>`;
   }
 
-  const STATUS_LABEL = { idle: "대기중", working: "작업중", watching: "모니터링" };
-  const STATUS_DOT = { idle: "var(--muted-2)", working: "var(--amber)", watching: "var(--teal)" };
-
   const openDirs = new Set();
 
   function fileIcon(dir, name) {
@@ -279,23 +273,6 @@
       await loadFiles();
     } catch (e) {
       alert("폴더 선택 실패: " + e.message);
-    }
-  }
-
-  async function loadTeam() {
-    const el = document.getElementById("teamTree");
-    try {
-      const agents = await window.gijo.listAgents();
-      el.innerHTML = agents.map((a) => {
-        const model = a.assignedModelId ? ` <span style="color:var(--muted-2);font-size:10px">· ${String(a.assignedModelId).replace(/</g, "&lt;")}</span>` : "";
-        return `<div style="display:flex;align-items:center;gap:7px;padding:3px 0 3px 4px;">
-          <span style="width:6px;height:6px;border-radius:50%;background:${STATUS_DOT[a.status] || "var(--muted-2)"};flex:none;"></span>
-          <span style="color:var(--text);">${String(a.name).replace(/</g, "&lt;")}</span>
-          <span style="color:var(--muted-2);font-size:10px;">${STATUS_LABEL[a.status] || ""}</span>${model}
-        </div>`;
-      }).join("");
-    } catch (e) {
-      el.innerHTML = '<div style="color:var(--muted-2)">팀을 불러오지 못했습니다</div>';
     }
   }
 
@@ -399,7 +376,7 @@
     setInterval(tick, 1000);
     await loadUser();
     greet();
-    await Promise.all([loadHealth(), loadTeam(), loadAssets(), loadTasks(), loadCollaboration(), loadFiles()]);
+    await Promise.all([loadHealth(), loadAssets(), loadTasks(), loadCollaboration(), loadFiles()]);
 
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
