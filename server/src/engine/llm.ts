@@ -47,11 +47,26 @@ async function ragContextFor(message: string, agentId: string): Promise<string |
     const { queryMemory } = await import("./memory.js");
     // 에이전트 전용 지식 + 전역 지식만 검색 (다른 에이전트 전용 문서는 제외).
     const chunks = await queryMemory(message, 4, agentId);
-    if (chunks.length === 0) return null;
-    return (
-      "참고 자료 — 사내 지식 베이스(장기 기억)에서 검색된 관련 내용입니다. 답변에 활용하되, 질문과 무관하면 무시하세요.\n" +
-      chunks.map((c, i) => `[${i + 1}] ${c}`).join("\n")
-    );
+
+    const parts: string[] = [];
+    if (chunks.length > 0) {
+      parts.push(
+        "참고 자료 — 사내 지식 베이스(장기 기억)에서 검색된 관련 내용입니다. 답변에 활용하되, 질문과 무관하면 무시하세요.\n" +
+          chunks.map((c, i) => `[${i + 1}] ${c}`).join("\n")
+      );
+    }
+
+    // 하이브리드: 온톨로지(지식 그래프)에서 질문·청크에 걸린 엔티티의 관계·규칙을 동반 주입한다.
+    // 벡터 검색과 별개 seam이라, 임베딩 서버가 없어 청크가 비어도 규칙은 걸릴 수 있다.
+    try {
+      const { ontologyContextFor } = await import("./ontology.js");
+      const onto = ontologyContextFor(message, chunks, agentId);
+      if (onto) parts.push(onto);
+    } catch {
+      /* 온톨로지가 비어있거나 조회 실패해도 채팅은 계속된다 (RAG와 동일한 방어). */
+    }
+
+    return parts.length > 0 ? parts.join("\n\n") : null;
   } catch {
     return null;
   }

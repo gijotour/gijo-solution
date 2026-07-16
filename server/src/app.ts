@@ -42,6 +42,7 @@ import { registerUsageRoutes, usageLoggingMiddleware } from "./engine/usage";
 import { registerLogsRoutes } from "./engine/logs";
 import { registerLlmActivityRoutes } from "./engine/llmactivity";
 import { registerKevRoutes } from "./engine/kev";
+import { registerOntologyRoutes } from "./engine/ontology";
 
 // 온프레미스 배포 시 GIJO_CORS_ORIGINS(콤마 구분)로 허용 오리진을 사내망으로 제한할 수 있다.
 // 미지정 시(기본 개발/단일 데스크톱 모드)는 이전과 동일하게 모든 오리진을 허용한다.
@@ -97,6 +98,7 @@ export function createApp(): Express {
   registerLogsRoutes(app);
   registerLlmActivityRoutes(app);
   registerKevRoutes(app);
+  registerOntologyRoutes(app);
 
   app.get("/api/health", (_req, res) => res.json({ ok: true, service: "gijo-as-server" }));
 

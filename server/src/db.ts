@@ -238,6 +238,26 @@ db.exec(`
   );
 `);
 
+db.exec(`
+  -- 온톨로지(지식 그래프) — 하이브리드 지식모델의 의미 계층(engine/ontology.ts).
+  -- 벡터 RAG(memory.ts/LanceDB)가 "의미가 비슷한 문장"을 찾는다면, 여기는 엔티티 사이의 명시적
+  -- 관계·규칙을 트리플(주어-술어-목적어)로 저장해 "왜 이 판단인지"의 근거를 추적할 수 있게 한다.
+  -- 예: (SQL인젝션, 완화기법, 입력검증) / (관리자API, 접근권한, 보안운영팀).
+  -- scope: memory.ts와 동일 규칙 — 'global'은 모든 에이전트가, 그 외는 해당 agentId 전용 지식.
+  CREATE TABLE IF NOT EXISTS ontology_triples (
+    id TEXT PRIMARY KEY,
+    subject TEXT NOT NULL,
+    predicate TEXT NOT NULL,
+    object TEXT NOT NULL,
+    scope TEXT NOT NULL DEFAULT 'global',
+    source TEXT,
+    createdAt INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_ontology_subject ON ontology_triples(subject);
+  CREATE INDEX IF NOT EXISTS idx_ontology_object ON ontology_triples(object);
+  CREATE INDEX IF NOT EXISTS idx_ontology_scope ON ontology_triples(scope);
+`);
+
 // 마이그레이션: assets.aibom (AI-BOM 5영역 메타 JSON). CREATE TABLE에 직접 넣지 않고 ALTER로
 // 추가해 기존 DB에도 적용되게 한다. 이미 있으면 SQLite가 duplicate column 에러를 던지므로 무시한다.
 try {
