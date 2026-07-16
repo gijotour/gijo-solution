@@ -32,7 +32,10 @@ describe("llm chat system prompt (한국어 기본 처리)", () => {
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body.messages).toHaveLength(2);
     expect(body.messages[0].role).toBe("system");
-    expect(body.messages[0].content).toContain("오케스트레이터");
+    // 프롬프트엔 (표시 이름이 아니라) 역할이 들어간다 — orchestrator 역할 "작업 분배 · 결과 취합".
+    expect(body.messages[0].content).toContain("작업 분배");
+    // 페르소나 자기소개 방지 회귀: 표시 이름을 프롬프트에 주입하지 않는다.
+    expect(body.messages[0].content).not.toContain('입니다. 담당 역할');
     expect(body.messages[0].content).toContain("반드시 한국어로");
     expect(body.messages[0].content).toContain("지어내지 않습니다");
     expect(body.messages[1]).toEqual({ role: "user", content: "SQL 인젝션이 뭐야?" });

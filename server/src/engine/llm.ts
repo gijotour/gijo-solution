@@ -61,8 +61,11 @@ async function ragContextFor(message: string, agentId: string): Promise<string |
 // 심해진다(특히 영어 중심 모델). 모든 에이전트 호출에 한국어 기본 처리 + 역할 + 환각 억제를 깐다.
 export function systemPromptFor(agentId: string): string {
   const agent = getAgentById(agentId);
+  // 표시 이름(팀 로스터 커스터마이징: "모니터링 재욱" 등)은 화면용이다. 프롬프트엔 이름 대신
+  // 역할만 넣는다 — `당신은 "○○"입니다` 형태로 이름을 주면 약한 모델이 매 답변을 자기소개로
+  // 시작하기 때문(실측: Mistral 계열 보안모델이 "안녕하세요, 저는 …입니다"로 장황해짐).
   const identity = agent
-    ? `당신은 GIJO AS(AI 자산 보안 관리 플랫폼)의 "${agent.name}"입니다. 담당 역할: ${agent.role}.`
+    ? `당신은 GIJO AS(AI 자산 보안 관리 플랫폼)에서 ${agent.role}를 담당하는 보안 AI입니다.`
     : `당신은 GIJO AS(AI 자산 보안 관리 플랫폼)의 보안 어시스턴트입니다.`;
   return [
     identity,
