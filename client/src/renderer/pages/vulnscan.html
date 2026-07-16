@@ -70,6 +70,7 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
 .vd-state.new{background:rgba(59,130,246,0.18);color:var(--blue-light);}
 .vd-state.resurfaced{background:rgba(240,120,40,0.2);color:#f7a86a;}
 .vd-state.fixed{background:rgba(30,185,128,0.16);color:var(--teal);}
+.vd-state.fixed-unverified{background:rgba(245,185,66,0.16);color:#f5b942;border:1px dashed rgba(245,185,66,0.5);}
 .vd-item.is-fixed{opacity:.5;}
 .vd-item.is-fixed .vd-name{text-decoration:line-through;}
 .vd-remediate{flex-shrink:0;background:rgba(59,130,246,0.14);border:1px solid var(--border-strong);color:var(--blue-light);font-size:10.5px;font-weight:800;padding:2px 9px;border-radius:6px;cursor:pointer;}
@@ -358,7 +359,17 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
         const misfit = isMisfit(f) ? `<span class="vd-misfit" title="CVSS 등급은 낮지만 실제 악용확률이 높습니다 — 등급만 보면 놓치는 건">⚠ 등급↓ 악용↑</span>` : "";
         const kev = f.kev ? `<span class="vd-kev" title="CISA KEV — 실제 악용이 확인된 취약점. 최우선 조치.&#10;${esc((f.kevCves || []).join(', '))}">🔴 KEV 악용중</span>` : "";
         const STATE_LABEL = { new: "🆕 신규", resurfaced: "♻ 재발", fixed: "✓ 고쳐짐" };
-        const state = f.state && STATE_LABEL[f.state] ? `<span class="vd-state ${f.state}" title="지난 스캔 대비 상태">${STATE_LABEL[f.state]}</span>` : "";
+        let state = "";
+        if (f.state === "fixed") {
+          // 인증 재스캔으로 검증된 Fixed와, 비인증이라 신뢰할 수 없는 Fixed를 구분한다(Tenable 조치 검증 요건).
+          if (f.fixedVerified === false)
+            state = `<span class="vd-state fixed-unverified" title="비인증(원격) 재스캔에서 사라졌을 뿐, 정말 고쳐졌는지 검증되지 않았습니다. 인증(credentialed) 재스캔으로 재확인이 필요합니다.">✓ 고쳐짐(미검증)</span>`;
+          else if (f.fixedVerified === true)
+            state = `<span class="vd-state fixed" title="인증(credentialed) 재스캔에서 사라져 조치가 검증되었습니다.">✓ 고쳐짐 · 검증됨</span>`;
+          else state = `<span class="vd-state fixed" title="지난 스캔에서 사라짐">✓ 고쳐짐</span>`;
+        } else if (f.state && STATE_LABEL[f.state]) {
+          state = `<span class="vd-state ${f.state}" title="지난 스캔 대비 상태">${STATE_LABEL[f.state]}</span>`;
+        }
         // 고쳐진 것엔 조치 등록 버튼을 달지 않는다.
         const remediate = f.state === "fixed" ? "" : `<button class="vd-remediate" data-rem data-name="${esc(f.finding_type)}" data-sev="${f.severity}" data-kev="${f.kev ? 1 : 0}" title="이 취약점을 조치 항목(담당자·기한)으로 등록">＋ 조치 등록</button>`;
         return (
@@ -436,6 +447,11 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
       const dedup = r.rows && r.rows > r.findings ? ` (원본 ${r.rows.toLocaleString()}행 → CVE 중복 제거)` : "";
       status.textContent = `✓ ${r.hosts}개 호스트 · 취약점 ${r.findings.toLocaleString()}건을 등록했습니다.${dedup}`;
       status.style.color = "var(--teal)";
+      // 비인증(원격) 스캔 경고 — 로컬 취약점 탐지·조치검증 신뢰도가 낮다(Tenable 조치 검증 요건).
+      const uncred = (r.uncredentialedHosts || []).length;
+      if (uncred > 0) {
+        status.innerHTML += `<div style="margin-top:6px;color:#f5b942;font-size:11.5px;">⚠ ${uncred}개 호스트가 <b>비인증(원격) 스캔</b>입니다 — 로컬 취약점을 놓칠 수 있고, 이 스캔에서 사라진 취약점은 "미검증"으로 표시됩니다. 정확한 조치 검증에는 인증(credentialed) 스캔이 필요합니다.</div>`;
+      }
       await refresh();
     } catch (err) {
       status.textContent = "✗ 업로드 실패: " + err.message;

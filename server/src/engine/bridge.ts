@@ -26,6 +26,10 @@ export interface StandardFinding {
   // 재스캔 간 상태 추적(취약점 스캐너 자산 전용). key는 스캔 사이 동일 취약점을 잇는 안정적 식별자.
   key?: string;
   state?: "new" | "active" | "fixed" | "resurfaced";
+  // "Fixed"가 인증(credentialed) 재스캔으로 검증됐는지(Tenable §조치 검증 요건). 비인증 스캔에서
+  // 사라진 것은 정말 고쳐진 게 아니라 스캐너 가시성이 준 것일 수 있어 신뢰할 수 없다.
+  // true=인증 재스캔으로 검증됨, false=비인증이라 미검증(재확인 필요), undefined=인증 여부 불명.
+  fixedVerified?: boolean;
 }
 
 const adapters: Record<string, ScanAdapter> = {

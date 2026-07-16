@@ -18,6 +18,8 @@ export interface VulnScanResult {
   findings: number; // 실제 취약점 수 (플러그인 기준 중복 제거 후)
   rows: number; // 원본 행 수 — Nessus는 CVE마다 행을 복제하므로 findings보다 클 수 있다
   assets: Asset[];
+  // 비인증(uncredentialed) 스캔으로 점검된 호스트 — 로컬 취약점 탐지·조치검증 신뢰도가 낮다는 경고용.
+  uncredentialedHosts: string[];
 }
 
 // Nessus/일반 취약점 도구 CSV·JSON의 흔한 컬럼명 별칭.
@@ -114,6 +116,7 @@ export interface ParsedVuln {
   vpr?: number;
   port: string;
   protocol: string;
+  output?: string; // 플러그인 출력(주로 19506 "Nessus Scan Information"의 인증 여부 판별용)
 }
 
 // 호스트 부가 정보 — CSV에는 없고 Nessus HTML 리포트에만 있다. 자산에 이름·OS를 채우는 데 쓴다.
@@ -121,6 +124,16 @@ export interface HostMeta {
   dnsName?: string;
   os?: string;
   mac?: string;
+  // 이 호스트가 인증(credentialed) 스캔으로 점검됐는지(플러그인 19506 "Credentialed checks : yes/no").
+  // 비인증 스캔은 로컬 취약점 탐지·조치검증 신뢰도가 낮다(Tenable §조치 검증 요건).
+  credentialed?: boolean;
+}
+
+// 플러그인 19506("Nessus Scan Information") 출력의 "Credentialed checks : yes/no"로 인증 스캔 여부 판별.
+// 어느 포맷(CSV plugin_output·HTML 본문·XML plugin_output)이든 같은 문구가 나온다.
+function detectCredentialed(text: string): boolean | undefined {
+  const m = /Credentialed checks\s*:\s*(yes|no)/i.exec(text);
+  return m ? m[1].toLowerCase() === "yes" : undefined;
 }
 
 // ── Nessus HTML 리포트 파서 ─────────────────────────────────────────────────
@@ -187,7 +200,9 @@ export function parseNessusHtml(html: string): { vulns: ParsedVuln[]; meta: Map<
     const os = fieldAfter(headText, "OS");
     const dnsName = fieldAfter(headText, "DNS Name");
     const mac = fieldAfter(headText, "MAC Address");
-    if (os || dnsName || mac) meta.set(seg.host, { os, dnsName, mac });
+    // 인증 스캔 여부는 플러그인 19506 블록 본문에 있다(구간 전체를 훑는다).
+    const credentialed = detectCredentialed(seg.body);
+    if (os || dnsName || mac || credentialed !== undefined) meta.set(seg.host, { os, dnsName, mac, credentialed });
 
     // 취약점 블록: 헤더 사이 구간이 그 취약점의 상세다.
     const vh = [...seg.body.matchAll(VULN_HEADER_RE)];
@@ -259,7 +274,10 @@ export function parseNessusXml(xml: string): { vulns: ParsedVuln[]; meta: Map<st
     const os = propTag("operating-system");
     const dnsName = propTag("host-fqdn") ?? propTag("host-rdns");
     const mac = propTag("mac-address");
-    if (os || dnsName || mac) meta.set(host, { os, dnsName, mac });
+    // 인증 스캔 여부: 플러그인 19506 출력에 "Credentialed checks : yes/no". Nessus는 이를 호스트
+    // 속성(Credentialed_Scan)으로도 남긴다 — 둘 다 확인한다.
+    const credentialed = propTag("Credentialed_Scan") !== undefined ? propTag("Credentialed_Scan") === "true" : detectCredentialed(body);
+    if (os || dnsName || mac || credentialed !== undefined) meta.set(host, { os, dnsName, mac, credentialed });
 
     const itemRe = /<ReportItem\b([^>]*)>([\s\S]*?)<\/ReportItem>/g;
     let im: RegExpExecArray | null;
@@ -305,6 +323,7 @@ export function parseVulnReport(content: string, format: VulnFormat): ParsedVuln
       vpr: pickNum(row, ALIASES.vpr),
       port: pick(row, ALIASES.port),
       protocol: pick(row, ALIASES.protocol),
+      output: pick(row, ["plugin_output", "output"]),
     }))
     .filter((v) => v.host && v.name); // 호스트·항목명 없는 행은 무시
 }
@@ -321,7 +340,9 @@ function findingLabel(name: string, cves: string[]): string {
 // - 이번에 처음 보이면 new, 이전에도 있었으면 active
 // - 이전에 fixed였는데 다시 나타나면 resurfaced
 // - 이전엔 있었는데 이번에 없으면 fixed. fixed는 재발할 때까지 목록에 유지한다(고쳐진 이력 보존).
-function applyStateTracking(prev: StandardFinding[], current: StandardFinding[]): StandardFinding[] {
+// credentialed: 이번(재)스캔이 인증 스캔인지. Fixed 판정의 신뢰도(fixedVerified)를 좌우한다 —
+// 비인증 스캔에서 사라진 것은 정말 고쳐진 게 아니라 스캐너 가시성이 준 것일 수 있다(Tenable §조치 검증).
+function applyStateTracking(prev: StandardFinding[], current: StandardFinding[], credentialed?: boolean): StandardFinding[] {
   // 상태 추적 도입 이전에 저장된 스냅샷은 key/state가 없다 — 새 key와 매칭되지 않아 전부 유령
   // fixed가 되어버린다. 그런 옛 스냅샷 위에 처음 임포트할 땐 기준선으로 삼는다(전부 new, fixed 없음).
   const legacyPrev = prev.length > 0 && !prev.some((p) => p.key !== undefined || p.state !== undefined);
@@ -341,7 +362,15 @@ function applyStateTracking(prev: StandardFinding[], current: StandardFinding[])
   const curKeys = new Set(current.map(keyOf));
   // 이번 스캔에 없는 이전 항목은 fixed로 유지(방금 고쳐진 것 + 이전부터 고쳐져 계속 없는 것).
   // 목록 크기는 그 호스트에서 관측된 고유 취약점 수로 유한하다.
-  const carriedFixed = prev.filter((p) => !curKeys.has(keyOf(p))).map((p) => ({ ...p, state: "fixed" as const }));
+  // 검증 신뢰도: 인증 재스캔에서 안 보이면 검증됨(이전에 미검증이던 것도 승격). 비인증이면 방금 고쳐진
+  // 것은 미검증(false)으로 두되, 이미 검증된 이력은 강등하지 않는다.
+  const carriedFixed = prev
+    .filter((p) => !curKeys.has(keyOf(p)))
+    .map((p) => ({
+      ...p,
+      state: "fixed" as const,
+      fixedVerified: credentialed === true ? true : p.state === "fixed" ? p.fixedVerified : credentialed,
+    }));
   return [...current, ...carriedFixed];
 }
 
@@ -358,12 +387,16 @@ export function importVulnScan(content: string, format: VulnFormat, sourceLabel:
   }
 
   const assets: Asset[] = [];
+  const uncredentialedHosts: string[] = [];
   let totalFindings = 0;
   for (const [host, vulns] of byHost) {
     const id = `vuln:${host}`;
     // 상태 추적: registerAsset이 findings를 초기화하므로 그 전에 이전 스냅샷을 확보한다.
     const prevFindings = getAsset(id)?.findings ?? [];
     const meta = metaOf(host);
+    // 인증 스캔 여부: HTML/XML은 meta에, CSV/JSON은 플러그인 출력에서 찾는다(19506 "Nessus Scan Information").
+    const credentialed = meta.credentialed ?? vulns.map((v) => detectCredentialed(v.output ?? "")).find((c) => c !== undefined);
+    if (credentialed === false) uncredentialedHosts.push(host);
     // OS/커널은 이 호스트의 구성요소(SBOM)로 넣는다 — "취약점 점검 대상이 자산 구성에 포함"되는 설계.
     // 예: "Linux Kernel 4.18.0-... on Red Hat Enterprise Linux release 8.10 (Ootpa)"
     const components: AssetComponent[] = [];
@@ -428,13 +461,14 @@ export function importVulnScan(content: string, format: VulnFormat, sourceLabel:
       };
     });
     // 이전 스냅샷과 대조해 new/active/resurfaced 태깅 + 이번에 고쳐진 것(fixed) 추가.
-    const findingsWithState = applyStateTracking(prevFindings, findings);
+    // 인증 여부를 넘겨 Fixed 검증 신뢰도(fixedVerified)를 함께 판정한다.
+    const findingsWithState = applyStateTracking(prevFindings, findings, credentialed);
     // findings(fixed 제외)만 "현재 취약점" 카운트로 센다.
     totalFindings += findingsWithState.filter((f) => f.state !== "fixed").length;
     const asset = recordFindings(id, findingsWithState);
     if (asset) assets.push(asset);
   }
-  return { hosts: byHost.size, findings: totalFindings, rows: parsed.length, assets };
+  return { hosts: byHost.size, findings: totalFindings, rows: parsed.length, assets, uncredentialedHosts };
 }
 
 export function registerVulnScanRoutes(app: Express): void {

@@ -273,6 +273,58 @@ describe("vulnscan (Tenable Nessus 등 취약점 스캔 결과 업로드)", () =
     expect(netstat.evidence).toContain("포트: tcp/22, udp/53");
   });
 
+  it("marks a Fixed as unverified when the rescan was uncredentialed (Tenable 조치 검증 요건)", () => {
+    // 플러그인 19506(Nessus Scan Information)의 Plugin Output에 인증 스캔 여부가 담긴다.
+    const scan = (rows: string, cred: "yes" | "no") =>
+      importVulnScan(
+        "Plugin ID,CVE,Risk,Host,Name,Plugin Output\n" +
+          rows +
+          `19506,,None,10.0.0.5,Nessus Scan Information,Credentialed checks : ${cred}\n`,
+        "csv",
+        "nessus"
+      );
+    const findingB = () => getAsset("vuln:10.0.0.5")!.findings.find((x) => x.finding_type.startsWith("취약점B"));
+
+    // 1차: A·B 존재
+    scan("100,CVE-2021-1,Critical,10.0.0.5,취약점A,\n200,CVE-2021-2,High,10.0.0.5,취약점B,\n", "yes");
+    // 2차: B가 사라졌는데 비인증 스캔 → 정말 고쳐졌는지 신뢰 불가
+    const r2 = scan("100,CVE-2021-1,Critical,10.0.0.5,취약점A,\n", "no");
+    expect(r2.uncredentialedHosts).toContain("10.0.0.5");
+    expect(findingB()!.state).toBe("fixed");
+    expect(findingB()!.fixedVerified).toBe(false); // 미검증
+
+    // 3차: 여전히 B 없음 + 이번엔 인증 스캔 → 조치가 검증됨(미검증에서 승격)
+    const r3 = scan("100,CVE-2021-1,Critical,10.0.0.5,취약점A,\n", "yes");
+    expect(r3.uncredentialedHosts).not.toContain("10.0.0.5");
+    expect(findingB()!.fixedVerified).toBe(true); // 검증됨으로 승격
+  });
+
+  it("a Fixed found via a credentialed rescan is verified immediately", () => {
+    const scan = (rows: string) =>
+      importVulnScan(
+        "Plugin ID,CVE,Risk,Host,Name,Plugin Output\n" + rows + "19506,,None,10.0.0.9,Nessus Scan Information,Credentialed checks : yes\n",
+        "csv",
+        "s"
+      );
+    scan("100,CVE-2021-1,Critical,10.0.0.9,취약점A,\n200,CVE-2021-2,High,10.0.0.9,취약점B,\n");
+    const r = scan("100,CVE-2021-1,Critical,10.0.0.9,취약점A,\n");
+    expect(r.uncredentialedHosts).toEqual([]);
+    const b = getAsset("vuln:10.0.0.9")!.findings.find((x) => x.finding_type.startsWith("취약점B"))!;
+    expect(b.state).toBe("fixed");
+    expect(b.fixedVerified).toBe(true);
+  });
+
+  it("detects credentialed scan from .nessus host property (Credentialed_Scan) and plugin 19506", () => {
+    const xml = (cred: "true" | "false") =>
+      `<NessusClientData_v2><ReportHost name="10.0.0.7"><HostProperties>` +
+      `<tag name="Credentialed_Scan">${cred}</tag></HostProperties>` +
+      `<ReportItem port="0" protocol="tcp" severity="3" pluginID="500" pluginName="테스트 취약점"><cve>CVE-2020-1</cve></ReportItem>` +
+      `</ReportHost></NessusClientData_v2>`;
+    expect(importVulnScan(xml("false"), "nessus", "s").uncredentialedHosts).toContain("10.0.0.7");
+    resetAssetsForTests();
+    expect(importVulnScan(xml("true"), "nessus", "s").uncredentialedHosts).toEqual([]);
+  });
+
   it("parses JSON array and {vulnerabilities:[...]} envelopes", () => {
     expect(parseVulnReport('[{"host":"1.1.1.1","name":"x","risk":"high"}]', "json")).toHaveLength(1);
     expect(parseVulnReport('{"vulnerabilities":[{"ip":"2.2.2.2","plugin_name":"y","severity":"low"}]}', "json")).toHaveLength(1);

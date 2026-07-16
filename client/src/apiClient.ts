@@ -582,7 +582,7 @@ export const assetsApi = {
   updateAiBom: (id: string, aibom: AiBom) => request<Asset>(`/api/assets/${id}/aibom`, { method: "PUT", body: { aibom } }),
   remove: (id: string) => request<{ ok: boolean }>(`/api/assets/${encodeURIComponent(id)}`, { method: "DELETE" }),
   importVulnScan: (content: string, format: "json" | "csv" | "html" | "nessus", source: string) =>
-    request<{ hosts: number; findings: number; assets: Asset[] }>("/api/vulnscan/import", {
+    request<{ hosts: number; findings: number; rows: number; assets: Asset[]; uncredentialedHosts: string[] }>("/api/vulnscan/import", {
       method: "POST",
       body: { content, format, source },
     }),
