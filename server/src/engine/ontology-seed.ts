@@ -13,9 +13,10 @@ import { addTriples, deleteTriplesBySource, type TripleInput } from "./ontology"
 
 // 시드 트리플의 출처 태그 — 재적재 시 이 출처의 기존 트리플만 지워 멱등하게 만든다(수동 입력분은 보존).
 export const SEED_SOURCE = "KISA AI 보안 위협 대응 매뉴얼(2026.7)";
-// 완화통제·보안제품 시드는 별도 출처 태그로 각각 독립 멱등.
+// 완화통제·보안제품·취약점분류 시드는 별도 출처 태그로 각각 독립 멱등.
 export const MITIGATION_SOURCE = "KISA AI 보안 위협 대응 매뉴얼(2026.7) 별첨2 양호기준";
 export const PRODUCT_SOURCE = "GIJO AS 보안제품 카탈로그";
+export const VULN_SOURCE = "GIJO AS 취약점관리 지침";
 
 const AIBOM_AREA_LABEL: Record<AiBomArea, string> = {
   model: "모델",
@@ -74,12 +75,59 @@ export function securityProductTriples(): TripleInput[] {
   return triples;
 }
 
+// 취약점 분류 도메인 — GIJO AS 취약점관리 지침(Tenable VM 기반)의 구조화 데이터를 트리플로.
+// 생애주기 4단계(루프)·CVSS 심각도 밴드·우선순위 지표(CVSS/EPSS/VPR/CISA KEV)·VPR 결정요인·상태 추적.
+// 전부 지침 문서에 명시된 사실만(밴드 수치·명칭·정의). AI 위협 시드와 별개의 '취약 자산관리' 서브그래프.
+export function vulnClassificationTriples(): TripleInput[] {
+  const t = (subject: string, predicate: string, object: string): TripleInput => ({ subject, predicate, object, source: VULN_SOURCE });
+  const rows: TripleInput[] = [];
+
+  // 생애주기 4단계 + 루프 연결
+  const stages = ["발견·평가", "우선순위", "조치", "측정"];
+  for (const s of stages) rows.push(t("취약점 관리", "생애주기", s));
+  for (let i = 0; i < stages.length; i++) rows.push(t(stages[i], "다음단계", stages[(i + 1) % stages.length]));
+
+  // CVSS 심각도 등급 밴드 (지침 §2)
+  const cvss: [string, string][] = [["Critical", "9.0–10.0"], ["High", "7.0–8.9"], ["Medium", "4.0–6.9"], ["Low", "0.1–3.9"], ["Info", "0"]];
+  for (const [grade, range] of cvss) { rows.push(t("CVSS 심각도", "등급", grade)); rows.push(t(grade, "점수범위", range)); }
+
+  // 우선순위 판단 지표
+  for (const ind of ["CVSS", "EPSS", "VPR", "CISA KEV", "자산 중요도"]) rows.push(t("취약점 우선순위", "판단지표", ind));
+  rows.push(t("CVSS", "의미", "기술적 심각도"));
+  rows.push(t("EPSS", "정식명칭", "Exploit Prediction Scoring System"));
+  rows.push(t("EPSS", "의미", "향후 30일 내 악용 확률"));
+  rows.push(t("VPR", "정식명칭", "Vulnerability Priority Rating"));
+  rows.push(t("VPR", "출처", "Tenable"));
+  rows.push(t("VPR", "범위", "0.1–10.0"));
+  rows.push(t("CISA KEV", "의미", "실제 악용이 확인된 취약점"));
+  rows.push(t("CISA KEV", "우선순위", "최우선 조치"));
+  rows.push(t("Tenable 권고", "내용", "VPR 높은 것부터 조치"));
+
+  // VPR 결정요인 (Key Drivers)
+  for (const d of ["익스플로잇 성숙도", "악용확률(EPSS)", "CISA KEV 등재", "언론·다크웹 언급"]) rows.push(t("VPR", "결정요인", d));
+
+  // 상태 추적 (재스캔 기반 자동 판정)
+  const states: [string, string][] = [
+    ["New", "처음 1회 탐지"], ["Active", "2회 이상 탐지(계속 존재)"],
+    ["Fixed", "재스캔에서 사라짐(조치 완료 검증)"], ["Resurfaced", "Fixed 후 재발"],
+  ];
+  for (const [st, meaning] of states) { rows.push(t("취약점 상태", "값", st)); rows.push(t(st, "의미", meaning)); }
+
+  return rows;
+}
+
 // 멱등 적재: 각 시드 그룹을 자기 출처 태그로 지우고 다시 생성한다. 사용자가 손으로 넣은 트리플은
 // 출처가 달라 보존된다. 반환값은 새로 넣은 트리플 수(전체).
 export function seedOntologyFromCatalog(): { inserted: number; sources: string[] } {
   deleteTriplesBySource(SEED_SOURCE);
   deleteTriplesBySource(MITIGATION_SOURCE);
   deleteTriplesBySource(PRODUCT_SOURCE);
-  const rows = addTriples([...threatCatalogTriples(), ...mitigationTriples(), ...securityProductTriples()]);
-  return { inserted: rows.length, sources: [SEED_SOURCE, MITIGATION_SOURCE, PRODUCT_SOURCE] };
+  deleteTriplesBySource(VULN_SOURCE);
+  const rows = addTriples([
+    ...threatCatalogTriples(),
+    ...mitigationTriples(),
+    ...securityProductTriples(),
+    ...vulnClassificationTriples(),
+  ]);
+  return { inserted: rows.length, sources: [SEED_SOURCE, MITIGATION_SOURCE, PRODUCT_SOURCE, VULN_SOURCE] };
 }

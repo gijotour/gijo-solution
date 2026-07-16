@@ -156,4 +156,34 @@ describe("ontology 시드 — KISA 위협 카탈로그 → 트리플 (실제 도
     expect(edr.some((t) => t.predicate === "유형" && t.object === "보안제품")).toBe(true);
     expect(listTriples({ subject: "기타" })).toHaveLength(0); // '기타'는 제외
   });
+
+  it("취약점 분류 시드 — 생애주기 루프·CVSS 밴드·우선순위 지표가 들어간다", async () => {
+    const { vulnClassificationTriples, seedOntologyFromCatalog, VULN_SOURCE } = await import("../src/engine/ontology-seed");
+    seedOntologyFromCatalog();
+
+    // 생애주기 4단계가 루프로 연결(측정 → 발견·평가)
+    const lifecycle = listTriples({ subject: "취약점 관리" }).filter((t) => t.predicate === "생애주기");
+    expect(lifecycle).toHaveLength(4);
+    expect(listTriples({ subject: "측정" }).some((t) => t.predicate === "다음단계" && t.object === "발견·평가")).toBe(true);
+
+    // CVSS Critical 밴드
+    expect(listTriples({ subject: "Critical" }).some((t) => t.object === "9.0–10.0")).toBe(true);
+
+    // 우선순위 판단 지표에 CISA KEV 포함 + 의미
+    const prio = listTriples({ subject: "취약점 우선순위" }).map((t) => t.object);
+    expect(prio).toContain("CISA KEV");
+    expect(listTriples({ subject: "CISA KEV" }).some((t) => t.object.includes("실제 악용"))).toBe(true);
+
+    // 전부 지침 출처로 태깅
+    expect(vulnClassificationTriples().every((t) => t.source === VULN_SOURCE)).toBe(true);
+  });
+
+  it("취약점 확장 — 'EPSS 우선순위' 질문에 지표·정의가 함께 나온다", async () => {
+    const { seedOntologyFromCatalog } = await import("../src/engine/ontology-seed");
+    seedOntologyFromCatalog();
+    const hits = expandOntology("EPSS로 취약점 우선순위를 어떻게 정하나요?", undefined, { hops: 2, limit: 40 });
+    const objs = hits.map((t) => t.object);
+    expect(objs.some((o) => o.includes("악용 확률"))).toBe(true); // EPSS 의미
+    expect(objs).toContain("VPR"); // 우선순위 지표로 연결
+  });
 });
