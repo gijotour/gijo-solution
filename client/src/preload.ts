@@ -56,7 +56,7 @@ const gijoApi = {
   listMaintenance: () => api.maintenanceApi.list(),
   listDueMaintenance: () => api.maintenanceApi.due(),
   listMaintenanceByAsset: (assetId: string) => api.maintenanceApi.byAsset(assetId),
-  createMaintenance: (args: { title: string; productName: string; scheduleDate: string; intervalDays?: number; assetId?: string }) =>
+  createMaintenance: (args: { title: string; productName: string; scheduleDate: string; intervalDays?: number; assetId?: string; productId?: string }) =>
     api.maintenanceApi.create(args),
   reportMaintenance: (id: string, args: { note: string; filename?: string; content?: string }) =>
     api.maintenanceApi.report(id, args),

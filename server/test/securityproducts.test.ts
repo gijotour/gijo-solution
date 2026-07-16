@@ -20,6 +20,7 @@ import {
   importManual,
   listProducts,
 } from "../src/engine/securityproducts";
+import { createMaintenanceItem, resetMaintenanceForTests } from "../src/engine/maintenance";
 
 async function login(app: ReturnType<typeof createApp>) {
   const res = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" });
@@ -137,6 +138,24 @@ describe("securityproducts (보안제품 종류별 관리 + 매뉴얼)", () => {
 
     // 키워드도 없으면 "기타"
     expect(importManual("이상한_장비_설명서.pdf", undefined).category).toBe("기타");
+  });
+
+  // ── 유지보수 점검 ↔ 보안제품 연결 ─────────────────────────────────────────
+  it("links a maintenance item to a product by name (구분자·공백 차이 흡수)", () => {
+    resetMaintenanceForTests();
+    const fw = createProduct({ name: "경계 방화벽 (FW-01)", category: "방화벽" });
+
+    // 제품명 표기가 달라도("방화벽(FW-01)" vs "방화벽 (FW-01)") 스쿼시 매칭으로 연결된다
+    const m = createMaintenanceItem({ title: "정책 점검", productName: "경계 방화벽(FW-01)", scheduleDate: "2026-08-01" });
+    expect(m.productId).toBe(fw.id);
+
+    // 등록부에 없는 제품명이면 연결 없이 자유텍스트로만 남는다(기존 동작 보존)
+    const loose = createMaintenanceItem({ title: "x", productName: "등록 안 된 장비", scheduleDate: "2026-08-01" });
+    expect(loose.productId).toBeUndefined();
+
+    // 명시적 productId가 오면 이름 매칭보다 우선
+    const explicit = createMaintenanceItem({ title: "y", productName: "아무 이름", scheduleDate: "2026-08-01", productId: fw.id });
+    expect(explicit.productId).toBe(fw.id);
   });
 
   it("POST /api/security-products/import-doc classifies via API (metadata-only, no file body)", async () => {

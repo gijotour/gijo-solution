@@ -22,6 +22,7 @@ export interface MaintenanceItem {
   status: MaintenanceStatus;
   assetId?: string; // 연결된 AI 자산(assets.ts) — 선택
   assetName?: string; // assetId의 현재 자산명(읽을 때 조회, 저장 안 함)
+  productId?: string; // 연결된 보안제품(security_products) — 미지정 시 productName 유사 매칭으로 자동 해석
   reportNote?: string;
   reportDocName?: string; // 첨부된 점검서가 지식베이스에 수집됐으면 그 문서명
   reportedBy?: string;
@@ -41,6 +42,7 @@ interface MaintenanceRow {
   intervalDays: number | null;
   status: MaintenanceStatus;
   assetId: string | null;
+  productId: string | null;
   reportNote: string | null;
   reportDocName: string | null;
   reportedBy: string | null;
@@ -60,6 +62,18 @@ function resolveAssetName(assetId: string | null): string | undefined {
   return row?.name;
 }
 
+// 점검 등록 시 productId를 안 주면 productName으로 보안제품 등록부에서 찾아 연결한다.
+// 구분자·공백 차이를 흡수하는 스쿼시 비교("경계 방화벽(FW-01)" ↔ "경계 방화벽 (FW-01)").
+// securityproducts.ts를 import하지 않고 테이블을 직접 읽어 순환 참조를 피한다(assets 조회와 같은 패턴).
+const listProductNamesStmt = db.prepare("SELECT id, name FROM security_products");
+const squashName = (s: string): string => (s.toLowerCase().match(/[a-z0-9가-힣]+/g) ?? []).join("");
+function resolveProductIdByName(productName: string): string | undefined {
+  const target = squashName(productName);
+  if (!target) return undefined;
+  const rows = listProductNamesStmt.all() as { id: string; name: string }[];
+  return rows.find((r) => squashName(r.name) === target)?.id;
+}
+
 function fromRow(row: MaintenanceRow): MaintenanceItem {
   return {
     id: row.id,
@@ -70,6 +84,7 @@ function fromRow(row: MaintenanceRow): MaintenanceItem {
     status: row.status,
     assetId: row.assetId ?? undefined,
     assetName: resolveAssetName(row.assetId),
+    productId: row.productId ?? undefined,
     reportNote: row.reportNote ?? undefined,
     reportDocName: row.reportDocName ?? undefined,
     reportedBy: row.reportedBy ?? undefined,
@@ -114,12 +129,12 @@ function today(): string {
 // insert/update를 하나로 — compliance.ts의 ON CONFLICT...DO UPDATE 패턴을 그대로 따른다.
 const upsertStmt = db.prepare(`
   INSERT INTO maintenance_items
-    (id, title, productName, scheduleDate, intervalDays, status, assetId, reportNote, reportDocName,
+    (id, title, productName, scheduleDate, intervalDays, status, assetId, productId, reportNote, reportDocName,
      reportedBy, reportedAt, reviewedBy, reviewedAt, reviewNote, createdAt, updatedAt)
-  VALUES (@id, @title, @productName, @scheduleDate, @intervalDays, @status, @assetId, @reportNote, @reportDocName,
+  VALUES (@id, @title, @productName, @scheduleDate, @intervalDays, @status, @assetId, @productId, @reportNote, @reportDocName,
      @reportedBy, @reportedAt, @reviewedBy, @reviewedAt, @reviewNote, @createdAt, @updatedAt)
   ON CONFLICT(id) DO UPDATE SET
-    status=excluded.status, assetId=excluded.assetId, reportNote=excluded.reportNote, reportDocName=excluded.reportDocName,
+    status=excluded.status, assetId=excluded.assetId, productId=excluded.productId, reportNote=excluded.reportNote, reportDocName=excluded.reportDocName,
     reportedBy=excluded.reportedBy, reportedAt=excluded.reportedAt, reviewedBy=excluded.reviewedBy,
     reviewedAt=excluded.reviewedAt, reviewNote=excluded.reviewNote, updatedAt=excluded.updatedAt
 `);
@@ -170,6 +185,7 @@ function save(item: MaintenanceItem): MaintenanceItem {
     intervalDays: item.intervalDays ?? null,
     status: item.status,
     assetId: item.assetId ?? null,
+    productId: item.productId ?? null,
     reportNote: item.reportNote ?? null,
     reportDocName: item.reportDocName ?? null,
     reportedBy: item.reportedBy ?? null,
@@ -196,6 +212,7 @@ export function createMaintenanceItem(
     scheduleDate: string;
     intervalDays?: number;
     assetId?: string;
+    productId?: string;
   },
   actor?: string,
   createdNote?: string
@@ -211,6 +228,8 @@ export function createMaintenanceItem(
     scheduleDate: args.scheduleDate,
     intervalDays: args.intervalDays,
     assetId: args.assetId,
+    // 명시된 productId가 우선, 없으면 제품명으로 등록부에서 찾아 자동 연결.
+    productId: args.productId ?? resolveProductIdByName(args.productName),
     status: "scheduled",
     createdAt: now,
     updatedAt: now,
@@ -460,9 +479,9 @@ export function registerMaintenanceRoutes(app: Express): void {
 
   app.post("/api/maintenance", authMiddleware, (req, res) => {
     const user = (req as Request & { user?: GijoUser }).user;
-    const { title, productName, scheduleDate, intervalDays, assetId } = req.body ?? {};
+    const { title, productName, scheduleDate, intervalDays, assetId, productId } = req.body ?? {};
     try {
-      res.json(createMaintenanceItem({ title, productName, scheduleDate, intervalDays, assetId }, user?.displayName));
+      res.json(createMaintenanceItem({ title, productName, scheduleDate, intervalDays, assetId, productId }, user?.displayName));
     } catch (err) {
       res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
     }

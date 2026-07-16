@@ -89,6 +89,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .prod-asset{font-size:10.5px;font-weight:700;color:var(--purple);background:rgba(139,124,240,0.14);padding:2px 8px;border-radius:6px;}
 .prod-del{margin-left:auto;background:transparent;border:1px solid #e2483d;color:#f5928a;border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;}
 .prod-note{font-size:11.5px;color:var(--muted);margin-top:6px;}
+.prod-maint{font-size:11.5px;color:var(--muted);margin-top:8px;padding:6px 10px;background:var(--panel-2);border:1px solid var(--border);border-radius:7px;cursor:pointer;}
+.prod-maint:hover{border-color:var(--border-strong);}
 
 /* 문서 영역 */
 .docs{margin-top:12px;border-top:1px dashed var(--border);padding-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:14px;}
@@ -275,6 +277,27 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     );
   }
 
+  // 이 제품의 유지보수 점검 현황 — productId 연결(신규)과 제품명 스쿼시 매칭(과거 자유텍스트 등록분)
+  // 둘 다 잡는다. 클릭하면 운영 가이드에서 점검을 등록/보고한다.
+  let allMaints = [];
+  const squashName = (s) => (String(s || "").toLowerCase().match(/[a-z0-9가-힣]+/g) || []).join("");
+  function maintLineHtml(p) {
+    const mine = allMaints.filter((m) => m.productId === p.id || squashName(m.productName) === squashName(p.name));
+    if (!mine.length)
+      return `<div class="prod-maint" data-open-ops title="운영 가이드에서 점검 일정 등록">🔧 점검 이력 없음 — <span style="color:var(--blue-light)">점검 등록 →</span></div>`;
+    const today = new Date().toISOString().slice(0, 10);
+    const overdue = mine.filter((m) => m.status === "scheduled" && m.scheduleDate <= today).length;
+    const pending = mine.filter((m) => m.status === "reported").length;
+    const next = mine.filter((m) => m.status === "scheduled" && m.scheduleDate > today).sort((a, b) => a.scheduleDate.localeCompare(b.scheduleDate))[0];
+    const parts = [
+      overdue ? `<span style="color:#f5928a;font-weight:800">지연 ${overdue}</span>` : "",
+      pending ? `<span style="color:var(--amber);font-weight:800">승인대기 ${pending}</span>` : "",
+      next ? `다음 점검 ${esc(next.scheduleDate)}` : "",
+      !overdue && !pending && !next ? `<span style="color:var(--teal)">점검 완료</span>` : "",
+    ].filter(Boolean).join(" · ");
+    return `<div class="prod-maint" data-open-ops title="운영 가이드에서 점검 보고/승인">🔧 점검 ${mine.length}건 · ${parts} <span style="color:var(--blue-light)">→</span></div>`;
+  }
+
   function prodHtml(p) {
     const meta = [p.vendor, p.model].filter(Boolean).join(" · ");
     return (
@@ -286,6 +309,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       `<button class="prod-del" data-prod-del="${p.id}" data-name="${esc(p.name)}">✕ 제품 삭제</button>` +
       `</div>` +
       (p.note ? `<div class="prod-note">${esc(p.note)}</div>` : "") +
+      maintLineHtml(p) +
       `<div class="docs">` +
       docColHtml(p, "manual", "제품 매뉴얼") +
       docColHtml(p, "logManual", "로그 매뉴얼") +
@@ -307,6 +331,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const root = document.getElementById("groups");
     try {
       const groups = await window.gijo.listSecurityProductsGrouped();
+      // 점검 현황은 부가 정보 — 실패해도 제품 목록은 그려져야 한다.
+      allMaints = await window.gijo.listMaintenance().catch(() => []);
       renderSummary(groups);
       if (!groups.length) {
         root.innerHTML = `<div class="empty-all">아직 등록된 보안제품이 없습니다. 위에서 종류를 골라 제품을 등록하세요.</div>`;
@@ -348,6 +374,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   }
 
   async function onGroupsClick(e) {
+    const ops = e.target.closest("[data-open-ops]");
+    if (ops) { window.gijo.navigateTo("opsguide.html"); return; }
     const toggle = e.target.closest("[data-toggle]");
     if (toggle) {
       const cat = toggle.dataset.toggle;

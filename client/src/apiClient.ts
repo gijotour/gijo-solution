@@ -181,6 +181,7 @@ export interface MaintenanceItem {
   status: "scheduled" | "reported" | "approved" | "rejected";
   assetId?: string;
   assetName?: string;
+  productId?: string; // 연결된 보안제품(security_products) — 서버가 제품명 유사 매칭으로 자동 해석
   reportNote?: string;
   reportDocName?: string;
   reportedBy?: string;
@@ -205,7 +206,7 @@ export const maintenanceApi = {
   list: () => request<MaintenanceItem[]>("/api/maintenance"),
   due: () => request<MaintenanceItem[]>("/api/maintenance/due"),
   byAsset: (assetId: string) => request<MaintenanceItem[]>(`/api/assets/${encodeURIComponent(assetId)}/maintenance`),
-  create: (args: { title: string; productName: string; scheduleDate: string; intervalDays?: number; assetId?: string }) =>
+  create: (args: { title: string; productName: string; scheduleDate: string; intervalDays?: number; assetId?: string; productId?: string }) =>
     request<MaintenanceItem>("/api/maintenance", { method: "POST", body: args }),
   report: (id: string, args: { note: string; filename?: string; content?: string }) =>
     request<MaintenanceItem>(`/api/maintenance/${id}/report`, { method: "POST", body: args }),

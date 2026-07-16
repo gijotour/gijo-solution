@@ -199,7 +199,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
       <form id="maintForm" class="maint-form">
         <input id="mTitle" type="text" placeholder="점검 제목 (예: 방화벽 정책 점검)" required>
-        <input id="mProduct" type="text" placeholder="대상 제품/자산 (예: FW-01)" required>
+        <input id="mProduct" type="text" placeholder="대상 제품/자산 (예: FW-01)" list="productOptions" required>
+        <datalist id="productOptions"></datalist>
         <select id="mAsset" title="등록된 AI 자산과 연결(선택)"><option value="">AI 자산 연결 안 함</option></select>
         <input id="mDate" type="date" required>
         <select id="mInterval">
@@ -520,6 +521,17 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     } catch (e) {}
   }
 
+  // 보안제품 등록부의 제품명을 자동완성으로 제안한다 — 등록부 이름 그대로 고르면 점검이
+  // 그 제품에 자동 연결되어(서버의 이름 매칭) 보안제품 관리 화면에서 점검 현황이 보인다.
+  async function loadProductOptions() {
+    try {
+      const products = await window.gijo.listSecurityProducts();
+      document.getElementById("productOptions").innerHTML = products
+        .map((p) => `<option value="${esc(p.name)}">`)
+        .join("");
+    } catch (e) {}
+  }
+
   async function onMaintSubmit(e) {
     e.preventDefault();
     const title = document.getElementById("mTitle").value.trim();
@@ -580,6 +592,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.getElementById("mDate").value = todayStr();
     loadMaintenance();
     loadAssetOptions();
+    loadProductOptions();
     loadNotify();
 
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
