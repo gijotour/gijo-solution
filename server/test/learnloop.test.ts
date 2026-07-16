@@ -8,6 +8,7 @@ import {
   resetLearnloopForTests,
   putLearnloopConfig,
   getLearnloopStatus,
+  pruneChatLogs,
 } from "../src/engine/learnloop";
 
 async function login(app: ReturnType<typeof createApp>) {
@@ -229,6 +230,39 @@ describe("learnloop (헤르메스 폐쇄형 학습 루프)", () => {
     expect(res.body.ready).toBe(requiredAllOk);
 
     expect((await request(app).get("/api/learnloop/preflight")).status).toBe(401);
+  });
+
+  it("prune keeps unused training candidates and drops consumed/rejected logs first", async () => {
+    // 6건 수집 후: 2건 학습에 사용(=build-dataset), 1건 👎, 나머지 3건은 미평가 후보로 남김
+    for (let i = 0; i < 6; i++) recordChatLog("analysis", `q${i}`, `a${i}`);
+    let logs = (await request(app).get("/api/learnloop/logs").set(auth())).body.logs;
+    // 오래된 2건에 👍 → build-dataset으로 usedInDataset=1
+    await request(app).post(`/api/learnloop/logs/${logs[5].id}/rate`).set(auth()).send({ rating: 1 });
+    await request(app).post(`/api/learnloop/logs/${logs[4].id}/rate`).set(auth()).send({ rating: 1 });
+    // 3건 더 채워 최소치를 맞추고 build로 5건을 소진(usedInDataset=1)시킨다
+    await request(app).post(`/api/learnloop/logs/${logs[3].id}/rate`).set(auth()).send({ rating: 1 });
+    await request(app).post(`/api/learnloop/logs/${logs[2].id}/rate`).set(auth()).send({ rating: 1 });
+    await request(app).post(`/api/learnloop/logs/${logs[1].id}/rate`).set(auth()).send({ rating: 1 });
+    await request(app).post(`/api/learnloop/logs/${logs[0].id}/rate`).set(auth()).send({ rating: -1 }); // 👎
+    const built = await request(app).post("/api/learnloop/build-dataset").set(auth()).send({});
+    savedDatasets.push(built.body.datasetId);
+
+    // 이제: 5건 usedInDataset=1, 1건 rating=-1 → 전부 "안전 삭제 대상". 미학습 후보는 0건.
+    // 캡을 2로 낮춰 prune → 안전 행부터 오래된 순으로 지워 총 2건만 남아야 한다.
+    const removed = pruneChatLogs(2);
+    expect(removed).toBe(4);
+    const after = (await request(app).get("/api/learnloop/logs").set(auth())).body;
+    expect(after.kpis.total).toBe(2);
+  });
+
+  it("prune protects unrated/positive unused candidates until forced by cap", async () => {
+    for (let i = 0; i < 4; i++) recordChatLog("analysis", `keep${i}`, `a${i}`); // 전부 미평가 미사용 후보
+    // 캡을 10으로 두면(현재 4건) 아무것도 안 지운다
+    expect(pruneChatLogs(10)).toBe(0);
+    expect((await request(app).get("/api/learnloop/logs").set(auth())).body.kpis.total).toBe(4);
+    // 캡을 2로 낮추면 안전 행이 없으므로 최후 수단으로 오래된 후보 2건을 지운다
+    expect(pruneChatLogs(2)).toBe(2);
+    expect((await request(app).get("/api/learnloop/logs").set(auth())).body.kpis.total).toBe(2);
   });
 
   it("requires auth on all routes", async () => {

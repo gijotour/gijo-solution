@@ -46,4 +46,14 @@ describe("collaboration", () => {
     expect(res.body[0].from).toBe("orchestrator");
     expect(res.body[1].to).toBe("orchestrator");
   });
+
+  it("caps the in-memory log so it can't grow unbounded", async () => {
+    // 상한(500)을 크게 넘겨 넣어도 history는 최근 100개만, 내부 버퍼는 상한 이하로 유지된다.
+    for (let i = 0; i < 700; i++) emitCollaboration({ from: "a", to: "b", message: `m${i}` });
+    const res = await request(app).get("/api/collaboration/history").set("Authorization", `Bearer ${token}`);
+    expect(res.body).toHaveLength(100); // 라우트는 최근 100개
+    // 가장 최근 이벤트가 마지막 — 오래된 것들은 상한 초과로 잘려나갔다
+    expect(res.body[99].message).toBe("m699");
+    expect(res.body[0].message).toBe("m600");
+  });
 });

@@ -13,6 +13,9 @@ export interface CollaborationEvent {
   timestamp: number;
 }
 
+// 인메모리 링버퍼 — 상한이 없으면 장시간 구동 시 무한히 쌓인다(llmactivity.ts와 같은 방식으로 상한).
+// history 라우트가 최근 100개만 돌려주므로 그보다 넉넉히 잡아 근래 이력을 보존한다.
+const MAX_EVENTS = 500;
 const log: CollaborationEvent[] = [];
 let wss: WebSocketServer | null = null;
 
@@ -23,6 +26,7 @@ export function attachCollaborationSocket(server: WebSocketServer): void {
 export function emitCollaboration(evt: Omit<CollaborationEvent, "timestamp">): void {
   const full: CollaborationEvent = { ...evt, timestamp: Date.now() };
   log.push(full);
+  if (log.length > MAX_EVENTS) log.splice(0, log.length - MAX_EVENTS);
   wss?.clients.forEach((client) => {
     if (client.readyState === 1 /* OPEN */) {
       client.send(JSON.stringify({ channel: "collaboration:event", payload: full }));

@@ -91,6 +91,19 @@ const pickLogsWithUnratedStmt = db.prepare(
   "SELECT * FROM chat_logs WHERE usedInDataset = 0 AND (rating = 1 OR rating IS NULL) ORDER BY createdAt ASC"
 );
 const markUsedStmt = db.prepare("UPDATE chat_logs SET usedInDataset = 1 WHERE id = ?");
+const countLogsStmt = db.prepare("SELECT COUNT(*) AS n FROM chat_logs");
+// 보존 상한 초과분을 오래된 순으로 지운다 — 단, 아직 학습에 쓰지 않은 후보(👍/미평가 미사용)는
+// 보호하고 "이미 학습에 쓰였거나(usedInDataset=1) 👎(rating=-1)"인 안전한 행부터 지운다.
+const pruneSafeLogsStmt = db.prepare(
+  `DELETE FROM chat_logs WHERE id IN (
+     SELECT id FROM chat_logs WHERE usedInDataset = 1 OR rating = -1 ORDER BY createdAt ASC LIMIT ?
+   )`
+);
+// 안전한 행을 다 지워도 여전히 상한을 넘으면(미학습 후보만 대량 적체된 극단적 경우) 최후 수단으로
+// 가장 오래된 것부터 지운다 — 그래도 진짜 무한 증가만은 막는다.
+const pruneOldestLogsStmt = db.prepare(
+  `DELETE FROM chat_logs WHERE id IN (SELECT id FROM chat_logs ORDER BY createdAt ASC LIMIT ?)`
+);
 
 const insertRunStmt = db.prepare(
   "INSERT INTO learnloop_runs (id, datasetId, baseModel, outputModelId, stage, error, startedAt, finishedAt) VALUES (@id, @datasetId, @baseModel, @outputModelId, @stage, NULL, @startedAt, NULL)"
@@ -201,6 +214,27 @@ export function putLearnloopConfig(patch: Partial<LearnloopConfig>): LearnloopCo
   return getLearnloopConfig();
 }
 
+// 수집 로그 보존 상한(무한 증가 방지). COUNT+DELETE를 매 insert마다 돌리지 않으려고 카운터로
+// PRUNE_EVERY 주기에만 정리한다 — 실제 행 수는 최대 CHATLOG_MAX + PRUNE_EVERY 로 유계.
+const CHATLOG_MAX = Number(process.env.GIJO_CHATLOG_MAX ?? 10000);
+const PRUNE_EVERY = 200;
+let insertsSincePrune = 0;
+
+// 상한 초과분을 삭제한다. 학습 대기 후보(👍/미평가 미사용)는 보호하고 안전한 행(이미 학습됨 또는
+// 👎)부터 지운 뒤, 그래도 넘치면 최후 수단으로 가장 오래된 것을 지운다. 테스트에서도 직접 부른다.
+export function pruneChatLogs(cap = CHATLOG_MAX): number {
+  const total = (countLogsStmt.get() as { n: number }).n;
+  let over = total - cap;
+  if (over <= 0) return 0;
+  let removed = pruneSafeLogsStmt.run(over).changes;
+  over -= removed;
+  if (over > 0) removed += pruneOldestLogsStmt.run(over).changes;
+  if (removed > 0) {
+    console.warn(`[learnloop] 수집 로그 보존 상한(${cap}) 초과 — 오래된 ${removed}건 정리`);
+  }
+  return removed;
+}
+
 // ── ① 수집 ────────────────────────────────────────────────────────────
 // llm.ts chat()의 remember:true 경로에서 호출된다. 캡처 실패가 채팅 응답을 죽이면 안 되므로
 // 전체를 try/catch로 감싼다. autoCollect가 꺼져 있으면 조용히 무시.
@@ -215,6 +249,10 @@ export function recordChatLog(agentId: string, question: string, answer: string)
       answer,
       createdAt: Date.now(),
     });
+    if (++insertsSincePrune >= PRUNE_EVERY) {
+      insertsSincePrune = 0;
+      pruneChatLogs();
+    }
   } catch (err) {
     console.warn("[learnloop] 대화 수집 실패(채팅에는 영향 없음):", err instanceof Error ? err.message : err);
   }
