@@ -683,7 +683,14 @@ tr:last-child td{border-bottom:none;}
     if (!text) return;
     taskBarInput.value = "";
     try {
-      await window.gijo.sendInstruction(text);
+      const result = await window.gijo.sendInstruction(text);
+      // 복합(멀티스텝) 지시면 실행된 단계 요약을 피드 상단에 명확히 남긴다(단계별 진행은 협업 로그로 실시간 표시됨).
+      if (result && result.steps && result.steps.length) {
+        const summary = result.steps.map((s, i) => `${i + 1}. ${s.label}`).join(" → ");
+        if (chatFeed.textContent.includes("없습니다") || chatFeed.textContent.includes("불러오는 중")) chatFeed.innerHTML = "";
+        chatFeed.insertAdjacentHTML("afterbegin",
+          `<div class="chat-row" style="background:rgba(59,130,246,0.1)"><span style="color:var(--blue-light);font-weight:800">🧭 복합 지시 ${result.steps.length}단계</span><span class="chat-msg">${String(summary).replace(/</g, "&lt;")}</span></div>`);
+      }
       await Promise.all([loadAgents(), loadTaskKpis()]);
     } catch (e) {
       alert("지시 처리 중 오류가 발생했습니다: " + e.message);

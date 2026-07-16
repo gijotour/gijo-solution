@@ -136,14 +136,24 @@ export const agentsApi = {
 };
 
 // ── 지시(디스패처) ────────────────────────────────────────────────────
+export interface OrchestrationStepResult {
+  action: "scan" | "analyze" | "report";
+  label: string;
+  output: string;
+  assetIds?: string[];
+  findingCount?: number;
+}
 export interface DispatchResult {
   task: { id: string; priority: string; text: string; agentId?: string; done: boolean; createdAt: number };
   route: { agentId: string; action: "scan" | "analyze" | "report" | "chat"; targetAssetId?: string };
   output: string;
+  steps?: OrchestrationStepResult[]; // 복합(멀티스텝) 지시일 때만
 }
 
 export const dispatchApi = {
   send: (text: string) => request<DispatchResult>("/api/dispatch", { method: "POST", body: { text } }),
+  plan: (text: string) =>
+    request<{ steps: OrchestrationStepResult[]; multi: boolean }>("/api/dispatch/plan", { method: "POST", body: { text } }),
 };
 
 // ── 작업 큐 ───────────────────────────────────────────────────────────

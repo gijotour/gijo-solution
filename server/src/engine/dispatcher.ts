@@ -12,12 +12,68 @@ import { emitCollaboration } from "./collaboration";
 import { runAdapter, StandardFinding } from "./bridge";
 import { chat } from "./llm";
 import { analyzeFindings } from "./analysis";
-import { recordFindings, getAsset } from "./assets";
+import { recordFindings, getAsset, listAssets } from "./assets";
+import { listFindings } from "./cti";
+import { matchCtiToAssets } from "./ctimatch";
+import { generateReport } from "./report";
 
 export interface DispatchResult {
   task: TaskItem;
   route: RoutedIntent;
   output: string;
+  steps?: StepResult[]; // 복합(멀티스텝) 지시일 때 각 단계 결과
+}
+
+// ── 복합 지시(오케스트레이션) ─────────────────────────────────────────
+// "이 CTI 영향 자산 스캔하고 리포트까지"처럼 여러 액션을 순서대로 잇는 지시를 계획→순차 실행한다.
+// 대상(scope)은 지시문에서 해석한다: 특정 자산 / CTI 영향 자산(ctimatch) / 전체 자산.
+type StepScope = { type: "asset"; assetId: string } | { type: "cti-affected" } | { type: "all-assets" };
+
+export interface OrchestrationStep {
+  action: "scan" | "analyze" | "report";
+  scope?: StepScope;
+  label: string;
+}
+
+export interface StepResult {
+  action: OrchestrationStep["action"];
+  label: string;
+  output: string;
+  assetIds?: string[];
+  findingCount?: number;
+}
+
+const ACTION_PATTERNS: { action: OrchestrationStep["action"]; re: RegExp }[] = [
+  { action: "scan", re: /재스캔|스캔|scan/i },
+  { action: "analyze", re: /우선순위|분석|analy/i },
+  { action: "report", re: /리포트|보고서|report/i },
+];
+
+// 지시문에서 스캔 대상 범위를 해석한다.
+function resolveScopeFromText(text: string): StepScope {
+  if (/cti/i.test(text) && /영향|관련|매칭|affected/i.test(text)) return { type: "cti-affected" };
+  const mentioned = listAssets().find((a) => text.includes(a.id) || text.includes(a.name));
+  if (mentioned) return { type: "asset", assetId: mentioned.id };
+  return { type: "all-assets" };
+}
+
+// 규칙 기반 계획: 지시문에 나타난 액션 키워드를 등장 순서대로 단계로 만든다(결정적 — 테스트 용이).
+export function planInstruction(text: string): OrchestrationStep[] {
+  const hits = ACTION_PATTERNS.map(({ action, re }) => ({ action, pos: text.search(re) })).filter((h) => h.pos >= 0);
+  hits.sort((a, b) => a.pos - b.pos);
+  const scope = resolveScopeFromText(text);
+  const LABELS: Record<OrchestrationStep["action"], string> = { scan: "스캔", analyze: "우선순위 분석", report: "리포트 작성" };
+  return hits.map((h) => ({
+    action: h.action,
+    scope: h.action === "scan" ? scope : undefined,
+    label: LABELS[h.action],
+  }));
+}
+
+function resolveScopeAssetIds(scope: StepScope | undefined, ctiAffected: () => Promise<string[]>): Promise<string[]> {
+  if (!scope || scope.type === "all-assets") return Promise.resolve(listAssets().map((a) => a.id));
+  if (scope.type === "asset") return Promise.resolve([scope.assetId]);
+  return ctiAffected();
 }
 
 function priorityForAction(action: RoutedIntent["action"]): TaskItem["priority"] {
@@ -63,7 +119,87 @@ async function executeRoutedAction(route: RoutedIntent, instructionText: string)
   }
 }
 
+const AGENT_FOR_ACTION: Record<OrchestrationStep["action"], string> = { scan: "scan", analyze: "analysis", report: "report" };
+
+// 복합 지시를 순차 실행한다. 각 단계는 협업 로그로 실시간 브로드캐스트되고, 스캔 결과(findings)는
+// 다음 단계(분석·리포트)로 누적 전달된다.
+async function runOrchestration(instructionText: string, steps: OrchestrationStep[], task: TaskItem): Promise<StepResult[]> {
+  const results: StepResult[] = [];
+  const accumulated: StandardFinding[] = [];
+  const scannedAssetIds = new Set<string>();
+  // CTI 영향 자산은 한 번만 계산(여러 단계가 참조할 수 있으므로).
+  const ctiAffected = async (): Promise<string[]> => {
+    const findings = await listFindings();
+    return [...new Set(matchCtiToAssets(findings, listAssets()).matches.flatMap((m) => m.matchedAssets.map((a) => a.assetId)))];
+  };
+
+  for (let i = 0; i < steps.length; i++) {
+    const step = steps[i];
+    const agentId = AGENT_FOR_ACTION[step.action];
+    setAgentStatus(agentId, "working");
+    emitCollaboration({ from: "orchestrator", to: agentId, message: `단계 ${i + 1}/${steps.length} — ${step.label}` });
+
+    let output = "";
+    let assetIds: string[] | undefined;
+    let findingCount: number | undefined;
+    try {
+      if (step.action === "scan") {
+        assetIds = await resolveScopeAssetIds(step.scope, ctiAffected);
+        let count = 0;
+        for (const assetId of assetIds) {
+          const scanPath = getAsset(assetId)?.path ?? assetId;
+          const findings = await runAdapter("modelscan", scanPath).catch((err) => [
+            { finding_type: "scan_error", severity: "low" as const, evidence: String(err), source_tool: "modelscan" },
+          ]);
+          recordFindings(assetId, findings);
+          accumulated.push(...findings);
+          scannedAssetIds.add(assetId);
+          count += findings.length;
+        }
+        findingCount = count;
+        output = assetIds.length
+          ? `${assetIds.length}개 자산 스캔 완료 — finding ${count}건 (${assetIds.join(", ")})`
+          : "스캔 대상 자산이 없습니다.";
+      } else if (step.action === "analyze") {
+        output = accumulated.length
+          ? (await analyzeFindings(accumulated)).summary
+          : await chat({ agentId: "analysis", message: instructionText, remember: true });
+      } else {
+        // report — 앞 단계에서 스캔한 자산이 있으면 그 범위로, 없으면 전체로 보고서를 만든다.
+        const scoped = scannedAssetIds.size ? [...scannedAssetIds] : undefined;
+        const r = await generateReport({ type: "ondemand", assetIds: scoped });
+        assetIds = scoped;
+        output = `${r.executiveSummary}\n(리포트 파일: ${r.filePath})`;
+      }
+    } catch (err) {
+      output = `단계 실패: ${err instanceof Error ? err.message : String(err)}`;
+    }
+
+    emitCollaboration({ from: agentId, to: "orchestrator", message: `단계 ${i + 1} 완료: ${output.slice(0, 120)}` });
+    resetAgentToDefault(agentId);
+    results.push({ action: step.action, label: step.label, output, assetIds, findingCount });
+  }
+
+  // 스캔 결과가 있으면 태스크 우선순위를 최고 심각도로 갱신.
+  if (accumulated.length) updateTaskPriority(task.id, priorityForFindings(accumulated));
+  return results;
+}
+
 export async function dispatchInstruction(instructionText: string): Promise<DispatchResult> {
+  // 복합 지시(2단계 이상)면 오케스트레이션으로 순차 실행한다.
+  const steps = planInstruction(instructionText);
+  if (steps.length >= 2) {
+    const task = createTask({ text: instructionText, agentId: "orchestrator", priority: "P1" });
+    setAgentStatus("orchestrator", "working");
+    emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `복합 지시 ${steps.length}단계 실행: ${steps.map((s) => s.label).join(" → ")}` });
+    const stepResults = await runOrchestration(instructionText, steps, task);
+    resetAgentToDefault("orchestrator");
+    const updated = completeTask(task.id);
+    const completedTask = updated.find((t) => t.id === task.id) ?? task;
+    const output = stepResults.map((r, i) => `【${i + 1}. ${r.label}】 ${r.output}`).join("\n\n");
+    return { task: completedTask, route: { agentId: "orchestrator", action: "chat" }, output, steps: stepResults };
+  }
+
   const route = await routeIntent(instructionText);
   const agent = getAgentById(route.agentId);
 
@@ -99,4 +235,9 @@ export function registerDispatcherRoutes(app: Express): void {
       res.json(await dispatchInstruction(req.body.text));
     })
   );
+  // 실행 없이 지시가 몇 단계로 계획되는지 미리 보여준다(복합 지시 여부 확인용).
+  app.post("/api/dispatch/plan", authMiddleware, (req, res) => {
+    const steps = planInstruction(String(req.body?.text ?? ""));
+    res.json({ steps, multi: steps.length >= 2 });
+  });
 }

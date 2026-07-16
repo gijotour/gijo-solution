@@ -18,6 +18,7 @@ vi.mock("../src/engine/bridge", () => ({
 
 import { createApp } from "../src/app";
 import { resetAssetsForTests } from "../src/engine/assets";
+import { planInstruction } from "../src/engine/dispatcher";
 
 async function login(app: ReturnType<typeof createApp>) {
   const res = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" });
@@ -127,5 +128,72 @@ describe("dispatcher + intent + assets integration", () => {
       .send({ text: "아무거나 스캔해줘" });
 
     expect(res.body.task.priority).toBe(expectedPriority);
+  });
+
+  describe("복합 지시(멀티스텝 오케스트레이션)", () => {
+    it("planInstruction builds ordered steps; single action stays single (1 step)", () => {
+      expect(planInstruction("오늘 상태 어때?")).toHaveLength(0);
+      expect(planInstruction("fraud-detect-llm 스캔해줘").map((s) => s.action)).toEqual(["scan"]);
+      expect(planInstruction("스캔하고 우선순위 분석해서 리포트까지 작성해줘").map((s) => s.action)).toEqual([
+        "scan",
+        "analyze",
+        "report",
+      ]);
+    });
+
+    it("resolves 'CTI 영향 자산' scope for scan steps", () => {
+      const steps = planInstruction("CTI 영향 자산 스캔하고 리포트까지");
+      expect(steps.map((s) => s.action)).toEqual(["scan", "report"]);
+      expect(steps[0].scope).toEqual({ type: "cti-affected" });
+    });
+
+    it("runs a 스캔→리포트 compound end to end, returning per-step results", async () => {
+      await request(app)
+        .post("/api/assets")
+        .set("Authorization", `Bearer ${token}`)
+        .send({ id: "fraud-detect-llm", name: "fraud-detect-llm", path: "models/fraud.gguf" });
+
+      const res = await request(app)
+        .post("/api/dispatch")
+        .set("Authorization", `Bearer ${token}`)
+        .send({ text: "fraud-detect-llm 스캔하고 리포트 작성해줘" });
+
+      expect(res.status).toBe(200);
+      expect(res.body.steps).toHaveLength(2);
+      expect(res.body.steps[0].action).toBe("scan");
+      expect(res.body.steps[0].assetIds).toEqual(["fraud-detect-llm"]);
+      expect(res.body.steps[1].action).toBe("report");
+      expect(res.body.task.done).toBe(true);
+      // 스캔이 실제로 자산에 finding을 기록했는지(누적 → 리포트 범위)
+      const asset = await request(app).get("/api/assets/fraud-detect-llm").set("Authorization", `Bearer ${token}`);
+      expect(asset.body.findings.length).toBeGreaterThan(0);
+    });
+
+    it("a CTI-affected compound scans the assets matched to seeded CTI threats", async () => {
+      // 시드된 샘플 CTI 'KoBERT ...'와 매칭되도록 KoBERT 컴포넌트 자산 등록
+      await request(app)
+        .post("/api/assets")
+        .set("Authorization", `Bearer ${token}`)
+        .send({ id: "doc-ai", name: "문서 분류 AI", path: "models/doc.gguf", components: [{ name: "KoBERT", version: "1", license: "Apache" }] });
+
+      const res = await request(app)
+        .post("/api/dispatch")
+        .set("Authorization", `Bearer ${token}`)
+        .send({ text: "CTI 영향 자산 스캔하고 리포트까지" });
+
+      expect(res.body.steps[0].action).toBe("scan");
+      expect(res.body.steps[0].assetIds).toContain("doc-ai");
+    });
+
+    it("POST /api/dispatch/plan previews steps without executing", async () => {
+      const res = await request(app)
+        .post("/api/dispatch/plan")
+        .set("Authorization", `Bearer ${token}`)
+        .send({ text: "스캔하고 리포트까지" });
+      expect(res.body.multi).toBe(true);
+      expect(res.body.steps.map((s: { action: string }) => s.action)).toEqual(["scan", "report"]);
+      // 실행되지 않았으므로 스캔 어댑터는 호출되지 않는다
+      expect(mockRunAdapter).not.toHaveBeenCalled();
+    });
   });
 });
