@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 보안 KPI 대시보드</title>
+<style>
+:root{
+  --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
+.app{display:grid;grid-template-columns:220px 1fr;}
+.sidebar{padding:22px 14px;border-right:1px solid var(--border);min-height:900px;}
+.nav-section{font-size:10.5px;font-weight:700;color:var(--muted-2);letter-spacing:1.2px;margin:18px 10px 8px;}
+.nav-section:first-child{margin-top:0;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:2px;}
+.nav-item .ic{width:18px;text-align:center;font-size:14px;}
+.nav-item.active{background:rgba(59,130,246,0.12);color:var(--white);box-shadow:inset 3px 0 0 var(--blue);cursor:default;}
+.nav-item:hover:not(.active){background:rgba(255,255,255,0.04);color:var(--white);}
+.main{padding:28px 32px 48px;}
+.topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;}
+.page-title{font-size:21px;font-weight:800;color:#fff;}
+.page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;max-width:860px;line-height:1.6;}
+.header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2);}
+.header-left{display:flex;align-items:center;gap:12px;}
+.header-left img{height:22px;}
+.app-title{font-size:15px;font-weight:800;color:#fff;}
+.clock{font-size:12px;color:var(--blue-light);font-weight:600;}
+.header-right{display:flex;align-items:center;gap:10px;}
+.status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
+.status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
+.beta-tag{background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
+.avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+.icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
+
+.cat{margin-bottom:24px;max-width:1040px;}
+.cat-title{font-size:14px;font-weight:800;color:#fff;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+.tile{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+.tile .t-label{font-size:11px;color:var(--muted);margin-bottom:6px;}
+.tile .t-value{font-size:22px;font-weight:800;color:#fff;}
+.footer{margin-top:20px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted-2);max-width:1040px;}
+.footer img{height:16px;opacity:0.6;}
+
+/* 추세 */
+.trend-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;max-width:1040px;}
+.trend-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+.trend-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:8px;}
+.trend-name{font-size:12.5px;font-weight:700;color:var(--text);}
+.trend-now{font-size:16px;font-weight:800;}
+.trend-note{font-size:11px;color:var(--muted-2);margin-top:6px;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <img src="https://gijo.ai/_nuxt/logo_gijo_white.CCh2YXJe.svg" alt="GIJO">
+    <div class="app-title">GIJO AS</div>
+    <div class="clock" id="clockEl">-</div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill" id="statusPill"><span class="dot"></span>연결 확인 중<span class="beta-tag">LIVE</span></div>
+    <div class="avatar-btn" id="avatarBtn">-</div>
+    <div class="icon-btn" id="settingsBtn">⚙</div>
+  </div>
+</div>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="nav-section">AI 팀</div>
+    <div class="nav-item" data-page="agent.html"><span class="ic">◉</span>에이전트 AI</div>
+    <div class="nav-section">모니터링</div>
+    <div class="nav-item" data-page="dashboard.html"><span class="ic">◆</span>대시보드</div>
+    <div class="nav-item active"><span class="ic">📊</span>보안 KPI</div>
+    <div class="nav-item" data-page="inventory.html"><span class="ic">◇</span>AI 자산</div>
+    <div class="nav-item" data-page="sbom.html"><span class="ic">▢</span>AI-BOM</div>
+    <div class="nav-item" data-page="threat.html"><span class="ic">△</span>위협 인텔리전스</div>
+    <div class="nav-item" data-page="vulnscan.html"><span class="ic">⊘</span>취약 자산관리</div>
+    <div class="nav-section">거버넌스</div>
+    <div class="nav-item" data-page="compliance.html"><span class="ic">✓</span>컴플라이언스</div>
+    <div class="nav-item" data-page="report.html"><span class="ic">▣</span>내부 리포트</div>
+    <div class="nav-item" data-page="approvals.html"><span class="ic">◈</span>승인 워크플로우</div>
+    <div class="nav-item" data-page="opsguide.html"><span class="ic">🛠</span>운영 가이드</div>
+    <div class="nav-section">고급 기능</div>
+    <div class="nav-item" data-page="merge.html"><span class="ic">⬡</span>보안 LLM 합성</div>
+    <div class="nav-item" data-page="learnloop.html"><span class="ic">🔄</span>헤르메스 학습 루프</div>
+    <div class="nav-item" data-page="llmguide.html"><span class="ic">📚</span>추천 LLM 가이드</div>
+    <div class="nav-item" data-page="memory.html"><span class="ic">⛁</span>AI 기억 · 학습</div>
+    <div class="nav-item" data-page="billing.html"><span class="ic">$</span>사용량 · 요금</div>
+    <div class="nav-section">시스템</div>
+    <div class="nav-item" data-page="logs.html"><span class="ic">▤</span>로그</div>
+    <div class="nav-item" data-page="settings.html"><span class="ic">⚙</span>설정</div>
+  </div>
+
+  <div class="main">
+    <div class="topbar-row">
+      <div>
+        <div class="page-title">📊 보안 KPI 대시보드</div>
+        <div class="page-sub">자산·취약점·점검·CTI·컴플라이언스·AI 학습 지표를 한곳에 모아 보여줍니다. 매일 스냅샷이 쌓여 추세가 되고, 임원·팀장 보고와 방향성 결정에 씁니다.</div>
+      </div>
+    </div>
+
+    <div id="kpiRoot"><div style="color:var(--muted)">불러오는 중...</div></div>
+
+    <div class="footer">
+      <img src="https://gijo.ai/_nuxt/logo_gijo_only_white.ATZVOJtw.svg" alt="GIJO">
+      <span>© 2026 GIJO Technology · GIJO AS Platform · Confidential</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  const clockEl = document.getElementById("clockEl");
+  const statusPill = document.getElementById("statusPill");
+  const avatarBtn = document.getElementById("avatarBtn");
+
+  function tick() {
+    clockEl.textContent = new Date().toLocaleString("ko-KR", {
+      hour: "2-digit", minute: "2-digit", hour12: true, year: "numeric", month: "2-digit", day: "2-digit",
+    });
+  }
+  async function loadHealth() {
+    try {
+      await window.gijo.checkServerHealth();
+      statusPill.innerHTML = '<span class="dot"></span>운영중<span class="beta-tag">LIVE</span>';
+    } catch (e) {
+      statusPill.innerHTML = '<span class="dot" style="background:#e2483d"></span>서버 연결 끊김';
+    }
+  }
+  async function loadUser() {
+    try {
+      const user = await window.gijo.me();
+      avatarBtn.textContent = (user.displayName || user.username || "-").charAt(0);
+    } catch (e) {}
+  }
+
+  function tile(label, value, color) {
+    return `<div class="tile"><div class="t-label">${label}</div><div class="t-value"${color ? ` style="color:${color}"` : ""}>${value}</div></div>`;
+  }
+
+  // 값 배열 → 미니 스파크라인 SVG. 값이 1개뿐이면 점 하나로 표시.
+  function sparkline(values, color) {
+    const w = 220, h = 40, pad = 3;
+    if (!values.length) return "";
+    const max = Math.max(...values, 1), min = Math.min(...values, 0);
+    const span = max - min || 1;
+    const x = (i) => pad + (values.length === 1 ? w / 2 : (i * (w - 2 * pad)) / (values.length - 1));
+    const y = (v) => h - pad - ((v - min) / span) * (h - 2 * pad);
+    if (values.length === 1) {
+      return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}"><circle cx="${x(0)}" cy="${y(values[0])}" r="3" fill="${color}"/></svg>`;
+    }
+    const pts = values.map((v, i) => `${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+    return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}"><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${x(values.length - 1)}" cy="${y(values[values.length - 1])}" r="2.6" fill="${color}"/></svg>`;
+  }
+
+  function trendCard(name, values, color, unit) {
+    const now = values.length ? values[values.length - 1] : 0;
+    const note = values.length <= 1 ? "추세는 매일 스냅샷이 쌓이며 나타납니다 (현재 " + values.length + "일)" : `최근 ${values.length}일`;
+    return `<div class="trend-card"><div class="trend-head"><span class="trend-name">${name}</span><span class="trend-now" style="color:${color}">${now}${unit || ""}</span></div>${sparkline(values, color)}<div class="trend-note">${note}</div></div>`;
+  }
+
+  async function load() {
+    const root = document.getElementById("kpiRoot");
+    try {
+      const { current, trend } = await window.gijo.getSecurityKpi();
+      const c = current;
+      const series = (path) => trend.map((s) => path.split(".").reduce((o, k) => o[k], s));
+
+      root.innerHTML =
+        `<div class="cat"><div class="cat-title">🖥 자산 위험도</div><div class="tiles">` +
+        tile("전체 자산", c.assets.total) +
+        tile("고위험", c.assets.highRisk, "#f5928a") +
+        tile("중위험", c.assets.midRisk, "var(--amber)") +
+        tile("저위험", c.assets.lowRisk, "var(--teal)") +
+        `</div></div>` +
+
+        `<div class="cat"><div class="cat-title">🔎 취약점 승인 (finding)</div><div class="tiles">` +
+        tile("전체 finding", c.findings.total) +
+        tile("미검토", c.findings.pending, "var(--amber)") +
+        tile("승인(확정)", c.findings.approved, "var(--teal)") +
+        tile("반려(오탐)", c.findings.rejected, "#f5928a") +
+        `</div></div>` +
+
+        `<div class="cat"><div class="cat-title">🔧 유지보수 점검 거버넌스</div><div class="tiles">` +
+        tile("전체 점검", c.inspections.total) +
+        tile("지연", c.inspections.overdue, "#f5928a") +
+        tile("승인 대기", c.inspections.pendingApproval, "var(--amber)") +
+        tile("승인됨", c.inspections.approved, "var(--teal)") +
+        `</div></div>` +
+
+        `<div class="cat"><div class="cat-title">🎯 CTI 위협 · 자산 영향</div><div class="tiles">` +
+        tile("수집 위협", c.cti.totalFindings) +
+        tile("자산 매칭 위협", c.cti.matchedFindings, "var(--amber)") +
+        tile("영향받는 자산", c.cti.affectedAssets, "#f5928a") +
+        tile("긴급 매칭", c.cti.criticalMatches, "#f5928a") +
+        `</div></div>` +
+
+        `<div class="cat"><div class="cat-title">✓ 컴플라이언스 · 🔄 AI 학습</div><div class="tiles">` +
+        tile("KISA 위협 항목", c.compliance.total) +
+        tile("대응 완료", c.compliance.covered, "var(--teal)") +
+        tile("대응률", c.compliance.coverageRate + "%", "var(--blue-light)") +
+        tile("배포된 학습 모델", c.learning.deployedModels, "var(--purple)") +
+        `</div></div>` +
+
+        `<div class="cat"><div class="cat-title">📈 추세</div><div class="trend-grid">` +
+        trendCard("고위험 자산", series("assets.highRisk"), "#f5928a", "건") +
+        trendCard("지연 점검", series("inspections.overdue"), "var(--amber)", "건") +
+        trendCard("CTI 영향 자산", series("cti.affectedAssets"), "#f5928a", "건") +
+        trendCard("컴플라이언스 대응률", series("compliance.coverageRate"), "var(--teal)", "%") +
+        `</div></div>`;
+    } catch (e) {
+      root.innerHTML = '<div style="color:#f5928a">KPI를 불러오지 못했습니다: ' + String(e.message || e).replace(/</g, "&lt;") + "</div>";
+    }
+  }
+
+  function init() {
+    tick();
+    setInterval(tick, 30000);
+    loadUser();
+    loadHealth();
+    load();
+    document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
+    document.querySelectorAll(".nav-item[data-page]").forEach((el) => {
+      el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
+    });
+  }
+
+  if (!window.gijo.isAuthenticated()) {
+    window.gijo.navigateTo("login.html");
+  } else {
+    init();
+  }
+</script>
+
+</body>
+</html>

@@ -35,6 +35,7 @@ import { registerApprovalsRoutes } from "./engine/approvals";
 import { registerCtiRoutes } from "./engine/cti";
 import { registerCtiMatchRoutes } from "./engine/ctimatch";
 import { registerReportRoutes } from "./engine/report";
+import { registerKpiRoutes } from "./engine/kpi";
 import { registerUsageRoutes, usageLoggingMiddleware } from "./engine/usage";
 import { registerLogsRoutes } from "./engine/logs";
 import { registerLlmActivityRoutes } from "./engine/llmactivity";
@@ -86,6 +87,7 @@ export function createApp(): Express {
   registerCtiRoutes(app);
   registerCtiMatchRoutes(app);
   registerReportRoutes(app);
+  registerKpiRoutes(app);
   registerUsageRoutes(app);
   registerLogsRoutes(app);
   registerLlmActivityRoutes(app);

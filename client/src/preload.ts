@@ -134,6 +134,9 @@ const gijoApi = {
   configureCtiFeed: (feedId: string, apiKey: string) => api.ctiApi.configureFeed(feedId, apiKey),
   disconnectCtiFeed: (feedId: string) => api.ctiApi.disconnectFeed(feedId),
 
+  // 통합 보안 KPI 대시보드
+  getSecurityKpi: () => api.kpiApi.get(),
+
   // 내부 리포트
   generateReport: (opts: { type: "weekly" | "quarterly" | "ondemand"; assetIds?: string[] }) =>
     api.reportApi.generate(opts.type, opts.assetIds),

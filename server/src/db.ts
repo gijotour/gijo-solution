@@ -186,6 +186,14 @@ db.exec(`
     note TEXT,
     PRIMARY KEY (assetId, findingKey)
   );
+
+  -- 통합 보안 KPI 일일 스냅샷(engine/kpi.ts) — 하루 한 행(date PK). 여러 도메인 지표를 metrics JSON에
+  -- 담아 매일 쌓고, 이 이력으로 추세(시계열)를 그린다. 임원 보고·방향성 결정 지원.
+  CREATE TABLE IF NOT EXISTS security_kpi_snapshots (
+    date TEXT PRIMARY KEY,
+    metrics TEXT NOT NULL,
+    at INTEGER NOT NULL
+  );
 `);
 
 db.exec(`

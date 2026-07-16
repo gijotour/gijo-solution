@@ -430,6 +430,22 @@ export const ctiApi = {
     ),
 };
 
+// ── 통합 보안 KPI 대시보드 ────────────────────────────────────────────
+export interface KpiSnapshot {
+  date: string;
+  at: number;
+  assets: { total: number; highRisk: number; midRisk: number; lowRisk: number };
+  findings: { total: number; pending: number; approved: number; rejected: number };
+  inspections: { total: number; overdue: number; pendingApproval: number; approved: number; rejected: number };
+  cti: { totalFindings: number; matchedFindings: number; affectedAssets: number; criticalMatches: number };
+  compliance: { total: number; covered: number; coverageRate: number };
+  learning: { totalRuns: number; deployedModels: number };
+}
+
+export const kpiApi = {
+  get: () => request<{ current: KpiSnapshot; trend: KpiSnapshot[] }>("/api/kpi"),
+};
+
 // ── 내부 리포트 ───────────────────────────────────────────────────────
 export const reportApi = {
   generate: (type: "weekly" | "quarterly" | "ondemand", assetIds?: string[]) =>
