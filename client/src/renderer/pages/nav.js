@@ -10,8 +10,10 @@
   // 통합 구조. 각 group은 사이드바 1항목 = 탭 묶음. tabs[0].page가 대표(사이드바 클릭 시 이동).
   var SECTIONS = [
     { section: "모니터링", groups: [
-      { ic: "◆", label: "대시보드", tabs: [{ page: "dashboard.html", label: "대시보드" }] },
-      { ic: "📊", label: "보안 KPI", tabs: [{ page: "kpi.html", label: "보안 KPI" }] },
+      { ic: "◆", label: "대시보드", tabs: [
+        { page: "dashboard.html", label: "대시보드" },
+        { page: "kpi.html", label: "보안 KPI" },
+      ]},
     ]},
     { section: "보안 업무", groups: [
       { ic: "◇", label: "AI 자산", tabs: [
