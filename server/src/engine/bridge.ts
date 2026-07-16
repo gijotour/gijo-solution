@@ -21,6 +21,8 @@ export interface StandardFinding {
   // severity(CVSS 기반)만으로는 "지금 실제로 털리는 것"이 후순위로 밀리므로 함께 저장한다.
   epss?: number; // 0~1, 30일 내 악용될 확률 (FIRST EPSS)
   vpr?: number; // 0~10, Tenable VPR (실제 위협 기반 우선순위)
+  kev?: boolean; // CISA KEV 등재 — 실제로 악용이 확인된 취약점(최우선)
+  kevCves?: string[]; // 이 취약점의 CVE 중 KEV에 등재된 것들
 }
 
 const adapters: Record<string, ScanAdapter> = {

@@ -3,6 +3,7 @@ import request from "supertest";
 import { createApp } from "../src/app";
 import { parseVulnReport, importVulnScan } from "../src/engine/vulnscan";
 import { resetAssetsForTests, listAssets, getAsset } from "../src/engine/assets";
+import { resetKevForTests } from "../src/engine/kev";
 
 async function login(app: ReturnType<typeof createApp>) {
   const res = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" });
@@ -15,6 +16,7 @@ describe("vulnscan (Tenable Nessus 등 취약점 스캔 결과 업로드)", () =
 
   beforeEach(async () => {
     resetAssetsForTests();
+    resetKevForTests();
     app = createApp();
     token = await login(app);
   });
@@ -121,6 +123,30 @@ describe("vulnscan (Tenable Nessus 등 취약점 스캔 결과 업로드)", () =
     // 포트 0은 "호스트 전체" 관례라 표기하지 않는다
     const whole = f.find((x) => x.finding_type.startsWith("호스트 전체"))!;
     expect(whole.evidence).not.toContain("포트:");
+  });
+
+  it("flags findings whose CVE is on the CISA KEV list (실제 악용 확인)", () => {
+    resetKevForTests(["CVE-2021-44228", "CVE-2021-45046"]); // KEV 등재된 것으로 가정
+    const csv =
+      "Plugin ID,CVE,Risk,Host,Name\n" +
+      "155999,CVE-2021-44228,Critical,10.0.0.5,Log4Shell\n" +
+      "888,CVE-2020-0001,Critical,10.0.0.5,조용한 Critical\n";
+    importVulnScan(csv, "csv", "nessus");
+    const f = getAsset("vuln:10.0.0.5")!.findings;
+
+    const log4j = f.find((x) => x.finding_type.startsWith("Log4Shell"))!;
+    expect(log4j.kev).toBe(true);
+    expect(log4j.kevCves).toEqual(["CVE-2021-44228"]);
+    expect(log4j.evidence).toContain("CISA KEV");
+
+    const quiet = f.find((x) => x.finding_type.startsWith("조용한"))!;
+    expect(quiet.kev).toBeUndefined(); // KEV 아님
+  });
+
+  it("does not flag KEV when the list is empty (오프라인/미갱신)", () => {
+    resetKevForTests([]);
+    importVulnScan("Host,Name,Risk,CVE\nh,x,Critical,CVE-2021-44228\n", "csv", "s");
+    expect(getAsset("vuln:h")!.findings[0].kev).toBeUndefined();
   });
 
   it("leaves EPSS/VPR undefined when the report has no such columns (0과 구분)", () => {

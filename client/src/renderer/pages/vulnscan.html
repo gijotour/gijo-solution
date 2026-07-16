@@ -65,6 +65,7 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
 .vd-epss.hot{background:rgba(226,72,61,0.18);color:#f5928a;}
 .vd-vpr{font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:5px;background:rgba(255,255,255,0.06);color:var(--muted);flex-shrink:0;}
 .vd-misfit{font-size:10px;font-weight:800;padding:1px 6px;border-radius:5px;background:rgba(240,160,32,0.18);color:var(--amber);flex-shrink:0;}
+.vd-kev{font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:rgba(226,72,61,0.22);color:#ff8a80;flex-shrink:0;border:1px solid rgba(226,72,61,0.5);}
 .vd-ev{display:none;margin-top:8px;padding:10px 12px;background:var(--panel-2);border-radius:6px;font-size:11.5px;color:var(--muted);line-height:1.75;white-space:pre-wrap;word-break:break-word;max-height:240px;overflow-y:auto;}
 .vd-item.open .vd-ev{display:block;}
 .vd-empty{padding:16px;color:var(--muted);font-size:12.5px;}
@@ -170,6 +171,7 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
       <div class="vd-sub" id="vdSub"></div>
       <div class="vd-controls">
         <span class="vd-chip active" data-sev="all">전체</span>
+        <span class="vd-chip" data-sev="kev" id="vdKevChip" title="CISA KEV — 실제 악용이 확인된 취약점만">🔴 KEV</span>
         <span class="vd-chip" data-sev="critical">Critical</span>
         <span class="vd-chip" data-sev="high">High</span>
         <span class="vd-chip" data-sev="medium">Medium</span>
@@ -263,10 +265,15 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
     const c = sevCounts(f);
     document.getElementById("vdTitle").textContent = `${asset.name} — 취약점 ${f.length.toLocaleString()}건`;
     const misfits = f.filter(isMisfit).length;
+    const kevCount = f.filter((x) => x.kev).length;
     document.getElementById("vdSub").textContent =
       `출처 ${asset.owner} · 최근 스캔 ${fmtDate(asset.lastScannedAt)} · Critical ${c.critical} / High ${c.high} / Medium ${c.medium} / Low·Info ${c.low}` +
+      (kevCount ? ` · 🔴 실제 악용 확인(KEV) ${kevCount}건 — 최우선` : "") +
       (misfits ? ` · ⚠ 등급은 낮지만 악용확률 50%↑ ${misfits}건 (등급만 보면 놓침)` : "") +
       ` — 항목을 클릭하면 상세(CVE 목록·조치 근거)가 펼쳐집니다.`;
+    // KEV가 없으면 KEV 필터 칩을 흐리게(정보 전달)
+    const kevChip = document.getElementById("vdKevChip");
+    if (kevChip) kevChip.style.opacity = kevCount ? "1" : "0.4";
     document.getElementById("vulnDetail").style.display = "";
     renderVdList();
     // 행 하이라이트
@@ -282,10 +289,12 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
     const asset = hostCache.find((a) => a.id === currentHostId);
     if (!asset) return;
     const q = document.getElementById("vdSearch").value.trim().toLowerCase();
-    const bySev = (a, b) => (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9) || String(a.finding_type).localeCompare(String(b.finding_type));
-    const byEpss = (a, b) => (b.epss ?? -1) - (a.epss ?? -1) || bySev(a, b);
+    // KEV(실제 악용 확인)는 어떤 정렬에서도 최상단으로 — 가장 강한 위험 신호.
+    const kevFirst = (a, b) => (b.kev ? 1 : 0) - (a.kev ? 1 : 0);
+    const bySev = (a, b) => kevFirst(a, b) || (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9) || String(a.finding_type).localeCompare(String(b.finding_type));
+    const byEpss = (a, b) => kevFirst(a, b) || (b.epss ?? -1) - (a.epss ?? -1) || bySev(a, b);
     const items = (asset.findings || [])
-      .filter((f) => vdFilter === "all" || f.severity === vdFilter)
+      .filter((f) => (vdFilter === "kev" ? f.kev : vdFilter === "all" || f.severity === vdFilter))
       .filter((f) => !q || `${f.finding_type} ${f.evidence || ""}`.toLowerCase().includes(q))
       .sort(vdSort === "epss" ? byEpss : bySev);
     if (items.length === 0) {
@@ -300,12 +309,13 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
             : "";
         const vpr = f.vpr != null ? `<span class="vd-vpr" title="Tenable VPR — 실제 위협 기반 우선순위(0~10)">VPR ${f.vpr}</span>` : "";
         const misfit = isMisfit(f) ? `<span class="vd-misfit" title="CVSS 등급은 낮지만 실제 악용확률이 높습니다 — 등급만 보면 놓치는 건">⚠ 등급↓ 악용↑</span>` : "";
+        const kev = f.kev ? `<span class="vd-kev" title="CISA KEV — 실제 악용이 확인된 취약점. 최우선 조치.&#10;${esc((f.kevCves || []).join(', '))}">🔴 KEV 악용중</span>` : "";
         return (
           `<div class="vd-item">` +
           `<div class="vd-item-top">` +
           `<span class="sev ${SEV_CLASS[f.severity] || "sev-l"}">${SEV_LABEL[f.severity] || "?"}</span>` +
           `<span class="vd-name">${esc(f.finding_type)}</span>` +
-          misfit + epss + vpr +
+          kev + misfit + epss + vpr +
           `</div>` +
           `<div class="vd-ev">${esc(f.evidence || "(상세 없음)")}</div>` +
           `</div>`

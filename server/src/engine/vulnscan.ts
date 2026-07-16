@@ -11,6 +11,7 @@ import type { Express } from "express";
 import { authMiddleware } from "../auth/auth";
 import { registerAsset, recordFindings, Asset, AssetComponent } from "./assets";
 import type { StandardFinding } from "./bridge";
+import { kevMatches } from "./kev";
 
 export interface VulnScanResult {
   hosts: number;
@@ -317,13 +318,15 @@ export function importVulnScan(content: string, format: VulnFormat, sourceLabel:
       ]
         .filter(Boolean)
         .join("\n");
+      const kevCves = kevMatches(list); // 이 취약점의 CVE 중 실제 악용 확인(CISA KEV)된 것
       return {
         finding_type: findingLabel(rep.name, list),
         severity: toSeverity(rep.risk),
-        evidence,
+        evidence: kevCves.length ? `${evidence}\n⚠ CISA KEV(실제 악용 확인): ${kevCves.join(", ")}` : evidence,
         source_tool: sourceLabel,
         ...(epss !== undefined ? { epss } : {}),
         ...(vpr !== undefined ? { vpr } : {}),
+        ...(kevCves.length ? { kev: true, kevCves } : {}),
       };
     });
     totalFindings += findings.length;

@@ -15,6 +15,7 @@ import { attachLlmActivitySocket } from "./engine/llmactivity";
 import { attachHfModelsSocket } from "./engine/hfmodels";
 import { attachLearnloopSocket } from "./engine/learnloop";
 import { stopLocalEngine, stopEmbeddingEngine, autoStartLocalEngines } from "./engine/localengine";
+import { refreshKev } from "./engine/kev";
 
 // 가능한 한 이른 시점에 설치해야 이후의 console.log/warn/error가 전부 캡처된다.
 installConsoleCapture();
@@ -39,6 +40,10 @@ httpServer.listen(PORT, () => {
   console.log("standalone 모드: 클라이언트 GIJO_SERVER_URL을 http://localhost:" + PORT + " 로 설정하면 같은 머신에서 붙습니다.");
   // 모델 파일이 있으면 채팅 LLM + 임베딩 서버를 자동 기동 — 실패해도 서버 자체는 계속 뜬다.
   void autoStartLocalEngines().catch((err) => console.error("[index] 로컬 LLM 자동 시작 실패:", err));
+  // CISA KEV 목록을 백그라운드로 최신화(공개 피드 다운로드 — 실패해도 캐시로 동작).
+  void refreshKev()
+    .then((s) => console.log(`[kev] KEV 목록 ${s.count}건 (${s.source})`))
+    .catch((err) => console.error("[kev] KEV 갱신 실패(캐시 유지):", err));
 });
 
 // 서버 프로세스 종료 시 자식으로 띄운 llama-server가 고아 프로세스로 남지 않도록 함께 정리한다.
