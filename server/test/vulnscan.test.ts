@@ -144,6 +144,41 @@ describe("vulnscan (Tenable Nessus 등 취약점 스캔 결과 업로드)", () =
     expect(sevs).toEqual(["high", "low", "medium"]);
   });
 
+  it("parses a Nessus HTML report: host meta (DNS/OS) enriches the asset, vulns become findings", () => {
+    // Nessus HTML 리포트의 실제 구조를 축약한 것 — 호스트 헤더 → Host Information → 취약점 블록.
+    const html =
+      `<div style="font-size: 22px; font-weight: 700;">192.168.219.98<div class="clear"></div></div>` +
+      `<div>Host Information</div><div>DNS Name:<br>oracle.local<br>IP:<br>192.168.219.98<br>` +
+      `MAC Address:<br>02:42:B0:30:1F:0C<br>OS:<br>Linux Kernel 4.18.0-553 on Red Hat Enterprise Linux release 8.10 (Ootpa)<br></div>` +
+      `<div style="background: #91243E;" onclick="toggleSection('id12-container');">155999 - Apache Log4j &lt; 2.15.0 RCE<div> - </div></div>` +
+      `<div id="id12-container"><div class="details-header">Synopsis</div><div>원격 코드 실행 취약점</div>` +
+      `<div>Risk Factor<br>Critical</div><div>EPSS Score<br>0.9436</div><div>VPR Score<br>10.0</div>` +
+      `<div>CVE-2021-44228</div><h2>tcp/0</h2></div>` +
+      `<div style="background: #67ACE1;" onclick="toggleSection('id20-container');">14272 - Netstat Portscanner<div> - </div></div>` +
+      `<div id="id20-container"><div class="details-header">Synopsis</div><div>열린 포트 목록</div>` +
+      `<div>Risk Factor<br>None</div><h2>tcp/22</h2><h2>udp/53</h2></div>`;
+
+    const result = importVulnScan(html, "html", "nessus-html");
+    expect(result.hosts).toBe(1);
+    expect(result.findings).toBe(2); // 플러그인 2개
+
+    const asset = getAsset("vuln:192.168.219.98")!;
+    // CSV로는 IP만 알 수 있던 것이 HTML에서는 이름·OS까지 채워진다
+    expect(asset.name).toBe("oracle.local (192.168.219.98)");
+    expect(asset.path).toBe("192.168.219.98");
+    expect(asset.components.map((c) => c.name)).toContain("Red Hat Enterprise Linux release 8.10 (Ootpa)");
+
+    const log4j = asset.findings.find((f) => f.finding_type.includes("Log4j"))!;
+    expect(log4j.severity).toBe("critical"); // 색이 아니라 "Risk Factor" 텍스트로 판정
+    expect(log4j.finding_type).toContain("CVE-2021-44228");
+    expect(log4j.epss).toBeCloseTo(0.9436);
+    expect(log4j.vpr).toBe(10);
+
+    const netstat = asset.findings.find((f) => f.finding_type.includes("Netstat"))!;
+    expect(netstat.severity).toBe("low"); // None → low
+    expect(netstat.evidence).toContain("포트: tcp/22, udp/53"); // 여러 포트가 한 건으로 합쳐짐
+  });
+
   it("parses JSON array and {vulnerabilities:[...]} envelopes", () => {
     expect(parseVulnReport('[{"host":"1.1.1.1","name":"x","risk":"high"}]', "json")).toHaveLength(1);
     expect(parseVulnReport('{"vulnerabilities":[{"ip":"2.2.2.2","plugin_name":"y","severity":"low"}]}', "json")).toHaveLength(1);

@@ -9,7 +9,7 @@
 
 import type { Express } from "express";
 import { authMiddleware } from "../auth/auth";
-import { registerAsset, recordFindings, Asset } from "./assets";
+import { registerAsset, recordFindings, Asset, AssetComponent } from "./assets";
 import type { StandardFinding } from "./bridge";
 
 export interface VulnScanResult {
@@ -115,7 +115,115 @@ export interface ParsedVuln {
   protocol: string;
 }
 
-export function parseVulnReport(content: string, format: "json" | "csv"): ParsedVuln[] {
+// 호스트 부가 정보 — CSV에는 없고 Nessus HTML 리포트에만 있다. 자산에 이름·OS를 채우는 데 쓴다.
+export interface HostMeta {
+  dnsName?: string;
+  os?: string;
+  mac?: string;
+}
+
+// ── Nessus HTML 리포트 파서 ─────────────────────────────────────────────────
+// 구조: 호스트 헤더(font-size:22px) → Host Information 표 → 취약점 블록들.
+// 취약점 블록 = 헤더 div(onclick="toggleSection(...)">"<pluginId> - <이름>") + 상세 컨테이너.
+// 심각도는 헤더 배경색으로도 구분되지만 색 대신 본문의 "Risk Factor" 텍스트를 쓴다(견고함).
+function htmlToText(fragment: string): string {
+  return fragment
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(tr|div|p|h[1-6]|li|td)>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/[ \t]+/g, " ")
+    .replace(/\n\s*\n+/g, "\n")
+    .trim();
+}
+
+// "라벨:\n값" 형태에서 값 한 줄을 뽑는다.
+function fieldAfter(text: string, label: string): string | undefined {
+  const m = text.match(new RegExp(label + "\\s*:?\\s*\\n?\\s*(.+)"));
+  const v = m?.[1]?.trim();
+  return v && v.length ? v : undefined;
+}
+
+const HOST_HEADER_RE = /<div[^>]*style="font-size:\s*22px;[^"]*"[^>]*>([^<]+)<div class="clear">/g;
+// 취약점 헤더: 배경색(심각도) + "<pluginId> - <이름>".
+// onclick 값은 "toggleSection('idN-container');" 처럼 세미콜론이 붙기도 하므로 속성 끝(")까지 흘려보낸다.
+const VULN_HEADER_RE = /<div[^>]*background:\s*(#[0-9A-Fa-f]{6})[^>]*onclick="toggleSection\([^"]*"[^>]*>\s*(\d{3,8})\s*-\s*([^<]+?)\s*<div/g;
+
+// 심각도는 헤더 배경색으로 읽는다. 본문의 "Risk Factor" 텍스트는 플러그인의 정적 위험도라
+// 실제 등급과 다르다(실측: Log4j 1.x — Risk Factor "High" 인데 실제 Critical). 색상 분포는
+// 같은 스캔의 CSV Risk 분포와 정확히 일치함을 확인해 이 매핑을 채택했다.
+const NESSUS_SEVERITY_COLORS: Record<string, string> = {
+  "#91243E": "Critical",
+  "#DD4B50": "High",
+  "#F18C43": "Medium",
+  "#F8C851": "Low",
+  "#67ACE1": "None",
+};
+
+export function parseNessusHtml(html: string): { vulns: ParsedVuln[]; meta: Map<string, HostMeta> } {
+  const vulns: ParsedVuln[] = [];
+  const meta = new Map<string, HostMeta>();
+
+  // 호스트별로 문서를 자른다(단일 호스트 리포트면 구간 1개).
+  const heads = [...html.matchAll(HOST_HEADER_RE)];
+  const segments = heads.map((h, i) => ({
+    host: h[1].trim(),
+    body: html.slice(h.index! + h[0].length, i + 1 < heads.length ? heads[i + 1].index! : html.length),
+  }));
+
+  for (const seg of segments) {
+    // "Host Information" 표(DNS Name/IP/MAC/OS)는 요약 표 뒤라 문서 앞부분만 봐선 놓친다 —
+    // 라벨 위치를 찾아 그 뒤를 읽는다.
+    const hi = seg.body.indexOf("Host Information");
+    const headText = htmlToText(hi >= 0 ? seg.body.slice(hi, hi + 2500) : seg.body.slice(0, 3000));
+    const os = fieldAfter(headText, "OS");
+    const dnsName = fieldAfter(headText, "DNS Name");
+    const mac = fieldAfter(headText, "MAC Address");
+    if (os || dnsName || mac) meta.set(seg.host, { os, dnsName, mac });
+
+    // 취약점 블록: 헤더 사이 구간이 그 취약점의 상세다.
+    const vh = [...seg.body.matchAll(VULN_HEADER_RE)];
+    for (let i = 0; i < vh.length; i++) {
+      const color = vh[i][1].toUpperCase();
+      const pluginId = vh[i][2];
+      const name = htmlToText(vh[i][3]);
+      const block = seg.body.slice(vh[i].index!, i + 1 < vh.length ? vh[i + 1].index! : seg.body.length);
+      const text = htmlToText(block);
+
+      // 색상 매핑이 우선(실측 검증됨), 모르는 색이면 본문 텍스트로 폴백.
+      const risk = NESSUS_SEVERITY_COLORS[color] ?? fieldAfter(text, "Risk Factor") ?? "";
+      const description = (fieldAfter(text, "Synopsis") ?? "").slice(0, 400);
+      const epssRaw = fieldAfter(text, "EPSS Score");
+      const vprRaw = fieldAfter(text, "VPR Score");
+      const epss = epssRaw && Number.isFinite(Number(epssRaw)) ? Number(epssRaw) : undefined;
+      const vpr = vprRaw && Number.isFinite(Number(vprRaw)) ? Number(vprRaw) : undefined;
+      const cves = [...new Set([...block.matchAll(/CVE-\d{4}-\d{3,7}/g)].map((m) => m[0]))];
+      const ports = [...new Set([...block.matchAll(/<h2>([a-z]+)\/(\d+)<\/h2>/g)].map((m) => `${m[1]}/${m[2]}`))];
+      const split = (p: string) => ({ protocol: p.split("/")[0], port: p.split("/")[1] });
+      const first = ports.length ? split(ports[0]) : { protocol: "", port: "" };
+      const base = { host: seg.host, name, risk, description, pluginId, epss, vpr };
+
+      // CSV처럼 CVE 하나당 한 항목을 내보내면 기존 병합 로직(플러그인 기준 합치기 + CVE 수집)이
+      // 그대로 동작한다. 포트가 여러 개면 나머지 포트도 항목으로 내보내 병합 때 수집되게 한다.
+      if (cves.length) for (const cve of cves) vulns.push({ ...base, cve, ...first });
+      else vulns.push({ ...base, cve: "", ...first });
+      for (const p of ports.slice(1)) vulns.push({ ...base, cve: "", ...split(p) });
+    }
+  }
+  return { vulns, meta };
+}
+
+export type VulnFormat = "json" | "csv" | "html";
+
+export function parseVulnReport(content: string, format: VulnFormat): ParsedVuln[] {
+  if (format === "html") return parseNessusHtml(content).vulns;
   const rows = format === "csv" ? parseCsv(content) : parseJson(content);
   return rows
     .map((row) => ({
@@ -141,8 +249,11 @@ function findingLabel(name: string, cves: string[]): string {
   return `${name} (${cves[0]} 외 ${cves.length - 1}건)`;
 }
 
-export function importVulnScan(content: string, format: "json" | "csv", sourceLabel: string): VulnScanResult {
-  const parsed = parseVulnReport(content, format);
+export function importVulnScan(content: string, format: VulnFormat, sourceLabel: string): VulnScanResult {
+  // HTML 리포트에는 CSV에 없는 호스트 정보(DNS 이름·OS)가 있다 — 자산 이름·구성요소로 채운다.
+  const html = format === "html" ? parseNessusHtml(content) : null;
+  const parsed = html ? html.vulns : parseVulnReport(content, format);
+  const metaOf = (host: string): HostMeta => html?.meta.get(host) ?? {};
   // 호스트별로 그룹핑 — 한 호스트 = 한 자산, 그 호스트의 취약점들 = findings
   const byHost = new Map<string, ParsedVuln[]>();
   for (const v of parsed) {
@@ -154,13 +265,27 @@ export function importVulnScan(content: string, format: "json" | "csv", sourceLa
   let totalFindings = 0;
   for (const [host, vulns] of byHost) {
     const id = `vuln:${host}`;
+    const meta = metaOf(host);
+    // OS/커널은 이 호스트의 구성요소(SBOM)로 넣는다 — "취약점 점검 대상이 자산 구성에 포함"되는 설계.
+    // 예: "Linux Kernel 4.18.0-... on Red Hat Enterprise Linux release 8.10 (Ootpa)"
+    const components: AssetComponent[] = [];
+    if (meta.os) {
+      const m = meta.os.match(/^(.*?)\s+on\s+(.*)$/i);
+      if (m) {
+        components.push({ name: m[2].trim(), version: "-", license: "-" }); // 배포판
+        components.push({ name: m[1].trim().replace(/\s+\S+$/, "").trim() || "Kernel", version: (m[1].match(/\S+$/) ?? ["-"])[0], license: "-" });
+      } else {
+        components.push({ name: meta.os, version: "-", license: "-" });
+      }
+    }
     registerAsset({
       id,
-      name: host,
+      // DNS 이름이 있으면 사람이 알아보게 이름으로 쓰고, IP는 path로 남긴다.
+      name: meta.dnsName ? `${meta.dnsName} (${host})` : host,
       path: host,
       assetType: "infra-host",
       owner: sourceLabel,
-      components: [],
+      components,
     });
 
     // Nessus CSV는 플러그인(취약점) 1건을 CVE 개수만큼 행으로 복제해 내보낸다 — 그대로 세면
@@ -211,8 +336,8 @@ export function importVulnScan(content: string, format: "json" | "csv", sourceLa
 export function registerVulnScanRoutes(app: Express): void {
   app.post("/api/vulnscan/import", authMiddleware, (req, res) => {
     const { content, format, source } = req.body as { content?: string; format?: string; source?: string };
-    if (!content || (format !== "json" && format !== "csv")) {
-      res.status(400).json({ error: "content(문자열)와 format('json'|'csv')이 필요합니다" });
+    if (!content || (format !== "json" && format !== "csv" && format !== "html")) {
+      res.status(400).json({ error: "content(문자열)와 format('json'|'csv'|'html')이 필요합니다" });
       return;
     }
     try {
