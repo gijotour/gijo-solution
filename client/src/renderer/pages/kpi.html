@@ -163,10 +163,35 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     return `<div class="trend-card"><div class="trend-head"><span class="trend-name">${name}</span><span class="trend-now" style="color:${color}">${now}${unit || ""}</span></div>${sparkline(values, color)}<div class="trend-note">${note}</div></div>`;
   }
 
+  const fmtD = (ms) => { const d = new Date(ms); return `${d.getMonth() + 1}/${d.getDate()}`; };
+
+  // 스캔 기반 취약점 번다운 — 매 스캔 시점의 열린 취약점(빨강)·KEV(진빨강)를 실제 저장 이력에서
+  // 재구성한 시계열. 일일 스냅샷과 달리 재스캔을 거듭한 실제 감소 궤적을 보여준다.
+  function burndownChart(points) {
+    if (!points || !points.length) return "";
+    const W = 640, H = 172, padL = 34, padR = 12, padT = 12, padB = 24;
+    const iw = W - padL - padR, ih = H - padT - padB, n = points.length;
+    const maxV = Math.max(1, ...points.map((p) => p.active));
+    const x = (i) => padL + (n === 1 ? iw / 2 : (i * iw) / (n - 1));
+    const y = (v) => padT + ih - (v / maxV) * ih;
+    const line = (key, color, width) => {
+      if (n === 1) return `<circle cx="${x(0)}" cy="${y(points[0][key])}" r="3.4" fill="${color}"/>`;
+      const pts = points.map((p, i) => `${x(i).toFixed(1)},${y(p[key]).toFixed(1)}`).join(" ");
+      return `<polyline points="${pts}" fill="none" stroke="${color}" stroke-width="${width}" stroke-linejoin="round" stroke-linecap="round"/><circle cx="${x(n - 1)}" cy="${y(points[n - 1][key])}" r="3" fill="${color}"/>`;
+    };
+    const grid = [0, Math.round(maxV / 2), maxV]
+      .filter((g, i, a) => a.indexOf(g) === i)
+      .map((g) => `<line x1="${padL}" y1="${y(g)}" x2="${W - padR}" y2="${y(g)}" stroke="var(--border)" stroke-width="1"/><text x="${padL - 6}" y="${y(g) + 3}" text-anchor="end" font-size="9" fill="var(--muted-2)">${g}</text>`)
+      .join("");
+    const xl = `<text x="${x(0)}" y="${H - 7}" text-anchor="start" font-size="9" fill="var(--muted-2)">${fmtD(points[0].at)}</text>` +
+      (n > 1 ? `<text x="${x(n - 1)}" y="${H - 7}" text-anchor="end" font-size="9" fill="var(--muted-2)">${fmtD(points[n - 1].at)}</text>` : "");
+    return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px">${grid}${line("active", "#f5928a", 2.2)}${line("kev", "#ff5a4d", 2)}${xl}</svg>`;
+  }
+
   async function load() {
     const root = document.getElementById("kpiRoot");
     try {
-      const { current, trend } = await window.gijo.getSecurityKpi();
+      const { current, trend, burndown } = await window.gijo.getSecurityKpi();
       const c = current;
       // 경로 중간이 없으면(옛 스냅샷에 vulnerabilities 없음) 0으로 — 추세가 끊기지 않게.
       const series = (path) => trend.map((s) => path.split(".").reduce((o, k) => (o == null ? undefined : o[k]), s) ?? 0);
@@ -228,7 +253,21 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         tile("배포된 학습 모델", c.learning.deployedModels, "var(--purple)") +
         `</div></div>` +
 
-        `<div class="cat"><div class="cat-title">📈 추세 · 조치 번다운</div><div class="trend-grid">` +
+        (() => {
+          const bd = burndown || [];
+          const n = bd.length;
+          const first = n ? bd[0].active : 0, last = n ? bd[n - 1].active : 0, delta = last - first;
+          const net = n < 2
+            ? `<span style="color:var(--muted)">스캔 ${n}회</span>`
+            : `<span style="color:var(--muted-2)">${first}</span> → <span class="trend-now" style="color:${last <= first ? "var(--teal)" : "#f5928a"}">${last}</span> <span style="color:${delta <= 0 ? "var(--teal)" : "#f5928a"};font-weight:800">${delta <= 0 ? "▼" : "▲"}${Math.abs(delta)}</span>`;
+          const chart = burndownChart(bd);
+          const body = n === 0
+            ? `<div class="trend-note">아직 스캔 이력이 없습니다. 취약점 리포트를 업로드하면 재스캔마다 번다운이 그려집니다.</div>`
+            : chart + `<div class="trend-note"><span style="color:#f5928a">●</span> 열린 취약점 &nbsp; <span style="color:#ff5a4d">●</span> 실제 악용(KEV) &nbsp;·&nbsp; ${n < 2 ? "재스캔이 쌓이면 감소 궤적이 나타납니다" : `${n}개 스캔 시점 기준 — 실제 저장된 스캔 이력에서 재구성`}</div>`;
+          return `<div class="cat"><div class="cat-title">📉 취약점 번다운 (실제 스캔 이력)</div><div class="trend-card" style="max-width:680px"><div class="trend-head"><span class="trend-name">열린 취약점 — 재스캔마다 재구성 (줄수록 좋음)</span><span class="trend-now">${net}</span></div>${body}</div></div>`;
+        })() +
+
+        `<div class="cat"><div class="cat-title">📈 추세 · 조치 번다운 (일일 스냅샷)</div><div class="trend-grid">` +
         trendCard("열린 취약점 (번다운 — 줄수록 좋음)", series("vulnerabilities.active"), "#f5928a", "건") +
         trendCard("실제 악용(KEV)", series("vulnerabilities.kev"), "#ff8a80", "건") +
         trendCard("SLA 준수율", series("remediation.slaCompliance"), "var(--teal)", "%") +

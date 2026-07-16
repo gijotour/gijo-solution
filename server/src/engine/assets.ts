@@ -119,6 +119,13 @@ const listScanRunsStmt = db.prepare("SELECT * FROM scan_runs WHERE assetId = ? O
 const updateFindingsStmt = db.prepare("UPDATE assets SET findings = ?, lastScannedAt = ? WHERE id = ?");
 const updateSbomStmt = db.prepare("UPDATE assets SET sbomGeneratedAt = ? WHERE id = ?");
 const updateAiBomStmt = db.prepare("UPDATE assets SET aibom = ? WHERE id = ?");
+const updateAssetMetaStmt = db.prepare("UPDATE assets SET name = ?, owner = ?, components = ? WHERE id = ?");
+
+// 이름·소유자·구성요소만 갱신한다(스캔 이력·findings·registeredAt는 보존). 재스캔 임포트가
+// registerAsset처럼 이력을 지우지 않고 호스트 메타만 최신화하는 용도(취약점 번다운/측정에 필요).
+export function updateAssetMeta(id: string, name: string, owner: string, components: AssetComponent[]): void {
+  updateAssetMetaStmt.run(name, owner, JSON.stringify(components), id);
+}
 
 function scanHistoryOf(assetId: string): ScanRun[] {
   return (listScanRunsStmt.all(assetId) as ScanRunRow[]).map((row) => ({

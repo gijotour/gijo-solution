@@ -458,8 +458,17 @@ export interface KpiSnapshot {
   learning: { totalRuns: number; deployedModels: number };
 }
 
+export interface BurndownPoint {
+  at: number;
+  active: number;
+  critical: number;
+  high: number;
+  kev: number;
+  fixed: number;
+}
+
 export const kpiApi = {
-  get: () => request<{ current: KpiSnapshot; trend: KpiSnapshot[] }>("/api/kpi"),
+  get: () => request<{ current: KpiSnapshot; trend: KpiSnapshot[]; burndown: BurndownPoint[] }>("/api/kpi"),
 };
 
 // ── 내부 리포트 ───────────────────────────────────────────────────────

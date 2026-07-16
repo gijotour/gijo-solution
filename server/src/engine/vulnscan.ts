@@ -9,7 +9,7 @@
 
 import type { Express } from "express";
 import { authMiddleware } from "../auth/auth";
-import { registerAsset, recordFindings, getAsset, Asset, AssetComponent } from "./assets";
+import { registerAsset, updateAssetMeta, recordFindings, getAsset, Asset, AssetComponent } from "./assets";
 import type { StandardFinding } from "./bridge";
 import { kevMatches } from "./kev";
 
@@ -392,7 +392,8 @@ export function importVulnScan(content: string, format: VulnFormat, sourceLabel:
   for (const [host, vulns] of byHost) {
     const id = `vuln:${host}`;
     // 상태 추적: registerAsset이 findings를 초기화하므로 그 전에 이전 스냅샷을 확보한다.
-    const prevFindings = getAsset(id)?.findings ?? [];
+    const existing = getAsset(id);
+    const prevFindings = existing?.findings ?? [];
     const meta = metaOf(host);
     // 인증 스캔 여부: HTML/XML은 meta에, CSV/JSON은 플러그인 출력에서 찾는다(19506 "Nessus Scan Information").
     const credentialed = meta.credentialed ?? vulns.map((v) => detectCredentialed(v.output ?? "")).find((c) => c !== undefined);
@@ -409,15 +410,11 @@ export function importVulnScan(content: string, format: VulnFormat, sourceLabel:
         components.push({ name: meta.os, version: "-", license: "-" });
       }
     }
-    registerAsset({
-      id,
-      // DNS 이름이 있으면 사람이 알아보게 이름으로 쓰고, IP는 path로 남긴다.
-      name: meta.dnsName ? `${meta.dnsName} (${host})` : host,
-      path: host,
-      assetType: "infra-host",
-      owner: sourceLabel,
-      components,
-    });
+    const name = meta.dnsName ? `${meta.dnsName} (${host})` : host;
+    // 재스캔이면 registerAsset(스캔 이력 삭제)이 아니라 메타만 갱신해 과거 스캔 스냅샷을 보존한다 —
+    // 취약점 번다운/측정(재스캔 간 위험 감소 추적)은 이 이력이 있어야 성립한다.
+    if (existing) updateAssetMeta(id, name, sourceLabel, components);
+    else registerAsset({ id, name, path: host, assetType: "infra-host", owner: sourceLabel, components });
 
     // Nessus CSV는 플러그인(취약점) 1건을 CVE 개수만큼 행으로 복제해 내보낸다 — 그대로 세면
     // 건수가 몇 배로 부풀려진다(실측: 1,171행 = 실제 282건). 플러그인 id(없으면 항목명)로 합치고

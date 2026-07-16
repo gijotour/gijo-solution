@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import { createApp } from "../src/app";
-import { computeKpiSnapshot, resetKpiForTests } from "../src/engine/kpi";
+import { computeKpiSnapshot, resetKpiForTests, vulnerabilityBurndown } from "../src/engine/kpi";
 import { importVulnScan } from "../src/engine/vulnscan";
 import { resetKevForTests } from "../src/engine/kev";
 import { resetAssetsForTests, seedSampleAssetsIfEmpty } from "../src/engine/assets";
@@ -85,6 +85,22 @@ describe("kpi (통합 보안 KPI 대시보드)", () => {
     expect(r.overdue).toBe(1);
     expect(r.dueSoon).toBe(1);
     expect(r.slaCompliance).toBe(67); // 3건 중 2건 기한 내 = 67%
+  });
+
+  it("reconstructs a vulnerability burn-down from real scan history (재스캔마다 감소)", async () => {
+    resetAssetsForTests(); // 시드 자산 제거 — 이 테스트의 호스트만 집계되게
+    const scan = (rows: string) => importVulnScan("Plugin ID,CVE,Risk,Host,Name\n" + rows, "csv", "s");
+
+    scan("1,CVE-2021-1,Critical,10.0.0.5,A\n2,CVE-2021-2,High,10.0.0.5,B\n3,CVE-2021-3,Medium,10.0.0.5,C\n");
+    await new Promise((r) => setTimeout(r, 3)); // scannedAt(ms)이 겹치지 않게
+    scan("1,CVE-2021-1,Critical,10.0.0.5,A\n"); // B·C 고쳐짐 → 열린 것 3→1
+
+    const bd = vulnerabilityBurndown();
+    expect(bd.length).toBe(2); // 스캔 2회 = 시점 2개
+    expect(bd[0].active).toBe(3);
+    expect(bd[1].active).toBe(1); // 번다운: 열린 취약점 감소
+    expect(bd[1].fixed).toBe(2); // 2건 고쳐짐(누적)
+    expect(bd[0].at).toBeLessThan(bd[1].at); // 시간순
   });
 
   it("GET /api/kpi returns current + trend and persists one row per day", async () => {

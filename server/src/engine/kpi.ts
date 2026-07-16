@@ -99,6 +99,49 @@ function vulnerabilityMetrics(): KpiSnapshot["vulnerabilities"] {
   return v;
 }
 
+// 스캔 기반 취약점 번다운(측정) — 일일 KPI 스냅샷과 달리 실제 저장된 scan_runs 이력에서
+// 재구성한다. 매 스캔 시각마다 "그 시점의 포트폴리오 상태"(각 호스트의 그 시각 이하 최신 스캔)를
+// 집계해, 재스캔을 거듭하며 열린 취약점이 실제로 줄고 있는지 보여준다(Tenable §측정: 재스캔으로
+// 위험 감소 추적). 일일 스냅샷이 없어도(막 도입) 과거 스캔 이력만 있으면 곧바로 추세가 나온다.
+export interface BurndownPoint {
+  at: number;
+  active: number; // 열린 취약점(fixed 제외)
+  critical: number;
+  high: number;
+  kev: number;
+  fixed: number; // 누적 고쳐진 것
+}
+
+export function vulnerabilityBurndown(): BurndownPoint[] {
+  const hosts = listAssets().filter((a) => a.assetType === "infra-host");
+  const times = new Set<number>();
+  for (const h of hosts) for (const r of h.scanHistory) times.add(r.scannedAt);
+  const sorted = [...times].sort((a, b) => a - b);
+  return sorted.map((t) => {
+    const pt: BurndownPoint = { at: t, active: 0, critical: 0, high: 0, kev: 0, fixed: 0 };
+    for (const h of hosts) {
+      // scanHistory는 오래된 순 — t 이하의 마지막 스캔 스냅샷을 그 호스트의 "그 시점 상태"로 쓴다.
+      let latest: (typeof h.scanHistory)[number] | undefined;
+      for (const r of h.scanHistory) {
+        if (r.scannedAt <= t) latest = r;
+        else break;
+      }
+      if (!latest) continue;
+      for (const f of latest.findings) {
+        if (f.state === "fixed") {
+          pt.fixed++;
+          continue;
+        }
+        pt.active++;
+        if (f.severity === "critical") pt.critical++;
+        else if (f.severity === "high") pt.high++;
+        if (f.kev) pt.kev++;
+      }
+    }
+    return pt;
+  });
+}
+
 // 취약점에서 등록된 조치 항목(task.ref가 "vuln:")의 SLA 준수 현황.
 function remediationMetrics(): KpiSnapshot["remediation"] {
   const now = Date.now();
@@ -192,7 +235,8 @@ export function registerKpiRoutes(app: Express): void {
     asyncRoute(async (_req, res) => {
       const current = await computeKpiSnapshot();
       persistDailySnapshot(current);
-      res.json({ current, trend: listKpiTrend(30) });
+      // burndown: 저장된 스캔 이력에서 재구성한 실제 취약점 감소 추세(일일 스냅샷과 독립).
+      res.json({ current, trend: listKpiTrend(30), burndown: vulnerabilityBurndown() });
     })
   );
 }
