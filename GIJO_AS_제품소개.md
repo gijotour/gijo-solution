@@ -191,17 +191,75 @@ finding 내용 해시로 상태를 저장해 **재스캔 후에도 검토 결과
 
 ---
 
-## 6. 기술·배포
+## 6. 아키텍처 및 적용 기술
 
+### 6.1 시스템 구성 (한눈에)
+
+![GIJO AS 시스템 아키텍처 — 클라이언트 → 서버 → 로컬 AI 실행 영역(온프레미스)](screenshots/00-아키텍처.png)
+
+**3계층 · 단일 GPU 머신 완결형:**
+```
+[보안담당자 데스크톱(Electron, N대)]
+        │  REST(요청/응답) + WebSocket(실시간 7채널)
+        ▼
+[GIJO AS 서버 — Node.js/Express, 상태 단독 소유]
+   인증 · 오케스트레이션 · 상관관계 엔진 · 거버넌스/집계 · 자산/SBOM · CTI · 알림 · 영속화(SQLite)
+        │  같은 머신 내 localhost 프로세스 호출
+        ▼
+[로컬 AI 실행 영역 — RTX 3090 GPU]
+   로컬 LLM 서빙(llama.cpp) · RAG 벡터DB(LanceDB) · AI 자산 스캔(ModelScan) · 자가학습(Unsloth)
+```
+> 서버 1대가 **모든 상태를 단독 소유**하고, 여러 데스크톱 클라이언트가 REST/WebSocket으로 접속하는 CS 구조.
+> 서버·AI·데이터가 **한 GPU 머신 안에서 완결**되어 폐쇄망 배포에 적합합니다.
+
+### 6.2 적용 기술 스택 (레이어별)
+
+| 레이어 | 기술 | 역할 |
+|---|---|---|
+| **클라이언트** | Electron 31 · TypeScript · esbuild | 데스크톱 앱. `contextBridge` preload로 안전한 API 표면만 노출 |
+| | apiClient(REST) · wsClient(WebSocket) | 서버 통신 · 실시간 이벤트 수신 |
+| **서버(웹)** | Node.js · Express 4 · TypeScript | REST API + 앱 조립. `ws`로 WebSocket 브로드캐스트 |
+| | JWT(jsonwebtoken) · bcryptjs | 담당자별 로그인(회전형 refresh 토큰) · 비밀번호 해시 |
+| | better-sqlite3 (SQLite, WAL) | 자산·점검·승인·KPI·계정 등 전 상태 영속화 |
+| | AES-256-GCM(cryptopack) | CTI/SMTP 비밀키 암호화 저장(평문 저장 안 함) |
+| **문서/표준** | @cyclonedx/cyclonedx-library | SBOM CycloneDX 1.5 생성 |
+| | (직접 생성) SPDX-2.3 JSON | SBOM SPDX 내보내기 |
+| | docx | 임원/팀장 리포트(.docx) 생성 |
+| | nodemailer(SMTP) | 리포트·점검 지연 알림 이메일 |
+| | simple-git | 리포지토리 스캔(자산 자동 등록) |
+| **AI/데이터** | llama.cpp | 로컬 LLM 서빙(채팅 :8080+ 멀티모델 풀, 임베딩 :8081) |
+| | LanceDB · Apache Arrow | 장기 기억(RAG) 벡터 저장·검색 |
+| | BGE-M3 | 임베딩 모델(RAG 검색용) |
+| | ModelScan (python) | AI 모델 파일 정적 취약점 스캔 |
+| | Unsloth · llama-quantize | QLoRA 파인튜닝 · GGUF 변환·양자화(자가학습) |
+| | pypdf / OWPML | 문서(PDF·HWPX·에러로그) 텍스트 추출 |
+| **프로토콜** | MCP(@modelcontextprotocol/sdk) | 도구/에이전트 연동 표준 |
+
+### 6.3 실시간 처리 — WebSocket 이벤트 채널(7종)
+서버가 상태 변화를 모든 접속 클라이언트에 즉시 브로드캐스트합니다(폴링 없음):
+`collaboration:event`(에이전트 협업) · `llm:event`(추론 실황) · `asset:updated`(자산 갱신) ·
+`finetune:progress` · `learnloop:progress`(학습 진행) · `hf-download:progress`(모델 다운로드) · `log:event`(서버 로그)
+
+### 6.4 핵심 데이터 흐름
+1. **복합 지시:** 자연어 → 의도 라우팅(로컬 LLM, 규칙 폴백) → 다단계 실행 → 협업 로그 실시간 표출
+2. **RAG:** 문서 업로드 → 텍스트 추출(python) → 청크·임베딩(BGE-M3) → LanceDB → 채팅 시 근거 주입
+3. **자가학습 루프:** 대화 수집(SQLite) → 👍 정제 → QLoRA 학습(Unsloth) → GGUF 변환(llama.cpp) → 에이전트 배포
+4. **상관관계:** CTI 위협 텍스트 ↔ 자산 식별자 토큰 매칭 → 영향 자산 → 서비스 영향도 롤업
+
+### 6.5 보안·배포 특성 (폐쇄망 설계)
 | 항목 | 내용 |
 |---|---|
-| 배포 | **온프레미스(폐쇄망)** — 데이터·AI 외부 유출 없음 |
-| AI | 로컬 LLM(llama.cpp) + RAG(LanceDB) + QLoRA 학습(Unsloth) |
-| 추천 베이스 | 보안: Lily/ZySec/Foundation-Sec · 학습: Hermes 3 |
-| 서버 | Node.js + SQLite (단일 GPU 머신 상주) |
-| 클라이언트 | Electron 데스크톱 (여러 대가 서버 1대에 접속) |
-| 인증 | 보안담당자별 로그인(JWT), admin/담당자 권한 |
-| 품질 | 서버 자동화 테스트 **245개 통과** (v1.0.0) |
+| **데이터 주권** | 대화·문서·학습·자산·리포트 전 과정이 **조직 내부에서 완결** |
+| 외부 연결 | **선택적 CTI 벤더 API** + 최초 모델 다운로드(폐쇄망 이전 전)뿐 |
+| GPU 조율 | 학습·병합 시 추론 엔진 자동 정지→재기동(단일 3090 VRAM 충돌 방지) |
+| 인증·권한 | 보안담당자별 로그인(JWT), admin/담당자 이분 권한 |
+| 비밀정보 | API키·SMTP 비밀번호 AES-256-GCM 암호화(평문 저장 안 함) |
+| **품질** | 서버 자동화 테스트 **245개 통과**, 38개 엔진 모듈, 실기동 엔드투엔드 검증 |
+
+### 6.6 확장·운영
+- **모델 자유 교체:** 추천 LLM 가이드에서 보안·학습·RAG·경량 모델을 용도별로 다운로드, 에이전트별 배정
+- **자산 자동 유입:** Nessus 취약점 업로드 · Git 리포지토리 스캔으로 자산 자동 등록
+- **모델 자산 관리:** AI-BOM 5영역(모델·데이터·프롬프트·도구·인프라) + SBOM 표준 내보내기
 
 ---
 

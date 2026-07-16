@@ -1,0 +1,73 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel2:#0e1526;--border:rgba(255,255,255,0.10);--bs:rgba(255,255,255,0.18);--blue:#3b82f6;--bl:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--m2:#5f6785;--teal:#1eb980;--amber:#f0a020;--purple:#8b7cf0;--red:#f5928a;}
+*{box-sizing:border-box;margin:0;padding:0;font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;}
+body{background:var(--bg);color:var(--text);width:1400px;padding:34px 40px;}
+.hd{display:flex;align-items:baseline;gap:12px;margin-bottom:4px;}
+.hd h1{font-size:24px;font-weight:800;color:#fff;}
+.hd .sub{font-size:13px;color:var(--muted);}
+.tag{font-size:11px;font-weight:800;color:#06281c;background:var(--teal);padding:2px 9px;border-radius:5px;}
+.legend{font-size:11.5px;color:var(--m2);margin:2px 0 20px;}
+.zone{border:1px solid var(--border);border-radius:16px;padding:16px 18px 18px;margin-bottom:16px;background:linear-gradient(180deg,rgba(255,255,255,0.02),transparent);}
+.zt{font-size:12px;font-weight:800;letter-spacing:.5px;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+.zt .pill{font-size:10px;font-weight:700;color:var(--m2);border:1px solid var(--border);border-radius:20px;padding:2px 9px;}
+.row{display:flex;gap:12px;align-items:stretch;flex-wrap:wrap;}
+.box{background:var(--panel);border:1px solid var(--bs);border-radius:11px;padding:12px 14px;flex:1;min-width:150px;}
+.box .t{font-size:13px;font-weight:800;color:#fff;display:flex;align-items:center;gap:7px;}
+.box .d{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.5;}
+.box .tech{font-size:10px;color:var(--bl);margin-top:7px;font-family:'Consolas',monospace;}
+.b-blue{border-color:rgba(59,130,246,.45);} .b-teal{border-color:rgba(30,185,128,.45);} .b-purple{border-color:rgba(139,124,240,.45);} .b-amber{border-color:rgba(240,160,32,.45);}
+.arrow{text-align:center;color:var(--m2);font-size:20px;padding:3px 0;font-weight:700;}
+.arrow .lbl{font-size:11px;color:var(--bl);font-weight:700;}
+.gpu{border:1.5px dashed rgba(240,160,32,.5);border-radius:16px;padding:14px 16px 16px;background:rgba(240,160,32,0.03);}
+.gpu-h{font-size:12px;font-weight:800;color:var(--amber);margin-bottom:12px;}
+.sec{position:absolute;right:40px;}
+.foot{font-size:11px;color:var(--m2);margin-top:16px;border-top:1px solid var(--border);padding-top:12px;}
+</style></head><body>
+
+<div class="hd"><h1>GIJO AS — 시스템 아키텍처</h1><span class="tag">v1.0.0</span><span class="sub">온프레미스 · 폐쇄망 · 단일 GPU 머신 완결형</span></div>
+<div class="legend">🔵 프레젠테이션 · 🟢 서비스/엔진 · 🟣 AI/데이터 · 🟠 GPU 로컬 실행 — 데이터·AI가 조직 경계 밖으로 나가지 않습니다.</div>
+
+<!-- Clients -->
+<div class="zone">
+  <div class="zt">🔵 클라이언트 <span class="pill">Electron 데스크톱 · 여러 대가 서버 1대에 접속</span></div>
+  <div class="row">
+    <div class="box b-blue"><div class="t">🖥 보안담당자 데스크톱 앱</div><div class="d">19개 화면(KPI·위협·자산·운영·승인·학습루프 등). 페이지=순수 HTML+인라인 스크립트.</div><div class="tech">Electron 31 · contextBridge preload · esbuild</div></div>
+    <div class="box b-blue"><div class="t">🔌 통신 계층</div><div class="d">apiClient(REST) + wsClient(WebSocket) 로만 서버와 통신. JWT 토큰 보관·자동 갱신.</div><div class="tech">REST /api/* · WebSocket /ws</div></div>
+  </div>
+</div>
+
+<div class="arrow">▲ ▼ &nbsp;<span class="lbl">REST(요청/응답) + WebSocket(실시간 이벤트 7채널)</span></div>
+
+<!-- Server -->
+<div class="zone">
+  <div class="zt">🟢 GIJO AS 서버 <span class="pill">Node.js · Express · 상시 상주 · 상태 단독 소유</span></div>
+  <div class="row" style="margin-bottom:10px;">
+    <div class="box b-teal"><div class="t">🔐 인증·권한</div><div class="d">보안담당자별 로그인, admin/담당자 이분 권한.</div><div class="tech">JWT(회전형 refresh) · bcrypt</div></div>
+    <div class="box b-teal"><div class="t">🧭 오케스트레이션</div><div class="d">자연어 지시→의도 라우팅→복합 다단계 실행(스캔→분석→리포트).</div><div class="tech">dispatcher · intent</div></div>
+    <div class="box b-teal"><div class="t">🔗 상관관계 엔진</div><div class="d">CTI↔자산 매칭 · 자산↔서비스 영향도 · finding 승인→SBOM 게이트.</div><div class="tech">ctimatch · serviceimpact · approvals</div></div>
+    <div class="box b-teal"><div class="t">📊 거버넌스·집계</div><div class="d">유지보수 점검 · 통합 KPI 스냅샷 · 컴플라이언스 · 리포트(docx).</div><div class="tech">maintenance · kpi · compliance · report</div></div>
+  </div>
+  <div class="row">
+    <div class="box"><div class="t">📦 자산·SBOM</div><div class="d">인벤토리 · AI-BOM · SBOM(CycloneDX/SPDX) · 취약점 스캔 업로드.</div><div class="tech">assets · sbom · vulnscan</div></div>
+    <div class="box"><div class="t">📡 CTI 피드</div><div class="d">라이선스 벤더 API(선택)로만 수집. API키 암호화 저장.</div><div class="tech">cti · AES-256-GCM</div></div>
+    <div class="box"><div class="t">📧 알림·리포트 발송</div><div class="d">점검 지연 알림 · 리포트 이메일.</div><div class="tech">nodemailer(SMTP)</div></div>
+    <div class="box"><div class="t">💾 영속화</div><div class="d">자산·점검·승인·KPI·계정 등 전 상태. 실시간 브로드캐스트.</div><div class="tech">better-sqlite3 · ws</div></div>
+  </div>
+</div>
+
+<div class="arrow">▼ &nbsp;<span class="lbl">같은 머신 내 localhost 호출(프로세스 간)</span></div>
+
+<!-- GPU zone -->
+<div class="gpu">
+  <div class="gpu-h">🟠 로컬 AI 실행 영역 (RTX 3090 GPU 머신 · 전부 온프레미스)</div>
+  <div class="row" style="margin-bottom:10px;">
+    <div class="box b-purple"><div class="t">🧠 로컬 LLM 서빙</div><div class="d">보안 특화 LLM 멀티모델 풀. 에이전트별 모델 배정, VRAM 예산 자동 관리.</div><div class="tech">llama.cpp · chat :8080+ · embed :8081</div></div>
+    <div class="box b-purple"><div class="t">📚 장기 기억(RAG)</div><div class="d">사내 문서·매뉴얼·에러로그를 벡터화해 검색·근거 주입.</div><div class="tech">LanceDB · Apache Arrow · BGE-M3</div></div>
+    <div class="box b-amber"><div class="t">🔬 AI 자산 정적 스캔</div><div class="d">모델 파일 취약점(위험한 역직렬화 등) 스캔.</div><div class="tech">ModelScan(python)</div></div>
+    <div class="box b-amber"><div class="t">🔄 자가학습 파이프라인</div><div class="d">대화 수집→정제→QLoRA 학습→GGUF 변환·배포(폐쇄망).</div><div class="tech">Unsloth · llama-quantize</div></div>
+  </div>
+</div>
+
+<div class="foot">외부 연결은 <b style="color:var(--red)">선택적 CTI 벤더 API</b>와 최초 모델 다운로드(폐쇄망 이전 전)뿐 — 대화·문서·학습·자산·리포트 전 과정이 조직 내부에서 완결됩니다.  ·  서버 자동화 테스트 245개 통과</div>
+
+</body></html>
