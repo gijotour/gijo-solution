@@ -98,6 +98,31 @@ describe("vulnscan (Tenable Nessus 등 취약점 스캔 결과 업로드)", () =
     expect(byEpss[byEpss.length - 1].finding_type).toBe("조용한 Critical (CVE-2024-9999)");
   });
 
+  it("merges a plugin found on several ports into one finding, listing the ports as context", () => {
+    // 포트 스캐너 계열은 포트마다 한 줄씩 나오지만 조치 대상은 하나다(HTML 리포트 본문과 동일한 구조).
+    const csv =
+      "Plugin ID,Risk,Host,Protocol,Port,Name,Synopsis\n" +
+      "14272,None,10.0.0.5,tcp,22,Netstat Portscanner,열린 포트\n" +
+      "14272,None,10.0.0.5,tcp,111,Netstat Portscanner,열린 포트\n" +
+      "14272,None,10.0.0.5,udp,53,Netstat Portscanner,열린 포트\n" +
+      "999,High,10.0.0.5,tcp,1521,Oracle TNS 취약점,리스너\n" +
+      "888,Critical,10.0.0.5,tcp,0,호스트 전체 이슈,전체\n";
+    const result = importVulnScan(csv, "csv", "nessus");
+    expect(result.rows).toBe(5);
+    expect(result.findings).toBe(3); // 포트 3개짜리는 1건으로
+
+    const f = getAsset("vuln:10.0.0.5")!.findings;
+    const netstat = f.find((x) => x.finding_type.startsWith("Netstat"))!;
+    expect(netstat.evidence).toContain("포트: tcp/111, tcp/22, udp/53");
+
+    const oracle = f.find((x) => x.finding_type.startsWith("Oracle TNS"))!;
+    expect(oracle.evidence).toContain("포트: tcp/1521"); // 조치에 필요한 맥락 보존
+
+    // 포트 0은 "호스트 전체" 관례라 표기하지 않는다
+    const whole = f.find((x) => x.finding_type.startsWith("호스트 전체"))!;
+    expect(whole.evidence).not.toContain("포트:");
+  });
+
   it("leaves EPSS/VPR undefined when the report has no such columns (0과 구분)", () => {
     importVulnScan("Host,Name,Risk\n10.0.0.7,항목,High\n", "csv", "s");
     const f = getAsset("vuln:10.0.0.7")!.findings[0];

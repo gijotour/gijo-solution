@@ -32,6 +32,9 @@ const ALIASES = {
   // 실제 위협 지표 — CVSS 기반 Risk만 보면 "Medium인데 악용확률 94%"인 건이 후순위로 밀린다.
   epss: ["epss_score", "epss"],
   vpr: ["vpr_score", "vpr"],
+  // 어느 포트에서 잡혔는지 — 조치할 때 필요한 맥락(예: Oracle 리스너 tcp/1521).
+  port: ["port"],
+  protocol: ["protocol", "proto"],
 };
 
 // 숫자 컬럼 파싱 — 값이 없거나 숫자가 아니면 undefined(0과 구분해야 정렬이 왜곡되지 않는다).
@@ -108,6 +111,8 @@ export interface ParsedVuln {
   pluginId: string;
   epss?: number;
   vpr?: number;
+  port: string;
+  protocol: string;
 }
 
 export function parseVulnReport(content: string, format: "json" | "csv"): ParsedVuln[] {
@@ -122,6 +127,8 @@ export function parseVulnReport(content: string, format: "json" | "csv"): Parsed
       pluginId: pick(row, ALIASES.pluginId),
       epss: pickNum(row, ALIASES.epss),
       vpr: pickNum(row, ALIASES.vpr),
+      port: pick(row, ALIASES.port),
+      protocol: pick(row, ALIASES.protocol),
     }))
     .filter((v) => v.host && v.name); // 호스트·항목명 없는 행은 무시
 }
@@ -159,21 +166,30 @@ export function importVulnScan(content: string, format: "json" | "csv", sourceLa
     // Nessus CSV는 플러그인(취약점) 1건을 CVE 개수만큼 행으로 복제해 내보낸다 — 그대로 세면
     // 건수가 몇 배로 부풀려진다(실측: 1,171행 = 실제 282건). 플러그인 id(없으면 항목명)로 합치고
     // CVE는 한 건에 모아 붙인다. EPSS/VPR도 플러그인 단위 점수라 CVE별로 나누는 게 의미가 없다.
-    const byVuln = new Map<string, { rep: ParsedVuln; cves: Set<string>; epss?: number; vpr?: number }>();
+    // 같은 플러그인이 여러 포트에서 잡히면 스캐너는 포트마다 한 줄씩 낸다(예: 포트 스캐너 계열).
+    // 조치 대상은 어차피 하나이므로 한 건으로 합치고, 포트는 맥락으로 남긴다.
+    const byVuln = new Map<string, { rep: ParsedVuln; cves: Set<string>; ports: Set<string>; epss?: number; vpr?: number }>();
     for (const v of vulns) {
       const key = v.pluginId || v.name;
-      if (!byVuln.has(key)) byVuln.set(key, { rep: v, cves: new Set<string>() });
+      if (!byVuln.has(key)) byVuln.set(key, { rep: v, cves: new Set<string>(), ports: new Set<string>() });
       const g = byVuln.get(key)!;
       if (v.cve) g.cves.add(v.cve);
+      // 포트 0은 "호스트 전체"를 뜻하는 Nessus 관례라 표기하지 않는다.
+      if (v.port && v.port !== "0") g.ports.add(v.protocol ? `${v.protocol}/${v.port}` : v.port);
       // EPSS/VPR은 플러그인 단위 점수라 복제 행마다 같은 값이지만, 다를 경우 가장 위험한 값을 남긴다.
       if (v.epss !== undefined) g.epss = Math.max(g.epss ?? 0, v.epss);
       if (v.vpr !== undefined) g.vpr = Math.max(g.vpr ?? 0, v.vpr);
     }
 
-    const findings: StandardFinding[] = [...byVuln.values()].map(({ rep, cves, epss, vpr }) => {
+    const findings: StandardFinding[] = [...byVuln.values()].map(({ rep, cves, ports, epss, vpr }) => {
       const list = [...cves].sort();
-      // 요약에는 대표 CVE만 쓰되, 전체 목록은 evidence에 남겨 추적성을 잃지 않는다.
-      const evidence = [rep.description || `${host} — ${rep.name}`, list.length > 1 ? `CVE(${list.length}): ${list.join(", ")}` : ""]
+      const portList = [...ports].sort();
+      // 요약에는 대표 CVE만 쓰되, 전체 목록·포트는 evidence에 남겨 추적성을 잃지 않는다.
+      const evidence = [
+        rep.description || `${host} — ${rep.name}`,
+        portList.length ? `포트: ${portList.join(", ")}` : "",
+        list.length > 1 ? `CVE(${list.length}): ${list.join(", ")}` : "",
+      ]
         .filter(Boolean)
         .join("\n");
       return {
