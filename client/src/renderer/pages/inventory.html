@@ -73,6 +73,8 @@
   .sbom-pending{color:var(--amber);font-weight:700;font-size:12px;}
   .owner{font-size:12px;color:var(--muted);}
   .row-actions{color:var(--blue-light);font-size:12px;font-weight:700;cursor:pointer;}
+  .asset-del{color:var(--muted-2);font-size:12px;font-weight:700;cursor:pointer;padding:0 4px;border-radius:4px;}
+  .asset-del:hover{color:#f5928a;background:rgba(226,72,61,0.14);}
 
   .pagination{display:flex;justify-content:space-between;align-items:center;padding:14px 4px 4px;font-size:12px;color:var(--muted);}
   .page-btns{display:flex;gap:6px;}
@@ -380,6 +382,7 @@
           const action = isHost
             ? `<span class="row-actions" data-vulns="1" title="취약 자산관리에서 이 호스트의 취약점 보기">취약점 보기 →</span>`
             : `<span class="row-actions" data-scan="${a.id}">재스캔 →</span>`;
+          const del = `<span class="asset-del" data-del="${a.id}" data-name="${a.name}" title="자산 삭제">✕</span>`;
           return `<tr>
             <td><div class="asset-name">${a.name}${kevBadge}${maintBadge}</div><div class="asset-sub">${os}</div></td>
             <td><span class="type-badge">${a.assetType}</span></td>
@@ -387,7 +390,7 @@
             <td><span class="risk-badge risk-${risk.level === "none" ? "low" : risk.level}"><span class="risk-dot"></span>${risk.label}</span></td>
             <td>${relativeTime(a.lastScannedAt)}</td>
             <td>${sbomCell}</td>
-            <td>${action}</td>
+            <td style="white-space:nowrap">${action} <span style="color:var(--muted-2)">·</span> ${del}</td>
           </tr>`;
         })
         .join("");
@@ -589,6 +592,17 @@
       }
       if (e.target.dataset.vulns) {
         window.gijo.navigateTo("vulnscan.html");
+        return;
+      }
+      if (e.target.dataset.del) {
+        const id = e.target.dataset.del;
+        if (!confirm(`'${e.target.dataset.name}' 자산을 삭제할까요?\n스캔 이력·finding 승인 기록도 함께 삭제됩니다.`)) return;
+        try {
+          await window.gijo.deleteAsset(id);
+          await refresh();
+        } catch (err) {
+          alert("삭제 실패: " + (err.message || err));
+        }
         return;
       }
       if (genId) {

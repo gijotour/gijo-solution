@@ -232,6 +232,18 @@ export function resetAssetsForTests(): void {
   db.exec("DELETE FROM scan_runs; DELETE FROM assets;");
 }
 
+const deleteAssetStmt = db.prepare("DELETE FROM assets WHERE id = ?");
+const deleteFindingApprovalsStmt = db.prepare("DELETE FROM finding_approvals WHERE assetId = ?");
+
+// 자산 1건 삭제 — 스캔 이력·finding 승인 기록까지 함께 정리(FK 순서상 자식 먼저). 존재하지 않으면 false.
+export function deleteAsset(id: string): boolean {
+  if (!getAssetRowStmt.get(id)) return false;
+  deleteScanRunsStmt.run(id);
+  deleteFindingApprovalsStmt.run(id);
+  deleteAssetStmt.run(id);
+  return true;
+}
+
 export function getAsset(assetId: string): Asset | undefined {
   const row = getAssetRowStmt.get(assetId) as AssetRow | undefined;
   return row ? fromRow(row) : undefined;
@@ -324,5 +336,10 @@ export function registerAssetsRoutes(app: Express): void {
     const asset = updateAiBom(String(req.params.id), req.body.aibom);
     if (!asset) return res.status(404).json({ error: "asset not found" });
     res.json(asset);
+  });
+  app.delete("/api/assets/:id", authMiddleware, (req, res) => {
+    const ok = deleteAsset(String(req.params.id));
+    if (!ok) return res.status(404).json({ error: "asset not found" });
+    res.json({ ok: true });
   });
 }

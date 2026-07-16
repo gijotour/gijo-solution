@@ -27,6 +27,21 @@ describe("assets", () => {
     token = await login(app);
   });
 
+  it("deletes an asset (and 404s for an unknown id)", async () => {
+    await request(app)
+      .post("/api/assets")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ id: "to-delete", name: "삭제 대상", path: "p" });
+    expect((await request(app).get("/api/assets").set("Authorization", `Bearer ${token}`)).body.some((a: { id: string }) => a.id === "to-delete")).toBe(true);
+
+    const del = await request(app).delete("/api/assets/to-delete").set("Authorization", `Bearer ${token}`);
+    expect(del.status).toBe(200);
+    expect((await request(app).get("/api/assets").set("Authorization", `Bearer ${token}`)).body.some((a: { id: string }) => a.id === "to-delete")).toBe(false);
+
+    expect((await request(app).delete("/api/assets/nope").set("Authorization", `Bearer ${token}`)).status).toBe(404);
+    expect((await request(app).delete("/api/assets/to-delete")).status).toBe(401); // 인증 필요
+  });
+
   it("registers an asset with defaults for optional fields", async () => {
     const res = await request(app)
       .post("/api/assets")
