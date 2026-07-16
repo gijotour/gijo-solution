@@ -150,10 +150,12 @@
       <div class="explorer-title"><span>자산 탐색기</span><span style="color:var(--muted-2);cursor:pointer" id="refreshAssetsBtn">⟳</span></div>
       <div class="explorer-sub">GIJO AS Desktop</div>
       <div class="explorer-tree" id="explorerTree" style="margin-bottom:16px;">불러오는 중...</div>
-      <div class="explorer-title"><span>📁 파일</span><span><span style="color:var(--muted-2);cursor:pointer;margin-right:8px;" id="pickFolderBtn" title="작업 폴더 선택">📂</span><span style="color:var(--muted-2);cursor:pointer" id="refreshFilesBtn" title="새로고침">⟳</span></span></div>
-      <div class="explorer-sub" id="fileRootLabel">프로젝트 폴더 (읽기 전용)</div>
-      <div style="font-size:10.5px;color:var(--muted-2);margin-bottom:6px;line-height:1.5;">📄 문서(PDF·HWPX·텍스트)를 클릭하면 <b style="color:var(--teal)">장기 기억에 올리기</b></div>
-      <div class="explorer-tree" id="fileTree" style="font-size:12px;">불러오는 중...</div>
+      <div class="explorer-title"><span id="fileSectionToggle" style="cursor:pointer" title="접기/펼치기"><span id="fileSectionCaret" style="color:var(--muted-2)">▾</span> 📁 파일</span><span><span style="color:var(--muted-2);cursor:pointer;margin-right:8px;" id="pickFolderBtn" title="작업 폴더 선택">📂</span><span style="color:var(--muted-2);cursor:pointer" id="refreshFilesBtn" title="새로고침">⟳</span></span></div>
+      <div id="fileSectionBody">
+        <div class="explorer-sub" id="fileRootLabel">프로젝트 폴더 (읽기 전용)</div>
+        <div style="font-size:10.5px;color:var(--muted-2);margin-bottom:6px;line-height:1.5;">📄 문서(PDF·HWPX·텍스트)를 클릭하면 <b style="color:var(--teal)">장기 기억에 올리기</b></div>
+        <div class="explorer-tree" id="fileTree" style="font-size:12px;">불러오는 중...</div>
+      </div>
     </div>
 
     <div class="center-stage">
@@ -412,6 +414,27 @@
     }
   }
 
+  // 📁 파일 섹션 접기/펼치기 (경로 안내·힌트·트리를 통째로 감춘다).
+  function toggleFileSection() {
+    const body = document.getElementById("fileSectionBody");
+    const caret = document.getElementById("fileSectionCaret");
+    const collapsed = body.style.display === "none";
+    body.style.display = collapsed ? "" : "none";
+    caret.textContent = collapsed ? "▾" : "▸";
+  }
+
+  // 접힌 자산 그룹("ai"/"hosts") — 새로고침/재렌더 후에도 유지되도록 렌더 밖에 둔다.
+  const collapsedAssetGroups = new Set();
+
+  function assetGroup(key, label, count, rowsHtml, extraStyle) {
+    const collapsed = collapsedAssetGroups.has(key);
+    return (
+      `<div class="folder" data-grp="${key}" style="cursor:pointer;${extraStyle || ""}">` +
+      `<span style="color:var(--muted-2)">${collapsed ? "▸" : "▾"}</span> ${label} (${count})</div>` +
+      `<div data-grp-body="${key}" style="${collapsed ? "display:none" : ""}">${rowsHtml}</div>`
+    );
+  }
+
   async function loadAssets() {
     try {
       const assets = await window.gijo.listAssets();
@@ -421,16 +444,25 @@
       }
       const hosts = assets.filter((a) => a.assetType === "infra-host");
       const ai = assets.filter((a) => a.assetType !== "infra-host");
-      let html = "";
-      html += `<div class="folder">▸ AI 자산 (${ai.length})</div>`;
-      html += ai.slice(0, 8).map((a) => assetRow(a, false)).join("");
-      if (ai.length > 8) html += `<div style="padding-left:14px;color:var(--muted-2);font-size:11px">…외 ${ai.length - 8}건</div>`;
+      let aiRows = ai.slice(0, 8).map((a) => assetRow(a, false)).join("");
+      if (ai.length > 8) aiRows += `<div style="padding-left:14px;color:var(--muted-2);font-size:11px">…외 ${ai.length - 8}건</div>`;
+      let html = assetGroup("ai", "AI 자산", ai.length, aiRows);
       if (hosts.length) {
-        html += `<div class="folder" style="margin-top:8px">▸ 인프라 호스트 (${hosts.length})</div>`;
-        html += hosts.slice(0, 8).map((a) => assetRow(a, true)).join("");
-        if (hosts.length > 8) html += `<div style="padding-left:14px;color:var(--muted-2);font-size:11px">…외 ${hosts.length - 8}건</div>`;
+        let hostRows = hosts.slice(0, 8).map((a) => assetRow(a, true)).join("");
+        if (hosts.length > 8) hostRows += `<div style="padding-left:14px;color:var(--muted-2);font-size:11px">…외 ${hosts.length - 8}건</div>`;
+        html += assetGroup("hosts", "인프라 호스트", hosts.length, hostRows, "margin-top:8px");
       }
       explorerTree.innerHTML = html;
+      explorerTree.querySelectorAll("[data-grp]").forEach((hd) => {
+        hd.addEventListener("click", () => {
+          const key = hd.dataset.grp;
+          const body = explorerTree.querySelector(`[data-grp-body="${key}"]`);
+          const open = collapsedAssetGroups.has(key);
+          if (open) collapsedAssetGroups.delete(key); else collapsedAssetGroups.add(key);
+          body.style.display = open ? "" : "none";
+          hd.querySelector("span").textContent = open ? "▾" : "▸";
+        });
+      });
     } catch (e) {
       explorerTree.innerHTML = '<div style="color:var(--muted-2)">자산 목록을 불러오지 못했습니다</div>';
     }
@@ -598,6 +630,7 @@
     document.getElementById("refreshAssetsBtn").addEventListener("click", loadAssets);
     document.getElementById("refreshFilesBtn").addEventListener("click", loadFiles);
     document.getElementById("pickFolderBtn").addEventListener("click", pickFolder);
+    document.getElementById("fileSectionToggle").addEventListener("click", toggleFileSection);
     document.getElementById("todoAddBtn").addEventListener("click", addTodo);
     todoInput.addEventListener("keydown", (e) => { if (e.key === "Enter") addTodo(); });
     todayItems.addEventListener("click", onTaskAction);
