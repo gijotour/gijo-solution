@@ -10,6 +10,8 @@ vi.mock("../src/engine/llm", () => ({
 
 import { createApp } from "../src/app";
 import { resetAssetsForTests } from "../src/engine/assets";
+import { maintenanceSummary } from "../src/engine/report";
+import type { MaintenanceItem } from "../src/engine/maintenance";
 
 async function login(app: ReturnType<typeof createApp>) {
   const res = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" });
@@ -44,6 +46,25 @@ describe("report", () => {
     const bytes = fs.readFileSync(res.body.filePath);
     // .docx files are zip archives; verify the real PK magic bytes, not just that a file exists.
     expect(bytes.subarray(0, 2).toString("hex")).toBe("504b");
+  });
+
+  it("maintenanceSummary counts by status and flags overdue scheduled items", () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const mk = (over: Partial<MaintenanceItem>): MaintenanceItem => ({
+      id: "x", title: "t", productName: "p", scheduleDate: "2099-01-01", status: "scheduled",
+      createdAt: 0, updatedAt: 0, ...over,
+    });
+    const items = [
+      mk({ status: "scheduled", scheduleDate: today }), // 지연
+      mk({ status: "scheduled", scheduleDate: "2099-01-01" }), // 예정(미래)
+      mk({ status: "reported" }),
+      mk({ status: "approved" }),
+      mk({ status: "approved" }),
+      mk({ status: "rejected" }),
+    ];
+    const s = maintenanceSummary(items);
+    expect(s).toEqual({ total: 6, scheduled: 2, overdue: 1, reported: 1, approved: 2, rejected: 1 });
+    expect(maintenanceSummary([])).toEqual({ total: 0, scheduled: 0, overdue: 0, reported: 0, approved: 0, rejected: 0 });
   });
 
   it("scopes the report to only the requested asset ids", async () => {

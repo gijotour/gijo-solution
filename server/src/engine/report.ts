@@ -9,6 +9,7 @@ import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { chat } from "./llm";
 import { listAssets, getAsset, Asset } from "./assets";
+import { listMaintenanceItems, MaintenanceItem } from "./maintenance";
 
 export interface ReportRequest {
   type: "weekly" | "quarterly" | "ondemand";
@@ -37,8 +38,45 @@ function severityCounts(assets: Asset[]): Record<string, number> {
   return counts;
 }
 
-async function buildDocx(req: ReportRequest, assets: Asset[], executiveSummary: string): Promise<Buffer> {
+// 유지보수 점검 현황 요약(거버넌스 섹션용). scheduleDate가 오늘 이하인 scheduled는 "지연".
+export interface MaintenanceSummary {
+  total: number;
+  scheduled: number;
+  overdue: number;
+  reported: number; // 승인 대기
+  approved: number;
+  rejected: number;
+}
+
+export function maintenanceSummary(items: MaintenanceItem[]): MaintenanceSummary {
+  const today = new Date().toISOString().slice(0, 10);
+  const s: MaintenanceSummary = { total: items.length, scheduled: 0, overdue: 0, reported: 0, approved: 0, rejected: 0 };
+  for (const m of items) {
+    if (m.status === "scheduled") {
+      s.scheduled++;
+      if (m.scheduleDate <= today) s.overdue++;
+    } else if (m.status === "reported") s.reported++;
+    else if (m.status === "approved") s.approved++;
+    else if (m.status === "rejected") s.rejected++;
+  }
+  return s;
+}
+
+const MAINT_STATUS_LABEL: Record<MaintenanceItem["status"], string> = {
+  scheduled: "예정",
+  reported: "승인 대기",
+  approved: "승인됨",
+  rejected: "반려",
+};
+
+async function buildDocx(req: ReportRequest, assets: Asset[], executiveSummary: string, maintenance: MaintenanceItem[]): Promise<Buffer> {
   const counts = severityCounts(assets);
+  const ms = maintenanceSummary(maintenance);
+  // 감사 추적: 최근 승인/반려 처리 건(검토자·사유). 리포트에는 최근 10건만.
+  const reviewed = maintenance
+    .filter((m) => m.status === "approved" || m.status === "rejected")
+    .sort((a, b) => (b.reviewedAt ?? 0) - (a.reviewedAt ?? 0))
+    .slice(0, 10);
   const doc = new Document({
     sections: [
       {
@@ -50,6 +88,30 @@ async function buildDocx(req: ReportRequest, assets: Asset[], executiveSummary: 
           ...Object.entries(counts).map(
             ([severity, count]) => new Paragraph({ children: [new TextRun(`${severity}: ${count}건`)] })
           ),
+          new Paragraph({ text: "유지보수 점검 거버넌스", heading: HeadingLevel.HEADING_1 }),
+          new Paragraph({
+            children: [
+              new TextRun(
+                `전체 ${ms.total}건 · 예정 ${ms.scheduled}건(지연 ${ms.overdue}) · 승인 대기 ${ms.reported}건 · 승인됨 ${ms.approved}건 · 반려 ${ms.rejected}건`
+              ),
+            ],
+          }),
+          new Paragraph({ text: "최근 승인·반려 이력(감사 추적)", heading: HeadingLevel.HEADING_2 }),
+          ...(reviewed.length
+            ? reviewed.map(
+                (m) =>
+                  new Paragraph({
+                    children: [
+                      new TextRun(
+                        `[${MAINT_STATUS_LABEL[m.status]}] ${m.title} · ${m.productName}` +
+                          (m.assetName ? ` (자산: ${m.assetName})` : "") +
+                          ` — 검토자 ${m.reviewedBy ?? "-"}` +
+                          (m.status === "rejected" && m.reviewNote ? ` · 사유: ${m.reviewNote}` : "")
+                      ),
+                    ],
+                  })
+              )
+            : [new Paragraph({ children: [new TextRun("승인·반려 처리된 점검 없음")] })]),
           new Paragraph({ text: "자산별 상세", heading: HeadingLevel.HEADING_1 }),
           ...assets.flatMap((asset) => [
             new Paragraph({ text: asset.name, heading: HeadingLevel.HEADING_2 }),
@@ -72,12 +134,17 @@ async function buildDocx(req: ReportRequest, assets: Asset[], executiveSummary: 
 export async function generateReport(req: ReportRequest): Promise<ReportResult> {
   const assets = collectAssets(req);
   const counts = severityCounts(assets);
+  const maintenance = listMaintenanceItems();
+  const ms = maintenanceSummary(maintenance);
   const executiveSummary = await chat({
     agentId: "report",
-    message: `다음 보안 현황 데이터를 바탕으로 경영진용 1페이지 요약을 작성해줘. 자산 ${assets.length}건, 심각도별 발견 건수: ${JSON.stringify(counts)}`,
+    message:
+      `다음 보안 현황 데이터를 바탕으로 경영진용 1페이지 요약을 작성해줘. 자산 ${assets.length}건, ` +
+      `심각도별 발견 건수: ${JSON.stringify(counts)}. ` +
+      `유지보수 점검: 전체 ${ms.total}건 중 지연 ${ms.overdue}건, 승인 대기 ${ms.reported}건, 반려 ${ms.rejected}건.`,
   });
 
-  const buffer = await buildDocx(req, assets, executiveSummary);
+  const buffer = await buildDocx(req, assets, executiveSummary, maintenance);
   await fs.mkdir(REPORT_DIR, { recursive: true });
   const filePath = path.join(REPORT_DIR, `${req.type}-${Date.now()}.docx`);
   await fs.writeFile(filePath, buffer);
