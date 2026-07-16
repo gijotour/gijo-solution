@@ -477,5 +477,39 @@ tr:last-child td{border-bottom:none;}
   }
 </script>
 
+
+<script>
+// 사이드바 섹션(모니터링/거버넌스 등) 접기·펼치기 — localStorage로 페이지 이동 후에도 유지.
+// 독립 스크립트라 window.gijo 준비 여부와 무관하게 동작한다.
+(() => {
+  const KEY = "gijo:navCollapsed";
+  let collapsed;
+  try { collapsed = new Set(JSON.parse(localStorage.getItem(KEY) || "[]")); } catch (e) { collapsed = new Set(); }
+  document.querySelectorAll(".sidebar .nav-section").forEach((sec) => {
+    const name = sec.textContent.trim();
+    const items = [];
+    let el = sec.nextElementSibling;
+    while (el && !el.classList.contains("nav-section")) { items.push(el); el = el.nextElementSibling; }
+    if (!items.length) return;
+    const caret = document.createElement("span");
+    caret.style.cssText = "float:right;font-size:9px;opacity:.8";
+    sec.appendChild(caret);
+    sec.style.cursor = "pointer";
+    // 현재 페이지가 든 섹션은 접혀 있어도 펼쳐서 위치를 잃지 않게 한다.
+    if (items.some((i) => i.classList.contains("active"))) collapsed.delete(name);
+    const apply = () => {
+      const c = collapsed.has(name);
+      items.forEach((i) => (i.style.display = c ? "none" : ""));
+      caret.textContent = c ? "▸" : "▾";
+    };
+    apply();
+    sec.addEventListener("click", () => {
+      if (collapsed.has(name)) collapsed.delete(name); else collapsed.add(name);
+      try { localStorage.setItem(KEY, JSON.stringify([...collapsed])); } catch (e) {}
+      apply();
+    });
+  });
+})();
+</script>
 </body>
 </html>
