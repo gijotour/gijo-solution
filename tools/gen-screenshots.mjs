@@ -66,6 +66,9 @@ async function main() {
     smtp: await g("/api/email/config"),
     usage: await g("/api/usage/summary"),
     users: await g("/api/users"),
+    securityProductsGrouped: await g("/api/security-products/grouped"),
+    productCategories: await g("/api/security-products/categories"),
+    securityProducts: await g("/api/security-products"),
   };
 
   // 브라우저에 주입할 window.gijo 스텁(읽기=주입 데이터 반환, 쓰기/구독=no-op). 페이지 스크립트보다 먼저 실행.
@@ -111,6 +114,9 @@ async function main() {
       listLearnloopRuns: () => R(DATA.learnloopRuns),
       listHfDownloadJobs: () => R(DATA.hfJobs || []),
       listDir: () => R({ root: "GIJO", rootName: "GIJO", path: "", items: [] }),
+      listSecurityProductsGrouped: () => R(DATA.securityProductsGrouped),
+      getProductCategories: () => R(DATA.productCategories),
+      listSecurityProducts: () => R(DATA.securityProducts),
     };
     // 이벤트 구독 + 나머지 모든 메서드는 no-op(스크린샷은 사용자 조작이 없으므로 안전).
     return new Proxy(gijo, {
@@ -133,6 +139,8 @@ async function main() {
     { page: "agent.html", name: "08-에이전트AI" },
     { page: "compliance.html", name: "09-컴플라이언스" },
     { page: "sbom.html", name: "10-AI-BOM-SBOM" },
+    { page: "vulnscan.html", name: "11-취약자산관리-생애주기" },
+    { page: "products.html", name: "12-보안제품관리-매뉴얼" },
   ];
 
   const browser = await chromium.launch({ channel: "msedge", headless: true });
