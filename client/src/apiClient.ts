@@ -535,9 +535,21 @@ export interface ThreatCompliance {
 export interface DexModel {
   id: string; name: string; base: string; arch: string; size: string; focus: string; note?: string; lang: string;
 }
+export interface AgentModelRecommendation {
+  agentId: string;
+  id: string;
+  name: string;
+  size: string;
+  approxGb: string;
+  desc: string;
+  tag?: string;
+  reason: string;
+}
+
 export const modelDexApi = {
   list: () => request<{ models: DexModel[]; groups: { arch: string; models: DexModel[] }[] }>("/api/modeldex"),
   guide: () => request("/api/llmguide"),
+  agentRecommendations: () => request<Record<string, AgentModelRecommendation>>("/api/modeldex/agent-recommendations"),
 };
 
 export const complianceApi = {

@@ -106,11 +106,78 @@ export const LLM_GUIDE: LlmGuideCategory[] = [
   },
 ];
 
+// ── AI 팀 에이전트별 모델 추천 (기능 기반) ────────────────────────────
+// 각 에이전트의 담당 역할(agents.ts AGENT_DEFS)에 맞는 모델을 도감(LLM_GUIDE)에서 고른다.
+// modelId는 반드시 LLM_GUIDE에 있는 다운로드 가능한 GGUF여야 한다 — 그래야 에이전트 화면에서
+// "받기"(다운로드 큐)와 "적용"(할당)이 바로 동작한다. 이름/용량 등 표시 정보는 아래에서
+// LLM_GUIDE를 조회해 자동으로 채운다(중복 정의 방지).
+interface AgentModelRecSpec {
+  modelId: string; // LLM_GUIDE의 GGUF repo id
+  reason: string;
+}
+
+const AGENT_MODEL_RECOMMENDATIONS: Record<string, AgentModelRecSpec> = {
+  orchestrator: {
+    modelId: "bartowski/Qwen2.5-7B-Instruct-GGUF",
+    reason: "지시 이해와 한국어 라우팅 정확도가 좋아 작업 분배·의도 판단에 적합. 더 빠른 응답이 급하면 Llama 3.2 3B로 교체하세요.",
+  },
+  scan: {
+    modelId: "mradermacher/Foundation-Sec-8B-GGUF",
+    reason: "스캔(ModelScan) 결과로 나온 모델 취약점을 위협 관점에서 해석·요약하는 데 강합니다.",
+  },
+  pentest: {
+    modelId: "QuantFactory/Lily-Cybersecurity-7B-v0.2-GGUF",
+    reason: "공격 기법·익스플로잇·사고대응에 특화된 보안 모델(GIJO 기본). 침투테스트 검증 설명에 적합.",
+  },
+  analysis: {
+    modelId: "bartowski/Qwen2.5-7B-Instruct-GGUF",
+    reason: "우선순위 판단과 매끄러운 한국어 설명 품질이 좋습니다. 학습 데이터셋 Q&A 생성에도 이 에이전트가 쓰입니다.",
+  },
+  sbom: {
+    modelId: "QuantFactory/SecurityLLM-GGUF",
+    reason: "보안 정책·컴플라이언스·구성 문서 이해에 강해 SBOM 항목 정리·설명에 맞습니다.",
+  },
+  cti: {
+    modelId: "mradermacher/Foundation-Sec-8B-GGUF",
+    reason: "딥웹·다크웹 위협 인텔리전스를 분석·추론하는 범용 보안 파운데이션 모델(Cisco).",
+  },
+  report: {
+    modelId: "bartowski/Qwen2.5-7B-Instruct-GGUF",
+    reason: "한국어 보고서 문체·서식 품질이 가장 좋아 내부 보고서 작성에 적합합니다.",
+  },
+  "model-evolution": {
+    modelId: "NousResearch/Hermes-3-Llama-3.1-8B-GGUF",
+    reason: "헤르메스 학습 루프의 확정 베이스 — 지시따르기·구조화 출력이 뛰어나 모델 진화(학습) 대상에 맞습니다.",
+  },
+};
+
+export interface AgentModelRecommendation extends RecommendedModel {
+  agentId: string;
+  reason: string;
+}
+
+// 도감(LLM_GUIDE) 전체를 id로 조회할 수 있게 평탄화한 룩업.
+const GUIDE_BY_ID: Map<string, RecommendedModel> = new Map(LLM_GUIDE.flatMap((c) => c.models).map((m) => [m.id, m]));
+
+// 에이전트별 추천을 도감 정보(name/size/approxGb/tag)로 살찌워 돌려준다.
+export function getAgentModelRecommendations(): Record<string, AgentModelRecommendation> {
+  const out: Record<string, AgentModelRecommendation> = {};
+  for (const [agentId, spec] of Object.entries(AGENT_MODEL_RECOMMENDATIONS)) {
+    const model = GUIDE_BY_ID.get(spec.modelId);
+    if (!model) continue; // 도감에 없는 id는 건너뛴다(다운로드 불가라 추천해도 무의미)
+    out[agentId] = { agentId, reason: spec.reason, ...model };
+  }
+  return out;
+}
+
 export function registerModelDexRoutes(app: Express): void {
   app.get("/api/modeldex", authMiddleware, (_req, res) => {
     res.json({ models: SECURITY_LLM_DEX, groups: synthesisGroups() });
   });
   app.get("/api/llmguide", authMiddleware, (_req, res) => {
     res.json(LLM_GUIDE);
+  });
+  app.get("/api/modeldex/agent-recommendations", authMiddleware, (_req, res) => {
+    res.json(getAgentModelRecommendations());
   });
 }

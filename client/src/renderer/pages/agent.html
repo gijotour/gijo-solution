@@ -118,6 +118,14 @@ tr:last-child td{border-bottom:none;}
 .agent-name{font-size:13.5px;font-weight:800;color:#fff;}
 .agent-role{font-size:11px;color:var(--muted);margin-top:1px;}
 .agent-model{font-size:11px;color:var(--muted-2);margin-top:8px;padding-top:8px;border-top:1px solid var(--border);}
+.agent-rec{margin-top:8px;font-size:11px;color:var(--muted);line-height:1.5;}
+.agent-rec .rec-head{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
+.agent-rec b{color:var(--blue-light);}
+.agent-rec .rec-gb{color:var(--muted-2);}
+.agent-rec .rec-reason{color:var(--muted-2);font-size:10.5px;margin-top:3px;}
+.rec-btn{background:transparent;border:1px solid var(--border-strong);color:var(--blue-light);padding:3px 10px;border-radius:6px;font-size:10.5px;font-weight:700;cursor:pointer;margin-left:auto;}
+.rec-btn:disabled{opacity:.55;cursor:default;}
+.rec-ok{color:var(--teal);font-weight:700;margin-left:auto;font-size:10.5px;}
 .agent-status{position:absolute;top:14px;right:14px;display:flex;align-items:center;gap:5px;font-size:10.5px;font-weight:700;}
 .st-dot{width:7px;height:7px;border-radius:50%;}
 .st-working .st-dot{background:var(--teal);}
@@ -317,6 +325,31 @@ tr:last-child td{border-bottom:none;}
   let availableModels = [];
   let isAdmin = false;
 
+  let agentRecs = {};
+  const esc = (s) => String(s == null ? "" : s).replace(/</g, "&lt;");
+  const dirNameOf = (id) => String(id).replace(/\//g, "__");
+
+  // 기능 기반 추천 모델 표시 — 받아지지 않았으면 [받기](다운로드 큐), 받아졌으면 [적용](할당).
+  function recommendationHtml(a) {
+    const rec = agentRecs[a.id];
+    if (!rec) return "";
+    const dir = dirNameOf(rec.id);
+    const installed = availableModels.some((m) => m.id === dir);
+    const assigned = a.assignedModelId === dir;
+    let action;
+    if (assigned) action = `<span class="rec-ok">✓ 적용됨</span>`;
+    else if (installed) action = isAdmin
+      ? `<button class="rec-btn" data-rec-apply="${a.id}" data-rec-dir="${dir}">적용</button>`
+      : `<span class="rec-gb" style="margin-left:auto">받아짐 · admin이 적용</span>`;
+    else action = `<button class="rec-btn" data-rec-get="${esc(rec.id)}">받기</button>`;
+    return (
+      `<div class="agent-rec">` +
+      `<div class="rec-head">💡 추천: <b>${esc(rec.name)}</b> <span class="rec-gb">${esc(rec.approxGb)}</span>${action}</div>` +
+      `<div class="rec-reason">${esc(rec.reason)}</div>` +
+      `</div>`
+    );
+  }
+
   function modelSelectHtml(a) {
     const opts = [`<option value="">전역 모델 따름</option>`]
       .concat(
@@ -348,9 +381,40 @@ tr:last-child td{border-bottom:none;}
             </div>
           </div>
           ${modelSelectHtml(a)}
+          ${recommendationHtml(a)}
         </div>`;
       })
       .join("");
+
+    // 추천 모델 받기(다운로드 큐) / 적용(할당) — 부모 위임 대신 렌더마다 바인딩(카드가 매번 재생성됨).
+    agentGrid.querySelectorAll("[data-rec-get]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const modelId = btn.dataset.recGet;
+        btn.disabled = true;
+        btn.textContent = "대기열 추가...";
+        try {
+          await window.gijo.loadHfModel(modelId);
+          btn.textContent = "받는 중 ↓";
+          // 하단 다운로드 패널(onHfDownloadProgress)이 진행률을 보여주고, 완료 시 카드가 갱신된다.
+        } catch (err) {
+          btn.disabled = false;
+          btn.textContent = "받기";
+          alert("다운로드 시작 실패: " + ((err && err.message) || err));
+        }
+      });
+    });
+    agentGrid.querySelectorAll("[data-rec-apply]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        try {
+          await window.gijo.setAgentModel(btn.dataset.recApply, btn.dataset.recDir);
+          await loadAgents();
+        } catch (err) {
+          btn.disabled = false;
+          alert("적용 실패: " + ((err && err.message) || err));
+        }
+      });
+    });
 
     agentGrid.querySelectorAll(".agent-model-select").forEach((sel) => {
       sel.addEventListener("change", async (e) => {
@@ -418,8 +482,13 @@ tr:last-child td{border-bottom:none;}
 
   async function loadAgents() {
     try {
-      const [agents, models] = await Promise.all([window.gijo.listAgents(), window.gijo.listModels().catch(() => [])]);
+      const [agents, models, recs] = await Promise.all([
+        window.gijo.listAgents(),
+        window.gijo.listModels().catch(() => []),
+        window.gijo.getAgentRecommendations().catch(() => ({})),
+      ]);
       availableModels = models;
+      agentRecs = recs || {};
       renderAgents(agents);
     } catch (e) {
       agentGrid.innerHTML = '<div style="color:var(--muted)">에이전트 목록을 불러오지 못했습니다</div>';
@@ -567,7 +636,8 @@ tr:last-child td{border-bottom:none;}
   function onHfJobUpdate(job) {
     hfJobs.set(job.id, job);
     renderHfJobs();
-    if (job.status === "done") loadEngineStatus();
+    // 다운로드가 끝나면 모델이 로컬에 생겨서 추천 "받기"→"적용" 전환 + 엔진 목록 갱신이 필요하다.
+    if (job.status === "done") { loadEngineStatus(); loadAgents(); }
   }
 
   async function searchHf() {

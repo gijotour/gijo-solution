@@ -37,6 +37,7 @@ const gijoApi = {
   listAgents: () => api.agentsApi.list(),
   setAgentModel: (agentId: string, modelId: string | null) => api.agentsApi.setModel(agentId, modelId),
   setAgentName: (agentId: string, name: string | null) => api.agentsApi.setName(agentId, name),
+  getAgentRecommendations: () => api.modelDexApi.agentRecommendations(),
   listModels: () => api.localEngineApi.models(),
   sendInstruction: (text: string) => api.dispatchApi.send(text),
   onCollaborationEvent: (cb: (evt: unknown) => void) => onChannel("collaboration:event", cb),
