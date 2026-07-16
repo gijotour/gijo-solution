@@ -149,6 +149,31 @@ describe("vulnscan (Tenable Nessus 등 취약점 스캔 결과 업로드)", () =
     expect(getAsset("vuln:h")!.findings[0].kev).toBeUndefined();
   });
 
+  it("tracks vulnerability state across re-scans (new → active → fixed → resurfaced)", () => {
+    const scan = (rows: string) => importVulnScan("Plugin ID,CVE,Risk,Host,Name\n" + rows, "csv", "nessus");
+    const stateOf = (name: string) => {
+      const f = getAsset("vuln:10.0.0.5")!.findings.find((x) => x.finding_type.startsWith(name));
+      return f?.state;
+    };
+
+    // 1차 스캔: 둘 다 처음 → new
+    scan("100,CVE-2021-1,Critical,10.0.0.5,취약점A\n200,CVE-2021-2,High,10.0.0.5,취약점B\n");
+    expect(stateOf("취약점A")).toBe("new");
+    expect(stateOf("취약점B")).toBe("new");
+
+    // 2차 스캔: A는 그대로(→active), B는 사라짐(→fixed로 목록에 남음)
+    scan("100,CVE-2021-1,Critical,10.0.0.5,취약점A\n");
+    expect(stateOf("취약점A")).toBe("active");
+    expect(stateOf("취약점B")).toBe("fixed");
+    // fixed는 현재 취약점 카운트에서 제외
+    expect(scan("100,CVE-2021-1,Critical,10.0.0.5,취약점A\n").findings).toBe(1);
+
+    // 4차 스캔: B가 다시 나타남 → resurfaced (직전에 fixed였으므로)
+    scan("100,CVE-2021-1,Critical,10.0.0.5,취약점A\n200,CVE-2021-2,High,10.0.0.5,취약점B\n");
+    expect(stateOf("취약점A")).toBe("active");
+    expect(stateOf("취약점B")).toBe("resurfaced");
+  });
+
   it("leaves EPSS/VPR undefined when the report has no such columns (0과 구분)", () => {
     importVulnScan("Host,Name,Risk\n10.0.0.7,항목,High\n", "csv", "s");
     const f = getAsset("vuln:10.0.0.7")!.findings[0];

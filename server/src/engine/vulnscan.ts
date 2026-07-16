@@ -9,7 +9,7 @@
 
 import type { Express } from "express";
 import { authMiddleware } from "../auth/auth";
-import { registerAsset, recordFindings, Asset, AssetComponent } from "./assets";
+import { registerAsset, recordFindings, getAsset, Asset, AssetComponent } from "./assets";
 import type { StandardFinding } from "./bridge";
 import { kevMatches } from "./kev";
 
@@ -250,6 +250,34 @@ function findingLabel(name: string, cves: string[]): string {
   return `${name} (${cves[0]} 외 ${cves.length - 1}건)`;
 }
 
+// 스캔 간 취약점 상태(new/active/fixed/resurfaced). 이전 스냅샷과 key로 대조한다(Tenable과 동일 개념).
+// - 이번에 처음 보이면 new, 이전에도 있었으면 active
+// - 이전에 fixed였는데 다시 나타나면 resurfaced
+// - 이전엔 있었는데 이번에 없으면 fixed. fixed는 재발할 때까지 목록에 유지한다(고쳐진 이력 보존).
+function applyStateTracking(prev: StandardFinding[], current: StandardFinding[]): StandardFinding[] {
+  // 상태 추적 도입 이전에 저장된 스냅샷은 key/state가 없다 — 새 key와 매칭되지 않아 전부 유령
+  // fixed가 되어버린다. 그런 옛 스냅샷 위에 처음 임포트할 땐 기준선으로 삼는다(전부 new, fixed 없음).
+  const legacyPrev = prev.length > 0 && !prev.some((p) => p.key !== undefined || p.state !== undefined);
+  if (legacyPrev) {
+    for (const f of current) f.state = "new";
+    return current;
+  }
+
+  const keyOf = (f: StandardFinding) => f.key ?? f.finding_type;
+  const prevActive = new Set(prev.filter((p) => p.state !== "fixed").map(keyOf));
+  const prevFixed = new Set(prev.filter((p) => p.state === "fixed").map(keyOf));
+
+  for (const f of current) {
+    const k = keyOf(f);
+    f.state = prevFixed.has(k) ? "resurfaced" : prevActive.has(k) ? "active" : "new";
+  }
+  const curKeys = new Set(current.map(keyOf));
+  // 이번 스캔에 없는 이전 항목은 fixed로 유지(방금 고쳐진 것 + 이전부터 고쳐져 계속 없는 것).
+  // 목록 크기는 그 호스트에서 관측된 고유 취약점 수로 유한하다.
+  const carriedFixed = prev.filter((p) => !curKeys.has(keyOf(p))).map((p) => ({ ...p, state: "fixed" as const }));
+  return [...current, ...carriedFixed];
+}
+
 export function importVulnScan(content: string, format: VulnFormat, sourceLabel: string): VulnScanResult {
   // HTML 리포트에는 CSV에 없는 호스트 정보(DNS 이름·OS)가 있다 — 자산 이름·구성요소로 채운다.
   const html = format === "html" ? parseNessusHtml(content) : null;
@@ -266,6 +294,8 @@ export function importVulnScan(content: string, format: VulnFormat, sourceLabel:
   let totalFindings = 0;
   for (const [host, vulns] of byHost) {
     const id = `vuln:${host}`;
+    // 상태 추적: registerAsset이 findings를 초기화하므로 그 전에 이전 스냅샷을 확보한다.
+    const prevFindings = getAsset(id)?.findings ?? [];
     const meta = metaOf(host);
     // OS/커널은 이 호스트의 구성요소(SBOM)로 넣는다 — "취약점 점검 대상이 자산 구성에 포함"되는 설계.
     // 예: "Linux Kernel 4.18.0-... on Red Hat Enterprise Linux release 8.10 (Ootpa)"
@@ -324,13 +354,17 @@ export function importVulnScan(content: string, format: VulnFormat, sourceLabel:
         severity: toSeverity(rep.risk),
         evidence: kevCves.length ? `${evidence}\n⚠ CISA KEV(실제 악용 확인): ${kevCves.join(", ")}` : evidence,
         source_tool: sourceLabel,
+        key: rep.pluginId || rep.name, // 스캔 간 동일 취약점을 잇는 안정적 식별자
         ...(epss !== undefined ? { epss } : {}),
         ...(vpr !== undefined ? { vpr } : {}),
         ...(kevCves.length ? { kev: true, kevCves } : {}),
       };
     });
-    totalFindings += findings.length;
-    const asset = recordFindings(id, findings);
+    // 이전 스냅샷과 대조해 new/active/resurfaced 태깅 + 이번에 고쳐진 것(fixed) 추가.
+    const findingsWithState = applyStateTracking(prevFindings, findings);
+    // findings(fixed 제외)만 "현재 취약점" 카운트로 센다.
+    totalFindings += findingsWithState.filter((f) => f.state !== "fixed").length;
+    const asset = recordFindings(id, findingsWithState);
     if (asset) assets.push(asset);
   }
   return { hosts: byHost.size, findings: totalFindings, rows: parsed.length, assets };

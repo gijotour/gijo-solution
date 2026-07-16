@@ -66,6 +66,12 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
 .vd-vpr{font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:5px;background:rgba(255,255,255,0.06);color:var(--muted);flex-shrink:0;}
 .vd-misfit{font-size:10px;font-weight:800;padding:1px 6px;border-radius:5px;background:rgba(240,160,32,0.18);color:var(--amber);flex-shrink:0;}
 .vd-kev{font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:rgba(226,72,61,0.22);color:#ff8a80;flex-shrink:0;border:1px solid rgba(226,72,61,0.5);}
+.vd-state{font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;flex-shrink:0;}
+.vd-state.new{background:rgba(59,130,246,0.18);color:var(--blue-light);}
+.vd-state.resurfaced{background:rgba(240,120,40,0.2);color:#f7a86a;}
+.vd-state.fixed{background:rgba(30,185,128,0.16);color:var(--teal);}
+.vd-item.is-fixed{opacity:.5;}
+.vd-item.is-fixed .vd-name{text-decoration:line-through;}
 .vd-ev{display:none;margin-top:8px;padding:10px 12px;background:var(--panel-2);border-radius:6px;font-size:11.5px;color:var(--muted);line-height:1.75;white-space:pre-wrap;word-break:break-word;max-height:240px;overflow-y:auto;}
 .vd-item.open .vd-ev{display:block;}
 .vd-empty{padding:16px;color:var(--muted);font-size:12.5px;}
@@ -218,10 +224,12 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
   }
 
   function sevCounts(findings) {
+    // 고쳐진(fixed) 항목은 "현재 위험"이 아니므로 심각도 카운트에서 제외한다.
     const c = { critical: 0, high: 0, medium: 0, low: 0 };
-    (findings || []).forEach((f) => { c[f.severity] = (c[f.severity] || 0) + 1; });
+    (findings || []).forEach((f) => { if (f.state !== "fixed") c[f.severity] = (c[f.severity] || 0) + 1; });
     return c;
   }
+  const activeCount = (findings) => (findings || []).filter((f) => f.state !== "fixed").length;
 
   function fmtDate(ts) {
     return ts ? new Date(ts).toLocaleString("ko-KR", { year: "2-digit", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
@@ -263,14 +271,22 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
     }
     const f = asset.findings || [];
     const c = sevCounts(f);
-    document.getElementById("vdTitle").textContent = `${asset.name} — 취약점 ${f.length.toLocaleString()}건`;
-    const misfits = f.filter(isMisfit).length;
-    const kevCount = f.filter((x) => x.kev).length;
+    const active = f.filter((x) => x.state !== "fixed");
+    document.getElementById("vdTitle").textContent = `${asset.name} — 취약점 ${active.length.toLocaleString()}건`;
+    const misfits = active.filter(isMisfit).length;
+    const kevCount = active.filter((x) => x.kev).length;
+    const nNew = f.filter((x) => x.state === "new").length;
+    const nResurf = f.filter((x) => x.state === "resurfaced").length;
+    const nFixed = f.filter((x) => x.state === "fixed").length;
+    const delta = (nNew || nResurf || nFixed)
+      ? ` · 이번 스캔: ${nNew ? `🆕 신규 ${nNew}` : ""}${nResurf ? ` ♻ 재발 ${nResurf}` : ""}${nFixed ? ` ✓ 고쳐짐 ${nFixed}` : ""}`
+      : "";
     document.getElementById("vdSub").textContent =
       `출처 ${asset.owner} · 최근 스캔 ${fmtDate(asset.lastScannedAt)} · Critical ${c.critical} / High ${c.high} / Medium ${c.medium} / Low·Info ${c.low}` +
       (kevCount ? ` · 🔴 실제 악용 확인(KEV) ${kevCount}건 — 최우선` : "") +
       (misfits ? ` · ⚠ 등급은 낮지만 악용확률 50%↑ ${misfits}건 (등급만 보면 놓침)` : "") +
-      ` — 항목을 클릭하면 상세(CVE 목록·조치 근거)가 펼쳐집니다.`;
+      delta +
+      ` — 항목을 클릭하면 상세가 펼쳐집니다.`;
     // KEV가 없으면 KEV 필터 칩을 흐리게(정보 전달)
     const kevChip = document.getElementById("vdKevChip");
     if (kevChip) kevChip.style.opacity = kevCount ? "1" : "0.4";
@@ -289,10 +305,11 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
     const asset = hostCache.find((a) => a.id === currentHostId);
     if (!asset) return;
     const q = document.getElementById("vdSearch").value.trim().toLowerCase();
-    // KEV(실제 악용 확인)는 어떤 정렬에서도 최상단으로 — 가장 강한 위험 신호.
+    // 고쳐진 것은 항상 맨 아래, KEV(실제 악용 확인)는 그 위에서 최상단.
+    const fixedLast = (a, b) => (a.state === "fixed" ? 1 : 0) - (b.state === "fixed" ? 1 : 0);
     const kevFirst = (a, b) => (b.kev ? 1 : 0) - (a.kev ? 1 : 0);
-    const bySev = (a, b) => kevFirst(a, b) || (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9) || String(a.finding_type).localeCompare(String(b.finding_type));
-    const byEpss = (a, b) => kevFirst(a, b) || (b.epss ?? -1) - (a.epss ?? -1) || bySev(a, b);
+    const bySev = (a, b) => fixedLast(a, b) || kevFirst(a, b) || (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9) || String(a.finding_type).localeCompare(String(b.finding_type));
+    const byEpss = (a, b) => fixedLast(a, b) || kevFirst(a, b) || (b.epss ?? -1) - (a.epss ?? -1) || bySev(a, b);
     const items = (asset.findings || [])
       .filter((f) => (vdFilter === "kev" ? f.kev : vdFilter === "all" || f.severity === vdFilter))
       .filter((f) => !q || `${f.finding_type} ${f.evidence || ""}`.toLowerCase().includes(q))
@@ -310,12 +327,14 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
         const vpr = f.vpr != null ? `<span class="vd-vpr" title="Tenable VPR — 실제 위협 기반 우선순위(0~10)">VPR ${f.vpr}</span>` : "";
         const misfit = isMisfit(f) ? `<span class="vd-misfit" title="CVSS 등급은 낮지만 실제 악용확률이 높습니다 — 등급만 보면 놓치는 건">⚠ 등급↓ 악용↑</span>` : "";
         const kev = f.kev ? `<span class="vd-kev" title="CISA KEV — 실제 악용이 확인된 취약점. 최우선 조치.&#10;${esc((f.kevCves || []).join(', '))}">🔴 KEV 악용중</span>` : "";
+        const STATE_LABEL = { new: "🆕 신규", resurfaced: "♻ 재발", fixed: "✓ 고쳐짐" };
+        const state = f.state && STATE_LABEL[f.state] ? `<span class="vd-state ${f.state}" title="지난 스캔 대비 상태">${STATE_LABEL[f.state]}</span>` : "";
         return (
-          `<div class="vd-item">` +
+          `<div class="vd-item ${f.state === "fixed" ? "is-fixed" : ""}">` +
           `<div class="vd-item-top">` +
           `<span class="sev ${SEV_CLASS[f.severity] || "sev-l"}">${SEV_LABEL[f.severity] || "?"}</span>` +
           `<span class="vd-name">${esc(f.finding_type)}</span>` +
-          kev + misfit + epss + vpr +
+          state + kev + misfit + epss + vpr +
           `</div>` +
           `<div class="vd-ev">${esc(f.evidence || "(상세 없음)")}</div>` +
           `</div>`

@@ -23,6 +23,9 @@ export interface StandardFinding {
   vpr?: number; // 0~10, Tenable VPR (실제 위협 기반 우선순위)
   kev?: boolean; // CISA KEV 등재 — 실제로 악용이 확인된 취약점(최우선)
   kevCves?: string[]; // 이 취약점의 CVE 중 KEV에 등재된 것들
+  // 재스캔 간 상태 추적(취약점 스캐너 자산 전용). key는 스캔 사이 동일 취약점을 잇는 안정적 식별자.
+  key?: string;
+  state?: "new" | "active" | "fixed" | "resurfaced";
 }
 
 const adapters: Record<string, ScanAdapter> = {
