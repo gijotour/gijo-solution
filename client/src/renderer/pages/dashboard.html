@@ -386,16 +386,6 @@
 
   const openDirs = new Set();
 
-  function fileIcon(dir, name) {
-    if (dir) return "📁";
-    if (/\.(md|txt|log)$/i.test(name)) return "📄";
-    if (/\.(html|htm)$/i.test(name)) return "🌐";
-    if (/\.(json|js|ts|py)$/i.test(name)) return "📜";
-    if (/\.(png|jpg|jpeg|svg|gif|ico)$/i.test(name)) return "🖼️";
-    if (/\.(zip|gz|7z)$/i.test(name)) return "🗜️";
-    return "📄";
-  }
-
   async function renderDir(relPath, depth, container) {
     let data;
     try { data = await window.gijo.listDir(relPath); } catch (e) { return; }
@@ -405,7 +395,7 @@
       const row = document.createElement("div");
       row.style.cssText = `padding:2px 0 2px ${depth * 12 + 4}px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${item.dir || canIngest ? "cursor:pointer;" : "color:var(--muted);"}`;
       const caret = item.dir ? (openDirs.has(itemPath) ? "▾ " : "▸ ") : "";
-      row.innerHTML = `<span style="color:var(--muted-2)">${caret}</span>${fileIcon(item.dir, item.name)} ${item.name.replace(/</g, "&lt;")}`;
+      row.innerHTML = `<span style="color:var(--muted-2)">${caret}</span>${item.name.replace(/</g, "&lt;")}`;
       if (canIngest) row.title = "클릭 → 장기 기억에 올리기";
       container.appendChild(row);
       if (item.dir) {
@@ -480,11 +470,11 @@
   const collapsedFolders = new Set();
   const escT = (s) => String(s == null ? "" : s).replace(/</g, "&lt;");
 
-  function folderHtml(key, icon, label, actsHtml) {
+  function folderHtml(key, label, actsHtml) {
     const c = collapsedFolders.has(key);
     return (
       `<div class="tree-folder" data-folder="${key}">` +
-      `<span class="tree-caret">${c ? "▸" : "▾"}</span>${icon} ${label}` +
+      `<span class="tree-caret">${c ? "▸" : "▾"}</span>${label}` +
       `<span class="tree-count" id="cnt-${key}"></span>${actsHtml || ""}</div>` +
       `<div class="tree-children ${c ? "collapsed" : ""}" id="tree-${key}"><div class="tree-empty">불러오는 중…</div></div>`
     );
@@ -492,10 +482,10 @@
 
   function renderExplorer() {
     explorerTree.innerHTML =
-      folderHtml("ai", "🧠", "AI 자산") +
-      folderHtml("hosts", "🖥", "인프라 호스트") +
-      folderHtml("products", "🧰", "보안제품", `<span class="tree-act" data-open-products title="보안제품 관리 열기">↗</span>`) +
-      folderHtml("files", "📁", "문서", `<span class="tree-act" id="pickFolderBtn" title="작업 폴더 선택">📂</span><span class="tree-act" id="refreshFilesBtn" title="새로고침">⟳</span>`);
+      folderHtml("ai", "AI 자산") +
+      folderHtml("hosts", "인프라 호스트") +
+      folderHtml("products", "보안제품", `<span class="tree-act" data-open-products title="보안제품 관리 열기">↗</span>`) +
+      folderHtml("files", "문서", `<span class="tree-act" id="pickFolderBtn" title="작업 폴더 선택">📂</span><span class="tree-act" id="refreshFilesBtn" title="새로고침">⟳</span>`);
     explorerTree.querySelectorAll(".tree-folder").forEach((hd) => {
       hd.addEventListener("click", (e) => {
         if (e.target.closest(".tree-act")) return; // 액션 아이콘 클릭은 접기와 분리
@@ -552,7 +542,7 @@
       if (!box) return;
       if (!total) box.innerHTML = `<div class="tree-leaf click" data-open-products>등록된 제품 없음 — 클릭해 등록</div>`;
       else box.innerHTML = groups.flatMap((g) => g.products.map((p) =>
-        `<div class="tree-leaf click" data-open-products title="${escT(g.label)} · 보안제품 관리">${g.icon} ${escT(p.name)}</div>`
+        `<div class="tree-leaf click" data-open-products title="${escT(g.label)} · 보안제품 관리">${escT(p.name)}</div>`
       )).join("");
       box.querySelectorAll("[data-open-products]").forEach((x) => x.addEventListener("click", () => window.gijo.navigateTo("products.html")));
     } catch (e) {
