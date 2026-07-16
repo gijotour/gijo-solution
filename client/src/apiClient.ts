@@ -562,6 +562,25 @@ export const modelDexApi = {
   agentRecommendations: () => request<Record<string, AgentModelRecommendation>>("/api/modeldex/agent-recommendations"),
 };
 
+// ── 승인 워크플로우(스캔 finding 검토 → 승인/반려) ──────────────────────
+export interface FindingReview {
+  assetId: string;
+  assetName: string;
+  findingKey: string;
+  finding: { finding_type: string; severity: "low" | "medium" | "high" | "critical"; evidence: string; source_tool: string };
+  status: "pending" | "approved" | "rejected";
+  reviewedBy?: string;
+  reviewedAt?: number;
+  note?: string;
+}
+
+export const approvalsApi = {
+  list: () =>
+    request<{ reviews: FindingReview[]; summary: { total: number; pending: number; approved: number; rejected: number } }>("/api/approvals"),
+  set: (assetId: string, key: string, status: "approved" | "rejected" | "pending", note?: string) =>
+    request(`/api/approvals/${encodeURIComponent(assetId)}/${encodeURIComponent(key)}`, { method: "POST", body: { status, note } }),
+};
+
 export const complianceApi = {
   list: () => request<ThreatCompliance[]>("/api/compliance"),
   setStatus: (code: string, status: string, note: string) =>

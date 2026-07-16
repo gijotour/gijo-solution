@@ -7,6 +7,7 @@ import { Models, Enums, Spec, Serialize } from "@cyclonedx/cyclonedx-library";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { getAsset, markSbomGenerated } from "./assets";
+import { isFindingRejected } from "./approvals";
 
 export interface SbomComponent {
   name: string;
@@ -91,13 +92,14 @@ function buildCycloneDxJson(assetId: string, components: SbomComponent[]): strin
 
 export async function generateSbom(assetId: string): Promise<SbomDocument> {
   const asset = getAsset(assetId);
+  // 승인 워크플로우: 오탐(rejected)으로 처리된 finding은 SBOM 취약점 반영에서 제외한다
+  // (미검토 pending은 아직 반영 — "확인 안 됨"을 "안전"으로 오해시키지 않기 위함).
+  const activeFindings = (asset?.findings ?? []).filter((f) => !isFindingRejected(assetId, f));
   const components: SbomComponent[] = (asset?.components ?? []).map((c) => ({
     name: c.name,
     version: c.version,
     license: c.license,
-    knownVulns: (asset?.findings ?? [])
-      .filter((f) => f.evidence.includes(c.name))
-      .map((f) => f.finding_type),
+    knownVulns: activeFindings.filter((f) => f.evidence.includes(c.name)).map((f) => f.finding_type),
   }));
   markSbomGenerated(assetId);
   return { assetId, format: "cyclonedx", components, generatedAt: new Date().toISOString() };

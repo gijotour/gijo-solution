@@ -75,6 +75,9 @@ const gijoApi = {
   importVulnScan: (content: string, format: "json" | "csv", source: string) => api.assetsApi.importVulnScan(content, format, source),
   listModelDex: () => api.modelDexApi.list(),
   listLlmGuide: () => api.modelDexApi.guide(),
+  listApprovals: () => api.approvalsApi.list(),
+  setFindingApproval: (assetId: string, key: string, status: "approved" | "rejected" | "pending", note?: string) =>
+    api.approvalsApi.set(assetId, key, status, note),
   listCompliance: () => api.complianceApi.list(),
   setComplianceStatus: (code: string, status: string, note: string) => api.complianceApi.setStatus(code, status, note),
   onAssetUpdated: (cb: (asset: unknown) => void) => onChannel("asset:updated", cb),

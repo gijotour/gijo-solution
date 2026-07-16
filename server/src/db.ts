@@ -173,6 +173,19 @@ db.exec(`
     startedAt INTEGER NOT NULL,
     finishedAt INTEGER
   );
+
+  -- 승인 워크플로우(engine/approvals.ts) — 스캔 finding별 검토 상태. finding 자체는 안정 id가 없어
+  -- (assetId + finding 내용 해시)를 키로 쓴다. status: approved(확정) | rejected(오탐). 저장된 행이
+  -- 없는 finding은 pending(미검토)으로 본다. rejected=오탐은 SBOM 취약점 반영에서 제외한다.
+  CREATE TABLE IF NOT EXISTS finding_approvals (
+    assetId TEXT NOT NULL,
+    findingKey TEXT NOT NULL,
+    status TEXT NOT NULL,
+    reviewedBy TEXT,
+    reviewedAt INTEGER,
+    note TEXT,
+    PRIMARY KEY (assetId, findingKey)
+  );
 `);
 
 db.exec(`

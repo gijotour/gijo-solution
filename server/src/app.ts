@@ -30,6 +30,7 @@ import { registerTasksRoutes } from "./engine/tasks";
 import { registerMaintenanceRoutes } from "./engine/maintenance";
 import { registerEmailRoutes } from "./engine/email";
 import { registerSbomRoutes } from "./engine/sbom";
+import { registerApprovalsRoutes } from "./engine/approvals";
 import { registerCtiRoutes } from "./engine/cti";
 import { registerReportRoutes } from "./engine/report";
 import { registerUsageRoutes, usageLoggingMiddleware } from "./engine/usage";
@@ -78,6 +79,7 @@ export function createApp(): Express {
   registerMaintenanceRoutes(app);
   registerEmailRoutes(app);
   registerSbomRoutes(app);
+  registerApprovalsRoutes(app);
   registerCtiRoutes(app);
   registerReportRoutes(app);
   registerUsageRoutes(app);
