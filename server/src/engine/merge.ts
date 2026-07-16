@@ -83,10 +83,13 @@ export function planMerge(idA: string, idB: string): MergePlan {
   fs.writeFileSync(configPath, config, "utf-8");
 
   const mergedDir = path.join(OUTPUTS_DIR, outputModelId, "merged");
+  // 변환은 f16 중간 파일(<id>.f16.gguf)로 내고, 양자화가 그걸 읽어 최종 <id>.gguf를 만든다.
+  // (예전엔 변환이 <id>.gguf로 바로 써서 양자화 입력 파일명과 어긋났다 — 실행해보고 잡은 버그.)
+  const f16Path = `models/${outputModelId}/${outputModelId}.f16.gguf`;
   const commands = [
     `mergekit-yaml ${configPath} ${mergedDir} --cuda`,
-    `python ${path.join(LLAMA_CPP_DIR, "convert_hf_to_gguf.py")} ${mergedDir} --outfile models/${outputModelId}/${outputModelId}.gguf --outtype f16`,
-    `${path.join(LLAMA_CPP_DIR, "build", "bin", "Release", "llama-quantize.exe")} models/${outputModelId}/${outputModelId}.f16.gguf models/${outputModelId}/${outputModelId}.gguf Q5_K_M`,
+    `python ${path.join(LLAMA_CPP_DIR, "convert_hf_to_gguf.py")} ${mergedDir} --outfile ${f16Path} --outtype f16`,
+    `${path.join(LLAMA_CPP_DIR, "build", "bin", "Release", "llama-quantize.exe")} ${f16Path} models/${outputModelId}/${outputModelId}.gguf Q5_K_M`,
   ];
   return { ok: true, modelA: a, modelB: b, outputModelId, config, configPath, commands };
 }

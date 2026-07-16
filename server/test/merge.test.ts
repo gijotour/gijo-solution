@@ -36,6 +36,13 @@ describe("merge (보안 LLM 합성 설정 생성)", () => {
     expect(plan.config).toContain("slerp");
     expect(fs.existsSync(plan.configPath!)).toBe(true);
     expect(plan.commands!.some((c) => c.startsWith("mergekit-yaml"))).toBe(true);
+    // 파이프라인 연결 회귀: 변환이 만드는 f16 파일명을 양자화가 그대로 입력으로 받아야 한다
+    // (예전 버그: 변환은 <id>.gguf로 쓰고 양자화는 <id>.f16.gguf를 읽어 3단계에서 실패).
+    const convert = plan.commands!.find((c) => c.includes("convert_hf_to_gguf"))!;
+    const quantize = plan.commands!.find((c) => c.includes("llama-quantize"))!;
+    const f16 = `models/${plan.outputModelId}/${plan.outputModelId}.f16.gguf`;
+    expect(convert).toContain(`--outfile ${f16}`);
+    expect(quantize).toContain(`${f16} models/${plan.outputModelId}/${plan.outputModelId}.gguf`);
     fs.rmSync(plan.configPath!, { force: true });
   });
 
