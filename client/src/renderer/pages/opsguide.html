@@ -163,6 +163,16 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div class="cat-head"><span style="font-size:18px">🔧</span><span class="cat-title">② 유지보수 일정 · 점검서 · 승인</span></div>
       <div class="cat-intro">점검 일정을 등록하고, 마감이 되면 결과를 보고하세요. 관리자가 승인하면 완료되고(반복주기가 있으면 다음 회차가 자동 등록), 반려되면 사유와 함께 다시 보고해야 합니다.</div>
 
+      <!-- 점검 현황 요약 KPI — compliance.html의 거버넌스 KPI 스트립과 같은 스타일. 아래 목록 데이터로 클라이언트에서 계산한다. -->
+      <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:14px;">
+        <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;"><div style="font-size:11px;color:var(--muted);margin-bottom:6px;">전체 점검</div><div style="font-size:19px;font-weight:800;color:#fff;" id="kpiTotal">-</div></div>
+        <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;"><div style="font-size:11px;color:var(--muted);margin-bottom:6px;">지연</div><div style="font-size:19px;font-weight:800;color:#f5928a;" id="kpiOverdue">-</div></div>
+        <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;"><div style="font-size:11px;color:var(--muted);margin-bottom:6px;">승인 대기</div><div style="font-size:19px;font-weight:800;color:var(--amber);" id="kpiPending">-</div></div>
+        <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;"><div style="font-size:11px;color:var(--muted);margin-bottom:6px;">승인 완료</div><div style="font-size:19px;font-weight:800;color:var(--teal);" id="kpiApproved">-</div></div>
+        <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;"><div style="font-size:11px;color:var(--muted);margin-bottom:6px;">승인율</div><div style="font-size:19px;font-weight:800;color:var(--blue-light);" id="kpiRate">-</div></div>
+      </div>
+      <div id="kpiByProduct" style="font-size:11.5px;color:var(--muted);margin-bottom:16px;line-height:1.9;"></div>
+
       <form id="maintForm" class="maint-form">
         <input id="mTitle" type="text" placeholder="점검 제목 (예: 방화벽 정책 점검)" required>
         <input id="mProduct" type="text" placeholder="대상 제품/자산 (예: FW-01)" required>
@@ -338,10 +348,44 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     );
   }
 
+  // 점검 목록 데이터로 상단 KPI 스트립을 채운다 — 추가 서버 호출 없이 클라이언트에서 집계.
+  function renderMaintKpis(items) {
+    const today = todayStr();
+    const total = items.length;
+    const overdue = items.filter((m) => m.status === "scheduled" && m.scheduleDate <= today).length;
+    const pending = items.filter((m) => m.status === "reported").length;
+    const approved = items.filter((m) => m.status === "approved").length;
+    const reviewed = approved + items.filter((m) => m.status === "rejected").length; // 검토 완료(승인+반려)
+    document.getElementById("kpiTotal").textContent = total;
+    document.getElementById("kpiOverdue").textContent = overdue;
+    document.getElementById("kpiPending").textContent = pending;
+    document.getElementById("kpiApproved").textContent = approved;
+    document.getElementById("kpiRate").textContent = reviewed ? Math.round((approved / reviewed) * 100) + "%" : "—";
+
+    // 제품별 요약 — 미완료(예정/승인대기) 건이 있는 제품만, 지연 건수를 붉게 표시.
+    const byProduct = {};
+    for (const m of items) {
+      const p = (byProduct[m.productName] = byProduct[m.productName] || { open: 0, overdue: 0 });
+      if (m.status === "scheduled" || m.status === "reported") p.open++;
+      if (m.status === "scheduled" && m.scheduleDate <= today) p.overdue++;
+    }
+    const chips = Object.keys(byProduct)
+      .filter((p) => byProduct[p].open > 0)
+      .sort((a, b) => byProduct[b].overdue - byProduct[a].overdue || byProduct[b].open - byProduct[a].open)
+      .map((p) => {
+        const s = byProduct[p];
+        const od = s.overdue ? ` <span style="color:#f5928a;font-weight:800">지연 ${s.overdue}</span>` : "";
+        return `<span style="display:inline-block;margin-right:14px">${esc(p)}: 미완료 ${s.open}${od}</span>`;
+      })
+      .join("");
+    document.getElementById("kpiByProduct").innerHTML = chips ? "제품별 미완료 — " + chips : "";
+  }
+
   async function loadMaintenance() {
     const list = document.getElementById("maintList");
     try {
       const items = await window.gijo.listMaintenance();
+      renderMaintKpis(items);
       list.innerHTML = items.length
         ? items.map(maintRowHtml).join("")
         : '<div style="color:var(--muted-2);font-size:12px">등록된 점검 일정이 없습니다.</div>';
