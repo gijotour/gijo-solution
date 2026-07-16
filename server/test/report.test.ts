@@ -10,7 +10,10 @@ vi.mock("../src/engine/llm", () => ({
 
 import { createApp } from "../src/app";
 import { resetAssetsForTests } from "../src/engine/assets";
-import { maintenanceSummary } from "../src/engine/report";
+import { maintenanceSummary, collectVulnReportData } from "../src/engine/report";
+import { importVulnScan } from "../src/engine/vulnscan";
+import { resetKevForTests } from "../src/engine/kev";
+import { createTask, resetTasksForTests } from "../src/engine/tasks";
 import type { MaintenanceItem } from "../src/engine/maintenance";
 
 async function login(app: ReturnType<typeof createApp>) {
@@ -26,6 +29,30 @@ describe("report", () => {
     resetAssetsForTests();
     app = createApp();
     token = await login(app);
+  });
+
+  it("collectVulnReportData aggregates host vulns + KEV + remediation SLA for the report", () => {
+    resetTasksForTests();
+    resetKevForTests(["CVE-2021-44228"]);
+    importVulnScan(
+      "Plugin ID,CVE,Risk,Host,Name\n" +
+        "1,CVE-2021-44228,Critical,10.5.5.5,Log4Shell\n" +
+        "2,CVE-2020-1,High,10.5.5.5,취약점B\n",
+      "csv",
+      "nessus"
+    );
+    createTask({ text: "[조치] Log4Shell", ref: "vuln:10.5.5.5", priority: "P0", dueAt: Date.now() - 86400000 }); // 초과
+
+    const d = collectVulnReportData();
+    expect(d.hosts).toBe(1);
+    expect(d.active).toBe(2);
+    expect(d.critical).toBe(1);
+    expect(d.kev).toBe(1);
+    expect(d.topKev[0]).toMatchObject({ name: expect.stringContaining("Log4Shell") });
+    expect(d.remediation.tasks).toBe(1);
+    expect(d.remediation.overdue).toBe(1);
+    expect(d.remediation.slaCompliance).toBe(0); // 1건이 기한 초과
+    expect(d.remediation.topOpen).toHaveLength(1);
   });
 
   it("generates a real .docx file and returns the (mocked) LLM executive summary", async () => {
