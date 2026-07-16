@@ -57,6 +57,27 @@
   .agent-bubble-text{font-size:12.5px;color:var(--text);line-height:1.6;}
   .agent-bubble-name{font-size:11.5px;font-weight:800;color:var(--blue-light);margin-bottom:4px;}
 
+  /* 중앙 아이콘 주변 떠다니는 말풍선 — 오케스트레이터 답변·문서검색 결과를 아이콘에서 뻗어나오게 */
+  .stage-core{position:relative;width:100%;max-width:560px;}
+  .bubble-field{position:absolute;inset:0;pointer-events:none;z-index:4;}
+  .float-bubble{position:absolute;width:200px;max-width:46%;background:rgba(16,24,42,0.94);border:1px solid var(--border-strong);border-radius:12px;padding:9px 11px 10px;box-shadow:0 8px 26px rgba(0,0,0,0.5),0 0 16px rgba(59,130,246,0.14);pointer-events:auto;opacity:0;transform:scale(.82);animation:bubblePop .34s cubic-bezier(.2,1.3,.5,1) forwards;}
+  @keyframes bubblePop{to{opacity:1;transform:scale(1);}}
+  .float-bubble.doc{border-color:rgba(30,185,128,0.45);box-shadow:0 8px 26px rgba(0,0,0,0.5),0 0 16px rgba(30,185,128,0.16);}
+  .fb-name{font-size:10px;font-weight:800;color:var(--blue-light);margin-bottom:3px;display:flex;align-items:center;gap:5px;}
+  .float-bubble.doc .fb-name{color:var(--teal);}
+  .fb-name .fb-x{margin-left:auto;color:var(--muted-2);cursor:pointer;font-size:11px;padding:0 2px;}
+  .fb-name .fb-x:hover{color:#f5928a;}
+  .fb-text{font-size:11px;color:var(--text);line-height:1.55;max-height:118px;overflow-y:auto;white-space:pre-wrap;word-break:break-word;}
+  .float-bubble::after{content:"";position:absolute;width:11px;height:11px;background:inherit;border:inherit;transform:rotate(45deg);}
+  .float-bubble.tail-r::after{right:-6px;top:26px;border-top:none;border-left:none;}
+  .float-bubble.tail-l::after{left:-6px;top:26px;border-bottom:none;border-right:none;}
+  /* 아이콘 둘레 6개 슬롯(좌열은 오른쪽 꼬리, 우열은 왼쪽 꼬리) */
+  .fb-s0{top:1%;left:0;} .fb-s1{top:1%;right:0;}
+  .fb-s2{top:39%;left:-3%;} .fb-s3{top:39%;right:-3%;}
+  .fb-s4{bottom:3%;left:1%;} .fb-s5{bottom:3%;right:1%;}
+  .bubble-clear{position:absolute;top:1%;left:50%;transform:translateX(-50%);z-index:5;background:rgba(16,24,42,0.9);border:1px solid var(--border-strong);color:var(--muted);border-radius:14px;padding:3px 12px;font-size:10.5px;font-weight:700;cursor:pointer;pointer-events:auto;display:none;}
+  .bubble-clear:hover{color:#fff;}
+
   .today-panel{padding:18px 16px;border-left:1px solid var(--border);display:flex;flex-direction:column;}
   .today-title{display:flex;align-items:center;gap:8px;font-size:13.5px;font-weight:800;color:#fff;margin-bottom:14px;}
   .today-input{display:flex;gap:8px;margin-bottom:14px;}
@@ -165,6 +186,9 @@
     </div>
 
     <div class="center-stage">
+      <div class="stage-core">
+      <div class="bubble-clear" id="bubbleClear">✕ 말풍선 지우기</div>
+      <div class="bubble-field" id="bubbleField"></div>
       <svg class="network-svg" viewBox="0 0 600 440" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <radialGradient id="nodeFill" cx="50%" cy="42%" r="60%">
@@ -248,6 +272,7 @@
 <circle class="spark-extra" cx="255" cy="345" r="2.3" fill="#dcebff" filter="url(#sparkGlow)" style="animation-delay:.25s"/>
 <image href="assets/gijo-center.png" x="196" y="116" width="208" height="208" preserveAspectRatio="xMidYMid meet"/>
       </svg>
+      </div>
       <div class="agent-bubble">
         <div class="agent-avatar">◆</div>
         <div>
@@ -600,17 +625,49 @@
     busyTimer = setTimeout(() => networkSvg && networkSvg.classList.remove("busy"), 4000);
   }
 
+  // ── 중앙 아이콘 주변 떠다니는 말풍선 ──────────────────────────────────────
+  // 오케스트레이터 답변·문서검색 결과를 아이콘 둘레 6개 슬롯에 순환 배치한다(오래된 것부터 교체).
+  const bubbleField = document.getElementById("bubbleField");
+  const bubbleClear = document.getElementById("bubbleClear");
+  const BUBBLE_SLOTS = ["fb-s0 tail-r", "fb-s1 tail-l", "fb-s2 tail-r", "fb-s3 tail-l", "fb-s4 tail-r", "fb-s5 tail-l"];
+  let bubbleSeq = 0;
+  const escB = (s) => String(s == null ? "" : s).replace(/</g, "&lt;");
+
+  function spawnBubble(name, text, kind) {
+    const slot = BUBBLE_SLOTS[bubbleSeq % BUBBLE_SLOTS.length];
+    bubbleSeq++;
+    const slotKey = slot.split(" ")[0];
+    const prev = bubbleField.querySelector("." + slotKey);
+    if (prev) prev.remove(); // 같은 슬롯의 이전 말풍선 교체
+    const el = document.createElement("div");
+    el.className = "float-bubble " + slot + (kind === "doc" ? " doc" : "");
+    el.innerHTML =
+      `<div class="fb-name">${kind === "doc" ? "🔍" : "◆"} ${escB(name)}<span class="fb-x" title="닫기">✕</span></div>` +
+      `<div class="fb-text">${escB(text)}</div>`;
+    el.querySelector(".fb-x").addEventListener("click", () => { el.remove(); toggleClearBtn(); });
+    bubbleField.appendChild(el);
+    toggleClearBtn();
+    return el;
+  }
+  function clearBubbles() { bubbleField.innerHTML = ""; bubbleSeq = 0; toggleClearBtn(); }
+  function toggleClearBtn() { bubbleClear.style.display = bubbleField.childElementCount ? "block" : "none"; }
+
   async function sendToOrchestrator(text) {
     pulseBusy();
     agentBubbleText.textContent = "처리 중...";
+    // 사용자 지시도 말풍선으로 남겨 맥락을 보이게 한다.
+    spawnBubble("나의 지시", text, "answer");
     try {
       const result = await window.gijo.sendInstruction(text);
       agentBubbleName.textContent = result.route.agentId;
       agentBubbleText.textContent = result.output;
+      // 답변을 아이콘 주변 말풍선으로 — 여러 답변이 둘레에 쌓인다.
+      spawnBubble(result.route.agentId || "오케스트레이터", result.output, "answer");
       await loadTasks();
       if (result.route.action === "scan") await loadAssets();
     } catch (e) {
       agentBubbleText.textContent = "지시 처리 중 오류가 발생했습니다: " + e.message;
+      spawnBubble("오류", e.message, "answer");
     }
   }
 
@@ -659,14 +716,21 @@
     const question = document.getElementById("docQueryInput").value.trim();
     const box = document.getElementById("docQueryResults");
     if (!question) return;
-    const agentId = document.getElementById("docQueryScope").value || undefined;
+    const scopeSel = document.getElementById("docQueryScope");
+    const agentId = scopeSel.value || undefined;
+    // 선택한 관점(에이전트 범위) 라벨 — 말풍선에 "○○ 관점"으로 표기한다.
+    const scopeLabel = agentId ? scopeSel.options[scopeSel.selectedIndex].text : "지식베이스";
     box.style.display = "block";
     box.innerHTML = '<div style="color:var(--muted);font-size:12px">검색 중...</div>';
     try {
       const results = await window.gijo.queryMemory(question, 5, agentId);
-      box.innerHTML = results.length
-        ? results.map((r) => `<div class="chunk">${r.replace(/</g, "&lt;")}</div>`).join("")
-        : '<div style="color:var(--muted);font-size:12px">관련 문서가 없습니다 — 먼저 문서를 올리세요(왼쪽 파일 탐색기에서 문서 클릭 또는 AI 기억·학습 화면).</div>';
+      if (results.length) {
+        // 관점별 말풍선: 각 관련 문서 조각을 아이콘 주변에 띄운다(근거 1·2·3…).
+        results.forEach((r, i) => spawnBubble(`${scopeLabel} · 근거 ${i + 1}`, r, "doc"));
+        box.innerHTML = '<div style="color:var(--teal);font-size:11.5px">🔍 “' + question.replace(/</g, "&lt;") + '” — 아이콘 주변에 ' + results.length + '개 관점 말풍선으로 표시했습니다.</div>';
+      } else {
+        box.innerHTML = '<div style="color:var(--muted);font-size:12px">관련 문서가 없습니다 — 먼저 문서를 올리세요(왼쪽 파일 탐색기에서 문서 클릭 또는 AI 기억·학습 화면).</div>';
+      }
     } catch (e) {
       box.innerHTML = '<div style="color:#f87171;font-size:12px">검색 실패: ' + e.message + '</div>';
     }
@@ -692,6 +756,7 @@
     todayItems.addEventListener("click", onTaskAction);
     document.getElementById("docQueryBtn").addEventListener("click", docQuery);
     document.getElementById("docQueryInput").addEventListener("keydown", (e) => { if (e.key === "Enter") docQuery(); });
+    bubbleClear.addEventListener("click", clearBubbles);
 
     chatInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
