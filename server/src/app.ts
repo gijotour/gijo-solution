@@ -13,6 +13,7 @@ import { registerRepoScanRoutes } from "./engine/reposcan";
 import { registerVulnScanRoutes } from "./engine/vulnscan";
 import { registerComplianceRoutes } from "./engine/compliance";
 import { registerModelDexRoutes } from "./engine/modeldex";
+import { registerMergeRoutes } from "./engine/merge";
 import { registerDispatcherRoutes } from "./engine/dispatcher";
 import { registerMemoryRoutes } from "./engine/memory";
 import { registerBridgeRoutes } from "./engine/bridge";
@@ -62,6 +63,7 @@ export function createApp(): Express {
   registerVulnScanRoutes(app);
   registerComplianceRoutes(app);
   registerModelDexRoutes(app);
+  registerMergeRoutes(app);
   registerDispatcherRoutes(app);
   registerMemoryRoutes(app);
   registerBridgeRoutes(app);

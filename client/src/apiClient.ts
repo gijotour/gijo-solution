@@ -562,6 +562,33 @@ export const modelDexApi = {
   agentRecommendations: () => request<Record<string, AgentModelRecommendation>>("/api/modeldex/agent-recommendations"),
 };
 
+// ── 보안 LLM 합성(모델 병합) ──────────────────────────────────────────
+export interface MergePlan {
+  ok: boolean;
+  reason?: string;
+  modelA?: DexModel;
+  modelB?: DexModel;
+  outputModelId?: string;
+  config?: string;
+  configPath?: string;
+  commands?: string[];
+}
+export interface MergePreflightCheck {
+  key: string;
+  label: string;
+  ok: boolean;
+  required: boolean;
+  detail?: string;
+  hint?: string;
+}
+export const mergeApi = {
+  plan: (modelA: string, modelB: string) => request<MergePlan>("/api/merge/plan", { method: "POST", body: { modelA, modelB } }),
+  preflight: (a?: string, b?: string) =>
+    request<{ checks: MergePreflightCheck[]; ready: boolean }>(
+      `/api/merge/preflight${a && b ? `?a=${encodeURIComponent(a)}&b=${encodeURIComponent(b)}` : ""}`
+    ),
+};
+
 // ── 승인 워크플로우(스캔 finding 검토 → 승인/반려) ──────────────────────
 export interface FindingReview {
   assetId: string;

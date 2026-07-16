@@ -168,7 +168,7 @@ tr:last-child td{border-bottom:none;}
 
     <div class="panel">
       <div class="panel-title" style="display:block;">🧬 합성하기 <span class="badge b-amber" style="margin-left:6px;">SLERP · R&D</span></div>
-      <div class="panel-sub">호환되는 두 모델을 고르면 합성 계획을 보여줍니다. 실제 병합 실행(mergekit)은 GPU 파이프라인 연동 후 활성화됩니다.</div>
+      <div class="panel-sub">호환되는 두 모델을 고르면 바로 돌릴 수 있는 <b>mergekit 설정(YAML)</b>과 실행 명령을 생성하고 준비물을 점검합니다. 실제 병합은 GPU 머신에서 그 명령으로 실행하세요(mergekit 필요).</div>
       <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:6px;">
         <select id="modelA" style="flex:1;min-width:200px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;"></select>
         <span style="color:var(--blue-light);font-weight:800;">+</span>
@@ -236,25 +236,45 @@ tr:last-child td{border-bottom:none;}
     }
   }
 
-  function planSynthesis() {
-    const a = dexModels.find((m) => m.id === document.getElementById("modelA").value);
-    const b = dexModels.find((m) => m.id === document.getElementById("modelB").value);
+  async function planSynthesis() {
+    const idA = document.getElementById("modelA").value;
+    const idB = document.getElementById("modelB").value;
     const r = document.getElementById("planResult");
-    if (!a || !b) { r.innerHTML = '<span style="color:var(--amber)">두 모델을 모두 선택하세요.</span>'; return; }
-    if (a.id === b.id) { r.innerHTML = '<span style="color:var(--amber)">서로 다른 모델을 선택하세요.</span>'; return; }
-    if (a.arch !== b.arch || a.size !== b.size) {
-      r.innerHTML = `<span style="color:#f5928a">✕ 합성 불가 — 아키텍처·크기가 다릅니다 (${a.arch}·${a.size} vs ${b.arch}·${b.size}). SLERP은 같은 구조에서만 동작합니다.</span>`;
-      return;
+    if (!idA || !idB) { r.innerHTML = '<span style="color:var(--amber)">두 모델을 모두 선택하세요.</span>'; return; }
+    r.innerHTML = '<span style="color:var(--muted)">합성 설정 생성 중...</span>';
+    try {
+      // 서버가 호환성 검증 + mergekit 설정(YAML) 생성 + 실행 명령을 돌려준다. 준비물도 함께 점검.
+      const [plan, pf] = await Promise.all([
+        window.gijo.planMerge(idA, idB),
+        window.gijo.mergePreflight(idA, idB).catch(() => null),
+      ]);
+      if (!plan.ok) {
+        r.innerHTML = `<span style="color:#f5928a">✕ 합성 불가 — ${esc(plan.reason || "")}</span>`;
+        return;
+      }
+      const a = plan.modelA, b = plan.modelB;
+      const pfHtml = pf
+        ? `<div style="margin-top:10px;font-size:11.5px;">준비물 점검: ` +
+          pf.checks.map((c) => `<span style="color:${c.ok ? "var(--teal)" : (c.required ? "#f5928a" : "var(--amber)")}">${c.ok ? "✓" : "✗"} ${esc(c.label)}${!c.ok && c.hint ? ` <span style="color:var(--muted-2)">(${esc(c.hint)})</span>` : ""}</span>`).join(" &nbsp; ") +
+          `<div style="color:${pf.ready ? "var(--teal)" : "var(--amber)"};margin-top:4px;font-weight:700;">${pf.ready ? "✓ 실행 준비 완료 — 아래 명령을 GPU 머신에서 실행하세요." : "⚠ 빠진 준비물이 있습니다 — 위 힌트대로 갖춘 뒤 실행하세요."}</div></div>`
+        : "";
+      r.innerHTML = `<div style="background:var(--panel-2);border:1px solid rgba(30,185,128,0.35);border-radius:8px;padding:12px 14px;">
+        <div style="color:var(--teal);font-weight:800;margin-bottom:6px;">✓ 합성 가능 → 설정 생성됨</div>
+        <div style="color:var(--text);line-height:1.8;">
+          <b>${esc(a.name)}</b> + <b>${esc(b.name)}</b> → <b style="color:var(--blue-light)">${esc(plan.outputModelId)}</b><br>
+          방식: SLERP (구면 선형 보간, t=0.5) · 구조: ${esc(a.arch)} · ${esc(a.size)}<br>
+          결합 강점: ${esc(a.focus)} <span style="color:var(--muted-2)">+</span> ${esc(b.focus)}
+        </div>
+        <div style="margin-top:10px;font-size:11px;color:var(--muted);">설정 저장됨: <span style="color:var(--blue-light)">${esc(plan.configPath)}</span></div>
+        <div style="margin-top:6px;font-size:10.5px;color:var(--muted);font-weight:700;">mergekit 설정 (YAML)</div>
+        <pre style="background:#05070d;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:10.5px;color:#8fd6a8;overflow-x:auto;white-space:pre;margin-top:4px;">${esc(plan.config)}</pre>
+        <div style="margin-top:8px;font-size:10.5px;color:var(--muted);font-weight:700;">실행 명령 (GPU 머신)</div>
+        <pre style="background:#05070d;border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:10.5px;color:var(--blue-light);overflow-x:auto;white-space:pre;margin-top:4px;">${esc((plan.commands || []).join("\n"))}</pre>
+        ${pfHtml}
+      </div>`;
+    } catch (e) {
+      r.innerHTML = '<span style="color:#f5928a">합성 계획 생성 실패: ' + esc(e.message) + '</span>';
     }
-    r.innerHTML = `<div style="background:var(--panel-2);border:1px solid rgba(30,185,128,0.35);border-radius:8px;padding:12px 14px;">
-      <div style="color:var(--teal);font-weight:800;margin-bottom:6px;">✓ 합성 가능</div>
-      <div style="color:var(--text);line-height:1.8;">
-        <b>${esc(a.name)}</b> + <b>${esc(b.name)}</b> → 새 보안 LLM<br>
-        방식: SLERP (구면 선형 보간, 가중치 0.5) · 구조: ${a.arch} · ${a.size}<br>
-        결합 강점: ${esc(a.focus)} <span style="color:var(--muted-2)">+</span> ${esc(b.focus)}
-      </div>
-      <div style="color:var(--muted-2);margin-top:8px;font-size:11px;">실제 병합 실행(mergekit)과 GGUF 변환은 GPU 파이프라인 연동 후 활성화됩니다. 지금은 합성 계획만 제공합니다.</div>
-    </div>`;
   }
 
   async function init() {
