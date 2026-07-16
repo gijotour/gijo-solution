@@ -91,34 +91,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 </div>
 
 <div class="app">
-  <div class="sidebar">
-    <div class="nav-section">모니터링</div>
-    <div class="nav-item" data-page="dashboard.html"><span class="ic">◆</span>대시보드</div>
-    <div class="nav-item" data-page="kpi.html"><span class="ic">📊</span>보안 KPI</div>
-    <div class="nav-section">자산 · 취약점</div>
-    <div class="nav-item" data-page="inventory.html"><span class="ic">◇</span>AI 자산</div>
-    <div class="nav-item" data-page="sbom.html"><span class="ic">▢</span>AI-BOM</div>
-    <div class="nav-item" data-page="vulnscan.html"><span class="ic">⊘</span>취약 자산관리</div>
-    <div class="nav-item" data-page="threat.html"><span class="ic">△</span>위협 인텔리전스</div>
-    <div class="nav-section">보안 운영</div>
-    <div class="nav-item" data-page="products.html"><span class="ic">🧰</span>보안제품 관리</div>
-    <div class="nav-item" data-page="opsguide.html"><span class="ic">🛠</span>운영 가이드(유지보수)</div>
-    <div class="nav-item" data-page="approvals.html"><span class="ic">◈</span>승인 워크플로우</div>
-    <div class="nav-section">보고 · 컴플라이언스</div>
-    <div class="nav-item" data-page="report.html"><span class="ic">▣</span>내부 리포트</div>
-    <div class="nav-item" data-page="compliance.html"><span class="ic">✓</span>컴플라이언스</div>
-    <div class="nav-section">AI 팀 · 학습</div>
-    <div class="nav-item" data-page="agent.html"><span class="ic">◉</span>에이전트 AI</div>
-    <div class="nav-item" data-page="memory.html"><span class="ic">⛁</span>AI 기억 · 학습</div>
-    <div class="nav-item" data-page="learnloop.html"><span class="ic">🔄</span>헤르메스 학습 루프</div>
-    <div class="nav-item" data-page="merge.html"><span class="ic">⬡</span>보안 LLM 합성</div>
-    <div class="nav-item" data-page="llmguide.html"><span class="ic">📚</span>추천 LLM 가이드</div>
-        <div class="nav-item" data-page="ontology.html"><span class="ic">🕸</span>온톨로지</div>
-    <div class="nav-section">시스템</div>
-    <div class="nav-item" data-page="billing.html"><span class="ic">$</span>사용량 · 요금</div>
-    <div class="nav-item" data-page="logs.html"><span class="ic">▤</span>로그</div>
-    <div class="nav-item active"><span class="ic">⚙</span>설정</div>
-  </div>
+  <div class="sidebar" id="gijoNav"></div>
 
   <div class="main">
     <div class="topbar-row">
@@ -508,38 +481,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 </script>
 
 
-<script>
-// 사이드바 섹션(모니터링/거버넌스 등) 접기·펼치기 — localStorage로 페이지 이동 후에도 유지.
-// 독립 스크립트라 window.gijo 준비 여부와 무관하게 동작한다.
-(() => {
-  const KEY = "gijo:navCollapsed";
-  let collapsed;
-  try { collapsed = new Set(JSON.parse(localStorage.getItem(KEY) || "[]")); } catch (e) { collapsed = new Set(); }
-  document.querySelectorAll(".sidebar .nav-section").forEach((sec) => {
-    const name = sec.textContent.trim();
-    const items = [];
-    let el = sec.nextElementSibling;
-    while (el && !el.classList.contains("nav-section")) { items.push(el); el = el.nextElementSibling; }
-    if (!items.length) return;
-    const caret = document.createElement("span");
-    caret.style.cssText = "float:right;font-size:9px;opacity:.8";
-    sec.appendChild(caret);
-    sec.style.cursor = "pointer";
-    // 현재 페이지가 든 섹션은 접혀 있어도 펼쳐서 위치를 잃지 않게 한다.
-    if (items.some((i) => i.classList.contains("active"))) collapsed.delete(name);
-    const apply = () => {
-      const c = collapsed.has(name);
-      items.forEach((i) => (i.style.display = c ? "none" : ""));
-      caret.textContent = c ? "▸" : "▾";
-    };
-    apply();
-    sec.addEventListener("click", () => {
-      if (collapsed.has(name)) collapsed.delete(name); else collapsed.add(name);
-      try { localStorage.setItem(KEY, JSON.stringify([...collapsed])); } catch (e) {}
-      apply();
-    });
-  });
-})();
-</script>
+
+<script src="nav.js"></script>
 </body>
 </html>
