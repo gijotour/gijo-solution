@@ -149,6 +149,10 @@ const AGENT_MODEL_RECOMMENDATIONS: Record<string, AgentModelRecSpec> = {
     modelId: "NousResearch/Hermes-3-Llama-3.1-8B-GGUF",
     reason: "헤르메스 학습 루프의 확정 베이스 — 지시따르기·구조화 출력이 뛰어나 모델 진화(학습) 대상에 맞습니다.",
   },
+  normaltic: {
+    modelId: "bartowski/Qwen2.5-7B-Instruct-GGUF",
+    reason: "검색된 사내 자료를 근거로 취약점을 설명하고 사례를 정리하는 데 한국어 품질·지시따르기가 좋습니다(엄격 그라운딩에 적합).",
+  },
 };
 
 export interface AgentModelRecommendation extends RecommendedModel {

@@ -43,7 +43,7 @@ describe("auth", () => {
     const res = await request(app).get("/api/agents").set("Authorization", `Bearer ${login.body.accessToken}`);
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body.length).toBe(8);
+    expect(res.body.length).toBe(9); // 보안 8종 + 사내지식 해설(노말틱)
   });
 
   it("exchanges a refresh token for a new token pair and rotates the old refresh token out", async () => {

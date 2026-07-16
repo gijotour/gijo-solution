@@ -40,6 +40,9 @@ const AGENT_DEFS: AgentBase[] = [
   { id: "cti", name: "CTI 에이전트", role: "딥웹 · 다크웹 감시", defaultStatus: "watching" },
   { id: "report", name: "리포트 에이전트", role: "내부 보고서 작성", defaultStatus: "idle" },
   { id: "model-evolution", name: "모델 진화 에이전트", role: "보안 특화 LLM 병합", defaultStatus: "idle" },
+  // 사내 지식베이스(RAG)에 적재된 자료만 근거로 취약점·코드를 설명하고 실제 사례를 검색해 준다.
+  // 표시 이름은 기본 "노말틱"이며 다른 에이전트처럼 UI에서 바꿀 수 있다.
+  { id: "normaltic", name: "노말틱", role: "취약점·코드 사내 지식 해설·사례 검색", defaultStatus: "watching" },
 ];
 
 const liveStatus = new Map<string, AgentStatus>(AGENT_DEFS.map((a) => [a.id, a.defaultStatus]));

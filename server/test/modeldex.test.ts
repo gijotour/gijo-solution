@@ -42,9 +42,9 @@ describe("modeldex (보안 특화 LLM 도감)", () => {
     const recs = getAgentModelRecommendations();
     const guideIds = new Set(LLM_GUIDE.flatMap((c) => c.models).map((m) => m.id));
 
-    it("covers every one of the 8 fixed agents", () => {
+    it("covers every one of the 9 agents (보안 8종 + 노말틱)", () => {
       const agentIds = listAgents().map((a) => a.id);
-      expect(agentIds).toHaveLength(8);
+      expect(agentIds).toHaveLength(9);
       for (const id of agentIds) {
         expect(recs[id], `${id} 추천 누락`).toBeDefined();
       }
