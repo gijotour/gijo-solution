@@ -6,6 +6,7 @@ import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { getAgentById } from "./agents";
 import { emitLlmActivity, modelBasename } from "./llmactivity";
+import { recordChatLog } from "./learnloop";
 
 const LOCAL_LLM_BASE_URL = process.env.GIJO_LOCAL_LLM_URL ?? "http://localhost:8080/v1";
 // 6.2절: 임베딩 모델(BGE-M3 등)은 채팅용 LLM과 별도 llama-server 프로세스로 동시 서빙한다 (RTX 3090 VRAM 여유 활용).
@@ -130,6 +131,9 @@ export async function chat(args: ChatArgs): Promise<string> {
   if (args.remember && reply) {
     const updated = [...history, { role: "user" as const, content: args.message }, { role: "assistant" as const, content: reply }];
     histories.set(args.agentId, updated.slice(-HISTORY_LIMIT));
+    // 헤르메스 학습 루프 ① 수집: 실제 대화만 영속 저장한다(연결 실패 문자열은 위에서 조기 반환돼
+    // 여기 못 온다). recordChatLog는 내부 try/catch — 수집 실패가 채팅을 죽이지 않는다.
+    recordChatLog(args.agentId, args.message, reply);
   }
   return reply;
 }

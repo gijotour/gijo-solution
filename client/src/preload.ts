@@ -99,6 +99,18 @@ const gijoApi = {
   listDatasets: () => api.datasetApi.list(),
   extractDocument: (filename: string, content: string) => api.datasetApi.extract(filename, content),
 
+  // 헤르메스 폐쇄형 학습 루프(수집→정제→학습→배포)
+  listLearnloopLogs: (limit?: number, offset?: number) => api.learnloopApi.logs(limit, offset),
+  rateLearnloopLog: (id: string, rating: 1 | -1 | 0) => api.learnloopApi.rate(id, rating),
+  deleteLearnloopLog: (id: string) => api.learnloopApi.removeLog(id),
+  buildLearnloopDataset: (includeUnrated?: boolean) => api.learnloopApi.buildDataset(includeUnrated),
+  startLearnloopRun: (datasetId?: string) => api.learnloopApi.run(datasetId),
+  getLearnloopStatus: () => api.learnloopApi.status(),
+  listLearnloopRuns: () => api.learnloopApi.runs(),
+  getLearnloopConfig: () => api.learnloopApi.getConfig(),
+  putLearnloopConfig: (patch: Partial<api.LearnloopConfig>) => api.learnloopApi.putConfig(patch),
+  onLearnloopProgress: (cb: (run: unknown) => void) => onChannel("learnloop:progress", cb),
+
   // HuggingFace 모델 검색 · 다운로드(백그라운드 큐 — load()는 잡을 반환하고 즉시 끝난다)
   searchHfModels: (query: string) => api.hfModelsApi.search(query),
   loadHfModel: (modelId: string) => api.hfModelsApi.load(modelId),

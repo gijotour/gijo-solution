@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 헤르메스 학습 루프</title>
+<style>
+:root{
+  --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
+.app{display:grid;grid-template-columns:220px 1fr;}
+.sidebar{padding:22px 14px;border-right:1px solid var(--border);min-height:900px;}
+.nav-section{font-size:10.5px;font-weight:700;color:var(--muted-2);letter-spacing:1.2px;margin:18px 10px 8px;}
+.nav-section:first-child{margin-top:0;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:2px;}
+.nav-item .ic{width:18px;text-align:center;font-size:14px;}
+.nav-item.active{background:rgba(59,130,246,0.12);color:var(--white);box-shadow:inset 3px 0 0 var(--blue);cursor:default;}
+.nav-item:hover:not(.active){background:rgba(255,255,255,0.04);color:var(--white);}
+.main{padding:28px 32px 48px;}
+.topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;}
+.page-title{font-size:21px;font-weight:800;color:#fff;}
+.page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;max-width:880px;line-height:1.6;}
+.header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2);}
+.header-left{display:flex;align-items:center;gap:12px;}
+.header-left img{height:22px;}
+.app-title{font-size:15px;font-weight:800;color:#fff;}
+.clock{font-size:12px;color:var(--blue-light);font-weight:600;}
+.header-right{display:flex;align-items:center;gap:10px;}
+.status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
+.status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
+.beta-tag{background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
+.avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+.icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
+
+.notice{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:12px 16px;font-size:12px;color:var(--muted);line-height:1.7;max-width:1000px;margin-bottom:22px;}
+.notice b{color:var(--blue-light);}
+.cat{margin-bottom:26px;max-width:1000px;}
+.cat-head{display:flex;align-items:baseline;gap:10px;margin-bottom:4px;}
+.cat-title{font-size:16px;font-weight:800;color:#fff;}
+.cat-intro{font-size:12.5px;color:var(--muted);margin-bottom:14px;line-height:1.6;max-width:860px;}
+.footer{margin-top:20px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted-2);max-width:1000px;}
+.footer img{height:16px;opacity:0.6;}
+
+/* 루프 개념 스트립(수집→정제→학습→배포) */
+.loop-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;}
+.loop-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;position:relative;}
+.loop-card .lc-step{font-size:10px;font-weight:800;color:var(--muted-2);letter-spacing:1px;}
+.loop-card .lc-name{font-size:14px;font-weight:800;color:#fff;margin:3px 0 5px;}
+.loop-card .lc-desc{font-size:11px;color:var(--muted);line-height:1.55;}
+.loop-card:not(:last-child)::after{content:"→";position:absolute;right:-11px;top:50%;transform:translateY(-50%);color:var(--muted-2);font-size:14px;z-index:1;}
+
+/* 실행 단계 진행바 */
+.run-stages{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 6px;}
+.stage-chip{font-size:11px;font-weight:700;padding:5px 11px;border-radius:16px;background:var(--panel-2);border:1px solid var(--border);color:var(--muted-2);}
+.stage-chip.active{background:rgba(59,130,246,0.16);border-color:var(--blue);color:var(--blue-light);animation:pulse 1.2s ease-in-out infinite;}
+.stage-chip.passed{background:rgba(30,185,128,0.12);border-color:rgba(30,185,128,0.4);color:var(--teal);}
+.stage-chip.failed{background:rgba(226,72,61,0.12);border-color:#e2483d;color:#f5928a;}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.55}}
+.run-line{font-size:12px;color:var(--muted);min-height:16px;}
+.run-line.err{color:#f5928a;}
+.run-line.ok{color:var(--teal);}
+
+/* KPI */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px;}
+.kpi{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+.kpi .k-label{font-size:11px;color:var(--muted);margin-bottom:6px;}
+.kpi .k-value{font-size:19px;font-weight:800;color:#fff;word-break:break-all;}
+
+/* 버튼 */
+.btn-primary{background:var(--blue);color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;}
+.btn-primary:disabled{opacity:.5;cursor:default;}
+.btn-ghost{background:transparent;border:1px solid var(--border-strong);color:var(--text);padding:10px 16px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;}
+.btn-ghost:disabled{opacity:.5;cursor:default;}
+.actions-row{display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap;}
+
+/* 설정 */
+.cfg-panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;}
+.cfg-field{display:flex;flex-direction:column;gap:5px;}
+.cfg-field label{font-size:11px;color:var(--muted);font-weight:700;}
+.cfg-field input,.cfg-field select{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 12px;color:var(--text);font-size:12.5px;outline:none;min-width:160px;}
+.cfg-field input.wide{min-width:280px;}
+.cfg-toggle{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text);font-weight:600;padding-bottom:9px;}
+.cfg-toggle input{width:16px;height:16px;accent-color:var(--teal);}
+
+/* 수집 로그 */
+.log-list{display:flex;flex-direction:column;gap:8px;}
+.log-item{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:11px 14px;}
+.log-q{font-size:12.5px;font-weight:700;color:#fff;line-height:1.5;}
+.log-a{font-size:12px;color:var(--muted);line-height:1.6;margin-top:4px;max-height:60px;overflow:hidden;}
+.log-foot{display:flex;align-items:center;gap:8px;margin-top:8px;}
+.log-agent{font-size:10.5px;font-weight:700;color:var(--purple);background:rgba(139,124,240,0.14);padding:2px 8px;border-radius:6px;}
+.log-when{font-size:10.5px;color:var(--muted-2);}
+.log-used{font-size:10.5px;font-weight:700;color:var(--teal);}
+.rate-btn{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;padding:4px 10px;font-size:12px;cursor:pointer;color:var(--muted);margin-left:auto;}
+.rate-btn+.rate-btn{margin-left:0;}
+.rate-btn.on-up{background:rgba(30,185,128,0.18);border-color:var(--teal);color:var(--teal);}
+.rate-btn.on-down{background:rgba(226,72,61,0.16);border-color:#e2483d;color:#f5928a;}
+.rate-btn.del{color:var(--muted-2);}
+
+/* 실행 이력 */
+.runs-list{display:flex;flex-direction:column;gap:8px;}
+.run-item{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:11px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px;}
+.run-badge{font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px;}
+.run-badge.done{color:var(--teal);background:rgba(30,185,128,0.14);}
+.run-badge.error{color:#f5928a;background:rgba(226,72,61,0.14);}
+.run-badge.progress{color:var(--blue-light);background:rgba(59,130,246,0.14);}
+.run-model{font-weight:800;color:#fff;}
+.run-meta{color:var(--muted-2);font-size:11px;margin-left:auto;}
+.run-err{width:100%;color:#f5928a;font-size:11px;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <img src="https://gijo.ai/_nuxt/logo_gijo_white.CCh2YXJe.svg" alt="GIJO">
+    <div class="app-title">GIJO AS</div>
+    <div class="clock" id="clockEl">-</div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill" id="statusPill"><span class="dot"></span>연결 확인 중<span class="beta-tag">LIVE</span></div>
+    <div class="avatar-btn" id="avatarBtn">-</div>
+    <div class="icon-btn" id="settingsBtn">⚙</div>
+  </div>
+</div>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="nav-section">AI 팀</div>
+    <div class="nav-item" data-page="agent.html"><span class="ic">◉</span>에이전트 AI</div>
+    <div class="nav-section">모니터링</div>
+    <div class="nav-item" data-page="dashboard.html"><span class="ic">◆</span>대시보드</div>
+    <div class="nav-item" data-page="inventory.html"><span class="ic">◇</span>AI 자산</div>
+    <div class="nav-item" data-page="sbom.html"><span class="ic">▢</span>AI-BOM</div>
+    <div class="nav-item" data-page="threat.html"><span class="ic">△</span>위협 인텔리전스</div>
+    <div class="nav-item" data-page="vulnscan.html"><span class="ic">⊘</span>취약 자산관리</div>
+    <div class="nav-section">거버넌스</div>
+    <div class="nav-item" data-page="compliance.html"><span class="ic">✓</span>컴플라이언스</div>
+    <div class="nav-item" data-page="report.html"><span class="ic">▣</span>내부 리포트</div>
+    <div class="nav-item" data-page="approvals.html"><span class="ic">◈</span>승인 워크플로우</div>
+    <div class="nav-item" data-page="opsguide.html"><span class="ic">🛠</span>운영 가이드</div>
+    <div class="nav-section">고급 기능</div>
+    <div class="nav-item" data-page="merge.html"><span class="ic">⬡</span>보안 LLM 합성</div>
+    <div class="nav-item active"><span class="ic">🔄</span>헤르메스 학습 루프</div>
+    <div class="nav-item" data-page="llmguide.html"><span class="ic">📚</span>추천 LLM 가이드</div>
+    <div class="nav-item" data-page="memory.html"><span class="ic">⛁</span>AI 기억 · 학습</div>
+    <div class="nav-item" data-page="billing.html"><span class="ic">$</span>사용량 · 요금</div>
+    <div class="nav-section">시스템</div>
+    <div class="nav-item" data-page="logs.html"><span class="ic">▤</span>로그</div>
+    <div class="nav-item" data-page="settings.html"><span class="ic">⚙</span>설정</div>
+  </div>
+
+  <div class="main">
+    <div class="topbar-row">
+      <div>
+        <div class="page-title">🔄 헤르메스 학습 루프</div>
+        <div class="page-sub">에이전트와 나눈 실제 대화가 자동으로 수집되고, 담당자가 👍로 승인한 것만 데이터셋이 되어 로컬 GPU에서 학습(QLoRA)됩니다. 학습된 모델은 GGUF로 변환돼 에이전트에 자동 배포 — 이 모든 과정이 <b style="color:var(--blue-light)">폐쇄망 안에서만</b> 돕니다.</div>
+      </div>
+    </div>
+
+    <div class="notice">
+      · <b>폐쇄형</b>: 대화·데이터셋·학습·배포 전 과정이 이 서버(GPU 머신) 안에서만 이루어지고 외부로 나가지 않습니다.<br>
+      · 루프 실행 중에는 GPU를 학습이 독점하므로 <b>채팅·문서검색(RAG)이 일시 중지</b>됐다가 끝나면 자동 재개됩니다.<br>
+      · 베이스 모델(기본 <b>Hermes 3 · Llama 3.1 8B</b>)의 학습용 원본 가중치는 첫 실행 전에 미리 받아둬야 합니다 — 폐쇄망 이전 시 <b>hf download NousResearch/Hermes-3-Llama-3.1-8B</b> 선행. 배포 모델은 <b>버전(-v1, -v2…)</b>으로 쌓여 언제든 이전 버전으로 되돌릴 수 있습니다.
+    </div>
+
+    <div class="loop-strip">
+      <div class="loop-card"><div class="lc-step">STEP 1</div><div class="lc-name">📥 수집</div><div class="lc-desc">에이전트 실제 대화(질문·답변)를 자동 저장 — 아래 목록에서 확인</div></div>
+      <div class="loop-card"><div class="lc-step">STEP 2</div><div class="lc-name">🧹 정제</div><div class="lc-desc">담당자가 👍한 대화만 골라 학습 데이터셋으로 변환</div></div>
+      <div class="loop-card"><div class="lc-step">STEP 3</div><div class="lc-name">🎓 학습</div><div class="lc-desc">Hermes 3 베이스에 QLoRA 파인튜닝 (RTX 3090 로컬)</div></div>
+      <div class="loop-card"><div class="lc-step">STEP 4</div><div class="lc-name">🚀 배포</div><div class="lc-desc">GGUF 변환 후 대상 에이전트에 새 버전 자동 할당</div></div>
+    </div>
+
+    <div class="kpi-grid">
+      <div class="kpi"><div class="k-label">수집된 대화</div><div class="k-value" id="kpiTotal">-</div></div>
+      <div class="kpi"><div class="k-label">👍 긍정 평가</div><div class="k-value" id="kpiPositive" style="color:var(--teal)">-</div></div>
+      <div class="kpi"><div class="k-label">학습 후보(미사용)</div><div class="k-value" id="kpiUnused" style="color:var(--blue-light)">-</div></div>
+      <div class="kpi"><div class="k-label">최근 배포 모델</div><div class="k-value" id="kpiModel" style="font-size:14px">-</div></div>
+    </div>
+
+    <div class="cat">
+      <div class="cat-head"><span style="font-size:18px">▶</span><span class="cat-title">루프 실행</span></div>
+      <div class="cat-intro">원클릭 실행 시 [👍 로그 → 데이터셋 → 학습 → GGUF 변환 → 에이전트 배포]가 순서대로 진행됩니다. 각 단계는 아래에 실시간 표시됩니다.</div>
+      <div class="actions-row">
+        <button class="btn-primary" id="runBtn">🔄 루프 실행 (원클릭)</button>
+        <button class="btn-ghost" id="buildBtn">데이터셋만 만들기</button>
+        <span class="run-line" id="actionLine"></span>
+      </div>
+      <div class="run-stages" id="runStages"></div>
+      <div class="run-line" id="runLine">아직 실행 이력이 없습니다.</div>
+    </div>
+
+    <div class="cat">
+      <div class="cat-head"><span style="font-size:18px">⚙</span><span class="cat-title">루프 설정</span></div>
+      <div class="cat-intro">모델·대상은 신중히 바꾸세요. 베이스 모델은 HuggingFace 원본 repo id(HF transformers)이며, GGUF id가 아닙니다.</div>
+      <div class="cfg-panel">
+        <label class="cfg-toggle"><input type="checkbox" id="cfgAutoCollect">대화 자동 수집</label>
+        <div class="cfg-field"><label>학습 베이스 모델 (HF repo)</label><input id="cfgBaseModel" class="wide" placeholder="NousResearch/Hermes-3-Llama-3.1-8B"></div>
+        <div class="cfg-field"><label>배포 모델 접두어</label><input id="cfgPrefix" placeholder="hermes-sec-tuned"></div>
+        <div class="cfg-field"><label>배포 대상 에이전트</label><select id="cfgAgent"></select></div>
+        <button class="btn-ghost" id="cfgSaveBtn">저장</button>
+        <span class="run-line" id="cfgLine"></span>
+      </div>
+    </div>
+
+    <div class="cat">
+      <div class="cat-head"><span style="font-size:18px">📥</span><span class="cat-title">수집된 대화</span></div>
+      <div class="cat-intro">좋은 답변에 👍를 남기면 다음 학습에 채택됩니다. 👎/삭제한 대화는 학습에서 제외됩니다. 이미 학습에 쓰인 대화는 ✓ 표시.</div>
+      <div class="log-list" id="logList"><div style="color:var(--muted);font-size:12px">불러오는 중...</div></div>
+    </div>
+
+    <div class="cat">
+      <div class="cat-head"><span style="font-size:18px">🕘</span><span class="cat-title">실행 이력</span></div>
+      <div class="runs-list" id="runsList"><div style="color:var(--muted);font-size:12px">불러오는 중...</div></div>
+    </div>
+
+    <div class="footer">
+      <img src="https://gijo.ai/_nuxt/logo_gijo_only_white.ATZVOJtw.svg" alt="GIJO">
+      <span>© 2026 GIJO Technology · GIJO AS Platform · Confidential</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  const clockEl = document.getElementById("clockEl");
+  const statusPill = document.getElementById("statusPill");
+  const avatarBtn = document.getElementById("avatarBtn");
+
+  function tick() {
+    clockEl.textContent = new Date().toLocaleString("ko-KR", {
+      hour: "2-digit", minute: "2-digit", hour12: true, year: "numeric", month: "2-digit", day: "2-digit",
+    });
+  }
+  async function loadHealth() {
+    try {
+      await window.gijo.checkServerHealth();
+      statusPill.innerHTML = '<span class="dot"></span>운영중<span class="beta-tag">LIVE</span>';
+    } catch (e) {
+      statusPill.innerHTML = '<span class="dot" style="background:#e2483d"></span>서버 연결 끊김';
+    }
+  }
+  async function loadUser() {
+    try {
+      const user = await window.gijo.me();
+      avatarBtn.textContent = (user.displayName || user.username || "-").charAt(0);
+    } catch (e) {}
+  }
+
+  const esc = (s) => String(s == null ? "" : s).replace(/</g, "&lt;");
+  const fmtTime = (ts) => new Date(ts).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+
+  // ── 실행 단계 표시 ─────────────────────────────────────────────────
+  const STAGES = [
+    { key: "stopping-engines", label: "엔진 정지" },
+    { key: "training", label: "학습(QLoRA)" },
+    { key: "exporting", label: "GGUF 변환" },
+    { key: "deploying", label: "에이전트 배포" },
+    { key: "restarting-engines", label: "엔진 재기동" },
+  ];
+
+  function renderRunState(run) {
+    const stagesEl = document.getElementById("runStages");
+    const lineEl = document.getElementById("runLine");
+    if (!run) {
+      stagesEl.innerHTML = "";
+      lineEl.className = "run-line";
+      lineEl.textContent = "아직 실행 이력이 없습니다.";
+      return;
+    }
+    const idx = STAGES.findIndex((s) => s.key === run.stage);
+    const finished = run.stage === "done" || run.stage === "error";
+    stagesEl.innerHTML = STAGES.map((s, i) => {
+      let cls = "stage-chip";
+      if (run.stage === "error") {
+        // 실패 시: error 메시지에 단계명이 들어있음 — 어디까지 갔는지는 passed 처리로 근사
+        cls += run.error && run.error.startsWith(s.key) ? " failed" : "";
+      }
+      if (!finished && i === idx) cls += " active";
+      else if (finished || i < idx) cls += run.stage === "error" && run.error && run.error.startsWith(s.key) ? " failed" : " passed";
+      return `<span class="${cls}">${i + 1}. ${s.label}</span>`;
+    }).join("");
+    if (run.stage === "done") {
+      lineEl.className = "run-line ok";
+      lineEl.textContent = `✓ 완료 — ${run.outputModelId} 모델이 배포되었습니다 (데이터셋 ${run.datasetId})`;
+    } else if (run.stage === "error") {
+      lineEl.className = "run-line err";
+      lineEl.textContent = "✗ " + (run.error || "실패");
+    } else {
+      lineEl.className = "run-line";
+      const s = STAGES.find((x) => x.key === run.stage);
+      lineEl.textContent = `진행 중… ${s ? s.label : run.stage} — 이 화면을 벗어나도 계속됩니다.`;
+    }
+  }
+
+  // ── KPI + 로그 목록 ────────────────────────────────────────────────
+  async function loadLogs() {
+    try {
+      const { logs, kpis } = await window.gijo.listLearnloopLogs(50, 0);
+      document.getElementById("kpiTotal").textContent = kpis.total;
+      document.getElementById("kpiPositive").textContent = kpis.positive;
+      document.getElementById("kpiUnused").textContent = kpis.unused;
+      const list = document.getElementById("logList");
+      list.innerHTML = logs.length
+        ? logs.map(logRowHtml).join("")
+        : '<div style="color:var(--muted-2);font-size:12px">아직 수집된 대화가 없습니다 — 에이전트 AI 화면이나 대시보드에서 대화하면 자동으로 쌓입니다.</div>';
+    } catch (e) {
+      document.getElementById("logList").innerHTML = '<div style="color:#f5928a;font-size:12px">불러오지 못했습니다: ' + e.message + "</div>";
+    }
+  }
+
+  function logRowHtml(l) {
+    const up = l.rating === 1 ? " on-up" : "";
+    const down = l.rating === -1 ? " on-down" : "";
+    return (
+      `<div class="log-item" data-id="${l.id}">` +
+      `<div class="log-q">Q. ${esc(l.question)}</div>` +
+      `<div class="log-a">A. ${esc(l.answer)}</div>` +
+      `<div class="log-foot">` +
+      `<span class="log-agent">${esc(l.agentId)}</span>` +
+      `<span class="log-when">${fmtTime(l.createdAt)}</span>` +
+      (l.usedInDataset ? `<span class="log-used">✓ 학습에 사용됨</span>` : "") +
+      `<button class="rate-btn${up}" data-rate="1" title="좋은 답변 — 학습에 채택">👍</button>` +
+      `<button class="rate-btn${down}" data-rate="-1" title="나쁜 답변 — 학습에서 제외">👎</button>` +
+      `<button class="rate-btn del" data-del="1" title="기록 삭제">✕</button>` +
+      `</div></div>`
+    );
+  }
+
+  async function onLogAction(e) {
+    const item = e.target.closest(".log-item");
+    if (!item) return;
+    const id = item.dataset.id;
+    if (e.target.dataset.del) {
+      await window.gijo.deleteLearnloopLog(id).catch((err) => alert("삭제 실패: " + err.message));
+      await loadLogs();
+    } else if (e.target.dataset.rate) {
+      const val = Number(e.target.dataset.rate);
+      // 같은 버튼을 다시 누르면 평가 해제
+      const already = (val === 1 && e.target.classList.contains("on-up")) || (val === -1 && e.target.classList.contains("on-down"));
+      await window.gijo.rateLearnloopLog(id, already ? 0 : val).catch((err) => alert("평가 실패: " + err.message));
+      await loadLogs();
+    }
+  }
+
+  // ── 실행 이력 ──────────────────────────────────────────────────────
+  async function loadRuns() {
+    try {
+      const runs = await window.gijo.listLearnloopRuns();
+      const latest = runs[0];
+      document.getElementById("kpiModel").textContent =
+        (runs.find((r) => r.stage === "done") || {}).outputModelId || "아직 없음";
+      const list = document.getElementById("runsList");
+      list.innerHTML = runs.length
+        ? runs.map(runRowHtml).join("")
+        : '<div style="color:var(--muted-2);font-size:12px">실행 이력이 없습니다.</div>';
+      return latest;
+    } catch (e) {
+      document.getElementById("runsList").innerHTML = '<div style="color:#f5928a;font-size:12px">불러오지 못했습니다: ' + e.message + "</div>";
+    }
+  }
+
+  function runRowHtml(r) {
+    const badge = r.stage === "done" ? "done" : r.stage === "error" ? "error" : "progress";
+    const label = r.stage === "done" ? "완료" : r.stage === "error" ? "실패" : "진행 중";
+    return (
+      `<div class="run-item">` +
+      `<span class="run-badge ${badge}">${label}</span>` +
+      `<span class="run-model">${esc(r.outputModelId)}</span>` +
+      `<span style="color:var(--muted)">데이터셋 ${esc(r.datasetId)}</span>` +
+      `<span style="color:var(--muted-2);font-size:11px">${esc(r.baseModel)}</span>` +
+      `<span class="run-meta">${fmtTime(r.startedAt)}${r.finishedAt ? " ~ " + fmtTime(r.finishedAt) : ""}</span>` +
+      (r.error ? `<div class="run-err">${esc(r.error)}</div>` : "") +
+      `</div>`
+    );
+  }
+
+  // ── 실행/데이터셋 버튼 ─────────────────────────────────────────────
+  async function onRun() {
+    const btn = document.getElementById("runBtn");
+    const line = document.getElementById("actionLine");
+    if (!confirm("학습 루프를 실행합니다.\n진행 중에는 채팅·문서검색이 일시 중지됩니다 (완료 후 자동 재개).\n계속할까요?")) return;
+    btn.disabled = true;
+    line.textContent = "";
+    try {
+      const run = await window.gijo.startLearnloopRun();
+      renderRunState(run);
+    } catch (err) {
+      let msg = (err && err.message) || String(err);
+      const brace = msg.indexOf("{");
+      if (brace >= 0) { try { const j = JSON.parse(msg.slice(brace)); if (j.error) msg = j.error; } catch (_) {} }
+      line.className = "run-line err";
+      line.textContent = "✗ " + msg;
+      btn.disabled = false;
+    }
+  }
+
+  async function onBuild() {
+    const line = document.getElementById("actionLine");
+    line.className = "run-line";
+    line.textContent = "데이터셋 생성 중...";
+    try {
+      const r = await window.gijo.buildLearnloopDataset();
+      line.className = "run-line ok";
+      line.textContent = `✓ 데이터셋 생성됨: ${r.datasetId} (${r.examples}개 문답) — AI 기억·학습 화면에서도 쓸 수 있습니다.`;
+      await loadLogs();
+    } catch (err) {
+      let msg = (err && err.message) || String(err);
+      const brace = msg.indexOf("{");
+      if (brace >= 0) { try { const j = JSON.parse(msg.slice(brace)); if (j.error) msg = j.error; } catch (_) {} }
+      line.className = "run-line err";
+      line.textContent = "✗ " + msg;
+    }
+  }
+
+  // ── 설정 ───────────────────────────────────────────────────────────
+  async function loadConfig() {
+    try {
+      const [cfg, agents] = await Promise.all([window.gijo.getLearnloopConfig(), window.gijo.listAgents().catch(() => [])]);
+      document.getElementById("cfgAutoCollect").checked = cfg.autoCollect;
+      document.getElementById("cfgBaseModel").value = cfg.baseModel;
+      document.getElementById("cfgPrefix").value = cfg.modelPrefix;
+      const sel = document.getElementById("cfgAgent");
+      sel.innerHTML = agents.map((a) => `<option value="${esc(a.id)}"${a.id === cfg.targetAgent ? " selected" : ""}>${esc(a.name)}</option>`).join("");
+    } catch (e) {
+      document.getElementById("cfgLine").textContent = "설정을 불러오지 못했습니다";
+    }
+  }
+
+  async function saveConfig() {
+    const line = document.getElementById("cfgLine");
+    try {
+      await window.gijo.putLearnloopConfig({
+        autoCollect: document.getElementById("cfgAutoCollect").checked,
+        baseModel: document.getElementById("cfgBaseModel").value.trim(),
+        modelPrefix: document.getElementById("cfgPrefix").value.trim(),
+        targetAgent: document.getElementById("cfgAgent").value,
+      });
+      line.className = "run-line ok";
+      line.textContent = "✓ 저장됨";
+    } catch (err) {
+      let msg = (err && err.message) || String(err);
+      const brace = msg.indexOf("{");
+      if (brace >= 0) { try { const j = JSON.parse(msg.slice(brace)); if (j.error) msg = j.error; } catch (_) {} }
+      line.className = "run-line err";
+      line.textContent = "✗ " + msg;
+    }
+  }
+
+  // ── 실시간 진행 ────────────────────────────────────────────────────
+  function onProgress(run) {
+    renderRunState(run);
+    if (run.stage === "done" || run.stage === "error") {
+      document.getElementById("runBtn").disabled = false;
+      loadRuns();
+      loadLogs(); // 원클릭 실행이 로그를 소진(usedInDataset)했을 수 있음
+    }
+  }
+
+  async function init() {
+    tick();
+    setInterval(tick, 30000);
+    loadUser();
+    loadHealth();
+    loadConfig();
+    loadLogs();
+    const latest = await loadRuns();
+    // 진행 중이던 실행이 있으면 이어서 표시(페이지를 벗어나도 서버에서 계속 도는 구조)
+    if (latest) renderRunState(latest);
+    if (latest && latest.stage !== "done" && latest.stage !== "error") document.getElementById("runBtn").disabled = true;
+
+    if (window.gijoRealtime) window.gijoRealtime.connect();
+    window.gijo.onLearnloopProgress(onProgress);
+
+    document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
+    document.querySelectorAll(".nav-item[data-page]").forEach((el) => {
+      el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
+    });
+    document.getElementById("runBtn").addEventListener("click", onRun);
+    document.getElementById("buildBtn").addEventListener("click", onBuild);
+    document.getElementById("cfgSaveBtn").addEventListener("click", saveConfig);
+    document.getElementById("logList").addEventListener("click", onLogAction);
+  }
+
+  if (!window.gijo.isAuthenticated()) {
+    window.gijo.navigateTo("login.html");
+  } else {
+    init();
+  }
+</script>
+
+</body>
+</html>

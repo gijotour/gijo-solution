@@ -75,6 +75,7 @@ export const LLM_GUIDE: LlmGuideCategory[] = [
     title: "파인튜닝 베이스 LLM",
     intro: "우리 문서로 학습(파인튜닝)시켜 문체·판단을 각인시킬 때 쓰는 범용 베이스. 학습이 잘 먹고 자료가 많은 모델을 골랐습니다.",
     models: [
+      { id: "NousResearch/Hermes-3-Llama-3.1-8B-GGUF", name: "Hermes 3 (Llama 3.1 8B)", size: "8B", approxGb: "약 4.9GB", tag: "학습루프 베이스", desc: "헤르메스 학습 루프의 확정 베이스. 지시 따르기·구조화 출력이 뛰어나 자가학습 루프에 적합합니다. 실제 학습은 HF 원본(NousResearch/Hermes-3-Llama-3.1-8B)으로, 이 GGUF는 학습 전 베이스 응답 확인용." },
       { id: "bartowski/Meta-Llama-3.1-8B-Instruct-GGUF", name: "Llama 3.1 8B Instruct", size: "8B", approxGb: "약 4.9GB", desc: "가장 널리 쓰이는 파인튜닝 베이스. 한국어 포함 다국어와 도구 사용이 안정적입니다." },
       { id: "bartowski/Qwen2.5-7B-Instruct-GGUF", name: "Qwen2.5 7B Instruct", size: "7B", approxGb: "약 4.7GB", desc: "지시 따르기·한국어 품질이 좋아 파인튜닝 후 실무 응답이 매끄럽습니다." },
       { id: "bartowski/Phi-3.5-mini-instruct-GGUF", name: "Phi-3.5 mini", size: "3.8B", approxGb: "약 2.4GB", tag: "경량 베이스", desc: "작지만 추론이 좋아 GPU 여유가 적을 때 파인튜닝 베이스로 쓰기 좋습니다." },

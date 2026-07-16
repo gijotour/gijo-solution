@@ -10,6 +10,12 @@ import { recordProcessOutput } from "./logs";
 export interface FinetuneArgs {
   agentId: string;
   datasetId: string;
+  // 학습 베이스 모델(HF repo id). 지정 시 GIJO_FT_BASE_MODEL 환경변수로 스크립트에 전달 —
+  // 학습 루프(learnloop.ts)가 설정된 베이스(예: Hermes 3)를 주입하는 경로.
+  baseModel?: string;
+  // 종료 콜백(성공/실패 공통) — 학습 루프가 다음 단계(GGUF export)로 이어가기 위해 쓴다.
+  // 폴링 대신 콜백인 이유: exit/error 어느 쪽으로 끝나든 정확히 한 번 호출된다.
+  onComplete?: (result: { ok: boolean; message?: string }) => void;
 }
 
 export interface FinetuneProgress {
@@ -52,7 +58,9 @@ export function startFinetune(args: FinetuneArgs): { started: boolean; error?: s
 
   // PYTHONUTF8=1: Windows 기본 콘솔 코드페이지(cp949)로는 한국어 로그가 파이프에서 깨지고
   // em-dash 같은 문자는 UnicodeEncodeError로 스크립트를 죽인다 (modelscan_wrapper와 같은 함정).
-  const proc = spawn("python", scriptArgs, { env: { ...process.env, PYTHONUTF8: "1" } });
+  const proc = spawn("python", scriptArgs, {
+    env: { ...process.env, PYTHONUTF8: "1", ...(args.baseModel ? { GIJO_FT_BASE_MODEL: args.baseModel } : {}) },
+  });
   let stderrTail = "";
 
   recordProcessOutput("finetune", "log", `$ python ${scriptArgs.join(" ")}`);
@@ -75,16 +83,19 @@ export function startFinetune(args: FinetuneArgs): { started: boolean; error?: s
     running = false;
     lastProgress = { ...(lastProgress ?? { step: 0, maxSteps: 0, loss: 0 }), status: "error", message: String(err.message) };
     broadcastProgress(lastProgress);
+    args.onComplete?.({ ok: false, message: String(err.message) });
   });
   proc.on("exit", (code) => {
-    if (!running) return; // error 핸들러가 이미 종결한 경우
+    if (!running) return; // error 핸들러가 이미 종결한 경우 (onComplete도 거기서 이미 호출됨)
     running = false;
+    const message = code === 0 ? undefined : stderrTail.trim().split("\n").pop();
     lastProgress = {
       ...(lastProgress ?? { step: 0, maxSteps: 0, loss: 0 }),
       status: code === 0 ? "done" : "error",
-      message: code === 0 ? undefined : stderrTail.trim().split("\n").pop(),
+      message,
     };
     broadcastProgress(lastProgress);
+    args.onComplete?.({ ok: code === 0, message });
   });
 
   return { started: true };

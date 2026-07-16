@@ -24,6 +24,7 @@ import { registerIntentRoutes } from "./engine/intent";
 import { registerLlmRoutes } from "./engine/llm";
 import { registerLocalEngineRoutes } from "./engine/localengine";
 import { registerFinetuneRoutes } from "./engine/finetune";
+import { registerLearnloopRoutes } from "./engine/learnloop";
 import { registerToolsRoutes } from "./engine/tools";
 import { registerTasksRoutes } from "./engine/tasks";
 import { registerMaintenanceRoutes } from "./engine/maintenance";
@@ -71,6 +72,7 @@ export function createApp(): Express {
   registerLlmRoutes(app);
   registerLocalEngineRoutes(app);
   registerFinetuneRoutes(app);
+  registerLearnloopRoutes(app);
   registerToolsRoutes(app);
   registerTasksRoutes(app);
   registerMaintenanceRoutes(app);

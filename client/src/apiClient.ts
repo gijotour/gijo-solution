@@ -281,6 +281,54 @@ export const datasetApi = {
     request<{ text: string }>("/api/dataset/extract", { method: "POST", body: { filename, content } }),
 };
 
+// ── 헤르메스 폐쇄형 학습 루프 ─────────────────────────────────────────
+// 수집(대화 로그) → 정제(👍만 데이터셋으로) → 학습(QLoRA) → 배포(GGUF→에이전트 할당).
+// 실행 진행은 learnloop:progress WebSocket 채널로 밀려온다.
+export interface LearnloopChatLog {
+  id: string;
+  agentId: string;
+  question: string;
+  answer: string;
+  rating: number | null;
+  usedInDataset: boolean;
+  createdAt: number;
+}
+
+export interface LearnloopRun {
+  id: string;
+  datasetId: string;
+  baseModel: string;
+  outputModelId: string;
+  stage: "stopping-engines" | "training" | "exporting" | "deploying" | "restarting-engines" | "done" | "error";
+  error?: string;
+  startedAt: number;
+  finishedAt?: number;
+}
+
+export interface LearnloopConfig {
+  autoCollect: boolean;
+  baseModel: string;
+  modelPrefix: string;
+  targetAgent: string;
+}
+
+export const learnloopApi = {
+  logs: (limit?: number, offset?: number) =>
+    request<{ logs: LearnloopChatLog[]; kpis: { total: number; positive: number; negative: number; unused: number } }>(
+      `/api/learnloop/logs?limit=${limit ?? 50}&offset=${offset ?? 0}`
+    ),
+  rate: (id: string, rating: 1 | -1 | 0) =>
+    request<LearnloopChatLog>(`/api/learnloop/logs/${encodeURIComponent(id)}/rate`, { method: "POST", body: { rating } }),
+  removeLog: (id: string) => request(`/api/learnloop/logs/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  buildDataset: (includeUnrated?: boolean) =>
+    request<{ datasetId: string; examples: number }>("/api/learnloop/build-dataset", { method: "POST", body: { includeUnrated } }),
+  run: (datasetId?: string) => request<LearnloopRun>("/api/learnloop/run", { method: "POST", body: { datasetId } }),
+  status: () => request<{ running: boolean; run: LearnloopRun | null }>("/api/learnloop/status"),
+  runs: () => request<LearnloopRun[]>("/api/learnloop/runs"),
+  getConfig: () => request<LearnloopConfig>("/api/learnloop/config"),
+  putConfig: (patch: Partial<LearnloopConfig>) => request<LearnloopConfig>("/api/learnloop/config", { method: "PUT", body: patch }),
+};
+
 // ── HuggingFace 모델 ──────────────────────────────────────────────────
 // 다운로드는 서버가 백그라운드 큐로 처리한다 — load()는 잡을 큐에 넣고 즉시 반환하며,
 // 실제 진행률은 hf-download:progress WebSocket 채널(또는 jobs() 폴링)로 따라간다.
