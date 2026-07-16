@@ -72,6 +72,9 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
 .vd-state.fixed{background:rgba(30,185,128,0.16);color:var(--teal);}
 .vd-item.is-fixed{opacity:.5;}
 .vd-item.is-fixed .vd-name{text-decoration:line-through;}
+.vd-remediate{flex-shrink:0;background:rgba(59,130,246,0.14);border:1px solid var(--border-strong);color:var(--blue-light);font-size:10.5px;font-weight:800;padding:2px 9px;border-radius:6px;cursor:pointer;}
+.vd-remediate:hover{background:rgba(59,130,246,0.24);border-color:var(--blue);}
+.vd-remediate.done{background:rgba(30,185,128,0.16);color:var(--teal);border-color:rgba(30,185,128,0.4);cursor:default;}
 .vd-ev{display:none;margin-top:8px;padding:10px 12px;background:var(--panel-2);border-radius:6px;font-size:11.5px;color:var(--muted);line-height:1.75;white-space:pre-wrap;word-break:break-word;max-height:240px;overflow-y:auto;}
 .vd-item.open .vd-ev{display:block;}
 .vd-empty{padding:16px;color:var(--muted);font-size:12.5px;}
@@ -216,11 +219,38 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
     }
   }
 
+  let currentUser = "";
   async function loadUser() {
     try {
       const user = await window.gijo.me();
-      avatarBtn.textContent = (user.displayName || user.username || "-").charAt(0);
+      currentUser = user.displayName || user.username || "";
+      avatarBtn.textContent = (currentUser || "-").charAt(0);
     } catch (e) {}
+  }
+
+  // 취약점 → 조치 항목: 심각도·KEV로 우선순위와 SLA(기한)를 자동 산정한다.
+  // KEV(실제 악용)는 7일, Critical 14, High 30, Medium 60, Low 90일.
+  function remediationPlan(sev, kev) {
+    const days = kev ? 7 : sev === "critical" ? 14 : sev === "high" ? 30 : sev === "medium" ? 60 : 90;
+    const priority = kev || sev === "critical" ? "P0" : sev === "high" ? "P1" : sev === "medium" ? "P2" : "P3";
+    return { days, priority, dueAt: Date.now() + days * 86400000 };
+  }
+
+  async function remediate(btn) {
+    const asset = hostCache.find((a) => a.id === currentHostId);
+    const name = btn.dataset.name;
+    const { days, priority, dueAt } = remediationPlan(btn.dataset.sev, btn.dataset.kev === "1");
+    btn.disabled = true;
+    btn.textContent = "등록 중...";
+    try {
+      await window.gijo.addTask(`[조치] ${name} — ${asset ? asset.name : ""}`, { priority, dueAt, assignee: currentUser, ref: currentHostId });
+      btn.textContent = `✓ 등록됨 · 기한 D-${days}`;
+      btn.classList.add("done");
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = "＋ 조치 등록";
+      alert("조치 등록 실패: " + (err.message || err));
+    }
   }
 
   function sevCounts(findings) {
@@ -329,12 +359,14 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
         const kev = f.kev ? `<span class="vd-kev" title="CISA KEV — 실제 악용이 확인된 취약점. 최우선 조치.&#10;${esc((f.kevCves || []).join(', '))}">🔴 KEV 악용중</span>` : "";
         const STATE_LABEL = { new: "🆕 신규", resurfaced: "♻ 재발", fixed: "✓ 고쳐짐" };
         const state = f.state && STATE_LABEL[f.state] ? `<span class="vd-state ${f.state}" title="지난 스캔 대비 상태">${STATE_LABEL[f.state]}</span>` : "";
+        // 고쳐진 것엔 조치 등록 버튼을 달지 않는다.
+        const remediate = f.state === "fixed" ? "" : `<button class="vd-remediate" data-rem data-name="${esc(f.finding_type)}" data-sev="${f.severity}" data-kev="${f.kev ? 1 : 0}" title="이 취약점을 조치 항목(담당자·기한)으로 등록">＋ 조치 등록</button>`;
         return (
           `<div class="vd-item ${f.state === "fixed" ? "is-fixed" : ""}">` +
           `<div class="vd-item-top">` +
           `<span class="sev ${SEV_CLASS[f.severity] || "sev-l"}">${SEV_LABEL[f.severity] || "?"}</span>` +
           `<span class="vd-name">${esc(f.finding_type)}</span>` +
-          state + kev + misfit + epss + vpr +
+          state + kev + misfit + epss + vpr + remediate +
           `</div>` +
           `<div class="vd-ev">${esc(f.evidence || "(상세 없음)")}</div>` +
           `</div>`
@@ -453,6 +485,8 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
     document.getElementById("vdSearch").addEventListener("input", renderVdList);
     // 취약점 항목 클릭 → 상세(CVE 목록·증거) 펼치기
     document.getElementById("vdList").addEventListener("click", (e) => {
+      const btn = e.target.closest(".vd-remediate");
+      if (btn) { e.stopPropagation(); if (!btn.classList.contains("done")) remediate(btn); return; }
       const item = e.target.closest(".vd-item");
       if (item) item.classList.toggle("open");
     });

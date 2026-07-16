@@ -157,9 +157,15 @@ export const dispatchApi = {
 };
 
 // ── 작업 큐 ───────────────────────────────────────────────────────────
+export interface NewTaskOptions {
+  priority?: "P0" | "P1" | "P2" | "P3";
+  dueAt?: number;
+  assignee?: string;
+  ref?: string;
+}
 export const tasksApi = {
   list: () => request("/api/tasks"),
-  add: (text: string) => request("/api/tasks", { method: "POST", body: { text } }),
+  add: (text: string, opts?: NewTaskOptions) => request("/api/tasks", { method: "POST", body: { text, ...(opts || {}) } }),
   complete: (id: string) => request(`/api/tasks/${id}/complete`, { method: "POST" }),
   toggle: (id: string, done: boolean) => request(`/api/tasks/${id}/toggle`, { method: "POST", body: { done } }),
   remove: (id: string) => request(`/api/tasks/${id}`, { method: "DELETE" }),

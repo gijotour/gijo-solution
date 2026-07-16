@@ -5,6 +5,7 @@ import { computeKpiSnapshot, resetKpiForTests } from "../src/engine/kpi";
 import { importVulnScan } from "../src/engine/vulnscan";
 import { resetKevForTests } from "../src/engine/kev";
 import { resetAssetsForTests, seedSampleAssetsIfEmpty } from "../src/engine/assets";
+import { createTask, resetTasksForTests } from "../src/engine/tasks";
 
 async function login(app: ReturnType<typeof createApp>) {
   const res = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" });
@@ -21,6 +22,7 @@ describe("kpi (통합 보안 KPI 대시보드)", () => {
     // 테스트 간 자산 상태 격리: 시드 3개로 되돌린다(취약점 임포트 테스트가 자산을 남기지 않게).
     resetAssetsForTests();
     seedSampleAssetsIfEmpty();
+    resetTasksForTests();
     resetKevForTests();
     app = createApp();
     token = await login(app);
@@ -69,6 +71,20 @@ describe("kpi (통합 보안 KPI 대시보드)", () => {
     expect(v.active).toBe(1);
     expect(v.newlyFixed).toBe(2);
     expect(v.remediationRate).toBe(67); // 2 / (1 + 2) = 67%
+  });
+
+  it("aggregates remediation SLA status from vuln-linked tasks", async () => {
+    const day = 86400000;
+    createTask({ text: "[조치] A", ref: "vuln:10.0.0.1", dueAt: Date.now() + 5 * day }); // 여유
+    createTask({ text: "[조치] B", ref: "vuln:10.0.0.1", dueAt: Date.now() + 2 * day }); // 임박
+    createTask({ text: "[조치] C", ref: "vuln:10.0.0.1", dueAt: Date.now() - 1 * day }); // 초과
+    createTask({ text: "일반 할일" }); // ref 없음 → 집계 제외
+
+    const r = (await computeKpiSnapshot()).remediation;
+    expect(r.tasks).toBe(3); // ref=vuln: 인 것만
+    expect(r.overdue).toBe(1);
+    expect(r.dueSoon).toBe(1);
+    expect(r.slaCompliance).toBe(67); // 3건 중 2건 기한 내 = 67%
   });
 
   it("GET /api/kpi returns current + trend and persists one row per day", async () => {

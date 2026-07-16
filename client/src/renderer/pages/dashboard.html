@@ -70,6 +70,8 @@
   .today-del{flex-shrink:0;background:none;border:none;color:var(--muted-2);cursor:pointer;font-size:13px;line-height:1;padding:2px 5px;border-radius:4px;}
   .today-del:hover{color:#f5928a;background:rgba(226,72,61,0.14);}
   #todayItems{max-height:260px;overflow-y:auto;}
+  .today-sla{font-size:10px;font-weight:800;flex-shrink:0;}
+  .today-who{font-size:10px;font-weight:700;color:var(--blue-light);background:rgba(59,130,246,0.14);padding:1px 6px;border-radius:5px;flex-shrink:0;max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .today-p{padding:2px 7px;border-radius:5px;font-size:10.5px;font-weight:800;flex-shrink:0;}
   .p0{background:rgba(226,72,61,0.18);color:#f5928a;}
   .p1{background:rgba(240,160,32,0.18);color:#f7c777;}
@@ -468,14 +470,25 @@
     }
   }
 
+  // SLA(기한) 배지: 남은 일수(D-N) 또는 초과(D+N). 임박(3일↓)·초과는 색으로 경고.
+  function slaBadge(t) {
+    if (!t.dueAt || t.done) return "";
+    const days = Math.ceil((t.dueAt - Date.now()) / 86400000);
+    const label = days < 0 ? `기한초과 D+${-days}` : days === 0 ? "오늘 마감" : `D-${days}`;
+    const color = days < 0 ? "#f5928a" : days <= 3 ? "var(--amber)" : "var(--muted-2)";
+    return `<span class="today-sla" style="color:${color}" title="조치 기한(SLA)">${label}</span>`;
+  }
+
   function taskRowHtml(t) {
     const cls = PRIORITY_CLASS[t.priority] || "p1";
     const text = String(t.text).replace(/</g, "&lt;");
+    const who = t.assignee ? `<span class="today-who" title="담당자">${String(t.assignee).replace(/</g, "&lt;")}</span>` : "";
     return (
       `<div class="today-item ${t.done ? "done" : ""}" data-id="${t.id}">` +
       `<input type="checkbox" class="today-check" ${t.done ? "checked" : ""} title="완료 표시">` +
       `<span class="today-p ${cls}">${t.priority}</span>` +
       `<span class="today-text" title="${text}">${text}</span>` +
+      who + slaBadge(t) +
       `<button class="today-del" title="삭제">✕</button>` +
       `</div>`
     );
@@ -502,7 +515,11 @@
         return;
       }
       // 지연/마감 점검(있으면) 맨 위, 그다음 미완료 할 일(우선순위 순), 완료(최근 순)는 아래에 흐리게.
-      const open = tasks.filter((t) => !t.done).sort((a, b) => (PRIORITY_ORDER[a.priority] ?? 9) - (PRIORITY_ORDER[b.priority] ?? 9));
+      // 우선순위 → 기한(SLA) 순. 기한 있는 건이 없는 건보다 위로, 임박·초과가 먼저.
+      const open = tasks.filter((t) => !t.done).sort((a, b) =>
+        (PRIORITY_ORDER[a.priority] ?? 9) - (PRIORITY_ORDER[b.priority] ?? 9) ||
+        (a.dueAt ?? Infinity) - (b.dueAt ?? Infinity)
+      );
       const done = tasks.filter((t) => t.done).sort((a, b) => b.createdAt - a.createdAt);
       todayItems.innerHTML = [...dueMaint.map(maintDueRowHtml), ...open.map(taskRowHtml), ...done.map(taskRowHtml)].join("");
     } catch (e) {

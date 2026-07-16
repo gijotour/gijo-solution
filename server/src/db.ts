@@ -229,3 +229,13 @@ try {
 } catch {
   /* 컬럼이 이미 있으면 정상 — 무시 */
 }
+
+// 마이그레이션: tasks에 조치(remediation) 항목용 필드 — dueAt(SLA 기한, ms), assignee(담당자),
+// ref(연결된 취약점/자산 참조). 전부 선택 항목이라 nullable. 취약점 → 조치 항목 전환에 쓴다.
+for (const col of ["dueAt INTEGER", "assignee TEXT", "ref TEXT"]) {
+  try {
+    db.exec(`ALTER TABLE tasks ADD COLUMN ${col}`);
+  } catch {
+    /* 컬럼이 이미 있으면 정상 — 무시 */
+  }
+}

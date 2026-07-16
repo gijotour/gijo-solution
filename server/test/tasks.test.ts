@@ -57,6 +57,25 @@ describe("tasks (오늘 확인할 항목)", () => {
     expect(res.body.find((t: { id: string }) => t.id === id).done).toBe(true);
   });
 
+  it("stores SLA(dueAt)/assignee/ref when creating a remediation task", async () => {
+    const due = Date.now() + 7 * 86400000;
+    const res = await request(app)
+      .post("/api/tasks")
+      .set(auth())
+      .send({ text: "[조치] Log4Shell — oracle.local", priority: "P0", dueAt: due, assignee: "김보안", ref: "vuln:192.168.219.98" });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ priority: "P0", dueAt: due, assignee: "김보안", ref: "vuln:192.168.219.98" });
+
+    const list = await request(app).get("/api/tasks").set(auth());
+    expect(list.body[0]).toMatchObject({ dueAt: due, assignee: "김보안", ref: "vuln:192.168.219.98" });
+  });
+
+  it("rejects empty text and ignores an invalid priority", async () => {
+    expect((await request(app).post("/api/tasks").set(auth()).send({ text: "  " })).status).toBe(400);
+    const ok = await request(app).post("/api/tasks").set(auth()).send({ text: "일반 할일", priority: "P9" });
+    expect(ok.body.priority).toBe("P2"); // 잘못된 우선순위는 기본값
+  });
+
   it("requires auth", async () => {
     expect((await request(app).get("/api/tasks")).status).toBe(401);
     expect((await request(app).delete("/api/tasks/x")).status).toBe(401);

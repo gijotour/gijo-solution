@@ -171,6 +171,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       // 경로 중간이 없으면(옛 스냅샷에 vulnerabilities 없음) 0으로 — 추세가 끊기지 않게.
       const series = (path) => trend.map((s) => path.split(".").reduce((o, k) => (o == null ? undefined : o[k]), s) ?? 0);
       const v = c.vulnerabilities || { hosts: 0, active: 0, critical: 0, high: 0, medium: 0, low: 0, kev: 0, newCount: 0, resurfaced: 0, newlyFixed: 0, remediationRate: 0 };
+      const rem = c.remediation || { tasks: 0, open: 0, done: 0, overdue: 0, dueSoon: 0, slaCompliance: 100 };
 
       root.innerHTML =
         `<div class="cat"><div class="cat-title">🖥 자산 위험도</div><div class="tiles">` +
@@ -213,6 +214,13 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         tile("✓ 고쳐짐", v.newlyFixed, "var(--teal)") +
         `</div></div>` +
 
+        `<div class="cat"><div class="cat-title">📋 조치 항목 · SLA</div><div class="tiles">` +
+        tile("조치 항목", rem.tasks) +
+        tile("기한 초과", rem.overdue, rem.overdue ? "#f5928a" : "var(--teal)") +
+        tile("임박(3일↓)", rem.dueSoon, rem.dueSoon ? "var(--amber)" : "var(--muted)") +
+        tile("SLA 준수율", rem.slaCompliance + "%", rem.slaCompliance >= 90 ? "var(--teal)" : rem.slaCompliance >= 70 ? "var(--amber)" : "#f5928a") +
+        `</div></div>` +
+
         `<div class="cat"><div class="cat-title">✓ 컴플라이언스 · 🔄 AI 학습</div><div class="tiles">` +
         tile("KISA 위협 항목", c.compliance.total) +
         tile("대응 완료", c.compliance.covered, "var(--teal)") +
@@ -223,8 +231,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         `<div class="cat"><div class="cat-title">📈 추세 · 조치 번다운</div><div class="trend-grid">` +
         trendCard("열린 취약점 (번다운 — 줄수록 좋음)", series("vulnerabilities.active"), "#f5928a", "건") +
         trendCard("실제 악용(KEV)", series("vulnerabilities.kev"), "#ff8a80", "건") +
-        trendCard("고위험 자산", series("assets.highRisk"), "#f5928a", "건") +
-        trendCard("컴플라이언스 대응률", series("compliance.coverageRate"), "var(--teal)", "%") +
+        trendCard("SLA 준수율", series("remediation.slaCompliance"), "var(--teal)", "%") +
+        trendCard("조치 기한 초과", series("remediation.overdue"), "#f5928a", "건") +
         `</div></div>`;
     } catch (e) {
       root.innerHTML = '<div style="color:#f5928a">KPI를 불러오지 못했습니다: ' + String(e.message || e).replace(/</g, "&lt;") + "</div>";

@@ -17,6 +17,7 @@ import { listCompliance } from "./compliance";
 import { listFindings } from "./cti";
 import { matchCtiToAssets } from "./ctimatch";
 import { listLearnloopRuns } from "./learnloop";
+import { listTasks } from "./tasks";
 
 export interface KpiSnapshot {
   date: string; // YYYY-MM-DD
@@ -41,6 +42,15 @@ export interface KpiSnapshot {
     resurfaced: number; // 재발
     newlyFixed: number; // 최근 스캔에서 고쳐짐
     remediationRate: number; // 고쳐짐 / (열림 + 고쳐짐) %
+  };
+  // 조치 항목(SLA) 추적 — 취약점에서 등록된 조치 태스크(ref가 vuln:)의 기한 준수 현황.
+  remediation: {
+    tasks: number; // 조치 항목 수
+    open: number;
+    done: number;
+    overdue: number; // 기한 초과 미완료
+    dueSoon: number; // 3일 내 마감(미완료)
+    slaCompliance: number; // 기한 초과 안 한 비율 %
   };
 }
 
@@ -89,6 +99,20 @@ function vulnerabilityMetrics(): KpiSnapshot["vulnerabilities"] {
   return v;
 }
 
+// 취약점에서 등록된 조치 항목(task.ref가 "vuln:")의 SLA 준수 현황.
+function remediationMetrics(): KpiSnapshot["remediation"] {
+  const now = Date.now();
+  const tasks = listTasks().filter((t) => (t.ref ?? "").startsWith("vuln:"));
+  const done = tasks.filter((t) => t.done).length;
+  const open = tasks.length - done;
+  const overdue = tasks.filter((t) => !t.done && t.dueAt != null && t.dueAt < now).length;
+  const dueSoon = tasks.filter((t) => !t.done && t.dueAt != null && t.dueAt >= now && t.dueAt - now <= 3 * 86400000).length;
+  // SLA 준수 = 기한을 넘기지 않은 것(완료했거나 아직 기한 전) 비율.
+  const compliant = tasks.filter((t) => t.dueAt == null || t.done || t.dueAt >= now).length;
+  const slaCompliance = tasks.length ? Math.round((compliant / tasks.length) * 100) : 100;
+  return { tasks: tasks.length, open, done, overdue, dueSoon, slaCompliance };
+}
+
 export async function computeKpiSnapshot(): Promise<KpiSnapshot> {
   const assets = listAssets();
 
@@ -135,6 +159,7 @@ export async function computeKpiSnapshot(): Promise<KpiSnapshot> {
       deployedModels: runs.filter((r) => r.stage === "done").length,
     },
     vulnerabilities: vulnerabilityMetrics(),
+    remediation: remediationMetrics(),
   };
 }
 
