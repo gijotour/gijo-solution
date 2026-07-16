@@ -121,12 +121,22 @@
     main.insertBefore(bar, main.firstChild);
   }
 
-  function render() {
+  // 온보딩(시작 가이드)을 모든 페이지에 로드 — 런처로 어디서든 재열기·체크. 자동표시는 대시보드 1회.
+  function loadOnboarding() {
+    if (document.getElementById("gijoObScript")) return;
+    var s = document.createElement("script");
+    s.id = "gijoObScript";
+    s.src = "onboarding.js";
+    document.body.appendChild(s);
+  }
+
+  function boot() {
     var here = currentPage();
     renderSidebar(here);
     renderTabs(here);
+    loadOnboarding();
   }
 
-  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", render);
-  else render();
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+  else boot();
 })();
