@@ -24,6 +24,57 @@ export interface SbomDocument {
 
 const EXPORT_DIR = path.join("data", "exports");
 
+// SPDX 2.3 JSON — 표준 스키마라 별도 라이브러리 없이 직접 구성한다. 루트(자산=ML 모델) 패키지를
+// 문서가 DESCRIBES하고, 각 컴포넌트 패키지를 루트가 CONTAINS하는 관계로 표현한다. SPDXID는
+// `SPDXRef-[A-Za-z0-9.-]+`만 허용하므로 컴포넌트명 대신 인덱스 id를 쓰고 실제 이름은 name에 담는다.
+export function buildSpdxJson(assetId: string, components: SbomComponent[]): string {
+  const created = new Date().toISOString();
+  const rootId = "SPDXRef-Package-Root";
+  const pkgs = [
+    {
+      SPDXID: rootId,
+      name: assetId,
+      versionInfo: "NOASSERTION",
+      downloadLocation: "NOASSERTION",
+      filesAnalyzed: false,
+      licenseConcluded: "NOASSERTION",
+      licenseDeclared: "NOASSERTION",
+      copyrightText: "NOASSERTION",
+      primaryPackagePurpose: "APPLICATION",
+    },
+    ...components.map((c, i) => ({
+      SPDXID: `SPDXRef-Package-${i}`,
+      name: c.name,
+      versionInfo: c.version || "NOASSERTION",
+      downloadLocation: "NOASSERTION",
+      filesAnalyzed: false,
+      licenseConcluded: "NOASSERTION",
+      licenseDeclared: c.license || "NOASSERTION",
+      copyrightText: "NOASSERTION",
+      primaryPackagePurpose: "LIBRARY",
+    })),
+  ];
+  const relationships = [
+    { spdxElementId: "SPDXRef-DOCUMENT", relatedSpdxElement: rootId, relationshipType: "DESCRIBES" },
+    ...components.map((_, i) => ({
+      spdxElementId: rootId,
+      relatedSpdxElement: `SPDXRef-Package-${i}`,
+      relationshipType: "CONTAINS",
+    })),
+  ];
+  const doc = {
+    spdxVersion: "SPDX-2.3",
+    dataLicense: "CC0-1.0",
+    SPDXID: "SPDXRef-DOCUMENT",
+    name: `gijo-as-sbom-${assetId}`,
+    documentNamespace: `https://gijo.ai/spdx/${encodeURIComponent(assetId)}-${Date.now()}`,
+    creationInfo: { created, creators: ["Tool: GIJO-AS", "Organization: GIJO Technology"] },
+    packages: pkgs,
+    relationships,
+  };
+  return JSON.stringify(doc, null, 2);
+}
+
 function buildCycloneDxJson(assetId: string, components: SbomComponent[]): string {
   const bom = new Models.Bom();
   bom.metadata.component = new Models.Component(Enums.ComponentType.MachineLearningModel, assetId);
@@ -53,11 +104,8 @@ export async function generateSbom(assetId: string): Promise<SbomDocument> {
 }
 
 export async function exportSbom(assetId: string, format: "cyclonedx" | "spdx"): Promise<string> {
-  if (format === "spdx") {
-    throw new Error("SPDX 내보내기는 아직 미구현 — CycloneDX만 지원 (spdx-sbom-generator 등 별도 라이브러리 연동 필요)");
-  }
   const { components } = await generateSbom(assetId);
-  const json = buildCycloneDxJson(assetId, components);
+  const json = format === "spdx" ? buildSpdxJson(assetId, components) : buildCycloneDxJson(assetId, components);
 
   await fs.mkdir(EXPORT_DIR, { recursive: true });
   const filePath = path.join(EXPORT_DIR, `${assetId}.${format}.json`);

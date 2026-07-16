@@ -416,7 +416,7 @@ tr:last-child td{border-bottom:none;}
             ? '<span class="badge b-teal">생성됨</span>'
             : '<span class="badge b-amber">미생성</span>';
           const actionCell = a.sbomGeneratedAt
-            ? `<span data-export="${a.id}">내보내기 →</span>`
+            ? `<span data-export="${a.id}" data-fmt="cyclonedx">CycloneDX ↓</span> · <span data-export="${a.id}" data-fmt="spdx">SPDX ↓</span>`
             : `<span data-generate="${a.id}">지금 생성 →</span>`;
           return `<tr>
             <td><div class="asset-name" style="cursor:pointer" data-select="${a.id}">${a.name}</div></td>
@@ -484,9 +484,10 @@ tr:last-child td{border-bottom:none;}
         logExport("생성", genId, "SBOM 생성 완료");
         await refresh();
       } else if (exportId) {
+        const fmt = e.target.dataset.fmt === "spdx" ? "spdx" : "cyclonedx";
         e.target.textContent = "내보내는 중...";
-        const result = await window.gijo.exportSbom(exportId, "cyclonedx");
-        logExport("내보내기", exportId, `서버에 저장됨: ${result.path}`);
+        const result = await window.gijo.exportSbom(exportId, fmt);
+        logExport("내보내기", exportId, `${fmt.toUpperCase()} 저장됨: ${result.path}`);
         await refresh();
       }
     });
