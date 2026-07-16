@@ -168,7 +168,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     try {
       const { current, trend } = await window.gijo.getSecurityKpi();
       const c = current;
-      const series = (path) => trend.map((s) => path.split(".").reduce((o, k) => o[k], s));
+      // 경로 중간이 없으면(옛 스냅샷에 vulnerabilities 없음) 0으로 — 추세가 끊기지 않게.
+      const series = (path) => trend.map((s) => path.split(".").reduce((o, k) => (o == null ? undefined : o[k]), s) ?? 0);
+      const v = c.vulnerabilities || { hosts: 0, active: 0, critical: 0, high: 0, medium: 0, low: 0, kev: 0, newCount: 0, resurfaced: 0, newlyFixed: 0, remediationRate: 0 };
 
       root.innerHTML =
         `<div class="cat"><div class="cat-title">🖥 자산 위험도</div><div class="tiles">` +
@@ -199,6 +201,18 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         tile("긴급 매칭", c.cti.criticalMatches, "#f5928a") +
         `</div></div>` +
 
+        `<div class="cat"><div class="cat-title">🛡 취약점 조치 현황 (번다운)</div><div class="tiles">` +
+        tile("열린 취약점", v.active, v.active ? "#f5928a" : "var(--teal)") +
+        tile("🔴 실제 악용(KEV)", v.kev, v.kev ? "#ff8a80" : "var(--muted)") +
+        tile("이번 조치율", v.remediationRate + "%", "var(--teal)") +
+        tile("스캔 호스트", v.hosts, "var(--blue-light)") +
+        `</div><div class="tiles" style="margin-top:12px">` +
+        tile("Critical", v.critical, "#f5928a") +
+        tile("High", v.high, "#f7a86a") +
+        tile("🆕 신규", v.newCount, "var(--blue-light)") +
+        tile("✓ 고쳐짐", v.newlyFixed, "var(--teal)") +
+        `</div></div>` +
+
         `<div class="cat"><div class="cat-title">✓ 컴플라이언스 · 🔄 AI 학습</div><div class="tiles">` +
         tile("KISA 위협 항목", c.compliance.total) +
         tile("대응 완료", c.compliance.covered, "var(--teal)") +
@@ -206,10 +220,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         tile("배포된 학습 모델", c.learning.deployedModels, "var(--purple)") +
         `</div></div>` +
 
-        `<div class="cat"><div class="cat-title">📈 추세</div><div class="trend-grid">` +
+        `<div class="cat"><div class="cat-title">📈 추세 · 조치 번다운</div><div class="trend-grid">` +
+        trendCard("열린 취약점 (번다운 — 줄수록 좋음)", series("vulnerabilities.active"), "#f5928a", "건") +
+        trendCard("실제 악용(KEV)", series("vulnerabilities.kev"), "#ff8a80", "건") +
         trendCard("고위험 자산", series("assets.highRisk"), "#f5928a", "건") +
-        trendCard("지연 점검", series("inspections.overdue"), "var(--amber)", "건") +
-        trendCard("CTI 영향 자산", series("cti.affectedAssets"), "#f5928a", "건") +
         trendCard("컴플라이언스 대응률", series("compliance.coverageRate"), "var(--teal)", "%") +
         `</div></div>`;
     } catch (e) {

@@ -246,7 +246,7 @@ export function listAssets(): Asset[] {
 // maintenance.ts의 샘플 점검이 이 자산들에 연결될 수 있다. 실제 자산이 등록되면(테이블 비어있지
 // 않으면) 절대 끼어들지 않는다.
 export const SAMPLE_ASSET_IDS = ["ai-secbot-01", "ai-doccls-02", "ai-anomaly-03"] as const;
-function seedSampleAssetsIfEmpty(): void {
+export function seedSampleAssetsIfEmpty(): void {
   if ((listAssetRowsStmt.all() as AssetRow[]).length > 0) return;
   registerAsset({
     id: "ai-secbot-01",

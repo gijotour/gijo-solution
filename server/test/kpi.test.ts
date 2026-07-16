@@ -2,6 +2,9 @@ import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import { createApp } from "../src/app";
 import { computeKpiSnapshot, resetKpiForTests } from "../src/engine/kpi";
+import { importVulnScan } from "../src/engine/vulnscan";
+import { resetKevForTests } from "../src/engine/kev";
+import { resetAssetsForTests, seedSampleAssetsIfEmpty } from "../src/engine/assets";
 
 async function login(app: ReturnType<typeof createApp>) {
   const res = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" });
@@ -15,6 +18,10 @@ describe("kpi (통합 보안 KPI 대시보드)", () => {
 
   beforeEach(async () => {
     resetKpiForTests();
+    // 테스트 간 자산 상태 격리: 시드 3개로 되돌린다(취약점 임포트 테스트가 자산을 남기지 않게).
+    resetAssetsForTests();
+    seedSampleAssetsIfEmpty();
+    resetKevForTests();
     app = createApp();
     token = await login(app);
   });
@@ -35,6 +42,33 @@ describe("kpi (통합 보안 KPI 대시보드)", () => {
       expect(snap[k]).toBeTruthy();
     }
     expect(snap.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("includes vulnerability remediation metrics (active/KEV/fixed) from vuln scans", async () => {
+    resetKevForTests(["CVE-2021-44228"]); // KEV 등재로 가정
+    // 1차 스캔: 3건 모두 new
+    importVulnScan(
+      "Plugin ID,CVE,Risk,Host,Name\n" +
+        "1,CVE-2021-44228,Critical,10.9.9.9,Log4Shell\n" +
+        "2,CVE-2020-1,High,10.9.9.9,취약점B\n" +
+        "3,,Medium,10.9.9.9,취약점C\n",
+      "csv",
+      "nessus"
+    );
+    let v = (await computeKpiSnapshot()).vulnerabilities;
+    expect(v.hosts).toBe(1);
+    expect(v.active).toBe(3);
+    expect(v.critical).toBe(1);
+    expect(v.kev).toBe(1); // Log4Shell
+    expect(v.newCount).toBe(3);
+    expect(v.newlyFixed).toBe(0);
+
+    // 2차 스캔: B/C 사라짐 → fixed 2, active 1
+    importVulnScan("Plugin ID,CVE,Risk,Host,Name\n1,CVE-2021-44228,Critical,10.9.9.9,Log4Shell\n", "csv", "nessus");
+    v = (await computeKpiSnapshot()).vulnerabilities;
+    expect(v.active).toBe(1);
+    expect(v.newlyFixed).toBe(2);
+    expect(v.remediationRate).toBe(67); // 2 / (1 + 2) = 67%
   });
 
   it("GET /api/kpi returns current + trend and persists one row per day", async () => {

@@ -27,6 +27,21 @@ export interface KpiSnapshot {
   cti: { totalFindings: number; matchedFindings: number; affectedAssets: number; criticalMatches: number };
   compliance: { total: number; covered: number; coverageRate: number };
   learning: { totalRuns: number; deployedModels: number };
+  // 취약점 조치 현황(번다운·측정) — 인프라 호스트 자산의 최근 스캔 기준. 일일 스냅샷이 쌓이면
+  // vulnerabilities.active 추세가 곧 조치 번다운(줄어들수록 좋음)이 된다.
+  vulnerabilities: {
+    hosts: number;
+    active: number; // 현재 열린 취약점(fixed 제외)
+    critical: number;
+    high: number;
+    medium: number;
+    low: number;
+    kev: number; // 실제 악용 확인(CISA KEV)
+    newCount: number; // 최근 스캔에서 새로 생김
+    resurfaced: number; // 재발
+    newlyFixed: number; // 최근 스캔에서 고쳐짐
+    remediationRate: number; // 고쳐짐 / (열림 + 고쳐짐) %
+  };
 }
 
 function todayStr(): string {
@@ -46,6 +61,32 @@ function riskCounts(): { total: number; highRisk: number; midRisk: number; lowRi
     else lowRisk++;
   }
   return { total: assets.length, highRisk, midRisk, lowRisk };
+}
+
+// 인프라 호스트 자산(취약점 스캔 대상)의 최근 스캔 findings로 조치 현황을 집계한다.
+// state 태깅(vulnscan.ts)에 기대 — active/new/resurfaced는 열린 것, fixed는 고쳐진 것.
+function vulnerabilityMetrics(): KpiSnapshot["vulnerabilities"] {
+  const hosts = listAssets().filter((a) => a.assetType === "infra-host");
+  const v = { hosts: hosts.length, active: 0, critical: 0, high: 0, medium: 0, low: 0, kev: 0, newCount: 0, resurfaced: 0, newlyFixed: 0, remediationRate: 0 };
+  for (const a of hosts) {
+    for (const f of a.findings) {
+      if (f.state === "fixed") {
+        v.newlyFixed++;
+        continue;
+      }
+      v.active++;
+      if (f.severity === "critical") v.critical++;
+      else if (f.severity === "high") v.high++;
+      else if (f.severity === "medium") v.medium++;
+      else v.low++;
+      if (f.kev) v.kev++;
+      if (f.state === "new") v.newCount++;
+      else if (f.state === "resurfaced") v.resurfaced++;
+    }
+  }
+  const denom = v.active + v.newlyFixed;
+  v.remediationRate = denom ? Math.round((v.newlyFixed / denom) * 100) : 0;
+  return v;
 }
 
 export async function computeKpiSnapshot(): Promise<KpiSnapshot> {
@@ -93,6 +134,7 @@ export async function computeKpiSnapshot(): Promise<KpiSnapshot> {
       totalRuns: runs.length,
       deployedModels: runs.filter((r) => r.stage === "done").length,
     },
+    vulnerabilities: vulnerabilityMetrics(),
   };
 }
 
