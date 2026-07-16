@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 온톨로지 (지식 그래프)</title>
+<style>
+:root{
+  --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
+.app{display:grid;grid-template-columns:220px 1fr;}
+.sidebar{padding:22px 14px;border-right:1px solid var(--border);min-height:900px;}
+.nav-section{font-size:10.5px;font-weight:700;color:var(--muted-2);letter-spacing:1.2px;margin:18px 10px 8px;}
+.nav-section:first-child{margin-top:0;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:2px;}
+.nav-item .ic{width:18px;text-align:center;font-size:14px;}
+.nav-item.active{background:rgba(59,130,246,0.12);color:var(--white);box-shadow:inset 3px 0 0 var(--blue);cursor:default;}
+.nav-item:hover:not(.active){background:rgba(255,255,255,0.04);color:var(--white);}
+.main{padding:28px 32px 48px;}
+.topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;}
+.page-title{font-size:21px;font-weight:800;color:#fff;}
+.page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;}
+.btn-primary{background:var(--blue);color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;}
+.btn-primary:disabled{opacity:0.5;cursor:not-allowed;}
+.btn-ghost{background:var(--panel);color:var(--text);border:1px solid var(--border-strong);padding:8px 14px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;max-width:960px;}
+.panel-title{font-size:14.5px;font-weight:800;color:#fff;margin-bottom:4px;}
+.panel-sub{font-size:11.5px;color:var(--muted);margin-bottom:16px;line-height:1.6;}
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:6px;font-weight:600;}
+.field input,.field select{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;outline:none;}
+.field-row{display:flex;gap:8px;align-items:flex-end;}
+.field-row .field{flex:1;margin-bottom:0;}
+.status-line{font-size:12.5px;margin-top:10px;}
+.status-ok{color:var(--teal);}
+.status-err{color:#f5928a;}
+.hint{font-size:11.5px;color:var(--muted-2);margin-top:8px;line-height:1.6;}
+.stat-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;max-width:960px;}
+.stat-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 20px;min-width:150px;}
+.stat-num{font-size:26px;font-weight:800;color:#fff;}
+.stat-label{font-size:11.5px;color:var(--muted);margin-top:2px;}
+.triple-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border);font-size:12.5px;}
+.triple-row:last-child{border-bottom:none;}
+.chip{display:inline-block;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:6px;padding:3px 9px;font-weight:700;color:var(--text);}
+.chip-s{color:var(--blue-light);}
+.chip-o{color:var(--teal);}
+.pred{color:var(--muted);font-size:11.5px;}
+.arrow{color:var(--muted-2);}
+.del-btn{margin-left:auto;background:none;border:none;color:var(--muted-2);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:6px;}
+.del-btn:hover{color:var(--red);background:rgba(226,72,61,0.1);}
+.src-tag{font-size:10px;color:var(--muted-2);background:rgba(139,124,240,0.12);border-radius:5px;padding:2px 6px;margin-left:6px;}
+.list-box{max-height:360px;overflow-y:auto;}
+.graph-wrap{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.graph-wrap svg{display:block;width:100%;height:440px;}
+.node circle{fill:var(--panel);stroke:var(--blue);stroke-width:1.5;transition:.15s;}
+.node text{fill:var(--text);font-size:10.5px;font-weight:600;}
+.node.dim circle,.node.dim text{opacity:.2;}
+.edge{stroke:var(--border-strong);stroke-width:1;}
+.edge.hl{stroke:var(--blue-light);stroke-width:2;}
+.edge-label{fill:var(--muted-2);font-size:8.5px;}
+.footer{margin-top:8px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted-2);}
+.footer img{height:16px;opacity:0.6;}
+.header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2);}
+.header-left{display:flex;align-items:center;gap:12px;}
+.header-left img{height:22px;}
+.app-title{font-size:15px;font-weight:800;color:#fff;}
+.clock{font-size:12px;color:var(--blue-light);font-weight:600;}
+.header-right{display:flex;align-items:center;gap:10px;}
+.status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
+.status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
+.beta-tag{background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
+.avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+.icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
+.result-box{background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:12px;font-size:12.5px;color:var(--text);}
+.result-chunk{padding:7px 0;border-bottom:1px solid var(--border);line-height:1.6;}
+.result-chunk:last-child{border-bottom:none;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <span id="homeLink" data-page="dashboard.html" title="대시보드로 이동" style="display:flex;align-items:center;gap:12px;cursor:pointer"><img src="https://gijo.ai/_nuxt/logo_gijo_white.CCh2YXJe.svg" alt="GIJO">
+    <div class="app-title">GIJO AS</div></span>
+    <div class="clock" id="clockEl">-</div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill" id="statusPill"><span class="dot"></span>연결 확인 중<span class="beta-tag">LIVE</span></div>
+    <div class="avatar-btn" id="avatarBtn">-</div>
+    <div class="icon-btn" id="settingsBtn">⚙</div>
+  </div>
+</div>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="nav-section">모니터링</div>
+    <div class="nav-item" data-page="dashboard.html"><span class="ic">◆</span>대시보드</div>
+    <div class="nav-item" data-page="kpi.html"><span class="ic">📊</span>보안 KPI</div>
+    <div class="nav-section">자산 · 취약점</div>
+    <div class="nav-item" data-page="inventory.html"><span class="ic">◇</span>AI 자산</div>
+    <div class="nav-item" data-page="sbom.html"><span class="ic">▢</span>AI-BOM</div>
+    <div class="nav-item" data-page="vulnscan.html"><span class="ic">⊘</span>취약 자산관리</div>
+    <div class="nav-item" data-page="threat.html"><span class="ic">△</span>위협 인텔리전스</div>
+    <div class="nav-section">보안 운영</div>
+    <div class="nav-item" data-page="products.html"><span class="ic">🧰</span>보안제품 관리</div>
+    <div class="nav-item" data-page="opsguide.html"><span class="ic">🛠</span>운영 가이드(유지보수)</div>
+    <div class="nav-item" data-page="approvals.html"><span class="ic">◈</span>승인 워크플로우</div>
+    <div class="nav-section">보고 · 컴플라이언스</div>
+    <div class="nav-item" data-page="report.html"><span class="ic">▣</span>내부 리포트</div>
+    <div class="nav-item" data-page="compliance.html"><span class="ic">✓</span>컴플라이언스</div>
+    <div class="nav-section">AI 팀 · 학습</div>
+    <div class="nav-item" data-page="agent.html"><span class="ic">◉</span>에이전트 AI</div>
+    <div class="nav-item" data-page="memory.html"><span class="ic">⛁</span>AI 기억 · 학습</div>
+    <div class="nav-item active"><span class="ic">🕸</span>온톨로지</div>
+    <div class="nav-item" data-page="learnloop.html"><span class="ic">🔄</span>헤르메스 학습 루프</div>
+    <div class="nav-item" data-page="merge.html"><span class="ic">⬡</span>보안 LLM 합성</div>
+    <div class="nav-item" data-page="llmguide.html"><span class="ic">📚</span>추천 LLM 가이드</div>
+    <div class="nav-section">시스템</div>
+    <div class="nav-item" data-page="billing.html"><span class="ic">$</span>사용량 · 요금</div>
+    <div class="nav-item" data-page="logs.html"><span class="ic">▤</span>로그</div>
+    <div class="nav-item" data-page="settings.html"><span class="ic">⚙</span>설정</div>
+  </div>
+
+  <div class="main">
+    <div class="topbar-row">
+      <div>
+        <div class="page-title">온톨로지 · 지식 그래프</div>
+        <div class="page-sub">엔티티 사이의 <b>명시적 관계·규칙</b>을 트리플(주어–관계–대상)로 저장합니다. 벡터 검색(장기 기억)이 "비슷한 문장"을 찾는다면, 여기는 "왜 이 판단인지"의 근거가 되어 채팅에 함께 주입됩니다.</div>
+      </div>
+      <button class="btn-primary" id="seedBtn" title="KISA AI 보안 위협 카탈로그를 트리플로 불러옵니다">＋ 샘플 지식 불러오기 (KISA 위협)</button>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat-card"><div class="stat-num" id="statCount">-</div><div class="stat-label">전체 관계(트리플)</div></div>
+      <div class="stat-card"><div class="stat-num" id="statEntities">-</div><div class="stat-label">엔티티(노드)</div></div>
+      <div class="stat-card"><div class="stat-num" id="statPreds">-</div><div class="stat-label">관계 종류</div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">🔎 규칙 주입 미리보기</div>
+      <div class="panel-sub">질문을 입력하면, 채팅 시 이 질문에 <b>어떤 규칙·관계가 함께 주입되는지</b> 그대로 보여줍니다(하이브리드 확장). 예: "탈옥 대응", "관리자API 차단"</div>
+      <div class="field-row">
+        <div class="field"><label for="expandInput">질문 / 텍스트</label><input id="expandInput" placeholder="예: 탈옥 위협에 어떻게 대응하나요?"></div>
+        <button class="btn-primary" id="expandBtn" style="align-self:flex-end">확장</button>
+      </div>
+      <div class="result-box" id="expandResult" style="display:none"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">🕸 관계 그래프</div>
+      <div class="panel-sub">현재 등록된 관계를 노드-링크로 시각화합니다. 노드에 마우스를 올리면 연결된 관계가 강조됩니다. (가독성을 위해 최대 <span id="graphCap">60</span>개 관계까지 표시)</div>
+      <div class="field-row" style="margin-bottom:12px">
+        <div class="field"><label for="filterSubject">특정 엔티티만 보기 (주어)</label><input id="filterSubject" placeholder="비워두면 전체 · 예: 탈옥"></div>
+        <button class="btn-ghost" id="filterBtn" style="align-self:flex-end">필터</button>
+        <button class="btn-ghost" id="filterClearBtn" style="align-self:flex-end">전체</button>
+      </div>
+      <div class="graph-wrap"><svg id="graph" viewBox="0 0 900 440" preserveAspectRatio="xMidYMid meet"></svg></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">＋ 관계 추가</div>
+      <div class="panel-sub">주어–관계–대상 형식으로 규칙을 직접 등록합니다. 예: <span class="chip chip-s">관리자API</span> <span class="pred">접근권한</span> <span class="chip chip-o">보안운영팀</span></div>
+      <div class="field-row">
+        <div class="field"><label>주어 (Subject)</label><input id="addSubject" placeholder="관리자API"></div>
+        <div class="field"><label>관계 (Predicate)</label><input id="addPredicate" placeholder="접근권한"></div>
+        <div class="field"><label>대상 (Object)</label><input id="addObject" placeholder="보안운영팀"></div>
+      </div>
+      <div class="field-row" style="margin-top:12px">
+        <div class="field"><label>출처 (선택)</label><input id="addSource" placeholder="예: 접근제어지침 3.2"></div>
+        <div class="field"><label for="addScope">적용 범위</label><select id="addScope"><option value="global">전체 공유 (모든 에이전트)</option></select></div>
+        <button class="btn-primary" id="addBtn" style="align-self:flex-end">추가</button>
+      </div>
+      <div class="status-line" id="addStatus"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">📋 등록된 관계 <span id="listCount" style="color:var(--muted);font-weight:600;font-size:12px"></span></div>
+      <div class="panel-sub">삭제하려면 각 행의 🗑 을 누르세요. 자동 생성(시드) 항목은 출처 태그가 붙습니다.</div>
+      <div class="list-box" id="tripleList"></div>
+    </div>
+
+    <div class="footer">
+      <img src="https://gijo.ai/_nuxt/logo_gijo_only_white.ATZVOJtw.svg" alt="GIJO">
+      <span>© 2026 GIJO Technology · GIJO AS Platform · Confidential</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  const clockEl = document.getElementById("clockEl");
+  const statusPill = document.getElementById("statusPill");
+  const avatarBtn = document.getElementById("avatarBtn");
+  const GRAPH_CAP = 60;
+  let allTriples = [];
+
+  function tick() {
+    clockEl.textContent = new Date().toLocaleString("ko-KR", {
+      hour: "2-digit", minute: "2-digit", hour12: true, year: "numeric", month: "2-digit", day: "2-digit",
+    });
+  }
+  async function loadHealth() {
+    try { await window.gijo.checkServerHealth(); statusPill.innerHTML = '<span class="dot"></span>운영중<span class="beta-tag">LIVE</span>'; }
+    catch (e) { statusPill.innerHTML = '<span class="dot" style="background:#e2483d"></span>서버 연결 끊김'; }
+  }
+  async function loadUser() {
+    try { const user = await window.gijo.me(); avatarBtn.textContent = (user.displayName || user.username || "-").charAt(0); } catch (e) {}
+  }
+  async function loadAgentScopes() {
+    try {
+      const agents = await window.gijo.listAgents();
+      const sel = document.getElementById("addScope");
+      for (const a of agents) sel.insertAdjacentHTML("beforeend", `<option value="${a.id}">${a.name} 전용</option>`);
+    } catch (e) {}
+  }
+
+  const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  function renderStats() {
+    const nodes = new Set(), preds = new Set();
+    for (const t of allTriples) { nodes.add(t.subject); nodes.add(t.object); preds.add(t.predicate); }
+    document.getElementById("statCount").textContent = allTriples.length;
+    document.getElementById("statEntities").textContent = nodes.size;
+    document.getElementById("statPreds").textContent = preds.size;
+  }
+
+  function renderList(triples) {
+    const box = document.getElementById("tripleList");
+    document.getElementById("listCount").textContent = `· ${triples.length}건`;
+    if (triples.length === 0) { box.innerHTML = `<div style="color:var(--muted-2);font-size:12.5px;padding:14px 0">등록된 관계가 없습니다. 위 "샘플 지식 불러오기"로 시작하거나 직접 추가하세요.</div>`; return; }
+    box.innerHTML = triples.map((t) => `
+      <div class="triple-row">
+        <span class="chip chip-s">${esc(t.subject)}</span>
+        <span class="arrow">—</span><span class="pred">${esc(t.predicate)}</span><span class="arrow">→</span>
+        <span class="chip chip-o">${esc(t.object)}</span>
+        ${t.source ? `<span class="src-tag">${esc(t.source)}</span>` : ""}
+        <button class="del-btn" data-id="${t.id}" title="삭제">🗑</button>
+      </div>`).join("");
+    box.querySelectorAll(".del-btn").forEach((b) => b.addEventListener("click", () => removeTriple(b.dataset.id)));
+  }
+
+  // 노드-링크 그래프를 원형 배치로 그린다(결정적 레이아웃 — 새로고침해도 위치 안정).
+  function renderGraph(triples) {
+    const svg = document.getElementById("graph");
+    const W = 900, H = 440, cx = W / 2, cy = H / 2, R = 165;
+    const shown = triples.slice(0, GRAPH_CAP);
+    document.getElementById("graphCap").textContent = GRAPH_CAP;
+    const nodeNames = [];
+    const seen = new Set();
+    for (const t of shown) { for (const n of [t.subject, t.object]) if (!seen.has(n)) { seen.add(n); nodeNames.push(n); } }
+    if (nodeNames.length === 0) { svg.innerHTML = `<text x="${cx}" y="${cy}" text-anchor="middle" fill="#5f6785" font-size="13">표시할 관계가 없습니다</text>`; return; }
+    const pos = {};
+    nodeNames.forEach((n, i) => {
+      const a = (i / nodeNames.length) * Math.PI * 2 - Math.PI / 2;
+      pos[n] = { x: cx + R * Math.cos(a), y: cy + R * Math.sin(a), i };
+    });
+    const deg = {}; nodeNames.forEach((n) => (deg[n] = 0));
+    shown.forEach((t) => { deg[t.subject]++; deg[t.object]++; });
+
+    let edges = "", labels = "", nodes = "";
+    shown.forEach((t, i) => {
+      const a = pos[t.subject], b = pos[t.object];
+      edges += `<line class="edge" data-s="${esc(t.subject)}" data-o="${esc(t.object)}" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}"></line>`;
+      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+      labels += `<text class="edge-label" x="${mx.toFixed(1)}" y="${my.toFixed(1)}" text-anchor="middle">${esc(t.predicate)}</text>`;
+    });
+    nodeNames.forEach((n) => {
+      const p = pos[n];
+      const r = Math.min(9 + deg[n] * 1.6, 18);
+      const anchor = p.x < cx ? "end" : "start";
+      const dx = p.x < cx ? -(r + 4) : (r + 4);
+      const label = n.length > 12 ? n.slice(0, 11) + "…" : n;
+      nodes += `<g class="node" data-name="${esc(n)}"><circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${r.toFixed(1)}"></circle>`
+        + `<text x="${(p.x + dx).toFixed(1)}" y="${(p.y + 3.5).toFixed(1)}" text-anchor="${anchor}">${esc(label)}</text></g>`;
+    });
+    svg.innerHTML = edges + labels + nodes;
+
+    // 호버 강조: 노드에 올리면 그 노드에 붙은 엣지·이웃만 밝게.
+    svg.querySelectorAll(".node").forEach((g) => {
+      const name = g.dataset.name;
+      g.addEventListener("mouseenter", () => {
+        const neighbors = new Set([name]);
+        svg.querySelectorAll(".edge").forEach((e) => {
+          const hit = e.dataset.s === name || e.dataset.o === name;
+          e.classList.toggle("hl", hit);
+          if (hit) { neighbors.add(e.dataset.s); neighbors.add(e.dataset.o); }
+        });
+        svg.querySelectorAll(".node").forEach((nn) => nn.classList.toggle("dim", !neighbors.has(nn.dataset.name)));
+      });
+      g.addEventListener("mouseleave", () => {
+        svg.querySelectorAll(".edge").forEach((e) => e.classList.remove("hl"));
+        svg.querySelectorAll(".node").forEach((nn) => nn.classList.remove("dim"));
+      });
+    });
+  }
+
+  async function refresh(filterSubject) {
+    try {
+      allTriples = await window.gijo.listOntology(filterSubject ? { subject: filterSubject } : undefined);
+    } catch (e) { allTriples = []; }
+    renderStats();
+    renderList(allTriples);
+    renderGraph(allTriples);
+  }
+
+  async function seed() {
+    const btn = document.getElementById("seedBtn");
+    btn.disabled = true; btn.textContent = "불러오는 중...";
+    try {
+      const r = await window.gijo.seedOntology();
+      btn.textContent = `✓ ${r.inserted}건 불러옴`;
+      document.getElementById("filterSubject").value = "";
+      await refresh();
+    } catch (e) { btn.textContent = "✗ 실패 — 다시 시도"; }
+    finally { setTimeout(() => { btn.disabled = false; btn.textContent = "＋ 샘플 지식 불러오기 (KISA 위협)"; }, 2200); }
+  }
+
+  async function addTriple() {
+    const subject = document.getElementById("addSubject").value.trim();
+    const predicate = document.getElementById("addPredicate").value.trim();
+    const object = document.getElementById("addObject").value.trim();
+    const source = document.getElementById("addSource").value.trim();
+    const scope = document.getElementById("addScope").value;
+    const status = document.getElementById("addStatus");
+    if (!subject || !predicate || !object) { status.textContent = "주어·관계·대상을 모두 입력하세요."; status.className = "status-line status-err"; return; }
+    try {
+      await window.gijo.addOntologyTriple({ subject, predicate, object, scope, source: source || undefined });
+      status.textContent = `✓ 추가됨: ${subject} —[${predicate}]→ ${object}`;
+      status.className = "status-line status-ok";
+      ["addSubject", "addPredicate", "addObject", "addSource"].forEach((id) => (document.getElementById(id).value = ""));
+      await refresh(document.getElementById("filterSubject").value.trim() || undefined);
+    } catch (e) { status.textContent = "✗ 추가 실패: " + e.message; status.className = "status-line status-err"; }
+  }
+
+  async function removeTriple(id) {
+    try { await window.gijo.removeOntologyTriple(id); await refresh(document.getElementById("filterSubject").value.trim() || undefined); } catch (e) {}
+  }
+
+  async function expand() {
+    const text = document.getElementById("expandInput").value.trim();
+    const box = document.getElementById("expandResult");
+    if (!text) return;
+    box.style.display = "block";
+    box.innerHTML = `<span style="color:var(--muted)">확장 중...</span>`;
+    try {
+      const hits = await window.gijo.expandOntology(text);
+      if (!hits || hits.length === 0) { box.innerHTML = `<span style="color:var(--muted-2)">이 질문에 연결되는 규칙이 없습니다. (그래프에 관련 엔티티가 없거나 아직 등록 전)</span>`; return; }
+      box.innerHTML = `<div style="color:var(--teal);font-weight:700;margin-bottom:8px">이 질문에 함께 주입될 규칙 ${hits.length}건:</div>` +
+        hits.map((t) => `<div class="result-chunk"><span class="chip chip-s">${esc(t.subject)}</span> <span class="pred">${esc(t.predicate)}</span> <span class="arrow">→</span> <span class="chip chip-o">${esc(t.object)}</span>${t.source ? ` <span class="src-tag">${esc(t.source)}</span>` : ""}</div>`).join("");
+    } catch (e) { box.innerHTML = `<span class="status-err">확장 실패: ${esc(e.message)}</span>`; }
+  }
+
+  async function init() {
+    tick(); setInterval(tick, 30000);
+    await loadUser(); await loadHealth(); await loadAgentScopes();
+    document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
+    document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
+    document.getElementById("seedBtn").addEventListener("click", seed);
+    document.getElementById("addBtn").addEventListener("click", addTriple);
+    document.getElementById("expandBtn").addEventListener("click", expand);
+    document.getElementById("expandInput").addEventListener("keydown", (e) => { if (e.key === "Enter") expand(); });
+    document.getElementById("filterBtn").addEventListener("click", () => refresh(document.getElementById("filterSubject").value.trim() || undefined));
+    document.getElementById("filterSubject").addEventListener("keydown", (e) => { if (e.key === "Enter") refresh(document.getElementById("filterSubject").value.trim() || undefined); });
+    document.getElementById("filterClearBtn").addEventListener("click", () => { document.getElementById("filterSubject").value = ""; refresh(); });
+    await refresh();
+    if (window.gijoRealtime) window.gijoRealtime.connect();
+  }
+
+  if (!window.gijo.isAuthenticated()) window.gijo.navigateTo("login.html");
+  else init();
+</script>
+
+<script>
+// 사이드바 섹션 접기·펼치기 — memory.html과 동일. localStorage로 유지.
+(() => {
+  const KEY = "gijo:navCollapsed";
+  let collapsed;
+  try { collapsed = new Set(JSON.parse(localStorage.getItem(KEY) || "[]")); } catch (e) { collapsed = new Set(); }
+  document.querySelectorAll(".sidebar .nav-section").forEach((sec) => {
+    const name = sec.textContent.trim();
+    const items = [];
+    let el = sec.nextElementSibling;
+    while (el && !el.classList.contains("nav-section")) { items.push(el); el = el.nextElementSibling; }
+    if (!items.length) return;
+    const caret = document.createElement("span");
+    caret.style.cssText = "float:right;font-size:9px;opacity:.8";
+    sec.appendChild(caret);
+    sec.style.cursor = "pointer";
+    if (items.some((i) => i.classList.contains("active"))) collapsed.delete(name);
+    const apply = () => {
+      const c = collapsed.has(name);
+      items.forEach((i) => (i.style.display = c ? "none" : ""));
+      caret.textContent = c ? "▸" : "▾";
+    };
+    apply();
+    sec.addEventListener("click", () => {
+      if (collapsed.has(name)) collapsed.delete(name); else collapsed.add(name);
+      try { localStorage.setItem(KEY, JSON.stringify([...collapsed])); } catch (e) {}
+      apply();
+    });
+  });
+})();
+</script>
+</body>
+</html>

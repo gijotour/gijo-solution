@@ -105,3 +105,36 @@ describe("ontology (온톨로지 / 지식 그래프) — 하이브리드 지식�
     expect(listTriples()).toHaveLength(2);
   });
 });
+
+describe("ontology 시드 — KISA 위협 카탈로그 → 트리플 (실제 도메인 데이터)", () => {
+  it("카탈로그의 위협을 실제 매핑 그대로 트리플로 만든다", async () => {
+    const { seedOntologyFromCatalog, SEED_SOURCE } = await import("../src/engine/ontology-seed");
+    const { inserted } = seedOntologyFromCatalog();
+    expect(inserted).toBeGreaterThan(20); // 위협 20건 × (코드+분류+영역+프레임워크 매핑들)
+
+    // '탈옥'(M06)은 카탈로그에 있는 실제 위협 — 코드·OWASP 매핑이 트리플로 있어야 한다.
+    const jailbreak = listTriples({ subject: "탈옥" });
+    expect(jailbreak.some((t) => t.predicate === "위협코드" && t.object === "M06")).toBe(true);
+    expect(jailbreak.some((t) => t.object.includes("LLM01:2025 Prompt Injection"))).toBe(true);
+    expect(jailbreak.every((t) => t.source === SEED_SOURCE)).toBe(true);
+  });
+
+  it("공유 매핑(OWASP LLM01)을 통해 서로 다른 위협이 그래프로 연결된다", async () => {
+    const { seedOntologyFromCatalog } = await import("../src/engine/ontology-seed");
+    seedOntologyFromCatalog();
+    // '탈옥'과 '에이전트 하이재킹'은 둘 다 LLM01:2025로 매핑 → 2홉이면 서로 닿는다.
+    const hits = expandOntology("탈옥 대응이 궁금합니다", undefined, { hops: 2, limit: 50 });
+    const subjects = new Set(hits.map((t) => t.subject));
+    expect(subjects.has("탈옥")).toBe(true);
+    expect(subjects.has("에이전트 하이재킹")).toBe(true); // LLM01 공유 노드를 경유
+  });
+
+  it("재적재는 멱등 — 시드 출처 트리플이 중복되지 않고 수동 입력분은 보존한다", async () => {
+    const { seedOntologyFromCatalog } = await import("../src/engine/ontology-seed");
+    addTriple({ subject: "수동규칙", predicate: "적용", object: "보존대상" }); // 손으로 넣은 것
+    const first = seedOntologyFromCatalog();
+    const second = seedOntologyFromCatalog();
+    expect(second.inserted).toBe(first.inserted); // 두 번 넣어도 같은 수
+    expect(listTriples({ subject: "수동규칙" })).toHaveLength(1); // 수동 입력분 보존
+  });
+});

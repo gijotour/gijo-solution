@@ -98,6 +98,15 @@ export function deleteTriple(id: string): boolean {
   return db.prepare("DELETE FROM ontology_triples WHERE id = ?").run(id).changes > 0;
 }
 
+// 특정 출처의 트리플을 모두 제거 — 시드(자동 생성 트리플) 재적재를 멱등하게 만들 때 쓴다.
+export function deleteTriplesBySource(source: string): number {
+  return db.prepare("DELETE FROM ontology_triples WHERE source = ?").run(source).changes;
+}
+
+export function countTriples(): number {
+  return (db.prepare("SELECT COUNT(*) AS n FROM ontology_triples").get() as { n: number }).n;
+}
+
 // 하이브리드 확장의 핵심. 주어진 텍스트(질문 + 벡터 RAG가 찾아온 청크)에서 온톨로지에 등록된
 // 엔티티를 부분문자열로 탐지해 시드로 삼고, 거기서 hops만큼 관계를 따라가며 관련 트리플을 모은다.
 // 한국어는 공백 토큰화가 불안정하므로(형태소 분석기 없이) 부분문자열 매칭을 쓴다.
@@ -210,6 +219,23 @@ export function registerOntologyRoutes(app: Express): void {
     asyncRoute(async (req, res) => {
       const text: string = req.body?.text ?? req.body?.question ?? "";
       res.json(expandOntology(text, req.body?.agentId, { hops: req.body?.hops, limit: req.body?.limit }));
+    })
+  );
+  // 그래프 개요 — 전체 트리플 수(화면 상태 표시용).
+  app.get(
+    "/api/ontology/stats",
+    authMiddleware,
+    asyncRoute(async (_req, res) => {
+      res.json({ count: countTriples() });
+    })
+  );
+  // 샘플 지식 적재 — KISA AI 보안 위협 카탈로그를 트리플로 변환해 넣는다(멱등). 화면 버튼용.
+  app.post(
+    "/api/ontology/seed",
+    authMiddleware,
+    asyncRoute(async (_req, res) => {
+      const { seedOntologyFromCatalog } = await import("./ontology-seed.js");
+      res.json(seedOntologyFromCatalog());
     })
   );
 }

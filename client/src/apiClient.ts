@@ -321,6 +321,33 @@ export const memoryApi = {
     request<string[]>("/api/memory/query", { method: "POST", body: { question, topK, agentId } }),
 };
 
+// ── 온톨로지 (지식 그래프 / 하이브리드 지식모델의 의미 계층) ──────────────
+export interface OntologyTriple {
+  id: string;
+  subject: string;
+  predicate: string;
+  object: string;
+  scope: string;
+  source: string | null;
+  createdAt: number;
+}
+export const ontologyApi = {
+  list: (filter?: { scope?: string; subject?: string }) => {
+    const q = new URLSearchParams();
+    if (filter?.scope) q.set("scope", filter.scope);
+    if (filter?.subject) q.set("subject", filter.subject);
+    const qs = q.toString();
+    return request<OntologyTriple[]>(`/api/ontology/triples${qs ? `?${qs}` : ""}`);
+  },
+  add: (t: { subject: string; predicate: string; object: string; scope?: string; source?: string }) =>
+    request<OntologyTriple>("/api/ontology/triple", { method: "POST", body: t }),
+  remove: (id: string) => request<{ deleted: boolean }>(`/api/ontology/triple/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  expand: (text: string, agentId?: string) =>
+    request<OntologyTriple[]>("/api/ontology/expand", { method: "POST", body: { text, agentId } }),
+  stats: () => request<{ count: number }>("/api/ontology/stats"),
+  seed: () => request<{ inserted: number; source: string }>("/api/ontology/seed", { method: "POST" }),
+};
+
 // ── LLM 브리지 / 채팅 ─────────────────────────────────────────────────
 export const bridgeApi = {
   run: (payload: unknown) => request("/api/bridge/run", { method: "POST", body: payload }),

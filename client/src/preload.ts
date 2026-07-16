@@ -116,6 +116,14 @@ const gijoApi = {
   ingestDocument: (path: string, scope?: string) => api.memoryApi.ingest(path, scope),
   ingestMemoryFile: (filename: string, content: string, scope?: string) => api.memoryApi.ingestFile(filename, content, scope),
   queryMemory: (question: string, topK?: number, agentId?: string) => api.memoryApi.query(question, topK, agentId),
+
+  // 온톨로지(지식 그래프)
+  listOntology: (filter?: { scope?: string; subject?: string }) => api.ontologyApi.list(filter),
+  addOntologyTriple: (t: { subject: string; predicate: string; object: string; scope?: string; source?: string }) => api.ontologyApi.add(t),
+  removeOntologyTriple: (id: string) => api.ontologyApi.remove(id),
+  expandOntology: (text: string, agentId?: string) => api.ontologyApi.expand(text, agentId),
+  ontologyStats: () => api.ontologyApi.stats(),
+  seedOntology: () => api.ontologyApi.seed(),
   startFinetune: (agentId: string, datasetId: string) => api.finetuneApi.start(agentId, datasetId),
   onFinetuneProgress: (cb: (p: unknown) => void) => onChannel("finetune:progress", cb),
   convertDataset: (rawText: string) => api.datasetApi.convert(rawText),
