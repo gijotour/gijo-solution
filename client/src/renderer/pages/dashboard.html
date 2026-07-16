@@ -633,7 +633,10 @@
   let bubbleSeq = 0;
   const escB = (s) => String(s == null ? "" : s).replace(/</g, "&lt;");
 
-  function spawnBubble(name, text, kind) {
+  // 화자는 아이콘으로만 표시한다(에이전트/오케스트레이터 이름 텍스트는 쓰지 않는다 — 꼬리가
+  // 중앙 GIJO 아이콘을 가리켜 출처가 자명). 문서검색만 "관점" 라벨을 아이콘 옆에 붙인다.
+  const BUBBLE_ICON = { user: "🗨", answer: "◆", error: "⚠", doc: "🔍" };
+  function spawnBubble(text, kind, label) {
     const slot = BUBBLE_SLOTS[bubbleSeq % BUBBLE_SLOTS.length];
     bubbleSeq++;
     const slotKey = slot.split(" ")[0];
@@ -641,8 +644,10 @@
     if (prev) prev.remove(); // 같은 슬롯의 이전 말풍선 교체
     const el = document.createElement("div");
     el.className = "float-bubble " + slot + (kind === "doc" ? " doc" : "");
+    const icon = BUBBLE_ICON[kind] || "◆";
+    const head = label ? `${icon} ${escB(label)}` : icon; // 답변·지시는 아이콘만
     el.innerHTML =
-      `<div class="fb-name">${kind === "doc" ? "🔍" : "◆"} ${escB(name)}<span class="fb-x" title="닫기">✕</span></div>` +
+      `<div class="fb-name">${head}<span class="fb-x" title="닫기">✕</span></div>` +
       `<div class="fb-text">${escB(text)}</div>`;
     el.querySelector(".fb-x").addEventListener("click", () => { el.remove(); toggleClearBtn(); });
     bubbleField.appendChild(el);
@@ -655,19 +660,19 @@
   async function sendToOrchestrator(text) {
     pulseBusy();
     agentBubbleText.textContent = "처리 중...";
-    // 사용자 지시도 말풍선으로 남겨 맥락을 보이게 한다.
-    spawnBubble("나의 지시", text, "answer");
+    // 사용자 지시(🗨)도 말풍선으로 남겨 맥락을 보이게 한다.
+    spawnBubble(text, "user");
     try {
       const result = await window.gijo.sendInstruction(text);
       agentBubbleName.textContent = result.route.agentId;
       agentBubbleText.textContent = result.output;
-      // 답변을 아이콘 주변 말풍선으로 — 여러 답변이 둘레에 쌓인다.
-      spawnBubble(result.route.agentId || "오케스트레이터", result.output, "answer");
+      // 답변은 아이콘(◆)만으로 — 이름 텍스트 없이 아이콘 주변에 쌓인다.
+      spawnBubble(result.output, "answer");
       await loadTasks();
       if (result.route.action === "scan") await loadAssets();
     } catch (e) {
       agentBubbleText.textContent = "지시 처리 중 오류가 발생했습니다: " + e.message;
-      spawnBubble("오류", e.message, "answer");
+      spawnBubble(e.message, "error");
     }
   }
 
@@ -726,7 +731,7 @@
       const results = await window.gijo.queryMemory(question, 5, agentId);
       if (results.length) {
         // 관점별 말풍선: 각 관련 문서 조각을 아이콘 주변에 띄운다(근거 1·2·3…).
-        results.forEach((r, i) => spawnBubble(`${scopeLabel} · 근거 ${i + 1}`, r, "doc"));
+        results.forEach((r, i) => spawnBubble(r, "doc", `${scopeLabel} · 근거 ${i + 1}`));
         box.innerHTML = '<div style="color:var(--teal);font-size:11.5px">🔍 “' + question.replace(/</g, "&lt;") + '” — 아이콘 주변에 ' + results.length + '개 관점 말풍선으로 표시했습니다.</div>';
       } else {
         box.innerHTML = '<div style="color:var(--muted);font-size:12px">관련 문서가 없습니다 — 먼저 문서를 올리세요(왼쪽 파일 탐색기에서 문서 클릭 또는 AI 기억·학습 화면).</div>';
