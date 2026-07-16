@@ -9,6 +9,7 @@ import { authMiddleware, adminMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { db } from "../db";
 import type { GijoUser } from "../auth/users";
+import { sendMail } from "./email";
 
 export type MaintenanceStatus = "scheduled" | "reported" | "approved" | "rejected";
 
@@ -294,6 +295,51 @@ export function listMaintenanceByAsset(assetId: string): MaintenanceItem[] {
   return (byAssetStmt.all(assetId) as MaintenanceRow[]).map(fromRow);
 }
 
+// ── 점검 지연/마감 이메일 알림 ────────────────────────────────────────
+// 기존 SMTP 설정(email.ts)을 그대로 재사용한다. 알림 수신자는 app_state에 저장해 다음에 미리 채운다.
+const getMailStateStmt = db.prepare("SELECT value FROM app_state WHERE key = ?");
+const setMailStateStmt = db.prepare(
+  "INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+);
+const RECIPIENTS_KEY = "maintenance:notifyEmails";
+
+export function getNotifyRecipients(): string[] {
+  const raw = (getMailStateStmt.get(RECIPIENTS_KEY) as { value: string } | undefined)?.value;
+  return raw ? JSON.parse(raw) : [];
+}
+
+function saveNotifyRecipients(emails: string[]): void {
+  setMailStateStmt.run(RECIPIENTS_KEY, JSON.stringify(emails));
+}
+
+// 지연/마감 점검 목록으로 알림 메일 본문을 만든다(순수 함수 — 테스트 용이). 마감 지난 일수를 계산.
+export function buildDueMaintenanceEmail(items: MaintenanceItem[]): { subject: string; text: string } {
+  const todayStr = today();
+  const lines = items.map((m) => {
+    const daysOver = Math.round((Date.parse(todayStr) - Date.parse(m.scheduleDate)) / (24 * 60 * 60 * 1000));
+    const when = daysOver > 0 ? `${daysOver}일 지연` : "오늘 마감";
+    return `• [${when}] ${m.title} — ${m.productName}${m.assetName ? ` (자산: ${m.assetName})` : ""} · 예정일 ${m.scheduleDate}`;
+  });
+  const subject = `[GIJO AS] 유지보수 점검 ${items.length}건 마감/지연 알림`;
+  const text =
+    `아래 보안제품 점검이 마감되었거나 지연되었습니다. GIJO AS 운영 가이드에서 점검 결과를 등록해주세요.\n\n` +
+    lines.join("\n") +
+    `\n\n— GIJO AS 자동 알림`;
+  return { subject, text };
+}
+
+// 지연/마감 점검을 수신자에게 메일로 알린다. 대상이 없으면 발송하지 않는다(빈 알림 방지).
+export async function notifyDueMaintenance(to: string[]): Promise<{ sent: boolean; count: number }> {
+  const recipients = to.map((s) => s.trim()).filter(Boolean);
+  if (recipients.length === 0) throw new Error("수신자 이메일이 필요합니다");
+  saveNotifyRecipients(recipients);
+  const due = listDueMaintenance();
+  if (due.length === 0) return { sent: false, count: 0 };
+  const { subject, text } = buildDueMaintenanceEmail(due);
+  await sendMail({ to: recipients, subject, text });
+  return { sent: true, count: due.length };
+}
+
 // 테스트 전용: db는 모듈 싱글턴이라 createApp()을 새로 호출해도 초기화되지 않는다.
 export function resetMaintenanceForTests(): void {
   db.exec("DELETE FROM maintenance_events");
@@ -391,6 +437,26 @@ seedSamplesIfEmpty();
 export function registerMaintenanceRoutes(app: Express): void {
   app.get("/api/maintenance", authMiddleware, (_req, res) => res.json(listMaintenanceItems()));
   app.get("/api/maintenance/due", authMiddleware, (_req, res) => res.json(listDueMaintenance()));
+
+  // 지연/마감 점검 이메일 알림. GET은 저장된 수신자·현재 지연 건수(미리 보기)를, POST는 발송.
+  app.get("/api/maintenance/notify", authMiddleware, (_req, res) => {
+    res.json({ recipients: getNotifyRecipients(), dueCount: listDueMaintenance().length });
+  });
+  app.post(
+    "/api/maintenance/notify",
+    authMiddleware,
+    asyncRoute(async (req, res) => {
+      const to = (Array.isArray(req.body?.to) ? (req.body.to as string[]) : String(req.body?.to ?? "").split(/[,\s]+/))
+        .map((s) => s.trim())
+        .filter(Boolean);
+      if (to.length === 0) {
+        res.status(400).json({ error: "수신자 이메일이 필요합니다" });
+        return;
+      }
+      // SMTP 미설정 등 발송 오류는 asyncRoute가 500으로 격리한다(email.ts sendReport와 같은 패턴).
+      res.json(await notifyDueMaintenance(to));
+    })
+  );
 
   app.post("/api/maintenance", authMiddleware, (req, res) => {
     const user = (req as Request & { user?: GijoUser }).user;

@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import { createApp } from "../src/app";
-import { resetMaintenanceForTests } from "../src/engine/maintenance";
+import { resetMaintenanceForTests, buildDueMaintenanceEmail } from "../src/engine/maintenance";
+import type { MaintenanceItem } from "../src/engine/maintenance";
 import { resetUsersForTests } from "../src/auth/users";
+import { resetSmtpConfigForTests } from "../src/engine/email";
 
 async function login(app: ReturnType<typeof createApp>, username = "jyh", password = "changeme") {
   const res = await request(app).post("/api/auth/login").send({ username, password });
@@ -17,6 +19,7 @@ describe("maintenance (유지보수 일정 · 점검서 · 승인)", () => {
   beforeEach(async () => {
     resetMaintenanceForTests();
     resetUsersForTests();
+    resetSmtpConfigForTests();
     app = createApp();
     adminToken = await login(app);
   });
@@ -217,6 +220,51 @@ describe("maintenance (유지보수 일정 · 점검서 · 승인)", () => {
     expect(empty.status).toBe(200);
     expect(empty.body).toEqual([]);
     expect((await request(app).get("/api/assets/x/maintenance")).status).toBe(401);
+  });
+
+  it("buildDueMaintenanceEmail summarizes due items with overdue days", () => {
+    const today = new Date().toISOString().slice(0, 10);
+    const past = new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10);
+    const items = [
+      { id: "1", title: "방화벽 점검", productName: "FW-01", scheduleDate: today, status: "scheduled", createdAt: 0, updatedAt: 0 },
+      { id: "2", title: "IPS 점검", productName: "IPS-02", scheduleDate: past, status: "scheduled", createdAt: 0, updatedAt: 0 },
+    ] as MaintenanceItem[];
+    const { subject, text } = buildDueMaintenanceEmail(items);
+    expect(subject).toContain("2건");
+    expect(text).toContain("오늘 마감");
+    expect(text).toContain("3일 지연");
+    expect(text).toContain("방화벽 점검");
+  });
+
+  it("notify requires recipients (400) and reports no send when nothing is due", async () => {
+    // 수신자 없음 → 400
+    expect((await request(app).post("/api/maintenance/notify").set(auth(adminToken)).send({ to: [] })).status).toBe(400);
+
+    // 시드 데이터에는 지연 건이 있으나 여기선 reset 상태 — 예정(미래)만 만들어 지연 0건으로.
+    await createItem({ title: "미래 점검", scheduleDate: "2099-01-01" });
+    // SMTP 미설정이지만 지연 0건이면 발송 자체를 안 하므로 sent:false로 정상 반환
+    const res = await request(app).post("/api/maintenance/notify").set(auth(adminToken)).send({ to: ["ops@example.com"] });
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ sent: false, count: 0 });
+  });
+
+  it("notify persists recipients and 500s cleanly when SMTP is unconfigured but items are due", async () => {
+    await createItem({ title: "지연 점검", scheduleDate: new Date().toISOString().slice(0, 10) });
+    // SMTP 미설정 + 지연 있음 → 발송 시도하다 500(asyncRoute 격리), 서버는 계속 응답.
+    const res = await request(app).post("/api/maintenance/notify").set(auth(adminToken)).send({ to: ["ops@example.com", "sec@example.com"] });
+    expect(res.status).toBe(500);
+    expect(res.body.error).toMatch(/SMTP 설정이 없습니다/);
+    expect((await request(app).get("/api/health")).status).toBe(200);
+
+    // 수신자는 발송 전에 저장됐다 → 다음 조회 때 미리 채워진다.
+    const cfg = await request(app).get("/api/maintenance/notify").set(auth(adminToken));
+    expect(cfg.body.recipients).toEqual(["ops@example.com", "sec@example.com"]);
+    expect(cfg.body.dueCount).toBeGreaterThanOrEqual(1);
+  });
+
+  it("notify requires auth", async () => {
+    expect((await request(app).get("/api/maintenance/notify")).status).toBe(401);
+    expect((await request(app).post("/api/maintenance/notify")).status).toBe(401);
   });
 
   it("requires auth", async () => {

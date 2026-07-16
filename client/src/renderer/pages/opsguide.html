@@ -186,6 +186,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       </div>
       <div id="kpiByProduct" style="font-size:11.5px;color:var(--muted);margin-bottom:16px;line-height:1.9;"></div>
 
+      <!-- 지연/마감 점검 이메일 알림 — 기존 SMTP 설정(설정 화면) 재사용. -->
+      <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+        <span style="font-size:12px;font-weight:700;color:var(--text);">📧 지연 점검 알림</span>
+        <input id="notifyEmails" placeholder="수신자 이메일(쉼표로 구분)" style="flex:1;min-width:200px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:8px 12px;color:var(--text);font-size:12.5px;outline:none;">
+        <button id="notifyBtn" class="ops-btn-secondary" type="button">지연 점검 메일 보내기</button>
+        <span id="notifyLine" style="font-size:11.5px;color:var(--muted);"></span>
+      </div>
+
       <form id="maintForm" class="maint-form">
         <input id="mTitle" type="text" placeholder="점검 제목 (예: 방화벽 정책 점검)" required>
         <input id="mProduct" type="text" placeholder="대상 제품/자산 (예: FW-01)" required>
@@ -533,6 +541,34 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     }
   }
 
+  // 저장된 수신자를 미리 채우고 현재 지연 건수를 버튼 옆에 안내한다.
+  async function loadNotify() {
+    try {
+      const { recipients, dueCount } = await window.gijo.getMaintenanceNotify();
+      document.getElementById("notifyEmails").value = (recipients || []).join(", ");
+      document.getElementById("notifyLine").textContent = dueCount ? `현재 지연/마감 ${dueCount}건` : "지연/마감 점검 없음";
+    } catch (e) {}
+  }
+
+  async function sendNotify() {
+    const btn = document.getElementById("notifyBtn");
+    const line = document.getElementById("notifyLine");
+    const to = document.getElementById("notifyEmails").value.split(/[,\s]+/).map((s) => s.trim()).filter(Boolean);
+    if (to.length === 0) { line.textContent = "수신자 이메일을 입력하세요"; return; }
+    btn.disabled = true;
+    line.textContent = "발송 중...";
+    try {
+      const r = await window.gijo.sendMaintenanceNotify(to);
+      line.textContent = r.sent ? `✓ ${r.count}건 알림 발송됨` : "지연/마감 점검이 없어 발송하지 않았습니다";
+    } catch (err) {
+      let msg = (err && err.message) || String(err);
+      const brace = msg.indexOf("{");
+      if (brace >= 0) { try { const j = JSON.parse(msg.slice(brace)); if (j.error) msg = j.error; } catch (_) {} }
+      line.textContent = "✗ " + msg;
+    }
+    btn.disabled = false;
+  }
+
   async function init() {
     tick();
     setInterval(tick, 30000);
@@ -541,6 +577,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.getElementById("mDate").value = todayStr();
     loadMaintenance();
     loadAssetOptions();
+    loadNotify();
 
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll(".nav-item[data-page]").forEach((el) => {
@@ -554,6 +591,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     document.getElementById("maintForm").addEventListener("submit", onMaintSubmit);
     document.getElementById("maintList").addEventListener("click", onMaintAction);
+    document.getElementById("notifyBtn").addEventListener("click", sendNotify);
   }
 
   if (!window.gijo.isAuthenticated()) {

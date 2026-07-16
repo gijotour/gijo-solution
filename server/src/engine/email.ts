@@ -124,6 +124,25 @@ export async function sendReportEmail(args: SendReportEmailArgs): Promise<void> 
   });
 }
 
+// 첨부 없는 범용 알림 메일(예: 점검 지연 알림). 저장된 SMTP 설정을 그대로 재사용한다.
+export interface SendMailArgs {
+  to: string[];
+  subject: string;
+  text: string;
+  html?: string;
+}
+
+export async function sendMail(args: SendMailArgs): Promise<void> {
+  const { transport, fromAddress } = buildTransport();
+  await transport.sendMail({
+    from: fromAddress,
+    to: args.to.join(", "),
+    subject: args.subject,
+    text: args.text,
+    ...(args.html ? { html: args.html } : {}),
+  });
+}
+
 export function registerEmailRoutes(app: Express): void {
   app.get("/api/email/config", authMiddleware, (_req, res) => {
     res.json(getSmtpConfig() ?? null);

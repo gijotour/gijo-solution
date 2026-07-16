@@ -197,6 +197,8 @@ export const maintenanceApi = {
   reject: (id: string, reason: string) =>
     request<MaintenanceItem>(`/api/maintenance/${id}/reject`, { method: "POST", body: { reason } }),
   history: (id: string) => request<MaintenanceEvent[]>(`/api/maintenance/${id}/history`),
+  getNotify: () => request<{ recipients: string[]; dueCount: number }>("/api/maintenance/notify"),
+  notify: (to: string[]) => request<{ sent: boolean; count: number }>("/api/maintenance/notify", { method: "POST", body: { to } }),
 };
 
 // ── 협업 로그 ─────────────────────────────────────────────────────────
