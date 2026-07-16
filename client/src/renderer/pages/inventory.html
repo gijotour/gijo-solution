@@ -211,6 +211,7 @@
       </div>
       <div class="filters" id="filterChips">
         <div class="filter-chip active" data-filter="all">전체</div>
+        <div class="filter-chip" data-filter="kev" style="color:#ff8a80">🔴 실제 악용(KEV)</div>
         <div class="filter-chip" data-filter="high">고위험</div>
         <div class="filter-chip" data-filter="nosbom">SBOM 미생성</div>
         <div class="filter-chip" data-filter="unscanned">미스캔</div>
@@ -305,12 +306,19 @@
 
   const SEVERITY_RANK = { critical: 3, high: 3, medium: 2, low: 1 };
 
+  // 현재 위험 = 열린(fixed 아닌) finding만. 상태 추적 도입 후 fixed가 findings에 남으므로 제외한다.
+  function activeFindings(asset) {
+    return (asset.findings || []).filter((f) => f.state !== "fixed");
+  }
+
   function riskOf(asset) {
-    if (asset.findings.length === 0) return { level: "none", label: "미스캔" };
-    const maxRank = Math.max(...asset.findings.map((f) => SEVERITY_RANK[f.severity] ?? 0));
-    if (maxRank >= 3) return { level: "high", label: `높음 · ${asset.findings.length}건` };
-    if (maxRank === 2) return { level: "mid", label: `중간 · ${asset.findings.length}건` };
-    return { level: "low", label: `낮음 · ${asset.findings.length}건` };
+    const f = activeFindings(asset);
+    if (f.length === 0) return { level: "none", label: asset.lastScannedAt ? "양호" : "미스캔", kev: false };
+    const kev = f.some((x) => x.kev);
+    const maxRank = Math.max(...f.map((x) => SEVERITY_RANK[x.severity] ?? 0));
+    const level = maxRank >= 3 ? "high" : maxRank === 2 ? "mid" : "low";
+    const word = level === "high" ? "높음" : level === "mid" ? "중간" : "낮음";
+    return { level, label: `${word} · ${f.length}건`, kev };
   }
 
   function relativeTime(ts) {
@@ -328,6 +336,7 @@
     return assets.filter((a) => {
       if (q && !a.name.toLowerCase().includes(q) && !a.owner.toLowerCase().includes(q)) return false;
       const risk = riskOf(a).level;
+      if (activeFilter === "kev" && !riskOf(a).kev) return false;
       if (activeFilter === "high" && risk !== "high") return false;
       if (activeFilter === "nosbom" && a.sbomGeneratedAt) return false;
       if (activeFilter === "unscanned" && a.lastScannedAt) return false;
@@ -361,14 +370,24 @@
           const maintBadge = mc
             ? ` <span data-open-ops="1" title="이 자산의 유지보수 점검 — 운영 가이드로 이동" style="cursor:pointer;font-size:10.5px;font-weight:700;color:${mc.overdue ? "#f5928a" : "var(--blue-light)"};background:rgba(59,130,246,0.14);padding:1px 7px;border-radius:6px;">🔧 점검 ${mc.total}${mc.overdue ? ` · 지연 ${mc.overdue}` : ""}</span>`
             : "";
+          const isHost = a.assetType === "infra-host";
+          // 실제 악용(KEV) 있으면 최우선 신호를 자산명 옆에 표시.
+          const kevBadge = risk.kev
+            ? ` <span title="실제 악용이 확인된 취약점(CISA KEV) 포함 — 최우선" style="font-size:10.5px;font-weight:800;color:#ff8a80;background:rgba(226,72,61,0.2);border:1px solid rgba(226,72,61,0.5);padding:1px 7px;border-radius:6px;">🔴 KEV</span>`
+            : "";
+          // 인프라 호스트는 IP 대신 OS(구성요소 첫 항목)를 부제로 — HTML 임포트로 채워진 정보.
+          const os = isHost && a.components && a.components.length ? a.components[0].name : a.path;
+          const action = isHost
+            ? `<span class="row-actions" data-vulns="1" title="취약 자산관리에서 이 호스트의 취약점 보기">취약점 보기 →</span>`
+            : `<span class="row-actions" data-scan="${a.id}">재스캔 →</span>`;
           return `<tr>
-            <td><div class="asset-name">${a.name}${maintBadge}</div><div class="asset-sub">${a.path}</div></td>
+            <td><div class="asset-name">${a.name}${kevBadge}${maintBadge}</div><div class="asset-sub">${os}</div></td>
             <td><span class="type-badge">${a.assetType}</span></td>
             <td class="owner">${a.owner}</td>
             <td><span class="risk-badge risk-${risk.level === "none" ? "low" : risk.level}"><span class="risk-dot"></span>${risk.label}</span></td>
             <td>${relativeTime(a.lastScannedAt)}</td>
             <td>${sbomCell}</td>
-            <td class="row-actions" data-scan="${a.id}">재스캔 →</td>
+            <td>${action}</td>
           </tr>`;
         })
         .join("");
@@ -566,6 +585,10 @@
       const scanId = e.target.dataset.scan;
       if (e.target.dataset.openOps) {
         window.gijo.navigateTo("opsguide.html");
+        return;
+      }
+      if (e.target.dataset.vulns) {
+        window.gijo.navigateTo("vulnscan.html");
         return;
       }
       if (genId) {
