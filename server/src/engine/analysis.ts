@@ -18,24 +18,51 @@ const FEW_SHOT_EXAMPLE = `예시 입력:
 
 function buildPrompt(findings: StandardFinding[]): string {
   return [
-    "너는 보안 스캔 결과를 해석하는 분석가야. 아래 finding 배열을 보고 비전문가 개발자도 이해할 수 있는 요약과 우선순위, 쉬운 설명을 JSON으로만 출력해.",
+    "너는 시니어 보안 분석가야. 아래 finding 배열을 검토해 보안담당자용 요약과 우선순위, 실무 설명을 작성해.",
+    "지침: 심각도(critical>high>medium>low)에 더해 실제 악용 신호(KEV·EPSS)를 함께 고려해 우선순위를 정하고, 각 항목마다 왜 그 순위인지 조치 근거를 한 문장으로 제시해. 인사말·자기소개·군더더기 없이 사실만. summary는 '즉시 조치 N건, 순차 조치 M건' 식으로 핵심을 먼저 밝혀.",
     FEW_SHOT_EXAMPLE,
     "실제 입력:",
     JSON.stringify(findings),
-    "실제 출력(JSON만, 마크다운 코드블록 없이):",
+    "출력은 아래 스키마의 JSON만(마크다운·설명 없이): {\"summary\":string,\"prioritized\":[{\"index\":number,\"severity\":string,\"reason\":string}],\"plainExplanation\":string}",
   ].join("\n\n");
 }
 
-function parseAnalysis(raw: string, findingCount: number): FindingAnalysis {
-  const cleaned = raw.replace(/^```(json)?/i, "").replace(/```$/, "").trim();
-  try {
-    const parsed = JSON.parse(cleaned) as FindingAnalysis;
-    if (parsed.summary && parsed.prioritized) return parsed;
-  } catch {
-    // LLM이 JSON 포맷을 지키지 못한 경우 원문을 요약으로 그대로 반환
+// JSON 본문만 뽑아 파싱한다. 모델이 앞뒤에 문장을 붙이거나 코드블록으로 감싸도 견디도록
+// 첫 { … 마지막 } 구간을 추출해 재시도한다.
+function extractJson(raw: string): Record<string, unknown> | null {
+  const cleaned = raw.replace(/^```(json)?/i, "").replace(/```\s*$/, "").trim();
+  const candidates = [cleaned];
+  const first = cleaned.indexOf("{");
+  const last = cleaned.lastIndexOf("}");
+  if (first >= 0 && last > first) candidates.push(cleaned.slice(first, last + 1));
+  for (const c of candidates) {
+    try {
+      const parsed = JSON.parse(c);
+      if (parsed && typeof parsed === "object") return parsed as Record<string, unknown>;
+    } catch {
+      /* 다음 후보 시도 */
+    }
   }
+  return null;
+}
+
+export function parseAnalysis(raw: string, findingCount: number): FindingAnalysis {
+  const parsed = extractJson(raw);
+  if (parsed && typeof parsed.summary === "string" && parsed.summary.trim()) {
+    // 일부 모델은 prioritized 대신 details/priorities 같은 키를 쓴다 — 배열이면 받아들인다.
+    const list = [parsed.prioritized, parsed.details, parsed.priorities].find((v) => Array.isArray(v)) as
+      | FindingAnalysis["prioritized"]
+      | undefined;
+    return {
+      summary: parsed.summary.trim(),
+      prioritized: list ?? [],
+      plainExplanation: typeof parsed.plainExplanation === "string" ? parsed.plainExplanation : "",
+    };
+  }
+  // JSON 파싱 실패 시: 원문 JSON 덩어리를 그대로 노출하지 않고 사람이 읽을 문장만 남긴다.
+  const fallback = raw.trim().startsWith("{") ? "" : raw.trim();
   return {
-    summary: raw || `이 자산에서 발견된 ${findingCount}개 취약점에 대한 분석에 실패했습니다.`,
+    summary: fallback || `발견된 ${findingCount}개 항목의 자동 분석에 실패했습니다. 원본 finding을 직접 확인하세요.`,
     prioritized: [],
     plainExplanation: "",
   };
