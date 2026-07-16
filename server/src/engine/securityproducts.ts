@@ -26,7 +26,7 @@ export const PRODUCT_CATEGORIES = [
   { id: "NAC", label: "NAC (접근제어)", icon: "🚪" },
   { id: "기타", label: "기타", icon: "📦" },
 ] as const;
-const CATEGORY_IDS = new Set(PRODUCT_CATEGORIES.map((c) => c.id));
+const CATEGORY_IDS = new Set<string>(PRODUCT_CATEGORIES.map((c) => c.id));
 
 // 제품 문서 종류 — 제품 매뉴얼 / 로그(분석) 매뉴얼 / 기타.
 export const DOC_KINDS = [
@@ -34,7 +34,7 @@ export const DOC_KINDS = [
   { id: "logManual", label: "로그 매뉴얼" },
   { id: "etc", label: "기타 문서" },
 ] as const;
-const DOC_KIND_IDS = new Set(DOC_KINDS.map((k) => k.id));
+const DOC_KIND_IDS = new Set<string>(DOC_KINDS.map((k) => k.id));
 
 export interface SecurityProduct {
   id: string;
