@@ -42,6 +42,28 @@ tr:last-child td{border-bottom:none;}
 .sev-h{background:rgba(240,120,40,0.18);color:#f7a86a;}
 .sev-m{background:rgba(240,160,32,0.15);color:var(--amber);}
 .sev-l{background:rgba(139,147,171,0.15);color:var(--muted);}
+/* 호스트 행 클릭 → 취약점 목록 드릴다운 */
+tbody tr[data-id]{cursor:pointer;}
+tbody tr[data-id]:hover td{background:rgba(59,130,246,0.07);}
+tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
+.row-caret{color:var(--muted-2);margin-right:6px;font-size:11px;}
+.vd-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+.vd-title{font-size:14.5px;font-weight:800;color:#fff;}
+.vd-close{font-size:12px;color:var(--blue-light);font-weight:700;cursor:pointer;}
+.vd-sub{font-size:11.5px;color:var(--muted);margin-bottom:14px;line-height:1.6;}
+.vd-controls{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;}
+.vd-chip{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);padding:5px 12px;border-radius:20px;font-size:11.5px;font-weight:700;cursor:pointer;}
+.vd-chip.active{background:rgba(59,130,246,0.15);border-color:var(--blue);color:var(--blue-light);}
+.vd-search{flex:1;min-width:200px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:7px 12px;color:var(--text);font-size:12.5px;outline:none;}
+.vd-list{max-height:520px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;}
+.vd-item{border-bottom:1px solid var(--border);padding:10px 12px;cursor:pointer;}
+.vd-item:last-child{border-bottom:none;}
+.vd-item:hover{background:rgba(255,255,255,0.03);}
+.vd-item-top{display:flex;align-items:center;gap:8px;font-size:12.5px;}
+.vd-name{color:var(--text);flex:1;line-height:1.5;}
+.vd-ev{display:none;margin-top:8px;padding:10px 12px;background:var(--panel-2);border-radius:6px;font-size:11.5px;color:var(--muted);line-height:1.75;white-space:pre-wrap;word-break:break-word;max-height:240px;overflow-y:auto;}
+.vd-item.open .vd-ev{display:block;}
+.vd-empty{padding:16px;color:var(--muted);font-size:12.5px;}
 .status-line{font-size:12.5px;margin-top:10px;}
 .footer{margin-top:8px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted-2);}
 .footer img{height:16px;opacity:0.6;}
@@ -135,6 +157,24 @@ tr:last-child td{border-bottom:none;}
       </table>
     </div>
 
+    <!-- 호스트를 클릭하면 그 호스트의 취약점 목록이 여기에 열린다 -->
+    <div class="panel" id="vulnDetail" style="display:none">
+      <div class="vd-head">
+        <span class="vd-title" id="vdTitle">—</span>
+        <span class="vd-close" id="vdClose">✕ 닫기</span>
+      </div>
+      <div class="vd-sub" id="vdSub"></div>
+      <div class="vd-controls">
+        <span class="vd-chip active" data-sev="all">전체</span>
+        <span class="vd-chip" data-sev="critical">Critical</span>
+        <span class="vd-chip" data-sev="high">High</span>
+        <span class="vd-chip" data-sev="medium">Medium</span>
+        <span class="vd-chip" data-sev="low">Low/Info</span>
+        <input class="vd-search" id="vdSearch" placeholder="취약점명 · CVE로 검색 (예: log4j, CVE-2021-44228, firefox)">
+      </div>
+      <div class="vd-list" id="vdList"></div>
+    </div>
+
     <div class="footer">
       <img src="https://gijo.ai/_nuxt/logo_gijo_only_white.ATZVOJtw.svg" alt="GIJO">
       <span>© 2026 GIJO Technology · GIJO AS Platform · Confidential</span>
@@ -180,6 +220,78 @@ tr:last-child td{border-bottom:none;}
     return ts ? new Date(ts).toLocaleString("ko-KR", { year: "2-digit", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "—";
   }
 
+  const esc = (s) => String(s == null ? "" : s).replace(/</g, "&lt;");
+
+  // ── 호스트 → 취약점 목록 드릴다운 ───────────────────────────────────────
+  const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
+  const SEV_CLASS = { critical: "sev-c", high: "sev-h", medium: "sev-m", low: "sev-l" };
+  const SEV_LABEL = { critical: "CRIT", high: "HIGH", medium: "MED", low: "LOW" };
+  let hostCache = [];
+  let currentHostId = null;
+  let vdFilter = "all";
+
+  function closeDetail() {
+    currentHostId = null;
+    document.getElementById("vulnDetail").style.display = "none";
+    document.querySelectorAll("#hostRows tr[data-id]").forEach((tr) => {
+      tr.classList.remove("on");
+      const c = tr.querySelector(".row-caret"); if (c) c.textContent = "▸";
+    });
+  }
+
+  function openHost(asset, keepFilters) {
+    currentHostId = asset.id;
+    if (!keepFilters) {
+      vdFilter = "all";
+      document.querySelectorAll(".vd-chip").forEach((c) => c.classList.toggle("active", c.dataset.sev === "all"));
+      document.getElementById("vdSearch").value = "";
+    }
+    const f = asset.findings || [];
+    const c = sevCounts(f);
+    document.getElementById("vdTitle").textContent = `${asset.name} — 취약점 ${f.length.toLocaleString()}건`;
+    document.getElementById("vdSub").textContent =
+      `출처 ${asset.owner} · 최근 스캔 ${fmtDate(asset.lastScannedAt)} · Critical ${c.critical} / High ${c.high} / Medium ${c.medium} / Low·Info ${c.low}` +
+      ` — 항목을 클릭하면 상세(CVE 목록·조치 근거)가 펼쳐집니다.`;
+    document.getElementById("vulnDetail").style.display = "";
+    renderVdList();
+    // 행 하이라이트
+    document.querySelectorAll("#hostRows tr[data-id]").forEach((tr) => {
+      const on = tr.dataset.id === asset.id;
+      tr.classList.toggle("on", on);
+      const car = tr.querySelector(".row-caret"); if (car) car.textContent = on ? "▾" : "▸";
+    });
+  }
+
+  function renderVdList() {
+    const list = document.getElementById("vdList");
+    const asset = hostCache.find((a) => a.id === currentHostId);
+    if (!asset) return;
+    const q = document.getElementById("vdSearch").value.trim().toLowerCase();
+    const items = (asset.findings || [])
+      .filter((f) => vdFilter === "all" || f.severity === vdFilter)
+      .filter((f) => !q || `${f.finding_type} ${f.evidence || ""}`.toLowerCase().includes(q))
+      .sort((a, b) => (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9) || String(a.finding_type).localeCompare(String(b.finding_type)));
+    if (items.length === 0) {
+      list.innerHTML = '<div class="vd-empty">조건에 맞는 취약점이 없습니다.</div>';
+      return;
+    }
+    list.innerHTML = items
+      .map(
+        (f) =>
+          `<div class="vd-item">` +
+          `<div class="vd-item-top">` +
+          `<span class="sev ${SEV_CLASS[f.severity] || "sev-l"}">${SEV_LABEL[f.severity] || "?"}</span>` +
+          `<span class="vd-name">${esc(f.finding_type)}</span>` +
+          `<span style="color:var(--muted-2);font-size:11px;flex-shrink:0">${esc(f.source_tool || "")}</span>` +
+          `</div>` +
+          `<div class="vd-ev">${esc(f.evidence || "(상세 없음)")}</div>` +
+          `</div>`
+      )
+      .join("");
+    const shown = items.length, total = (asset.findings || []).length;
+    if (shown !== total) list.insertAdjacentHTML("afterbegin", `<div class="vd-empty" style="border-bottom:1px solid var(--border)">${shown.toLocaleString()}건 표시 (전체 ${total.toLocaleString()}건)</div>`);
+  }
+
   async function refresh() {
     let assets = [];
     try {
@@ -200,13 +312,20 @@ tr:last-child td{border-bottom:none;}
           (c.high ? `<span class="sev sev-h">H ${c.high}</span>` : "") +
           (c.medium ? `<span class="sev sev-m">M ${c.medium}</span>` : "") +
           (c.low ? `<span class="sev sev-l">L ${c.low}</span>` : "") || '<span style="color:var(--muted)">—</span>';
-        return `<tr>
-          <td><div class="host-name">${String(a.name).replace(/</g, "&lt;")}</div></td>
-          <td style="color:var(--muted)">${String(a.owner).replace(/</g, "&lt;")}</td>
+        const open = currentHostId === a.id ? " on" : "";
+        return `<tr data-id="${esc(a.id)}" class="${open.trim()}" title="클릭하면 이 호스트의 취약점 목록이 열립니다">
+          <td><div class="host-name"><span class="row-caret">${currentHostId === a.id ? "▾" : "▸"}</span>${esc(a.name)}</div></td>
+          <td style="color:var(--muted)">${esc(a.owner)}</td>
           <td>${badges}</td>
           <td style="color:var(--muted)">${fmtDate(a.lastScannedAt)}</td>
         </tr>`;
       }).join("");
+    }
+    hostCache = assets;
+    // 열어둔 호스트가 있으면 최신 데이터로 다시 그린다(업로드 후 갱신 등).
+    if (currentHostId) {
+      const still = assets.find((a) => a.id === currentHostId);
+      if (still) openHost(still, true); else closeDetail();
     }
     document.getElementById("kpiHosts").textContent = assets.length;
     document.getElementById("kpiCrit").textContent = totals.critical;
@@ -251,6 +370,29 @@ tr:last-child td{border-bottom:none;}
     });
     document.getElementById("uploadBtn").addEventListener("click", () => document.getElementById("vulnFileInput").click());
     document.getElementById("vulnFileInput").addEventListener("change", handleUpload);
+
+    // 호스트 행 클릭 → 취약점 목록 열기/닫기 (행은 매번 다시 그려지므로 tbody에 위임)
+    hostRows.addEventListener("click", (e) => {
+      const tr = e.target.closest("tr[data-id]");
+      if (!tr) return;
+      const asset = hostCache.find((a) => a.id === tr.dataset.id);
+      if (!asset) return;
+      if (currentHostId === asset.id) closeDetail(); else openHost(asset);
+    });
+    document.getElementById("vdClose").addEventListener("click", closeDetail);
+    document.querySelectorAll(".vd-chip").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        vdFilter = chip.dataset.sev;
+        document.querySelectorAll(".vd-chip").forEach((c) => c.classList.toggle("active", c === chip));
+        renderVdList();
+      });
+    });
+    document.getElementById("vdSearch").addEventListener("input", renderVdList);
+    // 취약점 항목 클릭 → 상세(CVE 목록·증거) 펼치기
+    document.getElementById("vdList").addEventListener("click", (e) => {
+      const item = e.target.closest(".vd-item");
+      if (item) item.classList.toggle("open");
+    });
   }
 
   if (!window.gijo.isAuthenticated()) {
