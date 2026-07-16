@@ -332,6 +332,18 @@ export async function stopEmbeddingEngine(): Promise<void> {
   }
 }
 
+// GPU 1대(RTX 3090) 전제: 파인튜닝·GGUF 병합은 VRAM을 독점해야 한다. 학습 전에 추론
+// llama-server 풀과 임베딩 서버를 모두 내려 VRAM을 비우고(pause), 학습이 끝나면 부팅 때와 같은
+// 자동 시작으로 되돌린다(resume). finetune.ts(단독 학습)와 learnloop.ts(학습 루프)가 공유한다.
+export async function pauseInferenceEngines(): Promise<void> {
+  await stopLocalEngine();
+  await stopEmbeddingEngine();
+}
+
+export async function resumeInferenceEngines(): Promise<void> {
+  await autoStartLocalEngines();
+}
+
 // 채팅 진입점(llm.ts chat)에서 호출 — 에이전트에 할당된 모델(없으면 기본 모델)을 풀에 보장하고
 // 그 모델이 서빙되는 base URL을 돌려준다. 모델 파일 자체가 없으면 기본 포트 URL로 폴백한다.
 export async function ensureAgentModel(agentId: string): Promise<string> {

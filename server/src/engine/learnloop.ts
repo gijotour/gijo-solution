@@ -23,7 +23,7 @@ import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { db } from "../db";
 import { startFinetune, isFinetuneRunning } from "./finetune";
-import { stopLocalEngine, stopEmbeddingEngine, autoStartLocalEngines } from "./localengine";
+import { pauseInferenceEngines, resumeInferenceEngines } from "./localengine";
 import { setAgentModel, getAgentById } from "./agents";
 import { attachProcessLogging, recordProcessOutput } from "./logs";
 
@@ -357,12 +357,10 @@ async function runPipeline(run: LearnloopRun, config: LearnloopConfig): Promise<
   try {
     // (1) 추론 엔진 정지 — 학습·병합이 GPU(VRAM)를 독점해야 한다. 진행 중 채팅/RAG은 일시 불가.
     if (SMOKE()) await smokeTick();
-    else {
-      await stopLocalEngine();
-      await stopEmbeddingEngine();
-    }
+    else await pauseInferenceEngines();
 
     // (2) QLoRA 학습 — 설정된 베이스 모델(Hermes 3 기본)을 주입.
+    // manageEngines:false — 엔진 정지/재기동은 루프가 export까지 포함해 직접 관리한다(이중 정지 방지).
     setStage(run, "training");
     if (SMOKE()) await smokeTick();
     else {
@@ -371,6 +369,7 @@ async function runPipeline(run: LearnloopRun, config: LearnloopConfig): Promise<
           agentId: config.targetAgent,
           datasetId: run.datasetId,
           baseModel: run.baseModel,
+          manageEngines: false,
           onComplete: (r) => (r.ok ? resolve() : reject(new Error(r.message ?? "학습 실패"))),
         });
         if (!result.started) reject(new Error(result.error ?? "학습을 시작하지 못했습니다"));
@@ -398,7 +397,7 @@ async function runPipeline(run: LearnloopRun, config: LearnloopConfig): Promise<
   // (5) 성공/실패와 무관하게 추론 엔진 재기동 — 루프가 실패해도 채팅이 죽은 채 남으면 안 된다.
   setStage(run, "restarting-engines");
   if (!SMOKE()) {
-    await autoStartLocalEngines().catch((err) =>
+    await resumeInferenceEngines().catch((err) =>
       console.error("[learnloop] 엔진 재기동 실패 — 에이전트 AI 화면에서 수동 기동 필요:", err)
     );
   }
