@@ -52,6 +52,13 @@
   .network-svg.busy .spark{animation-duration:1s;}
   .network-svg.busy .spark-extra{animation:twinkle 0.8s ease-in-out infinite;}
   .network-svg.busy{filter:drop-shadow(0 0 6px rgba(95,161,255,0.25));}
+  /* 모델 미준비 안내 배너 — 로컬 모델 받기 / 사내 서버 연결 두 경로 제시 */
+  .model-guide{margin-top:12px;max-width:520px;background:rgba(240,160,32,0.08);border:1px solid rgba(240,160,32,0.4);border-radius:12px;padding:12px 16px;text-align:center;}
+  .mg-title{font-size:12px;font-weight:700;color:var(--amber);margin-bottom:10px;line-height:1.5;}
+  .mg-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
+  .mg-btn{background:var(--panel);border:1px solid var(--border-strong);color:var(--text);border-radius:8px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;}
+  .mg-btn:hover{border-color:var(--blue-light);color:#fff;}
+  .mg-btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;}
   .agent-bubble{display:flex;align-items:flex-start;gap:10px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 18px;max-width:420px;margin-top:8px;}
   .agent-avatar{width:28px;height:28px;border-radius:8px;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;}
   .agent-bubble-text{font-size:12.5px;color:var(--text);line-height:1.6;}
@@ -291,6 +298,14 @@
         <input id="chatInput" placeholder="오케스트레이터에게 지시하세요… 예: fraud-detect-llm 전체 재스캔하고 리포트까지 작성해줘">
         <div class="agent-chat-hint" id="chatHint">Enter 전송 · Shift+Enter 줄바꿈</div>
       </div>
+      <!-- 모델 미준비 안내: AI 답변에 모델이 필요할 때 두 경로를 함께 제시(로컬 모델 받기 / 사내 서버 연결). -->
+      <div class="model-guide" id="modelGuide" style="display:none">
+        <div class="mg-title">⚠ AI 모델이 준비되지 않았습니다 — 답변을 받으려면 아래 중 하나를 하세요</div>
+        <div class="mg-actions">
+          <button class="mg-btn primary" id="mgDownloadBtn">📥 이 PC에 모델 받기 · 추천 LLM 가이드</button>
+          <button class="mg-btn" id="mgServerBtn">🖧 사내 GPU 서버에 연결 · 설정</button>
+        </div>
+      </div>
     </div>
 
     <div class="today-panel">
@@ -344,6 +359,16 @@
       statusPill.style.borderColor = "rgba(226,72,61,0.4)";
       statusPill.style.color = "#f5928a";
     }
+  }
+
+  // 모델 준비 여부 확인 → 안내 배너 노출/숨김. 로드된 모델이 하나라도 ready면 숨긴다.
+  const modelGuide = () => document.getElementById("modelGuide");
+  async function checkModelReady() {
+    try {
+      const s = await window.gijo.getLocalEngineStatus();
+      const ready = s && Array.isArray(s.loaded) ? s.loaded.some((m) => m.ready) : !!(s && s.running && s.modelId);
+      modelGuide().style.display = ready ? "none" : "block";
+    } catch (e) { /* 상태 조회 실패 시 안내를 강제로 띄우지 않는다 */ }
   }
 
   async function loadUser() {
@@ -697,6 +722,8 @@
       agentBubbleText.textContent = result.output;
       // 답변은 아이콘(◆)만으로 — 이름 텍스트 없이 아이콘 주변에 쌓인다.
       spawnBubble(result.output, "answer");
+      // 답변이 "모델 미준비" 안내면 배너도 띄워 두 경로(모델 받기/서버 연결)를 바로 제시.
+      if (/모델이 아직 준비|로컬 LLM|localengine/.test(result.output || "")) modelGuide().style.display = "block";
       await loadTasks();
       if (result.route.action === "scan") await loadAssets();
     } catch (e) {
@@ -775,7 +802,7 @@
     setInterval(tick, 1000);
     await loadUser();
     greet();
-    await Promise.all([loadHealth(), loadAssets(), loadSecurityProducts(), loadTasks(), loadCollaboration(), loadFiles(), loadDocSearchScopes()]);
+    await Promise.all([loadHealth(), loadAssets(), loadSecurityProducts(), loadTasks(), loadCollaboration(), loadFiles(), loadDocSearchScopes(), checkModelReady()]);
 
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
@@ -791,6 +818,8 @@
     document.getElementById("docQueryBtn").addEventListener("click", docQuery);
     document.getElementById("docQueryInput").addEventListener("keydown", (e) => { if (e.key === "Enter") docQuery(); });
     bubbleClear.addEventListener("click", clearBubbles);
+    document.getElementById("mgDownloadBtn").addEventListener("click", () => window.gijo.navigateTo("llmguide.html"));
+    document.getElementById("mgServerBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
 
     chatInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) {
