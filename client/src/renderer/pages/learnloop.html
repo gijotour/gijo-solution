@@ -77,6 +77,22 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .btn-ghost:disabled{opacity:.5;cursor:default;}
 .actions-row{display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap;}
 
+/* 사전 점검 */
+.pf-panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;}
+.pf-summary{font-size:12.5px;font-weight:800;margin-bottom:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.pf-summary.ready{color:var(--teal);}
+.pf-summary.notready{color:var(--amber);}
+.pf-list{display:flex;flex-direction:column;gap:7px;}
+.pf-item{display:flex;align-items:flex-start;gap:9px;font-size:12px;}
+.pf-ic{flex-shrink:0;font-size:13px;width:16px;text-align:center;}
+.pf-ic.ok{color:var(--teal);}
+.pf-ic.bad{color:#f5928a;}
+.pf-ic.warn{color:var(--amber);}
+.pf-body{flex:1;min-width:0;}
+.pf-label{color:var(--text);font-weight:600;}
+.pf-detail{color:var(--muted-2);font-size:11px;margin-left:6px;}
+.pf-hint{color:var(--amber);font-size:11px;margin-top:2px;font-family:'Consolas','Menlo',monospace;}
+
 /* 설정 */
 .cfg-panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;}
 .cfg-field{display:flex;flex-direction:column;gap:5px;}
@@ -180,6 +196,16 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div class="kpi"><div class="k-label">👍 긍정 평가</div><div class="k-value" id="kpiPositive" style="color:var(--teal)">-</div></div>
       <div class="kpi"><div class="k-label">학습 후보(미사용)</div><div class="k-value" id="kpiUnused" style="color:var(--blue-light)">-</div></div>
       <div class="kpi"><div class="k-label">최근 배포 모델</div><div class="k-value" id="kpiModel" style="font-size:14px">-</div></div>
+    </div>
+
+    <div class="cat">
+      <div class="cat-head"><span style="font-size:18px">🩺</span><span class="cat-title">사전 점검</span></div>
+      <div class="cat-intro">실행 전에 준비물(Python·unsloth·gguf·llama.cpp·베이스 모델 캐시)을 확인합니다. 하나라도 빠지면 실행 도중에 실패하니, <b style="color:var(--amber)">모두 초록불</b>인지 먼저 확인하세요.</div>
+      <div class="pf-panel">
+        <div class="pf-summary" id="pfSummary">점검 중...</div>
+        <div class="pf-list" id="pfList"></div>
+        <div style="margin-top:10px"><button class="btn-ghost" id="pfBtn">다시 점검</button></div>
+      </div>
     </div>
 
     <div class="cat">
@@ -296,6 +322,38 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     }
   }
 
+  // ── 사전 점검 ──────────────────────────────────────────────────────
+  let preflightReady = null; // null=미확인, true/false=점검 결과
+  async function loadPreflight() {
+    const summary = document.getElementById("pfSummary");
+    const list = document.getElementById("pfList");
+    summary.className = "pf-summary";
+    summary.textContent = "점검 중...";
+    try {
+      const { checks, ready } = await window.gijo.getLearnloopPreflight();
+      preflightReady = ready;
+      summary.className = "pf-summary " + (ready ? "ready" : "notready");
+      summary.textContent = ready ? "✓ 모든 준비물이 갖춰졌습니다 — 루프를 실행할 수 있어요." : "⚠ 준비물이 빠져 있습니다 — 아래 항목을 갖춘 뒤 실행하세요.";
+      list.innerHTML = checks.map((c) => {
+        const cls = c.ok ? "ok" : (c.required ? "bad" : "warn");
+        const ic = c.ok ? "✓" : (c.required ? "✗" : "!");
+        return (
+          `<div class="pf-item">` +
+          `<span class="pf-ic ${cls}">${ic}</span>` +
+          `<span class="pf-body"><span class="pf-label">${esc(c.label)}</span>` +
+          (c.detail ? `<span class="pf-detail">${esc(c.detail)}</span>` : "") +
+          (!c.ok && c.hint ? `<div class="pf-hint">▸ ${esc(c.hint)}</div>` : "") +
+          `</span></div>`
+        );
+      }).join("");
+    } catch (e) {
+      preflightReady = null;
+      summary.className = "pf-summary notready";
+      summary.textContent = "점검 실패: " + e.message;
+      list.innerHTML = "";
+    }
+  }
+
   // ── KPI + 로그 목록 ────────────────────────────────────────────────
   async function loadLogs() {
     try {
@@ -382,6 +440,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   async function onRun() {
     const btn = document.getElementById("runBtn");
     const line = document.getElementById("actionLine");
+    // 사전 점검이 실패 상태면 한 번 더 경고(그래도 강행은 허용 — 기존 데이터셋만 있으면 될 수도 있음).
+    if (preflightReady === false && !confirm("사전 점검에서 빠진 준비물이 있습니다.\n이대로 실행하면 도중에 실패할 수 있어요.\n그래도 계속할까요?")) return;
     if (!confirm("학습 루프를 실행합니다.\n진행 중에는 채팅·문서검색이 일시 중지됩니다 (완료 후 자동 재개).\n계속할까요?")) return;
     btn.disabled = true;
     line.textContent = "";
@@ -467,6 +527,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     loadHealth();
     loadConfig();
     loadLogs();
+    loadPreflight();
     const latest = await loadRuns();
     // 진행 중이던 실행이 있으면 이어서 표시(페이지를 벗어나도 서버에서 계속 도는 구조)
     if (latest) renderRunState(latest);
@@ -481,6 +542,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     });
     document.getElementById("runBtn").addEventListener("click", onRun);
     document.getElementById("buildBtn").addEventListener("click", onBuild);
+    document.getElementById("pfBtn").addEventListener("click", loadPreflight);
     document.getElementById("cfgSaveBtn").addEventListener("click", saveConfig);
     document.getElementById("logList").addEventListener("click", onLogAction);
   }

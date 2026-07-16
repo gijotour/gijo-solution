@@ -16,8 +16,9 @@
 
 import type { Express } from "express";
 import type { WebSocketServer } from "ws";
-import { spawn } from "child_process";
+import { spawn, spawnSync } from "child_process";
 import * as fs from "fs";
+import * as os from "os";
 import * as path from "path";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
@@ -429,6 +430,108 @@ function runExport(datasetId: string, outputModelId: string): Promise<void> {
   });
 }
 
+// ── 사전 점검(preflight) ──────────────────────────────────────────────
+// 실제 루프 실행 전에 준비물을 확인해 "실행 중간에 실패"하는 고질 문제를 예방한다. GPU를 쓰거나
+// 학습을 돌리지 않는 가벼운 검사만 한다(python 임포트 가능 여부는 find_spec으로 — 모듈을 실제로
+// 로드하지 않아 빠르다).
+export interface PreflightCheck {
+  key: string;
+  label: string;
+  ok: boolean;
+  required: boolean; // false면 경고성(없어도 실행은 됨)
+  detail?: string;
+  hint?: string;
+}
+
+const LLAMA_CPP_DIR = process.env.GIJO_LLAMA_CPP_DIR ?? "llama.cpp";
+
+// HuggingFace 허브 캐시 경로 후보들. HF_HOME > 기본 ~/.cache/huggingface/hub.
+function hfHubDirs(): string[] {
+  const dirs: string[] = [];
+  if (process.env.HF_HUB_CACHE) dirs.push(process.env.HF_HUB_CACHE);
+  if (process.env.HF_HOME) dirs.push(path.join(process.env.HF_HOME, "hub"));
+  dirs.push(path.join(os.homedir(), ".cache", "huggingface", "hub"));
+  return dirs;
+}
+
+// baseModel(HF repo id)의 fp16 가중치가 허브 캐시에 받아져 있는지 — 폐쇄망 이전 전 선행 다운로드 확인.
+function isBaseModelCached(baseModel: string): boolean {
+  const cacheName = "models--" + baseModel.replace(/\//g, "--");
+  return hfHubDirs().some((hub) => {
+    const dir = path.join(hub, cacheName);
+    // 스냅샷 폴더에 실제 파일이 있어야 "받아짐"으로 본다(빈 디렉터리 방어).
+    const snap = path.join(dir, "snapshots");
+    return fs.existsSync(snap) && fs.readdirSync(snap).length > 0;
+  });
+}
+
+export function preflightCheck(): { checks: PreflightCheck[]; ready: boolean } {
+  const config = getLearnloopConfig();
+  const checks: PreflightCheck[] = [];
+
+  // 1) python
+  const py = spawnSync("python", ["--version"], { encoding: "utf-8" });
+  const pythonOk = py.status === 0;
+  checks.push({
+    key: "python",
+    label: "Python 실행 가능",
+    ok: pythonOk,
+    required: true,
+    detail: pythonOk ? (py.stdout || py.stderr || "").trim() : undefined,
+    hint: pythonOk ? undefined : "GPU 머신에 Python이 설치돼 있어야 합니다.",
+  });
+
+  // 2·3) 학습(unsloth)·변환(gguf) 파이썬 패키지 — find_spec으로 한 번에 확인(모듈 로드 안 함).
+  let unsloth = false;
+  let gguf = false;
+  if (pythonOk) {
+    const probe = spawnSync(
+      "python",
+      ["-c", "import importlib.util as u,json;print(json.dumps({'unsloth':u.find_spec('unsloth') is not None,'gguf':u.find_spec('gguf') is not None}))"],
+      { encoding: "utf-8" }
+    );
+    try {
+      const parsed = JSON.parse((probe.stdout || "").trim());
+      unsloth = !!parsed.unsloth;
+      gguf = !!parsed.gguf;
+    } catch {
+      /* 파싱 실패 시 둘 다 false 유지 */
+    }
+  }
+  checks.push({ key: "unsloth", label: "unsloth (QLoRA 학습)", ok: unsloth, required: true, hint: unsloth ? undefined : "pip install unsloth" });
+  checks.push({ key: "gguf", label: "gguf 패키지 (GGUF 변환)", ok: gguf, required: true, hint: gguf ? undefined : "pip install gguf" });
+
+  // 4·5) llama.cpp 변환 스크립트 + 양자화 실행파일(export_gguf.py와 같은 경로 규칙).
+  const convertOk = fs.existsSync(path.join(LLAMA_CPP_DIR, "convert_hf_to_gguf.py"));
+  const quantizeOk = fs.existsSync(path.join(LLAMA_CPP_DIR, "build", "bin", "Release", "llama-quantize.exe"));
+  checks.push({ key: "llama-convert", label: "llama.cpp 변환 스크립트", ok: convertOk, required: true, hint: convertOk ? undefined : "llama.cpp 클론 필요 (PC세팅 체크리스트 STEP 5)" });
+  checks.push({ key: "llama-quantize", label: "llama.cpp 양자화 빌드", ok: quantizeOk, required: true, hint: quantizeOk ? undefined : "llama.cpp를 빌드하세요 (llama-quantize.exe)" });
+
+  // 6) 베이스 모델 가중치 캐시 — 첫 실학습 전 폐쇄망 이전 전에 받아둬야 함.
+  const cached = isBaseModelCached(config.baseModel);
+  checks.push({
+    key: "base-model",
+    label: `베이스 모델 캐시 (${config.baseModel})`,
+    ok: cached,
+    required: true,
+    hint: cached ? undefined : `hf download ${config.baseModel}`,
+  });
+
+  // 7) 학습 데이터 준비(경고성) — 👍/미평가 미사용 로그가 최소치 이상인지.
+  const unused = (pickLogsStmt.all() as ChatLogRow[]).length;
+  checks.push({
+    key: "training-data",
+    label: "학습 데이터(👍 대화)",
+    ok: unused >= 5,
+    required: false,
+    detail: `현재 ${unused}건`,
+    hint: unused >= 5 ? undefined : "대화를 더 수집하고 👍를 남기거나, 기존 데이터셋으로 실행하세요.",
+  });
+
+  const ready = checks.every((c) => c.ok || !c.required);
+  return { checks, ready };
+}
+
 // 테스트 전용: db는 모듈 싱글턴이라 createApp()을 새로 호출해도 초기화되지 않는다.
 export function resetLearnloopForTests(): void {
   db.exec("DELETE FROM chat_logs; DELETE FROM learnloop_runs;");
@@ -492,6 +595,8 @@ export function registerLearnloopRoutes(app: Express): void {
       }
     })
   );
+
+  app.get("/api/learnloop/preflight", authMiddleware, (_req, res) => res.json(preflightCheck()));
 
   app.get("/api/learnloop/status", authMiddleware, (_req, res) => res.json(getLearnloopStatus()));
   app.get("/api/learnloop/runs", authMiddleware, (_req, res) => res.json(listLearnloopRuns()));

@@ -209,6 +209,28 @@ describe("learnloop (헤르메스 폐쇄형 학습 루프)", () => {
     expect((await request(app).put("/api/learnloop/config").set(auth()).send({ targetAgent: "no-such" })).status).toBe(400);
   });
 
+  it("preflight returns a structured check list and requires auth", async () => {
+    const res = await request(app).get("/api/learnloop/preflight").set(auth());
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body.checks)).toBe(true);
+    expect(typeof res.body.ready).toBe("boolean");
+    // 예상 점검 항목이 모두 있는지(환경마다 ok 값은 다르므로 존재+형태만 확인)
+    const keys = res.body.checks.map((c: { key: string }) => c.key);
+    for (const k of ["python", "unsloth", "gguf", "llama-convert", "llama-quantize", "base-model", "training-data"]) {
+      expect(keys, `${k} 누락`).toContain(k);
+    }
+    for (const c of res.body.checks) {
+      expect(typeof c.ok).toBe("boolean");
+      expect(typeof c.required).toBe("boolean");
+      expect(c.label.length).toBeGreaterThan(0);
+    }
+    // 필수 항목이 하나라도 실패면 ready=false여야 한다(일관성)
+    const requiredAllOk = res.body.checks.filter((c: { required: boolean }) => c.required).every((c: { ok: boolean }) => c.ok);
+    expect(res.body.ready).toBe(requiredAllOk);
+
+    expect((await request(app).get("/api/learnloop/preflight")).status).toBe(401);
+  });
+
   it("requires auth on all routes", async () => {
     expect((await request(app).get("/api/learnloop/logs")).status).toBe(401);
     expect((await request(app).post("/api/learnloop/run")).status).toBe(401);

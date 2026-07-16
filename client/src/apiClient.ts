@@ -312,7 +312,17 @@ export interface LearnloopConfig {
   targetAgent: string;
 }
 
+export interface LearnloopPreflightCheck {
+  key: string;
+  label: string;
+  ok: boolean;
+  required: boolean;
+  detail?: string;
+  hint?: string;
+}
+
 export const learnloopApi = {
+  preflight: () => request<{ checks: LearnloopPreflightCheck[]; ready: boolean }>("/api/learnloop/preflight"),
   logs: (limit?: number, offset?: number) =>
     request<{ logs: LearnloopChatLog[]; kpis: { total: number; positive: number; negative: number; unused: number } }>(
       `/api/learnloop/logs?limit=${limit ?? 50}&offset=${offset ?? 0}`

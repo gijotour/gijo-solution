@@ -101,6 +101,7 @@ const gijoApi = {
   extractDocument: (filename: string, content: string) => api.datasetApi.extract(filename, content),
 
   // 헤르메스 폐쇄형 학습 루프(수집→정제→학습→배포)
+  getLearnloopPreflight: () => api.learnloopApi.preflight(),
   listLearnloopLogs: (limit?: number, offset?: number) => api.learnloopApi.logs(limit, offset),
   rateLearnloopLog: (id: string, rating: 1 | -1 | 0) => api.learnloopApi.rate(id, rating),
   deleteLearnloopLog: (id: string) => api.learnloopApi.removeLog(id),
