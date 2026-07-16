@@ -114,6 +114,17 @@ export function resetTasksForTests(): void {
   db.exec("DELETE FROM tasks");
 }
 
+// 첫 실행에 "오늘 확인할 항목"·KPI SLA가 비어 보이지 않게 예시 조치 항목 3건을 시드한다
+// (assets.ts의 샘플 취약점 호스트와 연결). 취약점 연결 조치가 하나라도 있으면 끼어들지 않는다.
+export function seedSampleRemediationTasksIfEmpty(): void {
+  if (listTasks().some((t) => (t.ref ?? "").startsWith("vuln:"))) return;
+  const day = 86400000;
+  createTask({ text: "[조치] Apache Log4j RCE — 샘플-웹서버", priority: "P0", dueAt: Date.now() + 5 * day, assignee: "샘플담당", ref: "vuln:sample-web01" });
+  createTask({ text: "[조치] OpenSSH 업데이트 — 샘플-웹서버", priority: "P1", dueAt: Date.now() - 2 * day, assignee: "샘플담당", ref: "vuln:sample-web01" }); // 기한 초과
+  createTask({ text: "[조치] Oracle CPU 적용 — 샘플-웹서버", priority: "P2", dueAt: Date.now() + 2 * day, assignee: "샘플담당", ref: "vuln:sample-web01" }); // 임박
+}
+seedSampleRemediationTasksIfEmpty();
+
 export function registerTasksRoutes(app: Express): void {
   app.get("/api/tasks", authMiddleware, (_req, res) => res.json(listTasks()));
   app.post("/api/tasks", authMiddleware, (req, res) => {

@@ -281,6 +281,35 @@ export function seedSampleAssetsIfEmpty(): void {
 }
 seedSampleAssetsIfEmpty();
 
+// 취약점 관리 화면(취약 자산관리·인벤토리·KPI·리포트)이 첫 실행에 비어 보이지 않게 예시 인프라
+// 호스트 1대 + 취약점 몇 건을 시드한다 — Nessus 리포트를 아직 안 올린 상태의 온보딩/데모용.
+// 실제 호스트가 하나라도 등록되면(infra-host 존재) 절대 끼어들지 않는다. 값은 실제와 유사하되
+// owner를 "샘플(예시)"로 표시해 진짜 스캔 결과와 구분한다.
+export const SAMPLE_VULN_HOST_ID = "vuln:sample-web01";
+export function seedSampleVulnHostIfEmpty(): void {
+  const hasHost = (listAssetRowsStmt.all() as AssetRow[]).some((r) => r.assetType === "infra-host");
+  if (hasHost) return;
+  registerAsset({
+    id: SAMPLE_VULN_HOST_ID,
+    name: "샘플-웹서버 (10.0.0.100)",
+    path: "10.0.0.100",
+    assetType: "infra-host",
+    owner: "샘플(예시)",
+    service: "임직원 보안 포털", // 샘플 AI 자산과 같은 서비스에 연결(서비스 영향도 데모 일관성)
+    components: [
+      { name: "Ubuntu 22.04 LTS", version: "-", license: "-" },
+      { name: "Linux Kernel", version: "5.15.0-91", license: "-" },
+    ],
+  });
+  recordFindings(SAMPLE_VULN_HOST_ID, [
+    { finding_type: "Apache Log4j < 2.15.0 RCE (CVE-2021-44228)", severity: "critical", evidence: "경로: /opt/app/lib/log4j-core-2.11.0.jar (설치 2.11.0 → 2.12.2 필요)\n⚠ CISA KEV(실제 악용 확인): CVE-2021-44228", source_tool: "샘플", key: "sample-log4j", state: "active", epss: 0.9436, vpr: 10, kev: true, kevCves: ["CVE-2021-44228"] },
+    { finding_type: "OpenSSH < 9.6 사용자 열거 (CVE-2024-6387)", severity: "high", evidence: "포트: tcp/22", source_tool: "샘플", key: "sample-ssh", state: "new", epss: 0.42, vpr: 8.1 },
+    { finding_type: "Oracle DB CPU 미적용 (CVE-2022-21432 외 16건)", severity: "medium", evidence: "포트: tcp/1521\nCVE(17): CVE-2022-21432 …", source_tool: "샘플", key: "sample-oracle", state: "active", epss: 0.9439, vpr: 8.9 },
+    { finding_type: "SSL 인증서 만료 임박", severity: "low", evidence: "만료 30일 이내 — 갱신 완료로 이번 스캔에서 해소됨", source_tool: "샘플", key: "sample-ssl", state: "fixed" },
+  ]);
+}
+seedSampleVulnHostIfEmpty();
+
 export function registerAssetsRoutes(app: Express): void {
   app.get("/api/assets", authMiddleware, (_req, res) => res.json(listAssets()));
   app.get("/api/assets/:id", authMiddleware, (req, res) => {
