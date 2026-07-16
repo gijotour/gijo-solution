@@ -197,6 +197,13 @@
       <div class="kpi-mini"><div class="kpi-mini-label">SBOM 미생성</div><div class="kpi-mini-value" id="kpiNoSbom" style="color:var(--amber)">-</div></div>
     </div>
 
+    <!-- 서비스 영향도: 자산에 문제가 생기면 어느 업무 서비스가 영향받는지 자동 집계(자산 위험·CTI 위협·지연 점검). -->
+    <div style="background:var(--panel);border:1px solid rgba(240,160,32,0.3);border-radius:12px;padding:16px 18px;margin-bottom:16px;">
+      <div style="font-size:14px;font-weight:800;color:#fff;margin-bottom:2px;">🔗 서비스 영향도 <span style="font-size:11px;font-weight:600;color:var(--muted)">자산 → 업무 서비스 의존성</span></div>
+      <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">각 자산이 지원하는 서비스별로 위험(고위험 자산·CTI 위협·지연 점검)을 모아 "지금 위험한 서비스"를 보여줍니다. 자산 등록 시 <b>지원 서비스</b>를 지정하면 집계됩니다.</div>
+      <div id="serviceImpactBody" style="display:flex;flex-direction:column;gap:8px;">불러오는 중...</div>
+    </div>
+
     <div class="toolbar">
       <div class="search">
         <span style="color:var(--muted-2)">⌕</span>
@@ -250,6 +257,8 @@
     </select>
     <label for="assetOwnerInput">소유부서</label>
     <input id="assetOwnerInput" placeholder="예: 정보보안팀">
+    <label for="assetServiceInput">지원 서비스 (선택 — 서비스 영향도 집계용)</label>
+    <input id="assetServiceInput" placeholder="예: 대외 웹서비스, 임직원 포털">
     <div class="modal-err" id="modalErr"></div>
     <div class="modal-actions">
       <button class="btn-ghost" id="modalCancelBtn">취소</button>
@@ -393,9 +402,45 @@
     }
   }
 
+  const IMPACT = {
+    high: { label: "높음", color: "#f5928a", bg: "rgba(226,72,61,0.14)" },
+    mid: { label: "중간", color: "var(--amber)", bg: "rgba(240,160,32,0.14)" },
+    low: { label: "낮음", color: "var(--blue-light)", bg: "rgba(59,130,246,0.14)" },
+    none: { label: "정상", color: "var(--teal)", bg: "rgba(30,185,128,0.14)" },
+  };
+  async function loadServiceImpact() {
+    const body = document.getElementById("serviceImpactBody");
+    try {
+      const { services, summary } = await window.gijo.getServiceImpact();
+      if (!services.length) {
+        body.innerHTML = '<div style="color:var(--muted-2);font-size:12px">등록된 자산이 없습니다.</div>';
+        return;
+      }
+      body.innerHTML = services.map((s) => {
+        const im = IMPACT[s.impactLevel] || IMPACT.none;
+        const factors = [];
+        if (s.highRiskAssets) factors.push(`고위험 자산 ${s.highRiskAssets}`);
+        if (s.ctiAffectedAssets) factors.push(`<span style="color:#f5928a">CTI 위협 ${s.ctiAffectedAssets}</span>`);
+        if (s.overdueInspections) factors.push(`<span style="color:var(--amber)">지연 점검 ${s.overdueInspections}</span>`);
+        const factorsStr = factors.length ? factors.join(" · ") : "위험 요인 없음";
+        const assetNames = s.assets.map((a) => a.name.replace(/</g, "&lt;")).join(", ");
+        return `<div style="display:flex;align-items:center;gap:10px;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:10px 13px;flex-wrap:wrap;">
+          <span style="font-size:10px;font-weight:800;padding:3px 9px;border-radius:6px;color:${im.color};background:${im.bg};white-space:nowrap;">영향도 ${im.label}</span>
+          <span style="font-size:13px;font-weight:800;color:#fff;">${s.service.replace(/</g, "&lt;")}</span>
+          <span style="font-size:11px;color:var(--muted-2);">자산 ${s.assetCount} · ${assetNames}</span>
+          <span style="font-size:11.5px;color:var(--muted);margin-left:auto;">${factorsStr}</span>
+        </div>`;
+      }).join("") +
+      (summary.unassignedAssets ? `<div style="font-size:11px;color:var(--muted-2);margin-top:2px;">※ 서비스 미지정 자산 ${summary.unassignedAssets}건 — 자산 등록 시 '지원 서비스'를 지정하세요.</div>` : "");
+    } catch (e) {
+      body.innerHTML = '<div style="color:#f5928a;font-size:12px">서비스 영향도를 불러오지 못했습니다: ' + e.message + "</div>";
+    }
+  }
+
   async function refresh() {
     [allAssets] = await Promise.all([window.gijo.listAssets(), loadMaintCounts()]);
     render();
+    loadServiceImpact();
   }
 
   // 서버가 스캔 완료 · SBOM 생성 · 자산 등록 시점마다 WebSocket으로 밀어주는 asset:updated를
@@ -426,7 +471,7 @@
 
   function openModal() {
     modalErr.textContent = "";
-    ["assetIdInput", "assetNameInput", "assetPathInput", "assetOwnerInput"].forEach((id) => (document.getElementById(id).value = ""));
+    ["assetIdInput", "assetNameInput", "assetPathInput", "assetOwnerInput", "assetServiceInput"].forEach((id) => (document.getElementById(id).value = ""));
     modal.classList.add("open");
   }
 
@@ -440,12 +485,13 @@
     const path = document.getElementById("assetPathInput").value.trim();
     const assetType = document.getElementById("assetTypeInput").value;
     const owner = document.getElementById("assetOwnerInput").value.trim() || "-";
+    const service = document.getElementById("assetServiceInput").value.trim() || undefined;
     if (!id || !name || !path) {
       modalErr.textContent = "자산 ID, 자산명, 경로는 필수입니다.";
       return;
     }
     try {
-      await window.gijo.registerAsset({ id, name, path, assetType, owner });
+      await window.gijo.registerAsset({ id, name, path, assetType, owner, service });
       closeModal();
       await refresh();
     } catch (e) {

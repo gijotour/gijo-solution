@@ -221,3 +221,11 @@ try {
 } catch {
   /* 컬럼이 이미 있으면 정상 — 무시 */
 }
+
+// 마이그레이션: assets.service (이 자산이 지원·보호하는 업무 서비스). 서비스 영향도(serviceimpact.ts)
+// 산출용 — 자산에 문제가 생기면 어느 서비스가 영향받는지 집계한다. 선택 항목이라 nullable.
+try {
+  db.exec("ALTER TABLE assets ADD COLUMN service TEXT");
+} catch {
+  /* 컬럼이 이미 있으면 정상 — 무시 */
+}

@@ -69,8 +69,9 @@ const gijoApi = {
   // 자산 인벤토리
   listAssets: () => api.assetsApi.list(),
   getAsset: (id: string) => api.assetsApi.get(id),
-  registerAsset: (args: { id: string; name: string; path: string; assetType?: string; owner?: string }) =>
+  registerAsset: (args: { id: string; name: string; path: string; assetType?: string; owner?: string; service?: string }) =>
     api.assetsApi.register(args),
+  getServiceImpact: () => api.serviceImpactApi.get(),
   importAssets: (content: string, format: "json" | "csv", source: string) => api.assetsApi.import(content, format, source),
   scanRepos: (args: { provider: string; owner: string; token?: string; baseUrl?: string; maxRepos?: number }) => api.assetsApi.scanRepos(args),
   updateAiBom: (id: string, aibom: unknown) => api.assetsApi.updateAiBom(id, aibom as import("./apiClient").AiBom),

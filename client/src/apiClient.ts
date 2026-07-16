@@ -536,6 +536,7 @@ export interface Asset {
   path: string;
   assetType: string;
   owner: string;
+  service: string | null;
   components: AssetComponent[];
   findings: Finding[];
   aibom: AiBom;
@@ -544,10 +545,26 @@ export interface Asset {
   sbomGeneratedAt: number | null;
 }
 
+// ── 서비스 영향도 ─────────────────────────────────────────────────────
+export interface ServiceImpact {
+  service: string;
+  assetCount: number;
+  highRiskAssets: number;
+  ctiAffectedAssets: number;
+  overdueInspections: number;
+  impactLevel: "high" | "mid" | "low" | "none";
+  assets: { id: string; name: string; risk: "high" | "mid" | "low" | "none"; ctiThreat: boolean; overdueInspections: number }[];
+}
+
+export const serviceImpactApi = {
+  get: () =>
+    request<{ services: ServiceImpact[]; summary: { totalServices: number; atRisk: number; unassignedAssets: number } }>("/api/service-impact"),
+};
+
 export const assetsApi = {
   list: () => request<Asset[]>("/api/assets"),
   get: (id: string) => request<Asset>(`/api/assets/${id}`),
-  register: (args: { id: string; name: string; path: string; assetType?: string; owner?: string; components?: AssetComponent[] }) =>
+  register: (args: { id: string; name: string; path: string; assetType?: string; owner?: string; service?: string; components?: AssetComponent[] }) =>
     request<Asset>("/api/assets", { method: "POST", body: args }),
   import: (content: string, format: "json" | "csv", source: string) =>
     request<{ imported: number; skipped: number; assets: Asset[] }>("/api/assets/import", {

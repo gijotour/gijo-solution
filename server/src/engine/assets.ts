@@ -69,6 +69,7 @@ export interface Asset {
   path: string;
   assetType: string;
   owner: string;
+  service: string | null; // 이 자산이 지원·보호하는 업무 서비스(서비스 영향도 집계용). 미지정이면 null.
   components: AssetComponent[];
   findings: StandardFinding[]; // 가장 최근 스캔 결과만 — 현재 위험 상태
   scanHistory: ScanRun[]; // 스캔 전체 이력, 오래된 순
@@ -84,6 +85,7 @@ interface AssetRow {
   path: string;
   assetType: string;
   owner: string;
+  service: string | null;
   components: string;
   findings: string;
   aibom: string;
@@ -100,12 +102,12 @@ interface ScanRunRow {
 }
 
 const upsertAssetStmt = db.prepare(`
-  INSERT INTO assets (id, name, path, assetType, owner, components, findings, registeredAt, lastScannedAt, sbomGeneratedAt)
-  VALUES (@id, @name, @path, @assetType, @owner, @components, @findings, @registeredAt, @lastScannedAt, @sbomGeneratedAt)
+  INSERT INTO assets (id, name, path, assetType, owner, service, components, findings, registeredAt, lastScannedAt, sbomGeneratedAt)
+  VALUES (@id, @name, @path, @assetType, @owner, @service, @components, @findings, @registeredAt, @lastScannedAt, @sbomGeneratedAt)
   ON CONFLICT(id) DO UPDATE SET
     name = excluded.name, path = excluded.path, assetType = excluded.assetType, owner = excluded.owner,
-    components = excluded.components, findings = excluded.findings, registeredAt = excluded.registeredAt,
-    lastScannedAt = excluded.lastScannedAt, sbomGeneratedAt = excluded.sbomGeneratedAt
+    service = excluded.service, components = excluded.components, findings = excluded.findings,
+    registeredAt = excluded.registeredAt, lastScannedAt = excluded.lastScannedAt, sbomGeneratedAt = excluded.sbomGeneratedAt
 `);
 const getAssetRowStmt = db.prepare("SELECT * FROM assets WHERE id = ?");
 const listAssetRowsStmt = db.prepare("SELECT * FROM assets");
@@ -133,6 +135,7 @@ function fromRow(row: AssetRow): Asset {
     path: row.path,
     assetType: row.assetType,
     owner: row.owner,
+    service: row.service ?? null,
     components: JSON.parse(row.components) as AssetComponent[],
     findings: JSON.parse(row.findings) as StandardFinding[],
     scanHistory: scanHistoryOf(row.id),
@@ -162,6 +165,7 @@ export function registerAsset(args: {
   path: string;
   assetType?: string;
   owner?: string;
+  service?: string;
   components?: AssetComponent[];
 }): Asset {
   // 재등록은 스캔 이력/현재 findings를 초기화한다 (기존 동작 유지).
@@ -172,6 +176,7 @@ export function registerAsset(args: {
     path: args.path,
     assetType: args.assetType ?? "기타",
     owner: args.owner ?? "-",
+    service: args.service?.trim() || null,
     components: JSON.stringify(args.components ?? []),
     findings: JSON.stringify([]),
     registeredAt: Date.now(),
@@ -249,6 +254,7 @@ function seedSampleAssetsIfEmpty(): void {
     path: "/srv/ai/secbot",
     assetType: "LLM 서비스",
     owner: "보안팀",
+    service: "임직원 보안 포털",
     components: [
       { name: "Qwen2.5-7B-Instruct", version: "q4_k_m", license: "Apache-2.0" },
       { name: "bge-m3", version: "1.0", license: "MIT" },
@@ -260,6 +266,7 @@ function seedSampleAssetsIfEmpty(): void {
     path: "/srv/ai/doc-classifier",
     assetType: "분류 모델",
     owner: "정보보호팀",
+    service: "문서관리 시스템",
     components: [{ name: "KoBERT", version: "1.0", license: "Apache-2.0" }],
   });
   registerAsset({
@@ -268,6 +275,7 @@ function seedSampleAssetsIfEmpty(): void {
     path: "/srv/ai/anomaly",
     assetType: "이상탐지 모델",
     owner: "SOC",
+    service: "SOC 관제 플랫폼",
     components: [{ name: "IsolationForest", version: "scikit-1.4", license: "BSD-3" }],
   });
 }
