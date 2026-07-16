@@ -29,7 +29,18 @@ const ALIASES = {
   // 취약점 1건의 식별자. Nessus CSV는 CVE마다 행을 복제하므로(플러그인 1개에 CVE 17개면 17행),
   // 이 값으로 합쳐야 건수가 실제와 맞는다.
   pluginId: ["plugin_id", "pluginid", "check_id", "rule_id", "test_id"],
+  // 실제 위협 지표 — CVSS 기반 Risk만 보면 "Medium인데 악용확률 94%"인 건이 후순위로 밀린다.
+  epss: ["epss_score", "epss"],
+  vpr: ["vpr_score", "vpr"],
 };
+
+// 숫자 컬럼 파싱 — 값이 없거나 숫자가 아니면 undefined(0과 구분해야 정렬이 왜곡되지 않는다).
+function pickNum(row: Record<string, string>, aliases: string[]): number | undefined {
+  const raw = pick(row, aliases);
+  if (!raw) return undefined;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : undefined;
+}
 
 // Nessus Risk Factor / 일반 severity 문자열 → StandardFinding severity
 function toSeverity(risk: string): StandardFinding["severity"] {
@@ -95,6 +106,8 @@ export interface ParsedVuln {
   cve: string;
   description: string;
   pluginId: string;
+  epss?: number;
+  vpr?: number;
 }
 
 export function parseVulnReport(content: string, format: "json" | "csv"): ParsedVuln[] {
@@ -107,6 +120,8 @@ export function parseVulnReport(content: string, format: "json" | "csv"): Parsed
       cve: pick(row, ALIASES.cve),
       description: pick(row, ALIASES.description),
       pluginId: pick(row, ALIASES.pluginId),
+      epss: pickNum(row, ALIASES.epss),
+      vpr: pickNum(row, ALIASES.vpr),
     }))
     .filter((v) => v.host && v.name); // 호스트·항목명 없는 행은 무시
 }
@@ -144,14 +159,18 @@ export function importVulnScan(content: string, format: "json" | "csv", sourceLa
     // Nessus CSV는 플러그인(취약점) 1건을 CVE 개수만큼 행으로 복제해 내보낸다 — 그대로 세면
     // 건수가 몇 배로 부풀려진다(실측: 1,171행 = 실제 282건). 플러그인 id(없으면 항목명)로 합치고
     // CVE는 한 건에 모아 붙인다. EPSS/VPR도 플러그인 단위 점수라 CVE별로 나누는 게 의미가 없다.
-    const byVuln = new Map<string, { rep: ParsedVuln; cves: Set<string> }>();
+    const byVuln = new Map<string, { rep: ParsedVuln; cves: Set<string>; epss?: number; vpr?: number }>();
     for (const v of vulns) {
       const key = v.pluginId || v.name;
       if (!byVuln.has(key)) byVuln.set(key, { rep: v, cves: new Set<string>() });
-      if (v.cve) byVuln.get(key)!.cves.add(v.cve);
+      const g = byVuln.get(key)!;
+      if (v.cve) g.cves.add(v.cve);
+      // EPSS/VPR은 플러그인 단위 점수라 복제 행마다 같은 값이지만, 다를 경우 가장 위험한 값을 남긴다.
+      if (v.epss !== undefined) g.epss = Math.max(g.epss ?? 0, v.epss);
+      if (v.vpr !== undefined) g.vpr = Math.max(g.vpr ?? 0, v.vpr);
     }
 
-    const findings: StandardFinding[] = [...byVuln.values()].map(({ rep, cves }) => {
+    const findings: StandardFinding[] = [...byVuln.values()].map(({ rep, cves, epss, vpr }) => {
       const list = [...cves].sort();
       // 요약에는 대표 CVE만 쓰되, 전체 목록은 evidence에 남겨 추적성을 잃지 않는다.
       const evidence = [rep.description || `${host} — ${rep.name}`, list.length > 1 ? `CVE(${list.length}): ${list.join(", ")}` : ""]
@@ -162,6 +181,8 @@ export function importVulnScan(content: string, format: "json" | "csv", sourceLa
         severity: toSeverity(rep.risk),
         evidence,
         source_tool: sourceLabel,
+        ...(epss !== undefined ? { epss } : {}),
+        ...(vpr !== undefined ? { vpr } : {}),
       };
     });
     totalFindings += findings.length;

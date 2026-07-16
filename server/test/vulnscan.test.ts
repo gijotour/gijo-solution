@@ -77,6 +77,34 @@ describe("vulnscan (Tenable Nessus 등 취약점 스캔 결과 업로드)", () =
     expect(log4j.severity).toBe("critical");
   });
 
+  it("keeps EPSS/VPR so exploit-likelihood can outrank CVSS-based severity", () => {
+    // Nessus 실데이터의 핵심 패턴: Risk=Medium 인데 EPSS 0.94 (실제로는 활발히 악용됨)
+    const csv =
+      "Plugin ID,CVE,Risk,Host,Name,EPSS Score,VPR Score\n" +
+      "189165,CVE-2022-21432,Medium,10.0.0.5,Oracle DB (Jan 2024 CPU),0.9439,8.9\n" +
+      "189165,CVE-2023-38545,Medium,10.0.0.5,Oracle DB (Jan 2024 CPU),0.9439,8.9\n" +
+      "777,CVE-2024-9999,Critical,10.0.0.5,조용한 Critical,0.0004,2.1\n";
+    importVulnScan(csv, "csv", "nessus");
+    const f = getAsset("vuln:10.0.0.5")!.findings;
+
+    const oracle = f.find((x) => x.finding_type.startsWith("Oracle DB"))!;
+    expect(oracle.severity).toBe("medium"); // CVSS 기반 등급은 낮지만
+    expect(oracle.epss).toBeCloseTo(0.9439); // 실제 악용확률은 94%
+    expect(oracle.vpr).toBe(8.9);
+
+    // 악용확률로 정렬하면 Medium이 Critical보다 위로 올라온다 — 이게 이 지표를 넣은 이유
+    const byEpss = [...f].sort((a, b) => (b.epss ?? -1) - (a.epss ?? -1));
+    expect(byEpss[0].finding_type).toContain("Oracle DB");
+    expect(byEpss[byEpss.length - 1].finding_type).toBe("조용한 Critical (CVE-2024-9999)");
+  });
+
+  it("leaves EPSS/VPR undefined when the report has no such columns (0과 구분)", () => {
+    importVulnScan("Host,Name,Risk\n10.0.0.7,항목,High\n", "csv", "s");
+    const f = getAsset("vuln:10.0.0.7")!.findings[0];
+    expect(f.epss).toBeUndefined();
+    expect(f.vpr).toBeUndefined();
+  });
+
   it("falls back to the finding name when the tool has no plugin id", () => {
     const csv = "Host,Name,Risk,CVE\n" + "h,같은 취약점,High,CVE-1\n" + "h,같은 취약점,High,CVE-2\n" + "h,다른 취약점,Low,\n";
     const result = importVulnScan(csv, "csv", "s");

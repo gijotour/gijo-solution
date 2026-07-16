@@ -17,6 +17,10 @@ export interface StandardFinding {
   severity: "low" | "medium" | "high" | "critical";
   evidence: string;
   source_tool: string;
+  // 취약점 스캐너가 주면 함께 보관하는 실제 위협 지표(없으면 undefined).
+  // severity(CVSS 기반)만으로는 "지금 실제로 털리는 것"이 후순위로 밀리므로 함께 저장한다.
+  epss?: number; // 0~1, 30일 내 악용될 확률 (FIRST EPSS)
+  vpr?: number; // 0~10, Tenable VPR (실제 위협 기반 우선순위)
 }
 
 const adapters: Record<string, ScanAdapter> = {

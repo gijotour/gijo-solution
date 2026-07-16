@@ -61,6 +61,10 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
 .vd-item:hover{background:rgba(255,255,255,0.03);}
 .vd-item-top{display:flex;align-items:center;gap:8px;font-size:12.5px;}
 .vd-name{color:var(--text);flex:1;line-height:1.5;}
+.vd-epss{font-size:10.5px;font-weight:800;padding:1px 7px;border-radius:5px;background:rgba(139,124,240,0.16);color:var(--purple);flex-shrink:0;}
+.vd-epss.hot{background:rgba(226,72,61,0.18);color:#f5928a;}
+.vd-vpr{font-size:10.5px;font-weight:700;padding:1px 7px;border-radius:5px;background:rgba(255,255,255,0.06);color:var(--muted);flex-shrink:0;}
+.vd-misfit{font-size:10px;font-weight:800;padding:1px 6px;border-radius:5px;background:rgba(240,160,32,0.18);color:var(--amber);flex-shrink:0;}
 .vd-ev{display:none;margin-top:8px;padding:10px 12px;background:var(--panel-2);border-radius:6px;font-size:11.5px;color:var(--muted);line-height:1.75;white-space:pre-wrap;word-break:break-word;max-height:240px;overflow-y:auto;}
 .vd-item.open .vd-ev{display:block;}
 .vd-empty{padding:16px;color:var(--muted);font-size:12.5px;}
@@ -170,6 +174,7 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
         <span class="vd-chip" data-sev="high">High</span>
         <span class="vd-chip" data-sev="medium">Medium</span>
         <span class="vd-chip" data-sev="low">Low/Info</span>
+        <span class="vd-chip" id="vdSortBtn" title="정렬 기준 전환 — EPSS는 30일 내 실제 악용될 확률">↕ 심각도 순</span>
         <input class="vd-search" id="vdSearch" placeholder="취약점명 · CVE로 검색 (예: log4j, CVE-2021-44228, firefox)">
       </div>
       <div class="vd-list" id="vdList"></div>
@@ -229,6 +234,10 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
   let hostCache = [];
   let currentHostId = null;
   let vdFilter = "all";
+  let vdSort = "sev"; // "sev" = 심각도 순, "epss" = 악용확률 순
+
+  // CVSS 기반 Risk 는 Medium인데 실제 악용확률(EPSS)이 높은 건 — 등급만 보면 놓친다.
+  const isMisfit = (f) => (f.epss ?? 0) >= 0.5 && f.severity !== "critical" && f.severity !== "high";
 
   function closeDetail() {
     currentHostId = null;
@@ -243,14 +252,20 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
     currentHostId = asset.id;
     if (!keepFilters) {
       vdFilter = "all";
-      document.querySelectorAll(".vd-chip").forEach((c) => c.classList.toggle("active", c.dataset.sev === "all"));
+      vdSort = "sev";
+      document.querySelectorAll(".vd-chip[data-sev]").forEach((c) => c.classList.toggle("active", c.dataset.sev === "all"));
+      const sortBtn = document.getElementById("vdSortBtn");
+      sortBtn.textContent = "↕ 심각도 순";
+      sortBtn.classList.remove("active");
       document.getElementById("vdSearch").value = "";
     }
     const f = asset.findings || [];
     const c = sevCounts(f);
     document.getElementById("vdTitle").textContent = `${asset.name} — 취약점 ${f.length.toLocaleString()}건`;
+    const misfits = f.filter(isMisfit).length;
     document.getElementById("vdSub").textContent =
       `출처 ${asset.owner} · 최근 스캔 ${fmtDate(asset.lastScannedAt)} · Critical ${c.critical} / High ${c.high} / Medium ${c.medium} / Low·Info ${c.low}` +
+      (misfits ? ` · ⚠ 등급은 낮지만 악용확률 50%↑ ${misfits}건 (등급만 보면 놓침)` : "") +
       ` — 항목을 클릭하면 상세(CVE 목록·조치 근거)가 펼쳐집니다.`;
     document.getElementById("vulnDetail").style.display = "";
     renderVdList();
@@ -267,26 +282,35 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
     const asset = hostCache.find((a) => a.id === currentHostId);
     if (!asset) return;
     const q = document.getElementById("vdSearch").value.trim().toLowerCase();
+    const bySev = (a, b) => (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9) || String(a.finding_type).localeCompare(String(b.finding_type));
+    const byEpss = (a, b) => (b.epss ?? -1) - (a.epss ?? -1) || bySev(a, b);
     const items = (asset.findings || [])
       .filter((f) => vdFilter === "all" || f.severity === vdFilter)
       .filter((f) => !q || `${f.finding_type} ${f.evidence || ""}`.toLowerCase().includes(q))
-      .sort((a, b) => (SEV_ORDER[a.severity] ?? 9) - (SEV_ORDER[b.severity] ?? 9) || String(a.finding_type).localeCompare(String(b.finding_type)));
+      .sort(vdSort === "epss" ? byEpss : bySev);
     if (items.length === 0) {
       list.innerHTML = '<div class="vd-empty">조건에 맞는 취약점이 없습니다.</div>';
       return;
     }
     list.innerHTML = items
-      .map(
-        (f) =>
+      .map((f) => {
+        const epss =
+          f.epss != null
+            ? `<span class="vd-epss ${f.epss >= 0.5 ? "hot" : ""}" title="EPSS — 30일 내 실제 악용될 확률">EPSS ${(f.epss * 100).toFixed(1)}%</span>`
+            : "";
+        const vpr = f.vpr != null ? `<span class="vd-vpr" title="Tenable VPR — 실제 위협 기반 우선순위(0~10)">VPR ${f.vpr}</span>` : "";
+        const misfit = isMisfit(f) ? `<span class="vd-misfit" title="CVSS 등급은 낮지만 실제 악용확률이 높습니다 — 등급만 보면 놓치는 건">⚠ 등급↓ 악용↑</span>` : "";
+        return (
           `<div class="vd-item">` +
           `<div class="vd-item-top">` +
           `<span class="sev ${SEV_CLASS[f.severity] || "sev-l"}">${SEV_LABEL[f.severity] || "?"}</span>` +
           `<span class="vd-name">${esc(f.finding_type)}</span>` +
-          `<span style="color:var(--muted-2);font-size:11px;flex-shrink:0">${esc(f.source_tool || "")}</span>` +
+          misfit + epss + vpr +
           `</div>` +
           `<div class="vd-ev">${esc(f.evidence || "(상세 없음)")}</div>` +
           `</div>`
-      )
+        );
+      })
       .join("");
     const shown = items.length, total = (asset.findings || []).length;
     if (shown !== total) list.insertAdjacentHTML("afterbegin", `<div class="vd-empty" style="border-bottom:1px solid var(--border)">${shown.toLocaleString()}건 표시 (전체 ${total.toLocaleString()}건)</div>`);
@@ -380,12 +404,20 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
       if (currentHostId === asset.id) closeDetail(); else openHost(asset);
     });
     document.getElementById("vdClose").addEventListener("click", closeDetail);
-    document.querySelectorAll(".vd-chip").forEach((chip) => {
+    // 심각도 필터 칩 (정렬 토글 칩은 data-sev 가 없으므로 제외)
+    document.querySelectorAll(".vd-chip[data-sev]").forEach((chip) => {
       chip.addEventListener("click", () => {
         vdFilter = chip.dataset.sev;
-        document.querySelectorAll(".vd-chip").forEach((c) => c.classList.toggle("active", c === chip));
+        document.querySelectorAll(".vd-chip[data-sev]").forEach((c) => c.classList.toggle("active", c === chip));
         renderVdList();
       });
+    });
+    // 정렬 토글: 심각도 순 ↔ 악용확률(EPSS) 순
+    document.getElementById("vdSortBtn").addEventListener("click", (e) => {
+      vdSort = vdSort === "sev" ? "epss" : "sev";
+      e.target.textContent = vdSort === "epss" ? "↕ 악용확률 순" : "↕ 심각도 순";
+      e.target.classList.toggle("active", vdSort === "epss");
+      renderVdList();
     });
     document.getElementById("vdSearch").addEventListener("input", renderVdList);
     // 취약점 항목 클릭 → 상세(CVE 목록·증거) 펼치기
