@@ -230,6 +230,49 @@ describe("vulnscan (Tenable Nessus 등 취약점 스캔 결과 업로드)", () =
     expect(netstat.evidence).toContain("포트: tcp/22, udp/53"); // 여러 포트가 한 건으로 합쳐짐
   });
 
+  it("parses a native .nessus (XML) report: host meta from HostProperties, severity from the numeric attribute", () => {
+    // Nessus 원본 .nessus 구조를 축약한 것. 핵심: 심각도는 severity 속성(0~4)으로 판정한다 —
+    // risk_factor 텍스트는 신뢰하지 않는다(Log4j 1.x 처럼 텍스트가 실제 등급과 어긋나는 함정 회피).
+    const xml =
+      `<?xml version="1.0"?><NessusClientData_v2><Report name="scan">` +
+      `<ReportHost name="192.168.219.98"><HostProperties>` +
+      `<tag name="host-fqdn">oracle.local</tag>` +
+      `<tag name="operating-system">Red Hat Enterprise Linux release 8.10 (Ootpa)</tag>` +
+      `<tag name="mac-address">02:42:B0:30:1F:0C</tag>` +
+      `</HostProperties>` +
+      // severity=4(Critical) 인데 risk_factor 텍스트는 일부러 "High"로 어긋나게 둔다 → 속성이 이겨야 함
+      `<ReportItem port="0" protocol="tcp" severity="4" pluginID="155999" pluginName="Apache Log4j &lt; 2.15.0 RCE">` +
+      `<cve>CVE-2021-44228</cve><cve>CVE-2021-45046</cve><risk_factor>High</risk_factor>` +
+      `<epss_score>0.9436</epss_score><vpr_score>10.0</vpr_score><synopsis>원격 코드 실행</synopsis></ReportItem>` +
+      // severity=0(None) → low, 포트 두 줄이 한 플러그인
+      `<ReportItem port="22" protocol="tcp" severity="0" pluginID="14272" pluginName="Netstat Portscanner">` +
+      `<risk_factor>None</risk_factor><synopsis>열린 포트</synopsis></ReportItem>` +
+      `<ReportItem port="53" protocol="udp" severity="0" pluginID="14272" pluginName="Netstat Portscanner">` +
+      `<risk_factor>None</risk_factor><synopsis>열린 포트</synopsis></ReportItem>` +
+      `</ReportHost></Report></NessusClientData_v2>`;
+
+    resetKevForTests(["CVE-2021-44228"]);
+    const result = importVulnScan(xml, "nessus", "nessus-native");
+    expect(result.hosts).toBe(1);
+    expect(result.findings).toBe(2); // 플러그인 2개(포트 두 줄은 1건으로 합침)
+
+    const asset = getAsset("vuln:192.168.219.98")!;
+    // HostProperties에서 이름·OS를 채운다(CSV로는 IP만 알던 것)
+    expect(asset.name).toBe("oracle.local (192.168.219.98)");
+    expect(asset.components.map((c) => c.name)).toContain("Red Hat Enterprise Linux release 8.10 (Ootpa)");
+
+    const log4j = asset.findings.find((f) => f.finding_type.includes("Log4j"))!;
+    expect(log4j.severity).toBe("critical"); // severity="4" → critical (risk_factor "High"를 무시)
+    expect(log4j.finding_type).toContain("CVE-2021-44228");
+    expect(log4j.epss).toBeCloseTo(0.9436);
+    expect(log4j.vpr).toBe(10);
+    expect(log4j.kev).toBe(true); // KEV 매칭도 CVE 기반으로 동작
+
+    const netstat = asset.findings.find((f) => f.finding_type.includes("Netstat"))!;
+    expect(netstat.severity).toBe("low"); // severity="0" → low
+    expect(netstat.evidence).toContain("포트: tcp/22, udp/53");
+  });
+
   it("parses JSON array and {vulnerabilities:[...]} envelopes", () => {
     expect(parseVulnReport('[{"host":"1.1.1.1","name":"x","risk":"high"}]', "json")).toHaveLength(1);
     expect(parseVulnReport('{"vulnerabilities":[{"ip":"2.2.2.2","plugin_name":"y","severity":"low"}]}', "json")).toHaveLength(1);

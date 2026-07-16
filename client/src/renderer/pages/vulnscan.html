@@ -145,10 +145,10 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
 
     <div class="panel">
       <div style="font-size:14.5px;font-weight:800;color:#fff;margin-bottom:4px;">스캔 결과 업로드</div>
-      <div style="font-size:11.5px;color:var(--muted);margin-bottom:14px;">Nessus는 "Export → CSV" 결과를 그대로 올리면 됩니다. Host/IP, Name, Risk, CVE 컬럼을 자동 인식합니다.</div>
+      <div style="font-size:11.5px;color:var(--muted);margin-bottom:14px;">Nessus의 <b>.nessus(원본 XML)</b> · CSV · HTML 리포트를 그대로 올리면 됩니다. 플러그인 단위로 중복을 제거하고 호스트 정보(OS·DNS)·EPSS·VPR·KEV를 자동 인식합니다.</div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
         <input id="sourceInput" placeholder="스캔 출처 라벨 (예: nessus-2026-07)" style="flex:1;min-width:200px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;">
-        <input type="file" id="vulnFileInput" accept=".json,.csv,.html,.htm" style="display:none">
+        <input type="file" id="vulnFileInput" accept=".nessus,.xml,.json,.csv,.html,.htm" style="display:none">
         <button class="btn-primary" id="uploadBtn">파일 선택 & 업로드</button>
       </div>
       <div class="status-line" id="uploadStatus"></div>
@@ -426,9 +426,9 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
     try {
       const text = await file.text();
       const lower = file.name.toLowerCase();
-      // HTML 리포트는 호스트명·OS까지 담고 있어 자산 정보가 더 풍부해진다.
-      const format = lower.endsWith(".csv") ? "csv" : /\.html?$/.test(lower) ? "html" : "json";
-      const source = document.getElementById("sourceInput").value.trim() || file.name.replace(/\.(json|csv)$/i, "");
+      // .nessus(원본 XML)·HTML 리포트는 호스트명·OS까지 담고 있어 자산 정보가 더 풍부해진다.
+      const format = /\.(nessus|xml)$/.test(lower) ? "nessus" : lower.endsWith(".csv") ? "csv" : /\.html?$/.test(lower) ? "html" : "json";
+      const source = document.getElementById("sourceInput").value.trim() || file.name.replace(/\.(nessus|xml|json|csv|html?|htm)$/i, "");
       status.textContent = "분석 중...";
       status.style.color = "var(--muted)";
       const r = await window.gijo.importVulnScan(text, format, source);

@@ -581,7 +581,7 @@ export const assetsApi = {
     request<{ scanned: number; registered: number; assets: Asset[] }>("/api/reposcan", { method: "POST", body: args }),
   updateAiBom: (id: string, aibom: AiBom) => request<Asset>(`/api/assets/${id}/aibom`, { method: "PUT", body: { aibom } }),
   remove: (id: string) => request<{ ok: boolean }>(`/api/assets/${encodeURIComponent(id)}`, { method: "DELETE" }),
-  importVulnScan: (content: string, format: "json" | "csv" | "html", source: string) =>
+  importVulnScan: (content: string, format: "json" | "csv" | "html" | "nessus", source: string) =>
     request<{ hosts: number; findings: number; assets: Asset[] }>("/api/vulnscan/import", {
       method: "POST",
       body: { content, format, source },

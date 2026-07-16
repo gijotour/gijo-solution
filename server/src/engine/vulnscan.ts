@@ -221,10 +221,77 @@ export function parseNessusHtml(html: string): { vulns: ParsedVuln[]; meta: Map<
   return { vulns, meta };
 }
 
-export type VulnFormat = "json" | "csv" | "html";
+// ── Nessus 네이티브 .nessus(XML) 파서 ───────────────────────────────────────
+// 구조: <ReportHost name="IP"><HostProperties><tag name="host-fqdn">…</tag>
+//   <tag name="operating-system">…</tag>…</HostProperties>
+//   <ReportItem port="1521" protocol="tcp" severity="0~4" pluginID="…" pluginName="…">
+//     <cve>…</cve> <risk_factor>…</risk_factor> <epss_score>…</epss_score> <vpr_score>…</vpr_score>
+//     <synopsis>…</synopsis> …</ReportItem></ReportHost>
+// 심각도는 severity 속성(0=info,1=low,2=med,3=high,4=critical)을 신뢰한다 — 이게 Nessus의
+// 실제 등급이다(HTML의 Risk Factor 텍스트 함정 회피). CSV/HTML과 같은 {vulns, meta} 형태로 반환.
+function xmlUnescape(s: string): string {
+  return s
+    .replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&apos;/g, "'").replace(/&#x?[0-9a-fA-F]+;/g, " ").replace(/&amp;/g, "&");
+}
+function attr(tag: string, name: string): string {
+  const m = tag.match(new RegExp(`${name}\\s*=\\s*"([^"]*)"`, "i"));
+  return m ? xmlUnescape(m[1]) : "";
+}
+function elemText(block: string, tag: string): string {
+  const m = block.match(new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`, "i"));
+  return m ? xmlUnescape(m[1].trim()) : "";
+}
+const XML_SEVERITY: Record<string, string> = { "0": "None", "1": "Low", "2": "Medium", "3": "High", "4": "Critical" };
+
+export function parseNessusXml(xml: string): { vulns: ParsedVuln[]; meta: Map<string, HostMeta> } {
+  const vulns: ParsedVuln[] = [];
+  const meta = new Map<string, HostMeta>();
+  const hostRe = /<ReportHost\b([^>]*)>([\s\S]*?)<\/ReportHost>/g;
+  let hm: RegExpExecArray | null;
+  while ((hm = hostRe.exec(xml)) !== null) {
+    const host = attr(`<ReportHost ${hm[1]}>`, "name");
+    if (!host) continue;
+    const body = hm[2];
+    const propTag = (name: string) => {
+      const m = body.match(new RegExp(`<tag[^>]*name\\s*=\\s*"${name}"[^>]*>([\\s\\S]*?)</tag>`, "i"));
+      return m ? xmlUnescape(m[1].trim()) : undefined;
+    };
+    const os = propTag("operating-system");
+    const dnsName = propTag("host-fqdn") ?? propTag("host-rdns");
+    const mac = propTag("mac-address");
+    if (os || dnsName || mac) meta.set(host, { os, dnsName, mac });
+
+    const itemRe = /<ReportItem\b([^>]*)>([\s\S]*?)<\/ReportItem>/g;
+    let im: RegExpExecArray | null;
+    while ((im = itemRe.exec(body)) !== null) {
+      const open = `<ReportItem ${im[1]}>`;
+      const block = im[2];
+      const pluginId = attr(open, "pluginID");
+      const name = attr(open, "pluginName");
+      if (!name) continue;
+      const risk = XML_SEVERITY[attr(open, "severity")] ?? elemText(block, "risk_factor") ?? "";
+      const epssRaw = elemText(block, "epss_score");
+      const vprRaw = elemText(block, "vpr_score");
+      const epss = epssRaw && Number.isFinite(Number(epssRaw)) ? Number(epssRaw) : undefined;
+      const vpr = vprRaw && Number.isFinite(Number(vprRaw)) ? Number(vprRaw) : undefined;
+      const cves = [...new Set([...block.matchAll(/<cve>\s*(CVE-\d{4}-\d{3,7})\s*<\/cve>/gi)].map((m) => m[1].toUpperCase()))];
+      const description = (elemText(block, "synopsis") || elemText(block, "description")).slice(0, 400);
+      const port = attr(open, "port");
+      const protocol = attr(open, "protocol");
+      const base = { host, name, risk, description, pluginId, epss, vpr, port, protocol };
+      // CVE 하나당 한 항목(기존 병합 로직이 플러그인 기준으로 다시 합친다). CVE 없으면 1건.
+      if (cves.length) for (const cve of cves) vulns.push({ ...base, cve });
+      else vulns.push({ ...base, cve: "" });
+    }
+  }
+  return { vulns, meta };
+}
+
+export type VulnFormat = "json" | "csv" | "html" | "nessus";
 
 export function parseVulnReport(content: string, format: VulnFormat): ParsedVuln[] {
   if (format === "html") return parseNessusHtml(content).vulns;
+  if (format === "nessus") return parseNessusXml(content).vulns;
   const rows = format === "csv" ? parseCsv(content) : parseJson(content);
   return rows
     .map((row) => ({
@@ -279,10 +346,10 @@ function applyStateTracking(prev: StandardFinding[], current: StandardFinding[])
 }
 
 export function importVulnScan(content: string, format: VulnFormat, sourceLabel: string): VulnScanResult {
-  // HTML 리포트에는 CSV에 없는 호스트 정보(DNS 이름·OS)가 있다 — 자산 이름·구성요소로 채운다.
-  const html = format === "html" ? parseNessusHtml(content) : null;
-  const parsed = html ? html.vulns : parseVulnReport(content, format);
-  const metaOf = (host: string): HostMeta => html?.meta.get(host) ?? {};
+  // HTML·.nessus 리포트에는 CSV에 없는 호스트 정보(DNS 이름·OS)가 있다 — 자산 이름·구성요소로 채운다.
+  const withMeta = format === "html" ? parseNessusHtml(content) : format === "nessus" ? parseNessusXml(content) : null;
+  const parsed = withMeta ? withMeta.vulns : parseVulnReport(content, format);
+  const metaOf = (host: string): HostMeta => withMeta?.meta.get(host) ?? {};
   // 호스트별로 그룹핑 — 한 호스트 = 한 자산, 그 호스트의 취약점들 = findings
   const byHost = new Map<string, ParsedVuln[]>();
   for (const v of parsed) {
@@ -373,8 +440,8 @@ export function importVulnScan(content: string, format: VulnFormat, sourceLabel:
 export function registerVulnScanRoutes(app: Express): void {
   app.post("/api/vulnscan/import", authMiddleware, (req, res) => {
     const { content, format, source } = req.body as { content?: string; format?: string; source?: string };
-    if (!content || (format !== "json" && format !== "csv" && format !== "html")) {
-      res.status(400).json({ error: "content(문자열)와 format('json'|'csv'|'html')이 필요합니다" });
+    if (!content || (format !== "json" && format !== "csv" && format !== "html" && format !== "nessus")) {
+      res.status(400).json({ error: "content(문자열)와 format('json'|'csv'|'html'|'nessus')이 필요합니다" });
       return;
     }
     try {
