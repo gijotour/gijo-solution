@@ -78,6 +78,7 @@ const gijoApi = {
   addProductDoc: (id: string, args: { kind: string; title: string; note?: string; filename?: string; content?: string }) =>
     api.securityProductsApi.addDoc(id, args),
   deleteProductDoc: (docId: string) => api.securityProductsApi.removeDoc(docId),
+  importProductManual: (filename: string, content?: string) => api.securityProductsApi.importDoc(filename, content),
 
   // 자산 인벤토리
   listAssets: () => api.assetsApi.list(),

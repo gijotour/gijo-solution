@@ -16,6 +16,9 @@ import {
   getProduct,
   deleteProduct,
   resetSecurityProductsForTests,
+  classifyManual,
+  importManual,
+  listProducts,
 } from "../src/engine/securityproducts";
 
 async function login(app: ReturnType<typeof createApp>) {
@@ -92,5 +95,63 @@ describe("securityproducts (보안제품 종류별 관리 + 매뉴얼)", () => {
     expect(() => createProduct({ name: "  ", category: "방화벽" })).toThrow();
     const p = createProduct({ name: "x", category: "방화벽" });
     expect(() => addProductDoc(p.id, { kind: "manual", title: "" })).toThrow();
+  });
+
+  // ── 매뉴얼 자동 분류(Nessus처럼 파일만 올리면 반영) ────────────────────────
+  it("classifies a manual to an existing product by model token in the filename", () => {
+    const fw = createProduct({ name: "경계 방화벽 (FW-01)", category: "방화벽", vendor: "SECUI", model: "MF2" });
+    createProduct({ name: "임직원 단말 EDR", category: "EDR", vendor: "AhnLab", model: "EPP" });
+
+    // 모델명 "MF2"가 파일명에 있으면 그 제품으로 (구분자 달라도: mf2 / MF-2 스쿼시 매칭)
+    const c = classifyManual("MF2_관리자_매뉴얼_v3.2.pdf", listProducts());
+    expect(c.product?.id).toBe(fw.id);
+    expect(c.reason).toBe("product-match");
+    expect(c.kind).toBe("manual");
+  });
+
+  it("detects log manuals and attaches to the single product of a keyword-guessed category", () => {
+    const fw = createProduct({ name: "경계 방화벽 (FW-01)", category: "방화벽" });
+    createProduct({ name: "임직원 단말 EDR", category: "EDR" });
+
+    // "방화벽" 키워드 + 그 종류 제품이 1개 → 그 제품. "로그" → logManual.
+    const c = classifyManual("방화벽_차단로그_분석_가이드.txt", listProducts());
+    expect(c.product?.id).toBe(fw.id);
+    expect(c.reason).toBe("category-single");
+    expect(c.kind).toBe("logManual");
+    // "카탈로그"의 '로그'는 로그 매뉴얼로 오탐하지 않는다
+    expect(classifyManual("방화벽_제품_카탈로그.pdf", listProducts()).kind).toBe("manual");
+  });
+
+  it("auto-creates a product (like Nessus auto-registers hosts) when nothing matches", () => {
+    createProduct({ name: "경계 방화벽", category: "방화벽" });
+
+    // VPN 키워드는 있지만 VPN 제품이 없다 → 새 제품(category VPN) 자동 등록
+    const r = importManual("VPN_게이트웨이_설정_매뉴얼.pdf", undefined, "정요한");
+    expect(r.createdProduct).toBe(true);
+    expect(r.category).toBe("VPN");
+    expect(r.productName).toBe("VPN_게이트웨이_설정_매뉴얼");
+    expect(r.kind).toBe("manual");
+    const created = getProduct(r.productId)!;
+    expect(created.docs).toHaveLength(1);
+    expect(created.docs[0].title).toBe("VPN_게이트웨이_설정_매뉴얼");
+
+    // 키워드도 없으면 "기타"
+    expect(importManual("이상한_장비_설명서.pdf", undefined).category).toBe("기타");
+  });
+
+  it("POST /api/security-products/import-doc classifies via API (metadata-only, no file body)", async () => {
+    await request(app).post("/api/security-products").set(auth()).send({ name: "웹방화벽 (WAF-01)", category: "WAF", model: "WEBFRONT" });
+
+    const r = await request(app)
+      .post("/api/security-products/import-doc")
+      .set(auth())
+      .send({ filename: "WEBFRONT_탐지로그_해설.txt" });
+    expect(r.status).toBe(200);
+    expect(r.body.reason).toBe("product-match"); // 모델명 WEBFRONT 매칭
+    expect(r.body.kind).toBe("logManual");
+    expect(r.body.createdProduct).toBe(false);
+
+    const bad = await request(app).post("/api/security-products/import-doc").set(auth()).send({});
+    expect(bad.status).toBe(400);
   });
 });

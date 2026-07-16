@@ -267,6 +267,18 @@ export const securityProductsApi = {
     request<ProductDoc>(`/api/security-products/${encodeURIComponent(id)}/docs`, { method: "POST", body: args }),
   removeDoc: (docId: string) =>
     request<{ ok: boolean }>(`/api/security-products/docs/${encodeURIComponent(docId)}`, { method: "DELETE" }),
+  // 매뉴얼 자동 분류 임포트 — 파일명으로 제품 매칭(없으면 자동 등록)·종류·문서구분까지 반영.
+  importDoc: (filename: string, content?: string) =>
+    request<{
+      filename: string;
+      productId: string;
+      productName: string;
+      category: string;
+      kind: string;
+      createdProduct: boolean;
+      reason: string;
+      docName?: string;
+    }>("/api/security-products/import-doc", { method: "POST", body: { filename, content } }),
 };
 
 // ── 협업 로그 ─────────────────────────────────────────────────────────
