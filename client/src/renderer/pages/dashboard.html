@@ -152,6 +152,10 @@
       <div class="explorer-title"><span>자산 탐색기</span><span style="color:var(--muted-2);cursor:pointer" id="refreshAssetsBtn">⟳</span></div>
       <div class="explorer-sub">GIJO AS Desktop</div>
       <div class="explorer-tree" id="explorerTree" style="margin-bottom:16px;">불러오는 중...</div>
+      <div class="explorer-title"><span id="productsToggle" style="cursor:pointer" title="접기/펼치기"><span id="productsCaret" style="color:var(--muted-2)">▾</span> 🧰 유지보수 보안제품</span><span style="color:var(--muted-2);cursor:pointer" id="openProductsBtn" title="보안제품 관리 열기">↗</span></div>
+      <div id="productsSectionBody">
+        <div class="explorer-tree" id="productsTree" style="margin-bottom:16px;">불러오는 중...</div>
+      </div>
       <div class="explorer-title"><span id="fileSectionToggle" style="cursor:pointer" title="접기/펼치기"><span id="fileSectionCaret" style="color:var(--muted-2)">▾</span> 📁 파일</span><span><span style="color:var(--muted-2);cursor:pointer;margin-right:8px;" id="pickFolderBtn" title="작업 폴더 선택">📂</span><span style="color:var(--muted-2);cursor:pointer" id="refreshFilesBtn" title="새로고침">⟳</span></span></div>
       <div id="fileSectionBody">
         <div class="explorer-sub" id="fileRootLabel">프로젝트 폴더 (읽기 전용)</div>
@@ -470,6 +474,39 @@
     }
   }
 
+  // 🧰 유지보수 보안제품 — 종류(방화벽/EDR/DLP…)별로 묶어 한눈에. 클릭하면 보안제품 관리로 이동.
+  async function loadSecurityProducts() {
+    const el = document.getElementById("productsTree");
+    const esc = (s) => String(s == null ? "" : s).replace(/</g, "&lt;");
+    try {
+      const groups = await window.gijo.listSecurityProductsGrouped();
+      const total = groups.reduce((s, g) => s + g.products.length, 0);
+      if (!total) {
+        el.innerHTML = '<div data-open-products style="padding-left:14px;color:var(--muted-2);font-size:11px;cursor:pointer">등록된 보안제품이 없습니다 — 클릭해 등록</div>';
+      } else {
+        el.innerHTML = groups.map((g) =>
+          `<div data-open-products style="cursor:pointer" title="보안제품 관리 열기">` +
+          `<span class="folder">${g.icon} ${esc(g.label)}</span> <span style="color:var(--muted-2)">(${g.products.length})</span></div>` +
+          `<div style="padding-left:16px;color:var(--muted);font-size:11.5px;line-height:1.9;margin-bottom:4px">` +
+          g.products.slice(0, 4).map((p) => `• ${esc(p.name)}`).join("<br>") +
+          (g.products.length > 4 ? `<br><span style="color:var(--muted-2)">…외 ${g.products.length - 4}건</span>` : "") +
+          `</div>`
+        ).join("");
+      }
+      el.querySelectorAll("[data-open-products]").forEach((x) => x.addEventListener("click", () => window.gijo.navigateTo("products.html")));
+    } catch (e) {
+      el.innerHTML = '<div style="color:var(--muted-2)">보안제품을 불러오지 못했습니다</div>';
+    }
+  }
+
+  function toggleProductsSection() {
+    const body = document.getElementById("productsSectionBody");
+    const caret = document.getElementById("productsCaret");
+    const collapsed = body.style.display === "none";
+    body.style.display = collapsed ? "" : "none";
+    caret.textContent = collapsed ? "▾" : "▸";
+  }
+
   // SLA(기한) 배지: 남은 일수(D-N) 또는 초과(D+N). 임박(3일↓)·초과는 색으로 경고.
   function slaBadge(t) {
     if (!t.dueAt || t.done) return "";
@@ -640,7 +677,7 @@
     setInterval(tick, 1000);
     await loadUser();
     greet();
-    await Promise.all([loadHealth(), loadAssets(), loadTasks(), loadCollaboration(), loadFiles(), loadDocSearchScopes()]);
+    await Promise.all([loadHealth(), loadAssets(), loadSecurityProducts(), loadTasks(), loadCollaboration(), loadFiles(), loadDocSearchScopes()]);
 
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
@@ -648,6 +685,8 @@
     document.getElementById("refreshFilesBtn").addEventListener("click", loadFiles);
     document.getElementById("pickFolderBtn").addEventListener("click", pickFolder);
     document.getElementById("fileSectionToggle").addEventListener("click", toggleFileSection);
+    document.getElementById("productsToggle").addEventListener("click", toggleProductsSection);
+    document.getElementById("openProductsBtn").addEventListener("click", () => window.gijo.navigateTo("products.html"));
     document.getElementById("todoAddBtn").addEventListener("click", addTodo);
     todoInput.addEventListener("keydown", (e) => { if (e.key === "Enter") addTodo(); });
     todayItems.addEventListener("click", onTaskAction);

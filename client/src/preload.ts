@@ -66,6 +66,19 @@ const gijoApi = {
   getMaintenanceNotify: () => api.maintenanceApi.getNotify(),
   sendMaintenanceNotify: (to: string[]) => api.maintenanceApi.notify(to),
 
+  // 보안제품 등록부(종류별 관리 + 제품/로그 매뉴얼)
+  listSecurityProducts: () => api.securityProductsApi.list(),
+  listSecurityProductsGrouped: () => api.securityProductsApi.grouped(),
+  getProductCategories: () => api.securityProductsApi.categories(),
+  createSecurityProduct: (args: { name: string; category: string; vendor?: string; model?: string; assetId?: string; note?: string }) =>
+    api.securityProductsApi.create(args),
+  updateSecurityProduct: (id: string, patch: { name?: string; category?: string; vendor?: string; model?: string; assetId?: string; note?: string }) =>
+    api.securityProductsApi.update(id, patch),
+  deleteSecurityProduct: (id: string) => api.securityProductsApi.remove(id),
+  addProductDoc: (id: string, args: { kind: string; title: string; note?: string; filename?: string; content?: string }) =>
+    api.securityProductsApi.addDoc(id, args),
+  deleteProductDoc: (docId: string) => api.securityProductsApi.removeDoc(docId),
+
   // 자산 인벤토리
   listAssets: () => api.assetsApi.list(),
   getAsset: (id: string) => api.assetsApi.get(id),

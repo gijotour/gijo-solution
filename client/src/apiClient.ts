@@ -217,6 +217,58 @@ export const maintenanceApi = {
   notify: (to: string[]) => request<{ sent: boolean; count: number }>("/api/maintenance/notify", { method: "POST", body: { to } }),
 };
 
+// ── 보안제품 등록부(종류별 관리 + 제품/로그 매뉴얼) ─────────────────────
+export interface ProductDoc {
+  id: string;
+  productId: string;
+  kind: string; // manual | logManual | etc
+  title: string;
+  docName?: string;
+  note?: string;
+  uploadedBy?: string;
+  at: number;
+}
+export interface SecurityProduct {
+  id: string;
+  name: string;
+  category: string;
+  vendor?: string;
+  model?: string;
+  assetId?: string;
+  assetName?: string;
+  note?: string;
+  docs: ProductDoc[];
+  createdAt: number;
+  updatedAt: number;
+}
+export interface ProductCategoryMeta {
+  id: string;
+  label: string;
+  icon: string;
+}
+export interface ProductGroup {
+  category: string;
+  label: string;
+  icon: string;
+  products: SecurityProduct[];
+}
+
+export const securityProductsApi = {
+  list: () => request<SecurityProduct[]>("/api/security-products"),
+  grouped: () => request<ProductGroup[]>("/api/security-products/grouped"),
+  categories: () =>
+    request<{ categories: ProductCategoryMeta[]; docKinds: { id: string; label: string }[] }>("/api/security-products/categories"),
+  create: (args: { name: string; category: string; vendor?: string; model?: string; assetId?: string; note?: string }) =>
+    request<SecurityProduct>("/api/security-products", { method: "POST", body: args }),
+  update: (id: string, patch: { name?: string; category?: string; vendor?: string; model?: string; assetId?: string; note?: string }) =>
+    request<SecurityProduct>(`/api/security-products/${encodeURIComponent(id)}`, { method: "PUT", body: patch }),
+  remove: (id: string) => request<{ ok: boolean }>(`/api/security-products/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  addDoc: (id: string, args: { kind: string; title: string; note?: string; filename?: string; content?: string }) =>
+    request<ProductDoc>(`/api/security-products/${encodeURIComponent(id)}/docs`, { method: "POST", body: args }),
+  removeDoc: (docId: string) =>
+    request<{ ok: boolean }>(`/api/security-products/docs/${encodeURIComponent(docId)}`, { method: "DELETE" }),
+};
+
 // ── 협업 로그 ─────────────────────────────────────────────────────────
 export interface CollaborationEvent {
   from: string;

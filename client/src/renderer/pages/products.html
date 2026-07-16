@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 보안제품 관리</title>
+<style>
+:root{
+  --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
+.app{display:grid;grid-template-columns:220px 1fr;}
+.sidebar{padding:22px 14px;border-right:1px solid var(--border);min-height:900px;}
+.nav-section{font-size:10.5px;font-weight:700;color:var(--muted-2);letter-spacing:1.2px;margin:18px 10px 8px;}
+.nav-section:first-child{margin-top:0;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:2px;}
+.nav-item .ic{width:18px;text-align:center;font-size:14px;}
+.nav-item.active{background:rgba(59,130,246,0.12);color:var(--white);box-shadow:inset 3px 0 0 var(--blue);cursor:default;}
+.nav-item:hover:not(.active){background:rgba(255,255,255,0.04);color:var(--white);}
+.main{padding:28px 32px 48px;}
+.topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;}
+.page-title{font-size:21px;font-weight:800;color:#fff;}
+.page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;max-width:900px;line-height:1.6;}
+.header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2);}
+.header-left{display:flex;align-items:center;gap:12px;}
+.header-left img{height:22px;}
+.app-title{font-size:15px;font-weight:800;color:#fff;}
+.clock{font-size:12px;color:var(--blue-light);font-weight:600;}
+.header-right{display:flex;align-items:center;gap:10px;}
+.status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
+.status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
+.beta-tag{background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
+.avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+.icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
+
+.notice{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:12px 16px;font-size:12px;color:var(--muted);line-height:1.7;max-width:1040px;margin-bottom:20px;}
+.notice b{color:var(--blue-light);}
+
+/* 종류 요약 칩 */
+.cat-summary{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;max-width:1040px;}
+.cat-chip{display:flex;align-items:center;gap:7px;background:var(--panel);border:1px solid var(--border);border-radius:20px;padding:7px 14px;font-size:12.5px;font-weight:700;color:var(--text);cursor:pointer;}
+.cat-chip:hover{border-color:var(--border-strong);}
+.cat-chip .cnt{background:var(--blue);color:#fff;border-radius:10px;padding:0 8px;font-size:11px;font-weight:800;}
+.cat-chip.empty{opacity:.5;}
+.cat-chip.empty .cnt{background:var(--muted-2);}
+
+/* 등록 폼 */
+.reg-form{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:22px;max-width:1040px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;}
+.reg-form input,.reg-form select{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 12px;color:var(--text);font-size:12.5px;outline:none;}
+.reg-form input[type=text]{min-width:150px;}
+.reg-form .grow{flex:1;min-width:180px;}
+.reg-form button{background:var(--blue);color:#fff;border:none;border-radius:8px;padding:0 18px;font-size:12.5px;font-weight:800;cursor:pointer;}
+
+/* 종류 그룹 */
+.group{margin-bottom:18px;max-width:1040px;}
+.group-head{display:flex;align-items:center;gap:10px;cursor:pointer;padding:10px 14px;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;}
+.group-head .gi{font-size:18px;}
+.group-title{font-size:14.5px;font-weight:800;color:#fff;}
+.group-count{font-size:11.5px;color:var(--muted-2);font-weight:700;}
+.group-caret{margin-left:auto;color:var(--muted-2);font-size:12px;transition:transform .15s;}
+.group.collapsed .group-caret{transform:rotate(-90deg);}
+.group.collapsed .group-body{display:none;}
+.group-body{padding:10px 0 0;display:flex;flex-direction:column;gap:10px;}
+
+/* 제품 카드 */
+.prod{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:13px 15px;}
+.prod-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+.prod-name{font-size:13.5px;font-weight:800;color:#fff;}
+.prod-meta{font-size:11.5px;color:var(--muted);}
+.prod-asset{font-size:10.5px;font-weight:700;color:var(--purple);background:rgba(139,124,240,0.14);padding:2px 8px;border-radius:6px;}
+.prod-del{margin-left:auto;background:transparent;border:1px solid #e2483d;color:#f5928a;border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;}
+.prod-note{font-size:11.5px;color:var(--muted);margin-top:6px;}
+
+/* 문서 영역 */
+.docs{margin-top:12px;border-top:1px dashed var(--border);padding-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+@media(max-width:760px){.docs{grid-template-columns:1fr;}}
+.doc-col-title{font-size:11.5px;font-weight:800;color:var(--blue-light);margin-bottom:6px;display:flex;align-items:center;gap:6px;}
+.doc-list{display:flex;flex-direction:column;gap:5px;margin-bottom:8px;}
+.doc-item{display:flex;align-items:center;gap:8px;background:var(--panel-2);border:1px solid var(--border);border-radius:7px;padding:7px 10px;}
+.doc-title{font-size:12px;font-weight:700;color:var(--text);}
+.doc-searchable{font-size:9.5px;font-weight:800;color:var(--teal);background:rgba(30,185,128,0.14);padding:1px 6px;border-radius:5px;}
+.doc-by{font-size:10.5px;color:var(--muted-2);margin-left:auto;}
+.doc-del{background:transparent;border:none;color:var(--muted-2);font-size:13px;cursor:pointer;padding:0 2px;}
+.doc-del:hover{color:#f5928a;}
+.doc-empty{font-size:11px;color:var(--muted-2);padding:2px 0 6px;}
+.doc-add{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+.doc-add input[type=text]{flex:1;min-width:120px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;padding:6px 9px;color:var(--text);font-size:11.5px;outline:none;}
+.doc-add input[type=file]{font-size:10.5px;color:var(--muted);max-width:150px;}
+.doc-add button{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);border-radius:7px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;}
+.doc-add button:disabled{opacity:.5;cursor:default;}
+.doc-hint{font-size:10.5px;color:var(--muted-2);min-height:12px;flex-basis:100%;}
+
+.footer{margin-top:22px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted-2);max-width:1040px;}
+.footer img{height:16px;opacity:0.6;}
+.empty-all{color:var(--muted);font-size:13px;padding:30px 0;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <span id="homeLink" data-page="dashboard.html" title="대시보드로 이동" style="display:flex;align-items:center;gap:12px;cursor:pointer"><img src="https://gijo.ai/_nuxt/logo_gijo_white.CCh2YXJe.svg" alt="GIJO">
+    <div class="app-title">GIJO AS</div></span>
+    <div class="clock" id="clockEl">-</div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill" id="statusPill"><span class="dot"></span>연결 확인 중<span class="beta-tag">LIVE</span></div>
+    <div class="avatar-btn" id="avatarBtn">-</div>
+    <div class="icon-btn" id="settingsBtn">⚙</div>
+  </div>
+</div>
+
+<div class="app">
+  <div class="sidebar">
+    <div class="nav-section">AI 팀</div>
+    <div class="nav-item" data-page="agent.html"><span class="ic">◉</span>에이전트 AI</div>
+    <div class="nav-section">모니터링</div>
+    <div class="nav-item" data-page="dashboard.html"><span class="ic">◆</span>대시보드</div>
+    <div class="nav-item" data-page="kpi.html"><span class="ic">📊</span>보안 KPI</div>
+    <div class="nav-item" data-page="inventory.html"><span class="ic">◇</span>AI 자산</div>
+    <div class="nav-item" data-page="sbom.html"><span class="ic">▢</span>AI-BOM</div>
+    <div class="nav-item" data-page="threat.html"><span class="ic">△</span>위협 인텔리전스</div>
+    <div class="nav-item" data-page="vulnscan.html"><span class="ic">⊘</span>취약 자산관리</div>
+    <div class="nav-section">거버넌스</div>
+    <div class="nav-item" data-page="compliance.html"><span class="ic">✓</span>컴플라이언스</div>
+    <div class="nav-item" data-page="report.html"><span class="ic">▣</span>내부 리포트</div>
+    <div class="nav-item" data-page="approvals.html"><span class="ic">◈</span>승인 워크플로우</div>
+    <div class="nav-item" data-page="opsguide.html"><span class="ic">🛠</span>운영 가이드</div>
+    <div class="nav-item active"><span class="ic">🧰</span>보안제품 관리</div>
+    <div class="nav-section">고급 기능</div>
+    <div class="nav-item" data-page="merge.html"><span class="ic">⬡</span>보안 LLM 합성</div>
+    <div class="nav-item" data-page="learnloop.html"><span class="ic">🔄</span>헤르메스 학습 루프</div>
+    <div class="nav-item" data-page="llmguide.html"><span class="ic">📚</span>추천 LLM 가이드</div>
+    <div class="nav-item" data-page="memory.html"><span class="ic">⛁</span>AI 기억 · 학습</div>
+    <div class="nav-item" data-page="billing.html"><span class="ic">$</span>사용량 · 요금</div>
+    <div class="nav-section">시스템</div>
+    <div class="nav-item" data-page="logs.html"><span class="ic">▤</span>로그</div>
+    <div class="nav-item" data-page="settings.html"><span class="ic">⚙</span>설정</div>
+  </div>
+
+  <div class="main">
+    <div class="topbar-row">
+      <div>
+        <div class="page-title">🧰 보안제품 관리</div>
+        <div class="page-sub">운영 중인 보안제품을 종류(방화벽·EDR·DLP·WAF·VPN 등)별로 등록하고, 제품별로 <b>제품 매뉴얼</b>과 <b>로그(분석) 매뉴얼</b>을 넣어 관리합니다. 대시보드에서 종류별로 한눈에 보이고, 유지보수 점검(운영 가이드)과 연결됩니다.</div>
+      </div>
+    </div>
+
+    <div class="notice">
+      · 파일을 첨부한 매뉴얼은 텍스트가 지식베이스(장기 기억)에 자동 수집되어 대시보드 <b>"🔍 올린 문서 검색"</b>에서도 바로 찾아집니다.<br>
+      · 종류(category)로 묶어 관리하면 담당자가 "무슨 제품을 운영 중이고 그 제품 문서는 어디 있나"를 한눈에 파악합니다.
+    </div>
+
+    <div class="cat-summary" id="catSummary"></div>
+
+    <form class="reg-form" id="regForm">
+      <input type="text" id="pName" class="grow" placeholder="제품명 (예: 경계 방화벽 FW-01)" required>
+      <select id="pCategory"></select>
+      <input type="text" id="pVendor" placeholder="제조사 (선택)" style="max-width:150px">
+      <input type="text" id="pModel" placeholder="모델/버전 (선택)" style="max-width:140px">
+      <select id="pAsset"><option value="">연결 자산 없음</option></select>
+      <button type="submit">＋ 제품 등록</button>
+    </form>
+
+    <div id="groups"><div style="color:var(--muted);font-size:12px">불러오는 중...</div></div>
+
+    <div class="footer">
+      <img src="https://gijo.ai/_nuxt/logo_gijo_only_white.ATZVOJtw.svg" alt="GIJO">
+      <span>© 2026 GIJO Technology · GIJO AS Platform · Confidential</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  const clockEl = document.getElementById("clockEl");
+  const statusPill = document.getElementById("statusPill");
+  const avatarBtn = document.getElementById("avatarBtn");
+  let currentUser = null;
+  let CAT_META = {};   // id → {label, icon}
+  let CATEGORIES = []; // 순서 보존
+  let DOC_KINDS = [];  // [{id,label}]
+  const collapsed = new Set(); // 접힌 종류
+
+  const esc = (s) => String(s == null ? "" : s).replace(/</g, "&lt;").replace(/"/g, "&quot;");
+
+  function tick() {
+    clockEl.textContent = new Date().toLocaleString("ko-KR", {
+      hour: "2-digit", minute: "2-digit", hour12: true, year: "numeric", month: "2-digit", day: "2-digit",
+    });
+  }
+  async function loadHealth() {
+    try { await window.gijo.checkServerHealth(); statusPill.innerHTML = '<span class="dot"></span>운영중<span class="beta-tag">LIVE</span>'; }
+    catch (e) { statusPill.innerHTML = '<span class="dot" style="background:#e2483d"></span>서버 연결 끊김'; }
+  }
+  async function loadUser() {
+    try { currentUser = await window.gijo.me(); avatarBtn.textContent = (currentUser.displayName || currentUser.username || "-").charAt(0); } catch (e) {}
+  }
+
+  function fileToBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result).split(",")[1] || "");
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  const catLabel = (id) => (CAT_META[id] ? CAT_META[id].label : id);
+  const catIcon = (id) => (CAT_META[id] ? CAT_META[id].icon : "📦");
+
+  async function loadMeta() {
+    const { categories, docKinds } = await window.gijo.getProductCategories();
+    CATEGORIES = categories;
+    DOC_KINDS = docKinds;
+    CAT_META = {};
+    for (const c of categories) CAT_META[c.id] = { label: c.label, icon: c.icon };
+    document.getElementById("pCategory").innerHTML = categories.map((c) => `<option value="${c.id}">${c.icon} ${esc(c.label)}</option>`).join("");
+    try {
+      const assets = await window.gijo.listAssets();
+      const sel = document.getElementById("pAsset");
+      for (const a of assets) sel.insertAdjacentHTML("beforeend", `<option value="${esc(a.id)}">${esc(a.name)}</option>`);
+    } catch (e) {}
+  }
+
+  function docColHtml(product, kind, kindLabel) {
+    const docs = product.docs.filter((d) => d.kind === kind);
+    const list = docs.length
+      ? docs.map((d) =>
+          `<div class="doc-item"><span class="doc-title">${esc(d.title)}</span>` +
+          (d.docName ? `<span class="doc-searchable" title="지식베이스에서 검색 가능">🔍 검색가능</span>` : "") +
+          `<span class="doc-by">${esc(d.uploadedBy || "")}</span>` +
+          `<button class="doc-del" data-doc-del="${d.id}" title="문서 삭제">✕</button></div>`
+        ).join("")
+      : `<div class="doc-empty">아직 없음 — 아래에서 추가하세요.</div>`;
+    return (
+      `<div class="doc-col">` +
+      `<div class="doc-col-title">${kind === "logManual" ? "🗒" : kind === "manual" ? "📘" : "📎"} ${esc(kindLabel)}</div>` +
+      `<div class="doc-list">${list}</div>` +
+      `<div class="doc-add" data-pid="${product.id}" data-kind="${kind}">` +
+      `<input type="text" placeholder="문서 제목 (파일 없이 제목만 등록도 가능)">` +
+      `<input type="file" accept=".pdf,.hwpx,.hwp,.txt,.md,.csv,.json,.log,.docx">` +
+      `<button data-doc-add>＋ 추가</button>` +
+      `<div class="doc-hint"></div>` +
+      `</div>` +
+      `</div>`
+    );
+  }
+
+  function prodHtml(p) {
+    const meta = [p.vendor, p.model].filter(Boolean).join(" · ");
+    return (
+      `<div class="prod">` +
+      `<div class="prod-top">` +
+      `<span class="prod-name">${esc(p.name)}</span>` +
+      (meta ? `<span class="prod-meta">${esc(meta)}</span>` : "") +
+      (p.assetName ? `<span class="prod-asset">🔗 ${esc(p.assetName)}</span>` : "") +
+      `<button class="prod-del" data-prod-del="${p.id}" data-name="${esc(p.name)}">✕ 제품 삭제</button>` +
+      `</div>` +
+      (p.note ? `<div class="prod-note">${esc(p.note)}</div>` : "") +
+      `<div class="docs">` +
+      docColHtml(p, "manual", "제품 매뉴얼") +
+      docColHtml(p, "logManual", "로그 매뉴얼") +
+      `</div>` +
+      `</div>`
+    );
+  }
+
+  function renderSummary(groups) {
+    const byCat = {};
+    for (const g of groups) byCat[g.category] = g.products.length;
+    document.getElementById("catSummary").innerHTML = CATEGORIES.map((c) => {
+      const n = byCat[c.id] || 0;
+      return `<div class="cat-chip ${n ? "" : "empty"}" data-jump="${c.id}"><span>${c.icon} ${esc(c.label)}</span><span class="cnt">${n}</span></div>`;
+    }).join("");
+  }
+
+  async function loadProducts() {
+    const root = document.getElementById("groups");
+    try {
+      const groups = await window.gijo.listSecurityProductsGrouped();
+      renderSummary(groups);
+      if (!groups.length) {
+        root.innerHTML = `<div class="empty-all">아직 등록된 보안제품이 없습니다. 위에서 종류를 골라 제품을 등록하세요.</div>`;
+        return;
+      }
+      root.innerHTML = groups.map((g) => {
+        const isCol = collapsed.has(g.category);
+        return (
+          `<div class="group ${isCol ? "collapsed" : ""}" data-cat="${g.category}">` +
+          `<div class="group-head" data-toggle="${g.category}">` +
+          `<span class="gi">${g.icon}</span><span class="group-title">${esc(g.label)}</span>` +
+          `<span class="group-count">${g.products.length}개 제품</span><span class="group-caret">▼</span>` +
+          `</div>` +
+          `<div class="group-body">${g.products.map(prodHtml).join("")}</div>` +
+          `</div>`
+        );
+      }).join("");
+    } catch (e) {
+      root.innerHTML = `<div style="color:#f5928a;font-size:12px">불러오기 실패: ${esc(e.message || e)}</div>`;
+    }
+  }
+
+  async function onRegister(e) {
+    e.preventDefault();
+    const name = document.getElementById("pName").value.trim();
+    if (!name) return;
+    const args = {
+      name,
+      category: document.getElementById("pCategory").value,
+      vendor: document.getElementById("pVendor").value.trim() || undefined,
+      model: document.getElementById("pModel").value.trim() || undefined,
+      assetId: document.getElementById("pAsset").value || undefined,
+    };
+    try {
+      await window.gijo.createSecurityProduct(args);
+      e.target.reset();
+      await loadProducts();
+    } catch (err) { alert("등록 실패: " + ((err && err.message) || err)); }
+  }
+
+  async function onGroupsClick(e) {
+    const toggle = e.target.closest("[data-toggle]");
+    if (toggle) {
+      const cat = toggle.dataset.toggle;
+      if (collapsed.has(cat)) collapsed.delete(cat); else collapsed.add(cat);
+      document.querySelector(`.group[data-cat="${cat}"]`).classList.toggle("collapsed");
+      return;
+    }
+    const prodDel = e.target.closest("[data-prod-del]");
+    if (prodDel) {
+      if (!confirm(`"${prodDel.dataset.name}" 제품과 첨부 문서를 모두 삭제할까요?`)) return;
+      try { await window.gijo.deleteSecurityProduct(prodDel.dataset.prodDel); await loadProducts(); }
+      catch (err) { alert("삭제 실패: " + ((err && err.message) || err)); }
+      return;
+    }
+    const docDel = e.target.closest("[data-doc-del]");
+    if (docDel) {
+      if (!confirm("이 문서를 삭제할까요?")) return;
+      try { await window.gijo.deleteProductDoc(docDel.dataset.docDel); await loadProducts(); }
+      catch (err) { alert("삭제 실패: " + ((err && err.message) || err)); }
+      return;
+    }
+    const docAdd = e.target.closest("[data-doc-add]");
+    if (docAdd) {
+      const box = docAdd.closest(".doc-add");
+      const pid = box.dataset.pid, kind = box.dataset.kind;
+      const titleInput = box.querySelector('input[type=text]');
+      const fileInput = box.querySelector('input[type=file]');
+      const hint = box.querySelector(".doc-hint");
+      const file = fileInput.files[0];
+      const title = titleInput.value.trim();
+      if (!title && !file) { hint.textContent = "제목을 입력하거나 파일을 선택하세요."; return; }
+      docAdd.disabled = true; hint.textContent = file ? "업로드·지식베이스 수집 중..." : "추가 중...";
+      try {
+        const args = { kind, title };
+        if (file) { args.filename = file.name; args.content = await fileToBase64(file); }
+        await window.gijo.addProductDoc(pid, args);
+        await loadProducts();
+      } catch (err) {
+        hint.textContent = "✗ " + ((err && err.message) || err);
+        docAdd.disabled = false;
+      }
+    }
+  }
+
+  async function init() {
+    tick();
+    setInterval(tick, 30000);
+    await loadUser();
+    loadHealth();
+    await loadMeta();
+    await loadProducts();
+
+    document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
+    document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
+    document.getElementById("regForm").addEventListener("submit", onRegister);
+    document.getElementById("groups").addEventListener("click", onGroupsClick);
+    document.getElementById("catSummary").addEventListener("click", (e) => {
+      const chip = e.target.closest("[data-jump]");
+      if (!chip) return;
+      const g = document.querySelector(`.group[data-cat="${chip.dataset.jump}"]`);
+      if (g) { collapsed.delete(chip.dataset.jump); g.classList.remove("collapsed"); g.scrollIntoView({ behavior: "smooth", block: "start" }); }
+    });
+  }
+
+  if (!window.gijo.isAuthenticated()) {
+    window.gijo.navigateTo("login.html");
+  } else {
+    init();
+  }
+</script>
+
+</body>
+</html>

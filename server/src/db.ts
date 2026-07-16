@@ -194,6 +194,37 @@ db.exec(`
     metrics TEXT NOT NULL,
     at INTEGER NOT NULL
   );
+
+  -- 운영 중인 보안제품 등록부(engine/securityproducts.ts) — 유지보수 대상 제품을 종류(category:
+  -- 방화벽/EDR/DLP/WAF/VPN/IPS/SIEM/백신/NAC/기타)별로 구분해 관리한다. maintenance_items의
+  -- 자유텍스트 productName과 달리 제품을 1급 엔티티로 두어 대시보드에서 종류별로 한눈에 본다.
+  CREATE TABLE IF NOT EXISTS security_products (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    category TEXT NOT NULL,
+    vendor TEXT,
+    model TEXT,
+    assetId TEXT,
+    note TEXT,
+    createdAt INTEGER NOT NULL,
+    updatedAt INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_security_products_category ON security_products(category);
+
+  -- 보안제품별 문서(engine/securityproducts.ts) — 제품 매뉴얼·로그 매뉴얼 등. 파일을 첨부하면
+  -- 텍스트를 추출해 지식베이스(RAG)에도 수집하므로(docName) "올린 문서 검색"에서 바로 찾아진다.
+  -- kind: manual(제품 매뉴얼) | logManual(로그 매뉴얼) | etc(기타 문서).
+  CREATE TABLE IF NOT EXISTS product_docs (
+    id TEXT PRIMARY KEY,
+    productId TEXT NOT NULL REFERENCES security_products(id),
+    kind TEXT NOT NULL,
+    title TEXT NOT NULL,
+    docName TEXT,
+    note TEXT,
+    uploadedBy TEXT,
+    at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_product_docs_productId ON product_docs(productId);
 `);
 
 db.exec(`

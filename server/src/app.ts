@@ -29,6 +29,7 @@ import { registerLearnloopRoutes } from "./engine/learnloop";
 import { registerToolsRoutes } from "./engine/tools";
 import { registerTasksRoutes } from "./engine/tasks";
 import { registerMaintenanceRoutes } from "./engine/maintenance";
+import { registerSecurityProductRoutes } from "./engine/securityproducts";
 import { registerEmailRoutes } from "./engine/email";
 import { registerSbomRoutes } from "./engine/sbom";
 import { registerApprovalsRoutes } from "./engine/approvals";
@@ -83,6 +84,7 @@ export function createApp(): Express {
   registerToolsRoutes(app);
   registerTasksRoutes(app);
   registerMaintenanceRoutes(app);
+  registerSecurityProductRoutes(app);
   registerEmailRoutes(app);
   registerSbomRoutes(app);
   registerApprovalsRoutes(app);
