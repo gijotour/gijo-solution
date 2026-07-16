@@ -173,6 +173,52 @@ describe("maintenance (유지보수 일정 · 점검서 · 승인)", () => {
     expect((await request(app).get("/api/maintenance/x/history")).status).toBe(401);
   });
 
+  it("links an inspection to an AI asset and resolves the asset name", async () => {
+    // 자산 하나 등록
+    await request(app)
+      .post("/api/assets")
+      .set(auth(adminToken))
+      .send({ id: "asset-x1", name: "테스트 AI 자산", path: "/srv/ai/x1", assetType: "LLM 서비스", owner: "보안팀" });
+
+    const created = await request(app)
+      .post("/api/maintenance")
+      .set(auth(adminToken))
+      .send({ title: "가드레일 점검", productName: "챗봇", scheduleDate: "2026-01-01", assetId: "asset-x1" });
+    expect(created.status).toBe(200);
+    expect(created.body.assetId).toBe("asset-x1");
+    expect(created.body.assetName).toBe("테스트 AI 자산"); // 읽을 때 자산명이 채워진다
+
+    // 자산별 점검 목록
+    const byAsset = await request(app).get("/api/assets/asset-x1/maintenance").set(auth(adminToken));
+    expect(byAsset.status).toBe(200);
+    expect(byAsset.body).toHaveLength(1);
+    expect(byAsset.body[0].id).toBe(created.body.id);
+
+    // 연결 안 한 점검은 그 자산 목록에 안 뜬다
+    await request(app)
+      .post("/api/maintenance")
+      .set(auth(adminToken))
+      .send({ title: "미연결", productName: "FW-01", scheduleDate: "2026-01-01" });
+    const stillOne = await request(app).get("/api/assets/asset-x1/maintenance").set(auth(adminToken));
+    expect(stillOne.body).toHaveLength(1);
+  });
+
+  it("creating without assetId leaves it unset", async () => {
+    const res = await request(app)
+      .post("/api/maintenance")
+      .set(auth(adminToken))
+      .send({ title: "미연결 점검", productName: "IPS-02", scheduleDate: "2026-01-01" });
+    expect(res.body.assetId).toBeUndefined();
+    expect(res.body.assetName).toBeUndefined();
+  });
+
+  it("byAsset for an unknown asset is empty and requires auth", async () => {
+    const empty = await request(app).get("/api/assets/no-such-asset/maintenance").set(auth(adminToken));
+    expect(empty.status).toBe(200);
+    expect(empty.body).toEqual([]);
+    expect((await request(app).get("/api/assets/x/maintenance")).status).toBe(401);
+  });
+
   it("requires auth", async () => {
     expect((await request(app).get("/api/maintenance")).status).toBe(401);
     expect((await request(app).post("/api/maintenance")).status).toBe(401);

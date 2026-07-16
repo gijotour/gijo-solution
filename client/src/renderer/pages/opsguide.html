@@ -72,6 +72,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .maint-badge.rej{color:#f5928a;background:rgba(226,72,61,0.14);}
 .maint-title{font-size:13px;font-weight:800;color:#fff;}
 .maint-product{font-size:11.5px;color:var(--muted);}
+.maint-asset{font-size:10.5px;font-weight:700;color:var(--purple);background:rgba(139,124,240,0.14);padding:2px 8px;border-radius:6px;}
 .maint-date{font-size:11.5px;color:var(--muted-2);margin-left:auto;}
 .maint-date.overdue{color:#f5928a;font-weight:800;}
 .maint-actions{display:flex;gap:6px;}
@@ -187,6 +188,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <form id="maintForm" class="maint-form">
         <input id="mTitle" type="text" placeholder="점검 제목 (예: 방화벽 정책 점검)" required>
         <input id="mProduct" type="text" placeholder="대상 제품/자산 (예: FW-01)" required>
+        <select id="mAsset" title="등록된 AI 자산과 연결(선택)"><option value="">AI 자산 연결 안 함</option></select>
         <input id="mDate" type="date" required>
         <select id="mInterval">
           <option value="">반복 없음</option>
@@ -349,6 +351,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       `<span class="maint-badge ${STATUS_CLASS[m.status]}">${STATUS_LABEL[m.status]}</span>` +
       `<span class="maint-title">${esc(m.title)}</span>` +
       `<span class="maint-product">${esc(m.productName)}</span>` +
+      (m.assetName ? `<span class="maint-asset" title="연결된 AI 자산">🧩 ${esc(m.assetName)}</span>` : "") +
       `<span class="maint-date${overdue ? " overdue" : ""}">${esc(m.scheduleDate)}${m.intervalDays ? ` · ${m.intervalDays}일마다` : ""}</span>` +
       `<span class="maint-actions">${actions}</span>` +
       `</div>` +
@@ -494,12 +497,24 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     }
   }
 
+  // 등록된 AI 자산을 점검 연결 드롭다운에 채운다. 자산이 없으면 기본 옵션만 남는다.
+  async function loadAssetOptions() {
+    try {
+      const assets = await window.gijo.listAssets();
+      const sel = document.getElementById("mAsset");
+      for (const a of assets) {
+        sel.insertAdjacentHTML("beforeend", `<option value="${esc(a.id)}">${esc(a.name)} (${esc(a.assetType)})</option>`);
+      }
+    } catch (e) {}
+  }
+
   async function onMaintSubmit(e) {
     e.preventDefault();
     const title = document.getElementById("mTitle").value.trim();
     const productName = document.getElementById("mProduct").value.trim();
     const scheduleDate = document.getElementById("mDate").value;
     const intervalRaw = document.getElementById("mInterval").value;
+    const assetId = document.getElementById("mAsset").value || undefined;
     if (!title || !productName || !scheduleDate) return;
     try {
       await window.gijo.createMaintenance({
@@ -507,6 +522,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         productName,
         scheduleDate,
         intervalDays: intervalRaw ? Number(intervalRaw) : undefined,
+        assetId,
       });
       e.target.reset();
       document.getElementById("mDate").value = todayStr();
@@ -523,6 +539,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     loadHealth();
     document.getElementById("mDate").value = todayStr();
     loadMaintenance();
+    loadAssetOptions();
 
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll(".nav-item[data-page]").forEach((el) => {

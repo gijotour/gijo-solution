@@ -236,6 +236,43 @@ export function listAssets(): Asset[] {
   return (listAssetRowsStmt.all() as AssetRow[]).map(fromRow);
 }
 
+// 최초 기동 시(자산이 하나도 없을 때) 예시 AI 자산 몇 개를 등록해 인벤토리·점검 연동을 바로
+// 체험할 수 있게 한다 — users.ts의 seedDefaultAdminIfEmpty()와 같은 패턴. id는 고정값이라
+// maintenance.ts의 샘플 점검이 이 자산들에 연결될 수 있다. 실제 자산이 등록되면(테이블 비어있지
+// 않으면) 절대 끼어들지 않는다.
+export const SAMPLE_ASSET_IDS = ["ai-secbot-01", "ai-doccls-02", "ai-anomaly-03"] as const;
+function seedSampleAssetsIfEmpty(): void {
+  if ((listAssetRowsStmt.all() as AssetRow[]).length > 0) return;
+  registerAsset({
+    id: "ai-secbot-01",
+    name: "사내 보안 상담 챗봇",
+    path: "/srv/ai/secbot",
+    assetType: "LLM 서비스",
+    owner: "보안팀",
+    components: [
+      { name: "Qwen2.5-7B-Instruct", version: "q4_k_m", license: "Apache-2.0" },
+      { name: "bge-m3", version: "1.0", license: "MIT" },
+    ],
+  });
+  registerAsset({
+    id: "ai-doccls-02",
+    name: "문서 민감도 분류 AI",
+    path: "/srv/ai/doc-classifier",
+    assetType: "분류 모델",
+    owner: "정보보호팀",
+    components: [{ name: "KoBERT", version: "1.0", license: "Apache-2.0" }],
+  });
+  registerAsset({
+    id: "ai-anomaly-03",
+    name: "이상행위 탐지 엔진",
+    path: "/srv/ai/anomaly",
+    assetType: "이상탐지 모델",
+    owner: "SOC",
+    components: [{ name: "IsolationForest", version: "scikit-1.4", license: "BSD-3" }],
+  });
+}
+seedSampleAssetsIfEmpty();
+
 export function registerAssetsRoutes(app: Express): void {
   app.get("/api/assets", authMiddleware, (_req, res) => res.json(listAssets()));
   app.get("/api/assets/:id", authMiddleware, (req, res) => {

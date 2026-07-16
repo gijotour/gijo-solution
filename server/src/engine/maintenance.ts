@@ -19,6 +19,8 @@ export interface MaintenanceItem {
   scheduleDate: string; // "YYYY-MM-DD"
   intervalDays?: number; // 있으면 승인 시 같은 title로 다음 회차를 자동 생성(반복 점검)
   status: MaintenanceStatus;
+  assetId?: string; // 연결된 AI 자산(assets.ts) — 선택
+  assetName?: string; // assetId의 현재 자산명(읽을 때 조회, 저장 안 함)
   reportNote?: string;
   reportDocName?: string; // 첨부된 점검서가 지식베이스에 수집됐으면 그 문서명
   reportedBy?: string;
@@ -37,6 +39,7 @@ interface MaintenanceRow {
   scheduleDate: string;
   intervalDays: number | null;
   status: MaintenanceStatus;
+  assetId: string | null;
   reportNote: string | null;
   reportDocName: string | null;
   reportedBy: string | null;
@@ -48,6 +51,14 @@ interface MaintenanceRow {
   updatedAt: number;
 }
 
+// 연결된 자산의 현재 이름만 가볍게 조회한다(전체 Asset를 끌어오지 않음). 자산이 삭제됐으면 undefined.
+const assetNameStmt = db.prepare("SELECT name FROM assets WHERE id = ?");
+function resolveAssetName(assetId: string | null): string | undefined {
+  if (!assetId) return undefined;
+  const row = assetNameStmt.get(assetId) as { name: string } | undefined;
+  return row?.name;
+}
+
 function fromRow(row: MaintenanceRow): MaintenanceItem {
   return {
     id: row.id,
@@ -56,6 +67,8 @@ function fromRow(row: MaintenanceRow): MaintenanceItem {
     scheduleDate: row.scheduleDate,
     intervalDays: row.intervalDays ?? undefined,
     status: row.status,
+    assetId: row.assetId ?? undefined,
+    assetName: resolveAssetName(row.assetId),
     reportNote: row.reportNote ?? undefined,
     reportDocName: row.reportDocName ?? undefined,
     reportedBy: row.reportedBy ?? undefined,
@@ -100,12 +113,12 @@ function today(): string {
 // insert/update를 하나로 — compliance.ts의 ON CONFLICT...DO UPDATE 패턴을 그대로 따른다.
 const upsertStmt = db.prepare(`
   INSERT INTO maintenance_items
-    (id, title, productName, scheduleDate, intervalDays, status, reportNote, reportDocName,
+    (id, title, productName, scheduleDate, intervalDays, status, assetId, reportNote, reportDocName,
      reportedBy, reportedAt, reviewedBy, reviewedAt, reviewNote, createdAt, updatedAt)
-  VALUES (@id, @title, @productName, @scheduleDate, @intervalDays, @status, @reportNote, @reportDocName,
+  VALUES (@id, @title, @productName, @scheduleDate, @intervalDays, @status, @assetId, @reportNote, @reportDocName,
      @reportedBy, @reportedAt, @reviewedBy, @reviewedAt, @reviewNote, @createdAt, @updatedAt)
   ON CONFLICT(id) DO UPDATE SET
-    status=excluded.status, reportNote=excluded.reportNote, reportDocName=excluded.reportDocName,
+    status=excluded.status, assetId=excluded.assetId, reportNote=excluded.reportNote, reportDocName=excluded.reportDocName,
     reportedBy=excluded.reportedBy, reportedAt=excluded.reportedAt, reviewedBy=excluded.reviewedBy,
     reviewedAt=excluded.reviewedAt, reviewNote=excluded.reviewNote, updatedAt=excluded.updatedAt
 `);
@@ -114,6 +127,7 @@ const listStmt = db.prepare("SELECT * FROM maintenance_items ORDER BY scheduleDa
 const dueStmt = db.prepare(
   "SELECT * FROM maintenance_items WHERE status = 'scheduled' AND scheduleDate <= ? ORDER BY scheduleDate ASC"
 );
+const byAssetStmt = db.prepare("SELECT * FROM maintenance_items WHERE assetId = ? ORDER BY scheduleDate ASC");
 const insertEventStmt = db.prepare(
   "INSERT INTO maintenance_events (id, itemId, event, actor, note, at) VALUES (@id, @itemId, @event, @actor, @note, @at)"
 );
@@ -144,10 +158,17 @@ export function listItemEvents(itemId: string): MaintenanceEvent[] {
   }));
 }
 
+// 바인딩은 명시적으로 — MaintenanceItem에는 컬럼이 아닌 assetName도 있어(읽기 전용) 그대로
+// 넘기면 better-sqlite3가 "알 수 없는 named parameter"로 거부한다.
 function save(item: MaintenanceItem): MaintenanceItem {
   upsertStmt.run({
-    ...item,
+    id: item.id,
+    title: item.title,
+    productName: item.productName,
+    scheduleDate: item.scheduleDate,
     intervalDays: item.intervalDays ?? null,
+    status: item.status,
+    assetId: item.assetId ?? null,
     reportNote: item.reportNote ?? null,
     reportDocName: item.reportDocName ?? null,
     reportedBy: item.reportedBy ?? null,
@@ -155,6 +176,8 @@ function save(item: MaintenanceItem): MaintenanceItem {
     reviewedBy: item.reviewedBy ?? null,
     reviewedAt: item.reviewedAt ?? null,
     reviewNote: item.reviewNote ?? null,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
   });
   return item;
 }
@@ -171,6 +194,7 @@ export function createMaintenanceItem(
     productName: string;
     scheduleDate: string;
     intervalDays?: number;
+    assetId?: string;
   },
   actor?: string,
   createdNote?: string
@@ -179,18 +203,19 @@ export function createMaintenanceItem(
     throw new Error("title, productName, scheduleDate가 필요합니다");
   }
   const now = Date.now();
-  const item = save({
+  const created = save({
     id: newId(),
     title: args.title,
     productName: args.productName,
     scheduleDate: args.scheduleDate,
     intervalDays: args.intervalDays,
+    assetId: args.assetId,
     status: "scheduled",
     createdAt: now,
     updatedAt: now,
   });
-  recordEvent(item.id, "created", actor, createdNote);
-  return item;
+  recordEvent(created.id, "created", actor, createdNote);
+  return getItem(created.id); // assetName까지 채워 돌려준다
 }
 
 // 담당자가 점검을 마치고 결과를 보고한다 — 승인 대기 상태로 전환. 반려된 점검은 문제를 고친 뒤
@@ -264,6 +289,11 @@ export function listDueMaintenance(): MaintenanceItem[] {
   return (dueStmt.all(today()) as MaintenanceRow[]).map(fromRow);
 }
 
+// 특정 AI 자산에 연결된 점검 — 인벤토리/자산 상세 연동용.
+export function listMaintenanceByAsset(assetId: string): MaintenanceItem[] {
+  return (byAssetStmt.all(assetId) as MaintenanceRow[]).map(fromRow);
+}
+
 // 테스트 전용: db는 모듈 싱글턴이라 createApp()을 새로 호출해도 초기화되지 않는다.
 export function resetMaintenanceForTests(): void {
   db.exec("DELETE FROM maintenance_events");
@@ -284,62 +314,77 @@ function seedEvent(itemId: string, event: MaintenanceEventType, actor: string, a
 }
 const DAY = 24 * 60 * 60 * 1000;
 
-// 최초 기동 시(테이블이 비어 있을 때) 전체 흐름(예정→승인대기→승인됨)을 보여주는 샘플 3건을
-// 시드한다 — users.ts의 seedDefaultAdminIfEmpty()와 같은 패턴. 빈 화면 대신 바로 감을 잡게 한다.
-// 각 샘플에 상태 변경 이력도 함께 심어 타임라인 화면을 바로 확인할 수 있게 한다.
+const dstr = (ms: number): string => new Date(ms).toISOString().slice(0, 10);
+
+// 최초 기동 시(테이블이 비어 있을 때) 모든 상태(예정/지연/승인대기/승인/반려)와 자산 연결·
+// 반려→재점검→승인 사이클까지 보여주는 샘플 6건을 시드한다 — users.ts의 seedDefaultAdminIfEmpty()와
+// 같은 패턴. 빈 화면 대신 바로 감을 잡게 한다. AI 자산 연결 건은 assets.ts의 SAMPLE_ASSET_IDS를
+// 가리킨다(자산 시드가 먼저 돌아 존재함). 각 샘플에 상태 변경 이력도 함께 심어 타임라인을 바로 본다.
 function seedSamplesIfEmpty(): void {
   if (listStmt.all().length > 0) return;
   const now = Date.now();
-  const lastMonth = new Date();
-  lastMonth.setMonth(lastMonth.getMonth() - 1);
 
+  // 1) 방화벽(어플라이언스, 미연결) — 예정·오늘 마감(지연)
   const fw = save({
-    id: newId(),
-    title: "방화벽 정책 정기 점검",
-    productName: "경계 방화벽(FW-01)",
-    scheduleDate: today(),
-    intervalDays: 90,
-    status: "scheduled",
-    createdAt: now,
-    updatedAt: now,
+    id: newId(), title: "방화벽 정책 정기 점검", productName: "경계 방화벽(FW-01)",
+    scheduleDate: today(), intervalDays: 90, status: "scheduled", createdAt: now, updatedAt: now,
   });
   seedEvent(fw.id, "created", "정요한", now - 7 * DAY);
 
-  const ips = save({
-    id: newId(),
-    title: "IPS 시그니처 업데이트 점검",
-    productName: "침입방지시스템(IPS-02)",
-    scheduleDate: today(),
-    intervalDays: 30,
-    status: "reported",
-    reportNote: "최신 시그니처로 업데이트 완료, 오탐 3건 튜닝함",
-    reportedBy: "정요한",
-    reportedAt: now,
-    createdAt: now,
-    updatedAt: now,
+  // 2) VPN(어플라이언스, 미연결) — 예정·향후(지연 아님)
+  const vpn = save({
+    id: newId(), title: "VPN 게이트웨이 인증서 점검", productName: "VPN 게이트웨이(VPN-03)",
+    scheduleDate: dstr(now + 10 * DAY), intervalDays: 365, status: "scheduled", createdAt: now, updatedAt: now,
   });
-  seedEvent(ips.id, "created", "정요한", now - 5 * DAY);
-  seedEvent(ips.id, "reported", "정요한", now - 1 * DAY, "최신 시그니처로 업데이트 완료, 오탐 3건 튜닝함");
+  seedEvent(vpn.id, "created", "정요한", now - 2 * DAY);
 
-  const wafCreated = lastMonth.getTime();
-  const waf = save({
-    id: newId(),
-    title: "WAF 룰셋 점검",
-    productName: "웹방화벽(WAF-01)",
-    scheduleDate: lastMonth.toISOString().slice(0, 10),
-    intervalDays: 90,
-    status: "approved",
-    reportNote: "룰셋 최신화 및 예외 처리 재검토 완료",
-    reportedBy: "정요한",
-    reportedAt: wafCreated + 2 * DAY,
-    reviewedBy: "정요한",
-    reviewedAt: wafCreated + 3 * DAY,
-    createdAt: wafCreated,
-    updatedAt: wafCreated + 3 * DAY,
+  // 3) 보안 챗봇(AI 자산 연결) — 승인 대기
+  const bot = save({
+    id: newId(), title: "프롬프트 가드레일 점검", productName: "보안 상담 챗봇",
+    assetId: "ai-secbot-01", scheduleDate: today(), intervalDays: 30, status: "reported",
+    reportNote: "프롬프트 인젝션 테스트 12종 통과, 시스템 프롬프트 노출 없음", reportedBy: "정요한", reportedAt: now - 1 * DAY,
+    createdAt: now, updatedAt: now,
   });
-  seedEvent(waf.id, "created", "정요한", wafCreated);
-  seedEvent(waf.id, "reported", "정요한", wafCreated + 2 * DAY, "룰셋 최신화 및 예외 처리 재검토 완료");
-  seedEvent(waf.id, "approved", "정요한", wafCreated + 3 * DAY);
+  seedEvent(bot.id, "created", "정요한", now - 5 * DAY);
+  seedEvent(bot.id, "reported", "정요한", now - 1 * DAY, "프롬프트 인젝션 테스트 12종 통과, 시스템 프롬프트 노출 없음");
+
+  // 4) WAF(어플라이언스, 미연결) — 승인 완료(지난달)
+  const wafBase = now - 30 * DAY;
+  const waf = save({
+    id: newId(), title: "WAF 룰셋 점검", productName: "웹방화벽(WAF-01)",
+    scheduleDate: dstr(wafBase), intervalDays: 90, status: "approved",
+    reportNote: "룰셋 최신화 및 예외 처리 재검토 완료", reportedBy: "정요한", reportedAt: wafBase + 2 * DAY,
+    reviewedBy: "정요한", reviewedAt: wafBase + 3 * DAY, createdAt: wafBase, updatedAt: wafBase + 3 * DAY,
+  });
+  seedEvent(waf.id, "created", "정요한", wafBase);
+  seedEvent(waf.id, "reported", "정요한", wafBase + 2 * DAY, "룰셋 최신화 및 예외 처리 재검토 완료");
+  seedEvent(waf.id, "approved", "정요한", wafBase + 3 * DAY);
+
+  // 5) 문서분류 AI(AI 자산 연결) — 반려→재점검→승인 전체 사이클(타임라인 시연용)
+  const dcBase = now - 14 * DAY;
+  const doc = save({
+    id: newId(), title: "학습데이터 접근권한 점검", productName: "문서 민감도 분류 AI",
+    assetId: "ai-doccls-02", scheduleDate: dstr(dcBase), intervalDays: 30, status: "approved",
+    reportNote: "2차 재점검 — 접근권한 최소화 적용 완료", reportedBy: "정요한", reportedAt: dcBase + 4 * DAY,
+    reviewedBy: "정요한", reviewedAt: dcBase + 5 * DAY, createdAt: dcBase, updatedAt: dcBase + 5 * DAY,
+  });
+  seedEvent(doc.id, "created", "정요한", dcBase);
+  seedEvent(doc.id, "reported", "정요한", dcBase + 1 * DAY, "1차 점검 — 광범위 접근권한 발견");
+  seedEvent(doc.id, "rejected", "정요한", dcBase + 2 * DAY, "접근권한 과다 — 최소권한 재적용 필요");
+  seedEvent(doc.id, "reported", "정요한", dcBase + 4 * DAY, "2차 재점검 — 접근권한 최소화 적용 완료");
+  seedEvent(doc.id, "approved", "정요한", dcBase + 5 * DAY);
+
+  // 6) 이상탐지 엔진(AI 자산 연결) — 반려(재보고 대기)
+  const an = save({
+    id: newId(), title: "오탐 룰 점검", productName: "이상행위 탐지 엔진",
+    assetId: "ai-anomaly-03", scheduleDate: dstr(now - 3 * DAY), intervalDays: 90, status: "rejected",
+    reportNote: "오탐 룰 검토, 일부 임계값만 조정", reportedBy: "정요한", reportedAt: now - 4 * DAY,
+    reviewedBy: "정요한", reviewedAt: now - 3 * DAY, reviewNote: "오탐률 여전히 높음 — 임계값 재산정 후 재보고",
+    createdAt: now - 6 * DAY, updatedAt: now - 3 * DAY,
+  });
+  seedEvent(an.id, "created", "정요한", now - 6 * DAY);
+  seedEvent(an.id, "reported", "정요한", now - 4 * DAY, "오탐 룰 검토, 일부 임계값만 조정");
+  seedEvent(an.id, "rejected", "정요한", now - 3 * DAY, "오탐률 여전히 높음 — 임계값 재산정 후 재보고");
 }
 seedSamplesIfEmpty();
 
@@ -349,8 +394,9 @@ export function registerMaintenanceRoutes(app: Express): void {
 
   app.post("/api/maintenance", authMiddleware, (req, res) => {
     const user = (req as Request & { user?: GijoUser }).user;
+    const { title, productName, scheduleDate, intervalDays, assetId } = req.body ?? {};
     try {
-      res.json(createMaintenanceItem(req.body, user?.displayName));
+      res.json(createMaintenanceItem({ title, productName, scheduleDate, intervalDays, assetId }, user?.displayName));
     } catch (err) {
       res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
     }
@@ -359,6 +405,11 @@ export function registerMaintenanceRoutes(app: Express): void {
   // 한 점검 항목의 상태 변경 이력(등록→보고→승인/반려) 타임라인.
   app.get("/api/maintenance/:id/history", authMiddleware, (req, res) => {
     res.json(listItemEvents(String(req.params.id)));
+  });
+
+  // 특정 AI 자산에 연결된 점검 목록 — 인벤토리 화면에서 자산별 점검 현황을 보여준다.
+  app.get("/api/assets/:id/maintenance", authMiddleware, (req, res) => {
+    res.json(listMaintenanceByAsset(String(req.params.id)));
   });
 
   // 점검 결과 보고. filename+content(base64)가 함께 오면 텍스트를 추출해 지식베이스(RAG)에도

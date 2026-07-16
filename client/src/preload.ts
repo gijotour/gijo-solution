@@ -54,7 +54,8 @@ const gijoApi = {
   // 유지보수 일정 · 점검서 · 승인(거버넌스 검증)
   listMaintenance: () => api.maintenanceApi.list(),
   listDueMaintenance: () => api.maintenanceApi.due(),
-  createMaintenance: (args: { title: string; productName: string; scheduleDate: string; intervalDays?: number }) =>
+  listMaintenanceByAsset: (assetId: string) => api.maintenanceApi.byAsset(assetId),
+  createMaintenance: (args: { title: string; productName: string; scheduleDate: string; intervalDays?: number; assetId?: string }) =>
     api.maintenanceApi.create(args),
   reportMaintenance: (id: string, args: { note: string; filename?: string; content?: string }) =>
     api.maintenanceApi.report(id, args),

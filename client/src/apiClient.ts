@@ -163,6 +163,8 @@ export interface MaintenanceItem {
   scheduleDate: string;
   intervalDays?: number;
   status: "scheduled" | "reported" | "approved" | "rejected";
+  assetId?: string;
+  assetName?: string;
   reportNote?: string;
   reportDocName?: string;
   reportedBy?: string;
@@ -186,7 +188,8 @@ export interface MaintenanceEvent {
 export const maintenanceApi = {
   list: () => request<MaintenanceItem[]>("/api/maintenance"),
   due: () => request<MaintenanceItem[]>("/api/maintenance/due"),
-  create: (args: { title: string; productName: string; scheduleDate: string; intervalDays?: number }) =>
+  byAsset: (assetId: string) => request<MaintenanceItem[]>(`/api/assets/${encodeURIComponent(assetId)}/maintenance`),
+  create: (args: { title: string; productName: string; scheduleDate: string; intervalDays?: number; assetId?: string }) =>
     request<MaintenanceItem>("/api/maintenance", { method: "POST", body: args }),
   report: (id: string, args: { note: string; filename?: string; content?: string }) =>
     request<MaintenanceItem>(`/api/maintenance/${id}/report`, { method: "POST", body: args }),

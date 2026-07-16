@@ -166,3 +166,10 @@ try {
 } catch {
   /* 컬럼이 이미 있으면 정상 — 무시 */
 }
+
+// 마이그레이션: maintenance_items.assetId (점검을 등록된 AI 자산에 연결). 선택 항목이라 nullable.
+try {
+  db.exec("ALTER TABLE maintenance_items ADD COLUMN assetId TEXT");
+} catch {
+  /* 컬럼이 이미 있으면 정상 — 무시 */
+}

@@ -151,6 +151,7 @@
     <div class="nav-item"><span class="ic">✓</span>컴플라이언스</div>
     <div class="nav-item" data-page="report.html"><span class="ic">▣</span>내부 리포트</div>
     <div class="nav-item"><span class="ic">◈</span>승인 워크플로우</div>
+    <div class="nav-item" data-page="opsguide.html"><span class="ic">🛠</span>운영 가이드</div>
     <div class="nav-section">고급 기능</div>
     <div class="nav-item" data-page="merge.html"><span class="ic">⬡</span>보안 LLM 합성</div>
     <div class="nav-item"><span class="ic">⛁</span>단기·장기 기억</div>
@@ -345,8 +346,12 @@
           const sbomCell = a.sbomGeneratedAt
             ? '<span class="sbom-ok">완료</span>'
             : `<span class="sbom-pending" style="cursor:pointer" data-gen-sbom="${a.id}">생성하기</span>`;
+          const mc = maintByAsset[a.id];
+          const maintBadge = mc
+            ? ` <span data-open-ops="1" title="이 자산의 유지보수 점검 — 운영 가이드로 이동" style="cursor:pointer;font-size:10.5px;font-weight:700;color:${mc.overdue ? "#f5928a" : "var(--blue-light)"};background:rgba(59,130,246,0.14);padding:1px 7px;border-radius:6px;">🔧 점검 ${mc.total}${mc.overdue ? ` · 지연 ${mc.overdue}` : ""}</span>`
+            : "";
           return `<tr>
-            <td><div class="asset-name">${a.name}</div><div class="asset-sub">${a.path}</div></td>
+            <td><div class="asset-name">${a.name}${maintBadge}</div><div class="asset-sub">${a.path}</div></td>
             <td><span class="type-badge">${a.assetType}</span></td>
             <td class="owner">${a.owner}</td>
             <td><span class="risk-badge risk-${risk.level === "none" ? "low" : risk.level}"><span class="risk-dot"></span>${risk.label}</span></td>
@@ -367,8 +372,27 @@
     document.getElementById("kpiNoSbom").textContent = allAssets.filter((a) => !a.sbomGeneratedAt).length;
   }
 
+  // assetId → { total, overdue } — 자산별 연결된 점검 건수. 인벤토리 행에 배지로 노출한다.
+  let maintByAsset = {};
+  async function loadMaintCounts() {
+    try {
+      const items = await window.gijo.listMaintenance();
+      const today = new Date().toISOString().slice(0, 10);
+      const map = {};
+      for (const m of items) {
+        if (!m.assetId) continue;
+        const s = (map[m.assetId] = map[m.assetId] || { total: 0, overdue: 0 });
+        s.total++;
+        if (m.status === "scheduled" && m.scheduleDate <= today) s.overdue++;
+      }
+      maintByAsset = map;
+    } catch (e) {
+      maintByAsset = {};
+    }
+  }
+
   async function refresh() {
-    allAssets = await window.gijo.listAssets();
+    [allAssets] = await Promise.all([window.gijo.listAssets(), loadMaintCounts()]);
     render();
   }
 
@@ -492,6 +516,10 @@
     assetRows.addEventListener("click", async (e) => {
       const genId = e.target.dataset.genSbom;
       const scanId = e.target.dataset.scan;
+      if (e.target.dataset.openOps) {
+        window.gijo.navigateTo("opsguide.html");
+        return;
+      }
       if (genId) {
         await generateSbomFor(genId, e.target);
       } else if (scanId) {
@@ -524,4 +552,3 @@
 
 </body>
 </html>
-       
