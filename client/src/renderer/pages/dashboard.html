@@ -36,12 +36,25 @@
   .avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
 
   .body-grid{display:grid;grid-template-columns:220px 1fr 300px;min-height:640px;}
-  .explorer{padding:18px 14px;border-right:1px solid var(--border);}
-  .explorer-title{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:700;color:var(--text);margin-bottom:4px;}
-  .explorer-sub{font-size:11px;color:var(--blue-light);margin-bottom:24px;}
-  .explorer-tree{font-size:12.5px;color:var(--muted);line-height:2.1;}
-  .explorer-tree .folder{color:var(--text);font-weight:600;}
-  .explorer-hint{margin-top:28px;font-size:12px;color:var(--muted-2);text-align:center;line-height:1.7;font-style:italic;}
+  .explorer{padding:18px 12px;border-right:1px solid var(--border);}
+  .explorer-title{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px;}
+  .explorer-sub{font-size:11px;color:var(--blue-light);margin-bottom:10px;}
+  .explorer-tree{font-size:12px;color:var(--muted);line-height:1.9;}
+  /* 통일된 트리 탐색기 — 폴더(접기)·자식(가이드라인)·리프(항목)를 한 스타일로 */
+  .tree-folder{display:flex;align-items:center;gap:6px;padding:5px 5px;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--text);border-radius:6px;}
+  .tree-folder:hover{background:rgba(255,255,255,0.04);}
+  .tree-caret{color:var(--muted-2);font-size:9px;width:9px;flex-shrink:0;text-align:center;}
+  .tree-count{margin-left:auto;font-size:10px;color:var(--muted-2);font-weight:700;background:rgba(255,255,255,0.05);border-radius:9px;padding:0 7px;}
+  .tree-act{color:var(--muted-2);cursor:pointer;font-size:11px;padding:0 2px;flex-shrink:0;}
+  .tree-act:hover{color:var(--blue-light);}
+  .tree-children{margin:1px 0 4px 13px;padding-left:9px;border-left:1px solid var(--border);font-size:11.5px;line-height:1.8;}
+  .tree-children.collapsed{display:none;}
+  .tree-leaf{padding:3px 5px;font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:5px;}
+  .tree-leaf.click{cursor:pointer;}
+  .tree-leaf.click:hover{background:rgba(255,255,255,0.04);color:var(--text);}
+  .tree-leaf .sub{color:var(--muted-2);font-size:10px;}
+  .tree-leaf .badge{color:var(--amber);font-size:10px;font-weight:700;}
+  .tree-empty{padding:3px 5px;font-size:11px;color:var(--muted-2);}
 
   .center-stage{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;position:relative;}
   .network-svg{width:100%;max-width:560px;}
@@ -183,19 +196,9 @@
 
   <div class="body-grid">
     <div class="explorer">
-      <div class="explorer-title"><span>자산 탐색기</span><span style="color:var(--muted-2);cursor:pointer" id="refreshAssetsBtn">⟳</span></div>
+      <div class="explorer-title"><span>자산 탐색기</span><span class="tree-act" id="refreshAssetsBtn" title="새로고침">⟳</span></div>
       <div class="explorer-sub">GIJO AS Desktop</div>
-      <div class="explorer-tree" id="explorerTree" style="margin-bottom:16px;">불러오는 중...</div>
-      <div class="explorer-title"><span id="productsToggle" style="cursor:pointer" title="접기/펼치기"><span id="productsCaret" style="color:var(--muted-2)">▾</span> 🧰 유지보수 보안제품</span><span style="color:var(--muted-2);cursor:pointer" id="openProductsBtn" title="보안제품 관리 열기">↗</span></div>
-      <div id="productsSectionBody">
-        <div class="explorer-tree" id="productsTree" style="margin-bottom:16px;">불러오는 중...</div>
-      </div>
-      <div class="explorer-title"><span id="fileSectionToggle" style="cursor:pointer" title="접기/펼치기"><span id="fileSectionCaret" style="color:var(--muted-2)">▾</span> 📁 파일</span><span><span style="color:var(--muted-2);cursor:pointer;margin-right:8px;" id="pickFolderBtn" title="작업 폴더 선택">📂</span><span style="color:var(--muted-2);cursor:pointer" id="refreshFilesBtn" title="새로고침">⟳</span></span></div>
-      <div id="fileSectionBody">
-        <div class="explorer-sub" id="fileRootLabel">프로젝트 폴더 (읽기 전용)</div>
-        <div style="font-size:10.5px;color:var(--muted-2);margin-bottom:6px;line-height:1.5;">📄 문서(PDF·HWPX·텍스트)를 클릭하면 <b style="color:var(--teal)">장기 기억에 올리기</b></div>
-        <div class="explorer-tree" id="fileTree" style="font-size:12px;">불러오는 중...</div>
-      </div>
+      <div id="explorerTree">불러오는 중...</div>
     </div>
 
     <div class="center-stage">
@@ -381,13 +384,6 @@
     }
   }
 
-  function assetRow(a, showPath) {
-    const nm = String(a.name).replace(/</g, "&lt;");
-    const sub = showPath && a.path && a.path !== a.name ? ` <span style="color:var(--muted-2);font-size:10.5px">${String(a.path).replace(/</g, "&lt;")}</span>` : "";
-    const vulns = a.findings.length ? ` <span style="color:var(--amber)">(${a.findings.length})</span>` : "";
-    return `<div style="padding-left:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${nm}${sub}${vulns}</div>`;
-  }
-
   const openDirs = new Set();
 
   function fileIcon(dir, name) {
@@ -455,15 +451,16 @@
   }
 
   async function loadFiles() {
-    const el = document.getElementById("fileTree");
+    const el = document.getElementById("tree-files");
+    if (!el) return;
     el.innerHTML = "";
     openDirs.clear();
     try {
-      const root = await window.gijo.listDir("");
-      document.getElementById("fileRootLabel").textContent = (root.rootName || root.root) + " (읽기 전용)";
+      await window.gijo.listDir("");
       await renderDir("", 0, el);
+      if (!el.innerHTML) el.innerHTML = `<div class="tree-empty">문서 없음</div>`;
     } catch (e) {
-      el.innerHTML = '<div style="color:var(--muted-2)">파일을 불러오지 못했습니다 (데스크톱 앱에서만 동작)</div>';
+      el.innerHTML = '<div class="tree-empty">파일을 불러오지 못했습니다 (데스크톱 앱 전용)</div>';
     }
   }
 
@@ -477,91 +474,90 @@
     }
   }
 
-  // 📁 파일 섹션 접기/펼치기 (경로 안내·힌트·트리를 통째로 감춘다).
-  function toggleFileSection() {
-    const body = document.getElementById("fileSectionBody");
-    const caret = document.getElementById("fileSectionCaret");
-    const collapsed = body.style.display === "none";
-    body.style.display = collapsed ? "" : "none";
-    caret.textContent = collapsed ? "▾" : "▸";
+  // ── 통일된 트리 탐색기 ────────────────────────────────────────────────────
+  // AI 자산 · 인프라 호스트 · 보안제품 · 문서를 하나의 파일탐색기형 트리로 묶는다.
+  // 접기 상태는 렌더 밖(collapsedFolders)에 둬 새로고침 후에도 유지된다.
+  const collapsedFolders = new Set();
+  const escT = (s) => String(s == null ? "" : s).replace(/</g, "&lt;");
+
+  function folderHtml(key, icon, label, actsHtml) {
+    const c = collapsedFolders.has(key);
+    return (
+      `<div class="tree-folder" data-folder="${key}">` +
+      `<span class="tree-caret">${c ? "▸" : "▾"}</span>${icon} ${label}` +
+      `<span class="tree-count" id="cnt-${key}"></span>${actsHtml || ""}</div>` +
+      `<div class="tree-children ${c ? "collapsed" : ""}" id="tree-${key}"><div class="tree-empty">불러오는 중…</div></div>`
+    );
   }
 
-  // 접힌 자산 그룹("ai"/"hosts") — 새로고침/재렌더 후에도 유지되도록 렌더 밖에 둔다.
-  const collapsedAssetGroups = new Set();
+  function renderExplorer() {
+    explorerTree.innerHTML =
+      folderHtml("ai", "🧠", "AI 자산") +
+      folderHtml("hosts", "🖥", "인프라 호스트") +
+      folderHtml("products", "🧰", "보안제품", `<span class="tree-act" data-open-products title="보안제품 관리 열기">↗</span>`) +
+      folderHtml("files", "📁", "문서", `<span class="tree-act" id="pickFolderBtn" title="작업 폴더 선택">📂</span><span class="tree-act" id="refreshFilesBtn" title="새로고침">⟳</span>`);
+    explorerTree.querySelectorAll(".tree-folder").forEach((hd) => {
+      hd.addEventListener("click", (e) => {
+        if (e.target.closest(".tree-act")) return; // 액션 아이콘 클릭은 접기와 분리
+        const key = hd.dataset.folder;
+        const body = document.getElementById("tree-" + key);
+        const open = collapsedFolders.has(key);
+        if (open) collapsedFolders.delete(key); else collapsedFolders.add(key);
+        body.classList.toggle("collapsed", !open);
+        hd.querySelector(".tree-caret").textContent = open ? "▾" : "▸";
+      });
+    });
+    explorerTree.querySelectorAll("[data-open-products]").forEach((x) => x.addEventListener("click", () => window.gijo.navigateTo("products.html")));
+    document.getElementById("pickFolderBtn").addEventListener("click", pickFolder);
+    document.getElementById("refreshFilesBtn").addEventListener("click", loadFiles);
+  }
 
-  function assetGroup(key, label, count, rowsHtml, extraStyle) {
-    const collapsed = collapsedAssetGroups.has(key);
-    return (
-      `<div class="folder" data-grp="${key}" style="cursor:pointer;${extraStyle || ""}">` +
-      `<span style="color:var(--muted-2)">${collapsed ? "▸" : "▾"}</span> ${label} (${count})</div>` +
-      `<div data-grp-body="${key}" style="${collapsed ? "display:none" : ""}">${rowsHtml}</div>`
-    );
+  const setCount = (key, n) => { const el = document.getElementById("cnt-" + key); if (el) el.textContent = n; };
+
+  function assetLeaf(a, showPath) {
+    const sub = showPath && a.path && a.path !== a.name ? ` <span class="sub">${escT(a.path)}</span>` : "";
+    const vulns = a.findings && a.findings.length ? ` <span class="badge">${a.findings.length}</span>` : "";
+    return `<div class="tree-leaf">${escT(a.name)}${sub}${vulns}</div>`;
+  }
+  function fillAssetFolder(key, list, showPath) {
+    setCount(key, list.length);
+    const box = document.getElementById("tree-" + key);
+    if (!box) return;
+    if (!list.length) { box.innerHTML = `<div class="tree-empty">없음</div>`; return; }
+    let rows = list.slice(0, 12).map((a) => assetLeaf(a, showPath)).join("");
+    if (list.length > 12) rows += `<div class="tree-empty">…외 ${list.length - 12}건</div>`;
+    box.innerHTML = rows;
   }
 
   async function loadAssets() {
     try {
       const assets = await window.gijo.listAssets();
-      if (assets.length === 0) {
-        explorerTree.innerHTML = '<div class="folder">▸ AI 자산 (0)</div><div style="padding-left:14px;color:var(--muted-2)">등록된 자산이 없습니다</div>';
-        return;
-      }
       const hosts = assets.filter((a) => a.assetType === "infra-host");
       const ai = assets.filter((a) => a.assetType !== "infra-host");
-      let aiRows = ai.slice(0, 8).map((a) => assetRow(a, false)).join("");
-      if (ai.length > 8) aiRows += `<div style="padding-left:14px;color:var(--muted-2);font-size:11px">…외 ${ai.length - 8}건</div>`;
-      let html = assetGroup("ai", "AI 자산", ai.length, aiRows);
-      if (hosts.length) {
-        let hostRows = hosts.slice(0, 8).map((a) => assetRow(a, true)).join("");
-        if (hosts.length > 8) hostRows += `<div style="padding-left:14px;color:var(--muted-2);font-size:11px">…외 ${hosts.length - 8}건</div>`;
-        html += assetGroup("hosts", "인프라 호스트", hosts.length, hostRows, "margin-top:8px");
-      }
-      explorerTree.innerHTML = html;
-      explorerTree.querySelectorAll("[data-grp]").forEach((hd) => {
-        hd.addEventListener("click", () => {
-          const key = hd.dataset.grp;
-          const body = explorerTree.querySelector(`[data-grp-body="${key}"]`);
-          const open = collapsedAssetGroups.has(key);
-          if (open) collapsedAssetGroups.delete(key); else collapsedAssetGroups.add(key);
-          body.style.display = open ? "" : "none";
-          hd.querySelector("span").textContent = open ? "▾" : "▸";
-        });
-      });
+      fillAssetFolder("ai", ai, false);
+      fillAssetFolder("hosts", hosts, true);
     } catch (e) {
-      explorerTree.innerHTML = '<div style="color:var(--muted-2)">자산 목록을 불러오지 못했습니다</div>';
+      const b = document.getElementById("tree-ai");
+      if (b) b.innerHTML = `<div class="tree-empty">자산을 불러오지 못했습니다</div>`;
     }
   }
 
-  // 🧰 유지보수 보안제품 — 종류(방화벽/EDR/DLP…)별로 묶어 한눈에. 클릭하면 보안제품 관리로 이동.
+  // 보안제품 — 종류(방화벽/EDR/DLP…)를 접두 아이콘으로 붙여 한 줄씩(평평하게). 클릭 시 보안제품 관리로.
   async function loadSecurityProducts() {
-    const el = document.getElementById("productsTree");
-    const esc = (s) => String(s == null ? "" : s).replace(/</g, "&lt;");
+    const box = document.getElementById("tree-products");
     try {
       const groups = await window.gijo.listSecurityProductsGrouped();
       const total = groups.reduce((s, g) => s + g.products.length, 0);
-      if (!total) {
-        el.innerHTML = '<div data-open-products style="padding-left:14px;color:var(--muted-2);font-size:11px;cursor:pointer">등록된 보안제품이 없습니다 — 클릭해 등록</div>';
-      } else {
-        el.innerHTML = groups.map((g) =>
-          `<div data-open-products style="cursor:pointer" title="보안제품 관리 열기">` +
-          `<span class="folder">${g.icon} ${esc(g.label)}</span> <span style="color:var(--muted-2)">(${g.products.length})</span></div>` +
-          `<div style="padding-left:16px;color:var(--muted);font-size:11.5px;line-height:1.9;margin-bottom:4px">` +
-          g.products.slice(0, 4).map((p) => `• ${esc(p.name)}`).join("<br>") +
-          (g.products.length > 4 ? `<br><span style="color:var(--muted-2)">…외 ${g.products.length - 4}건</span>` : "") +
-          `</div>`
-        ).join("");
-      }
-      el.querySelectorAll("[data-open-products]").forEach((x) => x.addEventListener("click", () => window.gijo.navigateTo("products.html")));
+      setCount("products", total);
+      if (!box) return;
+      if (!total) box.innerHTML = `<div class="tree-leaf click" data-open-products>등록된 제품 없음 — 클릭해 등록</div>`;
+      else box.innerHTML = groups.flatMap((g) => g.products.map((p) =>
+        `<div class="tree-leaf click" data-open-products title="${escT(g.label)} · 보안제품 관리">${g.icon} ${escT(p.name)}</div>`
+      )).join("");
+      box.querySelectorAll("[data-open-products]").forEach((x) => x.addEventListener("click", () => window.gijo.navigateTo("products.html")));
     } catch (e) {
-      el.innerHTML = '<div style="color:var(--muted-2)">보안제품을 불러오지 못했습니다</div>';
+      if (box) box.innerHTML = `<div class="tree-empty">보안제품을 불러오지 못했습니다</div>`;
     }
-  }
-
-  function toggleProductsSection() {
-    const body = document.getElementById("productsSectionBody");
-    const caret = document.getElementById("productsCaret");
-    const collapsed = body.style.display === "none";
-    body.style.display = collapsed ? "" : "none";
-    caret.textContent = collapsed ? "▾" : "▸";
   }
 
   // SLA(기한) 배지: 남은 일수(D-N) 또는 초과(D+N). 임박(3일↓)·초과는 색으로 경고.
@@ -802,16 +798,12 @@
     setInterval(tick, 1000);
     await loadUser();
     greet();
+    renderExplorer(); // 트리 골격을 먼저 그린 뒤 각 로더가 자식 컨테이너를 채운다
     await Promise.all([loadHealth(), loadAssets(), loadSecurityProducts(), loadTasks(), loadCollaboration(), loadFiles(), loadDocSearchScopes(), checkModelReady()]);
 
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
     document.getElementById("refreshAssetsBtn").addEventListener("click", loadAssets);
-    document.getElementById("refreshFilesBtn").addEventListener("click", loadFiles);
-    document.getElementById("pickFolderBtn").addEventListener("click", pickFolder);
-    document.getElementById("fileSectionToggle").addEventListener("click", toggleFileSection);
-    document.getElementById("productsToggle").addEventListener("click", toggleProductsSection);
-    document.getElementById("openProductsBtn").addEventListener("click", () => window.gijo.navigateTo("products.html"));
     document.getElementById("todoAddBtn").addEventListener("click", addTodo);
     todoInput.addEventListener("keydown", (e) => { if (e.key === "Enter") addTodo(); });
     todayItems.addEventListener("click", onTaskAction);
