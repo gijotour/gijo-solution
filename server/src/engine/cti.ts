@@ -195,6 +195,25 @@ export async function listFindings(): Promise<CtiFinding[]> {
   );
 }
 
+// 최초 기동 시(탐지 내역이 비어 있을 때) 샘플 CTI finding을 시드한다 — 시드된 샘플 AI 자산
+// (assets.ts)의 컴포넌트와 매칭되도록 target을 구성해, 벤더 키 없이도 "CTI↔자산 매칭"을 바로
+// 시연할 수 있게 한다. source를 "샘플(데모)"로 명확히 표기한다(가짜 벤더 데이터로 오인 방지).
+const countFindingsStmt = db.prepare("SELECT COUNT(*) AS n FROM cti_findings");
+function seedSampleFindingsIfEmpty(): void {
+  if ((countFindingsStmt.get() as { n: number }).n > 0) return;
+  const now = Date.now();
+  const when = (daysAgo: number) => new Date(now - daysAgo * 86400000).toISOString().slice(0, 16).replace("T", " ");
+  const samples: Omit<CtiFinding, "id">[] = [
+    { detectedAt: when(0), type: "위협 캠페인 · 공급망", target: "Qwen2.5 오픈웨이트 모델 가중치 변조 공급망 위협 정황", source: "샘플(데모)", severity: "warning" },
+    { detectedAt: when(1), type: "악성 패키지", target: "bge-m3 임베딩 모델 배포 패키지에 악성코드 삽입 사례 보고", source: "샘플(데모)", severity: "critical" },
+    { detectedAt: when(2), type: "프롬프트 인젝션", target: "KoBERT 기반 한국어 분류 모델 대상 프롬프트 인젝션 캠페인", source: "샘플(데모)", severity: "warning" },
+    { detectedAt: when(3), type: "우회 기법 PoC", target: "IsolationForest 이상탐지 우회(evasion) 기법 PoC 공개", source: "샘플(데모)", severity: "info" },
+    { detectedAt: when(4), type: "자격증명 유출", target: "다크웹서 유출 계정 자격증명 판매 게시글 (금융권 포털)", source: "샘플(데모)", severity: "info" },
+  ];
+  samples.forEach((s, i) => insertFindingStmt.run({ ...s, id: `sample-cti-${i}`, feedId: "sample", collectedAt: now }));
+}
+seedSampleFindingsIfEmpty();
+
 export function registerCtiRoutes(app: Express): void {
   app.get("/api/cti/feeds", authMiddleware, (_req, res) => res.json(listFeeds()));
   app.post("/api/cti/feeds/:id/configure", authMiddleware, (req, res) => {

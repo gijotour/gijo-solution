@@ -179,10 +179,18 @@ tr:last-child td{border-bottom:none;}
     </div>
 
 
-<div class="kpi-strip" style="grid-template-columns:repeat(3,1fr)">
+<div class="kpi-strip" style="grid-template-columns:repeat(4,1fr)">
   <div class="kpi-mini"><div class="kpi-mini-label">연동된 CTI 벤더</div><div class="kpi-mini-value" id="connectedFeedCount">-</div></div>
   <div class="kpi-mini"><div class="kpi-mini-label">탐지 내역</div><div class="kpi-mini-value" id="findingCount">-</div></div>
   <div class="kpi-mini"><div class="kpi-mini-label">긴급 탐지</div><div class="kpi-mini-value" style="color:#f5928a" id="criticalCount">-</div></div>
+  <div class="kpi-mini"><div class="kpi-mini-label">영향받는 내부 자산</div><div class="kpi-mini-value" style="color:var(--amber)" id="affectedAssetCount">-</div></div>
+</div>
+
+<!-- CTI ↔ 내부 자산 자동 매칭: "지금 우리에게 영향 있는 위협"을 자동 산출해 수작업 대조를 없앤다. -->
+<div class="panel" style="border-color:rgba(240,160,32,0.35)">
+  <div class="panel-title">🎯 내부 자산에 영향을 주는 위협 <span style="font-size:11px;font-weight:600;color:var(--muted)">CTI ↔ 자산 자동 매칭</span></div>
+  <div class="panel-sub">위협 인텔의 대상 텍스트를 자산 인벤토리(자산명·컴포넌트·CVE·AI-BOM)와 대조해 영향 자산을 자동으로 찾습니다. 담당자의 눈 대조 작업을 대신합니다.</div>
+  <div id="ctiMatchBody" style="margin-top:10px;display:flex;flex-direction:column;gap:9px;">불러오는 중...</div>
 </div>
 
 <div class="content-grid">
@@ -289,6 +297,41 @@ tr:last-child td{border-bottom:none;}
         '<tr><td colspan="5" style="color:#f5928a;text-align:center;padding:28px 10px">탐지 내역을 불러오지 못했습니다. 서버 연결 상태를 확인하세요.</td></tr>';
     }
   }
+
+  // CTI ↔ 자산 자동 매칭 결과 렌더 — 영향받는 위협만 표시(매칭 없는 건 여기 안 나옴).
+  async function loadCtiMatches() {
+    const body = document.getElementById("ctiMatchBody");
+    try {
+      const { matches, summary } = await window.gijo.getCtiAssetMatches();
+      document.getElementById("affectedAssetCount").textContent = summary.affectedAssets;
+      if (!matches.length) {
+        body.innerHTML = '<div style="color:var(--muted);font-size:12px">내부 자산에 매칭되는 위협이 없습니다 — 안전하거나, 아직 자산·CTI 데이터가 부족할 수 있습니다.</div>';
+        return;
+      }
+      // 심각도 높은 순
+      const sev = { critical: 0, warning: 1, info: 2 };
+      matches.sort((a, b) => sev[a.finding.severity] - sev[b.finding.severity]);
+      body.innerHTML = matches
+        .map((m) => {
+          const sb = SEVERITY_BADGE[m.finding.severity] || { cls: "b-blue", label: m.finding.severity };
+          const assets = m.matchedAssets
+            .map((a) => `<span style="background:var(--panel-2);border:1px solid var(--border);border-radius:6px;padding:2px 8px;font-size:11px;color:var(--blue-light)">${esc(a.assetName)} <span style="color:var(--muted-2)">· ${a.matchedOn.map(esc).join(", ")}</span></span>`)
+            .join(" ");
+          return `<div style="background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:11px 13px;">
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <span class="badge ${sb.cls}">${sb.label}</span>
+              <span style="font-size:12.5px;font-weight:700;color:#fff;">${esc(m.finding.target)}</span>
+              <span style="font-size:11px;color:var(--muted-2);margin-left:auto;">${esc(m.finding.source)}</span>
+            </div>
+            <div style="font-size:11px;color:var(--muted);margin:6px 0 5px;">${esc(m.finding.type)}</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;"><span style="font-size:11px;color:var(--amber);font-weight:700;">영향 자산 ${m.matchedAssets.length} →</span> ${assets}</div>
+          </div>`;
+        })
+        .join("");
+    } catch (e) {
+      body.innerHTML = '<div style="color:#f5928a;font-size:12px">매칭을 불러오지 못했습니다: ' + esc(e.message) + "</div>";
+    }
+  }
   const modal = document.getElementById("apiKeyModal");
   const feedSelect = document.getElementById("feedSelect");
   const apiKeyInput = document.getElementById("apiKeyInput");
@@ -388,6 +431,7 @@ tr:last-child td{border-bottom:none;}
 
   loadFeeds();
   loadFindings();
+  loadCtiMatches();
 </script>
 
 </body>

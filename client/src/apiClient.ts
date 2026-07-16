@@ -413,12 +413,21 @@ export const sbomApi = {
 };
 
 // ── CTI(위협 인텔리전스) ──────────────────────────────────────────────
+export interface CtiAssetMatch {
+  finding: { id: string; detectedAt: string; type: string; target: string; source: string; severity: "info" | "warning" | "critical" };
+  matchedAssets: { assetId: string; assetName: string; matchedOn: string[] }[];
+}
+
 export const ctiApi = {
   feeds: () => request("/api/cti/feeds"),
   findings: () => request("/api/cti/findings"),
   configureFeed: (feedId: string, apiKey: string) =>
     request(`/api/cti/feeds/${feedId}/configure`, { method: "POST", body: { apiKey } }),
   disconnectFeed: (feedId: string) => request(`/api/cti/feeds/${feedId}/disconnect`, { method: "POST" }),
+  assetMatches: () =>
+    request<{ matches: CtiAssetMatch[]; summary: { totalFindings: number; matchedFindings: number; affectedAssets: number; criticalMatches: number } }>(
+      "/api/cti/asset-matches"
+    ),
 };
 
 // ── 내부 리포트 ───────────────────────────────────────────────────────

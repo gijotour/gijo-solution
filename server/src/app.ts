@@ -33,6 +33,7 @@ import { registerEmailRoutes } from "./engine/email";
 import { registerSbomRoutes } from "./engine/sbom";
 import { registerApprovalsRoutes } from "./engine/approvals";
 import { registerCtiRoutes } from "./engine/cti";
+import { registerCtiMatchRoutes } from "./engine/ctimatch";
 import { registerReportRoutes } from "./engine/report";
 import { registerUsageRoutes, usageLoggingMiddleware } from "./engine/usage";
 import { registerLogsRoutes } from "./engine/logs";
@@ -83,6 +84,7 @@ export function createApp(): Express {
   registerSbomRoutes(app);
   registerApprovalsRoutes(app);
   registerCtiRoutes(app);
+  registerCtiMatchRoutes(app);
   registerReportRoutes(app);
   registerUsageRoutes(app);
   registerLogsRoutes(app);

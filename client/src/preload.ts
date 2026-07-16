@@ -130,6 +130,7 @@ const gijoApi = {
   // CTI(딥웹/다크웹 피드)
   listCtiFeeds: () => api.ctiApi.feeds(),
   listCtiFindings: () => api.ctiApi.findings(),
+  getCtiAssetMatches: () => api.ctiApi.assetMatches(),
   configureCtiFeed: (feedId: string, apiKey: string) => api.ctiApi.configureFeed(feedId, apiKey),
   disconnectCtiFeed: (feedId: string) => api.ctiApi.disconnectFeed(feedId),
 
