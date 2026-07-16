@@ -137,4 +137,23 @@ describe("ontology 시드 — KISA 위협 카탈로그 → 트리플 (실제 도
     expect(second.inserted).toBe(first.inserted); // 두 번 넣어도 같은 수
     expect(listTriples({ subject: "수동규칙" })).toHaveLength(1); // 수동 입력분 보존
   });
+
+  it("완화통제 시드는 위협 노드에 직접 붙어 접근제어가 위협과 그래프로 연결된다", async () => {
+    const { seedOntologyFromCatalog } = await import("../src/engine/ontology-seed");
+    seedOntologyFromCatalog();
+    // '벡터 DB·임베딩 유출'(M02) 위협에서 확장하면 완화통제(문서단위 접근제어)가 함께 나와야 한다.
+    const hits = expandOntology("벡터 DB 임베딩 유출을 어떻게 막나요?", undefined, { hops: 1, limit: 50 });
+    const objs = hits.map((t) => t.object);
+    expect(objs.some((o) => o.includes("문서 단위 접근제어"))).toBe(true);
+    expect(hits.some((t) => t.predicate === "완화통제")).toBe(true);
+  });
+
+  it("보안제품 카탈로그 시드 — 라벨 괄호에서 기능을 파싱한다", async () => {
+    const { seedOntologyFromCatalog } = await import("../src/engine/ontology-seed");
+    seedOntologyFromCatalog();
+    const edr = listTriples({ subject: "EDR" });
+    expect(edr.some((t) => t.predicate === "기능" && t.object === "단말탐지대응")).toBe(true);
+    expect(edr.some((t) => t.predicate === "유형" && t.object === "보안제품")).toBe(true);
+    expect(listTriples({ subject: "기타" })).toHaveLength(0); // '기타'는 제외
+  });
 });

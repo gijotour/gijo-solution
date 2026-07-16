@@ -25,6 +25,12 @@ export const GLOBAL_SCOPE = "global";
 // 1글자 엔티티는 부분문자열 매칭 시 오탐(예: '망'이 '희망'에 걸림)이 심해 시드에서 제외한다.
 const MIN_ENTITY_LEN = 2;
 
+// 엔티티 매칭용 정규화 — 공백·구분점(·•・-/)을 지우고 소문자화한다. 엔티티명이 "벡터 DB·임베딩 유출"처럼
+// 가운뎃점/공백을 포함해도 사용자가 "벡터 DB 임베딩 유출"로 자연스럽게 쳤을 때 걸리게 하는 게 목적.
+function normalizeForMatch(s: string): string {
+  return s.replace(/[\s·•・\-/]/g, "").toLowerCase();
+}
+
 export interface Triple {
   id: string;
   subject: string;
@@ -124,12 +130,19 @@ export function expandOntology(
     .all(...scopes) as Triple[];
   if (all.length === 0 || !text) return [];
 
-  // 시드 엔티티: 텍스트에 실제로 등장하는 주어/목적어.
+  // 시드 엔티티: 텍스트에 실제로 등장하는 주어/목적어. 정규화 후 부분문자열로 비교해
+  // 공백/가운뎃점 차이를 흡수한다.
+  const normText = normalizeForMatch(text);
   const seen = new Set<string>();
   const frontierInit = new Set<string>();
+  const mentions = (entity: string) => {
+    if (entity.length < MIN_ENTITY_LEN) return false;
+    const n = normalizeForMatch(entity);
+    return n.length >= MIN_ENTITY_LEN && normText.includes(n);
+  };
   for (const t of all) {
-    if (t.subject.length >= MIN_ENTITY_LEN && text.includes(t.subject)) frontierInit.add(t.subject);
-    if (t.object.length >= MIN_ENTITY_LEN && text.includes(t.object)) frontierInit.add(t.object);
+    if (mentions(t.subject)) frontierInit.add(t.subject);
+    if (mentions(t.object)) frontierInit.add(t.object);
   }
   if (frontierInit.size === 0) return [];
   for (const e of frontierInit) seen.add(e);

@@ -345,7 +345,7 @@ export const ontologyApi = {
   expand: (text: string, agentId?: string) =>
     request<OntologyTriple[]>("/api/ontology/expand", { method: "POST", body: { text, agentId } }),
   stats: () => request<{ count: number }>("/api/ontology/stats"),
-  seed: () => request<{ inserted: number; source: string }>("/api/ontology/seed", { method: "POST" }),
+  seed: () => request<{ inserted: number; sources: string[] }>("/api/ontology/seed", { method: "POST" }),
 };
 
 // ── LLM 브리지 / 채팅 ─────────────────────────────────────────────────
