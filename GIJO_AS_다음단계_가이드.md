@@ -196,16 +196,17 @@ GRC 플랫폼도 아니다. 이 전제가 아래 모든 우선순위를 결정�
   전부 준비됐으니, 수요가 보이면 Lily 본판 기준 실측(다운로드 ~14GB + 학습 + 내보내기)만
   하면 된다.
 
-### 3.3 최종 로컬 LLM 모델 선정 — ✅ 결정됨 (2026-07-15)
+### 3.3 최종 로컬 LLM 모델 선정 — ✅ 재결정 (2026-07-17)
 
-- **결정**: `segolilylabs/Lily-Cybersecurity-7B-v0.2` (사이버보안 특화 파인튜닝, Mistral-7B
-  기반). 배포용 modelId는 **`lily-cybersecurity-7b-v0.2`**, GGUF는 제작사 공식 저장소
-  `segolilylabs/Lily-Cybersecurity-7B-v0.2-GGUF`의 **Q5_K_M**(약 5GB — RTX 3090 24GB에서
-  VRAM 여유가 커서 `--ctx-size` 상향 여지가 크다). PC세팅 체크리스트 STEP 6이 이 모델
-  기준으로 갱신됨.
-- **알려진 트레이드오프** (결정 뒤집자는 게 아니라 기록): 영어 중심 모델이라 **한국어
-  응답 품질은 별도 검증 필요** — GPU PC 도착 후 STEP 10 스모크 테스트에 한국어 지시
-  항목이 포함돼 있다. 보안 도메인 특화가 7B의 일반 성능 한계를 상쇄한다는 판단.
+- **현재 결정 (2026-07-17)**: **`gijo-main-orchestrator`** — GIJO 자체 오케스트레이터 LLM
+  (Qwen2 계열 7.6B, Q5_K_M, 32K ctx). `localengine.ts`의 `DEFAULT_MODEL_ID` 기본값이자
+  부팅 자동 시작 모델. 실 GPU(RTX 3090) 검증: 부팅 시 기본 로드 + 한국어 응답 정상
+  ("저는 GIJO AS…작업 분배와 결과 취합을 담당하는 보안 AI입니다", 0.7s). 온톨로지 하이브리드
+  주입도 이 모델로 실증됨.
+- **이전 결정 (2026-07-15, 대체됨)**: `segolilylabs/Lily-Cybersecurity-7B-v0.2` (Mistral-7B
+  기반 보안 특화). 영어 중심이라 한국어 품질이 약점이었다. 현재는 modeldex 카탈로그에
+  **채팅 모델 옵션·합성 소스**로 남아 있어 언제든 선택 가능(제거하지 않음). `GIJO_DEFAULT_MODEL_ID`
+  환경변수로 기본 모델을 바꿀 수 있다.
 
 ### 3.4 `server-java-reference/` 존폐 — ✅ 폐기 결정·삭제 완료 (2026-07-15)
 

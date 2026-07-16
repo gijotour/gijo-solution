@@ -25,8 +25,10 @@ const DEFAULT_CTX_SIZE = Number(process.env.GIJO_LOCAL_LLM_CTX_SIZE ?? 32768);
 // Java 참고 구현(LocalEngineService)과 동일하게 10초까지 정상 종료를 기다린 뒤 강제 종료한다.
 const STOP_TIMEOUT_MS = Number(process.env.GIJO_LOCAL_LLM_STOP_TIMEOUT_MS ?? 10000);
 
-// 제품 확정 모델 (다음단계 가이드 3.3, 2026-07-15). "마지막 사용 모델" 기록이 없을 때의 기본.
-const DEFAULT_MODEL_ID = process.env.GIJO_DEFAULT_MODEL_ID ?? "lily-cybersecurity-7b-v0.2";
+// 제품 확정 모델 (2026-07-17 변경: gijo-main-orchestrator — GIJO 자체 오케스트레이터 LLM).
+// "마지막 사용 모델" 기록이 없을 때의 기본. models/gijo-main-orchestrator/gijo-main-orchestrator.gguf.
+// (이전 확정 모델 Lily-Cybersecurity-7B는 modeldex 카탈로그에 옵션으로 남아 있어 언제든 선택 가능.)
+const DEFAULT_MODEL_ID = process.env.GIJO_DEFAULT_MODEL_ID ?? "gijo-main-orchestrator";
 
 // RAG 임베딩용 별도 llama-server (llm.ts의 EMBEDDING_SERVER_URL과 짝). 스왑/풀 대상이 아니라
 // 부팅 시 1회 자동 기동만 관리한다.

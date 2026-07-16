@@ -20,7 +20,7 @@ export interface DexModel {
 
 // 검증된 보안 특화 LLM 큐레이션 (HF에서 존재·base 확인, 2026-07). 합성은 arch가 같은 것끼리.
 export const SECURITY_LLM_DEX: DexModel[] = [
-  { id: "segolilylabs/Lily-Cybersecurity-7B-v0.2", name: "Lily Cybersecurity 7B", base: "Mistral-7B-Instruct-v0.2", arch: "mistral", size: "7B", focus: "일반 보안 Q&A · 사고대응 · 개념 설명", note: "GIJO 확정 채팅 모델", lang: "영어" },
+  { id: "segolilylabs/Lily-Cybersecurity-7B-v0.2", name: "Lily Cybersecurity 7B", base: "Mistral-7B-Instruct-v0.2", arch: "mistral", size: "7B", focus: "일반 보안 Q&A · 사고대응 · 개념 설명", note: "채팅 모델 옵션 (합성 소스로도 사용)", lang: "영어" },
   { id: "ZySec-AI/SecurityLLM", name: "ZySec 7B (SecurityLLM)", base: "Mistral-7B", arch: "mistral", size: "7B", focus: "보안 운영 · 정책 · 컴플라이언스 문서", lang: "영어" },
   { id: "fdtn-ai/Foundation-Sec-8B", name: "Foundation-Sec 8B", base: "Llama-3.1-8B", arch: "llama", size: "8B", focus: "위협 분석 · 보안 추론 (범용 보안 파운데이션)", note: "Cisco Foundation AI", lang: "영어" },
   { id: "clouditera/SecGPT-1.5B", name: "SecGPT 1.5B", base: "Qwen2-1.5B", arch: "qwen2", size: "1.5B", focus: "경량 보안 어시스턴트 (온디바이스)", note: "clouditera", lang: "중국어" },
@@ -64,7 +64,7 @@ export const LLM_GUIDE: LlmGuideCategory[] = [
     title: "보안 특화 LLM",
     intro: "침해사고 대응·취약점 분석·보안 개념을 이미 학습한 모델. 보안 담당 에이전트의 두뇌로 바로 쓰기 좋습니다.",
     models: [
-      { id: "QuantFactory/Lily-Cybersecurity-7B-v0.2-GGUF", name: "Lily Cybersecurity 7B", size: "7B", approxGb: "약 4.4GB", tag: "GIJO 기본", desc: "사이버보안 일반 Q&A·사고대응·개념 설명에 특화. GIJO AS의 확정 채팅 모델입니다." },
+      { id: "QuantFactory/Lily-Cybersecurity-7B-v0.2-GGUF", name: "Lily Cybersecurity 7B", size: "7B", approxGb: "약 4.4GB", tag: "보안 특화", desc: "사이버보안 일반 Q&A·사고대응·개념 설명에 특화한 채팅 모델 옵션. (GIJO 기본 채팅 모델은 자체 gijo-main-orchestrator입니다.)" },
       { id: "QuantFactory/SecurityLLM-GGUF", name: "ZySec 7B (SecurityLLM)", size: "7B", approxGb: "약 4.4GB", desc: "보안 운영·정책·컴플라이언스 문서 이해에 강합니다. 리포트/거버넌스 계열 에이전트에 적합." },
       { id: "mradermacher/Foundation-Sec-8B-GGUF", name: "Foundation-Sec 8B", size: "8B", approxGb: "약 4.9GB", tag: "Cisco", desc: "위협 분석·보안 추론용 파운데이션 모델(Cisco Foundation AI). 분석·CTI 에이전트 후보." },
     ],
