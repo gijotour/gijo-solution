@@ -205,7 +205,7 @@ tr:last-child td{border-bottom:none;}
         <div class="page-sub">여러 보안 특화 LLM 에이전트가 역할을 나눠 협업하고, 작업을 지시하면 팀이 알아서 처리합니다</div>
       </div>
       <div style="display:flex;gap:8px;">
-        <button class="btn-ghost" id="agentSettingsBtn">에이전트 설정</button><button class="btn-primary" id="addAgentBtn">+ 에이전트 추가</button>
+        <button class="btn-ghost" id="agentSettingsBtn" title="에이전트 이름·모델 설정">에이전트 설정</button><button class="btn-primary" id="addAgentBtn" title="보안 에이전트 8종은 역할 고정 — 이름·모델만 커스터마이즈 가능">+ 에이전트 추가</button>
       </div>
     </div>
 
@@ -274,6 +274,20 @@ tr:last-child td{border-bottom:none;}
       <img src="https://gijo.ai/_nuxt/logo_gijo_only_white.ATZVOJtw.svg" alt="GIJO">
       <span>© 2026 GIJO Technology · GIJO AS Platform · Confidential</span>
     </div>
+  </div>
+</div>
+
+<!-- 에이전트 팀 설정 모달 — 8종 역할은 고정, 이름·모델은 여기서 한 곳에서 커스터마이즈한다. -->
+<div id="agentSettingsModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:100;align-items:flex-start;justify-content:center;padding:40px 16px;overflow-y:auto;">
+  <div style="background:var(--panel);border:1px solid var(--border-strong);border-radius:14px;width:100%;max-width:720px;padding:22px 24px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:6px;">
+      <div style="font-size:17px;font-weight:800;color:#fff;">에이전트 팀 설정</div>
+      <span id="agentSettingsClose" style="cursor:pointer;color:var(--muted);font-size:18px;">✕</span>
+    </div>
+    <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:16px;">
+      보안 에이전트 <b>8종은 역할이 고정</b>되어 있어 추가·삭제할 수 없습니다. 대신 각 에이전트의 <b style="color:var(--blue-light)">표시 이름</b>과 <b style="color:var(--blue-light)">사용 모델</b>을 팀에 맞게 바꿀 수 있습니다(모델 변경은 관리자만).
+    </div>
+    <div id="agentSettingsBody" style="display:flex;flex-direction:column;gap:10px;">불러오는 중...</div>
   </div>
 </div>
 
@@ -495,6 +509,67 @@ tr:last-child td{border-bottom:none;}
     }
   }
 
+  // ── 에이전트 팀 설정 모달 ──────────────────────────────────────────
+  // 8종 역할은 서버 고정. 여기서 표시 이름·사용 모델을 한 곳에서 바꾼다(기존 카드 편집과 같은 API).
+  function agentSettingRow(a) {
+    const style = AGENT_STYLE[a.id] || { icon: "●", color: "var(--muted)", bg: "var(--panel-2)" };
+    const modelOpts = [`<option value="">전역 모델 따름</option>`]
+      .concat(availableModels.map((m) => `<option value="${m.id}" ${a.assignedModelId === m.id ? "selected" : ""}>${esc(m.id)}</option>`))
+      .join("");
+    const renamed = a.name !== a.defaultName;
+    return (
+      `<div style="display:flex;gap:10px;align-items:center;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;flex-wrap:wrap;">` +
+      `<div class="agent-icon" style="width:30px;height:30px;font-size:14px;background:${style.bg};color:${style.color}">${style.icon}</div>` +
+      `<div style="flex:1;min-width:130px;">` +
+      `<input class="as-name" data-agent="${a.id}" value="${esc(a.name)}" placeholder="${esc(a.defaultName)}" style="width:100%;background:var(--panel);border:1px solid var(--border-strong);border-radius:6px;padding:6px 9px;color:#fff;font-size:12.5px;font-weight:700;outline:none;">` +
+      `<div style="font-size:10.5px;color:var(--muted-2);margin-top:3px;">${esc(a.role)}${renamed ? ` · 기본: ${esc(a.defaultName)}` : ""}</div>` +
+      `</div>` +
+      `<select class="as-model" data-agent="${a.id}" ${isAdmin ? "" : "disabled"} style="min-width:180px;background:var(--panel);border:1px solid var(--border-strong);border-radius:6px;padding:6px 8px;color:var(--text);font-size:11px;outline:none;">${modelOpts}</select>` +
+      (renamed ? `<button class="rec-btn" data-reset="${a.id}" style="margin-left:0">이름 초기화</button>` : "") +
+      `</div>`
+    );
+  }
+
+  async function openAgentSettings() {
+    const modal = document.getElementById("agentSettingsModal");
+    const body = document.getElementById("agentSettingsBody");
+    modal.style.display = "flex";
+    body.textContent = "불러오는 중...";
+    try {
+      const [agents, models] = await Promise.all([window.gijo.listAgents(), window.gijo.listModels().catch(() => [])]);
+      availableModels = models;
+      body.innerHTML = agents.map(agentSettingRow).join("");
+    } catch (e) {
+      body.innerHTML = '<div style="color:#f5928a">불러오지 못했습니다: ' + e.message + "</div>";
+    }
+  }
+
+  function closeAgentSettings() {
+    document.getElementById("agentSettingsModal").style.display = "none";
+    loadAgents(); // 모달에서 바꾼 내용을 카드에도 반영
+  }
+
+  async function onAgentSettingsAction(e) {
+    const body = document.getElementById("agentSettingsBody");
+    // 이름 초기화
+    const resetId = e.target.dataset.reset;
+    if (resetId) {
+      try { await window.gijo.setAgentName(resetId, null); await openAgentSettings(); } catch (err) { alert("초기화 실패: " + err.message); }
+      return;
+    }
+    // 모델 변경
+    if (e.target.classList.contains("as-model")) {
+      const id = e.target.dataset.agent;
+      e.target.disabled = true;
+      try { await window.gijo.setAgentModel(id, e.target.value || null); } catch (err) { alert("모델 할당 실패: " + err.message); }
+      e.target.disabled = false;
+    }
+  }
+
+  async function commitAgentName(input) {
+    try { await window.gijo.setAgentName(input.dataset.agent, input.value.trim() || null); } catch (err) { alert("이름 변경 실패: " + err.message); }
+  }
+
   async function loadTaskKpis() {
     try {
       const tasks = await window.gijo.listTasks();
@@ -713,8 +788,18 @@ tr:last-child td{border-bottom:none;}
     document.getElementById("clearFeedBtn").addEventListener("click", () => {
       chatFeed.innerHTML = '<div style="color:var(--muted);font-size:12px">지워졌습니다 (서버 이력은 유지됩니다)</div>';
     });
-    document.getElementById("agentSettingsBtn").addEventListener("click", () => alert("에이전트 설정 기능은 아직 구현되지 않았습니다."));
-    document.getElementById("addAgentBtn").addEventListener("click", () => alert("에이전트 추가 기능은 아직 구현되지 않았습니다 — 현재 8종 보안 에이전트는 서버에 고정 정의되어 있습니다."));
+    // 두 버튼 모두 팀 설정 모달을 연다. "추가"는 역할이 고정이라 실제 추가는 없고, 모달이
+    // "8종 고정 · 이름/모델 커스터마이즈 가능"을 안내한다(가짜 추가 대신 정직한 안내).
+    document.getElementById("agentSettingsBtn").addEventListener("click", openAgentSettings);
+    document.getElementById("addAgentBtn").addEventListener("click", openAgentSettings);
+    document.getElementById("agentSettingsClose").addEventListener("click", closeAgentSettings);
+    const settingsModal = document.getElementById("agentSettingsModal");
+    settingsModal.addEventListener("click", (e) => { if (e.target === settingsModal) closeAgentSettings(); });
+    const settingsBody = document.getElementById("agentSettingsBody");
+    settingsBody.addEventListener("change", onAgentSettingsAction); // 모델 select
+    settingsBody.addEventListener("click", onAgentSettingsAction);  // 이름 초기화
+    settingsBody.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.classList.contains("as-name")) e.target.blur(); });
+    settingsBody.addEventListener("blur", (e) => { if (e.target.classList.contains("as-name")) commitAgentName(e.target); }, true);
   }
 
   if (!window.gijo.isAuthenticated()) {
