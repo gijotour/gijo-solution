@@ -50,6 +50,40 @@ describe("vulnscan (Tenable Nessus 등 취약점 스캔 결과 업로드)", () =
     expect(host5!.findings.some((f) => f.severity === "medium")).toBe(true);
   });
 
+  it("collapses Nessus CVE-duplicated rows into one finding per plugin, keeping every CVE", () => {
+    // Nessus는 플러그인 1건을 CVE 개수만큼 행으로 복제해 내보낸다(같은 Plugin ID/Name/Risk).
+    const csv =
+      "Plugin ID,CVE,Risk,Host,Name,Synopsis\n" +
+      "189165,CVE-2022-21432,Medium,10.0.0.5,Oracle DB (January 2024 CPU),패치 누락\n" +
+      "189165,CVE-2023-38545,Medium,10.0.0.5,Oracle DB (January 2024 CPU),패치 누락\n" +
+      "189165,CVE-2023-38546,Medium,10.0.0.5,Oracle DB (January 2024 CPU),패치 누락\n" +
+      "12345,CVE-2021-44228,Critical,10.0.0.5,Apache Log4j RCE,Log4Shell\n";
+    const result = importVulnScan(csv, "csv", "nessus");
+
+    expect(result.rows).toBe(4); // 원본 행
+    expect(result.findings).toBe(2); // 실제 취약점(플러그인) — 부풀림 제거
+    const host = getAsset("vuln:10.0.0.5")!;
+    expect(host.findings).toHaveLength(2);
+
+    const oracle = host.findings.find((f) => f.finding_type.startsWith("Oracle DB"))!;
+    expect(oracle.finding_type).toBe("Oracle DB (January 2024 CPU) (CVE-2022-21432 외 2건)");
+    // 대표 CVE만 제목에 쓰되 전체 목록은 evidence에 남아야 추적이 된다
+    expect(oracle.evidence).toContain("CVE(3):");
+    expect(oracle.evidence).toContain("CVE-2023-38546");
+    expect(oracle.severity).toBe("medium");
+
+    const log4j = host.findings.find((f) => f.finding_type.startsWith("Apache Log4j"))!;
+    expect(log4j.finding_type).toBe("Apache Log4j RCE (CVE-2021-44228)"); // 단일 CVE는 그대로
+    expect(log4j.severity).toBe("critical");
+  });
+
+  it("falls back to the finding name when the tool has no plugin id", () => {
+    const csv = "Host,Name,Risk,CVE\n" + "h,같은 취약점,High,CVE-1\n" + "h,같은 취약점,High,CVE-2\n" + "h,다른 취약점,Low,\n";
+    const result = importVulnScan(csv, "csv", "s");
+    expect(result.rows).toBe(3);
+    expect(result.findings).toBe(2); // 이름이 같으면 한 건으로 합침
+  });
+
   it("maps risk strings to severities (critical/high/medium/low, none→low)", () => {
     const csv = "Host,Name,Risk\nh,a,High\nh,b,None\nh,c,Moderate\n";
     importVulnScan(csv, "csv", "s");

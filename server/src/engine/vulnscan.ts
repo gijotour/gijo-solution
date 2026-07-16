@@ -14,7 +14,8 @@ import type { StandardFinding } from "./bridge";
 
 export interface VulnScanResult {
   hosts: number;
-  findings: number;
+  findings: number; // 실제 취약점 수 (플러그인 기준 중복 제거 후)
+  rows: number; // 원본 행 수 — Nessus는 CVE마다 행을 복제하므로 findings보다 클 수 있다
   assets: Asset[];
 }
 
@@ -25,6 +26,9 @@ const ALIASES = {
   risk: ["risk", "risk_factor", "severity", "criticality"],
   cve: ["cve", "cve_id", "cves"],
   description: ["description", "synopsis", "plugin_output", "details"],
+  // 취약점 1건의 식별자. Nessus CSV는 CVE마다 행을 복제하므로(플러그인 1개에 CVE 17개면 17행),
+  // 이 값으로 합쳐야 건수가 실제와 맞는다.
+  pluginId: ["plugin_id", "pluginid", "check_id", "rule_id", "test_id"],
 };
 
 // Nessus Risk Factor / 일반 severity 문자열 → StandardFinding severity
@@ -90,6 +94,7 @@ export interface ParsedVuln {
   risk: string;
   cve: string;
   description: string;
+  pluginId: string;
 }
 
 export function parseVulnReport(content: string, format: "json" | "csv"): ParsedVuln[] {
@@ -101,8 +106,17 @@ export function parseVulnReport(content: string, format: "json" | "csv"): Parsed
       risk: pick(row, ALIASES.risk),
       cve: pick(row, ALIASES.cve),
       description: pick(row, ALIASES.description),
+      pluginId: pick(row, ALIASES.pluginId),
     }))
     .filter((v) => v.host && v.name); // 호스트·항목명 없는 행은 무시
+}
+
+// 취약점 1건의 표시명: 이름 + CVE. CVE가 여러 개면 대표 1개 + 나머지 개수로 줄인다.
+// 항목명에 이미 그 CVE가 들어 있으면(Nessus 플러그인 이름에 흔함) 덧붙이지 않는다.
+function findingLabel(name: string, cves: string[]): string {
+  if (cves.length === 0) return name;
+  if (cves.length === 1) return name.includes(cves[0]) ? name : `${name} (${cves[0]})`;
+  return `${name} (${cves[0]} 외 ${cves.length - 1}건)`;
 }
 
 export function importVulnScan(content: string, format: "json" | "csv", sourceLabel: string): VulnScanResult {
@@ -115,6 +129,7 @@ export function importVulnScan(content: string, format: "json" | "csv", sourceLa
   }
 
   const assets: Asset[] = [];
+  let totalFindings = 0;
   for (const [host, vulns] of byHost) {
     const id = `vuln:${host}`;
     registerAsset({
@@ -125,18 +140,35 @@ export function importVulnScan(content: string, format: "json" | "csv", sourceLa
       owner: sourceLabel,
       components: [],
     });
-    const findings: StandardFinding[] = vulns
-      // info/none 등급이면서 취약점명이 사실상 정보성인 것도 일단 기록(필터는 UI에서).
-      .map((v) => ({
-        finding_type: v.cve ? `${v.name} (${v.cve})` : v.name,
-        severity: toSeverity(v.risk),
-        evidence: v.description || `${host} — ${v.name}`,
+
+    // Nessus CSV는 플러그인(취약점) 1건을 CVE 개수만큼 행으로 복제해 내보낸다 — 그대로 세면
+    // 건수가 몇 배로 부풀려진다(실측: 1,171행 = 실제 282건). 플러그인 id(없으면 항목명)로 합치고
+    // CVE는 한 건에 모아 붙인다. EPSS/VPR도 플러그인 단위 점수라 CVE별로 나누는 게 의미가 없다.
+    const byVuln = new Map<string, { rep: ParsedVuln; cves: Set<string> }>();
+    for (const v of vulns) {
+      const key = v.pluginId || v.name;
+      if (!byVuln.has(key)) byVuln.set(key, { rep: v, cves: new Set<string>() });
+      if (v.cve) byVuln.get(key)!.cves.add(v.cve);
+    }
+
+    const findings: StandardFinding[] = [...byVuln.values()].map(({ rep, cves }) => {
+      const list = [...cves].sort();
+      // 요약에는 대표 CVE만 쓰되, 전체 목록은 evidence에 남겨 추적성을 잃지 않는다.
+      const evidence = [rep.description || `${host} — ${rep.name}`, list.length > 1 ? `CVE(${list.length}): ${list.join(", ")}` : ""]
+        .filter(Boolean)
+        .join("\n");
+      return {
+        finding_type: findingLabel(rep.name, list),
+        severity: toSeverity(rep.risk),
+        evidence,
         source_tool: sourceLabel,
-      }));
+      };
+    });
+    totalFindings += findings.length;
     const asset = recordFindings(id, findings);
     if (asset) assets.push(asset);
   }
-  return { hosts: byHost.size, findings: parsed.length, assets };
+  return { hosts: byHost.size, findings: totalFindings, rows: parsed.length, assets };
 }
 
 export function registerVulnScanRoutes(app: Express): void {

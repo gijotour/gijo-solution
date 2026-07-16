@@ -226,7 +226,9 @@ tr:last-child td{border-bottom:none;}
       status.textContent = "분석 중...";
       status.style.color = "var(--muted)";
       const r = await window.gijo.importVulnScan(text, format, source);
-      status.textContent = `✓ ${r.hosts}개 호스트 · 취약점 ${r.findings}건을 등록했습니다.`;
+      // Nessus는 CVE마다 행을 복제하므로 원본 행 수와 실제 취약점 수가 다르다 — 둘 다 보여준다.
+      const dedup = r.rows && r.rows > r.findings ? ` (원본 ${r.rows.toLocaleString()}행 → CVE 중복 제거)` : "";
+      status.textContent = `✓ ${r.hosts}개 호스트 · 취약점 ${r.findings.toLocaleString()}건을 등록했습니다.${dedup}`;
       status.style.color = "var(--teal)";
       await refresh();
     } catch (err) {
