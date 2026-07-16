@@ -86,6 +86,17 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .maint-report-form textarea{flex:1;min-width:200px;min-height:50px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:8px 10px;color:var(--text);font-size:12px;font-family:inherit;resize:vertical;}
 .maint-report-form input[type=file]{font-size:11px;color:var(--muted);max-width:220px;}
 .maint-report-form button{background:var(--blue);color:#fff;border:none;border-radius:7px;padding:0 14px;font-size:11.5px;font-weight:800;cursor:pointer;}
+/* 이력 타임라인 */
+.maint-timeline{margin-top:12px;padding-left:6px;border-left:2px solid var(--border);display:flex;flex-direction:column;gap:12px;}
+.tl-event{position:relative;padding-left:16px;}
+.tl-event::before{content:"";position:absolute;left:-7px;top:3px;width:10px;height:10px;border-radius:50%;background:var(--muted-2);border:2px solid var(--panel);}
+.tl-event.created::before{background:var(--blue-light);}
+.tl-event.reported::before{background:var(--amber);}
+.tl-event.approved::before{background:var(--teal);}
+.tl-event.rejected::before{background:#f5928a;}
+.tl-head{font-size:12px;font-weight:800;color:#fff;}
+.tl-meta{font-size:11px;color:var(--muted-2);margin-top:1px;}
+.tl-note{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.6;}
 </style>
 </head>
 <body>
@@ -314,11 +325,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     let actions = "";
     if (m.status === "scheduled") {
       actions = `<button class="maint-btn" data-action="report-open" data-id="${m.id}">점검 결과 등록</button>`;
+    } else if (m.status === "rejected") {
+      actions = `<button class="maint-btn" data-action="report-open" data-id="${m.id}">재점검 보고</button>`;
     } else if (m.status === "reported" && isAdmin) {
       actions =
         `<button class="maint-btn ok" data-action="approve" data-id="${m.id}">승인</button>` +
         `<button class="maint-btn danger" data-action="reject" data-id="${m.id}">반려</button>`;
     }
+    // 이력 토글은 모든 항목에 제공한다(등록→보고→승인/반려 감사 추적).
+    actions += `<button class="maint-btn" data-action="history-toggle" data-id="${m.id}">이력</button>`;
     const detail = [];
     if (m.reportNote) {
       detail.push(
@@ -344,8 +359,37 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       `<button data-action="report-submit" data-id="${m.id}">제출</button>` +
       `<button data-action="report-cancel" data-id="${m.id}">취소</button>` +
       `</div>` +
+      `<div class="maint-timeline" id="timeline-${m.id}" style="display:none"></div>` +
       `</div>`
     );
+  }
+
+  // 이벤트 타입별 라벨/아이콘 — 타임라인 렌더링용.
+  const EVENT_LABEL = { created: "일정 등록", reported: "점검 결과 보고", approved: "승인", rejected: "반려" };
+  const EVENT_ICON = { created: "🗓", reported: "📋", approved: "✓", rejected: "✗" };
+  function fmtEventTime(ts) {
+    return new Date(ts).toLocaleString("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+  }
+  async function renderTimeline(id) {
+    const box = document.getElementById(`timeline-${id}`);
+    box.innerHTML = '<div style="color:var(--muted);font-size:11.5px">이력 불러오는 중...</div>';
+    try {
+      const events = await window.gijo.getMaintenanceHistory(id);
+      box.innerHTML = events.length
+        ? events
+            .map(
+              (e) =>
+                `<div class="tl-event ${e.event}">` +
+                `<div class="tl-head">${EVENT_ICON[e.event] || "•"} ${EVENT_LABEL[e.event] || e.event}</div>` +
+                `<div class="tl-meta">${fmtEventTime(e.at)}${e.actor ? " · " + esc(e.actor) : ""}</div>` +
+                (e.note ? `<div class="tl-note">${esc(e.note)}</div>` : "") +
+                `</div>`
+            )
+            .join("")
+        : '<div style="color:var(--muted-2);font-size:11.5px">기록된 이력이 없습니다.</div>';
+    } catch (err) {
+      box.innerHTML = '<div style="color:#f5928a;font-size:11.5px">이력을 불러오지 못했습니다: ' + ((err && err.message) || err) + "</div>";
+    }
   }
 
   // 점검 목록 데이터로 상단 KPI 스트립을 채운다 — 추가 서버 호출 없이 클라이언트에서 집계.
@@ -399,7 +443,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     if (!btn) return;
     const action = btn.dataset.action;
     const id = btn.dataset.id;
-    if (action === "report-open") {
+    if (action === "history-toggle") {
+      const box = document.getElementById(`timeline-${id}`);
+      if (box.style.display === "none") {
+        box.style.display = "flex";
+        renderTimeline(id);
+      } else {
+        box.style.display = "none";
+      }
+    } else if (action === "report-open") {
       document.getElementById(`report-form-${id}`).style.display = "flex";
     } else if (action === "report-cancel") {
       document.getElementById(`report-form-${id}`).style.display = "none";

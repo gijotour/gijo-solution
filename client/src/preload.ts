@@ -60,6 +60,7 @@ const gijoApi = {
     api.maintenanceApi.report(id, args),
   approveMaintenance: (id: string) => api.maintenanceApi.approve(id),
   rejectMaintenance: (id: string, reason: string) => api.maintenanceApi.reject(id, reason),
+  getMaintenanceHistory: (id: string) => api.maintenanceApi.history(id),
 
   // 자산 인벤토리
   listAssets: () => api.assetsApi.list(),

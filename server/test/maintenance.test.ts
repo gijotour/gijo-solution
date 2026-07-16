@@ -124,6 +124,55 @@ describe("maintenance (유지보수 일정 · 점검서 · 승인)", () => {
     expect(due.body[0].title).toBe("오늘 마감");
   });
 
+  it("records a status-change history timeline (created -> reported -> approved) in order", async () => {
+    const item = await createItem({ title: "이력 점검", intervalDays: 90 });
+    await request(app).post(`/api/maintenance/${item.id}/report`).set(auth(adminToken)).send({ note: "점검 결과 메모" });
+    await request(app).post(`/api/maintenance/${item.id}/approve`).set(auth(adminToken));
+
+    const hist = await request(app).get(`/api/maintenance/${item.id}/history`).set(auth(adminToken));
+    expect(hist.status).toBe(200);
+    expect(hist.body.map((e: { event: string }) => e.event)).toEqual(["created", "reported", "approved"]);
+    // 이벤트는 시간순(at ASC)으로 정렬돼야 한다
+    const times = hist.body.map((e: { at: number }) => e.at);
+    expect([...times].sort((a, b) => a - b)).toEqual(times);
+    // 보고 이벤트에 메모와 수행자가 실린다
+    const reported = hist.body.find((e: { event: string }) => e.event === "reported");
+    expect(reported.note).toBe("점검 결과 메모");
+    expect(reported.actor).toBe("정요한");
+  });
+
+  it("allows re-reporting after rejection and captures the whole cycle in history", async () => {
+    const item = await createItem();
+    await request(app).post(`/api/maintenance/${item.id}/report`).set(auth(adminToken)).send({ note: "1차 점검" });
+    await request(app).post(`/api/maintenance/${item.id}/reject`).set(auth(adminToken)).send({ reason: "범위 부족" });
+
+    // 반려된 항목을 다시 보고할 수 있어야 한다(재점검)
+    const reReport = await request(app).post(`/api/maintenance/${item.id}/report`).set(auth(adminToken)).send({ note: "2차 재점검" });
+    expect(reReport.status).toBe(200);
+    expect(reReport.body.status).toBe("reported");
+    // 재보고 시 이전 반려 검토 기록은 지워진다("최신" 필드가 새 보고를 가리킴)
+    expect(reReport.body.reviewNote).toBeUndefined();
+
+    const approved = await request(app).post(`/api/maintenance/${item.id}/approve`).set(auth(adminToken));
+    expect(approved.body.status).toBe("approved");
+
+    const hist = await request(app).get(`/api/maintenance/${item.id}/history`).set(auth(adminToken));
+    expect(hist.body.map((e: { event: string }) => e.event)).toEqual([
+      "created",
+      "reported",
+      "rejected",
+      "reported",
+      "approved",
+    ]);
+  });
+
+  it("history is empty for an unknown id and requires auth", async () => {
+    const empty = await request(app).get("/api/maintenance/no-such-id/history").set(auth(adminToken));
+    expect(empty.status).toBe(200);
+    expect(empty.body).toEqual([]);
+    expect((await request(app).get("/api/maintenance/x/history")).status).toBe(401);
+  });
+
   it("requires auth", async () => {
     expect((await request(app).get("/api/maintenance")).status).toBe(401);
     expect((await request(app).post("/api/maintenance")).status).toBe(401);

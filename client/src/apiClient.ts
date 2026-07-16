@@ -174,6 +174,15 @@ export interface MaintenanceItem {
   updatedAt: number;
 }
 
+export interface MaintenanceEvent {
+  id: string;
+  itemId: string;
+  event: "created" | "reported" | "approved" | "rejected";
+  actor?: string;
+  note?: string;
+  at: number;
+}
+
 export const maintenanceApi = {
   list: () => request<MaintenanceItem[]>("/api/maintenance"),
   due: () => request<MaintenanceItem[]>("/api/maintenance/due"),
@@ -184,6 +193,7 @@ export const maintenanceApi = {
   approve: (id: string) => request<MaintenanceItem>(`/api/maintenance/${id}/approve`, { method: "POST" }),
   reject: (id: string, reason: string) =>
     request<MaintenanceItem>(`/api/maintenance/${id}/reject`, { method: "POST", body: { reason } }),
+  history: (id: string) => request<MaintenanceEvent[]>(`/api/maintenance/${id}/history`),
 };
 
 // ── 협업 로그 ─────────────────────────────────────────────────────────

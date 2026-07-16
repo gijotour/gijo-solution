@@ -133,6 +133,19 @@ db.exec(`
     createdAt INTEGER NOT NULL,
     updatedAt INTEGER NOT NULL
   );
+
+  -- 점검 상태 변경 이력(감사 추적). append-only — 한 항목의 등록→보고→승인/반려 전이를 시간순으로
+  -- 남긴다(assets.ts의 scan_runs와 같은 "부모=최신상태 + 자식=이벤트 로그" 패턴). event는
+  -- created | reported | approved | rejected. actor는 수행자 표시명, note는 보고 메모/반려 사유.
+  CREATE TABLE IF NOT EXISTS maintenance_events (
+    id TEXT PRIMARY KEY,
+    itemId TEXT NOT NULL REFERENCES maintenance_items(id),
+    event TEXT NOT NULL,
+    actor TEXT,
+    note TEXT,
+    at INTEGER NOT NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_maintenance_events_itemId ON maintenance_events(itemId);
 `);
 
 db.exec(`
