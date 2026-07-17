@@ -19,6 +19,10 @@ export interface ChatArgs {
   // true면 단기 기억(대화 이력)과 장기 기억(RAG) 자동 주입을 켠다 — 대화형 채팅 라우트 전용.
   // dispatcher/analysis 같은 프로그램적 단발 호출은 기본값(false)으로 이력에 끼어들지 않는다.
   remember?: boolean;
+  // 지정 시 llama.cpp json_schema 강제 디코딩 — 출력이 스키마에 맞는 JSON임을 샘플러 수준에서
+  // 보장한다(에이전트 루프의 도구 선택 등). 이 경로는 결정 호출이므로 temperature 0으로 고정하고,
+  // 인사말 제거·중국어 재생성 후처리를 건너뛴다(JSON을 훼손할 수 있으므로).
+  responseSchema?: unknown;
 }
 
 // ── 단기 기억: 에이전트별 최근 대화 이력 ─────────────────────────────────────
@@ -187,10 +191,14 @@ export async function chat(args: ChatArgs): Promise<string> {
 
   emitLlmActivity({ kind: "chat", phase: "start", agent: agentName, detail: "추론 요청" });
 
+  // json_schema와 grammar는 llama.cpp에서 동시에 못 쓴다 — 스키마 강제 시 스키마가 우선.
+  const constrained = args.responseSchema
+    ? { json_schema: args.responseSchema, temperature: 0 }
+    : { grammar: NO_HAN_GRAMMAR };
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "local", messages, grammar: NO_HAN_GRAMMAR, ...(args.maxTokens ? { max_tokens: args.maxTokens } : {}) }),
+    body: JSON.stringify({ model: "local", messages, ...constrained, ...(args.maxTokens ? { max_tokens: args.maxTokens } : {}) }),
     signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
   }).catch((err: unknown) => ((err as Error)?.name === "TimeoutError" ? ("timeout" as const) : null));
 
@@ -213,6 +221,22 @@ export async function chat(args: ChatArgs): Promise<string> {
     timings?: { predicted_per_second?: number };
   };
   const rawContent = data.choices?.[0]?.message?.content ?? "";
+
+  // 스키마 강제 응답은 JSON 그대로 반환 — 후처리(서두 제거·중국어 재생성)가 JSON을 훼손하면 안 된다.
+  if (args.responseSchema) {
+    emitLlmActivity({
+      kind: "chat",
+      phase: "done",
+      agent: agentName,
+      model: modelBasename(data.model),
+      promptTokens: data.usage?.prompt_tokens,
+      completionTokens: data.usage?.completion_tokens,
+      latencyMs: Date.now() - started,
+      detail: "구조화 응답 완료",
+    });
+    return rawContent.trim();
+  }
+
   let reply = stripLeadingPreamble(rawContent);
 
   // 중국어 드리프트 감지 시 한국어 강제로 1회 재생성하고 더 깨끗한(한자 적은) 쪽을 채택한다.

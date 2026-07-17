@@ -11,6 +11,7 @@ import { setAgentStatus, resetAgentToDefault, getAgentById } from "./agents";
 import { emitCollaboration } from "./collaboration";
 import { runAdapter, StandardFinding } from "./bridge";
 import { chat } from "./llm";
+import { runAgentLoop, AgentToolCall } from "./agentloop";
 import { analyzeFindings } from "./analysis";
 import { recordFindings, getAsset, listAssets } from "./assets";
 import { listFindings } from "./cti";
@@ -22,6 +23,7 @@ export interface DispatchResult {
   route: RoutedIntent;
   output: string;
   steps?: StepResult[]; // 복합(멀티스텝) 지시일 때 각 단계 결과
+  toolCalls?: AgentToolCall[]; // 에이전트 루프가 실행한 도구 내역(화면 표시용)
   // 학습 루프 실행 요청 시: 바로 실행하지 않고 화면의 명시적 확인 버튼으로만 시작(오발동 방지).
   confirm?: { type: "learnloop"; datasets: { id: string; examples: number }[] };
 }
@@ -99,6 +101,7 @@ function priorityForFindings(findings: StandardFinding[]): TaskItem["priority"] 
 interface ActionResult {
   output: string;
   findings?: StandardFinding[];
+  toolCalls?: AgentToolCall[];
 }
 
 async function executeRoutedAction(route: RoutedIntent, instructionText: string): Promise<ActionResult> {
@@ -117,6 +120,12 @@ async function executeRoutedAction(route: RoutedIntent, instructionText: string)
     case "report":
     case "chat":
     default: {
+      // chat 지시는 에이전트 루프를 먼저 시도한다 — 등록된 도구(자산 조회 등)로 실데이터 근거
+      // 답변을 만들 수 있으면 그 결과를, 아니면(null) 기존 채팅으로 폴백(회귀 없음).
+      if (route.action === "chat") {
+        const loop = await runAgentLoop(instructionText).catch(() => null);
+        if (loop) return { output: loop.output, toolCalls: loop.toolCalls };
+      }
       // 모델 로드·선택은 chat() 내부(ensureAgentModel)에서 처리된다.
       return { output: await chat({ agentId: route.agentId, message: instructionText, remember: true }) };
     }
@@ -285,9 +294,11 @@ export async function dispatchInstruction(instructionText: string): Promise<Disp
   emitCollaboration({ from: "orchestrator", to: route.agentId, message: `작업 할당: "${instructionText}"` });
 
   let output: string;
+  let toolCalls: AgentToolCall[] | undefined;
   try {
     const result = await executeRoutedAction(route, instructionText);
     output = result.output;
+    toolCalls = result.toolCalls;
     if (result.findings) {
       updateTaskPriority(task.id, priorityForFindings(result.findings));
     }
@@ -300,7 +311,7 @@ export async function dispatchInstruction(instructionText: string): Promise<Disp
   const updatedTasks = completeTask(task.id);
   const completedTask = updatedTasks.find((t) => t.id === task.id) ?? task;
 
-  return { task: completedTask, route, output };
+  return { task: completedTask, route, output, ...(toolCalls ? { toolCalls } : {}) };
 }
 
 export function registerDispatcherRoutes(app: Express): void {
