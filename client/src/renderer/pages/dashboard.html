@@ -849,6 +849,15 @@
     });
     // 로컬 LLM이 실제로 추론/임베딩할 때마다도 작업 중으로 간주해 반짝임을 살린다.
     if (window.gijo.onLlmActivity) window.gijo.onLlmActivity(pulseBusy);
+    // 자산·스캔 변경(asset:updated)이 오면 자산 탐색기·오늘의 조치를 즉시 새로고침 — 스캔 업로드가
+    // 대시보드에 바로 반영되게(수동 새로고침 없이). 잦은 이벤트 대비 300ms 디바운스.
+    if (window.gijo.onAssetUpdated) {
+      let t;
+      window.gijo.onAssetUpdated(() => {
+        clearTimeout(t);
+        t = setTimeout(() => { loadAssets(); loadTodayPriority(); }, 300);
+      });
+    }
   }
 
   if (!window.gijo.isAuthenticated()) {

@@ -71,6 +71,10 @@ describe("llm chat system prompt (한국어 기본 처리)", () => {
     it("응답 전체가 인사/예고뿐이면(뒤 본문 없음) 지우지 않음", () => {
       expect(stripLeadingPreamble("안녕하세요.")).toBe("안녕하세요.");
     });
+    it("제목 라인 뒤 인사말도 제거", () => {
+      expect(stripLeadingPreamble("[제목] 보안 현황 요약\n\n안녕하세요. 취약점 5건입니다.")).toBe("취약점 5건입니다.");
+      expect(stripLeadingPreamble("# 주간 리포트\n안녕하세요. Critical 2건 발견.")).toBe("Critical 2건 발견.");
+    });
   });
 
   it("each defined agent gets its own role in the prompt", () => {

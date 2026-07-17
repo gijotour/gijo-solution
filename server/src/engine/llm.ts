@@ -119,9 +119,20 @@ const GREETING_PREFIX_RE = /^(안녕하세요|안녕히 계세요|안녕|반갑�
 // 응답-메타(답변/보고/작성 등) + 예고 종결. '즉시 패치를 적용하겠습니다' 같은 실제 조치문은 메타어가 없어 보존됨.
 const PREAMBLE_SENTENCE_RE = /(답변|설명|작성|보고|안내|정리|요약|말씀|브리핑|리포트|검토)\S*\s*(을|를|에 대해|에 대한|해)?\s*(드리겠습니다|드릴게요|하겠습니다|할게요|알려드리겠습니다|말씀드리겠습니다|보고드리겠습니다)[.!?]?\s*$/;
 const SELF_INTRO_RE = /^(저는|제가|나는)\s.*(입니다|이에요|예요|담당(합니다|입니다)?)[.!?]?\s*$/;
+// 모델이 붙인 제목/라벨 한 줄('[제목] …', '# …', '**…**', '제목: …') — 리포트 템플릿이 이미 제목을
+// 넣으므로 이 줄을 빼야 그 아래 인사말도 정리된다.
+const TITLE_LINE_RE = /^(\[[^\]\n]{1,20}\][^\n]{0,45}|【[^】\n]{1,20}】[^\n]{0,45}|#{1,6}\s[^\n]{1,45}|\*\*[^*\n]{1,45}\*\*|제목\s*[:：][^\n]{1,45})$/;
 
 export function stripLeadingPreamble(text: string): string {
   let t = (text ?? "").trim();
+  // 제목/라벨 한 줄 제거(뒤에 본문이 있을 때만) → 그 아래 인사말이 선행으로 노출되게.
+  const nlIdx = t.indexOf("\n");
+  if (nlIdx > 0) {
+    const firstLine = t.slice(0, nlIdx).trim();
+    const restLines = t.slice(nlIdx).trim();
+    // 문장부호가 있으면 제목이 아니라 실제 문장일 수 있으니 보존.
+    if (restLines && !/[.!?。]/.test(firstLine) && TITLE_LINE_RE.test(firstLine)) t = restLines;
+  }
   const afterGreet = t.replace(GREETING_PREFIX_RE, "").trim(); // "안녕하세요, 본문" → "본문"
   if (afterGreet) t = afterGreet; // 인사만 있고 뒤 본문이 없으면 원문 유지(빈 응답 방지)
   for (let i = 0; i < 2; i++) {
