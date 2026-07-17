@@ -159,10 +159,13 @@ describe("dispatcher + intent + assets integration", () => {
         .send({ text: "fraud-detect-llm 스캔하고 리포트 작성해줘" });
 
       expect(res.status).toBe(200);
-      expect(res.body.steps).toHaveLength(2);
+      // 스캔 뒤 GIJO Agent(normaltic)가 자동 투입돼 용어·사례를 부연한다(스캔·분석 후 1회, 리포트 전).
+      expect(res.body.steps).toHaveLength(3);
       expect(res.body.steps[0].action).toBe("scan");
       expect(res.body.steps[0].assetIds).toEqual(["fraud-detect-llm"]);
-      expect(res.body.steps[1].action).toBe("report");
+      expect(res.body.steps[1].action).toBe("enrich");
+      expect(res.body.steps[1].output).toBe("[mock] LLM 응답");
+      expect(res.body.steps[2].action).toBe("report");
       expect(res.body.task.done).toBe(true);
       // 스캔이 실제로 자산에 finding을 기록했는지(누적 → 리포트 범위)
       const asset = await request(app).get("/api/assets/fraud-detect-llm").set("Authorization", `Bearer ${token}`);

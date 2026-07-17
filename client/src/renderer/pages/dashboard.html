@@ -314,7 +314,7 @@
         </div>
       </div>
       <div class="agent-dock" id="agentDock">
-        <div class="dock-who" id="dockWho"><div class="dw-i">🧭</div><div><b>오케스트레이터</b><br><span>지시 대상</span></div></div>
+        <div class="dock-who" id="dockWho"><div class="dw-i">🧭</div><div><b>Security Orchestrator</b><br><span>지시 대상</span></div></div>
         <input id="chatInput" placeholder="지시를 입력하세요… 예: fraud-detect-llm 전체 재스캔하고 리포트까지">
         <button class="dock-send" id="dockSend">전송</button>
         <button class="dock-all" id="dockAll">◉ 전체 지시</button>
@@ -348,13 +348,16 @@
   const teamGrid = document.getElementById("teamGrid");
   const dockWho = document.getElementById("dockWho");
   const chatInput = document.getElementById("chatInput");
-  const AGENT_ICON = { orchestrator: "🧭", scan: "⊘", analysis: "◎", report: "▣", normaltic: "📚" };
+  const AGENT_ICON = { orchestrator: "🧭", scan: "⊘", analysis: "◎", report: "▣", ti: "🛰", normaltic: "📚" };
   const STATUS_META = {
     working: { cls: "working", badge: "작업 중", bcls: "tc-work" },
     watching: { cls: "watching", badge: "감시 중", bcls: "tc-watch" },
     idle: { cls: "", badge: "대기", bcls: "tc-idle" },
   };
   let agentsById = {};
+  // 협업 피드·대화 독에서 에이전트 id 대신 표시 이름을 쓴다(팀 커스텀 이름 반영, 로딩 전엔 기본값).
+  const agentLabel = (id) => (agentsById[id] && agentsById[id].name) || id;
+  const orchLabel = () => (agentsById.orchestrator && agentsById.orchestrator.name) || "Security Orchestrator";
   let currentTarget = "orchestrator";
   const todoInput = document.getElementById("todoInput");
 
@@ -753,30 +756,30 @@
   async function sendToOrchestrator(text) {
     pulseBusy();
     markWorking("orchestrator");
-    clBusy("오케스트레이터 작업 중");
-    clAppend("instr", { icon: "정", name: "나 · 팀장 → 오케스트레이터", message: text });
-    const typing = clAppend("typing", { icon: "🧭", name: "오케스트레이터" });
+    clBusy(orchLabel() + " 작업 중");
+    clAppend("instr", { icon: "정", name: `나 · 팀장 → ${orchLabel()}`, message: text });
+    const typing = clAppend("typing", { icon: "🧭", name: orchLabel() });
     try {
       const result = await window.gijo.sendInstruction(text);
       const who = result.route && result.route.agentId && result.route.agentId !== "orchestrator"
-        ? `오케스트레이터 → ${result.route.agentId}` : "오케스트레이터";
+        ? `${orchLabel()} → ${agentLabel(result.route.agentId)}` : orchLabel();
       clReplaceTyping(typing, "reply", { icon: "🧭", name: who, message: result.output });
       // 답변이 "모델 미준비" 안내면 배너도 띄워 두 경로(모델 받기/서버 연결)를 바로 제시.
       const notReady = /모델이 아직 준비|로컬 LLM|localengine/.test(result.output || "");
       if (notReady) modelGuide().style.display = "block";
-      else clOfferReport("오케스트레이터");
+      else clOfferReport(orchLabel());
       await loadTasks();
       if (result.route && result.route.action === "scan") await loadAssets();
       refreshTeamStatus();
     } catch (e) {
-      clReplaceTyping(typing, "error", { icon: "⚠", name: "오케스트레이터", message: e.message });
+      clReplaceTyping(typing, "error", { icon: "⚠", name: orchLabel(), message: e.message });
     }
   }
 
   function greet() {
     const hour = new Date().getHours();
     const greeting = hour < 12 ? "좋은 아침입니다" : hour < 18 ? "안녕하세요" : "좋은 저녁입니다";
-    clAppend("reply", { icon: "🧭", name: "오케스트레이터", message: `${greeting}${displayName ? ", " + displayName + "님" : ""}. 팀원을 고르고 아래 대화 독에서 지시하세요.` });
+    clAppend("reply", { icon: "🧭", name: orchLabel(), message: `${greeting}${displayName ? ", " + displayName + "님" : ""}. 팀원을 고르고 아래 대화 독에서 지시하세요.` });
   }
 
   // ── 시안3: 팀 카드 그리드 + 하단 대화 독 ─────────────────────────────
@@ -786,7 +789,7 @@
     const m = String(a.assignedModelId || "").toLowerCase();
     if (m.includes("merge") || m.includes("lily") || m.includes("zysec") || m.includes("security")) return "보안LLM";
     if (m.includes("gijo") || m.includes("orchestrator")) return "gijo";
-    return (a.id === "scan" || a.id === "analysis") ? "보안LLM" : "gijo";
+    return (a.id === "scan" || a.id === "analysis" || a.id === "ti") ? "보안LLM" : "gijo";
   }
   function tcardHtml(a) {
     const meta = STATUS_META[a.status] || STATUS_META.idle;
@@ -877,7 +880,7 @@
     const to = String(evt.to || "");
     clAppend("event", {
       icon: AGENT_ICON[from] || "◆",
-      name: `${from} → ${to}`,
+      name: `${agentLabel(from)} → ${agentLabel(to)}`,
       message: String(evt.message || ""),
     });
   }
@@ -920,7 +923,9 @@
     await loadUser();
     greet();
     renderExplorer(); // 트리 골격을 먼저 그린 뒤 각 로더가 자식 컨테이너를 채운다
-    await Promise.all([loadHealth(), loadAssets(), loadSecurityProducts(), loadTasks(), loadCollaboration(), loadFiles(), checkModelReady(), loadTodayPriority(), renderTeam()]);
+    // renderTeam을 먼저 끝내 agentsById를 채운다 — 협업 이력(loadCollaboration)이 id 대신 표시 이름을 쓰도록.
+    await renderTeam();
+    await Promise.all([loadHealth(), loadAssets(), loadSecurityProducts(), loadTasks(), loadCollaboration(), loadFiles(), checkModelReady(), loadTodayPriority()]);
     pollGpu();
     setInterval(pollGpu, 2500); // 실 GPU 사용률에 따라 로고 발광 강도 갱신
 

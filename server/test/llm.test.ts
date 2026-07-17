@@ -79,8 +79,9 @@ describe("llm chat system prompt (한국어 기본 처리)", () => {
 
   it("each defined agent gets its own role in the prompt", () => {
     expect(systemPromptFor("analysis")).toContain("우선순위 판단");
-    expect(systemPromptFor("scan")).toContain("스캔 결과");
+    expect(systemPromptFor("scan")).toContain("초기 데이터 해석");
     expect(systemPromptFor("report")).toContain("보고서");
+    expect(systemPromptFor("ti")).toContain("위협 인텔리전스");
   });
 
   it("remember:true carries prior turns into the next call (단기 기억)", async () => {

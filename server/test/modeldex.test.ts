@@ -42,9 +42,9 @@ describe("modeldex (보안 특화 LLM 도감)", () => {
     const recs = getAgentModelRecommendations();
     const guideIds = new Set(LLM_GUIDE.flatMap((c) => c.models).map((m) => m.id));
 
-    it("covers every one of the 5 agents (오케스트레이터·스캔·분석·리포트 + GIJO Security)", () => {
+    it("covers every one of the 6 agents (Security Orchestrator·Scan·Analyze·Report·TI + GIJO Agent)", () => {
       const agentIds = listAgents().map((a) => a.id);
-      expect(agentIds).toHaveLength(5);
+      expect(agentIds).toHaveLength(6);
       for (const id of agentIds) {
         expect(recs[id], `${id} 추천 누락`).toBeDefined();
       }
@@ -59,7 +59,7 @@ describe("modeldex (보안 특화 LLM 도감)", () => {
       }
     });
 
-    it("리포트 에이전트는 한국어 품질 좋은 Qwen2.5를 추천받는다", () => {
+    it("Report Agent는 한국어 품질 좋은 Qwen2.5를 추천받는다", () => {
       expect(recs["report"].id).toBe("bartowski/Qwen2.5-7B-Instruct-GGUF");
     });
 

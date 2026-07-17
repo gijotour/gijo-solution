@@ -36,7 +36,9 @@ export interface OrchestrationStep {
 }
 
 export interface StepResult {
-  action: OrchestrationStep["action"];
+  // enrich = GIJO Agent(normaltic)의 용어 해설·사례 부연 — 계획(planInstruction)에는 없고
+  // 스캔·분석이 끝난 지점에 자동 투입된다(아래 runGijoEnrichment).
+  action: OrchestrationStep["action"] | "enrich";
   label: string;
   output: string;
   assetIds?: string[];
@@ -121,6 +123,31 @@ async function executeRoutedAction(route: RoutedIntent, instructionText: string)
 
 const AGENT_FOR_ACTION: Record<OrchestrationStep["action"], string> = { scan: "scan", analyze: "analysis", report: "report" };
 
+// GIJO Agent(normaltic) 부연 — 스캔·분석 결과에 나온 용어·탐지 항목을 사내 지식베이스(RAG) 근거로
+// 해설하고 실제 사례를 부연한다. 단계마다 부르면 LLM 호출이 배로 늘어 파이프라인이 느려지므로
+// 스캔·분석이 모두 끝난 지점에 1회만 투입한다(2026-07-17 확정). 실패해도 파이프라인은 계속(보조 단계).
+async function runGijoEnrichment(results: StepResult[], fromAgentId: string): Promise<StepResult> {
+  const source = results
+    .filter((r) => r.action === "scan" || r.action === "analyze")
+    .map((r) => `[${r.label}] ${r.output}`)
+    .join("\n")
+    .slice(0, 1500); // 프롬프트 폭주 방지 — 용어 추출에는 앞부분 요약이면 충분
+  setAgentStatus("normaltic", "working");
+  emitCollaboration({ from: fromAgentId, to: "normaltic", message: "스캔·분석 결과 용어 해설·사례 부연 요청" });
+  let output: string;
+  try {
+    output = await chat({
+      agentId: "normaltic",
+      message: `다음 스캔·분석 결과에 나온 보안 용어·탐지 항목을 짧게 해설하고, 사내 지식베이스에 관련 사례가 있으면 부연해줘.\n\n${source}`,
+    });
+  } catch (err) {
+    output = `부연 생략: ${err instanceof Error ? err.message : String(err)}`;
+  }
+  emitCollaboration({ from: "normaltic", to: "orchestrator", message: `부연 완료: ${output.slice(0, 120)}` });
+  resetAgentToDefault("normaltic");
+  return { action: "enrich", label: "용어 해설·사례 부연", output };
+}
+
 // 복합 지시를 순차 실행한다. 각 단계는 협업 로그로 실시간 브로드캐스트되고, 스캔 결과(findings)는
 // 다음 단계(분석·리포트)로 누적 전달된다.
 async function runOrchestration(instructionText: string, steps: OrchestrationStep[], task: TaskItem): Promise<StepResult[]> {
@@ -128,10 +155,19 @@ async function runOrchestration(instructionText: string, steps: OrchestrationSte
   const accumulated: StandardFinding[] = [];
   const scannedAssetIds = new Set<string>();
   // CTI 영향 자산은 한 번만 계산(여러 단계가 참조할 수 있으므로).
+  // CTI ↔ 자산 자동 매칭은 TI Agent 담당 — 위협 인텔 텍스트를 자산 인벤토리(자산명·컴포넌트·CVE·AI-BOM)와
+  // 대조해 영향 자산을 찾고, 결과를 협업 피드로 알린다(매칭 자체는 규칙 엔진 ctimatch가 수행).
   const ctiAffected = async (): Promise<string[]> => {
+    setAgentStatus("ti", "working");
+    emitCollaboration({ from: "orchestrator", to: "ti", message: "CTI ↔ 자산 자동 매칭 요청 — 위협 인텔을 자산 인벤토리와 대조" });
     const findings = await listFindings();
-    return [...new Set(matchCtiToAssets(findings, listAssets()).matches.flatMap((m) => m.matchedAssets.map((a) => a.assetId)))];
+    const ids = [...new Set(matchCtiToAssets(findings, listAssets()).matches.flatMap((m) => m.matchedAssets.map((a) => a.assetId)))];
+    emitCollaboration({ from: "ti", to: "orchestrator", message: ids.length ? `영향 자산 ${ids.length}개 매칭: ${ids.join(", ").slice(0, 100)}` : "영향 자산 없음 — 현재 CTI 위협과 매칭되는 자산이 없습니다" });
+    resetAgentToDefault("ti");
+    return ids;
   };
+  // GIJO 부연을 끼워 넣을 지점: 마지막 스캔/분석 단계 직후(리포트보다 앞 — 해설→보고 순서).
+  const lastInterpretIdx = steps.reduce((last, s, idx) => (s.action === "scan" || s.action === "analyze" ? idx : last), -1);
 
   for (let i = 0; i < steps.length; i++) {
     const step = steps[i];
@@ -178,6 +214,12 @@ async function runOrchestration(instructionText: string, steps: OrchestrationSte
     emitCollaboration({ from: agentId, to: "orchestrator", message: `단계 ${i + 1} 완료: ${output.slice(0, 120)}` });
     resetAgentToDefault(agentId);
     results.push({ action: step.action, label: step.label, output, assetIds, findingCount });
+
+    // 마지막 스캔/분석 단계가 끝나면 GIJO Agent가 결과 용어·사례를 부연한다.
+    // 부연할 거리가 없으면(스캔 finding 0건 + 분석 단계도 없음) 건너뛴다.
+    if (i === lastInterpretIdx && (accumulated.length > 0 || step.action === "analyze")) {
+      results.push(await runGijoEnrichment(results, agentId));
+    }
   }
 
   // 스캔 결과가 있으면 태스크 우선순위를 최고 심각도로 갱신.

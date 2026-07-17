@@ -117,6 +117,7 @@ tr:last-child td{border-bottom:none;}
 .agent-icon{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
 .agent-name{font-size:13.5px;font-weight:800;color:#fff;}
 .agent-role{font-size:11px;color:var(--muted);margin-top:1px;}
+.agent-desc{font-size:11px;color:var(--muted);line-height:1.55;margin:8px 0 10px;}
 .agent-model{font-size:11px;color:var(--muted-2);margin-top:8px;padding-top:8px;border-top:1px solid var(--border);}
 .agent-rec{margin-top:8px;font-size:11px;color:var(--muted);line-height:1.5;}
 .agent-rec .rec-head{display:flex;align-items:center;gap:6px;flex-wrap:wrap;}
@@ -201,7 +202,7 @@ tr:last-child td{border-bottom:none;}
 
 <div class="panel">
   <div class="panel-title">우리 팀 — 보안 에이전트 로스터</div>
-  <div class="panel-sub">각 에이전트는 역할에 맞는 전용 모델을 사용하며, 오케스트레이터가 작업을 나누고 결과를 취합합니다</div>
+  <div class="panel-sub">각 에이전트는 역할에 맞는 전용 모델을 사용합니다. Security Orchestrator가 작업을 나누면 Scan → Analyze 결과를 GIJO Agent가 사내 지식으로 부연하고 Report Agent가 보고서로 정리하며, TI Agent는 CTI 위협을 상시 모니터링해 영향 자산을 알립니다</div>
   <div class="agent-grid" id="agentGrid">
     <div style="color:var(--muted)">불러오는 중...</div>
   </div>
@@ -262,7 +263,7 @@ tr:last-child td{border-bottom:none;}
       <span id="agentSettingsClose" style="cursor:pointer;color:var(--muted);font-size:18px;">✕</span>
     </div>
     <div style="font-size:12px;color:var(--muted);line-height:1.6;margin-bottom:16px;">
-      각 에이전트의 <b>역할은 고정</b>되어 있어 추가·삭제할 수 없습니다. 대신 각 에이전트의 <b style="color:var(--blue-light)">표시 이름</b>과 <b style="color:var(--blue-light)">사용 모델</b>을 팀에 맞게 바꿀 수 있습니다(모델 변경은 관리자만). 예: 분석 에이전트의 이름을 “위협분석관”처럼.
+      각 에이전트의 <b>역할은 고정</b>되어 있어 추가·삭제할 수 없습니다. 대신 각 에이전트의 <b style="color:var(--blue-light)">표시 이름</b>과 <b style="color:var(--blue-light)">사용 모델</b>을 팀에 맞게 바꿀 수 있습니다(모델 변경은 관리자만). 예: Analyze Agent의 이름을 “위협분석관”처럼.
     </div>
     <div id="agentSettingsBody" style="display:flex;flex-direction:column;gap:10px;">불러오는 중...</div>
   </div>
@@ -284,6 +285,7 @@ tr:last-child td{border-bottom:none;}
     analysis: { icon: "◈", color: "var(--amber)", bg: "rgba(240,160,32,0.18)" },
     sbom: { icon: "▢", color: "var(--teal)", bg: "rgba(30,185,128,0.18)" },
     cti: { icon: "◎", color: "var(--blue-light)", bg: "rgba(59,130,246,0.18)" },
+    ti: { icon: "🛰", color: "var(--blue-light)", bg: "rgba(59,130,246,0.18)" },
     report: { icon: "▣", color: "var(--purple)", bg: "rgba(139,124,240,0.18)" },
     "model-evolution": { icon: "⬡", color: "#f5928a", bg: "rgba(226,72,61,0.18)" },
   };
@@ -371,6 +373,7 @@ tr:last-child td{border-bottom:none;}
               <div class="agent-role">${a.role}${renamed ? ` · <span style="color:var(--muted-2)">기본: ${String(a.defaultName).replace(/</g, "&lt;")}</span>` : ""}</div>
             </div>
           </div>
+          ${a.desc ? `<div class="agent-desc">${esc(a.desc)}</div>` : ""}
           ${modelSelectHtml(a)}
           ${recommendationHtml(a)}
         </div>`;

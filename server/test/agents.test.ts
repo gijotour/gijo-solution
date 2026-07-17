@@ -83,13 +83,13 @@ describe("agent model assignment (A)", () => {
   it("renames an agent (팀 로스터) and exposes defaultName; empty resets to default", async () => {
     const before = await request(app).get("/api/agents").set("Authorization", `Bearer ${token}`);
     const orch = before.body.find((a: { id: string }) => a.id === "orchestrator");
-    expect(orch.name).toBe("오케스트레이터");
-    expect(orch.defaultName).toBe("오케스트레이터");
+    expect(orch.name).toBe("Security Orchestrator");
+    expect(orch.defaultName).toBe("Security Orchestrator");
 
     const put = await request(app).post("/api/agents/orchestrator/name").set("Authorization", `Bearer ${token}`).send({ name: "우리 보안반장" });
     expect(put.status).toBe(200);
     expect(put.body.name).toBe("우리 보안반장");
-    expect(put.body.defaultName).toBe("오케스트레이터");
+    expect(put.body.defaultName).toBe("Security Orchestrator");
 
     const list = await request(app).get("/api/agents").set("Authorization", `Bearer ${token}`);
     expect(list.body.find((a: { id: string }) => a.id === "orchestrator").name).toBe("우리 보안반장");
@@ -97,7 +97,7 @@ describe("agent model assignment (A)", () => {
     // 빈 이름 → 기본으로 되돌림
     await request(app).post("/api/agents/orchestrator/name").set("Authorization", `Bearer ${token}`).send({ name: "" });
     const reset = await request(app).get("/api/agents").set("Authorization", `Bearer ${token}`);
-    expect(reset.body.find((a: { id: string }) => a.id === "orchestrator").name).toBe("오케스트레이터");
+    expect(reset.body.find((a: { id: string }) => a.id === "orchestrator").name).toBe("Security Orchestrator");
   });
 
   it("rejects a too-long agent name and an unknown agent", async () => {

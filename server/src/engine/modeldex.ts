@@ -119,23 +119,27 @@ interface AgentModelRecSpec {
 const AGENT_MODEL_RECOMMENDATIONS: Record<string, AgentModelRecSpec> = {
   orchestrator: {
     modelId: "bartowski/Qwen2.5-7B-Instruct-GGUF",
-    reason: "지시 이해와 한국어 라우팅 정확도가 좋아 작업 분배·의도 판단에 적합. 더 빠른 응답이 급하면 Llama 3.2 3B로 교체하세요.",
+    reason: "지시 이해와 한국어 라우팅 정확도가 좋아 작업 분배·의도 판단·결과 취합에 적합. 더 빠른 응답이 급하면 Llama 3.2 3B로 교체하세요.",
   },
   scan: {
     modelId: "mradermacher/Foundation-Sec-8B-GGUF",
-    reason: "스캔(ModelScan) 결과로 나온 모델 취약점을 위협 관점에서 해석·요약하는 데 강합니다.",
+    reason: "업로드·스캔(ModelScan) 결과로 나온 모델 취약점을 위협 관점에서 해석·요약하는 데 강합니다.",
   },
   analysis: {
     modelId: "bartowski/Qwen2.5-7B-Instruct-GGUF",
-    reason: "우선순위 판단과 매끄러운 한국어 설명 품질이 좋습니다. 학습 데이터셋 Q&A 생성에도 이 에이전트가 쓰입니다.",
+    reason: "우선순위 판단과 매끄러운 한국어 설명 품질이 좋습니다. 기억·학습(RAG)·온톨로지 관리와 학습 데이터셋 Q&A 생성도 이 에이전트 담당입니다.",
   },
   report: {
     modelId: "bartowski/Qwen2.5-7B-Instruct-GGUF",
-    reason: "한국어 보고서 문체·서식 품질이 가장 좋아 내부 보고서 작성에 적합합니다.",
+    reason: "한국어 보고서 문체·서식 품질이 가장 좋아 내부 보고서·결과 레포팅에 적합합니다.",
+  },
+  ti: {
+    modelId: "mradermacher/Foundation-Sec-8B-GGUF",
+    reason: "딥웹·다크웹 CTI 피드의 영문 위협 정보를 보안 관점에서 해석·요약하는 데 강합니다. 자산 매칭 자체는 규칙 엔진(CTI↔자산 대조)이 수행합니다.",
   },
   normaltic: {
     modelId: "bartowski/Qwen2.5-7B-Instruct-GGUF",
-    reason: "검색된 사내 자료를 근거로 취약점을 설명하고 사례를 정리하는 데 한국어 품질·지시따르기가 좋습니다(엄격 그라운딩에 적합).",
+    reason: "스캔·분석 결과에 나온 용어를 사내 자료 근거로 해설하고 사례를 부연하는 데 한국어 품질·지시따르기가 좋습니다(엄격 그라운딩에 적합).",
   },
 };
 

@@ -122,6 +122,7 @@ export interface AgentInfo {
   name: string;
   defaultName: string;
   role: string;
+  desc: string; // 업무 연계 설명(파이프라인에서 누구와 어떻게 이어지는지)
   assignedModelId: string | null;
   status: "idle" | "working" | "watching";
   defaultStatus: "idle" | "working" | "watching";
