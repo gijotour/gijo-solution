@@ -12,6 +12,7 @@ import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { db } from "../db";
 import { THREAT_CRITERIA } from "./compliance-criteria";
+import { getAsset, type AiBom } from "./assets";
 
 export type ThreatCategory = "data" | "model" | "agent" | "supplychain" | "highperf";
 export type AiBomArea = "model" | "dataset" | "prompt" | "agentTool" | "infrastructure";
@@ -146,8 +147,80 @@ export function resetComplianceForTests(): void {
   db.exec("DELETE FROM compliance_status");
 }
 
+// ── AI-BOM ↔ KISA 위협 자동 매칭 (거버넌스 연계) ──────────────────────────
+// 자산의 AI-BOM에서 "채워진 영역"을 보고, 그 영역과 연결된 위협을 노출 위협으로 매칭한다.
+// 조직 대응 상태(covered/partial/na/open)를 결합해 "이 AI 자산이 어떤 위협에 노출됐고 대응됐는지"를 준다.
+function filledAiBomAreas(aibom: AiBom): Set<AiBomArea> {
+  const s = new Set<AiBomArea>();
+  const any = (o: Record<string, string>) => Object.values(o).some((v) => (v ?? "").trim() !== "");
+  if (any(aibom.model)) s.add("model");
+  if (any(aibom.dataset)) s.add("dataset");
+  if (any(aibom.prompt)) s.add("prompt");
+  if (any(aibom.agentTool)) s.add("agentTool");
+  if (any(aibom.infrastructure)) s.add("infrastructure");
+  return s;
+}
+
+export interface AiBomThreatMatch {
+  code: string;
+  name: string;
+  category: ThreatCategory;
+  categoryLabel: string;
+  matchedAreas: AiBomArea[];
+  status: ComplianceStatus;
+  owasp: string[];
+  nist: string[];
+}
+export interface AiBomThreatReport {
+  assetId: string;
+  assetName: string;
+  matches: AiBomThreatMatch[];
+  summary: { relevant: number; covered: number; partial: number; na: number; open: number };
+}
+
+const STATUS_RANK: Record<ComplianceStatus, number> = { open: 0, partial: 1, na: 2, covered: 3 };
+
+export function aibomThreatMatches(assetId: string): AiBomThreatReport {
+  const asset = getAsset(assetId);
+  if (!asset) throw new Error("자산을 찾을 수 없습니다");
+  const filled = filledAiBomAreas(asset.aibom);
+  const statusMap = new Map((getStatusStmt.all() as StatusRow[]).map((r) => [r.threatCode, r.status]));
+  const matches: AiBomThreatMatch[] = [];
+  const summary = { relevant: 0, covered: 0, partial: 0, na: 0, open: 0 };
+  for (const t of THREAT_CATALOG) {
+    const matchedAreas = t.aibomAreas.filter((a) => filled.has(a));
+    if (matchedAreas.length === 0) continue;
+    const status = statusMap.get(t.code) ?? "open";
+    matches.push({
+      code: t.code,
+      name: t.name,
+      category: t.category,
+      categoryLabel: CATEGORY_LABEL[t.category],
+      matchedAreas,
+      status,
+      owasp: t.owasp,
+      nist: t.nist,
+    });
+    summary.relevant++;
+    if (status === "covered") summary.covered++;
+    else if (status === "partial") summary.partial++;
+    else if (status === "na") summary.na++;
+    else summary.open++;
+  }
+  matches.sort((a, b) => STATUS_RANK[a.status] - STATUS_RANK[b.status] || a.code.localeCompare(b.code));
+  return { assetId, assetName: asset.name, matches, summary };
+}
+
 export function registerComplianceRoutes(app: Express): void {
   app.get("/api/compliance", authMiddleware, (_req, res) => res.json(listCompliance()));
+  // AI-BOM 기반 자산별 노출 위협 + 대응 현황(거버넌스 연계).
+  app.get("/api/assets/:id/aibom/threats", authMiddleware, (req, res) => {
+    try {
+      res.json(aibomThreatMatches(String(req.params.id)));
+    } catch (e) {
+      res.status(404).json({ error: e instanceof Error ? e.message : String(e) });
+    }
+  });
   // AI 초안 — 위협별 대응 상태 제안(저장 아님, 담당자 검토용).
   app.post("/api/compliance/:code/draft", authMiddleware, asyncRoute(async (req, res) => {
     res.json(await buildComplianceDraft(String(req.params.code)));

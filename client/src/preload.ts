@@ -109,6 +109,7 @@ const gijoApi = {
   generateSbom: (assetId: string) => api.sbomApi.generate(assetId),
   exportSbom: (assetId: string, format: "cyclonedx" | "spdx") => api.sbomApi.export(assetId, format),
   exportAiBom: (assetId: string) => api.sbomApi.aibomExport(assetId),
+  aibomThreats: (assetId: string) => api.sbomApi.aibomThreats(assetId),
 
   // 로컬 LLM(서버가 보유한 GPU 머신의 llama.cpp 프로세스를 원격 제어)
   getLocalEngineStatus: () => api.localEngineApi.status(),

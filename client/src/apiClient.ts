@@ -536,7 +536,25 @@ export const sbomApi = {
     request(`/api/sbom/${assetId}/export`, { method: "POST", body: { format } }),
   aibomExport: (assetId: string) =>
     request<{ path: string; filename: string; json: string }>(`/api/sbom/${assetId}/aibom-export`, { method: "POST" }),
+  aibomThreats: (assetId: string) => request<AiBomThreatReport>(`/api/assets/${assetId}/aibom/threats`),
 };
+
+export interface AiBomThreatMatch {
+  code: string;
+  name: string;
+  category: string;
+  categoryLabel: string;
+  matchedAreas: string[];
+  status: "covered" | "partial" | "na" | "open";
+  owasp: string[];
+  nist: string[];
+}
+export interface AiBomThreatReport {
+  assetId: string;
+  assetName: string;
+  matches: AiBomThreatMatch[];
+  summary: { relevant: number; covered: number; partial: number; na: number; open: number };
+}
 
 // ── CTI(위협 인텔리전스) ──────────────────────────────────────────────
 export interface CtiAssetMatch {

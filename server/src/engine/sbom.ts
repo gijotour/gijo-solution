@@ -9,6 +9,7 @@ import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { getAsset, markSbomGenerated, type AiBom } from "./assets";
 import { isFindingRejected } from "./approvals";
+import { aibomThreatMatches, type AiBomThreatMatch } from "./compliance";
 
 export interface SbomComponent {
   name: string;
@@ -94,7 +95,7 @@ function buildCycloneDxJson(assetId: string, components: SbomComponent[]): strin
 // AI-BOM (CycloneDX ML-BOM) — 코드 SBOM에 AI 구성명세(모델·데이터셋·프롬프트·도구·인프라)를 더한 표준 문서.
 // 루트를 machine-learning-model 컴포넌트로, AI-BOM 5영역을 properties/data 컴포넌트로 싣는다.
 // 민감정보(시스템 프롬프트·가중치)는 원문 대신 해시/입력값만 담아 유출을 막는다.
-function buildAiBomCycloneDx(name: string, aibom: AiBom, components: SbomComponent[]): string {
+function buildAiBomCycloneDx(name: string, aibom: AiBom, components: SbomComponent[], threats: AiBomThreatMatch[]): string {
   const bom = new Models.Bom();
   const root = new Models.Component(Enums.ComponentType.MachineLearningModel, name);
   const put = (comp: Models.Component, n: string, v: string | undefined) => {
@@ -114,6 +115,10 @@ function buildAiBomCycloneDx(name: string, aibom: AiBom, components: SbomCompone
   put(root, "gijo:agentTool:mcpServers", aibom.agentTool.mcpServers);
   put(root, "gijo:infra:compute", aibom.infrastructure.compute);
   put(root, "gijo:infra:hostingProvider", aibom.infrastructure.hostingProvider);
+  // AI-BOM 기반 노출 KISA 위협 + 조직 대응 상태(거버넌스 연계). 예: gijo:threat:M02 = "벡터 DB·임베딩 유출 [open] (dataset)".
+  for (const t of threats) {
+    root.properties.add(new Models.Property(`gijo:threat:${t.code}`, `${t.name} [${t.status}] (${t.matchedAreas.join(",")})`));
+  }
   bom.metadata.component = root;
 
   // 데이터셋 → data 컴포넌트(값이 있을 때만).
@@ -140,7 +145,8 @@ export async function exportAiBom(assetId: string): Promise<{ path: string; file
   const asset = getAsset(assetId);
   if (!asset) throw new Error("자산을 찾을 수 없습니다");
   const { components } = await generateSbom(assetId); // 코드 의존성은 기존 SBOM 로직 재사용
-  const json = buildAiBomCycloneDx(asset.name, asset.aibom, components);
+  const threats = aibomThreatMatches(assetId).matches; // AI-BOM 기반 노출 위협 + 대응 상태
+  const json = buildAiBomCycloneDx(asset.name, asset.aibom, components, threats);
   await fs.mkdir(EXPORT_DIR, { recursive: true });
   const filename = `${assetId}.aibom.cyclonedx.json`;
   const filePath = path.join(EXPORT_DIR, filename);
