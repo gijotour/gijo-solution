@@ -171,6 +171,8 @@ function matchGovernance(f: Finding): GovernanceMatch[] {
     { framework: "ISMS-P", control: "2.11.2 취약점 점검 및 조치", rationale: "발견 취약점의 점검·조치·재점검 이력 관리 대상" },
     { framework: "ISO/IEC 27001:2022", control: "A.8.8 기술적 취약점 관리", rationale: "기술적 취약점의 적시 식별·평가·대응" },
     { framework: "취약점 관리 생애주기", control: "식별 → 평가(VPR·EPSS) → 조치 → 검증", rationale: "생애주기 4단계 상태 추적 대상" },
+    { framework: "전자금융감독규정", control: "제37조의4 취약점 분석·평가 · 제21조 정보처리시스템 보호", rationale: "(금융권 적용 시) 정기 취약점 분석·평가 및 시스템 보호대책 대상" },
+    { framework: "클라우드보안인증(CSAP)", control: "보호대책 — 취약점 점검·조치", rationale: "(클라우드·공공 적용 시) 취약점 점검·조치 통제 대상" },
   ];
   if (/패치|미적용|cpu|버전|version|update|outdated|eol|hotfix/.test(t))
     g.push(
@@ -403,11 +405,14 @@ export async function generateReport(req: ReportRequest): Promise<ReportResult> 
 
   // 우선순위 조치 목록(개선 #2)과 AI 브리핑(개선 #4)을 보고서에 포함.
   const priorities = prioritizedReviews(8);
+  // AI 조치 브리핑(LLM 서술)은 내부 검토용에만 — 보고용은 '취약점 사례·거버넌스 매칭'으로 갈음(중복 제거).
   let triageDraft = "";
-  try {
-    triageDraft = (await buildTriageDraft(5)).draft;
-  } catch {
-    /* LLM 미가동 등 — 브리핑 없이 진행 */
+  if (audience === "internal") {
+    try {
+      triageDraft = (await buildTriageDraft(5)).draft;
+    } catch {
+      /* LLM 미가동 등 — 브리핑 없이 진행 */
+    }
   }
 
   const buffer = await buildDocx(req, assets, executiveSummary, maintenance, vuln, priorities, triageDraft);
