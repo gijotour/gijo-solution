@@ -33,7 +33,7 @@ export interface DecisionPair {
 
 // GOLD(승인 누적)는 datasets/ 밖에 둔다 — 원시 쌍이라 그대로는 학습 데이터셋이 아니고,
 // build 시 결정 프롬프트로 렌더해 datasets/orchestrator-tools.json으로 내보낸다(카탈로그 드리프트 견딤).
-const GOLD_PATH = path.join("data", "orchestrator-gold.json");
+const GOLD_PATH = process.env.GIJO_ORCH_GOLD_PATH ?? path.join("data", "orchestrator-gold.json");
 export const ORCHESTRATOR_DATASET_ID = "orchestrator-tools";
 
 // ── 큐레이션 시드 ────────────────────────────────────────────────────────

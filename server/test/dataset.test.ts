@@ -118,7 +118,8 @@ describe("dataset", () => {
     expect(list.body).toContainEqual({ id, examples: 2 });
 
     const fs = await import("fs");
-    const filePath = `data/datasets/${id}.json`;
+    const path = await import("path");
+    const filePath = path.join(process.env.GIJO_DATASETS_DIR ?? path.join("data", "datasets"), `${id}.json`);
     const rows = JSON.parse(fs.readFileSync(filePath, "utf-8"));
     expect(rows).toHaveLength(2);
     fs.unlinkSync(filePath);

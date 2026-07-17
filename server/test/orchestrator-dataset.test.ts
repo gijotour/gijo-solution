@@ -27,8 +27,10 @@ import {
   ORCHESTRATOR_DATASET_ID,
 } from "../src/engine/orchestrator-dataset";
 
-const GOLD_PATH = path.join("data", "orchestrator-gold.json");
-const DATASET_PATH = path.join("data", "datasets", `${ORCHESTRATOR_DATASET_ID}.json`);
+// vitest.config.ts가 격리한 임시 경로를 그대로 쓴다 — 운영 datasets/orchestrator-tools.json을
+// 지우지 않도록(실측: afterAll이 운영 파일을 삭제해 재학습이 파일없음으로 실패한 사고).
+const GOLD_PATH = process.env.GIJO_ORCH_GOLD_PATH ?? path.join("data", "orchestrator-gold.json");
+const DATASET_PATH = path.join(process.env.GIJO_DATASETS_DIR ?? path.join("data", "datasets"), `${ORCHESTRATOR_DATASET_ID}.json`);
 
 function cleanGold() {
   for (const p of [GOLD_PATH, DATASET_PATH]) {

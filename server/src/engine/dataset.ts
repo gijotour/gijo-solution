@@ -11,7 +11,9 @@ import { asyncRoute } from "../util/asyncRoute";
 import { chat } from "./llm";
 import { recordProcessOutput } from "./logs";
 
-const DATASETS_DIR = path.join("data", "datasets");
+// 테스트가 실제 데이터셋(data/datasets/*.json)을 덮어쓰거나 지우지 않도록 경로를 env로 격리 가능하게 한다
+// (vitest.config.ts가 임시 디렉터리로 지정). 미설정 시 운영 경로.
+const DATASETS_DIR = process.env.GIJO_DATASETS_DIR ?? path.join("data", "datasets");
 
 // 업로드된 문서(PDF/HWPX/TXT 등)에서 학습용 텍스트를 추출한다 — scripts/extract_doc.py(python) 사용.
 // 파일을 임시 폴더에 쓴 뒤 확장자를 유지해 스크립트가 형식을 판별하게 한다. PYTHONUTF8=1(한국어).

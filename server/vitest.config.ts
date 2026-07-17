@@ -17,6 +17,9 @@ export default defineConfig({
       GIJO_LOCAL_LLM_URL: "http://127.0.0.1:59999/v1",
       GIJO_EMBEDDING_URL: "http://127.0.0.1:59998/v1",
       GIJO_LLAMA_SERVER_PATH: "__no_llama_server_in_tests__",
+      // 테스트가 실제 데이터셋·골드 파일을 건드리지 않게 임시 경로로 격리(운영 orchestrator-tools.json 보호).
+      GIJO_DATASETS_DIR: "data/test-tmp/datasets",
+      GIJO_ORCH_GOLD_PATH: "data/test-tmp/orchestrator-gold.json",
     },
     testTimeout: 15000, // 실 spawn 회피해도 연결 실패 폴백까지 여유(기본 5s는 부하 시 빠듯).
   },

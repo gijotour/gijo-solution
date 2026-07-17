@@ -44,7 +44,7 @@ describe("learnloop (헤르메스 폐쇄형 학습 루프)", () => {
   afterAll(() => {
     delete process.env.GIJO_LEARNLOOP_SMOKE;
     for (const id of savedDatasets) {
-      fs.rmSync(path.join("data", "datasets", `${id}.json`), { force: true });
+      fs.rmSync(path.join(process.env.GIJO_DATASETS_DIR ?? path.join("data", "datasets"), `${id}.json`), { force: true });
     }
   });
 
@@ -122,7 +122,7 @@ describe("learnloop (헤르메스 폐쇄형 학습 루프)", () => {
     expect(res.body.examples).toBe(5);
     savedDatasets.push(res.body.datasetId);
 
-    const file = path.join("data", "datasets", `${res.body.datasetId}.json`);
+    const file = path.join(process.env.GIJO_DATASETS_DIR ?? path.join("data", "datasets"), `${res.body.datasetId}.json`);
     expect(fs.existsSync(file)).toBe(true);
     const pairs = JSON.parse(fs.readFileSync(file, "utf-8"));
     expect(pairs).toHaveLength(5);
