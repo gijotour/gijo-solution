@@ -41,39 +41,80 @@ export interface IngestResult {
   embeddingModel: string;
   scope: string;
   docClass?: string; // classify=true로 수집 시 Scan·Analyze Agent가 판별한 분류(매뉴얼/보고서/정책/기타)
+  linkedProduct?: string; // '매뉴얼'로 분류돼 기존 보안제품에 자동 연결됐으면 그 제품명
 }
 
 // ── 문서 자동 분류 — 올린 문서를 Scan·Analyze Agent가 분석해 종류를 판별한다 ─────────
-// Scan Agent(수집·초기 해석) → Analyze Agent(LLM 분류) 순으로 협업 피드에 흐름이 보인다.
-// LLM이 꺼져 있거나 응답을 파싱할 수 없으면 파일명 휴리스틱으로 폴백한다(결정적·정직한 차선).
+// Scan Agent(수집·초기 해석) → Analyze Agent(분류) 순으로 협업 피드에 흐름이 보인다.
+// 파일명에 문서 종류가 명시돼 있으면(~매뉴얼, ~보고서, ~정책) 그것을 최우선으로 신뢰한다 —
+// 사내 관례상 파일명 표기가 내용 단어 빈도보다 정확하다(실측: '정책 백업' 내용 때문에
+// 운영매뉴얼이 '정책'으로 오분류). 파일명에 없을 때만 LLM으로 내용을 판단하고,
+// LLM이 꺼져 있거나 파싱 실패면 완화된 파일명 휴리스틱으로 폴백한다(결정적·정직한 차선).
 const DOC_CLASSES = ["매뉴얼", "보고서", "정책", "기타"] as const;
 
-function classifyByFilename(documentId: string): string {
+// 명시적 문서 종류 표기만 잡는 엄격판 — 매뉴얼 표기가 가장 강한 신호라 먼저 검사한다.
+function classifyByFilenameStrict(documentId: string): string | null {
   if (/매뉴얼|manual|가이드|guide/i.test(documentId)) return "매뉴얼";
-  if (/보고서|report|동향|현황|분석/i.test(documentId)) return "보고서";
-  if (/정책|지침|규정|policy|표준/i.test(documentId)) return "정책";
-  return "기타";
+  if (/보고서|report/i.test(documentId)) return "보고서";
+  if (/정책|지침|규정|policy/i.test(documentId)) return "정책";
+  return null;
+}
+
+function classifyByFilename(documentId: string): string {
+  return (
+    classifyByFilenameStrict(documentId) ??
+    (/동향|현황|분석/i.test(documentId) ? "보고서" : /표준/i.test(documentId) ? "정책" : "기타")
+  );
 }
 
 async function classifyDocument(documentId: string, text: string): Promise<string> {
   emitCollaboration({ from: "scan", to: "analysis", message: `문서 분석·분류 요청: ${documentId}` });
   let docClass: string;
-  try {
-    const reply = await chat({
-      agentId: "analysis",
-      message: [
-        "다음 문서를 아래 4가지 중 정확히 한 단어로만 분류하라. 다른 텍스트 없이 그 한 단어만 출력한다.",
-        "선택지: 매뉴얼(제품·시스템 사용법/운영/로그 설명), 보고서(동향·현황·분석 결과), 정책(사내 규정·지침·표준), 기타",
-        `파일명: ${documentId}`,
-        `내용 일부: ${text.slice(0, 800)}`,
-      ].join("\n"),
-    });
-    docClass = DOC_CLASSES.find((c) => reply.includes(c)) ?? classifyByFilename(documentId);
-  } catch {
-    docClass = classifyByFilename(documentId);
+  const byName = classifyByFilenameStrict(documentId);
+  if (byName) {
+    docClass = byName;
+  } else {
+    try {
+      const reply = await chat({
+        agentId: "analysis",
+        message: [
+          "다음 문서를 아래 4가지 중 정확히 한 단어로만 분류하라. 다른 텍스트 없이 그 한 단어만 출력한다.",
+          "선택지: 매뉴얼(제품·시스템 사용법/운영/로그 설명), 보고서(동향·현황·분석 결과), 정책(사내 규정·지침·표준), 기타",
+          `파일명: ${documentId}`,
+          `내용 일부: ${text.slice(0, 800)}`,
+        ].join("\n"),
+      });
+      docClass = DOC_CLASSES.find((c) => reply.includes(c)) ?? classifyByFilename(documentId);
+    } catch {
+      docClass = classifyByFilename(documentId);
+    }
   }
-  emitCollaboration({ from: "analysis", to: "orchestrator", message: `문서 분류 완료: ${documentId} → ${docClass}` });
+  emitCollaboration({
+    from: "analysis",
+    to: "orchestrator",
+    message: `문서 분류 완료: ${documentId} → ${docClass}${byName ? " (파일명 표기 근거)" : ""}`,
+  });
   return docClass;
+}
+
+// '매뉴얼'로 분류된 문서를 기존 보안제품에 자동 연결한다(새 제품 생성 없음 — 등록부 오염 방지).
+// 연결되면 제품 화면·탐색기의 매뉴얼 배지에 바로 반영되고, 협업 피드로 알린다.
+async function linkManualToProduct(documentId: string): Promise<string | undefined> {
+  try {
+    const { attachManualToExistingProduct } = await import("./securityproducts.js");
+    const linked = attachManualToExistingProduct(documentId, documentId, "문서·분석 자동 연결");
+    if (linked) {
+      emitCollaboration({
+        from: "analysis",
+        to: "orchestrator",
+        message: `매뉴얼 자동 연결: ${documentId} → 보안제품 '${linked.productName}' (${linked.kind === "logManual" ? "로그 매뉴얼" : "제품 매뉴얼"})`,
+      });
+      return linked.productName;
+    }
+  } catch (err) {
+    console.warn(`[memory] 매뉴얼-보안제품 연결 실패: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  return undefined;
 }
 
 // scope: "global"이면 모든 에이전트가 검색, 그 외에는 해당 agentId 전용 문서.
@@ -163,16 +204,18 @@ export async function ingestText(documentId: string, raw: string, scope: string 
   // 사용자 업로드 경로(classify=true)에서만 Scan·Analyze Agent 분류 실행 — 보안제품 매뉴얼 수집처럼
   // 종류가 이미 정해진 프로그램적 수집은 건너뛴다. 분류 실패해도 수집은 성공 처리.
   let docClass: string | undefined;
+  let linkedProduct: string | undefined;
   if (classify) {
     try {
       docClass = await classifyDocument(documentId, raw);
       setDocClassStmt.run(docClass, documentId);
+      if (docClass === "매뉴얼") linkedProduct = await linkManualToProduct(documentId);
     } catch (err) {
       console.warn(`[memory] 문서 분류 실패: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
-  return { documentId, chunks: chunks.length, embeddingModel: "local-embedding-server", scope, docClass };
+  return { documentId, chunks: chunks.length, embeddingModel: "local-embedding-server", scope, docClass, linkedProduct };
 }
 
 // SQL 문자열 injection 방지 — scope는 LanceDB where 절에 문자열로 들어간다. 에이전트 id와

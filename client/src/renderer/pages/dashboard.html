@@ -503,11 +503,12 @@
             try {
               const f = await window.gijo.readFile(itemPath);
               const r = await window.gijo.ingestMemoryFile(f.name, f.content, "global");
-              st.textContent = `✓ ${r.chunks}개 청크 저장 · 분류: ${r.docClass || "기타"}`;
+              st.textContent = `✓ ${r.chunks}개 청크 저장 · 분류: ${r.docClass || "기타"}${r.linkedProduct ? ` · 보안제품 '${r.linkedProduct}'에 연결됨` : ""}`;
               st.style.color = "var(--teal)";
               // 파일 행에 분류 배지 즉시 반영(다음 새로고침 전에도 보이게).
               docClassMap.set(f.name, r.docClass || "기타");
               row.insertAdjacentHTML("beforeend", ` <span class="leaf-b ${DOCCLASS_B[r.docClass] || "lb-mut"}">${String(r.docClass || "기타").replace(/</g, "&lt;")}</span>`);
+              if (r.linkedProduct) loadSecurityProducts(); // 매뉴얼 자동 연결 → 제품 매뉴얼 배지 갱신
             } catch (err) {
               st.textContent = "✗ " + err.message;
               st.style.color = "#f87171";
@@ -665,7 +666,21 @@
     assetPop.classList.add("on");
     document.getElementById("apClose").addEventListener("click", closeAssetPop);
     assetPop.querySelectorAll("[data-nav]").forEach((b) => b.addEventListener("click", () => window.gijo.navigateTo(b.dataset.nav)));
-    document.getElementById("apRescan").addEventListener("click", () => { closeAssetPop(); sendToOrchestrator(`${a.id} 스캔해줘`); });
+    // 경량 단건 재스캔 — dispatch 파이프라인(요약·부연) 없이 어댑터만 즉시 실행하고 팝오버를 갱신.
+    document.getElementById("apRescan").addEventListener("click", async (ev) => {
+      const btn = ev.currentTarget;
+      btn.disabled = true;
+      btn.textContent = "스캔 중…";
+      try {
+        await window.gijo.scanAsset(a.id);
+        await loadAssets();
+        const leaf = document.querySelector(`[data-asset="${a.id}"]`);
+        if (leaf) openAssetPop(a.id, leaf); // 새 findings로 팝오버 갱신
+      } catch (err) {
+        btn.disabled = false;
+        btn.textContent = "재스캔 실패 — 다시";
+      }
+    });
   }
   function closeAssetPop() { assetPop.classList.remove("on"); }
   document.addEventListener("click", (e) => {

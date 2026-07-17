@@ -16,8 +16,12 @@ import type { WebSocketServer } from "ws";
 import * as crypto from "crypto";
 import * as fs from "fs";
 import { authMiddleware } from "../auth/auth";
+import { asyncRoute } from "../util/asyncRoute";
+import { runAdapter } from "./bridge";
 import type { StandardFinding } from "./bridge";
 import { db } from "../db";
+import { emitCollaboration } from "./collaboration";
+import { setAgentStatus, resetAgentToDefault } from "./agents";
 
 export interface AssetComponent {
   name: string;
@@ -342,6 +346,24 @@ export function registerAssetsRoutes(app: Express): void {
   app.post("/api/assets", authMiddleware, (req, res) => {
     res.json(registerAsset(req.body));
   });
+  // 경량 단건 재스캔 — 대시보드 자산 팝오버용. dispatch(의도분류·LLM 요약·부연) 없이 스캔
+  // 어댑터만 돌려 자산에 반영한다. 무거운 파이프라인은 지시("○○ 스캔해줘")로, 이건 버튼 즉답 경로.
+  app.post("/api/assets/:id/scan", authMiddleware, asyncRoute(async (req, res) => {
+    const asset = getAsset(String(req.params.id));
+    if (!asset) {
+      res.status(404).json({ error: "asset not found" });
+      return;
+    }
+    setAgentStatus("scan", "working");
+    emitCollaboration({ from: "orchestrator", to: "scan", message: `단건 재스캔: ${asset.id}` });
+    const findings = await runAdapter("modelscan", asset.path || asset.id).catch((err) => [
+      { finding_type: "scan_error", severity: "low" as const, evidence: String(err), source_tool: "modelscan" },
+    ]);
+    recordFindings(asset.id, findings);
+    emitCollaboration({ from: "scan", to: "orchestrator", message: `재스캔 완료: ${asset.id} — finding ${findings.length}건` });
+    resetAgentToDefault("scan");
+    res.json({ assetId: asset.id, findings: findings.length });
+  }));
   app.put("/api/assets/:id/aibom", authMiddleware, (req, res) => {
     const asset = updateAiBom(String(req.params.id), req.body.aibom);
     if (!asset) return res.status(404).json({ error: "asset not found" });

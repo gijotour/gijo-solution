@@ -343,6 +343,7 @@ export interface IngestResult {
   embeddingModel: string;
   scope: string;
   docClass?: string; // Scan·Analyze Agent 분류(매뉴얼/보고서/정책/기타)
+  linkedProduct?: string; // '매뉴얼' 분류 시 자동 연결된 기존 보안제품명
 }
 
 export interface MemoryDocument {
@@ -732,6 +733,8 @@ export const serviceImpactApi = {
 export const assetsApi = {
   list: () => request<Asset[]>("/api/assets"),
   get: (id: string) => request<Asset>(`/api/assets/${id}`),
+  // 경량 단건 재스캔(대시보드 팝오버) — dispatch 파이프라인 없이 어댑터만 실행.
+  scan: (id: string) => request<{ assetId: string; findings: number }>(`/api/assets/${id}/scan`, { method: "POST" }),
   register: (args: { id: string; name: string; path: string; assetType?: string; owner?: string; service?: string; components?: AssetComponent[] }) =>
     request<Asset>("/api/assets", { method: "POST", body: args }),
   import: (content: string, format: "json" | "csv", source: string) =>

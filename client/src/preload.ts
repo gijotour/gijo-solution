@@ -84,6 +84,7 @@ const gijoApi = {
   // 자산 인벤토리
   listAssets: () => api.assetsApi.list(),
   getAsset: (id: string) => api.assetsApi.get(id),
+  scanAsset: (id: string) => api.assetsApi.scan(id),
   deleteAsset: (id: string) => api.assetsApi.remove(id),
   registerAsset: (args: { id: string; name: string; path: string; assetType?: string; owner?: string; service?: string }) =>
     api.assetsApi.register(args),

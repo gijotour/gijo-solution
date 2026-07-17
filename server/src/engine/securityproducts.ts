@@ -344,6 +344,31 @@ export function importManual(filename: string, docName: string | undefined, uplo
   };
 }
 
+// 문서·분석(대시보드/기억 화면) 수집에서 '매뉴얼'로 분류된 문서를 기존 보안제품에 자동 연결한다.
+// 명시적 매뉴얼 일괄 업로드(importManual)와 달리 새 제품은 만들지 않는다 — 일반 문서 수집이
+// 제품 등록부를 오염시키지 않게, 기존 제품에 확실히 매칭되는 경우만 연결한다. 중복 연결 방지.
+export function attachManualToExistingProduct(
+  filename: string,
+  docName: string,
+  uploadedBy?: string
+): ManualImportResult | null {
+  const c = classifyManual(filename, listProducts());
+  if (!c.product) return null;
+  const stem = filename.replace(/\.[^.]+$/, "");
+  if ((c.product.docs ?? []).some((d) => d.docName === docName || d.title === stem)) return null; // 이미 연결됨
+  addProductDoc(c.product.id, { kind: c.kind, title: stem, docName }, uploadedBy);
+  return {
+    filename,
+    productId: c.product.id,
+    productName: c.product.name,
+    category: c.product.category,
+    kind: c.kind,
+    createdProduct: false,
+    reason: c.reason,
+    docName,
+  };
+}
+
 // 테스트 전용.
 export function resetSecurityProductsForTests(): void {
   db.exec("DELETE FROM product_docs; DELETE FROM security_products;");
