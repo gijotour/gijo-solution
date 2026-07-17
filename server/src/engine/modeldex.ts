@@ -125,29 +125,13 @@ const AGENT_MODEL_RECOMMENDATIONS: Record<string, AgentModelRecSpec> = {
     modelId: "mradermacher/Foundation-Sec-8B-GGUF",
     reason: "스캔(ModelScan) 결과로 나온 모델 취약점을 위협 관점에서 해석·요약하는 데 강합니다.",
   },
-  pentest: {
-    modelId: "QuantFactory/Lily-Cybersecurity-7B-v0.2-GGUF",
-    reason: "공격 기법·익스플로잇·사고대응에 특화된 보안 모델(GIJO 기본). 침투테스트 검증 설명에 적합.",
-  },
   analysis: {
     modelId: "bartowski/Qwen2.5-7B-Instruct-GGUF",
     reason: "우선순위 판단과 매끄러운 한국어 설명 품질이 좋습니다. 학습 데이터셋 Q&A 생성에도 이 에이전트가 쓰입니다.",
   },
-  sbom: {
-    modelId: "QuantFactory/SecurityLLM-GGUF",
-    reason: "보안 정책·컴플라이언스·구성 문서 이해에 강해 SBOM 항목 정리·설명에 맞습니다.",
-  },
-  cti: {
-    modelId: "mradermacher/Foundation-Sec-8B-GGUF",
-    reason: "딥웹·다크웹 위협 인텔리전스를 분석·추론하는 범용 보안 파운데이션 모델(Cisco).",
-  },
   report: {
     modelId: "bartowski/Qwen2.5-7B-Instruct-GGUF",
     reason: "한국어 보고서 문체·서식 품질이 가장 좋아 내부 보고서 작성에 적합합니다.",
-  },
-  "model-evolution": {
-    modelId: "NousResearch/Hermes-3-Llama-3.1-8B-GGUF",
-    reason: "헤르메스 학습 루프의 확정 베이스 — 지시따르기·구조화 출력이 뛰어나 모델 진화(학습) 대상에 맞습니다.",
   },
   normaltic: {
     modelId: "bartowski/Qwen2.5-7B-Instruct-GGUF",

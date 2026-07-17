@@ -31,17 +31,16 @@ interface AgentBase {
   defaultStatus: AgentStatus;
 }
 
+// 에이전트 로스터 — "역할극 페르소나"를 줄이고 사내 데이터(RAG·온톨로지) 근거로 판단·검증하는
+// 소수 정예로 재구성(2026-07-17). 워크플로우(dispatch: 스캔→분석→리포트) + 조율 + 엄격 그라운딩(노말틱).
+// 제거된 페르소나(침투테스트·SBOM·CTI·모델진화)는 dispatch에 안 쓰이고 전용 화면·엔진(SBOM/CTI/합성)이
+// 이미 담당하므로 일반 LLM 답변만 내던 중복이었다. LLM은 gijo + 보안LLM 2개만 사용.
 const AGENT_DEFS: AgentBase[] = [
   { id: "orchestrator", name: "오케스트레이터", role: "작업 분배 · 결과 취합", defaultStatus: "watching" },
-  { id: "scan", name: "스캔 에이전트", role: "정적분석 실행 (ModelScan)", defaultStatus: "idle" },
-  { id: "pentest", name: "침투테스트 에이전트", role: "익스플로잇 검증 (Penligent)", defaultStatus: "idle" },
-  { id: "analysis", name: "분석 에이전트", role: "우선순위 판단 · 설명", defaultStatus: "idle" },
-  { id: "sbom", name: "SBOM 에이전트", role: "SBOM 생성 · 정리", defaultStatus: "idle" },
-  { id: "cti", name: "CTI 에이전트", role: "딥웹 · 다크웹 감시", defaultStatus: "watching" },
+  { id: "scan", name: "스캔 에이전트", role: "스캔 결과 해석 · 자산 반영", defaultStatus: "idle" },
+  { id: "analysis", name: "분석 에이전트", role: "취약점 우선순위 판단 · 근거 설명", defaultStatus: "idle" },
   { id: "report", name: "리포트 에이전트", role: "내부 보고서 작성", defaultStatus: "idle" },
-  { id: "model-evolution", name: "모델 진화 에이전트", role: "보안 특화 LLM 병합", defaultStatus: "idle" },
-  // 사내 지식베이스(RAG)에 적재된 자료만 근거로 취약점·코드를 설명하고 실제 사례를 검색해 준다.
-  // 표시 이름은 기본 "노말틱"이며 다른 에이전트처럼 UI에서 바꿀 수 있다.
+  // 사내 지식베이스(RAG)+온톨로지에 적재된 자료만 근거로 설명하고 실제 사례를 검색해 준다(엄격 그라운딩).
   { id: "normaltic", name: "노말틱", role: "취약점·코드 사내 지식 해설·사례 검색", defaultStatus: "watching" },
 ];
 

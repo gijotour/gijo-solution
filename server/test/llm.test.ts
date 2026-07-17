@@ -49,7 +49,7 @@ describe("llm chat system prompt (한국어 기본 처리)", () => {
 
   it("each defined agent gets its own role in the prompt", () => {
     expect(systemPromptFor("analysis")).toContain("우선순위 판단");
-    expect(systemPromptFor("cti")).toContain("딥웹");
+    expect(systemPromptFor("scan")).toContain("스캔 결과");
     expect(systemPromptFor("report")).toContain("보고서");
   });
 

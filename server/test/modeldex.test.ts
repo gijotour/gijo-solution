@@ -42,9 +42,9 @@ describe("modeldex (보안 특화 LLM 도감)", () => {
     const recs = getAgentModelRecommendations();
     const guideIds = new Set(LLM_GUIDE.flatMap((c) => c.models).map((m) => m.id));
 
-    it("covers every one of the 9 agents (보안 8종 + 노말틱)", () => {
+    it("covers every one of the 5 agents (오케스트레이터·스캔·분석·리포트 + 노말틱)", () => {
       const agentIds = listAgents().map((a) => a.id);
-      expect(agentIds).toHaveLength(9);
+      expect(agentIds).toHaveLength(5);
       for (const id of agentIds) {
         expect(recs[id], `${id} 추천 누락`).toBeDefined();
       }
@@ -59,8 +59,8 @@ describe("modeldex (보안 특화 LLM 도감)", () => {
       }
     });
 
-    it("model-evolution is recommended the Hermes learning-loop base", () => {
-      expect(recs["model-evolution"].id).toBe("NousResearch/Hermes-3-Llama-3.1-8B-GGUF");
+    it("리포트 에이전트는 한국어 품질 좋은 Qwen2.5를 추천받는다", () => {
+      expect(recs["report"].id).toBe("bartowski/Qwen2.5-7B-Instruct-GGUF");
     });
 
     it("GET /api/modeldex/agent-recommendations returns the map", async () => {
@@ -68,7 +68,7 @@ describe("modeldex (보안 특화 LLM 도감)", () => {
       const token = await login(app);
       const res = await request(app).get("/api/modeldex/agent-recommendations").set("Authorization", `Bearer ${token}`);
       expect(res.status).toBe(200);
-      expect(res.body.pentest.id).toBe("QuantFactory/Lily-Cybersecurity-7B-v0.2-GGUF");
+      expect(res.body.scan.id).toBe("mradermacher/Foundation-Sec-8B-GGUF");
       expect(res.body.orchestrator.reason).toContain("라우팅");
       expect((await request(app).get("/api/modeldex/agent-recommendations")).status).toBe(401);
     });
