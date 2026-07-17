@@ -420,6 +420,27 @@ async function buildDocx(
   return Packer.toBuffer(doc);
 }
 
+// 합성모델(학습루프 대화로그가 섞인 merged 모델)이 요약을 "[주인이]/[나]" 대화록 형식으로
+// 돌려주는 드리프트 실측(2026-07-17) — 화자 표시·영어 역할극 줄·프롬프트 잔재를 제거하고
+// 보고서 본문만 남긴다. 정상 출력엔 아무 영향 없다(매칭 줄이 없으면 원문 그대로).
+function stripDialogueArtifacts(text: string): string {
+  const lines = String(text ?? "").split("\n");
+  const out: string[] = [];
+  for (const line of lines) {
+    const t = line.trim();
+    if (/^\[참고 자료/.test(t)) break; // 프롬프트 잔재부터는 전부 폐기
+    const speaker = t.match(/^\[(주인이|나|user|assistant|system)\]\s*(.*)$/i);
+    if (speaker) {
+      const body = speaker[2];
+      if (/^[A-Za-z]/.test(body)) continue; // 영어 역할극 줄은 폐기
+      if (body) out.push(body); // 화자 표기만 떼고 한국어 본문은 보존
+      continue;
+    }
+    out.push(line);
+  }
+  return out.join("\n").trim();
+}
+
 export async function generateReport(req: ReportRequest): Promise<ReportResult> {
   const assets = collectAssets(req);
   const counts = severityCounts(assets);
@@ -435,17 +456,17 @@ export async function generateReport(req: ReportRequest): Promise<ReportResult> 
   const caseHint = cases.length
     ? ` 취약점 사례(우선순위): ${cases.slice(0, 3).map((c) => `[${c.priority.code}] ${c.finding.finding_type}`).join(", ")}. 각 사례는 ISMS-P·ISO27001 등 거버넌스 통제에 매핑됨.`
     : "";
-  const executiveSummary = await chat({
+  const executiveSummary = stripDialogueArtifacts(await chat({
     agentId: "report",
     message:
-      `다음 보안 현황 데이터를 바탕으로 1페이지 요약을 작성해줘. ${audienceGuide} 자산 ${assets.length}건, ` +
+      `다음 보안 현황 데이터를 바탕으로 1페이지 요약을 작성해줘. 출력은 보고서 본문 문단만 — 대화록·화자 표시([나]·[주인이] 등)·질문/답변 형식·영어 문장을 절대 쓰지 마세요. ${audienceGuide} 자산 ${assets.length}건, ` +
       `심각도별 발견 건수: ${JSON.stringify(counts)}. ` +
       `취약점 조치: 스캔 호스트 ${vuln.hosts}대, 열린 취약점 ${vuln.active}건(Critical ${vuln.critical}·High ${vuln.high}), ` +
       `실제 악용 확인(KEV) ${vuln.kev}건은 최우선 조치 대상. 조치 SLA 준수율 ${vuln.remediation.slaCompliance}%, 기한 초과 ${vuln.remediation.overdue}건. ` +
       `유지보수 점검: 전체 ${ms.total}건 중 지연 ${ms.overdue}건, 승인 대기 ${ms.reported}건, 반려 ${ms.rejected}건.${caseHint} ` +
       `KEV와 기한 초과, 그리고 EPSS가 높은 취약점을 우선순위로 강조해줘. ` +
       `중요: 위에 제시된 수치만 사용하고, 제시되지 않은 숫자(호스트 대수 등)를 새로 지어내지 마세요. 스캔 호스트는 정확히 ${vuln.hosts}대입니다.`,
-  });
+  }));
 
   // 우선순위 조치 목록(개선 #2)과 AI 브리핑(개선 #4)을 보고서에 포함.
   const priorities = prioritizedReviews(8);
@@ -453,7 +474,7 @@ export async function generateReport(req: ReportRequest): Promise<ReportResult> 
   let triageDraft = "";
   if (audience === "internal") {
     try {
-      triageDraft = (await buildTriageDraft(5)).draft;
+      triageDraft = stripDialogueArtifacts((await buildTriageDraft(5)).draft);
     } catch {
       /* LLM 미가동 등 — 브리핑 없이 진행 */
     }
