@@ -56,8 +56,8 @@
   .tree-leaf .badge{color:var(--amber);font-size:10px;font-weight:700;}
   .tree-empty{padding:3px 5px;font-size:11px;color:var(--muted-2);}
 
-  .center-stage{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;position:relative;}
-  .network-svg{width:100%;max-width:560px;}
+  .center-stage{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:18px 22px 0;position:relative;min-height:640px;}
+  .network-svg{width:100%;max-width:420px;}
   .network-svg .spark{animation:twinkle 3.2s ease-in-out infinite;}
   @keyframes twinkle{0%,100%{opacity:.3}50%{opacity:1}}
   /* 작업 중: 기본 스파크는 더 빨리 반짝이고, 숨겨둔 추가 스파크가 켜진다 */
@@ -78,7 +78,7 @@
   .agent-bubble-name{font-size:11.5px;font-weight:800;color:var(--blue-light);margin-bottom:4px;}
 
   /* 중앙 아이콘을 허브로 한 다이어그램형 말풍선 — 아이콘에서 각 답변/근거로 연결선이 뻗는다 */
-  .stage-core{position:relative;width:100%;max-width:560px;}
+  .stage-core{position:relative;width:100%;max-width:420px;}
   .bubble-links{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3;overflow:visible;}
   /* 아이콘 가장자리 → 말풍선으로 가는 매끈한 발광 실선(허브-스포크). 복잡한 네트워크 위에서도 읽히게. */
   .link-line{stroke:rgba(120,180,255,0.6);stroke-width:1.6;stroke-linecap:round;filter:drop-shadow(0 0 2.5px rgba(95,161,255,0.6));}
@@ -132,6 +132,38 @@
   .agent-chat input{width:100%;background:var(--panel);border:1px solid var(--border-strong);border-radius:10px;padding:13px 16px;color:var(--text);font-size:13px;outline:none;}
   .agent-chat input:focus{border-color:var(--blue);}
   .agent-chat-hint{font-size:11px;color:var(--muted-2);text-align:center;}
+
+  /* 시안3 — 로고 코어 + 팀 카드 그리드 + 하단 대화 독 (AI 에이전트 지휘) */
+  .console-caption{font-size:12px;color:var(--muted);margin:2px 0 14px;text-align:center;max-width:560px;}
+  .team-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;width:100%;max-width:740px;}
+  .tcard{background:var(--panel);border:1px solid var(--border);border-radius:13px;padding:12px 9px;text-align:center;cursor:pointer;position:relative;transition:.15s;}
+  .tcard:hover{border-color:var(--border-strong);transform:translateY(-2px);}
+  .tcard.sel{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue) inset,0 0 18px rgba(59,130,246,.18);}
+  .tcard.working{border-color:rgba(59,130,246,0.5);box-shadow:0 0 16px rgba(59,130,246,0.18);}
+  .tc-av{width:42px;height:42px;border-radius:12px;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-size:19px;background:var(--panel-2);border:1px solid var(--border);}
+  .tcard.working .tc-av{border-color:var(--blue);animation:tcpulse 1.5s infinite;}
+  @keyframes tcpulse{0%,100%{box-shadow:0 0 0 0 rgba(59,130,246,.5)}50%{box-shadow:0 0 0 7px rgba(59,130,246,0)}}
+  .tcard.watching .tc-av{border-color:rgba(30,185,128,.55);}
+  .tc-name{font-size:12px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .tc-role{font-size:9.5px;color:var(--muted);margin-top:3px;min-height:24px;line-height:1.35;}
+  .tc-badges{display:flex;gap:4px;justify-content:center;margin-top:7px;flex-wrap:wrap;}
+  .tc-b{font-size:8.5px;font-weight:800;padding:2px 6px;border-radius:5px;}
+  .tc-work{color:var(--blue-light);background:rgba(59,130,246,0.16);}
+  .tc-watch{color:var(--teal);background:rgba(30,185,128,0.16);}
+  .tc-idle{color:var(--muted-2);background:rgba(255,255,255,0.05);}
+  .tc-llm{color:var(--purple);background:rgba(139,124,240,0.14);}
+  .tc-live{position:absolute;top:8px;right:9px;font-size:8.5px;color:var(--blue-light);font-weight:800;}
+  .tc-typing span{display:inline-block;width:3.5px;height:3.5px;border-radius:50%;background:var(--blue-light);margin:0 1px;animation:tcblink 1s infinite;}
+  .tc-typing span:nth-child(2){animation-delay:.2s}.tc-typing span:nth-child(3){animation-delay:.4s}
+  @keyframes tcblink{0%,100%{opacity:.3}50%{opacity:1}}
+  .agent-dock{margin-top:auto;width:100%;position:sticky;bottom:0;background:linear-gradient(180deg,rgba(10,14,26,0) 0%,var(--bg) 26%);padding:16px 0 18px;display:flex;align-items:center;gap:10px;justify-content:center;z-index:6;}
+  .dock-who{display:flex;align-items:center;gap:8px;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);border-radius:10px;padding:7px 11px;white-space:nowrap;}
+  .dock-who .dw-i{width:26px;height:26px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:13px;}
+  .dock-who b{font-size:12px;color:#fff;}.dock-who span{font-size:10px;color:var(--blue-light);}
+  .agent-dock input{flex:1;max-width:520px;background:var(--panel);border:1px solid var(--border-strong);border-radius:10px;padding:12px 14px;color:var(--text);font-size:13px;outline:none;}
+  .agent-dock input:focus{border-color:var(--blue);}
+  .dock-send{background:var(--blue);color:#fff;border:none;border-radius:10px;padding:0 20px;height:44px;font-weight:800;cursor:pointer;}
+  .dock-all{background:var(--panel);border:1px solid var(--border-strong);color:var(--blue-light);font-weight:800;font-size:11.5px;border-radius:10px;padding:0 13px;height:44px;white-space:nowrap;cursor:pointer;}
 
   .docsearch{padding:14px 20px;border-bottom:1px solid var(--border);background:var(--panel-2);}
   .docsearch-head{display:flex;align-items:baseline;gap:10px;margin-bottom:8px;flex-wrap:wrap;}
@@ -284,17 +316,8 @@
 <image href="assets/gijo-center.png" x="196" y="116" width="208" height="208" preserveAspectRatio="xMidYMid meet"/>
       </svg>
       </div>
-      <div class="agent-bubble">
-        <div class="agent-avatar">◆</div>
-        <div>
-          <div class="agent-bubble-name" id="agentBubbleName">오케스트레이터</div>
-          <div class="agent-bubble-text" id="agentBubbleText">불러오는 중...</div>
-        </div>
-      </div>
-      <div class="agent-chat">
-        <input id="chatInput" placeholder="오케스트레이터에게 지시하세요… 예: fraud-detect-llm 전체 재스캔하고 리포트까지 작성해줘">
-        <div class="agent-chat-hint" id="chatHint">Enter 전송 · Shift+Enter 줄바꿈</div>
-      </div>
+      <div class="console-caption" id="consoleCaption">보안 지휘 콘솔 — 팀원 카드를 클릭해 지시 대상을 고르고, 아래 대화 독에서 지시하세요.</div>
+      <div class="team-grid" id="teamGrid"><div style="grid-column:1/-1;text-align:center;color:var(--muted);font-size:12px">팀원 불러오는 중...</div></div>
       <!-- 모델 미준비 안내: AI 답변에 모델이 필요할 때 두 경로를 함께 제시(로컬 모델 받기 / 사내 서버 연결). -->
       <div class="model-guide" id="modelGuide" style="display:none">
         <div class="mg-title">⚠ AI 모델이 준비되지 않았습니다 — 답변을 받으려면 아래 중 하나를 하세요</div>
@@ -302,6 +325,12 @@
           <button class="mg-btn primary" id="mgDownloadBtn">📥 이 PC에 모델 받기 · 추천 LLM 가이드</button>
           <button class="mg-btn" id="mgServerBtn">🖧 사내 GPU 서버에 연결 · 설정</button>
         </div>
+      </div>
+      <div class="agent-dock" id="agentDock">
+        <div class="dock-who" id="dockWho"><div class="dw-i">🧭</div><div><b>오케스트레이터</b><br><span>지시 대상</span></div></div>
+        <input id="chatInput" placeholder="지시를 입력하세요… 예: fraud-detect-llm 전체 재스캔하고 리포트까지">
+        <button class="dock-send" id="dockSend">전송</button>
+        <button class="dock-all" id="dockAll">◉ 전체 지시</button>
       </div>
     </div>
 
@@ -334,9 +363,18 @@
   const avatarBtn = document.getElementById("avatarBtn");
   const explorerTree = document.getElementById("explorerTree");
   const todayItems = document.getElementById("todayItems");
-  const agentBubbleName = document.getElementById("agentBubbleName");
-  const agentBubbleText = document.getElementById("agentBubbleText");
+  const consoleCaption = document.getElementById("consoleCaption");
+  const teamGrid = document.getElementById("teamGrid");
+  const dockWho = document.getElementById("dockWho");
   const chatInput = document.getElementById("chatInput");
+  const AGENT_ICON = { orchestrator: "🧭", scan: "⊘", analysis: "◎", report: "▣", normaltic: "📚" };
+  const STATUS_META = {
+    working: { cls: "working", badge: "작업 중", bcls: "tc-work" },
+    watching: { cls: "watching", badge: "감시 중", bcls: "tc-watch" },
+    idle: { cls: "", badge: "대기", bcls: "tc-idle" },
+  };
+  let agentsById = {};
+  let currentTarget = "orchestrator";
   const todoInput = document.getElementById("todoInput");
 
   let displayName = "";
@@ -700,28 +738,110 @@
 
   async function sendToOrchestrator(text) {
     pulseBusy();
-    agentBubbleText.textContent = "처리 중...";
-    // 내 지시는 말풍선으로 띄우지 않는다(아이콘은 답변만 말한다). 지시는 아래 입력창에 남는다.
+    markWorking("orchestrator");
     try {
       const result = await window.gijo.sendInstruction(text);
-      agentBubbleName.textContent = result.route.agentId;
-      agentBubbleText.textContent = result.output;
-      // 답변은 아이콘(◆)만으로 — 이름 텍스트 없이 아이콘 주변에 쌓인다.
-      spawnBubble(result.output, "answer");
+      // 답변은 로고 코어 주변 말풍선으로 — 오케스트레이터가 답한 것으로 표기.
+      spawnBubble(result.output, "answer", "오케스트레이터");
       // 답변이 "모델 미준비" 안내면 배너도 띄워 두 경로(모델 받기/서버 연결)를 바로 제시.
       if (/모델이 아직 준비|로컬 LLM|localengine/.test(result.output || "")) modelGuide().style.display = "block";
       await loadTasks();
-      if (result.route.action === "scan") await loadAssets();
+      if (result.route && result.route.action === "scan") await loadAssets();
+      refreshTeamStatus();
     } catch (e) {
-      agentBubbleText.textContent = "지시 처리 중 오류가 발생했습니다: " + e.message;
-      spawnBubble(e.message, "error");
+      spawnBubble(e.message, "error", "오케스트레이터");
     }
   }
 
   function greet() {
     const hour = new Date().getHours();
     const greeting = hour < 12 ? "좋은 아침입니다" : hour < 18 ? "안녕하세요" : "좋은 저녁입니다";
-    agentBubbleText.textContent = `${greeting}${displayName ? ", " + displayName + "님" : ""}. 아래에 지시를 입력하시면 바로 처리합니다.`;
+    spawnBubble(`${greeting}${displayName ? ", " + displayName + "님" : ""}. 팀원을 고르고 아래 대화 독에서 지시하세요.`, "answer", "오케스트레이터");
+  }
+
+  // ── 시안3: 팀 카드 그리드 + 하단 대화 독 ─────────────────────────────
+  function llmBadge(a) {
+    const m = String(a.assignedModelId || "").toLowerCase();
+    if (m.includes("gijo")) return "gijo";
+    if (m.includes("lily") || m.includes("zysec") || m.includes("sec") || m.includes("merge")) return "보안LLM";
+    return (a.id === "scan" || a.id === "analysis") ? "보안LLM" : "gijo";
+  }
+  function tcardHtml(a) {
+    const meta = STATUS_META[a.status] || STATUS_META.idle;
+    const icon = AGENT_ICON[a.id] || "◆";
+    const live = a.status === "working" ? '<div class="tc-live tc-typing"><span></span><span></span><span></span></div>' : "";
+    return `<div class="tcard ${meta.cls}${a.id === currentTarget ? " sel" : ""}" data-agent="${a.id}">${live}` +
+      `<div class="tc-av">${icon}</div><div class="tc-name">${escT(a.name)}</div>` +
+      `<div class="tc-role">${escT(a.role || "")}</div>` +
+      `<div class="tc-badges"><span class="tc-b ${meta.bcls}">${meta.badge}</span><span class="tc-b tc-llm">${escT(llmBadge(a))}</span></div></div>`;
+  }
+  async function renderTeam() {
+    try {
+      const agents = await window.gijo.listAgents();
+      agentsById = {};
+      agents.forEach((a) => { agentsById[a.id] = a; });
+      teamGrid.innerHTML = agents.map(tcardHtml).join("");
+      teamGrid.querySelectorAll(".tcard").forEach((c) => c.addEventListener("click", () => selectAgent(c.dataset.agent)));
+      if (!agentsById[currentTarget]) currentTarget = agents[0] ? agents[0].id : "orchestrator";
+      selectAgent(currentTarget);
+    } catch (e) {
+      teamGrid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--muted-2);font-size:12px">팀원을 불러오지 못했습니다</div>';
+    }
+  }
+  function selectAgent(id) {
+    currentTarget = id;
+    teamGrid.querySelectorAll(".tcard").forEach((c) => c.classList.toggle("sel", c.dataset.agent === id));
+    const a = agentsById[id];
+    const icon = AGENT_ICON[id] || "◆";
+    dockWho.innerHTML = `<div class="dw-i">${icon}</div><div><b>${a ? escT(a.name) : escT(id)}</b><br><span>지시 대상</span></div>`;
+    chatInput.placeholder = a ? `${a.name}에게 지시…` : "지시를 입력하세요…";
+  }
+  function markWorking(id) {
+    const c = teamGrid.querySelector('.tcard[data-agent="' + id + '"]');
+    if (!c) return;
+    c.classList.add("working");
+    if (!c.querySelector(".tc-live")) c.insertAdjacentHTML("afterbegin", '<div class="tc-live tc-typing"><span></span><span></span><span></span></div>');
+    clearTimeout(c._wt);
+    c._wt = setTimeout(refreshTeamStatus, 4000);
+  }
+  async function refreshTeamStatus() {
+    try {
+      const agents = await window.gijo.listAgents();
+      agents.forEach((a) => {
+        agentsById[a.id] = a;
+        const c = teamGrid.querySelector('.tcard[data-agent="' + a.id + '"]');
+        if (!c) return;
+        const meta = STATUS_META[a.status] || STATUS_META.idle;
+        c.classList.remove("working", "watching");
+        if (meta.cls) c.classList.add(meta.cls);
+        const live = c.querySelector(".tc-live");
+        if (a.status !== "working" && live) live.remove();
+        const badge = c.querySelector(".tc-badges .tc-b");
+        if (badge) { badge.className = "tc-b " + meta.bcls; badge.textContent = meta.badge; }
+      });
+    } catch (e) {}
+  }
+  async function sendToAgent(id, text) {
+    pulseBusy();
+    markWorking(id);
+    const a = agentsById[id];
+    const label = a ? a.name : id;
+    try {
+      const r = await window.gijo.chat(id, text);
+      const reply = r && r.reply != null ? r.reply : String(r);
+      spawnBubble(reply, "answer", label);
+      if (/모델이 아직 준비|로컬 LLM|localengine/.test(reply || "")) modelGuide().style.display = "block";
+      refreshTeamStatus();
+    } catch (e) {
+      spawnBubble(e.message, "error", label);
+    }
+  }
+  function dockSubmit() {
+    const text = chatInput.value.trim();
+    if (!text) return;
+    chatInput.value = "";
+    if (currentTarget === "orchestrator") sendToOrchestrator(text);
+    else sendToAgent(currentTarget, text);
   }
 
   const collabRows = document.getElementById("collabRows");
@@ -813,7 +933,7 @@
     await loadUser();
     greet();
     renderExplorer(); // 트리 골격을 먼저 그린 뒤 각 로더가 자식 컨테이너를 채운다
-    await Promise.all([loadHealth(), loadAssets(), loadSecurityProducts(), loadTasks(), loadCollaboration(), loadFiles(), loadDocSearchScopes(), checkModelReady(), loadTodayPriority()]);
+    await Promise.all([loadHealth(), loadAssets(), loadSecurityProducts(), loadTasks(), loadCollaboration(), loadFiles(), loadDocSearchScopes(), checkModelReady(), loadTodayPriority(), renderTeam()]);
 
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
@@ -828,23 +948,18 @@
     document.getElementById("mgServerBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
 
     chatInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter" && !e.shiftKey) {
-        e.preventDefault();
-        const text = chatInput.value.trim();
-        if (!text) return;
-        chatInput.value = "";
-        sendToOrchestrator(text);
-      }
+      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); dockSubmit(); }
     });
+    document.getElementById("dockSend").addEventListener("click", dockSubmit);
+    document.getElementById("dockAll").addEventListener("click", () => { selectAgent("orchestrator"); dockSubmit(); });
 
     document.getElementById("todayCtaBtn").addEventListener("click", () => {
       sendToOrchestrator("오늘 확인할 항목을 우선순위대로 에이전트 팀에게 위임해서 처리해줘");
     });
 
     window.gijo.onCollaborationEvent((evt) => {
-      agentBubbleName.textContent = evt.to;
-      agentBubbleText.textContent = evt.message;
       appendCollabRow(evt);
+      if (evt && evt.to) markWorking(evt.to);
       pulseBusy();
     });
     // 로컬 LLM이 실제로 추론/임베딩할 때마다도 작업 중으로 간주해 반짝임을 살린다.
