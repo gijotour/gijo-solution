@@ -175,7 +175,17 @@ export async function chat(args: ChatArgs): Promise<string> {
 
   // RAG 참고자료는 별도 system 메시지가 아니라 시스템 프롬프트에 합친다 — Mistral 계열
   // (Lily 포함) 채팅 템플릿은 system 메시지 2개를 "roles must alternate" 에러로 거부한다.
-  const systemContent = rag ? `${systemPromptFor(args.agentId)}\n\n${rag}` : systemPromptFor(args.agentId);
+  //
+  // 구조화 결정 호출(responseSchema)은 대화용 페르소나를 상속하지 않는다. systemPromptFor는
+  // "인사말 없이 산문으로 간결하게 답하라" 같은 *서술* 규칙이라, 도구 선택 JSON을 내야 하는
+  // 결정 호출과 충돌한다 — 실측(2026-07-17): 도구가 6개로 늘어 사용자 메시지가 길어지자 모델이
+  // 페르소나 쪽으로 기울어 register_asset을 안 부르고 산문으로 답했다(같은 모델에 페르소나 없이
+  // 직접 물으면 3/3 정확). 결정 호출의 규칙은 호출자 메시지에 이미 다 들어 있다.
+  const systemContent = args.responseSchema
+    ? "너는 지시를 읽고 도구를 고르는 분류기다. 설명·인사 없이 요청된 JSON 객체 하나만 출력한다."
+    : rag
+      ? `${systemPromptFor(args.agentId)}\n\n${rag}`
+      : systemPromptFor(args.agentId);
   const messages = [{ role: "system", content: systemContent }, ...history, { role: "user", content: args.message }];
 
   // 실시간 스트림용: 어느 에이전트가 지금 로컬 LLM으로 추론하는지 눈에 보이게 한다.

@@ -124,12 +124,6 @@ async function executeRoutedAction(route: RoutedIntent, instructionText: string)
     case "report":
     case "chat":
     default: {
-      // chat 지시는 에이전트 루프를 먼저 시도한다 — 등록된 도구(자산 조회 등)로 실데이터 근거
-      // 답변을 만들 수 있으면 그 결과를, 아니면(null) 기존 채팅으로 폴백(회귀 없음).
-      if (route.action === "chat") {
-        const loop = await runAgentLoop(instructionText).catch(() => null);
-        if (loop) return { output: loop.output, toolCalls: loop.toolCalls, approval: loop.approval };
-      }
       // 모델 로드·선택은 chat() 내부(ensureAgentModel)에서 처리된다.
       return { output: await chat({ agentId: route.agentId, message: instructionText, remember: true }) };
     }
@@ -287,6 +281,28 @@ export async function dispatchInstruction(instructionText: string): Promise<Disp
     const completedTask = updated.find((t) => t.id === task.id) ?? task;
     const output = stepResults.map((r, i) => `【${i + 1}. ${r.label}】 ${r.output}`).join("\n\n");
     return { task: completedTask, route: { agentId: "orchestrator", action: "chat" }, output, steps: stepResults };
+  }
+
+  // 에이전트 루프를 intent 분류보다 **먼저** 시도한다. 등록된 도구로 답할 수 있으면 그것으로 끝낸다.
+  // 순서가 중요하다(2026-07-17 실측): 예전엔 4분류 intent(scan/analyze/report/chat)가 앞을 막아
+  // "지금 급한 취약점 상위 3건만 알려줘"가 analyze로 분류돼 루프에 도달하지 못했다. 그 4분류는
+  // 화면 메뉴를 미러링한 레거시 축이라, 의도 축 도구셋(search·explain·today)의 앞을 막으면 안 된다.
+  // 루프가 처리 못 하면(null) 아래 기존 경로로 그대로 폴백하므로 스캔·리포트 동작은 보존된다.
+  const loop = await runAgentLoop(instructionText).catch(() => null);
+  if (loop) {
+    const loopTask = createTask({ text: instructionText, agentId: "orchestrator", priority: "P2" });
+    setAgentStatus("orchestrator", "working");
+    emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `지시 처리: "${instructionText}"` });
+    emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `완료: ${loop.output.slice(0, 120)}` });
+    resetAgentToDefault("orchestrator");
+    const updated = completeTask(loopTask.id);
+    return {
+      task: updated.find((t) => t.id === loopTask.id) ?? loopTask,
+      route: { agentId: "orchestrator", action: "chat" },
+      output: loop.output,
+      toolCalls: loop.toolCalls,
+      ...(loop.approval ? { approval: loop.approval } : {}),
+    };
   }
 
   const route = await routeIntent(instructionText);

@@ -191,10 +191,8 @@ describe("POST /api/agent/approve", () => {
   });
 
   it("dispatch가 쓰기 지시에 approval을 실어 보낸다(실행 없이)", async () => {
-    // dispatch는 LLM을 두 번 쓴다: ① intent 라우팅 ② 에이전트 루프의 도구 결정.
-    mockChat
-      .mockResolvedValueOnce('{"action":"chat","targetAssetId":null}')
-      .mockResolvedValueOnce('{"action":"tool","tool":"register_asset","args":{"name":"챗봇","path":"c.gguf"}}');
+    // 에이전트 루프가 intent 분류보다 먼저 돈다 — 첫 LLM 호출이 곧 도구 결정이다.
+    mockChat.mockResolvedValueOnce('{"action":"tool","tool":"register_asset","args":{"name":"챗봇","path":"c.gguf"}}');
     const res = await request(app)
       .post("/api/dispatch")
       .set("Authorization", `Bearer ${token}`)

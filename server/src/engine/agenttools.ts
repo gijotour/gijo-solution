@@ -1,5 +1,12 @@
 // engine/agenttools.ts — 에이전트 루프가 호출할 수 있는 도구 레지스트리.
-// 메뉴 하나씩 확장한다(계획서 §4): 「AI 자산」 조회(Phase 1) → 쓰기(Phase 2, 결재판).
+//
+// ⚠ 설계 축: **화면 메뉴가 아니라 사용자 의도** (2026-07-17 확정).
+// 처음엔 메뉴를 1:1로 미러링했는데(list_assets/get_asset/get_aibom = 자산 메뉴), 그러면 LLM이
+// "이 질문은 어느 메뉴인가"를 먼저 풀어야 하고 메뉴를 가로지르는 질문("오늘 뭐부터?", "Log4Shell
+// 관련된 거 다 찾아줘")에 도구를 3~4개 조합해야 해서 실패율이 올라간다. 그래서 도구를 의도 단위로
+// 잡고, 메뉴 경계를 서버가 가로지른다:
+//   찾기(search) · 설명(explain) · 상세(get_asset) · 목록(list_assets) · 오늘(today) · 등록(register_asset)
+// 온톨로지(지식 그래프)가 그 접착제다 — 위협→완화통제→보안제품→자산 관계가 이미 메뉴를 가로지른다.
 //
 // 원칙(QA 보고서 2026-07-17): 판단·검증·실행은 여기(규칙 코드), LLM은 도구 선택·인자 추출만.
 // 도구 결과는 LLM에 재주입되므로 장황한 JSON 대신 짧은 한국어 요약 텍스트를 돌려준다.
@@ -8,6 +15,10 @@
 // 만들어 돌려주고, 사람이 승인한 뒤 /api/agent/approve로만 실행된다(시안 B, 2026-07-17 확정).
 
 import { listAssets, getAsset, registerAsset, Asset } from "./assets";
+import { expandOntology } from "./ontology";
+import { prioritizedReviews } from "./approvals";
+import { listProducts } from "./securityproducts";
+import { listDocuments } from "./memory";
 
 export interface AgentToolParam {
   name: string;
@@ -52,6 +63,8 @@ function runListAssets(): string {
   return [`등록된 AI 자산 ${assets.length}개:`, ...lines].join("\n").slice(0, 2000);
 }
 
+// 자산 상세 — AI-BOM까지 한 번에 준다(예전엔 get_aibom을 따로 뒀는데, LLM이 "AI-BOM도 봐야 하나"를
+// 매번 판단해야 해서 도구만 늘고 턴이 늘었다. 상세는 상세 하나로 충분하다).
 function runGetAsset(args: Record<string, string>): string {
   const asset = getAsset(args.assetId);
   if (!asset) {
@@ -63,27 +76,149 @@ function runGetAsset(args: Record<string, string>): string {
     .sort((a, b) => SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity))
     .slice(0, 5)
     .map((f) => `  - [${f.severity}] ${f.finding_type}: ${f.evidence.slice(0, 80)}`);
+  const b = asset.aibom;
+  const v = (s: string) => (s.trim() === "" ? "미기재" : s);
+  const aibomLines = [
+    `AI-BOM: 파운데이션=${v(b.model.foundationModel)} | 아키텍처=${v(b.model.architecture)} | 용도=${v(b.model.intendedUse)}`,
+    `        데이터출처=${v(b.dataset.sources)} | 가드레일=${v(b.prompt.guardrails).slice(0, 40)} | 인프라=${v(b.infrastructure.compute)}`,
+  ];
+  // 온톨로지 연계: 이 자산의 유형·구성에 걸리는 위협·완화통제를 함께 준다(AI-BOM → 위협 흐름).
+  const threats = ontologyLinesFor(`${asset.name} ${asset.assetType} ${b.model.foundationModel} ${b.model.architecture}`, 6);
   return [
     `자산 ${asset.id} (${asset.name})`,
     `유형=${asset.assetType} | 담당=${asset.owner || "미지정"} | 서비스=${asset.service ?? "미지정"} | 경로=${asset.path}`,
     `마지막 스캔: ${asset.lastScannedAt ? new Date(asset.lastScannedAt).toLocaleString("ko-KR") : "스캔 이력 없음"} | ${findingSummary(asset)}`,
+    ...aibomLines,
     ...(top.length ? ["주요 finding(심각도순, 최대 5건):", ...top] : []),
-  ].join("\n").slice(0, 2000);
+    ...(threats.length ? ["사내 온톨로지가 아는 관련 위협·통제:", ...threats] : []),
+  ].join("\n").slice(0, 2500);
 }
 
-function runGetAibom(args: Record<string, string>): string {
-  const asset = getAsset(args.assetId);
-  if (!asset) return `자산 "${args.assetId}"을(를) 찾을 수 없습니다.`;
-  const b = asset.aibom;
-  const v = (s: string) => (s.trim() === "" ? "미기재" : s);
+// ── 온톨로지(지식 그래프)를 도구의 접착제로 ─────────────────────────────
+// 위협→완화통제→보안제품→자산 관계는 이미 메뉴를 가로지른다. 이걸 도구 결과에 얹어
+// LLM이 "메뉴를 더 뒤지지 않아도" 근거 있는 답을 하게 한다.
+function ontologyLinesFor(text: string, limit: number): string[] {
+  try {
+    return expandOntology(text, undefined, { hops: 2, limit }).map(
+      (t) => `  - ${t.subject} —[${t.predicate}]→ ${t.object}`
+    );
+  } catch {
+    return []; // 온톨로지가 비어 있어도 도구는 계속 동작한다
+  }
+}
+
+// explain — "이게 뭐야 / 어떤 위협이 걸려 / 우리 통제는?" 한 방에.
+// 온톨로지 관계 + 사내 문서(업로드·자동분류된 장기기억) + 보유 보안제품을 가로질러 근거를 모은다.
+async function runExplain(args: Record<string, string>): Promise<string> {
+  const topic = args.topic.trim();
+  const out: string[] = [];
+
+  const triples = ontologyLinesFor(topic, 12);
+  if (triples.length) out.push(`사내 온톨로지 관계 — "${topic}" 관련:`, ...triples);
+
+  // 업로드·자동분류된 사내 문서 중 제목이 걸리는 것(있으면 근거로 제시).
+  try {
+    const docs = (await listDocuments()).filter((d) => matches(d.documentId, topic));
+    if (docs.length) {
+      out.push(
+        `사내 문서(장기기억) ${docs.length}건:`,
+        ...docs.slice(0, 5).map((d) => `  - ${d.documentId}${d.docClass ? ` [${d.docClass}]` : ""} (조각 ${d.chunks})`)
+      );
+    }
+  } catch {
+    /* 임베딩 미기동 등 — 문서 근거 없이 계속 */
+  }
+
+  // 보유 보안제품 중 관련된 것(대응 수단 제시).
+  const products = listProducts().filter((p) => matches(`${p.name} ${p.category} ${p.vendor ?? ""}`, topic));
+  if (products.length) {
+    out.push(
+      `보유 보안제품 ${products.length}건:`,
+      ...products.slice(0, 5).map((p) => `  - ${p.name} (${p.category}${p.vendor ? `, ${p.vendor}` : ""})`)
+    );
+  }
+
+  if (out.length === 0) {
+    return `"${topic}"에 대해 사내 온톨로지·문서·보안제품 등록부에서 찾은 근거가 없습니다. 일반 지식으로만 답하거나, 관련 문서를 업로드하면 근거가 쌓입니다.`;
+  }
+  return out.join("\n").slice(0, 2500);
+}
+
+// 느슨한 부분일치 — 한국어는 형태소 분석 없이 공백 토큰화가 불안정해 정규화 후 부분문자열로 본다
+// (온톨로지 expandOntology와 같은 전략).
+function matches(haystack: string, needle: string): boolean {
+  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "");
+  const n = norm(needle);
+  return n.length >= 2 && norm(haystack).includes(n);
+}
+
+// search — 메뉴를 가로지르는 단일 검색. LLM이 "어느 메뉴를 봐야 하나"를 풀지 않아도 되게 한다.
+async function runSearch(args: Record<string, string>): Promise<string> {
+  const q = args.query.trim();
+  const out: string[] = [];
+
+  const assets = listAssets().filter(
+    (a) => matches(a.id, q) || matches(a.name, q) || matches(a.assetType, q) || a.components.some((c) => matches(c.name, q))
+  );
+  if (assets.length) {
+    out.push(`AI 자산 ${assets.length}건:`, ...assets.slice(0, 6).map((a) => `  - ${a.id} | ${a.name} | ${a.assetType} | ${findingSummary(a)}`));
+  }
+
+  // 취약점 — 전 자산을 가로질러 우선순위 상위에서 찾는다(자산별로 뒤지지 않아도 되게).
+  const vulns = prioritizedReviews(100).filter(
+    (r) => matches(r.finding.finding_type, q) || matches(r.finding.evidence, q) || matches(r.assetName, q)
+  );
+  if (vulns.length) {
+    // assetId를 함께 준다 — LLM이 이어서 get_asset(assetId)을 부를 수 있어야 한다.
+    // (자산명만 주면 id를 몰라 다음 도구를 못 부르고 턴이 낭비된다.)
+    out.push(
+      `취약점 ${vulns.length}건(우선순위순):`,
+      ...vulns.slice(0, 6).map((r) => `  - [${r.finding.severity}] ${r.finding.finding_type} @ ${r.assetName}(id=${r.assetId}) — 점수 ${r.score}${r.assignee ? `, 담당 ${r.assignee}` : ""}${r.overdue ? " ⚠지연" : ""}`)
+    );
+  }
+
+  const products = listProducts().filter((p) => matches(`${p.name} ${p.category} ${p.vendor ?? ""}`, q));
+  if (products.length) {
+    out.push(`보안제품 ${products.length}건:`, ...products.slice(0, 5).map((p) => `  - ${p.name} (${p.category})`));
+  }
+
+  try {
+    const docs = (await listDocuments()).filter((d) => matches(d.documentId, q));
+    if (docs.length) {
+      out.push(`사내 문서 ${docs.length}건:`, ...docs.slice(0, 5).map((d) => `  - ${d.documentId}${d.docClass ? ` [${d.docClass}]` : ""}`));
+    }
+  } catch {
+    /* 임베딩 미기동 — 문서 검색 생략 */
+  }
+
+  const triples = ontologyLinesFor(q, 6);
+  if (triples.length) out.push("온톨로지 관계:", ...triples);
+
+  if (out.length === 0) return `"${q}"에 해당하는 자산·취약점·보안제품·문서·온톨로지 관계를 찾지 못했습니다.`;
+  return out.join("\n").slice(0, 2500);
+}
+
+// today — "오늘 뭐부터?" 한 방에. KEV/EPSS/VPR 점수로 전 자산을 가로질러 정렬한 조치 우선순위.
+function runToday(args: Record<string, string>): string {
+  const limit = Math.min(Math.max(Number(args.limit) || 5, 1), 20);
+  const top = prioritizedReviews(limit);
+  if (top.length === 0) return "지금 조치할 취약점이 없습니다. (오탐 판정·조치완료 제외)";
+  const lines = top.map((r, i) => {
+    const f = r.finding;
+    const tags = [
+      f.kev ? "KEV(실제악용)" : null,
+      f.epss != null ? `EPSS ${f.epss}` : null,
+      f.vpr != null ? `VPR ${f.vpr}` : null,
+    ].filter(Boolean).join(" · ");
+    // assetId 포함 — LLM이 "1번 자산 자세히 봐줘" 후속 지시에 get_asset을 바로 부를 수 있게.
+    return `${i + 1}. [${f.severity}] ${f.finding_type} @ ${r.assetName}(id=${r.assetId})${tags ? ` — ${tags}` : ""}${r.assignee ? ` | 담당 ${r.assignee}` : " | 담당 미지정"}${r.dueDate ? ` | 기한 ${r.dueDate}` : ""}${r.overdue ? " ⚠기한초과" : ""}`;
+  });
+  const overdue = top.filter((r) => r.overdue).length;
   return [
-    `${asset.id} AI-BOM 5영역:`,
-    `- 모델: 파운데이션=${v(b.model.foundationModel)} | 아키텍처=${v(b.model.architecture)} | 용도=${v(b.model.intendedUse)} | 한계=${v(b.model.limitations)}`,
-    `- 데이터: 출처=${v(b.dataset.sources)} | 벡터DB=${v(b.dataset.vectorDbLocation)}`,
-    `- 프롬프트: 시스템=${v(b.prompt.systemPrompt).slice(0, 60)} | 가드레일=${v(b.prompt.guardrails).slice(0, 60)}`,
-    `- 도구: API=${v(b.agentTool.apis)} | MCP=${v(b.agentTool.mcpServers)}`,
-    `- 인프라: 컴퓨트=${v(b.infrastructure.compute)} | 호스팅=${v(b.infrastructure.hostingProvider)}`,
-  ].join("\n").slice(0, 2000);
+    `오늘 조치 우선순위 상위 ${top.length}건 (KEV→EPSS→VPR 순):`,
+    ...lines,
+    overdue ? `⚠ 기한 초과 ${overdue}건 포함` : "",
+  ].filter(Boolean).join("\n").slice(0, 2500);
 }
 
 // ── 「AI 자산」 쓰기 도구 (Phase 2 — 결재판 경유) ────────────────────────
@@ -145,18 +280,40 @@ const TOOLS: AgentTool[] = [
     label: "자산 상세 조회",
     domain: "assets",
     write: false,
-    description: '자산 1개의 상세와 발견된 취약점(finding)을 조회한다. 예: {"assetId":"ai-secbot-01"}',
+    description:
+      '자산 1개의 상세를 조회한다 — 취약점(finding)·AI-BOM·관련 위협까지 함께 나온다. 예: {"assetId":"ai-secbot-01"}',
     params: [{ name: "assetId", label: "자산 id", description: "조회할 자산 id", required: true }],
     run: runGetAsset,
   },
   {
-    name: "get_aibom",
-    label: "AI-BOM 조회",
-    domain: "assets",
+    name: "search",
+    label: "통합 검색",
+    domain: "cross", // 메뉴를 가로지른다 — 자산·취약점·보안제품·문서·온톨로지를 한 번에
     write: false,
-    description: '자산의 AI-BOM(모델·데이터·프롬프트·도구·인프라 구성명세)을 조회한다. 예: {"assetId":"ai-secbot-01"}',
-    params: [{ name: "assetId", label: "자산 id", description: "조회할 자산 id", required: true }],
-    run: runGetAibom,
+    description:
+      '무엇이든 찾는다 — 자산·취약점·보안제품·사내문서·온톨로지 관계를 한 번에 검색한다. 어디 있는지 모를 때 이것부터 쓴다. 예: {"query":"Log4Shell"}',
+    params: [{ name: "query", label: "검색어", description: "찾을 키워드 (자산명·취약점·제품·문서·위협)", required: true }],
+    run: runSearch,
+  },
+  {
+    name: "explain",
+    label: "근거 조회(온톨로지)",
+    domain: "cross",
+    write: false,
+    description:
+      '보안 주제·위협·용어의 사내 근거를 모은다 — 온톨로지 관계(위협→완화통제→제품)·사내 문서·보유 보안제품. "이게 뭐야", "무슨 위협이 걸려", "우리 통제는?"에 쓴다. 예: {"topic":"프롬프트 인젝션"}',
+    params: [{ name: "topic", label: "주제", description: "설명이 필요한 위협·용어·주제", required: true }],
+    run: runExplain,
+  },
+  {
+    name: "today",
+    label: "오늘의 조치 우선순위",
+    domain: "cross",
+    write: false,
+    description:
+      '지금 조치할 취약점 우선순위를 전 자산을 가로질러 알려준다(KEV→EPSS→VPR 순, 담당자·기한·지연 포함). "오늘 뭐부터?"에 쓴다. 예: {"limit":"5"}',
+    params: [{ name: "limit", label: "개수", description: "상위 몇 건 (기본 5)", required: false }],
+    run: runToday,
   },
   {
     name: "register_asset",
