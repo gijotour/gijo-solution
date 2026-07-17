@@ -13,6 +13,7 @@ import { listAssets, getAsset, Asset } from "./assets";
 import { listMaintenanceItems, MaintenanceItem } from "./maintenance";
 import { listTasks, TaskItem } from "./tasks";
 import { prioritizedReviews, buildTriageDraft, type PrioritizedFinding } from "./approvals";
+import { aibomThreatMatches, type AiBomThreatReport } from "./compliance";
 
 export interface ReportRequest {
   type: "weekly" | "quarterly" | "ondemand";
@@ -221,6 +222,20 @@ function prioritiesTable(items: PrioritizedFinding[]): Table {
   return new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: [header, ...rows] });
 }
 
+// 리포트 범위 자산들의 AI-BOM 기반 위협 노출(매칭이 있는 자산만). 특수 기능(거버넌스 연계)의 보고서 노출.
+function collectAiThreatReports(assets: Asset[]): AiBomThreatReport[] {
+  const out: AiBomThreatReport[] = [];
+  for (const a of assets) {
+    try {
+      const r = aibomThreatMatches(a.id);
+      if (r.matches.length) out.push(r);
+    } catch {
+      /* 자산 조회 실패 등 — 리포트 생성을 죽이지 않는다 */
+    }
+  }
+  return out;
+}
+
 async function buildDocx(
   req: ReportRequest,
   assets: Asset[],
@@ -228,7 +243,8 @@ async function buildDocx(
   maintenance: MaintenanceItem[],
   vuln: VulnReportData,
   priorities: PrioritizedFinding[],
-  triageDraft: string
+  triageDraft: string,
+  aiThreats: AiBomThreatReport[]
 ): Promise<Buffer> {
   const counts = severityCounts(assets);
   const ms = maintenanceSummary(maintenance);
@@ -315,6 +331,34 @@ async function buildDocx(
                     new Paragraph({ children: [new TextRun({ text: `조치 우선순위 ${c.priority.code} — 기한 ${c.priority.sla} (기준: ${c.priority.basis})`, bold: true })] }),
                     new Paragraph({ children: [new TextRun({ text: "거버넌스 매칭:", bold: true })] }),
                     ...c.governance.map((g) => new Paragraph({ children: [new TextRun(`· ${g.framework} ${g.control} — ${g.rationale}`)] })),
+                  ];
+                }),
+              ]
+            : []),
+          // AI 자산 위협 노출(AI-BOM 거버넌스) — 구성명세 기반 KISA 위협 매칭·대응 현황(특수 기능).
+          ...(aiThreats.length
+            ? [
+                new Paragraph({ text: "AI 자산 위협 노출 (AI-BOM 거버넌스)", heading: HeadingLevel.HEADING_1 }),
+                new Paragraph({
+                  children: [new TextRun({ text: "각 AI 자산의 구성명세(AI-BOM)에서 채워진 영역을 기준으로 KISA AI 보안 위협을 자동 매칭하고 조직 대응 현황을 결합했습니다.", italics: true, size: 18 })],
+                }),
+                ...aiThreats.flatMap((r) => {
+                  const s = r.summary;
+                  const openTop = r.matches.filter((m) => m.status === "open").slice(0, 6);
+                  return [
+                    new Paragraph({ text: `${r.assetName} — 노출 ${s.relevant} · 대응완료 ${s.covered} · 부분 ${s.partial} · 미대응 ${s.open}`, heading: HeadingLevel.HEADING_2 }),
+                    ...openTop.map(
+                      (m) =>
+                        new Paragraph({
+                          children: [new TextRun(`[${m.code}] ${m.name} — 영역 ${m.matchedAreas.join("·")}${m.owasp[0] ? ` · ${m.owasp[0]}` : ""}`)],
+                        })
+                    ),
+                    ...(s.open > openTop.length
+                      ? [new Paragraph({ children: [new TextRun({ text: `… 외 미대응 ${s.open - openTop.length}건 (리포트·컴플라이언스 화면에서 전체 확인)`, size: 18, italics: true })] })]
+                      : []),
+                    ...(s.open === 0
+                      ? [new Paragraph({ children: [new TextRun("미대응 위협 없음 — 노출 위협이 모두 대응(또는 해당없음) 처리됨")] })]
+                      : []),
                   ];
                 }),
               ]
@@ -415,7 +459,8 @@ export async function generateReport(req: ReportRequest): Promise<ReportResult> 
     }
   }
 
-  const buffer = await buildDocx(req, assets, executiveSummary, maintenance, vuln, priorities, triageDraft);
+  const aiThreats = collectAiThreatReports(assets);
+  const buffer = await buildDocx(req, assets, executiveSummary, maintenance, vuln, priorities, triageDraft, aiThreats);
   await fs.mkdir(REPORT_DIR, { recursive: true });
   const base = `${req.type}-${Date.now()}`;
   const filePath = path.join(REPORT_DIR, `${base}.docx`);
@@ -426,7 +471,7 @@ export async function generateReport(req: ReportRequest): Promise<ReportResult> 
   // PDF 생성(개선 #3) — 요청 시. HTML로 만들어 headless 브라우저로 A4 렌더. 실패해도 DOCX는 그대로.
   if (req.format === "pdf" || req.format === "both") {
     const pdfPath = path.join(REPORT_DIR, `${base}.pdf`);
-    const html = buildReportHtml(req, assets, executiveSummary, maintenance, vuln, priorities, triageDraft);
+    const html = buildReportHtml(req, assets, executiveSummary, maintenance, vuln, priorities, triageDraft, aiThreats);
     const ok = await renderPdf(html, pdfPath);
     if (ok) result.pdfPath = pdfPath;
     else result.pdfError = "PDF 렌더 실패(headless 브라우저 미가용). DOCX만 제공됩니다.";
@@ -442,7 +487,8 @@ function buildReportHtml(
   maintenance: MaintenanceItem[],
   vuln: VulnReportData,
   priorities: PrioritizedFinding[],
-  triageDraft: string
+  triageDraft: string,
+  aiThreats: AiBomThreatReport[]
 ): string {
   const esc = (s: string) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const counts = severityCounts(assets);
@@ -482,6 +528,26 @@ function buildReportHtml(
     )
     .join("");
   const triageHtml = triageDraft && !triageDraft.startsWith("⚠") ? `<h2>AI 조치 브리핑 (참고)</h2><pre>${esc(triageDraft)}</pre>` : "";
+  const aiThreatsHtml = aiThreats.length
+    ? `<h2>AI 자산 위협 노출 (AI-BOM 거버넌스)</h2><p class="muted">각 AI 자산의 구성명세(AI-BOM)에서 채워진 영역을 기준으로 KISA AI 보안 위협을 자동 매칭하고 조직 대응 현황을 결합했습니다.</p>` +
+      aiThreats
+        .map((r) => {
+          const s = r.summary;
+          const openTop = r.matches.filter((m) => m.status === "open").slice(0, 6);
+          const rows = openTop
+            .map((m) => `<tr><td>${esc(m.code)}</td><td>${esc(m.name)}</td><td>${esc(m.matchedAreas.join("·"))}</td><td>${esc(m.owasp[0] ?? "-")}</td></tr>`)
+            .join("");
+          const more = s.open > openTop.length ? `<p class="muted">… 외 미대응 ${s.open - openTop.length}건</p>` : "";
+          const none = s.open === 0 ? `<p>미대응 위협 없음 — 노출 위협이 모두 대응(또는 해당없음) 처리됨</p>` : "";
+          return (
+            `<h3 style="margin:12px 0 4px;font-size:12.5px">${esc(r.assetName)} — 노출 ${s.relevant} · 대응완료 ${s.covered} · 부분 ${s.partial} · 미대응 ${s.open}</h3>` +
+            (openTop.length ? `<table><tr><th>코드</th><th>위협</th><th>매칭 영역</th><th>OWASP</th></tr>${rows}</table>` : "") +
+            more +
+            none
+          );
+        })
+        .join("")
+    : "";
   return `<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><style>
     body{font-family:"Malgun Gothic","맑은 고딕",sans-serif;color:#111;font-size:12px;line-height:1.6;padding:8px}
     h1{font-size:20px;border-bottom:2px solid #333;padding-bottom:6px} h2{font-size:14px;margin-top:18px;color:#1a3a6b}
@@ -499,6 +565,7 @@ function buildReportHtml(
     ${priorities.length ? `<h2>우선순위 조치 목록 (오늘의 조치 Top)</h2><table><tr><th>순위</th><th>심각도</th><th>취약점</th><th>자산</th><th>담당자</th><th>기한</th><th>상태</th></tr>${rows}</table>` : ""}
     ${triageHtml}
     ${casesHtml}
+    ${aiThreatsHtml}
     <h2>유지보수 점검 거버넌스</h2>
     <p>전체 ${ms.total}건 · 예정 ${ms.scheduled}건(지연 ${ms.overdue}) · 승인 대기 ${ms.reported}건 · 승인됨 ${ms.approved}건 · 반려 ${ms.rejected}건</p>
   </body></html>`;

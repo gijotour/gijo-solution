@@ -278,6 +278,8 @@ tr:last-child td{border-bottom:none;}
       { k: "architecture", label: "아키텍처 정보" },
       { k: "finetuneHistory", label: "파인튜닝 이력" },
       { k: "weightsHash", label: "가중치(Weights) 파일 해시" },
+      { k: "intendedUse", label: "용도·사용 범위 (Intended Use — 모델 카드)" },
+      { k: "limitations", label: "한계·주의사항 (Limitations — 모델 카드)" },
     ] },
     { key: "dataset", label: "Dataset (데이터)", purpose: "저작권/라이선스 침해 · 개인정보(PII) 유출 및 오염 데이터 추적", fields: [
       { k: "sources", label: "학습/파인튜닝 데이터셋 출처" },
@@ -332,7 +334,39 @@ tr:last-child td{border-bottom:none;}
         ${fields}
       </div>`;
     }).join("");
+    attachWeightsHashButton(asset.id);
     loadAiBomThreats(asset.id);
+  }
+
+  // 가중치 해시 자동 계산(SHA-256 스트리밍) — 서버가 접근 가능한 가중치 파일 경로가 필요하다.
+  // 경로가 비어 있으면 자산 path를 쓰고, 실패 시(파일 없음 등) 서버의 정직한 에러를 그대로 보여준다.
+  function attachWeightsHashButton(assetId) {
+    const whEl = document.querySelector('#aibomAreas textarea[data-area="model"][data-field="weightsHash"]');
+    if (!whEl) return;
+    const wrap = document.createElement("div");
+    wrap.style.cssText = "display:flex;gap:6px;align-items:center;margin-top:5px";
+    wrap.innerHTML =
+      `<input id="whPathInput" placeholder="가중치 파일 경로(비우면 자산 path 사용) 예: D:\\models\\model.gguf"
+        style="flex:1;background:var(--panel);border:1px solid var(--border-strong);border-radius:6px;padding:5px 9px;color:var(--text);font-size:11px;outline:none">` +
+      `<button id="whCalcBtn" class="btn-ghost" style="padding:5px 10px;font-size:11px;white-space:nowrap">⚙ SHA-256 자동 계산</button>`;
+    whEl.insertAdjacentElement("afterend", wrap);
+    document.getElementById("whCalcBtn").addEventListener("click", async () => {
+      const btn = document.getElementById("whCalcBtn");
+      const status = document.getElementById("aibomStatus");
+      btn.disabled = true; btn.textContent = "계산 중…";
+      try {
+        const fp = document.getElementById("whPathInput").value.trim() || undefined;
+        const r = await window.gijo.computeWeightsHash(assetId, fp);
+        whEl.value = r.weightsHash;
+        status.textContent = `✓ 가중치 해시 계산 완료 (${(r.sizeBytes / 1048576).toFixed(1)}MB · ${r.filePath})`;
+        status.style.color = "var(--teal)";
+      } catch (e) {
+        status.textContent = "✗ " + e.message;
+        status.style.color = "#f5928a";
+      } finally {
+        btn.disabled = false; btn.textContent = "⚙ SHA-256 자동 계산";
+      }
+    });
   }
 
   // AI-BOM 구성 기반 노출 KISA 위협 + 조직 대응 현황을 자동 매칭해 보여준다(거버넌스 연계).

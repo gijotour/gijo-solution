@@ -13,6 +13,8 @@
 
 import type { Express } from "express";
 import type { WebSocketServer } from "ws";
+import * as crypto from "crypto";
+import * as fs from "fs";
 import { authMiddleware } from "../auth/auth";
 import type { StandardFinding } from "./bridge";
 import { db } from "../db";
@@ -26,7 +28,8 @@ export interface AssetComponent {
 // AI-BOM 5영역 — 코드 의존성(SBOM)을 넘어 모델·데이터·프롬프트·도구·인프라까지의 구성명세.
 // 각 항목은 자유 텍스트(보안담당자가 채워 넣는 관리 항목)다. 값이 비면 "미기재"로 간주.
 export interface AiBom {
-  model: { foundationModel: string; finetuneHistory: string; architecture: string; weightsHash: string };
+  // intendedUse/limitations는 모델 카드(Model Card) 항목 — 용도 범위·한계를 명세해 오사용을 막는다.
+  model: { foundationModel: string; finetuneHistory: string; architecture: string; weightsHash: string; intendedUse: string; limitations: string };
   dataset: { sources: string; vectorDbLocation: string };
   prompt: { systemPrompt: string; guardrails: string };
   agentTool: { apis: string; mcpServers: string };
@@ -35,7 +38,7 @@ export interface AiBom {
 
 export function emptyAiBom(): AiBom {
   return {
-    model: { foundationModel: "", finetuneHistory: "", architecture: "", weightsHash: "" },
+    model: { foundationModel: "", finetuneHistory: "", architecture: "", weightsHash: "", intendedUse: "", limitations: "" },
     dataset: { sources: "", vectorDbLocation: "" },
     prompt: { systemPrompt: "", guardrails: "" },
     agentTool: { apis: "", mcpServers: "" },
@@ -343,6 +346,29 @@ export function registerAssetsRoutes(app: Express): void {
     const asset = updateAiBom(String(req.params.id), req.body.aibom);
     if (!asset) return res.status(404).json({ error: "asset not found" });
     res.json(asset);
+  });
+  // 가중치 파일 SHA-256 자동 계산 — AI-BOM 무결성·출처 추적(모델 카드). 스트리밍 해시라 수 GB GGUF도 안전.
+  // body.filePath(선택, 기본=자산 path). 파일이 없거나 디렉터리면 정직하게 400으로 알린다(추측·자동보정 없음).
+  app.post("/api/assets/:id/aibom/weights-hash", authMiddleware, (req, res) => {
+    const asset = getAsset(String(req.params.id));
+    if (!asset) return res.status(404).json({ error: "자산을 찾을 수 없습니다" });
+    const filePath = String((req.body?.filePath ?? "").trim() || asset.path);
+    let stat: fs.Stats;
+    try {
+      stat = fs.statSync(filePath);
+    } catch {
+      return res.status(400).json({ error: `파일을 찾을 수 없습니다: ${filePath} — 가중치 파일 경로를 직접 지정하세요` });
+    }
+    if (!stat.isFile()) return res.status(400).json({ error: `파일이 아닙니다(디렉터리 등): ${filePath}` });
+    const hash = crypto.createHash("sha256");
+    const stream = fs.createReadStream(filePath);
+    stream.on("data", (d) => hash.update(d));
+    stream.on("error", (err) => res.status(500).json({ error: `읽기 실패: ${err.message}` }));
+    stream.on("end", () => {
+      const weightsHash = `sha256:${hash.digest("hex")}`;
+      updateAiBom(asset.id, { ...asset.aibom, model: { ...asset.aibom.model, weightsHash } });
+      res.json({ assetId: asset.id, filePath, sizeBytes: stat.size, weightsHash });
+    });
   });
   app.delete("/api/assets/:id", authMiddleware, (req, res) => {
     const ok = deleteAsset(String(req.params.id));

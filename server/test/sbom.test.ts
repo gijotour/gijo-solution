@@ -1,6 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import * as fs from "fs";
+import * as os from "os";
+import * as path from "path";
+import * as crypto from "crypto";
 import { createApp } from "../src/app";
 import { resetAssetsForTests } from "../src/engine/assets";
 import { buildSpdxJson } from "../src/engine/sbom";
@@ -75,7 +78,7 @@ describe("sbom", () => {
       .set("Authorization", `Bearer ${token}`)
       .send({
         aibom: {
-          model: { foundationModel: "Qwen2.5-7B", finetuneHistory: "SFT v1", architecture: "", weightsHash: "" },
+          model: { foundationModel: "Qwen2.5-7B", finetuneHistory: "SFT v1", architecture: "", weightsHash: "", intendedUse: "사내 보안 상담 전용", limitations: "법률 자문 불가" },
           dataset: { sources: "사내 문서", vectorDbLocation: "LanceDB" },
           prompt: { systemPrompt: "비밀 시스템 프롬프트", guardrails: "PII 마스킹" },
           agentTool: { apis: "내부 API", mcpServers: "" },
@@ -95,6 +98,8 @@ describe("sbom", () => {
       (bom.metadata.component.properties || []).map((p: { name: string; value: string }) => [p.name, p.value])
     );
     expect(props["gijo:model:foundationModel"]).toBe("Qwen2.5-7B");
+    expect(props["gijo:model:intendedUse"]).toBe("사내 보안 상담 전용"); // 모델 카드
+    expect(props["gijo:model:limitations"]).toBe("법률 자문 불가");
     expect(props["gijo:infra:hostingProvider"]).toBe("온프레미스");
     // 시스템 프롬프트는 원문 대신 SHA-256 해시만 — 원문이 문서에 없어야 한다.
     expect(props["gijo:prompt:systemPromptSha256"]).toMatch(/^[a-f0-9]{64}$/);
@@ -103,6 +108,33 @@ describe("sbom", () => {
     const types = (bom.components || []).map((c: { type: string }) => c.type);
     expect(types).toContain("data");
     expect((bom.components || []).some((c: { name: string }) => c.name === "torch")).toBe(true);
+  });
+
+  it("weights-hash: 파일을 스트리밍 SHA-256으로 계산해 AI-BOM에 기록, 없는 파일은 정직한 400", async () => {
+    const tmp = path.join(os.tmpdir(), `gijo-weights-${Date.now()}.bin`);
+    fs.writeFileSync(tmp, "fake-weights-content");
+    const expected = "sha256:" + crypto.createHash("sha256").update("fake-weights-content").digest("hex");
+
+    const res = await request(app)
+      .post("/api/assets/fraud-detect-llm/aibom/weights-hash")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ filePath: tmp });
+    expect(res.status).toBe(200);
+    expect(res.body.weightsHash).toBe(expected);
+    expect(res.body.sizeBytes).toBeGreaterThan(0);
+
+    // AI-BOM에 영속 반영됐는지
+    const asset = await request(app).get("/api/assets/fraud-detect-llm").set("Authorization", `Bearer ${token}`);
+    expect(asset.body.aibom.model.weightsHash).toBe(expected);
+    fs.rmSync(tmp, { force: true });
+
+    // 없는 파일 → 400 + 명확한 에러(추측·자동보정 없음)
+    const bad = await request(app)
+      .post("/api/assets/fraud-detect-llm/aibom/weights-hash")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ filePath: path.join(os.tmpdir(), "no-such-weights-file.gguf") });
+    expect(bad.status).toBe(400);
+    expect(bad.body.error).toContain("파일을 찾을 수 없습니다");
   });
 
   it("buildSpdxJson uses valid SPDXID refs and NOASSERTION for missing fields", () => {

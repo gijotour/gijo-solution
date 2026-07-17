@@ -672,7 +672,7 @@ export interface Finding {
 }
 
 export interface AiBom {
-  model: { foundationModel: string; finetuneHistory: string; architecture: string; weightsHash: string };
+  model: { foundationModel: string; finetuneHistory: string; architecture: string; weightsHash: string; intendedUse: string; limitations: string };
   dataset: { sources: string; vectorDbLocation: string };
   prompt: { systemPrompt: string; guardrails: string };
   agentTool: { apis: string; mcpServers: string };
@@ -723,6 +723,8 @@ export const assetsApi = {
   scanRepos: (args: { provider: string; owner: string; token?: string; baseUrl?: string; maxRepos?: number }) =>
     request<{ scanned: number; registered: number; assets: Asset[] }>("/api/reposcan", { method: "POST", body: args }),
   updateAiBom: (id: string, aibom: AiBom) => request<Asset>(`/api/assets/${id}/aibom`, { method: "PUT", body: { aibom } }),
+  weightsHash: (id: string, filePath?: string) =>
+    request<{ assetId: string; filePath: string; sizeBytes: number; weightsHash: string }>(`/api/assets/${id}/aibom/weights-hash`, { method: "POST", body: { filePath } }),
   remove: (id: string) => request<{ ok: boolean }>(`/api/assets/${encodeURIComponent(id)}`, { method: "DELETE" }),
   importVulnScan: (content: string, format: "json" | "csv" | "html" | "nessus", source: string) =>
     request<{ hosts: number; findings: number; rows: number; assets: Asset[]; uncredentialedHosts: string[] }>("/api/vulnscan/import", {

@@ -105,6 +105,8 @@ function buildAiBomCycloneDx(name: string, aibom: AiBom, components: SbomCompone
   put(root, "gijo:model:finetuneHistory", aibom.model.finetuneHistory);
   put(root, "gijo:model:architecture", aibom.model.architecture);
   put(root, "gijo:model:weightsHash", aibom.model.weightsHash);
+  put(root, "gijo:model:intendedUse", aibom.model.intendedUse); // 모델 카드 — 용도·사용 범위
+  put(root, "gijo:model:limitations", aibom.model.limitations); // 모델 카드 — 한계·주의사항
   // 시스템 프롬프트는 원문 대신 SHA-256 해시만(무결성 추적 + 유출 방지).
   if (aibom.prompt.systemPrompt && aibom.prompt.systemPrompt.trim())
     root.properties.add(
