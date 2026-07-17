@@ -161,6 +161,10 @@ const hasChineseDrift = (t: string): boolean => /[一-鿿]{2,}/.test(t);
 // llama.cpp 외 서버가 grammar 필드를 모르면 무시되며, 그 경우 아래 hasChineseDrift 재생성이 백스톱으로 남는다.
 const NO_HAN_GRAMMAR = "root ::= [^\\u4e00-\\u9fff]*";
 
+// 로컬 LLM/임베딩 응답 상한 — GPU가 학습·병렬 에이전트 작업에 잡혀 있으면 요청이 무한 대기할 수
+// 있다(실측 2026-07-17: 채팅 5분 행 후 실패). 상한을 두고 정직한 지연 안내로 떨어뜨린다.
+const LLM_TIMEOUT_MS = Number(process.env.GIJO_LLM_TIMEOUT_MS ?? 120_000);
+
 export async function chat(args: ChatArgs): Promise<string> {
   const history = args.remember ? (histories.get(args.agentId) ?? []) : [];
   const rag = args.remember ? await ragContextFor(args.message, args.agentId) : null;
@@ -187,7 +191,14 @@ export async function chat(args: ChatArgs): Promise<string> {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ model: "local", messages, grammar: NO_HAN_GRAMMAR, ...(args.maxTokens ? { max_tokens: args.maxTokens } : {}) }),
-  }).catch(() => null);
+    signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
+  }).catch((err: unknown) => ((err as Error)?.name === "TimeoutError" ? ("timeout" as const) : null));
+
+  if (res === "timeout") {
+    // GPU가 학습·병렬 작업에 잡혀 요청이 무한 대기하는 것을 상한으로 끊는다(실측: 채팅 5분 행).
+    emitLlmActivity({ kind: "chat", phase: "error", agent: agentName, detail: `응답 시간 초과(${Math.round(LLM_TIMEOUT_MS / 1000)}s)` });
+    return `⚠ 로컬 LLM 응답이 제한 시간(${Math.round(LLM_TIMEOUT_MS / 1000)}초)을 초과했습니다. GPU가 학습이나 다른 작업을 처리 중일 수 있습니다 — 잠시 후 다시 시도하세요.`;
+  }
 
   if (!res || !res.ok) {
     emitLlmActivity({ kind: "chat", phase: "error", agent: agentName, detail: "로컬 LLM 연결 실패" });
@@ -217,7 +228,8 @@ export async function chat(args: ChatArgs): Promise<string> {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ model: "local", messages: retryMessages, grammar: NO_HAN_GRAMMAR, ...(args.maxTokens ? { max_tokens: args.maxTokens } : {}) }),
-    }).catch(() => null);
+      signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
+    }).catch(() => null); // 재작성 실패·시간 초과면 원래 답을 그대로 쓴다
     if (retryRes && retryRes.ok) {
       const retryData = (await retryRes.json()) as { choices?: { message?: { content?: string } }[] };
       const retryReply = stripLeadingPreamble(retryData.choices?.[0]?.message?.content ?? "");
@@ -254,6 +266,7 @@ export async function embed(texts: string[]): Promise<number[][]> {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ model: "local", input: texts }),
+    signal: AbortSignal.timeout(LLM_TIMEOUT_MS), // 임베딩도 무한 대기 방지(시간 초과 시 아래 연결 실패 처리)
   }).catch(() => null);
 
   if (!res || !res.ok) {
