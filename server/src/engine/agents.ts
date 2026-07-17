@@ -32,7 +32,7 @@ interface AgentBase {
 }
 
 // 에이전트 로스터 — "역할극 페르소나"를 줄이고 사내 데이터(RAG·온톨로지) 근거로 판단·검증하는
-// 소수 정예로 재구성(2026-07-17). 워크플로우(dispatch: 스캔→분석→리포트) + 조율 + 엄격 그라운딩(노말틱).
+// 소수 정예로 재구성(2026-07-17). 워크플로우(dispatch: 스캔→분석→리포트) + 조율 + 엄격 그라운딩(GIJO Security, id=normaltic).
 // 제거된 페르소나(침투테스트·SBOM·CTI·모델진화)는 dispatch에 안 쓰이고 전용 화면·엔진(SBOM/CTI/합성)이
 // 이미 담당하므로 일반 LLM 답변만 내던 중복이었다. LLM은 gijo + 보안LLM 2개만 사용.
 const AGENT_DEFS: AgentBase[] = [
@@ -41,7 +41,7 @@ const AGENT_DEFS: AgentBase[] = [
   { id: "analysis", name: "분석 에이전트", role: "취약점 우선순위 판단 · 근거 설명", defaultStatus: "idle" },
   { id: "report", name: "리포트 에이전트", role: "내부 보고서 작성", defaultStatus: "idle" },
   // 사내 지식베이스(RAG)+온톨로지에 적재된 자료만 근거로 설명하고 실제 사례를 검색해 준다(엄격 그라운딩).
-  { id: "normaltic", name: "노말틱", role: "취약점·코드 사내 지식 해설·사례 검색", defaultStatus: "watching" },
+  { id: "normaltic", name: "GIJO Security", role: "취약점·코드 사내 지식 해설·사례 검색", defaultStatus: "watching" },
 ];
 
 const liveStatus = new Map<string, AgentStatus>(AGENT_DEFS.map((a) => [a.id, a.defaultStatus]));

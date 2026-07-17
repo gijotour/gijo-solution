@@ -43,7 +43,7 @@ describe("auth", () => {
     const res = await request(app).get("/api/agents").set("Authorization", `Bearer ${login.body.accessToken}`);
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body.length).toBe(5); // 오케스트레이터·스캔·분석·리포트 + 노말틱(그라운딩)
+    expect(res.body.length).toBe(5); // 오케스트레이터·스캔·분석·리포트 + GIJO Security(id=normaltic, 그라운딩)
   });
 
   it("exchanges a refresh token for a new token pair and rotates the old refresh token out", async () => {

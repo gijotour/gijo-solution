@@ -42,7 +42,7 @@ describe("modeldex (보안 특화 LLM 도감)", () => {
     const recs = getAgentModelRecommendations();
     const guideIds = new Set(LLM_GUIDE.flatMap((c) => c.models).map((m) => m.id));
 
-    it("covers every one of the 5 agents (오케스트레이터·스캔·분석·리포트 + 노말틱)", () => {
+    it("covers every one of the 5 agents (오케스트레이터·스캔·분석·리포트 + GIJO Security)", () => {
       const agentIds = listAgents().map((a) => a.id);
       expect(agentIds).toHaveLength(5);
       for (const id of agentIds) {
