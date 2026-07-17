@@ -206,6 +206,23 @@ tr:last-child td{border-bottom:none;}
       <option value="weekly">주간</option>
       <option value="quarterly">분기</option>
     </select>
+    <label>용도 (독자에 따라 문체·구성이 달라집니다)</label>
+    <div style="display:flex;gap:8px;margin-bottom:12px;">
+      <label style="flex:1;display:flex;gap:7px;align-items:flex-start;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 11px;cursor:pointer;">
+        <input type="radio" name="reportAudience" value="official" checked style="margin-top:2px;accent-color:var(--blue)">
+        <span><b style="color:#fff;font-size:12.5px">📄 보고용</b><br><span style="font-size:10.5px;color:var(--muted)">경영진·감사용. 격식 문어체·거버넌스 강조</span></span>
+      </label>
+      <label style="flex:1;display:flex;gap:7px;align-items:flex-start;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 11px;cursor:pointer;">
+        <input type="radio" name="reportAudience" value="internal" style="margin-top:2px;accent-color:var(--blue)">
+        <span><b style="color:#fff;font-size:12.5px">🔍 내가 볼 것</b><br><span style="font-size:10.5px;color:var(--muted)">내부 검토용. 격식 없이 액션 중심</span></span>
+      </label>
+    </div>
+    <label for="reportFormatInput">출력 형식</label>
+    <select id="reportFormatInput">
+      <option value="both">DOCX + PDF</option>
+      <option value="docx">DOCX만</option>
+      <option value="pdf">PDF만</option>
+    </select>
     <label>대상 자산 (선택 안 하면 전체 자산 대상)</label>
     <div class="modal-checklist" id="assetChecklist"></div>
     <div class="modal-err" id="modalErr"></div>
@@ -294,14 +311,16 @@ tr:last-child td{border-bottom:none;}
 
   async function generate() {
     const type = document.getElementById("reportTypeInput").value;
+    const audience = (document.querySelector('input[name="reportAudience"]:checked') || {}).value || "official";
+    const format = document.getElementById("reportFormatInput").value;
     const assetIds = [...assetChecklist.querySelectorAll("input:checked")].map((el) => el.value);
     modalSaveBtn.disabled = true;
     modalSaveBtn.textContent = "생성 중...";
     const startedAt = Date.now();
     try {
-      const result = await window.gijo.generateReport({ type, assetIds: assetIds.length ? assetIds : undefined });
+      const result = await window.gijo.generateReport({ type, assetIds: assetIds.length ? assetIds : undefined, audience, format });
       sessionReports.unshift({
-        type, assetIds, filePath: result.filePath, executiveSummary: result.executiveSummary,
+        type, audience, assetIds, filePath: result.filePath, pdfPath: result.pdfPath, executiveSummary: result.executiveSummary,
         at: Date.now(), durationMs: Date.now() - startedAt,
       });
       renderReportRows();

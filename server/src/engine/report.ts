@@ -18,6 +18,8 @@ export interface ReportRequest {
   type: "weekly" | "quarterly" | "ondemand";
   assetIds?: string[];
   format?: "docx" | "pdf" | "both"; // 기본 docx. pdf/both면 PDF도 생성(개선 #3).
+  // 대상 독자: internal=내부 검토용(격식 없이 액션 중심) / official=보고용(격식·거버넌스 강조). 기본 official.
+  audience?: "internal" | "official";
 }
 
 export interface ReportResult {
@@ -25,7 +27,10 @@ export interface ReportResult {
   pdfPath?: string; // PDF 경로(format이 pdf/both이고 렌더 성공 시)
   pdfError?: string; // PDF 요청했으나 실패한 경우 사유(브라우저 미가용 등)
   executiveSummary: string;
+  audience: "internal" | "official";
 }
+
+type Finding = Asset["findings"][number];
 
 const REPORT_DIR = path.join("data", "reports");
 
@@ -128,6 +133,68 @@ function fmtDue(t: TaskItem): string {
   return days < 0 ? `기한초과 D+${-days}` : days === 0 ? "오늘 마감" : `D-${days}`;
 }
 
+// ── 취약점 사례 · 거버넌스 매칭 ─────────────────────────────────────────────
+// 인프라 취약점 finding을 보안 거버넌스 통제에 규칙 기반으로 매핑한다(설명 가능).
+// 컴플라이언스 카탈로그(KISA AI 위협)는 AI 모델 위협용이라 인프라 패치 취약점과 안 맞으므로
+// 여기서 패치·형상관리·취약점 생애주기·접근통제 등 인프라 거버넌스로 별도 매칭한다.
+export interface GovernanceMatch {
+  framework: string;
+  control: string;
+  rationale: string;
+}
+export interface VulnCase {
+  assetName: string;
+  finding: Finding;
+  priority: { code: string; sla: string; basis: string };
+  governance: GovernanceMatch[];
+}
+
+// EPSS·KEV·심각도로 조치 우선순위와 SLA 기한을 산정(취약점 관리 지침 기준).
+function classifyVulnPriority(f: Finding): { code: string; sla: string; basis: string } {
+  const epss = typeof f.epss === "number" ? f.epss : 0;
+  if (f.kev || epss >= 0.9 || f.severity === "critical")
+    return {
+      code: "P0",
+      sla: "즉시 조치(7일 이내)",
+      basis: f.kev ? "KEV(실제 악용 확인)" : epss >= 0.9 ? `EPSS ${(epss * 100).toFixed(0)}%(악용 가능성 매우 높음)` : "Critical 심각도",
+    };
+  if (f.severity === "high" || epss >= 0.5)
+    return { code: "P1", sla: "30일 이내", basis: f.severity === "high" ? "High 심각도" : `EPSS ${(epss * 100).toFixed(0)}%` };
+  if (f.severity === "medium") return { code: "P2", sla: "90일 이내", basis: "Medium 심각도" };
+  return { code: "P3", sla: "정기 점검 시 조치", basis: "Low 심각도" };
+}
+
+function matchGovernance(f: Finding): GovernanceMatch[] {
+  const t = `${f.finding_type} ${f.evidence}`.toLowerCase();
+  const g: GovernanceMatch[] = [
+    { framework: "ISMS-P", control: "2.11.2 취약점 점검 및 조치", rationale: "발견 취약점의 점검·조치·재점검 이력 관리 대상" },
+    { framework: "ISO/IEC 27001:2022", control: "A.8.8 기술적 취약점 관리", rationale: "기술적 취약점의 적시 식별·평가·대응" },
+    { framework: "취약점 관리 생애주기", control: "식별 → 평가(VPR·EPSS) → 조치 → 검증", rationale: "생애주기 4단계 상태 추적 대상" },
+  ];
+  if (/패치|미적용|cpu|버전|version|update|outdated|eol|hotfix/.test(t))
+    g.push(
+      { framework: "ISMS-P", control: "2.10.8 패치관리 · 2.9 형상관리", rationale: "보안 패치(예: Oracle Critical Patch Update) 적용·형상 기준 관리 미흡" },
+      { framework: "주요정보통신기반시설", control: "취약점 분석·평가 — 패치 적용 점검항목", rationale: "정기 분석·평가 및 조치 이행 대상" }
+    );
+  if (/oracle|db|database|sql|계정|권한|account|privilege|1521/.test(t))
+    g.push({ framework: "ISMS-P", control: "2.5 인증·권한 관리 · 2.6 접근통제", rationale: "DB 계정·권한·접근통제 점검과 연계" });
+  return g;
+}
+
+// 인프라 호스트 자산의 미조치 finding을 우선순위·거버넌스 매칭이 붙은 사례 목록으로.
+export function vulnCases(assets: Asset[]): VulnCase[] {
+  const rank: Record<string, number> = { P0: 0, P1: 1, P2: 2, P3: 3 };
+  const cases: VulnCase[] = [];
+  for (const a of assets) {
+    if (a.assetType !== "infra-host") continue;
+    for (const f of a.findings) {
+      if (f.state === "fixed") continue;
+      cases.push({ assetName: a.name, finding: f, priority: classifyVulnPriority(f), governance: matchGovernance(f) });
+    }
+  }
+  return cases.sort((x, y) => (rank[x.priority.code] ?? 9) - (rank[y.priority.code] ?? 9));
+}
+
 const RV_STATUS_LABEL: Record<string, string> = { pending: "미검토", approved: "승인(확정)", rejected: "반려(오탐)" };
 
 // 우선순위 조치 목록 표 — finding-level 조치 관리(담당자·기한·지연)를 보고서에 그대로 노출(개선 #2).
@@ -162,6 +229,8 @@ async function buildDocx(
 ): Promise<Buffer> {
   const counts = severityCounts(assets);
   const ms = maintenanceSummary(maintenance);
+  const cases = vulnCases(assets);
+  const audienceLabel = (req.audience ?? "official") === "internal" ? "내부 검토용" : "보고용";
   // 감사 추적: 최근 승인/반려 처리 건(검토자·사유). 리포트에는 최근 10건만.
   const reviewed = maintenance
     .filter((m) => m.status === "approved" || m.status === "rejected")
@@ -171,8 +240,8 @@ async function buildDocx(
     sections: [
       {
         children: [
-          new Paragraph({ text: `GIJO AS 보안 현황 리포트 (${req.type})`, heading: HeadingLevel.TITLE }),
-          new Paragraph({ text: "경영진 요약", heading: HeadingLevel.HEADING_1 }),
+          new Paragraph({ text: `GIJO AS 보안 현황 리포트 (${req.type} · ${audienceLabel})`, heading: HeadingLevel.TITLE }),
+          new Paragraph({ text: (req.audience ?? "official") === "internal" ? "요약 (내부 검토용)" : "경영진 요약", heading: HeadingLevel.HEADING_1 }),
           new Paragraph({ children: [new TextRun(executiveSummary)] }),
           new Paragraph({ text: "심각도별 분포", heading: HeadingLevel.HEADING_1 }),
           ...Object.entries(counts).map(
@@ -220,6 +289,30 @@ async function buildDocx(
             ? [
                 new Paragraph({ text: "AI 조치 브리핑 (참고)", heading: HeadingLevel.HEADING_2 }),
                 ...triageDraft.split("\n").filter((l) => l.trim()).map((l) => new Paragraph({ children: [new TextRun(l)] })),
+              ]
+            : []),
+          // 취약점 사례 · 거버넌스 매칭 — 각 취약점을 우선순위+거버넌스 통제에 매핑(신규).
+          ...(cases.length
+            ? [
+                new Paragraph({ text: "취약점 사례 · 거버넌스 매칭", heading: HeadingLevel.HEADING_1 }),
+                new Paragraph({ children: [new TextRun({ text: "각 취약점을 조치 우선순위(EPSS·KEV·심각도)와 보안 거버넌스 통제에 매핑했습니다.", italics: true, size: 18 })] }),
+                ...cases.flatMap((c) => {
+                  const f = c.finding;
+                  const meta =
+                    `자산 ${c.assetName} · 심각도 ${f.severity}` +
+                    (typeof f.epss === "number" ? ` · EPSS ${(f.epss * 100).toFixed(1)}%` : "") +
+                    (f.vpr != null ? ` · VPR ${f.vpr}` : "") +
+                    (f.kev ? " · KEV" : "") +
+                    ` · 출처 ${f.source_tool}`;
+                  return [
+                    new Paragraph({ text: `[${c.priority.code}] ${f.finding_type}`, heading: HeadingLevel.HEADING_2 }),
+                    new Paragraph({ children: [new TextRun(meta)] }),
+                    new Paragraph({ children: [new TextRun(`근거: ${f.evidence.replace(/\n/g, " ")}`)] }),
+                    new Paragraph({ children: [new TextRun({ text: `조치 우선순위 ${c.priority.code} — 기한 ${c.priority.sla} (기준: ${c.priority.basis})`, bold: true })] }),
+                    new Paragraph({ children: [new TextRun({ text: "거버넌스 매칭:", bold: true })] }),
+                    ...c.governance.map((g) => new Paragraph({ children: [new TextRun(`· ${g.framework} ${g.control} — ${g.rationale}`)] })),
+                  ];
+                }),
               ]
             : []),
           ...(vuln.topKev.length
@@ -285,15 +378,24 @@ export async function generateReport(req: ReportRequest): Promise<ReportResult> 
   const maintenance = listMaintenanceItems();
   const ms = maintenanceSummary(maintenance);
   const vuln = collectVulnReportData();
+  const audience = req.audience ?? "official";
+  const cases = vulnCases(assets);
+  const audienceGuide =
+    audience === "internal"
+      ? "이 요약은 보안담당자 본인 검토용입니다. 격식·미사여구 없이, 지금 급한 것과 바로 할 일(다음 액션) 중심으로 간결하게 쓰세요."
+      : "이 요약은 경영진·감사 보고용입니다. 정중한 문어체로, 거버넌스·컴플라이언스 관점과 의사결정 포인트를 강조하세요.";
+  const caseHint = cases.length
+    ? ` 취약점 사례(우선순위): ${cases.slice(0, 3).map((c) => `[${c.priority.code}] ${c.finding.finding_type}`).join(", ")}. 각 사례는 ISMS-P·ISO27001 등 거버넌스 통제에 매핑됨.`
+    : "";
   const executiveSummary = await chat({
     agentId: "report",
     message:
-      `다음 보안 현황 데이터를 바탕으로 경영진용 1페이지 요약을 작성해줘. 자산 ${assets.length}건, ` +
+      `다음 보안 현황 데이터를 바탕으로 1페이지 요약을 작성해줘. ${audienceGuide} 자산 ${assets.length}건, ` +
       `심각도별 발견 건수: ${JSON.stringify(counts)}. ` +
       `취약점 조치: 스캔 호스트 ${vuln.hosts}대, 열린 취약점 ${vuln.active}건(Critical ${vuln.critical}·High ${vuln.high}), ` +
       `실제 악용 확인(KEV) ${vuln.kev}건은 최우선 조치 대상. 조치 SLA 준수율 ${vuln.remediation.slaCompliance}%, 기한 초과 ${vuln.remediation.overdue}건. ` +
-      `유지보수 점검: 전체 ${ms.total}건 중 지연 ${ms.overdue}건, 승인 대기 ${ms.reported}건, 반려 ${ms.rejected}건. ` +
-      `KEV와 기한 초과 조치를 우선순위로 강조해줘.`,
+      `유지보수 점검: 전체 ${ms.total}건 중 지연 ${ms.overdue}건, 승인 대기 ${ms.reported}건, 반려 ${ms.rejected}건.${caseHint} ` +
+      `KEV와 기한 초과, 그리고 EPSS가 높은 취약점을 우선순위로 강조해줘.`,
   });
 
   // 우선순위 조치 목록(개선 #2)과 AI 브리핑(개선 #4)을 보고서에 포함.
@@ -311,7 +413,7 @@ export async function generateReport(req: ReportRequest): Promise<ReportResult> 
   const filePath = path.join(REPORT_DIR, `${base}.docx`);
   await fs.writeFile(filePath, buffer);
 
-  const result: ReportResult = { filePath, executiveSummary };
+  const result: ReportResult = { filePath, executiveSummary, audience };
 
   // PDF 생성(개선 #3) — 요청 시. HTML로 만들어 headless 브라우저로 A4 렌더. 실패해도 DOCX는 그대로.
   if (req.format === "pdf" || req.format === "both") {
@@ -337,6 +439,32 @@ function buildReportHtml(
   const esc = (s: string) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
   const counts = severityCounts(assets);
   const ms = maintenanceSummary(maintenance);
+  const cases = vulnCases(assets);
+  const audienceLabel = (req.audience ?? "official") === "internal" ? "내부 검토용" : "보고용";
+  const casesHtml = cases.length
+    ? `<h2>취약점 사례 · 거버넌스 매칭</h2><p class="muted">각 취약점을 조치 우선순위(EPSS·KEV·심각도)와 보안 거버넌스 통제에 매핑했습니다.</p>` +
+      cases
+        .map((c) => {
+          const f = c.finding;
+          const meta =
+            `자산 ${esc(c.assetName)} · 심각도 ${esc(f.severity)}` +
+            (typeof f.epss === "number" ? ` · EPSS ${(f.epss * 100).toFixed(1)}%` : "") +
+            (f.vpr != null ? ` · VPR ${f.vpr}` : "") +
+            (f.kev ? " · KEV" : "") +
+            ` · 출처 ${esc(f.source_tool)}`;
+          const gov = c.governance
+            .map((g) => `<tr><td>${esc(g.framework)}</td><td>${esc(g.control)}</td><td>${esc(g.rationale)}</td></tr>`)
+            .join("");
+          return (
+            `<h3 style="margin:14px 0 4px;font-size:12.5px">[${c.priority.code}] ${esc(f.finding_type)}</h3>` +
+            `<p style="margin:2px 0">${meta}</p>` +
+            `<p style="margin:2px 0">근거: ${esc(f.evidence).replace(/\n/g, " ")}</p>` +
+            `<p style="margin:2px 0"><b>조치 우선순위 ${c.priority.code} — 기한 ${esc(c.priority.sla)}</b> (기준: ${esc(c.priority.basis)})</p>` +
+            `<table><tr><th>프레임워크</th><th>통제</th><th>매칭 근거</th></tr>${gov}</table>`
+          );
+        })
+        .join("")
+    : "";
   const rows = priorities
     .map((r, i) =>
       `<tr><td>${i + 1}</td><td>${esc(r.finding.severity)}${r.finding.kev ? " · KEV" : ""}</td>` +
@@ -353,8 +481,8 @@ function buildReportHtml(
     th{background:#f0f3f8} pre{white-space:pre-wrap;background:#f7f8fa;border:1px solid #ddd;padding:10px;border-radius:6px;font-family:inherit}
     .muted{color:#666;font-size:10.5px;font-style:italic}
   </style></head><body>
-    <h1>GIJO AS 보안 현황 리포트 (${esc(req.type)})</h1>
-    <h2>경영진 요약</h2><p>${esc(executiveSummary).replace(/\n/g, "<br>")}</p>
+    <h1>GIJO AS 보안 현황 리포트 (${esc(req.type)} · ${audienceLabel})</h1>
+    <h2>${(req.audience ?? "official") === "internal" ? "요약 (내부 검토용)" : "경영진 요약"}</h2><p>${esc(executiveSummary).replace(/\n/g, "<br>")}</p>
     <h2>심각도별 분포</h2><p>${Object.entries(counts).map(([s, c]) => `${esc(s)}: ${c}건`).join(" · ")}</p>
     <h2>취약점 조치 현황</h2>
     <p>스캔 호스트 ${vuln.hosts}대 · 열린 취약점 ${vuln.active}건 (Critical ${vuln.critical}/High ${vuln.high}/Medium ${vuln.medium}/Low ${vuln.low}) · 실제 악용(KEV) ${vuln.kev}건</p>
@@ -362,6 +490,7 @@ function buildReportHtml(
     <p class="muted">※ SLA 준수율 = (기한 내 조치 완료) ÷ (전체 조치대상 ${vuln.remediation.tasks}건) × 100. 기한 초과 ${vuln.remediation.overdue}건은 미준수.</p>
     ${priorities.length ? `<h2>우선순위 조치 목록 (오늘의 조치 Top)</h2><table><tr><th>순위</th><th>심각도</th><th>취약점</th><th>자산</th><th>담당자</th><th>기한</th><th>상태</th></tr>${rows}</table>` : ""}
     ${triageHtml}
+    ${casesHtml}
     <h2>유지보수 점검 거버넌스</h2>
     <p>전체 ${ms.total}건 · 예정 ${ms.scheduled}건(지연 ${ms.overdue}) · 승인 대기 ${ms.reported}건 · 승인됨 ${ms.approved}건 · 반려 ${ms.rejected}건</p>
   </body></html>`;

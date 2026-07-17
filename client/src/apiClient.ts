@@ -581,8 +581,11 @@ export const kpiApi = {
 
 // ── 내부 리포트 ───────────────────────────────────────────────────────
 export const reportApi = {
-  generate: (type: "weekly" | "quarterly" | "ondemand", assetIds?: string[]) =>
-    request("/api/report/generate", { method: "POST", body: { type, assetIds } }),
+  generate: (
+    type: "weekly" | "quarterly" | "ondemand",
+    assetIds?: string[],
+    opts?: { audience?: "internal" | "official"; format?: "docx" | "pdf" | "both" }
+  ) => request("/api/report/generate", { method: "POST", body: { type, assetIds, audience: opts?.audience, format: opts?.format } }),
 };
 
 // ── 사용량 · 요금 ─────────────────────────────────────────────────────

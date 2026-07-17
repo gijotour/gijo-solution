@@ -9,8 +9,8 @@ vi.mock("../src/engine/llm", () => ({
 }));
 
 import { createApp } from "../src/app";
-import { resetAssetsForTests } from "../src/engine/assets";
-import { maintenanceSummary, collectVulnReportData } from "../src/engine/report";
+import { resetAssetsForTests, listAssets } from "../src/engine/assets";
+import { maintenanceSummary, collectVulnReportData, vulnCases } from "../src/engine/report";
 import { importVulnScan } from "../src/engine/vulnscan";
 import { resetKevForTests } from "../src/engine/kev";
 import { createTask, resetTasksForTests } from "../src/engine/tasks";
@@ -92,6 +92,41 @@ describe("report", () => {
     const s = maintenanceSummary(items);
     expect(s).toEqual({ total: 6, scheduled: 2, overdue: 1, reported: 1, approved: 2, rejected: 1 });
     expect(maintenanceSummary([])).toEqual({ total: 0, scheduled: 0, overdue: 0, reported: 0, approved: 0, rejected: 0 });
+  });
+
+  it("vulnCases maps an Oracle patch finding to priority + governance controls (거버넌스 매칭)", () => {
+    resetKevForTests([]);
+    importVulnScan(
+      "Plugin ID,CVE,Risk,Host,Name\n" + "1,CVE-2022-21432,Medium,10.0.0.9,Oracle DB CPU 미적용\n",
+      "csv",
+      "nessus"
+    );
+    const cases = vulnCases(listAssets());
+    const oracle = cases.find((c) => /Oracle/.test(c.finding.finding_type));
+    expect(oracle).toBeTruthy();
+    // 공통 취약점 관리 통제
+    expect(oracle!.governance.some((g) => g.framework === "ISMS-P" && /2\.11\.2/.test(g.control))).toBe(true);
+    expect(oracle!.governance.some((g) => /27001/.test(g.framework))).toBe(true);
+    // 패치/CPU 키워드 → 패치·형상관리 + 주요정보통신기반시설
+    expect(oracle!.governance.some((g) => /패치관리|형상관리/.test(g.control))).toBe(true);
+    expect(oracle!.governance.some((g) => /주요정보통신기반시설/.test(g.framework))).toBe(true);
+    // DB 키워드 → 접근통제
+    expect(oracle!.governance.some((g) => /접근통제/.test(g.control))).toBe(true);
+    expect(["P0", "P1", "P2", "P3"]).toContain(oracle!.priority.code);
+  });
+
+  it("report result carries the audience (기본 official, internal 선택 반영)", async () => {
+    const def = await request(app)
+      .post("/api/report/generate")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ type: "ondemand" });
+    expect(def.body.audience).toBe("official");
+
+    const internal = await request(app)
+      .post("/api/report/generate")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ type: "ondemand", audience: "internal" });
+    expect(internal.body.audience).toBe("internal");
   });
 
   it("scopes the report to only the requested asset ids", async () => {
