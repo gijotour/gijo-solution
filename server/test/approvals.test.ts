@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import { createApp } from "../src/app";
 import { resetAssetsForTests, recordFindings } from "../src/engine/assets";
-import { resetApprovalsForTests, findingKey } from "../src/engine/approvals";
+import { resetApprovalsForTests, findingKey, buildTriagePrompt, prioritizedReviews } from "../src/engine/approvals";
 import type { StandardFinding } from "../src/engine/bridge";
 
 async function login(app: ReturnType<typeof createApp>) {
@@ -96,6 +96,22 @@ describe("approvals (finding 검토 워크플로우)", () => {
     await request(app).post(`/api/approvals/m1/${findingKey("m1", kevF)}`).set(auth()).send({ status: "rejected" });
     body = (await request(app).get("/api/approvals/priorities").set(auth())).body;
     expect(body.items.map((i: { finding: StandardFinding }) => i.finding.finding_type)).toEqual(["high-epss", "high-vpr"]);
+  });
+
+  it("AI triage 프롬프트: 상위 취약점·지시·온톨로지 근거를 담는다", () => {
+    const top = prioritizedReviews(5);
+    const prompt = buildTriagePrompt(top, "관련 규칙·관계 — (테스트 완화통제)");
+    expect(prompt).toContain("오늘의 조치 브리핑");
+    expect(prompt).toContain("unsafe-pickle"); // 픽스처 finding_type
+    expect(prompt).toContain("권장 조치 기한"); // 지시
+    expect(prompt).toContain("테스트 완화통제"); // 온톨로지 근거 주입
+  });
+
+  it("AI triage 라우트: 초안을 200으로 반환(LLM 미가동 시 안내 초안)", async () => {
+    const r = await request(app).post("/api/approvals/triage").set(auth()).send({ limit: 5 });
+    expect(r.status).toBe(200);
+    expect(typeof r.body.draft).toBe("string");
+    expect(r.body.count).toBeGreaterThanOrEqual(1);
   });
 
   it("approves and rejects a finding, updating status + reviewer", async () => {

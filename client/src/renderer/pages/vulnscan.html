@@ -141,11 +141,13 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
 
     <!-- 오늘의 조치: 전 자산을 가로질러 KEV·EPSS·VPR로 정렬한 우선순위 목록 ("오늘 뭐부터") -->
     <div class="panel" id="todayPanel" style="border-color:rgba(59,130,246,0.4)">
-      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px;">
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px;flex-wrap:wrap;">
         <div style="font-size:14.5px;font-weight:800;color:#fff;">🎯 오늘의 조치 <span style="color:var(--blue-light)">우선순위</span></div>
-        <div style="font-size:11px;color:var(--muted-2);">CISA KEV(실제 악용) → EPSS(악용확률) → VPR → 심각도 순 · 오탐 제외</div>
+        <div style="font-size:11px;color:var(--muted-2);flex:1;">CISA KEV(실제 악용) → EPSS(악용확률) → VPR → 심각도 순 · 오탐 제외</div>
+        <button class="btn-primary" id="triageBtn" style="padding:7px 14px;font-size:12px" title="상위 취약점에 대한 조치 브리핑을 로컬 AI가 작성합니다">🤖 AI 조치 브리핑</button>
       </div>
       <div id="todayList" style="margin-top:10px;font-size:12.5px;color:var(--muted)">불러오는 중...</div>
+      <div id="triageBox" style="display:none;margin-top:12px;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:12.5px;color:var(--text);line-height:1.7;white-space:pre-wrap;"></div>
     </div>
 
     <div class="panel">
@@ -492,6 +494,24 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
     }
   }
 
+  // AI 조치 브리핑 — 상위 취약점 [근거·권장조치·기한] 초안을 로컬 LLM이 작성.
+  async function runTriage() {
+    const btn = document.getElementById("triageBtn");
+    const box = document.getElementById("triageBox");
+    const orig = btn.textContent;
+    btn.disabled = true; btn.textContent = "AI 작성 중…";
+    box.style.display = "block";
+    box.textContent = "로컬 AI가 상위 취약점을 분석해 조치 브리핑을 작성 중입니다… (수 초)";
+    try {
+      const { draft } = await window.gijo.aiTriage(5);
+      box.textContent = draft;
+    } catch (e) {
+      box.textContent = "브리핑 생성 실패: " + ((e && e.message) || e);
+    } finally {
+      btn.disabled = false; btn.textContent = orig;
+    }
+  }
+
   async function init() {
     tick();
     setInterval(tick, 30000);
@@ -500,6 +520,7 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
     await refresh();
     await loadToday();
     document.getElementById("todayList").addEventListener("click", () => window.gijo.navigateTo("approvals.html"));
+    document.getElementById("triageBtn").addEventListener("click", runTriage);
 
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => {
