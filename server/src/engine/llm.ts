@@ -154,6 +154,12 @@ export function stripLeadingPreamble(text: string): string {
 const countHan = (t: string): number => (t.match(/[一-鿿]/g) || []).length;
 const hasChineseDrift = (t: string): boolean => /[一-鿿]{2,}/.test(t);
 
+// 중국어 드리프트 근본 차단 — llama.cpp GBNF 문법으로 생성 단계에서 한자(U+4E00–U+9FFF)를 금지한다.
+// 프롬프트 규칙(확률적)·후처리 재생성(사후적)과 달리 샘플러 수준의 결정적 차단이라 드리프트가 0이 된다.
+// merge 재합성은 실측(2026-07-17)에서 효과 없음이 증명돼 이 방식을 채택. 한글(U+AC00–)은 별개 영역이라 무영향.
+// llama.cpp 외 서버가 grammar 필드를 모르면 무시되며, 그 경우 아래 hasChineseDrift 재생성이 백스톱으로 남는다.
+const NO_HAN_GRAMMAR = "root ::= [^\\u4e00-\\u9fff]*";
+
 export async function chat(args: ChatArgs): Promise<string> {
   const history = args.remember ? (histories.get(args.agentId) ?? []) : [];
   const rag = args.remember ? await ragContextFor(args.message, args.agentId) : null;
@@ -179,7 +185,7 @@ export async function chat(args: ChatArgs): Promise<string> {
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "local", messages, ...(args.maxTokens ? { max_tokens: args.maxTokens } : {}) }),
+    body: JSON.stringify({ model: "local", messages, grammar: NO_HAN_GRAMMAR, ...(args.maxTokens ? { max_tokens: args.maxTokens } : {}) }),
   }).catch(() => null);
 
   if (!res || !res.ok) {
@@ -209,7 +215,7 @@ export async function chat(args: ChatArgs): Promise<string> {
     const retryRes = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "local", messages: retryMessages, ...(args.maxTokens ? { max_tokens: args.maxTokens } : {}) }),
+      body: JSON.stringify({ model: "local", messages: retryMessages, grammar: NO_HAN_GRAMMAR, ...(args.maxTokens ? { max_tokens: args.maxTokens } : {}) }),
     }).catch(() => null);
     if (retryRes && retryRes.ok) {
       const retryData = (await retryRes.json()) as { choices?: { message?: { content?: string } }[] };
