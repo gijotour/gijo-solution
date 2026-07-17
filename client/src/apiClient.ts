@@ -163,10 +163,17 @@ export interface NewTaskOptions {
   dueAt?: number;
   assignee?: string;
   ref?: string;
+  routineFeedback?: boolean; // 직접 입력한 일과 — 학습 신호로 기록돼 다음 추천 가이드에 반영
+}
+export interface RoutineSuggestion {
+  cadence: "daily" | "weekly";
+  text: string;
+  source: string;
 }
 export const tasksApi = {
   list: () => request("/api/tasks"),
   add: (text: string, opts?: NewTaskOptions) => request("/api/tasks", { method: "POST", body: { text, ...(opts || {}) } }),
+  routineSuggestions: () => request<RoutineSuggestion[]>("/api/tasks/routine-suggestions"),
   complete: (id: string) => request(`/api/tasks/${id}/complete`, { method: "POST" }),
   toggle: (id: string, done: boolean) => request(`/api/tasks/${id}/toggle`, { method: "POST", body: { done } }),
   remove: (id: string) => request(`/api/tasks/${id}`, { method: "DELETE" }),

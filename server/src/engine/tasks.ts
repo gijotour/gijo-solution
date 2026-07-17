@@ -2,6 +2,7 @@
 
 import type { Express } from "express";
 import { authMiddleware } from "../auth/auth";
+import { asyncRoute } from "../util/asyncRoute";
 import { db } from "../db";
 
 export interface TaskItem {
@@ -125,14 +126,90 @@ export function seedSampleRemediationTasksIfEmpty(): void {
 }
 seedSampleRemediationTasksIfEmpty();
 
+// ── "오늘 확인할 항목" 추천 가이드 ───────────────────────────────────────
+// + 버튼에서 매일/매주 일과를 추천한다. 근거는 ① 팀장이 직접 추가해온 일과(routine_feedback —
+// 다음 추천에 반영되는 학습 신호이자 datasets/routine-feedback.json 파인튜닝 축적) ② 사내
+// 지식(RAG) 근거 LLM 제안 ③ LLM 미기동 시 기본 가이드(규칙 기반, 정직한 폴백).
+const insertRoutineFbStmt = db.prepare("INSERT INTO routine_feedback (text, addedAt) VALUES (?, ?)");
+const listRoutineFbStmt = db.prepare("SELECT text FROM routine_feedback ORDER BY addedAt DESC LIMIT 8");
+
+export function recordRoutineFeedback(text: string): void {
+  insertRoutineFbStmt.run(text, Date.now());
+  // 파인튜닝 데이터셋에도 축적 — 실패해도 할일 추가는 성공 처리(부가 경로).
+  import("./dataset.js")
+    .then((d) => d.appendRoutineExample(text))
+    .catch((err) => console.warn(`[tasks] 루틴 데이터셋 축적 실패: ${err instanceof Error ? err.message : String(err)}`));
+}
+
+export interface RoutineSuggestion {
+  cadence: "daily" | "weekly";
+  text: string;
+  source: string;
+}
+
+export async function routineSuggestions(): Promise<RoutineSuggestion[]> {
+  const fb = (listRoutineFbStmt.all() as { text: string }[]).map((r) => r.text);
+  const out: RoutineSuggestion[] = [];
+  try {
+    const { queryMemory } = await import("./memory.js");
+    const chunks = await queryMemory("보안 운영 일일 주간 점검 루틴 확인 항목", 4).catch(() => [] as string[]);
+    const { chat } = await import("./llm.js");
+    const reply = await chat({
+      agentId: "analysis",
+      message: [
+        "보안 운영 담당자의 '오늘 확인할 항목' 추천 목록을 만들어라.",
+        '출력은 JSON 배열만: [{"cadence":"daily"|"weekly","text":"..."}] 형식으로 4~6개, 다른 텍스트 없이.',
+        "daily는 매일 하는 일, weekly는 주말/매주 하는 일. 각 text는 30자 이내 한국어 실무 문장.",
+        fb.length ? `팀장이 직접 추가해온 일과(우선 반영): ${fb.slice(0, 5).join(" / ")}` : "",
+        chunks.length ? `사내 자료 발췌:\n${chunks.join("\n").slice(0, 1200)}` : "",
+      ].filter(Boolean).join("\n"),
+    });
+    const m = reply.match(/\[[\s\S]*\]/);
+    const rows = m ? (JSON.parse(m[0]) as { cadence?: string; text?: string }[]) : [];
+    for (const r of rows) {
+      if (r && typeof r.text === "string" && r.text.trim()) {
+        out.push({
+          cadence: r.cadence === "weekly" ? "weekly" : "daily",
+          text: r.text.trim().slice(0, 60),
+          source: chunks.length ? "AI 추천 · 사내 지식 근거" : "AI 추천",
+        });
+      }
+    }
+  } catch {
+    /* LLM 미기동/파싱 실패 — 아래 기본 가이드로 */
+  }
+  // 직접 추가 이력은 항상 상단에 재제안(학습 반영을 눈에 보이게).
+  for (const t of fb.slice(0, 3).reverse()) out.unshift({ cadence: "daily", text: t.slice(0, 60), source: "직접 추가 이력 · 학습 반영" });
+  if (!out.some((s) => s.cadence === "daily" && !s.source.startsWith("직접"))) {
+    out.push(
+      { cadence: "daily", text: "방화벽·EDR 이상 알림 확인", source: "기본 가이드" },
+      { cadence: "daily", text: "전일 스캔 결과·신규 취약점 확인", source: "기본 가이드" }
+    );
+  }
+  if (!out.some((s) => s.cadence === "weekly")) {
+    out.push(
+      { cadence: "weekly", text: "전체 자산 재스캔·우선순위 갱신", source: "기본 가이드" },
+      { cadence: "weekly", text: "보안제품 정책 백업 상태 점검", source: "기본 가이드" }
+    );
+  }
+  // 중복 텍스트 제거 후 상한.
+  const seen = new Set<string>();
+  return out.filter((s) => !seen.has(s.text) && seen.add(s.text)).slice(0, 10);
+}
+
 export function registerTasksRoutes(app: Express): void {
   app.get("/api/tasks", authMiddleware, (_req, res) => res.json(listTasks()));
+  app.get("/api/tasks/routine-suggestions", authMiddleware, asyncRoute(async (_req, res) => {
+    res.json(await routineSuggestions());
+  }));
   app.post("/api/tasks", authMiddleware, (req, res) => {
-    const b = req.body as { text?: string; priority?: TaskItem["priority"]; dueAt?: number; assignee?: string; ref?: string };
+    const b = req.body as { text?: string; priority?: TaskItem["priority"]; dueAt?: number; assignee?: string; ref?: string; routineFeedback?: boolean };
     if (!b.text || !String(b.text).trim()) {
       res.status(400).json({ error: "text가 필요합니다" });
       return;
     }
+    // 대시보드에서 직접 입력한 일과는 학습 신호로 기록 — 다음 추천 가이드에 반영된다.
+    if (b.routineFeedback) recordRoutineFeedback(String(b.text).trim());
     const priority = ["P0", "P1", "P2", "P3"].includes(b.priority as string) ? b.priority : undefined;
     res.json(createTask({ text: String(b.text), priority, dueAt: typeof b.dueAt === "number" ? b.dueAt : undefined, assignee: b.assignee, ref: b.ref }));
   });

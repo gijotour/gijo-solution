@@ -153,6 +153,15 @@
   .today-input{display:flex;gap:8px;margin-bottom:14px;}
   .today-input input{flex:1;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:0 12px;height:34px;color:var(--text);font-size:12.5px;outline:none;}
   .today-add{width:34px;height:34px;border-radius:8px;background:var(--teal);color:#06281c;border:none;font-weight:800;cursor:pointer;font-size:16px;}
+  /* 추천 일과 가이드 패널 — 빈 입력 + 클릭 시 열림 */
+  .todo-sugg:not(:empty){background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:8px 10px;margin:-6px 0 12px;}
+  .ts-load{font-size:11px;color:var(--muted-2);padding:2px 0;}
+  .ts-h{font-size:10px;font-weight:800;color:var(--blue-light);margin:5px 0 3px;}
+  .ts-item{display:flex;align-items:center;gap:6px;padding:3px 0;font-size:11.5px;color:var(--text);}
+  .ts-item .ts-t{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ts-item .ts-src{font-size:8.5px;color:var(--muted-2);flex-shrink:0;}
+  .ts-add{width:20px;height:20px;border-radius:6px;background:rgba(30,185,128,0.16);color:var(--teal);border:1px solid rgba(30,185,128,0.4);cursor:pointer;font-size:12px;line-height:1;flex-shrink:0;}
+  .ts-foot{font-size:9.5px;color:var(--muted-2);margin-top:7px;padding-top:6px;border-top:1px solid var(--border);line-height:1.5;}
   .today-item{display:flex;align-items:center;gap:9px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:9px 11px;margin-bottom:8px;font-size:12px;}
   .today-item .today-text{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .today-item.done{opacity:.55;}
@@ -364,7 +373,8 @@
 
     <div class="today-panel">
       <div class="today-title">⦿ 오늘 확인할 항목</div>
-      <div class="today-input"><input id="todoInput" placeholder="할일 추가..."><button class="today-add" id="todoAddBtn">+</button></div>
+      <div class="today-input"><input id="todoInput" placeholder="할일 추가... (비우고 + = 추천)"><button class="today-add" id="todoAddBtn" title="입력하면 추가, 비우고 누르면 추천 일과 가이드">+</button></div>
+      <div class="todo-sugg" id="todoSugg"></div>
       <div id="todayItems"><div style="font-size:12px;color:var(--muted)">불러오는 중...</div></div>
       <button class="today-cta" id="todayCtaBtn">▶ 운영 시작 — 에이전트 팀에게 맡기기</button>
 
@@ -786,10 +796,39 @@
 
   async function addTodo() {
     const text = todoInput.value.trim();
-    if (!text) return;
+    // 비우고 + 를 누르면 추천 일과 가이드를 연다(매일/매주 — 직접 추가 이력·사내 지식 근거).
+    if (!text) { toggleTodoSuggestions(); return; }
     todoInput.value = "";
-    await window.gijo.addTask(text);
+    // 직접 입력한 일과는 학습 신호(routineFeedback)로 기록 — 파인튜닝 데이터셋에 쌓이고 다음 추천에 반영.
+    await window.gijo.addTask(text, { routineFeedback: true });
     await loadTasks();
+  }
+
+  // ── 추천 일과 가이드 — + 버튼(빈 입력)으로 열림. 항목의 +로 바로 추가 ──
+  const todoSugg = document.getElementById("todoSugg");
+  const CAD_LABEL = { daily: "매일 하는 일", weekly: "매주(주말) 하는 일" };
+  async function toggleTodoSuggestions() {
+    if (todoSugg.innerHTML) { todoSugg.innerHTML = ""; return; }
+    todoSugg.innerHTML = '<div class="ts-load">추천 일과 불러오는 중… (사내 지식 참고)</div>';
+    let suggs = [];
+    try { suggs = await window.gijo.getRoutineSuggestions(); } catch (e) {
+      todoSugg.innerHTML = '<div class="ts-load">추천을 불러오지 못했습니다 — 직접 입력해 주세요</div>';
+      return;
+    }
+    const groups = ["daily", "weekly"].map((cad) => {
+      const list = suggs.filter((s) => s.cadence === cad);
+      if (!list.length) return "";
+      return `<div class="ts-h">${CAD_LABEL[cad]}</div>` + list.map((s) =>
+        `<div class="ts-item"><span class="ts-t">${escB(s.text)}</span><span class="ts-src">${escB(s.source)}</span><button class="ts-add" data-sugg="${escB(s.text)}">＋</button></div>`
+      ).join("");
+    }).join("");
+    todoSugg.innerHTML = groups +
+      '<div class="ts-foot">✍ 직접 입력해 추가한 일과는 학습(파인튜닝 데이터셋)에 쌓여 다음 추천에 반영됩니다</div>';
+    todoSugg.querySelectorAll(".ts-add").forEach((b) => b.addEventListener("click", async () => {
+      b.disabled = true; b.textContent = "✓";
+      await window.gijo.addTask(b.dataset.sugg); // 추천 채택은 학습 신호 아님(추천의 재학습 방지)
+      await loadTasks();
+    }));
   }
 
   // 작업 중이면 중앙 그래프에 busy를 켜 반짝임을 빠르게·많게 한다. 마지막 활동 후 4초 지나면 잦아든다.

@@ -164,6 +164,23 @@ export function saveDataset(id: string, examples: ConversationExample[]): { id: 
   return { id, examples: valid.length };
 }
 
+// 팀장이 "오늘 확인할 항목"에 직접 추가한 일과를 학습 데이터셋으로 축적한다(파인튜닝 반영 경로).
+// routine-feedback.json에 Q&A로 쌓여 학습 루프에서 그대로 학습할 수 있고,
+// 추천 가이드(tasks.routineSuggestions) 프롬프트에도 인용돼 다음 추천에 반영된다.
+export function appendRoutineExample(text: string): void {
+  fs.mkdirSync(DATASETS_DIR, { recursive: true });
+  const file = path.join(DATASETS_DIR, "routine-feedback.json");
+  let rows: ConversationExample[] = [];
+  try {
+    rows = JSON.parse(fs.readFileSync(file, "utf-8")) as ConversationExample[];
+    if (!Array.isArray(rows)) rows = [];
+  } catch {
+    rows = [];
+  }
+  rows.push({ question: "보안 운영에서 오늘/이번 주 확인할 점검 항목을 추천해줘", answer: text });
+  fs.writeFileSync(file, JSON.stringify(rows, null, 2), "utf-8");
+}
+
 export function listDatasets(): { id: string; examples: number }[] {
   if (!fs.existsSync(DATASETS_DIR)) return [];
   return fs

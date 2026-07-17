@@ -281,6 +281,16 @@ try {
   /* 컬럼이 이미 있으면 정상 — 무시 */
 }
 
+db.exec(`
+  -- "오늘 확인할 항목"에 팀장이 직접 추가한 일과(engine/tasks.ts) — 추천 가이드의 학습 신호.
+  -- 추천 프롬프트에 인용되고, datasets/routine-feedback.json(파인튜닝 데이터셋)에도 함께 축적된다.
+  CREATE TABLE IF NOT EXISTS routine_feedback (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    text TEXT NOT NULL,
+    addedAt INTEGER NOT NULL
+  );
+`);
+
 // 마이그레이션: memory_documents.docClass — 문서 수집 시 Scan·Analyze Agent가 판별한 분류
 // (매뉴얼/보고서/정책/기타). 탐색기·문서관리 화면에서 배지로 표시. nullable(분류 전 문서).
 try {

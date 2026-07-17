@@ -48,6 +48,7 @@ const gijoApi = {
   // 작업 큐
   listTasks: () => api.tasksApi.list(),
   addTask: (text: string, opts?: import("./apiClient").NewTaskOptions) => api.tasksApi.add(text, opts),
+  getRoutineSuggestions: () => api.tasksApi.routineSuggestions(),
   completeTask: (id: string) => api.tasksApi.complete(id),
   toggleTask: (id: string, done: boolean) => api.tasksApi.toggle(id, done),
   deleteTask: (id: string) => api.tasksApi.remove(id),
