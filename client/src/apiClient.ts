@@ -320,6 +320,20 @@ export const llmActivityApi = {
   history: () => request<LlmActivityEvent[]>("/api/llm-activity/history"),
 };
 
+// ── 스마트 통합 업로드 — 파일 유형 자동 판별·라우팅(취약점 스캔/매뉴얼/문서 분류) ──
+export interface AutoUploadResult {
+  filename: string;
+  routedTo: "vulnscan" | "product-manual" | "memory";
+  reason: string;
+  vulnscan?: { hosts: number; findings: number };
+  manual?: { productName: string; kind: string; createdProduct: boolean };
+  memory?: { chunks: number; docClass?: string; linkedProduct?: string };
+}
+export const uploadApi = {
+  auto: (filename: string, content: string) =>
+    request<AutoUploadResult>("/api/upload/auto", { method: "POST", body: { filename, content } }),
+};
+
 // ── 장기 기억(RAG) ────────────────────────────────────────────────────
 export const memoryApi = {
   ingest: (path: string, scope?: string) =>

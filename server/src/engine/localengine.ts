@@ -318,6 +318,17 @@ export async function autoStartLocalEngines(): Promise<void> {
   }
 
   const embPath = modelFilePath(EMBEDDING_MODEL_ID);
+  // 이전 서버 프로세스가 남긴 임베딩 llama-server가 이미 포트를 잡고 정상 서빙 중이면 재사용한다.
+  // 실측(2026-07-17): 서버 재시작 시 자식 llama-server가 고아로 살아남아 새 스폰이 포트 충돌로
+  // 죽고, 임베딩이 "반쯤 죽은" 상태(간헐 hang/실패)가 됐다 — 중복 스폰이 원인이라 선점 감지로 막는다.
+  const alive = await fetch(`http://localhost:${EMBEDDING_PORT}/v1/models`, { signal: AbortSignal.timeout(1500) })
+    .then((r) => r.ok)
+    .catch(() => false);
+  if (alive) {
+    console.log(`[localengine] 임베딩 서버 이미 동작 중(port ${EMBEDDING_PORT}) — 재사용, 중복 스폰 생략`);
+    embeddingModelId = EMBEDDING_MODEL_ID;
+    return;
+  }
   if (fs.existsSync(embPath)) {
     console.log(`[localengine] 임베딩 서버 자동 시작: ${EMBEDDING_MODEL_ID} (port ${EMBEDDING_PORT})`);
     const spawned = spawn(LLAMA_SERVER_PATH, ["-m", embPath, "--embedding", "--port", String(EMBEDDING_PORT)], {

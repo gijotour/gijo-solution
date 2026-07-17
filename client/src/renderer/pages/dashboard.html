@@ -254,6 +254,9 @@
         <div class="sc-meta" id="scMeta">연동 서버 정보 불러오는 중…</div>
       </div>
       <div id="gijoObSlot"></div>
+      <!-- 스마트 업로드 — 파일만 올리면 유형(스캔/매뉴얼/문서)을 자동 판별해 처리, 입력칸 없음 -->
+      <div class="tree-nav" id="smartUploadBtn" title="스캔 결과·매뉴얼·문서를 올리면 자동으로 판별해 반영합니다">📥 파일 올리기 — 자동 분류<span class="tree-act" style="margin-left:auto">＋</span></div>
+      <input type="file" id="smartUploadInput" multiple style="display:none">
       <div id="explorerTree">불러오는 중...</div>
     </div>
     <!-- 자산 상세 팝오버(시안2) — 탐색기 자산 클릭 시 옆에 뜬다 -->
@@ -687,6 +690,38 @@
     if (assetPop.classList.contains("on") && !e.target.closest("#assetPop") && !e.target.closest("[data-asset]")) closeAssetPop();
   });
   document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeAssetPop(); });
+
+  // ── 스마트 통합 업로드 — 파일만 올리면 서버가 유형을 판별해 자동 라우팅(입력칸 최소화) ──
+  // 결과는 협업 피드에 한 줄로: 어떤 파이프라인으로 갔고 왜 그렇게 판별됐는지(reason)까지.
+  const smartInput = document.getElementById("smartUploadInput");
+  document.getElementById("smartUploadBtn").addEventListener("click", () => smartInput.click());
+  smartInput.addEventListener("change", async () => {
+    for (const file of [...smartInput.files]) {
+      const row = clAppend("event", { icon: "📥", name: "스마트 업로드", message: `${file.name} — 유형 판별·처리 중…` });
+      try {
+        const b64 = await new Promise((res, rej) => {
+          const fr = new FileReader();
+          fr.onload = () => res(String(fr.result).split(",")[1] || "");
+          fr.onerror = () => rej(new Error("파일 읽기 실패"));
+          fr.readAsDataURL(file);
+        });
+        const r = await window.gijo.uploadAuto(file.name, b64);
+        const msg =
+          r.routedTo === "vulnscan"
+            ? `취약점 스캔으로 자동 반영 — 호스트 ${r.vulnscan.hosts}·finding ${r.vulnscan.findings}건 (${r.reason})`
+            : r.routedTo === "product-manual"
+              ? `보안제품 '${r.manual.productName}'에 ${r.manual.kind === "logManual" ? "로그" : "제품"} 매뉴얼로 연결${r.manual.createdProduct ? " · 신규 제품 자동 등록" : ""}`
+              : `장기기억 ${r.memory.chunks}청크 수집 · 분류 ${r.memory.docClass || "기타"}${r.memory.linkedProduct ? ` · 제품 '${r.memory.linkedProduct}' 연결` : ""}`;
+        const cm = row.querySelector(".cm");
+        if (cm) cm.textContent = `${file.name} → ${msg}`;
+        await Promise.all([loadAssets(), loadSecurityProducts(), loadFiles(), loadTodayPriority()]);
+      } catch (e) {
+        const cm = row.querySelector(".cm");
+        if (cm) cm.textContent = `${file.name} — 실패: ${e.message}`;
+      }
+    }
+    smartInput.value = "";
+  });
 
   // ── 연동 서버 정보 카드 — 실제 연결 정보만 표시(주소·상태·로드된 로컬 LLM·에이전트 수) ──
   async function loadServerCard() {
