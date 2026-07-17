@@ -87,28 +87,7 @@ tr:last-child td{border-bottom:none;}
     <div class="topbar-row">
       <div>
         <div class="page-title">AI 기억 · 학습</div>
-        <div class="page-sub">AI에게 우리 회사 지식을 주는 3가지 방법입니다. 쉬운 것부터 시작하세요.</div>
-      </div>
-    </div>
-
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px;max-width:900px;">
-      <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;">
-        <div style="font-size:22px;margin-bottom:6px;">⚡</div>
-        <div style="font-weight:800;color:#fff;font-size:14px;margin-bottom:4px;">단기 기억</div>
-        <div style="font-size:12px;color:var(--text);line-height:1.6;">방금 나눈 대화를 기억해요. 대화하는 동안만 유효하고, 서버를 끄면 잊어버립니다.</div>
-        <div style="font-size:11px;color:var(--muted-2);margin-top:8px;">✅ 자동 · 설정 필요 없음</div>
-      </div>
-      <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;">
-        <div style="font-size:22px;margin-bottom:6px;">📚</div>
-        <div style="font-weight:800;color:#fff;font-size:14px;margin-bottom:4px;">장기 기억 <span style="font-size:10px;color:var(--teal);">· 가장 쉬움</span></div>
-        <div style="font-size:12px;color:var(--text);line-height:1.6;">사내 문서를 올려두면 채팅할 때 알아서 찾아 참고해요. 파일만 올리면 끝, 계속 쌓입니다.</div>
-        <div style="font-size:11px;color:var(--muted-2);margin-top:8px;">👇 아래 "문서 올리기"에서 시작</div>
-      </div>
-      <div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;">
-        <div style="font-size:22px;margin-bottom:6px;">🎓</div>
-        <div style="font-weight:800;color:#fff;font-size:14px;margin-bottom:4px;">학습 <span style="font-size:10px;color:var(--amber);">· 고급</span></div>
-        <div style="font-size:12px;color:var(--text);line-height:1.6;">문서로 AI를 직접 훈련시켜 아예 외우게 해요. 시간과 GPU가 필요하지만 가장 강력합니다.</div>
-        <div style="font-size:11px;color:var(--muted-2);margin-top:8px;">👇 아래 "학습" 섹션 (GPU 필요)</div>
+        <div class="page-sub">사내 문서를 올려 AI가 참고하게 하고(장기 기억·RAG), 올린 문서를 확인·관리하거나 학습(파인튜닝)에 씁니다.</div>
       </div>
     </div>
 
@@ -177,9 +156,6 @@ tr:last-child td{border-bottom:none;}
     .dm-m b{font-size:16px;color:#fff;display:block;}.dm-m span{font-size:10px;color:var(--muted-2);}
     .dm-how{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:11px 13px;margin-bottom:12px;font-size:11.5px;color:var(--text);line-height:1.6;}
     .dm-how b{color:var(--blue-light);}
-    .dm-chunkh{font-size:11px;font-weight:800;color:var(--muted-2);margin-bottom:6px;}
-    .dm-chunk{background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px;font-size:11px;color:var(--muted);line-height:1.5;white-space:pre-wrap;max-height:110px;overflow:hidden;}
-    .dm-chunk b{color:var(--muted-2);font-size:9.5px;}
     .dm-del{margin-top:14px;border-top:1px solid var(--border);padding-top:12px;display:flex;gap:10px;align-items:stretch;}
     .dm-delbox{flex:1;background:rgba(226,72,61,0.06);border:1px solid rgba(226,72,61,0.28);border-radius:9px;padding:10px 12px;}
     .dm-delbox .h{font-size:11.5px;font-weight:800;color:#f5928a;margin-bottom:6px;}
@@ -351,7 +327,7 @@ tr:last-child td{border-bottom:none;}
     }
   }
 
-  // ── 올린 문서 확인·관리(장기기억) — 목록 + 상세(조각 미리보기) + 삭제 2옵션 ──
+  // ── 올린 문서 확인·관리(장기기억) — 목록 + 상세 + 삭제 2옵션(장기기억만 / 원본까지) ──
   let dmDocs = [];
   let dmSelected = null;
   let dmConfirmId = null;
@@ -401,23 +377,11 @@ tr:last-child td{border-bottom:none;}
       `<div class="dm-m"><b>${scopeShort}</b><span>검색 범위</span></div>` +
       `<div class="dm-m"><b>임베딩됨 ✓</b><span>상태</span></div></div>` +
       `<div class="dm-how">🧠 <b>어떻게 학습됐나:</b> 800자 단위 ${d.chunks}개 조각으로 나뉘어 bge-m3로 벡터화돼 장기기억에 저장됐습니다. 질문하면 관련 조각이 검색돼 답변에 자동 주입됩니다. <b>모델 가중치에 각인되는 파인튜닝이 아니라</b> 검색 참고자료이므로, 삭제하면 즉시 답변에서 빠집니다.</div>` +
-      `<div class="dm-chunkh">조각 미리보기</div><div id="dmChunks"><div class="dm-empty">조각 불러오는 중...</div></div>` +
       `<div class="dm-del"><div class="dm-delbox"><div class="h">🗑 이 문서 삭제</div>` +
       `<label class="dm-opt"><input type="radio" name="dmDel" value="mem" checked><span><b>장기기억에서만 제거</b><span class="t">임베딩 ${d.chunks}조각 삭제 · 답변에서 즉시 빠짐 · 재업로드로 복구</span></span></label>` +
       `<label class="dm-opt${d.hasSource ? "" : " dis"}"><input type="radio" name="dmDel" value="file"${d.hasSource ? "" : " disabled"}><span><b>원본 파일까지 삭제</b><span class="t">${d.hasSource ? "임베딩 + 서버 원본 파일 완전 제거 · 복구 불가" : "서버에 저장된 원본이 없어 임베딩 제거로 완전 삭제됩니다"}</span></span></label>` +
       `</div><button class="dm-delbtn" id="dmDelBtn">삭제</button></div>`;
     document.getElementById("dmDelBtn").addEventListener("click", () => deleteDoc(documentId));
-    try {
-      const chunks = await window.gijo.memoryDocumentChunks(documentId, 5);
-      if (dmSelected !== documentId) return;
-      const box = document.getElementById("dmChunks");
-      box.innerHTML = chunks.length
-        ? chunks.map((c) => `<div class="dm-chunk"><b>조각 #${c.chunkIndex}</b><br>${dmEsc((c.text || "").slice(0, 400))}${(c.text || "").length > 400 ? "…" : ""}</div>`).join("")
-        : '<div class="dm-empty">조각이 없습니다.</div>';
-    } catch (e) {
-      const box = document.getElementById("dmChunks");
-      if (box) box.innerHTML = '<div class="dm-empty">조각을 불러오지 못했습니다.</div>';
-    }
   }
 
   async function deleteDoc(documentId) {
@@ -439,8 +403,8 @@ tr:last-child td{border-bottom:none;}
       await loadDocuments();
     } catch (e) {
       btn.disabled = false; btn.textContent = "삭제"; btn.style.background = "";
-      const box = document.getElementById("dmChunks");
-      if (box) box.insertAdjacentHTML("afterbegin", '<div class="dm-empty" style="color:#f5928a">삭제 실패: ' + dmEsc(e.message) + '</div>');
+      const box = document.querySelector("#dmDetail .dm-delbox");
+      if (box) box.insertAdjacentHTML("beforeend", '<div style="color:#f5928a;font-size:11px;margin-top:6px">삭제 실패: ' + dmEsc(e.message) + '</div>');
     }
   }
 
