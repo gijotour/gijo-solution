@@ -26,9 +26,7 @@ async function main() {
   const auth = { headers: { Authorization: `Bearer ${token}` } };
   const g = async (p) => fetch(`${BASE}${p}`, auth).then((r) => r.json()).catch(() => null);
 
-  let agents = (await g("/api/agents")) || [];
-  // 표시 이름 변경 반영(라이브 서버는 아직 구 빌드라 "노말틱"을 서빙 → 스냅샷에선 새 이름으로).
-  agents = agents.map((a) => (a.id === "normaltic" ? { ...a, name: "GIJO Security" } : a));
+  const agents = (await g("/api/agents")) || []; // 서버가 반환하는 실제 이름·모델 그대로 사용
 
   const DATA = {
     me: login.user ?? { displayName: "정요한", username: "jyh", role: "admin" },

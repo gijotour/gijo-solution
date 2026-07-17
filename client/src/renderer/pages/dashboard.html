@@ -761,9 +761,11 @@
 
   // ── 시안3: 팀 카드 그리드 + 하단 대화 독 ─────────────────────────────
   function llmBadge(a) {
+    // 보안 합성모델(예: merged-lily-gijo-loop-ai-securityllm)은 이름에 "gijo"도 포함하므로
+    // 합성/보안 지표를 먼저 검사한 뒤 gijo를 판정한다.
     const m = String(a.assignedModelId || "").toLowerCase();
-    if (m.includes("gijo")) return "gijo";
-    if (m.includes("lily") || m.includes("zysec") || m.includes("sec") || m.includes("merge")) return "보안LLM";
+    if (m.includes("merge") || m.includes("lily") || m.includes("zysec") || m.includes("security")) return "보안LLM";
+    if (m.includes("gijo") || m.includes("orchestrator")) return "gijo";
     return (a.id === "scan" || a.id === "analysis") ? "보안LLM" : "gijo";
   }
   function tcardHtml(a) {
