@@ -9,6 +9,7 @@
 
 import type { Express } from "express";
 import { authMiddleware } from "../auth/auth";
+import { asyncRoute } from "../util/asyncRoute";
 import { db } from "../db";
 import { THREAT_CRITERIA } from "./compliance-criteria";
 
@@ -104,12 +105,53 @@ export function setComplianceStatus(threatCode: string, status: ComplianceStatus
   upsertStatusStmt.run({ threatCode, status, note: note || null, updatedAt: Date.now() });
 }
 
+// AI 초안(자동 triage) — 위협의 양호/취약 기준 + 조직의 실제 AI 자산 현황을 근거로 대응 상태
+// 초안(status + 근거 note)을 로컬 LLM이 제안한다. 자동 저장 아님(담당자 검토 후 PUT). 21개를
+// 첫날부터 수작업 평가하는 부담을 줄이는 게 목적.
+export async function buildComplianceDraft(code: string): Promise<{ status: ComplianceStatus; note: string }> {
+  const threat = listCompliance().find((t) => t.code === code);
+  if (!threat) throw new Error(`알 수 없는 위협 코드: ${code}`);
+
+  // 조직 현황 요약 — 실제 자산 데이터 기반(지어내지 않게).
+  const { listAssets } = await import("./assets.js");
+  const assets = listAssets();
+  const withAibom = assets.filter((a) => a.aibom && JSON.stringify(a.aibom).replace(/[{}":,\s]/g, "").length > 0).length;
+  const findings = assets.reduce((n, a) => n + (a.findings?.length ?? 0), 0);
+  const context = `등록 AI 자산 ${assets.length}개, AI-BOM 작성 ${withAibom}개, 스캔 취약점 ${findings}건`;
+
+  const prompt = [
+    `KISA AI 보안 위협 대응 현황 평가 초안을 작성하세요.`,
+    `위협: ${threat.name} (${threat.categoryLabel})`,
+    `[양호(대응됨) 기준] ${threat.criteria.good || "-"}`,
+    `[취약(미흡) 기준] ${threat.criteria.weak || "-"}`,
+    `[우리 조직 현황] ${context}`,
+    "",
+    "규칙:",
+    "- 첫 줄에 정확히 다음 중 하나만: '상태: covered'(충분히 대응) / '상태: partial'(부분 대응) / '상태: na'(해당 없음) / '상태: open'(미대응).",
+    "- 그다음 줄부터 담당자가 확인할 근거와 권장 조치를 2~3문장으로.",
+    "- 반드시 한국어로만 작성(중국어·일본어 금지). 주어진 현황 범위 안에서만 판단하고 지어내지 마세요.",
+  ].join("\n");
+
+  const { chat } = await import("./llm.js");
+  const reply = await chat({ agentId: "orchestrator", message: prompt, remember: false, maxTokens: 400 });
+
+  const m = reply.match(/상태\s*[:：]\s*(covered|partial|na|open)/i);
+  const status = (m ? (m[1].toLowerCase() as ComplianceStatus) : "partial");
+  // 첫 '상태:' 줄을 제외한 나머지를 근거 note로.
+  const note = reply.replace(/^[^\n]*상태\s*[:：]\s*(covered|partial|na|open)[^\n]*\n?/im, "").trim() || reply.trim();
+  return { status, note: `🤖 AI 초안(검토 필요) · ${note}` };
+}
+
 export function resetComplianceForTests(): void {
   db.exec("DELETE FROM compliance_status");
 }
 
 export function registerComplianceRoutes(app: Express): void {
   app.get("/api/compliance", authMiddleware, (_req, res) => res.json(listCompliance()));
+  // AI 초안 — 위협별 대응 상태 제안(저장 아님, 담당자 검토용).
+  app.post("/api/compliance/:code/draft", authMiddleware, asyncRoute(async (req, res) => {
+    res.json(await buildComplianceDraft(String(req.params.code)));
+  }));
   app.put("/api/compliance/:code", authMiddleware, (req, res) => {
     try {
       setComplianceStatus(String(req.params.code), req.body.status, String(req.body.note ?? ""));

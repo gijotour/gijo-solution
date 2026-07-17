@@ -75,4 +75,12 @@ describe("compliance (KISA 매뉴얼 위협 × 프레임워크 대응 현황)", 
     const badStatus = await request(app).put("/api/compliance/M03").set("Authorization", `Bearer ${token}`).send({ status: "maybe" });
     expect(badStatus.status).toBe(400);
   });
+
+  it("AI 초안: 위협에 대해 유효한 상태 + 근거 note를 200으로 반환", async () => {
+    const r = await request(app).post("/api/compliance/M06/draft").set("Authorization", `Bearer ${token}`).send({});
+    expect(r.status).toBe(200);
+    expect(["covered", "partial", "na", "open"]).toContain(r.body.status);
+    expect(typeof r.body.note).toBe("string");
+    expect(r.body.note).toContain("🤖 AI 초안"); // 담당자 검토 표식
+  });
 });

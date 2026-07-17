@@ -43,6 +43,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .beta-tag{background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
 .avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
 .icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
+.ai-draft-btn{width:100%;margin-top:6px;background:var(--panel);border:1px solid var(--border-strong);color:var(--blue-light);border-radius:6px;padding:5px 8px;font-size:11px;font-weight:700;cursor:pointer;}
+.ai-draft-btn:hover{border-color:var(--blue);}
+.ai-draft-btn:disabled{opacity:0.6;cursor:default;}
 </style>
 </head>
 <body>
@@ -162,7 +165,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         <input data-note="${t.code}" value="${esc(t.note)}" placeholder="대응 근거·메모 (선택)"
           style="width:100%;margin-top:6px;background:var(--panel-2);border:1px solid var(--border);border-radius:6px;padding:5px 8px;color:var(--text);font-size:11.5px;outline:none;">
       </div>
-      <div><select data-status="${t.code}" style="width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:6px;padding:7px 8px;color:var(--text);font-size:12px;outline:none;cursor:pointer;">${opts}</select></div>
+      <div><select data-status="${t.code}" style="width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:6px;padding:7px 8px;color:var(--text);font-size:12px;outline:none;cursor:pointer;">${opts}</select>
+        <button data-draft="${t.code}" class="ai-draft-btn" title="AI가 양호/취약 기준과 우리 자산 현황으로 대응 상태 초안을 제안합니다">🤖 AI 초안</button>
+      </div>
     </div>`;
   }
 
@@ -207,6 +212,24 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         const t = catalog.find((x) => x.code === code);
         if (t && t.note === e.target.value) return;
         try { await window.gijo.setComplianceStatus(code, t.status, e.target.value); catalog = await window.gijo.listCompliance(); } catch (err) { alert("저장 실패: " + err.message); }
+      });
+    });
+    // AI 초안 — 위협의 양호/취약 기준 + 자산 현황으로 대응 상태 초안을 채운다(검토 후 조정 가능).
+    cats.querySelectorAll("button[data-draft]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const code = btn.dataset.draft;
+        const orig = btn.textContent;
+        btn.disabled = true; btn.textContent = "AI 작성 중…";
+        try {
+          const { status, note } = await window.gijo.complianceDraft(code);
+          await window.gijo.setComplianceStatus(code, status, note); // 초안 저장(note에 '🤖 AI 초안' 표식)
+          catalog = await window.gijo.listCompliance();
+          expanded.add(code); // 근거를 바로 볼 수 있게 펼침
+          render();
+        } catch (err) {
+          alert("AI 초안 실패: " + ((err && err.message) || err));
+          btn.disabled = false; btn.textContent = orig;
+        }
       });
     });
   }

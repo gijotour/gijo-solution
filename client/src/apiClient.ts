@@ -790,4 +790,6 @@ export const complianceApi = {
   list: () => request<ThreatCompliance[]>("/api/compliance"),
   setStatus: (code: string, status: string, note: string) =>
     request<ThreatCompliance>(`/api/compliance/${code}`, { method: "PUT", body: { status, note } }),
+  // AI 초안 — 위협별 대응 상태 제안(저장 아님). 담당자 검토용.
+  draft: (code: string) => request<{ status: string; note: string }>(`/api/compliance/${code}/draft`, { method: "POST" }),
 };

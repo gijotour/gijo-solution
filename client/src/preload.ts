@@ -102,6 +102,7 @@ const gijoApi = {
   aiTriage: (limit?: number) => api.approvalsApi.triage(limit),
   listCompliance: () => api.complianceApi.list(),
   setComplianceStatus: (code: string, status: string, note: string) => api.complianceApi.setStatus(code, status, note),
+  complianceDraft: (code: string) => api.complianceApi.draft(code),
   onAssetUpdated: (cb: (asset: unknown) => void) => onChannel("asset:updated", cb),
 
   // SBOM
