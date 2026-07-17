@@ -22,6 +22,7 @@ import {
   collectDecisionPairs,
   toTrainingExample,
   buildOrchestratorDataset,
+  amplifyDecisionPairs,
   goldCount,
   ORCHESTRATOR_DATASET_ID,
 } from "../src/engine/orchestrator-dataset";
@@ -126,6 +127,30 @@ describe("buildOrchestratorDataset — 시드+골드 → 학습 데이터셋", (
     appendApprovedDecision("새 지시 오탐이야", "update_finding_status", { assetId: "a", finding: "f", status: "오탐" });
     const after = (await buildOrchestratorDataset()).examples;
     expect(after).toBe(base + 1);
+  });
+});
+
+describe("amplifyDecisionPairs — 지시문만 증폭, 값 유실 변형은 버린다(과적합 완화)", () => {
+  it("그라운딩(assetId·finding) 유지 변형만 채택하고 결정은 그대로 둔다", async () => {
+    const pair = {
+      instruction: "ai-secbot-01 버전 노출 오탐이야",
+      decision: { action: "tool" as const, tool: "update_finding_status", args: { assetId: "ai-secbot-01", finding: "버전 노출", status: "오탐" } },
+    };
+    // 변형2는 assetId·finding이 없다 → 그라운딩 깨져 버려져야 한다.
+    mockChat.mockResolvedValueOnce(JSON.stringify(["ai-secbot-01 버전 노출은 오탐으로 처리해줘", "이건 잘못 잡힌 거야"]));
+    const out = await amplifyDecisionPairs([pair], () => 3);
+    expect(out).toHaveLength(2); // 원본 + 유효변형1 (변형2 탈락)
+    expect(out[0]).toBe(pair);
+    expect(out[1].instruction).toContain("ai-secbot-01");
+    expect(out[1].decision).toBe(pair.decision); // 도구·인자 불변
+  });
+
+  it("파싱 불가·빈 응답이면 원본만 남긴다(증폭 실패가 데이터셋을 깨지 않음)", async () => {
+    const pair = { instruction: "오늘 뭐부터?", decision: { action: "tool" as const, tool: "today", args: {} } };
+    mockChat.mockResolvedValueOnce("죄송하지만 도와드릴 수 없습니다");
+    const out = await amplifyDecisionPairs([pair], () => 3);
+    expect(out).toHaveLength(1);
+    expect(out[0]).toBe(pair);
   });
 });
 

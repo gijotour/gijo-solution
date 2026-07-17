@@ -134,14 +134,103 @@ export function collectDecisionPairs(): DecisionPair[] {
   return [...seedOnly, ...gold];
 }
 
+// ── 증폭(지시문만 패러프레이즈) ────────────────────────────────────────────
+// 소량 시드(31건)로 학습하면 과적합한다(실측: loss 0.009). 다양한 표현을 늘려 완화한다.
+// 핵심: 지시문의 *표현*만 바꾸고 도구·인자(assetId·finding·status 의도)는 고정한다. dataset.ts의
+// amplifyDataset은 question/answer 전체를 바꿔 결정 프롬프트·JSON을 훼손하므로 여기선 못 쓴다.
+
+function normContains(haystack: string, needle: string): boolean {
+  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "");
+  const n = norm(needle);
+  return n.length >= 2 && norm(haystack).includes(n);
+}
+
+// 원본 지시에 실제로 나타난 인자 값 — 변형이 이걸 잃으면 (지시→인자) 그라운딩이 깨지므로 버린다.
+function mustKeepValues(pair: DecisionPair): string[] {
+  return Object.values(pair.decision.args ?? {}).filter((v) => v && normContains(pair.instruction, v));
+}
+
+// LLM 출력에서 문자열 배열을 견고하게 뽑는다(코드펜스 제거 → [..] 슬라이스 → parse → 정규식 폴백).
+function parseStringArray(raw: string): string[] {
+  let s = raw.replace(/```(?:json)?/gi, "").trim();
+  const a = s.indexOf("["), b = s.lastIndexOf("]");
+  if (a >= 0 && b > a) s = s.slice(a, b + 1);
+  try {
+    const arr = JSON.parse(s);
+    if (Array.isArray(arr)) return arr.filter((x): x is string => typeof x === "string");
+  } catch { /* 폴백 */ }
+  const out: string[] = [];
+  const re = /"((?:[^"\\]|\\.)*)"/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(raw)) !== null) {
+    try { out.push(JSON.parse(`"${m[1]}"`)); } catch { out.push(m[1]); }
+  }
+  return out;
+}
+
+type ChatFn = (args: { agentId: string; message: string; maxTokens?: number }) => Promise<string>;
+
+async function instructionVariants(pair: DecisionPair, n: number, chat: ChatFn): Promise<string[]> {
+  if (n <= 0) return [];
+  const keep = mustKeepValues(pair);
+  const keepLine = keep.length
+    ? `반드시 글자 그대로 유지할 값: ${keep.join(", ")}. 판정·의도(오탐/조치완료/배정 등)도 바꾸지 마라.`
+    : "무엇을 시키는지(의도)는 절대 바꾸지 마라.";
+  const prompt = [
+    `다음 보안 플랫폼 사용자 지시를 뜻은 그대로 두고 표현·말투만 다르게 ${n}가지로 바꿔라.`,
+    keepLine,
+    `출력은 JSON 문자열 배열만: ["변형1","변형2",...] — 다른 설명 없이.`,
+    `원본 지시: "${pair.instruction}"`,
+  ].join("\n");
+  let raw = "";
+  try {
+    raw = await chat({ agentId: "analysis", message: prompt, maxTokens: 512 });
+  } catch {
+    return [];
+  }
+  const seen = new Set([pair.instruction.trim()]);
+  const out: string[] = [];
+  for (const v of parseStringArray(raw)) {
+    if (out.length >= n) break; // 요청 개수(n)로 제한 — 모델이 더 많이 뱉어도 factor가 분포를 통제하게
+    const s = v.trim();
+    if (!s || s.length > 200 || seen.has(s)) continue;
+    if (!keep.every((k) => normContains(s, k))) continue; // 값 유실 → 그라운딩 깨짐, 버린다
+    seen.add(s);
+    out.push(s);
+  }
+  return out;
+}
+
+// 각 쌍을 (원본 + 유효 변형)으로 늘린다. 약점 update_finding_status는 더 크게 증폭한다.
+// chatFn 주입 가능 — 별도 프로세스에서 실행할 때 모델 라우팅/스폰(GPU 경합)을 피하려고 실행 중인
+// :8080에 직접 붙는 호출을 넣을 수 있다. 생략하면 서버 컨텍스트의 chat(라우팅 포함)을 쓴다.
+export async function amplifyDecisionPairs(
+  pairs: DecisionPair[],
+  factorFor: (p: DecisionPair) => number = (p) => (p.decision.tool === "update_finding_status" ? 5 : 3),
+  chatFn?: ChatFn
+): Promise<DecisionPair[]> {
+  const chat = chatFn ?? ((await import("./llm.js")).chat as ChatFn);
+  const out: DecisionPair[] = [];
+  for (const pair of pairs) {
+    out.push(pair);
+    const variants = await instructionVariants(pair, factorFor(pair) - 1, chat);
+    for (const instruction of variants) out.push({ instruction, decision: pair.decision });
+  }
+  return out;
+}
+
 // 시드+골드를 orchestrator-tools.json으로 저장한다. dataset.ts는 llm.ts를 import하므로
 // 정적 import 시 순환 우려 → learnloop의 선례대로 동적 import.
-export async function buildOrchestratorDataset(): Promise<{ datasetId: string; examples: number; seed: number; gold: number }> {
-  const pairs = collectDecisionPairs();
+// amplify=true면 증폭(LLM 호출 다수 — :8080 필요)한 뒤 저장한다.
+export async function buildOrchestratorDataset(
+  opts: { amplify?: boolean } = {}
+): Promise<{ datasetId: string; examples: number; seed: number; gold: number; amplified: boolean }> {
+  let pairs = collectDecisionPairs();
+  if (opts.amplify) pairs = await amplifyDecisionPairs(pairs);
   const examples = pairs.map(toTrainingExample);
   const { saveDataset } = await import("./dataset.js");
   const saved = saveDataset(ORCHESTRATOR_DATASET_ID, examples);
-  return { datasetId: saved.id, examples: saved.examples, seed: SEED_DECISIONS.length, gold: goldCount() };
+  return { datasetId: saved.id, examples: saved.examples, seed: SEED_DECISIONS.length, gold: goldCount(), amplified: !!opts.amplify };
 }
 
 export function registerOrchestratorDatasetRoutes(app: Express): void {
