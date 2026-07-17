@@ -319,7 +319,23 @@ export const memoryApi = {
     request("/api/memory/ingest-file", { method: "POST", body: { filename, content, scope } }),
   query: (question: string, topK?: number, agentId?: string) =>
     request<string[]>("/api/memory/query", { method: "POST", body: { question, topK, agentId } }),
+  // 올린 문서 관리(장기기억) — 목록·조각 미리보기·삭제.
+  listDocuments: () =>
+    request<MemoryDocument[]>("/api/memory/documents"),
+  documentChunks: (documentId: string, limit?: number) =>
+    request<{ chunkIndex: number; text: string }[]>("/api/memory/document/chunks", { method: "POST", body: { documentId, limit } }),
+  deleteDocument: (documentId: string, withFile?: boolean) =>
+    request<{ documentId: string; deletedChunks: number; deletedFile: boolean }>("/api/memory/document/delete", { method: "POST", body: { documentId, withFile } }),
 };
+
+export interface MemoryDocument {
+  documentId: string;
+  scope: string;
+  chunks: number;
+  embeddingModel: string | null;
+  ingestedAt: string | null;
+  hasSource: boolean;
+}
 
 // ── 온톨로지 (지식 그래프 / 하이브리드 지식모델의 의미 계층) ──────────────
 export interface OntologyTriple {

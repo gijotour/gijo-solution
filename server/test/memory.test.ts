@@ -16,7 +16,7 @@ vi.mock("../src/engine/llm", () => ({
   registerLlmRoutes: vi.fn(),
 }));
 
-const { ingestDocument, ingestText, queryMemory } = await import("../src/engine/memory");
+const { ingestDocument, ingestText, queryMemory, listDocuments, getDocumentChunks, deleteDocument } = await import("../src/engine/memory");
 
 const DOC_A = path.join(tmpDb, "doc-a.txt");
 const DOC_B = path.join(tmpDb, "doc-b.txt");
@@ -67,6 +67,54 @@ describe("memory (장기 기억 / LanceDB) — 임베딩 모델 교체 자가 �
     const hits = await queryMemory("모델 보관 위치?");
     expect(hits.some((t) => t.includes("VAULT-9"))).toBe(true);
     expect(hits.some((t) => t.includes("김민수"))).toBe(false);
+  });
+});
+
+describe("memory documents (올린 문서 목록·조각 미리보기·삭제)", () => {
+  it("lists ingested documents with chunk counts and records ingestedAt", async () => {
+    embedDim = 3;
+    await ingestText("guide-x.txt", "첫 번째 관리 대상 문서입니다.", "global");
+    await ingestText("guide-y.md", "두 번째 문서 — 마크다운.", "global");
+    const docs = await listDocuments();
+    const x = docs.find((d) => d.documentId === "guide-x.txt");
+    const y = docs.find((d) => d.documentId === "guide-y.md");
+    expect(x).toBeTruthy();
+    expect(y).toBeTruthy();
+    expect(x!.chunks).toBeGreaterThanOrEqual(1);
+    expect(y!.scope).toBe("global");
+    expect(y!.ingestedAt).toBeTruthy(); // 방금 수집 → 시각 기록됨
+    expect(y!.hasSource).toBe(false); // ingestText(base64 경로)는 서버 원본 없음
+  });
+
+  it("previews a document's chunk text (어떻게 학습됐는지 확인)", async () => {
+    embedDim = 3;
+    await ingestText("preview-doc.txt", "조각 미리보기 확인용 문서 내용입니다.", "global");
+    const chunks = await getDocumentChunks("preview-doc.txt", 5);
+    expect(chunks.length).toBeGreaterThanOrEqual(1);
+    expect(chunks[0].text).toContain("조각 미리보기");
+  });
+
+  it("ingestDocument records a sourcePath so 원본까지 삭제 is possible", async () => {
+    embedDim = 3;
+    const p = path.join(tmpDb, "with-source.txt");
+    fs.writeFileSync(p, "원본 경로가 있는 문서.", "utf-8");
+    await ingestDocument(p, "global");
+    const docs = await listDocuments();
+    const d = docs.find((x) => x.documentId === "with-source.txt");
+    expect(d).toBeTruthy();
+    expect(d!.hasSource).toBe(true);
+  });
+
+  it("deletes a document's embeddings and drops it from the list + search", async () => {
+    embedDim = 3;
+    await ingestText("delete-me.txt", "삭제 대상 문서 고유내용 ZZTOP.", "global");
+    expect((await listDocuments()).some((d) => d.documentId === "delete-me.txt")).toBe(true);
+    const res = await deleteDocument("delete-me.txt", false);
+    expect(res.deletedChunks).toBeGreaterThanOrEqual(1);
+    expect(res.deletedFile).toBe(false);
+    expect((await listDocuments()).some((d) => d.documentId === "delete-me.txt")).toBe(false);
+    const hits = await queryMemory("ZZTOP", 10);
+    expect(hits.join(" ")).not.toContain("ZZTOP");
   });
 });
 

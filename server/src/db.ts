@@ -161,6 +161,19 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_chat_logs_createdAt ON chat_logs(createdAt);
 
+  -- 장기기억(RAG/LanceDB) 문서 메타데이터. LanceDB 행에는 documentId·chunk·vector만 있어
+  -- 업로드 시각·원본 경로를 담을 수 없다(새 필드 추가 시 스키마 드리프트로 테이블이 재생성됨).
+  -- 문서 단위 메타데이터는 여기 SQLite에 둔다. chunks/scope의 진실 원천은 LanceDB이고 여기 값은
+  -- 참고·백필용. 이 테이블에 없는(과거 수집) 문서는 목록에서 ingestedAt=null('이전 업로드')로 표시.
+  CREATE TABLE IF NOT EXISTS memory_documents (
+    documentId TEXT PRIMARY KEY,
+    scope TEXT NOT NULL DEFAULT 'global',
+    chunks INTEGER NOT NULL DEFAULT 0,
+    embeddingModel TEXT,
+    sourcePath TEXT,
+    ingestedAt TEXT NOT NULL
+  );
+
   -- 학습 루프 실행 이력(engine/learnloop.ts) — 한 번의 수집→정제→학습→배포 사이클이 한 행.
   -- stage: stopping-engines | training | exporting | deploying | restarting-engines | done | error
   CREATE TABLE IF NOT EXISTS learnloop_runs (

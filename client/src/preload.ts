@@ -119,6 +119,9 @@ const gijoApi = {
   ingestDocument: (path: string, scope?: string) => api.memoryApi.ingest(path, scope),
   ingestMemoryFile: (filename: string, content: string, scope?: string) => api.memoryApi.ingestFile(filename, content, scope),
   queryMemory: (question: string, topK?: number, agentId?: string) => api.memoryApi.query(question, topK, agentId),
+  listMemoryDocuments: () => api.memoryApi.listDocuments(),
+  memoryDocumentChunks: (documentId: string, limit?: number) => api.memoryApi.documentChunks(documentId, limit),
+  deleteMemoryDocument: (documentId: string, withFile?: boolean) => api.memoryApi.deleteDocument(documentId, withFile),
 
   // 온톨로지(지식 그래프)
   listOntology: (filter?: { scope?: string; subject?: string }) => api.ontologyApi.list(filter),

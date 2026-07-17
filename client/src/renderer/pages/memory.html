@@ -156,6 +156,48 @@ tr:last-child td{border-bottom:none;}
       </details>
     </div>
 
+    <style>
+    .dm-wrap{display:grid;grid-template-columns:320px 1fr;gap:14px;margin-top:12px;}
+    .dm-list{border:1px solid var(--border);border-radius:10px;background:var(--panel-2);overflow:hidden;max-height:540px;overflow-y:auto;}
+    .dm-li{display:flex;align-items:center;gap:9px;padding:11px 12px;border-bottom:1px solid var(--border);cursor:pointer;}
+    .dm-li:last-child{border-bottom:none;}
+    .dm-li:hover{background:rgba(255,255,255,0.03);}
+    .dm-li.sel{background:rgba(59,130,246,0.12);box-shadow:inset 3px 0 0 var(--blue);}
+    .dm-li .ic{font-size:15px;flex:0 0 auto;}
+    .dm-li .nm{flex:1;font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+    .dm-li.sel .nm{color:#fff;font-weight:700;}
+    .dm-li .ck{font-size:10px;font-weight:800;color:var(--blue-light);background:rgba(59,130,246,0.14);border-radius:6px;padding:2px 7px;flex:0 0 auto;}
+    .dm-detail{border:1px solid var(--border);border-radius:10px;background:var(--panel);padding:16px;min-height:220px;}
+    .dm-empty{padding:26px;text-align:center;color:var(--muted-2);font-size:12px;}
+    .dm-dtop{display:flex;align-items:flex-start;gap:11px;border-bottom:1px solid var(--border);padding-bottom:12px;margin-bottom:12px;}
+    .dm-dtop .ic{width:40px;height:40px;border-radius:10px;background:var(--panel-2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:20px;flex:0 0 auto;}
+    .dm-dname{font-size:14px;font-weight:800;color:#fff;word-break:break-all;}
+    .dm-dmeta{font-size:11px;color:var(--muted-2);margin-top:3px;}
+    .dm-metric{display:flex;gap:20px;margin:12px 0;flex-wrap:wrap;}
+    .dm-m b{font-size:16px;color:#fff;display:block;}.dm-m span{font-size:10px;color:var(--muted-2);}
+    .dm-how{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:11px 13px;margin-bottom:12px;font-size:11.5px;color:var(--text);line-height:1.6;}
+    .dm-how b{color:var(--blue-light);}
+    .dm-chunkh{font-size:11px;font-weight:800;color:var(--muted-2);margin-bottom:6px;}
+    .dm-chunk{background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-bottom:6px;font-size:11px;color:var(--muted);line-height:1.5;white-space:pre-wrap;max-height:110px;overflow:hidden;}
+    .dm-chunk b{color:var(--muted-2);font-size:9.5px;}
+    .dm-del{margin-top:14px;border-top:1px solid var(--border);padding-top:12px;display:flex;gap:10px;align-items:stretch;}
+    .dm-delbox{flex:1;background:rgba(226,72,61,0.06);border:1px solid rgba(226,72,61,0.28);border-radius:9px;padding:10px 12px;}
+    .dm-delbox .h{font-size:11.5px;font-weight:800;color:#f5928a;margin-bottom:6px;}
+    .dm-opt{display:flex;gap:8px;align-items:flex-start;padding:5px 0;cursor:pointer;}
+    .dm-opt input{margin-top:3px;accent-color:#e2483d;}
+    .dm-opt b{font-size:11px;color:#fff;}.dm-opt .t{font-size:10px;color:var(--muted);display:block;}
+    .dm-opt.dis{opacity:.55;}
+    .dm-delbtn{background:#e2483d;color:#fff;border:none;border-radius:9px;padding:0 18px;font-weight:800;font-size:12px;cursor:pointer;}
+    .dm-delbtn:disabled{opacity:.5;cursor:not-allowed;}
+    </style>
+    <div class="panel">
+      <div class="panel-title">📚 올린 문서 확인 · 관리 <span id="dmSummary" style="font-size:11px;font-weight:600;color:var(--muted-2);margin-left:6px"></span></div>
+      <div class="panel-sub">올린 문서가 <b style="color:var(--blue-light)">어떻게 학습(임베딩)됐는지</b>와 실제 조각을 확인하고, <b>장기기억/원본</b> 단위로 삭제합니다. (올린 문서는 파인튜닝이 아니라 검색용 임베딩 — 삭제하면 답변에서 즉시 빠집니다)</div>
+      <div class="dm-wrap">
+        <div class="dm-list" id="dmList"><div class="dm-empty">불러오는 중...</div></div>
+        <div class="dm-detail" id="dmDetail"><div class="dm-empty">왼쪽에서 문서를 선택하세요.</div></div>
+      </div>
+    </div>
 
     <div class="panel">
       <details style="margin-bottom:14px;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
@@ -287,6 +329,7 @@ tr:last-child td{border-bottom:none;}
     status.textContent = `✓ ${ok}개 문서를 장기 기억에 저장했습니다 (총 ${totalChunks}개 청크 · ${scopeLabel}). 이제 채팅에서 자동으로 참고합니다.`;
     status.className = "status-line status-ok";
     e.target.value = "";
+    loadDocuments(); // 올린 문서 목록 즉시 갱신
   }
 
   async function ingest() {
@@ -301,9 +344,103 @@ tr:last-child td{border-bottom:none;}
       const scopeLabel = result.scope === "global" ? "전체 공유" : `${result.scope} 전용`;
       line.textContent = `✓ ${result.documentId} — ${result.chunks}개 청크 저장됨 · ${scopeLabel}`;
       line.className = "status-line status-ok";
+      loadDocuments(); // 올린 문서 목록 즉시 갱신
     } catch (e) {
       line.textContent = "✗ 수집 실패: " + e.message;
       line.className = "status-line status-err";
+    }
+  }
+
+  // ── 올린 문서 확인·관리(장기기억) — 목록 + 상세(조각 미리보기) + 삭제 2옵션 ──
+  let dmDocs = [];
+  let dmSelected = null;
+  let dmConfirmId = null;
+  const DM_ICON = (name) => /\.pdf$/i.test(name) ? "📕" : /\.hwpx?$/i.test(name) ? "📘" : /\.md$/i.test(name) ? "📝" : "📄";
+  const dmEsc = (s) => String(s == null ? "" : s).replace(/</g, "&lt;");
+
+  async function loadDocuments(keepSel) {
+    const list = document.getElementById("dmList");
+    if (!list) return;
+    try {
+      dmDocs = await window.gijo.listMemoryDocuments();
+    } catch (e) {
+      list.innerHTML = '<div class="dm-empty">불러오지 못했습니다: ' + dmEsc(e.message) + '</div>';
+      return;
+    }
+    const totalChunks = dmDocs.reduce((s, d) => s + (d.chunks || 0), 0);
+    document.getElementById("dmSummary").textContent = `· ${dmDocs.length}개 문서 · ${totalChunks}조각 · bge-m3`;
+    if (!dmDocs.length) {
+      list.innerHTML = '<div class="dm-empty">아직 올린 문서가 없습니다. 위에서 파일을 올려보세요.</div>';
+      document.getElementById("dmDetail").innerHTML = '<div class="dm-empty">올린 문서가 여기에 표시됩니다.</div>';
+      return;
+    }
+    list.innerHTML = dmDocs.map((d) =>
+      `<div class="dm-li" data-id="${dmEsc(d.documentId)}"><span class="ic">${DM_ICON(d.documentId)}</span>` +
+      `<span class="nm" title="${dmEsc(d.documentId)}">${dmEsc(d.documentId)}</span><span class="ck">${d.chunks}</span></div>`
+    ).join("");
+    list.querySelectorAll(".dm-li").forEach((el) => el.addEventListener("click", () => selectDoc(el.dataset.id)));
+    const target = (keepSel && dmDocs.some((d) => d.documentId === keepSel)) ? keepSel : dmDocs[0].documentId;
+    selectDoc(target);
+  }
+
+  async function selectDoc(documentId) {
+    dmSelected = documentId;
+    dmConfirmId = null;
+    document.querySelectorAll("#dmList .dm-li").forEach((el) => el.classList.toggle("sel", el.dataset.id === documentId));
+    const d = dmDocs.find((x) => x.documentId === documentId);
+    const detail = document.getElementById("dmDetail");
+    if (!d || !detail) return;
+    const when = d.ingestedAt ? new Date(d.ingestedAt).toLocaleString("ko-KR") : "이전 업로드(시각 미기록)";
+    const scopeShort = d.scope === "global" ? "전역" : d.scope;
+    const scopeLabel = d.scope === "global" ? "전역(공유)" : d.scope + " 전용";
+    detail.innerHTML =
+      `<div class="dm-dtop"><div class="ic">${DM_ICON(documentId)}</div><div><div class="dm-dname">${dmEsc(documentId)}</div>` +
+      `<div class="dm-dmeta">${scopeLabel} 범위 · 업로드 ${dmEsc(when)}</div></div></div>` +
+      `<div class="dm-metric"><div class="dm-m"><b>${d.chunks}</b><span>임베딩 조각</span></div>` +
+      `<div class="dm-m"><b>bge-m3</b><span>임베딩 모델</span></div>` +
+      `<div class="dm-m"><b>${scopeShort}</b><span>검색 범위</span></div>` +
+      `<div class="dm-m"><b>임베딩됨 ✓</b><span>상태</span></div></div>` +
+      `<div class="dm-how">🧠 <b>어떻게 학습됐나:</b> 800자 단위 ${d.chunks}개 조각으로 나뉘어 bge-m3로 벡터화돼 장기기억에 저장됐습니다. 질문하면 관련 조각이 검색돼 답변에 자동 주입됩니다. <b>모델 가중치에 각인되는 파인튜닝이 아니라</b> 검색 참고자료이므로, 삭제하면 즉시 답변에서 빠집니다.</div>` +
+      `<div class="dm-chunkh">조각 미리보기</div><div id="dmChunks"><div class="dm-empty">조각 불러오는 중...</div></div>` +
+      `<div class="dm-del"><div class="dm-delbox"><div class="h">🗑 이 문서 삭제</div>` +
+      `<label class="dm-opt"><input type="radio" name="dmDel" value="mem" checked><span><b>장기기억에서만 제거</b><span class="t">임베딩 ${d.chunks}조각 삭제 · 답변에서 즉시 빠짐 · 재업로드로 복구</span></span></label>` +
+      `<label class="dm-opt${d.hasSource ? "" : " dis"}"><input type="radio" name="dmDel" value="file"${d.hasSource ? "" : " disabled"}><span><b>원본 파일까지 삭제</b><span class="t">${d.hasSource ? "임베딩 + 서버 원본 파일 완전 제거 · 복구 불가" : "서버에 저장된 원본이 없어 임베딩 제거로 완전 삭제됩니다"}</span></span></label>` +
+      `</div><button class="dm-delbtn" id="dmDelBtn">삭제</button></div>`;
+    document.getElementById("dmDelBtn").addEventListener("click", () => deleteDoc(documentId));
+    try {
+      const chunks = await window.gijo.memoryDocumentChunks(documentId, 5);
+      if (dmSelected !== documentId) return;
+      const box = document.getElementById("dmChunks");
+      box.innerHTML = chunks.length
+        ? chunks.map((c) => `<div class="dm-chunk"><b>조각 #${c.chunkIndex}</b><br>${dmEsc((c.text || "").slice(0, 400))}${(c.text || "").length > 400 ? "…" : ""}</div>`).join("")
+        : '<div class="dm-empty">조각이 없습니다.</div>';
+    } catch (e) {
+      const box = document.getElementById("dmChunks");
+      if (box) box.innerHTML = '<div class="dm-empty">조각을 불러오지 못했습니다.</div>';
+    }
+  }
+
+  async function deleteDoc(documentId) {
+    const btn = document.getElementById("dmDelBtn");
+    // 네이티브 confirm 대신 두 번 클릭 확인(Electron 안전).
+    if (dmConfirmId !== documentId) {
+      dmConfirmId = documentId;
+      btn.textContent = "정말 삭제? (한 번 더)";
+      btn.style.background = "#b3271c";
+      setTimeout(() => { if (dmConfirmId === documentId && btn) { dmConfirmId = null; btn.textContent = "삭제"; btn.style.background = ""; } }, 4000);
+      return;
+    }
+    dmConfirmId = null;
+    const opt = document.querySelector('input[name="dmDel"]:checked');
+    const withFile = !!(opt && opt.value === "file");
+    btn.disabled = true; btn.textContent = "삭제 중...";
+    try {
+      await window.gijo.deleteMemoryDocument(documentId, withFile);
+      await loadDocuments();
+    } catch (e) {
+      btn.disabled = false; btn.textContent = "삭제"; btn.style.background = "";
+      const box = document.getElementById("dmChunks");
+      if (box) box.insertAdjacentHTML("afterbegin", '<div class="dm-empty" style="color:#f5928a">삭제 실패: ' + dmEsc(e.message) + '</div>');
     }
   }
 
@@ -412,6 +549,7 @@ tr:last-child td{border-bottom:none;}
     await loadUser();
     await loadHealth();
     await loadAgentScopes();
+    await loadDocuments();
 
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.getElementById("learnloopLink").addEventListener("click", () => window.gijo.navigateTo("learnloop.html"));
