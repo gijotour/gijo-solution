@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8"><title>디자인 C — 메신저 워크스페이스</title>
+<style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);--border-strong:rgba(255,255,255,0.16);
+--blue:#3b82f6;--blue-light:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--teal:#1eb980;--amber:#f0a020;--purple:#8b7cf0;--red:#e2483d;}
+*{box-sizing:border-box;margin:0;padding:0;font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;}
+body{background:var(--bg);color:var(--text);padding:0;}
+.mock-tag{position:fixed;top:0;left:0;background:var(--purple);color:#fff;font-size:11px;font-weight:800;padding:4px 12px;border-bottom-right-radius:8px;z-index:99;}
+.app{display:grid;grid-template-columns:280px 1fr;height:100vh;}
+.side{background:var(--panel-2);border-right:1px solid var(--border);padding:16px 12px;display:flex;flex-direction:column;}
+.boss{display:flex;align-items:center;gap:10px;padding:8px 8px 14px;border-bottom:1px solid var(--border);margin-bottom:10px;}
+.boss .av{width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#8b7cf0);display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;}
+.boss b{font-size:13px;color:#fff;}.boss span{font-size:10.5px;color:var(--muted);}
+.sec{font-size:10.5px;font-weight:800;color:var(--muted-2);letter-spacing:1px;margin:10px 6px 6px;}
+.ch{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;cursor:pointer;margin-bottom:2px;position:relative;}
+.ch:hover{background:rgba(255,255,255,0.04);}
+.ch.sel{background:rgba(59,130,246,0.14);}
+.ch .ic{width:26px;height:26px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;flex:0 0 auto;}
+.ch .nm{font-size:13px;font-weight:700;color:var(--text);flex:1;}
+.ch.sel .nm{color:#fff;}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;}
+.dot.work{background:var(--blue-light);box-shadow:0 0 6px var(--blue-light);}.dot.watch{background:var(--teal);}.dot.idle{background:var(--muted-2);}
+.unread{background:var(--red);color:#fff;font-size:10px;font-weight:800;border-radius:20px;padding:1px 6px;}
+.main{display:flex;flex-direction:column;}
+.top{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid var(--border);}
+.top .who{display:flex;align-items:center;gap:11px;}
+.top .who .ic{width:34px;height:34px;border-radius:9px;background:var(--panel);border:1px solid var(--border-strong);display:flex;align-items:center;justify-content:center;font-size:16px;}
+.top .nm{font-size:14px;font-weight:800;color:#fff;}.top .rl{font-size:11px;color:var(--muted);}
+.tabs{display:flex;gap:2px;}
+.tab{font-size:12px;font-weight:700;color:var(--muted);padding:6px 12px;border-bottom:2px solid transparent;cursor:pointer;}
+.tab.on{color:#fff;border-bottom-color:var(--blue);}
+.body{flex:1;padding:20px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;background:var(--bg);}
+.msg{max-width:70%;font-size:13px;line-height:1.6;padding:10px 14px;border-radius:12px;}
+.msg.me{align-self:flex-end;background:var(--blue);color:#fff;border-bottom-right-radius:4px;}
+.msg.ag{align-self:flex-start;background:var(--panel);border:1px solid var(--border);border-bottom-left-radius:4px;}
+.msg small{display:block;font-size:10px;color:var(--muted-2);margin-bottom:3px;}
+.sys{align-self:center;font-size:11px;color:var(--muted-2);background:var(--panel-2);border:1px solid var(--border);border-radius:20px;padding:4px 12px;}
+.inp{display:flex;gap:8px;padding:14px 20px;border-top:1px solid var(--border);}
+.inp input{flex:1;background:var(--panel);border:1px solid var(--border-strong);border-radius:10px;padding:11px 13px;color:var(--text);font-size:13px;outline:none;}
+.inp button{background:var(--blue);color:#fff;border:none;border-radius:10px;padding:0 18px;font-weight:700;cursor:pointer;}
+.llm{font-size:9.5px;font-weight:800;color:var(--purple);background:rgba(139,124,240,0.14);border-radius:5px;padding:1px 6px;}
+</style></head>
+<body>
+<div class="mock-tag">디자인 C — 메신저 워크스페이스</div>
+<div class="app">
+  <div class="side">
+    <div class="boss"><div class="av">정</div><div><b>정요한 팀장</b><br><span>보안 총괄</span></div></div>
+    <div class="sec">전체 지휘</div>
+    <div class="ch"><div class="ic">◉</div><div class="nm"># 전체 지시 (오케스트레이터)</div><span class="dot work"></span></div>
+    <div class="sec">팀원 · 작업 중 2</div>
+    <div class="ch sel"><div class="ic">⊘</div><div class="nm">스캔 에이전트</div><span class="unread">2</span><span class="dot work"></span></div>
+    <div class="ch"><div class="ic">◎</div><div class="nm">분석 에이전트</div><span class="dot idle"></span></div>
+    <div class="ch"><div class="ic">▣</div><div class="nm">리포트 에이전트</div><span class="dot idle"></span></div>
+    <div class="ch"><div class="ic">📚</div><div class="nm">GIJO Security</div><span class="dot watch"></span></div>
+  </div>
+  <div class="main">
+    <div class="top">
+      <div class="who"><div class="ic">⊘</div><div><div class="nm">스캔 에이전트 <span class="llm">보안LLM</span></div><div class="rl">스캔 결과 해석 · 자산 반영 · <span style="color:var(--blue-light)">작업 중</span></div></div></div>
+      <div class="tabs"><div class="tab on">대화</div><div class="tab">협업 로그</div></div>
+    </div>
+    <div class="body">
+      <div class="sys">오늘 · 스캔 에이전트와의 대화</div>
+      <div class="msg me"><small>나 · 팀장</small>방금 올린 Nessus 결과 자산에 반영하고, Critical부터 요약해줘.</div>
+      <div class="msg ag"><small>스캔 에이전트</small>3개 호스트를 자산에 반영했습니다. Critical 2건 — Apache Struts RCE(CVE-2017-5638, KEV), Log4Shell(CVE-2021-44228, KEV). 둘 다 실제 악용 확인되어 최우선입니다. 분석 에이전트에 우선순위 산정을 넘길까요?</div>
+      <div class="msg me"><small>나 · 팀장</small>응, 넘기고 리포트까지 이어줘.</div>
+      <div class="msg ag"><small>스캔 에이전트</small>분석 에이전트에 전달했습니다. 완료되면 리포트 에이전트가 브리핑을 작성합니다. (협업 로그 탭에서 진행 확인)</div>
+    </div>
+    <div class="inp"><input placeholder="스캔 에이전트에게 메시지…"><button>전송</button></div>
+  </div>
+</div>
+<script>
+document.querySelectorAll(".ch").forEach(c=>c.addEventListener("click",()=>{document.querySelectorAll(".ch").forEach(x=>x.classList.remove("sel"));c.classList.add("sel");}));
+document.querySelectorAll(".tab").forEach(t=>t.addEventListener("click",()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("on"));t.classList.add("on");}));
+</script>
+</body></html>

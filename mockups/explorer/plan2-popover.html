@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8">
+<style>
+:root{--bg:#0a0e1a;--panel:#0f1626;--panel2:#141d31;--border:#1e2a44;--border2:#2a3a5c;--blue:#3b82f6;--bluel:#7ab3ff;--muted:#8b98b8;--muted2:#5c6a8a;--teal:#1eb980;--amber:#f0a020;--red:#e2483d;--purple:#8b7cf0;}
+*{box-sizing:border-box;margin:0;padding:0;font-family:'Segoe UI','Malgun Gothic',sans-serif;}
+body{background:var(--bg);color:#dde5f5;padding:20px;display:flex;justify-content:center;}
+.wrap{width:1120px;}
+.plan-tag{display:inline-block;background:rgba(30,185,128,.13);border:1px solid var(--teal);color:var(--teal);font-size:13px;font-weight:800;padding:6px 14px;border-radius:8px;margin-bottom:6px;}
+.plan-desc{font-size:12.5px;color:var(--muted);margin-bottom:14px;line-height:1.6;}
+.app{display:flex;border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--bg);position:relative;}
+.explorer{width:300px;background:var(--panel);border-right:1px solid var(--border);padding:14px 12px;min-height:820px;}
+.main{flex:1;display:flex;align-items:center;justify-content:center;color:var(--muted2);font-size:13px;background:radial-gradient(ellipse at 50% 30%,rgba(59,130,246,.06),transparent 60%);}
+.ex-title{display:flex;align-items:center;font-size:12.5px;font-weight:800;color:#fff;padding:2px 4px 8px;}
+.ex-title .act{margin-left:auto;color:var(--muted);cursor:pointer;font-size:13px;}
+.server-card{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:9px 11px;margin-bottom:6px;}
+.server-card .nm{font-size:12px;font-weight:800;color:#fff;display:flex;align-items:center;gap:6px;}
+.server-card .nm .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);box-shadow:0 0 6px var(--teal);}
+.server-card .meta{font-size:10px;color:var(--muted);margin-top:4px;line-height:1.5;}
+.server-card .meta b{color:var(--bluel);font-weight:700;}
+.guide-row{display:flex;align-items:center;gap:7px;background:rgba(139,124,240,.08);border:1px solid rgba(139,124,240,.35);border-radius:9px;padding:7px 10px;margin-bottom:12px;cursor:pointer;font-size:11.5px;font-weight:800;color:var(--purple);}
+.guide-row .pr{margin-left:auto;font-size:10px;background:rgba(139,124,240,.18);padding:2px 7px;border-radius:6px;}
+.folder{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:800;color:#e7edfb;padding:6px 4px 4px;cursor:pointer;}
+.folder .cnt{font-size:10px;color:var(--muted2);font-weight:700;}
+.folder .act{margin-left:auto;color:var(--muted2);font-size:11.5px;cursor:pointer;}
+.subfolder{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:800;color:var(--bluel);padding:4px 4px 2px 14px;cursor:pointer;}
+.subfolder .cnt{font-size:9.5px;color:var(--muted2);}
+.leaf{display:flex;align-items:center;gap:6px;font-size:11.5px;color:#c6d2ea;padding:4.5px 6px 4.5px 26px;border-radius:6px;cursor:pointer;position:relative;}
+.leaf:hover{background:rgba(59,130,246,.08);}
+.leaf.sel{background:rgba(59,130,246,.14);color:#fff;outline:1px solid rgba(59,130,246,.4);}
+.leaf .badge{margin-left:auto;font-size:9px;font-weight:800;padding:1.5px 6px;border-radius:5px;}
+.b-red{color:#f5928a;background:rgba(226,72,61,.15);}
+.b-amber{color:var(--amber);background:rgba(240,160,32,.14);}
+.b-teal{color:var(--teal);background:rgba(30,185,128,.13);}
+.b-mut{color:var(--muted2);background:rgba(255,255,255,.05);}
+.b-purple{color:var(--purple);background:rgba(139,124,240,.14);}
+.b-blue{color:var(--bluel);background:rgba(59,130,246,.14);}
+.manual-link{font-size:9.5px;color:var(--bluel);margin-left:auto;cursor:pointer;white-space:nowrap;}
+.docnav{display:flex;align-items:center;gap:6px;padding:7px 6px;margin-top:10px;cursor:pointer;font-size:12px;font-weight:700;color:var(--bluel);border-radius:7px;border:1px dashed rgba(59,130,246,.35);}
+.note{font-size:9.5px;color:var(--muted2);padding:4px 6px 0 26px;line-height:1.5;}
+.spin{display:inline-block;width:9px;height:9px;border:1.5px solid var(--blue);border-top-color:transparent;border-radius:50%;}
+/* ★ 시안2 핵심: 오른쪽 플라이아웃 팝오버 */
+.popover{position:absolute;left:312px;top:250px;width:330px;background:var(--panel2);border:1px solid var(--blue);border-radius:12px;padding:13px 14px;box-shadow:0 10px 40px rgba(0,0,0,.55),0 0 24px rgba(59,130,246,.12);z-index:5;}
+.popover:before{content:"";position:absolute;left:-7px;top:26px;width:12px;height:12px;background:var(--panel2);border-left:1px solid var(--blue);border-bottom:1px solid var(--blue);transform:rotate(45deg);}
+.popover .dt{font-size:12.5px;font-weight:800;color:#fff;display:flex;align-items:center;gap:7px;}
+.popover .dd{font-size:11px;color:var(--muted);line-height:1.6;margin:7px 0 10px;}
+.popover .kv{display:flex;gap:8px;font-size:10.5px;color:var(--muted);margin-bottom:4px;}
+.popover .kv b{color:#c6d2ea;font-weight:700;min-width:66px;}
+.vuln-h{font-size:10px;font-weight:800;color:var(--muted2);margin:9px 0 3px;}
+.vuln-row{display:flex;align-items:center;gap:6px;font-size:10.5px;color:#c6d2ea;background:rgba(255,255,255,.03);border-radius:6px;padding:5px 8px;margin-top:4px;}
+.sev{font-size:8.5px;font-weight:800;padding:1px 5px;border-radius:4px;}
+.dl{display:flex;gap:7px;margin-top:11px;}
+.dl a{font-size:10.5px;font-weight:800;color:var(--bluel);background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);padding:5px 11px;border-radius:7px;text-decoration:none;}
+.close{position:absolute;top:9px;right:11px;color:var(--muted2);font-size:12px;cursor:pointer;}
+</style></head>
+<body><div class="wrap">
+<div class="plan-tag">시안 2 — 플라이아웃 팝오버형</div>
+<div class="plan-desc">자산을 클릭하면 <b>탐색기 옆에 상세 팝오버가 떠서</b> 설명·최근 취약점·바로가기를 보여줍니다. 트리는 항상 슬림하게 유지 — 상세 정보 공간이 가장 넓고, 다른 곳 클릭 시 닫힘.</div>
+<div class="app">
+<div class="explorer">
+  <div class="ex-title">자산 탐색기 <span class="act">⟳</span></div>
+
+  <div class="server-card">
+    <div class="nm"><span class="dot"></span>GIJO AS Desktop</div>
+    <div class="meta">연동 서버 <b>localhost:4000</b> · 운영중 · v2.0.0<br>로컬 LLM <b>2모델</b> 로드 · 에이전트 <b>6</b></div>
+  </div>
+  <div class="guide-row">🚀 시작 가이드 <span class="pr">0 / 12</span></div>
+
+  <div class="folder">▾ AI 자산 <span class="cnt">4</span></div>
+  <div class="subfolder">▾ ◆ AI-BOM <span class="cnt">3</span></div>
+  <div class="leaf sel">🤖 사내 보안 상담 챗봇 <span class="badge b-amber">취약점 1</span></div>
+  <div class="leaf">📄 문서 민감도 분류 AI <span class="badge b-teal">정상</span></div>
+  <div class="leaf">📈 이상행위 탐지 엔진 <span class="badge b-teal">정상</span></div>
+  <div class="subfolder">▾ ▤ SBOM <span class="cnt">1</span></div>
+  <div class="leaf">🖥 샘플-웹서버 <span style="font-size:9px;color:var(--muted2)">10.0.0.100</span> <span class="badge b-red">finding 12</span></div>
+
+  <div class="folder">▾ 보안제품 관리 <span class="cnt">4</span><span class="act">↗</span></div>
+  <div class="leaf">🧱 경계 방화벽 (FW-01) <span class="badge b-blue">매뉴얼 2</span></div>
+  <div class="leaf">🛡 임직원 단말 EDR <span class="manual-link">매뉴얼 올리기 +</span></div>
+  <div class="leaf">🔒 정보유출 방지 (DLP) <span class="badge b-blue">매뉴얼 1</span></div>
+  <div class="leaf">🌐 웹방화벽 (WAF-01) <span class="manual-link">로그 매뉴얼 +</span></div>
+  <div class="note">제품 클릭 → 보안제품 관리에서 제품·로그 매뉴얼 업로드</div>
+
+  <div class="folder">▾ 문서 · 분석 <span class="cnt">3</span><span class="act">📂</span><span class="act" style="margin-left:4px">⟳</span></div>
+  <div class="leaf">📕 FW-01_운영매뉴얼.pdf <span class="badge b-blue">매뉴얼→보안제품</span></div>
+  <div class="leaf">📄 2026_취약점동향.pdf <span class="badge b-purple">보고서</span></div>
+  <div class="leaf">📝 신규정책_초안.hwp <span class="badge b-mut"><span class="spin"></span> 분석 중</span></div>
+  <div class="note">올리면 Scan·Analyze Agent가 내용을 분석해 매뉴얼/보고서/정책으로 자동 분류</div>
+
+  <div class="docnav">📚 올린 문서 관리 <span style="margin-left:auto">↗</span></div>
+</div>
+<div class="main">(보안 지휘 콘솔 영역 — 변경 없음)</div>
+
+<!-- ★ 클릭 시 옆에 뜨는 팝오버 -->
+<div class="popover">
+  <span class="close">✕</span>
+  <div class="dt">🤖 사내 보안 상담 챗봇 <span class="badge b-amber" style="margin-left:auto;font-size:9px;padding:2px 7px;border-radius:5px;">취약점 1</span></div>
+  <div class="dd">임직원 보안 문의에 답하는 사내 챗봇. Scan Agent가 자산으로 등록하고 상태를 관리합니다.</div>
+  <div class="kv"><b>자산 ID</b> ai-secbot-01</div>
+  <div class="kv"><b>유형</b> 파운데이션 모델 · GGUF</div>
+  <div class="kv"><b>마지막 스캔</b> 오늘 18:46 (ModelScan)</div>
+  <div class="kv"><b>상태</b> <span style="color:var(--teal);font-weight:800">정상 — 즉시 조치 0건</span></div>
+  <div class="vuln-h">최근 취약점</div>
+  <div class="vuln-row"><span class="sev b-amber">LOW</span> outdated_dependency — 정기 업데이트로 해결 예정</div>
+  <div class="dl"><a>AI-BOM 보기 ↗</a><a>재스캔 ▶</a><a>취약점 관리 ↗</a></div>
+</div>
+</div>
+</div></body></html>

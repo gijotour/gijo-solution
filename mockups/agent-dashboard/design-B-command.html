@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8"><title>디자인 B — 지휘본부(상황실)</title>
+<style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);--border-strong:rgba(255,255,255,0.16);
+--blue:#3b82f6;--blue-light:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--teal:#1eb980;--amber:#f0a020;--purple:#8b7cf0;}
+*{box-sizing:border-box;margin:0;padding:0;font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;}
+body{background:radial-gradient(1200px 700px at 50% 30%,#0e1730,#0a0e1a);color:var(--text);padding:20px;}
+.mock-tag{position:fixed;top:0;left:0;background:var(--purple);color:#fff;font-size:11px;font-weight:800;padding:4px 12px;border-bottom-right-radius:8px;z-index:99;}
+.head{text-align:center;margin-bottom:6px;}
+.title{font-size:20px;font-weight:800;color:#fff;}
+.sub{font-size:12px;color:var(--muted);margin-top:3px;}
+.stage{position:relative;width:600px;height:500px;margin:6px auto 0;}
+.links{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
+.node{position:absolute;transform:translate(-50%,-50%);width:112px;text-align:center;cursor:pointer;}
+.node .av{width:60px;height:60px;border-radius:16px;margin:0 auto;display:flex;align-items:center;justify-content:center;font-size:26px;background:var(--panel);border:1.5px solid var(--border);}
+.node .nm{font-size:12px;font-weight:800;color:#fff;margin-top:7px;}
+.node .rl{font-size:10px;color:var(--muted);margin-top:1px;}
+.node .st{font-size:9.5px;font-weight:800;padding:1px 7px;border-radius:5px;display:inline-block;margin-top:5px;}
+.st.work{color:var(--blue-light);background:rgba(59,130,246,0.18);} .st.watch{color:var(--teal);background:rgba(30,185,128,0.18);} .st.idle{color:var(--muted-2);background:rgba(255,255,255,0.06);}
+.node.working .av{border-color:var(--blue);box-shadow:0 0 22px rgba(59,130,246,.4);animation:pulse 1.5s infinite;}
+.node.watching .av{border-color:rgba(30,185,128,.6);}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(59,130,246,.45)}50%{box-shadow:0 0 0 10px rgba(59,130,246,0)}}
+.boss{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:130px;text-align:center;z-index:5;}
+.boss .av{width:76px;height:76px;border-radius:50%;margin:0 auto;display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:800;color:#fff;background:linear-gradient(135deg,#3b82f6,#8b7cf0);box-shadow:0 0 30px rgba(139,124,240,.45);}
+.boss .nm{font-size:13px;font-weight:800;color:#fff;margin-top:7px;}.boss .rl{font-size:10.5px;color:var(--blue-light);}
+.bubble{position:absolute;max-width:230px;background:var(--panel);border:1px solid var(--border-strong);border-radius:12px;padding:11px 13px;font-size:12px;line-height:1.55;color:var(--text);box-shadow:0 8px 24px rgba(0,0,0,.4);}
+.bubble small{display:block;font-size:10px;color:var(--blue-light);font-weight:800;margin-bottom:3px;}
+.cmd{max-width:600px;margin:14px auto 0;display:flex;gap:8px;background:var(--panel);border:1px solid var(--border-strong);border-radius:12px;padding:10px 12px;}
+.cmd .to{font-size:11px;font-weight:800;color:var(--blue-light);background:rgba(59,130,246,0.12);border-radius:7px;padding:6px 10px;white-space:nowrap;}
+.cmd input{flex:1;background:transparent;border:none;color:var(--text);font-size:13px;outline:none;}
+.cmd button{background:var(--blue);color:#fff;border:none;border-radius:8px;padding:7px 16px;font-weight:700;cursor:pointer;}
+</style></head>
+<body>
+<div class="mock-tag">디자인 B — 지휘본부(상황실)</div>
+<div class="head"><div class="title">🛰 보안 지휘본부</div><div class="sub">팀 전체를 내려다보며 지휘하세요. 팀원을 클릭하면 그 자리에서 대화합니다.</div></div>
+<div class="stage">
+  <svg class="links" viewBox="0 0 600 500">
+    <defs><filter id="g"><feGaussianBlur stdDeviation="2"/></filter></defs>
+    <!-- 활성(작업 중) 연결선 -->
+    <line x1="300" y1="250" x2="300" y2="90" stroke="#5fa1ff" stroke-width="2.2" opacity=".9"/>
+    <line x1="300" y1="250" x2="452" y2="205" stroke="#5fa1ff" stroke-width="2.2" opacity=".9"/>
+    <!-- 대기/감시 연결선 -->
+    <line x1="300" y1="250" x2="400" y2="388" stroke="#ffffff" stroke-width="1" opacity=".14"/>
+    <line x1="300" y1="250" x2="200" y2="388" stroke="#ffffff" stroke-width="1" opacity=".14"/>
+    <line x1="300" y1="250" x2="148" y2="205" stroke="#1eb980" stroke-width="1.4" opacity=".4"/>
+  </svg>
+  <div class="boss"><div class="av">정</div><div class="nm">정요한 팀장</div><div class="rl">보안 총괄 · 지휘</div></div>
+  <div class="node working" style="left:300px;top:90px"><div class="av">🧭</div><div class="nm">오케스트레이터</div><div class="rl">작업 분배·취합</div><span class="st work">작업 중</span></div>
+  <div class="node working" style="left:452px;top:205px"><div class="av">⊘</div><div class="nm">스캔</div><div class="rl">스캔 결과 해석</div><span class="st work">작업 중</span></div>
+  <div class="node" style="left:400px;top:388px"><div class="av">◎</div><div class="nm">분석</div><div class="rl">우선순위 판단</div><span class="st idle">대기</span></div>
+  <div class="node" style="left:200px;top:388px"><div class="av">▣</div><div class="nm">리포트</div><div class="rl">보고서 작성</div><span class="st idle">대기</span></div>
+  <div class="node watching" style="left:148px;top:205px"><div class="av">📚</div><div class="nm">GIJO Sec</div><div class="rl">사내지식 해설</div><span class="st watch">감시 중</span></div>
+  <div class="bubble" style="left:360px;top:120px"><small>🧭 오케스트레이터</small>스캔 결과 반영을 지시했습니다. 완료되면 분석→리포트로 이어서 진행할게요.</div>
+</div>
+<div class="cmd">
+  <span class="to">▶ 오케스트레이터에게</span>
+  <input placeholder="팀 전체 지시… 예: 전체 자산 재스캔 후 KEV 우선 브리핑">
+  <button>지시</button>
+</div>
+<script>
+document.querySelectorAll(".node").forEach(n=>n.addEventListener("click",()=>{
+  document.querySelector(".cmd .to").textContent="▶ "+n.querySelector(".nm").textContent+"에게";
+}));
+</script>
+</body></html>

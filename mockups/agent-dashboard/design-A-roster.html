@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8"><title>디자인 A — 팀 로스터 + 대화 패널</title>
+<style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);--border-strong:rgba(255,255,255,0.16);
+--blue:#3b82f6;--blue-light:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--teal:#1eb980;--amber:#f0a020;--purple:#8b7cf0;}
+*{box-sizing:border-box;margin:0;padding:0;font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;}
+body{background:var(--bg);color:var(--text);padding:22px;}
+.mock-tag{position:fixed;top:0;left:0;background:var(--purple);color:#fff;font-size:11px;font-weight:800;padding:4px 12px;border-bottom-right-radius:8px;z-index:99;}
+.head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+.title{font-size:20px;font-weight:800;color:#fff;}
+.sub{font-size:12px;color:var(--muted);margin-top:3px;}
+.boss{display:flex;align-items:center;gap:10px;}
+.boss-av{width:38px;height:38px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#8b7cf0);display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;}
+.dispatch{display:flex;gap:8px;background:var(--panel);border:1px solid var(--border-strong);border-radius:10px;padding:8px 10px;margin-bottom:16px;}
+.dispatch input{flex:1;background:transparent;border:none;color:var(--text);font-size:13px;outline:none;}
+.dispatch .chip{font-size:11px;font-weight:700;color:var(--blue-light);background:rgba(59,130,246,0.12);border-radius:6px;padding:4px 9px;white-space:nowrap;}
+.dispatch button{background:var(--blue);color:#fff;border:none;border-radius:8px;padding:6px 14px;font-size:12.5px;font-weight:700;cursor:pointer;}
+.wrap{display:grid;grid-template-columns:340px 1fr;gap:16px;}
+.roster{display:flex;flex-direction:column;gap:10px;}
+.rt-label{font-size:11px;font-weight:800;color:var(--muted-2);letter-spacing:1px;margin-bottom:2px;}
+.agent{display:flex;align-items:center;gap:12px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:13px 14px;cursor:pointer;position:relative;transition:.15s;}
+.agent:hover{border-color:var(--border-strong);}
+.agent.sel{border-color:var(--blue);box-shadow:inset 3px 0 0 var(--blue);}
+.agent.working{border-color:rgba(59,130,246,0.55);box-shadow:0 0 18px rgba(59,130,246,0.22);}
+.av{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:20px;flex:0 0 auto;background:var(--panel-2);border:1px solid var(--border);}
+.agent.working .av{border-color:var(--blue);animation:pulse 1.4s infinite;}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(59,130,246,.5)}50%{box-shadow:0 0 0 6px rgba(59,130,246,0)}}
+.a-name{font-size:13.5px;font-weight:800;color:#fff;}
+.a-role{font-size:11px;color:var(--muted);margin-top:2px;}
+.a-badges{display:flex;gap:5px;margin-top:6px;}
+.b{font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:5px;}
+.b-work{color:var(--blue-light);background:rgba(59,130,246,0.16);}
+.b-watch{color:var(--teal);background:rgba(30,185,128,0.16);}
+.b-idle{color:var(--muted-2);background:rgba(255,255,255,0.05);}
+.b-llm{color:var(--purple);background:rgba(139,124,240,0.14);}
+.a-live{position:absolute;top:12px;right:14px;font-size:10px;color:var(--blue-light);font-weight:700;}
+.typing span{display:inline-block;width:4px;height:4px;border-radius:50%;background:var(--blue-light);margin:0 1px;animation:blink 1s infinite;}
+.typing span:nth-child(2){animation-delay:.2s}.typing span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,100%{opacity:.3}50%{opacity:1}}
+.chat{background:var(--panel);border:1px solid var(--border);border-radius:14px;display:flex;flex-direction:column;min-height:560px;}
+.chat-head{display:flex;align-items:center;gap:12px;padding:16px 18px;border-bottom:1px solid var(--border);}
+.chat-body{flex:1;padding:18px;display:flex;flex-direction:column;gap:12px;overflow-y:auto;}
+.msg{max-width:75%;font-size:13px;line-height:1.6;padding:10px 14px;border-radius:12px;}
+.msg.me{align-self:flex-end;background:var(--blue);color:#fff;border-bottom-right-radius:4px;}
+.msg.ag{align-self:flex-start;background:var(--panel-2);border:1px solid var(--border);border-bottom-left-radius:4px;}
+.msg small{display:block;font-size:10px;color:var(--muted-2);margin-bottom:3px;}
+.chat-input{display:flex;gap:8px;padding:14px 18px;border-top:1px solid var(--border);}
+.chat-input input{flex:1;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:9px;padding:10px 12px;color:var(--text);font-size:13px;outline:none;}
+.chat-input button{background:var(--blue);color:#fff;border:none;border-radius:9px;padding:0 18px;font-weight:700;cursor:pointer;}
+</style></head>
+<body>
+<div class="mock-tag">디자인 A — 팀 로스터 + 대화 패널</div>
+<div class="head">
+  <div><div class="title">AI 보안팀 지휘</div><div class="sub">팀원을 선택해 직접 지시하거나, 오케스트레이터에게 전체 작업을 맡기세요.</div></div>
+  <div class="boss"><div style="text-align:right"><div style="font-size:12.5px;font-weight:800;color:#fff">정요한 팀장</div><div style="font-size:11px;color:var(--muted)">보안 총괄</div></div><div class="boss-av">정</div></div>
+</div>
+<div class="dispatch">
+  <span class="chip">◉ 전체 지시</span>
+  <input placeholder="오케스트레이터에게 전체 작업 위임… 예: fraud-detect-llm 재스캔하고 분석·리포트까지">
+  <button>지시</button>
+</div>
+<div class="wrap">
+  <div class="roster">
+    <div class="rt-label">팀원 (5) · 작업 중 2</div>
+    <div class="agent working sel"><div class="av">🧭</div><div style="flex:1"><div class="a-name">오케스트레이터</div><div class="a-role">작업 분배 · 결과 취합</div><div class="a-badges"><span class="b b-work">작업 중</span><span class="b b-llm">gijo</span></div></div><div class="a-live typing"><span></span><span></span><span></span></div></div>
+    <div class="agent working"><div class="av">⊘</div><div style="flex:1"><div class="a-name">스캔 에이전트</div><div class="a-role">스캔 결과 해석 · 자산 반영</div><div class="a-badges"><span class="b b-work">작업 중</span><span class="b b-llm">보안LLM</span></div></div><div class="a-live">▶ 실행 12s</div></div>
+    <div class="agent"><div class="av">◎</div><div style="flex:1"><div class="a-name">분석 에이전트</div><div class="a-role">취약점 우선순위 판단</div><div class="a-badges"><span class="b b-idle">대기</span><span class="b b-llm">보안LLM</span></div></div></div>
+    <div class="agent"><div class="av">▣</div><div style="flex:1"><div class="a-name">리포트 에이전트</div><div class="a-role">내부 보고서 작성</div><div class="a-badges"><span class="b b-idle">대기</span><span class="b b-llm">gijo</span></div></div></div>
+    <div class="agent"><div class="av">📚</div><div style="flex:1"><div class="a-name">GIJO Security</div><div class="a-role">사내 지식 해설 · 사례 검색</div><div class="a-badges"><span class="b b-watch">감시 중</span><span class="b b-llm">gijo</span></div></div></div>
+  </div>
+  <div class="chat">
+    <div class="chat-head"><div class="av" style="width:38px;height:38px;font-size:17px">🧭</div><div><div class="a-name">오케스트레이터</div><div class="a-role">gijo · 작업 분배 · 결과 취합</div></div></div>
+    <div class="chat-body">
+      <div class="msg me"><small>나 · 팀장</small>이번 주 취약점 현황 정리하고 우선순위 조치 브리핑까지 만들어줘.</div>
+      <div class="msg ag"><small>오케스트레이터</small>스캔 에이전트에 최신 결과 반영을 지시했습니다. 완료되면 분석 에이전트가 KEV·EPSS·VPR로 우선순위를 매기고, 리포트 에이전트가 브리핑을 작성합니다. 진행 상황은 실시간으로 보여드릴게요.</div>
+      <div class="msg ag"><small>협업 로그</small>🧭→⊘ 스캔 결과 반영 지시 · ⊘ 작업 중…</div>
+    </div>
+    <div class="chat-input"><input placeholder="오케스트레이터에게 지시…"><button>전송</button></div>
+  </div>
+</div>
+<script>
+document.querySelectorAll(".agent").forEach(a=>a.addEventListener("click",()=>{document.querySelectorAll(".agent").forEach(x=>x.classList.remove("sel"));a.classList.add("sel");}));
+</script>
+</body></html>

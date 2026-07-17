@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8"><title>문서관리 시안 2 — 카드형</title>
+<style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);--border-strong:rgba(255,255,255,0.16);
+--blue:#3b82f6;--blue-light:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--teal:#1eb980;--amber:#f0a020;--purple:#8b7cf0;--red:#e2483d;}
+*{box-sizing:border-box;margin:0;padding:0;font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;}
+body{background:var(--bg);color:var(--text);padding:20px 24px;}
+.mock-tag{position:fixed;top:0;left:0;background:var(--purple);color:#fff;font-size:11px;font-weight:800;padding:4px 12px;border-bottom-right-radius:8px;z-index:99;}
+.head{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:14px;}
+.title{font-size:19px;font-weight:800;color:#fff;}
+.subnote{font-size:11.5px;color:var(--muted);margin-top:4px;max-width:660px;line-height:1.5;}
+.summary{display:flex;gap:8px;}
+.sc{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:8px 14px;text-align:center;}
+.sc b{font-size:16px;color:#fff;display:block;}.sc span{font-size:10px;color:var(--muted-2);}
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px 15px;position:relative;}
+.card:hover{border-color:var(--border-strong);}
+.chead{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;}
+.chead .ic{width:38px;height:38px;border-radius:10px;background:var(--panel-2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:19px;flex:0 0 auto;}
+.cname{font-size:12.5px;font-weight:800;color:#fff;line-height:1.35;word-break:break-all;}
+.cmeta{font-size:10.5px;color:var(--muted-2);margin-top:2px;}
+.learn{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:9px 11px;margin-bottom:10px;}
+.learn .l1{font-size:11px;color:var(--text);display:flex;align-items:center;gap:6px;}
+.learn .l1 b{color:var(--blue-light);}
+.learn .l2{font-size:10px;color:var(--muted-2);margin-top:4px;}
+.badges{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:11px;}
+.badge{font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:6px;}
+.b-scope{color:var(--teal);background:rgba(30,185,128,0.14);}
+.b-ok{color:var(--teal);background:rgba(30,185,128,0.1);}
+.b-inject{color:var(--purple);background:rgba(139,124,240,0.14);}
+.cfoot{display:flex;gap:7px;}
+.act{flex:1;text-align:center;font-size:11px;font-weight:700;border-radius:8px;padding:8px 0;cursor:pointer;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--muted);}
+.act.prev:hover{color:var(--blue-light);border-color:var(--blue);}
+.act.del{color:#f5928a;border-color:rgba(226,72,61,0.35);flex:0 0 auto;padding:8px 12px;}
+.act.del:hover{background:rgba(226,72,61,0.12);}
+</style></head>
+<body>
+<div class="mock-tag">문서관리 시안 2 — 카드형(학습방식 강조)</div>
+<div class="head">
+  <div>
+    <div class="title">📚 장기기억 문서</div>
+    <div class="subnote">각 문서가 <b style="color:var(--blue-light)">어떻게 지식이 됐는지</b>(조각 수·임베딩·검색범위)를 카드로 보여주고, 학습이 끝난 문서를 <b>장기기억/원본 단위로 삭제</b>할 수 있습니다.</div>
+  </div>
+  <div class="summary">
+    <div class="sc"><b>14</b><span>문서</span></div>
+    <div class="sc"><b>506</b><span>조각</span></div>
+    <div class="sc"><b>전역</b><span>범위</span></div>
+  </div>
+</div>
+<div class="grid">
+  <div class="card">
+    <div class="chead"><div class="ic">📕</div><div><div class="cname">[최종]AI 보안 위협 대응 매뉴얼.pdf</div><div class="cmeta">PDF · 07-16 14:22</div></div></div>
+    <div class="learn"><div class="l1">🧠 <b>임베딩 292조각</b> · bge-m3로 벡터화</div><div class="l2">질문 시 관련 조각을 검색해 답변에 자동 주입 (학습=파인튜닝 아님)</div></div>
+    <div class="badges"><span class="badge b-scope">전역 검색</span><span class="badge b-ok">임베딩됨 ✓</span><span class="badge b-inject">채팅 자동주입</span></div>
+    <div class="cfoot"><span class="act prev">조각 미리보기</span><span class="act del">삭제</span></div>
+  </div>
+  <div class="card">
+    <div class="chead"><div class="ic">📕</div><div><div class="cname">2024 하반기 사이버 위협 동향 보고서.pdf</div><div class="cmeta">PDF · 07-16 14:20</div></div></div>
+    <div class="learn"><div class="l1">🧠 <b>임베딩 93조각</b> · bge-m3로 벡터화</div><div class="l2">질문 시 관련 조각을 검색해 답변에 자동 주입</div></div>
+    <div class="badges"><span class="badge b-scope">전역 검색</span><span class="badge b-ok">임베딩됨 ✓</span><span class="badge b-inject">채팅 자동주입</span></div>
+    <div class="cfoot"><span class="act prev">조각 미리보기</span><span class="act del">삭제</span></div>
+  </div>
+  <div class="card">
+    <div class="chead"><div class="ic">📝</div><div><div class="cname">normaltic_사례_전체_572.md</div><div class="cmeta">Markdown · 07-16 14:18</div></div></div>
+    <div class="learn"><div class="l1">🧠 <b>임베딩 39조각</b> · bge-m3로 벡터화</div><div class="l2">질문 시 관련 조각을 검색해 답변에 자동 주입</div></div>
+    <div class="badges"><span class="badge b-scope">전역 검색</span><span class="badge b-ok">임베딩됨 ✓</span><span class="badge b-inject">채팅 자동주입</span></div>
+    <div class="cfoot"><span class="act prev">조각 미리보기</span><span class="act del">삭제</span></div>
+  </div>
+  <div class="card">
+    <div class="chead"><div class="ic">📘</div><div><div class="cname">250705 SKT 침해사고 원인분석 결과.hwpx</div><div class="cmeta">HWPX · 07-16 14:15</div></div></div>
+    <div class="learn"><div class="l1">🧠 <b>임베딩 17조각</b> · bge-m3로 벡터화</div><div class="l2">질문 시 관련 조각을 검색해 답변에 자동 주입</div></div>
+    <div class="badges"><span class="badge b-scope">전역 검색</span><span class="badge b-ok">임베딩됨 ✓</span><span class="badge b-inject">채팅 자동주입</span></div>
+    <div class="cfoot"><span class="act prev">조각 미리보기</span><span class="act del">삭제</span></div>
+  </div>
+  <div class="card">
+    <div class="chead"><div class="ic">📄</div><div><div class="cname">V3_백신_운영_매뉴얼.txt</div><div class="cmeta">TXT · 이전 업로드</div></div></div>
+    <div class="learn"><div class="l1">🧠 <b>임베딩 1조각</b> · bge-m3로 벡터화</div><div class="l2">짧은 문서 — 1조각으로 저장</div></div>
+    <div class="badges"><span class="badge b-scope">전역 검색</span><span class="badge b-ok">임베딩됨 ✓</span><span class="badge b-inject">채팅 자동주입</span></div>
+    <div class="cfoot"><span class="act prev">조각 미리보기</span><span class="act del">삭제</span></div>
+  </div>
+  <div class="card">
+    <div class="chead"><div class="ic">📄</div><div><div class="cname">VPN_게이트웨이_인증서_갱신절차.txt</div><div class="cmeta">TXT · 이전 업로드</div></div></div>
+    <div class="learn"><div class="l1">🧠 <b>임베딩 1조각</b> · bge-m3로 벡터화</div><div class="l2">짧은 문서 — 1조각으로 저장</div></div>
+    <div class="badges"><span class="badge b-scope">전역 검색</span><span class="badge b-ok">임베딩됨 ✓</span><span class="badge b-inject">채팅 자동주입</span></div>
+    <div class="cfoot"><span class="act prev">조각 미리보기</span><span class="act del">삭제</span></div>
+  </div>
+</div>
+<div style="text-align:center;font-size:11px;color:var(--muted-2);margin-top:14px">…외 8개 더 · 삭제 시 [장기기억만 / 원본까지] 선택</div>
+</body></html>

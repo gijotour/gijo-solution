@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8"><title>A안 시안 3 — 로고 코어 + 팀 카드 그리드 + 하단 대화 독</title>
+<style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);--border-strong:rgba(255,255,255,0.16);
+--blue:#3b82f6;--blue-light:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--teal:#1eb980;--amber:#f0a020;--purple:#8b7cf0;}
+*{box-sizing:border-box;margin:0;padding:0;font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;}
+body{background:radial-gradient(900px 520px at 50% 22%,#0e1730,#0a0e1a);color:var(--text);padding:16px 22px 96px;}
+.mock-tag{position:fixed;top:0;left:0;background:var(--purple);color:#fff;font-size:11px;font-weight:800;padding:4px 12px;border-bottom-right-radius:8px;z-index:99;}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:2px;}
+.status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:5px 12px;border-radius:20px;font-size:11.5px;font-weight:800;}
+.status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
+.boss{display:flex;align-items:center;gap:9px;}
+.boss .t{text-align:right;}.boss .t b{font-size:12.5px;color:#fff;}.boss .t span{font-size:10.5px;color:var(--muted);}
+.boss .av{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#8b7cf0);display:flex;align-items:center;justify-content:center;font-weight:800;color:#fff;}
+.hero{display:flex;flex-direction:column;align-items:center;}
+.orb{width:190px;height:190px;}
+.orb .spark{animation:tw 3s ease-in-out infinite;}@keyframes tw{0%,100%{opacity:.3}50%{opacity:1}}
+.htitle{font-size:18px;font-weight:800;color:#fff;margin-top:-6px;}
+.hsub{font-size:11.5px;color:var(--muted);margin-top:4px;margin-bottom:16px;}
+.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:11px;max-width:940px;margin:0 auto;}
+.agent{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px 11px;text-align:center;cursor:pointer;position:relative;transition:.15s;}
+.agent:hover{border-color:var(--border-strong);transform:translateY(-2px);}
+.agent.sel{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue) inset,0 0 20px rgba(59,130,246,.18);}
+.agent.working{border-color:rgba(59,130,246,0.5);box-shadow:0 0 18px rgba(59,130,246,0.18);}
+.av{width:46px;height:46px;border-radius:13px;margin:0 auto 9px;display:flex;align-items:center;justify-content:center;font-size:21px;background:var(--panel-2);border:1px solid var(--border);}
+.agent.working .av{border-color:var(--blue);animation:pulse 1.5s infinite;}
+@keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(59,130,246,.5)}50%{box-shadow:0 0 0 7px rgba(59,130,246,0)}}
+.agent.watching .av{border-color:rgba(30,185,128,.55);}
+.a-name{font-size:12.5px;font-weight:800;color:#fff;}
+.a-role{font-size:10px;color:var(--muted);margin-top:3px;min-height:24px;}
+.a-badges{display:flex;gap:4px;justify-content:center;margin-top:7px;flex-wrap:wrap;}
+.b{font-size:8.5px;font-weight:800;padding:2px 6px;border-radius:5px;}
+.b-work{color:var(--blue-light);background:rgba(59,130,246,0.16);}
+.b-watch{color:var(--teal);background:rgba(30,185,128,0.16);}
+.b-idle{color:var(--muted-2);background:rgba(255,255,255,0.05);}
+.b-llm{color:var(--purple);background:rgba(139,124,240,0.14);}
+.live{position:absolute;top:8px;right:9px;font-size:8.5px;color:var(--blue-light);font-weight:800;}
+.typing span{display:inline-block;width:3.5px;height:3.5px;border-radius:50%;background:var(--blue-light);margin:0 1px;animation:blink 1s infinite;}
+.typing span:nth-child(2){animation-delay:.2s}.typing span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,100%{opacity:.3}50%{opacity:1}}
+.dock{position:fixed;left:0;right:0;bottom:0;background:rgba(11,16,28,0.97);border-top:1px solid var(--border-strong);padding:12px 22px;box-shadow:0 -8px 24px rgba(0,0,0,.4);}
+.dock-in{max-width:940px;margin:0 auto;display:flex;align-items:center;gap:10px;}
+.dock .who{display:flex;align-items:center;gap:9px;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);border-radius:10px;padding:7px 11px;white-space:nowrap;}
+.dock .who .di{width:26px;height:26px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:13px;}
+.dock .who b{font-size:12px;color:#fff;}.dock .who span{font-size:10px;color:var(--blue-light);}
+.dock input{flex:1;background:var(--panel);border:1px solid var(--border-strong);border-radius:10px;padding:11px 14px;color:var(--text);font-size:13px;outline:none;}
+.dock button{background:var(--blue);color:#fff;border:none;border-radius:10px;padding:0 20px;height:42px;font-weight:800;cursor:pointer;}
+.dock .allbtn{background:var(--panel);border:1px solid var(--border-strong);color:var(--blue-light);font-weight:800;font-size:11.5px;border-radius:10px;padding:0 12px;height:42px;white-space:nowrap;cursor:pointer;}
+</style></head>
+<body>
+<div class="mock-tag">A안 시안 3 — 로고 코어 + 팀 카드 그리드 + 하단 대화 독</div>
+<div class="topbar">
+  <div class="status-pill"><span class="dot"></span>운영중 · AI 보안팀 5명 · 작업 중 2</div>
+  <div class="boss"><div class="t"><b>정요한 팀장</b><br><span>보안 총괄</span></div><div class="av">정</div></div>
+</div>
+<div class="hero">
+  <svg class="orb" viewBox="0 0 300 300" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <radialGradient id="nf" cx="50%" cy="42%" r="60%"><stop offset="0%" stop-color="#e2eeff"/><stop offset="55%" stop-color="#5fa1ff"/><stop offset="100%" stop-color="#2f6fd0"/></radialGradient>
+      <filter id="ng" x="-250%" y="-250%" width="600%" height="600%"><feGaussianBlur stdDeviation="2.4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+      <radialGradient id="cg" cx="50%" cy="50%" r="50%"><stop offset="0%" stop-color="rgba(95,161,255,0.55)"/><stop offset="70%" stop-color="rgba(59,130,246,0.12)"/><stop offset="100%" stop-color="rgba(0,0,0,0)"/></radialGradient>
+    </defs>
+    <circle cx="150" cy="150" r="44" fill="none" stroke="#1a2c52"/><circle cx="150" cy="150" r="76" fill="none" stroke="#1a2c52"/>
+    <circle cx="150" cy="150" r="108" fill="none" stroke="#16264a"/><circle cx="150" cy="150" r="136" fill="none" stroke="#16264a"/>
+    <g stroke="#2a4a8a" stroke-width="1" opacity=".7">
+      <line x1="150" y1="150" x2="150" y2="42"/><line x1="150" y1="150" x2="226.4" y2="73.6"/><line x1="150" y1="150" x2="258" y2="150"/><line x1="150" y1="150" x2="226.4" y2="226.4"/>
+      <line x1="150" y1="150" x2="150" y2="258"/><line x1="150" y1="150" x2="73.6" y2="226.4"/><line x1="150" y1="150" x2="42" y2="150"/><line x1="150" y1="150" x2="73.6" y2="73.6"/>
+    </g>
+    <circle cx="150" cy="150" r="62" fill="url(#cg)"/>
+    <g fill="url(#nf)" filter="url(#ng)">
+      <circle cx="150" cy="42" r="4.6"/><circle cx="226.4" cy="73.6" r="4.6"/><circle cx="258" cy="150" r="4.6"/><circle cx="226.4" cy="226.4" r="4.6"/>
+      <circle cx="150" cy="258" r="4.6"/><circle cx="73.6" cy="226.4" r="4.6"/><circle cx="42" cy="150" r="4.6"/><circle cx="73.6" cy="73.6" r="4.6"/>
+    </g>
+    <g fill="#8fc0ff" filter="url(#ng)"><circle cx="192" cy="58" r="3"/><circle cx="242" cy="108" r="3"/><circle cx="242" cy="192" r="3"/><circle cx="192" cy="242" r="3"/><circle cx="108" cy="242" r="3"/><circle cx="58" cy="192" r="3"/><circle cx="58" cy="108" r="3"/><circle cx="108" cy="58" r="3"/></g>
+    <g fill="#cfe4ff" filter="url(#ng)"><circle class="spark" cx="150" cy="20" r="2"/><circle class="spark" cx="272" cy="96" r="1.8" style="animation-delay:.6s"/><circle class="spark" cx="60" cy="256" r="1.8" style="animation-delay:.3s"/></g>
+    <text x="150" y="168" text-anchor="middle" style="font-size:40px;font-weight:900;fill:#cfe4ff;">◣G</text>
+  </svg>
+  <div class="htitle">보안 지휘 콘솔</div>
+  <div class="hsub">로고 코어 아래 팀 카드, 화면 하단 고정 대화 독으로 항상 지시할 수 있습니다.</div>
+</div>
+<div class="grid">
+  <div class="agent working sel"><div class="av">🧭</div><div class="a-name">오케스트레이터</div><div class="a-role">작업 분배·취합</div><div class="a-badges"><span class="b b-work">작업 중</span><span class="b b-llm">gijo</span></div><div class="live typing"><span></span><span></span><span></span></div></div>
+  <div class="agent working"><div class="av">⊘</div><div class="a-name">스캔</div><div class="a-role">스캔 해석·자산 반영</div><div class="a-badges"><span class="b b-work">작업 중</span><span class="b b-llm">보안LLM</span></div><div class="live">12s</div></div>
+  <div class="agent"><div class="av">◎</div><div class="a-name">분석</div><div class="a-role">우선순위 판단</div><div class="a-badges"><span class="b b-idle">대기</span><span class="b b-llm">보안LLM</span></div></div>
+  <div class="agent"><div class="av">▣</div><div class="a-name">리포트</div><div class="a-role">보고서 작성</div><div class="a-badges"><span class="b b-idle">대기</span><span class="b b-llm">gijo</span></div></div>
+  <div class="agent watching"><div class="av">📚</div><div class="a-name">GIJO Security</div><div class="a-role">사내지식 해설</div><div class="a-badges"><span class="b b-watch">감시 중</span><span class="b b-llm">gijo</span></div></div>
+</div>
+<div class="dock">
+  <div class="dock-in">
+    <div class="who"><div class="di">🧭</div><div><b>오케스트레이터</b><br><span>지시 대상</span></div></div>
+    <input placeholder="지시를 입력하세요… 예: fraud-detect-llm 전체 재스캔하고 리포트까지">
+    <button>전송</button>
+    <button class="allbtn">◉ 전체 지시</button>
+  </div>
+</div>
+<script>document.querySelectorAll(".agent").forEach(a=>a.addEventListener("click",()=>{
+  document.querySelectorAll(".agent").forEach(x=>x.classList.remove("sel"));a.classList.add("sel");
+  var nm=a.querySelector(".a-name").textContent, ic=a.querySelector(".av").textContent;
+  document.querySelector(".dock .who").innerHTML='<div class="di">'+ic+'</div><div><b>'+nm+'</b><br><span>지시 대상</span></div>';
+}));</script>
+</body></html>
