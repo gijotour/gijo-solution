@@ -82,6 +82,22 @@ describe("approvals (finding 검토 워크플로우)", () => {
     expect(r.status).toBe(400);
   });
 
+  it("우선순위(오늘의 조치): KEV > EPSS > VPR 순, 오탐 제외", async () => {
+    const kevF: StandardFinding = { finding_type: "kev-exploited", severity: "medium", evidence: "y", source_tool: "nessus", epss: 0.5, vpr: 5, kev: true };
+    const epssF: StandardFinding = { finding_type: "high-epss", severity: "medium", evidence: "z", source_tool: "nessus", epss: 0.9, vpr: 4 };
+    const vprF: StandardFinding = { finding_type: "high-vpr", severity: "critical", evidence: "x", source_tool: "nessus", epss: 0.01, vpr: 9 };
+    recordFindings("m1", [vprF, kevF, epssF]); // 순서 섞어 주입
+
+    let body = (await request(app).get("/api/approvals/priorities").set(auth())).body;
+    expect(body.items.map((i: { finding: StandardFinding }) => i.finding.finding_type)).toEqual(["kev-exploited", "high-epss", "high-vpr"]);
+    expect(body.items[0].score).toBeGreaterThan(body.items[1].score);
+
+    // KEV 건을 오탐 반려 → 우선순위 목록에서 제외
+    await request(app).post(`/api/approvals/m1/${findingKey("m1", kevF)}`).set(auth()).send({ status: "rejected" });
+    body = (await request(app).get("/api/approvals/priorities").set(auth())).body;
+    expect(body.items.map((i: { finding: StandardFinding }) => i.finding.finding_type)).toEqual(["high-epss", "high-vpr"]);
+  });
+
   it("approves and rejects a finding, updating status + reviewer", async () => {
     const key = findingKey("m1", FINDING);
     const approve = await request(app).post(`/api/approvals/m1/${key}`).set(auth()).send({ status: "approved" });

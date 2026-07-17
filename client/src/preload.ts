@@ -98,6 +98,7 @@ const gijoApi = {
   listApprovals: () => api.approvalsApi.list(),
   // status·note·assignee·dueDate를 부분 갱신. status만 주면 기존 승인/반려 동작과 동일.
   setFindingReview: (assetId: string, key: string, patch: api.ReviewPatch) => api.approvalsApi.set(assetId, key, patch),
+  listActionPriorities: (limit?: number) => api.approvalsApi.priorities(limit),
   listCompliance: () => api.complianceApi.list(),
   setComplianceStatus: (code: string, status: string, note: string) => api.complianceApi.setStatus(code, status, note),
   onAssetUpdated: (cb: (asset: unknown) => void) => onChannel("asset:updated", cb),

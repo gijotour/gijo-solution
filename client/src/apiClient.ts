@@ -779,6 +779,9 @@ export const approvalsApi = {
   // status·note·assignee·dueDate를 부분 갱신(merge). 판정 없이 담당자·기한만 배정도 가능.
   set: (assetId: string, key: string, patch: ReviewPatch) =>
     request(`/api/approvals/${encodeURIComponent(assetId)}/${encodeURIComponent(key)}`, { method: "POST", body: patch }),
+  // 오늘의 조치 — 전 자산 finding을 KEV·EPSS·VPR·심각도로 정렬한 우선순위 목록.
+  priorities: (limit = 10) =>
+    request<{ items: (FindingReview & { score: number })[] }>(`/api/approvals/priorities?limit=${limit}`),
 };
 
 export const complianceApi = {

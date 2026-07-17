@@ -93,6 +93,24 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
 .beta-tag{background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
 .avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
 .icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
+/* 오늘의 조치(우선순위) */
+#todayList .tp-row{display:flex;align-items:center;gap:8px;padding:8px 6px;border-bottom:1px solid var(--border);cursor:pointer;flex-wrap:wrap;}
+#todayList .tp-row:last-child{border-bottom:none;}
+#todayList .tp-row:hover{background:rgba(255,255,255,0.03);}
+.tp-rank{width:20px;text-align:center;font-weight:800;color:var(--muted-2);font-size:12px;}
+.tp-sev{font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:5px;text-transform:uppercase;}
+.tp-sev-critical{color:#fff;background:#91243E;}.tp-sev-high{color:#fff;background:#DD4B50;}
+.tp-sev-medium{color:#1a1200;background:#F18C43;}.tp-sev-low{color:#e7eaf3;background:rgba(255,255,255,0.1);}
+.tp-b{font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:5px;}
+.tp-kev{color:#fff;background:#e2483d;}.tp-epss{color:var(--amber);background:rgba(240,160,32,0.15);}
+.tp-vpr{color:var(--blue-light);background:rgba(59,130,246,0.15);}
+.tp-type{font-size:12.5px;font-weight:700;color:#fff;}
+.tp-asset{font-size:11px;color:var(--purple);}
+.tp-metaend{margin-left:auto;display:flex;align-items:center;gap:8px;}
+.tp-who{font-size:10.5px;font-weight:700;color:var(--teal);}
+.tp-unassigned{color:var(--muted-2);}
+.tp-due{font-size:10.5px;color:var(--muted);}
+.tp-overdue{color:#f5928a;font-weight:800;}
 </style>
 </head>
 <body>
@@ -119,6 +137,15 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
         <div class="page-title">취약 자산관리</div>
         <div class="page-sub">Tenable Nessus 등 취약점 도구의 스캔 결과(CSV/JSON)를 업로드하면 호스트(IP)별로 자산 등록하고 발견 취약점을 반영합니다. 데이터는 사내에서만 이동합니다.</div>
       </div>
+    </div>
+
+    <!-- 오늘의 조치: 전 자산을 가로질러 KEV·EPSS·VPR로 정렬한 우선순위 목록 ("오늘 뭐부터") -->
+    <div class="panel" id="todayPanel" style="border-color:rgba(59,130,246,0.4)">
+      <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px;">
+        <div style="font-size:14.5px;font-weight:800;color:#fff;">🎯 오늘의 조치 <span style="color:var(--blue-light)">우선순위</span></div>
+        <div style="font-size:11px;color:var(--muted-2);">CISA KEV(실제 악용) → EPSS(악용확률) → VPR → 심각도 순 · 오탐 제외</div>
+      </div>
+      <div id="todayList" style="margin-top:10px;font-size:12.5px;color:var(--muted)">불러오는 중...</div>
     </div>
 
     <div class="panel">
@@ -430,11 +457,39 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
         status.innerHTML += `<div style="margin-top:6px;color:#f5b942;font-size:11.5px;">⚠ ${uncred}개 호스트가 <b>비인증(원격) 스캔</b>입니다 — 로컬 취약점을 놓칠 수 있고, 이 스캔에서 사라진 취약점은 "미검증"으로 표시됩니다. 정확한 조치 검증에는 인증(credentialed) 스캔이 필요합니다.</div>`;
       }
       await refresh();
+      await loadToday();
     } catch (err) {
       status.textContent = "✗ 업로드 실패: " + err.message;
       status.style.color = "#f5928a";
     }
     e.target.value = "";
+  }
+
+  // 오늘의 조치 — 전 자산 우선순위 목록. 행 클릭 시 조치·승인 화면으로.
+  async function loadToday() {
+    const box = document.getElementById("todayList");
+    try {
+      const { items } = await window.gijo.listActionPriorities(8);
+      if (!items || !items.length) {
+        box.innerHTML = '<span style="color:var(--muted-2)">조치 대상 취약점이 없습니다 — 스캔 결과를 업로드하세요.</span>';
+        return;
+      }
+      box.innerHTML = items.map((r, i) => {
+        const f = r.finding;
+        const kev = f.kev ? '<span class="tp-b tp-kev">🔴 KEV</span>' : "";
+        const epss = f.epss != null ? `<span class="tp-b tp-epss">EPSS ${Math.round(f.epss * 100)}%</span>` : "";
+        const vpr = f.vpr != null ? `<span class="tp-b tp-vpr">VPR ${f.vpr}</span>` : "";
+        const who = r.assignee ? `<span class="tp-who">${esc(r.assignee)}</span>` : '<span class="tp-who tp-unassigned">미배정</span>';
+        const due = r.dueDate ? `<span class="tp-due${r.overdue ? " tp-overdue" : ""}">~${esc(r.dueDate)}${r.overdue ? " ⚠" : ""}</span>` : "";
+        return `<div class="tp-row"><span class="tp-rank">${i + 1}</span>` +
+          `<span class="tp-sev tp-sev-${esc(f.severity)}">${esc(f.severity)}</span>${kev}${epss}${vpr}` +
+          `<span class="tp-type">${esc(f.finding_type)}</span>` +
+          `<span class="tp-asset">${esc(r.assetName)}</span>` +
+          `<span class="tp-metaend">${who}${due}</span></div>`;
+      }).join("");
+    } catch (e) {
+      box.innerHTML = '<span style="color:#f5928a">불러오지 못했습니다: ' + e.message + "</span>";
+    }
   }
 
   async function init() {
@@ -443,6 +498,8 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
     await loadUser();
     await loadHealth();
     await refresh();
+    await loadToday();
+    document.getElementById("todayList").addEventListener("click", () => window.gijo.navigateTo("approvals.html"));
 
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => {
