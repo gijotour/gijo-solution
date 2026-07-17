@@ -24,15 +24,30 @@ beforeEach(() => {
 describe("agenttools — 「AI 자산」 조회 도구", () => {
   // 도구는 화면 메뉴가 아니라 사용자 의도 단위다(2026-07-17 확정) — 목록·상세·찾기·설명·오늘·등록.
   // search/explain/today는 메뉴를 가로지르므로 domain="cross".
-  it("도구는 의도 단위로 등록돼 있다 (조회 5종 + 쓰기 3종)", () => {
+  it("도구는 의도 단위로 등록돼 있다 (조회 6종 + 쓰기 3종)", () => {
     const tools = listAgentTools();
     expect(tools.map((t) => t.name)).toEqual([
-      "list_assets", "get_asset", "search", "explain", "today",
+      "list_assets", "get_asset", "search", "explain", "today", "threats",
       "register_asset", "assign_finding", "update_finding_status",
     ]);
     expect(tools.filter((t) => t.write).map((t) => t.name)).toEqual(["register_asset", "assign_finding", "update_finding_status"]);
-    // 메뉴를 가로지르는 도구가 있어야 "오늘 뭐부터?" 같은 질문에 도구 1개로 답한다.
-    expect(tools.filter((t) => t.domain === "cross").map((t) => t.name)).toEqual(["search", "explain", "today"]);
+    // 메뉴를 가로지르는 도구가 있어야 "오늘 뭐부터?"·"우리 관련 위협?" 같은 질문에 도구 1개로 답한다.
+    expect(tools.filter((t) => t.domain === "cross").map((t) => t.name)).toEqual(["search", "explain", "today", "threats"]);
+  });
+
+  // threats(CTI×자산) — cti.ts가 기동 시 시드하는 샘플 위협(KoBERT·Qwen2.5·bge-m3 등)과
+  // 자산 신호의 교집합. 벤더 키 없이도 매칭이 되도록 시드돼 있다(cti.ts 주석).
+  it("threats는 자산이 없으면 겹치는 위협이 없다고 답한다", async () => {
+    const out = String(await findAgentTool("threats")!.run({}));
+    // 샘플 위협은 있지만(피드 시드) 자산이 0개라 매칭이 없다.
+    expect(out).toMatch(/겹치는 것은 없습니다|새로 탐지된 위협이 없습니다/);
+  });
+
+  it("threats는 자산 신호가 CTI 탐지와 겹치면 해당 위협·자산 id를 준다", async () => {
+    registerAsset({ id: "ai-kobert-01", name: "KoBERT 분류기", path: "models/kobert.onnx" });
+    const out = String(await findAgentTool("threats")!.run({ limit: "5" }));
+    expect(out).toContain("KoBERT"); // 시드 위협 target 텍스트
+    expect(out).toContain("ai-kobert-01"); // 이어서 get_asset 할 수 있게 id 노출
   });
 
   it("list_assets는 자산 개수·이름·finding 요약을 담는다", async () => {

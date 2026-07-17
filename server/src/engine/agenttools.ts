@@ -19,6 +19,8 @@ import { expandOntology } from "./ontology";
 import { prioritizedReviews, updateFindingReview, findingKey, ReviewPatch, ApprovalStatus } from "./approvals";
 import { listProducts } from "./securityproducts";
 import { listDocuments } from "./memory";
+import { listFindings as listCtiFindings } from "./cti";
+import { matchCtiToAssets } from "./ctimatch";
 
 export interface AgentToolParam {
   name: string;
@@ -221,6 +223,41 @@ function runToday(args: Record<string, string>): string {
   ].filter(Boolean).join("\n").slice(0, 2500);
 }
 
+// threats — "요즘 위협 있어? / 새로 뜬 거 우리랑 관련?" 한 방에. 위협 인텔리전스(CTI) 피드의
+// 최신 탐지와 사내 자산 신호(이름·컴포넌트·AI-BOM·CVE)의 교집합을 준다. 위협×자산은 이미 메뉴를
+// 가로지르므로(domain=cross) 의도 축 도구로 딱 맞는다 — 매칭 계산은 기존 순수함수를 그대로 쓴다.
+const CTI_SEV_ORDER: Record<string, number> = { critical: 0, warning: 1, info: 2 };
+
+async function runThreats(args: Record<string, string>): Promise<string> {
+  const limit = Math.min(Math.max(Number(args.limit) || 5, 1), 20);
+  let findings;
+  try {
+    findings = await listCtiFindings();
+  } catch {
+    return "위협 인텔리전스(CTI) 피드를 조회하지 못했습니다.";
+  }
+  if (findings.length === 0) {
+    return "CTI 피드에 새로 탐지된 위협이 없습니다. (피드 미연동 시 위협 인텔리전스 화면에서 API 키를 설정하세요.)";
+  }
+  const { matches, summary } = matchCtiToAssets(findings, listAssets());
+  if (matches.length === 0) {
+    return `최신 위협 ${summary.totalFindings}건을 확인했지만, 우리 자산 신호와 겹치는 것은 없습니다.`;
+  }
+  const top = matches
+    .slice()
+    .sort((a, b) => (CTI_SEV_ORDER[a.finding.severity] ?? 3) - (CTI_SEV_ORDER[b.finding.severity] ?? 3))
+    .slice(0, limit);
+  // matchedAssets에 id=를 함께 준다 — LLM이 이어서 get_asset(assetId)으로 파고들 수 있게.
+  const lines = top.map((m) => {
+    const hit = m.matchedAssets.map((a) => `${a.assetName}(id=${a.assetId})`).join(", ");
+    return `- [${m.finding.severity}] ${m.finding.type} — ${m.finding.target} (출처 ${m.finding.source}) → 우리 자산: ${hit}`;
+  });
+  return [
+    `최신 위협 ${summary.totalFindings}건 중 우리 자산에 걸리는 것 ${summary.matchedFindings}건 (영향 자산 ${summary.affectedAssets}개, 심각·경고 ${summary.criticalMatches}건):`,
+    ...lines,
+  ].join("\n").slice(0, 2500);
+}
+
 // ── 「AI 자산」 쓰기 도구 (Phase 2 — 결재판 경유) ────────────────────────
 
 // 이름에서 자산 id를 만든다 — UX 피드백 러프엣지("id를 사람이 지정해야 함") 해소.
@@ -398,6 +435,16 @@ const TOOLS: AgentTool[] = [
       '지금 조치할 취약점 우선순위를 전 자산을 가로질러 알려준다(KEV→EPSS→VPR 순, 담당자·기한·지연 포함). "오늘 뭐부터?"에 쓴다. 예: {"limit":"5"}',
     params: [{ name: "limit", label: "개수", description: "상위 몇 건 (기본 5)", required: false }],
     run: runToday,
+  },
+  {
+    name: "threats",
+    label: "우리 관련 위협(CTI)",
+    domain: "cross", // 위협 인텔리전스 × 자산을 가로지른다
+    write: false,
+    description:
+      '우리 자산에 걸리는 최신 위협을 알려준다 — CTI(위협 인텔리전스) 피드의 탐지와 사내 자산의 교집합. "요즘 위협 있어?", "새로 뜬 거 우리랑 관련?"에 쓴다. 예: {"limit":"5"}',
+    params: [{ name: "limit", label: "개수", description: "상위 몇 건 (기본 5)", required: false }],
+    run: runThreats,
   },
   {
     name: "register_asset",

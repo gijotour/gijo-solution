@@ -69,17 +69,23 @@ merged-lily와 동시 로드, 실측 VRAM 여유 내). 전역 "마지막 사용 
 - dispatcher 통합: chat 라우트에서 루프 먼저 시도, 실패·무관 시 기존 채팅 폴백(무해한 회귀)
 - 검증: vitest(LLM 모킹) + 실 GPU end-to-end(Node fetch, 한글) + **벤치 케이스를 실제 루프로 재실행**
 
-### Phase 2 — 쓰기 도구 + 되물어보기 「AI 자산 등록 / 취약점 관리」 (1.5~2일)
-- `ask_user` 도구: 필수 입력 누락 시 화면에 입력 폼 카드(learnloop confirm 카드 패턴 일반화 — **UI 시안 3종 먼저**)
-- 쓰기 도구: `register_asset`(id 자동생성 — UX피드백 러프엣지 동시 해소) · `assign_finding`(담당자·기한) · `update_finding_status`
-- 실행 전 확인 카드(오발동 방지 원칙). QA P2 두 건(0건 경고·재시도 안내) 동반 처리
+### Phase 2 — 쓰기 도구 + 되물어보기 「AI 자산 등록 / 취약점 관리」 ✅ **완료(2026-07-18)**
+- ~~`ask_user` 도구~~ → **불필요**로 판명: 빠진 필수값이 결재판에서 빈 칸으로 뜨는 게 곧 되물음. 별도 도구 없이 해결.
+- 쓰기 도구 3종 완료: `register_asset`(id 자동생성) · `assign_finding`(담당자·기한) · `update_finding_status`(오탐/조치완료).
+- **결재판(시안 B)** 경유 확정 — 실행 전 값 검토·승인. 값 출처 배지(지시에서/조회 결과/자동생성/AI 추정/입력 필요).
+- finding 지목: LLM은 today/search 결과의 assetId·심각도·유형을 **복사만**, 어느 finding인지 판단은 서버 규칙(`resolveFinding`, 0/2+건 거부). 쓰기 실패는 throw→400→"실행 실패"(완료 오인 방지).
+- 근거 축에 **조회 결과(found)** 추가: `buildApproval(tool, args, instruction, toolResults)` — today가 찾아준 값을 환각으로 오판해 되묻던 문제 해소.
+- 커밋: `4097234`. 테스트 `agentfinding.test.ts` 14케이스 + 전체 390 green.
 
-### Phase 3 — 나머지 메뉴 순차 확장 (2~3일)
-1. 「위협 인텔리전스」: `cti_status` · `match_cti_assets`(기존 ctimatch 재사용)
-2. 「보안 운영」: `list_products` · `register_product` · `list_maintenance`(쓰기는 확인 카드)
-3. 「리포트·컴플라이언스」: `generate_report`(기존) · `compliance_draft`(기존 AI 초안 재사용)
-4. 「AI 지식·모델」: `list_docs` · `learnloop_status`(학습 시작은 기존 확인 절차 유지 — 자동화 제외)
-- 도메인 라우팅(1차 분류 → 해당 메뉴 도구만 노출)은 도구 15개 초과 시점에 도입
+### Phase 3 — 나머지 의도(intent) 확장 (진행 중, 2026-07-18 착수)
+> **재설계 반영(commit adbee95)**: 도구 축이 "메뉴 미러링"에서 "사용자 의도"로 바뀌었으므로, 아래 옛
+> 메뉴별 목록(`cti_status`·`list_products`…)은 그대로 쓰지 않는다. 메뉴를 가로지르는 **의도**가
+> 기존 6도구로 안 풀릴 때만 새 도구를 추가한다(온톨로지·매칭이 메뉴 경계를 이미 가로지른다).
+
+- ✅ `threats`(domain=cross) — "요즘 위협 있어? / 우리랑 관련?": CTI 피드 탐지 × 자산 신호 교집합. 기존 순수함수 `matchCtiToAssets` 재사용. (agentloop.test.ts 2케이스)
+- ⏸ `report`(보고서 생성) — **보류**: 무겁다(자체 LLM 호출 + docx/pdf 파일 생성 + 긴 산출물이 루프에 재주입되면 컨텍스트 폭증). 넣는다면 짧은 요약만 반환하도록 래핑 + 실 LLM 검증 필요. 별도 세션에서.
+- ⏸ `register_product`/`compliance_draft`/`list_docs` — 필요 의도가 실제로 관찰될 때 추가(현재 search/explain이 문서·제품을 이미 가로질러 조회). 선제 추가는 메뉴 미러링 회귀.
+- 도메인 라우팅(1차 분류 → 해당 도구만 노출)은 도구 **15개 초과** 시점에 도입 — 현재 9개.
 
 ### Phase 4 — 자체 강화 (상시)
 - 지시문→도구호출 로그를 학습루프 데이터셋으로 축적 → gijo-main-orchestrator 파인튜닝
