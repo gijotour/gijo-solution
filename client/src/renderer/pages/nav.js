@@ -35,13 +35,15 @@
       ]},
     ]},
     { section: "AI", groups: [
-      { ic: "◉", label: "AI 어시스턴트", tabs: [{ page: "agent.html", label: "에이전트 AI" }] },
+      { ic: "◉", label: "AI 어시스턴트", tabs: [
+        { page: "agent.html", label: "에이전트 AI" },
+        { page: "merge.html", label: "LLM 합성" },
+        { page: "llmguide.html", label: "LLM 가이드" },
+      ]},
       { ic: "🧠", label: "AI 지식·모델", tabs: [
         { page: "memory.html", label: "기억·학습" },
         { page: "ontology.html", label: "온톨로지" },
         { page: "learnloop.html", label: "학습 루프" },
-        { page: "merge.html", label: "LLM 합성" },
-        { page: "llmguide.html", label: "LLM 가이드" },
       ]},
     ]},
     { section: "시스템", groups: [
