@@ -96,8 +96,8 @@ const gijoApi = {
   mergePreflight: (a?: string, b?: string) => api.mergeApi.preflight(a, b),
   listLlmGuide: () => api.modelDexApi.guide(),
   listApprovals: () => api.approvalsApi.list(),
-  setFindingApproval: (assetId: string, key: string, status: "approved" | "rejected" | "pending", note?: string) =>
-    api.approvalsApi.set(assetId, key, status, note),
+  // status·note·assignee·dueDate를 부분 갱신. status만 주면 기존 승인/반려 동작과 동일.
+  setFindingReview: (assetId: string, key: string, patch: api.ReviewPatch) => api.approvalsApi.set(assetId, key, patch),
   listCompliance: () => api.complianceApi.list(),
   setComplianceStatus: (code: string, status: string, note: string) => api.complianceApi.setStatus(code, status, note),
   onAssetUpdated: (cb: (asset: unknown) => void) => onChannel("asset:updated", cb),

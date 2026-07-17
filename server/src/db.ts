@@ -184,6 +184,8 @@ db.exec(`
     reviewedBy TEXT,
     reviewedAt INTEGER,
     note TEXT,
+    assignee TEXT,        -- 조치 담당자(자유 텍스트)
+    dueDate TEXT,         -- 조치 기한(SLA) 'YYYY-MM-DD'
     PRIMARY KEY (assetId, findingKey)
   );
 
@@ -280,6 +282,11 @@ try {
 } catch {
   /* 컬럼이 이미 있으면 정상 — 무시 */
 }
+
+// 마이그레이션: finding_approvals.assignee/dueDate (조치 담당자·기한). 승인(오탐 판정)을 넘어
+// "누가·언제까지 조치"를 관리하기 위한 조치 관리 필드. 기존 DB에도 적용되게 ALTER로 추가.
+try { db.exec("ALTER TABLE finding_approvals ADD COLUMN assignee TEXT"); } catch { /* 이미 있으면 무시 */ }
+try { db.exec("ALTER TABLE finding_approvals ADD COLUMN dueDate TEXT"); } catch { /* 이미 있으면 무시 */ }
 
 // 마이그레이션: assets.service (이 자산이 지원·보호하는 업무 서비스). 서비스 영향도(serviceimpact.ts)
 // 산출용 — 자산에 문제가 생기면 어느 서비스가 영향받는지 집계한다. 선택 항목이라 nullable.

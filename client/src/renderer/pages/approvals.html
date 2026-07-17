@@ -66,16 +66,17 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   <div class="main">
     <div class="topbar-row">
       <div>
-        <div class="page-title">승인 워크플로우</div>
-        <div class="page-sub">스캔으로 나온 finding을 검토해 <b style="color:var(--teal)">확정(승인)</b> 또는 <b style="color:#f5928a">오탐(반려)</b>으로 처리합니다. 반려된 오탐은 SBOM 취약점 반영에서 제외됩니다.</div>
+        <div class="page-title">조치·승인</div>
+        <div class="page-sub">스캔 finding을 <b style="color:var(--teal)">확정(승인)</b>/<b style="color:#f5928a">오탐(반려)</b>으로 판정하고, 확정 건에 <b>담당자·기한(SLA)</b>을 붙여 조치를 관리합니다. 기한이 지난 미조치 건은 <b style="color:#f5928a">지연</b>으로 표시됩니다.</div>
       </div>
     </div>
 
-    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px;max-width:820px;">
+    <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:12px;margin-bottom:18px;max-width:900px;">
       <div class="panel" style="margin:0"><div class="panel-sub" style="margin:0 0 6px">전체 finding</div><div style="font-size:20px;font-weight:800;color:#fff" id="kTotal">-</div></div>
       <div class="panel" style="margin:0"><div class="panel-sub" style="margin:0 0 6px">미검토</div><div style="font-size:20px;font-weight:800;color:var(--amber)" id="kPending">-</div></div>
       <div class="panel" style="margin:0"><div class="panel-sub" style="margin:0 0 6px">승인(확정)</div><div style="font-size:20px;font-weight:800;color:var(--teal)" id="kApproved">-</div></div>
       <div class="panel" style="margin:0"><div class="panel-sub" style="margin:0 0 6px">반려(오탐)</div><div style="font-size:20px;font-weight:800;color:#f5928a" id="kRejected">-</div></div>
+      <div class="panel" style="margin:0"><div class="panel-sub" style="margin:0 0 6px">지연(기한초과)</div><div style="font-size:20px;font-weight:800;color:#f5928a" id="kOverdue">-</div></div>
     </div>
 
     <div class="panel">
@@ -111,7 +112,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   .rv-btn.ok{background:var(--teal);border-color:var(--teal);color:#06281c;}
   .rv-btn.danger{background:transparent;border-color:#e2483d;color:#f5928a;}
   .rv-btn.undo{color:var(--muted-2);}
+  .rv-item-overdue{border-color:rgba(226,72,61,0.5);}
+  .rv-overdue{color:#f5928a;background:rgba(226,72,61,0.18);}
+  .rv-remed{display:flex;align-items:center;gap:8px;margin-top:9px;flex-wrap:wrap;}
+  .rv-remed-lbl{font-size:10.5px;font-weight:700;color:var(--muted-2);}
+  .rv-assignee,.rv-due{background:var(--panel);border:1px solid var(--border-strong);color:var(--text);border-radius:7px;padding:5px 9px;font-size:12px;outline:none;}
+  .rv-assignee{width:130px;}
+  .rv-assignee:focus,.rv-due:focus{border-color:var(--blue);}
 </style>
+<datalist id="gijoUserList"></datalist>
 
 <script>
   const clockEl = document.getElementById("clockEl");
@@ -137,8 +146,19 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       r.status !== "pending"
         ? `<div class="rv-meta">${RV_LABEL[r.status]} · ${esc(r.reviewedBy || "-")}${r.note ? " · " + esc(r.note) : ""}</div>`
         : "";
+    // 조치 관리 줄: 담당자·기한. 반려(오탐)는 조치 대상이 아니라 숨긴다.
+    const remediation =
+      r.status === "rejected"
+        ? ""
+        : `<div class="rv-remed">` +
+          `<span class="rv-remed-lbl">담당자</span>` +
+          `<input class="rv-assignee" data-a="${esc(r.assetId)}" data-k="${esc(r.findingKey)}" value="${esc(r.assignee || "")}" placeholder="미배정" list="gijoUserList">` +
+          `<span class="rv-remed-lbl">기한</span>` +
+          `<input type="date" class="rv-due" data-a="${esc(r.assetId)}" data-k="${esc(r.findingKey)}" value="${esc(r.dueDate || "")}">` +
+          (r.overdue ? `<span class="rv-badge rv-overdue">⚠ 지연</span>` : "") +
+          `</div>`;
     return (
-      `<div class="rv-item">` +
+      `<div class="rv-item${r.overdue ? " rv-item-overdue" : ""}">` +
       `<div class="rv-top">` +
       `<span class="rv-badge rv-${r.status}">${RV_LABEL[r.status]}</span>` +
       `<span class="sev sev-${esc(r.finding.severity)}">${esc(r.finding.severity)}</span>` +
@@ -147,6 +167,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       `<span class="rv-actions">${actions}</span>` +
       `</div>` +
       `<div class="rv-evidence">${esc(r.finding.evidence)} <span style="color:var(--muted-2)">(${esc(r.finding.source_tool)})</span></div>` +
+      remediation +
       meta +
       `</div>`
     );
@@ -160,6 +181,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       document.getElementById("kPending").textContent = summary.pending;
       document.getElementById("kApproved").textContent = summary.approved;
       document.getElementById("kRejected").textContent = summary.rejected;
+      document.getElementById("kOverdue").textContent = summary.overdue ?? 0;
       // 미검토 먼저, 그다음 심각도 순으로.
       const order = { pending: 0, approved: 1, rejected: 2 };
       const sev = { critical: 0, high: 1, medium: 2, low: 3 };
@@ -176,16 +198,41 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const btn = e.target.closest("[data-act]");
     if (!btn) return;
     const { act, a, k } = btn.dataset;
-    let note;
-    if (act === "rejected") { note = prompt("오탐 사유(선택)") || ""; }
+    const patch = { status: act };
+    if (act === "rejected") { patch.note = prompt("오탐 사유(선택)") || ""; }
     btn.disabled = true;
     try {
-      await window.gijo.setFindingApproval(a, k, act, note);
+      await window.gijo.setFindingReview(a, k, patch);
       await loadReviews();
     } catch (err) {
       alert("처리 실패: " + ((err && err.message) || err));
       btn.disabled = false;
     }
+  }
+
+  // 담당자·기한 입력 변경 → 부분 갱신(판정은 건드리지 않음). 저장 후 목록 새로고침해 지연/요약 반영.
+  async function onRemediationChange(e) {
+    const el = e.target;
+    const isAssignee = el.classList.contains("rv-assignee");
+    const isDue = el.classList.contains("rv-due");
+    if (!isAssignee && !isDue) return;
+    const { a, k } = el.dataset;
+    const patch = isAssignee ? { assignee: el.value } : { dueDate: el.value };
+    try {
+      await window.gijo.setFindingReview(a, k, patch);
+      await loadReviews();
+    } catch (err) {
+      alert("저장 실패: " + ((err && err.message) || err));
+    }
+  }
+
+  async function loadUserSuggestions() {
+    // 담당자 자동완성(관리자만 접근 가능 — 실패해도 자유 입력은 그대로 동작).
+    try {
+      const users = await window.gijo.listUsers();
+      document.getElementById("gijoUserList").innerHTML = (users || [])
+        .map((u) => `<option value="${esc(u.displayName || u.username)}">`).join("");
+    } catch (e) {}
   }
 
   async function init() {
@@ -202,7 +249,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       avatarBtn.textContent = (user.displayName || user.username || "-").charAt(0);
     } catch (e) {}
     loadReviews();
-    document.getElementById("reviewList").addEventListener("click", onReviewClick);
+    loadUserSuggestions();
+    const rl = document.getElementById("reviewList");
+    rl.addEventListener("click", onReviewClick);
+    rl.addEventListener("change", onRemediationChange);
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => {
       el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));

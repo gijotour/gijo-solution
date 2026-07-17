@@ -40,7 +40,46 @@ describe("approvals (finding 검토 워크플로우)", () => {
     expect(res.body.reviews).toHaveLength(1);
     expect(res.body.reviews[0].status).toBe("pending");
     expect(res.body.reviews[0].assetName).toBe("모델1");
-    expect(res.body.summary).toEqual({ total: 1, pending: 1, approved: 0, rejected: 0 });
+    expect(res.body.summary).toEqual({ total: 1, pending: 1, approved: 0, rejected: 0, overdue: 0 });
+  });
+
+  it("조치 관리: 담당자·기한(SLA) 배정 — status 없이 배정만 가능", async () => {
+    const key = findingKey("m1", FINDING);
+    // 판정 없이 담당자·기한만 배정
+    const r = await request(app).post(`/api/approvals/m1/${key}`).set(auth()).send({ assignee: "김보안", dueDate: "2999-12-31" });
+    expect(r.status).toBe(200);
+    let review = (await request(app).get("/api/approvals").set(auth())).body.reviews[0];
+    expect(review.assignee).toBe("김보안");
+    expect(review.dueDate).toBe("2999-12-31");
+    expect(review.status).toBe("pending"); // 판정은 여전히 미검토
+    expect(review.overdue).toBe(false); // 미래 기한
+
+    // 판정(approved)을 추가해도 담당자·기한은 유지(merge)
+    await request(app).post(`/api/approvals/m1/${key}`).set(auth()).send({ status: "approved" });
+    review = (await request(app).get("/api/approvals").set(auth())).body.reviews[0];
+    expect(review.status).toBe("approved");
+    expect(review.assignee).toBe("김보안");
+    expect(review.dueDate).toBe("2999-12-31");
+  });
+
+  it("조치 관리: 지난 기한은 overdue로 계산(rejected는 제외)", async () => {
+    const key = findingKey("m1", FINDING);
+    await request(app).post(`/api/approvals/m1/${key}`).set(auth()).send({ assignee: "김보안", dueDate: "2000-01-01" });
+    let body = (await request(app).get("/api/approvals").set(auth())).body;
+    expect(body.reviews[0].overdue).toBe(true);
+    expect(body.summary.overdue).toBe(1);
+
+    // 오탐(rejected)으로 판정하면 조치 대상이 아니므로 overdue 아님
+    await request(app).post(`/api/approvals/m1/${key}`).set(auth()).send({ status: "rejected" });
+    body = (await request(app).get("/api/approvals").set(auth())).body;
+    expect(body.reviews[0].overdue).toBe(false);
+    expect(body.summary.overdue).toBe(0);
+  });
+
+  it("조치 관리: 잘못된 기한 형식은 400", async () => {
+    const key = findingKey("m1", FINDING);
+    const r = await request(app).post(`/api/approvals/m1/${key}`).set(auth()).send({ dueDate: "2026/01/01" });
+    expect(r.status).toBe(400);
   });
 
   it("approves and rejects a finding, updating status + reviewer", async () => {
