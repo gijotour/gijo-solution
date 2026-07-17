@@ -142,7 +142,10 @@ export async function runAgentLoop(instruction: string): Promise<AgentLoopResult
     } else if (tool.write) {
       // 쓰기 도구는 여기서 실행하지 않는다 — 값을 결재판으로 만들어 돌려주고, 사람이 승인해야
       // /api/agent/approve에서 실행된다(오발동 방지). 루프는 여기서 끝난다.
-      const approval = buildApproval(tool, args, instruction);
+      // 지금까지의 조회 결과를 함께 넘긴다 — assetId·finding처럼 앞선 도구 결과에서 복사한 값을
+      // 환각(guess)으로 오판해 되묻지 않게 하기 위해서다(근거=지시문 ∪ 조회 결과).
+      const toolResults = calls.map((c) => c.result).join("\n");
+      const approval = buildApproval(tool, args, instruction, toolResults);
       emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `승인 대기: ${tool.label} — 값 검토 요청` });
       return { output: approvalMessage(approval), toolCalls: calls, approval };
     } else {

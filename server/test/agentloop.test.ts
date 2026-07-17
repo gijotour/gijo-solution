@@ -24,10 +24,13 @@ beforeEach(() => {
 describe("agenttools — 「AI 자산」 조회 도구", () => {
   // 도구는 화면 메뉴가 아니라 사용자 의도 단위다(2026-07-17 확정) — 목록·상세·찾기·설명·오늘·등록.
   // search/explain/today는 메뉴를 가로지르므로 domain="cross".
-  it("도구는 의도 단위로 등록돼 있다 (조회 5종 + 쓰기 1종)", () => {
+  it("도구는 의도 단위로 등록돼 있다 (조회 5종 + 쓰기 3종)", () => {
     const tools = listAgentTools();
-    expect(tools.map((t) => t.name)).toEqual(["list_assets", "get_asset", "search", "explain", "today", "register_asset"]);
-    expect(tools.filter((t) => t.write).map((t) => t.name)).toEqual(["register_asset"]);
+    expect(tools.map((t) => t.name)).toEqual([
+      "list_assets", "get_asset", "search", "explain", "today",
+      "register_asset", "assign_finding", "update_finding_status",
+    ]);
+    expect(tools.filter((t) => t.write).map((t) => t.name)).toEqual(["register_asset", "assign_finding", "update_finding_status"]);
     // 메뉴를 가로지르는 도구가 있어야 "오늘 뭐부터?" 같은 질문에 도구 1개로 답한다.
     expect(tools.filter((t) => t.domain === "cross").map((t) => t.name)).toEqual(["search", "explain", "today"]);
   });

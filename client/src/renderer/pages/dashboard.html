@@ -1009,6 +1009,7 @@
   // 빠진 필수값은 빈 칸으로 떠서 그 자체가 "되물어보기"가 된다(별도 ask 단계 불필요).
   const AP_SRC = {
     said: { label: "지시에서", cls: "said" },
+    found: { label: "조회 결과", cls: "auto" }, // 앞선 도구 조회 결과에서 온 값(근거 있음)
     auto: { label: "자동생성", cls: "auto" },
     guess: { label: "AI 추정", cls: "guess" },
     empty: { label: "입력 필요", cls: "empty" },

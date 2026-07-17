@@ -16,7 +16,7 @@
 
 import { listAssets, getAsset, registerAsset, Asset } from "./assets";
 import { expandOntology } from "./ontology";
-import { prioritizedReviews } from "./approvals";
+import { prioritizedReviews, updateFindingReview, findingKey, ReviewPatch, ApprovalStatus } from "./approvals";
 import { listProducts } from "./securityproducts";
 import { listDocuments } from "./memory";
 
@@ -263,6 +263,90 @@ function runRegisterAsset(args: Record<string, string>): string {
   return `자산 ${asset.id}(${asset.name})을 등록했습니다. 등록 자산 ${before}개 → ${before + 1}개. 스캔은 아직 실행하지 않았습니다.`;
 }
 
+// ── 취약점 조치 쓰기 도구 (Phase 2 — 결재판 경유) ────────────────────────
+//
+// finding 지목의 원칙: findingKey는 (assetId+내용) sha1 해시라 LLM이 만들 수 없다. 그래서 LLM은
+// today/search/get_asset 결과에 이미 노출된 assetId와 finding 설명(심각도·유형)을 "복사"만 하고,
+// 어떤 finding인지 특정하는 판단은 서버 규칙(resolveFinding)이 한다. 해석 실패·모호는 규칙이
+// 거부하고 사람에게 되묻는다(오발동 방지). 매칭이 유일할 때만 실제 findingKey로 변환해 실행한다.
+
+interface FindingHit {
+  key: string; // 실제 findingKey (sha1 16자)
+  label: string; // 사람이 읽을 요약 "[critical] 프롬프트 인젝션"
+}
+
+function findingLabel(f: Asset["findings"][number]): string {
+  return `[${f.severity}] ${f.finding_type}`;
+}
+
+// assetId 안에서 needle(심각도·유형·근거 부분일치)로 finding 1건을 특정한다.
+// 0건/2건+는 실패로 돌려주고(사람에게 되묻기), 정확히 1건일 때만 hit을 준다.
+function resolveFinding(assetId: string, needle: string): { ok: true; hit: FindingHit } | { ok: false; error: string } {
+  const asset = getAsset((assetId ?? "").trim());
+  if (!asset) {
+    const ids = listAssets().map((a) => a.id).join(", ") || "(없음)";
+    return { ok: false, error: `자산 "${assetId}"을(를) 찾을 수 없습니다. 등록된 자산 id: ${ids}` };
+  }
+  if (asset.findings.length === 0) return { ok: false, error: `자산 ${asset.id}에는 조치할 취약점(finding)이 없습니다.` };
+  const n = (needle ?? "").trim();
+  if (n.length < 2) {
+    const sample = asset.findings.slice(0, 6).map(findingLabel).join(" / ");
+    return { ok: false, error: `어느 취약점인지 지목이 필요합니다. ${asset.id}의 취약점: ${sample}` };
+  }
+  const hits = asset.findings.filter((f) => matches(`${f.finding_type} ${f.severity} ${f.evidence}`, n));
+  if (hits.length === 0) {
+    const sample = asset.findings.slice(0, 6).map(findingLabel).join(" / ");
+    return { ok: false, error: `${asset.id}에서 "${needle}"에 맞는 취약점을 찾지 못했습니다. 이 자산의 취약점: ${sample}` };
+  }
+  if (hits.length > 1) {
+    const sample = hits.slice(0, 6).map(findingLabel).join(" / ");
+    return { ok: false, error: `"${needle}"에 ${hits.length}건이 걸립니다 — 심각도·유형으로 더 구체적으로 지목하세요: ${sample}` };
+  }
+  const f = hits[0];
+  return { ok: true, hit: { key: findingKey(asset.id, f), label: findingLabel(f) } };
+}
+
+// 상태 한국어 → enum (결정적 규칙, LLM 추정이 아니다).
+function normalizeStatus(raw: string): ApprovalStatus | null {
+  const s = (raw ?? "").trim().toLowerCase();
+  if (/오탐|false|무시|반려|제외|reject/.test(s)) return "rejected";
+  if (/조치|완료|해결|확정|승인|approv|fix|done|patch/.test(s)) return "approved";
+  if (/미검토|보류|대기|원복|pending/.test(s)) return "pending";
+  return null;
+}
+
+const DUE_RE = /^\d{4}-\d{2}-\d{2}$/;
+
+// 쓰기 도구는 실패 시 문자열이 아니라 throw 한다 — 결재판 승인 경로(/api/agent/approve)가 이를
+// 400으로 돌려 화면이 "실행 실패"로 표시한다. 읽기 도구가 오류 문자열을 LLM에 재주입하는 것과 달리,
+// 쓰기 실패를 "✅ 완료" 메시지로 보여주면 사람이 배정이 된 줄 오해할 수 있어서다(오발동 방지).
+function runAssignFinding(args: Record<string, string>): string {
+  const r = resolveFinding(args.assetId, args.finding);
+  if (!r.ok) throw new Error(r.error);
+  const assignee = args.assignee.trim(); // required — validateToolArgs가 보장
+  const patch: ReviewPatch = { assignee };
+  const due = args.dueDate?.trim();
+  if (due) {
+    if (!DUE_RE.test(due)) throw new Error(`기한은 YYYY-MM-DD 형식이어야 합니다 (받은 값: "${due}").`);
+    patch.dueDate = due;
+  }
+  updateFindingReview(args.assetId.trim(), r.hit.key, patch, "orchestrator");
+  return `${args.assetId} ${r.hit.label} → 담당자 ${assignee}${patch.dueDate ? `, 기한 ${patch.dueDate}` : ""} 배정했습니다.`;
+}
+
+function runUpdateFindingStatus(args: Record<string, string>): string {
+  const r = resolveFinding(args.assetId, args.finding);
+  if (!r.ok) throw new Error(r.error);
+  const status = normalizeStatus(args.status);
+  if (!status) throw new Error(`상태 "${args.status}"를 해석하지 못했습니다. "조치완료" 또는 "오탐"으로 지정하세요.`);
+  const patch: ReviewPatch = { status };
+  const note = args.note?.trim();
+  if (note) patch.note = note;
+  updateFindingReview(args.assetId.trim(), r.hit.key, patch, "orchestrator");
+  const label = status === "rejected" ? "오탐(SBOM·조치 대상에서 제외)" : status === "approved" ? "조치완료(확정)" : "미검토(원복)";
+  return `${args.assetId} ${r.hit.label} → ${label} 처리했습니다.${note ? ` 사유: ${note}` : ""}`;
+}
+
 // ── 레지스트리 ──────────────────────────────────────────────────────────
 
 const TOOLS: AgentTool[] = [
@@ -342,6 +426,45 @@ const TOOLS: AgentTool[] = [
     undo: "자산 화면에서 삭제하거나, 아래 '방금 등록 취소'로 되돌릴 수 있습니다.",
     run: runRegisterAsset,
   },
+  {
+    name: "assign_finding",
+    label: "취약점 담당자·기한 배정",
+    domain: "assets",
+    write: true,
+    description:
+      '취약점에 조치 담당자(와 기한)를 배정한다. assetId와 finding(심각도·유형으로 지목)은 today/search 결과에서 가져온다. 예: {"assetId":"ai-secbot-01","finding":"프롬프트 인젝션","assignee":"김보안","dueDate":"2026-07-31"}',
+    params: [
+      { name: "assetId", label: "자산 id", description: "대상 자산 id (today/search 결과의 id=)", required: true },
+      { name: "finding", label: "대상 취약점", description: "심각도·유형으로 지목 (예: critical 프롬프트 인젝션)", required: true },
+      { name: "assignee", label: "담당자", description: "조치 담당자·조직", required: true },
+      { name: "dueDate", label: "기한", description: "조치 기한 YYYY-MM-DD (선택)", required: false },
+    ],
+    effect: (args) => `취약점 검토대장에 담당자${args.dueDate?.trim() ? "·기한(SLA)" : ""}을 기록 · 스캔·자산 데이터는 바뀌지 않음`,
+    undo: "승인 화면(취약점 관리)에서 담당자·기한을 다시 비우면 미배정으로 원복됩니다.",
+    run: runAssignFinding,
+  },
+  {
+    name: "update_finding_status",
+    label: "취약점 판정(오탐·조치완료)",
+    domain: "assets",
+    write: true,
+    description:
+      '취약점을 "조치완료"(확정) 또는 "오탐"(SBOM·조치 대상에서 제외)으로 판정한다. assetId와 finding은 today/search 결과에서 가져온다. 예: {"assetId":"ai-secbot-01","finding":"버전 노출","status":"오탐","note":"내부망 전용"}',
+    params: [
+      { name: "assetId", label: "자산 id", description: "대상 자산 id", required: true },
+      { name: "finding", label: "대상 취약점", description: "심각도·유형으로 지목", required: true },
+      { name: "status", label: "판정", description: "조치완료 / 오탐 (미검토로 원복도 가능)", required: true },
+      { name: "note", label: "사유", description: "판정 근거·메모 (선택)", required: false },
+    ],
+    effect: (args) => {
+      const st = normalizeStatus(args.status ?? "");
+      if (st === "rejected") return "이 취약점을 오탐 처리 · SBOM 취약점과 '오늘의 조치'에서 제외됨";
+      if (st === "approved") return "이 취약점을 조치완료로 확정 · 검토대장에 기록";
+      return "판정을 미검토로 원복";
+    },
+    undo: "승인 화면에서 판정을 미검토로 되돌리면 원상복귀됩니다.",
+    run: runUpdateFindingStatus,
+  },
 ];
 
 export function listAgentTools(): AgentTool[] {
@@ -377,7 +500,9 @@ export function validateToolArgs(tool: AgentTool, args: Record<string, unknown>)
 // (지시에서/자동생성/AI 추정) 표시해, 7B 모델의 추정을 사람이 빠르게 검증하게 한다.
 // 되물어보기(ask_user)는 별도 도구가 필요 없다 — 빠진 필수값이 빈 칸으로 표시되는 게 곧 되물음이다.
 
-export type FieldSource = "said" | "auto" | "guess" | "empty";
+// said=지시문에 나온 값 · found=앞선 조회 결과(today/search 등)에서 온 값 · auto=서버 규칙 생성 ·
+// guess=근거 없는 AI 추정(필수면 되묻음) · empty=빈 칸. said·found는 근거가 있어 그대로 유지한다.
+export type FieldSource = "said" | "found" | "auto" | "guess" | "empty";
 
 export interface ApprovalField {
   key: string;
@@ -397,15 +522,22 @@ export interface PendingApproval {
   missing: string[]; // 필수인데 비어 있는 필드 — 화면이 빨갛게 강조하고 승인을 막는다
 }
 
-// 값이 지시문에 실제로 나왔는지 규칙으로 본다(LLM에게 출처를 묻지 않는다 — 부담·환각 회피).
+// 값이 특정 텍스트(지시문·조회 결과)에 실제로 나왔는지 규칙으로 본다(LLM에게 출처를 묻지 않는다 — 부담·환각 회피).
 // 공백을 무시하고 비교해 "사내 챗봇" ↔ "사내챗봇" 같은 표기 차이를 흡수한다.
-function instructionHas(instruction: string, value: string): boolean {
+function textHas(haystack: string, value: string): boolean {
   const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "");
   const v = norm(value);
-  return v.length >= 2 && norm(instruction).includes(v);
+  return v.length >= 2 && norm(haystack).includes(v);
 }
 
-export function buildApproval(tool: AgentTool, rawArgs: Record<string, string>, instruction: string): PendingApproval {
+// toolResults: 이 결재판이 뜨기까지 에이전트 루프가 실행한 읽기 도구들의 결과(합친 텍스트).
+// assign_finding의 assetId·finding처럼 "앞선 조회 결과에서 복사한" 값은 환각이 아니므로 유지한다.
+export function buildApproval(
+  tool: AgentTool,
+  rawArgs: Record<string, string>,
+  instruction: string,
+  toolResults = ""
+): PendingApproval {
   const autoFilled = tool.autoFill ? tool.autoFill(rawArgs) : {};
   const args = { ...rawArgs, ...autoFilled };
   const fields: ApprovalField[] = tool.params.map((p) => {
@@ -413,12 +545,13 @@ export function buildApproval(tool: AgentTool, rawArgs: Record<string, string>, 
     let source: FieldSource;
     if (!value) source = "empty";
     else if (p.name in autoFilled) source = "auto";
-    else if (instructionHas(instruction, value)) source = "said";
+    else if (textHas(instruction, value)) source = "said";
+    else if (textHas(toolResults, value)) source = "found"; // 앞선 조회 결과에서 온 값 — 근거 있음
     else source = "guess";
     // 필수값은 LLM이 지어낸 값(guess)을 받지 않는다 — 빈 칸으로 되묻는다.
     // 실측(2026-07-17): 경로를 안 알려주고 "테스트봇 등록해줘"라고 하면 7B 모델이 그럴듯한
     // 파일 경로를 지어낸다. 근거 없는 필수값이 채워져 있으면 사람이 무심코 승인할 수 있으므로,
-    // 필수값은 "지시에 있거나 서버 규칙이 만든 것"만 인정한다. 선택값의 추정은 배지로 표시만 한다.
+    // 필수값은 "지시·조회 결과에 있거나 서버 규칙이 만든 것"만 인정한다. 선택값의 추정은 배지로 표시만 한다.
     if (source === "guess" && p.required) return { key: p.name, label: p.label, value: "", source: "empty" as const, required: true, hint: p.description };
     return { key: p.name, label: p.label, value, source, required: p.required, hint: p.description };
   });
