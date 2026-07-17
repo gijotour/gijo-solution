@@ -496,7 +496,7 @@ const TOOLS: AgentTool[] = [
     domain: "assets",
     write: true,
     description:
-      '취약점을 "조치완료"(확정) 또는 "오탐"(SBOM·조치 대상에서 제외)으로 판정한다. assetId와 finding은 today/search 결과에서 가져온다. 예: {"assetId":"ai-secbot-01","finding":"버전 노출","status":"오탐","note":"내부망 전용"}',
+      '취약점 판정을 바꾼다 — "이건 오탐이야", "오탐 처리해줘", "조치완료", "고쳤어/패치했어"에 쓴다. status는 "오탐" 또는 "조치완료". assetId·finding은 today/search 결과에서 지목한다. 예: {"assetId":"ai-secbot-01","finding":"버전 노출","status":"오탐","note":"내부망 전용"}',
     params: [
       { name: "assetId", label: "자산 id", description: "대상 자산 id", required: true },
       { name: "finding", label: "대상 취약점", description: "심각도·유형으로 지목", required: true },
