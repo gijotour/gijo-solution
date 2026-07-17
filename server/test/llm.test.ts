@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { chat, systemPromptFor, resetChatHistoryForTests } from "../src/engine/llm";
+import { chat, systemPromptFor, resetChatHistoryForTests, stripLeadingPreamble } from "../src/engine/llm";
 
 function stubLlm(reply = "답변") {
   const fetchMock = vi.fn().mockResolvedValue({
@@ -45,6 +45,32 @@ describe("llm chat system prompt (한국어 기본 처리)", () => {
     const prompt = systemPromptFor("nonexistent-agent");
     expect(prompt).toContain("보안 어시스턴트");
     expect(prompt).toContain("반드시 한국어로");
+  });
+
+  describe("stripLeadingPreamble (응답 후처리 — 인사말·예고 서두 제거, 본문 보존)", () => {
+    it("쉼표로 붙은 선행 인사 제거", () => {
+      expect(stripLeadingPreamble("안녕하세요, 이번 주 보안 현황은 양호합니다.")).toBe("이번 주 보안 현황은 양호합니다.");
+    });
+    it("인사 문장 제거", () => {
+      expect(stripLeadingPreamble("안녕하세요. 취약점 3건입니다.")).toBe("취약점 3건입니다.");
+    });
+    it("응답-메타 예고 문장 제거", () => {
+      expect(stripLeadingPreamble("이번 달 취약점 조치 현황을 보고드리겠습니다. 총 50건입니다.")).toBe("총 50건입니다.");
+    });
+    it("자기소개 문장 제거", () => {
+      expect(stripLeadingPreamble("저는 보안 담당 AI입니다. Log4Shell은 즉시 패치해야 합니다.")).toBe("Log4Shell은 즉시 패치해야 합니다.");
+    });
+    it("실제 조치문(메타어 없음)은 보존", () => {
+      const t = "즉시 패치를 적용하겠습니다. 그다음 재스캔합니다.";
+      expect(stripLeadingPreamble(t)).toBe(t);
+    });
+    it("구조화 출력(상태:/번호목록)은 건드리지 않음", () => {
+      expect(stripLeadingPreamble("상태: partial\n근거: 부분 대응")).toBe("상태: partial\n근거: 부분 대응");
+      expect(stripLeadingPreamble("1. Apache Log4j RCE\n2. OpenSSH")).toBe("1. Apache Log4j RCE\n2. OpenSSH");
+    });
+    it("응답 전체가 인사/예고뿐이면(뒤 본문 없음) 지우지 않음", () => {
+      expect(stripLeadingPreamble("안녕하세요.")).toBe("안녕하세요.");
+    });
   });
 
   it("each defined agent gets its own role in the prompt", () => {

@@ -110,6 +110,34 @@ export function systemPromptFor(agentId: string): string {
   ].join("\n");
 }
 
+// ── 응답 후처리: 첫머리 인사말·예고 서두 제거(본문 보존) ─────────────────
+// LLM이 프롬프트 규칙을 100% 지키지 않아 남는 '안녕하세요 …', '~을 보고드리겠습니다' 같은
+// 응답-메타 예고, 자기소개를 서버에서 마지막으로 정리한다. 본문·구조화 출력(상태:/번호목록)은 건드리지 않게
+// 보수적으로: (1) 쉼표로 붙은 선행 인사만 제거, (2) 첫 문장이 '인사/자기소개/응답메타 예고'이고 뒤에 본문이
+// 남을 때만 그 문장을 제거(최대 2문장).
+const GREETING_PREFIX_RE = /^(안녕하세요|안녕히 계세요|안녕|반갑습니다|반가워요|반갑네요|좋은 (아침|오후|하루)(입니다|이에요|예요)?)[\s,·!.]*/;
+// 응답-메타(답변/보고/작성 등) + 예고 종결. '즉시 패치를 적용하겠습니다' 같은 실제 조치문은 메타어가 없어 보존됨.
+const PREAMBLE_SENTENCE_RE = /(답변|설명|작성|보고|안내|정리|요약|말씀|브리핑|리포트|검토)\S*\s*(을|를|에 대해|에 대한|해)?\s*(드리겠습니다|드릴게요|하겠습니다|할게요|알려드리겠습니다|말씀드리겠습니다|보고드리겠습니다)[.!?]?\s*$/;
+const SELF_INTRO_RE = /^(저는|제가|나는)\s.*(입니다|이에요|예요|담당(합니다|입니다)?)[.!?]?\s*$/;
+
+export function stripLeadingPreamble(text: string): string {
+  let t = (text ?? "").trim();
+  const afterGreet = t.replace(GREETING_PREFIX_RE, "").trim(); // "안녕하세요, 본문" → "본문"
+  if (afterGreet) t = afterGreet; // 인사만 있고 뒤 본문이 없으면 원문 유지(빈 응답 방지)
+  for (let i = 0; i < 2; i++) {
+    const nl = t.indexOf("\n");
+    const dot = t.search(/[.!?？。]/);
+    const cut = dot >= 0 ? dot + 1 : nl >= 0 ? nl : -1;
+    const first = (cut >= 0 ? t.slice(0, cut) : t).trim();
+    const rest = cut >= 0 ? t.slice(cut).trim() : "";
+    if (!first || !rest) break; // 뒤에 본문이 없으면 보존(전체 삭제 방지)
+    if (GREETING_PREFIX_RE.test(first) || SELF_INTRO_RE.test(first) || PREAMBLE_SENTENCE_RE.test(first)) {
+      t = rest;
+    } else break;
+  }
+  return t.trim();
+}
+
 export async function chat(args: ChatArgs): Promise<string> {
   const history = args.remember ? (histories.get(args.agentId) ?? []) : [];
   const rag = args.remember ? await ragContextFor(args.message, args.agentId) : null;
@@ -150,7 +178,7 @@ export async function chat(args: ChatArgs): Promise<string> {
     usage?: { prompt_tokens?: number; completion_tokens?: number };
     timings?: { predicted_per_second?: number };
   };
-  const reply = data.choices?.[0]?.message?.content ?? "";
+  const reply = stripLeadingPreamble(data.choices?.[0]?.message?.content ?? "");
 
   // llama.cpp 실측치(usage·timings)를 그대로 실어 보낸다 — 값이 나오면 실제 추론이 일어난 것.
   emitLlmActivity({
