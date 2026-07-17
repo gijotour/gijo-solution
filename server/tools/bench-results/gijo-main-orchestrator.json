@@ -1,0 +1,161 @@
+{
+  "summary": {
+    "candidate": "gijo-main-orchestrator",
+    "label": "gijo-main-orchestrator (Qwen2.5 7.6B 머지, 제품 기본)",
+    "jsonOk": "10/10",
+    "toolOk": "10/10",
+    "argsOk": "10/10",
+    "avgMs": 232
+  },
+  "rows": [
+    {
+      "case": "A",
+      "text": "등록된 자산 몇 개야?",
+      "jsonOk": true,
+      "toolOk": true,
+      "argsOk": true,
+      "ms": 212,
+      "got": {
+        "action": "tool",
+        "tool": "list_assets",
+        "args": {}
+      },
+      "raw": "{\"action\":\"tool\",\"tool\":\"list_assets\",\"args\":{}}"
+    },
+    {
+      "case": "B",
+      "text": "ai-secbot-01 상세 보여줘",
+      "jsonOk": true,
+      "toolOk": true,
+      "argsOk": true,
+      "ms": 209,
+      "got": {
+        "action": "tool",
+        "tool": "get_asset",
+        "args": {
+          "assetId": "ai-secbot-01"
+        }
+      },
+      "raw": "{\"action\":\"tool\",\"tool\":\"get_asset\",\"args\":{\"assetId\":\"ai-secbot-01\"}}"
+    },
+    {
+      "case": "C",
+      "text": "오늘 뭐부터 조치해야 해? 상위 5개만",
+      "jsonOk": true,
+      "toolOk": true,
+      "argsOk": true,
+      "ms": 196,
+      "got": {
+        "action": "tool",
+        "tool": "list_vuln_priorities",
+        "args": {
+          "limit": "5"
+        }
+      },
+      "raw": "{\"action\":\"tool\",\"tool\":\"list_vuln_priorities\",\"args\":{\"limit\":\"5\"}}"
+    },
+    {
+      "case": "D",
+      "text": "새 자산 등록해줘. 이름은 사내챗봇이고 경로는 models/chatbot.gguf 야",
+      "jsonOk": true,
+      "toolOk": true,
+      "argsOk": true,
+      "ms": 250,
+      "got": {
+        "action": "tool",
+        "tool": "register_asset",
+        "args": {
+          "name": "사내챗봇",
+          "path": "models/chatbot.gguf"
+        }
+      },
+      "raw": "{\"action\":\"tool\",\"tool\":\"register_asset\",\"args\":{\"name\":\"사내챗봇\",\"path\":\"models/chatbot.gguf\"}}"
+    },
+    {
+      "case": "E",
+      "text": "고마워, 수고했어!",
+      "jsonOk": true,
+      "toolOk": true,
+      "argsOk": true,
+      "ms": 217,
+      "got": {
+        "action": "final",
+        "answer": "감사합니다! 필요시 언제든지 도와드릴게요."
+      },
+      "raw": "{\"action\":\"final\",\"answer\":\"감사합니다! 필요시 언제든지 도와드릴게요.\"}"
+    },
+    {
+      "case": "F",
+      "text": "fraud-detect-llm 에 취약점 뭐 나왔는지 알려줘",
+      "jsonOk": true,
+      "toolOk": true,
+      "argsOk": true,
+      "ms": 216,
+      "got": {
+        "action": "tool",
+        "tool": "get_asset",
+        "args": {
+          "assetId": "fraud-detect-llm"
+        }
+      },
+      "raw": "{\"action\":\"tool\",\"tool\":\"get_asset\",\"args\":{\"assetId\":\"fraud-detect-llm\"}}"
+    },
+    {
+      "case": "G",
+      "text": "경영진 볼 보고서 하나 뽑아줘",
+      "jsonOk": true,
+      "toolOk": true,
+      "argsOk": true,
+      "ms": 137,
+      "got": {
+        "action": "tool",
+        "tool": "generate_report",
+        "args": {}
+      },
+      "raw": "{\"action\":\"tool\",\"tool\":\"generate_report\",\"args\":{}}"
+    },
+    {
+      "case": "H",
+      "text": "우리가 관리하는 AI 자산 전체 목록 보여줘",
+      "jsonOk": true,
+      "toolOk": true,
+      "argsOk": true,
+      "ms": 143,
+      "got": {
+        "action": "tool",
+        "tool": "list_assets",
+        "args": {}
+      },
+      "raw": "{\"action\":\"tool\",\"tool\":\"list_assets\",\"args\":{}}"
+    },
+    {
+      "case": "I",
+      "text": "취약점 우선순위 top 3 알려줘",
+      "jsonOk": true,
+      "toolOk": true,
+      "argsOk": true,
+      "ms": 191,
+      "got": {
+        "action": "tool",
+        "tool": "list_vuln_priorities",
+        "args": {
+          "limit": "3"
+        }
+      },
+      "raw": "{\"action\":\"tool\",\"tool\":\"list_vuln_priorities\",\"args\":{\"limit\":\"3\"}}"
+    },
+    {
+      "case": "J",
+      "text": "다크웹에서 우리 회사 계정 유출됐는지 확인해줘",
+      "jsonOk": true,
+      "toolOk": true,
+      "argsOk": true,
+      "ms": 550,
+      "got": {
+        "action": "final",
+        "answer": "현재 제공된 도구들은 다크웹을 직접 검색하는 기능을 가지고 있지 않습니다. 하지만 다크웹에서의 계정 유출 정보를 추적하는 서비스를 이용하거나, 해당 서비스를 통한 유출 여부 확인을 요청할 수 있습니다."
+      },
+      "raw": "{\"action\":\"final\",\"answer\":\"현재 제공된 도구들은 다크웹을 직접 검색하는 기능을 가지고 있지 않습니다. 하지만 다크웹에서의 계정 유출 정보를 추적하는 서비스를 이용하거나, 해당 서비스를 통한 유출 여부 확인을 요청할 수 있습니다.\"}"
+    }
+  ]
+}

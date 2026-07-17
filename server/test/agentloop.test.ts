@@ -22,10 +22,11 @@ beforeEach(() => {
 });
 
 describe("agenttools — 「AI 자산」 조회 도구", () => {
-  it("도구 3종이 조회 전용으로 등록돼 있다", () => {
+  it("「AI 자산」 도구: 조회 3종 + 쓰기 1종(결재판 경유)", () => {
     const tools = listAgentTools();
-    expect(tools.map((t) => t.name)).toEqual(["list_assets", "get_asset", "get_aibom"]);
-    expect(tools.every((t) => !t.write)).toBe(true);
+    expect(tools.map((t) => t.name)).toEqual(["list_assets", "get_asset", "get_aibom", "register_asset"]);
+    expect(tools.filter((t) => !t.write).map((t) => t.name)).toEqual(["list_assets", "get_asset", "get_aibom"]);
+    expect(tools.filter((t) => t.write).map((t) => t.name)).toEqual(["register_asset"]);
     expect(tools.every((t) => t.domain === "assets")).toBe(true);
   });
 

@@ -40,6 +40,8 @@ const gijoApi = {
   getAgentRecommendations: () => api.modelDexApi.agentRecommendations(),
   listModels: () => api.localEngineApi.models(),
   sendInstruction: (text: string) => api.dispatchApi.send(text),
+  // 결재판 승인 실행 — 쓰기 도구는 이 경로로만 실행된다(지시만으로는 실행 안 됨).
+  approveAgentTool: (tool: string, args: Record<string, string>) => api.dispatchApi.approve(tool, args),
   onCollaborationEvent: (cb: (evt: unknown) => void) => onChannel("collaboration:event", cb),
   listCollaborationHistory: () => api.collaborationApi.history(),
   onLlmActivity: (cb: (evt: unknown) => void) => onChannel("llm:event", cb),

@@ -149,12 +149,36 @@ export interface DispatchResult {
   route: { agentId: string; action: "scan" | "analyze" | "report" | "chat"; targetAssetId?: string };
   output: string;
   steps?: OrchestrationStepResult[]; // 복합(멀티스텝) 지시일 때만
+  toolCalls?: { tool: string; args: Record<string, string>; result: string }[]; // 에이전트 루프가 실행한 조회 도구
+  approval?: PendingApproval; // 쓰기 지시일 때 — 승인해야 실행된다
+}
+
+// 결재판 — 쓰기 도구는 지시만으로 실행되지 않고 이 구조가 화면에 떠서 사람의 승인을 받는다.
+// source: said=지시에서 뽑음 · auto=서버 규칙이 채움 · guess=LLM 추정(검증 필요) · empty=입력 필요
+export interface ApprovalField {
+  key: string;
+  label: string;
+  value: string;
+  source: "said" | "auto" | "guess" | "empty";
+  required: boolean;
+  hint: string;
+}
+export interface PendingApproval {
+  tool: string;
+  label: string;
+  fields: ApprovalField[];
+  effect: string;
+  undo: string;
+  missing: string[];
 }
 
 export const dispatchApi = {
   send: (text: string) => request<DispatchResult>("/api/dispatch", { method: "POST", body: { text } }),
   plan: (text: string) =>
     request<{ steps: OrchestrationStepResult[]; multi: boolean }>("/api/dispatch/plan", { method: "POST", body: { text } }),
+  // 결재판 승인 — 사람이 값을 확인·수정하고 누른 뒤에만 호출된다.
+  approve: (tool: string, args: Record<string, string>) =>
+    request<{ output: string }>("/api/agent/approve", { method: "POST", body: { tool, args } }),
 };
 
 // ── 작업 큐 ───────────────────────────────────────────────────────────

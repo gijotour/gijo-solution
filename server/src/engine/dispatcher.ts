@@ -12,6 +12,7 @@ import { emitCollaboration } from "./collaboration";
 import { runAdapter, StandardFinding } from "./bridge";
 import { chat } from "./llm";
 import { runAgentLoop, AgentToolCall } from "./agentloop";
+import { executeApprovedTool, PendingApproval } from "./agenttools";
 import { analyzeFindings } from "./analysis";
 import { recordFindings, getAsset, listAssets } from "./assets";
 import { listFindings } from "./cti";
@@ -24,6 +25,8 @@ export interface DispatchResult {
   output: string;
   steps?: StepResult[]; // 복합(멀티스텝) 지시일 때 각 단계 결과
   toolCalls?: AgentToolCall[]; // 에이전트 루프가 실행한 도구 내역(화면 표시용)
+  // 쓰기 도구 지시 시: 실행하지 않고 결재판을 돌려준다 — 화면에서 승인해야 실행된다(시안 B).
+  approval?: PendingApproval;
   // 학습 루프 실행 요청 시: 바로 실행하지 않고 화면의 명시적 확인 버튼으로만 시작(오발동 방지).
   confirm?: { type: "learnloop"; datasets: { id: string; examples: number }[] };
 }
@@ -102,6 +105,7 @@ interface ActionResult {
   output: string;
   findings?: StandardFinding[];
   toolCalls?: AgentToolCall[];
+  approval?: PendingApproval;
 }
 
 async function executeRoutedAction(route: RoutedIntent, instructionText: string): Promise<ActionResult> {
@@ -124,7 +128,7 @@ async function executeRoutedAction(route: RoutedIntent, instructionText: string)
       // 답변을 만들 수 있으면 그 결과를, 아니면(null) 기존 채팅으로 폴백(회귀 없음).
       if (route.action === "chat") {
         const loop = await runAgentLoop(instructionText).catch(() => null);
-        if (loop) return { output: loop.output, toolCalls: loop.toolCalls };
+        if (loop) return { output: loop.output, toolCalls: loop.toolCalls, approval: loop.approval };
       }
       // 모델 로드·선택은 chat() 내부(ensureAgentModel)에서 처리된다.
       return { output: await chat({ agentId: route.agentId, message: instructionText, remember: true }) };
@@ -295,10 +299,12 @@ export async function dispatchInstruction(instructionText: string): Promise<Disp
 
   let output: string;
   let toolCalls: AgentToolCall[] | undefined;
+  let approval: PendingApproval | undefined;
   try {
     const result = await executeRoutedAction(route, instructionText);
     output = result.output;
     toolCalls = result.toolCalls;
+    approval = result.approval;
     if (result.findings) {
       updateTaskPriority(task.id, priorityForFindings(result.findings));
     }
@@ -311,7 +317,7 @@ export async function dispatchInstruction(instructionText: string): Promise<Disp
   const updatedTasks = completeTask(task.id);
   const completedTask = updatedTasks.find((t) => t.id === task.id) ?? task;
 
-  return { task: completedTask, route, output, ...(toolCalls ? { toolCalls } : {}) };
+  return { task: completedTask, route, output, ...(toolCalls ? { toolCalls } : {}), ...(approval ? { approval } : {}) };
 }
 
 export function registerDispatcherRoutes(app: Express): void {
@@ -327,4 +333,32 @@ export function registerDispatcherRoutes(app: Express): void {
     const steps = planInstruction(String(req.body?.text ?? ""));
     res.json({ steps, multi: steps.length >= 2 });
   });
+
+  // 결재판 승인 — 화면에서 사람이 값을 확인(수정 가능)하고 승인한 쓰기 도구를 실제로 실행한다.
+  // 지시만으로는 절대 여기 도달하지 않는다(오발동 방지 원칙 — 학습루프 확인 절차와 같은 계약).
+  app.post(
+    "/api/agent/approve",
+    authMiddleware,
+    asyncRoute(async (req, res) => {
+      const toolName = String(req.body?.tool ?? "");
+      const rawArgs = (req.body?.args ?? {}) as Record<string, unknown>;
+      // 화면에서 온 값만 문자열로 받는다(타입 오염 방어).
+      const args: Record<string, string> = {};
+      for (const [k, v] of Object.entries(rawArgs)) if (typeof v === "string") args[k] = v;
+      const task = createTask({ text: `[승인 실행] ${toolName}`, agentId: "orchestrator", priority: "P2" });
+      setAgentStatus("orchestrator", "working");
+      emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `승인됨 — ${toolName} 실행` });
+      try {
+        const output = await executeApprovedTool(toolName, args);
+        emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `실행 완료: ${output.slice(0, 120)}` });
+        resetAgentToDefault("orchestrator");
+        const updated = completeTask(task.id);
+        res.json({ output, task: updated.find((t) => t.id === task.id) ?? task });
+      } catch (err) {
+        resetAgentToDefault("orchestrator");
+        completeTask(task.id);
+        res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+      }
+    })
+  );
 }

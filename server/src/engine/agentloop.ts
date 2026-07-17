@@ -11,7 +11,7 @@
 // 채팅 경로로 폴백한다. 즉 루프 도입으로 기존 동작이 나빠지는 회귀가 없다.
 
 import { chat } from "./llm";
-import { listAgentTools, findAgentTool, toolCatalogText, validateToolArgs } from "./agenttools";
+import { listAgentTools, findAgentTool, toolCatalogText, validateToolArgs, buildApproval, PendingApproval } from "./agenttools";
 import { emitCollaboration } from "./collaboration";
 
 const MAX_STEPS = 5;
@@ -37,6 +37,8 @@ export interface AgentToolCall {
 export interface AgentLoopResult {
   output: string;
   toolCalls: AgentToolCall[];
+  // 쓰기 도구가 선택되면 실행 대신 결재판을 돌려준다 — 승인은 /api/agent/approve로만(시안 B).
+  approval?: PendingApproval;
 }
 
 interface Decision {
@@ -80,6 +82,15 @@ function decisionPrompt(instruction: string, calls: AgentToolCall[]): string {
     "",
     `사용자 지시: "${instruction}"`,
   ].join("\n");
+}
+
+// 결재판을 띄울 때 피드에 남길 안내문 — LLM을 한 번 더 부르지 않고 규칙으로 만든다(빠르고 결정적).
+function approvalMessage(approval: PendingApproval): string {
+  if (approval.missing.length) {
+    const labels = approval.fields.filter((f) => approval.missing.includes(f.key)).map((f) => f.label);
+    return `${approval.label}을(를) 준비했습니다. ${labels.join("·")} 값이 필요합니다 — 아래에서 채우고 승인해 주세요.`;
+  }
+  return `${approval.label}을(를) 준비했습니다. 아래 값을 확인하고 승인해 주세요.`;
 }
 
 // 최종 답변 재작성 — 도구 결과(사실)를 근거로 일반 chat 경로에서 한국어 답을 만든다.
@@ -129,8 +140,11 @@ export async function runAgentLoop(instruction: string): Promise<AgentLoopResult
     if (!tool) {
       result = `존재하지 않는 도구: ${decision.tool ?? "(없음)"}. 사용 가능한 도구 중에서만 골라라.`;
     } else if (tool.write) {
-      // Phase 2(확인 카드) 전까지 쓰기 도구는 실행하지 않는다 — 오발동 방지 원칙.
-      result = `${tool.name}은(는) 상태를 바꾸는 도구라 아직 지시만으로 실행할 수 없습니다. 화면에서 직접 실행해 주세요.`;
+      // 쓰기 도구는 여기서 실행하지 않는다 — 값을 결재판으로 만들어 돌려주고, 사람이 승인해야
+      // /api/agent/approve에서 실행된다(오발동 방지). 루프는 여기서 끝난다.
+      const approval = buildApproval(tool, args, instruction);
+      emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `승인 대기: ${tool.label} — 값 검토 요청` });
+      return { output: approvalMessage(approval), toolCalls: calls, approval };
     } else {
       const invalid = validateToolArgs(tool, args);
       if (invalid) {

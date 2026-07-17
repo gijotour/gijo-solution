@@ -142,6 +142,34 @@
   .cl-offer-btn:hover{filter:brightness(1.08);}
   .cl-row.instr{border-color:rgba(59,130,246,0.35);}
   .cl-row.instr .cn{color:#fff;}
+  /* 결재판(시안 B) — 쓰기 도구는 실행 전 여기서 값을 검토·승인한다. 값마다 출처를 표시해
+     LLM 추정(guess)을 사람이 빠르게 검증하게 한다. 빠진 필수값은 빈 칸 = 되물어보기. */
+  .ap{margin:2px 0;border:1px solid rgba(59,130,246,0.5);border-radius:11px;background:linear-gradient(180deg,rgba(59,130,246,0.1),rgba(59,130,246,0.03));overflow:hidden;animation:clpop .25s ease-out;}
+  .ap-head{display:flex;align-items:center;gap:8px;padding:9px 12px;background:rgba(59,130,246,0.14);border-bottom:1px solid rgba(59,130,246,0.28);}
+  .ap-title{font-size:11.5px;font-weight:800;color:#fff;}
+  .ap-badge{margin-left:auto;font-size:9.5px;font-weight:800;color:var(--amber);background:rgba(240,160,32,0.15);border:1px solid rgba(240,160,32,0.4);border-radius:5px;padding:2px 7px;}
+  .ap-body{padding:10px 12px;}
+  .ap-intro{font-size:11px;color:var(--muted);margin-bottom:8px;line-height:1.6;}
+  .ap-f{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);}
+  .ap-f:last-of-type{border-bottom:none;}
+  .ap-k{font-size:10.5px;font-weight:700;color:var(--muted);width:72px;flex:0 0 auto;}
+  .ap-k .req{color:var(--red);}
+  .ap-in{flex:1;min-width:0;background:var(--panel);border:1px solid var(--border-strong);border-radius:6px;padding:5px 8px;color:var(--text);font-size:11.5px;outline:none;font-family:inherit;}
+  .ap-in:focus{border-color:var(--blue);}
+  .ap-in.need{border-color:rgba(226,72,61,0.55);background:rgba(226,72,61,0.05);}
+  .ap-in.auto{border-color:rgba(30,185,128,0.35);}
+  .ap-in.guess{border-color:rgba(240,160,32,0.45);}
+  .ap-src{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;flex:0 0 auto;white-space:nowrap;}
+  .ap-src.said{color:var(--blue-light);background:rgba(59,130,246,0.14);border:1px solid rgba(59,130,246,0.3);}
+  .ap-src.auto{color:var(--teal);background:rgba(30,185,128,0.12);border:1px solid rgba(30,185,128,0.3);}
+  .ap-src.guess{color:var(--amber);background:rgba(240,160,32,0.12);border:1px solid rgba(240,160,32,0.3);}
+  .ap-src.empty{color:var(--red);background:rgba(226,72,61,0.12);border:1px solid rgba(226,72,61,0.35);}
+  .ap-effect{margin-top:9px;padding:7px 9px;background:var(--panel-2);border:1px solid var(--border);border-radius:6px;font-size:10.5px;color:var(--muted);line-height:1.7;}
+  .ap-effect b{color:var(--text);}
+  .ap-actions{display:flex;gap:6px;padding:9px 12px;border-top:1px solid var(--border);background:var(--panel-2);}
+  .ap-go{background:var(--teal);color:#06281c;border:none;border-radius:7px;padding:6px 14px;font-size:11.5px;font-weight:800;cursor:pointer;}
+  .ap-go:disabled{opacity:0.5;cursor:not-allowed;}
+  .ap-no{background:transparent;color:var(--muted);border:1px solid var(--border-strong);border-radius:7px;padding:6px 12px;font-size:11.5px;font-weight:700;cursor:pointer;margin-left:auto;}
   .cl-row.event .cn{color:var(--teal);}
   .cl-row.error{border-color:rgba(226,72,61,0.4);}
   .cl-row.error .cn{color:#f5928a;}
@@ -976,6 +1004,78 @@
     return el;
   }
 
+  // 결재판 카드(시안 B) — 쓰기 도구는 지시만으로 실행되지 않는다. AI가 채운 값을 표로 보여주고
+  // 값마다 출처(지시에서/자동생성/AI 추정)를 달아 사람이 빠르게 검증한 뒤 승인해야 실행된다.
+  // 빠진 필수값은 빈 칸으로 떠서 그 자체가 "되물어보기"가 된다(별도 ask 단계 불필요).
+  const AP_SRC = {
+    said: { label: "지시에서", cls: "said" },
+    auto: { label: "자동생성", cls: "auto" },
+    guess: { label: "AI 추정", cls: "guess" },
+    empty: { label: "입력 필요", cls: "empty" },
+  };
+  function clApproval(approval) {
+    const el = clAppend("event", { icon: "🗂️", name: "승인 대기", message: "" });
+    el.remove(); // 표준 행 대신 전용 카드로 그린다
+    const card = document.createElement("div");
+    card.className = "ap";
+    const fieldsHtml = approval.fields
+      .map((f) => {
+        const src = AP_SRC[f.source] || AP_SRC.guess;
+        const inCls = f.source === "empty" ? "need" : f.source === "auto" ? "auto" : f.source === "guess" ? "guess" : "";
+        return (
+          `<div class="ap-f"><div class="ap-k">${escB(f.label)}${f.required ? '<span class="req">*</span>' : ""}</div>` +
+          `<input class="ap-in ${inCls}" data-k="${escB(f.key)}" value="${escB(f.value)}" placeholder="${escB(f.hint)}">` +
+          `<span class="ap-src ${src.cls}">${src.label}</span></div>`
+        );
+      })
+      .join("");
+    card.innerHTML =
+      `<div class="ap-head"><span>🗂️</span><span class="ap-title">실행 승인 — ${escB(approval.label)} (${escB(approval.tool)})</span>` +
+      `<span class="ap-badge">쓰기 작업</span></div>` +
+      `<div class="ap-body"><div class="ap-intro">지시에서 아래와 같이 정리했습니다. 확인 후 승인해 주세요.</div>${fieldsHtml}` +
+      (approval.effect || approval.undo
+        ? `<div class="ap-effect">${approval.effect ? `<b>실행되면:</b> ${escB(approval.effect)}<br>` : ""}${approval.undo ? `<b>되돌리기:</b> ${escB(approval.undo)}` : ""}</div>`
+        : "") +
+      `</div><div class="ap-actions"><button class="ap-go">✓ 승인하고 실행</button><button class="ap-no">취소</button></div>`;
+    clRows.appendChild(card);
+    clRows.scrollTop = clRows.scrollHeight;
+
+    const go = card.querySelector(".ap-go");
+    const inputs = [...card.querySelectorAll(".ap-in")];
+    const collect = () => Object.fromEntries(inputs.map((i) => [i.dataset.k, i.value.trim()]));
+    // 필수값이 비어 있으면 승인 버튼을 잠근다 — 서버도 한 번 더 검증하지만 화면에서 먼저 막는다.
+    const required = approval.fields.filter((f) => f.required).map((f) => f.key);
+    const sync = () => {
+      const args = collect();
+      const missing = required.filter((k) => !args[k]);
+      go.disabled = missing.length > 0;
+      go.textContent = missing.length ? `✓ 승인 (${missing.length}개 입력 필요)` : "✓ 승인하고 실행";
+    };
+    inputs.forEach((i) => i.addEventListener("input", sync));
+    sync();
+
+    card.querySelector(".ap-no").addEventListener("click", () => {
+      card.remove();
+      clAppend("event", { icon: "✕", name: "취소됨", message: `${approval.label}을(를) 실행하지 않았습니다.` });
+    });
+    go.addEventListener("click", async () => {
+      go.disabled = true;
+      go.textContent = "실행 중…";
+      try {
+        const r = await window.gijo.approveAgentTool(approval.tool, collect());
+        card.remove();
+        clAppend("offer", { icon: "✅", name: `실행 완료 — ${approval.tool}`, message: r.output });
+        await loadTasks();
+        refreshTeamStatus();
+      } catch (err) {
+        go.disabled = false;
+        sync();
+        clAppend("error", { icon: "⚠", name: "실행 실패", message: (err && err.message) || String(err) });
+      }
+    });
+    return card;
+  }
+
   // 학습 루프 실행 확인 카드 — 서버가 confirm으로 되돌린 요청(무거운 GPU 학습 + 엔진 일시 중단)을
   // 명시적 버튼으로만 시작한다. 시작하면 진행은 학습 루프 화면에서 본다.
   function clLearnConfirm(confirm) {
@@ -1026,6 +1126,13 @@
       const who = result.route && result.route.agentId && result.route.agentId !== "orchestrator"
         ? `${orchLabel()} → ${agentLabel(result.route.agentId)}` : orchLabel();
       clReplaceTyping(typing, "reply", { icon: "🧭", name: who, message: result.output });
+      // 쓰기 지시 — 서버가 실행하지 않고 결재판을 돌려줬다. 값을 검토·승인해야 실행된다(시안 B).
+      if (result.approval) {
+        clApproval(result.approval);
+        await loadTasks();
+        refreshTeamStatus();
+        return;
+      }
       // 학습 루프 실행 요청 — 리포트 제안 대신 확인 카드(명시적 시작 버튼)를 붙인다.
       if (result.confirm && result.confirm.type === "learnloop") {
         clLearnConfirm(result.confirm);

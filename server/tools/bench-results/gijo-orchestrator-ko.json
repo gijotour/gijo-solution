@@ -1,0 +1,161 @@
+{
+  "summary": {
+    "candidate": "gijo-orchestrator-ko",
+    "label": "gijo-orchestrator-ko (Qwen2.5 7.6B 머지 ko)",
+    "jsonOk": "10/10",
+    "toolOk": "10/10",
+    "argsOk": "9/10",
+    "avgMs": 236
+  },
+  "rows": [
+    {
+      "case": "A",
+      "text": "등록된 자산 몇 개야?",
+      "jsonOk": true,
+      "toolOk": true,
+      "argsOk": true,
+      "ms": 401,
+      "got": {
+        "action": "tool",
+        "tool": "list_assets",
+        "args": {}
+      },
+      "raw": "{\"action\":\"tool\",\"tool\":\"list_assets\",\"args\":{}}"
+    },
+    {
+      "case": "B",
+      "text": "ai-secbot-01 상세 보여줘",
+      "jsonOk": true,
+      "toolOk": true,
+      "argsOk": false,
+      "ms": 212,
+      "got": {
+        "action": "tool",
+        "tool": "get_asset",
+        "args": {
+          "assetId": "ai-sec-01"
+        }
+      },
+      "raw": "{\"action\":\"tool\",\"tool\":\"get_asset\",\"args\":{\"assetId\":\"ai-sec-01\"}}"
+    },
+    {
+      "case": "C",
+      "text": "오늘 뭐부터 조치해야 해? 상위 5개만",
+      "jsonOk": true,
+      "toolOk": true,
+      "argsOk": true,
+      "ms": 201,
+      "got": {
+        "action": "tool",
+        "tool": "list_vuln_priorities",
+        "args": {
+          "limit": "5"
+        }
+      },
+      "raw": "{\"action\":\"tool\",\"tool\":\"list_vuln_priorities\",\"args\":{\"limit\":\"5\"}}"
+    },
+    {
+      "case": "D",
+      "text": "새 자산 등록해줘. 이름은 사내챗봇이고 경로는 models/chatbot.gguf 야",
+      "jsonOk": true,
+      "toolOk": true,
+      "argsOk": true,
+      "ms": 256,
+      "got": {
+        "action": "tool",
+        "tool": "register_asset",
+        "args": {
+          "name": "사내챗봇",
+          "path": "models/chatbot.gguf"
+        }
+      },
+      "raw": "{\"action\":\"tool\",\"tool\":\"register_asset\",\"args\":{\"name\":\"사내챗봇\",\"path\":\"models/chatbot.gguf\"}}"
+    },
+    {
+      "case": "E",
+      "text": "고마워, 수고했어!",
+      "jsonOk": true,
+      "toolOk": true,
+      "argsOk": true,
+      "ms": 220,
+      "got": {
+        "action": "final",
+        "answer": "감사합니다! 필요한 도움이 있으면 언제든지 알려주세요."
+      },
+      "raw": "{\"action\":\"final\",\"answer\":\"감사합니다! 필요한 도움이 있으면 언제든지 알려주세요.\"}"
+    },
+    {
+      "case": "F",
+      "text": "fraud-detect-llm 에 취약점 뭐 나왔는지 알려줘",
+      "jsonOk": true,
+      "toolOk": true,
+      "argsOk": true,
+      "ms": 214,
+      "got": {
+        "action": "tool",
+        "tool": "get_asset",
+        "args": {
+          "assetId": "fraud-detect-llm"
+        }
+      },
+      "raw": "{\"action\":\"tool\",\"tool\":\"get_asset\",\"args\":{\"assetId\":\"fraud-detect-llm\"}}"
+    },
+    {
+      "case": "G",
+      "text": "경영진 볼 보고서 하나 뽑아줘",
+      "jsonOk": true,
+      "toolOk": true,
+      "argsOk": true,
+      "ms": 143,
+      "got": {
+        "action": "tool",
+        "tool": "generate_report",
+        "args": {}
+      },
+      "raw": "{\"action\":\"tool\",\"tool\":\"generate_report\",\"args\":{}}"
+    },
+    {
+      "case": "H",
+      "text": "우리가 관리하는 AI 자산 전체 목록 보여줘",
+      "jsonOk": true,
+      "toolOk": true,
+      "argsOk": true,
+      "ms": 150,
+      "got": {
+        "action": "tool",
+        "tool": "list_assets",
+        "args": {}
+      },
+      "raw": "{\"action\":\"tool\",\"tool\":\"list_assets\",\"args\":{}}"
+    },
+    {
+      "case": "I",
+      "text": "취약점 우선순위 top 3 알려줘",
+      "jsonOk": true,
+      "toolOk": true,
+      "argsOk": true,
+      "ms": 201,
+      "got": {
+        "action": "tool",
+        "tool": "list_vuln_priorities",
+        "args": {
+          "limit": "3"
+        }
+      },
+      "raw": "{\"action\":\"tool\",\"tool\":\"list_vuln_priorities\",\"args\":{\"limit\":\"3\"}}"
+    },
+    {
+      "case": "J",
+      "text": "다크웹에서 우리 회사 계정 유출됐는지 확인해줘",
+      "jsonOk": true,
+      "toolOk": true,
+      "argsOk": true,
+      "ms": 366,
+      "got": {
+        "action": "final",
+        "answer": "현재 제공된 도구들은 다크웹을 직접 모니터링하지 못합니다. 다른 모니터링 서비스를 이용해 주세요."
+      },
+      "raw": "{\"action\":\"final\",\"answer\":\"현재 제공된 도구들은 다크웹을 직접 모니터링하지 못합니다. 다른 모니터링 서비스를 이용해 주세요.\"}"
+    }
+  ]
+}
