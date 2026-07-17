@@ -136,6 +136,38 @@ function getFreeVramMb(): Promise<number | null> {
   });
 }
 
+// 실 GPU 사용률(utilization %)·VRAM을 nvidia-smi로 실측. 대시보드 로고 발광 강도에 쓴다.
+// GPU가 없으면 available:false — 클라이언트는 그때 발광을 기본값으로 둔다(가짜 수치 안 만듦).
+export interface GpuUsage {
+  available: boolean;
+  utilization: number; // 0~100 (%)
+  memUsedMb: number;
+  memTotalMb: number;
+  memPercent: number; // 0~100
+}
+export function getGpuUsage(): Promise<GpuUsage> {
+  return new Promise((resolve) => {
+    execFile(
+      "nvidia-smi",
+      ["--query-gpu=utilization.gpu,memory.used,memory.total", "--format=csv,noheader,nounits"],
+      (err, stdout) => {
+        if (err) return resolve({ available: false, utilization: 0, memUsedMb: 0, memTotalMb: 0, memPercent: 0 });
+        // 여러 GPU면 첫 줄만(단일 RTX 3090 가정). "12, 8192, 24576"
+        const parts = String(stdout).trim().split("\n")[0].split(",").map((s) => parseInt(s.trim(), 10));
+        const [util, used, total] = parts;
+        if (![util, used, total].every(Number.isFinite)) return resolve({ available: false, utilization: 0, memUsedMb: 0, memTotalMb: 0, memPercent: 0 });
+        resolve({
+          available: true,
+          utilization: Math.max(0, Math.min(100, util)),
+          memUsedMb: used,
+          memTotalMb: total,
+          memPercent: total > 0 ? Math.round((used / total) * 100) : 0,
+        });
+      }
+    );
+  });
+}
+
 function allocPort(): number {
   const used = new Set<number>([EMBEDDING_PORT, ...[...pool.values()].map((m) => m.port)]);
   for (let p = PORT; p <= PORT_RANGE_END; p++) {
@@ -365,6 +397,10 @@ export function registerLocalEngineRoutes(app: Express): void {
   app.get("/api/localengine/status", authMiddleware, (_req, res) => {
     res.json(getLocalEngineStatus());
   });
+  // 실 GPU 사용률(로고 발광 강도용) — nvidia-smi 실측. 폴링용이라 가볍다.
+  app.get("/api/localengine/gpu", authMiddleware, asyncRoute(async (_req, res) => {
+    res.json(await getGpuUsage());
+  }));
   app.get("/api/localengine/models", authMiddleware, (_req, res) => {
     res.json(listAvailableModels());
   });

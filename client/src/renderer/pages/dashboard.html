@@ -57,14 +57,16 @@
   .tree-empty{padding:3px 5px;font-size:11px;color:var(--muted-2);}
 
   .center-stage{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:14px 22px 0;position:relative;min-height:640px;}
-  .network-svg{width:100%;max-width:300px;}
+  /* 로고 발광 강도는 --gpu(0~1, 실 GPU 사용률)에 비례한다 — 반경·밝기가 함께 커진다. */
+  .network-svg{width:100%;max-width:300px;--gpu:0;
+    filter:drop-shadow(0 0 calc(3px + var(--gpu) * 30px) rgba(95,161,255, calc(0.10 + var(--gpu) * 0.6)));
+    transition:filter 1s ease;}
   .network-svg .spark{animation:twinkle 3.2s ease-in-out infinite;}
   @keyframes twinkle{0%,100%{opacity:.3}50%{opacity:1}}
   /* 작업 중: 기본 스파크는 더 빨리 반짝이고, 숨겨둔 추가 스파크가 켜진다 */
   .network-svg .spark-extra{opacity:0;}
   .network-svg.busy .spark{animation-duration:1s;}
   .network-svg.busy .spark-extra{animation:twinkle 0.8s ease-in-out infinite;}
-  .network-svg.busy{filter:drop-shadow(0 0 6px rgba(95,161,255,0.25));}
   /* 모델 미준비 안내 배너 — 로컬 모델 받기 / 사내 서버 연결 두 경로 제시 */
   .model-guide{margin-top:12px;max-width:520px;background:rgba(240,160,32,0.08);border:1px solid rgba(240,160,32,0.4);border-radius:12px;padding:12px 16px;text-align:center;}
   .mg-title{font-size:12px;font-weight:700;color:var(--amber);margin-bottom:10px;line-height:1.5;}
@@ -93,6 +95,14 @@
   .cl-row .cn{font-size:10.5px;font-weight:800;color:var(--blue-light);margin-bottom:1px;display:flex;gap:7px;align-items:baseline;}
   .cl-row .cn .ct{font-weight:600;color:var(--muted-2);font-size:9.5px;margin-left:auto;flex:0 0 auto;}
   .cl-row .cm{color:var(--text);white-space:pre-wrap;word-break:break-word;}
+  /* 긴 답변은 4줄로 고정(적당한 크기), 클릭하면 펼침 — 피드가 한 답변으로 도배되지 않게. */
+  .cl-row .cm.clamp{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:4;overflow:hidden;cursor:pointer;}
+  .cl-row .cm.clamp.open{display:block;-webkit-line-clamp:none;overflow:visible;}
+  .cl-more{font-size:10px;font-weight:700;color:var(--blue-light);cursor:pointer;margin-top:3px;display:inline-block;}
+  .cl-row.offer{border-color:rgba(30,185,128,0.4);background:rgba(30,185,128,0.07);}
+  .cl-row.offer .cn{color:var(--teal);}
+  .cl-offer-btn{margin-top:6px;background:var(--teal);color:#06281c;border:none;border-radius:7px;padding:5px 12px;font-size:11.5px;font-weight:800;cursor:pointer;}
+  .cl-offer-btn:hover{filter:brightness(1.08);}
   .cl-row.instr{border-color:rgba(59,130,246,0.35);}
   .cl-row.instr .cn{color:#fff;}
   .cl-row.event .cn{color:var(--teal);}
@@ -666,10 +676,30 @@
   // 작업 중이면 중앙 그래프에 busy를 켜 반짝임을 빠르게·많게 한다. 마지막 활동 후 4초 지나면 잦아든다.
   const networkSvg = document.querySelector(".network-svg");
   let busyTimer = null;
+  let gpuGlow = 0; // 실 GPU 사용률 기반 발광(0~1). pulseBusy와 합쳐 최종 발광을 정한다.
+  function applyGlow() {
+    if (!networkSvg) return;
+    // GPU 사용률이 주 신호. 추론 순간(busy)엔 최소 0.35 이상으로 살짝 띄워 반응감을 준다.
+    const busyFloor = networkSvg.classList.contains("busy") ? 0.35 : 0;
+    networkSvg.style.setProperty("--gpu", Math.max(gpuGlow, busyFloor).toFixed(3));
+  }
   function pulseBusy() {
     if (networkSvg) networkSvg.classList.add("busy");
+    applyGlow();
     clearTimeout(busyTimer);
-    busyTimer = setTimeout(() => networkSvg && networkSvg.classList.remove("busy"), 4000);
+    busyTimer = setTimeout(() => { if (networkSvg) networkSvg.classList.remove("busy"); applyGlow(); }, 4000);
+  }
+
+  // 실 GPU 사용률(nvidia-smi) 폴링 → 로고 발광 강도. GPU 없으면(available:false) 0으로 두고 busy만 반영.
+  async function pollGpu() {
+    try {
+      const g = await window.gijo.getGpuUsage();
+      // 사용률(util)과 VRAM 점유(mem)를 섞되 util에 가중 — 실제 연산 강도를 더 반영.
+      gpuGlow = g && g.available ? Math.min(1, (g.utilization * 0.75 + g.memPercent * 0.25) / 100) : 0;
+    } catch (e) {
+      gpuGlow = 0;
+    }
+    applyGlow();
   }
 
   // ── 실시간 에이전트 협업 라이브 피드(지휘 콘솔 아래 전체 폭) ─────────────────
@@ -690,20 +720,33 @@
     }, 4000);
   }
 
-  // kind: instr(나의 지시) | reply(에이전트 답변) | event(팀원 간 위임) | error | typing
+  // kind: instr(나의 지시) | reply(에이전트 답변) | event(팀원 간 위임) | error | typing | offer
+  const CL_CLAMP_LEN = 140; // 이보다 길면 4줄 고정 + 펼치기
   function clAppend(kind, { icon, name, message }) {
     const empty = clRows.querySelector(".cl-empty");
     if (empty) empty.remove();
     const el = document.createElement("div");
     el.className = "cl-row " + kind;
     const time = new Date().toLocaleTimeString("ko-KR", { hour12: false });
+    // 긴 답변(reply/event)은 4줄로 고정하고, 클릭하면 펼치는 "더보기"를 붙인다.
+    const long = (kind === "reply" || kind === "event") && String(message).length > CL_CLAMP_LEN;
     const body =
       kind === "typing"
         ? '<span class="cm"><span></span><span></span><span></span></span>'
-        : `<div class="cm">${escB(message)}</div>`;
+        : `<div class="cm${long ? " clamp" : ""}">${escB(message)}</div>${long ? '<span class="cl-more">더보기 ▾</span>' : ""}`;
     el.innerHTML =
       `<div class="ci">${icon || "◆"}</div>` +
       `<div class="cb"><div class="cn">${escB(name)}<span class="ct">${time}</span></div>${body}</div>`;
+    if (long) {
+      const cm = el.querySelector(".cm");
+      const more = el.querySelector(".cl-more");
+      const toggle = () => {
+        const open = cm.classList.toggle("open");
+        more.textContent = open ? "접기 ▴" : "더보기 ▾";
+      };
+      cm.addEventListener("click", toggle);
+      more.addEventListener("click", toggle);
+    }
     clRows.appendChild(el);
     while (clRows.childElementCount > CL_MAX) clRows.removeChild(clRows.firstChild);
     clRows.scrollTop = clRows.scrollHeight;
@@ -712,6 +755,17 @@
   function clReplaceTyping(typingEl, kind, entry) {
     if (typingEl && typingEl.parentNode) typingEl.remove();
     return clAppend(kind, entry);
+  }
+  // 답변 뒤 "이 결과를 보고서로 정리할까요?" 제안 — 클릭하면 리포트 화면으로.
+  function clOfferReport(label) {
+    const el = clAppend("offer", { icon: "📄", name: "리포트 제안", message: `방금 ${label ? label + "의 " : ""}결과를 보고서로 정리할까요?` });
+    const btn = document.createElement("button");
+    btn.className = "cl-offer-btn";
+    btn.textContent = "📄 리포트 만들기 →";
+    btn.addEventListener("click", () => window.gijo.navigateTo("report.html"));
+    el.querySelector(".cb").appendChild(btn);
+    clRows.scrollTop = clRows.scrollHeight;
+    return el;
   }
 
   async function sendToOrchestrator(text) {
@@ -726,7 +780,9 @@
         ? `오케스트레이터 → ${result.route.agentId}` : "오케스트레이터";
       clReplaceTyping(typing, "reply", { icon: "🧭", name: who, message: result.output });
       // 답변이 "모델 미준비" 안내면 배너도 띄워 두 경로(모델 받기/서버 연결)를 바로 제시.
-      if (/모델이 아직 준비|로컬 LLM|localengine/.test(result.output || "")) modelGuide().style.display = "block";
+      const notReady = /모델이 아직 준비|로컬 LLM|localengine/.test(result.output || "");
+      if (notReady) modelGuide().style.display = "block";
+      else clOfferReport("오케스트레이터");
       await loadTasks();
       if (result.route && result.route.action === "scan") await loadAssets();
       refreshTeamStatus();
@@ -819,6 +875,7 @@
       const reply = r && r.reply != null ? r.reply : String(r);
       clReplaceTyping(typing, "reply", { icon, name: label, message: reply });
       if (/모델이 아직 준비|로컬 LLM|localengine/.test(reply || "")) modelGuide().style.display = "block";
+      else clOfferReport(label);
       refreshTeamStatus();
     } catch (e) {
       clReplaceTyping(typing, "error", { icon: "⚠", name: label, message: e.message });
@@ -916,6 +973,8 @@
     greet();
     renderExplorer(); // 트리 골격을 먼저 그린 뒤 각 로더가 자식 컨테이너를 채운다
     await Promise.all([loadHealth(), loadAssets(), loadSecurityProducts(), loadTasks(), loadCollaboration(), loadFiles(), loadDocSearchScopes(), checkModelReady(), loadTodayPriority(), renderTeam()]);
+    pollGpu();
+    setInterval(pollGpu, 2500); // 실 GPU 사용률에 따라 로고 발광 강도 갱신
 
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
