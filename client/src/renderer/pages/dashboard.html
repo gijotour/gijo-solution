@@ -58,6 +58,40 @@
   .tree-leaf .sub{color:var(--muted-2);font-size:10px;}
   .tree-leaf .badge{color:var(--amber);font-size:10px;font-weight:700;}
   .tree-empty{padding:3px 5px;font-size:11px;color:var(--muted-2);}
+  /* 연동 서버 정보 카드 + 시작 가이드 슬롯 — 자산 탐색기 상단(GIJO AS Desktop 아래) */
+  .server-card{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:8px 10px;margin:4px 0 6px;}
+  .sc-nm{font-size:11.5px;font-weight:800;color:#fff;display:flex;align-items:center;gap:6px;}
+  .sc-dot{width:7px;height:7px;border-radius:50%;background:var(--teal);box-shadow:0 0 6px var(--teal);flex-shrink:0;}
+  .sc-dot.off{background:#e2483d;box-shadow:none;}
+  .sc-meta{font-size:9.5px;color:var(--muted);margin-top:3px;line-height:1.55;}
+  .sc-meta b{color:var(--blue-light);font-weight:700;}
+  #gijoObSlot .ob-row{display:flex;align-items:center;gap:6px;background:rgba(139,124,240,0.08);border:1px solid rgba(139,124,240,0.35);border-radius:8px;padding:6px 9px;margin-bottom:8px;cursor:pointer;font-size:11px;font-weight:800;color:var(--purple);}
+  #gijoObSlot .ob-row .pr{margin-left:auto;font-size:9.5px;background:rgba(139,124,240,0.18);padding:1px 6px;border-radius:5px;}
+  /* AI 자산 하위 그룹(AI-BOM/SBOM) 헤더 */
+  .tree-sub{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:800;color:var(--blue-light);padding:3px 2px 1px;}
+  .tree-sub .cnt{font-size:9px;color:var(--muted-2);font-weight:700;}
+  /* 자산·제품·문서 리프 상태 배지 */
+  .tree-leaf.row{display:flex;align-items:center;gap:5px;}
+  .leaf-b{margin-left:auto;font-size:8.5px;font-weight:800;padding:1px 5px;border-radius:5px;flex-shrink:0;}
+  .lb-red{color:#f5928a;background:rgba(226,72,61,0.15);}
+  .lb-amber{color:var(--amber);background:rgba(240,160,32,0.14);}
+  .lb-teal{color:var(--teal);background:rgba(30,185,128,0.13);}
+  .lb-blue{color:var(--blue-light);background:rgba(59,130,246,0.14);}
+  .lb-purple{color:var(--purple);background:rgba(139,124,240,0.14);}
+  .lb-mut{color:var(--muted-2);background:rgba(255,255,255,0.05);}
+  /* 자산 상세 팝오버(시안2 확정) — 클릭한 자산 옆에 떠서 설명·최근 취약점·바로가기 */
+  .asset-pop{position:fixed;width:300px;background:var(--panel-2);border:1px solid var(--blue);border-radius:12px;padding:12px 13px;box-shadow:0 10px 40px rgba(0,0,0,.55),0 0 24px rgba(59,130,246,.12);z-index:80;display:none;}
+  .asset-pop.on{display:block;}
+  .ap-close{position:absolute;top:8px;right:10px;color:var(--muted-2);font-size:12px;cursor:pointer;}
+  .ap-t{font-size:12.5px;font-weight:800;color:#fff;display:flex;align-items:center;gap:7px;padding-right:16px;}
+  .ap-kv{display:flex;gap:8px;font-size:10.5px;color:var(--muted);margin-top:4px;}
+  .ap-kv b{color:#c6d2ea;font-weight:700;min-width:62px;flex-shrink:0;}
+  .ap-h{font-size:10px;font-weight:800;color:var(--muted-2);margin:9px 0 2px;}
+  .ap-vuln{display:flex;align-items:flex-start;gap:6px;font-size:10.5px;color:#c6d2ea;background:rgba(255,255,255,.03);border-radius:6px;padding:5px 8px;margin-top:4px;line-height:1.4;}
+  .ap-sev{font-size:8.5px;font-weight:800;padding:1px 5px;border-radius:4px;flex-shrink:0;}
+  .ap-links{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap;}
+  .ap-links button{font-size:10.5px;font-weight:800;color:var(--blue-light);background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.3);padding:5px 10px;border-radius:7px;cursor:pointer;}
+  .manual-link{margin-left:auto;font-size:9px;color:var(--blue-light);white-space:nowrap;flex-shrink:0;}
 
   .center-stage{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:14px 22px 0;position:relative;min-height:640px;}
   /* 로고 발광 강도는 --gpu(0~1, 실 GPU 사용률)에 비례한다 — 반경·밝기가 함께 커진다. */
@@ -140,19 +174,20 @@
 
   /* 시안3 — 로고 코어 + 팀 카드 그리드 + 하단 대화 독 (AI 에이전트 지휘) */
   .console-caption{font-size:12px;color:var(--muted);margin:2px 0 14px;text-align:center;max-width:560px;}
-  .team-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;width:100%;max-width:740px;}
-  .tcard{background:var(--panel);border:1px solid var(--border);border-radius:13px;padding:12px 9px;text-align:center;cursor:pointer;position:relative;transition:.15s;}
+  /* 6인 로스터가 한 줄에 딱 맞게 — 카드 컴팩트(아바타·글자 축소). */
+  .team-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;width:100%;max-width:780px;}
+  .tcard{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:9px 5px;text-align:center;cursor:pointer;position:relative;transition:.15s;}
   .tcard:hover{border-color:var(--border-strong);transform:translateY(-2px);}
   .tcard.sel{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue) inset,0 0 18px rgba(59,130,246,.18);}
   .tcard.working{border-color:rgba(59,130,246,0.5);box-shadow:0 0 16px rgba(59,130,246,0.18);}
-  .tc-av{width:42px;height:42px;border-radius:12px;margin:0 auto 8px;display:flex;align-items:center;justify-content:center;font-size:19px;background:var(--panel-2);border:1px solid var(--border);}
+  .tc-av{width:32px;height:32px;border-radius:9px;margin:0 auto 6px;display:flex;align-items:center;justify-content:center;font-size:15px;background:var(--panel-2);border:1px solid var(--border);}
   .tcard.working .tc-av{border-color:var(--blue);animation:tcpulse 1.5s infinite;}
   @keyframes tcpulse{0%,100%{box-shadow:0 0 0 0 rgba(59,130,246,.5)}50%{box-shadow:0 0 0 7px rgba(59,130,246,0)}}
   .tcard.watching .tc-av{border-color:rgba(30,185,128,.55);}
-  .tc-name{font-size:12px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .tc-role{font-size:9.5px;color:var(--muted);margin-top:3px;min-height:24px;line-height:1.35;}
-  .tc-badges{display:flex;gap:4px;justify-content:center;margin-top:7px;flex-wrap:wrap;}
-  .tc-b{font-size:8.5px;font-weight:800;padding:2px 6px;border-radius:5px;}
+  .tc-name{font-size:10.5px;font-weight:800;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .tc-role{font-size:8.5px;color:var(--muted);margin-top:2px;min-height:22px;line-height:1.3;}
+  .tc-badges{display:flex;gap:3px;justify-content:center;margin-top:5px;flex-wrap:wrap;}
+  .tc-b{font-size:8px;font-weight:800;padding:2px 5px;border-radius:4px;}
   .tc-work{color:var(--blue-light);background:rgba(59,130,246,0.16);}
   .tc-watch{color:var(--teal);background:rgba(30,185,128,0.16);}
   .tc-idle{color:var(--muted-2);background:rgba(255,255,255,0.05);}
@@ -205,9 +240,15 @@
   <div class="body-grid">
     <div class="explorer">
       <div class="explorer-title"><span>자산 탐색기</span><span class="tree-act" id="refreshAssetsBtn" title="새로고침">⟳</span></div>
-      <div class="explorer-sub">GIJO AS Desktop</div>
+      <div class="server-card">
+        <div class="sc-nm"><span class="sc-dot" id="scDot"></span>GIJO AS Desktop</div>
+        <div class="sc-meta" id="scMeta">연동 서버 정보 불러오는 중…</div>
+      </div>
+      <div id="gijoObSlot"></div>
       <div id="explorerTree">불러오는 중...</div>
     </div>
+    <!-- 자산 상세 팝오버(시안2) — 탐색기 자산 클릭 시 옆에 뜬다 -->
+    <div class="asset-pop" id="assetPop"></div>
 
     <div class="center-stage">
       <div class="stage-core">
@@ -417,8 +458,11 @@
       const row = document.createElement("div");
       row.style.cssText = `padding:2px 0 2px ${depth * 12 + 4}px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${item.dir || canIngest ? "cursor:pointer;" : "color:var(--muted);"}`;
       const caret = item.dir ? (openDirs.has(itemPath) ? "▾ " : "▸ ") : "";
-      row.innerHTML = `<span style="color:var(--muted-2)">${caret}</span>${item.name.replace(/</g, "&lt;")}`;
-      if (canIngest) row.title = "클릭 → 장기 기억에 올리기";
+      // 이미 분석(수집)된 문서면 Scan·Analyze Agent가 판별한 분류 배지를 보여준다.
+      const docClass = !item.dir ? docClassMap.get(item.name) : undefined;
+      const classBadge = docClass ? ` <span class="leaf-b ${DOCCLASS_B[docClass] || "lb-mut"}">${docClass.replace(/</g, "&lt;")}</span>` : "";
+      row.innerHTML = `<span style="color:var(--muted-2)">${caret}</span>${item.name.replace(/</g, "&lt;")}${classBadge}`;
+      if (canIngest) row.title = "클릭 → Scan·Analyze Agent가 분석·분류해 장기 기억(RAG)에 저장";
       container.appendChild(row);
       if (item.dir) {
         const childBox = document.createElement("div");
@@ -438,19 +482,22 @@
           if (actionBox.innerHTML) { actionBox.innerHTML = ""; return; }
           actionBox.innerHTML =
             `<div style="padding:2px 0 6px ${depth * 12 + 20}px;">` +
-            `<button class="mem-ingest-btn" style="font-size:11px;background:var(--teal);color:#04211d;border:none;border-radius:6px;padding:3px 9px;cursor:pointer;font-weight:800">📥 장기 기억에 올리기</button> ` +
+            `<button class="mem-ingest-btn" style="font-size:11px;background:var(--teal);color:#04211d;border:none;border-radius:6px;padding:3px 9px;cursor:pointer;font-weight:800">🧠 분석해 올리기</button> ` +
             `<span class="mem-ingest-status" style="font-size:11px;color:var(--muted)"></span></div>`;
           const btn = actionBox.querySelector(".mem-ingest-btn");
           const st = actionBox.querySelector(".mem-ingest-status");
           btn.addEventListener("click", async (ev) => {
             ev.stopPropagation();
             btn.disabled = true;
-            st.textContent = "추출·저장 중...";
+            st.textContent = "Scan·Analyze Agent 분석·분류 중...";
             try {
               const f = await window.gijo.readFile(itemPath);
               const r = await window.gijo.ingestMemoryFile(f.name, f.content, "global");
-              st.textContent = `✓ ${r.chunks}개 청크 저장됨 · 전체 공유`;
+              st.textContent = `✓ ${r.chunks}개 청크 저장 · 분류: ${r.docClass || "기타"}`;
               st.style.color = "var(--teal)";
+              // 파일 행에 분류 배지 즉시 반영(다음 새로고침 전에도 보이게).
+              docClassMap.set(f.name, r.docClass || "기타");
+              row.insertAdjacentHTML("beforeend", ` <span class="leaf-b ${DOCCLASS_B[r.docClass] || "lb-mut"}">${String(r.docClass || "기타").replace(/</g, "&lt;")}</span>`);
             } catch (err) {
               st.textContent = "✗ " + err.message;
               st.style.color = "#f87171";
@@ -462,11 +509,19 @@
     }
   }
 
+  // 분석(수집)된 문서의 분류(매뉴얼/보고서/정책/기타) — 파일명 → 분류 매핑. 배지 색도 분류별로.
+  let docClassMap = new Map();
+  const DOCCLASS_B = { "매뉴얼": "lb-blue", "보고서": "lb-purple", "정책": "lb-teal", "기타": "lb-mut" };
+
   async function loadFiles() {
     const el = document.getElementById("tree-files");
     if (!el) return;
     el.innerHTML = "";
     openDirs.clear();
+    try {
+      const docs = await window.gijo.listMemoryDocuments();
+      docClassMap = new Map(docs.filter((d) => d.docClass).map((d) => [d.documentId, d.docClass]));
+    } catch (e) { /* 분류 배지는 부가 정보 — 목록 로딩 실패해도 파일 트리는 계속 */ }
     try {
       await window.gijo.listDir("");
       await renderDir("", 0, el);
@@ -503,11 +558,12 @@
   }
 
   function renderExplorer() {
+    // 2026-07-17 개편: AI 자산은 AI-BOM/SBOM 하위로 분리(인프라 호스트는 SBOM에 흡수),
+    // "보안제품"→"보안제품 관리"(매뉴얼 업로드 연결), "문서"→"문서 · 분석"(에이전트 자동 분류).
     explorerTree.innerHTML =
       folderHtml("ai", "AI 자산") +
-      folderHtml("hosts", "인프라 호스트") +
-      folderHtml("products", "보안제품", `<span class="tree-act" data-open-products title="보안제품 관리 열기">↗</span>`) +
-      folderHtml("files", "문서", `<span class="tree-act" id="pickFolderBtn" title="작업 폴더 선택">📂</span><span class="tree-act" id="refreshFilesBtn" title="새로고침">⟳</span>`) +
+      folderHtml("products", "보안제품 관리", `<span class="tree-act" data-open-products title="보안제품 관리 열기">↗</span>`) +
+      folderHtml("files", "문서 · 분석", `<span class="tree-act" id="pickFolderBtn" title="작업 폴더 선택">📂</span><span class="tree-act" id="refreshFilesBtn" title="새로고침">⟳</span>`) +
       `<div class="tree-nav" id="openDocMgmt" title="장기기억(RAG)에 올린 문서 확인·관리 화면으로 이동">📚 올린 문서 관리<span class="tree-act" style="margin-left:auto">↗</span></div>`;
     explorerTree.querySelectorAll(".tree-folder").forEach((hd) => {
       hd.addEventListener("click", (e) => {
@@ -528,31 +584,104 @@
 
   const setCount = (key, n) => { const el = document.getElementById("cnt-" + key); if (el) el.textContent = n; };
 
-  function assetLeaf(a, showPath) {
+  // Scan Agent가 등록·관리하는 자산 목록 — AI-BOM(AI 모델)/SBOM(인프라 호스트)으로 나눠 표시하고,
+  // 리프 클릭 시 상세 팝오버(설명·최근 취약점 상태)를 띄운다.
+  let assetById = {};
+  const SEV_RANK = { critical: 3, high: 3, medium: 2, low: 1 };
+  function assetLeafHtml(a, showPath) {
+    const n = (a.findings || []).length;
+    const worst = (a.findings || []).reduce((w, f) => Math.max(w, SEV_RANK[f.severity] || 1), 0);
+    const badge = n
+      ? `<span class="leaf-b ${worst >= 3 ? "lb-red" : "lb-amber"}">취약점 ${n}</span>`
+      : `<span class="leaf-b lb-teal">정상</span>`;
     const sub = showPath && a.path && a.path !== a.name ? ` <span class="sub">${escT(a.path)}</span>` : "";
-    const vulns = a.findings && a.findings.length ? ` <span class="badge">${a.findings.length}</span>` : "";
-    return `<div class="tree-leaf">${escT(a.name)}${sub}${vulns}</div>`;
-  }
-  function fillAssetFolder(key, list, showPath) {
-    setCount(key, list.length);
-    const box = document.getElementById("tree-" + key);
-    if (!box) return;
-    if (!list.length) { box.innerHTML = `<div class="tree-empty">없음</div>`; return; }
-    let rows = list.slice(0, 12).map((a) => assetLeaf(a, showPath)).join("");
-    if (list.length > 12) rows += `<div class="tree-empty">…외 ${list.length - 12}건</div>`;
-    box.innerHTML = rows;
+    return `<div class="tree-leaf click row" data-asset="${escT(a.id)}" title="클릭 → 자산 상세(설명·최근 취약점)">${escT(a.name)}${sub}${badge}</div>`;
   }
 
   async function loadAssets() {
     try {
       const assets = await window.gijo.listAssets();
+      assetById = {};
+      assets.forEach((a) => { assetById[a.id] = a; });
       const hosts = assets.filter((a) => a.assetType === "infra-host");
       const ai = assets.filter((a) => a.assetType !== "infra-host");
-      fillAssetFolder("ai", ai, false);
-      fillAssetFolder("hosts", hosts, true);
+      setCount("ai", assets.length);
+      const box = document.getElementById("tree-ai");
+      if (!box) return;
+      const sec = (label, list, showPath) =>
+        `<div class="tree-sub">${label} <span class="cnt">${list.length}</span></div>` +
+        (list.length ? list.slice(0, 12).map((a) => assetLeafHtml(a, showPath)).join("") : `<div class="tree-empty">없음</div>`) +
+        (list.length > 12 ? `<div class="tree-empty">…외 ${list.length - 12}건</div>` : "");
+      box.innerHTML = sec("◆ AI-BOM", ai, false) + sec("▤ SBOM", hosts, true);
+      box.querySelectorAll("[data-asset]").forEach((el) =>
+        el.addEventListener("click", (e) => { e.stopPropagation(); openAssetPop(el.dataset.asset, el); })
+      );
     } catch (e) {
       const b = document.getElementById("tree-ai");
       if (b) b.innerHTML = `<div class="tree-empty">자산을 불러오지 못했습니다</div>`;
+    }
+  }
+
+  // ── 자산 상세 팝오버(시안2 확정) — 설명·최근 취약점·바로가기. 바깥 클릭/ESC로 닫힘 ──
+  const assetPop = document.getElementById("assetPop");
+  const AP_SEV_CLS = { critical: "lb-red", high: "lb-red", medium: "lb-amber", low: "lb-mut" };
+  function openAssetPop(assetId, anchorEl) {
+    const a = assetById[assetId];
+    if (!a) return;
+    const n = (a.findings || []).length;
+    const urgent = (a.findings || []).filter((f) => f.severity === "critical" || f.severity === "high").length;
+    const scanned = a.lastScannedAt ? new Date(a.lastScannedAt).toLocaleString("ko-KR", { hour12: false }) : "스캔 전";
+    const vulns = (a.findings || []).slice(0, 3).map((f) =>
+      `<div class="ap-vuln"><span class="ap-sev ${AP_SEV_CLS[f.severity] || "lb-mut"}">${escT(String(f.severity || "?").toUpperCase())}</span><span>${escT(f.finding_type || "")}${f.evidence ? " — " + escT(String(f.evidence).slice(0, 64)) : ""}</span></div>`
+    ).join("");
+    assetPop.innerHTML =
+      `<span class="ap-close" id="apClose">✕</span>` +
+      `<div class="ap-t">${escT(a.name)}${n ? `<span class="leaf-b lb-amber" style="margin-left:auto">취약점 ${n}</span>` : `<span class="leaf-b lb-teal" style="margin-left:auto">정상</span>`}</div>` +
+      `<div class="ap-kv"><b>자산 ID</b> ${escT(a.id)}</div>` +
+      `<div class="ap-kv"><b>유형</b> ${escT(a.assetType || "-")}</div>` +
+      (a.owner ? `<div class="ap-kv"><b>소유부서</b> ${escT(a.owner)}</div>` : "") +
+      (a.service ? `<div class="ap-kv"><b>지원 서비스</b> ${escT(a.service)}</div>` : "") +
+      `<div class="ap-kv"><b>마지막 스캔</b> ${escT(scanned)}</div>` +
+      `<div class="ap-kv"><b>상태</b> <span style="color:${urgent ? "#f5928a" : "var(--teal)"};font-weight:800">즉시 조치 ${urgent}건</span></div>` +
+      (vulns ? `<div class="ap-h">최근 취약점</div>${vulns}` : "") +
+      `<div class="ap-links">` +
+      `<button data-nav="sbom.html">AI-BOM 보기 ↗</button>` +
+      `<button data-nav="vulnscan.html">취약점 관리 ↗</button>` +
+      `<button id="apRescan">재스캔 ▶</button>` +
+      `</div>`;
+    const r = anchorEl.getBoundingClientRect();
+    assetPop.style.left = Math.round(r.right + 10) + "px";
+    assetPop.style.top = Math.max(60, Math.min(window.innerHeight - 340, Math.round(r.top - 14))) + "px";
+    assetPop.classList.add("on");
+    document.getElementById("apClose").addEventListener("click", closeAssetPop);
+    assetPop.querySelectorAll("[data-nav]").forEach((b) => b.addEventListener("click", () => window.gijo.navigateTo(b.dataset.nav)));
+    document.getElementById("apRescan").addEventListener("click", () => { closeAssetPop(); sendToOrchestrator(`${a.id} 스캔해줘`); });
+  }
+  function closeAssetPop() { assetPop.classList.remove("on"); }
+  document.addEventListener("click", (e) => {
+    if (assetPop.classList.contains("on") && !e.target.closest("#assetPop") && !e.target.closest("[data-asset]")) closeAssetPop();
+  });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeAssetPop(); });
+
+  // ── 연동 서버 정보 카드 — 실제 연결 정보만 표시(주소·상태·로드된 로컬 LLM·에이전트 수) ──
+  async function loadServerCard() {
+    const dot = document.getElementById("scDot");
+    const meta = document.getElementById("scMeta");
+    try {
+      await window.gijo.checkServerHealth();
+      dot.classList.remove("off");
+      let url = "localhost:4000";
+      try { url = String(await window.gijo.getServerUrl()).replace(/^https?:\/\//, "").replace(/\/$/, ""); } catch (e) {}
+      let llm = 0;
+      try {
+        const s = await window.gijo.getLocalEngineStatus();
+        llm = s && Array.isArray(s.loaded) ? s.loaded.filter((m) => m.ready).length : (s && s.running ? 1 : 0);
+      } catch (e) {}
+      const agents = Object.keys(agentsById).length;
+      meta.innerHTML = `연동 서버 <b>${escT(url)}</b> · 운영중<br>로컬 LLM <b>${llm}</b>모델 로드${agents ? ` · 에이전트 <b>${agents}</b>` : ""}`;
+    } catch (e) {
+      dot.classList.add("off");
+      meta.textContent = "서버 연결 끊김 — 설정에서 서버 주소를 확인하세요";
     }
   }
 
@@ -565,9 +694,14 @@
       setCount("products", total);
       if (!box) return;
       if (!total) box.innerHTML = `<div class="tree-leaf click" data-open-products>등록된 제품 없음 — 클릭해 등록</div>`;
-      else box.innerHTML = groups.flatMap((g) => g.products.map((p) =>
-        `<div class="tree-leaf click" data-open-products title="${escT(g.label)} · 보안제품 관리">${escT(p.name)}</div>`
-      )).join("");
+      else box.innerHTML = groups.flatMap((g) => g.products.map((p) => {
+        // 제품·로그 매뉴얼 첨부 상태 — 있으면 개수, 없으면 올리기 유도. 클릭하면 보안제품 관리로.
+        const docs = (p.docs || []).length;
+        const tail = docs
+          ? `<span class="leaf-b lb-blue">매뉴얼 ${docs}</span>`
+          : `<span class="manual-link">매뉴얼 올리기 +</span>`;
+        return `<div class="tree-leaf click row" data-open-products title="${escT(g.label)} · 제품·로그 매뉴얼 업로드는 보안제품 관리에서">${escT(p.name)}${tail}</div>`;
+      })).join("");
       box.querySelectorAll("[data-open-products]").forEach((x) => x.addEventListener("click", () => window.gijo.navigateTo("products.html")));
     } catch (e) {
       if (box) box.innerHTML = `<div class="tree-empty">보안제품을 불러오지 못했습니다</div>`;
@@ -692,7 +826,7 @@
   const clRows = document.getElementById("clRows");
   const clStatus = document.getElementById("clStatus");
   const escB = (s) => String(s == null ? "" : s).replace(/</g, "&lt;");
-  const CL_MAX = 60;
+  const CL_MAX = 4; // 피드에 최대 4행만 유지 — 오래된 행 제거(전체 이력은 AI 어시스턴트 화면). 60이던 것을 화면 고정 요구로 축소.
   let clStatusTimer = null;
 
   function clBusy(label) {
@@ -888,8 +1022,8 @@
   async function loadCollaboration() {
     try {
       const history = await window.gijo.listCollaborationHistory();
-      // 최근 8건만 미리 채워 흐름의 맥락을 준다(전체 이력은 AI 어시스턴트 화면).
-      history.slice(-8).forEach(appendCollabRow);
+      // 최근 4건만 미리 채워 흐름의 맥락을 준다(피드는 최대 4행 고정, 전체 이력은 AI 어시스턴트 화면).
+      history.slice(-4).forEach(appendCollabRow);
     } catch (e) {}
   }
 
@@ -923,9 +1057,9 @@
     await loadUser();
     greet();
     renderExplorer(); // 트리 골격을 먼저 그린 뒤 각 로더가 자식 컨테이너를 채운다
-    // renderTeam을 먼저 끝내 agentsById를 채운다 — 협업 이력(loadCollaboration)이 id 대신 표시 이름을 쓰도록.
+    // renderTeam을 먼저 끝내 agentsById를 채운다 — 협업 이력(loadCollaboration)·서버 카드가 표시 이름/수를 쓰도록.
     await renderTeam();
-    await Promise.all([loadHealth(), loadAssets(), loadSecurityProducts(), loadTasks(), loadCollaboration(), loadFiles(), checkModelReady(), loadTodayPriority()]);
+    await Promise.all([loadHealth(), loadServerCard(), loadAssets(), loadSecurityProducts(), loadTasks(), loadCollaboration(), loadFiles(), checkModelReady(), loadTodayPriority()]);
     pollGpu();
     setInterval(pollGpu, 2500); // 실 GPU 사용률에 따라 로고 발광 강도 갱신
 

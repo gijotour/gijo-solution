@@ -281,6 +281,14 @@ try {
   /* 컬럼이 이미 있으면 정상 — 무시 */
 }
 
+// 마이그레이션: memory_documents.docClass — 문서 수집 시 Scan·Analyze Agent가 판별한 분류
+// (매뉴얼/보고서/정책/기타). 탐색기·문서관리 화면에서 배지로 표시. nullable(분류 전 문서).
+try {
+  db.exec("ALTER TABLE memory_documents ADD COLUMN docClass TEXT");
+} catch {
+  /* 컬럼이 이미 있으면 정상 — 무시 */
+}
+
 // 마이그레이션: maintenance_items.assetId (점검을 등록된 AI 자산에 연결). 선택 항목이라 nullable.
 try {
   db.exec("ALTER TABLE maintenance_items ADD COLUMN assetId TEXT");

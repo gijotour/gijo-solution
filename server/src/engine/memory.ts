@@ -9,8 +9,9 @@ import * as path from "path";
 import * as lancedb from "@lancedb/lancedb";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
-import { embed } from "./llm";
+import { embed, chat } from "./llm";
 import { db } from "../db";
+import { emitCollaboration } from "./collaboration";
 
 // 문서 단위 메타데이터(업로드 시각·원본 경로)는 SQLite에 둔다 — LanceDB 스키마는 건드리지 않는다.
 const upsertDocMetaStmt = db.prepare(
@@ -22,6 +23,7 @@ const upsertDocMetaStmt = db.prepare(
 );
 const getDocMetaStmt = db.prepare("SELECT * FROM memory_documents WHERE documentId = ?");
 const deleteDocMetaStmt = db.prepare("DELETE FROM memory_documents WHERE documentId = ?");
+const setDocClassStmt = db.prepare("UPDATE memory_documents SET docClass = ? WHERE documentId = ?");
 
 // LanceDB where/delete 절에 문자열 리터럴로 들어가는 documentId(파일명)의 작은따옴표를 이스케이프.
 function escapeLiteral(s: string): string {
@@ -38,6 +40,40 @@ export interface IngestResult {
   chunks: number;
   embeddingModel: string;
   scope: string;
+  docClass?: string; // classify=true로 수집 시 Scan·Analyze Agent가 판별한 분류(매뉴얼/보고서/정책/기타)
+}
+
+// ── 문서 자동 분류 — 올린 문서를 Scan·Analyze Agent가 분석해 종류를 판별한다 ─────────
+// Scan Agent(수집·초기 해석) → Analyze Agent(LLM 분류) 순으로 협업 피드에 흐름이 보인다.
+// LLM이 꺼져 있거나 응답을 파싱할 수 없으면 파일명 휴리스틱으로 폴백한다(결정적·정직한 차선).
+const DOC_CLASSES = ["매뉴얼", "보고서", "정책", "기타"] as const;
+
+function classifyByFilename(documentId: string): string {
+  if (/매뉴얼|manual|가이드|guide/i.test(documentId)) return "매뉴얼";
+  if (/보고서|report|동향|현황|분석/i.test(documentId)) return "보고서";
+  if (/정책|지침|규정|policy|표준/i.test(documentId)) return "정책";
+  return "기타";
+}
+
+async function classifyDocument(documentId: string, text: string): Promise<string> {
+  emitCollaboration({ from: "scan", to: "analysis", message: `문서 분석·분류 요청: ${documentId}` });
+  let docClass: string;
+  try {
+    const reply = await chat({
+      agentId: "analysis",
+      message: [
+        "다음 문서를 아래 4가지 중 정확히 한 단어로만 분류하라. 다른 텍스트 없이 그 한 단어만 출력한다.",
+        "선택지: 매뉴얼(제품·시스템 사용법/운영/로그 설명), 보고서(동향·현황·분석 결과), 정책(사내 규정·지침·표준), 기타",
+        `파일명: ${documentId}`,
+        `내용 일부: ${text.slice(0, 800)}`,
+      ].join("\n"),
+    });
+    docClass = DOC_CLASSES.find((c) => reply.includes(c)) ?? classifyByFilename(documentId);
+  } catch {
+    docClass = classifyByFilename(documentId);
+  }
+  emitCollaboration({ from: "analysis", to: "orchestrator", message: `문서 분류 완료: ${documentId} → ${docClass}` });
+  return docClass;
 }
 
 // scope: "global"이면 모든 에이전트가 검색, 그 외에는 해당 agentId 전용 문서.
@@ -60,14 +96,14 @@ function chunkText(text: string, size = CHUNK_SIZE, overlap = CHUNK_OVERLAP): st
   return chunks;
 }
 
-export async function ingestDocument(filePath: string, scope: string = GLOBAL_SCOPE): Promise<IngestResult> {
+export async function ingestDocument(filePath: string, scope: string = GLOBAL_SCOPE, classify = false): Promise<IngestResult> {
   const raw = await fs.readFile(filePath, "utf-8");
-  return ingestText(path.basename(filePath), raw, scope, path.resolve(filePath));
+  return ingestText(path.basename(filePath), raw, scope, path.resolve(filePath), classify);
 }
 
 // 이미 추출된 텍스트를 지식 베이스에 직접 넣는다 — 파일 업로드(PDF/HWPX 추출 후)나
 // 서버 밖 클라이언트에서 올린 문서용. ingestDocument는 파일을 읽어 이 함수로 위임한다.
-export async function ingestText(documentId: string, raw: string, scope: string = GLOBAL_SCOPE, sourcePath?: string): Promise<IngestResult> {
+export async function ingestText(documentId: string, raw: string, scope: string = GLOBAL_SCOPE, sourcePath?: string, classify = false): Promise<IngestResult> {
   const chunks = chunkText(raw);
   if (chunks.length === 0) return { documentId, chunks: 0, embeddingModel: "none", scope };
 
@@ -124,7 +160,19 @@ export async function ingestText(documentId: string, raw: string, scope: string 
     console.warn(`[memory] 문서 메타데이터 기록 실패: ${err instanceof Error ? err.message : String(err)}`);
   }
 
-  return { documentId, chunks: chunks.length, embeddingModel: "local-embedding-server", scope };
+  // 사용자 업로드 경로(classify=true)에서만 Scan·Analyze Agent 분류 실행 — 보안제품 매뉴얼 수집처럼
+  // 종류가 이미 정해진 프로그램적 수집은 건너뛴다. 분류 실패해도 수집은 성공 처리.
+  let docClass: string | undefined;
+  if (classify) {
+    try {
+      docClass = await classifyDocument(documentId, raw);
+      setDocClassStmt.run(docClass, documentId);
+    } catch (err) {
+      console.warn(`[memory] 문서 분류 실패: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  return { documentId, chunks: chunks.length, embeddingModel: "local-embedding-server", scope, docClass };
 }
 
 // SQL 문자열 injection 방지 — scope는 LanceDB where 절에 문자열로 들어간다. 에이전트 id와
@@ -162,6 +210,7 @@ export interface MemoryDocument {
   embeddingModel: string | null;
   ingestedAt: string | null; // 없으면 이 기능 이전에 수집된 문서
   hasSource: boolean; // 서버에 원본 파일 경로가 기록돼 있어 '원본까지 삭제'가 가능한지
+  docClass: string | null; // Scan·Analyze Agent 분류(매뉴얼/보고서/정책/기타) — 분류 전 문서는 null
 }
 
 // 장기기억에 저장된 문서 목록. 조각 수·scope의 진실 원천은 LanceDB(실제 임베딩),
@@ -185,7 +234,7 @@ export async function listDocuments(): Promise<MemoryDocument[]> {
     }
   }
   const metaRows = db.prepare("SELECT * FROM memory_documents").all() as {
-    documentId: string; embeddingModel: string | null; sourcePath: string | null; ingestedAt: string;
+    documentId: string; embeddingModel: string | null; sourcePath: string | null; ingestedAt: string; docClass: string | null;
   }[];
   const metaById = new Map(metaRows.map((m) => [m.documentId, m]));
   const out: MemoryDocument[] = [];
@@ -198,6 +247,7 @@ export async function listDocuments(): Promise<MemoryDocument[]> {
       embeddingModel: meta?.embeddingModel ?? null,
       ingestedAt: meta?.ingestedAt ?? null,
       hasSource: !!meta?.sourcePath,
+      docClass: meta?.docClass ?? null,
     });
   }
   out.sort((a, b) => (b.ingestedAt ?? "").localeCompare(a.ingestedAt ?? "") || b.chunks - a.chunks);
@@ -255,7 +305,8 @@ export function registerMemoryRoutes(app: Express): void {
     "/api/memory/ingest",
     authMiddleware,
     asyncRoute(async (req, res) => {
-      res.json(await ingestDocument(req.body.path, req.body.scope ?? GLOBAL_SCOPE));
+      // 사용자 업로드 경로 — Scan·Analyze Agent 분류 포함(classify:false로 끌 수 있음).
+      res.json(await ingestDocument(req.body.path, req.body.scope ?? GLOBAL_SCOPE, req.body.classify !== false));
     })
   );
   // 파일 업로드 → 텍스트 추출(PDF/HWPX/TXT) → 지식 베이스 수집. 담당자가 경로를 타이핑하지 않고
@@ -276,7 +327,8 @@ export function registerMemoryRoutes(app: Express): void {
           res.status(400).json({ error: "문서에서 텍스트를 추출하지 못했습니다 (빈 문서이거나 지원하지 않는 형식)" });
           return;
         }
-        res.json(await ingestText(filename, text, scope ?? GLOBAL_SCOPE));
+        // 사용자 업로드 경로 — Scan·Analyze Agent 분류 포함.
+        res.json(await ingestText(filename, text, scope ?? GLOBAL_SCOPE, undefined, true));
       } catch (err) {
         res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
       }

@@ -315,9 +315,10 @@ export const llmActivityApi = {
 
 // ── 장기 기억(RAG) ────────────────────────────────────────────────────
 export const memoryApi = {
-  ingest: (path: string, scope?: string) => request("/api/memory/ingest", { method: "POST", body: { path, scope } }),
+  ingest: (path: string, scope?: string) =>
+    request<IngestResult>("/api/memory/ingest", { method: "POST", body: { path, scope } }),
   ingestFile: (filename: string, content: string, scope?: string) =>
-    request("/api/memory/ingest-file", { method: "POST", body: { filename, content, scope } }),
+    request<IngestResult>("/api/memory/ingest-file", { method: "POST", body: { filename, content, scope } }),
   query: (question: string, topK?: number, agentId?: string) =>
     request<string[]>("/api/memory/query", { method: "POST", body: { question, topK, agentId } }),
   // 올린 문서 관리(장기기억) — 목록·조각 미리보기·삭제.
@@ -329,6 +330,14 @@ export const memoryApi = {
     request<{ documentId: string; deletedChunks: number; deletedFile: boolean }>("/api/memory/document/delete", { method: "POST", body: { documentId, withFile } }),
 };
 
+export interface IngestResult {
+  documentId: string;
+  chunks: number;
+  embeddingModel: string;
+  scope: string;
+  docClass?: string; // Scan·Analyze Agent 분류(매뉴얼/보고서/정책/기타)
+}
+
 export interface MemoryDocument {
   documentId: string;
   scope: string;
@@ -336,6 +345,7 @@ export interface MemoryDocument {
   embeddingModel: string | null;
   ingestedAt: string | null;
   hasSource: boolean;
+  docClass: string | null;
 }
 
 // ── 온톨로지 (지식 그래프 / 하이브리드 지식모델의 의미 계층) ──────────────

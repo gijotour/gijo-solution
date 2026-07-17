@@ -150,6 +150,25 @@
     injectCss();
     var p = progress();
     var el = document.createElement("div");
+    // 페이지가 슬롯(#gijoObSlot — 대시보드 자산 탐색기의 GIJO AS Desktop 카드 아래)을 제공하면
+    // 거기 인라인으로, 없으면 기존 우하단 플로팅으로. 슬롯 스타일은 페이지 CSS(.ob-row)가 담당.
+    var slot = document.getElementById("gijoObSlot");
+    if (slot) {
+      el.id = "gijoObLauncher";
+      el.className = "ob-row";
+      el.style.position = "static"; // #gijoObLauncher의 fixed 스타일 무효화
+      el.style.right = "auto";
+      el.style.bottom = "auto";
+      el.style.boxShadow = "none";
+      el.style.borderRadius = "8px";
+      el.style.padding = "6px 9px";
+      el.style.fontSize = "11px";
+      el.innerHTML = (p.done >= p.total ? "✅ 가이드 완료" : "🚀 시작 가이드") + ' <span class="pr">' + p.done + " / " + p.total + "</span>";
+      el.addEventListener("click", open);
+      slot.innerHTML = "";
+      slot.appendChild(el);
+      return;
+    }
     el.id = "gijoObLauncher";
     el.innerHTML = p.done >= p.total ? "가이드 완료 ✓" : "🚀 시작 가이드 <b>" + p.done + "/" + p.total + "</b>";
     el.addEventListener("click", open);
