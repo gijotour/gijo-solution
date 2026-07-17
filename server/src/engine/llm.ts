@@ -138,6 +138,11 @@ export function stripLeadingPreamble(text: string): string {
   return t.trim();
 }
 
+// 중국어 드리프트 감지 — 2자 이상 연속된 CJK 한자는 중국어 구다(현대 한국어는 한자를 잇달아 쓰지 않음).
+// 문장 중간에 섞이면 잘라낼 수 없어 재생성으로 처리한다. 단일 한자(예: 外)는 무시해 오탐을 줄인다.
+const countHan = (t: string): number => (t.match(/[一-鿿]/g) || []).length;
+const hasChineseDrift = (t: string): boolean => /[一-鿿]{2,}/.test(t);
+
 export async function chat(args: ChatArgs): Promise<string> {
   const history = args.remember ? (histories.get(args.agentId) ?? []) : [];
   const rag = args.remember ? await ragContextFor(args.message, args.agentId) : null;
@@ -178,7 +183,29 @@ export async function chat(args: ChatArgs): Promise<string> {
     usage?: { prompt_tokens?: number; completion_tokens?: number };
     timings?: { predicted_per_second?: number };
   };
-  const reply = stripLeadingPreamble(data.choices?.[0]?.message?.content ?? "");
+  const rawContent = data.choices?.[0]?.message?.content ?? "";
+  let reply = stripLeadingPreamble(rawContent);
+
+  // 중국어 드리프트 감지 시 한국어 강제로 1회 재생성하고 더 깨끗한(한자 적은) 쪽을 채택한다.
+  // (인사말과 달리 중간에 섞여 잘라낼 수 없으므로 재요청. 드리프트는 ~10~15%라 대부분 재생성 안 함.)
+  if (hasChineseDrift(reply)) {
+    emitLlmActivity({ kind: "chat", phase: "start", agent: agentName, detail: "중국어 감지 — 한국어로 재생성" });
+    const retryMessages = [
+      ...messages,
+      { role: "assistant", content: rawContent },
+      { role: "user", content: "직전 답변에 중국어(汉字)가 섞였습니다. 같은 내용을 처음부터 끝까지 반드시 한국어로만 다시 작성하세요. 중국어·한자 단어를 절대 쓰지 마세요(CVE·제품명·버전 등 고유 표기만 원문 유지)." },
+    ];
+    const retryRes = await fetch(`${baseUrl}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "local", messages: retryMessages, ...(args.maxTokens ? { max_tokens: args.maxTokens } : {}) }),
+    }).catch(() => null);
+    if (retryRes && retryRes.ok) {
+      const retryData = (await retryRes.json()) as { choices?: { message?: { content?: string } }[] };
+      const retryReply = stripLeadingPreamble(retryData.choices?.[0]?.message?.content ?? "");
+      if (retryReply && countHan(retryReply) < countHan(reply)) reply = retryReply;
+    }
+  }
 
   // llama.cpp 실측치(usage·timings)를 그대로 실어 보낸다 — 값이 나오면 실제 추론이 일어난 것.
   emitLlmActivity({
