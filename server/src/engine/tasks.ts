@@ -3,7 +3,7 @@
 import type { Express } from "express";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
-import { db } from "../db";
+import { db, assertTestDb } from "../db";
 
 export interface TaskItem {
   id: string;
@@ -112,6 +112,7 @@ export function listTasks(): TaskItem[] {
 
 // 테스트 전용: db는 모듈 싱글턴이라 createApp()을 새로 호출해도 초기화되지 않는다.
 export function resetTasksForTests(): void {
+  assertTestDb("resetTasksForTests");
   db.exec("DELETE FROM tasks");
 }
 

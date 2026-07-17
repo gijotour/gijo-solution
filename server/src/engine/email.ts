@@ -6,7 +6,7 @@ import type { Express } from "express";
 import nodemailer from "nodemailer";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
-import { db } from "../db";
+import { db, assertTestDb } from "../db";
 import { encryptString, decryptString, getEncryptionKey } from "./cryptopack";
 
 const CONFIG_ID = "default";
@@ -93,6 +93,7 @@ export function saveSmtpConfig(input: SmtpConfigInput): SmtpConfigPublic {
 
 // 테스트 전용: db는 모듈 싱글턴이라 createApp()을 새로 호출해도 초기화되지 않는다.
 export function resetSmtpConfigForTests(): void {
+  assertTestDb("resetSmtpConfigForTests");
   db.exec("DELETE FROM smtp_config");
 }
 

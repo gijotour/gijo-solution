@@ -7,7 +7,7 @@
 import type { Express, Request } from "express";
 import { authMiddleware, adminMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
-import { db } from "../db";
+import { db, assertTestDb } from "../db";
 import type { GijoUser } from "../auth/users";
 import { sendMail } from "./email";
 
@@ -361,6 +361,7 @@ export async function notifyDueMaintenance(to: string[]): Promise<{ sent: boolea
 
 // 테스트 전용: db는 모듈 싱글턴이라 createApp()을 새로 호출해도 초기화되지 않는다.
 export function resetMaintenanceForTests(): void {
+  assertTestDb("resetMaintenanceForTests");
   db.exec("DELETE FROM maintenance_events");
   db.exec("DELETE FROM maintenance_items");
 }

@@ -369,8 +369,12 @@ export function attachManualToExistingProduct(
   };
 }
 
-// 테스트 전용.
+// 테스트 전용. 실 운영 DB에서 실수로 호출돼 등록부가 통째로 지워지는 사고 방지
+// (2026-07-17 실측: 운영 DB의 제품·문서 테이블이 비워진 흔적 — in-memory DB에서만 허용).
 export function resetSecurityProductsForTests(): void {
+  if (process.env.GIJO_DB_PATH !== ":memory:") {
+    throw new Error("resetSecurityProductsForTests는 테스트(GIJO_DB_PATH=:memory:)에서만 호출할 수 있습니다");
+  }
   db.exec("DELETE FROM product_docs; DELETE FROM security_products;");
 }
 

@@ -10,7 +10,7 @@
 import type { Express } from "express";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
-import { db } from "../db";
+import { db, assertTestDb } from "../db";
 import { THREAT_CRITERIA } from "./compliance-criteria";
 import { getAsset, type AiBom } from "./assets";
 
@@ -144,6 +144,7 @@ export async function buildComplianceDraft(code: string): Promise<{ status: Comp
 }
 
 export function resetComplianceForTests(): void {
+  assertTestDb("resetComplianceForTests");
   db.exec("DELETE FROM compliance_status");
 }
 

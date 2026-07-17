@@ -8,7 +8,7 @@
 import type { Express } from "express";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
-import { db } from "../db";
+import { db, assertTestDb } from "../db";
 import { listAssets } from "./assets";
 import { listMaintenanceItems } from "./maintenance";
 import { maintenanceSummary } from "./report";
@@ -224,6 +224,7 @@ export function listKpiTrend(limit = 30): KpiSnapshot[] {
 
 // 테스트 전용: db는 모듈 싱글턴이라 createApp()을 새로 호출해도 초기화되지 않는다.
 export function resetKpiForTests(): void {
+  assertTestDb("resetKpiForTests");
   db.exec("DELETE FROM security_kpi_snapshots");
 }
 

@@ -22,7 +22,7 @@ import * as os from "os";
 import * as path from "path";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
-import { db } from "../db";
+import { db, assertTestDb } from "../db";
 import { startFinetune, isFinetuneRunning } from "./finetune";
 import { pauseInferenceEngines, resumeInferenceEngines } from "./localengine";
 import { setAgentModel, getAgentById } from "./agents";
@@ -572,6 +572,7 @@ export function preflightCheck(): { checks: PreflightCheck[]; ready: boolean } {
 
 // 테스트 전용: db는 모듈 싱글턴이라 createApp()을 새로 호출해도 초기화되지 않는다.
 export function resetLearnloopForTests(): void {
+  assertTestDb("resetLearnloopForTests");
   db.exec("DELETE FROM chat_logs; DELETE FROM learnloop_runs;");
   db.exec("DELETE FROM app_state WHERE key LIKE 'learnloop:%'");
   loopRunning = false;

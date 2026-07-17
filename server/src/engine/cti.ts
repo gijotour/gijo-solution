@@ -6,7 +6,7 @@
 import type { Express } from "express";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
-import { db } from "../db";
+import { db, assertTestDb } from "../db";
 import { encryptString, decryptString, getEncryptionKey } from "./cryptopack";
 
 // 클라이언트에는 원본 키를 절대 내려주지 않는다 — 등록 여부만 노출.
@@ -70,6 +70,7 @@ function toPublic(row: CtiFeedRow): CtiFeedPublic {
 
 // 테스트 전용: db는 모듈 싱글턴이라 createApp()을 새로 호출해도 초기화되지 않는다.
 export function resetFeedsForTests(): void {
+  assertTestDb("resetFeedsForTests");
   db.exec("DELETE FROM cti_feeds; DELETE FROM cti_findings; DELETE FROM cti_sync");
   seedFeeds();
 }

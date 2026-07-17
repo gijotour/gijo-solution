@@ -19,7 +19,7 @@ import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { runAdapter } from "./bridge";
 import type { StandardFinding } from "./bridge";
-import { db } from "../db";
+import { db, assertTestDb } from "../db";
 import { emitCollaboration } from "./collaboration";
 import { setAgentStatus, resetAgentToDefault } from "./agents";
 
@@ -243,6 +243,7 @@ export function markSbomGenerated(assetId: string): Asset | undefined {
 
 // 테스트 전용: db는 모듈 싱글턴이라 createApp()을 새로 호출해도 초기화되지 않는다.
 export function resetAssetsForTests(): void {
+  assertTestDb("resetAssetsForTests");
   db.exec("DELETE FROM scan_runs; DELETE FROM assets;");
 }
 

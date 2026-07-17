@@ -23,6 +23,15 @@ if (DB_PATH !== ":memory:") {
 export const db = new Database(DB_PATH);
 db.pragma("journal_mode = WAL"); // :memory: DB는 이 pragma를 조용히 무시하고 memory 저널을 유지한다.
 
+// 테스트 전용 리셋(reset*ForTests) 가드 — 스크래치 스크립트가 GIJO_DB_PATH 없이 실행되면
+// 실 운영 DB를 향하므로, 리셋이 운영 데이터를 통째로 지우는 사고를 막는다
+// (2026-07-17 실측: 운영 DB의 보안제품 등록부가 비워진 흔적 — in-memory DB에서만 허용).
+export function assertTestDb(fnName: string): void {
+  if (DB_PATH !== ":memory:") {
+    throw new Error(`${fnName}는 테스트(GIJO_DB_PATH=:memory:)에서만 호출할 수 있습니다`);
+  }
+}
+
 db.exec(`
   CREATE TABLE IF NOT EXISTS assets (
     id TEXT PRIMARY KEY,
