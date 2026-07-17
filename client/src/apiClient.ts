@@ -534,6 +534,8 @@ export const sbomApi = {
   generate: (assetId: string) => request(`/api/sbom/${assetId}/generate`, { method: "POST" }),
   export: (assetId: string, format: "cyclonedx" | "spdx") =>
     request(`/api/sbom/${assetId}/export`, { method: "POST", body: { format } }),
+  aibomExport: (assetId: string) =>
+    request<{ path: string; filename: string; json: string }>(`/api/sbom/${assetId}/aibom-export`, { method: "POST" }),
 };
 
 // ── CTI(위협 인텔리전스) ──────────────────────────────────────────────

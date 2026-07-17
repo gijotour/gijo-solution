@@ -69,6 +69,42 @@ describe("sbom", () => {
     expect(doc.relationships.some((r: { relationshipType: string }) => r.relationshipType === "CONTAINS")).toBe(true);
   });
 
+  it("exports an AI-BOM (CycloneDX ML-BOM) weaving in the 5 AI-BOM areas, prompt hashed", async () => {
+    await request(app)
+      .put("/api/assets/fraud-detect-llm/aibom")
+      .set("Authorization", `Bearer ${token}`)
+      .send({
+        aibom: {
+          model: { foundationModel: "Qwen2.5-7B", finetuneHistory: "SFT v1", architecture: "", weightsHash: "" },
+          dataset: { sources: "사내 문서", vectorDbLocation: "LanceDB" },
+          prompt: { systemPrompt: "비밀 시스템 프롬프트", guardrails: "PII 마스킹" },
+          agentTool: { apis: "내부 API", mcpServers: "" },
+          infrastructure: { compute: "RTX 3090", hostingProvider: "온프레미스" },
+        },
+      });
+
+    const res = await request(app).post("/api/sbom/fraud-detect-llm/aibom-export").set("Authorization", `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.filename).toContain("fraud-detect-llm.aibom.cyclonedx.json");
+
+    const bom = JSON.parse(res.body.json);
+    expect(bom.bomFormat).toBe("CycloneDX");
+    expect(bom.specVersion).toBe("1.5");
+    expect(bom.metadata.component.type).toBe("machine-learning-model");
+    const props: Record<string, string> = Object.fromEntries(
+      (bom.metadata.component.properties || []).map((p: { name: string; value: string }) => [p.name, p.value])
+    );
+    expect(props["gijo:model:foundationModel"]).toBe("Qwen2.5-7B");
+    expect(props["gijo:infra:hostingProvider"]).toBe("온프레미스");
+    // 시스템 프롬프트는 원문 대신 SHA-256 해시만 — 원문이 문서에 없어야 한다.
+    expect(props["gijo:prompt:systemPromptSha256"]).toMatch(/^[a-f0-9]{64}$/);
+    expect(res.body.json).not.toContain("비밀 시스템 프롬프트");
+    // 데이터셋 = data 컴포넌트, 코드 의존성 = library 컴포넌트
+    const types = (bom.components || []).map((c: { type: string }) => c.type);
+    expect(types).toContain("data");
+    expect((bom.components || []).some((c: { name: string }) => c.name === "torch")).toBe(true);
+  });
+
   it("buildSpdxJson uses valid SPDXID refs and NOASSERTION for missing fields", () => {
     const json = buildSpdxJson("asset-x", [{ name: "numpy", version: "", license: "", knownVulns: [] }]);
     const doc = JSON.parse(json);
