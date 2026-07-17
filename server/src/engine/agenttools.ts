@@ -392,7 +392,8 @@ const TOOLS: AgentTool[] = [
     label: "자산 목록 조회",
     domain: "assets",
     write: false,
-    description: "등록된 AI 자산 전체 목록을 조회한다 (개수·이름·유형·담당자·finding 요약 포함)",
+    description:
+      'AI 자산 목록을 보여준다 — "자산 목록", "자산 다 보여줘", "우리 자산 뭐 있어", "등록된 자산 보여줘"에 쓴다 (개수·이름·유형·담당자·finding 요약 포함).',
     params: [],
     run: runListAssets,
   },
@@ -442,7 +443,7 @@ const TOOLS: AgentTool[] = [
     domain: "cross", // 위협 인텔리전스 × 자산을 가로지른다
     write: false,
     description:
-      '우리 자산에 걸리는 최신 위협을 알려준다 — CTI(위협 인텔리전스) 피드의 탐지와 사내 자산의 교집합. "요즘 위협 있어?", "새로 뜬 거 우리랑 관련?"에 쓴다. 예: {"limit":"5"}',
+      '우리 자산에 걸리는 최신 위협을 보여준다 — "요즘 위협 있어?", "새로 뜬 거 우리랑 관련?", "우리 자산에 걸리는 위협", "위협 인텔"에 쓴다. CTI 피드 탐지 × 사내 자산 교집합. 예: {"limit":"5"}',
     params: [{ name: "limit", label: "개수", description: "상위 몇 건 (기본 5)", required: false }],
     run: runThreats,
   },
