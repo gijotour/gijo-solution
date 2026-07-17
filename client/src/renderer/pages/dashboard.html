@@ -941,6 +941,45 @@
     return el;
   }
 
+  // 학습 루프 실행 확인 카드 — 서버가 confirm으로 되돌린 요청(무거운 GPU 학습 + 엔진 일시 중단)을
+  // 명시적 버튼으로만 시작한다. 시작하면 진행은 학습 루프 화면에서 본다.
+  function clLearnConfirm(confirm) {
+    const el = clAppend("offer", {
+      icon: "🧠",
+      name: "학습 루프 실행 확인",
+      message: "실 GPU 파인튜닝이 실행되고 학습 중 로컬 LLM이 일시 중단됩니다. 데이터셋을 고르고 시작을 확인하세요.",
+    });
+    const box = document.createElement("div");
+    box.style.cssText = "display:flex;gap:6px;align-items:center;margin-top:7px;flex-wrap:wrap;";
+    const ds = confirm.datasets || [];
+    if (ds.length) {
+      box.innerHTML =
+        `<select class="cl-ds" style="background:var(--panel);border:1px solid var(--border-strong);border-radius:7px;padding:5px 8px;color:var(--text);font-size:11px;outline:none;">` +
+        ds.map((d) => `<option value="${escB(d.id)}">${escB(d.id)} (${d.examples}건)</option>`).join("") +
+        `</select><button class="cl-offer-btn cl-learn-go">▶ 학습 시작 확인</button><button class="cl-offer-btn cl-learn-open">학습 루프 화면 ↗</button>`;
+    } else {
+      box.innerHTML = `<span style="font-size:11px;color:var(--muted)">데이터셋 없음 — 학습 루프 화면에서 먼저 만드세요.</span><button class="cl-offer-btn cl-learn-open">학습 루프 화면 ↗</button>`;
+    }
+    el.querySelector(".cb").appendChild(box);
+    box.querySelector(".cl-learn-open").addEventListener("click", () => window.gijo.navigateTo("learnloop.html"));
+    const go = box.querySelector(".cl-learn-go");
+    if (go) go.addEventListener("click", async () => {
+      go.disabled = true;
+      go.textContent = "시작 중…";
+      try {
+        await window.gijo.startLearnloopRun(box.querySelector(".cl-ds").value);
+        box.innerHTML = `<span style="font-size:11px;color:var(--teal);font-weight:800">🚀 학습 루프 시작됨 — 학습 중 로컬 LLM이 잠시 중단됩니다</span><button class="cl-offer-btn cl-learn-open2">진행 보기 ↗</button>`;
+        box.querySelector(".cl-learn-open2").addEventListener("click", () => window.gijo.navigateTo("learnloop.html"));
+      } catch (err) {
+        go.disabled = false;
+        go.textContent = "▶ 학습 시작 확인";
+        clAppend("error", { icon: "⚠", name: "학습 루프", message: "시작 실패: " + ((err && err.message) || err) });
+      }
+    });
+    clRows.scrollTop = clRows.scrollHeight;
+    return el;
+  }
+
   async function sendToOrchestrator(text) {
     pulseBusy();
     markWorking("orchestrator");
@@ -952,6 +991,13 @@
       const who = result.route && result.route.agentId && result.route.agentId !== "orchestrator"
         ? `${orchLabel()} → ${agentLabel(result.route.agentId)}` : orchLabel();
       clReplaceTyping(typing, "reply", { icon: "🧭", name: who, message: result.output });
+      // 학습 루프 실행 요청 — 리포트 제안 대신 확인 카드(명시적 시작 버튼)를 붙인다.
+      if (result.confirm && result.confirm.type === "learnloop") {
+        clLearnConfirm(result.confirm);
+        await loadTasks();
+        refreshTeamStatus();
+        return;
+      }
       // 답변이 "모델 미준비" 안내면 배너도 띄워 두 경로(모델 받기/서버 연결)를 바로 제시.
       const notReady = /모델이 아직 준비|로컬 LLM|localengine/.test(result.output || "");
       if (notReady) modelGuide().style.display = "block";

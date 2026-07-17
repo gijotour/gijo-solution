@@ -130,6 +130,32 @@ describe("dispatcher + intent + assets integration", () => {
     expect(res.body.task.priority).toBe(expectedPriority);
   });
 
+  describe("학습 루프 실행 지시 — 확인 절차(오발동 방지)", () => {
+    it.each(["학습 루프 실행해줘", "파인튜닝 시작해줘", "학습루프 돌려줘"])(
+      "'%s'는 바로 실행하지 않고 confirm(learnloop)으로 확인을 요구한다",
+      async (text) => {
+        const res = await request(app)
+          .post("/api/dispatch")
+          .set("Authorization", `Bearer ${token}`)
+          .send({ text });
+        expect(res.status).toBe(200);
+        expect(res.body.confirm?.type).toBe("learnloop");
+        expect(Array.isArray(res.body.confirm.datasets)).toBe(true);
+        expect(res.body.output).toContain("일시 중단");
+        expect(res.body.task.done).toBe(true);
+        expect(mockRunAdapter).not.toHaveBeenCalled(); // 스캔 파이프라인을 타지 않는다
+      }
+    );
+
+    it("학습 루프를 언급만 한 지시(실행 동사 없음)는 확인 절차를 타지 않는다", async () => {
+      const res = await request(app)
+        .post("/api/dispatch")
+        .set("Authorization", `Bearer ${token}`)
+        .send({ text: "학습 루프가 뭐야?" });
+      expect(res.body.confirm).toBeUndefined();
+    });
+  });
+
   describe("복합 지시(멀티스텝 오케스트레이션)", () => {
     it("planInstruction builds ordered steps; single action stays single (1 step)", () => {
       expect(planInstruction("오늘 상태 어때?")).toHaveLength(0);
