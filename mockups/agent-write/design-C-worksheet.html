@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>시안 C — 사이드 워크시트 (AI가 초안 채운 폼을 옆에 펼침)</title>
+<style>
+  :root{
+    --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+    --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;
+    --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:#05070d;color:var(--text);padding:24px;}
+  .wrap{max-width:1000px;margin:0 auto;}
+  .mock-label{font-size:13px;font-weight:800;color:var(--blue-light);margin-bottom:4px;}
+  .mock-desc{font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.7;}
+  .split{display:grid;grid-template-columns:1fr 340px;gap:12px;align-items:start;}
+  .console{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+  .cl-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--panel-2);border-bottom:1px solid var(--border);}
+  .cl-title{font-size:12.5px;font-weight:800;color:#fff;}
+  .cl-status{font-size:10.5px;font-weight:800;color:var(--amber);display:flex;align-items:center;gap:6px;}
+  .cl-dot{width:7px;height:7px;border-radius:50%;background:var(--amber);}
+  .cl-rows{padding:10px 12px;display:flex;flex-direction:column;gap:6px;min-height:330px;}
+  .cl-row{display:flex;gap:9px;align-items:flex-start;font-size:12px;line-height:1.55;padding:8px 10px;border-radius:9px;background:var(--panel-2);border:1px solid var(--border);}
+  .ci{width:24px;height:24px;border-radius:7px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;flex:0 0 auto;}
+  .cb{flex:1;min-width:0;}
+  .cn{font-size:10.5px;font-weight:800;color:var(--blue-light);margin-bottom:2px;display:flex;gap:7px;align-items:baseline;}
+  .ct{font-weight:600;color:var(--muted-2);font-size:9.5px;margin-left:auto;}
+  .cm{color:var(--text);white-space:pre-wrap;}
+  .cl-row.instr{border-color:rgba(59,130,246,0.35);}
+  .cl-row.instr .cn{color:#fff;}
+  .cl-row.tool{background:rgba(139,124,240,0.06);border-color:rgba(139,124,240,0.3);}
+  .cl-row.tool .cn{color:var(--purple);}
+  .cl-row.tool .cm{color:var(--muted);font-size:11px;font-family:ui-monospace,Consolas,monospace;}
+  .cl-row.link{border-color:rgba(240,160,32,0.45);background:rgba(240,160,32,0.07);}
+  .cl-row.link .cn{color:var(--amber);}
+  .link-btn{margin-top:6px;background:var(--amber);color:#2a1a02;border:none;border-radius:7px;padding:5px 12px;font-size:11px;font-weight:800;cursor:pointer;}
+  .cl-input{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--border);background:var(--panel-2);}
+  .cl-input input{flex:1;background:var(--panel);border:1px solid var(--border-strong);border-radius:8px;padding:8px 11px;color:var(--text);font-size:12px;outline:none;}
+  .cl-input button{background:var(--blue);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:800;cursor:pointer;}
+
+  /* ── 시안 C 핵심: 오른쪽에 슬라이드되는 워크시트 패널(AI 초안 채워진 전체 폼) ── */
+  .sheet{background:var(--panel);border:1px solid rgba(240,160,32,0.45);border-radius:12px;overflow:hidden;box-shadow:-8px 0 24px rgba(0,0,0,0.35);}
+  .sh-head{padding:11px 13px;background:rgba(240,160,32,0.12);border-bottom:1px solid rgba(240,160,32,0.3);display:flex;align-items:center;gap:8px;}
+  .sh-title{font-size:12px;font-weight:800;color:#fff;}
+  .sh-close{margin-left:auto;color:var(--muted-2);cursor:pointer;font-size:13px;}
+  .sh-sub{padding:9px 13px;font-size:11px;color:var(--muted);line-height:1.6;border-bottom:1px solid var(--border);background:var(--panel-2);}
+  .sh-sub b{color:var(--teal);}
+  .sh-body{padding:12px 13px;display:flex;flex-direction:column;gap:11px;max-height:420px;overflow-y:auto;}
+  .sh-group{font-size:9.5px;font-weight:800;color:var(--muted-2);letter-spacing:0.5px;padding-top:4px;border-top:1px solid var(--border);padding-bottom:1px;}
+  .sh-group:first-child{border-top:none;padding-top:0;}
+  .sh-field{display:flex;flex-direction:column;gap:4px;}
+  .sh-label{font-size:10.5px;font-weight:700;color:var(--muted);display:flex;align-items:center;gap:6px;}
+  .sh-label .req{color:var(--red);}
+  .sh-tag{font-size:9px;font-weight:700;padding:1px 5px;border-radius:4px;margin-left:auto;}
+  .tag-auto{color:var(--teal);background:rgba(30,185,128,0.12);border:1px solid rgba(30,185,128,0.3);}
+  .tag-said{color:var(--blue-light);background:rgba(59,130,246,0.14);border:1px solid rgba(59,130,246,0.3);}
+  .tag-need{color:var(--red);background:rgba(226,72,61,0.12);border:1px solid rgba(226,72,61,0.35);}
+  .sh-input{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;padding:7px 9px;color:var(--text);font-size:11.5px;outline:none;font-family:inherit;}
+  .sh-input:focus{border-color:var(--blue);}
+  .sh-input.need{border-color:rgba(226,72,61,0.5);background:rgba(226,72,61,0.05);}
+  .sh-input.auto{border-color:rgba(30,185,128,0.35);}
+  select.sh-input{cursor:pointer;}
+  .sh-actions{padding:11px 13px;border-top:1px solid var(--border);background:var(--panel-2);display:flex;gap:7px;}
+  .btn-run{flex:1;background:var(--teal);color:#06281c;border:none;border-radius:7px;padding:8px 12px;font-size:11.5px;font-weight:800;cursor:pointer;}
+  .btn-cancel{background:transparent;color:var(--muted);border:1px solid var(--border-strong);border-radius:7px;padding:8px 12px;font-size:11.5px;font-weight:700;cursor:pointer;}
+  .note{margin-top:14px;padding:12px 14px;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;font-size:11.5px;color:var(--muted);line-height:1.8;}
+  .note b{color:var(--text);}
+  .note .plus{color:var(--teal);font-weight:800;}
+  .note .minus{color:var(--amber);font-weight:800;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="mock-label">시안 C — 사이드 워크시트</div>
+  <div class="mock-desc">쓰기 작업이 시작되면 오른쪽에 <b>전용 작업 패널</b>이 펼쳐진다. AI가 아는 값은 미리 채워두고, 사람은 폼에서 자유롭게 고친 뒤 실행. 대화 피드는 짧은 안내만 남아 흐름이 깨끗하다.</div>
+
+  <div class="split">
+    <div class="console">
+      <div class="cl-head">
+        <div class="cl-title">🧭 AI 에이전트 지휘 콘솔</div>
+        <div class="cl-status"><span class="cl-dot"></span>작업 패널 입력 대기</div>
+      </div>
+      <div class="cl-rows">
+        <div class="cl-row instr">
+          <div class="ci">정</div>
+          <div class="cb">
+            <div class="cn">나 · 팀장 → Security Orchestrator<span class="ct">14:32</span></div>
+            <div class="cm">사내 챗봇 자산 등록해줘. AI-BOM도 같이 채워서</div>
+          </div>
+        </div>
+        <div class="cl-row tool">
+          <div class="ci">🔧</div>
+          <div class="cb">
+            <div class="cn">도구 실행<span class="ct">14:32</span></div>
+            <div class="cm">list_assets() → 6개 (중복 id 없음)</div>
+          </div>
+        </div>
+        <div class="cl-row link">
+          <div class="ci">📋</div>
+          <div class="cb">
+            <div class="cn">작업 패널을 열었습니다<span class="ct">14:32</span></div>
+            <div class="cm">자산 등록 + AI-BOM 항목을 오른쪽 패널에 초안으로 채웠습니다.
+빨간 표시 <b>1건(모델 경로)</b>만 채우시면 바로 실행할 수 있습니다.</div>
+            <button class="link-btn">📋 작업 패널 보기 →</button>
+          </div>
+        </div>
+      </div>
+      <div class="cl-input">
+        <input placeholder="지시를 입력하세요">
+        <button>전송</button>
+      </div>
+    </div>
+
+    <div class="sheet">
+      <div class="sh-head">
+        <span>📋</span>
+        <span class="sh-title">자산 등록 워크시트</span>
+        <span class="sh-close">✕</span>
+      </div>
+      <div class="sh-sub">AI가 <b>6개 항목을 미리 채웠습니다</b>. 자유롭게 고친 뒤 실행하세요.</div>
+      <div class="sh-body">
+        <div class="sh-group">기본 정보</div>
+        <div class="sh-field">
+          <div class="sh-label">자산 id <span class="sh-tag tag-auto">자동생성</span></div>
+          <input class="sh-input auto" value="사내-챗봇-01">
+        </div>
+        <div class="sh-field">
+          <div class="sh-label">이름 <span class="req">*</span> <span class="sh-tag tag-said">지시에서</span></div>
+          <input class="sh-input auto" value="사내 챗봇">
+        </div>
+        <div class="sh-field">
+          <div class="sh-label">모델 경로 <span class="req">*</span> <span class="sh-tag tag-need">입력 필요</span></div>
+          <input class="sh-input need" placeholder="models/chatbot.gguf">
+        </div>
+        <div class="sh-field">
+          <div class="sh-label">유형 <span class="sh-tag tag-auto">AI 추정</span></div>
+          <select class="sh-input auto"><option>LLM 서비스</option><option>분류 모델</option><option>이상탐지 모델</option><option>기타</option></select>
+        </div>
+        <div class="sh-field">
+          <div class="sh-label">담당자</div>
+          <input class="sh-input" placeholder="(선택)">
+        </div>
+
+        <div class="sh-group">AI-BOM · 모델</div>
+        <div class="sh-field">
+          <div class="sh-label">파운데이션 모델 <span class="sh-tag tag-auto">AI 추정</span></div>
+          <input class="sh-input auto" value="Qwen2.5-7B">
+        </div>
+        <div class="sh-field">
+          <div class="sh-label">아키텍처 <span class="sh-tag tag-auto">AI 추정</span></div>
+          <input class="sh-input auto" value="qwen2">
+        </div>
+        <div class="sh-field">
+          <div class="sh-label">용도 (Model Card)</div>
+          <input class="sh-input" placeholder="예: 사내 보안 문의 응답">
+        </div>
+
+        <div class="sh-group">AI-BOM · 데이터</div>
+        <div class="sh-field">
+          <div class="sh-label">데이터 출처</div>
+          <input class="sh-input" placeholder="예: 사내 보안 규정 문서">
+        </div>
+      </div>
+      <div class="sh-actions">
+        <button class="btn-run">▶ 등록 실행</button>
+        <button class="btn-cancel">취소</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>이 시안의 성격</b><br>
+    <span class="plus">장점</span> · <b>항목이 많아도 감당된다</b> — AI-BOM(14항목)·보안제품 등록처럼 큰 폼에 유일하게 맞는다. 대화 피드가 폼에 밀리지 않아 깨끗하다. 사람이 전체를 한눈에 보고 고칠 수 있어 통제감이 높다.<br>
+    <span class="minus">단점</span> · 시선이 좌우로 갈린다. 자산 등록처럼 <b>2~3개짜리 작업엔 과하다</b>(패널 열기 자체가 부담). 대시보드 3분할 레이아웃과 자리 경쟁 — 오른쪽 300px 열을 이미 쓰고 있어 레이아웃 변경이 따라온다. 구현이 가장 크다.<br>
+    <b>적합</b> · AI-BOM 작성, 보안제품 등록부처럼 <b>필드 8개 이상</b>인 작업.
+  </div>
+</div>
+</body>
+</html>

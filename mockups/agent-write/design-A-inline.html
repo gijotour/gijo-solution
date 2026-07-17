@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>시안 A — 인라인 폼 카드 (대화 안에서 채우기)</title>
+<style>
+  :root{
+    --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+    --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;
+    --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:#05070d;color:var(--text);padding:24px;}
+  .wrap{max-width:760px;margin:0 auto;}
+  .mock-label{font-size:13px;font-weight:800;color:var(--blue-light);margin-bottom:4px;}
+  .mock-desc{font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.7;}
+  .console{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+  .cl-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:var(--panel-2);border-bottom:1px solid var(--border);}
+  .cl-title{font-size:12.5px;font-weight:800;color:#fff;}
+  .cl-status{font-size:10.5px;font-weight:800;color:var(--blue-light);display:flex;align-items:center;gap:6px;}
+  .cl-dot{width:7px;height:7px;border-radius:50%;background:var(--blue-light);}
+  .cl-rows{padding:10px 12px;display:flex;flex-direction:column;gap:6px;}
+  .cl-row{display:flex;gap:9px;align-items:flex-start;font-size:12px;line-height:1.55;padding:8px 10px;border-radius:9px;background:var(--panel-2);border:1px solid var(--border);}
+  .ci{width:24px;height:24px;border-radius:7px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;flex:0 0 auto;}
+  .cb{flex:1;min-width:0;}
+  .cn{font-size:10.5px;font-weight:800;color:var(--blue-light);margin-bottom:2px;display:flex;gap:7px;align-items:baseline;}
+  .ct{font-weight:600;color:var(--muted-2);font-size:9.5px;margin-left:auto;}
+  .cm{color:var(--text);white-space:pre-wrap;}
+  .cl-row.instr{border-color:rgba(59,130,246,0.35);}
+  .cl-row.instr .cn{color:#fff;}
+  .cl-row.tool{background:rgba(139,124,240,0.06);border-color:rgba(139,124,240,0.3);}
+  .cl-row.tool .cn{color:var(--purple);}
+  .cl-row.tool .cm{color:var(--muted);font-size:11px;font-family:ui-monospace,Consolas,monospace;}
+
+  /* ── 시안 A 핵심: 되물어보기 = 대화 흐름 안의 인라인 입력 카드 ── */
+  .cl-row.ask{border-color:rgba(240,160,32,0.45);background:rgba(240,160,32,0.07);}
+  .cl-row.ask .cn{color:var(--amber);}
+  .ask-form{margin-top:9px;display:flex;flex-direction:column;gap:8px;}
+  .ask-field{display:flex;align-items:center;gap:8px;}
+  .ask-label{font-size:11px;font-weight:700;color:var(--muted);width:74px;flex:0 0 auto;}
+  .ask-label .req{color:var(--red);margin-left:2px;}
+  .ask-input{flex:1;background:var(--panel);border:1px solid var(--border-strong);border-radius:7px;padding:6px 9px;color:var(--text);font-size:11.5px;outline:none;font-family:inherit;}
+  .ask-input:focus{border-color:var(--blue);}
+  .ask-input.filled{border-color:rgba(30,185,128,0.5);}
+  .ask-hint{font-size:10px;color:var(--muted-2);margin-left:82px;margin-top:-4px;}
+  .ask-auto{font-size:10px;color:var(--teal);font-weight:700;background:rgba(30,185,128,0.12);border:1px solid rgba(30,185,128,0.3);border-radius:5px;padding:2px 6px;flex:0 0 auto;}
+  .ask-actions{display:flex;gap:6px;margin-top:4px;}
+  .btn-go{background:var(--teal);color:#06281c;border:none;border-radius:7px;padding:6px 14px;font-size:11.5px;font-weight:800;cursor:pointer;}
+  .btn-ghost{background:transparent;color:var(--muted);border:1px solid var(--border-strong);border-radius:7px;padding:6px 12px;font-size:11.5px;font-weight:700;cursor:pointer;}
+
+  .cl-row.done{border-color:rgba(30,185,128,0.4);background:rgba(30,185,128,0.07);}
+  .cl-row.done .cn{color:var(--teal);}
+  .undo-btn{margin-top:7px;background:transparent;border:1px solid rgba(226,72,61,0.4);color:var(--red);border-radius:7px;padding:4px 10px;font-size:10.5px;font-weight:700;cursor:pointer;}
+  .cl-input{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--border);background:var(--panel-2);}
+  .cl-input input{flex:1;background:var(--panel);border:1px solid var(--border-strong);border-radius:8px;padding:8px 11px;color:var(--text);font-size:12px;outline:none;}
+  .cl-input button{background:var(--blue);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:800;cursor:pointer;}
+  .note{margin-top:14px;padding:12px 14px;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;font-size:11.5px;color:var(--muted);line-height:1.8;}
+  .note b{color:var(--text);}
+  .note .plus{color:var(--teal);font-weight:800;}
+  .note .minus{color:var(--amber);font-weight:800;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="mock-label">시안 A — 인라인 폼 카드</div>
+  <div class="mock-desc">되물어보기와 실행 확인을 <b>대화 흐름 안에서</b> 처리한다. AI가 빠진 값만 골라 입력칸으로 띄우고, 채우면 그 자리에서 실행 확인까지. 기존 학습루프 확인 카드 패턴의 자연스러운 확장.</div>
+
+  <div class="console">
+    <div class="cl-head">
+      <div class="cl-title">🧭 AI 에이전트 지휘 콘솔</div>
+      <div class="cl-status"><span class="cl-dot"></span>Security Orchestrator 작업 중</div>
+    </div>
+    <div class="cl-rows">
+
+      <div class="cl-row instr">
+        <div class="ci">정</div>
+        <div class="cb">
+          <div class="cn">나 · 팀장 → Security Orchestrator<span class="ct">14:32</span></div>
+          <div class="cm">사내 챗봇 자산 등록해줘</div>
+        </div>
+      </div>
+
+      <div class="cl-row tool">
+        <div class="ci">🔧</div>
+        <div class="cb">
+          <div class="cn">도구 실행<span class="ct">14:32</span></div>
+          <div class="cm">list_assets() → 등록된 자산 6개 (중복 확인 완료)</div>
+        </div>
+      </div>
+
+      <div class="cl-row ask">
+        <div class="ci">📝</div>
+        <div class="cb">
+          <div class="cn">입력이 필요합니다 — 자산 등록<span class="ct">14:32</span></div>
+          <div class="cm">자산을 등록하려면 아래 값이 필요합니다. id는 이름에서 자동 생성했습니다.</div>
+          <div class="ask-form">
+            <div class="ask-field">
+              <div class="ask-label">자산 id</div>
+              <input class="ask-input filled" value="사내-챗봇-01">
+              <span class="ask-auto">자동생성</span>
+            </div>
+            <div class="ask-field">
+              <div class="ask-label">이름<span class="req">*</span></div>
+              <input class="ask-input filled" value="사내 챗봇">
+            </div>
+            <div class="ask-field">
+              <div class="ask-label">모델 경로<span class="req">*</span></div>
+              <input class="ask-input" placeholder="models/chatbot.gguf — 이 값이 필요합니다">
+            </div>
+            <div class="ask-field">
+              <div class="ask-label">담당자</div>
+              <input class="ask-input" placeholder="(선택) 비우면 미지정">
+            </div>
+            <div class="ask-actions">
+              <button class="btn-go">▶ 이 값으로 등록 실행</button>
+              <button class="btn-ghost">취소</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="cl-row done">
+        <div class="ci">✅</div>
+        <div class="cb">
+          <div class="cn">실행 완료 — register_asset<span class="ct">14:33</span></div>
+          <div class="cm">자산 <b>사내-챗봇-01</b>(사내 챗봇)을 등록했습니다. 등록 자산이 6개 → 7개가 되었습니다.
+스캔은 아직 실행하지 않았습니다 — "사내-챗봇-01 스캔해줘"라고 지시하시면 이어서 진행합니다.</div>
+          <button class="undo-btn">↩ 방금 등록 취소</button>
+        </div>
+      </div>
+
+    </div>
+    <div class="cl-input">
+      <input placeholder="지시를 입력하세요 — 예: 사내-챗봇-01 스캔하고 리포트까지">
+      <button>전송</button>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>이 시안의 성격</b><br>
+    <span class="plus">장점</span> · 화면 이동 0 — 대화하던 자리에서 끝난다. 기존 확인 카드 코드를 확장하는 것이라 구현이 가장 빠르고 위험이 적다. 빠진 값만 보여줘 입력 부담이 작다.<br>
+    <span class="minus">단점</span> · 입력 항목이 6~7개 넘어가면 카드가 길어져 대화 흐름이 밀린다. AI-BOM처럼 항목 많은 등록에는 좁다.<br>
+    <b>적합</b> · 자산 등록, 조치 담당자·기한 배정 같이 <b>필드 2~4개</b>짜리 작업.
+  </div>
+</div>
+</body>
+</html>
