@@ -87,9 +87,15 @@ merged-lily와 동시 로드, 실측 VRAM 여유 내). 전역 "마지막 사용 
 - ⏸ `register_product`/`compliance_draft`/`list_docs` — 필요 의도가 실제로 관찰될 때 추가(현재 search/explain이 문서·제품을 이미 가로질러 조회). 선제 추가는 메뉴 미러링 회귀.
 - 도메인 라우팅(1차 분류 → 해당 도구만 노출)은 도구 **15개 초과** 시점에 도입 — 현재 9개.
 
-### Phase 4 — 자체 강화 (상시)
-- 지시문→도구호출 로그를 학습루프 데이터셋으로 축적 → gijo-main-orchestrator 파인튜닝
-- qwen3-30b-a3b 단독 벤치(VRAM 확보 시), 14B 실험 — QA 업그레이드 경로
+### Phase 4 — 자체 강화 (진행 중, 2026-07-18 데이터셋 기반 구축)
+> 정조준 대상: 실측에서 드러난 `update_finding_status` 선택률(7B가 선언형 "~은 오탐이야"를 못 골라 폴백).
+
+- ✅ **데이터셋 기반**(`orchestrator-dataset.ts`): 지시→도구결정을 학습루프가 소비하는 `{question, answer}`로 만든다. **question = 결정 프롬프트(카탈로그+규칙+지시), answer = 결정 JSON** — `buildDecisionPrompt`로 train==inference 보장. 도구 카탈로그 변경 시 재생성.
+- ✅ **큐레이션 시드 31건**: 9개 도구 전부 + `final` 음성예시, **update_finding_status를 최다 가중**(선언형·명령형·동사변형). 시드는 실재 도구의 유효 호출만 가르친다(테스트가 `validateToolArgs`로 검증).
+- ✅ **상시 축적(골드)**: 사람이 결재판에서 **승인한 쓰기**(지시→도구+인자)를 `data/orchestrator-gold.json`에 누적 → 빌드 시 시드와 합쳐 데이터셋에 포함. 승인=검증된 정답이라 모델 자기오류를 재강화하지 않는 안전 신호. (instruction을 결재판→approve로 전달)
+- API: `GET/POST /api/learnloop/orchestrator-dataset[/build]` — 현황·빌드. 산출물 id=`orchestrator-tools`(→ 학습루프/파인튜닝이 이 id로 학습).
+- ⏸ **실제 파인튜닝 실행은 사용자 트리거**: 학습 중 로컬 LLM(:8080)이 내려가고(GPU 1대), 설계상 "학습 시작=확인 필수·자동화 제외"라 자동 실행하지 않는다. 데이터셋 빌드 → 학습루프 확인 카드/`startLearnloopRun({datasetId:"orchestrator-tools"})`로 시작.
+- (후순위) qwen3-30b-a3b 단독 벤치(VRAM 확보 시), 14B 실험 — QA 업그레이드 경로.
 
 ### 자동화 제외(설계상 수동 유지)
 학습 시작 · 데이터 삭제/초기화 · 메일 발송 · 설정 변경 → 확인 카드 필수 또는 도구 미노출.

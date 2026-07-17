@@ -177,8 +177,9 @@ export const dispatchApi = {
   plan: (text: string) =>
     request<{ steps: OrchestrationStepResult[]; multi: boolean }>("/api/dispatch/plan", { method: "POST", body: { text } }),
   // 결재판 승인 — 사람이 값을 확인·수정하고 누른 뒤에만 호출된다.
-  approve: (tool: string, args: Record<string, string>) =>
-    request<{ output: string }>("/api/agent/approve", { method: "POST", body: { tool, args } }),
+  // instruction: 이 결재판을 만든 원 지시 — 서버가 승인된 (지시→도구)를 파인튜닝 골드로 누적(Phase 4).
+  approve: (tool: string, args: Record<string, string>, instruction = "") =>
+    request<{ output: string }>("/api/agent/approve", { method: "POST", body: { tool, args, instruction } }),
 };
 
 // ── 작업 큐 ───────────────────────────────────────────────────────────

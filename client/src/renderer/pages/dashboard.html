@@ -1063,7 +1063,7 @@
       go.disabled = true;
       go.textContent = "실행 중…";
       try {
-        const r = await window.gijo.approveAgentTool(approval.tool, collect());
+        const r = await window.gijo.approveAgentTool(approval.tool, collect(), approval.instruction || "");
         card.remove();
         clAppend("offer", { icon: "✅", name: `실행 완료 — ${approval.tool}`, message: r.output });
         await loadTasks();

@@ -13,6 +13,7 @@ import { runAdapter, StandardFinding } from "./bridge";
 import { chat } from "./llm";
 import { runAgentLoop, AgentToolCall } from "./agentloop";
 import { executeApprovedTool, PendingApproval } from "./agenttools";
+import { appendApprovedDecision } from "./orchestrator-dataset";
 import { analyzeFindings } from "./analysis";
 import { recordFindings, getAsset, listAssets } from "./assets";
 import { listFindings } from "./cti";
@@ -357,6 +358,7 @@ export function registerDispatcherRoutes(app: Express): void {
     authMiddleware,
     asyncRoute(async (req, res) => {
       const toolName = String(req.body?.tool ?? "");
+      const instruction = String(req.body?.instruction ?? "");
       const rawArgs = (req.body?.args ?? {}) as Record<string, unknown>;
       // 화면에서 온 값만 문자열로 받는다(타입 오염 방어).
       const args: Record<string, string> = {};
@@ -367,6 +369,8 @@ export function registerDispatcherRoutes(app: Express): void {
       try {
         const output = await executeApprovedTool(toolName, args);
         emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `실행 완료: ${output.slice(0, 120)}` });
+        // 사람이 승인한 (지시→도구) = 검증된 정답. 파인튜닝 골드 예시로 누적한다(Phase 4, 자가강화).
+        appendApprovedDecision(instruction, toolName, args);
         resetAgentToDefault("orchestrator");
         const updated = completeTask(task.id);
         res.json({ output, task: updated.find((t) => t.id === task.id) ?? task });

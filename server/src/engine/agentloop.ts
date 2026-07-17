@@ -84,6 +84,13 @@ function decisionPrompt(instruction: string, calls: AgentToolCall[]): string {
   ].join("\n");
 }
 
+// 파인튜닝 데이터셋 생성용(Phase 4) — 이력 없는 단일 지시의 결정 프롬프트를 그대로 돌려준다.
+// 학습 예시의 question이 추론 시 orchestrator가 보내는 프롬프트와 동일해야(train==inference)
+// 도구 선택이 실제로 개선된다. 도구 카탈로그가 바뀌면 데이터셋을 재생성해야 한다.
+export function buildDecisionPrompt(instruction: string): string {
+  return decisionPrompt(instruction, []);
+}
+
 // 결재판을 띄울 때 피드에 남길 안내문 — LLM을 한 번 더 부르지 않고 규칙으로 만든다(빠르고 결정적).
 function approvalMessage(approval: PendingApproval): string {
   if (approval.missing.length) {

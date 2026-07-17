@@ -567,6 +567,7 @@ export interface PendingApproval {
   effect: string;
   undo: string;
   missing: string[]; // 필수인데 비어 있는 필드 — 화면이 빨갛게 강조하고 승인을 막는다
+  instruction: string; // 이 결재판을 만든 원 지시 — 승인 시 파인튜닝 골드 예시로 누적(Phase 4)
 }
 
 // 값이 특정 텍스트(지시문·조회 결과)에 실제로 나왔는지 규칙으로 본다(LLM에게 출처를 묻지 않는다 — 부담·환각 회피).
@@ -609,6 +610,7 @@ export function buildApproval(
     effect: tool.effect ? tool.effect(args) : "",
     undo: tool.undo ?? "",
     missing: fields.filter((f) => f.required && !f.value).map((f) => f.key),
+    instruction,
   };
 }
 
