@@ -66,9 +66,10 @@ export interface VulnReportData {
   remediation: { tasks: number; done: number; open: number; overdue: number; slaCompliance: number; topOpen: TaskItem[] };
 }
 
-export function collectVulnReportData(): VulnReportData {
+export function collectVulnReportData(scopeAssets?: Asset[]): VulnReportData {
   const now = Date.now();
-  const hosts = listAssets().filter((a) => a.assetType === "infra-host");
+  // 리포트가 특정 자산으로 스코프되면 취약점 통계도 그 자산만 집계한다(요약과 사례의 범위 일치).
+  const hosts = (scopeAssets ?? listAssets()).filter((a) => a.assetType === "infra-host");
   const d = { hosts: hosts.length, active: 0, critical: 0, high: 0, medium: 0, low: 0, kev: 0, topKev: [] as { name: string; host: string }[] };
   for (const a of hosts) {
     for (const f of a.findings) {
@@ -296,6 +297,7 @@ async function buildDocx(
             ? [
                 new Paragraph({ text: "취약점 사례 · 거버넌스 매칭", heading: HeadingLevel.HEADING_1 }),
                 new Paragraph({ children: [new TextRun({ text: "각 취약점을 조치 우선순위(EPSS·KEV·심각도)와 보안 거버넌스 통제에 매핑했습니다.", italics: true, size: 18 })] }),
+                new Paragraph({ children: [new TextRun({ text: "※ 거버넌스 매핑은 지침 기반 참고 매핑입니다. 조직의 통제 기준선(ISMS-P 인증 범위 등)에 맞춰 최종 확인하세요.", italics: true, size: 18 })] }),
                 ...cases.flatMap((c) => {
                   const f = c.finding;
                   const meta =
@@ -377,7 +379,7 @@ export async function generateReport(req: ReportRequest): Promise<ReportResult> 
   const counts = severityCounts(assets);
   const maintenance = listMaintenanceItems();
   const ms = maintenanceSummary(maintenance);
-  const vuln = collectVulnReportData();
+  const vuln = collectVulnReportData(req.assetIds?.length ? assets : undefined);
   const audience = req.audience ?? "official";
   const cases = vulnCases(assets);
   const audienceGuide =
@@ -395,7 +397,8 @@ export async function generateReport(req: ReportRequest): Promise<ReportResult> 
       `취약점 조치: 스캔 호스트 ${vuln.hosts}대, 열린 취약점 ${vuln.active}건(Critical ${vuln.critical}·High ${vuln.high}), ` +
       `실제 악용 확인(KEV) ${vuln.kev}건은 최우선 조치 대상. 조치 SLA 준수율 ${vuln.remediation.slaCompliance}%, 기한 초과 ${vuln.remediation.overdue}건. ` +
       `유지보수 점검: 전체 ${ms.total}건 중 지연 ${ms.overdue}건, 승인 대기 ${ms.reported}건, 반려 ${ms.rejected}건.${caseHint} ` +
-      `KEV와 기한 초과, 그리고 EPSS가 높은 취약점을 우선순위로 강조해줘.`,
+      `KEV와 기한 초과, 그리고 EPSS가 높은 취약점을 우선순위로 강조해줘. ` +
+      `중요: 위에 제시된 수치만 사용하고, 제시되지 않은 숫자(호스트 대수 등)를 새로 지어내지 마세요. 스캔 호스트는 정확히 ${vuln.hosts}대입니다.`,
   });
 
   // 우선순위 조치 목록(개선 #2)과 AI 브리핑(개선 #4)을 보고서에 포함.
@@ -442,7 +445,7 @@ function buildReportHtml(
   const cases = vulnCases(assets);
   const audienceLabel = (req.audience ?? "official") === "internal" ? "내부 검토용" : "보고용";
   const casesHtml = cases.length
-    ? `<h2>취약점 사례 · 거버넌스 매칭</h2><p class="muted">각 취약점을 조치 우선순위(EPSS·KEV·심각도)와 보안 거버넌스 통제에 매핑했습니다.</p>` +
+    ? `<h2>취약점 사례 · 거버넌스 매칭</h2><p class="muted">각 취약점을 조치 우선순위(EPSS·KEV·심각도)와 보안 거버넌스 통제에 매핑했습니다. ※ 거버넌스 매핑은 지침 기반 참고 매핑이며, 조직의 통제 기준선에 맞춰 최종 확인하세요.</p>` +
       cases
         .map((c) => {
           const f = c.finding;
@@ -525,6 +528,27 @@ export function registerReportRoutes(app: Express): void {
     authMiddleware,
     asyncRoute(async (req, res) => {
       res.json(await generateReport(req.body));
+    })
+  );
+  // 생성된 리포트 파일을 base64 JSON으로 반환 — 클라이언트가 열기/저장(서버가 다른 머신이어도 동작).
+  app.get(
+    "/api/report/file/:name",
+    authMiddleware,
+    asyncRoute(async (req, res) => {
+      const name = path.basename(String(req.params.name)); // 경로 순회(../) 방지
+      if (!/\.(docx|pdf)$/i.test(name)) {
+        res.status(400).json({ error: "docx/pdf 파일만 받을 수 있습니다" });
+        return;
+      }
+      try {
+        const buf = await fs.readFile(path.join(REPORT_DIR, name));
+        const mime = name.toLowerCase().endsWith(".pdf")
+          ? "application/pdf"
+          : "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+        res.json({ name, mime, base64: buf.toString("base64") });
+      } catch {
+        res.status(404).json({ error: "리포트 파일을 찾을 수 없습니다" });
+      }
     })
   );
 }

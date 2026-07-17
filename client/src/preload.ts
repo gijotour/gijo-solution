@@ -170,6 +170,7 @@ const gijoApi = {
   // 내부 리포트
   generateReport: (opts: { type: "weekly" | "quarterly" | "ondemand"; assetIds?: string[]; audience?: "internal" | "official"; format?: "docx" | "pdf" | "both" }) =>
     api.reportApi.generate(opts.type, opts.assetIds, { audience: opts.audience, format: opts.format }),
+  downloadReportFile: (name: string) => api.reportApi.file(name),
 
   // 이메일(SMTP) 설정
   getSmtpConfig: () => api.emailApi.getConfig(),

@@ -270,21 +270,51 @@ tr:last-child td{border-bottom:none;}
 
   const TYPE_LABEL = { weekly: "정기 · 주간", quarterly: "정기 · 분기", ondemand: "온디맨드" };
 
+  // 생성된 리포트 파일을 서버에서 받아(base64) blob으로 열기/저장. 서버가 다른 머신이어도 동작.
+  async function downloadReport(name, btn) {
+    const orig = btn ? btn.textContent : "";
+    if (btn) btn.textContent = "받는 중…";
+    try {
+      const f = await window.gijo.downloadReportFile(name);
+      const bytes = Uint8Array.from(atob(f.base64), (c) => c.charCodeAt(0));
+      const blob = new Blob([bytes], { type: f.mime });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = f.name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+      if (btn) btn.textContent = orig;
+    } catch (e) {
+      if (btn) btn.textContent = "실패";
+    }
+  }
+
   function renderReportRows() {
     if (sessionReports.length === 0) {
       reportRows.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">이번 세션에서 생성한 리포트가 없습니다</td></tr>';
       return;
     }
+    const dlBtn = (name) =>
+      `<button class="rep-dl" data-name="${name}" style="font-size:11px;background:var(--panel-2);border:1px solid var(--border-strong);color:var(--blue-light);border-radius:6px;padding:4px 9px;cursor:pointer;margin-right:5px;">${/\.pdf$/i.test(name) ? "📄 PDF" : "📥 DOCX"}</button>`;
+    const baseName = (p) => (p ? String(p).split(/[\\/]/).pop() : "");
     reportRows.innerHTML = sessionReports
-      .map(
-        (r) => `<tr>
-          <td><span class="badge b-blue">${TYPE_LABEL[r.type]}</span></td>
+      .map((r) => {
+        const audLabel = r.audience === "internal" ? "🔍 내부용" : "📄 보고용";
+        const docName = baseName(r.filePath);
+        const pdfName = baseName(r.pdfPath);
+        const btns = (docName ? dlBtn(docName) : "") + (pdfName ? dlBtn(pdfName) : "");
+        return `<tr>
+          <td><span class="badge b-blue">${TYPE_LABEL[r.type]}</span><br><span style="font-size:10px;color:var(--muted-2);white-space:nowrap">${audLabel}</span></td>
           <td>${r.assetIds.length ? r.assetIds.join(", ") : "전체 자산"}</td>
           <td>${new Date(r.at).toLocaleString("ko-KR")}</td>
-          <td class="row-actions">${r.filePath}</td>
-        </tr>`
-      )
+          <td class="row-actions">${btns}</td>
+        </tr>`;
+      })
       .join("");
+    reportRows.querySelectorAll(".rep-dl").forEach((b) => b.addEventListener("click", () => downloadReport(b.dataset.name, b)));
 
     document.getElementById("kpiSessionCount").textContent = sessionReports.length;
     const avgMs = sessionReports.reduce((sum, r) => sum + r.durationMs, 0) / sessionReports.length;
