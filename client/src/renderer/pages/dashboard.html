@@ -311,6 +311,12 @@
       <div id="todayItems"><div style="font-size:12px;color:var(--muted)">불러오는 중...</div></div>
       <button class="today-cta" id="todayCtaBtn">▶ 운영 시작 — 에이전트 팀에게 맡기기</button>
 
+      <!-- 오늘의 조치: 전 자산 취약점을 KEV·EPSS·VPR로 정렬한 상위 항목 (클릭 → 취약점 관리) -->
+      <div id="todayPriority" style="margin-top:18px;background:var(--panel-2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;cursor:pointer;" title="취약점 관리로 이동" data-page="vulnscan.html">
+        <div style="font-size:10.5px;font-weight:700;color:var(--muted-2);letter-spacing:1px;margin-bottom:8px;">🎯 오늘의 조치 · 우선순위</div>
+        <div id="todayPriorityList" style="font-size:11.5px;color:var(--muted)">불러오는 중...</div>
+      </div>
+
       <div class="collab-feed" id="collabFeed" style="margin-top:20px;background:var(--panel-2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;">
         <div style="font-size:10.5px;font-weight:700;color:var(--muted-2);letter-spacing:1px;margin-bottom:8px;">실시간 에이전트 협업</div>
         <div id="collabRows" style="max-height:280px;overflow-y:auto;font-size:11.5px;line-height:1.9;font-family:'Consolas','Menlo',monospace;">
@@ -777,13 +783,37 @@
     }
   }
 
+  // 오늘의 조치 — 전 자산 취약점 우선순위 상위 5(KEV·EPSS·VPR 순). 클릭은 data-page로 취약점 관리 이동.
+  async function loadTodayPriority() {
+    const box = document.getElementById("todayPriorityList");
+    if (!box) return;
+    try {
+      const { items } = await window.gijo.listActionPriorities(5);
+      if (!items || !items.length) { box.innerHTML = '<span style="color:var(--muted-2)">조치 대상 취약점 없음</span>'; return; }
+      const dot = { critical: "#e2483d", high: "#f5928a", medium: "#f0a020", low: "#5f6785" };
+      box.innerHTML = items.map((r, i) => {
+        const f = r.finding;
+        const tag = f.kev ? '<span style="color:#f5928a;font-weight:800">KEV</span>'
+          : (f.epss != null ? `<span style="color:var(--amber)">EPSS ${Math.round(f.epss * 100)}%</span>` : "");
+        const nm = (f.finding_type || "").length > 32 ? f.finding_type.slice(0, 31) + "…" : (f.finding_type || "");
+        return `<div style="display:flex;align-items:center;gap:7px;padding:4px 0;">` +
+          `<span style="color:var(--muted-2);width:12px">${i + 1}</span>` +
+          `<span style="width:7px;height:7px;border-radius:50%;background:${dot[f.severity] || "#5f6785"};flex:0 0 auto"></span>` +
+          `<span style="color:var(--text);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escT(nm)}</span>` +
+          `<span style="font-size:10px">${tag}</span></div>`;
+      }).join("");
+    } catch (e) {
+      box.innerHTML = '<span style="color:var(--muted-2)">불러오지 못함</span>';
+    }
+  }
+
   async function init() {
     tick();
     setInterval(tick, 1000);
     await loadUser();
     greet();
     renderExplorer(); // 트리 골격을 먼저 그린 뒤 각 로더가 자식 컨테이너를 채운다
-    await Promise.all([loadHealth(), loadAssets(), loadSecurityProducts(), loadTasks(), loadCollaboration(), loadFiles(), loadDocSearchScopes(), checkModelReady()]);
+    await Promise.all([loadHealth(), loadAssets(), loadSecurityProducts(), loadTasks(), loadCollaboration(), loadFiles(), loadDocSearchScopes(), checkModelReady(), loadTodayPriority()]);
 
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
