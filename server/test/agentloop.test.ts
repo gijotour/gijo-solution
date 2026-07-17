@@ -94,6 +94,20 @@ describe("runAgentLoop — 결정→실행→최종답변", () => {
     expect(mockChat.mock.calls[2][0].message).toContain("fraud-detect-llm");
   });
 
+  it("같은 도구를 같은 인자로 되풀이하면 재실행 없이 종료해 최종 답을 만든다(루프 낭비 차단)", async () => {
+    seedAsset();
+    mockChat
+      .mockResolvedValueOnce('{"action":"tool","tool":"list_assets","args":{}}') // 결정 1 — 실행됨
+      .mockResolvedValueOnce('{"action":"tool","tool":"list_assets","args":{}}') // 결정 2 — 동일 반복 → 재실행 안 함
+      .mockResolvedValueOnce("자산 1개 요약"); // 최종 재작성(composeFinalAnswer)
+    const r = await runAgentLoop("자산 목록 계속 봐줘");
+    expect(r).not.toBeNull();
+    expect(r!.toolCalls).toHaveLength(1); // list_assets는 한 번만 실행
+    expect(r!.output).toBe("자산 1개 요약");
+    // 결정 2회 + 최종 재작성 1회 = 3회 (반복 재실행으로 MAX_STEPS까지 가지 않는다)
+    expect(mockChat).toHaveBeenCalledTimes(3);
+  });
+
   it("도구 없이 final이면 null — 기존 채팅 폴백(회귀 없음)", async () => {
     mockChat.mockResolvedValueOnce('{"action":"final","answer":"안녕하세요"}');
     expect(await runAgentLoop("고마워")).toBeNull();
@@ -130,7 +144,10 @@ describe("runAgentLoop — 결정→실행→최종답변", () => {
 
   it("반복 상한(5회)에 걸리면 모은 결과로라도 최종 답변을 만든다", async () => {
     seedAsset();
-    for (let i = 0; i < 5; i++) mockChat.mockResolvedValueOnce('{"action":"tool","tool":"list_assets","args":{}}');
+    // 서로 다른 인자(get_asset assetId 5종)로 매 스텝 다른 도구 호출 → 중복차단에 안 걸리고 상한까지 간다.
+    for (let i = 0; i < 5; i++) {
+      mockChat.mockResolvedValueOnce(`{"action":"tool","tool":"get_asset","args":{"assetId":"none-${i}"}}`);
+    }
     mockChat.mockResolvedValueOnce("상한 도달 답변");
     const r = await runAgentLoop("자산 계속 봐줘");
     expect(r!.toolCalls).toHaveLength(5);

@@ -136,6 +136,15 @@ export async function runAgentLoop(instruction: string): Promise<AgentLoopResult
     // action=tool — 규칙 검증이 LLM 출력 뒤에 항상 위치한다(QA 원칙).
     const tool = decision.tool ? findAgentTool(decision.tool) : undefined;
     const args = decision.args ?? {};
+
+    // 같은 조회 도구를 같은 인자로 되풀이하면(실측: today를 5회 반복) 재실행은 같은 결과라 낭비다.
+    // 이미 실행한 (도구+인자)면 재실행 없이 루프를 끝내 지금까지의 결과로 최종 답을 만든다.
+    // 쓰기 도구는 해당 없음(결재판을 돌려주고 즉시 종료하므로 calls에 쌓이지 않는다).
+    if (tool && !tool.write) {
+      const sig = `${decision.tool}:${JSON.stringify(args)}`;
+      if (calls.some((c) => `${c.tool}:${JSON.stringify(c.args)}` === sig)) break;
+    }
+
     let result: string;
     if (!tool) {
       result = `존재하지 않는 도구: ${decision.tool ?? "(없음)"}. 사용 가능한 도구 중에서만 골라라.`;
