@@ -48,7 +48,7 @@ export function isAuthenticated(): boolean {
 }
 
 interface RequestOpts {
-  method?: "GET" | "POST" | "PUT" | "DELETE";
+  method?: "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
   body?: unknown;
   skipAuthRetry?: boolean;
 }
@@ -173,7 +173,9 @@ export interface PendingApproval {
 }
 
 export const dispatchApi = {
-  send: (text: string) => request<DispatchResult>("/api/dispatch", { method: "POST", body: { text } }),
+  // sessionId를 주면 지시·응답이 그 작업 세션의 턴으로 기록되고, 직전 대화가 맥락으로 실린다.
+  send: (text: string, sessionId?: string) =>
+    request<DispatchResult>("/api/dispatch", { method: "POST", body: { text, ...(sessionId ? { sessionId } : {}) } }),
   plan: (text: string) =>
     request<{ steps: OrchestrationStepResult[]; multi: boolean }>("/api/dispatch/plan", { method: "POST", body: { text } }),
   // 결재판 승인 — 사람이 값을 확인·수정하고 누른 뒤에만 호출된다.
@@ -182,6 +184,37 @@ export const dispatchApi = {
     request<{ output: string; undoId?: string }>("/api/agent/approve", { method: "POST", body: { tool, args, instruction } }),
   // #7 원클릭 undo — 방금 승인 실행을 통째로 되돌린다(id 생략 시 가장 최근).
   undo: (id?: string) => request<{ ok: boolean; message: string }>("/api/agent/undo", { method: "POST", body: { id } }),
+};
+
+// ── 작업 세션(대화 세션형) ────────────────────────────────────────────
+export type WorkSessionStatus = "active" | "done" | "ignored";
+export interface WorkSession {
+  id: string;
+  title: string;
+  status: WorkSessionStatus;
+  createdAt: number;
+  updatedAt: number;
+}
+export interface WorkSessionSummary extends WorkSession {
+  turnCount: number;
+  lastPreview: string;
+  lastRole: "user" | "assistant" | null;
+}
+export interface WorkSessionTurn {
+  id: string;
+  sessionId: string;
+  role: "user" | "assistant";
+  content: string;
+  tool?: string;
+  at: number;
+}
+export const workSessionsApi = {
+  list: () => request<WorkSessionSummary[]>("/api/work-sessions"),
+  create: (title?: string) => request<WorkSession>("/api/work-sessions", { method: "POST", body: title ? { title } : {} }),
+  get: (id: string) => request<{ session: WorkSession; turns: WorkSessionTurn[] }>(`/api/work-sessions/${id}`),
+  update: (id: string, patch: { title?: string; status?: WorkSessionStatus }) =>
+    request<WorkSession>(`/api/work-sessions/${id}`, { method: "PATCH", body: patch }),
+  remove: (id: string) => request<{ ok: boolean }>(`/api/work-sessions/${id}`, { method: "DELETE" }),
 };
 
 // ── 작업 큐 ───────────────────────────────────────────────────────────

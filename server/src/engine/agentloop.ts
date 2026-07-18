@@ -93,7 +93,8 @@ function parseDecision(raw: string): Decision | null {
   }
 }
 
-function decisionPrompt(instruction: string, calls: AgentToolCall[]): string {
+function decisionPrompt(instruction: string, calls: AgentToolCall[], context = ""): string {
+  const ctx = context ? ["", context, '위는 같은 세션의 이전 대화다. 지시가 "이어서/그거/방금"처럼 앞을 가리키면 이 맥락을 근거로 해석하라.'] : [];
   const history = calls.length
     ? [
         "",
@@ -113,6 +114,7 @@ function decisionPrompt(instruction: string, calls: AgentToolCall[]): string {
     '- 반드시 JSON 객체 하나만 출력한다: {"action":"tool","tool":"도구이름","args":{...}} 또는 {"action":"final","answer":"직접 답변"}',
     "- 지시와 맞는 도구가 없으면 action=final로 답한다. 도구 이름을 지어내지 않는다.",
     "- args 값은 모두 문자열로 쓴다.",
+    ...ctx,
     ...history,
     ...anaphoraHint(instruction),
     "",
@@ -148,11 +150,12 @@ function approvalMessage(approval: PendingApproval): string {
 
 // 최종 답변 재작성 — 도구 결과(사실)를 근거로 일반 chat 경로에서 한국어 답을 만든다.
 // remember:true라 대화 이력·학습루프 수집·RAG 주입까지 기존 채팅과 동일하게 동작한다.
-async function composeFinalAnswer(instruction: string, calls: AgentToolCall[]): Promise<string> {
+async function composeFinalAnswer(instruction: string, calls: AgentToolCall[], context = ""): Promise<string> {
   const facts = calls.map((c, i) => `[${i + 1}] ${c.tool}: ${c.result}`).join("\n");
   return chat({
     agentId: "orchestrator",
     message: [
+      ...(context ? [context, ""] : []),
       `사용자 지시: "${instruction}"`,
       "",
       "방금 시스템에서 조회한 실제 데이터:",
@@ -166,14 +169,14 @@ async function composeFinalAnswer(instruction: string, calls: AgentToolCall[]): 
 
 // 지시를 에이전트 루프로 처리한다. 도구를 하나도 쓰지 않았거나 결정이 파싱 불가면 null
 // (호출자가 기존 채팅으로 폴백). 도구를 썼으면 실행 내역과 최종 답변을 돌려준다.
-export async function runAgentLoop(instruction: string): Promise<AgentLoopResult | null> {
+export async function runAgentLoop(instruction: string, context = ""): Promise<AgentLoopResult | null> {
   if (listAgentTools().length === 0) return null;
 
   const calls: AgentToolCall[] = [];
   for (let step = 0; step < MAX_STEPS; step++) {
     const raw = await chat({
       agentId: "orchestrator",
-      message: decisionPrompt(instruction, calls),
+      message: decisionPrompt(instruction, calls, context),
       responseSchema: DECISION_SCHEMA,
       maxTokens: 300,
     }).catch(() => "");
@@ -182,7 +185,7 @@ export async function runAgentLoop(instruction: string): Promise<AgentLoopResult
 
     if (decision.action === "final") {
       if (calls.length === 0) return null; // 도구가 필요 없는 일반 대화 → 기존 채팅(RAG·이력)이 더 낫다
-      const output = await composeFinalAnswer(instruction, calls);
+      const output = await composeFinalAnswer(instruction, calls, context);
       return { output, toolCalls: calls };
     }
 
@@ -233,6 +236,6 @@ export async function runAgentLoop(instruction: string): Promise<AgentLoopResult
 
   // 반복 상한 도달 — 지금까지 모은 결과로라도 답을 만든다(도구를 썼을 때만).
   if (calls.length === 0) return null;
-  const output = await composeFinalAnswer(instruction, calls);
+  const output = await composeFinalAnswer(instruction, calls, context);
   return { output, toolCalls: calls };
 }

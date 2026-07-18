@@ -130,6 +130,42 @@ describe("dispatcher + intent + assets integration", () => {
     expect(res.body.task.priority).toBe(expectedPriority);
   });
 
+  describe("작업 세션 연결 — sessionId로 지시하면 턴이 기록된다", () => {
+    it("세션과 함께 지시하면 user·assistant 턴이 저장되고 응답에 sessionId가 실린다", async () => {
+      const created = await request(app)
+        .post("/api/work-sessions")
+        .set("Authorization", `Bearer ${token}`)
+        .send({});
+      const sessionId = created.body.id as string;
+
+      const res = await request(app)
+        .post("/api/dispatch")
+        .set("Authorization", `Bearer ${token}`)
+        .send({ text: "오늘 상태 어때?", sessionId });
+      expect(res.status).toBe(200);
+      expect(res.body.sessionId).toBe(sessionId);
+
+      const detail = await request(app).get(`/api/work-sessions/${sessionId}`).set("Authorization", `Bearer ${token}`);
+      expect(detail.body.turns).toHaveLength(2);
+      expect(detail.body.turns[0].role).toBe("user");
+      expect(detail.body.turns[0].content).toBe("오늘 상태 어때?");
+      expect(detail.body.turns[1].role).toBe("assistant");
+      // 첫 user 턴이 세션 제목을 자동으로 지었는지
+      expect(detail.body.session.title).toBe("오늘 상태 어때?");
+    });
+
+    it("sessionId 없이 지시하면 세션이 만들어지지 않는다(종전 동작 보존)", async () => {
+      const before = await request(app).get("/api/work-sessions").set("Authorization", `Bearer ${token}`);
+      const res = await request(app)
+        .post("/api/dispatch")
+        .set("Authorization", `Bearer ${token}`)
+        .send({ text: "오늘 상태 어때?" });
+      expect(res.body.sessionId).toBeUndefined();
+      const after = await request(app).get("/api/work-sessions").set("Authorization", `Bearer ${token}`);
+      expect(after.body.length).toBe(before.body.length); // 새 세션이 생기지 않음
+    });
+  });
+
   describe("학습 루프 실행 지시 — 확인 절차(오발동 방지)", () => {
     it.each(["학습 루프 실행해줘", "파인튜닝 시작해줘", "학습루프 돌려줘"])(
       "'%s'는 바로 실행하지 않고 confirm(learnloop)으로 확인을 요구한다",

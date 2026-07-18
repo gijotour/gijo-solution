@@ -17,6 +17,9 @@
       { ic: "🔬", label: "보안 분석", tabs: [
         { page: "analysis.html", label: "통합 관제" },
       ]},
+      { ic: "💬", label: "작업 세션", tabs: [
+        { page: "sessions.html", label: "작업 세션" },
+      ]},
     ]},
     { section: "보안 업무", groups: [
       { ic: "◇", label: "AI 자산", tabs: [
@@ -53,10 +56,11 @@
       ]},
     ]},
     { section: "시스템", groups: [
+      // 로그는 상시 확인 대상이라 설정 하위 탭이 아닌 최상위 항목으로 둔다.
+      { ic: "🗒", label: "로그", tabs: [{ page: "logs.html", label: "로그" }] },
       { ic: "⚙", label: "설정", tabs: [
         { page: "settings.html", label: "설정" },
         { page: "billing.html", label: "사용량·요금" },
-        { page: "logs.html", label: "로그" },
       ]},
     ]},
   ];

@@ -21,6 +21,7 @@ import { recordFindings, getAsset, listAssets } from "./assets";
 import { listFindings } from "./cti";
 import { matchCtiToAssets } from "./ctimatch";
 import { generateReport } from "./report";
+import { appendTurn, recentTurnsText, getSession } from "./worksessions";
 
 export interface DispatchResult {
   task: TaskItem;
@@ -32,6 +33,8 @@ export interface DispatchResult {
   approval?: PendingApproval;
   // 학습 루프 실행 요청 시: 바로 실행하지 않고 화면의 명시적 확인 버튼으로만 시작(오발동 방지).
   confirm?: { type: "learnloop"; datasets: { id: string; examples: number }[] };
+  // 작업 세션에 속한 지시였으면 그 세션 id를 돌려준다(화면이 해당 세션 대화를 갱신하도록).
+  sessionId?: string;
 }
 
 // ── 복합 지시(오케스트레이션) ─────────────────────────────────────────
@@ -111,7 +114,7 @@ interface ActionResult {
   approval?: PendingApproval;
 }
 
-async function executeRoutedAction(route: RoutedIntent, instructionText: string): Promise<ActionResult> {
+async function executeRoutedAction(route: RoutedIntent, instructionText: string, contextText = ""): Promise<ActionResult> {
   switch (route.action) {
     case "scan": {
       const assetId = route.targetAssetId ?? "unknown-asset";
@@ -128,7 +131,9 @@ async function executeRoutedAction(route: RoutedIntent, instructionText: string)
     case "chat":
     default: {
       // 모델 로드·선택은 chat() 내부(ensureAgentModel)에서 처리된다.
-      return { output: await chat({ agentId: route.agentId, message: instructionText, remember: true }) };
+      // 세션 맥락이 있으면 앞에 붙여 "이어서/그거" 같은 대화형 후속을 이해하게 한다.
+      const message = contextText ? `${contextText}\n\n[현재 지시] ${instructionText}` : instructionText;
+      return { output: await chat({ agentId: route.agentId, message, remember: true }) };
     }
   }
 }
@@ -266,7 +271,29 @@ async function learnloopConfirmResult(instructionText: string): Promise<Dispatch
   return { task: completedTask, route: { agentId: "analysis", action: "chat" }, output, confirm: { type: "learnloop", datasets } };
 }
 
-export async function dispatchInstruction(instructionText: string): Promise<DispatchResult> {
+// 작업 세션 래퍼 — sessionId가 있으면 지시를 user 턴, 응답을 assistant 턴으로 기록하고
+// 직전 턴들을 맥락으로 실어 "이어서" 지시가 되게 한다. sessionId가 없으면 종전과 100% 동일.
+export async function dispatchInstruction(instructionText: string, sessionId?: string): Promise<DispatchResult> {
+  const session = sessionId ? getSession(sessionId) : null;
+  // 맥락은 이번 지시를 기록하기 "전" 시점의 대화로 계산한다(방금 넣은 user 턴이 맥락에 중복되지 않게).
+  const contextText = session ? recentTurnsText(session.id) : "";
+  if (session) appendTurn(session.id, "user", instructionText);
+  const result = await dispatchInstructionCore(instructionText, contextText);
+  if (session) appendTurn(session.id, "assistant", result.output, turnToolTag(result));
+  return session ? { ...result, sessionId: session.id } : result;
+}
+
+// 응답 턴에 붙일 짧은 도구/경로 배지 — 화면에서 "무엇으로 처리됐는지"를 한눈에 보여준다.
+function turnToolTag(r: DispatchResult): string | undefined {
+  if (r.approval) return "결재판";
+  if (r.confirm) return "확인대기";
+  if (r.steps && r.steps.length) return `${r.steps.length}단계`;
+  if (r.toolCalls && r.toolCalls.length) return r.toolCalls[0].tool;
+  if (r.route && r.route.action !== "chat") return r.route.action;
+  return undefined;
+}
+
+async function dispatchInstructionCore(instructionText: string, contextText = ""): Promise<DispatchResult> {
   // 런타임 가드레일 — 입력의 프롬프트 인젝션 시도를 실시간 검사. block 모드면 거절, flag면 기록·경고 후 진행.
   const guard = guardInput(instructionText, "dispatch");
   if (guard.flagged) {
@@ -306,7 +333,7 @@ export async function dispatchInstruction(instructionText: string): Promise<Disp
   // "지금 급한 취약점 상위 3건만 알려줘"가 analyze로 분류돼 루프에 도달하지 못했다. 그 4분류는
   // 화면 메뉴를 미러링한 레거시 축이라, 의도 축 도구셋(search·explain·today)의 앞을 막으면 안 된다.
   // 루프가 처리 못 하면(null) 아래 기존 경로로 그대로 폴백하므로 스캔·리포트 동작은 보존된다.
-  const loop = await runAgentLoop(instructionText).catch(() => null);
+  const loop = await runAgentLoop(instructionText, contextText).catch(() => null);
   if (loop) {
     const loopTask = createTask({ text: instructionText, agentId: "orchestrator", priority: "P2" });
     setAgentStatus("orchestrator", "working");
@@ -335,7 +362,7 @@ export async function dispatchInstruction(instructionText: string): Promise<Disp
   let toolCalls: AgentToolCall[] | undefined;
   let approval: PendingApproval | undefined;
   try {
-    const result = await executeRoutedAction(route, instructionText);
+    const result = await executeRoutedAction(route, instructionText, contextText);
     output = result.output;
     toolCalls = result.toolCalls;
     approval = result.approval;
@@ -359,7 +386,8 @@ export function registerDispatcherRoutes(app: Express): void {
     "/api/dispatch",
     authMiddleware,
     asyncRoute(async (req, res) => {
-      res.json(await dispatchInstruction(req.body.text));
+      const sessionId = typeof req.body?.sessionId === "string" ? req.body.sessionId : undefined;
+      res.json(await dispatchInstruction(req.body.text, sessionId));
     })
   );
   // 실행 없이 지시가 몇 단계로 계획되는지 미리 보여준다(복합 지시 여부 확인용).
