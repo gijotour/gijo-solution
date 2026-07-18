@@ -148,7 +148,14 @@ export async function ingestText(documentId: string, raw: string, scope: string 
   const chunks = chunkText(raw);
   if (chunks.length === 0) return { documentId, chunks: 0, embeddingModel: "none", scope };
 
-  const vectors = await embed(chunks);
+  // 대용량 문서(수백~수천 청크)를 한 번에 임베딩하면 임베딩 서버 요청이 제한시간(120s)을 넘겨
+  // 통째로 실패(embed가 연결오류로 표기)한다. 배치로 나눠 각 요청이 시간 안에 끝나게 한다.
+  const EMBED_BATCH = 64;
+  const vectors: number[][] = [];
+  for (let i = 0; i < chunks.length; i += EMBED_BATCH) {
+    const vecs = await embed(chunks.slice(i, i + EMBED_BATCH));
+    for (const v of vecs) vectors.push(v);
+  }
   const rows: MemoryRow[] = chunks.map((text, i) => ({ documentId, chunkIndex: i, text, scope, vector: vectors[i] }));
 
   const db = await lancedb.connect(DB_PATH);

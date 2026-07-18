@@ -321,7 +321,14 @@ export async function autoStartLocalEngines(): Promise<void> {
   // 이전 서버 프로세스가 남긴 임베딩 llama-server가 이미 포트를 잡고 정상 서빙 중이면 재사용한다.
   // 실측(2026-07-17): 서버 재시작 시 자식 llama-server가 고아로 살아남아 새 스폰이 포트 충돌로
   // 죽고, 임베딩이 "반쯤 죽은" 상태(간헐 hang/실패)가 됐다 — 중복 스폰이 원인이라 선점 감지로 막는다.
-  const alive = await fetch(`http://localhost:${EMBEDDING_PORT}/v1/models`, { signal: AbortSignal.timeout(1500) })
+  // /v1/models만 확인하면 "반쯤 죽은"(모델은 응답, 임베딩은 hang) 서버를 재사용해버린다 — 실제 임베딩을
+  // 한 번 돌려보고 성공할 때만 재사용한다. 실패(먹통)면 새로 띄운다.
+  const alive = await fetch(`http://localhost:${EMBEDDING_PORT}/v1/embeddings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model: "local", input: "healthcheck" }),
+    signal: AbortSignal.timeout(4000),
+  })
     .then((r) => r.ok)
     .catch(() => false);
   if (alive) {
@@ -330,8 +337,10 @@ export async function autoStartLocalEngines(): Promise<void> {
     return;
   }
   if (fs.existsSync(embPath)) {
-    console.log(`[localengine] 임베딩 서버 자동 시작: ${EMBEDDING_MODEL_ID} (port ${EMBEDDING_PORT})`);
-    const spawned = spawn(LLAMA_SERVER_PATH, ["-m", embPath, "--embedding", "--port", String(EMBEDDING_PORT)], {
+    console.log(`[localengine] 임베딩 서버 자동 시작: ${EMBEDDING_MODEL_ID} (port ${EMBEDDING_PORT}, GPU 상주)`);
+    // -ngl -1: bge-m3를 GPU에 상주시킨다(채팅 모델과 동일). 이게 없으면 CPU로 돌아 배치 임베딩이 느려
+    // 대용량 문서 수집이 타임아웃난다(에이전트 모델처럼 GPU에 함께 올려 쓰는 설계).
+    const spawned = spawn(LLAMA_SERVER_PATH, ["-m", embPath, "--embedding", "-ngl", "-1", "--port", String(EMBEDDING_PORT)], {
       stdio: "pipe",
     });
     embeddingProcess = spawned;
