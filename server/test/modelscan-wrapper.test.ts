@@ -26,6 +26,9 @@ describe.runIf(pythonAndModelscanAvailable())("modelscan_wrapper.py (real Python
 
   beforeAll(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "modelscan-wrapper-test-"));
+    // Python은 Windows에서도 forward slash 경로를 허용한다 — 백슬래시를 쓰면 Linux CI에서
+    // 파일명에 '\'가 그대로 박혀 스캔 대상이 안 만들어진다(크로스플랫폼).
+    const tmpFwd = tmpDir.replace(/\\/g, "/");
     // 악성 pickle 페이로드를 저장소에 커밋해두지 않고 테스트 시점에 즉석으로 만든다 — 실제 동작하는
     // exploit 파일을 레포에 넣으면 백신/GitHub 악성코드 스캐너 오탐을 부를 수 있다.
     const makeFixtures = `
@@ -36,9 +39,9 @@ class Evil:
         import os
         return (os.system, ("echo test",))
 
-with open(r"${tmpDir}\\evil.pkl", "wb") as f:
+with open(r"${tmpFwd}/evil.pkl", "wb") as f:
     pickle.dump(Evil(), f)
-with open(r"${tmpDir}\\safe.pkl", "wb") as f:
+with open(r"${tmpFwd}/safe.pkl", "wb") as f:
     pickle.dump({"a": 1}, f)
 `;
     execFileSync(PYTHON, ["-c", makeFixtures]);
