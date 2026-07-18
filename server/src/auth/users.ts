@@ -5,6 +5,7 @@
 
 import type { Express, Request } from "express";
 import * as bcrypt from "bcryptjs";
+import * as crypto from "crypto";
 import { db } from "../db";
 import { authMiddleware, adminMiddleware } from "./auth";
 
@@ -108,12 +109,44 @@ export function findUserById(id: string): GijoUser | undefined {
   return getByIdStmt.get(id) as UserRow | undefined;
 }
 
-// 최초 기동 시(테이블이 비어 있을 때) 기본 관리자 계정을 하나 시드한다 — 실치 마법사가
-// 생기기 전까지의 최소 조치. 운영 환경에서는 로그인 직후 비밀번호부터 바꿀 것.
+// 최초 기동 시(테이블이 비어 있을 때) 관리자 계정을 하나 시드한다.
+// ⚠ 고객 self-install 보안: 운영(NODE_ENV=production)이나 GIJO_INITIAL_ADMIN_PASSWORD 지정 시엔
+// 알려진 기본 비번("changeme")을 절대 쓰지 않는다 — env 비번을 쓰거나, 없으면 강력 랜덤을 생성해
+// 콘솔에 1회만 출력한다(설치자가 확인 후 로그인·즉시 변경). 개발/테스트는 기존 jyh/changeme 유지.
+export interface InitialAdmin {
+  username: string;
+  password: string;
+  displayName: string;
+  generated: boolean; // 랜덤 생성 여부(출력 필요)
+}
+export function computeInitialAdmin(env: NodeJS.ProcessEnv = process.env): InitialAdmin {
+  const isProd = env.NODE_ENV === "production";
+  const envPw = env.GIJO_INITIAL_ADMIN_PASSWORD;
+  const username = env.GIJO_INITIAL_ADMIN_USERNAME || (isProd || envPw ? "admin" : "jyh");
+  if (isProd || envPw) {
+    return { username, password: envPw || crypto.randomBytes(12).toString("base64url"), displayName: "관리자", generated: !envPw };
+  }
+  return { username: "jyh", password: "changeme", displayName: "정요한", generated: false };
+}
+
+// 개발 기본 계정(jyh/changeme)이 아직 그대로인지 — 보안 경고·프리플라이트용.
+export function usingDefaultCredential(): boolean {
+  const row = getByUsernameStmt.get("jyh") as UserRow | undefined;
+  return Boolean(row && bcrypt.compareSync("changeme", row.passwordHash));
+}
+
 function seedDefaultAdminIfEmpty(): void {
   const existing = listStmt.all() as UserRow[];
   if (existing.length > 0) return;
-  createUser({ username: "jyh", password: "changeme", displayName: "정요한", role: "admin" });
+  const a = computeInitialAdmin();
+  createUser({ username: a.username, password: a.password, displayName: a.displayName, role: "admin" });
+  if (a.generated) {
+    console.log("════════════════════════════════════════════════");
+    console.log(`[setup] 초기 관리자 계정 생성 — 아이디: ${a.username}`);
+    console.log(`[setup] 초기 비밀번호: ${a.password}`);
+    console.log("[setup] ⚠ 로그인 후 즉시 변경하세요. 이 비밀번호는 다시 표시되지 않습니다.");
+    console.log("════════════════════════════════════════════════");
+  }
 }
 seedDefaultAdminIfEmpty();
 

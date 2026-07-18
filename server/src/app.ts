@@ -28,6 +28,7 @@ import { registerRedteamRoutes } from "./engine/redteam";
 import { registerGuardrailRoutes } from "./engine/guardrail";
 import { registerAnalysisHubRoutes } from "./engine/analysishub";
 import { registerModelLicenseRoutes } from "./engine/modellicense";
+import { registerPreflightRoutes } from "./engine/preflight";
 import { registerGitSyncRoutes } from "./engine/gitsync";
 import { registerHfModelsRoutes } from "./engine/hfmodels";
 import { registerIntentRoutes } from "./engine/intent";
@@ -109,6 +110,7 @@ export function createApp(): Express {
   registerGuardrailRoutes(app);
   registerAnalysisHubRoutes(app);
   registerModelLicenseRoutes(app);
+  registerPreflightRoutes(app);
   registerGitSyncRoutes(app);
   registerHfModelsRoutes(app);
   registerIntentRoutes(app);
