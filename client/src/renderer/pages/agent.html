@@ -320,6 +320,7 @@ tr:last-child td{border-bottom:none;}
 
   let agentRecs = {};
   let globalModelId = null; // 전역(공유) 채팅 모델 id — 개별 지정 안 한 에이전트가 쓰는 모델
+  let embeddingInfo = null; // 임베딩(bge-m3) 모듈 — 로스터에 팀원 카드로 함께 표시
   const esc = (s) => String(s == null ? "" : s).replace(/</g, "&lt;");
   const dirNameOf = (id) => String(id).replace(/\//g, "__");
 
@@ -346,6 +347,25 @@ tr:last-child td{border-bottom:none;}
       style="width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:6px;padding:6px 8px;color:var(--text);font-size:11.5px;outline:none;cursor:pointer">${opts}</select>`;
   }
 
+  // 임베딩(bge-m3) 팀원 카드 — 대화하는 에이전트는 아니지만 '검색 기억'을 담당하는 상주 모듈이라 로스터에 함께 둔다.
+  // 모델 교체 드롭다운·이름변경은 없다(임베딩 전용 고정).
+  function embeddingMemberHtml() {
+    if (!embeddingInfo || !embeddingInfo.running) return "";
+    const model = embeddingInfo.modelId || "bge-m3";
+    return `<div class="agent-card">
+      <div class="agent-status st-working"><span class="st-dot"></span>상주</div>
+      <div class="agent-top">
+        <div class="agent-icon" style="background:rgba(30,185,128,.14);color:var(--teal)">🔎</div>
+        <div style="flex:1;min-width:0;">
+          <div class="agent-name">임베딩 엔진</div>
+          <div class="agent-role">문서·매뉴얼 검색 벡터화 (RAG)</div>
+        </div>
+      </div>
+      <div class="agent-desc">업로드된 매뉴얼·문서를 벡터로 변환해 검색·질의(RAG)를 뒷받침합니다. 대화는 하지 않고 팀의 '검색 기억'을 담당하는 상주 모듈입니다.</div>
+      <div class="agent-rec"><div class="rec-head">🧠 현재 추천 모델: <b>${esc(model)}</b> <span class="rec-gb">임베딩 전용 · GPU 상주 · :${embeddingInfo.port}</span></div></div>
+    </div>`;
+  }
+
   function renderAgents(agents) {
     agentGrid.innerHTML = agents
       .map((a) => {
@@ -368,7 +388,7 @@ tr:last-child td{border-bottom:none;}
           ${recommendationHtml(a)}
         </div>`;
       })
-      .join("");
+      .join("") + embeddingMemberHtml();
 
     // 추천 모델 받기(다운로드 큐) / 적용(할당) — 부모 위임 대신 렌더마다 바인딩(카드가 매번 재생성됨).
     agentGrid.querySelectorAll("[data-rec-get]").forEach((btn) => {
@@ -476,6 +496,7 @@ tr:last-child td{border-bottom:none;}
       agentRecs = recs || {};
       // 전역(공유) 모델 = 지금 로드된 기본 채팅 모델. 에이전트가 개별 모델을 지정 안 했으면 이걸 쓴다.
       globalModelId = status ? (status.modelId || (status.loaded && status.loaded[0] && status.loaded[0].modelId) || null) : null;
+      embeddingInfo = status ? status.embedding : null;
       renderAgents(agents);
     } catch (e) {
       agentGrid.innerHTML = '<div style="color:var(--muted)">에이전트 목록을 불러오지 못했습니다</div>';
