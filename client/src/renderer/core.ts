@@ -17,7 +17,8 @@ declare global {
       navigateTo: (page: string) => Promise<void>;
       listAgents: () => Promise<unknown[]>;
       sendInstruction: (text: string) => Promise<unknown>;
-      approveAgentTool: (tool: string, args: Record<string, string>, instruction?: string) => Promise<{ output: string }>;
+      approveAgentTool: (tool: string, args: Record<string, string>, instruction?: string) => Promise<{ output: string; undoId?: string }>;
+      undoAgentTool: (id?: string) => Promise<{ ok: boolean; message: string }>;
       onCollaborationEvent: (cb: (evt: unknown) => void) => void;
       listTasks: () => Promise<unknown[]>;
       addTask: (text: string) => Promise<unknown>;

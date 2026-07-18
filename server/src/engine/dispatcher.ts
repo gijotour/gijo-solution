@@ -14,6 +14,7 @@ import { chat } from "./llm";
 import { runAgentLoop, AgentToolCall } from "./agentloop";
 import { executeApprovedTool, PendingApproval } from "./agenttools";
 import { appendApprovedDecision } from "./orchestrator-dataset";
+import { undoSnapshot, undoCommit } from "./undo";
 import { analyzeFindings } from "./analysis";
 import { recordFindings, getAsset, listAssets } from "./assets";
 import { listFindings } from "./cti";
@@ -367,13 +368,15 @@ export function registerDispatcherRoutes(app: Express): void {
       setAgentStatus("orchestrator", "working");
       emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `승인됨 — ${toolName} 실행` });
       try {
+        const undoBefore = undoSnapshot(); // #7: 실행 전 상태 스냅샷(원클릭 undo용)
         const output = await executeApprovedTool(toolName, args);
+        const undoId = undoCommit(toolName, output.slice(0, 50), undoBefore); // 변화 있으면 되돌리기 항목 등록
         emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `실행 완료: ${output.slice(0, 120)}` });
         // 사람이 승인한 (지시→도구) = 검증된 정답. 파인튜닝 골드 예시로 누적한다(Phase 4, 자가강화).
         appendApprovedDecision(instruction, toolName, args);
         resetAgentToDefault("orchestrator");
         const updated = completeTask(task.id);
-        res.json({ output, task: updated.find((t) => t.id === task.id) ?? task });
+        res.json({ output, undoId, task: updated.find((t) => t.id === task.id) ?? task });
       } catch (err) {
         resetAgentToDefault("orchestrator");
         completeTask(task.id);

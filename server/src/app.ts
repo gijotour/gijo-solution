@@ -22,6 +22,7 @@ import { registerCollaborationRoutes } from "./engine/collaboration";
 import { registerDatasetRoutes } from "./engine/dataset";
 import { registerOrchestratorDatasetRoutes } from "./engine/orchestrator-dataset";
 import { registerBriefingRoutes } from "./engine/briefing";
+import { registerUndoRoutes } from "./engine/undo";
 import { registerGitSyncRoutes } from "./engine/gitsync";
 import { registerHfModelsRoutes } from "./engine/hfmodels";
 import { registerIntentRoutes } from "./engine/intent";
@@ -82,6 +83,7 @@ export function createApp(): Express {
   registerDatasetRoutes(app);
   registerOrchestratorDatasetRoutes(app);
   registerBriefingRoutes(app);
+  registerUndoRoutes(app);
   registerGitSyncRoutes(app);
   registerHfModelsRoutes(app);
   registerIntentRoutes(app);

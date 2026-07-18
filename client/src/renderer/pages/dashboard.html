@@ -159,6 +159,9 @@
   .ap-in.need{border-color:rgba(226,72,61,0.55);background:rgba(226,72,61,0.05);}
   .ap-in.auto{border-color:rgba(30,185,128,0.35);}
   .ap-in.guess{border-color:rgba(240,160,32,0.45);}
+  .cl-undo{margin-top:6px;font-size:11px;font-weight:600;color:var(--amber);background:rgba(240,160,32,0.1);border:1px solid rgba(240,160,32,0.35);border-radius:6px;padding:4px 10px;cursor:pointer;}
+  .cl-undo:hover{background:rgba(240,160,32,0.18);}
+  .cl-undo:disabled{opacity:.5;cursor:default;}
   .ap-src{font-size:9px;font-weight:700;padding:2px 6px;border-radius:4px;flex:0 0 auto;white-space:nowrap;}
   .ap-src.said{color:var(--blue-light);background:rgba(59,130,246,0.14);border:1px solid rgba(59,130,246,0.3);}
   .ap-src.auto{color:var(--teal);background:rgba(30,185,128,0.12);border:1px solid rgba(30,185,128,0.3);}
@@ -1065,7 +1068,28 @@
       try {
         const r = await window.gijo.approveAgentTool(approval.tool, collect(), approval.instruction || "");
         card.remove();
-        clAppend("offer", { icon: "✅", name: `실행 완료 — ${approval.tool}`, message: r.output });
+        const row = clAppend("offer", { icon: "✅", name: `실행 완료 — ${approval.tool}`, message: r.output });
+        // #7 원클릭 undo — 서버가 되돌릴 게 있으면 undoId를 준다. 방금 실행 취소 버튼을 붙인다.
+        if (r && r.undoId) {
+          const undoBtn = document.createElement("button");
+          undoBtn.className = "cl-undo";
+          undoBtn.textContent = "↩ 방금 실행 취소";
+          undoBtn.addEventListener("click", async () => {
+            undoBtn.disabled = true;
+            try {
+              const u = await window.gijo.undoAgentTool(r.undoId);
+              undoBtn.remove();
+              clAppend("event", { icon: "↩", name: "되돌림", message: (u && u.message) || "되돌렸습니다." });
+              await loadTasks();
+              refreshTeamStatus();
+            } catch (e) {
+              undoBtn.disabled = false;
+              clAppend("error", { icon: "⚠", name: "되돌리기 실패", message: (e && e.message) || String(e) });
+            }
+          });
+          const cb = row.querySelector(".cb");
+          if (cb) cb.appendChild(undoBtn);
+        }
         await loadTasks();
         refreshTeamStatus();
       } catch (err) {
