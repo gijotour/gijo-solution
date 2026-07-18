@@ -45,6 +45,9 @@
         { page: "ontology.html", label: "온톨로지" },
         { page: "learnloop.html", label: "학습 루프" },
       ]},
+      { ic: "🛡", label: "AI 견고성", tabs: [
+        { page: "redteam.html", label: "레드팀·가드레일" },
+      ]},
     ]},
     { section: "시스템", groups: [
       { ic: "⚙", label: "설정", tabs: [

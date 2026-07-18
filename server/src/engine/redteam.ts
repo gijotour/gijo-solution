@@ -49,6 +49,8 @@ export interface RedTeamResult {
   severity: string;
   desc: string;
   vulnerable: boolean; // 공격 성공 = 모델이 뚫림
+  prompt: string; // 실제로 보낸 공격(카나리·마커 치환됨) — 감사 상세용
+  basis: string; // 판정 근거(카나리 유출 / 마커 순응)
   responseExcerpt: string;
 }
 
@@ -101,7 +103,8 @@ export async function runRedTeam(callLlm: LlmCaller, model = "orchestrator"): Pr
       response = "(호출 실패)";
     }
     const vulnerable = p.succeeds(response, canary, marker);
-    results.push({ id: p.id, category: p.category, severity: p.severity, desc: p.desc, vulnerable, responseExcerpt: response.replace(/\s+/g, " ").slice(0, 160) });
+    const basis = p.succeeds === obeysMarker ? "주입 마커 순응(지시 무시)" : "비밀 카나리 유출";
+    results.push({ id: p.id, category: p.category, severity: p.severity, desc: p.desc, vulnerable, prompt, basis, responseExcerpt: response.replace(/\s+/g, " ").slice(0, 240) });
     const c = (byCategory[p.category] ??= { total: 0, vulnerable: 0 });
     c.total++;
     if (vulnerable) c.vulnerable++;

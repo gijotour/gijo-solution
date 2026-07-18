@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — AI 견고성 (레드팀·가드레일)</title>
+<style>
+:root{
+  --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
+.header{display:flex;justify-content:space-between;align-items:center;padding:12px 22px;border-bottom:1px solid var(--border);}
+.header-left{display:flex;align-items:center;gap:16px;}
+.header img{height:22px;}
+.app-title{font-size:15px;font-weight:800;color:#fff;}
+.clock{font-size:12px;color:var(--muted);}
+.header-right{display:flex;align-items:center;gap:12px;}
+.status-pill{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--teal);background:rgba(30,185,128,0.1);border:1px solid rgba(30,185,128,0.25);border-radius:20px;padding:5px 12px;}
+.status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
+.beta-tag{font-size:9px;font-weight:800;color:var(--muted-2);letter-spacing:.5px;}
+.avatar-btn{width:30px;height:30px;border-radius:50%;background:var(--blue);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer;}
+.icon-btn{width:30px;height:30px;border-radius:8px;border:1px solid var(--border-strong);display:flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer;}
+.app{display:grid;grid-template-columns:220px 1fr;}
+.sidebar{padding:22px 14px;border-right:1px solid var(--border);min-height:900px;}
+.nav-section{font-size:10.5px;font-weight:700;color:var(--muted-2);letter-spacing:1.2px;margin:18px 10px 8px;}
+.nav-section:first-child{margin-top:0;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:2px;}
+.nav-item .ic{width:18px;text-align:center;font-size:14px;}
+.nav-item.active{background:rgba(59,130,246,0.12);color:var(--white);box-shadow:inset 3px 0 0 var(--blue);cursor:default;}
+.nav-item:hover:not(.active){background:rgba(255,255,255,0.04);color:var(--white);}
+.main{padding:28px 32px 48px;}
+.topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;}
+.page-title{font-size:21px;font-weight:800;color:#fff;}
+.page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;max-width:720px;line-height:1.6;}
+.btn-primary{background:var(--blue);color:#fff;border:none;padding:10px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;}
+.btn-primary:disabled{opacity:0.5;cursor:not-allowed;}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;max-width:1080px;}
+.panel-title{font-size:14.5px;font-weight:800;color:#fff;margin-bottom:4px;}
+.panel-sub{font-size:11.5px;color:var(--muted);margin-bottom:14px;line-height:1.6;}
+.muted{color:var(--muted);}
+
+/* 가드레일 패널 */
+.guard-row{display:flex;align-items:center;gap:18px;flex-wrap:wrap;}
+.guard-state{display:flex;align-items:center;gap:10px;font-weight:800;font-size:15px;}
+.guard-badge{font-size:11px;font-weight:800;padding:3px 10px;border-radius:6px;}
+.gb-off{color:var(--muted-2);background:rgba(255,255,255,.06);}
+.gb-flag{color:var(--amber);background:rgba(240,160,32,.14);}
+.gb-block{color:var(--teal);background:rgba(30,185,128,.14);}
+.seg{display:inline-flex;border:1px solid var(--border-strong);border-radius:8px;overflow:hidden;}
+.seg button{background:transparent;border:none;color:var(--muted);font-size:12px;font-weight:700;padding:8px 14px;cursor:pointer;}
+.seg button.active{background:var(--blue);color:#fff;cursor:default;}
+.guard-counts{margin-left:auto;font-size:12px;color:var(--muted);}
+.guard-counts b{color:var(--text);}
+.glog{margin-top:14px;max-height:150px;overflow-y:auto;}
+.glog-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px;}
+.glog-row:last-child{border-bottom:none;}
+.glog-row .gcat{color:var(--red);font-weight:700;}
+.glog-row .gex{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}
+.glog-row .gbk{font-size:10px;font-weight:800;padding:1px 6px;border-radius:4px;}
+.gbk.b{color:var(--red);background:rgba(226,72,61,.14);}
+.gbk.f{color:var(--amber);background:rgba(240,160,32,.14);}
+
+/* 견고성 KPI 위젯 (시안 B) */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;max-width:1080px;margin-bottom:16px;}
+.kpi{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px;}
+.kpi .v{font-size:30px;font-weight:800;}
+.kpi .k{color:var(--muted);font-size:12px;margin-top:4px;}
+.kpi.donut{display:flex;align-items:center;gap:14px;}
+.kpi.donut svg{flex:none;}
+.verdict-line{font-size:12px;margin-top:6px;font-weight:700;}
+
+/* 카테고리 막대 + 항목 (시안 B+C) */
+.cols{display:grid;grid-template-columns:340px 1fr;gap:16px;max-width:1080px;align-items:start;}
+.catbar{margin:11px 0;}
+.catbar .top{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px;}
+.catbar .track{height:9px;background:var(--panel-2);border-radius:5px;overflow:hidden;}
+.catbar .track>i{display:block;height:100%;}
+.advice{margin-top:16px;padding:11px;border-radius:8px;background:rgba(240,160,32,.08);border:1px solid rgba(240,160,32,.25);font-size:12px;color:var(--amber);line-height:1.6;}
+
+/* 펼침 항목(시안 C) */
+.sevgroup-h{font-size:12px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin:16px 0 6px;}
+.sevgroup-h:first-child{margin-top:0;}
+.item{border:1px solid var(--border);border-radius:9px;margin-bottom:8px;overflow:hidden;background:var(--panel-2);}
+.item.vuln{border-left:3px solid var(--red);}
+.item.vuln.high{border-left-color:var(--amber);}
+.item.vuln.medium{border-left-color:#c9a227;}
+.item.safe{border-left:3px solid var(--teal);}
+.item-head{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;font-size:13.5px;}
+.sev{font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:4px;}
+.sev.critical{color:var(--red);background:rgba(226,72,61,.14);}
+.sev.high{color:var(--amber);background:rgba(240,160,32,.14);}
+.sev.medium{color:#c9a227;background:rgba(201,162,39,.12);}
+.res{margin-left:auto;font-size:12px;font-weight:800;}
+.res.v{color:var(--red);}.res.s{color:var(--teal);}
+.caret{color:var(--muted-2);transition:transform .15s;font-size:11px;width:12px;}
+.item.open .caret{transform:rotate(90deg);}
+.item-body{display:none;padding:2px 16px 16px 36px;font-size:12.5px;color:var(--muted);line-height:1.75;}
+.item.open .item-body{display:block;}
+.item-body .lbl{color:var(--text);font-weight:700;}
+.item-body pre{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;white-space:pre-wrap;color:#cdd7e0;font-size:12px;margin:6px 0;font-family:inherit;}
+.footer{display:flex;align-items:center;gap:10px;margin-top:32px;color:var(--muted-2);font-size:11px;}
+.footer img{height:16px;opacity:.6;}
+.empty{color:var(--muted-2);font-size:13px;padding:30px;text-align:center;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <span id="homeLink" data-page="dashboard.html" title="대시보드로 이동" style="display:flex;align-items:center;gap:12px;cursor:pointer"><img src="https://gijo.ai/_nuxt/logo_gijo_white.CCh2YXJe.svg" alt="GIJO">
+    <div class="app-title">GIJO AS</div></span>
+    <div class="clock" id="clockEl">-</div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill" id="statusPill"><span class="dot"></span>연결 확인 중<span class="beta-tag">LIVE</span></div>
+    <div class="avatar-btn" id="avatarBtn">-</div>
+    <div class="icon-btn" id="settingsBtn">⚙</div>
+  </div>
+</div>
+
+<div class="app">
+  <div class="sidebar" id="gijoNav"></div>
+
+  <div class="main">
+    <div class="topbar-row">
+      <div>
+        <div class="page-title">AI 견고성 · 레드팀 · 가드레일</div>
+        <div class="page-sub">배포된 로컬 LLM이 <b>프롬프트 인젝션·탈옥</b>에 얼마나 견고한지 실측(레드팀)하고, 실시간 입력을 검사해 인젝션 시도를 탐지·차단(가드레일)합니다. 온프레미스에서 도는 AI 보안 방어선입니다.</div>
+      </div>
+      <button class="btn-primary" id="runBtn">▶ 레드팀 실행</button>
+    </div>
+
+    <!-- 가드레일: 실시간 방어 -->
+    <div class="panel">
+      <div class="panel-title">🛡 런타임 가드레일 <span class="muted" style="font-size:11px;font-weight:600">— 실시간 인젝션 방어</span></div>
+      <div class="panel-sub">사용자 지시가 LLM에 들어가기 전 검사합니다. <b>탐지</b>는 기록만 하고 진행, <b>차단</b>은 인젝션 의심 요청을 거절합니다.</div>
+      <div class="guard-row">
+        <div class="guard-state"><span id="guardBadge" class="guard-badge gb-flag">탐지</span></div>
+        <div class="seg" id="guardSeg">
+          <button data-mode="off">끔</button>
+          <button data-mode="flag">탐지</button>
+          <button data-mode="block">차단</button>
+        </div>
+        <div class="guard-counts">누적 탐지 <b id="gFlagged">0</b> · 차단 <b id="gBlocked">0</b></div>
+      </div>
+      <div class="glog" id="guardLog"></div>
+    </div>
+
+    <!-- 레드팀 요약 위젯 -->
+    <div class="kpis" id="kpis">
+      <div class="kpi donut">
+        <svg width="66" height="66" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="#0e1526" stroke-width="4"/><circle id="scoreArc" cx="18" cy="18" r="15.9" fill="none" stroke="#e2483d" stroke-width="4" stroke-dasharray="0 100" stroke-linecap="round" transform="rotate(-90 18 18)"/><text id="scoreText" x="18" y="21" text-anchor="middle" font-size="9" fill="#e7eaf3" font-weight="700">-</text></svg>
+        <div><div class="v" id="verdictWord" style="font-size:16px">-</div><div class="k">견고성 점수 / 100</div></div>
+      </div>
+      <div class="kpi"><div class="v" id="kVuln" style="color:var(--red)">-</div><div class="k">뚫린 공격</div></div>
+      <div class="kpi"><div class="v" id="kSafe" style="color:var(--teal)">-</div><div class="k">방어한 공격</div></div>
+      <div class="kpi"><div class="v" id="kTotal">-</div><div class="k">총 페이로드</div></div>
+    </div>
+
+    <div class="cols">
+      <div class="panel" style="margin-bottom:0">
+        <div class="panel-title">카테고리별 취약률</div>
+        <div class="panel-sub" id="ranAt">아직 실행 기록이 없습니다.</div>
+        <div id="cats"></div>
+        <div class="advice" id="advice" style="display:none"></div>
+      </div>
+      <div class="panel" style="margin-bottom:0">
+        <div class="panel-title">공격 결과 <span class="muted" style="font-size:11px;font-weight:600">— 항목을 누르면 공격·응답·판정근거·권고</span></div>
+        <div id="results"><div class="empty">레드팀을 실행하면 14개 공격의 상세 결과가 여기 표시됩니다.</div></div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <img src="https://gijo.ai/_nuxt/logo_gijo_only_white.ATZVOJtw.svg" alt="GIJO">
+      <span>© 2026 GIJO Technology · GIJO AS Platform · Confidential</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  const clockEl = document.getElementById("clockEl");
+  const statusPill = document.getElementById("statusPill");
+  const avatarBtn = document.getElementById("avatarBtn");
+  const runBtn = document.getElementById("runBtn");
+
+  const CAT_LABEL = {
+    "instruction-override": "지시 무시", "system-prompt-leak": "시스템프롬프트 유출",
+    "jailbreak": "탈옥", "obfuscation": "난독화 우회", "indirect": "간접 주입",
+  };
+  const CAT_ADVICE = {
+    "system-prompt-leak": "시스템 프롬프트에 비밀값(API키·크리덴셜) 미포함",
+    "instruction-override": "가드레일 block 모드 상시 · 위험 도구는 결재판 승인 유지",
+    "jailbreak": "역할·페르소나 고정 · 거절 규칙을 시스템 상단에 명시",
+    "obfuscation": "출력 후처리로 비밀 패턴(정규식) 마스킹",
+    "indirect": "외부 문서·요약 입력도 가드레일 대상에 포함",
+  };
+  const SEV_ORDER = { critical: 0, high: 1, medium: 2 };
+  const SEV_LABEL = { critical: "CRITICAL", high: "HIGH", medium: "MEDIUM" };
+
+  function esc(s){ return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+  function tick(){ clockEl.textContent = new Date().toLocaleString("ko-KR",{hour:"2-digit",minute:"2-digit",hour12:true,year:"numeric",month:"2-digit",day:"2-digit"}); }
+  async function loadHealth(){ try{ await window.gijo.checkServerHealth(); statusPill.innerHTML='<span class="dot"></span>운영중<span class="beta-tag">LIVE</span>'; }catch(e){ statusPill.innerHTML='<span class="dot" style="background:#e2483d"></span>서버 연결 끊김'; } }
+  async function loadUser(){ try{ const u=await window.gijo.me(); avatarBtn.textContent=(u.displayName||u.username||"-").charAt(0); }catch(e){} }
+
+  // ── 가드레일 ──
+  function renderGuard(status){
+    const badge = document.getElementById("guardBadge");
+    const map = { off:["gb-off","끔"], flag:["gb-flag","탐지"], block:["gb-block","차단"] };
+    const m = map[status.mode] || map.flag;
+    badge.className = "guard-badge " + m[0]; badge.textContent = m[1];
+    document.getElementById("gFlagged").textContent = status.flaggedCount;
+    document.getElementById("gBlocked").textContent = status.blockedCount;
+    document.querySelectorAll("#guardSeg button").forEach(b => b.classList.toggle("active", b.dataset.mode === status.mode));
+  }
+  function renderGuardLog(events){
+    const box = document.getElementById("guardLog");
+    if(!events.length){ box.innerHTML = '<div class="muted" style="font-size:12px;padding:6px 0">탐지된 인젝션 시도가 없습니다.</div>'; return; }
+    box.innerHTML = events.map(e => {
+      const t = new Date(e.at).toLocaleString("ko-KR",{month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit"});
+      const cats = (e.categories||[]).map(c => CAT_LABEL[c]||c).join(", ");
+      return '<div class="glog-row"><span class="muted" style="width:92px">'+t+'</span>'+
+        '<span class="gcat">'+esc(cats)+'</span>'+
+        '<span class="gex">'+esc(e.excerpt)+'</span>'+
+        '<span class="gbk '+(e.blocked?"b":"f")+'">'+(e.blocked?"차단":"기록")+'</span></div>';
+    }).join("");
+  }
+  async function loadGuard(){
+    try{
+      const [status, log] = await Promise.all([window.gijo.guardrailStatus(), window.gijo.guardrailLog(30)]);
+      renderGuard(status); renderGuardLog(log);
+    }catch(e){}
+  }
+  document.getElementById("guardSeg").addEventListener("click", async (ev) => {
+    const btn = ev.target.closest("button"); if(!btn) return;
+    try{ const status = await window.gijo.setGuardrailMode(btn.dataset.mode); renderGuard(status); }catch(e){}
+  });
+
+  // ── 레드팀 ──
+  function verdict(score){
+    if(score >= 80) return ["양호","var(--teal)"];
+    if(score >= 50) return ["주의","var(--amber)"];
+    return ["위험","var(--red)"];
+  }
+  function renderReport(rep){
+    if(!rep || !rep.results || !rep.results.length){ return; }
+    const score = rep.robustnessScore || 0;
+    const [word, color] = verdict(score);
+    document.getElementById("scoreArc").setAttribute("stroke-dasharray", score + " " + (100-score));
+    document.getElementById("scoreArc").setAttribute("stroke", color);
+    document.getElementById("scoreText").textContent = score;
+    const vw = document.getElementById("verdictWord"); vw.textContent = word; vw.style.color = color;
+    document.getElementById("kVuln").textContent = rep.vulnerable;
+    document.getElementById("kSafe").textContent = rep.total - rep.vulnerable;
+    document.getElementById("kTotal").textContent = rep.total;
+    document.getElementById("ranAt").textContent = "대상: " + (rep.model||"orchestrator") + " · " + new Date(rep.ranAt).toLocaleString("ko-KR");
+
+    // 카테고리 막대
+    const cats = Object.entries(rep.byCategory||{}).sort((a,b)=> (b[1].vulnerable/b[1].total) - (a[1].vulnerable/a[1].total));
+    document.getElementById("cats").innerHTML = cats.map(([cat,c])=>{
+      const pct = Math.round((c.vulnerable/c.total)*100);
+      const col = pct >= 67 ? "var(--red)" : pct >= 34 ? "var(--amber)" : "var(--teal)";
+      return '<div class="catbar"><div class="top"><span>'+esc(CAT_LABEL[cat]||cat)+'</span><span class="muted">'+c.vulnerable+'/'+c.total+'</span></div>'+
+        '<div class="track"><i style="width:'+pct+'%;background:'+col+'"></i></div></div>';
+    }).join("");
+
+    // 조치 권고 — 취약한 카테고리에 대해서만
+    const vulnCats = cats.filter(([,c])=>c.vulnerable>0).map(([cat])=>CAT_ADVICE[cat]).filter(Boolean);
+    const advice = document.getElementById("advice");
+    if(vulnCats.length){ advice.style.display="block"; advice.innerHTML = "💡 조치: " + [...new Set(vulnCats)].join(" · "); }
+    else advice.style.display="none";
+
+    // 결과 항목 — 심각도순, 뚫림 먼저
+    const sorted = rep.results.slice().sort((a,b)=>{
+      if(a.vulnerable !== b.vulnerable) return a.vulnerable ? -1 : 1;
+      return (SEV_ORDER[a.severity]??9) - (SEV_ORDER[b.severity]??9);
+    });
+    let lastSev = null, html = "";
+    for(const r of sorted){
+      const key = r.vulnerable ? r.severity : "safe";
+      if(key !== lastSev){
+        lastSev = key;
+        html += '<div class="sevgroup-h">'+(r.vulnerable ? (SEV_LABEL[r.severity]||r.severity) : "방어 성공")+'</div>';
+      }
+      const cls = r.vulnerable ? ("item vuln "+r.severity) : "item safe";
+      html += '<div class="'+cls+'">'+
+        '<div class="item-head"><span class="caret">▶</span>'+
+          (r.vulnerable ? '<span class="sev '+r.severity+'">'+r.severity+'</span>' : '')+
+          '<span>'+esc(r.desc)+'</span>'+
+          '<span class="res '+(r.vulnerable?"v":"s")+'">'+(r.vulnerable?"뚫림":"방어")+'</span></div>'+
+        '<div class="item-body">'+
+          '<div><span class="lbl">공격:</span> '+esc(r.prompt)+'</div>'+
+          '<div style="margin-top:6px"><span class="lbl">모델 응답:</span></div><pre>'+esc(r.responseExcerpt||"(응답 없음)")+'</pre>'+
+          '<div><span class="lbl">판정 근거:</span> '+esc(r.basis)+' — '+(r.vulnerable?'공격 성공(모델이 순응)':'방어 성공(순응하지 않음)')+'</div>'+
+          (r.vulnerable && CAT_ADVICE[r.category] ? '<div style="margin-top:4px"><span class="lbl">권고:</span> '+esc(CAT_ADVICE[r.category])+'</div>' : '')+
+        '</div></div>';
+    }
+    document.getElementById("results").innerHTML = html;
+    document.querySelectorAll("#results .item-head").forEach(h => h.addEventListener("click", ()=> h.parentElement.classList.toggle("open")));
+  }
+
+  async function loadLast(){ try{ const rep = await window.gijo.lastRedTeam(); if(rep && rep.results && rep.results.length) renderReport(rep); }catch(e){} }
+
+  runBtn.addEventListener("click", async () => {
+    runBtn.disabled = true; const orig = runBtn.textContent; runBtn.textContent = "실행 중… (14개 공격 · ~1분)";
+    try{ const rep = await window.gijo.runRedTeam(); renderReport(rep); }
+    catch(e){ document.getElementById("results").innerHTML = '<div class="empty">실행 실패: '+esc(e.message||e)+'<br>오케스트레이터 모델이 로드됐는지 확인하세요.</div>'; }
+    finally{ runBtn.disabled = false; runBtn.textContent = orig; }
+  });
+
+  document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
+  document.querySelectorAll("[data-page]").forEach(el => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
+
+  if(!window.gijo.isAuthenticated()){ window.gijo.navigateTo("login.html"); }
+  else {
+    tick(); setInterval(tick, 30000);
+    loadHealth(); loadUser(); loadGuard(); loadLast();
+    if(window.gijoRealtime) window.gijoRealtime.connect();
+  }
+</script>
+<script src="nav.js"></script>
+</body>
+</html>

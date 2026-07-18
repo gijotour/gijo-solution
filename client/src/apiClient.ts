@@ -424,6 +424,47 @@ export const ontologyApi = {
   seed: () => request<{ inserted: number; sources: string[] }>("/api/ontology/seed", { method: "POST" }),
 };
 
+// ── AI 견고성: 레드팀(사후 실측) + 가드레일(실시간 방어) ────────────────
+export interface RedTeamResult {
+  id: string;
+  category: string;
+  severity: string;
+  desc: string;
+  vulnerable: boolean;
+  prompt: string;
+  basis: string;
+  responseExcerpt: string;
+}
+export interface RedTeamReport {
+  ranAt: number;
+  model: string;
+  total: number;
+  vulnerable: number;
+  robustnessScore: number;
+  byCategory: Record<string, { total: number; vulnerable: number }>;
+  results: RedTeamResult[];
+}
+export const redteamApi = {
+  run: () => request<RedTeamReport>("/api/redteam/run", { method: "POST" }),
+  last: () => request<RedTeamReport>("/api/redteam/last"),
+  payloads: () => request<{ id: string; category: string; severity: string; desc: string }[]>("/api/redteam/payloads"),
+};
+
+export type GuardMode = "off" | "flag" | "block";
+export interface GuardEvent {
+  at: number;
+  source: string;
+  excerpt: string;
+  categories: string[];
+  blocked: boolean;
+}
+export const guardrailApi = {
+  status: () => request<{ mode: GuardMode; flaggedCount: number; blockedCount: number }>("/api/guardrail/status"),
+  log: (limit = 50) => request<GuardEvent[]>(`/api/guardrail/log?limit=${limit}`),
+  setMode: (mode: GuardMode) =>
+    request<{ mode: GuardMode; flaggedCount: number; blockedCount: number }>("/api/guardrail/mode", { method: "POST", body: { mode } }),
+};
+
 // ── LLM 브리지 / 채팅 ─────────────────────────────────────────────────
 export const bridgeApi = {
   run: (payload: unknown) => request("/api/bridge/run", { method: "POST", body: payload }),

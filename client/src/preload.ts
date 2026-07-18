@@ -140,6 +140,13 @@ const gijoApi = {
   expandOntology: (text: string, agentId?: string) => api.ontologyApi.expand(text, agentId),
   ontologyStats: () => api.ontologyApi.stats(),
   seedOntology: () => api.ontologyApi.seed(),
+
+  // AI 견고성: 레드팀 + 가드레일
+  runRedTeam: () => api.redteamApi.run(),
+  lastRedTeam: () => api.redteamApi.last(),
+  guardrailStatus: () => api.guardrailApi.status(),
+  guardrailLog: (limit?: number) => api.guardrailApi.log(limit),
+  setGuardrailMode: (mode: import("./apiClient").GuardMode) => api.guardrailApi.setMode(mode),
   startFinetune: (agentId: string, datasetId: string) => api.finetuneApi.start(agentId, datasetId),
   onFinetuneProgress: (cb: (p: unknown) => void) => onChannel("finetune:progress", cb),
   convertDataset: (rawText: string) => api.datasetApi.convert(rawText),
