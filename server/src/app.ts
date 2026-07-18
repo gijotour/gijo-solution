@@ -27,6 +27,7 @@ import { registerUndoRoutes } from "./engine/undo";
 import { registerRedteamRoutes } from "./engine/redteam";
 import { registerGuardrailRoutes } from "./engine/guardrail";
 import { registerAnalysisHubRoutes } from "./engine/analysishub";
+import { registerModelLicenseRoutes } from "./engine/modellicense";
 import { registerGitSyncRoutes } from "./engine/gitsync";
 import { registerHfModelsRoutes } from "./engine/hfmodels";
 import { registerIntentRoutes } from "./engine/intent";
@@ -107,6 +108,7 @@ export function createApp(): Express {
   registerRedteamRoutes(app);
   registerGuardrailRoutes(app);
   registerAnalysisHubRoutes(app);
+  registerModelLicenseRoutes(app);
   registerGitSyncRoutes(app);
   registerHfModelsRoutes(app);
   registerIntentRoutes(app);
