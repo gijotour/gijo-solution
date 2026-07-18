@@ -13,6 +13,7 @@ import { addTriples, deleteTriplesBySource, type TripleInput } from "./ontology"
 import { atlasTriples, ATLAS_SOURCE } from "./atlas-seed";
 import { owaspLlmTriples, OWASP_SOURCE } from "./owasp-llm-seed";
 import { nistAiRmfTriples, NIST_SOURCE } from "./nist-airmf-seed";
+import { cweTriples, CWE_SOURCE } from "./cwe-seed";
 
 // 시드 트리플의 출처 태그 — 재적재 시 이 출처의 기존 트리플만 지워 멱등하게 만든다(수동 입력분은 보존).
 export const SEED_SOURCE = "KISA AI 보안 위협 대응 매뉴얼(2026.7)";
@@ -129,6 +130,7 @@ export function seedOntologyFromCatalog(): { inserted: number; sources: string[]
   deleteTriplesBySource(ATLAS_SOURCE);
   deleteTriplesBySource(OWASP_SOURCE);
   deleteTriplesBySource(NIST_SOURCE);
+  deleteTriplesBySource(CWE_SOURCE);
   const rows = addTriples([
     ...threatCatalogTriples(),
     ...mitigationTriples(),
@@ -137,6 +139,7 @@ export function seedOntologyFromCatalog(): { inserted: number; sources: string[]
     ...atlasTriples(), // MITRE ATLAS 국제 표준(전술·기법·완화통제) — KISA 위협과 코드로 자동 연결
     ...owaspLlmTriples(), // OWASP LLM Top 10(2025) — KISA 위협과 OWASP 코드로 자동 연결
     ...nistAiRmfTriples(), // NIST AI RMF + GenAI Profile(거버넌스) — GenAI 위험을 OWASP에 교차 연결
+    ...cweTriples(), // CWE Top 25(2024) + AI/LLM 약점 — 약점 클래스 축, LLM CWE를 OWASP에 연결
   ]);
-  return { inserted: rows.length, sources: [SEED_SOURCE, MITIGATION_SOURCE, PRODUCT_SOURCE, VULN_SOURCE, ATLAS_SOURCE, OWASP_SOURCE, NIST_SOURCE] };
+  return { inserted: rows.length, sources: [SEED_SOURCE, MITIGATION_SOURCE, PRODUCT_SOURCE, VULN_SOURCE, ATLAS_SOURCE, OWASP_SOURCE, NIST_SOURCE, CWE_SOURCE] };
 }

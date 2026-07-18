@@ -5,6 +5,7 @@ import { addTriples, expandOntology } from "../src/engine/ontology";
 import { atlasTriples, ATLAS_SOURCE } from "../src/engine/atlas-seed";
 import { owaspLlmTriples, OWASP_SOURCE } from "../src/engine/owasp-llm-seed";
 import { nistAiRmfTriples, NIST_SOURCE } from "../src/engine/nist-airmf-seed";
+import { cweTriples, CWE_SOURCE } from "../src/engine/cwe-seed";
 import { threatCatalogTriples } from "../src/engine/ontology-seed";
 
 beforeEach(() => {
@@ -77,5 +78,24 @@ describe("NIST AI RMF + GenAI Profile 온톨로지 시드", () => {
     const exp = expandOntology("데이터 프라이버시", undefined, { hops: 3, limit: 80 });
     const flat = exp.map((t) => `${t.subject}|${t.predicate}|${t.object}`).join("\n");
     expect(flat).toContain("LLM02:2025 Sensitive Information Disclosure");
+  });
+});
+
+describe("CWE(약점 클래스) 온톨로지 시드", () => {
+  it("Top 25 + AI/LLM 약점을 담고 LLM CWE를 OWASP에 연결한다", () => {
+    const t = cweTriples();
+    expect(t.every((x) => x.source === CWE_SOURCE)).toBe(true);
+    expect(t.filter((x) => x.predicate === "유형" && x.object === "CWE Top 25 위험 약점(2024)")).toHaveLength(25);
+    // CWE-1427 프롬프트 인젝션 → OWASP LLM01
+    expect(t.some((x) => x.subject.startsWith("CWE-1427") && x.predicate === "관련" && x.object === "LLM01:2025 Prompt Injection")).toBe(true);
+    // CWE-1426 GenAI 출력검증 실패 → 전통 인젝션(유발가능)
+    expect(t.some((x) => x.subject.startsWith("CWE-1426") && x.predicate === "유발가능")).toBe(true);
+  });
+
+  it("LLM CWE에서 OWASP를 거쳐 KISA까지 이어진다 (CWE-1427 → LLM01 → 위협)", () => {
+    addTriples([...threatCatalogTriples(), ...owaspLlmTriples(), ...cweTriples()]);
+    const exp = expandOntology("CWE-1427", undefined, { hops: 3, limit: 80 });
+    const flat = exp.map((t) => `${t.subject}|${t.predicate}|${t.object}`).join("\n");
+    expect(flat).toContain("LLM01:2025 Prompt Injection");
   });
 });
