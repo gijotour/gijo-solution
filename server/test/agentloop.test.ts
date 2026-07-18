@@ -8,7 +8,7 @@ vi.mock("../src/engine/llm", () => ({
   registerLlmRoutes: vi.fn(),
 }));
 
-import { runAgentLoop } from "../src/engine/agentloop";
+import { runAgentLoop, setLastTarget, resetContextForTests } from "../src/engine/agentloop";
 import { listAgentTools, findAgentTool, validateToolArgs } from "../src/engine/agenttools";
 import { resetAssetsForTests, registerAsset, recordFindings } from "../src/engine/assets";
 
@@ -19,6 +19,28 @@ function seedAsset(id = "fraud-detect-llm") {
 beforeEach(() => {
   mockChat.mockReset();
   resetAssetsForTests();
+  resetContextForTests();
+});
+
+describe("#8 대화 맥락 — '아까 그거' 후속 지시", () => {
+  it("직전 대상이 있고 지시가 '아까 그거'면 프롬프트에 대상을 실어준다", async () => {
+    seedAsset();
+    setLastTarget("fraud-detect-llm", "프롬프트 인젝션", "취약점 배정");
+    mockChat.mockResolvedValueOnce('{"action":"tool","tool":"assign_finding","args":{"assetId":"fraud-detect-llm","finding":"프롬프트 인젝션","assignee":"이영희"}}');
+    const r = await runAgentLoop("아까 그거 이영희로 바꿔");
+    expect(r?.approval?.tool).toBe("assign_finding");
+    const firstMsg = mockChat.mock.calls[0][0].message as string;
+    expect(firstMsg).toContain("직전에 다룬 취약점");
+    expect(firstMsg).toContain("프롬프트 인젝션");
+  });
+
+  it("지시대명사가 없으면 직전 대상을 주입하지 않는다", async () => {
+    seedAsset();
+    setLastTarget("fraud-detect-llm", "프롬프트 인젝션", "x");
+    mockChat.mockResolvedValueOnce('{"action":"tool","tool":"list_assets","args":{}}').mockResolvedValueOnce('{"action":"final"}').mockResolvedValueOnce("답");
+    await runAgentLoop("자산 목록 보여줘");
+    expect(mockChat.mock.calls[0][0].message as string).not.toContain("직전에 다룬 취약점");
+  });
 });
 
 describe("agenttools — 「AI 자산」 조회 도구", () => {

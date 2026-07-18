@@ -16,6 +16,23 @@ import { emitCollaboration } from "./collaboration";
 
 const MAX_STEPS = 5;
 
+// #8 대화 맥락 — 직전에 다룬 취약점을 기억해 "아까 그거 이영희로 바꿔" 같은 후속을 해석한다.
+// 1인 운영 전제라 전역 1건으로 충분(TTL 10분 지나면 무시). 쓰기 대상이 잡힐 때 갱신한다.
+interface LastTarget { assetId: string; finding: string; label: string; at: number }
+let lastTarget: LastTarget | null = null;
+const TARGET_TTL_MS = 10 * 60 * 1000;
+const ANAPHORA_RE = /아까|방금|그거|그것|이거|이것|저거|그\s*취약점|위\s*취약점|같은\s*(거|취약점)|그\s*건|이\s*건/;
+
+export function setLastTarget(assetId: string, finding: string, label: string): void {
+  if (assetId && finding) lastTarget = { assetId, finding, label, at: Date.now() };
+}
+function recentTarget(): LastTarget | null {
+  return lastTarget && Date.now() - lastTarget.at < TARGET_TTL_MS ? lastTarget : null;
+}
+export function resetContextForTests(): void {
+  lastTarget = null;
+}
+
 // 벤치(tools/orchestrator-bench.mjs)와 동일한 결정 스키마 — 벤치 결과가 곧 이 루프의 실측 근거다.
 const DECISION_SCHEMA = {
   type: "object",
@@ -97,9 +114,20 @@ function decisionPrompt(instruction: string, calls: AgentToolCall[]): string {
     "- 지시와 맞는 도구가 없으면 action=final로 답한다. 도구 이름을 지어내지 않는다.",
     "- args 값은 모두 문자열로 쓴다.",
     ...history,
+    ...anaphoraHint(instruction),
     "",
     `사용자 지시: "${instruction}"`,
   ].join("\n");
+}
+
+// #8: 지시가 "아까 그거" 류이고 최근 다룬 대상이 있으면, 그 대상을 프롬프트에 실어 해석을 돕는다.
+function anaphoraHint(instruction: string): string[] {
+  const t = recentTarget();
+  if (!t || !ANAPHORA_RE.test(instruction)) return [];
+  return [
+    "",
+    `직전에 다룬 취약점: 자산 "${t.assetId}", 취약점 "${t.finding}" (${t.label}). 지시의 "아까/방금/그거/이거"는 이것을 가리킨다 — 필요하면 이 assetId·finding을 그대로 써라.`,
+  ];
 }
 
 // 파인튜닝 데이터셋 생성용(Phase 4) — 이력 없는 단일 지시의 결정 프롬프트를 그대로 돌려준다.
@@ -180,6 +208,8 @@ export async function runAgentLoop(instruction: string): Promise<AgentLoopResult
       // 환각(guess)으로 오판해 되묻지 않게 하기 위해서다(근거=지시문 ∪ 조회 결과).
       const toolResults = calls.map((c) => c.result).join("\n");
       const approval = buildApproval(tool, args, instruction, toolResults);
+      // #8: 방금 다룬 취약점을 기억(후속 "아까 그거"용) — assetId·finding 인자가 있는 도구만.
+      if (args.assetId && args.finding) setLastTarget(args.assetId, args.finding, tool.label);
       emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `승인 대기: ${tool.label} — 값 검토 요청` });
       return { output: approvalMessage(approval), toolCalls: calls, approval };
     } else {
