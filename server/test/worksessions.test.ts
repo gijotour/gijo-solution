@@ -33,6 +33,20 @@ describe("worksessions — 세션 생성·조회", () => {
   it("없는 세션 조회는 null", () => {
     expect(getSession("nope")).toBeNull();
   });
+
+  it("contextRef(대상 참조)를 저장하고 조회·목록에 실어준다", () => {
+    const s = createSession("사내 상담 챗봇 · 상태", "asset:chatbot-01");
+    expect(s.contextRef).toBe("asset:chatbot-01");
+    expect(getSession(s.id)?.contextRef).toBe("asset:chatbot-01");
+    const summary = listSessions().find((x) => x.id === s.id);
+    expect(summary?.contextRef).toBe("asset:chatbot-01");
+  });
+
+  it("contextRef 없이 만든 일반 세션은 contextRef가 undefined", () => {
+    const s = createSession();
+    expect(s.contextRef).toBeUndefined();
+    expect(getSession(s.id)?.contextRef).toBeUndefined();
+  });
 });
 
 describe("worksessions — 턴 추가·자동 제목", () => {

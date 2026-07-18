@@ -192,6 +192,7 @@ export interface WorkSession {
   id: string;
   title: string;
   status: WorkSessionStatus;
+  contextRef?: string; // 탐색기 대상 참조(asset:.. / vuln:.. / product:.. / today)
   createdAt: number;
   updatedAt: number;
 }
@@ -210,11 +211,14 @@ export interface WorkSessionTurn {
 }
 export const workSessionsApi = {
   list: () => request<WorkSessionSummary[]>("/api/work-sessions"),
-  create: (title?: string) => request<WorkSession>("/api/work-sessions", { method: "POST", body: title ? { title } : {} }),
+  create: (title?: string, contextRef?: string) =>
+    request<WorkSession>("/api/work-sessions", { method: "POST", body: { ...(title ? { title } : {}), ...(contextRef ? { contextRef } : {}) } }),
   get: (id: string) => request<{ session: WorkSession; turns: WorkSessionTurn[] }>(`/api/work-sessions/${id}`),
   update: (id: string, patch: { title?: string; status?: WorkSessionStatus }) =>
     request<WorkSession>(`/api/work-sessions/${id}`, { method: "PATCH", body: patch }),
   remove: (id: string) => request<{ ok: boolean }>(`/api/work-sessions/${id}`, { method: "DELETE" }),
+  addTurn: (id: string, role: "user" | "assistant", content: string, tool?: string) =>
+    request<WorkSessionTurn>(`/api/work-sessions/${id}/turns`, { method: "POST", body: { role, content, ...(tool ? { tool } : {}) } }),
 };
 
 // ── 작업 큐 ───────────────────────────────────────────────────────────

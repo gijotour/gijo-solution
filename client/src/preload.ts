@@ -46,10 +46,11 @@ const gijoApi = {
 
   // 작업 세션(대화 세션형) — 오케스트레이터 지시·응답을 세션 대화로 묶어 관리.
   listWorkSessions: () => api.workSessionsApi.list(),
-  createWorkSession: (title?: string) => api.workSessionsApi.create(title),
+  createWorkSession: (title?: string, contextRef?: string) => api.workSessionsApi.create(title, contextRef),
   getWorkSession: (id: string) => api.workSessionsApi.get(id),
   updateWorkSession: (id: string, patch: { title?: string; status?: import("./apiClient").WorkSessionStatus }) => api.workSessionsApi.update(id, patch),
   deleteWorkSession: (id: string) => api.workSessionsApi.remove(id),
+  addWorkSessionTurn: (id: string, role: "user" | "assistant", content: string, tool?: string) => api.workSessionsApi.addTurn(id, role, content, tool),
   onCollaborationEvent: (cb: (evt: unknown) => void) => onChannel("collaboration:event", cb),
   listCollaborationHistory: () => api.collaborationApi.history(),
   onLlmActivity: (cb: (evt: unknown) => void) => onChannel("llm:event", cb),

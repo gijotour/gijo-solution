@@ -35,7 +35,7 @@
   .icon-btn.on{background:rgba(59,130,246,0.18);border-color:var(--blue);color:var(--blue-light);}
   .avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
 
-  .body-grid{display:grid;grid-template-columns:220px 1fr 300px;min-height:640px;}
+  .body-grid{display:grid;grid-template-columns:220px 1fr;min-height:640px;}
   .explorer{padding:18px 12px;border-right:1px solid var(--border);}
   .explorer-title{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px;}
   .explorer-sub{font-size:11px;color:var(--blue-light);margin-bottom:10px;}
@@ -405,21 +405,8 @@
         <button class="dock-all" id="dockAll">◉ 전체 지시</button>
       </div>
     </div>
-
-    <div class="today-panel">
-      <div class="today-title">⦿ 오늘 확인할 항목</div>
-      <div class="today-input"><input id="todoInput" placeholder="할일 추가... (비우고 + = 추천)"><button class="today-add" id="todoAddBtn" title="입력하면 추가, 비우고 누르면 추천 일과 가이드">+</button></div>
-      <div class="todo-sugg" id="todoSugg"></div>
-      <div id="todayItems"><div style="font-size:12px;color:var(--muted)">불러오는 중...</div></div>
-      <button class="today-cta" id="todayCtaBtn">▶ 운영 시작 — 에이전트 팀에게 맡기기</button>
-
-      <!-- 오늘의 조치: 전 자산 취약점을 KEV·EPSS·VPR로 정렬한 상위 항목 (클릭 → 취약점 관리) -->
-      <div id="todayPriority" style="margin-top:18px;background:var(--panel-2);border:1px solid var(--border);border-radius:12px;padding:12px 14px;cursor:pointer;" title="취약점 관리로 이동" data-page="vulnscan.html">
-        <div style="font-size:10.5px;font-weight:700;color:var(--muted-2);letter-spacing:1px;margin-bottom:8px;">🎯 오늘의 조치 · 우선순위</div>
-        <div id="todayPriorityList" style="font-size:11.5px;color:var(--muted)">불러오는 중...</div>
-      </div>
-
-    </div>
+    <!-- 오늘 확인할 항목 · 운영 시작 · 오늘의 조치는 "작업 세션"(sessions.html) 자산 탐색기로 이관됨.
+         거기서 항목을 누르면 그 대상의 상태를 보여주는 대화 세션이 열린다(💬 헤더 아이콘). -->
   </div>
 
 </div>
@@ -838,6 +825,7 @@
   }
 
   async function loadTasks() {
+    if (!todayItems) return; // 오늘 확인할 항목 패널은 작업 세션(sessions.html)으로 이관됨
     try {
       const [tasks, dueMaint] = await Promise.all([window.gijo.listTasks(), window.gijo.listDueMaintenance().catch(() => [])]);
       if (tasks.length === 0 && dueMaint.length === 0) {
@@ -877,6 +865,7 @@
   }
 
   async function addTodo() {
+    if (!todoInput) return;
     const text = todoInput.value.trim();
     // 비우고 + 를 누르면 추천 일과 가이드를 연다(매일/매주 — 직접 추가 이력·사내 지식 근거).
     if (!text) { toggleTodoSuggestions(); return; }
@@ -890,6 +879,7 @@
   const todoSugg = document.getElementById("todoSugg");
   const CAD_LABEL = { daily: "매일 하는 일", weekly: "매주(주말) 하는 일" };
   async function toggleTodoSuggestions() {
+    if (!todoSugg) return;
     if (todoSugg.innerHTML) { todoSugg.innerHTML = ""; return; }
     todoSugg.innerHTML = '<div class="ts-load">추천 일과 불러오는 중… (사내 지식 참고)</div>';
     let suggs = [];
@@ -1334,9 +1324,11 @@
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
     document.getElementById("refreshAssetsBtn").addEventListener("click", loadAssets);
-    document.getElementById("todoAddBtn").addEventListener("click", addTodo);
-    todoInput.addEventListener("keydown", (e) => { if (e.key === "Enter") addTodo(); });
-    todayItems.addEventListener("click", onTaskAction);
+    // 오늘 확인할 항목 UI는 작업 세션(sessions.html)으로 이관됨 — 대시보드에 없으면 배선 생략.
+    const todoAddBtn = document.getElementById("todoAddBtn");
+    if (todoAddBtn) todoAddBtn.addEventListener("click", addTodo);
+    if (todoInput) todoInput.addEventListener("keydown", (e) => { if (e.key === "Enter") addTodo(); });
+    if (todayItems) todayItems.addEventListener("click", onTaskAction);
     document.getElementById("mgDownloadBtn").addEventListener("click", () => window.gijo.navigateTo("llmguide.html"));
     document.getElementById("mgServerBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
 
@@ -1346,7 +1338,8 @@
     document.getElementById("dockSend").addEventListener("click", dockSubmit);
     document.getElementById("dockAll").addEventListener("click", () => { selectAgent("orchestrator"); dockSubmit(); });
 
-    document.getElementById("todayCtaBtn").addEventListener("click", () => {
+    const todayCtaBtn = document.getElementById("todayCtaBtn");
+    if (todayCtaBtn) todayCtaBtn.addEventListener("click", () => {
       sendToOrchestrator("오늘 확인할 항목을 우선순위대로 에이전트 팀에게 위임해서 처리해줘");
     });
 

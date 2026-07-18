@@ -37,6 +37,11 @@ migrate(
    CREATE INDEX IF NOT EXISTS idx_work_session_turns_sessionId ON work_session_turns(sessionId);`
 );
 
+// contextRef: 이 세션이 탐색기의 어떤 대상에서 열렸는지("asset:chatbot-01" / "vuln:호스트|키" /
+// "product:id" / "today"). 세션을 다시 열 때 그 대상의 상태 카드·추천 다음 단계를 재구성하는 데 쓴다.
+// 별도 마이그레이션으로 추가해 기존 work_sessions 테이블에도 적용되게 한다(원 마이그레이션은 불변).
+migrate("work_sessions-contextRef", "ALTER TABLE work_sessions ADD COLUMN contextRef TEXT");
+
 // status: active(진행중) | done(완료) | ignored(무시). 새 세션은 active로 시작한다.
 export type SessionStatus = "active" | "done" | "ignored";
 const STATUSES: SessionStatus[] = ["active", "done", "ignored"];
@@ -55,6 +60,7 @@ export interface WorkSession {
   id: string;
   title: string;
   status: SessionStatus;
+  contextRef?: string; // 탐색기 대상 참조(asset:.. / vuln:.. / product:.. / today). 없으면 일반 세션.
   createdAt: number;
   updatedAt: number;
 }
@@ -70,6 +76,7 @@ interface SessionRow {
   id: string;
   title: string;
   status: string;
+  contextRef: string | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -83,16 +90,25 @@ interface TurnRow {
 }
 
 function rowToSession(r: SessionRow): WorkSession {
-  return { id: r.id, title: r.title, status: (STATUSES.includes(r.status as SessionStatus) ? r.status : "active") as SessionStatus, createdAt: r.createdAt, updatedAt: r.updatedAt };
+  return {
+    id: r.id,
+    title: r.title,
+    status: (STATUSES.includes(r.status as SessionStatus) ? r.status : "active") as SessionStatus,
+    contextRef: r.contextRef ?? undefined,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+  };
 }
 function rowToTurn(r: TurnRow): SessionTurn {
   return { id: r.id, sessionId: r.sessionId, role: r.role === "assistant" ? "assistant" : "user", content: r.content, tool: r.tool ?? undefined, at: r.at };
 }
 
-export function createSession(title?: string): WorkSession {
+export function createSession(title?: string, contextRef?: string): WorkSession {
   const now = Date.now();
-  const s: WorkSession = { id: randomUUID(), title: (title && title.trim()) || DEFAULT_TITLE, status: "active", createdAt: now, updatedAt: now };
-  db.prepare("INSERT INTO work_sessions (id, title, status, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)").run(s.id, s.title, s.status, s.createdAt, s.updatedAt);
+  const s: WorkSession = { id: randomUUID(), title: (title && title.trim()) || DEFAULT_TITLE, status: "active", contextRef: contextRef || undefined, createdAt: now, updatedAt: now };
+  db.prepare("INSERT INTO work_sessions (id, title, status, contextRef, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)").run(
+    s.id, s.title, s.status, s.contextRef ?? null, s.createdAt, s.updatedAt
+  );
   return s;
 }
 
@@ -187,7 +203,8 @@ export function registerWorkSessionRoutes(app: Express): void {
 
   app.post("/api/work-sessions", authMiddleware, (req, res) => {
     const title = typeof req.body?.title === "string" ? req.body.title : undefined;
-    res.json(createSession(title));
+    const contextRef = typeof req.body?.contextRef === "string" ? req.body.contextRef : undefined;
+    res.json(createSession(title, contextRef));
   });
 
   app.get("/api/work-sessions/:id", authMiddleware, (req, res) => {

@@ -1,0 +1,110 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>세션 v2 시안 A — 상태카드+빠른칩</title>
+<style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel2:#0e1526;--border:rgba(255,255,255,.08);--bs:rgba(255,255,255,.16);--blue:#3b82f6;--bl:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--m2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0}
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:"Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px}
+.title{font-size:19px;font-weight:800;color:#fff;padding:16px 22px 3px}.sub{font-size:12px;color:var(--muted);padding:0 22px 12px}
+.wrap{display:grid;grid-template-columns:236px 232px 1fr;gap:12px;padding:0 22px 22px}
+.col{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;min-height:600px}
+.colhead{padding:11px 13px;font-size:12.5px;font-weight:800;color:#fff;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center}
+.newbtn{background:var(--blue);color:#fff;border:0;border-radius:7px;font-size:11px;font-weight:700;padding:5px 10px;cursor:pointer}
+/* 탐색기 4구획 */
+.tree{padding:6px 6px 10px;overflow-y:auto}
+.sec{margin-top:4px}
+.sechead{display:flex;align-items:center;gap:6px;padding:7px 8px;border-radius:7px;font-weight:800;font-size:12px;color:var(--text);cursor:pointer}
+.sechead:hover{background:var(--panel2)}.sechead .c{margin-left:auto;font-size:10px;color:var(--m2);font-weight:700}
+.runbtn{margin:5px 8px 3px;display:block;width:calc(100% - 16px);background:rgba(30,185,128,.14);color:var(--teal);border:1px solid rgba(30,185,128,.3);border-radius:7px;padding:7px;font-size:11.5px;font-weight:800;cursor:pointer}
+.leaf{padding:6px 9px 6px 24px;font-size:12px;color:var(--muted);cursor:pointer;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:6px}
+.leaf:hover{color:#fff;background:var(--panel2)}.leaf.on{color:#fff;background:rgba(59,130,246,.12)}
+.pri{font-size:8.5px;font-weight:900;padding:1px 5px;border-radius:4px}.p0{color:#f5928a;background:rgba(226,72,61,.16)}.p1{color:var(--amber);background:rgba(240,160,32,.14)}
+/* 세션 목록 */
+.sitem{padding:9px 11px;border-radius:8px;cursor:pointer;margin:0 8px 4px;border:1px solid transparent}
+.sitem:hover{background:var(--panel2)}.sitem.on{background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.3)}
+.sitem .t{font-weight:700;font-size:12px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sitem .m{font-size:10px;color:var(--m2);margin-top:4px;display:flex;justify-content:space-between}
+.tag{font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px}.tag.on{color:var(--teal);background:rgba(30,185,128,.14)}
+/* 대화 */
+.chead{padding:12px 15px;border-bottom:1px solid var(--border)}.chead .t{font-weight:800;color:#fff;font-size:14px}.chead .m{font-size:11px;color:var(--muted);margin-top:2px}
+.conv{flex:1;padding:15px;overflow-y:auto}
+.turn{margin-bottom:14px}.you{background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:8px 12px;font-size:12.5px;margin-bottom:6px}.you b{color:var(--bl)}
+.card{background:var(--panel2);border:1px solid var(--bs);border-radius:10px;padding:12px 14px;margin-bottom:8px}
+.card .h{font-weight:800;color:#fff;font-size:13px;display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.card .h .badge{font-size:9px;font-weight:900;padding:2px 7px;border-radius:5px;background:rgba(226,72,61,.16);color:#f5928a}
+.grid{display:grid;grid-template-columns:auto 1fr;gap:5px 12px;font-size:11.5px}
+.grid .k{color:var(--m2)}.grid .v{color:var(--text)}
+.ask{font-size:12.5px;color:var(--bl);font-weight:700;margin:10px 0 8px;padding-left:2px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{background:var(--panel2);border:1px solid var(--bs);border-radius:16px;padding:6px 12px;font-size:11.5px;font-weight:700;color:var(--text);cursor:pointer}
+.chip:hover{border-color:var(--blue);color:var(--bl)}
+.cin{padding:11px 15px;border-top:1px solid var(--border);display:flex;gap:8px}.cin input{flex:1;background:var(--panel2);border:1px solid var(--bs);border-radius:9px;padding:10px 13px;color:var(--text)}.cin button{background:var(--blue);color:#fff;border:0;border-radius:9px;padding:0 18px;font-weight:800}
+.cap{font-size:12px;color:var(--m2);padding:0 22px 18px}
+</style></head><body>
+<div class="title">작업 세션 v2 — 시안 A · 상태 카드 + 빠른 액션 칩</div>
+<div class="sub">탐색기 항목 클릭 → 세션이 열리고 <b>상태 카드</b>(자산 정보)를 보여준 뒤 <b>무엇을 도와드릴까요?</b>와 <b>빠른 액션 칩</b>을 제시. 대시보드 오른쪽 패널은 없애고 이 탐색기로 통합.</div>
+<div class="wrap">
+  <!-- 탐색기 4구획 -->
+  <div class="col">
+    <div class="colhead"><span>🗂 자산 탐색기</span><span style="color:var(--muted);font-size:13px">⟳</span></div>
+    <div class="tree">
+      <div class="sec">
+        <div class="sechead">⦿ 오늘 확인할 항목 <span class="c">3</span></div>
+        <button class="runbtn">▶ 운영 시작 — 세션에서 판단</button>
+        <div class="leaf">Log4j 재스캔 결과 확인</div>
+        <div class="leaf">방화벽 룰 정기 점검</div>
+        <div class="leaf">주간 리포트 발송</div>
+      </div>
+      <div class="sec">
+        <div class="sechead">🎯 오늘의 조치 · 우선순위 <span class="c">3</span></div>
+        <div class="leaf on"><span class="pri p0">P0</span>Log4j RCE · 상담 챗봇</div>
+        <div class="leaf"><span class="pri p1">P1</span>OpenSSL · 결제 API</div>
+        <div class="leaf"><span class="pri p1">P1</span>Struts2 · 포털</div>
+      </div>
+      <div class="sec">
+        <div class="sechead">◆ AI 자산 · AI-BOM <span class="c">4</span></div>
+        <div class="leaf">사내 상담 챗봇</div>
+        <div class="leaf">문서 분류 AI</div>
+        <div class="leaf">이상거래 탐지 LLM</div>
+        <div class="leaf">코드 리뷰 어시스턴트</div>
+      </div>
+      <div class="sec">
+        <div class="sechead">🧰 보안제품 관리 <span class="c">6</span></div>
+        <div class="leaf">AhnLab 방화벽</div>
+        <div class="leaf">Genian NAC</div>
+        <div class="leaf">SecuwaySSL VPN</div>
+      </div>
+    </div>
+  </div>
+  <!-- 세션 목록 -->
+  <div class="col">
+    <div class="colhead"><span>💬 작업 세션</span><button class="newbtn">＋ 새 세션</button></div>
+    <div style="padding:6px 4px">
+      <div class="sitem on"><div class="t">사내 상담 챗봇 · 상태</div><div class="m"><span>방금</span><span class="tag on">진행중</span></div></div>
+      <div class="sitem"><div class="t">오늘 급한 취약점 확인·배정</div><div class="m"><span>07:20 · 3턴</span><span class="tag on">진행중</span></div></div>
+      <div class="sitem"><div class="t">방화벽 로그 브루트포스 분석</div><div class="m"><span>어제 · 2턴</span><span>완료</span></div></div>
+    </div>
+  </div>
+  <!-- 대화(클릭으로 열린 세션) -->
+  <div class="col">
+    <div class="chead"><div class="t">사내 상담 챗봇 · 상태</div><div class="m">자산 탐색기에서 열림 · 방금</div></div>
+    <div class="conv">
+      <div class="turn">
+        <div class="card">
+          <div class="h">◆ 사내 상담 챗봇 <span class="badge">취약점 3</span></div>
+          <div class="grid">
+            <span class="k">식별자</span><span class="v">chatbot-01 · models/chatbot.gguf</span>
+            <span class="k">취약점</span><span class="v" style="color:#f5928a">critical 1 · high 2 (P0 Log4j RCE 포함)</span>
+            <span class="k">최근 스캔</span><span class="v">2026-07-17 · modelscan</span>
+            <span class="k">AI-BOM</span><span class="v">Llama-3.2-3B · 데이터 3소스 · 견고성 82점</span>
+            <span class="k">서비스 영향</span><span class="v">고객 상담(대외)</span>
+          </div>
+        </div>
+        <div class="ask">무엇을 도와드릴까요?</div>
+        <div class="chips">
+          <div class="chip">🔁 재스캔</div><div class="chip">👤 담당자 배정</div><div class="chip">🛠 조치 절차</div><div class="chip">📦 AI-BOM 열기</div><div class="chip">🛡 견고성 점검</div>
+        </div>
+      </div>
+    </div>
+    <div class="cin"><input placeholder="직접 입력하거나 위 칩을 누르세요… (예: Log4j 재스캔해서 해결됐는지 확인)"><button>전송</button></div>
+  </div>
+</div>
+<div class="cap">시안 A — 클릭 시 구조화된 상태 카드 + 빠른 액션 칩. 정보 풍부·원클릭 실행. 단 첫 화면이 다소 촘촘함.</div>
+</body></html>
