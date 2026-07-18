@@ -162,8 +162,22 @@ tr:last-child td{border-bottom:none;}
 <div class="content-grid">
   <div>
     <div class="panel">
-      <div class="panel-title">리포트 이력</div>
-      <div class="panel-sub">서버에 저장된 리포트를 최신순으로 표시합니다(최근 100건, 과거 세션·재기동 포함). 유형별 DOCX·PDF를 바로 내려받을 수 있습니다.</div>
+      <div style="display:flex;align-items:flex-start;gap:12px;">
+        <div style="flex:1;">
+          <div class="panel-title">리포트 이력</div>
+          <div class="panel-sub">서버에 저장된 리포트를 최신순으로 표시합니다(최근 100건, 과거 세션·재기동 포함). 유형별 DOCX·PDF를 바로 내려받을 수 있습니다.</div>
+        </div>
+        <div style="display:flex;align-items:center;gap:6px;white-space:nowrap;padding-top:2px;">
+          <span style="font-size:11.5px;color:var(--muted)">오래된 리포트 정리</span>
+          <select id="pruneDays" style="font-size:11.5px;background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);border-radius:6px;padding:4px 7px;outline:none;">
+            <option value="7">7일 이전</option>
+            <option value="30" selected>30일 이전</option>
+            <option value="90">90일 이전</option>
+            <option value="180">180일 이전</option>
+          </select>
+          <button id="pruneBtn" style="font-size:11.5px;background:transparent;border:1px solid #e2483d;color:#f5928a;border-radius:6px;padding:5px 10px;cursor:pointer;font-weight:700;">일괄 삭제</button>
+        </div>
+      </div>
       <table>
         <tr><th>유형</th><th>대상 자산</th><th>생성일시</th><th></th></tr>
         <tbody id="reportRows">
@@ -348,6 +362,24 @@ tr:last-child td{border-bottom:none;}
     if (viewModal._url) { URL.revokeObjectURL(viewModal._url); viewModal._url = null; }
   }
 
+  async function pruneOld() {
+    const days = Number(document.getElementById("pruneDays").value);
+    if (!confirm(`${days}일 이전에 생성된 리포트를 모두 삭제할까요? DOCX·PDF·요약이 함께 삭제되며 되돌릴 수 없습니다.`)) return;
+    const btn = document.getElementById("pruneBtn");
+    const orig = btn.textContent;
+    btn.disabled = true; btn.textContent = "삭제 중…";
+    try {
+      const r = await window.gijo.pruneReports(days);
+      await loadHistory();
+      renderReportRows();
+      alert(`${days}일 이전 리포트 ${r.deletedReports}건(파일 ${r.deletedFiles}개)을 삭제했습니다.`);
+    } catch (e) {
+      alert("일괄 삭제 실패: " + ((e && e.message) || e));
+    } finally {
+      btn.disabled = false; btn.textContent = orig;
+    }
+  }
+
   async function deleteReportRow(base, btn) {
     if (!confirm("이 리포트를 삭제할까요? DOCX·PDF·요약 파일이 함께 삭제되며 되돌릴 수 없습니다.")) return;
     if (btn) btn.disabled = true;
@@ -473,6 +505,7 @@ tr:last-child td{border-bottom:none;}
     modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
     document.getElementById("viewCloseBtn").addEventListener("click", closeViewer);
     viewModal.addEventListener("click", (e) => { if (e.target === viewModal) closeViewer(); });
+    document.getElementById("pruneBtn").addEventListener("click", pruneOld);
     document.getElementById("templateBtn").addEventListener("click", () => {
       alert("템플릿 관리 기능은 아직 구현되지 않았습니다.");
     });

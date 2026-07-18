@@ -618,6 +618,49 @@ export async function deleteReport(base: string): Promise<{ deleted: string[] }>
   return { deleted };
 }
 
+// N일 이전에 생성된 리포트를 일괄 삭제한다(누적된 과거 리포트 정리용).
+// 생성 시각은 파일명 타임스탬프 우선, 없으면 mtime. 시각을 못 구하면(0) 안전하게 건드리지 않는다.
+export async function pruneReports(olderThanDays: number): Promise<{ deletedReports: number; deletedFiles: number }> {
+  if (!Number.isFinite(olderThanDays) || olderThanDays < 1) {
+    throw new Error("olderThanDays는 1 이상이어야 합니다");
+  }
+  const cutoff = Date.now() - olderThanDays * 86400000;
+  await fs.mkdir(REPORT_DIR, { recursive: true });
+  const files = await fs.readdir(REPORT_DIR);
+  const byBase = new Map<string, string[]>();
+  for (const f of files) {
+    const m = /^(.+)\.(docx|pdf|json)$/i.exec(f);
+    if (!m) continue;
+    const arr = byBase.get(m[1]) ?? [];
+    arr.push(f);
+    byBase.set(m[1], arr);
+  }
+  let deletedReports = 0;
+  let deletedFiles = 0;
+  for (const [base, group] of byBase) {
+    const fm = /-(\d+)$/.exec(base);
+    let createdAt = fm ? Number(fm[1]) : 0;
+    if (!createdAt) {
+      try {
+        createdAt = Math.floor((await fs.stat(path.join(REPORT_DIR, group[0]))).mtimeMs);
+      } catch {
+        createdAt = 0;
+      }
+    }
+    if (!createdAt || createdAt >= cutoff) continue; // 시각 불명 또는 기준 이내면 보존
+    for (const f of group) {
+      try {
+        await fs.unlink(path.join(REPORT_DIR, f));
+        deletedFiles++;
+      } catch {
+        /* 이미 없으면 무시 */
+      }
+    }
+    deletedReports++;
+  }
+  return { deletedReports, deletedFiles };
+}
+
 // 보고서 HTML(개선 #3 PDF용) — DOCX와 같은 데이터를 A4 인쇄용 HTML로. 한국어는 시스템 폰트로 렌더.
 function buildReportHtml(
   req: ReportRequest,
@@ -748,6 +791,18 @@ export function registerReportRoutes(app: Express): void {
     asyncRoute(async (req, res) => {
       const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 100));
       res.json(await listReportHistory(limit));
+    })
+  );
+  // N일 이전 리포트 일괄 삭제 — 라우트 순서상 /:base보다 먼저 두어 'prune'이 base로 안 잡히게 한다.
+  app.post(
+    "/api/report/prune",
+    authMiddleware,
+    asyncRoute(async (req, res) => {
+      try {
+        res.json(await pruneReports(Number(req.body?.olderThanDays)));
+      } catch (e) {
+        res.status(400).json({ error: (e as Error).message });
+      }
     })
   );
   app.delete(

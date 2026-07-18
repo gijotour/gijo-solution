@@ -815,6 +815,9 @@ export const reportApi = {
   // 리포트 삭제(docx·pdf·메타 일괄).
   remove: (base: string) =>
     request<{ deleted: string[] }>(`/api/report/${encodeURIComponent(base)}`, { method: "DELETE" }),
+  // N일 이전 리포트 일괄 삭제.
+  prune: (olderThanDays: number) =>
+    request<{ deletedReports: number; deletedFiles: number }>("/api/report/prune", { method: "POST", body: { olderThanDays } }),
 };
 
 export interface ReportHistoryEntry {
