@@ -206,9 +206,12 @@ export async function runAgentLoop(instruction: string): Promise<AgentLoopResult
       // /api/agent/approve에서 실행된다(오발동 방지). 루프는 여기서 끝난다.
       // 지금까지의 조회 결과를 함께 넘긴다 — assetId·finding처럼 앞선 도구 결과에서 복사한 값을
       // 환각(guess)으로 오판해 되묻지 않게 하기 위해서다(근거=지시문 ∪ 조회 결과).
-      const toolResults = calls.map((c) => c.result).join("\n");
+      // #8: 직전 대상(lastTarget)도 그라운딩에 포함한다 — "아까 그거"에서 모델이 채운 assetId·finding이
+      // 지시문에 없어도 blank되지 않게(맥락에서 온 근거 있는 값이므로).
+      const ctx = recentTarget();
+      const toolResults = [calls.map((c) => c.result).join("\n"), ctx ? `직전 대상 자산 ${ctx.assetId} 취약점 ${ctx.finding}` : ""].filter(Boolean).join("\n");
       const approval = buildApproval(tool, args, instruction, toolResults);
-      // #8: 방금 다룬 취약점을 기억(후속 "아까 그거"용) — assetId·finding 인자가 있는 도구만.
+      // 방금 다룬 취약점을 기억(후속 "아까 그거"용) — assetId·finding 인자가 있는 도구만.
       if (args.assetId && args.finding) setLastTarget(args.assetId, args.finding, tool.label);
       emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `승인 대기: ${tool.label} — 값 검토 요청` });
       return { output: approvalMessage(approval), toolCalls: calls, approval };
