@@ -56,6 +56,16 @@ describe("#1 인자 추출 강건화 — assetId 접두어 관용 + status autoF
     expect(reviewFor("vuln:sample-web01", "Log4j")?.assignee).toBe("정요한");
   });
 
+  it("finding 토큰이 연속이 아니어도 매칭한다 (OpenSSH 사용자 열거 ↔ OpenSSH < 9.6 사용자 열거)", async () => {
+    registerAsset({ id: "vuln:web02", name: "웹서버2", path: "-" });
+    recordFindings("vuln:web02", [
+      { finding_type: "OpenSSH < 9.6 사용자 열거 (CVE-2024-6387)", severity: "high", evidence: "banner", source_tool: "nessus" },
+    ]);
+    const out = await executeApprovedTool("update_finding_status", { assetId: "vuln:web02", finding: "OpenSSH 사용자 열거", status: "조치완료" });
+    expect(out).toContain("조치완료");
+    expect(reviewFor("vuln:web02", "OpenSSH")?.status).toBe("approved");
+  });
+
   it('status가 비어도 지시문 "패치 다 했어"에서 조치완료로 채운다(autoFill)', () => {
     const tool = findAgentTool("update_finding_status")!;
     const ap = buildApproval(tool, { assetId: "ai-secbot-01", finding: "버전 정보 노출" }, "ai-secbot-01 버전 정보 노출 패치 다 했어");
@@ -69,6 +79,15 @@ describe("#1 인자 추출 강건화 — assetId 접두어 관용 + status autoF
     const tool = findAgentTool("update_finding_status")!;
     const ap = buildApproval(tool, { assetId: "ai-secbot-01", finding: "버전 정보 노출" }, "ai-secbot-01 버전 정보 노출 이건 오탐이야");
     expect(ap.fields.find((f) => f.key === "status")!.value).toBe("오탐");
+  });
+
+  it('모델이 지시문에 없는 status("패치 완료")를 넣어도 canonical로 정규화(blank 안 됨)', () => {
+    const tool = findAgentTool("update_finding_status")!;
+    // 실측: 모델이 "패치 완료"를 status로 줌 → 예전엔 guess로 blank돼 승인 막힘.
+    const ap = buildApproval(tool, { assetId: "ai-secbot-01", finding: "버전 정보 노출", status: "패치 완료" }, "ai-secbot-01 버전 정보 노출 패치 다 했어");
+    const status = ap.fields.find((f) => f.key === "status")!;
+    expect(status.value).toBe("조치완료");
+    expect(ap.missing).not.toContain("status");
   });
 });
 

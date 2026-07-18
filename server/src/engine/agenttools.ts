@@ -363,6 +363,16 @@ function findingLabel(f: Asset["findings"][number]): string {
   return `[${f.severity}] ${f.finding_type}`;
 }
 
+// finding 지목 매칭 — needle의 모든 토큰이 haystack에 있으면 매칭(연속 부분문자열 아님).
+// 실측(2026-07-18): "OpenSSH 사용자 열거"가 실제 "OpenSSH < 9.6 사용자 열거"와 연속이 아니라
+// (중간에 "< 9.6") 매칭 실패했다. 토큰별 포함으로 흡수한다. 과매칭은 resolveFinding의 2건+ 거부가 잡는다.
+function findingMatches(haystack: string, needle: string): boolean {
+  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "");
+  const h = norm(haystack);
+  const tokens = (needle ?? "").trim().split(/\s+/).map(norm).filter((t) => t.length >= 2);
+  return tokens.length > 0 && tokens.every((t) => h.includes(t));
+}
+
 // assetId를 관용적으로 찾는다 — 실측(2026-07-18): 7B가 "vuln:sample-web01"에서 "vuln:" 접두어를
 // 떨어뜨려 매칭 실패. 정확 일치 → 접두어 붙여보기/떼보기 → 정규화 일치 순으로 시도한다.
 function resolveAsset(assetId: string): Asset | undefined {
@@ -391,7 +401,7 @@ function resolveFinding(assetId: string, needle: string): { ok: true; hit: Findi
     const sample = asset.findings.slice(0, 6).map(findingLabel).join(" / ");
     return { ok: false, error: `어느 취약점인지 지목이 필요합니다. ${asset.id}의 취약점: ${sample}` };
   }
-  const hits = asset.findings.filter((f) => matches(`${f.finding_type} ${f.severity} ${f.evidence}`, n));
+  const hits = asset.findings.filter((f) => findingMatches(`${f.finding_type} ${f.severity} ${f.evidence}`, n));
   if (hits.length === 0) {
     const sample = asset.findings.slice(0, 6).map(findingLabel).join(" / ");
     return { ok: false, error: `${asset.id}에서 "${needle}"에 맞는 취약점을 찾지 못했습니다. 이 자산의 취약점: ${sample}` };
@@ -634,13 +644,13 @@ const TOOLS: AgentTool[] = [
       { name: "status", label: "판정", description: "조치완료 / 오탐 (미검토로 원복도 가능)", required: true },
       { name: "note", label: "사유", description: "판정 근거·메모 (선택)", required: false },
     ],
-    // status를 안 줬으면 지시문에서 규칙 추론한다 — 실측: "패치 다 했어"에서 7B가 status를 못 채워 승인이 막혔다.
+    // status를 canonical("조치완료"/"오탐")로 정규화한다 — 모델이 준 값이든(예 "패치 완료") 안 줬든
+    // 지시문에서 규칙 추론한다. 실측(2026-07-18): 모델이 지시문에 없는 status("패치 완료")를 넣으면
+    // guess로 blank 처리돼 승인이 막혔다. autoFill(source=auto)로 채우면 blank되지 않는다.
     autoFill: (args, instruction) => {
+      const word = inferStatusWord(args.status ?? "") || inferStatusWord(instruction);
       const filled: Record<string, string> = {};
-      if (!args.status?.trim()) {
-        const word = inferStatusWord(instruction);
-        if (word) filled.status = word;
-      }
+      if (word) filled.status = word;
       return filled;
     },
     effect: (args) => {
