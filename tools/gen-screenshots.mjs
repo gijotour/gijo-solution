@@ -17,7 +17,10 @@ const { chromium } = require("playwright-core");
 
 const BASE = process.env.GIJO_SHOT_BASE ?? "http://localhost:4068";
 const PAGES_DIR = path.join(ROOT, "client", "src", "renderer", "pages");
-const OUT_DIR = path.join(ROOT, "screenshots");
+// 덱 모드(GIJO_SHOT_DECK=1): 슬라이드 삽입용. fullPage는 세로가 수천~수만 px이라 슬라이드에 못 넣으므로
+// 뷰포트 크기(16:10)로만 찍고 screenshots/deck/에 따로 둔다. 기본(풀페이지)은 매뉴얼용이라 그대로 유지.
+const DECK = process.env.GIJO_SHOT_DECK === "1";
+const OUT_DIR = DECK ? path.join(ROOT, "screenshots", "deck") : path.join(ROOT, "screenshots");
 fs.mkdirSync(OUT_DIR, { recursive: true });
 
 async function main() {
@@ -37,6 +40,7 @@ async function main() {
 
   const DATA = {
     me: login.user ?? { displayName: "정요한", username: "jyh", role: "admin" },
+    serverUrl: BASE,
     kpi: await g("/api/kpi"),
     ctiMatches: await g("/api/cti/asset-matches"),
     ctiFeeds: await g("/api/cti/feeds"),
@@ -69,6 +73,17 @@ async function main() {
     securityProductsGrouped: await g("/api/security-products/grouped"),
     productCategories: await g("/api/security-products/categories"),
     securityProducts: await g("/api/security-products"),
+    gpuUsage: await g("/api/localengine/gpu"),
+    routineSuggestions: await g("/api/tasks/routine-suggestions"),
+    actionPriorities: await g("/api/approvals/priorities?limit=10"),
+    memoryDocuments: await g("/api/memory/documents"),
+    analysisHub: await g("/api/analysis-hub/events"),
+    ontology: await g("/api/ontology/triples"),
+    guardrailStatus: await g("/api/guardrail/status"),
+    guardrailLog: await g("/api/guardrail/log?limit=50"),
+    redteamLast: await g("/api/redteam/last"),
+    redteamTargets: await g("/api/redteam/targets"),
+    logs: await g("/api/logs"),
   };
 
   // 브라우저에 주입할 window.gijo 스텁(읽기=주입 데이터 반환, 쓰기/구독=no-op). 페이지 스크립트보다 먼저 실행.
@@ -77,7 +92,7 @@ async function main() {
     const noop = () => {};
     const gijo = {
       isAuthenticated: () => true,
-      getServerUrl: () => "http://localhost:4068",
+      getServerUrl: () => DATA.serverUrl,
       checkServerHealth: () => R({ ok: true }),
       me: () => R(DATA.me),
       navigateTo: noop,
@@ -104,7 +119,17 @@ async function main() {
       listLlmActivity: () => R(DATA.llmActivity),
       listLlmGuide: () => R(DATA.llmGuide),
       listModelDex: () => R(DATA.modelDex),
-      listLogs: () => R([]),
+      listLogs: () => R(DATA.logs || []),
+      getGpuUsage: () => R(DATA.gpuUsage),
+      getRoutineSuggestions: () => R(DATA.routineSuggestions || []),
+      listActionPriorities: () => R(DATA.actionPriorities),
+      listMemoryDocuments: () => R(DATA.memoryDocuments || []),
+      analysisEvents: () => R(DATA.analysisHub),
+      listOntology: () => R(DATA.ontology || []),
+      guardrailStatus: () => R(DATA.guardrailStatus),
+      guardrailLog: () => R(DATA.guardrailLog || []),
+      lastRedTeam: () => R(DATA.redteamLast),
+      redteamTargets: () => R(DATA.redteamTargets),
       listUsers: () => R(DATA.users || []),
       getUsageSummary: () => R(DATA.usage),
       getSmtpConfig: () => R(DATA.smtp),
@@ -141,13 +166,25 @@ async function main() {
     { page: "sbom.html", name: "10-AI-BOM-SBOM" },
     { page: "vulnscan.html", name: "11-취약자산관리-생애주기" },
     { page: "products.html", name: "12-보안제품관리-매뉴얼" },
+    // 전 메뉴 커버(제품소개 자료용) — 위 12장에 없던 나머지 화면.
+    { page: "dashboard.html", name: "13-메인대시보드-지휘콘솔" },
+    { page: "analysis.html", name: "14-통합관제-보안분석" },
+    { page: "redteam.html", name: "15-레드팀-가드레일" },
+    { page: "ontology.html", name: "16-지식모델-온톨로지" },
+    { page: "memory.html", name: "17-기억학습-문서관리" },
+    { page: "merge.html", name: "18-LLM합성-모델머지" },
+    { page: "billing.html", name: "19-사용량-요금" },
+    { page: "logs.html", name: "20-시스템로그" },
+    { page: "settings.html", name: "21-설정-사용자관리" },
   ];
 
   const browser = await chromium.launch({ channel: "msedge", headless: true });
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 960 }, deviceScaleFactor: 2 });
   // 외부 로고(gijo.ai) 요청은 오프라인이라 차단해 렌더 지연 방지.
   await ctx.route(/gijo\.ai/, (route) => route.abort());
-  await ctx.addInitScript(`(${installStub.toString()})(${JSON.stringify(DATA)});
+  // 온보딩 오버레이는 대시보드 최초 진입 시 자동으로 뜨며 화면을 가린다 — '이미 봤음'으로 표시해 억제.
+  await ctx.addInitScript(`try { localStorage.setItem("gijo:onboarding:seen", "1"); } catch (e) {}
+    (${installStub.toString()})(${JSON.stringify(DATA)});
     window.gijo = (${installStub.toString()})(${JSON.stringify(DATA)});
     window.gijoRealtime = { connect: () => {} };`);
 
@@ -155,8 +192,11 @@ async function main() {
     const page = await ctx.newPage();
     try {
       await page.goto(pathToFileURL(path.join(PAGES_DIR, s.page)).href, { waitUntil: "load", timeout: 15000 });
+      // 헤더 로고는 gijo.ai에서 받아오는데 오프라인이라 차단된다 → 깨진 이미지 아이콘이 남으므로 숨긴다.
+      // (옆에 "GIJO AS" 텍스트가 이미 있어 로고가 빠져도 헤더가 비지 않는다.)
+      await page.addStyleTag({ content: 'img[src*="gijo.ai"]{display:none!important}' });
       await page.waitForTimeout(1200); // 렌더/데이터 반영 대기
-      await page.screenshot({ path: path.join(OUT_DIR, `${s.name}.png`), fullPage: true });
+      await page.screenshot({ path: path.join(OUT_DIR, `${s.name}.png`), fullPage: !DECK });
       console.log("✓", s.name);
     } catch (e) {
       console.log("✗", s.name, String(e.message).split("\n")[0]);
