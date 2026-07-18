@@ -71,7 +71,11 @@ async function cap(file, out, w, h) {
       listMemoryDocuments: () => d([]),
       getRoutineSuggestions: () => d([]),
       listAgents: () => d([{ id: "orchestrator", name: "Security Orchestrator", role: "지휘", status: "idle", defaultName: "Security Orchestrator" }]),
-      listCollaborationHistory: () => d([]),
+      listCollaborationHistory: () => d([
+        { from: "세션", to: "orchestrator", message: "💬 [사내 상담 챗봇 · 상태] 재스캔해서 해결됐는지 확인", timestamp: Date.now() - 8000 },
+        { from: "orchestrator", to: "scan", message: "단계 1/2 — 스캔", timestamp: Date.now() - 6000 },
+        { from: "orchestrator", to: "세션", message: "💬 [사내 상담 챗봇 · 상태] Log4j RCE 재발 없음 — 해결 확인", timestamp: Date.now() - 2000 },
+      ]),
       listLlmActivity: () => d([]),
       onCollaborationEvent: noop, onLlmActivity: noop, onAssetUpdated: noop, onHfDownloadProgress: noop, onLogEvent: noop,
       listHfDownloadJobs: () => d([]),

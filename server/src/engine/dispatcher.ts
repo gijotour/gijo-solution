@@ -277,9 +277,20 @@ export async function dispatchInstruction(instructionText: string, sessionId?: s
   const session = sessionId ? getSession(sessionId) : null;
   // 맥락은 이번 지시를 기록하기 "전" 시점의 대화로 계산한다(방금 넣은 user 턴이 맥락에 중복되지 않게).
   const contextText = session ? recentTurnsText(session.id) : "";
-  if (session) appendTurn(session.id, "user", instructionText);
+  let title = session?.title;
+  if (session) {
+    appendTurn(session.id, "user", instructionText);
+    // 첫 지시면 방금 자동 지정된 제목을 로그에 쓰기 위해 다시 읽는다("새 세션" 대신 실제 제목).
+    title = getSession(session.id)?.title ?? title;
+    // 작업 세션의 지시를 실시간 에이전트 협업 로그에도 흘린다 — 세션 제목으로 꼬리표를 달아
+    // "어느 세션에서 온 작업인지"가 로그에 드러나게 한다(대시보드 📡 실시간 협업 피드에 표시).
+    emitCollaboration({ from: "세션", to: "orchestrator", message: `💬 [${title}] ${instructionText}` });
+  }
   const result = await dispatchInstructionCore(instructionText, contextText);
-  if (session) appendTurn(session.id, "assistant", result.output, turnToolTag(result));
+  if (session) {
+    appendTurn(session.id, "assistant", result.output, turnToolTag(result));
+    emitCollaboration({ from: "orchestrator", to: "세션", message: `💬 [${title}] ${result.output.slice(0, 140)}` });
+  }
   return session ? { ...result, sessionId: session.id } : result;
 }
 

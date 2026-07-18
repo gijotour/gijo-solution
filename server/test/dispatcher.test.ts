@@ -152,6 +152,12 @@ describe("dispatcher + intent + assets integration", () => {
       expect(detail.body.turns[1].role).toBe("assistant");
       // 첫 user 턴이 세션 제목을 자동으로 지었는지
       expect(detail.body.session.title).toBe("오늘 상태 어때?");
+
+      // 세션 지시·응답이 실시간 협업 로그에도 세션 제목 꼬리표로 흘렀는지
+      const collab = await request(app).get("/api/collaboration/history").set("Authorization", `Bearer ${token}`);
+      const sessionEvents = collab.body.filter((e: { message: string }) => e.message.includes("[오늘 상태 어때?]"));
+      expect(sessionEvents.length).toBeGreaterThanOrEqual(2); // 지시(💬) + 응답(💬)
+      expect(sessionEvents.some((e: { from: string }) => e.from === "세션")).toBe(true);
     });
 
     it("sessionId 없이 지시하면 세션이 만들어지지 않는다(종전 동작 보존)", async () => {
