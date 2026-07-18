@@ -1,0 +1,12 @@
+import { createRequire } from "module"; import path from "path";
+const req = createRequire(path.resolve("client","package.json"));
+const { _electron: electron } = req("playwright-core");
+const app = await electron.launch({ args: ["."], cwd: path.resolve("client") });
+let win = await app.firstWindow();
+await win.waitForSelector("#username",{timeout:20000});
+await win.fill("#username","jyh"); await win.fill("#password","changeme"); await win.click("#loginBtn");
+await win.waitForFunction(()=>location.pathname.endsWith("dashboard.html"),{timeout:20000}).catch(()=>{});
+await win.waitForTimeout(2500);
+await win.screenshot({ path: path.resolve("mockups","product-doc","shot-dashboard.png"), fullPage: true });
+console.log("dashboard 캡처 완료");
+await app.close();
