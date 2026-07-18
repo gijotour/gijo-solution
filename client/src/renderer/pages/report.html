@@ -176,6 +176,7 @@ tr:last-child td{border-bottom:none;}
             <option value="180">180일 이전</option>
           </select>
           <button id="pruneBtn" style="font-size:11.5px;background:transparent;border:1px solid #e2483d;color:#f5928a;border-radius:6px;padding:5px 10px;cursor:pointer;font-weight:700;">일괄 삭제</button>
+          <button id="deleteAllBtn" style="font-size:11.5px;background:rgba(226,72,61,.14);border:1px solid #e2483d;color:#f5928a;border-radius:6px;padding:5px 10px;cursor:pointer;font-weight:800;">🗑 전체 삭제</button>
         </div>
       </div>
       <table>
@@ -380,6 +381,24 @@ tr:last-child td{border-bottom:none;}
     }
   }
 
+  async function deleteAllReports() {
+    if (!confirm("저장된 모든 리포트를 삭제할까요? DOCX·PDF·요약이 전부 삭제되며 되돌릴 수 없습니다.")) return;
+    if (!confirm("정말 전체 삭제할까요? 이 작업은 되돌릴 수 없습니다.")) return; // 파괴적 — 2단계 확인
+    const btn = document.getElementById("deleteAllBtn");
+    const orig = btn.textContent;
+    btn.disabled = true; btn.textContent = "삭제 중…";
+    try {
+      const r = await window.gijo.deleteAllReports();
+      await loadHistory();
+      renderReportRows();
+      alert(`리포트 ${r.deletedReports}건(파일 ${r.deletedFiles}개)을 전부 삭제했습니다.`);
+    } catch (e) {
+      alert("전체 삭제 실패: " + ((e && e.message) || e));
+    } finally {
+      btn.disabled = false; btn.textContent = orig;
+    }
+  }
+
   async function deleteReportRow(base, btn) {
     if (!confirm("이 리포트를 삭제할까요? DOCX·PDF·요약 파일이 함께 삭제되며 되돌릴 수 없습니다.")) return;
     if (btn) btn.disabled = true;
@@ -506,6 +525,7 @@ tr:last-child td{border-bottom:none;}
     document.getElementById("viewCloseBtn").addEventListener("click", closeViewer);
     viewModal.addEventListener("click", (e) => { if (e.target === viewModal) closeViewer(); });
     document.getElementById("pruneBtn").addEventListener("click", pruneOld);
+    document.getElementById("deleteAllBtn").addEventListener("click", deleteAllReports);
     document.getElementById("templateBtn").addEventListener("click", () => {
       alert("템플릿 관리 기능은 아직 구현되지 않았습니다.");
     });

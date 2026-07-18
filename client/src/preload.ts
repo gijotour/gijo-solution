@@ -50,6 +50,8 @@ const gijoApi = {
   getWorkSession: (id: string) => api.workSessionsApi.get(id),
   updateWorkSession: (id: string, patch: { title?: string; status?: import("./apiClient").WorkSessionStatus }) => api.workSessionsApi.update(id, patch),
   deleteWorkSession: (id: string) => api.workSessionsApi.remove(id),
+  pruneWorkSessions: (olderThanDays: number) => api.workSessionsApi.prune(olderThanDays),
+  deleteAllWorkSessions: () => api.workSessionsApi.deleteAll(),
   addWorkSessionTurn: (id: string, role: "user" | "assistant", content: string, tool?: string) => api.workSessionsApi.addTurn(id, role, content, tool),
   onCollaborationEvent: (cb: (evt: unknown) => void) => onChannel("collaboration:event", cb),
   listCollaborationHistory: () => api.collaborationApi.history(),
@@ -207,6 +209,7 @@ const gijoApi = {
   listReportHistory: () => api.reportApi.history(),
   deleteReport: (base: string) => api.reportApi.remove(base),
   pruneReports: (olderThanDays: number) => api.reportApi.prune(olderThanDays),
+  deleteAllReports: () => api.reportApi.removeAll(),
 
   // 이메일(SMTP) 설정
   getSmtpConfig: () => api.emailApi.getConfig(),

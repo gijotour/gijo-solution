@@ -217,6 +217,9 @@ export const workSessionsApi = {
   update: (id: string, patch: { title?: string; status?: WorkSessionStatus }) =>
     request<WorkSession>(`/api/work-sessions/${id}`, { method: "PATCH", body: patch }),
   remove: (id: string) => request<{ ok: boolean }>(`/api/work-sessions/${id}`, { method: "DELETE" }),
+  prune: (olderThanDays: number) =>
+    request<{ deleted: number }>("/api/work-sessions/prune", { method: "POST", body: { olderThanDays } }),
+  deleteAll: () => request<{ deleted: number }>("/api/work-sessions/delete-all", { method: "POST" }),
   addTurn: (id: string, role: "user" | "assistant", content: string, tool?: string) =>
     request<WorkSessionTurn>(`/api/work-sessions/${id}/turns`, { method: "POST", body: { role, content, ...(tool ? { tool } : {}) } }),
 };
@@ -818,6 +821,9 @@ export const reportApi = {
   // N일 이전 리포트 일괄 삭제.
   prune: (olderThanDays: number) =>
     request<{ deletedReports: number; deletedFiles: number }>("/api/report/prune", { method: "POST", body: { olderThanDays } }),
+  // 전체 리포트 삭제.
+  removeAll: () =>
+    request<{ deletedReports: number; deletedFiles: number }>("/api/report/delete-all", { method: "POST" }),
 };
 
 export interface ReportHistoryEntry {

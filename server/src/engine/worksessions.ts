@@ -186,6 +186,34 @@ export function deleteSession(id: string): boolean {
   return true;
 }
 
+// N일 동안 손대지 않은(updatedAt 기준) 세션을 일괄 삭제한다.
+export function pruneSessions(olderThanDays: number): number {
+  if (!Number.isFinite(olderThanDays) || olderThanDays < 1) {
+    throw new Error("olderThanDays는 1 이상이어야 합니다");
+  }
+  const cutoff = Date.now() - olderThanDays * 86400000;
+  const ids = (db.prepare("SELECT id FROM work_sessions WHERE updatedAt < ?").all(cutoff) as { id: string }[]).map((r) => r.id);
+  const tx = db.transaction(() => {
+    for (const id of ids) {
+      db.prepare("DELETE FROM work_session_turns WHERE sessionId = ?").run(id);
+      db.prepare("DELETE FROM work_sessions WHERE id = ?").run(id);
+    }
+  });
+  tx();
+  return ids.length;
+}
+
+// 전체 세션 삭제(대화 포함).
+export function deleteAllSessions(): number {
+  const { n } = db.prepare("SELECT COUNT(*) AS n FROM work_sessions").get() as { n: number };
+  const tx = db.transaction(() => {
+    db.prepare("DELETE FROM work_session_turns").run();
+    db.prepare("DELETE FROM work_sessions").run();
+  });
+  tx();
+  return n;
+}
+
 // 모델에 실을 직전 대화 맥락 — 최근 N턴을 "역할: 내용" 줄로 압축한다. 너무 길면 프롬프트가
 // 폭주하므로 턴 수·각 턴 길이에 상한을 둔다. 세션이 없거나 턴이 없으면 빈 문자열(맥락 없음).
 export function recentTurnsText(sessionId: string, maxTurns = 6): string {
@@ -224,6 +252,18 @@ export function registerWorkSessionRoutes(app: Express): void {
       session = setSessionStatus(id, req.body.status) ?? session;
     }
     res.json(session);
+  });
+
+  // 일괄 정리 — /:id보다 먼저 등록해 'prune'·'delete-all'이 id로 안 잡히게 한다.
+  app.post("/api/work-sessions/prune", authMiddleware, (req, res) => {
+    try {
+      res.json({ deleted: pruneSessions(Number(req.body?.olderThanDays)) });
+    } catch (e) {
+      res.status(400).json({ error: (e as Error).message });
+    }
+  });
+  app.post("/api/work-sessions/delete-all", authMiddleware, (_req, res) => {
+    res.json({ deleted: deleteAllSessions() });
   });
 
   app.delete("/api/work-sessions/:id", authMiddleware, (req, res) => {

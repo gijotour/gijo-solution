@@ -661,6 +661,26 @@ export async function pruneReports(olderThanDays: number): Promise<{ deletedRepo
   return { deletedReports, deletedFiles };
 }
 
+// 전체 리포트 삭제 — data/reports의 docx·pdf·메타(.json)를 모두 지운다.
+export async function deleteAllReports(): Promise<{ deletedReports: number; deletedFiles: number }> {
+  await fs.mkdir(REPORT_DIR, { recursive: true });
+  const files = await fs.readdir(REPORT_DIR);
+  const bases = new Set<string>();
+  let deletedFiles = 0;
+  for (const f of files) {
+    const m = /^(.+)\.(docx|pdf|json)$/i.exec(f);
+    if (!m) continue;
+    if (/docx|pdf/i.test(m[2])) bases.add(m[1]);
+    try {
+      await fs.unlink(path.join(REPORT_DIR, f));
+      deletedFiles++;
+    } catch {
+      /* 이미 없으면 무시 */
+    }
+  }
+  return { deletedReports: bases.size, deletedFiles };
+}
+
 // 보고서 HTML(개선 #3 PDF용) — DOCX와 같은 데이터를 A4 인쇄용 HTML로. 한국어는 시스템 폰트로 렌더.
 function buildReportHtml(
   req: ReportRequest,
@@ -803,6 +823,14 @@ export function registerReportRoutes(app: Express): void {
       } catch (e) {
         res.status(400).json({ error: (e as Error).message });
       }
+    })
+  );
+  // 전체 삭제 — /:base보다 먼저 등록해 'delete-all'이 base로 안 잡히게 한다.
+  app.post(
+    "/api/report/delete-all",
+    authMiddleware,
+    asyncRoute(async (_req, res) => {
+      res.json(await deleteAllReports());
     })
   );
   app.delete(
