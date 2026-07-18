@@ -258,6 +258,52 @@ async function runThreats(args: Record<string, string>): Promise<string> {
   ].join("\n").slice(0, 2500);
 }
 
+// #5 조치 절차 — "이거 어떻게 조치해?"에 완화통제·보안제품·매뉴얼 근거로 답한다.
+// explain(개념 설명)과 구분: 여기는 "무엇을 해야 하나"(대응 수단·절차 근거)에 초점.
+async function runRemediation(args: Record<string, string>): Promise<string> {
+  const topic = (args.topic ?? "").trim();
+  const out: string[] = [];
+  const controls = ontologyLinesFor(topic, 10);
+  if (controls.length) out.push(`사내 온톨로지 — "${topic}" 관련 완화통제·관계:`, ...controls);
+  const products = listProducts().filter((p) => matches(`${p.name} ${p.category} ${p.vendor ?? ""}`, topic));
+  if (products.length) {
+    out.push("대응에 쓸 수 있는 보유 보안제품:", ...products.slice(0, 5).map((p) => `  - ${p.name} (${p.category}${p.vendor ? `, ${p.vendor}` : ""})`));
+  }
+  try {
+    const docs = (await listDocuments()).filter((d) => matches(d.documentId, topic));
+    if (docs.length) out.push("참고할 사내 매뉴얼·문서(조치 절차 근거):", ...docs.slice(0, 5).map((d) => `  - ${d.documentId}${d.docClass ? ` [${d.docClass}]` : ""}`));
+  } catch {
+    /* 임베딩 미기동 — 문서 근거 없이 계속 */
+  }
+  if (out.length === 0) {
+    return `"${topic}"에 대한 사내 완화통제·보안제품·매뉴얼 근거를 찾지 못했습니다. 일반적 조치는 최신 패치 적용·설정 강화·접근통제이며, 관련 매뉴얼을 올리면 구체 절차가 쌓입니다.`;
+  }
+  return out.join("\n").slice(0, 2500);
+}
+
+// #6 재스캔 서사 — "지난 스캔 대비 뭐가 바뀌었어?"에 상태(신규·활성·해결·재발) 분포로 답한다.
+// 취약점 스캐너 자산의 finding.state(재스캔 자동 판정)를 그대로 집계한다.
+function runScanStatus(args: Record<string, string>): string {
+  const assets = args.assetId?.trim() ? [resolveAsset(args.assetId)].filter((a): a is Asset => !!a) : listAssets();
+  const counts: Record<string, number> = { new: 0, active: 0, fixed: 0, resurfaced: 0, unknown: 0 };
+  const fixedList: string[] = [];
+  for (const a of assets) {
+    for (const f of a.findings) {
+      const st = f.state ?? "unknown";
+      counts[st] = (counts[st] ?? 0) + 1;
+      if (st === "fixed") fixedList.push(`${a.id} [${f.severity}] ${f.finding_type}`);
+    }
+  }
+  const total = Object.values(counts).reduce((x, y) => x + y, 0);
+  if (total === 0) return "스캔된 취약점이 없습니다. (취약점 관리에서 스캔 결과를 업로드하세요.)";
+  const parts = [
+    `재스캔 기준 상태 (총 ${total}건): 신규 ${counts.new} · 활성 ${counts.active} · 해결 ${counts.fixed} · 재발 ${counts.resurfaced}`,
+  ];
+  if (fixedList.length) parts.push(`해결(fixed)로 판정된 ${fixedList.length}건 — 조치완료 확정 후보:`, ...fixedList.slice(0, 8).map((x) => `  - ${x}`));
+  if (counts.resurfaced) parts.push(`⚠ 재발 ${counts.resurfaced}건 — 조치 후 다시 나타남, 재확인 필요`);
+  return parts.join("\n").slice(0, 2500);
+}
+
 // ── 「AI 자산」 쓰기 도구 (Phase 2 — 결재판 경유) ────────────────────────
 
 // 이름에서 자산 id를 만든다 — UX 피드백 러프엣지("id를 사람이 지정해야 함") 해소.
@@ -406,6 +452,48 @@ function runUpdateFindingStatus(args: Record<string, string>): string {
   return `${args.assetId} ${r.hit.label} → ${label} 처리했습니다.${note ? ` 사유: ${note}` : ""}`;
 }
 
+// ── #2 자연어 일괄 조치 ──────────────────────────────────────────────────
+// "Critical KEV 전부 정요한 배정" 한 문장으로 다건 처리. 289건을 1건씩 다루는 건 비현실적.
+// filter는 규칙 파싱(심각도·KEV·상태·키워드), 매칭은 전 자산을 가로지른다(prioritizedReviews).
+
+interface BulkMatch { assetId: string; key: string; label: string; }
+
+function matchFindingsByFilter(filter: string): BulkMatch[] {
+  const f = (filter ?? "").toLowerCase();
+  let sel = prioritizedReviews(2000); // 전 자산 finding(오탐 제외), 우선순위순
+  if (/critical|크리티컬|심각/.test(f)) sel = sel.filter((r) => r.finding.severity === "critical");
+  else if (/high|높/.test(f)) sel = sel.filter((r) => r.finding.severity === "high");
+  else if (/medium|중간/.test(f)) sel = sel.filter((r) => r.finding.severity === "medium");
+  else if (/\blow\b|낮/.test(f)) sel = sel.filter((r) => r.finding.severity === "low");
+  if (/kev|실제\s*악용|악용/.test(f)) sel = sel.filter((r) => r.finding.kev);
+  if (/미배정|담당\s*없|미지정/.test(f)) sel = sel.filter((r) => !r.assignee);
+  if (/기한\s*초과|지연|overdue/.test(f)) sel = sel.filter((r) => r.overdue);
+  // 남은 키워드(심각도·KEV·집합어 제거 후)로 유형·근거 매칭
+  const kw = f.replace(/critical|high|medium|low|크리티컬|심각|높은?|중간|낮은?|kev|실제\s*악용|악용|미배정|담당\s*없음?|미지정|기한\s*초과|지연|overdue|전부|모두|다|취약점|것들?|전체/g, "").trim();
+  if (kw.length >= 2) sel = sel.filter((r) => matches(`${r.finding.finding_type} ${r.finding.evidence}`, kw));
+  return sel.map((r) => ({ assetId: r.assetId, key: r.findingKey, label: `[${r.finding.severity}] ${r.finding.finding_type} @ ${r.assetName}` }));
+}
+
+function runBulkUpdate(args: Record<string, string>): string {
+  const matched = matchFindingsByFilter(args.filter);
+  if (matched.length === 0) throw new Error(`"${args.filter}"에 맞는 취약점이 없습니다.`);
+  const patch: ReviewPatch = {};
+  if (args.assignee?.trim()) patch.assignee = args.assignee.trim();
+  if (args.dueDate?.trim()) {
+    if (!DUE_RE.test(args.dueDate.trim())) throw new Error(`기한은 YYYY-MM-DD 형식이어야 합니다 (받은 값: "${args.dueDate}").`);
+    patch.dueDate = args.dueDate.trim();
+  }
+  if (args.status?.trim()) {
+    const st = normalizeStatus(args.status);
+    if (!st) throw new Error(`상태 "${args.status}"를 해석하지 못했습니다.`);
+    patch.status = st;
+  }
+  if (!patch.assignee && !patch.dueDate && !patch.status) throw new Error("담당자·기한·판정 중 하나는 지정해야 합니다.");
+  for (const m of matched) updateFindingReview(m.assetId, m.key, patch, "orchestrator");
+  const acts = [patch.assignee && `담당 ${patch.assignee}`, patch.dueDate && `기한 ${patch.dueDate}`, patch.status && `판정 ${args.status.trim()}`].filter(Boolean).join(", ");
+  return `${matched.length}건에 일괄 적용했습니다: ${acts}.`;
+}
+
 // ── 레지스트리 ──────────────────────────────────────────────────────────
 
 const TOOLS: AgentTool[] = [
@@ -468,6 +556,26 @@ const TOOLS: AgentTool[] = [
       '우리 자산에 걸리는 최신 위협을 보여준다 — "요즘 위협 있어?", "새로 뜬 거 우리랑 관련?", "우리 자산에 걸리는 위협", "위협 인텔"에 쓴다. CTI 피드 탐지 × 사내 자산 교집합. 예: {"limit":"5"}',
     params: [{ name: "limit", label: "개수", description: "상위 몇 건 (기본 5)", required: false }],
     run: runThreats,
+  },
+  {
+    name: "remediation",
+    label: "조치 절차 가이드",
+    domain: "cross",
+    write: false,
+    description:
+      '취약점·위협을 "어떻게 조치/대응/막을지" 구체 절차를 사내 근거로 안내한다 — 완화통제(온톨로지)·보유 보안제품·매뉴얼(RAG). "어떻게 조치해?", "이거 어떻게 막아?", "대응 방법 알려줘"에 쓴다(개념 설명은 explain). 예: {"topic":"Log4Shell"}',
+    params: [{ name: "topic", label: "주제", description: "조치가 필요한 취약점·위협·주제", required: true }],
+    run: runRemediation,
+  },
+  {
+    name: "scan_status",
+    label: "재스캔 상태 요약",
+    domain: "cross",
+    write: false,
+    description:
+      '재스캔 기준 취약점 상태 변화를 요약한다 — 신규·활성·해결·재발 건수 + 해결(fixed) 후보. "지난 스캔 대비 뭐가 바뀌었어?", "새로 뜬 거 있어?", "해결된 거"에 쓴다. 예: {} 또는 {"assetId":"vuln:sample-web01"}',
+    params: [{ name: "assetId", label: "자산 id", description: "특정 자산만 (선택, 비우면 전체)", required: false }],
+    run: runScanStatus,
   },
   {
     name: "register_asset",
@@ -543,6 +651,29 @@ const TOOLS: AgentTool[] = [
     },
     undo: "승인 화면에서 판정을 미검토로 되돌리면 원상복귀됩니다.",
     run: runUpdateFindingStatus,
+  },
+  {
+    name: "bulk_update",
+    label: "취약점 일괄 조치",
+    domain: "cross", // 전 자산을 가로질러 조건으로 다건 처리
+    write: true,
+    description:
+      '여러 취약점을 조건으로 한 번에 처리한다 — "Critical KEV 전부 정요한한테 배정", "Oracle 취약점 다 오탐 처리", "높은 취약점 기한 2026-07-24로". filter(조건: 심각도·KEV·상태·키워드) + 담당자/기한/판정 중 하나 이상. 예: {"filter":"critical kev","assignee":"정요한","dueDate":"2026-07-24"}',
+    params: [
+      { name: "filter", label: "대상 조건", description: "심각도(critical/high…)·KEV·상태·키워드 (예: critical kev, Oracle)", required: true },
+      { name: "assignee", label: "담당자", description: "일괄 배정할 담당자 (선택)", required: false },
+      { name: "dueDate", label: "기한", description: "일괄 기한 YYYY-MM-DD (선택)", required: false },
+      { name: "status", label: "판정", description: "조치완료 / 오탐 (선택)", required: false },
+    ],
+    // 결재판에 영향받는 건수·목록을 보여준다 — 사람이 범위를 확인하고 승인한다(대량 쓰기 안전).
+    effect: (args) => {
+      const m = matchFindingsByFilter(args.filter ?? "");
+      if (m.length === 0) return `"${args.filter}"에 맞는 취약점 없음`;
+      const sample = m.slice(0, 5).map((x) => x.label).join(" · ");
+      return `${m.length}건에 일괄 적용 — ${sample}${m.length > 5 ? ` 외 ${m.length - 5}건` : ""}`;
+    },
+    undo: "승인 화면(취약점 관리)에서 개별로 되돌릴 수 있습니다. 범위가 크면 filter를 좁혀 다시 지시하세요.",
+    run: runBulkUpdate,
   },
 ];
 

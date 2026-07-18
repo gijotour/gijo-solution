@@ -72,6 +72,30 @@ describe("#1 인자 추출 강건화 — assetId 접두어 관용 + status autoF
   });
 });
 
+describe("#2 bulk_update — 조건으로 일괄 조치", () => {
+  it("filter=critical 이면 critical finding에만 담당자를 일괄 배정한다", async () => {
+    const out = await executeApprovedTool("bulk_update", { filter: "critical", assignee: "정요한" });
+    expect(out).toMatch(/1건에 일괄 적용/);
+    expect(reviewFor("ai-secbot-01", "프롬프트 인젝션")?.assignee).toBe("정요한"); // critical
+    expect(reviewFor("ai-secbot-01", "버전 정보")?.assignee).toBeUndefined(); // low는 제외
+  });
+
+  it("결재판 effect가 영향 건수·목록을 보여준다(대량 쓰기 범위 확인)", () => {
+    const tool = findAgentTool("bulk_update")!;
+    const ap = buildApproval(tool, { filter: "critical", assignee: "정요한" }, "critical 전부 정요한 배정");
+    expect(ap.effect).toMatch(/1건에 일괄 적용/);
+    expect(ap.effect).toContain("프롬프트 인젝션");
+  });
+
+  it("맞는 취약점이 없으면 실행하지 않는다", async () => {
+    await expect(executeApprovedTool("bulk_update", { filter: "SQL인젝션없는키워드zzz", assignee: "김보안" })).rejects.toThrow(/맞는 취약점이 없습니다/);
+  });
+
+  it("담당자·기한·판정이 하나도 없으면 거절한다", async () => {
+    await expect(executeApprovedTool("bulk_update", { filter: "critical" })).rejects.toThrow(/하나는 지정/);
+  });
+});
+
 describe("assign_finding — 담당자·기한 배정 (승인 실행)", () => {
   it("심각도·유형으로 지목한 취약점에 담당자와 기한을 기록한다", async () => {
     const out = await executeApprovedTool("assign_finding", {
