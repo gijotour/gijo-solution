@@ -327,19 +327,23 @@ export interface ManualImportResult {
 }
 
 // 분류 결과를 실제로 반영한다(제품 자동 등록 + 문서 추가). RAG 수집은 라우트에서 처리해 넘긴다.
-export function importManual(filename: string, docName: string | undefined, uploadedBy?: string): ManualImportResult {
+export function importManual(filename: string, docName: string | undefined, uploadedBy?: string, forceKind?: string): ManualImportResult {
   const stem = filename.replace(/\.[^.]+$/, "");
   const c = classifyManual(filename, listProducts());
-  const product = c.product ?? createProduct({ name: stem, category: c.category, note: "매뉴얼 일괄 업로드로 자동 등록" });
-  addProductDoc(product.id, { kind: c.kind, title: stem, docName }, uploadedBy);
+  const kind = forceKind ?? c.kind; // 사용자가 유형을 지정했으면(로그 등) 그걸 우선
+  // 사용자가 유형을 명시(forceKind)한 경우엔 "애매해서 물어본" 파일이므로 확실한 매칭(모델/벤더 일치=
+  // product-match)만 인정한다. 느슨한 카테고리 매칭으로 엉뚱한 제품에 붙지 않게 하고, 약하면 파일명으로 새 제품.
+  const matched = forceKind ? (c.reason === "product-match" ? c.product : undefined) : c.product;
+  const product = matched ?? createProduct({ name: stem, category: c.category, note: "매뉴얼 업로드로 자동 등록" });
+  addProductDoc(product.id, { kind, title: stem, docName }, uploadedBy);
   return {
     filename,
     productId: product.id,
     productName: product.name,
     category: product.category,
-    kind: c.kind,
-    createdProduct: !c.product,
-    reason: c.reason,
+    kind,
+    createdProduct: !matched,
+    reason: matched ? c.reason : "new-product",
     docName,
   };
 }

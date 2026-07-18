@@ -271,6 +271,16 @@
   .dock-who b{font-size:12px;color:#fff;}.dock-who span{font-size:10px;color:var(--blue-light);}
   .agent-dock input{flex:1;background:var(--panel);border:1px solid var(--border-strong);border-radius:10px;padding:12px 14px;color:var(--text);font-size:13px;outline:none;}
   .agent-dock input:focus{border-color:var(--blue);}
+  .dock-plus{flex:none;width:44px;height:44px;border-radius:10px;background:rgba(59,130,246,0.14);border:1px solid rgba(59,130,246,0.4);color:var(--blue-light);font-size:22px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .12s;}
+  .dock-plus:hover{background:rgba(59,130,246,0.26);}
+  /* 스마트 업로드 결정 카드(콘솔 인라인) — 애매할 때 유형 4택 */
+  .cl-updecide{background:rgba(240,160,32,0.06);border:1px solid rgba(240,160,32,0.3);border-radius:10px;padding:11px 13px;margin-top:6px;}
+  .cl-upd-h{font-size:12px;font-weight:800;color:#fff;margin-bottom:3px;}
+  .cl-upd-f{font-size:11px;color:var(--amber);margin-bottom:7px;word-break:break-all;}
+  .cl-upd-btns{display:flex;gap:6px;flex-wrap:wrap;}
+  .cl-upd-btns button{font-size:11.5px;font-weight:700;border-radius:8px;padding:6px 11px;cursor:pointer;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--text);}
+  .cl-upd-btns button.reco{background:rgba(59,130,246,0.14);border-color:var(--blue);color:var(--blue-light);}
+  .cl-upd-btns button:hover{border-color:var(--blue);}
   .dock-send{background:var(--blue);color:#fff;border:none;border-radius:10px;padding:0 20px;height:44px;font-weight:800;cursor:pointer;}
   .dock-all{background:var(--panel);border:1px solid var(--border-strong);color:var(--blue-light);font-weight:800;font-size:11.5px;border-radius:10px;padding:0 13px;height:44px;white-space:nowrap;cursor:pointer;}
 
@@ -439,6 +449,7 @@
         </div>
       </div>
       <div class="agent-dock" id="agentDock">
+        <button class="dock-plus" id="dockUpload" title="파일 올리기 — 자동 분류(취약점·매뉴얼·문서). 애매하면 유형을 물어봅니다">＋</button>
         <input id="chatInput" placeholder="지시를 입력하세요… 예: fraud-detect-llm 전체 재스캔하고 리포트까지">
         <button class="dock-send" id="dockSend">전송</button>
         <button class="dock-all" id="dockAll">◉ 전체 지시</button>
@@ -756,28 +767,44 @@
   // 결과는 협업 피드에 한 줄로: 어떤 파이프라인으로 갔고 왜 그렇게 판별됐는지(reason)까지.
   const smartInput = document.getElementById("smartUploadInput");
   // 파일 올리기 트리거는 통합 탐색기(문서·분석 > 파일 올리기)에서 smartInput.click()로 호출한다.
+  const readB64 = (file) => new Promise((res, rej) => {
+    const fr = new FileReader();
+    fr.onload = () => res(String(fr.result).split(",")[1] || "");
+    fr.onerror = () => rej(new Error("파일 읽기 실패"));
+    fr.readAsDataURL(file);
+  });
+  function uploadResultMsg(r) {
+    if (r.routedTo === "vulnscan") return `취약점 스캔으로 자동 반영 — 호스트 ${r.vulnscan.hosts}·finding ${r.vulnscan.findings}건 (${r.reason})`;
+    if (r.routedTo === "product-manual") return `보안제품 '${r.manual.productName}'에 ${r.manual.kind === "logManual" ? "로그" : "제품"} 매뉴얼로 연결${r.manual.createdProduct ? " · 신규 제품 자동 등록" : ""} (${r.reason})`;
+    return `장기기억 ${r.memory.chunks}청크 수집${r.memory.docClass ? ` · 분류 ${r.memory.docClass}` : ""}${r.memory.linkedProduct ? ` · 제품 '${r.memory.linkedProduct}' 연결` : ""} (${r.reason})`;
+  }
+  // 시안 B — 애매하면 콘솔 인라인 결정 카드(4유형). 확실하면 바로 결과 표시.
+  const UPLOAD_TYPES = [
+    { t: "asset", label: "🛡 보안제품 자산" },
+    { t: "log", label: "📊 로그 매뉴얼" },
+    { t: "document", label: "📄 일반 문서" },
+    { t: "guideline", label: "📘 가이드라인" },
+  ];
+  async function handleUpload(name, b64, cm, forceType) {
+    if (cm) cm.textContent = `${name} — ${forceType ? "처리 중…" : "유형 판별·처리 중…"}`;
+    const r = await window.gijo.uploadAuto(name, b64, forceType);
+    if (r.needsDecision && !forceType) {
+      const btns = UPLOAD_TYPES.map((x) => `<button data-t="${x.t}"${x.t === r.guess ? ' class="reco"' : ""}>${x.label}${x.t === r.guess ? " (추천)" : ""}</button>`).join("");
+      cm.innerHTML = `<div class="cl-updecide"><div class="cl-upd-h">🤔 이 파일, 어떻게 처리할까요?</div><div class="cl-upd-f">📄 ${escB(name)} — 파일명만으론 유형을 확신하기 어렵습니다</div><div class="cl-upd-btns">${btns}</div></div>`;
+      cm.querySelectorAll(".cl-upd-btns button").forEach((b) => b.addEventListener("click", () => handleUpload(name, b64, cm, b.dataset.t).catch((e) => { cm.textContent = `${name} — 실패: ${e.message}`; })));
+      return;
+    }
+    if (cm) cm.textContent = `${name} → ${uploadResultMsg(r)}`;
+    await Promise.all([reloadDashExplorer(), loadTodayPriority()]);
+  }
   smartInput.addEventListener("change", async () => {
     for (const file of [...smartInput.files]) {
       const row = clAppend("event", { icon: "📥", name: "스마트 업로드", message: `${file.name} — 유형 판별·처리 중…` });
+      const cm = row.querySelector(".cm");
       try {
-        const b64 = await new Promise((res, rej) => {
-          const fr = new FileReader();
-          fr.onload = () => res(String(fr.result).split(",")[1] || "");
-          fr.onerror = () => rej(new Error("파일 읽기 실패"));
-          fr.readAsDataURL(file);
-        });
-        const r = await window.gijo.uploadAuto(file.name, b64);
-        const msg =
-          r.routedTo === "vulnscan"
-            ? `취약점 스캔으로 자동 반영 — 호스트 ${r.vulnscan.hosts}·finding ${r.vulnscan.findings}건 (${r.reason})`
-            : r.routedTo === "product-manual"
-              ? `보안제품 '${r.manual.productName}'에 ${r.manual.kind === "logManual" ? "로그" : "제품"} 매뉴얼로 연결${r.manual.createdProduct ? " · 신규 제품 자동 등록" : ""}`
-              : `장기기억 ${r.memory.chunks}청크 수집 · 분류 ${r.memory.docClass || "기타"}${r.memory.linkedProduct ? ` · 제품 '${r.memory.linkedProduct}' 연결` : ""}`;
-        const cm = row.querySelector(".cm");
-        if (cm) cm.textContent = `${file.name} → ${msg}`;
-        await Promise.all([reloadDashExplorer(), loadTodayPriority()]);
+        const b64 = await readB64(file);
+        await handleUpload(file.name, b64, cm);
       } catch (e) {
-        const cm = row.querySelector(".cm");
         if (cm) cm.textContent = `${file.name} — 실패: ${e.message}`;
       }
     }
@@ -793,13 +820,15 @@
       dot.classList.remove("off");
       let url = "localhost:4000";
       try { url = String(await window.gijo.getServerUrl()).replace(/^https?:\/\//, "").replace(/\/$/, ""); } catch (e) {}
-      let llm = 0;
+      let chat = 0, emb = 0;
       try {
         const s = await window.gijo.getLocalEngineStatus();
-        llm = s && Array.isArray(s.loaded) ? s.loaded.filter((m) => m.ready).length : (s && s.running ? 1 : 0);
+        chat = s && Array.isArray(s.loaded) ? s.loaded.filter((m) => m.ready).length : (s && s.running ? 1 : 0);
+        emb = s && s.embedding && s.embedding.running ? 1 : 0; // 임베딩(bge-m3)도 GPU 상주 모듈로 함께 센다
       } catch (e) {}
+      const total = chat + emb;
       const agents = Object.keys(agentsById).length;
-      meta.innerHTML = `연동 서버 <b>${escT(url)}</b> · 운영중<br>로컬 LLM <b>${llm}</b>모델 로드${agents ? ` · 에이전트 <b>${agents}</b>` : ""}`;
+      meta.innerHTML = `연동 서버 <b>${escT(url)}</b> · 운영중<br>로컬 모델 <b>${total}</b>개 로드${emb ? ` (채팅 ${chat}·임베딩 ${emb})` : ""}${agents ? ` · 에이전트 <b>${agents}</b>` : ""}`;
     } catch (e) {
       dot.classList.add("off");
       meta.textContent = "서버 연결 끊김 — 설정에서 서버 주소를 확인하세요";
@@ -1508,6 +1537,7 @@
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); dockSubmit(); }
     });
     document.getElementById("dockSend").addEventListener("click", dockSubmit);
+    document.getElementById("dockUpload").addEventListener("click", () => smartInput.click());
     document.getElementById("dockAll").addEventListener("click", () => {
       dashCurrentSession = null; chatInput.placeholder = "지시를 입력하세요…"; // 세션 해제 — 일반 지시
       selectAgent("orchestrator"); dockSubmit();

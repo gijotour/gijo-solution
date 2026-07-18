@@ -388,17 +388,20 @@ export const llmActivityApi = {
 };
 
 // ── 스마트 통합 업로드 — 파일 유형 자동 판별·라우팅(취약점 스캔/매뉴얼/문서 분류) ──
+export type UploadType = "asset" | "log" | "document" | "guideline";
 export interface AutoUploadResult {
   filename: string;
-  routedTo: "vulnscan" | "product-manual" | "memory";
+  routedTo: "vulnscan" | "product-manual" | "memory" | "decision";
   reason: string;
+  needsDecision?: boolean;
+  guess?: UploadType;
   vulnscan?: { hosts: number; findings: number };
   manual?: { productName: string; kind: string; createdProduct: boolean };
   memory?: { chunks: number; docClass?: string; linkedProduct?: string };
 }
 export const uploadApi = {
-  auto: (filename: string, content: string) =>
-    request<AutoUploadResult>("/api/upload/auto", { method: "POST", body: { filename, content } }),
+  auto: (filename: string, content: string, forceType?: UploadType) =>
+    request<AutoUploadResult>("/api/upload/auto", { method: "POST", body: { filename, content, ...(forceType ? { forceType } : {}) } }),
 };
 
 // ── 장기 기억(RAG) ────────────────────────────────────────────────────

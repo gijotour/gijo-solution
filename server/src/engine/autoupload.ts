@@ -8,16 +8,29 @@ import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { emitCollaboration } from "./collaboration";
 import { importVulnScan } from "./vulnscan";
-import { importManual } from "./securityproducts";
+import { importManual, classifyManual, listProducts } from "./securityproducts";
 import { ingestText, GLOBAL_SCOPE } from "./memory";
+
+// 사용자가 결정창에서 고를 수 있는 4유형(파일명으로 애매할 때).
+export type UploadType = "asset" | "log" | "document" | "guideline";
 
 export interface AutoUploadResult {
   filename: string;
-  routedTo: "vulnscan" | "product-manual" | "memory";
+  routedTo: "vulnscan" | "product-manual" | "memory" | "decision"; // decision = 사용자 결정 필요
   reason: string; // 판별 근거(투명성)
+  needsDecision?: boolean; // true면 프론트가 결정 카드(4유형)를 띄운다
+  guess?: UploadType; // 결정 필요 시 추천 유형(미리 선택)
   vulnscan?: { hosts: number; findings: number };
   manual?: { productName: string; kind: string; createdProduct: boolean };
   memory?: { chunks: number; docClass?: string; linkedProduct?: string };
+}
+
+// 파일명으로 애매할 때의 추천 유형. 로그·가이드라인·매뉴얼 신호를 순서대로 본다.
+function guessType(filename: string): UploadType {
+  if (/로그|(?:^|[^a-z])logs?(?:[^a-z]|$)/i.test(filename)) return "log";
+  if (/가이드라인|guideline|지침/i.test(filename)) return "guideline";
+  if (/매뉴얼|manual|guide/i.test(filename)) return "asset"; // 제품 매뉴얼(User Guide 등)
+  return "document";
 }
 
 // Nessus CSV 헤더 감지 — host 열과 plugin/risk/cvss 계열 열이 함께 있으면 스캔 결과로 본다.
@@ -44,12 +57,44 @@ function looksLikeVulnJson(text: string): boolean {
   }
 }
 
-export async function autoRouteUpload(filename: string, base64: string): Promise<AutoUploadResult> {
+// RAG(임베딩) 수집은 임베딩 서버가 죽어 있어도 등록/처리를 막지 않도록 항상 비치명적으로 시도한다.
+async function tryIngest(filename: string, base64: string, classify = false): Promise<{ chunks: number; docClass?: string; linkedProduct?: string; docName?: string } | null> {
+  try {
+    const { extractDocumentText } = await import("./dataset.js");
+    const text = await extractDocumentText(filename, base64);
+    if (!text.trim()) return null;
+    const r = await ingestText(filename, text, GLOBAL_SCOPE, undefined, classify);
+    return { chunks: r.chunks, docClass: r.docClass, linkedProduct: r.linkedProduct, docName: filename };
+  } catch {
+    return null; // 임베딩 미기동 등 — 검색 수집만 생략, 상위 처리는 계속
+  }
+}
+
+// 사용자가 유형을 지정(결정창)했을 때 그 유형으로 바로 라우팅한다.
+async function routeByType(filename: string, base64: string, type: UploadType): Promise<AutoUploadResult> {
+  if (type === "asset" || type === "log") {
+    const ing = await tryIngest(filename, base64);
+    const m = importManual(filename, ing?.docName, undefined, type === "log" ? "logManual" : "manual");
+    emitCollaboration({ from: "scan", to: "orchestrator", message: `${filename} → 보안제품 '${m.productName}'에 ${type === "log" ? "로그" : "제품"} 매뉴얼로 등록${m.createdProduct ? " (신규 제품 자동 등록)" : ""}${ing ? "" : " · 검색수집 보류(임베딩 미기동)"}` });
+    return { filename, routedTo: "product-manual", reason: `사용자 지정: ${type === "log" ? "로그 매뉴얼" : "보안제품 자산"}`, manual: { productName: m.productName, kind: m.kind, createdProduct: m.createdProduct } };
+  }
+  // document / guideline → 장기기억(RAG). guideline은 분류 생략(가이드로 태깅만).
+  const ing = await tryIngest(filename, base64, type === "document");
+  if (!ing) {
+    return { filename, routedTo: "memory", reason: `사용자 지정: ${type === "guideline" ? "가이드라인" : "문서"} · 검색수집 보류(임베딩 미기동)`, memory: { chunks: 0, docClass: type === "guideline" ? "가이드라인" : undefined } };
+  }
+  return { filename, routedTo: "memory", reason: `사용자 지정: ${type === "guideline" ? "가이드라인" : "문서"}`, memory: { chunks: ing.chunks, docClass: type === "guideline" ? "가이드라인" : ing.docClass, linkedProduct: ing.linkedProduct } };
+}
+
+export async function autoRouteUpload(filename: string, base64: string, forceType?: UploadType): Promise<AutoUploadResult> {
+  // 사용자가 결정창에서 유형을 골랐으면 그대로 라우팅(판별 생략).
+  if (forceType) return routeByType(filename, base64, forceType);
+
   const textish = Buffer.from(base64, "base64").toString("utf-8");
   const ext = (filename.match(/\.[^.]+$/)?.[0] ?? "").toLowerCase();
   emitCollaboration({ from: "orchestrator", to: "scan", message: `파일 유형 판별: ${filename}` });
 
-  // ① 취약점 스캔 결과 — Nessus XML / 스캔 CSV / 취약점 JSON
+  // ① 취약점 스캔 결과 — Nessus XML / 스캔 CSV / 취약점 JSON (구조가 명확 → 자동)
   let vulnFormat: "nessus" | "csv" | "json" | null = null;
   let vulnReason = "";
   if (ext === ".nessus" || textish.includes("<NessusClientData")) {
@@ -64,52 +109,22 @@ export async function autoRouteUpload(filename: string, base64: string): Promise
   }
   if (vulnFormat) {
     const r = importVulnScan(textish, vulnFormat, filename);
-    emitCollaboration({
-      from: "scan",
-      to: "orchestrator",
-      message: `${filename} → 취약점 스캔으로 자동 반영 — 호스트 ${r.hosts}·finding ${r.findings}건`,
-    });
+    emitCollaboration({ from: "scan", to: "orchestrator", message: `${filename} → 취약점 스캔으로 자동 반영 — 호스트 ${r.hosts}·finding ${r.findings}건` });
     return { filename, routedTo: "vulnscan", reason: vulnReason, vulnscan: { hosts: r.hosts, findings: r.findings } };
   }
 
-  // ② 제품·로그 매뉴얼 — 파일명 표기(사내 관례상 가장 신뢰). RAG 수집 실패해도 등록부 연결은 진행.
-  if (/매뉴얼|manual|가이드|guide/i.test(filename)) {
-    let docName: string | undefined;
-    try {
-      const { extractDocumentText } = await import("./dataset.js");
-      const text = await extractDocumentText(filename, base64);
-      if (text.trim()) {
-        await ingestText(filename, text, GLOBAL_SCOPE);
-        docName = filename;
-      }
-    } catch {
-      /* RAG 수집 불가(임베딩 미기동 등) — 등록부 연결만이라도 진행 */
-    }
-    const m = importManual(filename, docName);
-    emitCollaboration({
-      from: "scan",
-      to: "orchestrator",
-      message: `${filename} → 보안제품 '${m.productName}'에 ${m.kind === "logManual" ? "로그" : "제품"} 매뉴얼로 자동 연결${m.createdProduct ? " (신규 제품 자동 등록)" : ""}`,
-    });
-    return {
-      filename,
-      routedTo: "product-manual",
-      reason: "파일명의 매뉴얼/가이드 표기 감지",
-      manual: { productName: m.productName, kind: m.kind, createdProduct: m.createdProduct },
-    };
+  // ② 기존 제품과 확실히 매칭되면(모델/벤더/종류 일치) 자동으로 그 제품 매뉴얼로.
+  const c = classifyManual(filename, listProducts());
+  if (c.reason !== "new-product") {
+    const ing = await tryIngest(filename, base64);
+    const m = importManual(filename, ing?.docName);
+    emitCollaboration({ from: "scan", to: "orchestrator", message: `${filename} → 보안제품 '${m.productName}'에 ${m.kind === "logManual" ? "로그" : "제품"} 매뉴얼로 자동 연결` });
+    return { filename, routedTo: "product-manual", reason: `기존 제품 매칭(${c.reason})`, manual: { productName: m.productName, kind: m.kind, createdProduct: m.createdProduct } };
   }
 
-  // ③ 일반 문서 — 장기기억 수집 + Scan·Analyze Agent 분류(매뉴얼 판정 시 제품 연결까지)
-  const { extractDocumentText } = await import("./dataset.js");
-  const text = await extractDocumentText(filename, base64);
-  if (!text.trim()) throw new Error("문서에서 텍스트를 추출하지 못했습니다 (빈 문서이거나 지원하지 않는 형식)");
-  const r = await ingestText(filename, text, GLOBAL_SCOPE, undefined, true);
-  return {
-    filename,
-    routedTo: "memory",
-    reason: "일반 문서 — 장기기억 수집 + 에이전트 분류",
-    memory: { chunks: r.chunks, docClass: r.docClass, linkedProduct: r.linkedProduct },
-  };
+  // ③ 파일명만으로는 자산/로그/문서/가이드라인을 확신하기 어렵다 → 사용자 결정 요청(추천 유형 첨부).
+  emitCollaboration({ from: "scan", to: "orchestrator", message: `${filename} → 유형이 애매해 사용자 결정 요청` });
+  return { filename, routedTo: "decision", needsDecision: true, guess: guessType(filename), reason: "파일명으로 유형을 확신하기 어려움 — 사용자 결정 필요" };
 }
 
 export function registerAutoUploadRoutes(app: Express): void {
@@ -117,12 +132,13 @@ export function registerAutoUploadRoutes(app: Express): void {
     "/api/upload/auto",
     authMiddleware,
     asyncRoute(async (req, res) => {
-      const { filename, content } = req.body as { filename?: string; content?: string };
+      const { filename, content, forceType } = req.body as { filename?: string; content?: string; forceType?: UploadType };
       if (!filename || !content) {
         res.status(400).json({ error: "filename과 content(base64)가 필요합니다" });
         return;
       }
-      res.json(await autoRouteUpload(filename.trim(), content));
+      const valid = forceType && ["asset", "log", "document", "guideline"].includes(forceType) ? forceType : undefined;
+      res.json(await autoRouteUpload(filename.trim(), content, valid));
     })
   );
 }
