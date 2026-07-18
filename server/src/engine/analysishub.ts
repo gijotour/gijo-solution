@@ -11,9 +11,9 @@
 // 파서는 "모든 로그를 마법처럼 이해"하지 않는다 — 아래 명시한 패턴만 결정적으로 잡는다.
 // 커버 범위는 점진 확장한다(honest scope). 판정이 결정적이라 재현 가능하고 테스트된다.
 
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import * as crypto from "crypto";
-import { db } from "../db";
+import { db, migrate } from "../db";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { listAssets } from "./assets";
@@ -22,6 +22,9 @@ import { chat } from "./llm";
 export type AnalysisSource = "vuln" | "log" | "product";
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
 export type Priority = "P0" | "P1" | "P2" | "P3";
+// 이벤트 생애주기 — 관제를 "처리해 나가는" 워크플로로. done/ignored는 해결(활성 위험 집계에서 제외).
+export type EventStatus = "open" | "ack" | "inprogress" | "done" | "ignored";
+const RESOLVED: EventStatus[] = ["done", "ignored"];
 
 export interface AnalysisEvent {
   id: string;
@@ -35,6 +38,8 @@ export interface AnalysisEvent {
   aiSummary: string;
   ref: string; // 원 소스 참조(assetId·리포트명 등)
   at: number;
+  status?: EventStatus; // 처리 상태(별도 테이블에서 병합 — 조회 시 항상 채워짐, 생성 시 생략)
+  statusNote?: string;
 }
 
 db.exec(`CREATE TABLE IF NOT EXISTS analysis_events (
@@ -60,14 +65,47 @@ const listStmt = db.prepare("SELECT * FROM analysis_events ORDER BY at DESC");
 const getEventStmt = db.prepare("SELECT * FROM analysis_events WHERE id = ?");
 const deleteBySourceStmt = db.prepare("DELETE FROM analysis_events WHERE source = ?");
 
-interface EventRow extends Omit<AnalysisEvent, "signals"> {
+// 이벤트 상태는 별도 테이블(event id로 키)에 둔다 — vuln 이벤트는 rebuildVulnEvents가 delete+reinsert
+// 하지만 id가 안정적(vuln:asset:key)이라 상태가 재빌드에도 살아남는다.
+migrate(
+  "analysis_event_status",
+  "CREATE TABLE IF NOT EXISTS analysis_event_status (eventId TEXT PRIMARY KEY, status TEXT NOT NULL, note TEXT, at INTEGER NOT NULL, by TEXT)"
+);
+const getStatusStmt = db.prepare("SELECT status, note FROM analysis_event_status WHERE eventId = ?");
+const setStatusStmt = db.prepare(
+  `INSERT INTO analysis_event_status (eventId, status, note, at, by) VALUES (@eventId, @status, @note, @at, @by)
+   ON CONFLICT(eventId) DO UPDATE SET status=excluded.status, note=excluded.note, at=excluded.at, by=excluded.by`
+);
+function getStatus(eventId: string): { status: EventStatus; note: string } {
+  const r = getStatusStmt.get(eventId) as { status: EventStatus; note: string } | undefined;
+  return { status: r?.status ?? "open", note: r?.note ?? "" };
+}
+export function setEventStatus(eventId: string, status: EventStatus, note = "", by = ""): void {
+  setStatusStmt.run({ eventId, status, note, at: Date.now(), by });
+}
+
+interface EventRow extends Omit<AnalysisEvent, "signals" | "status" | "statusNote"> {
   signals: string;
 }
 function rowToEvent(r: EventRow): AnalysisEvent {
-  return { ...r, signals: JSON.parse(r.signals || "[]") };
+  const st = getStatus(r.id);
+  return { ...r, signals: JSON.parse(r.signals || "[]"), status: st.status, statusNote: st.note };
 }
 function saveEvent(e: AnalysisEvent): void {
-  upsertStmt.run({ ...e, signals: JSON.stringify(e.signals) });
+  // status/statusNote는 별도 테이블 소관이라 여기 컬럼에 넣지 않는다(명시 컬럼만 바인딩).
+  upsertStmt.run({
+    id: e.id,
+    source: e.source,
+    title: e.title,
+    entity: e.entity,
+    severity: e.severity,
+    priority: e.priority,
+    detail: e.detail,
+    signals: JSON.stringify(e.signals),
+    aiSummary: e.aiSummary,
+    ref: e.ref,
+    at: e.at,
+  });
 }
 
 // ── 우선순위 산정 ─────────────────────────────────────────────────────────
@@ -348,11 +386,16 @@ export function computeCorrelations(events: AnalysisEvent[]): Correlation[] {
 
 // ── 조회 ───────────────────────────────────────────────────────────────────
 const PRI_RANK: Record<Priority, number> = { P0: 0, P1: 1, P2: 2, P3: 3 };
+const isResolved = (e: AnalysisEvent): boolean => RESOLVED.includes(e.status ?? "open");
 export function listAnalysisEvents(): AnalysisEvent[] {
   const events = (listStmt.all() as EventRow[]).map(rowToEvent);
-  return events.sort(
-    (a, b) => PRI_RANK[a.priority] - PRI_RANK[b.priority] || SEV_RANK[b.severity] - SEV_RANK[a.severity] || b.at - a.at
-  );
+  // 해결(완료/무시)된 건 아래로, 나머지는 위험도순.
+  return events.sort((a, b) => {
+    const ar = isResolved(a) ? 1 : 0;
+    const br = isResolved(b) ? 1 : 0;
+    if (ar !== br) return ar - br;
+    return PRI_RANK[a.priority] - PRI_RANK[b.priority] || SEV_RANK[b.severity] - SEV_RANK[a.severity] || b.at - a.at;
+  });
 }
 export function analysisSummary(events: AnalysisEvent[]): {
   total: number;
@@ -362,12 +405,14 @@ export function analysisSummary(events: AnalysisEvent[]): {
 } {
   const bySource: Record<AnalysisSource, number> = { vuln: 0, log: 0, product: 0 };
   const byPriority: Record<Priority, number> = { P0: 0, P1: 0, P2: 0, P3: 0 };
-  for (const e of events) {
+  // 종합위험·우선순위는 미해결(active) 이벤트만 집계 — 완료/무시한 건 위험에서 빠진다(워크플로).
+  const active = events.filter((e) => !RESOLVED.includes(e.status ?? "open"));
+  for (const e of active) {
     bySource[e.source]++;
     byPriority[e.priority]++;
   }
   const overall = byPriority.P0 > 0 ? "높음" : byPriority.P1 > 0 ? "보통" : "낮음";
-  return { total: events.length, bySource, byPriority, overall };
+  return { total: active.length, bySource, byPriority, overall };
 }
 
 export function getAnalysisEvent(id: string): AnalysisEvent | undefined {
@@ -408,6 +453,7 @@ export async function analyzeEvent(id: string): Promise<string> {
 
 export function resetAnalysisHubForTests(): void {
   db.exec("DELETE FROM analysis_events");
+  db.exec("DELETE FROM analysis_event_status");
 }
 
 // 드롭존 자동 판별: 파일명·내용으로 보안 로그 vs 운영 리포트를 가른다(결정적 규칙).
@@ -430,6 +476,17 @@ export function registerAnalysisHubRoutes(app: Express): void {
   // 취약점 소스 재빌드(자산 findings → 이벤트).
   app.post("/api/analysis-hub/rebuild-vuln", authMiddleware, (_req, res) => {
     res.json({ inserted: rebuildVulnEvents() });
+  });
+  // 이벤트 상태 변경 — 관제 워크플로(확인/처리중/완료/무시). 완료·무시는 활성 위험에서 빠진다.
+  app.post("/api/analysis-hub/events/:id/status", authMiddleware, (req, res) => {
+    const id = String(req.params.id);
+    const status = String(req.body?.status || "") as EventStatus;
+    if (!["open", "ack", "inprogress", "done", "ignored"].includes(status)) {
+      return res.status(400).json({ error: "잘못된 상태입니다(open/ack/inprogress/done/ignored)" });
+    }
+    const user = (req as Request & { user?: { displayName?: string } }).user;
+    setEventStatus(id, status, String(req.body?.note || ""), user?.displayName || "");
+    res.json({ ok: true, id, status });
   });
   // 보안 로그 인입 — 결정적 패턴 탐지.
   app.post(

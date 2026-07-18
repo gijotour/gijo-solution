@@ -168,6 +168,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   let data = { events: [], summary: null, correlations: [] };
   let filter = "all";
   let selectedId = null;
+  const STATUS_LABEL = { open:"열림", ack:"확인", inprogress:"처리중", done:"완료", ignored:"무시" };
 
   function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
   function tick(){ clockEl.textContent = new Date().toLocaleString("ko-KR",{hour:"2-digit",minute:"2-digit",hour12:true,year:"numeric",month:"2-digit",day:"2-digit"}); }
@@ -193,10 +194,13 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const shown = evs.slice(0, MAX_ROWS);
     box.innerHTML = shown.map((e, i) => {
       const sub = (e.signals && e.signals.length ? e.signals.join(" · ") + " · " : "") + esc(e.entity);
-      return '<div class="risk-row'+(e.id===selectedId?' sel':'')+'" data-id="'+esc(e.id)+'">'+
+      const st = e.status || "open";
+      const resolved = st==="done" || st==="ignored";
+      const stTag = st!=="open" ? ' <span style="font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(255,255,255,.08);color:var(--muted)">'+STATUS_LABEL[st]+'</span>' : '';
+      return '<div class="risk-row'+(e.id===selectedId?' sel':'')+'" data-id="'+esc(e.id)+'"'+(resolved?' style="opacity:.5"':'')+'>'+
         '<div class="rank">'+(i+1)+'</div>'+
         '<span class="src '+e.source+'">'+esc(SRC_LABEL[e.source]||e.source)+'</span>'+
-        '<div class="rr-main"><div class="rr-name">'+esc(e.title)+'</div><div class="rr-sub">'+sub+'</div></div>'+
+        '<div class="rr-main"><div class="rr-name">'+esc(e.title)+stTag+'</div><div class="rr-sub">'+sub+'</div></div>'+
         '<span class="pri '+e.priority.toLowerCase()+'">'+e.priority+'</span></div>';
     }).join("") + (evs.length>MAX_ROWS ? '<div class="empty">… 외 '+(evs.length-MAX_ROWS)+'건 (필터로 좁혀 보세요)</div>' : "");
     box.querySelectorAll(".risk-row").forEach(r => r.addEventListener("click", () => selectEvent(r.dataset.id)));
@@ -219,11 +223,29 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         (e.aiSummary ? '<div class="corr" style="background:rgba(59,130,246,.08);border-color:rgba(59,130,246,.25);color:#bcd3ff">🤖 <b>AI 분석</b><br>'+esc(e.aiSummary).replace(/\n/g,"<br>")+'</div>'
                      : '<button class="btn-ghost" id="aiBtn" style="font-size:12px">🤖 AI 분석 (무슨 일·왜 위험·권고)</button>')+
       '</div>'+
-      '<button class="btn-primary" id="mkTask">▶ 조치 생성 · 작업 등록</button>';
+      '<button class="btn-primary" id="mkTask">▶ 조치 생성 · 작업 등록</button>'+
+      '<div style="margin-top:10px;padding-top:9px;border-top:1px solid var(--border)">'+
+        '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">처리 상태: <b style="color:var(--text)">'+STATUS_LABEL[e.status||"open"]+'</b>'+(e.statusNote?(' — '+esc(e.statusNote)):'')+'</div>'+
+        '<div style="display:flex;gap:5px;flex-wrap:wrap">'+
+          [["ack","확인"],["inprogress","처리중"],["done","완료"],["ignored","무시"],["open","열림"]].map(([v,l])=>
+            '<button class="btn-ghost" data-st="'+v+'" style="font-size:11px;padding:5px 11px'+((e.status||"open")===v?';border-color:var(--blue);color:#fff':'')+'">'+l+'</button>').join("")+
+        '</div>'+
+      '</div>';
     const aiBtn = document.getElementById("aiBtn");
     if(aiBtn) aiBtn.addEventListener("click", () => runAnalyze(e.id));
     const mk = document.getElementById("mkTask");
     if(mk) mk.addEventListener("click", () => createTask(e));
+    body.querySelectorAll("[data-st]").forEach(b => b.addEventListener("click", () => setStatus(e.id, b.dataset.st)));
+  }
+  async function setStatus(id, status){
+    try{
+      await window.gijo.analysisSetStatus(id, status);
+      const e = data.events.find(x=>x.id===id); if(e) e.status = status;
+      // 완료·무시는 활성 위험에서 빠지므로 목록·요약 갱신
+      data = await window.gijo.analysisEvents();
+      renderSummary(); renderList(); selectEvent(id);
+      toast("상태 변경: "+STATUS_LABEL[status]);
+    }catch(err){ toast("상태 변경 실패: "+(err.message||err)); }
   }
   const PRI_TASK = { P0:"P0", P1:"P1", P2:"P2", P3:"P3" };
   async function runAnalyze(id){

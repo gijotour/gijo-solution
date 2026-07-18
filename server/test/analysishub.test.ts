@@ -1,5 +1,7 @@
 // 통합 보안 분석 허브 — 3소스 정규화·우선순위·상관분석(결정적 파서).
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, beforeAll } from "vitest";
+import request from "supertest";
+import { createApp } from "../src/app";
 import {
   parseSecurityLog,
   parseProductReport,
@@ -128,6 +130,38 @@ describe("detectIngestKind — 드롭존 자동 판별", () => {
   });
   it("CSV 운영 리포트는 리포트로", () => {
     expect(detectIngestKind("dlp-2026.csv", "일시,사용자,행위\n2026,홍길동,유출 차단")).toBe("report");
+  });
+});
+
+describe("이벤트 생애주기 (통합)", () => {
+  const app = createApp();
+  let token = "";
+  beforeAll(async () => {
+    token = (await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" })).body.accessToken;
+  });
+  const auth = () => ({ Authorization: `Bearer ${token}` });
+
+  it("완료 처리하면 활성 위험에서 빠지고 상태가 유지된다", async () => {
+    const log = Array.from({ length: 12 }, () => "Jul 18 sshd[1]: Failed password for root from 45.77.0.1 port 22 ssh2").join("\n");
+    await request(app).post("/api/analysis-hub/ingest").set(auth()).send({ filename: "life.log", content: log });
+    let hub = (await request(app).get("/api/analysis-hub/events").set(auth())).body;
+    const ev = hub.events.find((e: { source: string }) => e.source === "log");
+    expect(ev.status).toBe("open");
+    const p1before = hub.summary.byPriority.P1;
+
+    const r = await request(app).post(`/api/analysis-hub/events/${encodeURIComponent(ev.id)}/status`).set(auth()).send({ status: "done", note: "차단 완료" });
+    expect(r.status).toBe(200);
+
+    hub = (await request(app).get("/api/analysis-hub/events").set(auth())).body;
+    const after = hub.events.find((e: { id: string }) => e.id === ev.id);
+    expect(after.status).toBe("done");
+    expect(after.statusNote).toBe("차단 완료");
+    expect(hub.summary.byPriority.P1).toBe(p1before - 1); // 활성 집계에서 제외
+  });
+
+  it("잘못된 상태값은 400", async () => {
+    const r = await request(app).post("/api/analysis-hub/events/x/status").set(auth()).send({ status: "bogus" });
+    expect(r.status).toBe(400);
   });
 });
 

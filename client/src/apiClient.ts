@@ -480,6 +480,7 @@ export const guardrailApi = {
 };
 
 // ── 통합 보안 분석(관제) 허브 — 취약점·로그·운영리포트 3소스 정규화 ──────────
+export type EventStatus = "open" | "ack" | "inprogress" | "done" | "ignored";
 export interface AnalysisEvent {
   id: string;
   source: "vuln" | "log" | "product";
@@ -492,6 +493,8 @@ export interface AnalysisEvent {
   aiSummary: string;
   ref: string;
   at: number;
+  status?: EventStatus;
+  statusNote?: string;
 }
 export interface AnalysisCorrelation {
   entity: string;
@@ -513,6 +516,8 @@ export const analysisHubApi = {
   events: () => request<AnalysisHubData>("/api/analysis-hub/events"),
   rebuildVuln: () => request<{ inserted: number }>("/api/analysis-hub/rebuild-vuln", { method: "POST" }),
   analyze: (eventId: string) => request<{ aiSummary: string }>("/api/analysis-hub/analyze", { method: "POST", body: { eventId } }),
+  setStatus: (eventId: string, status: EventStatus, note = "") =>
+    request<{ ok: boolean; status: EventStatus }>(`/api/analysis-hub/events/${encodeURIComponent(eventId)}/status`, { method: "POST", body: { status, note } }),
   // 드롭존 통합 인입 — 서버가 로그/리포트를 자동 판별해 라우팅.
   ingest: (filename: string, content: string) =>
     request<{ routedTo: "log" | "report"; created: number; events: AnalysisEvent[] }>("/api/analysis-hub/ingest", {
