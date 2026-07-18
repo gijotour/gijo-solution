@@ -125,20 +125,27 @@ export async function runRedTeam(callLlm: LlmCaller, model = "orchestrator"): Pr
 // ── 엔드포인트 ────────────────────────────────────────────────────────────
 // 14 페이로드 × LLM 호출이라 무겁다(에이전트 루프 안에서 돌리지 않고 명시적 엔드포인트로 실행).
 
+// 대상별 최근 리포트 캐시(오케스트레이터·개별 모델·AI-BOM 자산). lastReport는 화면 기본(가장 최근).
+const lastReports = new Map<string, RedTeamReport>();
 let lastReport: RedTeamReport | null = null;
 
-// 서빙 오케스트레이터 모델을 raw로 호출(페르소나·RAG 없이 순수 시스템+사용자) — 실제 배포 모델의 견고성 측정.
-async function servedLlmCaller(system: string, user: string): Promise<string> {
-  const { ensureAgentModel } = await import("./localengine.js");
-  const base = await ensureAgentModel("orchestrator").catch(() => "http://localhost:8080/v1");
-  const res = await fetch(`${base}/chat/completions`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "local", messages: [{ role: "system", content: system }, { role: "user", content: user }], temperature: 0, max_tokens: 300 }),
-    signal: AbortSignal.timeout(45000),
-  });
-  const j = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-  return j.choices?.[0]?.message?.content ?? "";
+// 지정 로컬 모델을 raw로 호출(페르소나·RAG 없이 순수 시스템+사용자) — 실제 배포 모델의 견고성 측정.
+// modelId가 없으면 오케스트레이터(에이전트 할당 모델). 이렇게 대상만 바꿔 어느 내부 LLM이든 점검한다.
+function makeServedCaller(modelId?: string): LlmCaller {
+  return async (system: string, user: string): Promise<string> => {
+    const le = await import("./localengine.js");
+    const base = modelId
+      ? await le.ensureModelServed(modelId)
+      : await le.ensureAgentModel("orchestrator").catch(() => "http://localhost:8080/v1");
+    const res = await fetch(`${base}/chat/completions`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "local", messages: [{ role: "system", content: system }, { role: "user", content: user }], temperature: 0, max_tokens: 300 }),
+      signal: AbortSignal.timeout(45000),
+    });
+    const j = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    return j.choices?.[0]?.message?.content ?? "";
+  };
 }
 
 export function getLastRedTeamReport(): RedTeamReport | null {
@@ -146,15 +153,66 @@ export function getLastRedTeamReport(): RedTeamReport | null {
 }
 
 export function registerRedteamRoutes(app: Express): void {
+  // 점검 실행. body: { modelId?, assetId? }
+  //  · assetId 지정 → 그 AI-BOM 자산이 연결한 로컬 모델(modelRef, 또는 body.modelId)을 점검하고 결과를 자산에 기록.
+  //  · modelId 지정 → 그 로컬 모델만 점검.  · 둘 다 없음 → 오케스트레이터(기본).
   app.post(
     "/api/redteam/run",
     authMiddleware,
-    asyncRoute(async (_req, res) => {
-      lastReport = await runRedTeam(servedLlmCaller);
-      res.json(lastReport);
+    asyncRoute(async (req, res) => {
+      const assetId = req.body?.assetId ? String(req.body.assetId) : "";
+      let modelId = req.body?.modelId ? String(req.body.modelId) : "";
+      let label = modelId || "orchestrator";
+      let targetKey = modelId ? `model:${modelId}` : "orchestrator";
+      const { getAsset, setAssetRobustness } = await import("./assets.js");
+      const asset = assetId ? getAsset(assetId) : undefined;
+      if (assetId && !asset) return res.status(404).json({ error: "자산을 찾을 수 없습니다." });
+      if (asset) {
+        modelId = modelId || asset.aibom.model.modelRef;
+        if (!modelId) return res.status(400).json({ error: "이 자산에 연결된 로컬 모델(modelRef)이 없습니다. 대상 모델을 지정하세요." });
+        label = asset.name;
+        targetKey = `asset:${assetId}`;
+      }
+      let report: RedTeamReport;
+      try {
+        report = await runRedTeam(makeServedCaller(modelId || undefined), label);
+      } catch (e) {
+        return res.status(400).json({ error: (e as Error).message });
+      }
+      lastReport = report;
+      lastReports.set(targetKey, report);
+      if (asset) {
+        setAssetRobustness(asset.id, {
+          score: report.robustnessScore,
+          vulnerable: report.vulnerable,
+          total: report.total,
+          ranAt: report.ranAt,
+          modelId,
+        });
+      }
+      res.json({ ...report, targetKey });
     })
   );
-  app.get("/api/redteam/last", authMiddleware, (_req, res) => res.json(lastReport ?? { ranAt: 0, total: 0, vulnerable: 0, results: [] }));
+  // 대상 지정: ?target=orchestrator | model:<id> | asset:<id>. 없으면 가장 최근.
+  app.get("/api/redteam/last", authMiddleware, (req, res) => {
+    const target = req.query.target ? String(req.query.target) : "";
+    const rep = (target && lastReports.get(target)) || lastReport;
+    res.json(rep ?? { ranAt: 0, total: 0, vulnerable: 0, results: [] });
+  });
+  // 선택 가능한 점검 대상: 로컬 모델 전체 + AI-BOM에서 로컬 모델을 연결한 자산.
+  app.get(
+    "/api/redteam/targets",
+    authMiddleware,
+    asyncRoute(async (_req, res) => {
+      const le = await import("./localengine.js");
+      const { listAssets } = await import("./assets.js");
+      const models = le.listAvailableModels();
+      const assets = listAssets()
+        .filter((a) => a.aibom.model.modelRef)
+        .map((a) => ({ id: a.id, name: a.name, assetType: a.assetType, modelRef: a.aibom.model.modelRef, robustness: a.aibom.robustness }));
+      res.json({ models, assets });
+    })
+  );
   app.get("/api/redteam/payloads", authMiddleware, (_req, res) =>
     res.json(PAYLOADS.map((p) => ({ id: p.id, category: p.category, severity: p.severity, desc: p.desc })))
   );

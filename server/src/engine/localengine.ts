@@ -404,6 +404,14 @@ export async function ensureAgentModel(agentId: string): Promise<string> {
   return `http://localhost:${model.port}/v1`;
 }
 
+// 임의의 로컬 모델을 서빙 보장하고 그 OpenAI 호환 base URL을 돌려준다(레드팀 대상 다변화용).
+// 모델 파일(models/<id>/<id>.gguf)이 없으면 던진다 — 호출측이 대상 없음을 처리하게.
+export async function ensureModelServed(modelId: string): Promise<string> {
+  if (!isModelAvailable(modelId)) throw new Error(`로컬 모델 없음: ${modelId}`);
+  const model = await ensureModelLoaded(modelId);
+  return `http://localhost:${model.port}/v1`;
+}
+
 export function registerLocalEngineRoutes(app: Express): void {
   app.get("/api/localengine/status", authMiddleware, (_req, res) => {
     res.json(getLocalEngineStatus());

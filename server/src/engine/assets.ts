@@ -31,22 +31,35 @@ export interface AssetComponent {
 
 // AI-BOM 5영역 — 코드 의존성(SBOM)을 넘어 모델·데이터·프롬프트·도구·인프라까지의 구성명세.
 // 각 항목은 자유 텍스트(보안담당자가 채워 넣는 관리 항목)다. 값이 비면 "미기재"로 간주.
+// 자산의 AI 견고성(레드팀) 결과 — 이 자산이 서빙하는 모델이 프롬프트 인젝션에 얼마나 견고한지.
+// score=null이면 아직 미점검. modelRef가 있으면 그 로컬 모델을 점검 대상으로 삼는다.
+export interface AiBomRobustness {
+  score: number | null; // 견고성 점수 0~100
+  vulnerable: number;
+  total: number;
+  ranAt: number;
+  modelId: string; // 실제 점검한 로컬 모델 id
+}
+
 export interface AiBom {
   // intendedUse/limitations는 모델 카드(Model Card) 항목 — 용도 범위·한계를 명세해 오사용을 막는다.
-  model: { foundationModel: string; finetuneHistory: string; architecture: string; weightsHash: string; intendedUse: string; limitations: string };
+  // modelRef: 이 자산이 실제로 서빙하는 로컬 모델(models/<id>) — 레드팀 점검 대상 연결용. 없으면 미연결.
+  model: { foundationModel: string; finetuneHistory: string; architecture: string; weightsHash: string; intendedUse: string; limitations: string; modelRef: string };
   dataset: { sources: string; vectorDbLocation: string };
   prompt: { systemPrompt: string; guardrails: string };
   agentTool: { apis: string; mcpServers: string };
   infrastructure: { compute: string; hostingProvider: string };
+  robustness: AiBomRobustness; // AI 견고성(레드팀) 점검 결과
 }
 
 export function emptyAiBom(): AiBom {
   return {
-    model: { foundationModel: "", finetuneHistory: "", architecture: "", weightsHash: "", intendedUse: "", limitations: "" },
+    model: { foundationModel: "", finetuneHistory: "", architecture: "", weightsHash: "", intendedUse: "", limitations: "", modelRef: "" },
     dataset: { sources: "", vectorDbLocation: "" },
     prompt: { systemPrompt: "", guardrails: "" },
     agentTool: { apis: "", mcpServers: "" },
     infrastructure: { compute: "", hostingProvider: "" },
+    robustness: { score: null, vulnerable: 0, total: 0, ranAt: 0, modelId: "" },
   };
 }
 
@@ -229,6 +242,14 @@ export function updateAiBom(assetId: string, aibom: AiBom): Asset | undefined {
   const asset = getAsset(assetId)!;
   broadcastAssetUpdated(asset);
   return asset;
+}
+
+// 레드팀 점검 결과를 자산 AI-BOM에 기록한다. 점검한 modelId를 modelRef로도 고정(다음 재점검 대상).
+export function setAssetRobustness(assetId: string, r: AiBomRobustness): Asset | undefined {
+  const asset = getAsset(assetId);
+  if (!asset) return undefined;
+  const model = { ...asset.aibom.model, modelRef: r.modelId || asset.aibom.model.modelRef };
+  return updateAiBom(assetId, { ...asset.aibom, model, robustness: r });
 }
 
 export function markSbomGenerated(assetId: string): Asset | undefined {

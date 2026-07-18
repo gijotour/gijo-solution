@@ -444,9 +444,23 @@ export interface RedTeamReport {
   byCategory: Record<string, { total: number; vulnerable: number }>;
   results: RedTeamResult[];
 }
+export interface RedTeamTargetAsset {
+  id: string;
+  name: string;
+  assetType: string;
+  modelRef: string;
+  robustness: { score: number | null; vulnerable: number; total: number; ranAt: number; modelId: string };
+}
+export interface RedTeamTargets {
+  models: { id: string; running: boolean }[];
+  assets: RedTeamTargetAsset[];
+}
 export const redteamApi = {
-  run: () => request<RedTeamReport>("/api/redteam/run", { method: "POST" }),
-  last: () => request<RedTeamReport>("/api/redteam/last"),
+  // opts 없음=오케스트레이터, {modelId}=특정 로컬 모델, {assetId}=AI-BOM 자산(결과가 자산에 기록됨).
+  run: (opts?: { modelId?: string; assetId?: string }) =>
+    request<RedTeamReport & { targetKey?: string }>("/api/redteam/run", { method: "POST", body: opts ?? {} }),
+  last: (target?: string) => request<RedTeamReport>(`/api/redteam/last${target ? `?target=${encodeURIComponent(target)}` : ""}`),
+  targets: () => request<RedTeamTargets>("/api/redteam/targets"),
   payloads: () => request<{ id: string; category: string; severity: string; desc: string }[]>("/api/redteam/payloads"),
 };
 
@@ -773,12 +787,20 @@ export interface Finding {
   source_tool: string;
 }
 
+export interface AiBomRobustness {
+  score: number | null;
+  vulnerable: number;
+  total: number;
+  ranAt: number;
+  modelId: string;
+}
 export interface AiBom {
-  model: { foundationModel: string; finetuneHistory: string; architecture: string; weightsHash: string; intendedUse: string; limitations: string };
+  model: { foundationModel: string; finetuneHistory: string; architecture: string; weightsHash: string; intendedUse: string; limitations: string; modelRef: string };
   dataset: { sources: string; vectorDbLocation: string };
   prompt: { systemPrompt: string; guardrails: string };
   agentTool: { apis: string; mcpServers: string };
   infrastructure: { compute: string; hostingProvider: string };
+  robustness: AiBomRobustness;
 }
 
 export interface Asset {

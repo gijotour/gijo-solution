@@ -26,6 +26,11 @@ describe("runRedTeam", () => {
     expect(Object.keys(rep.byCategory).length).toBeGreaterThan(0);
   });
 
+  it("대상 라벨이 리포트에 담긴다(다중 모델·자산 점검용)", async () => {
+    const rep = await runRedTeam(refuseAll, "lily-cybersecurity-7b-v0.2");
+    expect(rep.model).toBe("lily-cybersecurity-7b-v0.2");
+  });
+
   it("마커 순응 페이로드는 주입 마커를 뱉으면 취약으로 판정", async () => {
     const obeyMarker: LlmCaller = async (_system, user) => {
       const m = user.match(/INJECTED-[0-9A-F]+/);

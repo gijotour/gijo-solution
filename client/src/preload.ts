@@ -142,8 +142,9 @@ const gijoApi = {
   seedOntology: () => api.ontologyApi.seed(),
 
   // AI 견고성: 레드팀 + 가드레일
-  runRedTeam: () => api.redteamApi.run(),
-  lastRedTeam: () => api.redteamApi.last(),
+  runRedTeam: (opts?: { modelId?: string; assetId?: string }) => api.redteamApi.run(opts),
+  lastRedTeam: (target?: string) => api.redteamApi.last(target),
+  redteamTargets: () => api.redteamApi.targets(),
   guardrailStatus: () => api.guardrailApi.status(),
   guardrailLog: (limit?: number) => api.guardrailApi.log(limit),
   setGuardrailMode: (mode: import("./apiClient").GuardMode) => api.guardrailApi.setMode(mode),

@@ -10,7 +10,7 @@ vi.mock("../src/engine/llm", () => ({
 }));
 
 import { createApp } from "../src/app";
-import { resetAssetsForTests } from "../src/engine/assets";
+import { resetAssetsForTests, setAssetRobustness } from "../src/engine/assets";
 
 async function login(app: ReturnType<typeof createApp>) {
   const res = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" });
@@ -112,13 +112,24 @@ describe("assets", () => {
     expect(afterSecondScan.body.findings.length).toBe(findingsAfterOneScan);
   });
 
-  it("new assets carry an empty 5-area AI-BOM", async () => {
+  it("new assets carry an empty AI-BOM (5영역 + 견고성)", async () => {
     const res = await request(app)
       .post("/api/assets")
       .set("Authorization", `Bearer ${token}`)
       .send({ id: "a1", name: "a1", path: "x" });
-    expect(Object.keys(res.body.aibom).sort()).toEqual(["agentTool", "dataset", "infrastructure", "model", "prompt"]);
+    expect(Object.keys(res.body.aibom).sort()).toEqual(["agentTool", "dataset", "infrastructure", "model", "prompt", "robustness"]);
     expect(res.body.aibom.model.foundationModel).toBe("");
+    expect(res.body.aibom.model.modelRef).toBe(""); // 로컬 모델 미연결
+    expect(res.body.aibom.robustness.score).toBeNull(); // 미점검
+  });
+
+  it("setAssetRobustness가 레드팀 점수를 AI-BOM에 기록하고 modelRef를 고정한다", async () => {
+    await request(app).post("/api/assets").set("Authorization", `Bearer ${token}`).send({ id: "a1", name: "챗봇", path: "x" });
+    setAssetRobustness("a1", { score: 43, vulnerable: 8, total: 14, ranAt: 1234, modelId: "lily-cybersecurity-7b-v0.2" });
+    const get = await request(app).get("/api/assets/a1").set("Authorization", `Bearer ${token}`);
+    expect(get.body.aibom.robustness.score).toBe(43);
+    expect(get.body.aibom.robustness.vulnerable).toBe(8);
+    expect(get.body.aibom.model.modelRef).toBe("lily-cybersecurity-7b-v0.2"); // 다음 재점검 대상으로 고정
   });
 
   it("PUT /api/assets/:id/aibom persists and merges partial AI-BOM data", async () => {
