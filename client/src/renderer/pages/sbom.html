@@ -335,7 +335,72 @@ tr:last-child td{border-bottom:none;}
       </div>`;
     }).join("");
     attachWeightsHashButton(asset.id);
+    renderRobustness(asset);
     loadAiBomThreats(asset.id);
+  }
+
+  // AI 견고성(레드팀) — AI-BOM에 내장. 연결 로컬 모델을 골라 점검하면 결과가 이 자산에 기록된다.
+  function robustnessVerdict(score) {
+    if (score == null) return ["미점검", "var(--muted-2)"];
+    if (score >= 80) return ["양호", "var(--teal)"];
+    if (score >= 50) return ["주의", "var(--amber)"];
+    return ["위험", "var(--red)"];
+  }
+  async function renderRobustness(asset) {
+    let card = document.getElementById("aibomRobustness");
+    if (!card) {
+      card = document.createElement("div");
+      card.id = "aibomRobustness";
+      card.style.cssText = "margin-top:12px;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:14px 16px";
+      document.getElementById("aibomAreas").insertAdjacentElement("afterend", card);
+    }
+    const rob = (asset.aibom && asset.aibom.robustness) || { score: null };
+    const modelRef = (asset.aibom && asset.aibom.model && asset.aibom.model.modelRef) || "";
+    const [word, color] = robustnessVerdict(rob.score);
+    const scoreHtml = rob.score == null
+      ? '<span style="font-size:22px;font-weight:800;color:var(--muted-2)">—</span>'
+      : '<span style="font-size:22px;font-weight:800;color:' + color + '">' + rob.score + '</span><span style="font-size:11px;color:var(--muted)">/100</span>';
+    const meta = rob.score == null ? "아직 점검하지 않았습니다."
+      : (rob.vulnerable + "/" + rob.total + " 취약 · " + new Date(rob.ranAt).toLocaleString("ko-KR") + (rob.modelId ? " · " + rob.modelId : ""));
+    card.innerHTML =
+      '<div style="font-size:13px;font-weight:800;color:#fff;margin-bottom:2px">🛡 AI 견고성 (레드팀)</div>' +
+      '<div style="font-size:10.5px;color:var(--amber);margin-bottom:10px">배포 모델이 프롬프트 인젝션·탈옥에 얼마나 견고한지 실측 — 결과가 이 자산 AI-BOM에 기록됩니다</div>' +
+      '<div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">' +
+        '<div>' + scoreHtml + '<div style="font-size:12px;font-weight:700;color:' + color + '">' + word + '</div></div>' +
+        '<div style="font-size:11.5px;color:var(--muted);flex:1;min-width:160px">' + esc(meta) + '</div>' +
+        '<select id="robModelSel" style="min-width:220px;background:var(--panel);border:1px solid var(--border-strong);border-radius:6px;padding:7px 9px;color:var(--text);font-size:12px;outline:none"><option value="">연결 로컬 모델 선택…</option></select>' +
+        '<button id="robRunBtn" class="btn-primary" style="padding:7px 14px;font-size:12px">▶ 견고성 점검</button>' +
+        '<span id="robDetailLink" style="font-size:11px;color:var(--blue-light);cursor:pointer">상세 리포트 →</span>' +
+      '</div>' +
+      '<div id="robStatus" style="font-size:11.5px;margin-top:8px"></div>';
+    // 로컬 모델 셀렉트 채우기(연결된 modelRef 기본 선택).
+    try {
+      const t = await window.gijo.redteamTargets();
+      const sel = document.getElementById("robModelSel");
+      if (sel) {
+        sel.innerHTML = '<option value="">연결 로컬 모델 선택…</option>' +
+          (t.models || []).map((m) => '<option value="' + esc(m.id) + '"' + (m.id === modelRef ? " selected" : "") + '>' + esc(m.id) + '</option>').join("");
+      }
+    } catch (e) {}
+    document.getElementById("robDetailLink").addEventListener("click", () => window.gijo.navigateTo("redteam.html"));
+    document.getElementById("robRunBtn").addEventListener("click", () => runRobustness(asset.id));
+  }
+  async function runRobustness(assetId) {
+    const btn = document.getElementById("robRunBtn");
+    const status = document.getElementById("robStatus");
+    const modelId = document.getElementById("robModelSel").value;
+    if (!modelId) { status.textContent = "먼저 연결 로컬 모델을 선택하세요."; status.style.color = "#f5928a"; return; }
+    btn.disabled = true; const orig = btn.textContent; btn.textContent = "점검 중… (~1분)";
+    status.textContent = "14개 인젝션 공격으로 실측 중…"; status.style.color = "var(--muted)";
+    try {
+      await window.gijo.runRedTeam({ assetId, modelId });
+      const updated = await window.gijo.getAsset(assetId);
+      renderAiBom(updated); // 새 점수로 다시 그림
+    } catch (e) {
+      status.textContent = "✗ 점검 실패: " + (e.message || e);
+      status.style.color = "#f5928a";
+      btn.disabled = false; btn.textContent = orig;
+    }
   }
 
   // 가중치 해시 자동 계산(SHA-256 스트리밍) — 서버가 접근 가능한 가중치 파일 경로가 필요하다.

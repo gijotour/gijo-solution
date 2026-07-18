@@ -130,8 +130,17 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         <div class="page-title">AI 견고성 · 레드팀 · 가드레일</div>
         <div class="page-sub">배포된 로컬 LLM이 <b>프롬프트 인젝션·탈옥</b>에 얼마나 견고한지 실측(레드팀)하고, 실시간 입력을 검사해 인젝션 시도를 탐지·차단(가드레일)합니다. 온프레미스에서 도는 AI 보안 방어선입니다.</div>
       </div>
-      <button class="btn-primary" id="runBtn">▶ 레드팀 실행</button>
+      <div style="display:flex;align-items:flex-end;gap:10px">
+        <div>
+          <label for="targetSelect" style="display:block;font-size:11px;color:var(--muted);margin-bottom:5px">점검 대상</label>
+          <select id="targetSelect" style="min-width:280px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;outline:none">
+            <option value="orchestrator">오케스트레이터 (내 메인 LLM)</option>
+          </select>
+        </div>
+        <button class="btn-primary" id="runBtn">▶ 레드팀 실행</button>
+      </div>
     </div>
+    <div id="targetNote" style="font-size:11.5px;color:var(--teal);margin:-6px 0 14px;display:none">📦 AI-BOM 자산을 선택했습니다 — 점검 결과(견고성 점수)가 그 자산의 AI-BOM에 자동 기록됩니다.</div>
 
     <!-- 가드레일: 실시간 방어 -->
     <div class="panel">
@@ -301,12 +310,59 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.querySelectorAll("#results .item-head").forEach(h => h.addEventListener("click", ()=> h.parentElement.classList.toggle("open")));
   }
 
-  async function loadLast(){ try{ const rep = await window.gijo.lastRedTeam(); if(rep && rep.results && rep.results.length) renderReport(rep); }catch(e){} }
+  // ── 점검 대상 ──
+  const targetSelect = document.getElementById("targetSelect");
+  async function loadTargets(){
+    try{
+      const t = await window.gijo.redteamTargets();
+      let html = '<option value="orchestrator">오케스트레이터 (내 메인 LLM)</option>';
+      if(t.assets && t.assets.length){
+        html += '<optgroup label="AI-BOM 연결 자산">';
+        html += t.assets.map(a => '<option value="asset:'+esc(a.id)+'">📦 '+esc(a.name)+' ('+esc(a.modelRef)+')'+
+          (a.robustness && a.robustness.score!=null ? ' — 최근 '+a.robustness.score+'점' : ' — 미점검')+'</option>').join("");
+        html += '</optgroup>';
+      }
+      if(t.models && t.models.length){
+        html += '<optgroup label="로컬 모델 ('+t.models.length+')">';
+        html += t.models.map(m => '<option value="model:'+esc(m.id)+'">'+esc(m.id)+'</option>').join("");
+        html += '</optgroup>';
+      }
+      targetSelect.innerHTML = html;
+    }catch(e){}
+  }
+  // 선택값 → 실행 인자 + 캐시 키.
+  function currentTarget(){
+    const v = targetSelect.value || "orchestrator";
+    if(v.startsWith("asset:")) return { opts: { assetId: v.slice(6) }, key: v, isAsset: true };
+    if(v.startsWith("model:")) return { opts: { modelId: v.slice(6) }, key: v, isAsset: false };
+    return { opts: {}, key: "orchestrator", isAsset: false };
+  }
+  function clearReport(){
+    document.getElementById("scoreText").textContent = "-";
+    document.getElementById("verdictWord").textContent = "-";
+    ["kVuln","kSafe","kTotal"].forEach(id => document.getElementById(id).textContent = "-");
+    document.getElementById("cats").innerHTML = "";
+    document.getElementById("advice").style.display = "none";
+    document.getElementById("ranAt").textContent = "이 대상은 아직 점검 기록이 없습니다. [레드팀 실행]을 누르세요.";
+    document.getElementById("results").innerHTML = '<div class="empty">이 대상을 점검하면 14개 공격의 상세 결과가 표시됩니다.</div>';
+  }
+  async function loadLast(){
+    const { key } = currentTarget();
+    try{
+      const rep = await window.gijo.lastRedTeam(key);
+      if(rep && rep.results && rep.results.length) renderReport(rep); else clearReport();
+    }catch(e){ clearReport(); }
+  }
+  targetSelect.addEventListener("change", () => {
+    document.getElementById("targetNote").style.display = currentTarget().isAsset ? "block" : "none";
+    loadLast();
+  });
 
   runBtn.addEventListener("click", async () => {
+    const { opts } = currentTarget();
     runBtn.disabled = true; const orig = runBtn.textContent; runBtn.textContent = "실행 중… (14개 공격 · ~1분)";
-    try{ const rep = await window.gijo.runRedTeam(); renderReport(rep); }
-    catch(e){ document.getElementById("results").innerHTML = '<div class="empty">실행 실패: '+esc(e.message||e)+'<br>오케스트레이터 모델이 로드됐는지 확인하세요.</div>'; }
+    try{ const rep = await window.gijo.runRedTeam(opts); renderReport(rep); }
+    catch(e){ document.getElementById("results").innerHTML = '<div class="empty">실행 실패: '+esc(e.message||e)+'<br>대상 모델이 로드 가능한지 확인하세요.</div>'; }
     finally{ runBtn.disabled = false; runBtn.textContent = orig; }
   });
 
@@ -316,7 +372,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   if(!window.gijo.isAuthenticated()){ window.gijo.navigateTo("login.html"); }
   else {
     tick(); setInterval(tick, 30000);
-    loadHealth(); loadUser(); loadGuard(); loadLast();
+    loadHealth(); loadUser(); loadGuard();
+    loadTargets().then(loadLast);
     if(window.gijoRealtime) window.gijoRealtime.connect();
   }
 </script>
