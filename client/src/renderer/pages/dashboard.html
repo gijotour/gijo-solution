@@ -43,14 +43,12 @@
   .dash-sessions .dsh-t{font-size:12px;font-weight:700;color:var(--text);}
   .dash-new{background:var(--blue);color:#fff;border:0;border-radius:6px;font-size:11px;font-weight:700;padding:4px 9px;cursor:pointer;}
   .dash-slist{flex:1;overflow-y:auto;padding:2px 8px 8px;}
-  .dash-sitem{padding:8px 10px;border-radius:8px;cursor:pointer;border:1px solid transparent;margin-bottom:3px;}
+  .dash-sitem{padding:8px 8px 8px 10px;border-radius:8px;cursor:pointer;border:1px solid transparent;margin-bottom:2px;display:flex;align-items:center;gap:8px;}
   .dash-sitem:hover{background:var(--panel-2);}
-  .dash-sitem .t{font-weight:700;font-size:12px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .dash-sitem .l{font-size:10.5px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .dash-sitem .m{font-size:9.5px;color:var(--muted-2);margin-top:4px;display:flex;justify-content:space-between;}
-  .dash-stag{font-size:8.5px;font-weight:800;padding:1px 5px;border-radius:4px;}
-  .dash-stag.active{color:var(--teal);background:rgba(30,185,128,.14);}
-  .dash-stag.done,.dash-stag.ignored{color:var(--muted-2);background:rgba(255,255,255,.06);}
+  .dash-sitem .t{flex:1;min-width:0;font-weight:700;font-size:12px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .dash-sdel{flex-shrink:0;font-size:11px;color:var(--muted-2);opacity:0;cursor:pointer;padding:2px 4px;border-radius:5px;}
+  .dash-sitem:hover .dash-sdel{opacity:.8;}
+  .dash-sdel:hover{opacity:1;color:#f5928a;background:rgba(226,72,61,.12);}
   .dash-sfull{padding:9px 12px;border-top:1px solid var(--border);font-size:11px;color:var(--blue-light);font-weight:700;cursor:pointer;text-align:center;}
   .dash-sfull:hover{background:var(--panel-2);}
   .explorer-title{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px;}
@@ -1345,15 +1343,21 @@
         box.innerHTML = '<div style="font-size:11px;color:var(--muted-2);padding:10px 6px;line-height:1.6">아직 세션이 없습니다.<br>＋ 새 세션 또는 전체 화면의 탐색기 항목을 눌러 시작하세요.</div>';
         return;
       }
+      // 간단하게 — 제목만. 각 항목에서 바로 삭제(🗑) 가능.
       box.innerHTML = list.slice(0, 15).map((s) => {
-        const prev = s.lastPreview ? escT(s.lastPreview) : "새 대화";
-        return `<div class="dash-sitem" data-id="${s.id}"><div class="t">${escT(s.title)}</div><div class="l">${prev}</div>` +
-          `<div class="m"><span>${s.turnCount}턴</span><span class="dash-stag ${s.status}">${DASH_STATUS_LABEL[s.status] || s.status}</span></div></div>`;
+        return `<div class="dash-sitem" data-id="${s.id}"><span class="t">${escT(s.title)}</span><span class="dash-sdel" data-del="${s.id}" title="세션 삭제">🗑</span></div>`;
       }).join("");
-      box.querySelectorAll(".dash-sitem").forEach((el) => el.addEventListener("click", () => openSessionPage(el.dataset.id)));
+      box.querySelectorAll(".dash-sitem").forEach((el) => el.addEventListener("click", (e) => {
+        if (e.target.closest(".dash-sdel")) { e.stopPropagation(); deleteDashSession(el.dataset.id); return; }
+        openSessionPage(el.dataset.id);
+      }));
     } catch (e) {
       box.innerHTML = '<div style="font-size:11px;color:var(--muted-2);padding:8px">세션을 불러오지 못했습니다</div>';
     }
+  }
+  async function deleteDashSession(id) {
+    if (!confirm("이 세션과 대화를 삭제할까요? 되돌릴 수 없습니다.")) return;
+    try { await window.gijo.deleteWorkSession(id); await loadDashSessions(); } catch (e) { alert("삭제 실패: " + (e && e.message || e)); }
   }
   function openSessionPage(id) {
     try { localStorage.setItem("gijo:sessions:open", id); } catch (e) {}

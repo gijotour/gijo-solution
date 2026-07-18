@@ -72,12 +72,13 @@
   .search input{flex:1;background:transparent;border:0;outline:none;color:var(--text);font-size:12px;}
   .search input::placeholder{color:var(--muted-2);}
   .slist{flex:1;overflow-y:auto;padding:4px 8px 10px;}
-  .sitem{padding:10px 12px;border-radius:9px;cursor:pointer;margin-bottom:4px;border:1px solid transparent;}
+  .sitem{padding:9px 10px 9px 12px;border-radius:9px;cursor:pointer;margin-bottom:3px;border:1px solid transparent;display:flex;align-items:center;gap:8px;}
   .sitem:hover{background:var(--panel-2);}
   .sitem.on{background:rgba(59,130,246,0.1);border-color:rgba(59,130,246,0.3);}
-  .sitem .t{font-weight:700;font-size:12.5px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .sitem .l{font-size:11px;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .sitem .m{font-size:10.5px;color:var(--muted-2);margin-top:5px;display:flex;justify-content:space-between;align-items:center;gap:6px;}
+  .sitem .t{flex:1;min-width:0;font-weight:700;font-size:12.5px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .sitem .sdel{flex-shrink:0;font-size:12px;color:var(--muted-2);opacity:0;cursor:pointer;padding:2px 4px;border-radius:5px;}
+  .sitem:hover .sdel{opacity:.8;}
+  .sitem .sdel:hover{opacity:1;color:#f5928a;background:rgba(226,72,61,0.12);}
   .tag{font-size:9px;font-weight:800;padding:2px 7px;border-radius:5px;flex-shrink:0;}
   .tag.active{color:var(--teal);background:rgba(30,185,128,0.14);}
   .tag.done{color:var(--muted-2);background:rgba(255,255,255,0.06);}
@@ -263,15 +264,17 @@
         : `<div class="list-empty">아직 세션이 없습니다.<br>＋ 새 세션으로 시작하세요.</div>`;
       return;
     }
+    // 간단하게 — 제목만. 각 항목에서 바로 삭제(🗑) 가능.
     sessionListEl.innerHTML = filtered.map((s) => {
-      const preview = s.lastPreview ? `${s.lastRole === "user" ? "" : "AI: "}${esc(s.lastPreview)}` : "새 대화 — 지시를 입력하세요";
       return `<div class="sitem ${s.id === currentId ? "on" : ""}" data-id="${s.id}">
-        <div class="t">${esc(s.title)}</div>
-        <div class="l">${preview}</div>
-        <div class="m"><span>${fmtTime(s.updatedAt)} · ${s.turnCount}턴</span><span class="tag ${s.status}">${STATUS_LABEL[s.status] || s.status}</span></div>
+        <span class="t">${esc(s.title)}</span>
+        <span class="sdel" data-del="${s.id}" title="세션 삭제">🗑</span>
       </div>`;
     }).join("");
-    sessionListEl.querySelectorAll(".sitem").forEach((el) => el.addEventListener("click", () => openSession(el.dataset.id)));
+    sessionListEl.querySelectorAll(".sitem").forEach((el) => el.addEventListener("click", (e) => {
+      if (e.target.closest(".sdel")) { e.stopPropagation(); deleteSessionById(el.dataset.id); return; }
+      openSession(el.dataset.id);
+    }));
   }
   async function loadSessions(selectFirst) {
     try {
@@ -400,18 +403,22 @@
     try { await window.gijo.updateWorkSession(currentId, { status: e.target.value }); await loadSessions(false); }
     catch (err) { alert("상태 변경 실패: " + (err && err.message || err)); }
   }
-  async function deleteSession() {
-    if (!currentId) return;
+  // 목록·헤더 어디서든 세션을 삭제한다. 열려 있던 세션을 지우면 대화 영역을 비운다.
+  async function deleteSessionById(id) {
+    if (!id) return;
     if (!confirm("이 세션과 대화를 삭제할까요? 되돌릴 수 없습니다.")) return;
     try {
-      await window.gijo.deleteWorkSession(currentId);
-      currentId = null; currentSession = null;
-      convHead.style.display = "none";
-      convEl.innerHTML = ""; convEl.appendChild(convEmpty); convEmpty.style.display = "flex";
-      chatInput.disabled = true; sendBtn.disabled = true;
-      await loadSessions(true);
+      await window.gijo.deleteWorkSession(id);
+      if (currentId === id) {
+        currentId = null; currentSession = null;
+        convHead.style.display = "none";
+        convEl.innerHTML = ""; convEl.appendChild(convEmpty); convEmpty.style.display = "flex";
+        chatInput.disabled = true; sendBtn.disabled = true;
+      }
+      await loadSessions(false);
     } catch (e) { alert("삭제 실패: " + (e && e.message || e)); }
   }
+  function deleteSession() { deleteSessionById(currentId); } // 헤더 🗑 버튼
 
   async function init() {
     tick(); setInterval(tick, 30000);
