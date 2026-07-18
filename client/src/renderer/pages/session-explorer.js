@@ -147,11 +147,15 @@
       '<div class="se-leaf se-act" data-action="upload">📥 파일 올리기 — 자동 분류</div>' +
       '<div class="se-leaf se-act" data-action="manage">📚 올린 문서 관리</div>';
 
-    // 시스템 BOM: 기존 인프라(SBOM) + AI/ML(ML-BOM). '오늘의 조치·우선순위'는 탐색기에서 제거(요청).
+    // ML BOM 한 섹션 안에 인프라(SBOM)/AI·ML(ML-BOM)을 하위 그룹으로 나눈다(2026-07-19 통합).
+    // 하위 그룹핑은 기존과 동일 — AI/ML 자산은 인프라 위에서 구동되므로 함께 본다.
+    var mlbomInner =
+      '<div class="se-subhead">🖥 인프라 · SBOM<span class="se-c">' + infraAssets.length + "</span></div>" + infraLeaves +
+      '<div class="se-subhead">🧠 AI/ML · ML-BOM<span class="se-c">' + mlAssets.length + "</span></div>" + mlLeaves;
+
     container.innerHTML =
       sectionHtml("today", "⦿", "오늘 확인할 항목", caches.tasks.length, todayLeaves, '<button class="se-run" data-run="1">▶ 운영 시작 — 세션에서 판단</button>') +
-      sectionHtml("sbom", "🖥", "SBOM · 인프라 자산", infraAssets.length, infraLeaves) +
-      sectionHtml("mlbom", "🧠", "ML BOM · AI/ML 자산", mlAssets.length, mlLeaves) +
+      sectionHtml("mlbom", "🧠", "ML BOM · 시스템 자산", infraAssets.length + mlAssets.length, mlbomInner) +
       sectionHtml("product", "🧰", "보안제품 관리", caches.products.length, prodLeaves) +
       sectionHtml("files", "📁", "문서 · 분석", "", docLeaves);
 
@@ -181,6 +185,7 @@
       ".se-sechead{display:flex;align-items:center;gap:6px;padding:7px 8px;border-radius:7px;font-weight:800;font-size:12px;color:var(--text);cursor:pointer}" +
       ".se-sechead:hover{background:var(--panel-2,#0e1526)}.se-car{font-size:10px;color:var(--muted-2,#5f6785);width:9px}" +
       ".se-c{margin-left:auto;font-size:10px;color:var(--muted-2,#5f6785);font-weight:700}" +
+      ".se-subhead{display:flex;align-items:center;gap:6px;padding:5px 8px 4px 18px;font-weight:700;font-size:11px;color:var(--muted,#8b93ab);margin-top:2px}" +
       ".se-run{margin:5px 8px 3px;display:block;width:calc(100% - 16px);background:rgba(30,185,128,.14);color:var(--teal,#1eb980);border:1px solid rgba(30,185,128,.3);border-radius:7px;padding:7px;font-size:11.5px;font-weight:800;cursor:pointer}" +
       ".se-run:hover{background:rgba(30,185,128,.22)}" +
       ".se-leaf{display:flex;align-items:center;gap:6px;padding:6px 9px 6px 24px;color:var(--muted,#8b93ab);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;border-radius:6px;font-size:12px}" +

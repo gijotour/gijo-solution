@@ -24,11 +24,11 @@
       ]},
     ]},
     { section: "보안 업무", groups: [
-      { ic: "◇", label: "AI 자산", tabs: [
+      // 자산과 그 취약점은 한 흐름이라 하나로 통합(2026-07-19): 목록·AI-BOM·취약점·조치를 탭으로.
+      // 탐색기(session-explorer)는 SBOM(인프라)/ML BOM(AI) 하위 그룹으로 자산을 나눈다.
+      { ic: "🧠", label: "ML BOM", tabs: [
         { page: "inventory.html", label: "자산 목록" },
         { page: "sbom.html", label: "AI-BOM 구성" },
-      ]},
-      { ic: "⊘", label: "취약점 관리", tabs: [
         { page: "vulnscan.html", label: "취약점" },
         { page: "approvals.html", label: "조치·승인" },
       ]},
@@ -48,7 +48,7 @@
         { page: "merge.html", label: "LLM 합성" },
         { page: "llmguide.html", label: "LLM 가이드" },
       ]},
-      { ic: "🧠", label: "AI 지식·모델", tabs: [
+      { ic: "📚", label: "AI 지식·모델", tabs: [
         { page: "memory.html", label: "기억·학습" },
         { page: "docenrich.html", label: "문서 보강" },
         { page: "ontology.html", label: "온톨로지" },
