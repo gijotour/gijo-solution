@@ -302,8 +302,7 @@
         <div class="sc-meta" id="scMeta">연동 서버 정보 불러오는 중…</div>
       </div>
       <div id="gijoObSlot"></div>
-      <!-- 스마트 업로드 — 파일만 올리면 유형(스캔/매뉴얼/문서)을 자동 판별해 처리, 입력칸 없음 -->
-      <div class="tree-nav" id="smartUploadBtn" title="스캔 결과·매뉴얼·문서를 올리면 자동으로 판별해 반영합니다">📥 파일 올리기 — 자동 분류<span class="tree-act" style="margin-left:auto">＋</span></div>
+      <!-- 스마트 업로드 입력(숨김). 트리거는 통합 탐색기의 "문서·분석 > 📥 파일 올리기"에서 호출. -->
       <input type="file" id="smartUploadInput" multiple style="display:none">
       <div id="explorerTree">불러오는 중...</div>
     </div>
@@ -435,6 +434,7 @@
 
 </div>
 
+<script src="session-explorer.js"></script>
 <script>
   const clockEl = document.getElementById("clockEl");
   const statusPill = document.getElementById("statusPill");
@@ -737,7 +737,7 @@
   // ── 스마트 통합 업로드 — 파일만 올리면 서버가 유형을 판별해 자동 라우팅(입력칸 최소화) ──
   // 결과는 협업 피드에 한 줄로: 어떤 파이프라인으로 갔고 왜 그렇게 판별됐는지(reason)까지.
   const smartInput = document.getElementById("smartUploadInput");
-  document.getElementById("smartUploadBtn").addEventListener("click", () => smartInput.click());
+  // 파일 올리기 트리거는 통합 탐색기(문서·분석 > 파일 올리기)에서 smartInput.click()로 호출한다.
   smartInput.addEventListener("change", async () => {
     for (const file of [...smartInput.files]) {
       const row = clAppend("event", { icon: "📥", name: "스마트 업로드", message: `${file.name} — 유형 판별·처리 중…` });
@@ -757,7 +757,7 @@
               : `장기기억 ${r.memory.chunks}청크 수집 · 분류 ${r.memory.docClass || "기타"}${r.memory.linkedProduct ? ` · 제품 '${r.memory.linkedProduct}' 연결` : ""}`;
         const cm = row.querySelector(".cm");
         if (cm) cm.textContent = `${file.name} → ${msg}`;
-        await Promise.all([loadAssets(), loadSecurityProducts(), loadFiles(), loadTodayPriority()]);
+        await Promise.all([reloadDashExplorer(), loadTodayPriority()]);
       } catch (e) {
         const cm = row.querySelector(".cm");
         if (cm) cm.textContent = `${file.name} — 실패: ${e.message}`;
@@ -791,6 +791,7 @@
   // 보안제품 — 종류(방화벽/EDR/DLP…)를 접두 아이콘으로 붙여 한 줄씩(평평하게). 클릭 시 보안제품 관리로.
   async function loadSecurityProducts() {
     const box = document.getElementById("tree-products");
+    if (!box) return; // 통합 탐색기로 교체됨 — 구 트리 컨테이너가 없으면 no-op
     try {
       const groups = await window.gijo.listSecurityProductsGrouped();
       const total = groups.reduce((s, g) => s + g.products.length, 0);
@@ -1185,7 +1186,7 @@
       if (notReady) modelGuide().style.display = "block";
       else clOfferReport(orchLabel());
       await loadTasks();
-      if (result.route && result.route.action === "scan") await loadAssets();
+      if (result.route && result.route.action === "scan") await reloadDashExplorer();
       refreshTeamStatus();
     } catch (e) {
       clReplaceTyping(typing, "error", { icon: "⚠", name: orchLabel(), message: e.message });
@@ -1359,21 +1360,45 @@
     window.gijo.navigateTo("sessions.html");
   }
 
+  // ── 통합 자산 탐색기(공유 모듈) — 작업 세션 화면과 동일한 5구획 탐색기 ────────
+  async function reloadDashExplorer() {
+    const box = document.getElementById("explorerTree");
+    if (!box) return;
+    try {
+      await window.gijoSessionExplorer.load();
+      window.gijoSessionExplorer.render(box, {
+        onSelect: onDashEntitySelect,
+        onUpload: () => { const si = document.getElementById("smartUploadInput"); if (si) si.click(); },
+        onManageDocs: () => window.gijo.navigateTo("memory.html"),
+      });
+    } catch (e) {
+      box.innerHTML = '<div style="padding:8px;color:var(--muted-2);font-size:11px">탐색기를 불러오지 못했습니다</div>';
+    }
+  }
+  // 대상 클릭 → 상태 세션 생성 후 전용 "작업 세션" 화면에서 그 대화를 연다(딥링크).
+  async function onDashEntitySelect(type, id) {
+    const ctx = window.gijoSessionExplorer.buildContext(type, id);
+    try {
+      const s = await window.gijo.createWorkSession(ctx.title, type + ":" + id);
+      await window.gijo.addWorkSessionTurn(s.id, "assistant", ctx.statusText, "상태");
+      openSessionPage(s.id);
+    } catch (e) { alert("세션 생성 실패: " + (e && e.message || e)); }
+  }
+
   async function init() {
     tick();
     setInterval(tick, 1000);
     await loadUser();
     greet();
-    renderExplorer(); // 트리 골격을 먼저 그린 뒤 각 로더가 자식 컨테이너를 채운다
     // renderTeam을 먼저 끝내 agentsById를 채운다 — 협업 이력(loadCollaboration)·서버 카드가 표시 이름/수를 쓰도록.
     await renderTeam();
-    await Promise.all([loadHealth(), loadServerCard(), loadAssets(), loadSecurityProducts(), loadTasks(), loadCollaboration(), loadFiles(), checkModelReady(), loadTodayPriority()]);
+    await Promise.all([loadHealth(), loadServerCard(), reloadDashExplorer(), loadCollaboration(), checkModelReady(), loadTodayPriority()]);
     pollGpu();
     setInterval(pollGpu, 2500); // 실 GPU 사용률에 따라 로고 발광 강도 갱신
 
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
-    document.getElementById("refreshAssetsBtn").addEventListener("click", loadAssets);
+    document.getElementById("refreshAssetsBtn").addEventListener("click", reloadDashExplorer);
     // 오늘 확인할 항목 UI는 작업 세션(sessions.html)으로 이관됨 — 대시보드에 없으면 배선 생략.
     const todoAddBtn = document.getElementById("todoAddBtn");
     if (todoAddBtn) todoAddBtn.addEventListener("click", addTodo);
@@ -1413,7 +1438,7 @@
       let t;
       window.gijo.onAssetUpdated(() => {
         clearTimeout(t);
-        t = setTimeout(() => { loadAssets(); loadTodayPriority(); }, 300);
+        t = setTimeout(() => { reloadDashExplorer(); loadTodayPriority(); loadDashSessions(); }, 300);
       });
     }
   }
