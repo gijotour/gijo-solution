@@ -6,6 +6,7 @@ import { atlasTriples, ATLAS_SOURCE } from "../src/engine/atlas-seed";
 import { owaspLlmTriples, OWASP_SOURCE } from "../src/engine/owasp-llm-seed";
 import { nistAiRmfTriples, NIST_SOURCE } from "../src/engine/nist-airmf-seed";
 import { cweTriples, CWE_SOURCE } from "../src/engine/cwe-seed";
+import { attackTriples, ATTACK_SOURCE } from "../src/engine/attack-seed";
 import { threatCatalogTriples } from "../src/engine/ontology-seed";
 
 beforeEach(() => {
@@ -97,5 +98,24 @@ describe("CWE(약점 클래스) 온톨로지 시드", () => {
     const exp = expandOntology("CWE-1427", undefined, { hops: 3, limit: 80 });
     const flat = exp.map((t) => `${t.subject}|${t.predicate}|${t.object}`).join("\n");
     expect(flat).toContain("LLM01:2025 Prompt Injection");
+  });
+});
+
+describe("MITRE ATT&CK Enterprise 온톨로지 시드", () => {
+  it("취약점 악용 전술의 기법·전술·완화통제를 담는다(top-level 필터)", () => {
+    const t = attackTriples();
+    expect(t.length).toBeGreaterThan(500);
+    expect(t.every((x) => x.source === ATTACK_SOURCE)).toBe(true);
+    for (const p of ["유형", "전술", "완화통제", "설명"]) expect(t.some((x) => x.predicate === p)).toBe(true);
+    // 기법 노드는 "T#### Name" 형식, 하위기법(T####.###)은 제외됨
+    expect(t.some((x) => /^T\d{4} /.test(x.subject))).toBe(true);
+    expect(t.some((x) => /^T\d{4}\.\d{3} /.test(x.subject))).toBe(false);
+  });
+
+  it("공개 표준 기법(T1190 Exploit Public-Facing Application)에서 전술·완화통제를 조회한다", () => {
+    addTriples(attackTriples());
+    const exp = expandOntology("T1190 Exploit Public-Facing Application", undefined, { hops: 2, limit: 40 });
+    expect(exp.some((t) => t.predicate === "전술")).toBe(true);
+    expect(exp.some((t) => t.predicate === "완화통제")).toBe(true);
   });
 });
