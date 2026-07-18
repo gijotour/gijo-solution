@@ -15,6 +15,7 @@ import { runAgentLoop, AgentToolCall } from "./agentloop";
 import { executeApprovedTool, PendingApproval } from "./agenttools";
 import { appendApprovedDecision } from "./orchestrator-dataset";
 import { undoSnapshot, undoCommit } from "./undo";
+import { guardInput } from "./guardrail";
 import { analyzeFindings } from "./analysis";
 import { recordFindings, getAsset, listAssets } from "./assets";
 import { listFindings } from "./cti";
@@ -266,6 +267,21 @@ async function learnloopConfirmResult(instructionText: string): Promise<Dispatch
 }
 
 export async function dispatchInstruction(instructionText: string): Promise<DispatchResult> {
+  // 런타임 가드레일 — 입력의 프롬프트 인젝션 시도를 실시간 검사. block 모드면 거절, flag면 기록·경고 후 진행.
+  const guard = guardInput(instructionText, "dispatch");
+  if (guard.flagged) {
+    emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `🛡 가드레일: 프롬프트 인젝션 시도 감지(${guard.categories.join(", ")})${guard.allowed ? " — 기록 후 진행" : " — 차단"}` });
+  }
+  if (!guard.allowed) {
+    const task = createTask({ text: instructionText, agentId: "orchestrator", priority: "P1" });
+    completeTask(task.id);
+    return {
+      task,
+      route: { agentId: "orchestrator", action: "chat" },
+      output: `🛡 가드레일이 이 요청을 차단했습니다 — 프롬프트 인젝션 시도로 판단(${guard.categories.join(", ")}). 정상 요청이면 표현을 바꿔 다시 시도하거나, 설정에서 가드레일 모드를 조정하세요.`,
+    };
+  }
+
   // 학습 루프 실행 지시는 확인 절차로 우회 — 파이프라인을 타지 않는다.
   if (LEARN_TOPIC_RE.test(instructionText) && LEARN_RUN_RE.test(instructionText)) {
     return learnloopConfirmResult(instructionText);

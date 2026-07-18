@@ -24,6 +24,7 @@ import { registerOrchestratorDatasetRoutes } from "./engine/orchestrator-dataset
 import { registerBriefingRoutes } from "./engine/briefing";
 import { registerUndoRoutes } from "./engine/undo";
 import { registerRedteamRoutes } from "./engine/redteam";
+import { registerGuardrailRoutes } from "./engine/guardrail";
 import { registerGitSyncRoutes } from "./engine/gitsync";
 import { registerHfModelsRoutes } from "./engine/hfmodels";
 import { registerIntentRoutes } from "./engine/intent";
@@ -86,6 +87,7 @@ export function createApp(): Express {
   registerBriefingRoutes(app);
   registerUndoRoutes(app);
   registerRedteamRoutes(app);
+  registerGuardrailRoutes(app);
   registerGitSyncRoutes(app);
   registerHfModelsRoutes(app);
   registerIntentRoutes(app);
