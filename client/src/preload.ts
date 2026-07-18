@@ -154,6 +154,7 @@ const gijoApi = {
   cloudEgressLog: (limit?: number) => api.cloudApi.egressLog(limit),
   saveCloudAnswerToKb: (question: string, answer: string, providerLabel: string, model: string) =>
     api.cloudApi.saveToKb(question, answer, providerLabel, model),
+  cloudUsage: () => api.cloudApi.usage(),
 
   // 온톨로지(지식 그래프)
   listOntology: (filter?: { scope?: string; subject?: string }) => api.ontologyApi.list(filter),

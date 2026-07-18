@@ -106,6 +106,17 @@ db.exec(`
   );
   CREATE INDEX IF NOT EXISTS idx_cloud_egress_log_at ON cloud_egress_log(at);
 
+  -- 클라우드 API 토큰 사용량 누적(요금 화면용). 제공자·모델별 호출 수·입출력 토큰을 upsert로 쌓는다.
+  -- usage.ts(외부 서비스 호출 수 인메모리)와 달리 재시작에도 남게 영속화 — 비용 추적이 목적이라.
+  CREATE TABLE IF NOT EXISTS cloud_usage (
+    provider TEXT NOT NULL,
+    model TEXT NOT NULL,
+    calls INTEGER NOT NULL DEFAULT 0,
+    inTokens INTEGER NOT NULL DEFAULT 0,
+    outTokens INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (provider, model)
+  );
+
   -- CTI 탐지 내역 캐시. 벤더 API를 요청마다 때리지 않도록 30분 게이트로 동기화하고(cti.ts),
   -- 외부 API 장애 시엔 이 캐시가 그대로 응답이 된다(경량 서킷 브레이커). collectedAt 인덱스는
   -- 90일 TTL 정리용 — 다음단계 가이드 3.1의 채택 항목.

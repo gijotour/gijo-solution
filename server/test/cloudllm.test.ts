@@ -107,6 +107,25 @@ describe("cloud LLM 하이브리드", () => {
     expect(log.body[0].decision).toBe("allowed");
   });
 
+  it("실제 전송된 호출의 토큰을 계측해 요금 화면 데이터로 집계한다", async () => {
+    db.exec("DELETE FROM cloud_usage");
+    await request(app).post("/api/cloud/config").set("Authorization", `Bearer ${admin}`)
+      .send({ enabled: true, activeProvider: "openai", provider: "openai", apiKey: "sk-x", model: "gpt-4o-mini" });
+    vi.spyOn(global, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ choices: [{ message: { content: "답변" } }], usage: { prompt_tokens: 100, completion_tokens: 200 } }), { status: 200 })
+    );
+    await request(app).post("/api/cloud/ask").set("Authorization", `Bearer ${admin}`).send({ question: "CVSS가 뭐야?" });
+
+    const usage = await request(app).get("/api/cloud/usage").set("Authorization", `Bearer ${admin}`);
+    expect(usage.body.totalCalls).toBe(1);
+    expect(usage.body.totalTokens).toBe(300);
+    const row = usage.body.rows.find((r: { model: string }) => r.model === "gpt-4o-mini");
+    expect(row.inTokens).toBe(100);
+    expect(row.outTokens).toBe(200);
+    // gpt-4o-mini 표준요금(입력 0.15/출력 0.60 per 1M) → 100*.15/1e6 + 200*.6/1e6 = 0.000135
+    expect(row.estimatedCost).toBeCloseTo(0.000135, 6);
+  });
+
   it("/screen은 실제 호출 없이 판정만 미리보기한다", async () => {
     const fetchSpy = vi.spyOn(global, "fetch");
     const blocked = await request(app).post("/api/cloud/screen").set("Authorization", `Bearer ${admin}`).send({ question: "10.0.0.5 취약점" });

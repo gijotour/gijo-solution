@@ -131,10 +131,74 @@ export function listEgressLog(limit = 100): EgressLogEntry[] {
   }));
 }
 
+// ── 토큰 사용량·비용 (요금 화면 연동) ────────────────────────────────────────
+const upsertUsageStmt = db.prepare(
+  `INSERT INTO cloud_usage (provider, model, calls, inTokens, outTokens) VALUES (@provider, @model, 1, @inTokens, @outTokens)
+   ON CONFLICT(provider, model) DO UPDATE SET calls = calls + 1, inTokens = inTokens + @inTokens, outTokens = outTokens + @outTokens`
+);
+const listUsageStmt = db.prepare("SELECT provider, model, calls, inTokens, outTokens FROM cloud_usage");
+
+function recordCloudUsage(provider: CloudProvider, model: string, inTokens: number, outTokens: number): void {
+  upsertUsageStmt.run({ provider, model, inTokens: Math.max(0, inTokens || 0), outTokens: Math.max(0, outTokens || 0) });
+}
+
+// 표준(유료) 요금 추정 단가 — 100만 토큰당 USD. 모델명 부분일치로 매칭, 없으면 제공자 기본값.
+// ⚠ 요금은 수시로 바뀌고 무료 등급이면 실제 $0 — 어디까지나 "표준 요금 기준 예상"이다.
+const RATE_PER_MTOK: { match: RegExp; in: number; out: number }[] = [
+  { match: /gemini.*flash/i, in: 0.1, out: 0.4 },
+  { match: /gemini.*pro/i, in: 1.25, out: 5.0 },
+  { match: /claude.*(haiku)/i, in: 0.8, out: 4.0 },
+  { match: /claude.*(sonnet)/i, in: 3.0, out: 15.0 },
+  { match: /claude.*(opus)/i, in: 15.0, out: 75.0 },
+  { match: /gpt-4o-mini|gpt-4\.1-mini|gpt-5-mini/i, in: 0.15, out: 0.6 },
+  { match: /gpt-4o|gpt-4\.1|gpt-5/i, in: 2.5, out: 10.0 },
+];
+function rateFor(model: string): { in: number; out: number } {
+  return RATE_PER_MTOK.find((r) => r.match.test(model)) ?? { in: 0.5, out: 1.5 };
+}
+
+export interface CloudUsageRow {
+  provider: CloudProvider;
+  providerLabel: string;
+  model: string;
+  calls: number;
+  inTokens: number;
+  outTokens: number;
+  estimatedCost: number; // 표준 요금 기준 예상 USD(무료 등급이면 실제 $0)
+}
+
+export function cloudUsageSummary(): { rows: CloudUsageRow[]; totalCalls: number; totalTokens: number; estimatedCost: number } {
+  const rows = (listUsageStmt.all() as { provider: string; model: string; calls: number; inTokens: number; outTokens: number }[]).map((r) => {
+    const rate = rateFor(r.model);
+    const cost = (r.inTokens / 1_000_000) * rate.in + (r.outTokens / 1_000_000) * rate.out;
+    return {
+      provider: r.provider as CloudProvider,
+      providerLabel: PROVIDER_LABEL[r.provider as CloudProvider] ?? r.provider,
+      model: r.model,
+      calls: r.calls,
+      inTokens: r.inTokens,
+      outTokens: r.outTokens,
+      estimatedCost: Math.round(cost * 1_000_000) / 1_000_000,
+    };
+  });
+  return {
+    rows,
+    totalCalls: rows.reduce((s, r) => s + r.calls, 0),
+    totalTokens: rows.reduce((s, r) => s + r.inTokens + r.outTokens, 0),
+    estimatedCost: Math.round(rows.reduce((s, r) => s + r.estimatedCost, 0) * 1_000_000) / 1_000_000,
+  };
+}
+
 // ── provider 어댑터 ─────────────────────────────────────────────────────────
-// system을 인자로 받는다 — 대화(askCloud)는 CLOUD_SYSTEM_PROMPT를, 문서 보강(cloudComplete)은
-// 번역·구조화 프롬프트를 넣는다. maxTokens도 인자화(번역은 긴 출력이 필요).
-async function callOpenAiCompatible(baseUrl: string, apiKey: string, model: string, system: string, user: string, maxTokens?: number): Promise<string> {
+// text와 함께 토큰 사용량(요금 계측용)을 돌려준다. system을 인자로 받는다 — 대화(askCloud)는
+// CLOUD_SYSTEM_PROMPT를, 문서 보강(cloudComplete)은 번역·구조화 프롬프트를 넣는다.
+interface CloudCallResult {
+  text: string;
+  inTokens: number;
+  outTokens: number;
+}
+
+async function callOpenAiCompatible(baseUrl: string, apiKey: string, model: string, system: string, user: string, maxTokens?: number): Promise<CloudCallResult> {
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
@@ -147,11 +211,11 @@ async function callOpenAiCompatible(baseUrl: string, apiKey: string, model: stri
     signal: AbortSignal.timeout(CLOUD_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 200)}`);
-  const j = (await res.json()) as { choices?: { message?: { content?: string } }[] };
-  return j.choices?.[0]?.message?.content ?? "";
+  const j = (await res.json()) as { choices?: { message?: { content?: string } }[]; usage?: { prompt_tokens?: number; completion_tokens?: number } };
+  return { text: j.choices?.[0]?.message?.content ?? "", inTokens: j.usage?.prompt_tokens ?? 0, outTokens: j.usage?.completion_tokens ?? 0 };
 }
 
-async function callClaude(apiKey: string, model: string, system: string, user: string, maxTokens = 1024): Promise<string> {
+async function callClaude(apiKey: string, model: string, system: string, user: string, maxTokens = 1024): Promise<CloudCallResult> {
   // Anthropic은 OpenAI 호환이 아니라 Messages API — system은 별도 필드, user 메시지만 배열로.
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
@@ -165,11 +229,11 @@ async function callClaude(apiKey: string, model: string, system: string, user: s
     signal: AbortSignal.timeout(CLOUD_TIMEOUT_MS),
   });
   if (!res.ok) throw new Error(`${res.status} ${(await res.text()).slice(0, 200)}`);
-  const j = (await res.json()) as { content?: { text?: string }[] };
-  return j.content?.map((c) => c.text ?? "").join("") ?? "";
+  const j = (await res.json()) as { content?: { text?: string }[]; usage?: { input_tokens?: number; output_tokens?: number } };
+  return { text: j.content?.map((c) => c.text ?? "").join("") ?? "", inTokens: j.usage?.input_tokens ?? 0, outTokens: j.usage?.output_tokens ?? 0 };
 }
 
-async function callProvider(p: CloudProvider, apiKey: string, model: string, system: string, user: string, maxTokens?: number): Promise<string> {
+async function callProvider(p: CloudProvider, apiKey: string, model: string, system: string, user: string, maxTokens?: number): Promise<CloudCallResult> {
   if (p === "openai") return callOpenAiCompatible("https://api.openai.com/v1", apiKey, model, system, user, maxTokens);
   if (p === "gemini") return callOpenAiCompatible("https://generativelanguage.googleapis.com/v1beta/openai", apiKey, model, system, user, maxTokens);
   return callClaude(apiKey, model, system, user, maxTokens);
@@ -183,7 +247,10 @@ export async function cloudComplete(system: string, user: string, maxTokens = 40
   const provider = activeProvider();
   const key = providerKey(provider);
   if (!key) throw new Error(`${PROVIDER_LABEL[provider]} API 키가 없습니다.`);
-  return callProvider(provider, key, providerModel(provider), system, user, maxTokens);
+  const model = providerModel(provider);
+  const r = await callProvider(provider, key, model, system, user, maxTokens);
+  recordCloudUsage(provider, model, r.inTokens, r.outTokens);
+  return r.text;
 }
 
 // 제공자가 지금 이 키로 실제 쓸 수 있는 모델 목록을 조회한다 — 모델 별칭이 수시로 바뀌므로
@@ -241,7 +308,9 @@ export async function askCloud(question: string, user?: GijoUser): Promise<Cloud
 
   const model = providerModel(provider);
   try {
-    const answer = await callProvider(provider, apiKey, model, CLOUD_SYSTEM_PROMPT, q);
+    const r = await callProvider(provider, apiKey, model, CLOUD_SYSTEM_PROMPT, q);
+    const answer = r.text;
+    recordCloudUsage(provider, model, r.inTokens, r.outTokens);
     logEgress({ userId: user?.id, provider, decision: "allowed", reasons: [], question: q });
     emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `클라우드 질의: ${PROVIDER_LABEL[provider]}(${model}) — 내부정보 미포함 확인됨` });
     return { routedToCloud: true, blocked: false, reasons: [], provider, providerLabel: PROVIDER_LABEL[provider], model, answer };
@@ -333,6 +402,11 @@ export function registerCloudLlmRoutes(app: Express): void {
   app.get("/api/cloud/status", authMiddleware, (_req, res) => {
     const p = activeProvider();
     res.json({ enabled: isEnabled() && hasKey(p), activeProvider: p, providerLabel: PROVIDER_LABEL[p] });
+  });
+
+  // 토큰 사용량·예상 비용 — 요금 화면(billing.html) 연동. 비밀 없음(제공자·모델·토큰·호출수만).
+  app.get("/api/cloud/usage", authMiddleware, (_req, res) => {
+    res.json(cloudUsageSummary());
   });
 
   // 이 키로 지금 쓸 수 있는 모델 목록 — 관리자 전용(모델 별칭이 자주 바뀌어 유효한 걸 고르게).
