@@ -512,6 +512,7 @@ export interface AnalysisHubData {
 export const analysisHubApi = {
   events: () => request<AnalysisHubData>("/api/analysis-hub/events"),
   rebuildVuln: () => request<{ inserted: number }>("/api/analysis-hub/rebuild-vuln", { method: "POST" }),
+  analyze: (eventId: string) => request<{ aiSummary: string }>("/api/analysis-hub/analyze", { method: "POST", body: { eventId } }),
   // 드롭존 통합 인입 — 서버가 로그/리포트를 자동 판별해 라우팅.
   ingest: (filename: string, content: string) =>
     request<{ routedTo: "log" | "report"; created: number; events: AnalysisEvent[] }>("/api/analysis-hub/ingest", {

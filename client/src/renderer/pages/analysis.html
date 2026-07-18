@@ -215,9 +215,32 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       (e.signals&&e.signals.length ? '<div class="sigs">'+e.signals.map(s=>'<span class="sig">'+esc(s)+'</span>').join("")+'</div>' : "")+
       '<pre>'+esc(e.detail||"(상세 없음)")+'</pre>'+
       (corr ? '<div class="corr">🔗 <b>상관:</b> '+esc(corr.note)+'</div>' : "")+
-      '<button class="btn-primary" id="mkTask">▶ 조치 생성 · 담당 배정</button>';
+      '<div id="aiBox" style="margin:8px 0">'+
+        (e.aiSummary ? '<div class="corr" style="background:rgba(59,130,246,.08);border-color:rgba(59,130,246,.25);color:#bcd3ff">🤖 <b>AI 분석</b><br>'+esc(e.aiSummary).replace(/\n/g,"<br>")+'</div>'
+                     : '<button class="btn-ghost" id="aiBtn" style="font-size:12px">🤖 AI 분석 (무슨 일·왜 위험·권고)</button>')+
+      '</div>'+
+      '<button class="btn-primary" id="mkTask">▶ 조치 생성 · 작업 등록</button>';
+    const aiBtn = document.getElementById("aiBtn");
+    if(aiBtn) aiBtn.addEventListener("click", () => runAnalyze(e.id));
     const mk = document.getElementById("mkTask");
-    if(mk) mk.addEventListener("click", () => toast("조치 생성은 취약점·작업 화면과 연결 예정입니다."));
+    if(mk) mk.addEventListener("click", () => createTask(e));
+  }
+  const PRI_TASK = { P0:"P0", P1:"P1", P2:"P2", P3:"P3" };
+  async function runAnalyze(id){
+    const box = document.getElementById("aiBox");
+    if(box) box.innerHTML = '<div class="corr" style="background:rgba(59,130,246,.08);border-color:rgba(59,130,246,.25);color:#bcd3ff">🤖 AI가 분석 중… (로컬 LLM)</div>';
+    try{
+      const r = await window.gijo.analysisAnalyze(id);
+      const e = data.events.find(x=>x.id===id); if(e) e.aiSummary = r.aiSummary;
+      selectEvent(id); // 요약 포함해 다시 렌더
+    }catch(err){ if(box) box.innerHTML = '<div class="corr" style="color:#f5928a">AI 분석 실패: '+esc(err.message||err)+'</div>'; }
+  }
+  async function createTask(e){
+    const text = '['+SRC_LABEL[e.source]+'] '+e.title + (e.entity?(' — '+e.entity):'');
+    try{
+      await window.gijo.addTask(text, { priority: PRI_TASK[e.priority]||"P2", ref: e.ref||undefined });
+      toast('작업 등록됨: '+text);
+    }catch(err){ toast('작업 등록 실패: '+(err.message||err)); }
   }
   function renderCorrelations(){
     const panel = document.getElementById("corrPanel");

@@ -6,6 +6,7 @@ import {
   computePriority,
   computeCorrelations,
   detectIngestKind,
+  buildAnalysisPrompt,
   resetAnalysisHubForTests,
   AnalysisEvent,
 } from "../src/engine/analysishub";
@@ -50,6 +51,48 @@ describe("parseSecurityLog — 인증 브루트포스", () => {
   it("임계치 미만은 이벤트를 만들지 않는다", () => {
     const r = parseSecurityLog("로그", "Failed password for x from 1.2.3.4 port 22 ssh2");
     expect(r.events).toHaveLength(0);
+  });
+});
+
+describe("parseSecurityLog — 방화벽 차단/포트스캔", () => {
+  it("한 IP가 여러 포트에서 차단되면 포트스캔", () => {
+    const log = Array.from({ length: 20 }, (_, i) => `Jul 18 fw kernel: [UFW BLOCK] DENY SRC=45.33.0.1 DST=10.0.0.5 PROTO=TCP DPT=${1000 + i}`).join("\n");
+    const r = parseSecurityLog("방화벽", log);
+    const scan = r.events.find((e) => e.title.includes("포트 스캔"));
+    expect(scan).toBeTruthy();
+    expect(scan!.entity).toBe("45.33.0.1");
+    expect(scan!.signals).toContain("포트스캔");
+  });
+  it("같은 포트로 차단이 폭주하면 차단 폭주(포트스캔 아님)", () => {
+    const log = Array.from({ length: 35 }, () => "Jul 18 fw kernel: DROP SRC=203.0.113.9 DST=10.0.0.5 DPT=3389").join("\n");
+    const r = parseSecurityLog("방화벽", log);
+    expect(r.events.find((e) => e.title.includes("차단 폭주"))).toBeTruthy();
+    expect(r.events.find((e) => e.title.includes("포트 스캔"))).toBeFalsy();
+  });
+});
+
+describe("parseSecurityLog — 웹 공격 시그니처", () => {
+  it("접근 로그의 SQLi/XSS 흔적을 소스 IP별로 잡는다", () => {
+    const log = [
+      '203.0.113.9 - - [18/Jul/2026] "GET /?q=union select * from users" 200',
+      '203.0.113.9 - - [18/Jul/2026] "GET /page?x=<script>alert(1)</script>" 200',
+    ].join("\n");
+    const r = parseSecurityLog("웹서버", log);
+    const web = r.events.find((e) => e.title.includes("웹 공격"));
+    expect(web).toBeTruthy();
+    expect(web!.entity).toBe("203.0.113.9");
+    expect(web!.signals).toContain("웹공격");
+  });
+});
+
+describe("buildAnalysisPrompt — LLM 분석 그라운딩", () => {
+  it("이벤트 상세·대상·형식 지시를 프롬프트에 담는다", () => {
+    const e: AnalysisEvent = { id: "x", source: "log", title: "포트 스캔 의심 — 45.33.0.1", entity: "45.33.0.1", severity: "high", priority: "P1", detail: "포트 20개 차단", signals: ["포트스캔"], aiSummary: "", ref: "방화벽", at: 1 };
+    const p = buildAnalysisPrompt(e);
+    expect(p).toContain("45.33.0.1");
+    expect(p).toContain("포트 20개 차단");
+    expect(p).toContain("무슨 일");
+    expect(p).toContain("추측을 사실처럼");
   });
 });
 

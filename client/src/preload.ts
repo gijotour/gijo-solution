@@ -145,6 +145,7 @@ const gijoApi = {
   analysisEvents: () => api.analysisHubApi.events(),
   analysisRebuildVuln: () => api.analysisHubApi.rebuildVuln(),
   analysisIngest: (filename: string, content: string) => api.analysisHubApi.ingest(filename, content),
+  analysisAnalyze: (eventId: string) => api.analysisHubApi.analyze(eventId),
 
   // AI 견고성: 레드팀 + 가드레일
   runRedTeam: (opts?: { modelId?: string; assetId?: string }) => api.redteamApi.run(opts),

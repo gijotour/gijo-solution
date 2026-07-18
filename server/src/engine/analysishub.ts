@@ -17,6 +17,7 @@ import { db } from "../db";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { listAssets } from "./assets";
+import { chat } from "./llm";
 
 export type AnalysisSource = "vuln" | "log" | "product";
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
@@ -56,6 +57,7 @@ const upsertStmt = db.prepare(`INSERT INTO analysis_events (id, source, title, e
     severity=excluded.severity, priority=excluded.priority, detail=excluded.detail, signals=excluded.signals,
     aiSummary=excluded.aiSummary, ref=excluded.ref, at=excluded.at`);
 const listStmt = db.prepare("SELECT * FROM analysis_events ORDER BY at DESC");
+const getEventStmt = db.prepare("SELECT * FROM analysis_events WHERE id = ?");
 const deleteBySourceStmt = db.prepare("DELETE FROM analysis_events WHERE source = ?");
 
 interface EventRow extends Omit<AnalysisEvent, "signals"> {
@@ -137,48 +139,101 @@ export interface LogParseResult {
   totalLines: number;
 }
 
-export function parseSecurityLog(source: string, content: string, threshold = 10): LogParseResult {
-  const lines = content.split(/\r?\n/);
+// 탐지기 ①: 인증 브루트포스 — 소스 IP별 인증 실패 집계, 성공 로그 있으면 활성악용.
+function detectBruteForce(source: string, lines: string[], threshold: number): { events: AnalysisEvent[]; matched: number } {
   const fails = new Map<string, number>();
   const accepts = new Set<string>();
   let matched = 0;
   for (const line of lines) {
-    let hit = false;
     for (const re of FAIL_RES) {
       const m = line.match(re);
-      if (m) {
-        fails.set(m[1], (fails.get(m[1]) ?? 0) + 1);
-        hit = true;
-        break;
-      }
+      if (m) { fails.set(m[1], (fails.get(m[1]) ?? 0) + 1); matched++; break; }
     }
     const acc = line.match(ACCEPT_RE);
     if (acc) accepts.add(acc[1]);
-    if (hit) matched++;
   }
   const events: AnalysisEvent[] = [];
-  const now = Date.now();
   for (const [ip, count] of fails) {
     if (count < threshold) continue;
     const succeeded = accepts.has(ip);
     const signals = ["브루트포스"];
-    if (succeeded) signals.push("활성 악용"); // 실패 다발 후 성공 = 계정 탈취 가능성
+    if (succeeded) signals.push("활성 악용");
     const severity: Severity = succeeded ? "critical" : "high";
-    events.push({
-      id: `log:${source}:${ip}`,
-      source: "log",
-      title: `인증 브루트포스 의심 — ${ip}`,
-      entity: ip,
-      severity,
-      priority: computePriority(severity, signals),
-      detail: `${source}에서 ${ip}의 인증 실패 ${count}회${succeeded ? " 후 성공 로그 존재(계정 탈취 가능성)" : ""}. 임계치 ${threshold} 초과.`,
-      signals,
-      aiSummary: "",
-      ref: source,
-      at: now,
-    });
+    events.push(mkLog(source, `log:${source}:brute:${ip}`, `인증 브루트포스 의심 — ${ip}`, ip, severity, signals,
+      `${source}에서 ${ip}의 인증 실패 ${count}회${succeeded ? " 후 성공 로그 존재(계정 탈취 가능성)" : ""}. 임계치 ${threshold} 초과.`));
   }
-  return { events, matchedLines: matched, totalLines: lines.length };
+  return { events, matched };
+}
+
+// 탐지기 ②: 방화벽 차단 — iptables/UFW(SRC=/DPT=)·Cisco(dst .../port) 차단 로그를 소스 IP별로 집계.
+// 서로 다른 목적지 포트가 많으면 포트스캔, 차단 건수만 많으면 차단 폭주로 본다.
+const DENY_RE = /\b(DENY|DROP|BLOCK|Deny|denied|REJECT|blocked)\b/i;
+function extractDeny(line: string): { src: string; dpt?: string } | null {
+  if (!DENY_RE.test(line)) return null;
+  const src = (line.match(/SRC=(\d+\.\d+\.\d+\.\d+)/i) || line.match(/src\S*?\s?(\d+\.\d+\.\d+\.\d+)/i) || line.match(/(\d+\.\d+\.\d+\.\d+)/))?.[1];
+  const dpt = (line.match(/DPT=(\d+)/i) || line.match(/dst \S*?\/(\d{1,5})/i) || line.match(/dpt\D{0,3}(\d{2,5})/i))?.[1];
+  return src ? { src, dpt } : null;
+}
+function detectFirewall(source: string, lines: string[], portScanPorts = 15, floodThreshold = 30): { events: AnalysisEvent[]; matched: number } {
+  const perSrc = new Map<string, { denies: number; ports: Set<string> }>();
+  let matched = 0;
+  for (const line of lines) {
+    const d = extractDeny(line);
+    if (!d) continue;
+    matched++;
+    const rec = perSrc.get(d.src) ?? { denies: 0, ports: new Set<string>() };
+    rec.denies++;
+    if (d.dpt) rec.ports.add(d.dpt);
+    perSrc.set(d.src, rec);
+  }
+  const events: AnalysisEvent[] = [];
+  for (const [ip, rec] of perSrc) {
+    if (rec.ports.size >= portScanPorts) {
+      events.push(mkLog(source, `log:${source}:scan:${ip}`, `포트 스캔 의심 — ${ip}`, ip, "high", ["포트스캔"],
+        `${source}에서 ${ip}가 서로 다른 목적지 포트 ${rec.ports.size}개를 차단당함(차단 ${rec.denies}건) — 스캐닝 정황.`));
+    } else if (rec.denies >= floodThreshold) {
+      events.push(mkLog(source, `log:${source}:flood:${ip}`, `방화벽 차단 폭주 — ${ip}`, ip, "medium", ["반복"],
+        `${source}에서 ${ip}가 ${rec.denies}회 차단됨 — 반복 접근 시도.`));
+    }
+  }
+  return { events, matched };
+}
+
+// 탐지기 ③: 웹 공격 시그니처 — 접근 로그에서 SQLi/XSS/경로순회/명령주입 흔적을 소스 IP별로 집계.
+const WEB_PATTERNS = [/union\s+select/i, /<script/i, /\.\.\/\.\.\//, /\/etc\/passwd/i, /\bor\b\s+['"]?1['"]?\s*=\s*['"]?1/i, /%27/i, /%3Cscript/i, /base64_decode/i, /\/bin\/(?:ba)?sh/i, /cmd\.exe/i, /\bexec\s*\(/i];
+function detectWebAttack(source: string, lines: string[]): { events: AnalysisEvent[]; matched: number } {
+  const perIp = new Map<string, number>();
+  let matched = 0;
+  for (const line of lines) {
+    if (!WEB_PATTERNS.some((re) => re.test(line))) continue;
+    matched++;
+    const ip = (line.match(/^\s*(\d+\.\d+\.\d+\.\d+)/) || line.match(/(\d+\.\d+\.\d+\.\d+)/))?.[1] ?? "unknown";
+    perIp.set(ip, (perIp.get(ip) ?? 0) + 1);
+  }
+  const events: AnalysisEvent[] = [];
+  for (const [ip, hits] of perIp) {
+    const severity: Severity = hits >= 5 ? "high" : "medium";
+    events.push(mkLog(source, `log:${source}:web:${ip}`, `웹 공격 시그니처 — ${ip}`, ip, severity, ["웹공격"],
+      `${source}에서 ${ip}의 요청에 웹 공격 흔적(SQLi/XSS/경로순회/명령주입 등) ${hits}건 탐지.`));
+  }
+  return { events, matched };
+}
+
+function mkLog(source: string, id: string, title: string, entity: string, severity: Severity, signals: string[], detail: string): AnalysisEvent {
+  return { id, source: "log", title, entity, severity, priority: computePriority(severity, signals), detail, signals, aiSummary: "", ref: source, at: Date.now() };
+}
+
+// 여러 결정적 탐지기를 돌려 보안 로그를 이벤트로 정규화한다.
+export function parseSecurityLog(source: string, content: string, threshold = 10): LogParseResult {
+  const lines = content.split(/\r?\n/);
+  const brute = detectBruteForce(source, lines, threshold);
+  const fw = detectFirewall(source, lines);
+  const web = detectWebAttack(source, lines);
+  return {
+    events: [...brute.events, ...fw.events, ...web.events],
+    matchedLines: brute.matched + fw.matched + web.matched,
+    totalLines: lines.length,
+  };
 }
 
 // ── 소스 ③: 보안제품 운영 리포트 — 결정적 키워드·수치 추출 ─────────────────
@@ -315,6 +370,42 @@ export function analysisSummary(events: AnalysisEvent[]): {
   return { total: events.length, bySource, byPriority, overall };
 }
 
+export function getAnalysisEvent(id: string): AnalysisEvent | undefined {
+  const r = getEventStmt.get(id) as EventRow | undefined;
+  return r ? rowToEvent(r) : undefined;
+}
+
+// ── LLM 이벤트 분석 ─────────────────────────────────────────────────────────
+// 결정적 파서가 "무엇을" 잡았다면, LLM은 담당자에게 "무슨 일·왜 위험·뭘 해야" 를 붙인다.
+// 이벤트 상세 + 상관관계를 근거로 주입(그라운딩) — 추측을 사실처럼 쓰지 않게 지시.
+export function buildAnalysisPrompt(e: AnalysisEvent, correlation?: Correlation): string {
+  const srcKo = e.source === "vuln" ? "취약점 스캐너" : e.source === "log" ? "보안 로그" : "보안제품 운영 리포트";
+  return [
+    "당신은 1인 보안담당자를 돕는 보안 분석가입니다. 아래 보안 이벤트를 한국어로 간결히 분석하세요.",
+    "형식: ① 무슨 일인지(1문장) ② 왜 위험한지(1문장) ③ 지금 할 조치(1~2가지, 구체적으로).",
+    "제공된 근거만 사용하고, 추측을 사실처럼 쓰지 마세요. 근거가 부족하면 '확인 필요'로 표시하세요.",
+    "",
+    `[소스] ${srcKo}`,
+    `[제목] ${e.title}`,
+    `[대상] ${e.entity}`,
+    `[심각도/우선순위] ${e.severity} / ${e.priority}`,
+    `[신호] ${e.signals.join(", ") || "없음"}`,
+    `[상세] ${e.detail}`,
+    correlation ? `[상관관계] ${correlation.note}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
+export async function analyzeEvent(id: string): Promise<string> {
+  const e = getAnalysisEvent(id);
+  if (!e) throw new Error("이벤트를 찾을 수 없습니다.");
+  const corr = computeCorrelations(listAnalysisEvents()).find((c) => c.eventIds.includes(id));
+  const summary = (await chat({ agentId: "analysis", message: buildAnalysisPrompt(e, corr) })).trim();
+  saveEvent({ ...e, aiSummary: summary });
+  return summary;
+}
+
 export function resetAnalysisHubForTests(): void {
   db.exec("DELETE FROM analysis_events");
 }
@@ -364,6 +455,20 @@ export function registerAnalysisHubRoutes(app: Express): void {
       const r = parseProductReport(name, content);
       r.events.forEach(saveEvent);
       res.json({ created: r.events.length, counts: r.counts, events: r.events });
+    })
+  );
+  // 이벤트 LLM 분석 — 무슨 일·왜 위험·권고 조치(상세+상관 그라운딩). 결과를 이벤트 aiSummary에 저장.
+  app.post(
+    "/api/analysis-hub/analyze",
+    authMiddleware,
+    asyncRoute(async (req, res) => {
+      const id = String(req.body?.eventId || "");
+      if (!id) return res.status(400).json({ error: "eventId가 필요합니다." });
+      try {
+        res.json({ aiSummary: await analyzeEvent(id) });
+      } catch (e) {
+        res.status(404).json({ error: (e as Error).message });
+      }
     })
   );
   // 드롭존 통합 인입 — 파일 하나를 자동 판별해 로그/리포트 파이프라인으로 라우팅.
