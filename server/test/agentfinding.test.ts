@@ -44,6 +44,34 @@ beforeEach(() => {
   seedAssetWithFindings();
 });
 
+describe("#1 인자 추출 강건화 — assetId 접두어 관용 + status autoFill", () => {
+  it("assetId에서 vuln: 접두어를 떨어뜨려도 finding을 찾는다", async () => {
+    registerAsset({ id: "vuln:sample-web01", name: "샘플 웹서버", path: "-" });
+    recordFindings("vuln:sample-web01", [
+      { finding_type: "Apache Log4j RCE", severity: "critical", evidence: "CVE-2021-44228", source_tool: "nessus" },
+    ]);
+    // 7B가 "vuln:" 접두어를 떨어뜨린 케이스
+    const out = await executeApprovedTool("assign_finding", { assetId: "sample-web01", finding: "Log4j", assignee: "정요한" });
+    expect(out).toContain("정요한");
+    expect(reviewFor("vuln:sample-web01", "Log4j")?.assignee).toBe("정요한");
+  });
+
+  it('status가 비어도 지시문 "패치 다 했어"에서 조치완료로 채운다(autoFill)', () => {
+    const tool = findAgentTool("update_finding_status")!;
+    const ap = buildApproval(tool, { assetId: "ai-secbot-01", finding: "버전 정보 노출" }, "ai-secbot-01 버전 정보 노출 패치 다 했어");
+    const status = ap.fields.find((f) => f.key === "status")!;
+    expect(status.value).toBe("조치완료");
+    expect(status.source).toBe("auto");
+    expect(ap.missing).not.toContain("status"); // 더 이상 막히지 않는다
+  });
+
+  it('지시문 "이건 오탐이야"면 status를 오탐으로 채운다', () => {
+    const tool = findAgentTool("update_finding_status")!;
+    const ap = buildApproval(tool, { assetId: "ai-secbot-01", finding: "버전 정보 노출" }, "ai-secbot-01 버전 정보 노출 이건 오탐이야");
+    expect(ap.fields.find((f) => f.key === "status")!.value).toBe("오탐");
+  });
+});
+
 describe("assign_finding — 담당자·기한 배정 (승인 실행)", () => {
   it("심각도·유형으로 지목한 취약점에 담당자와 기한을 기록한다", async () => {
     const out = await executeApprovedTool("assign_finding", {

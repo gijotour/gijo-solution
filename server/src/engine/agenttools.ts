@@ -37,7 +37,7 @@ export interface AgentTool {
   description: string; // LLM에게 보여줄 한 줄 설명(한국어)
   params: AgentToolParam[];
   // 쓰기 도구용: LLM이 안 준 값을 서버 규칙으로 채운다(예: id를 이름에서 생성). 결재판에서 "자동생성"으로 표시된다.
-  autoFill?: (args: Record<string, string>) => Record<string, string>;
+  autoFill?: (args: Record<string, string>, instruction: string) => Record<string, string>;
   effect?: (args: Record<string, string>) => string; // "실행되면:" 고지
   undo?: string; // "되돌리기:" 고지
   run: (args: Record<string, string>) => Promise<string> | string;
@@ -310,16 +310,31 @@ function runRegisterAsset(args: Record<string, string>): string {
 interface FindingHit {
   key: string; // 실제 findingKey (sha1 16자)
   label: string; // 사람이 읽을 요약 "[critical] 프롬프트 인젝션"
+  assetId: string; // 해석된 실제 자산 id — 검토대장 저장 키(원 인자의 접두어 누락을 흡수)
 }
 
 function findingLabel(f: Asset["findings"][number]): string {
   return `[${f.severity}] ${f.finding_type}`;
 }
 
+// assetId를 관용적으로 찾는다 — 실측(2026-07-18): 7B가 "vuln:sample-web01"에서 "vuln:" 접두어를
+// 떨어뜨려 매칭 실패. 정확 일치 → 접두어 붙여보기/떼보기 → 정규화 일치 순으로 시도한다.
+function resolveAsset(assetId: string): Asset | undefined {
+  const raw = (assetId ?? "").trim();
+  if (!raw) return undefined;
+  let asset = getAsset(raw);
+  if (!asset) asset = getAsset(raw.startsWith("vuln:") ? raw.slice(5) : `vuln:${raw}`);
+  if (!asset) {
+    const norm = (s: string) => s.toLowerCase().replace(/^vuln:/, "");
+    asset = listAssets().find((a) => norm(a.id) === norm(raw));
+  }
+  return asset;
+}
+
 // assetId 안에서 needle(심각도·유형·근거 부분일치)로 finding 1건을 특정한다.
 // 0건/2건+는 실패로 돌려주고(사람에게 되묻기), 정확히 1건일 때만 hit을 준다.
 function resolveFinding(assetId: string, needle: string): { ok: true; hit: FindingHit } | { ok: false; error: string } {
-  const asset = getAsset((assetId ?? "").trim());
+  const asset = resolveAsset(assetId);
   if (!asset) {
     const ids = listAssets().map((a) => a.id).join(", ") || "(없음)";
     return { ok: false, error: `자산 "${assetId}"을(를) 찾을 수 없습니다. 등록된 자산 id: ${ids}` };
@@ -340,16 +355,23 @@ function resolveFinding(assetId: string, needle: string): { ok: true; hit: Findi
     return { ok: false, error: `"${needle}"에 ${hits.length}건이 걸립니다 — 심각도·유형으로 더 구체적으로 지목하세요: ${sample}` };
   }
   const f = hits[0];
-  return { ok: true, hit: { key: findingKey(asset.id, f), label: findingLabel(f) } };
+  return { ok: true, hit: { key: findingKey(asset.id, f), label: findingLabel(f), assetId: asset.id } };
 }
 
 // 상태 한국어 → enum (결정적 규칙, LLM 추정이 아니다).
+// 완료 표현을 폭넓게 잡는다 — 실측(2026-07-18): "패치 다 했어"가 status로 안 잡혀 승인이 막혔다.
 function normalizeStatus(raw: string): ApprovalStatus | null {
   const s = (raw ?? "").trim().toLowerCase();
-  if (/오탐|false|무시|반려|제외|reject/.test(s)) return "rejected";
-  if (/조치|완료|해결|확정|승인|approv|fix|done|patch/.test(s)) return "approved";
-  if (/미검토|보류|대기|원복|pending/.test(s)) return "pending";
+  if (/오탐|false positive|false-positive|무시|반려|제외|아님|reject/.test(s)) return "rejected";
+  if (/조치|완료|해결|해결했|확정|승인|고쳤|고침|고쳐|패치|끝났|끝냈|막았|적용했|처리했|처리 완료|됐어|됐다|approv|fix|done|patch|resolv|remediat/.test(s)) return "approved";
+  if (/미검토|보류|대기|원복|되돌|pending/.test(s)) return "pending";
   return null;
+}
+
+// status가 비면 지시문에서 규칙 추론한 canonical 한국어("조치완료"/"오탐")를 돌려준다(autoFill용).
+function inferStatusWord(instruction: string): string | undefined {
+  const st = normalizeStatus(instruction);
+  return st === "approved" ? "조치완료" : st === "rejected" ? "오탐" : undefined;
 }
 
 const DUE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -367,7 +389,7 @@ function runAssignFinding(args: Record<string, string>): string {
     if (!DUE_RE.test(due)) throw new Error(`기한은 YYYY-MM-DD 형식이어야 합니다 (받은 값: "${due}").`);
     patch.dueDate = due;
   }
-  updateFindingReview(args.assetId.trim(), r.hit.key, patch, "orchestrator");
+  updateFindingReview(r.hit.assetId, r.hit.key, patch, "orchestrator");
   return `${args.assetId} ${r.hit.label} → 담당자 ${assignee}${patch.dueDate ? `, 기한 ${patch.dueDate}` : ""} 배정했습니다.`;
 }
 
@@ -379,7 +401,7 @@ function runUpdateFindingStatus(args: Record<string, string>): string {
   const patch: ReviewPatch = { status };
   const note = args.note?.trim();
   if (note) patch.note = note;
-  updateFindingReview(args.assetId.trim(), r.hit.key, patch, "orchestrator");
+  updateFindingReview(r.hit.assetId, r.hit.key, patch, "orchestrator");
   const label = status === "rejected" ? "오탐(SBOM·조치 대상에서 제외)" : status === "approved" ? "조치완료(확정)" : "미검토(원복)";
   return `${args.assetId} ${r.hit.label} → ${label} 처리했습니다.${note ? ` 사유: ${note}` : ""}`;
 }
@@ -504,6 +526,15 @@ const TOOLS: AgentTool[] = [
       { name: "status", label: "판정", description: "조치완료 / 오탐 (미검토로 원복도 가능)", required: true },
       { name: "note", label: "사유", description: "판정 근거·메모 (선택)", required: false },
     ],
+    // status를 안 줬으면 지시문에서 규칙 추론한다 — 실측: "패치 다 했어"에서 7B가 status를 못 채워 승인이 막혔다.
+    autoFill: (args, instruction) => {
+      const filled: Record<string, string> = {};
+      if (!args.status?.trim()) {
+        const word = inferStatusWord(instruction);
+        if (word) filled.status = word;
+      }
+      return filled;
+    },
     effect: (args) => {
       const st = normalizeStatus(args.status ?? "");
       if (st === "rejected") return "이 취약점을 오탐 처리 · SBOM 취약점과 '오늘의 조치'에서 제외됨";
@@ -587,7 +618,7 @@ export function buildApproval(
   instruction: string,
   toolResults = ""
 ): PendingApproval {
-  const autoFilled = tool.autoFill ? tool.autoFill(rawArgs) : {};
+  const autoFilled = tool.autoFill ? tool.autoFill(rawArgs, instruction) : {};
   const args = { ...rawArgs, ...autoFilled };
   const fields: ApprovalField[] = tool.params.map((p) => {
     const value = (args[p.name] ?? "").trim();
