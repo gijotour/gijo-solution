@@ -1,6 +1,6 @@
 {
   "name": "gijo-as-server",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "description": "GIJO AS — 보안 오케스트레이터 서버 (엔진 모듈 전부 호스팅)",
   "main": "dist/index.js",
   "scripts": {
