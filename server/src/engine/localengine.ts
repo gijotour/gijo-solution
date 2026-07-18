@@ -337,31 +337,118 @@ export async function autoStartLocalEngines(): Promise<void> {
     return;
   }
   if (fs.existsSync(embPath)) {
-    console.log(`[localengine] 임베딩 서버 자동 시작: ${EMBEDDING_MODEL_ID} (port ${EMBEDDING_PORT}, GPU 상주)`);
-    // -ngl -1: bge-m3를 GPU에 상주시킨다(채팅 모델과 동일). 이게 없으면 CPU로 돌아 배치 임베딩이 느려
-    // 대용량 문서 수집이 타임아웃난다(에이전트 모델처럼 GPU에 함께 올려 쓰는 설계).
-    const spawned = spawn(LLAMA_SERVER_PATH, ["-m", embPath, "--embedding", "-ngl", "-1", "--port", String(EMBEDDING_PORT)], {
-      stdio: "pipe",
-    });
-    embeddingProcess = spawned;
-    embeddingModelId = EMBEDDING_MODEL_ID;
-    spawned.on("exit", () => {
-      if (embeddingProcess === spawned) {
-        embeddingProcess = null;
-        embeddingModelId = null;
-      }
-    });
-    spawned.on("error", (err) => {
-      console.error(`[localengine] 임베딩 서버 기동 실패 (model=${EMBEDDING_MODEL_ID}):`, err);
-      if (embeddingProcess === spawned) {
-        embeddingProcess = null;
-        embeddingModelId = null;
-      }
-    });
+    spawnEmbeddingServer(embPath);
   } else {
     console.log(
       `[localengine] 임베딩 서버 자동 시작 건너뜀 — ${embPath} 없음. RAG를 쓰려면 임베딩 모델을 배치하거나 GIJO_EMBEDDING_MODEL_ID를 설정하세요.`
     );
+  }
+}
+
+// 임베딩 llama-server를 스폰한다(재기동에서도 재사용). -ngl -1: bge-m3를 GPU에 상주시켜 배치
+// 임베딩이 CPU로 느려지지 않게 한다(채팅 모델과 동일 설계).
+function spawnEmbeddingServer(embPath: string): void {
+  console.log(`[localengine] 임베딩 서버 시작: ${EMBEDDING_MODEL_ID} (port ${EMBEDDING_PORT}, GPU 상주)`);
+  const spawned = spawn(LLAMA_SERVER_PATH, ["-m", embPath, "--embedding", "-ngl", "-1", "--port", String(EMBEDDING_PORT)], { stdio: "pipe" });
+  embeddingProcess = spawned;
+  embeddingModelId = EMBEDDING_MODEL_ID;
+  spawned.on("exit", () => {
+    if (embeddingProcess === spawned) {
+      embeddingProcess = null;
+      embeddingModelId = null;
+    }
+  });
+  spawned.on("error", (err) => {
+    console.error(`[localengine] 임베딩 서버 기동 실패 (model=${EMBEDDING_MODEL_ID}):`, err);
+    if (embeddingProcess === spawned) {
+      embeddingProcess = null;
+      embeddingModelId = null;
+    }
+  });
+}
+
+// 지정 포트를 잡고 있는 프로세스를 강제 종료한다 — 재기동 시 고아 프로세스가 포트를 잡고 있어
+// 새 스폰이 충돌로 죽는 걸 막는다(실측 2026-07-17의 중복 스폰 문제와 같은 뿌리). Windows는 netstat+
+// taskkill, unix는 lsof+kill. 실패해도 비치명적(재기동이 어차피 재시도).
+function killProcessOnPort(port: number): Promise<void> {
+  return new Promise((resolve) => {
+    if (process.platform === "win32") {
+      execFile("cmd", ["/c", `for /f "tokens=5" %a in ('netstat -ano ^| findstr :${port} ^| findstr LISTENING') do taskkill /F /PID %a`], () => resolve());
+    } else {
+      execFile("sh", ["-c", `lsof -ti tcp:${port} | xargs -r kill -9`], () => resolve());
+    }
+  });
+}
+
+// 실제 임베딩 요청으로 서버가 살아있는지 확인한다. /v1/models(또는 프로세스 존재)만으론 "반쯤 죽은"
+// (프로세스는 살아있고 실제 임베딩은 hang) 상태를 못 잡는다(실측 2026-07-19: GPU 경합으로 임베딩이
+// 무응답이 되어 문서 인입이 통째로 실패). 짧은 타임아웃으로 실제 임베딩을 한 번 돌려본다.
+async function probeEmbeddingAlive(timeoutMs = 6000): Promise<boolean> {
+  return fetch(`http://localhost:${EMBEDDING_PORT}/v1/embeddings`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ model: "local", input: "healthcheck" }),
+    signal: AbortSignal.timeout(timeoutMs),
+  })
+    .then(async (r) => r.ok && Array.isArray((await r.json())?.data))
+    .catch(() => false);
+}
+
+// ── 임베딩 서버 hang 감시·자동 재기동 ────────────────────────────────────────
+// 주기적으로 실제 임베딩을 찔러보고, 연속 실패하면(일시적 부하와 진짜 hang을 구분하려 2회) 서버를
+// 죽이고 새로 띄운다. 부팅 시 1회 시작하며(index.ts), 이후 자가 치유한다.
+let embeddingMonitorTimer: NodeJS.Timeout | null = null;
+let embeddingProbeFailures = 0;
+let embeddingRestarting = false;
+const EMBED_MONITOR_INTERVAL_MS = Number(process.env.GIJO_EMBED_MONITOR_INTERVAL_MS ?? 30000);
+const EMBED_FAIL_THRESHOLD = Number(process.env.GIJO_EMBED_FAIL_THRESHOLD ?? 2);
+
+async function checkAndHealEmbedding(): Promise<void> {
+  if (embeddingRestarting) return; // 재기동 중이면 건너뜀(중복 방지)
+  const embPath = modelFilePath(EMBEDDING_MODEL_ID);
+  if (!fs.existsSync(embPath)) return; // 임베딩 모델 미배치 — 감시 대상 아님
+  const alive = await probeEmbeddingAlive();
+  if (alive) {
+    embeddingProbeFailures = 0;
+    return;
+  }
+  embeddingProbeFailures += 1;
+  console.warn(`[localengine] 임베딩 서버 무응답 감지 (${embeddingProbeFailures}/${EMBED_FAIL_THRESHOLD})`);
+  if (embeddingProbeFailures < EMBED_FAIL_THRESHOLD) return;
+
+  // 임계 도달 — 죽이고 새로 띄운다.
+  embeddingRestarting = true;
+  try {
+    console.warn(`[localengine] 임베딩 서버 hang — 자동 재기동`);
+    await stopEmbeddingEngine().catch(() => {});
+    await killProcessOnPort(EMBEDDING_PORT).catch(() => {}); // 고아 프로세스가 포트를 잡고 있을 수 있음
+    spawnEmbeddingServer(embPath);
+    // 새 서버가 실제 임베딩에 응답할 때까지 대기(최대 ~40s).
+    for (let i = 0; i < 20; i++) {
+      await new Promise((r) => setTimeout(r, 2000));
+      if (await probeEmbeddingAlive()) {
+        console.log(`[localengine] 임베딩 서버 재기동 완료 — 정상 응답 확인`);
+        embeddingProbeFailures = 0;
+        break;
+      }
+    }
+  } finally {
+    embeddingRestarting = false;
+  }
+}
+
+export function startEmbeddingMonitor(): void {
+  if (embeddingMonitorTimer) return;
+  embeddingMonitorTimer = setInterval(() => {
+    void checkAndHealEmbedding();
+  }, EMBED_MONITOR_INTERVAL_MS);
+  console.log(`[localengine] 임베딩 서버 감시 시작 (${EMBED_MONITOR_INTERVAL_MS / 1000}s 간격, 연속 ${EMBED_FAIL_THRESHOLD}회 실패 시 자동 재기동)`);
+}
+
+export function stopEmbeddingMonitor(): void {
+  if (embeddingMonitorTimer) {
+    clearInterval(embeddingMonitorTimer);
+    embeddingMonitorTimer = null;
   }
 }
 

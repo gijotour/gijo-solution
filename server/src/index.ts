@@ -16,8 +16,9 @@ import { attachLogsSocket, installConsoleCapture } from "./engine/logs";
 import { attachLlmActivitySocket } from "./engine/llmactivity";
 import { attachHfModelsSocket } from "./engine/hfmodels";
 import { attachLearnloopSocket } from "./engine/learnloop";
-import { stopLocalEngine, stopEmbeddingEngine, autoStartLocalEngines } from "./engine/localengine";
+import { stopLocalEngine, stopEmbeddingEngine, autoStartLocalEngines, startEmbeddingMonitor, stopEmbeddingMonitor } from "./engine/localengine";
 import { refreshKev } from "./engine/kev";
+import { bootstrapDocsBundleWithRetry } from "./engine/docsbundle";
 
 // 가능한 한 이른 시점에 설치해야 이후의 console.log/warn/error가 전부 캡처된다.
 installConsoleCapture();
@@ -50,16 +51,24 @@ httpServer.listen(PORT, () => {
   console.log(`GIJO AS 서버 기동 — ${scheme}://localhost:${PORT} (WebSocket: /ws)${tlsEnabled ? " [TLS 활성]" : ""}`);
   console.log(`standalone 모드: 클라이언트 GIJO_SERVER_URL을 ${scheme}://localhost:${PORT} 로 설정하면 같은 머신에서 붙습니다.`);
   // 모델 파일이 있으면 채팅 LLM + 임베딩 서버를 자동 기동 — 실패해도 서버 자체는 계속 뜬다.
-  void autoStartLocalEngines().catch((err) => console.error("[index] 로컬 LLM 자동 시작 실패:", err));
+  // 이어서 임베딩 서버 hang 감시를 켠다 — 프로세스는 살아있어도 임베딩이 무응답이 되는 상태를
+  // 실제 임베딩 요청으로 감지해 자동 재기동한다(실측 2026-07-19: GPU 경합으로 임베딩 hang).
+  void autoStartLocalEngines()
+    .catch((err) => console.error("[index] 로컬 LLM 자동 시작 실패:", err))
+    .finally(() => startEmbeddingMonitor());
   // CISA KEV 목록을 백그라운드로 최신화(공개 피드 다운로드 — 실패해도 캐시로 동작).
   void refreshKev()
     .then((s) => console.log(`[kev] KEV 목록 ${s.count}건 (${s.source})`))
     .catch((err) => console.error("[kev] KEV 갱신 실패(캐시 유지):", err));
+  // 제품 문서 기본 코퍼스를 지식베이스에 인입 — 이게 있어야 "이 화면 뭐예요"에 근거를 갖고
+  // 답한다(비어 있으면 지어내거나 '자료 없음'만 답한다). 임베딩 서버 기동을 기다려 재시도한다.
+  void bootstrapDocsBundleWithRetry();
 });
 
 // 서버 프로세스 종료 시 자식으로 띄운 llama-server가 고아 프로세스로 남지 않도록 함께 정리한다.
 async function shutdown(signal: string): Promise<void> {
   console.log(`[index] ${signal} 수신 — 로컬 LLM 엔진 정리 후 종료`);
+  stopEmbeddingMonitor();
   await Promise.all([stopLocalEngine(), stopEmbeddingEngine()]);
   httpServer.close(() => process.exit(0));
 }
