@@ -28,8 +28,10 @@ const PROVIDER_LABEL: Record<CloudProvider, string> = {
 };
 
 // 기본 모델(사용자가 설정에서 바꿀 수 있음). 비용·품질 균형점을 초깃값으로.
+// gemini는 버전 별칭(2.0/2.5-flash)이 "신규 사용자 불가"로 자주 막혀(실측 2026-07-19), 항상 최신
+// flash를 가리키는 무버전 별칭 gemini-flash-latest를 기본으로 둔다(설정의 "사용 가능 모델"로 교체 가능).
 const DEFAULT_MODEL: Record<CloudProvider, string> = {
-  gemini: "gemini-2.0-flash",
+  gemini: "gemini-flash-latest",
   claude: "claude-sonnet-5",
   openai: "gpt-4o-mini",
 };
@@ -169,6 +171,30 @@ async function callProvider(p: CloudProvider, apiKey: string, model: string, que
   return callClaude(apiKey, model, question);
 }
 
+// 제공자가 지금 이 키로 실제 쓸 수 있는 모델 목록을 조회한다 — 모델 별칭이 수시로 바뀌므로
+// (실측 2026-07-19: gemini-2.0-flash·2.5-flash가 "신규 사용자 불가"로 404) admin이 유효한 모델을
+// 고를 수 있게 한다. 실패는 빈 목록으로(진단용이라 치명적이지 않음).
+async function listModelsFor(p: CloudProvider, apiKey: string): Promise<string[]> {
+  try {
+    if (p === "claude") {
+      const res = await fetch("https://api.anthropic.com/v1/models?limit=100", {
+        headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!res.ok) return [];
+      const j = (await res.json()) as { data?: { id: string }[] };
+      return (j.data ?? []).map((m) => m.id);
+    }
+    const base = p === "openai" ? "https://api.openai.com/v1" : "https://generativelanguage.googleapis.com/v1beta/openai";
+    const res = await fetch(`${base}/models`, { headers: { Authorization: `Bearer ${apiKey}` }, signal: AbortSignal.timeout(15_000) });
+    if (!res.ok) return [];
+    const j = (await res.json()) as { data?: { id: string }[] };
+    return (j.data ?? []).map((m) => m.id.replace(/^models\//, ""));
+  } catch {
+    return [];
+  }
+}
+
 // ── 게이트를 통과한 클라우드 질의 (이 함수만이 외부로 나가는 유일한 경로) ────────────────
 export interface CloudAskResult {
   routedToCloud: boolean; // true면 answer가 클라우드 응답
@@ -260,6 +286,21 @@ export function registerCloudLlmRoutes(app: Express): void {
     const p = activeProvider();
     res.json({ enabled: isEnabled() && hasKey(p), activeProvider: p, providerLabel: PROVIDER_LABEL[p] });
   });
+
+  // 이 키로 지금 쓸 수 있는 모델 목록 — 관리자 전용(모델 별칭이 자주 바뀌어 유효한 걸 고르게).
+  app.get(
+    "/api/cloud/models",
+    authMiddleware,
+    adminMiddleware,
+    asyncRoute(async (req, res) => {
+      const p = String(req.query.provider || activeProvider()) as CloudProvider;
+      if (!PROVIDERS.includes(p)) return res.status(400).json({ error: "알 수 없는 제공자" });
+      const key = providerKey(p);
+      if (!key) return res.status(400).json({ error: "이 제공자의 API 키가 없습니다." });
+      const models = await listModelsFor(p, key);
+      res.json({ provider: p, models });
+    })
+  );
 
   // 유출 방지 게이트 미리보기 — 실제 호출 없이 "이 질문이 클라우드로 나갈 수 있는지"만 판정(투명성).
   app.post("/api/cloud/screen", authMiddleware, (req, res) => {
