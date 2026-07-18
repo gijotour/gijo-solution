@@ -50,6 +50,7 @@
       ]},
       { ic: "🧠", label: "AI 지식·모델", tabs: [
         { page: "memory.html", label: "기억·학습" },
+        { page: "docenrich.html", label: "문서 보강" },
         { page: "ontology.html", label: "온톨로지" },
         { page: "learnloop.html", label: "학습 루프" },
       ]},

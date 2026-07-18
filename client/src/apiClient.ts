@@ -471,6 +471,27 @@ export interface CloudUsageSummary {
   estimatedCost: number;
 }
 
+// ── 문서 보강 인입 (영문 매뉴얼·장애노트 → 한글 RAG + 온톨로지) ──────────────
+export interface EnrichIngestArgs {
+  productName: string;
+  section: string;
+  sourceDoc?: string;
+  mode?: "auto" | "cloud" | "local" | "manual";
+  text?: string; // AI 모드: 원본(영문/원문)
+  korean?: string; // manual 모드: 사람이 작성한 한글 본문
+  triples?: { subject: string; predicate: string; object: string }[];
+}
+export interface EnrichIngestResult {
+  documentId: string;
+  chunks: number;
+  triples: number;
+  translated: boolean;
+  via: "cloud" | "local" | "manual" | "none";
+}
+export const docsApi = {
+  enrichIngest: (a: EnrichIngestArgs) => request<EnrichIngestResult>("/api/docs/enrich-ingest", { method: "POST", body: a }),
+};
+
 // ── 장기 기억(RAG) ────────────────────────────────────────────────────
 export const memoryApi = {
   ingest: (path: string, scope?: string) =>

@@ -155,6 +155,7 @@ const gijoApi = {
   saveCloudAnswerToKb: (question: string, answer: string, providerLabel: string, model: string) =>
     api.cloudApi.saveToKb(question, answer, providerLabel, model),
   cloudUsage: () => api.cloudApi.usage(),
+  enrichIngest: (a: import("./apiClient").EnrichIngestArgs) => api.docsApi.enrichIngest(a),
 
   // 온톨로지(지식 그래프)
   listOntology: (filter?: { scope?: string; subject?: string }) => api.ontologyApi.list(filter),
