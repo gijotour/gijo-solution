@@ -54,7 +54,25 @@ function parseDecision(raw: string): Decision | null {
     if (p.action !== "tool" && p.action !== "final") return null;
     return p;
   } catch {
-    return null; // LLM 연결 실패 안내문(⚠…) 등 JSON이 아니면 폴백
+    // 잘린 JSON 회수(실측 2026-07-18): action=final일 때 모델이 도구 결과(자산 목록 등)를 answer에
+    // 통째로 뱉으면 maxTokens에서 잘려 JSON이 깨진다. 그 answer는 어차피 composeFinalAnswer가
+    // 재작성하므로 버려도 되고, tool 결정의 tool/args는 잘림 앞부분에 온다 → action만 회수하면 된다.
+    // (LLM 연결 실패 안내문 "⚠…" 등 action이 없는 진짜 비JSON은 아래에서 null로 폴백된다.)
+    const actionM = raw.match(/"action"\s*:\s*"(tool|final)"/);
+    if (!actionM) return null;
+    if (actionM[1] === "final") return { action: "final" };
+    const toolM = raw.match(/"tool"\s*:\s*"([a-zA-Z_]+)"/);
+    if (!toolM) return null;
+    const argsM = raw.match(/"args"\s*:\s*(\{[^}]*\})/);
+    let args: Record<string, string> = {};
+    if (argsM) {
+      try {
+        args = JSON.parse(argsM[1]) as Record<string, string>;
+      } catch {
+        /* args가 잘렸으면 빈 인자로 — 규칙 검증(validateToolArgs)이 뒤에서 잡는다 */
+      }
+    }
+    return { action: "tool", tool: toolM[1], args };
   }
 }
 

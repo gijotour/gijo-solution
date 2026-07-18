@@ -108,6 +108,31 @@ describe("runAgentLoop — 결정→실행→최종답변", () => {
     expect(mockChat).toHaveBeenCalledTimes(3);
   });
 
+  // 실측 버그(2026-07-18): action=final일 때 모델이 도구 결과(자산 목록 등)를 answer에 통째로
+  // 뱉으면 maxTokens에서 잘려 JSON이 깨지고, parseDecision이 null을 줘 루프 전체가 폐기→환각 폴백됐다.
+  it("최종 답이 잘려 JSON이 깨져도 도구 결과를 살린다(루프 폐기 안 함)", async () => {
+    seedAsset();
+    mockChat
+      .mockResolvedValueOnce('{"action":"tool","tool":"list_assets","args":{}}') // step0: 도구 선택
+      .mockResolvedValueOnce('{"action":"final","answer":"등록된 AI 자산 6개:\\n- fraud-detect-llm | 사내 | 유형=LLM | 담당=보안팀 | fin') // step1: 잘린 JSON
+      .mockResolvedValueOnce("최종 답(재작성)"); // composeFinalAnswer
+    const r = await runAgentLoop("자산 다 보여줘");
+    expect(r).not.toBeNull(); // 폴백하지 않는다
+    expect(r!.toolCalls.map((c) => c.tool)).toContain("list_assets");
+    expect(r!.output).toBe("최종 답(재작성)");
+  });
+
+  it("도구 결정 JSON이 뒤에서 잘려도 tool·args를 회수한다", async () => {
+    seedAsset();
+    mockChat
+      .mockResolvedValueOnce('{"action":"tool","tool":"get_asset","args":{"assetId":"fraud-detect-llm"}, "answer":"이 자산 상세를 보면 aaaaaaaa') // 잘림
+      .mockResolvedValueOnce('{"action":"final"}')
+      .mockResolvedValueOnce("상세 답");
+    const r = await runAgentLoop("fraud 상세");
+    expect(r!.toolCalls[0].tool).toBe("get_asset");
+    expect(r!.toolCalls[0].args.assetId).toBe("fraud-detect-llm");
+  });
+
   it("도구 없이 final이면 null — 기존 채팅 폴백(회귀 없음)", async () => {
     mockChat.mockResolvedValueOnce('{"action":"final","answer":"안녕하세요"}');
     expect(await runAgentLoop("고마워")).toBeNull();
