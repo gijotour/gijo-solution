@@ -3,6 +3,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import { db } from "../src/db";
 import { addTriples, expandOntology } from "../src/engine/ontology";
 import { atlasTriples, ATLAS_SOURCE } from "../src/engine/atlas-seed";
+import { owaspLlmTriples, OWASP_SOURCE } from "../src/engine/owasp-llm-seed";
 import { threatCatalogTriples } from "../src/engine/ontology-seed";
 
 beforeEach(() => {
@@ -36,5 +37,24 @@ describe("MITRE ATLAS 온톨로지 시드", () => {
     const exp = expandOntology("AML.T0020 Poison Training Data", undefined, { hops: 2, limit: 40 });
     expect(exp.some((t) => t.predicate === "전술")).toBe(true);
     expect(exp.some((t) => t.predicate === "완화통제")).toBe(true);
+  });
+});
+
+describe("OWASP LLM Top 10 (2025) 온톨로지 시드", () => {
+  it("LLM01~LLM10 위험을 유형·설명·완화통제·영향영역으로 담는다", () => {
+    const t = owaspLlmTriples();
+    expect(t.every((x) => x.source === OWASP_SOURCE)).toBe(true);
+    const subjects = new Set(t.map((x) => x.subject));
+    for (const s of ["LLM01:2025 Prompt Injection", "LLM04:2025 Data and Model Poisoning", "LLM10:2025 Unbounded Consumption"]) expect(subjects.has(s)).toBe(true);
+    expect(t.some((x) => x.predicate === "완화통제")).toBe(true);
+  });
+
+  it("KISA 위협이 OWASP 코드로 그래프에 연결된다 (D01 → LLM04)", () => {
+    addTriples([...threatCatalogTriples(), ...owaspLlmTriples()]);
+    const exp = expandOntology("불균형 데이터", undefined, { hops: 2, limit: 60 });
+    const flat = exp.map((t) => `${t.subject}|${t.predicate}|${t.object}`).join("\n");
+    expect(flat).toContain("LLM04:2025 Data and Model Poisoning");
+    // OWASP 노드의 완화통제까지 닿는다
+    expect(exp.some((t) => t.subject.startsWith("LLM04") && t.predicate === "완화통제")).toBe(true);
   });
 });
