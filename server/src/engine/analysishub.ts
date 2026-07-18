@@ -18,6 +18,7 @@ import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { listAssets } from "./assets";
 import { chat } from "./llm";
+import { PLAIN_LANGUAGE_RULE } from "./promptstyle";
 
 export type AnalysisSource = "vuln" | "log" | "product";
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
@@ -427,6 +428,7 @@ export function buildAnalysisPrompt(e: AnalysisEvent, correlation?: Correlation)
   const srcKo = e.source === "vuln" ? "취약점 스캐너" : e.source === "log" ? "보안 로그" : "보안제품 운영 리포트";
   return [
     "당신은 1인 보안담당자를 돕는 보안 분석가입니다. 아래 보안 이벤트를 한국어로 간결히 분석하세요.",
+    PLAIN_LANGUAGE_RULE,
     "형식: ① 무슨 일인지(1문장) ② 왜 위험한지(1문장) ③ 지금 할 조치(1~2가지, 구체적으로).",
     "제공된 근거만 사용하고, 추측을 사실처럼 쓰지 마세요. 근거가 부족하면 '확인 필요'로 표시하세요.",
     "",

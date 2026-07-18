@@ -9,6 +9,7 @@ import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, Ta
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { chat } from "./llm";
+import { PLAIN_LANGUAGE_RULE } from "./promptstyle";
 import { listAssets, getAsset, Asset } from "./assets";
 import { listMaintenanceItems, MaintenanceItem } from "./maintenance";
 import { listTasks, TaskItem } from "./tasks";
@@ -452,14 +453,14 @@ export async function generateReport(req: ReportRequest): Promise<ReportResult> 
   const audienceGuide =
     audience === "internal"
       ? "이 요약은 보안담당자 본인 검토용입니다. 격식·미사여구 없이, 지금 급한 것과 바로 할 일(다음 액션) 중심으로 간결하게 쓰세요."
-      : "이 요약은 경영진·감사 보고용입니다. 정중한 문어체로, 거버넌스·컴플라이언스 관점과 의사결정 포인트를 강조하세요.";
+      : "이 요약은 경영진·감사 보고용입니다. 정중하되 쉬운 말로 쓰고(전문용어는 괄호로 풀어서), 지금 무엇이 위험하고 무엇을 결정·조치해야 하는지를 분명히 강조하세요.";
   const caseHint = cases.length
     ? ` 취약점 사례(우선순위): ${cases.slice(0, 3).map((c) => `[${c.priority.code}] ${c.finding.finding_type}`).join(", ")}. 각 사례는 ISMS-P·ISO27001 등 거버넌스 통제에 매핑됨.`
     : "";
   const executiveSummary = stripDialogueArtifacts(await chat({
     agentId: "report",
     message:
-      `다음 보안 현황 데이터를 바탕으로 1페이지 요약을 작성해줘. 출력은 보고서 본문 문단만 — 대화록·화자 표시([나]·[주인이] 등)·질문/답변 형식·영어 문장을 절대 쓰지 마세요. ${audienceGuide} 자산 ${assets.length}건, ` +
+      `다음 보안 현황 데이터를 바탕으로 1페이지 요약을 작성해줘. 출력은 보고서 본문 문단만 — 대화록·화자 표시([나]·[주인이] 등)·질문/답변 형식·영어 문장을 절대 쓰지 마세요. ${PLAIN_LANGUAGE_RULE} ${audienceGuide} 자산 ${assets.length}건, ` +
       `심각도별 발견 건수: ${JSON.stringify(counts)}. ` +
       `취약점 조치: 스캔 호스트 ${vuln.hosts}대, 열린 취약점 ${vuln.active}건(Critical ${vuln.critical}·High ${vuln.high}), ` +
       `실제 악용 확인(KEV) ${vuln.kev}건은 최우선 조치 대상. 조치 SLA 준수율 ${vuln.remediation.slaCompliance}%, 기한 초과 ${vuln.remediation.overdue}건. ` +
