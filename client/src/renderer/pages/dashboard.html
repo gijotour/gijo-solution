@@ -457,6 +457,8 @@
   const agentLabel = (id) => (agentsById[id] && agentsById[id].name) || id;
   const orchLabel = () => (agentsById.orchestrator && agentsById.orchestrator.name) || "Security Orchestrator";
   let currentTarget = "orchestrator";
+  // 탐색기에서 연 작업 세션 — 실시간 활동에서 이어서 지시하면 이 세션에 기록·태깅된다(별도 화면 이동 없음).
+  let dashCurrentSession = null;
   const todoInput = document.getElementById("todoInput");
 
   let displayName = "";
@@ -963,7 +965,7 @@
   const clRows = document.getElementById("clRows");
   const clStatus = document.getElementById("clStatus");
   const escB = (s) => String(s == null ? "" : s).replace(/</g, "&lt;");
-  const CL_MAX = 4; // 피드에 최대 4행만 유지 — 오래된 행 제거(전체 이력은 AI 어시스턴트 화면). 60이던 것을 화면 고정 요구로 축소.
+  const CL_MAX = 10; // 실시간 활동이 세션 작업 공간이 되어 상태 카드+추천+대화가 흐르므로 여유를 둔다(스크롤). 오래된 행은 제거.
   let clStatusTimer = null;
 
   function clBusy(label) {
@@ -1164,7 +1166,8 @@
     clAppend("instr", { icon: "정", name: `나 · 팀장 → ${orchLabel()}`, message: text });
     const typing = clAppend("typing", { icon: "🧭", name: orchLabel() });
     try {
-      const result = await window.gijo.sendInstruction(text);
+      // 탐색기에서 연 세션이 있으면 그 세션에 이어서(기록·맥락·태깅). 없으면 일반 지시.
+      const result = await window.gijo.sendInstruction(text, dashCurrentSession ? dashCurrentSession.id : undefined);
       const who = result.route && result.route.agentId && result.route.agentId !== "orchestrator"
         ? `${orchLabel()} → ${agentLabel(result.route.agentId)}` : orchLabel();
       clReplaceTyping(typing, "reply", { icon: "🧭", name: who, message: result.output });
@@ -1296,6 +1299,8 @@
   function appendCollabRow(evt) {
     const from = String(evt.from || "");
     const to = String(evt.to || "");
+    // 세션 태그 이벤트(from/to="세션")는 대시보드에서 상태 카드·대화 독으로 이미 직접 표시하므로 중복 방지.
+    if (from === "세션" || to === "세션") return;
     clAppend("event", {
       icon: AGENT_ICON[from] || "◆",
       name: `${agentLabel(from)} → ${agentLabel(to)}`,
@@ -1382,14 +1387,39 @@
       box.innerHTML = '<div style="padding:8px;color:var(--muted-2);font-size:11px">탐색기를 불러오지 못했습니다</div>';
     }
   }
-  // 대상 클릭 → 상태 세션 생성 후 전용 "작업 세션" 화면에서 그 대화를 연다(딥링크).
+  // 대상 클릭 → 별도 화면으로 넘기지 않고 "실시간 활동"에 상태 카드+추천을 바로 표시한다.
+  // 이어서 대화 독에 지시하면 이 세션에 기록되고, 응답도 실시간 활동에 흐른다(대시보드에서 모두 처리).
   async function onDashEntitySelect(type, id) {
     const ctx = window.gijoSessionExplorer.buildContext(type, id);
+    clAppend("reply", { icon: "📋", name: ctx.title, message: ctx.statusText });
+    appendSuggestions(ctx.suggestions);
     try {
       const s = await window.gijo.createWorkSession(ctx.title, type + ":" + id);
       await window.gijo.addWorkSessionTurn(s.id, "assistant", ctx.statusText, "상태");
-      openSessionPage(s.id);
-    } catch (e) { alert("세션 생성 실패: " + (e && e.message || e)); }
+      dashCurrentSession = { id: s.id, title: s.title || ctx.title };
+      chatInput.placeholder = `“${ctx.title}”에 이어서 지시… (또는 위 추천 클릭)`;
+      chatInput.focus();
+      loadDashSessions();
+    } catch (e) { /* 세션 저장에 실패해도 상태 카드는 이미 실시간 활동에 표시됨 */ }
+  }
+  // 추천 다음 단계를 실시간 활동에 클릭 가능한 버튼으로 붙인다(누르면 그 지시를 대화 독으로 전송).
+  function appendSuggestions(suggestions) {
+    if (!suggestions || !suggestions.length) return;
+    const el = clAppend("offer", { icon: "💡", name: "이런 작업을 할 수 있어요 — 눌러서 지시", message: "" });
+    const cb = el.querySelector(".cb");
+    if (!cb) return;
+    const wrap = document.createElement("div");
+    wrap.style.cssText = "display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;";
+    suggestions.forEach((sg) => {
+      const b = document.createElement("button");
+      b.className = "cl-offer-btn";
+      b.style.cssText = "background:var(--panel);border:1px solid var(--border-strong);color:var(--blue-light);";
+      b.textContent = sg.label;
+      b.title = sg.instruction;
+      b.addEventListener("click", () => { chatInput.value = sg.instruction; dockSubmit(); });
+      wrap.appendChild(b);
+    });
+    cb.appendChild(wrap);
   }
 
   async function init() {
@@ -1418,7 +1448,10 @@
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); dockSubmit(); }
     });
     document.getElementById("dockSend").addEventListener("click", dockSubmit);
-    document.getElementById("dockAll").addEventListener("click", () => { selectAgent("orchestrator"); dockSubmit(); });
+    document.getElementById("dockAll").addEventListener("click", () => {
+      dashCurrentSession = null; chatInput.placeholder = "지시를 입력하세요…"; // 세션 해제 — 일반 지시
+      selectAgent("orchestrator"); dockSubmit();
+    });
 
     const todayCtaBtn = document.getElementById("todayCtaBtn");
     if (todayCtaBtn) todayCtaBtn.addEventListener("click", () => {

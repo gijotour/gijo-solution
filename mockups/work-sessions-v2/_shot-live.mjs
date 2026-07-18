@@ -39,7 +39,7 @@ const stub = { ASSETS, PRI, PRODUCTS, TASKS, SESSIONS, TURNS_S1 };
 
 const b = await chromium.launch({ channel: "msedge", headless: true }).catch(() => chromium.launch({ headless: true }));
 
-async function cap(file, out, w, h) {
+async function cap(file, out, w, h, clickSel) {
   const p = await b.newPage({ viewport: { width: w, height: h }, deviceScaleFactor: 2 });
   const errs = [];
   p.on("pageerror", (e) => errs.push(String(e)));
@@ -85,11 +85,12 @@ async function cap(file, out, w, h) {
   }, stub);
   await p.goto(pathToFileURL(path.join(pagesDir, file)).href, { waitUntil: "load" });
   await p.waitForTimeout(800);
+  if (clickSel) { await p.click(clickSel).catch(() => {}); await p.waitForTimeout(500); }
   await p.screenshot({ path: path.join(outDir, out), fullPage: false });
   console.log(`캡처: ${out}${errs.length ? "  ⚠ pageerror: " + errs.join(" | ") : "  (JS 오류 없음)"}`);
   await p.close();
 }
 
 await cap("sessions.html", "live-sessions-v2.png", 1320, 840);
-await cap("dashboard.html", "live-dashboard-2col.png", 1320, 840);
+await cap("dashboard.html", "live-dashboard-2col.png", 1320, 840, '.se-leaf[data-type="asset"]');
 await b.close();
