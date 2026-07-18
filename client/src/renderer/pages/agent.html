@@ -330,7 +330,7 @@ tr:last-child td{border-bottom:none;}
     const currentLabel = current
       ? `<b>${esc(current)}</b>${a.assignedModelId ? "" : ' <span class="rec-gb">전역 공유</span>'}`
       : '<span class="rec-gb">전역 모델 미로드</span>';
-    return `<div class="agent-rec"><div class="rec-head">🧠 현재 모델: ${currentLabel}</div></div>`;
+    return `<div class="agent-rec"><div class="rec-head">🧠 현재 추천 모델: ${currentLabel}</div></div>`;
   }
 
   function modelSelectHtml(a) {
