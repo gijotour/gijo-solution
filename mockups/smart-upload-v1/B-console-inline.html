@@ -1,0 +1,55 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>스마트 업로드 시안 B — 콘솔 인라인</title>
+<style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.16);--blue:#3b82f6;--blue-light:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--teal:#1eb980;--amber:#f0a020;--red:#e2483d;--purple:#8b7cf0;}
+*{box-sizing:border-box;margin:0;padding:0;}body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);padding:26px 30px;}
+.title{font-size:15px;font-weight:800;color:#fff;margin-bottom:4px;}.sub{font-size:12px;color:var(--muted);margin-bottom:16px;}
+.console{background:var(--panel);border:1px solid var(--border);border-radius:13px;overflow:hidden;max-width:940px;}
+.cl-head{display:flex;justify-content:space-between;align-items:center;padding:11px 15px;background:var(--panel-2);border-bottom:1px solid var(--border);}
+.cl-title{font-size:12.5px;font-weight:800;color:#fff;}
+.cl-body{padding:16px;min-height:300px;font-size:12.5px;color:var(--muted);line-height:1.7;}
+.cl-you{color:var(--blue-light);font-weight:700;}
+.evt{display:flex;gap:9px;align-items:flex-start;margin:10px 0;}
+.evt .ic{font-size:15px;flex:none;}
+/* 인라인 결정 카드 */
+.dcard{background:rgba(240,160,32,.06);border:1px solid rgba(240,160,32,.3);border-radius:11px;padding:13px 15px;margin:10px 0;}
+.dcard .h{font-size:12.5px;font-weight:800;color:#fff;margin-bottom:3px;}
+.dcard .f{font-size:11.5px;color:var(--amber);margin-bottom:8px;}
+.dcard .ai{font-size:11.5px;color:var(--muted);line-height:1.6;margin-bottom:10px;}
+.dcard .ai b{color:var(--text);}
+.dbtns{display:flex;gap:7px;flex-wrap:wrap;}
+.db{font-size:11.5px;font-weight:700;border-radius:8px;padding:7px 12px;cursor:pointer;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--text);}
+.db.reco{background:rgba(59,130,246,.14);border-color:var(--blue);color:var(--blue-light);}
+.db:hover{border-color:var(--blue);}
+.dock{display:flex;gap:8px;align-items:center;padding:12px 15px;border-top:1px solid var(--border);}
+.plus{width:40px;height:40px;flex:none;border-radius:10px;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);color:var(--blue-light);font-size:20px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.dock input{flex:1;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:10px;padding:12px 15px;color:var(--text);font-size:13px;}
+.send{background:var(--blue);color:#fff;border:0;border-radius:10px;padding:0 22px;font-weight:800;font-size:13px;}
+.note{max-width:940px;margin-top:14px;font-size:11px;color:var(--amber);background:rgba(240,160,32,.08);border:1px solid rgba(240,160,32,.2);border-radius:8px;padding:9px 12px;}
+</style></head><body>
+<div class="title">💬 지휘 콘솔 — 스마트 업로드 시안 B (콘솔 인라인 결정)</div>
+<div class="sub">[＋]로 올린 파일의 처리 과정·결정이 실시간 활동(협업 독) 흐름 안에 카드로 나타남. 모달 없이 대화처럼.</div>
+<div class="console">
+  <div class="cl-head"><span class="cl-title">🧭 지휘 콘솔 · 실시간 활동</span><span style="font-size:11px;color:var(--muted-2)">● 처리 중</span></div>
+  <div class="cl-body">
+    <div class="evt"><span class="ic">📥</span><div><b style="color:#fff">스마트 업로드</b> — Tenable_Web_App_Scanning-User_Guide.pdf · 유형 판별 중…</div></div>
+    <div class="dcard">
+      <div class="h">🤔 이 파일, 어떻게 처리할까요?</div>
+      <div class="f">📄 Tenable_Web_App_Scanning-User_Guide.pdf</div>
+      <div class="ai">파일명만으론 <b>종류를 확신하기 어렵습니다.</b> 내용상 <b>웹앱 취약점 스캐너 매뉴얼</b>로 보여요. 유형을 골라주시면 그대로 등록·수집합니다.</div>
+      <div class="dbtns">
+        <span class="db reco">🛡 보안제품 자산 (추천)</span>
+        <span class="db">📊 로그 매뉴얼</span>
+        <span class="db">📄 일반 문서</span>
+        <span class="db">📘 가이드라인</span>
+      </div>
+    </div>
+    <div class="evt" style="opacity:.5"><span class="ic">🧭</span><div>선택하면 → 보안제품 등록/문서 수집을 진행하고 결과를 여기 이어서 보여드립니다.</div></div>
+  </div>
+  <div class="dock">
+    <div class="plus" title="파일 올리기 — 자동 분류">＋</div>
+    <input placeholder="오케스트레이터에게 지시…">
+    <button class="send">전송</button>
+  </div>
+</div>
+<div class="note">시안 B — 결정을 <b>실시간 활동 흐름 안 카드</b>로. 오케스트레이터 대화·처리 로그와 한 줄기라 맥락이 자연스럽고, 여러 파일도 순서대로 흐름에 쌓임. (에이전트 결재판과 동일 패턴)</div>
+</body></html>

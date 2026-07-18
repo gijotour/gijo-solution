@@ -1,0 +1,64 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>스마트 업로드 시안 A — 중앙 결정 모달</title>
+<style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.16);--blue:#3b82f6;--blue-light:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--teal:#1eb980;--amber:#f0a020;--red:#e2483d;--purple:#8b7cf0;}
+*{box-sizing:border-box;margin:0;padding:0;}body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);padding:26px 30px;}
+.title{font-size:15px;font-weight:800;color:#fff;margin-bottom:4px;}.sub{font-size:12px;color:var(--muted);margin-bottom:16px;}
+.console{background:var(--panel);border:1px solid var(--border);border-radius:13px;overflow:hidden;max-width:940px;}
+.cl-head{display:flex;justify-content:space-between;align-items:center;padding:11px 15px;background:var(--panel-2);border-bottom:1px solid var(--border);}
+.cl-title{font-size:12.5px;font-weight:800;color:#fff;}
+.cl-body{padding:16px;min-height:220px;font-size:12.5px;color:var(--muted);line-height:1.7;}
+.cl-you{color:var(--blue-light);font-weight:700;}
+.dock{display:flex;gap:8px;align-items:center;padding:12px 15px;border-top:1px solid var(--border);}
+.plus{width:40px;height:40px;flex:none;border-radius:10px;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);color:var(--blue-light);font-size:20px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.plus:hover{background:rgba(59,130,246,.24);}
+.dock input{flex:1;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:10px;padding:12px 15px;color:var(--text);font-size:13px;}
+.send{background:var(--blue);color:#fff;border:0;border-radius:10px;padding:0 22px;font-weight:800;font-size:13px;}
+.hint{font-size:11px;color:var(--muted-2);margin-top:8px;}
+/* 모달 */
+.ov{position:fixed;inset:0;background:rgba(4,7,13,.72);display:flex;align-items:center;justify-content:center;}
+.modal{background:var(--panel);border:1px solid var(--border-strong);border-radius:14px;width:560px;max-width:92vw;padding:22px 24px;box-shadow:0 20px 60px rgba(0,0,0,.5);}
+.m-top{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
+.m-file{font-size:14px;font-weight:800;color:#fff;}
+.m-ai{font-size:12px;color:var(--amber);background:rgba(240,160,32,.1);border:1px solid rgba(240,160,32,.25);border-radius:8px;padding:9px 12px;margin:12px 0 16px;line-height:1.6;}
+.m-ai b{color:#ffd27a;}
+.m-q{font-size:12.5px;font-weight:700;color:var(--muted);margin-bottom:10px;}
+.choices{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+.ch{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:10px;padding:13px 14px;cursor:pointer;}
+.ch:hover{border-color:var(--blue);}
+.ch.sel{border-color:var(--blue);background:rgba(59,130,246,.1);}
+.ch .h{font-size:13px;font-weight:800;color:#fff;margin-bottom:3px;}
+.ch .d{font-size:10.5px;color:var(--muted);line-height:1.5;}
+.ch .tag{float:right;font-size:9.5px;font-weight:800;color:var(--amber);background:rgba(240,160,32,.14);border-radius:4px;padding:1px 6px;}
+.m-acts{display:flex;justify-content:flex-end;gap:8px;margin-top:18px;}
+.btn-ghost{background:var(--panel-2);color:var(--text);border:1px solid var(--border-strong);padding:9px 16px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;}
+.btn-primary{background:var(--blue);color:#fff;border:0;padding:9px 18px;border-radius:8px;font-size:12.5px;font-weight:800;cursor:pointer;}
+.note{max-width:940px;margin-top:14px;font-size:11px;color:var(--amber);background:rgba(240,160,32,.08);border:1px solid rgba(240,160,32,.2);border-radius:8px;padding:9px 12px;}
+</style></head><body>
+<div class="title">💬 지휘 콘솔 — 스마트 업로드 시안 A (중앙 결정 모달)</div>
+<div class="sub">지시 입력창 앞 [＋]로 파일 올리기. 분류가 명확하면 바로 반영, 애매하면 아래 모달로 유형을 물어봄.</div>
+<div class="console">
+  <div class="cl-head"><span class="cl-title">🧭 지휘 콘솔</span><span style="font-size:11px;color:var(--muted-2)">● 대기 중</span></div>
+  <div class="cl-body"><span class="cl-you">나</span> · 오늘 급한 취약점 뭐야?<br><span style="color:var(--muted-2)">🧭 오케스트레이터 — KEV 1건(HTTP/2 Rapid Reset)이 최우선입니다…</span></div>
+  <div class="dock">
+    <div class="plus" title="파일 올리기 — 자동 분류">＋</div>
+    <input placeholder="오케스트레이터에게 지시…">
+    <button class="send">전송</button>
+  </div>
+</div>
+<div class="note">시안 A — 파일 선택 후 <b>화면 중앙 모달</b>로 결정. 큰 선택 카드 4개 + AI 추정 강조. 신중한 결정에 적합(제품 등록 등 되돌리기 번거로운 작업).</div>
+
+<div class="ov">
+  <div class="modal">
+    <div class="m-top">📥 <span class="m-file">Tenable_Web_App_Scanning-User_Guide.pdf</span></div>
+    <div class="m-ai">🤖 파일명으로는 <b>종류를 확신하기 어렵습니다</b>. 내용상 <b>웹 애플리케이션 취약점 스캐너 매뉴얼</b>로 보이는데, 어떤 유형으로 등록할까요?</div>
+    <div class="m-q">이 파일을 무엇으로 처리할까요?</div>
+    <div class="choices">
+      <div class="ch sel"><span class="tag">AI 추천</span><div class="h">🛡 보안제품 자산</div><div class="d">제품 등록부에 자산으로 등록 + 매뉴얼 검색</div></div>
+      <div class="ch"><div class="h">📊 로그 매뉴얼</div><div class="d">로그 명령어·필드 해석용 매뉴얼</div></div>
+      <div class="ch"><div class="h">📄 일반 문서</div><div class="d">지식베이스에만 수집(검색용)</div></div>
+      <div class="ch"><div class="h">📘 가이드라인</div><div class="d">지침·가이드로 태깅해 수집</div></div>
+    </div>
+    <div class="m-acts"><button class="btn-ghost">취소</button><button class="btn-primary">보안제품 자산으로 등록 ▶</button></div>
+  </div>
+</div>
+</body></html>

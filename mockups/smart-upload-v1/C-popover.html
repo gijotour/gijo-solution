@@ -1,0 +1,47 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8"><title>스마트 업로드 시안 C — 입력창 팝오버</title>
+<style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.16);--blue:#3b82f6;--blue-light:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--teal:#1eb980;--amber:#f0a020;--red:#e2483d;--purple:#8b7cf0;}
+*{box-sizing:border-box;margin:0;padding:0;}body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);padding:26px 30px;}
+.title{font-size:15px;font-weight:800;color:#fff;margin-bottom:4px;}.sub{font-size:12px;color:var(--muted);margin-bottom:16px;}
+.console{background:var(--panel);border:1px solid var(--border);border-radius:13px;overflow:hidden;max-width:940px;position:relative;}
+.cl-head{display:flex;justify-content:space-between;align-items:center;padding:11px 15px;background:var(--panel-2);border-bottom:1px solid var(--border);}
+.cl-title{font-size:12.5px;font-weight:800;color:#fff;}
+.cl-body{padding:16px;min-height:230px;font-size:12.5px;color:var(--muted);line-height:1.7;}
+.cl-you{color:var(--blue-light);font-weight:700;}
+.dock{display:flex;gap:8px;align-items:center;padding:12px 15px;border-top:1px solid var(--border);position:relative;}
+.plus{width:40px;height:40px;flex:none;border-radius:10px;background:rgba(59,130,246,.24);border:1px solid var(--blue);color:var(--blue-light);font-size:20px;font-weight:800;display:flex;align-items:center;justify-content:center;cursor:pointer;}
+.dock input{flex:1;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:10px;padding:12px 15px;color:var(--text);font-size:13px;}
+.send{background:var(--blue);color:#fff;border:0;border-radius:10px;padding:0 22px;font-weight:800;font-size:13px;}
+/* 팝오버 */
+.pop{position:absolute;left:15px;bottom:64px;width:400px;background:var(--panel);border:1px solid var(--border-strong);border-radius:12px;padding:14px 16px;box-shadow:0 14px 40px rgba(0,0,0,.5);}
+.pop::after{content:"";position:absolute;left:16px;bottom:-8px;width:14px;height:14px;background:var(--panel);border-right:1px solid var(--border-strong);border-bottom:1px solid var(--border-strong);transform:rotate(45deg);}
+.p-file{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:700;color:#fff;margin-bottom:10px;}
+.p-file .x{margin-left:auto;color:var(--muted-2);cursor:pointer;}
+.p-ai{font-size:11px;color:var(--amber);margin-bottom:10px;line-height:1.5;}
+.p-lab{font-size:11px;color:var(--muted);margin-bottom:6px;}
+.p-sel{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);border-radius:9px;padding:10px 12px;font-size:12.5px;font-weight:700;margin-bottom:12px;}
+.p-acts{display:flex;gap:7px;justify-content:flex-end;}
+.btn-ghost{background:var(--panel-2);color:var(--muted);border:1px solid var(--border-strong);padding:8px 14px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;}
+.btn-primary{background:var(--blue);color:#fff;border:0;padding:8px 16px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;}
+.note{max-width:940px;margin-top:14px;font-size:11px;color:var(--amber);background:rgba(240,160,32,.08);border:1px solid rgba(240,160,32,.2);border-radius:8px;padding:9px 12px;}
+</style></head><body>
+<div class="title">💬 지휘 콘솔 — 스마트 업로드 시안 C (입력창 위 팝오버)</div>
+<div class="sub">[＋] 누르면 입력창 바로 위에 작은 팝오버. 추정 유형이 드롭다운에 미리 선택돼 있고, 그대로 확인하거나 바꾸면 끝. 가장 빠름.</div>
+<div class="console">
+  <div class="cl-head"><span class="cl-title">🧭 지휘 콘솔</span><span style="font-size:11px;color:var(--muted-2)">● 대기 중</span></div>
+  <div class="cl-body"><span class="cl-you">나</span> · 오늘 급한 취약점 뭐야?<br><span style="color:var(--muted-2)">🧭 오케스트레이터 — KEV 1건(HTTP/2 Rapid Reset)이 최우선입니다…</span></div>
+  <div class="dock">
+    <div class="pop">
+      <div class="p-file">📄 Tenable_Web_App_Scanning-User_Guide.pdf <span class="x">✕</span></div>
+      <div class="p-ai">🤖 종류가 애매해요 — 웹앱 스캐너 매뉴얼로 추정. 확인하거나 바꿔주세요.</div>
+      <div class="p-lab">이 파일의 유형</div>
+      <select class="p-sel"><option>🛡 보안제품 자산 (AI 추천)</option><option>📊 로그 매뉴얼</option><option>📄 일반 문서</option><option>📘 가이드라인</option></select>
+      <div class="p-acts"><button class="btn-ghost">취소</button><button class="btn-primary">등록 ▶</button></div>
+    </div>
+    <div class="plus" title="파일 올리기 — 자동 분류">＋</div>
+    <input placeholder="오케스트레이터에게 지시…">
+    <button class="send">전송</button>
+  </div>
+</div>
+<div class="note">시안 C — <b>입력창 위 팝오버 + 드롭다운</b>. 화면 안 가리고 한두 클릭으로 끝나 가장 빠름. 명확하면 팝오버 없이 바로 반영, 애매할 때만 이 팝오버가 뜸.</div>
+</body></html>
