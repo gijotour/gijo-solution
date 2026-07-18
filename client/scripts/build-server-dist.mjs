@@ -39,6 +39,32 @@ fs.cpSync(path.join(serverDir, "dist"), path.join(outDir, "dist"), { recursive: 
 fs.copyFileSync(path.join(serverDir, "package.json"), path.join(outDir, "package.json"));
 fs.copyFileSync(path.join(serverDir, "package-lock.json"), path.join(outDir, "package-lock.json"));
 
+// 제품 문서 기본 코퍼스(docsbundle.ts가 첫 기동 때 지식베이스에 인입한다). 설치본에는
+// 리포지토리가 없으므로 매니페스트에 열거된 문서만 골라 server-dist/docs/에 실어 보낸다 —
+// 여기 복사되지 않은 문서는 고객사에 나가지 않는다(내부 개발 문서 유출 차단이 목적).
+console.log("[build-server-dist] 2.5/5 제품 문서 코퍼스 복사...");
+const manifestName = "docs-manifest.json";
+const manifestSrc = path.join(serverDir, manifestName);
+if (fs.existsSync(manifestSrc)) {
+  fs.copyFileSync(manifestSrc, path.join(outDir, manifestName));
+  const manifest = JSON.parse(fs.readFileSync(manifestSrc, "utf-8"));
+  const repoRoot = path.resolve(serverDir, "..");
+  const docsOut = path.join(outDir, "docs");
+  fs.mkdirSync(docsOut, { recursive: true });
+  const missing = [];
+  for (const entry of manifest.files ?? []) {
+    const src = path.join(repoRoot, entry.file);
+    if (fs.existsSync(src)) fs.copyFileSync(src, path.join(docsOut, entry.file));
+    else missing.push(entry.file);
+  }
+  // 문서가 빠지면 설치본의 지식베이스가 그만큼 비어 채로 나간다 — 조용히 넘기면 배포 후에야
+  // "설명을 못 한다"로 드러나므로 빌드를 세운다.
+  if (missing.length) throw new Error(`[build-server-dist] 매니페스트 문서 누락: ${missing.join(", ")}`);
+  console.log(`[build-server-dist] 제품 문서 ${(manifest.files ?? []).length}건 복사 완료`);
+} else {
+  console.warn(`[build-server-dist] ${manifestName} 없음 — 제품 문서 코퍼스 없이 패키징합니다`);
+}
+
 console.log("[build-server-dist] 3/4 프로덕션 전용 의존성 설치...");
 run("npm", ["ci", "--omit=dev"], outDir);
 
