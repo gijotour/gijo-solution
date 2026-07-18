@@ -21,6 +21,7 @@ import { listProducts } from "./securityproducts";
 import { listDocuments } from "./memory";
 import { listFindings as listCtiFindings } from "./cti";
 import { matchCtiToAssets } from "./ctimatch";
+import { dailyBriefingText } from "./briefing";
 
 export interface AgentToolParam {
   name: string;
@@ -586,6 +587,16 @@ const TOOLS: AgentTool[] = [
       '재스캔 기준 취약점 상태 변화를 요약한다 — 신규·활성·해결·재발 건수 + 해결(fixed) 후보. "지난 스캔 대비 뭐가 바뀌었어?", "새로 뜬 거 있어?", "해결된 거"에 쓴다. 예: {} 또는 {"assetId":"vuln:sample-web01"}',
     params: [{ name: "assetId", label: "자산 id", description: "특정 자산만 (선택, 비우면 전체)", required: false }],
     run: runScanStatus,
+  },
+  {
+    name: "briefing",
+    label: "오늘의 브리핑",
+    domain: "cross",
+    write: false,
+    description:
+      '오늘의 보안 브리핑을 한 번에 준다 — 오늘의 조치 상위·지난 이후 신규 취약점·기한 초과/임박(SLA)·우리 관련 위협·추천 3. "오늘 브리핑", "아침에 뭐 챙겨야 돼?", "오늘 상황 요약해줘"에 쓴다. 예: {}',
+    params: [],
+    run: () => dailyBriefingText({ save: true }),
   },
   {
     name: "register_asset",
