@@ -70,7 +70,14 @@ async function cap(file, out, w, h, clickSel) {
       listDir: () => d({ root: "D:/", rootName: "D", path: "", items: [] }),
       listMemoryDocuments: () => d([]),
       getRoutineSuggestions: () => d([]),
-      listAgents: () => d([{ id: "orchestrator", name: "Security Orchestrator", role: "지휘", status: "idle", defaultName: "Security Orchestrator" }]),
+      listAgents: () => d([
+        { id: "orchestrator", name: "Security Orchestrator", role: "지휘", status: "idle", defaultName: "Security Orchestrator" },
+        { id: "scan", name: "Scan Agent", role: "스캔", status: "working", defaultName: "Scan Agent" },
+        { id: "analysis", name: "Analyze Agent", role: "분석", status: "idle", defaultName: "Analyze Agent" },
+        { id: "report", name: "Report Agent", role: "리포트", status: "idle", defaultName: "Report Agent" },
+        { id: "ti", name: "TI Agent", role: "위협 인텔", status: "watching", defaultName: "TI Agent" },
+        { id: "normaltic", name: "GIJO Agent", role: "지식 부연", status: "idle", defaultName: "GIJO Agent" },
+      ]),
       listCollaborationHistory: () => d([
         { from: "세션", to: "orchestrator", message: "💬 [사내 상담 챗봇 · 상태] 재스캔해서 해결됐는지 확인", timestamp: Date.now() - 8000 },
         { from: "orchestrator", to: "scan", message: "단계 1/2 — 스캔", timestamp: Date.now() - 6000 },

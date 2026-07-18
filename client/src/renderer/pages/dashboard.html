@@ -238,8 +238,8 @@
   /* 시안3 — 로고 코어 + 팀 카드 그리드 + 하단 대화 독 (AI 에이전트 지휘) */
   .console-caption{font-size:12px;color:var(--muted);margin:2px 0 14px;text-align:center;max-width:560px;}
   /* 6인 로스터가 한 줄에 딱 맞게 — 카드 컴팩트(아바타·글자 축소). */
-  /* 팀원 카드(에이전트 선택)는 대시보드에서 숨김 — 지시 대상은 오케스트레이터 기본. 선택은 AI 어시스턴트 화면. */
-  .team-grid{display:none;}
+  /* 팀원 카드 — 이름 없이 아이콘·역할·상태 배지만(어떤 에이전트가 작업 중인지 한눈에). */
+  .team-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;width:100%;}
   .tcard{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:9px 5px;text-align:center;cursor:pointer;position:relative;transition:.15s;}
   .tcard:hover{border-color:var(--border-strong);transform:translateY(-2px);}
   .tcard.sel{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue) inset,0 0 18px rgba(59,130,246,.18);}
@@ -416,7 +416,7 @@
       <!-- 실시간 에이전트 협업 — 보안 콘솔 아래. 세션·에이전트 활동이 흐른다. -->
       <div class="collab-live" id="collabLive">
         <div class="cl-head">
-          <span class="cl-title">📡 실시간 활동</span>
+          <span class="cl-title">🧭 지휘 콘솔</span>
           <div style="display:flex;align-items:center;gap:12px">
             <span class="cl-status" id="clStatus"><span class="cl-dot"></span>대기 중</span>
             <span class="cl-expand" id="clExpand" title="콘솔 넓게 보기 (좌우 패널 숨김/복원)">⛶</span>
@@ -1225,8 +1225,9 @@
     const meta = STATUS_META[a.status] || STATUS_META.idle;
     const icon = AGENT_ICON[a.id] || "◆";
     const live = a.status === "working" ? '<div class="tc-live tc-typing"><span></span><span></span><span></span></div>' : "";
-    return `<div class="tcard ${meta.cls}${a.id === currentTarget ? " sel" : ""}" data-agent="${a.id}">${live}` +
-      `<div class="tc-av">${icon}</div><div class="tc-name">${escT(a.name)}</div>` +
+    // 이름(tc-name)은 표시하지 않는다 — 아이콘·역할·상태로 "어떤 에이전트가 작업 중인지"만 본다.
+    return `<div class="tcard ${meta.cls}${a.id === currentTarget ? " sel" : ""}" data-agent="${a.id}" title="${escT(a.name)}">${live}` +
+      `<div class="tc-av">${icon}</div>` +
       `<div class="tc-role">${escT(a.role || "")}</div>` +
       `<div class="tc-badges"><span class="tc-b ${meta.bcls}">${meta.badge}</span><span class="tc-b tc-llm">${escT(llmBadge(a))}</span></div></div>`;
   }
