@@ -233,6 +233,18 @@ tr:last-child td{border-bottom:none;}
   </div>
 </div>
 
+<div class="modal-overlay" id="viewModal">
+  <div class="modal" style="max-width:920px;width:92vw;height:88vh;display:flex;flex-direction:column;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+      <div class="modal-title" id="viewTitle" style="margin:0;flex:1;">리포트 미리보기</div>
+      <button class="rep-dl" id="viewDownloadBtn" style="font-size:11px;background:var(--panel-2);border:1px solid var(--border-strong);color:var(--blue-light);border-radius:6px;padding:5px 10px;cursor:pointer;">📥 내려받기</button>
+      <button class="btn-ghost" id="viewCloseBtn">닫기</button>
+    </div>
+    <div id="viewBody" style="flex:1;min-height:0;background:#fff;border:1px solid var(--border);border-radius:8px;overflow:auto;"></div>
+    <div id="viewNote" style="font-size:11px;color:var(--muted-2);margin-top:8px;"></div>
+  </div>
+</div>
+
 <script>
   const clockEl = document.getElementById("clockEl");
   const statusPill = document.getElementById("statusPill");
@@ -301,6 +313,54 @@ tr:last-child td{border-bottom:none;}
     }
   }
 
+  // 뷰어 — 저장된 PDF를 그대로 화면에 띄운다. PDF가 없는 리포트는 저장된 요약을 보여준다(정직한 폴백).
+  const viewModal = document.getElementById("viewModal");
+  async function openViewer(base) {
+    const entry = historyReports.find((r) => r.base === base);
+    if (!entry) return;
+    const body = document.getElementById("viewBody");
+    const note = document.getElementById("viewNote");
+    document.getElementById("viewTitle").textContent =
+      `${TYPE_LABEL[entry.type] || entry.type} · ${entry.createdAt ? new Date(entry.createdAt).toLocaleString("ko-KR") : ""}`;
+    document.getElementById("viewDownloadBtn").onclick = () => downloadReport(entry.pdf || entry.docx);
+    body.innerHTML = '<div style="color:#555;padding:22px">불러오는 중…</div>';
+    note.textContent = "";
+    viewModal.classList.add("open");
+    if (entry.pdf) {
+      try {
+        const f = await window.gijo.downloadReportFile(entry.pdf);
+        const bytes = Uint8Array.from(atob(f.base64), (c) => c.charCodeAt(0));
+        const url = URL.createObjectURL(new Blob([bytes], { type: f.mime }));
+        viewModal._url = url;
+        body.innerHTML = `<iframe src="${url}" style="width:100%;height:100%;border:0;"></iframe>`;
+        note.textContent = "저장된 PDF를 그대로 표시합니다.";
+      } catch (e) {
+        body.innerHTML = '<div style="color:#b00020;padding:22px">PDF를 불러오지 못했습니다: ' + esc(e.message) + "</div>";
+      }
+    } else {
+      body.innerHTML = `<div style="padding:24px;color:#222;font-size:13px;line-height:1.9;white-space:pre-wrap;">${esc(entry.summary || "저장된 요약이 없습니다. DOCX를 내려받아 확인하세요.")}</div>`;
+      note.textContent = "이 리포트는 PDF가 없어 저장된 요약만 표시합니다. 전체 내용은 DOCX 내려받기로 확인하세요.";
+    }
+  }
+  function closeViewer() {
+    viewModal.classList.remove("open");
+    document.getElementById("viewBody").innerHTML = ""; // iframe 정지
+    if (viewModal._url) { URL.revokeObjectURL(viewModal._url); viewModal._url = null; }
+  }
+
+  async function deleteReportRow(base, btn) {
+    if (!confirm("이 리포트를 삭제할까요? DOCX·PDF·요약 파일이 함께 삭제되며 되돌릴 수 없습니다.")) return;
+    if (btn) btn.disabled = true;
+    try {
+      await window.gijo.deleteReport(base);
+      await loadHistory();
+      renderReportRows();
+    } catch (e) {
+      alert("삭제 실패: " + ((e && e.message) || e));
+      if (btn) btn.disabled = false;
+    }
+  }
+
   function esc(s) { return String(s == null ? "" : s).replace(/[&<]/g, (c) => (c === "&" ? "&amp;" : "&lt;")); }
 
   function renderReportRows() {
@@ -309,6 +369,10 @@ tr:last-child td{border-bottom:none;}
     } else {
       const dlBtn = (name) =>
         `<button class="rep-dl" data-name="${name}" style="font-size:11px;background:var(--panel-2);border:1px solid var(--border-strong);color:var(--blue-light);border-radius:6px;padding:4px 9px;cursor:pointer;margin-right:5px;">${/\.pdf$/i.test(name) ? "📄 PDF" : "📥 DOCX"}</button>`;
+      const viewBtn = (base) =>
+        `<button class="rep-view" data-base="${base}" style="font-size:11px;background:var(--teal);border:1px solid var(--teal);color:#04211d;border-radius:6px;padding:4px 9px;cursor:pointer;margin-right:5px;font-weight:700;">👁 보기</button>`;
+      const delBtn = (base) =>
+        `<button class="rep-del" data-base="${base}" title="삭제" style="font-size:11px;background:transparent;border:1px solid #e2483d;color:#f5928a;border-radius:6px;padding:4px 9px;cursor:pointer;">🗑</button>`;
       reportRows.innerHTML = historyReports
         .map((r) => {
           const audLabel = r.audience === "internal" ? "🔍 내부용" : "📄 보고용";
@@ -316,16 +380,18 @@ tr:last-child td{border-bottom:none;}
             ? r.assetNames.join(", ")
             : (r.assetIds && r.assetIds.length ? r.assetIds.join(", ") : "전체 자산");
           const when = r.createdAt ? new Date(r.createdAt).toLocaleString("ko-KR") : "-";
-          const btns = (r.docx ? dlBtn(r.docx) : "") + (r.pdf ? dlBtn(r.pdf) : "");
+          const files = (r.docx ? dlBtn(r.docx) : "") + (r.pdf ? dlBtn(r.pdf) : "");
           return `<tr>
             <td><span class="badge b-blue">${TYPE_LABEL[r.type] || r.type}</span><br><span style="font-size:10px;color:var(--muted-2);white-space:nowrap">${audLabel}</span></td>
             <td>${esc(target)}</td>
             <td>${when}</td>
-            <td class="row-actions">${btns || '<span style="color:var(--muted-2);font-size:11px">파일 없음</span>'}</td>
+            <td class="row-actions" style="white-space:nowrap">${viewBtn(r.base)}${files}${delBtn(r.base)}</td>
           </tr>`;
         })
         .join("");
       reportRows.querySelectorAll(".rep-dl").forEach((b) => b.addEventListener("click", () => downloadReport(b.dataset.name, b)));
+      reportRows.querySelectorAll(".rep-view").forEach((b) => b.addEventListener("click", () => openViewer(b.dataset.base)));
+      reportRows.querySelectorAll(".rep-del").forEach((b) => b.addEventListener("click", () => deleteReportRow(b.dataset.base, b)));
     }
 
     // KPI — 생성 건수/최근 생성은 저장 이력 기준, 평균 생성 시간은 이번 세션 실측만 있음.
@@ -405,6 +471,8 @@ tr:last-child td{border-bottom:none;}
     document.getElementById("modalCancelBtn").addEventListener("click", closeModal);
     modalSaveBtn.addEventListener("click", generate);
     modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
+    document.getElementById("viewCloseBtn").addEventListener("click", closeViewer);
+    viewModal.addEventListener("click", (e) => { if (e.target === viewModal) closeViewer(); });
     document.getElementById("templateBtn").addEventListener("click", () => {
       alert("템플릿 관리 기능은 아직 구현되지 않았습니다.");
     });

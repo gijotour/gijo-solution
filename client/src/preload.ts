@@ -205,6 +205,7 @@ const gijoApi = {
     api.reportApi.generate(opts.type, opts.assetIds, { audience: opts.audience, format: opts.format }),
   downloadReportFile: (name: string) => api.reportApi.file(name),
   listReportHistory: () => api.reportApi.history(),
+  deleteReport: (base: string) => api.reportApi.remove(base),
 
   // 이메일(SMTP) 설정
   getSmtpConfig: () => api.emailApi.getConfig(),

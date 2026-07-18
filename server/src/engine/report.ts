@@ -524,6 +524,7 @@ export async function generateReport(req: ReportRequest): Promise<ReportResult> 
 // 저장된 리포트 이력 — data/reports/의 파일을 base(파일명 접두)로 묶어 최신순으로 나열한다.
 // 사이드카(.json)가 있으면 대상 자산·독자·요약까지, 없으면(구버전) 파일명·mtime으로 폴백.
 export interface ReportHistoryEntry {
+  base: string; // 파일명 접두(확장자 제외) — 삭제·식별 키
   type: string;
   createdAt: number;
   audience?: string;
@@ -563,6 +564,7 @@ export async function listReportHistory(limit = 100): Promise<ReportHistoryEntry
   for (const { base, e, ts } of bases) {
     const fm = /^(weekly|quarterly|ondemand)-\d+$/.exec(base);
     const entry: ReportHistoryEntry = {
+      base,
       type: fm ? fm[1] : "ondemand",
       createdAt: ts,
       assetIds: [],
@@ -594,6 +596,26 @@ export async function listReportHistory(limit = 100): Promise<ReportHistoryEntry
   }
   out.sort((a, b) => b.createdAt - a.createdAt);
   return out;
+}
+
+// 리포트 삭제 — base(파일명 접두)에 해당하는 docx·pdf·메타(.json)를 함께 지운다.
+// 경로 순회 방지: base는 파일명 한 조각이어야 하고(슬래시·..·확장자 불가) 안전 문자만 허용.
+export async function deleteReport(base: string): Promise<{ deleted: string[] }> {
+  const safe = path.basename(String(base || ""));
+  if (safe !== base || !/^[A-Za-z0-9._-]+$/.test(safe) || safe.includes("..")) {
+    throw new Error("잘못된 리포트 식별자입니다");
+  }
+  const deleted: string[] = [];
+  for (const ext of ["docx", "pdf", "json"]) {
+    const p = path.join(REPORT_DIR, `${safe}.${ext}`);
+    try {
+      await fs.unlink(p);
+      deleted.push(`${safe}.${ext}`);
+    } catch {
+      /* 없는 파일은 무시(pdf 미생성·메타 없음 등) */
+    }
+  }
+  return { deleted };
 }
 
 // 보고서 HTML(개선 #3 PDF용) — DOCX와 같은 데이터를 A4 인쇄용 HTML로. 한국어는 시스템 폰트로 렌더.
@@ -726,6 +748,17 @@ export function registerReportRoutes(app: Express): void {
     asyncRoute(async (req, res) => {
       const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 100));
       res.json(await listReportHistory(limit));
+    })
+  );
+  app.delete(
+    "/api/report/:base",
+    authMiddleware,
+    asyncRoute(async (req, res) => {
+      try {
+        res.json(await deleteReport(String(req.params.base)));
+      } catch (e) {
+        res.status(400).json({ error: (e as Error).message });
+      }
     })
   );
   // 생성된 리포트 파일을 base64 JSON으로 반환 — 클라이언트가 열기/저장(서버가 다른 머신이어도 동작).

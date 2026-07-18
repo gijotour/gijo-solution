@@ -812,9 +812,13 @@ export const reportApi = {
   // 저장된 리포트 이력(과거 생성분 포함).
   history: () =>
     request<ReportHistoryEntry[]>("/api/report/history"),
+  // 리포트 삭제(docx·pdf·메타 일괄).
+  remove: (base: string) =>
+    request<{ deleted: string[] }>(`/api/report/${encodeURIComponent(base)}`, { method: "DELETE" }),
 };
 
 export interface ReportHistoryEntry {
+  base: string;
   type: string;
   createdAt: number;
   audience?: "internal" | "official";
