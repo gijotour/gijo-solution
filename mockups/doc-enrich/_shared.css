@@ -1,0 +1,64 @@
+/* 공유 스타일 — GIJO AS 다크 테마 (문서 보강 인입 UI 시안) */
+:root{
+  --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#fff;
+  --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:#05070d;color:var(--text);padding:26px;}
+.wrap{max-width:920px;margin:0 auto;}
+.tag{display:inline-block;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:5px;background:rgba(59,130,246,.14);border:1px solid var(--blue);color:var(--blue-light);margin-bottom:12px;}
+h1{font-size:20px;font-weight:800;color:#fff;margin-bottom:2px;}
+.sub{font-size:12.5px;color:var(--muted);margin-bottom:20px;line-height:1.6;}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;}
+.ptitle{font-size:14px;font-weight:800;color:#fff;margin-bottom:4px;display:flex;align-items:center;gap:8px;}
+.psub{font-size:11.5px;color:var(--muted);margin-bottom:14px;line-height:1.6;}
+.badge{font-size:9.5px;font-weight:800;padding:1px 7px;border-radius:5px;}
+.b-teal{background:rgba(30,185,128,.15);border:1px solid rgba(30,185,128,.4);color:var(--teal);}
+.b-purple{background:rgba(139,124,240,.15);border:1px solid var(--purple);color:#b3a6ff;}
+.b-amber{background:rgba(240,160,32,.14);border:1px solid rgba(240,160,32,.4);color:var(--amber);}
+.field{margin-bottom:12px;}
+.field label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:5px;font-weight:600;}
+.field input,.field textarea,.field select{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;outline:none;font-family:inherit;}
+.field textarea{resize:vertical;line-height:1.6;}
+.field input:focus,.field textarea:focus{border-color:var(--blue);}
+.row{display:flex;gap:10px;}.row>*{flex:1;}
+.btn{background:var(--blue);color:#fff;border:0;border-radius:8px;padding:10px 18px;font-size:12.5px;font-weight:700;cursor:pointer;}
+.btn-ghost{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--blue-light);}
+.drop{border:1.5px dashed var(--border-strong);border-radius:10px;padding:26px;text-align:center;color:var(--muted);font-size:12.5px;background:var(--panel-2);}
+.drop b{color:var(--blue-light);}
+/* 모드 카드 */
+.modes{display:flex;gap:10px;margin-bottom:6px;}
+.mode{flex:1;border:1px solid var(--border-strong);border-radius:10px;padding:12px;cursor:pointer;background:var(--panel-2);}
+.mode.sel{border-color:var(--blue);background:rgba(59,130,246,.1);}
+.mode .mh{font-size:12.5px;font-weight:800;color:#fff;margin-bottom:3px;display:flex;align-items:center;gap:6px;}
+.mode .md{font-size:10.5px;color:var(--muted);line-height:1.5;}
+.mode .mt{font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:auto;}
+/* 진행/결과 */
+.res{font-size:11.5px;border-top:1px solid var(--border);margin-top:8px;}
+.res-row{display:flex;align-items:center;gap:8px;padding:8px 2px;border-bottom:1px solid var(--border);}
+.res-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;background:var(--teal);}
+.res-dot.run{background:var(--amber);}
+.res-name{flex:1;color:var(--text);}
+.res-meta{color:var(--muted-2);font-size:10px;flex-shrink:0;}
+.via{font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;}
+.via.cloud{background:rgba(139,124,240,.16);border:1px solid var(--purple);color:#b3a6ff;}
+.via.local{background:rgba(30,185,128,.13);border:1px solid rgba(30,185,128,.4);color:var(--teal);}
+.via.manual{background:rgba(240,160,32,.14);border:1px solid rgba(240,160,32,.4);color:var(--amber);}
+/* 탭 */
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin-bottom:18px;}
+.tab{padding:9px 16px;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;margin-bottom:-1px;}
+.tab.active{color:#fff;border-bottom-color:var(--blue);}
+/* 위저드 스텝 */
+.steps{display:flex;gap:6px;margin-bottom:18px;}
+.step{flex:1;text-align:center;font-size:11px;font-weight:700;color:var(--muted-2);padding:8px;border-radius:8px;background:var(--panel-2);border:1px solid var(--border);}
+.step.on{color:#fff;border-color:var(--blue);background:rgba(59,130,246,.1);}
+.step.done{color:var(--teal);}
+/* 트리플 미리보기 */
+.triple{display:flex;align-items:center;gap:6px;font-size:11.5px;padding:6px 0;border-bottom:1px solid var(--border);}
+.triple .s{color:#fff;font-weight:600;}.triple .p{color:var(--amber);}.triple .o{color:var(--text);}
+.triple .arrow{color:var(--muted-2);}
+.note{font-size:11px;color:var(--muted);background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:11px 13px;line-height:1.6;margin-top:12px;}
+.note b{color:var(--text);}
+.kv{display:flex;gap:8px;margin-bottom:7px;}
+.kv input{flex:1;}

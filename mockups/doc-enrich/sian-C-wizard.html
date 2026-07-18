@@ -1,0 +1,41 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
+<title>시안 C — 검토 위저드</title><link rel="stylesheet" href="_shared.css"></head><body>
+<div class="wrap">
+  <div class="tag">시안 C</div>
+  <h1>단계별 위저드 — 저장 전에 사람이 검토·수정</h1>
+  <div class="sub">소스 → 방식 → <b>미리보기(번역 결과·추출된 관계를 사람이 확인·수정)</b> → 저장. AI가 만든 것을 그대로 넣지 않고 <b>사람이 한 번 검수</b>하고 저장하므로 품질·정확도가 가장 높습니다. 외부 생성물 검증 원칙과도 맞습니다.</div>
+
+  <div class="steps">
+    <div class="step done">1. 소스 ✓</div>
+    <div class="step done">2. 방식 ✓</div>
+    <div class="step on">3. 검토·수정</div>
+    <div class="step">4. 저장</div>
+  </div>
+
+  <div class="panel">
+    <div class="ptitle">👁 미리보기 — 저장 전 확인 <span class="badge b-purple" style="margin-left:8px">☁ 클라우드(Gemini)로 번역됨</span></div>
+    <div class="psub">Tenable SC · "진단 파일 로그 옵션" 섹션. 번역과 추출된 관계를 확인하고, 틀린 게 있으면 고친 뒤 저장하세요.</div>
+
+    <div class="field"><label>한글 번역 (명령어·경로는 원문 유지 — 직접 수정 가능)</label>
+      <textarea rows="5">진단 파일에 포함할 로그를 선택합니다. 각 옵션의 기본값은 다음과 같습니다.
+· Install Log — Tenable Security Center 설치 이벤트 로그(install.log). 기본값: Enabled
+· Apache Log — 웹서버 요청 로그(/opt/sc/support/error_Log). 기본값: Enabled
+· PostgreSQL Log — 데이터베이스 서버 로그(postgresql.log). 기본값: Enabled</textarea>
+    </div>
+
+    <div class="field"><label>추출된 관계 (온톨로지에 저장됨 — 잘못된 건 지우거나 고침)</label>
+      <div style="border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;background:var(--panel-2)">
+        <div class="triple" style="border:0"><span class="s">Apache Log</span><span class="arrow">—[</span><span class="p">포함 파일</span><span class="arrow">]→</span><span class="o">/opt/sc/support/error_Log</span><span style="margin-left:auto;color:var(--muted-2);cursor:pointer">✕</span></div>
+        <div class="triple"><span class="s">PostgreSQL Log</span><span class="arrow">—[</span><span class="p">포함 파일</span><span class="arrow">]→</span><span class="o">postgresql.log</span><span style="margin-left:auto;color:var(--muted-2);cursor:pointer">✕</span></div>
+        <div class="triple" style="border:0"><span class="s">Install Log</span><span class="arrow">—[</span><span class="p">기본값</span><span class="arrow">]→</span><span class="o">Enabled</span><span style="margin-left:auto;color:var(--muted-2);cursor:pointer">✕</span></div>
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button class="btn-ghost btn">← 방식 다시</button>
+      <button class="btn">✓ 검토 완료 · 지식베이스에 저장 →</button>
+    </div>
+  </div>
+
+  <div class="note"><b>장점</b> — 저장 전에 사람이 검수·수정 → 품질·정확도 최고. 잘못된 번역·환각 관계를 걸러냄. AI 검증 원칙에 부합.<br><b>단점</b> — 섹션마다 검토가 필요해 대량 처리엔 느림(고품질/소량에 적합). 배치와 병행하면 좋음.</div>
+</div></body></html>

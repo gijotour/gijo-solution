@@ -1,0 +1,43 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
+<title>시안 A — 파일 드롭 + 자동 배치</title><link rel="stylesheet" href="_shared.css"></head><body>
+<div class="wrap">
+  <div class="tag">시안 A</div>
+  <h1>파일 드롭 → 고가치 섹션 자동 감지 → 배치 보강</h1>
+  <div class="sub">영문 매뉴얼을 통째로 올리면 시스템이 로그·알림·트러블슈팅 등 <b>실무에서 찾을 섹션을 자동 선별</b>해 보여주고, 방식(클라우드/로컬)만 고르면 한꺼번에 번역·구조화합니다. "많은 문서를 빠르게" 채우는 데 강합니다.</div>
+
+  <div class="panel">
+    <div class="ptitle">📄 원본 문서</div>
+    <div class="drop">📥 <b>Tenable_Security_Center-User_Guide.pdf</b> 업로드됨 · 1,512p · 영문 감지<br><span style="font-size:11px;color:var(--muted-2)">PDF·HWPX·TXT 지원 · 여기에 끌어다 놓거나 클릭</span></div>
+  </div>
+
+  <div class="panel">
+    <div class="ptitle">🎯 자동 감지된 고가치 섹션 <span class="badge b-teal" style="margin-left:auto">14개 · 8개 선택됨</span></div>
+    <div class="psub">담당자가 실제로 검색할 섹션(로그·알림·진단·스캔 운영)을 밀집도로 선별했습니다. 체크 해제하면 제외됩니다.</div>
+    <div style="font-size:12px">
+      <label style="display:flex;gap:8px;padding:7px 2px;border-bottom:1px solid var(--border)"><input type="checkbox" checked style="width:auto"> 진단 파일 로그 옵션 (install.log·error_Log·postgresql.log) <span class="badge b-teal" style="margin-left:auto">로그 20↑</span></label>
+      <label style="display:flex;gap:8px;padding:7px 2px;border-bottom:1px solid var(--border)"><input type="checkbox" checked style="width:auto"> 알림(Alert) 설정·티켓·이메일 변수 <span class="badge b-teal" style="margin-left:auto">알림 12</span></label>
+      <label style="display:flex;gap:8px;padding:7px 2px;border-bottom:1px solid var(--border)"><input type="checkbox" checked style="width:auto"> 스캔 일시중지·재개 운영 <span class="badge b-teal" style="margin-left:auto">운영 11</span></label>
+      <label style="display:flex;gap:8px;padding:7px 2px;border-bottom:1px solid var(--border)"><input type="checkbox" style="width:auto"> 하드웨어 요구사항 <span class="badge" style="margin-left:auto;color:var(--muted-2)">저가치</span></label>
+    </div>
+  </div>
+
+  <div class="panel">
+    <div class="ptitle">⚙ 보강 방식</div>
+    <div class="modes">
+      <div class="mode sel"><div class="mh">☁ 클라우드 <span class="mt via cloud">품질↑</span></div><div class="md">Gemini/Claude. 빠르고 정확. 벤더 공개자료만·비용/한도.</div></div>
+      <div class="mode"><div class="mh">💻 로컬 <span class="mt via local">무료</span></div><div class="md">온프렘 7B. 클라우드 없이·폐쇄망. 품질 낮음.</div></div>
+    </div>
+    <div style="margin-top:12px"><button class="btn">▶ 선택 8개 섹션 보강 시작</button> <span style="font-size:11px;color:var(--muted-2)">예상 ~2분 · 클라우드 무료한도 내</span></div>
+  </div>
+
+  <div class="panel">
+    <div class="ptitle">📊 진행 상황</div>
+    <div class="res">
+      <div class="res-row"><span class="res-dot"></span><span class="res-name">진단 파일 로그 옵션</span><span class="via cloud">cloud</span><span class="res-meta">3청크·20관계</span></div>
+      <div class="res-row"><span class="res-dot"></span><span class="res-name">알림 설정·이메일 변수</span><span class="via cloud">cloud</span><span class="res-meta">3청크·12관계</span></div>
+      <div class="res-row"><span class="res-dot run"></span><span class="res-name">스캔 일시중지·재개 운영</span><span class="res-meta" style="color:var(--amber)">번역 중…</span></div>
+    </div>
+  </div>
+
+  <div class="note"><b>장점</b> — 큰 매뉴얼을 한 번에. 고가치 섹션 자동 선별로 비용 낭비 없음.<br><b>단점</b> — 수동 장애노트 작성은 별도 화면으로 빠짐(이 시안은 "매뉴얼 배치"에 집중).</div>
+</div></body></html>
