@@ -499,7 +499,101 @@ export async function generateReport(req: ReportRequest): Promise<ReportResult> 
     if (ok) result.pdfPath = pdfPath;
     else result.pdfError = "PDF 렌더 실패(headless 브라우저 미가용). DOCX만 제공됩니다.";
   }
+
+  // 이력 메타데이터를 사이드카(.json)로 남긴다 — 파일명만으론 대상 자산·독자를 복원할 수 없으므로.
+  // (리포트 이력 화면이 재기동·다른 세션에서도 과거 리포트를 그대로 보여줄 수 있게 한다.)
+  try {
+    const meta = {
+      base,
+      type: req.type,
+      audience,
+      assetIds: req.assetIds ?? [],
+      assetNames: assets.map((a) => a.name),
+      createdAt: Date.now(),
+      docx: path.basename(filePath),
+      pdf: result.pdfPath ? path.basename(result.pdfPath) : undefined,
+      summary: executiveSummary.slice(0, 400),
+    };
+    await fs.writeFile(path.join(REPORT_DIR, `${base}.json`), JSON.stringify(meta, null, 2), "utf-8");
+  } catch {
+    /* 메타 저장 실패해도 리포트 자체는 유효 — 이력에선 파일명 기반으로 폴백 표시 */
+  }
   return result;
+}
+
+// 저장된 리포트 이력 — data/reports/의 파일을 base(파일명 접두)로 묶어 최신순으로 나열한다.
+// 사이드카(.json)가 있으면 대상 자산·독자·요약까지, 없으면(구버전) 파일명·mtime으로 폴백.
+export interface ReportHistoryEntry {
+  type: string;
+  createdAt: number;
+  audience?: string;
+  assetIds: string[];
+  assetNames: string[];
+  summary?: string;
+  docx?: string;
+  pdf?: string;
+}
+
+export async function listReportHistory(limit = 100): Promise<ReportHistoryEntry[]> {
+  await fs.mkdir(REPORT_DIR, { recursive: true });
+  const files = await fs.readdir(REPORT_DIR);
+  const byBase = new Map<string, { docx?: string; pdf?: string; meta?: string }>();
+  for (const f of files) {
+    const m = /^(.+)\.(docx|pdf|json)$/i.exec(f);
+    if (!m) continue;
+    const base = m[1];
+    const e = byBase.get(base) ?? {};
+    if (/docx/i.test(m[2])) e.docx = f;
+    else if (/pdf/i.test(m[2])) e.pdf = f;
+    else e.meta = f;
+    byBase.set(base, e);
+  }
+  // 1) 파일명(`type-timestamp`)으로 값싸게 정렬용 시각을 뽑아 최신순 정렬 후 상한만 남긴다.
+  //    (리포트가 수백~수천 개 쌓여도 사이드카 JSON을 그 상한만큼만 읽어 비용을 억제한다.)
+  const bases = [...byBase.entries()]
+    .filter(([, e]) => e.docx || e.pdf) // 메타만 있고 문서 없는 건 제외
+    .map(([base, e]) => {
+      const fm = /^(?:weekly|quarterly|ondemand)-(\d+)$/.exec(base);
+      return { base, e, ts: fm ? Number(fm[1]) : 0 };
+    })
+    .sort((a, b) => b.ts - a.ts)
+    .slice(0, Math.max(1, limit));
+  // 2) 상한 안의 항목만 사이드카(대상 자산·독자·요약)로 보강한다.
+  const out: ReportHistoryEntry[] = [];
+  for (const { base, e, ts } of bases) {
+    const fm = /^(weekly|quarterly|ondemand)-\d+$/.exec(base);
+    const entry: ReportHistoryEntry = {
+      type: fm ? fm[1] : "ondemand",
+      createdAt: ts,
+      assetIds: [],
+      assetNames: [],
+      docx: e.docx,
+      pdf: e.pdf,
+    };
+    if (e.meta) {
+      try {
+        const meta = JSON.parse(await fs.readFile(path.join(REPORT_DIR, e.meta), "utf-8"));
+        entry.type = meta.type ?? entry.type;
+        entry.createdAt = meta.createdAt ?? entry.createdAt;
+        entry.audience = meta.audience;
+        entry.assetIds = meta.assetIds ?? [];
+        entry.assetNames = meta.assetNames ?? [];
+        entry.summary = meta.summary;
+      } catch {
+        /* 메타 깨졌으면 파일명 기반 폴백 유지 */
+      }
+    }
+    if (!entry.createdAt) {
+      try {
+        entry.createdAt = Math.floor((await fs.stat(path.join(REPORT_DIR, (e.docx || e.pdf) as string))).mtimeMs);
+      } catch {
+        /* stat 실패 시 0 유지 */
+      }
+    }
+    out.push(entry);
+  }
+  out.sort((a, b) => b.createdAt - a.createdAt);
+  return out;
 }
 
 // 보고서 HTML(개선 #3 PDF용) — DOCX와 같은 데이터를 A4 인쇄용 HTML로. 한국어는 시스템 폰트로 렌더.
@@ -623,6 +717,15 @@ export function registerReportRoutes(app: Express): void {
     authMiddleware,
     asyncRoute(async (req, res) => {
       res.json(await generateReport(req.body));
+    })
+  );
+  // 저장된 리포트 이력 — 이번 세션뿐 아니라 과거에 생성한 리포트까지(재기동·다른 세션 포함).
+  app.get(
+    "/api/report/history",
+    authMiddleware,
+    asyncRoute(async (req, res) => {
+      const limit = Math.min(500, Math.max(1, Number(req.query.limit) || 100));
+      res.json(await listReportHistory(limit));
     })
   );
   // 생성된 리포트 파일을 base64 JSON으로 반환 — 클라이언트가 열기/저장(서버가 다른 머신이어도 동작).

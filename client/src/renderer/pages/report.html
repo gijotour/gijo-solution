@@ -162,12 +162,12 @@ tr:last-child td{border-bottom:none;}
 <div class="content-grid">
   <div>
     <div class="panel">
-      <div class="panel-title">리포트 이력 (이번 세션)</div>
-      <div class="panel-sub">서버가 리포트 이력을 저장하지 않아, 이번 세션에서 실제로 생성한 리포트만 표시합니다.</div>
+      <div class="panel-title">리포트 이력</div>
+      <div class="panel-sub">서버에 저장된 리포트를 최신순으로 표시합니다(최근 100건, 과거 세션·재기동 포함). 유형별 DOCX·PDF를 바로 내려받을 수 있습니다.</div>
       <table>
         <tr><th>유형</th><th>대상 자산</th><th>생성일시</th><th></th></tr>
         <tbody id="reportRows">
-          <tr><td colspan="4" style="color:var(--muted)">이번 세션에서 생성한 리포트가 없습니다</td></tr>
+          <tr><td colspan="4" style="color:var(--muted)">불러오는 중…</td></tr>
         </tbody>
       </table>
     </div>
@@ -244,6 +244,7 @@ tr:last-child td{border-bottom:none;}
   const modalSaveBtn = document.getElementById("modalSaveBtn");
 
   const sessionReports = [];
+  let historyReports = []; // 서버에 저장된 과거 리포트까지 포함(재기동·다른 세션 포함)
   let allAssets = [];
 
   function tick() {
@@ -292,37 +293,60 @@ tr:last-child td{border-bottom:none;}
     }
   }
 
-  function renderReportRows() {
-    if (sessionReports.length === 0) {
-      reportRows.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">이번 세션에서 생성한 리포트가 없습니다</td></tr>';
-      return;
+  async function loadHistory() {
+    try {
+      historyReports = (await window.gijo.listReportHistory()) || [];
+    } catch (e) {
+      historyReports = [];
     }
-    const dlBtn = (name) =>
-      `<button class="rep-dl" data-name="${name}" style="font-size:11px;background:var(--panel-2);border:1px solid var(--border-strong);color:var(--blue-light);border-radius:6px;padding:4px 9px;cursor:pointer;margin-right:5px;">${/\.pdf$/i.test(name) ? "📄 PDF" : "📥 DOCX"}</button>`;
-    const baseName = (p) => (p ? String(p).split(/[\\/]/).pop() : "");
-    reportRows.innerHTML = sessionReports
-      .map((r) => {
-        const audLabel = r.audience === "internal" ? "🔍 내부용" : "📄 보고용";
-        const docName = baseName(r.filePath);
-        const pdfName = baseName(r.pdfPath);
-        const btns = (docName ? dlBtn(docName) : "") + (pdfName ? dlBtn(pdfName) : "");
-        return `<tr>
-          <td><span class="badge b-blue">${TYPE_LABEL[r.type]}</span><br><span style="font-size:10px;color:var(--muted-2);white-space:nowrap">${audLabel}</span></td>
-          <td>${r.assetIds.length ? r.assetIds.join(", ") : "전체 자산"}</td>
-          <td>${new Date(r.at).toLocaleString("ko-KR")}</td>
-          <td class="row-actions">${btns}</td>
-        </tr>`;
-      })
-      .join("");
-    reportRows.querySelectorAll(".rep-dl").forEach((b) => b.addEventListener("click", () => downloadReport(b.dataset.name, b)));
+  }
 
-    document.getElementById("kpiSessionCount").textContent = sessionReports.length;
-    const avgMs = sessionReports.reduce((sum, r) => sum + r.durationMs, 0) / sessionReports.length;
-    document.getElementById("kpiAvgTime").textContent = `${(avgMs / 1000).toFixed(1)}초`;
-    document.getElementById("kpiLastGen").textContent = new Date(sessionReports[0].at).toLocaleTimeString("ko-KR");
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<]/g, (c) => (c === "&" ? "&amp;" : "&lt;")); }
 
-    document.getElementById("summarySub").textContent = `${TYPE_LABEL[sessionReports[0].type]} · LLM 자동 생성`;
-    document.getElementById("summaryText").textContent = sessionReports[0].executiveSummary;
+  function renderReportRows() {
+    if (historyReports.length === 0) {
+      reportRows.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">아직 생성한 리포트가 없습니다 — "+ 리포트 생성"으로 만들어 보세요</td></tr>';
+    } else {
+      const dlBtn = (name) =>
+        `<button class="rep-dl" data-name="${name}" style="font-size:11px;background:var(--panel-2);border:1px solid var(--border-strong);color:var(--blue-light);border-radius:6px;padding:4px 9px;cursor:pointer;margin-right:5px;">${/\.pdf$/i.test(name) ? "📄 PDF" : "📥 DOCX"}</button>`;
+      reportRows.innerHTML = historyReports
+        .map((r) => {
+          const audLabel = r.audience === "internal" ? "🔍 내부용" : "📄 보고용";
+          const target = (r.assetNames && r.assetNames.length)
+            ? r.assetNames.join(", ")
+            : (r.assetIds && r.assetIds.length ? r.assetIds.join(", ") : "전체 자산");
+          const when = r.createdAt ? new Date(r.createdAt).toLocaleString("ko-KR") : "-";
+          const btns = (r.docx ? dlBtn(r.docx) : "") + (r.pdf ? dlBtn(r.pdf) : "");
+          return `<tr>
+            <td><span class="badge b-blue">${TYPE_LABEL[r.type] || r.type}</span><br><span style="font-size:10px;color:var(--muted-2);white-space:nowrap">${audLabel}</span></td>
+            <td>${esc(target)}</td>
+            <td>${when}</td>
+            <td class="row-actions">${btns || '<span style="color:var(--muted-2);font-size:11px">파일 없음</span>'}</td>
+          </tr>`;
+        })
+        .join("");
+      reportRows.querySelectorAll(".rep-dl").forEach((b) => b.addEventListener("click", () => downloadReport(b.dataset.name, b)));
+    }
+
+    // KPI — 생성 건수/최근 생성은 저장 이력 기준, 평균 생성 시간은 이번 세션 실측만 있음.
+    document.getElementById("kpiSessionCount").textContent = historyReports.length;
+    document.getElementById("kpiLastGen").textContent = historyReports.length && historyReports[0].createdAt
+      ? new Date(historyReports[0].createdAt).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })
+      : "-";
+    if (sessionReports.length) {
+      const avgMs = sessionReports.reduce((sum, r) => sum + r.durationMs, 0) / sessionReports.length;
+      document.getElementById("kpiAvgTime").textContent = `${(avgMs / 1000).toFixed(1)}초`;
+    }
+
+    // 요약 패널 — 이번 세션에서 방금 만든 게 있으면 전체 요약을, 없으면 최근 저장 리포트의 요약(미리보기)을.
+    const latest = sessionReports[0];
+    if (latest) {
+      document.getElementById("summarySub").textContent = `${TYPE_LABEL[latest.type]} · LLM 자동 생성`;
+      document.getElementById("summaryText").textContent = latest.executiveSummary;
+    } else if (historyReports.length && historyReports[0].summary) {
+      document.getElementById("summarySub").textContent = `${TYPE_LABEL[historyReports[0].type] || historyReports[0].type} · 최근 저장 리포트 요약`;
+      document.getElementById("summaryText").textContent = historyReports[0].summary;
+    }
   }
 
   function openModal() {
@@ -353,6 +377,7 @@ tr:last-child td{border-bottom:none;}
         type, audience, assetIds, filePath: result.filePath, pdfPath: result.pdfPath, executiveSummary: result.executiveSummary,
         at: Date.now(), durationMs: Date.now() - startedAt,
       });
+      await loadHistory(); // 방금 저장된 리포트까지 서버 이력에서 다시 읽어 표에 반영
       renderReportRows();
       closeModal();
     } catch (e) {
@@ -369,6 +394,8 @@ tr:last-child td{border-bottom:none;}
     await loadUser();
     await loadHealth();
     allAssets = await window.gijo.listAssets();
+    await loadHistory();
+    renderReportRows();
 
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => {

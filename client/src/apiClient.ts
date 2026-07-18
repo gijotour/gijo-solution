@@ -809,7 +809,21 @@ export const reportApi = {
   // 생성된 리포트 파일 내용(base64) — 클라이언트가 blob으로 만들어 열기/저장.
   file: (name: string) =>
     request<{ name: string; mime: string; base64: string }>(`/api/report/file/${encodeURIComponent(name)}`),
+  // 저장된 리포트 이력(과거 생성분 포함).
+  history: () =>
+    request<ReportHistoryEntry[]>("/api/report/history"),
 };
+
+export interface ReportHistoryEntry {
+  type: string;
+  createdAt: number;
+  audience?: "internal" | "official";
+  assetIds: string[];
+  assetNames: string[];
+  summary?: string;
+  docx?: string;
+  pdf?: string;
+}
 
 // ── 사용량 · 요금 ─────────────────────────────────────────────────────
 export interface UsageSummary {
