@@ -44,6 +44,14 @@
 
 > **추천 LLM 가이드** 화면에서 용도별 모델을 다운로드할 수 있습니다(온라인 상태일 때).
 
+#### ⚖️ 모델 라이선스 · BYOM (상업 배포 시 필수 확인)
+번들 모델을 그대로 재배포·판매하려면 각 모델의 원본 라이선스를 지켜야 합니다. **`GET /api/localengine/model-licenses`**(관리자)로 현재 모델들의 분류를 확인하세요:
+- **permissive** (예: Qwen2.5-7B/Coder·Qwen3·BGE-M3, Apache-2.0 추정) — 상업 번들 가능(추정, 원본 확인 권장)
+- **restricted** (Llama·Hermes = Llama 커뮤니티 라이선스, Qwen2.5-3B = 비상업) — 조건 준수/제외 필요
+- **byom** (합성·개조·출처불명: gijo 오케스트레이터·merged·abliterated 등) — **번들 금지, 고객이 직접(BYOM)**
+- **상용 배포 권장**: 기본 탑재는 permissive만, 나머지는 고객이 사내에서 직접 받아 `GIJO_MODELS_DIR`에 배치.
+> ⚠️ 이 분류는 법무 검토의 출발점이며 법적 확정이 아닙니다. 판매 전 각 모델 원본 라이선스를 법무가 확인하세요.
+
 ---
 
 ## 3. 서버 설치·기동 (GPU 머신)
@@ -63,6 +71,14 @@
 | `GIJO_LLAMA_CPP_DIR` | `llama.cpp` | llama.cpp 경로 |
 | `GIJO_EMBEDDING_MODEL_ID` | `bge-m3` | RAG 임베딩 모델 |
 | `PYTHONUTF8` | — | **`1` 고정 권장** (Windows cp949로 한글 로그 깨짐·스크립트 사망 방지) |
+| **보안 (self-install 필수)** | | |
+| `NODE_ENV` | — | 운영 설치는 **`production`** 권장(안전 기본값·시크릿 강제) |
+| `GIJO_JWT_SECRET` | (개발 기본값) | **운영 필수** — 미설정 시 `production`에서 서버가 뜨지 않음(토큰 위조 방지). 긴 랜덤 문자열 |
+| `GIJO_INITIAL_ADMIN_PASSWORD` | — | 최초 관리자 비번. 미지정+`production`이면 **랜덤 생성 후 콘솔 1회 출력** |
+| `GIJO_INITIAL_ADMIN_USERNAME` | `admin`/`jyh` | 최초 관리자 아이디 |
+| `GIJO_TLS_CERT_PATH` / `GIJO_TLS_KEY_PATH` | — | **둘 다 지정 시 HTTPS**로 서빙(사내망 스니핑 방지 권장) |
+| `GIJO_MIN_PASSWORD_LEN` | `8` | 비밀번호 최소 길이 |
+| `GIJO_LOGIN_MAX_FAILS` | `10` | 로그인 실패 임계(초과 시 15분 잠금) |
 
 ### 3.3 기동
 ```
@@ -77,9 +93,17 @@ node dist/index.js
 - 서버는 항상 켜져 있어야 합니다. **Windows 서비스**(nssm 등) 또는 작업 스케줄러로 부팅 시 자동 기동 등록을 권장합니다.
 - **방화벽:** 사내망에서 데스크톱들이 붙도록 `4000/tcp`(및 WebSocket) 허용. 외부(인터넷) 노출은 금지.
 
-### 3.5 최초 관리자 계정
-- 최초 기동 시 기본 관리자 **`jyh` / `changeme`** 가 시드됩니다.
-- **반드시 최초 로그인 후 비밀번호를 변경**하고, 담당자별 계정을 발급하세요(설정 → 계정 관리).
+### 3.5 최초 관리자 계정 (⚠️ self-install 보안 핵심)
+운영 설치는 **알려진 기본 비밀번호를 절대 쓰지 않도록** 아래 중 하나로 초기 계정을 만드세요.
+- **권장**: `GIJO_INITIAL_ADMIN_PASSWORD`(+선택 `GIJO_INITIAL_ADMIN_USERNAME`)를 지정하고 기동 → 그 값으로 관리자 생성.
+- 또는 `NODE_ENV=production`만 설정하고 초기 비번 미지정 → **강력 랜덤 비번을 생성해 콘솔에 1회만 출력**합니다(설치자가 기록·로그인·즉시 변경).
+- (개발/데모 한정) 위 둘 다 없으면 `jyh` / `changeme`가 시드됩니다 — **운영에서는 금지**.
+- 최초 로그인 후 담당자별 계정을 발급하세요(설정 → 계정 관리). 로그인은 실패 `GIJO_LOGIN_MAX_FAILS`회 초과 시 15분 잠깁니다(무차별 대입 방어).
+
+### 3.6 설치 후 자가 진단 (프리플라이트)
+관리자로 로그인 후 **`GET /api/admin/preflight`** 를 호출하면 이 머신의 준비 상태를 항목별로 점검합니다:
+Node·GPU(nvidia-smi)·llama-server·모델(상업번들 안전/BYOM 개수)·JWT 시크릿·**기본 비밀번호 사용 여부**·데이터 저장소. `ready:false`면 `fail` 항목을 조치하세요.
+- `/api/health`는 스키마 버전을 함께 반환합니다(업그레이드 후 반영 확인용).
 
 ---
 
@@ -109,6 +133,9 @@ node dist/index.js
 - [ ] `server/` 코드 + `npm ci --omit=dev` 완료된 node_modules
 - [ ] `client/release/GIJO AS Setup 1.0.0.exe`
 - [ ] 서버 상시 상주 등록(서비스) · 방화벽 `4000/tcp`
+- [ ] **보안**: `GIJO_JWT_SECRET` 설정 · 초기 관리자 비번(env 또는 랜덤) · (권장) TLS 인증서
+- [ ] **설치 후**: `GET /api/admin/preflight` 로 `ready:true` 확인 · 기본 비밀번호 변경
+- [ ] **모델**: 라이선스 확인(`/api/localengine/model-licenses`) — 번들 가능/BYOM 구분
 
 ---
 
@@ -116,7 +143,8 @@ node dist/index.js
 
 1. 서버: 새 `server/dist` 반영 후 **서버 프로세스 재시작**(무중단이 아니므로 점검 시간에).
 2. 클라이언트: 새 버전 설치본 재배포(버전 번호로 구분).
-3. DB(`data/gijo-as.sqlite`)는 유지됩니다 — 스키마 변경은 기동 시 자동 마이그레이션(ALTER 안전 처리).
+3. DB(`data/gijo-as.sqlite`)는 유지됩니다 — 스키마 변경은 기동 시 자동 마이그레이션(ALTER 안전 처리 + `schema_migrations` 기록). 업그레이드 후 `GET /api/health`의 `schema` 버전으로 반영을 확인하세요.
+4. **업그레이드 전 백업**: 서버 정지 후 `data/gijo-as.sqlite` 파일을 복사(권장). 문제 시 파일을 되돌리면 복구됩니다.
 
 > **주의:** 서버 코드만 갱신하고 재시작하지 않으면 **구버전 프로세스가 계속 떠 있어** 새 기능/라우트가 반영되지 않습니다(구버전은 새 API를 404로 응답). 갱신 후 반드시 재시작하세요.
 
@@ -130,7 +158,10 @@ node dist/index.js
 - **임베딩(RAG) 미동작:** `GIJO_MODELS_DIR`에 `bge-m3/bge-m3.gguf` 배치 여부 확인.
 - **자가학습 실행 안 됨:** 학습 루프 화면의 **사전 점검(preflight)** 에서 python·학습 스택·베이스 모델 캐시 상태 확인.
 - **단독 모드에서 SQLite 오류:** 번들 서버의 better-sqlite3가 Electron ABI로 재빌드됐는지(설치본 빌드 시 `build-server-dist`가 수행) 확인.
+- **설치했는데 뭐가 안 되는지 모를 때:** `GET /api/admin/preflight`로 항목별 진단(GPU·모델·JWT·기본계정·저장소). `fail` 먼저 해결.
+- **운영인데 서버가 안 뜸:** `NODE_ENV=production`인데 `GIJO_JWT_SECRET` 미설정이면 의도적으로 기동을 막습니다(취약 상태 방지). 시크릿을 설정하세요.
+- **초기 관리자 비번을 못 봤음:** 랜덤 생성 비번은 콘솔에 1회만 출력됩니다. 놓쳤으면 서버 로그(`data/restart-out.log` 등)를 확인하거나, DB의 users를 비우고(백업 후) 재기동해 재생성.
 
 ---
 
-*본 가이드는 GIJO AS v1.0.0 기준입니다. 아키텍처 상세는 `GIJO_AS_제품소개.md` §6, 사용법은 `GIJO_AS_사용자_매뉴얼.md`를 참고하세요.*
+*본 가이드는 GIJO AS v1.0.0 기준(2026-07-18 self-install 보안 보강: 안전 초기계정·JWT·TLS·프리플라이트·모델 라이선스/BYOM)입니다. 사용법은 `GIJO_AS_보안담당자_실무매뉴얼.md`를 참고하세요.*
