@@ -35,10 +35,11 @@
   .icon-btn.on{background:rgba(59,130,246,0.18);border-color:var(--blue);color:var(--blue-light);}
   .avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
 
-  .body-grid{display:grid;grid-template-columns:220px 228px 1fr;min-height:640px;}
+  .body-grid{display:grid;grid-template-columns:220px 1fr 228px;min-height:640px;}
   .explorer{padding:18px 12px;border-right:1px solid var(--border);}
-  /* 작업 세션 열 — 자산 탐색기 바로 옆. 목록은 여기서 보고, 클릭하면 전용 화면에서 그 대화가 열린다. */
-  .dash-sessions{border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:0;}
+  /* 작업 세션 열 — 이력 관리용. 주 작업은 실시간 활동에서 하므로 오른쪽 끝(order:2)으로 뺀다. */
+  .dash-sessions{order:2;border-left:1px solid var(--border);display:flex;flex-direction:column;min-height:0;}
+  .center-stage{order:1;}
   .dash-sessions .dsh{display:flex;align-items:center;justify-content:space-between;padding:16px 12px 8px;}
   .dash-sessions .dsh-t{font-size:12px;font-weight:700;color:var(--text);}
   .dash-new{background:var(--blue);color:#fff;border:0;border-radius:6px;font-size:11px;font-weight:700;padding:4px 9px;cursor:pointer;}
@@ -392,7 +393,7 @@
       <div id="explorerTree">불러오는 중...</div>
     </div>
 
-    <!-- 작업 세션 열 — 자산 탐색기 바로 옆. 클릭하면 전용 "작업 세션" 화면에서 그 대화가 열린다. -->
+    <!-- 작업 세션 열 — 오른쪽 끝(이력 관리). 클릭하면 전용 화면에서 그 세션 대화를 상세 리뷰. -->
     <div class="dash-sessions">
       <div class="dsh"><span class="dsh-t">💬 작업 세션</span><button class="dash-new" id="dashNewSession">＋ 새 세션</button></div>
       <div class="dash-slist" id="dashSessionList"><div style="font-size:11px;color:var(--muted-2);padding:8px">불러오는 중…</div></div>
