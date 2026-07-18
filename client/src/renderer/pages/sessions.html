@@ -108,6 +108,48 @@
   .cin input:disabled{opacity:.5;}
   .cin button{background:var(--blue);color:#fff;border:0;border-radius:9px;padding:0 20px;font-weight:800;font-size:13px;cursor:pointer;}
   .cin button:disabled{opacity:.5;cursor:default;}
+
+  /* ── 시안 A(보안 분석 판박이) 레이아웃 ── */
+  .app{display:grid;grid-template-columns:220px 1fr;}
+  .sidebar{padding:22px 14px;border-right:1px solid var(--border);min-height:820px;}
+  .nav-section{font-size:10.5px;font-weight:700;color:var(--muted-2);letter-spacing:1.2px;margin:16px 10px 8px;}
+  .nav-section:first-child{margin-top:0;}
+  .nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:2px;cursor:pointer;}
+  .nav-item .ic{width:18px;text-align:center;font-size:14px;}
+  .nav-item.active{background:rgba(59,130,246,.12);color:var(--white);box-shadow:inset 3px 0 0 var(--blue);cursor:default;}
+  .nav-item:hover:not(.active){background:rgba(255,255,255,.04);color:var(--white);}
+  .v3-main{padding:22px 30px 40px;}
+  .topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px;gap:16px;}
+  .page-sub{max-width:720px;line-height:1.6;}
+  .v3-tools{display:flex;gap:8px;align-items:center;flex:none;}
+  .btn-primary{background:var(--blue);color:#fff;border:none;padding:9px 15px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;}
+  .btn-ghost{background:var(--panel);color:var(--text);border:1px solid var(--border-strong);padding:8px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;outline:none;}
+  .btn-danger{background:rgba(226,72,61,.14);color:#f5928a;border:1px solid #e2483d;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:800;cursor:pointer;}
+  .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
+  .tile{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 15px;}
+  .tile .lab{font-size:11.5px;color:var(--muted);}.tile .v{font-size:24px;font-weight:800;margin-top:3px;color:#fff;}.tile .d{font-size:10.5px;color:var(--muted-2);margin-top:3px;}
+  .two{display:grid;grid-template-columns:1.15fr 1.4fr;gap:16px;align-items:start;}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:15px 17px;}
+  .ph{font-size:13.5px;font-weight:800;color:#fff;margin-bottom:10px;}
+  .filters{display:flex;gap:6px;margin:8px 0;flex-wrap:wrap;}
+  .fchip{font-size:11.5px;padding:5px 11px;border-radius:20px;background:var(--panel-2);border:1px solid var(--border);color:var(--muted);cursor:pointer;}
+  .fchip.active{background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.4);color:#fff;}
+  .slist{max-height:540px;overflow-y:auto;}
+  .srow{display:flex;align-items:center;gap:11px;padding:11px 6px;border-bottom:1px solid var(--border);cursor:pointer;}
+  .srow:hover{background:var(--panel-2);}.srow.on{background:rgba(59,130,246,.08);}
+  .sdot{width:8px;height:8px;border-radius:50%;flex:none;}
+  .sdot.active{background:var(--teal);}.sdot.done{background:var(--muted-2);}.sdot.ignored{background:var(--muted-2);opacity:.5;}
+  .sr-main{flex:1;min-width:0;}
+  .sr-title{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .sr-sub{font-size:11px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .sr-meta{font-size:10.5px;color:var(--muted-2);flex:none;text-align:right;white-space:nowrap;}
+  .sdel{color:var(--muted-2);font-size:12px;cursor:pointer;flex:none;padding:2px 4px;border-radius:4px;}
+  .sdel:hover{color:#f5928a;background:rgba(226,72,61,.12);}
+  .badge{font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;}
+  .b-active{color:var(--teal);background:rgba(30,185,128,.14);}.b-done{color:var(--muted-2);background:rgba(255,255,255,.05);}.b-ignored{color:var(--muted-2);background:rgba(255,255,255,.04);}
+  .v3-detail{display:flex;flex-direction:column;min-height:520px;padding:0;overflow:hidden;}
+  .v3-detail .conv{flex:1;}
+  .list-empty{padding:22px 8px;color:var(--muted-2);font-size:12px;text-align:center;line-height:1.7;}
 </style>
 </head>
 <body>
@@ -119,66 +161,85 @@
   </div>
   <div class="header-right">
     <div class="status-pill" id="statusPill"><span class="dot"></span>연결 확인 중<span class="beta-tag">LIVE</span></div>
-    <div class="icon-row">
-      <div class="icon-btn" data-page="dashboard.html" title="대시보드">◆</div>
-      <div class="icon-btn on" data-page="sessions.html" title="작업 세션">💬</div>
-      <div class="icon-btn" data-page="inventory.html" title="AI 자산">◇</div>
-      <div class="icon-btn" data-page="vulnscan.html" title="취약점 관리">⊘</div>
-      <div class="icon-btn" data-page="agent.html" title="AI 어시스턴트">◉</div>
-      <div class="icon-btn" data-page="memory.html" title="AI 지식·모델">🧠</div>
-      <div class="icon-btn" id="settingsBtn" title="설정">⚙</div>
-    </div>
     <div class="avatar-btn" id="avatarBtn">-</div>
+    <div class="icon-btn" id="settingsBtn" title="설정">⚙</div>
   </div>
 </div>
 
-<div class="page-head">
-  <div class="page-title">작업 세션</div>
-  <div class="page-sub">자산 탐색기에서 항목을 누르면 그 대상의 상태를 보여주는 대화 세션이 열립니다. 상태를 확인하고 추천 작업을 고르거나 직접 지시하세요.</div>
+<div class="app">
+  <div class="sidebar" id="gijoNav"></div>
+
+<div class="v3-main">
+  <div class="topbar-row">
+    <div>
+      <div class="page-title">💬 작업 세션</div>
+      <div class="page-sub">지시·분석 대화를 세션으로 관리합니다. 왼쪽에서 세션을 고르면 오른쪽에 상태·대화가 열립니다.</div>
+    </div>
+    <div class="v3-tools">
+      <button class="btn-primary" id="newSessionBtn">＋ 새 세션</button>
+      <span style="font-size:11.5px;color:var(--muted)">오래된 세션 정리</span>
+      <select class="btn-ghost" id="pruneDays" title="선택 기간 이전(마지막 활동 기준) 세션 정리">
+        <option value="7">7일 이전</option>
+        <option value="30" selected>30일 이전</option>
+        <option value="90">90일 이전</option>
+        <option value="180">180일 이전</option>
+      </select>
+      <button class="btn-danger" id="pruneBtn" style="background:transparent;font-weight:700;">일괄 삭제</button>
+      <button class="btn-danger" id="deleteAllBtn">🗑 전체 삭제</button>
+    </div>
+  </div>
+
+  <div class="tiles">
+    <div class="tile"><div class="lab">전체 세션</div><div class="v" id="kTotal">-</div><div class="d">누적</div></div>
+    <div class="tile"><div class="lab">🟢 진행중</div><div class="v" id="kActive" style="color:var(--teal)">-</div><div class="d">active</div></div>
+    <div class="tile"><div class="lab">완료</div><div class="v" id="kDone">-</div><div class="d">done</div></div>
+    <div class="tile"><div class="lab">오늘 생성</div><div class="v" id="kToday">-</div><div class="d">today</div></div>
+  </div>
+
+  <div class="two">
+    <!-- 좌: 세션 목록 -->
+    <div class="panel">
+      <div class="ph">세션 목록 <span id="listCount" style="font-size:11px;color:var(--muted-2);font-weight:600"></span></div>
+      <div class="search">🔎<input id="sessionSearch" placeholder="세션 검색…"></div>
+      <div class="filters" id="statusFilters">
+        <span class="fchip active" data-st="all">전체</span>
+        <span class="fchip" data-st="active">🟢 진행중</span>
+        <span class="fchip" data-st="done">완료</span>
+        <span class="fchip" data-st="ignored">무시</span>
+      </div>
+      <div class="slist" id="sessionList">불러오는 중…</div>
+    </div>
+
+    <!-- 우: 대화 상세 -->
+    <div class="panel v3-detail">
+      <div class="conv-head" id="convHead" style="display:none">
+        <div>
+          <div class="t" id="convTitle">—</div>
+          <div class="m" id="convMeta">—</div>
+        </div>
+        <div class="conv-acts">
+          <select class="ca-sel" id="convStatus" title="세션 상태">
+            <option value="active">진행중</option>
+            <option value="done">완료</option>
+            <option value="ignored">무시</option>
+          </select>
+          <button class="ca-btn" id="renameBtn" title="이름 변경">✎ 이름</button>
+          <button class="ca-btn" id="deleteBtn" title="세션 삭제">🗑 삭제</button>
+        </div>
+      </div>
+      <div class="conv" id="conv">
+        <div class="conv-empty" id="convEmpty">
+          <div class="big">💬</div>
+          <div>왼쪽에서 세션을 고르거나 <b style="color:var(--blue-light)">＋ 새 세션</b>으로 시작하세요.<br>지시하면 이 세션의 대화로 기록됩니다.</div>
+        </div>
+      </div>
+      <div class="cin">
+        <input id="chatInput" placeholder="이 세션에 이어서 지시… (예: 오늘 제일 급한 취약점 뭐야?)" disabled>
+        <button id="sendBtn" disabled>전송</button>
+      </div>
+    </div>
+  </div>
 </div>
-
-<div class="body-grid">
-  <!-- 1) 자산 탐색기 -->
-  <div class="col">
-    <div class="colhead"><span>🗂 자산 탐색기</span><span class="tree-act" id="refreshExplorer" title="새로고침" style="cursor:pointer;color:var(--muted);font-size:13px">⟳</span></div>
-    <div class="tree" id="explorerTree">불러오는 중…</div>
-  </div>
-
-  <!-- 2) 작업 세션 목록 -->
-  <div class="col">
-    <div class="colhead"><span>💬 작업 세션</span><button class="newbtn" id="newSessionBtn">＋ 새 세션</button></div>
-    <div class="search">🔎<input id="sessionSearch" placeholder="세션 검색…"></div>
-    <div class="slist" id="sessionList">불러오는 중…</div>
-  </div>
-
-  <!-- 3) 대화 -->
-  <div class="col">
-    <div class="conv-head" id="convHead" style="display:none">
-      <div>
-        <div class="t" id="convTitle">—</div>
-        <div class="m" id="convMeta">—</div>
-      </div>
-      <div class="conv-acts">
-        <select class="ca-sel" id="convStatus" title="세션 상태">
-          <option value="active">진행중</option>
-          <option value="done">완료</option>
-          <option value="ignored">무시</option>
-        </select>
-        <button class="ca-btn" id="renameBtn" title="이름 변경">✎ 이름</button>
-        <button class="ca-btn" id="deleteBtn" title="세션 삭제">🗑 삭제</button>
-      </div>
-    </div>
-    <div class="conv" id="conv">
-      <div class="conv-empty" id="convEmpty">
-        <div class="big">💬</div>
-        <div>왼쪽에서 세션을 고르거나 <b style="color:var(--blue-light)">＋ 새 세션</b>으로 시작하세요.<br>지시하면 이 세션의 대화로 기록됩니다.</div>
-      </div>
-    </div>
-    <div class="cin">
-      <input id="chatInput" placeholder="이 세션에 이어서 지시… (예: 오늘 제일 급한 취약점 뭐야?)" disabled>
-      <button id="sendBtn" disabled>전송</button>
-    </div>
-  </div>
 </div>
 
 <script src="session-explorer.js"></script>
@@ -187,7 +248,6 @@
   const statusPill = document.getElementById("statusPill");
   const avatarBtn = document.getElementById("avatarBtn");
   const sessionListEl = document.getElementById("sessionList");
-  const explorerTree = document.getElementById("explorerTree");
   const convEl = document.getElementById("conv");
   const convHead = document.getElementById("convHead");
   const convEmpty = document.getElementById("convEmpty");
@@ -202,9 +262,7 @@
   let currentId = null;     // 열린 세션 id
   let currentSession = null;// 열린 세션 전체(상태·contextRef 포함)
   let searchQuery = "";
-  // 탐색기 대상 데이터 캐시 — 클릭 시 상태 카드·추천 다음 단계를 이 캐시로 구성한다.
-  let assetsCache = [], prioritiesCache = [], productsCache = [], todayCache = [];
-  const collapsed = {}; // 구획 접기 상태
+  let statusFilter = "all"; // 전체/active/done/ignored
 
   function tick() {
     clockEl.textContent = new Date().toLocaleString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: true, year: "numeric", month: "2-digit", day: "2-digit" });
@@ -226,52 +284,51 @@
     try { const u = await window.gijo.me(); avatarBtn.textContent = (u.displayName || u.username || "-").charAt(0); } catch (e) {}
   }
 
-  // ── 통합 자산 탐색기(공유 모듈 session-explorer.js) — 대시보드와 동일 ──────
-  async function reloadExplorer() {
-    try {
-      await window.gijoSessionExplorer.load();
-      window.gijoSessionExplorer.render(explorerTree, {
-        onSelect: openEntity,
-        onUpload: () => window.gijo.navigateTo("memory.html"),    // 문서·분석 > 파일 올리기
-        onManageDocs: () => window.gijo.navigateTo("memory.html"), // 문서·분석 > 올린 문서 관리
-      });
-    } catch (e) {
-      explorerTree.innerHTML = '<div style="padding:8px;color:var(--muted-2);font-size:11px">탐색기를 불러오지 못했습니다</div>';
-    }
+  // 추천 다음 단계(contextRef 세션)를 위해 탐색기 데이터만 미리 로드(트리 렌더는 하지 않음 — 탐색기 화면 제거됨).
+  async function loadExplorerData() {
+    try { await window.gijoSessionExplorer.load(); } catch (e) { /* 없으면 추천만 비활성 */ }
   }
 
-  // 대상 클릭 → contextRef 세션 생성 + 상태 카드를 첫 assistant 턴으로 기록 + 열기.
-  async function openEntity(type, id) {
-    const ctx = window.gijoSessionExplorer.buildContext(type, id);
-    try {
-      const s = await window.gijo.createWorkSession(ctx.title, `${type}:${id}`);
-      await window.gijo.addWorkSessionTurn(s.id, "assistant", ctx.statusText, "상태");
-      await loadSessions(false);
-      openSession(s.id);
-    } catch (e) { alert("세션 생성 실패: " + (e && e.message || e)); }
+  // ── KPI 타일 ─────────────────────────────────────────────────────────
+  function renderTiles() {
+    const total = sessions.length;
+    const active = sessions.filter((s) => s.status === "active").length;
+    const done = sessions.filter((s) => s.status === "done").length;
+    const startOfDay = new Date(); startOfDay.setHours(0, 0, 0, 0);
+    const today = sessions.filter((s) => s.createdAt >= startOfDay.getTime()).length;
+    document.getElementById("kTotal").textContent = total;
+    document.getElementById("kActive").textContent = active;
+    document.getElementById("kDone").textContent = done;
+    document.getElementById("kToday").textContent = today;
   }
 
   // ── 세션 목록 ────────────────────────────────────────────────────────
   function sessionMatches(s, q) {
-    if (!q) return true;
-    return (s.title || "").toLowerCase().includes(q) || (s.lastPreview || "").toLowerCase().includes(q);
+    if (q && !((s.title || "").toLowerCase().includes(q) || (s.lastPreview || "").toLowerCase().includes(q))) return false;
+    if (statusFilter !== "all" && s.status !== statusFilter) return false;
+    return true;
   }
+  const STATUS_BADGE = { active: "b-active", done: "b-done", ignored: "b-ignored" };
   function renderSessionList() {
     const filtered = sessions.filter((s) => sessionMatches(s, searchQuery));
+    document.getElementById("listCount").textContent = sessions.length ? `${filtered.length}/${sessions.length}건` : "";
     if (!filtered.length) {
       sessionListEl.innerHTML = sessions.length
-        ? `<div class="list-empty">검색 결과가 없습니다.</div>`
+        ? `<div class="list-empty">조건에 맞는 세션이 없습니다.</div>`
         : `<div class="list-empty">아직 세션이 없습니다.<br>＋ 새 세션으로 시작하세요.</div>`;
       return;
     }
-    // 간단하게 — 제목만. 각 항목에서 바로 삭제(🗑) 가능.
     sessionListEl.innerHTML = filtered.map((s) => {
-      return `<div class="sitem ${s.id === currentId ? "on" : ""}" data-id="${s.id}">
-        <span class="t">${esc(s.title)}</span>
+      const st = s.status || "active";
+      const preview = s.lastPreview ? esc(s.lastPreview) : "아직 대화 없음";
+      return `<div class="srow ${s.id === currentId ? "on" : ""}" data-id="${s.id}">
+        <span class="sdot ${st}"></span>
+        <div class="sr-main"><div class="sr-title">${esc(s.title)}</div><div class="sr-sub">${preview}</div></div>
+        <div class="sr-meta"><span class="badge ${STATUS_BADGE[st] || "b-active"}">${STATUS_LABEL[st] || st}</span><br>${fmtTime(s.updatedAt)} · ${s.turnCount || 0}턴</div>
         <span class="sdel" data-del="${s.id}" title="세션 삭제">🗑</span>
       </div>`;
     }).join("");
-    sessionListEl.querySelectorAll(".sitem").forEach((el) => el.addEventListener("click", (e) => {
+    sessionListEl.querySelectorAll(".srow").forEach((el) => el.addEventListener("click", (e) => {
       if (e.target.closest(".sdel")) { e.stopPropagation(); deleteSessionById(el.dataset.id); return; }
       openSession(el.dataset.id);
     }));
@@ -283,6 +340,7 @@
       sessionListEl.innerHTML = `<div class="list-empty">세션을 불러오지 못했습니다.</div>`;
       return;
     }
+    renderTiles();
     renderSessionList();
     if (selectFirst && !currentId && sessions.length) openSession(sessions[0].id);
   }
@@ -302,9 +360,12 @@
   // 추천 다음 단계(시안 C) — contextRef 세션이면 대화 아래에 클릭 가능한 단계 목록을 붙인다.
   function suggestionsHtml() {
     if (!currentSession || !currentSession.contextRef) return "";
-    const [type, ...rest] = currentSession.contextRef.split(":");
-    const ctx = window.gijoSessionExplorer.buildContext(type, rest.join(":"));
-    if (!ctx.suggestions || !ctx.suggestions.length) return "";
+    let ctx;
+    try {
+      const [type, ...rest] = currentSession.contextRef.split(":");
+      ctx = window.gijoSessionExplorer.buildContext(type, rest.join(":"));
+    } catch (e) { return ""; } // 탐색기 데이터 미로드 등 — 추천 없이 진행
+    if (!ctx || !ctx.suggestions || !ctx.suggestions.length) return "";
     const steps = ctx.suggestions
       .map((s, i) => `<div class="step" data-instr="${esc(s.instruction)}"><div class="n">${i + 1}</div><div class="x">${esc(s.label)}${s.hint ? ` <span>· ${esc(s.hint)}</span>` : ""}</div></div>`)
       .join("");
@@ -420,10 +481,43 @@
   }
   function deleteSession() { deleteSessionById(currentId); } // 헤더 🗑 버튼
 
+  // 열려 있던 세션이 삭제 목록에 포함됐을 수 있으므로 대화 영역을 안전하게 비운다.
+  function clearOpenIfGone() {
+    if (currentId && !sessions.some((s) => s.id === currentId)) {
+      currentId = null; currentSession = null;
+      convHead.style.display = "none";
+      convEl.innerHTML = ""; convEl.appendChild(convEmpty); convEmpty.style.display = "flex";
+      chatInput.disabled = true; sendBtn.disabled = true;
+    }
+  }
+  // 기간 이전(마지막 활동 기준) 세션 일괄 삭제. (리포트 화면과 동일한 패턴: 드롭다운 선택 + 일괄 삭제 버튼)
+  async function pruneOld() {
+    const days = Number(document.getElementById("pruneDays").value);
+    if (!days) return;
+    if (!confirm(`${days}일 이전(마지막 활동 기준)의 세션을 모두 삭제할까요? 대화까지 삭제되며 되돌릴 수 없습니다.`)) return;
+    const btn = document.getElementById("pruneBtn");
+    const orig = btn.textContent; btn.disabled = true; btn.textContent = "삭제 중…";
+    try {
+      const r = await window.gijo.pruneWorkSessions(days);
+      await loadSessions(false); clearOpenIfGone();
+      alert(`${days}일 이전 세션 ${r.deleted}건을 삭제했습니다.`);
+    } catch (e) { alert("일괄 삭제 실패: " + ((e && e.message) || e)); }
+    finally { btn.disabled = false; btn.textContent = orig; }
+  }
+  async function deleteAll() {
+    if (!confirm("모든 작업 세션을 삭제할까요? 대화까지 전부 삭제되며 되돌릴 수 없습니다.")) return;
+    if (!confirm("정말 전체 삭제할까요? 이 작업은 되돌릴 수 없습니다.")) return; // 파괴적 — 2단계 확인
+    try {
+      const r = await window.gijo.deleteAllWorkSessions();
+      await loadSessions(false); clearOpenIfGone();
+      alert(`세션 ${r.deleted}건을 전부 삭제했습니다.`);
+    } catch (e) { alert("전체 삭제 실패: " + ((e && e.message) || e)); }
+  }
+
   async function init() {
     tick(); setInterval(tick, 30000);
     await loadUser(); await loadHealth();
-    await reloadExplorer();
+    await loadExplorerData();
     // 대시보드 세션 열에서 넘어온 딥링크(localStorage) — 특정 세션 열기 / 새 세션 시작.
     let openId = null, wantNew = false;
     try {
@@ -439,7 +533,13 @@
     document.querySelectorAll(".header [data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.getElementById("newSessionBtn").addEventListener("click", newSession);
-    document.getElementById("refreshExplorer").addEventListener("click", reloadExplorer);
+    document.getElementById("pruneBtn").addEventListener("click", pruneOld);
+    document.getElementById("deleteAllBtn").addEventListener("click", deleteAll);
+    document.getElementById("statusFilters").querySelectorAll(".fchip").forEach((c) => c.addEventListener("click", () => {
+      statusFilter = c.dataset.st;
+      document.getElementById("statusFilters").querySelectorAll(".fchip").forEach((x) => x.classList.toggle("active", x === c));
+      renderSessionList();
+    }));
     document.getElementById("renameBtn").addEventListener("click", startRename);
     document.getElementById("convTitle").addEventListener("click", startRename);
     document.getElementById("deleteBtn").addEventListener("click", deleteSession);
@@ -452,5 +552,6 @@
   if (!window.gijo.isAuthenticated()) window.gijo.navigateTo("login.html");
   else init();
 </script>
+<script src="nav.js"></script>
 </body>
 </html>

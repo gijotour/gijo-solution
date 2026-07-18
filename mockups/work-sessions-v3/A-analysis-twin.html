@@ -1,0 +1,114 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
+<title>작업 세션 시안 A — 보안 분석 판박이</title>
+<style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.16);--blue:#3b82f6;--blue-light:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;}
+*{box-sizing:border-box;margin:0;padding:0;}body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
+.header{display:flex;justify-content:space-between;align-items:center;padding:12px 22px;border-bottom:1px solid var(--border);}
+.header-left{display:flex;align-items:center;gap:16px;}.app-title{font-size:15px;font-weight:800;color:#fff;}.clock{font-size:12px;color:var(--muted);}
+.status-pill{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--teal);background:rgba(30,185,128,.1);border:1px solid rgba(30,185,128,.25);border-radius:20px;padding:5px 12px;}
+.status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
+.app{display:grid;grid-template-columns:220px 1fr;}
+.sidebar{padding:22px 14px;border-right:1px solid var(--border);min-height:820px;}
+.nav-section{font-size:10.5px;font-weight:700;color:var(--muted-2);letter-spacing:1.2px;margin:16px 10px 8px;}.nav-section:first-child{margin-top:0;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:8px;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:2px;}
+.nav-item .ic{width:18px;text-align:center;}
+.nav-item.active{background:rgba(59,130,246,.12);color:#fff;box-shadow:inset 3px 0 0 var(--blue);}
+.main{padding:24px 30px 40px;}
+.topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px;}
+.page-title{font-size:21px;font-weight:800;color:#fff;}
+.page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;max-width:760px;line-height:1.6;}
+.tools{display:flex;gap:8px;align-items:center;}
+.btn-ghost{background:var(--panel);color:var(--text);border:1px solid var(--border-strong);padding:8px 13px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;}
+.btn-primary{background:var(--blue);color:#fff;border:none;padding:9px 15px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;}
+.btn-danger{background:transparent;color:#f5928a;border:1px solid rgba(226,72,61,.5);padding:8px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
+.tile{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 15px;}
+.tile .lab{font-size:11.5px;color:var(--muted);}.tile .v{font-size:24px;font-weight:800;margin-top:3px;}.tile .d{font-size:10.5px;color:var(--muted-2);margin-top:3px;}
+.two{display:grid;grid-template-columns:1.15fr 1.4fr;gap:16px;align-items:start;}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
+.ph{font-size:13.5px;font-weight:800;color:#fff;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;}
+.psub{font-size:11px;color:var(--muted-2);margin-bottom:10px;}
+.search{display:flex;align-items:center;gap:7px;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:7px 10px;margin-bottom:8px;font-size:12px;color:var(--muted);}
+.filters{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;}
+.fchip{font-size:11.5px;padding:5px 11px;border-radius:20px;background:var(--panel-2);border:1px solid var(--border);color:var(--muted);cursor:pointer;}
+.fchip.active{background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.4);color:#fff;}
+.slist{max-height:520px;overflow-y:auto;}
+.srow{display:flex;align-items:center;gap:11px;padding:11px 6px;border-bottom:1px solid var(--border);cursor:pointer;}
+.srow:hover{background:var(--panel-2);}.srow.sel{background:rgba(59,130,246,.07);}
+.sdot{width:8px;height:8px;border-radius:50%;flex:none;}.sdot.active{background:var(--teal);}.sdot.done{background:var(--muted-2);}
+.sr-main{flex:1;min-width:0;}
+.sr-title{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sr-sub{font-size:11px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sr-meta{font-size:10.5px;color:var(--muted-2);flex:none;text-align:right;}
+.badge{font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;}
+.b-active{color:var(--teal);background:rgba(30,185,128,.14);}.b-done{color:var(--muted-2);background:rgba(255,255,255,.05);}
+.statuscard{background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.2);border-radius:9px;padding:12px 14px;margin-bottom:12px;}
+.statuscard .h{font-weight:800;color:#fff;font-size:12.5px;margin-bottom:5px;}
+.statuscard .l{font-size:11.5px;color:var(--muted);line-height:1.75;}.statuscard .l b{color:var(--text);}
+.recs{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px;}
+.rec{font-size:11px;padding:5px 10px;border-radius:7px;background:var(--panel-2);border:1px solid var(--border-strong);color:var(--blue-light);cursor:pointer;}
+.turn{margin-bottom:13px;}
+.you{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:9px 12px;font-size:12.5px;margin-bottom:6px;line-height:1.5;}.you b{color:var(--blue-light);}
+.ai{font-size:12.5px;color:var(--muted);line-height:1.7;padding-left:4px;}
+.ai .tool{font-size:10px;font-weight:800;color:var(--teal);background:rgba(30,185,128,.12);border-radius:4px;padding:1px 7px;margin-right:6px;}
+.cin{display:flex;gap:8px;margin-top:12px;}
+.cin input{flex:1;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:9px;padding:10px 13px;color:var(--text);font-size:12.5px;}
+.cin button{background:var(--blue);color:#fff;border:0;border-radius:9px;padding:0 18px;font-weight:800;font-size:12.5px;}
+.note{margin-top:14px;font-size:11px;color:var(--amber);background:rgba(240,160,32,.08);border:1px solid rgba(240,160,32,.2);border-radius:8px;padding:9px 12px;}
+</style></head><body>
+<div class="header"><div class="header-left"><div class="app-title">GIJO AS</div><div class="clock">2026. 07. 19. 오전 1:10</div></div>
+<div class="status-pill"><span class="dot"></span>운영중</div></div>
+<div class="app">
+  <div class="sidebar">
+    <div class="nav-section">모니터링</div>
+    <div class="nav-item"><span class="ic">◆</span> 대시보드</div>
+    <div class="nav-item"><span class="ic">🔬</span> 보안 분석</div>
+    <div class="nav-item active"><span class="ic">💬</span> 작업 세션</div>
+    <div class="nav-section">보안 업무</div>
+    <div class="nav-item"><span class="ic">◇</span> AI 자산</div>
+    <div class="nav-item"><span class="ic">⊘</span> 취약점 관리</div>
+  </div>
+  <div class="main">
+    <div class="topbar-row">
+      <div><div class="page-title">💬 작업 세션</div>
+      <div class="page-sub">지시·분석 대화를 세션으로 관리합니다. 왼쪽에서 세션을 고르면 오른쪽에 상태·대화가 열립니다. <b>(자산 탐색기 없음 — 대시보드에서 진입)</b></div></div>
+      <div class="tools">
+        <button class="btn-primary">＋ 새 세션</button>
+        <select class="btn-ghost"><option>정리: 30일 이전 삭제</option><option>7일 이전</option><option>90일 이전</option></select>
+        <button class="btn-danger">🗑 전체 삭제</button>
+      </div>
+    </div>
+    <div class="tiles">
+      <div class="tile"><div class="lab">전체 세션</div><div class="v">128</div><div class="d">누적</div></div>
+      <div class="tile"><div class="lab">🟢 진행중</div><div class="v" style="color:var(--teal)">7</div><div class="d">active</div></div>
+      <div class="tile"><div class="lab">완료</div><div class="v">109</div><div class="d">done</div></div>
+      <div class="tile"><div class="lab">오늘 생성</div><div class="v">5</div><div class="d">today</div></div>
+    </div>
+    <div class="two">
+      <div class="panel">
+        <div class="ph">세션 목록</div>
+        <div class="psub">최신순 · 진행중 우선</div>
+        <div class="search">🔎 세션 검색…</div>
+        <div class="filters"><span class="fchip active">전체</span><span class="fchip">🟢 진행중</span><span class="fchip">완료</span><span class="fchip">무시</span></div>
+        <div class="slist">
+          <div class="srow sel"><span class="sdot active"></span><div class="sr-main"><div class="sr-title">Ollama 서버 취약점 조치</div><div class="sr-sub">CVE-2024-37032 우선순위와 재스캔…</div></div><div class="sr-meta"><span class="badge b-active">진행중</span><br>방금</div></div>
+          <div class="srow"><span class="sdot active"></span><div class="sr-main"><div class="sr-title">AI-BOM 위협 검토 (보안 챗봇)</div><div class="sr-sub">KISA 18개 위협 대응 상태 정리…</div></div><div class="sr-meta"><span class="badge b-active">진행중</span><br>12분 전</div></div>
+          <div class="srow"><span class="sdot done"></span><div class="sr-main"><div class="sr-title">주간 리포트 초안</div><div class="sr-sub">경영진 요약 문체 쉬운 말로…</div></div><div class="sr-meta"><span class="badge b-done">완료</span><br>1시간 전</div></div>
+          <div class="srow"><span class="sdot done"></span><div class="sr-main"><div class="sr-title">shadow-gpt-proxy 조사</div><div class="sr-sub">비인가 외부 LLM 프록시 차단…</div></div><div class="sr-meta"><span class="badge b-done">완료</span><br>어제</div></div>
+          <div class="srow"><span class="sdot done"></span><div class="sr-main"><div class="sr-title">192.168.219.98 재스캔</div><div class="sr-sub">282건 → 조치 후 변화 요약…</div></div><div class="sr-meta"><span class="badge b-done">완료</span><br>2일 전</div></div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="ph">Ollama 서버 취약점 조치 <span style="font-size:11px;color:var(--muted-2)">진행중 · 4개 지시</span></div>
+        <div class="statuscard"><div class="h">📋 대상 상태 — vuln:10.10.20.15 (Ollama LLM 서버)</div>
+          <div class="l">열린 취약점 <b>10건</b> (Critical 3 · High 3) · <b>KEV 1건</b> · EPSS 최고 93%<br>최우선: <b>Ollama RCE</b>, <b>OpenSSH regreSSHion</b>, <b>NVIDIA 컨테이너 탈출</b></div>
+          <div class="recs"><span class="rec">▶ 조치 순서 브리핑</span><span class="rec">▶ 담당자·기한 배정</span><span class="rec">▶ 재스캔</span></div>
+        </div>
+        <div class="turn"><div class="you"><b>나</b> · Ollama 서버 취약점 우선순위대로 정리해줘</div>
+          <div class="ai"><span class="tool">스캔 담당</span>KEV·EPSS 기준 상위 3건은 원격 코드 실행(공격자가 원격에서 시스템을 마음대로 조종) 계열입니다. 즉시 조치 대상 …</div></div>
+        <div class="cin"><input placeholder="이 세션에 이어서 지시…"><button>전송</button></div>
+      </div>
+    </div>
+    <div class="note">시안 A — 보안 분석 화면과 동일한 골격(상단 KPI 타일 + 좌 리스트/우 상세). 삭제 정리는 우상단 툴바(기간 드롭다운 + 전체 삭제).</div>
+  </div>
+</div></body></html>
