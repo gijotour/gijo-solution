@@ -85,12 +85,13 @@ async function cap(file, out, w, h, clickSel) {
   }, stub);
   await p.goto(pathToFileURL(path.join(pagesDir, file)).href, { waitUntil: "load" });
   await p.waitForTimeout(800);
-  if (clickSel) { await p.click(clickSel).catch(() => {}); await p.waitForTimeout(500); }
+  for (const sel of (clickSel || [])) { await p.click(sel).catch(() => {}); await p.waitForTimeout(400); }
   await p.screenshot({ path: path.join(outDir, out), fullPage: false });
   console.log(`캡처: ${out}${errs.length ? "  ⚠ pageerror: " + errs.join(" | ") : "  (JS 오류 없음)"}`);
   await p.close();
 }
 
 await cap("sessions.html", "live-sessions-v2.png", 1320, 840);
-await cap("dashboard.html", "live-dashboard-2col.png", 1320, 840, '.se-leaf[data-type="asset"]');
+await cap("dashboard.html", "live-dashboard-2col.png", 1320, 840, ['.se-sechead[data-sec="asset"]', '.se-leaf[data-type="asset"]']);
+await cap("dashboard.html", "live-dashboard-focus.png", 1320, 840, ['#clExpand']);
 await b.close();

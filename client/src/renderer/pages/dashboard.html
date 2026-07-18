@@ -36,6 +36,11 @@
   .avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
 
   .body-grid{display:grid;grid-template-columns:220px 1fr 228px;min-height:640px;}
+  /* 콘솔 넓게 보기(⛶) — 좌우 패널을 숨겨 중앙 콘솔이 전체 폭으로 늘어난다. */
+  .body-grid.focus{grid-template-columns:1fr;}
+  .body-grid.focus .explorer,.body-grid.focus .dash-sessions{display:none;}
+  .cl-expand{font-size:14px;color:var(--muted);cursor:pointer;line-height:1;}
+  .cl-expand:hover{color:var(--blue-light);}
   .explorer{padding:18px 12px;border-right:1px solid var(--border);}
   /* 작업 세션 열 — 이력 관리용. 주 작업은 실시간 활동에서 하므로 오른쪽 끝(order:2)으로 뺀다. */
   .dash-sessions{order:2;border-left:1px solid var(--border);display:flex;flex-direction:column;min-height:0;}
@@ -405,13 +410,15 @@
 
     <div class="center-stage">
 
-      <div class="console-caption" id="consoleCaption">보안 지휘 콘솔 — 팀원 카드를 클릭해 지시 대상을 고르고, 아래 대화 독에서 지시하세요.</div>
       <div class="team-grid" id="teamGrid"><div style="grid-column:1/-1;text-align:center;color:var(--muted);font-size:12px">팀원 불러오는 중...</div></div>
       <!-- 실시간 에이전트 협업 — 보안 콘솔 아래. 세션·에이전트 활동이 흐른다. -->
       <div class="collab-live" id="collabLive">
         <div class="cl-head">
           <span class="cl-title">📡 실시간 활동</span>
-          <span class="cl-status" id="clStatus"><span class="cl-dot"></span>대기 중</span>
+          <div style="display:flex;align-items:center;gap:12px">
+            <span class="cl-status" id="clStatus"><span class="cl-dot"></span>대기 중</span>
+            <span class="cl-expand" id="clExpand" title="콘솔 넓게 보기 (좌우 패널 숨김/복원)">⛶</span>
+          </div>
         </div>
         <div class="cl-rows" id="clRows"><div class="cl-empty">지시하면 여기서 실시간으로 흐릅니다.</div></div>
       </div>
@@ -424,7 +431,6 @@
         </div>
       </div>
       <div class="agent-dock" id="agentDock">
-        <div class="dock-who" id="dockWho"><div class="dw-i">🧭</div><div><b>Security Orchestrator</b><br><span>지시 대상</span></div></div>
         <input id="chatInput" placeholder="지시를 입력하세요… 예: fraud-detect-llm 전체 재스캔하고 리포트까지">
         <button class="dock-send" id="dockSend">전송</button>
         <button class="dock-all" id="dockAll">◉ 전체 지시</button>
@@ -1239,9 +1245,12 @@
     currentTarget = id;
     teamGrid.querySelectorAll(".tcard").forEach((c) => c.classList.toggle("sel", c.dataset.agent === id));
     const a = agentsById[id];
-    const icon = AGENT_ICON[id] || "◆";
-    dockWho.innerHTML = `<div class="dw-i">${icon}</div><div><b>${a ? escT(a.name) : escT(id)}</b><br><span>지시 대상</span></div>`;
-    chatInput.placeholder = a ? `${a.name}에게 지시…` : "지시를 입력하세요…";
+    if (dockWho) { // 지시 대상 표시(현재 대시보드에선 제거됨 — 존재할 때만 갱신)
+      const icon = AGENT_ICON[id] || "◆";
+      dockWho.innerHTML = `<div class="dw-i">${icon}</div><div><b>${a ? escT(a.name) : escT(id)}</b><br><span>지시 대상</span></div>`;
+    }
+    // 세션에 묶여 있지 않을 때만 placeholder를 대상 안내로 덮는다(세션 이어가기 안내 보존).
+    if (!dashCurrentSession) chatInput.placeholder = a ? `${a.name}에게 지시…` : "지시를 입력하세요…";
   }
   function markWorking(id) {
     const c = teamGrid.querySelector('.tcard[data-agent="' + id + '"]');
@@ -1465,6 +1474,15 @@
     if (dashNew) dashNew.addEventListener("click", () => { try { localStorage.setItem("gijo:sessions:new", "1"); } catch (e) {} window.gijo.navigateTo("sessions.html"); });
     const dashFull = document.getElementById("dashSessionsFull");
     if (dashFull) dashFull.addEventListener("click", () => window.gijo.navigateTo("sessions.html"));
+
+    // 콘솔 넓게 보기(⛶) — 좌우 패널을 숨겨 중앙 콘솔을 전체 폭으로 늘린다(다시 누르면 복원).
+    const clExpand = document.getElementById("clExpand");
+    if (clExpand) clExpand.addEventListener("click", () => {
+      const bg = document.querySelector(".body-grid");
+      const on = bg.classList.toggle("focus");
+      clExpand.textContent = on ? "🗗" : "⛶";
+      clExpand.title = on ? "원래대로 (좌우 패널 복원)" : "콘솔 넓게 보기 (좌우 패널 숨김/복원)";
+    });
 
     window.gijo.onCollaborationEvent((evt) => {
       appendCollabRow(evt);

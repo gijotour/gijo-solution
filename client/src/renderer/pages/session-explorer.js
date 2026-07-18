@@ -9,7 +9,8 @@
 
 (function () {
   var caches = { assets: [], pri: [], products: [], tasks: [] };
-  var collapsed = {}; // 구획 접기 상태(모듈 수명 동안 유지)
+  // 구획 접기 상태 — 처음엔 모두 접힘(헤더를 눌러야 하위 항목이 펼쳐진다).
+  var collapsed = { today: true, vuln: true, asset: true, product: true, files: true };
 
   function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
   function priKey(p) { return p.assetId + "|" + p.findingKey; }
