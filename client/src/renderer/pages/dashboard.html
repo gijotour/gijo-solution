@@ -85,6 +85,10 @@
   .sc-dot.off{background:#e2483d;box-shadow:none;}
   .sc-meta{font-size:9.5px;color:var(--muted);margin-top:3px;line-height:1.55;}
   .sc-meta b{color:var(--blue-light);font-weight:700;}
+  .sc-gpu{font-size:9.5px;color:var(--muted);margin-top:5px;display:flex;align-items:center;gap:6px;}
+  .sc-gpu b{color:var(--amber);font-weight:800;}
+  .sc-gpu .gbar{flex:1;height:4px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden;min-width:36px;}
+  .sc-gpu .gbar > i{display:block;height:100%;width:0;border-radius:3px;transition:width .8s ease,background .8s ease;}
   #gijoObSlot .ob-row{display:flex;align-items:center;gap:6px;background:rgba(139,124,240,0.08);border:1px solid rgba(139,124,240,0.35);border-radius:8px;padding:6px 9px;margin-bottom:8px;cursor:pointer;font-size:11px;font-weight:800;color:var(--purple);}
   #gijoObSlot .ob-row .pr{margin-left:auto;font-size:9.5px;background:rgba(139,124,240,0.18);padding:1px 6px;border-radius:5px;}
   /* AI 자산 하위 그룹(AI-BOM/SBOM) 헤더 */
@@ -114,9 +118,10 @@
   .manual-link{margin-left:auto;font-size:9px;color:var(--blue-light);white-space:nowrap;flex-shrink:0;}
 
   .center-stage{display:flex;flex-direction:column;align-items:center;justify-content:flex-start;padding:14px 22px 0;position:relative;min-height:640px;}
-  /* 로고 발광 강도는 --gpu(0~1, 실 GPU 사용률)에 비례한다 — 반경·밝기가 함께 커진다. */
-  .network-svg{width:100%;max-width:300px;--gpu:0;
-    filter:drop-shadow(0 0 calc(3px + var(--gpu) * 30px) rgba(95,161,255, calc(0.10 + var(--gpu) * 0.6)));
+  /* 로고 발광은 --gpu(0~1, 실 GPU 사용률)에 비례해 반경·밝기가 커지고, 색은 --glow-rgb로
+     사용량이 많을수록 노랑→빨강으로 바뀐다(JS applyGlow가 두 변수를 함께 갱신). */
+  .network-svg{width:100%;max-width:300px;--gpu:0;--glow-rgb:245,200,40;
+    filter:drop-shadow(0 0 calc(3px + var(--gpu) * 30px) rgba(var(--glow-rgb), calc(0.14 + var(--gpu) * 0.55)));
     transition:filter 1s ease;}
   .network-svg .spark{animation:twinkle 3.2s ease-in-out infinite;}
   @keyframes twinkle{0%,100%{opacity:.3}50%{opacity:1}}
@@ -389,11 +394,12 @@
 <image href="assets/gijo-center.png" x="196" y="116" width="208" height="208" preserveAspectRatio="xMidYMid meet"/>
       </svg>
       </div>
-      <div class="explorer-title"><span>자산 탐색기</span><span class="tree-act" id="refreshAssetsBtn" title="새로고침">⟳</span></div>
       <div class="server-card">
         <div class="sc-nm"><span class="sc-dot" id="scDot"></span>GIJO AS Desktop</div>
         <div class="sc-meta" id="scMeta">연동 서버 정보 불러오는 중…</div>
+        <div class="sc-gpu" id="scGpu"><span class="sc-gpu-t">GPU 사용률 —</span></div>
       </div>
+      <div class="explorer-title"><span>자산 탐색기</span><span class="tree-act" id="refreshAssetsBtn" title="새로고침">⟳</span></div>
       <div id="gijoObSlot"></div>
       <!-- 스마트 업로드 입력(숨김). 트리거는 통합 탐색기의 "문서·분석 > 📥 파일 올리기"에서 호출. -->
       <input type="file" id="smartUploadInput" multiple style="display:none">
@@ -944,11 +950,33 @@
   const networkSvg = document.querySelector(".network-svg");
   let busyTimer = null;
   let gpuGlow = 0; // 실 GPU 사용률 기반 발광(0~1). pulseBusy와 합쳐 최종 발광을 정한다.
+  // 발광 색 — 사용량(0~1)이 많을수록 노랑(245,200,40)→빨강(230,60,50)으로 보간.
+  function glowRgb(g) {
+    const c = Math.max(0, Math.min(1, g));
+    const r = Math.round(245 + (230 - 245) * c);
+    const gg = Math.round(200 + (60 - 200) * c);
+    const b = Math.round(40 + (50 - 40) * c);
+    return `${r},${gg},${b}`;
+  }
   function applyGlow() {
     if (!networkSvg) return;
     // GPU 사용률이 주 신호. 추론 순간(busy)엔 최소 0.35 이상으로 살짝 띄워 반응감을 준다.
     const busyFloor = networkSvg.classList.contains("busy") ? 0.35 : 0;
-    networkSvg.style.setProperty("--gpu", Math.max(gpuGlow, busyFloor).toFixed(3));
+    const g = Math.max(gpuGlow, busyFloor);
+    networkSvg.style.setProperty("--gpu", g.toFixed(3));
+    networkSvg.style.setProperty("--glow-rgb", glowRgb(g)); // 사용량↑ → 노랑→빨강
+  }
+  // GIJO AS Desktop 카드에 실 GPU 사용률·VRAM을 표시(막대 색도 노랑→빨강).
+  function updateGpuCard(g) {
+    const el = document.getElementById("scGpu");
+    if (!el) return;
+    if (g && g.available) {
+      const util = Math.round(g.utilization), mem = Math.round(g.memPercent);
+      el.innerHTML = `GPU <b>${util}%</b> · VRAM <b>${mem}%</b>` +
+        `<span class="gbar"><i style="width:${util}%;background:rgb(${glowRgb(util / 100)})"></i></span>`;
+    } else {
+      el.innerHTML = '<span class="sc-gpu-t" style="color:var(--muted-2)">GPU 미검출 (CPU 또는 원격 서버)</span>';
+    }
   }
   function pulseBusy() {
     if (networkSvg) networkSvg.classList.add("busy");
@@ -959,13 +987,15 @@
 
   // 실 GPU 사용률(nvidia-smi) 폴링 → 로고 발광 강도. GPU 없으면(available:false) 0으로 두고 busy만 반영.
   async function pollGpu() {
+    let g = null;
     try {
-      const g = await window.gijo.getGpuUsage();
+      g = await window.gijo.getGpuUsage();
       // 사용률(util)과 VRAM 점유(mem)를 섞되 util에 가중 — 실제 연산 강도를 더 반영.
       gpuGlow = g && g.available ? Math.min(1, (g.utilization * 0.75 + g.memPercent * 0.25) / 100) : 0;
     } catch (e) {
       gpuGlow = 0;
     }
+    updateGpuCard(g);
     applyGlow();
   }
 

@@ -12,7 +12,9 @@
     { section: "모니터링", groups: [
       { ic: "◆", label: "대시보드", tabs: [
         { page: "dashboard.html", label: "대시보드" },
-        { page: "kpi.html", label: "보안 KPI" },
+      ]},
+      { ic: "📊", label: "보안 KPI", tabs: [
+        { page: "kpi.html", label: "보안 KPI 대시보드" },
       ]},
       { ic: "🔬", label: "보안 분석", tabs: [
         { page: "analysis.html", label: "통합 관제" },
