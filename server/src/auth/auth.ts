@@ -28,6 +28,41 @@ interface RefreshRecord {
 
 const refreshTokens = new Map<string, RefreshRecord>();
 
+// ── 로그인 브루트포스 방어 ──────────────────────────────────────────────────
+// 보안 제품의 로그인 자체가 무차별 대입에 뚫리면 치명적이다. (IP + 아이디)별 실패를 집계하고
+// 임계 초과 시 잠근다. 성공하면 즉시 초기화. 폐쇄망 단일 서버라 인메모리로 충분(재시작 시 리셋).
+const LOGIN_MAX_FAILS = Number(process.env.GIJO_LOGIN_MAX_FAILS ?? 10);
+const LOGIN_WINDOW_MS = Number(process.env.GIJO_LOGIN_WINDOW_MS ?? 15 * 60 * 1000);
+interface LoginAttempt {
+  fails: number;
+  firstAt: number;
+  lockedUntil: number;
+}
+const loginAttempts = new Map<string, LoginAttempt>();
+function loginKey(req: Request, username: string): string {
+  const ip = req.ip || req.socket?.remoteAddress || "?";
+  return `${ip}:${username}`;
+}
+// 잠겨 있으면 남은 잠금 시간(ms), 아니면 0.
+function loginLockRemaining(key: string): number {
+  const a = loginAttempts.get(key);
+  if (!a) return 0;
+  if (a.lockedUntil > Date.now()) return a.lockedUntil - Date.now();
+  if (Date.now() - a.firstAt > LOGIN_WINDOW_MS) loginAttempts.delete(key);
+  return 0;
+}
+function recordLoginFail(key: string): void {
+  const now = Date.now();
+  const a = loginAttempts.get(key) ?? { fails: 0, firstAt: now, lockedUntil: 0 };
+  if (now - a.firstAt > LOGIN_WINDOW_MS) {
+    a.fails = 0;
+    a.firstAt = now;
+  }
+  a.fails += 1;
+  if (a.fails >= LOGIN_MAX_FAILS) a.lockedUntil = now + LOGIN_WINDOW_MS;
+  loginAttempts.set(key, a);
+}
+
 export interface TokenPair {
   accessToken: string;
   refreshToken: string;
@@ -51,9 +86,10 @@ function revokeRefreshToken(token: string): void {
   refreshTokens.delete(token);
 }
 
-// 테스트 전용: refreshTokens는 모듈 싱글턴이라 createApp()을 새로 호출해도 초기화되지 않는다.
+// 테스트 전용: refreshTokens·로그인 시도 카운터는 모듈 싱글턴이라 createApp()을 새로 호출해도 초기화되지 않는다.
 export function resetAuthForTests(): void {
   refreshTokens.clear();
+  loginAttempts.clear();
 }
 
 export function authMiddleware(req: Request, res: Response, next: NextFunction): void {
@@ -91,11 +127,19 @@ export function adminMiddleware(req: Request, res: Response, next: NextFunction)
 export function registerAuthRoutes(app: Express): void {
   app.post("/api/auth/login", (req, res) => {
     const { username, password } = req.body as { username: string; password: string };
+    const key = loginKey(req, username ?? "");
+    const lockMs = loginLockRemaining(key);
+    if (lockMs > 0) {
+      res.status(429).json({ error: `로그인 시도가 너무 많습니다. ${Math.ceil(lockMs / 60000)}분 후 다시 시도하세요.` });
+      return;
+    }
     const user = findUserByUsername(username);
     if (!user || !bcrypt.compareSync(password, user.passwordHash)) {
+      recordLoginFail(key);
       res.status(401).json({ error: "invalid credentials" });
       return;
     }
+    loginAttempts.delete(key); // 성공 시 카운터 초기화
     const tokens = issueTokenPair(user.id);
     res.json({ ...tokens, user: { id: user.id, displayName: user.displayName, role: user.role } });
   });

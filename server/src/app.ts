@@ -3,6 +3,7 @@
 
 import express, { Express } from "express";
 import cors from "cors";
+import { schemaVersion } from "./db";
 
 import { registerAuthRoutes } from "./auth/auth";
 import { registerUsersRoutes } from "./auth/users";
@@ -60,9 +61,25 @@ function corsOptions(): cors.CorsOptions | undefined {
   return { origin: origins };
 }
 
+// 보안 응답 헤더 — 외부 의존성(helmet) 없이 핵심만. 보안 제품 자체의 최소 하드닝.
+// HSTS는 TLS로 서빙할 때만(평문 HTTP에 붙이면 무의미·오해 소지).
+function securityHeaders(req: express.Request, res: express.Response, next: express.NextFunction): void {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("Referrer-Policy", "no-referrer");
+  res.setHeader("X-XSS-Protection", "0");
+  res.setHeader("Cross-Origin-Opener-Policy", "same-origin");
+  if (req.secure || process.env.GIJO_TLS_CERT_PATH) {
+    res.setHeader("Strict-Transport-Security", "max-age=15552000; includeSubDomains");
+  }
+  next();
+}
+
 export function createApp(): Express {
   const app = express();
+  app.disable("x-powered-by"); // 서버 스택 노출 최소화
   app.use(cors(corsOptions()));
+  app.use(securityHeaders);
   // 자산 탐지 결과·Nessus 스캔·매뉴얼(base64) 업로드가 클 수 있어 기본 100kb 제한을 올린다.
   // 50mb = 스캔 텍스트 ~49MB / base64 문서 원본 ~36MB까지. 폐쇄망 단일 서버라 메모리만 유의.
   app.use(express.json({ limit: "50mb" }));
@@ -115,7 +132,7 @@ export function createApp(): Express {
   registerKevRoutes(app);
   registerOntologyRoutes(app);
 
-  app.get("/api/health", (_req, res) => res.json({ ok: true, service: "gijo-as-server" }));
+  app.get("/api/health", (_req, res) => res.json({ ok: true, service: "gijo-as-server", schema: schemaVersion() }));
 
   return app;
 }

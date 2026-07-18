@@ -345,3 +345,26 @@ for (const col of ["dueAt INTEGER", "assignee TEXT", "ref TEXT"]) {
     /* 컬럼이 이미 있으면 정상 — 무시 */
   }
 }
+
+// ── 스키마 마이그레이션 추적 ─────────────────────────────────────────────────
+// 위쪽 ALTER들은 "이미 있으면 무시"라 멱등하지만 적용 이력이 남지 않아, 고객 버전 업그레이드 시
+// 어떤 마이그레이션이 적용됐는지 알 수 없었다. 이제 적용된 마이그레이션 id를 기록해 버전을
+// 추적한다(헬스 응답으로 노출). 새 마이그레이션은 migrate(id, sql)로 등록 — 한 번만 실행되고 기록된다.
+db.exec("CREATE TABLE IF NOT EXISTS schema_migrations (id TEXT PRIMARY KEY, appliedAt INTEGER NOT NULL)");
+const appliedMigrations = new Set((db.prepare("SELECT id FROM schema_migrations").all() as { id: string }[]).map((r) => r.id));
+const recordMigration = db.prepare("INSERT OR IGNORE INTO schema_migrations (id, appliedAt) VALUES (?, ?)");
+
+export function migrate(id: string, sql: string): void {
+  if (appliedMigrations.has(id)) return;
+  db.exec(sql);
+  recordMigration.run(id, Date.now());
+  appliedMigrations.add(id);
+}
+
+export function schemaVersion(): { count: number; latest: string | null } {
+  const row = db.prepare("SELECT id FROM schema_migrations ORDER BY appliedAt DESC, id DESC LIMIT 1").get() as { id: string } | undefined;
+  return { count: appliedMigrations.size, latest: row?.id ?? null };
+}
+
+// 위의 초기 스키마 전체를 하나의 베이스라인으로 기록(이미 컬럼이 존재하므로 no-op SQL).
+migrate("baseline-2026-07", "SELECT 1");

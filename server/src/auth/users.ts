@@ -52,6 +52,14 @@ function newId(): string {
   return "u" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
+// 비밀번호 정책 — 길이 우선(기본 8자, GIJO_MIN_PASSWORD_LEN으로 조정). 보안 제품이라 최소한을 강제한다.
+const MIN_PASSWORD_LEN = Number(process.env.GIJO_MIN_PASSWORD_LEN ?? 8);
+export function validatePassword(password: string): void {
+  if (!password || password.length < MIN_PASSWORD_LEN) {
+    throw new Error(`비밀번호는 ${MIN_PASSWORD_LEN}자 이상이어야 합니다`);
+  }
+}
+
 export function createUser(args: {
   username: string;
   password: string;
@@ -61,6 +69,7 @@ export function createUser(args: {
   if (getByUsernameStmt.get(args.username)) {
     throw new Error(`이미 사용 중인 아이디입니다: ${args.username}`);
   }
+  validatePassword(args.password);
   const row: UserRow = {
     id: newId(),
     username: args.username,
@@ -157,11 +166,8 @@ export function registerUsersRoutes(app: Express): void {
       return;
     }
     const { password } = req.body as { password: string };
-    if (!password || password.length < 4) {
-      res.status(400).json({ error: "비밀번호는 4자 이상이어야 합니다" });
-      return;
-    }
     try {
+      validatePassword(password);
       changePassword(targetId, password);
       res.json({ ok: true });
     } catch (err) {

@@ -112,8 +112,8 @@ describe("agent model assignment (A)", () => {
     await request(app)
       .post("/api/users")
       .set("Authorization", `Bearer ${token}`)
-      .send({ username: "officer1", password: "pw1234", displayName: "담당자", role: "security_officer" });
-    const officerToken = await login(app, "officer1", "pw1234");
+      .send({ username: "officer1", password: "pw123456", displayName: "담당자", role: "security_officer" });
+    const officerToken = await login(app, "officer1", "pw123456");
     const res = await request(app)
       .post("/api/agents/analysis/model")
       .set("Authorization", `Bearer ${officerToken}`)

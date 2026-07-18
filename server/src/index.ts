@@ -4,6 +4,8 @@
 // 이 서버 하나에 REST/WebSocket으로 접속한다.
 
 import { createServer } from "http";
+import { createServer as createHttpsServer } from "https";
+import * as fs from "fs";
 import { WebSocketServer } from "ws";
 
 import { createApp } from "./app";
@@ -23,7 +25,15 @@ installConsoleCapture();
 const PORT = Number(process.env.GIJO_SERVER_PORT ?? 4000);
 
 const app = createApp();
-const httpServer = createServer(app);
+
+// TLS(HTTPS) 선택 지원 — GIJO_TLS_CERT_PATH + GIJO_TLS_KEY_PATH가 둘 다 있으면 HTTPS로 서빙한다.
+// 폐쇄망 단일 서버라 평문 HTTP도 동작하지만, 사내망 스니핑 방지를 위해 운영은 TLS 권장.
+const TLS_CERT = process.env.GIJO_TLS_CERT_PATH;
+const TLS_KEY = process.env.GIJO_TLS_KEY_PATH;
+const tlsEnabled = Boolean(TLS_CERT && TLS_KEY);
+const httpServer = tlsEnabled
+  ? createHttpsServer({ cert: fs.readFileSync(TLS_CERT as string), key: fs.readFileSync(TLS_KEY as string) }, app)
+  : createServer(app);
 
 // 실시간 채널: collaboration:event, finetune:progress, asset:updated, log:event, hf-download:progress 등을 모든 접속 클라이언트에 브로드캐스트
 const wss = new WebSocketServer({ server: httpServer, path: "/ws" });
@@ -35,9 +45,10 @@ attachLlmActivitySocket(wss);
 attachHfModelsSocket(wss);
 attachLearnloopSocket(wss);
 
+const scheme = tlsEnabled ? "https" : "http";
 httpServer.listen(PORT, () => {
-  console.log(`GIJO AS 서버 기동 — http://localhost:${PORT} (WebSocket: /ws)`);
-  console.log("standalone 모드: 클라이언트 GIJO_SERVER_URL을 http://localhost:" + PORT + " 로 설정하면 같은 머신에서 붙습니다.");
+  console.log(`GIJO AS 서버 기동 — ${scheme}://localhost:${PORT} (WebSocket: /ws)${tlsEnabled ? " [TLS 활성]" : ""}`);
+  console.log(`standalone 모드: 클라이언트 GIJO_SERVER_URL을 ${scheme}://localhost:${PORT} 로 설정하면 같은 머신에서 붙습니다.`);
   // 모델 파일이 있으면 채팅 LLM + 임베딩 서버를 자동 기동 — 실패해도 서버 자체는 계속 뜬다.
   void autoStartLocalEngines().catch((err) => console.error("[index] 로컬 LLM 자동 시작 실패:", err));
   // CISA KEV 목록을 백그라운드로 최신화(공개 피드 다운로드 — 실패해도 캐시로 동작).

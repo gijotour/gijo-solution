@@ -31,8 +31,8 @@ describe("user account management", () => {
     await request(app)
       .post("/api/users")
       .set("Authorization", `Bearer ${admin.accessToken}`)
-      .send({ username: "officer1", password: "pw1234", displayName: "담당자1", role: "security_officer" });
-    const officer = await login(app, "officer1", "pw1234");
+      .send({ username: "officer1", password: "pw123456", displayName: "담당자1", role: "security_officer" });
+    const officer = await login(app, "officer1", "pw123456");
 
     const list = await request(app).get("/api/users").set("Authorization", `Bearer ${officer.accessToken}`);
     expect(list.status).toBe(403);
@@ -40,7 +40,7 @@ describe("user account management", () => {
     const create = await request(app)
       .post("/api/users")
       .set("Authorization", `Bearer ${officer.accessToken}`)
-      .send({ username: "officer2", password: "pw1234", displayName: "담당자2", role: "security_officer" });
+      .send({ username: "officer2", password: "pw123456", displayName: "담당자2", role: "security_officer" });
     expect(create.status).toBe(403);
   });
 
@@ -48,11 +48,11 @@ describe("user account management", () => {
     const create = await request(app)
       .post("/api/users")
       .set("Authorization", `Bearer ${admin.accessToken}`)
-      .send({ username: "officer1", password: "pw1234", displayName: "담당자1", role: "security_officer" });
+      .send({ username: "officer1", password: "pw123456", displayName: "담당자1", role: "security_officer" });
     expect(create.status).toBe(200);
     expect(create.body).toMatchObject({ username: "officer1", displayName: "담당자1", role: "security_officer" });
 
-    const loginRes = await request(app).post("/api/auth/login").send({ username: "officer1", password: "pw1234" });
+    const loginRes = await request(app).post("/api/auth/login").send({ username: "officer1", password: "pw123456" });
     expect(loginRes.status).toBe(200);
   });
 
@@ -60,7 +60,7 @@ describe("user account management", () => {
     const res = await request(app)
       .post("/api/users")
       .set("Authorization", `Bearer ${admin.accessToken}`)
-      .send({ username: "jyh", password: "pw1234", displayName: "중복", role: "security_officer" });
+      .send({ username: "jyh", password: "pw123456", displayName: "중복", role: "security_officer" });
     expect(res.status).toBe(400);
   });
 
@@ -68,14 +68,14 @@ describe("user account management", () => {
     const create = await request(app)
       .post("/api/users")
       .set("Authorization", `Bearer ${admin.accessToken}`)
-      .send({ username: "officer1", password: "pw1234", displayName: "담당자1", role: "security_officer" });
+      .send({ username: "officer1", password: "pw123456", displayName: "담당자1", role: "security_officer" });
 
     const del = await request(app)
       .delete(`/api/users/${create.body.id}`)
       .set("Authorization", `Bearer ${admin.accessToken}`);
     expect(del.status).toBe(200);
 
-    const loginRes = await request(app).post("/api/auth/login").send({ username: "officer1", password: "pw1234" });
+    const loginRes = await request(app).post("/api/auth/login").send({ username: "officer1", password: "pw123456" });
     expect(loginRes.status).toBe(401);
   });
 
@@ -91,8 +91,8 @@ describe("user account management", () => {
     const create = await request(app)
       .post("/api/users")
       .set("Authorization", `Bearer ${admin.accessToken}`)
-      .send({ username: "officer1", password: "pw1234", displayName: "담당자1", role: "security_officer" });
-    const officer = await login(app, "officer1", "pw1234");
+      .send({ username: "officer1", password: "pw123456", displayName: "담당자1", role: "security_officer" });
+    const officer = await login(app, "officer1", "pw123456");
 
     // officer는 admin이 아니라 애초에 403이지만, "마지막 admin 보호" 자체는 admin이 admin을 지우는
     // 시나리오로 검증한다: 두 번째 admin을 만들고, 첫 번째 admin이 자기 자신이 아닌 그 admin을
@@ -100,8 +100,8 @@ describe("user account management", () => {
     const secondAdminRes = await request(app)
       .post("/api/users")
       .set("Authorization", `Bearer ${admin.accessToken}`)
-      .send({ username: "admin2", password: "pw1234", displayName: "관리자2", role: "admin" });
-    const secondAdmin = await login(app, "admin2", "pw1234");
+      .send({ username: "admin2", password: "pw123456", displayName: "관리자2", role: "admin" });
+    const secondAdmin = await login(app, "admin2", "pw123456");
 
     // 지금 admin 2명(jyh, admin2). admin2가 jyh를 지우는 건 허용(admin2 관점에서 자기 자신 아님, 마지막
     // admin도 아님 — 지운 뒤에도 admin2가 남으니까).
@@ -124,8 +124,8 @@ describe("user account management", () => {
     const create = await request(app)
       .post("/api/users")
       .set("Authorization", `Bearer ${admin.accessToken}`)
-      .send({ username: "officer1", password: "pw1234", displayName: "담당자1", role: "security_officer" });
-    const officer = await login(app, "officer1", "pw1234");
+      .send({ username: "officer1", password: "pw123456", displayName: "담당자1", role: "security_officer" });
+    const officer = await login(app, "officer1", "pw123456");
 
     const change = await request(app)
       .post(`/api/users/${officer.user.id}/password`)
@@ -133,7 +133,7 @@ describe("user account management", () => {
       .send({ password: "new-password" });
     expect(change.status).toBe(200);
 
-    const oldLogin = await request(app).post("/api/auth/login").send({ username: "officer1", password: "pw1234" });
+    const oldLogin = await request(app).post("/api/auth/login").send({ username: "officer1", password: "pw123456" });
     expect(oldLogin.status).toBe(401);
     const newLogin = await request(app).post("/api/auth/login").send({ username: "officer1", password: "new-password" });
     expect(newLogin.status).toBe(200);
@@ -143,12 +143,12 @@ describe("user account management", () => {
     const create = await request(app)
       .post("/api/users")
       .set("Authorization", `Bearer ${admin.accessToken}`)
-      .send({ username: "officer1", password: "pw1234", displayName: "담당자1", role: "security_officer" });
+      .send({ username: "officer1", password: "pw123456", displayName: "담당자1", role: "security_officer" });
     const officer2Create = await request(app)
       .post("/api/users")
       .set("Authorization", `Bearer ${admin.accessToken}`)
-      .send({ username: "officer2", password: "pw1234", displayName: "담당자2", role: "security_officer" });
-    const officer1 = await login(app, "officer1", "pw1234");
+      .send({ username: "officer2", password: "pw123456", displayName: "담당자2", role: "security_officer" });
+    const officer1 = await login(app, "officer1", "pw123456");
 
     const res = await request(app)
       .post(`/api/users/${officer2Create.body.id}/password`)
@@ -161,7 +161,7 @@ describe("user account management", () => {
     const create = await request(app)
       .post("/api/users")
       .set("Authorization", `Bearer ${admin.accessToken}`)
-      .send({ username: "officer1", password: "pw1234", displayName: "담당자1", role: "security_officer" });
+      .send({ username: "officer1", password: "pw123456", displayName: "담당자1", role: "security_officer" });
 
     const res = await request(app)
       .post(`/api/users/${create.body.id}/password`)

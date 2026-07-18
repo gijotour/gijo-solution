@@ -91,8 +91,8 @@ describe("maintenance (유지보수 일정 · 점검서 · 승인)", () => {
     await request(app)
       .post("/api/users")
       .set(auth(adminToken))
-      .send({ username: "officer1", password: "pw1234", displayName: "김담당", role: "security_officer" });
-    const officerToken = await login(app, "officer1", "pw1234");
+      .send({ username: "officer1", password: "pw123456", displayName: "김담당", role: "security_officer" });
+    const officerToken = await login(app, "officer1", "pw123456");
 
     const item = await createItem();
     await request(app).post(`/api/maintenance/${item.id}/report`).set(auth(officerToken)).send({ note: "점검함" });
