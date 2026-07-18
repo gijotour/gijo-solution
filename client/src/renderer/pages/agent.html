@@ -319,28 +319,33 @@ tr:last-child td{border-bottom:none;}
   let isAdmin = false;
 
   let agentRecs = {};
+  let globalModelId = null; // 전역(공유) 채팅 모델 id — 개별 지정 안 한 에이전트가 쓰는 모델
   const esc = (s) => String(s == null ? "" : s).replace(/</g, "&lt;");
   const dirNameOf = (id) => String(id).replace(/\//g, "__");
 
-  // 기능 기반 추천 모델 표시 — 받아지지 않았으면 [받기](다운로드 큐), 받아졌으면 [적용](할당).
+  // 지금 이 에이전트가 실제로 쓰는 모델을 앞에 표시한다(요청: 추천 → 현재 사용 모델).
+  // 개별 지정(assignedModelId)이 있으면 그 모델, 없으면 전역 공유 모델. 기능 기반 추천은 참고로 아래에 유지(받기/적용).
   function recommendationHtml(a) {
+    const current = a.assignedModelId || globalModelId;
+    const currentLabel = current
+      ? `<b>${esc(current)}</b>${a.assignedModelId ? "" : ' <span class="rec-gb">전역 공유</span>'}`
+      : '<span class="rec-gb">전역 모델 미로드</span>';
+    const currentLine = `<div class="rec-head">🧠 현재 모델: ${currentLabel}</div>`;
     const rec = agentRecs[a.id];
-    if (!rec) return "";
-    const dir = dirNameOf(rec.id);
-    const installed = availableModels.some((m) => m.id === dir);
-    const assigned = a.assignedModelId === dir;
-    let action;
-    if (assigned) action = `<span class="rec-ok">✓ 적용됨</span>`;
-    else if (installed) action = isAdmin
-      ? `<button class="rec-btn" data-rec-apply="${a.id}" data-rec-dir="${dir}">적용</button>`
-      : `<span class="rec-gb" style="margin-left:auto">받아짐 · admin이 적용</span>`;
-    else action = `<button class="rec-btn" data-rec-get="${esc(rec.id)}">받기</button>`;
-    return (
-      `<div class="agent-rec">` +
-      `<div class="rec-head">💡 추천: <b>${esc(rec.name)}</b> <span class="rec-gb">${esc(rec.approxGb)}</span>${action}</div>` +
-      `<div class="rec-reason">${esc(rec.reason)}</div>` +
-      `</div>`
-    );
+    let recBlock = "";
+    if (rec) {
+      const dir = dirNameOf(rec.id);
+      const installed = availableModels.some((m) => m.id === dir);
+      const assigned = a.assignedModelId === dir;
+      let action;
+      if (assigned) action = `<span class="rec-ok">✓ 적용됨</span>`;
+      else if (installed) action = isAdmin
+        ? `<button class="rec-btn" data-rec-apply="${a.id}" data-rec-dir="${dir}">적용</button>`
+        : `<span class="rec-gb" style="margin-left:auto">받아짐 · admin이 적용</span>`;
+      else action = `<button class="rec-btn" data-rec-get="${esc(rec.id)}">받기</button>`;
+      recBlock = `<div class="rec-reason" style="margin-top:6px">💡 추천: <b>${esc(rec.name)}</b> <span class="rec-gb">${esc(rec.approxGb)}</span>${action}<br>${esc(rec.reason)}</div>`;
+    }
+    return `<div class="agent-rec">${currentLine}${recBlock}</div>`;
   }
 
   function modelSelectHtml(a) {
@@ -476,13 +481,16 @@ tr:last-child td{border-bottom:none;}
 
   async function loadAgents() {
     try {
-      const [agents, models, recs] = await Promise.all([
+      const [agents, models, recs, status] = await Promise.all([
         window.gijo.listAgents(),
         window.gijo.listModels().catch(() => []),
         window.gijo.getAgentRecommendations().catch(() => ({})),
+        window.gijo.getLocalEngineStatus().catch(() => null),
       ]);
       availableModels = models;
       agentRecs = recs || {};
+      // 전역(공유) 모델 = 지금 로드된 기본 채팅 모델. 에이전트가 개별 모델을 지정 안 했으면 이걸 쓴다.
+      globalModelId = status ? (status.modelId || (status.loaded && status.loaded[0] && status.loaded[0].modelId) || null) : null;
       renderAgents(agents);
     } catch (e) {
       agentGrid.innerHTML = '<div style="color:var(--muted)">에이전트 목록을 불러오지 못했습니다</div>';
@@ -647,11 +655,16 @@ tr:last-child td{border-bottom:none;}
         row.innerHTML = `<span>llama-server</span><span class="badge b-amber">중지됨</span>`;
         return;
       }
-      const loaded = status.loaded && status.loaded.length ? status.loaded : [{ modelId: status.modelId, port: status.port, ready: true }];
-      const list = loaded
+      const chat = status.loaded && status.loaded.length ? status.loaded : [{ modelId: status.modelId, port: status.port, ready: true }];
+      // 임베딩(bge-m3)도 GPU 상주 모듈이라 함께 표시한다(채팅 + 임베딩 = 2개).
+      const emb = status.embedding && status.embedding.running
+        ? [{ modelId: `${status.embedding.modelId} (임베딩)`, port: status.embedding.port, ready: true }]
+        : [];
+      const all = [...chat, ...emb];
+      const list = all
         .map((m) => `<span class="badge b-teal" style="margin:1px 0">● ${m.modelId}${m.ready ? "" : " (로딩중)"} · :${m.port}</span>`)
         .join(" ");
-      row.innerHTML = `<span>llama-server · ${loaded.length}개 상주</span><span style="display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end">${list}</span>`;
+      row.innerHTML = `<span>llama-server · ${all.length}개 상주</span><span style="display:flex;flex-wrap:wrap;gap:4px;justify-content:flex-end">${list}</span>`;
     } catch (e) {
       row.innerHTML = `<span>llama-server</span><span class="badge b-amber">상태 조회 실패</span>`;
     }
