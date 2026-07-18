@@ -1143,6 +1143,21 @@
           badge.textContent = "☁ 클라우드 · 내부정보 미포함";
           badge.style.cssText = "font-size:9.5px;font-weight:800;padding:1px 7px;border-radius:5px;background:rgba(139,124,240,.16);border:1px solid #8b7cf0;color:#b3a6ff;margin-left:6px";
           row.querySelector(".cn").appendChild(badge);
+          // 4단계 — 이 답변을 지식베이스(RAG)에 저장. 외부 생성물이라 자동 인입 대신 사람이 눌러 승인.
+          const saveBtn = document.createElement("button");
+          saveBtn.className = "cl-offer-btn";
+          saveBtn.textContent = "📥 지식베이스에 저장";
+          saveBtn.title = "외부 클라우드 답변을 사내 지식베이스에 저장합니다(검증 필요 표시가 함께 붙습니다).";
+          saveBtn.addEventListener("click", async () => {
+            saveBtn.disabled = true; saveBtn.textContent = "저장 중…";
+            try {
+              const s = await window.gijo.saveCloudAnswerToKb(question, r.answer || "", r.providerLabel || "클라우드", r.model || "");
+              saveBtn.textContent = `✓ 지식베이스 저장됨 (${s.chunks}청크)`;
+            } catch (e) {
+              saveBtn.disabled = false; saveBtn.textContent = "📥 저장 실패 — 다시";
+            }
+          });
+          row.querySelector(".cb").appendChild(saveBtn);
           btn.parentElement.parentElement.remove(); // 제안 행 제거(중복 방지)
         } else if (r.blocked) {
           btn.textContent = "🔒 내부 정보 감지 — 전송 안 됨";

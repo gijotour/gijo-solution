@@ -2,6 +2,14 @@
 // 실제 클라우드 호출은 global.fetch를 가로채 "무엇이 나가는지"까지 확인한다(내부맥락 미포함 증명).
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import request from "supertest";
+
+// 지식베이스 저장은 임베딩(LanceDB)을 타므로, 그 경로만 대역으로 두고 "무엇을 저장하는지"를 검증한다.
+const ingestSpy = vi.fn(async (documentId: string) => ({ documentId, chunks: 1, embeddingModel: "mock", scope: "global" }));
+vi.mock("../src/engine/memory", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../src/engine/memory")>()),
+  ingestText: (documentId: string, ...rest: unknown[]) => ingestSpy(documentId, ...(rest as [])),
+}));
+
 import { createApp } from "../src/app";
 import { resetAssetsForTests, registerAsset } from "../src/engine/assets";
 
@@ -106,5 +114,24 @@ describe("cloud LLM 하이브리드", () => {
     const ok = await request(app).post("/api/cloud/screen").set("Authorization", `Bearer ${admin}`).send({ question: "CVSS 점수 계산법" });
     expect(ok.body.allowed).toBe(true);
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("클라우드 답변을 지식베이스에 저장하면 출처·검증경고를 붙여 인입한다(4단계)", async () => {
+    ingestSpy.mockClear();
+    const r = await request(app).post("/api/cloud/save-to-kb").set("Authorization", `Bearer ${admin}`)
+      .send({ question: "XZ Utils 백도어가 뭐야?", answer: "리눅스 압축 도구에 심어진 공급망 백도어입니다.", providerLabel: "Google Gemini", model: "gemini-flash-latest" });
+    expect(r.status).toBe(200);
+    expect(r.body.documentId).toContain("☁"); // 출처 구분 접두어
+    expect(ingestSpy).toHaveBeenCalledTimes(1);
+    const [docId, content] = ingestSpy.mock.calls[0];
+    expect(docId).toContain("Google Gemini");
+    expect(content).toContain("외부 클라우드 LLM이 생성한 내용");   // 검증 필요 경고
+    expect(content).toContain("XZ Utils 백도어가 뭐야?");          // 질문 보존
+    expect(content).toContain("공급망 백도어");                    // 답변 보존
+  });
+
+  it("답변 없이 저장 요청하면 400", async () => {
+    const r = await request(app).post("/api/cloud/save-to-kb").set("Authorization", `Bearer ${admin}`).send({ question: "q" });
+    expect(r.status).toBe(400);
   });
 });

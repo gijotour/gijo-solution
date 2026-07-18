@@ -451,6 +451,8 @@ export const cloudApi = {
   ask: (question: string) => request<CloudAskResult>("/api/cloud/ask", { method: "POST", body: { question } }),
   screen: (question: string) => request<EgressScreen>("/api/cloud/screen", { method: "POST", body: { question } }),
   egressLog: (limit?: number) => request<EgressLogEntry[]>(`/api/cloud/egress-log${limit ? `?limit=${limit}` : ""}`),
+  saveToKb: (question: string, answer: string, providerLabel: string, model: string) =>
+    request<{ documentId: string; chunks: number }>("/api/cloud/save-to-kb", { method: "POST", body: { question, answer, providerLabel, model } }),
 };
 
 // ── 장기 기억(RAG) ────────────────────────────────────────────────────

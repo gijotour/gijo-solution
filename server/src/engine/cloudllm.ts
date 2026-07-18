@@ -17,6 +17,7 @@ import type { GijoUser } from "../auth/users";
 import { encryptString, decryptString, getEncryptionKey } from "./cryptopack";
 import { screenForCloud } from "./cloudegress";
 import { emitCollaboration } from "./collaboration";
+import { ingestText, GLOBAL_SCOPE } from "./memory";
 
 export type CloudProvider = "gemini" | "claude" | "openai";
 const PROVIDERS: CloudProvider[] = ["gemini", "claude", "openai"];
@@ -235,6 +236,39 @@ export async function askCloud(question: string, user?: GijoUser): Promise<Cloud
   }
 }
 
+// ── 클라우드 답변을 지식베이스(RAG)에 저장 (4단계: 사람 승인 후에만) ──────────────
+// 설계 원칙(2026-07-19): 클라우드 답변은 자동 인입하지 않는다 — 외부 생성물이라 환각·라이선스·
+// 로컬 모델 종속 위험이 있다. 사용자가 명시적으로 "저장" 버튼을 눌러 승인한 것만, 그것도 "외부
+// 클라우드 생성물이라 검증 필요"라는 경고 문구를 앞에 붙여 저장한다(RAG가 나중에 이걸 근거로
+// 답할 때 그 성격을 알 수 있게). documentId에도 ☁를 붙여 '올린 문서 관리'에서 구분되게 한다.
+export interface SaveToKbResult {
+  documentId: string;
+  chunks: number;
+}
+
+export async function saveCloudAnswerToKb(question: string, answer: string, providerLabel: string, model: string): Promise<SaveToKbResult> {
+  const q = (question ?? "").trim();
+  const a = (answer ?? "").trim();
+  if (!a) throw new Error("저장할 답변이 없습니다.");
+  const now = new Date();
+  const stamp = `${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  const qSlug = q.replace(/\s+/g, " ").slice(0, 30) || "클라우드 답변";
+  const documentId = `☁ ${qSlug} (${providerLabel}, ${stamp})`;
+  const content = [
+    `[클라우드 보조 답변 · ${providerLabel} ${model} · ${now.toLocaleString("ko-KR")}]`,
+    "⚠ 외부 클라우드 LLM이 생성한 내용입니다 — 사내 검증 근거가 아니므로 사실 확인 후 활용하세요.",
+    "",
+    `질문: ${q}`,
+    "",
+    "답변:",
+    a,
+  ].join("\n");
+  // classify=false — 출처가 명확(클라우드)하므로 LLM 분류를 돌리지 않는다.
+  const r = await ingestText(documentId, content, GLOBAL_SCOPE, undefined, false);
+  emitCollaboration({ from: "orchestrator", to: "analysis", message: `클라우드 답변을 지식베이스에 저장(승인): ${documentId} — ${r.chunks}청크` });
+  return { documentId, chunks: r.chunks };
+}
+
 // ── 라우트 ──────────────────────────────────────────────────────────────────
 export function registerCloudLlmRoutes(app: Express): void {
   // 설정 조회 — 키 평문은 절대 안 내려주고 설정 여부(hasKey)만.
@@ -312,4 +346,15 @@ export function registerCloudLlmRoutes(app: Express): void {
   app.get("/api/cloud/egress-log", authMiddleware, adminMiddleware, (req, res) => {
     res.json(listEgressLog(Number(req.query.limit) || 100));
   });
+
+  // 클라우드 답변을 지식베이스에 저장 — 사용자가 답변 아래 버튼을 눌러 명시적으로 승인한 경우만.
+  app.post(
+    "/api/cloud/save-to-kb",
+    authMiddleware,
+    asyncRoute(async (req, res) => {
+      const { question, answer, providerLabel, model } = req.body as { question?: string; answer?: string; providerLabel?: string; model?: string };
+      if (!answer) return res.status(400).json({ error: "answer가 필요합니다." });
+      res.json(await saveCloudAnswerToKb(question ?? "", answer, providerLabel ?? "클라우드", model ?? ""));
+    })
+  );
 }
