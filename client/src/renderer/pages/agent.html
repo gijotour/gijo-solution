@@ -323,29 +323,14 @@ tr:last-child td{border-bottom:none;}
   const esc = (s) => String(s == null ? "" : s).replace(/</g, "&lt;");
   const dirNameOf = (id) => String(id).replace(/\//g, "__");
 
-  // 지금 이 에이전트가 실제로 쓰는 모델을 앞에 표시한다(요청: 추천 → 현재 사용 모델).
-  // 개별 지정(assignedModelId)이 있으면 그 모델, 없으면 전역 공유 모델. 기능 기반 추천은 참고로 아래에 유지(받기/적용).
+  // 지금 이 에이전트가 실제로 쓰는 모델만 표시한다(개별 지정 모델 또는 전역 공유 모델).
+  // 로스터 카드에는 추천 모델·설명은 표시하지 않는다(요청). 추천/다운로드는 우측 'HuggingFace 모델 검색'에서.
   function recommendationHtml(a) {
     const current = a.assignedModelId || globalModelId;
     const currentLabel = current
       ? `<b>${esc(current)}</b>${a.assignedModelId ? "" : ' <span class="rec-gb">전역 공유</span>'}`
       : '<span class="rec-gb">전역 모델 미로드</span>';
-    const currentLine = `<div class="rec-head">🧠 현재 모델: ${currentLabel}</div>`;
-    const rec = agentRecs[a.id];
-    let recBlock = "";
-    if (rec) {
-      const dir = dirNameOf(rec.id);
-      const installed = availableModels.some((m) => m.id === dir);
-      const assigned = a.assignedModelId === dir;
-      let action;
-      if (assigned) action = `<span class="rec-ok">✓ 적용됨</span>`;
-      else if (installed) action = isAdmin
-        ? `<button class="rec-btn" data-rec-apply="${a.id}" data-rec-dir="${dir}">적용</button>`
-        : `<span class="rec-gb" style="margin-left:auto">받아짐 · admin이 적용</span>`;
-      else action = `<button class="rec-btn" data-rec-get="${esc(rec.id)}">받기</button>`;
-      recBlock = `<div class="rec-reason" style="margin-top:6px">💡 추천: <b>${esc(rec.name)}</b> <span class="rec-gb">${esc(rec.approxGb)}</span>${action}<br>${esc(rec.reason)}</div>`;
-    }
-    return `<div class="agent-rec">${currentLine}${recBlock}</div>`;
+    return `<div class="agent-rec"><div class="rec-head">🧠 현재 모델: ${currentLabel}</div></div>`;
   }
 
   function modelSelectHtml(a) {
