@@ -1,0 +1,4 @@
+model_name,type,owner,endpoint,framework,discovered_by,notes
+gijo-security-assistant (Llama-3.1-8B-Instruct 파인튜닝),ai-llm,보안운영팀,https://llm-internal.gijo.local/v1,Ollama,AI Discovery Scan,사내 보안 상담 챗봇. RAG로 사내 보안정책 참조. 미인증 API 노출 의심.
+gijo-doc-classifier (Qwen2.5-14B),ai-llm,정보보호팀,https://llm-internal.gijo.local:8443/v1,vLLM,AI Discovery Scan,문서 민감도 자동 분류 모델. 인사·계약 문서 접근.
+shadow-gpt-proxy (외부 GPT-4o 프록시),ai-gateway,미상(비인가),https://34.120.55.12/openai,LiteLLM,AI Discovery Scan,비인가 외부 LLM 프록시 발견. 사내 데이터 외부 유출 위험.
