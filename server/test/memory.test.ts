@@ -7,6 +7,9 @@ import * as os from "os";
 // (개발 머신의 실제 data/memory.lancedb를 건드리지 않기 위해).
 const tmpDb = fs.mkdtempSync(path.join(os.tmpdir(), "gijo-lancedb-"));
 process.env.GIJO_MEMORY_DB_PATH = tmpDb;
+// ingestDocument는 경로 순회 방지를 위해 허용 루트(기본 data/) 밖의 파일을 거부한다(2026-07-19 보안수정).
+// 이 테스트는 임시 디렉터리에 픽스처 파일을 두므로, 그 디렉터리를 허용 루트로 지정한다.
+process.env.GIJO_INGEST_ROOT = tmpDb;
 
 // 임베딩 차원을 테스트마다 바꿀 수 있는 mock — 임베딩 모델 교체 시나리오 재현용
 let embedDim = 3;

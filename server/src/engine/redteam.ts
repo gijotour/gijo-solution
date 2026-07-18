@@ -131,7 +131,7 @@ let lastReport: RedTeamReport | null = null;
 
 // 지정 로컬 모델을 raw로 호출(페르소나·RAG 없이 순수 시스템+사용자) — 실제 배포 모델의 견고성 측정.
 // modelId가 없으면 오케스트레이터(에이전트 할당 모델). 이렇게 대상만 바꿔 어느 내부 LLM이든 점검한다.
-function makeServedCaller(modelId?: string): LlmCaller {
+export function makeServedCaller(modelId?: string): LlmCaller {
   return async (system: string, user: string): Promise<string> => {
     const le = await import("./localengine.js");
     const base = modelId

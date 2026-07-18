@@ -388,20 +388,69 @@ export const llmActivityApi = {
 };
 
 // ── 스마트 통합 업로드 — 파일 유형 자동 판별·라우팅(취약점 스캔/매뉴얼/문서 분류) ──
-export type UploadType = "asset" | "log" | "document" | "guideline";
+export type UploadType = "asset" | "log" | "document" | "guideline" | "vulnreport";
 export interface AutoUploadResult {
   filename: string;
   routedTo: "vulnscan" | "product-manual" | "memory" | "decision";
   reason: string;
   needsDecision?: boolean;
   guess?: UploadType;
+  guessProductName?: string;
   vulnscan?: { hosts: number; findings: number };
   manual?: { productName: string; kind: string; createdProduct: boolean };
   memory?: { chunks: number; docClass?: string; linkedProduct?: string };
 }
 export const uploadApi = {
-  auto: (filename: string, content: string, forceType?: UploadType) =>
-    request<AutoUploadResult>("/api/upload/auto", { method: "POST", body: { filename, content, ...(forceType ? { forceType } : {}) } }),
+  auto: (filename: string, content: string, forceType?: UploadType, productName?: string) =>
+    request<AutoUploadResult>("/api/upload/auto", {
+      method: "POST",
+      body: { filename, content, ...(forceType ? { forceType } : {}), ...(productName ? { productName } : {}) },
+    }),
+};
+
+// ── 선택적 클라우드 LLM 하이브리드 (Gemini/Claude/OpenAI) ─────────────────
+export type CloudProvider = "gemini" | "claude" | "openai";
+export interface CloudConfig {
+  enabled: boolean;
+  activeProvider: CloudProvider;
+  providers: { provider: CloudProvider; label: string; hasKey: boolean; model: string }[];
+}
+export interface CloudAskResult {
+  routedToCloud: boolean;
+  blocked: boolean;
+  reasons: string[];
+  provider?: CloudProvider;
+  providerLabel?: string;
+  model?: string;
+  answer?: string;
+  error?: string;
+}
+export interface EgressScreen {
+  allowed: boolean;
+  reasons: string[];
+}
+export interface EgressLogEntry {
+  id: string;
+  at: number;
+  userId: string | null;
+  provider: string | null;
+  decision: "allowed" | "blocked";
+  reasons: string[];
+  questionPreview: string | null;
+}
+export interface CloudStatus {
+  enabled: boolean;
+  activeProvider: CloudProvider;
+  providerLabel: string;
+}
+export const cloudApi = {
+  status: () => request<CloudStatus>("/api/cloud/status"),
+  getConfig: () => request<CloudConfig>("/api/cloud/config"),
+  saveConfig: (patch: { enabled?: boolean; activeProvider?: CloudProvider; provider?: CloudProvider; apiKey?: string; model?: string; clearKey?: boolean }) =>
+    request<CloudConfig>("/api/cloud/config", { method: "POST", body: patch }),
+  ask: (question: string) => request<CloudAskResult>("/api/cloud/ask", { method: "POST", body: { question } }),
+  screen: (question: string) => request<EgressScreen>("/api/cloud/screen", { method: "POST", body: { question } }),
+  egressLog: (limit?: number) => request<EgressLogEntry[]>(`/api/cloud/egress-log${limit ? `?limit=${limit}` : ""}`),
 };
 
 // ── 장기 기억(RAG) ────────────────────────────────────────────────────

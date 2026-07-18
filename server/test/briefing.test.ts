@@ -10,9 +10,10 @@ vi.mock("../src/engine/llm", () => ({
 import { resetAssetsForTests, registerAsset, recordFindings } from "../src/engine/assets";
 import { resetApprovalsForTests, listFindingReviews, updateFindingReview } from "../src/engine/approvals";
 import { slaAlerts, buildDailyBriefing } from "../src/engine/briefing";
+import { plusDaysLocal } from "../src/util/date";
 
 function ymd(daysFromNow: number): string {
-  return new Date(Date.now() + daysFromNow * 86400000).toISOString().slice(0, 10);
+  return plusDaysLocal(daysFromNow);
 }
 
 beforeEach(() => {

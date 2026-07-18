@@ -150,8 +150,15 @@ function approvalMessage(approval: PendingApproval): string {
 
 // 최종 답변 재작성 — 도구 결과(사실)를 근거로 일반 chat 경로에서 한국어 답을 만든다.
 // remember:true라 대화 이력·학습루프 수집·RAG 주입까지 기존 채팅과 동일하게 동작한다.
+// 도구 선택 과정의 자체 실수(존재하지 않는 도구를 부름·인자 오류·실행 실패)는 결정 루프가 다음
+// 스텝에서 스스로 고치라고 남겨두는 메모지, 사용자에게 보여줄 사실이 아니다. 실측(2026-07-19):
+// 이 오류 메시지가 그대로 최종 답변 근거에 섞여 들어가 "자동화된 비교 도구가 없는 것을 확인했기
+// 때문에" 같은 내부 과정 이야기가 사용자 답변에 새어나왔다 — 최종 답변을 만들 때는 걸러낸다.
+const INTERNAL_TOOL_ERROR_RE = /^(존재하지 않는 도구|인자 오류|도구 실행 실패):/;
+
 async function composeFinalAnswer(instruction: string, calls: AgentToolCall[], context = ""): Promise<string> {
-  const facts = calls.map((c, i) => `[${i + 1}] ${c.tool}: ${c.result}`).join("\n");
+  const usefulCalls = calls.filter((c) => !INTERNAL_TOOL_ERROR_RE.test(c.result));
+  const facts = (usefulCalls.length ? usefulCalls : calls).map((c, i) => `[${i + 1}] ${c.tool}: ${c.result}`).join("\n");
   return chat({
     agentId: "orchestrator",
     message: [
@@ -162,6 +169,9 @@ async function composeFinalAnswer(instruction: string, calls: AgentToolCall[], c
       facts,
       "",
       "위 데이터만 근거로 지시에 대한 최종 답변을 작성하라. 데이터에 없는 내용은 지어내지 마라.",
+      "지시에 비교 대상이나 조건이 여러 개 있으면(예: 자산 2개 비교) 하나만 다루고 끝내지 말고 전부 빠짐없이 다뤄라.",
+      "같은 판단·결론을 문장만 바꿔 반복하지 마라 — 한 번만 명확히 말하고 끝내라.",
+      "도구·시스템 내부 동작(어떤 도구를 썼는지, 도구가 있는지 없는지 등)은 언급하지 말고, 데이터에서 얻은 결론만 말하라.",
     ].join("\n"),
     remember: true,
   });

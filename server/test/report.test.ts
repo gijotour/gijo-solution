@@ -15,6 +15,7 @@ import { importVulnScan } from "../src/engine/vulnscan";
 import { resetKevForTests } from "../src/engine/kev";
 import { createTask, resetTasksForTests } from "../src/engine/tasks";
 import type { MaintenanceItem } from "../src/engine/maintenance";
+import { todayLocal } from "../src/util/date";
 
 async function login(app: ReturnType<typeof createApp>) {
   const res = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" });
@@ -76,7 +77,7 @@ describe("report", () => {
   });
 
   it("maintenanceSummary counts by status and flags overdue scheduled items", () => {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = todayLocal();
     const mk = (over: Partial<MaintenanceItem>): MaintenanceItem => ({
       id: "x", title: "t", productName: "p", scheduleDate: "2099-01-01", status: "scheduled",
       createdAt: 0, updatedAt: 0, ...over,

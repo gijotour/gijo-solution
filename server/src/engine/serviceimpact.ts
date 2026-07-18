@@ -8,6 +8,7 @@
 import type { Express } from "express";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
+import { todayLocal } from "../util/date";
 import { listAssets, Asset } from "./assets";
 import { listMaintenanceItems } from "./maintenance";
 import { listFindings } from "./cti";
@@ -95,9 +96,7 @@ export function computeServiceImpact(
   };
 }
 
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+const today = todayLocal;
 
 // 지연(오늘 이하·미완료) 점검을 자산별로 집계한다.
 function overdueInspectionsByAsset(): Map<string, number> {

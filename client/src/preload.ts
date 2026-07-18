@@ -98,7 +98,8 @@ const gijoApi = {
   listAssets: () => api.assetsApi.list(),
   getAsset: (id: string) => api.assetsApi.get(id),
   scanAsset: (id: string) => api.assetsApi.scan(id),
-  uploadAuto: (filename: string, content: string, forceType?: import("./apiClient").UploadType) => api.uploadApi.auto(filename, content, forceType),
+  uploadAuto: (filename: string, content: string, forceType?: import("./apiClient").UploadType, productName?: string) =>
+    api.uploadApi.auto(filename, content, forceType, productName),
   deleteAsset: (id: string) => api.assetsApi.remove(id),
   registerAsset: (args: { id: string; name: string; path: string; assetType?: string; owner?: string; service?: string }) =>
     api.assetsApi.register(args),
@@ -142,6 +143,15 @@ const gijoApi = {
   listMemoryDocuments: () => api.memoryApi.listDocuments(),
   memoryDocumentChunks: (documentId: string, limit?: number) => api.memoryApi.documentChunks(documentId, limit),
   deleteMemoryDocument: (documentId: string, withFile?: boolean) => api.memoryApi.deleteDocument(documentId, withFile),
+
+  // 선택적 클라우드 LLM 하이브리드(Gemini/Claude/OpenAI) — 기본 OFF·admin 설정, egress 게이트 통과분만.
+  cloudStatus: () => api.cloudApi.status(),
+  getCloudConfig: () => api.cloudApi.getConfig(),
+  saveCloudConfig: (patch: { enabled?: boolean; activeProvider?: import("./apiClient").CloudProvider; provider?: import("./apiClient").CloudProvider; apiKey?: string; model?: string; clearKey?: boolean }) =>
+    api.cloudApi.saveConfig(patch),
+  askCloud: (question: string) => api.cloudApi.ask(question),
+  screenCloud: (question: string) => api.cloudApi.screen(question),
+  cloudEgressLog: (limit?: number) => api.cloudApi.egressLog(limit),
 
   // 온톨로지(지식 그래프)
   listOntology: (filter?: { scope?: string; subject?: string }) => api.ontologyApi.list(filter),

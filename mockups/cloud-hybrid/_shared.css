@@ -1,0 +1,54 @@
+/* 공유 스타일 — GIJO AS 다크 테마 토큰(설정/대시보드 화면과 동일 계열) */
+:root{
+  --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#fff;
+  --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:#05070d;color:var(--text);padding:28px;}
+.wrap{max-width:900px;margin:0 auto;}
+.mock-h{font-size:20px;font-weight:800;color:#fff;margin-bottom:2px;}
+.mock-sub{font-size:12.5px;color:var(--muted);margin-bottom:20px;}
+.mock-tag{display:inline-block;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:5px;background:rgba(59,130,246,.14);border:1px solid var(--blue);color:var(--blue-light);margin-bottom:14px;}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;}
+.panel-title{font-size:14.5px;font-weight:800;color:#fff;margin-bottom:4px;display:flex;align-items:center;gap:8px;}
+.panel-sub{font-size:11.5px;color:var(--muted);margin-bottom:16px;line-height:1.6;}
+.badge{font-size:9.5px;font-weight:800;padding:1px 7px;border-radius:5px;}
+.b-teal{background:rgba(30,185,128,.15);border:1px solid rgba(30,185,128,.4);color:var(--teal);}
+.b-amber{background:rgba(240,160,32,.14);border:1px solid rgba(240,160,32,.4);color:var(--amber);}
+.b-blue{background:rgba(59,130,246,.14);border:1px solid var(--blue);color:var(--blue-light);}
+.field{margin-bottom:12px;}
+.field label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:5px;font-weight:600;}
+.field input,.field select{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;outline:none;}
+.field input:focus,.field select:focus{border-color:var(--blue);}
+.row{display:flex;gap:10px;}.row>*{flex:1;}
+.btn{background:var(--blue);color:#fff;border:0;border-radius:8px;padding:9px 16px;font-size:12.5px;font-weight:700;cursor:pointer;}
+.btn-ghost{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--blue-light);}
+.switch{width:44px;height:24px;border-radius:14px;background:var(--panel-2);border:1px solid var(--border-strong);position:relative;cursor:pointer;flex-shrink:0;}
+.switch.on{background:rgba(30,185,128,.3);border-color:var(--teal);}
+.switch .knob{width:18px;height:18px;border-radius:50%;background:var(--muted);position:absolute;top:2px;left:2px;transition:.15s;}
+.switch.on .knob{left:22px;background:var(--teal);}
+.prov{display:flex;gap:8px;margin-bottom:14px;}
+.prov .p{flex:1;text-align:center;padding:10px;border:1px solid var(--border-strong);border-radius:9px;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;background:var(--panel-2);}
+.prov .p.sel{border-color:var(--blue);color:#fff;background:rgba(59,130,246,.12);}
+.prov .p small{display:block;font-size:9.5px;color:var(--muted-2);font-weight:600;margin-top:2px;}
+.log{font-size:11px;border-top:1px solid var(--border);margin-top:8px;}
+.log-row{display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid var(--border);}
+.log-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.log-dot.block{background:var(--red);}.log-dot.allow{background:var(--teal);}
+.log-q{flex:1;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.log-meta{color:var(--muted-2);font-size:10px;flex-shrink:0;}
+/* 대화(콘솔) 목업 공통 */
+.console{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;}
+.msg{display:flex;gap:10px;margin-bottom:14px;}
+.msg .av{width:28px;height:28px;border-radius:8px;background:var(--panel-2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;}
+.msg .body{flex:1;}
+.msg .who{font-size:11.5px;font-weight:700;color:var(--blue-light);margin-bottom:3px;display:flex;align-items:center;gap:6px;}
+.msg .txt{font-size:12.5px;color:var(--text);line-height:1.65;}
+.cloud-badge{font-size:9.5px;font-weight:800;padding:1px 7px;border-radius:5px;background:rgba(139,124,240,.16);border:1px solid var(--purple);color:#b3a6ff;}
+.local-badge{font-size:9.5px;font-weight:800;padding:1px 7px;border-radius:5px;background:rgba(30,185,128,.13);border:1px solid rgba(30,185,128,.4);color:var(--teal);}
+.dock{display:flex;gap:8px;align-items:center;margin-top:6px;padding-top:12px;border-top:1px solid var(--border);}
+.dock input{flex:1;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:10px;padding:11px 13px;color:var(--text);font-size:12.5px;outline:none;}
+.note{font-size:11px;color:var(--muted);background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;line-height:1.6;margin-top:10px;}
+.note b{color:var(--text);}
+.blockcard{border:1px solid rgba(240,160,32,.35);background:rgba(240,160,32,.06);border-radius:9px;padding:11px 13px;font-size:11.5px;color:var(--amber);margin-top:8px;line-height:1.6;}

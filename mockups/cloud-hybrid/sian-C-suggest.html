@@ -1,0 +1,61 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
+<title>시안 C — 안전 판정 시 클라우드 제안 칩</title><link rel="stylesheet" href="_shared.css"></head><body>
+<div class="wrap">
+  <div class="mock-tag">시안 C</div>
+  <div class="mock-h">게이트가 "안전한 일반질문"으로 판정하면 클라우드 제안</div>
+  <div class="mock-sub">담당자가 토글을 신경 쓸 필요 없이 로컬로 답하되, 유출 게이트가 <b>미리 통과 판정</b>한 질문에만 "클라우드로 더 나은 답 받기" 제안 칩을 띄운다. 내부정보 질문에는 제안 자체가 뜨지 않아 자연스럽게 로컬로 남는다.</div>
+
+  <!-- 설정(공통) -->
+  <div class="panel">
+    <div class="panel-title">☁ 클라우드 LLM <span class="badge b-teal">admin 전용</span></div>
+    <div class="panel-sub">기본은 로컬입니다. 활성화하면 <b>안전하다고 판정된 일반 질문에만</b> 클라우드 제안이 표시됩니다. 담당자가 제안을 눌러야 실제로 전송됩니다(자동 전송 안 함).</div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+      <div class="switch on"><div class="knob"></div></div>
+      <div style="font-size:12.5px;font-weight:700;color:#fff;">클라우드 제안 켜기</div>
+    </div>
+    <div class="prov">
+      <div class="p">Gemini<small>gemini-2.0-flash</small></div>
+      <div class="p sel">Claude<small>claude-sonnet-5</small></div>
+      <div class="p">OpenAI<small>gpt-4o-mini</small></div>
+    </div>
+    <div class="field"><label>API 키 (암호화 저장)</label><input type="password" value="●●●●●●●●●●●●" placeholder="sk-ant-…"></div>
+    <button class="btn">저장</button>
+  </div>
+
+  <!-- 대화 -->
+  <div class="console">
+    <!-- 안전 질문 → 제안 칩 -->
+    <div class="msg">
+      <div class="av">👤</div><div class="body"><div class="who">나</div>
+        <div class="txt">EPSS 점수와 CVSS 점수는 뭐가 다른 거야?</div>
+        <div style="margin-top:8px;display:inline-flex;align-items:center;gap:8px;background:rgba(139,124,240,.1);border:1px solid var(--purple);border-radius:20px;padding:5px 12px;">
+          <span style="font-size:11px;color:#b3a6ff;font-weight:700;">☁ 일반 질문 — 클라우드(Claude)로 더 자세히 답받기</span>
+          <button class="btn" style="padding:3px 10px;font-size:10.5px;">받기</button>
+        </div>
+      </div>
+    </div>
+    <div class="msg">
+      <div class="av">🤖</div><div class="body"><div class="who">Security Orchestrator <span class="local-badge">● 로컬</span></div>
+        <div class="txt">CVSS는 취약점의 '심각도(구조적 위험)'를, EPSS는 '가까운 미래에 실제 악용될 확률'을 나타냅니다. 둘은 …</div></div>
+    </div>
+
+    <!-- 내부정보 질문 → 제안 없음 -->
+    <div class="msg" style="opacity:.95;">
+      <div class="av">👤</div><div class="body"><div class="who">나</div>
+        <div class="txt">10.10.20.15 서버 취약점 중 뭐부터 조치해?</div>
+        <div style="margin-top:6px;font-size:10.5px;color:var(--muted-2);">🔒 내부 자산(IP)이 포함돼 로컬에서만 처리 — 클라우드 제안 없음</div>
+      </div>
+    </div>
+    <div class="msg">
+      <div class="av">🤖</div><div class="body"><div class="who">Security Orchestrator <span class="local-badge">● 로컬</span></div>
+        <div class="txt">10.10.20.15에서 가장 급한 건 OpenSSH regreSSHion(CVE-2024-6387)입니다. KEV 등재 …</div></div>
+    </div>
+
+    <div class="dock">
+      <input placeholder="Security Orchestrator에게 지시…">
+      <button class="btn">전송</button>
+    </div>
+  </div>
+
+  <div class="note"><b>장점</b> — 담당자가 아무것도 신경 안 써도 됨. 시스템이 "안전할 때만" 제안하므로 자연스럽고, 내부정보 질문엔 제안이 안 떠 유출 유도 자체가 없음.<br><b>단점</b> — 매 질문마다 게이트 판정을 먼저 돌려야 함(가벼운 규칙이라 즉시). "제안"이 오히려 클라우드 사용을 부추긴다는 관점도 가능.</div>
+</div></body></html>

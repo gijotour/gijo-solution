@@ -7,6 +7,7 @@
 import type { Express, Request } from "express";
 import { authMiddleware, adminMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
+import { todayLocal } from "../util/date";
 import { db, assertTestDb } from "../db";
 import type { GijoUser } from "../auth/users";
 import { sendMail } from "./email";
@@ -122,9 +123,7 @@ function newId(): string {
   return "mnt" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+const today = todayLocal;
 
 // insert/update를 하나로 — compliance.ts의 ON CONFLICT...DO UPDATE 패턴을 그대로 따른다.
 const upsertStmt = db.prepare(`

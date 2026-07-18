@@ -268,6 +268,33 @@ function guessCategory(filename: string): string | undefined {
   return CATEGORY_KEYWORDS.find((k) => k.re.test(filename))?.id;
 }
 
+// 신규 제품 자동 등록 시 파일명 그대로(확장자만 제거) 쓰면 "Tenable_..._3_93-User_Guide"처럼
+// 지저분해서, 버전·에디션·문서 종류 표기를 걷어내 사람이 보는 제품명에 가깝게 다듬는다.
+// 어디까지나 추천값 — 결정 카드에서 사용자가 그대로 쓰거나 고쳐 쓴다(수동입력 우선).
+const PRODUCT_NAME_NOISE: RegExp[] = [
+  /\bv?\d+(?:\.\d+)+\b/gi, // 3.93, v1.2.3
+  /\b\d+\s+\d+\b/g, // "3 93"(버전이 구분자로 쪼개진 경우)
+  /\bon[\s-]?prem(?:ises)?\b/gi,
+  /\bcloud\b/gi,
+  /\buser\s*guide\b/gi,
+  /\badmin(?:istrator|istration)?\s*guide\b/gi,
+  /\binstall(?:ation)?\s*guide\b/gi,
+  /\bquick\s*start\b/gi,
+  /\brelease\s*notes?\b/gi,
+  /\bguide\b/gi,
+  /\bmanual\b/gi,
+  /\bdatasheet\b/gi,
+  /\bwhitepaper\b/gi,
+  /가이드|매뉴얼|사용자\s*설명서|설치\s*가이드|관리자\s*가이드|릴리즈\s*노트/g,
+];
+export function guessProductName(filename: string): string {
+  const stem = filename.replace(/\.[^.]+$/, "");
+  let s = stem.replace(/[_\-.]+/g, " ");
+  for (const re of PRODUCT_NAME_NOISE) s = s.replace(re, " ");
+  s = s.replace(/\s+/g, " ").trim();
+  return s || stem.trim();
+}
+
 // 로그 매뉴얼 판별. "카탈로그/catalog"의 '로그'는 오탐이라 먼저 제거하고 검사한다.
 function guessKind(filename: string): string {
   const cleaned = filename.replace(/카탈로그|catalog/gi, "");
@@ -278,6 +305,17 @@ function guessKind(filename: string): string {
 const tokensOf = (s: string): string[] => (s.toLowerCase().match(/[a-z0-9]+|[가-힣]+/g) ?? []).filter((t) => t.length >= 2);
 const squash = (s: string): string => (s.toLowerCase().match(/[a-z0-9가-힣]+/g) ?? []).join("");
 
+// "user"/"guide"/"manual" 같은 문서 종류 표기 단어는 벤더가 달라도 파일명에 흔히 같이 붙는다
+// (모든 회사가 "*_User_Guide.pdf"를 낸다). 이런 단어까지 제품명 토큰으로 세면 자동 등록된 제품명에
+// 이 단어가 남아있을 때(예: 옛 "Tenable_..._User_Guide") 전혀 다른 벤더의 매뉴얼도 오매칭된다 —
+// 실제로 관측된 사고. 식별력 없는 문서-종류 단어는 유사도 채점에서 제외한다.
+const GENERIC_DOC_WORDS = new Set([
+  "user", "guide", "manual", "admin", "administrator", "administration",
+  "install", "installation", "quick", "start", "release", "notes",
+  "datasheet", "whitepaper", "on", "premises", "cloud", "edition",
+  "가이드", "매뉴얼", "사용자", "설명서", "설치", "관리자", "릴리즈", "노트",
+]);
+
 // 파일명 ↔ 기존 제품 유사도. 모델/벤더 같은 고유 식별자는 세게, 일반 이름 토큰은 약하게 친다.
 function matchScore(filename: string, p: SecurityProduct): number {
   const fileSquashed = squash(filename);
@@ -285,7 +323,7 @@ function matchScore(filename: string, p: SecurityProduct): number {
   let score = 0;
   if (p.model && squash(p.model).length >= 2 && fileSquashed.includes(squash(p.model))) score += 3;
   if (p.vendor && squash(p.vendor).length >= 3 && fileSquashed.includes(squash(p.vendor))) score += 2;
-  for (const t of tokensOf(p.name)) if (fileTokens.has(t)) score += 1;
+  for (const t of tokensOf(p.name)) if (!GENERIC_DOC_WORDS.has(t) && fileTokens.has(t)) score += 1;
   return score;
 }
 
@@ -327,14 +365,22 @@ export interface ManualImportResult {
 }
 
 // 분류 결과를 실제로 반영한다(제품 자동 등록 + 문서 추가). RAG 수집은 라우트에서 처리해 넘긴다.
-export function importManual(filename: string, docName: string | undefined, uploadedBy?: string, forceKind?: string): ManualImportResult {
+// nameOverride: 결정 카드에서 사용자가 확인·수정한 제품명(신규 등록 시에만 쓰임, 없으면 자동 추천값).
+export function importManual(
+  filename: string,
+  docName: string | undefined,
+  uploadedBy?: string,
+  forceKind?: string,
+  nameOverride?: string
+): ManualImportResult {
   const stem = filename.replace(/\.[^.]+$/, "");
   const c = classifyManual(filename, listProducts());
   const kind = forceKind ?? c.kind; // 사용자가 유형을 지정했으면(로그 등) 그걸 우선
   // 사용자가 유형을 명시(forceKind)한 경우엔 "애매해서 물어본" 파일이므로 확실한 매칭(모델/벤더 일치=
   // product-match)만 인정한다. 느슨한 카테고리 매칭으로 엉뚱한 제품에 붙지 않게 하고, 약하면 파일명으로 새 제품.
   const matched = forceKind ? (c.reason === "product-match" ? c.product : undefined) : c.product;
-  const product = matched ?? createProduct({ name: stem, category: c.category, note: "매뉴얼 업로드로 자동 등록" });
+  const name = nameOverride?.trim() || guessProductName(filename);
+  const product = matched ?? createProduct({ name, category: c.category, note: "매뉴얼 업로드로 자동 등록" });
   addProductDoc(product.id, { kind, title: stem, docName }, uploadedBy);
   return {
     filename,

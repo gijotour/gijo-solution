@@ -130,7 +130,10 @@ describe("securityproducts (보안제품 종류별 관리 + 매뉴얼)", () => {
     const r = importManual("VPN_게이트웨이_설정_매뉴얼.pdf", undefined, "정요한");
     expect(r.createdProduct).toBe(true);
     expect(r.category).toBe("VPN");
-    expect(r.productName).toBe("VPN_게이트웨이_설정_매뉴얼");
+    // 신규 등록 제품명은 파일명 그대로가 아니라 버전/문서종류 표기를 걷어낸 추천값으로 저장된다
+    // (2026-07-19: "User_Guide" 같은 표기가 이름에 남으면 다른 벤더 매뉴얼과 오매칭되는 사고가
+    //  있었다 — guessProductName으로 정리).
+    expect(r.productName).toBe("VPN 게이트웨이 설정");
     expect(r.kind).toBe("manual");
     const created = getProduct(r.productId)!;
     expect(created.docs).toHaveLength(1);

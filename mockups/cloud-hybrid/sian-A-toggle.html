@@ -1,0 +1,51 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
+<title>시안 A — 입력창 클라우드 토글</title><link rel="stylesheet" href="_shared.css"></head><body>
+<div class="wrap">
+  <div class="mock-tag">시안 A</div>
+  <div class="mock-h">입력창 옆 클라우드 토글 — "지금 이 질문은 클라우드로"</div>
+  <div class="mock-sub">담당자가 질문 직전에 켜고 끄는 방식. 가장 명시적이고 통제감이 높다. 켠 상태에서 내부정보가 감지되면 자동으로 로컬로 떨어뜨리고 사유를 알려준다.</div>
+
+  <!-- 설정(공통) -->
+  <div class="panel">
+    <div class="panel-title">☁ 클라우드 LLM <span class="badge b-teal">admin 전용</span></div>
+    <div class="panel-sub">온프레미스가 기본입니다. 켜면 <b>내부 정보가 없는 일반 질문만</b> 선택한 클라우드로 보낼 수 있습니다 — 자산·IP·담당자·사내 문서가 섞이면 자동 차단됩니다.</div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px;">
+      <div class="switch on"><div class="knob"></div></div>
+      <div><div style="font-size:12.5px;font-weight:700;color:#fff;">클라우드 사용 허용</div><div style="font-size:11px;color:var(--muted);">끄면 모든 답변이 로컬 LLM으로만 처리됩니다(완전 폐쇄).</div></div>
+    </div>
+    <div class="prov">
+      <div class="p sel">Gemini<small>gemini-2.0-flash</small></div>
+      <div class="p">Claude<small>claude-sonnet-5</small></div>
+      <div class="p">OpenAI<small>gpt-4o-mini</small></div>
+    </div>
+    <div class="field"><label>API 키 (암호화 저장 · 다시 표시되지 않음)</label><input type="password" value="●●●●●●●●●●●●●●●●" placeholder="AIza…"></div>
+    <div class="row"><button class="btn">저장</button><button class="btn btn-ghost">연결 테스트</button></div>
+    <div style="margin-top:18px;font-size:11.5px;font-weight:700;color:var(--muted);">🛡 유출 방지 감사 로그 <span style="color:var(--muted-2);font-weight:400;">— 클라우드로 나간/차단된 모든 질문</span></div>
+    <div class="log">
+      <div class="log-row"><span class="log-dot allow"></span><span class="log-q">CVSS 점수는 어떻게 계산하나요?</span><span class="log-meta">Gemini · 14:22</span></div>
+      <div class="log-row"><span class="log-dot block"></span><span class="log-q">oracle.local 취약점 우선순위 알려줘</span><span class="log-meta">차단(자산명) · 14:19</span></div>
+      <div class="log-row"><span class="log-dot block"></span><span class="log-q">우리 자산 중 제일 위험한 거</span><span class="log-meta">차단(내부표현) · 14:05</span></div>
+    </div>
+  </div>
+
+  <!-- 대화 -->
+  <div class="console">
+    <div class="msg">
+      <div class="av">👤</div><div class="body"><div class="who">나</div>
+        <div class="txt">프롬프트 인젝션 방어의 일반적인 방법들을 정리해줘</div></div>
+    </div>
+    <div class="msg">
+      <div class="av">☁</div><div class="body"><div class="who">Security Orchestrator <span class="cloud-badge">☁ Gemini · 내부정보 미포함</span></div>
+        <div class="txt">프롬프트 인젝션 방어는 크게 입력 필터링, 권한 최소화, 출력 검증 세 층위로 나뉩니다. ① 입력 단계에서 …</div></div>
+    </div>
+    <div class="dock">
+      <div class="switch on" title="클라우드 켜짐"><div class="knob"></div></div>
+      <span style="font-size:11px;font-weight:700;color:#b3a6ff;">☁ 클라우드</span>
+      <input value="oracle.local 취약점 먼저 뭐부터 조치해?" style="border-color:var(--amber);">
+      <button class="btn">전송</button>
+    </div>
+    <div class="blockcard">🛡 이 질문에는 <b>등록된 자산명(oracle.local)</b>이 있어 클라우드로 보내지 않고 <b>로컬 LLM으로 답합니다</b>. 클라우드에는 사내 정보가 나가지 않습니다.</div>
+  </div>
+
+  <div class="note"><b>장점</b> — 사용자가 매 질문마다 명시적으로 통제. "지금 이건 클라우드" 의도가 분명.<br><b>단점</b> — 토글을 매번 신경 써야 함. 켜둔 걸 잊고 민감 질문을 하면(→ 게이트가 막지만) 흐름이 끊길 수 있음.</div>
+</div></body></html>

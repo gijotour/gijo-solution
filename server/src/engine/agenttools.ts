@@ -14,7 +14,8 @@
 // 쓰기 도구(write:true)는 루프가 바로 실행하지 않는다 — 값을 결재판(PendingApproval)으로
 // 만들어 돌려주고, 사람이 승인한 뒤 /api/agent/approve로만 실행된다(시안 B, 2026-07-17 확정).
 
-import { listAssets, getAsset, registerAsset, Asset } from "./assets";
+import { dateOnlyLocal, addDaysLocal } from "../util/date";
+import { listAssets, getAsset, registerAsset, setAssetRobustness, Asset } from "./assets";
 import { expandOntology } from "./ontology";
 import { prioritizedReviews, updateFindingReview, findingKey, ReviewPatch, ApprovalStatus } from "./approvals";
 import { listProducts } from "./securityproducts";
@@ -22,6 +23,7 @@ import { listDocuments } from "./memory";
 import { listFindings as listCtiFindings } from "./cti";
 import { matchCtiToAssets } from "./ctimatch";
 import { dailyBriefingText } from "./briefing";
+import { runRedTeam, makeServedCaller } from "./redteam";
 
 export interface AgentToolParam {
   name: string;
@@ -155,9 +157,20 @@ function matches(haystack: string, needle: string): boolean {
   return n.length >= 2 && norm(haystack).includes(n);
 }
 
-// search — 메뉴를 가로지르는 단일 검색. LLM이 "어느 메뉴를 봐야 하나"를 풀지 않아도 되게 한다.
-async function runSearch(args: Record<string, string>): Promise<string> {
-  const q = args.query.trim();
+// LLM이 "A OR B"·"A와 B"처럼 여러 대상을 한 검색어로 합쳐 보내는 경우가 실측(2026-07-19)으로
+// 관측됐다 — matches()는 단순 부분일치라 그 합쳐진 문자열 그대로는 아무것도 안 걸린다("oracle.local
+// 10.10.20.15" 같은 자산은 없으므로). 도구 설명으로 나눠 부르라고 안내해도 작은 모델은 잘 안 지켜서,
+// 결정적 규칙으로 분리한다(이 파일의 원칙: 판단은 규칙, LLM은 선택만).
+const MULTI_QUERY_SPLIT_RE = /\s+(?:or|and)\s+|,|、|와\s+|과\s+|\|/gi;
+function splitQueryTerms(q: string): string[] {
+  const parts = q
+    .split(MULTI_QUERY_SPLIT_RE)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 2);
+  return parts.length > 1 ? parts : [q];
+}
+
+async function searchOne(q: string): Promise<string[]> {
   const out: string[] = [];
 
   const assets = listAssets().filter(
@@ -197,8 +210,27 @@ async function runSearch(args: Record<string, string>): Promise<string> {
   const triples = ontologyLinesFor(q, 6);
   if (triples.length) out.push("온톨로지 관계:", ...triples);
 
-  if (out.length === 0) return `"${q}"에 해당하는 자산·취약점·보안제품·문서·온톨로지 관계를 찾지 못했습니다.`;
-  return out.join("\n").slice(0, 2500);
+  return out;
+}
+
+// search — 메뉴를 가로지르는 단일 검색. LLM이 "어느 메뉴를 봐야 하나"를 풀지 않아도 되게 한다.
+async function runSearch(args: Record<string, string>): Promise<string> {
+  const q = args.query.trim();
+  const terms = splitQueryTerms(q);
+
+  if (terms.length === 1) {
+    const out = await searchOne(terms[0]);
+    if (out.length === 0) return `"${q}"에 해당하는 자산·취약점·보안제품·문서·온톨로지 관계를 찾지 못했습니다.`;
+    return out.join("\n").slice(0, 2500);
+  }
+
+  // 여러 대상 — 대상별로 각각 찾아 이름표를 붙여 묶는다(비교 질문에서 한쪽이 누락되지 않도록).
+  const blocks: string[] = [];
+  for (const term of terms) {
+    const out = await searchOne(term);
+    blocks.push(`■ "${term}"`, ...(out.length ? out : [`  해당하는 자산·취약점·보안제품·문서·온톨로지 관계를 찾지 못했습니다.`]));
+  }
+  return blocks.join("\n").slice(0, 3500);
 }
 
 // today — "오늘 뭐부터?" 한 방에. KEV/EPSS/VPR 점수로 전 자산을 가로질러 정렬한 조치 우선순위.
@@ -305,6 +337,33 @@ function runScanStatus(args: Record<string, string>): string {
   return parts.join("\n").slice(0, 2500);
 }
 
+// 레드팀(프롬프트 인젝션·탈옥) 점검을 자산이 연결한 로컬 모델에 실제로 실행한다 — 14개 표준 공격
+// 페이로드 × LLM 호출이라 시간이 걸리지만, 판단을 바꾸는 게 아니라 측정값을 기록할 뿐이라
+// redteam.html의 "점검 실행" 버튼과 같은 신뢰 수준으로 승인 없이(write:false) 실행한다.
+// 읽기 도구라 실패는 throw가 아니라 문자열로 돌려준다(LLM이 사유를 그대로 사람에게 설명).
+async function runRunRedteam(args: Record<string, string>): Promise<string> {
+  const asset = resolveAsset(args.assetId ?? "");
+  if (!asset) {
+    const ids = listAssets().map((a) => a.id).join(", ") || "(없음)";
+    return `자산 "${args.assetId}"을(를) 찾을 수 없습니다. 등록된 자산 id: ${ids}`;
+  }
+  const modelId = asset.aibom?.model?.modelRef;
+  if (!modelId) {
+    return `${asset.name}(${asset.id})에는 연결된 로컬 모델(AI-BOM modelRef)이 없어 레드팀 점검을 할 수 없습니다 — AI/LLM 자산만 점검 대상입니다.`;
+  }
+  const report = await runRedTeam(makeServedCaller(modelId), asset.name);
+  setAssetRobustness(asset.id, { score: report.robustnessScore, vulnerable: report.vulnerable, total: report.total, ranAt: report.ranAt, modelId });
+  const worst = Object.entries(report.byCategory)
+    .filter(([, c]) => c.vulnerable > 0)
+    .sort((a, b) => b[1].vulnerable - a[1].vulnerable)[0];
+  const vulnList = report.results.filter((r) => r.vulnerable).slice(0, 5).map((r) => `  - [${r.severity}] ${r.desc} (${r.basis})`);
+  return [
+    `${asset.name} 레드팀 점검 완료 — 견고성 ${report.robustnessScore}점 (${report.total - report.vulnerable}/${report.total} 방어 성공)`,
+    worst ? `가장 취약한 유형: ${worst[0]} (${worst[1].vulnerable}/${worst[1].total}건 뚫림)` : "14개 공격 유형 전부 방어 성공",
+    ...(vulnList.length ? ["뚫린 공격:", ...vulnList] : []),
+  ].join("\n");
+}
+
 // ── 「AI 자산」 쓰기 도구 (Phase 2 — 결재판 경유) ────────────────────────
 
 // 이름에서 자산 id를 만든다 — UX 피드백 러프엣지("id를 사람이 지정해야 함") 해소.
@@ -375,7 +434,10 @@ function findingMatches(haystack: string, needle: string): boolean {
 }
 
 // assetId를 관용적으로 찾는다 — 실측(2026-07-18): 7B가 "vuln:sample-web01"에서 "vuln:" 접두어를
-// 떨어뜨려 매칭 실패. 정확 일치 → 접두어 붙여보기/떼보기 → 정규화 일치 순으로 시도한다.
+// 떨어뜨려 매칭 실패. 정확 일치 → 접두어 붙여보기/떼보기 → 정규화 일치 → 자산 이름(호스트명) 순으로 시도한다.
+// 실측(2026-07-19): "oracle.local Log4j RCE 담당자 배정해줘"처럼 사람이 화면에 표시된 이름
+// (예: "oracle.local (192.168.219.98)")으로 부르면 id(vuln:192.168.219.98)와 안 맞아 승인이 실패했다 —
+// 이름으로 유일하게 특정되는 경우만 그 자산으로 매칭한다(모호하면 실패해 되묻게 둔다).
 function resolveAsset(assetId: string): Asset | undefined {
   const raw = (assetId ?? "").trim();
   if (!raw) return undefined;
@@ -384,6 +446,11 @@ function resolveAsset(assetId: string): Asset | undefined {
   if (!asset) {
     const norm = (s: string) => s.toLowerCase().replace(/^vuln:/, "");
     asset = listAssets().find((a) => norm(a.id) === norm(raw));
+  }
+  if (!asset) {
+    const needle = raw.toLowerCase();
+    const hits = listAssets().filter((a) => (a.name ?? "").toLowerCase().includes(needle));
+    if (hits.length === 1) asset = hits[0];
   }
   return asset;
 }
@@ -429,6 +496,34 @@ function normalizeStatus(raw: string): ApprovalStatus | null {
 function inferStatusWord(instruction: string): string | undefined {
   const st = normalizeStatus(instruction);
   return st === "approved" ? "조치완료" : st === "rejected" ? "오탐" : undefined;
+}
+
+const WEEKDAY_MON0: Record<string, number> = { 월: 0, 화: 1, 수: 2, 목: 3, 금: 4, 토: 5, 일: 6 };
+
+// "이번주 금요일"·"내일"처럼 사람이 흔히 쓰는 상대 기한을 YYYY-MM-DD로 바꾼다(결정적 규칙).
+// 실측(2026-07-19): LLM이 지시문의 "이번주 금요일"을 그대로 dueDate에 넣어 승인 시 형식 검증
+// (YYYY-MM-DD)에서 매번 실패했다. 못 알아들으면 undefined를 돌려줘 필드를 비운 채 두고
+// (dueDate는 선택값) 사람이 승인 화면에서 직접 채우게 한다 — 틀린 날짜를 우기지 않는다.
+function parseRelativeDueDate(text: string, now: Date = new Date()): string | undefined {
+  const s = (text ?? "").trim();
+  if (DUE_RE.test(s)) return s;
+  // 달력 날짜만 다루므로 로컬 연/월/일로 계산한다 — toISOString(UTC)로 하면 자정 근처(예: 새벽
+  // 0~9시 KST)에 하루 밀리는 버그가 생긴다(실측: "이번주 금요일"이 목요일로 계산됨).
+  const iso = dateOnlyLocal;
+  const addDays = addDaysLocal;
+  if (/오늘/.test(s)) return iso(now);
+  if (/모레/.test(s)) return iso(addDays(now, 2));
+  if (/내일/.test(s)) return iso(addDays(now, 1));
+  const daysAfter = s.match(/(\d+)\s*일\s*(?:후|뒤)/);
+  if (daysAfter) return iso(addDays(now, Number(daysAfter[1])));
+  const wd = s.match(/(다음\s*주|이번\s*주)?\s*(월|화|수|목|금|토|일)\s*요일/);
+  if (wd) {
+    const target = WEEKDAY_MON0[wd[2]];
+    const mondayThisWeek = addDays(now, -((now.getDay() + 6) % 7)); // 이번 주 월요일
+    const base = /다음/.test(wd[1] ?? "") ? addDays(mondayThisWeek, 7) : mondayThisWeek;
+    return iso(addDays(base, target));
+  }
+  return undefined;
 }
 
 const DUE_RE = /^\d{4}-\d{2}-\d{2}$/;
@@ -534,8 +629,8 @@ const TOOLS: AgentTool[] = [
     domain: "cross", // 메뉴를 가로지른다 — 자산·취약점·보안제품·문서·온톨로지를 한 번에
     write: false,
     description:
-      '무엇이든 찾는다 — 자산·취약점·보안제품·사내문서·온톨로지 관계를 한 번에 검색한다. 어디 있는지 모를 때 이것부터 쓴다. 예: {"query":"Log4Shell"}',
-    params: [{ name: "query", label: "검색어", description: "찾을 키워드 (자산명·취약점·제품·문서·위협)", required: true }],
+      '무엇이든 찾는다 — 자산·취약점·보안제품·사내문서·온톨로지 관계를 한 번에 검색한다. 어디 있는지 모를 때 이것부터 쓴다. query는 검색어 하나만 넣는다 — "A OR B"·"A와 B"처럼 여러 대상을 한 문자열로 합치지 마라(그 문자열 그대로 찾아 0건이 된다). 대상이 여러 개면 이 도구를 대상마다 한 번씩(여러 스텝) 호출한다. 예: {"query":"Log4Shell"}',
+    params: [{ name: "query", label: "검색어", description: "찾을 키워드 하나(자산명·취약점·제품·문서·위협) — 여러 개를 합치지 말 것", required: true }],
     run: runSearch,
   },
   {
@@ -599,6 +694,16 @@ const TOOLS: AgentTool[] = [
     run: () => dailyBriefingText({ save: true }),
   },
   {
+    name: "run_redteam",
+    label: "AI 견고성(레드팀) 점검",
+    domain: "assets",
+    write: false,
+    description:
+      '자산이 서빙하는 로컬 LLM에 프롬프트 인젝션·탈옥 공격 14종을 실제로 실행해 견고성을 측정한다. AI-BOM에 연결된 로컬 모델(modelRef)이 있는 AI/LLM 자산만 대상이다(인프라 호스트는 불가). "레드팀 점검해줘", "이 자산 견고성 점검", "프롬프트 인젝션 테스트해줘"에 쓴다. 예: {"assetId":"ai-secbot-01"}',
+    params: [{ name: "assetId", label: "자산 id", description: "점검할 AI/LLM 자산 id", required: true }],
+    run: runRunRedteam,
+  },
+  {
     name: "register_asset",
     label: "자산 등록",
     domain: "assets",
@@ -638,6 +743,22 @@ const TOOLS: AgentTool[] = [
       { name: "assignee", label: "담당자", description: "조치 담당자·조직", required: true },
       { name: "dueDate", label: "기한", description: "조치 기한 YYYY-MM-DD (선택)", required: false },
     ],
+    // 결재판을 띄우기 전에 서버 규칙으로 정정한다 — 실측(2026-07-19):
+    // ① 사람이 화면에 표시된 이름(예: "oracle.local")으로 자산을 지목하면 LLM이 그 문자열을 그대로
+    //    assetId에 넣어 실제 id(vuln:192.168.219.98)와 안 맞아 승인이 실패했다 — resolveAsset로 정정.
+    // ② "이번주 금요일" 같은 상대 기한이 그대로 dueDate에 들어가 형식 검증에서 매번 실패했다 —
+    //    파싱되면 YYYY-MM-DD로, 안 되면 비워서(선택값이므로) 사람이 직접 채우게 한다.
+    autoFill: (args, instruction) => {
+      const filled: Record<string, string> = {};
+      const resolved = resolveAsset(args.assetId ?? "");
+      if (resolved && resolved.id !== args.assetId) filled.assetId = resolved.id;
+      const due = args.dueDate?.trim();
+      if (due && !DUE_RE.test(due)) {
+        const parsed = parseRelativeDueDate(due) ?? parseRelativeDueDate(instruction);
+        filled.dueDate = parsed ?? "";
+      }
+      return filled;
+    },
     effect: (args) => `취약점 검토대장에 담당자${args.dueDate?.trim() ? "·기한(SLA)" : ""}을 기록 · 스캔·자산 데이터는 바뀌지 않음`,
     undo: "승인 화면(취약점 관리)에서 담당자·기한을 다시 비우면 미배정으로 원복됩니다.",
     run: runAssignFinding,

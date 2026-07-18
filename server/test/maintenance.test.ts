@@ -3,6 +3,7 @@ import request from "supertest";
 import { createApp } from "../src/app";
 import { resetMaintenanceForTests, buildDueMaintenanceEmail } from "../src/engine/maintenance";
 import type { MaintenanceItem } from "../src/engine/maintenance";
+import { todayLocal, plusDaysLocal } from "../src/util/date";
 import { resetUsersForTests } from "../src/auth/users";
 import { resetSmtpConfigForTests } from "../src/engine/email";
 
@@ -117,7 +118,7 @@ describe("maintenance (유지보수 일정 · 점검서 · 승인)", () => {
   });
 
   it("GET /due only returns scheduled items due today or earlier", async () => {
-    await createItem({ title: "오늘 마감", scheduleDate: new Date().toISOString().slice(0, 10) });
+    await createItem({ title: "오늘 마감", scheduleDate: todayLocal() });
     await createItem({ title: "먼 미래", scheduleDate: "2099-01-01" });
     const reportedItem = await createItem({ title: "이미 보고됨", scheduleDate: "2020-01-01" });
     await request(app).post(`/api/maintenance/${reportedItem.id}/report`).set(auth(adminToken)).send({ note: "완료" });
@@ -223,8 +224,8 @@ describe("maintenance (유지보수 일정 · 점검서 · 승인)", () => {
   });
 
   it("buildDueMaintenanceEmail summarizes due items with overdue days", () => {
-    const today = new Date().toISOString().slice(0, 10);
-    const past = new Date(Date.now() - 3 * 86400000).toISOString().slice(0, 10);
+    const today = todayLocal();
+    const past = plusDaysLocal(-3);
     const items = [
       { id: "1", title: "방화벽 점검", productName: "FW-01", scheduleDate: today, status: "scheduled", createdAt: 0, updatedAt: 0 },
       { id: "2", title: "IPS 점검", productName: "IPS-02", scheduleDate: past, status: "scheduled", createdAt: 0, updatedAt: 0 },

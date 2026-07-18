@@ -8,6 +8,7 @@ import { createRequire } from "module";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType } from "docx";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
+import { todayLocal } from "../util/date";
 import { chat } from "./llm";
 import { PLAIN_LANGUAGE_RULE } from "./promptstyle";
 import { listAssets, getAsset, Asset } from "./assets";
@@ -110,7 +111,7 @@ export interface MaintenanceSummary {
 }
 
 export function maintenanceSummary(items: MaintenanceItem[]): MaintenanceSummary {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayLocal();
   const s: MaintenanceSummary = { total: items.length, scheduled: 0, overdue: 0, reported: 0, approved: 0, rejected: 0 };
   for (const m of items) {
     if (m.status === "scheduled") {

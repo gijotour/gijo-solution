@@ -6,6 +6,7 @@ import type { Express } from "express";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { db } from "../db";
+import { todayLocal, plusDaysLocal } from "../util/date";
 import { prioritizedReviews, listFindingReviews, PrioritizedFinding, FindingReview } from "./approvals";
 import { listAssets } from "./assets";
 import { listFindings } from "./cti";
@@ -16,12 +17,8 @@ const insertSnap = db.prepare("INSERT INTO briefing_snapshot (takenAt, keysJson)
 const latestSnap = db.prepare("SELECT keysJson FROM briefing_snapshot ORDER BY takenAt DESC LIMIT 1");
 const pruneSnap = db.prepare("DELETE FROM briefing_snapshot WHERE id NOT IN (SELECT id FROM briefing_snapshot ORDER BY takenAt DESC LIMIT 30)");
 
-function today(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-function plusDays(n: number): string {
-  return new Date(Date.now() + n * 86400000).toISOString().slice(0, 10);
-}
+const today = todayLocal;
+const plusDays = plusDaysLocal;
 
 // #4 SLA 알림 — 기한 초과 + 임박(D-2 이내). rejected(오탐)는 조치 대상 아님.
 export function slaAlerts(): { overdue: FindingReview[]; dueSoon: FindingReview[] } {

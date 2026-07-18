@@ -277,6 +277,9 @@
   .cl-updecide{background:rgba(240,160,32,0.06);border:1px solid rgba(240,160,32,0.3);border-radius:10px;padding:11px 13px;margin-top:6px;}
   .cl-upd-h{font-size:12px;font-weight:800;color:#fff;margin-bottom:3px;}
   .cl-upd-f{font-size:11px;color:var(--amber);margin-bottom:7px;word-break:break-all;}
+  .cl-upd-pname{margin-bottom:7px;}
+  .cl-upd-pname-in{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;padding:7px 9px;color:var(--text);font-size:12px;outline:none;}
+  .cl-upd-pname-in:focus{border-color:var(--blue);}
   .cl-upd-btns{display:flex;gap:6px;flex-wrap:wrap;}
   .cl-upd-btns button{font-size:11.5px;font-weight:700;border-radius:8px;padding:6px 11px;cursor:pointer;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--text);}
   .cl-upd-btns button.reco{background:rgba(59,130,246,0.14);border-color:var(--blue);color:var(--blue-light);}
@@ -302,6 +305,7 @@
       <div class="status-pill" id="statusPill"><span class="dot"></span>연결 확인 중<span class="beta-tag">LIVE</span></div>
       <div class="icon-row">
         <div class="icon-btn" data-page="kpi.html" title="보안 KPI">📊</div>
+        <div class="icon-btn" data-page="analysis.html" title="보안 분석 (통합 관제)">🔬</div>
         <div class="icon-btn" data-page="sessions.html" title="작업 세션 (대화 세션별 관리)">💬</div>
         <div class="icon-btn" data-page="inventory.html" title="AI 자산 (목록·AI-BOM)">◇</div>
         <div class="icon-btn" data-page="vulnscan.html" title="취약점 관리 (취약점·조치)">⊘</div>
@@ -310,7 +314,9 @@
         <div class="icon-btn" data-page="report.html" title="리포트·컴플라이언스">▣</div>
         <div class="icon-btn" data-page="agent.html" title="AI 어시스턴트">◉</div>
         <div class="icon-btn" data-page="memory.html" title="AI 지식·모델 (기억·온톨로지·학습·모델)">🧠</div>
-        <div class="icon-btn" data-page="settings.html" title="설정 (연결·요금·로그)">⚙</div>
+        <div class="icon-btn" data-page="redteam.html" title="AI 견고성 (레드팀·가드레일)">🛡</div>
+        <div class="icon-btn" data-page="logs.html" title="로그">🗒</div>
+        <div class="icon-btn" data-page="settings.html" title="설정 (연결·요금)">⚙</div>
       </div>
       <div class="avatar-btn" id="avatarBtn">-</div>
       <div class="icon-btn" id="settingsBtn">⚙</div>
@@ -778,20 +784,30 @@
     if (r.routedTo === "product-manual") return `보안제품 '${r.manual.productName}'에 ${r.manual.kind === "logManual" ? "로그" : "제품"} 매뉴얼로 연결${r.manual.createdProduct ? " · 신규 제품 자동 등록" : ""} (${r.reason})`;
     return `장기기억 ${r.memory.chunks}청크 수집${r.memory.docClass ? ` · 분류 ${r.memory.docClass}` : ""}${r.memory.linkedProduct ? ` · 제품 '${r.memory.linkedProduct}' 연결` : ""} (${r.reason})`;
   }
-  // 시안 B — 애매하면 콘솔 인라인 결정 카드(4유형). 확실하면 바로 결과 표시.
+  // 시안 B — 애매하면 콘솔 인라인 결정 카드(5유형). 확실하면 바로 결과 표시.
   const UPLOAD_TYPES = [
+    { t: "vulnreport", label: "🩹 취약점 리포트/로그" },
     { t: "asset", label: "🛡 보안제품 자산" },
     { t: "log", label: "📊 로그 매뉴얼" },
     { t: "document", label: "📄 일반 문서" },
     { t: "guideline", label: "📘 가이드라인" },
   ];
-  async function handleUpload(name, b64, cm, forceType) {
+  // 신규 제품으로 등록될 유형(보안제품 자산·로그 매뉴얼)에서만 제품명 입력칸을 쓴다 — 자동 추천값 기본,
+  // 파일명이 지저분하거나 추천이 어긋나면 수동입력으로 고쳐 확정할 수 있다.
+  const PRODUCT_NAME_TYPES = new Set(["asset", "log"]);
+  async function handleUpload(name, b64, cm, forceType, productName) {
     if (cm) cm.textContent = `${name} — ${forceType ? "처리 중…" : "유형 판별·처리 중…"}`;
-    const r = await window.gijo.uploadAuto(name, b64, forceType);
+    const r = await window.gijo.uploadAuto(name, b64, forceType, productName);
     if (r.needsDecision && !forceType) {
       const btns = UPLOAD_TYPES.map((x) => `<button data-t="${x.t}"${x.t === r.guess ? ' class="reco"' : ""}>${x.label}${x.t === r.guess ? " (추천)" : ""}</button>`).join("");
-      cm.innerHTML = `<div class="cl-updecide"><div class="cl-upd-h">🤔 이 파일, 어떻게 처리할까요?</div><div class="cl-upd-f">📄 ${escB(name)} — 파일명만으론 유형을 확신하기 어렵습니다</div><div class="cl-upd-btns">${btns}</div></div>`;
-      cm.querySelectorAll(".cl-upd-btns button").forEach((b) => b.addEventListener("click", () => handleUpload(name, b64, cm, b.dataset.t).catch((e) => { cm.textContent = `${name} — 실패: ${e.message}`; })));
+      const pname = r.guessProductName ? `<div class="cl-upd-pname"><input type="text" class="cl-upd-pname-in" value="${escB(r.guessProductName)}" placeholder="제품명(보안제품 자산·로그 매뉴얼 선택 시 사용, 필요시 수정)"></div>` : "";
+      cm.innerHTML = `<div class="cl-updecide"><div class="cl-upd-h">🤔 이 파일, 어떻게 처리할까요?</div><div class="cl-upd-f">📄 ${escB(name)} — 파일명만으론 유형을 확신하기 어렵습니다</div>${pname}<div class="cl-upd-btns">${btns}</div></div>`;
+      cm.querySelectorAll(".cl-upd-btns button").forEach((b) => b.addEventListener("click", () => {
+        const t = b.dataset.t;
+        const pnameIn = cm.querySelector(".cl-upd-pname-in");
+        const pn = PRODUCT_NAME_TYPES.has(t) && pnameIn ? pnameIn.value.trim() || undefined : undefined;
+        handleUpload(name, b64, cm, t, pn).catch((e) => { cm.textContent = `${name} — 실패: ${e.message}`; });
+      }));
       return;
     }
     if (cm) cm.textContent = `${name} → ${uploadResultMsg(r)}`;
@@ -1094,6 +1110,54 @@
     return el;
   }
 
+  // 시안 B — 로컬 답변 뒤 "클라우드에도 물어보기". 클라우드가 켜져 있고(관리자 설정) 유출 게이트를
+  // 통과한 일반 질문에만 버튼이 뜬다. 내부정보가 섞이면 버튼 대신 "로컬 전용" 표시 → 유출 유도 자체가 없다.
+  let dashCloudStatus = null; // 세션당 1회 조회 후 캐시
+  async function getDashCloudStatus() {
+    if (dashCloudStatus !== null) return dashCloudStatus;
+    try { dashCloudStatus = await window.gijo.cloudStatus(); }
+    catch (e) { dashCloudStatus = { enabled: false }; }
+    return dashCloudStatus;
+  }
+  async function clCloudOffer(question) {
+    const status = await getDashCloudStatus();
+    if (!status || !status.enabled) return; // 클라우드 미사용(기본) — 아무것도 안 함(온프렘 그대로)
+    let screen;
+    try { screen = await window.gijo.screenCloud(question); } catch (e) { return; }
+    if (!screen.allowed) {
+      // 내부 정보 포함 — 클라우드 제안을 아예 띄우지 않고, 왜 로컬 전용인지만 조용히 알린다.
+      const note = clAppend("event", { icon: "🔒", name: "로컬 전용", message: `이 질문은 내부 정보(${screen.reasons.join(", ")})가 있어 클라우드로 보낼 수 없습니다 — 로컬 답변만 제공됩니다.` });
+      return note;
+    }
+    const el = clAppend("offer", { icon: "☁", name: "보조 의견", message: `내부 정보 미포함 — 이 질문을 ${status.providerLabel}에도 물어볼 수 있습니다.` });
+    const btn = document.createElement("button");
+    btn.className = "cl-offer-btn";
+    btn.textContent = `☁ ${status.providerLabel}에도 물어보기`;
+    btn.addEventListener("click", async () => {
+      btn.disabled = true; btn.textContent = "☁ 물어보는 중…";
+      try {
+        const r = await window.gijo.askCloud(question);
+        if (r.routedToCloud) {
+          const row = clAppend("reply", { icon: "☁", name: `${r.providerLabel} · 보조 의견`, message: r.answer || "(빈 응답)" });
+          const badge = document.createElement("span");
+          badge.textContent = "☁ 클라우드 · 내부정보 미포함";
+          badge.style.cssText = "font-size:9.5px;font-weight:800;padding:1px 7px;border-radius:5px;background:rgba(139,124,240,.16);border:1px solid #8b7cf0;color:#b3a6ff;margin-left:6px";
+          row.querySelector(".cn").appendChild(badge);
+          btn.parentElement.parentElement.remove(); // 제안 행 제거(중복 방지)
+        } else if (r.blocked) {
+          btn.textContent = "🔒 내부 정보 감지 — 전송 안 됨";
+        } else {
+          btn.disabled = false; btn.textContent = `☁ 다시 시도 (${(r.error || "실패").slice(0, 40)})`;
+        }
+      } catch (e) {
+        btn.disabled = false; btn.textContent = "☁ 실패 — 다시 시도";
+      }
+    });
+    el.querySelector(".cb").appendChild(btn);
+    clRows.scrollTop = clRows.scrollHeight;
+    return el;
+  }
+
   // 결재판 카드(시안 B) — 쓰기 도구는 지시만으로 실행되지 않는다. AI가 채운 값을 표로 보여주고
   // 값마다 출처(지시에서/자동생성/AI 추정)를 달아 사람이 빠르게 검증한 뒤 승인해야 실행된다.
   // 빠진 필수값은 빈 칸으로 떠서 그 자체가 "되물어보기"가 된다(별도 ask 단계 불필요).
@@ -1267,7 +1331,7 @@
       // 답변이 "모델 미준비" 안내면 배너도 띄워 두 경로(모델 받기/서버 연결)를 바로 제시.
       const notReady = /모델이 아직 준비|로컬 LLM|localengine/.test(result.output || "");
       if (notReady) modelGuide().style.display = "block";
-      else clOfferReport(orchLabel());
+      else { clOfferReport(orchLabel()); clCloudOffer(text); }
       await loadTasks();
       if (result.route && result.route.action === "scan") await reloadDashExplorer();
       refreshTeamStatus();

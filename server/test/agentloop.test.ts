@@ -46,10 +46,10 @@ describe("#8 대화 맥락 — '아까 그거' 후속 지시", () => {
 describe("agenttools — 「AI 자산」 조회 도구", () => {
   // 도구는 화면 메뉴가 아니라 사용자 의도 단위다(2026-07-17 확정) — 목록·상세·찾기·설명·오늘·등록.
   // search/explain/today는 메뉴를 가로지르므로 domain="cross".
-  it("도구는 의도 단위로 등록돼 있다 (조회 9종 + 쓰기 4종)", () => {
+  it("도구는 의도 단위로 등록돼 있다 (조회 10종 + 쓰기 4종)", () => {
     const tools = listAgentTools();
     expect(tools.map((t) => t.name)).toEqual([
-      "list_assets", "get_asset", "search", "explain", "today", "threats", "remediation", "scan_status", "briefing",
+      "list_assets", "get_asset", "search", "explain", "today", "threats", "remediation", "scan_status", "briefing", "run_redteam",
       "register_asset", "assign_finding", "update_finding_status", "bulk_update",
     ]);
     expect(tools.filter((t) => t.write).map((t) => t.name)).toEqual(["register_asset", "assign_finding", "update_finding_status", "bulk_update"]);
@@ -175,6 +175,11 @@ describe("runAgentLoop — 결정→실행→최종답변", () => {
     const r = await runAgentLoop("자산 보여줘");
     expect(r!.toolCalls[0].result).toContain("존재하지 않는 도구");
     expect(r!.toolCalls[1].tool).toBe("list_assets");
+    // 실측(2026-07-19): 이 내부 오류 메시지가 최종 답변 작성 프롬프트에 그대로 섞여 들어가
+    // "도구가 없어서..." 같은 내부 과정 얘기가 사용자 답변에 새어나왔다 — composeFinalAnswer로
+    // 보내는 마지막 chat() 호출에는 이 오류가 빠져야 한다.
+    const finalCallMessage = mockChat.mock.calls.at(-1)![0].message as string;
+    expect(finalCallMessage).not.toContain("존재하지 않는 도구");
   });
 
   it("필수 인자 누락이면 실행하지 않고 인자 오류를 관찰로 준다", async () => {

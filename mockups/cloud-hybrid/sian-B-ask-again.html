@@ -1,0 +1,43 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
+<title>시안 B — 답변 아래 "클라우드에도 물어보기"</title><link rel="stylesheet" href="_shared.css"></head><body>
+<div class="wrap">
+  <div class="mock-tag">시안 B</div>
+  <div class="mock-h">로컬이 먼저 답하고, 원하면 "클라우드에도 물어보기"</div>
+  <div class="mock-sub">기본 흐름은 100% 로컬. 로컬 답변이 아쉬울 때만 담당자가 버튼 하나로 클라우드 답변을 추가로 받아 <b>나란히 비교</b>한다. 클라우드는 "보조 의견"으로 자리매김 — 온프렘 정체성을 가장 덜 흔든다.</div>
+
+  <!-- 설정(공통, 접힌 요약) -->
+  <div class="panel">
+    <div class="panel-title">☁ 클라우드 LLM <span class="badge b-teal">admin 전용</span> <span class="badge b-blue" style="margin-left:auto;">활성 · Claude</span></div>
+    <div class="panel-sub">기본은 로컬입니다. 활성화하면 답변마다 "클라우드에도 물어보기"가 나타나며, 내부 정보가 없는 질문만 전송됩니다. (설정 상세는 클릭하여 펼침)</div>
+    <div class="log">
+      <div class="log-row"><span class="log-dot allow"></span><span class="log-q">SBOM과 AI-BOM의 차이가 뭐야?</span><span class="log-meta">Claude · 15:40</span></div>
+      <div class="log-row"><span class="log-dot block"></span><span class="log-q">사내 챗봇 레드팀 결과 해석해줘</span><span class="log-meta">차단(자산명) · 15:31</span></div>
+    </div>
+  </div>
+
+  <!-- 대화 -->
+  <div class="console">
+    <div class="msg">
+      <div class="av">👤</div><div class="body"><div class="who">나</div>
+        <div class="txt">공급망 공격(Supply Chain Attack)을 AI 모델 관점에서 설명해줘</div></div>
+    </div>
+    <div class="msg">
+      <div class="av">🤖</div><div class="body"><div class="who">Security Orchestrator <span class="local-badge">● 로컬</span></div>
+        <div class="txt">AI 모델 공급망 공격은 모델 가중치·데이터셋·의존 패키지 어느 단계든 오염될 수 있는 위협입니다. 대표적으로 …</div>
+        <div style="margin-top:9px;"><button class="btn btn-ghost" style="font-size:11.5px;">☁ 이 질문 클라우드(Claude)에도 물어보기</button>
+        <span style="font-size:10.5px;color:var(--muted-2);margin-left:8px;">내부 정보 미포함 확인됨 · 전송 가능</span></div>
+      </div>
+    </div>
+    <div class="msg">
+      <div class="av">☁</div><div class="body"><div class="who">Claude <span class="cloud-badge">☁ 보조 의견</span></div>
+        <div class="txt">로컬 답변에 더해, 실제 사례로는 2024년 PyTorch 의존성 오염, Hugging Face의 악성 pickle 업로드 사건이 대표적입니다. 방어는 ① 모델 서명 검증 ② …</div></div>
+    </div>
+    <div class="dock">
+      <input value="레드팀에서 뚫린 프롬프트 인젝션 일반 대응책은?" placeholder="Security Orchestrator에게 지시…">
+      <button class="btn">전송</button>
+    </div>
+    <div class="note">민감정보가 든 질문이면 답변 아래 "클라우드에도 물어보기" 버튼이 <b>아예 뜨지 않습니다</b>(대신 "내부 정보 포함 — 로컬 전용" 표시). 담당자가 실수로 유출을 시도할 여지 자체가 없음.</div>
+  </div>
+
+  <div class="note"><b>장점</b> — 온프렘이 항상 기본. 클라우드는 명시적 추가 액션이라 유출 위험 최소. 로컬 vs 클라우드 답을 나란히 비교 가능(품질 체감·신뢰).<br><b>단점</b> — 한 질문에 최대 두 번 답이 생겨 화면이 길어짐. LLM을 두 번 호출(비용·시간).</div>
+</div></body></html>

@@ -8,6 +8,7 @@
 import type { Express } from "express";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
+import { todayLocal } from "../util/date";
 import { db, assertTestDb } from "../db";
 import { listAssets } from "./assets";
 import { listMaintenanceItems } from "./maintenance";
@@ -54,9 +55,7 @@ export interface KpiSnapshot {
   };
 }
 
-function todayStr(): string {
-  return new Date().toISOString().slice(0, 10);
-}
+const todayStr = todayLocal;
 
 // 자산 위험도 등급: critical/high finding이 하나라도 있으면 고위험, medium만 있으면 중위험, 그 외 저위험.
 function riskCounts(): { total: number; highRisk: number; midRisk: number; lowRisk: number } {

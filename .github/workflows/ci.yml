@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [main]
 
+# 배포 대상(온프레미스, 한국)과 같은 타임존으로 고정한다. GitHub Actions 기본 러너는 UTC라
+# "오늘" 날짜 계산이 로컬(KST)과 항상 일치해버려, 자정~오전9시(KST) 구간에서만 터지는
+# 타임존 버그(실측 2026-07-19: SLA 기한초과 판정이 하루 밀림)를 CI가 절대 못 잡는다.
+env:
+  TZ: Asia/Seoul
+
 jobs:
   server:
     name: Server — typecheck + test

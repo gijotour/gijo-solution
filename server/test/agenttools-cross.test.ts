@@ -62,6 +62,25 @@ describe("search — 메뉴를 가로지르는 단일 검색", () => {
     const out = await run("search", { query: "웹 서비스" });
     expect(out).toContain("web-01"); // 문서 검색 실패가 자산 검색을 죽이지 않는다
   });
+
+  // 실측(2026-07-19): "자산A와 자산B 비교해줘" 질문에서 7B 모델이 두 대상을 "A OR B" 한 문자열로
+  // 합쳐 검색해 0건이 되고, 비교 자체가 통째로 실패했다. 합쳐진 문자열은 매칭될 리 없으므로
+  // 결정적으로 나눠서 각각 찾는다 — 비교 질문에서 한쪽이 통째로 누락되지 않게.
+  it("여러 대상을 'A OR B'로 합쳐 보내도 각각 나눠 찾는다", async () => {
+    registerAsset({ id: "web-01", name: "웹 서비스", path: "p" });
+    registerAsset({ id: "db-02", name: "DB 서버", path: "p" });
+    const out = await run("search", { query: "웹 서비스 OR DB 서버" });
+    expect(out).toContain("web-01");
+    expect(out).toContain("db-02");
+  });
+
+  it("'A와 B' 형태(한국어 조사)도 나눠 찾는다", async () => {
+    registerAsset({ id: "web-01", name: "웹서비스", path: "p" });
+    registerAsset({ id: "db-02", name: "DB서버", path: "p" });
+    const out = await run("search", { query: "웹서비스와 DB서버" });
+    expect(out).toContain("web-01");
+    expect(out).toContain("db-02");
+  });
 });
 
 describe("explain — 온톨로지 근거 조회", () => {

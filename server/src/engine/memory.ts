@@ -33,6 +33,19 @@ function escapeLiteral(s: string): string {
 const DB_PATH = process.env.GIJO_MEMORY_DB_PATH ?? path.join("data", "memory.lancedb");
 const TABLE_NAME = "documents";
 const CHUNK_SIZE = 800;
+
+// 경로 기반 인입(/api/memory/ingest)은 memory.html의 "서버에 이미 있는 파일 경로로 직접 수집" 기능용
+// — 예시가 "data/docs/incident-policy.txt"이듯 서버 data 디렉터리 안의 문서를 가리키는 용도다.
+// 로그인만 하면(관리자 권한 불필요) 호출되는데 과거엔 경로 제한이 없어, 서버가 읽을 수 있는 임의
+// 절대경로를 인입한 뒤 "원본까지 삭제"로 지우면 임의 파일 삭제까지 가능했다(2026-07-19 발견·차단).
+const INGEST_ROOT = path.resolve(process.env.GIJO_INGEST_ROOT ?? "data");
+function assertWithinIngestRoot(filePath: string): string {
+  const resolved = path.resolve(filePath);
+  if (resolved !== INGEST_ROOT && !resolved.startsWith(INGEST_ROOT + path.sep)) {
+    throw new Error(`허용된 경로(${INGEST_ROOT}) 밖의 파일은 인입할 수 없습니다`);
+  }
+  return resolved;
+}
 const CHUNK_OVERLAP = 100;
 
 export interface IngestResult {
@@ -138,8 +151,9 @@ function chunkText(text: string, size = CHUNK_SIZE, overlap = CHUNK_OVERLAP): st
 }
 
 export async function ingestDocument(filePath: string, scope: string = GLOBAL_SCOPE, classify = false): Promise<IngestResult> {
-  const raw = await fs.readFile(filePath, "utf-8");
-  return ingestText(path.basename(filePath), raw, scope, path.resolve(filePath), classify);
+  const resolved = assertWithinIngestRoot(filePath);
+  const raw = await fs.readFile(resolved, "utf-8");
+  return ingestText(path.basename(resolved), raw, scope, resolved, classify);
 }
 
 // 이미 추출된 텍스트를 지식 베이스에 직접 넣는다 — 파일 업로드(PDF/HWPX 추출 후)나

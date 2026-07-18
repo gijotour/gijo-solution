@@ -83,6 +83,29 @@ db.exec(`
     fromAddress TEXT NOT NULL
   );
 
+  -- 선택적 클라우드 LLM 하이브리드(engine/cloudllm.ts). provider별 API 키를 암호화 저장한다.
+  -- 온프렘 원칙상 기본 비활성이며(app_state의 'cloud:enabled'), encryptedApiKey는 cti_feeds와
+  -- 동일하게 cryptopack.ts로 암호화한 JSON을 넣는다(평문 저장 안 함).
+  CREATE TABLE IF NOT EXISTS cloud_llm_keys (
+    provider TEXT PRIMARY KEY,     -- gemini | claude | openai
+    encryptedApiKey TEXT,
+    model TEXT
+  );
+
+  -- 클라우드 유출 방지 게이트(engine/cloudegress.ts) 판정 감사 로그. append-only.
+  -- decision: allowed(클라우드로 나감) | blocked(내부정보 감지→로컬 폴백). reasons는 차단 사유 JSON 배열.
+  -- questionPreview는 질문 앞부분만(전체 저장 안 함) — 감사엔 충분하고 저장 노출은 최소화.
+  CREATE TABLE IF NOT EXISTS cloud_egress_log (
+    id TEXT PRIMARY KEY,
+    at INTEGER NOT NULL,
+    userId TEXT,
+    provider TEXT,
+    decision TEXT NOT NULL,
+    reasons TEXT,
+    questionPreview TEXT
+  );
+  CREATE INDEX IF NOT EXISTS idx_cloud_egress_log_at ON cloud_egress_log(at);
+
   -- CTI 탐지 내역 캐시. 벤더 API를 요청마다 때리지 않도록 30분 게이트로 동기화하고(cti.ts),
   -- 외부 API 장애 시엔 이 캐시가 그대로 응답이 된다(경량 서킷 브레이커). collectedAt 인덱스는
   -- 90일 TTL 정리용 — 다음단계 가이드 3.1의 채택 항목.

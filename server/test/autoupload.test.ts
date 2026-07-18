@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import { createApp } from "../src/app";
 import { resetAssetsForTests } from "../src/engine/assets";
-import { resetSecurityProductsForTests } from "../src/engine/securityproducts";
+import { resetSecurityProductsForTests, createProduct } from "../src/engine/securityproducts";
 
 const b64 = (s: string) => Buffer.from(s, "utf-8").toString("base64");
 
@@ -45,6 +45,8 @@ describe("스마트 통합 업로드 — 파일 유형 자동 판별·라우팅"
   });
 
   it("파일명에 '매뉴얼'이 있으면 보안제품 등록부로 라우팅된다(내용 추출 실패해도 등록은 진행)", async () => {
+    // "방화벽" 카테고리 제품이 정확히 1개 있어야 category-single로 확정 라우팅된다(등록부 오염 방지 설계).
+    createProduct({ name: "경계 방화벽", category: "방화벽" });
     const res = await request(app)
       .post("/api/upload/auto")
       .set("Authorization", `Bearer ${token}`)
