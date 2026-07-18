@@ -4,6 +4,7 @@ import { db } from "../src/db";
 import { addTriples, expandOntology } from "../src/engine/ontology";
 import { atlasTriples, ATLAS_SOURCE } from "../src/engine/atlas-seed";
 import { owaspLlmTriples, OWASP_SOURCE } from "../src/engine/owasp-llm-seed";
+import { nistAiRmfTriples, NIST_SOURCE } from "../src/engine/nist-airmf-seed";
 import { threatCatalogTriples } from "../src/engine/ontology-seed";
 
 beforeEach(() => {
@@ -56,5 +57,25 @@ describe("OWASP LLM Top 10 (2025) 온톨로지 시드", () => {
     expect(flat).toContain("LLM04:2025 Data and Model Poisoning");
     // OWASP 노드의 완화통제까지 닿는다
     expect(exp.some((t) => t.subject.startsWith("LLM04") && t.predicate === "완화통제")).toBe(true);
+  });
+});
+
+describe("NIST AI RMF + GenAI Profile 온톨로지 시드", () => {
+  it("4기능·7신뢰속성·GenAI 위험을 담고 GenAI 위험을 OWASP에 교차 연결한다", () => {
+    const t = nistAiRmfTriples();
+    expect(t.every((x) => x.source === NIST_SOURCE)).toBe(true);
+    const funcs = t.filter((x) => x.subject === "NIST AI RMF" && x.predicate === "기능");
+    expect(funcs).toHaveLength(4);
+    expect(t.filter((x) => x.subject === "NIST AI RMF" && x.predicate === "신뢰속성")).toHaveLength(7);
+    // GenAI '정보 보안' 위험 → OWASP LLM01 프롬프트 인젝션으로 연결
+    expect(t.some((x) => x.subject === "정보 보안" && x.predicate === "관련" && x.object === "LLM01:2025 Prompt Injection")).toBe(true);
+  });
+
+  it("NIST GenAI 위험 → OWASP → KISA로 3단 그래프가 이어진다", () => {
+    addTriples([...threatCatalogTriples(), ...owaspLlmTriples(), ...nistAiRmfTriples()]);
+    // '데이터 프라이버시'(NIST) → LLM02(OWASP) 로 시작해 확장
+    const exp = expandOntology("데이터 프라이버시", undefined, { hops: 3, limit: 80 });
+    const flat = exp.map((t) => `${t.subject}|${t.predicate}|${t.object}`).join("\n");
+    expect(flat).toContain("LLM02:2025 Sensitive Information Disclosure");
   });
 });
