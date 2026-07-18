@@ -469,12 +469,13 @@ export async function generateReport(req: ReportRequest): Promise<ReportResult> 
   }));
 
   // 우선순위 조치 목록(개선 #2)과 AI 브리핑(개선 #4)을 보고서에 포함.
-  const priorities = prioritizedReviews(8);
+  // 자산 스코프 리포트면 그 자산들의 취약점만(전체 리포트면 assetIds가 없어 전 자산 — 종전과 동일).
+  const priorities = prioritizedReviews(8, req.assetIds);
   // AI 조치 브리핑(LLM 서술)은 내부 검토용에만 — 보고용은 '취약점 사례·거버넌스 매칭'으로 갈음(중복 제거).
   let triageDraft = "";
   if (audience === "internal") {
     try {
-      triageDraft = stripDialogueArtifacts((await buildTriageDraft(5)).draft);
+      triageDraft = stripDialogueArtifacts((await buildTriageDraft(5, req.assetIds)).draft);
     } catch {
       /* LLM 미가동 등 — 브리핑 없이 진행 */
     }
