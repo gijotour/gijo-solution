@@ -1,0 +1,57 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>대상선택 시안 C — 자산 내장</title>
+<style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel2:#0e1526;--border:rgba(255,255,255,.08);--bs:rgba(255,255,255,.16);--blue:#3b82f6;--text:#e7eaf3;--muted:#8b93ab;--m2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0}
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:"Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);padding:26px}
+.title{font-size:20px;font-weight:800;color:#fff}.sub{font-size:12.5px;color:var(--muted);margin:4px 0 20px;max-width:780px;line-height:1.6}
+.asset{max-width:1000px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:14px}
+.ahead{display:flex;align-items:center;gap:12px;border-bottom:1px solid var(--border);padding-bottom:14px;margin-bottom:16px}
+.ahead .an{font-size:16px;font-weight:800;color:#fff}.ahead .at{font-size:12px;color:var(--muted)}
+.aibom-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.area{background:var(--panel2);border:1px solid var(--border);border-radius:9px;padding:12px 14px}
+.area .h{font-size:11px;color:var(--purple);font-weight:800;margin-bottom:6px}
+.area .kv{font-size:12px;color:var(--muted);line-height:1.7}.area .kv b{color:var(--text);font-weight:600}
+.robust{grid-column:1/3;background:linear-gradient(180deg,rgba(226,72,61,.06),transparent);border-color:rgba(226,72,61,.25)}
+.rob-row{display:flex;align-items:center;gap:16px}
+.rob-donut{flex:none}
+.rob-big{font-size:15px;font-weight:800;color:var(--red)}
+.rob-meta{font-size:12px;color:var(--muted);line-height:1.6}
+.rob-cats{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.chip{font-size:10.5px;padding:2px 8px;border-radius:5px;background:rgba(226,72,61,.12);color:var(--red)}
+.rob-act{margin-left:auto;text-align:right}
+.btn{background:var(--blue);color:#fff;border:0;border-radius:8px;padding:9px 16px;font-weight:700;font-size:12.5px;cursor:pointer}
+.link{font-size:11px;color:var(--muted);margin-top:6px}
+.h4{font-size:12px;color:var(--muted);margin:6px 0 8px;max-width:1000px}
+.cap{font-size:12px;color:var(--m2);margin-top:20px;max-width:1000px}
+.tag{font-size:10px;color:var(--m2);background:rgba(139,124,240,.12);border-radius:5px;padding:2px 7px}
+</style></head><body>
+<div class="title">📦 AI 자산 상세 · AI-BOM</div>
+<div class="sub">레드팀을 <b>자산(AI-BOM) 상세 안</b>으로 넣습니다. 각 AI 자산 카드에 "AI 견고성" 영역이 6번째 AI-BOM 항목으로 들어가고, 거기서 바로 [견고성 점검]. 거버넌스가 자산 중심 — "이 자산의 모델·데이터·프롬프트, 그리고 견고성"이 한 곳에.</div>
+
+<div class="asset">
+  <div class="ahead"><span style="font-size:22px">📦</span><div><div class="an">사내 상담 챗봇</div><div class="at">LLM 서비스 · 담당 정요한</div></div><span class="tag" style="margin-left:auto">AI-BOM</span></div>
+  <div class="aibom-grid">
+    <div class="area"><div class="h">① 모델</div><div class="kv">기반: <b>Qwen2.5-3B-Instruct</b><br>연결 로컬모델: <b>bartowski__Qwen2.5-3B</b></div></div>
+    <div class="area"><div class="h">③ 프롬프트</div><div class="kv">시스템 프롬프트: <b>기재됨</b><br>가드레일: <b>탈옥 차단 규칙</b></div></div>
+    <div class="area robust">
+      <div class="h" style="color:var(--red)">🛡 AI 견고성 (레드팀)</div>
+      <div class="rob-row">
+        <svg class="rob-donut" width="58" height="58" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="#0e1526" stroke-width="4"/><circle cx="18" cy="18" r="15.9" fill="none" stroke="#e2483d" stroke-width="4" stroke-dasharray="29 71" stroke-linecap="round" transform="rotate(-90 18 18)"/><text x="18" y="21" text-anchor="middle" font-size="9" fill="#e7eaf3" font-weight="700">29</text></svg>
+        <div>
+          <div class="rob-big">위험 · 29/100</div>
+          <div class="rob-meta">10/14 취약 · 방어 4 · 2시간 전 점검</div>
+          <div class="rob-cats"><span class="chip">지시무시 5/6</span><span class="chip">시스템유출 1/1</span><span class="chip">탈옥 2/4</span></div>
+        </div>
+        <div class="rob-act"><button class="btn">▶ 견고성 재점검</button><div class="link">상세 리포트 →</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="h4">미점검 자산은 점검 유도</div>
+<div class="asset" style="padding:16px 20px">
+  <div style="display:flex;align-items:center;gap:12px"><span style="font-size:20px">📦</span><div><div class="an" style="font-size:14px">보안 요약 봇</div><div class="at">LLM 서비스 · Lily-7B 연결</div></div>
+  <div style="margin-left:auto;display:flex;align-items:center;gap:12px"><span style="font-size:12px;color:var(--m2)">🛡 견고성 미점검</span><button class="btn">▶ 견고성 점검</button></div></div>
+</div>
+
+<div class="cap">시안 C — <b>자산 내장</b>. 레드팀이 AI-BOM의 일부가 됨. 자산별 거버넌스가 가장 자연스럽고 플래그십 AI-BOM 스토리에 부합. 레드팀 페이지는 모델 전용으로 축소·공존.</div>
+</body></html>

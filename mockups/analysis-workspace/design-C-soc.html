@@ -1,0 +1,61 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>분석 워크스페이스 C — 통합 위험 관제</title>
+<style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel2:#0e1526;--border:rgba(255,255,255,.08);--bs:rgba(255,255,255,.16);--blue:#3b82f6;--text:#e7eaf3;--muted:#8b93ab;--m2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0}
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:"Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);padding:26px}
+.title{font-size:21px;font-weight:800;color:#fff}.sub{font-size:12.5px;color:var(--muted);margin:4px 0 18px;max-width:840px;line-height:1.6}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;max-width:1200px;margin-bottom:16px}
+.tile{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:15px}
+.tile .lab{font-size:11.5px;color:var(--muted)}.tile .v{font-size:24px;font-weight:800;margin-top:3px}
+.tile .d{font-size:10.5px;color:var(--m2);margin-top:3px}
+.tile.risk{background:linear-gradient(180deg,rgba(226,72,61,.1),transparent);border-color:rgba(226,72,61,.3)}
+.two{display:grid;grid-template-columns:1.5fr 1fr;gap:16px;max-width:1200px;align-items:start}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px}
+.ph{font-size:13.5px;font-weight:800;color:#fff;margin-bottom:4px}.ph .s{font-size:11px;color:var(--muted);font-weight:600}
+.psub{font-size:11px;color:var(--m2);margin-bottom:12px}
+.risk-row{display:flex;align-items:center;gap:11px;padding:12px 6px;border-bottom:1px solid var(--border);cursor:pointer}
+.risk-row:hover{background:var(--panel2)}.risk-row.sel{background:rgba(59,130,246,.07)}
+.rank{font-size:16px;font-weight:800;color:var(--m2);width:22px;text-align:center}
+.src{font-size:10px;font-weight:800;padding:2px 7px;border-radius:4px;flex:none}
+.src.vuln{color:var(--red);background:rgba(226,72,61,.12)}.src.log{color:var(--amber);background:rgba(240,160,32,.12)}.src.prod{color:var(--purple);background:rgba(139,124,240,.12)}
+.rr-main{flex:1;min-width:0}.rr-name{font-weight:700;font-size:13px}.rr-ai{font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.5}
+.pri{font-size:11px;font-weight:800;padding:3px 9px;border-radius:20px;flex:none}
+.p0{color:var(--red);background:rgba(226,72,61,.14)}.p1{color:var(--amber);background:rgba(240,160,32,.14)}.p2{color:var(--teal);background:rgba(30,185,128,.14)}
+.ana .ah{font-size:13px;font-weight:800;color:#fff;margin-bottom:10px}
+.ana .row{font-size:12.5px;color:var(--muted);line-height:1.8}.ana .row b{color:var(--text)}
+.ana pre{background:var(--panel2);border:1px solid var(--border);border-radius:7px;padding:10px;font-size:11.5px;color:#cdd7e0;white-space:pre-wrap;font-family:inherit;margin:8px 0}
+.corr{background:rgba(139,124,240,.08);border:1px solid rgba(139,124,240,.25);border-radius:8px;padding:10px;font-size:11.5px;color:#b9aef5;line-height:1.6;margin-top:10px}
+.btn{background:var(--blue);color:#fff;border:0;border-radius:7px;padding:8px 14px;font-size:12px;font-weight:700;cursor:pointer;margin-top:10px}
+.cap{font-size:12px;color:var(--m2);margin-top:18px;max-width:1200px}
+</style></head><body>
+<div class="title">🔬 보안 분석 · 통합 관제</div>
+<div class="sub">세 소스(취약점·로그·운영리포트)를 정규화해 <b>하나의 우선순위 위험 리스트</b>로 병합합니다. 소스를 의식하지 않고 "지금 제일 위험한 것"부터 봅니다. AI가 소스 간 상관관계도 찾습니다.</div>
+<div class="tiles">
+  <div class="tile risk"><div class="lab">종합 위험도</div><div class="v" style="color:var(--red)">높음</div><div class="d">P0 3 · P1 6 · P2 11</div></div>
+  <div class="tile"><div class="lab">🔍 취약점</div><div class="v">14</div><div class="d">Critical 2 · KEV 1</div></div>
+  <div class="tile"><div class="lab">📊 보안 로그</div><div class="v">3</div><div class="d">브루트포스 의심 1</div></div>
+  <div class="tile"><div class="lab">🧰 운영 리포트</div><div class="v">2</div><div class="d">DLP 차단 3 · 격리 12</div></div>
+</div>
+<div class="two">
+  <div class="panel">
+    <div class="ph">통합 위험 우선순위 <span class="s">— 3소스 병합</span></div>
+    <div class="psub">모든 소스의 발견·이벤트를 위험도(노출·KEV·EPSS·영향)로 통합 정렬</div>
+    <div class="risk-row sel"><div class="rank">1</div><span class="src vuln">취약점</span><div class="rr-main"><div class="rr-name">Log4j RCE — web01</div><div class="rr-ai">KEV·인터넷 노출·EPSS 0.94. 즉시 조치.</div></div><span class="pri p0">P0</span></div>
+    <div class="risk-row"><div class="rank">2</div><span class="src log">로그</span><div class="rr-main"><div class="rr-name">SSH 브루트포스 — 203.0.113.5</div><div class="rr-ai">8분간 412회 실패. IP 차단 필요.</div></div><span class="pri p0">P0</span></div>
+    <div class="risk-row"><div class="rank">3</div><span class="src prod">운영</span><div class="rr-main"><div class="rr-name">DLP 개인정보 유출 시도 3건</div><div class="rr-ai">1건 반복 사용자. 소명·차단.</div></div><span class="pri p0">P0</span></div>
+    <div class="risk-row"><div class="rank">4</div><span class="src prod">운영</span><div class="rr-main"><div class="rr-name">백신 격리 재발 — PC-0417</div><div class="rr-ai">동일 단말 2건 재발. 잔존 감염 의심.</div></div><span class="pri p1">P1</span></div>
+    <div class="risk-row"><div class="rank">5</div><span class="src log">로그</span><div class="rr-main"><div class="rr-name">비정상 아웃바운드 — PC-0417</div><div class="rr-ai">외부 8443 지속 연결.</div></div><span class="pri p1">P1</span></div>
+  </div>
+  <div class="panel ana">
+    <div class="ah">Log4j RCE — web01</div>
+    <div class="row"><b>소스:</b> 취약점 스캐너(nessus-2026-07) · <b>자산:</b> web01</div>
+    <div class="row"><b>AI 분석:</b> CVE-2021-44228 · KEV 등재 · EPSS 0.94 · 인터넷 노출. 즉시 패치/완화 1순위.</div>
+    <pre>조치
+1. 임시완화: log4j2.formatMsgNoLookups=true
+2. 패치: Log4j 2.17+ 업그레이드
+3. 인증 재스캔으로 검증</pre>
+    <div class="corr">🔗 <b>AI 상관분석:</b> #4 백신 재발(PC-0417)과 #5 비정상 아웃바운드가 <b>같은 단말</b>. 감염+C2 연계 가능성 → 함께 조사 권고.</div>
+    <button class="btn">▶ 조치 생성 · 담당 배정</button>
+  </div>
+</div>
+<div class="cap">시안 C — <b>통합 위험 관제(SOC형)</b>. 소스 병합 + 우선순위 + 소스 간 상관분석. 1인 담당자가 "오늘 뭐부터"를 바로 판단. 가장 분석 지향적이지만 정규화·우선순위 엔진이 세 소스 모두 필요.</div>
+</body></html>

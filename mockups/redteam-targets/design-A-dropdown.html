@@ -1,0 +1,66 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>대상선택 시안 A — 드롭다운</title>
+<style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel2:#0e1526;--border:rgba(255,255,255,.08);--bs:rgba(255,255,255,.16);--blue:#3b82f6;--text:#e7eaf3;--muted:#8b93ab;--m2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980}
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:"Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);padding:26px}
+.title{font-size:20px;font-weight:800;color:#fff}.sub{font-size:12.5px;color:var(--muted);margin:4px 0 20px;max-width:760px;line-height:1.6}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:14px;max-width:1000px}
+.ptitle{font-size:14px;font-weight:800;color:#fff;margin-bottom:12px}
+.selector{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+.fld{flex:1;min-width:280px}.fld label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:6px}
+select{width:100%;background:var(--panel2);border:1px solid var(--bs);border-radius:8px;padding:11px 12px;color:var(--text);font-size:13.5px}
+.btn{background:var(--blue);color:#fff;border:0;border-radius:8px;padding:11px 20px;font-weight:700;font-size:13px;cursor:pointer}
+.note{font-size:11.5px;color:var(--teal);margin-top:10px;background:rgba(30,185,128,.08);border:1px solid rgba(30,185,128,.25);border-radius:8px;padding:9px 11px}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;max-width:1000px;margin-bottom:14px}
+.kpi{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:15px}.kpi .v{font-size:26px;font-weight:800}.kpi .k{font-size:11.5px;color:var(--muted);margin-top:3px}
+.opt{color:var(--m2);font-size:11px}
+h4{font-size:12px;color:var(--muted);margin:18px 0 8px;max-width:1000px}
+.invrow{display:flex;align-items:center;gap:12px;max-width:1000px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 16px;margin-bottom:8px}
+.invrow .nm{font-weight:700;font-size:13.5px}.invrow .ty{font-size:11px;color:var(--muted)}
+.badge{margin-left:auto;font-size:11px;font-weight:800;padding:4px 10px;border-radius:20px}
+.b-red{color:var(--red);background:rgba(226,72,61,.14)}.b-amber{color:var(--amber);background:rgba(240,160,32,.14)}.b-none{color:var(--m2);background:rgba(255,255,255,.05)}
+.cap{font-size:12px;color:var(--m2);margin-top:22px;max-width:1000px}
+</style></head><body>
+<div class="title">🛡 AI 견고성 · 레드팀</div>
+<div class="sub">레드팀 페이지 상단에 <b>점검 대상 드롭다운</b>을 둡니다. 오케스트레이터·개별 로컬 모델·AI-BOM 연결 자산 중 골라 실행. 기존 리포트 화면은 그대로.</div>
+
+<div class="panel">
+  <div class="ptitle">점검 대상 선택</div>
+  <div class="selector">
+    <div class="fld"><label>대상</label>
+      <select>
+        <optgroup label="어시스턴트">
+          <option>오케스트레이터 (내 메인 LLM)</option>
+        </optgroup>
+        <optgroup label="AI-BOM 연결 자산">
+          <option>📦 사내 상담 챗봇 (Qwen2.5-3B) — 최근 29점</option>
+          <option>📦 보안 요약 봇 (Lily-7B) — 미점검</option>
+        </optgroup>
+        <optgroup label="로컬 모델 (15)">
+          <option>gijo-main-orchestrator</option>
+          <option>lily-cybersecurity-7b-v0.2</option>
+          <option>QuantFactory__SecurityLLM-GGUF</option>
+          <option>mradermacher__Foundation-Sec-8B-GGUF</option>
+          <option>… 외 11개</option>
+        </optgroup>
+      </select>
+    </div>
+    <button class="btn">▶ 레드팀 실행</button>
+  </div>
+  <div class="note">📦 AI-BOM 자산을 선택하면 점검 결과(견고성 점수)가 <b>그 자산의 AI-BOM에 자동 기록</b>됩니다.</div>
+</div>
+
+<div class="kpis">
+  <div class="kpi"><div class="v" style="color:var(--red)">29</div><div class="k">견고성 · 사내 상담 챗봇</div></div>
+  <div class="kpi"><div class="v" style="color:var(--red)">10</div><div class="k">뚫림</div></div>
+  <div class="kpi"><div class="v" style="color:var(--teal)">4</div><div class="k">방어</div></div>
+  <div class="kpi"><div class="v">14</div><div class="k">총 페이로드</div></div>
+</div>
+<div class="opt" style="max-width:1000px">↑ 아래에 기존 카테고리 막대 + 항목 펼침 상세(그대로 유지)</div>
+
+<h4>그리고 인벤토리(AI 자산) 목록엔 자산마다 작은 견고성 배지</h4>
+<div class="invrow"><div><div class="nm">사내 상담 챗봇</div><div class="ty">LLM 서비스 · Qwen2.5-3B</div></div><span class="badge b-red">견고성 29</span></div>
+<div class="invrow"><div><div class="nm">보안 요약 봇</div><div class="ty">LLM 서비스 · Lily-7B</div></div><span class="badge b-none">미점검</span></div>
+<div class="invrow"><div><div class="nm">이상탐지 모델</div><div class="ty">이상탐지 모델</div></div><span class="badge b-none">해당 없음</span></div>
+
+<div class="cap">시안 A — <b>드롭다운 대상 선택</b>. 가장 단순·익숙. 레드팀 페이지 최소 변경. 자산 화면엔 견고성 배지만 추가.</div>
+</body></html>

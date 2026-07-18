@@ -1,0 +1,59 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>대상선택 시안 B — 대상 매트릭스</title>
+<style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel2:#0e1526;--border:rgba(255,255,255,.08);--bs:rgba(255,255,255,.16);--blue:#3b82f6;--text:#e7eaf3;--muted:#8b93ab;--m2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980}
+*{box-sizing:border-box;margin:0;padding:0}body{font-family:"Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);padding:26px}
+.title{font-size:20px;font-weight:800;color:#fff}.sub{font-size:12.5px;color:var(--muted);margin:4px 0 20px;max-width:780px;line-height:1.6}
+.cols{display:grid;grid-template-columns:1.1fr 1.3fr;gap:16px;max-width:1120px;align-items:start}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px}
+.ptitle{font-size:13.5px;font-weight:800;color:#fff;margin-bottom:12px;display:flex;justify-content:space-between}
+.ptitle .cnt{font-size:11px;color:var(--muted);font-weight:600}
+.trow{display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:9px;border:1px solid transparent;cursor:pointer}
+.trow:hover{background:var(--panel2)}.trow.sel{background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.35)}
+.trow .ic{width:22px;text-align:center}
+.trow .nm{font-weight:700;font-size:13px}.trow .mt{font-size:11px;color:var(--muted)}
+.score{margin-left:auto;text-align:right}
+.score .n{font-size:17px;font-weight:800}.score .l{font-size:9.5px;color:var(--m2)}
+.s-red{color:var(--red)}.s-amber{color:var(--amber)}.s-teal{color:var(--teal)}.s-none{color:var(--m2);font-size:12px !important}
+.run{margin-left:8px;background:var(--blue);color:#fff;border:0;border-radius:7px;padding:7px 12px;font-size:11.5px;font-weight:700;cursor:pointer}
+.grp{font-size:10.5px;color:var(--m2);font-weight:700;letter-spacing:.5px;margin:12px 4px 4px}
+.grp:first-child{margin-top:0}
+.rt-head{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.rt-head .big{font-size:38px;font-weight:800;color:var(--red)}
+.rt-head .rt-meta{font-size:12px;color:var(--muted)}
+.donut{flex:none}
+.catbar{margin:9px 0}.catbar .t{display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px}.catbar .tr{height:8px;background:var(--panel2);border-radius:4px;overflow:hidden}.catbar .tr>i{display:block;height:100%}
+.item{border:1px solid var(--border);border-left:3px solid var(--red);border-radius:8px;padding:9px 12px;margin-top:7px;font-size:12.5px;display:flex;align-items:center;gap:8px}
+.sev{font-size:10px;font-weight:800;padding:1px 7px;border-radius:4px;color:var(--red);background:rgba(226,72,61,.14)}
+.res{margin-left:auto;color:var(--red);font-weight:800;font-size:11.5px}
+.cap{font-size:12px;color:var(--m2);margin-top:20px;max-width:1120px}
+</style></head><body>
+<div class="title">🛡 AI 견고성 · 레드팀</div>
+<div class="sub">레드팀 페이지 자체를 <b>점검 대상 목록(좌) + 선택 대상 리포트(우)</b>로. 로컬 모델·AI-BOM 자산이 각자 마지막 견고성 점수를 달고 나열되고, 행에서 바로 [점검]. AI 자산 견고성을 한 판에서 관리.</div>
+<div class="cols">
+  <div class="panel">
+    <div class="ptitle"><span>점검 대상</span><span class="cnt">자산 2 · 모델 15</span></div>
+    <div class="grp">AI-BOM 자산</div>
+    <div class="trow sel"><span class="ic">📦</span><div><div class="nm">사내 상담 챗봇</div><div class="mt">Qwen2.5-3B · 2h 전</div></div><div class="score"><div class="n s-red">29</div><div class="l">견고성</div></div><button class="run">점검</button></div>
+    <div class="trow"><span class="ic">📦</span><div><div class="nm">보안 요약 봇</div><div class="mt">Lily-7B · 미점검</div></div><div class="score"><div class="n s-none">—</div></div><button class="run">점검</button></div>
+    <div class="grp">어시스턴트 · 로컬 모델</div>
+    <div class="trow"><span class="ic">◉</span><div><div class="nm">오케스트레이터</div><div class="mt">gijo-main-orchestrator</div></div><div class="score"><div class="n s-amber">43</div><div class="l">견고성</div></div><button class="run">점검</button></div>
+    <div class="trow"><span class="ic">🔒</span><div><div class="nm">lily-cybersecurity-7b</div><div class="mt">보안 특화</div></div><div class="score"><div class="n s-none">—</div></div><button class="run">점검</button></div>
+    <div class="trow"><span class="ic">🔒</span><div><div class="nm">Foundation-Sec-8B</div><div class="mt">보안 특화</div></div><div class="score"><div class="n s-none">—</div></div><button class="run">점검</button></div>
+    <div class="trow"><span class="ic">◇</span><div><div class="nm">SecurityLLM</div><div class="mt">… 외 11개 모델</div></div><div class="score"><div class="n s-none">—</div></div><button class="run">점검</button></div>
+  </div>
+  <div class="panel">
+    <div class="ptitle"><span>📦 사내 상담 챗봇 — 리포트</span><span class="cnt">Qwen2.5-3B</span></div>
+    <div class="rt-head">
+      <svg class="donut" width="60" height="60" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="#0e1526" stroke-width="4"/><circle cx="18" cy="18" r="15.9" fill="none" stroke="#e2483d" stroke-width="4" stroke-dasharray="29 71" stroke-linecap="round" transform="rotate(-90 18 18)"/><text x="18" y="21" text-anchor="middle" font-size="9" fill="#e7eaf3" font-weight="700">29</text></svg>
+      <div><div class="big" style="font-size:22px">위험</div><div class="rt-meta">10/14 취약 · 방어 4</div></div>
+    </div>
+    <div class="catbar"><div class="t"><span>지시 무시</span><span style="color:var(--muted)">5/6</span></div><div class="tr"><i style="width:83%;background:var(--red)"></i></div></div>
+    <div class="catbar"><div class="t"><span>시스템프롬프트 유출</span><span style="color:var(--muted)">1/1</span></div><div class="tr"><i style="width:100%;background:var(--red)"></i></div></div>
+    <div class="catbar"><div class="t"><span>탈옥</span><span style="color:var(--muted)">2/4</span></div><div class="tr"><i style="width:50%;background:var(--amber)"></i></div></div>
+    <div class="item"><span class="sev">critical</span><span>시스템 프롬프트 유출</span><span class="res">뚫림</span></div>
+    <div class="item"><span class="sev">critical</span><span>직접 지시 무시</span><span class="res">뚫림</span></div>
+    <div class="item" style="border-left-color:var(--amber)"><span class="sev" style="color:var(--amber);background:rgba(240,160,32,.14)">high</span><span>개발자 모드 사칭</span><span class="res">뚫림</span></div>
+  </div>
+</div>
+<div class="cap">시안 B — <b>대상 매트릭스</b>. 모든 AI 모델·자산의 견고성을 한 화면에서 비교·점검. 거버넌스 대시보드에 가장 가깝지만 구현량 큼.</div>
+</body></html>

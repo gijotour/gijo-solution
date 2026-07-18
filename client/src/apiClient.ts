@@ -479,6 +479,47 @@ export const guardrailApi = {
     request<{ mode: GuardMode; flaggedCount: number; blockedCount: number }>("/api/guardrail/mode", { method: "POST", body: { mode } }),
 };
 
+// ── 통합 보안 분석(관제) 허브 — 취약점·로그·운영리포트 3소스 정규화 ──────────
+export interface AnalysisEvent {
+  id: string;
+  source: "vuln" | "log" | "product";
+  title: string;
+  entity: string;
+  severity: "critical" | "high" | "medium" | "low" | "info";
+  priority: "P0" | "P1" | "P2" | "P3";
+  detail: string;
+  signals: string[];
+  aiSummary: string;
+  ref: string;
+  at: number;
+}
+export interface AnalysisCorrelation {
+  entity: string;
+  sources: ("vuln" | "log" | "product")[];
+  eventIds: string[];
+  note: string;
+}
+export interface AnalysisHubData {
+  events: AnalysisEvent[];
+  summary: {
+    total: number;
+    bySource: { vuln: number; log: number; product: number };
+    byPriority: { P0: number; P1: number; P2: number; P3: number };
+    overall: "높음" | "보통" | "낮음";
+  };
+  correlations: AnalysisCorrelation[];
+}
+export const analysisHubApi = {
+  events: () => request<AnalysisHubData>("/api/analysis-hub/events"),
+  rebuildVuln: () => request<{ inserted: number }>("/api/analysis-hub/rebuild-vuln", { method: "POST" }),
+  // 드롭존 통합 인입 — 서버가 로그/리포트를 자동 판별해 라우팅.
+  ingest: (filename: string, content: string) =>
+    request<{ routedTo: "log" | "report"; created: number; events: AnalysisEvent[] }>("/api/analysis-hub/ingest", {
+      method: "POST",
+      body: { filename, content },
+    }),
+};
+
 // ── LLM 브리지 / 채팅 ─────────────────────────────────────────────────
 export const bridgeApi = {
   run: (payload: unknown) => request("/api/bridge/run", { method: "POST", body: payload }),

@@ -14,6 +14,9 @@
         { page: "dashboard.html", label: "대시보드" },
         { page: "kpi.html", label: "보안 KPI" },
       ]},
+      { ic: "🔬", label: "보안 분석", tabs: [
+        { page: "analysis.html", label: "통합 관제" },
+      ]},
     ]},
     { section: "보안 업무", groups: [
       { ic: "◇", label: "AI 자산", tabs: [

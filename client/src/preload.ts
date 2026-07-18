@@ -141,6 +141,11 @@ const gijoApi = {
   ontologyStats: () => api.ontologyApi.stats(),
   seedOntology: () => api.ontologyApi.seed(),
 
+  // 통합 보안 분석(관제) 허브
+  analysisEvents: () => api.analysisHubApi.events(),
+  analysisRebuildVuln: () => api.analysisHubApi.rebuildVuln(),
+  analysisIngest: (filename: string, content: string) => api.analysisHubApi.ingest(filename, content),
+
   // AI 견고성: 레드팀 + 가드레일
   runRedTeam: (opts?: { modelId?: string; assetId?: string }) => api.redteamApi.run(opts),
   lastRedTeam: (target?: string) => api.redteamApi.last(target),
