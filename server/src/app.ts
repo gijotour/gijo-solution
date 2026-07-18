@@ -43,6 +43,7 @@ import { registerMaintenanceRoutes } from "./engine/maintenance";
 import { registerSecurityProductRoutes } from "./engine/securityproducts";
 import { registerEmailRoutes } from "./engine/email";
 import { registerCloudLlmRoutes } from "./engine/cloudllm";
+import { registerDocEnrichRoutes } from "./engine/docenrich";
 import { registerSbomRoutes } from "./engine/sbom";
 import { registerApprovalsRoutes } from "./engine/approvals";
 import { registerCtiRoutes } from "./engine/cti";
@@ -128,6 +129,7 @@ export function createApp(): Express {
   registerSecurityProductRoutes(app);
   registerEmailRoutes(app);
   registerCloudLlmRoutes(app);
+  registerDocEnrichRoutes(app);
   registerSbomRoutes(app);
   registerApprovalsRoutes(app);
   registerCtiRoutes(app);

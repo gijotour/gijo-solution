@@ -132,14 +132,17 @@ export function listEgressLog(limit = 100): EgressLogEntry[] {
 }
 
 // ── provider 어댑터 ─────────────────────────────────────────────────────────
-async function callOpenAiCompatible(baseUrl: string, apiKey: string, model: string, question: string): Promise<string> {
+// system을 인자로 받는다 — 대화(askCloud)는 CLOUD_SYSTEM_PROMPT를, 문서 보강(cloudComplete)은
+// 번역·구조화 프롬프트를 넣는다. maxTokens도 인자화(번역은 긴 출력이 필요).
+async function callOpenAiCompatible(baseUrl: string, apiKey: string, model: string, system: string, user: string, maxTokens?: number): Promise<string> {
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
       model,
-      messages: [{ role: "system", content: CLOUD_SYSTEM_PROMPT }, { role: "user", content: question }],
+      messages: [{ role: "system", content: system }, { role: "user", content: user }],
       temperature: 0.3,
+      ...(maxTokens ? { max_tokens: maxTokens } : {}),
     }),
     signal: AbortSignal.timeout(CLOUD_TIMEOUT_MS),
   });
@@ -148,16 +151,16 @@ async function callOpenAiCompatible(baseUrl: string, apiKey: string, model: stri
   return j.choices?.[0]?.message?.content ?? "";
 }
 
-async function callClaude(apiKey: string, model: string, question: string): Promise<string> {
+async function callClaude(apiKey: string, model: string, system: string, user: string, maxTokens = 1024): Promise<string> {
   // Anthropic은 OpenAI 호환이 아니라 Messages API — system은 별도 필드, user 메시지만 배열로.
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "Content-Type": "application/json", "x-api-key": apiKey, "anthropic-version": "2023-06-01" },
     body: JSON.stringify({
       model,
-      max_tokens: 1024,
-      system: CLOUD_SYSTEM_PROMPT,
-      messages: [{ role: "user", content: question }],
+      max_tokens: maxTokens,
+      system,
+      messages: [{ role: "user", content: user }],
     }),
     signal: AbortSignal.timeout(CLOUD_TIMEOUT_MS),
   });
@@ -166,10 +169,21 @@ async function callClaude(apiKey: string, model: string, question: string): Prom
   return j.content?.map((c) => c.text ?? "").join("") ?? "";
 }
 
-async function callProvider(p: CloudProvider, apiKey: string, model: string, question: string): Promise<string> {
-  if (p === "openai") return callOpenAiCompatible("https://api.openai.com/v1", apiKey, model, question);
-  if (p === "gemini") return callOpenAiCompatible("https://generativelanguage.googleapis.com/v1beta/openai", apiKey, model, question);
-  return callClaude(apiKey, model, question);
+async function callProvider(p: CloudProvider, apiKey: string, model: string, system: string, user: string, maxTokens?: number): Promise<string> {
+  if (p === "openai") return callOpenAiCompatible("https://api.openai.com/v1", apiKey, model, system, user, maxTokens);
+  if (p === "gemini") return callOpenAiCompatible("https://generativelanguage.googleapis.com/v1beta/openai", apiKey, model, system, user, maxTokens);
+  return callClaude(apiKey, model, system, user, maxTokens);
+}
+
+// 저수준 완성 호출 — 활성 제공자·키를 재사용해 임의 system/user로 호출한다. 문서 보강(번역·구조화)
+// 같은 내부 배치용. ⚠ egress 게이트를 타지 않으므로 호출자가 "외부로 나가도 되는 콘텐츠"임을
+// 보장해야 한다(벤더 공개 매뉴얼 등). 내부 자산 데이터엔 절대 쓰지 말 것.
+export async function cloudComplete(system: string, user: string, maxTokens = 4096): Promise<string> {
+  if (!isEnabled()) throw new Error("클라우드 LLM이 비활성 상태입니다(설정에서 관리자가 켜야 합니다).");
+  const provider = activeProvider();
+  const key = providerKey(provider);
+  if (!key) throw new Error(`${PROVIDER_LABEL[provider]} API 키가 없습니다.`);
+  return callProvider(provider, key, providerModel(provider), system, user, maxTokens);
 }
 
 // 제공자가 지금 이 키로 실제 쓸 수 있는 모델 목록을 조회한다 — 모델 별칭이 수시로 바뀌므로
@@ -227,7 +241,7 @@ export async function askCloud(question: string, user?: GijoUser): Promise<Cloud
 
   const model = providerModel(provider);
   try {
-    const answer = await callProvider(provider, apiKey, model, q);
+    const answer = await callProvider(provider, apiKey, model, CLOUD_SYSTEM_PROMPT, q);
     logEgress({ userId: user?.id, provider, decision: "allowed", reasons: [], question: q });
     emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `클라우드 질의: ${PROVIDER_LABEL[provider]}(${model}) — 내부정보 미포함 확인됨` });
     return { routedToCloud: true, blocked: false, reasons: [], provider, providerLabel: PROVIDER_LABEL[provider], model, answer };
