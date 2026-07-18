@@ -4,6 +4,9 @@
 // dashboard.html에 <script src="onboarding.js"> 로 포함. 재열기용 플로팅 런처도 제공.
 
 (function () {
+  // [보류 2026-07-18] 시작 가이드(온보딩)는 향후 재정리 예정 — 그때까지 표시하지 않는다.
+  // DISABLED=true 동안 자동표시·런처 pill 모두 미표시. 재개하려면 false로만 바꾸면 됨(내용은 보존).
+  var DISABLED = true;
   var CHECK_KEY = "gijo:onboarding:checked"; // 체크된 항목 id 배열
   var SEEN_KEY = "gijo:onboarding:seen";     // 최초 자동표시 1회 플래그
 
@@ -176,6 +179,7 @@
   }
 
   function init() {
+    if (DISABLED) return; // [보류] 시작 가이드 재정리 전까지 미표시(자동표시·런처 pill 모두 생략)
     renderLauncher();
     // 대시보드 최초 도착 시 1회 자동 표시.
     var onDash = (location.pathname || "").indexOf("dashboard.html") >= 0;

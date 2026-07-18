@@ -562,7 +562,18 @@
   async function init() {
     tick(); setInterval(tick, 30000);
     await loadUser(); await loadHealth();
-    await Promise.all([loadExplorer(), loadSessions(true)]);
+    await loadExplorer();
+    // 대시보드 세션 열에서 넘어온 딥링크(localStorage) — 특정 세션 열기 / 새 세션 시작.
+    let openId = null, wantNew = false;
+    try {
+      openId = localStorage.getItem("gijo:sessions:open");
+      wantNew = localStorage.getItem("gijo:sessions:new") === "1";
+      localStorage.removeItem("gijo:sessions:open");
+      localStorage.removeItem("gijo:sessions:new");
+    } catch (e) {}
+    await loadSessions(!openId && !wantNew); // 딥링크 없을 때만 최근 세션 자동 선택
+    if (wantNew) await newSession();
+    else if (openId && sessions.some((s) => s.id === openId)) openSession(openId);
 
     document.querySelectorAll(".header [data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));

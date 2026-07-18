@@ -78,7 +78,6 @@ async function cap(file, out, w, h) {
     };
     window.gijo = new Proxy(known, { get: (t, k) => (k in t ? t[k] : () => Promise.resolve([])) });
     window.gijoRealtime = { connect: () => {} };
-    try { localStorage.setItem("gijo:onboarding:seen", "1"); } catch (e) {} // 온보딩 자동표시 억제
   }, stub);
   await p.goto(pathToFileURL(path.join(pagesDir, file)).href, { waitUntil: "load" });
   await p.waitForTimeout(800);

@@ -35,8 +35,24 @@
   .icon-btn.on{background:rgba(59,130,246,0.18);border-color:var(--blue);color:var(--blue-light);}
   .avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
 
-  .body-grid{display:grid;grid-template-columns:220px 1fr;min-height:640px;}
+  .body-grid{display:grid;grid-template-columns:220px 228px 1fr;min-height:640px;}
   .explorer{padding:18px 12px;border-right:1px solid var(--border);}
+  /* 작업 세션 열 — 자산 탐색기 바로 옆. 목록은 여기서 보고, 클릭하면 전용 화면에서 그 대화가 열린다. */
+  .dash-sessions{border-right:1px solid var(--border);display:flex;flex-direction:column;min-height:0;}
+  .dash-sessions .dsh{display:flex;align-items:center;justify-content:space-between;padding:16px 12px 8px;}
+  .dash-sessions .dsh-t{font-size:12px;font-weight:700;color:var(--text);}
+  .dash-new{background:var(--blue);color:#fff;border:0;border-radius:6px;font-size:11px;font-weight:700;padding:4px 9px;cursor:pointer;}
+  .dash-slist{flex:1;overflow-y:auto;padding:2px 8px 8px;}
+  .dash-sitem{padding:8px 10px;border-radius:8px;cursor:pointer;border:1px solid transparent;margin-bottom:3px;}
+  .dash-sitem:hover{background:var(--panel-2);}
+  .dash-sitem .t{font-weight:700;font-size:12px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .dash-sitem .l{font-size:10.5px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .dash-sitem .m{font-size:9.5px;color:var(--muted-2);margin-top:4px;display:flex;justify-content:space-between;}
+  .dash-stag{font-size:8.5px;font-weight:800;padding:1px 5px;border-radius:4px;}
+  .dash-stag.active{color:var(--teal);background:rgba(30,185,128,.14);}
+  .dash-stag.done,.dash-stag.ignored{color:var(--muted-2);background:rgba(255,255,255,.06);}
+  .dash-sfull{padding:9px 12px;border-top:1px solid var(--border);font-size:11px;color:var(--blue-light);font-weight:700;cursor:pointer;text-align:center;}
+  .dash-sfull:hover{background:var(--panel-2);}
   .explorer-title{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px;}
   .explorer-sub{font-size:11px;color:var(--blue-light);margin-bottom:10px;}
   .explorer-tree{font-size:12px;color:var(--muted);line-height:1.9;}
@@ -291,6 +307,14 @@
       <input type="file" id="smartUploadInput" multiple style="display:none">
       <div id="explorerTree">불러오는 중...</div>
     </div>
+
+    <!-- 작업 세션 열 — 자산 탐색기 바로 옆. 클릭하면 전용 "작업 세션" 화면에서 그 대화가 열린다. -->
+    <div class="dash-sessions">
+      <div class="dsh"><span class="dsh-t">💬 작업 세션</span><button class="dash-new" id="dashNewSession">＋ 새 세션</button></div>
+      <div class="dash-slist" id="dashSessionList"><div style="font-size:11px;color:var(--muted-2);padding:8px">불러오는 중…</div></div>
+      <div class="dash-sfull" id="dashSessionsFull">전체 작업 세션 열기 ↗</div>
+    </div>
+
     <!-- 자산 상세 팝오버(시안2) — 탐색기 자산 클릭 시 옆에 뜬다 -->
     <div class="asset-pop" id="assetPop"></div>
 
@@ -1309,6 +1333,32 @@
     }
   }
 
+  // ── 작업 세션 열(탐색기 옆) ────────────────────────────────────────────
+  const DASH_STATUS_LABEL = { active: "진행중", done: "완료", ignored: "무시" };
+  async function loadDashSessions() {
+    const box = document.getElementById("dashSessionList");
+    if (!box) return;
+    try {
+      const list = await window.gijo.listWorkSessions();
+      if (!list.length) {
+        box.innerHTML = '<div style="font-size:11px;color:var(--muted-2);padding:10px 6px;line-height:1.6">아직 세션이 없습니다.<br>＋ 새 세션 또는 전체 화면의 탐색기 항목을 눌러 시작하세요.</div>';
+        return;
+      }
+      box.innerHTML = list.slice(0, 15).map((s) => {
+        const prev = s.lastPreview ? escT(s.lastPreview) : "새 대화";
+        return `<div class="dash-sitem" data-id="${s.id}"><div class="t">${escT(s.title)}</div><div class="l">${prev}</div>` +
+          `<div class="m"><span>${s.turnCount}턴</span><span class="dash-stag ${s.status}">${DASH_STATUS_LABEL[s.status] || s.status}</span></div></div>`;
+      }).join("");
+      box.querySelectorAll(".dash-sitem").forEach((el) => el.addEventListener("click", () => openSessionPage(el.dataset.id)));
+    } catch (e) {
+      box.innerHTML = '<div style="font-size:11px;color:var(--muted-2);padding:8px">세션을 불러오지 못했습니다</div>';
+    }
+  }
+  function openSessionPage(id) {
+    try { localStorage.setItem("gijo:sessions:open", id); } catch (e) {}
+    window.gijo.navigateTo("sessions.html");
+  }
+
   async function init() {
     tick();
     setInterval(tick, 1000);
@@ -1342,6 +1392,13 @@
     if (todayCtaBtn) todayCtaBtn.addEventListener("click", () => {
       sendToOrchestrator("오늘 확인할 항목을 우선순위대로 에이전트 팀에게 위임해서 처리해줘");
     });
+
+    // 작업 세션 열 — 목록 로드 + 새 세션/전체 화면 진입(전용 화면으로 딥링크).
+    loadDashSessions();
+    const dashNew = document.getElementById("dashNewSession");
+    if (dashNew) dashNew.addEventListener("click", () => { try { localStorage.setItem("gijo:sessions:new", "1"); } catch (e) {} window.gijo.navigateTo("sessions.html"); });
+    const dashFull = document.getElementById("dashSessionsFull");
+    if (dashFull) dashFull.addEventListener("click", () => window.gijo.navigateTo("sessions.html"));
 
     window.gijo.onCollaborationEvent((evt) => {
       appendCollabRow(evt);
