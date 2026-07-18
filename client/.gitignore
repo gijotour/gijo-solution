@@ -2,3 +2,6 @@ node_modules/
 dist/
 release/
 *.log
+# build-server-dist가 설치본용으로 복사하는 산출물(매번 재생성) — server-dist/package.json만 추적.
+server-dist/docs/
+server-dist/docs-manifest.json
