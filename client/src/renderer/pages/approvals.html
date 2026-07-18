@@ -119,6 +119,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   .rv-assignee,.rv-due{background:var(--panel);border:1px solid var(--border-strong);color:var(--text);border-radius:7px;padding:5px 9px;font-size:12px;outline:none;}
   .rv-assignee{width:130px;}
   .rv-assignee:focus,.rv-due:focus{border-color:var(--blue);}
+  .rv-more{width:100%;margin-top:4px;background:var(--panel);border:1px solid var(--border-strong);color:var(--blue-light);border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer;}
+  .rv-more:hover{border-color:var(--blue);}
 </style>
 <datalist id="gijoUserList"></datalist>
 
@@ -135,6 +137,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   }
 
   const RV_LABEL = { pending: "미검토", approved: "승인됨", rejected: "반려(오탐)" };
+  // 자산 하나에 finding이 수백 건일 수 있어(대규모 스캔) 전부 렌더하면 DOM이 수천 노드로 불어난다.
+  // 미검토·심각도 우선으로 정렬한 뒤 상위 RV_CAP건만 그리고, 나머지는 '전체 보기'로 펼친다.
+  const RV_CAP = 50;
+  let rvShowAll = false;
 
   function reviewHtml(r) {
     const actions =
@@ -186,15 +192,26 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       const order = { pending: 0, approved: 1, rejected: 2 };
       const sev = { critical: 0, high: 1, medium: 2, low: 3 };
       reviews.sort((a, b) => (order[a.status] - order[b.status]) || (sev[a.finding.severity] - sev[b.finding.severity]));
-      list.innerHTML = reviews.length
-        ? reviews.map(reviewHtml).join("")
-        : '<div style="color:var(--muted-2);font-size:12px">검토할 finding이 없습니다 — AI 자산에서 스캔을 먼저 실행하세요.</div>';
+      if (!reviews.length) {
+        list.innerHTML = '<div style="color:var(--muted-2);font-size:12px">검토할 finding이 없습니다 — AI 자산에서 스캔을 먼저 실행하세요.</div>';
+        return;
+      }
+      const shown = rvShowAll ? reviews : reviews.slice(0, RV_CAP);
+      let html = shown.map(reviewHtml).join("");
+      if (reviews.length > RV_CAP) {
+        html += rvShowAll
+          ? `<button class="rv-more" data-more="collapse">상위 ${RV_CAP}건만 보기 ▲</button>`
+          : `<button class="rv-more" data-more="expand">전체 ${reviews.length}건 중 ${RV_CAP}건 표시 — 전체 보기 ▼</button>`;
+      }
+      list.innerHTML = html;
     } catch (e) {
       list.innerHTML = '<div style="color:#f5928a;font-size:12px">불러오지 못했습니다: ' + e.message + "</div>";
     }
   }
 
   async function onReviewClick(e) {
+    const more = e.target.closest("[data-more]");
+    if (more) { rvShowAll = more.dataset.more === "expand"; loadReviews(); return; }
     const btn = e.target.closest("[data-act]");
     if (!btn) return;
     const { act, a, k } = btn.dataset;

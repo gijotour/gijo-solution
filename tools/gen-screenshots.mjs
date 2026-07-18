@@ -178,6 +178,10 @@ async function main() {
     { page: "settings.html", name: "21-설정-사용자관리" },
   ];
 
+  // GIJO_SHOT_ONLY="05,06" — 일부 화면만 다시 찍고 싶을 때(파일명 접두 번호로 필터). 없으면 전체.
+  const only = (process.env.GIJO_SHOT_ONLY ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  const shotList = only.length ? shots.filter((s) => only.some((p) => s.name.startsWith(p))) : shots;
+
   const browser = await chromium.launch({ channel: "msedge", headless: true });
   const ctx = await browser.newContext({ viewport: { width: 1440, height: 960 }, deviceScaleFactor: 2 });
   // 외부 로고(gijo.ai) 요청은 오프라인이라 차단해 렌더 지연 방지.
@@ -188,7 +192,7 @@ async function main() {
     window.gijo = (${installStub.toString()})(${JSON.stringify(DATA)});
     window.gijoRealtime = { connect: () => {} };`);
 
-  for (const s of shots) {
+  for (const s of shotList) {
     const page = await ctx.newPage();
     try {
       await page.goto(pathToFileURL(path.join(PAGES_DIR, s.page)).href, { waitUntil: "load", timeout: 15000 });
@@ -196,7 +200,23 @@ async function main() {
       // (옆에 "GIJO AS" 텍스트가 이미 있어 로고가 빠져도 헤더가 비지 않는다.)
       await page.addStyleTag({ content: 'img[src*="gijo.ai"]{display:none!important}' });
       await page.waitForTimeout(1200); // 렌더/데이터 반영 대기
-      await page.screenshot({ path: path.join(OUT_DIR, `${s.name}.png`), fullPage: !DECK });
+      const outFile = path.join(OUT_DIR, `${s.name}.png`);
+      if (DECK) {
+        await page.screenshot({ path: outFile }); // 뷰포트만(16:10)
+      } else {
+        // 매뉴얼용 풀페이지. 다만 데이터가 많은 목록 화면(승인·위협 등)은 세로가 수만 px까지 치솟아
+        // 매뉴얼에 못 쓴다 — 정상 화면 최대치(~2900px)보다 넉넉한 상한에서 상단만 캡처한다.
+        // (clip은 fullPage 없이 뷰포트로 잘려 무용지물이라, 뷰포트 높이를 상한으로 키워 상단을 담는다.)
+        const MANUAL_MAX_H = 3200; // CSS px
+        const contentH = await page.evaluate(() => document.documentElement.scrollHeight);
+        if (contentH > MANUAL_MAX_H) {
+          await page.setViewportSize({ width: 1440, height: MANUAL_MAX_H });
+          await page.waitForTimeout(200); // 뷰포트 변경 후 재배치 대기
+          await page.screenshot({ path: outFile });
+        } else {
+          await page.screenshot({ path: outFile, fullPage: true });
+        }
+      }
       console.log("✓", s.name);
     } catch (e) {
       console.log("✗", s.name, String(e.message).split("\n")[0]);
