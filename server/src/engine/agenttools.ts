@@ -433,7 +433,7 @@ const TOOLS: AgentTool[] = [
     domain: "cross",
     write: false,
     description:
-      '지금 조치할 취약점 우선순위를 전 자산을 가로질러 알려준다(KEV→EPSS→VPR 순, 담당자·기한·지연 포함). "오늘 뭐부터?"에 쓴다. 예: {"limit":"5"}',
+      '지금 조치할 취약점 우선순위를 전 자산을 가로질러 알려준다(KEV→EPSS→VPR 순, 담당자·기한·지연 포함). "오늘 뭐부터?", "제일 급한 취약점", "우선순위 높은 거", "지금 급한 거", "뭐부터 조치해"에 쓴다. 예: {"limit":"5"}',
     params: [{ name: "limit", label: "개수", description: "상위 몇 건 (기본 5)", required: false }],
     run: runToday,
   },
