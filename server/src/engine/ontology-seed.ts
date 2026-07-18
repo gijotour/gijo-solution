@@ -10,6 +10,7 @@
 import { THREAT_CATALOG, CATEGORY_LABEL, type AiBomArea } from "./compliance";
 import { PRODUCT_CATEGORIES } from "./securityproducts";
 import { addTriples, deleteTriplesBySource, type TripleInput } from "./ontology";
+import { atlasTriples, ATLAS_SOURCE } from "./atlas-seed";
 
 // 시드 트리플의 출처 태그 — 재적재 시 이 출처의 기존 트리플만 지워 멱등하게 만든다(수동 입력분은 보존).
 export const SEED_SOURCE = "KISA AI 보안 위협 대응 매뉴얼(2026.7)";
@@ -123,11 +124,13 @@ export function seedOntologyFromCatalog(): { inserted: number; sources: string[]
   deleteTriplesBySource(MITIGATION_SOURCE);
   deleteTriplesBySource(PRODUCT_SOURCE);
   deleteTriplesBySource(VULN_SOURCE);
+  deleteTriplesBySource(ATLAS_SOURCE);
   const rows = addTriples([
     ...threatCatalogTriples(),
     ...mitigationTriples(),
     ...securityProductTriples(),
     ...vulnClassificationTriples(),
+    ...atlasTriples(), // MITRE ATLAS 국제 표준(전술·기법·완화통제) — KISA 위협과 코드로 자동 연결
   ]);
-  return { inserted: rows.length, sources: [SEED_SOURCE, MITIGATION_SOURCE, PRODUCT_SOURCE, VULN_SOURCE] };
+  return { inserted: rows.length, sources: [SEED_SOURCE, MITIGATION_SOURCE, PRODUCT_SOURCE, VULN_SOURCE, ATLAS_SOURCE] };
 }
