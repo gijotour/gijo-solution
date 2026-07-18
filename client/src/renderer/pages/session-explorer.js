@@ -123,16 +123,22 @@
     var todayLeaves = caches.tasks.length
       ? caches.tasks.slice(0, 6).map(function (t) { return '<div class="se-leaf" data-type="today" data-id="' + t.id + '" title="' + esc(t.text) + '">' + esc(t.text) + "</div>"; }).join("")
       : '<div class="se-empty">오늘 확인할 항목 없음</div>';
-    var priLeaves = caches.pri.length
-      ? caches.pri.map(function (p) {
-          var pr = p.priority || sevToPri(p.finding && p.finding.severity);
-          var name = (p.finding && p.finding.finding_type) || "취약점";
-          return '<div class="se-leaf" data-type="vuln" data-id="' + esc(priKey(p)) + '" title="' + esc(name) + " · " + esc(p.assetId) + '"><span class="se-pri ' + pr + '">' + pr + "</span>" + esc(name) + " · " + esc(p.assetId) + "</div>";
-        }).join("")
-      : '<div class="se-empty">우선 조치 항목 없음</div>';
-    var assetLeaves = caches.assets.length
-      ? caches.assets.map(function (a) { return '<div class="se-leaf" data-type="asset" data-id="' + esc(a.id) + '" title="' + esc(a.name || a.id) + '">◆ ' + esc(a.name || a.id) + "</div>"; }).join("")
-      : '<div class="se-empty">등록된 AI 자산 없음</div>';
+    // 시스템 BOM 그룹핑 — 기존 인프라(SBOM) vs AI/ML(ML-BOM). AI/ML 자산은 인프라 위에서 구동된다.
+    function isInfraAsset(a) {
+      var t = (a.assetType || "").toLowerCase();
+      return t === "infra-host" || /infra|host|서버|server|(^|[^a-z])os([^a-z]|$)|runtime|런타임|네트워크|network|db|데이터베이스/.test(t);
+    }
+    function assetLeaf(a, icon) {
+      return '<div class="se-leaf" data-type="asset" data-id="' + esc(a.id) + '" title="' + esc((a.name || a.id) + " · " + (a.assetType || "")) + '">' + icon + " " + esc(a.name || a.id) + "</div>";
+    }
+    var infraAssets = caches.assets.filter(isInfraAsset);
+    var mlAssets = caches.assets.filter(function (a) { return !isInfraAsset(a); });
+    var infraLeaves = infraAssets.length
+      ? infraAssets.map(function (a) { return assetLeaf(a, "🖥"); }).join("")
+      : '<div class="se-empty">등록된 인프라 자산 없음</div>';
+    var mlLeaves = mlAssets.length
+      ? mlAssets.map(function (a) { return assetLeaf(a, "◆"); }).join("")
+      : '<div class="se-empty">등록된 AI/ML 자산 없음</div>';
     var prodLeaves = caches.products.length
       ? caches.products.map(function (p) { return '<div class="se-leaf" data-type="product" data-id="' + esc(p.id) + '" title="' + esc(p.name) + '">' + esc(p.name) + "</div>"; }).join("")
       : '<div class="se-empty">등록된 보안제품 없음</div>';
@@ -141,10 +147,11 @@
       '<div class="se-leaf se-act" data-action="upload">📥 파일 올리기 — 자동 분류</div>' +
       '<div class="se-leaf se-act" data-action="manage">📚 올린 문서 관리</div>';
 
+    // 시스템 BOM: 기존 인프라(SBOM) + AI/ML(ML-BOM). '오늘의 조치·우선순위'는 탐색기에서 제거(요청).
     container.innerHTML =
       sectionHtml("today", "⦿", "오늘 확인할 항목", caches.tasks.length, todayLeaves, '<button class="se-run" data-run="1">▶ 운영 시작 — 세션에서 판단</button>') +
-      sectionHtml("vuln", "🎯", "오늘의 조치 · 우선순위", caches.pri.length, priLeaves) +
-      sectionHtml("asset", "◆", "AI 자산 · AI-BOM", caches.assets.length, assetLeaves) +
+      sectionHtml("sbom", "🖥", "SBOM · 인프라 자산", infraAssets.length, infraLeaves) +
+      sectionHtml("mlbom", "🧠", "ML BOM · AI/ML 자산", mlAssets.length, mlLeaves) +
       sectionHtml("product", "🧰", "보안제품 관리", caches.products.length, prodLeaves) +
       sectionHtml("files", "📁", "문서 · 분석", "", docLeaves);
 
