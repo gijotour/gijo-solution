@@ -341,9 +341,10 @@ export async function chat(args: ChatArgs): Promise<string> {
 
 export async function embed(texts: string[]): Promise<number[][]> {
   const started = Date.now();
-  // OpenAI 호환 경로(/v1/embeddings)를 쓴다. 최신 llama.cpp의 네이티브 /embeddings는
-  // {data:[...]} 가 아니라 [{index,embedding:[[...]]}] 형태(중첩 배열)를 돌려줘 파싱이 깨진다.
-  const res = await fetch(`${EMBEDDING_SERVER_URL}/v1/embeddings`, {
+  // EMBEDDING_SERVER_URL에는 이미 /v1이 포함돼 있다(기본값 http://localhost:8081/v1).
+  // 따라서 여기서는 /embeddings만 붙여야 OpenAI 호환 경로가 된다 — /v1/embeddings를 붙이면
+  // /v1/v1/embeddings가 되어 404가 나고, RAG가 조용히 죽는다(2026-07-19 실제 발생).
+  const res = await fetch(`${EMBEDDING_SERVER_URL}/embeddings`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ model: "local", input: texts }),
