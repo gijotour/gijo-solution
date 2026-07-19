@@ -19,6 +19,7 @@ import { attachLearnloopSocket } from "./engine/learnloop";
 import { stopLocalEngine, stopEmbeddingEngine, autoStartLocalEngines, startEmbeddingMonitor, stopEmbeddingMonitor } from "./engine/localengine";
 import { refreshKev } from "./engine/kev";
 import { bootstrapDocsBundleWithRetry } from "./engine/docsbundle";
+import { closeHttpServer } from "./util/gracefulClose";
 
 // 가능한 한 이른 시점에 설치해야 이후의 console.log/warn/error가 전부 캡처된다.
 installConsoleCapture();
@@ -66,11 +67,38 @@ httpServer.listen(PORT, () => {
 });
 
 // 서버 프로세스 종료 시 자식으로 띄운 llama-server가 고아 프로세스로 남지 않도록 함께 정리한다.
+//
+// 종료는 어떤 경우에도 끝나야 한다. 예전엔 httpServer.close()가 열린 연결을 기다리다
+// 영영 안 끝나서 systemd가 90초 뒤 SIGKILL로 죽였다(2026-07-19 실측·재현).
+// 강제 종료가 매 재시작마다 일어나면 언젠가 쓰기 도중에 걸린다.
+const SHUTDOWN_DEADLINE_MS = 15_000;
+let shuttingDown = false;
+
 async function shutdown(signal: string): Promise<void> {
+  if (shuttingDown) return; // 신호가 두 번 올 수 있다
+  shuttingDown = true;
   console.log(`[index] ${signal} 수신 — 로컬 LLM 엔진 정리 후 종료`);
-  stopEmbeddingMonitor();
-  await Promise.all([stopLocalEngine(), stopEmbeddingEngine()]);
-  httpServer.close(() => process.exit(0));
+
+  // 무슨 일이 있어도 이 시간 안에는 프로세스가 사라진다.
+  // 엔진 정리 단계가 걸려도 여기서 빠져나오도록 가장 먼저 건다.
+  const deadline = setTimeout(() => {
+    console.error(`[index] 종료가 ${SHUTDOWN_DEADLINE_MS}ms 안에 끝나지 않아 강제 종료합니다.`);
+    process.exit(1);
+  }, SHUTDOWN_DEADLINE_MS);
+  deadline.unref();
+
+  try {
+    stopEmbeddingMonitor();
+    await Promise.all([stopLocalEngine(), stopEmbeddingEngine()]);
+  } catch (err) {
+    // 엔진 정리에 실패해도 종료는 계속한다 — 안 끝나는 것보다 낫다.
+    console.error("[index] 로컬 LLM 엔진 정리 실패(종료는 계속):", err);
+  }
+
+  const result = await closeHttpServer(httpServer, wss);
+  if (result === "timeout") console.error("[index] 연결 정리 후에도 서버가 닫히지 않아 그대로 종료합니다.");
+  clearTimeout(deadline);
+  process.exit(0);
 }
 
 process.on("SIGINT", () => void shutdown("SIGINT"));
