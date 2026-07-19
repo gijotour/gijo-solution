@@ -68,15 +68,16 @@
       // 사이드바 열을 레일+서브패널 폭으로. #gijoNav(=.sidebar)의 기존 패딩·테두리·min-height 무력화.
       ".app{grid-template-columns:auto 1fr !important;}" +
       "#gijoNav{padding:0 !important;border-right:0 !important;min-height:0 !important;display:flex;position:sticky;top:0;height:100vh;align-self:start;z-index:20;}" +
-      ".gn-rail{width:56px;background:#0a1120;border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:3px;height:100vh;}" +
+      // 레일(54)+서브패널(166)=220px — 기존 사이드바 폭과 동일하게 맞춰 본문이 좁아지지 않게 한다.
+      ".gn-rail{width:54px;background:#0a1120;border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:3px;height:100vh;}" +
       ".gn-ic{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--muted);cursor:pointer;flex:0 0 auto;}" +
       ".gn-ic:hover{background:rgba(255,255,255,.05);color:#fff;}" +
       ".gn-ic.active{background:rgba(59,130,246,.16);color:var(--blue-light);}" +
       ".gn-ic.hasactive::after{content:'';position:absolute;margin-top:26px;margin-left:26px;width:6px;height:6px;border-radius:50%;background:var(--blue);}" +
       ".gn-spacer{flex:1 1 auto;}" +
-      ".gn-sub{width:188px;background:var(--panel-2);border-right:1px solid var(--border);height:100vh;overflow-y:auto;padding:6px 0;}" +
-      ".gn-subtitle{font-size:12px;font-weight:800;color:#fff;padding:14px 16px 9px;letter-spacing:.2px;}" +
-      ".gn-item{padding:8px 16px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}" +
+      ".gn-sub{width:166px;background:var(--panel-2);border-right:1px solid var(--border);height:100vh;overflow-y:auto;padding:6px 0;}" +
+      ".gn-subtitle{font-size:11.5px;font-weight:800;color:#fff;padding:14px 13px 9px;letter-spacing:.2px;}" +
+      ".gn-item{padding:8px 13px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}" +
       ".gn-item:hover{color:#fff;background:rgba(255,255,255,.03);}" +
       ".gn-item.active{color:var(--blue-light);box-shadow:inset 3px 0 0 var(--blue);background:rgba(59,130,246,.08);cursor:default;}" +
       ".gn-logo{height:26px;width:42px;display:flex;align-items:center;justify-content:center;margin-bottom:6px;cursor:pointer;}" +
