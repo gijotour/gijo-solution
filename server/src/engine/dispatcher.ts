@@ -16,6 +16,7 @@ import { executeApprovedTool, PendingApproval } from "./agenttools";
 import { appendApprovedDecision } from "./orchestrator-dataset";
 import { undoSnapshot, undoCommit } from "./undo";
 import { gateUserInput } from "./gateway";
+import { toolDomainsForScreen } from "./screencontext";
 import { analyzeFindings } from "./analysis";
 import { recordFindings, getAsset, listAssets } from "./assets";
 import { listFindings } from "./cti";
@@ -348,7 +349,11 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   // "지금 급한 취약점 상위 3건만 알려줘"가 analyze로 분류돼 루프에 도달하지 못했다. 그 4분류는
   // 화면 메뉴를 미러링한 레거시 축이라, 의도 축 도구셋(search·explain·today)의 앞을 막으면 안 된다.
   // 루프가 처리 못 하면(null) 아래 기존 경로로 그대로 폴백하므로 스캔·리포트 동작은 보존된다.
-  const loop = await runAgentLoop(instructionText, contextText).catch(() => null);
+  // 화면에서 온 업무 영역으로 도구 후보를 좁힌다 — 도구가 늘어도 프롬프트가 커지지 않게 하는 장치.
+  // 화면을 모르거나 전역 화면(대시보드)이면 undefined라 종전대로 전체가 후보가 된다.
+  const loop = await runAgentLoop(instructionText, contextText, {
+    domains: toolDomainsForScreen(screen),
+  }).catch(() => null);
   if (loop) {
     const loopTask = createTask({ text: instructionText, agentId: "orchestrator", priority: "P2" });
     setAgentStatus("orchestrator", "working");

@@ -32,11 +32,35 @@ export interface AgentToolParam {
   required: boolean;
 }
 
+// ── 도메인 축 ───────────────────────────────────────────────────────────────
+// 메뉴 전수 조사(tools/menu-audit.mjs)에서 나온 업무 영역. 화면 24개와 1:1이 아니다 —
+// 지시를 받을 수 있는 영역만 추린 것이다(설정·로그·사용량은 오케스트레이션 대상이 아니다).
+//
+// 이 축으로 도구를 걸러 프롬프트에 넣는다. 전체를 평평하게 뿌리면 도구가 늘수록 선택 정확도가
+// 떨어진다 — 업계에서 말하는 "도구 발견 문제"이고, 해법은 상황에 맞는 것만 노출하는 것이다.
+export const TOOL_DOMAINS = [
+  "assets", // 자산 인벤토리
+  "vuln", // 취약점·조치
+  "sbom", // AI-BOM/SBOM 구성
+  "products", // 보안제품 등록부
+  "maintenance", // 정기 점검
+  "report", // 보고서
+  "knowledge", // 장기기억·온톨로지
+  "threat", // 위협 인텔
+] as const;
+export type ToolDomain = (typeof TOOL_DOMAINS)[number] | "cross";
+
 export interface AgentTool {
   name: string;
   label: string; // 결재판 제목용("자산 등록")
-  domain: string; // 메뉴 단위 도메인("assets" 등) — 도구 15개 초과 시 도메인 라우팅에 쓴다
+  // 이 도구가 속한 업무 영역. "cross"는 어느 화면에서든 쓰이는 횡단 도구(검색·설명·브리핑 등)라
+  // 도메인 필터와 무관하게 항상 노출된다.
+  domain: ToolDomain;
   write: boolean; // true면 상태를 바꾸는 도구 — 결재판을 거쳐야 실행된다
+  // 이 도구를 쓸 수 있는 최소 권한. 지정하면 그 권한이 없는 사용자에게는 목록에서 아예 숨긴다.
+  // GPU를 통째로 점유하거나(파인튜닝·모델 병합) 전체에 영향을 주는(엔진 로드·설정) 작업용.
+  // 한 명이 실행하면 추론 엔진이 내려가 담당자 전원이 채팅을 못 쓰게 되므로 담당자 권한에서 뺀다.
+  requiredRole?: "admin";
   description: string; // LLM에게 보여줄 한 줄 설명(한국어)
   params: AgentToolParam[];
   // 쓰기 도구용: LLM이 안 준 값을 서버 규칙으로 채운다(예: id를 이름에서 생성). 결재판에서 "자동생성"으로 표시된다.
@@ -828,11 +852,28 @@ export function findAgentTool(name: string): AgentTool | undefined {
 }
 
 // LLM 프롬프트에 넣을 도구 목록 텍스트.
-export function toolCatalogText(): string {
-  return TOOLS.map((t) => {
-    const params = t.params.length ? `(${t.params.map((p) => p.name + (p.required ? "" : "?")).join(", ")})` : "()";
-    return `- ${t.name}${params}: ${t.description}`;
-  }).join("\n");
+/**
+ * 지금 상황에서 쓸 수 있는 도구만 고른다.
+ *
+ * @param domains 노출할 업무 영역. 비우면 전체(종전 동작). "cross" 도구는 항상 포함된다.
+ * @param role    호출자 권한. "admin"이 아니면 requiredRole="admin"인 도구를 숨긴다 —
+ *                오케스트레이터가 애초에 후보로 삼지 못하게 해, 권한 없는 실행 시도 자체를 없앤다.
+ */
+export function listToolsFor(domains?: string[], role?: string): AgentTool[] {
+  return TOOLS.filter((t) => {
+    if (t.requiredRole === "admin" && role !== "admin") return false;
+    if (!domains || domains.length === 0) return true;
+    return t.domain === "cross" || domains.includes(t.domain);
+  });
+}
+
+export function toolCatalogText(domains?: string[], role?: string): string {
+  return listToolsFor(domains, role)
+    .map((t) => {
+      const params = t.params.length ? `(${t.params.map((p) => p.name + (p.required ? "" : "?")).join(", ")})` : "()";
+      return `- ${t.name}${params}: ${t.description}`;
+    })
+    .join("\n");
 }
 
 // 규칙 검증: 필수 인자가 전부 있고 문자열인지. 문제가 없으면 null, 있으면 한국어 사유를 돌려준다.

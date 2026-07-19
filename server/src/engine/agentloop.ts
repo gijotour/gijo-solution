@@ -11,7 +11,7 @@
 // 채팅 경로로 폴백한다. 즉 루프 도입으로 기존 동작이 나빠지는 회귀가 없다.
 
 import { chat } from "./llm";
-import { listAgentTools, findAgentTool, toolCatalogText, validateToolArgs, buildApproval, PendingApproval } from "./agenttools";
+import { listAgentTools, listToolsFor, findAgentTool, toolCatalogText, validateToolArgs, buildApproval, PendingApproval } from "./agenttools";
 import { emitCollaboration } from "./collaboration";
 
 const MAX_STEPS = 5;
@@ -93,7 +93,7 @@ function parseDecision(raw: string): Decision | null {
   }
 }
 
-function decisionPrompt(instruction: string, calls: AgentToolCall[], context = ""): string {
+function decisionPrompt(instruction: string, calls: AgentToolCall[], context = "", scope?: ToolScope): string {
   const ctx = context ? ["", context, '위는 같은 세션의 이전 대화다. 지시가 "이어서/그거/방금"처럼 앞을 가리키면 이 맥락을 근거로 해석하라.'] : [];
   const history = calls.length
     ? [
@@ -108,7 +108,7 @@ function decisionPrompt(instruction: string, calls: AgentToolCall[], context = "
     "너는 GIJO AS 보안 플랫폼의 오케스트레이터다. 사용자 지시를 읽고 아래 도구 중 하나를 골라 호출하거나, 도구가 필요 없으면 직접 답한다.",
     "",
     "사용 가능한 도구:",
-    toolCatalogText(),
+    toolCatalogText(scope?.domains, scope?.role),
     "",
     "규칙:",
     '- 반드시 JSON 객체 하나만 출력한다: {"action":"tool","tool":"도구이름","args":{...}} 또는 {"action":"final","answer":"직접 답변"}',
@@ -179,14 +179,25 @@ async function composeFinalAnswer(instruction: string, calls: AgentToolCall[], c
 
 // 지시를 에이전트 루프로 처리한다. 도구를 하나도 쓰지 않았거나 결정이 파싱 불가면 null
 // (호출자가 기존 채팅으로 폴백). 도구를 썼으면 실행 내역과 최종 답변을 돌려준다.
-export async function runAgentLoop(instruction: string, context = ""): Promise<AgentLoopResult | null> {
-  if (listAgentTools().length === 0) return null;
+/**
+ * 이번 지시에서 쓸 수 있는 도구의 범위.
+ * - domains: 화면에서 온 업무 영역(screencontext). 없으면 좁히지 않는다.
+ * - role: 호출자 권한. admin이 아니면 requiredRole="admin" 도구는 후보에서 빠진다.
+ */
+export interface ToolScope {
+  domains?: string[];
+  role?: string;
+}
+
+export async function runAgentLoop(instruction: string, context = "", scope?: ToolScope): Promise<AgentLoopResult | null> {
+  // 범위를 적용한 뒤 쓸 도구가 하나도 없으면 루프를 돌 이유가 없다(호출자가 채팅으로 폴백).
+  if (listToolsFor(scope?.domains, scope?.role).length === 0) return null;
 
   const calls: AgentToolCall[] = [];
   for (let step = 0; step < MAX_STEPS; step++) {
     const raw = await chat({
       agentId: "orchestrator",
-      message: decisionPrompt(instruction, calls, context),
+      message: decisionPrompt(instruction, calls, context, scope),
       responseSchema: DECISION_SCHEMA,
       maxTokens: 300,
     }).catch(() => "");

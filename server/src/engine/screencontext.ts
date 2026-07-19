@@ -16,8 +16,14 @@ import type { RoutedIntent } from "./intent";
 export interface ScreenContext {
   /** 화면 이름 — 프롬프트와 로그에 쓴다 */
   label: string;
-  /** 이 화면의 업무 영역. LLM 라우팅 프롬프트에 힌트로 실린다 */
+  /** 사람이 읽는 업무 영역 설명 */
   domain: string;
+  /**
+   * 이 화면에서 쓸 수 있는 도구 영역(agenttools.ts의 ToolDomain).
+   * 지정하면 오케스트레이터가 이 영역 + cross 도구만 후보로 놓는다 — 도구가 늘어도
+   * 프롬프트가 커지지 않게 하는 장치다. 비우면 도구를 좁히지 않는다.
+   */
+  toolDomains?: string[];
   /**
    * 지시문에 동사가 없을 때 가정할 액션. undefined면 추측하지 않는다
    * (설정·로그처럼 오케스트레이션 대상이 아닌 화면).
@@ -32,22 +38,22 @@ const SCREENS: Record<string, ScreenContext> = {
   "analysis.html": { label: "통합 관제", domain: "스캐너·로그·운영리포트 통합 분석", defaultAction: "analyze" },
   "sessions.html": { label: "작업 세션", domain: "진행 중인 작업 대화" },
 
-  "inventory.html": { label: "자산 목록", domain: "AI·IT 자산 인벤토리", defaultAction: "scan" },
-  "sbom.html": { label: "AI-BOM 구성", domain: "AI-BOM/SBOM 구성요소·견고성" },
-  "vulnscan.html": { label: "취약점", domain: "취약점 스캔 결과·조치 우선순위", defaultAction: "analyze" },
-  "approvals.html": { label: "조치·승인", domain: "탐지 항목 승인·반려" },
+  "inventory.html": { label: "자산 목록", domain: "AI·IT 자산 인벤토리", defaultAction: "scan", toolDomains: ["assets"] },
+  "sbom.html": { label: "AI-BOM 구성", domain: "AI-BOM/SBOM 구성요소·견고성", toolDomains: ["sbom", "assets"] },
+  "vulnscan.html": { label: "취약점", domain: "취약점 스캔 결과·조치 우선순위", defaultAction: "analyze", toolDomains: ["vuln", "assets"] },
+  "approvals.html": { label: "조치·승인", domain: "탐지 항목 승인·반려", toolDomains: ["vuln"] },
 
-  "threat.html": { label: "위협 인텔리전스", domain: "외부 위협 인텔·CTI 피드" },
-  "products.html": { label: "보안제품", domain: "보안제품 등록부·매뉴얼" },
-  "opsguide.html": { label: "유지보수", domain: "정기 점검 일정·이력" },
+  "threat.html": { label: "위협 인텔리전스", domain: "외부 위협 인텔·CTI 피드", toolDomains: ["threat"] },
+  "products.html": { label: "보안제품", domain: "보안제품 등록부·매뉴얼", toolDomains: ["products"] },
+  "opsguide.html": { label: "유지보수", domain: "정기 점검 일정·이력", toolDomains: ["maintenance"] },
 
-  "report.html": { label: "내부 리포트", domain: "보고서 작성·배포", defaultAction: "report" },
-  "compliance.html": { label: "컴플라이언스", domain: "규제·통제 항목 대응 현황" },
+  "report.html": { label: "내부 리포트", domain: "보고서 작성·배포", defaultAction: "report", toolDomains: ["report"] },
+  "compliance.html": { label: "컴플라이언스", domain: "규제·통제 항목 대응 현황", toolDomains: ["report"] },
 
   "agent.html": { label: "에이전트 AI", domain: "에이전트 설정·직접 지시" },
-  "memory.html": { label: "기억·학습", domain: "장기기억(RAG) 문서" },
-  "ontology.html": { label: "온톨로지", domain: "지식 그래프·표준 매핑" },
-  "redteam.html": { label: "AI 견고성", domain: "레드팀·가드레일" },
+  "memory.html": { label: "기억·학습", domain: "장기기억(RAG) 문서", toolDomains: ["knowledge"] },
+  "ontology.html": { label: "온톨로지", domain: "지식 그래프·표준 매핑", toolDomains: ["knowledge"] },
+  "redteam.html": { label: "AI 견고성", domain: "레드팀·가드레일", toolDomains: ["assets"] },
 
   // 오케스트레이션 대상이 아닌 화면들 — defaultAction 없음(추측하지 않는다).
   "merge.html": { label: "LLM 합성", domain: "모델 병합" },
@@ -73,4 +79,13 @@ export function getScreenContext(screen?: string): ScreenContext | undefined {
 /** 지시문에서 액션을 못 찾았을 때만 쓰는 화면 기반 추정. 없으면 undefined. */
 export function fallbackActionForScreen(screen?: string): RoutedIntent["action"] | undefined {
   return getScreenContext(screen)?.defaultAction;
+}
+
+/**
+ * 이 화면에서 노출할 도구 영역. 화면을 모르거나 전역 화면(대시보드)이면 undefined —
+ * 호출자가 도구를 좁히지 않거나 다른 방법으로 영역을 정해야 한다는 뜻이다.
+ */
+export function toolDomainsForScreen(screen?: string): string[] | undefined {
+  const d = getScreenContext(screen)?.toolDomains;
+  return d && d.length > 0 ? d : undefined;
 }
