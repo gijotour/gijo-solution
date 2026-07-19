@@ -156,6 +156,62 @@ describe("executeApprovedTool — 승인된 것만 실행", () => {
   });
 });
 
+// ③ 쓰기 역량 — asset_coverage(결손 조회) 짝: assign_owner(담당부서 채우기).
+describe("assign_owner — 자산 담당부서 채우기 (쓰기, 결재판 경유)", () => {
+  it("단건: 승인 실행이 담당부서를 지정한다", async () => {
+    registerAsset({ id: "ai-secbot-01", name: "사내 챗봇", path: "p.gguf" });
+    const out = await executeApprovedTool("assign_owner", { assetId: "ai-secbot-01", owner: "보안팀" });
+    expect(out).toContain("1건");
+    expect(getAsset("ai-secbot-01")!.owner).toBe("보안팀");
+  });
+
+  it("다건: 쉼표로 나열한 자산 전부에 담당부서를 지정한다", async () => {
+    registerAsset({ id: "vuln:10.20.0.5", name: "호스트A", path: "-" });
+    registerAsset({ id: "vuln:10.20.0.9", name: "호스트B", path: "-" });
+    const out = await executeApprovedTool("assign_owner", { assetId: "vuln:10.20.0.5, vuln:10.20.0.9", owner: "인프라팀" });
+    expect(out).toContain("2건");
+    expect(getAsset("vuln:10.20.0.5")!.owner).toBe("인프라팀");
+    expect(getAsset("vuln:10.20.0.9")!.owner).toBe("인프라팀");
+  });
+
+  it("접두어(vuln:)를 흘려도 자산을 찾아 지정한다", async () => {
+    registerAsset({ id: "vuln:192.168.219.98", name: "oracle.local", path: "-" });
+    const out = await executeApprovedTool("assign_owner", { assetId: "192.168.219.98", owner: "DBA팀" });
+    expect(getAsset("vuln:192.168.219.98")!.owner).toBe("DBA팀");
+    expect(out).toContain("1건");
+  });
+
+  it("대상을 못 찾으면 등록 자산 목록을 안내한다(오발동 방지)", async () => {
+    registerAsset({ id: "real-01", name: "실자산", path: "-" });
+    const out = await executeApprovedTool("assign_owner", { assetId: "존재안함", owner: "x" });
+    expect(out).toContain("찾지 못했습니다");
+    expect(out).toContain("real-01");
+  });
+
+  it("결재판: coverage 결과에서 온 자산 id는 found, 지시문 담당부서는 said", () => {
+    registerAsset({ id: "vuln:10.20.0.5", name: "호스트A", path: "-" });
+    const ap = buildApproval(
+      findAgentTool("assign_owner")!,
+      { assetId: "vuln:10.20.0.5", owner: "인프라팀" },
+      "이 자산들 담당부서 인프라팀으로 지정해줘",
+      "담당부서가 알려지지 않은 자산: vuln:10.20.0.5" // 앞선 asset_coverage 결과
+    );
+    const by = (k: string) => ap.fields.find((f) => f.key === k)!;
+    expect(by("assetId").source).toBe("found");
+    expect(by("owner").value).toBe("인프라팀");
+    expect(by("owner").source).toBe("said");
+    expect(ap.effect).toContain("담당부서");
+  });
+
+  it("runAgentLoop: 쓰기라 실행하지 않고 결재판을 돌려준다", async () => {
+    registerAsset({ id: "vuln:10.20.0.5", name: "호스트A", path: "-" });
+    mockChat.mockResolvedValueOnce('{"action":"tool","tool":"assign_owner","args":{"assetId":"vuln:10.20.0.5","owner":"인프라팀"}}');
+    const r = await runAgentLoop("vuln:10.20.0.5 담당부서 인프라팀으로 지정해줘");
+    expect(r!.approval!.tool).toBe("assign_owner");
+    expect(getAsset("vuln:10.20.0.5")!.owner).not.toBe("인프라팀"); // 승인 전에는 안 바뀜(등록 기본값 유지)
+  });
+});
+
 describe("POST /api/agent/approve", () => {
   let app: ReturnType<typeof createApp>;
   let token: string;

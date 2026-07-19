@@ -15,7 +15,7 @@
 // 만들어 돌려주고, 사람이 승인한 뒤 /api/agent/approve로만 실행된다(시안 B, 2026-07-17 확정).
 
 import { dateOnlyLocal, addDaysLocal } from "../util/date";
-import { listAssets, getAsset, registerAsset, setAssetRobustness, Asset } from "./assets";
+import { listAssets, getAsset, registerAsset, updateAssetOwnership, setAssetRobustness, Asset } from "./assets";
 import { computeAssetCoverage, coverageSummaryText, type GapKind } from "./assetcoverage";
 import { expandOntology } from "./ontology";
 import { prioritizedReviews, updateFindingReview, findingKey, ReviewPatch, ApprovalStatus } from "./approvals";
@@ -432,6 +432,37 @@ function runRegisterAsset(args: Record<string, string>): string {
     owner: args.owner?.trim() || undefined,
   });
   return `자산 ${asset.id}(${asset.name})을 등록했습니다. 등록 자산 ${before}개 → ${before + 1}개. 스캔은 아직 실행하지 않았습니다.`;
+}
+
+// assetId 인자에 여러 자산이 들어올 수 있다(asset_coverage가 결손 자산 여럿을 나열하고 사용자가
+// "이 자산들 전부"라고 하면 LLM이 목록을 복사해온다). 쉼표·공백으로 쪼개 각각 resolveAsset한다.
+function resolveAssetList(raw: string): { resolved: Asset[]; unresolved: string[] } {
+  const tokens = (raw ?? "").split(/[,\s]+/).map((t) => t.trim()).filter(Boolean);
+  const resolved: Asset[] = [];
+  const unresolved: string[] = [];
+  const seen = new Set<string>();
+  for (const t of tokens) {
+    const a = resolveAsset(t);
+    if (a && !seen.has(a.id)) { seen.add(a.id); resolved.push(a); }
+    else if (!a) unresolved.push(t);
+  }
+  return { resolved, unresolved };
+}
+
+function runAssignOwner(args: Record<string, string>): string {
+  const { resolved, unresolved } = resolveAssetList(args.assetId ?? "");
+  if (resolved.length === 0) {
+    const ids = listAssets().map((a) => a.id).slice(0, 12).join(", ") || "(없음)";
+    return `대상 자산을 찾지 못했습니다: "${args.assetId}". 등록된 자산 id: ${ids}`;
+  }
+  const owner = (args.owner ?? "").trim();
+  const service = args.service?.trim();
+  for (const a of resolved) {
+    updateAssetOwnership(a.id, { owner, ...(service ? { service } : {}) });
+  }
+  const names = resolved.map((a) => a.id).join(", ");
+  const tail = unresolved.length ? ` (찾지 못해 건너뜀: ${unresolved.join(", ")})` : "";
+  return `자산 ${resolved.length}건에 담당부서를 "${owner}"로 지정했습니다${service ? ` · 서비스 "${service}"` : ""}: ${names}${tail}`;
 }
 
 // ── 취약점 조치 쓰기 도구 (Phase 2 — 결재판 경유) ────────────────────────
@@ -931,6 +962,38 @@ const TOOLS: AgentTool[] = [
       { name: "gap", label: "결손 종류", description: "owner(담당부서)·service(서비스)·sbom·unscanned(미점검) 중 하나 (선택, 비우면 전체)", required: false },
     ],
     run: runAssetCoverage,
+  },
+  {
+    // asset_coverage가 "담당부서 없는 자산"을 짚어주면(조회) 이 도구로 채운다(쓰기). 결손→조치의 짝.
+    name: "assign_owner",
+    label: "자산 담당부서·서비스 지정",
+    domain: "assets",
+    write: true,
+    description:
+      '자산에 담당부서(owner)를 지정한다(서비스도 선택). asset_coverage로 담당부서 결손을 확인한 뒤 그 자산들을 채울 때 쓴다. assetId는 하나 또는 여러 개(쉼표·공백 구분, coverage 결과의 id를 복사). 예: {"assetId":"vuln:10.20.0.5, vuln:10.20.0.9","owner":"인프라팀"} 또는 {"assetId":"ai-secbot-01","owner":"보안팀","service":"챗봇"}',
+    params: [
+      { name: "assetId", label: "자산 id", description: "대상 자산 id — 하나 또는 여러 개(쉼표·공백 구분, coverage 결과의 id=)", required: true },
+      { name: "owner", label: "담당부서", description: "지정할 담당부서·담당자", required: true },
+      { name: "service", label: "서비스", description: "연결 서비스명 (선택)", required: false },
+    ],
+    // 사람이 화면 표시 이름으로 자산을 부르거나 접두어(vuln:)를 흘리면 실제 id와 안 맞는다 —
+    // resolveAssetList로 canonical id 목록으로 정정한다. 단, 정정이 실제로 필요할 때만 채운다
+    // (안 그러면 항상 auto로 표시돼 "coverage 결과에서 왔다(found)"는 근거 배지를 덮어버린다 —
+    // assign_finding과 같은 원칙).
+    autoFill: (args): Record<string, string> => {
+      const raw = (args.assetId ?? "").trim();
+      const { resolved } = resolveAssetList(raw);
+      if (!resolved.length) return {};
+      const canonical = resolved.map((a) => a.id).join(", ");
+      return canonical !== raw ? { assetId: canonical } : {};
+    },
+    effect: (args) => {
+      const { resolved } = resolveAssetList(args.assetId ?? "");
+      const n = resolved.length || 1;
+      return `자산 ${n}건의 담당부서를 "${(args.owner ?? "").trim()}"로 지정${args.service?.trim() ? ` · 서비스 "${args.service.trim()}"` : ""} · 스캔·취약점 데이터는 바뀌지 않음`;
+    },
+    undo: "자산 화면(커버리지 탭)에서 담당부서를 다시 비우면 미배정으로 원복됩니다.",
+    run: runAssignOwner,
   },
   {
     name: "aibom_status",
