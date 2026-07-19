@@ -22,6 +22,7 @@ import * as os from "os";
 import * as path from "path";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
+import { llamaBinPath } from "../util/llamabin";
 import { db, assertTestDb } from "../db";
 import { startFinetune, isFinetuneRunning } from "./finetune";
 import { pauseInferenceEngines, resumeInferenceEngines } from "./localengine";
@@ -541,7 +542,7 @@ export function preflightCheck(): { checks: PreflightCheck[]; ready: boolean } {
 
   // 4·5) llama.cpp 변환 스크립트 + 양자화 실행파일(export_gguf.py와 같은 경로 규칙).
   const convertOk = fs.existsSync(path.join(LLAMA_CPP_DIR, "convert_hf_to_gguf.py"));
-  const quantizeOk = fs.existsSync(path.join(LLAMA_CPP_DIR, "build", "bin", "Release", "llama-quantize.exe"));
+  const quantizeOk = fs.existsSync(llamaBinPath("llama-quantize", LLAMA_CPP_DIR));
   checks.push({ key: "llama-convert", label: "llama.cpp 변환 스크립트", ok: convertOk, required: true, hint: convertOk ? undefined : "llama.cpp 클론 필요 (PC세팅 체크리스트 STEP 5)" });
   checks.push({ key: "llama-quantize", label: "llama.cpp 양자화 빌드", ok: quantizeOk, required: true, hint: quantizeOk ? undefined : "llama.cpp를 빌드하세요 (llama-quantize.exe)" });
 

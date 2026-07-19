@@ -6,6 +6,7 @@ import type { Express } from "express";
 import * as fs from "fs";
 import { execFileSync } from "child_process";
 import { authMiddleware, adminMiddleware } from "../auth/auth";
+import { llamaBinPath } from "../util/llamabin";
 import { usingDefaultCredential } from "../auth/users";
 
 export interface PreflightCheck {
@@ -34,13 +35,9 @@ export async function runPreflight(): Promise<{ checks: PreflightCheck[]; ready:
   const gpu = gpuAvailable();
   checks.push({ name: "GPU (nvidia-smi)", status: gpu.ok ? "pass" : "warn", detail: gpu.detail });
 
-  // llama-server 바이너리
-  const llamaPath = process.env.GIJO_LLAMA_SERVER_PATH;
-  if (llamaPath) {
-    checks.push({ name: "llama-server", status: fs.existsSync(llamaPath) ? "pass" : "fail", detail: fs.existsSync(llamaPath) ? llamaPath : `경로에 파일 없음: ${llamaPath}` });
-  } else {
-    checks.push({ name: "llama-server", status: "warn", detail: "GIJO_LLAMA_SERVER_PATH 미설정 — 기본 경로 사용 추정" });
-  }
+  // llama-server 바이너리 — env 미설정이면 플랫폼별 기본 경로(win: Release/*.exe, linux: */name)를 점검한다.
+  const llamaPath = process.env.GIJO_LLAMA_SERVER_PATH ?? llamaBinPath("llama-server");
+  checks.push({ name: "llama-server", status: fs.existsSync(llamaPath) ? "pass" : "fail", detail: fs.existsSync(llamaPath) ? llamaPath : `경로에 파일 없음: ${llamaPath}` });
 
   // 모델 존재 + 상업 번들 안전 개수
   try {

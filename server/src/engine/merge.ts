@@ -12,6 +12,7 @@ import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { authMiddleware } from "../auth/auth";
+import { llamaBinPath } from "../util/llamabin";
 import { SECURITY_LLM_DEX, DexModel } from "./modeldex";
 
 const OUTPUTS_DIR = process.env.GIJO_OUTPUTS_DIR ?? "outputs";
@@ -89,7 +90,7 @@ export function planMerge(idA: string, idB: string): MergePlan {
   const commands = [
     `mergekit-yaml ${configPath} ${mergedDir} --cuda`,
     `python ${path.join(LLAMA_CPP_DIR, "convert_hf_to_gguf.py")} ${mergedDir} --outfile ${f16Path} --outtype f16`,
-    `${path.join(LLAMA_CPP_DIR, "build", "bin", "Release", "llama-quantize.exe")} ${f16Path} models/${outputModelId}/${outputModelId}.gguf Q5_K_M`,
+    `${llamaBinPath("llama-quantize", LLAMA_CPP_DIR)} ${f16Path} models/${outputModelId}/${outputModelId}.gguf Q5_K_M`,
   ];
   return { ok: true, modelA: a, modelB: b, outputModelId, config, configPath, commands };
 }
@@ -137,7 +138,7 @@ export function mergePreflight(idA?: string, idB?: string): { checks: MergePrefl
   checks.push({ key: "mergekit", label: "mergekit 설치", ok: mk, required: true, hint: mk ? undefined : "pip install mergekit" });
 
   const convertOk = fs.existsSync(path.join(LLAMA_CPP_DIR, "convert_hf_to_gguf.py"));
-  const quantizeOk = fs.existsSync(path.join(LLAMA_CPP_DIR, "build", "bin", "Release", "llama-quantize.exe"));
+  const quantizeOk = fs.existsSync(llamaBinPath("llama-quantize", LLAMA_CPP_DIR));
   checks.push({ key: "llama-convert", label: "llama.cpp 변환 스크립트", ok: convertOk, required: true, hint: convertOk ? undefined : "llama.cpp 클론 필요" });
   checks.push({ key: "llama-quantize", label: "llama.cpp 양자화 빌드", ok: quantizeOk, required: true, hint: quantizeOk ? undefined : "llama.cpp 빌드 필요" });
 

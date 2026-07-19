@@ -13,12 +13,11 @@ import * as path from "path";
 import * as fs from "fs";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
+import { llamaBinPath } from "../util/llamabin";
 import { db } from "../db";
 import { emitLlmActivity, modelBasename } from "./llmactivity";
 
-const LLAMA_SERVER_PATH =
-  process.env.GIJO_LLAMA_SERVER_PATH ??
-  path.join("llama.cpp", "build", "bin", "Release", "llama-server.exe");
+const LLAMA_SERVER_PATH = process.env.GIJO_LLAMA_SERVER_PATH ?? llamaBinPath("llama-server");
 const MODELS_DIR = process.env.GIJO_MODELS_DIR ?? "models";
 const PORT = Number(process.env.GIJO_LOCAL_LLM_PORT ?? 8080);
 const DEFAULT_CTX_SIZE = Number(process.env.GIJO_LOCAL_LLM_CTX_SIZE ?? 32768);
