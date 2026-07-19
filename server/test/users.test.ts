@@ -135,7 +135,8 @@ describe("user account management", () => {
 
     const oldLogin = await request(app).post("/api/auth/login").send({ username: "officer1", password: "pw123456" });
     expect(oldLogin.status).toBe(401);
-    const newLogin = await request(app).post("/api/auth/login").send({ username: "officer1", password: "new-password" });
+    // officer1의 이전 세션이 아직 살아있으므로(중복로그인 방지) 재로그인은 force로.
+    const newLogin = await request(app).post("/api/auth/login").send({ username: "officer1", password: "new-password", force: true });
     expect(newLogin.status).toBe(200);
   });
 

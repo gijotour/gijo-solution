@@ -100,14 +100,37 @@ async function request<T = unknown>(path: string, opts: RequestOpts = {}): Promi
 }
 
 // ── 인증 ──────────────────────────────────────────────────────────────
+// 중복로그인 방지: 이미 다른 곳에서 로그인 중이면 서버가 409(already_logged_in)를 준다.
+// request()의 예외는 contextBridge를 건너며 커스텀 속성이 사라지므로, login()은 던지지 않고
+// 결과를 구조화된 값으로 돌려준다 — 렌더러가 "강제 로그인하시겠습니까?" 확인 UI를 그릴 수 있게.
+export interface LoginResult {
+  ok: boolean;
+  code?: "already_logged_in" | "invalid_credentials" | "locked" | "error";
+  message?: string;
+  user?: { id: string; displayName: string; role: string };
+}
+
 export const authApi = {
-  login: async (username: string, password: string) => {
-    const result = await request<{ accessToken: string; refreshToken: string; user: unknown }>("/api/auth/login", {
+  login: async (username: string, password: string, force = false): Promise<LoginResult> => {
+    const res = await fetch(`${serverUrl}/api/auth/login`, {
       method: "POST",
-      body: { username, password },
-    });
-    setAuthTokens(result);
-    return result;
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password, ...(force ? { force: true } : {}) }),
+    }).catch(() => null);
+    if (!res) return { ok: false, code: "error", message: "서버에 연결할 수 없습니다." };
+    const data = (await res.json().catch(() => ({}))) as {
+      accessToken?: string;
+      refreshToken?: string;
+      user?: { id: string; displayName: string; role: string };
+      error?: string;
+      message?: string;
+    };
+    if (!res.ok) {
+      const code = res.status === 409 && data.error === "already_logged_in" ? "already_logged_in" : res.status === 429 ? "locked" : "invalid_credentials";
+      return { ok: false, code, message: data.message ?? data.error ?? "로그인에 실패했습니다." };
+    }
+    setAuthTokens({ accessToken: data.accessToken!, refreshToken: data.refreshToken! });
+    return { ok: true, user: data.user };
   },
   logout: async () => {
     await request("/api/auth/logout", { method: "POST", body: { refreshToken } });

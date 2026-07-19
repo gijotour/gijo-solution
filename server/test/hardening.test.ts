@@ -43,8 +43,8 @@ describe("보안 하드닝", () => {
     const ok = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" });
     expect(ok.status).toBe(200);
     for (let i = 0; i < 5; i++) await request(app).post("/api/auth/login").send({ username: "jyh", password: "wrong-pass" });
-    const stillOk = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" });
-    expect(stillOk.status).toBe(200); // 초기화됐으므로 아직 잠기지 않음
+    const stillOk = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme", force: true });
+    expect(stillOk.status).toBe(200); // 초기화됐으므로 아직 잠기지 않음(force: 직전 ok 로그인 세션이 이미 살아있어 중복로그인 방지에 걸리므로)
   });
 
   it("비밀번호 정책: 8자 미만 거부", () => {

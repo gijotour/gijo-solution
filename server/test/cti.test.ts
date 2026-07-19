@@ -4,8 +4,10 @@ import { createApp } from "../src/app";
 import { resetFeedsForTests, configureFeed, getDecryptedApiKey } from "../src/engine/cti";
 import { db } from "../src/db";
 
-async function login(app: ReturnType<typeof createApp>) {
-  const res = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" });
+async function login(app: ReturnType<typeof createApp>, force = false) {
+  const res = await request(app)
+    .post("/api/auth/login")
+    .send({ username: "jyh", password: "changeme", ...(force ? { force: true } : {}) });
   return res.body.accessToken as string;
 }
 
@@ -177,7 +179,7 @@ describe("cti feed key management", () => {
 
     // a second createApp() call proves the state lives in db.ts, not in a per-app-instance variable
     const secondApp = createApp();
-    const secondToken = await login(secondApp);
+    const secondToken = await login(secondApp, true); // 같은 계정으로 두 번째 로그인 — 중복로그인 방지를 강제로 우회
     const res = await request(secondApp).get("/api/cti/feeds").set("Authorization", `Bearer ${secondToken}`);
     const flashpoint = res.body.find((f: { id: string }) => f.id === "flashpoint");
     expect(flashpoint.hasApiKey).toBe(true);

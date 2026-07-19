@@ -83,4 +83,33 @@ describe("auth", () => {
     const stillWorks = await request(app).get("/api/agents").set("Authorization", `Bearer ${login.body.accessToken}`);
     expect(stillWorks.status).toBe(200);
   });
+
+  it("blocks a second login for the same account while a session is already active", async () => {
+    const first = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" });
+    expect(first.status).toBe(200);
+
+    const second = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" });
+    expect(second.status).toBe(409);
+    expect(second.body.error).toBe("already_logged_in");
+
+    // 옛 세션은 여전히 살아 있다 — 차단됐을 뿐 대체되지 않았다.
+    const refreshRes = await request(app).post("/api/auth/refresh").send({ refreshToken: first.body.refreshToken });
+    expect(refreshRes.status).toBe(200);
+  });
+
+  it("force login revokes the old session and the old refresh token stops working", async () => {
+    const first = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" });
+    expect(first.status).toBe(200);
+
+    const second = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme", force: true });
+    expect(second.status).toBe(200);
+    expect(second.body.refreshToken).not.toBe(first.body.refreshToken);
+
+    const oldRefresh = await request(app).post("/api/auth/refresh").send({ refreshToken: first.body.refreshToken });
+    expect(oldRefresh.status).toBe(409);
+    expect(oldRefresh.body.error).toBe("session_superseded");
+
+    const newRefresh = await request(app).post("/api/auth/refresh").send({ refreshToken: second.body.refreshToken });
+    expect(newRefresh.status).toBe(200);
+  });
 });

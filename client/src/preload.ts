@@ -14,8 +14,8 @@ const gijoApi = {
   getServerUrl: () => api.getServerUrl(),
   checkServerHealth: () => api.healthApi.check(),
 
-  // 인증(보안담당자별 로그인)
-  login: (username: string, password: string) => api.authApi.login(username, password),
+  // 인증(보안담당자별 로그인) — force: 이미 다른 곳에서 로그인 중이어도 강제로 이 세션을 새 세션으로 대체
+  login: (username: string, password: string, force?: boolean) => api.authApi.login(username, password, force),
   logout: () => api.authApi.logout(),
   me: () => api.authApi.me(),
   isAuthenticated: () => api.isAuthenticated(),

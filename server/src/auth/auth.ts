@@ -27,6 +27,12 @@ interface RefreshRecord {
 }
 
 const refreshTokens = new Map<string, RefreshRecord>();
+// 중복로그인 방지: 계정당 "현재" 세션은 하나뿐이라는 불변식을 이 역인덱스로 유지한다.
+// 로그인 시 이미 유효한 세션이 있으면 차단(강제 로그인 확인 필요) — 9.5절 정책의 연장.
+// 강제 로그인 시엔 옛 refresh token을 즉시 지우지 않고 이 맵만 새 토큰으로 갈아 끼운다:
+// 그래야 옛 기기가 다음 refresh를 시도할 때 "다른 곳에서 로그인되어 세션이 종료됐다"는
+// 구체적인 사유를 줄 수 있다(그 시점에 refreshTokens에서 지운다 — 지연 정리).
+const activeSessionByUser = new Map<string, string>();
 
 // ── 로그인 브루트포스 방어 ──────────────────────────────────────────────────
 // 보안 제품의 로그인 자체가 무차별 대입에 뚫리면 치명적이다. (IP + 아이디)별 실패를 집계하고
@@ -75,6 +81,7 @@ function signAccessToken(userId: string): string {
 function issueRefreshToken(userId: string): string {
   const token = crypto.randomBytes(32).toString("hex");
   refreshTokens.set(token, { userId, expiresAt: Date.now() + REFRESH_TOKEN_TTL_MS });
+  activeSessionByUser.set(userId, token);
   return token;
 }
 
@@ -83,12 +90,29 @@ function issueTokenPair(userId: string): TokenPair {
 }
 
 function revokeRefreshToken(token: string): void {
+  const record = refreshTokens.get(token);
   refreshTokens.delete(token);
+  if (record && activeSessionByUser.get(record.userId) === token) {
+    activeSessionByUser.delete(record.userId);
+  }
+}
+
+// 이 userId로 아직 만료되지 않은 세션이 살아 있는지 — 로그인 중복 여부 판단 기준.
+function findActiveSession(userId: string): string | undefined {
+  const token = activeSessionByUser.get(userId);
+  if (!token) return undefined;
+  const record = refreshTokens.get(token);
+  if (!record || record.expiresAt < Date.now()) {
+    activeSessionByUser.delete(userId);
+    return undefined;
+  }
+  return token;
 }
 
 // 테스트 전용: refreshTokens·로그인 시도 카운터는 모듈 싱글턴이라 createApp()을 새로 호출해도 초기화되지 않는다.
 export function resetAuthForTests(): void {
   refreshTokens.clear();
+  activeSessionByUser.clear();
   loginAttempts.clear();
 }
 
@@ -126,7 +150,7 @@ export function adminMiddleware(req: Request, res: Response, next: NextFunction)
 
 export function registerAuthRoutes(app: Express): void {
   app.post("/api/auth/login", (req, res) => {
-    const { username, password } = req.body as { username: string; password: string };
+    const { username, password, force } = req.body as { username: string; password: string; force?: boolean };
     const key = loginKey(req, username ?? "");
     const lockMs = loginLockRemaining(key);
     if (lockMs > 0) {
@@ -137,6 +161,11 @@ export function registerAuthRoutes(app: Express): void {
     if (!user || !bcrypt.compareSync(password, user.passwordHash)) {
       recordLoginFail(key);
       res.status(401).json({ error: "invalid credentials" });
+      return;
+    }
+    // 중복로그인 방지: 이미 다른 곳에서 로그인 중이면 강제 확인 없이는 새 세션을 내주지 않는다.
+    if (findActiveSession(user.id) && !force) {
+      res.status(409).json({ error: "already_logged_in", message: "이미 다른 곳에서 로그인 중입니다. 강제 로그인하시겠습니까?" });
       return;
     }
     loginAttempts.delete(key); // 성공 시 카운터 초기화
@@ -154,6 +183,12 @@ export function registerAuthRoutes(app: Express): void {
     if (record.expiresAt < Date.now()) {
       refreshTokens.delete(refreshToken);
       res.status(401).json({ error: "refresh token expired" });
+      return;
+    }
+    // 다른 곳에서 강제 로그인해 이 세션이 대체됐는지 — activeSessionByUser가 갈아 끼워져 있다.
+    if (activeSessionByUser.get(record.userId) !== refreshToken) {
+      refreshTokens.delete(refreshToken);
+      res.status(409).json({ error: "session_superseded", message: "다른 곳에서 로그인되어 이 세션은 종료되었습니다." });
       return;
     }
     // 회전(rotation): 재사용 방지를 위해 사용된 refresh token은 즉시 폐기하고 새 쌍을 발급한다.

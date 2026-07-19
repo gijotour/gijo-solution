@@ -109,15 +109,32 @@
 
     serverInput.value = window.gijo.getServerUrl();
 
-    async function doLogin() {
+    async function doLogin(force) {
       errMsg.textContent = "";
       btn.disabled = true;
       btn.textContent = "연결 중...";
       try {
         if (serverInput.value.trim()) window.gijo.setServerUrl(serverInput.value.trim());
-        await window.gijo.login(userInput.value.trim(), passInput.value);
-        window.gijoRealtime.connect();
-        await window.gijo.navigateTo("dashboard.html");
+        const result = await window.gijo.login(userInput.value.trim(), passInput.value, force);
+        if (result.ok) {
+          window.gijoRealtime.connect();
+          await window.gijo.navigateTo("dashboard.html");
+          return;
+        }
+        if (result.code === "already_logged_in") {
+          const confirmed = window.confirm("이미 다른 곳에서 로그인 중입니다.\n강제로 로그인하면 그 세션은 로그아웃됩니다. 계속할까요?");
+          btn.disabled = false;
+          btn.textContent = "로그인";
+          if (confirmed) {
+            await doLogin(true);
+          }
+          return;
+        }
+        errMsg.textContent = result.code === "locked"
+          ? result.message
+          : "로그인 실패: 아이디/비밀번호 또는 서버 주소를 확인하세요.";
+        btn.disabled = false;
+        btn.textContent = "로그인";
       } catch (e) {
         errMsg.textContent = "로그인 실패: 아이디/비밀번호 또는 서버 주소를 확인하세요.";
         btn.disabled = false;
@@ -125,8 +142,8 @@
       }
     }
 
-    btn.addEventListener("click", doLogin);
-    passInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(); });
+    btn.addEventListener("click", () => doLogin(false));
+    passInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(false); });
   </script>
 </body>
 </html>
