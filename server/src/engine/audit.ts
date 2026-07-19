@@ -87,15 +87,22 @@ export function registerAuditRoutes(app: Express): void {
       res.json({ entries: listAudit({ kind, limit }), summary: auditSummary() });
     })
   );
-  // 수동 기록(화면에서 담당자가 남기는 메모 등) — 실행 계열은 서버 내부에서 recordAudit로 남긴다.
+  // 클라이언트가 남기는 기록 — CLI 실행/차단(담당자 PC 터미널)과 화면 메모.
+  // kind는 클라이언트가 정당하게 남길 수 있는 계열(cli·block·config)로 제한한다 — auth·write처럼
+  // 서버가 권위 있게 남기는 종류는 여기서 못 만든다(위조 방지). actor는 서버가 토큰에서 채운다.
+  const CLIENT_KINDS = new Set(["cli", "block", "config"]);
   app.post("/api/audit", authMiddleware, (req, res) => {
     const user = (req as Request & { user?: GijoUser }).user;
-    const { action, target, detail } = req.body as { action?: string; target?: string; detail?: string };
+    const { kind, action, target, detail, result } = req.body as {
+      kind?: string; action?: string; target?: string; detail?: string; result?: AuditResult;
+    };
     if (!action || !action.trim()) {
       res.status(400).json({ error: "action이 필요합니다" });
       return;
     }
-    recordAudit({ kind: "config", actor: user?.displayName ?? null, action: action.trim(), target, detail, result: "ok" });
+    const k = (kind && CLIENT_KINDS.has(kind) ? kind : "config") as AuditKind;
+    const r: AuditResult = result === "blocked" || result === "error" ? result : "ok";
+    recordAudit({ kind: k, actor: user?.displayName ?? null, action: action.trim(), target, detail, result: r });
     res.json({ ok: true });
   });
 }

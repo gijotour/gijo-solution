@@ -5,7 +5,9 @@
 import { app, BrowserWindow, ipcMain, dialog } from "electron";
 import * as path from "path";
 import { spawn, ChildProcess } from "child_process";
+import * as os from "os";
 import * as fs from "fs";
+import { isDangerous } from "./terminalPolicy";
 
 let mainWindow: BrowserWindow | null = null;
 let bundledServerProcess: ChildProcess | null = null;
@@ -163,6 +165,48 @@ ipcMain.handle("fs:pickRoot", async () => {
   explorerRoot = path.resolve(result.filePaths[0]);
   saveRoot(explorerRoot); // 다음 실행 때 이 폴더로 시작
   return { cancelled: false, root: explorerRoot, rootName: path.basename(explorerRoot) };
+});
+
+// ── 담당자 PC CLI 터미널 (①) ─────────────────────────────────────────────
+// 담당자 PC의 셸(PowerShell)을 앱 안에서 직접 실행한다. 세션을 유지하려고 지속형 셸을 하나 띄우고
+// stdin으로 명령을 흘려 넣는다(cwd·변수 보존). 출력은 terminal:data 이벤트로 렌더러에 스트리밍.
+// 위험 명령은 isDangerous로 실행 전 차단한다(수동·챗봇 무관). 서버가 아니라 이 PC에서 돈다.
+let termShell: ChildProcess | null = null;
+function termSend(data: string): void {
+  mainWindow?.webContents.send("terminal:data", data);
+}
+function startTermShell(): void {
+  if (termShell) return;
+  const isWin = process.platform === "win32";
+  const shellCmd = isWin ? "powershell.exe" : (process.env.SHELL || "/bin/bash");
+  const shellArgs = isWin ? ["-NoLogo", "-NoExit", "-Command", "-"] : ["-i"];
+  termShell = spawn(shellCmd, shellArgs, { cwd: os.homedir(), env: process.env });
+  termShell.stdout?.on("data", (d: Buffer) => termSend(d.toString()));
+  termShell.stderr?.on("data", (d: Buffer) => termSend(d.toString()));
+  termShell.on("exit", (code) => { termSend(`\n[셸 종료 코드 ${code}]\n`); termShell = null; });
+  termShell.on("error", (err) => { termSend(`\n[셸 오류: ${err.message}]\n`); termShell = null; });
+}
+ipcMain.handle("terminal:start", async () => {
+  startTermShell();
+  return { ok: true, shell: process.platform === "win32" ? "PowerShell" : (process.env.SHELL || "bash"), cwd: os.homedir() };
+});
+// 위험 검사만(실행 안 함) — 챗봇 경로가 사전 판정에 쓴다.
+ipcMain.handle("terminal:check", async (_e, cmd: string) => isDangerous(String(cmd ?? "")));
+ipcMain.handle("terminal:exec", async (_e, cmd: string) => {
+  const line = String(cmd ?? "");
+  const danger = isDangerous(line);
+  if (danger.blocked) return { blocked: true, reason: danger.reason };
+  if (!termShell) startTermShell();
+  try {
+    termShell?.stdin?.write(line.replace(/\r?\n$/, "") + "\n");
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : String(e) };
+  }
+});
+ipcMain.handle("terminal:kill", async () => {
+  if (termShell) { termShell.kill(); termShell = null; }
+  return { ok: true };
 });
 
 app.whenReady().then(() => {

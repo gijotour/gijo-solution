@@ -1044,8 +1044,14 @@ export const auditApi = {
     const qs = q.toString();
     return request<{ entries: AuditEntry[]; summary: { total: number; byKind: Record<string, number> } }>(`/api/audit${qs ? `?${qs}` : ""}`);
   },
-  record: (action: string, target?: string, detail?: string) =>
-    request<{ ok: boolean }>("/api/audit", { method: "POST", body: { action, target, detail } }),
+  record: (action: string, target?: string, detail?: string, kind?: string, result?: string) =>
+    request<{ ok: boolean }>("/api/audit", { method: "POST", body: { action, target, detail, kind, result } }),
+};
+
+// ── 터미널 명령 제안(챗봇 → CLI, 제안만·실행은 클라이언트가 승인 후) ──────────
+export const terminalApi = {
+  suggest: (requestText: string) =>
+    request<{ command: string; explanation: string }>("/api/terminal/suggest", { method: "POST", body: { request: requestText } }),
 };
 
 // ── 자산 인벤토리 ─────────────────────────────────────────────────────

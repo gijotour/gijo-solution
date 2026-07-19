@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 터미널 (CLI)</title>
+<style>
+:root{
+  --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
+.app{display:grid;grid-template-columns:220px 1fr;}
+.sidebar{padding:22px 14px;border-right:1px solid var(--border);min-height:900px;}
+.nav-section{font-size:10.5px;font-weight:700;color:var(--muted-2);letter-spacing:1.2px;margin:18px 10px 8px;}
+.nav-section:first-child{margin-top:0;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:2px;}
+.nav-item .ic{width:18px;text-align:center;font-size:14px;}
+.nav-item.active{background:rgba(59,130,246,0.12);color:var(--white);box-shadow:inset 3px 0 0 var(--blue);cursor:default;}
+.nav-item:hover:not(.active){background:rgba(255,255,255,0.04);color:var(--white);}
+.main{padding:28px 32px 40px;}
+.topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:16px;}
+.page-title{font-size:21px;font-weight:800;color:#fff;}
+.page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;max-width:920px;line-height:1.55;}
+.header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2);}
+.header-left{display:flex;align-items:center;gap:12px;}
+.header-left img{height:22px;}
+.app-title{font-size:15px;font-weight:800;color:#fff;}
+.clock{font-size:12px;color:var(--blue-light);font-weight:600;}
+.header-right{display:flex;align-items:center;gap:10px;}
+.status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
+.status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
+.beta-tag{background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
+.avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+.icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
+
+.warn{background:rgba(240,160,32,.08);border:1px solid rgba(240,160,32,.35);border-radius:9px;padding:9px 13px;font-size:11.5px;color:var(--amber);margin-bottom:12px;line-height:1.55;}
+.warn b{color:#fff;}
+
+/* 챗봇 명령 요청 */
+.askbar{display:flex;gap:8px;margin-bottom:10px;}
+.askbar input{flex:1;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 12px;color:var(--text);font-size:12.5px;outline:none;}
+.askbar button{background:var(--purple);color:#fff;border:0;border-radius:8px;padding:0 16px;font-size:12.5px;font-weight:800;cursor:pointer;}
+.askbar button:disabled{opacity:.5;cursor:default;}
+
+/* 챗봇 제안(승인 카드) */
+.propose{background:rgba(240,160,32,.08);border:1px solid rgba(240,160,32,.4);border-radius:9px;padding:10px 13px;margin-bottom:10px;font-size:12px;}
+.propose .pc{font-family:Consolas,monospace;color:#8fd6a8;background:#05070d;border:1px solid var(--border);border-radius:6px;padding:6px 9px;margin:6px 0;display:inline-block;}
+.propose .pr{color:var(--amber);font-size:11px;}
+.propose .pr.blocked{color:#f5928a;}
+.propose .acts{margin-top:8px;display:flex;gap:8px;}
+.propose .ok{background:var(--teal);color:#06281c;border:0;border-radius:6px;padding:5px 14px;font-size:11.5px;font-weight:800;cursor:pointer;}
+.propose .no{background:transparent;border:1px solid var(--border-strong);color:var(--muted);border-radius:6px;padding:5px 14px;font-size:11.5px;font-weight:700;cursor:pointer;}
+
+.term-wrap{background:#05070d;border:1px solid var(--border-strong);border-radius:10px;overflow:hidden;}
+.term-bar{display:flex;align-items:center;gap:10px;padding:7px 12px;border-bottom:1px solid var(--border);font-size:11.5px;color:var(--muted);}
+.term-bar .tt{font-weight:800;color:var(--teal);}
+.term-bar .badge{font-size:9px;font-weight:800;padding:1px 7px;border-radius:4px;background:rgba(30,185,128,.16);color:var(--teal);}
+.term-bar .loc{margin-left:auto;font-size:10.5px;color:var(--muted-2);}
+.term-out{height:calc(100vh - 400px);min-height:300px;overflow-y:auto;padding:10px 13px;font-family:"Consolas","Cascadia Mono",monospace;font-size:12px;line-height:1.55;white-space:pre-wrap;word-break:break-word;color:#cfe8d6;}
+.term-out .in{color:var(--blue-light);}
+.term-out .blk{color:#f5928a;}
+.term-in{display:flex;align-items:center;gap:8px;border-top:1px solid var(--border);padding:8px 12px;}
+.term-in .ps{color:var(--blue-light);font-family:Consolas,monospace;font-size:12px;}
+.term-in input{flex:1;background:transparent;border:0;color:#cfe8d6;font-family:Consolas,monospace;font-size:12.5px;outline:none;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <span id="homeLink" data-page="dashboard.html" title="대시보드로 이동" style="display:flex;align-items:center;gap:12px;cursor:pointer"><img src="https://gijo.ai/_nuxt/logo_gijo_white.CCh2YXJe.svg" alt="GIJO">
+    <div class="app-title">GIJO AS</div></span>
+    <div class="clock" id="clockEl">-</div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill" id="statusPill"><span class="dot"></span>연결 확인 중<span class="beta-tag">LIVE</span></div>
+    <div class="avatar-btn" id="avatarBtn">-</div>
+    <div class="icon-btn" id="settingsBtn">⚙</div>
+  </div>
+</div>
+
+<div class="app">
+  <div class="sidebar" id="gijoNav"></div>
+
+  <div class="main">
+    <div class="topbar-row">
+      <div>
+        <div class="page-title">&gt;_ 터미널 (CLI)</div>
+        <div class="page-sub">담당자 PC의 셸(PowerShell)을 이 앱 안에서 직접 실행합니다. 서버가 아니라 이 PC에서 돕니다. 위험 명령(드라이브 삭제·포맷 등)은 실행 전 차단되며, 모든 실행·차단은 <b>작업 기록</b>에 남습니다.</div>
+      </div>
+    </div>
+
+    <div class="warn">⚠ 이 터미널은 담당자 본인 PC에서 명령을 실행합니다. 원격 대상 작업은 직접 입력한 명령(ssh 등) 안에서만 이뤄집니다 — 앱이 원격에 직접 붙지 않습니다.</div>
+
+    <!-- ④ 챗봇에게 명령 요청 → 허용목록 판정 → 승인 후 실행 -->
+    <div class="askbar">
+      <input id="askInput" placeholder="챗봇에게 명령 요청 (예: 10.0.0.5 열린 포트 스캔해줘) — 제안된 명령을 승인 후 실행">
+      <button id="askBtn">🤖 명령 제안 받기</button>
+    </div>
+    <div id="proposeSlot"></div>
+
+    <div class="term-wrap">
+      <div class="term-bar"><span class="tt">&gt;_ 터미널</span><span class="badge" id="shellBadge">담당자 PC</span><span class="loc" id="termLoc">셸 시작 중…</span></div>
+      <div class="term-out" id="termOut"></div>
+      <div class="term-in"><span class="ps">PS&gt;</span><input id="termInput" placeholder="명령 입력 후 Enter" autocomplete="off" spellcheck="false"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const clockEl = document.getElementById("clockEl");
+  const statusPill = document.getElementById("statusPill");
+  const avatarBtn = document.getElementById("avatarBtn");
+  const termOut = document.getElementById("termOut");
+  const termInput = document.getElementById("termInput");
+  const esc = (s) => String(s == null ? "" : s).replace(/</g, "&lt;");
+
+  function tick() { clockEl.textContent = new Date().toLocaleString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: true, year: "numeric", month: "2-digit", day: "2-digit" }); }
+  async function loadHealth() { try { await window.gijo.checkServerHealth(); statusPill.innerHTML = '<span class="dot"></span>운영중<span class="beta-tag">LIVE</span>'; } catch (e) { statusPill.innerHTML = '<span class="dot" style="background:#e2483d"></span>서버 연결 끊김'; } }
+  async function loadUser() { try { const u = await window.gijo.me(); avatarBtn.textContent = (u.displayName || u.username || "-").charAt(0); } catch (e) {} }
+
+  function append(text, cls) {
+    const span = document.createElement("span");
+    if (cls) span.className = cls;
+    span.textContent = text;
+    termOut.appendChild(span);
+    termOut.scrollTop = termOut.scrollHeight;
+  }
+
+  // 실제 실행(수동/챗봇 공통) — 위험이면 차단, 아니면 실행. 실행·차단을 작업기록에 남긴다.
+  async function runCommand(cmd, source) {
+    const line = cmd.trim();
+    if (!line) return;
+    append(`\nPS> ${line}\n`, "in");
+    const r = await window.gijo.terminal.exec(line);
+    if (r && r.blocked) {
+      append(`🚫 차단됨 — ${r.reason}\n`, "blk");
+      window.gijo.recordAudit(`CLI 차단: ${line}`, source || "manual", r.reason, "block", "blocked").catch(() => {});
+      return;
+    }
+    window.gijo.recordAudit(`CLI 실행: ${line}`, source || "manual", null, "cli", "ok").catch(() => {});
+  }
+
+  // ④ 챗봇에게 명령 제안 받기 → 정책 판정 → 승인 카드
+  async function askChatbot() {
+    const q = document.getElementById("askInput").value.trim();
+    if (!q) return;
+    const btn = document.getElementById("askBtn");
+    btn.disabled = true; btn.textContent = "🤖 생각 중…";
+    try {
+      const r = await window.gijo.suggestCommand(q);
+      renderPropose(r.command, r.explanation);
+    } catch (e) {
+      renderPropose(null, "명령 제안을 받지 못했습니다: " + ((e && e.message) || e));
+    } finally {
+      btn.disabled = false; btn.textContent = "🤖 명령 제안 받기";
+    }
+  }
+  function renderPropose(command, explanation) {
+    const slot = document.getElementById("proposeSlot");
+    if (!command) { slot.innerHTML = `<div class="propose"><div class="pr">${esc(explanation)}</div></div>`; return; }
+    const cls = window.gijo.classifyCommand(command); // {decision, inList, reason}
+    const blocked = cls.decision === "blocked";
+    slot.innerHTML =
+      `<div class="propose"><div>🤖 제안: ${esc(explanation || "")}</div>` +
+      `<div class="pc">${esc(command)}</div>` +
+      `<div class="pr ${blocked ? "blocked" : ""}">${blocked ? "🚫 위험 명령 — 실행할 수 없습니다: " + esc(cls.reason) : (cls.inList ? "✓ 허용목록 명령 — 승인 후 실행" : "⚠ 허용목록 밖 — 승인 시에만 실행")}</div>` +
+      (blocked ? "" : `<div class="acts"><button class="ok" id="proposeOk">승인·실행</button><button class="no" id="proposeNo">거부</button></div>`) +
+      `</div>`;
+    if (!blocked) {
+      document.getElementById("proposeOk").addEventListener("click", () => {
+        window.gijo.recordAudit(`챗봇 명령 승인: ${command}`, "chatbot", explanation || null, "cli", "ok").catch(() => {});
+        runCommand(command, "chatbot");
+        slot.innerHTML = "";
+      });
+      document.getElementById("proposeNo").addEventListener("click", () => { slot.innerHTML = ""; });
+    }
+  }
+
+  async function init() {
+    tick(); setInterval(tick, 30000);
+    await loadUser();
+    loadHealth();
+
+    // 담당자 PC 셸 시작 + 출력 스트리밍 구독
+    window.gijo.terminal.onData((d) => append(d));
+    try {
+      const s = await window.gijo.terminal.start();
+      document.getElementById("termLoc").textContent = `${s.shell} · ${s.cwd}`;
+      document.getElementById("shellBadge").textContent = `담당자 PC · ${s.shell}`;
+    } catch (e) { append("[셸을 시작하지 못했습니다]\n", "blk"); }
+
+    termInput.addEventListener("keydown", (e) => {
+      if (e.key === "Enter") { const v = termInput.value; termInput.value = ""; runCommand(v, "manual"); }
+    });
+    document.getElementById("askBtn").addEventListener("click", askChatbot);
+    document.getElementById("askInput").addEventListener("keydown", (e) => { if (e.key === "Enter") askChatbot(); });
+
+    document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
+    document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
+  }
+
+  if (!window.gijo.isAuthenticated()) window.gijo.navigateTo("login.html");
+  else init();
+</script>
+
+<script src="nav.js"></script>
+</body>
+</html>

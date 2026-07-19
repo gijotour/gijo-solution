@@ -63,6 +63,8 @@
       { ic: "🗒", label: "로그", tabs: [{ page: "logs.html", label: "로그" }] },
       // 작업 기록(감사 로그) — 모든 실행/승인/차단/변경의 단일 타임라인.
       { ic: "📜", label: "작업 기록", tabs: [{ page: "audit.html", label: "작업 기록" }] },
+      // 담당자 PC CLI 터미널 — 수동 실행 + 챗봇 명령 제안(허용목록·승인).
+      { ic: ">_", label: "터미널", tabs: [{ page: "terminal.html", label: "터미널 (CLI)" }] },
       { ic: "⚙", label: "설정", tabs: [
         { page: "settings.html", label: "설정" },
         { page: "billing.html", label: "사용량·요금" },

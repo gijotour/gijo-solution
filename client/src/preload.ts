@@ -7,6 +7,7 @@
 import { contextBridge, ipcRenderer } from "electron";
 import * as api from "./apiClient";
 import { connectWebSocket, onChannel } from "./wsClient";
+import { classifyChatbotCommand } from "./terminalPolicy";
 
 const gijoApi = {
   // 서버 연결 설정
@@ -246,7 +247,20 @@ const gijoApi = {
 
   // 작업 기록(감사 로그)
   listAudit: (kind?: string, limit?: number) => api.auditApi.list(kind, limit),
-  recordAudit: (action: string, target?: string, detail?: string) => api.auditApi.record(action, target, detail),
+  recordAudit: (action: string, target?: string, detail?: string, kind?: string, result?: string) => api.auditApi.record(action, target, detail, kind, result),
+
+  // 담당자 PC CLI 터미널 — 앱 안에서 담당자 PC의 셸을 실행(서버 아님). 위험 명령은 실행 전 차단.
+  terminal: {
+    start: () => ipcRenderer.invoke("terminal:start") as Promise<{ ok: boolean; shell: string; cwd: string }>,
+    exec: (cmd: string) => ipcRenderer.invoke("terminal:exec", cmd) as Promise<{ ok?: boolean; blocked?: boolean; reason?: string; error?: string }>,
+    check: (cmd: string) => ipcRenderer.invoke("terminal:check", cmd) as Promise<{ blocked: boolean; reason: string }>,
+    kill: () => ipcRenderer.invoke("terminal:kill"),
+    onData: (cb: (data: string) => void) => ipcRenderer.on("terminal:data", (_e, data: string) => cb(data)),
+  },
+  // 챗봇 명령 정책 판정(허용목록/위험) — 렌더러가 승인 UI 결정에 쓴다.
+  classifyCommand: (cmd: string) => classifyChatbotCommand(cmd),
+  // 챗봇에게 명령 제안 받기(서버 LLM) — 제안만, 실행은 위 terminal.exec + 사람 승인.
+  suggestCommand: (requestText: string) => api.terminalApi.suggest(requestText),
 };
 
 contextBridge.exposeInMainWorld("gijo", gijoApi);

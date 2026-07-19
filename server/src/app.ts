@@ -54,6 +54,7 @@ import { registerKpiRoutes } from "./engine/kpi";
 import { registerUsageRoutes, usageLoggingMiddleware } from "./engine/usage";
 import { registerLogsRoutes } from "./engine/logs";
 import { registerAuditRoutes } from "./engine/audit";
+import { registerCmdSuggestRoutes } from "./engine/cmdsuggest";
 import { registerLlmActivityRoutes } from "./engine/llmactivity";
 import { registerKevRoutes } from "./engine/kev";
 import { registerOntologyRoutes } from "./engine/ontology";
@@ -141,6 +142,7 @@ export function createApp(): Express {
   registerUsageRoutes(app);
   registerLogsRoutes(app);
   registerAuditRoutes(app);
+  registerCmdSuggestRoutes(app);
   registerLlmActivityRoutes(app);
   registerKevRoutes(app);
   registerOntologyRoutes(app);
