@@ -1067,8 +1067,9 @@
     const el = document.getElementById("scGpu");
     if (!el) return;
     if (g && g.available) {
-      const util = Math.round(g.utilization), mem = Math.round(g.memPercent);
-      el.innerHTML = `GPU <b>${util}%</b> · VRAM <b>${mem}%</b>` +
+      const util = Math.round(g.utilization);
+      const usedGb = (g.memUsedMb / 1024).toFixed(1), totalGb = (g.memTotalMb / 1024).toFixed(1);
+      el.innerHTML = `GPU <b>${util}%</b> · VRAM <b>${usedGb}/${totalGb}GB</b>` +
         `<span class="gbar"><i style="width:${util}%;background:rgb(${glowRgb(util / 100)})"></i></span>`;
     } else {
       el.innerHTML = '<span class="sc-gpu-t" style="color:var(--muted-2)">GPU 미검출 (CPU 또는 원격 서버)</span>';
