@@ -107,6 +107,87 @@ Node·GPU(nvidia-smi)·llama-server·모델(상업번들 안전/BYOM 개수)·JW
 
 ---
 
+## 3.7 (대안) WSL2 서버 배포
+
+Windows에 직접 설치하는 대신 같은 GPU 머신의 **WSL2(Ubuntu 24.04)** 안에서 서버를 돌리는 방식입니다.
+UTF-8 기본 로케일이라 `PYTHONUTF8` 우회가 불필요하고, CUDA 생태계의 1차 지원 대상(Linux)을 그대로 씁니다.
+클라이언트 배포(§4)는 동일합니다. 배경·전체 절차는 `GIJO_AS_WSL2_서버이전_계획서.md` 참조.
+
+### 3.7.1 WSL 환경
+```bash
+# systemd 활성화 — /etc/wsl.conf 에 아래를 넣고 `wsl --shutdown` 후 재진입
+[boot]
+systemd=true
+
+sudo apt install -y build-essential cmake python3.12-venv
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash - && sudo apt install -y nodejs
+
+# CUDA toolkit (호스트 드라이버는 건드리지 않는다 — WSL 안에는 toolkit만)
+wget https://developer.download.nvidia.com/compute/cuda/repos/wsl-ubuntu/x86_64/cuda-keyring_1.1-1_all.deb
+sudo dpkg -i cuda-keyring_1.1-1_all.deb && sudo apt update
+sudo apt install -y cuda-toolkit-13-3
+nvidia-smi   # GPU 인식 확인
+```
+
+### 3.7.2 llama.cpp 빌드
+```bash
+git clone --depth 1 https://github.com/ggml-org/llama.cpp.git ~/gijo-as/llama.cpp
+cd ~/gijo-as/llama.cpp
+export PATH=/usr/local/cuda/bin:$PATH
+cmake -B build -DGGML_CUDA=ON -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=86
+cmake --build build --config Release -j$(nproc)
+build/bin/llama-server --list-devices   # CUDA0 가 보여야 한다
+```
+> `CMAKE_CUDA_ARCHITECTURES`는 GPU에 맞춘다(RTX 3090 = 86, RTX 40xx = 89).
+
+### 3.7.3 배치
+`~/gijo-as/` 아래 `server/`(소스·scripts·package*.json·docs-manifest.json), `venv/`, `docs/`, `llama.cpp/`를 둡니다.
+**모델과 DB는 반드시 WSL ext4 내부에 둡니다** — `/mnt/d/...`에 두면 9p 파일시스템 경계 때문에 모델 로드·SQLite I/O가 수 배 느려집니다.
+
+```bash
+cd ~/gijo-as/server
+npm ci && npx tsc -p tsconfig.json    # better-sqlite3·lancedb가 Linux용으로 재빌드된다
+python3 -m venv ~/gijo-as/venv && ~/gijo-as/venv/bin/pip install -r requirements.txt
+```
+
+DB는 파일 복사가 아니라 **온라인 백업 API**로 옮깁니다(가동 중이면 `-wal`에 미반영 트랜잭션이 남아 단순 `cp`는 깨질 수 있음):
+```bash
+node -e 'const D=require("better-sqlite3");const s=new D("/mnt/d/Connect AI/server/data/gijo-as.sqlite",{readonly:true});s.backup("data/gijo-as.sqlite").then(()=>s.close())'
+```
+`data/` 아래 `encryption.key`·`memory.lancedb/`·`kev.json`도 함께 옮깁니다.
+`docs-manifest.json`이 열거한 **고객사용 제품 문서**는 `GIJO_DOCS_DIR`가 가리키는 디렉터리에 두어야 부팅 시 RAG 인입이 됩니다.
+
+### 3.7.4 systemd 상주
+`/etc/systemd/system/gijo-as.service` — venv를 `PATH` 앞에 두어 `spawn("python")`이 venv를 잡게 하는 것이 핵심입니다.
+```ini
+[Service]
+Type=simple
+User=gijo
+WorkingDirectory=/home/gijo/gijo-as/server
+EnvironmentFile=/home/gijo/gijo-as/gijo-as.env
+Environment=PATH=/home/gijo/gijo-as/venv/bin:/usr/local/cuda/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+Environment=LD_LIBRARY_PATH=/usr/local/cuda/lib64:/usr/lib/wsl/lib
+ExecStart=/usr/bin/node dist/index.js
+Restart=always
+```
+`gijo-as.env`(권한 600, 커밋 금지)에는 `NODE_ENV=production`, `GIJO_JWT_SECRET`(필수 — 운영에서 미설정이면 서버가 뜨지 않음), `GIJO_SERVER_PORT=4000`, 그리고 llama.cpp를 `server/` 밖에 두었으므로 `GIJO_LLAMA_SERVER_PATH`·`GIJO_LLAMA_CPP_DIR`·`GIJO_DOCS_DIR` 절대경로를 넣습니다.
+
+```bash
+sudo systemctl daemon-reload && sudo systemctl enable --now gijo-as.service
+```
+
+### 3.7.5 네트워킹 (분산 모드)
+- **권장(Windows 11 22H2+):** `%USERPROFILE%\.wslconfig`에 `[wsl2]` / `networkingMode=mirrored` → WSL이 호스트 IP를 공유해 포트포워딩이 불필요합니다. 적용에 `wsl --shutdown`이 필요하며, **이때 Windows 쪽 기존 서버가 4000을 잡고 있으면 충돌**하므로 전환 시점에 함께 정리합니다.
+- **구버전 대안:** `netsh interface portproxy add v4tov4 listenport=4000 connectaddress=<WSL IP> connectport=4000` (WSL IP는 재부팅 시 바뀌므로 갱신 스크립트 필요).
+- Windows 방화벽 `4000/tcp` 인바운드 허용(사내망 한정).
+- **부팅 시 자동 기동:** 작업 스케줄러에 시작 트리거로 `wsl.exe -d Ubuntu-24.04 --exec /bin/true`를 SYSTEM·최고 권한으로 등록하면 WSL이 올라오면서 systemd가 서비스를 이어서 띄웁니다. **재부팅 테스트를 전환 전 필수 통과 조건으로** 삼으세요.
+
+### 3.7.6 롤백
+Windows 쪽 서버·모델·DB를 지우지 않고 그대로 둡니다. 문제 시 `sudo systemctl stop gijo-as` 후 기존 Windows 서비스를 재기동하면 즉시 복귀합니다.
+단, 전환 후 WSL DB에 변경분이 쌓이므로 **롤백 시에는 WSL DB를 Windows로 역복사**해야 합니다.
+
+---
+
 ## 4. 클라이언트(데스크톱) 배포
 
 ### 4.1 설치본
