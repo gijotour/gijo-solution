@@ -45,7 +45,9 @@ describe("vulnscan (Tenable Nessus 등 취약점 스캔 결과 업로드)", () =
     const host5 = getAsset("vuln:10.0.0.5");
     expect(host5).toBeDefined();
     expect(host5!.assetType).toBe("infra-host");
-    expect(host5!.owner).toBe("nessus-2026-07");
+    // 담당부서는 사람이 지정하는 값이다 — 반입 출처("nessus-2026-07")를 넣지 않는다.
+    // 출처는 finding.source_tool에 남는다. 상세는 test/vulnimport-owner.test.ts 참고.
+    expect(host5!.owner).toBe("");
     expect(host5!.findings).toHaveLength(2);
     const crit = host5!.findings.find((f) => f.severity === "critical");
     expect(crit!.finding_type).toContain("CVE-2024-0001");

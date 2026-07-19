@@ -413,8 +413,15 @@ export function importVulnScan(content: string, format: VulnFormat, sourceLabel:
     const name = meta.dnsName ? `${meta.dnsName} (${host})` : host;
     // 재스캔이면 registerAsset(스캔 이력 삭제)이 아니라 메타만 갱신해 과거 스캔 스냅샷을 보존한다 —
     // 취약점 번다운/측정(재스캔 간 위험 감소 추적)은 이 이력이 있어야 성립한다.
-    if (existing) updateAssetMeta(id, name, sourceLabel, components);
-    else registerAsset({ id, name, path: host, assetType: "infra-host", owner: sourceLabel, components });
+    // owner(담당부서)에 sourceLabel(출처 파일명)을 넣지 않는다 — 의미가 다른 필드다.
+    // 실측(2026-07-19): 담당부서에 "nessus-scan-sample.csv" 같은 값이 6건 저장돼 있었다.
+    // 사고 발생 시 연락할 대상을 알 수 없게 되고, 화면상으로는 "담당부서 채워짐"으로 보여
+    // 결손이 감춰진다. 출처는 finding의 source_tool에 이미 기록된다(아래).
+    //
+    // 재스캔 시에는 기존 owner를 보존한다. 예전에는 sourceLabel로 덮어써서, 담당자가 손으로
+    // 지정해둔 담당부서가 재스캔 한 번에 날아갔다.
+    if (existing) updateAssetMeta(id, name, existing.owner ?? "", components);
+    else registerAsset({ id, name, path: host, assetType: "infra-host", owner: "", components });
 
     // Nessus CSV는 플러그인(취약점) 1건을 CVE 개수만큼 행으로 복제해 내보낸다 — 그대로 세면
     // 건수가 몇 배로 부풀려진다(실측: 1,171행 = 실제 282건). 플러그인 id(없으면 항목명)로 합치고
