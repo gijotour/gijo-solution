@@ -200,7 +200,7 @@ tr:last-child td{border-bottom:none;}
   <div class="kpi-mini"><div class="kpi-mini-label">완료된 작업</div><div class="kpi-mini-value" id="kpiDone">-</div></div>
 </div>
 
-<div class="panel">
+<div class="panel" id="rosterPanel">
   <div class="panel-title">우리 팀 — 보안 에이전트 로스터</div>
   <div class="panel-sub">각 에이전트는 역할에 맞는 전용 모델을 사용합니다. Security Orchestrator가 작업을 나누면 Scan → Analyze 결과를 GIJO Agent가 사내 지식으로 부연하고 Report Agent가 보고서로 정리하며, TI Agent는 CTI 위협을 상시 모니터링해 영향 자산을 알립니다</div>
   <div class="agent-grid" id="agentGrid">
@@ -741,10 +741,24 @@ tr:last-child td{border-bottom:none;}
     }
   }
 
+  // 에이전트 구성(이름·모델)은 관리자만 — 담당자(security_officer)는 정의된 팀을 그대로 쓴다.
+  // 로스터 카드(이름변경 클릭)와 설정 모달이 둘 다 여기 안에 있어서, 패널+버튼을 감추면
+  // 커스터마이즈 진입점이 통째로 사라진다(서버도 adminMiddleware로 이중 방어).
+  function applyAdminGating() {
+    if (isAdmin) return;
+    const rosterPanel = document.getElementById("rosterPanel");
+    if (rosterPanel) rosterPanel.style.display = "none";
+    const settingsBtn = document.getElementById("agentSettingsBtn");
+    if (settingsBtn) settingsBtn.style.display = "none";
+    const addBtn = document.getElementById("addAgentBtn");
+    if (addBtn) addBtn.style.display = "none";
+  }
+
   async function init() {
     tick();
     setInterval(tick, 30000);
     await loadUser();
+    applyAdminGating();
     await loadHealth();
     await Promise.all([loadAgents(), loadTaskKpis(), loadCollaboration(), loadEngineStatus()]);
 

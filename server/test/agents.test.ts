@@ -120,4 +120,17 @@ describe("agent model assignment (A)", () => {
       .send({ modelId: "sec-tuned-test-v0" });
     expect(res.status).toBe(403);
   });
+
+  it("non-admin cannot rename agents either (403) — 팀은 관리자만 구성", async () => {
+    await request(app)
+      .post("/api/users")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ username: "officer2", password: "pw123456", displayName: "담당자2", role: "security_officer" });
+    const officerToken = await login(app, "officer2", "pw123456");
+    const res = await request(app)
+      .post("/api/agents/orchestrator/name")
+      .set("Authorization", `Bearer ${officerToken}`)
+      .send({ name: "내맘대로팀장" });
+    expect(res.status).toBe(403);
+  });
 });

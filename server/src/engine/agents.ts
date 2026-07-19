@@ -174,8 +174,9 @@ export function registerAgentsRoutes(app: Express): void {
     }
   });
 
-  // 에이전트 표시 이름 변경("우리 팀" 로스터). body.name=null/빈값이면 기본 이름으로 되돌림.
-  app.post("/api/agents/:id/name", authMiddleware, (req, res) => {
+  // 에이전트 표시 이름 변경("우리 팀" 로스터) — admin만. body.name=null/빈값이면 기본 이름으로 되돌림.
+  // 담당자(security_officer)는 정의된 팀을 그대로 쓴다(클라이언트도 로스터 UI를 숨김 — 이건 그 서버측 강제).
+  app.post("/api/agents/:id/name", authMiddleware, adminMiddleware, (req, res) => {
     try {
       setAgentName(String(req.params.id), req.body.name ?? null);
       res.json(getAgentById(String(req.params.id)));
