@@ -50,11 +50,21 @@ function openFindingsOf(a: Asset) {
   return (a.findings || []).filter((f) => f.state !== "fixed");
 }
 
+// SBOM(구성요소 목록)·AI-BOM은 소프트웨어·AI 자산에만 의미가 있다. 취약점 스캐너로 들여온 IP
+// 호스트나 인프라 호스트(방화벽·DB·네트워크 장비)는 구성요소 SBOM 대상이 아니다 — 이걸 "SBOM 없음"
+// 으로 세면 커버리지가 거짓 결손을 만든다(실측 2026-07-19: 방화벽까지 SBOM 결손으로 집계).
+// assets.isAiAsset과 목적은 같으나 순환 임포트 회피를 위해 여기서 자체 판별한다.
+const NON_SOFTWARE_TYPES = new Set(["infra-host"]);
+function sbomApplies(a: Asset): boolean {
+  if (a.id.startsWith("vuln:")) return false; // 스캐너가 들여온 IP 호스트
+  return !NON_SOFTWARE_TYPES.has(a.assetType);
+}
+
 export function gapsOf(a: Asset): GapKind[] {
   const gaps: GapKind[] = [];
   if (isOwnerMissing(a.owner)) gaps.push("owner");
   if (!a.service || !a.service.trim()) gaps.push("service");
-  if (!a.sbomGeneratedAt) gaps.push("sbom");
+  if (sbomApplies(a) && !a.sbomGeneratedAt) gaps.push("sbom");
   if (!a.lastScannedAt) gaps.push("unscanned");
   return gaps;
 }

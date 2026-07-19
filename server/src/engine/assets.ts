@@ -64,6 +64,18 @@ export function emptyAiBom(): AiBom {
   };
 }
 
+// AI/모델 자산인가 — AI-BOM·견고성 점검이 의미 있는 자산만 True.
+// AI-BOM은 방화벽·DB·스캐너로 들여온 IP 호스트 같은 IT 자산엔 해당이 없다. 이걸 "AI-BOM 미완성"으로
+// 세면 거버넌스 현황이 거짓 결손으로 가득 찬다(실측 2026-07-19: 방화벽까지 AI-BOM 미완성 집계).
+// "AI처럼 보이면 True"의 긍정 판별을 쓴다(IT 유형을 일일이 나열해 배제하는 것보다 안전).
+const AI_ASSET_TYPES = new Set(["LLM 서비스", "분류 모델", "이상탐지 모델"]);
+export function isAiAsset(a: Asset): boolean {
+  if (AI_ASSET_TYPES.has(a.assetType)) return true;
+  // AI-BOM 핵심 항목(파운데이션 모델·서빙 모델 참조)이 채워져 있으면 AI 자산으로 본다.
+  const m = a.aibom?.model;
+  return Boolean(m && (m.modelRef.trim() || m.foundationModel.trim()));
+}
+
 // 저장된 부분 JSON을 빈 기본값 위에 병합해 항상 완전한 5영역 구조를 돌려준다(스키마 진화 대비).
 function mergeAiBom(raw: string): AiBom {
   const base = emptyAiBom();

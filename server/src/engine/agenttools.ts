@@ -15,7 +15,7 @@
 // 만들어 돌려주고, 사람이 승인한 뒤 /api/agent/approve로만 실행된다(시안 B, 2026-07-17 확정).
 
 import { dateOnlyLocal, addDaysLocal } from "../util/date";
-import { listAssets, getAsset, registerAsset, updateAssetOwnership, setAssetRobustness, Asset } from "./assets";
+import { listAssets, getAsset, registerAsset, updateAssetOwnership, setAssetRobustness, isAiAsset, Asset } from "./assets";
 import { computeAssetCoverage, coverageSummaryText, type GapKind } from "./assetcoverage";
 import { expandOntology } from "./ontology";
 import { prioritizedReviews, updateFindingReview, findingKey, ReviewPatch, ApprovalStatus } from "./approvals";
@@ -841,11 +841,10 @@ function runAssetCoverage(args: Record<string, string>): string {
 
 function runAibomStatus(args: Record<string, string>): string {
   const only = (args.assetId ?? "").trim();
-  const assets = only ? listAssets().filter((a) => a.id === only) : listAssets();
-  if (assets.length === 0) return only ? `자산을 찾을 수 없습니다: ${only}` : "등록된 자산이 없습니다.";
 
   if (only) {
-    const a = assets[0];
+    const a = listAssets().find((x) => x.id === only);
+    if (!a) return `자산을 찾을 수 없습니다: ${only}`;
     const { filled, total, missing } = aibomFilledFields(a);
     const r = a.aibom.robustness;
     const rob = r.ranAt ? `견고성 ${r.score ?? "-"}점 (취약 ${r.vulnerable}/${r.total})` : "견고성 미점검";
@@ -854,7 +853,12 @@ function runAibomStatus(args: Record<string, string>): string {
     return missing.length ? `${head}\n미기재: ${missing.join(", ")}` : `${head}\n5영역 모두 기재 완료.`;
   }
 
-  const rows = assets.map((a) => ({ a, ...aibomFilledFields(a) }));
+  // 전체 현황은 AI/모델 자산만 센다 — 방화벽·DB 같은 IT 자산은 AI-BOM 대상이 아니라 제외한다
+  // (안 그러면 IT 자산이 전부 "AI-BOM 미완성"으로 잡혀 거버넌스 현황이 노이즈로 덮인다).
+  const aiAssets = listAssets().filter(isAiAsset);
+  if (aiAssets.length === 0) return "등록된 AI/모델 자산이 없습니다. (방화벽·서버 등 IT 자산은 AI-BOM 대상이 아닙니다)";
+
+  const rows = aiAssets.map((a) => ({ a, ...aibomFilledFields(a) }));
   const incomplete = rows.filter((r) => r.missing.length > 0);
   const noSbom = rows.filter((r) => !r.a.sbomGeneratedAt);
   const noRobustness = rows.filter((r) => !r.a.aibom.robustness.ranAt);

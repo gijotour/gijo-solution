@@ -451,6 +451,74 @@ export function stopEmbeddingMonitor(): void {
   }
 }
 
+// ── 채팅 모델 hang 감시·자동 재기동 ──────────────────────────────────────────
+// 임베딩과 같은 문제가 채팅 모델에도 있다: llama-server의 /health는 200인데 실제 추론이
+// 무응답(hang)이 될 수 있다(실측 2026-07-19: 요청 폭주 후 채팅 모델 무응답 → 임베딩과 달리
+// 자동복구가 없어 사람이 수동 재시작해야 했음). 짧은 완성 요청을 실제로 돌려보고, 연속 실패하면
+// 그 모델을 죽이고 새로 띄운다. 타임아웃을 넉넉히(30s) 잡아 정상적인 긴 응답을 hang으로 오판하지
+// 않게 하고, 2회 연속 실패(≈3분 무응답)일 때만 재기동한다.
+async function probeChatAlive(port: number, timeoutMs = 30000): Promise<boolean> {
+  return fetch(`http://localhost:${port}/v1/chat/completions`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ messages: [{ role: "user", content: "ping" }], max_tokens: 1, temperature: 0 }),
+    signal: AbortSignal.timeout(timeoutMs),
+  })
+    .then((r) => r.ok)
+    .catch(() => false);
+}
+
+let chatMonitorTimer: NodeJS.Timeout | null = null;
+const chatProbeFailures = new Map<string, number>(); // modelId -> 연속 실패 수
+let chatHealing = false;
+const CHAT_MONITOR_INTERVAL_MS = Number(process.env.GIJO_CHAT_MONITOR_INTERVAL_MS ?? 90000);
+const CHAT_FAIL_THRESHOLD = Number(process.env.GIJO_CHAT_FAIL_THRESHOLD ?? 2);
+
+async function checkAndHealChat(): Promise<void> {
+  if (chatHealing || embeddingRestarting) return; // 재기동 중이면 건너뜀(GPU 경합·중복 방지)
+  const models = [...pool.values()].filter((m) => m.ready);
+  for (const m of models) {
+    const alive = await probeChatAlive(m.port);
+    if (alive) {
+      chatProbeFailures.set(m.modelId, 0);
+      continue;
+    }
+    const fails = (chatProbeFailures.get(m.modelId) ?? 0) + 1;
+    chatProbeFailures.set(m.modelId, fails);
+    console.warn(`[localengine] 채팅 모델 무응답 감지: ${m.modelId} (${fails}/${CHAT_FAIL_THRESHOLD})`);
+    if (fails < CHAT_FAIL_THRESHOLD) continue;
+
+    // 임계 도달 — 한 번에 한 모델만 죽이고 새로 띄운다(GPU 부담·중복 방지).
+    chatHealing = true;
+    try {
+      console.warn(`[localengine] 채팅 모델 hang — 자동 재기동: ${m.modelId}`);
+      await unloadModel(m.modelId).catch(() => {});
+      await killProcessOnPort(m.port).catch(() => {}); // 고아 프로세스가 포트를 잡고 있을 수 있음
+      const reloaded = await ensureModelLoaded(m.modelId).catch(() => null);
+      if (reloaded && (await probeChatAlive(reloaded.port))) {
+        console.log(`[localengine] 채팅 모델 재기동 완료 — 정상 응답 확인: ${m.modelId}`);
+        chatProbeFailures.set(m.modelId, 0);
+      }
+    } finally {
+      chatHealing = false;
+    }
+    break;
+  }
+}
+
+export function startChatMonitor(): void {
+  if (chatMonitorTimer) return;
+  chatMonitorTimer = setInterval(() => void checkAndHealChat(), CHAT_MONITOR_INTERVAL_MS);
+  console.log(`[localengine] 채팅 모델 감시 시작 (${CHAT_MONITOR_INTERVAL_MS / 1000}s 간격, 연속 ${CHAT_FAIL_THRESHOLD}회 실패 시 자동 재기동)`);
+}
+
+export function stopChatMonitor(): void {
+  if (chatMonitorTimer) {
+    clearInterval(chatMonitorTimer);
+    chatMonitorTimer = null;
+  }
+}
+
 export async function stopEmbeddingEngine(): Promise<void> {
   const proc = embeddingProcess;
   if (!proc) return;

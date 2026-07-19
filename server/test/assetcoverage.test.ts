@@ -6,7 +6,7 @@ import {
   isOwnerMissing,
   type AssetCoverage,
 } from "../src/engine/assetcoverage";
-import { emptyAiBom, type Asset } from "../src/engine/assets";
+import { emptyAiBom, isAiAsset, type Asset } from "../src/engine/assets";
 
 function asset(over: Partial<Asset> & { id: string }): Asset {
   return {
@@ -48,6 +48,28 @@ describe("자산 커버리지 — 무엇을 모르는가", () => {
     expect(gapsOf(asset({ id: "a", service: null }))).toEqual(["service"]);
     expect(gapsOf(asset({ id: "a", sbomGeneratedAt: null }))).toEqual(["sbom"]);
     expect(gapsOf(asset({ id: "a", lastScannedAt: null }))).toEqual(["unscanned"]);
+  });
+
+  it("isAiAsset — AI 유형이거나 AI-BOM(모델참조·파운데이션)이 채워지면 AI 자산", () => {
+    expect(isAiAsset(asset({ id: "a", assetType: "LLM 서비스" }))).toBe(true);
+    expect(isAiAsset(asset({ id: "a", assetType: "이상탐지 모델" }))).toBe(true);
+    // IT 유형이라도 AI-BOM에 모델 참조가 있으면 AI 자산으로 본다.
+    const withModel = asset({ id: "a", assetType: "서버" });
+    withModel.aibom.model.modelRef = "models/x.gguf";
+    expect(isAiAsset(withModel)).toBe(true);
+    // 방화벽·스캐너 IP 호스트 등 AI-BOM이 빈 IT 자산은 AI 자산 아님.
+    expect(isAiAsset(asset({ id: "vuln:10.0.0.1", assetType: "infra-host" }))).toBe(false);
+    expect(isAiAsset(asset({ id: "a", assetType: "방화벽" }))).toBe(false);
+  });
+
+  it("SBOM 결손은 소프트웨어·AI 자산에만 — 스캐너 IP 호스트·인프라 호스트는 제외", () => {
+    // 방화벽·DB 같은 IT 자산까지 'SBOM 없음'으로 세면 거짓 결손이 된다(2026-07-19 수정).
+    expect(gapsOf(asset({ id: "vuln:10.0.0.1", sbomGeneratedAt: null }))).not.toContain("sbom");
+    expect(gapsOf(asset({ id: "a", assetType: "infra-host", sbomGeneratedAt: null }))).not.toContain("sbom");
+    // 소프트웨어·AI 자산은 종전대로 SBOM 결손을 짚는다.
+    expect(gapsOf(asset({ id: "a", assetType: "LLM 서비스", sbomGeneratedAt: null }))).toContain("sbom");
+    // 담당부서·미점검 같은 다른 결손은 IT 자산에도 그대로 적용된다(SBOM만 제외).
+    expect(gapsOf(asset({ id: "vuln:10.0.0.1", owner: "", sbomGeneratedAt: null }))).toEqual(["owner"]);
   });
 
   it("fixed 처리된 취약점은 현재 위험으로 세지 않는다", () => {
