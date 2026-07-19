@@ -121,10 +121,36 @@ describe("runAgentLoop — 결정→실행→최종답변", () => {
     expect(r!.toolCalls).toHaveLength(1);
     expect(r!.toolCalls[0].tool).toBe("list_assets");
     expect(r!.toolCalls[0].result).toContain("fraud-detect-llm");
-    // 결정 호출에는 스키마 강제, 최종 재작성에는 remember(이력·학습루프 수집)가 걸린다.
+    // 결정 호출에는 스키마 강제, 최종 재작성에는 생성 길이 상한(maxTokens)이 걸린다. remember(임베딩
+    // 재호출)은 최종답 경로에서 뺐다 — 단일 GPU에서 채팅 모델과 경합해 멈추던 원인이라(오늘 수정).
     expect(mockChat.mock.calls[0][0]).toMatchObject({ agentId: "orchestrator", responseSchema: expect.anything() });
-    expect(mockChat.mock.calls[2][0]).toMatchObject({ remember: true });
+    expect(mockChat.mock.calls[2][0]).toMatchObject({ maxTokens: 800 });
+    expect(mockChat.mock.calls[2][0].remember).toBeFalsy();
     expect(mockChat.mock.calls[2][0].message).toContain("fraud-detect-llm");
+  });
+
+  it("대표 문구 '오늘 뭐부터 조치해야 해?'는 LLM 결정을 건너뛰고 today를 강제 실행한다", async () => {
+    seedAsset();
+    // mockChat을 큐잉하지 않는다 — 강제 실행이면 LLM 결정 호출 자체가 없어야 한다.
+    const r = await runAgentLoop("오늘 뭐부터 조치해야 해?");
+    expect(r).not.toBeNull();
+    expect(r!.toolCalls[0].tool).toBe("today");
+    expect(r!.output).toBe(r!.toolCalls[0].result); // directAnswer라 그대로
+    expect(mockChat).not.toHaveBeenCalled(); // LLM 라우팅 흔들림 원천 차단
+  });
+
+  it("directAnswer 도구(today)는 LLM 재작성 없이 결과를 그대로 답한다", async () => {
+    seedAsset();
+    // 강제 문구가 아닌 지시로 LLM이 today를 고르게 한다(강제 가드 경로와 분리해 재작성 생략만 검증).
+    mockChat
+      .mockResolvedValueOnce('{"action":"tool","tool":"today","args":{}}') // 결정 1
+      .mockResolvedValueOnce('{"action":"final"}'); // 결정 2 — 결과로 충분
+    const r = await runAgentLoop("위험 순위 목록 보여줘");
+    expect(r).not.toBeNull();
+    expect(r!.toolCalls[0].tool).toBe("today");
+    // 최종 답 = today 결과 그대로. LLM은 '결정'만 부르고 최종 재작성(3번째 호출)은 없다 = 멈춤 원천 차단.
+    expect(r!.output).toBe(r!.toolCalls[0].result);
+    expect(mockChat).toHaveBeenCalledTimes(2);
   });
 
   it("같은 도구를 같은 인자로 되풀이하면 재실행 없이 종료해 최종 답을 만든다(루프 낭비 차단)", async () => {

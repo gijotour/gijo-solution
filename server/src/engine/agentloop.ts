@@ -156,9 +156,23 @@ function approvalMessage(approval: PendingApproval): string {
 // 때문에" 같은 내부 과정 이야기가 사용자 답변에 새어나왔다 — 최종 답변을 만들 때는 걸러낸다.
 const INTERNAL_TOOL_ERROR_RE = /^(존재하지 않는 도구|인자 오류|도구 실행 실패):/;
 
+// 도구 결과가 이미 사람이 읽기 좋은 결정적 요약이면(directAnswer) LLM 재작성 없이 그대로 답한다.
+// 단일 도구 호출일 때만 — 여러 도구를 조합한 답은 종합이 필요하므로 재작성 경로로 보낸다.
+function directAnswerFor(calls: AgentToolCall[]): string | null {
+  if (calls.length !== 1) return null;
+  const only = calls[0];
+  if (INTERNAL_TOOL_ERROR_RE.test(only.result)) return null; // 실패 결과는 재작성 경로에서 안내
+  return findAgentTool(only.tool)?.directAnswer ? only.result : null;
+}
+
+// 최종 답 길이 상한 — 도구 결과를 프롬프트에 다시 실을 때 과도하게 커지지 않게 자른다(멈춤 방지).
+const MAX_FACT_CHARS = 1800;
+
 async function composeFinalAnswer(instruction: string, calls: AgentToolCall[], context = ""): Promise<string> {
   const usefulCalls = calls.filter((c) => !INTERNAL_TOOL_ERROR_RE.test(c.result));
-  const facts = (usefulCalls.length ? usefulCalls : calls).map((c, i) => `[${i + 1}] ${c.tool}: ${c.result}`).join("\n");
+  const facts = (usefulCalls.length ? usefulCalls : calls)
+    .map((c, i) => `[${i + 1}] ${c.tool}: ${c.result.slice(0, MAX_FACT_CHARS)}`)
+    .join("\n");
   return chat({
     agentId: "orchestrator",
     message: [
@@ -173,7 +187,10 @@ async function composeFinalAnswer(instruction: string, calls: AgentToolCall[], c
       "같은 판단·결론을 문장만 바꿔 반복하지 마라 — 한 번만 명확히 말하고 끝내라.",
       "도구·시스템 내부 동작(어떤 도구를 썼는지, 도구가 있는지 없는지 등)은 언급하지 말고, 데이터에서 얻은 결론만 말하라.",
     ].join("\n"),
-    remember: true,
+    // remember:true는 이 합성 메시지로 임베딩(RAG) 호출까지 유발한다 — 단일 GPU에서 채팅 모델과
+    // 경합해 데이터가 많을 때 최종답 생성이 멈추는 원인이었다(실측: today/explain 300초 무응답).
+    // 최종답에는 이미 근거(facts)가 다 실려 있어 RAG·이력이 필요 없다. 끄고, 생성 길이도 상한을 둔다.
+    maxTokens: 800,
   });
 }
 
@@ -189,9 +206,44 @@ export interface ToolScope {
   role?: string;
 }
 
+// 제품 핵심 문구인데 LLM이 "일반 질문"으로 오인해 도구를 건너뛰고 잡담으로 답하던 의도를
+// 결정적으로 해당 도구에 못박는다(A단계 교훈: 라우팅 흔들림은 프롬프트 힌트가 아니라 결정적
+// 후처리로 고친다). 실측(2026-07-19): "오늘 뭐부터 조치해야 해?"가 3/3 chat 폴백 → today 미호출.
+// 문구가 명백할 때만 발동하도록 좁게 잡는다(과발동 시 최악이라도 우선순위 목록을 보여주는 것뿐).
+const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }[] = [
+  {
+    re: /오늘.{0,6}(뭐|무엇|어디|먼저).{0,4}(부터|먼저).{0,6}(조치|해|처리|봐|볼|하지)|뭐부터\s*(조치|해|하지)|(제일|가장|지금)\s*급한\s*(취약점|건|것)|우선순위.{0,4}(취약점|조치)/,
+    tool: "today",
+    args: {},
+  },
+];
+function forcedToolFor(instruction: string, scope?: ToolScope): { tool: string; args: Record<string, string> } | null {
+  const available = new Set(listToolsFor(scope?.domains, scope?.role).map((t) => t.name));
+  for (const f of FORCED_INTENTS) {
+    if (f.re.test(instruction) && available.has(f.tool)) return { tool: f.tool, args: f.args };
+  }
+  return null;
+}
+
 export async function runAgentLoop(instruction: string, context = "", scope?: ToolScope): Promise<AgentLoopResult | null> {
   // 범위를 적용한 뒤 쓸 도구가 하나도 없으면 루프를 돌 이유가 없다(호출자가 채팅으로 폴백).
   if (listToolsFor(scope?.domains, scope?.role).length === 0) return null;
+
+  // 대표 문구는 LLM 결정을 건너뛰고 곧장 그 도구를 실행한다 — 흔들림 없이 항상 답한다.
+  const forced = forcedToolFor(instruction, scope);
+  if (forced) {
+    const tool = findAgentTool(forced.tool);
+    if (tool && !tool.write) {
+      try {
+        const result = String(await tool.run(forced.args));
+        const calls: AgentToolCall[] = [{ tool: forced.tool, args: forced.args, result }];
+        const direct = directAnswerFor(calls);
+        return { output: direct ?? (await composeFinalAnswer(instruction, calls, context)), toolCalls: calls };
+      } catch {
+        /* 강제 실행 실패 시 아래 일반 루프로 폴백 */
+      }
+    }
+  }
 
   const calls: AgentToolCall[] = [];
   for (let step = 0; step < MAX_STEPS; step++) {
@@ -206,7 +258,8 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
 
     if (decision.action === "final") {
       if (calls.length === 0) return null; // 도구가 필요 없는 일반 대화 → 기존 채팅(RAG·이력)이 더 낫다
-      const output = await composeFinalAnswer(instruction, calls, context);
+      const direct = directAnswerFor(calls);
+      const output = direct ?? (await composeFinalAnswer(instruction, calls, context));
       return { output, toolCalls: calls };
     }
 
@@ -257,6 +310,7 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
 
   // 반복 상한 도달 — 지금까지 모은 결과로라도 답을 만든다(도구를 썼을 때만).
   if (calls.length === 0) return null;
-  const output = await composeFinalAnswer(instruction, calls, context);
+  const direct = directAnswerFor(calls);
+  const output = direct ?? (await composeFinalAnswer(instruction, calls, context));
   return { output, toolCalls: calls };
 }

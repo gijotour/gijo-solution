@@ -67,6 +67,10 @@ export interface AgentTool {
   // GPU를 통째로 점유하거나(파인튜닝·모델 병합) 전체에 영향을 주는(엔진 로드·설정) 작업용.
   // 한 명이 실행하면 추론 엔진이 내려가 담당자 전원이 채팅을 못 쓰게 되므로 담당자 권한에서 뺀다.
   requiredRole?: "admin";
+  // true면 이 도구의 결과를 그대로 최종 답으로 쓴다(LLM 재작성 생략). 출력이 이미 사람이 읽기 좋은
+  // 결정적 요약(예: today의 우선순위 목록)일 때 쓴다 — 두 번째 LLM 호출을 없애 빠르고,
+  // 대용량 결과를 LLM에 다시 밀어넣다 멈추는 일(실측: today 300초 무응답)을 원천 차단한다.
+  directAnswer?: boolean;
   description: string; // LLM에게 보여줄 한 줄 설명(한국어)
   params: AgentToolParam[];
   // 쓰기 도구용: LLM이 안 준 값을 서버 규칙으로 채운다(예: id를 이름에서 생성). 결재판에서 "자동생성"으로 표시된다.
@@ -1228,6 +1232,9 @@ const TOOLS: AgentTool[] = [
     description:
       '지금 조치할 취약점 우선순위를 전 자산을 가로질러 알려준다(KEV→EPSS→VPR 순, 담당자·기한·지연 포함). "오늘 뭐부터?", "제일 급한 취약점", "우선순위 높은 거", "지금 급한 거", "뭐부터 조치해"에 쓴다. 예: {"limit":"5"}',
     params: [{ name: "limit", label: "개수", description: "상위 몇 건 (기본 5)", required: false }],
+    // 결과가 이미 사람이 읽기 좋은 우선순위 목록이라 LLM 재작성을 생략한다 — 제품 핵심 명령이라
+    // 항상 빠르고 확실하게 답해야 한다(재작성 경로에서 데이터 많을 때 멈추던 문제 원천 차단).
+    directAnswer: true,
     run: runToday,
   },
   {
