@@ -624,9 +624,101 @@ function runBulkUpdate(args: Record<string, string>): string {
   return `${matched.length}건에 일괄 적용했습니다: ${acts}.`;
 }
 
+// ── 「취약점」 도메인 도구 ───────────────────────────────────────────────
+// 메뉴 전수 조사에서 vuln 영역에 오케스트레이션 경로가 없던 역량을 채운다.
+
+// 취약점 현황을 조건으로 훑는다. today(cross)가 "오늘 볼 상위 N건"이라면 이건 "조건에 맞는
+// 것들이 지금 어떤 상태인가"를 본다 — 배정·기한·판정 현황 파악이 목적이다.
+function runFindingStatusOverview(args: Record<string, string>): string {
+  const filter = (args.filter ?? "").trim().toLowerCase();
+  const rows = prioritizedReviews(200);
+  const matched = filter
+    ? rows.filter((r) => {
+        const hay = `${r.assetId} ${r.finding.finding_type} ${r.finding.severity} ${r.finding.evidence ?? ""} ${r.assignee ?? ""} ${r.status}`.toLowerCase();
+        return filter.split(/\s+/).every((w) => hay.includes(w));
+      })
+    : rows;
+
+  if (matched.length === 0) return filter ? `조건("${args.filter}")에 맞는 취약점이 없습니다.` : "등록된 취약점이 없습니다.";
+
+  const byStatus = { pending: 0, approved: 0, rejected: 0 } as Record<string, number>;
+  let unassigned = 0;
+  let overdue = 0;
+  const today = dateOnlyLocal(new Date());
+  for (const r of matched) {
+    byStatus[r.status] = (byStatus[r.status] ?? 0) + 1;
+    if (!r.assignee) unassigned++;
+    if (r.dueDate && r.dueDate < today && r.status === "pending") overdue++;
+  }
+
+  const head =
+    `취약점 ${matched.length}건 — 미검토 ${byStatus.pending ?? 0}, 조치완료 ${byStatus.approved ?? 0}, 오탐 ${byStatus.rejected ?? 0}` +
+    ` / 담당자 미배정 ${unassigned}건, 기한 초과 ${overdue}건`;
+
+  const lines = matched.slice(0, 10).map((r) => {
+    const who = r.assignee ? `담당 ${r.assignee}` : "담당 미배정";
+    const due = r.dueDate ? `기한 ${r.dueDate}` : "기한 없음";
+    return `- [${r.finding.severity}] ${r.assetId} · ${r.finding.finding_type} (${r.status}, ${who}, ${due})`;
+  });
+  const more = matched.length > 10 ? `\n… 외 ${matched.length - 10}건` : "";
+  return `${head}\n${lines.join("\n")}${more}`;
+}
+
+// 승인/반려 — 조치·승인 화면(approvals.html)의 setFindingReview에 해당하는 역량.
+function runReviewFinding(args: Record<string, string>): string {
+  const assetId = (args.assetId ?? "").trim();
+  const target = (args.finding ?? "").trim().toLowerCase();
+  const decision = (args.decision ?? "").trim();
+
+  const asset = getAsset(assetId);
+  if (!asset) return `자산을 찾을 수 없습니다: ${assetId}`;
+
+  const hit = asset.findings.find((f) =>
+    `${f.severity} ${f.finding_type} ${f.evidence ?? ""}`.toLowerCase().includes(target)
+  );
+  if (!hit) return `"${args.finding}"에 해당하는 취약점을 ${assetId}에서 찾지 못했습니다.`;
+
+  const status: ApprovalStatus =
+    /승인|approve|조치완료|처리/.test(decision) ? "approved" : /반려|오탐|reject|false/.test(decision) ? "rejected" : "pending";
+
+  const patch: ReviewPatch = { status, ...(args.note ? { note: args.note } : {}) };
+  updateFindingReview(assetId, findingKey(assetId, hit), patch, "agent");
+  const label = status === "approved" ? "승인(조치완료)" : status === "rejected" ? "반려(오탐)" : "미검토로 원복";
+  return `${assetId}의 "${hit.finding_type}"(${hit.severity})을 ${label} 처리했습니다.`;
+}
+
 // ── 레지스트리 ──────────────────────────────────────────────────────────
 
 const TOOLS: AgentTool[] = [
+  {
+    name: "finding_status",
+    label: "취약점 현황 조회",
+    domain: "vuln",
+    write: false,
+    description:
+      '취약점들이 지금 어떤 상태인지 본다 — 배정·기한·판정 현황. today가 "오늘 볼 상위 건"이라면 이건 "조건에 맞는 것들의 처리 현황"이다. 예: {"filter":"critical"}, {"filter":"미배정"}, 비우면 전체',
+    params: [
+      { name: "filter", label: "조건", description: "심각도·자산·담당자·상태 키워드 (선택, 비우면 전체)", required: false },
+    ],
+    run: runFindingStatusOverview,
+  },
+  {
+    name: "review_finding",
+    label: "취약점 승인·반려",
+    domain: "vuln",
+    write: true,
+    description:
+      '취약점을 승인(조치완료) 또는 반려(오탐)로 판정한다. 예: {"assetId":"fraud-detect-llm","finding":"critical pickle","decision":"반려"}',
+    params: [
+      { name: "assetId", label: "자산 id", description: "대상 자산 id", required: true },
+      { name: "finding", label: "대상 취약점", description: "심각도·유형으로 지목 (예: critical pickle)", required: true },
+      { name: "decision", label: "판정", description: "승인(조치완료) / 반려(오탐)", required: true },
+      { name: "note", label: "메모", description: "판정 사유 (선택)", required: false },
+    ],
+    effect: () => "해당 취약점의 검토 상태가 바뀌고 조치·승인 화면에 반영됩니다.",
+    undo: "조치·승인 화면에서 판정을 미검토로 되돌리면 원상복귀됩니다.",
+    run: runReviewFinding,
+  },
   {
     name: "list_assets",
     label: "자산 목록 조회",
@@ -757,7 +849,9 @@ const TOOLS: AgentTool[] = [
   {
     name: "assign_finding",
     label: "취약점 담당자·기한 배정",
-    domain: "assets",
+    // 자산이 아니라 취약점을 다루는 도구다. 원래 assets로 분류돼 있었으나 vuln이 맞다
+    // (취약점 화면은 vuln+assets를 함께 노출하므로 그 화면에서는 종전대로 보인다).
+    domain: "vuln",
     write: true,
     description:
       '취약점에 조치 담당자(와 기한)를 배정한다. assetId와 finding(심각도·유형으로 지목)은 today/search 결과에서 가져온다. 예: {"assetId":"ai-secbot-01","finding":"프롬프트 인젝션","assignee":"김보안","dueDate":"2026-07-31"}',
@@ -790,7 +884,7 @@ const TOOLS: AgentTool[] = [
   {
     name: "update_finding_status",
     label: "취약점 판정(오탐·조치완료)",
-    domain: "assets",
+    domain: "vuln",
     write: true,
     description:
       '취약점의 조치 결과·판정을 기록한다(상태 변경). 사용자가 "고쳤어", "패치했어", "조치했어", "조치완료", "다 해결했어", "이제 됐어"(→조치완료) 또는 "이건 오탐이야", "오탐 처리해", "무시해도 돼"(→오탐)라고 하면 단순 대화가 아니라 **반드시 이 도구로** 상태를 남긴다. status는 "조치완료" 또는 "오탐". assetId·finding은 today/search 결과에서 지목. 예: {"assetId":"ai-secbot-01","finding":"버전 노출","status":"조치완료"}',

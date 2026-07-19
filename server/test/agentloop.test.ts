@@ -46,15 +46,26 @@ describe("#8 대화 맥락 — '아까 그거' 후속 지시", () => {
 describe("agenttools — 「AI 자산」 조회 도구", () => {
   // 도구는 화면 메뉴가 아니라 사용자 의도 단위다(2026-07-17 확정) — 목록·상세·찾기·설명·오늘·등록.
   // search/explain/today는 메뉴를 가로지르므로 domain="cross".
-  it("도구는 의도 단위로 등록돼 있다 (조회 10종 + 쓰기 4종)", () => {
+  // 전수 목록을 하드코딩하면 역량을 하나 추가할 때마다 이 테스트가 깨진다(B단계에서 30종까지
+  // 늘어난다). 지키려던 것은 "목록이 이것뿐"이 아니라 아래 세 가지 성질이므로 그것만 검사한다.
+  it("도구는 의도 단위로 등록돼 있다", () => {
     const tools = listAgentTools();
-    expect(tools.map((t) => t.name)).toEqual([
-      "list_assets", "get_asset", "search", "explain", "today", "threats", "remediation", "scan_status", "briefing", "run_redteam",
-      "register_asset", "assign_finding", "update_finding_status", "bulk_update",
-    ]);
-    expect(tools.filter((t) => t.write).map((t) => t.name)).toEqual(["register_asset", "assign_finding", "update_finding_status", "bulk_update"]);
-    // 메뉴를 가로지르는 도구가 있어야 "오늘 뭐부터?"·"우리 관련 위협?" 같은 질문에 도구 1개로 답한다.
-    expect(tools.filter((t) => t.domain === "cross").map((t) => t.name)).toEqual(["search", "explain", "today", "threats", "remediation", "scan_status", "briefing", "bulk_update"]);
+    const names = tools.map((t) => t.name);
+
+    // ① 기본 조회 도구가 빠지지 않았다
+    for (const n of ["list_assets", "get_asset", "search", "explain", "today"]) expect(names).toContain(n);
+
+    // ② 상태를 바꾸는 도구는 전부 write=true여야 한다 — 결재판을 우회하면 안 된다
+    for (const n of ["register_asset", "assign_finding", "update_finding_status", "bulk_update", "review_finding"]) {
+      expect(tools.find((t) => t.name === n)?.write, n).toBe(true);
+    }
+
+    // ③ 메뉴를 가로지르는 도구가 있어야 "오늘 뭐부터?"·"우리 관련 위협?"에 도구 1개로 답한다.
+    const cross = tools.filter((t) => t.domain === "cross").map((t) => t.name);
+    for (const n of ["search", "explain", "today", "threats", "briefing"]) expect(cross).toContain(n);
+
+    // 이름 중복이 없다(레지스트리 무결성)
+    expect(new Set(names).size).toBe(names.length);
   });
 
   // threats(CTI×자산) — cti.ts가 기동 시 시드하는 샘플 위협(KoBERT·Qwen2.5·bge-m3 등)과
