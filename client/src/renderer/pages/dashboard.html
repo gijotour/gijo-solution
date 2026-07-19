@@ -168,6 +168,12 @@
   .cl-row.offer .cn{color:var(--teal);}
   .cl-offer-btn{margin-top:6px;background:var(--teal);color:#06281c;border:none;border-radius:7px;padding:5px 12px;font-size:11.5px;font-weight:800;cursor:pointer;}
   .cl-offer-btn:hover{filter:brightness(1.08);}
+  /* 답변 뒤 붙는 작은 제안 — 설명 문장 없이 아이콘+짧은 라벨 알약(시안 B, 사용자 확정) */
+  .cl-pill-row{display:flex;gap:6px;padding:0 9px;}
+  .cl-pill{display:flex;align-items:center;gap:5px;height:24px;padding:0 10px;border-radius:20px;font-size:10.5px;font-weight:700;cursor:pointer;border:1px solid rgba(30,185,128,0.4);background:rgba(30,185,128,0.1);color:var(--teal);}
+  .cl-pill:hover{filter:brightness(1.15);}
+  .cl-pill:disabled{opacity:.6;cursor:default;}
+  .cl-pill.cloud{border-color:rgba(139,124,240,0.4);background:rgba(139,124,240,0.1);color:var(--purple);}
   .cl-row.instr{border-color:rgba(59,130,246,0.35);}
   .cl-row.instr .cn{color:#fff;}
   /* 결재판(시안 B) — 쓰기 도구는 실행 전 여기서 값을 검토·승인한다. 값마다 출처를 표시해
@@ -1150,16 +1156,33 @@
     if (typingEl && typingEl.parentNode) typingEl.remove();
     return clAppend(kind, entry);
   }
+  // 답변 뒤 붙는 작은 제안 알약 — 이름/설명 문장 없이 아이콘+짧은 라벨만(시안 B).
+  // title(툴팁)에 원래 설명 문장을 그대로 남겨 정보 손실 없이 자리만 줄인다.
+  function clAppendPill(cls, label, title, onClick) {
+    const empty = clRows.querySelector(".cl-empty");
+    if (empty) empty.remove();
+    const row = document.createElement("div");
+    row.className = "cl-pill-row";
+    const btn = document.createElement("button");
+    btn.className = "cl-pill" + (cls ? " " + cls : "");
+    btn.textContent = label;
+    btn.title = title;
+    btn.addEventListener("click", onClick);
+    row.appendChild(btn);
+    clRows.appendChild(row);
+    while (clRows.childElementCount > CL_MAX) clRows.removeChild(clRows.firstChild);
+    clRows.scrollTop = clRows.scrollHeight;
+    return btn;
+  }
+
   // 답변 뒤 "이 결과를 보고서로 정리할까요?" 제안 — 클릭하면 리포트 화면으로.
   function clOfferReport(label) {
-    const el = clAppend("offer", { icon: "📄", name: "리포트 제안", message: `방금 ${label ? label + "의 " : ""}결과를 보고서로 정리할까요?` });
-    const btn = document.createElement("button");
-    btn.className = "cl-offer-btn";
-    btn.textContent = "📄 리포트 만들기 →";
-    btn.addEventListener("click", () => window.gijo.navigateTo("report.html"));
-    el.querySelector(".cb").appendChild(btn);
-    clRows.scrollTop = clRows.scrollHeight;
-    return el;
+    return clAppendPill(
+      "",
+      "📄 리포트",
+      `방금 ${label ? label + "의 " : ""}결과를 보고서로 정리할까요? — 리포트 만들기`,
+      () => window.gijo.navigateTo("report.html")
+    );
   }
 
   // 시안 B — 로컬 답변 뒤 "클라우드에도 물어보기". 클라우드가 켜져 있고(관리자 설정) 유출 게이트를
@@ -1181,48 +1204,47 @@
       const note = clAppend("event", { icon: "🔒", name: "로컬 전용", message: `이 질문은 내부 정보(${screen.reasons.join(", ")})가 있어 클라우드로 보낼 수 없습니다 — 로컬 답변만 제공됩니다.` });
       return note;
     }
-    const el = clAppend("offer", { icon: "☁", name: "보조 의견", message: `내부 정보 미포함 — 이 질문을 ${status.providerLabel}에도 물어볼 수 있습니다.` });
-    const btn = document.createElement("button");
-    btn.className = "cl-offer-btn";
-    btn.textContent = `☁ ${status.providerLabel}에도 물어보기`;
-    btn.addEventListener("click", async () => {
-      btn.disabled = true; btn.textContent = "☁ 물어보는 중…";
-      try {
-        const r = await window.gijo.askCloud(question);
-        if (r.routedToCloud) {
-          const row = clAppend("reply", { icon: "☁", name: `${r.providerLabel} · 보조 의견`, message: r.answer || "(빈 응답)" });
-          const badge = document.createElement("span");
-          badge.textContent = "☁ 클라우드 · 내부정보 미포함";
-          badge.style.cssText = "font-size:9.5px;font-weight:800;padding:1px 7px;border-radius:5px;background:rgba(139,124,240,.16);border:1px solid #8b7cf0;color:#b3a6ff;margin-left:6px";
-          row.querySelector(".cn").appendChild(badge);
-          // 4단계 — 이 답변을 지식베이스(RAG)에 저장. 외부 생성물이라 자동 인입 대신 사람이 눌러 승인.
-          const saveBtn = document.createElement("button");
-          saveBtn.className = "cl-offer-btn";
-          saveBtn.textContent = "📥 지식베이스에 저장";
-          saveBtn.title = "외부 클라우드 답변을 사내 지식베이스에 저장합니다(검증 필요 표시가 함께 붙습니다).";
-          saveBtn.addEventListener("click", async () => {
-            saveBtn.disabled = true; saveBtn.textContent = "저장 중…";
-            try {
-              const s = await window.gijo.saveCloudAnswerToKb(question, r.answer || "", r.providerLabel || "클라우드", r.model || "");
-              saveBtn.textContent = `✓ 지식베이스 저장됨 (${s.chunks}청크)`;
-            } catch (e) {
-              saveBtn.disabled = false; saveBtn.textContent = "📥 저장 실패 — 다시";
-            }
-          });
-          row.querySelector(".cb").appendChild(saveBtn);
-          btn.parentElement.parentElement.remove(); // 제안 행 제거(중복 방지)
-        } else if (r.blocked) {
-          btn.textContent = "🔒 내부 정보 감지 — 전송 안 됨";
-        } else {
-          btn.disabled = false; btn.textContent = `☁ 다시 시도 (${(r.error || "실패").slice(0, 40)})`;
+    const btn = clAppendPill(
+      "cloud",
+      `☁ ${status.providerLabel} 추가 질의`,
+      `내부 정보 미포함 — 이 질문을 ${status.providerLabel}에도 물어볼 수 있습니다.`,
+      async () => {
+        btn.disabled = true; btn.textContent = "☁ 묻는 중…";
+        try {
+          const r = await window.gijo.askCloud(question);
+          if (r.routedToCloud) {
+            const row = clAppend("reply", { icon: "☁", name: `${r.providerLabel} · 보조 의견`, message: r.answer || "(빈 응답)" });
+            const badge = document.createElement("span");
+            badge.textContent = "☁ 클라우드 · 내부정보 미포함";
+            badge.style.cssText = "font-size:9.5px;font-weight:800;padding:1px 7px;border-radius:5px;background:rgba(139,124,240,.16);border:1px solid #8b7cf0;color:#b3a6ff;margin-left:6px";
+            row.querySelector(".cn").appendChild(badge);
+            // 4단계 — 이 답변을 지식베이스(RAG)에 저장. 외부 생성물이라 자동 인입 대신 사람이 눌러 승인.
+            const saveBtn = document.createElement("button");
+            saveBtn.className = "cl-offer-btn";
+            saveBtn.textContent = "📥 지식베이스에 저장";
+            saveBtn.title = "외부 클라우드 답변을 사내 지식베이스에 저장합니다(검증 필요 표시가 함께 붙습니다).";
+            saveBtn.addEventListener("click", async () => {
+              saveBtn.disabled = true; saveBtn.textContent = "저장 중…";
+              try {
+                const s = await window.gijo.saveCloudAnswerToKb(question, r.answer || "", r.providerLabel || "클라우드", r.model || "");
+                saveBtn.textContent = `✓ 지식베이스 저장됨 (${s.chunks}청크)`;
+              } catch (e) {
+                saveBtn.disabled = false; saveBtn.textContent = "📥 저장 실패 — 다시";
+              }
+            });
+            row.querySelector(".cb").appendChild(saveBtn);
+            btn.parentElement.remove(); // 제안 알약 행 제거(중복 방지)
+          } else if (r.blocked) {
+            btn.textContent = "🔒 감지됨";
+          } else {
+            btn.disabled = false; btn.textContent = "☁ 다시 시도";
+          }
+        } catch (e) {
+          btn.disabled = false; btn.textContent = "☁ 다시 시도";
         }
-      } catch (e) {
-        btn.disabled = false; btn.textContent = "☁ 실패 — 다시 시도";
       }
-    });
-    el.querySelector(".cb").appendChild(btn);
-    clRows.scrollTop = clRows.scrollHeight;
-    return el;
+    );
+    return btn;
   }
 
   // 결재판 카드(시안 B) — 쓰기 도구는 지시만으로 실행되지 않는다. AI가 채운 값을 표로 보여주고
