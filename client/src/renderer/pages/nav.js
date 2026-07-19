@@ -1,146 +1,141 @@
-// nav.js — GIJO AS 네비게이션 단일 소스 (사이드바 + 그룹 탭바).
-// IA 통합설계(GIJO_AS_IA_통합설계.md) 1~4단계 구현:
-//  · 사이드바: 20개 페이지를 통합 그룹(≈10개 최상위)으로 재배치. 한 곳에서만 관리.
-//  · 탭바: 여러 페이지를 한 그룹으로 묶고, 그룹 내 이동은 .main 상단 탭으로 (페이지 병합 없이).
-//    예) "취약점 관리" = 취약점(vulnscan) + 조치·승인(approvals) 두 탭.
-// 각 페이지의 기존 스크립트·API 호출은 그대로 — 네비게이션만 묶는다(회귀 위험 최소).
-// 스타일: 사이드바는 페이지 <style>의 .sidebar/.nav-*; 탭바는 이 파일이 :root 토큰으로 주입.
+// nav.js — GIJO AS 네비게이션 (시안 B: 아이콘 레일 + 서브패널).
+// 모든 페이지의 <div id="gijoNav"> 안에 [얇은 아이콘 레일 | 서브패널]을 그린다. 레일에서 대분류를
+// 고르면 그 분류의 기능이 서브패널에 나오고, 항목을 클릭하면 그 페이지로 이동한다(기존 멀티페이지
+// 구조 유지 — 페이지별 대량 수정 없이 좌측 IA만 시안 B로 교체하는 저위험 방식).
+// 스타일은 페이지 :root 토큰(--panel-2·--border·--blue…)을 그대로 쓰므로 다크 테마와 일관된다.
 
 (function () {
-  // 통합 구조. 각 group은 사이드바 1항목 = 탭 묶음. tabs[0].page가 대표(사이드바 클릭 시 이동).
-  var SECTIONS = [
-    { section: "모니터링", groups: [
-      { ic: "◆", label: "대시보드", tabs: [
-        { page: "dashboard.html", label: "대시보드" },
-      ]},
-      { ic: "📊", label: "보안 KPI", tabs: [
-        { page: "kpi.html", label: "보안 KPI 대시보드" },
-      ]},
-      { ic: "🔬", label: "보안 분석", tabs: [
-        { page: "analysis.html", label: "통합 관제" },
-      ]},
-      { ic: "💬", label: "작업 세션", tabs: [
-        { page: "sessions.html", label: "작업 세션" },
-      ]},
+  // 대분류(레일 아이콘) → 기능(서브패널 항목). 24기능을 4대분류 + 안내 + 설정으로 간소화.
+  var GROUPS = [
+    { id: "monitor", ic: "🖥", label: "관제·모니터링", items: [
+      { page: "dashboard.html", label: "대시보드" },
+      { page: "kpi.html", label: "보안 KPI" },
+      { page: "analysis.html", label: "보안 분석 (통합 관제)" },
+      { page: "sessions.html", label: "작업 세션" },
+      { page: "threat.html", label: "위협 인텔리전스" },
     ]},
-    { section: "보안 업무", groups: [
-      // 자산과 그 취약점은 한 흐름이라 하나로 통합(2026-07-19): 목록·AI-BOM·취약점·조치를 탭으로.
-      // 탐색기(session-explorer)는 SBOM(인프라)/ML BOM(AI) 하위 그룹으로 자산을 나눈다.
-      { ic: "🧠", label: "ML BOM", tabs: [
-        { page: "inventory.html", label: "자산 목록" },
-        { page: "sbom.html", label: "AI-BOM 구성" },
-        { page: "vulnscan.html", label: "취약점" },
-        { page: "approvals.html", label: "조치·승인" },
-      ]},
-      { ic: "△", label: "위협 인텔리전스", tabs: [{ page: "threat.html", label: "위협 인텔리전스" }] },
-      { ic: "🧰", label: "보안 운영", tabs: [
-        { page: "products.html", label: "보안제품" },
-        { page: "opsguide.html", label: "유지보수" },
-      ]},
-      { ic: "▣", label: "리포트·컴플라이언스", tabs: [
-        { page: "report.html", label: "내부 리포트" },
-        { page: "compliance.html", label: "컴플라이언스" },
-      ]},
+    { id: "assets", ic: "🛡", label: "자산·취약점·대응", items: [
+      { page: "inventory.html", label: "자산 목록" },
+      { page: "sbom.html", label: "AI-BOM 구성" },
+      { page: "vulnscan.html", label: "취약점" },
+      { page: "approvals.html", label: "조치·승인" },
+      { page: "products.html", label: "보안제품" },
+      { page: "opsguide.html", label: "유지보수" },
+      { page: "report.html", label: "리포트" },
+      { page: "compliance.html", label: "컴플라이언스" },
     ]},
-    { section: "AI", groups: [
-      { ic: "◉", label: "AI 어시스턴트", tabs: [
-        { page: "agent.html", label: "에이전트 AI" },
-        { page: "merge.html", label: "LLM 합성" },
-        { page: "llmguide.html", label: "LLM 가이드" },
-      ]},
-      { ic: "📚", label: "AI 지식·모델", tabs: [
-        { page: "memory.html", label: "기억·학습" },
-        { page: "docenrich.html", label: "문서 보강" },
-        { page: "ontology.html", label: "온톨로지" },
-        { page: "learnloop.html", label: "학습 루프" },
-      ]},
-      { ic: "🛡", label: "AI 견고성", tabs: [
-        { page: "redteam.html", label: "레드팀·가드레일" },
-      ]},
+    { id: "ai", ic: "🤖", label: "AI", items: [
+      { page: "agent.html", label: "에이전트 AI" },
+      { page: "merge.html", label: "LLM 합성" },
+      { page: "llmguide.html", label: "LLM 가이드" },
+      { page: "memory.html", label: "기억·학습 (RAG)" },
+      { page: "docenrich.html", label: "문서 보강" },
+      { page: "ontology.html", label: "온톨로지" },
+      { page: "learnloop.html", label: "학습 루프" },
+      { page: "redteam.html", label: "레드팀·가드레일" },
     ]},
-    { section: "시스템", groups: [
-      // 로그는 상시 확인 대상이라 설정 하위 탭이 아닌 최상위 항목으로 둔다.
-      { ic: "🗒", label: "로그", tabs: [{ page: "logs.html", label: "로그" }] },
-      // 작업 기록(감사 로그) — 모든 실행/승인/차단/변경의 단일 타임라인.
-      { ic: "📜", label: "작업 기록", tabs: [{ page: "audit.html", label: "작업 기록" }] },
-      // 담당자 PC CLI 터미널 — 수동 실행 + 챗봇 명령 제안(허용목록·승인).
-      { ic: ">_", label: "터미널", tabs: [{ page: "terminal.html", label: "터미널 (CLI)" }] },
-      { ic: "⚙", label: "설정", tabs: [
-        { page: "settings.html", label: "설정" },
-        { page: "billing.html", label: "사용량·요금" },
-      ]},
+    { id: "system", ic: "🛠", label: "시스템", items: [
+      { page: "logs.html", label: "로그" },
+      { page: "audit.html", label: "작업 기록 (감사)" },
+      { page: "terminal.html", label: "터미널 (CLI)" },
+    ]},
+    { id: "help", ic: "❓", label: "기능 안내", bottom: true, items: [
+      { page: "reference.html", label: "기능 안내 — 전체 기능·입력칸" },
+    ]},
+    { id: "settings", ic: "⚙", label: "설정", bottom: true, items: [
+      { page: "settings.html", label: "설정" },
+      { page: "billing.html", label: "사용량·요금" },
     ]},
   ];
 
   function currentPage() {
     return decodeURIComponent((location.pathname || "").split("/").pop() || "");
   }
-  function inGroup(g, page) { return g.tabs.some(function (t) { return t.page === page; }); }
   function go(page) { if (window.gijo && window.gijo.navigateTo) window.gijo.navigateTo(page); }
   function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
-
-  // ── 사이드바: 그룹당 1항목 ────────────────────────────────
-  function renderSidebar(here) {
-    var root = document.getElementById("gijoNav");
-    if (!root) return;
-    root.innerHTML = "";
-    SECTIONS.forEach(function (sec) {
-      var head = document.createElement("div");
-      head.className = "nav-section";
-      head.textContent = sec.section;
-      root.appendChild(head);
-      sec.groups.forEach(function (g) {
-        var active = inGroup(g, here);
-        var el = document.createElement("div");
-        el.className = "nav-item" + (active ? " active" : "");
-        el.innerHTML = '<span class="ic"></span>' + esc(g.label);
-        el.querySelector(".ic").textContent = g.ic;
-        if (!active) el.addEventListener("click", function () { go(g.tabs[0].page); });
-        root.appendChild(el);
-      });
-    });
-  }
-
-  // ── 그룹 탭바: 현재 페이지가 든 그룹의 형제 탭 (.main 상단) ──
-  function findGroup(here) {
-    for (var i = 0; i < SECTIONS.length; i++) {
-      var gs = SECTIONS[i].groups;
-      for (var j = 0; j < gs.length; j++) if (inGroup(gs[j], here)) return gs[j];
+  function groupOf(page) {
+    for (var i = 0; i < GROUPS.length; i++) {
+      for (var j = 0; j < GROUPS[i].items.length; j++) if (GROUPS[i].items[j].page === page) return GROUPS[i];
     }
-    return null;
+    return GROUPS[0];
   }
-  function injectTabCss() {
-    if (document.getElementById("gijoTabCss")) return;
+
+  function injectCss() {
+    if (document.getElementById("gijoNavCss")) return;
     var st = document.createElement("style");
-    st.id = "gijoTabCss";
+    st.id = "gijoNavCss";
     st.textContent =
-      ".gijo-tabs{display:flex;gap:2px;border-bottom:1px solid var(--border);margin:-4px 0 20px;flex-wrap:wrap}" +
-      ".gijo-tab{padding:9px 16px;font-size:13px;font-weight:700;color:var(--muted);cursor:pointer;" +
-      "border-bottom:2px solid transparent;margin-bottom:-1px}" +
-      ".gijo-tab:hover{color:var(--white)}" +
-      ".gijo-tab.active{color:#fff;border-bottom-color:var(--blue);cursor:default}";
+      // 사이드바 열을 레일+서브패널 폭으로. #gijoNav(=.sidebar)의 기존 패딩·테두리·min-height 무력화.
+      ".app{grid-template-columns:auto 1fr !important;}" +
+      "#gijoNav{padding:0 !important;border-right:0 !important;min-height:0 !important;display:flex;position:sticky;top:0;height:100vh;align-self:start;z-index:20;}" +
+      ".gn-rail{width:56px;background:#0a1120;border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:3px;height:100vh;}" +
+      ".gn-ic{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--muted);cursor:pointer;flex:0 0 auto;}" +
+      ".gn-ic:hover{background:rgba(255,255,255,.05);color:#fff;}" +
+      ".gn-ic.active{background:rgba(59,130,246,.16);color:var(--blue-light);}" +
+      ".gn-ic.hasactive::after{content:'';position:absolute;margin-top:26px;margin-left:26px;width:6px;height:6px;border-radius:50%;background:var(--blue);}" +
+      ".gn-spacer{flex:1 1 auto;}" +
+      ".gn-sub{width:188px;background:var(--panel-2);border-right:1px solid var(--border);height:100vh;overflow-y:auto;padding:6px 0;}" +
+      ".gn-subtitle{font-size:12px;font-weight:800;color:#fff;padding:14px 16px 9px;letter-spacing:.2px;}" +
+      ".gn-item{padding:8px 16px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}" +
+      ".gn-item:hover{color:#fff;background:rgba(255,255,255,.03);}" +
+      ".gn-item.active{color:var(--blue-light);box-shadow:inset 3px 0 0 var(--blue);background:rgba(59,130,246,.08);cursor:default;}" +
+      ".gn-logo{height:26px;width:42px;display:flex;align-items:center;justify-content:center;margin-bottom:6px;cursor:pointer;}" +
+      ".gn-logo img{height:20px;}";
     document.head.appendChild(st);
   }
-  function renderTabs(here) {
-    var group = findGroup(here);
-    if (!group || group.tabs.length < 2) return; // 단일 페이지 그룹은 탭 없음
-    var main = document.querySelector(".main");
-    if (!main || document.querySelector(".gijo-tabs")) return;
-    injectTabCss();
-    var bar = document.createElement("div");
-    bar.className = "gijo-tabs";
-    group.tabs.forEach(function (t) {
-      var tab = document.createElement("div");
-      var active = t.page === here;
-      tab.className = "gijo-tab" + (active ? " active" : "");
-      tab.textContent = t.label;
-      if (!active) tab.addEventListener("click", function () { go(t.page); });
-      bar.appendChild(tab);
+
+  var shownGroupId = null; // 현재 서브패널에 펼친 대분류(초기값=현재 페이지의 대분류)
+
+  function render() {
+    var root = document.getElementById("gijoNav");
+    if (!root) return;
+    injectCss();
+    var here = currentPage();
+    var activeGroup = groupOf(here);
+    if (!shownGroupId) shownGroupId = activeGroup.id;
+    var shown = GROUPS.filter(function (g) { return g.id === shownGroupId; })[0] || activeGroup;
+
+    // 레일
+    var rail = document.createElement("div");
+    rail.className = "gn-rail";
+    var logo = document.createElement("div");
+    logo.className = "gn-logo";
+    logo.title = "대시보드로";
+    logo.innerHTML = '<img src="https://gijo.ai/_nuxt/logo_gijo_only_white.ATZVOJtw.svg" alt="GIJO">';
+    logo.addEventListener("click", function () { go("dashboard.html"); });
+    rail.appendChild(logo);
+    var spacerAdded = false;
+    GROUPS.forEach(function (g) {
+      if (g.bottom && !spacerAdded) { var sp = document.createElement("div"); sp.className = "gn-spacer"; rail.appendChild(sp); spacerAdded = true; }
+      var ic = document.createElement("div");
+      ic.className = "gn-ic" + (g.id === shown.id ? " active" : "") + (g.id === activeGroup.id && g.id !== shown.id ? " hasactive" : "");
+      ic.style.position = "relative";
+      ic.title = g.label;
+      ic.textContent = g.ic;
+      ic.addEventListener("click", function () { shownGroupId = g.id; render(); });
+      rail.appendChild(ic);
     });
-    main.insertBefore(bar, main.firstChild);
+
+    // 서브패널
+    var sub = document.createElement("div");
+    sub.className = "gn-sub";
+    var title = document.createElement("div");
+    title.className = "gn-subtitle";
+    title.textContent = shown.ic + " " + shown.label;
+    sub.appendChild(title);
+    shown.items.forEach(function (it) {
+      var el = document.createElement("div");
+      el.className = "gn-item" + (it.page === here ? " active" : "");
+      el.textContent = it.label;
+      if (it.page !== here) el.addEventListener("click", function () { go(it.page); });
+      sub.appendChild(el);
+    });
+
+    root.innerHTML = "";
+    root.appendChild(rail);
+    root.appendChild(sub);
   }
 
-  // 온보딩(시작 가이드)을 모든 페이지에 로드 — 런처로 어디서든 재열기·체크. 자동표시는 대시보드 1회.
   function loadOnboarding() {
     if (document.getElementById("gijoObScript")) return;
     var s = document.createElement("script");
@@ -150,12 +145,9 @@
   }
 
   function boot() {
-    var here = currentPage();
-    renderSidebar(here);
-    renderTabs(here);
+    render();
     loadOnboarding();
   }
-
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
   else boot();
 })();
