@@ -297,7 +297,9 @@ export async function chat(args: ChatArgs): Promise<string> {
 
 export async function embed(texts: string[]): Promise<number[][]> {
   const started = Date.now();
-  const res = await fetch(`${EMBEDDING_SERVER_URL}/embeddings`, {
+  // OpenAI 호환 경로(/v1/embeddings)를 쓴다. 최신 llama.cpp의 네이티브 /embeddings는
+  // {data:[...]} 가 아니라 [{index,embedding:[[...]]}] 형태(중첩 배열)를 돌려줘 파싱이 깨진다.
+  const res = await fetch(`${EMBEDDING_SERVER_URL}/v1/embeddings`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ model: "local", input: texts }),
