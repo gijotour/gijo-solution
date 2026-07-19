@@ -15,7 +15,7 @@ import { runAgentLoop, AgentToolCall } from "./agentloop";
 import { executeApprovedTool, PendingApproval } from "./agenttools";
 import { appendApprovedDecision } from "./orchestrator-dataset";
 import { undoSnapshot, undoCommit } from "./undo";
-import { guardInput } from "./guardrail";
+import { gateUserInput } from "./gateway";
 import { analyzeFindings } from "./analysis";
 import { recordFindings, getAsset, listAssets } from "./assets";
 import { listFindings } from "./cti";
@@ -133,7 +133,8 @@ async function executeRoutedAction(route: RoutedIntent, instructionText: string,
       // 모델 로드·선택은 chat() 내부(ensureAgentModel)에서 처리된다.
       // 세션 맥락이 있으면 앞에 붙여 "이어서/그거" 같은 대화형 후속을 이해하게 한다.
       const message = contextText ? `${contextText}\n\n[현재 지시] ${instructionText}` : instructionText;
-      return { output: await chat({ agentId: route.agentId, message, remember: true }) };
+      // trusted: 지시문은 dispatchInstructionCore에서 이미 관문을 지났다(이중 집계 방지).
+      return { output: await chat({ agentId: route.agentId, message, remember: true, trusted: true }) };
     }
   }
 }
@@ -156,6 +157,7 @@ async function runGijoEnrichment(results: StepResult[], fromAgentId: string): Pr
     output = await chat({
       agentId: "normaltic",
       message: `다음 스캔·분석 결과에 나온 보안 용어·탐지 항목을 짧게 해설하고, 사내 지식베이스에 관련 사례가 있으면 부연해줘.\n\n${source}`,
+      trusted: true, // 사용자 입력이 아니라 앞 단계 산출물로 조립한 내부 프롬프트
     });
   } catch (err) {
     output = `부연 생략: ${err instanceof Error ? err.message : String(err)}`;
@@ -216,7 +218,7 @@ async function runOrchestration(instructionText: string, steps: OrchestrationSte
       } else if (step.action === "analyze") {
         output = accumulated.length
           ? (await analyzeFindings(accumulated)).summary
-          : await chat({ agentId: "analysis", message: instructionText, remember: true });
+          : await chat({ agentId: "analysis", message: instructionText, remember: true, trusted: true });
       } else {
         // report — 앞 단계에서 스캔한 자산이 있으면 그 범위로, 없으면 전체로 보고서를 만든다.
         const scoped = scannedAssetIds.size ? [...scannedAssetIds] : undefined;
@@ -306,7 +308,9 @@ function turnToolTag(r: DispatchResult): string | undefined {
 
 async function dispatchInstructionCore(instructionText: string, contextText = ""): Promise<DispatchResult> {
   // 런타임 가드레일 — 입력의 프롬프트 인젝션 시도를 실시간 검사. block 모드면 거절, flag면 기록·경고 후 진행.
-  const guard = guardInput(instructionText, "dispatch");
+  // guardInput을 직접 부르지 않고 게이트웨이를 거친다 — 검사 지점을 한 곳으로 모아, 앞으로
+  // 검사가 늘어도(PII·출력 필터 등) 모든 입구에 자동으로 적용되게 하기 위함이다.
+  const guard = gateUserInput(instructionText, "dispatch");
   if (guard.flagged) {
     emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `🛡 가드레일: 프롬프트 인젝션 시도 감지(${guard.categories.join(", ")})${guard.allowed ? " — 기록 후 진행" : " — 차단"}` });
   }

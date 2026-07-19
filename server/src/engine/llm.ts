@@ -7,6 +7,7 @@ import { asyncRoute } from "../util/asyncRoute";
 import { getAgentById } from "./agents";
 import { emitLlmActivity, modelBasename } from "./llmactivity";
 import { recordChatLog } from "./learnloop";
+import { gateUserInput } from "./gateway";
 
 const LOCAL_LLM_BASE_URL = process.env.GIJO_LOCAL_LLM_URL ?? "http://localhost:8080/v1";
 // 6.2절: 임베딩 모델(BGE-M3 등)은 채팅용 LLM과 별도 llama-server 프로세스로 동시 서빙한다 (RTX 3090 VRAM 여유 활용).
@@ -23,6 +24,10 @@ export interface ChatArgs {
   // 보장한다(에이전트 루프의 도구 선택 등). 이 경로는 결정 호출이므로 temperature 0으로 고정하고,
   // 인사말 제거·중국어 재생성 후처리를 건너뛴다(JSON을 훼손할 수 있으므로).
   responseSchema?: unknown;
+  // 이미 게이트웨이(gateUserInput)를 지난 입력임을 뜻한다. dispatcher처럼 지시문을 먼저
+  // 검사한 뒤 같은 텍스트를 넘기는 내부 재진입에서만 쓴다 — 안 그러면 한 요청이 두 번 집계된다.
+  // 사용자 입력을 처음 받는 경로에서는 절대 켜지 않는다.
+  trusted?: boolean;
 }
 
 // ── 단기 기억: 에이전트별 최근 대화 이력 ─────────────────────────────────────
@@ -200,6 +205,13 @@ const NO_HAN_GRAMMAR = "root ::= [^\\u4e00-\\u9fff]*";
 const LLM_TIMEOUT_MS = Number(process.env.GIJO_LLM_TIMEOUT_MS ?? 120_000);
 
 export async function chat(args: ChatArgs): Promise<string> {
+  // 단일 관문 — 사용자 입력이 LLM에 닿기 전 반드시 여기를 지난다(engine/gateway.ts 주석 참고).
+  // trusted는 이미 관문을 지난 내부 재진입(dispatcher)만 쓴다.
+  if (!args.trusted) {
+    const gate = gateUserInput(args.message, "chat");
+    if (!gate.allowed) return gate.message ?? "요청이 차단되었습니다.";
+  }
+
   const history = args.remember ? (histories.get(args.agentId) ?? []) : [];
   const rag = args.remember ? await ragContextFor(args.message, args.agentId) : null;
 

@@ -12,6 +12,7 @@ import { asyncRoute } from "../util/asyncRoute";
 import { embed, chat } from "./llm";
 import { db } from "../db";
 import { emitCollaboration } from "./collaboration";
+import { gateUserInput } from "./gateway";
 
 // 문서 단위 메타데이터(업로드 시각·원본 경로)는 SQLite에 둔다 — LanceDB 스키마는 건드리지 않는다.
 const upsertDocMetaStmt = db.prepare(
@@ -402,6 +403,13 @@ export function registerMemoryRoutes(app: Express): void {
     "/api/memory/query",
     authMiddleware,
     asyncRoute(async (req, res) => {
+      // 지식 검색도 사용자 입력이 LLM(임베딩)에 닿는 경로라 관문을 지난다.
+      // 여기가 비어 있어 인젝션 페이로드가 그대로 통과하던 것을 막는다(2026-07-19 실측).
+      const gate = gateUserInput(String(req.body?.question ?? ""), "memory-query");
+      if (!gate.allowed) {
+        res.status(400).json({ error: gate.message });
+        return;
+      }
       res.json(await queryMemory(req.body.question, req.body.topK, req.body.agentId));
     })
   );
