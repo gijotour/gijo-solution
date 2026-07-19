@@ -39,6 +39,11 @@
   /* 콘솔 넓게 보기(⛶) — 좌우 패널을 숨겨 중앙 콘솔이 전체 폭으로 늘어난다. */
   .body-grid.focus{grid-template-columns:1fr;}
   .body-grid.focus .explorer,.body-grid.focus .dash-sessions{display:none;}
+  /* 오른쪽 작업 세션 패널만 숨기기(② 요청) — 왼쪽 탐색기는 남기고 중앙만 넓힌다. */
+  .body-grid.no-right{grid-template-columns:220px 1fr;}
+  .body-grid.no-right .dash-sessions{display:none;}
+  .dsh-hide{background:transparent;border:0;color:var(--muted-2);font-size:14px;cursor:pointer;line-height:1;padding:0 2px;}
+  .dsh-hide:hover{color:var(--blue-light);}
   .cl-expand{font-size:14px;color:var(--muted);cursor:pointer;line-height:1;}
   .cl-expand:hover{color:var(--blue-light);}
   .explorer{padding:18px 12px;border-right:1px solid var(--border);}
@@ -365,6 +370,7 @@
         <div class="icon-btn" data-page="kpi.html" title="보안 KPI">📊</div>
         <div class="icon-btn" data-page="analysis.html" title="보안 분석 (통합 관제)">🔬</div>
         <div class="icon-btn" data-page="sessions.html" title="작업 세션 (대화 세션별 관리)">💬</div>
+        <div class="icon-btn" id="toggleRightBtn" title="오른쪽 세션 패널 접기/펴기">◧</div>
         <div class="icon-btn" data-page="inventory.html" title="ML BOM (자산·AI-BOM·취약점·조치)">🧠</div>
         <div class="icon-btn" data-page="threat.html" title="위협 인텔리전스">△</div>
         <div class="icon-btn" data-page="products.html" title="보안 운영 (제품·유지보수)">🧰</div>
@@ -481,7 +487,7 @@
 
     <!-- 작업 세션 열 — 오른쪽 끝(이력 관리). 클릭하면 전용 화면에서 그 세션 대화를 상세 리뷰. -->
     <div class="dash-sessions">
-      <div class="dsh"><span class="dsh-t">💬 작업 세션</span><button class="dash-new" id="dashNewSession">＋ 새 세션</button></div>
+      <div class="dsh"><span class="dsh-t">💬 작업 세션</span><button class="dash-new" id="dashNewSession">＋ 새 세션</button><button class="dsh-hide" id="dashHideRight" title="오른쪽 패널 숨기기">⏵</button></div>
       <div class="dash-slist" id="dashSessionList"><div style="font-size:11px;color:var(--muted-2);padding:8px">불러오는 중…</div></div>
       <div class="dash-sfull" id="dashSessionsFull">전체 작업 세션 열기 ↗</div>
     </div>
@@ -1861,6 +1867,25 @@
       clExpand.textContent = on ? "🗗" : "⛶";
       clExpand.title = on ? "원래대로 (좌우 패널 복원)" : "콘솔 넓게 보기 (좌우 패널 숨김/복원)";
     });
+
+    // ② 오른쪽 작업 세션 패널만 접기/펴기 — 상태는 기억한다(다음 방문에도 유지).
+    // 패널 헤더의 ⏵ 버튼과 상단 ◧ 버튼 둘 다 같은 토글. 접히면 중앙 콘솔이 넓어진다.
+    const RIGHT_HIDDEN_KEY = "gijo.dashRightHidden";
+    function applyRightHidden(hidden) {
+      const bg = document.querySelector(".body-grid");
+      if (!bg) return;
+      bg.classList.toggle("no-right", hidden);
+      const t = document.getElementById("toggleRightBtn");
+      if (t) { t.classList.toggle("on", hidden); t.title = hidden ? "오른쪽 세션 패널 펴기" : "오른쪽 세션 패널 접기"; }
+    }
+    function toggleRight() {
+      const hidden = !(document.querySelector(".body-grid")?.classList.contains("no-right"));
+      try { localStorage.setItem(RIGHT_HIDDEN_KEY, hidden ? "1" : "0"); } catch (e) {}
+      applyRightHidden(hidden);
+    }
+    document.getElementById("dashHideRight")?.addEventListener("click", toggleRight);
+    document.getElementById("toggleRightBtn")?.addEventListener("click", toggleRight);
+    try { applyRightHidden(localStorage.getItem(RIGHT_HIDDEN_KEY) === "1"); } catch (e) {}
 
     window.gijo.onCollaborationEvent((evt) => {
       appendCollabRow(evt);
