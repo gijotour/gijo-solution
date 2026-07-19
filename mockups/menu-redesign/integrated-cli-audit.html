@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>통합 구조 — 메뉴 개편 + CLI 터미널(허용목록) + 오른쪽 숨기기 + 작업기록</title>
+<style>
+  :root{
+    --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+    --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#fff;
+    --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--teal:#1eb980;--amber:#f0a020;--red:#e2483d;--purple:#8b7cf0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:#05070d;color:var(--text);padding:26px;}
+  h1{font-size:19px;margin-bottom:4px;}
+  .lead{color:var(--muted);font-size:12.5px;margin-bottom:6px;line-height:1.6;max-width:1120px;}
+  .decided{font-size:11.5px;color:var(--teal);margin-bottom:20px;font-weight:700;}
+  h2{font-size:15px;color:#fff;margin:26px 0 6px;}
+  .desc{font-size:11.5px;color:var(--muted);margin-bottom:10px;line-height:1.55;max-width:1120px;}
+  .pin{display:inline-block;font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:5px;background:rgba(240,160,32,.16);color:var(--amber);margin-left:6px;}
+
+  /* 통합 셸 */
+  .shell{display:grid;grid-template-columns:58px 200px 1fr 210px;grid-template-rows:1fr 132px;height:500px;background:var(--bg);border:1px solid var(--border);border-radius:12px;overflow:hidden;max-width:1120px;}
+  .rail{grid-row:1/3;background:#0a1120;border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding-top:10px;gap:3px;}
+  .railIc{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--muted);cursor:pointer;position:relative;}
+  .railIc.active{background:rgba(59,130,246,.16);color:var(--blue-light);}
+  .railIc.term{color:var(--teal);}
+  .railIc.audit{color:var(--amber);}
+  .railSp{margin-top:auto;}
+
+  .sub{grid-row:1/2;background:var(--panel-2);border-right:1px solid var(--border);padding:6px 0;overflow:auto;}
+  .subTitle{font-size:12px;font-weight:800;color:#fff;padding:10px 14px 8px;}
+  .subItem{padding:7px 14px;font-size:11.5px;color:var(--muted);cursor:pointer;}
+  .subItem.active{color:var(--blue-light);box-shadow:inset 3px 0 0 var(--blue);background:rgba(59,130,246,.08);}
+
+  .content{grid-row:1/2;padding:14px 16px;overflow:auto;position:relative;}
+  .crumb{font-size:10.5px;color:var(--muted-2);margin-bottom:8px;}
+  .content h3{font-size:14px;color:#fff;margin-bottom:8px;}
+  .row{display:flex;justify-content:space-between;padding:8px 10px;background:var(--panel);border:1px solid var(--border);border-radius:7px;margin-bottom:6px;font-size:11px;}
+  .row .sev{font-weight:800;color:#f5928a;}
+
+  /* 오른쪽 접이식 패널 */
+  .right{grid-row:1/2;background:var(--panel-2);border-left:1px solid var(--border);padding:0;position:relative;}
+  .right .rhead{display:flex;align-items:center;justify-content:space-between;padding:10px 12px;border-bottom:1px solid var(--border);}
+  .right .rt{font-size:11.5px;font-weight:800;color:#fff;}
+  .hide{font-size:14px;color:var(--muted-2);cursor:pointer;background:var(--panel);border:1px solid var(--border);border-radius:6px;width:22px;height:22px;display:flex;align-items:center;justify-content:center;}
+  .sessItem{padding:9px 12px;border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);}
+  .sessItem b{color:var(--text);display:block;font-size:11.5px;}
+  .anno{position:absolute;font-size:10px;font-weight:800;color:var(--amber);}
+
+  /* 하단 터미널 */
+  .term{grid-column:2/5;grid-row:2/3;background:#05070d;border-top:1px solid var(--border);display:flex;flex-direction:column;}
+  .termbar{display:flex;align-items:center;gap:10px;padding:6px 12px;border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);}
+  .termbar .tt{font-weight:800;color:var(--teal);}
+  .termbar .badge{font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;background:rgba(30,185,128,.16);color:var(--teal);}
+  .termbar .loc{margin-left:auto;font-size:10px;color:var(--muted-2);}
+  .termbody{flex:1;padding:8px 12px;font-family:Consolas,monospace;font-size:11px;line-height:1.7;overflow:auto;}
+  .cmd{color:#8fd6a8;}
+  .cmd .p{color:var(--blue-light);}
+  .ok{color:var(--muted);}
+  .blocked{color:#f5928a;}
+  .approve{display:inline-flex;gap:6px;align-items:center;margin-top:4px;background:rgba(240,160,32,.08);border:1px solid rgba(240,160,32,.4);border-radius:7px;padding:5px 9px;font-family:"Pretendard",sans-serif;font-size:10.5px;color:var(--amber);}
+  .approve b{color:#fff;}
+  .btn-ok{background:var(--teal);color:#06281c;border:none;border-radius:5px;padding:2px 9px;font-size:10px;font-weight:800;}
+  .btn-no{background:transparent;border:1px solid var(--border-strong);color:var(--muted);border-radius:5px;padding:2px 9px;font-size:10px;font-weight:700;}
+
+  .note{max-width:1120px;margin-top:14px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:13px 16px;font-size:11.5px;color:var(--muted);line-height:1.75;}
+  .note b{color:#fff;}
+  .note .k{color:var(--amber);font-weight:800;}
+
+  /* 작업기록 뷰 */
+  .audit{max-width:1120px;margin-top:22px;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
+  .audit h3{font-size:13.5px;color:#fff;margin-bottom:4px;}
+  .audit .s{font-size:11px;color:var(--muted);margin-bottom:12px;}
+  .filt{display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;}
+  .fc{font-size:10.5px;font-weight:700;padding:4px 10px;border-radius:20px;background:var(--panel);border:1px solid var(--border-strong);color:var(--muted);}
+  .fc.on{background:rgba(59,130,246,.15);border-color:var(--blue);color:var(--blue-light);}
+  .aud{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--border);font-size:11.5px;}
+  .aud .tm{color:var(--muted-2);font-size:10.5px;white-space:nowrap;width:52px;}
+  .aud .kind{font-size:9px;font-weight:800;padding:1px 7px;border-radius:4px;white-space:nowrap;}
+  .k-cli{background:rgba(30,185,128,.16);color:var(--teal);}
+  .k-appr{background:rgba(240,160,32,.16);color:var(--amber);}
+  .k-write{background:rgba(139,124,240,.16);color:var(--purple);}
+  .k-block{background:rgba(226,72,61,.16);color:#f5928a;}
+  .aud .msg{color:var(--text);}
+  .aud .who{color:var(--muted-2);margin-left:auto;white-space:nowrap;font-size:10.5px;}
+</style>
+</head>
+<body>
+  <h1>통합 구조 — 메뉴 개편 + CLI 터미널 + 오른쪽 숨기기 + 작업기록</h1>
+  <p class="lead">추천 구조(시안 B 아이콘 레일)에 요청 3기능을 얹은 통합안입니다. VS Code처럼 <b>왼쪽 이동 · 가운데 작업 · 아래 터미널 · 오른쪽 접이식 확인</b>의 4구획.</p>
+  <p class="decided">✔ 결정 반영: CLI는 <b>담당자 PC에서 직접 실행</b> · 챗봇 연결은 <b>허용목록(allowlist)</b> 방식 + 결재판 승인 경유</p>
+
+  <div class="shell">
+    <div class="rail">
+      <div class="railIc">🖥</div>
+      <div class="railIc active">🛡</div>
+      <div class="railIc">🤖</div>
+      <div class="railIc term" title="터미널(CLI)">&gt;_</div>
+      <div class="railIc audit" title="작업 기록">📜</div>
+      <div class="railIc railSp">❓</div>
+      <div class="railIc" style="margin-bottom:8px">⚙</div>
+    </div>
+    <div class="sub">
+      <div class="subTitle">자산·취약점·대응</div>
+      <div class="subItem active">취약점</div>
+      <div class="subItem">자산 등록·목록</div>
+      <div class="subItem">조치·승인</div>
+      <div class="subItem">보안제품</div>
+    </div>
+    <div class="content">
+      <div class="crumb">🛡 자산·취약점·대응 › 취약점</div>
+      <h3>취약점 우선순위</h3>
+      <div class="row"><span>Apache Log4j RCE — was-order-01</span><span class="sev">CRITICAL · KEV</span></div>
+      <div class="row"><span>FortiOS SSL-VPN 인증 우회 — fortigate-vpn-01</span><span class="sev">CRITICAL</span></div>
+      <div class="row"><span>Ivanti Connect Secure RCE — ivanti-cs-01</span><span class="sev">CRITICAL · KEV</span></div>
+      <div class="anno" style="right:216px;top:6px">③ 오른쪽 숨기기 ▶</div>
+    </div>
+    <div class="right">
+      <div class="rhead"><span class="rt">💬 작업 세션</span><span class="hide" title="오른쪽 패널 숨기기">⏵</span></div>
+      <div class="sessItem"><b>오늘 조치 우선순위</b>Log4Shell 외 4건…</div>
+      <div class="sessItem"><b>fortigate 담당배정</b>인프라운영팀 지정 완료</div>
+      <div class="sessItem"><b>SBOM 생성</b>gijo-sec-assistant…</div>
+    </div>
+    <div class="term">
+      <div class="termbar"><span class="tt">&gt;_ 터미널 (담당자 PC)</span><span class="badge">허용목록 ON</span><span class="loc">PowerShell · C:\\ops</span></div>
+      <div class="termbody">
+        <div class="cmd"><span class="p">PS&gt;</span> nmap -sV 10.0.0.5   <span class="ok">✓ 허용목록 통과 · 실행됨</span></div>
+        <div class="ok">  Starting Nmap 7.9 … 443/tcp open  https</div>
+        <div class="blocked"><span class="p">PS&gt;</span> Remove-Item -Recurse C:\\   🚫 허용목록 차단 — 위험 명령</div>
+        <div class="approve">☁ 챗봇 제안: <b>이 호스트에 nmap 미설치 — winget install nmap 실행?</b> · 허용목록 밖이라 승인 필요 <button class="btn-ok">승인</button><button class="btn-no">거부</button></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>세 기능이 이 한 화면에 어떻게 들어가는가</b><br>
+    <span class="k">① CLI 터미널</span> — 아래 패널. <b>담당자 PC의 PowerShell</b>을 직접 띄움(수동 실행은 자유). <b>허용목록</b>에 있는 안전한 명령(nmap·scan 등)만 바로 실행되고, 목록 밖·위험 명령은 <b>차단</b>. <b>챗봇이 제안</b>한 명령(예: 원격도구 설치)은 곧바로 실행하지 않고 <b>결재판처럼 승인/거부</b>를 받은 뒤에만 실행.<br>
+    <span class="k">② 오른쪽 숨기기</span> — 오른쪽 "작업 세션" 패널의 ⏵ 버튼으로 접기/펴기(상태 기억). 접으면 가운데 작업 화면이 넓어짐.<br>
+    <span class="k">③ 작업 기록</span> — 레일의 📜. 터미널 실행·챗봇 승인·쓰기 작업·차단이 전부 한 타임라인에 남음(아래).
+  </div>
+
+  <div class="audit">
+    <h3>📜 작업 기록 (감사 로그) — 모든 작업이 남습니다</h3>
+    <div class="s">터미널 명령 · 챗봇 승인 · 취약점 판정 · 담당 배정 · 차단까지 한 곳에서 확인·검색·내보내기.</div>
+    <div class="filt"><span class="fc on">전체</span><span class="fc">터미널(CLI)</span><span class="fc">승인</span><span class="fc">쓰기</span><span class="fc">차단</span></div>
+    <div class="aud"><span class="tm">22:41</span><span class="kind k-cli">CLI</span><span class="msg">nmap -sV 10.0.0.5 실행 (허용목록 통과)</span><span class="who">jyh · 담당자 PC</span></div>
+    <div class="aud"><span class="tm">22:41</span><span class="kind k-block">차단</span><span class="msg">Remove-Item -Recurse C:\\ — 허용목록 밖 위험 명령 거부</span><span class="who">jyh</span></div>
+    <div class="aud"><span class="tm">22:40</span><span class="kind k-appr">승인</span><span class="msg">챗봇 제안 "winget install nmap" 승인 후 실행</span><span class="who">jyh 승인</span></div>
+    <div class="aud"><span class="tm">22:38</span><span class="kind k-write">쓰기</span><span class="msg">fortigate-vpn-01 담당부서=인프라운영팀 지정</span><span class="who">챗봇→승인</span></div>
+    <div class="aud"><span class="tm">22:35</span><span class="kind k-write">쓰기</span><span class="msg">Log4Shell(was-order-01) 조치완료 판정</span><span class="who">jyh</span></div>
+    <div class="aud" style="border-bottom:none"><span class="tm">22:30</span><span class="kind k-cli">CLI</span><span class="msg">Get-Service | Where Status -eq Running (허용목록 통과)</span><span class="who">jyh · 담당자 PC</span></div>
+  </div>
+
+  <div class="note" style="margin-top:14px">
+    <b>구현 시 보안 설계(허용목록·담당자 PC 기준)</b><br>
+    · 터미널은 <b>Electron 앱 안에서 담당자 PC의 셸을 pty로 실행</b>(node-pty). 원격 대상은 담당자가 친 명령(ssh 등) 안에서만 — 앱이 원격에 직접 붙지 않음.<br>
+    · <b>허용목록</b>: 관리자만 편집. 정규식/명령 화이트리스트로 관리(예: <code>nmap</code>, <code>winget install &lt;승인패키지&gt;</code>, 조회성 <code>Get-*</code>). 목록 밖은 실행 전 <b>승인 필수</b>, 위험 패턴(<code>Remove-Item -Recurse</code>, <code>rm -rf</code>, <code>format</code> 등)은 <b>항상 차단</b>.<br>
+    · <b>챗봇 연결</b>은 기존 결재판(사람 승인) 재사용 — AI가 명령을 <b>제안</b>만, 실행은 사람이. 자동 실행 없음.<br>
+    · <b>모든 실행·승인·차단은 작업 기록에 강제 기록</b>(끌 수 없음) — ①과 ③이 짝.
+  </div>
+</body>
+</html>
