@@ -243,6 +243,10 @@ const gijoApi = {
   // 서버 로그
   listLogs: () => api.logsApi.list(),
   onLogEvent: (cb: (entry: unknown) => void) => onChannel("log:event", cb),
+
+  // 작업 기록(감사 로그)
+  listAudit: (kind?: string, limit?: number) => api.auditApi.list(kind, limit),
+  recordAudit: (action: string, target?: string, detail?: string) => api.auditApi.record(action, target, detail),
 };
 
 contextBridge.exposeInMainWorld("gijo", gijoApi);

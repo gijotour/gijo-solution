@@ -9,6 +9,7 @@ import * as crypto from "crypto";
 import * as jwt from "jsonwebtoken";
 import * as bcrypt from "bcryptjs";
 import { findUserByUsername, findUserById, GijoUser } from "./users";
+import { recordAudit } from "../engine/audit";
 
 // 프로덕션에서 기본 개발용 시크릿이 그대로 쓰이면(토큰 위조 가능) 서버가 아예 뜨지 않게 막는다 —
 // "설정을 깜빡했다"가 "취약한 상태로 조용히 운영 중이었다"보다 훨씬 안전한 실패 모드다.
@@ -170,6 +171,7 @@ export function registerAuthRoutes(app: Express): void {
     }
     loginAttempts.delete(key); // 성공 시 카운터 초기화
     const tokens = issueTokenPair(user.id);
+    recordAudit({ kind: "auth", actor: user.displayName, action: force ? "강제 로그인" : "로그인", target: req.ip ?? null, result: "ok" });
     res.json({ ...tokens, user: { id: user.id, displayName: user.displayName, role: user.role } });
   });
 

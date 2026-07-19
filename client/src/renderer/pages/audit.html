@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 작업 기록</title>
+<style>
+:root{
+  --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
+.app{display:grid;grid-template-columns:220px 1fr;}
+.sidebar{padding:22px 14px;border-right:1px solid var(--border);min-height:900px;}
+.nav-section{font-size:10.5px;font-weight:700;color:var(--muted-2);letter-spacing:1.2px;margin:18px 10px 8px;}
+.nav-section:first-child{margin-top:0;}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:2px;}
+.nav-item .ic{width:18px;text-align:center;font-size:14px;}
+.nav-item.active{background:rgba(59,130,246,0.12);color:var(--white);box-shadow:inset 3px 0 0 var(--blue);cursor:default;}
+.nav-item:hover:not(.active){background:rgba(255,255,255,0.04);color:var(--white);}
+.main{padding:28px 32px 48px;}
+.topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;}
+.page-title{font-size:21px;font-weight:800;color:#fff;}
+.page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;max-width:900px;}
+.header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2);}
+.header-left{display:flex;align-items:center;gap:12px;}
+.header-left img{height:22px;}
+.app-title{font-size:15px;font-weight:800;color:#fff;}
+.clock{font-size:12px;color:var(--blue-light);font-weight:600;}
+.header-right{display:flex;align-items:center;gap:10px;}
+.status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
+.status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
+.beta-tag{background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
+.avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+.icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
+
+.toolbar{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+.filters{display:flex;gap:8px;flex-wrap:wrap;}
+.filter-chip{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;}
+.filter-chip.active{background:rgba(59,130,246,0.15);border-color:var(--blue);color:var(--blue-light);}
+.search{margin-left:auto;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:7px 12px;font-size:12px;color:var(--text);outline:none;width:240px;}
+.dl{background:transparent;border:1px solid var(--border-strong);color:var(--text);border-radius:8px;padding:7px 12px;font-size:12px;font-weight:700;cursor:pointer;}
+.dl:hover{border-color:var(--teal);color:var(--teal);}
+
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:6px 0;}
+.aud{display:flex;gap:12px;align-items:flex-start;padding:11px 18px;border-bottom:1px solid var(--border);font-size:12.5px;}
+.aud:last-child{border-bottom:none;}
+.aud .tm{color:var(--muted-2);font-size:11px;white-space:nowrap;width:118px;flex:0 0 auto;}
+.aud .kind{font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:5px;white-space:nowrap;flex:0 0 auto;}
+.k-cli{background:rgba(30,185,128,.16);color:var(--teal);}
+.k-approval{background:rgba(240,160,32,.16);color:var(--amber);}
+.k-write{background:rgba(139,124,240,.16);color:var(--purple);}
+.k-block{background:rgba(226,72,61,.16);color:#f5928a;}
+.k-auth{background:rgba(59,130,246,.16);color:var(--blue-light);}
+.k-config{background:rgba(255,255,255,.08);color:var(--muted);}
+.aud .body{flex:1;min-width:0;}
+.aud .act{color:var(--text);font-weight:600;}
+.aud .tgt{color:var(--blue-light);font-size:11px;margin-left:6px;}
+.aud .det{color:var(--muted-2);font-size:11px;margin-top:2px;white-space:pre-wrap;word-break:break-word;}
+.aud .who{color:var(--muted-2);font-size:11px;white-space:nowrap;flex:0 0 auto;}
+.aud .rz{font-size:9.5px;font-weight:800;padding:1px 6px;border-radius:4px;flex:0 0 auto;}
+.rz-ok{color:var(--teal);}
+.rz-blocked{background:rgba(226,72,61,.16);color:#f5928a;}
+.rz-error{background:rgba(226,72,61,.16);color:#f5928a;}
+.rz-pending{color:var(--amber);}
+.empty{padding:30px;text-align:center;color:var(--muted-2);font-size:13px;}
+.kpi{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+.kpi-mini{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px 16px;}
+.kpi-mini .l{font-size:10.5px;color:var(--muted);}
+.kpi-mini .v{font-size:18px;font-weight:800;color:#fff;}
+.footer{margin-top:14px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted-2);}
+.footer img{height:16px;opacity:0.6;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <span id="homeLink" data-page="dashboard.html" title="대시보드로 이동" style="display:flex;align-items:center;gap:12px;cursor:pointer"><img src="https://gijo.ai/_nuxt/logo_gijo_white.CCh2YXJe.svg" alt="GIJO">
+    <div class="app-title">GIJO AS</div></span>
+    <div class="clock" id="clockEl">-</div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill" id="statusPill"><span class="dot"></span>연결 확인 중<span class="beta-tag">LIVE</span></div>
+    <div class="avatar-btn" id="avatarBtn">-</div>
+    <div class="icon-btn" id="settingsBtn">⚙</div>
+  </div>
+</div>
+
+<div class="app">
+  <div class="sidebar" id="gijoNav"></div>
+
+  <div class="main">
+    <div class="topbar-row">
+      <div>
+        <div class="page-title">📜 작업 기록 (감사 로그)</div>
+        <div class="page-sub">누가 · 언제 · 무엇을 실행/승인/차단/변경했는지 한 타임라인에서 확인합니다. CLI 명령 실행, 챗봇 명령 승인·차단, 취약점 판정·담당 배정, 로그인이 전부 남습니다(끌 수 없음).</div>
+      </div>
+    </div>
+
+    <div class="kpi" id="kpiRow"></div>
+
+    <div class="toolbar">
+      <div class="filters" id="kindFilters">
+        <div class="filter-chip active" data-kind="all">전체</div>
+        <div class="filter-chip" data-kind="cli">CLI 실행</div>
+        <div class="filter-chip" data-kind="approval">승인</div>
+        <div class="filter-chip" data-kind="write">쓰기</div>
+        <div class="filter-chip" data-kind="block">차단</div>
+        <div class="filter-chip" data-kind="auth">로그인</div>
+        <div class="filter-chip" data-kind="config">설정·메모</div>
+      </div>
+      <input class="search" id="searchBox" placeholder="🔎 내용 검색 (명령·대상·담당자)">
+      <button class="dl" id="dlBtn">⬇ 내보내기 (.csv)</button>
+    </div>
+
+    <div class="panel" id="auditPanel"><div class="empty">불러오는 중…</div></div>
+
+    <div class="footer">
+      <img src="https://gijo.ai/_nuxt/logo_gijo_only_white.ATZVOJtw.svg" alt="GIJO">
+      <span>© 2026 GIJO Technology · GIJO AS Platform · Confidential</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  const clockEl = document.getElementById("clockEl");
+  const statusPill = document.getElementById("statusPill");
+  const avatarBtn = document.getElementById("avatarBtn");
+  const panel = document.getElementById("auditPanel");
+
+  let activeKind = "all";
+  let entries = [];
+  const KIND_LABEL = { cli: "CLI", approval: "승인", write: "쓰기", block: "차단", auth: "로그인", config: "설정" };
+  const esc = (s) => String(s == null ? "" : s).replace(/</g, "&lt;");
+
+  function tick() {
+    clockEl.textContent = new Date().toLocaleString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: true, year: "numeric", month: "2-digit", day: "2-digit" });
+  }
+  async function loadHealth() {
+    try { await window.gijo.checkServerHealth(); statusPill.innerHTML = '<span class="dot"></span>운영중<span class="beta-tag">LIVE</span>'; }
+    catch (e) { statusPill.innerHTML = '<span class="dot" style="background:#e2483d"></span>서버 연결 끊김'; }
+  }
+  async function loadUser() {
+    try { const u = await window.gijo.me(); avatarBtn.textContent = (u.displayName || u.username || "-").charAt(0); } catch (e) {}
+  }
+
+  function fmtTime(ms) {
+    return new Date(ms).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false });
+  }
+  function rowHtml(e) {
+    const kc = "k-" + e.kind;
+    const rz = "rz-" + e.result;
+    const rzLabel = { ok: "완료", blocked: "차단", error: "실패", pending: "대기" }[e.result] || e.result;
+    return (
+      `<div class="aud">` +
+      `<span class="tm">${fmtTime(e.at)}</span>` +
+      `<span class="kind ${kc}">${KIND_LABEL[e.kind] || e.kind}</span>` +
+      `<div class="body"><span class="act">${esc(e.action)}</span>${e.target ? `<span class="tgt">${esc(e.target)}</span>` : ""}` +
+      `${e.detail ? `<div class="det">${esc(e.detail)}</div>` : ""}</div>` +
+      `<span class="rz ${rz}">${rzLabel}</span>` +
+      `<span class="who">${esc(e.actor || "-")}</span>` +
+      `</div>`
+    );
+  }
+
+  function render() {
+    const q = (document.getElementById("searchBox").value || "").toLowerCase();
+    let rows = entries;
+    if (activeKind !== "all") rows = rows.filter((e) => e.kind === activeKind);
+    if (q) rows = rows.filter((e) => `${e.action} ${e.target || ""} ${e.detail || ""} ${e.actor || ""}`.toLowerCase().includes(q));
+    panel.innerHTML = rows.length ? rows.map(rowHtml).join("") : '<div class="empty">해당 조건의 작업 기록이 없습니다.</div>';
+  }
+
+  function renderKpi(summary) {
+    const el = document.getElementById("kpiRow");
+    const order = ["cli", "approval", "write", "block", "auth"];
+    el.innerHTML = `<div class="kpi-mini"><div class="l">전체</div><div class="v">${summary.total}</div></div>` +
+      order.map((k) => `<div class="kpi-mini"><div class="l">${KIND_LABEL[k]}</div><div class="v">${summary.byKind[k] || 0}</div></div>`).join("");
+  }
+
+  async function load() {
+    try {
+      const r = await window.gijo.listAudit(undefined, 500);
+      entries = r.entries || [];
+      renderKpi(r.summary || { total: entries.length, byKind: {} });
+      render();
+    } catch (e) {
+      panel.innerHTML = `<div class="empty">불러오지 못했습니다: ${esc(e.message || e)}</div>`;
+    }
+  }
+
+  function exportCsv() {
+    const q = (s) => `"${String(s ?? "").replace(/"/g, '""')}"`;
+    const header = "시각,종류,작업,대상,상세,결과,담당자";
+    const lines = entries.map((e) => [fmtTime(e.at), KIND_LABEL[e.kind] || e.kind, e.action, e.target || "", e.detail || "", e.result, e.actor || ""].map(q).join(","));
+    const csv = ["﻿" + header, ...lines].join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = `작업기록_${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
+  }
+
+  async function init() {
+    tick(); setInterval(tick, 30000);
+    await loadUser();
+    loadHealth();
+    await load();
+    setInterval(load, 15000); // 15초마다 새 기록 반영
+
+    document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
+    document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
+    document.getElementById("kindFilters").addEventListener("click", (e) => {
+      const chip = e.target.closest("[data-kind]"); if (!chip) return;
+      document.querySelectorAll("#kindFilters .filter-chip").forEach((c) => c.classList.remove("active"));
+      chip.classList.add("active"); activeKind = chip.dataset.kind; render();
+    });
+    document.getElementById("searchBox").addEventListener("input", render);
+    document.getElementById("dlBtn").addEventListener("click", exportCsv);
+  }
+
+  if (!window.gijo.isAuthenticated()) window.gijo.navigateTo("login.html");
+  else init();
+</script>
+
+<script src="nav.js"></script>
+</body>
+</html>

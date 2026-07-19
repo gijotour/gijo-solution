@@ -402,3 +402,22 @@ export function schemaVersion(): { count: number; latest: string | null } {
 
 // 위의 초기 스키마 전체를 하나의 베이스라인으로 기록(이미 컬럼이 존재하므로 no-op SQL).
 migrate("baseline-2026-07", "SELECT 1");
+
+// 작업 기록(감사 로그) — 모든 작업(CLI 실행·챗봇 승인·쓰기·차단·로그인 등)을 한 타임라인에 남긴다.
+// 흩어진 이벤트(협업/LLM활동/egress/가드레일)와 달리 "누가 무엇을 언제 실행/승인/차단했나"의
+// 단일 감사 원천. CLI(①)의 실행·승인·차단이 여기에 강제로 기록된다(끌 수 없음).
+migrate(
+  "audit-log-2026-07-19",
+  `CREATE TABLE IF NOT EXISTS audit_log (
+     id TEXT PRIMARY KEY,
+     at INTEGER NOT NULL,
+     kind TEXT NOT NULL,       -- cli | approval | write | block | auth | config
+     actor TEXT,               -- 사용자 표시이름 또는 'chatbot'
+     action TEXT NOT NULL,     -- 사람이 읽는 한 줄 요약
+     target TEXT,              -- 대상(자산id·호스트·명령 등)
+     detail TEXT,              -- 부가 상세(명령 전문 등)
+     result TEXT               -- ok | blocked | error | pending
+   );
+   CREATE INDEX IF NOT EXISTS idx_audit_log_at ON audit_log(at);
+   CREATE INDEX IF NOT EXISTS idx_audit_log_kind ON audit_log(kind);`
+);

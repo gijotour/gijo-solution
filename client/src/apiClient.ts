@@ -1025,6 +1025,29 @@ export const logsApi = {
   list: () => request<LogEntry[]>("/api/logs"),
 };
 
+// ── 작업 기록(감사 로그) ──────────────────────────────────────────────
+export interface AuditEntry {
+  id: string;
+  at: number;
+  kind: "cli" | "approval" | "write" | "block" | "auth" | "config";
+  actor: string | null;
+  action: string;
+  target: string | null;
+  detail: string | null;
+  result: "ok" | "blocked" | "error" | "pending";
+}
+export const auditApi = {
+  list: (kind?: string, limit?: number) => {
+    const q = new URLSearchParams();
+    if (kind) q.set("kind", kind);
+    if (limit) q.set("limit", String(limit));
+    const qs = q.toString();
+    return request<{ entries: AuditEntry[]; summary: { total: number; byKind: Record<string, number> } }>(`/api/audit${qs ? `?${qs}` : ""}`);
+  },
+  record: (action: string, target?: string, detail?: string) =>
+    request<{ ok: boolean }>("/api/audit", { method: "POST", body: { action, target, detail } }),
+};
+
 // ── 자산 인벤토리 ─────────────────────────────────────────────────────
 export interface AssetComponent {
   name: string;

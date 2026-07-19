@@ -61,6 +61,8 @@
     { section: "시스템", groups: [
       // 로그는 상시 확인 대상이라 설정 하위 탭이 아닌 최상위 항목으로 둔다.
       { ic: "🗒", label: "로그", tabs: [{ page: "logs.html", label: "로그" }] },
+      // 작업 기록(감사 로그) — 모든 실행/승인/차단/변경의 단일 타임라인.
+      { ic: "📜", label: "작업 기록", tabs: [{ page: "audit.html", label: "작업 기록" }] },
       { ic: "⚙", label: "설정", tabs: [
         { page: "settings.html", label: "설정" },
         { page: "billing.html", label: "사용량·요금" },

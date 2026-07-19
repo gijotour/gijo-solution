@@ -2,8 +2,10 @@
 // 8단계 문서에서 설명한 파이프라인과 동일하되, collaboration 로그는 이제
 // WebSocket으로 모든 접속 클라이언트에 브로드캐스트된다.
 
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { authMiddleware } from "../auth/auth";
+import type { GijoUser } from "../auth/users";
+import { recordAudit } from "./audit";
 import { asyncRoute } from "../util/asyncRoute";
 import { routeIntent, RoutedIntent } from "./intent";
 import { createTask, completeTask, updateTaskPriority, TaskItem } from "./tasks";
@@ -434,11 +436,14 @@ export function registerDispatcherRoutes(app: Express): void {
       const task = createTask({ text: `[승인 실행] ${toolName}`, agentId: "orchestrator", priority: "P2" });
       setAgentStatus("orchestrator", "working");
       emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `승인됨 — ${toolName} 실행` });
+      const actor = (req as Request & { user?: GijoUser }).user?.displayName ?? null;
       try {
         const undoBefore = undoSnapshot(); // #7: 실행 전 상태 스냅샷(원클릭 undo용)
         const output = await executeApprovedTool(toolName, args);
         const undoId = undoCommit(toolName, output.slice(0, 50), undoBefore); // 변화 있으면 되돌리기 항목 등록
         emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `실행 완료: ${output.slice(0, 120)}` });
+        // 작업 기록(감사 로그) — 승인된 쓰기 실행을 남긴다(챗봇 제안 → 사람 승인).
+        recordAudit({ kind: "write", actor, action: `승인 실행: ${toolName}`, target: args.assetId ?? args.code ?? null, detail: `${instruction ? instruction + " → " : ""}${output.slice(0, 200)}`, result: "ok" });
         // 사람이 승인한 (지시→도구) = 검증된 정답. 파인튜닝 골드 예시로 누적한다(Phase 4, 자가강화).
         appendApprovedDecision(instruction, toolName, args);
         resetAgentToDefault("orchestrator");
@@ -447,6 +452,7 @@ export function registerDispatcherRoutes(app: Express): void {
       } catch (err) {
         resetAgentToDefault("orchestrator");
         completeTask(task.id);
+        recordAudit({ kind: "write", actor, action: `승인 실행 실패: ${toolName}`, detail: err instanceof Error ? err.message : String(err), result: "error" });
         res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
       }
     })
