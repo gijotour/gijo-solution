@@ -19,7 +19,9 @@ function check(name, ok, detail) {
   console.log(`${ok ? "✅" : "❌"} ${name}${detail ? " — " + detail : ""}`);
 }
 
-const { body: auth } = await api("/api/auth/login", { method: "POST", body: JSON.stringify({ username: "jyh", password: "changeme" }) });
+// 운영 서버(비밀번호 다름·중복로그인 방지) 대상으로도 돌릴 수 있게 env로 비번·force를 받는다.
+const PW = process.env.GIJO_E2E_PASSWORD ?? "changeme";
+const { body: auth } = await api("/api/auth/login", { method: "POST", body: JSON.stringify({ username: "jyh", password: PW, force: true }) });
 const token = auth.accessToken;
 
 // 케이스: 지시 → 기대 도구(메뉴를 가로지르는 질문을 도구 1개로 답해야 한다)
@@ -30,6 +32,7 @@ const CASES = [
   { text: "Log4Shell 관련된 거 다 찾아줘", expect: "search" },
   { text: "등록된 AI 자산 몇 개야?", expect: "list_assets" },
   { text: "ai-secbot-01 자세히 보여줘", expect: "get_asset" },
+  { text: "자산 중에 담당부서나 SBOM 같은 게 빠진 게 뭐뭐야?", expect: "asset_coverage" },
 ];
 
 for (const c of CASES) {
