@@ -84,7 +84,11 @@ export interface ScanRun {
   findings: StandardFinding[];
 }
 
+// sample = 데모용 시드 데이터, scanner = 취약점 스캔 반입, registered = 직접 등록·저장소 스캔
+export type AssetOrigin = "sample" | "scanner" | "registered";
+
 export interface Asset {
+  origin: AssetOrigin;
   id: string;
   name: string;
   path: string;
@@ -170,8 +174,17 @@ function scanHistoryOf(assetId: string): ScanRun[] {
   }));
 }
 
+// 자산이 어디서 왔는가. 시드 샘플은 id로 정확히 식별한다 —
+// 이름이나 담당부서 문자열로 추측하면 사용자가 "샘플"이라고 적은 실 자산까지 숨긴다.
+export function assetOriginOf(id: string): AssetOrigin {
+  if ((SAMPLE_ASSET_IDS as readonly string[]).includes(id) || id === SAMPLE_VULN_HOST_ID) return "sample";
+  if (id.startsWith("vuln:")) return "scanner"; // importVulnScan이 붙이는 접두사
+  return "registered";
+}
+
 function fromRow(row: AssetRow): Asset {
   return {
+    origin: assetOriginOf(row.id),
     id: row.id,
     name: row.name,
     path: row.path,

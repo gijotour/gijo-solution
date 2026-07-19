@@ -1,8 +1,41 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { listAgentTools, listToolsFor, findAgentTool, toolCatalogText } from "../src/engine/agenttools";
-import { registerAsset, resetAssetsForTests, updateAssetOwnership, markSbomGenerated, recordFindings } from "../src/engine/assets";
+import { registerAsset, resetAssetsForTests, updateAssetOwnership, markSbomGenerated, recordFindings, assetOriginOf, listAssets, getAsset } from "../src/engine/assets";
+
+const getAssetOrigin = (id: string) => getAsset(id)!.origin;
 
 const run = (args: Record<string, string>) => findAgentTool("asset_coverage")!.run(args) as string;
+
+describe("자산 출처 판정 — 시드 샘플과 실 자산 구분", () => {
+  afterEach(() => resetAssetsForTests());
+
+  it("시드 샘플은 id로 정확히 식별한다", () => {
+    expect(assetOriginOf("ai-secbot-01")).toBe("sample");
+    expect(assetOriginOf("vuln:sample-web01")).toBe("sample");
+  });
+
+  it("취약점 스캔 반입분은 scanner다", () => {
+    expect(assetOriginOf("vuln:10.20.0.5")).toBe("scanner");
+    expect(assetOriginOf("vuln:192.168.219.98")).toBe("scanner");
+  });
+
+  it("직접 등록·저장소 스캔은 registered다", () => {
+    expect(assetOriginOf("fraud-detect-llm")).toBe("registered");
+    expect(assetOriginOf("repo:my-org/chatbot")).toBe("registered");
+  });
+
+  it("담당부서에 '샘플'이라 적은 실 자산을 샘플로 오인하지 않는다", () => {
+    // 문자열로 추측했다면 여기서 틀린다.
+    registerAsset({ id: "vuln:10.9.9.9", name: "샘플 서버", path: "p", assetType: "infra-host", owner: "샘플(예시)" });
+    expect(getAssetOrigin("vuln:10.9.9.9")).toBe("scanner");
+  });
+
+  it("목록 응답에 origin이 실려 나간다 — 화면이 추측하지 않아도 된다", () => {
+    registerAsset({ id: "vuln:10.9.9.9", name: "h", path: "p", assetType: "infra-host", owner: "" });
+    const a = listAssets().find((x) => x.id === "vuln:10.9.9.9")!;
+    expect(a.origin).toBe("scanner");
+  });
+});
 
 describe("asset_coverage 역량 — 챗봇이 결손을 답한다", () => {
   afterEach(() => resetAssetsForTests());

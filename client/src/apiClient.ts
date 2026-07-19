@@ -1042,7 +1042,11 @@ export interface AiBom {
   robustness: AiBomRobustness;
 }
 
+// sample = 데모용 시드 데이터, scanner = 취약점 스캔 반입, registered = 직접 등록·저장소 스캔
+export type AssetOrigin = "sample" | "scanner" | "registered";
+
 export interface Asset {
+  origin: AssetOrigin;
   id: string;
   name: string;
   path: string;

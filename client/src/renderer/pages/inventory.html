@@ -136,6 +136,12 @@
   .gapbadge.sbom{color:#f7c777;background:rgba(240,160,32,0.16);}
   .why-cell{font-size:11.5px;color:var(--muted);}
   .sortnote{font-size:11.5px;color:var(--muted-2);margin:12px 0 -4px;}
+
+  /* 유형 그룹 머리글 */
+  .group-head td{background:rgba(255,255,255,0.035);border-top:1px solid var(--border);border-bottom:1px solid var(--border);padding:9px 14px !important;}
+  .group-label{font-size:12.5px;font-weight:800;color:var(--text);}
+  .group-count{font-size:10.5px;font-weight:800;color:var(--blue-light);background:rgba(59,130,246,0.16);padding:1px 7px;border-radius:20px;margin-left:8px;}
+  .group-hint{font-size:11px;color:var(--muted-2);margin-left:10px;}
 </style>
 </head>
 <body>
@@ -182,6 +188,9 @@
       </div>
     </div>
 
+    <!-- 부가 패널은 기본으로 접는다 — 이 화면의 주인공은 자산 목록이다. 지우지 않고 감춘다. -->
+    <div id="extraToggle" style="font-size:12px;color:var(--muted-2);cursor:pointer;margin-bottom:12px;user-select:none;">▸ 저장소 스캔 · 위험 요약 · 서비스 영향도 보기</div>
+    <div id="extraPanels" style="display:none;">
     <div class="panel" style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:16px;">
       <div style="font-size:14.5px;font-weight:800;color:#fff;margin-bottom:4px;">코드 저장소 스캔 <span style="font-size:10.5px;font-weight:700;color:var(--teal);background:rgba(30,185,128,0.15);padding:2px 8px;border-radius:10px;margin-left:6px;">온프레미스 · 자체 탐지</span></div>
       <div style="font-size:11.5px;color:var(--muted);margin-bottom:14px;">GitHub 조직/사용자의 저장소를 훑어 AI 라이브러리(openai·langchain·transformers 등) 의존성이 있는 repo를 개발형 AI 자산으로 자동 등록합니다. 토큰은 저장하지 않고 이 스캔에만 사용합니다. 온프레미스 GitHub Enterprise는 Base URL로 지정하세요.</div>
@@ -208,6 +217,7 @@
       <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px;">각 자산이 지원하는 서비스별로 위험(고위험 자산·CTI 위협·지연 점검)을 모아 "지금 위험한 서비스"를 보여줍니다. 자산 등록 시 <b>지원 서비스</b>를 지정하면 집계됩니다.</div>
       <div id="serviceImpactBody" style="display:flex;flex-direction:column;gap:8px;">불러오는 중...</div>
     </div>
+    </div>
 
     <!-- 목록(무엇이 있는가)과 커버리지(무엇을 모르는가)를 나눈다. 같은 표에 섞으면 둘 다 안 보인다. -->
     <div class="cov-tabs" id="covTabs">
@@ -221,6 +231,12 @@
       <div class="search">
         <span style="color:var(--muted-2)">⌕</span>
         <input id="searchInput" placeholder="모델명, 소유부서로 검색">
+      </div>
+      <!-- 출처 필터는 위험 필터와 축이 달라 따로 둔다. 기본은 스캐너 유입분(실 자산). -->
+      <div class="filters" id="originChips" style="margin-right:4px;">
+        <div class="filter-chip active" data-origin="scanner">스캐너 유입</div>
+        <div class="filter-chip" data-origin="real">샘플 제외 전체</div>
+        <div class="filter-chip" data-origin="all">샘플 포함</div>
       </div>
       <div class="filters" id="filterChips">
         <div class="filter-chip active" data-filter="all">전체</div>
@@ -317,6 +333,7 @@
   // 커버리지는 서버가 계산한다 — 화면과 챗봇이 다른 숫자를 말하면 담당자는 둘 다 안 믿는다.
   let coverage = { total: 0, complete: 0, gaps: [], ranked: [] };
   let activeTab = "list";
+  let activeOrigin = "scanner"; // 기본은 실제로 들여온 자산만 — 시드 샘플은 숨긴다
 
   function tick() {
     clockEl.textContent = new Date().toLocaleString("ko-KR", {
@@ -367,9 +384,17 @@
     return `${Math.floor(diffHour / 24)}일 전`;
   }
 
+  // 출처는 서버가 id로 정확히 판정해 내려준다(origin) — 화면에서 이름으로 추측하지 않는다.
+  function passesOrigin(a) {
+    if (activeOrigin === "all") return true;
+    if (activeOrigin === "real") return a.origin !== "sample";
+    return a.origin === "scanner";
+  }
+
   function applyFilters(assets) {
     const q = searchInput.value.trim().toLowerCase();
     return assets.filter((a) => {
+      if (!passesOrigin(a)) return false;
       if (q && !a.name.toLowerCase().includes(q) && !a.owner.toLowerCase().includes(q)) return false;
       const risk = riskOf(a).level;
       if (activeFilter === "kev" && !riskOf(a).kev) return false;
@@ -401,14 +426,21 @@
     return assets.slice().sort((x, y) => (rank.get(x.id) ?? 1e9) - (rank.get(y.id) ?? 1e9));
   }
 
+  // 유형 그룹 — 인프라 호스트(스캐너가 훑는 것)와 AI 자산(모델·에이전트)은 성격이 다르다.
+  const GROUPS = [
+    { key: "infra", label: "인프라 호스트", hint: "취약점 스캐너가 훑은 서버·네트워크 자산", match: (a) => a.assetType === "infra-host" },
+    { key: "ai", label: "AI 자산", hint: "모델·에이전트·임베딩 등 AI 구성요소", match: (a) => a.assetType !== "infra-host" },
+  ];
+
   function render() {
     const filtered = sortByPriority(applyFilters(allAssets));
     const rankedById = new Map(coverage.ranked.map((r) => [r.id, r]));
     if (filtered.length === 0) {
       assetRows.innerHTML = '<tr><td colspan="8" style="color:var(--muted)">조건에 맞는 자산이 없습니다</td></tr>';
     } else {
-      assetRows.innerHTML = filtered
-        .map((a) => {
+      // 그룹 머리글을 표 안에 끼워 넣는다. 비어 있는 그룹은 그리지 않는다 —
+      // 빈 그룹을 남기면 "AI 자산이 0건"이 아니라 "필터에 걸렸다"는 걸 알기 어렵다.
+      const rowHtml = (a) => {
           const rk = rankedById.get(a.id);
           const gapBadges = rk
             ? rk.gaps.map((g) => `<span class="gapbadge ${g}" title="${GAP_LABEL[g]} 정보가 없습니다">${GAP_LABEL[g]}</span>`).join("")
@@ -448,10 +480,21 @@
             <td>${sbomCell}</td>
             <td style="white-space:nowrap">${action} <span style="color:var(--muted-2)">·</span> ${del}</td>
           </tr>`;
-        })
-        .join("");
+      };
+
+      assetRows.innerHTML = GROUPS.map((g) => {
+        const members = filtered.filter(g.match);
+        if (members.length === 0) return "";
+        const head = `<tr class="group-head"><td colspan="8">
+          <span class="group-label">${g.label}</span>
+          <span class="group-count">${members.length}건</span>
+          <span class="group-hint">${g.hint}</span>
+        </td></tr>`;
+        return head + members.map(rowHtml).join("");
+      }).join("");
     }
-    paginationLabel.textContent = `전체 ${allAssets.length}건 중 ${filtered.length}건 표시`;
+    const originNote = { scanner: "스캐너 유입분", real: "샘플 제외", all: "샘플 포함" }[activeOrigin];
+    paginationLabel.textContent = `${originNote} 기준 ${filtered.length}건 표시 · 등록된 자산 전체 ${allAssets.length}건`;
 
     document.getElementById("pageSubCount").textContent = allAssets.length;
     document.getElementById("kpiTotal").textContent = allAssets.length;
@@ -581,7 +624,8 @@
     [allAssets] = await Promise.all([window.gijo.listAssets(), loadMaintCounts()]);
     await loadCoverage();
     render();
-    loadServiceImpact();
+    // 부가 패널이 접혀 있으면 서비스 영향도를 부르지 않는다 — 안 보이는 걸 계산할 이유가 없다.
+    if (document.getElementById("extraPanels").style.display !== "none") loadServiceImpact();
   }
 
   // 서버가 스캔 완료 · SBOM 생성 · 자산 등록 시점마다 WebSocket으로 밀어주는 asset:updated를
@@ -791,6 +835,23 @@
       chip.classList.add("active");
       activeFilter = chip.dataset.filter;
       render();
+    });
+
+    document.getElementById("originChips").addEventListener("click", (e) => {
+      const chip = e.target.closest(".filter-chip");
+      if (!chip) return;
+      document.querySelectorAll("#originChips .filter-chip").forEach((c) => c.classList.remove("active"));
+      chip.classList.add("active");
+      activeOrigin = chip.dataset.origin;
+      render();
+    });
+
+    document.getElementById("extraToggle").addEventListener("click", (e) => {
+      const pane = document.getElementById("extraPanels");
+      const open = pane.style.display === "none";
+      pane.style.display = open ? "" : "none";
+      e.target.textContent = (open ? "▾ " : "▸ ") + "저장소 스캔 · 위험 요약 · 서비스 영향도 " + (open ? "숨기기" : "보기");
+      if (open) loadServiceImpact(); // 접혀 있는 동안은 불러오지 않는다
     });
 
     document.getElementById("covTabs").addEventListener("click", (e) => {
