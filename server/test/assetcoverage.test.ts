@@ -1,0 +1,120 @@
+import { describe, it, expect } from "vitest";
+import {
+  computeAssetCoverage,
+  coverageSummaryText,
+  gapsOf,
+  isOwnerMissing,
+  type AssetCoverage,
+} from "../src/engine/assetcoverage";
+import { emptyAiBom, type Asset } from "../src/engine/assets";
+
+function asset(over: Partial<Asset> & { id: string }): Asset {
+  return {
+    name: over.id,
+    path: "",
+    assetType: "model",
+    owner: "보안팀",
+    service: "대외 웹",
+    components: [],
+    findings: [],
+    scanHistory: [],
+    aibom: emptyAiBom(),
+    registeredAt: 1,
+    lastScannedAt: 1000,
+    sbomGeneratedAt: 1000,
+    ...over,
+  } as Asset;
+}
+
+const finding = (severity: string, over: Record<string, unknown> = {}) =>
+  ({ finding_type: "t", severity, evidence: "e", source_tool: "s", ...over }) as never;
+
+describe("자산 커버리지 — 무엇을 모르는가", () => {
+  it("파일명처럼 생긴 담당부서는 '없음'으로 센다", () => {
+    // 반입 파일명이 담당부서로 저장되던 버그의 잔재. 있음으로 세면 커버리지가 거짓말을 한다.
+    expect(isOwnerMissing("nessus-scan-sample.csv")).toBe(true);
+    expect(isOwnerMissing("oracle_nl4mm9.html")).toBe(true);
+    expect(isOwnerMissing("")).toBe(true);
+    expect(isOwnerMissing("   ")).toBe(true);
+    expect(isOwnerMissing(null)).toBe(true);
+    expect(isOwnerMissing("보안팀")).toBe(false);
+    // 부서명에 점이 들어가도 확장자가 아니면 유효하다
+    expect(isOwnerMissing("보안팀 A.그룹")).toBe(false);
+  });
+
+  it("결손 4종을 각각 잡아낸다", () => {
+    expect(gapsOf(asset({ id: "a" }))).toEqual([]);
+    expect(gapsOf(asset({ id: "a", owner: "" }))).toEqual(["owner"]);
+    expect(gapsOf(asset({ id: "a", service: null }))).toEqual(["service"]);
+    expect(gapsOf(asset({ id: "a", sbomGeneratedAt: null }))).toEqual(["sbom"]);
+    expect(gapsOf(asset({ id: "a", lastScannedAt: null }))).toEqual(["unscanned"]);
+  });
+
+  it("fixed 처리된 취약점은 현재 위험으로 세지 않는다", () => {
+    const cov = computeAssetCoverage([
+      asset({ id: "a", findings: [finding("critical", { state: "fixed" })] }),
+    ]);
+    expect(cov.ranked[0].openFindings).toBe(0);
+  });
+
+  it("취약점이 있는데 담당자를 모르는 자산이 맨 위로 온다", () => {
+    const cov = computeAssetCoverage([
+      asset({ id: "완비", findings: [finding("critical")] }),
+      asset({ id: "sbom없음", sbomGeneratedAt: null }),
+      asset({ id: "위험+담당불명", owner: "scan.csv", findings: [finding("critical"), finding("high")] }),
+    ]);
+    expect(cov.ranked[0].id).toBe("위험+담당불명");
+    expect(cov.ranked[0].why).toContain("연락할 담당자를 모름");
+  });
+
+  it("KEV 보유 자산은 결손이 없어도 우선순위가 올라간다", () => {
+    const cov = computeAssetCoverage([
+      asset({ id: "결손많음", owner: "", service: null, sbomGeneratedAt: null }),
+      asset({ id: "kev보유", findings: [finding("high", { kev: true })] }),
+    ]);
+    expect(cov.ranked[0].id).toBe("kev보유");
+    expect(cov.ranked[0].kev).toBe(true);
+  });
+
+  it("결손 없는 자산 수를 센다", () => {
+    const cov = computeAssetCoverage([
+      asset({ id: "a" }),
+      asset({ id: "b" }),
+      asset({ id: "c", owner: "" }),
+    ]);
+    expect(cov.total).toBe(3);
+    expect(cov.complete).toBe(2);
+  });
+
+  it("결손 묶음마다 이유와 조치가 붙는다 — 숫자만으로는 판단할 수 없다", () => {
+    const cov = computeAssetCoverage([asset({ id: "a", owner: "" }), asset({ id: "b", owner: "" })]);
+    const owner = cov.gaps.find((g) => g.kind === "owner")!;
+    expect(owner.assetIds).toEqual(["a", "b"]);
+    expect(owner.severity).toBe("high");
+    expect(owner.why.length).toBeGreaterThan(10);
+    expect(owner.fixLabel).toBeTruthy();
+  });
+
+  it("담당부서 결손이 SBOM 결손보다 위에 온다", () => {
+    const cov = computeAssetCoverage([asset({ id: "a", owner: "", sbomGeneratedAt: null })]);
+    const kinds = cov.gaps.map((g) => g.kind);
+    expect(kinds.indexOf("owner")).toBeLessThan(kinds.indexOf("sbom"));
+  });
+
+  it("자산이 없으면 결손도 없다", () => {
+    const cov = computeAssetCoverage([]);
+    expect(cov).toMatchObject({ total: 0, complete: 0, gaps: [], ranked: [] });
+    expect(coverageSummaryText(cov)).toContain("등록된 자산이 없습니다");
+  });
+
+  it("요약문은 결손 없을 때와 있을 때를 구분해 말한다", () => {
+    const clean: AssetCoverage = computeAssetCoverage([asset({ id: "a" })]);
+    expect(coverageSummaryText(clean)).toContain("결손이 없습니다");
+
+    const dirty = computeAssetCoverage([asset({ id: "a", owner: "scan.csv", findings: [finding("critical")] })]);
+    const text = coverageSummaryText(dirty);
+    expect(text).toContain("담당부서");
+    expect(text).toContain("먼저 볼 자산");
+    expect(text).toContain("a");
+  });
+});

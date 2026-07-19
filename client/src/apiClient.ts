@@ -1057,6 +1057,36 @@ export interface Asset {
   sbomGeneratedAt: number | null;
 }
 
+// ── 자산 커버리지(무엇을 모르는가) ────────────────────────────────────
+export type AssetGapKind = "owner" | "service" | "sbom" | "unscanned";
+
+export interface AssetGap {
+  kind: AssetGapKind;
+  severity: "high" | "mid";
+  title: string;
+  why: string;
+  fixLabel: string;
+  assetIds: string[];
+}
+
+export interface RankedAsset {
+  id: string;
+  name: string;
+  gaps: AssetGapKind[];
+  openFindings: number;
+  maxSeverity: string;
+  kev: boolean;
+  why: string;
+  score: number;
+}
+
+export interface AssetCoverage {
+  total: number;
+  complete: number;
+  gaps: AssetGap[];
+  ranked: RankedAsset[];
+}
+
 // ── 서비스 영향도 ─────────────────────────────────────────────────────
 export interface ServiceImpact {
   service: string;
@@ -1091,6 +1121,11 @@ export const assetsApi = {
   weightsHash: (id: string, filePath?: string) =>
     request<{ assetId: string; filePath: string; sizeBytes: number; weightsHash: string }>(`/api/assets/${id}/aibom/weights-hash`, { method: "POST", body: { filePath } }),
   remove: (id: string) => request<{ ok: boolean }>(`/api/assets/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  // 자산 정보 결손 현황 — 화면 커버리지 탭과 챗봇이 같은 계산을 본다.
+  coverage: () => request<AssetCoverage>("/api/assets/coverage"),
+  // 담당부서·서비스 정정 — 결손을 메우는 경로.
+  updateOwnership: (id: string, patch: { owner?: string; service?: string | null }) =>
+    request<Asset>(`/api/assets/${encodeURIComponent(id)}`, { method: "PATCH", body: patch }),
   importVulnScan: (content: string, format: "json" | "csv" | "html" | "nessus", source: string) =>
     request<{ hosts: number; findings: number; rows: number; assets: Asset[]; uncredentialedHosts: string[] }>("/api/vulnscan/import", {
       method: "POST",

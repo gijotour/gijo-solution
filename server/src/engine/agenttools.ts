@@ -16,6 +16,7 @@
 
 import { dateOnlyLocal, addDaysLocal } from "../util/date";
 import { listAssets, getAsset, registerAsset, setAssetRobustness, Asset } from "./assets";
+import { computeAssetCoverage, coverageSummaryText, type GapKind } from "./assetcoverage";
 import { expandOntology } from "./ontology";
 import { prioritizedReviews, updateFindingReview, findingKey, ReviewPatch, ApprovalStatus } from "./approvals";
 import { listProducts } from "./securityproducts";
@@ -718,6 +719,29 @@ function aibomFilledFields(a: Asset): { filled: number; total: number; missing: 
 }
 
 // AI-BOM 구성 현황 — 어느 자산이 비어 있고 무엇이 빠졌는지. 거버넌스 보고의 출발점이다.
+// 자산 커버리지 — 화면(inventory.html 커버리지 탭)과 같은 계산을 쓴다.
+// "무엇을 모르는가"는 한 곳에서만 세야 답이 갈리지 않는다.
+function runAssetCoverage(args: Record<string, string>): string {
+  const cov = computeAssetCoverage(listAssets());
+  const only = (args.gap ?? "").trim().toLowerCase();
+  if (!only) return coverageSummaryText(cov);
+
+  const KEY: Record<string, GapKind> = {
+    owner: "owner", 담당: "owner", 담당부서: "owner",
+    service: "service", 서비스: "service",
+    sbom: "sbom",
+    unscanned: "unscanned", 미스캔: "unscanned", 미점검: "unscanned",
+  };
+  const kind = KEY[only];
+  if (!kind) return `알 수 없는 결손 종류입니다: ${args.gap}\n가능한 값: owner(담당부서), service(서비스), sbom, unscanned(미점검)`;
+
+  const gap = cov.gaps.find((g) => g.kind === kind);
+  if (!gap) return `${only} 결손은 없습니다. 해당 항목은 전체 ${cov.total}건이 모두 채워져 있습니다.`;
+  const shown = gap.assetIds.slice(0, 15).map((id) => `- ${id}`).join("\n");
+  const more = gap.assetIds.length > 15 ? `\n… 외 ${gap.assetIds.length - 15}건` : "";
+  return `${gap.title}\n${gap.why}\n\n${shown}${more}\n\n조치: ${gap.fixLabel} (자산 화면 > 커버리지 탭)`;
+}
+
 function runAibomStatus(args: Record<string, string>): string {
   const only = (args.assetId ?? "").trim();
   const assets = only ? listAssets().filter((a) => a.id === only) : listAssets();
@@ -895,6 +919,18 @@ const TOOLS: AgentTool[] = [
       '정기 점검 일정의 기한 초과·예정 현황을 본다. 기한이 지난 것부터 보여준다. 예: {} 또는 {"filter":"방화벽"}',
     params: [{ name: "filter", label: "조건", description: "점검명·제품명·상태 (선택, 비우면 전체)", required: false }],
     run: runMaintenanceStatus,
+  },
+  {
+    name: "asset_coverage",
+    label: "자산 정보 결손 현황",
+    domain: "assets",
+    write: false,
+    description:
+      '자산 목록에서 "우리가 모르는 것"을 센다 — 담당부서·서비스·SBOM·점검이력이 빠진 자산. asset_status가 "무엇이 있는가"라면 이건 "무엇을 모르는가"다. gap을 주면 그 결손만 자산 id까지 나열한다. 예: {} 또는 {"gap":"담당부서"}',
+    params: [
+      { name: "gap", label: "결손 종류", description: "owner(담당부서)·service(서비스)·sbom·unscanned(미점검) 중 하나 (선택, 비우면 전체)", required: false },
+    ],
+    run: runAssetCoverage,
   },
   {
     name: "aibom_status",

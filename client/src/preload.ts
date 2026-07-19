@@ -101,6 +101,9 @@ const gijoApi = {
   uploadAuto: (filename: string, content: string, forceType?: import("./apiClient").UploadType, productName?: string) =>
     api.uploadApi.auto(filename, content, forceType, productName),
   deleteAsset: (id: string) => api.assetsApi.remove(id),
+  assetCoverage: () => api.assetsApi.coverage(),
+  updateAssetOwnership: (id: string, patch: { owner?: string; service?: string | null }) =>
+    api.assetsApi.updateOwnership(id, patch),
   registerAsset: (args: { id: string; name: string; path: string; assetType?: string; owner?: string; service?: string }) =>
     api.assetsApi.register(args),
   getServiceImpact: () => api.serviceImpactApi.get(),

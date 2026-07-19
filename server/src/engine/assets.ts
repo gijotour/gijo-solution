@@ -22,6 +22,7 @@ import type { StandardFinding } from "./bridge";
 import { db, assertTestDb } from "../db";
 import { emitCollaboration } from "./collaboration";
 import { setAgentStatus, resetAgentToDefault } from "./agents";
+import { computeAssetCoverage } from "./assetcoverage";
 
 export interface AssetComponent {
   name: string;
@@ -145,6 +146,20 @@ const updateAssetMetaStmt = db.prepare("UPDATE assets SET name = ?, owner = ?, c
 // registerAsset처럼 이력을 지우지 않고 호스트 메타만 최신화하는 용도(취약점 번다운/측정에 필요).
 export function updateAssetMeta(id: string, name: string, owner: string, components: AssetComponent[]): void {
   updateAssetMetaStmt.run(name, owner, JSON.stringify(components), id);
+}
+
+// 담당부서·서비스만 고친다 — 자산 화면 커버리지 탭에서 결손을 메우는 경로.
+// 주지 않은 필드는 건드리지 않는다(빈 문자열로 지우려면 명시적으로 ""를 준다).
+export function updateAssetOwnership(id: string, patch: { owner?: string; service?: string | null }): Asset | undefined {
+  const current = getAsset(id);
+  if (!current) return undefined;
+  const owner = patch.owner === undefined ? current.owner : patch.owner.trim();
+  const rawService = patch.service === undefined ? current.service : patch.service;
+  const service = rawService === null || String(rawService).trim() === "" ? null : String(rawService).trim();
+  db.prepare("UPDATE assets SET owner=?, service=? WHERE id=?").run(owner, service, id);
+  const updated = getAsset(id);
+  if (updated) broadcastAssetUpdated(updated);
+  return updated;
 }
 
 function scanHistoryOf(assetId: string): ScanRun[] {
@@ -360,6 +375,8 @@ seedSampleVulnHostIfEmpty();
 
 export function registerAssetsRoutes(app: Express): void {
   app.get("/api/assets", authMiddleware, (_req, res) => res.json(listAssets()));
+  // :id 라우트보다 먼저 — 뒤에 두면 "coverage"가 자산 id로 잡힌다.
+  app.get("/api/assets/coverage", authMiddleware, (_req, res) => res.json(computeAssetCoverage(listAssets())));
   app.get("/api/assets/:id", authMiddleware, (req, res) => {
     const asset = getAsset(String(req.params.id));
     if (!asset) return res.status(404).json({ error: "asset not found" });
@@ -386,6 +403,16 @@ export function registerAssetsRoutes(app: Express): void {
     resetAgentToDefault("scan");
     res.json({ assetId: asset.id, findings: findings.length });
   }));
+  // 담당부서·서비스 정정 — 커버리지 결손을 메우는 경로.
+  app.patch("/api/assets/:id", authMiddleware, (req, res) => {
+    const { owner, service } = req.body ?? {};
+    if (owner === undefined && service === undefined) {
+      return res.status(400).json({ error: "owner 또는 service 중 하나는 있어야 합니다" });
+    }
+    const updated = updateAssetOwnership(String(req.params.id), { owner, service });
+    if (!updated) return res.status(404).json({ error: "asset not found" });
+    res.json(updated);
+  });
   app.put("/api/assets/:id/aibom", authMiddleware, (req, res) => {
     const asset = updateAiBom(String(req.params.id), req.body.aibom);
     if (!asset) return res.status(404).json({ error: "asset not found" });
