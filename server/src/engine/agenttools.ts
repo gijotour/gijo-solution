@@ -19,9 +19,11 @@ import { listAssets, getAsset, registerAsset, updateAssetOwnership, setAssetRobu
 import { computeAssetCoverage, coverageSummaryText, type GapKind } from "./assetcoverage";
 import { expandOntology } from "./ontology";
 import { prioritizedReviews, updateFindingReview, findingKey, ReviewPatch, ApprovalStatus } from "./approvals";
-import { listProducts } from "./securityproducts";
-import { listMaintenanceItems } from "./maintenance";
-import { listCompliance } from "./compliance";
+import { listProducts, createProduct, PRODUCT_CATEGORIES } from "./securityproducts";
+import { listMaintenanceItems, createMaintenanceItem } from "./maintenance";
+import { listCompliance, setComplianceStatus } from "./compliance";
+import { generateSbom } from "./sbom";
+import type { ComplianceStatus } from "./compliance";
 import { countTriples } from "./ontology";
 import { listDocuments } from "./memory";
 import { listFindings as listCtiFindings } from "./cti";
@@ -463,6 +465,66 @@ function runAssignOwner(args: Record<string, string>): string {
   const names = resolved.map((a) => a.id).join(", ");
   const tail = unresolved.length ? ` (찾지 못해 건너뜀: ${unresolved.join(", ")})` : "";
   return `자산 ${resolved.length}건에 담당부서를 "${owner}"로 지정했습니다${service ? ` · 서비스 "${service}"` : ""}: ${names}${tail}`;
+}
+
+// ── 도메인별 쓰기 도구 (조회↔쓰기 짝 맞추기, 전부 결재판 경유) ────────────────
+
+// 위협 코드(M06 등) 또는 위협명(탈옥 등)으로 대응 상태를 지정한다. 상태 한국어→enum은 결정적 규칙.
+function normalizeComplianceStatus(raw: string): ComplianceStatus | null {
+  const s = (raw ?? "").trim().toLowerCase();
+  if (/대응\s*완료|완료|충족|이행|covered|적용/.test(s)) return "covered";
+  if (/부분|일부|진행|partial/.test(s)) return "partial";
+  if (/해당\s*없|해당\s*안|무관|비해당|not\s*applicable|(?:^|[^a-z])na(?:[^a-z]|$)/.test(s)) return "na";
+  if (/미대응|미조치|미이행|해당\s*있|open|미흡/.test(s)) return "open";
+  return null;
+}
+function resolveThreatCode(needle: string): { code: string; name: string } | undefined {
+  const n = (needle ?? "").trim();
+  if (!n) return undefined;
+  const all = listCompliance();
+  const byCode = all.find((t) => t.code.toLowerCase() === n.toLowerCase());
+  if (byCode) return { code: byCode.code, name: byCode.name };
+  const byName = all.filter((t) => t.name.replace(/\s+/g, "").includes(n.replace(/\s+/g, "")));
+  return byName.length === 1 ? { code: byName[0].code, name: byName[0].name } : undefined;
+}
+function runSetComplianceStatus(args: Record<string, string>): string {
+  const threat = resolveThreatCode(args.code ?? "");
+  if (!threat) return `위협을 특정하지 못했습니다: "${args.code}". 위협 현황(compliance_status)에서 코드(예: M06)나 위협명(예: 탈옥)을 확인하세요.`;
+  const status = normalizeComplianceStatus(args.status ?? "");
+  if (!status) return `대응 상태를 알 수 없습니다: "${args.status}". covered(대응완료)·partial(부분)·na(해당없음)·open(미대응) 중 하나여야 합니다.`;
+  setComplianceStatus(threat.code, status, (args.note ?? "").trim());
+  const label: Record<ComplianceStatus, string> = { covered: "대응완료", partial: "부분대응", na: "해당없음", open: "미대응" };
+  return `위협 ${threat.code}(${threat.name})의 대응 상태를 "${label[status]}"로 기록했습니다.`;
+}
+
+// 상대 기한("다음주 월요일")·절대일자를 YYYY-MM-DD로. 파싱 실패면 그대로 둬 검증에서 되묻게 한다.
+function runScheduleMaintenance(args: Record<string, string>): string {
+  const productName = (args.productName ?? "").trim();
+  const scheduleDate = parseRelativeDueDate(args.scheduleDate ?? "") ?? (args.scheduleDate ?? "").trim();
+  if (!productName) return "어느 제품의 점검인지(productName) 필요합니다.";
+  if (!DUE_RE.test(scheduleDate)) return `점검일(scheduleDate)을 YYYY-MM-DD로 지정하세요: "${args.scheduleDate}".`;
+  const title = (args.title ?? "").trim() || `${productName} 정기 점검`;
+  const item = createMaintenanceItem({ title, productName, scheduleDate });
+  return `점검 일정을 등록했습니다 — ${item.productName} · ${item.title} · ${item.scheduleDate}${item.assetName ? ` (자산 ${item.assetName} 연결)` : ""}.`;
+}
+
+function runRegisterProduct(args: Record<string, string>): string {
+  const name = (args.name ?? "").trim();
+  if (!name) return "제품명(name)이 필요합니다.";
+  const category = (args.category ?? "").trim(); // createProduct가 미지의 종류를 "기타"로 흡수한다
+  const p = createProduct({ name, category, vendor: args.vendor?.trim() || undefined, model: args.model?.trim() || undefined });
+  return `보안제품을 등록했습니다 — ${p.name} · 종류 ${p.category}${p.vendor ? ` · ${p.vendor}` : ""}${p.model ? ` ${p.model}` : ""}.`;
+}
+
+async function runGenerateSbom(args: Record<string, string>): Promise<string> {
+  const asset = resolveAsset(args.assetId ?? "");
+  if (!asset) {
+    const ids = listAssets().map((a) => a.id).slice(0, 12).join(", ") || "(없음)";
+    return `대상 자산을 찾지 못했습니다: "${args.assetId}". 등록된 자산 id: ${ids}`;
+  }
+  const doc = await generateSbom(asset.id);
+  const n = doc.components?.length ?? 0;
+  return `자산 ${asset.id}(${asset.name})의 SBOM을 생성했습니다 — 구성요소 ${n}개. AI-BOM 구성 현황에서 확인하세요.`;
 }
 
 // ── 취약점 조치 쓰기 도구 (Phase 2 — 결재판 경유) ────────────────────────
@@ -923,6 +985,28 @@ const TOOLS: AgentTool[] = [
     run: runComplianceStatus,
   },
   {
+    // compliance_status(이행 현황 조회)의 짝 — 위협별 대응 상태를 기록(쓰기).
+    name: "set_compliance_status",
+    label: "위협 대응 상태 기록",
+    domain: "report",
+    write: true,
+    description:
+      '위협(KISA 카탈로그)의 대응 상태를 기록한다. compliance_status에서 코드(예: M06)나 위협명(예: 탈옥)을 확인해 지목. status는 covered(대응완료)·partial(부분)·na(해당없음)·open(미대응). 예: {"code":"M06","status":"covered","note":"가드레일 적용"}',
+    params: [
+      { name: "code", label: "위협", description: "위협 코드(M06 등) 또는 위협명(탈옥 등)", required: true },
+      { name: "status", label: "대응 상태", description: "covered(대응완료)·partial(부분)·na(해당없음)·open(미대응)", required: true },
+      { name: "note", label: "근거", description: "대응 근거·메모 (선택)", required: false },
+    ],
+    effect: (args) => {
+      const t = resolveThreatCode(args.code ?? "");
+      const st = normalizeComplianceStatus(args.status ?? "");
+      const label: Record<string, string> = { covered: "대응완료", partial: "부분대응", na: "해당없음", open: "미대응" };
+      return `위협 ${t ? `${t.code}(${t.name})` : args.code}의 대응 상태를 "${st ? label[st] : args.status}"로 기록 · 위협 카탈로그 현황에만 반영`;
+    },
+    undo: "컴플라이언스 화면에서 상태를 되돌릴 수 있습니다.",
+    run: runSetComplianceStatus,
+  },
+  {
     name: "knowledge_status",
     label: "지식 자산 현황",
     domain: "knowledge",
@@ -942,6 +1026,24 @@ const TOOLS: AgentTool[] = [
     run: runProductStatus,
   },
   {
+    // product_status(보유 현황 조회)의 짝 — 보안제품 등록(쓰기).
+    name: "register_product",
+    label: "보안제품 등록",
+    domain: "products",
+    write: true,
+    description:
+      '운영 중인 보안제품을 등록부에 추가한다. category는 방화벽·EDR·DLP·WAF·VPN·IPS·SIEM·백신·NAC·기타 중 하나(모르면 비워두면 기타). 예: {"name":"경계 방화벽 FW-01","category":"방화벽","vendor":"SECUI","model":"MF2"}',
+    params: [
+      { name: "name", label: "제품명", description: "보안제품 이름", required: true },
+      { name: "category", label: "종류", description: "방화벽·EDR·DLP·WAF·VPN·IPS·SIEM·백신·NAC·기타 (선택)", required: false },
+      { name: "vendor", label: "제조사", description: "제조사·벤더 (선택)", required: false },
+      { name: "model", label: "모델", description: "모델·버전 (선택)", required: false },
+    ],
+    effect: (args) => `보안제품 "${(args.name ?? "").trim()}"을(를) 등록부에 추가${args.category?.trim() ? ` · 종류 ${args.category.trim()}` : ""} · 자산·취약점과는 별개`,
+    undo: "보안제품 화면에서 제품을 삭제하면 원복됩니다.",
+    run: runRegisterProduct,
+  },
+  {
     name: "maintenance_status",
     label: "점검 일정 현황",
     domain: "maintenance",
@@ -950,6 +1052,30 @@ const TOOLS: AgentTool[] = [
       '정기 점검 일정의 기한 초과·예정 현황을 본다. 기한이 지난 것부터 보여준다. 예: {} 또는 {"filter":"방화벽"}',
     params: [{ name: "filter", label: "조건", description: "점검명·제품명·상태 (선택, 비우면 전체)", required: false }],
     run: runMaintenanceStatus,
+  },
+  {
+    // maintenance_status(점검 현황 조회)의 짝 — 점검 일정 등록(쓰기).
+    name: "schedule_maintenance",
+    label: "점검 일정 등록",
+    domain: "maintenance",
+    write: true,
+    description:
+      '정기 점검 일정을 새로 잡는다. productName(어느 제품)과 scheduleDate(YYYY-MM-DD, "다음주 월요일" 같은 상대 표현도 가능)가 필요하다. 예: {"productName":"경계 방화벽","scheduleDate":"2026-08-01"}',
+    params: [
+      { name: "productName", label: "대상 제품", description: "점검할 보안제품명", required: true },
+      { name: "scheduleDate", label: "점검일", description: "YYYY-MM-DD (상대 표현도 자동 변환)", required: true },
+      { name: "title", label: "점검명", description: "점검 제목 (선택, 비우면 '○○ 정기 점검')", required: false },
+    ],
+    // 상대 기한("다음주 월요일")을 YYYY-MM-DD로 정정한다(assign_finding의 dueDate와 같은 규칙).
+    autoFill: (args, instruction): Record<string, string> => {
+      const raw = (args.scheduleDate ?? "").trim();
+      if (DUE_RE.test(raw)) return {};
+      const parsed = parseRelativeDueDate(raw) ?? parseRelativeDueDate(instruction);
+      return parsed ? { scheduleDate: parsed } : {};
+    },
+    effect: (args) => `점검 일정 등록 — ${(args.productName ?? "").trim()} · ${(args.scheduleDate ?? "").trim()} · 알림/승인 흐름과 연동`,
+    undo: "운영 가이드(점검) 화면에서 일정을 삭제하면 원복됩니다.",
+    run: runScheduleMaintenance,
   },
   {
     name: "asset_coverage",
@@ -994,6 +1120,24 @@ const TOOLS: AgentTool[] = [
     },
     undo: "자산 화면(커버리지 탭)에서 담당부서를 다시 비우면 미배정으로 원복됩니다.",
     run: runAssignOwner,
+  },
+  {
+    // sbom 결손(asset_coverage의 sbom gap·aibom_status)을 짚었을 때 이 도구로 생성한다.
+    name: "generate_sbom",
+    label: "SBOM 생성",
+    domain: "sbom",
+    write: true,
+    description:
+      '자산의 SBOM(구성요소 목록)을 생성한다. asset_coverage/aibom_status가 "SBOM 없음"을 짚은 자산에 쓴다. 예: {"assetId":"fraud-detect-llm"}',
+    params: [{ name: "assetId", label: "자산 id", description: "대상 자산 id (coverage/aibom 결과의 id=)", required: true }],
+    autoFill: (args): Record<string, string> => {
+      const raw = (args.assetId ?? "").trim();
+      const a = resolveAsset(raw);
+      return a && a.id !== raw ? { assetId: a.id } : {};
+    },
+    effect: (args) => `자산 "${(args.assetId ?? "").trim()}"의 SBOM(구성요소 목록)을 생성·저장 · 스캔 결과는 바뀌지 않음`,
+    undo: "SBOM은 재생성으로 갱신됩니다(별도 되돌리기 없음).",
+    run: runGenerateSbom,
   },
   {
     name: "aibom_status",

@@ -12,6 +12,9 @@ import { createApp } from "../src/app";
 import { runAgentLoop } from "../src/engine/agentloop";
 import { findAgentTool, buildApproval, generateAssetId, executeApprovedTool } from "../src/engine/agenttools";
 import { resetAssetsForTests, registerAsset, listAssets, getAsset } from "../src/engine/assets";
+import { listCompliance, resetComplianceForTests } from "../src/engine/compliance";
+import { listMaintenanceItems, resetMaintenanceForTests } from "../src/engine/maintenance";
+import { listProducts, resetSecurityProductsForTests } from "../src/engine/securityproducts";
 
 async function login(app: ReturnType<typeof createApp>) {
   const res = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" });
@@ -209,6 +212,75 @@ describe("assign_owner — 자산 담당부서 채우기 (쓰기, 결재판 경�
     const r = await runAgentLoop("vuln:10.20.0.5 담당부서 인프라팀으로 지정해줘");
     expect(r!.approval!.tool).toBe("assign_owner");
     expect(getAsset("vuln:10.20.0.5")!.owner).not.toBe("인프라팀"); // 승인 전에는 안 바뀜(등록 기본값 유지)
+  });
+});
+
+// 도메인별 쓰기 역량 — 조회만 있던 도메인(compliance·products·maintenance·sbom)에 쓰기 짝 추가.
+describe("도메인 쓰기 역량 — 결재판 승인 실행", () => {
+  beforeEach(() => {
+    resetComplianceForTests();
+    resetMaintenanceForTests();
+    resetSecurityProductsForTests();
+  });
+
+  it("set_compliance_status: 코드로 대응 상태를 기록한다", async () => {
+    const out = await executeApprovedTool("set_compliance_status", { code: "M06", status: "covered", note: "가드레일 적용" });
+    expect(out).toContain("M06");
+    expect(listCompliance().find((t) => t.code === "M06")!.status).toBe("covered");
+  });
+
+  it("set_compliance_status: 위협명(탈옥)으로도 지목하고 한국어 상태를 매핑한다", async () => {
+    const out = await executeApprovedTool("set_compliance_status", { code: "탈옥", status: "대응완료", note: "" });
+    expect(listCompliance().find((t) => t.code === "M06")!.status).toBe("covered"); // 탈옥 = M06
+    expect(out).toContain("대응완료");
+  });
+
+  it("set_compliance_status: 알 수 없는 코드/상태는 실행하지 않고 안내한다", async () => {
+    expect(await executeApprovedTool("set_compliance_status", { code: "ZZ99", status: "covered" })).toContain("특정하지 못했");
+    expect(await executeApprovedTool("set_compliance_status", { code: "M06", status: "몰라요" })).toContain("알 수 없");
+  });
+
+  it("register_product: 보안제품을 등록부에 추가한다", async () => {
+    const before = listProducts().length;
+    const out = await executeApprovedTool("register_product", { name: "경계 방화벽 FW-01", category: "방화벽", vendor: "SECUI", model: "MF2" });
+    expect(out).toContain("경계 방화벽 FW-01");
+    expect(listProducts().length).toBe(before + 1);
+    expect(listProducts().some((p) => p.name === "경계 방화벽 FW-01" && p.category === "방화벽")).toBe(true);
+  });
+
+  it("register_product: 모르는 종류는 기타로 흡수한다", async () => {
+    await executeApprovedTool("register_product", { name: "정체불명", category: "이상한종류" });
+    expect(listProducts().find((p) => p.name === "정체불명")!.category).toBe("기타");
+  });
+
+  it("schedule_maintenance: 점검 일정을 등록한다", async () => {
+    const out = await executeApprovedTool("schedule_maintenance", { productName: "경계 방화벽", scheduleDate: "2026-08-01" });
+    expect(out).toContain("2026-08-01");
+    expect(listMaintenanceItems().some((m) => m.productName === "경계 방화벽" && m.scheduleDate === "2026-08-01")).toBe(true);
+  });
+
+  it("schedule_maintenance: 잘못된 날짜는 실행하지 않고 되묻는다", async () => {
+    const out = await executeApprovedTool("schedule_maintenance", { productName: "방화벽", scheduleDate: "아무때나" });
+    expect(out).toContain("YYYY-MM-DD");
+    expect(listMaintenanceItems()).toHaveLength(0);
+  });
+
+  it("schedule_maintenance: autoFill이 상대 표현을 YYYY-MM-DD로 정정한다", () => {
+    const ap = buildApproval(
+      findAgentTool("schedule_maintenance")!,
+      { productName: "방화벽", scheduleDate: "오늘" },
+      "방화벽 점검 오늘로 잡아줘"
+    );
+    const date = ap.fields.find((f) => f.key === "scheduleDate")!;
+    expect(date.value).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(date.source).toBe("auto");
+  });
+
+  it("generate_sbom: 자산의 SBOM을 생성한다", async () => {
+    registerAsset({ id: "fraud-detect-llm", name: "이상거래탐지", path: "m.gguf" });
+    const out = await executeApprovedTool("generate_sbom", { assetId: "fraud-detect-llm" });
+    expect(out).toContain("SBOM");
+    expect(getAsset("fraud-detect-llm")!.sbomGeneratedAt).toBeTruthy();
   });
 });
 
