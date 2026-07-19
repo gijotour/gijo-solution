@@ -160,6 +160,35 @@ export function stripLeadingPreamble(text: string): string {
 const countHan = (t: string): number => (t.match(/[一-鿿]/g) || []).length;
 const hasChineseDrift = (t: string): boolean => /[一-鿿]{2,}/.test(t);
 
+// 영어 드리프트 감지 — 응답 전체가 영어로 나오는 경우(실측 2026-07-19: 보안 합성모델이
+// "취약점 조치 우선순위" 질문에 2512자를 전부 영어로 답함). 중국어와 달리 문자 종류로는
+// 못 가른다 — 정상 한국어 답변에도 CVE·제품명·명령어 같은 라틴 문자가 섞이기 때문이다.
+// 그래서 '한글 음절 대비 라틴 문자 비율'로 판정한다.
+//
+// 오탐 방지 장치 두 가지:
+//  (1) 코드 블록/인라인 코드는 원문 유지가 정상이므로 측정에서 제외한다.
+//  (2) 임계치를 아주 낮게(25%) 잡는다 — 고유명사가 많은 한국어 답변도 실측상 50% 이상이라
+//      여유가 크다. 전면 영어 응답은 한글이 0~5%라 이 사이에 명확한 골짜기가 있다.
+//  (3) 글자 수가 적으면(짧은 확인 응답·코드 한 줄) 비율이 요동치므로 아예 판정하지 않는다.
+const CODE_SPAN_RE = /```[\s\S]*?```|`[^`\n]*`/g;
+const HANGUL_RATIO_THRESHOLD = 0.25;
+const DRIFT_MIN_LETTERS = 60;
+
+/** 코드 구간을 뺀 본문에서 한글 음절이 (한글+라틴) 글자 중 차지하는 비율. 글자가 없으면 1(정상 취급). */
+export function hangulRatio(text: string): number {
+  const t = (text ?? "").replace(CODE_SPAN_RE, " ");
+  const hangul = (t.match(/[가-힣]/g) || []).length;
+  const latin = (t.match(/[A-Za-z]/g) || []).length;
+  return hangul + latin === 0 ? 1 : hangul / (hangul + latin);
+}
+
+export function hasEnglishDrift(text: string): boolean {
+  const t = (text ?? "").replace(CODE_SPAN_RE, " ");
+  const letters = (t.match(/[가-힣]/g) || []).length + (t.match(/[A-Za-z]/g) || []).length;
+  if (letters < DRIFT_MIN_LETTERS) return false; // 표본이 너무 작아 판정 불가
+  return hangulRatio(text) < HANGUL_RATIO_THRESHOLD;
+}
+
 // 중국어 드리프트 근본 차단 — llama.cpp GBNF 문법으로 생성 단계에서 한자(U+4E00–U+9FFF)를 금지한다.
 // 프롬프트 규칙(확률적)·후처리 재생성(사후적)과 달리 샘플러 수준의 결정적 차단이라 드리프트가 0이 된다.
 // merge 재합성은 실측(2026-07-17)에서 효과 없음이 증명돼 이 방식을 채택. 한글(U+AC00–)은 별개 영역이라 무영향.
@@ -250,15 +279,30 @@ export async function chat(args: ChatArgs): Promise<string> {
 
   let reply = stripLeadingPreamble(rawContent);
 
-  // 중국어 드리프트 감지 시 한국어 강제로 1회 재생성하고 더 깨끗한(한자 적은) 쪽을 채택한다.
-  // (인사말과 달리 중간에 섞여 잘라낼 수 없으므로 재요청. 드리프트는 ~10~15%라 대부분 재생성 안 함.)
-  if (hasChineseDrift(reply)) {
-    emitLlmActivity({ kind: "chat", phase: "start", agent: agentName, detail: "중국어 감지 — 한국어로 재생성" });
-    const retryMessages = [
-      ...messages,
-      { role: "assistant", content: rawContent },
-      { role: "user", content: "직전 답변에 중국어(汉字)가 섞였습니다. 같은 내용을 처음부터 끝까지 반드시 한국어로만 다시 작성하세요. 중국어·한자 단어를 절대 쓰지 마세요(CVE·제품명·버전 등 고유 표기만 원문 유지)." },
-    ];
+  // 언어 드리프트(중국어 혼입 / 전면 영어) 감지 시 한국어 강제로 1회 재생성하고 더 나은 쪽을 채택한다.
+  // (인사말과 달리 잘라낼 수 없으므로 재요청. 드리프트는 소수 질문에서만 나므로 대부분 재생성 안 함.)
+  // 두 드리프트가 겹쳐도 재생성은 한 번만 한다 — 중국어 혼입이 더 좁고 확실한 신호라 우선.
+  const drift = hasChineseDrift(reply)
+    ? {
+        detail: "중국어 감지 — 한국어로 재생성",
+        instruction:
+          "직전 답변에 중국어(汉字)가 섞였습니다. 같은 내용을 처음부터 끝까지 반드시 한국어로만 다시 작성하세요. 중국어·한자 단어를 절대 쓰지 마세요(CVE·제품명·버전 등 고유 표기만 원문 유지).",
+        // 한자가 더 적은 쪽이 더 나은 답.
+        isBetter: (candidate: string, current: string) => countHan(candidate) < countHan(current),
+      }
+    : hasEnglishDrift(reply)
+      ? {
+          detail: "영어 감지 — 한국어로 재생성",
+          instruction:
+            "직전 답변이 영어로 작성되었습니다. 같은 내용을 처음부터 끝까지 반드시 한국어로만 다시 작성하세요. 영어 문장을 쓰지 마세요(코드·명령어·CVE·제품명·버전 등 고유 표기만 원문 유지).",
+          // 한글 비율이 더 높은 쪽이 더 나은 답.
+          isBetter: (candidate: string, current: string) => hangulRatio(candidate) > hangulRatio(current),
+        }
+      : null;
+
+  if (drift) {
+    emitLlmActivity({ kind: "chat", phase: "start", agent: agentName, detail: drift.detail });
+    const retryMessages = [...messages, { role: "assistant", content: rawContent }, { role: "user", content: drift.instruction }];
     const retryRes = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -268,7 +312,7 @@ export async function chat(args: ChatArgs): Promise<string> {
     if (retryRes && retryRes.ok) {
       const retryData = (await retryRes.json()) as { choices?: { message?: { content?: string } }[] };
       const retryReply = stripLeadingPreamble(retryData.choices?.[0]?.message?.content ?? "");
-      if (retryReply && countHan(retryReply) < countHan(reply)) reply = retryReply;
+      if (retryReply && drift.isBetter(retryReply, reply)) reply = retryReply;
     }
   }
 
