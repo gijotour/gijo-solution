@@ -19,6 +19,9 @@ import { listAssets, getAsset, registerAsset, setAssetRobustness, Asset } from "
 import { expandOntology } from "./ontology";
 import { prioritizedReviews, updateFindingReview, findingKey, ReviewPatch, ApprovalStatus } from "./approvals";
 import { listProducts } from "./securityproducts";
+import { listMaintenanceItems } from "./maintenance";
+import { listCompliance } from "./compliance";
+import { countTriples } from "./ontology";
 import { listDocuments } from "./memory";
 import { listFindings as listCtiFindings } from "./cti";
 import { matchCtiToAssets } from "./ctimatch";
@@ -744,9 +747,155 @@ function runAibomStatus(args: Record<string, string>): string {
   return `${head}\n${lines.join("\n")}${more}`;
 }
 
+// ── 「보안제품」 도메인 도구 ─────────────────────────────────────────────
+// 보안제품 등록부는 "무엇을 쓰고 있고, 운영 문서(매뉴얼)가 갖춰졌는가"가 핵심이다.
+// 문서가 없는 제품은 장애 시 대응이 늦어지므로 그 공백을 짚어주는 데 초점을 맞춘다.
+function runProductStatus(args: Record<string, string>): string {
+  const q = (args.query ?? "").trim().toLowerCase();
+  const all = listProducts();
+  if (all.length === 0) return "등록된 보안제품이 없습니다.";
+
+  const matched = q
+    ? all.filter((p) => `${p.name} ${p.category} ${p.vendor ?? ""} ${p.model ?? ""} ${p.note ?? ""}`.toLowerCase().includes(q))
+    : all;
+  if (matched.length === 0) return `"${args.query}"에 맞는 보안제품이 없습니다.`;
+
+  const noDocs = matched.filter((p) => p.docs.length === 0);
+  const byCat = new Map<string, number>();
+  for (const p of matched) byCat.set(p.category, (byCat.get(p.category) ?? 0) + 1);
+
+  const head =
+    `보안제품 ${matched.length}건 (${[...byCat].map(([c, n]) => `${c} ${n}`).join(", ")})` +
+    ` — 운영문서 없는 제품 ${noDocs.length}건`;
+  const lines = matched.slice(0, 10).map((p) => {
+    const vendor = p.vendor ? `${p.vendor} ` : "";
+    const linked = p.assetName ? `, 자산 ${p.assetName}` : "";
+    return `- ${vendor}${p.name} (${p.category}, 문서 ${p.docs.length}건${linked})`;
+  });
+  const more = matched.length > 10 ? `\n… 외 ${matched.length - 10}건` : "";
+  const warn = noDocs.length ? `\n문서 미등록: ${noDocs.slice(0, 5).map((p) => p.name).join(", ")}` : "";
+  return `${head}\n${lines.join("\n")}${more}${warn}`;
+}
+
+// ── 「유지보수」 도메인 도구 ─────────────────────────────────────────────
+// 정기 점검은 "기한이 지났는가"가 전부다. 지연된 것부터 보여준다.
+function runMaintenanceStatus(args: Record<string, string>): string {
+  const items = listMaintenanceItems();
+  if (items.length === 0) return "등록된 점검 일정이 없습니다.";
+
+  const today = dateOnlyLocal(new Date());
+  const q = (args.filter ?? "").trim().toLowerCase();
+  const matched = q
+    ? items.filter((m) => `${m.title} ${m.productName} ${m.status} ${m.assetName ?? ""}`.toLowerCase().includes(q))
+    : items;
+  if (matched.length === 0) return `"${args.filter}"에 맞는 점검 일정이 없습니다.`;
+
+  // approved(승인 완료)를 뺀 나머지가 아직 손이 필요한 것들이다.
+  const open = matched.filter((m) => m.status !== "approved");
+  const overdue = open.filter((m) => m.scheduleDate < today);
+  const upcoming = open.filter((m) => m.scheduleDate >= today);
+
+  const head = `점검 일정 ${matched.length}건 — 기한 초과 ${overdue.length}건, 예정 ${upcoming.length}건, 완료 ${matched.length - open.length}건`;
+  const list = [...overdue, ...upcoming].slice(0, 10).map((m) => {
+    const late = m.scheduleDate < today ? " ⚠기한초과" : "";
+    return `- ${m.title} · ${m.productName} (${m.scheduleDate}, ${m.status})${late}`;
+  });
+  return list.length ? `${head}\n${list.join("\n")}` : `${head}\n미완료 항목이 없습니다.`;
+}
+
+// ── 「리포트·컴플라이언스」 도메인 도구 ──────────────────────────────────
+// 보고서 생성 자체는 결재·범위 선택이 필요해 화면에서 하는 게 맞다. 여기서 채우는 공백은
+// "지금 보고할 거리가 무엇인가" — 컴플라이언스 이행 현황이다.
+function runComplianceStatus(args: Record<string, string>): string {
+  const rows = listCompliance();
+  if (rows.length === 0) return "등록된 컴플라이언스 항목이 없습니다.";
+
+  const q = (args.filter ?? "").trim().toLowerCase();
+  const matched = q
+    ? rows.filter((r) => `${r.code} ${r.name} ${r.status} ${r.note ?? ""}`.toLowerCase().includes(q))
+    : rows;
+  if (matched.length === 0) return `"${args.filter}"에 맞는 항목이 없습니다.`;
+
+  const counts = matched.reduce<Record<string, number>>((acc, r) => {
+    acc[r.status] = (acc[r.status] ?? 0) + 1;
+    return acc;
+  }, {});
+  // 상태는 covered(대응됨)·partial(부분)·open(미대응)·na(해당없음).
+  // 손이 필요한 건 open과 partial이다.
+  const LABEL: Record<string, string> = { covered: "대응됨", partial: "부분대응", open: "미대응", na: "해당없음" };
+  const pending = matched.filter((r) => r.status === "open" || r.status === "partial");
+
+  const head =
+    `컴플라이언스 ${matched.length}건 — ` +
+    Object.entries(counts).map(([s, n]) => `${LABEL[s] ?? s} ${n}`).join(", ");
+  const lines = pending
+    .slice(0, 10)
+    .map((r) => `- [${LABEL[r.status] ?? r.status}] ${r.code} ${r.name}${r.note ? ` (${r.note.slice(0, 30)})` : ""}`);
+  return pending.length ? `${head}\n조치 필요:\n${lines.join("\n")}` : `${head}\n미대응 항목이 없습니다.`;
+}
+
+// ── 「지식·모델」 도메인 도구 ────────────────────────────────────────────
+// 답변 품질은 지식베이스가 좌우한다. "무엇이 들어 있고 얼마나 연결됐는가"를 본다.
+async function runKnowledgeStatus(): Promise<string> {
+  const docs = await listDocuments(); // lancedb 조회라 비동기다
+  const triples = countTriples();
+  if (docs.length === 0 && triples === 0) return "등록된 지식 자료가 없습니다. 문서를 먼저 인입하세요.";
+
+  const chunks = docs.reduce((n, d) => n + (d.chunks ?? 0), 0);
+  const byScope = docs.reduce<Record<string, number>>((acc, d) => {
+    const s = d.scope ?? "global";
+    acc[s] = (acc[s] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  const head = `장기기억 문서 ${docs.length}건 (조각 ${chunks}개), 온톨로지 트리플 ${triples}개`;
+  const scopes = `범위별: ${Object.entries(byScope).map(([s, n]) => `${s} ${n}`).join(", ")}`;
+  const recent = docs.slice(-5).map((d) => `- ${d.documentId}`).reverse();
+  return `${head}\n${scopes}\n최근 인입:\n${recent.join("\n")}`;
+}
+
 // ── 레지스트리 ──────────────────────────────────────────────────────────
 
 const TOOLS: AgentTool[] = [
+  {
+    name: "compliance_status",
+    label: "컴플라이언스 이행 현황",
+    domain: "report",
+    write: false,
+    description:
+      '규제·통제 항목의 이행 현황을 본다. 미이행·진행중 항목을 먼저 보여준다 — 보고서에 담을 거리를 찾는 용도. 예: {} 또는 {"filter":"미이행"}',
+    params: [{ name: "filter", label: "조건", description: "코드·항목명·상태 (선택, 비우면 전체)", required: false }],
+    run: runComplianceStatus,
+  },
+  {
+    name: "knowledge_status",
+    label: "지식 자산 현황",
+    domain: "knowledge",
+    write: false,
+    description: "장기기억(RAG) 문서와 온톨로지 트리플이 얼마나 쌓였는지 본다. 답변 품질의 근거가 되는 자료 현황이다.",
+    params: [],
+    run: runKnowledgeStatus,
+  },
+  {
+    name: "product_status",
+    label: "보안제품 현황",
+    domain: "products",
+    write: false,
+    description:
+      '등록된 보안제품과 운영문서(매뉴얼) 보유 현황을 본다. 문서 없는 제품은 장애 시 대응이 늦어지므로 따로 짚어준다. 예: {} 또는 {"query":"방화벽"}',
+    params: [{ name: "query", label: "검색어", description: "제품명·분류·벤더 (선택, 비우면 전체)", required: false }],
+    run: runProductStatus,
+  },
+  {
+    name: "maintenance_status",
+    label: "점검 일정 현황",
+    domain: "maintenance",
+    write: false,
+    description:
+      '정기 점검 일정의 기한 초과·예정 현황을 본다. 기한이 지난 것부터 보여준다. 예: {} 또는 {"filter":"방화벽"}',
+    params: [{ name: "filter", label: "조건", description: "점검명·제품명·상태 (선택, 비우면 전체)", required: false }],
+    run: runMaintenanceStatus,
+  },
   {
     name: "aibom_status",
     label: "AI-BOM 구성 현황",

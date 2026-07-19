@@ -24,8 +24,11 @@ describe("도구 도메인 필터", () => {
     }
   });
 
+  // 실재하는 도메인 이름을 쓰면 나중에 그 도메인에 도구가 생겨 테스트가 깨진다(실제로 겪었다 —
+  // maintenance를 예시로 썼다가 거기 도구를 추가하자 실패했다). 존재하지 않는 이름으로 고정한다.
   it("등록된 도구가 없는 도메인은 cross만 남는다", () => {
-    const tools = listToolsFor(["maintenance"]); // 아직 도구 미등록 영역
+    const tools = listToolsFor(["__없는도메인__"]);
+    expect(tools.length).toBeGreaterThan(0); // cross는 남아야 한다
     expect(tools.every((t) => t.domain === "cross")).toBe(true);
   });
 
