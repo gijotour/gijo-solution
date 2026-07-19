@@ -226,7 +226,7 @@
     </div>
 
     <div id="listPane">
-    <div class="sortnote" id="sortNote">취약점 심각도 × 정보 결손 순으로 정렬 — 위에 있을수록 손이 필요합니다.</div>
+    <div class="sortnote" id="sortNote">가장 급한 결손으로 묶고, 그룹 안에서는 취약점 심각도 순으로 정렬 — 위에 있을수록 손이 필요합니다.</div>
     <div class="toolbar">
       <div class="search">
         <span style="color:var(--muted-2)">⌕</span>
@@ -426,11 +426,23 @@
     return assets.slice().sort((x, y) => (rank.get(x.id) ?? 1e9) - (rank.get(y.id) ?? 1e9));
   }
 
-  // 유형 그룹 — 인프라 호스트(스캐너가 훑는 것)와 AI 자산(모델·에이전트)은 성격이 다르다.
-  const GROUPS = [
-    { key: "infra", label: "인프라 호스트", hint: "취약점 스캐너가 훑은 서버·네트워크 자산", match: (a) => a.assetType === "infra-host" },
-    { key: "ai", label: "AI 자산", hint: "모델·에이전트·임베딩 등 AI 구성요소", match: (a) => a.assetType !== "infra-host" },
+  // 결손 그룹 — 목록이 곧 작업 대기열이 된다. 결손을 메우면 자산이 아래 그룹으로 내려간다.
+  // 자산 하나가 여러 결손을 가질 수 있으므로 가장 급한 것 하나로만 배치한다.
+  // 여러 그룹에 중복해 넣으면 "5건"이 "15건"처럼 보여 규모를 오해하게 된다.
+  const GAP_GROUPS = [
+    { key: "owner", label: "담당부서 없음", hint: "사고가 나도 연락할 대상이 없습니다 — 가장 급합니다" },
+    { key: "unscanned", label: "미점검", hint: "한 번도 점검하지 않아 위험을 알 수 없습니다" },
+    { key: "service", label: "서비스 미연결", hint: "장애·침해 시 영향 범위를 계산할 수 없습니다" },
+    { key: "sbom", label: "SBOM 없음", hint: "신규 취약점이 공개돼도 영향 여부를 판단할 수 없습니다" },
+    { key: "none", label: "정보 완비", hint: "결손 없음 — 손이 필요하지 않습니다" },
   ];
+
+  // 가장 급한 결손 하나. GAP_GROUPS 순서가 곧 우선순위다.
+  function primaryGap(rk) {
+    if (!rk || rk.gaps.length === 0) return "none";
+    for (const g of GAP_GROUPS) if (g.key !== "none" && rk.gaps.includes(g.key)) return g.key;
+    return "none";
+  }
 
   function render() {
     const filtered = sortByPriority(applyFilters(allAssets));
@@ -482,16 +494,24 @@
           </tr>`;
       };
 
-      assetRows.innerHTML = GROUPS.map((g) => {
-        const members = filtered.filter(g.match);
-        if (members.length === 0) return "";
-        const head = `<tr class="group-head"><td colspan="8">
-          <span class="group-label">${g.label}</span>
-          <span class="group-count">${members.length}건</span>
-          <span class="group-hint">${g.hint}</span>
-        </td></tr>`;
-        return head + members.map(rowHtml).join("");
-      }).join("");
+      // 커버리지를 못 받았으면 결손을 모른다 — 전부 "정보 완비"로 몰아 보여주면 거짓말이 된다.
+      // 그럴 땐 그룹 없이 평평하게 그리고 그 사실을 알린다.
+      if (coverage.ranked.length === 0) {
+        assetRows.innerHTML =
+          `<tr class="group-head"><td colspan="8"><span class="group-hint">결손 정보를 불러오지 못해 그룹 없이 표시합니다.</span></td></tr>` +
+          filtered.map(rowHtml).join("");
+      } else {
+        assetRows.innerHTML = GAP_GROUPS.map((g) => {
+          const members = filtered.filter((a) => primaryGap(rankedById.get(a.id)) === g.key);
+          if (members.length === 0) return "";
+          const head = `<tr class="group-head"><td colspan="8">
+            <span class="group-label">${g.label}</span>
+            <span class="group-count">${members.length}건</span>
+            <span class="group-hint">${g.hint}</span>
+          </td></tr>`;
+          return head + members.map(rowHtml).join("");
+        }).join("");
+      }
     }
     const originNote = { scanner: "스캐너 유입분", real: "샘플 제외", all: "샘플 포함" }[activeOrigin];
     paginationLabel.textContent = `${originNote} 기준 ${filtered.length}건 표시 · 등록된 자산 전체 ${allAssets.length}건`;
