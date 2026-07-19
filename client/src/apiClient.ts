@@ -195,10 +195,24 @@ export interface PendingApproval {
   missing: string[];
 }
 
+// 지금 보고 있는 화면의 파일명. 렌더러가 아닌 곳(테스트·메인 프로세스)에서 부르면 undefined.
+function currentScreen(): string | undefined {
+  const path = (globalThis as { location?: { pathname?: string } }).location?.pathname;
+  if (!path) return undefined;
+  const file = path.split(/[\\/]/).pop();
+  return file && file.endsWith(".html") ? file : undefined;
+}
+
 export const dispatchApi = {
   // sessionId를 주면 지시·응답이 그 작업 세션의 턴으로 기록되고, 직전 대화가 맥락으로 실린다.
-  send: (text: string, sessionId?: string) =>
-    request<DispatchResult>("/api/dispatch", { method: "POST", body: { text, ...(sessionId ? { sessionId } : {}) } }),
+  // screen: 지시가 들어온 화면(예: "vulnscan.html"). 서버가 모호한 지시를 해석하는 힌트로 쓴다
+  // — 취약점 화면에서 "정리해줘"는 우선순위 정리로 본다(server/engine/screencontext.ts).
+  // 호출자가 안 주면 현재 문서 경로에서 자동으로 채운다.
+  send: (text: string, sessionId?: string, screen?: string) =>
+    request<DispatchResult>("/api/dispatch", {
+      method: "POST",
+      body: { text, ...(sessionId ? { sessionId } : {}), screen: screen ?? currentScreen() },
+    }),
   plan: (text: string) =>
     request<{ steps: OrchestrationStepResult[]; multi: boolean }>("/api/dispatch/plan", { method: "POST", body: { text } }),
   // 결재판 승인 — 사람이 값을 확인·수정하고 누른 뒤에만 호출된다.

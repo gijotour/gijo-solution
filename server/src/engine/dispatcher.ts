@@ -275,7 +275,7 @@ async function learnloopConfirmResult(instructionText: string): Promise<Dispatch
 
 // 작업 세션 래퍼 — sessionId가 있으면 지시를 user 턴, 응답을 assistant 턴으로 기록하고
 // 직전 턴들을 맥락으로 실어 "이어서" 지시가 되게 한다. sessionId가 없으면 종전과 100% 동일.
-export async function dispatchInstruction(instructionText: string, sessionId?: string): Promise<DispatchResult> {
+export async function dispatchInstruction(instructionText: string, sessionId?: string, screen?: string): Promise<DispatchResult> {
   const session = sessionId ? getSession(sessionId) : null;
   // 맥락은 이번 지시를 기록하기 "전" 시점의 대화로 계산한다(방금 넣은 user 턴이 맥락에 중복되지 않게).
   const contextText = session ? recentTurnsText(session.id) : "";
@@ -288,7 +288,7 @@ export async function dispatchInstruction(instructionText: string, sessionId?: s
     // "어느 세션에서 온 작업인지"가 로그에 드러나게 한다(대시보드 📡 실시간 협업 피드에 표시).
     emitCollaboration({ from: "세션", to: "orchestrator", message: `💬 [${title}] ${instructionText}` });
   }
-  const result = await dispatchInstructionCore(instructionText, contextText);
+  const result = await dispatchInstructionCore(instructionText, contextText, screen);
   if (session) {
     appendTurn(session.id, "assistant", result.output, turnToolTag(result));
     emitCollaboration({ from: "orchestrator", to: "세션", message: `💬 [${title}] ${result.output.slice(0, 140)}` });
@@ -306,7 +306,7 @@ function turnToolTag(r: DispatchResult): string | undefined {
   return undefined;
 }
 
-async function dispatchInstructionCore(instructionText: string, contextText = ""): Promise<DispatchResult> {
+async function dispatchInstructionCore(instructionText: string, contextText = "", screen?: string): Promise<DispatchResult> {
   // 런타임 가드레일 — 입력의 프롬프트 인젝션 시도를 실시간 검사. block 모드면 거절, flag면 기록·경고 후 진행.
   // guardInput을 직접 부르지 않고 게이트웨이를 거친다 — 검사 지점을 한 곳으로 모아, 앞으로
   // 검사가 늘어도(PII·출력 필터 등) 모든 입구에 자동으로 적용되게 하기 위함이다.
@@ -365,7 +365,8 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     };
   }
 
-  const route = await routeIntent(instructionText);
+  // 화면 컨텍스트를 함께 넘긴다 — 동사 없는 지시("정리해줘")를 화면으로 해석하기 위함(screencontext.ts).
+  const route = await routeIntent(instructionText, screen);
   const agent = getAgentById(route.agentId);
 
   const task = createTask({ text: instructionText, agentId: route.agentId, priority: priorityForAction(route.action) });
@@ -402,7 +403,9 @@ export function registerDispatcherRoutes(app: Express): void {
     authMiddleware,
     asyncRoute(async (req, res) => {
       const sessionId = typeof req.body?.sessionId === "string" ? req.body.sessionId : undefined;
-      res.json(await dispatchInstruction(req.body.text, sessionId));
+      // screen — 클라이언트가 보내는 현재 화면(예: "vulnscan.html"). 없어도 동작한다(구버전 호환).
+      const screen = typeof req.body?.screen === "string" ? req.body.screen : undefined;
+      res.json(await dispatchInstruction(req.body.text, sessionId, screen));
     })
   );
   // 실행 없이 지시가 몇 단계로 계획되는지 미리 보여준다(복합 지시 여부 확인용).

@@ -7,6 +7,7 @@ import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { listAssets } from "./assets";
 import { chat } from "./llm";
+import { fallbackActionForScreen } from "./screencontext";
 
 export interface RoutedIntent {
   agentId: string;
@@ -28,11 +29,23 @@ function findMentionedAssetId(text: string): string | undefined {
   return listAssets().find((asset) => text.includes(asset.id) || text.includes(asset.name))?.id;
 }
 
-function routeIntentByRegex(text: string): RoutedIntent {
+// 지시문에 "무엇을 하라"는 동작 단어가 있는가. 있으면 텍스트가 화면보다 우선한다.
+// routeIntentByRegex의 판별과 같은 어휘를 쓴다 — 두 곳이 어긋나면 라우팅이 설명 불가능해진다.
+const ACTION_WORDS = /스캔|재스캔|scan|리포트|보고서|report|우선순위|분석|analy/i;
+export function hasExplicitAction(text: string): boolean {
+  return ACTION_WORDS.test(text ?? "");
+}
+
+function routeIntentByRegex(text: string, screen?: string): RoutedIntent {
   const targetAssetId = findMentionedAssetId(text);
+  // 지시문의 명시적 동사가 최우선 — 화면은 어디까지나 힌트다.
   if (/스캔|재스캔|scan/i.test(text)) return { agentId: "scan", action: "scan", targetAssetId };
   if (/리포트|보고서|report/i.test(text)) return { agentId: "report", action: "report", targetAssetId };
   if (/우선순위|분석|analy/i.test(text)) return { agentId: "analysis", action: "analyze", targetAssetId };
+  // 동사가 없을 때만 화면으로 추정한다. 취약점 화면에서 "정리해줘"는 우선순위 정리로 본다.
+  // 예전엔 이런 지시가 전부 일반 대화로 떨어져 아무 일도 일어나지 않았다.
+  const fromScreen = fallbackActionForScreen(screen);
+  if (fromScreen) return { agentId: agentIdForAction(fromScreen), action: fromScreen, targetAssetId };
   return { agentId: "orchestrator", action: "chat" };
 }
 
@@ -75,10 +88,41 @@ function buildFewShotPrompt(text: string): string {
   ].join("\n");
 }
 
-export async function routeIntent(text: string): Promise<RoutedIntent> {
-  const reply = await chat({ agentId: "orchestrator", message: buildFewShotPrompt(text) }).catch(() => undefined);
+/**
+ * 화면 신호는 프롬프트 힌트가 아니라 **결정적 후처리**로 적용한다.
+ *
+ * 처음엔 화면 설명을 프롬프트에 넣어 분류기가 참고하게 했는데, 실측(2026-07-19)에서 같은
+ * 입력에 매번 다른 답이 나왔다 — "이거 정리해줘"@취약점이 3회 실행에서 report→analyze→report,
+ * 설정 화면은 chat→report→analyze. 7B 분류기의 흔들림이라 프롬프트를 다듬는 건 노이즈 쫓기였다.
+ * 게다가 힌트의 존재 자체가 "뭔가 실행하라"는 신호로 읽혀, 지시 대상이 아닌 설정 화면에서도
+ * 액션을 만들어냈다.
+ *
+ * 그래서 역할을 나눴다 — 분류기는 지시문만 보고 판단하고(잘하는 일), 그 결과가 "판단 못 함(chat)"일
+ * 때만 화면이 결정적으로 개입한다. 명시적 동사가 있으면 분류기 결과가 그대로 이기므로
+ * "지시문 우선" 원칙도 지켜진다.
+ */
+export async function routeIntent(text: string, screen?: string): Promise<RoutedIntent> {
+  // trusted: 지시문은 dispatch에서 이미 게이트웨이를 지났고, 여기서는 분류용 프롬프트로 감싸 보낸다.
+  const reply = await chat({ agentId: "orchestrator", message: buildFewShotPrompt(text), trusted: true }).catch(() => undefined);
   const parsed = reply ? parseRoutedIntent(reply) : undefined;
-  return parsed ?? routeIntentByRegex(text);
+  const routed = parsed ?? routeIntentByRegex(text, screen);
+
+  // 지시문에 동작 단어가 없으면 화면이 결정한다 — 분류기 판단보다 우선.
+  //
+  // 분류기에 맡겨 보니 같은 문장이 실행마다 다른 액션이 됐다(실측: 자산 화면의 "이거 정리해줘"가
+  // 3회에 scan·analyze·analyze). 사용자 입장에서 같은 말이 매번 다른 일을 하는 건 제품으로서
+  // 곤란하다. 동사가 없는 지시는 애초에 텍스트만으로 알 수 없는 것이므로, 확률적 추측 대신
+  // 사용자가 이미 표현한 맥락(보고 있는 화면)을 결정적으로 쓴다.
+  const fromScreen = fallbackActionForScreen(screen);
+  if (fromScreen && !hasExplicitAction(text)) {
+    return { agentId: agentIdForAction(fromScreen), action: fromScreen, targetAssetId: routed.targetAssetId };
+  }
+
+  // 동작 단어가 있으면 분류기 판단을 따르되, 그마저 "판단 못 함"이면 화면으로 보정한다.
+  if (routed.action === "chat" && fromScreen) {
+    return { agentId: agentIdForAction(fromScreen), action: fromScreen, targetAssetId: routed.targetAssetId };
+  }
+  return routed;
 }
 
 export function registerIntentRoutes(app: Express): void {
@@ -86,7 +130,7 @@ export function registerIntentRoutes(app: Express): void {
     "/api/intent/route",
     authMiddleware,
     asyncRoute(async (req, res) => {
-      res.json(await routeIntent(req.body.text));
+      res.json(await routeIntent(req.body.text, req.body.screen));
     })
   );
 }
