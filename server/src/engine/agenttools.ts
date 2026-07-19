@@ -687,9 +687,78 @@ function runReviewFinding(args: Record<string, string>): string {
   return `${assetId}의 "${hit.finding_type}"(${hit.severity})을 ${label} 처리했습니다.`;
 }
 
+// ── 「AI-BOM」 도메인 도구 ───────────────────────────────────────────────
+// AI-BOM은 제품의 차별 기능이다. 5영역(model·dataset·prompt·agentTool·infrastructure)이
+// 얼마나 채워졌는지가 곧 거버넌스 준비도이므로, "무엇이 비었는가"를 짚어주는 게 핵심이다.
+
+// 5영역 중 실제로 값이 들어간 항목 수를 센다. 빈 문자열은 미기재로 본다.
+function aibomFilledFields(a: Asset): { filled: number; total: number; missing: string[] } {
+  const b = a.aibom;
+  const groups: [string, Record<string, string>][] = [
+    ["모델", { 기반모델: b.model.foundationModel, 아키텍처: b.model.architecture, 가중치해시: b.model.weightsHash, 용도: b.model.intendedUse, 한계: b.model.limitations }],
+    ["데이터셋", { 출처: b.dataset.sources, 벡터DB: b.dataset.vectorDbLocation }],
+    ["프롬프트", { 시스템프롬프트: b.prompt.systemPrompt, 가드레일: b.prompt.guardrails }],
+    ["도구", { API: b.agentTool.apis, MCP: b.agentTool.mcpServers }],
+    ["인프라", { 컴퓨트: b.infrastructure.compute, 호스팅: b.infrastructure.hostingProvider }],
+  ];
+  let filled = 0;
+  let total = 0;
+  const missing: string[] = [];
+  for (const [group, fields] of groups) {
+    for (const [label, v] of Object.entries(fields)) {
+      total++;
+      if (v && v.trim()) filled++;
+      else missing.push(`${group}·${label}`);
+    }
+  }
+  return { filled, total, missing };
+}
+
+// AI-BOM 구성 현황 — 어느 자산이 비어 있고 무엇이 빠졌는지. 거버넌스 보고의 출발점이다.
+function runAibomStatus(args: Record<string, string>): string {
+  const only = (args.assetId ?? "").trim();
+  const assets = only ? listAssets().filter((a) => a.id === only) : listAssets();
+  if (assets.length === 0) return only ? `자산을 찾을 수 없습니다: ${only}` : "등록된 자산이 없습니다.";
+
+  if (only) {
+    const a = assets[0];
+    const { filled, total, missing } = aibomFilledFields(a);
+    const r = a.aibom.robustness;
+    const rob = r.ranAt ? `견고성 ${r.score ?? "-"}점 (취약 ${r.vulnerable}/${r.total})` : "견고성 미점검";
+    const sbom = a.sbomGeneratedAt ? `SBOM 생성됨` : "SBOM 미생성";
+    const head = `${a.id} — AI-BOM ${filled}/${total} 항목 기재, ${sbom}, ${rob}`;
+    return missing.length ? `${head}\n미기재: ${missing.join(", ")}` : `${head}\n5영역 모두 기재 완료.`;
+  }
+
+  const rows = assets.map((a) => ({ a, ...aibomFilledFields(a) }));
+  const incomplete = rows.filter((r) => r.missing.length > 0);
+  const noSbom = rows.filter((r) => !r.a.sbomGeneratedAt);
+  const noRobustness = rows.filter((r) => !r.a.aibom.robustness.ranAt);
+
+  const head =
+    `자산 ${rows.length}건 — AI-BOM 미완성 ${incomplete.length}건, SBOM 미생성 ${noSbom.length}건, 견고성 미점검 ${noRobustness.length}건`;
+  const lines = rows
+    .slice(0, 10)
+    .map((r) => `- ${r.a.id}: ${r.filled}/${r.total} 기재${r.missing.length ? ` (미기재 ${r.missing.length}개)` : " ✓"}`);
+  const more = rows.length > 10 ? `\n… 외 ${rows.length - 10}건` : "";
+  return `${head}\n${lines.join("\n")}${more}`;
+}
+
 // ── 레지스트리 ──────────────────────────────────────────────────────────
 
 const TOOLS: AgentTool[] = [
+  {
+    name: "aibom_status",
+    label: "AI-BOM 구성 현황",
+    domain: "sbom",
+    write: false,
+    description:
+      'AI-BOM 5영역(모델·데이터셋·프롬프트·도구·인프라)이 얼마나 채워졌는지, SBOM 생성·견고성 점검 여부를 본다. assetId를 주면 그 자산의 미기재 항목까지 짚어준다. 예: {} 또는 {"assetId":"fraud-detect-llm"}',
+    params: [
+      { name: "assetId", label: "자산 id", description: "특정 자산만 (선택, 비우면 전체 현황)", required: false },
+    ],
+    run: runAibomStatus,
+  },
   {
     name: "finding_status",
     label: "취약점 현황 조회",
