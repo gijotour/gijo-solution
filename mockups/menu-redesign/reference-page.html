@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>기능 안내 — 전체 기능·입력칸 목록 + 링크 (설명 페이지 시안)</title>
+<style>
+  :root{
+    --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+    --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#fff;
+    --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--teal:#1eb980;--amber:#f0a020;--purple:#8b7cf0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:#05070d;color:var(--text);padding:26px;}
+  h1{font-size:19px;margin-bottom:4px;}
+  .lead{color:var(--muted);font-size:12.5px;margin-bottom:16px;max-width:1000px;line-height:1.6;}
+  .searchbar{max-width:1000px;background:var(--panel);border:1px solid var(--border-strong);border-radius:9px;padding:10px 14px;font-size:13px;color:var(--muted-2);margin-bottom:8px;}
+  .catrow{display:flex;gap:8px;flex-wrap:wrap;max-width:1000px;margin-bottom:20px;}
+  .catchip{font-size:11.5px;font-weight:700;padding:6px 12px;border-radius:20px;background:var(--panel);border:1px solid var(--border-strong);color:var(--muted);cursor:pointer;}
+  .catchip.active{background:rgba(59,130,246,.15);border-color:var(--blue);color:var(--blue-light);}
+
+  .cat{max-width:1000px;margin-bottom:22px;}
+  .cat-h{font-size:14px;font-weight:800;color:#fff;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+  table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+  th{text-align:left;font-size:10px;font-weight:700;color:var(--muted-2);text-transform:uppercase;letter-spacing:.5px;padding:9px 12px;border-bottom:1px solid var(--border);background:var(--panel-2);}
+  td{padding:11px 12px;border-bottom:1px solid var(--border);vertical-align:top;font-size:12px;}
+  tr:last-child td{border-bottom:none;}
+  .fn{font-weight:700;color:#fff;white-space:nowrap;}
+  .fn .ic{margin-right:6px;}
+  .inputs{display:flex;gap:5px;flex-wrap:wrap;}
+  .chip{font-size:10.5px;padding:2px 8px;border-radius:5px;background:var(--panel-2);border:1px solid var(--border);color:var(--muted);}
+  .chip.req{border-color:rgba(226,72,61,.4);color:#f5928a;}
+  .chip.none{color:var(--muted-2);border-style:dashed;}
+  .go{font-size:11px;font-weight:800;color:var(--blue-light);cursor:pointer;white-space:nowrap;}
+  .go:hover{text-decoration:underline;}
+  .note{max-width:1000px;margin-top:8px;font-size:11px;color:var(--muted-2);line-height:1.6;}
+</style>
+</head>
+<body>
+  <h1>❓ 기능 안내 — 전체 기능·입력칸 목록</h1>
+  <p class="lead">GIJO AS의 모든 기능과, 각 기능에서 입력하는 칸을 한 곳에 정리했습니다. <b style="color:#f5928a">빨강</b>=필수. 오른쪽 <b style="color:var(--blue-light)">이동 →</b>을 누르면 해당 기능으로 바로 갑니다. (요청: "모든 메뉴 기능 입력칸 리스트화 + 설명·링크 페이지")</p>
+  <div class="searchbar">🔎 기능·입력칸 검색… (예: 담당부서, CVE, SMTP)</div>
+  <div class="catrow">
+    <span class="catchip active">전체</span><span class="catchip">🖥 관제·모니터링</span><span class="catchip">🛡 자산·취약점·대응</span><span class="catchip">🤖 AI·시스템</span>
+  </div>
+
+  <div class="cat">
+    <div class="cat-h">🖥 관제·모니터링</div>
+    <table>
+      <tr><th style="width:180px">기능</th><th>입력칸</th><th style="width:70px">이동</th></tr>
+      <tr><td class="fn"><span class="ic">◆</span>대시보드</td><td><div class="inputs"><span class="chip">지휘 콘솔 지시</span></div></td><td class="go">이동 →</td></tr>
+      <tr><td class="fn"><span class="ic">📊</span>보안 KPI</td><td><div class="inputs"><span class="chip none">입력 없음(조회)</span></div></td><td class="go">이동 →</td></tr>
+      <tr><td class="fn"><span class="ic">🔬</span>통합 보안분석</td><td><div class="inputs"><span class="chip">로그·리포트 드롭존 업로드</span></div></td><td class="go">이동 →</td></tr>
+      <tr><td class="fn"><span class="ic">💬</span>작업 세션</td><td><div class="inputs"><span class="chip">세션 검색</span><span class="chip">이어서 지시</span></div></td><td class="go">이동 →</td></tr>
+      <tr><td class="fn"><span class="ic">△</span>위협 인텔리전스</td><td><div class="inputs"><span class="chip">벤더 API 키</span></div></td><td class="go">이동 →</td></tr>
+    </table>
+  </div>
+
+  <div class="cat">
+    <div class="cat-h">🛡 자산·취약점·대응</div>
+    <table>
+      <tr><th style="width:180px">기능</th><th>입력칸</th><th style="width:70px">이동</th></tr>
+      <tr><td class="fn"><span class="ic">📋</span>자산 등록·목록</td><td><div class="inputs"><span class="chip req">자산 ID</span><span class="chip req">이름</span><span class="chip req">경로</span><span class="chip">담당부서</span><span class="chip">서비스</span><span class="chip">저장소 스캔(조직·토큰·BaseURL)</span><span class="chip">검색</span></div></td><td class="go">이동 →</td></tr>
+      <tr><td class="fn"><span class="ic">🧠</span>AI-BOM 구성</td><td><div class="inputs"><span class="chip">자산 검색</span><span class="chip">가중치 파일 경로</span><span class="chip">AI-BOM 5영역 값</span></div></td><td class="go">이동 →</td></tr>
+      <tr><td class="fn"><span class="ic">🔓</span>취약점</td><td><div class="inputs"><span class="chip">스캔 리포트 업로드</span><span class="chip">출처 라벨</span><span class="chip">취약점·CVE 검색</span></div></td><td class="go">이동 →</td></tr>
+      <tr><td class="fn"><span class="ic">✅</span>조치·승인</td><td><div class="inputs"><span class="chip">담당자</span><span class="chip">기한</span><span class="chip">판정(오탐·완료)</span></div></td><td class="go">이동 →</td></tr>
+      <tr><td class="fn"><span class="ic">🧰</span>보안제품</td><td><div class="inputs"><span class="chip req">제품명</span><span class="chip">종류</span><span class="chip">제조사</span><span class="chip">모델</span><span class="chip">매뉴얼 업로드</span><span class="chip">정형정보 9항목(펌웨어·IP·로그형식·EOL 등)</span></div></td><td class="go">이동 →</td></tr>
+      <tr><td class="fn"><span class="ic">🔧</span>유지보수</td><td><div class="inputs"><span class="chip req">점검 제목</span><span class="chip req">대상 제품</span><span class="chip req">점검일</span><span class="chip">점검 결과 메모</span><span class="chip">수신자 이메일</span></div></td><td class="go">이동 →</td></tr>
+      <tr><td class="fn"><span class="ic">▣</span>리포트</td><td><div class="inputs"><span class="chip">유형(주간·분기·수시)</span><span class="chip">대상 자산</span><span class="chip">형식(docx·pdf)</span></div></td><td class="go">이동 →</td></tr>
+      <tr><td class="fn"><span class="ic">📑</span>컴플라이언스</td><td><div class="inputs"><span class="chip">대응 상태</span><span class="chip">대응 근거·메모</span></div></td><td class="go">이동 →</td></tr>
+    </table>
+  </div>
+
+  <div class="cat">
+    <div class="cat-h">🤖 AI·시스템</div>
+    <table>
+      <tr><th style="width:180px">기능</th><th>입력칸</th><th style="width:70px">이동</th></tr>
+      <tr><td class="fn"><span class="ic">◉</span>에이전트 AI</td><td><div class="inputs"><span class="chip">팀 지시</span><span class="chip">HF 모델 검색</span><span class="chip">에이전트 이름(관리자)</span><span class="chip">모델 배정(관리자)</span></div></td><td class="go">이동 →</td></tr>
+      <tr><td class="fn"><span class="ic">🧬</span>LLM 합성</td><td><div class="inputs"><span class="chip">모델 A·B 선택</span></div></td><td class="go">이동 →</td></tr>
+      <tr><td class="fn"><span class="ic">📖</span>LLM 가이드</td><td><div class="inputs"><span class="chip none">입력 없음(조회)</span></div></td><td class="go">이동 →</td></tr>
+      <tr><td class="fn"><span class="ic">📚</span>기억·학습(RAG)</td><td><div class="inputs"><span class="chip">문서 경로/붙여넣기</span><span class="chip">scope</span><span class="chip">데이터셋 ID</span><span class="chip">질의</span></div></td><td class="go">이동 →</td></tr>
+      <tr><td class="fn"><span class="ic">🩹</span>문서 보강</td><td><div class="inputs"><span class="chip req">제품</span><span class="chip req">섹션</span><span class="chip">증상·원인·해결</span><span class="chip">원문 붙여넣기</span></div></td><td class="go">이동 →</td></tr>
+      <tr><td class="fn"><span class="ic">🕸</span>온톨로지</td><td><div class="inputs"><span class="chip req">주어</span><span class="chip req">관계</span><span class="chip req">목적어</span><span class="chip">출처</span><span class="chip">질의</span></div></td><td class="go">이동 →</td></tr>
+      <tr><td class="fn"><span class="ic">🔁</span>학습 루프</td><td><div class="inputs"><span class="chip">베이스 모델</span><span class="chip">모델 접두어</span><span class="chip">데이터셋</span></div></td><td class="go">이동 →</td></tr>
+      <tr><td class="fn"><span class="ic">🛡</span>레드팀·가드레일</td><td><div class="inputs"><span class="chip">점검 대상 모델·자산</span><span class="chip">가드레일 모드</span></div></td><td class="go">이동 →</td></tr>
+      <tr><td class="fn"><span class="ic">🗒</span>로그</td><td><div class="inputs"><span class="chip none">입력 없음(조회)</span></div></td><td class="go">이동 →</td></tr>
+      <tr><td class="fn"><span class="ic">⚙</span>설정</td><td><div class="inputs"><span class="chip">서버 주소</span><span class="chip">비밀번호 변경</span><span class="chip">계정(아이디·이름·비번)</span><span class="chip">기본 모델</span><span class="chip">SMTP(호스트·포트·발신)</span><span class="chip">클라우드(모델·API키)</span></div></td><td class="go">이동 →</td></tr>
+      <tr><td class="fn"><span class="ic">💳</span>사용량·요금</td><td><div class="inputs"><span class="chip none">입력 없음(조회)</span></div></td><td class="go">이동 →</td></tr>
+    </table>
+  </div>
+
+  <div class="note">· 이 페이지는 왼쪽 메뉴 맨 위 "❓ 기능 안내"에서 언제든 열 수 있게 배치합니다(시안 C의 상단 버튼).<br>· 실제 구현 시 각 입력칸은 자동으로 코드에서 수집해 항상 최신 상태로 유지할 수 있습니다(수기 관리 불필요).</div>
+</body>
+</html>
