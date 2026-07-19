@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>임베딩 엔진 로스터 편입 — 시안 3종</title>
+<style>
+  :root{
+    --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+    --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#fff;
+    --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:#05070d;color:var(--text);padding:26px 30px 60px;}
+  h1{font-size:19px;margin-bottom:6px;}
+  .sub{font-size:12.5px;color:var(--muted);margin-bottom:26px;line-height:1.6;}
+  .variant{background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:20px 22px 24px;margin-bottom:26px;}
+  .vh{display:flex;align-items:baseline;gap:10px;margin-bottom:4px;}
+  .vh b{font-size:15px;color:#fff;}
+  .vh .tag{font-size:10px;font-weight:800;padding:3px 8px;border-radius:5px;background:rgba(59,130,246,.16);color:var(--blue-light);}
+  .vd{font-size:12px;color:var(--muted);line-height:1.65;margin-bottom:16px;}
+  .pros{font-size:11.5px;color:var(--muted);line-height:1.7;margin-top:14px;padding-top:12px;border-top:1px dashed var(--border);}
+  .pros b{color:var(--text);}
+  .pros .warn{color:var(--amber);}
+
+  /* ── 실제 대시보드 로스터 스타일 ── */
+  .team-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;width:100%;}
+  .tcard{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:9px 5px;text-align:center;cursor:pointer;position:relative;transition:.15s;}
+  .tcard:hover{border-color:var(--border-strong);transform:translateY(-2px);}
+  .tcard.working{border-color:rgba(59,130,246,0.5);box-shadow:0 0 16px rgba(59,130,246,0.18);}
+  .tc-av{width:32px;height:32px;border-radius:9px;margin:0 auto 6px;display:flex;align-items:center;justify-content:center;font-size:15px;background:var(--panel-2);border:1px solid var(--border);}
+  .tcard.working .tc-av{border-color:var(--blue);animation:tcpulse 1.5s infinite;}
+  @keyframes tcpulse{0%,100%{box-shadow:0 0 0 0 rgba(59,130,246,.5)}50%{box-shadow:0 0 0 7px rgba(59,130,246,0)}}
+  .tc-role{font-size:8.5px;color:var(--muted);margin-top:2px;min-height:22px;line-height:1.3;}
+  .tc-badges{display:flex;gap:3px;justify-content:center;margin-top:5px;flex-wrap:wrap;}
+  .tc-b{font-size:8px;font-weight:800;padding:2px 5px;border-radius:4px;}
+  .tc-work{color:var(--blue-light);background:rgba(59,130,246,0.16);}
+  .tc-watch{color:var(--teal);background:rgba(30,185,128,0.16);}
+  .tc-idle{color:var(--muted-2);background:rgba(255,255,255,0.05);}
+  .tc-llm{color:var(--purple);background:rgba(139,124,240,0.14);}
+  .tc-live{position:absolute;top:8px;right:9px;font-size:8.5px;color:var(--blue-light);font-weight:800;}
+  .tc-typing span{display:inline-block;width:3.5px;height:3.5px;border-radius:50%;background:var(--blue-light);margin:0 1px;animation:tcblink 1s infinite;}
+  .tc-typing span:nth-child(2){animation-delay:.2s}.tc-typing span:nth-child(3){animation-delay:.4s}
+  @keyframes tcblink{0%,100%{opacity:.3}50%{opacity:1}}
+
+  /* ── 시안 B: 인프라 카드 구분 ── */
+  .tcard.infra{background:linear-gradient(180deg,rgba(30,185,128,.05),var(--panel));border-style:dashed;border-color:rgba(30,185,128,.32);cursor:default;}
+  .tcard.infra:hover{transform:none;border-color:rgba(30,185,128,.5);}
+  .tcard.infra .tc-av{border-color:rgba(30,185,128,.4);}
+  .tc-b.tc-infra{color:var(--teal);background:rgba(30,185,128,.16);}
+  .infra-tag{position:absolute;top:-7px;left:50%;transform:translateX(-50%);font-size:7.5px;font-weight:800;letter-spacing:.4px;color:var(--teal);background:var(--bg);padding:0 6px;}
+
+  /* ── 시안 C: 강한 실시간 반응 ── */
+  .tcard.emb-c.active{border-color:rgba(30,185,128,.65);box-shadow:0 0 18px rgba(30,185,128,.22);}
+  .tcard.emb-c.active .tc-av{border-color:var(--teal);animation:embpulse 1.1s infinite;}
+  @keyframes embpulse{0%,100%{box-shadow:0 0 0 0 rgba(30,185,128,.55)}50%{box-shadow:0 0 0 8px rgba(30,185,128,0)}}
+  .wave{display:flex;align-items:flex-end;justify-content:center;gap:2px;height:13px;margin-top:4px;}
+  .wave i{width:2.5px;background:var(--teal);border-radius:2px;height:3px;opacity:.85;}
+  .tcard.emb-c.active .wave i{animation:wv .85s infinite ease-in-out;}
+  .wave i:nth-child(2){animation-delay:.1s}.wave i:nth-child(3){animation-delay:.2s}
+  .wave i:nth-child(4){animation-delay:.3s}.wave i:nth-child(5){animation-delay:.4s}
+  @keyframes wv{0%,100%{height:3px}50%{height:12px}}
+  .emb-stat{font-size:7.5px;color:var(--teal);margin-top:3px;font-weight:700;min-height:10px;}
+
+  .ctrl{margin:18px 0 4px;display:flex;gap:9px;align-items:center;}
+  .ctrl button{background:rgba(59,130,246,.16);border:1px solid rgba(59,130,246,.4);color:var(--blue-light);
+    font-size:11.5px;font-weight:700;padding:7px 13px;border-radius:8px;cursor:pointer;font-family:inherit;}
+  .ctrl button:hover{background:rgba(59,130,246,.28);}
+  .ctrl span{font-size:11px;color:var(--muted-2);}
+</style>
+</head>
+<body>
+
+<h1>임베딩 엔진을 로스터에 편입 — 시안 3종</h1>
+<p class="sub">
+  현재 로스터는 에이전트 6인(오케스트레이터·스캔·분석·리포트·위협인텔·지식해설)입니다.
+  여기에 <b>임베딩 엔진(bge-m3)</b>을 7번째로 넣되, 성격이 다릅니다 —
+  <b>대화 상대가 아니라 RAG 검색·문서 인입을 처리하는 엔진</b>입니다. 그 차이를 어떻게 다룰지가 세 시안의 갈림점입니다.<br>
+  아래 <b>“임베딩 호출 시뮬레이션”</b> 버튼으로 실제 동작 시 반응을 확인하세요.
+</p>
+
+<!-- ── 시안 A ── -->
+<div class="variant">
+  <div class="vh"><b>시안 A — 동등 카드</b><span class="tag">가장 단순</span></div>
+  <p class="vd">
+    다른 팀원과 완전히 같은 형태로 7번째 카드를 추가합니다. 호출되면 기존 <code>working</code> 상태와 동일하게
+    파란 테두리·펄스·타이핑 점이 켜집니다. 코드 변경이 가장 적고 시각적으로 통일됩니다.
+  </p>
+  <div class="team-grid" id="gridA"></div>
+  <div class="pros">
+    <b>장점</b> · 구현·유지보수가 가장 단순하고 로스터가 한눈에 균일합니다.<br>
+    <b class="warn">단점</b> · 클릭해서 대화하려는 시도가 생깁니다. 임베딩은 대화 상대가 아니라 눌러도 할 게 없습니다.
+  </div>
+</div>
+
+<!-- ── 시안 B ── -->
+<div class="variant">
+  <div class="vh"><b>시안 B — 인프라 구분</b><span class="tag">역할을 정직하게</span></div>
+  <p class="vd">
+    7번째 자리에 두되 <b>점선 테두리·청록 계열</b>로 팀원과 구분하고 “엔진” 라벨을 답니다.
+    대화 대상으로 선택되지 않으며, 클릭하면 엔진 상태(모델·포트·처리량)를 보여줍니다.
+  </p>
+  <div class="team-grid" id="gridB"></div>
+  <div class="pros">
+    <b>장점</b> · 사람(에이전트)과 인프라(엔진)의 차이가 화면에서 바로 읽혀 오해가 없습니다.<br>
+    <b class="warn">단점</b> · 카드 스타일이 하나 더 늘어 로스터의 균일함이 약간 깨집니다.
+  </div>
+</div>
+
+<!-- ── 시안 C ── -->
+<div class="variant">
+  <div class="vh"><b>시안 C — 실시간 반응 강화</b><span class="tag">동작이 잘 보임</span></div>
+  <p class="vd">
+    B의 구분에 더해, 호출될 때마다 <b>파형 애니메이션</b>이 뛰고 <b>처리 건수·응답 지연</b>이 카드에 실시간으로 찍힙니다.
+    RAG가 실제로 도는지 대시보드에서 즉시 확인됩니다.
+  </p>
+  <div class="team-grid" id="gridC"></div>
+  <div class="ctrl">
+    <button onclick="simulate()">임베딩 호출 시뮬레이션</button>
+    <span id="simMsg">세 시안 모두 동시에 반응합니다</span>
+  </div>
+  <div class="pros">
+    <b>장점</b> · “지금 검색이 돌고 있다”가 가장 명확합니다. 장애 시(응답 없음)도 바로 눈에 띕니다.<br>
+    <b class="warn">단점</b> · 요소가 늘어 카드가 조금 복잡해지고, 잦은 호출 시 시선을 끕니다.
+  </div>
+</div>
+
+<script>
+const AGENTS = [
+  { icon:"🧭", role:"지휘·배분",     badge:"대기",  bcls:"tc-idle",  llm:"gijo" },
+  { icon:"🔍", role:"스캔·수집",     badge:"감시중", bcls:"tc-watch", llm:"lily" },
+  { icon:"📊", role:"우선순위 판단",  badge:"작업중", bcls:"tc-work",  llm:"lily", working:true },
+  { icon:"📝", role:"보고서 작성",    badge:"대기",  bcls:"tc-idle",  llm:"lily" },
+  { icon:"🛰️", role:"위협 인텔",     badge:"감시중", bcls:"tc-watch", llm:"lily" },
+  { icon:"💬", role:"지식 해설",      badge:"대기",  bcls:"tc-idle",  llm:"lily" },
+];
+
+function agentCards(working) {
+  return AGENTS.map(a => {
+    const w = a.working ? " working" : "";
+    const live = a.working ? '<div class="tc-live tc-typing"><span></span><span></span><span></span></div>' : "";
+    return `<div class="tcard${w}">${live}<div class="tc-av">${a.icon}</div>
+      <div class="tc-role">${a.role}</div>
+      <div class="tc-badges"><span class="tc-b ${a.bcls}">${a.badge}</span><span class="tc-b tc-llm">${a.llm}</span></div></div>`;
+  }).join("");
+}
+
+// 시안 A — 동등 카드
+document.getElementById("gridA").innerHTML = agentCards() + `
+  <div class="tcard" id="embA">
+    <div class="tc-live tc-typing" style="display:none"><span></span><span></span><span></span></div>
+    <div class="tc-av">🧬</div>
+    <div class="tc-role">임베딩·검색</div>
+    <div class="tc-badges"><span class="tc-b tc-idle" id="badgeA">대기</span><span class="tc-b tc-llm">bge-m3</span></div>
+  </div>`;
+
+// 시안 B — 인프라 구분
+document.getElementById("gridB").innerHTML = agentCards() + `
+  <div class="tcard infra" id="embB">
+    <span class="infra-tag">ENGINE</span>
+    <div class="tc-av">🧬</div>
+    <div class="tc-role">임베딩·검색<br>bge-m3</div>
+    <div class="tc-badges"><span class="tc-b tc-infra" id="badgeB">상주</span></div>
+  </div>`;
+
+// 시안 C — 실시간 반응
+document.getElementById("gridC").innerHTML = agentCards() + `
+  <div class="tcard infra emb-c" id="embC">
+    <span class="infra-tag">ENGINE</span>
+    <div class="tc-av">🧬</div>
+    <div class="tc-role">임베딩·검색</div>
+    <div class="wave"><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="emb-stat" id="statC">누적 1,284건</div>
+    <div class="tc-badges"><span class="tc-b tc-infra" id="badgeC">상주</span></div>
+  </div>`;
+
+let total = 1284;
+function simulate() {
+  const n = 3 + Math.floor(Math.random() * 6);
+  const ms = 40 + Math.floor(Math.random() * 90);
+  total += n;
+
+  // A: 기존 working 상태 그대로
+  const a = document.getElementById("embA");
+  a.classList.add("working");
+  a.querySelector(".tc-live").style.display = "";
+  document.getElementById("badgeA").textContent = "작업중";
+  document.getElementById("badgeA").className = "tc-b tc-work";
+
+  // B: 배지만 바뀜 (차분)
+  document.getElementById("badgeB").textContent = "검색중";
+
+  // C: 파형 + 실시간 수치
+  const c = document.getElementById("embC");
+  c.classList.add("active");
+  document.getElementById("badgeC").textContent = "검색중";
+  document.getElementById("statC").textContent = `${n}건 · ${ms}ms`;
+
+  document.getElementById("simMsg").textContent = `임베딩 ${n}건 처리 (${ms}ms)`;
+
+  setTimeout(() => {
+    a.classList.remove("working");
+    a.querySelector(".tc-live").style.display = "none";
+    document.getElementById("badgeA").textContent = "대기";
+    document.getElementById("badgeA").className = "tc-b tc-idle";
+    document.getElementById("badgeB").textContent = "상주";
+    c.classList.remove("active");
+    document.getElementById("badgeC").textContent = "상주";
+    document.getElementById("statC").textContent = `누적 ${total.toLocaleString()}건`;
+    document.getElementById("simMsg").textContent = "세 시안 모두 동시에 반응합니다";
+  }, 2200);
+}
+</script>
+</body>
+</html>

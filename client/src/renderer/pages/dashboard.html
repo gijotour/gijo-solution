@@ -244,7 +244,9 @@
   .console-caption{font-size:12px;color:var(--muted);margin:2px 0 14px;text-align:center;max-width:560px;}
   /* 6인 로스터가 한 줄에 딱 맞게 — 카드 컴팩트(아바타·글자 축소). */
   /* 팀원 카드 — 이름 없이 아이콘·역할·상태 배지만(어떤 에이전트가 작업 중인지 한눈에). */
-  .team-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;width:100%;}
+  /* 에이전트 6인 + 엔진 2(임베딩·가드레일) = 8칸. 칸 수를 고정하지 않고 auto-fit으로 둔다 —
+     앞으로 엔진이 더 붙어도 폭이 부족하면 자연스럽게 다음 줄로 넘어가고, 넉넉하면 한 줄을 유지한다. */
+  .team-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(64px,1fr));gap:8px;width:100%;}
   .tcard{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:9px 5px;text-align:center;cursor:pointer;position:relative;transition:.15s;}
   .tcard:hover{border-color:var(--border-strong);transform:translateY(-2px);}
   .tcard.sel{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue) inset,0 0 18px rgba(59,130,246,.18);}
@@ -265,6 +267,56 @@
   .tc-typing span{display:inline-block;width:3.5px;height:3.5px;border-radius:50%;background:var(--blue-light);margin:0 1px;animation:tcblink 1s infinite;}
   .tc-typing span:nth-child(2){animation-delay:.2s}.tc-typing span:nth-child(3){animation-delay:.4s}
   @keyframes tcblink{0%,100%{opacity:.3}50%{opacity:1}}
+  /* ── 임베딩 엔진 카드 ──────────────────────────────────────────────────────
+     로스터 7번째 자리이지만 성격이 다르다 — 대화 상대(에이전트)가 아니라 RAG 검색·문서
+     인입을 처리하는 인프라다. 점선 테두리·청록 계열과 ENGINE 라벨로 구분해, 눌러서
+     대화하려는 오해를 막는다(선택 대상에서도 제외). 호출될 때만 파형이 뛴다. */
+  .tcard.infra{background:linear-gradient(180deg,rgba(30,185,128,.05),var(--panel));border-style:dashed;
+    border-color:rgba(30,185,128,.32);cursor:default;}
+  .tcard.infra:hover{transform:none;border-color:rgba(30,185,128,.5);}
+  .tcard.infra .tc-av{border-color:rgba(30,185,128,.4);}
+  .tcard.infra.down{border-color:rgba(226,72,61,.45);background:linear-gradient(180deg,rgba(226,72,61,.06),var(--panel));}
+  .tcard.infra.down .tc-av{border-color:rgba(226,72,61,.5);}
+  .tc-b.tc-infra{color:var(--teal);background:rgba(30,185,128,.16);}
+  .tc-b.tc-infra-down{color:var(--red);background:rgba(226,72,61,.16);}
+  .infra-tag{position:absolute;top:-7px;left:50%;transform:translateX(-50%);font-size:7.5px;font-weight:800;
+    letter-spacing:.4px;color:var(--teal);background:var(--bg);padding:0 6px;}
+  .tcard.infra.down .infra-tag{color:var(--red);}
+  .tcard.infra.active{border-color:rgba(30,185,128,.65);box-shadow:0 0 18px rgba(30,185,128,.22);}
+  .tcard.infra.active .tc-av{border-color:var(--teal);animation:embpulse 1.1s infinite;}
+  @keyframes embpulse{0%,100%{box-shadow:0 0 0 0 rgba(30,185,128,.55)}50%{box-shadow:0 0 0 8px rgba(30,185,128,0)}}
+  .emb-wave{display:flex;align-items:flex-end;justify-content:center;gap:2px;height:13px;margin-top:4px;}
+  .emb-wave i{width:2.5px;background:var(--teal);border-radius:2px;height:3px;opacity:.85;}
+  .tcard.infra.down .emb-wave i{background:var(--red);}
+  .tcard.infra.active .emb-wave i{animation:embwv .85s infinite ease-in-out;}
+  .emb-wave i:nth-child(2){animation-delay:.1s}.emb-wave i:nth-child(3){animation-delay:.2s}
+  .emb-wave i:nth-child(4){animation-delay:.3s}.emb-wave i:nth-child(5){animation-delay:.4s}
+  @keyframes embwv{0%,100%{height:3px}50%{height:12px}}
+  .emb-stat{font-size:7.5px;color:var(--teal);margin-top:3px;font-weight:700;min-height:10px;}
+  .tcard.infra.down .emb-stat{color:var(--red);}
+  /* ── 가드레일 카드 ─────────────────────────────────────────────────────────
+     임베딩과 같은 ENGINE 계열이지만 의미가 반대다 — 임베딩은 "돌고 있으면 정상",
+     가드레일은 "탐지가 뜨면 공격받는 중"이다. 그래서 평상시 청록이 아니라 중립(회색)이고,
+     탐지 시 앰버, 보호가 꺼져 있으면(off) 빨강으로 경고한다. */
+  .tcard.guard{background:linear-gradient(180deg,rgba(139,124,240,.05),var(--panel));
+    border-color:rgba(139,124,240,.28);}
+  .tcard.guard:hover{border-color:rgba(139,124,240,.5);}
+  .tcard.guard .tc-av{border-color:rgba(139,124,240,.4);}
+  .tcard.guard .infra-tag{color:var(--purple);}
+  .tc-b.tc-guard{color:var(--purple);background:rgba(139,124,240,.16);}
+  .tc-b.tc-guard-alert{color:var(--amber);background:rgba(240,160,32,.18);}
+  .tc-b.tc-guard-off{color:var(--red);background:rgba(226,72,61,.16);}
+  .guard-stat{font-size:7.5px;color:var(--muted);margin-top:3px;font-weight:700;min-height:10px;}
+  /* 탐지 발생 — 앰버로 강하게 반응 */
+  .tcard.guard.hit{border-color:rgba(240,160,32,.7);box-shadow:0 0 18px rgba(240,160,32,.25);}
+  .tcard.guard.hit .tc-av{border-color:var(--amber);animation:gdpulse 1s infinite;}
+  .tcard.guard.hit .guard-stat{color:var(--amber);}
+  @keyframes gdpulse{0%,100%{box-shadow:0 0 0 0 rgba(240,160,32,.6)}50%{box-shadow:0 0 0 8px rgba(240,160,32,0)}}
+  /* 보호 꺼짐 — 상시 경고(깜빡이지 않되 눈에 띄게) */
+  .tcard.guard.off{border-color:rgba(226,72,61,.5);background:linear-gradient(180deg,rgba(226,72,61,.07),var(--panel));}
+  .tcard.guard.off .tc-av{border-color:rgba(226,72,61,.55);}
+  .tcard.guard.off .infra-tag{color:var(--red);}
+  .tcard.guard.off .guard-stat{color:var(--red);}
   .agent-dock{margin-top:auto;width:100%;position:sticky;bottom:0;background:linear-gradient(180deg,rgba(10,14,26,0) 0%,var(--bg) 26%);padding:16px 0 18px;display:flex;align-items:center;gap:10px;justify-content:center;z-index:6;}
   .dock-who{display:flex;align-items:center;gap:8px;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.3);border-radius:10px;padding:7px 11px;white-space:nowrap;}
   .dock-who .dw-i{width:26px;height:26px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:13px;}
@@ -1379,13 +1431,158 @@
       `<div class="tc-role">${escT(a.role || "")}</div>` +
       `<div class="tc-badges"><span class="tc-b ${meta.bcls}">${meta.badge}</span><span class="tc-b tc-llm">${escT(llmBadge(a))}</span></div></div>`;
   }
+  // ── 임베딩 엔진 카드 (로스터 7번째) ────────────────────────────────────────
+  // 에이전트가 아니라 인프라라, 서버의 에이전트 목록이 아닌 localengine 상태에서 생사를 읽고
+  // llm:event(kind=embed)로 실제 호출을 반영한다. 누적 건수는 화면이 떠 있는 동안의 관측치다.
+  let embTotal = 0;
+  let embResetTimer = null;
+
+  function embCardHtml() {
+    return '<div class="tcard infra" id="embCard" title="임베딩 엔진 — RAG 검색·문서 인입에 쓰입니다 (대화 대상 아님)">' +
+      '<span class="infra-tag">ENGINE</span>' +
+      '<div class="tc-av">🧬</div>' +
+      '<div class="tc-role">임베딩·검색</div>' +
+      '<div class="emb-wave"><i></i><i></i><i></i><i></i><i></i></div>' +
+      '<div class="emb-stat" id="embStat">확인 중…</div>' +
+      '<div class="tc-badges"><span class="tc-b tc-infra" id="embBadge">확인 중</span></div></div>';
+  }
+
+  // 엔진이 살아 있는지(상주/중지)를 localengine 상태로 갱신한다.
+  async function refreshEmbeddingCard() {
+    const card = document.getElementById("embCard");
+    if (!card) return;
+    const badge = document.getElementById("embBadge");
+    const stat = document.getElementById("embStat");
+    try {
+      const s = await window.gijo.getLocalEngineStatus();
+      const up = !!(s && s.embedding && s.embedding.running);
+      card.classList.toggle("down", !up);
+      badge.textContent = up ? "상주" : "중지";
+      badge.className = "tc-b " + (up ? "tc-infra" : "tc-infra-down");
+      if (!card.classList.contains("active")) {
+        stat.textContent = up
+          ? (embTotal > 0 ? `누적 ${embTotal.toLocaleString()}건` : (s.embedding.modelId || "bge-m3"))
+          : "엔진 미기동";
+      }
+    } catch {
+      card.classList.add("down");
+      badge.textContent = "확인 불가";
+      badge.className = "tc-b tc-infra-down";
+      stat.textContent = "상태 조회 실패";
+    }
+  }
+
+  // 임베딩이 실제로 돌 때마다 파형을 띄우고 처리 건수·지연을 찍는다.
+  function onEmbeddingActivity(evt) {
+    const card = document.getElementById("embCard");
+    if (!card || !evt || evt.kind !== "embed") return;
+    const stat = document.getElementById("embStat");
+    const badge = document.getElementById("embBadge");
+
+    if (evt.phase === "error") {
+      card.classList.remove("active");
+      card.classList.add("down");
+      badge.textContent = "오류";
+      badge.className = "tc-b tc-infra-down";
+      stat.textContent = "연결 실패";
+      return;
+    }
+    if (evt.phase !== "done") return;
+
+    card.classList.remove("down");
+    card.classList.add("active");
+    badge.textContent = "검색중";
+    badge.className = "tc-b tc-infra";
+
+    // detail은 "N개 임베딩" 형태 — 건수를 뽑아 누적에 더한다(형식이 바뀌면 조용히 1건 취급).
+    const n = Number((String(evt.detail || "").match(/(\d+)\s*개/) || [])[1]) || 1;
+    embTotal += n;
+    stat.textContent = evt.latencyMs ? `${n}건 · ${evt.latencyMs}ms` : `${n}건`;
+
+    clearTimeout(embResetTimer);
+    embResetTimer = setTimeout(() => {
+      card.classList.remove("active");
+      badge.textContent = "상주";
+      stat.textContent = `누적 ${embTotal.toLocaleString()}건`;
+    }, 2200);
+  }
+
+  // ── 가드레일 카드 (로스터 8번째) ──────────────────────────────────────────
+  // 용도: "AI가 지금 공격받고 있는가"와 "방어가 켜져 있는가"를 한눈에 본다.
+  // 임베딩 카드와 의미가 반대다 — 임베딩은 돌면 정상, 가드레일은 탐지가 뜨면 비정상이다.
+  // 가드레일은 ws 푸시가 없어(상태 API만 존재) 폴링으로 증가분을 감지한다.
+  let guardSeenFlagged = null; // 직전 관측치. 첫 조회는 기준선만 잡고 반응하지 않는다.
+  let guardHitTimer = null;
+
+  function guardCardHtml() {
+    return '<div class="tcard infra guard" id="guardCard" data-page="redteam.html" ' +
+      'title="런타임 가드레일 — LLM 입력의 프롬프트 인젝션을 실시간 검사합니다. 클릭하면 AI 견고성 화면으로 이동합니다.">' +
+      '<span class="infra-tag">GUARD</span>' +
+      '<div class="tc-av">🛡</div>' +
+      '<div class="tc-role">프롬프트 방어</div>' +
+      '<div class="guard-stat" id="guardStat">확인 중…</div>' +
+      '<div class="tc-badges"><span class="tc-b tc-guard" id="guardBadge">확인 중</span></div></div>';
+  }
+
+  async function refreshGuardCard() {
+    const card = document.getElementById("guardCard");
+    if (!card) return;
+    const badge = document.getElementById("guardBadge");
+    const stat = document.getElementById("guardStat");
+    try {
+      const s = await window.gijo.guardrailStatus();
+      const flagged = Number(s.flaggedCount) || 0;
+      const blocked = Number(s.blockedCount) || 0;
+
+      // 모드 표시 — off는 방어가 없는 상태라 경고로 다룬다.
+      card.classList.toggle("off", s.mode === "off");
+      badge.textContent = s.mode === "block" ? "차단" : s.mode === "flag" ? "감시" : "꺼짐";
+      badge.className = "tc-b " + (s.mode === "off" ? "tc-guard-off" : "tc-guard");
+
+      // 직전 관측보다 탐지가 늘었으면 공격 시도가 있었다는 뜻 — 앰버로 반응.
+      if (guardSeenFlagged !== null && flagged > guardSeenFlagged) {
+        const delta = flagged - guardSeenFlagged;
+        card.classList.add("hit");
+        stat.textContent = `탐지 +${delta}건`;
+        clearTimeout(guardHitTimer);
+        guardHitTimer = setTimeout(() => {
+          card.classList.remove("hit");
+          stat.textContent = guardSummary(flagged, blocked, s.mode);
+        }, 6000);
+      } else if (!card.classList.contains("hit")) {
+        stat.textContent = guardSummary(flagged, blocked, s.mode);
+      }
+      guardSeenFlagged = flagged;
+    } catch {
+      badge.textContent = "확인 불가";
+      badge.className = "tc-b tc-guard-off";
+      stat.textContent = "상태 조회 실패";
+    }
+  }
+
+  // 누적 수치는 서버 기동 이후 기준이고 최근 200건까지만 보관된다 — 문구로 오해를 줄인다.
+  function guardSummary(flagged, blocked, mode) {
+    if (mode === "off") return "보호 꺼짐";
+    if (flagged === 0) return "탐지 없음";
+    return `탐지 ${flagged} · 차단 ${blocked}`;
+  }
+
   async function renderTeam() {
     try {
       const agents = await window.gijo.listAgents();
       agentsById = {};
       agents.forEach((a) => { agentsById[a.id] = a; });
-      teamGrid.innerHTML = agents.map(tcardHtml).join("");
-      teamGrid.querySelectorAll(".tcard").forEach((c) => c.addEventListener("click", () => selectAgent(c.dataset.agent)));
+      teamGrid.innerHTML = agents.map(tcardHtml).join("") + embCardHtml() + guardCardHtml();
+      // data-agent가 있는 카드만 대화 대상 — 엔진 카드들은 속성이 없어 자연히 제외된다.
+      teamGrid.querySelectorAll(".tcard[data-agent]").forEach((c) => c.addEventListener("click", () => selectAgent(c.dataset.agent)));
+      // 가드레일 카드는 대화가 아니라 화면 이동(AI 견고성)으로 연결한다.
+      const gc = document.getElementById("guardCard");
+      if (gc) {
+        gc.style.cursor = "pointer";
+        gc.addEventListener("click", () => window.gijo.navigateTo("redteam.html"));
+      }
+      refreshEmbeddingCard();
+      refreshGuardCard();
       if (!agentsById[currentTarget]) currentTarget = agents[0] ? agents[0].id : "orchestrator";
       selectAgent(currentTarget);
     } catch (e) {
@@ -1648,7 +1845,14 @@
       pulseBusy();
     });
     // 로컬 LLM이 실제로 추론/임베딩할 때마다도 작업 중으로 간주해 반짝임을 살린다.
-    if (window.gijo.onLlmActivity) window.gijo.onLlmActivity(pulseBusy);
+    // 임베딩 이벤트는 로스터의 엔진 카드에도 따로 반영한다(파형·처리량).
+    if (window.gijo.onLlmActivity) {
+      window.gijo.onLlmActivity((evt) => { pulseBusy(); onEmbeddingActivity(evt); });
+    }
+    // 엔진 생사는 이벤트가 없을 때도 바뀔 수 있어(수동 중지·크래시) 주기적으로 확인한다.
+    setInterval(refreshEmbeddingCard, 30000);
+    // 가드레일은 ws 푸시가 없어 폴링이 유일한 신호다. 공격 탐지를 늦게 알면 의미가 줄어 15초로 둔다.
+    setInterval(refreshGuardCard, 15000);
     // 자산·스캔 변경(asset:updated)이 오면 자산 탐색기·오늘의 조치를 즉시 새로고침 — 스캔 업로드가
     // 대시보드에 바로 반영되게(수동 새로고침 없이). 잦은 이벤트 대비 300ms 디바운스.
     if (window.gijo.onAssetUpdated) {
