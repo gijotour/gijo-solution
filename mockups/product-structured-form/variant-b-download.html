@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>시안 B 구체화 — AI 초안 다운로드/가져오기 흐름</title>
+<style>
+  :root{
+    --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+    --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+    --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:#05070d;color:var(--text);padding:28px;}
+  h1{font-size:18px;margin-bottom:4px;}
+  .lead{color:var(--muted);font-size:12.5px;margin-bottom:22px;}
+  .flow{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;}
+  .step{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px;position:relative;}
+  .step-num{position:absolute;top:-10px;left:14px;background:var(--blue);color:#fff;font-size:10px;font-weight:800;padding:2px 8px;border-radius:10px;}
+  .step h2{font-size:12.5px;color:#fff;margin:6px 0 3px;}
+  .step .sub{font-size:10.5px;color:var(--muted);line-height:1.5;margin-bottom:12px;min-height:44px;}
+  .arrow-between{display:flex;align-items:center;justify-content:center;color:var(--muted-2);font-size:18px;}
+
+  .panel-box{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:11px;}
+  .upload-drop{border:1.5px dashed var(--border-strong);border-radius:8px;padding:18px 10px;text-align:center;color:var(--muted-2);font-size:10.5px;}
+  .upload-drop b{color:var(--blue-light);}
+  .filechip{display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--border);border-radius:7px;padding:6px 9px;font-size:10.5px;margin-top:8px;}
+  .filechip .x{margin-left:auto;color:var(--muted-2);cursor:pointer;}
+
+  .btn{border:none;border-radius:7px;padding:7px 12px;font-size:10.5px;font-weight:700;cursor:pointer;width:100%;margin-bottom:6px;display:flex;align-items:center;justify-content:center;gap:5px;}
+  .btn-ai{background:var(--blue);color:#fff;}
+  .btn-dl{background:transparent;border:1px solid var(--border-strong);color:var(--text);}
+  .btn-dl:hover{border-color:var(--teal);color:var(--teal);}
+  .btn-import{background:transparent;border:1px dashed var(--border-strong);color:var(--muted);}
+  .btn-save{background:var(--teal);color:#06281c;}
+
+  .field-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px dashed var(--border);gap:8px;}
+  .field-row:last-child{border-bottom:none;}
+  .field-label{color:var(--muted);font-size:10.5px;flex:0 0 92px;}
+  .field-input{background:var(--panel);border:1px solid var(--border-strong);border-radius:5px;padding:4px 7px;color:var(--text);font-size:10.5px;flex:1;min-width:0;}
+  .src-badge{font-size:8.5px;font-weight:800;padding:1px 5px;border-radius:4px;flex:0 0 auto;}
+  .src-said{background:rgba(30,185,128,.18);color:var(--teal);}
+  .src-guess{background:rgba(240,160,32,.18);color:var(--amber);}
+  .src-empty{background:rgba(226,72,61,.18);color:#f5928a;}
+
+  .csv-preview{background:#05070d;border:1px solid var(--border);border-radius:8px;padding:10px;font-family:Consolas,monospace;font-size:9.5px;color:#8fd6a8;line-height:1.7;overflow-x:auto;white-space:pre;}
+  .csv-preview .h{color:var(--blue-light);}
+
+  .note{margin-top:22px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 18px;font-size:12px;color:var(--muted);line-height:1.7;}
+  .note b{color:#fff;}
+  .note code{background:var(--panel-2);padding:1px 5px;border-radius:4px;color:var(--blue-light);font-size:11px;}
+</style>
+</head>
+<body>
+  <h1>시안 B 구체화 — AI 초안 채우기 + 다운로드/가져오기</h1>
+  <p class="lead">제품 상세 화면(products.html) 안에서 그대로 이어지는 3단계 흐름입니다. 매뉴얼 업로드 → AI 초안 채우기(화면에서 바로 확인·수정 가능) → <b style="color:#fff">그 초안을 파일로 내려받아 Excel 등에서 편하게 검토·수정한 뒤 다시 올려서 반영</b>. 웹 화면 입력이 불편한 사람은 다운로드-수정-업로드만으로 등록을 끝낼 수 있습니다.</p>
+
+  <div class="flow">
+    <div class="step">
+      <span class="step-num">1</span>
+      <h2>매뉴얼 업로드</h2>
+      <div class="sub">기존과 동일한 업로드. 매뉴얼이 없으면 건너뛰고 바로 빈 양식을 다운받아도 됨.</div>
+      <div class="panel-box">
+        <div class="upload-drop">📎 매뉴얼 파일을 여기에 드래그<br>(또는 <b>선택</b>)</div>
+        <div class="filechip">📄 FortiGate_600F_Manual.pdf <span class="x">✕</span></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="step-num">2</span>
+      <h2>AI 초안 채우기 (화면에서 확인)</h2>
+      <div class="sub">json_schema 강제 디코딩으로 매뉴얼에서 항목을 뽑아 채움. 출처 배지(문서/AI추정/미입력)로 뭘 더 봐야 하는지 바로 보임 — 여기서 직접 고쳐도 됨.</div>
+      <div class="panel-box">
+        <button class="btn btn-ai">✨ AI로 초안 채우기</button>
+        <div class="field-row"><span class="field-label">펌웨어 버전</span><input class="field-input" value="v9.2.1"><span class="src-badge src-said">문서</span></div>
+        <div class="field-row"><span class="field-label">관리 IP·포트</span><input class="field-input" value="10.0.4.1:443"><span class="src-badge src-guess">AI추정</span></div>
+        <div class="field-row"><span class="field-label">로그 형식</span><input class="field-input" value="Syslog(CEF)"><span class="src-badge src-guess">AI추정</span></div>
+        <div class="field-row"><span class="field-label">EOL</span><input class="field-input" placeholder="미입력" style="border-color:var(--red)"><span class="src-badge src-empty">필요</span></div>
+      </div>
+    </div>
+
+    <div class="step">
+      <span class="step-num">3</span>
+      <h2>다운로드 → 검토 → 가져오기</h2>
+      <div class="sub">지금 채워진 값을 CSV로 내려받아 Excel에서 편집(누락값 채우기 등) 후, 같은 자리에 다시 올리면 화면 필드가 그대로 갱신됩니다.</div>
+      <div class="panel-box">
+        <button class="btn btn-dl">⬇ 초안 다운로드 (.csv)</button>
+        <button class="btn btn-import">⬆ 채운 양식 가져오기</button>
+        <div class="csv-preview"><span class="h">항목,값,출처</span>
+펌웨어 버전,v9.2.1,문서
+관리 IP·포트,10.0.4.1:443,AI추정
+로그 형식,Syslog(CEF),AI추정
+EOL,,미입력</div>
+        <button class="btn btn-save" style="margin-top:10px">✓ 이 정보로 제품 등록</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>구현 메모</b><br>
+    · 다운로드 버튼은 <b>AI 초안이 없어도(빈 값이어도)</b> 항상 눌러집니다 — 매뉴얼이 아예 없는 제품도 "빈 양식 받기 → Excel에서 채우기 → 가져오기"로 등록 가능.<br>
+    · 파일 형식은 <code>.csv</code>(UTF-8 BOM 포함 — 안 넣으면 Excel에서 한글이 깨짐, 실제로 자주 나는 문제라 특히 신경써야 함). 기존 취약점스캔·자산 CSV 가져오기와 같은 방식이라 새 라이브러리 없이 구현 가능.<br>
+    · "가져오기"는 파일의 <code>항목,값</code> 두 컬럼만 읽어 화면 필드에 그대로 매핑 — 사람이 고친 값이므로 출처 배지는 자동으로 "직접입력"으로 바뀜.<br>
+    · 여러 제품을 한 번에 처리하고 싶다면(제품 10개 매뉴얼을 한꺼번에 등록 등) 같은 CSV 포맷을 여러 행/여러 제품으로 확장한 "일괄 가져오기"로 나중에 넓힐 수 있습니다 — 지금은 제품 1개 단위로 범위를 좁혔습니다.
+  </div>
+</body>
+</html>

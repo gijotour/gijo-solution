@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>지휘콘솔 제안 카드 — 작은 아이콘 시안 3종</title>
+<style>
+  :root{
+    --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+    --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+    --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:#05070d;color:var(--text);padding:32px;}
+  h1{font-size:18px;margin-bottom:6px;}
+  .lead{color:var(--muted);font-size:13px;margin-bottom:28px;}
+  .variants{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;}
+  .variant{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px;}
+  .variant h2{font-size:13.5px;color:#fff;margin-bottom:3px;}
+  .variant .desc{font-size:11.5px;color:var(--muted);line-height:1.5;margin-bottom:14px;min-height:48px;}
+  .console{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px;}
+
+  /* 공통 — 기존 지휘콘솔 행 스타일(참고용, 답변 예시에 사용) */
+  .cl-row{display:flex;gap:9px;align-items:flex-start;font-size:12px;line-height:1.55;padding:7px 9px;border-radius:9px;background:var(--panel-2);border:1px solid var(--border);}
+  .cl-row .ci{width:24px;height:24px;border-radius:7px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;flex:0 0 auto;}
+  .cl-row .cb{flex:1;min-width:0;}
+  .cl-row .cn{font-size:10.5px;font-weight:800;color:var(--blue-light);margin-bottom:1px;}
+  .cl-row .cm{color:var(--text);}
+
+  /* ── 시안 A: 아이콘 전용 칩(라벨 없음, hover 툴팁) ── */
+  .chip-icon-only{display:flex;gap:6px;margin-top:2px;padding-left:33px;}
+  .chip-a{width:26px;height:26px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer;border:1px solid rgba(30,185,128,0.4);background:rgba(30,185,128,0.1);color:var(--teal);}
+  .chip-a.cloud{border-color:rgba(139,124,240,0.4);background:rgba(139,124,240,0.1);color:var(--purple);}
+  .chip-a:hover{filter:brightness(1.2);}
+
+  /* ── 시안 B: 아이콘+짧은 라벨 필(pill), 한 줄 ── */
+  .chip-pill-row{display:flex;gap:6px;margin-top:2px;padding-left:33px;}
+  .chip-b{display:flex;align-items:center;gap:5px;height:24px;padding:0 10px;border-radius:20px;font-size:10.5px;font-weight:700;cursor:pointer;border:1px solid rgba(30,185,128,0.4);background:rgba(30,185,128,0.1);color:var(--teal);}
+  .chip-b.cloud{border-color:rgba(139,124,240,0.4);background:rgba(139,124,240,0.1);color:var(--purple);}
+  .chip-b:hover{filter:brightness(1.15);}
+
+  /* ── 시안 C: 미니 아이콘 행(이름만, 설명 문장 생략, 클릭하면 바로 실행) ── */
+  .cl-row.offer-mini{border-color:rgba(30,185,128,0.3);background:rgba(30,185,128,0.05);padding:5px 9px;cursor:pointer;}
+  .cl-row.offer-mini:hover{background:rgba(30,185,128,0.1);}
+  .cl-row.offer-mini .ci{width:20px;height:20px;font-size:11px;}
+  .cl-row.offer-mini .cn{margin:0;font-size:11px;}
+  .cl-row.offer-mini.cloud{border-color:rgba(139,124,240,0.3);background:rgba(139,124,240,0.05);}
+  .cl-row.offer-mini.cloud:hover{background:rgba(139,124,240,0.1);}
+  .cl-row.offer-mini.cloud .cn{color:var(--purple);}
+  .cl-row.offer-mini .cn-icon{margin-right:6px;}
+  .arrow{margin-left:auto;color:var(--muted-2);font-size:10px;}
+
+  .tag{display:inline-block;font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:5px;background:rgba(255,255,255,0.08);color:var(--muted);margin-bottom:8px;}
+</style>
+</head>
+<body>
+  <h1>지휘콘솔 — "리포트 제안"·"보조 의견" 카드를 작은 아이콘으로</h1>
+  <p class="lead">현재는 아이콘+제목+설명 문장+전체 폭 버튼으로 된 큰 카드입니다. 답변 아래에 붙는 이 두 제안을 작은 아이콘으로 줄이는 3가지 방향입니다. 위쪽은 기존 답변 행(그대로 유지), 아래쪽이 각 시안의 제안 표현입니다.</p>
+
+  <div class="variants">
+    <div class="variant">
+      <span class="tag">시안 A</span>
+      <h2>아이콘만(툴팁)</h2>
+      <div class="desc">텍스트 없이 작은 원형 아이콘 버튼만. 마우스를 올리면 툴팁으로 "리포트로 정리" / "Gemini에도 물어보기"가 뜬다. 가장 눈에 덜 띔 — 화면이 제일 깔끔하지만 처음 보는 사람은 뭔지 바로 못 알아챌 수 있음.</div>
+      <div class="console">
+        <div class="cl-row reply">
+          <div class="ci">◆</div>
+          <div class="cb"><div class="cn">Security Orchestrator</div><div class="cm">취약점 3건을 확인했고 우선순위를 정리했습니다.</div></div>
+        </div>
+        <div class="chip-icon-only">
+          <div class="chip-a" title="방금 결과를 보고서로 정리할까요? — 리포트 만들기">📄</div>
+          <div class="chip-a cloud" title="내부 정보 미포함 — Google Gemini에도 물어보기">☁</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="variant">
+      <span class="tag">시안 B (추천)</span>
+      <h2>아이콘 + 짧은 라벨 필</h2>
+      <div class="desc">아이콘 옆에 2~4글자 라벨만("리포트" / "Gemini")을 붙인 작은 알약 모양 버튼. 설명 문장 없이도 뭘 누르는지 바로 알 수 있고, 자리도 거의 안 차지함. 기존 색(초록=리포트, 보라=클라우드) 유지.</div>
+      <div class="console">
+        <div class="cl-row reply">
+          <div class="ci">◆</div>
+          <div class="cb"><div class="cn">Security Orchestrator</div><div class="cm">취약점 3건을 확인했고 우선순위를 정리했습니다.</div></div>
+        </div>
+        <div class="chip-pill-row">
+          <div class="chip-b">📄 리포트</div>
+          <div class="chip-b cloud">☁ Gemini</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="variant">
+      <span class="tag">시안 C</span>
+      <h2>미니 한 줄 행(이름만)</h2>
+      <div class="desc">기존 행 구조(아이콘+이름)는 유지하되 설명 문장과 별도 버튼을 없애고, 이름 자체를 클릭하면 바로 실행되는 한 줄로 축소. 다른 지휘콘솔 행들과 톤이 가장 비슷해 리듬이 자연스러움.</div>
+      <div class="console">
+        <div class="cl-row reply">
+          <div class="ci">◆</div>
+          <div class="cb"><div class="cn">Security Orchestrator</div><div class="cm">취약점 3건을 확인했고 우선순위를 정리했습니다.</div></div>
+        </div>
+        <div class="cl-row offer-mini">
+          <div class="ci">📄</div>
+          <div class="cb" style="display:flex;align-items:center;"><span class="cn">리포트로 정리하기</span><span class="arrow">→</span></div>
+        </div>
+        <div class="cl-row offer-mini cloud">
+          <div class="ci">☁</div>
+          <div class="cb" style="display:flex;align-items:center;"><span class="cn">Gemini에도 물어보기</span><span class="arrow">→</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>

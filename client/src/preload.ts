@@ -93,6 +93,9 @@ const gijoApi = {
     api.securityProductsApi.addDoc(id, args),
   deleteProductDoc: (docId: string) => api.securityProductsApi.removeDoc(docId),
   importProductManual: (filename: string, content?: string) => api.securityProductsApi.importDoc(filename, content),
+  getProductFields: (id: string) => api.securityProductsApi.getFields(id),
+  saveProductFields: (id: string, fields: { key: string; value: string }[]) => api.securityProductsApi.saveFields(id, fields),
+  draftProductFields: (id: string, filename: string, content: string) => api.securityProductsApi.draftFields(id, filename, content),
 
   // 자산 인벤토리
   listAssets: () => api.assetsApi.list(),

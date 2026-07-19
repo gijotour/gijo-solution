@@ -111,6 +111,32 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .doc-add button:disabled{opacity:.5;cursor:default;}
 .doc-hint{font-size:10.5px;color:var(--muted-2);min-height:12px;flex-basis:100%;}
 
+/* 정형 정보(온톨로지 기반 양식) — 시안 B: 업로드 화면에 바로 이어붙임 */
+.fields-toggle{margin-top:10px;padding:8px 10px;background:var(--panel-2);border:1px solid var(--border);border-radius:7px;font-size:11.5px;font-weight:700;color:var(--blue-light);cursor:pointer;display:flex;align-items:center;gap:6px;}
+.fields-toggle:hover{border-color:var(--border-strong);}
+.fields-toggle .car{margin-left:auto;color:var(--muted-2);font-size:10px;transition:transform .15s;}
+.fields-toggle.open .car{transform:rotate(90deg);}
+.fields-panel{margin-top:8px;padding:12px;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;}
+.fields-draft-row{display:flex;gap:8px;align-items:center;margin-bottom:6px;flex-wrap:wrap;}
+.fields-draft-row input[type=file]{font-size:10.5px;color:var(--muted);max-width:220px;}
+.fbtn{background:transparent;border:1px solid var(--border-strong);color:var(--text);border-radius:7px;padding:6px 11px;font-size:11px;font-weight:700;cursor:pointer;}
+.fbtn.ai{background:var(--blue);color:#fff;border-color:var(--blue);}
+.fbtn.save{background:var(--teal);color:#06281c;border-color:var(--teal);}
+.fbtn:disabled{opacity:.5;cursor:default;}
+.field-hint{font-size:10.5px;color:var(--muted-2);min-height:13px;margin-bottom:8px;}
+.field-row{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px dashed var(--border);}
+.field-row:last-child{border-bottom:none;}
+.field-label{flex:0 0 168px;font-size:11px;color:var(--muted);}
+.field-input{flex:1;min-width:0;background:var(--panel);border:1px solid var(--border-strong);border-radius:6px;padding:6px 9px;color:var(--text);font-size:11.5px;outline:none;}
+.field-input:focus{border-color:var(--blue);}
+.f-badge{flex:0 0 auto;font-size:9px;font-weight:800;padding:2px 6px;border-radius:5px;}
+.f-badge.saved{background:rgba(30,185,128,.16);color:var(--teal);}
+.f-badge.ai{background:rgba(240,160,32,.16);color:var(--amber);}
+.f-badge.edited{background:rgba(59,130,246,.16);color:var(--blue-light);}
+.f-badge.empty{background:rgba(226,72,61,.16);color:#f5928a;}
+.fields-actions{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap;}
+.fields-actions label.fbtn{display:inline-flex;align-items:center;}
+
 .footer{margin-top:22px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted-2);max-width:1040px;}
 .footer img{height:16px;opacity:0.6;}
 .empty-all{color:var(--muted);font-size:13px;padding:30px 0;}
@@ -288,8 +314,177 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       docColHtml(p, "manual", "제품 매뉴얼") +
       docColHtml(p, "logManual", "로그 매뉴얼") +
       `</div>` +
+      `<div class="fields-toggle" data-fields-toggle="${p.id}" data-name="${esc(p.name)}"><span>🧬 정형 정보 (온톨로지)</span><span class="car">▸</span></div>` +
+      `<div class="fields-panel" id="fp-${p.id}" style="display:none"></div>` +
       `</div>`
     );
+  }
+
+  // ── 정형 정보(온톨로지 기반 양식, 시안 B) ────────────────────────────────
+  // 매뉴얼 업로드 → AI 초안 채우기(화면에서 확인·수정) → 다운로드/가져오기(Excel 등 편한 도구에서
+  // 검토) → 저장. 출처 배지(저장됨/AI추정/직접입력/미입력)는 화면에서만 의미있는 리뷰 표시라
+  // 서버엔 값만 저장한다(결재판과 같은 원칙).
+  const fieldsState = {}; // productId -> { fields: [{key,label,value}] } — 마지막으로 서버에서 받은 값(라벨·CSV 매핑용)
+  const BADGE_LABEL = { saved: "저장됨", ai: "AI추정", edited: "직접입력", empty: "미입력" };
+
+  function fieldRowHtml(f) {
+    const badge = f.value ? "saved" : "empty";
+    return (
+      `<div class="field-row">` +
+      `<span class="field-label">${esc(f.label)}</span>` +
+      `<input class="field-input" data-field-key="${f.key}" value="${esc(f.value)}">` +
+      `<span class="f-badge ${badge}" data-badge="${f.key}">${BADGE_LABEL[badge]}</span>` +
+      `</div>`
+    );
+  }
+
+  function fieldsPanelHtml(pid, fields) {
+    return (
+      `<div class="fields-draft-row">` +
+      `<input type="file" class="fdraft-file" accept=".pdf,.hwpx,.hwp,.txt,.md,.docx">` +
+      `<button class="fbtn ai" data-fdraft-run="${pid}">✨ AI로 초안 채우기</button>` +
+      `</div>` +
+      `<div class="field-hint" data-fdraft-hint="${pid}"></div>` +
+      fields.map(fieldRowHtml).join("") +
+      `<div class="fields-actions">` +
+      `<button class="fbtn" data-fields-dl="${pid}">⬇ 초안 다운로드 (.csv)</button>` +
+      `<label class="fbtn">⬆ 채운 양식 가져오기<input type="file" accept=".csv" data-fields-import="${pid}" style="display:none"></label>` +
+      `<button class="fbtn save" data-fields-save="${pid}">✓ 정형 정보 저장</button>` +
+      `</div>`
+    );
+  }
+
+  async function toggleFields(pid) {
+    const toggle = document.querySelector(`[data-fields-toggle="${pid}"]`);
+    const panel = document.getElementById(`fp-${pid}`);
+    if (!toggle || !panel) return;
+    const opening = panel.style.display === "none";
+    panel.style.display = opening ? "block" : "none";
+    toggle.classList.toggle("open", opening);
+    if (opening && !fieldsState[pid]) {
+      panel.innerHTML = `<div style="color:var(--muted);font-size:11px">불러오는 중...</div>`;
+      try {
+        const fields = await window.gijo.getProductFields(pid);
+        fieldsState[pid] = { fields };
+        panel.innerHTML = fieldsPanelHtml(pid, fields);
+      } catch (e) {
+        panel.innerHTML = `<div style="color:#f5928a;font-size:11px">불러오기 실패: ${esc((e && e.message) || e)}</div>`;
+      }
+    }
+  }
+
+  function currentFieldValues(pid) {
+    const panel = document.getElementById(`fp-${pid}`);
+    return [...panel.querySelectorAll("[data-field-key]")].map((inp) => ({ key: inp.dataset.fieldKey, value: inp.value }));
+  }
+
+  function setBadge(pid, key, badge) {
+    const el = document.querySelector(`#fp-${pid} [data-badge="${key}"]`);
+    if (!el) return;
+    el.className = `f-badge ${badge}`;
+    el.textContent = BADGE_LABEL[badge];
+  }
+
+  async function runFieldDraft(pid) {
+    const panel = document.getElementById(`fp-${pid}`);
+    const fileInput = panel.querySelector(".fdraft-file");
+    const hint = panel.querySelector(`[data-fdraft-hint="${pid}"]`);
+    const btn = panel.querySelector(`[data-fdraft-run="${pid}"]`);
+    const file = fileInput.files[0];
+    if (!file) { hint.style.color = "#f5928a"; hint.textContent = "먼저 매뉴얼 파일을 선택하세요."; return; }
+    btn.disabled = true; hint.style.color = "var(--muted-2)"; hint.textContent = "AI가 매뉴얼에서 항목을 뽑는 중...";
+    try {
+      const content = await fileToBase64(file);
+      const draft = await window.gijo.draftProductFields(pid, file.name, content);
+      for (const f of draft) {
+        if (!f.value) continue;
+        const input = panel.querySelector(`[data-field-key="${f.key}"]`);
+        if (input) { input.value = f.value; setBadge(pid, f.key, "ai"); }
+      }
+      hint.style.color = "var(--teal)";
+      hint.textContent = "✓ 초안을 채웠습니다 — 확인 후 저장하세요.";
+    } catch (e) {
+      hint.style.color = "#f5928a";
+      hint.textContent = "✗ 초안 생성 실패: " + ((e && e.message) || e);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function downloadFieldsCsv(pid, productName) {
+    const state = fieldsState[pid];
+    if (!state) return;
+    const values = currentFieldValues(pid);
+    const q = (s) => `"${String(s ?? "").replace(/"/g, '""')}"`;
+    const rows = values.map((v) => {
+      const label = (state.fields.find((f) => f.key === v.key) || {}).label || v.key;
+      return [q(label), q(v.value)].join(",");
+    });
+    const csv = ["항목,값", ...rows].join("\r\n");
+    // UTF-8 BOM 필수 — 없으면 Excel에서 한글이 깨진다(실제로 자주 나는 문제).
+    const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${(productName || pid).replace(/[\\/:*?"<>|]/g, "_")}_정형정보.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  // 아주 단순한 CSV 파서 — 따옴표로 감싼 필드(콤마·줄바꿈 포함)까지 처리한다.
+  function parseCsv(text) {
+    if (text.charCodeAt(0) === 0xfeff) text = text.slice(1);
+    const rows = [];
+    let row = [], field = "", inQuotes = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (inQuotes) {
+        if (c === '"') { if (text[i + 1] === '"') { field += '"'; i++; } else inQuotes = false; }
+        else field += c;
+      } else if (c === '"') inQuotes = true;
+      else if (c === ",") { row.push(field); field = ""; }
+      else if (c === "\n" || c === "\r") {
+        if (c === "\r" && text[i + 1] === "\n") i++;
+        row.push(field); field = ""; rows.push(row); row = [];
+      } else field += c;
+    }
+    if (field.length || row.length) { row.push(field); rows.push(row); }
+    return rows.filter((r) => r.length && r.some((c) => c !== ""));
+  }
+
+  async function importFieldsCsv(pid, file) {
+    const panel = document.getElementById(`fp-${pid}`);
+    const state = fieldsState[pid];
+    if (!panel || !state) return;
+    const text = await file.text();
+    const rows = parseCsv(text).slice(1); // 헤더(항목,값) 제외
+    for (const [label, value] of rows) {
+      const f = state.fields.find((x) => x.label === label);
+      if (!f) continue;
+      const input = panel.querySelector(`[data-field-key="${f.key}"]`);
+      if (input) { input.value = value; setBadge(pid, f.key, "edited"); }
+    }
+  }
+
+  async function saveFieldsFor(pid) {
+    const panel = document.getElementById(`fp-${pid}`);
+    const btn = panel.querySelector(`[data-fields-save="${pid}"]`);
+    btn.disabled = true;
+    btn.textContent = "저장 중...";
+    try {
+      const values = currentFieldValues(pid);
+      const saved = await window.gijo.saveProductFields(pid, values);
+      fieldsState[pid] = { fields: saved };
+      for (const f of saved) setBadge(pid, f.key, f.value ? "saved" : "empty");
+      btn.textContent = "✓ 저장됨";
+      setTimeout(() => { btn.textContent = "✓ 정형 정보 저장"; btn.disabled = false; }, 1500);
+    } catch (e) {
+      alert("저장 실패: " + ((e && e.message) || e));
+      btn.textContent = "✓ 정형 정보 저장";
+      btn.disabled = false;
+    }
   }
 
   function renderSummary(groups) {
@@ -391,6 +586,39 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         hint.textContent = "✗ " + ((err && err.message) || err);
         docAdd.disabled = false;
       }
+      return;
+    }
+    const fieldsToggle = e.target.closest("[data-fields-toggle]");
+    if (fieldsToggle) { toggleFields(fieldsToggle.dataset.fieldsToggle); return; }
+    const fdraftRun = e.target.closest("[data-fdraft-run]");
+    if (fdraftRun) { runFieldDraft(fdraftRun.dataset.fdraftRun); return; }
+    const fieldsDl = e.target.closest("[data-fields-dl]");
+    if (fieldsDl) {
+      const pid = fieldsDl.dataset.fieldsDl;
+      const name = document.querySelector(`[data-fields-toggle="${pid}"]`)?.dataset.name;
+      downloadFieldsCsv(pid, name);
+      return;
+    }
+    const fieldsSave = e.target.closest("[data-fields-save]");
+    if (fieldsSave) { saveFieldsFor(fieldsSave.dataset.fieldsSave); return; }
+  }
+
+  // 정형 정보 입력칸을 사람이 직접 고치면 배지를 "직접입력"으로 바꾼다(AI 초안·CSV 가져오기는
+  // .value를 코드로 설정할 뿐이라 input 이벤트가 안 뜨므로, 여기 걸리는 건 항상 사람의 타이핑).
+  function onGroupsInput(e) {
+    const input = e.target.closest("[data-field-key]");
+    if (!input) return;
+    const panel = input.closest(".fields-panel");
+    const pid = panel && panel.id.replace(/^fp-/, "");
+    if (pid) setBadge(pid, input.dataset.fieldKey, "edited");
+  }
+
+  async function onGroupsChange(e) {
+    const importInput = e.target.closest("[data-fields-import]");
+    if (importInput) {
+      const file = importInput.files[0];
+      if (file) await importFieldsCsv(importInput.dataset.fieldsImport, file);
+      importInput.value = "";
     }
   }
 
@@ -443,6 +671,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.getElementById("regForm").addEventListener("submit", onRegister);
     document.getElementById("bulkInput").addEventListener("change", handleBulkUpload);
     document.getElementById("groups").addEventListener("click", onGroupsClick);
+    document.getElementById("groups").addEventListener("input", onGroupsInput);
+    document.getElementById("groups").addEventListener("change", onGroupsChange);
     document.getElementById("catSummary").addEventListener("click", (e) => {
       const chip = e.target.closest("[data-jump]");
       if (!chip) return;

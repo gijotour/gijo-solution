@@ -11,6 +11,8 @@ import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { db } from "../db";
 import type { GijoUser } from "../auth/users";
+import { chat } from "./llm";
+import { addTriple, listTriples, deleteTriple } from "./ontology";
 
 // 보안제품 종류 카탈로그 — 대시보드/등록 폼에서 공용으로 쓴다. 한국 중소기업 보안팀이 흔히
 // 운영하는 제품군 위주(과한 세분화 지양). "기타"로 흡수 가능.
@@ -35,6 +37,31 @@ export const DOC_KINDS = [
   { id: "etc", label: "기타 문서" },
 ] as const;
 const DOC_KIND_IDS = new Set<string>(DOC_KINDS.map((k) => k.id));
+
+// 제품 "정형 정보" 항목 — 매뉴얼 업로드가 지금까지 RAG(자유 텍스트 검색)로만 가고 온톨로지(구조화
+// 지식)엔 전혀 안 남던 문제를 보완한다(2026-07-19 설계). subject=제품id로 온톨로지 트리플에 저장해,
+// 향후 자산 매칭·조치절차 추천 등에서 "값"으로 바로 조회할 수 있게 한다.
+// 근거: NIST SP 800-53 CM-8(자산목록 필수 항목: 버전·시리얼·네트워크주소·물리위치·공급업체) +
+// ServiceNow/BMC 계열 CMDB의 보안장비 스키마(펌웨어·포트·인증) + EOL 메타데이터 관리 관행.
+// 로그 형식·전송방식은 GIJO AS 특화 — 이 제품의 핵심 가치가 보안로그 분석이라 실제 파서 연결에 쓰인다.
+export const PRODUCT_FIELD_SCHEMA = [
+  { key: "firmwareVersion", label: "펌웨어/버전" },
+  { key: "serialNumber", label: "시리얼 번호" },
+  { key: "managementAccess", label: "관리 IP·포트·접근 프로토콜" },
+  { key: "logFormat", label: "로그 형식" },
+  { key: "logForwarding", label: "로그 전송 방식" },
+  { key: "authMethod", label: "인증/접근 방식" },
+  { key: "location", label: "설치 위치/네트워크 구간" },
+  { key: "eolDate", label: "지원 종료일(EOL)" },
+  { key: "supplierContact", label: "공급업체/담당자 연락처" },
+] as const;
+const FIELD_KEYS = new Set<string>(PRODUCT_FIELD_SCHEMA.map((f) => f.key));
+
+export interface ProductFieldValue {
+  key: string;
+  label: string;
+  value: string;
+}
 
 export interface SecurityProduct {
   id: string;
@@ -463,6 +490,73 @@ export function seedSampleProductsIfEmpty(): void {
 }
 seedSampleProductsIfEmpty();
 
+// 저장된 정형 정보를 온톨로지 트리플에서 읽어 고정 스키마 순서로 돌려준다 — 값이 없는 항목도
+// 빈 문자열로 채워서 화면이 항상 9개 행을 그린다(사람이 뭘 더 채워야 하는지 한눈에 보이게).
+export function getProductFields(productId: string): ProductFieldValue[] {
+  const byKey = new Map<string, string>();
+  for (const t of listTriples({ subject: productId })) {
+    if (FIELD_KEYS.has(t.predicate)) byKey.set(t.predicate, t.object);
+  }
+  return PRODUCT_FIELD_SCHEMA.map((f) => ({ key: f.key, label: f.label, value: byKey.get(f.key) ?? "" }));
+}
+
+// 값이 있는 항목만 트리플로 upsert(기존 값 지우고 새로 씀), 빈 값은 트리플 자체를 지운다(빈 사실을
+// 온톨로지에 남기지 않는다). source는 어디서 왔든(AI 초안 확인/직접 입력/CSV 가져오기 모두) 저장
+// 시점엔 "사람이 확인한 값"이므로 productId로 통일 — 결재판과 같은 원칙(출처 배지는 검토 단계에서만 의미있다).
+export function saveProductFields(productId: string, fields: { key: string; value: string }[]): ProductFieldValue[] {
+  if (!getProduct(productId)) throw new Error("존재하지 않는 보안제품입니다");
+  const existing = listTriples({ subject: productId }).filter((t) => FIELD_KEYS.has(t.predicate));
+  for (const t of existing) deleteTriple(t.id);
+  const source = `product-fields:${productId}`;
+  for (const f of fields) {
+    if (!FIELD_KEYS.has(f.key)) continue;
+    const value = (f.value ?? "").trim();
+    if (!value) continue;
+    addTriple({ subject: productId, predicate: f.key, object: value, source });
+  }
+  return getProductFields(productId);
+}
+
+function buildFieldDraftPrompt(productName: string, text: string): string {
+  const fieldLines = PRODUCT_FIELD_SCHEMA.map((f) => `- ${f.key}: ${f.label}`).join("\n");
+  return [
+    `다음은 보안제품 "${productName}" 매뉴얼에서 발췌한 텍스트입니다.`,
+    "아래 9개 항목의 값을 문서에서 찾아 JSON으로 채우세요.",
+    "문서에 명시적으로 나오지 않는 항목은 반드시 빈 문자열(\"\")로 두세요 — 절대 추측하거나 지어내지 마세요.",
+    fieldLines,
+    "",
+    "발췌:",
+    '"""',
+    text.slice(0, 6000),
+    '"""',
+  ].join("\n");
+}
+
+const FIELD_DRAFT_SCHEMA = {
+  type: "object",
+  properties: Object.fromEntries(PRODUCT_FIELD_SCHEMA.map((f) => [f.key, { type: "string" }])),
+  required: PRODUCT_FIELD_SCHEMA.map((f) => f.key),
+} as const;
+
+// 매뉴얼 발췌에서 AI가 정형 정보 초안을 뽑는다 — 저장하지 않고 돌려준다(사람이 화면에서 확인·수정
+// 후 별도로 저장). json_schema 강제 디코딩(에이전트 도구선택에서 실측 검증된 방식)을 재사용해,
+// docenrich.ts의 프롬프트-only JSON 파싱보다 신뢰도 높은 추출을 한다.
+export async function draftProductFields(productName: string, text: string): Promise<ProductFieldValue[]> {
+  const raw = await chat({
+    agentId: "analysis",
+    message: buildFieldDraftPrompt(productName, text),
+    responseSchema: FIELD_DRAFT_SCHEMA,
+    maxTokens: 500,
+  });
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(raw) as Record<string, unknown>;
+  } catch {
+    throw new Error("AI가 정형 정보를 추출하지 못했습니다 — 다시 시도하거나 직접 입력하세요.");
+  }
+  return PRODUCT_FIELD_SCHEMA.map((f) => ({ key: f.key, label: f.label, value: String(parsed[f.key] ?? "").trim() }));
+}
+
 export function registerSecurityProductRoutes(app: Express): void {
   app.get("/api/security-products", authMiddleware, (_req, res) => res.json(listProducts()));
   app.get("/api/security-products/grouped", authMiddleware, (_req, res) => res.json(productsByCategory()));
@@ -491,6 +585,53 @@ export function registerSecurityProductRoutes(app: Express): void {
   app.delete("/api/security-products/:id", authMiddleware, (req, res) => {
     res.status(deleteProduct(String(req.params.id)) ? 200 : 404).json({ ok: true });
   });
+
+  // 정형 정보(온톨로지 기반 양식) — 조회 · 저장 · AI 초안.
+  app.get("/api/security-products/:id/fields", authMiddleware, (req, res) => {
+    if (!getProduct(String(req.params.id))) {
+      res.status(404).json({ error: "존재하지 않는 보안제품입니다" });
+      return;
+    }
+    res.json(getProductFields(String(req.params.id)));
+  });
+
+  app.post("/api/security-products/:id/fields", authMiddleware, (req, res) => {
+    const { fields } = req.body as { fields?: { key: string; value: string }[] };
+    if (!getProduct(String(req.params.id))) {
+      res.status(404).json({ error: "존재하지 않는 보안제품입니다" });
+      return;
+    }
+    if (!Array.isArray(fields)) {
+      res.status(400).json({ error: "fields 배열이 필요합니다" });
+      return;
+    }
+    res.json(saveProductFields(String(req.params.id), fields));
+  });
+
+  // 매뉴얼 발췌에서 AI 초안을 뽑아 돌려준다(저장 안 함 — 화면에서 확인 후 위 저장 API를 따로 호출).
+  app.post(
+    "/api/security-products/:id/fields/draft",
+    authMiddleware,
+    asyncRoute(async (req, res) => {
+      const product = getProduct(String(req.params.id));
+      if (!product) {
+        res.status(404).json({ error: "존재하지 않는 보안제품입니다" });
+        return;
+      }
+      const { filename, content } = req.body as { filename?: string; content?: string };
+      if (!filename || !content) {
+        res.status(400).json({ error: "filename·content(base64)가 필요합니다" });
+        return;
+      }
+      const { extractDocumentText } = await import("./dataset.js");
+      const text = await extractDocumentText(filename, content);
+      if (!text.trim()) {
+        res.status(400).json({ error: "문서에서 텍스트를 추출하지 못했습니다" });
+        return;
+      }
+      res.json(await draftProductFields(product.name, text));
+    })
+  );
 
   // 제품 문서 추가. filename+content(base64)가 함께 오면 텍스트를 추출해 지식베이스(RAG)에도
   // 수집한다(maintenance 점검서와 같은 패턴) — 매뉴얼이 곧 검색 가능한 문서가 된다.

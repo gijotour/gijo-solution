@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>보안제품 정형 양식 — 구체화안 + 시안 3종</title>
+<style>
+  :root{
+    --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+    --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+    --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:#05070d;color:var(--text);padding:32px;}
+  h1{font-size:19px;margin-bottom:6px;}
+  h2{font-size:15px;margin:26px 0 10px;color:#fff;}
+  .lead{color:var(--muted);font-size:13px;margin-bottom:8px;line-height:1.6;}
+  .src{font-size:11px;color:var(--muted-2);margin-bottom:24px;}
+  table{width:100%;border-collapse:collapse;font-size:12.5px;margin-bottom:8px;}
+  th{text-align:left;padding:8px 10px;color:var(--muted-2);font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;border-bottom:1px solid var(--border);}
+  td{padding:9px 10px;border-bottom:1px solid var(--border);vertical-align:top;}
+  tr:last-child td{border-bottom:none;}
+  .fname{font-weight:700;color:#fff;}
+  .badge{display:inline-block;font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:5px;background:rgba(59,130,246,0.15);color:var(--blue-light);}
+  .badge.existing{background:rgba(30,185,128,0.15);color:var(--teal);}
+  .src-tag{font-size:10.5px;color:var(--muted-2);}
+  .variants{display:grid;grid-template-columns:repeat(3,1fr);gap:20px;margin-top:10px;}
+  .variant{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px;}
+  .variant h3{font-size:13.5px;color:#fff;margin-bottom:3px;}
+  .variant .desc{font-size:11.5px;color:var(--muted);line-height:1.5;margin-bottom:14px;min-height:64px;}
+  .tag{display:inline-block;font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:5px;background:rgba(255,255,255,0.08);color:var(--muted);margin-bottom:8px;}
+
+  /* mini UI previews */
+  .mini{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:12px;font-size:11.5px;}
+  .mini .tabs{display:flex;gap:4px;margin-bottom:10px;}
+  .mini .tab{padding:5px 10px;border-radius:6px 6px 0 0;font-size:10.5px;font-weight:700;color:var(--muted);background:var(--panel);border:1px solid var(--border);border-bottom:none;}
+  .mini .tab.active{color:#fff;background:var(--blue);}
+  .field-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px dashed var(--border);}
+  .field-row:last-child{border-bottom:none;}
+  .field-label{color:var(--muted);font-size:10.5px;}
+  .field-val{color:#fff;font-size:10.5px;font-weight:600;}
+  .field-input{background:var(--panel);border:1px solid var(--border-strong);border-radius:5px;padding:3px 7px;color:var(--text);font-size:10.5px;width:110px;}
+  .src-badge{font-size:8.5px;font-weight:800;padding:1px 5px;border-radius:4px;margin-left:5px;}
+  .src-said{background:rgba(30,185,128,.18);color:var(--teal);}
+  .src-guess{background:rgba(240,160,32,.18);color:var(--amber);}
+  .src-empty{background:rgba(226,72,61,.18);color:#f5928a;}
+  .ai-btn{background:var(--blue);color:#fff;border:none;border-radius:6px;padding:5px 10px;font-size:10px;font-weight:700;cursor:pointer;margin-bottom:8px;}
+  .step-dots{display:flex;gap:5px;margin-bottom:10px;}
+  .step-dot{width:20px;height:4px;border-radius:2px;background:var(--border-strong);}
+  .step-dot.active{background:var(--blue);}
+  .upload-drop{border:1.5px dashed var(--border-strong);border-radius:8px;padding:16px;text-align:center;color:var(--muted-2);font-size:10.5px;margin-bottom:8px;}
+</style>
+</head>
+<body>
+  <h1>보안제품 "정형 양식" 구체화안</h1>
+  <p class="lead">매뉴얼 업로드는 그대로 두고, 아래 항목들을 보안제품 등록부에 추가합니다. AI가 업로드된 매뉴얼에서 초안을 뽑아 채우고(json_schema 강제 디코딩 — 도구선택에서 이미 검증된 방식), 사람은 결재판처럼 출처 배지를 보고 확인·수정만 합니다.</p>
+
+  <h2>제안 항목 목록 (근거 포함)</h2>
+  <table>
+    <tr><th>항목</th><th>이미 있음/신규</th><th>왜 이 항목인가 (근거)</th></tr>
+    <tr><td class="fname">제품명 · 카테고리 · 제조사 · 모델</td><td><span class="badge existing">기존</span></td><td class="src-tag">이미 DB 컬럼으로 존재(SecurityProduct.name/category/vendor/model)</td></tr>
+    <tr><td class="fname">펌웨어/소프트웨어 버전</td><td><span class="badge">신규</span></td><td class="src-tag">NIST SP 800-53 CM-8 — "software version numbers"는 자산목록 필수 항목</td></tr>
+    <tr><td class="fname">시리얼 번호</td><td><span class="badge">신규</span></td><td class="src-tag">NIST CM-8 + 대다수 CMDB(ServiceNow 등) 공통 필수 필드</td></tr>
+    <tr><td class="fname">관리 IP · 포트 · 접근 프로토콜(SSH/HTTPS 등)</td><td><span class="badge">신규</span></td><td class="src-tag">NIST CM-8 "네트워크 주소(IPv4/IPv6) 전 프로토콜" + CMDB의 IP주소 필드</td></tr>
+    <tr><td class="fname">로그 형식(syslog/CEF/LEEF/JSON 등) · 전송 방식</td><td><span class="badge">신규 · GIJO 특화</span></td><td class="src-tag">제품의 1차 목표가 "보안로그 분석"이라 이 항목이 실제로 파서 연결에 쓰임(범용 CMDB엔 없는 항목)</td></tr>
+    <tr><td class="fname">인증/접근 방식(계정 유형·인증서 등)</td><td><span class="badge">신규</span></td><td class="src-tag">보안장비 인벤토리 실측 사례 — "credentials, posture" 항목이 130여 개 필드 중 핵심으로 언급됨</td></tr>
+    <tr><td class="fname">설치 위치/네트워크 구간(DMZ·내부망 등)</td><td><span class="badge">신규</span></td><td class="src-tag">NIST CM-8 "physical location" — 자산 실사·감사 시 필수</td></tr>
+    <tr><td class="fname">지원 종료일(EOL) · 유지보수 만료일</td><td><span class="badge">신규</span></td><td class="src-tag">EOL 메타데이터 관리 관행 — 벤더 지원종료는 취약점 관리의 핵심 트리거</td></tr>
+    <tr><td class="fname">공급업체/담당자 연락처</td><td><span class="badge">신규</span></td><td class="src-tag">NIST CM-8 "supplier information" + CMDB 오너십 필드</td></tr>
+  </table>
+  <p class="src">근거: NIST SP 800-53 Rev.5 CM-8(csf.tools, upguard.com) · ServiceNow/BMC CMDB 구성항목 스키마(virima.com, docs.bmc.com) · 보안장비 인벤토리 실측 사례(cyberautomations.com) · EOL 메타데이터 관행(endoflife.date 논의)</p>
+
+  <h2>화면 통합 방식 — 시안 3종</h2>
+  <div class="variants">
+
+    <div class="variant">
+      <span class="tag">시안 A</span>
+      <h3>제품 상세에 "정형 정보" 탭 추가</h3>
+      <div class="desc">지금 있는 "매뉴얼" 탭 옆에 "정형 정보" 탭을 새로 만듭니다. 업로드와 완전히 분리된 화면이라 기존 흐름을 안 건드립니다. 다만 탭을 오가야 해서 "업로드하면 자동으로 채워진다"는 연결감은 약함.</div>
+      <div class="mini">
+        <div class="tabs"><div class="tab">개요</div><div class="tab">매뉴얼</div><div class="tab active">정형 정보</div></div>
+        <div class="field-row"><span class="field-label">펌웨어 버전</span><span class="field-val">v9.2.1<span class="src-badge src-said">문서</span></span></div>
+        <div class="field-row"><span class="field-label">관리 IP</span><span class="field-input">10.0.x.x</span></div>
+        <div class="field-row"><span class="field-label">로그 형식</span><span class="field-val">Syslog(CEF)<span class="src-badge src-guess">AI추정</span></span></div>
+        <div class="field-row"><span class="field-label">EOL</span><span class="field-val" style="color:var(--red)">미입력<span class="src-badge src-empty">필요</span></span></div>
+      </div>
+    </div>
+
+    <div class="variant">
+      <span class="tag">시안 B (추천)</span>
+      <h3>업로드 화면에 바로 이어붙임</h3>
+      <div class="desc">매뉴얼을 올리면 그 아래 바로 "AI 초안 채우기" 버튼이 뜨고, 누르면 같은 화면에서 필드가 채워집니다. 업로드→구조화가 한 화면·한 흐름이라 사용자가 "이게 왜 필요한지" 바로 체감. 탭 전환 없어 제일 매끄러움.</div>
+      <div class="mini">
+        <div class="upload-drop">📎 매뉴얼 파일을 여기에 드래그 (또는 선택)</div>
+        <button class="ai-btn">✨ AI로 정형 정보 초안 채우기</button>
+        <div class="field-row"><span class="field-label">펌웨어 버전</span><span class="field-val">v9.2.1<span class="src-badge src-said">문서</span></span></div>
+        <div class="field-row"><span class="field-label">로그 형식</span><span class="field-val">Syslog(CEF)<span class="src-badge src-guess">AI추정</span></span></div>
+        <div class="field-row"><span class="field-label">EOL</span><span class="field-val" style="color:var(--red)">미입력<span class="src-badge src-empty">필요</span></span></div>
+      </div>
+    </div>
+
+    <div class="variant">
+      <span class="tag">시안 C</span>
+      <h3>등록 마법사(3단계)</h3>
+      <div class="desc">제품을 신규 등록할 때 1)매뉴얼 업로드(건너뛰기 가능) → 2)AI 초안 검토(결재판 스타일) → 3)저장, 단계별로 진행. 처음 등록하는 사람에게는 제일 안내가 친절하지만, 이미 등록된 제품에 나중에 정보를 추가하는 경우엔 안 맞음(마법사는 신규용).</div>
+      <div class="mini">
+        <div class="step-dots"><div class="step-dot"></div><div class="step-dot active"></div><div class="step-dot"></div></div>
+        <div style="color:var(--muted);font-size:10px;margin-bottom:6px">2단계 — AI 초안 검토</div>
+        <div class="field-row"><span class="field-label">펌웨어 버전</span><span class="field-val">v9.2.1<span class="src-badge src-said">문서</span></span></div>
+        <div class="field-row"><span class="field-label">관리 IP</span><span class="field-val">10.0.x.x<span class="src-badge src-guess">AI추정</span></span></div>
+        <div class="field-row"><span class="field-label">EOL</span><span class="field-val" style="color:var(--red)">미입력<span class="src-badge src-empty">필요</span></span></div>
+      </div>
+    </div>
+
+  </div>
+</body>
+</html>

@@ -2,8 +2,10 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import request from "supertest";
 
 // 문서 첨부 시 dataset/memory(RAG) 경로가 실제 임베딩 모델을 띄우지 않게 목킹한다.
+// chatSpy는 정형 정보 AI 초안(draftProductFields) 테스트에서 반환값을 테스트별로 바꿔 쓴다.
+const chatSpy = vi.fn(async () => "ok");
 vi.mock("../src/engine/llm", () => ({
-  chat: vi.fn(async () => "ok"),
+  chat: (...a: unknown[]) => chatSpy(...(a as [])),
   embed: vi.fn(async (texts: string[]) => texts.map(() => [0.1, 0.2, 0.3])),
   registerLlmRoutes: vi.fn(),
 }));
@@ -19,6 +21,10 @@ import {
   classifyManual,
   importManual,
   listProducts,
+  getProductFields,
+  saveProductFields,
+  draftProductFields,
+  PRODUCT_FIELD_SCHEMA,
 } from "../src/engine/securityproducts";
 import { createMaintenanceItem, resetMaintenanceForTests } from "../src/engine/maintenance";
 
@@ -34,6 +40,8 @@ describe("securityproducts (보안제품 종류별 관리 + 매뉴얼)", () => {
 
   beforeEach(async () => {
     resetSecurityProductsForTests();
+    chatSpy.mockReset();
+    chatSpy.mockResolvedValue("ok");
     app = createApp();
     token = await login(app);
   });
@@ -175,5 +183,115 @@ describe("securityproducts (보안제품 종류별 관리 + 매뉴얼)", () => {
 
     const bad = await request(app).post("/api/security-products/import-doc").set(auth()).send({});
     expect(bad.status).toBe(400);
+  });
+
+  // ── 정형 정보(온톨로지 기반 양식) ──────────────────────────────────────
+  describe("정형 정보 — 조회·저장·AI 초안", () => {
+    it("fresh product: 9개 항목이 모두 빈 값으로 채워져 돌아온다", () => {
+      const p = createProduct({ name: "방화벽", category: "방화벽" });
+      const fields = getProductFields(p.id);
+      expect(fields).toHaveLength(PRODUCT_FIELD_SCHEMA.length);
+      expect(fields.every((f) => f.value === "")).toBe(true);
+      expect(fields.map((f) => f.key)).toEqual(PRODUCT_FIELD_SCHEMA.map((f) => f.key));
+    });
+
+    it("saveProductFields: 값 있는 항목만 저장하고, 빈 값은 무시한다", () => {
+      const p = createProduct({ name: "방화벽", category: "방화벽" });
+      saveProductFields(p.id, [
+        { key: "firmwareVersion", value: "v9.2.1" },
+        { key: "eolDate", value: "" }, // 빈 값 — 저장 안 됨
+      ]);
+      const fields = getProductFields(p.id);
+      expect(fields.find((f) => f.key === "firmwareVersion")!.value).toBe("v9.2.1");
+      expect(fields.find((f) => f.key === "eolDate")!.value).toBe("");
+    });
+
+    it("saveProductFields를 다시 부르면 기존 값을 대체한다(중복 트리플 없음)", () => {
+      const p = createProduct({ name: "방화벽", category: "방화벽" });
+      saveProductFields(p.id, [{ key: "firmwareVersion", value: "v9.2.1" }]);
+      saveProductFields(p.id, [{ key: "firmwareVersion", value: "v9.3.0" }]);
+      expect(getProductFields(p.id).find((f) => f.key === "firmwareVersion")!.value).toBe("v9.3.0");
+    });
+
+    it("이전에 값이 있던 항목을 빈 값으로 다시 저장하면 트리플이 지워진다", () => {
+      const p = createProduct({ name: "방화벽", category: "방화벽" });
+      saveProductFields(p.id, [{ key: "firmwareVersion", value: "v9.2.1" }]);
+      saveProductFields(p.id, [{ key: "firmwareVersion", value: "" }]);
+      expect(getProductFields(p.id).find((f) => f.key === "firmwareVersion")!.value).toBe("");
+    });
+
+    it("스키마에 없는 키는 무시한다(온톨로지 오염 방지)", () => {
+      const p = createProduct({ name: "방화벽", category: "방화벽" });
+      saveProductFields(p.id, [{ key: "invented-field", value: "x" } as { key: string; value: string }]);
+      expect(getProductFields(p.id).every((f) => f.value === "")).toBe(true);
+    });
+
+    it("draftProductFields: json_schema 응답을 파싱해 스키마 순서대로 돌려준다", async () => {
+      chatSpy.mockResolvedValueOnce(
+        JSON.stringify({
+          firmwareVersion: "v9.2.1",
+          serialNumber: "",
+          managementAccess: "10.0.4.1:443",
+          logFormat: "Syslog(CEF)",
+          logForwarding: "",
+          authMethod: "",
+          location: "",
+          eolDate: "",
+          supplierContact: "",
+        })
+      );
+      const draft = await draftProductFields("FortiGate 600F", "펌웨어 v9.2.1, 관리 포트 10.0.4.1:443, 로그는 CEF 형식");
+      expect(chatSpy).toHaveBeenCalledWith(
+        expect.objectContaining({ agentId: "analysis", responseSchema: expect.any(Object) })
+      );
+      expect(draft.map((f) => f.key)).toEqual(PRODUCT_FIELD_SCHEMA.map((f) => f.key));
+      expect(draft.find((f) => f.key === "firmwareVersion")!.value).toBe("v9.2.1");
+      expect(draft.find((f) => f.key === "managementAccess")!.value).toBe("10.0.4.1:443");
+    });
+
+    it("draftProductFields: LLM이 JSON이 아닌 걸 돌려주면 명확한 에러를 던진다", async () => {
+      chatSpy.mockResolvedValueOnce("죄송합니다, 답변할 수 없습니다");
+      await expect(draftProductFields("FortiGate 600F", "본문")).rejects.toThrow();
+    });
+
+    it("GET/POST /api/security-products/:id/fields — API 왕복", async () => {
+      const created = await request(app).post("/api/security-products").set(auth()).send({ name: "EDR", category: "EDR" });
+      const id = created.body.id;
+
+      const empty = await request(app).get(`/api/security-products/${id}/fields`).set(auth());
+      expect(empty.status).toBe(200);
+      expect(empty.body).toHaveLength(PRODUCT_FIELD_SCHEMA.length);
+
+      const saved = await request(app)
+        .post(`/api/security-products/${id}/fields`)
+        .set(auth())
+        .send({ fields: [{ key: "serialNumber", value: "SN-12345" }] });
+      expect(saved.status).toBe(200);
+      expect(saved.body.find((f: { key: string }) => f.key === "serialNumber").value).toBe("SN-12345");
+
+      const notFound = await request(app).get(`/api/security-products/ghost/fields`).set(auth());
+      expect(notFound.status).toBe(404);
+    });
+
+    it("POST /api/security-products/:id/fields/draft — 매뉴얼 발췌에서 AI 초안(전체 흐름)", async () => {
+      const created = await request(app).post("/api/security-products").set(auth()).send({ name: "방화벽", category: "방화벽" });
+      const id = created.body.id;
+      chatSpy.mockResolvedValueOnce(
+        JSON.stringify({
+          firmwareVersion: "v9.2.1", serialNumber: "", managementAccess: "", logFormat: "",
+          logForwarding: "", authMethod: "", location: "", eolDate: "", supplierContact: "",
+        })
+      );
+      const content = Buffer.from("본 장비의 펌웨어 버전은 v9.2.1 입니다.", "utf8").toString("base64");
+      const r = await request(app)
+        .post(`/api/security-products/${id}/fields/draft`)
+        .set(auth())
+        .send({ filename: "manual.txt", content });
+      expect(r.status).toBe(200);
+      expect(r.body.find((f: { key: string }) => f.key === "firmwareVersion").value).toBe("v9.2.1");
+
+      const missing = await request(app).post(`/api/security-products/${id}/fields/draft`).set(auth()).send({});
+      expect(missing.status).toBe(400);
+    });
   });
 });

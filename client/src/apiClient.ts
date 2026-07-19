@@ -365,6 +365,13 @@ export interface ProductGroup {
   icon: string;
   products: SecurityProduct[];
 }
+// 제품 "정형 정보"(온톨로지 기반 양식) — 매뉴얼 업로드가 RAG 검색용 텍스트로만 남던 것을 보완해,
+// 고정된 9개 항목(펌웨어·시리얼·관리IP 등)을 구조화된 값으로 관리한다.
+export interface ProductFieldValue {
+  key: string;
+  label: string;
+  value: string;
+}
 
 export const securityProductsApi = {
   list: () => request<SecurityProduct[]>("/api/security-products"),
@@ -380,6 +387,12 @@ export const securityProductsApi = {
     request<ProductDoc>(`/api/security-products/${encodeURIComponent(id)}/docs`, { method: "POST", body: args }),
   removeDoc: (docId: string) =>
     request<{ ok: boolean }>(`/api/security-products/docs/${encodeURIComponent(docId)}`, { method: "DELETE" }),
+  getFields: (id: string) => request<ProductFieldValue[]>(`/api/security-products/${encodeURIComponent(id)}/fields`),
+  saveFields: (id: string, fields: { key: string; value: string }[]) =>
+    request<ProductFieldValue[]>(`/api/security-products/${encodeURIComponent(id)}/fields`, { method: "POST", body: { fields } }),
+  // 매뉴얼 파일에서 AI가 정형 정보 초안을 뽑는다 — 저장 안 됨, 화면에서 확인 후 saveFields로 별도 저장.
+  draftFields: (id: string, filename: string, content: string) =>
+    request<ProductFieldValue[]>(`/api/security-products/${encodeURIComponent(id)}/fields/draft`, { method: "POST", body: { filename, content } }),
   // 매뉴얼 자동 분류 임포트 — 파일명으로 제품 매칭(없으면 자동 등록)·종류·문서구분까지 반영.
   importDoc: (filename: string, content?: string) =>
     request<{
