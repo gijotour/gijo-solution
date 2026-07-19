@@ -53,9 +53,11 @@ export function resetChatHistoryForTests(): void {
 // 호출 시점에 동적 import.)
 async function ragContextFor(message: string, agentId: string): Promise<string | null> {
   try {
-    const { queryMemory } = await import("./memory.js");
+    const { queryMemoryRelevant } = await import("./memory.js");
     // 에이전트 전용 지식 + 전역 지식만 검색 (다른 에이전트 전용 문서는 제외).
-    const chunks = await queryMemory(message, 4, agentId);
+    // 거리 임계값을 넘는 청크는 버린다 — 무관한 조각을 "참고 자료"로 붙이면 모델이 그걸
+    // 근거인 양 답한다(memory.ts의 RAG_RELEVANCE_MAX_DISTANCE 주석 참고).
+    const chunks = await queryMemoryRelevant(message, 4, agentId);
 
     const parts: string[] = [];
     if (chunks.length > 0) {
@@ -244,6 +246,20 @@ export async function chat(args: ChatArgs): Promise<string> {
   if (!args.responseSchema) {
     const canned = smallTalkReply(args.message);
     if (canned) return canned;
+  }
+
+  // GIJO Agent(normaltic)의 엄격 그라운딩은 코드로 보장한다.
+  //
+  // 이 에이전트는 "사내 자료에 없으면 없다고 밝힌다"가 존재 이유인데, 프롬프트 규칙만으로는
+  // 지켜지지 않았다(2026-07-19 실측: "2026년 프로야구 우승팀"에 "롯데 지자체입니다"라고
+  // 없는 사실을 단정했다). 관련 자료가 없으면 애초에 LLM에 묻지 않는 것이 유일한 보장이다.
+  if (args.agentId === "normaltic" && !args.responseSchema) {
+    const { queryMemoryRelevant } = await import("./memory.js");
+    const relevant = await queryMemoryRelevant(args.message, 4, args.agentId).catch(() => null);
+    // null = 검색 자체가 실패(임베딩 서버 다운 등) — 이때는 막지 않고 평소대로 진행한다.
+    if (relevant && relevant.length === 0) {
+      return "등록된 사내 자료에는 관련 내용이 없습니다. 사내 문서를 먼저 등록하시거나, 다른 에이전트에게 물어보세요.";
+    }
   }
 
   const history = args.remember ? (histories.get(args.agentId) ?? []) : [];

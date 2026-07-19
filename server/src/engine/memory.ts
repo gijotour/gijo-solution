@@ -248,6 +248,49 @@ function safeScope(s: string): string {
 
 // agentId를 주면 "그 에이전트 전용 문서 + 전역 문서"만 검색한다. 없으면(대시보드/오케스트레이터)
 // 전역 문서만. 특정 에이전트에 귀속된 지식이 다른 에이전트로 새지 않도록 하는 게 목적.
+// 벡터 검색은 관련이 없어도 "가장 가까운" 청크를 돌려준다. 그래서 "베트남 쌀국수 육수 내는 법"에도
+// 보안 문서 조각이 딸려 나오고, 모델은 그걸 근거인 양 붙잡고 답한다(2026-07-19 실측: 그라운딩
+// 전용 에이전트가 없는 사실을 지어냈다).
+//
+// 임계값은 실측으로 정했다. 사내 자료에 있는 질문 4개와 없는 질문 4개의 최근접 거리를 재보니
+//   관련 있음: 0.503 ~ 0.775
+//   관련 없음: 1.086 ~ 1.285
+// 두 무리가 0.311만큼 떨어져 깨끗이 갈린다. 중간값 0.93보다 살짝 느슨한 0.95를 쓴다 —
+// 애매하게 관련된 실제 질문을 막는 쪽보다, 무관한 잡음을 거르는 쪽이 목적이기 때문이다.
+export const RAG_RELEVANCE_MAX_DISTANCE = 0.95;
+
+export interface ScoredChunk {
+  text: string;
+  distance: number;
+}
+
+/** 거리까지 함께 돌려주는 검색. 그라운딩 판단(관련 자료가 있는가)에 쓴다. */
+export async function queryMemoryScored(question: string, topK = 5, agentId?: string): Promise<ScoredChunk[]> {
+  const db = await lancedb.connect(DB_PATH);
+  const names = await db.tableNames();
+  if (!names.includes(TABLE_NAME)) return [];
+
+  const table = await db.openTable(TABLE_NAME);
+  const [queryVector] = await embed([question]);
+  const scopes = agentId && agentId !== GLOBAL_SCOPE ? [GLOBAL_SCOPE, safeScope(agentId)] : [GLOBAL_SCOPE];
+  const whereClause = `scope IN (${scopes.map((s) => `'${s}'`).join(", ")})`;
+  try {
+    const results = (await table.search(queryVector).where(whereClause).limit(topK).toArray()) as (MemoryRow & {
+      _distance?: number;
+    })[];
+    return results.map((r) => ({ text: r.text, distance: Number(r._distance ?? Number.POSITIVE_INFINITY) }));
+  } catch (err) {
+    console.warn(`[memory] 지식 베이스 검색 실패: ${err instanceof Error ? err.message : String(err)}`);
+    return [];
+  }
+}
+
+/** 관련 있는 청크만 남긴다(거리 임계값 적용). 관련 자료가 없으면 빈 배열. */
+export async function queryMemoryRelevant(question: string, topK = 5, agentId?: string): Promise<string[]> {
+  const scored = await queryMemoryScored(question, topK, agentId);
+  return scored.filter((c) => c.distance <= RAG_RELEVANCE_MAX_DISTANCE).map((c) => c.text);
+}
+
 export async function queryMemory(question: string, topK = 5, agentId?: string): Promise<string[]> {
   const db = await lancedb.connect(DB_PATH);
   const names = await db.tableNames();

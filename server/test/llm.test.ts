@@ -206,7 +206,9 @@ describe("llm chat system prompt (한국어 기본 처리)", () => {
   });
 
   it("injects RAG context into the single system prompt (장기 기억 — Mistral 템플릿은 system 2개를 거부)", async () => {
+    // ragContextFor는 거리 임계값을 적용한 queryMemoryRelevant를 쓴다(무관한 청크 주입 방지).
     vi.doMock("../src/engine/memory", () => ({
+      queryMemoryRelevant: vi.fn().mockResolvedValue(["사내 규정: pickle 파일은 반드시 스캔 후 반입한다."]),
       queryMemory: vi.fn().mockResolvedValue(["사내 규정: pickle 파일은 반드시 스캔 후 반입한다."]),
     }));
     const fetchMock = stubLlm();
@@ -224,6 +226,7 @@ describe("llm chat system prompt (한국어 기본 처리)", () => {
 
   it("chat still works when the embedding server / knowledge base is unavailable", async () => {
     vi.doMock("../src/engine/memory", () => ({
+      queryMemoryRelevant: vi.fn().mockRejectedValue(new Error("임베딩 서버에 연결할 수 없습니다")),
       queryMemory: vi.fn().mockRejectedValue(new Error("임베딩 서버에 연결할 수 없습니다")),
     }));
     const fetchMock = stubLlm("RAG 없이 답변");
