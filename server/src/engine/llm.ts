@@ -166,6 +166,34 @@ export function stripLeadingPreamble(text: string): string {
   return t.trim();
 }
 
+// ── 응답 길이 상한 ──────────────────────────────────────────────────────────
+// max_tokens를 호출자가 줄 때만 걸고 있어, 일반 채팅은 상한이 없었다. 그래서 모델이 멈출 때까지
+// 쏟아냈다(실측 2026-07-19: 한 에이전트가 "이번 주 보안 상황 정리해줘"에 6,525자를 53초 동안).
+// 보안담당자용 답변은 길어도 이 정도면 충분하고, 넘어가면 읽히지 않는다.
+// 리포트 생성처럼 긴 출력이 필요한 호출은 args.maxTokens로 직접 지정하므로 영향받지 않는다.
+const DEFAULT_MAX_TOKENS = 800;
+
+// ── 시스템 프롬프트 복창 감지 ───────────────────────────────────────────────
+// 이 크기 모델은 규칙 목록을 "내용"으로 착각해 그대로 옮겨 적는다(실측: 6개 에이전트 중 2개가
+// "응답 규칙(위에서부터 엄격히 지킬 것)…"을 답변으로 냈다). 규칙을 더 붙여 막으려 해봤지만
+// 오히려 심해졌다 — 규칙이 길수록 복창할 거리가 늘기 때문이다.
+// 그래서 프롬프트를 손대는 대신, 나온 답을 검사해 다시 받는다(중국어·영어 드리프트와 같은 구조).
+const PROMPT_LEAK_MARKERS = [
+  "응답 규칙",
+  "위에서부터 엄격히",
+  "첫 문장 규칙",
+  "인사말·서두·예고",
+  "인사말, 서두, 예고",
+  "당신은 GIJO AS",
+  "절대 금지】",
+  "반복 금지】",
+];
+export function hasPromptLeak(text: string): boolean {
+  const t = text ?? "";
+  // 한 개는 우연히 인용했을 수 있으나(사용자가 규칙을 물어본 경우 등), 두 개 이상이면 복창이다.
+  return PROMPT_LEAK_MARKERS.filter((m) => t.includes(m)).length >= 2;
+}
+
 // 중국어 드리프트 감지 — 2자 이상 연속된 CJK 한자는 중국어 구다(현대 한국어는 한자를 잇달아 쓰지 않음).
 // 문장 중간에 섞이면 잘라낼 수 없어 재생성으로 처리한다. 단일 한자(예: 外)는 무시해 오탐을 줄인다.
 const countHan = (t: string): number => (t.match(/[一-鿿]/g) || []).length;
@@ -300,7 +328,7 @@ export async function chat(args: ChatArgs): Promise<string> {
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "local", messages, ...constrained, ...(args.maxTokens ? { max_tokens: args.maxTokens } : {}) }),
+    body: JSON.stringify({ model: "local", messages, ...constrained, max_tokens: args.maxTokens ?? DEFAULT_MAX_TOKENS }),
     signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
   }).catch((err: unknown) => ((err as Error)?.name === "TimeoutError" ? ("timeout" as const) : null));
 
@@ -344,7 +372,15 @@ export async function chat(args: ChatArgs): Promise<string> {
   // 언어 드리프트(중국어 혼입 / 전면 영어) 감지 시 한국어 강제로 1회 재생성하고 더 나은 쪽을 채택한다.
   // (인사말과 달리 잘라낼 수 없으므로 재요청. 드리프트는 소수 질문에서만 나므로 대부분 재생성 안 함.)
   // 두 드리프트가 겹쳐도 재생성은 한 번만 한다 — 중국어 혼입이 더 좁고 확실한 신호라 우선.
-  const drift = hasChineseDrift(reply)
+  const drift = hasPromptLeak(reply)
+    ? {
+        detail: "지시문 복창 감지 — 재생성",
+        instruction:
+          "직전 답변에 당신에게 주어진 지시·규칙이 그대로 옮겨졌습니다. 규칙은 사용자에게 보여주는 내용이 아닙니다. 규칙을 언급하지 말고, 사용자의 질문에 대한 답만 다시 작성하세요.",
+        // 규칙 표지가 적은 쪽이 더 나은 답.
+        isBetter: (candidate: string) => !hasPromptLeak(candidate),
+      }
+    : hasChineseDrift(reply)
     ? {
         detail: "중국어 감지 — 한국어로 재생성",
         instruction:
@@ -368,7 +404,7 @@ export async function chat(args: ChatArgs): Promise<string> {
     const retryRes = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "local", messages: retryMessages, grammar: NO_HAN_GRAMMAR, ...(args.maxTokens ? { max_tokens: args.maxTokens } : {}) }),
+      body: JSON.stringify({ model: "local", messages: retryMessages, grammar: NO_HAN_GRAMMAR, max_tokens: args.maxTokens ?? DEFAULT_MAX_TOKENS }),
       signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
     }).catch(() => null); // 재작성 실패·시간 초과면 원래 답을 그대로 쓴다
     if (retryRes && retryRes.ok) {
