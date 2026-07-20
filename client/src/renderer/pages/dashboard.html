@@ -444,22 +444,8 @@
     </div>
     <div class="header-right">
       <div class="status-pill" id="statusPill"><span class="dot"></span>연결 확인 중<span class="beta-tag">LIVE</span></div>
-      <div class="icon-row">
-        <div class="icon-btn" data-page="kpi.html" title="보안 KPI">📊</div>
-        <div class="icon-btn" data-page="analysis.html" title="보안 분석 (통합 관제)">🔬</div>
-        <div class="icon-btn" data-page="sessions.html" title="작업 세션 (대화 세션별 관리)">💬</div>
-        <div class="icon-btn" id="toggleRightBtn" title="오른쪽 세션 패널 접기/펴기">◧</div>
-        <div class="icon-btn" data-page="inventory.html" title="ML BOM (자산·AI-BOM·취약점·조치)">🧠</div>
-        <div class="icon-btn" data-page="threat.html" title="위협 인텔리전스">△</div>
-        <div class="icon-btn" data-page="products.html" title="보안 운영 (제품·유지보수)">🧰</div>
-        <div class="icon-btn" data-page="report.html" title="리포트·컴플라이언스">▣</div>
-        <div class="icon-btn" data-page="agent.html" title="AI 어시스턴트">◉</div>
-        <div class="icon-btn" id="officeBtn" title="우리 AI 팀 사무실 (별도 창)">🏢</div>
-        <div class="icon-btn" data-page="memory.html" title="AI 지식·모델 (기억·문서보강·온톨로지·학습)">📚</div>
-        <div class="icon-btn" data-page="redteam.html" title="AI 견고성 (레드팀·가드레일)">🛡</div>
-        <div class="icon-btn" data-page="logs.html" title="로그">🗒</div>
-        <div class="icon-btn" data-page="settings.html" title="설정 (연결·요금)">⚙</div>
-      </div>
+      <!-- 상단 툴바 = '내 업무 바로가기'에 등록된 항목만 동적 렌더(아래 dashMenu IIFE의 renderTopShortcuts). -->
+      <div class="icon-row" id="topShortcuts"></div>
       <div class="avatar-btn" id="avatarBtn">-</div>
       <div class="icon-btn" id="settingsBtn">⚙</div>
     </div>
@@ -2276,6 +2262,23 @@
     });
     root.querySelectorAll("[data-addcad]").forEach(function (el) {
       el.addEventListener("click", function (e) { e.stopPropagation(); openPicker(el.getAttribute("data-addcad"), el); });
+    });
+    renderTopShortcuts(); // 상단 툴바도 등록 목록과 동기화
+  }
+  // 상단 툴바 = '내 업무 바로가기'에 등록된 항목만(주기 3구획 합쳐 중복 제거·순서 유지). 등록 변경 시 자동 갱신.
+  function renderTopShortcuts() {
+    var bar = document.getElementById("topShortcuts");
+    if (!bar) return;
+    var seen = {}, pages = [];
+    ["daily", "weekly", "monthly"].forEach(function (c) {
+      (layout[c] || []).forEach(function (pg) { if (!seen[pg] && CATALOG[pg]) { seen[pg] = 1; pages.push(pg); } });
+    });
+    bar.innerHTML = pages.map(function (pg) {
+      var m = CATALOG[pg];
+      return '<div class="icon-btn" data-goto="' + pg + '" title="' + esc(m[0]) + '">' + m[1] + "</div>";
+    }).join("");
+    bar.querySelectorAll("[data-goto]").forEach(function (el) {
+      el.addEventListener("click", function () { if (window.gijo && window.gijo.navigateTo) window.gijo.navigateTo(el.getAttribute("data-goto")); });
     });
   }
   document.addEventListener("click", function (e) { if (!e.target.closest(".dm-picker") && !e.target.closest("[data-addcad]")) closePicker(); });
