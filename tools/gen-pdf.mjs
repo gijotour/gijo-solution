@@ -11,8 +11,21 @@ import { createRequire } from "module";
 import { fileURLToPath, pathToFileURL } from "url";
 
 const ROOT = path.resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
-const require = createRequire(pathToFileURL(path.join(ROOT, "client", "package.json")));
-const { chromium } = require("playwright-core");
+// playwright-core는 server의 정식 의존성이다(95e2ab9 — 리포트 PDF 렌더러 영속화).
+// client에는 선언돼 있지 않고, 예전 설치의 잔여물로 우연히 잡히던 것이라 client를 기준으로
+// 잡으면 새로 받은 체크아웃(npm ci)에서 "Cannot find module 'playwright-core'"로 죽는다.
+// server → client 순으로 찾아 둘 중 있는 쪽을 쓴다.
+function resolveChromium() {
+  for (const dir of ["server", "client"]) {
+    try {
+      return createRequire(pathToFileURL(path.join(ROOT, dir, "package.json")))("playwright-core").chromium;
+    } catch {
+      /* 다음 후보로 */
+    }
+  }
+  throw new Error("playwright-core를 찾지 못했습니다 — server/에서 `npm ci` 후 다시 실행하세요.");
+}
+const chromium = resolveChromium();
 
 const DEFAULT_DOCS = ["GIJO_AS_제품소개.md", "GIJO_AS_사용자_매뉴얼.md"];
 const inputs = process.argv.slice(2).length ? process.argv.slice(2) : DEFAULT_DOCS;
