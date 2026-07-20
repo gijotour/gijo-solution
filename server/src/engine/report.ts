@@ -781,12 +781,29 @@ function buildReportHtml(
 
 // HTML → A4 PDF (headless 브라우저). playwright-core는 client/node_modules에 있으므로 그쪽에서 resolve.
 // 브라우저(Edge/Chromium) 미가용 시 false 반환 → 호출부가 DOCX만 제공.
+// playwright-core를 여러 위치에서 순서대로 resolve한다:
+//  ① server 자체(node_modules에 설치된 운영 배포 — client 폴더가 없는 WSL 서버) → ② dev 환경의 ../client.
+// 어느 쪽도 없으면 PDF 없이 DOCX만 제공(비치명적).
+function loadPlaywright(): { chromium: { launch: (o: unknown) => Promise<any> } } | null {
+  const candidates = [
+    path.resolve(process.cwd(), "package.json"), // server 자체
+    path.resolve(process.cwd(), "..", "client", "package.json"), // dev: sibling client
+  ];
+  for (const base of candidates) {
+    try {
+      return createRequire(base)("playwright-core") as { chromium: { launch: (o: unknown) => Promise<any> } };
+    } catch {
+      /* 다음 후보 */
+    }
+  }
+  return null;
+}
 async function renderPdf(html: string, outPath: string): Promise<boolean> {
   try {
-    const req = createRequire(path.resolve(process.cwd(), "..", "client", "package.json"));
-    // playwright-core는 server 의존성이 아니라 client/node_modules에서 resolve(타입 없이 런타임 로드).
-    const pw = req("playwright-core") as { chromium: { launch: (o: unknown) => Promise<any> } };
+    const pw = loadPlaywright();
+    if (!pw) throw new Error("playwright-core 미설치(server·client 어디에도 없음)");
     const chromium = pw.chromium;
+    // Windows dev는 msedge, 리눅스(운영 WSL)는 설치된 chromium으로 폴백.
     const browser: any = await chromium.launch({ channel: "msedge", headless: true }).catch(() => chromium.launch({ headless: true }));
     try {
       const page = await browser.newPage();
