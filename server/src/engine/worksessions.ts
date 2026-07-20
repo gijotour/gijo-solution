@@ -17,6 +17,7 @@ import * as path from "path";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from "docx";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
+import { onAudit } from "./audit";
 import { db } from "../db";
 import { migrate } from "../db";
 
@@ -226,6 +227,27 @@ export function recentTurnsText(sessionId: string, maxTurns = 6): string {
   const lines = recent.map((t) => `${t.role === "user" ? "사용자" : "AI"}: ${t.content.replace(/\s+/g, " ").trim().slice(0, 300)}`);
   return ["이전 대화 맥락(같은 세션):", ...lines].join("\n");
 }
+
+// ── 모든 행위 → 작업 세션 자동 기록(사용자 요청 2026-07-20) ────────────
+// 감사 로그에 남는 행위(하드닝 점검·승인 실행·CLI·설정 변경 등)를 작업 세션 목록에도 1건씩 남긴다.
+// auth(로그인/로그아웃)는 제외 — 세션 목록이 접속 기록으로 도배되는 것을 막는다(접속은 사무실 창 presence·감사에서).
+// 단발 행위는 즉시 "완료"로 저장한다. setSessionStatus 직접 호출은 DOCX 리포트를 만들지 않으므로
+// (리포트는 PATCH 라우트 전용) 행위마다 리포트가 쏟아지는 일은 없다.
+const AUDIT_KIND_LABEL: Record<string, string> = {
+  cli: "CLI", approval: "승인", write: "실행", block: "차단", config: "설정",
+};
+onAudit((e) => {
+  if (e.kind === "auth") return;
+  try {
+    const title = `[${AUDIT_KIND_LABEL[e.kind] ?? e.kind}] ${e.action}${e.target ? " — " + e.target : ""}`.slice(0, 90);
+    const s = createSession(title);
+    // 주체: scheduler(자동 점검)는 AI 팀(assistant), 그 외(담당자 행위)는 나(user)로 — 목록의 "주체" 표기용.
+    const role = e.actor === "scheduler" ? "assistant" : "user";
+    const body = (e.detail || e.action) + (e.result !== "ok" ? ` (결과: ${e.result})` : "");
+    appendTurn(s.id, role, body, e.actor ?? undefined);
+    if (e.result !== "pending") setSessionStatus(s.id, "done");
+  } catch { /* 세션 반영 실패가 본 작업·감사 기록을 막지 않게 */ }
+});
 
 // ── 세션 종료 리포트 ─────────────────────────────────────────────────
 // 세션을 "완료"로 바꾸면 그 대화 전체(지시·응답·도구 태그·시각)를 DOCX로 남긴다.

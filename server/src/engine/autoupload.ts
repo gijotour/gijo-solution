@@ -3,8 +3,9 @@
 // 우선이고, LLM은 일반 문서의 종류 분류(memory.classify)에만 쓴다 — 무거운 판별에 LLM을 쓰지
 // 않아 빠르고 재현 가능하다. 판별 근거(reason)를 응답에 담아 "왜 이렇게 처리됐는지" 투명하게 보여준다.
 
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { authMiddleware } from "../auth/auth";
+import { recordAudit } from "./audit";
 import { asyncRoute } from "../util/asyncRoute";
 import { emitCollaboration } from "./collaboration";
 import { importVulnScan, parseNessusHtml } from "./vulnscan";
@@ -181,7 +182,16 @@ export function registerAutoUploadRoutes(app: Express): void {
       }
       const valid =
         forceType && ["asset", "log", "document", "guideline", "vulnreport"].includes(forceType) ? forceType : undefined;
-      res.json(await autoRouteUpload(filename.trim(), content, valid, productName));
+      const result = await autoRouteUpload(filename.trim(), content, valid, productName);
+      // 유형이 확정돼 실제 반영된 업로드만 기록(needsDecision=재질문 단계는 행위가 아직 아님).
+      if (!(result as { needsDecision?: boolean }).needsDecision) {
+        const user = (req as Request & { user?: { displayName?: string } }).user;
+        recordAudit({
+          kind: "write", actor: user?.displayName ?? null, action: "파일 업로드 자동 분류",
+          target: filename.trim(), detail: `유형: ${(result as { type?: string }).type ?? valid ?? "?"}`, result: "ok",
+        });
+      }
+      res.json(result);
     })
   );
 }

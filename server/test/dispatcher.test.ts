@@ -160,15 +160,18 @@ describe("dispatcher + intent + assets integration", () => {
       expect(sessionEvents.some((e: { from: string }) => e.from === "세션")).toBe(true);
     });
 
-    it("sessionId 없이 지시하면 세션이 만들어지지 않는다(종전 동작 보존)", async () => {
+    it("sessionId 없이 지시해도 세션이 자동 생성된다(모든 행위를 작업 세션에 — 2026-07-20)", async () => {
       const before = await request(app).get("/api/work-sessions").set("Authorization", `Bearer ${token}`);
       const res = await request(app)
         .post("/api/dispatch")
         .set("Authorization", `Bearer ${token}`)
         .send({ text: "오늘 상태 어때?" });
-      expect(res.body.sessionId).toBeUndefined();
+      expect(res.body.sessionId).toBeTruthy(); // 자동 생성된 세션을 돌려줘 클라가 이어갈 수 있다
       const after = await request(app).get("/api/work-sessions").set("Authorization", `Bearer ${token}`);
-      expect(after.body.length).toBe(before.body.length); // 새 세션이 생기지 않음
+      expect(after.body.length).toBe(before.body.length + 1);
+      const created = after.body.find((s: { id: string }) => s.id === res.body.sessionId);
+      expect(created).toBeTruthy();
+      expect(created.title).toContain("오늘 상태"); // 첫 지시로 제목 자동 지정
     });
   });
 

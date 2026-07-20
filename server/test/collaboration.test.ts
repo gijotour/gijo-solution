@@ -42,9 +42,13 @@ describe("collaboration", () => {
     await request(app).post("/api/dispatch").set("Authorization", `Bearer ${token}`).send({ text: "상태 확인" });
 
     const res = await request(app).get("/api/collaboration/history").set("Authorization", `Bearer ${token}`);
-    expect(res.body).toHaveLength(2);
-    expect(res.body[0].from).toBe("orchestrator");
-    expect(res.body[1].to).toBe("orchestrator");
+    // 2026-07-20부터 무세션 지시도 세션이 자동 생성되므로 "세션" 태그 이벤트 2건이 앞뒤로 추가된다:
+    // [세션→orchestrator 지시, orchestrator→에이전트 시작, 에이전트→orchestrator 완료, orchestrator→세션 응답]
+    expect(res.body).toHaveLength(4);
+    expect(res.body[0].from).toBe("세션");
+    expect(res.body[1].from).toBe("orchestrator");
+    expect(res.body[2].to).toBe("orchestrator");
+    expect(res.body[3].to).toBe("세션");
   });
 
   it("caps the in-memory log so it can't grow unbounded", async () => {

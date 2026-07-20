@@ -1,7 +1,7 @@
 // engine/report.ts — 내부 SBOM 기반 내부보고용 리포트 (6.4.1절)
 // 데이터 소스는 6.4의 자산 레지스트리(assets.ts)를 그대로 재사용 — 별도 수집 로직 없음.
 
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import * as fs from "fs/promises";
 import * as path from "path";
 import { createRequire } from "module";
@@ -16,6 +16,10 @@ import { listMaintenanceItems, MaintenanceItem } from "./maintenance";
 import { listTasks, TaskItem } from "./tasks";
 import { prioritizedReviews, buildTriageDraft, type PrioritizedFinding } from "./approvals";
 import { aibomThreatMatches, type AiBomThreatReport } from "./compliance";
+import { recordAudit } from "./audit";
+import type { GijoUser } from "../auth/users";
+
+type ExpressRequestWithUser = Request & { user?: GijoUser };
 
 export interface ReportRequest {
   type: "weekly" | "quarterly" | "ondemand";
@@ -803,7 +807,14 @@ export function registerReportRoutes(app: Express): void {
     "/api/report/generate",
     authMiddleware,
     asyncRoute(async (req, res) => {
-      res.json(await generateReport(req.body));
+      const result = await generateReport(req.body);
+      // 작업 기록(감사)에 남긴다 → onAudit 훅으로 작업 세션 목록에도 자동 반영("모든 행위" 요청).
+      const actor = (req as ExpressRequestWithUser).user?.displayName ?? null;
+      recordAudit({
+        kind: "write", actor, action: `리포트 생성 (${req.body?.type ?? "ondemand"})`,
+        target: path.basename(result.filePath), detail: result.executiveSummary.slice(0, 200), result: "ok",
+      });
+      res.json(result);
     })
   );
   // 저장된 리포트 이력 — 이번 세션뿐 아니라 과거에 생성한 리포트까지(재기동·다른 세션 포함).

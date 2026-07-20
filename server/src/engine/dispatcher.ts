@@ -24,7 +24,7 @@ import { recordFindings, getAsset, listAssets } from "./assets";
 import { listFindings } from "./cti";
 import { matchCtiToAssets } from "./ctimatch";
 import { generateReport } from "./report";
-import { appendTurn, recentTurnsText, getSession } from "./worksessions";
+import { appendTurn, recentTurnsText, getSession, createSession } from "./worksessions";
 
 export interface DispatchResult {
   task: TaskItem;
@@ -277,9 +277,12 @@ async function learnloopConfirmResult(instructionText: string): Promise<Dispatch
 }
 
 // 작업 세션 래퍼 — sessionId가 있으면 지시를 user 턴, 응답을 assistant 턴으로 기록하고
-// 직전 턴들을 맥락으로 실어 "이어서" 지시가 되게 한다. sessionId가 없으면 종전과 100% 동일.
+// 직전 턴들을 맥락으로 실어 "이어서" 지시가 되게 한다.
+// sessionId가 없으면 자동으로 새 세션을 만들어 기록한다(사용자 요청 2026-07-20 — "모든 행위를
+// 작업 세션에": 팀 사무실 CTA·에이전트 페이지 등 세션 없이 오던 지시도 이력에 남게).
+// 응답의 sessionId를 클라이언트가 저장하면 그 세션으로 "이어서" 지시가 된다.
 export async function dispatchInstruction(instructionText: string, sessionId?: string, screen?: string): Promise<DispatchResult> {
-  const session = sessionId ? getSession(sessionId) : null;
+  const session = (sessionId ? getSession(sessionId) : null) ?? createSession();
   // 맥락은 이번 지시를 기록하기 "전" 시점의 대화로 계산한다(방금 넣은 user 턴이 맥락에 중복되지 않게).
   const contextText = session ? recentTurnsText(session.id) : "";
   let title = session?.title;

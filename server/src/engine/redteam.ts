@@ -8,6 +8,7 @@
 import type { Express } from "express";
 import * as crypto from "crypto";
 import { authMiddleware } from "../auth/auth";
+import { recordAudit } from "./audit";
 import { asyncRoute } from "../util/asyncRoute";
 
 export type AttackCategory = "instruction-override" | "jailbreak" | "system-prompt-leak" | "obfuscation" | "indirect";
@@ -181,6 +182,15 @@ export function registerRedteamRoutes(app: Express): void {
       }
       lastReport = report;
       lastReports.set(targetKey, report);
+      // 작업 기록(감사) → onAudit 훅으로 작업 세션에도 자동 반영("모든 행위" 요청).
+      recordAudit({
+        kind: "write",
+        actor: (req as import("express").Request & { user?: { displayName?: string } }).user?.displayName ?? null,
+        action: "레드팀 점검 실행",
+        target: label,
+        detail: `견고성 ${report.robustnessScore}점 · 취약 ${report.vulnerable}/${report.total}`,
+        result: "ok",
+      });
       if (asset) {
         setAssetRobustness(asset.id, {
           score: report.robustnessScore,

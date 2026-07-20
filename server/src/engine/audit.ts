@@ -28,6 +28,14 @@ const insertStmt = db.prepare(
    VALUES (@id, @at, @kind, @actor, @action, @target, @detail, @result)`
 );
 
+// 감사 기록 리스너 — "모든 행위를 작업 세션에도 남긴다"(사용자 요청 2026-07-20) 같은 부가 반영을
+// 순환 의존 없이 붙이기 위한 훅. audit는 리프 모듈로 유지하고, 소비자(worksessions)가 등록한다.
+export type AuditListener = (e: AuditEntry) => void;
+const listeners: AuditListener[] = [];
+export function onAudit(l: AuditListener): void {
+  listeners.push(l);
+}
+
 // 어디서든 부를 수 있는 기록 함수. 실패해도 본 작업을 막지 않게 조용히 삼킨다(감사 기록이
 // 기능을 깨뜨리면 안 된다). detail은 길 수 있어 4000자로 자른다.
 export function recordAudit(e: {
@@ -38,19 +46,23 @@ export function recordAudit(e: {
   detail?: string | null;
   result?: AuditResult;
 }): void {
+  const entry: AuditEntry = {
+    id: randomUUID(),
+    at: Date.now(),
+    kind: e.kind,
+    actor: e.actor ?? null,
+    action: e.action,
+    target: e.target ?? null,
+    detail: e.detail ? e.detail.slice(0, 4000) : null,
+    result: e.result ?? "ok",
+  };
   try {
-    insertStmt.run({
-      id: randomUUID(),
-      at: Date.now(),
-      kind: e.kind,
-      actor: e.actor ?? null,
-      action: e.action,
-      target: e.target ?? null,
-      detail: e.detail ? e.detail.slice(0, 4000) : null,
-      result: e.result ?? "ok",
-    });
+    insertStmt.run(entry);
   } catch (err) {
     console.error("[audit] 기록 실패(무시):", err instanceof Error ? err.message : err);
+  }
+  for (const l of listeners) {
+    try { l(entry); } catch { /* 리스너 실패가 감사·본 작업을 막지 않게 */ }
   }
 }
 

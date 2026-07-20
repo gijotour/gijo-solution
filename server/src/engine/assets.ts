@@ -21,6 +21,7 @@ import { runAdapter } from "./bridge";
 import type { StandardFinding } from "./bridge";
 import { db, assertTestDb } from "../db";
 import { emitCollaboration } from "./collaboration";
+import { recordAudit } from "./audit";
 import { setAgentStatus, resetAgentToDefault } from "./agents";
 import { computeAssetCoverage } from "./assetcoverage";
 
@@ -426,6 +427,15 @@ export function registerAssetsRoutes(app: Express): void {
     recordFindings(asset.id, findings);
     emitCollaboration({ from: "scan", to: "orchestrator", message: `재스캔 완료: ${asset.id} — finding ${findings.length}건` });
     resetAgentToDefault("scan");
+    // 작업 기록(감사) → onAudit 훅으로 작업 세션에도 자동 반영("모든 행위" 요청).
+    recordAudit({
+      kind: "write",
+      actor: (req as import("express").Request & { user?: { displayName?: string } }).user?.displayName ?? null,
+      action: "자산 재스캔",
+      target: asset.name,
+      detail: `finding ${findings.length}건`,
+      result: "ok",
+    });
     res.json({ assetId: asset.id, findings: findings.length });
   }));
   // 담당부서·서비스 정정 — 커버리지 결손을 메우는 경로.

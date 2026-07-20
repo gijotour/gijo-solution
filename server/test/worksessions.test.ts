@@ -187,3 +187,25 @@ describe("worksessions — 세션 종료 리포트", () => {
     expect(await generateSessionReport("nope")).toBeNull();
   });
 });
+
+describe("worksessions — 모든 행위 자동 세션(감사 훅)", () => {
+  it("감사 기록이 남으면 작업 세션 목록에도 완료 세션이 생긴다", async () => {
+    const { recordAudit } = await import("../src/engine/audit");
+    recordAudit({ kind: "write", actor: "정요한", action: "자산 재스캔", target: "샘플-웹서버", detail: "finding 3건" });
+    const list = listSessions();
+    const s = list.find((x) => x.title.includes("자산 재스캔"));
+    expect(s).toBeTruthy();
+    expect(s!.title).toContain("[실행]");
+    expect(s!.title).toContain("샘플-웹서버");
+    expect(s!.status).toBe("done"); // 단발 행위는 즉시 완료(리포트 자동 생성은 없음 — PATCH 경로 전용)
+    expect(s!.lastRole).toBe("user"); // 담당자 행위 → 주체 "나"
+    expect(s!.lastPreview).toContain("finding 3건");
+  });
+
+  it("auth(로그인) 기록은 세션을 만들지 않는다 — 목록 도배 방지", async () => {
+    const { recordAudit } = await import("../src/engine/audit");
+    const before = listSessions().length;
+    recordAudit({ kind: "auth", actor: "정요한", action: "로그인" });
+    expect(listSessions().length).toBe(before);
+  });
+});
