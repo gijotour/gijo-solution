@@ -39,7 +39,7 @@ export interface ReportResult {
 
 type Finding = Asset["findings"][number];
 
-const REPORT_DIR = path.join("data", "reports");
+const REPORT_DIR = process.env.GIJO_REPORT_DIR || path.join("data", "reports");
 
 function collectAssets(req: ReportRequest): Asset[] {
   if (req.assetIds?.length) {
@@ -885,13 +885,20 @@ export function registerReportRoutes(app: Express): void {
     })
   );
   // N일 이전 리포트 일괄 삭제 — 라우트 순서상 /:base보다 먼저 두어 'prune'이 base로 안 잡히게 한다.
+  // 파괴적 작업이라 반드시 감사에 남긴다 — 예전엔 여기 누락돼 있어 리포트가 사라져도 누가·언제 지웠는지
+  // 알 방법이 없었다(2026-07-21 실측: 운영 data/reports가 통째로 비었는데 흔적이 전혀 없었음).
   app.post(
     "/api/report/prune",
     authMiddleware,
     asyncRoute(async (req, res) => {
+      const actor = (req as ExpressRequestWithUser).user?.displayName ?? null;
       try {
-        res.json(await pruneReports(Number(req.body?.olderThanDays)));
+        const days = Number(req.body?.olderThanDays);
+        const result = await pruneReports(days);
+        recordAudit({ kind: "write", actor, action: `리포트 일괄 삭제(${days}일 이전)`, detail: `리포트 ${result.deletedReports}건 · 파일 ${result.deletedFiles}개`, result: "ok" });
+        res.json(result);
       } catch (e) {
+        recordAudit({ kind: "write", actor, action: "리포트 일괄 삭제 실패", detail: (e as Error).message, result: "error" });
         res.status(400).json({ error: (e as Error).message });
       }
     })
@@ -900,17 +907,24 @@ export function registerReportRoutes(app: Express): void {
   app.post(
     "/api/report/delete-all",
     authMiddleware,
-    asyncRoute(async (_req, res) => {
-      res.json(await deleteAllReports());
+    asyncRoute(async (req, res) => {
+      const actor = (req as ExpressRequestWithUser).user?.displayName ?? null;
+      const result = await deleteAllReports();
+      recordAudit({ kind: "write", actor, action: "리포트 전체 삭제", detail: `리포트 ${result.deletedReports}건 · 파일 ${result.deletedFiles}개`, result: "ok" });
+      res.json(result);
     })
   );
   app.delete(
     "/api/report/:base",
     authMiddleware,
     asyncRoute(async (req, res) => {
+      const actor = (req as ExpressRequestWithUser).user?.displayName ?? null;
       try {
-        res.json(await deleteReport(String(req.params.base)));
+        const result = await deleteReport(String(req.params.base));
+        recordAudit({ kind: "write", actor, action: "리포트 삭제", target: String(req.params.base), detail: result.deleted.join(", "), result: "ok" });
+        res.json(result);
       } catch (e) {
+        recordAudit({ kind: "write", actor, action: "리포트 삭제 실패", target: String(req.params.base), detail: (e as Error).message, result: "error" });
         res.status(400).json({ error: (e as Error).message });
       }
     })

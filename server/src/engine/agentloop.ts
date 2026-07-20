@@ -224,6 +224,12 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }
     tool: "run_hardening_scan",
     args: {},
   },
+  // 정기 리포트 스케줄 조회 — "다음 리포트 언제", "이번 주 스케줄" 등은 today/briefing으로 새기 쉬워 못박는다.
+  {
+    re: /(정기|자동)?\s*리포트\s*(스케줄|일정|예약).{0,6}(확인|알려|보여|뭐)|다음\s*(정기\s*)?리포트.{0,4}(언제|일정)|리포트\s*(자동\s*)?생성.{0,4}(언제|스케줄|일정)/,
+    tool: "report_schedule_list",
+    args: {},
+  },
   // 오늘의 브리핑 — 대시보드(전체 도구 노출)에서 문구가 명백한데도 LLM이 도구를 건너뛰고 잡담으로
   // 떨어지던 것(실측 0/3 → chat)을 못박는다. "문서 리포트 작성"은 여기 안 걸리게 좁게 잡는다.
   {

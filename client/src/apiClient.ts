@@ -993,6 +993,53 @@ export interface ReportHistoryEntry {
   pdf?: string;
 }
 
+// ── 정기 리포트(주간/분기) 자동 생성 스케줄 ────────────────────────────────
+export interface ReportSchedule {
+  id: string;
+  type: "weekly" | "quarterly";
+  assetIds: string[] | null;
+  format: "docx" | "pdf" | "both";
+  audience: "internal" | "official";
+  dayOfWeek: number | null;
+  hour: number;
+  minute: number;
+  enabled: boolean;
+  lastRunAt: number | null;
+  nextRunAt: number;
+  lastResult: "success" | "fail" | null;
+  lastError: string | null;
+  lastReportBase: string | null;
+  createdAt: number;
+}
+export interface ReportScheduleRunEntry {
+  id: string; scheduleId: string; at: number; source: "scheduled" | "manual"; result: "success" | "fail"; detail: string | null;
+}
+export interface CreateReportScheduleInput {
+  type: "weekly" | "quarterly";
+  assetIds?: string[] | null;
+  format: "docx" | "pdf" | "both";
+  audience: "internal" | "official";
+  dayOfWeek?: number | null;
+  hour: number;
+  minute: number;
+}
+
+export const reportScheduleApi = {
+  list: () => request<{ schedules: ReportSchedule[] }>("/api/report/schedules"),
+  create: (input: CreateReportScheduleInput) => request<{ schedule: ReportSchedule }>("/api/report/schedules", { method: "POST", body: input }),
+  update: (id: string, patch: Partial<CreateReportScheduleInput> & { enabled?: boolean }) =>
+    request<{ schedule: ReportSchedule }>(`/api/report/schedules/${id}`, { method: "PATCH", body: patch }),
+  remove: (id: string) => request<{ ok: boolean }>(`/api/report/schedules/${id}`, { method: "DELETE" }),
+  runNow: (id: string) => request<{ schedule: ReportSchedule }>(`/api/report/schedules/${id}/run`, { method: "POST" }),
+  runs: (scheduleId?: string, limit?: number) => {
+    const q = new URLSearchParams();
+    if (scheduleId) q.set("scheduleId", scheduleId);
+    if (limit) q.set("limit", String(limit));
+    const qs = q.toString();
+    return request<{ runs: ReportScheduleRunEntry[] }>(`/api/report/schedules/runs${qs ? `?${qs}` : ""}`);
+  },
+};
+
 // ── 사용량 · 요금 ─────────────────────────────────────────────────────
 export interface UsageSummary {
   service: string;

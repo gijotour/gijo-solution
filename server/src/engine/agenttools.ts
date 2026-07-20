@@ -31,6 +31,7 @@ import { matchCtiToAssets } from "./ctimatch";
 import { dailyBriefingText } from "./briefing";
 import { runRedTeam, makeServedCaller } from "./redteam";
 import { runHardeningScan, scanSummaryText, isStandard } from "./hardeningscan";
+import { listSchedules as listReportSchedules, scheduleSummaryText } from "./reportschedule";
 
 export interface AgentToolParam {
   name: string;
@@ -970,6 +971,12 @@ function runComplianceStatus(args: Record<string, string>): string {
   return pending.length ? `${head}\n조치 필요:\n${lines.join("\n")}` : `${head}\n미대응 항목이 없습니다.`;
 }
 
+// 정기 리포트(주간/분기) 자동 생성 스케줄 조회 — 화면(예약 설정)에서 등록한 스케줄을 챗봇이
+// 그대로 알 수 있게 한다("다음 정기 리포트 언제야?", "이번 주 스케줄 뭐있어?" 등).
+function runReportScheduleList(): string {
+  return scheduleSummaryText(listReportSchedules());
+}
+
 // ── 「지식·모델」 도메인 도구 ────────────────────────────────────────────
 // 답변 품질은 지식베이스가 좌우한다. "무엇이 들어 있고 얼마나 연결됐는가"를 본다.
 async function runKnowledgeStatus(): Promise<string> {
@@ -1024,6 +1031,17 @@ const TOOLS: AgentTool[] = [
     },
     undo: "컴플라이언스 화면에서 상태를 되돌릴 수 있습니다.",
     run: runSetComplianceStatus,
+  },
+  {
+    name: "report_schedule_list",
+    label: "정기 리포트 스케줄 조회",
+    domain: "report",
+    write: false,
+    description:
+      '등록된 정기 리포트(주간/분기) 자동 생성 스케줄을 조회한다. 대상 자산·주기·다음 실행 시각·최근 실행 성공/실패를 그대로 보여준다. "다음 정기 리포트 언제야?", "이번 주 리포트 스케줄 확인해줘", "리포트 자동 생성 스케줄 뭐있어?"에 쓴다. 예: {}',
+    directAnswer: true,
+    params: [],
+    run: runReportScheduleList,
   },
   {
     name: "knowledge_status",

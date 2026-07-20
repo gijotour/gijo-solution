@@ -1,0 +1,95 @@
+<!doctype html><html><head><meta charset="utf-8"><title>시안 B — 마스터-디테일</title><style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.16);--blue:#3b82f6;--blue-light:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;}
+*{box-sizing:border-box;margin:0;padding:0;font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;}
+body{background:var(--bg);color:var(--text);padding:22px;width:1100px;}
+h2{font-size:19px;color:#fff;margin-bottom:3px;}
+.sub{font-size:12px;color:var(--muted);margin-bottom:16px;}
+.btn{background:var(--blue);color:#fff;border:0;border-radius:7px;padding:7px 13px;font-size:12px;font-weight:800;cursor:pointer;}
+.btn.ghost{background:transparent;border:1px solid var(--border-strong);color:var(--muted);}
+.btn.sm{padding:4px 9px;font-size:11px;}
+.chip{font-size:10px;font-weight:800;padding:2px 8px;border-radius:5px;}
+.chip.on{background:rgba(30,185,128,.15);color:#1eb980;}
+.chip.off{background:rgba(139,147,171,.15);color:#8b93ab;}
+.chip.warn{background:rgba(226,72,61,.15);color:#e2483d;}
+.chip.bot{background:rgba(139,124,240,.16);color:#b7a8ff;}
+.layout{display:grid;grid-template-columns:300px 1fr;gap:14px;}
+.list-item{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:8px;cursor:pointer;}
+.list-item.active{border-color:var(--blue);background:rgba(59,130,246,.08);}
+.list-item .t{font-size:12.5px;font-weight:800;color:#fff;display:flex;justify-content:space-between;}
+.list-item .m{font-size:10.5px;color:var(--muted);margin-top:4px;}
+.panel{background:var(--panel-2);border:1px solid var(--border);border-radius:11px;padding:16px 18px;}
+.dgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-top:6px;}
+.dgrid label{font-size:10.5px;color:var(--muted-2);font-weight:700;display:block;margin-bottom:3px;}
+.dgrid input,.dgrid select{width:100%;background:var(--panel);border:1px solid var(--border-strong);border-radius:6px;padding:6px 8px;color:var(--text);font-size:11.5px;}
+.hist{font-size:11.5px;border-collapse:collapse;width:100%;margin-top:8px;}
+.hist td{padding:6px 4px;border-bottom:1px solid var(--border);}
+.toggle{width:34px;height:19px;border-radius:11px;position:relative;display:inline-block;}
+.toggle .k{width:15px;height:15px;border-radius:50%;background:#fff;position:absolute;top:2px;transition:.2s;}
+.divider{border-top:1px solid var(--border);margin:14px 0;}
+.qa{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:9px 11px;font-size:11.5px;margin-top:7px;}
+.qa .q{color:var(--blue-light);font-weight:700;}
+.qa .a{color:var(--muted);margin-top:3px;line-height:1.6;}
+</style></head><body>
+<h2>📅 리포트 스케줄 관리 <span style="font-size:11px;color:var(--muted-2);font-weight:600">시안 B · 마스터-디테일</span></h2>
+<div class="sub">왼쪽에서 스케줄을 선택해 상세 설정·실행 이력·챗봇 연동 상태를 확인합니다.</div>
+
+<div class="layout">
+  <div>
+    <div class="list-item active">
+      <div class="t">주간 · 전체 자산 <span class="chip on">켜짐</span></div>
+      <div class="m">매주 월 09:00 · 다음 7/28</div>
+    </div>
+    <div class="list-item">
+      <div class="t">분기 · 전체 자산 <span class="chip on">켜짐</span></div>
+      <div class="m">분기 첫 영업일 · 다음 10/1</div>
+    </div>
+    <div class="list-item">
+      <div class="t">주간 · 인프라 자산 <span class="chip warn">주의</span></div>
+      <div class="m">매주 금 18:00 · 최근 실패</div>
+    </div>
+    <div class="list-item">
+      <div class="t">주간 · AI 모델 자산 <span class="chip off">꺼짐</span></div>
+      <div class="m">매주 수 09:00 · 일시중지</div>
+    </div>
+    <button class="btn sm ghost" style="width:100%;margin-top:6px">+ 새 스케줄</button>
+  </div>
+
+  <div class="panel">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <b style="color:#fff;font-size:14px">주간 리포트 · 전체 자산</b>
+      <div style="display:flex;gap:8px;align-items:center">
+        <span class="toggle" style="background:var(--teal)"><span class="k" style="right:2px"></span></span>
+        <button class="btn sm">저장</button>
+      </div>
+    </div>
+    <div class="dgrid">
+      <div><label>유형</label><select><option>주간</option><option>분기</option></select></div>
+      <div><label>대상 자산</label><select><option>전체 자산</option></select></div>
+      <div><label>요일·시각</label><input value="매주 월 09:00"></div>
+      <div><label>형식</label><select><option>DOCX+PDF</option></select></div>
+      <div><label>수신 대상</label><select><option>official(보고용)</option></select></div>
+      <div><label>다음 실행</label><input value="2026-07-28 09:00" disabled style="color:var(--muted)"></div>
+    </div>
+
+    <div class="divider"></div>
+    <b style="font-size:12.5px;color:#fff">최근 실행 이력</b>
+    <table class="hist">
+      <tr><td>7/21(월) 09:00</td><td><span class="chip on">성공</span></td><td style="color:var(--muted)">경영진 요약 자동 생성 완료</td></tr>
+      <tr><td>7/14(월) 09:00</td><td><span class="chip on">성공</span></td><td style="color:var(--muted)">Critical 3건 신규 반영</td></tr>
+      <tr><td>7/7(월) 09:00</td><td><span class="chip on">성공</span></td><td style="color:var(--muted)">-</td></tr>
+    </table>
+
+    <div class="divider"></div>
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <b style="font-size:12.5px;color:#fff">🤖 챗봇 연동</b>
+      <span class="chip bot">이 스케줄 조회 허용됨</span>
+    </div>
+    <div style="font-size:11px;color:var(--muted);margin-top:4px">담당자가 챗봇에게 이 스케줄에 대해 물으면 아래처럼 실시간 상태를 그대로 답합니다.</div>
+    <div class="qa">
+      <div class="q">Q. 이번 주 리포트 스케줄 확인해줘</div>
+      <div class="a">A. 주간 리포트(전체 자산)는 매주 월 09:00에 자동 생성되도록 켜져 있고, 다음 실행은 7/28(월) 09:00입니다. 최근 3회 모두 성공했습니다.</div>
+    </div>
+  </div>
+</div>
+
+</body></html>

@@ -1,0 +1,90 @@
+<!doctype html><html><head><meta charset="utf-8"><title>시안 C — 대시보드 카드형 + 챗봇 패널</title><style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.16);--blue:#3b82f6;--blue-light:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;}
+*{box-sizing:border-box;margin:0;padding:0;font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;}
+body{background:var(--bg);color:var(--text);padding:22px;width:1180px;}
+h2{font-size:19px;color:#fff;margin-bottom:3px;}
+.sub{font-size:12px;color:var(--muted);margin-bottom:16px;}
+.btn{background:var(--blue);color:#fff;border:0;border-radius:7px;padding:7px 13px;font-size:12px;font-weight:800;cursor:pointer;}
+.btn.sm{padding:4px 9px;font-size:11px;}
+.chip{font-size:10px;font-weight:800;padding:2px 8px;border-radius:5px;}
+.chip.on{background:rgba(30,185,128,.15);color:#1eb980;}
+.chip.off{background:rgba(139,147,171,.15);color:#8b93ab;}
+.chip.warn{background:rgba(226,72,61,.15);color:#e2483d;}
+.chip.bot{background:rgba(139,124,240,.16);color:#b7a8ff;}
+.kpi{display:flex;gap:12px;margin-bottom:14px;}
+.kpi .k{flex:1;background:var(--panel-2);border:1px solid var(--border);border-radius:11px;padding:12px 15px;}
+.kpi .kv{font-size:23px;font-weight:800;}
+.kpi .kl{font-size:11px;color:var(--muted);margin-top:2px;}
+.layout{display:grid;grid-template-columns:1fr 320px;gap:14px;}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
+.tcard{background:var(--panel-2);border:1px solid var(--border);border-radius:11px;padding:14px 16px;}
+.tcard.warn{border-color:rgba(226,72,61,.4);}
+.tcard.off{opacity:.6;}
+.toggle{width:34px;height:19px;border-radius:11px;position:relative;display:inline-block;}
+.toggle .k{width:15px;height:15px;border-radius:50%;background:#fff;position:absolute;top:2px;transition:.2s;}
+.addcard{border:1px dashed var(--border-strong);border-radius:11px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12.5px;font-weight:700;cursor:pointer;min-height:120px;}
+.chatpanel{background:var(--panel-2);border:1px solid var(--border);border-radius:11px;padding:14px 16px;display:flex;flex-direction:column;height:560px;}
+.chatpanel .hd{font-size:13px;font-weight:800;color:#fff;display:flex;align-items:center;gap:6px;margin-bottom:4px;}
+.chatpanel .hd .live{width:7px;height:7px;border-radius:50%;background:var(--teal);}
+.chatpanel .sub2{font-size:10.5px;color:var(--muted-2);margin-bottom:10px;}
+.chatpanel .msgs{flex:1;overflow:hidden;}
+.bubble{border-radius:10px;padding:9px 11px;font-size:11.5px;line-height:1.6;max-width:92%;margin-bottom:9px;}
+.bubble.user{background:var(--blue);color:#fff;margin-left:auto;}
+.bubble.bot{background:var(--panel);border:1px solid var(--border-strong);color:var(--text);}
+.chatinput{display:flex;gap:6px;margin-top:8px;}
+.chatinput input{flex:1;background:var(--panel);border:1px solid var(--border-strong);border-radius:7px;padding:8px 10px;color:var(--text);font-size:11.5px;}
+</style></head><body>
+<h2>📅 리포트 스케줄 관리 <span style="font-size:11px;color:var(--muted-2);font-weight:600">시안 C · 대시보드 카드형 + 챗봇 패널</span></h2>
+<div class="sub">스케줄 현황을 카드로 한눈에 보고, 오른쪽 챗봇 패널에서 바로 물어볼 수 있습니다.</div>
+
+<div class="kpi">
+  <div class="k"><div class="kv" style="color:#fff">3</div><div class="kl">활성 스케줄</div></div>
+  <div class="k"><div class="kv" style="color:#5fa1ff">7/28(월)</div><div class="kl">가장 가까운 다음 실행</div></div>
+  <div class="k"><div class="kv" style="color:#1eb980">12건</div><div class="kl">이번 분기 자동 생성 예정</div></div>
+  <div class="k" style="border-color:rgba(226,72,61,.4)"><div class="kv" style="color:#e2483d">1</div><div class="kl">최근 생성 실패</div></div>
+</div>
+
+<div class="layout">
+  <div class="grid">
+    <div class="tcard">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><b style="color:#fff;font-size:13px;flex:1">주간 리포트 · 전체 자산</b><span class="chip on">켜짐</span></div>
+      <div style="font-size:11px;color:var(--muted)">매주 월 09:00 · DOCX+PDF · official</div>
+      <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);border-top:1px solid var(--border);padding-top:8px;margin-top:8px">
+        <span>다음 7/28(월) 09:00</span><span class="chip bot">🤖 조회 가능</span></div>
+      <div style="margin-top:9px;display:flex;gap:6px"><span class="toggle" style="background:var(--teal)"><span class="k" style="right:2px"></span></span><button class="btn sm" style="margin-left:auto">편집</button></div>
+    </div>
+    <div class="tcard">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><b style="color:#fff;font-size:13px;flex:1">분기 리포트 · 전체 자산</b><span class="chip on">켜짐</span></div>
+      <div style="font-size:11px;color:var(--muted)">분기 첫 영업일 09:00 · DOCX+PDF · official</div>
+      <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);border-top:1px solid var(--border);padding-top:8px;margin-top:8px">
+        <span>다음 10/1(목) 09:00</span><span class="chip bot">🤖 조회 가능</span></div>
+      <div style="margin-top:9px;display:flex;gap:6px"><span class="toggle" style="background:var(--teal)"><span class="k" style="right:2px"></span></span><button class="btn sm" style="margin-left:auto">편집</button></div>
+    </div>
+    <div class="tcard warn">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><b style="color:#fff;font-size:13px;flex:1">주간 리포트 · 인프라 자산 8건</b><span class="chip warn">주의</span></div>
+      <div style="font-size:11px;color:var(--muted)">매주 금 18:00 · DOCX · internal</div>
+      <div style="font-size:10.5px;color:#e2483d;font-weight:700;margin-top:6px">▲ 7/18 생성 실패 — LLM 응답 지연</div>
+      <div style="margin-top:9px;display:flex;gap:6px"><span class="toggle" style="background:var(--teal)"><span class="k" style="right:2px"></span></span><button class="btn sm" style="margin-left:auto">편집</button></div>
+    </div>
+    <div class="tcard off">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px"><b style="color:var(--muted);font-size:13px;flex:1">주간 리포트 · AI 모델 자산 5건</b><span class="chip off">꺼짐</span></div>
+      <div style="font-size:11px;color:var(--muted-2)">매주 수 09:00 · 일시중지됨</div>
+      <div style="margin-top:9px;display:flex;gap:6px"><span class="toggle" style="background:var(--muted-2)"><span class="k" style="left:2px"></span></span><button class="btn sm" style="margin-left:auto">편집</button></div>
+    </div>
+    <div class="addcard">＋ 새 스케줄 추가</div>
+  </div>
+
+  <div class="chatpanel">
+    <div class="hd"><span class="live"></span>🤖 리포트 비서</div>
+    <div class="sub2">스케줄 데이터에 실시간 접근 · 대시보드 챗봇과 동일한 창구</div>
+    <div class="msgs">
+      <div class="bubble user">이번 주 리포트 스케줄 확인해줘</div>
+      <div class="bubble bot">이번 주엔 <b>7/25(금) 18:00 인프라 자산 주간 리포트</b>가 예정돼 있고, <b>7/28(월) 09:00 전체 자산 주간 리포트</b>도 있습니다.</div>
+      <div class="bubble user">지난주에 실패한 거 있었어?</div>
+      <div class="bubble bot">네, <b>7/18(금) 인프라 자산 주간 리포트가 LLM 응답 지연으로 실패</b>했습니다. 지금 다시 생성할까요?</div>
+    </div>
+    <div class="chatinput"><input placeholder="스케줄에 대해 물어보세요…"><button class="btn sm">전송</button></div>
+  </div>
+</div>
+
+</body></html>

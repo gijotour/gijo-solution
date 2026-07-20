@@ -1,6 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import request from "supertest";
 import * as fs from "fs";
+import * as path from "path";
+import * as os from "os";
+
+// REPORT_DIR은 report.ts 모듈 로드 시점에 읽히므로 import 전에 임시 디렉터리로 고정한다
+// (운영 data/reports에 테스트용 [mock] 리포트가 실제로 쌓여 리포트 이력 100건 상한 밖으로
+// 사용자 리포트가 밀려나던 사고가 있었다 — 반드시 격리해야 함).
+const tmpReportDir = fs.mkdtempSync(path.join(os.tmpdir(), "gijo-reports-"));
+process.env.GIJO_REPORT_DIR = tmpReportDir;
 
 vi.mock("../src/engine/llm", () => ({
   chat: vi.fn(async () => "[mock] 경영진 요약 — 이번 주 특이사항 없음"),
@@ -8,14 +16,15 @@ vi.mock("../src/engine/llm", () => ({
   registerLlmRoutes: vi.fn(),
 }));
 
-import { createApp } from "../src/app";
-import { resetAssetsForTests, listAssets } from "../src/engine/assets";
-import { maintenanceSummary, collectVulnReportData, vulnCases, stripMetaPreamble } from "../src/engine/report";
-import { importVulnScan } from "../src/engine/vulnscan";
-import { resetKevForTests } from "../src/engine/kev";
-import { createTask, resetTasksForTests } from "../src/engine/tasks";
+const { createApp } = await import("../src/app");
+const { resetAssetsForTests, listAssets } = await import("../src/engine/assets");
+const { maintenanceSummary, collectVulnReportData, vulnCases, stripMetaPreamble } = await import("../src/engine/report");
+const { importVulnScan } = await import("../src/engine/vulnscan");
+const { resetKevForTests } = await import("../src/engine/kev");
+const { createTask, resetTasksForTests } = await import("../src/engine/tasks");
+const { todayLocal } = await import("../src/util/date");
+const { listAudit } = await import("../src/engine/audit");
 import type { MaintenanceItem } from "../src/engine/maintenance";
-import { todayLocal } from "../src/util/date";
 
 async function login(app: ReturnType<typeof createApp>) {
   const res = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" });
@@ -146,6 +155,23 @@ describe("report", () => {
       .send({ type: "ondemand", assetIds: ["asset-a"] });
 
     expect(res.status).toBe(200);
+  });
+
+  it("삭제·일괄삭제·전체삭제는 감사로그를 남긴다 — 실측(2026-07-21): 이 로그가 없어서 운영 리포트가 통째로 사라졌는데 누가 언제 지웠는지 전혀 알 수 없었다", async () => {
+    const gen = await request(app).post("/api/report/generate").set("Authorization", `Bearer ${token}`).send({ type: "ondemand" });
+    const base = /([\w-]+)\.docx$/.exec(gen.body.filePath)![1];
+
+    const del = await request(app).delete(`/api/report/${base}`).set("Authorization", `Bearer ${token}`);
+    expect(del.status).toBe(200);
+    expect(listAudit({ kind: "write" }).some((e) => e.action === "리포트 삭제" && e.target === base)).toBe(true);
+
+    const prune = await request(app).post("/api/report/prune").set("Authorization", `Bearer ${token}`).send({ olderThanDays: 9999 });
+    expect(prune.status).toBe(200);
+    expect(listAudit({ kind: "write" }).some((e) => e.action.startsWith("리포트 일괄 삭제"))).toBe(true);
+
+    const delAll = await request(app).post("/api/report/delete-all").set("Authorization", `Bearer ${token}`);
+    expect(delAll.status).toBe(200);
+    expect(listAudit({ kind: "write" }).some((e) => e.action === "리포트 전체 삭제")).toBe(true);
   });
 });
 

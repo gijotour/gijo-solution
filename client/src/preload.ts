@@ -236,6 +236,16 @@ const gijoApi = {
   pruneReports: (olderThanDays: number) => api.reportApi.prune(olderThanDays),
   deleteAllReports: () => api.reportApi.removeAll(),
 
+  // 정기 리포트(주간/분기) 자동 생성 스케줄 — report.html "예약 설정" 패널이 사용. 챗봇도 같은 데이터를 조회.
+  reportSchedules: {
+    list: () => api.reportScheduleApi.list(),
+    create: (input: api.CreateReportScheduleInput) => api.reportScheduleApi.create(input),
+    update: (id: string, patch: Partial<api.CreateReportScheduleInput> & { enabled?: boolean }) => api.reportScheduleApi.update(id, patch),
+    remove: (id: string) => api.reportScheduleApi.remove(id),
+    runNow: (id: string) => api.reportScheduleApi.runNow(id),
+    runs: (scheduleId?: string, limit?: number) => api.reportScheduleApi.runs(scheduleId, limit),
+  },
+
   // 이메일(SMTP) 설정
   getSmtpConfig: () => api.emailApi.getConfig(),
   saveSmtpConfig: (config: api.SmtpConfigInput) => api.emailApi.saveConfig(config),

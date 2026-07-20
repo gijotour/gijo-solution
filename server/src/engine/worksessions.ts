@@ -303,7 +303,7 @@ if (process.env.GIJO_DB_PATH !== ":memory:" && process.env.NODE_ENV !== "test") 
 // 세션을 "완료"로 바꾸면 그 대화 전체(지시·응답·도구 태그·시각)를 DOCX로 남긴다.
 // report.ts의 이력 관례(파일 + .json 사이드카)를 그대로 따라 리포트 화면 이력에 함께 나타난다.
 // LLM 호출 없음 — 결정적(빠르고 실패 없음). 실패해도 상태 변경 자체는 유효해야 하므로 호출부에서 감싼다.
-const REPORT_DIR = path.join("data", "reports");
+const REPORT_DIR = process.env.GIJO_REPORT_DIR || path.join("data", "reports");
 const fmtTime = (ms: number) =>
   new Date(ms).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
 

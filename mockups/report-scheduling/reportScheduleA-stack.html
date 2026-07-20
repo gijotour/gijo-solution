@@ -1,0 +1,114 @@
+<!doctype html><html><head><meta charset="utf-8"><title>시안 A — 리스트+인라인 폼</title><style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.16);--blue:#3b82f6;--blue-light:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;}
+*{box-sizing:border-box;margin:0;padding:0;font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;}
+body{background:var(--bg);color:var(--text);padding:22px;width:1040px;}
+h2{font-size:19px;color:#fff;margin-bottom:3px;}
+.sub{font-size:12px;color:var(--muted);margin-bottom:16px;}
+.sec{font-size:13px;font-weight:800;color:#fff;margin:20px 0 9px;display:flex;align-items:center;gap:8px;}
+.sec .n{color:var(--muted-2);font-weight:600;font-size:11px;}
+.btn{background:var(--blue);color:#fff;border:0;border-radius:7px;padding:7px 13px;font-size:12px;font-weight:800;cursor:pointer;}
+.btn.ghost{background:transparent;border:1px solid var(--border-strong);color:var(--muted);}
+.btn.sm{padding:4px 9px;font-size:11px;}
+.card{background:var(--panel-2);border:1px solid var(--border);border-radius:11px;padding:14px 16px;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{text-align:left;color:var(--muted-2);font-size:10.5px;font-weight:700;padding:7px 9px;border-bottom:1px solid var(--border);}
+td{padding:9px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.chip{font-size:10px;font-weight:800;padding:2px 8px;border-radius:5px;}
+.chip.std{background:rgba(59,130,246,.15);color:#5fa1ff;}
+.chip.on{background:rgba(30,185,128,.15);color:#1eb980;}
+.chip.off{background:rgba(139,147,171,.15);color:#8b93ab;}
+.chip.warn{background:rgba(226,72,61,.15);color:#e2483d;}
+.chip.bot{background:rgba(139,124,240,.16);color:#b7a8ff;}
+.toggle{width:34px;height:19px;border-radius:11px;position:relative;display:inline-block;}
+.toggle .k{width:15px;height:15px;border-radius:50%;background:#fff;position:absolute;top:2px;transition:.2s;}
+.form{background:var(--panel);border:1px dashed var(--border-strong);border-radius:10px;padding:14px 16px;margin-top:8px;display:grid;grid-template-columns:repeat(5,1fr);gap:10px;}
+.form label{font-size:10.5px;color:var(--muted-2);font-weight:700;display:block;margin-bottom:3px;}
+.form input,.form select{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:6px;padding:6px 8px;color:var(--text);font-size:11.5px;}
+.form .full{grid-column:1/-1;display:flex;justify-content:flex-end;gap:8px;margin-top:2px;}
+.kpi{display:flex;gap:12px;margin-bottom:6px;}
+.kpi .k{flex:1;background:var(--panel-2);border:1px solid var(--border);border-radius:11px;padding:12px 15px;}
+.kpi .kv{font-size:23px;font-weight:800;}
+.kpi .kl{font-size:11px;color:var(--muted);margin-top:2px;}
+.chatbox{background:var(--panel-2);border:1px solid var(--border);border-radius:11px;padding:14px 16px;margin-top:8px;}
+.bubble{border-radius:10px;padding:9px 12px;font-size:12px;line-height:1.6;max-width:80%;margin-bottom:8px;}
+.bubble.user{background:var(--blue);color:#fff;margin-left:auto;}
+.bubble.bot{background:var(--panel);border:1px solid var(--border-strong);color:var(--text);}
+</style></head><body>
+<h2>📅 리포트 스케줄 관리 <span style="font-size:11px;color:var(--muted-2);font-weight:600">시안 A · 리스트+인라인 폼</span></h2>
+<div class="sub">정기 리포트(주간/분기) 자동 생성 스케줄을 한 화면에서 확인·관리합니다. 등록된 스케줄은 챗봇에게 물어봐도 바로 확인할 수 있습니다.</div>
+
+<div class="kpi">
+  <div class="k"><div class="kv" style="color:#fff">3</div><div class="kl">활성 스케줄</div></div>
+  <div class="k"><div class="kv" style="color:#5fa1ff">7/28(월) 09:00</div><div class="kl">다음 자동 생성</div></div>
+  <div class="k"><div class="kv" style="color:#1eb980">12건</div><div class="kl">이번 분기 자동 생성 예정</div></div>
+  <div class="k" style="border-color:rgba(226,72,61,.4)"><div class="kv" style="color:#e2483d">1</div><div class="kl">최근 생성 실패</div></div>
+</div>
+
+<div class="sec">전체 스케줄 <span class="n">(4)</span></div>
+<div class="card">
+<table>
+<tr><th>유형</th><th>대상 자산</th><th>주기</th><th>다음 실행</th><th>형식/수신</th><th>마지막 결과</th><th>챗봇</th><th>활성</th><th></th></tr>
+<tr>
+  <td><b style="color:#fff">주간</b></td>
+  <td>전체 자산</td>
+  <td>매주 월 09:00</td>
+  <td>7/28(월) 09:00</td>
+  <td>DOCX+PDF · official</td>
+  <td><span class="chip on">성공</span> <span style="color:var(--muted-2)">7/21</span></td>
+  <td><span class="chip bot">🤖 조회 가능</span></td>
+  <td><span class="toggle" style="background:var(--teal)"><span class="k" style="right:2px"></span></span></td>
+  <td><button class="btn sm ghost">편집</button></td>
+</tr>
+<tr>
+  <td><b style="color:#fff">분기</b></td>
+  <td>전체 자산</td>
+  <td>분기 첫 영업일 09:00</td>
+  <td>10/1(목) 09:00</td>
+  <td>DOCX+PDF · official</td>
+  <td><span class="chip on">성공</span> <span style="color:var(--muted-2)">7/1</span></td>
+  <td><span class="chip bot">🤖 조회 가능</span></td>
+  <td><span class="toggle" style="background:var(--teal)"><span class="k" style="right:2px"></span></span></td>
+  <td><button class="btn sm ghost">편집</button></td>
+</tr>
+<tr>
+  <td><b style="color:#fff">주간</b></td>
+  <td>인프라 자산 8건</td>
+  <td>매주 금 18:00</td>
+  <td>7/25(금) 18:00</td>
+  <td>DOCX · internal</td>
+  <td><span class="chip warn">실패</span> <span style="color:var(--muted-2)">7/18 · LLM 응답 지연</span></td>
+  <td><span class="chip bot">🤖 조회 가능</span></td>
+  <td><span class="toggle" style="background:var(--teal)"><span class="k" style="right:2px"></span></span></td>
+  <td><button class="btn sm ghost">편집</button></td>
+</tr>
+<tr>
+  <td><b style="color:var(--muted)">주간</b></td>
+  <td>AI 모델 자산 5건</td>
+  <td>매주 수 09:00</td>
+  <td style="color:var(--muted-2)">일시중지됨</td>
+  <td>DOCX · official</td>
+  <td><span class="chip off">이력 없음</span></td>
+  <td><span class="chip off">🤖 조회만</span></td>
+  <td><span class="toggle" style="background:var(--muted-2)"><span class="k" style="left:2px"></span></span></td>
+  <td><button class="btn sm ghost">편집</button></td>
+</tr>
+</table>
+</div>
+
+<div class="sec">+ 새 스케줄 추가</div>
+<div class="form">
+  <div><label>유형</label><select><option>주간</option><option>분기</option></select></div>
+  <div><label>대상 자산</label><select><option>전체 자산</option><option>선택 자산…</option></select></div>
+  <div><label>요일·시각</label><input value="매주 월 09:00"></div>
+  <div><label>형식</label><select><option>DOCX+PDF</option><option>DOCX만</option></select></div>
+  <div><label>수신 대상</label><select><option>official(보고용)</option><option>internal(내부 검토용)</option></select></div>
+  <div class="full"><button class="btn ghost sm">취소</button><button class="btn sm">스케줄 추가</button></div>
+</div>
+
+<div class="sec">💬 챗봇에게 물어보면</div>
+<div class="chatbox">
+  <div class="bubble user">다음 정기 리포트 언제 생성돼?</div>
+  <div class="bubble bot">등록된 스케줄 기준으로 <b>주간 리포트가 7/28(월) 09:00</b>에 자동 생성될 예정입니다. 가장 최근인 <b>분기 리포트는 7/1에 성공적으로 생성</b>됐고, 다음 분기 리포트는 10/1(목)입니다. 다만 <b>"인프라 자산" 주간 스케줄은 7/18에 LLM 응답 지연으로 실패</b>했으니 확인이 필요합니다.</div>
+</div>
+
+</body></html>

@@ -168,8 +168,9 @@ describe("worksessions — 세션 종료 리포트", () => {
 
     const report = await generateSessionReport(s.id);
     expect(report).not.toBeNull();
-    const docxPath = path.join("data", "reports", report!.docx);
-    const metaPath = path.join("data", "reports", `${report!.base}.json`);
+    const reportDir = process.env.GIJO_REPORT_DIR || path.join("data", "reports");
+    const docxPath = path.join(reportDir, report!.docx);
+    const metaPath = path.join(reportDir, `${report!.base}.json`);
     try {
       const stat = await fs.stat(docxPath);
       expect(stat.size).toBeGreaterThan(1000); // 실제 DOCX 바이너리

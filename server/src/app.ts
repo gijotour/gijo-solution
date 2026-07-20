@@ -57,6 +57,7 @@ import { registerAuditRoutes } from "./engine/audit";
 import { registerCmdSuggestRoutes } from "./engine/cmdsuggest";
 import { registerHardeningRoutes } from "./engine/hardeningscan";
 import { registerHardeningTargetRoutes } from "./engine/hardeningtargets";
+import { registerReportScheduleRoutes } from "./engine/reportschedule";
 import { registerLlmActivityRoutes } from "./engine/llmactivity";
 import { registerKevRoutes } from "./engine/kev";
 import { registerOntologyRoutes } from "./engine/ontology";
@@ -140,6 +141,7 @@ export function createApp(): Express {
   registerCtiMatchRoutes(app);
   registerServiceImpactRoutes(app);
   registerReportRoutes(app);
+  registerReportScheduleRoutes(app);
   registerKpiRoutes(app);
   registerUsageRoutes(app);
   registerLogsRoutes(app);

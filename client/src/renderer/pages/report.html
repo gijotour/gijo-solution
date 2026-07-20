@@ -108,6 +108,22 @@ tr:last-child td{border-bottom:none;}
 .modal-checklist label{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text);font-weight:400;margin-bottom:8px;}
 .modal-err{font-size:12px;color:#f5928a;min-height:16px;margin-bottom:4px;}
 .modal-actions{display:flex;gap:8px;justify-content:flex-end;}
+
+.sched-item{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:8px;cursor:pointer;}
+.sched-item.active{border-color:var(--blue);background:rgba(59,130,246,0.08);}
+.sched-item .t{font-size:12.5px;font-weight:800;color:#fff;display:flex;justify-content:space-between;gap:6px;}
+.sched-item .m{font-size:10.5px;color:var(--muted);margin-top:4px;}
+.chip-sm{font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:5px;white-space:nowrap;border:none;cursor:pointer;font-family:inherit;}
+.chip-on{background:rgba(30,185,128,0.15);color:var(--teal);}
+.chip-off{background:rgba(139,147,171,0.15);color:var(--muted);}
+.chip-warn{background:rgba(226,72,61,0.15);color:#f5928a;}
+.chip-bot{background:rgba(139,124,240,0.16);color:#cabdfd;font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:6px;white-space:nowrap;}
+.sched-form label{display:block;font-size:10.5px;color:var(--muted-2);font-weight:700;margin:9px 0 4px;}
+.sched-form select,.sched-form input[type=number]{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;padding:7px 9px;color:var(--text);font-size:12px;outline:none;}
+.sched-hist{width:100%;border-collapse:collapse;margin-top:6px;}
+.sched-hist td{padding:6px 4px;border-bottom:1px solid var(--border);font-size:11.5px;}
+.sched-checklist{max-height:110px;overflow-y:auto;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;padding:8px 10px;}
+.sched-checklist label{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--text);font-weight:400;margin-bottom:6px;}
 </style>
 </head>
 <body>
@@ -154,7 +170,7 @@ tr:last-child td{border-bottom:none;}
 
 <div class="kpi-strip">
   <div class="kpi-mini"><div class="kpi-mini-label">이번 세션 생성</div><div class="kpi-mini-value" id="kpiSessionCount">0</div></div>
-  <div class="kpi-mini"><div class="kpi-mini-label">자동 생성 예약</div><div class="kpi-mini-value" style="color:var(--muted)">미구현</div></div>
+  <div class="kpi-mini"><div class="kpi-mini-label">자동 생성 예약</div><div class="kpi-mini-value" id="kpiActiveSchedules">-</div></div>
   <div class="kpi-mini"><div class="kpi-mini-label">평균 생성 시간</div><div class="kpi-mini-value" id="kpiAvgTime">-</div></div>
   <div class="kpi-mini"><div class="kpi-mini-label">최근 생성</div><div class="kpi-mini-value" id="kpiLastGen">-</div></div>
 </div>
@@ -195,11 +211,19 @@ tr:last-child td{border-bottom:none;}
         "+ 리포트 생성"으로 새 리포트를 만들면 LLM이 작성한 경영진 요약이 여기 표시됩니다.
       </div>
     </div>
-    <div class="panel">
-      <div class="panel-title">예약 설정</div>
-      <div style="font-size:12.5px;color:var(--muted-2);line-height:1.7">
-        정기 리포트 자동 생성(스케줄링)은 아직 구현되지 않았습니다. 현재는 "+ 리포트 생성"으로 그때그때 온디맨드 생성만 가능합니다.
-      </div>
+  </div>
+</div>
+
+<div class="panel">
+  <div class="panel-title">정기 리포트 스케줄 <span class="chip-bot" title="등록된 스케줄은 챗봇에게 물어봐도(예: &quot;다음 정기 리포트 언제야?&quot;) 실시간으로 그대로 답합니다">🤖 챗봇에서도 확인 가능</span></div>
+  <div class="panel-sub">주간·분기 리포트를 지정한 요일·시각에 자동 생성합니다. 왼쪽에서 스케줄을 고르면 오른쪽에서 설정·실행 이력을 확인·수정할 수 있습니다.</div>
+  <div style="display:grid;grid-template-columns:280px 1fr;gap:16px;margin-top:8px;">
+    <div>
+      <div id="schedList"><div style="color:var(--muted);font-size:12px">불러오는 중…</div></div>
+      <button class="btn-ghost" id="schedAddBtn" style="width:100%;margin-top:4px">+ 새 스케줄</button>
+    </div>
+    <div id="schedDetail">
+      <div style="color:var(--muted);font-size:12.5px">왼쪽에서 스케줄을 선택하거나 "+ 새 스케줄"로 추가하세요.</div>
     </div>
   </div>
 </div>
@@ -273,6 +297,9 @@ tr:last-child td{border-bottom:none;}
   const sessionReports = [];
   let historyReports = []; // 서버에 저장된 과거 리포트까지 포함(재기동·다른 세션 포함)
   let allAssets = [];
+  let schedules = []; // 정기 리포트(주간/분기) 자동 생성 스케줄
+  let selectedScheduleId = null; // null=미선택, "new"=새 스케줄 작성 중
+  const DOW_LABEL = ["일", "월", "화", "수", "목", "금", "토"];
 
   function tick() {
     clockEl.textContent = new Date().toLocaleString("ko-KR", {
@@ -505,6 +532,238 @@ tr:last-child td{border-bottom:none;}
     }
   }
 
+  // ── 정기 리포트 스케줄(시안 B: 마스터-디테일) ──────────────────────────────
+  const pad2 = (n) => String(n).padStart(2, "0");
+  function fmtDT(ms) {
+    if (!ms) return "-";
+    return new Date(ms).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  }
+  function scheduleCadenceText(s) {
+    return s.type === "weekly"
+      ? `매주 ${DOW_LABEL[s.dayOfWeek ?? 1]} ${pad2(s.hour)}:${pad2(s.minute)}`
+      : `분기 첫 영업일 ${pad2(s.hour)}:${pad2(s.minute)}`;
+  }
+
+  async function loadSchedules() {
+    try {
+      const r = await window.gijo.reportSchedules.list();
+      schedules = r.schedules || [];
+    } catch (e) {
+      schedules = [];
+    }
+    document.getElementById("kpiActiveSchedules").textContent = schedules.filter((s) => s.enabled).length;
+  }
+
+  function renderScheduleList() {
+    const list = document.getElementById("schedList");
+    if (!schedules.length) {
+      list.innerHTML = '<div style="color:var(--muted);font-size:12px">등록된 스케줄이 없습니다</div>';
+      return;
+    }
+    list.innerHTML = schedules
+      .map((s) => {
+        const scope = s.assetIds && s.assetIds.length ? `자산 ${s.assetIds.length}건` : "전체 자산";
+        const statusChip = !s.enabled
+          ? '<span class="chip-sm chip-off">꺼짐</span>'
+          : s.lastResult === "fail"
+          ? '<span class="chip-sm chip-warn">주의</span>'
+          : '<span class="chip-sm chip-on">켜짐</span>';
+        return `<div class="sched-item${s.id === selectedScheduleId ? " active" : ""}" data-id="${s.id}">
+          <div class="t"><span>${s.type === "weekly" ? "주간" : "분기"} · ${esc(scope)}</span>${statusChip}</div>
+          <div class="m">${esc(scheduleCadenceText(s))}${s.enabled ? ` · 다음 ${fmtDT(s.nextRunAt)}` : ""}</div>
+        </div>`;
+      })
+      .join("");
+    list.querySelectorAll(".sched-item").forEach((el) => el.addEventListener("click", () => selectSchedule(el.dataset.id)));
+  }
+
+  async function selectSchedule(id) {
+    selectedScheduleId = id;
+    renderScheduleList();
+    await renderScheduleDetail();
+  }
+
+  async function renderNewScheduleForm() {
+    selectedScheduleId = "new";
+    renderScheduleList();
+    await renderScheduleDetail();
+  }
+
+  async function renderScheduleDetail() {
+    const detail = document.getElementById("schedDetail");
+    if (!selectedScheduleId) {
+      detail.innerHTML = '<div style="color:var(--muted);font-size:12.5px">왼쪽에서 스케줄을 선택하거나 "+ 새 스케줄"로 추가하세요.</div>';
+      return;
+    }
+    const isNew = selectedScheduleId === "new";
+    const s = isNew ? null : schedules.find((x) => x.id === selectedScheduleId);
+    if (!isNew && !s) {
+      detail.innerHTML = "";
+      return;
+    }
+
+    const assetOptionsHtml = allAssets.length
+      ? allAssets
+          .map((a) => `<label><input type="checkbox" value="${a.id}" ${s && s.assetIds && s.assetIds.includes(a.id) ? "checked" : ""}> ${esc(a.name)}</label>`)
+          .join("")
+      : '<div style="color:var(--muted-2)">등록된 자산이 없습니다</div>';
+
+    detail.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;">
+        <b style="color:#fff;font-size:13.5px">${isNew ? "새 스케줄" : (s.type === "weekly" ? "주간" : "분기") + " 리포트"}</b>
+        ${!isNew ? `<button class="chip-sm ${s.enabled ? "chip-on" : "chip-off"}" id="schedToggleBtn">${s.enabled ? "켜짐" : "꺼짐"}</button>` : ""}
+      </div>
+      <div class="sched-form">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+          <div><label>유형</label><select id="schedType">
+            <option value="weekly" ${!s || s.type === "weekly" ? "selected" : ""}>주간</option>
+            <option value="quarterly" ${s && s.type === "quarterly" ? "selected" : ""}>분기</option>
+          </select></div>
+          <div id="schedDowWrap"><label>요일</label><select id="schedDow">
+            ${DOW_LABEL.map((d, i) => `<option value="${i}" ${(s ? s.dayOfWeek : 1) === i ? "selected" : ""}>${d}요일</option>`).join("")}
+          </select></div>
+          <div><label>시각</label><div style="display:flex;gap:6px;align-items:center;">
+            <input type="number" id="schedHour" min="0" max="23" value="${s ? s.hour : 9}" style="width:64px">
+            <span style="color:var(--muted)">:</span>
+            <input type="number" id="schedMinute" min="0" max="59" value="${s ? s.minute : 0}" style="width:64px">
+          </div></div>
+          <div><label>형식</label><select id="schedFormat">
+            <option value="both" ${!s || s.format === "both" ? "selected" : ""}>DOCX+PDF</option>
+            <option value="docx" ${s && s.format === "docx" ? "selected" : ""}>DOCX만</option>
+            <option value="pdf" ${s && s.format === "pdf" ? "selected" : ""}>PDF만</option>
+          </select></div>
+          <div style="grid-column:1/-1"><label>수신 대상</label><select id="schedAudience">
+            <option value="official" ${!s || s.audience === "official" ? "selected" : ""}>official(보고용)</option>
+            <option value="internal" ${s && s.audience === "internal" ? "selected" : ""}>internal(내부 검토용)</option>
+          </select></div>
+        </div>
+        <label>대상 자산 (선택 안 하면 전체 자산)</label>
+        <div class="sched-checklist" id="schedAssetChecklist">${assetOptionsHtml}</div>
+      </div>
+      <div class="modal-err" id="schedErr"></div>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px;">
+        ${!isNew ? '<button class="btn-ghost" id="schedDeleteBtn" style="color:#f5928a;border-color:#e2483d">삭제</button>' : ""}
+        ${!isNew ? '<button class="btn-ghost" id="schedRunNowBtn">지금 실행</button>' : ""}
+        <button class="btn-primary" id="schedSaveBtn">${isNew ? "스케줄 추가" : "저장"}</button>
+      </div>
+      ${
+        !isNew
+          ? `<div style="margin-top:14px;border-top:1px solid var(--border);padding-top:10px;">
+        <b style="font-size:12px;color:#fff">최근 실행 이력</b>
+        <table class="sched-hist" id="schedHistTable"><tr><td style="color:var(--muted)">불러오는 중…</td></tr></table>
+      </div>`
+          : ""
+      }
+    `;
+
+    const typeSel = document.getElementById("schedType");
+    const dowWrap = document.getElementById("schedDowWrap");
+    const syncDow = () => { dowWrap.style.display = typeSel.value === "weekly" ? "" : "none"; };
+    syncDow();
+    typeSel.addEventListener("change", syncDow);
+
+    document.getElementById("schedSaveBtn").addEventListener("click", () => saveSchedule(isNew));
+    if (!isNew) {
+      document.getElementById("schedToggleBtn").addEventListener("click", () => toggleSchedule(s));
+      document.getElementById("schedDeleteBtn").addEventListener("click", () => deleteScheduleRow(s.id));
+      document.getElementById("schedRunNowBtn").addEventListener("click", () => runScheduleNow(s.id));
+      await loadScheduleRuns(s.id);
+    }
+  }
+
+  function readScheduleForm() {
+    const type = document.getElementById("schedType").value;
+    const hour = Number(document.getElementById("schedHour").value);
+    const minute = Number(document.getElementById("schedMinute").value);
+    const format = document.getElementById("schedFormat").value;
+    const audience = document.getElementById("schedAudience").value;
+    const assetIds = [...document.querySelectorAll("#schedAssetChecklist input:checked")].map((el) => el.value);
+    const input = { type, hour, minute, format, audience, assetIds: assetIds.length ? assetIds : null };
+    if (type === "weekly") input.dayOfWeek = Number(document.getElementById("schedDow").value);
+    return input;
+  }
+
+  async function saveSchedule(isNew) {
+    const btn = document.getElementById("schedSaveBtn");
+    const errEl = document.getElementById("schedErr");
+    errEl.textContent = "";
+    const input = readScheduleForm();
+    btn.disabled = true;
+    try {
+      if (isNew) {
+        const r = await window.gijo.reportSchedules.create(input);
+        selectedScheduleId = r.schedule.id;
+      } else {
+        await window.gijo.reportSchedules.update(selectedScheduleId, input);
+      }
+      await loadSchedules();
+      renderScheduleList();
+      await renderScheduleDetail();
+    } catch (e) {
+      errEl.textContent = "저장 실패: " + ((e && e.message) || e);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function toggleSchedule(s) {
+    try {
+      await window.gijo.reportSchedules.update(s.id, { enabled: !s.enabled });
+      await loadSchedules();
+      renderScheduleList();
+      await renderScheduleDetail();
+    } catch (e) {
+      alert("변경 실패: " + ((e && e.message) || e));
+    }
+  }
+
+  async function deleteScheduleRow(id) {
+    if (!confirm("이 스케줄을 삭제할까요? 이미 생성된 리포트는 그대로 남습니다.")) return;
+    try {
+      await window.gijo.reportSchedules.remove(id);
+      selectedScheduleId = null;
+      await loadSchedules();
+      renderScheduleList();
+      await renderScheduleDetail();
+    } catch (e) {
+      alert("삭제 실패: " + ((e && e.message) || e));
+    }
+  }
+
+  async function runScheduleNow(id) {
+    const btn = document.getElementById("schedRunNowBtn");
+    if (btn) { btn.disabled = true; btn.textContent = "실행 중…"; }
+    try {
+      await window.gijo.reportSchedules.runNow(id);
+      await loadSchedules();
+      await loadHistory(); // 방금 생성한 리포트를 리포트 이력에도 반영
+      renderReportRows();
+      renderScheduleList();
+      await renderScheduleDetail();
+    } catch (e) {
+      alert("실행 실패: " + ((e && e.message) || e));
+    }
+  }
+
+  async function loadScheduleRuns(id) {
+    const table = document.getElementById("schedHistTable");
+    if (!table) return;
+    try {
+      const r = await window.gijo.reportSchedules.runs(id, 10);
+      const runs = r.runs || [];
+      table.innerHTML = runs.length
+        ? runs
+            .map(
+              (run) =>
+                `<tr><td>${fmtDT(run.at)}</td><td><span class="chip-sm ${run.result === "success" ? "chip-on" : "chip-warn"}">${run.result === "success" ? "성공" : "실패"}</span></td><td style="color:var(--muted)">${esc(run.detail || "-")}</td></tr>`
+            )
+            .join("")
+        : '<tr><td style="color:var(--muted)">실행 이력이 없습니다</td></tr>';
+    } catch (e) {
+      table.innerHTML = '<tr><td style="color:var(--muted)">이력을 불러오지 못했습니다</td></tr>';
+    }
+  }
+
   async function init() {
     tick();
     setInterval(tick, 30000);
@@ -513,6 +772,8 @@ tr:last-child td{border-bottom:none;}
     allAssets = await window.gijo.listAssets();
     await loadHistory();
     renderReportRows();
+    await loadSchedules();
+    renderScheduleList();
 
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => {
@@ -529,6 +790,7 @@ tr:last-child td{border-bottom:none;}
     document.getElementById("templateBtn").addEventListener("click", () => {
       alert("템플릿 관리 기능은 아직 구현되지 않았습니다.");
     });
+    document.getElementById("schedAddBtn").addEventListener("click", renderNewScheduleForm);
   }
 
   if (!window.gijo.isAuthenticated()) {

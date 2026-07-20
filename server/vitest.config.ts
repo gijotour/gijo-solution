@@ -21,6 +21,11 @@ export default defineConfig({
       // 테스트가 실제 데이터셋·골드 파일을 건드리지 않게 임시 경로로 격리(운영 orchestrator-tools.json 보호).
       GIJO_DATASETS_DIR: "data/test-tmp/datasets",
       GIJO_ORCH_GOLD_PATH: "data/test-tmp/orchestrator-gold.json",
+      // report.test.ts가 개별 파일에서 mkdtempSync로도 격리하지만, 그것만 믿지 않는다 — 실측(2026-07-21):
+      // 전체 스위트로 돌리면 report.test.ts가 만든 [mock] 리포트가 실제 data/reports에 새어나가 리포트
+      // 이력 100건 상한 밖으로 실제 사용자 리포트가 밀려나는 사고가 있었다. 여기서 기본값 자체를
+      // 막아두면 개별 파일이 격리를 깜빡하거나 워커 간 모듈 캐시 타이밍이 어긋나도 운영 데이터는 안전하다.
+      GIJO_REPORT_DIR: "data/test-tmp/reports",
     },
     testTimeout: 15000, // 실 spawn 회피해도 연결 실패 폴백까지 여유(기본 5s는 부하 시 빠듯).
   },
