@@ -347,8 +347,10 @@
   .ai-team-h{display:flex;align-items:center;gap:9px;margin-bottom:11px;}
   .ai-team-t{font-size:13.5px;font-weight:800;color:#fff;letter-spacing:.2px;}
   .ai-team-sub{font-size:10.5px;color:var(--muted-2);font-weight:600;}
-  .ai-team-office{margin-left:auto;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);color:var(--blue-light);font-size:11.5px;font-weight:700;border-radius:9px;padding:6px 11px;cursor:pointer;transition:.14s;white-space:nowrap;}
+  /* 제목 바로 옆 배치(사용자 요청 2026-07-20 — "AI 팀" 곁에서 바로 열게), 부제는 오른쪽 끝으로. */
+  .ai-team-office{background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);color:var(--blue-light);font-size:11.5px;font-weight:700;border-radius:9px;padding:6px 11px;cursor:pointer;transition:.14s;white-space:nowrap;}
   .ai-team-office:hover{background:var(--blue);color:#fff;border-color:var(--blue);transform:translateY(-1px);}
+  .ai-team-sub{margin-left:auto;}
   /* 울타리 안에서는 로스터가 박스의 배경 위에 놓이므로 카드 배경을 한 단계 낮춰 대비를 준다. */
   .ai-team .team-grid .tcard{background:var(--panel-2);}
   .team-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(64px,1fr));gap:8px;width:100%;}
@@ -620,8 +622,8 @@
            헤더에 🏢 팀 사무실(별도 창) 바로 열기. 가드레일도 이 울타리 안 팀원으로 표시된다. -->
       <div class="ai-team">
         <div class="ai-team-h"><span class="ai-team-t">🤖 AI 팀</span>
-          <span class="ai-team-sub" id="aiTeamSub"></span>
-          <button class="ai-team-office" id="teamOfficeBtn" title="우리 AI 팀 사무실 (별도 창으로 열기)">🏢 팀 사무실</button></div>
+          <button class="ai-team-office" id="teamOfficeBtn" title="우리 AI 팀 사무실 (별도 창으로 열기)">🏢 팀 사무실 3D로 보기</button>
+          <span class="ai-team-sub" id="aiTeamSub"></span></div>
         <div class="team-grid" id="teamGrid"><div style="grid-column:1/-1;text-align:center;color:var(--muted);font-size:12px">팀원 불러오는 중...</div></div>
       </div>
       <!-- 지휘 콘솔·입력창은 오른쪽 패널(지휘 콘솔 섹션)로 이관됨 → 중앙은 메뉴·로스터·활동 위주. -->
