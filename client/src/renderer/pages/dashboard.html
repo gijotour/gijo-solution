@@ -72,6 +72,10 @@
   .body-grid.no-right .dash-sessions{display:none;}
   .dsh-hide{background:transparent;border:0;color:var(--muted-2);font-size:14px;cursor:pointer;line-height:1;padding:0 2px;}
   .dsh-hide:hover{color:var(--blue-light);}
+  /* 오른쪽 패널 접힘 시 다시 여는 탭(오른쪽 가장자리) — 패널이 보이면 숨김. */
+  .right-reopen{position:fixed;right:0;top:50%;transform:translateY(-50%);background:var(--blue);color:#fff;padding:14px 6px;border-radius:10px 0 0 10px;font-size:12px;font-weight:800;cursor:pointer;writing-mode:vertical-rl;display:none;z-index:40;box-shadow:-2px 0 14px rgba(0,0,0,.45);letter-spacing:2px;}
+  .right-reopen:hover{background:#3576e0;}
+  .right-reopen.on{display:block;}
   .cl-expand{font-size:14px;color:var(--muted);cursor:pointer;line-height:1;}
   .cl-expand:hover{color:var(--blue-light);}
   .explorer{padding:18px 12px;border-right:1px solid var(--border);}
@@ -394,6 +398,8 @@
 </style>
 </head>
 <body class="g-ui">
+<!-- 오른쪽 패널을 접었을 때(◧) 다시 여는 탭 — 오른쪽 가장자리. 패널이 보이면 숨겨진다. -->
+<div class="right-reopen" id="rightReopen" title="오른쪽 패널 열기 (작업 세션·지휘 콘솔)">◧ 패널</div>
 
 
 
@@ -532,7 +538,7 @@
       <!-- 작업 세션 (기본 접힘) -->
       <div class="acc collapsed" id="accSessions">
         <div class="acc-h" data-acc="sessions"><span class="car">▾</span><span class="acc-t">💬 작업 세션</span>
-          <span class="acc-sp"><button class="dsh-hide" id="dashHideRight" title="오른쪽 패널 숨기기">⏵</button></span></div>
+          <span class="acc-sp"><button class="dash-new" id="dashNewSession" title="새 작업 세션 등록">＋ 등록</button></span></div>
         <div class="acc-b acc-b-sessions">
           <div class="dash-slist" id="dashSessionList"><div style="font-size:11px;color:var(--muted-2);padding:8px">불러오는 중…</div></div>
           <div class="dash-sfull" id="dashSessionsFull">전체 작업 세션 열기 ↗</div>
@@ -1981,6 +1987,9 @@
       bg.classList.toggle("no-right", hidden);
       const t = document.getElementById("toggleRightBtn");
       if (t) { t.classList.toggle("on", hidden); t.title = hidden ? "오른쪽 세션 패널 펴기" : "오른쪽 세션 패널 접기"; }
+      // 접혔을 때만 오른쪽 가장자리에 '◧ 패널' 열기 탭을 띄운다(다시 여는 확실한 버튼).
+      const rr = document.getElementById("rightReopen");
+      if (rr) rr.classList.toggle("on", hidden);
     }
     function toggleRight() {
       const hidden = !(document.querySelector(".body-grid")?.classList.contains("no-right"));
@@ -1990,6 +1999,7 @@
     // 세션 패널의 ⏵/◧는 아코디언 토글과 겹치지 않게(헤더 버튼) 이벤트 전파를 막는다.
     document.getElementById("dashHideRight")?.addEventListener("click", (e) => { e.stopPropagation(); toggleRight(); });
     document.getElementById("toggleRightBtn")?.addEventListener("click", toggleRight);
+    document.getElementById("rightReopen")?.addEventListener("click", toggleRight); // 접힘 상태 '열기' 탭
     // 오른쪽 패널은 이제 지휘 콘솔(채팅)을 품으므로 기본 '펼침'(사용자가 ◧로 숨기면 "1" 저장·유지).
     try { applyRightHidden(localStorage.getItem(RIGHT_HIDDEN_KEY) === "1"); } catch (e) {}
 
