@@ -237,10 +237,12 @@ export const dispatchApi = {
 
 // ── 작업 세션(대화 세션형) ────────────────────────────────────────────
 export type WorkSessionStatus = "active" | "done" | "ignored";
+export type WorkSessionDoneBy = "user" | "auto"; // 완료 경위 — 사용자 완료 / 30분 무대화 등 자동 완료
 export interface WorkSession {
   id: string;
   title: string;
   status: WorkSessionStatus;
+  doneBy?: WorkSessionDoneBy; // status가 done일 때만
   contextRef?: string; // 탐색기 대상 참조(asset:.. / vuln:.. / product:.. / today)
   createdAt: number;
   updatedAt: number;

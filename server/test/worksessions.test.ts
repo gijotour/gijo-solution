@@ -11,6 +11,7 @@ import {
   setSessionStatus,
   deleteSession,
   recentTurnsText,
+  autoCompleteIdleSessions,
 } from "../src/engine/worksessions";
 
 beforeEach(() => {
@@ -207,5 +208,62 @@ describe("worksessions — 모든 행위 자동 세션(감사 훅)", () => {
     const before = listSessions().length;
     recordAudit({ kind: "auth", actor: "정요한", action: "로그인" });
     expect(listSessions().length).toBe(before);
+  });
+});
+
+describe("worksessions — 완료 경위(doneBy) 구분 + 30분 자동 완료", () => {
+  it("사용자 완료는 doneBy='user', 자동 완료는 doneBy='auto'", () => {
+    const u = createSession("사용자 완료 세션");
+    appendTurn(u.id, "user", "지시");
+    expect(setSessionStatus(u.id, "done", "user")?.doneBy).toBe("user");
+
+    const a = createSession("자동 완료 세션");
+    appendTurn(a.id, "user", "지시");
+    expect(setSessionStatus(a.id, "done", "auto")?.doneBy).toBe("auto");
+    // 기본값은 user
+    const d = createSession("기본 완료");
+    expect(setSessionStatus(d.id, "done")?.doneBy).toBe("user");
+  });
+
+  it("done이 아닌 상태로 되돌리면 doneBy가 지워진다", () => {
+    const s = createSession();
+    appendTurn(s.id, "user", "x");
+    setSessionStatus(s.id, "done", "auto");
+    expect(setSessionStatus(s.id, "active")?.doneBy).toBeUndefined();
+  });
+
+  it("대화가 있는 유휴 active 세션을 자동 완료한다(doneBy=auto)", () => {
+    const s = createSession("유휴 대화 세션");
+    appendTurn(s.id, "user", "옛날 지시");
+    // idleMs 음수 → cutoff가 미래라 모든 active(턴 有)가 유휴로 잡힘
+    const n = autoCompleteIdleSessions(-1000);
+    expect(n).toBeGreaterThanOrEqual(1);
+    const done = listSessions().find((x) => x.id === s.id);
+    expect(done?.status).toBe("done");
+    expect(done?.doneBy).toBe("auto");
+  });
+
+  it("빈 세션(턴 0)은 자동 완료하지 않는다", () => {
+    const empty = createSession("빈 껍데기");
+    autoCompleteIdleSessions(-1000);
+    expect(listSessions().find((x) => x.id === empty.id)?.status).toBe("active");
+  });
+
+  it("최근 대화한 세션은 자동 완료하지 않는다(30분 미경과)", () => {
+    const s = createSession("방금 대화");
+    appendTurn(s.id, "user", "지금 지시");
+    const n = autoCompleteIdleSessions(30 * 60 * 1000); // 30분 유휴 기준 — 방금 갱신됐으니 제외
+    const still = listSessions().find((x) => x.id === s.id);
+    expect(still?.status).toBe("active");
+    expect(n).toBe(0);
+  });
+
+  it("자동 완료는 updatedAt(마지막 대화 시각)을 바꾸지 않는다", () => {
+    const s = createSession();
+    const turn = appendTurn(s.id, "user", "x")!;
+    const before = getSession(s.id)!.updatedAt;
+    autoCompleteIdleSessions(-1000);
+    expect(getSession(s.id)!.updatedAt).toBe(before);
+    expect(getSession(s.id)!.updatedAt).toBe(turn.at);
   });
 });
