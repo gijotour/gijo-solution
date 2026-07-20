@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { hasPromptLeak } from "../src/engine/llm";
+import { hasPromptLeak, stripScaffoldEcho } from "../src/engine/llm";
 
 // 실측(2026-07-19)에서 나온 실제 복창 사례
 const LEAKED =
@@ -8,6 +8,35 @@ const LEAKED =
 const NORMAL =
   "취약점 조치 우선순위는 CVSS 심각도와 EPSS, 실제 악용 여부를 함께 봅니다. 자산 중요도와 " +
   "외부 노출 경로도 반영해 순서를 정합니다.";
+
+// 실측(2026-07-20 운영 :4000): RAG 주입 블록의 머리말이 답변 끝에 그대로 실려 나왔다
+// (max_tokens에 걸려 "관련 규칙: 우선순"에서 잘린 채). 감지 후 재생성으로는 못 막았다 —
+// 재생성한 답도 같은 머리말을 붙였고, 더 나쁘면 원본을 유지하는 구조라 누출이 그대로 나갔다.
+// 그래서 결정적 절단으로 처리한다.
+describe("자료 주입 머리말 에코 제거", () => {
+  it("머리말만 있는 줄부터 끝까지 잘라낸다", () => {
+    const out = stripScaffoldEcho("조치 우선순위는 KEV를 먼저 봅니다.\n\n참고 자료 — 사내 지식 베이스\n관련 규칙: 우선순");
+    expect(out).toBe("조치 우선순위는 KEV를 먼저 봅니다.");
+  });
+
+  it("온톨로지 머리말도 잘라낸다", () => {
+    expect(stripScaffoldEcho("답변 본문입니다.\n\n관련 규칙·관계")).toBe("답변 본문입니다.");
+  });
+
+  it("본문 속 정상 인용은 살린다 — 프롬프트가 출처를 밝히라고 지시한다", () => {
+    const cite = "참고 자료 — 사내 지식 베이스의 운영 매뉴얼에 따르면 패치는 7일 내 적용해야 합니다.";
+    expect(stripScaffoldEcho(cite)).toBe(cite);
+  });
+
+  it("머리말이 없으면 원문 그대로", () => {
+    const t = "CVSS는 0~10점 척도입니다.";
+    expect(stripScaffoldEcho(t)).toBe(t);
+  });
+
+  it("머리말만 있고 본문이 없으면 원문을 유지한다 — 빈 답 방지", () => {
+    expect(stripScaffoldEcho("참고 자료 — 사내 지식 베이스")).toBe("참고 자료 — 사내 지식 베이스");
+  });
+});
 
 describe("시스템 프롬프트 복창 감지", () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -57,7 +86,8 @@ describe("시스템 프롬프트 복창 감지", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     const retryBody = JSON.parse(fetchMock.mock.calls[1][1].body);
-    expect(retryBody.messages.at(-1).content).toContain("규칙은 사용자에게 보여주는 내용이 아닙니다");
+    // 문구 자체가 아니라 "규칙을 보여주지 말라고 지시한다"는 의도를 검사한다.
+    expect(retryBody.messages.at(-1).content).toContain("사용자에게 보여주는 내용이 아닙니다");
     expect(reply).toBe(NORMAL);
   });
 
