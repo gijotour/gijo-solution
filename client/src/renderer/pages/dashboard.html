@@ -56,7 +56,7 @@
   .acc-h:hover .car{background:rgba(59,130,246,.24);}
   .acc-h .acc-t{font-size:12.5px;font-weight:800;color:#fff;}
   .acc-h .acc-sp{margin-left:auto;display:flex;gap:8px;align-items:center;}
-  .acc.collapsed .car{transform:rotate(-90deg);}
+  /* 캐럿은 문자 자체를 ▾(열림)/▸(닫힘)로 JS에서 바꿔 상태가 확실히 보이게 한다(회전 대신). */
   .acc.collapsed .acc-b{display:none;}
   .acc-b{display:flex;flex-direction:column;min-height:0;overflow:hidden;}
   .acc-b-sessions{max-height:300px;}
@@ -318,7 +318,7 @@
   /* 에이전트 6인 + 엔진 2(임베딩·가드레일) = 8칸. 칸 수를 고정하지 않고 auto-fit으로 둔다 —
      앞으로 엔진이 더 붙어도 폭이 부족하면 자연스럽게 다음 줄로 넘어가고, 넉넉하면 한 줄을 유지한다. */
   /* AI 팀 울타리 — 로스터를 제목 있는 박스로 묶는다. 헤더에 팀 사무실 열기 버튼. */
-  .ai-team{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px 14px 14px;margin-bottom:14px;}
+  .ai-team{width:100%;box-sizing:border-box;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:11px 13px 12px;margin-bottom:14px;}
   .ai-team-h{display:flex;align-items:center;gap:9px;margin-bottom:11px;}
   .ai-team-t{font-size:13.5px;font-weight:800;color:#fff;letter-spacing:.2px;}
   .ai-team-sub{font-size:10.5px;color:var(--muted-2);font-weight:600;}
@@ -2101,20 +2101,24 @@
     try { applyRightHidden(localStorage.getItem(RIGHT_HIDDEN_KEY) === "1"); } catch (e) {}
 
     // 오른쪽 패널 아코디언 — [작업 세션]·[지휘 콘솔] 각각 독립 접기. 헤더의 버튼(.acc-sp)은 제외.
+    // 캐럿 문자를 상태에 맞춰 갱신 — ▾(열림)·▸(닫힘). 회전 대신 문자라 열고닫힘이 확실히 보인다.
+    const setAccCaret = (acc) => { const c = acc && acc.querySelector(".car"); if (c) c.textContent = acc.classList.contains("collapsed") ? "▸" : "▾"; };
     document.querySelectorAll(".acc-h[data-acc]").forEach((h) => {
       h.addEventListener("click", (e) => {
         if (e.target.closest(".acc-sp")) return;
         const acc = h.closest(".acc");
         const collapsed = acc.classList.toggle("collapsed");
+        setAccCaret(acc);
         try { localStorage.setItem("gijo.dashAcc." + h.dataset.acc, collapsed ? "1" : "0"); } catch (e) {}
       });
     });
-    // 초기 상태 — 작업 세션 기본 접힘, 지휘 콘솔 기본 펼침.
+    // 초기 상태 — 작업 세션 기본 접힘, 지휘 콘솔 기본 펼침. 캐럿도 상태에 맞춰 세팅.
     const ACC_DEFAULT = { sessions: "1", console: "0" };
     [["accSessions", "sessions"], ["accConsole", "console"]].forEach(([id, key]) => {
       let v; try { v = localStorage.getItem("gijo.dashAcc." + key); } catch (e) {}
       if (v == null) v = ACC_DEFAULT[key];
-      document.getElementById(id)?.classList.toggle("collapsed", v === "1");
+      const acc = document.getElementById(id);
+      if (acc) { acc.classList.toggle("collapsed", v === "1"); setAccCaret(acc); }
     });
 
     window.gijo.onCollaborationEvent((evt) => {
@@ -2181,7 +2185,7 @@
 
   var st = document.createElement("style");
   st.textContent =
-    ".dash-menu{margin-bottom:14px;background:var(--panel);border:1px solid var(--border);border-radius:13px;padding:12px 14px;}" +
+    ".dash-menu{width:100%;box-sizing:border-box;margin-bottom:12px;background:var(--panel);border:1px solid var(--border);border-radius:13px;padding:10px 12px;}" +
     ".dm-top{display:flex;align-items:center;gap:9px;}" +
     ".dm-h{font-size:13.5px;font-weight:800;color:#fff;}" +
     ".dm-role{font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;background:rgba(59,130,246,.15);color:var(--blue-light);}" +
@@ -2189,11 +2193,11 @@
     ".dm-btn{background:transparent;border:1px solid var(--border-strong);color:var(--muted);border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;}" +
     ".dm-btn.on{border-color:var(--blue);color:var(--blue-light);}" +
     ".dm-sub{font-size:11px;color:var(--muted);margin:5px 0 2px;}" +
-    ".dm-sec{font-size:10.5px;font-weight:800;color:var(--muted-2);margin:12px 2px 7px;}" +
-    ".dm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(90px,1fr));gap:8px;}" +
-    ".dm-tile{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:10px 6px;text-align:center;cursor:pointer;position:relative;transition:.14s;}" +
+    ".dm-sec{font-size:10.5px;font-weight:800;color:var(--muted-2);margin:8px 2px 5px;}" +
+    ".dm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:7px;}" +
+    ".dm-tile{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:8px 5px;text-align:center;cursor:pointer;position:relative;transition:.14s;}" +
     ".dm-tile:hover{border-color:var(--blue);transform:translateY(-2px);}" +
-    ".dm-tile .dic{font-size:18px;display:block;margin-bottom:5px;}" +
+    ".dm-tile .dic{font-size:16px;display:block;margin-bottom:4px;}" +
     ".dm-tile .dlb{font-size:11px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}" +
     ".dm-tile.add{border-style:dashed;}.dm-tile.add .dic{color:var(--blue-light);}.dm-tile.add .dlb{color:var(--muted);}" +
     ".dm-x{position:absolute;top:3px;right:5px;width:16px;height:16px;border-radius:50%;background:rgba(226,72,61,.92);color:#fff;font-size:10px;line-height:16px;display:none;}" +
