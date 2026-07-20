@@ -9,7 +9,7 @@ import { asyncRoute } from "../util/asyncRoute";
 import { getAgentById } from "./agents";
 import { emitLlmActivity, modelBasename } from "./llmactivity";
 import { recordChatLog } from "./learnloop";
-import { explainHardTerms } from "./glossary";
+import { explainHardTerms, glossaryGroundingFor } from "./glossary";
 import { gateUserInput } from "./gateway";
 
 const LOCAL_LLM_BASE_URL = process.env.GIJO_LOCAL_LLM_URL ?? "http://localhost:8080/v1";
@@ -217,7 +217,7 @@ const META_THRESHOLD = 3;
 // 표지 하나만 걸려도 누출로 본다 — 위 응답 규칙과 달리 이건 내부 블록 머리말이라
 // 정상 산문에 우연히 나올 수 없다. 다만 시스템 프롬프트가 "어떤 자료에 따랐는지 밝히라"고
 // 지시하므로, 개념어("사내 지식 베이스"만 쓰는 인용)는 건드리지 않고 머리말 형태만 잡는다.
-const SCAFFOLD_MARKERS = ["참고 자료 — 사내 지식 베이스", "관련 규칙·관계", "관련 규칙:"];
+const SCAFFOLD_MARKERS = ["참고 자료 — 사내 지식 베이스", "관련 규칙·관계", "관련 규칙:", "확정 용어 정의"];
 
 export function hasPromptLeak(text: string): boolean {
   const t = text ?? "";
@@ -357,11 +357,17 @@ export async function chat(args: ChatArgs): Promise<string> {
   // 결정 호출과 충돌한다 — 실측(2026-07-17): 도구가 6개로 늘어 사용자 메시지가 길어지자 모델이
   // 페르소나 쪽으로 기울어 register_asset을 안 부르고 산문으로 답했다(같은 모델에 페르소나 없이
   // 직접 물으면 3/3 정확). 결정 호출의 규칙은 호출자 메시지에 이미 다 들어 있다.
+  // 질문에 나온 보안 용어의 확정 정의를 함께 깐다 — 모델이 약자를 지어내는 것을 막는다
+  // (실측: KEV를 CVE로 3/3 오인 → 주입 후 0/4).
+  //
+  // explain과 같은 게이트를 쓴다. 용어를 **사람이 읽고 이해해야 하는 자리**에서만 의미가 있고,
+  // 컴플라이언스 초안·triage 초안처럼 프로그램이 소비하는 호출에는 프롬프트만 길어진다.
+  // 실제로 전 호출에 걸었더니 그 내부 경로들이 느려져 라우트 테스트가 15초 제한을 넘겼다 —
+  // 세션 초반 explainHardTerms를 chat() 전체에 걸어 내부 호출을 오염시킨 것과 같은 실수였다.
+  const grounding = args.responseSchema || !args.explain ? null : glossaryGroundingFor(args.message);
   const systemContent = args.responseSchema
     ? "너는 지시를 읽고 도구를 고르는 분류기다. 설명·인사 없이 요청된 JSON 객체 하나만 출력한다."
-    : rag
-      ? `${systemPromptFor(args.agentId)}\n\n${rag}`
-      : systemPromptFor(args.agentId);
+    : [systemPromptFor(args.agentId), grounding, rag].filter(Boolean).join("\n\n");
   const messages = [{ role: "system", content: systemContent }, ...history, { role: "user", content: args.message }];
 
   // 실시간 스트림용: 어느 에이전트가 지금 로컬 LLM으로 추론하는지 눈에 보이게 한다.
