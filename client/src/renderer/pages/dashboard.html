@@ -447,7 +447,7 @@
       <!-- 상단 툴바 = '내 업무 바로가기'에 등록된 항목만 동적 렌더(아래 dashMenu IIFE의 renderTopShortcuts). -->
       <div class="icon-row" id="topShortcuts"></div>
       <div class="avatar-btn" id="avatarBtn">-</div>
-      <div class="icon-btn" id="settingsBtn">⚙</div>
+      <div class="icon-btn" id="settingsBtn" title="보안 KPI 대시보드">📊</div>
     </div>
   </div>
 
@@ -2024,7 +2024,7 @@
     pollGpu();
     setInterval(pollGpu, 2500); // 실 GPU 사용률에 따라 로고 발광 강도 갱신
 
-    document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
+    document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("kpi.html")); // 오른쪽 아이콘 → 보안 KPI 대시보드
     document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
     const officeBtn = document.getElementById("officeBtn");
     if (officeBtn) officeBtn.addEventListener("click", () => window.gijo.openTeamOffice()); // 별도 창 — 페이지 이동 아님

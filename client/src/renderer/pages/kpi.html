@@ -37,7 +37,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
 
 .cat{margin-bottom:24px;max-width:1040px;}
-.cat-title{font-size:14px;font-weight:800;color:#fff;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.cat-title{font-size:14px;font-weight:800;color:#fff;margin-bottom:10px;display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;}
+.cat-title:hover{color:var(--blue-light);}
+/* 접이식 — 제목 클릭으로 섹션 접기(카드가 너무 많아 기본은 첫 섹션만 펼침). */
+.cat.collapsed{margin-bottom:8px;}
+.cat.collapsed > :not(.cat-title){display:none;}
+.kcar{color:var(--blue-light);font-size:11px;font-weight:900;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;border-radius:5px;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.35);flex:0 0 auto;}
 .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
 .tile{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
 .tile .t-label{font-size:11px;color:var(--muted);margin-bottom:6px;}
@@ -249,9 +254,33 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         trendCard("SLA 준수율", series("remediation.slaCompliance"), "var(--teal)", "%") +
         trendCard("조치 기한 초과", series("remediation.overdue"), "#f5928a", "건") +
         `</div></div>`;
+      wireKpiCollapse();
     } catch (e) {
       root.innerHTML = '<div style="color:#f5928a">KPI를 불러오지 못했습니다: ' + String(e.message || e).replace(/</g, "&lt;") + "</div>";
     }
+  }
+
+  // 접이식 — 각 섹션 제목 클릭으로 접기/펴기. 카드가 많아 기본은 전부 접힘(제목만). 선택은 저장.
+  function wireKpiCollapse() {
+    const root = document.getElementById("kpiRoot");
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem("gijo.kpi.collapsed") || "{}"); } catch (e) {}
+    root.querySelectorAll(".cat").forEach((cat) => {
+      const title = cat.querySelector(".cat-title");
+      if (!title) return;
+      const key = title.textContent.trim();
+      let collapsed = saved[key] != null ? saved[key] : true; // 기본 접힘
+      const caret = document.createElement("span");
+      caret.className = "kcar";
+      title.insertBefore(caret, title.firstChild);
+      const apply = () => { cat.classList.toggle("collapsed", collapsed); caret.textContent = collapsed ? "▸" : "▾"; };
+      apply();
+      title.addEventListener("click", () => {
+        collapsed = !collapsed; apply();
+        saved[key] = collapsed;
+        try { localStorage.setItem("gijo.kpi.collapsed", JSON.stringify(saved)); } catch (e) {}
+      });
+    });
   }
 
   function init() {
