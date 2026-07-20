@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<title>사무실 "이쁘게" — 아트 시안 3종</title>
+<style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--border:rgba(255,255,255,.08);--blue:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab}
+*{margin:0;box-sizing:border-box;font-family:'Segoe UI',sans-serif}
+body{background:var(--bg);color:var(--text);padding:24px;display:grid;gap:22px;max-width:960px;margin:0 auto}
+h1{font-size:16px}
+.variant{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px}
+.v-label{font-size:13px;font-weight:800;color:var(--blue);margin-bottom:4px}
+.v-desc{font-size:11.5px;color:var(--muted);margin-bottom:10px;line-height:1.5}
+canvas{width:100%;border-radius:10px;border:1px solid var(--border)}
+.note{font-size:11px;color:var(--muted);text-align:center}
+</style></head><body>
+<h1>🎨 팀 사무실 아트 업그레이드 — 시안 3종 (레이아웃·기능 동일, 무드만 다름)</h1>
+<div class="note">공통 업그레이드: 캐릭터 외곽선·음영·눈 / 책상 소품(키보드·머그·서류) / 그림자 / 모니터 발광 헤일로+스캔라인 / 러그·책장·커피코너 / 창밖 하늘·빛기둥 / 벽 시계·로고</div>
+
+<div class="variant"><div class="v-label">시안 ① 코지 우드 — 따뜻한 원목 사무실</div>
+<div class="v-desc">원목 바닥+따뜻한 조명. 낮 하늘 창. 오래 켜놔도 눈이 편한 아늑함 — "우리 팀 방" 느낌.</div>
+<canvas id="c1"></canvas></div>
+
+<div class="variant"><div class="v-label">시안 ② 네온 SOC — 야간 관제센터</div>
+<div class="v-desc">짙은 남색+시안 네온 그리드 바닥, "GIJO SOC" 네온사인, 밤하늘 창. 보안 관제 무드 최대치 — 관제 모니터에 걸어두면 제일 폼남.</div>
+<canvas id="c2"></canvas></div>
+
+<div class="variant"><div class="v-label">시안 ③ 딥 블루 리치 — 현 팔레트 유지 + 디테일 강화</div>
+<div class="v-desc">지금의 다크 블루 톤을 유지하면서 아트만 촘촘하게. 앱 다른 화면과 톤이 가장 잘 맞음(안전한 선택).</div>
+<canvas id="c3"></canvas></div>
+
+<script src="pixel-office-v2.js"></script>
+<script>
+createOffice2(document.getElementById("c1"), OFFICE_THEMES.cozy);
+createOffice2(document.getElementById("c2"), OFFICE_THEMES.neon);
+createOffice2(document.getElementById("c3"), OFFICE_THEMES.deep);
+</script>
+</body></html>
