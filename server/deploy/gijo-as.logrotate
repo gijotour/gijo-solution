@@ -1,0 +1,17 @@
+# GIJO AS 운영서버 로그 로테이션
+# 설치 위치: /etc/logrotate.d/gijo-as
+# 적용:      sudo cp 이 파일 → 위 경로 (logrotate.timer가 매일 자동 실행)
+# 문법 확인: sudo logrotate -d /etc/logrotate.d/gijo-as
+#
+# 목적: server.log(systemd StandardOutput=append)가 무한 증가하던 것을 일일 로테이션.
+#       copytruncate = 서비스가 파일을 append로 잡고 있으므로 복사 후 원본을 truncate
+#       (서비스 재시작 없이 로테이션). 압축 보관 7일치.
+/home/gijo/gijo-as/server.log {
+  daily
+  rotate 7
+  compress
+  delaycompress
+  missingok
+  notifempty
+  copytruncate
+}
