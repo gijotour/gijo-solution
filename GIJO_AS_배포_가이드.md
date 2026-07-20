@@ -147,7 +147,10 @@ build/bin/llama-server --list-devices   # CUDA0 가 보여야 한다
 ```bash
 cd ~/gijo-as/server
 npm ci && npx tsc -p tsconfig.json    # better-sqlite3·lancedb가 Linux용으로 재빌드된다
+npm run install-browser               # 리포트 PDF 렌더용 headless chromium(~/.cache/ms-playwright)
 python3 -m venv ~/gijo-as/venv && ~/gijo-as/venv/bin/pip install -r requirements.txt
+# 리포트 PDF 한글 렌더 폰트 — 없으면 PDF에서 한글이 □(tofu)로 깨진다
+sudo apt-get install -y fonts-nanum fonts-noto-cjk && fc-cache -f
 ```
 
 DB는 파일 복사가 아니라 **온라인 백업 API**로 옮깁니다(가동 중이면 `-wal`에 미반영 트랜잭션이 남아 단순 `cp`는 깨질 수 있음):
