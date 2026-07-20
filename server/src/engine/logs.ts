@@ -73,7 +73,9 @@ export function installConsoleCapture(): void {
   (["log", "warn", "error"] as const).forEach((level) => {
     const original = console[level].bind(console);
     console[level] = (...args: unknown[]) => {
-      original(...args);
+      // stdout(→ server.log)에는 정렬 가능한 로컬(KST) 타임스탬프를 앞에 붙인다(사후 로그 분석용).
+      // WS 로그 뷰어(recordLog)는 숫자 timestamp를 따로 저장하므로 원본 인자를 그대로 넘긴다.
+      original(`[${new Date().toLocaleString("sv-SE")}]`, ...args);
       recordLog(level, ...args);
     };
   });
