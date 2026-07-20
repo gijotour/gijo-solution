@@ -77,6 +77,11 @@
   .right-reopen{position:fixed;right:0;top:50%;transform:translateY(-50%);background:var(--blue);color:#fff;padding:14px 6px;border-radius:10px 0 0 10px;font-size:12px;font-weight:800;cursor:pointer;writing-mode:vertical-rl;display:none;z-index:40;box-shadow:-2px 0 14px rgba(0,0,0,.45);letter-spacing:2px;}
   .right-reopen:hover{background:#3576e0;}
   .right-reopen.on{display:block;}
+  /* 오른쪽 작업 화면 전체 접기 헤더 — 두 섹션을 통째로 여닫는 명확한 컨트롤. */
+  .dash-right-head{display:flex;align-items:center;gap:8px;padding:9px 12px;border-bottom:1px solid var(--border);background:var(--panel-3);flex:0 0 auto;}
+  .drh-t{font-size:12px;font-weight:800;color:#fff;letter-spacing:.2px;}
+  .drh-toggle{margin-left:auto;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);color:var(--blue-light);font-size:11px;font-weight:700;border-radius:8px;padding:5px 10px;cursor:pointer;transition:.14s;white-space:nowrap;}
+  .drh-toggle:hover{background:var(--blue);color:#fff;border-color:var(--blue);}
   .cl-expand{font-size:14px;color:var(--muted);cursor:pointer;line-height:1;}
   .cl-expand:hover{color:var(--blue-light);}
   .explorer{padding:18px 12px;border-right:1px solid var(--border);}
@@ -96,6 +101,8 @@
   .dash-sfull{padding:9px 12px;border-top:1px solid var(--border);font-size:11px;color:var(--blue-light);font-weight:700;cursor:pointer;text-align:center;}
   .dash-sfull:hover{background:var(--panel-2);}
   .explorer-title{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px;}
+  /* 탐색기 파일 트리 글자 크기 — 기본(≈16px)이 커서 11.5px로 축소(파일명·폴더명). */
+  #explorerTree{font-size:11.5px;line-height:1.5;}
   .explorer-sub{font-size:11px;color:var(--blue-light);margin-bottom:10px;}
   .explorer-tree{font-size:12px;color:var(--muted);line-height:1.9;}
   /* 통일된 트리 탐색기 — 폴더(접기)·자식(가이드라인)·리프(항목)를 한 스타일로 */
@@ -117,7 +124,7 @@
   .tree-leaf .badge{color:var(--amber);font-size:10px;font-weight:700;}
   .tree-empty{padding:3px 5px;font-size:11px;color:var(--muted-2);}
   /* AS 탐색기 — 파일 탐색기 아래 2번째 섹션(리포트·문서). 글씨 12px = 지휘 콘솔과 동일. */
-  .as-explorer{margin-top:9px;padding-top:9px;border-top:1px dashed var(--border-strong);font-size:12px;}
+  .as-explorer{margin-top:9px;padding-top:9px;border-top:1px dashed var(--border-strong);font-size:11.5px;}
   .as-sec{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.3px;padding:1px 4px 5px;}
   .asx-row{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:7px;cursor:pointer;white-space:nowrap;overflow:hidden;}
   .asx-row:hover{background:rgba(255,255,255,.045);}
@@ -125,7 +132,7 @@
   .asx-ic{width:15px;text-align:center;flex:0 0 auto;}
   .asx-nm{overflow:hidden;text-overflow:ellipsis;color:#dfe8f7;}
   .asx-cnt{margin-left:auto;font-size:10px;color:var(--blue-light);background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.35);border-radius:999px;padding:0 6px;flex:0 0 auto;}
-  .asx-body .asx-file{display:flex;align-items:center;gap:6px;padding:3px 6px 3px 20px;border-radius:7px;cursor:pointer;white-space:nowrap;overflow:hidden;font-size:12px;}
+  .asx-body .asx-file{display:flex;align-items:center;gap:6px;padding:3px 6px 3px 20px;border-radius:7px;cursor:pointer;white-space:nowrap;overflow:hidden;font-size:11.5px;}
   .asx-body .asx-file:hover{background:rgba(255,255,255,.045);}
   .asx-body .asx-file .asx-nm{color:var(--muted);}
   .asx-empty{padding:3px 6px 3px 22px;font-size:11px;color:var(--muted-2);}
@@ -423,7 +430,7 @@
 </head>
 <body class="g-ui">
 <!-- 오른쪽 패널을 접었을 때(◧) 다시 여는 탭 — 오른쪽 가장자리. 패널이 보이면 숨겨진다. -->
-<div class="right-reopen" id="rightReopen" title="오른쪽 패널 열기 (작업 세션·지휘 콘솔)">◧ 패널</div>
+<div class="right-reopen" id="rightReopen" title="오른쪽 작업 화면 열기 (작업 세션·지휘 콘솔)">◧ 작업 화면 열기</div>
 
 
 
@@ -560,6 +567,11 @@
 
     <!-- 오른쪽 패널 — [작업 세션]+[지휘 콘솔]을 위아래 접이식(아코디언)으로. 각각 독립 접기. -->
     <div class="dash-sessions" id="dashRight">
+      <!-- 오른쪽 작업 화면 전체 접기/펴기 — 두 섹션(작업 세션·지휘 콘솔)을 통째로 여닫는다. -->
+      <div class="dash-right-head" id="dashRightHead">
+        <span class="drh-t">🗂 작업 화면</span>
+        <button class="drh-toggle" id="dashRightCollapse" title="오른쪽 작업 화면 전체 접기 (다시 열기: 오른쪽 가장자리 탭)">◧ 접기</button>
+      </div>
       <!-- 작업 세션 (기본 접힘) -->
       <div class="acc collapsed" id="accSessions">
         <div class="acc-h" data-acc="sessions"><span class="car">▾</span><span class="acc-t">💬 작업 세션</span>
@@ -2096,6 +2108,7 @@
     // 세션 패널의 ⏵/◧는 아코디언 토글과 겹치지 않게(헤더 버튼) 이벤트 전파를 막는다.
     document.getElementById("dashHideRight")?.addEventListener("click", (e) => { e.stopPropagation(); toggleRight(); });
     document.getElementById("toggleRightBtn")?.addEventListener("click", toggleRight);
+    document.getElementById("dashRightCollapse")?.addEventListener("click", toggleRight); // 패널 안 '전체 접기' 헤더 버튼
     document.getElementById("rightReopen")?.addEventListener("click", toggleRight); // 접힘 상태 '열기' 탭
     // 오른쪽 패널은 이제 지휘 콘솔(채팅)을 품으므로 기본 '펼침'(사용자가 ◧로 숨기면 "1" 저장·유지).
     try { applyRightHidden(localStorage.getItem(RIGHT_HIDDEN_KEY) === "1"); } catch (e) {}
