@@ -27,6 +27,11 @@
   .pin { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel-2);
     color: var(--muted); cursor: pointer; font-size: 14px; }
   .pin.on { color: var(--teal); border-color: var(--teal); }
+  /* 아트 무드 전환(코지/네온/딥블루) — 선택은 localStorage에 저장 */
+  .theme-seg { display: flex; gap: 2px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 2px; }
+  .theme-seg button { width: 26px; height: 24px; border: none; border-radius: 6px; background: transparent; color: var(--muted);
+    cursor: pointer; font-size: 12px; }
+  .theme-seg button.on { background: rgba(59,130,246,.2); color: #fff; }
 
   .body { display: grid; grid-template-columns: 1fr 280px; gap: 14px; padding: 0 18px; flex: 1 1 auto; min-height: 0; }
   .office-col { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
@@ -84,6 +89,11 @@
     <div class="h-title">🏢 보안팀 사무실 <span class="live" id="liveBadge">LIVE</span></div>
     <div class="h-right">
       <span id="statLine">에이전트 불러오는 중…</span>
+      <div class="theme-seg" id="themeSeg" title="사무실 무드">
+        <button data-theme="cozy" title="코지 우드">☀</button>
+        <button data-theme="neon" title="네온 SOC">🌃</button>
+        <button data-theme="deep" title="딥 블루">🌊</button>
+      </div>
       <button class="pin" id="pinBtn" title="항상 위에 고정 (관제 모니터용)">📌</button>
     </div>
   </div>
@@ -124,19 +134,37 @@
   const office = (function () {
     const canvas = document.getElementById("office");
     const ctx = canvas.getContext("2d");
-    const COLS = 20, ROWS = 11, S = 3;
+    const COLS = 22, ROWS = 12, S = 3;
     const W = COLS * 8, H = ROWS * 8;
     canvas.width = W * S; canvas.height = H * S;
     canvas.style.imageRendering = "pixelated";
+    const WALL_H = 14;
     const DESKS = [
-      { x: 3, y: 2 }, { x: 8, y: 2 }, { x: 13, y: 2 },
-      { x: 3, y: 6 }, { x: 8, y: 6 }, { x: 13, y: 6 },
+      { x: 3, y: 2 }, { x: 9, y: 2 }, { x: 15, y: 2 },
+      { x: 3, y: 6.6 }, { x: 9, y: 6.6 }, { x: 15, y: 6.6 },
     ];
-    const COFFEE = { x: 17.5, y: 8.5 };
+    const COFFEE = { x: 156, y: 90 }; // 커피 코너(픽셀 좌표)
+    const TABLE = { x: 78, y: 66 };   // 회의 테이블
     // 외부 콘솔 접속자(시안 ②): 오른쪽 벽 출입문으로 걸어 들어와 회의 테이블에 합석한다.
-    const DOOR = { x: W - 8, y: 40 };
-    const SEATS = [ { x: 70, y: 64 }, { x: 83, y: 62 }, { x: 96, y: 64 }, { x: 76, y: 86 }, { x: 90, y: 86 } ];
+    const DOOR = { x: W - 8, y: 46 };
+    const SEATS = [ { x: 68, y: 74 }, { x: 108, y: 74 }, { x: 74, y: 90 }, { x: 90, y: 90 }, { x: 106, y: 90 } ];
     const VISITOR_COLORS = ["#e2b0ff", "#ffd28a", "#9fe8ff", "#ffb3c1", "#c5f0a4"];
+    const HAIRS = ["#2b2f45", "#4a3020", "#1e2230", "#4a3020", "#2b2f45", "#1e2230"];
+
+    // 아트 무드 3종 — 사용자 전환(☀🌃🌊), 선택은 localStorage 저장. 레이아웃·동작은 동일.
+    const THEMES = {
+      cozy: { wallTop: "#2a2320", base: "#241d18", floorA: "#5a4632", floorB: "#514029", plank: "rgba(0,0,0,.18)", grid: null,
+        rug: ["#1eb980", "#17a06e"], deskTop: "#7a5a3a", deskFace: "#5f4530", deskEdge: "#8f6c48",
+        skyTop: "#7fb2e8", skyBottom: "#cfe3f5", sun: "#ffe9a8", sign: null, accent: "#f0a020", shaft: "rgba(255,236,180,.05)" },
+      neon: { wallTop: "#0a0f1e", base: "#060a14", floorA: "#101828", floorB: "#0c1220", plank: null, grid: "rgba(64,220,255,.10)",
+        rug: ["#12335a", "#0e2846"], deskTop: "#2a3a55", deskFace: "#1d2a40", deskEdge: "#3b5378",
+        skyTop: "#0b1030", skyBottom: "#25164a", sun: "#cfd8ff", sign: "GIJO SOC", accent: "#40dcff", shaft: "rgba(64,220,255,.045)" },
+      deep: { wallTop: "#0e1526", base: "#0a1120", floorA: "#1c2440", floorB: "#171e35", plank: null, grid: "rgba(255,255,255,.03)",
+        rug: ["#31406e", "#283457"], deskTop: "#5a4632", deskFace: "#463626", deskEdge: "#6d563e",
+        skyTop: "#1c2c55", skyBottom: "#3a2c66", sun: "#ffe9a8", sign: null, accent: "#5fa1ff", shaft: "rgba(160,190,255,.05)" },
+    };
+    let T = THEMES[localStorage.getItem("gijo:office:theme") || "neon"] || THEMES.neon;
+    function setTheme(name) { if (THEMES[name]) { T = THEMES[name]; localStorage.setItem("gijo:office:theme", name); } }
     let agents = []; // {name, shortName, color, state, x, y, wanderT, desk, visit?, moving}
     let visitors = []; // {username, color, x, y, seat, phase: enter|seated|leave, moving}
     let bubble = null; // {agentIdx, msg, ttl}
@@ -153,8 +181,8 @@
         return {
           name: a.name, shortName: shortName(a.name), color: PALETTE[i % PALETTE.length],
           state: a.status,
-          x: prev ? prev.x : (DESKS[i].x + 1) * 8,
-          y: prev ? prev.y : DESKS[i].y * 8 + 22,
+          x: prev ? prev.x : DESKS[i].x * 8 + 8,
+          y: prev ? prev.y : DESKS[i].y * 8 + 26,
           wanderT: prev ? prev.wanderT : 0,
           desk: i,
         };
@@ -186,7 +214,7 @@
     }
     // 작업 완료 ✓ 파티클 — 지정 위치가 없으면 회의 테이블 위에서 터진다.
     function sparkle(x, y) {
-      const cx = x == null ? 86 : x, cy = y == null ? 62 : y;
+      const cx = x == null ? 92 : x, cy = y == null ? 60 : y;
       for (let i = 0; i < 7; i++) sparkles.push({ x: cx + (Math.random() * 16 - 8), y: cy + (Math.random() * 8 - 4), life: 40 + Math.random() * 20 });
     }
     // 접속자 목록 반영: 새 접속자는 문에서 입장, 사라진 접속자는 문으로 퇴장.
@@ -200,7 +228,7 @@
         visitors.push({
           username: v.username,
           color: VISITOR_COLORS[visitors.length % VISITOR_COLORS.length],
-          x: DOOR.x - 2, y: DOOR.y + 14, seat, phase: "enter", moving: true,
+          x: DOOR.x - 4, y: DOOR.y + 16, seat, phase: "enter", moving: true,
         });
         doorOpenT = 55;
       });
@@ -218,31 +246,63 @@
       return false;
     }
 
+    function plantAt(x, y) {
+      px(x + 1, y - 8, 6, 8, "#2c7a4a"); px(x, y - 5, 3, 4, "#2c5a3a"); px(x + 5, y - 6, 3, 4, "#2c5a3a");
+      px(x + 1, y, 6, 5, "#a06a3c"); px(x + 1, y, 6, 1, "#c08a52");
+    }
     function drawRoom() {
-      for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++)
-        px(c * 8, r * 8, 8, 8, (r + c) % 2 ? "#1a2338" : "#171f33");
-      px(0, 0, W, 10, "#0e1526"); px(0, 10, W, 2, "#2a3552");
-      for (let i = 0; i < 4; i++) px(14 + i * 44, 2, 20, 7, "#22345c");
-      px(72, 70, 28, 12, "#3a2f22"); px(74, 68, 24, 4, "#4a3c2c"); // 회의 테이블
-      px(2, 74, 8, 10, "#2c5a3a"); px(4, 82, 4, 4, "#5a3c28");     // 화분
-      px(W - 12, 14, 8, 10, "#2c5a3a"); px(W - 10, 22, 4, 4, "#5a3c28");
-      px(COFFEE.x * 8, COFFEE.y * 8 - 6, 10, 12, "#3a4258");        // 커피머신
-      px(COFFEE.x * 8 + 2, COFFEE.y * 8 - 4, 6, 3, "#e2483d");
-      // 출입문(오른쪽 벽) — 접속/퇴장 때 doorOpenT 동안 열린다
-      px(DOOR.x, DOOR.y, 8, 16, "#4a3c2c");
-      if (doorOpenT > 0) { px(DOOR.x + 1, DOOR.y + 1, 6, 14, "#151b2c"); px(DOOR.x + 5, DOOR.y + 2, 2, 12, "#6a5940"); }
-      else { px(DOOR.x + 1, DOOR.y + 1, 6, 14, "#3a2f22"); px(DOOR.x + 2, DOOR.y + 7, 1, 2, "#f0a020"); }
+      // 바닥(테마: 원목/네온그리드/딥)
+      for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++) px(c * 8, r * 8, 8, 8, (r + c) % 2 ? T.floorA : T.floorB);
+      if (T.plank) for (let r = 2; r < ROWS; r++) px(0, r * 8, W, 0.5, T.plank);
+      if (T.grid) for (let c = 0; c < COLS; c++) px(c * 8, WALL_H, 0.5, H - WALL_H, T.grid);
+      // 벽 + 걸레받이
+      px(0, 0, W, WALL_H - 2, T.wallTop); px(0, WALL_H - 2, W, 2, T.base);
+      // 창문 3개 — 하늘 그라데이션 + 해/달 + 빛기둥
+      for (let i = 0; i < 3; i++) {
+        const wx = 16 + i * 52;
+        px(wx - 1, 1, 26, 10, T.base);
+        px(wx, 2, 24, 5, T.skyTop); px(wx, 7, 24, 3, T.skyBottom);
+        px(wx + 18, 3, 3, 3, T.sun);
+        px(wx + 11, 2, 1, 8, T.base);
+        ctx.fillStyle = T.shaft; ctx.fillRect((wx - 2) * S, 11 * S, 28 * S, 30 * S);
+      }
+      // 벽 장식: 방패 로고·시계·(네온 테마) 사인
+      px(4, 3, 8, 8, T.base); px(5, 4, 6, 5, T.accent); px(7, 5, 2, 4, "#fff");
+      px(100, 3, 7, 7, "#e7eaf3"); px(102, 4, 1, 3, "#333"); px(103, 6, 2, 1, "#333"); px(100, 3, 7, 1, T.base);
+      if (T.sign) { ctx.font = `bold ${4 * S}px monospace`; ctx.fillStyle = T.accent; ctx.shadowColor = T.accent; ctx.shadowBlur = 6; ctx.fillText(T.sign, 148 * S, 8 * S); ctx.shadowBlur = 0; }
+      // 러그 + 회의 테이블(3톤 음영 + 서류)
+      px(TABLE.x - 12, TABLE.y - 12, 52, 24, T.rug[0]); px(TABLE.x - 10, TABLE.y - 10, 48, 20, T.rug[1]);
+      px(TABLE.x, TABLE.y - 2, 28, 4, T.deskEdge); px(TABLE.x, TABLE.y + 2, 28, 8, T.deskTop); px(TABLE.x, TABLE.y + 10, 28, 3, T.deskFace);
+      px(TABLE.x + 4, TABLE.y + 3, 5, 3, "#e7eaf3"); px(TABLE.x + 18, TABLE.y + 4, 5, 3, "#cfd8ff");
+      // 화분·책장·커피 코너
+      plantAt(4, 86); plantAt(W - 10, 20);
+      px(W - 26, 16, 14, 16, T.deskFace);
+      for (let i = 0; i < 3; i++) px(W - 25, 18 + i * 5, 12, 3, ["#e2483d", "#5fa1ff", "#f0a020"][i]);
+      px(COFFEE.x - 2, COFFEE.y - 12, 14, 16, T.deskFace);
+      px(COFFEE.x, COFFEE.y - 10, 10, 12, "#3a4258");
+      px(COFFEE.x + 2, COFFEE.y - 8, 6, 3, "#e2483d"); px(COFFEE.x + 3, COFFEE.y - 2, 3, 2, "#e7eaf3");
+      // 출입문(프레임+명패) — 접속/퇴장 때 doorOpenT 동안 열린다
+      px(DOOR.x - 1, DOOR.y - 1, 9, 18, T.deskEdge);
+      if (doorOpenT > 0) { px(DOOR.x, DOOR.y, 8, 16, "#0d1322"); px(DOOR.x + 5, DOOR.y + 1, 2, 14, T.deskFace); }
+      else { px(DOOR.x, DOOR.y, 8, 16, T.deskFace); px(DOOR.x + 1, DOOR.y + 7, 1, 2, "#f0a020"); }
+      // 책상들(그림자·3톤·키보드·머그·서류·모니터 헤일로+스캔라인)
       DESKS.forEach((d, i) => {
         const a = agents[i];
-        px(d.x * 8, d.y * 8 + 6, 22, 9, "#4a3c2c");
-        px(d.x * 8 + 1, d.y * 8 + 15, 3, 4, "#3a2f22");
-        px(d.x * 8 + 18, d.y * 8 + 15, 3, 4, "#3a2f22");
+        const dx = d.x * 8, dy = d.y * 8;
+        ctx.fillStyle = "rgba(0,0,0,.22)"; ctx.fillRect(dx * S, (dy + 15) * S, 24 * S, 3 * S);
+        px(dx, dy + 6, 24, 2, T.deskEdge); px(dx, dy + 8, 24, 6, T.deskTop); px(dx, dy + 14, 24, 2, T.deskFace);
+        px(dx + 1, dy + 16, 3, 4, T.deskFace); px(dx + 20, dy + 16, 3, 4, T.deskFace);
+        px(dx + 8, dy + 11, 7, 2, "#141a2b");
+        px(dx + 18, dy + 9, 3, 3, "#e2483d");
+        px(dx + 2, dy + 9, 4, 2, "#e7eaf3");
         const st = a ? a.state : "idle";
-        const glow = st === "working" ? (Math.floor(t / 20) % 2 ? "#1eb980" : "#17a06e")
-                   : st === "watching" ? "#f0a020" : "#2a3552";
-        px(d.x * 8 + 7, d.y * 8 - 1, 9, 7, "#0a0e1a");
-        px(d.x * 8 + 8, d.y * 8, 7, 5, glow);
-        px(d.x * 8 + 10, d.y * 8 + 6, 3, 2, "#3a4258");
+        const on = st !== "idle";
+        const glow = st === "working" ? (Math.floor(t / 20) % 2 ? "#2ee6a0" : "#1eb980") : st === "watching" ? "#f0a020" : "#232c44";
+        if (on) { ctx.fillStyle = st === "working" ? "rgba(46,230,160,.10)" : "rgba(240,160,32,.10)"; ctx.fillRect((dx + 5) * S, (dy - 4) * S, 14 * S, 12 * S); }
+        px(dx + 7, dy - 2, 10, 8, "#05070d");
+        px(dx + 8, dy - 1, 8, 6, glow);
+        if (on && Math.floor(t / 30) % 3 === 0) px(dx + 9, dy, 4, 1, "rgba(255,255,255,.5)");
+        px(dx + 11, dy + 6, 2, 2, "#39445f");
       });
     }
 
@@ -262,26 +322,29 @@
       const tw = ctx.measureText(text).width;
       ctx.fillText(text, cx * S - tw / 2, cy * S);
     }
+    // 공용 도트 캐릭터 — 외곽선·눈·셔츠 음영·팔·걷기 다리. (x,y)=발 기준.
+    function drawChar(x, y, shirt, hair, o) {
+      const bob = o.typing && !o.moving ? Math.floor(t / 12) % 2 : 0;
+      px(x - 1, y - 15 + bob, 8, 15 - bob, "rgba(5,8,14,.55)"); // 외곽선
+      drawLegs(x, y - 2, o.moving);
+      px(x, y - 8 + bob, 7, 6, shirt); px(x + 5, y - 8 + bob, 2, 6, "rgba(0,0,0,.25)");
+      px(x - 1, y - 7 + bob, 1, 4, shirt); px(x + 7, y - 7 + bob, 1, 4, shirt); // 팔
+      if (o.typing && !o.moving) px(x - 1 + (bob ? 1 : 0), y - 4, 2, 2, "#e8c39e");
+      px(x + 1, y - 13 + bob, 5, 5, "#e8c39e"); // 얼굴
+      px(x + 2, y - 11 + bob, 1, 1, "#1c1f2b"); px(x + 4, y - 11 + bob, 1, 1, "#1c1f2b"); // 눈
+      px(x, y - 15 + bob, 7, 3, hair); px(x, y - 13 + bob, 1, 2, hair); px(x + 6, y - 13 + bob, 1, 2, hair);
+      if (o.dot) px(x + 3, y - 18, 2, 2, o.dot);
+      if (o.tag) nameTag(o.tag, x + 3.5, y + 5, o.tagColor || "rgba(231,234,243,.8)");
+    }
     function drawAgent(a) {
-      const bob = a.state === "working" && !a.moving ? (Math.floor(t / 12) % 2) : 0;
-      const wx = a.x, wy = a.y + (a.state === "idle" && !a.moving ? Math.sin(t / 30 + a.desk) * 1.5 : 0);
-      px(wx, wy - 6 + bob, 6, 6, a.color);
-      px(wx + 1, wy - 11 + bob, 4, 5, "#e8c39e");
-      px(wx, wy - 13 + bob, 6, 3, a.desk % 2 ? "#3a2f22" : "#22263a");
-      drawLegs(wx, wy, a.moving);
-      if (a.state === "working" && !a.moving) px(wx - 2 + (bob ? 1 : 0), wy - 3, 2, 2, "#e8c39e");
-      const dot = a.state === "working" ? "#1eb980" : a.state === "watching" ? "#f0a020" : "#5f6785";
-      px(wx + 2, wy - 16, 2, 2, dot);
-      nameTag(a.shortName, wx + 3, wy + 6, "rgba(231,234,243,.75)");
+      const wy = a.y + (a.state === "idle" && !a.moving ? Math.sin(t / 30 + a.desk) * 1.5 : 0);
+      const dot = a.state === "working" ? "#2ee6a0" : a.state === "watching" ? "#f0a020" : "#5f6785";
+      drawChar(a.x, wy, a.color, HAIRS[a.desk], { typing: a.state === "working", moving: a.moving, dot, tag: a.shortName });
     }
     // 외부 콘솔 접속자 — 셔츠는 개인색, 머리는 갈색, 이름표는 노란빛(사람임을 구분).
     function drawVisitor(v) {
-      const wx = v.x, wy = v.y + (v.phase === "seated" ? Math.sin(t / 40 + v.seat) * 1 : 0);
-      px(wx, wy - 6, 6, 6, v.color);
-      px(wx + 1, wy - 11, 4, 5, "#e8c39e");
-      px(wx, wy - 13, 6, 3, "#4a3020");
-      drawLegs(wx, wy, v.moving);
-      nameTag(v.username, wx + 3, wy + 6, "#ffe9a8");
+      const wy = v.y + (v.phase === "seated" ? Math.sin(t / 40 + v.seat) * 1 : 0);
+      drawChar(v.x, wy, v.color, "#4a3020", { moving: v.moving, tag: v.username, tagColor: "#ffe9a8" });
     }
     function drawParticles() {
       // 커피 김 — 위로 올라가며 옅어진다
@@ -301,11 +364,11 @@
       ctx.font = `${3.4 * S}px 'Malgun Gothic',sans-serif`;
       const tw = ctx.measureText(bubble.msg).width;
       const w = Math.min(tw + 4 * S, (W - 8) * S);
-      const bx = Math.max(2 * S, Math.min(a.x * S - w / 2, (W - 2) * S - w));
-      const by = (a.y - 26) * S;
-      ctx.fillStyle = "#e7eaf3";
+      const bx = Math.max(2 * S, Math.min((a.x + 3.5) * S - w / 2, (W - 2) * S - w));
+      const by = (a.y - 28) * S;
+      ctx.fillStyle = "#f4f6fb";
       ctx.fillRect(bx, by, w, 6 * S);
-      ctx.fillRect(a.x * S, by + 6 * S, 2 * S, 2 * S);
+      ctx.fillRect((a.x + 3) * S, by + 6 * S, 2 * S, 2 * S);
       ctx.fillStyle = "#0a0e1a";
       ctx.fillText(bubble.msg, bx + 2 * S, by + 4.4 * S);
     }
@@ -315,19 +378,19 @@
       if (bubble) bubble.ttl--;
       if (doorOpenT > 0) doorOpenT--;
       // 커피 김 — 주기적으로 피어오른다
-      if (t % 26 === 0) steam.push({ x: COFFEE.x * 8 + 3 + Math.random() * 3, y: COFFEE.y * 8 - 8, life: 90 });
+      if (t % 26 === 0) steam.push({ x: COFFEE.x + 3 + Math.random() * 3, y: COFFEE.y - 12, life: 90 });
       steam.forEach((s) => { s.y -= 0.18; s.x += Math.sin(t / 10 + s.life) * 0.08; s.life--; });
       steam = steam.filter((s) => s.life > 0);
       sparkles.forEach((p) => { p.y -= 0.25; p.life--; });
       sparkles = sparkles.filter((p) => p.life > 0);
 
       agents.forEach((a) => {
-        const hx = (DESKS[a.desk].x + 1) * 8, hy = DESKS[a.desk].y * 8 + 22;
+        const hx = DESKS[a.desk].x * 8 + 8, hy = DESKS[a.desk].y * 8 + 26;
         // 협업 이벤트 방문(from→to) — 상대 책상 옆까지 걸어가 머문 뒤 복귀
         if (a.visit) {
           const target = agents[a.visit.to];
           if (a.visit.phase === "go") {
-            if (walkTo(a, (DESKS[target.desk].x + 1) * 8 + 9, DESKS[target.desk].y * 8 + 22, 0.7)) a.visit.phase = "hold";
+            if (walkTo(a, DESKS[target.desk].x * 8 + 19, DESKS[target.desk].y * 8 + 26, 0.7)) a.visit.phase = "hold";
           } else if (a.visit.phase === "hold") {
             if (--a.visit.holdT <= 0) a.visit.phase = "back";
           } else if (walkTo(a, hx, hy, 0.7)) {
@@ -338,7 +401,7 @@
         if (a.state !== "idle") { walkTo(a, hx, hy, 0.4); return; }
         // 대기 배회 — 전원이 커피머신에 몰리지 않게 책상별로 다른 지점(커피/화분/창가)을 돌고, 주기도 어긋나게.
         a.wanderT++;
-        const SPOTS = [ { x: COFFEE.x * 8, y: COFFEE.y * 8 }, { x: 10, y: 78 }, { x: W - 22, y: 26 } ];
+        const SPOTS = [ { x: COFFEE.x - 8, y: COFFEE.y - 2 }, { x: 12, y: 84 }, { x: 20, y: 30 } ];
         const goal = Math.floor((a.wanderT + a.desk * 97) / 300) % 2 ? SPOTS[a.desk % 3] : { x: hx, y: hy };
         walkTo(a, goal.x, goal.y, 0.3);
       });
@@ -346,11 +409,11 @@
       // 접속자: 입장 → 좌석, 퇴장 → 문에서 소멸
       visitors = visitors.filter((v) => {
         if (v.phase === "enter") {
-          const seat = v.seat >= 0 ? SEATS[v.seat] : { x: DOOR.x - 14, y: DOOR.y + 18 };
+          const seat = v.seat >= 0 ? SEATS[v.seat] : { x: DOOR.x - 16, y: DOOR.y + 20 };
           if (walkTo(v, seat.x, seat.y, 0.6)) v.phase = "seated";
           return true;
         }
-        if (v.phase === "leave") return !walkTo(v, DOOR.x - 2, DOOR.y + 14, 0.7);
+        if (v.phase === "leave") return !walkTo(v, DOOR.x - 4, DOOR.y + 16, 0.7);
         return true;
       });
 
@@ -364,7 +427,7 @@
       requestAnimationFrame(step);
     }
     step();
-    const api = { setAgents, setVisitors, showBubble, collabMove, sparkle };
+    const api = { setAgents, setVisitors, showBubble, collabMove, sparkle, setTheme };
     window.__office = api; // e2e·디버깅용 훅(협업 이동/파티클을 코드로 유발해 육안 확인)
     return api;
   })();
@@ -547,6 +610,20 @@
       ctaBtn.textContent = orig;
     }
   });
+
+  // ── 아트 무드 전환(코지/네온/딥블루) ──
+  const themeSeg = document.getElementById("themeSeg");
+  function markTheme() {
+    const cur = localStorage.getItem("gijo:office:theme") || "neon";
+    themeSeg.querySelectorAll("button").forEach((b) => b.classList.toggle("on", b.dataset.theme === cur));
+  }
+  themeSeg.addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-theme]");
+    if (!btn) return;
+    office.setTheme(btn.dataset.theme);
+    markTheme();
+  });
+  markTheme();
 
   // ── 항상 위 고정 ──
   let pinned = false;
