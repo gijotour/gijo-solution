@@ -25,6 +25,10 @@ const REFRESH_TOKEN_TTL_MS = Number(process.env.GIJO_REFRESH_TOKEN_TTL_MS ?? 7 *
 interface RefreshRecord {
   userId: string;
   expiresAt: number;
+  // 접속 현황 표시(팀 사무실 창 "외부 콘솔 접속자")용 메타데이터. 회전(rotation) 시 이어받는다.
+  ip?: string;
+  since: number; // 최초 로그인 시각
+  lastSeenAt: number; // 마지막 인증 요청 시각 — presence 판정 기준
 }
 
 const refreshTokens = new Map<string, RefreshRecord>();
@@ -79,15 +83,22 @@ function signAccessToken(userId: string): string {
   return jwt.sign({ sub: userId }, JWT_SECRET, { expiresIn: ACCESS_TOKEN_TTL } as jwt.SignOptions);
 }
 
-function issueRefreshToken(userId: string): string {
+function issueRefreshToken(userId: string, meta?: { ip?: string; since?: number }): string {
   const token = crypto.randomBytes(32).toString("hex");
-  refreshTokens.set(token, { userId, expiresAt: Date.now() + REFRESH_TOKEN_TTL_MS });
+  const now = Date.now();
+  refreshTokens.set(token, {
+    userId,
+    expiresAt: now + REFRESH_TOKEN_TTL_MS,
+    ip: meta?.ip,
+    since: meta?.since ?? now, // 회전 시 최초 로그인 시각을 이어받는다
+    lastSeenAt: now,
+  });
   activeSessionByUser.set(userId, token);
   return token;
 }
 
-function issueTokenPair(userId: string): TokenPair {
-  return { accessToken: signAccessToken(userId), refreshToken: issueRefreshToken(userId) };
+function issueTokenPair(userId: string, meta?: { ip?: string; since?: number }): TokenPair {
+  return { accessToken: signAccessToken(userId), refreshToken: issueRefreshToken(userId, meta) };
 }
 
 function revokeRefreshToken(token: string): void {
@@ -108,6 +119,37 @@ function findActiveSession(userId: string): string | undefined {
     return undefined;
   }
   return token;
+}
+
+// 접속 중 세션 목록 — 팀 사무실 창이 "외부 콘솔 접속자"로 그린다. 로그인한 사용자 누구나 조회 가능
+// (협업 도구의 presence와 같은 성격 — 토큰·IP 원본 같은 민감값은 내리지 않되 IP는 표시용으로 포함).
+export interface ActiveSessionInfo {
+  userId: string;
+  username: string;
+  displayName: string;
+  role: GijoUser["role"];
+  ip: string | null;
+  since: number;
+  lastSeenAt: number;
+}
+export function listActiveSessions(): ActiveSessionInfo[] {
+  const out: ActiveSessionInfo[] = [];
+  for (const [userId, token] of activeSessionByUser) {
+    const record = refreshTokens.get(token);
+    if (!record || record.expiresAt < Date.now()) continue;
+    const user = findUserById(userId);
+    if (!user) continue;
+    out.push({
+      userId,
+      username: user.username,
+      displayName: user.displayName,
+      role: user.role,
+      ip: record.ip ?? null,
+      since: record.since,
+      lastSeenAt: record.lastSeenAt,
+    });
+  }
+  return out.sort((a, b) => a.since - b.since);
 }
 
 // 테스트 전용: refreshTokens·로그인 시도 카운터는 모듈 싱글턴이라 createApp()을 새로 호출해도 초기화되지 않는다.
@@ -132,6 +174,12 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
       return;
     }
     (req as Request & { user?: GijoUser }).user = user;
+    // presence 갱신 — 이 사용자의 현재 세션이 살아 있으면 마지막 활동 시각을 찍는다(Map 조회 2회, 저비용).
+    const sessionToken = activeSessionByUser.get(user.id);
+    if (sessionToken) {
+      const record = refreshTokens.get(sessionToken);
+      if (record) record.lastSeenAt = Date.now();
+    }
     next();
   } catch {
     res.status(401).json({ error: "unauthorized" });
@@ -170,7 +218,7 @@ export function registerAuthRoutes(app: Express): void {
       return;
     }
     loginAttempts.delete(key); // 성공 시 카운터 초기화
-    const tokens = issueTokenPair(user.id);
+    const tokens = issueTokenPair(user.id, { ip: req.ip ?? undefined });
     recordAudit({ kind: "auth", actor: user.displayName, action: force ? "강제 로그인" : "로그인", target: req.ip ?? null, result: "ok" });
     res.json({ ...tokens, user: { id: user.id, displayName: user.displayName, role: user.role } });
   });
@@ -194,8 +242,9 @@ export function registerAuthRoutes(app: Express): void {
       return;
     }
     // 회전(rotation): 재사용 방지를 위해 사용된 refresh token은 즉시 폐기하고 새 쌍을 발급한다.
+    // 접속 메타(IP·최초 로그인 시각)는 이어받는다 — presence 표시가 회전 때마다 리셋되지 않게.
     refreshTokens.delete(refreshToken);
-    res.json(issueTokenPair(record.userId));
+    res.json(issueTokenPair(record.userId, { ip: record.ip, since: record.since }));
   });
 
   app.post("/api/auth/logout", authMiddleware, (req, res) => {
@@ -206,5 +255,10 @@ export function registerAuthRoutes(app: Express): void {
 
   app.get("/api/auth/me", authMiddleware, (req, res) => {
     res.json((req as Request & { user?: GijoUser }).user);
+  });
+
+  // 접속 중 클라이언트(외부 콘솔) 목록 — 팀 사무실 창의 presence 표시용.
+  app.get("/api/auth/sessions", authMiddleware, (_req, res) => {
+    res.json(listActiveSessions());
   });
 }

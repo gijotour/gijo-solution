@@ -20,6 +20,7 @@ const gijoApi = {
   logout: () => api.authApi.logout(),
   me: () => api.authApi.me(),
   isAuthenticated: () => api.isAuthenticated(),
+  listActiveSessions: () => api.authApi.sessions(), // 접속 중 클라이언트(외부 콘솔) — 팀 사무실 presence
 
   // 계정 관리(admin 전용 목록/생성/삭제 — 본인 비밀번호 변경은 누구나)
   listUsers: () => api.usersApi.list(),

@@ -133,8 +133,16 @@
       { x: 3, y: 6 }, { x: 8, y: 6 }, { x: 13, y: 6 },
     ];
     const COFFEE = { x: 17.5, y: 8.5 };
-    let agents = []; // {name, shortName, color, state, x, y, wanderT, desk}
+    // 외부 콘솔 접속자(시안 ②): 오른쪽 벽 출입문으로 걸어 들어와 회의 테이블에 합석한다.
+    const DOOR = { x: W - 8, y: 40 };
+    const SEATS = [ { x: 70, y: 64 }, { x: 83, y: 62 }, { x: 96, y: 64 }, { x: 76, y: 86 }, { x: 90, y: 86 } ];
+    const VISITOR_COLORS = ["#e2b0ff", "#ffd28a", "#9fe8ff", "#ffb3c1", "#c5f0a4"];
+    let agents = []; // {name, shortName, color, state, x, y, wanderT, desk, visit?, moving}
+    let visitors = []; // {username, color, x, y, seat, phase: enter|seated|leave, moving}
     let bubble = null; // {agentIdx, msg, ttl}
+    let sparkles = []; // 작업 완료 ✓ 파티클 {x, y, life}
+    let steam = []; // 커피머신 김 {x, y, life}
+    let doorOpenT = 0; // >0이면 문 열림 연출
     let t = 0;
 
     function px(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(Math.round(x * S), Math.round(y * S), w * S, h * S); }
@@ -158,10 +166,56 @@
       return s.length > 12 ? s.slice(0, 12) : s;
     }
     // 협업 이벤트 발신자 이름으로 캐릭터를 찾아 말풍선을 띄운다. 못 찾으면 무시(피드에는 남음).
+    function agentIdxByName(name) {
+      if (!name) return -1;
+      const n = String(name).toLowerCase();
+      return agents.findIndex((a) => a.name.toLowerCase() === n || n.indexOf(a.shortName.toLowerCase()) >= 0 || a.name.toLowerCase().indexOf(n) >= 0);
+    }
     function showBubble(fromName, msg) {
-      const idx = agents.findIndex((a) => fromName && (a.name === fromName || fromName.indexOf(a.shortName) >= 0 || a.name.indexOf(fromName) >= 0));
+      const idx = agentIdxByName(fromName);
       if (idx < 0) return;
       bubble = { agentIdx: idx, msg: String(msg).slice(0, 60), ttl: 260 };
+    }
+    // 협업 이벤트 from→to: from 캐릭터가 to 책상까지 걸어가 말풍선을 띄우고 잠시 머문 뒤 복귀한다.
+    function collabMove(fromName, toName, msg) {
+      const fi = agentIdxByName(fromName), ti = agentIdxByName(toName);
+      if (fi < 0) { showBubble(fromName, msg); return; }
+      if (ti < 0 || ti === fi) { showBubble(fromName, msg); return; }
+      agents[fi].visit = { to: ti, phase: "go", holdT: 170 };
+      bubble = { agentIdx: fi, msg: String(msg).slice(0, 60), ttl: 420 };
+    }
+    // 작업 완료 ✓ 파티클 — 지정 위치가 없으면 회의 테이블 위에서 터진다.
+    function sparkle(x, y) {
+      const cx = x == null ? 86 : x, cy = y == null ? 62 : y;
+      for (let i = 0; i < 7; i++) sparkles.push({ x: cx + (Math.random() * 16 - 8), y: cy + (Math.random() * 8 - 4), life: 40 + Math.random() * 20 });
+    }
+    // 접속자 목록 반영: 새 접속자는 문에서 입장, 사라진 접속자는 문으로 퇴장.
+    function setVisitors(list) {
+      const seen = new Set(list.map((v) => v.username));
+      list.forEach((v) => {
+        if (visitors.some((x) => x.username === v.username)) return;
+        const used = new Set(visitors.map((x) => x.seat));
+        let seat = SEATS.findIndex((_, i) => !used.has(i));
+        if (seat < 0) seat = -1; // 좌석 초과 — 문 옆에 서 있는다
+        visitors.push({
+          username: v.username,
+          color: VISITOR_COLORS[visitors.length % VISITOR_COLORS.length],
+          x: DOOR.x - 2, y: DOOR.y + 14, seat, phase: "enter", moving: true,
+        });
+        doorOpenT = 55;
+      });
+      visitors.forEach((v) => {
+        if (!seen.has(v.username) && v.phase !== "leave") { v.phase = "leave"; doorOpenT = 55; }
+      });
+    }
+    // 목표 지점으로 한 걸음 — 도착하면 true. moving 플래그로 걷기 애니메이션을 켠다.
+    function walkTo(o, tx, ty, speed) {
+      const dx = tx - o.x, dy = ty - o.y;
+      if (Math.abs(dx) < speed && Math.abs(dy) < speed) { o.x = tx; o.y = ty; o.moving = false; return true; }
+      o.x += Math.sign(dx) * Math.min(speed, Math.abs(dx));
+      o.y += Math.sign(dy) * Math.min(speed, Math.abs(dy));
+      o.moving = true;
+      return false;
     }
 
     function drawRoom() {
@@ -174,6 +228,10 @@
       px(W - 12, 14, 8, 10, "#2c5a3a"); px(W - 10, 22, 4, 4, "#5a3c28");
       px(COFFEE.x * 8, COFFEE.y * 8 - 6, 10, 12, "#3a4258");        // 커피머신
       px(COFFEE.x * 8 + 2, COFFEE.y * 8 - 4, 6, 3, "#e2483d");
+      // 출입문(오른쪽 벽) — 접속/퇴장 때 doorOpenT 동안 열린다
+      px(DOOR.x, DOOR.y, 8, 16, "#4a3c2c");
+      if (doorOpenT > 0) { px(DOOR.x + 1, DOOR.y + 1, 6, 14, "#151b2c"); px(DOOR.x + 5, DOOR.y + 2, 2, 12, "#6a5940"); }
+      else { px(DOOR.x + 1, DOOR.y + 1, 6, 14, "#3a2f22"); px(DOOR.x + 2, DOOR.y + 7, 1, 2, "#f0a020"); }
       DESKS.forEach((d, i) => {
         const a = agents[i];
         px(d.x * 8, d.y * 8 + 6, 22, 9, "#4a3c2c");
@@ -188,20 +246,52 @@
       });
     }
 
+    // 걷는 중이면 두 다리를 엇갈리게 — 정지 시엔 다리 한 줄.
+    function drawLegs(wx, wy, moving) {
+      if (moving) {
+        const ph = Math.floor(t / 6) % 2;
+        px(wx + 1, wy + (ph ? 0 : 1), 2, ph ? 2 : 1, "#22263a");
+        px(wx + 3, wy + (ph ? 1 : 0), 2, ph ? 1 : 2, "#22263a");
+      } else {
+        px(wx + 1, wy, 2, 1, "#22263a"); px(wx + 3, wy, 2, 1, "#22263a");
+      }
+    }
+    function nameTag(text, cx, cy, color) {
+      ctx.font = `${3 * S}px 'Malgun Gothic',sans-serif`;
+      ctx.fillStyle = color;
+      const tw = ctx.measureText(text).width;
+      ctx.fillText(text, cx * S - tw / 2, cy * S);
+    }
     function drawAgent(a) {
-      const bob = a.state === "working" ? (Math.floor(t / 12) % 2) : 0;
-      const wx = a.x, wy = a.y + (a.state === "idle" ? Math.sin(t / 30 + a.desk) * 1.5 : 0);
+      const bob = a.state === "working" && !a.moving ? (Math.floor(t / 12) % 2) : 0;
+      const wx = a.x, wy = a.y + (a.state === "idle" && !a.moving ? Math.sin(t / 30 + a.desk) * 1.5 : 0);
       px(wx, wy - 6 + bob, 6, 6, a.color);
       px(wx + 1, wy - 11 + bob, 4, 5, "#e8c39e");
       px(wx, wy - 13 + bob, 6, 3, a.desk % 2 ? "#3a2f22" : "#22263a");
-      if (a.state === "working") px(wx - 2 + (bob ? 1 : 0), wy - 3, 2, 2, "#e8c39e");
+      drawLegs(wx, wy, a.moving);
+      if (a.state === "working" && !a.moving) px(wx - 2 + (bob ? 1 : 0), wy - 3, 2, 2, "#e8c39e");
       const dot = a.state === "working" ? "#1eb980" : a.state === "watching" ? "#f0a020" : "#5f6785";
       px(wx + 2, wy - 16, 2, 2, dot);
-      // 이름 라벨(실해상도)
-      ctx.font = `${3 * S}px 'Malgun Gothic',sans-serif`;
-      ctx.fillStyle = "rgba(231,234,243,.75)";
-      const tw = ctx.measureText(a.shortName).width;
-      ctx.fillText(a.shortName, (wx + 3) * S - tw / 2, (wy + 6) * S);
+      nameTag(a.shortName, wx + 3, wy + 6, "rgba(231,234,243,.75)");
+    }
+    // 외부 콘솔 접속자 — 셔츠는 개인색, 머리는 갈색, 이름표는 노란빛(사람임을 구분).
+    function drawVisitor(v) {
+      const wx = v.x, wy = v.y + (v.phase === "seated" ? Math.sin(t / 40 + v.seat) * 1 : 0);
+      px(wx, wy - 6, 6, 6, v.color);
+      px(wx + 1, wy - 11, 4, 5, "#e8c39e");
+      px(wx, wy - 13, 6, 3, "#4a3020");
+      drawLegs(wx, wy, v.moving);
+      nameTag(v.username, wx + 3, wy + 6, "#ffe9a8");
+    }
+    function drawParticles() {
+      // 커피 김 — 위로 올라가며 옅어진다
+      steam.forEach((s) => { ctx.fillStyle = `rgba(200,210,230,${s.life / 90})`; ctx.fillRect(Math.round(s.x * S), Math.round(s.y * S), S, S); });
+      // 작업 완료 ✓ — 초록 반짝이
+      sparkles.forEach((p) => {
+        ctx.fillStyle = `rgba(30,185,128,${Math.min(1, p.life / 30)})`;
+        ctx.fillRect(Math.round(p.x * S), Math.round(p.y * S), S, S);
+        if (p.life > 20) { ctx.fillRect(Math.round((p.x - 1) * S), Math.round(p.y * S), S, S); ctx.fillRect(Math.round((p.x + 1) * S), Math.round(p.y * S), S, S); }
+      });
     }
 
     function drawBubble() {
@@ -223,25 +313,60 @@
     function step() {
       t++;
       if (bubble) bubble.ttl--;
+      if (doorOpenT > 0) doorOpenT--;
+      // 커피 김 — 주기적으로 피어오른다
+      if (t % 26 === 0) steam.push({ x: COFFEE.x * 8 + 3 + Math.random() * 3, y: COFFEE.y * 8 - 8, life: 90 });
+      steam.forEach((s) => { s.y -= 0.18; s.x += Math.sin(t / 10 + s.life) * 0.08; s.life--; });
+      steam = steam.filter((s) => s.life > 0);
+      sparkles.forEach((p) => { p.y -= 0.25; p.life--; });
+      sparkles = sparkles.filter((p) => p.life > 0);
+
       agents.forEach((a) => {
-        if (a.state !== "idle") {
-          // 자리로 복귀
-          const hx = (DESKS[a.desk].x + 1) * 8, hy = DESKS[a.desk].y * 8 + 22;
-          a.x += Math.sign(hx - a.x) * 0.4; a.y += Math.sign(hy - a.y) * 0.4;
+        const hx = (DESKS[a.desk].x + 1) * 8, hy = DESKS[a.desk].y * 8 + 22;
+        // 협업 이벤트 방문(from→to) — 상대 책상 옆까지 걸어가 머문 뒤 복귀
+        if (a.visit) {
+          const target = agents[a.visit.to];
+          if (a.visit.phase === "go") {
+            if (walkTo(a, (DESKS[target.desk].x + 1) * 8 + 9, DESKS[target.desk].y * 8 + 22, 0.7)) a.visit.phase = "hold";
+          } else if (a.visit.phase === "hold") {
+            if (--a.visit.holdT <= 0) a.visit.phase = "back";
+          } else if (walkTo(a, hx, hy, 0.7)) {
+            a.visit = null;
+          }
           return;
         }
+        if (a.state !== "idle") { walkTo(a, hx, hy, 0.4); return; }
+        // 대기 배회 — 전원이 커피머신에 몰리지 않게 책상별로 다른 지점(커피/화분/창가)을 돌고, 주기도 어긋나게.
         a.wanderT++;
-        const goal = Math.floor(a.wanderT / 300) % 2 ? COFFEE : { x: DESKS[a.desk].x + 1, y: DESKS[a.desk].y + 2.7 };
-        a.x += Math.sign(goal.x * 8 - a.x) * 0.3; a.y += Math.sign(goal.y * 8 - a.y) * 0.3;
+        const SPOTS = [ { x: COFFEE.x * 8, y: COFFEE.y * 8 }, { x: 10, y: 78 }, { x: W - 22, y: 26 } ];
+        const goal = Math.floor((a.wanderT + a.desk * 97) / 300) % 2 ? SPOTS[a.desk % 3] : { x: hx, y: hy };
+        walkTo(a, goal.x, goal.y, 0.3);
       });
+
+      // 접속자: 입장 → 좌석, 퇴장 → 문에서 소멸
+      visitors = visitors.filter((v) => {
+        if (v.phase === "enter") {
+          const seat = v.seat >= 0 ? SEATS[v.seat] : { x: DOOR.x - 14, y: DOOR.y + 18 };
+          if (walkTo(v, seat.x, seat.y, 0.6)) v.phase = "seated";
+          return true;
+        }
+        if (v.phase === "leave") return !walkTo(v, DOOR.x - 2, DOOR.y + 14, 0.7);
+        return true;
+      });
+
       ctx.clearRect(0, 0, W * S, H * S);
       drawRoom();
-      agents.slice().sort((p, q) => p.y - q.y).forEach(drawAgent);
+      const people = agents.map((a) => ({ y: a.y, draw: () => drawAgent(a) }))
+        .concat(visitors.map((v) => ({ y: v.y, draw: () => drawVisitor(v) })));
+      people.sort((p, q) => p.y - q.y).forEach((p) => p.draw());
+      drawParticles();
       drawBubble();
       requestAnimationFrame(step);
     }
     step();
-    return { setAgents, showBubble };
+    const api = { setAgents, setVisitors, showBubble, collabMove, sparkle };
+    window.__office = api; // e2e·디버깅용 훅(협업 이동/파티클을 코드로 유발해 육안 확인)
+    return api;
   })();
 
   // ── 실데이터 연동 ──────────────────────────────────────────────────
@@ -255,13 +380,38 @@
 
   const AGENT_COLOR = {}; // name → color (피드 색상, 캔버스 팔레트와 동일 순서)
 
+  let agentCounts = { working: 0, watching: 0, idle: 0 };
+  let visitorCount = 0;
+  function renderStat() {
+    statLine.innerHTML = `작업중 <b>${agentCounts.working}</b> · 주시 <b>${agentCounts.watching}</b> · 대기 <b>${agentCounts.idle}</b> · 🧑 접속 <b>${visitorCount}</b>`;
+  }
+
   async function loadAgents() {
     const agents = await window.gijo.listAgents();
     office.setAgents(agents);
     agents.slice(0, 6).forEach((a, i) => { AGENT_COLOR[a.name] = PALETTE[i % PALETTE.length]; });
     const c = { working: 0, watching: 0, idle: 0 };
     agents.forEach((a) => { c[a.status] = (c[a.status] || 0) + 1; });
-    statLine.innerHTML = `작업중 <b>${c.working}</b> · 주시 <b>${c.watching}</b> · 대기 <b>${c.idle}</b>`;
+    agentCounts = c;
+    renderStat();
+  }
+
+  // 외부 콘솔 접속자(서버에 로그인한 클라이언트) — presence는 최근 활동(lastSeenAt) 기준.
+  // refresh token은 7일 살아 있으므로 "로그인만 해두고 떠난" 세션은 접속으로 치지 않는다.
+  const ONLINE_WINDOW_MS = 3 * 60 * 1000;
+  let knownVisitors = null; // null=첫 로드(입장 피드 생략), 이후 Set<username>
+  async function loadSessions() {
+    const sessions = await window.gijo.listActiveSessions();
+    const online = (sessions || []).filter((s) => Date.now() - s.lastSeenAt < ONLINE_WINDOW_MS);
+    const names = new Set(online.map((s) => s.username));
+    if (knownVisitors) {
+      for (const n of names) if (!knownVisitors.has(n)) feedLine("🚪 입장", `${n} 님이 외부 콘솔로 접속했습니다`, "#ffe9a8");
+      for (const n of knownVisitors) if (!names.has(n)) feedLine("🚪 퇴장", `${n} 님의 외부 콘솔 접속이 종료되었습니다`, "var(--muted)");
+    }
+    knownVisitors = names;
+    visitorCount = online.length;
+    office.setVisitors(online.map((s) => ({ username: s.username })));
+    renderStat();
   }
 
   function feedLine(from, msg, color) {
@@ -279,7 +429,9 @@
     if (!evt || !evt.message) return;
     const from = evt.from || "팀";
     feedLine(from + (evt.to ? " → " + evt.to : ""), evt.message, AGENT_COLOR[from]);
-    office.showBubble(from, evt.message);
+    // from 캐릭터가 to 책상까지 걸어가 말풍선 — to가 없으면 제자리 말풍선
+    office.collabMove(from, evt.to, evt.message);
+    if (/작업 완료|완료:/.test(evt.message)) office.sparkle();
   }
 
   // ── 오늘의 할일: 실 작업 큐에서 "오늘 처리할 것"만 큐레이션 ──
@@ -344,6 +496,7 @@
     try {
       if (e.target.matches("input[type=checkbox]")) {
         await window.gijo.toggleTask(id, e.target.checked);
+        if (e.target.checked) office.sparkle(); // 완료 ✓ 반짝이
         await loadTasks();
       } else if (e.target.matches(".t-del")) {
         await window.gijo.deleteTask(id);
@@ -413,12 +566,13 @@
       return;
     }
     try {
-      await Promise.all([loadAgents(), loadTasks()]);
+      await Promise.all([loadAgents(), loadTasks(), loadSessions()]);
       const history = await window.gijo.listCollaborationHistory();
       (history || []).slice(-8).forEach((evt) => feedLine(evt.from + (evt.to ? " → " + evt.to : ""), evt.message, AGENT_COLOR[evt.from]));
       if (window.gijoRealtime) window.gijoRealtime.connect();
       window.gijo.onCollaborationEvent(onCollabEvent);
       setInterval(loadAgents, 20000);  // 상태는 휘발성 라이브 신호 — 주기 폴링으로 갱신
+      setInterval(loadSessions, 15000); // 외부 콘솔 접속자 presence
       setInterval(loadTasks, 60000);
     } catch (e) {
       feedLine("시스템", "초기화 실패: " + (e && e.message || e), "var(--red)");

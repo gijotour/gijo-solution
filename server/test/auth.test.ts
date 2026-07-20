@@ -112,4 +112,39 @@ describe("auth", () => {
     const newRefresh = await request(app).post("/api/auth/refresh").send({ refreshToken: second.body.refreshToken });
     expect(newRefresh.status).toBe(200);
   });
+
+  // 접속 중 세션 목록(팀 사무실 "외부 콘솔 접속자") — 로그인 필요, 활동 시각 갱신, 로그아웃 시 사라짐.
+  it("lists active sessions with presence metadata and drops them on logout", async () => {
+    resetAuthForTests();
+    const login = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" });
+    expect(login.status).toBe(200);
+
+    // 미인증 접근은 거부
+    const anon = await request(app).get("/api/auth/sessions");
+    expect(anon.status).toBe(401);
+
+    const res = await request(app).get("/api/auth/sessions").set("Authorization", `Bearer ${login.body.accessToken}`);
+    expect(res.status).toBe(200);
+    expect(res.body.length).toBe(1);
+    expect(res.body[0].username).toBe("jyh");
+    expect(res.body[0].role).toBe("admin");
+    expect(res.body[0].since).toBeGreaterThan(0);
+    expect(res.body[0].lastSeenAt).toBeGreaterThanOrEqual(res.body[0].since);
+    expect(res.body[0]).not.toHaveProperty("passwordHash"); // 해시 등 민감값 미노출
+
+    // 인증 요청이 있을 때마다 lastSeenAt이 앞으로 간다(presence 판정 근거)
+    const before = res.body[0].lastSeenAt;
+    await new Promise((r) => setTimeout(r, 15));
+    await request(app).get("/api/agents").set("Authorization", `Bearer ${login.body.accessToken}`);
+    const after = await request(app).get("/api/auth/sessions").set("Authorization", `Bearer ${login.body.accessToken}`);
+    expect(after.body[0].lastSeenAt).toBeGreaterThan(before);
+
+    // 로그아웃하면 세션 목록에서 사라진다 (자기 세션 반납 → 목록은 빈 배열)
+    await request(app).post("/api/auth/logout")
+      .set("Authorization", `Bearer ${login.body.accessToken}`)
+      .send({ refreshToken: login.body.refreshToken });
+    const gone = await request(app).get("/api/auth/sessions").set("Authorization", `Bearer ${login.body.accessToken}`);
+    expect(gone.status).toBe(200); // access token은 자연 만료 전까지 유효(무상태 JWT)
+    expect(gone.body.length).toBe(0);
+  });
 });

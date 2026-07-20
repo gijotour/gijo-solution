@@ -1,0 +1,79 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<title>외부 콘솔 접속자 표현 — 시안 3종</title>
+<style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--border:rgba(255,255,255,.08);--teal:#1eb980;--blue:#5fa1ff;--amber:#f0a020;--text:#e7eaf3;--muted:#8b93ab}
+*{margin:0;box-sizing:border-box;font-family:'Segoe UI',sans-serif}
+body{background:var(--bg);color:var(--text);padding:24px;display:grid;gap:22px;max-width:900px;margin:0 auto}
+h1{font-size:16px}
+.variant{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:14px}
+.v-label{font-size:13px;font-weight:800;color:var(--blue);margin-bottom:4px}
+.v-desc{font-size:11.5px;color:var(--muted);margin-bottom:10px;line-height:1.5}
+canvas{width:100%;border-radius:10px;border:1px solid var(--border);image-rendering:pixelated}
+.note{font-size:11px;color:var(--muted);text-align:center}
+</style></head><body>
+<h1>🚪 외부 콘솔 접속자(서버에 로그인한 클라이언트) 표현 — 시안 3종</h1>
+<div class="note">공통: 실데이터 /api/auth/sessions · 입장/퇴장 걷기 연출 · 이름표(계정명) · 역동성 패키지(이벤트 기반 이동·커피 김·완료 파티클)는 어느 시안이든 함께 적용</div>
+
+<div class="variant"><div class="v-label">시안 ① 라운지 소파 — 사무실 왼쪽 아래 접견 라운지</div>
+<div class="v-desc">접속자는 소파에 앉아 노트북을 편다. 에이전트 업무 공간과 분리돼 "지켜보는 사람" 느낌. 최대 4명, 초과분은 +N 배지.</div>
+<canvas id="v1" width="480" height="264"></canvas></div>
+
+<div class="variant"><div class="v-label">시안 ② 출입문 + 회의 테이블 합석 — 문으로 걸어 들어와 착석</div>
+<div class="v-desc">오른쪽 벽에 출입문. 접속하면 문이 열리고 걸어 들어와 중앙 회의 테이블에 앉는다. "한 팀으로 합류" 느낌 — Agentic SOC의 human-in-the-loop 구도.</div>
+<canvas id="v2" width="480" height="264"></canvas></div>
+
+<div class="variant"><div class="v-label">시안 ③ 게스트 데스크 줄 — 하단에 방문자 전용 좌석</div>
+<div class="v-desc">하단에 미니 책상+노트북 줄. 접속자마다 자기 자리가 생기고 퇴장하면 사라진다. 좌석이 늘어나는 재미, 누가 왔는지 가장 또렷.</div>
+<canvas id="v3" width="480" height="264"></canvas></div>
+
+<script>
+// 시안 전용 정지 렌더 — 방 베이스 + 변형별 방문자 배치만 그린다(애니메이션 없음).
+const S=3, COLS=20, ROWS=11, W=COLS*8, H=ROWS*8;
+const DESKS=[{x:3,y:2},{x:8,y:2},{x:13,y:2},{x:3,y:6},{x:8,y:6},{x:13,y:6}];
+const AG=["#5fa1ff","#1eb980","#8b7cf0","#f0a020","#e2483d","#7dd3c0"];
+const VISITORS=[{n:"jyh",c:"#e2b0ff"},{n:"test1",c:"#ffd28a"},{n:"gijo01",c:"#9fe8ff"}];
+function painter(id){const ctx=document.getElementById(id).getContext("2d");
+  return {px:(x,y,w,h,c)=>{ctx.fillStyle=c;ctx.fillRect(Math.round(x*S),Math.round(y*S),w*S,h*S);},
+          txt:(s,x,y,c)=>{ctx.font=(3*S)+"px 'Malgun Gothic'";ctx.fillStyle=c||"rgba(231,234,243,.8)";
+            const w=ctx.measureText(s).width;ctx.fillText(s,x*S-w/2,y*S);}};}
+function room(p,opt){opt=opt||{};
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++)p.px(c*8,r*8,8,8,(r+c)%2?"#1a2338":"#171f33");
+  p.px(0,0,W,10,"#0e1526");p.px(0,10,W,2,"#2a3552");
+  for(let i=0;i<4;i++)p.px(14+i*44,2,20,7,"#22345c");
+  if(!opt.noTable){p.px(72,66,28,12,"#3a2f22");p.px(74,64,24,4,"#4a3c2c");}
+  p.px(W-12,14,8,10,"#2c5a3a");p.px(W-10,22,4,4,"#5a3c28");
+  p.px(140,62,10,12,"#3a4258");p.px(142,64,6,3,"#e2483d"); // 커피머신
+  DESKS.forEach((d,i)=>{p.px(d.x*8,d.y*8+6,22,9,"#4a3c2c");
+    p.px(d.x*8+7,d.y*8-1,9,7,"#0a0e1a");p.px(d.x*8+8,d.y*8,7,5,i%2?"#1eb980":"#f0a020");});
+}
+function agent(p,d,i){const x=(DESKS[d].x+1)*8,y=DESKS[d].y*8+22;
+  p.px(x,y-6,6,6,AG[i]);p.px(x+1,y-11,4,5,"#e8c39e");p.px(x,y-13,6,3,"#22263a");}
+function person(p,x,y,c,name,laptop){
+  p.px(x,y-6,6,6,c);p.px(x+1,y-11,4,5,"#e8c39e");p.px(x,y-13,6,3,"#4a3020");
+  if(laptop)p.px(x+6,y-3,5,3,"#2a3552");
+  if(name)p.txt(name,x+3,y+5,"#ffe9a8");}
+
+// ① 라운지 소파
+(function(){const p=painter("v1");room(p);for(let i=0;i<6;i++)agent(p,i,i);
+  p.px(6,66,34,6,"#5a3c28");p.px(6,60,34,8,"#7a5236");p.px(4,58,4,16,"#5a3c28");p.px(40,58,4,16,"#5a3c28"); // 소파
+  VISITORS.forEach((v,i)=>person(p,10+i*11,68,v.c,v.n,true));
+  p.txt("외부 콘솔 라운지",26,80,"#8b93ab");})();
+
+// ② 출입문 + 회의 테이블
+(function(){const p=painter("v2");room(p);for(let i=0;i<6;i++)agent(p,i,i);
+  p.px(W-8,40,8,16,"#4a3c2c");p.px(W-7,42,3,12,"#151b2c");p.px(W-3,47,1,2,"#f0a020"); // 문
+  person(p,120,52,VISITORS[0].c,VISITORS[0].n,false); // 문에서 걸어옴
+  person(p,76,76,VISITORS[1].c,VISITORS[1].n,false);  // 테이블 앞
+  person(p,92,76,VISITORS[2].c,VISITORS[2].n,false);
+  p.txt("→ 입장 연출",140,36,"#8b93ab");})();
+
+// ③ 게스트 데스크 줄
+(function(){const p=painter("v3");room(p,{noTable:true});for(let i=0;i<6;i++)agent(p,i,i);
+  VISITORS.forEach((v,i)=>{const gx=14+i*30;
+    p.px(gx,70,16,7,"#39485f");p.px(gx+1,77,2,3,"#2a3552");p.px(gx+13,77,2,3,"#2a3552"); // 게스트 데스크
+    p.px(gx+5,66,7,4,"#0a0e1a");p.px(gx+6,67,5,2,"#5fa1ff"); // 노트북
+    person(p,gx+5,88,v.c,v.n,false);});
+  p.txt("게스트석 — 접속자 수만큼 늘어남",56,32,"#8b93ab");})();
+</script>
+</body></html>

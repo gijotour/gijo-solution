@@ -137,7 +137,19 @@ export const authApi = {
     setAuthTokens(null);
   },
   me: () => request("/api/auth/me"),
+  sessions: () => request<ActiveSessionInfo[]>("/api/auth/sessions"),
 };
+
+// 접속 중 세션(외부 콘솔 클라이언트) — 팀 사무실 창 presence 표시용.
+export interface ActiveSessionInfo {
+  userId: string;
+  username: string;
+  displayName: string;
+  role: "security_officer" | "admin";
+  ip: string | null;
+  since: number;
+  lastSeenAt: number;
+}
 
 // ── 에이전트 AI ───────────────────────────────────────────────────────
 export interface AgentInfo {
