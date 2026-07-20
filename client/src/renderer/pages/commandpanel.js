@@ -13,6 +13,8 @@
 
   var OPEN_KEY = "gijo.cmdpanel.open";
   var esc = function (s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); };
+  // 응답의 가벼운 서식(굵게 **..**·줄바꿈)만 렌더 — 콘솔 답변 가독성.
+  var fmt = function (s) { return esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\n/g, "<br>"); };
   var sessionId = null; // 첫 지시 때 지연 생성
 
   function injectCss() {
@@ -130,11 +132,11 @@
     if (!text) return;
     input.value = "";
     appendRow("user", esc(text), "나");
-    var typing = appendRow("reply", "처리 중…", "Security Orchestrator");
+    var typing = appendRow("reply", "처리 중… <span style=\"color:var(--muted-2,#5f6b82);font-size:10.5px\">첫 응답은 모델 준비로 다소 걸릴 수 있어요</span>", "Security Orchestrator");
     try {
       if (!sessionId) { try { var s = await window.gijo.createWorkSession(text.slice(0, 30), "screen:" + here); sessionId = s && s.id; } catch (e) {} }
       var r = await window.gijo.sendInstruction(text, sessionId || undefined);
-      typing.innerHTML = '<div class="gcp-who">Security Orchestrator</div>' + esc(r.output || "(응답 없음)");
+      typing.innerHTML = '<div class="gcp-who">Security Orchestrator</div>' + fmt(r.output || "(응답 없음)");
       if (r.approval) appendRow("note", "⚖ 결재가 필요한 지시입니다 — 대시보드나 해당 화면에서 값을 확인하고 승인하세요.");
       if (r.route && r.route.action === "scan") { /* 스캔류는 완료 후 화면 새로고침이 필요할 수 있음 */ }
       loadSessions();
