@@ -48,9 +48,12 @@
   .acc:last-child{border-bottom:0;}
   #accConsole{flex:1 1 auto;}
   .acc.collapsed{flex:0 0 auto;}
-  .acc-h{display:flex;align-items:center;gap:8px;padding:12px;cursor:pointer;background:var(--panel-2);flex:0 0 auto;}
-  .acc-h .car{color:var(--muted-2);font-size:11px;transition:.15s;flex:0 0 auto;}
-  .acc-h .acc-t{font-size:12px;font-weight:800;color:var(--text);}
+  .acc-h{display:flex;align-items:center;gap:9px;padding:11px 12px;cursor:pointer;background:var(--panel-2);flex:0 0 auto;transition:background .12s;user-select:none;}
+  .acc-h:hover{background:#16213b;}
+  /* 접기/펼치기 캐럿 — 파란 박스로 명확히 보이게(클릭 가능 어포던스). */
+  .acc-h .car{color:var(--blue-light);font-size:11px;font-weight:900;flex:0 0 auto;width:22px;height:22px;display:flex;align-items:center;justify-content:center;border-radius:6px;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.35);transition:transform .18s,background .12s;}
+  .acc-h:hover .car{background:rgba(59,130,246,.24);}
+  .acc-h .acc-t{font-size:12.5px;font-weight:800;color:#fff;}
   .acc-h .acc-sp{margin-left:auto;display:flex;gap:8px;align-items:center;}
   .acc.collapsed .car{transform:rotate(-90deg);}
   .acc.collapsed .acc-b{display:none;}
@@ -528,7 +531,7 @@
       <!-- 작업 세션 (기본 접힘) -->
       <div class="acc collapsed" id="accSessions">
         <div class="acc-h" data-acc="sessions"><span class="car">▾</span><span class="acc-t">💬 작업 세션</span>
-          <span class="acc-sp"><button class="dash-new" id="dashNewSession">＋ 새 세션</button><button class="dsh-hide" id="dashHideRight" title="오른쪽 패널 숨기기">⏵</button></span></div>
+          <span class="acc-sp"><button class="dsh-hide" id="dashHideRight" title="오른쪽 패널 숨기기">⏵</button></span></div>
         <div class="acc-b acc-b-sessions">
           <div class="dash-slist" id="dashSessionList"><div style="font-size:11px;color:var(--muted-2);padding:8px">불러오는 중…</div></div>
           <div class="dash-sfull" id="dashSessionsFull">전체 작업 세션 열기 ↗</div>
