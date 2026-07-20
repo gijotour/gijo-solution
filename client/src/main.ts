@@ -143,6 +143,10 @@ function rootStateFile(): string {
   return path.join(app.getPath("userData"), "explorer-root.txt");
 }
 function loadSavedRoot(): void {
+  // 기본 루트는 담당자 '내 문서'(제품 문서 번들이 아니라 본인 PC 파일을 보게). 환경변수 지정 시 그대로 존중.
+  if (!process.env.GIJO_EXPLORER_ROOT) {
+    try { const docs = app.getPath("documents"); if (docs && fs.existsSync(docs)) explorerRoot = docs; } catch { /* 문서 폴더 못 찾으면 기존 기본 유지 */ }
+  }
   try {
     const saved = fs.readFileSync(rootStateFile(), "utf-8").trim();
     if (saved && fs.existsSync(saved) && fs.statSync(saved).isDirectory()) explorerRoot = path.resolve(saved);

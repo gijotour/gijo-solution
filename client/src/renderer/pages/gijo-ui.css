@@ -6,6 +6,20 @@
  * 원칙(웹 표준 조사): 토큰 3계층(원시→시맨틱→컴포넌트), 4px 간격 스케일, 다크 4단계 표면 계층,
  *       상태 default/hover/focus/disabled 통일. */
 
+/* ── 전체 폰트 통일: Pretendard 오프라인 번들 ──────────────────────────────
+ * 모든 화면이 이미 "Pretendard" 우선 스택을 쓰지만 폰트가 로드되지 않아 화면마다 폴백
+ * (Malgun Gothic/Segoe UI)이 달라 제각각으로 보였다. 온프렘(오프라인)이라 CDN 대신 앱에
+ * woff2를 동봉하고 여기서 로드한다 → 전 화면이 CSS 덮어쓰기 없이 Pretendard로 통일된다.
+ * 코드/터미널의 monospace(Consolas) 선언은 그대로 유지된다. */
+@font-face {
+  font-family: "Pretendard";
+  src: url("fonts/PretendardVariable.woff2") format("woff2-variations"),
+       url("fonts/PretendardVariable.woff2") format("woff2");
+  font-weight: 45 920;
+  font-style: normal;
+  font-display: swap;
+}
+
 :root {
   /* ── 색: 원시(팔레트는 현재 유지) ── */
   --g-bg: #0a0e1a;

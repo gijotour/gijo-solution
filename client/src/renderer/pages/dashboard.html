@@ -33,8 +33,9 @@
   .status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
   .beta-tag{background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
   .icon-row{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
-  .icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;transition:background .12s,border-color .12s,color .12s;}
-  .icon-btn:hover{background:rgba(59,130,246,0.18);border-color:var(--blue);color:var(--blue-light);}
+  /* 상단 툴바 아이콘 — '내 업무 바로가기' 타일(.dm-tile)과 같은 톤으로 통일(panel-2·라운드10·호버 상승). */
+  .icon-btn{width:34px;height:34px;border-radius:10px;background:var(--panel-2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--muted);cursor:pointer;transition:background .14s,border-color .14s,color .14s,transform .14s;}
+  .icon-btn:hover{background:rgba(59,130,246,0.14);border-color:var(--blue);color:var(--blue-light);transform:translateY(-2px);}
   .icon-btn.on{background:rgba(59,130,246,0.18);border-color:var(--blue);color:var(--blue-light);}
   .avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
 
@@ -115,6 +116,20 @@
   .tree-leaf .sub{color:var(--muted-2);font-size:10px;}
   .tree-leaf .badge{color:var(--amber);font-size:10px;font-weight:700;}
   .tree-empty{padding:3px 5px;font-size:11px;color:var(--muted-2);}
+  /* AS 탐색기 — 파일 탐색기 아래 2번째 섹션(리포트·문서). 글씨 12px = 지휘 콘솔과 동일. */
+  .as-explorer{margin-top:9px;padding-top:9px;border-top:1px dashed var(--border-strong);font-size:12px;}
+  .as-sec{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.3px;padding:1px 4px 5px;}
+  .asx-row{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:7px;cursor:pointer;white-space:nowrap;overflow:hidden;}
+  .asx-row:hover{background:rgba(255,255,255,.045);}
+  .asx-car{width:12px;text-align:center;color:var(--muted-2);font-size:10px;flex:0 0 auto;}
+  .asx-ic{width:15px;text-align:center;flex:0 0 auto;}
+  .asx-nm{overflow:hidden;text-overflow:ellipsis;color:#dfe8f7;}
+  .asx-cnt{margin-left:auto;font-size:10px;color:var(--blue-light);background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.35);border-radius:999px;padding:0 6px;flex:0 0 auto;}
+  .asx-body .asx-file{display:flex;align-items:center;gap:6px;padding:3px 6px 3px 20px;border-radius:7px;cursor:pointer;white-space:nowrap;overflow:hidden;font-size:12px;}
+  .asx-body .asx-file:hover{background:rgba(255,255,255,.045);}
+  .asx-body .asx-file .asx-nm{color:var(--muted);}
+  .asx-empty{padding:3px 6px 3px 22px;font-size:11px;color:var(--muted-2);}
+  .asx-total{font-size:10px;color:var(--muted-2);padding:3px 6px 2px 22px;}
   /* 연동 서버 정보 카드 + 시작 가이드 슬롯 — 자산 탐색기 상단(GIJO AS Desktop 아래) */
   .server-card{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:8px 10px;margin:4px 0 6px;}
   .sc-nm{font-size:11.5px;font-weight:800;color:#fff;display:flex;align-items:center;gap:6px;}
@@ -302,6 +317,15 @@
   /* 팀원 카드 — 이름 없이 아이콘·역할·상태 배지만(어떤 에이전트가 작업 중인지 한눈에). */
   /* 에이전트 6인 + 엔진 2(임베딩·가드레일) = 8칸. 칸 수를 고정하지 않고 auto-fit으로 둔다 —
      앞으로 엔진이 더 붙어도 폭이 부족하면 자연스럽게 다음 줄로 넘어가고, 넉넉하면 한 줄을 유지한다. */
+  /* AI 팀 울타리 — 로스터를 제목 있는 박스로 묶는다. 헤더에 팀 사무실 열기 버튼. */
+  .ai-team{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:12px 14px 14px;margin-bottom:14px;}
+  .ai-team-h{display:flex;align-items:center;gap:9px;margin-bottom:11px;}
+  .ai-team-t{font-size:13.5px;font-weight:800;color:#fff;letter-spacing:.2px;}
+  .ai-team-sub{font-size:10.5px;color:var(--muted-2);font-weight:600;}
+  .ai-team-office{margin-left:auto;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);color:var(--blue-light);font-size:11.5px;font-weight:700;border-radius:9px;padding:6px 11px;cursor:pointer;transition:.14s;white-space:nowrap;}
+  .ai-team-office:hover{background:var(--blue);color:#fff;border-color:var(--blue);transform:translateY(-1px);}
+  /* 울타리 안에서는 로스터가 박스의 배경 위에 놓이므로 카드 배경을 한 단계 낮춰 대비를 준다. */
+  .ai-team .team-grid .tcard{background:var(--panel-2);}
   .team-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(64px,1fr));gap:8px;width:100%;}
   .tcard{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:9px 5px;text-align:center;cursor:pointer;position:relative;transition:.15s;}
   .tcard:hover{border-color:var(--border-strong);transform:translateY(-2px);}
@@ -576,7 +600,14 @@
       <!-- 담당자 업무 메뉴 — 역할 자동 큐레이션 + 업무 주기별(오늘/주간/월간) + 담당자 직접 담기(편집). -->
       <div class="dash-menu" id="dashMenu"></div>
 
-      <div class="team-grid" id="teamGrid"><div style="grid-column:1/-1;text-align:center;color:var(--muted);font-size:12px">팀원 불러오는 중...</div></div>
+      <!-- AI 팀 — 에이전트 로스터(에이전트 + 임베딩 엔진 + 가드레일)를 하나의 '울타리'로 묶는다.
+           헤더에 🏢 팀 사무실(별도 창) 바로 열기. 가드레일도 이 울타리 안 팀원으로 표시된다. -->
+      <div class="ai-team">
+        <div class="ai-team-h"><span class="ai-team-t">🤖 AI 팀</span>
+          <span class="ai-team-sub" id="aiTeamSub"></span>
+          <button class="ai-team-office" id="teamOfficeBtn" title="우리 AI 팀 사무실 (별도 창으로 열기)">🏢 팀 사무실</button></div>
+        <div class="team-grid" id="teamGrid"><div style="grid-column:1/-1;text-align:center;color:var(--muted);font-size:12px">팀원 불러오는 중...</div></div>
+      </div>
       <!-- 지휘 콘솔·입력창은 오른쪽 패널(지휘 콘솔 섹션)로 이관됨 → 중앙은 메뉴·로스터·활동 위주. -->
     </div>
     <!-- 오늘 확인할 항목 · 운영 시작 · 오늘의 조치는 "작업 세션"(sessions.html) 자산 탐색기로 이관됨.
@@ -1869,21 +1900,76 @@
   // (기존 자산 탐색기 대체) 폴더는 그 자리에서 ▸/▾ 펼침(renderDir·openDirs), 문서 파일은 클릭 시
   // "🧠 분석해 올리기"로 장기기억(RAG)에 넣을 수 있다. 루트 밖(..)·50MB↑는 메인에서 차단.
   async function reloadDashExplorer() { await loadFileExplorer(); }
+  // AS 탐색기 상태·캐시 — 리포트(리포트 메뉴 등록분)·문서(장기기억 RAG 등록분). 콘솔 크기(12px) 폰트.
+  const asOpen = { report: false, doc: false };
+  let asReportsCache = [];
+  let asDocsCache = [];
   async function loadFileExplorer() {
     if (!explorerTree) return;
     try {
-      const docs = await window.gijo.listMemoryDocuments();
-      docClassMap = new Map(docs.filter((d) => d.docClass).map((d) => [d.documentId, d.docClass]));
-    } catch (e) { /* 분류 배지는 부가 정보 — 실패해도 트리는 계속 */ }
+      asDocsCache = await window.gijo.listMemoryDocuments();
+      docClassMap = new Map(asDocsCache.filter((d) => d.docClass).map((d) => [d.documentId, d.docClass]));
+    } catch (e) { asDocsCache = asDocsCache || []; /* 분류 배지는 부가 정보 */ }
+    try { asReportsCache = await window.gijo.listReportHistory(); } catch (e) { asReportsCache = asReportsCache || []; }
+    explorerTree.innerHTML = "";
+    // 1) 내 PC 파일 트리
+    const fileBox = document.createElement("div");
+    explorerTree.appendChild(fileBox);
     try {
       const data = await window.gijo.listDir("");
       const rn = document.getElementById("fxRoot"); if (rn) rn.textContent = data.rootName || "루트";
-      explorerTree.innerHTML = "";
-      await renderDir("", 0, explorerTree);
-      if (!explorerTree.innerHTML) explorerTree.innerHTML = '<div class="tree-empty">빈 폴더</div>';
+      await renderDir("", 0, fileBox);
+      if (!fileBox.innerHTML) fileBox.innerHTML = '<div class="tree-empty">빈 폴더</div>';
     } catch (e) {
-      explorerTree.innerHTML = '<div class="tree-empty">파일을 불러오지 못했습니다 (데스크톱 앱 전용)</div>';
+      fileBox.innerHTML = '<div class="tree-empty">파일을 불러오지 못했습니다 (데스크톱 앱 전용)</div>';
     }
+    // 2) AS 탐색기 (리포트 · 문서)
+    renderAsExplorer(explorerTree);
+  }
+  // AS 탐색기 — 리포트/문서를 폴더처럼 ▸ 펼쳐 그 자리에서 목록을 본다(시안 A 2섹션 스택).
+  function renderAsExplorer(root) {
+    const sec = document.createElement("div");
+    sec.className = "as-explorer";
+    sec.innerHTML = '<div class="as-sec">📋 AS 탐색기</div>';
+    root.appendChild(sec);
+    sec.appendChild(asFolder("report", "📊", "리포트", asReportsCache.length, fillReports));
+    sec.appendChild(asFolder("doc", "📄", "문서", asDocsCache.length, fillDocs));
+  }
+  function asFolder(key, icon, label, count, fill) {
+    const wrap = document.createElement("div");
+    const row = document.createElement("div");
+    row.className = "asx-row";
+    row.innerHTML = '<span class="asx-car">' + (asOpen[key] ? "▾" : "▸") + '</span><span class="asx-ic">' + icon +
+      '</span><span class="asx-nm">' + label + '</span><span class="asx-cnt">' + count + '</span>';
+    const body = document.createElement("div");
+    body.className = "asx-body";
+    if (asOpen[key]) fill(body);
+    row.addEventListener("click", () => {
+      asOpen[key] = !asOpen[key];
+      row.querySelector(".asx-car").textContent = asOpen[key] ? "▾" : "▸";
+      if (asOpen[key]) fill(body); else body.innerHTML = "";
+    });
+    wrap.appendChild(row); wrap.appendChild(body);
+    return wrap;
+  }
+  function fillReports(box) {
+    if (!asReportsCache.length) { box.innerHTML = '<div class="asx-empty">등록된 리포트 없음</div>'; return; }
+    const typeLabel = (t) => t === "weekly" ? "주간" : t === "quarterly" ? "분기" : "수시";
+    box.innerHTML = asReportsCache.map((r) => {
+      const d = r.createdAt ? new Date(r.createdAt).toLocaleDateString("ko-KR") : "";
+      return '<div class="asx-file" data-report="1" title="리포트 화면에서 열기"><span class="asx-ic">📄</span>' +
+        '<span class="asx-nm">' + escT(typeLabel(r.type) + " 리포트 · " + d) + '</span></div>';
+    }).join("");
+    box.querySelectorAll("[data-report]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo("report.html")));
+  }
+  function fillDocs(box) {
+    if (!asDocsCache.length) { box.innerHTML = '<div class="asx-empty">등록된 문서 없음</div>'; return; }
+    box.innerHTML = asDocsCache.map((dd) => {
+      const cls = dd.docClass ? ' <span class="leaf-b ' + (DOCCLASS_B[dd.docClass] || "lb-mut") + '">' + escT(dd.docClass) + '</span>' : "";
+      return '<div class="asx-file" data-doc="1" title="올린 문서 관리 화면에서 열기"><span class="asx-ic">📄</span>' +
+        '<span class="asx-nm">' + escT(dd.documentId) + '</span>' + cls + '</div>';
+    }).join("") + '<div class="asx-total">총 ' + asDocsCache.length + '개</div>';
+    box.querySelectorAll("[data-doc]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo("memory.html")));
   }
   // 대상 클릭 → 별도 화면으로 넘기지 않고 "실시간 활동"에 상태 카드+추천을 바로 표시한다.
   // 이어서 대화 독에 지시하면 이 세션에 기록되고, 응답도 실시간 활동에 흐른다(대시보드에서 모두 처리).
@@ -1944,6 +2030,8 @@
     document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
     const officeBtn = document.getElementById("officeBtn");
     if (officeBtn) officeBtn.addEventListener("click", () => window.gijo.openTeamOffice()); // 별도 창 — 페이지 이동 아님
+    const teamOfficeBtn = document.getElementById("teamOfficeBtn");
+    if (teamOfficeBtn) teamOfficeBtn.addEventListener("click", () => window.gijo.openTeamOffice()); // AI 팀 박스 헤더 — 팀 사무실 창
     const refreshFilesBtn = document.getElementById("refreshFilesBtn");
     if (refreshFilesBtn) refreshFilesBtn.addEventListener("click", () => loadFileExplorer());
     const pickRootBtn = document.getElementById("pickRootBtn");
