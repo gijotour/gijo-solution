@@ -7,7 +7,8 @@
     "build": "tsc -p tsconfig.json",
     "start": "npm run build && node dist/index.js",
     "watch": "tsc -p tsconfig.json --watch",
-    "test": "vitest run"
+    "test": "vitest run",
+    "install-browser": "playwright-core install chromium"
   },
   "author": "GIJO Technology",
   "license": "UNLICENSED",
@@ -28,6 +29,7 @@
     "jsonwebtoken": "^9.0.3",
     "node-fetch": "^3.3.2",
     "nodemailer": "^9.0.3",
+    "playwright-core": "^1.47.0",
     "simple-git": "^3.36.0",
     "ws": "^8.17.0"
   },

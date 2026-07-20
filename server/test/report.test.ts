@@ -10,7 +10,7 @@ vi.mock("../src/engine/llm", () => ({
 
 import { createApp } from "../src/app";
 import { resetAssetsForTests, listAssets } from "../src/engine/assets";
-import { maintenanceSummary, collectVulnReportData, vulnCases } from "../src/engine/report";
+import { maintenanceSummary, collectVulnReportData, vulnCases, stripMetaPreamble } from "../src/engine/report";
 import { importVulnScan } from "../src/engine/vulnscan";
 import { resetKevForTests } from "../src/engine/kev";
 import { createTask, resetTasksForTests } from "../src/engine/tasks";
@@ -146,5 +146,37 @@ describe("report", () => {
       .send({ type: "ondemand", assetIds: ["asset-a"] });
 
     expect(res.status).toBe(200);
+  });
+});
+
+describe("stripMetaPreamble — 요약 서두 메타 문장 제거", () => {
+  it("순수 메타 서두 문장(제공하겠습니다/요약입니다)을 버린다", () => {
+    const r = stripMetaPreamble("기업 보안담당자에게 보안 현황 요약을 제공하겠습니다. 전체 16건의 자산에서 취약점 313건이 발견되었습니다.");
+    expect(r).not.toContain("제공하겠습니다");
+    expect(r).toContain("313건"); // 데이터 문장은 보존
+  });
+
+  it("'제가 보고하는 목적은…' 자기지시 문장을 버린다", () => {
+    const r = stripMetaPreamble("보안 관리자를 위한 1페이지 보고서 요약입니다. 제가 보고하는 목적은 경영진에 정보를 제공하는 것입니다. Critical 60건이 최우선입니다.");
+    expect(r).not.toMatch(/보고서 요약입니다|보고하는 목적은/);
+    expect(r).toContain("Critical 60건");
+  });
+
+  it("데이터 문장 앞의 리드 구절('…바탕으로 요약하면,')만 잘라낸다", () => {
+    const r = stripMetaPreamble("이 보안 현황 데이터를 바탕으로 요약하면, 16건의 자산 중 313개의 취약점이 있습니다.");
+    expect(r.startsWith("16건")).toBe(true);
+    expect(r).toContain("313개");
+  });
+
+  it("메타가 없는 정상 요약은 그대로 둔다", () => {
+    const clean = "KEV 20건이 최우선 조치 대상입니다. SLA 준수율은 100%입니다.";
+    expect(stripMetaPreamble(clean)).toBe(clean);
+  });
+
+  it("'취약점' 키워드만 있고 숫자 없는 목차형 메타('…살펴볼 수 있는 요약입니다')도 버린다", () => {
+    const r = stripMetaPreamble("해당 자산의 취약점 상황을 한 눈에 살펴볼 수 있는 요약입니다. 전체 자산 16건에서 Critical 60건이 발견됐습니다.");
+    expect(r).not.toMatch(/살펴볼 수 있는|요약입니다/);
+    expect(r).toContain("16건");
+    expect(r).toContain("Critical 60건");
   });
 });

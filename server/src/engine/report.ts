@@ -444,6 +444,45 @@ function stripDialogueArtifacts(text: string): string {
     }
     out.push(line);
   }
+  return stripMetaPreamble(out.join("\n").trim());
+}
+
+// 요약 서두의 메타-담화(자기지시) 문장·구절을 걷어낸다(2026-07-20 사용자 지적). 모델이 요약 대신
+// "…요약을 제공하겠습니다", "제가 보고하는 목적은…" 같은 프롬프트 복창을 앞에 붙이는 것을 제거한다.
+// 보수적으로: 실제 수치·CVE 등 데이터가 담긴 문장이 나오면 거기서부터 원문 그대로 보존한다.
+export function stripMetaPreamble(text: string): string {
+  // 순수 메타(자기지시) 문장 신호 — 서두에서 통째로 버린다.
+  const META = /요약(을|음)?\s*(제공|작성|말씀|드리)|보고서\s*요약입니다|요약입니다|제가\s*(보고|답변|작성|말씀)|제\s*(답변|보고)(은|는)|유용하게|이해할\s*수\s*있는\s*정보를\s*제공|다음과\s*같(습니다|이\s*(요약|보고))|살펴볼\s*수\s*있는|하겠습니다/;
+  // 확실한 데이터 신호(숫자·CVE 등) — 있으면 실제 내용 문장이므로 보존을 시작한다.
+  // "취약점·자산" 같은 키워드는 메타 문장("…취약점 상황 요약입니다")에도 흔해 여기에 넣지 않는다.
+  const STRONG_DATA = /\d{2,}|CVE-|KEV|SLA|Critical|High/;
+  // 데이터 문장 앞에 붙은 리드 구절(…요약하면, / …바탕으로, 등)만 잘라내는 패턴.
+  const LEAD = /^.*?(요약하면|바탕으로\s*(요약|정리)하면|다음과\s*같이\s*요약합니다|정리하면)\s*[,:]?\s*/;
+
+  const lines = text.split("\n");
+  const out: string[] = [];
+  let started = false; // 실제 데이터 문장이 시작됐는지
+  for (const line of lines) {
+    if (started || !line.trim()) { out.push(line); continue; }
+    const sentences = line.split(/(?<=[.!?。])\s+/);
+    const kept: string[] = [];
+    for (let s of sentences) {
+      if (!started) {
+        if (STRONG_DATA.test(s)) {
+          s = s.replace(LEAD, ""); // 데이터 문장 앞 리드 구절 제거
+          started = true;
+          kept.push(s);
+        } else if (META.test(s)) {
+          continue; // 순수 메타 서두 문장 폐기(숫자 없는 "…요약입니다/살펴볼 수 있는" 포함)
+        } else {
+          kept.push(s); // 메타도 데이터도 아닌 일반 문장(짧은 제목 등)은 보존
+        }
+      } else {
+        kept.push(s);
+      }
+    }
+    if (kept.join(" ").trim()) out.push(kept.join(" "));
+  }
   return out.join("\n").trim();
 }
 
@@ -757,7 +796,9 @@ function buildReportHtml(
         .join("")
     : "";
   return `<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><style>
-    body{font-family:"Malgun Gothic","맑은 고딕",sans-serif;color:#111;font-size:12px;line-height:1.6;padding:8px}
+    /* Windows(dev, msedge)는 Malgun Gothic, 리눅스(운영 WSL, chromium)는 Noto Sans CJK/나눔 —
+       리눅스에 없는 폰트를 앞에 두면 한글이 tofu(□)로 깨지므로 양쪽 한글 폰트를 모두 지정한다. */
+    body{font-family:"Malgun Gothic","맑은 고딕","Noto Sans CJK KR","Noto Sans KR","NanumGothic","나눔고딕",sans-serif;color:#111;font-size:12px;line-height:1.6;padding:8px}
     h1{font-size:20px;border-bottom:2px solid #333;padding-bottom:6px} h2{font-size:14px;margin-top:18px;color:#1a3a6b}
     table{border-collapse:collapse;width:100%;margin-top:8px;font-size:11px} th,td{border:1px solid #bbb;padding:5px 7px;text-align:left}
     th{background:#f0f3f8} pre{white-space:pre-wrap;background:#f7f8fa;border:1px solid #ddd;padding:10px;border-radius:6px;font-family:inherit}

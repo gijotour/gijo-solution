@@ -1147,7 +1147,7 @@ const TOOLS: AgentTool[] = [
     domain: "sbom",
     write: true,
     description:
-      '자산의 SBOM(구성요소 목록)을 생성한다. asset_coverage/aibom_status가 "SBOM 없음"을 짚은 자산에 쓴다. 예: {"assetId":"fraud-detect-llm"}',
+      '자산의 SBOM 파일을 **새로 생성**한다("SBOM 만들어줘/생성해줘"). **구성요소 현황·정리 조회는 aibom_status를 쓴다(이건 생성 전용).** asset_coverage/aibom_status가 "SBOM 없음"을 짚은 자산에 쓴다. 예: {"assetId":"fraud-detect-llm"}',
     params: [{ name: "assetId", label: "자산 id", description: "대상 자산 id (coverage/aibom 결과의 id=)", required: true }],
     autoFill: (args): Record<string, string> => {
       const raw = (args.assetId ?? "").trim();
@@ -1164,7 +1164,7 @@ const TOOLS: AgentTool[] = [
     domain: "sbom",
     write: false,
     description:
-      'AI-BOM 5영역(모델·데이터셋·프롬프트·도구·인프라)이 얼마나 채워졌는지, SBOM 생성·견고성 점검 여부를 본다. assetId를 주면 그 자산의 미기재 항목까지 짚어준다. 예: {} 또는 {"assetId":"fraud-detect-llm"}',
+      'AI-BOM **구성요소 현황을 조회**한다 — 5영역(모델·데이터셋·프롬프트·도구·인프라)이 얼마나 채워졌는지, SBOM 생성·견고성 점검 여부를 본다. "AI-BOM 보여줘/현황", "자산별 구성요소 정리해줘"에 쓴다(새로 생성이 아니라 **조회**). assetId를 주면 그 자산의 미기재 항목까지 짚어준다. 예: {} 또는 {"assetId":"fraud-detect-llm"}',
     params: [
       { name: "assetId", label: "자산 id", description: "특정 자산만 (선택, 비우면 전체 현황)", required: false },
     ],
@@ -1245,7 +1245,7 @@ const TOOLS: AgentTool[] = [
     domain: "cross",
     write: false,
     description:
-      '지금 조치할 취약점 우선순위를 전 자산을 가로질러 알려준다(KEV→EPSS→VPR 순, 담당자·기한·지연 포함). "오늘 뭐부터?", "제일 급한 취약점", "우선순위 높은 거", "지금 급한 거", "뭐부터 조치해"에 쓴다. 예: {"limit":"5"}',
+      '지금 조치할 취약점 **우선순위**를 전 자산을 가로질러 알려준다(KEV→EPSS→VPR 순, 담당자·기한·지연 포함). "오늘 뭐부터?", "제일 급한 취약점", "우선순위 높은 거", "뭐부터 조치해"에 쓴다. **단 담당자·기한을 배정/지정하라는 지시("배정해줘","담당자 지정")는 assign_finding, 특정 상태(열린/미조치 등) 취약점 목록은 finding_status로 간다.** 예: {"limit":"5"}',
     params: [{ name: "limit", label: "개수", description: "상위 몇 건 (기본 5)", required: false }],
     // 결과가 이미 사람이 읽기 좋은 우선순위 목록이라 LLM 재작성을 생략한다 — 제품 핵심 명령이라
     // 항상 빠르고 확실하게 답해야 한다(재작성 경로에서 데이터 많을 때 멈추던 문제 원천 차단).
@@ -1288,7 +1288,7 @@ const TOOLS: AgentTool[] = [
     domain: "cross",
     write: false,
     description:
-      '오늘의 보안 브리핑을 한 번에 준다 — 오늘의 조치 상위·지난 이후 신규 취약점·기한 초과/임박(SLA)·우리 관련 위협·추천 3. "오늘 브리핑", "아침에 뭐 챙겨야 돼?", "오늘 상황 요약해줘"에 쓴다. 예: {}',
+      '오늘의 보안 브리핑을 한 번에 화면에 **즉석 요약**해 준다 — 오늘의 조치 상위·지난 이후 신규 취약점·기한 초과/임박(SLA)·우리 관련 위협·추천 3. "오늘 브리핑(해줘)", "아침에 뭐 챙겨야 돼?", "지금/오늘 상황 요약해줘"에 쓴다. **단 "리포트/보고서 작성·뽑아줘"처럼 문서를 만드는 지시는 브리핑이 아니라 리포트(report)로 간다.** 예: {}',
     params: [],
     run: () => dailyBriefingText({ save: true }),
   },
@@ -1351,7 +1351,7 @@ const TOOLS: AgentTool[] = [
     domain: "vuln",
     write: true,
     description:
-      '취약점에 조치 담당자(와 기한)를 배정한다. assetId와 finding(심각도·유형으로 지목)은 today/search 결과에서 가져온다. 예: {"assetId":"ai-secbot-01","finding":"프롬프트 인젝션","assignee":"김보안","dueDate":"2026-07-31"}',
+      '취약점에 조치 **담당자와 기한(마감일)을 배정/지정**한다("담당자 배정해줘","기한 정해줘","가장 급한/우선순위 높은 취약점 담당자·기한 배정" 포함 — 우선순위 조회가 아니라 실제 배정). assetId와 finding(심각도·유형으로 지목)은 today/search 결과에서 가져온다. 예: {"assetId":"ai-secbot-01","finding":"프롬프트 인젝션","assignee":"김보안","dueDate":"2026-07-31"}',
     params: [
       { name: "assetId", label: "자산 id", description: "대상 자산 id (today/search 결과의 id=)", required: true },
       { name: "finding", label: "대상 취약점", description: "심각도·유형으로 지목 (예: critical 프롬프트 인젝션)", required: true },
