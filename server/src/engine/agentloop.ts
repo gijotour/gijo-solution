@@ -222,11 +222,23 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }
     tool: "run_hardening_scan",
     args: {},
   },
+  // 오늘의 브리핑 — 대시보드(전체 도구 노출)에서 문구가 명백한데도 LLM이 도구를 건너뛰고 잡담으로
+  // 떨어지던 것(실측 0/3 → chat)을 못박는다. "문서 리포트 작성"은 여기 안 걸리게 좁게 잡는다.
+  {
+    re: /브리핑|아침.{0,5}(뭐|무엇).{0,4}챙|오늘.{0,6}(챙겨야|챙길|상황\s*(요약|정리))|지금.{0,4}상황\s*(요약|정리)/,
+    tool: "briefing",
+    args: {},
+  },
 ];
 function forcedToolFor(instruction: string, scope?: ToolScope): { tool: string; args: Record<string, string> } | null {
   const available = new Set(listToolsFor(scope?.domains, scope?.role).map((t) => t.name));
+  // "가장 급한 취약점 담당자·기한 배정해줘"처럼 배정/지정 지시면 우선순위 조회(today)로 못박지 않는다
+  // — LLM이 assign_finding(쓰기)을 고르도록 둔다(실측: today 강제가 배정 명령까지 흡수했었음).
+  const isAssign = /배정|담당자\s*(를|을|.{0,2})?(지정|정해|배치|맡|줘|넣)|기한\s*(을|를)?\s*(지정|정해|설정|잡)|맡겨|배치해줘/.test(instruction);
   for (const f of FORCED_INTENTS) {
     if (f.re.test(instruction) && available.has(f.tool)) {
+      if (f.tool === "today" && isAssign) continue; // 배정 지시는 today로 강제하지 않음
+      if (f.tool === "briefing" && /리포트|보고서|report/i.test(instruction)) continue; // 문서 리포트는 briefing 아님
       // 하드닝 점검은 지시문에 CIS가 명시되면 국제기준(cis), 아니면 국내 CCE(kisa)로.
       if (f.tool === "run_hardening_scan") {
         return { tool: f.tool, args: { standard: /\bcis\b|국제/i.test(instruction) ? "cis" : "kisa" } };
