@@ -179,9 +179,13 @@ export async function ingestText(documentId: string, raw: string, scope: string 
     } catch (batchErr) {
       if (slice.length === 1) throw batchErr; // 단건도 실패면 임베딩 서버 자체 문제 — 위로 던진다
       console.warn(`[memory] 배치 임베딩 실패(${slice.length}건) — 청크 단위로 재시도: ${batchErr instanceof Error ? batchErr.message : String(batchErr)}`);
+      // 청크를 곧바로 연속 호출하면 GPU를 수 분간 독점해 동시에 도는 채팅 모델이 hang 판정을
+      // 받는 연쇄가 실측됐다(2026-07-21: 64건 재시도 도중 gijo-main-orchestrator hang → 재기동).
+      // 매 청크 사이 짧게 쉬어 다른 모델도 GPU 틈을 얻게 한다(전체 지연은 미미: 64건×150ms≈10s).
       for (const c of slice) {
         const v = await embed([c]);
         vectors.push(v[0]);
+        await new Promise((resolve) => setTimeout(resolve, 150));
       }
     }
   }
