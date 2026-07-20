@@ -526,7 +526,8 @@
         <div class="sc-meta" id="scMeta">연동 서버 정보 불러오는 중…</div>
         <div class="sc-gpu" id="scGpu"><span class="sc-gpu-t">GPU 사용률 —</span></div>
       </div>
-      <div class="explorer-title"><span>자산 탐색기</span><span class="tree-act" id="addAssetDashBtn" title="자산 직접 등록" style="margin-left:auto">＋</span><span class="tree-act" id="refreshAssetsBtn" title="새로고침">⟳</span></div>
+      <div class="explorer-title"><span>📁 탐색기</span><span class="tree-act" id="pickRootBtn" title="폴더 선택 — 이 폴더가 탐색 루트가 됩니다" style="margin-left:auto">📁</span><span class="tree-act" id="refreshFilesBtn" title="새로고침">↻</span></div>
+      <div class="fx-rootline" id="fxRootLine" style="font-size:11px;color:var(--muted-2);padding:3px 4px 7px;display:flex;align-items:center;gap:5px;border-bottom:1px solid var(--border);margin-bottom:6px;" title="현재 탐색 루트 폴더 — 📁 버튼으로 변경">📂 <b id="fxRoot" style="color:var(--muted);font-weight:700">루트</b></div>
       <div id="gijoObSlot"></div>
       <!-- 스마트 업로드 입력(숨김). 트리거는 통합 탐색기의 "문서·분석 > 📥 파일 올리기"에서 호출. -->
       <input type="file" id="smartUploadInput" multiple style="display:none">
@@ -744,7 +745,8 @@
     try {
       const r = await window.gijo.pickWorkFolder();
       if (r.cancelled) return;
-      await loadFiles();
+      openDirs.clear(); // 새 루트 → 펼침 상태 초기화
+      await loadFileExplorer();
     } catch (e) {
       alert("폴더 선택 실패: " + e.message);
     }
@@ -1863,18 +1865,24 @@
   }
 
   // ── 통합 자산 탐색기(공유 모듈) — 작업 세션 화면과 동일한 5구획 탐색기 ────────
-  async function reloadDashExplorer() {
-    const box = document.getElementById("explorerTree");
-    if (!box) return;
+  // 내 PC 파일 탐색기 — 선택한 루트 폴더(fs:pickRoot) 안의 폴더·파일을 읽기전용 트리로 본다.
+  // (기존 자산 탐색기 대체) 폴더는 그 자리에서 ▸/▾ 펼침(renderDir·openDirs), 문서 파일은 클릭 시
+  // "🧠 분석해 올리기"로 장기기억(RAG)에 넣을 수 있다. 루트 밖(..)·50MB↑는 메인에서 차단.
+  async function reloadDashExplorer() { await loadFileExplorer(); }
+  async function loadFileExplorer() {
+    if (!explorerTree) return;
     try {
-      await window.gijoSessionExplorer.load();
-      window.gijoSessionExplorer.render(box, {
-        onSelect: onDashEntitySelect,
-        onUpload: () => { const si = document.getElementById("smartUploadInput"); if (si) si.click(); },
-        onManageDocs: () => window.gijo.navigateTo("memory.html"),
-      });
+      const docs = await window.gijo.listMemoryDocuments();
+      docClassMap = new Map(docs.filter((d) => d.docClass).map((d) => [d.documentId, d.docClass]));
+    } catch (e) { /* 분류 배지는 부가 정보 — 실패해도 트리는 계속 */ }
+    try {
+      const data = await window.gijo.listDir("");
+      const rn = document.getElementById("fxRoot"); if (rn) rn.textContent = data.rootName || "루트";
+      explorerTree.innerHTML = "";
+      await renderDir("", 0, explorerTree);
+      if (!explorerTree.innerHTML) explorerTree.innerHTML = '<div class="tree-empty">빈 폴더</div>';
     } catch (e) {
-      box.innerHTML = '<div style="padding:8px;color:var(--muted-2);font-size:11px">탐색기를 불러오지 못했습니다</div>';
+      explorerTree.innerHTML = '<div class="tree-empty">파일을 불러오지 못했습니다 (데스크톱 앱 전용)</div>';
     }
   }
   // 대상 클릭 → 별도 화면으로 넘기지 않고 "실시간 활동"에 상태 카드+추천을 바로 표시한다.
@@ -1936,9 +1944,10 @@
     document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
     const officeBtn = document.getElementById("officeBtn");
     if (officeBtn) officeBtn.addEventListener("click", () => window.gijo.openTeamOffice()); // 별도 창 — 페이지 이동 아님
-    document.getElementById("refreshAssetsBtn").addEventListener("click", reloadDashExplorer);
-    const addAssetDashBtn = document.getElementById("addAssetDashBtn");
-    if (addAssetDashBtn) addAssetDashBtn.addEventListener("click", (e) => { e.stopPropagation(); openAssetRegForm(); });
+    const refreshFilesBtn = document.getElementById("refreshFilesBtn");
+    if (refreshFilesBtn) refreshFilesBtn.addEventListener("click", () => loadFileExplorer());
+    const pickRootBtn = document.getElementById("pickRootBtn");
+    if (pickRootBtn) pickRootBtn.addEventListener("click", (e) => { e.stopPropagation(); pickFolder(); });
     // 오늘 확인할 항목 UI는 작업 세션(sessions.html)으로 이관됨 — 대시보드에 없으면 배선 생략.
     const todoAddBtn = document.getElementById("todoAddBtn");
     if (todoAddBtn) todoAddBtn.addEventListener("click", addTodo);
@@ -2040,7 +2049,7 @@
       let t;
       window.gijo.onAssetUpdated(() => {
         clearTimeout(t);
-        t = setTimeout(() => { reloadDashExplorer(); loadTodayPriority(); loadDashSessions(); }, 300);
+        t = setTimeout(() => { loadTodayPriority(); loadDashSessions(); }, 300);
       });
     }
   }
