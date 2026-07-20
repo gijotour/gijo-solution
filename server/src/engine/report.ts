@@ -796,7 +796,9 @@ function buildReportHtml(
         .join("")
     : "";
   return `<!DOCTYPE html><html lang="ko"><head><meta charset="utf-8"><style>
-    body{font-family:"Malgun Gothic","맑은 고딕",sans-serif;color:#111;font-size:12px;line-height:1.6;padding:8px}
+    /* Windows(dev, msedge)는 Malgun Gothic, 리눅스(운영 WSL, chromium)는 Noto Sans CJK/나눔 —
+       리눅스에 없는 폰트를 앞에 두면 한글이 tofu(□)로 깨지므로 양쪽 한글 폰트를 모두 지정한다. */
+    body{font-family:"Malgun Gothic","맑은 고딕","Noto Sans CJK KR","Noto Sans KR","NanumGothic","나눔고딕",sans-serif;color:#111;font-size:12px;line-height:1.6;padding:8px}
     h1{font-size:20px;border-bottom:2px solid #333;padding-bottom:6px} h2{font-size:14px;margin-top:18px;color:#1a3a6b}
     table{border-collapse:collapse;width:100%;margin-top:8px;font-size:11px} th,td{border:1px solid #bbb;padding:5px 7px;text-align:left}
     th{background:#f0f3f8} pre{white-space:pre-wrap;background:#f7f8fa;border:1px solid #ddd;padding:10px;border-radius:6px;font-family:inherit}
