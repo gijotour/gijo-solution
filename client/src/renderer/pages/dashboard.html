@@ -37,6 +37,9 @@
   .icon-btn{width:34px;height:34px;border-radius:10px;background:var(--panel-2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:16px;color:var(--muted);cursor:pointer;transition:background .14s,border-color .14s,color .14s,transform .14s;}
   .icon-btn:hover{background:rgba(59,130,246,0.14);border-color:var(--blue);color:var(--blue-light);transform:translateY(-2px);}
   .icon-btn.on{background:rgba(59,130,246,0.18);border-color:var(--blue);color:var(--blue-light);}
+  /* 전체메뉴 버튼 — 아이콘 대신 텍스트로. 대시보드엔 nav 사이드바가 없어 KPI(전체 메뉴 화면)로 보낸다. */
+  .menu-btn{height:34px;border-radius:10px;background:var(--panel-2);border:1px solid var(--border);display:flex;align-items:center;gap:5px;padding:0 12px;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;white-space:nowrap;transition:background .14s,border-color .14s,color .14s,transform .14s;}
+  .menu-btn:hover{background:rgba(59,130,246,0.14);border-color:var(--blue);color:var(--blue-light);transform:translateY(-2px);}
   .avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
 
   .body-grid{display:grid;grid-template-columns:220px 1fr 360px;min-height:640px;}
@@ -447,7 +450,7 @@
       <!-- 상단 툴바 = '내 업무 바로가기'에 등록된 항목만 동적 렌더(아래 dashMenu IIFE의 renderTopShortcuts). -->
       <div class="icon-row" id="topShortcuts"></div>
       <div class="avatar-btn" id="avatarBtn">-</div>
-      <div class="icon-btn" id="settingsBtn" title="보안 KPI 대시보드">📊</div>
+      <div class="menu-btn" id="settingsBtn" title="전체 메뉴 — 보안 KPI 대시보드로 이동">☰ 전체메뉴</div>
     </div>
   </div>
 
