@@ -1,5 +1,20 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import request from "supertest";
+
+// LLM은 스텁으로 대체한다(리포 공통 패턴 — agentloop·agenttools 등과 동일).
+//
+// 왜: 이 파일의 triage 라우트 테스트는 **라우트 계약**(200·draft 문자열·count)을 보는 것이지
+// 모델 답변 품질을 보는 게 아니다. 그런데 스텁이 없어 실제 llama-server를 호출했고, 서버가
+// 떠 있으면 진짜 추론을 하다 15초 제한을 넘겨 전체 병렬 실행에서 흔들렸다(2026-07-21).
+// GPU 상태에 따라 통과 여부가 갈리는 테스트는 회귀를 잡아주지 못한다.
+const TRIAGE_DRAFT = "1. unsafe-pickle (m1) — 즉시 조치. 근거: KEV 등재.\n2. 권장 조치 기한: 7일 이내.";
+const mockChat = vi.fn(async () => TRIAGE_DRAFT);
+vi.mock("../src/engine/llm", () => ({
+  chat: (...args: unknown[]) => mockChat(...args),
+  embed: vi.fn(async (texts: string[]) => texts.map(() => [0.1, 0.2, 0.3])),
+  registerLlmRoutes: vi.fn(),
+}));
+
 import { createApp } from "../src/app";
 import { resetAssetsForTests, recordFindings } from "../src/engine/assets";
 import { resetApprovalsForTests, findingKey, buildTriagePrompt, prioritizedReviews } from "../src/engine/approvals";
@@ -107,11 +122,27 @@ describe("approvals (finding 검토 워크플로우)", () => {
     expect(prompt).toContain("테스트 완화통제"); // 온톨로지 근거 주입
   });
 
-  it("AI triage 라우트: 초안을 200으로 반환(LLM 미가동 시 안내 초안)", async () => {
+  it("AI triage 라우트: 모델 초안을 그대로 실어 200으로 반환", async () => {
     const r = await request(app).post("/api/approvals/triage").set(auth()).send({ limit: 5 });
     expect(r.status).toBe(200);
-    expect(typeof r.body.draft).toBe("string");
+    // 스텁 응답이 그대로 실려야 한다 — 라우트가 모델 출력을 삼키거나 바꾸지 않음을 확인.
+    expect(r.body.draft).toBe(TRIAGE_DRAFT);
     expect(r.body.count).toBeGreaterThanOrEqual(1);
+    // 프롬프트에 실제 조치 대상이 실려 나갔는지(빈 프롬프트로 부르지 않았는지)까지 본다.
+    expect(mockChat).toHaveBeenCalled();
+    const sent = mockChat.mock.calls.at(-1)?.[0] as { message: string } | undefined;
+    expect(sent?.message).toContain("unsafe-pickle");
+  });
+
+  it("조치 대상이 없으면 LLM을 부르지 않고 안내 문구를 준다", async () => {
+    resetApprovalsForTests();
+    resetAssetsForTests();
+    mockChat.mockClear();
+    const r = await request(app).post("/api/approvals/triage").set(auth()).send({ limit: 5 });
+    expect(r.status).toBe(200);
+    expect(r.body.count).toBe(0);
+    expect(r.body.draft).toContain("스캔 결과를 먼저 업로드");
+    expect(mockChat).not.toHaveBeenCalled(); // 부를 이유가 없을 때 GPU를 쓰지 않는다
   });
 
   it("approves and rejects a finding, updating status + reviewer", async () => {

@@ -1,5 +1,19 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import request from "supertest";
+
+// LLM 스텁(리포 공통 패턴). 이 파일의 "AI 초안" 테스트는 **모델 출력을 파싱해 상태·근거로
+// 나누는 라우트 로직**을 보는 것이지 모델 판단력을 보는 게 아니다. 스텁이 없어 실제
+// llama-server를 호출했고, 서버가 떠 있으면 15초 제한을 넘겨 전체 병렬 실행에서 흔들렸다.
+// 게다가 실제 호출일 때는 응답이 무엇이든 파서가 기본값 partial로 떨어져 통과해버려,
+// 파싱이 깨져도 이 테스트가 잡지 못했다(스텁으로 바꾸며 단언을 조였다).
+const DRAFT_REPLY = "상태: covered\n등록 AI 자산 전부에 AI-BOM이 작성돼 있고 스캔 취약점도 0건입니다. 분기별 재점검만 유지하세요.";
+const mockChat = vi.fn(async () => DRAFT_REPLY);
+vi.mock("../src/engine/llm", () => ({
+  chat: (...args: unknown[]) => mockChat(...args),
+  embed: vi.fn(async (texts: string[]) => texts.map(() => [0.1, 0.2, 0.3])),
+  registerLlmRoutes: vi.fn(),
+}));
+
 import { createApp } from "../src/app";
 import { THREAT_CATALOG, resetComplianceForTests } from "../src/engine/compliance";
 import { resetAssetsForTests } from "../src/engine/assets";
@@ -112,11 +126,21 @@ describe("compliance (KISA 매뉴얼 위협 × 프레임워크 대응 현황)", 
     expect(badStatus.status).toBe(400);
   });
 
-  it("AI 초안: 위협에 대해 유효한 상태 + 근거 note를 200으로 반환", async () => {
+  it("AI 초안: 모델이 낸 상태를 파싱하고 근거를 note로 분리한다", async () => {
     const r = await request(app).post("/api/compliance/M06/draft").set("Authorization", `Bearer ${token}`).send({});
     expect(r.status).toBe(200);
-    expect(["covered", "partial", "na", "open"]).toContain(r.body.status);
-    expect(typeof r.body.note).toBe("string");
+    // 기본값(partial)이 아니라 **모델이 낸 값**을 읽었는지 — 파서가 죽으면 여기서 걸린다.
+    expect(r.body.status).toBe("covered");
     expect(r.body.note).toContain("🤖 AI 초안"); // 담당자 검토 표식
+    expect(r.body.note).toContain("분기별 재점검"); // 근거 본문 보존
+    expect(r.body.note).not.toContain("상태: covered"); // '상태:' 줄은 note에서 제거
+  });
+
+  it("AI 초안: 모델이 상태를 안 내면 partial로 떨어진다(안전한 기본값)", async () => {
+    mockChat.mockResolvedValueOnce("판단하기 어렵습니다. 자료를 더 주세요.");
+    const r = await request(app).post("/api/compliance/M06/draft").set("Authorization", `Bearer ${token}`).send({});
+    expect(r.status).toBe(200);
+    expect(r.body.status).toBe("partial");
+    expect(r.body.note).toContain("판단하기 어렵습니다");
   });
 });
