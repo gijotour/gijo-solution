@@ -165,7 +165,7 @@ async function runGijoEnrichment(results: StepResult[], fromAgentId: string): Pr
   } catch (err) {
     output = `부연 생략: ${err instanceof Error ? err.message : String(err)}`;
   }
-  emitCollaboration({ from: "normaltic", to: "orchestrator", message: `부연 완료: ${output.slice(0, 120)}` });
+  emitCollaboration({ from: "normaltic", to: "orchestrator", message: `부연 완료: ${output.slice(0, 600)}` });
   resetAgentToDefault("normaltic");
   return { action: "enrich", label: "용어 해설·사례 부연", output };
 }
@@ -233,7 +233,7 @@ async function runOrchestration(instructionText: string, steps: OrchestrationSte
       output = `단계 실패: ${err instanceof Error ? err.message : String(err)}`;
     }
 
-    emitCollaboration({ from: agentId, to: "orchestrator", message: `단계 ${i + 1} 완료: ${output.slice(0, 120)}` });
+    emitCollaboration({ from: agentId, to: "orchestrator", message: `단계 ${i + 1} 완료: ${output.slice(0, 600)}` });
     resetAgentToDefault(agentId);
     results.push({ action: step.action, label: step.label, output, assetIds, findingCount });
 
@@ -297,7 +297,7 @@ export async function dispatchInstruction(instructionText: string, sessionId?: s
   const result = await dispatchInstructionCore(instructionText, contextText, screen);
   if (session) {
     appendTurn(session.id, "assistant", result.output, turnToolTag(result));
-    emitCollaboration({ from: "orchestrator", to: "세션", message: `💬 [${title}] ${result.output.slice(0, 140)}` });
+    emitCollaboration({ from: "orchestrator", to: "세션", message: `💬 [${title}] ${result.output.slice(0, 600)}` });
   }
   return session ? { ...result, sessionId: session.id } : result;
 }
@@ -363,7 +363,9 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     const loopTask = createTask({ text: instructionText, agentId: "orchestrator", priority: "P2" });
     setAgentStatus("orchestrator", "working");
     emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `지시 처리: "${instructionText}"` });
-    emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `완료: ${loop.output.slice(0, 120)}` });
+    // 완료 이벤트는 실제 답변을 실어 나른다 — 120자로 자르면 지휘 콘솔 대화가 목록 중간에서 끊긴다
+    // (2026-07-20 사용자 지적). 화면 쪽이 4줄 클램프+더보기로 접으므로 여기선 넉넉히 보낸다.
+    emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `완료: ${loop.output.slice(0, 1500)}` });
     resetAgentToDefault("orchestrator");
     const updated = completeTask(loopTask.id);
     return {
@@ -444,7 +446,7 @@ export function registerDispatcherRoutes(app: Express): void {
         const undoBefore = undoSnapshot(); // #7: 실행 전 상태 스냅샷(원클릭 undo용)
         const output = await executeApprovedTool(toolName, args);
         const undoId = undoCommit(toolName, output.slice(0, 50), undoBefore); // 변화 있으면 되돌리기 항목 등록
-        emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `실행 완료: ${output.slice(0, 120)}` });
+        emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `실행 완료: ${output.slice(0, 600)}` });
         // 작업 기록(감사 로그) — 승인된 쓰기 실행을 남긴다(챗봇 제안 → 사람 승인).
         recordAudit({ kind: "write", actor, action: `승인 실행: ${toolName}`, target: args.assetId ?? args.code ?? null, detail: `${instruction ? instruction + " → " : ""}${output.slice(0, 200)}`, result: "ok" });
         // 사람이 승인한 (지시→도구) = 검증된 정답. 파인튜닝 골드 예시로 누적한다(Phase 4, 자가강화).
