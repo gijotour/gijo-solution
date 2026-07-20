@@ -4,6 +4,9 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GIJO AS — AI Security Manager OS</title>
+<link rel="stylesheet" href="gijo-ui.css">
+<!-- 공용 디자인 시스템(시안 C). body.g-ui로 전역 베이스라인(스크롤바·포커스) 통일 — 아래 body 태그에 g-ui. -->
+
 <style>
   :root{
     --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
@@ -365,7 +368,7 @@
 
 </style>
 </head>
-<body>
+<body class="g-ui">
 
 
 
@@ -1955,7 +1958,8 @@
     }
     document.getElementById("dashHideRight")?.addEventListener("click", toggleRight);
     document.getElementById("toggleRightBtn")?.addEventListener("click", toggleRight);
-    try { applyRightHidden(localStorage.getItem(RIGHT_HIDDEN_KEY) === "1"); } catch (e) {}
+    // 기본 접힘 — 오른쪽 세션 패널은 처음엔 접혀 있고, 사용자가 ◧로 펴면(=="0") 그 설정을 유지한다.
+    try { applyRightHidden(localStorage.getItem(RIGHT_HIDDEN_KEY) !== "0"); } catch (e) {}
 
     window.gijo.onCollaborationEvent((evt) => {
       appendCollabRow(evt);

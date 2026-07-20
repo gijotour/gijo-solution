@@ -146,7 +146,19 @@
     document.body.appendChild(s);
   }
 
+  // 공용 디자인 시스템(gijo-ui.css)을 모든 페이지에 주입한다 — .g-* 컴포넌트 사용 가능 + body.g-ui로
+  // 안전한 전역 베이스라인(스크롤바·포커스링·폰트 스무딩)만 통일(레이아웃은 안 건드림).
+  function loadDesignSystem() {
+    if (!document.getElementById("gijoUiCss")) {
+      var l = document.createElement("link");
+      l.id = "gijoUiCss"; l.rel = "stylesheet"; l.href = "gijo-ui.css";
+      document.head.appendChild(l);
+    }
+    if (document.body) document.body.classList.add("g-ui");
+  }
+
   function boot() {
+    loadDesignSystem();
     render();
     loadOnboarding();
   }

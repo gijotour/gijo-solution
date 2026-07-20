@@ -1,0 +1,126 @@
+/* gijo-ui.css — GIJO AS 공용 디자인 시스템 (시안 C: 정돈 강화)
+ * 목적: 화면마다 흩어진 스타일을 하나의 규칙으로 통일한다. 현재 다크 팔레트는 유지하고,
+ *       간격·라운드·그림자·타이포 스케일과 재사용 컴포넌트(.g-*)를 표준화한다.
+ * 적용: nav.js가 모든 페이지 <head>에 이 파일을 주입한다(대시보드는 직접 link). 컴포넌트는
+ *       .g- 접두사라 기존 클래스와 충돌하지 않는다 — 화면을 점진적으로 .g-*로 옮겨 통일한다.
+ * 원칙(웹 표준 조사): 토큰 3계층(원시→시맨틱→컴포넌트), 4px 간격 스케일, 다크 4단계 표면 계층,
+ *       상태 default/hover/focus/disabled 통일. */
+
+:root {
+  /* ── 색: 원시(팔레트는 현재 유지) ── */
+  --g-bg: #0a0e1a;
+  --g-surface-1: #121a2e;   /* 카드·패널 */
+  --g-surface-2: #0e1526;   /* 중첩·입력 */
+  --g-surface-3: #0a1120;   /* 레일 등 */
+  --g-border: rgba(255, 255, 255, 0.08);
+  --g-border-strong: rgba(255, 255, 255, 0.16);
+  --g-blue: #3b82f6;
+  --g-blue-light: #5fa1ff;
+  --g-teal: #1eb980;
+  --g-amber: #f0a020;
+  --g-red: #e2483d;
+  --g-purple: #8b7cf0;
+  --g-text: #e7eaf3;
+  --g-muted: #8b93ab;
+  --g-muted-2: #5f6785;
+
+  /* ── 간격 스케일 (4px 기준) ── */
+  --g-s1: 4px; --g-s2: 8px; --g-s3: 12px; --g-s4: 16px; --g-s5: 24px; --g-s6: 32px;
+
+  /* ── 라운드 (시안 C: 강화) ── */
+  --g-r-sm: 8px; --g-r: 12px; --g-r-lg: 16px; --g-r-pill: 999px;
+
+  /* ── 그림자 (표면 계층) ── */
+  --g-shadow-1: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --g-shadow-2: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --g-shadow-modal: 0 20px 60px rgba(0, 0, 0, 0.5);
+
+  /* ── 타이포 스케일 (시안 C: ↑) ── */
+  --g-t-h1: 22px; --g-t-h2: 16px; --g-t-md: 14.5px; --g-t-sm: 13px; --g-t-xs: 11px; --g-t-kpi: 27px;
+
+  /* ── 컴포넌트 토큰 ── */
+  --g-btn-h: 36px;
+  --g-input-h: 36px;
+  --g-focus: 0 0 0 3px rgba(59, 130, 246, 0.28);
+}
+
+/* ── 안전한 전역 베이스라인 (레이아웃 안 건드림, 결만 통일) ── */
+.g-scope, .g-ui * { -webkit-font-smoothing: antialiased; }
+/* 포커스 링 통일 — 키보드 접근성. 마우스 클릭엔 안 뜬다(:focus-visible). */
+.g-ui :focus-visible { outline: 2px solid var(--g-blue-light); outline-offset: 1px; }
+/* 스크롤바 통일 (얇고 은은하게) */
+.g-ui ::-webkit-scrollbar { width: 10px; height: 10px; }
+.g-ui ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.10); border-radius: var(--g-r-pill); border: 2px solid transparent; background-clip: padding-box; }
+.g-ui ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,.18); background-clip: padding-box; }
+.g-ui ::-webkit-scrollbar-track { background: transparent; }
+
+/* ── 버튼 ── */
+.g-btn { height: var(--g-btn-h); display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 0 var(--g-s4); border-radius: var(--g-r); font-size: var(--g-t-sm); font-weight: 700; cursor: pointer; border: 1px solid transparent; transition: background .12s, border-color .12s, color .12s, transform .12s; white-space: nowrap; }
+.g-btn:active { transform: translateY(1px); }
+.g-btn.g-primary { background: var(--g-blue); color: #fff; }
+.g-btn.g-primary:hover { background: #3576e0; }
+.g-btn.g-ghost { background: transparent; border-color: var(--g-border-strong); color: var(--g-muted); }
+.g-btn.g-ghost:hover { color: #fff; border-color: var(--g-blue); }
+.g-btn.g-danger { background: rgba(226, 72, 61, 0.14); border-color: var(--g-red); color: #f5928a; }
+.g-btn.g-danger:hover { background: rgba(226, 72, 61, 0.22); }
+.g-btn.g-teal { background: rgba(30, 185, 128, 0.14); border-color: var(--g-teal); color: var(--g-teal); }
+.g-btn.g-sm { height: 28px; font-size: var(--g-t-xs); padding: 0 12px; border-radius: var(--g-r-sm); }
+.g-btn:disabled, .g-btn.g-disabled { opacity: 0.45; cursor: default; }
+.g-btn:disabled:active, .g-btn.g-disabled:active { transform: none; }
+
+/* ── 카드 & 표면 계층 ── */
+.g-card { background: var(--g-surface-1); border: 1px solid var(--g-border); border-radius: var(--g-r); padding: var(--g-s5); box-shadow: var(--g-shadow-1); }
+.g-card-sm { padding: var(--g-s4); }
+.g-nested { background: var(--g-surface-2); border: 1px solid var(--g-border); border-radius: var(--g-r-sm); padding: var(--g-s3); }
+.g-ct { font-size: var(--g-t-md); font-weight: 800; color: #fff; margin-bottom: var(--g-s2); }
+.g-cx { font-size: var(--g-t-sm); color: var(--g-muted); line-height: 1.55; }
+
+/* ── KPI 타일 ── */
+.g-kpis { display: grid; gap: var(--g-s3); }
+.g-kpi { background: var(--g-surface-2); border: 1px solid var(--g-border); border-radius: var(--g-r); padding: var(--g-s4) var(--g-s5); }
+.g-kpi .kv { font-size: var(--g-t-kpi); font-weight: 800; color: #fff; }
+.g-kpi .kl { font-size: var(--g-t-xs); color: var(--g-muted); margin-top: var(--g-s1); }
+
+/* ── 배지 (심각도·상태) ── */
+.g-badge { display: inline-flex; align-items: center; font-size: var(--g-t-xs); font-weight: 800; padding: 2px 9px; border-radius: var(--g-r-pill); white-space: nowrap; }
+.g-b-crit { background: rgba(226, 72, 61, 0.16); color: #f5928a; }
+.g-b-high { background: rgba(240, 160, 32, 0.16); color: var(--g-amber); }
+.g-b-med { background: rgba(59, 130, 246, 0.16); color: var(--g-blue-light); }
+.g-b-low { background: rgba(255, 255, 255, 0.06); color: var(--g-muted-2); }
+.g-b-ok { background: rgba(30, 185, 128, 0.16); color: var(--g-teal); }
+.g-b-warn { background: rgba(240, 160, 32, 0.16); color: var(--g-amber); }
+.g-b-bad { background: rgba(226, 72, 61, 0.16); color: #f5928a; }
+
+/* ── 칩 (필터·태그) ── */
+.g-chip { display: inline-flex; align-items: center; gap: 6px; background: var(--g-surface-2); border: 1px solid var(--g-border-strong); border-radius: var(--g-r-pill); padding: 6px 13px; font-size: var(--g-t-sm); font-weight: 700; color: var(--g-text); cursor: pointer; }
+.g-chip:hover { border-color: var(--g-blue); color: #fff; }
+.g-chip.g-on { background: rgba(59, 130, 246, 0.14); border-color: var(--g-blue); color: var(--g-blue-light); }
+
+/* ── 입력 ── */
+.g-field { display: flex; flex-direction: column; gap: 5px; }
+.g-field label { font-size: var(--g-t-xs); color: var(--g-muted-2); font-weight: 700; }
+.g-input { background: var(--g-surface-2); border: 1px solid var(--g-border-strong); border-radius: var(--g-r); padding: 0 12px; height: var(--g-input-h); color: var(--g-text); font-size: var(--g-t-sm); outline: none; width: 100%; }
+.g-input:focus { border-color: var(--g-blue); box-shadow: var(--g-focus); }
+select.g-input { cursor: pointer; }
+
+/* ── 표 ── */
+.g-table { width: 100%; border-collapse: collapse; font-size: var(--g-t-sm); }
+.g-table th { text-align: left; color: var(--g-muted-2); font-size: var(--g-t-xs); font-weight: 700; padding: var(--g-s3); border-bottom: 1px solid var(--g-border); }
+.g-table td { padding: var(--g-s3); border-bottom: 1px solid var(--g-border); vertical-align: middle; }
+.g-table tbody tr:hover { background: rgba(255, 255, 255, 0.02); }
+
+/* ── 토글 스위치 ── */
+.g-toggle { width: 38px; height: 22px; border-radius: var(--g-r-pill); position: relative; display: inline-block; cursor: pointer; background: var(--g-muted-2); transition: background .15s; flex: 0 0 auto; }
+.g-toggle.g-on { background: var(--g-teal); }
+.g-toggle .k { width: 16px; height: 16px; border-radius: 50%; background: #fff; position: absolute; top: 3px; left: 3px; transition: left .15s; }
+.g-toggle.g-on .k { left: 19px; }
+
+/* ── 섹션 헤더 ── */
+.g-section-label { font-size: var(--g-t-xs); font-weight: 800; color: var(--g-muted-2); letter-spacing: .4px; text-transform: uppercase; margin-bottom: var(--g-s3); }
+
+/* ── 모달 ── */
+.g-modal-bg { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); display: none; align-items: center; justify-content: center; z-index: 95; }
+.g-modal-bg.g-on { display: flex; }
+.g-modal { width: 380px; max-width: 92vw; background: var(--g-surface-1); border: 1px solid var(--g-border-strong); border-radius: var(--g-r); padding: var(--g-s5); box-shadow: var(--g-shadow-modal); }
+.g-modal .mt { font-size: var(--g-t-md); font-weight: 800; color: #fff; margin-bottom: var(--g-s4); }
+.g-modal .macts { display: flex; gap: var(--g-s2); justify-content: flex-end; margin-top: var(--g-s5); }
