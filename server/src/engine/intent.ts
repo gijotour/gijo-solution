@@ -118,7 +118,15 @@ export async function routeIntent(text: string, screen?: string): Promise<Routed
     return { agentId: agentIdForAction(fromScreen), action: fromScreen, targetAssetId: routed.targetAssetId };
   }
 
-  // 동작 단어가 있으면 분류기 판단을 따르되, 그마저 "판단 못 함"이면 화면으로 보정한다.
+  // 동작 단어가 있으면 분류기 판단을 따른다. 단 분류기가 chat으로 흘렸는데(7B 흔들림) 지시문에
+  // 명시적 동작 동사가 있으면 결정적 규칙으로 되살린다 — 실측(2026-07-20): "주간 보안 리포트
+  // 작성해줘"가 실행마다 report↔chat을 오가 1/3까지 떨어졌다. 분류기가 스스로 못 정한 것이므로
+  // 확률적 재추측 대신 지시문의 명시 동사를 결정적으로 따른다("지시문 우선" 원칙과 일치).
+  if (routed.action === "chat" && hasExplicitAction(text)) {
+    const byRegex = routeIntentByRegex(text, screen);
+    if (byRegex.action !== "chat") return byRegex;
+  }
+  // 그마저 "판단 못 함"이면 화면으로 보정한다.
   if (routed.action === "chat" && fromScreen) {
     return { agentId: agentIdForAction(fromScreen), action: fromScreen, targetAssetId: routed.targetAssetId };
   }
