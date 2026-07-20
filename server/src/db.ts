@@ -421,3 +421,48 @@ migrate(
    CREATE INDEX IF NOT EXISTS idx_audit_log_at ON audit_log(at);
    CREATE INDEX IF NOT EXISTS idx_audit_log_kind ON audit_log(kind);`
 );
+
+// 원격 SSH 정기점검 — 점검 대상(장비) 레지스트리 + 스케줄 + 실행 이력.
+// 대상: local(서버 자신) 또는 ssh(원격 장비). 스케줄: interval_hours 마다 자동 점검.
+// 이력: 매 실행의 준수율·취약 수를 남겨 추세(개선/악화)를 본다.
+migrate(
+  "hardening-remote-2026-07-20",
+  `CREATE TABLE IF NOT EXISTS hardening_targets (
+     id TEXT PRIMARY KEY,
+     label TEXT NOT NULL,
+     host TEXT NOT NULL,           -- 'local' 또는 IP/호스트명
+     port INTEGER NOT NULL DEFAULT 22,
+     username TEXT,
+     authMethod TEXT NOT NULL,     -- local | key | password
+     secret TEXT,                  -- key: 개인키 경로 · password: 비밀번호(온프렘 로컬 저장)
+     createdAt INTEGER NOT NULL
+   );
+   CREATE TABLE IF NOT EXISTS hardening_schedules (
+     id TEXT PRIMARY KEY,
+     targetId TEXT NOT NULL,
+     standard TEXT NOT NULL,       -- kisa | cis
+     intervalHours INTEGER NOT NULL,
+     enabled INTEGER NOT NULL DEFAULT 1,
+     lastRunAt INTEGER,
+     nextRunAt INTEGER NOT NULL,
+     lastRate INTEGER,
+     lastFail INTEGER,
+     createdAt INTEGER NOT NULL
+   );
+   CREATE TABLE IF NOT EXISTS hardening_runs (
+     id TEXT PRIMARY KEY,
+     targetId TEXT NOT NULL,
+     targetLabel TEXT NOT NULL,
+     standard TEXT NOT NULL,
+     at INTEGER NOT NULL,
+     rate INTEGER NOT NULL,
+     pass INTEGER NOT NULL,
+     fail INTEGER NOT NULL,
+     warn INTEGER NOT NULL,
+     na INTEGER NOT NULL,
+     source TEXT NOT NULL,         -- manual | scheduled | chatbot
+     summary TEXT
+   );
+   CREATE INDEX IF NOT EXISTS idx_hardening_runs_target ON hardening_runs(targetId, at);
+   CREATE INDEX IF NOT EXISTS idx_hardening_sched_next ON hardening_schedules(nextRunAt);`
+);

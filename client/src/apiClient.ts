@@ -1054,6 +1054,55 @@ export const terminalApi = {
     request<{ command: string; explanation: string }>("/api/terminal/suggest", { method: "POST", body: { request: requestText } }),
 };
 
+// ── 보안장비 하드닝(보안설정) 점검 — 표준 기준 체크리스트 실행·리포트 ──────────
+export type HardeningStatus = "PASS" | "FAIL" | "WARN" | "NA";
+export interface HardeningItem { id: string; cat: string; title: string; ref: string; remediation: string; status: HardeningStatus; evidence: string }
+export interface HardeningReport {
+  standard: "kisa" | "cis";
+  standardLabel: string;
+  target: string;
+  startedAt: string;
+  durationMs: number;
+  items: HardeningItem[];
+  summary: { total: number; pass: number; fail: number; warn: number; na: number; scored: number; rate: number; verdict: string };
+}
+export interface HardeningChecklist { id: "kisa" | "cis"; label: string; count: number; items: { id: string; cat: string; title: string; ref: string }[] }
+
+// 원격 SSH 정기점검 — 대상(장비)·스케줄·이력
+export type HardeningAuth = "local" | "key" | "password";
+export interface HardeningTargetPublic { id: string; label: string; host: string; port: number; username: string | null; authMethod: HardeningAuth; hasSecret: boolean }
+export interface HardeningScheduleRow { id: string; targetId: string; targetLabel: string; standard: "kisa" | "cis"; intervalHours: number; enabled: number; lastRunAt: number | null; nextRunAt: number; lastRate: number | null; lastFail: number | null; createdAt: number }
+export interface HardeningRun { id: string; targetId: string; targetLabel: string; standard: string; at: number; rate: number; pass: number; fail: number; warn: number; na: number; source: string; summary: string | null }
+export interface NewTarget { label: string; host: string; port?: number; username?: string; authMethod: HardeningAuth; secret?: string }
+
+export const hardeningApi = {
+  checklists: () => request<{ standards: HardeningChecklist[] }>("/api/hardening/checklists"),
+  scan: (standard: "kisa" | "cis", target?: string) =>
+    request<{ report: HardeningReport; markdown: string; summary: string }>("/api/hardening/scan", { method: "POST", body: { standard, target } }),
+  // 대상(장비)
+  listTargets: () => request<{ targets: HardeningTargetPublic[] }>("/api/hardening/targets"),
+  createTarget: (t: NewTarget) => request<{ target: HardeningTargetPublic }>("/api/hardening/targets", { method: "POST", body: t }),
+  deleteTarget: (id: string) => request<{ ok: boolean }>(`/api/hardening/targets/${id}`, { method: "DELETE" }),
+  probeTarget: (id: string) => request<{ ok: boolean; detail: string }>(`/api/hardening/targets/${id}/probe`, { method: "POST", body: {} }),
+  scanTarget: (id: string, standard: "kisa" | "cis") =>
+    request<{ report: HardeningReport; summary: string }>(`/api/hardening/targets/${id}/scan`, { method: "POST", body: { standard } }),
+  // 스케줄
+  listSchedules: () => request<{ schedules: HardeningScheduleRow[] }>("/api/hardening/schedules"),
+  createSchedule: (targetId: string, standard: "kisa" | "cis", intervalHours: number) =>
+    request<{ schedule: HardeningScheduleRow }>("/api/hardening/schedules", { method: "POST", body: { targetId, standard, intervalHours } }),
+  toggleSchedule: (id: string, enabled: boolean) =>
+    request<{ ok: boolean }>(`/api/hardening/schedules/${id}`, { method: "PATCH", body: { enabled } }),
+  deleteSchedule: (id: string) => request<{ ok: boolean }>(`/api/hardening/schedules/${id}`, { method: "DELETE" }),
+  // 이력
+  runs: (targetId?: string, limit?: number) => {
+    const q = new URLSearchParams();
+    if (targetId) q.set("targetId", targetId);
+    if (limit) q.set("limit", String(limit));
+    const qs = q.toString();
+    return request<{ runs: HardeningRun[] }>(`/api/hardening/runs${qs ? `?${qs}` : ""}`);
+  },
+};
+
 // ── 자산 인벤토리 ─────────────────────────────────────────────────────
 export interface AssetComponent {
   name: string;

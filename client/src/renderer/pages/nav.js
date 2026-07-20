@@ -38,6 +38,7 @@
       { page: "logs.html", label: "로그" },
       { page: "audit.html", label: "작업 기록 (감사)" },
       { page: "terminal.html", label: "터미널 (CLI)" },
+      { page: "hardening.html", label: "원격 정기점검" },
     ]},
     { id: "help", ic: "❓", label: "기능 안내", bottom: true, items: [
       { page: "reference.html", label: "기능 안내 — 전체 기능·입력칸" },

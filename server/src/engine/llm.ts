@@ -2,6 +2,8 @@
 // 서버 프로세스 안에서 localengine.ts가 띄운 llama-server를 호출한다 (같은 머신, localhost).
 
 import type { Express } from "express";
+import http from "node:http";
+import https from "node:https";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { getAgentById } from "./agents";
@@ -437,25 +439,54 @@ export async function chat(args: ChatArgs): Promise<string> {
   return reply;
 }
 
+// 임베딩 서버로 보내는 POST — 매 요청 새 연결(keepAlive:false)로 한다.
+// 왜: 전역 fetch(undici)는 연결을 재사용하는데, 임베딩 llama-server가 (모니터의 hang 복구 등으로)
+// 재기동되면 풀에 남은 죽은 소켓을 계속 재사용해 embed가 통째로 실패한다 — 임베딩 서버는 멀쩡한데
+// 실행 서버만 못 붙는 현상(2026-07-20 실측: 새 프로세스는 정상, 실행 서버는 지속 실패). node:http로
+// keepAlive를 끄면 매 호출 새 연결이라 stale 소켓 재사용이 원천 차단된다(외부 의존성 없이 근본 해결).
+function embedPost(url: string, bodyObj: unknown, timeoutMs: number): Promise<{ ok: boolean; status: number; text: string }> {
+  return new Promise((resolve) => {
+    const u = new URL(url);
+    const body = Buffer.from(JSON.stringify(bodyObj));
+    const mod = u.protocol === "https:" ? https : http;
+    const req = mod.request(
+      {
+        hostname: u.hostname,
+        port: u.port || (u.protocol === "https:" ? 443 : 80),
+        path: u.pathname + u.search,
+        method: "POST",
+        headers: { "Content-Type": "application/json", "Content-Length": body.length },
+        agent: new mod.Agent({ keepAlive: false }), // 재사용 안 함 — 죽은 소켓 원천 차단
+        timeout: timeoutMs,
+      },
+      (res) => {
+        let data = "";
+        res.setEncoding("utf8");
+        res.on("data", (c) => (data += c));
+        res.on("end", () => resolve({ ok: (res.statusCode ?? 0) >= 200 && (res.statusCode ?? 0) < 300, status: res.statusCode ?? 0, text: data }));
+      }
+    );
+    req.on("error", () => resolve({ ok: false, status: 0, text: "" }));
+    req.on("timeout", () => { req.destroy(); resolve({ ok: false, status: 0, text: "" }); });
+    req.write(body);
+    req.end();
+  });
+}
+
 export async function embed(texts: string[]): Promise<number[][]> {
   const started = Date.now();
   // EMBEDDING_SERVER_URL에는 이미 /v1이 포함돼 있다(기본값 http://localhost:8081/v1).
   // 따라서 여기서는 /embeddings만 붙여야 OpenAI 호환 경로가 된다 — /v1/embeddings를 붙이면
   // /v1/v1/embeddings가 되어 404가 나고, RAG가 조용히 죽는다(2026-07-19 실제 발생).
-  const res = await fetch(`${EMBEDDING_SERVER_URL}/embeddings`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "local", input: texts }),
-    signal: AbortSignal.timeout(LLM_TIMEOUT_MS), // 임베딩도 무한 대기 방지(시간 초과 시 아래 연결 실패 처리)
-  }).catch(() => null);
+  const res = await embedPost(`${EMBEDDING_SERVER_URL}/embeddings`, { model: "local", input: texts }, LLM_TIMEOUT_MS);
 
-  if (!res || !res.ok) {
+  if (!res.ok) {
     emitLlmActivity({ kind: "embed", phase: "error", model: "임베딩", detail: "임베딩 서버 연결 실패" });
     throw new Error(
       "임베딩 서버에 연결할 수 없습니다. 별도 llama-server를 --embedding 플래그로 " + EMBEDDING_SERVER_URL + " 에 기동하세요."
     );
   }
-  const data = (await res.json()) as { data?: { embedding: number[] }[] };
+  const data = JSON.parse(res.text) as { data?: { embedding: number[] }[] };
   if (!data.data) throw new Error("임베딩 서버 응답 형식이 올바르지 않습니다.");
   // 장기 기억 검색·수집 때 임베딩이 실제로 도는 것도 보이게 한다(추론 파이프라인의 일부).
   emitLlmActivity({

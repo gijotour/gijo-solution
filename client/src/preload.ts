@@ -261,6 +261,24 @@ const gijoApi = {
   classifyCommand: (cmd: string) => classifyChatbotCommand(cmd),
   // 챗봇에게 명령 제안 받기(서버 LLM) — 제안만, 실행은 위 terminal.exec + 사람 승인.
   suggestCommand: (requestText: string) => api.terminalApi.suggest(requestText),
+  // 보안장비 하드닝 점검(표준 기준 체크리스트 실행·리포트) — 챗봇 "점검해줘" 인텐트가 호출.
+  hardeningChecklists: () => api.hardeningApi.checklists(),
+  hardeningScan: (standard: "kisa" | "cis", target?: string) => api.hardeningApi.scan(standard, target),
+  // 원격 SSH 정기점검 — 대상(장비)·스케줄·이력 관리(관제 대시보드 hardening.html이 사용).
+  hardeningTargets: {
+    list: () => api.hardeningApi.listTargets(),
+    create: (t: api.NewTarget) => api.hardeningApi.createTarget(t),
+    remove: (id: string) => api.hardeningApi.deleteTarget(id),
+    probe: (id: string) => api.hardeningApi.probeTarget(id),
+    scan: (id: string, standard: "kisa" | "cis") => api.hardeningApi.scanTarget(id, standard),
+  },
+  hardeningSchedules: {
+    list: () => api.hardeningApi.listSchedules(),
+    create: (targetId: string, standard: "kisa" | "cis", intervalHours: number) => api.hardeningApi.createSchedule(targetId, standard, intervalHours),
+    toggle: (id: string, enabled: boolean) => api.hardeningApi.toggleSchedule(id, enabled),
+    remove: (id: string) => api.hardeningApi.deleteSchedule(id),
+  },
+  hardeningRuns: (targetId?: string, limit?: number) => api.hardeningApi.runs(targetId, limit),
 };
 
 contextBridge.exposeInMainWorld("gijo", gijoApi);

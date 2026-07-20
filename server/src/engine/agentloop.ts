@@ -216,11 +216,23 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }
     tool: "today",
     args: {},
   },
+  // 보안장비 하드닝(보안설정) 점검 — 명백한 문구는 곧장 스캔 도구로. CIS를 명시하면 cis, 아니면 국내 CCE(kisa).
+  {
+    re: /(하드닝|보안\s*설정)\s*(점검|진단|스캔|체크)|CCE\s*(점검|진단|기준)|(장비|서버|시스템)\s*(보안\s*)?(점검|진단)해|기준.{0,3}(점검|진단)|취약점\s*진단해/,
+    tool: "run_hardening_scan",
+    args: {},
+  },
 ];
 function forcedToolFor(instruction: string, scope?: ToolScope): { tool: string; args: Record<string, string> } | null {
   const available = new Set(listToolsFor(scope?.domains, scope?.role).map((t) => t.name));
   for (const f of FORCED_INTENTS) {
-    if (f.re.test(instruction) && available.has(f.tool)) return { tool: f.tool, args: f.args };
+    if (f.re.test(instruction) && available.has(f.tool)) {
+      // 하드닝 점검은 지시문에 CIS가 명시되면 국제기준(cis), 아니면 국내 CCE(kisa)로.
+      if (f.tool === "run_hardening_scan") {
+        return { tool: f.tool, args: { standard: /\bcis\b|국제/i.test(instruction) ? "cis" : "kisa" } };
+      }
+      return { tool: f.tool, args: f.args };
+    }
   }
   return null;
 }

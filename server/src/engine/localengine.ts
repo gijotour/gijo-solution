@@ -348,7 +348,14 @@ export async function autoStartLocalEngines(): Promise<void> {
 // 임베딩이 CPU로 느려지지 않게 한다(채팅 모델과 동일 설계).
 function spawnEmbeddingServer(embPath: string): void {
   console.log(`[localengine] 임베딩 서버 시작: ${EMBEDDING_MODEL_ID} (port ${EMBEDDING_PORT}, GPU 상주)`);
-  const spawned = spawn(LLAMA_SERVER_PATH, ["-m", embPath, "--embedding", "-ngl", "-1", "--port", String(EMBEDDING_PORT)], { stdio: "pipe" });
+  // --ctx-size/--batch-size/--ubatch-size를 bge-m3 최대(8192)로 명시한다. 기본값(n_ubatch=512)으로
+  // 뜨면 512토큰 초과 입력에 HTTP 500을 돌려줘 큰 청크(매뉴얼 등)가 조용히 인입 실패한다
+  // (2026-07-20 실측: 2000자↑ 입력 → 500. 모니터가 임베딩을 기본 인자로 재기동하며 RAG가 degraded).
+  const spawned = spawn(
+    LLAMA_SERVER_PATH,
+    ["-m", embPath, "--embedding", "-ngl", "-1", "--ctx-size", "8192", "--batch-size", "8192", "--ubatch-size", "8192", "--port", String(EMBEDDING_PORT)],
+    { stdio: "pipe" }
+  );
   embeddingProcess = spawned;
   embeddingModelId = EMBEDDING_MODEL_ID;
   spawned.on("exit", () => {

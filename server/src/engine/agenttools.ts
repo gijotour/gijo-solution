@@ -30,6 +30,7 @@ import { listFindings as listCtiFindings } from "./cti";
 import { matchCtiToAssets } from "./ctimatch";
 import { dailyBriefingText } from "./briefing";
 import { runRedTeam, makeServedCaller } from "./redteam";
+import { runHardeningScan, scanSummaryText, isStandard } from "./hardeningscan";
 
 export interface AgentToolParam {
   name: string;
@@ -396,6 +397,16 @@ async function runRunRedteam(args: Record<string, string>): Promise<string> {
     worst ? `가장 취약한 유형: ${worst[0]} (${worst[1].vulnerable}/${worst[1].total}건 뚫림)` : "14개 공격 유형 전부 방어 성공",
     ...(vulnList.length ? ["뚫린 공격:", ...vulnList] : []),
   ].join("\n");
+}
+
+// 보안장비 하드닝(보안설정) 점검 — 대상 장비 CLI에서 표준 기준 점검 명령을 실제 실행해 리포트한다.
+// 결과가 이미 사람이 읽기 좋은 요약이라 directAnswer로 LLM 재작성을 생략한다.
+async function runHardeningScanTool(args: Record<string, string>): Promise<string> {
+  const raw = (args.standard ?? "").toLowerCase();
+  const standard = isStandard(raw) ? raw : /cis|international|국제/.test(raw) ? "cis" : "kisa";
+  const target = (args.target ?? "").trim() || undefined;
+  const report = await runHardeningScan({ standard, target });
+  return scanSummaryText(report);
 }
 
 // ── 「AI 자산」 쓰기 도구 (Phase 2 — 결재판 경유) ────────────────────────
@@ -1290,6 +1301,20 @@ const TOOLS: AgentTool[] = [
       '자산이 서빙하는 로컬 LLM에 프롬프트 인젝션·탈옥 공격 14종을 실제로 실행해 견고성을 측정한다. AI-BOM에 연결된 로컬 모델(modelRef)이 있는 AI/LLM 자산만 대상이다(인프라 호스트는 불가). "레드팀 점검해줘", "이 자산 견고성 점검", "프롬프트 인젝션 테스트해줘"에 쓴다. 예: {"assetId":"ai-secbot-01"}',
     params: [{ name: "assetId", label: "자산 id", description: "점검할 AI/LLM 자산 id", required: true }],
     run: runRunRedteam,
+  },
+  {
+    name: "run_hardening_scan",
+    label: "보안장비 하드닝 점검",
+    domain: "cross", // 자산·보안제품·컴플라이언스를 가로지르는 진단
+    write: false,
+    description:
+      '보안장비(리눅스 기반)에 CLI로 접속해 표준 기준의 보안설정(하드닝) 점검을 실제로 실행하고 양호/취약을 리포트한다. 기준: 국내 CCE(KISA 주요정보통신기반시설 U-시리즈, 기본) 또는 CIS Benchmark. "하드닝 점검해줘", "보안 설정 점검", "CCE 점검", "취약점 진단해줘", "기준 점검"에 쓴다. 예: {"standard":"kisa"} 또는 {"standard":"cis"}',
+    directAnswer: true,
+    params: [
+      { name: "standard", label: "점검 기준", description: "kisa(국내 CCE, 기본) 또는 cis", required: false },
+      { name: "target", label: "대상 장비", description: "점검 대상 표시용 라벨 (선택)", required: false },
+    ],
+    run: runHardeningScanTool,
   },
   {
     name: "register_asset",

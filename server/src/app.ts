@@ -55,6 +55,8 @@ import { registerUsageRoutes, usageLoggingMiddleware } from "./engine/usage";
 import { registerLogsRoutes } from "./engine/logs";
 import { registerAuditRoutes } from "./engine/audit";
 import { registerCmdSuggestRoutes } from "./engine/cmdsuggest";
+import { registerHardeningRoutes } from "./engine/hardeningscan";
+import { registerHardeningTargetRoutes } from "./engine/hardeningtargets";
 import { registerLlmActivityRoutes } from "./engine/llmactivity";
 import { registerKevRoutes } from "./engine/kev";
 import { registerOntologyRoutes } from "./engine/ontology";
@@ -143,6 +145,8 @@ export function createApp(): Express {
   registerLogsRoutes(app);
   registerAuditRoutes(app);
   registerCmdSuggestRoutes(app);
+  registerHardeningRoutes(app);
+  registerHardeningTargetRoutes(app);
   registerLlmActivityRoutes(app);
   registerKevRoutes(app);
   registerOntologyRoutes(app);

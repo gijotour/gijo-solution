@@ -17,6 +17,7 @@ import { attachLlmActivitySocket } from "./engine/llmactivity";
 import { attachHfModelsSocket } from "./engine/hfmodels";
 import { attachLearnloopSocket } from "./engine/learnloop";
 import { stopLocalEngine, stopEmbeddingEngine, autoStartLocalEngines, startEmbeddingMonitor, stopEmbeddingMonitor, startChatMonitor, stopChatMonitor } from "./engine/localengine";
+import { startHardeningScheduler, stopHardeningScheduler } from "./engine/hardeningtargets";
 import { refreshKev } from "./engine/kev";
 import { bootstrapDocsBundleWithRetry } from "./engine/docsbundle";
 import { closeHttpServer } from "./util/gracefulClose";
@@ -60,6 +61,7 @@ httpServer.listen(PORT, () => {
       startEmbeddingMonitor();
       startChatMonitor(); // 채팅 모델도 hang(무응답) 감지·자동 재기동 — 임베딩과 동일 패턴
     });
+  startHardeningScheduler(); // 원격 SSH 정기점검 — 만기된 스케줄을 주기적으로 실행(LLM 무관·경량)
   // CISA KEV 목록을 백그라운드로 최신화(공개 피드 다운로드 — 실패해도 캐시로 동작).
   void refreshKev()
     .then((s) => console.log(`[kev] KEV 목록 ${s.count}건 (${s.source})`))
@@ -93,6 +95,7 @@ async function shutdown(signal: string): Promise<void> {
   try {
     stopEmbeddingMonitor();
     stopChatMonitor();
+    stopHardeningScheduler();
     await Promise.all([stopLocalEngine(), stopEmbeddingEngine()]);
   } catch (err) {
     // 엔진 정리에 실패해도 종료는 계속한다 — 안 끝나는 것보다 낫다.

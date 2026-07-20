@@ -165,11 +165,25 @@ export async function ingestText(documentId: string, raw: string, scope: string 
 
   // 대용량 문서(수백~수천 청크)를 한 번에 임베딩하면 임베딩 서버 요청이 제한시간(120s)을 넘겨
   // 통째로 실패(embed가 연결오류로 표기)한다. 배치로 나눠 각 요청이 시간 안에 끝나게 한다.
+  // 또한 임베딩 서버가 불안정하거나(배치 토큰이 n_batch 초과 등) 큰 배치를 거부하면 배치 전체가
+  // 실패해 문서가 조용히 인입 안 되는 문제가 있다(2026-07-20 실측: 다중 청크 배치는 빠르게 실패,
+  // 단건은 성공). 그래서 배치 실패 시 청크 단위로 쪼개 재시도한다 — 건강할 땐 빠르게, 불안정할 땐
+  // 견고하게(느리지만 반드시 들어가게).
   const EMBED_BATCH = 64;
   const vectors: number[][] = [];
   for (let i = 0; i < chunks.length; i += EMBED_BATCH) {
-    const vecs = await embed(chunks.slice(i, i + EMBED_BATCH));
-    for (const v of vecs) vectors.push(v);
+    const slice = chunks.slice(i, i + EMBED_BATCH);
+    try {
+      const vecs = await embed(slice);
+      for (const v of vecs) vectors.push(v);
+    } catch (batchErr) {
+      if (slice.length === 1) throw batchErr; // 단건도 실패면 임베딩 서버 자체 문제 — 위로 던진다
+      console.warn(`[memory] 배치 임베딩 실패(${slice.length}건) — 청크 단위로 재시도: ${batchErr instanceof Error ? batchErr.message : String(batchErr)}`);
+      for (const c of slice) {
+        const v = await embed([c]);
+        vectors.push(v[0]);
+      }
+    }
   }
   const rows: MemoryRow[] = chunks.map((text, i) => ({ documentId, chunkIndex: i, text, scope, vector: vectors[i] }));
 

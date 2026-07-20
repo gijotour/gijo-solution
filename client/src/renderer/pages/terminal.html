@@ -45,6 +45,42 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .askbar button{background:var(--purple);color:#fff;border:0;border-radius:8px;padding:0 16px;font-size:12.5px;font-weight:800;cursor:pointer;}
 .askbar button:disabled{opacity:.5;cursor:default;}
 
+/* 빠른 점검 칩 */
+.chips{display:flex;align-items:center;gap:8px;margin-bottom:10px;flex-wrap:wrap;}
+.chips .chip-lbl{font-size:11px;color:var(--muted-2);font-weight:700;}
+.chip{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);border-radius:16px;padding:5px 13px;font-size:11.5px;font-weight:700;cursor:pointer;}
+.chip:hover{border-color:var(--blue);color:#fff;}
+.chip:disabled{opacity:.5;cursor:default;}
+
+/* 하드닝 점검 리포트 카드 */
+.report{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:10px;padding:14px 16px;margin-bottom:12px;font-size:12px;}
+.report h4{font-size:14px;color:#fff;margin-bottom:3px;}
+.report .meta{font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5;}
+.report .score{font-size:22px;font-weight:800;}
+.report .sumline{display:flex;gap:14px;align-items:baseline;margin-bottom:10px;flex-wrap:wrap;}
+.report .tag{font-size:11px;font-weight:700;padding:2px 8px;border-radius:5px;}
+.report table{width:100%;border-collapse:collapse;font-size:11.5px;}
+.report th,.report td{text-align:left;padding:6px 8px;border-bottom:1px solid var(--border);vertical-align:top;}
+.report th{color:var(--muted-2);font-size:10.5px;font-weight:700;text-transform:none;}
+.report td.st{white-space:nowrap;font-weight:700;}
+.report .ev{color:var(--muted);font-size:11px;}
+.report .rc{margin-top:10px;font-size:11.5px;line-height:1.6;}
+.report .rc b{color:#fff;}
+.report .close{float:right;background:transparent;border:1px solid var(--border-strong);color:var(--muted);border-radius:6px;padding:3px 10px;font-size:11px;cursor:pointer;}
+/* 시안 A — 분류별 섹션 그룹 */
+.report .glabel{font-size:11px;color:var(--muted-2);font-weight:700;margin-bottom:2px;}
+.report .grp{margin-top:14px;border-left:3px solid var(--teal);padding-left:12px;}
+.report .ghead{display:flex;align-items:center;gap:8px;margin-bottom:4px;}
+.report .gname{font-size:13px;font-weight:800;color:#fff;}
+.report .gcount{color:var(--muted-2);font-size:11px;}
+.report .gbadges{margin-left:auto;display:flex;gap:5px;flex-wrap:wrap;}
+.report .gbadge{font-size:9.5px;font-weight:800;padding:1px 7px;border-radius:5px;}
+.report .gbadge.ok{background:rgba(30,185,128,.15);color:#1eb980;}
+.report .gbadge.bad{background:rgba(226,72,61,.15);color:#e2483d;}
+.report .gbadge.warn{background:rgba(240,160,32,.15);color:#f0a020;}
+.report .gbadge.na{background:rgba(139,147,171,.15);color:#8b93ab;}
+.report .gid{width:52px;color:var(--muted-2);font-weight:700;}
+
 /* 챗봇 제안(승인 카드) */
 .propose{background:rgba(240,160,32,.08);border:1px solid rgba(240,160,32,.4);border-radius:9px;padding:10px 13px;margin-bottom:10px;font-size:12px;}
 .propose .pc{font-family:Consolas,monospace;color:#8fd6a8;background:#05070d;border:1px solid var(--border);border-radius:6px;padding:6px 9px;margin:6px 0;display:inline-block;}
@@ -95,10 +131,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     <div class="warn">⚠ 이 터미널은 담당자 본인 PC에서 명령을 실행합니다. 원격 대상 작업은 직접 입력한 명령(ssh 등) 안에서만 이뤄집니다 — 앱이 원격에 직접 붙지 않습니다.</div>
 
-    <!-- ④ 챗봇에게 명령 요청 → 허용목록 판정 → 승인 후 실행 -->
+    <!-- ④ 챗봇에게 명령 요청 → 허용목록 판정 → 승인 후 실행 / 또는 "점검해줘" → 하드닝 점검 실행 -->
     <div class="askbar">
-      <input id="askInput" placeholder="챗봇에게 명령 요청 (예: 10.0.0.5 열린 포트 스캔해줘) — 제안된 명령을 승인 후 실행">
+      <input id="askInput" placeholder="챗봇에게 명령 요청 (예: 10.0.0.5 포트 스캔해줘 / 이 장비 하드닝 점검해줘)">
       <button id="askBtn">🤖 명령 제안 받기</button>
+    </div>
+    <div class="chips">
+      <span class="chip-lbl">빠른 점검:</span>
+      <button class="chip" data-scan="kisa">🛡 국내 CCE 점검 (KISA)</button>
+      <button class="chip" data-scan="cis">🌐 CIS Benchmark 점검</button>
     </div>
     <div id="proposeSlot"></div>
 
@@ -144,10 +185,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     window.gijo.recordAudit(`CLI 실행: ${line}`, source || "manual", null, "cli", "ok").catch(() => {});
   }
 
-  // ④ 챗봇에게 명령 제안 받기 → 정책 판정 → 승인 카드
+  // "점검해줘" 계열은 단일 명령 제안이 아니라 표준 기준 하드닝 점검을 실제로 실행한다(결정적 인텐트).
+  const SCAN_INTENT = /하드닝|보안\s*설정\s*점검|설정\s*점검|CCE|CIS|취약점\s*진단|기준\s*점검|보안\s*점검|장비.{0,6}점검/i;
+
+  // ④ 챗봇에게 명령 제안 받기 → 정책 판정 → 승인 카드 / 점검 요청이면 하드닝 점검 실행
   async function askChatbot() {
     const q = document.getElementById("askInput").value.trim();
     if (!q) return;
+    if (SCAN_INTENT.test(q)) { runHardeningFromChat(/\bcis\b|국제/i.test(q) ? "cis" : "kisa", q); return; }
     const btn = document.getElementById("askBtn");
     btn.disabled = true; btn.textContent = "🤖 생각 중…";
     try {
@@ -158,6 +203,64 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     } finally {
       btn.disabled = false; btn.textContent = "🤖 명령 제안 받기";
     }
+  }
+
+  const MARK = { PASS: "✅ 양호", FAIL: "❌ 취약", WARN: "⚠️ 확인필요", NA: "➖ 해당없음" };
+  const MARK_COLOR = { PASS: "#1eb980", FAIL: "#e2483d", WARN: "#f0a020", NA: "#8b93ab" };
+
+  // 챗봇 명령 → 대상 장비 CLI에서 표준 기준 하드닝 점검 실행 → 리포트 렌더 (실제 동작)
+  async function runHardeningFromChat(standard, q) {
+    const label = standard === "cis" ? "CIS Benchmark" : "국내 CCE (KISA 주요정보통신기반시설)";
+    const btn = document.getElementById("askBtn");
+    const chips = document.querySelectorAll(".chip");
+    btn.disabled = true; btn.textContent = "🛡 점검 중…"; chips.forEach((c) => (c.disabled = true));
+    append(`\n[챗봇] ${label} 기준 보안장비 하드닝 점검을 시작합니다…\n`, "in");
+    try {
+      const res = await window.gijo.hardeningScan(standard);
+      renderScanReport(res.report);
+      append(res.summary + "\n");
+    } catch (e) {
+      append(`[점검 실패] ${(e && e.message) || e}\n`, "blk");
+    } finally {
+      btn.disabled = false; btn.textContent = "🤖 명령 제안 받기"; chips.forEach((c) => (c.disabled = false));
+    }
+  }
+
+  // 시안 A — 분류(카테고리)별 섹션 그룹. 그룹 헤더에 소계 배지 + 좌측 색 바(취약 있으면 빨강).
+  function renderScanReport(rep) {
+    const s = rep.summary;
+    const verdictColor = s.fail === 0 ? "#1eb980" : s.fail <= 2 ? "#f0a020" : "#e2483d";
+    const cats = [];
+    rep.items.forEach((i) => { if (!cats.includes(i.cat)) cats.push(i.cat); });
+    const groups = cats.map((cat) => {
+      const items = rep.items.filter((i) => i.cat === cat);
+      const c = { PASS: 0, FAIL: 0, WARN: 0, NA: 0 };
+      items.forEach((i) => c[i.status]++);
+      const bar = c.FAIL > 0 ? "#e2483d" : c.WARN > 0 ? "#f0a020" : "#1eb980";
+      const badges =
+        (c.PASS ? `<span class="gbadge ok">양호 ${c.PASS}</span>` : "") +
+        (c.FAIL ? `<span class="gbadge bad">취약 ${c.FAIL}</span>` : "") +
+        (c.WARN ? `<span class="gbadge warn">확인 ${c.WARN}</span>` : "") +
+        (c.NA ? `<span class="gbadge na">해당없음 ${c.NA}</span>` : "");
+      const rows = items.map((i) =>
+        `<tr><td class="gid">${esc(i.id)}</td><td>${esc(i.title)}</td>` +
+        `<td class="st" style="color:${MARK_COLOR[i.status]};width:88px">${MARK[i.status]}</td>` +
+        `<td class="ev">${esc(i.evidence)}</td></tr>`
+      ).join("");
+      return `<div class="grp" style="border-left-color:${bar}">` +
+        `<div class="ghead"><span class="gname">${esc(cat)}</span><span class="gcount">${items.length}항목</span>` +
+        `<span class="gbadges">${badges}</span></div>` +
+        `<table><tbody>${rows}</tbody></table></div>`;
+    }).join("");
+    document.getElementById("proposeSlot").innerHTML =
+      `<div class="report">` +
+      `<button class="close" onclick="this.closest('.report').remove()">닫기</button>` +
+      `<h4>🛡 보안장비 하드닝 점검 리포트</h4>` +
+      `<div class="meta">대상: ${esc(rep.target)} · 기준: ${esc(rep.standardLabel)}<br>점검 방식: 장비 CLI 실 명령 실행·실측 · ${(rep.durationMs / 1000).toFixed(1)}초 소요</div>` +
+      `<div class="sumline"><span class="score" style="color:${verdictColor}">${s.rate}%</span>` +
+      `<span style="color:${verdictColor};font-weight:800">${esc(s.verdict)}</span>` +
+      `<span style="color:var(--muted)">✅ ${s.pass} · ❌ ${s.fail} · ⚠️ ${s.warn} · ➖ ${s.na} (총 ${s.total})</span></div>` +
+      `<div class="glabel">분류별 점검 결과</div>${groups}</div>`;
   }
   function renderPropose(command, explanation) {
     const slot = document.getElementById("proposeSlot");
@@ -193,11 +296,19 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       document.getElementById("shellBadge").textContent = `담당자 PC · ${s.shell}`;
     } catch (e) { append("[셸을 시작하지 못했습니다]\n", "blk"); }
 
+    // 대시보드 자산 탐색기의 "🖥 터미널 연결"에서 넘어온 프리필(ssh 명령)을 채워 둔다(검토 후 Enter로 실행).
+    try {
+      const pf = localStorage.getItem("gijo.terminal.prefill");
+      localStorage.removeItem("gijo.terminal.prefill");
+      if (pf) { termInput.value = pf; append(`\n[자산 탐색기] 연결 명령을 준비했습니다 — 검토 후 Enter로 실행하세요.\n`, "in"); setTimeout(() => termInput.focus(), 50); }
+    } catch (e) {}
+
     termInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter") { const v = termInput.value; termInput.value = ""; runCommand(v, "manual"); }
     });
     document.getElementById("askBtn").addEventListener("click", askChatbot);
     document.getElementById("askInput").addEventListener("keydown", (e) => { if (e.key === "Enter") askChatbot(); });
+    document.querySelectorAll(".chip[data-scan]").forEach((c) => c.addEventListener("click", () => runHardeningFromChat(c.dataset.scan, c.dataset.scan)));
 
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));

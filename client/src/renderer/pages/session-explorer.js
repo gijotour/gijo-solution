@@ -45,15 +45,22 @@
       var model = (bom.model && (bom.model.name || bom.model.modelRef)) || (a.components && a.components[0] && a.components[0].name) || "-";
       var rob = bom.robustness && bom.robustness.score != null ? bom.robustness.score + "점" : "미점검";
       var scan = a.lastScannedAt ? new Date(a.lastScannedAt).toLocaleDateString("ko-KR") : "없음";
+      // 호스트(장비/서버) 자산이면 접속 주소를 뽑아 "🖥 터미널 연결"을 최상단 추천으로 노출한다(ssh 프리필).
+      var pth = String(a.path || "").trim();
+      var host = "";
+      if ((a.assetType || "").toLowerCase() === "infra-host" && pth && !/[\\/]/.test(pth)) host = pth.split(":")[0];
+      else if (/^(?:\d{1,3}\.){3}\d{1,3}(?::\d+)?$/.test(pth)) host = pth.split(":")[0];
+      var sugg = [
+        { label: "이 자산 재스캔", hint: "스캔→비교", instruction: (a.name || a.id) + " 재스캔해줘" },
+        { label: "가장 급한 취약점 담당자·기한 배정", hint: "결재판", instruction: (a.name || a.id) + "의 가장 급한 취약점 담당자와 기한을 배정해줘" },
+        { label: "취약점 조치 절차 안내", hint: "매뉴얼·온톨로지", instruction: (a.name || a.id) + " 취약점 조치 절차 알려줘" },
+        { label: "AI 견고성(레드팀) 점검", hint: "14 페이로드", instruction: (a.name || a.id) + " 레드팀 점검해줘" },
+      ];
+      if (host) sugg.unshift({ label: "🖥 터미널 연결 (" + host + ")", hint: "SSH", terminalHost: host });
       return {
         title: (a.name || a.id) + " · 상태",
         statusText: "◆ " + (a.name || a.id) + " (" + a.id + ")\n취약점 " + sevSummary(a.findings) + " · 최근 스캔 " + scan + "\nAI-BOM " + model + " · 견고성 " + rob + " · 서비스 " + (a.service || "미지정"),
-        suggestions: [
-          { label: "이 자산 재스캔", hint: "스캔→비교", instruction: (a.name || a.id) + " 재스캔해줘" },
-          { label: "가장 급한 취약점 담당자·기한 배정", hint: "결재판", instruction: (a.name || a.id) + "의 가장 급한 취약점 담당자와 기한을 배정해줘" },
-          { label: "취약점 조치 절차 안내", hint: "매뉴얼·온톨로지", instruction: (a.name || a.id) + " 취약점 조치 절차 알려줘" },
-          { label: "AI 견고성(레드팀) 점검", hint: "14 페이로드", instruction: (a.name || a.id) + " 레드팀 점검해줘" },
-        ],
+        suggestions: sugg,
       };
     }
     if (type === "vuln") {
