@@ -46,6 +46,11 @@ migrate(
 // 별도 마이그레이션으로 추가해 기존 work_sessions 테이블에도 적용되게 한다(원 마이그레이션은 불변).
 migrate("work_sessions-contextRef", "ALTER TABLE work_sessions ADD COLUMN contextRef TEXT");
 
+// doneBy: 이 세션이 "완료(done)"가 된 경위 — "user"(사람이 명시적으로 완료) / "auto"(30분 무대화
+// 자동 완료·감사 단발행위 등 시스템 완료) / null(아직 완료 아님). 사용자 완료와 자동 완료를 화면에서
+// 구분해 표시하기 위함(2026-07-20 요청). done이 아닌 상태로 되돌리면 null로 지운다.
+migrate("work_sessions-doneBy", "ALTER TABLE work_sessions ADD COLUMN doneBy TEXT");
+
 // status: active(진행중) | done(완료) | ignored(무시). 새 세션은 active로 시작한다.
 export type SessionStatus = "active" | "done" | "ignored";
 const STATUSES: SessionStatus[] = ["active", "done", "ignored"];
@@ -60,10 +65,14 @@ export interface SessionTurn {
   at: number;
 }
 
+// 완료 경위 — 사용자 완료와 자동 완료(30분 무대화 등)를 구분한다.
+export type DoneBy = "user" | "auto";
+
 export interface WorkSession {
   id: string;
   title: string;
   status: SessionStatus;
+  doneBy?: DoneBy; // status가 done일 때만 채워짐(user/auto). 그 외엔 undefined.
   contextRef?: string; // 탐색기 대상 참조(asset:.. / vuln:.. / product:.. / today). 없으면 일반 세션.
   createdAt: number;
   updatedAt: number;
@@ -80,6 +89,7 @@ interface SessionRow {
   id: string;
   title: string;
   status: string;
+  doneBy: string | null;
   contextRef: string | null;
   createdAt: number;
   updatedAt: number;
@@ -94,10 +104,12 @@ interface TurnRow {
 }
 
 function rowToSession(r: SessionRow): WorkSession {
+  const status = (STATUSES.includes(r.status as SessionStatus) ? r.status : "active") as SessionStatus;
   return {
     id: r.id,
     title: r.title,
-    status: (STATUSES.includes(r.status as SessionStatus) ? r.status : "active") as SessionStatus,
+    status,
+    doneBy: status === "done" && (r.doneBy === "user" || r.doneBy === "auto") ? r.doneBy : undefined,
     contextRef: r.contextRef ?? undefined,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
@@ -174,11 +186,13 @@ export function renameSession(id: string, title: string): WorkSession | null {
   return getSession(id);
 }
 
-export function setSessionStatus(id: string, status: SessionStatus): WorkSession | null {
+// doneBy: status를 done으로 바꿀 때 그 경위를 함께 저장한다(기본 "user"). done이 아니면 doneBy는 지운다.
+export function setSessionStatus(id: string, status: SessionStatus, doneBy: DoneBy = "user"): WorkSession | null {
   if (!STATUSES.includes(status)) return null;
   const s = getSession(id);
   if (!s) return null;
-  db.prepare("UPDATE work_sessions SET status = ?, updatedAt = ? WHERE id = ?").run(status, Date.now(), id);
+  const by = status === "done" ? doneBy : null;
+  db.prepare("UPDATE work_sessions SET status = ?, doneBy = ?, updatedAt = ? WHERE id = ?").run(status, by, Date.now(), id);
   return getSession(id);
 }
 
@@ -245,9 +259,45 @@ onAudit((e) => {
     const role = e.actor === "scheduler" ? "assistant" : "user";
     const body = (e.detail || e.action) + (e.result !== "ok" ? ` (결과: ${e.result})` : "");
     appendTurn(s.id, role, body, e.actor ?? undefined);
-    if (e.result !== "pending") setSessionStatus(s.id, "done");
+    if (e.result !== "pending") setSessionStatus(s.id, "done", "auto"); // 단발 행위 = 시스템 자동 완료
   } catch { /* 세션 반영 실패가 본 작업·감사 기록을 막지 않게 */ }
 });
+
+// ── 30분 무대화 세션 자동 완료(2026-07-20 요청) ───────────────────────────
+// 대화형 세션은 "언제 끝났는지"를 시스템이 알 수 없어 진행중(active)으로 남는다. 마지막 갱신(updatedAt)이
+// IDLE_MS 이상 지났고 대화가 하나라도 있는 active 세션을 자동 완료한다(doneBy="auto"). 빈 세션(턴 0)은
+// 건드리지 않는다(버려진 껍데기 — prune 대상). updatedAt은 그대로 둬 "언제까지 대화했는지"를 보존한다.
+// 자동 완료는 DOCX 리포트를 만들지 않는다 — 리포트는 사용자가 의도적으로 완료(PATCH)할 때만.
+export const SESSION_AUTO_DONE_IDLE_MS = Number(process.env.GIJO_SESSION_AUTO_DONE_MS ?? 30 * 60 * 1000);
+export function autoCompleteIdleSessions(idleMs = SESSION_AUTO_DONE_IDLE_MS): number {
+  const cutoff = Date.now() - idleMs;
+  const rows = db
+    .prepare(
+      `SELECT s.id FROM work_sessions s
+       WHERE s.status = 'active' AND s.updatedAt < ?
+         AND EXISTS (SELECT 1 FROM work_session_turns t WHERE t.sessionId = s.id)`
+    )
+    .all(cutoff) as { id: string }[];
+  if (!rows.length) return 0;
+  // updatedAt을 건드리지 않고 상태만 바꾼다(마지막 대화 시각 보존, 목록 정렬도 유지).
+  const upd = db.prepare("UPDATE work_sessions SET status = 'done', doneBy = 'auto' WHERE id = ?");
+  const tx = db.transaction((ids: string[]) => { for (const id of ids) upd.run(id); });
+  tx(rows.map((r) => r.id));
+  return rows.length;
+}
+
+// 서버 상주 시 주기 스위프(5분마다). 테스트 환경(:memory:)에서는 타이머를 걸지 않는다.
+if (process.env.GIJO_DB_PATH !== ":memory:" && process.env.NODE_ENV !== "test") {
+  const timer = setInterval(() => {
+    try {
+      const n = autoCompleteIdleSessions();
+      if (n > 0) console.log(`[worksessions] 30분 무대화 세션 ${n}건 자동 완료`);
+    } catch (e) {
+      console.error("[worksessions] 자동 완료 스위프 실패:", e instanceof Error ? e.message : e);
+    }
+  }, 5 * 60 * 1000);
+  timer.unref?.(); // 이 타이머가 프로세스 종료를 막지 않게
+}
 
 // ── 세션 종료 리포트 ─────────────────────────────────────────────────
 // 세션을 "완료"로 바꾸면 그 대화 전체(지시·응답·도구 태그·시각)를 DOCX로 남긴다.
@@ -331,7 +381,7 @@ export function registerWorkSessionRoutes(app: Express): void {
     if (typeof req.body?.title === "string") session = renameSession(id, req.body.title) ?? session;
     if (typeof req.body?.status === "string") {
       if (!STATUSES.includes(req.body.status)) return res.status(400).json({ error: "허용되지 않은 상태" });
-      session = setSessionStatus(id, req.body.status) ?? session;
+      session = setSessionStatus(id, req.body.status, "user") ?? session; // 화면에서 온 완료 = 사용자 완료
     }
     let report: { base: string; docx: string } | null = null;
     if (!wasDone && session.status === "done") {

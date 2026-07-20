@@ -1898,7 +1898,8 @@
         const who = s.lastRole === "user" ? "나" : s.lastRole === "assistant" ? "AI 팀" : "—";
         const d = new Date(s.updatedAt);
         const when = `${d.getMonth() + 1}.${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-        const stL = DASH_STATUS_LABEL[s.status] || s.status;
+        // 완료는 경위 구분 — 사용자 완료 "완료", 30분 무대화 등 자동 완료 "자동완료".
+        const stL = s.status === "done" ? (s.doneBy === "auto" ? "자동완료" : "완료") : (DASH_STATUS_LABEL[s.status] || s.status);
         const prev = s.lastPreview ? ` — ${s.lastPreview}` : "";
         return `<div class="dash-sitem2 st-${s.status}" data-id="${s.id}">
           <div class="s-r1"><span class="s-dot"></span><span class="t">${escT(s.title)}</span>` +

@@ -320,11 +320,13 @@
     }
     sessionListEl.innerHTML = filtered.map((s) => {
       const st = s.status || "active";
+      // 완료는 경위 구분 — 사용자 완료 "완료", 30분 무대화 등 자동 완료 "자동완료".
+      const label = st === "done" ? (s.doneBy === "auto" ? "자동완료" : "완료") : (STATUS_LABEL[st] || st);
       const preview = s.lastPreview ? esc(s.lastPreview) : "아직 대화 없음";
       return `<div class="srow ${s.id === currentId ? "on" : ""}" data-id="${s.id}">
         <span class="sdot ${st}"></span>
         <div class="sr-main"><div class="sr-title">${esc(s.title)}</div><div class="sr-sub">${preview}</div></div>
-        <div class="sr-meta"><span class="badge ${STATUS_BADGE[st] || "b-active"}">${STATUS_LABEL[st] || st}</span><br>${fmtTime(s.updatedAt)} · ${s.turnCount || 0}턴</div>
+        <div class="sr-meta"><span class="badge ${STATUS_BADGE[st] || "b-active"}">${label}</span><br>${fmtTime(s.updatedAt)} · ${s.turnCount || 0}턴</div>
         <span class="sdel" data-del="${s.id}" title="세션 삭제">🗑</span>
       </div>`;
     }).join("");
