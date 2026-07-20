@@ -124,3 +124,15 @@ select.g-input { cursor: pointer; }
 .g-modal { width: 380px; max-width: 92vw; background: var(--g-surface-1); border: 1px solid var(--g-border-strong); border-radius: var(--g-r); padding: var(--g-s5); box-shadow: var(--g-shadow-modal); }
 .g-modal .mt { font-size: var(--g-t-md); font-weight: 800; color: #fff; margin-bottom: var(--g-s4); }
 .g-modal .macts { display: flex; gap: var(--g-s2); justify-content: flex-end; margin-top: var(--g-s5); }
+
+/* ── 레거시 화면 정렬 (Phase 2 롤아웃) ─────────────────────────────────────
+ * 여러 화면이 공유하는 공용 클래스명(btn-primary·btn-ghost·panel·card·tile·chip·pill·modal)의
+ * **라운드만** 시안 C로 통일한다(색·크기·구조는 안 건드림 → 저위험). body.g-ui 스코프라
+ * 페이지 자체 규칙보다 특이도가 높아 자동 적용된다. 화면별 세부 조정은 개별 파일에서 한다. */
+.g-ui .btn-primary, .g-ui .btn-ghost, .g-ui .btn { border-radius: var(--g-r); }
+.g-ui .panel, .g-ui .card, .g-ui .tile { border-radius: var(--g-r); }
+.g-ui .chip, .g-ui .fchip, .g-ui .kchip { border-radius: var(--g-r-pill); }
+.g-ui .pill, .g-ui .status-pill { border-radius: var(--g-r-pill); }
+.g-ui .modal, .g-ui .modal-overlay > .modal, .g-ui .card-lg { border-radius: var(--g-r); }
+/* 입력·셀렉트 라운드도 통일(있는 화면만) */
+.g-ui .input, .g-ui .field input, .g-ui .field select { border-radius: var(--g-r-sm); }
