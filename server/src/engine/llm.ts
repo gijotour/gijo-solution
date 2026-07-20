@@ -9,6 +9,7 @@ import { asyncRoute } from "../util/asyncRoute";
 import { getAgentById } from "./agents";
 import { emitLlmActivity, modelBasename } from "./llmactivity";
 import { recordChatLog } from "./learnloop";
+import { explainHardTerms } from "./glossary";
 import { gateUserInput } from "./gateway";
 
 const LOCAL_LLM_BASE_URL = process.env.GIJO_LOCAL_LLM_URL ?? "http://localhost:8080/v1";
@@ -436,7 +437,8 @@ export async function chat(args: ChatArgs): Promise<string> {
     // 여기 못 온다). recordChatLog는 내부 try/catch — 수집 실패가 채팅을 죽이지 않는다.
     recordChatLog(args.agentId, args.message, reply);
   }
-  return reply;
+  // 반환값에만 어려운 용어 쉬운 풀이를 붙인다(히스토리·학습로그는 원문 유지 — 맥락 오염·중복 방지).
+  return explainHardTerms(reply);
 }
 
 // 임베딩 서버로 보내는 POST — 매 요청 새 연결(keepAlive:false)로 한다.
