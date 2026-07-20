@@ -164,10 +164,21 @@
     if (document.body) document.body.classList.add("g-ui");
   }
 
+  // 공용 '오른쪽 작업 화면'(작업 세션 + 지휘 콘솔)을 모든 페이지에 주입한다 — 어느 화면에서든
+  // AI에게 지시할 수 있게. 대시보드는 자체 패널이 있어 commandpanel.js가 스스로 건너뛴다.
+  function loadCommandPanel() {
+    if (document.getElementById("gijoCmdScript")) return;
+    var s = document.createElement("script");
+    s.id = "gijoCmdScript";
+    s.src = "commandpanel.js";
+    document.body.appendChild(s);
+  }
+
   function boot() {
     loadDesignSystem();
     render();
     loadOnboarding();
+    loadCommandPanel();
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
   else boot();
