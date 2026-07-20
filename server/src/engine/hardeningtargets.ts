@@ -15,6 +15,7 @@ import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import type { GijoUser } from "../auth/users";
 import { recordAudit } from "./audit";
+import { projectHardeningEvents } from "./analysishub";
 import {
   runHardeningScan,
   targetRunner,
@@ -101,6 +102,8 @@ export async function runScanForTarget(target: HardeningTarget, standard: Standa
     detail: `준수율 ${s.rate}% · 취약 ${s.fail} · 확인필요 ${s.warn}`,
     result: "ok",
   });
+  // 취약·확인필요 항목을 통합 관제(보안 분석) 4번째 소스로 투영 — 장비명으로 취약점·로그와 상관·조치 흐름 연결.
+  projectHardeningEvents(target.id, target.label, standard, report.items);
   // 악화 알림 — 직전 대비 취약 건수가 늘면 별도 감사 항목으로 눈에 띄게 남긴다.
   if (prevFail !== null && s.fail > prevFail) {
     recordAudit({

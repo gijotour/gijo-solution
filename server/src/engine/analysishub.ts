@@ -20,7 +20,7 @@ import { listAssets } from "./assets";
 import { chat } from "./llm";
 import { PLAIN_LANGUAGE_RULE } from "./promptstyle";
 
-export type AnalysisSource = "vuln" | "log" | "product";
+export type AnalysisSource = "vuln" | "log" | "product" | "hardening";
 export type Severity = "critical" | "high" | "medium" | "low" | "info";
 export type Priority = "P0" | "P1" | "P2" | "P3";
 // 이벤트 생애주기 — 관제를 "처리해 나가는" 워크플로로. done/ignored는 해결(활성 위험 집계에서 제외).
@@ -350,6 +350,41 @@ export function parseProductReport(productName: string, content: string): Report
   return { events, counts };
 }
 
+// ── 소스 ④: 보안장비 하드닝 점검 — 취약 항목을 이벤트로 투영 ─────────────────
+// 등록된 원격 장비의 하드닝(CCE/CIS) 점검에서 취약(FAIL)·확인필요(WARN) 항목을 AnalysisEvent로
+// 올린다. entity=장비명이라 같은 장비의 취약점·로그와 상관분석에 묶이고, 기존 조치 흐름(▶조치)을 탄다.
+// id가 안정적(hardening:target:item)이라 재점검해도 상태(처리중/완료)가 살아남는다(고쳐지면 사라짐).
+const deleteHardeningByTargetStmt = db.prepare("DELETE FROM analysis_events WHERE source = 'hardening' AND ref = ?");
+export function projectHardeningEvents(
+  targetId: string,
+  targetLabel: string,
+  standard: string,
+  items: { id: string; title: string; status: string; evidence: string; remediation: string }[]
+): number {
+  deleteHardeningByTargetStmt.run(targetId); // 이번 점검에서 양호로 바뀐 항목은 자연히 사라진다
+  let n = 0;
+  for (const it of items) {
+    if (it.status !== "FAIL" && it.status !== "WARN") continue;
+    const severity: Severity = it.status === "FAIL" ? "medium" : "low";
+    const signals = ["보안설정 취약"];
+    saveEvent({
+      id: `hardening:${targetId}:${it.id}`,
+      source: "hardening",
+      title: `보안설정 취약: ${it.title}`,
+      entity: targetLabel,
+      severity,
+      priority: computePriority(severity, signals),
+      detail: `[${standard.toUpperCase()} ${it.id}] ${it.evidence} → 조치: ${it.remediation}`,
+      signals,
+      aiSummary: "",
+      ref: targetId,
+      at: Date.now(),
+    });
+    n++;
+  }
+  return n;
+}
+
 // ── 상관분석 ───────────────────────────────────────────────────────────────
 // 같은 entity(호스트/IP/PC)가 2개 이상 서로 다른 소스에 나타나면 교차 위험으로 묶는다.
 // 예: 백신 재발(product) + 비정상 아웃바운드(log)가 같은 PC → 감염+C2 연계 가능성.
@@ -360,7 +395,7 @@ export interface Correlation {
   note: string;
 }
 function sourceLabel(s: AnalysisSource): string {
-  return s === "vuln" ? "취약점" : s === "log" ? "보안로그" : "운영리포트";
+  return s === "vuln" ? "취약점" : s === "log" ? "보안로그" : s === "hardening" ? "하드닝점검" : "운영리포트";
 }
 export function computeCorrelations(events: AnalysisEvent[]): Correlation[] {
   const byEntity = new Map<string, AnalysisEvent[]>();
@@ -404,7 +439,7 @@ export function analysisSummary(events: AnalysisEvent[]): {
   byPriority: Record<Priority, number>;
   overall: "높음" | "보통" | "낮음";
 } {
-  const bySource: Record<AnalysisSource, number> = { vuln: 0, log: 0, product: 0 };
+  const bySource: Record<AnalysisSource, number> = { vuln: 0, log: 0, product: 0, hardening: 0 };
   const byPriority: Record<Priority, number> = { P0: 0, P1: 0, P2: 0, P3: 0 };
   // 종합위험·우선순위는 미해결(active) 이벤트만 집계 — 완료/무시한 건 위험에서 빠진다(워크플로).
   const active = events.filter((e) => !RESOLVED.includes(e.status ?? "open"));
@@ -425,7 +460,7 @@ export function getAnalysisEvent(id: string): AnalysisEvent | undefined {
 // 결정적 파서가 "무엇을" 잡았다면, LLM은 담당자에게 "무슨 일·왜 위험·뭘 해야" 를 붙인다.
 // 이벤트 상세 + 상관관계를 근거로 주입(그라운딩) — 추측을 사실처럼 쓰지 않게 지시.
 export function buildAnalysisPrompt(e: AnalysisEvent, correlation?: Correlation): string {
-  const srcKo = e.source === "vuln" ? "취약점 스캐너" : e.source === "log" ? "보안 로그" : "보안제품 운영 리포트";
+  const srcKo = e.source === "vuln" ? "취약점 스캐너" : e.source === "log" ? "보안 로그" : e.source === "hardening" ? "보안장비 하드닝 점검" : "보안제품 운영 리포트";
   return [
     "당신은 1인 보안담당자를 돕는 보안 분석가입니다. 아래 보안 이벤트를 한국어로 간결히 분석하세요.",
     PLAIN_LANGUAGE_RULE,

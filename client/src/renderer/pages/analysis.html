@@ -65,6 +65,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .src.vuln{color:var(--red);background:rgba(226,72,61,.12);}
 .src.log{color:var(--amber);background:rgba(240,160,32,.12);}
 .src.product{color:var(--purple);background:rgba(139,124,240,.12);}
+.src.hardening{color:var(--teal);background:rgba(30,185,128,.12);}
 .rr-main{flex:1;min-width:0;}
 .rr-name{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 .rr-sub{font-size:11px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -123,17 +124,19 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div class="tile"><div class="lab">🔍 취약점</div><div class="v" id="tVuln">-</div><div class="d">스캐너 리포트</div></div>
       <div class="tile"><div class="lab">📊 보안 로그</div><div class="v" id="tLog">-</div><div class="d">방화벽·IDS·서버</div></div>
       <div class="tile"><div class="lab">🧰 운영 리포트</div><div class="v" id="tProduct">-</div><div class="d">백신·EDR·DLP</div></div>
+      <div class="tile"><div class="lab">🛡 하드닝</div><div class="v" id="tHardening">-</div><div class="d">보안장비 점검</div></div>
     </div>
 
     <div class="two">
       <div class="panel">
-        <div class="ph">통합 위험 우선순위 <span style="font-size:11px;color:var(--muted);font-weight:600">— 3소스 병합</span></div>
+        <div class="ph">통합 위험 우선순위 <span style="font-size:11px;color:var(--muted);font-weight:600">— 4소스 병합</span></div>
         <div class="psub">모든 소스의 발견·이벤트를 위험도(노출·KEV·EPSS·반복·활성악용)로 통합 정렬</div>
         <div class="filters" id="filters">
           <span class="fchip active" data-src="all">전체</span>
           <span class="fchip" data-src="vuln">🔍 취약점</span>
           <span class="fchip" data-src="log">📊 로그</span>
           <span class="fchip" data-src="product">🧰 운영</span>
+          <span class="fchip" data-src="hardening">🛡 하드닝</span>
         </div>
         <div class="risk-list" id="riskList"><div class="empty">불러오는 중…</div></div>
       </div>
@@ -162,8 +165,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   const clockEl = document.getElementById("clockEl");
   const statusPill = document.getElementById("statusPill");
   const avatarBtn = document.getElementById("avatarBtn");
-  const SRC_LABEL = { vuln: "취약점", log: "보안로그", product: "운영리포트" };
-  const SRC_ICON = { vuln: "🔍", log: "📊", product: "🧰" };
+  const SRC_LABEL = { vuln: "취약점", log: "보안로그", product: "운영리포트", hardening: "하드닝점검" };
+  const SRC_ICON = { vuln: "🔍", log: "📊", product: "🧰", hardening: "🛡" };
   const MAX_ROWS = 100;
   let data = { events: [], summary: null, correlations: [] };
   let filter = "all";
@@ -185,6 +188,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.getElementById("tVuln").textContent = s.bySource.vuln;
     document.getElementById("tLog").textContent = s.bySource.log;
     document.getElementById("tProduct").textContent = s.bySource.product;
+    const tH = document.getElementById("tHardening"); if (tH) tH.textContent = s.bySource.hardening || 0;
   }
   function renderList(){
     const box = document.getElementById("riskList");
