@@ -409,8 +409,16 @@ let embeddingRestarting = false;
 const EMBED_MONITOR_INTERVAL_MS = Number(process.env.GIJO_EMBED_MONITOR_INTERVAL_MS ?? 30000);
 const EMBED_FAIL_THRESHOLD = Number(process.env.GIJO_EMBED_FAIL_THRESHOLD ?? 2);
 
+// 재기동 직후엔 GPU가 모델 로딩으로 바빠 "다른" 모델이 일시 무응답이 되고, 그걸 hang으로 오판해
+// 또 재기동 → 연쇄 재기동(폭주)이 생긴다(실측 2026-07-20: 임베딩→채팅→임베딩 순 재기동 반복,
+// GPU는 여유). 어느 모델이든 재기동하면 이 시각까지 두 감시가 모두 진정(probe 건너뜀+실패카운트
+// 리셋)해 오판 연쇄를 끊는다. 진짜 hang은 진정 구간이 끝난 뒤 다시 감지된다.
+let healSettleUntil = 0;
+const HEAL_SETTLE_MS = Number(process.env.GIJO_HEAL_SETTLE_MS ?? 60000);
+
 async function checkAndHealEmbedding(): Promise<void> {
-  if (embeddingRestarting) return; // 재기동 중이면 건너뜀(중복 방지)
+  if (embeddingRestarting || chatHealing) return; // 재기동 중이면 건너뜀(중복·GPU 경합 방지)
+  if (Date.now() < healSettleUntil) { embeddingProbeFailures = 0; return; } // 최근 재기동 직후 진정 구간
   const embPath = modelFilePath(EMBEDDING_MODEL_ID);
   if (!fs.existsSync(embPath)) return; // 임베딩 모델 미배치 — 감시 대상 아님
   const alive = await probeEmbeddingAlive();
@@ -424,6 +432,7 @@ async function checkAndHealEmbedding(): Promise<void> {
 
   // 임계 도달 — 죽이고 새로 띄운다.
   embeddingRestarting = true;
+  healSettleUntil = Date.now() + HEAL_SETTLE_MS; // 채팅 감시도 잠시 진정(연쇄 재기동 방지)
   try {
     console.warn(`[localengine] 임베딩 서버 hang — 자동 재기동`);
     await stopEmbeddingEngine().catch(() => {});
@@ -483,6 +492,7 @@ const CHAT_FAIL_THRESHOLD = Number(process.env.GIJO_CHAT_FAIL_THRESHOLD ?? 2);
 
 async function checkAndHealChat(): Promise<void> {
   if (chatHealing || embeddingRestarting) return; // 재기동 중이면 건너뜀(GPU 경합·중복 방지)
+  if (Date.now() < healSettleUntil) { chatProbeFailures.clear(); return; } // 최근 재기동 직후 진정 구간
   const models = [...pool.values()].filter((m) => m.ready);
   for (const m of models) {
     const alive = await probeChatAlive(m.port);
@@ -497,6 +507,7 @@ async function checkAndHealChat(): Promise<void> {
 
     // 임계 도달 — 한 번에 한 모델만 죽이고 새로 띄운다(GPU 부담·중복 방지).
     chatHealing = true;
+    healSettleUntil = Date.now() + HEAL_SETTLE_MS; // 임베딩·다른 채팅 감시도 잠시 진정(연쇄 재기동 방지)
     try {
       console.warn(`[localengine] 채팅 모델 hang — 자동 재기동: ${m.modelId}`);
       await unloadModel(m.modelId).catch(() => {});
