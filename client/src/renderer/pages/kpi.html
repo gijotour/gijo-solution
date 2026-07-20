@@ -260,16 +260,26 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     }
   }
 
-  // 접이식 — 각 섹션 제목 클릭으로 접기/펴기. 카드가 많아 기본은 전부 접힘(제목만). 선택은 저장.
+  // 접이식 — 제목 클릭으로 접기/펴기. 카드가 많아 기본은 접힘. 단 '번다운' 2섹션(취약점 번다운·
+  // 추세 조치 번다운)은 맨 위로 올리고 기본 펼침(핀)으로 둔다. 개별 선택은 저장.
+  // 상단 고정·기본 펼침 대상 = 추세 그래프 2섹션뿐(📉 취약점 번다운 · 📈 추세 조치 번다운).
+  // "🛡 취약점 조치 현황 (번다운)"에도 '번다운'이 들어가므로 이모지로 정확히 구분한다.
+  const isPinnedCat = (t) => t.indexOf("📉") >= 0 || t.indexOf("📈") >= 0;
   function wireKpiCollapse() {
     const root = document.getElementById("kpiRoot");
+    // 번다운 섹션을 맨 위로(원래 상대순서 유지).
+    [...root.querySelectorAll(".cat")]
+      .filter((c) => isPinnedCat(c.querySelector(".cat-title") ? c.querySelector(".cat-title").textContent : ""))
+      .reverse()
+      .forEach((c) => root.insertBefore(c, root.firstChild));
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem("gijo.kpi.collapsed") || "{}"); } catch (e) {}
     root.querySelectorAll(".cat").forEach((cat) => {
       const title = cat.querySelector(".cat-title");
       if (!title) return;
       const key = title.textContent.trim();
-      let collapsed = saved[key] != null ? saved[key] : true; // 기본 접힘
+      const pinned = isPinnedCat(key);
+      let collapsed = saved[key] != null ? saved[key] : !pinned; // 번다운은 기본 펼침, 그 외 기본 접힘
       const caret = document.createElement("span");
       caret.className = "kcar";
       title.insertBefore(caret, title.firstChild);
