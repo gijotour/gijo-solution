@@ -418,7 +418,7 @@ export function registerDispatcherRoutes(app: Express): void {
       const sessionId = typeof req.body?.sessionId === "string" ? req.body.sessionId : undefined;
       // screen — 클라이언트가 보내는 현재 화면(예: "vulnscan.html"). 없어도 동작한다(구버전 호환).
       const screen = typeof req.body?.screen === "string" ? req.body.screen : undefined;
-      res.json(await dispatchInstruction(req.body.text, sessionId, screen));
+      res.json(await dispatchInstruction(String(req.body?.text ?? ""), sessionId, screen));
     })
   );
   // 실행 없이 지시가 몇 단계로 계획되는지 미리 보여준다(복합 지시 여부 확인용).
