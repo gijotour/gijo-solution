@@ -417,6 +417,7 @@
         <div class="icon-btn" data-page="products.html" title="보안 운영 (제품·유지보수)">🧰</div>
         <div class="icon-btn" data-page="report.html" title="리포트·컴플라이언스">▣</div>
         <div class="icon-btn" data-page="agent.html" title="AI 어시스턴트">◉</div>
+        <div class="icon-btn" id="officeBtn" title="우리 AI 팀 사무실 (별도 창)">🏢</div>
         <div class="icon-btn" data-page="memory.html" title="AI 지식·모델 (기억·문서보강·온톨로지·학습)">📚</div>
         <div class="icon-btn" data-page="redteam.html" title="AI 견고성 (레드팀·가드레일)">🛡</div>
         <div class="icon-btn" data-page="logs.html" title="로그">🗒</div>
@@ -1927,6 +1928,8 @@
 
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
+    const officeBtn = document.getElementById("officeBtn");
+    if (officeBtn) officeBtn.addEventListener("click", () => window.gijo.openTeamOffice()); // 별도 창 — 페이지 이동 아님
     document.getElementById("refreshAssetsBtn").addEventListener("click", reloadDashExplorer);
     const addAssetDashBtn = document.getElementById("addAssetDashBtn");
     if (addAssetDashBtn) addAssetDashBtn.addEventListener("click", (e) => { e.stopPropagation(); openAssetRegForm(); });

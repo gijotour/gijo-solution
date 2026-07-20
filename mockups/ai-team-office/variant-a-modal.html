@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<title>시안 A — 에이전트 페이지 모달 "우리 AI 팀 사무실"</title>
+<style>
+:root{--g-bg:#0a0e1a;--g-surface-1:#121a2e;--g-surface-2:#0e1526;--g-border:rgba(255,255,255,.08);
+--g-blue:#3b82f6;--g-blue-light:#5fa1ff;--g-teal:#1eb980;--g-amber:#f0a020;--g-red:#e2483d;
+--g-text:#e7eaf3;--g-muted:#8b93ab;--g-r:12px;--g-r-lg:16px}
+*{margin:0;box-sizing:border-box;font-family:'Segoe UI',sans-serif}
+body{background:var(--g-bg);color:var(--g-text);min-height:100vh}
+.tag{position:fixed;top:10px;left:10px;background:var(--g-blue);color:#fff;font-size:12px;font-weight:800;
+padding:4px 10px;border-radius:999px;z-index:99}
+/* 뒤에 깔린 에이전트 페이지 (흐림) */
+.backdrop{filter:blur(3px) brightness(.5);padding:24px;pointer-events:none}
+.bd-title{font-size:22px;font-weight:800}.bd-sub{color:var(--g-muted);font-size:13px;margin-top:4px}
+.bd-panel{background:var(--g-surface-1);border:1px solid var(--g-border);border-radius:var(--g-r);height:120px;margin-top:16px}
+/* 모달 */
+.overlay{position:fixed;inset:0;background:rgba(4,7,14,.6);display:flex;align-items:center;justify-content:center;padding:24px}
+.modal{width:min(880px,95vw);background:var(--g-surface-1);border:1px solid rgba(255,255,255,.14);
+border-radius:var(--g-r-lg);box-shadow:0 20px 60px rgba(0,0,0,.5);overflow:hidden}
+.m-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--g-border)}
+.m-title{font-size:17px;font-weight:800}.m-title .sub{color:var(--g-muted);font-weight:400;font-size:12.5px;margin-left:10px}
+.m-x{color:var(--g-muted);font-size:18px;cursor:pointer}
+.m-body{display:grid;grid-template-columns:1fr 264px;gap:0}
+/* 왼쪽: 사무실 + 로스터 */
+.office-wrap{padding:14px 0 6px 18px}
+canvas{width:100%;border-radius:10px;border:1px solid var(--g-border);background:#171f33}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--g-teal);font-weight:700;margin:8px 0 4px}
+.live::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--g-teal);animation:p 1.4s infinite}
+@keyframes p{50%{opacity:.3}}
+.roster{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:8px 0 16px 18px}
+.r-card{display:flex;align-items:center;gap:8px;background:var(--g-surface-2);border:1px solid var(--g-border);
+border-radius:10px;padding:8px 10px;font-size:12px}
+.r-dot{width:8px;height:8px;border-radius:50%}
+.r-name{font-weight:700}.r-role{color:var(--g-muted);font-size:10.5px}
+/* 오른쪽: 오늘의 할일 */
+.todo{border-left:1px solid var(--g-border);background:var(--g-surface-2);display:flex;flex-direction:column}
+.t-head{padding:14px 16px 8px;font-weight:800;font-size:14px}
+.t-head .cnt{color:var(--g-muted);font-weight:400;font-size:12px}
+.t-add{display:flex;gap:6px;padding:0 14px 10px}
+.t-add input{flex:1;background:var(--g-bg);border:1px solid var(--g-border);border-radius:8px;height:32px;
+padding:0 10px;color:var(--g-text);font-size:12.5px}
+.t-add button{width:32px;height:32px;border-radius:8px;border:none;background:var(--g-teal);color:#04110b;font-weight:800;cursor:pointer}
+.t-list{flex:1;overflow:auto;padding:0 14px}
+.t-item{display:flex;gap:8px;align-items:flex-start;padding:8px 2px;border-bottom:1px solid var(--g-border);font-size:12.5px}
+.t-item input{margin-top:2px;accent-color:var(--g-teal)}
+.t-item .who{font-size:10.5px;color:var(--g-muted)}
+.t-item.done{opacity:.45;text-decoration:line-through}
+.t-cta{margin:12px 14px 14px;background:linear-gradient(135deg,#1eb980,#17a06e);border:none;border-radius:10px;
+height:40px;color:#04110b;font-weight:800;font-size:13px;cursor:pointer}
+.note{position:fixed;bottom:12px;left:12px;right:12px;text-align:center;color:var(--g-muted);font-size:11.5px}
+</style></head><body>
+<div class="tag">시안 A — 에이전트 페이지 모달</div>
+
+<div class="backdrop">
+  <div class="bd-title">에이전트 AI</div>
+  <div class="bd-sub">여러 보안 특화 LLM 에이전트가 역할을 나눠 협업하고, 작업을 지시하면 팀이 알아서 처리합니다</div>
+  <div class="bd-panel"></div><div class="bd-panel"></div><div class="bd-panel"></div>
+</div>
+
+<div class="overlay">
+  <div class="modal">
+    <div class="m-head">
+      <div class="m-title">🏢 우리 AI 팀 사무실 <span class="sub">에이전트 로스터의 "팀 사무실" 버튼으로 열림</span></div>
+      <div class="m-x">✕</div>
+    </div>
+    <div class="m-body">
+      <div>
+        <div class="office-wrap">
+          <canvas id="office"></canvas>
+          <div class="live">LIVE — 실제 에이전트 상태·협업 피드 연동</div>
+        </div>
+        <div class="roster" id="roster"></div>
+      </div>
+      <div class="todo">
+        <div class="t-head">☑ 오늘의 할일 <span class="cnt">4건 · 완료 1</span></div>
+        <div class="t-add"><input placeholder="할 일 추가…"><button>＋</button></div>
+        <div class="t-list">
+          <div class="t-item"><input type="checkbox"><div>하드닝 미조치 3건 재점검<div class="who">🤖 Scan 예약됨 · 14:00</div></div></div>
+          <div class="t-item"><input type="checkbox"><div>KEV 매칭 자산 조치 확인<div class="who">🤖 TI 감시 중</div></div></div>
+          <div class="t-item"><input type="checkbox"><div>주간 보고서 검토·결재<div class="who">👤 내 승인 대기</div></div></div>
+          <div class="t-item done"><input type="checkbox" checked><div>외부 테스터 VPN 발급<div class="who">완료 11:35</div></div></div>
+        </div>
+        <button class="t-cta">▶ 운영 시작 — AI 팀에게 맡기기</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="note">진입점: 기존 "에이전트 AI" 페이지 유지 + 모달만 추가 (구현 부담 최소) · 할일은 대시보드 "내 업무 바로가기(오늘)"와 동일 소스</div>
+
+<script src="pixel-office.js"></script>
+<script>
+createOffice(document.getElementById("office"));
+const roster=document.getElementById("roster");
+GIJO_AGENTS.forEach(a=>{
+  const roles={orch:"작업 분배·취합",scan:"스캔 해석·자산",analyze:"우선순위 판단",report:"보고서 작성",ti:"CTI 모니터링",gijo:"사내 지식 부연"};
+  const st={working:["#1eb980","작업 중"],watching:["#f0a020","주시 중"],idle:["#5f6785","대기"]}[a.state];
+  roster.insertAdjacentHTML("beforeend",
+    `<div class="r-card"><div class="r-dot" style="background:${st[0]}"></div>
+     <div><div class="r-name" style="color:${a.color}">${a.name}</div><div class="r-role">${roles[a.id]} · ${st[1]}</div></div></div>`);
+});
+</script>
+</body></html>

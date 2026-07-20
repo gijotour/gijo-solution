@@ -1,0 +1,430 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>GIJO AS — 우리 AI 팀 사무실</title>
+<link rel="stylesheet" href="gijo-ui.css">
+<style>
+  /* 별도 창(시안 B) — 사이드바 없음. 사무실 뷰 + 오늘의 할일 + 팀 대화 피드 + 운영 시작 CTA.
+     전부 실데이터: /api/agents 상태, /api/tasks, 협업 이벤트 WebSocket. 가짜 연출 없음. */
+  :root {
+    --bg: #0a0e1a; --panel: #121a2e; --panel-2: #0e1526;
+    --border: rgba(255,255,255,.08); --border-strong: rgba(255,255,255,.16);
+    --blue: #3b82f6; --blue-light: #5fa1ff; --teal: #1eb980; --amber: #f0a020; --red: #e2483d;
+    --text: #e7eaf3; --muted: #8b93ab; --muted-2: #5f6785;
+  }
+  * { margin: 0; box-sizing: border-box; font-family: "Pretendard", "Malgun Gothic", "Segoe UI", sans-serif; }
+  body { background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+  .head { display: flex; align-items: center; justify-content: space-between; padding: 12px 18px 8px; flex: 0 0 auto; }
+  .h-title { font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 10px; }
+  .live { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--teal); font-weight: 700; }
+  .live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--teal); animation: pulse 1.4s infinite; }
+  .live.off { color: var(--red); } .live.off::before { background: var(--red); animation: none; }
+  @keyframes pulse { 50% { opacity: .3; } }
+  .h-right { display: flex; align-items: center; gap: 10px; font-size: 11.5px; color: var(--muted); }
+  .h-right b { color: var(--blue-light); }
+  .pin { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel-2);
+    color: var(--muted); cursor: pointer; font-size: 14px; }
+  .pin.on { color: var(--teal); border-color: var(--teal); }
+
+  .body { display: grid; grid-template-columns: 1fr 280px; gap: 14px; padding: 0 18px; flex: 1 1 auto; min-height: 0; }
+  .office-col { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  canvas { width: 100%; border-radius: 12px; border: 1px solid var(--border); background: #171f33; flex: 0 1 auto; min-height: 0; object-fit: contain; }
+
+  /* 팀 대화 피드 — 실제 협업 이벤트(WebSocket) */
+  .feed { margin-top: 10px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px;
+    padding: 6px 12px 8px; height: 118px; overflow-y: auto; font-size: 12px; flex: 0 0 auto; }
+  .f-note { color: var(--muted-2); font-size: 10.5px; padding: 3px 0 4px; }
+  .f-line { display: flex; gap: 8px; padding: 3px 0; animation: up .3s; align-items: baseline; }
+  @keyframes up { from { transform: translateY(5px); opacity: 0; } }
+  .f-who { font-weight: 800; min-width: 96px; flex: 0 0 auto; font-size: 11.5px; }
+  .f-msg { color: var(--muted); word-break: break-all; }
+
+  /* 오른쪽: 오늘의 할일 (실 작업 큐 — /api/tasks) */
+  .todo { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; min-height: 0; }
+  .t-head { padding: 12px 14px 8px; font-weight: 800; font-size: 14px; display: flex; justify-content: space-between; align-items: baseline; }
+  .t-cnt { color: var(--muted); font-weight: 400; font-size: 11.5px; }
+  .t-add { display: flex; gap: 6px; padding: 0 12px 10px; }
+  .t-add input { flex: 1; background: var(--bg); border: 1px solid var(--border-strong); border-radius: 8px; height: 34px;
+    padding: 0 10px; color: var(--text); font-size: 12.5px; outline: none; min-width: 0; }
+  .t-add input:focus { border-color: var(--teal); }
+  .t-add button { width: 34px; height: 34px; border-radius: 8px; border: none; background: var(--teal); color: #04110b;
+    font-weight: 800; font-size: 16px; cursor: pointer; flex: 0 0 auto; }
+  .t-list { flex: 1 1 auto; overflow-y: auto; padding: 0 12px; min-height: 0; }
+  .t-item { display: flex; gap: 8px; align-items: flex-start; padding: 8px 2px; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+  .t-item input { margin-top: 2px; accent-color: var(--teal); cursor: pointer; }
+  .t-item.done .t-text { opacity: .45; text-decoration: line-through; }
+  .t-text { flex: 1; min-width: 0; cursor: default; word-break: break-all; }
+  .t-meta { font-size: 10.5px; color: var(--muted-2); margin-top: 2px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .t-pri { font-weight: 800; }
+  .t-pri.P0 { color: var(--red); } .t-pri.P1 { color: var(--amber); } .t-pri.P2 { color: var(--blue-light); } .t-pri.P3 { color: var(--muted-2); }
+  .t-due-over { color: var(--red); font-weight: 700; }
+  .t-due-today { color: var(--amber); font-weight: 700; }
+  .t-del { color: var(--muted-2); cursor: pointer; font-size: 12px; padding: 0 2px; flex: 0 0 auto; }
+  .t-del:hover { color: var(--red); }
+  .t-empty { color: var(--muted); font-size: 12px; padding: 12px 4px; line-height: 1.6; }
+  .t-more { text-align: center; color: var(--muted-2); font-size: 11px; padding: 8px 0; }
+
+  .cta-row { padding: 10px 18px 16px; flex: 0 0 auto; }
+  .cta { width: 100%; background: linear-gradient(135deg, #1eb980, #0f8f60); border: none; border-radius: 12px;
+    height: 46px; color: #04110b; font-weight: 800; font-size: 14.5px; cursor: pointer;
+    box-shadow: 0 4px 20px rgba(30,185,128,.3); }
+  .cta:disabled { opacity: .5; cursor: wait; }
+  .cta-hint { text-align: center; color: var(--muted-2); font-size: 10.5px; padding-top: 6px; }
+
+  /* 서버 연결 실패 오버레이 */
+  .dead { position: fixed; inset: 0; background: rgba(4,7,14,.85); display: none; align-items: center;
+    justify-content: center; text-align: center; color: var(--muted); font-size: 13px; line-height: 1.8; z-index: 50; }
+  .dead.show { display: flex; }
+</style>
+</head>
+<body class="g-ui">
+  <div class="head">
+    <div class="h-title">🏢 보안팀 사무실 <span class="live" id="liveBadge">LIVE</span></div>
+    <div class="h-right">
+      <span id="statLine">에이전트 불러오는 중…</span>
+      <button class="pin" id="pinBtn" title="항상 위에 고정 (관제 모니터용)">📌</button>
+    </div>
+  </div>
+
+  <div class="body">
+    <div class="office-col">
+      <canvas id="office"></canvas>
+      <div class="feed" id="feed">
+        <div class="f-note">팀 대화 피드 — 에이전트 협업 이벤트 실시간 스트림</div>
+      </div>
+    </div>
+    <div class="todo">
+      <div class="t-head">☑ 오늘의 할일 <span class="t-cnt" id="todoCnt"></span></div>
+      <div class="t-add">
+        <input id="todoInput" placeholder="할 일 추가… (Enter)" maxlength="200">
+        <button id="todoAddBtn" title="추가">＋</button>
+      </div>
+      <div class="t-list" id="todoList"><div class="t-empty">불러오는 중…</div></div>
+    </div>
+  </div>
+
+  <div class="cta-row">
+    <button class="cta" id="ctaBtn">▶ 운영 시작 — AI 팀에게 맡기기</button>
+    <div class="cta-hint">할 일이 비어 있으면 AI가 오늘의 루틴을 채우고, 있으면 최우선 할 일을 오케스트레이터에게 지시합니다 (쓰기 작업은 결재판 승인 후에만 실행)</div>
+  </div>
+
+  <div class="dead" id="deadOverlay"><div>⚠ 서버에 연결할 수 없습니다.<br>메인 창에서 로그인 상태를 확인한 뒤 이 창을 다시 열어주세요.</div></div>
+
+<script>
+(function () {
+  "use strict";
+  const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  // ── 픽셀 사무실 렌더러 — 시안 B 목업(pixel-office)을 실데이터 구동형으로 옮김 ──
+  // 상태 의미: working=타이핑+초록 모니터, watching=주황 모니터·정지, idle=자리 비움(배회).
+  // 말풍선은 연출이 아니라 실제 협업 이벤트(collaboration:event)의 message를 띄운다.
+  const PALETTE = ["#5fa1ff", "#1eb980", "#8b7cf0", "#f0a020", "#e2483d", "#7dd3c0"];
+  const office = (function () {
+    const canvas = document.getElementById("office");
+    const ctx = canvas.getContext("2d");
+    const COLS = 20, ROWS = 11, S = 3;
+    const W = COLS * 8, H = ROWS * 8;
+    canvas.width = W * S; canvas.height = H * S;
+    canvas.style.imageRendering = "pixelated";
+    const DESKS = [
+      { x: 3, y: 2 }, { x: 8, y: 2 }, { x: 13, y: 2 },
+      { x: 3, y: 6 }, { x: 8, y: 6 }, { x: 13, y: 6 },
+    ];
+    const COFFEE = { x: 17.5, y: 8.5 };
+    let agents = []; // {name, shortName, color, state, x, y, wanderT, desk}
+    let bubble = null; // {agentIdx, msg, ttl}
+    let t = 0;
+
+    function px(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(Math.round(x * S), Math.round(y * S), w * S, h * S); }
+
+    function setAgents(list) {
+      agents = list.slice(0, 6).map((a, i) => {
+        const prev = agents[i];
+        return {
+          name: a.name, shortName: shortName(a.name), color: PALETTE[i % PALETTE.length],
+          state: a.status,
+          x: prev ? prev.x : (DESKS[i].x + 1) * 8,
+          y: prev ? prev.y : DESKS[i].y * 8 + 22,
+          wanderT: prev ? prev.wanderT : 0,
+          desk: i,
+        };
+      });
+    }
+    function shortName(name) {
+      // "Security Orchestrator" → "Orchestrator" 같은 축약 — 캔버스 라벨용
+      const s = String(name).replace(/\s*Agent$/i, "").replace(/^Security\s+/i, "");
+      return s.length > 12 ? s.slice(0, 12) : s;
+    }
+    // 협업 이벤트 발신자 이름으로 캐릭터를 찾아 말풍선을 띄운다. 못 찾으면 무시(피드에는 남음).
+    function showBubble(fromName, msg) {
+      const idx = agents.findIndex((a) => fromName && (a.name === fromName || fromName.indexOf(a.shortName) >= 0 || a.name.indexOf(fromName) >= 0));
+      if (idx < 0) return;
+      bubble = { agentIdx: idx, msg: String(msg).slice(0, 60), ttl: 260 };
+    }
+
+    function drawRoom() {
+      for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++)
+        px(c * 8, r * 8, 8, 8, (r + c) % 2 ? "#1a2338" : "#171f33");
+      px(0, 0, W, 10, "#0e1526"); px(0, 10, W, 2, "#2a3552");
+      for (let i = 0; i < 4; i++) px(14 + i * 44, 2, 20, 7, "#22345c");
+      px(72, 70, 28, 12, "#3a2f22"); px(74, 68, 24, 4, "#4a3c2c"); // 회의 테이블
+      px(2, 74, 8, 10, "#2c5a3a"); px(4, 82, 4, 4, "#5a3c28");     // 화분
+      px(W - 12, 14, 8, 10, "#2c5a3a"); px(W - 10, 22, 4, 4, "#5a3c28");
+      px(COFFEE.x * 8, COFFEE.y * 8 - 6, 10, 12, "#3a4258");        // 커피머신
+      px(COFFEE.x * 8 + 2, COFFEE.y * 8 - 4, 6, 3, "#e2483d");
+      DESKS.forEach((d, i) => {
+        const a = agents[i];
+        px(d.x * 8, d.y * 8 + 6, 22, 9, "#4a3c2c");
+        px(d.x * 8 + 1, d.y * 8 + 15, 3, 4, "#3a2f22");
+        px(d.x * 8 + 18, d.y * 8 + 15, 3, 4, "#3a2f22");
+        const st = a ? a.state : "idle";
+        const glow = st === "working" ? (Math.floor(t / 20) % 2 ? "#1eb980" : "#17a06e")
+                   : st === "watching" ? "#f0a020" : "#2a3552";
+        px(d.x * 8 + 7, d.y * 8 - 1, 9, 7, "#0a0e1a");
+        px(d.x * 8 + 8, d.y * 8, 7, 5, glow);
+        px(d.x * 8 + 10, d.y * 8 + 6, 3, 2, "#3a4258");
+      });
+    }
+
+    function drawAgent(a) {
+      const bob = a.state === "working" ? (Math.floor(t / 12) % 2) : 0;
+      const wx = a.x, wy = a.y + (a.state === "idle" ? Math.sin(t / 30 + a.desk) * 1.5 : 0);
+      px(wx, wy - 6 + bob, 6, 6, a.color);
+      px(wx + 1, wy - 11 + bob, 4, 5, "#e8c39e");
+      px(wx, wy - 13 + bob, 6, 3, a.desk % 2 ? "#3a2f22" : "#22263a");
+      if (a.state === "working") px(wx - 2 + (bob ? 1 : 0), wy - 3, 2, 2, "#e8c39e");
+      const dot = a.state === "working" ? "#1eb980" : a.state === "watching" ? "#f0a020" : "#5f6785";
+      px(wx + 2, wy - 16, 2, 2, dot);
+      // 이름 라벨(실해상도)
+      ctx.font = `${3 * S}px 'Malgun Gothic',sans-serif`;
+      ctx.fillStyle = "rgba(231,234,243,.75)";
+      const tw = ctx.measureText(a.shortName).width;
+      ctx.fillText(a.shortName, (wx + 3) * S - tw / 2, (wy + 6) * S);
+    }
+
+    function drawBubble() {
+      if (!bubble || bubble.ttl <= 0) return;
+      const a = agents[bubble.agentIdx];
+      if (!a) return;
+      ctx.font = `${3.4 * S}px 'Malgun Gothic',sans-serif`;
+      const tw = ctx.measureText(bubble.msg).width;
+      const w = Math.min(tw + 4 * S, (W - 8) * S);
+      const bx = Math.max(2 * S, Math.min(a.x * S - w / 2, (W - 2) * S - w));
+      const by = (a.y - 26) * S;
+      ctx.fillStyle = "#e7eaf3";
+      ctx.fillRect(bx, by, w, 6 * S);
+      ctx.fillRect(a.x * S, by + 6 * S, 2 * S, 2 * S);
+      ctx.fillStyle = "#0a0e1a";
+      ctx.fillText(bubble.msg, bx + 2 * S, by + 4.4 * S);
+    }
+
+    function step() {
+      t++;
+      if (bubble) bubble.ttl--;
+      agents.forEach((a) => {
+        if (a.state !== "idle") {
+          // 자리로 복귀
+          const hx = (DESKS[a.desk].x + 1) * 8, hy = DESKS[a.desk].y * 8 + 22;
+          a.x += Math.sign(hx - a.x) * 0.4; a.y += Math.sign(hy - a.y) * 0.4;
+          return;
+        }
+        a.wanderT++;
+        const goal = Math.floor(a.wanderT / 300) % 2 ? COFFEE : { x: DESKS[a.desk].x + 1, y: DESKS[a.desk].y + 2.7 };
+        a.x += Math.sign(goal.x * 8 - a.x) * 0.3; a.y += Math.sign(goal.y * 8 - a.y) * 0.3;
+      });
+      ctx.clearRect(0, 0, W * S, H * S);
+      drawRoom();
+      agents.slice().sort((p, q) => p.y - q.y).forEach(drawAgent);
+      drawBubble();
+      requestAnimationFrame(step);
+    }
+    step();
+    return { setAgents, showBubble };
+  })();
+
+  // ── 실데이터 연동 ──────────────────────────────────────────────────
+  const liveBadge = document.getElementById("liveBadge");
+  const statLine = document.getElementById("statLine");
+  const feedEl = document.getElementById("feed");
+  const todoList = document.getElementById("todoList");
+  const todoCnt = document.getElementById("todoCnt");
+  const todoInput = document.getElementById("todoInput");
+  const ctaBtn = document.getElementById("ctaBtn");
+
+  const AGENT_COLOR = {}; // name → color (피드 색상, 캔버스 팔레트와 동일 순서)
+
+  async function loadAgents() {
+    const agents = await window.gijo.listAgents();
+    office.setAgents(agents);
+    agents.slice(0, 6).forEach((a, i) => { AGENT_COLOR[a.name] = PALETTE[i % PALETTE.length]; });
+    const c = { working: 0, watching: 0, idle: 0 };
+    agents.forEach((a) => { c[a.status] = (c[a.status] || 0) + 1; });
+    statLine.innerHTML = `작업중 <b>${c.working}</b> · 주시 <b>${c.watching}</b> · 대기 <b>${c.idle}</b>`;
+  }
+
+  function feedLine(from, msg, color) {
+    const div = document.createElement("div");
+    div.className = "f-line";
+    // 장문 LLM 응답이 피드를 도배하지 않게 잘라서 표시(전문은 에이전트 AI 페이지 협업 로그에서).
+    const short = String(msg).length > 180 ? String(msg).slice(0, 180) + "…" : String(msg);
+    div.innerHTML = `<span class="f-who" style="color:${color || "var(--blue-light)"}">${esc(from)}</span><span class="f-msg">${esc(short)}</span>`;
+    feedEl.appendChild(div);
+    while (feedEl.children.length > 40) feedEl.removeChild(feedEl.children[1]); // f-note 다음부터 정리
+    feedEl.scrollTop = feedEl.scrollHeight;
+  }
+
+  function onCollabEvent(evt) {
+    if (!evt || !evt.message) return;
+    const from = evt.from || "팀";
+    feedLine(from + (evt.to ? " → " + evt.to : ""), evt.message, AGENT_COLOR[from]);
+    office.showBubble(from, evt.message);
+  }
+
+  // ── 오늘의 할일: 실 작업 큐에서 "오늘 처리할 것"만 큐레이션 ──
+  // 기준: 미완료 중 (기한 초과 | 오늘 기한 | 오늘 생성 | P0). 그 외 미완료는 "이후 할일 N건"으로 접음.
+  let allTasks = [];
+  function endOfToday() { const d = new Date(); d.setHours(23, 59, 59, 999); return d.getTime(); }
+  function startOfToday() { const d = new Date(); d.setHours(0, 0, 0, 0); return d.getTime(); }
+
+  function isToday(task) {
+    if (task.dueAt && task.dueAt <= endOfToday()) return true;
+    if (task.createdAt >= startOfToday()) return true;
+    return task.priority === "P0";
+  }
+
+  function dueLabel(task) {
+    if (!task.dueAt) return "";
+    const now = Date.now();
+    if (task.dueAt < now) return '<span class="t-due-over">기한 초과</span>';
+    if (task.dueAt <= endOfToday()) return '<span class="t-due-today">오늘 기한</span>';
+    return `<span>~${new Date(task.dueAt).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" })}</span>`;
+  }
+
+  function renderTasks() {
+    const open = allTasks.filter((t) => !t.done);
+    const today = open.filter(isToday).sort((a, b) => {
+      const oa = a.dueAt && a.dueAt < Date.now() ? 0 : 1, ob = b.dueAt && b.dueAt < Date.now() ? 0 : 1;
+      if (oa !== ob) return oa - ob;
+      if (a.priority !== b.priority) return String(a.priority).localeCompare(String(b.priority));
+      return (a.dueAt || Infinity) - (b.dueAt || Infinity);
+    });
+    const later = open.length - today.length;
+    todoCnt.textContent = today.length ? `${today.length}건` : "";
+    if (!today.length) {
+      todoList.innerHTML = '<div class="t-empty">오늘 처리할 일이 없어요 — 위에 직접 추가하거나, 아래 <b>운영 시작</b>을 누르면 AI 팀이 오늘의 루틴으로 채워줘요 📌</div>'
+        + (later > 0 ? `<div class="t-more">이후 기한 할일 ${later}건은 에이전트 AI 페이지에서</div>` : "");
+      return;
+    }
+    todoList.innerHTML = today.map((t) => `
+      <div class="t-item${t.done ? " done" : ""}" data-id="${esc(t.id)}">
+        <input type="checkbox" ${t.done ? "checked" : ""} title="완료 처리">
+        <div class="t-text">${esc(t.text)}
+          <div class="t-meta">
+            <span class="t-pri ${esc(t.priority)}">${esc(t.priority)}</span>
+            ${dueLabel(t)}
+            ${t.assignee ? `<span>👤 ${esc(t.assignee)}</span>` : ""}
+          </div>
+        </div>
+        <span class="t-del" title="삭제">✕</span>
+      </div>`).join("")
+      + (later > 0 ? `<div class="t-more">이후 기한 할일 ${later}건은 에이전트 AI 페이지에서</div>` : "");
+  }
+
+  async function loadTasks() {
+    allTasks = await window.gijo.listTasks();
+    renderTasks();
+  }
+
+  todoList.addEventListener("click", async (e) => {
+    const item = e.target.closest(".t-item");
+    if (!item) return;
+    const id = item.dataset.id;
+    try {
+      if (e.target.matches("input[type=checkbox]")) {
+        await window.gijo.toggleTask(id, e.target.checked);
+        await loadTasks();
+      } else if (e.target.matches(".t-del")) {
+        await window.gijo.deleteTask(id);
+        await loadTasks();
+      }
+    } catch (err) { feedLine("시스템", "할일 처리 실패: " + (err && err.message || err), "var(--red)"); }
+  });
+
+  async function addTodo() {
+    const text = todoInput.value.trim();
+    if (!text) return;
+    todoInput.value = "";
+    try {
+      await window.gijo.addTask(text, { routineFeedback: true }); // 직접 입력 — 루틴 학습 신호
+      await loadTasks();
+    } catch (err) { feedLine("시스템", "할일 추가 실패: " + (err && err.message || err), "var(--red)"); }
+  }
+  document.getElementById("todoAddBtn").addEventListener("click", addTodo);
+  todoInput.addEventListener("keydown", (e) => { if (e.key === "Enter") addTodo(); });
+
+  // ── 운영 시작 CTA ──
+  // 비어 있으면: 루틴 추천으로 오늘의 할일을 채운다. 있으면: 최우선 할일을 오케스트레이터에게 지시.
+  ctaBtn.addEventListener("click", async () => {
+    ctaBtn.disabled = true;
+    const orig = ctaBtn.textContent;
+    try {
+      const open = allTasks.filter((t) => !t.done && isToday(t));
+      if (!open.length) {
+        ctaBtn.textContent = "루틴 추천 불러오는 중…";
+        const sugg = await window.gijo.getRoutineSuggestions();
+        const daily = (sugg || []).filter((s) => s.cadence === "daily").slice(0, 5);
+        if (!daily.length) { feedLine("시스템", "추천할 루틴이 아직 없어요 — 할 일을 직접 추가해 보세요"); return; }
+        for (const s of daily) await window.gijo.addTask(s.text, { ref: "routine:" + s.source });
+        await loadTasks();
+        feedLine("AI 팀", `오늘의 루틴 ${daily.length}건을 할일에 채웠어요`);
+      } else {
+        const top = open[0];
+        ctaBtn.textContent = "오케스트레이터에게 지시 중…";
+        feedLine("나 → Orchestrator", top.text, "var(--text)");
+        const result = await window.gijo.sendInstruction(top.text);
+        const summary = result && (result.summary || result.reply || result.message);
+        if (summary) feedLine("Orchestrator", String(summary).slice(0, 300), AGENT_COLOR["Security Orchestrator"]);
+      }
+    } catch (err) {
+      feedLine("시스템", "운영 시작 실패: " + (err && err.message || err), "var(--red)");
+    } finally {
+      ctaBtn.disabled = false;
+      ctaBtn.textContent = orig;
+    }
+  });
+
+  // ── 항상 위 고정 ──
+  let pinned = false;
+  document.getElementById("pinBtn").addEventListener("click", async (e) => {
+    pinned = !pinned;
+    await window.gijo.setOfficeAlwaysOnTop(pinned);
+    e.currentTarget.classList.toggle("on", pinned);
+  });
+
+  // ── 부팅 ──
+  (async function boot() {
+    try {
+      await window.gijo.checkServerHealth();
+    } catch (e) {
+      liveBadge.textContent = "연결 끊김"; liveBadge.classList.add("off");
+      document.getElementById("deadOverlay").classList.add("show");
+      return;
+    }
+    try {
+      await Promise.all([loadAgents(), loadTasks()]);
+      const history = await window.gijo.listCollaborationHistory();
+      (history || []).slice(-8).forEach((evt) => feedLine(evt.from + (evt.to ? " → " + evt.to : ""), evt.message, AGENT_COLOR[evt.from]));
+      if (window.gijoRealtime) window.gijoRealtime.connect();
+      window.gijo.onCollaborationEvent(onCollabEvent);
+      setInterval(loadAgents, 20000);  // 상태는 휘발성 라이브 신호 — 주기 폴링으로 갱신
+      setInterval(loadTasks, 60000);
+    } catch (e) {
+      feedLine("시스템", "초기화 실패: " + (e && e.message || e), "var(--red)");
+    }
+  })();
+})();
+</script>
+</body>
+</html>

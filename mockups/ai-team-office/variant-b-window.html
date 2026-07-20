@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<title>시안 B — 전용 창 "라이브 오피스" (영상 컨셉 그대로)</title>
+<style>
+:root{--g-bg:#0a0e1a;--g-surface-1:#121a2e;--g-surface-2:#0e1526;--g-border:rgba(255,255,255,.08);
+--g-blue-light:#5fa1ff;--g-teal:#1eb980;--g-amber:#f0a020;--g-red:#e2483d;--g-text:#e7eaf3;--g-muted:#8b93ab}
+*{margin:0;box-sizing:border-box;font-family:'Segoe UI',sans-serif}
+body{background:#06090f;color:var(--g-text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.tag{position:fixed;top:10px;left:10px;background:var(--g-teal);color:#04110b;font-size:12px;font-weight:800;
+padding:4px 10px;border-radius:999px;z-index:99}
+/* Electron 별도 창 프레임 */
+.win{width:min(960px,96vw);background:var(--g-bg);border:1px solid rgba(255,255,255,.14);border-radius:12px;
+box-shadow:0 24px 80px rgba(0,0,0,.6);overflow:hidden}
+.titlebar{display:flex;align-items:center;justify-content:space-between;background:#0e1526;
+padding:8px 12px;font-size:12px;color:var(--g-muted);border-bottom:1px solid var(--g-border)}
+.tb-btns span{display:inline-block;width:11px;height:11px;border-radius:50%;margin-left:6px;background:#2a3552}
+.head{display:flex;align-items:center;justify-content:space-between;padding:12px 18px}
+.h-title{font-size:16px;font-weight:800}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--g-teal);font-weight:700;margin-left:10px}
+.live::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--g-teal);animation:p 1.4s infinite}
+@keyframes p{50%{opacity:.3}}
+.h-right{font-size:11.5px;color:var(--g-muted)}
+.h-right b{color:var(--g-blue-light)}
+.body{display:grid;grid-template-columns:1fr 280px;gap:14px;padding:0 18px}
+canvas{width:100%;border-radius:12px;border:1px solid var(--g-border);background:#171f33}
+/* 팀 대화 피드 */
+.feed{margin:10px 18px 0;background:var(--g-surface-2);border:1px solid var(--g-border);border-radius:10px;
+padding:8px 12px;height:96px;overflow:hidden;font-size:12px}
+.f-line{display:flex;gap:8px;padding:3px 0;animation:up .4s}
+@keyframes up{from{transform:translateY(6px);opacity:0}}
+.f-who{font-weight:800;min-width:86px}
+.f-msg{color:var(--g-muted)}
+.f-note{color:#5f6785;font-size:10.5px;padding-top:4px}
+/* 오른쪽: 오늘의 할일 */
+.todo{background:var(--g-surface-1);border:1px solid var(--g-border);border-radius:12px;display:flex;flex-direction:column}
+.t-head{padding:12px 14px 8px;font-weight:800;font-size:14px}
+.t-add{display:flex;gap:6px;padding:0 12px 10px}
+.t-add input{flex:1;background:var(--g-bg);border:1px solid var(--g-teal);border-radius:8px;height:34px;
+padding:0 10px;color:var(--g-text);font-size:12.5px;outline:none}
+.t-add button{width:34px;height:34px;border-radius:8px;border:none;background:var(--g-teal);color:#04110b;font-weight:800;font-size:16px;cursor:pointer}
+.t-list{flex:1;overflow:auto;padding:0 12px;min-height:150px}
+.t-item{display:flex;gap:8px;align-items:flex-start;padding:8px 2px;border-bottom:1px solid var(--g-border);font-size:12.5px}
+.t-item input{margin-top:2px;accent-color:var(--g-teal)}
+.t-item .who{font-size:10.5px;color:var(--g-muted)}
+.t-empty{color:var(--g-muted);font-size:12px;padding:10px 4px;line-height:1.6}
+.cta{margin:10px 18px 16px;background:linear-gradient(135deg,#1eb980,#0f8f60);border:none;border-radius:12px;
+height:46px;color:#04110b;font-weight:800;font-size:14.5px;cursor:pointer;width:calc(100% - 36px);
+box-shadow:0 4px 20px rgba(30,185,128,.35)}
+.note{position:fixed;bottom:12px;left:12px;right:12px;text-align:center;color:var(--g-muted);font-size:11.5px}
+</style></head><body>
+<div class="tag">시안 B — 전용 창 라이브 오피스 (영상 컨셉)</div>
+
+<div class="win">
+  <div class="titlebar"><div>GIJO AS — 우리 AI 팀 사무실</div><div class="tb-btns"><span></span><span></span><span></span></div></div>
+  <div class="head">
+    <div class="h-title">🏢 보안팀 사무실 <span class="live">LIVE · 하드닝 정기점검 가동 중</span></div>
+    <div class="h-right">🧠 Brain: <b>merged-lily</b> · 자산 <b>15</b> · 대기 결재 <b>1</b></div>
+  </div>
+  <div class="body">
+    <canvas id="office"></canvas>
+    <div class="todo">
+      <div class="t-head">☑ 오늘의 할일</div>
+      <div class="t-add"><input placeholder="할 일 추가…"><button>＋</button></div>
+      <div class="t-list">
+        <div class="t-item"><input type="checkbox"><div>하드닝 미조치 3건 재점검<div class="who">🤖 Scan 예약 14:00</div></div></div>
+        <div class="t-item"><input type="checkbox"><div>KEV 매칭 자산 조치 확인<div class="who">🤖 TI 감시 중</div></div></div>
+        <div class="t-item"><input type="checkbox"><div>주간 보고서 검토·결재<div class="who">👤 내 승인 대기</div></div></div>
+        <div class="t-empty">할 일이 없으면 — 위에 추가하거나 아래 버튼을 누르면 AI 팀이 채워줘요 📌</div>
+      </div>
+    </div>
+  </div>
+  <div class="feed" id="feed">
+    <div class="f-note">팀 대화 피드 — 실제 협업 이벤트(WebSocket) 스트림</div>
+  </div>
+  <button class="cta">▶ 운영 시작 — AI 팀에게 맡기기</button>
+</div>
+<div class="note">진입점: 사이드바 "에이전트 AI" 옆 🏢 버튼 → Electron 별도 창(항상 위 고정 가능) · 관제 모니터에 상시 띄우는 용도</div>
+
+<script src="pixel-office.js"></script>
+<script>
+createOffice(document.getElementById("office"),{px:6});
+const FEED=[["Orchestrator","#5fa1ff","하드닝 점검 결과 4건 — Analyze에 우선순위 위임"],
+["Analyze","#8b7cf0","U-102 P1 판정 · 근거: SSH 원격 root 허용"],
+["TI","#e2483d","KEV 신규 2건 — 영향 자산 3대 매칭"],
+["Scan","#1eb980","192.168.0.0/24 정기 스캔 완료 · 신규 12건"],
+["Report","#f0a020","주간 보고서 초안 → 결재판 등록"],
+["GIJO","#7dd3c0","'U-102' 사내 지침 3.2절 근거 부연"]];
+const feed=document.getElementById("feed");let fi=0;
+setInterval(()=>{const [w,c,m]=FEED[fi%FEED.length];fi++;
+  feed.insertAdjacentHTML("beforeend",`<div class="f-line"><span class="f-who" style="color:${c}">${w}</span><span class="f-msg">${m}</span></div>`);
+  while(feed.children.length>4)feed.children[1].remove();},2200);
+</script>
+</body></html>

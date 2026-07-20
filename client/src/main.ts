@@ -10,6 +10,7 @@ import * as fs from "fs";
 import { isDangerous } from "./terminalPolicy";
 
 let mainWindow: BrowserWindow | null = null;
+let officeWindow: BrowserWindow | null = null; // "우리 AI 팀 사무실" 별도 창(시안 B) — 관제 모니터 상시용
 let bundledServerProcess: ChildProcess | null = null;
 
 // 페이지 전체 네비게이션(loadFile) 시마다 preload가 재실행되어 사라지는 인증 토큰/서버 주소를
@@ -98,6 +99,38 @@ function createMainWindow(): void {
 ipcMain.handle("navigate:to", async (_e, page: string) => {
   if (!mainWindow) return;
   await mainWindow.loadFile(path.join(__dirname, `../src/renderer/pages/${page}`));
+});
+
+// "우리 AI 팀 사무실" 별도 창 — 이미 열려 있으면 앞으로만 가져온다(중복 창 방지).
+// 인증 토큰은 메인 프로세스 authState에 있으므로(위 auth:getState) 새 창도 로그인 상태를 공유한다.
+ipcMain.handle("office:open", async () => {
+  if (officeWindow && !officeWindow.isDestroyed()) {
+    officeWindow.focus();
+    return;
+  }
+  officeWindow = new BrowserWindow({
+    width: 1000,
+    height: 760,
+    minWidth: 820,
+    minHeight: 620,
+    backgroundColor: "#0a0e1a",
+    title: "GIJO AS — 우리 AI 팀 사무실",
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+  officeWindow.removeMenu();
+  officeWindow.on("closed", () => { officeWindow = null; });
+  await officeWindow.loadFile(path.join(__dirname, "../src/renderer/pages/office.html"));
+});
+
+// 관제 모니터 상시용 — 항상 위 고정 토글(office.html 헤더의 📌 버튼).
+ipcMain.handle("office:setAlwaysOnTop", async (_e, on: boolean) => {
+  if (officeWindow && !officeWindow.isDestroyed()) officeWindow.setAlwaysOnTop(Boolean(on));
+  return { on: Boolean(on) };
 });
 
 // 읽기 전용 파일 탐색기 — 대시보드에서 폴더 트리를 본다. 명령 실행은 없다.

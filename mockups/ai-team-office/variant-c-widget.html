@@ -1,0 +1,104 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<title>시안 C — 대시보드 미니 오피스 위젯 + 클릭 확장</title>
+<style>
+:root{--g-bg:#0a0e1a;--g-surface-1:#121a2e;--g-surface-2:#0e1526;--g-border:rgba(255,255,255,.08);
+--g-blue-light:#5fa1ff;--g-teal:#1eb980;--g-amber:#f0a020;--g-red:#e2483d;--g-text:#e7eaf3;--g-muted:#8b93ab}
+*{margin:0;box-sizing:border-box;font-family:'Segoe UI',sans-serif}
+body{background:var(--g-bg);color:var(--g-text);min-height:100vh;padding:20px 20px 60px}
+.tag{position:fixed;top:10px;left:10px;background:#8b7cf0;color:#fff;font-size:12px;font-weight:800;
+padding:4px 10px;border-radius:999px;z-index:99}
+.stage{max-width:1040px;margin:34px auto 0;display:grid;gap:26px}
+.label{font-size:12px;font-weight:800;color:var(--g-blue-light);margin-bottom:8px}
+/* ① 대시보드 위젯 상태 */
+.dash{background:var(--g-surface-2);border:1px solid var(--g-border);border-radius:14px;padding:16px}
+.dash-title{font-size:15px;font-weight:800;margin-bottom:10px}
+.grid{display:grid;grid-template-columns:1fr 300px;gap:12px}
+.ph{background:var(--g-surface-1);border:1px solid var(--g-border);border-radius:10px;height:64px;
+display:flex;align-items:center;justify-content:center;color:#3d4560;font-size:12px}
+/* 미니 오피스 위젯 */
+.widget{grid-column:2;grid-row:1/span 3;background:var(--g-surface-1);border:1px solid var(--g-border);
+border-radius:12px;overflow:hidden;cursor:pointer;transition:border-color .15s}
+.widget:hover{border-color:var(--g-teal)}
+.w-head{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;font-size:12.5px;font-weight:800}
+.w-live{color:var(--g-teal);font-size:10.5px}
+canvas{width:100%;display:block}
+.w-foot{display:flex;justify-content:space-between;padding:8px 12px;font-size:11px;color:var(--g-muted);
+border-top:1px solid var(--g-border)}
+.w-foot b{color:var(--g-text)}
+.hint{text-align:center;font-size:11px;color:var(--g-teal);padding:6px;background:rgba(30,185,128,.07)}
+/* ② 확장 창 상태 */
+.expand{background:var(--g-surface-1);border:1px solid rgba(255,255,255,.14);border-radius:16px;
+box-shadow:0 20px 60px rgba(0,0,0,.5);overflow:hidden}
+.e-head{display:flex;align-items:center;justify-content:space-between;padding:13px 18px;border-bottom:1px solid var(--g-border)}
+.e-title{font-weight:800;font-size:15px}
+.e-body{display:grid;grid-template-columns:1fr 270px}
+.e-left{padding:14px 0 14px 18px;min-width:0}
+.e-left canvas{border-radius:10px;border:1px solid var(--g-border)}
+.ticker{margin-top:10px;font-size:11.5px;color:var(--g-muted);white-space:nowrap;overflow:hidden}
+.ticker span{display:inline-block;animation:mv 18s linear infinite}
+@keyframes mv{from{transform:translateX(15%)}to{transform:translateX(-100%)}}
+.todo{border-left:1px solid var(--g-border);background:var(--g-surface-2);display:flex;flex-direction:column}
+.t-head{padding:13px 14px 8px;font-weight:800;font-size:13.5px}
+.t-add{display:flex;gap:6px;padding:0 12px 8px}
+.t-add input{flex:1;background:var(--g-bg);border:1px solid var(--g-border);border-radius:8px;height:30px;padding:0 10px;color:var(--g-text);font-size:12px}
+.t-add button{width:30px;height:30px;border-radius:8px;border:none;background:var(--g-teal);color:#04110b;font-weight:800;cursor:pointer}
+.t-list{flex:1;padding:0 12px}
+.t-item{display:flex;gap:8px;padding:7px 2px;border-bottom:1px solid var(--g-border);font-size:12px}
+.t-item input{accent-color:var(--g-teal)}
+.t-item .who{font-size:10px;color:var(--g-muted)}
+.t-cta{margin:10px 12px 12px;background:linear-gradient(135deg,#1eb980,#0f8f60);border:none;border-radius:10px;height:38px;color:#04110b;font-weight:800;font-size:12.5px;cursor:pointer}
+.note{position:fixed;bottom:12px;left:12px;right:12px;text-align:center;color:var(--g-muted);font-size:11.5px}
+</style></head><body>
+<div class="tag">시안 C — 대시보드 위젯 + 확장</div>
+
+<div class="stage">
+  <div>
+    <div class="label">① 평소 — 대시보드 오른쪽에 상시 미니 사무실 (한눈 팀 현황)</div>
+    <div class="dash">
+      <div class="dash-title">대시보드</div>
+      <div class="grid">
+        <div class="ph">내 업무 바로가기 (기존)</div>
+        <div class="widget">
+          <div class="w-head">🏢 우리 AI 팀 <span class="w-live">● LIVE</span></div>
+          <canvas id="mini"></canvas>
+          <div class="w-foot"><span>작업중 <b>3</b> · 주시 <b>2</b> · 대기 <b>1</b></span><span>오늘 할일 <b>3</b></span></div>
+          <div class="hint">클릭하면 사무실 + 오늘의 할일 확장 ▼</div>
+        </div>
+        <div class="ph">보안 분석 요약 (기존)</div>
+        <div class="ph">자산 탐색기 (기존)</div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="label">② 클릭 후 — 확장 창 (사무실 + 오늘의 할일만)</div>
+    <div class="expand">
+      <div class="e-head"><div class="e-title">🏢 우리 AI 팀 사무실</div><div style="color:var(--g-muted)">✕</div></div>
+      <div class="e-body">
+        <div class="e-left">
+          <canvas id="full"></canvas>
+          <div class="ticker"><span>💬 Orchestrator: 하드닝 결과 4건 위임 · TI: KEV 2건 매칭 — 자산 3대 · Scan: 정기 스캔 완료 신규 12건 · Report: 주간 보고서 초안 결재판 등록 · GIJO: U-102 지침 부연</span></div>
+        </div>
+        <div class="todo">
+          <div class="t-head">☑ 오늘의 할일</div>
+          <div class="t-add"><input placeholder="할 일 추가…"><button>＋</button></div>
+          <div class="t-list">
+            <div class="t-item"><input type="checkbox"><div>하드닝 미조치 3건 재점검<div class="who">🤖 Scan 예약 14:00</div></div></div>
+            <div class="t-item"><input type="checkbox"><div>KEV 매칭 자산 조치 확인<div class="who">🤖 TI 감시 중</div></div></div>
+            <div class="t-item"><input type="checkbox"><div>주간 보고서 검토·결재<div class="who">👤 내 승인 대기</div></div></div>
+          </div>
+          <button class="t-cta">▶ AI 팀에게 맡기기</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="note">진입점: 대시보드 위젯이 곧 입구 (별도 메뉴 추가 없음) · 미니 상태는 30초 폴링, 확장 시 WebSocket LIVE</div>
+
+<script src="pixel-office.js"></script>
+<script>
+createOffice(document.getElementById("mini"),{showBubbles:false});
+createOffice(document.getElementById("full"));
+</script>
+</body></html>

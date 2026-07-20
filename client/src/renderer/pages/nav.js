@@ -26,6 +26,7 @@
     ]},
     { id: "ai", ic: "🤖", label: "AI", items: [
       { page: "agent.html", label: "에이전트 AI" },
+      { office: true, label: "🏢 팀 사무실 (창)" }, // 별도 창 — 페이지 이동이 아니라 office:open IPC
       { page: "merge.html", label: "LLM 합성" },
       { page: "llmguide.html", label: "LLM 가이드" },
       { page: "memory.html", label: "기억·학습 (RAG)" },
@@ -81,8 +82,9 @@
       ".gn-item{padding:8px 13px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}" +
       ".gn-item:hover{color:#fff;background:rgba(255,255,255,.03);}" +
       ".gn-item.active{color:var(--blue-light);box-shadow:inset 3px 0 0 var(--blue);background:rgba(59,130,246,.08);cursor:default;}" +
-      ".gn-logo{height:26px;width:42px;display:flex;align-items:center;justify-content:center;margin-bottom:6px;cursor:pointer;}" +
-      ".gn-logo img{height:20px;}";
+      // 레일(54px)에선 가로 워드마크가 잘리므로, 앞의 마크만 보이게 크롭한다(overflow hidden + 좌측 정렬).
+      ".gn-logo{height:30px;width:30px;overflow:hidden;display:flex;align-items:center;justify-content:flex-start;margin:0 auto 8px;cursor:pointer;}" +
+      ".gn-logo img{height:24px;width:auto;max-width:none;flex:0 0 auto;object-position:left center;}";
     document.head.appendChild(st);
   }
 
@@ -129,7 +131,12 @@
       var el = document.createElement("div");
       el.className = "gn-item" + (it.page === here ? " active" : "");
       el.textContent = it.label;
-      if (it.page !== here) el.addEventListener("click", function () { go(it.page); });
+      if (it.office) {
+        // 페이지 이동이 아니라 별도 창(우리 AI 팀 사무실)을 연다.
+        el.addEventListener("click", function () { if (window.gijo && window.gijo.openTeamOffice) window.gijo.openTeamOffice(); });
+      } else if (it.page !== here) {
+        el.addEventListener("click", function () { go(it.page); });
+      }
       sub.appendChild(el);
     });
 

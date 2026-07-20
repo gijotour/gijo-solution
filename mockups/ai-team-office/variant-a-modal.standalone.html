@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<title>시안 A — 에이전트 페이지 모달 "우리 AI 팀 사무실"</title>
+<style>
+:root{--g-bg:#0a0e1a;--g-surface-1:#121a2e;--g-surface-2:#0e1526;--g-border:rgba(255,255,255,.08);
+--g-blue:#3b82f6;--g-blue-light:#5fa1ff;--g-teal:#1eb980;--g-amber:#f0a020;--g-red:#e2483d;
+--g-text:#e7eaf3;--g-muted:#8b93ab;--g-r:12px;--g-r-lg:16px}
+*{margin:0;box-sizing:border-box;font-family:'Segoe UI',sans-serif}
+body{background:var(--g-bg);color:var(--g-text);min-height:100vh}
+.tag{position:fixed;top:10px;left:10px;background:var(--g-blue);color:#fff;font-size:12px;font-weight:800;
+padding:4px 10px;border-radius:999px;z-index:99}
+/* 뒤에 깔린 에이전트 페이지 (흐림) */
+.backdrop{filter:blur(3px) brightness(.5);padding:24px;pointer-events:none}
+.bd-title{font-size:22px;font-weight:800}.bd-sub{color:var(--g-muted);font-size:13px;margin-top:4px}
+.bd-panel{background:var(--g-surface-1);border:1px solid var(--g-border);border-radius:var(--g-r);height:120px;margin-top:16px}
+/* 모달 */
+.overlay{position:fixed;inset:0;background:rgba(4,7,14,.6);display:flex;align-items:center;justify-content:center;padding:24px}
+.modal{width:min(880px,95vw);background:var(--g-surface-1);border:1px solid rgba(255,255,255,.14);
+border-radius:var(--g-r-lg);box-shadow:0 20px 60px rgba(0,0,0,.5);overflow:hidden}
+.m-head{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--g-border)}
+.m-title{font-size:17px;font-weight:800}.m-title .sub{color:var(--g-muted);font-weight:400;font-size:12.5px;margin-left:10px}
+.m-x{color:var(--g-muted);font-size:18px;cursor:pointer}
+.m-body{display:grid;grid-template-columns:1fr 264px;gap:0}
+/* 왼쪽: 사무실 + 로스터 */
+.office-wrap{padding:14px 0 6px 18px}
+canvas{width:100%;border-radius:10px;border:1px solid var(--g-border);background:#171f33}
+.live{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:var(--g-teal);font-weight:700;margin:8px 0 4px}
+.live::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--g-teal);animation:p 1.4s infinite}
+@keyframes p{50%{opacity:.3}}
+.roster{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:8px 0 16px 18px}
+.r-card{display:flex;align-items:center;gap:8px;background:var(--g-surface-2);border:1px solid var(--g-border);
+border-radius:10px;padding:8px 10px;font-size:12px}
+.r-dot{width:8px;height:8px;border-radius:50%}
+.r-name{font-weight:700}.r-role{color:var(--g-muted);font-size:10.5px}
+/* 오른쪽: 오늘의 할일 */
+.todo{border-left:1px solid var(--g-border);background:var(--g-surface-2);display:flex;flex-direction:column}
+.t-head{padding:14px 16px 8px;font-weight:800;font-size:14px}
+.t-head .cnt{color:var(--g-muted);font-weight:400;font-size:12px}
+.t-add{display:flex;gap:6px;padding:0 14px 10px}
+.t-add input{flex:1;background:var(--g-bg);border:1px solid var(--g-border);border-radius:8px;height:32px;
+padding:0 10px;color:var(--g-text);font-size:12.5px}
+.t-add button{width:32px;height:32px;border-radius:8px;border:none;background:var(--g-teal);color:#04110b;font-weight:800;cursor:pointer}
+.t-list{flex:1;overflow:auto;padding:0 14px}
+.t-item{display:flex;gap:8px;align-items:flex-start;padding:8px 2px;border-bottom:1px solid var(--g-border);font-size:12.5px}
+.t-item input{margin-top:2px;accent-color:var(--g-teal)}
+.t-item .who{font-size:10.5px;color:var(--g-muted)}
+.t-item.done{opacity:.45;text-decoration:line-through}
+.t-cta{margin:12px 14px 14px;background:linear-gradient(135deg,#1eb980,#17a06e);border:none;border-radius:10px;
+height:40px;color:#04110b;font-weight:800;font-size:13px;cursor:pointer}
+.note{position:fixed;bottom:12px;left:12px;right:12px;text-align:center;color:var(--g-muted);font-size:11.5px}
+</style></head><body>
+<div class="tag">시안 A — 에이전트 페이지 모달</div>
+
+<div class="backdrop">
+  <div class="bd-title">에이전트 AI</div>
+  <div class="bd-sub">여러 보안 특화 LLM 에이전트가 역할을 나눠 협업하고, 작업을 지시하면 팀이 알아서 처리합니다</div>
+  <div class="bd-panel"></div><div class="bd-panel"></div><div class="bd-panel"></div>
+</div>
+
+<div class="overlay">
+  <div class="modal">
+    <div class="m-head">
+      <div class="m-title">🏢 우리 AI 팀 사무실 <span class="sub">에이전트 로스터의 "팀 사무실" 버튼으로 열림</span></div>
+      <div class="m-x">✕</div>
+    </div>
+    <div class="m-body">
+      <div>
+        <div class="office-wrap">
+          <canvas id="office"></canvas>
+          <div class="live">LIVE — 실제 에이전트 상태·협업 피드 연동</div>
+        </div>
+        <div class="roster" id="roster"></div>
+      </div>
+      <div class="todo">
+        <div class="t-head">☑ 오늘의 할일 <span class="cnt">4건 · 완료 1</span></div>
+        <div class="t-add"><input placeholder="할 일 추가…"><button>＋</button></div>
+        <div class="t-list">
+          <div class="t-item"><input type="checkbox"><div>하드닝 미조치 3건 재점검<div class="who">🤖 Scan 예약됨 · 14:00</div></div></div>
+          <div class="t-item"><input type="checkbox"><div>KEV 매칭 자산 조치 확인<div class="who">🤖 TI 감시 중</div></div></div>
+          <div class="t-item"><input type="checkbox"><div>주간 보고서 검토·결재<div class="who">👤 내 승인 대기</div></div></div>
+          <div class="t-item done"><input type="checkbox" checked><div>외부 테스터 VPN 발급<div class="who">완료 11:35</div></div></div>
+        </div>
+        <button class="t-cta">▶ 운영 시작 — AI 팀에게 맡기기</button>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="note">진입점: 기존 "에이전트 AI" 페이지 유지 + 모달만 추가 (구현 부담 최소) · 할일은 대시보드 "내 업무 바로가기(오늘)"와 동일 소스</div>
+
+<script>
+// pixel-office.js — 시안 공용 픽셀 사무실 렌더러 (목업 전용, 의존성 없음)
+// GIJO AS 에이전트 6명을 작은 픽셀 캐릭터로 그린다. 상태: working(타이핑)/watching(주시)/idle(배회).
+// 실구현 시 /api/agents 상태 + WebSocket 협업 피드로 구동한다는 전제를 시각화한다.
+(function () {
+  const AGENTS = [
+    { id: "orch",    name: "Orchestrator", color: "#5fa1ff", state: "working",  desk: 0 },
+    { id: "scan",    name: "Scan",         color: "#1eb980", state: "working",  desk: 1 },
+    { id: "analyze", name: "Analyze",      color: "#8b7cf0", state: "watching", desk: 2 },
+    { id: "report",  name: "Report",       color: "#f0a020", state: "idle",     desk: 3 },
+    { id: "ti",      name: "TI",           color: "#e2483d", state: "watching", desk: 4 },
+    { id: "gijo",    name: "GIJO",         color: "#7dd3c0", state: "working",  desk: 5 },
+  ];
+  const BUBBLES = [
+    ["scan", "신규 스캔 12건 자산 반영"],
+    ["ti", "KEV 2건 매칭 — 영향 자산 3대"],
+    ["orch", "하드닝 리포트 → Report에 위임"],
+    ["analyze", "CVE-2026-1234 우선순위 P1"],
+    ["report", "주간 보고서 초안 작성 중"],
+    ["gijo", "U-102 항목 사내 지침 부연"],
+  ];
+
+  // 사무실 타일맵: 20x11 타일(타일 8px). S=슈퍼샘플 배율 — 픽셀아트는 ×S 정수 확대로
+  // 또렷하게 유지하면서, 말풍선 텍스트는 실해상도로 작고 선명하게 그린다.
+  function createOffice(canvas, opts) {
+    const o = Object.assign({ showBubbles: true }, opts);
+    const ctx = canvas.getContext("2d");
+    const COLS = 20, ROWS = 11, S = 3;
+    const W = COLS * 8, H = ROWS * 8;
+    canvas.width = W * S; canvas.height = H * S;
+    canvas.style.imageRendering = "pixelated";
+
+    // 책상 위치(타일): 좌열 3, 우열 3
+    const DESKS = [
+      { x: 3, y: 2 }, { x: 8, y: 2 }, { x: 13, y: 2 },
+      { x: 3, y: 6 }, { x: 8, y: 6 }, { x: 13, y: 6 },
+    ];
+    const COFFEE = { x: 17.5, y: 8.5 };
+    const agents = AGENTS.map((a) => ({
+      ...a,
+      x: (DESKS[a.desk].x + 1) * 8, y: DESKS[a.desk].y * 8 + 22, // 책상 앞줄 — 모니터가 가려지지 않게
+      tx: 0, ty: 0, wanderT: 0, frame: 0,
+    }));
+    let bubbleIdx = 0, bubbleT = 0, t = 0;
+
+    function px(x, y, w, h, c) { ctx.fillStyle = c; ctx.fillRect(Math.round(x * S), Math.round(y * S), w * S, h * S); }
+
+    function drawRoom() {
+      // 바닥 체커
+      for (let r = 0; r < ROWS; r++) for (let c = 0; c < COLS; c++)
+        px(c * 8, r * 8, 8, 8, (r + c) % 2 ? "#1a2338" : "#171f33");
+      // 벽
+      px(0, 0, W, 10, "#0e1526"); px(0, 10, W, 2, "#2a3552");
+      // 창문
+      for (let i = 0; i < 4; i++) px(14 + i * 44, 2, 20, 7, "#22345c");
+      // 회의 테이블(중앙 하단)
+      px(72, 70, 28, 12, "#3a2f22"); px(74, 68, 24, 4, "#4a3c2c");
+      // 화분
+      px(2, 74, 8, 10, "#2c5a3a"); px(4, 82, 4, 4, "#5a3c28");
+      px(W - 12, 14, 8, 10, "#2c5a3a"); px(W - 10, 22, 4, 4, "#5a3c28");
+      // 커피머신
+      px(COFFEE.x * 8, COFFEE.y * 8 - 6, 10, 12, "#3a4258");
+      px(COFFEE.x * 8 + 2, COFFEE.y * 8 - 4, 6, 3, "#e2483d");
+      // 책상들
+      DESKS.forEach((d, i) => {
+        const a = agents[i];
+        px(d.x * 8, d.y * 8 + 6, 22, 9, "#4a3c2c");        // 상판
+        px(d.x * 8 + 1, d.y * 8 + 15, 3, 4, "#3a2f22");    // 다리
+        px(d.x * 8 + 18, d.y * 8 + 15, 3, 4, "#3a2f22");
+        // 모니터 — 상태별 발광
+        const glow = a.state === "working" ? (Math.floor(t / 20) % 2 ? "#1eb980" : "#17a06e")
+                   : a.state === "watching" ? "#f0a020" : "#2a3552";
+        px(d.x * 8 + 7, d.y * 8 - 1, 9, 7, "#0a0e1a");
+        px(d.x * 8 + 8, d.y * 8, 7, 5, glow);
+        px(d.x * 8 + 10, d.y * 8 + 6, 3, 2, "#3a4258");
+      });
+    }
+
+    function drawAgent(a) {
+      const bob = a.state === "working" ? (Math.floor(t / 12) % 2) : 0;
+      const wx = a.x, wy = a.y + (a.state === "idle" ? Math.sin(t / 30 + a.desk) * 1.5 : 0);
+      // 몸(역할색)·머리·타이핑 팔
+      px(wx, wy - 6 + bob, 6, 6, a.color);
+      px(wx + 1, wy - 11 + bob, 4, 5, "#e8c39e");
+      px(wx, wy - 13 + bob, 6, 3, a.desk % 2 ? "#3a2f22" : "#22263a"); // 머리카락
+      if (a.state === "working") px(wx - 2 + (bob ? 1 : 0), wy - 3, 2, 2, "#e8c39e");
+      // 상태 점
+      const dot = a.state === "working" ? "#1eb980" : a.state === "watching" ? "#f0a020" : "#5f6785";
+      px(wx + 2, wy - 16, 2, 2, dot);
+    }
+
+    function drawBubble() {
+      if (!o.showBubbles) return;
+      const [id, msg] = BUBBLES[bubbleIdx];
+      const a = agents.find((x) => x.id === id);
+      if (!a || bubbleT > 160) return;
+      // 말풍선은 실해상도(×S 캔버스 좌표)로 그려 텍스트를 작고 또렷하게.
+      ctx.font = `${3.4 * S}px 'Malgun Gothic',sans-serif`;
+      const tw = ctx.measureText(msg).width;
+      const w = Math.min(tw + 4 * S, (W - 8) * S);
+      const bx = Math.max(2 * S, Math.min(a.x * S - w / 2, (W - 2) * S - w));
+      const by = (a.y - 26) * S;
+      ctx.fillStyle = "#e7eaf3";
+      ctx.fillRect(bx, by, w, 6 * S);
+      ctx.fillRect(a.x * S, by + 6 * S, 2 * S, 2 * S); // 꼬리
+      ctx.fillStyle = "#0a0e1a";
+      ctx.fillText(msg, bx + 2 * S, by + 4.4 * S);
+    }
+
+    function step() {
+      t++;
+      bubbleT++;
+      if (bubbleT > 220) { bubbleT = 0; bubbleIdx = (bubbleIdx + 1) % BUBBLES.length; }
+      // idle 배회: 커피머신 ↔ 자리
+      agents.forEach((a) => {
+        if (a.state !== "idle") return;
+        a.wanderT++;
+        const goal = Math.floor(a.wanderT / 300) % 2 ? COFFEE : { x: DESKS[a.desk].x + 1, y: DESKS[a.desk].y + 2 };
+        const gx = goal.x * 8, gy = goal.y * 8;
+        a.x += Math.sign(gx - a.x) * 0.3; a.y += Math.sign(gy - a.y) * 0.3;
+      });
+      ctx.clearRect(0, 0, W * S, H * S);
+      drawRoom();
+      agents.slice().sort((p, q) => p.y - q.y).forEach(drawAgent);
+      drawBubble();
+      requestAnimationFrame(step);
+    }
+    step();
+    return { agents: AGENTS };
+  }
+  window.createOffice = createOffice;
+  window.GIJO_AGENTS = AGENTS;
+})();
+
+</script>
+<script>
+createOffice(document.getElementById("office"));
+const roster=document.getElementById("roster");
+GIJO_AGENTS.forEach(a=>{
+  const roles={orch:"작업 분배·취합",scan:"스캔 해석·자산",analyze:"우선순위 판단",report:"보고서 작성",ti:"CTI 모니터링",gijo:"사내 지식 부연"};
+  const st={working:["#1eb980","작업 중"],watching:["#f0a020","주시 중"],idle:["#5f6785","대기"]}[a.state];
+  roster.insertAdjacentHTML("beforeend",
+    `<div class="r-card"><div class="r-dot" style="background:${st[0]}"></div>
+     <div><div class="r-name" style="color:${a.color}">${a.name}</div><div class="r-role">${roles[a.id]} · ${st[1]}</div></div></div>`);
+});
+</script>
+</body></html>
