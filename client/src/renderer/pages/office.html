@@ -94,7 +94,6 @@
         <button data-theme="neon" title="네온 SOC">🌃</button>
         <button data-theme="deep" title="딥 블루">🌊</button>
       </div>
-      <button class="pin" id="pinBtn" title="항상 위에 고정 (관제 모니터용)">📌</button>
     </div>
   </div>
 
@@ -624,14 +623,6 @@
     markTheme();
   });
   markTheme();
-
-  // ── 항상 위 고정 ──
-  let pinned = false;
-  document.getElementById("pinBtn").addEventListener("click", async (e) => {
-    pinned = !pinned;
-    await window.gijo.setOfficeAlwaysOnTop(pinned);
-    e.currentTarget.classList.toggle("on", pinned);
-  });
 
   // ── 부팅 ──
   (async function boot() {
