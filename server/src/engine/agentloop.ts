@@ -230,6 +230,24 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }
     tool: "report_schedule_list",
     args: {},
   },
+  // 통합 보안 분석(관제) 허브 현황 — "보안 분석" 키워드가 today/briefing으로 새기 쉬워 못박는다.
+  {
+    re: /통합\s*(보안\s*)?(분석|관제)|보안\s*분석\s*(현황|어때|보여)|관제\s*현황/,
+    tool: "analysis_status",
+    args: {},
+  },
+  // 보안 KPI 현황 — "KPI"는 영문이라 대소문자 무관하게 잡는다.
+  {
+    re: /보안\s*kpi|kpi\s*(현황|어때|보여)|보안\s*지표\s*(현황|보여)/i,
+    tool: "kpi_status",
+    args: {},
+  },
+  // 작업 세션(대화 세션형) 현황.
+  {
+    re: /작업\s*세션.{0,6}(뭐|확인|알려|보여)|(지난|최근)\s*(대화\s*)?세션/,
+    tool: "work_session_status",
+    args: {},
+  },
   // 오늘의 브리핑 — 대시보드(전체 도구 노출)에서 문구가 명백한데도 LLM이 도구를 건너뛰고 잡담으로
   // 떨어지던 것(실측 0/3 → chat)을 못박는다. "문서 리포트 작성"은 여기 안 걸리게 좁게 잡는다.
   {

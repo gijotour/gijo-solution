@@ -32,6 +32,9 @@ import { dailyBriefingText } from "./briefing";
 import { runRedTeam, makeServedCaller } from "./redteam";
 import { runHardeningScan, scanSummaryText, isStandard } from "./hardeningscan";
 import { listSchedules as listReportSchedules, scheduleSummaryText } from "./reportschedule";
+import { listAnalysisEvents, analysisSummary, computeCorrelations } from "./analysishub";
+import { computeKpiSnapshot } from "./kpi";
+import { listSessions as listWorkSessions } from "./worksessions";
 
 export interface AgentToolParam {
   name: string;
@@ -977,6 +980,54 @@ function runReportScheduleList(): string {
   return scheduleSummaryText(listReportSchedules());
 }
 
+// 통합 보안 분석(관제) 현황 — 제품 1차 목표 화면(analysis.html). 취약점·보안로그·운영리포트·
+// 하드닝 4소스를 정규화한 이벤트를 그대로 요약하고, 소스 간 상관관계(같은 자산이 여러 소스에
+// 동시 출현)도 함께 짚어준다.
+function runAnalysisStatus(): string {
+  const events = listAnalysisEvents();
+  const s = analysisSummary(events);
+  if (s.total === 0) return "현재 미해결 통합 분석 이벤트가 없습니다(취약점·보안로그·운영리포트·하드닝 4소스 기준).";
+  const head = `통합 분석 이벤트 ${s.total}건(종합위험 ${s.overall}) — 취약점 ${s.bySource.vuln} · 보안로그 ${s.bySource.log} · 운영리포트 ${s.bySource.product} · 하드닝 ${s.bySource.hardening}`;
+  const pri = `우선순위: P0 ${s.byPriority.P0} · P1 ${s.byPriority.P1} · P2 ${s.byPriority.P2} · P3 ${s.byPriority.P3}`;
+  const top = events
+    .filter((e) => e.status !== "done" && e.status !== "ignored")
+    .slice(0, 8)
+    .map((e) => `- [${e.priority}] ${e.title} (${e.entity})`);
+  const corr = computeCorrelations(events)
+    .slice(0, 3)
+    .map((c) => `- ${c.note}`);
+  return [head, pri, top.length ? `최우선 항목:\n${top.join("\n")}` : "", corr.length ? `상관관계:\n${corr.join("\n")}` : ""].filter(Boolean).join("\n");
+}
+
+// 통합 보안 KPI 현황(kpi.html) — 자산 위험도·취약점·조치 SLA·점검·컴플라이언스를 한 스냅샷으로.
+async function runKpiStatus(): Promise<string> {
+  const s = await computeKpiSnapshot();
+  const lines = [
+    `자산 ${s.assets.total}건(고위험 ${s.assets.highRisk} · 중위험 ${s.assets.midRisk} · 저위험 ${s.assets.lowRisk})`,
+    `취약점 활성 ${s.vulnerabilities.active}건(Critical ${s.vulnerabilities.critical} · High ${s.vulnerabilities.high} · KEV ${s.vulnerabilities.kev}) · 조치율 ${s.vulnerabilities.remediationRate}%`,
+    `조치 SLA 준수율 ${s.remediation.slaCompliance}%(기한초과 ${s.remediation.overdue}건 · 마감임박 ${s.remediation.dueSoon}건)`,
+    `점검 ${s.inspections.total}건(지연 ${s.inspections.overdue} · 승인대기 ${s.inspections.pendingApproval})`,
+    `컴플라이언스 이행률 ${s.compliance.coverageRate}%(${s.compliance.covered}/${s.compliance.total})`,
+  ];
+  return `보안 KPI 현황(${s.date}):\n${lines.map((l) => `- ${l}`).join("\n")}`;
+}
+
+// 작업 세션(대화 세션형, sessions.html) 현황 — 최근 대화 이력을 챗봇이 그대로 알 수 있게 한다.
+function runWorkSessionStatus(args: Record<string, string>): string {
+  const sessions = listWorkSessions();
+  if (!sessions.length) return "작업 세션이 없습니다.";
+  const status = (args.status ?? "").trim();
+  const filtered = status === "active" || status === "done" ? sessions.filter((s) => s.status === status) : sessions;
+  if (!filtered.length) return `"${status}" 상태의 작업 세션이 없습니다.`;
+  const active = sessions.filter((s) => s.status === "active").length;
+  const done = sessions.filter((s) => s.status === "done").length;
+  const STATUS_LABEL: Record<string, string> = { active: "진행중", done: "완료", ignored: "무시" };
+  const top = filtered.slice(0, 8).map(
+    (s) => `- [${STATUS_LABEL[s.status] ?? s.status}] ${s.title}${s.turnCount ? ` (턴 ${s.turnCount}건)` : ""}${s.lastPreview ? ` · 최근 "${s.lastPreview.slice(0, 30)}"` : ""}`
+  );
+  return `작업 세션 ${sessions.length}건 — 진행중 ${active} · 완료 ${done}\n최근 세션:\n${top.join("\n")}`;
+}
+
 // ── 「지식·모델」 도메인 도구 ────────────────────────────────────────────
 // 답변 품질은 지식베이스가 좌우한다. "무엇이 들어 있고 얼마나 연결됐는가"를 본다.
 async function runKnowledgeStatus(): Promise<string> {
@@ -1042,6 +1093,39 @@ const TOOLS: AgentTool[] = [
     directAnswer: true,
     params: [],
     run: runReportScheduleList,
+  },
+  {
+    name: "analysis_status",
+    label: "통합 보안 분석(관제) 현황",
+    domain: "cross", // 취약점·보안로그·운영리포트·하드닝 4소스를 가로지르는 관제 허브
+    write: false,
+    description:
+      '통합 보안 분석(관제) 허브 현황을 조회한다 — 취약점·보안로그·보안제품 운영리포트·하드닝 점검 4소스를 정규화한 이벤트의 종합위험·소스별 건수·최우선 항목·소스 간 상관관계(같은 자산이 여러 소스에 동시 출현). "통합 분석 현황", "보안 분석 어때", "관제 현황 알려줘"에 쓴다. 예: {}',
+    directAnswer: true,
+    params: [],
+    run: runAnalysisStatus,
+  },
+  {
+    name: "kpi_status",
+    label: "보안 KPI 현황",
+    domain: "cross", // 자산·취약점·조치·점검·컴플라이언스를 가로지르는 통합 지표
+    write: false,
+    description:
+      '통합 보안 KPI 스냅샷을 조회한다 — 자산 위험도, 취약점 활성/조치율, 조치 SLA 준수율, 점검(유지보수) 지연/승인대기, 컴플라이언스 이행률. "보안 KPI 현황", "KPI 어때", "보안 지표 보여줘"에 쓴다. 예: {}',
+    directAnswer: true,
+    params: [],
+    run: runKpiStatus,
+  },
+  {
+    name: "work_session_status",
+    label: "작업 세션 현황",
+    domain: "cross", // 어느 화면에서 시작했든(자산·취약점·오늘 등) 가로지르는 대화 이력
+    write: false,
+    description:
+      '작업 세션(대화 세션형) 현황을 조회한다 — 진행중/완료 건수와 최근 세션 제목·턴 수·마지막 대화 미리보기. "작업 세션 뭐있어?", "지난 세션 확인해줘", "최근 대화 세션"에 쓴다. status로 active/done만 좁힐 수 있다. 예: {} 또는 {"status":"active"}',
+    directAnswer: true,
+    params: [{ name: "status", label: "상태", description: "active(진행중) 또는 done(완료) — 비우면 전체", required: false }],
+    run: runWorkSessionStatus,
   },
   {
     name: "knowledge_status",

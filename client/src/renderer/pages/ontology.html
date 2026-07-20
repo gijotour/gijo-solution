@@ -23,6 +23,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .main{padding:28px 32px 48px;}
 .topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;}
 .page-title{font-size:21px;font-weight:800;color:#fff;}
+.chip-bot{background:rgba(139,124,240,0.16);color:#cabdfd;font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:6px;white-space:nowrap;vertical-align:middle;margin-left:10px;}
 .page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;}
 .btn-primary{background:var(--blue);color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;}
 .btn-primary:disabled{opacity:0.5;cursor:not-allowed;}
@@ -101,7 +102,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   <div class="main">
     <div class="topbar-row">
       <div>
-        <div class="page-title">온톨로지 · 지식 그래프</div>
+        <div class="page-title">온톨로지 · 지식 그래프<span class="chip-bot" title="온톨로지 트리플 건수를 그대로 답합니다(예: “온톨로지에 몇 건 들어있어?”)">🤖 챗봇에서도 확인 가능</span></div>
         <div class="page-sub">엔티티 사이의 <b>명시적 관계·규칙</b>을 트리플(주어–관계–대상)로 저장합니다. 벡터 검색(장기 기억)이 "비슷한 문장"을 찾는다면, 여기는 "왜 이 판단인지"의 근거가 되어 채팅에 함께 주입됩니다.</div>
       </div>
       <button class="btn-primary" id="seedBtn" title="KISA AI 보안 위협 카탈로그를 트리플로 불러옵니다">＋ 샘플 지식 불러오기 (KISA 위협)</button>

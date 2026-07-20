@@ -19,6 +19,10 @@ import { findAgentTool, toolCatalogText } from "../src/engine/agenttools";
 import { resetAssetsForTests, registerAsset, recordFindings } from "../src/engine/assets";
 import { addTriple, deleteTriplesBySource } from "../src/engine/ontology";
 import { resetSecurityProductsForTests, createProduct } from "../src/engine/securityproducts";
+import { resetAnalysisHubForTests, rebuildVulnEvents } from "../src/engine/analysishub";
+import { resetKpiForTests } from "../src/engine/kpi";
+import { createSession, appendTurn, setSessionStatus } from "../src/engine/worksessions";
+import { db } from "../src/db";
 
 const run = (name: string, args: Record<string, string> = {}) => Promise.resolve(findAgentTool(name)!.run(args)).then(String);
 
@@ -167,5 +171,76 @@ describe("도구 카탈로그(LLM이 읽는 목록)", () => {
     // LLM이 언제 쓸지 알 수 있게 트리거 문구가 설명에 있어야 한다.
     expect(catalog).toContain("어디 있는지 모를 때");
     expect(catalog).toContain("오늘 뭐부터");
+  });
+});
+
+// 화면 × 챗봇 도구 커버리지 감사(2026-07-21)에서 조회 도구가 전혀 없던 3개 핵심 화면
+// (analysis.html·kpi.html·sessions.html)에 새로 연결한 도구들.
+describe("analysis_status — 통합 보안 분석(관제) 현황", () => {
+  beforeEach(() => resetAnalysisHubForTests());
+
+  it("이벤트가 없으면 정직하게 없다고 답한다", async () => {
+    const out = await run("analysis_status");
+    expect(out).toContain("없습니다");
+  });
+
+  it("취약점 소스 이벤트의 종합위험·우선순위·최우선 항목을 보여준다", async () => {
+    registerAsset({ id: "web-01", name: "웹 서비스", path: "p" });
+    recordFindings("web-01", [
+      { finding_type: "Log4Shell RCE", severity: "critical", evidence: "log4j 2.14", source_tool: "nessus", kev: true, epss: 0.94 },
+    ]);
+    rebuildVulnEvents();
+
+    const out = await run("analysis_status");
+    expect(out).toContain("통합 분석 이벤트");
+    expect(out).toContain("종합위험 높음"); // KEV 신호로 P0 → overall "높음"
+    expect(out).toContain("Log4Shell RCE");
+    expect(out).toContain("웹 서비스");
+  });
+});
+
+describe("kpi_status — 보안 KPI 현황", () => {
+  beforeEach(() => {
+    resetKpiForTests();
+    resetAssetsForTests();
+  });
+
+  it("자산·취약점·조치·컴플라이언스 지표를 한 스냅샷으로 답한다", async () => {
+    registerAsset({ id: "web-01", name: "웹 서비스", path: "p" });
+    recordFindings("web-01", [{ finding_type: "Log4Shell RCE", severity: "critical", evidence: "e", source_tool: "nessus" }]);
+
+    const out = await run("kpi_status");
+    expect(out).toContain("보안 KPI 현황");
+    expect(out).toContain("자산 1건");
+    expect(out).toContain("조치 SLA 준수율");
+    expect(out).toContain("컴플라이언스 이행률");
+  });
+});
+
+describe("work_session_status — 작업 세션 현황", () => {
+  beforeEach(() => {
+    db.exec("DELETE FROM work_session_turns; DELETE FROM work_sessions;");
+  });
+
+  it("세션이 없으면 정직하게 없다고 답한다", async () => {
+    const out = await run("work_session_status");
+    expect(out).toContain("없습니다");
+  });
+
+  it("진행중/완료 건수와 최근 세션 제목·미리보기를 보여준다", async () => {
+    const s1 = createSession("취약점 우선순위 정리");
+    appendTurn(s1.id, "user", "오늘 급한 거 뭐야?");
+    appendTurn(s1.id, "assistant", "Log4Shell이 최우선입니다", "today");
+    const s2 = createSession("리포트 스케줄 확인");
+    setSessionStatus(s2.id, "done");
+
+    const out = await run("work_session_status");
+    expect(out).toContain("진행중 1");
+    expect(out).toContain("완료 1");
+    expect(out).toContain("취약점 우선순위 정리");
+
+    const activeOnly = await run("work_session_status", { status: "active" });
+    expect(activeOnly).toContain("취약점 우선순위 정리");
+    expect(activeOnly).not.toContain("리포트 스케줄 확인");
   });
 });

@@ -36,6 +36,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .main{padding:28px 32px 48px;}
 .topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;}
 .page-title{font-size:21px;font-weight:800;color:#fff;}
+.chip-bot{background:rgba(139,124,240,0.16);color:#cabdfd;font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:6px;white-space:nowrap;vertical-align:middle;margin-left:10px;}
 .page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;}
 .btn-primary{background:var(--blue);color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;}
 .btn-ghost{background:transparent;border:1px solid var(--border-strong);color:var(--text);padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;}
@@ -132,7 +133,7 @@ tr:last-child td{border-bottom:none;}
   <div class="main">
     <div class="topbar-row">
       <div>
-        <div class="page-title">AI-BOM</div>
+        <div class="page-title">AI-BOM<span class="chip-bot" title="AI-BOM(ML-BOM) 현황을 그대로 답합니다(예: “AI-BOM 현황 알려줘”)">🤖 챗봇에서도 확인 가능</span></div>
         <div class="page-sub">코드 의존성(SBOM)을 넘어 모델 · 데이터 · 프롬프트 · 에이전트 도구 · 인프라 5영역을 명세해 블랙박스 AI 자산의 보안 리스크를 관리합니다.</div>
       </div>
       <div style="display:flex;gap:8px;">

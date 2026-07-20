@@ -31,6 +31,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .icon-btn{width:32px;height:32px;border-radius:var(--g-r-sm);background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
 /* 페이지 고유 */
 .page-title{font-size:var(--g-t-h1);font-weight:800;color:#fff;}
+.chip-bot{background:rgba(139,124,240,0.16);color:#cabdfd;font-size:10.5px;font-weight:800;padding:3px 9px;border-radius:6px;white-space:nowrap;vertical-align:middle;margin-left:10px;}
 .page-sub{font-size:var(--g-t-sm);color:var(--muted);margin-top:var(--g-s1);max-width:920px;line-height:1.55;}
 .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--g-s3);margin:var(--g-s5) 0 var(--g-s2);}
 .sec{font-size:var(--g-t-h2);font-weight:800;color:#fff;margin:var(--g-s5) 0 var(--g-s3);display:flex;align-items:center;gap:var(--g-s2);}
@@ -74,7 +75,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   <div class="main">
     <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px">
       <div>
-        <div class="page-title">🛡 원격 정기점검 관제</div>
+        <div class="page-title">🛡 원격 정기점검 관제<span class="chip-bot" title="하드닝(보안설정) 점검을 그대로 실행·요약합니다(예: “하드닝 점검해줘”)">🤖 챗봇에서도 확인 가능</span></div>
         <div class="page-sub">등록한 보안장비에 SSH로 접속해 하드닝(보안설정)을 주기적으로 자동 점검하고, 준수율 추세·악화를 관제합니다. 점검은 읽기 전용 진단 명령만 실행합니다.</div>
       </div>
       <button class="g-btn g-primary" id="addBtn">＋ 대상 등록</button>
