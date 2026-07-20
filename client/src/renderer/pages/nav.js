@@ -13,6 +13,7 @@
       { page: "analysis.html", label: "보안 분석 (통합 관제)" },
       { page: "sessions.html", label: "작업 세션" },
       { page: "threat.html", label: "위협 인텔리전스" },
+      { page: "mcp.html", label: "🔌 MCP 연동" },
     ]},
     { id: "assets", ic: "🛡", label: "자산·취약점·대응", items: [
       { page: "inventory.html", label: "자산 목록" },
