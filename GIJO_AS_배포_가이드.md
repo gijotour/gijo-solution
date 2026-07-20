@@ -176,13 +176,34 @@ Restart=always
 sudo systemctl daemon-reload && sudo systemctl enable --now gijo-as.service
 ```
 
-### 3.7.5 네트워킹 (분산 모드)
+### 3.7.5 코드 갱신 배포 (2회차 이후)
+
+최초 배치(3.7.3) 이후의 코드 반영은 `server/scripts/deploy.sh` 한 줄로 끝냅니다.
+유닛이 `User=gijo` + `Restart=always`라 **sudo 없이** 전 과정이 자동화됩니다.
+
+```bash
+# Windows에서 (PowerShell — Git Bash는 /mnt 경로를 Windows 경로로 망가뜨립니다)
+wsl -d Ubuntu-24.04 -- bash "/mnt/d/Connect AI/server/scripts/deploy.sh" --dry-run   # 반영될 파일 확인
+wsl -d Ubuntu-24.04 -- bash "/mnt/d/Connect AI/server/scripts/deploy.sh"             # 실제 배포
+```
+
+스크립트가 하는 일 — ① 변경된 `.ts` 탐지 ② 복사 ③ `tsc` ④ `pkill` ⑤ health 폴링:
+
+- **변경 탐지는 `diff --strip-trailing-cr`로 합니다.** Windows 체크아웃은 CRLF, WSL은 LF라 그냥 비교하면 모든 파일이 바뀐 것으로 나와 실제 변경분을 분간할 수 없습니다. 복사할 때도 `tr -d '\r'`로 걷어냅니다.
+- **`src/`만 배포합니다.** 운영 서버에는 `test/`가 없습니다(런타임 불필요). 테스트까지 동기화하면 배포마다 테스트 수십 개가 운영에 깔립니다.
+- **`tsc`가 실패하면 재시작하지 않습니다.** 깨진 `dist`로 서비스를 내리는 것이 최악입니다.
+- 재기동은 systemd가 맡습니다(`Restart=always`). 스크립트는 health 200을 확인할 때까지 최대 30초 기다립니다.
+
+> ⚠ **재시작하면 접속 중인 세션이 전부 끊깁니다.** refresh 토큰이 인메모리라 전 사용자 재로그인이 필요합니다. 근무 시간대에는 접속자를 확인하고 실행하세요.
+> 서버 코드만 바뀐 배포는 클라이언트 설치본 재빌드가 **불필요**합니다(§4는 렌더러·Electron 변경 시에만).
+
+### 3.7.6 네트워킹 (분산 모드)
 - **권장(Windows 11 22H2+):** `%USERPROFILE%\.wslconfig`에 `[wsl2]` / `networkingMode=mirrored` → WSL이 호스트 IP를 공유해 포트포워딩이 불필요합니다. 적용에 `wsl --shutdown`이 필요하며, **이때 Windows 쪽 기존 서버가 4000을 잡고 있으면 충돌**하므로 전환 시점에 함께 정리합니다.
 - **구버전 대안:** `netsh interface portproxy add v4tov4 listenport=4000 connectaddress=<WSL IP> connectport=4000` (WSL IP는 재부팅 시 바뀌므로 갱신 스크립트 필요).
 - Windows 방화벽 `4000/tcp` 인바운드 허용(사내망 한정).
 - **부팅 시 자동 기동:** 작업 스케줄러에 시작 트리거로 `wsl.exe -d Ubuntu-24.04 --exec /bin/true`를 SYSTEM·최고 권한으로 등록하면 WSL이 올라오면서 systemd가 서비스를 이어서 띄웁니다. **재부팅 테스트를 전환 전 필수 통과 조건으로** 삼으세요.
 
-### 3.7.6 롤백
+### 3.7.7 롤백
 Windows 쪽 서버·모델·DB를 지우지 않고 그대로 둡니다. 문제 시 `sudo systemctl stop gijo-as` 후 기존 Windows 서비스를 재기동하면 즉시 복귀합니다.
 단, 전환 후 WSL DB에 변경분이 쌓이므로 **롤백 시에는 WSL DB를 Windows로 역복사**해야 합니다.
 
