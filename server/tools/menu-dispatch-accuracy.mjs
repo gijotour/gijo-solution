@@ -24,9 +24,11 @@ async function login() {
   return j.accessToken;
 }
 
-async function dispatch(token, text, screen) {
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function dispatchOnce(token, text, screen) {
   const ctrl = new AbortController();
-  const t = setTimeout(() => ctrl.abort(), 60000);
+  const t = setTimeout(() => ctrl.abort(), 90000);
   try {
     const r = await fetch(`${BASE}/api/dispatch`, {
       method: "POST",
@@ -36,6 +38,18 @@ async function dispatch(token, text, screen) {
     });
     return await r.json();
   } finally { clearTimeout(t); }
+}
+
+// 연결 실패(서버 재시작 등 일시 장애)에는 재로그인 후 재시도해 측정이 오염되지 않게 한다.
+async function dispatch(tokenRef, text, screen) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try { return await dispatchOnce(tokenRef.token, text, screen); }
+    catch (e) {
+      if (attempt === 2) throw e;
+      await sleep(6000);
+      try { tokenRef.token = await login(); } catch { /* 다음 시도에서 재시도 */ }
+    }
+  }
 }
 
 function selected(res) {
@@ -53,7 +67,7 @@ function ok(expect, got) {
 
 async function main() {
   console.log(`# 메뉴별 디스패치 정확도 — ${new Date().toLocaleString("sv-SE")}  (${BASE})`);
-  const token = await login();
+  const tokenRef = { token: await login() };
   let total = 0, pass = 0;
   const perMenu = [];
   const fails = [];
@@ -63,7 +77,7 @@ async function main() {
       for (const cmd of s.commands) {
         total++; mt++;
         let got = { tool: undefined, action: undefined }, err;
-        try { got = selected(await dispatch(token, cmd, m.screen)); }
+        try { got = selected(await dispatch(tokenRef, cmd, m.screen)); }
         catch (e) { err = String(e.message || e); }
         const good = !err && ok(s.expect, got);
         if (good) { pass++; mp++; }
