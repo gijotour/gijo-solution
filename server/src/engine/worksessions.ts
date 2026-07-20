@@ -12,6 +12,9 @@
 
 import type { Express } from "express";
 import { randomUUID } from "crypto";
+import * as fsp from "fs/promises";
+import * as path from "path";
+import { Document, Packer, Paragraph, TextRun, HeadingLevel } from "docx";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { db } from "../db";
@@ -224,6 +227,62 @@ export function recentTurnsText(sessionId: string, maxTurns = 6): string {
   return ["이전 대화 맥락(같은 세션):", ...lines].join("\n");
 }
 
+// ── 세션 종료 리포트 ─────────────────────────────────────────────────
+// 세션을 "완료"로 바꾸면 그 대화 전체(지시·응답·도구 태그·시각)를 DOCX로 남긴다.
+// report.ts의 이력 관례(파일 + .json 사이드카)를 그대로 따라 리포트 화면 이력에 함께 나타난다.
+// LLM 호출 없음 — 결정적(빠르고 실패 없음). 실패해도 상태 변경 자체는 유효해야 하므로 호출부에서 감싼다.
+const REPORT_DIR = path.join("data", "reports");
+const fmtTime = (ms: number) =>
+  new Date(ms).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+
+export async function generateSessionReport(sessionId: string): Promise<{ base: string; docx: string } | null> {
+  const s = getSession(sessionId);
+  if (!s) return null;
+  const turns = getSessionTurns(sessionId);
+  const children: Paragraph[] = [
+    new Paragraph({ heading: HeadingLevel.TITLE, children: [new TextRun(`작업 세션 리포트 — ${s.title}`)] }),
+    new Paragraph({
+      children: [new TextRun({
+        text: `기간 ${fmtTime(s.createdAt)} ~ ${fmtTime(s.updatedAt)} · 대화 ${turns.length}턴` + (s.contextRef ? ` · 대상 ${s.contextRef}` : ""),
+        color: "666666",
+      })],
+    }),
+    new Paragraph({ children: [] }),
+  ];
+  if (!turns.length) {
+    children.push(new Paragraph({ children: [new TextRun("기록된 대화가 없습니다.")] }));
+  }
+  for (const t of turns) {
+    const who = t.role === "user" ? "나" : `AI 팀${t.tool ? ` (${t.tool})` : ""}`;
+    children.push(new Paragraph({
+      heading: HeadingLevel.HEADING_3,
+      children: [new TextRun(`[${fmtTime(t.at)}] ${who}`)],
+    }));
+    // 턴 내용 — 줄 단위 문단, 폭주 방지로 턴당 4000자 컷
+    for (const line of t.content.slice(0, 4000).split(/\r?\n/)) {
+      children.push(new Paragraph({ children: [new TextRun(line || " ")] }));
+    }
+  }
+  const doc = new Document({ sections: [{ children }] });
+  const buffer = await Packer.toBuffer(doc);
+  await fsp.mkdir(REPORT_DIR, { recursive: true });
+  const base = `session-${Date.now()}`;
+  await fsp.writeFile(path.join(REPORT_DIR, `${base}.docx`), buffer);
+  const firstUser = turns.find((t) => t.role === "user");
+  const meta = {
+    base,
+    type: "session",
+    audience: "internal",
+    assetIds: [] as string[],
+    assetNames: [s.title],
+    createdAt: Date.now(),
+    docx: `${base}.docx`,
+    summary: `세션 "${s.title}" 종료 리포트 · ${turns.length}턴` + (firstUser ? ` · 첫 지시: ${firstUser.content.slice(0, 120)}` : ""),
+  };
+  await fsp.writeFile(path.join(REPORT_DIR, `${base}.json`), JSON.stringify(meta, null, 2), "utf-8");
+  return { base, docx: `${base}.docx` };
+}
+
 export function registerWorkSessionRoutes(app: Express): void {
   app.get("/api/work-sessions", authMiddleware, (_req, res) => {
     res.json(listSessions());
@@ -241,18 +300,27 @@ export function registerWorkSessionRoutes(app: Express): void {
     res.json({ session, turns: getSessionTurns(req.params.id) });
   });
 
-  // 제목·상태 부분 수정.
-  app.patch("/api/work-sessions/:id", authMiddleware, (req, res) => {
+  // 제목·상태 부분 수정. 상태가 "완료"로 바뀌는 순간 세션 리포트(DOCX)를 자동 생성한다.
+  app.patch("/api/work-sessions/:id", authMiddleware, asyncRoute(async (req, res) => {
     const id = req.params.id;
     let session = getSession(id);
     if (!session) return res.status(404).json({ error: "세션을 찾을 수 없습니다" });
+    const wasDone = session.status === "done";
     if (typeof req.body?.title === "string") session = renameSession(id, req.body.title) ?? session;
     if (typeof req.body?.status === "string") {
       if (!STATUSES.includes(req.body.status)) return res.status(400).json({ error: "허용되지 않은 상태" });
       session = setSessionStatus(id, req.body.status) ?? session;
     }
-    res.json(session);
-  });
+    let report: { base: string; docx: string } | null = null;
+    if (!wasDone && session.status === "done") {
+      try {
+        report = await generateSessionReport(id);
+      } catch {
+        /* 리포트 생성 실패해도 상태 변경은 유효 — 리포트 화면에서 수동 재생성 가능 */
+      }
+    }
+    res.json(report ? { ...session, report } : session);
+  }));
 
   // 일괄 정리 — /:id보다 먼저 등록해 'prune'·'delete-all'이 id로 안 잡히게 한다.
   app.post("/api/work-sessions/prune", authMiddleware, (req, res) => {

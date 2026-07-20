@@ -555,7 +555,8 @@ export async function listReportHistory(limit = 100): Promise<ReportHistoryEntry
   const bases = [...byBase.entries()]
     .filter(([, e]) => e.docx || e.pdf) // 메타만 있고 문서 없는 건 제외
     .map(([base, e]) => {
-      const fm = /^(?:weekly|quarterly|ondemand)-(\d+)$/.exec(base);
+      // session-*: 작업 세션 종료 리포트(worksessions.ts) — 같은 이력에 함께 나열된다.
+      const fm = /^(?:weekly|quarterly|ondemand|session)-(\d+)$/.exec(base);
       return { base, e, ts: fm ? Number(fm[1]) : 0 };
     })
     .sort((a, b) => b.ts - a.ts)
@@ -563,7 +564,7 @@ export async function listReportHistory(limit = 100): Promise<ReportHistoryEntry
   // 2) 상한 안의 항목만 사이드카(대상 자산·독자·요약)로 보강한다.
   const out: ReportHistoryEntry[] = [];
   for (const { base, e, ts } of bases) {
-    const fm = /^(weekly|quarterly|ondemand)-\d+$/.exec(base);
+    const fm = /^(weekly|quarterly|ondemand|session)-\d+$/.exec(base);
     const entry: ReportHistoryEntry = {
       base,
       type: fm ? fm[1] : "ondemand",

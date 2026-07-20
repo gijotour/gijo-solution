@@ -65,11 +65,12 @@
   .acc-b-sessions{max-height:300px;}
   .acc-b-console{flex:1 1 auto;min-height:220px;}
   /* 콘솔이 패널 안에 들어오면서 입력 독을 패널형 하단바로 조정 */
-  .acc-b-console .agent-dock{position:static;background:var(--panel-2);border-top:1px solid var(--border);padding:10px 12px;margin-top:0;gap:7px;justify-content:stretch;}
-  .acc-b-console .agent-dock input{padding:10px 12px;font-size:12px;}
-  .acc-b-console .dock-plus{width:36px;height:36px;font-size:18px;}
-  .acc-b-console .dock-send{height:36px;padding:0 14px;}
-  .acc-b-console .dock-all{height:36px;padding:0 9px;font-size:10px;}
+  /* 전송 독 소형화(사용자 요청 2026-07-20) — 입력줄·버튼을 낮고 작게 */
+  .acc-b-console .agent-dock{position:static;background:var(--panel-2);border-top:1px solid var(--border);padding:7px 10px;margin-top:0;gap:5px;justify-content:stretch;}
+  .acc-b-console .agent-dock input{padding:6px 10px;font-size:11.5px;height:28px;box-sizing:border-box;}
+  .acc-b-console .dock-plus{width:28px;height:28px;font-size:14px;border-radius:8px;}
+  .acc-b-console .dock-send{height:28px;padding:0 10px;font-size:11px;border-radius:8px;}
+  .acc-b-console .dock-all{height:28px;padding:0 7px;font-size:9.5px;border-radius:8px;}
   .acc-b-console .model-guide{margin:8px 12px;max-width:none;}
   /* 오른쪽 작업 세션 패널만 숨기기(② 요청) — 왼쪽 탐색기는 남기고 중앙만 넓힌다. */
   .body-grid.no-right{grid-template-columns:220px 1fr;}
@@ -95,6 +96,20 @@
   .dash-sessions .dsh-t{font-size:12px;font-weight:700;color:var(--text);}
   .dash-new{background:var(--blue);color:#fff;border:0;border-radius:6px;font-size:11px;font-weight:700;padding:4px 9px;cursor:pointer;}
   .dash-slist{flex:1;overflow-y:auto;padding:2px 8px 8px;}
+  /* 세션 행 v2(사용자 요청 2026-07-20) — 모든 세션 + 일자·주체·진행사항, 글자 작게. ✓ 완료 시 리포트 자동 생성. */
+  .dash-sitem2{padding:6px 8px;border-radius:8px;cursor:pointer;border:1px solid transparent;margin-bottom:2px;}
+  .dash-sitem2:hover{background:var(--panel-2);}
+  .dash-sitem2 .s-r1{display:flex;align-items:center;gap:6px;}
+  .dash-sitem2 .s-dot{width:6px;height:6px;border-radius:50%;background:var(--teal);flex:none;}
+  .dash-sitem2.st-done .s-dot{background:var(--muted-2);}
+  .dash-sitem2.st-ignored .s-dot{background:#3d4560;}
+  .dash-sitem2 .t{flex:1;min-width:0;font-weight:700;font-size:11.5px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .dash-sitem2.st-done .t{color:var(--muted);}
+  .s-done{flex:none;font-size:9.5px;font-weight:700;color:var(--teal);border:1px solid rgba(30,185,128,.4);border-radius:5px;padding:1px 5px;opacity:0;cursor:pointer;white-space:nowrap;}
+  .dash-sitem2:hover .s-done{opacity:.9;}
+  .s-done:hover{background:rgba(30,185,128,.15);}
+  .s-r2{font-size:10px;color:var(--muted-2);margin:2px 0 0 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .dash-srep{font-size:10.5px;font-weight:700;color:var(--teal);padding:6px 10px;background:rgba(30,185,128,.08);border:1px solid rgba(30,185,128,.25);border-radius:7px;margin:4px 2px 6px;cursor:pointer;}
   .dash-sitem{padding:8px 8px 8px 10px;border-radius:8px;cursor:pointer;border:1px solid transparent;margin-bottom:2px;display:flex;align-items:center;gap:8px;}
   .dash-sitem:hover{background:var(--panel-2);}
   .dash-sitem .t{flex:1;min-width:0;font-weight:700;font-size:12px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
@@ -1875,12 +1890,23 @@
         box.innerHTML = '<div style="font-size:11px;color:var(--muted-2);padding:10px 6px;line-height:1.6">아직 세션이 없습니다.<br>＋ 새 세션 또는 전체 화면의 탐색기 항목을 눌러 시작하세요.</div>';
         return;
       }
-      // 간단하게 — 제목만. 각 항목에서 바로 삭제(🗑) 가능.
-      box.innerHTML = list.slice(0, 15).map((s) => {
-        return `<div class="dash-sitem" data-id="${s.id}"><span class="t">${escT(s.title)}</span><span class="dash-sdel" data-del="${s.id}" title="세션 삭제">🗑</span></div>`;
+      // 모든 세션(행위)을 나열 — 각 행: 제목 + [일자 · 주체 · 진행상태 · 턴수 — 마지막 내용].
+      // ✓ 완료를 누르면 서버가 세션 리포트(DOCX)를 자동 생성한다(리포트 화면 이력에 표시).
+      box.innerHTML = list.map((s) => {
+        const who = s.lastRole === "user" ? "나" : s.lastRole === "assistant" ? "AI 팀" : "—";
+        const d = new Date(s.updatedAt);
+        const when = `${d.getMonth() + 1}.${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+        const stL = DASH_STATUS_LABEL[s.status] || s.status;
+        const prev = s.lastPreview ? ` — ${s.lastPreview}` : "";
+        return `<div class="dash-sitem2 st-${s.status}" data-id="${s.id}">
+          <div class="s-r1"><span class="s-dot"></span><span class="t">${escT(s.title)}</span>` +
+          (s.status !== "done" ? `<span class="s-done" data-done="${s.id}" title="세션 완료 — 리포트 자동 생성">✓ 완료</span>` : "") +
+          `<span class="dash-sdel" data-del="${s.id}" title="세션 삭제">🗑</span></div>
+          <div class="s-r2">${when} · ${who} · ${stL} · ${s.turnCount}턴${escT(prev)}</div></div>`;
       }).join("");
-      box.querySelectorAll(".dash-sitem").forEach((el) => el.addEventListener("click", (e) => {
+      box.querySelectorAll(".dash-sitem2").forEach((el) => el.addEventListener("click", (e) => {
         if (e.target.closest(".dash-sdel")) { e.stopPropagation(); deleteDashSession(el.dataset.id); return; }
+        if (e.target.closest(".s-done")) { e.stopPropagation(); completeDashSession(el.dataset.id); return; }
         openSessionPage(el.dataset.id);
       }));
     } catch (e) {
@@ -1890,6 +1916,22 @@
   async function deleteDashSession(id) {
     if (!confirm("이 세션과 대화를 삭제할까요? 되돌릴 수 없습니다.")) return;
     try { await window.gijo.deleteWorkSession(id); await loadDashSessions(); } catch (e) { alert("삭제 실패: " + (e && e.message || e)); }
+  }
+  // 세션 완료 처리 — 서버가 대화 전체를 DOCX 리포트로 남긴다(응답 report에 파일 정보).
+  async function completeDashSession(id) {
+    try {
+      const r = await window.gijo.updateWorkSession(id, { status: "done" });
+      await loadDashSessions();
+      if (r && r.report) {
+        const note = document.createElement("div");
+        note.className = "dash-srep";
+        note.textContent = "📄 세션 리포트 생성됨 — 리포트 화면에서 확인 ↗";
+        note.addEventListener("click", () => window.gijo.navigateTo("report.html"));
+        const box = document.getElementById("dashSessionList");
+        if (box) box.prepend(note);
+        setTimeout(() => { try { note.remove(); } catch (e) {} }, 15000);
+      }
+    } catch (e) { alert("완료 처리 실패: " + (e && e.message || e)); }
   }
   function openSessionPage(id) {
     try { localStorage.setItem("gijo:sessions:open", id); } catch (e) {}
@@ -2196,11 +2238,12 @@
     ".dm-btn.on{border-color:var(--blue);color:var(--blue-light);}" +
     ".dm-sub{font-size:11px;color:var(--muted);margin:5px 0 2px;}" +
     ".dm-sec{font-size:10.5px;font-weight:800;color:var(--muted-2);margin:8px 2px 5px;}" +
-    ".dm-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(82px,1fr));gap:7px;}" +
-    ".dm-tile{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:8px 5px;text-align:center;cursor:pointer;position:relative;transition:.14s;}" +
+    // 6열 고정 + 큰 타일 — 아이콘·글자를 키워 폭을 꽉 채운다(사용자 요청 2026-07-20).
+    ".dm-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;}" +
+    ".dm-tile{background:var(--panel-2);border:1px solid var(--border);border-radius:12px;padding:16px 8px 14px;text-align:center;cursor:pointer;position:relative;transition:.14s;}" +
     ".dm-tile:hover{border-color:var(--blue);transform:translateY(-2px);}" +
-    ".dm-tile .dic{font-size:16px;display:block;margin-bottom:4px;}" +
-    ".dm-tile .dlb{font-size:11px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}" +
+    ".dm-tile .dic{font-size:28px;display:block;margin-bottom:8px;}" +
+    ".dm-tile .dlb{font-size:13px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;}" +
     ".dm-tile.add{border-style:dashed;}.dm-tile.add .dic{color:var(--blue-light);}.dm-tile.add .dlb{color:var(--muted);}" +
     ".dm-x{position:absolute;top:3px;right:5px;width:16px;height:16px;border-radius:50%;background:rgba(226,72,61,.92);color:#fff;font-size:10px;line-height:16px;display:none;}" +
     ".dash-menu.editing .dm-x{display:block;}.dash-menu.editing .dm-tile{cursor:default;}" +

@@ -153,3 +153,37 @@ describe("worksessions — recentTurnsText(맥락)", () => {
     expect(ctx).not.toContain("지시6");
   });
 });
+
+describe("worksessions — 세션 종료 리포트", () => {
+  it("완료된 세션의 대화를 DOCX + 사이드카(.json)로 남긴다", async () => {
+    const fs = await import("fs/promises");
+    const path = await import("path");
+    const { generateSessionReport } = await import("../src/engine/worksessions");
+
+    const s = createSession("리포트 생성 검증 세션");
+    appendTurn(s.id, "user", "취약점 우선순위 정리해줘");
+    appendTurn(s.id, "assistant", "KEV 2건이 최우선입니다.", "today");
+    setSessionStatus(s.id, "done");
+
+    const report = await generateSessionReport(s.id);
+    expect(report).not.toBeNull();
+    const docxPath = path.join("data", "reports", report!.docx);
+    const metaPath = path.join("data", "reports", `${report!.base}.json`);
+    try {
+      const stat = await fs.stat(docxPath);
+      expect(stat.size).toBeGreaterThan(1000); // 실제 DOCX 바이너리
+      const meta = JSON.parse(await fs.readFile(metaPath, "utf-8"));
+      expect(meta.type).toBe("session");
+      expect(meta.assetNames).toEqual(["리포트 생성 검증 세션"]);
+      expect(meta.summary).toContain("취약점 우선순위");
+    } finally {
+      await fs.unlink(docxPath).catch(() => {});
+      await fs.unlink(metaPath).catch(() => {});
+    }
+  });
+
+  it("없는 세션이면 null", async () => {
+    const { generateSessionReport } = await import("../src/engine/worksessions");
+    expect(await generateSessionReport("nope")).toBeNull();
+  });
+});
