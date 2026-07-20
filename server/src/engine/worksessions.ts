@@ -304,8 +304,10 @@ if (process.env.GIJO_DB_PATH !== ":memory:" && process.env.NODE_ENV !== "test") 
 // report.ts의 이력 관례(파일 + .json 사이드카)를 그대로 따라 리포트 화면 이력에 함께 나타난다.
 // LLM 호출 없음 — 결정적(빠르고 실패 없음). 실패해도 상태 변경 자체는 유효해야 하므로 호출부에서 감싼다.
 const REPORT_DIR = process.env.GIJO_REPORT_DIR || path.join("data", "reports");
+// dayPeriod를 명시하지 않으면 Node 버전에 따라 오전/오후 대신 영어 AM/PM이 나온다(실측:
+// 운영 Node 20은 AM/PM, Node 24는 오전/오후 — ICU/CLDR 버전 차이). 명시해서 버전 무관하게 고정.
 const fmtTime = (ms: number) =>
-  new Date(ms).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  new Date(ms).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", dayPeriod: "short" });
 
 export async function generateSessionReport(sessionId: string): Promise<{ base: string; docx: string } | null> {
   const s = getSession(sessionId);

@@ -18,6 +18,7 @@ import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { recordAudit } from "./audit";
 import type { GijoUser } from "../auth/users";
+import { koDateTimeString } from "../util/date";
 
 export type ScanStatus = "PASS" | "FAIL" | "WARN" | "NA";
 export type StandardId = "kisa" | "cis";
@@ -360,7 +361,7 @@ export function formatHardeningReport(r: ScanReport): string {
   L.push("");
   L.push(`- 대상 장비: ${r.target}`);
   L.push(`- 점검 기준: ${r.standardLabel}`);
-  L.push(`- 점검 일시: ${new Date(r.startedAt).toLocaleString("ko-KR")} (${(r.durationMs / 1000).toFixed(1)}초 소요)`);
+  L.push(`- 점검 일시: ${koDateTimeString(new Date(r.startedAt).getTime())} (${(r.durationMs / 1000).toFixed(1)}초 소요)`);
   L.push(`- 점검 방식: 장비 CLI 원격 점검(실 명령 실행·실측)`);
   L.push("");
   L.push(`## 요약`);

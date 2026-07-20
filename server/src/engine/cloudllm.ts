@@ -18,6 +18,7 @@ import { encryptString, decryptString, getEncryptionKey } from "./cryptopack";
 import { screenForCloud } from "./cloudegress";
 import { emitCollaboration } from "./collaboration";
 import { ingestText, GLOBAL_SCOPE } from "./memory";
+import { koDateTimeString } from "../util/date";
 
 export type CloudProvider = "gemini" | "claude" | "openai";
 const PROVIDERS: CloudProvider[] = ["gemini", "claude", "openai"];
@@ -338,7 +339,7 @@ export async function saveCloudAnswerToKb(question: string, answer: string, prov
   const qSlug = q.replace(/\s+/g, " ").slice(0, 30) || "클라우드 답변";
   const documentId = `☁ ${qSlug} (${providerLabel}, ${stamp})`;
   const content = [
-    `[클라우드 보조 답변 · ${providerLabel} ${model} · ${now.toLocaleString("ko-KR")}]`,
+    `[클라우드 보조 답변 · ${providerLabel} ${model} · ${koDateTimeString(now.getTime())}]`,
     "⚠ 외부 클라우드 LLM이 생성한 내용입니다 — 사내 검증 근거가 아니므로 사실 확인 후 활용하세요.",
     "",
     `질문: ${q}`,

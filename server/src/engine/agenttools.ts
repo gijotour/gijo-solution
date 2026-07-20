@@ -14,7 +14,7 @@
 // 쓰기 도구(write:true)는 루프가 바로 실행하지 않는다 — 값을 결재판(PendingApproval)으로
 // 만들어 돌려주고, 사람이 승인한 뒤 /api/agent/approve로만 실행된다(시안 B, 2026-07-17 확정).
 
-import { dateOnlyLocal, addDaysLocal } from "../util/date";
+import { dateOnlyLocal, addDaysLocal, koDateTimeString } from "../util/date";
 import { listAssets, getAsset, registerAsset, updateAssetOwnership, setAssetRobustness, isAiAsset, Asset } from "./assets";
 import { computeAssetCoverage, coverageSummaryText, type GapKind } from "./assetcoverage";
 import { expandOntology } from "./ontology";
@@ -131,7 +131,7 @@ function runGetAsset(args: Record<string, string>): string {
   return [
     `자산 ${asset.id} (${asset.name})`,
     `유형=${asset.assetType} | 담당=${asset.owner || "미지정"} | 서비스=${asset.service ?? "미지정"} | 경로=${asset.path}`,
-    `마지막 스캔: ${asset.lastScannedAt ? new Date(asset.lastScannedAt).toLocaleString("ko-KR") : "스캔 이력 없음"} | ${findingSummary(asset)}`,
+    `마지막 스캔: ${asset.lastScannedAt ? koDateTimeString(asset.lastScannedAt) : "스캔 이력 없음"} | ${findingSummary(asset)}`,
     ...aibomLines,
     ...(top.length ? ["주요 finding(심각도순, 최대 5건):", ...top] : []),
     ...(threats.length ? ["사내 온톨로지가 아는 관련 위협·통제:", ...threats] : []),

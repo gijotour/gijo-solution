@@ -302,7 +302,9 @@ export async function runDueSchedules(
 // ── 챗봇용 요약 텍스트 ────────────────────────────────────────────────────────
 const dowLabel = ["일", "월", "화", "수", "목", "금", "토"];
 function fmt(ms: number): string {
-  return new Date(ms).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  // dayPeriod를 명시하지 않으면 Node 버전에 따라 오전/오후 대신 영어 AM/PM이 나온다(실측:
+  // 운영 Node 20은 AM/PM, Node 24는 오전/오후 — ICU/CLDR 버전 차이). 명시해서 버전 무관하게 고정.
+  return new Date(ms).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", dayPeriod: "short" });
 }
 export function scheduleSummaryText(schedules: ReportSchedule[] = listSchedules()): string {
   if (!schedules.length) return "등록된 정기 리포트 스케줄이 없습니다.";
