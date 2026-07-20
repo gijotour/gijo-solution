@@ -4,70 +4,57 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>GIJO AS — 원격 정기점검 관제</title>
+<!-- 공용 디자인 시스템(시안 C) — 이 화면은 .g-* 컴포넌트를 채택한 파일럿이다. -->
+<link rel="stylesheet" href="gijo-ui.css">
 <style>
+/* 색 토큰(공용 팔레트 — gijo-ui와 동일). 레이아웃·이 화면 고유 요소만 여기서 정의하고,
+   버튼·카드·KPI·배지·입력·토글·모달은 gijo-ui.css의 .g-* 컴포넌트를 쓴다. */
 :root{
   --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
-  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#fff;
-  --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;
+  --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
 .app{display:grid;grid-template-columns:220px 1fr;}
 .sidebar{padding:22px 14px;border-right:1px solid var(--border);min-height:900px;}
-.main{padding:24px 30px 48px;}
+.main{padding:var(--g-s5) var(--g-s6) 48px;}
 .header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2);}
 .header-left{display:flex;align-items:center;gap:12px;}.header-left img{height:22px;}
 .app-title{font-size:15px;font-weight:800;color:#fff;}
 .clock{font-size:12px;color:var(--blue-light);font-weight:600;}
 .header-right{display:flex;align-items:center;gap:10px;}
-.status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,.15);border:1px solid rgba(30,185,128,.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
+.status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,.15);border:1px solid rgba(30,185,128,.4);color:var(--teal);padding:6px 14px;border-radius:var(--g-r-pill);font-size:12px;font-weight:800;}
 .status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
 .beta-tag{background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
 .avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
-.icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
-.page-title{font-size:21px;font-weight:800;color:#fff;}
-.page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;max-width:920px;line-height:1.55;}
-.btn{background:var(--blue);color:#fff;border:0;border-radius:7px;padding:7px 13px;font-size:12px;font-weight:800;cursor:pointer;}
-.btn.ghost{background:transparent;border:1px solid var(--border-strong);color:var(--muted);}
-.btn.sm{padding:4px 9px;font-size:11px;}
-.btn:disabled{opacity:.5;cursor:default;}
-.kpi{display:flex;gap:12px;margin:18px 0 6px;}
-.kpi .k{flex:1;background:var(--panel-2);border:1px solid var(--border);border-radius:11px;padding:12px 15px;}
-.kpi .kv{font-size:23px;font-weight:800;}.kpi .kl{font-size:11px;color:var(--muted);margin-top:2px;}
-.sec{font-size:13px;font-weight:800;color:#fff;margin:20px 0 10px;display:flex;align-items:center;gap:8px;}
-.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;}
-.tcard{background:var(--panel-2);border:1px solid var(--border);border-radius:11px;padding:13px 15px;}
+.icon-btn{width:32px;height:32px;border-radius:var(--g-r-sm);background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
+/* 페이지 고유 */
+.page-title{font-size:var(--g-t-h1);font-weight:800;color:#fff;}
+.page-sub{font-size:var(--g-t-sm);color:var(--muted);margin-top:var(--g-s1);max-width:920px;line-height:1.55;}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--g-s3);margin:var(--g-s5) 0 var(--g-s2);}
+.sec{font-size:var(--g-t-h2);font-weight:800;color:#fff;margin:var(--g-s5) 0 var(--g-s3);display:flex;align-items:center;gap:var(--g-s2);}
+.grid{display:grid;grid-template-columns:repeat(2,1fr);gap:var(--g-s3);}
+/* 장비 카드 — g-card 규칙(표면1·라운드12·그림자) 기반 + 카드 내부 요소 */
+.tcard{background:var(--g-surface-1);border:1px solid var(--border);border-radius:var(--g-r);padding:var(--g-s4);box-shadow:var(--g-shadow-1);}
 .tcard.warn{border-color:rgba(226,72,61,.4);}
-.tc-top{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.tc-top{display:flex;align-items:center;gap:var(--g-s2);margin-bottom:var(--g-s2);}
 .dot{width:8px;height:8px;border-radius:50%;display:inline-block;flex:0 0 auto;}
-.tc-name{color:#fff;font-size:13px;font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.chip{font-size:10px;font-weight:800;padding:2px 8px;border-radius:5px;}
-.chip.std{background:rgba(59,130,246,.15);color:#5fa1ff;}
-.tc-mid{display:flex;align-items:flex-end;gap:10px;margin-bottom:8px;}
-.tc-rate{font-size:28px;font-weight:800;}
-.tc-meta{display:flex;justify-content:space-between;font-size:10.5px;color:var(--muted);border-top:1px solid var(--border);padding-top:7px;font-family:Consolas,monospace;}
-.tc-warn{margin-top:6px;font-size:10.5px;color:#e2483d;font-weight:700;}
-.tc-acts{margin-top:9px;display:flex;gap:6px;align-items:center;}
-.toggle{width:34px;height:19px;border-radius:11px;position:relative;display:inline-block;cursor:pointer;flex:0 0 auto;}
-.toggle .k{width:15px;height:15px;border-radius:50%;background:#fff;position:absolute;top:2px;transition:.2s;}
-.tog-lbl{font-size:10.5px;color:var(--muted);}
-.empty{color:var(--muted);font-size:12.5px;padding:30px;text-align:center;border:1px dashed var(--border-strong);border-radius:11px;}
-/* 모달 */
-.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:50;}
-.modal-bg.show{display:flex;}
-.modal{background:var(--panel);border:1px solid var(--border-strong);border-radius:12px;padding:20px 22px;width:520px;max-width:92vw;}
-.modal h3{font-size:15px;color:#fff;margin-bottom:14px;}
-.frow{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;}
-.frow.one{grid-template-columns:1fr;}
-label{font-size:10.5px;color:var(--muted-2);font-weight:700;display:block;margin-bottom:3px;}
-input,select{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:6px;padding:7px 9px;color:var(--text);font-size:12px;outline:none;}
-.modal-acts{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;}
-.probe-res{font-size:11.5px;margin-top:8px;padding:7px 10px;border-radius:7px;}
-.toast{position:fixed;bottom:22px;right:22px;background:var(--panel);border:1px solid var(--border-strong);border-radius:9px;padding:11px 15px;font-size:12px;color:#fff;z-index:60;max-width:420px;box-shadow:0 8px 24px rgba(0,0,0,.4);display:none;}
+.tc-name{color:#fff;font-size:var(--g-t-sm);font-weight:700;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.tc-mid{display:flex;align-items:flex-end;gap:var(--g-s3);margin-bottom:var(--g-s2);}
+.tc-rate{font-size:var(--g-t-kpi);font-weight:800;}
+.tc-meta{display:flex;justify-content:space-between;font-size:var(--g-t-xs);color:var(--muted);border-top:1px solid var(--border);padding-top:var(--g-s2);font-family:Consolas,monospace;}
+.tc-warn{margin-top:var(--g-s2);font-size:var(--g-t-xs);color:var(--red);font-weight:700;}
+.tc-acts{margin-top:var(--g-s3);display:flex;gap:var(--g-s2);align-items:center;}
+.tog-lbl{font-size:var(--g-t-xs);color:var(--muted);}
+.empty{color:var(--muted);font-size:var(--g-t-sm);padding:36px;text-align:center;border:1px dashed var(--border-strong);border-radius:var(--g-r);}
+.frow{display:grid;grid-template-columns:1fr 1fr;gap:var(--g-s3);margin-bottom:var(--g-s3);}
+.probe-res{font-size:var(--g-t-sm);margin-top:var(--g-s2);padding:8px 11px;border-radius:var(--g-r-sm);}
+.toast{position:fixed;bottom:22px;right:22px;background:var(--panel);border:1px solid var(--border-strong);border-radius:var(--g-r);padding:11px 16px;font-size:var(--g-t-sm);color:#fff;z-index:60;max-width:420px;box-shadow:var(--g-shadow-2);display:none;}
 .toast.show{display:block;}
 </style>
 </head>
-<body>
+<body class="g-ui">
 
 <div class="header">
   <div class="header-left">
@@ -85,56 +72,56 @@ input,select{width:100%;background:var(--panel-2);border:1px solid var(--border-
 <div class="app">
   <div class="sidebar" id="gijoNav"></div>
   <div class="main">
-    <div style="display:flex;justify-content:space-between;align-items:flex-end">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px">
       <div>
         <div class="page-title">🛡 원격 정기점검 관제</div>
         <div class="page-sub">등록한 보안장비에 SSH로 접속해 하드닝(보안설정)을 주기적으로 자동 점검하고, 준수율 추세·악화를 관제합니다. 점검은 읽기 전용 진단 명령만 실행합니다.</div>
       </div>
-      <button class="btn" id="addBtn">+ 대상 등록</button>
+      <button class="g-btn g-primary" id="addBtn">＋ 대상 등록</button>
     </div>
 
-    <div class="kpi" id="kpiRow"></div>
-    <div class="sec">🖥 장비별 현황 <span id="cntLbl" style="color:var(--muted-2);font-weight:600;font-size:11px"></span></div>
+    <div class="kpis" id="kpiRow"></div>
+    <div class="sec">🖥 장비별 현황 <span id="cntLbl" style="color:var(--muted-2);font-weight:600;font-size:var(--g-t-xs)"></span></div>
     <div id="cardGrid" class="grid"></div>
   </div>
 </div>
 
 <!-- 대상 등록 모달 -->
-<div class="modal-bg" id="regModal">
-  <div class="modal">
-    <h3>점검 대상(장비) 등록</h3>
+<div class="g-modal-bg" id="regModal">
+  <div class="g-modal" style="width:520px">
+    <div class="mt">점검 대상(장비) 등록</div>
     <div class="frow">
-      <div><label>장비 이름</label><input id="rLabel" placeholder="경계 방화벽 (FW-01)"></div>
-      <div><label>인증 방식</label><select id="rAuth"><option value="key">SSH 키 (권장)</option><option value="password">비밀번호</option><option value="local">로컬(서버 자신)</option></select></div>
+      <div class="g-field"><label>장비 이름</label><input class="g-input" id="rLabel" placeholder="경계 방화벽 (FW-01)"></div>
+      <div class="g-field"><label>인증 방식</label><select class="g-input" id="rAuth"><option value="key">SSH 키 (권장)</option><option value="password">비밀번호</option><option value="local">로컬(서버 자신)</option></select></div>
     </div>
     <div class="frow">
-      <div><label>호스트 / IP</label><input id="rHost" placeholder="10.10.1.5"></div>
-      <div><label>포트</label><input id="rPort" value="22"></div>
+      <div class="g-field"><label>호스트 / IP</label><input class="g-input" id="rHost" placeholder="10.10.1.5"></div>
+      <div class="g-field"><label>포트</label><input class="g-input" id="rPort" value="22"></div>
     </div>
     <div class="frow" id="rCredRow">
-      <div><label>계정</label><input id="rUser" placeholder="admin"></div>
-      <div><label id="rSecLbl">개인키 경로</label><input id="rSecret" placeholder="/keys/id_ed25519"></div>
+      <div class="g-field"><label>계정</label><input class="g-input" id="rUser" placeholder="admin"></div>
+      <div class="g-field"><label id="rSecLbl">개인키 경로</label><input class="g-input" id="rSecret" placeholder="/keys/id_ed25519"></div>
     </div>
     <div class="probe-res" id="rProbe" style="display:none"></div>
-    <div class="modal-acts">
-      <button class="btn ghost" id="rCancel">취소</button>
-      <button class="btn" id="rSubmit">등록 + 접속확인</button>
+    <div class="macts">
+      <button class="g-btn g-ghost" id="rCancel">취소</button>
+      <button class="g-btn g-primary" id="rSubmit">등록 + 접속확인</button>
     </div>
   </div>
 </div>
 
 <!-- 스케줄 설정 모달 -->
-<div class="modal-bg" id="schModal">
-  <div class="modal" style="width:440px">
-    <h3 id="schTitle">정기점검 스케줄</h3>
+<div class="g-modal-bg" id="schModal">
+  <div class="g-modal" style="width:440px">
+    <div class="mt" id="schTitle">정기점검 스케줄</div>
     <div class="frow">
-      <div><label>점검 기준</label><select id="sStd"><option value="kisa">국내 CCE (KISA)</option><option value="cis">CIS Benchmark</option></select></div>
-      <div><label>점검 주기(시간)</label><input id="sInterval" value="24"></div>
+      <div class="g-field"><label>점검 기준</label><select class="g-input" id="sStd"><option value="kisa">국내 CCE (KISA)</option><option value="cis">CIS Benchmark</option></select></div>
+      <div class="g-field"><label>점검 주기(시간)</label><input class="g-input" id="sInterval" value="24"></div>
     </div>
-    <div id="schExisting" style="font-size:11.5px;color:var(--muted);margin-top:4px"></div>
-    <div class="modal-acts">
-      <button class="btn ghost" id="sCancel">닫기</button>
-      <button class="btn" id="sSubmit">스케줄 저장</button>
+    <div id="schExisting" style="font-size:var(--g-t-sm);color:var(--muted);margin-top:var(--g-s1)"></div>
+    <div class="macts">
+      <button class="g-btn g-ghost" id="sCancel">닫기</button>
+      <button class="g-btn g-primary" id="sSubmit">스케줄 저장</button>
     </div>
   </div>
 </div>
@@ -153,7 +140,7 @@ input,select{width:100%;background:var(--panel-2);border:1px solid var(--border-
   async function loadUser() { try { const u = await window.gijo.me(); $("avatarBtn").textContent = (u.displayName || u.username || "-").charAt(0); } catch (e) {} }
   function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 3500); }
 
-  function spark(vals, w = 84, h = 24, color = "#5fa1ff") {
+  function spark(vals, w = 90, h = 26, color = "#5fa1ff") {
     if (!vals.length) return '<span style="color:var(--muted-2);font-size:10px">이력 없음</span>';
     if (vals.length === 1) vals = [vals[0], vals[0]];
     const min = Math.min(...vals, 0), max = Math.max(...vals, 100);
@@ -179,15 +166,15 @@ input,select{width:100%;background:var(--panel-2);border:1px solid var(--border-
     const active = SCHEDULES.filter((s) => s.enabled).length;
     const worse = derived.filter((d) => d.worsening).length;
     $("kpiRow").innerHTML =
-      `<div class="k"><div class="kv" style="color:#fff">${TARGETS.length}</div><div class="kl">등록 장비</div></div>` +
-      `<div class="k"><div class="kv" style="color:#1eb980">${active}</div><div class="kl">활성 스케줄</div></div>` +
-      `<div class="k"><div class="kv" style="color:${rc(withRate.length ? avg : null)}">${withRate.length ? avg + "%" : "—"}</div><div class="kl">평균 준수율</div></div>` +
-      `<div class="k" ${worse ? 'style="border-color:rgba(226,72,61,.4)"' : ""}><div class="kv" style="color:${worse ? "#e2483d" : "#8b93ab"}">${worse}</div><div class="kl">악화 경고</div></div>`;
+      `<div class="g-kpi"><div class="kv" style="color:#fff">${TARGETS.length}</div><div class="kl">등록 장비</div></div>` +
+      `<div class="g-kpi"><div class="kv" style="color:#1eb980">${active}</div><div class="kl">활성 스케줄</div></div>` +
+      `<div class="g-kpi"><div class="kv" style="color:${rc(withRate.length ? avg : null)}">${withRate.length ? avg + "%" : "—"}</div><div class="kl">평균 준수율</div></div>` +
+      `<div class="g-kpi" ${worse ? 'style="border-color:rgba(226,72,61,.4)"' : ""}><div class="kv" style="color:${worse ? "#e2483d" : "#8b93ab"}">${worse}</div><div class="kl">악화 경고</div></div>`;
   }
 
   function renderCards() {
     $("cntLbl").textContent = `${TARGETS.length}대`;
-    if (!TARGETS.length) { $("cardGrid").className = ""; $("cardGrid").innerHTML = '<div class="empty">등록된 점검 대상이 없습니다. 오른쪽 위 <b>+ 대상 등록</b>으로 보안장비를 추가하세요.</div>'; return; }
+    if (!TARGETS.length) { $("cardGrid").className = ""; $("cardGrid").innerHTML = '<div class="empty">등록된 점검 대상이 없습니다. 오른쪽 위 <b>＋ 대상 등록</b>으로 보안장비를 추가하세요.</div>'; return; }
     $("cardGrid").className = "grid";
     $("cardGrid").innerHTML = TARGETS.map((t) => {
       const d = deriveTarget(t);
@@ -197,16 +184,16 @@ input,select{width:100%;background:var(--panel-2);border:1px solid var(--border-
       const hostTxt = t.host === "local" ? "🖥 로컬" : `${t.host}:${t.port}`;
       return `<div class="tcard ${d.worsening ? "warn" : ""}">
         <div class="tc-top"><span class="dot" style="background:${d.sched && d.sched.enabled ? rc(rate) : "#5f6785"}"></span>
-          <span class="tc-name" title="${esc(t.label)}">${esc(t.label)}</span><span class="chip std">${stdLabel}</span></div>
+          <span class="tc-name" title="${esc(t.label)}">${esc(t.label)}</span><span class="g-badge g-b-med">${stdLabel}</span></div>
         <div class="tc-mid"><div class="tc-rate" style="color:${rc(rate)}">${rate == null ? "—" : rate + "%"}</div>
           <div style="flex:1;text-align:right">${spark(d.trend, 90, 26, rc(rate))}</div></div>
         <div class="tc-meta"><span>${esc(hostTxt)} · ${authBadge(t.authMethod)}</span><span>${nextTxt}</span></div>
         ${d.worsening ? `<div class="tc-warn">▼ 지난 점검 대비 악화(${d.runs[d.runs.length - 2].rate}% → ${rate}%) — 확인 필요</div>` : ""}
         <div class="tc-acts">
-          ${d.sched ? `<span class="toggle" data-toggle="${d.sched.id}" data-on="${d.sched.enabled ? 1 : 0}" style="background:${d.sched.enabled ? "var(--teal)" : "var(--muted-2)"}"><span class="k" style="${d.sched.enabled ? "right:2px" : "left:2px"}"></span></span><span class="tog-lbl">정기점검 ${d.sched.enabled ? "켜짐" : "꺼짐"}</span>` : `<span class="tog-lbl">정기점검 없음</span>`}
-          <button class="btn sm ghost" data-sched="${t.id}" style="margin-left:auto">스케줄</button>
-          <button class="btn sm" data-scan="${t.id}">점검</button>
-          <button class="btn sm ghost" data-del="${t.id}" title="삭제">✕</button>
+          ${d.sched ? `<span class="g-toggle ${d.sched.enabled ? "g-on" : ""}" data-toggle="${d.sched.id}" data-on="${d.sched.enabled ? 1 : 0}"><span class="k"></span></span><span class="tog-lbl">정기점검 ${d.sched.enabled ? "켜짐" : "꺼짐"}</span>` : `<span class="tog-lbl">정기점검 없음</span>`}
+          <button class="g-btn g-sm g-ghost" data-sched="${t.id}" style="margin-left:auto">스케줄</button>
+          <button class="g-btn g-sm g-primary" data-scan="${t.id}">점검</button>
+          <button class="g-btn g-sm g-ghost" data-del="${t.id}" title="삭제">✕</button>
         </div></div>`;
     }).join("");
     // 이벤트 바인딩
@@ -246,7 +233,7 @@ input,select{width:100%;background:var(--panel-2);border:1px solid var(--border-
     $("rSecret").type = a === "password" ? "password" : "text";
     if (a === "local") $("rHost").value = "local";
   }
-  function openReg() { $("rProbe").style.display = "none"; $("regModal").classList.add("show"); }
+  function openReg() { $("rProbe").style.display = "none"; $("regModal").classList.add("g-on"); }
   async function submitReg() {
     const authMethod = $("rAuth").value;
     const body = { label: $("rLabel").value.trim(), host: (authMethod === "local" ? "local" : $("rHost").value.trim()), port: Number($("rPort").value) || 22, username: $("rUser").value.trim(), authMethod, secret: $("rSecret").value };
@@ -262,7 +249,7 @@ input,select{width:100%;background:var(--panel-2);border:1px solid var(--border-
         pr.innerHTML = (p.ok ? "✅ 접속 확인 — " : "⚠ 접속 실패 — ") + esc(p.detail);
       }
       toast(`'${target.label}' 등록됨`); await loadAll();
-      setTimeout(() => { $("regModal").classList.remove("show"); ["rLabel", "rHost", "rUser", "rSecret"].forEach((i) => ($(i).value = "")); $("rProbe").style.display = "none"; }, authMethod === "local" ? 200 : 1400);
+      setTimeout(() => { $("regModal").classList.remove("g-on"); ["rLabel", "rHost", "rUser", "rSecret"].forEach((i) => ($(i).value = "")); $("rProbe").style.display = "none"; }, authMethod === "local" ? 200 : 1400);
     } catch (e) { toast(`등록 실패: ${(e && e.message) || e}`); }
     finally { $("rSubmit").disabled = false; $("rSubmit").textContent = "등록 + 접속확인"; }
   }
@@ -277,7 +264,7 @@ input,select{width:100%;background:var(--panel-2);border:1px solid var(--border-
     $("sStd").value = s ? s.standard : "kisa";
     $("sInterval").value = s ? s.intervalHours : 24;
     $("schExisting").innerHTML = s ? `현재: ${s.standard.toUpperCase()} · ${s.intervalHours}시간마다 · ${s.enabled ? "활성" : "비활성"} · 다음 ${new Date(s.nextRunAt).toLocaleString("ko-KR")}` : "아직 스케줄이 없습니다. 저장하면 다음 점검 주기에 자동 실행됩니다.";
-    $("schModal").classList.add("show");
+    $("schModal").classList.add("g-on");
   }
   async function submitSched() {
     if (!schTargetId) return;
@@ -287,7 +274,7 @@ input,select{width:100%;background:var(--panel-2);border:1px solid var(--border-
     try {
       if (existing) await window.gijo.hardeningSchedules.remove(existing.id); // 재설정 = 기존 삭제 후 재생성
       await window.gijo.hardeningSchedules.create(schTargetId, std, interval);
-      toast("스케줄 저장됨 — 다음 주기에 자동 점검"); $("schModal").classList.remove("show"); await loadAll();
+      toast("스케줄 저장됨 — 다음 주기에 자동 점검"); $("schModal").classList.remove("g-on"); await loadAll();
     } catch (e) { toast(`스케줄 저장 실패: ${(e && e.message) || e}`); }
     finally { $("sSubmit").disabled = false; }
   }
@@ -300,13 +287,15 @@ input,select{width:100%;background:var(--panel-2);border:1px solid var(--border-
     await loadUser(); loadHealth();
     await loadAll();
     $("addBtn").addEventListener("click", openReg);
-    $("rCancel").addEventListener("click", () => $("regModal").classList.remove("show"));
+    $("rCancel").addEventListener("click", () => $("regModal").classList.remove("g-on"));
     $("rSubmit").addEventListener("click", submitReg);
     $("rAuth").addEventListener("change", syncCred); syncCred();
-    $("sCancel").addEventListener("click", () => $("schModal").classList.remove("show"));
+    $("sCancel").addEventListener("click", () => $("schModal").classList.remove("g-on"));
     $("sSubmit").addEventListener("click", submitSched);
     $("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
+    // 모달 배경 클릭 시 닫기
+    document.querySelectorAll(".g-modal-bg").forEach((bg) => bg.addEventListener("click", (e) => { if (e.target === bg) bg.classList.remove("g-on"); }));
     setInterval(loadAll, 30000); // 정기점검이 백그라운드로 돌므로 주기적 새로고침
   }
 

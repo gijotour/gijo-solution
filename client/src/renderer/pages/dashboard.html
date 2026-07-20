@@ -38,10 +38,32 @@
   .icon-btn.on{background:rgba(59,130,246,0.18);border-color:var(--blue);color:var(--blue-light);}
   .avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
 
-  .body-grid{display:grid;grid-template-columns:220px 1fr 228px;min-height:640px;}
-  /* 콘솔 넓게 보기(⛶) — 좌우 패널을 숨겨 중앙 콘솔이 전체 폭으로 늘어난다. */
+  .body-grid{display:grid;grid-template-columns:220px 1fr 360px;min-height:640px;}
+  /* 콘솔 넓게 보기(⛶) — 콘솔이 오른쪽 패널로 이관돼, 좌측 탐색기+중앙을 숨겨 오른쪽 패널이 넓어진다. */
   .body-grid.focus{grid-template-columns:1fr;}
-  .body-grid.focus .explorer,.body-grid.focus .dash-sessions{display:none;}
+  .body-grid.focus .explorer,.body-grid.focus .center-stage{display:none;}
+  /* 오른쪽 패널 아코디언 — [작업 세션]+[지휘 콘솔] 위아래, 각각 독립 접기 */
+  .dash-sessions{display:flex;flex-direction:column;min-height:0;}
+  .acc{display:flex;flex-direction:column;min-height:0;border-bottom:1px solid var(--border);}
+  .acc:last-child{border-bottom:0;}
+  #accConsole{flex:1 1 auto;}
+  .acc.collapsed{flex:0 0 auto;}
+  .acc-h{display:flex;align-items:center;gap:8px;padding:12px;cursor:pointer;background:var(--panel-2);flex:0 0 auto;}
+  .acc-h .car{color:var(--muted-2);font-size:11px;transition:.15s;flex:0 0 auto;}
+  .acc-h .acc-t{font-size:12px;font-weight:800;color:var(--text);}
+  .acc-h .acc-sp{margin-left:auto;display:flex;gap:8px;align-items:center;}
+  .acc.collapsed .car{transform:rotate(-90deg);}
+  .acc.collapsed .acc-b{display:none;}
+  .acc-b{display:flex;flex-direction:column;min-height:0;overflow:hidden;}
+  .acc-b-sessions{max-height:300px;}
+  .acc-b-console{flex:1 1 auto;min-height:220px;}
+  /* 콘솔이 패널 안에 들어오면서 입력 독을 패널형 하단바로 조정 */
+  .acc-b-console .agent-dock{position:static;background:var(--panel-2);border-top:1px solid var(--border);padding:10px 12px;margin-top:0;gap:7px;justify-content:stretch;}
+  .acc-b-console .agent-dock input{padding:10px 12px;font-size:12px;}
+  .acc-b-console .dock-plus{width:36px;height:36px;font-size:18px;}
+  .acc-b-console .dock-send{height:36px;padding:0 14px;}
+  .acc-b-console .dock-all{height:36px;padding:0 9px;font-size:10px;}
+  .acc-b-console .model-guide{margin:8px 12px;max-width:none;}
   /* 오른쪽 작업 세션 패널만 숨기기(② 요청) — 왼쪽 탐색기는 남기고 중앙만 넓힌다. */
   .body-grid.no-right{grid-template-columns:220px 1fr;}
   .body-grid.no-right .dash-sessions{display:none;}
@@ -501,11 +523,38 @@
       <div id="explorerTree">불러오는 중...</div>
     </div>
 
-    <!-- 작업 세션 열 — 오른쪽 끝(이력 관리). 클릭하면 전용 화면에서 그 세션 대화를 상세 리뷰. -->
-    <div class="dash-sessions">
-      <div class="dsh"><span class="dsh-t">💬 작업 세션</span><button class="dash-new" id="dashNewSession">＋ 새 세션</button><button class="dsh-hide" id="dashHideRight" title="오른쪽 패널 숨기기">⏵</button></div>
-      <div class="dash-slist" id="dashSessionList"><div style="font-size:11px;color:var(--muted-2);padding:8px">불러오는 중…</div></div>
-      <div class="dash-sfull" id="dashSessionsFull">전체 작업 세션 열기 ↗</div>
+    <!-- 오른쪽 패널 — [작업 세션]+[지휘 콘솔]을 위아래 접이식(아코디언)으로. 각각 독립 접기. -->
+    <div class="dash-sessions" id="dashRight">
+      <!-- 작업 세션 (기본 접힘) -->
+      <div class="acc collapsed" id="accSessions">
+        <div class="acc-h" data-acc="sessions"><span class="car">▾</span><span class="acc-t">💬 작업 세션</span>
+          <span class="acc-sp"><button class="dash-new" id="dashNewSession">＋ 새 세션</button><button class="dsh-hide" id="dashHideRight" title="오른쪽 패널 숨기기">⏵</button></span></div>
+        <div class="acc-b acc-b-sessions">
+          <div class="dash-slist" id="dashSessionList"><div style="font-size:11px;color:var(--muted-2);padding:8px">불러오는 중…</div></div>
+          <div class="dash-sfull" id="dashSessionsFull">전체 작업 세션 열기 ↗</div>
+        </div>
+      </div>
+      <!-- 지휘 콘솔 (기본 펼침) — 중앙에서 이관. 채팅+입력창이 오른쪽에서 바로 쓰인다. -->
+      <div class="acc" id="accConsole">
+        <div class="acc-h" data-acc="console"><span class="car">▾</span><span class="acc-t">🧭 지휘 콘솔</span>
+          <span class="acc-sp"><span class="cl-status" id="clStatus"><span class="cl-dot"></span>대기 중</span><span class="cl-expand" id="clExpand" title="콘솔 넓게 보기 (좌우 패널 숨김/복원)">⛶</span></span></div>
+        <div class="acc-b acc-b-console">
+          <div class="cl-rows" id="clRows"><div class="cl-empty">지시하면 여기서 실시간으로 흐릅니다.</div></div>
+          <div class="model-guide" id="modelGuide" style="display:none">
+            <div class="mg-title">⚠ AI 모델이 준비되지 않았습니다 — 답변을 받으려면 아래 중 하나를 하세요</div>
+            <div class="mg-actions">
+              <button class="mg-btn primary" id="mgDownloadBtn">📥 이 PC에 모델 받기 · 추천 LLM 가이드</button>
+              <button class="mg-btn" id="mgServerBtn">🖧 사내 GPU 서버에 연결 · 설정</button>
+            </div>
+          </div>
+          <div class="agent-dock" id="agentDock">
+            <button class="dock-plus" id="dockUpload" title="파일 올리기 — 자동 분류(취약점·매뉴얼·문서). 애매하면 유형을 물어봅니다">＋</button>
+            <input id="chatInput" placeholder="지시를 입력하세요…">
+            <button class="dock-send" id="dockSend">전송</button>
+            <button class="dock-all" id="dockAll">◉ 전체 지시</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- 자산 상세 팝오버(시안2) — 탐색기 자산 클릭 시 옆에 뜬다 -->
@@ -517,31 +566,7 @@
       <div class="dash-menu" id="dashMenu"></div>
 
       <div class="team-grid" id="teamGrid"><div style="grid-column:1/-1;text-align:center;color:var(--muted);font-size:12px">팀원 불러오는 중...</div></div>
-      <!-- 실시간 에이전트 협업 — 보안 콘솔 아래. 세션·에이전트 활동이 흐른다. -->
-      <div class="collab-live" id="collabLive">
-        <div class="cl-head">
-          <span class="cl-title">🧭 지휘 콘솔</span>
-          <div style="display:flex;align-items:center;gap:12px">
-            <span class="cl-status" id="clStatus"><span class="cl-dot"></span>대기 중</span>
-            <span class="cl-expand" id="clExpand" title="콘솔 넓게 보기 (좌우 패널 숨김/복원)">⛶</span>
-          </div>
-        </div>
-        <div class="cl-rows" id="clRows"><div class="cl-empty">지시하면 여기서 실시간으로 흐릅니다.</div></div>
-      </div>
-      <!-- 모델 미준비 안내: AI 답변에 모델이 필요할 때 두 경로를 함께 제시(로컬 모델 받기 / 사내 서버 연결). -->
-      <div class="model-guide" id="modelGuide" style="display:none">
-        <div class="mg-title">⚠ AI 모델이 준비되지 않았습니다 — 답변을 받으려면 아래 중 하나를 하세요</div>
-        <div class="mg-actions">
-          <button class="mg-btn primary" id="mgDownloadBtn">📥 이 PC에 모델 받기 · 추천 LLM 가이드</button>
-          <button class="mg-btn" id="mgServerBtn">🖧 사내 GPU 서버에 연결 · 설정</button>
-        </div>
-      </div>
-      <div class="agent-dock" id="agentDock">
-        <button class="dock-plus" id="dockUpload" title="파일 올리기 — 자동 분류(취약점·매뉴얼·문서). 애매하면 유형을 물어봅니다">＋</button>
-        <input id="chatInput" placeholder="지시를 입력하세요… 예: fraud-detect-llm 전체 재스캔하고 리포트까지">
-        <button class="dock-send" id="dockSend">전송</button>
-        <button class="dock-all" id="dockAll">◉ 전체 지시</button>
-      </div>
+      <!-- 지휘 콘솔·입력창은 오른쪽 패널(지휘 콘솔 섹션)로 이관됨 → 중앙은 메뉴·로스터·활동 위주. -->
     </div>
     <!-- 오늘 확인할 항목 · 운영 시작 · 오늘의 조치는 "작업 세션"(sessions.html) 자산 탐색기로 이관됨.
          거기서 항목을 누르면 그 대상의 상태를 보여주는 대화 세션이 열린다(💬 헤더 아이콘). -->
@@ -1956,10 +1981,28 @@
       try { localStorage.setItem(RIGHT_HIDDEN_KEY, hidden ? "1" : "0"); } catch (e) {}
       applyRightHidden(hidden);
     }
-    document.getElementById("dashHideRight")?.addEventListener("click", toggleRight);
+    // 세션 패널의 ⏵/◧는 아코디언 토글과 겹치지 않게(헤더 버튼) 이벤트 전파를 막는다.
+    document.getElementById("dashHideRight")?.addEventListener("click", (e) => { e.stopPropagation(); toggleRight(); });
     document.getElementById("toggleRightBtn")?.addEventListener("click", toggleRight);
-    // 기본 접힘 — 오른쪽 세션 패널은 처음엔 접혀 있고, 사용자가 ◧로 펴면(=="0") 그 설정을 유지한다.
-    try { applyRightHidden(localStorage.getItem(RIGHT_HIDDEN_KEY) !== "0"); } catch (e) {}
+    // 오른쪽 패널은 이제 지휘 콘솔(채팅)을 품으므로 기본 '펼침'(사용자가 ◧로 숨기면 "1" 저장·유지).
+    try { applyRightHidden(localStorage.getItem(RIGHT_HIDDEN_KEY) === "1"); } catch (e) {}
+
+    // 오른쪽 패널 아코디언 — [작업 세션]·[지휘 콘솔] 각각 독립 접기. 헤더의 버튼(.acc-sp)은 제외.
+    document.querySelectorAll(".acc-h[data-acc]").forEach((h) => {
+      h.addEventListener("click", (e) => {
+        if (e.target.closest(".acc-sp")) return;
+        const acc = h.closest(".acc");
+        const collapsed = acc.classList.toggle("collapsed");
+        try { localStorage.setItem("gijo.dashAcc." + h.dataset.acc, collapsed ? "1" : "0"); } catch (e) {}
+      });
+    });
+    // 초기 상태 — 작업 세션 기본 접힘, 지휘 콘솔 기본 펼침.
+    const ACC_DEFAULT = { sessions: "1", console: "0" };
+    [["accSessions", "sessions"], ["accConsole", "console"]].forEach(([id, key]) => {
+      let v; try { v = localStorage.getItem("gijo.dashAcc." + key); } catch (e) {}
+      if (v == null) v = ACC_DEFAULT[key];
+      document.getElementById(id)?.classList.toggle("collapsed", v === "1");
+    });
 
     window.gijo.onCollaborationEvent((evt) => {
       appendCollabRow(evt);
