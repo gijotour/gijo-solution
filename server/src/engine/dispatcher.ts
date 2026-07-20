@@ -137,7 +137,8 @@ async function executeRoutedAction(route: RoutedIntent, instructionText: string,
       // 세션 맥락이 있으면 앞에 붙여 "이어서/그거" 같은 대화형 후속을 이해하게 한다.
       const message = contextText ? `${contextText}\n\n[현재 지시] ${instructionText}` : instructionText;
       // trusted: 지시문은 dispatchInstructionCore에서 이미 관문을 지났다(이중 집계 방지).
-      return { output: await chat({ agentId: route.agentId, message, remember: true, trusted: true }) };
+      // explain: 지휘 콘솔에 그대로 표시되는 답변이다.
+      return { output: await chat({ agentId: route.agentId, message, remember: true, trusted: true, explain: true }) };
     }
   }
 }

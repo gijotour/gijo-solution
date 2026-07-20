@@ -237,4 +237,37 @@ describe("llm chat system prompt (한국어 기본 처리)", () => {
     const body = JSON.parse(fetchMock.mock.calls[0][1].body);
     expect(body.messages.map((m: { role: string }) => m.role)).toEqual(["system", "user"]);
   });
+
+  // 회귀 방지(2026-07-20): 어려운 용어 풀이 후처리를 chat() 전체에 무조건 걸었더니, 사람이 읽지 않는
+  // 내부 호출까지 오염됐다 — intent.routeIntent는 응답 전체를 JSON.parse하므로 풀이가 붙으면 파싱이
+  // 통째로 실패해 정규식 폴백으로 조용히 떨어졌고, 리포트 본문·파인튜닝 데이터셋에도 섞여 들어갔다.
+  // chat()의 기본 반환은 모델 답변 그대로여야 한다. 풀이는 화면에 나가는 경로에서만 explain으로 켠다.
+  describe("어려운 용어 풀이는 explain 옵션에서만 붙는다", () => {
+    const WITH_TERMS = "이 자산에 RCE 취약점(CVE-2021-44228)이 확인되어 즉시 조치가 필요합니다.";
+
+    it("기본 호출은 모델 답변을 그대로 돌려준다 — 내부 파서가 소비하는 경로", async () => {
+      stubLlm(WITH_TERMS);
+      const reply = await chat({ agentId: "analysis", message: "질문" });
+      expect(reply).toBe(WITH_TERMS);
+      expect(reply).not.toContain("🔎");
+    });
+
+    it("explain: true면 풀이를 덧붙인다 — 사람이 읽는 경로", async () => {
+      stubLlm(WITH_TERMS);
+      const reply = await chat({ agentId: "analysis", message: "질문", explain: true });
+      expect(reply.startsWith(WITH_TERMS)).toBe(true); // 본문은 손대지 않는다
+      expect(reply).toContain("🔎 쉬운 용어 풀이");
+      expect(reply).toContain("**RCE**");
+    });
+
+    it("explain을 켜도 단기 기억에는 원문만 저장한다 — 맥락 오염·중복 방지", async () => {
+      const fetchMock = stubLlm(WITH_TERMS);
+      await chat({ agentId: "analysis", message: "첫 질문", remember: true, explain: true });
+      await chat({ agentId: "analysis", message: "두 번째 질문", remember: true, explain: true });
+
+      const secondBody = JSON.parse(fetchMock.mock.calls[1][1].body);
+      const assistantTurn = secondBody.messages.find((m: { role: string }) => m.role === "assistant");
+      expect(assistantTurn.content).toBe(WITH_TERMS);
+    });
+  });
 });

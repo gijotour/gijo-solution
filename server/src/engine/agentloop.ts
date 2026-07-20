@@ -175,6 +175,8 @@ async function composeFinalAnswer(instruction: string, calls: AgentToolCall[], c
     .join("\n");
   return chat({
     agentId: "orchestrator",
+    // explain: 도구 실행 후 사용자에게 그대로 보여주는 최종 답변이다.
+    explain: true,
     message: [
       ...(context ? [context, ""] : []),
       `사용자 지시: "${instruction}"`,

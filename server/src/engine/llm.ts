@@ -31,6 +31,14 @@ export interface ChatArgs {
   // 검사한 뒤 같은 텍스트를 넘기는 내부 재진입에서만 쓴다 — 안 그러면 한 요청이 두 번 집계된다.
   // 사용자 입력을 처음 받는 경로에서는 절대 켜지 않는다.
   trusted?: boolean;
+  // true면 답변 끝에 어려운 용어 쉬운 풀이(glossary)를 붙인다 — 사람이 읽는 답변 전용.
+  //
+  // 기본값이 false인 이유: 이 후처리를 chat() 전체에 무조건 걸었더니(2026-07-20), 사람이 읽지 않는
+  // 내부 호출까지 오염됐다. intent.routeIntent는 응답 전체를 JSON.parse하는데 자산 id에 EDR·SIEM
+  // 같은 용어가 들어가면 풀이가 붙어 파싱이 통째로 실패하고 정규식 폴백으로 조용히 떨어졌다.
+  // 리포트 본문(report.executiveSummary)·파인튜닝 데이터셋에도 풀이 문단이 섞여 들어갔다.
+  // 풀이는 표현(presentation) 계층의 관심사이므로, 화면에 그대로 나가는 경로에서만 켠다.
+  explain?: boolean;
 }
 
 // ── 단기 기억: 에이전트별 최근 대화 이력 ─────────────────────────────────────
@@ -437,8 +445,9 @@ export async function chat(args: ChatArgs): Promise<string> {
     // 여기 못 온다). recordChatLog는 내부 try/catch — 수집 실패가 채팅을 죽이지 않는다.
     recordChatLog(args.agentId, args.message, reply);
   }
-  // 반환값에만 어려운 용어 쉬운 풀이를 붙인다(히스토리·학습로그는 원문 유지 — 맥락 오염·중복 방지).
-  return explainHardTerms(reply);
+  // 사람이 읽는 답변(explain)에만 어려운 용어 쉬운 풀이를 붙인다. 히스토리·학습로그는 위에서 이미
+  // 원문으로 저장됐다 — 맥락 오염·중복 방지.
+  return args.explain ? explainHardTerms(reply) : reply;
 }
 
 // 임베딩 서버로 보내는 POST — 매 요청 새 연결(keepAlive:false)로 한다.
@@ -508,7 +517,8 @@ export function registerLlmRoutes(app: Express): void {
     asyncRoute(async (req, res) => {
       // 모델 라우팅(에이전트 할당 모델 로드·URL 선택)은 chat() 안에서 처리한다.
       // 대화형 라우트는 단기 기억(이력) + 장기 기억(RAG) 주입을 켠다.
-      res.json({ reply: await chat({ ...req.body, remember: true }) });
+      // explain: 화면에 그대로 나가는 답변이므로 어려운 용어 풀이를 붙인다.
+      res.json({ reply: await chat({ ...req.body, remember: true, explain: true }) });
     })
   );
 }
