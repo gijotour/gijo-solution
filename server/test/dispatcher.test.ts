@@ -87,6 +87,22 @@ describe("dispatcher + intent + assets integration", () => {
     expect(unknownRes.status).toBe(404);
   });
 
+  it("도움말 지시는 화면별 가이드로 결정적으로 답한다(LLM 미경유)", async () => {
+    const res = await request(app)
+      .post("/api/dispatch")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ text: "이 화면 뭐 할 수 있어?", screen: "hardening.html" });
+    expect(res.status).toBe(200);
+    expect(res.body.output).toContain("하드닝");
+    expect(res.body.output).toContain("이 화면에서 챗봇으로 할 수 있는 것");
+    // 화면을 안 주면 전체 개요
+    const res2 = await request(app)
+      .post("/api/dispatch")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ text: "사용법 알려줘" });
+    expect(res2.body.output).toContain("사용 안내");
+  });
+
   it("chat-routed instructions call the (mocked) LLM and mark the task done", async () => {
     const res = await request(app)
       .post("/api/dispatch")
