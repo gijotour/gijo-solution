@@ -9,38 +9,38 @@
   var GROUPS = [
     { id: "monitor", ic: "🖥", label: "관제·모니터링", items: [
       { page: "dashboard.html", label: "대시보드" },
-      { page: "kpi.html", label: "보안 KPI" },
-      { page: "analysis.html", label: "보안 분석 (통합 관제)" },
-      { page: "sessions.html", label: "작업 세션" },
-      { page: "threat.html", label: "위협 인텔리전스" },
+      { page: "kpi.html", label: "보안 KPI", bot: true },
+      { page: "analysis.html", label: "보안 분석 (통합 관제)", bot: true },
+      { page: "sessions.html", label: "작업 세션", bot: true },
+      { page: "threat.html", label: "위협 인텔리전스", bot: true },
       { page: "mcp.html", label: "🔌 MCP 연동" },
     ]},
     { id: "assets", ic: "🛡", label: "자산·취약점·대응", items: [
-      { page: "inventory.html", label: "자산 목록" },
-      { page: "sbom.html", label: "AI-BOM 구성" },
-      { page: "vulnscan.html", label: "취약점" },
-      { page: "approvals.html", label: "조치·승인" },
-      { page: "products.html", label: "보안제품" },
-      { page: "opsguide.html", label: "유지보수" },
-      { page: "report.html", label: "리포트" },
-      { page: "compliance.html", label: "컴플라이언스" },
+      { page: "inventory.html", label: "자산 목록", bot: true },
+      { page: "sbom.html", label: "AI-BOM 구성", bot: true },
+      { page: "vulnscan.html", label: "취약점", bot: true },
+      { page: "approvals.html", label: "조치·승인", bot: true },
+      { page: "products.html", label: "보안제품", bot: true },
+      { page: "opsguide.html", label: "유지보수", bot: true },
+      { page: "report.html", label: "리포트", bot: true },
+      { page: "compliance.html", label: "컴플라이언스", bot: true },
     ]},
     { id: "ai", ic: "🤖", label: "AI", items: [
       { page: "agent.html", label: "에이전트 AI" },
       { office: true, label: "🏢 팀 사무실 (창)" }, // 별도 창 — 페이지 이동이 아니라 office:open IPC
       { page: "merge.html", label: "LLM 합성" },
       { page: "llmguide.html", label: "LLM 가이드" },
-      { page: "memory.html", label: "기억·학습 (RAG)" },
+      { page: "memory.html", label: "기억·학습 (RAG)", bot: true },
       { page: "docenrich.html", label: "문서 보강" },
-      { page: "ontology.html", label: "온톨로지" },
+      { page: "ontology.html", label: "온톨로지", bot: true },
       { page: "learnloop.html", label: "학습 루프" },
-      { page: "redteam.html", label: "레드팀·가드레일" },
+      { page: "redteam.html", label: "레드팀·가드레일", bot: true },
     ]},
     { id: "system", ic: "🛠", label: "시스템", items: [
       { page: "logs.html", label: "로그" },
       { page: "audit.html", label: "작업 기록 (감사)" },
       { page: "terminal.html", label: "터미널 (CLI)" },
-      { page: "hardening.html", label: "원격 정기점검" },
+      { page: "hardening.html", label: "원격 정기점검", bot: true },
     ]},
     { id: "help", ic: "❓", label: "기능 안내", bottom: true, items: [
       { page: "reference.html", label: "기능 안내 — 전체 기능·입력칸" },
@@ -89,7 +89,9 @@
       ".gn-logo img{height:24px;width:auto;max-width:none;flex:0 0 auto;object-position:left center;}" +
       // 업데이트 가능 배지 — 레일 아이콘 모서리 점 + 서브패널 항목의 작은 뱃지.
       ".gn-ic .gn-updot{position:absolute;top:4px;right:4px;width:8px;height:8px;border-radius:50%;background:var(--red);border:1.5px solid #0a1120;}" +
-      ".gn-item .gn-upbadge{margin-left:auto;background:var(--red);color:#fff;font-size:9px;font-weight:800;padding:1px 6px;border-radius:20px;}";
+      ".gn-item .gn-upbadge{margin-left:auto;background:var(--red);color:#fff;font-size:9px;font-weight:800;padding:1px 6px;border-radius:20px;}" +
+      // 챗봇에게 물어봐도 실데이터로 답하는 화면 표시 — 모든 메뉴에서 같은 자리(우측)에 일관되게.
+      ".gn-item .gn-bot{margin-left:auto;font-size:11px;opacity:.85;flex:0 0 auto;}";
     document.head.appendChild(st);
   }
 
@@ -143,6 +145,13 @@
       el.className = "gn-item" + (it.page === here ? " active" : "");
       el.style.display = "flex";
       el.textContent = it.label;
+      if (it.bot) {
+        var botMark = document.createElement("span");
+        botMark.className = "gn-bot";
+        botMark.textContent = "🤖";
+        botMark.title = "이 화면 데이터는 챗봇에게 물어봐도 그대로 답합니다";
+        el.appendChild(botMark);
+      }
       if (it.page === "update.html" && updateAvailable) {
         var upBadge = document.createElement("span");
         upBadge.className = "gn-upbadge";
