@@ -95,6 +95,8 @@
   .dash-sessions .dsh{display:flex;align-items:center;justify-content:space-between;padding:16px 12px 8px;}
   .dash-sessions .dsh-t{font-size:12px;font-weight:700;color:var(--text);}
   .dash-new{background:var(--blue);color:#fff;border:0;border-radius:6px;font-size:11px;font-weight:700;padding:4px 9px;cursor:pointer;}
+  .dash-active-badge{background:rgba(30,185,128,.15);color:var(--teal);border:1px solid rgba(30,185,128,.35);border-radius:20px;font-size:10.5px;font-weight:800;padding:3px 10px;cursor:pointer;white-space:nowrap;}
+  .dash-active-badge.zero{background:rgba(139,147,171,.12);color:var(--muted-2);border-color:transparent;}
   .dash-slist{flex:1;overflow-y:auto;padding:2px 8px 8px;}
   /* 세션 행 v2(사용자 요청 2026-07-20) — 모든 세션 + 일자·주체·진행사항, 글자 작게. ✓ 완료 시 리포트 자동 생성. */
   .dash-sitem2{padding:6px 8px;border-radius:8px;cursor:pointer;border:1px solid transparent;margin-bottom:2px;}
@@ -581,7 +583,7 @@
       <!-- 작업 세션 (기본 접힘) -->
       <div class="acc collapsed" id="accSessions">
         <div class="acc-h" data-acc="sessions"><span class="car">▾</span><span class="acc-t">💬 작업 세션</span>
-          <span class="acc-sp"><button class="dash-new" id="dashNewSession" title="새 작업 세션 등록">＋ 등록</button></span></div>
+          <span class="acc-sp"><span class="dash-active-badge zero" id="dashActiveBadge" title="진행중인 작업 세션 — 클릭하면 전체 작업 세션 화면으로">진행중 -</span></span></div>
         <div class="acc-b acc-b-sessions">
           <div class="dash-slist" id="dashSessionList"><div style="font-size:11px;color:var(--muted-2);padding:8px">불러오는 중…</div></div>
           <div class="dash-sfull" id="dashSessionsFull">전체 작업 세션 열기 ↗</div>
@@ -1888,6 +1890,12 @@
     if (!box) return;
     try {
       const list = await window.gijo.listWorkSessions();
+      const activeCount = list.filter((s) => s.status === "active").length;
+      const badge = document.getElementById("dashActiveBadge");
+      if (badge) {
+        badge.textContent = `진행중 ${activeCount}`;
+        badge.classList.toggle("zero", activeCount === 0);
+      }
       if (!list.length) {
         box.innerHTML = '<div style="font-size:11px;color:var(--muted-2);padding:10px 6px;line-height:1.6">아직 세션이 없습니다.<br>＋ 새 세션 또는 전체 화면의 탐색기 항목을 눌러 시작하세요.</div>';
         return;
@@ -2107,8 +2115,8 @@
 
     // 작업 세션 열 — 목록 로드 + 새 세션/전체 화면 진입(전용 화면으로 딥링크).
     loadDashSessions();
-    const dashNew = document.getElementById("dashNewSession");
-    if (dashNew) dashNew.addEventListener("click", () => { try { localStorage.setItem("gijo:sessions:new", "1"); } catch (e) {} window.gijo.navigateTo("sessions.html"); });
+    const dashActiveBadge = document.getElementById("dashActiveBadge");
+    if (dashActiveBadge) dashActiveBadge.addEventListener("click", () => window.gijo.navigateTo("sessions.html"));
     const dashFull = document.getElementById("dashSessionsFull");
     if (dashFull) dashFull.addEventListener("click", () => window.gijo.navigateTo("sessions.html"));
 
