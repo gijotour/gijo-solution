@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>오늘의 할일 — 실제 폭(280px) 검증</title>
+<style>
+  :root{
+    --bg:#0b0f17; --panel:#131a26; --panel-2:#1a2331; --border:#243044; --border-strong:#33425c;
+    --text:#e6ecf5; --muted:#93a2b8; --muted-2:#6b7a90;
+    --blue:#3b82f6; --blue-light:#7cb0ff; --teal:#1eb980; --amber:#f0a020; --red:#e2483d;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#070a10;color:var(--text);font-family:"Malgun Gothic","Segoe UI",system-ui,sans-serif;font-size:13px;line-height:1.6}
+  .wrap{padding:20px}
+  h1{font-size:18px;margin:0 0 3px}
+  .sub{color:var(--muted);font-size:12.5px;margin-bottom:16px}
+  .warn{background:rgba(240,160,32,.1);border:1px solid rgba(240,160,32,.4);border-radius:10px;padding:11px 14px;font-size:12.5px;margin-bottom:20px}
+  .warn b{color:var(--amber)}
+
+  .lab{font-size:11.5px;font-weight:800;color:var(--blue-light);margin:0 0 7px;letter-spacing:.3px}
+  .row-3{display:flex;gap:26px;align-items:flex-start;flex-wrap:wrap}
+
+  /* 실제 창 재현: 1000x760, body = 1fr 280px */
+  .win{width:1000px;height:600px;background:var(--bg);border:1px solid var(--border-strong);border-radius:10px;
+       overflow:hidden;display:flex;flex-direction:column;box-shadow:0 8px 30px rgba(0,0,0,.5)}
+  .win-top{height:38px;background:var(--panel-2);border-bottom:1px solid var(--border);display:flex;align-items:center;
+           padding:0 13px;font-size:12px;font-weight:800;gap:7px;flex:0 0 auto}
+  .win-body{display:grid;grid-template-columns:1fr 280px;gap:14px;padding:12px 16px;flex:1 1 auto;min-height:0}
+  .office{background:var(--panel);border:1px solid var(--border);border-radius:12px;display:flex;align-items:center;
+          justify-content:center;color:var(--muted-2);font-size:12px}
+  .todo{background:var(--panel);border:1px solid var(--border);border-radius:12px;display:flex;flex-direction:column;min-height:0;overflow:hidden}
+  .t-head{padding:9px 11px;border-bottom:1px solid var(--border);font-size:11.5px;font-weight:800;display:flex;gap:6px;align-items:center;flex:0 0 auto}
+  .t-head .cnt{margin-left:auto;font-size:10px;color:var(--muted-2)}
+  .t-list{flex:1 1 auto;overflow-y:auto;padding:9px}
+  .t-list::-webkit-scrollbar{width:6px}
+  .t-list::-webkit-scrollbar-thumb{background:var(--border-strong);border-radius:3px}
+
+  .badge{display:inline-block;font-size:9px;font-weight:800;padding:1px 6px;border-radius:20px}
+  .b-kev{background:rgba(226,72,61,.16);color:#f5928a;border:1px solid rgba(226,72,61,.4)}
+  .b-over{background:rgba(240,160,32,.14);color:var(--amber);border:1px solid rgba(240,160,32,.38)}
+  .b-cycle{background:rgba(30,185,128,.13);color:var(--teal);border:1px solid rgba(30,185,128,.36)}
+  .btn{border:none;border-radius:6px;padding:6px 10px;font-size:11px;font-weight:800;cursor:pointer;font-family:inherit}
+  .btn-go{background:var(--blue);color:#fff}
+  .btn-sub{background:transparent;color:var(--muted);border:1px solid var(--border-strong)}
+  .btn-w{width:100%;margin-top:5px}
+
+  /* A */
+  .focus{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:10px;padding:11px}
+  .focus .step{font-size:9.5px;font-weight:800;color:var(--muted-2)}
+  .focus .title{font-size:13px;font-weight:800;margin:5px 0 2px;line-height:1.4}
+  .focus .asset{font-size:10.5px;color:var(--muted);word-break:break-all}
+  .why{font-size:10.5px;color:var(--muted);background:rgba(255,255,255,.03);border-left:2px solid var(--border-strong);
+       padding:5px 7px;border-radius:0 5px 5px 0;margin:7px 0}
+  .why b{color:var(--text)}
+  .rec{background:rgba(59,130,246,.09);border:1px solid rgba(59,130,246,.3);border-radius:7px;padding:7px 9px;margin:7px 0}
+  .rec .lb{font-size:9.5px;font-weight:800;color:var(--blue-light)}
+  .rec .tx{font-size:11px;margin-top:2px}
+  .prog{display:flex;gap:3px;margin-top:9px}
+  .prog i{height:3px;flex:1;border-radius:2px;background:var(--border)}
+  .prog i.on{background:var(--blue)}
+
+  /* B */
+  .sec-h{font-size:10px;font-weight:800;padding:4px 1px;display:flex;gap:5px;align-items:center}
+  .sec-h .n{margin-left:auto;color:var(--muted-2)}
+  .item{background:var(--panel-2);border:1px solid var(--border);border-left-width:3px;border-radius:7px;padding:8px 9px;margin-bottom:5px}
+  .item.now{border-left-color:var(--red)} .item.today{border-left-color:var(--amber)}
+  .item .t{font-size:11.5px;font-weight:700;line-height:1.4}
+  .item .m{font-size:10px;color:var(--muted);margin-top:2px}
+  .item .f{display:flex;gap:5px;margin-top:6px}
+  .item .f .btn{padding:4px 9px;font-size:10.5px}
+  .later{text-align:center;font-size:10.5px;color:var(--muted-2);padding:6px;border:1px dashed var(--border);border-radius:7px}
+
+  /* C */
+  .brief{background:linear-gradient(180deg,rgba(59,130,246,.1),transparent);border:1px solid var(--border-strong);
+         border-radius:9px;padding:10px}
+  .brief .who{font-size:10px;font-weight:800;color:var(--blue-light);margin-bottom:6px}
+  .brief p{margin:0 0 7px;font-size:11.5px;line-height:1.65}
+  .hl{color:#f5928a;font-weight:800} .hl2{color:var(--amber);font-weight:800}
+  .choice{display:flex;gap:7px;align-items:center;background:var(--panel-2);border:1px solid var(--border);
+          border-radius:7px;padding:7px 8px;margin-bottom:5px;cursor:pointer}
+  .choice:hover{border-color:var(--blue)}
+  .choice .num{width:17px;height:17px;border-radius:5px;background:var(--blue);color:#fff;font-size:9.5px;font-weight:800;
+               display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .choice .ct{font-size:11px;font-weight:700;line-height:1.35}
+  .choice .cs{font-size:9.5px;color:var(--muted)}
+
+  .verdict{margin-top:12px;padding:11px 14px;border-radius:10px;font-size:12px;max-width:1000px}
+  .v-bad{background:rgba(226,72,61,.09);border:1px solid rgba(226,72,61,.35)}
+  .v-ok{background:rgba(30,185,128,.08);border:1px solid rgba(30,185,128,.35)}
+  .v-mid{background:rgba(240,160,32,.08);border:1px solid rgba(240,160,32,.35)}
+  .verdict b{color:#fff}
+  hr{border:none;border-top:1px solid var(--border);margin:34px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>📐 실제 폭 검증 — 사무실 창 1000×760, 할일 패널 <b>280px 고정</b></h1>
+  <div class="sub">앞선 시안은 열당 460px로 그린 비교용이었습니다. 아래는 <b>실제 들어갈 크기 그대로</b> 재현한 것입니다.</div>
+
+  <div class="warn">
+    <b>⚠ 결론 먼저</b> — 280px에서는 세 안 모두 정보가 잘립니다. 특히 <b>시안 A는 버튼 4개가 가로로 안 들어가고</b>,
+    <b>시안 B는 구획 헤더가 공간을 먹어</b> 실제로 보이는 항목이 2건뿐입니다. 아래에서 직접 확인하세요.
+  </div>
+
+  <!-- ───────── A ───────── -->
+  <div class="lab">시안 A — 한 건씩 (280px 실측)</div>
+  <div class="win">
+    <div class="win-top">🏢 우리 AI 팀 사무실</div>
+    <div class="win-body">
+      <div class="office">픽셀 사무실 뷰 (에이전트 6명 · 협업 피드)</div>
+      <div class="todo">
+        <div class="t-head">☑ 오늘의 할일 <span class="cnt">1 / 5</span></div>
+        <div class="t-list">
+          <div class="focus">
+            <div class="step">지금 처리할 것 · 1번째</div>
+            <div class="title">Log4Shell 원격코드실행 <span class="badge b-kev">KEV</span></div>
+            <div class="asset">oracle.local · CVE-2021-44228</div>
+            <div class="why"><b>왜 지금:</b> 실제 악용 확인 · 악용예측 94% · 기한 <b>2일 지남</b></div>
+            <div class="rec">
+              <div class="lb">추천 조치</div>
+              <div class="tx">log4j-core 2.17.1 교체 또는 JndiLookup 제거. 사내 FW-01 매뉴얼에 우회 절차 있음.</div>
+            </div>
+            <button class="btn btn-go btn-w">▶ AI에게 조치 맡기기</button>
+            <button class="btn btn-sub btn-w">✓ 조치 완료</button>
+            <button class="btn btn-sub btn-w">담당자 지정 · 내일로</button>
+            <div class="prog"><i class="on"></i><i></i><i></i><i></i><i></i></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="verdict v-bad">
+    <b>판정: 빠듯함.</b> 버튼 4개를 가로로 못 넣어 <b>세로로 3줄 쌓았습니다</b>(원래 시안은 가로 4개).
+    한 건이 패널을 거의 다 차지해서 <b>다음에 뭐가 있는지 안 보입니다</b>. 자산명이 길면 줄바꿈으로 더 길어집니다.
+  </div>
+
+  <hr>
+
+  <!-- ───────── B ───────── -->
+  <div class="lab">시안 B — 3구획 (280px 실측)</div>
+  <div class="win">
+    <div class="win-top">🏢 우리 AI 팀 사무실</div>
+    <div class="win-body">
+      <div class="office">픽셀 사무실 뷰 (에이전트 6명 · 협업 피드)</div>
+      <div class="todo">
+        <div class="t-head">☑ 오늘의 할일 <span class="cnt">5건</span></div>
+        <div class="t-list">
+          <div class="sec-h" style="color:#f5928a">🔴 지금 <span class="n">2건</span></div>
+          <div class="item now">
+            <div class="t">Log4Shell RCE <span class="badge b-kev">KEV</span> <span class="badge b-over">2일↑</span></div>
+            <div class="m">oracle.local · 악용예측 94%</div>
+            <div class="f"><button class="btn btn-go">▶ 맡기기</button><button class="btn btn-sub">완료</button></div>
+          </div>
+          <div class="item now">
+            <div class="t">OpenSSH 사용자 열거 <span class="badge b-over">오늘</span></div>
+            <div class="m">웹서버-01 · 담당 정요한</div>
+            <div class="f"><button class="btn btn-go">▶ 맡기기</button><button class="btn btn-sub">완료</button></div>
+          </div>
+          <div class="sec-h" style="color:var(--amber)">🟡 오늘 <span class="n">3건</span></div>
+          <div class="item today">
+            <div class="t">FW-01 하드닝 점검 <span class="badge b-cycle">분기</span></div>
+            <div class="m">CCE 11항목 · 91일 전 점검</div>
+            <div class="f"><button class="btn btn-go">▶ 점검</button><button class="btn btn-sub">미루기</button></div>
+          </div>
+          <div class="item today">
+            <div class="t">EDR 정책 검토 <span class="badge b-cycle">월간</span></div>
+            <div class="m">승인 대기 1건</div>
+            <div class="f"><button class="btn btn-go">▶ 열기</button></div>
+          </div>
+          <div class="item today">
+            <div class="t">NAC 유지보수 지연</div>
+            <div class="m">3일 지연</div>
+            <div class="f"><button class="btn btn-go">▶ 확인</button></div>
+          </div>
+          <div class="later">⌄ 이후 12건</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="verdict v-mid">
+    <b>판정: 들어가긴 하나 정보가 깎임.</b> 근거·추천 조치를 다 뺐습니다 —
+    "2일↑"처럼 <b>줄여 쓰면 뜻이 흐려지고</b>, 추천 조치가 없으니 <b>“선택만 하면 되는” 목표에서 멀어집니다</b>.
+    스크롤 없이 보이는 건 3건 정도입니다.
+  </div>
+
+  <hr>
+
+  <!-- ───────── C ───────── -->
+  <div class="lab">시안 C — AI 브리핑 (280px 실측)</div>
+  <div class="win">
+    <div class="win-top">🏢 우리 AI 팀 사무실</div>
+    <div class="win-body">
+      <div class="office">픽셀 사무실 뷰 (에이전트 6명 · 협업 피드)</div>
+      <div class="todo">
+        <div class="t-head">☑ 오늘의 할일 <span class="cnt">브리핑</span></div>
+        <div class="t-list">
+          <div class="brief">
+            <div class="who">🧭 Orchestrator · 09:02</div>
+            <p>오늘 급한 건 <span class="hl">2건</span>입니다.
+              <b>Log4Shell</b>은 실제 악용이 확인됐고 기한이 <span class="hl">2일 지났습니다</span>.
+              이것부터 권합니다.</p>
+            <p><span class="hl2">FW-01 분기 점검</span>이 오늘 도래했고, NAC 유지보수가 3일 지연 중입니다.</p>
+            <div class="choice">
+              <div class="num">1</div>
+              <div><div class="ct">Log4Shell 조치 맡기기</div><div class="cs">권장 · 절차까지 결재판에</div></div>
+            </div>
+            <div class="choice">
+              <div class="num">2</div>
+              <div><div class="ct">FW-01 점검 실행</div><div class="cs">CCE 11항목 · 3분</div></div>
+            </div>
+            <div class="choice">
+              <div class="num">3</div>
+              <div><div class="ct">전체 목록 보기</div><div class="cs">급한 2건 + 점검 3건</div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="verdict v-ok">
+    <b>판정: 280px에 가장 잘 맞음.</b> 문장은 좁은 폭에서도 읽히고(오히려 신문 칼럼처럼 자연스러움),
+    선택지는 원래 세로 목록이라 눌리지 않습니다. <b>근거·추천을 그대로 담고도 스크롤 없이 들어갑니다.</b>
+    다만 LLM 생성 5~10초와 환각 위험은 그대로입니다.
+  </div>
+
+  <hr>
+
+  <div class="lab">참고 — 패널을 340px로 넓히면 (사무실 뷰 60px 축소)</div>
+  <div class="win" style="width:1000px;height:330px">
+    <div class="win-top">🏢 우리 AI 팀 사무실</div>
+    <div class="win-body" style="grid-template-columns:1fr 340px">
+      <div class="office">픽셀 사무실 뷰 (60px 좁아짐 — 캐릭터 배치엔 영향 적음)</div>
+      <div class="todo">
+        <div class="t-head">☑ 오늘의 할일 <span class="cnt">5건</span></div>
+        <div class="t-list">
+          <div class="item now">
+            <div class="t">Log4Shell RCE <span class="badge b-kev">KEV</span> <span class="badge b-over">2일 초과</span></div>
+            <div class="m">oracle.local · 악용예측 94% · 실제 악용 확인</div>
+            <div class="m" style="color:var(--blue-light);margin-top:4px">→ 권장: log4j-core 2.17.1 교체</div>
+            <div class="f"><button class="btn btn-go">▶ 조치 맡기기</button><button class="btn btn-sub">완료</button><button class="btn btn-sub">내일로</button></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="verdict v-ok">
+    <b>340px면 근거 + 추천 + 버튼 3개가 한 줄로 들어갑니다.</b> 사무실 뷰는 60px만 좁아져 캐릭터 배치에 거의 영향이 없습니다.
+    시안 B를 쓰려면 이 정도 폭이 필요합니다.
+  </div>
+</div>
+</body>
+</html>
