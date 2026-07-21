@@ -705,8 +705,13 @@
     goBtn.disabled = true;
     goBtn.textContent = "AI 팀에 전달 중…";
     try {
+      // 맡긴 항목은 체크리스트에도 남아야 한다 — 안 그러면 지시만 나가고 "맡겼는데 어디 갔지?"가
+      // 된다(사용자 지적, 2026-07-22). 미완료로 등록해 두고, 처리 여부는 담당자가 체크리스트에서
+      // 직접 완료 처리한다(자동완료는 결재 대기 등 실제 완료가 아닐 수 있어 안 함).
+      await window.gijo.addTask(instruction, { ref: "brief:" + it.id });
       await window.gijo.sendInstruction(instruction);
       await loadGuide();
+      await loadTasks();
     } catch (err) {
       feedLine("시스템", "지시 실패: " + (err && err.message || err), "var(--red)");
       goBtn.disabled = false;
