@@ -133,7 +133,7 @@ select.g-input { cursor: pointer; }
 .g-section-label { font-size: var(--g-t-xs); font-weight: 800; color: var(--g-muted-2); letter-spacing: .4px; text-transform: uppercase; margin-bottom: var(--g-s3); }
 
 /* ── 모달 ── */
-.g-modal-bg { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); display: none; align-items: center; justify-content: center; z-index: 95; }
+.g-modal-bg { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); display: none; align-items: center; justify-content: center; z-index: 1000; }
 .g-modal-bg.g-on { display: flex; }
 .g-modal { width: 380px; max-width: 92vw; background: var(--g-surface-1); border: 1px solid var(--g-border-strong); border-radius: var(--g-r); padding: var(--g-s5); box-shadow: var(--g-shadow-modal); }
 .g-modal .mt { font-size: var(--g-t-md); font-weight: 800; color: #fff; margin-bottom: var(--g-s4); }

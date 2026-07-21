@@ -32,16 +32,17 @@ type Source = "manual" | "scheduled" | "chatbot";
 // ── 대상 레지스트리 ─────────────────────────────────────────────────────────
 interface TargetRow {
   id: string; label: string; host: string; port: number;
-  username: string | null; authMethod: string; secret: string | null; createdAt: number;
+  username: string | null; authMethod: string; secret: string | null; standard: string | null; createdAt: number;
 }
 const rowToTarget = (r: TargetRow): HardeningTarget => ({
   id: r.id, label: r.label, host: r.host, port: r.port,
   username: r.username ?? undefined, authMethod: r.authMethod as HardeningTarget["authMethod"], secret: r.secret ?? undefined,
+  standard: isStandard(r.standard ?? "") ? (r.standard as StandardId) : "kisa",
 });
-// secret을 뺀 안전한 공개 표현(호스트·포트·인증방식만).
+// secret을 뺀 안전한 공개 표현(호스트·포트·인증방식·기본기준만).
 const publicTarget = (t: HardeningTarget) => ({
   id: t.id, label: t.label, host: t.host, port: t.port, username: t.username ?? null,
-  authMethod: t.authMethod, hasSecret: Boolean(t.secret),
+  authMethod: t.authMethod, hasSecret: Boolean(t.secret), standard: t.standard ?? "kisa",
 });
 
 export function listTargets(): HardeningTarget[] {
@@ -54,11 +55,12 @@ export function getTarget(id: string): HardeningTarget | undefined {
 export function createTarget(t: Omit<HardeningTarget, "id">): HardeningTarget {
   const id = `tgt-${randomUUID().slice(0, 8)}`;
   db.prepare(
-    `INSERT INTO hardening_targets (id, label, host, port, username, authMethod, secret, createdAt)
-     VALUES (@id, @label, @host, @port, @username, @authMethod, @secret, @createdAt)`
+    `INSERT INTO hardening_targets (id, label, host, port, username, authMethod, secret, standard, createdAt)
+     VALUES (@id, @label, @host, @port, @username, @authMethod, @secret, @standard, @createdAt)`
   ).run({
     id, label: t.label, host: t.host, port: t.port || 22, username: t.username ?? null,
-    authMethod: t.authMethod, secret: t.secret ?? null, createdAt: Date.now(),
+    authMethod: t.authMethod, secret: t.secret ?? null,
+    standard: isStandard(t.standard ?? "") ? t.standard : "kisa", createdAt: Date.now(),
   });
   return getTarget(id)!;
 }
@@ -201,13 +203,16 @@ export function registerHardeningTargetRoutes(app: Express): void {
     const authMethod = String(b.authMethod ?? "").trim();
     if (!label || !host) { res.status(400).json({ error: "label·host가 필요합니다" }); return; }
     if (!["local", "key", "password"].includes(authMethod)) { res.status(400).json({ error: "authMethod는 local·key·password 중 하나" }); return; }
+    const standard = String(b.standard ?? "kisa");
+    if (!isStandard(standard)) { res.status(400).json({ error: "standard는 kisa·cis·kisa_pc·kisa_net 중 하나" }); return; }
     const t = createTarget({
       label, host, port: Number(b.port) || 22,
       username: b.username ? String(b.username).trim() : undefined,
       authMethod: authMethod as HardeningTarget["authMethod"],
       secret: b.secret ? String(b.secret) : undefined,
+      standard,
     });
-    recordAudit({ kind: "config", actor: actorOf(req), action: "하드닝 점검 대상 등록", target: t.label, detail: `${t.host}:${t.port} (${t.authMethod})`, result: "ok" });
+    recordAudit({ kind: "config", actor: actorOf(req), action: "하드닝 점검 대상 등록", target: t.label, detail: `${t.host}:${t.port} (${t.authMethod}·${standard})`, result: "ok" });
     res.json({ target: publicTarget(t) });
   }));
   app.delete("/api/hardening/targets/:id", authMiddleware, (req, res) => {
@@ -228,7 +233,8 @@ export function registerHardeningTargetRoutes(app: Express): void {
   app.post("/api/hardening/targets/:id/scan", authMiddleware, asyncRoute(async (req, res) => {
     const t = getTarget(req.params.id);
     if (!t) { res.status(404).json({ error: "대상을 찾을 수 없습니다" }); return; }
-    const standard = String(req.body?.standard ?? "kisa");
+    // 기준 미지정 시 대상 등록 시 정한 기본 기준(장비 유형)으로 점검한다.
+    const standard = String(req.body?.standard ?? t.standard ?? "kisa");
     if (!isStandard(standard)) { res.status(400).json({ error: "standard는 kisa·cis·kisa_pc·kisa_net 중 하나" }); return; }
     const report = await runScanForTarget(t, standard, "manual", actorOf(req));
     res.json({ report, summary: scanSummaryText(report) });

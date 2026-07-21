@@ -133,6 +133,28 @@ describe("hardeningtargets — 라우트", () => {
     expect(res.status).toBe(400);
   });
 
+  it("대상 등록 시 점검 기준(장비 유형)을 저장하고 응답에 노출한다", async () => {
+    const res = await request(app).post("/api/hardening/targets").set("Authorization", `Bearer ${token}`)
+      .send({ label: "코어 스위치", host: "10.0.0.9", authMethod: "key", secret: "/keys/id", standard: "kisa_net" });
+    expect(res.status).toBe(200);
+    expect(res.body.target.standard).toBe("kisa_net");
+    // 목록 재조회에도 유지
+    const list = await request(app).get("/api/hardening/targets").set("Authorization", `Bearer ${token}`);
+    expect(list.body.targets.find((t: { id: string }) => t.id === res.body.target.id).standard).toBe("kisa_net");
+  });
+
+  it("기준 미지정 등록은 kisa(리눅스)로 기본 저장된다", async () => {
+    const res = await request(app).post("/api/hardening/targets").set("Authorization", `Bearer ${token}`)
+      .send({ label: "리눅스 서버", host: "10.0.0.10", authMethod: "key", secret: "/keys/id" });
+    expect(res.body.target.standard).toBe("kisa");
+  });
+
+  it("잘못된 standard 값은 400", async () => {
+    const res = await request(app).post("/api/hardening/targets").set("Authorization", `Bearer ${token}`)
+      .send({ label: "x", host: "h", authMethod: "key", standard: "windows11" });
+    expect(res.status).toBe(400);
+  });
+
   it("스케줄 등록에는 유효한 targetId가 필요하다", async () => {
     const bad = await request(app).post("/api/hardening/schedules").set("Authorization", `Bearer ${token}`)
       .send({ targetId: "nope", standard: "kisa", intervalHours: 24 });

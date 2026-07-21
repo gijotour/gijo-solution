@@ -466,3 +466,10 @@ migrate(
    CREATE INDEX IF NOT EXISTS idx_hardening_runs_target ON hardening_runs(targetId, at);
    CREATE INDEX IF NOT EXISTS idx_hardening_sched_next ON hardening_schedules(nextRunAt);`
 );
+
+// 대상별 기본 점검 기준(장비 유형) — IP만 넣으면 항상 kisa(리눅스)로 돌던 문제 해소.
+// 등록 시 리눅스/윈도우PC/네트워크장비를 골라 저장하면 수동 점검이 그 기준으로 실행된다.
+migrate(
+  "hardening-target-standard-2026-07-21",
+  `ALTER TABLE hardening_targets ADD COLUMN standard TEXT NOT NULL DEFAULT 'kisa'`
+);

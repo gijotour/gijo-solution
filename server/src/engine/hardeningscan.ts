@@ -89,6 +89,7 @@ export interface HardeningTarget {
   username?: string;
   authMethod: AuthMethod;
   secret?: string; // key: 개인키 경로 · password: 비밀번호
+  standard?: StandardId; // 이 대상의 기본 점검 기준(장비 유형) — 수동 점검 시 사용
 }
 
 // SSH 실행 인자 조립(순수 함수 — 테스트 가능). local이면 null.

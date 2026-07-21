@@ -52,6 +52,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .probe-res{font-size:var(--g-t-sm);margin-top:var(--g-s2);padding:8px 11px;border-radius:var(--g-r-sm);}
 .toast{position:fixed;bottom:22px;right:22px;background:var(--panel);border:1px solid var(--border-strong);border-radius:var(--g-r);padding:11px 16px;font-size:var(--g-t-sm);color:#fff;z-index:60;max-width:420px;box-shadow:var(--g-shadow-2);display:none;}
 .toast.show{display:block;}
+.reg-guide{background:var(--panel-2,#0e1526);border:1px solid rgba(95,161,255,.25);border-radius:var(--g-r-sm);padding:11px 13px;font-size:var(--g-t-xs);color:var(--muted);line-height:1.75;margin-bottom:var(--g-s3);}
+.reg-guide b{color:var(--blue-light,#5fa1ff);font-weight:700;}
+.page-guide{background:var(--panel-2,#0e1526);border:1px solid var(--border);border-left:3px solid var(--blue,#3b82f6);border-radius:var(--g-r-sm);padding:10px 14px;font-size:var(--g-t-xs);color:var(--muted);line-height:1.7;margin:12px 0 16px;}
+.page-guide b{color:#fff;font-weight:700;}
+.page-guide .std{color:var(--blue-light,#5fa1ff);font-weight:700;}
 </style>
 </head>
 <body class="g-ui">
@@ -82,6 +87,13 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     <div id="gijoChatWidget" data-prompts='["하드닝 점검해줘"]' style="max-width:640px;margin-bottom:16px;"></div>
 
+    <div class="page-guide">
+      <b>점검 방법</b> — 오른쪽 위 <b>＋ 대상 등록</b>에서 <b>연결 가능한 장비의 IP</b>와 SSH 접속 정보를 넣고, 장비 유형(점검 기준)을 고르면 그 IP에 접속해 실제로 점검합니다.
+      기준은 4종입니다: <span class="std">리눅스 서버(U-시리즈)</span> · <span class="std">CIS Benchmark</span> · <span class="std">Windows PC(PC-시리즈)</span> · <span class="std">네트워크 장비(N-시리즈·Cisco)</span>.
+      점검은 <b>읽기 전용 진단 명령만</b> 실행하며(설정을 바꾸지 않음), 방화벽에서 대상 장비의 SSH 포트(기본 22)가 열려 있어야 합니다.
+      서버 자신을 점검하려면 인증 방식을 <b>로컬</b>로 등록하세요.
+    </div>
+
     <div class="kpis" id="kpiRow"></div>
     <div class="sec">🖥 장비별 현황 <span id="cntLbl" style="color:var(--muted-2);font-weight:600;font-size:var(--g-t-xs)"></span></div>
     <div id="cardGrid" class="grid"></div>
@@ -90,11 +102,21 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
 <!-- 대상 등록 모달 -->
 <div class="g-modal-bg" id="regModal">
-  <div class="g-modal" style="width:520px">
+  <div class="g-modal" style="width:560px">
     <div class="mt">점검 대상(장비) 등록</div>
+    <div class="reg-guide">
+      <b>연결 가능한 장비의 IP를 넣으면 그 장비에 접속해 실제로 점검합니다.</b><br>
+      · <b>점검 기준</b>에서 장비 유형을 고르면 그에 맞는 명령으로 점검합니다 (리눅스=U-시리즈, Windows PC=PC-시리즈, 네트워크 장비=N-시리즈 Cisco).<br>
+      · <b>인증</b>: 리눅스·네트워크 장비는 SSH 키(권장) 또는 비밀번호, Windows PC는 OpenSSH 서버가 켜져 있어야 원격 점검됩니다.<br>
+      · 방화벽에서 담당자 서버 → 대상 장비 <b>SSH 포트(기본 22)</b>가 열려 있어야 합니다. 등록 시 <b>접속확인</b>으로 연결을 먼저 검사합니다.
+    </div>
     <div class="frow">
       <div class="g-field"><label>장비 이름</label><input class="g-input" id="rLabel" placeholder="경계 방화벽 (FW-01)"></div>
+      <div class="g-field"><label>점검 기준(장비 유형)</label><select class="g-input" id="rStd"><option value="kisa">국내 CCE — 리눅스 서버 (U-시리즈)</option><option value="cis">CIS Benchmark (리눅스)</option><option value="kisa_pc">국내 CCE — Windows PC (PC-시리즈)</option><option value="kisa_net">국내 CCE — 네트워크 장비 (N-시리즈)</option></select></div>
+    </div>
+    <div class="frow">
       <div class="g-field"><label>인증 방식</label><select class="g-input" id="rAuth"><option value="key">SSH 키 (권장)</option><option value="password">비밀번호</option><option value="local">로컬(서버 자신)</option></select></div>
+      <div class="g-field"></div>
     </div>
     <div class="frow">
       <div class="g-field"><label>호스트 / IP</label><input class="g-input" id="rHost" placeholder="10.10.1.5"></div>
@@ -181,7 +203,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     $("cardGrid").innerHTML = TARGETS.map((t) => {
       const d = deriveTarget(t);
       const rate = d.latest ? d.latest.rate : null;
-      const stdLabel = d.sched ? d.sched.standard.toUpperCase() : "미설정";
+      const stdLabel = STD_SHORT[stdFor(t)] || "리눅스";
       const nextTxt = d.sched && d.sched.enabled ? `⏱ ${d.sched.intervalHours}시간 · ${new Date(d.sched.nextRunAt).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}` : "정기점검 미설정";
       const hostTxt = t.host === "local" ? "🖥 로컬" : `${t.host}:${t.port}`;
       return `<div class="tcard ${d.worsening ? "warn" : ""}">
@@ -211,8 +233,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     renderKpis(); renderCards();
   }
 
-  // 대상별 기준 추정: 스케줄 있으면 그 기준, 없으면 kisa
-  function stdFor(t) { const s = SCHEDULES.find((x) => x.targetId === t.id); return s ? s.standard : "kisa"; }
+  // 대상별 점검 기준: 스케줄 있으면 그 기준, 없으면 대상 등록 시 정한 기본 기준(장비 유형), 그것도 없으면 kisa
+  function stdFor(t) { const s = SCHEDULES.find((x) => x.targetId === t.id); return s ? s.standard : (t.standard || "kisa"); }
+  const STD_SHORT = { kisa: "리눅스", cis: "CIS", kisa_pc: "PC", kisa_net: "네트워크" };
 
   async function scanNow(id) {
     const t = TARGETS.find((x) => x.id === id); if (!t) return;
@@ -238,7 +261,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   function openReg() { $("rProbe").style.display = "none"; $("regModal").classList.add("g-on"); }
   async function submitReg() {
     const authMethod = $("rAuth").value;
-    const body = { label: $("rLabel").value.trim(), host: (authMethod === "local" ? "local" : $("rHost").value.trim()), port: Number($("rPort").value) || 22, username: $("rUser").value.trim(), authMethod, secret: $("rSecret").value };
+    const body = { label: $("rLabel").value.trim(), host: (authMethod === "local" ? "local" : $("rHost").value.trim()), port: Number($("rPort").value) || 22, username: $("rUser").value.trim(), authMethod, secret: $("rSecret").value, standard: $("rStd").value };
     if (!body.label || !body.host) { toast("장비 이름과 호스트를 입력하세요"); return; }
     $("rSubmit").disabled = true; $("rSubmit").textContent = "등록 중…";
     try {
