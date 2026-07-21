@@ -578,14 +578,16 @@
       return (a.dueAt || Infinity) - (b.dueAt || Infinity);
     });
     const later = open.length - today.length;
-    todoCnt.textContent = today.length ? `${today.length}건` : "";
+    myTaskCount = today.length;
+    updateTodoCount();
     if (!today.length) {
       myTasks.innerHTML = '<div class="t-empty">오늘 처리할 일이 없어요 — 위에 직접 추가하거나, 아래 <b>운영 시작</b>을 누르면 AI 팀이 오늘의 루틴으로 채워줘요 📌</div>'
         + (later > 0 ? `<div class="t-more">이후 기한 할일 ${later}건은 에이전트 AI 페이지에서</div>` : "");
       return;
     }
-    // 위 가이드(서버 계산)와 구분한다 — 이건 담당자가 직접 담거나 AI가 만든 작업 큐다.
-    myTasks.innerHTML = '<div class="my-h">내 할일</div>' + today.map((t) => `
+    // 위 구획(시스템이 데이터에서 찾아낸 조치 대상)과 구분한다 — 이건 담당자가 직접 담거나
+    // AI 지시로 생긴 작업 큐이고, 체크박스로 직접 지워야 사라진다. 이름과 기능을 일치시킨다.
+    myTasks.innerHTML = '<div class="my-h">☑ 내 체크리스트</div>' + today.map((t) => `
       <div class="t-item${t.done ? " done" : ""}" data-id="${esc(t.id)}">
         <input type="checkbox" ${t.done ? "checked" : ""} title="완료 처리">
         <div class="t-text">${esc(t.text)}
@@ -613,13 +615,24 @@
   // 갈아 끼운다. LLM이 5~10초 걸려도 담당자는 목록을 바로 본다.
   let guideItems = [];
   let guideFirstRender = true;
+  // 헤더 건수는 두 구획(오늘 브리핑 + 내 체크리스트)의 합이다. 한쪽만 세면 화면과 숫자가 어긋난다.
+  let myTaskCount = 0;
+  function updateTodoCount() {
+    const n = guideItems.length + myTaskCount;
+    todoCnt.textContent = n ? `${n}건` : "";
+  }
 
   function renderGuide(data) {
     guideItems = data.items || [];
+    updateTodoCount();
     if (!guideItems.length) { guideBox.style.display = "none"; return; }
     guideBox.style.display = "";
 
     // 브리핑 출처를 정직하게 구분 — LLM 문장인지 규칙 요약인지 담당자가 알 수 있어야 한다.
+    // 브리핑 출처를 정직하게 구분 — LLM 문장인지 규칙 요약인지 담당자가 알 수 있어야 한다.
+    // "AI 제안"이라고 쓰지 않는다: 항목들은 AI가 제안한 게 아니라 규칙으로 계산된 사실
+    // (KEV 등재·기한 초과·점검 주기 도래)이다. AI가 쓴 건 이 문장 하나뿐이라, "AI 제안"으로
+    // 묶으면 확정 사실의 신뢰도를 오히려 낮춰 전달하게 된다.
     const byLabel = data.briefBy === "llm" ? "🧭 오늘 브리핑" : "🧭 오늘 브리핑 (자동 요약)";
     guideBrief.innerHTML = `<span class="g-by">${byLabel}</span><span class="g-txt">${esc(data.brief || "")}</span>`;
 
