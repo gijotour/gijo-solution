@@ -30,10 +30,13 @@ export interface TodayItem {
   urgency: "now" | "today"; // 🔴 지금 / 🟡 오늘
   title: string;
   subtitle: string; // 자산·제품 등 대상
-  why: string; // 왜 지금인지 — 근거(규칙으로 계산된 사실만)
+  why: string; // 왜 지금인지 — 근거(규칙으로 계산된 사실만). 화면 표시용 불릿 문자열.
   action: string; // 무엇을 하면 되는지 — 추천 조치
   badges: string[]; // KEV, 2일 초과, 분기 도래 …
   ref?: string; // 클릭 시 이동 대상(assetId 등)
+  // 아래는 문장 조립용 구조화 값 — why(불릿)를 문장에 그대로 박으면 어색해서 따로 둔다.
+  kev?: boolean;
+  epssPct?: number;
 }
 
 export interface TodayBrief {
@@ -186,6 +189,8 @@ function vulnItems(now: number): TodayItem[] {
           : "AI 팀에 조치를 맡기거나 담당자를 지정하세요",
       badges,
       ref: g.assetId,
+      kev: g.kev,
+      epssPct: g.maxEpss != null ? Math.round(g.maxEpss * 100) : undefined,
     });
   }
 
@@ -263,39 +268,76 @@ export function ruleBrief(items: TodayItem[]): string {
 
   const parts: string[] = [];
   if (now.length) {
-    const kev = now.filter((i) => i.badges.includes("KEV")).length;
-    parts.push(
-      `오늘 급한 건 ${now.length}건입니다.` +
-        (kev ? ` 그중 ${kev}건은 실제 악용이 확인된 취약점(KEV)이라 먼저 처리하시길 권합니다.` : "")
-    );
-    parts.push(`가장 급한 것은 "${now[0].title}"(${now[0].subtitle})이고, ${now[0].why}입니다.`);
+    const kev = now.filter((i) => i.kev).length;
+    // 전부 KEV면 "그중 N건" 표현이 군더더기가 된다.
+    const kevPhrase =
+      kev === 0 ? "" : kev === now.length ? " 모두 실제 악용이 확인된 취약점(KEV)입니다." : ` 그중 ${kev}건은 실제 악용이 확인된 취약점(KEV)입니다.`;
+    parts.push(`오늘 급한 건 ${now.length}건이고,${kevPhrase || " 기한이 걸려 있습니다."}`.replace(",  ", ", "));
+
+    // 최우선 한 건은 근거를 문장으로 — why(불릿)를 그대로 박지 않는다.
+    const top = now[0];
+    const reason = [top.kev ? "실제 악용이 확인" : "", top.epssPct != null ? `악용예측 ${top.epssPct}%` : ""]
+      .filter(Boolean)
+      .join("·");
+    parts.push(`먼저 ${top.subtitle}의 ${top.title}부터 처리하시길 권합니다${reason ? ` (${reason})` : ""}.`);
   }
   if (today.length) {
-    const device = today.filter((i) => i.axis === "device");
-    parts.push(
-      device.length
-        ? `그 외에 점검 주기가 도래한 항목이 ${device.length}건 있습니다.`
-        : `오늘 기한인 항목이 ${today.length}건 있습니다.`
-    );
+    const device = today.filter((i) => i.axis === "device").length;
+    parts.push(device ? `그 외 점검 주기가 도래한 항목이 ${device}건 있습니다.` : `오늘 기한인 항목이 ${today.length}건 있습니다.`);
   }
   return parts.join(" ");
 }
 
+// ── 브리핑 후처리 ───────────────────────────────────────────────────────────
+// 프롬프트에 "목록을 다시 나열하지 마라"를 넣어도 7B는 지키지 않았다(실측 2026-07-21:
+// 항목 7개를 그대로 나열). 화면 바로 아래에 목록이 있으니 중복이고, 브리핑의 존재 이유
+// (읽으면 상황을 아는 것)가 사라진다. 프롬프트를 더 붙이는 대신 규칙으로 검사한다.
+
+const MAX_BRIEF_SENTENCES = 3;
+
+/** 제목에서 집계 접미사를 뗀 핵심 이름 — 브리핑이 이 이름을 몇 개나 읊었는지 세는 데 쓴다. */
+function coreName(title: string): string {
+  return title.replace(/\s*패치\s*\(\d+건\)\s*$/, "").trim();
+}
+
+/** 화면에 이미 있는 항목명을 3개 이상 나열하면 "목록 복창"으로 본다. */
+export function tooEnumerative(text: string, items: TodayItem[]): boolean {
+  const hits = items.filter((i) => {
+    const n = coreName(i.title);
+    return n.length >= 4 && text.includes(n);
+  }).length;
+  return hits >= 3;
+}
+
+/** 문장 수 상한 — 길어지면 아침에 안 읽힌다. */
+export function trimSentences(text: string, max = MAX_BRIEF_SENTENCES): string {
+  const parts = text.split(/(?<=[.!?])\s+/).filter((s) => s.trim());
+  return parts.length <= max ? text.trim() : parts.slice(0, max).join(" ").trim();
+}
+
 /** 브리핑 프롬프트 — 모델에게 **사실을 주고 문장만** 쓰게 한다(숫자 창작 차단). */
 export function buildBriefPrompt(items: TodayItem[]): string {
-  const lines = items
-    .slice(0, 8)
-    .map((i, n) => `${n + 1}. [${i.urgency === "now" ? "급함" : "오늘"}] ${i.title} (${i.subtitle}) — ${i.why}`);
+  // 항목을 많이 주면 모델이 그대로 나열한다(실측: 8건을 주니 7건을 읊었다).
+  // 집계는 숫자로 주고 **개별 항목은 최우선 1건만** 노출해 나열할 거리를 없앤다.
+  const now = items.filter((i) => i.urgency === "now");
+  const device = items.filter((i) => i.axis === "device").length;
+  const top = now[0] ?? items[0];
+  const facts = [
+    `급한 항목 ${now.length}건 (실제 악용 확인 ${now.filter((i) => i.kev).length}건)`,
+    device ? `점검 주기 도래 ${device}건` : "",
+    top ? `최우선: ${top.title} — ${top.subtitle} — ${top.why}` : "",
+  ].filter(Boolean);
+
   return [
-    "보안담당자에게 오늘 아침 브리핑을 2~3문장으로 써라. 아래는 시스템이 계산한 사실이다.",
+    "보안담당자에게 오늘 아침 브리핑을 2문장으로 써라. 아래는 시스템이 계산한 사실이다.",
     "",
-    ...lines,
+    ...facts.map((f) => `- ${f}`),
     "",
     "규칙:",
     "- 위에 제시된 사실만 쓴다. 건수·일수·비율을 새로 만들지 마라.",
-    "- 무엇부터 처리하면 좋은지 한 가지를 권한다.",
-    "- 목록을 다시 나열하지 마라(화면에 이미 목록이 있다). 상황 요약과 권고만.",
-    "- 인사말·서두 없이 본론부터. 3문장 이내.",
+    "- 첫 문장: 오늘 상황 요약(건수 중심). 둘째 문장: 무엇부터 처리할지 권고.",
+    "- 최우선 1건 외에 다른 취약점 이름을 나열하지 마라. 화면에 이미 목록이 있다.",
+    "- 인사말·서두 없이 본론부터. 2문장.",
   ].join("\n");
 }
 
@@ -310,7 +352,19 @@ export async function buildToday(withBrief = true): Promise<TodayBrief> {
     return 0;
   });
 
-  const items = all.slice(0, 6); // 화면(280px)에 담기는 만큼만. 나머지는 later로 센다.
+  // 화면(280px)에 담기는 만큼만 보여주되, **두 축에 각각 자리를 보장한다.**
+  //
+  // 왜 단순 slice가 아닌가(실측 2026-07-21): 급한 취약점이 12건이라 상위 6칸을 전부 먹어
+  // 장비 점검이 화면에서 통째로 사라졌다(counts에는 있는데 목록엔 없음). 두 축은 성격이 달라서
+  // — 취약점은 놓치면 뚫리고, 주기 점검은 놓치면 감사에서 걸린다 — 한쪽이 다른 쪽을 굶기면 안 된다.
+  // 급한 쪽에 더 주되(4:2), 상대가 비면 남은 자리를 넘겨 낭비하지 않는다.
+  const VULN_SLOTS = 4;
+  const DEVICE_SLOTS = 2;
+  const vulns = all.filter((i) => i.axis === "vuln");
+  const devices = all.filter((i) => i.axis === "device");
+  const vShown = vulns.slice(0, VULN_SLOTS + Math.max(0, DEVICE_SLOTS - devices.length));
+  const dShown = devices.slice(0, DEVICE_SLOTS + Math.max(0, VULN_SLOTS - vulns.length));
+  const items = [...vShown, ...dShown];
   const counts = {
     now: all.filter((i) => i.urgency === "now").length,
     today: all.filter((i) => i.urgency === "today").length,
@@ -319,7 +373,7 @@ export async function buildToday(withBrief = true): Promise<TodayBrief> {
 
   const fallback = ruleBrief(all);
   if (!withBrief || all.length === 0) {
-    return { items, counts, brief: fallback, briefBy: "rule", generatedAt: now };
+    return { items, counts, brief: trimSentences(fallback), briefBy: "rule", generatedAt: now };
   }
 
   // LLM은 문장만. 실패·타임아웃이면 규칙 문장으로 떨어진다 — 화면은 언제나 뜬다.
@@ -333,10 +387,12 @@ export async function buildToday(withBrief = true): Promise<TodayBrief> {
     });
     const text = (reply ?? "").trim();
     // 연결 실패 안내문(⚠로 시작)이나 빈 응답이면 규칙 문장을 쓴다.
-    if (!text || text.startsWith("⚠")) return { items, counts, brief: fallback, briefBy: "rule", generatedAt: now };
-    return { items, counts, brief: text, briefBy: "llm", generatedAt: now };
+    if (!text || text.startsWith("⚠")) return { items, counts, brief: trimSentences(fallback), briefBy: "rule", generatedAt: now };
+    // 목록을 그대로 읊었으면 브리핑 구실을 못 한다 — 규칙 문장이 더 낫다(짧고 정확).
+    if (tooEnumerative(text, items)) return { items, counts, brief: trimSentences(fallback), briefBy: "rule", generatedAt: now };
+    return { items, counts, brief: trimSentences(text), briefBy: "llm", generatedAt: now };
   } catch {
-    return { items, counts, brief: fallback, briefBy: "rule", generatedAt: now };
+    return { items, counts, brief: trimSentences(fallback), briefBy: "rule", generatedAt: now };
   }
 }
 

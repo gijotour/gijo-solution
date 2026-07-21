@@ -11,7 +11,7 @@ vi.mock("../src/engine/llm", () => ({
 import { buildToday, ruleBrief, buildBriefPrompt, groupNameFor } from "../src/engine/today";
 import { resetAssetsForTests, recordFindings, registerAsset } from "../src/engine/assets";
 import { resetMaintenanceForTests } from "../src/engine/maintenance";
-import { resetHardeningForTests } from "../src/engine/hardeningtargets";
+import { resetHardeningForTests, createTarget, createSchedule } from "../src/engine/hardeningtargets";
 import { resetApprovalsForTests, updateFindingReview, findingKey } from "../src/engine/approvals";
 import type { StandardFinding } from "../src/engine/bridge";
 
@@ -137,6 +137,33 @@ describe("오늘의 할일 — 가이드형 집계", () => {
     expect(t.items.find((i) => i.title.includes("Log4j"))).toBeUndefined();
   });
 
+  // 실측(2026-07-21): 급한 취약점이 12건이라 상위 6칸을 다 먹어 장비 점검이 화면에서 사라졌다
+  // (counts.today=3인데 items에는 0건). 두 축은 성격이 달라 한쪽이 다른 쪽을 굶기면 안 된다.
+  it("취약점이 많아도 장비 점검 자리를 보장한다 — 한 축이 다른 축을 굶기지 않는다", async () => {
+    const many: StandardFinding[] = [];
+    for (let i = 0; i < 12; i++) {
+      many.push({ ...KEV_FINDING, finding_type: `제품${i} 취약점`, evidence: `CVE-9999-${i}` } as StandardFinding);
+    }
+    recordFindings("srv-1", many);
+    // createSchedule은 nextRunAt=now로 만든다(첫 틱에 즉시 1회) → 생성 즉시 "주기 도래" 상태
+    const target = createTarget({ label: "FW-01", host: "local", port: 22, authMethod: "local" });
+    createSchedule(target.id, "kisa", 720); // 월간
+
+    const t = await buildToday(false);
+    expect(t.items.filter((i) => i.axis === "vuln").length).toBeGreaterThan(0);
+    expect(t.items.filter((i) => i.axis === "device").length).toBeGreaterThan(0); // 굶지 않는다
+  });
+
+  it("한쪽 축이 비면 남은 자리를 다른 축이 쓴다 — 화면을 낭비하지 않는다", async () => {
+    const many: StandardFinding[] = [];
+    for (let i = 0; i < 10; i++) {
+      many.push({ ...KEV_FINDING, finding_type: `제품${i} 취약점`, evidence: `CVE-8888-${i}` } as StandardFinding);
+    }
+    recordFindings("srv-1", many);
+    const t = await buildToday(false); // 장비 축 비어 있음
+    expect(t.items.filter((i) => i.axis === "vuln").length).toBe(6); // 4 + 남은 2칸
+  });
+
   it("취약점이 장비 주기보다 앞에 온다 — 반복 점검이 급한 KEV를 밀어내지 않게", async () => {
     recordFindings("srv-1", [KEV_FINDING]);
     const t = await buildToday(false);
@@ -178,18 +205,68 @@ describe("오늘의 할일 — 가이드형 집계", () => {
       expect(t.brief).toContain("급한 일은 없습니다");
     });
 
+    // 실측(2026-07-21): 프롬프트에 "목록을 다시 나열하지 마라"를 넣었는데 7B가 그대로 7개를
+    // 나열했다. 화면 바로 아래 목록이 있으니 중복이고 브리핑 구실을 못 한다. 규칙으로 잡는다.
+    it("모델이 항목을 나열하면 규칙 문장으로 대체한다", async () => {
+      recordFindings("srv-1", [
+        KEV_FINDING,
+        { ...KEV_FINDING, finding_type: "Ivanti Connect Secure 버퍼 오버플로", evidence: "CVE-2024-21887" },
+        { ...KEV_FINDING, finding_type: "Citrix NetScaler CitrixBleed", evidence: "CVE-2023-4966" },
+      ] as StandardFinding[]);
+      // 운영에서 실제로 나온 나열형 응답
+      mockChat.mockResolvedValueOnce(
+        "오늘 아침의 주요 보안 위협으로 Apache Log4j RCE, Ivanti Connect Secure 버퍼 오버플로, " +
+          "Citrix NetScaler CitrixBleed가 있습니다. 이 중 Apache Log4j RCE를 먼저 처리하세요."
+      );
+      const t = await buildToday(true);
+      expect(t.briefBy).toBe("rule");
+      expect(t.brief).toContain("급한 건");
+    });
+
+    it("정상 브리핑(항목 1~2개 언급)은 그대로 쓴다 — 과하게 막지 않는다", async () => {
+      recordFindings("srv-1", [KEV_FINDING]);
+      mockChat.mockResolvedValueOnce("Apache Log4j RCE가 가장 급합니다. 실제 악용이 확인돼 오늘 안에 패치하시길 권합니다.");
+      const t = await buildToday(true);
+      expect(t.briefBy).toBe("llm");
+      expect(t.brief).toContain("가장 급합니다");
+    });
+
+    it("긴 브리핑은 3문장으로 자른다 — 아침에 안 읽힌다", async () => {
+      recordFindings("srv-1", [KEV_FINDING]);
+      mockChat.mockResolvedValueOnce("첫째 문장. 둘째 문장. 셋째 문장. 넷째 문장. 다섯째 문장.");
+      const t = await buildToday(true);
+      expect(t.brief).toBe("첫째 문장. 둘째 문장. 셋째 문장.");
+    });
+
     it("프롬프트는 계산된 사실만 주고 숫자 창작을 금지한다", async () => {
       recordFindings("srv-1", [KEV_FINDING]);
       const t = await buildToday(false);
       const p = buildBriefPrompt(t.items);
       expect(p).toContain("건수·일수·비율을 새로 만들지 마라");
       expect(p).toContain("악용예측 94%"); // 계산된 값이 실려 나간다
-      expect(p).toContain("목록을 다시 나열하지 마라");
+      expect(p).toContain("다른 취약점 이름을 나열하지 마라");
+    });
+
+    it("프롬프트에 개별 항목은 최우선 1건만 넣는다 — 나열의 원인을 없앤다", async () => {
+      recordFindings("srv-1", [
+        KEV_FINDING,
+        { ...KEV_FINDING, finding_type: "Citrix NetScaler CitrixBleed", evidence: "CVE-2023-4966" },
+        { ...KEV_FINDING, finding_type: "Ivanti Connect Secure 버퍼 오버플로", evidence: "CVE-2024-21887" },
+      ] as StandardFinding[]);
+      const t = await buildToday(false);
+      const p = buildBriefPrompt(t.items);
+      expect(p).toContain("최우선:");
+      // 2·3번째 취약점 이름은 프롬프트에 없어야 한다(있으면 모델이 나열한다).
+      expect(p).not.toContain("CitrixBleed");
+      expect(p).not.toContain("Ivanti");
+      // 대신 집계 숫자로 상황을 전한다.
+      expect(p).toMatch(/급한 항목 \d+건/);
     });
 
     it("규칙 문장은 건수·최우선 항목을 정확히 반영한다", () => {
       const brief = ruleBrief([
-        { id: "a", axis: "vuln", urgency: "now", title: "Log4Shell", subtitle: "oracle.local", why: "실제 악용 확인", action: "", badges: ["KEV"] },
+        // kev/epssPct는 문장 조립용 구조화 값 — 실제 코드도 badges와 함께 채운다.
+        { id: "a", axis: "vuln", urgency: "now", title: "Log4Shell", subtitle: "oracle.local", why: "실제 악용 확인", action: "", badges: ["KEV"], kev: true, epssPct: 97 },
         { id: "b", axis: "device", urgency: "today", title: "FW-01 점검", subtitle: "방화벽", why: "주기 도래", action: "", badges: [] },
       ]);
       expect(brief).toContain("급한 건 1건");
