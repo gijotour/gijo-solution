@@ -735,7 +735,6 @@ export const llmApi = {
 // ── 로컬 엔진(llama.cpp 서버) ─────────────────────────────────────────
 export const localEngineApi = {
   status: () => request("/api/localengine/status"),
-  gpu: () => request<{ available: boolean; utilization: number; memUsedMb: number; memTotalMb: number; memPercent: number }>("/api/localengine/gpu"),
   models: () => request<{ id: string; running: boolean }[]>("/api/localengine/models"),
   start: (modelId: string) => request("/api/localengine/start", { method: "POST", body: { modelId } }),
   stop: () => request("/api/localengine/stop", { method: "POST" }),

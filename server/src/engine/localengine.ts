@@ -136,8 +136,9 @@ function getFreeVramMb(): Promise<number | null> {
   });
 }
 
-// 실 GPU 사용률(utilization %)·VRAM을 nvidia-smi로 실측. 대시보드 로고 발광 강도에 쓴다.
-// GPU가 없으면 available:false — 클라이언트는 그때 발광을 기본값으로 둔다(가짜 수치 안 만듦).
+// 실 GPU 사용률(utilization %)·VRAM을 nvidia-smi로 실측. LRU 모델 축출 판단·hang 진단 스냅샷에 쓴다
+// (대시보드 표시용 폴링은 제거됨 — 2026-07-21, VRAM 이슈 조사 중 단순화 결정).
+// GPU가 없으면 available:false.
 export interface GpuUsage {
   available: boolean;
   utilization: number; // 0~100 (%)
@@ -615,10 +616,6 @@ export function registerLocalEngineRoutes(app: Express): void {
   app.get("/api/localengine/status", authMiddleware, (_req, res) => {
     res.json(getLocalEngineStatus());
   });
-  // 실 GPU 사용률(로고 발광 강도용) — nvidia-smi 실측. 폴링용이라 가볍다.
-  app.get("/api/localengine/gpu", authMiddleware, asyncRoute(async (_req, res) => {
-    res.json(await getGpuUsage());
-  }));
   app.get("/api/localengine/models", authMiddleware, (_req, res) => {
     res.json(listAvailableModels());
   });
