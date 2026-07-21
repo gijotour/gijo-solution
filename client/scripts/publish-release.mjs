@@ -3,8 +3,9 @@
 // 게시한다. 서버에 로그인해 관리자 토큰을 받고, release/GIJO AS Setup {version}.exe를
 // application/octet-stream으로 그대로 업로드한다.
 //
-// 사용: node scripts/publish-release.mjs --notes "버그 수정" [--server http://localhost:4000] [--user jyh] [--password changeme]
+// 사용: node scripts/publish-release.mjs --notes "버그 수정" [--server http://localhost:4000] [--user jyh] [--password changeme] [--force]
 // 자격증명은 인자 대신 환경변수(GIJO_ADMIN_USER/GIJO_ADMIN_PASSWORD)로도 줄 수 있다.
+// --force: 그 계정이 이미 다른 곳(앱 등)에 로그인 중이면 강제 전환(그 세션은 끊긴다).
 
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -22,6 +23,7 @@ const serverUrl = (arg("server", process.env.GIJO_SERVER_URL || "http://localhos
 const username = arg("user", process.env.GIJO_ADMIN_USER || "");
 const password = arg("password", process.env.GIJO_ADMIN_PASSWORD || "");
 const notes = arg("notes", "");
+const force = process.argv.includes("--force");
 
 const pkg = JSON.parse(fs.readFileSync(path.join(clientDir, "package.json"), "utf-8"));
 const version = pkg.version;
@@ -39,9 +41,14 @@ async function main() {
   const login = await fetch(`${serverUrl}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ username, password, ...(force ? { force: true } : {}) }),
   }).then((r) => r.json());
-  if (!login.accessToken) throw new Error(`로그인 실패: ${JSON.stringify(login)}`);
+  if (!login.accessToken) {
+    if (login.error === "already_logged_in") {
+      throw new Error("이미 다른 곳에 로그인돼 있습니다(중복 로그인 방지) — --force를 추가해 강제 전환하세요(그 세션은 끊깁니다).");
+    }
+    throw new Error(`로그인 실패: ${JSON.stringify(login)}`);
+  }
 
   const buf = fs.readFileSync(installerPath);
   console.log(`[publish-release] 게시: ${version} (${(buf.length / 1024 / 1024).toFixed(1)}MB) ← ${installerPath}`);
