@@ -21,7 +21,9 @@ import type { GijoUser } from "../auth/users";
 import { koDateTimeString } from "../util/date";
 
 export type ScanStatus = "PASS" | "FAIL" | "WARN" | "NA";
-export type StandardId = "kisa" | "cis";
+export type StandardId = "kisa" | "cis" | "kisa_pc" | "kisa_net";
+// 표준별 대상 셸: linux(bash) · windows(cmd, PC 점검) · network(장비 CLI, show 명령)
+export type ShellKind = "linux" | "windows" | "network";
 
 export interface RunResult { code: number; out: string; err: string }
 export type RunFn = (cmd: string) => Promise<RunResult>;
@@ -58,6 +60,21 @@ export const hostRunner: RunFn = (cmd) =>
     const file = isWin ? "wsl.exe" : "bash";
     const args = isWin ? ["-e", "bash", "-lc", cmd] : ["-lc", cmd];
     execFile(file, args, { timeout: 15000, maxBuffer: 4 * 1024 * 1024 }, (err, so, se) => {
+      resolve({ code: err && typeof (err as { code?: number }).code === "number" ? (err as { code: number }).code : err ? 1 : 0, out: (so || "").trim(), err: (se || "").trim() });
+    });
+  });
+
+// Windows PC 점검용 로컬 러너 — 이 프로세스가 Windows에서 돌 때(개발기·담당자 PC 동봉 모드)만
+// cmd.exe로 직접 실행한다. chcp 65001로 코드페이지를 UTF-8로 바꿔 한국어 Windows의 net/reg
+// 출력이 CP949로 깨지는 문제를 차단한다. 리눅스 서버에서는 로컬 실행 불가 — SSH 원격 대상
+// (Windows OpenSSH 서버의 기본 셸이 cmd.exe라 같은 명령이 그대로 동작)을 등록해야 한다.
+export const winHostRunner: RunFn = (cmd) =>
+  new Promise((resolve) => {
+    if (process.platform !== "win32") {
+      resolve({ code: 1, out: "", err: "서버가 리눅스 — Windows PC는 SSH 원격 대상으로 등록해 점검하세요" });
+      return;
+    }
+    execFile("cmd.exe", ["/d", "/s", "/c", `chcp 65001>nul & ${cmd}`], { timeout: 20000, maxBuffer: 4 * 1024 * 1024, windowsVerbatimArguments: true }, (err, so, se) => {
       resolve({ code: err && typeof (err as { code?: number }).code === "number" ? (err as { code: number }).code : err ? 1 : 0, out: (so || "").trim(), err: (se || "").trim() });
     });
   });
@@ -227,6 +244,46 @@ const KISA_CHECKS: CheckItem[] = [
       return { status: r.out === "active" ? "PASS" : "FAIL", evidence: `rsyslog: ${r.out || "unknown"}` };
     },
   },
+  // ── 이하 4항목: CCE 파이프라인 명세(제어시스템 C-계열)에서 미커버로 판정돼 추가(2026-07-21).
+  {
+    id: "U-19", cat: "서비스 관리", title: "finger 서비스 비활성화", ref: "KISA U-19 / 제어 C-08",
+    remediation: "finger 데몬 제거·비활성화 (포트 79 차단)",
+    check: async (run) => {
+      const r = await run("ss -tlnH 2>/dev/null | awk '{print $4}' | grep -E ':79$' | head -1");
+      if (r.out) return { status: "FAIL", evidence: `finger 포트(79) 리스닝: ${r.out}` };
+      return { status: "PASS", evidence: "finger 서비스(포트 79) 미가동" };
+    },
+  },
+  {
+    id: "U-21", cat: "서비스 관리", title: "r 계열 서비스(rsh·rlogin·rexec) 비활성화", ref: "KISA U-21 / 제어 C-08·C-11",
+    remediation: "rsh/rlogin/rexec 서비스 제거 (포트 512·513·514 차단), SSH로 대체",
+    check: async (run) => {
+      const r = await run("ss -tlnH 2>/dev/null | awk '{print $4}' | grep -E ':(512|513|514)$' | tr '\\n' ' '");
+      if (r.out.trim()) return { status: "FAIL", evidence: `r 계열 포트 리스닝: ${r.out.trim()}` };
+      return { status: "PASS", evidence: "r 계열 서비스(512·513·514) 미가동" };
+    },
+  },
+  {
+    id: "U-54", cat: "계정 관리", title: "세션 타임아웃(TMOUT) 600초 이하", ref: "KISA U-54 / 제어 C-14",
+    remediation: "/etc/profile 에 TMOUT=600 (이하) 및 export TMOUT 설정",
+    check: async (run) => {
+      const r = await run("grep -hE '^[[:space:]]*(export[[:space:]]+)?TMOUT=' /etc/profile /etc/profile.d/*.sh /etc/bash.bashrc 2>/dev/null | tail -1");
+      const m = r.out.match(/TMOUT=([0-9]+)/);
+      if (!m) return { status: "FAIL", evidence: "TMOUT 미설정 — 방치 세션이 만료되지 않음" };
+      const v = num(m[1]);
+      if (v > 0 && v <= 600) return { status: "PASS", evidence: `TMOUT=${v}초 (기준 ≤600)` };
+      return { status: "FAIL", evidence: `TMOUT=${m[1]} (기준: 1~600초)` };
+    },
+  },
+  {
+    id: "U-61", cat: "서비스 관리", title: "취약 원격 프로토콜(FTP·telnet) 비활성화", ref: "KISA U-61 / 제어 C-08·C-11",
+    remediation: "vsftpd/proftpd·telnetd 중지, SFTP/SSH로 대체 (포트 21·23 차단)",
+    check: async (run) => {
+      const r = await run("ss -tlnH 2>/dev/null | awk '{print $4}' | grep -E ':(21|23)$' | tr '\\n' ' '");
+      if (r.out.trim()) return { status: "FAIL", evidence: `평문 프로토콜 포트 리스닝: ${r.out.trim()} (FTP=21·telnet=23)` };
+      return { status: "PASS", evidence: "FTP(21)·telnet(23) 미가동" };
+    },
+  },
 ];
 
 // ── CIS Benchmark(Level 1) 체크리스트 ──────────────────────────────────────
@@ -297,13 +354,224 @@ const CIS_CHECKS: CheckItem[] = [
   },
 ];
 
-const STANDARDS: Record<StandardId, { label: string; checks: CheckItem[] }> = {
-  kisa: { label: "국내 CCE — KISA 주요정보통신기반시설 취약점 분석·평가(UNIX U-시리즈)", checks: KISA_CHECKS },
-  cis: { label: "CIS Benchmark (Level 1)", checks: CIS_CHECKS },
+// ── 국내 CCE(KISA PC 점검) 체크리스트 — 임직원 Windows PC ─────────────────
+// 명령은 전부 Windows cmd 호환 한 줄(원격 Windows OpenSSH 기본 셸=cmd.exe에서도 동일 동작).
+// net accounts 출력은 한국어/영어 Windows 둘 다 파싱한다(chcp 65001로 UTF-8 보장).
+function accountsLine(out: string, keyRe: RegExp): string | null {
+  const line = out.split(/\r?\n/).find((l) => keyRe.test(l));
+  return line ? line.trim() : null;
+}
+function trailingNum(line: string | null): number {
+  if (!line) return NaN;
+  const m = line.match(/(\d+)\s*$/);
+  return m ? num(m[1]) : NaN;
+}
+const KISA_PC_CHECKS: CheckItem[] = [
+  {
+    id: "PC-01", cat: "계정·비밀번호", title: "비밀번호 최대 사용기간 90일 이하", ref: "KISA PC-01",
+    remediation: "net accounts /maxpwage:90 또는 로컬 보안 정책에서 최대 암호 사용 기간 설정",
+    check: async (run) => {
+      const r = await run("net accounts");
+      const line = accountsLine(r.out, /최대 암호 사용|Maximum password age/i);
+      if (!line) return { status: "WARN", evidence: "net accounts 출력에서 최대 사용기간 항목을 찾지 못함" };
+      if (/제한 없음|Unlimited/i.test(line)) return { status: "FAIL", evidence: "최대 사용기간 무제한 (기준 ≤90일)" };
+      const v = trailingNum(line);
+      if (!Number.isFinite(v)) return { status: "WARN", evidence: line.slice(0, 100) };
+      return { status: v <= 90 ? "PASS" : "FAIL", evidence: `최대 암호 사용기간 ${v}일 (기준 ≤90)` };
+    },
+  },
+  {
+    id: "PC-02a", cat: "계정·비밀번호", title: "비밀번호 최소 길이 8자 이상", ref: "KISA PC-02",
+    remediation: "net accounts /minpwlen:8 또는 로컬 보안 정책에서 최소 암호 길이 설정",
+    check: async (run) => {
+      const r = await run("net accounts");
+      const line = accountsLine(r.out, /최소 암호 길이|Minimum password length/i);
+      const v = trailingNum(line);
+      if (!Number.isFinite(v)) return { status: "WARN", evidence: line?.slice(0, 100) || "net accounts 출력 파싱 실패" };
+      return { status: v >= 8 ? "PASS" : "FAIL", evidence: `최소 암호 길이 ${v}자 (기준 ≥8)` };
+    },
+  },
+  {
+    id: "PC-02b", cat: "계정·비밀번호", title: "계정 잠금 임계값 설정(무차별 대입 방어)", ref: "KISA PC-02",
+    remediation: "net accounts /lockoutthreshold:5 또는 로컬 보안 정책에서 계정 잠금 임계값 설정",
+    check: async (run) => {
+      const r = await run("net accounts");
+      const line = accountsLine(r.out, /잠금 임계값|Lockout threshold/i);
+      if (!line) return { status: "WARN", evidence: "net accounts 출력에서 잠금 임계값 항목을 찾지 못함" };
+      if (/사용 안|Never/i.test(line)) return { status: "FAIL", evidence: "계정 잠금 임계값 미설정 (무차별 대입 무방비)" };
+      const v = trailingNum(line);
+      if (!Number.isFinite(v)) return { status: "WARN", evidence: line.slice(0, 100) };
+      return { status: v > 0 && v <= 10 ? "PASS" : "WARN", evidence: `잠금 임계값 ${v}회 (권장 ≤10)` };
+    },
+  },
+  {
+    id: "PC-03", cat: "계정·비밀번호", title: "복구 콘솔 자동 로그온 금지", ref: "KISA PC-03",
+    remediation: "레지스트리 RecoveryConsole SecurityLevel=0 (자동 관리자 로그온 금지)",
+    check: async (run) => {
+      const r = await run('reg query "HKLM\\SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion\\Setup\\RecoveryConsole" /v SecurityLevel');
+      if (r.code !== 0 || !r.out) return { status: "PASS", evidence: "복구 콘솔 정책 키 없음 — 현대 Windows 기본(자동 로그온 기능 자체 없음)" };
+      const m = r.out.match(/SecurityLevel\s+REG_DWORD\s+0x([0-9a-f]+)/i);
+      if (!m) return { status: "WARN", evidence: r.out.slice(0, 100) };
+      return { status: parseInt(m[1], 16) === 0 ? "PASS" : "FAIL", evidence: `SecurityLevel=0x${m[1]} (0=자동 로그온 금지)` };
+    },
+  },
+  {
+    id: "PC-04", cat: "네트워크·공유", title: "기본 공유 폴더(C$·ADMIN$) 제거", ref: "KISA PC-04",
+    remediation: "net share C$ /delete 등 관리 공유 제거 + AutoShareWks=0 레지스트리 설정",
+    check: async (run) => {
+      const r = await run("net share");
+      // 공유 이름은 각 행의 첫 토큰 — 로케일에 따라 들여쓰기가 달라 앞 공백을 허용한다.
+      const names = r.out.split(/\r?\n/).map((l) => (l.match(/^\s*([A-Za-z0-9$_-]+\$)(?:\s|$)/) || [])[1]).filter(Boolean) as string[];
+      const admin = names.filter((n) => /^[A-Z]\$$/i.test(n) || /^ADMIN\$$/i.test(n));
+      const ipc = names.some((n) => /^IPC\$$/i.test(n));
+      if (admin.length) return { status: "FAIL", evidence: `기본 관리 공유 활성: ${admin.join(", ")}` };
+      if (ipc) return { status: "WARN", evidence: "IPC$ 공유만 활성 (완전 제거는 도메인 환경에 따라 판단)" };
+      return { status: "PASS", evidence: "기본 공유 폴더 없음" };
+    },
+  },
+  {
+    id: "PC-05", cat: "서비스 관리", title: "불필요 서비스(Remote Registry) 비활성화", ref: "KISA PC-05",
+    remediation: "sc config RemoteRegistry start=disabled & sc stop RemoteRegistry",
+    check: async (run) => {
+      const r = await run("sc query RemoteRegistry");
+      if (/RUNNING/.test(r.out)) return { status: "FAIL", evidence: "RemoteRegistry 서비스 실행 중 (원격 레지스트리 접근 허용)" };
+      if (/STOPPED/.test(r.out)) return { status: "PASS", evidence: "RemoteRegistry 중지됨" };
+      if (r.code !== 0) return { status: "PASS", evidence: "RemoteRegistry 서비스 미설치" };
+      return { status: "WARN", evidence: r.out.slice(0, 100) };
+    },
+  },
+  {
+    id: "PC-06", cat: "소프트웨어", title: "비인가 상용 메신저 설치 확인", ref: "KISA PC-06",
+    remediation: "사내 허가되지 않은 메신저 제거 (허용 목록은 조직 정책에 따름)",
+    check: async (run) => {
+      const q = (root: string) => `reg query "${root}\\Microsoft\\Windows\\CurrentVersion\\Uninstall" /s /v DisplayName 2>nul`;
+      const r = await run(`(${q("HKLM\\SOFTWARE")} & ${q("HKLM\\SOFTWARE\\WOW6432Node")} & ${q("HKCU\\SOFTWARE")}) | findstr /i "kakao telegram discord nateon wechat whatsapp"`);
+      // 매칭 행은 두 종류: DisplayName 값 행(영문명) 또는 키 경로 행(한글 DisplayName인 경우
+      // 실측: 카카오톡은 DisplayName이 한글이라 경로 \KakaoTalk 로만 걸린다). 둘 다에서 이름 추출.
+      const found = [...new Set(
+        r.out.split(/\r?\n/).map((l) => {
+          const t = l.trim();
+          if (!t) return "";
+          if (/REG_SZ/.test(t)) return t.replace(/^DisplayName\s+REG_SZ\s+/i, "").trim();
+          if (/^HK/i.test(t)) return t.split("\\").pop() || "";
+          return "";
+        }).filter(Boolean)
+      )];
+      if (found.length) return { status: "WARN", evidence: `상용 메신저 발견: ${found.slice(0, 5).join(", ")} — 사내 허가 여부 확인 필요` };
+      return { status: "PASS", evidence: "알려진 상용 메신저 미설치" };
+    },
+  },
+  {
+    id: "PC-07", cat: "파일 시스템", title: "고정 드라이브 NTFS 포맷 사용", ref: "KISA PC-07",
+    remediation: "FAT32/exFAT 고정 드라이브를 NTFS로 변환 (convert <드라이브>: /fs:ntfs)",
+    check: async (run) => {
+      const r = await run("powershell -NoProfile -Command \"Get-CimInstance Win32_LogicalDisk -Filter 'DriveType=3' | ForEach-Object { $_.DeviceID + ' ' + $_.FileSystem }\"");
+      const drives = r.out.split(/\r?\n/).map((l) => l.trim()).filter((l) => /^[A-Z]:/.test(l));
+      if (!drives.length) return { status: "WARN", evidence: "고정 드라이브 조회 실패" };
+      const bad = drives.filter((d) => !/NTFS|ReFS/i.test(d));
+      if (bad.length) return { status: "FAIL", evidence: `NTFS 아님: ${bad.join(", ")}` };
+      return { status: "PASS", evidence: drives.join(", ") };
+    },
+  },
+];
+
+// ── 국내 CCE(KISA 네트워크 장비 N-시리즈) 체크리스트 — Cisco IOS 계열 ──────
+// SSH로 장비에 접속해 show running-config 를 읽어 판정한다(전부 읽기 전용).
+// 기본값 판정 근거: proxy-arp·domain-lookup은 IOS 기본 활성(미설정=취약), identd·mask-reply는
+// 기본 비활성(명시 활성만 취약), pad는 IOS 버전에 따라 기본값이 달라 미설정은 확인필요로 둔다.
+function netFail(r: RunResult): { status: ScanStatus; evidence: string } | null {
+  if (r.code !== 0 && !r.out) return { status: "WARN", evidence: `장비 CLI 응답 없음 — SSH 연결·권한 확인 (${(r.err || "").slice(0, 80)})` };
+  return null;
+}
+const KISA_NET_CHECKS: CheckItem[] = [
+  {
+    id: "N-33", cat: "기능 관리", title: "Proxy ARP 차단", ref: "KISA N-33 / 명세 N-33",
+    remediation: "인터페이스 설정에 no ip proxy-arp 적용",
+    check: async (run) => {
+      const r = await run("show running-config | include proxy-arp");
+      const bad = netFail(r); if (bad) return bad;
+      if (/^\s*ip proxy-arp/m.test(r.out)) return { status: "FAIL", evidence: "ip proxy-arp 활성 설정 존재" };
+      if (/no ip proxy-arp/.test(r.out)) return { status: "PASS", evidence: "no ip proxy-arp 적용됨" };
+      return { status: "WARN", evidence: "proxy-arp 설정 표기 없음 — Cisco 기본값은 활성(인터페이스별 확인 필요)" };
+    },
+  },
+  {
+    id: "N-34", cat: "기능 관리", title: "ICMP unreachable·redirect 차단", ref: "KISA N-34 / 명세 N-34",
+    remediation: "인터페이스 설정에 no ip unreachables·no ip redirects 적용",
+    check: async (run) => {
+      const r = await run("show running-config | include unreachables|redirects");
+      const bad = netFail(r); if (bad) return bad;
+      const unre = /no ip unreachables/.test(r.out);
+      const redi = /no ip redirects/.test(r.out);
+      if (unre && redi) return { status: "PASS", evidence: "no ip unreachables·no ip redirects 적용됨" };
+      if (unre || redi) return { status: "WARN", evidence: `일부만 적용: unreachables=${unre ? "차단" : "미차단"}, redirects=${redi ? "차단" : "미차단"}` };
+      return { status: "WARN", evidence: "ICMP 차단 설정 표기 없음 — 기본값 활성(확인 필요)" };
+    },
+  },
+  {
+    id: "N-35", cat: "기능 관리", title: "identd(TCP 113) 서비스 차단", ref: "KISA N-35 / 명세 N-35",
+    remediation: "no ip identd 적용 (기본 비활성 — 활성 설정 제거)",
+    check: async (run) => {
+      const r = await run("show running-config | include identd");
+      const bad = netFail(r); if (bad) return bad;
+      if (/^\s*ip identd/m.test(r.out)) return { status: "FAIL", evidence: "ip identd 활성 설정 존재" };
+      return { status: "PASS", evidence: "identd 비활성 (기본값)" };
+    },
+  },
+  {
+    id: "N-36", cat: "기능 관리", title: "Domain lookup 차단", ref: "KISA N-36 / 명세 N-36",
+    remediation: "no ip domain-lookup (또는 no ip domain lookup) 적용",
+    check: async (run) => {
+      const r = await run("show running-config | include domain");
+      const bad = netFail(r); if (bad) return bad;
+      if (/no ip domain[- ]lookup/.test(r.out)) return { status: "PASS", evidence: "no ip domain-lookup 적용됨" };
+      return { status: "FAIL", evidence: "domain lookup 차단 미설정 — Cisco 기본값 활성(명시 차단 필요)" };
+    },
+  },
+  {
+    id: "N-37", cat: "기능 관리", title: "PAD(X.25) 서비스 차단", ref: "KISA N-37 / 명세 N-37",
+    remediation: "no service pad 적용",
+    check: async (run) => {
+      const r = await run("show running-config | include pad");
+      const bad = netFail(r); if (bad) return bad;
+      if (/no service pad/.test(r.out)) return { status: "PASS", evidence: "no service pad 적용됨" };
+      if (/^\s*service pad/m.test(r.out)) return { status: "FAIL", evidence: "service pad 활성 설정 존재" };
+      return { status: "WARN", evidence: "pad 설정 표기 없음 — IOS 버전에 따라 기본값 상이(확인 필요)" };
+    },
+  },
+  {
+    id: "N-38", cat: "기능 관리", title: "ICMP mask-reply 차단", ref: "KISA N-38 / 명세 N-38",
+    remediation: "no ip mask-reply 적용 (기본 비활성 — 활성 설정 제거)",
+    check: async (run) => {
+      const r = await run("show running-config | include mask-reply");
+      const bad = netFail(r); if (bad) return bad;
+      if (/^\s*ip mask-reply/m.test(r.out)) return { status: "FAIL", evidence: "ip mask-reply 활성 설정 존재" };
+      return { status: "PASS", evidence: "mask-reply 비활성 (기본값)" };
+    },
+  },
+];
+
+const STANDARDS: Record<StandardId, { label: string; shell: ShellKind; checks: CheckItem[] }> = {
+  kisa: { label: "국내 CCE — KISA 주요정보통신기반시설 취약점 분석·평가(UNIX U-시리즈)", shell: "linux", checks: KISA_CHECKS },
+  cis: { label: "CIS Benchmark (Level 1)", shell: "linux", checks: CIS_CHECKS },
+  kisa_pc: { label: "국내 CCE — KISA 임직원 PC 점검(Windows PC-시리즈)", shell: "windows", checks: KISA_PC_CHECKS },
+  kisa_net: { label: "국내 CCE — KISA 네트워크 장비 점검(N-시리즈·Cisco IOS)", shell: "network", checks: KISA_NET_CHECKS },
 };
 
 export function isStandard(s: string): s is StandardId {
-  return s === "kisa" || s === "cis";
+  return s === "kisa" || s === "cis" || s === "kisa_pc" || s === "kisa_net";
+}
+
+// 표준에 맞는 로컬 기본 러너 — PC 점검은 Windows cmd, 그 외(linux·network)는 bash.
+// network를 로컬로 돌리면 show 명령이 실패해 전 항목 WARN이 된다(원격 SSH 대상 필요) — 의도된 동작.
+export function defaultRunnerFor(standard: StandardId): RunFn {
+  return STANDARDS[standard].shell === "windows" ? winHostRunner : hostRunner;
+}
+
+// 대상×표준에 맞는 러너 — 원격(ssh)이면 SSH, 로컬이면 표준별 기본 러너.
+export function runnerFor(t: HardeningTarget, standard: StandardId): RunFn {
+  if (t.authMethod === "local" || t.host === "local") return defaultRunnerFor(standard);
+  return targetRunner(t);
 }
 
 export function listChecklists() {
@@ -321,7 +589,7 @@ function verdictOf(fail: number): string {
 
 export async function runHardeningScan(opts: { standard: StandardId; target?: string; run?: RunFn }): Promise<ScanReport> {
   const std = STANDARDS[opts.standard];
-  const run = opts.run ?? hostRunner;
+  const run = opts.run ?? defaultRunnerFor(opts.standard);
   const target = opts.target || "localhost (this-appliance)";
   const t0 = Date.now();
   const startedAt = new Date().toISOString();
@@ -414,7 +682,7 @@ export function registerHardeningRoutes(app: Express): void {
     asyncRoute(async (req, res) => {
       const standard = String(req.body?.standard ?? "kisa").trim();
       if (!isStandard(standard)) {
-        res.status(400).json({ error: "standard는 kisa 또는 cis여야 합니다" });
+        res.status(400).json({ error: "standard는 kisa·cis·kisa_pc·kisa_net 중 하나여야 합니다" });
         return;
       }
       // target은 표시용 라벨만으로 쓴다 — 절대 셸 명령에 넣지 않는다(인젝션 방지).

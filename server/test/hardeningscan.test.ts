@@ -97,13 +97,172 @@ describe("hardeningscan — 판정 로직", () => {
     expect(r.items.find((i) => i.id === "FW-01")!.status).toBe("FAIL");
   });
 
-  it("체크리스트 메타: kisa 11항목·cis 7항목", () => {
+  it("체크리스트 메타: kisa 15·cis 7·kisa_pc 8·kisa_net 6 항목", () => {
     const lists = listChecklists();
-    const kisa = lists.find((l) => l.id === "kisa")!;
-    const cis = lists.find((l) => l.id === "cis")!;
-    expect(kisa.count).toBe(11);
-    expect(cis.count).toBe(7);
-    expect(kisa.items[0].id).toBe("U-01");
+    const by = Object.fromEntries(lists.map((l) => [l.id, l]));
+    expect(by["kisa"].count).toBe(15);
+    expect(by["cis"].count).toBe(7);
+    expect(by["kisa_pc"].count).toBe(8);
+    expect(by["kisa_net"].count).toBe(6);
+    expect(by["kisa"].items[0].id).toBe("U-01");
+  });
+});
+
+// ── 1단계 신규 리눅스 항목(U-19·U-21·U-54·U-61 — 제어 C-계열 대응) ─────────
+describe("hardeningscan — KISA 신규 항목(C-계열 대응)", () => {
+  it("취약: r계열·FTP 포트 리스닝 + TMOUT 미설정이면 FAIL", async () => {
+    const weak = mkRunner([
+      [/:79\$/, ""], // U-19 finger 없음 → PASS
+      [/\(512\|513\|514\)/, "0.0.0.0:513 "], // U-21 rlogin 리스닝 → FAIL
+      [/TMOUT=/, ""], // U-54 미설정 → FAIL
+      [/\(21\|23\)/, "0.0.0.0:21 0.0.0.0:23 "], // U-61 ftp+telnet → FAIL
+    ]);
+    const r = await runHardeningScan({ standard: "kisa", run: weak });
+    const by = Object.fromEntries(r.items.map((i) => [i.id, i]));
+    expect(by["U-19"].status).toBe("PASS");
+    expect(by["U-21"].status).toBe("FAIL");
+    expect(by["U-21"].evidence).toContain("513");
+    expect(by["U-54"].status).toBe("FAIL");
+    expect(by["U-61"].status).toBe("FAIL");
+    expect(by["U-61"].evidence).toContain("21");
+  });
+
+  it("양호: TMOUT=600 이하이면 U-54 PASS, 초과·0이면 FAIL", async () => {
+    const at = async (v: string) => {
+      const r = await runHardeningScan({ standard: "kisa", run: mkRunner([[/TMOUT=/, `export TMOUT=${v}`]]) });
+      return r.items.find((i) => i.id === "U-54")!.status;
+    };
+    expect(await at("600")).toBe("PASS");
+    expect(await at("300")).toBe("PASS");
+    expect(await at("7200")).toBe("FAIL");
+    expect(await at("0")).toBe("FAIL"); // 0=비활성
+  });
+});
+
+// ── 2단계 Windows PC 표준(kisa_pc) — net accounts 한/영 파싱 포함 ──────────
+const NET_ACCOUNTS_KO = [
+  "암호 변경 금지 기간(일):                                    0",
+  "최대 암호 사용 기간(일):                                    42",
+  "최소 암호 길이:                                             10",
+  "잠금 임계값:                                                5",
+].join("\r\n");
+const NET_ACCOUNTS_EN_WEAK = [
+  "Minimum password age (days):                          0",
+  "Maximum password age (days):                          Unlimited",
+  "Minimum password length:                              0",
+  "Lockout threshold:                                    Never",
+].join("\r\n");
+
+describe("hardeningscan — kisa_pc (Windows PC)", () => {
+  it("한국어 Windows: 정책 양호 판정", async () => {
+    const r = await runHardeningScan({
+      standard: "kisa_pc",
+      run: mkRunner([
+        [/^net accounts$/, NET_ACCOUNTS_KO],
+        [/net share/, " IPC$        원격 IPC\r\n"],
+        [/sc query RemoteRegistry/, "        STATE              : 1  STOPPED"],
+        [/RecoveryConsole/, ""], // 키 없음 → PASS (mkRunner code=0이지만 out 빈값 → PASS 분기)
+        [/findstr/, ""],
+        [/Get-CimInstance/, "C: NTFS\r\nD: NTFS"],
+      ]),
+    });
+    const by = Object.fromEntries(r.items.map((i) => [i.id, i]));
+    expect(by["PC-01"].status).toBe("PASS"); // 42일 ≤ 90
+    expect(by["PC-02a"].status).toBe("PASS"); // 10자 ≥ 8
+    expect(by["PC-02b"].status).toBe("PASS"); // 임계값 5
+    expect(by["PC-03"].status).toBe("PASS");
+    expect(by["PC-04"].status).toBe("WARN"); // IPC$만
+    expect(by["PC-05"].status).toBe("PASS");
+    expect(by["PC-06"].status).toBe("PASS");
+    expect(by["PC-07"].status).toBe("PASS");
+    expect(r.summary.fail).toBe(0);
+  });
+
+  it("영어 Windows(취약): 무제한 암호·잠금 미설정·기본 공유·메신저 검출", async () => {
+    const r = await runHardeningScan({
+      standard: "kisa_pc",
+      run: mkRunner([
+        [/^net accounts$/, NET_ACCOUNTS_EN_WEAK],
+        [/net share/, " C$           C:\\        기본 공유\r\n ADMIN$       C:\\Windows  원격 관리\r\n IPC$\r\n"],
+        [/sc query RemoteRegistry/, "        STATE              : 4  RUNNING"],
+        [/RecoveryConsole/, "    SecurityLevel    REG_DWORD    0x1"],
+        [/findstr/, "    DisplayName    REG_SZ    KakaoTalk\r\n    DisplayName    REG_SZ    Telegram Desktop"],
+        [/Get-CimInstance/, "C: NTFS\r\nE: FAT32"],
+      ]),
+    });
+    const by = Object.fromEntries(r.items.map((i) => [i.id, i]));
+    expect(by["PC-01"].status).toBe("FAIL"); // Unlimited
+    expect(by["PC-02a"].status).toBe("FAIL"); // 0자
+    expect(by["PC-02b"].status).toBe("FAIL"); // Never
+    expect(by["PC-03"].status).toBe("FAIL"); // SecurityLevel=1
+    expect(by["PC-04"].status).toBe("FAIL");
+    expect(by["PC-04"].evidence).toMatch(/C\$|ADMIN\$/);
+    expect(by["PC-05"].status).toBe("FAIL"); // RUNNING
+    expect(by["PC-06"].status).toBe("WARN");
+    expect(by["PC-06"].evidence).toContain("KakaoTalk");
+    expect(by["PC-07"].status).toBe("FAIL");
+    expect(by["PC-07"].evidence).toContain("FAT32");
+    expect(r.summary.verdict).toContain("미흡");
+  });
+});
+
+// ── 3단계 네트워크 장비 표준(kisa_net) — Cisco show run 목 출력 검증 ────────
+describe("hardeningscan — kisa_net (네트워크 장비)", () => {
+  it("하드닝된 Cisco 설정: 전 항목 PASS", async () => {
+    const r = await runHardeningScan({
+      standard: "kisa_net",
+      run: mkRunner([
+        [/include proxy-arp/, " no ip proxy-arp"],
+        [/include unreachables\|redirects/, " no ip unreachables\n no ip redirects"],
+        [/include identd/, ""],
+        [/include domain/, "no ip domain-lookup"],
+        [/include pad/, "no service pad"],
+        [/include mask-reply/, ""],
+      ]),
+    });
+    expect(r.summary.fail).toBe(0);
+    expect(r.summary.warn).toBe(0);
+    expect(r.summary.rate).toBe(100);
+  });
+
+  it("기본 설정 그대로인 장비: domain-lookup FAIL, proxy-arp·pad WARN", async () => {
+    const r = await runHardeningScan({
+      standard: "kisa_net",
+      run: mkRunner([[/include/, ""]]), // 모든 show 출력 빈값 = 명시 설정 없음
+    });
+    const by = Object.fromEntries(r.items.map((i) => [i.id, i]));
+    expect(by["N-33"].status).toBe("WARN"); // 기본 활성
+    expect(by["N-34"].status).toBe("WARN");
+    expect(by["N-35"].status).toBe("PASS"); // 기본 비활성
+    expect(by["N-36"].status).toBe("FAIL"); // 기본 활성 — 명시 차단 필요
+    expect(by["N-37"].status).toBe("WARN");
+    expect(by["N-38"].status).toBe("PASS");
+  });
+
+  it("활성 설정이 명시된 취약 장비: identd·mask-reply·pad FAIL", async () => {
+    const r = await runHardeningScan({
+      standard: "kisa_net",
+      run: mkRunner([
+        [/include proxy-arp/, " ip proxy-arp"],
+        [/include identd/, "ip identd"],
+        [/include pad/, "service pad"],
+        [/include mask-reply/, " ip mask-reply"],
+        [/include domain/, "no ip domain lookup"], // 구형 표기(공백)도 인정
+      ]),
+    });
+    const by = Object.fromEntries(r.items.map((i) => [i.id, i]));
+    expect(by["N-33"].status).toBe("FAIL");
+    expect(by["N-35"].status).toBe("FAIL");
+    expect(by["N-36"].status).toBe("PASS");
+    expect(by["N-37"].status).toBe("FAIL");
+    expect(by["N-38"].status).toBe("FAIL");
+  });
+
+  it("SSH 접속 불가(응답 없음): 전 항목 WARN — 오탐 없이 확인필요 처리", async () => {
+    const dead: RunFn = async () => ({ code: 255, out: "", err: "Connection timed out" });
+    const r = await runHardeningScan({ standard: "kisa_net", run: dead });
+    expect(r.items.every((i) => i.status === "WARN")).toBe(true);
+    expect(r.items[0].evidence).toContain("SSH");
   });
 });
 
@@ -115,11 +274,11 @@ describe("hardeningscan — 라우트", () => {
     token = await login(app);
   });
 
-  it("GET /api/hardening/checklists — 인증 필요, 2개 기준 반환", async () => {
+  it("GET /api/hardening/checklists — 인증 필요, 4개 기준 반환", async () => {
     expect((await request(app).get("/api/hardening/checklists")).status).toBe(401);
     const res = await request(app).get("/api/hardening/checklists").set("Authorization", `Bearer ${token}`);
     expect(res.status).toBe(200);
-    expect(res.body.standards).toHaveLength(2);
+    expect(res.body.standards).toHaveLength(4);
   });
 
   it("POST /api/hardening/scan — 잘못된 standard는 400", async () => {

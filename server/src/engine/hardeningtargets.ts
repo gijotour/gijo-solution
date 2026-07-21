@@ -18,7 +18,7 @@ import { recordAudit } from "./audit";
 import { projectHardeningEvents } from "./analysishub";
 import {
   runHardeningScan,
-  targetRunner,
+  runnerFor,
   probeTarget,
   scanSummaryText,
   isStandard,
@@ -86,7 +86,7 @@ function lastRunFail(targetId: string, standard: string): number | null {
 // run: 테스트에서 실 셸 대신 결정적 러너를 주입할 때 쓴다(미지정 시 대상에 맞는 실제 러너).
 export async function runScanForTarget(target: HardeningTarget, standard: StandardId, source: Source, actor = "system", run?: RunFn) {
   const prevFail = lastRunFail(target.id, standard); // 알림 판단용(이력 저장 전 값)
-  const report = await runHardeningScan({ standard, target: target.label, run: run ?? targetRunner(target) });
+  const report = await runHardeningScan({ standard, target: target.label, run: run ?? runnerFor(target, standard) });
   const s = report.summary;
   db.prepare(
     `INSERT INTO hardening_runs (id, targetId, targetLabel, standard, at, rate, pass, fail, warn, na, source, summary)
@@ -229,7 +229,7 @@ export function registerHardeningTargetRoutes(app: Express): void {
     const t = getTarget(req.params.id);
     if (!t) { res.status(404).json({ error: "대상을 찾을 수 없습니다" }); return; }
     const standard = String(req.body?.standard ?? "kisa");
-    if (!isStandard(standard)) { res.status(400).json({ error: "standard는 kisa 또는 cis" }); return; }
+    if (!isStandard(standard)) { res.status(400).json({ error: "standard는 kisa·cis·kisa_pc·kisa_net 중 하나" }); return; }
     const report = await runScanForTarget(t, standard, "manual", actorOf(req));
     res.json({ report, summary: scanSummaryText(report) });
   }));
@@ -243,7 +243,7 @@ export function registerHardeningTargetRoutes(app: Express): void {
     const standard = String(req.body?.standard ?? "kisa");
     const intervalHours = Math.max(1, Math.round(Number(req.body?.intervalHours) || 24));
     if (!getTarget(targetId)) { res.status(400).json({ error: "유효한 targetId가 필요합니다" }); return; }
-    if (!isStandard(standard)) { res.status(400).json({ error: "standard는 kisa 또는 cis" }); return; }
+    if (!isStandard(standard)) { res.status(400).json({ error: "standard는 kisa·cis·kisa_pc·kisa_net 중 하나" }); return; }
     const sch = createSchedule(targetId, standard, intervalHours);
     recordAudit({ kind: "config", actor: actorOf(req), action: "하드닝 정기점검 스케줄 등록", target: getTarget(targetId)!.label, detail: `${standard.toUpperCase()} · ${intervalHours}시간마다`, result: "ok" });
     res.json({ schedule: sch });

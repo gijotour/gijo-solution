@@ -407,7 +407,11 @@ async function runRunRedteam(args: Record<string, string>): Promise<string> {
 // 결과가 이미 사람이 읽기 좋은 요약이라 directAnswer로 LLM 재작성을 생략한다.
 async function runHardeningScanTool(args: Record<string, string>): Promise<string> {
   const raw = (args.standard ?? "").toLowerCase();
-  const standard = isStandard(raw) ? raw : /cis|international|국제/.test(raw) ? "cis" : "kisa";
+  const standard = isStandard(raw) ? raw
+    : /cis|international|국제/.test(raw) ? "cis"
+    : /pc|피시|윈도우|windows/.test(raw) ? "kisa_pc"
+    : /net|네트워크|스위치|라우터|cisco/.test(raw) ? "kisa_net"
+    : "kisa";
   const target = (args.target ?? "").trim() || undefined;
   const report = await runHardeningScan({ standard, target });
   return scanSummaryText(report);
@@ -1410,7 +1414,7 @@ const TOOLS: AgentTool[] = [
     domain: "cross", // 자산·보안제품·컴플라이언스를 가로지르는 진단
     write: false,
     description:
-      '보안장비(리눅스 기반)에 CLI로 접속해 표준 기준의 보안설정(하드닝) 점검을 실제로 실행하고 양호/취약을 리포트한다. 기준: 국내 CCE(KISA 주요정보통신기반시설 U-시리즈, 기본) 또는 CIS Benchmark. "하드닝 점검해줘", "보안 설정 점검", "CCE 점검", "취약점 진단해줘", "기준 점검"에 쓴다. 예: {"standard":"kisa"} 또는 {"standard":"cis"}',
+      '보안장비·PC에 CLI로 접속해 표준 기준의 보안설정(하드닝) 점검을 실제로 실행하고 양호/취약을 리포트한다. 기준: kisa(국내 CCE 리눅스 U-시리즈, 기본)·cis(CIS Benchmark)·kisa_pc(임직원 Windows PC PC-시리즈)·kisa_net(네트워크 장비 N-시리즈). "하드닝 점검해줘", "PC 점검", "CCE 점검", "취약점 진단해줘"에 쓴다. 예: {"standard":"kisa_pc"}',
     directAnswer: true,
     params: [
       { name: "standard", label: "점검 기준", description: "kisa(국내 CCE, 기본) 또는 cis", required: false },

@@ -138,8 +138,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     </div>
     <div class="chips">
       <span class="chip-lbl">빠른 점검:</span>
-      <button class="chip" data-scan="kisa">🛡 국내 CCE 점검 (KISA)</button>
+      <button class="chip" data-scan="kisa">🛡 국내 CCE 점검 (리눅스)</button>
       <button class="chip" data-scan="cis">🌐 CIS Benchmark 점검</button>
+      <button class="chip" data-scan="kisa_pc">💻 PC 점검 (Windows)</button>
+      <button class="chip" data-scan="kisa_net">🔀 네트워크 장비 점검</button>
     </div>
     <div id="proposeSlot"></div>
 
@@ -192,7 +194,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   async function askChatbot() {
     const q = document.getElementById("askInput").value.trim();
     if (!q) return;
-    if (SCAN_INTENT.test(q)) { runHardeningFromChat(/\bcis\b|국제/i.test(q) ? "cis" : "kisa", q); return; }
+    if (SCAN_INTENT.test(q)) {
+      const std = /\bcis\b|국제/i.test(q) ? "cis" : /\bpc\b|피시|윈도우|windows/i.test(q) ? "kisa_pc" : /네트워크\s*장비|스위치|라우터|cisco/i.test(q) ? "kisa_net" : "kisa";
+      runHardeningFromChat(std, q); return;
+    }
     const btn = document.getElementById("askBtn");
     btn.disabled = true; btn.textContent = "🤖 생각 중…";
     try {

@@ -265,9 +265,13 @@ function forcedToolFor(instruction: string, scope?: ToolScope): { tool: string; 
     if (f.re.test(instruction) && available.has(f.tool)) {
       if (f.tool === "today" && isAssign) continue; // 배정 지시는 today로 강제하지 않음
       if (f.tool === "briefing" && /리포트|보고서|report/i.test(instruction)) continue; // 문서 리포트는 briefing 아님
-      // 하드닝 점검은 지시문에 CIS가 명시되면 국제기준(cis), 아니면 국내 CCE(kisa)로.
+      // 하드닝 점검 기준 선택: CIS 명시→cis, PC/윈도우→kisa_pc, 네트워크 장비→kisa_net, 그 외→국내 CCE(kisa).
       if (f.tool === "run_hardening_scan") {
-        return { tool: f.tool, args: { standard: /\bcis\b|국제/i.test(instruction) ? "cis" : "kisa" } };
+        const standard = /\bcis\b|국제/i.test(instruction) ? "cis"
+          : /\bpc\b|피시|윈도우|windows/i.test(instruction) ? "kisa_pc"
+          : /네트워크\s*장비|스위치|라우터|cisco/i.test(instruction) ? "kisa_net"
+          : "kisa";
+        return { tool: f.tool, args: { standard } };
       }
       return { tool: f.tool, args: f.args };
     }
