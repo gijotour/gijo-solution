@@ -538,10 +538,14 @@ tr:last-child td{border-bottom:none;}
     if (!ms) return "-";
     return new Date(ms).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
   }
+  const SCHED_TYPE_LABEL = { ondemand: "요청", daily: "일일", weekly: "주간", monthly: "매월", quarterly: "분기" };
   function scheduleCadenceText(s) {
-    return s.type === "weekly"
-      ? `매주 ${DOW_LABEL[s.dayOfWeek ?? 1]} ${pad2(s.hour)}:${pad2(s.minute)}`
-      : `분기 첫 영업일 ${pad2(s.hour)}:${pad2(s.minute)}`;
+    const hm = `${pad2(s.hour)}:${pad2(s.minute)}`;
+    if (s.type === "ondemand") return "자동 실행 없음(필요할 때 직접 실행)";
+    if (s.type === "daily") return `매일 ${hm}`;
+    if (s.type === "weekly") return `매주 ${DOW_LABEL[s.dayOfWeek ?? 1]} ${hm}`;
+    if (s.type === "monthly") return `매월 1일(영업일) ${hm}`;
+    return `분기 첫 영업일 ${hm}`;
   }
 
   async function loadSchedules() {
@@ -568,9 +572,10 @@ tr:last-child td{border-bottom:none;}
           : s.lastResult === "fail"
           ? '<span class="chip-sm chip-warn">주의</span>'
           : '<span class="chip-sm chip-on">켜짐</span>';
+        const showNext = s.enabled && s.type !== "ondemand";
         return `<div class="sched-item${s.id === selectedScheduleId ? " active" : ""}" data-id="${s.id}">
-          <div class="t"><span>${s.type === "weekly" ? "주간" : "분기"} · ${esc(scope)}</span>${statusChip}</div>
-          <div class="m">${esc(scheduleCadenceText(s))}${s.enabled ? ` · 다음 ${fmtDT(s.nextRunAt)}` : ""}</div>
+          <div class="t"><span>${SCHED_TYPE_LABEL[s.type]} · ${esc(scope)}</span>${statusChip}</div>
+          <div class="m">${esc(scheduleCadenceText(s))}${showNext ? ` · 다음 ${fmtDT(s.nextRunAt)}` : ""}</div>
         </div>`;
       })
       .join("");
@@ -585,6 +590,12 @@ tr:last-child td{border-bottom:none;}
 
   async function renderNewScheduleForm() {
     selectedScheduleId = "new";
+    renderScheduleList();
+    await renderScheduleDetail();
+  }
+
+  async function backToScheduleList() {
+    selectedScheduleId = null;
     renderScheduleList();
     await renderScheduleDetail();
   }
@@ -608,25 +619,33 @@ tr:last-child td{border-bottom:none;}
           .join("")
       : '<div style="color:var(--muted-2)">등록된 자산이 없습니다</div>';
 
+    const curType = s ? s.type : "weekly";
+    // 분기(quarterly)는 2026-07-21 이전 등록분과의 하위호환용 — 새로 만들 때는 고르지 않고,
+    // 기존에 분기로 등록된 스케줄을 열었을 때만 선택지에 나타난다.
+    const typeOptions = [
+      ["ondemand", "요청"], ["daily", "일일"], ["weekly", "주간"], ["monthly", "매월"],
+      ...(curType === "quarterly" ? [["quarterly", "분기(기존)"]] : []),
+    ];
+
     detail.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;">
-        <b style="color:#fff;font-size:13.5px">${isNew ? "새 스케줄" : (s.type === "weekly" ? "주간" : "분기") + " 리포트"}</b>
+        <b style="color:#fff;font-size:13.5px">${isNew ? "새 스케줄" : SCHED_TYPE_LABEL[s.type] + " 리포트"}</b>
         ${!isNew ? `<button class="chip-sm ${s.enabled ? "chip-on" : "chip-off"}" id="schedToggleBtn">${s.enabled ? "켜짐" : "꺼짐"}</button>` : ""}
       </div>
       <div class="sched-form">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
           <div><label>유형</label><select id="schedType">
-            <option value="weekly" ${!s || s.type === "weekly" ? "selected" : ""}>주간</option>
-            <option value="quarterly" ${s && s.type === "quarterly" ? "selected" : ""}>분기</option>
+            ${typeOptions.map(([v, label]) => `<option value="${v}" ${curType === v ? "selected" : ""}>${label}</option>`).join("")}
           </select></div>
           <div id="schedDowWrap"><label>요일</label><select id="schedDow">
             ${DOW_LABEL.map((d, i) => `<option value="${i}" ${(s ? s.dayOfWeek : 1) === i ? "selected" : ""}>${d}요일</option>`).join("")}
           </select></div>
-          <div><label>시각</label><div style="display:flex;gap:6px;align-items:center;">
+          <div id="schedTimeWrap"><label>시각</label><div style="display:flex;gap:6px;align-items:center;">
             <input type="number" id="schedHour" min="0" max="23" value="${s ? s.hour : 9}" style="width:64px">
             <span style="color:var(--muted)">:</span>
             <input type="number" id="schedMinute" min="0" max="59" value="${s ? s.minute : 0}" style="width:64px">
           </div></div>
+          <div id="schedOndemandNote" style="grid-column:1/-1;font-size:11px;color:var(--muted-2);display:none">자동 실행 없음 — 등록해 두면 "지금 실행"으로 필요할 때 바로 생성합니다.</div>
           <div><label>형식</label><select id="schedFormat">
             <option value="both" ${!s || s.format === "both" ? "selected" : ""}>DOCX+PDF</option>
             <option value="docx" ${s && s.format === "docx" ? "selected" : ""}>DOCX만</option>
@@ -642,6 +661,7 @@ tr:last-child td{border-bottom:none;}
       </div>
       <div class="modal-err" id="schedErr"></div>
       <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px;">
+        <button class="btn-ghost" id="schedBackBtn">← 목록으로</button>
         ${!isNew ? '<button class="btn-ghost" id="schedDeleteBtn" style="color:#f5928a;border-color:#e2483d">삭제</button>' : ""}
         ${!isNew ? '<button class="btn-ghost" id="schedRunNowBtn">지금 실행</button>' : ""}
         <button class="btn-primary" id="schedSaveBtn">${isNew ? "스케줄 추가" : "저장"}</button>
@@ -658,10 +678,18 @@ tr:last-child td{border-bottom:none;}
 
     const typeSel = document.getElementById("schedType");
     const dowWrap = document.getElementById("schedDowWrap");
-    const syncDow = () => { dowWrap.style.display = typeSel.value === "weekly" ? "" : "none"; };
-    syncDow();
-    typeSel.addEventListener("change", syncDow);
+    const timeWrap = document.getElementById("schedTimeWrap");
+    const ondemandNote = document.getElementById("schedOndemandNote");
+    const syncType = () => {
+      dowWrap.style.display = typeSel.value === "weekly" ? "" : "none";
+      const isOndemand = typeSel.value === "ondemand";
+      timeWrap.style.display = isOndemand ? "none" : "";
+      ondemandNote.style.display = isOndemand ? "" : "none";
+    };
+    syncType();
+    typeSel.addEventListener("change", syncType);
 
+    document.getElementById("schedBackBtn").addEventListener("click", () => backToScheduleList());
     document.getElementById("schedSaveBtn").addEventListener("click", () => saveSchedule(isNew));
     if (!isNew) {
       document.getElementById("schedToggleBtn").addEventListener("click", () => toggleSchedule(s));

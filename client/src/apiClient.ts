@@ -996,7 +996,7 @@ export interface ReportHistoryEntry {
 // ── 정기 리포트(주간/분기) 자동 생성 스케줄 ────────────────────────────────
 export interface ReportSchedule {
   id: string;
-  type: "weekly" | "quarterly";
+  type: "ondemand" | "daily" | "weekly" | "monthly" | "quarterly";
   assetIds: string[] | null;
   format: "docx" | "pdf" | "both";
   audience: "internal" | "official";
@@ -1015,7 +1015,7 @@ export interface ReportScheduleRunEntry {
   id: string; scheduleId: string; at: number; source: "scheduled" | "manual"; result: "success" | "fail"; detail: string | null;
 }
 export interface CreateReportScheduleInput {
-  type: "weekly" | "quarterly";
+  type: "ondemand" | "daily" | "weekly" | "monthly" | "quarterly";
   assetIds?: string[] | null;
   format: "docx" | "pdf" | "both";
   audience: "internal" | "official";

@@ -22,7 +22,7 @@ import type { GijoUser } from "../auth/users";
 type ExpressRequestWithUser = Request & { user?: GijoUser };
 
 export interface ReportRequest {
-  type: "weekly" | "quarterly" | "ondemand";
+  type: "weekly" | "quarterly" | "ondemand" | "daily" | "monthly"; // daily/monthly는 reportschedule.ts의 정기 스케줄에서만 옴
   assetIds?: string[];
   format?: "docx" | "pdf" | "both"; // 기본 docx. pdf/both면 PDF도 생성(개선 #3).
   // 대상 독자: internal=내부 검토용(격식 없이 액션 중심) / official=보고용(격식·거버넌스 강조). 기본 official.

@@ -76,6 +76,32 @@ describe("reportschedule — computeNextRun(다음 실행 계산)", () => {
     expect(d.getMonth()).toBe(0);
     expect(d.getDate()).toBe(1);
   });
+
+  it("daily: 지정 시각이 아직 안 지났으면 오늘, 지났으면 내일", () => {
+    const notYet = computeNextRun("daily", null, 9, 0, new Date(2026, 6, 20, 8, 0));
+    expect(new Date(notYet).getDate()).toBe(20);
+    const passed = computeNextRun("daily", null, 9, 0, new Date(2026, 6, 20, 10, 0));
+    expect(new Date(passed).getDate()).toBe(21);
+  });
+
+  it("monthly: 매월 1일(영업일 보정)의 다음 발생을 계산한다", () => {
+    // 2026-08-01은 토요일 → 월요일(8/3)로 밀려야 함
+    const next = computeNextRun("monthly", null, 9, 0, new Date(2026, 6, 15, 0, 0)); // 7/15 기준
+    const d = new Date(next);
+    expect(d.getMonth()).toBe(7); // 8월
+    expect(d.getDate()).toBe(3); // 토요일(8/1) → 월요일(8/3)
+  });
+
+  it("monthly: 이번 달 1일이 이미 지났으면 다음 달로 넘어간다", () => {
+    const next = computeNextRun("monthly", null, 9, 0, new Date(2026, 7, 15, 0, 0)); // 8/15 기준 — 8/1(영업일 보정 8/3)도 이미 지남
+    const d = new Date(next);
+    expect(d.getMonth()).toBe(8); // 9월
+  });
+
+  it("ondemand: 자동 실행 시각이 먼 미래로 고정돼 스케줄러가 절대 자동 실행하지 않는다", () => {
+    const next = computeNextRun("ondemand", null, 9, 0, new Date());
+    expect(next).toBeGreaterThan(new Date(2100, 0, 1).getTime());
+  });
 });
 
 describe("reportschedule — CRUD", () => {
@@ -174,6 +200,24 @@ describe("reportschedule — 챗봇 조회(scheduleSummaryText / report_schedule
     expect(text).toContain("켜짐");
   });
 
+  it("ondemand 스케줄은 '요청' 라벨과 '자동 실행 없음'으로 표시되고 다음 실행은 '-'다", () => {
+    createSchedule({ type: "ondemand", format: "docx", audience: "official", hour: 9, minute: 0 });
+    const text = scheduleSummaryText();
+    expect(text).toContain("요청 리포트");
+    expect(text).toContain("자동 실행 없음");
+    expect(text).toContain("다음 실행 -");
+  });
+
+  it("daily·monthly 스케줄은 각각 '일일'·'매월' 라벨로 표시된다", () => {
+    createSchedule({ type: "daily", format: "docx", audience: "official", hour: 8, minute: 30 });
+    createSchedule({ type: "monthly", format: "docx", audience: "official", hour: 9, minute: 0 });
+    const text = scheduleSummaryText();
+    expect(text).toContain("일일 리포트");
+    expect(text).toContain("매일 08:30");
+    expect(text).toContain("매월 리포트");
+    expect(text).toContain("매월 1일(영업일)");
+  });
+
   it("report_schedule_list 도구가 레지스트리에 등록돼 있고 실행하면 스케줄 텍스트를 돌려준다", async () => {
     createSchedule({ type: "quarterly", format: "docx", audience: "internal", hour: 9, minute: 0 });
     const tool = findAgentTool("report_schedule_list");
@@ -238,5 +282,34 @@ describe("reportschedule — REST API", () => {
       .set("Authorization", `Bearer ${token}`)
       .send({ type: "quarterly", format: "docx", audience: "official", hour: 9, minute: 0, assetIds: ["no-such-asset"] });
     expect(res.status).toBe(400);
+  });
+
+  it("유효하지 않은 type이면 400 — ondemand/daily/weekly/monthly/quarterly만 허용", async () => {
+    const res = await request(app)
+      .post("/api/report/schedules")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ type: "yearly", format: "docx", audience: "official", hour: 9, minute: 0 });
+    expect(res.status).toBe(400);
+  });
+
+  it.each(["ondemand", "daily", "monthly"])("%s 타입은 dayOfWeek 없이도 등록된다", async (type) => {
+    const res = await request(app)
+      .post("/api/report/schedules")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ type, format: "docx", audience: "official", hour: 9, minute: 0 });
+    expect(res.status).toBe(200);
+    expect(res.body.schedule.type).toBe(type);
+    expect(res.body.schedule.dayOfWeek).toBeNull();
+  });
+
+  it("ondemand 스케줄은 항상 다음 실행이 먼 미래(자동 실행 없음)이고, 지금 실행은 그대로 동작한다", async () => {
+    const created = await request(app)
+      .post("/api/report/schedules")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ type: "ondemand", format: "docx", audience: "official", hour: 9, minute: 0 });
+    expect(created.body.schedule.nextRunAt).toBeGreaterThan(new Date(2100, 0, 1).getTime());
+
+    const ran = await request(app).post(`/api/report/schedules/${created.body.schedule.id}/run`).set("Authorization", `Bearer ${token}`);
+    expect(ran.body.schedule.lastResult).toBe("success");
   });
 });

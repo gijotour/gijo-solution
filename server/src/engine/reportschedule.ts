@@ -46,9 +46,15 @@ migrate(
    CREATE INDEX IF NOT EXISTS idx_report_sched_runs_sched ON report_schedule_runs(scheduleId, at);`
 );
 
-export type ScheduleType = "weekly" | "quarterly";
+// quarterly는 2026-07-21 이전에 등록된 스케줄과의 하위호환을 위해 계속 유효한 값으로 둔다
+// (신규 등록 화면은 ondemand/daily/weekly/monthly 4가지만 노출 — 사용자 요청 2026-07-21).
+export type ScheduleType = "ondemand" | "daily" | "weekly" | "monthly" | "quarterly";
 export type ScheduleFormat = "docx" | "pdf" | "both";
 export type ScheduleAudience = "internal" | "official";
+
+export const SCHEDULE_TYPE_LABEL: Record<ScheduleType, string> = {
+  ondemand: "요청", daily: "일일", weekly: "주간", monthly: "매월", quarterly: "분기",
+};
 
 export interface ReportSchedule {
   id: string;
@@ -100,12 +106,26 @@ function rowToSchedule(r: ScheduleRow): ReportSchedule {
 }
 
 // ── 다음 실행 시각 계산 ────────────────────────────────────────────────────
-// weekly: 지정한 요일·시각의 다음 발생. quarterly: 분기 시작월(1/4/7/10) 1일의 다음 영업일(주말이면 월요일로 밀림), 지정 시각.
+// ondemand: 자동 실행 없음(항상 먼 미래 — "지금 실행"으로만 생성하는 저장된 설정). daily: 매일 지정 시각.
+// weekly: 지정한 요일·시각의 다음 발생. monthly: 매월 1일의 다음 영업일(주말이면 월요일로 밀림), 지정 시각.
+// quarterly: 분기 시작월(1/4/7/10) 1일의 다음 영업일, 지정 시각(하위호환 — 신규 등록 화면엔 없음).
+const NEVER_AUTO_RUN = new Date(9999, 0, 1).getTime();
+export function isAutoScheduled(type: ScheduleType): boolean {
+  return type !== "ondemand";
+}
+
 function businessDayAdjust(d: Date): Date {
   const day = d.getDay();
   if (day === 6) d.setDate(d.getDate() + 2); // 토 → 월
   else if (day === 0) d.setDate(d.getDate() + 1); // 일 → 월
   return d;
+}
+
+function nextDaily(hour: number, minute: number, from: Date): number {
+  const d = new Date(from);
+  d.setHours(hour, minute, 0, 0);
+  if (d.getTime() <= from.getTime()) d.setDate(d.getDate() + 1);
+  return d.getTime();
 }
 
 function nextWeekly(dayOfWeek: number, hour: number, minute: number, from: Date): number {
@@ -118,6 +138,16 @@ function nextWeekly(dayOfWeek: number, hour: number, minute: number, from: Date)
   return d.getTime();
 }
 
+function nextMonthly(hour: number, minute: number, from: Date): number {
+  const y = from.getFullYear();
+  const m = from.getMonth();
+  for (const [yy, mm] of [[y, m], [y, m + 1]]) {
+    const cand = businessDayAdjust(new Date(yy, mm, 1, hour, minute, 0, 0));
+    if (cand.getTime() > from.getTime()) return cand.getTime();
+  }
+  return businessDayAdjust(new Date(y, m + 2, 1, hour, minute, 0, 0)).getTime();
+}
+
 function nextQuarterly(hour: number, minute: number, from: Date): number {
   const y = from.getFullYear();
   const candidates = [0, 3, 6, 9].map((m) => businessDayAdjust(new Date(y, m, 1, hour, minute, 0, 0)));
@@ -127,7 +157,13 @@ function nextQuarterly(hour: number, minute: number, from: Date): number {
 }
 
 export function computeNextRun(type: ScheduleType, dayOfWeek: number | null, hour: number, minute: number, from = new Date()): number {
-  return type === "weekly" ? nextWeekly(dayOfWeek ?? 1, hour, minute, from) : nextQuarterly(hour, minute, from);
+  switch (type) {
+    case "ondemand": return NEVER_AUTO_RUN;
+    case "daily": return nextDaily(hour, minute, from);
+    case "weekly": return nextWeekly(dayOfWeek ?? 1, hour, minute, from);
+    case "monthly": return nextMonthly(hour, minute, from);
+    case "quarterly": return nextQuarterly(hour, minute, from);
+  }
 }
 
 // ── CRUD ────────────────────────────────────────────────────────────────────
@@ -255,11 +291,11 @@ export async function runScheduleNow(
         : { now, base, id }
     );
     db.prepare(`INSERT INTO report_schedule_runs (id, scheduleId, at, source, result, detail) VALUES (?, ?, ?, ?, 'success', ?)`).run(
-      randomUUID(), id, now, source, `${sch.type === "weekly" ? "주간" : "분기"} 리포트 자동 생성 완료`
+      randomUUID(), id, now, source, `${SCHEDULE_TYPE_LABEL[sch.type]} 리포트 자동 생성 완료`
     );
     recordAudit({
       kind: "config", actor: source === "manual" ? "system" : "scheduler",
-      action: `정기 리포트 자동 생성 (${sch.type === "weekly" ? "주간" : "분기"}·${source})`,
+      action: `정기 리포트 자동 생성 (${SCHEDULE_TYPE_LABEL[sch.type]}·${source})`,
       target: sch.assetIds?.length ? `자산 ${sch.assetIds.length}건` : "전체 자산",
       detail: `${result.filePath}`, result: "ok",
     });
@@ -277,7 +313,7 @@ export async function runScheduleNow(
     );
     recordAudit({
       kind: "config", actor: source === "manual" ? "system" : "scheduler",
-      action: `정기 리포트 자동 생성 실패 (${sch.type === "weekly" ? "주간" : "분기"}·${source})`,
+      action: `정기 리포트 자동 생성 실패 (${SCHEDULE_TYPE_LABEL[sch.type]}·${source})`,
       target: sch.assetIds?.length ? `자산 ${sch.assetIds.length}건` : "전체 자산",
       detail: message, result: "error",
     });
@@ -306,14 +342,24 @@ function fmt(ms: number): string {
   // 운영 Node 20은 AM/PM, Node 24는 오전/오후 — ICU/CLDR 버전 차이). 명시해서 버전 무관하게 고정.
   return new Date(ms).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", dayPeriod: "short" });
 }
+function cadenceText(s: ReportSchedule): string {
+  const hm = `${String(s.hour).padStart(2, "0")}:${String(s.minute).padStart(2, "0")}`;
+  switch (s.type) {
+    case "ondemand": return "자동 실행 없음(필요할 때 직접 실행)";
+    case "daily": return `매일 ${hm}`;
+    case "weekly": return `매주 ${dowLabel[s.dayOfWeek ?? 1]} ${hm}`;
+    case "monthly": return `매월 1일(영업일) ${hm}`;
+    case "quarterly": return `분기 첫 영업일 ${hm}`;
+  }
+}
 export function scheduleSummaryText(schedules: ReportSchedule[] = listSchedules()): string {
   if (!schedules.length) return "등록된 정기 리포트 스케줄이 없습니다.";
   const lines = schedules.map((s) => {
-    const cadence = s.type === "weekly" ? `매주 ${dowLabel[s.dayOfWeek ?? 1]} ${String(s.hour).padStart(2, "0")}:${String(s.minute).padStart(2, "0")}` : `분기 첫 영업일 ${String(s.hour).padStart(2, "0")}:${String(s.minute).padStart(2, "0")}`;
     const scope = s.assetIds?.length ? `자산 ${s.assetIds.length}건` : "전체 자산";
     const status = s.enabled ? "켜짐" : "꺼짐(일시중지)";
     const last = s.lastRunAt ? `최근 ${fmt(s.lastRunAt)} ${s.lastResult === "success" ? "성공" : `실패(${s.lastError ?? ""})`}` : "실행 이력 없음";
-    return `- ${s.type === "weekly" ? "주간" : "분기"} 리포트 · ${scope} · ${cadence} · ${status} · 다음 실행 ${s.enabled ? fmt(s.nextRunAt) : "-"} · ${last}`;
+    const nextRun = s.enabled && isAutoScheduled(s.type) ? fmt(s.nextRunAt) : "-";
+    return `- ${SCHEDULE_TYPE_LABEL[s.type]} 리포트 · ${scope} · ${cadenceText(s)} · ${status} · 다음 실행 ${nextRun} · ${last}`;
   });
   return `정기 리포트 스케줄 ${schedules.length}건:\n${lines.join("\n")}`;
 }
@@ -339,9 +385,10 @@ export function resetReportSchedulesForTests(): void {
 }
 
 // ── 라우트 ────────────────────────────────────────────────────────────────────
+const VALID_TYPES: ScheduleType[] = ["ondemand", "daily", "weekly", "monthly", "quarterly"];
 function validateInput(b: Record<string, unknown>): { input?: CreateScheduleInput; error?: string } {
   const type = String(b.type ?? "");
-  if (type !== "weekly" && type !== "quarterly") return { error: "type은 weekly 또는 quarterly" };
+  if (!(VALID_TYPES as string[]).includes(type)) return { error: `type은 ${VALID_TYPES.join("·")} 중 하나` };
   const format = String(b.format ?? "both");
   if (!["docx", "pdf", "both"].includes(format)) return { error: "format은 docx·pdf·both 중 하나" };
   const audience = String(b.audience ?? "official");
@@ -361,12 +408,12 @@ function validateInput(b: Record<string, unknown>): { input?: CreateScheduleInpu
     const missing = assetIds.find((id) => !getAsset(id));
     if (missing) return { error: `존재하지 않는 자산 id: ${missing}` };
   }
-  return { input: { type, format: format as ScheduleFormat, audience: audience as ScheduleAudience, dayOfWeek, hour, minute, assetIds } };
+  return { input: { type: type as ScheduleType, format: format as ScheduleFormat, audience: audience as ScheduleAudience, dayOfWeek, hour, minute, assetIds } };
 }
 
 export function registerReportScheduleRoutes(app: Express): void {
   const actorOf = (req: Request) => (req as Request & { user?: GijoUser }).user?.username ?? "unknown";
-  const label = (s: ReportSchedule) => `${s.type === "weekly" ? "주간" : "분기"} 리포트${s.assetIds?.length ? ` (자산 ${s.assetIds.length}건)` : ""}`;
+  const label = (s: ReportSchedule) => `${SCHEDULE_TYPE_LABEL[s.type]} 리포트${s.assetIds?.length ? ` (자산 ${s.assetIds.length}건)` : ""}`;
 
   app.get("/api/report/schedules", authMiddleware, (_req, res) => {
     res.json({ schedules: listSchedules() });
