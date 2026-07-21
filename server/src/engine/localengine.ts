@@ -11,6 +11,7 @@ import type { Express } from "express";
 import { spawn, execFile, ChildProcess } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
+import * as os from "os";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { llamaBinPath } from "../util/llamabin";
@@ -165,6 +166,21 @@ export function getGpuUsage(): Promise<GpuUsage> {
       }
     );
   });
+}
+
+// hang 진단 스냅샷 — 재기동 직전 GPU·CPU·모델 프로세스 상태를 한 줄로 남긴다.
+// 반복되는 hang이 앱 로직(GPU 경합) 때문인지 호스트 차원의 순간 정지(WSL/드라이버) 때문인지
+// 실측(2026-07-21: embed→chat 순서였다가 chat→embed 순서로 뒤바뀜)만으로는 못 가른다 —
+// 다음 재현 때 이 스냅샷으로 바로 판별하기 위함(opslog-watch.mjs가 이 로그 라인도 findings로 잡는다).
+export async function captureHangDiagnostics(): Promise<string> {
+  const gpu = await getGpuUsage();
+  const load = os.loadavg().map((n) => n.toFixed(2)).join(",");
+  const memFreePct = Math.round((os.freemem() / os.totalmem()) * 100);
+  const models = [...pool.values()].map((m) => `${m.modelId}:${m.process.pid}${m.process.killed ? "(dead)" : ""}`).join(", ");
+  return (
+    `GPU ${gpu.available ? `${gpu.utilization}%·${gpu.memUsedMb}/${gpu.memTotalMb}MiB` : "조회불가"} · ` +
+    `CPU load ${load} · 여유메모리 ${memFreePct}% · 로드된 모델: ${models || "없음"}`
+  );
 }
 
 function allocPort(): number {
@@ -434,7 +450,8 @@ async function checkAndHealEmbedding(): Promise<void> {
   embeddingRestarting = true;
   healSettleUntil = Date.now() + HEAL_SETTLE_MS; // 채팅 감시도 잠시 진정(연쇄 재기동 방지)
   try {
-    console.warn(`[localengine] 임베딩 서버 hang — 자동 재기동`);
+    const diag = await captureHangDiagnostics().catch(() => "진단 실패");
+    console.warn(`[localengine] 임베딩 서버 hang — 자동 재기동 | 진단: ${diag}`);
     await stopEmbeddingEngine().catch(() => {});
     await killProcessOnPort(EMBEDDING_PORT).catch(() => {}); // 고아 프로세스가 포트를 잡고 있을 수 있음
     spawnEmbeddingServer(embPath);
@@ -509,7 +526,8 @@ async function checkAndHealChat(): Promise<void> {
     chatHealing = true;
     healSettleUntil = Date.now() + HEAL_SETTLE_MS; // 임베딩·다른 채팅 감시도 잠시 진정(연쇄 재기동 방지)
     try {
-      console.warn(`[localengine] 채팅 모델 hang — 자동 재기동: ${m.modelId}`);
+      const diag = await captureHangDiagnostics().catch(() => "진단 실패");
+      console.warn(`[localengine] 채팅 모델 hang — 자동 재기동: ${m.modelId} | 진단: ${diag}`);
       await unloadModel(m.modelId).catch(() => {});
       await killProcessOnPort(m.port).catch(() => {}); // 고아 프로세스가 포트를 잡고 있을 수 있음
       const reloaded = await ensureModelLoaded(m.modelId).catch(() => null);
