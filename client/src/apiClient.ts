@@ -1057,6 +1057,34 @@ export const healthApi = {
   check: () => request<{ ok: boolean; service: string }>("/api/health"),
 };
 
+// ── 클라이언트(Electron) 설치파일 배포 — 이 서버 자체가 배포처(외부 서비스 없음) ──────────
+export interface ClientReleaseInfo {
+  version: string;
+  notes: string | null;
+  size: number;
+  publishedAt: number;
+  sha256: string;
+}
+export interface ClientUpdateCheckResult {
+  latest: ClientReleaseInfo | null;
+  updateAvailable: boolean;
+}
+export interface ClientReleaseFull {
+  version: string;
+  notes: string | null;
+  filename: string;
+  sha256: string;
+  size: number;
+  publishedAt: number;
+}
+export const clientReleaseApi = {
+  // 실제 다운로드·설치·재시작은 main.ts(메인 프로세스)가 authState로 직접 처리한다(대용량 스트리밍 +
+  // 설치 파일 실행 + 앱 종료가 필요해 렌더러의 request() 헬퍼로는 못 한다).
+  checkLatest: (currentVersion: string) => request<ClientUpdateCheckResult>(`/api/client/latest-release?current=${encodeURIComponent(currentVersion)}`),
+  // 관리자 전용 — 게시 이력 전체(update.html의 관리자 패널).
+  listAll: () => request<{ releases: ClientReleaseFull[] }>("/api/client/releases"),
+};
+
 // ── 계정 관리 (admin 전용 목록/생성/삭제, 본인 비밀번호 변경은 누구나) ──────
 export interface GijoUserPublic {
   id: string;

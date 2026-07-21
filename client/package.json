@@ -11,7 +11,8 @@
     "watch": "tsc -p tsconfig.json --watch",
     "dist": "npm run build && npm run build-server-dist && electron-builder",
     "rebuild-server-native": "node scripts/rebuild-server-native.mjs",
-    "build-server-dist": "node scripts/build-server-dist.mjs"
+    "build-server-dist": "node scripts/build-server-dist.mjs",
+    "publish-release": "node scripts/publish-release.mjs"
   },
   "author": "GIJO Technology",
   "license": "UNLICENSED",

@@ -271,6 +271,15 @@ const gijoApi = {
     kill: () => ipcRenderer.invoke("terminal:kill"),
     onData: (cb: (data: string) => void) => ipcRenderer.on("terminal:data", (_e, data: string) => cb(data)),
   },
+  // 클라이언트 자동 업데이트 — 이 GIJO AS 서버 자체가 배포처(외부 서비스 없음). 다운로드·설치
+  // 실행·앱 종료는 메인 프로세스가 처리(대용량 스트리밍 + 실행 파일 실행이 렌더러에선 불가).
+  update: {
+    checkForUpdate: () => ipcRenderer.invoke("update:check") as Promise<api.ClientUpdateCheckResult>,
+    currentVersion: () => ipcRenderer.invoke("update:currentVersion") as Promise<string>,
+    install: (version: string) => ipcRenderer.invoke("update:install", version) as Promise<{ ok: boolean }>,
+    onProgress: (cb: (pct: number) => void) => ipcRenderer.on("update:progress", (_e, pct: number) => cb(pct)),
+    listReleases: () => api.clientReleaseApi.listAll(),
+  },
   // 챗봇 명령 정책 판정(허용목록/위험) — 렌더러가 승인 UI 결정에 쓴다.
   classifyCommand: (cmd: string) => classifyChatbotCommand(cmd),
   // 챗봇에게 명령 제안 받기(서버 LLM) — 제안만, 실행은 위 terminal.exec + 사람 승인.

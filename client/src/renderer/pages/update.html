@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 업데이트</title>
+<style>
+:root{
+  --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
+.app{display:grid;grid-template-columns:220px 1fr;}
+.sidebar{padding:22px 14px;border-right:1px solid var(--border);min-height:900px;}
+.main{padding:28px 32px 48px;}
+.topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;}
+.page-title{font-size:21px;font-weight:800;color:#fff;}
+.page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;}
+.btn-primary{background:var(--blue);color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;}
+.btn-primary:disabled{opacity:0.5;cursor:not-allowed;}
+.btn-ghost{background:transparent;border:1px solid var(--border-strong);color:var(--text);padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;max-width:640px;}
+.panel-title{font-size:14.5px;font-weight:800;color:#fff;margin-bottom:4px;}
+.panel-sub{font-size:11.5px;color:var(--muted);margin-bottom:16px;}
+.kv{display:grid;grid-template-columns:120px 1fr;gap:10px 12px;font-size:13px;margin-bottom:16px;}
+.kv dt{color:var(--muted);}
+.kv dd{color:var(--text);font-weight:600;}
+.badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;}
+.b-teal{background:rgba(30,185,128,0.15);color:var(--teal);}
+.b-amber{background:rgba(240,160,32,0.15);color:var(--amber);}
+.b-muted{background:rgba(139,147,171,0.15);color:var(--muted);}
+.notes{font-size:12.5px;color:var(--text);line-height:1.7;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:14px;white-space:pre-wrap;}
+.progress-track{height:8px;border-radius:20px;background:rgba(255,255,255,0.08);overflow:hidden;margin:12px 0 4px;display:none;}
+.progress-fill{height:100%;border-radius:20px;background:var(--blue);width:0%;transition:width .2s;}
+.progress-label{font-size:11.5px;color:var(--muted);display:none;}
+.status-line{font-size:12.5px;margin-top:10px;}
+.status-ok{color:var(--teal);}
+.status-err{color:#f5928a;}
+table{width:100%;border-collapse:collapse;font-size:12.5px;}
+th{text-align:left;font-size:10.5px;font-weight:700;padding:8px 6px;color:var(--muted-2);text-transform:uppercase;border-bottom:1px solid var(--border);}
+td{padding:9px 6px;border-bottom:1px solid var(--border);}
+.footer{margin-top:8px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted-2);}
+.footer img{height:16px;opacity:0.6;}
+.header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2);}
+.header-left{display:flex;align-items:center;gap:12px;}
+.header-left img{height:22px;}
+.app-title{font-size:15px;font-weight:800;color:#fff;}
+.clock{font-size:12px;color:var(--blue-light);font-weight:600;}
+.header-right{display:flex;align-items:center;gap:10px;}
+.status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
+.status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
+.beta-tag{background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
+.avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+.icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <span id="homeLink" data-page="dashboard.html" title="대시보드로 이동" style="display:flex;align-items:center;gap:12px;cursor:pointer"><img src="https://gijo.ai/_nuxt/logo_gijo_white.CCh2YXJe.svg" alt="GIJO">
+    <div class="app-title">GIJO AS</div></span>
+    <div class="clock" id="clockEl">-</div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill" id="statusPill"><span class="dot"></span>연결 확인 중<span class="beta-tag">LIVE</span></div>
+    <div class="avatar-btn" id="avatarBtn">-</div>
+    <div class="icon-btn" id="settingsBtn">⚙</div>
+  </div>
+</div>
+
+<div class="app">
+  <div class="sidebar" id="gijoNav"></div>
+
+  <div class="main">
+    <div class="topbar-row">
+      <div>
+        <div class="page-title">업데이트</div>
+        <div class="page-sub">이 GIJO AS 서버가 배포처입니다 — 관리자가 게시한 새 버전을 여기서 바로 설치할 수 있습니다.</div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">현재 버전</div>
+      <dl class="kv">
+        <dt>설치된 버전</dt><dd id="currentVersion">-</dd>
+        <dt>상태</dt><dd id="statusBadge"><span class="badge b-muted">확인 중…</span></dd>
+      </dl>
+      <button class="btn-ghost" id="checkBtn">지금 확인</button>
+    </div>
+
+    <div class="panel" id="updatePanel" style="display:none">
+      <div class="panel-title">새 버전 사용 가능</div>
+      <dl class="kv">
+        <dt>버전</dt><dd id="latestVersion">-</dd>
+        <dt>게시일</dt><dd id="latestPublished">-</dd>
+        <dt>크기</dt><dd id="latestSize">-</dd>
+      </dl>
+      <div class="notes" id="latestNotes"></div>
+      <button class="btn-primary" id="installBtn">지금 업데이트</button>
+      <div class="progress-track" id="progressTrack"><div class="progress-fill" id="progressFill"></div></div>
+      <div class="progress-label" id="progressLabel">다운로드 중… 0%</div>
+      <div class="status-line" id="installStatus"></div>
+    </div>
+
+    <div class="panel" id="adminPanel" style="display:none;max-width:820px">
+      <div class="panel-title">게시된 배포판(관리자)</div>
+      <div class="panel-sub">서버에 게시된 전체 버전 이력입니다. 새 버전 게시는 <code>npm run publish-release</code>로 합니다.</div>
+      <table>
+        <tr><th>버전</th><th>메모</th><th>크기</th><th>게시일시</th></tr>
+        <tbody id="releaseRows"><tr><td colspan="4" style="color:var(--muted)">불러오는 중…</td></tr></tbody>
+      </table>
+    </div>
+
+    <div class="footer">
+      <img src="https://gijo.ai/_nuxt/logo_gijo_only_white.ATZVOJtw.svg" alt="GIJO">
+      <span>© 2026 GIJO Technology · GIJO AS Platform · Confidential</span>
+    </div>
+  </div>
+</div>
+
+<script>
+  const clockEl = document.getElementById("clockEl");
+  const statusPill = document.getElementById("statusPill");
+  const avatarBtn = document.getElementById("avatarBtn");
+
+  function tick() {
+    clockEl.textContent = new Date().toLocaleString("ko-KR", {
+      hour: "2-digit", minute: "2-digit", hour12: true, year: "numeric", month: "2-digit", day: "2-digit",
+    });
+  }
+  async function loadHealth() {
+    try {
+      await window.gijo.checkServerHealth();
+      statusPill.innerHTML = '<span class="dot"></span>운영중<span class="beta-tag">LIVE</span>';
+    } catch (e) {
+      statusPill.innerHTML = '<span class="dot" style="background:#e2483d"></span>서버 연결 끊김';
+    }
+  }
+  let isAdmin = false;
+  async function loadUser() {
+    try {
+      const user = await window.gijo.me();
+      avatarBtn.textContent = (user.displayName || user.username || "-").charAt(0);
+      isAdmin = user.role === "admin";
+    } catch (e) {}
+  }
+
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<]/g, (c) => (c === "&" ? "&amp;" : "&lt;")); }
+  function fmtBytes(n) {
+    if (!n) return "-";
+    const mb = n / 1024 / 1024;
+    return `${mb.toFixed(1)} MB`;
+  }
+
+  let latest = null;
+
+  async function checkUpdate() {
+    const badge = document.getElementById("statusBadge");
+    badge.innerHTML = '<span class="badge b-muted">확인 중…</span>';
+    document.getElementById("currentVersion").textContent = await window.gijo.update.currentVersion();
+    try {
+      const r = await window.gijo.update.checkForUpdate();
+      latest = r.latest;
+      if (r.updateAvailable && r.latest) {
+        badge.innerHTML = '<span class="badge b-amber">업데이트 가능</span>';
+        document.getElementById("updatePanel").style.display = "";
+        document.getElementById("latestVersion").textContent = r.latest.version;
+        document.getElementById("latestPublished").textContent = new Date(r.latest.publishedAt).toLocaleString("ko-KR");
+        document.getElementById("latestSize").textContent = fmtBytes(r.latest.size);
+        document.getElementById("latestNotes").textContent = r.latest.notes || "(릴리스 노트 없음)";
+      } else {
+        badge.innerHTML = '<span class="badge b-teal">최신 버전입니다</span>';
+        document.getElementById("updatePanel").style.display = "none";
+      }
+    } catch (e) {
+      badge.innerHTML = '<span class="badge b-muted">확인 실패</span>';
+    }
+  }
+
+  async function installUpdate() {
+    if (!latest) return;
+    if (!confirm(`${latest.version} 버전으로 지금 업데이트할까요? 다운로드가 끝나면 앱이 자동으로 종료되고 설치가 진행됩니다.`)) return;
+    const btn = document.getElementById("installBtn");
+    const track = document.getElementById("progressTrack");
+    const fill = document.getElementById("progressFill");
+    const label = document.getElementById("progressLabel");
+    const statusLine = document.getElementById("installStatus");
+    btn.disabled = true;
+    track.style.display = "block";
+    label.style.display = "block";
+    statusLine.textContent = "";
+    window.gijo.update.onProgress((pct) => {
+      fill.style.width = pct + "%";
+      label.textContent = `다운로드 중… ${pct}%`;
+    });
+    try {
+      await window.gijo.update.install(latest.version);
+      label.textContent = "설치 프로그램 실행 중… 곧 앱이 종료됩니다.";
+    } catch (e) {
+      statusLine.className = "status-line status-err";
+      statusLine.textContent = "업데이트 실패: " + ((e && e.message) || e);
+      btn.disabled = false;
+    }
+  }
+
+  async function loadReleases() {
+    if (!isAdmin) return;
+    document.getElementById("adminPanel").style.display = "";
+    const rows = document.getElementById("releaseRows");
+    try {
+      const r = await window.gijo.update.listReleases();
+      const releases = r.releases || [];
+      rows.innerHTML = releases.length
+        ? releases
+            .map(
+              (rel) =>
+                `<tr><td>${esc(rel.version)}</td><td>${esc(rel.notes || "-")}</td><td>${fmtBytes(rel.size)}</td><td>${new Date(rel.publishedAt).toLocaleString("ko-KR")}</td></tr>`
+            )
+            .join("")
+        : '<tr><td colspan="4" style="color:var(--muted)">게시된 배포판이 없습니다</td></tr>';
+    } catch (e) {
+      rows.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">불러오지 못했습니다</td></tr>';
+    }
+  }
+
+  async function init() {
+    tick();
+    setInterval(tick, 30000);
+    await loadUser();
+    await loadHealth();
+    await checkUpdate();
+    await loadReleases();
+
+    document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
+    document.querySelectorAll("[data-page]").forEach((el) => {
+      el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
+    });
+    document.getElementById("checkBtn").addEventListener("click", checkUpdate);
+    document.getElementById("installBtn").addEventListener("click", installUpdate);
+  }
+
+  if (!window.gijo.isAuthenticated()) {
+    window.gijo.navigateTo("login.html");
+  } else {
+    init();
+  }
+</script>
+
+<script src="nav.js"></script>
+</body>
+</html>

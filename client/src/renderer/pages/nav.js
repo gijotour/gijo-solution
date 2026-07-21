@@ -48,6 +48,7 @@
     { id: "settings", ic: "⚙", label: "설정", bottom: true, items: [
       { page: "settings.html", label: "설정" },
       { page: "billing.html", label: "사용량·요금" },
+      { page: "update.html", label: "업데이트" },
     ]},
   ];
 
@@ -85,11 +86,15 @@
       ".gn-item.active{color:var(--blue-light);box-shadow:inset 3px 0 0 var(--blue);background:rgba(59,130,246,.08);cursor:default;}" +
       // 레일(54px)에선 가로 워드마크가 잘리므로, 앞의 마크만 보이게 크롭한다(overflow hidden + 좌측 정렬).
       ".gn-logo{height:30px;width:30px;overflow:hidden;display:flex;align-items:center;justify-content:flex-start;margin:0 auto 8px;cursor:pointer;}" +
-      ".gn-logo img{height:24px;width:auto;max-width:none;flex:0 0 auto;object-position:left center;}";
+      ".gn-logo img{height:24px;width:auto;max-width:none;flex:0 0 auto;object-position:left center;}" +
+      // 업데이트 가능 배지 — 레일 아이콘 모서리 점 + 서브패널 항목의 작은 뱃지.
+      ".gn-ic .gn-updot{position:absolute;top:4px;right:4px;width:8px;height:8px;border-radius:50%;background:var(--red);border:1.5px solid #0a1120;}" +
+      ".gn-item .gn-upbadge{margin-left:auto;background:var(--red);color:#fff;font-size:9px;font-weight:800;padding:1px 6px;border-radius:20px;}";
     document.head.appendChild(st);
   }
 
   var shownGroupId = null; // 현재 서브패널에 펼친 대분류(초기값=현재 페이지의 대분류)
+  var updateAvailable = false; // 클라이언트 새 버전 존재 여부(checkUpdateBadge가 채움)
 
   function render() {
     var root = document.getElementById("gijoNav");
@@ -115,8 +120,13 @@
       var ic = document.createElement("div");
       ic.className = "gn-ic" + (g.id === shown.id ? " active" : "") + (g.id === activeGroup.id && g.id !== shown.id ? " hasactive" : "");
       ic.style.position = "relative";
-      ic.title = g.label;
+      ic.title = g.label + (g.id === "settings" && updateAvailable ? " — 업데이트 가능" : "");
       ic.textContent = g.ic;
+      if (g.id === "settings" && updateAvailable) {
+        var dot = document.createElement("span");
+        dot.className = "gn-updot";
+        ic.appendChild(dot);
+      }
       ic.addEventListener("click", function () { shownGroupId = g.id; render(); });
       rail.appendChild(ic);
     });
@@ -131,7 +141,14 @@
     shown.items.forEach(function (it) {
       var el = document.createElement("div");
       el.className = "gn-item" + (it.page === here ? " active" : "");
+      el.style.display = "flex";
       el.textContent = it.label;
+      if (it.page === "update.html" && updateAvailable) {
+        var upBadge = document.createElement("span");
+        upBadge.className = "gn-upbadge";
+        upBadge.textContent = "1";
+        el.appendChild(upBadge);
+      }
       if (it.office) {
         // 페이지 이동이 아니라 별도 창(우리 AI 팀 사무실)을 연다.
         el.addEventListener("click", function () { if (window.gijo && window.gijo.openTeamOffice) window.gijo.openTeamOffice(); });
@@ -175,11 +192,35 @@
     document.body.appendChild(s);
   }
 
+  // 클라이언트 자동 업데이트 확인 — 앱 시작 시 1회(+페이지 이동마다 10분 캐시로 재확인).
+  // 로그인 전(login.html은 gijoNav가 없어 render() 자체를 안 함)에는 자연히 건너뛴다.
+  function checkUpdateBadge() {
+    if (!window.gijo || !window.gijo.update || !window.gijo.isAuthenticated || !window.gijo.isAuthenticated()) return;
+    var THROTTLE_MS = 10 * 60 * 1000;
+    var last = Number(sessionStorage.getItem("gijoUpdateCheckAt") || 0);
+    var cached = sessionStorage.getItem("gijoUpdateAvailable");
+    if (cached !== null && Date.now() - last < THROTTLE_MS) {
+      updateAvailable = cached === "1";
+      render();
+      return;
+    }
+    window.gijo.update
+      .checkForUpdate()
+      .then(function (r) {
+        updateAvailable = Boolean(r && r.updateAvailable);
+        sessionStorage.setItem("gijoUpdateCheckAt", String(Date.now()));
+        sessionStorage.setItem("gijoUpdateAvailable", updateAvailable ? "1" : "0");
+        render();
+      })
+      .catch(function () {});
+  }
+
   function boot() {
     loadDesignSystem();
     render();
     loadOnboarding();
     loadCommandPanel();
+    checkUpdateBadge();
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
   else boot();

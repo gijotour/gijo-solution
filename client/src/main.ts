@@ -7,6 +7,9 @@ import * as path from "path";
 import { spawn, ChildProcess } from "child_process";
 import * as os from "os";
 import * as fs from "fs";
+import * as http from "http";
+import * as https from "https";
+import { URL } from "url";
 import { isDangerous } from "./terminalPolicy";
 
 let mainWindow: BrowserWindow | null = null;
@@ -243,6 +246,71 @@ ipcMain.handle("terminal:exec", async (_e, cmd: string) => {
 });
 ipcMain.handle("terminal:kill", async () => {
   if (termShell) { termShell.kill(); termShell = null; }
+  return { ok: true };
+});
+
+// ── 클라이언트 자동 업데이트 — GIJO AS 서버 자체가 배포처(외부 서비스 없음) ─────────────────
+// 렌더러의 apiClient.request()로는 대용량 스트리밍 다운로드·설치파일 실행·앱 종료를 못 하므로,
+// 메인 프로세스가 authState(로그인 시 렌더러가 IPC로 동기해 둔 토큰)로 직접 처리한다.
+interface UpdateCheckResult {
+  latest: { version: string; notes: string | null; size: number; publishedAt: number; sha256: string } | null;
+  updateAvailable: boolean;
+}
+ipcMain.handle("update:check", async (): Promise<UpdateCheckResult> => {
+  if (!authState.serverUrl || !authState.accessToken) return { latest: null, updateAvailable: false };
+  try {
+    const res = await fetch(`${authState.serverUrl}/api/client/latest-release?current=${encodeURIComponent(app.getVersion())}`, {
+      headers: { Authorization: `Bearer ${authState.accessToken}` },
+    });
+    if (!res.ok) return { latest: null, updateAvailable: false };
+    return (await res.json()) as UpdateCheckResult;
+  } catch {
+    return { latest: null, updateAvailable: false };
+  }
+});
+ipcMain.handle("update:currentVersion", () => app.getVersion());
+
+// url을 destPath로 스트리밍 다운로드(전체를 메모리에 안 올림) — 진행률은 progress 콜백으로.
+function downloadToFile(urlStr: string, headers: Record<string, string>, destPath: string, onProgress: (pct: number) => void): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const u = new URL(urlStr);
+    const mod = u.protocol === "https:" ? https : http;
+    const req = mod.get(u, { headers }, (res) => {
+      if (res.statusCode !== 200) {
+        res.resume();
+        reject(new Error(`다운로드 실패: HTTP ${res.statusCode}`));
+        return;
+      }
+      const total = Number(res.headers["content-length"] || 0);
+      let received = 0;
+      const file = fs.createWriteStream(destPath);
+      res.on("data", (chunk: Buffer) => {
+        received += chunk.length;
+        if (total) onProgress(Math.round((received / total) * 100));
+      });
+      res.pipe(file);
+      file.on("finish", () => file.close(() => resolve()));
+      file.on("error", reject);
+      res.on("error", reject);
+    });
+    req.on("error", reject);
+  });
+}
+
+// 다운로드 → NSIS 설치파일 실행(현재 빌드는 oneClick·조용히 진행되며 설치 후 앱을 자동 재기동) → 종료.
+// 설치 프로그램이 실행 중인 exe를 덮어써야 하므로, spawn 직후 반드시 이 앱을 끝내야 한다.
+ipcMain.handle("update:install", async (event, version: string) => {
+  if (!authState.serverUrl || !authState.accessToken) throw new Error("로그인이 필요합니다");
+  const dest = path.join(os.tmpdir(), `GIJO-AS-Setup-${version}.exe`);
+  await downloadToFile(
+    `${authState.serverUrl}/api/client/download/${encodeURIComponent(version)}`,
+    { Authorization: `Bearer ${authState.accessToken}` },
+    dest,
+    (pct) => event.sender.send("update:progress", pct)
+  );
+  const child = spawn(dest, [], { detached: true, stdio: "ignore" });
+  child.unref();
+  setTimeout(() => app.quit(), 300); // 설치 프로그램이 뜰 시간을 살짝 준다
   return { ok: true };
 });
 
