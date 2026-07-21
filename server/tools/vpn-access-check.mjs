@@ -1,4 +1,4 @@
-// tools/vpn-access-check.mjs — WireGuard VPN 대역(기본 10.8.0.2~10.8.0.10)에서 온 로그인·활성
+// tools/vpn-access-check.mjs — WireGuard VPN 대역(기본 10.8.0.0/24 전체)에서 온 로그인·활성
 // 세션만 걸러 찍는다. 셸 중첩 따옴표 문제를 피하려 로그인·조회·필터를 한 Node 프로세스로 묶었다
 // (bash→wsl→bash→node 4중 이스케이프는 실측으로 깨지기 쉬움을 확인함, 2026-07-22).
 // 상태(마지막으로 본 감사로그 시각)는 파일에 저장해 반복 호출 간 중복 알림을 막는다.
@@ -11,8 +11,9 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BASE = process.env.GIJO_BASE ?? "http://localhost:4000";
 const STATE_PATH = process.env.GIJO_VPN_CHECK_STATE ?? path.join(__dirname, "..", "data", "vpn-access-check-state.json");
-const RANGE_LOW = Number(process.env.GIJO_VPN_RANGE_LOW ?? 2);
-const RANGE_HIGH = Number(process.env.GIJO_VPN_RANGE_HIGH ?? 10);
+// 사용자 요청(2026-07-22): 10.8.0.2~10 좁은 범위 → 10.8.0.x 전체(서브넷 전 대역)로 확대.
+const RANGE_LOW = Number(process.env.GIJO_VPN_RANGE_LOW ?? 0);
+const RANGE_HIGH = Number(process.env.GIJO_VPN_RANGE_HIGH ?? 255);
 
 function inRange(ip) {
   const m = String(ip || "").match(/^(?:::ffff:)?10\.8\.0\.(\d+)$/);
