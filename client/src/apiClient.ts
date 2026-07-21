@@ -727,6 +727,21 @@ export const bridgeApi = {
   adapters: () => request("/api/bridge/adapters"),
 };
 
+// 오늘의 할일(가이드형) — 서버가 취약점·정기점검·유지보수를 합쳐 계산해 내려준다.
+export interface TodayItem {
+  id: string; axis: "vuln" | "device"; urgency: "now" | "today";
+  title: string; subtitle: string; why: string; action: string; badges: string[];
+  ref?: string; kev?: boolean; epssPct?: number;
+}
+export interface TodayBrief {
+  items: TodayItem[]; counts: { now: number; today: number; later: number };
+  brief: string; briefBy: "llm" | "rule"; generatedAt: number;
+}
+export const todayApi = {
+  // brief=false면 LLM을 부르지 않고 즉답한다(첫 렌더용).
+  get: (withBrief = true) => request<TodayBrief>(`/api/today?brief=${withBrief ? 1 : 0}`),
+};
+
 export const llmApi = {
   chat: (agentId: string, message: string) =>
     request("/api/llm/chat", { method: "POST", body: { agentId, message } }),

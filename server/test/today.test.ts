@@ -161,7 +161,7 @@ describe("오늘의 할일 — 가이드형 집계", () => {
     }
     recordFindings("srv-1", many);
     const t = await buildToday(false); // 장비 축 비어 있음
-    expect(t.items.filter((i) => i.axis === "vuln").length).toBe(6); // 4 + 남은 2칸
+    expect(t.items.filter((i) => i.axis === "vuln").length).toBe(5); // 3 + 남은 2칸
   });
 
   it("취약점이 장비 주기보다 앞에 온다 — 반복 점검이 급한 KEV를 밀어내지 않게", async () => {

@@ -358,7 +358,10 @@ export async function buildToday(withBrief = true): Promise<TodayBrief> {
   // 장비 점검이 화면에서 통째로 사라졌다(counts에는 있는데 목록엔 없음). 두 축은 성격이 달라서
   // — 취약점은 놓치면 뚫리고, 주기 점검은 놓치면 감사에서 걸린다 — 한쪽이 다른 쪽을 굶기면 안 된다.
   // 급한 쪽에 더 주되(4:2), 상대가 비면 남은 자리를 넘겨 낭비하지 않는다.
-  const VULN_SLOTS = 4;
+  // 슬롯 수는 280px 패널의 실측으로 정했다 — 6건이면 가이드 높이가 700px가 되어
+  // 495px 패널에서 브리핑과 상위 항목이 한눈에 안 들어온다. 5건이면 대체로 들어간다.
+  // 나머지는 "그 외 N건"으로 접어 취약점 화면으로 보낸다.
+  const VULN_SLOTS = 3;
   const DEVICE_SLOTS = 2;
   const vulns = all.filter((i) => i.axis === "vuln");
   const devices = all.filter((i) => i.axis === "device");
