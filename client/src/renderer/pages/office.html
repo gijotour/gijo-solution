@@ -60,22 +60,37 @@
   /* ── 가이드형 브리핑 + 선택지(시안 C) ── 280px 폭 전제: 버튼을 가로로 늘어놓지 않는다. */
   .guide { margin: 8px 0 10px; }
   .g-brief { background: linear-gradient(180deg, rgba(59,130,246,.1), transparent);
-             border: 1px solid var(--border-strong); border-radius: 9px; padding: 9px 10px;
-             font-size: 11.5px; line-height: 1.65; margin-bottom: 8px; }
-  .g-brief .g-by { display: block; font-size: 9.5px; font-weight: 800; color: var(--blue-light); margin-bottom: 4px; }
-  .g-item { display: flex; gap: 7px; align-items: flex-start; background: var(--panel-2);
-            border: 1px solid var(--border); border-radius: 8px; padding: 7px 8px; margin-bottom: 5px; cursor: pointer; }
-  .g-item:hover { border-color: var(--blue); background: rgba(59,130,246,.06); }
+             border: 1px solid var(--border-strong); border-radius: 9px; padding: 8px 10px;
+             font-size: 11px; line-height: 1.6; margin-bottom: 7px; cursor: pointer; }
+  .g-brief .g-by { display: block; font-size: 9.5px; font-weight: 800; color: var(--blue-light); margin-bottom: 3px; }
+  /* 기본은 2줄까지만 — 누르면 전문이 펼쳐진다. 브리핑이 패널 절반을 먹으면 안 된다. */
+  .g-brief .g-txt { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+  .g-brief.open .g-txt { display: block; }
+  /* 접이식: 기본은 한 줄(제목+배지)만. 펼쳐야 근거·대상·조치가 나온다.
+     280px 패널에 5건을 다 펼쳐 놓으면 533px가 되어 브리핑이 밀려난다(실측). */
+  .g-item { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+            margin-bottom: 4px; overflow: hidden; }
   .g-item.now { border-left: 3px solid var(--red); }
   .g-item.today { border-left: 3px solid var(--amber); }
-  .g-num { width: 17px; height: 17px; border-radius: 5px; background: var(--blue); color: #fff;
-           font-size: 9.5px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; margin-top: 1px; }
-  .g-body { min-width: 0; flex: 1; }
-  .g-t { font-size: 11.5px; font-weight: 700; line-height: 1.35; word-break: break-word; }
-  .g-s { font-size: 9.5px; color: var(--muted); margin-top: 1px; word-break: break-all; }
+  .g-head { display: flex; gap: 6px; align-items: center; padding: 6px 8px; cursor: pointer; }
+  .g-head:hover { background: rgba(59,130,246,.07); }
+  .g-num { width: 16px; height: 16px; border-radius: 5px; background: var(--blue); color: #fff;
+           font-size: 9px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+  .g-t { font-size: 11px; font-weight: 700; line-height: 1.3; flex: 1; min-width: 0;
+         overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .g-caret { font-size: 9px; color: var(--muted-2); flex: 0 0 auto; transition: transform .15s; }
+  .g-item.open .g-caret { transform: rotate(90deg); }
+  .g-item.open .g-t { white-space: normal; }
+  .g-detail { display: none; padding: 0 8px 8px 30px; }
+  .g-item.open .g-detail { display: block; }
+  .g-s { font-size: 9.5px; color: var(--muted); word-break: break-all; }
   .g-w { font-size: 10px; color: var(--blue-light); margin-top: 3px; line-height: 1.45; }
-  .g-badges { margin-top: 3px; display: flex; gap: 3px; flex-wrap: wrap; }
-  .g-bd { font-size: 8.5px; font-weight: 800; padding: 1px 5px; border-radius: 20px;
+  .g-a { font-size: 10px; color: var(--text); margin-top: 5px; line-height: 1.45; }
+  .g-go { margin-top: 7px; width: 100%; background: var(--blue); color: #fff; border: none;
+          border-radius: 6px; padding: 6px 10px; font-size: 10.5px; font-weight: 800; cursor: pointer; font-family: inherit; }
+  .g-go:hover { filter: brightness(1.12); }
+  .g-go:disabled { opacity: .5; cursor: default; }
+  .g-bd { font-size: 8.5px; font-weight: 800; padding: 1px 5px; border-radius: 20px; flex: 0 0 auto;
           border: 1px solid var(--border-strong); color: var(--muted); }
   .g-bd.kev { color: #f5928a; border-color: rgba(226,72,61,.45); background: rgba(226,72,61,.12); }
   .g-more { font-size: 10px; color: var(--muted-2); text-align: center; padding: 5px;
@@ -606,18 +621,29 @@
 
     // 브리핑 출처를 정직하게 구분 — LLM 문장인지 규칙 요약인지 담당자가 알 수 있어야 한다.
     const byLabel = data.briefBy === "llm" ? "🧭 오늘 브리핑" : "🧭 오늘 브리핑 (자동 요약)";
-    guideBrief.innerHTML = `<span class="g-by">${byLabel}</span>${esc(data.brief || "")}`;
+    guideBrief.innerHTML = `<span class="g-by">${byLabel}</span><span class="g-txt">${esc(data.brief || "")}</span>`;
 
-    guideList.innerHTML = guideItems.map((it, n) => `
-      <div class="g-item ${it.urgency === "now" ? "now" : "today"}" data-idx="${n}" title="${esc(it.action)}">
-        <div class="g-num">${n + 1}</div>
-        <div class="g-body">
-          <div class="g-t">${esc(it.title)}${it.badges && it.badges.length ? ` ${it.badges
-            .map((b) => `<span class="g-bd${b === "KEV" ? " kev" : ""}">${esc(b)}</span>`).join("")}` : ""}</div>
+    // 접힌 상태에서는 번호·제목·핵심 배지 한 줄만. 펼치면 대상·근거·추천 조치가 나온다.
+    // 배지는 접힌 줄에 하나만(KEV 우선) — 여러 개를 늘어놓으면 제목이 밀린다.
+    guideList.innerHTML = guideItems.map((it, n) => {
+      const badges = it.badges || [];
+      const lead = badges.find((b) => b === "KEV") || badges[0];
+      return `
+      <div class="g-item ${it.urgency === "now" ? "now" : "today"}" data-idx="${n}">
+        <div class="g-head">
+          <div class="g-num">${n + 1}</div>
+          <div class="g-t">${esc(it.title)}</div>
+          ${lead ? `<span class="g-bd${lead === "KEV" ? " kev" : ""}">${esc(lead)}</span>` : ""}
+          <span class="g-caret">▶</span>
+        </div>
+        <div class="g-detail">
           <div class="g-s">${esc(it.subtitle)}</div>
           <div class="g-w">${esc(it.why)}</div>
+          <div class="g-a">→ ${esc(it.action)}</div>
+          <button class="g-go" data-go="${n}">▶ AI 팀에 맡기기</button>
         </div>
-      </div>`).join("");
+      </div>`;
+    }).join("");
 
     const c = data.counts || {};
     const rest = (c.now || 0) + (c.today || 0) - guideItems.length;
@@ -640,23 +666,39 @@
     }
   }
 
-  // 선택지 클릭 → 그 항목의 추천 조치를 오케스트레이터에게 맡긴다(담당자는 고르기만 한다).
+  guideBrief.addEventListener("click", () => guideBrief.classList.toggle("open"));
+
+  // 줄을 누르면 펼치기만 한다(아코디언 — 한 번에 하나). 실행은 펼친 뒤 버튼으로.
+  // 처음엔 줄 클릭이 곧바로 지시를 보냈는데, 확인 없이 실행되는 건 위험하다 — 근거를 보고
+  // 누르도록 한 단계를 뒀다.
   guideList.addEventListener("click", async (e) => {
     const row = e.target.closest(".g-item");
     if (!row) return;
+
+    const goBtn = e.target.closest(".g-go");
+    if (!goBtn) { // 헤더 클릭 → 펼치기/접기
+      const wasOpen = row.classList.contains("open");
+      guideList.querySelectorAll(".g-item.open").forEach((r) => r.classList.remove("open"));
+      if (!wasOpen) row.classList.add("open");
+      return;
+    }
+
     const it = guideItems[Number(row.dataset.idx)];
     if (!it) return;
     const instruction = it.axis === "device"
       ? `${it.subtitle}의 ${it.title}을 진행해줘. (${it.why})`
       : `${it.subtitle} 자산의 ${it.title} 조치를 진행해줘. 근거: ${it.why}`;
     feedLine("나", instruction, "var(--blue-light)");
-    row.style.opacity = ".5";
+    goBtn.disabled = true;
+    goBtn.textContent = "AI 팀에 전달 중…";
     try {
       await window.gijo.sendInstruction(instruction);
       await loadGuide();
     } catch (err) {
       feedLine("시스템", "지시 실패: " + (err && err.message || err), "var(--red)");
-    } finally { row.style.opacity = ""; }
+      goBtn.disabled = false;
+      goBtn.textContent = "▶ AI 팀에 맡기기";
+    }
   });
 
   todoList.addEventListener("click", async (e) => {
