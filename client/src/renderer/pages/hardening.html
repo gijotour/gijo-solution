@@ -80,6 +80,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <button class="g-btn g-primary" id="addBtn">＋ 대상 등록</button>
     </div>
 
+    <div id="gijoChatWidget" data-prompts='["하드닝 점검해줘"]' style="max-width:640px;margin-bottom:16px;"></div>
+
     <div class="kpis" id="kpiRow"></div>
     <div class="sec">🖥 장비별 현황 <span id="cntLbl" style="color:var(--muted-2);font-weight:600;font-size:var(--g-t-xs)"></span></div>
     <div id="cardGrid" class="grid"></div>
@@ -303,5 +305,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   else init();
 </script>
 <script src="nav.js"></script>
+<script src="chatwidget.js"></script>
 </body>
 </html>

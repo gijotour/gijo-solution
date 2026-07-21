@@ -107,6 +107,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <button class="btn-primary" id="seedBtn" title="KISA AI 보안 위협 카탈로그를 트리플로 불러옵니다">＋ 샘플 지식 불러오기 (KISA 위협)</button>
     </div>
 
+    <div id="gijoChatWidget" data-prompts='["온톨로지에 몇 건 들어있어?"]' style="max-width:640px;margin-bottom:16px;"></div>
+
     <div class="stat-row">
       <div class="stat-card"><div class="stat-num" id="statCount">-</div><div class="stat-label">전체 관계(트리플)</div></div>
       <div class="stat-card"><div class="stat-num" id="statEntities">-</div><div class="stat-label">엔티티(노드)</div></div>
@@ -348,5 +350,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
 
 <script src="nav.js"></script>
+<script src="chatwidget.js"></script>
 </body>
 </html>

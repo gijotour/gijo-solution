@@ -1,0 +1,73 @@
+<!doctype html><html><head><meta charset="utf-8"><title>시안 C — 인라인 전용 패널</title><style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.16);--blue:#3b82f6;--blue-light:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;}
+*{box-sizing:border-box;margin:0;padding:0;font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;}
+body{background:var(--bg);color:var(--text);padding:22px;width:1100px;}
+.page-title{font-size:21px;font-weight:800;color:#fff;}
+.page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;margin-bottom:16px;}
+.content-grid{display:grid;grid-template-columns:1.6fr 1fr;gap:16px;}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;}
+.panel-title{font-size:14.5px;font-weight:800;color:#fff;margin-bottom:10px;}
+.kpi{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+.kpi .k{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;}
+.kpi .kv{font-size:20px;font-weight:800;color:#fff;}
+.kpi .kl{font-size:11px;color:var(--muted);margin-top:4px;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{text-align:left;color:var(--muted-2);font-size:10.5px;padding:8px;border-bottom:1px solid var(--border);}
+td{padding:9px 8px;border-bottom:1px solid var(--border);}
+
+.chatpanel{background:linear-gradient(180deg,rgba(139,124,240,.08),transparent 40%),var(--panel);border:1px solid rgba(139,124,240,.3);border-radius:12px;padding:16px;display:flex;flex-direction:column;height:520px;}
+.cp-head{font-size:13.5px;font-weight:800;color:#fff;display:flex;align-items:center;gap:6px;margin-bottom:4px;}
+.cp-sub{font-size:10.5px;color:var(--muted-2);margin-bottom:10px;}
+.cp-guide{background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:11px;color:var(--muted);line-height:1.7;}
+.chip{display:inline-block;background:var(--panel-2);border:1px solid var(--border-strong);color:var(--blue-light);font-size:10.5px;padding:4px 10px;border-radius:20px;margin:3px 4px 0 0;cursor:pointer;}
+.cp-msgs{flex:1;overflow-y:auto;margin-top:8px;}
+.bubble{border-radius:9px;padding:9px 11px;font-size:11.5px;line-height:1.6;max-width:92%;margin-bottom:9px;}
+.bubble.user{background:var(--blue);color:#fff;margin-left:auto;}
+.bubble.bot{background:var(--panel-2);border:1px solid var(--border-strong);}
+.cp-dock{display:flex;gap:6px;margin-top:8px;}
+.cp-dock input{flex:1;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 11px;color:var(--text);font-size:11.5px;}
+.cp-dock button{background:var(--blue);color:#fff;border:0;border-radius:8px;padding:0 14px;font-size:11.5px;font-weight:700;cursor:pointer;}
+</style></head><body>
+<div style="font-size:11px;color:var(--muted-2);margin-bottom:10px">시안 C · 다른 패널과 나란히, 항상 보이는 전용 챗봇 패널(오른쪽 컬럼)</div>
+<div class="page-title">취약 자산관리</div>
+<div class="page-sub">Tenable Nessus 등 취약점 도구의 스캔 결과(CSV/JSON)를 업로드하면 호스트(IP)별로 자산 등록하고 발견 취약점을 반영합니다.</div>
+
+<div class="content-grid">
+  <div>
+    <div class="panel">
+      <div class="panel-title">🎯 오늘의 조치 우선순위</div>
+      <div class="kpi">
+        <div class="k"><div class="kv">3</div><div class="kl">Critical</div></div>
+        <div class="k"><div class="kv">5</div><div class="kl">High</div></div>
+        <div class="k"><div class="kv">2</div><div class="kl">KEV</div></div>
+        <div class="k"><div class="kv">8</div><div class="kl">스캔 호스트</div></div>
+      </div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">스캔 결과</div>
+      <table>
+        <tr><th>호스트</th><th>취약점</th><th>심각도</th></tr>
+        <tr><td>web01</td><td>Log4Shell RCE</td><td>Critical</td></tr>
+        <tr><td>db02</td><td>SQL 인젝션</td><td>Critical</td></tr>
+        <tr><td>vpn-gw</td><td>인증 우회</td><td>Critical</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="chatpanel">
+    <div class="cp-head">🤖 이 화면 챗봇</div>
+    <div class="cp-sub">취약점 데이터에 실시간으로 접근 — 궁금한 걸 바로 물어보세요.</div>
+    <div class="cp-guide">
+      이 화면에서 할 수 있는 질문 예시<br>
+      <span class="chip">미조치 Critical 몇 건?</span>
+      <span class="chip">KEV 있는 거 있어?</span>
+      <span class="chip">담당자 미배정 건</span>
+    </div>
+    <div class="cp-msgs">
+      <div class="bubble user">미조치 Critical 몇 건이야?</div>
+      <div class="bubble bot">Critical 미조치 3건입니다 — web01(Log4Shell), db02(SQL 인젝션), vpn-gw(인증 우회). 전부 KEV 등재돼 최우선 조치 대상입니다.</div>
+    </div>
+    <div class="cp-dock"><input placeholder="이 화면에 대해 물어보세요…"><button>전송</button></div>
+  </div>
+</div>
+</body></html>
