@@ -1,7 +1,7 @@
 {
   "name": "gijo-as-client",
   "productName": "GIJO AS",
-  "version": "2.5.0",
+  "version": "2.6.0",
   "description": "GIJO AS — AI Security Manager Platform (Electron client, connects to gijo-as-server)",
   "main": "dist/main.js",
   "scripts": {
@@ -12,7 +12,8 @@
     "dist": "npm run build && npm run build-server-dist && electron-builder",
     "rebuild-server-native": "node scripts/rebuild-server-native.mjs",
     "build-server-dist": "node scripts/build-server-dist.mjs",
-    "publish-release": "node scripts/publish-release.mjs"
+    "publish-release": "node scripts/publish-release.mjs",
+    "create-deploy-account": "node scripts/create-deploy-account.mjs"
   },
   "author": "GIJO Technology",
   "license": "UNLICENSED",
