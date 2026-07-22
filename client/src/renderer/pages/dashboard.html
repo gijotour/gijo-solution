@@ -2167,8 +2167,9 @@
     document.getElementById("toggleRightBtn")?.addEventListener("click", toggleRight);
     document.getElementById("dashRightCollapse")?.addEventListener("click", toggleRight); // 패널 안 '전체 접기' 헤더 버튼
     document.getElementById("rightReopen")?.addEventListener("click", toggleRight); // 접힘 상태 '열기' 탭
-    // 오른쪽 패널은 이제 지휘 콘솔(채팅)을 품으므로 기본 '펼침'(사용자가 ◧로 숨기면 "1" 저장·유지).
-    try { applyRightHidden(localStorage.getItem(RIGHT_HIDDEN_KEY) === "1"); } catch (e) {}
+    // 기본은 '접힘'(사용자 방침 2026-07-22) — 처음엔 오른쪽 가장자리 '◧ 작업 세션 열기' 탭만 보이고,
+    // 누르면 패널이 열린다(메뉴 페이지의 작업 세션 드로어와 동일한 접힘-기본 경험). 상태는 기억한다.
+    try { const st = localStorage.getItem(RIGHT_HIDDEN_KEY); applyRightHidden(st === null ? true : st === "1"); } catch (e) { applyRightHidden(true); }
 
     // 오른쪽 패널 아코디언 — [작업 세션]·[지휘 콘솔] 각각 독립 접기. 헤더의 버튼(.acc-sp)은 제외.
     // 캐럿 문자를 상태에 맞춰 갱신 — ▾(열림)·▸(닫힘). 회전 대신 문자라 열고닫힘이 확실히 보인다.

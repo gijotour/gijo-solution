@@ -91,7 +91,7 @@
     tab = document.createElement("div");
     tab.id = "gijoCmdTab";
     tab.title = "오른쪽 작업 세션 열기";
-    tab.textContent = "◧ 작업 세션";
+    tab.textContent = "◧ 작업 세션 열기"; // 대시보드 오른쪽 가장자리 탭과 동일 표현
     document.body.appendChild(tab);
 
     sessBody = panel.querySelector("#gcpSessList");
