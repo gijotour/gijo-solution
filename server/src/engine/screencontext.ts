@@ -39,6 +39,7 @@ const SCREENS: Record<string, ScreenContext> = {
   "sessions.html": { label: "작업 세션", domain: "진행 중인 작업 대화" },
 
   // 자산과 취약점은 붙어 다닌다 — 자산 목록에서 "이 자산 취약점 담당자 배정해줘"가 자연스럽다.
+  "assethub.html": { label: "자산 허브", domain: "자산·AI-BOM·취약점·AI위험 통합", toolDomains: ["assets", "vuln", "sbom"] },
   "inventory.html": { label: "자산 목록", domain: "AI·IT 자산 인벤토리", defaultAction: "scan", toolDomains: ["assets", "vuln"] },
   "sbom.html": { label: "AI-BOM 구성", domain: "AI-BOM/SBOM 구성요소·견고성", toolDomains: ["sbom", "assets"] },
   "vulnscan.html": { label: "취약점", domain: "취약점 스캔 결과·조치 우선순위", defaultAction: "analyze", toolDomains: ["vuln", "assets"] },

@@ -16,6 +16,7 @@
       { page: "mcp.html", label: "🔌 MCP 연동" },
     ]},
     { id: "assets", ic: "🛡", label: "자산·취약점·대응", items: [
+      { page: "assethub.html", label: "🛡 자산 허브", bot: true },
       { page: "inventory.html", label: "자산 목록", bot: true },
       { page: "sbom.html", label: "AI-BOM 구성", bot: true },
       { page: "vulnscan.html", label: "취약점", bot: true },

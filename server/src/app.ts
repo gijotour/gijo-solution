@@ -60,6 +60,7 @@ import { registerHardeningRoutes } from "./engine/hardeningscan";
 import { registerHardeningTargetRoutes } from "./engine/hardeningtargets";
 import { registerReportScheduleRoutes } from "./engine/reportschedule";
 import { registerClientReleaseRoutes } from "./engine/clientrelease";
+import { registerAssetHubRoutes } from "./engine/assethub";
 import { registerLlmActivityRoutes } from "./engine/llmactivity";
 import { registerKevRoutes } from "./engine/kev";
 import { registerOntologyRoutes } from "./engine/ontology";
@@ -146,6 +147,7 @@ export function createApp(): Express {
   registerReportRoutes(app);
   registerReportScheduleRoutes(app);
   registerClientReleaseRoutes(app);
+  registerAssetHubRoutes(app);
   registerKpiRoutes(app);
   registerUsageRoutes(app);
   registerLogsRoutes(app);

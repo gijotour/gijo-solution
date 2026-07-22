@@ -106,6 +106,9 @@ const gijoApi = {
   // 자산 인벤토리
   listAssets: () => api.assetsApi.list(),
   getAsset: (id: string) => api.assetsApi.get(id),
+  // 자산 허브(자산 목록·AI-BOM·취약점 통합 뷰)
+  assetHub: () => api.assetHubApi.overview(),
+  assetHubDetail: (id: string) => api.assetHubApi.detail(id),
   scanAsset: (id: string) => api.assetsApi.scan(id),
   uploadAuto: (filename: string, content: string, forceType?: import("./apiClient").UploadType, productName?: string) =>
     api.uploadApi.auto(filename, content, forceType, productName),

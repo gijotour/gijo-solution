@@ -59,9 +59,11 @@
   function build() {
     injectCss();
     host.removeAttribute("style");
-    host.className = "gcw";
+    // 정보 밀도가 높은 화면(자산 허브 등)은 data-start="collapsed"로 접힌 채 시작 — 상세를 가리지 않게.
+    var startCollapsed = host.dataset.start === "collapsed";
+    host.className = "gcw" + (startCollapsed ? " collapsed" : "");
     host.innerHTML =
-      '<div class="gcw-head"><span class="gcw-title">🤖 이 화면 챗봇</span><span class="gcw-toggle" id="gcwToggle">✕ 접기</span></div>' +
+      '<div class="gcw-head"><span class="gcw-title">🤖 이 화면 챗봇</span><span class="gcw-toggle" id="gcwToggle">' + (startCollapsed ? "🤖 챗봇" : "✕ 접기") + "</span></div>" +
       '<div class="gcw-body">' +
       '<div class="gcw-sub">이 화면 데이터에 실시간으로 접근 — 궁금한 걸 바로 물어보세요.</div>' +
       (prompts.length

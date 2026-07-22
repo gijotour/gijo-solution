@@ -69,6 +69,16 @@ const GUIDES: Record<string, ScreenGuide> = {
       "\"이 위협 조치 방법 알려줘\"",
     ],
   },
+  "assethub.html": {
+    title: "자산 허브",
+    what: "자산 하나에서 구성(AI-BOM)·취약점·AI 위험(OWASP LLM)을 한 흐름으로 봅니다. AI 자산이 앞에 옵니다.",
+    can: [
+      "\"AI 자산 위험 현황 알려줘\" — OWASP LLM 미대응 요약",
+      "\"미조치 취약점 몇 건이야?\"",
+      "\"커버리지 빠진 자산 있어?\"",
+    ],
+    tip: "자산을 클릭하면 개요·AI-BOM·취약점·AI 위험 4탭으로 파고들 수 있어요.",
+  },
   "inventory.html": {
     title: "자산 목록",
     what: "AI·IT 자산 인벤토리를 등록·조회하고 커버리지 결손을 찾습니다.",

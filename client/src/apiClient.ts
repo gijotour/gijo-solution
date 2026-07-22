@@ -1285,6 +1285,33 @@ export interface AssetCoverage {
   ranked: RankedAsset[];
 }
 
+// ── 자산 허브(통합 뷰) ────────────────────────────────────────────────
+export type OwaspStatus = "open" | "covered" | "na";
+export interface OwaspRiskState { code: string; title: string; status: OwaspStatus; evidence: string }
+export interface AssetHubVuln { critical: number; high: number; medium: number; low: number; kev: number; open: number }
+export interface AssetHubRow {
+  id: string; name: string; assetType: string; isAi: boolean; owner: string; service: string | null; host: string | null;
+  vuln: AssetHubVuln;
+  bomAreas: { model: number; dataset: number; prompt: number; agentTool: number; infrastructure: number; total: number };
+  sbomGenerated: boolean; robustnessScore: number | null; owaspOpen: number; owaspTopCodes: string[];
+  exposureScore: number; riskBand: "critical" | "high" | "medium" | "ok";
+}
+export interface AssetHubSummary {
+  totalAssets: number; aiAssets: number; itAssets: number; overallExposure: number;
+  bands: { aiAssetAvg: number; externalAvg: number; internalAvg: number };
+  owaspOpenByCode: { code: string; title: string; count: number }[];
+  vuln: { open: number; critical: number; high: number; medium: number; kev: number };
+  sbomMissing: number;
+}
+export interface AssetHubOverview { summary: AssetHubSummary; rows: AssetHubRow[] }
+export interface AssetHubDetail {
+  row: AssetHubRow;
+  owasp: OwaspRiskState[];
+  findings: { title: string; severity: string; kev: boolean; evidence: string; state: string }[];
+  aibom: AiBom;
+  host: string | null;
+}
+
 // ── 서비스 영향도 ─────────────────────────────────────────────────────
 export interface ServiceImpact {
   service: string;
@@ -1299,6 +1326,12 @@ export interface ServiceImpact {
 export const serviceImpactApi = {
   get: () =>
     request<{ services: ServiceImpact[]; summary: { totalServices: number; atRisk: number; unassignedAssets: number } }>("/api/service-impact"),
+};
+
+// 자산 허브(자산 목록·AI-BOM·취약점 통합 뷰) — 서버 assethub.ts 집계.
+export const assetHubApi = {
+  overview: () => request<AssetHubOverview>("/api/assethub"),
+  detail: (id: string) => request<AssetHubDetail>(`/api/assethub/${encodeURIComponent(id)}`),
 };
 
 export const assetsApi = {
