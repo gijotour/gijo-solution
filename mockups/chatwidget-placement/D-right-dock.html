@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>시안 D — 우측 도킹형 (가장자리 고정, 필요시 확장)</title>
+<style>
+  :root{--bg:#080c16;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.16);
+        --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--blue:#3b82f6;--blue-light:#5fa1ff;--purple:#8b7cf0;}
+  *{box-sizing:border-box;}
+  body{margin:0;font-family:'Segoe UI',sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;}
+  .shell{display:flex;height:100vh;}
+  .nav{width:220px;background:var(--panel);border-right:1px solid var(--border);padding:16px 10px;flex-shrink:0;}
+  .nav .logo{font-weight:900;font-size:14px;margin-bottom:20px;padding:0 8px;color:#fff;}
+  .nav .item{padding:9px 12px;border-radius:8px;font-size:12.5px;color:var(--muted);margin-bottom:2px;}
+  .nav .item.active{background:var(--panel-2);color:#fff;font-weight:700;border-left:3px solid var(--blue);}
+  .main{flex:1;position:relative;min-width:0;display:flex;flex-direction:column;}
+  .topbar{padding:14px 24px;border-bottom:1px solid var(--border);font-weight:800;font-size:15px;display:flex;justify-content:space-between;align-items:center;}
+  .badge{font-size:10px;background:rgba(139,124,240,.18);color:var(--purple);border:1px solid rgba(139,124,240,.4);padding:3px 9px;border-radius:20px;}
+  .body{flex:1;display:flex;overflow:hidden;}
+  .content{flex:1;padding:20px 24px;overflow-y:auto;}
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px;}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px;}
+  .card b{font-size:20px;display:block;margin-top:6px;}
+  table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--border);border-radius:10px;overflow:hidden;font-size:12px;}
+  th,td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);}
+  th{color:var(--muted);font-weight:700;background:var(--panel-2);}
+
+  /* ---- 시안 D: 우측 가장자리 도킹, 평소엔 좁게(320px), 대화 시작하면 폭이 넓어짐(520px), 세로는 항상 풀높이 ---- */
+  .dock-right{width:520px;flex-shrink:0;background:var(--panel);border-left:1px solid rgba(139,124,240,.4);
+    display:flex;flex-direction:column;box-shadow:-8px 0 24px rgba(0,0,0,.3);transition:width .2s;}
+  .dr-head{display:flex;align-items:center;justify-content:space-between;padding:12px 16px;border-bottom:1px solid var(--border);background:var(--panel-2);}
+  .dr-head .t{font-weight:800;font-size:13px;}
+  .dr-head .sub{font-size:10px;color:var(--muted-2);display:block;margin-top:2px;}
+  .dr-head .x{cursor:pointer;color:var(--muted);font-size:13px;}
+  .dr-msgs{flex:1;overflow-y:auto;padding:14px 16px;display:flex;flex-direction:column;gap:10px;}
+  .row{border-radius:9px;padding:10px 13px;font-size:12px;line-height:1.65;max-width:88%;}
+  .row.user{background:var(--blue);color:#fff;margin-left:auto;}
+  .row.bot{background:var(--panel-2);border:1px solid var(--border-strong);}
+  .dr-in{display:flex;gap:8px;padding:12px 16px;border-top:1px solid var(--border);}
+  .dr-in input{flex:1;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;color:var(--text);font-size:12px;outline:none;}
+  .dr-in button{background:var(--blue);color:#fff;border:0;border-radius:8px;padding:0 16px;font-weight:700;font-size:12px;}
+  .chip{display:inline-block;background:var(--panel-2);border:1px solid var(--border-strong);color:var(--blue-light);font-size:10.5px;padding:4px 10px;border-radius:20px;margin:2px 4px 0 0;}
+  .note{position:absolute;left:24px;top:64px;font-size:10.5px;color:var(--muted-2);background:var(--panel);border:1px dashed var(--border-strong);padding:8px 12px;border-radius:8px;max-width:280px;}
+</style>
+</head>
+<body>
+<div class="shell">
+  <div class="nav">
+    <div class="logo">GIJO AS</div>
+    <div class="item">대시보드</div>
+    <div class="item active">🤖 위협 인텔리전스</div>
+    <div class="item">자산 인벤토리</div>
+    <div class="item">SBOM</div>
+    <div class="item">취약점 스캔</div>
+  </div>
+  <div class="main">
+    <div class="topbar">위협 인텔리전스 <span class="badge">실시간</span></div>
+    <div class="body">
+      <div class="content">
+        <div class="note">평소(대화 시작 전)엔 폭 320px 정도로 좁게 있다가,<br>질문을 하면 이렇게 520px로 넓어지며<br>세로는 항상 화면 전체 높이 사용</div>
+        <div class="cards">
+          <div class="card">활성 위협<b>14</b></div>
+          <div class="card">고위험 CVE<b>6</b></div>
+          <div class="card">오늘 신규<b>3</b></div>
+        </div>
+        <table>
+          <tr><th>CVE</th><th>영향 자산</th><th>심각도</th><th>상태</th></tr>
+          <tr><td>CVE-2026-31402</td><td>web-prod-01</td><td>Critical</td><td>대응중</td></tr>
+          <tr><td>CVE-2026-29981</td><td>db-core-02</td><td>High</td><td>검토중</td></tr>
+          <tr><td>CVE-2026-27510</td><td>vpn-gw-01</td><td>High</td><td>대응중</td></tr>
+        </table>
+      </div>
+
+      <!-- 우측 도킹형: 화면 세로 전체를 항상 차지, 평소 좁고 대화 시작하면 폭이 넓어짐 -->
+      <div class="dock-right">
+        <div class="dr-head">
+          <div><span class="t">🤖 이 화면 챗봇</span><span class="sub">이 화면 데이터에 실시간 접근</span></div>
+          <div class="x">↔ 좁게</div>
+        </div>
+        <div class="dr-msgs">
+          <div class="row user">오늘 신규 위협 3건 자세히 알려줘</div>
+          <div class="row bot">
+            오늘(07-21) 신규 등록된 위협 3건입니다.<br><br>
+            <b>1. CVE-2026-31402</b> — Critical, web-prod-01 영향. Apache 모듈 원격코드실행. VPR 9.8, EPSS 92%.<br>
+            <b>2. CVE-2026-29981</b> — High, db-core-02 영향. PostgreSQL 권한상승. 패치 2026-07-22 예정.<br>
+            <b>3. CVE-2026-27510</b> — High, vpn-gw-01 영향. VPN 인증우회. 현재 대응 담당자 배정됨.<br><br>
+            자세한 조치 계획을 볼까요, 아니면 자산별 영향도를 볼까요?
+          </div>
+          <div><span class="chip">자산별 영향도 보기</span><span class="chip">조치 계획 보기</span></div>
+        </div>
+        <div class="dr-in"><input placeholder="이 화면에 대해 물어보세요…"><button>전송</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

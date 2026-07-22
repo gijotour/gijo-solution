@@ -1,0 +1,56 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.16);--blue:#3b82f6;--blue-light:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;}
+*{box-sizing:border-box;margin:0;padding:0;font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;}
+body{background:var(--bg);color:var(--text);padding:22px;width:760px;}
+.report{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:12px;padding:16px 18px;}
+h4{font-size:15px;color:#fff;margin-bottom:3px;}
+.meta{font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.5;}
+.sumline{display:flex;gap:14px;align-items:baseline;margin-bottom:14px;flex-wrap:wrap;padding-bottom:12px;border-bottom:1px solid var(--border);}
+.score{font-size:26px;font-weight:800;}
+.verdict{font-weight:800;}
+.tot{color:var(--muted);font-size:12px;}
+table{width:100%;border-collapse:collapse;font-size:11.5px;}
+td,th{text-align:left;padding:6px 8px;vertical-align:top;}
+.st{white-space:nowrap;font-weight:700;}
+.ev{color:var(--muted);font-size:11px;}
+.badge{font-size:9.5px;font-weight:800;padding:1px 7px;border-radius:5px;}
+</style></head><body><div class="report"><h4>🛡 보안장비 하드닝 점검 리포트</h4>
+  <div class="meta">대상: 운영 리눅스 장비 (WSL Ubuntu) · 기준: 국내 CCE — KISA 주요정보통신기반시설 취약점 분석·평가(U-시리즈)<br>점검 방식: 장비 CLI 실 명령 실행·실측 · 0.2초 소요</div>
+  <div class="sumline"><span class="score" style="color:#e2483d">50%</span>
+  <span class="verdict" style="color:#e2483d">🔴 미흡(다수 취약)</span>
+  <span class="tot">✅ 5 · ❌ 5 · ⚠️ 0 · ➖ 1 (총 11)</span></div>
+  <div style="font-size:12.5px;font-weight:800;color:#e2483d;margin-bottom:8px">🚨 조치 필요 (5건)</div>
+  <div style="display:flex;gap:10px;padding:9px 11px;border:1px solid rgba(226,72,61,.3);background:rgba(226,72,61,.06);border-radius:8px;margin-bottom:7px">
+    <span style="color:var(--muted-2);font-weight:800;font-size:11px;width:44px">U-02</span>
+    <div style="flex:1"><div style="font-weight:700;font-size:12.5px;color:#fff">패스워드 복잡성 설정</div>
+    <div class="ev" style="margin-top:2px">pam_pwquality 복잡도 미설정</div>
+    <div style="color:#8fd6a8;font-size:11px;margin-top:3px">→ common-password에 minlen·복잡도 설정</div></div>
+    <span class="st" style="color:#e2483d">❌ 취약</span></div><div style="display:flex;gap:10px;padding:9px 11px;border:1px solid rgba(226,72,61,.3);background:rgba(226,72,61,.06);border-radius:8px;margin-bottom:7px">
+    <span style="color:var(--muted-2);font-weight:800;font-size:11px;width:44px">U-03</span>
+    <div style="flex:1"><div style="font-weight:700;font-size:12.5px;color:#fff">계정 잠금 임계값 설정</div>
+    <div class="ev" style="margin-top:2px">로그인 실패 잠금(faillock) 미설정</div>
+    <div style="color:#8fd6a8;font-size:11px;margin-top:3px">→ deny=5 등 실패 잠금 설정</div></div>
+    <span class="st" style="color:#e2483d">❌ 취약</span></div><div style="display:flex;gap:10px;padding:9px 11px;border:1px solid rgba(226,72,61,.3);background:rgba(226,72,61,.06);border-radius:8px;margin-bottom:7px">
+    <span style="color:var(--muted-2);font-weight:800;font-size:11px;width:44px">U-46</span>
+    <div style="flex:1"><div style="font-weight:700;font-size:12.5px;color:#fff">패스워드 최소 길이 8자 이상</div>
+    <div class="ev" style="margin-top:2px">패스워드 최소 길이 미설정</div>
+    <div style="color:#8fd6a8;font-size:11px;margin-top:3px">→ PASS_MIN_LEN 8 이상</div></div>
+    <span class="st" style="color:#e2483d">❌ 취약</span></div><div style="display:flex;gap:10px;padding:9px 11px;border:1px solid rgba(226,72,61,.3);background:rgba(226,72,61,.06);border-radius:8px;margin-bottom:7px">
+    <span style="color:var(--muted-2);font-weight:800;font-size:11px;width:44px">U-47</span>
+    <div style="flex:1"><div style="font-weight:700;font-size:12.5px;color:#fff">패스워드 최대 사용기간 90일 이하</div>
+    <div class="ev" style="margin-top:2px">PASS_MAX_DAYS=99999</div>
+    <div style="color:#8fd6a8;font-size:11px;margin-top:3px">→ PASS_MAX_DAYS 90 이하로 설정</div></div>
+    <span class="st" style="color:#e2483d">❌ 취약</span></div><div style="display:flex;gap:10px;padding:9px 11px;border:1px solid rgba(226,72,61,.3);background:rgba(226,72,61,.06);border-radius:8px;margin-bottom:7px">
+    <span style="color:var(--muted-2);font-weight:800;font-size:11px;width:44px">U-48</span>
+    <div style="flex:1"><div style="font-weight:700;font-size:12.5px;color:#fff">패스워드 최소 사용기간 1일 이상</div>
+    <div class="ev" style="margin-top:2px">PASS_MIN_DAYS=0</div>
+    <div style="color:#8fd6a8;font-size:11px;margin-top:3px">→ PASS_MIN_DAYS 1 이상</div></div>
+    <span class="st" style="color:#e2483d">❌ 취약</span></div>
+  <div style="margin-top:14px;display:flex;gap:10px;flex-wrap:wrap">
+    <div style="flex:1;min-width:220px;border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+      <div style="font-size:11.5px;font-weight:800;color:#1eb980;margin-bottom:6px">✅ 양호 5건 (기준 충족)</div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.7">U-07 /etc/passwd 소유자·권한<br>U-08 /etc/shadow 소유자·권한<br>U-44 UID 0 계정 root뿐<br>U-56 UMASK 022 이상<br>U-72 시스템 로깅(rsyslog)</div></div>
+    <div style="flex:1;min-width:220px;border:1px solid var(--border);border-radius:8px;padding:10px 12px">
+      <div style="font-size:11.5px;font-weight:800;color:#8b93ab;margin-bottom:6px">➖ 해당없음 1건</div>
+      <div style="font-size:11px;color:var(--muted);line-height:1.7">U-01 root 계정 원격 접속 제한 — SSH 서버(sshd) 미설치 — 원격 접속면 없음</div></div>
+  </div></div></body></html>

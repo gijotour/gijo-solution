@@ -1,0 +1,85 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+:root{
+  --bg:#0a0e1a; --s1:#121a2e; --s2:#0e1526; --s3:#0a1120;
+  --border:rgba(255,255,255,.08); --border-strong:rgba(255,255,255,.16);
+  --blue:#3b82f6; --blue-light:#5fa1ff; --teal:#1eb980; --amber:#f0a020; --red:#e2483d; --purple:#8b7cf0;
+  --text:#e7eaf3; --muted:#8b93ab; --muted-2:#5f6785;
+}
+*{box-sizing:border-box;margin:0;padding:0;font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;}
+body{background:var(--bg);color:var(--text);padding:var(--pad-body);width:920px;}
+.h1{font-size:var(--t-h1);font-weight:800;color:#fff;margin-bottom:2px;}
+.sub{font-size:var(--t-sm);color:var(--muted);margin-bottom:var(--gap-lg);}
+.sec{margin-bottom:var(--gap-lg);}
+.sec > .lab{font-size:var(--t-xs);font-weight:800;color:var(--muted-2);letter-spacing:.4px;text-transform:uppercase;margin-bottom:var(--gap);}
+.row{display:flex;align-items:center;gap:var(--gap);flex-wrap:wrap;}
+/* 버튼 */
+.btn{height:var(--btn-h);display:inline-flex;align-items:center;gap:6px;padding:0 var(--btn-px);border-radius:var(--r);font-size:var(--t-sm);font-weight:700;cursor:pointer;border:1px solid transparent;transition:.12s;}
+.btn.primary{background:var(--blue);color:#fff;}
+.btn.primary:hover{background:#3576e0;}
+.btn.ghost{background:transparent;border-color:var(--border-strong);color:var(--muted);}
+.btn.ghost:hover{color:#fff;border-color:var(--blue);}
+.btn.danger{background:rgba(226,72,61,.14);border-color:var(--red);color:#f5928a;}
+.btn.sm{height:calc(var(--btn-h) - 8px);font-size:var(--t-xs);padding:0 10px;}
+.btn.disabled{opacity:.45;cursor:default;}
+.btn:focus-visible{outline:2px solid var(--blue-light);outline-offset:1px;}
+/* 카드 & 표면 계층 */
+.card{background:var(--s1);border:1px solid var(--border);border-radius:var(--r);padding:var(--pad-card);box-shadow:var(--shadow);}
+.card .ct{font-size:var(--t-md);font-weight:800;color:#fff;margin-bottom:6px;}
+.card .cx{font-size:var(--t-sm);color:var(--muted);line-height:1.5;}
+.nested{background:var(--s2);border:1px solid var(--border);border-radius:calc(var(--r) - 2px);padding:var(--gap);margin-top:var(--gap);}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--gap);}
+.kpi{background:var(--s2);border:1px solid var(--border);border-radius:var(--r);padding:var(--pad-card);}
+.kpi .kv{font-size:var(--t-kpi);font-weight:800;}
+.kpi .kl{font-size:var(--t-xs);color:var(--muted);margin-top:2px;}
+/* 배지 & 칩 */
+.badge{font-size:var(--t-xs);font-weight:800;padding:2px 8px;border-radius:var(--r-badge);}
+.b-crit{background:rgba(226,72,61,.16);color:#f5928a;} .b-high{background:rgba(240,160,32,.16);color:var(--amber);}
+.b-med{background:rgba(59,130,246,.16);color:var(--blue-light);} .b-low{background:rgba(255,255,255,.06);color:var(--muted-2);}
+.b-ok{background:rgba(30,185,128,.16);color:var(--teal);} .b-warn{background:rgba(240,160,32,.16);color:var(--amber);} .b-bad{background:rgba(226,72,61,.16);color:#f5928a;}
+.chip{display:inline-flex;align-items:center;gap:6px;background:var(--s2);border:1px solid var(--border-strong);border-radius:var(--r-chip);padding:5px 12px;font-size:var(--t-sm);font-weight:700;color:var(--text);}
+.chip.on{background:rgba(59,130,246,.14);border-color:var(--blue);color:var(--blue-light);}
+/* 입력 */
+.field{display:flex;flex-direction:column;gap:5px;min-width:200px;}
+.field label{font-size:var(--t-xs);color:var(--muted-2);font-weight:700;}
+.inp{background:var(--s2);border:1px solid var(--border-strong);border-radius:var(--r);padding:0 12px;height:var(--btn-h);color:var(--text);font-size:var(--t-sm);outline:none;}
+.inp:focus{border-color:var(--blue);box-shadow:0 0 0 3px rgba(59,130,246,.16);}
+/* 표 */
+table{width:100%;border-collapse:collapse;font-size:var(--t-sm);}
+th{text-align:left;color:var(--muted-2);font-size:var(--t-xs);font-weight:700;padding:var(--gap);border-bottom:1px solid var(--border);}
+td{padding:var(--gap);border-bottom:1px solid var(--border);}
+/* 토글 */
+.tg{width:38px;height:22px;border-radius:11px;position:relative;display:inline-block;background:var(--teal);}
+.tg .k{width:16px;height:16px;border-radius:50%;background:#fff;position:absolute;top:3px;right:3px;}
+/* 모달 미리보기 */
+.modal{width:360px;background:var(--s1);border:1px solid var(--border-strong);border-radius:var(--r);padding:var(--pad-card);box-shadow:0 20px 60px rgba(0,0,0,.5);}
+.modal .mt{font-size:var(--t-md);font-weight:800;color:#fff;margin-bottom:var(--gap);}
+.modal .macts{display:flex;gap:var(--gap);justify-content:flex-end;margin-top:var(--gap-lg);}
+
+:root{--t-h1:22px;--t-md:14.5px;--t-sm:13px;--t-xs:11px;--t-kpi:27px;--r:12px;--r-badge:999px;--r-chip:999px;--btn-h:36px;--btn-px:16px;--pad-body:26px;--pad-card:18px;--gap:12px;--gap-lg:26px;--shadow:0 2px 8px rgba(0,0,0,.3);}</style></head><body>
+  <div class="h1">🎨 GIJO AS 디자인 시스템 — C — 통일 + 정돈 강화 (여백·타이포↑)</div>
+  <div class="sub">현재 다크 팔레트 유지 · 공용 토큰(색·간격·라운드·표면 계층)과 컴포넌트를 통일. 모든 화면이 이 규칙을 공유합니다.</div>
+
+  <div class="sec"><div class="lab">버튼 (상태 통일)</div>
+  <div class="row"><button class="btn primary">기본 동작</button><button class="btn ghost">보조</button><button class="btn danger">삭제</button><button class="btn primary sm">작게</button><button class="btn ghost sm">작게</button><button class="btn primary disabled">비활성</button></div></div>
+
+  <div class="sec"><div class="lab">카드 & 표면 계층 & KPI</div>
+  <div class="row" style="align-items:stretch">
+    <div class="card" style="flex:1"><div class="ct">카드 (표면 1)</div><div class="cx">패널·카드는 배경 표면 1을 씁니다. 안에 중첩되는 요소는 표면 2로 계층을 만듭니다.<div class="nested">중첩 카드 (표면 2)</div></div></div>
+    <div class="kpis" style="flex:1.4"><div class="kpi"><div class="kv" style="color:#fff">15</div><div class="kl">등록 자산</div></div><div class="kpi"><div class="kv" style="color:var(--red)">3</div><div class="kl">즉시 조치</div></div><div class="kpi"><div class="kv" style="color:var(--teal)">67%</div><div class="kl">준수율</div></div><div class="kpi"><div class="kv" style="color:var(--amber)">2</div><div class="kl">확인필요</div></div></div>
+  </div></div>
+
+  <div class="sec"><div class="lab">배지 & 칩 (심각도·상태·필터)</div>
+  <div class="row"><span class="badge b-crit">CRITICAL</span><span class="badge b-high">HIGH</span><span class="badge b-med">MEDIUM</span><span class="badge b-low">LOW</span>
+  <span style="width:12px"></span><span class="badge b-ok">정상</span><span class="badge b-warn">확인필요</span><span class="badge b-bad">취약</span></div>
+  <div class="row" style="margin-top:10px"><span class="chip on">🔍 취약점</span><span class="chip">📊 로그</span><span class="chip">🧰 운영</span><span class="chip">🛡 하드닝</span></div></div>
+
+  <div class="sec"><div class="lab">입력 & 표 & 토글</div>
+  <div class="row" style="align-items:flex-end"><div class="field"><label>장비 이름</label><input class="inp" value="fortigate-vpn-01"></div><div class="field"><label>유형</label><input class="inp" value="infra-host"></div><div class="field" style="min-width:auto;flex-direction:row;align-items:center;gap:8px"><span class="tg"><span class="k"></span></span><span style="font-size:var(--t-sm);color:var(--muted)">정기점검 켜짐</span></div></div>
+  <div class="card" style="margin-top:12px;padding:0;overflow:hidden"><table><thead><tr><th>항목</th><th>대상</th><th>결과</th><th>우선순위</th></tr></thead><tbody>
+  <tr><td>패스워드 최대 사용기간</td><td>fortigate-vpn-01</td><td><span class="badge b-bad">취약</span></td><td><span class="badge b-med">P2</span></td></tr>
+  <tr><td>SSH root 로그인 차단</td><td>web-02</td><td><span class="badge b-ok">양호</span></td><td><span class="badge b-low">-</span></td></tr>
+  </tbody></table></div></div>
+
+  <div class="sec"><div class="lab">모달</div>
+  <div class="modal"><div class="mt">＋ 자산 직접 등록</div><div class="field" style="margin-bottom:10px"><label>이름</label><input class="inp" placeholder="예: fortigate-vpn-02"></div><div class="field"><label>주소/경로</label><input class="inp" placeholder="10.20.0.6"></div><div class="macts"><button class="btn ghost">취소</button><button class="btn primary">등록</button></div></div></div>
+  </body></html>

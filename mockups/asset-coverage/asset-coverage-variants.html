@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>자산 화면 — 커버리지 관점 시안 3종</title>
+<style>
+  :root{
+    --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+    --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;
+    --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:#05070d;color:var(--text);padding:26px 30px 60px;}
+  h1{font-size:19px;margin-bottom:6px;}
+  .sub{font-size:12.5px;color:var(--muted);margin-bottom:24px;line-height:1.65;}
+  .sub b{color:var(--text);}
+  .variant{background:var(--bg);border:1px solid var(--border);border-radius:14px;padding:20px 22px 24px;margin-bottom:26px;}
+  .vh{display:flex;align-items:baseline;gap:10px;margin-bottom:4px;}
+  .vh b{font-size:15px;color:#fff;}
+  .vh .tag{font-size:10px;font-weight:800;padding:3px 8px;border-radius:5px;background:rgba(59,130,246,.16);color:var(--blue-light);}
+  .vd{font-size:12px;color:var(--muted);line-height:1.65;margin-bottom:16px;}
+  .pros{font-size:11.5px;color:var(--muted);line-height:1.75;margin-top:16px;padding-top:12px;border-top:1px dashed var(--border);}
+  .pros b{color:var(--text);} .pros .warn{color:var(--amber);}
+
+  .screen{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+  .page-title{font-size:15px;font-weight:800;color:#fff;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
+  .page-title .cnt{font-size:11px;font-weight:700;color:var(--muted);}
+
+  table{width:100%;border-collapse:collapse;font-size:11.5px;}
+  th{text-align:left;color:var(--muted-2);font-weight:700;font-size:10.5px;padding:6px 8px;border-bottom:1px solid var(--border);}
+  td{padding:7px 8px;border-bottom:1px solid rgba(255,255,255,.04);}
+  tr:hover td{background:rgba(255,255,255,.02);}
+  .aid{font-weight:700;color:#fff;}
+  .muted{color:var(--muted-2);}
+  .bad{color:var(--red);}
+  .pill{display:inline-block;font-size:9px;font-weight:800;padding:2px 6px;border-radius:4px;margin-right:3px;}
+  .p-red{color:var(--red);background:rgba(226,72,61,.16);}
+  .p-amber{color:var(--amber);background:rgba(240,160,32,.16);}
+  .p-teal{color:var(--teal);background:rgba(30,185,128,.16);}
+  .p-gray{color:var(--muted-2);background:rgba(255,255,255,.05);}
+
+  /* A: 커버리지 배너 */
+  .cov-banner{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:14px;}
+  .cov-card{background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:9px 11px;}
+  .cov-card.alert{border-color:rgba(240,160,32,.45);background:linear-gradient(180deg,rgba(240,160,32,.06),var(--panel));}
+  .cov-n{font-size:19px;font-weight:800;color:#fff;line-height:1.1;}
+  .cov-card.alert .cov-n{color:var(--amber);}
+  .cov-l{font-size:10px;color:var(--muted);margin-top:2px;}
+
+  /* B: 탭 */
+  .tabs{display:flex;gap:4px;margin-bottom:12px;border-bottom:1px solid var(--border);}
+  .tab{font-size:12px;font-weight:700;padding:7px 14px;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;}
+  .tab.on{color:#fff;border-bottom-color:var(--blue);}
+  .tab .badge{font-size:9px;font-weight:800;background:rgba(240,160,32,.2);color:var(--amber);padding:1px 5px;border-radius:8px;margin-left:5px;}
+  .gapbox{background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:11px 13px;margin-bottom:8px;}
+  .gapbox h4{font-size:12px;color:#fff;margin-bottom:6px;display:flex;align-items:center;gap:6px;}
+  .gapbox .why{font-size:10.5px;color:var(--muted);margin-bottom:7px;line-height:1.5;}
+  .gapbox ul{list-style:none;font-size:11px;}
+  .gapbox li{padding:3px 0;color:var(--text);}
+  .fixbtn{font-size:10.5px;font-weight:700;color:var(--blue-light);background:rgba(59,130,246,.14);
+    border:1px solid rgba(59,130,246,.35);border-radius:6px;padding:4px 9px;cursor:pointer;margin-top:6px;font-family:inherit;}
+
+  /* C: 손이 필요한 순서 */
+  .risk-row td{border-left:2px solid transparent;}
+  .risk-row.r1 td:first-child{border-left-color:var(--red);}
+  .risk-row.r2 td:first-child{border-left-color:var(--amber);}
+  .why-col{font-size:10.5px;color:var(--amber);}
+  .sortnote{font-size:10.5px;color:var(--muted-2);margin-bottom:8px;}
+</style>
+</head>
+<body>
+
+<h1>자산 화면 — 커버리지 관점 시안 3종</h1>
+<p class="sub">
+  외부 자료(CAASM) 검토 결과, 자산 관리의 핵심 질문은 <b>"무엇이 목록에 있나"가 아니라 "무엇이 빠졌나"</b>입니다.
+  지금 <code>inventory.html</code>은 있는 것만 나열합니다. 아래 세 시안은 그 관점을 어떻게 넣을지의 차이입니다.<br>
+  <b>표시된 숫자는 실제 운영 데이터입니다</b> — 자산 7건(AI 1 + 스캐너 유입 인프라 6), 서비스 정보 2/7,
+  SBOM 2/7, 그리고 <b class="bad">담당부서에 파일명이 들어간 6건</b>(스캐너 반입 버그).
+</p>
+
+<!-- ── 시안 A ── -->
+<div class="variant">
+  <div class="vh"><b>시안 A — 커버리지 배너</b><span class="tag">변경 최소</span></div>
+  <p class="vd">
+    기존 목록은 그대로 두고 위에 <b>결손 요약 4칸</b>을 얹습니다. 숫자를 누르면 그 조건으로 목록이 걸러집니다.
+    화면 구조를 안 바꾸므로 지금 쓰던 방식이 그대로 유지됩니다.
+  </p>
+  <div class="screen">
+    <div class="page-title">AI 자산 <span class="cnt">7건</span></div>
+    <div class="cov-banner">
+      <div class="cov-card"><div class="cov-n">7</div><div class="cov-l">전체 자산</div></div>
+      <div class="cov-card alert"><div class="cov-n">6</div><div class="cov-l">담당부서 오류</div></div>
+      <div class="cov-card alert"><div class="cov-n">5</div><div class="cov-l">서비스 미지정</div></div>
+      <div class="cov-card alert"><div class="cov-n">5</div><div class="cov-l">SBOM 미생성</div></div>
+    </div>
+    <table>
+      <tr><th>자산</th><th>유형</th><th>담당부서</th><th>서비스</th><th>취약점</th></tr>
+      <tr><td class="aid">ai-secbot-01</td><td>LLM 서비스</td><td>보안팀</td><td>사내 챗봇</td><td>1건</td></tr>
+      <tr><td class="aid">vuln:10.10.20.15</td><td>infra-host</td><td class="bad">ollama-…-scan.csv</td><td class="muted">—</td><td>10건</td></tr>
+      <tr><td class="aid">vuln:10.20.0.5</td><td>infra-host</td><td class="bad">nessus-scan-sample.csv</td><td class="muted">—</td><td>3건</td></tr>
+      <tr><td class="aid">vuln:sample-web01</td><td>infra-host</td><td>샘플(예시)</td><td class="muted">—</td><td>4건</td></tr>
+    </table>
+  </div>
+  <div class="pros">
+    <b>장점</b> · 지금 화면을 거의 안 바꿔 익숙함이 유지되고, 구현이 가장 빠릅니다.<br>
+    <b class="warn">단점</b> · 배너는 숫자만 알려줄 뿐 <b>무엇을 해야 하는지</b>는 여전히 사용자가 판단해야 합니다.
+  </div>
+</div>
+
+<!-- ── 시안 B ── -->
+<div class="variant">
+  <div class="vh"><b>시안 B — 목록/커버리지 탭 분리</b><span class="tag">관점을 나눔</span></div>
+  <p class="vd">
+    <b>[전체 목록]</b>과 <b>[커버리지]</b> 탭으로 나눕니다. 커버리지 탭은 결손을 <b>이유와 조치까지</b> 묶어 보여줍니다 —
+    "왜 문제인지"와 "무엇을 누르면 되는지"가 한 카드에 있습니다.
+  </p>
+  <div class="screen">
+    <div class="page-title">AI 자산</div>
+    <div class="tabs">
+      <div class="tab">전체 목록<span class="badge">7</span></div>
+      <div class="tab on">커버리지<span class="badge">3개 결손</span></div>
+    </div>
+    <div class="gapbox">
+      <h4>🔴 담당부서가 잘못 기록된 자산 6건</h4>
+      <div class="why">스캐너로 들여올 때 <b>출처 파일명이 담당부서로 저장</b>됐습니다. 사고 발생 시 연락할 대상을 알 수 없습니다.</div>
+      <ul><li>· vuln:10.10.20.15 — "ollama-llm-server-nessus-scan.csv"</li>
+          <li>· vuln:10.20.0.5 — "nessus-scan-sample.csv"</li>
+          <li class="muted">· 외 4건</li></ul>
+      <button class="fixbtn">담당부서 일괄 지정 →</button>
+    </div>
+    <div class="gapbox">
+      <h4>🟠 서비스가 지정되지 않은 자산 5건</h4>
+      <div class="why">이 자산이 <b>어느 서비스에 쓰이는지</b> 모르면 장애 영향 범위를 계산할 수 없습니다.</div>
+      <button class="fixbtn">서비스 연결 →</button>
+    </div>
+    <div class="gapbox">
+      <h4>🟠 SBOM이 없는 자산 5건</h4>
+      <div class="why">구성요소를 모르면 신규 취약점 공개 시 <b>영향 여부를 판단할 수 없습니다</b>.</div>
+      <button class="fixbtn">일괄 생성 →</button>
+    </div>
+  </div>
+  <div class="pros">
+    <b>장점</b> · 결손마다 <b>왜 문제인지</b>가 붙어 있어 담당자가 우선순위를 스스로 판단할 수 있고, 조치 버튼이 바로 옆에 있습니다.<br>
+    <b class="warn">단점</b> · 탭이 하나 늘어 "어느 탭에서 하던 일이었지"가 생길 수 있습니다.
+  </div>
+</div>
+
+<!-- ── 시안 C ── -->
+<div class="variant">
+  <div class="vh"><b>시안 C — 손이 필요한 순서로 재정렬</b><span class="tag">가장 적극적</span></div>
+  <p class="vd">
+    목록 자체를 <b>조치가 필요한 순서</b>로 정렬하고, 각 행에 <b>무엇이 빠졌는지 배지</b>와 <b>왜 위험한지</b>를 붙입니다.
+    별도 탭 없이 목록 하나가 곧 작업 대기열이 됩니다.
+  </p>
+  <div class="screen">
+    <div class="page-title">AI 자산 <span class="cnt">7건 · 조치 필요 6건</span></div>
+    <div class="sortnote">취약점 심각도 × 정보 결손 × 서비스 영향도 순 정렬</div>
+    <table>
+      <tr><th>자산</th><th>결손</th><th>왜 지금 문제인가</th><th>취약점</th></tr>
+      <tr class="risk-row r1">
+        <td class="aid">vuln:10.10.20.15</td>
+        <td><span class="pill p-red">담당부서</span><span class="pill p-amber">서비스</span><span class="pill p-amber">SBOM</span></td>
+        <td class="why-col">취약점 10건인데 연락할 담당자를 모름</td>
+        <td>10건</td>
+      </tr>
+      <tr class="risk-row r1">
+        <td class="aid">vuln:sample-web01</td>
+        <td><span class="pill p-amber">서비스</span><span class="pill p-amber">SBOM</span></td>
+        <td class="why-col">취약점 4건, 영향 서비스 불명</td>
+        <td>4건</td>
+      </tr>
+      <tr class="risk-row r2">
+        <td class="aid">vuln:10.20.0.5</td>
+        <td><span class="pill p-red">담당부서</span><span class="pill p-amber">서비스</span></td>
+        <td class="why-col">담당부서에 파일명이 기록됨</td>
+        <td>3건</td>
+      </tr>
+      <tr>
+        <td class="aid">ai-secbot-01</td>
+        <td><span class="pill p-teal">완비</span></td>
+        <td class="muted">—</td>
+        <td>1건</td>
+      </tr>
+    </table>
+  </div>
+  <div class="pros">
+    <b>장점</b> · 화면을 열자마자 <b>무엇부터 손대야 할지</b>가 보입니다. 정보가 완비된 자산은 아래로 내려가 시야에서 빠집니다.<br>
+    <b class="warn">단점</b> · 정렬이 바뀌어 "아까 그 자산이 어디 갔지"가 생길 수 있고, 정렬 기준을 사용자가 신뢰해야 합니다.
+  </div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,56 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../client/src/renderer/pages/gijo-ui.css"><style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.16);--blue:#3b82f6;--blue-light:#5fa1ff;--teal:#1eb980;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;}
+*{box-sizing:border-box;margin:0;padding:0;font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;}
+body{background:#070b14;color:var(--text);padding:20px;display:flex;gap:16px;align-items:flex-start;}
+.center{flex:1;min-width:420px;}
+.note{font-size:11px;color:var(--muted-2);margin-top:10px;line-height:1.6;}
+.ph{font-size:12px;color:var(--muted-2);font-weight:800;margin-bottom:8px;}
+.stub{background:var(--panel-2);border:1px solid var(--border);border-radius:12px;padding:18px;color:var(--muted);font-size:12px;}
+/* 오른쪽 패널 */
+.rp{width:340px;flex:0 0 auto;background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;max-height:760px;}
+.acc{border-bottom:1px solid var(--border);display:flex;flex-direction:column;min-height:0;}
+.acc:last-child{border-bottom:0;flex:1;}
+.acc-h{display:flex;align-items:center;gap:8px;padding:12px 14px;cursor:pointer;background:var(--panel-2);}
+.acc-h .car{color:var(--muted-2);font-size:11px;transition:.15s;}
+.acc-h .t{font-size:12.5px;font-weight:800;color:#fff;}
+.acc-h .sp{margin-left:auto;display:flex;gap:6px;align-items:center;}
+.acc-b{padding:8px 12px 12px;overflow-y:auto;}
+.acc.collapsed .acc-b{display:none;}
+.acc.collapsed .acc-h .car{transform:rotate(-90deg);}
+/* 세션 리스트 */
+.sitem{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:9px;cursor:pointer;border:1px solid transparent;}
+.sitem:hover{background:var(--panel-2);}
+.sitem .st{flex:1;min-width:0;font-weight:700;font-size:12px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sitem .sd{font-size:10px;color:var(--muted-2);}
+/* 챗봇 */
+.chat{display:flex;flex-direction:column;gap:8px;min-height:220px;}
+.msg{display:flex;gap:8px;font-size:12px;line-height:1.5;}
+.msg .av{width:24px;height:24px;border-radius:7px;background:var(--panel-2);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:12px;flex:0 0 auto;}
+.msg .bubble{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:8px 11px;color:var(--text);}
+.dock{display:flex;gap:8px;padding-top:8px;border-top:1px solid var(--border);margin-top:auto;}
+.dock input{flex:1;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:10px;padding:0 12px;height:36px;color:var(--text);font-size:12px;outline:none;}
+</style></head><body class="g-ui">
+<div class="center">
+  <div class="ph">중앙 (콘솔 이관 후 — 메뉴·로스터·실시간 활동 위주)</div>
+  <div class="stub">🧭 내 업무 바로가기 · 에이전트 로스터 · 실시간 활동 …<br><br>(중앙의 지휘 콘솔/입력창은 오른쪽 패널로 이동 → 중앙이 넓어짐)</div>
+  <div class="note">· 오른쪽 패널은 기본 접힘(◧). 펼치면 아래 두 섹션이 나온다.<br>· [세션 관리]와 [지휘 콘솔]은 <b>각각 접었다 폈다</b> 가능(위아래 아코디언).<br>· 지휘 콘솔을 펼치면 채팅+입력창이 오른쪽에서 바로 쓰인다.</div>
+</div>
+<div class="rp">
+  <div class="acc ">
+    <div class="acc-h"><span class="car">▾</span><span class="t">💬 작업 세션</span><span class="sp"><button class="g-btn g-sm g-primary">＋ 새 세션</button></span></div>
+    <div class="acc-b">
+      <div class="sitem"><span class="g-badge g-b-med">진행</span><span class="st">Log4Shell 조치 세션</span></div>
+      <div class="sitem"><span class="g-badge g-b-ok">완료</span><span class="st">웹서버 재스캔 검토</span></div>
+      <div class="sitem"><span class="g-badge g-b-low">보관</span><span class="st">FW-01 정책 점검</span></div>
+      <div style="text-align:center;font-size:11px;color:var(--blue-light);font-weight:700;padding:8px;cursor:pointer">전체 작업 세션 열기 ↗</div>
+    </div>
+  </div>
+  <div class="acc ">
+    <div class="acc-h"><span class="car">▾</span><span class="t">🧭 지휘 콘솔</span><span class="sp"><span class="g-badge g-b-ok">● 대기</span></span></div>
+    <div class="acc-b"><div class="chat">
+      <div class="msg"><span class="av">🧭</span><div class="bubble">좋은 아침입니다, 정요한님. 팀원을 고르고 아래에서 지시하세요.</div></div>
+      <div class="msg" style="flex-direction:row-reverse"><span class="av" style="background:var(--blue);color:#fff;border-color:var(--blue)">정</span><div class="bubble" style="background:rgba(59,130,246,.12);border-color:var(--blue)">오늘 제일 급한 취약점 알려줘</div></div>
+      <div class="dock"><input placeholder="지시를 입력하세요…"><button class="g-btn g-primary">전송</button></div>
+    </div></div>
+  </div></div>
+</body></html>

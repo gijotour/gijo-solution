@@ -1,0 +1,94 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<title>메뉴 통합 시안 3종 비교</title>
+<style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.1);--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--blue:#3b82f6;--blue-light:#5fa1ff;--teal:#1eb980;--amber:#f0a020;--red:#e2483d;--purple:#8b7cf0;}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--text);font-family:'Malgun Gothic',sans-serif;padding:24px;}
+h1{font-size:19px;margin-bottom:6px;} .sub{font-size:12px;color:var(--muted);margin-bottom:20px;}
+.wrap{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;align-items:start;}
+.col{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;}
+.col.cur{opacity:.75;border-style:dashed;}
+.col h2{font-size:13.5px;margin-bottom:3px;} .col .d{font-size:10.5px;color:var(--muted);margin-bottom:10px;line-height:1.5;min-height:44px;}
+.cnt{font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;background:rgba(59,130,246,.15);color:var(--blue-light);margin-left:6px;}
+.g{margin-bottom:9px;}
+.gh{font-size:10.5px;font-weight:800;color:var(--muted-2);letter-spacing:.4px;padding:3px 2px;}
+.it{font-size:11.5px;padding:5px 9px;border-radius:6px;color:#cdd5e4;display:flex;align-items:center;gap:6px;}
+.it.hub{color:#fff;font-weight:700;background:rgba(59,130,246,.1);}
+.it .tag{margin-left:auto;font-size:8.5px;font-weight:800;padding:1px 5px;border-radius:4px;flex-shrink:0;}
+.t-merge{background:rgba(139,124,240,.18);color:#c9b8ff;} .t-move{background:rgba(240,160,32,.16);color:#f7c777;}
+.t-del{background:rgba(226,72,61,.16);color:#f5928a;} .t-tab{background:rgba(30,185,128,.14);color:#6fdcb5;}
+.sub-it{font-size:10.5px;color:var(--muted);padding:2px 9px 2px 24px;}
+.legend{margin-top:18px;font-size:10.5px;color:var(--muted);display:flex;gap:14px;flex-wrap:wrap;}
+.legend span{display:inline-flex;align-items:center;gap:5px;}
+</style></head><body>
+<h1>메뉴 통합 시안 3종 (현행 32 → A:14 / B:17 / C:11)</h1>
+<div class="sub">근거: 사이드바 모범사례(주 그룹 3~6·점진 공개·업무 흐름 기준 그룹핑) + Tenable One/Rapid7 Command의 "통합 플랫폼·허브" 흐름</div>
+<div class="wrap">
+
+<div class="col cur">
+  <h2>현행 <span class="cnt">32항목·6그룹</h2>
+  <div class="d">이번 주 자산허브·MCP·하드닝 등 신설로 재비대. AI 그룹 9개, 자산 그룹 9개.</div>
+  <div class="g"><div class="gh">🖥 관제·모니터링 (6)</div>
+    <div class="it">대시보드</div><div class="it">보안 KPI</div><div class="it">보안 분석</div><div class="it">작업 세션</div><div class="it">위협 인텔리전스</div><div class="it">MCP 연동</div></div>
+  <div class="g"><div class="gh">🛡 자산·취약점·대응 (9)</div>
+    <div class="it">자산 허브</div><div class="it">자산 목록</div><div class="it">AI-BOM 구성</div><div class="it">취약점</div><div class="it">조치·승인</div><div class="it">보안제품</div><div class="it">유지보수</div><div class="it">리포트</div><div class="it">컴플라이언스</div></div>
+  <div class="g"><div class="gh">🤖 AI (9)</div>
+    <div class="it">에이전트 AI</div><div class="it">팀 사무실(창)</div><div class="it">LLM 합성</div><div class="it">LLM 가이드</div><div class="it">기억·학습(RAG)</div><div class="it">문서 보강</div><div class="it">온톨로지</div><div class="it">학습 루프</div><div class="it">레드팀·가드레일</div></div>
+  <div class="g"><div class="gh">🛠 시스템 (4)</div>
+    <div class="it">로그</div><div class="it">작업 기록(감사)</div><div class="it">터미널(CLI)</div><div class="it">원격 정기점검</div></div>
+  <div class="g"><div class="gh">❓/⚙ (4)</div>
+    <div class="it">기능 안내</div><div class="it">설정</div><div class="it">사용량·요금</div><div class="it">업데이트</div></div>
+</div>
+
+<div class="col">
+  <h2>A안 — 허브 중심 슬림 <span class="cnt">14항목·4그룹</span></h2>
+  <div class="d">겹치는 화면은 허브 밑으로 강등(항목 유지하되 들여쓰기 하위). 클릭 동선 유지 — 페이지 개편 없음, nav만 변경. 저위험.</div>
+  <div class="g"><div class="gh">🖥 관제 (4)</div>
+    <div class="it">대시보드</div><div class="it">보안 분석</div><div class="it">보안 KPI</div><div class="it">위협 인텔리전스</div>
+    <div class="sub-it">└ 작업 세션 → 드로어·대시보드로 이동 <span class="tag t-move" style="margin-left:4px">이동</span></div></div>
+  <div class="g"><div class="gh">🛡 자산·조치 (6)</div>
+    <div class="it hub">자산 허브 <span class="tag t-merge">허브</span></div>
+    <div class="sub-it">└ 자산 목록 · AI-BOM · 취약점 (하위 항목으로 들여쓰기)</div>
+    <div class="it">조치·승인</div><div class="it">보안제품</div><div class="it">유지보수</div><div class="it">리포트</div><div class="it">컴플라이언스</div></div>
+  <div class="g"><div class="gh">🤖 AI (3)</div>
+    <div class="it">에이전트 AI · 팀 사무실</div>
+    <div class="it hub">AI 지식·모델 <span class="tag t-merge">허브</span></div>
+    <div class="sub-it">└ 기억·학습 · 온톨로지 · 문서보강 · 학습루프 · 합성 · 가이드</div>
+    <div class="it">레드팀·가드레일</div></div>
+  <div class="g"><div class="gh">🛠 시스템·설정 (4+α)</div>
+    <div class="it">로그·감사</div><div class="it">터미널·정기점검</div><div class="it">설정 <span class="tag t-move">MCP·요금·업데이트·안내 흡수</span></div></div>
+</div>
+
+<div class="col">
+  <h2>B안 — 업무 흐름 4그룹 <span class="cnt">17항목·4그룹</span></h2>
+  <div class="d">"발견→조치→보고" 업무 흐름 순서로 재배열. 병합은 최소(이름만 합침), 익숙한 구조 유지. 보수적.</div>
+  <div class="g"><div class="gh">1️⃣ 파악 (5)</div>
+    <div class="it">대시보드</div><div class="it">보안 분석</div><div class="it">자산 허브</div><div class="it">위협 인텔리전스</div><div class="it">보안 KPI</div></div>
+  <div class="g"><div class="gh">2️⃣ 조치 (5)</div>
+    <div class="it">취약점</div><div class="it">조치·승인</div><div class="it">원격 정기점검</div><div class="it">유지보수</div><div class="it">터미널(CLI)</div></div>
+  <div class="g"><div class="gh">3️⃣ 보고·자산 (4)</div>
+    <div class="it">리포트</div><div class="it">컴플라이언스</div><div class="it">보안제품</div><div class="it">자산 목록·AI-BOM <span class="tag t-merge">병합</span></div></div>
+  <div class="g"><div class="gh">4️⃣ AI·시스템 (3+설정)</div>
+    <div class="it">에이전트·팀 사무실</div><div class="it">AI 지식·모델 <span class="tag t-merge">6→1</span></div><div class="it">레드팀 · 로그·감사 · 설정(흡수)</div></div>
+</div>
+
+<div class="col">
+  <h2>C안 — 탭 통합 적극 <span class="cnt">11항목·3그룹</span></h2>
+  <div class="d">겹치는 페이지를 실제로 탭으로 병합(페이지 개편 필요). 사이드바 최슬림 — 구현 공수 최대, 장기 지향점.</div>
+  <div class="g"><div class="gh">🖥 관제 (4)</div>
+    <div class="it">대시보드</div><div class="it">보안 분석 <span class="tag t-tab">+KPI 탭</span></div><div class="it">위협 인텔리전스 <span class="tag t-tab">+MCP 탭</span></div><div class="it">리포트 <span class="tag t-tab">+컴플라이언스 탭</span></div></div>
+  <div class="g"><div class="gh">🛡 자산·조치 (4)</div>
+    <div class="it hub">자산 허브 <span class="tag t-tab">목록·BOM·취약점 완전 탭化</span></div>
+    <div class="it">조치·승인</div><div class="it">보안제품 <span class="tag t-tab">+유지보수 탭</span></div><div class="it">점검 콘솔 <span class="tag t-merge">터미널+정기점검</span></div></div>
+  <div class="g"><div class="gh">🤖 AI·시스템 (3+설정)</div>
+    <div class="it">AI 팀 <span class="tag t-merge">에이전트+사무실</span></div><div class="it">AI 지식·모델 <span class="tag t-tab">6→1 탭</span></div><div class="it">레드팀·가드레일</div>
+    <div class="sub-it">└ 로그·감사·설정·업데이트 → ⚙ 설정 하위</div></div>
+</div>
+
+</div>
+<div class="legend">
+  <span><span class="tag t-merge" style="position:static">허브/병합</span> 항목을 하나로 묶음(네비만)</span>
+  <span><span class="tag t-tab" style="position:static">탭</span> 페이지 자체를 탭으로 통합(개발 필요)</span>
+  <span><span class="tag t-move" style="position:static">이동</span> 설정·드로어 등으로 강등</span>
+</div>
+</body></html>

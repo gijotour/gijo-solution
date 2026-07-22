@@ -1,0 +1,28 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.16);--blue:#3b82f6;--blue-light:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;}
+*{box-sizing:border-box;margin:0;padding:0;font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;}
+body{background:var(--bg);color:var(--text);padding:22px;width:760px;}
+.report{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:12px;padding:16px 18px;}
+h4{font-size:15px;color:#fff;margin-bottom:3px;}
+.meta{font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.5;}
+.sumline{display:flex;gap:14px;align-items:baseline;margin-bottom:14px;flex-wrap:wrap;padding-bottom:12px;border-bottom:1px solid var(--border);}
+.score{font-size:26px;font-weight:800;}
+.verdict{font-weight:800;}
+.tot{color:var(--muted);font-size:12px;}
+table{width:100%;border-collapse:collapse;font-size:11.5px;}
+td,th{text-align:left;padding:6px 8px;vertical-align:top;}
+.st{white-space:nowrap;font-weight:700;}
+.ev{color:var(--muted);font-size:11px;}
+.badge{font-size:9.5px;font-weight:800;padding:1px 7px;border-radius:5px;}
+</style></head><body><div class="report"><h4>🛡 보안장비 하드닝 점검 리포트</h4>
+  <div class="meta">대상: 운영 리눅스 장비 (WSL Ubuntu) · 기준: 국내 CCE — KISA 주요정보통신기반시설 취약점 분석·평가(U-시리즈)<br>점검 방식: 장비 CLI 실 명령 실행·실측 · 0.2초 소요</div>
+  <div class="sumline"><span class="score" style="color:#e2483d">50%</span>
+  <span class="verdict" style="color:#e2483d">🔴 미흡(다수 취약)</span>
+  <span class="tot">✅ 5 · ❌ 5 · ⚠️ 0 · ➖ 1 (총 11)</span></div>
+  <div style="font-size:11px;color:var(--muted-2);font-weight:700;margin-bottom:2px">분류별 점검 결과</div><div style="margin-top:14px;border-left:3px solid #e2483d;padding-left:12px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-size:13px;font-weight:800;color:#fff">계정 관리</span><span style="color:var(--muted-2);font-size:11px">7항목</span><span style="margin-left:auto;display:flex;gap:5px"><span class="badge" style="background:rgba(30,185,128,.15);color:#1eb980">양호 1</span><span class="badge" style="background:rgba(226,72,61,.15);color:#e2483d">취약 5</span><span class="badge" style="background:rgba(139,147,171,.15);color:#8b93ab">해당없음 1</span></span></div>
+      <table><tbody><tr><td style="width:52px;color:var(--muted-2);font-weight:700">U-01</td><td>root 계정 원격 접속 제한</td><td class="st" style="color:#8b93ab;width:88px">➖ 해당없음</td><td class="ev">SSH 서버(sshd) 미설치 — 원격 접속면 없음</td></tr><tr><td style="width:52px;color:var(--muted-2);font-weight:700">U-02</td><td>패스워드 복잡성 설정</td><td class="st" style="color:#e2483d;width:88px">❌ 취약</td><td class="ev">pam_pwquality 복잡도 미설정</td></tr><tr><td style="width:52px;color:var(--muted-2);font-weight:700">U-03</td><td>계정 잠금 임계값 설정</td><td class="st" style="color:#e2483d;width:88px">❌ 취약</td><td class="ev">로그인 실패 잠금(faillock) 미설정</td></tr><tr><td style="width:52px;color:var(--muted-2);font-weight:700">U-44</td><td>UID 0 계정 root뿐</td><td class="st" style="color:#1eb980;width:88px">✅ 양호</td><td class="ev">UID 0 계정은 root 뿐</td></tr><tr><td style="width:52px;color:var(--muted-2);font-weight:700">U-46</td><td>패스워드 최소 길이 8자 이상</td><td class="st" style="color:#e2483d;width:88px">❌ 취약</td><td class="ev">패스워드 최소 길이 미설정</td></tr><tr><td style="width:52px;color:var(--muted-2);font-weight:700">U-47</td><td>패스워드 최대 사용기간 90일 이하</td><td class="st" style="color:#e2483d;width:88px">❌ 취약</td><td class="ev">PASS_MAX_DAYS=99999</td></tr><tr><td style="width:52px;color:var(--muted-2);font-weight:700">U-48</td><td>패스워드 최소 사용기간 1일 이상</td><td class="st" style="color:#e2483d;width:88px">❌ 취약</td><td class="ev">PASS_MIN_DAYS=0</td></tr></tbody></table></div><div style="margin-top:14px;border-left:3px solid #1eb980;padding-left:12px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-size:13px;font-weight:800;color:#fff">파일·디렉터리</span><span style="color:var(--muted-2);font-size:11px">3항목</span><span style="margin-left:auto;display:flex;gap:5px"><span class="badge" style="background:rgba(30,185,128,.15);color:#1eb980">양호 3</span></span></div>
+      <table><tbody><tr><td style="width:52px;color:var(--muted-2);font-weight:700">U-07</td><td>/etc/passwd 소유자·권한</td><td class="st" style="color:#1eb980;width:88px">✅ 양호</td><td class="ev">소유자 root, 권한 644</td></tr><tr><td style="width:52px;color:var(--muted-2);font-weight:700">U-08</td><td>/etc/shadow 소유자·권한</td><td class="st" style="color:#1eb980;width:88px">✅ 양호</td><td class="ev">소유자 root, 권한 640</td></tr><tr><td style="width:52px;color:var(--muted-2);font-weight:700">U-56</td><td>UMASK 022 이상</td><td class="st" style="color:#1eb980;width:88px">✅ 양호</td><td class="ev">UMASK=022</td></tr></tbody></table></div><div style="margin-top:14px;border-left:3px solid #1eb980;padding-left:12px">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-size:13px;font-weight:800;color:#fff">로그 관리</span><span style="color:var(--muted-2);font-size:11px">1항목</span><span style="margin-left:auto;display:flex;gap:5px"><span class="badge" style="background:rgba(30,185,128,.15);color:#1eb980">양호 1</span></span></div>
+      <table><tbody><tr><td style="width:52px;color:var(--muted-2);font-weight:700">U-72</td><td>시스템 로깅(rsyslog)</td><td class="st" style="color:#1eb980;width:88px">✅ 양호</td><td class="ev">rsyslog: active</td></tr></tbody></table></div></div></body></html>

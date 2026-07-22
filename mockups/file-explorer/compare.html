@@ -1,0 +1,127 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<title>PC 파일 탐색기 — 시안 3종</title>
+<style>
+  :root{
+    --bg:#0a1120; --panel:#0f1626; --panel-2:#121a2e; --panel-3:#0c1322;
+    --border:#1e2a44; --border-strong:#2a3a5e;
+    --blue:#3b82f6; --blue-light:#7ab0ff; --teal:#1eb980;
+    --text:#e6edf7; --muted:#8a97ad; --muted-2:#5f6b82;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;font-family:"Segoe UI","Malgun Gothic",system-ui,sans-serif;}
+  body{background:var(--bg);color:var(--text);padding:24px;}
+  h1{font-size:17px;font-weight:800;margin-bottom:4px;}
+  .sub{font-size:12.5px;color:var(--muted);margin-bottom:18px;line-height:1.6;}
+  .row{display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap;}
+  .col{width:250px;}
+  .cap{margin-top:10px;font-size:12px;color:var(--muted);line-height:1.55;}
+  .cap b{color:var(--blue-light);font-weight:800;font-size:12.5px;display:block;margin-bottom:3px;}
+  .tag{display:inline-block;font-size:10.5px;font-weight:700;color:var(--teal);background:rgba(30,185,128,.12);border:1px solid rgba(30,185,128,.4);border-radius:999px;padding:1px 7px;margin-top:6px;}
+
+  /* ── 공용 패널 (왼쪽 탐색기 폭 재현) ── */
+  .exp{width:230px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:10px 10px 12px;}
+  .exp-head{display:flex;align-items:center;gap:6px;padding:2px 2px 9px;border-bottom:1px solid var(--border);margin-bottom:8px;}
+  .exp-head .t{font-size:12.5px;font-weight:800;}
+  .exp-head .acts{margin-left:auto;display:flex;gap:5px;}
+  .abtn{width:24px;height:24px;border-radius:7px;background:var(--panel-2);border:1px solid var(--border-strong);
+    display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--muted);cursor:pointer;}
+  .abtn:hover{color:#fff;border-color:var(--blue);}
+  .rootline{font-size:11px;color:var(--muted-2);padding:0 2px 7px;display:flex;align-items:center;gap:5px;}
+  .rootline b{color:var(--muted);font-weight:700;}
+
+  /* 항목 공통 */
+  .it{display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:7px;font-size:12px;cursor:pointer;color:var(--text);white-space:nowrap;overflow:hidden;}
+  .it:hover{background:rgba(255,255,255,.045);}
+  .it .ic{width:15px;text-align:center;flex:0 0 auto;font-size:12px;}
+  .it .nm{overflow:hidden;text-overflow:ellipsis;}
+  .it.dir .nm{color:#dfe8f7;}
+  .it.file .nm{color:var(--muted);}
+  .car{width:12px;text-align:center;color:var(--muted-2);font-size:10px;flex:0 0 auto;}
+  .sz{margin-left:auto;font-size:10px;color:var(--muted-2);flex:0 0 auto;padding-left:6px;}
+
+  /* A 트리 인덴트 */
+  .d1{padding-left:14px;} .d2{padding-left:28px;}
+
+  /* B 브레드크럼 */
+  .crumb{display:flex;align-items:center;gap:3px;flex-wrap:wrap;font-size:11px;color:var(--muted);padding:2px 2px 8px;border-bottom:1px solid var(--border);margin-bottom:7px;}
+  .crumb .c{color:var(--blue-light);cursor:pointer;}
+  .crumb .c.cur{color:var(--text);font-weight:700;cursor:default;}
+  .crumb .sep{color:var(--muted-2);}
+  .upbtn{display:flex;align-items:center;gap:6px;padding:5px 6px;border-radius:7px;font-size:12px;color:var(--muted);cursor:pointer;margin-bottom:2px;}
+  .upbtn:hover{background:rgba(255,255,255,.045);color:#fff;}
+
+  /* C 액션 */
+  .it.hasact:hover .fa{display:flex;}
+  .fa{display:none;margin-left:auto;gap:3px;flex:0 0 auto;padding-left:6px;}
+  .fa span{font-size:10px;padding:1px 5px;border-radius:5px;background:var(--panel-3);border:1px solid var(--border-strong);color:var(--blue-light);}
+  .fa span.mem{color:var(--teal);border-color:rgba(30,185,128,.4);}
+  .pathbar{font-size:10.5px;color:var(--muted-2);background:var(--panel-3);border:1px solid var(--border);border-radius:7px;padding:4px 7px;margin-bottom:8px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+</style></head>
+<body>
+  <h1>내 PC 파일 탐색기 — 시안 3종 (왼쪽 패널 교체)</h1>
+  <div class="sub">현재 <b style="color:#dfe8f7">자산 탐색기</b>를 없애고, 담당자 PC의 폴더·파일을 읽기전용으로 열람하는 탐색기로 교체합니다. 공통: 상단 <b style="color:#dfe8f7">📁 탐색기</b> · ↻ 새로고침 · 📁 폴더 선택. 선택한 폴더가 루트가 되고 그 안만 탐색합니다(루트 밖 차단·50MB 상한).</div>
+
+  <div class="row">
+
+    <!-- ── 시안 A: 트리형 ── -->
+    <div class="col">
+      <div class="exp">
+        <div class="exp-head"><span class="t">📁 탐색기</span>
+          <div class="acts"><div class="abtn">↻</div><div class="abtn">📁</div></div></div>
+        <div class="rootline">📂 <b>Connect AI</b> · 루트</div>
+        <div class="it dir"><span class="car">▾</span><span class="ic">📂</span><span class="nm">docs</span></div>
+        <div class="it dir d1"><span class="car">▾</span><span class="ic">📂</span><span class="nm">reports</span></div>
+        <div class="it file d2"><span class="car"></span><span class="ic">📄</span><span class="nm">2026-Q2-점검.pdf</span></div>
+        <div class="it file d2"><span class="car"></span><span class="ic">📊</span><span class="nm">취약점-요약.xlsx</span></div>
+        <div class="it dir d1"><span class="car">▸</span><span class="ic">📁</span><span class="nm">manuals</span></div>
+        <div class="it dir"><span class="car">▸</span><span class="ic">📁</span><span class="nm">logs</span></div>
+        <div class="it dir"><span class="car">▸</span><span class="ic">📁</span><span class="nm">scans</span></div>
+        <div class="it file"><span class="car"></span><span class="ic">📄</span><span class="nm">README.md</span></div>
+        <div class="it file"><span class="car"></span><span class="ic">⚙️</span><span class="nm">config.yaml</span></div>
+      </div>
+      <div class="cap"><b>시안 A — 트리형 (VS Code식)</b>
+        폴더를 <b style="display:inline;color:#dfe8f7">그 자리에서 펼침/접힘</b>(▸/▾). 계층 전체가 한눈에. 기존 자산 트리와 조작감이 같아 익숙함.
+        <span class="tag">좁은 패널 표준 · 얕은~중간 깊이에 강함</span></div>
+    </div>
+
+    <!-- ── 시안 B: 탐색기형(경로 이동) ── -->
+    <div class="col">
+      <div class="exp">
+        <div class="exp-head"><span class="t">📁 탐색기</span>
+          <div class="acts"><div class="abtn">↻</div><div class="abtn">📁</div></div></div>
+        <div class="crumb"><span class="c">Connect AI</span><span class="sep">›</span><span class="c">…</span><span class="sep">›</span><span class="c">docs</span><span class="sep">›</span><span class="c cur">reports</span></div>
+        <div class="upbtn"><span class="ic">⬆</span><span>상위 폴더로</span></div>
+        <div class="it dir"><span class="ic">📁</span><span class="nm">2026-상반기</span></div>
+        <div class="it dir"><span class="ic">📁</span><span class="nm">2025-하반기</span></div>
+        <div class="it file"><span class="ic">📄</span><span class="nm">2026-Q2-점검.pdf</span><span class="sz">1.2MB</span></div>
+        <div class="it file"><span class="ic">📊</span><span class="nm">취약점-요약.xlsx</span><span class="sz">340KB</span></div>
+        <div class="it file"><span class="ic">📄</span><span class="nm">조치결과.docx</span><span class="sz">88KB</span></div>
+        <div class="it file"><span class="ic">🖼️</span><span class="nm">토폴로지.png</span><span class="sz">512KB</span></div>
+      </div>
+      <div class="cap"><b>시안 B — 탐색기형 (경로 이동)</b>
+        Windows 탐색기처럼 <b style="display:inline;color:#dfe8f7">현재 폴더 내용만</b> 리스트 + 상단 경로(브레드크럼, 중간은 … 접기) + ⬆상위. 폴더 클릭=진입. 파일 크기 표시.
+        <span class="tag">깊은 폴더·파일 많은 폴더에 강함</span></div>
+    </div>
+
+    <!-- ── 시안 C: 하이브리드 + 액션 ── -->
+    <div class="col">
+      <div class="exp">
+        <div class="exp-head"><span class="t">📁 탐색기</span>
+          <div class="acts"><div class="abtn">↻</div><div class="abtn">📁</div></div></div>
+        <div class="pathbar">📂 Connect AI › docs › reports</div>
+        <div class="it dir"><span class="car">▾</span><span class="ic">📂</span><span class="nm">reports</span></div>
+        <div class="it file hasact d1"><span class="ic">📄</span><span class="nm">2026-Q2-점검.pdf</span>
+          <span class="fa"><span class="mem">📥 기억</span><span>👁</span></span></div>
+        <div class="it file hasact d1"><span class="ic">📊</span><span class="nm">취약점-요약.xlsx</span>
+          <span class="fa"><span class="mem">📥 기억</span><span>👁</span></span></div>
+        <div class="it dir d1"><span class="car">▸</span><span class="ic">📁</span><span class="nm">manuals</span></div>
+        <div class="it dir"><span class="car">▸</span><span class="ic">📁</span><span class="nm">logs</span></div>
+        <div class="it file hasact"><span class="ic">📄</span><span class="nm">README.md</span>
+          <span class="fa"><span class="mem">📥 기억</span><span>👁</span></span></div>
+      </div>
+      <div class="cap"><b>시안 C — 트리 + 제품 연계 액션</b>
+        A의 트리에 경로바를 얹고, 파일에 마우스를 올리면 <b style="display:inline;color:var(--teal)">📥 기억(장기기억 RAG에 올리기)</b> · 👁 열기 액션이 뜸. 파일을 곧바로 GIJO에 학습·분석시킬 수 있음.
+        <span class="tag">탐색 + AI 제품 기능 결합</span></div>
+    </div>
+
+  </div>
+</body></html>

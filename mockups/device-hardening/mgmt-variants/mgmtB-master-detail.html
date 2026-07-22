@@ -1,0 +1,66 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.16);--blue:#3b82f6;--blue-light:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;}
+*{box-sizing:border-box;margin:0;padding:0;font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;}
+body{background:var(--bg);color:var(--text);padding:22px;width:1000px;}
+h2{font-size:19px;color:#fff;margin-bottom:3px;}
+.sub{font-size:12px;color:var(--muted);margin-bottom:16px;}
+.sec{font-size:13px;font-weight:800;color:#fff;margin:18px 0 9px;display:flex;align-items:center;gap:8px;}
+.sec .n{color:var(--muted-2);font-weight:600;font-size:11px;}
+.btn{background:var(--blue);color:#fff;border:0;border-radius:7px;padding:7px 13px;font-size:12px;font-weight:800;cursor:pointer;}
+.btn.ghost{background:transparent;border:1px solid var(--border-strong);color:var(--muted);}
+.btn.sm{padding:4px 9px;font-size:11px;}
+.card{background:var(--panel-2);border:1px solid var(--border);border-radius:11px;padding:14px 16px;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{text-align:left;color:var(--muted-2);font-size:10.5px;font-weight:700;padding:6px 9px;border-bottom:1px solid var(--border);}
+td{padding:8px 9px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.chip{font-size:10px;font-weight:800;padding:2px 8px;border-radius:5px;}
+.chip.std{background:rgba(59,130,246,.15);color:#5fa1ff;}
+.chip.on{background:rgba(30,185,128,.15);color:#1eb980;}
+.chip.off{background:rgba(139,147,171,.15);color:#8b93ab;}
+.chip.warn{background:rgba(226,72,61,.15);color:#e2483d;}
+.rate{font-weight:800;}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+.toggle{width:34px;height:19px;border-radius:11px;position:relative;display:inline-block;}
+.toggle .k{width:15px;height:15px;border-radius:50%;background:#fff;position:absolute;top:2px;transition:.2s;}
+.form{background:var(--panel);border:1px dashed var(--border-strong);border-radius:10px;padding:13px 15px;margin-top:8px;display:grid;grid-template-columns:repeat(4,1fr);gap:9px;}
+.form label{font-size:10.5px;color:var(--muted-2);font-weight:700;display:block;margin-bottom:3px;}
+.form input,.form select{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:6px;padding:6px 8px;color:var(--text);font-size:11.5px;}
+.kpi{display:flex;gap:12px;margin-bottom:6px;}
+.kpi .k{flex:1;background:var(--panel-2);border:1px solid var(--border);border-radius:11px;padding:12px 15px;}
+.kpi .kv{font-size:23px;font-weight:800;}
+.kpi .kl{font-size:11px;color:var(--muted);margin-top:2px;}
+.tcard{background:var(--panel-2);border:1px solid var(--border);border-radius:11px;padding:13px 15px;}
+.tcard.warn{border-color:rgba(226,72,61,.4);}
+</style></head><body>
+  <h2>🛡 원격 정기점검 관리</h2><div class="sub">왼쪽에서 장비를 고르면 오른쪽에 스케줄·추세·이력이 나옵니다.</div>
+  <div style="display:grid;grid-template-columns:320px 1fr;gap:16px">
+    <div><div class="sec">🖥 점검 대상 <span class="n">4</span></div><div class="card" style="padding:9px"><div style="display:flex;align-items:center;gap:9px;padding:11px 12px;border-radius:9px;margin-bottom:5px;cursor:pointer;background:rgba(59,130,246,.12);box-shadow:inset 3px 0 0 var(--blue)">
+    <span class="dot" style="background:#f0a020"></span>
+    <div style="flex:1"><div style="font-weight:700;font-size:12.5px;color:#fff">경계 방화벽 (FW-01)</div><div style="font-size:10.5px;color:var(--muted);font-family:Consolas,monospace">10.10.1.5:22</div></div>
+    <span class="rate" style="color:#f0a020;font-size:13px">78%</span></div><div style="display:flex;align-items:center;gap:9px;padding:11px 12px;border-radius:9px;margin-bottom:5px;cursor:pointer;border:1px solid var(--border)">
+    <span class="dot" style="background:#f0a020"></span>
+    <div style="flex:1"><div style="font-weight:700;font-size:12.5px;color:#fff">웹서버 (WEB-02)</div><div style="font-size:10.5px;color:var(--muted);font-family:Consolas,monospace">10.10.1.20:22</div></div>
+    <span class="rate" style="color:#f0a020;font-size:13px">67%</span></div><div style="display:flex;align-items:center;gap:9px;padding:11px 12px;border-radius:9px;margin-bottom:5px;cursor:pointer;border:1px solid var(--border)">
+    <span class="dot" style="background:#e2483d"></span>
+    <div style="flex:1"><div style="font-weight:700;font-size:12.5px;color:#fff">운영 리눅스 (self/local)</div><div style="font-size:10.5px;color:var(--muted);font-family:Consolas,monospace">local</div></div>
+    <span class="rate" style="color:#e2483d;font-size:13px">50%</span></div><div style="display:flex;align-items:center;gap:9px;padding:11px 12px;border-radius:9px;margin-bottom:5px;cursor:pointer;border:1px solid var(--border)">
+    <span class="dot" style="background:#5f6785"></span>
+    <div style="flex:1"><div style="font-weight:700;font-size:12.5px;color:#fff">DB서버 (DB-03)</div><div style="font-size:10.5px;color:var(--muted);font-family:Consolas,monospace">10.10.1.30:2222</div></div>
+    <span class="rate" style="color:#8b93ab;font-size:13px">—</span></div><button class="btn ghost sm" style="width:100%;margin-top:6px">+ 대상 등록</button></div></div>
+    <div><div class="sec">경계 방화벽 (FW-01) <span class="chip std" style="margin-left:4px">KISA</span></div>
+      <div class="card">
+        <div style="display:flex;gap:20px;align-items:center;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)">
+          <div><div style="font-size:34px;font-weight:800;color:#f0a020">78%</div><div style="font-size:11px;color:var(--muted)">현재 준수율 · 취약 3건</div></div>
+          <div style="flex:1"><div style="font-size:11px;color:var(--muted-2);font-weight:700;margin-bottom:4px">준수율 추세</div><svg width="200" height="42" style="vertical-align:middle"><polyline points="0,14.7 100,11.760000000000002 200,9.240000000000002" fill="none" stroke="#1eb980" stroke-width="2"/><circle cx="0" cy="14.7" r="2" fill="#1eb980"/><circle cx="100" cy="11.760000000000002" r="2" fill="#1eb980"/><circle cx="200" cy="9.240000000000002" r="2" fill="#1eb980"/></svg><div style="font-size:10.5px;color:#1eb980;margin-top:3px">▲ 65% → 78% (개선 중)</div></div>
+        </div>
+        <div style="display:flex;gap:20px;font-size:12px;flex-wrap:wrap">
+          <div><div style="color:var(--muted-2);font-size:10.5px">접속</div><div style="font-family:Consolas,monospace">10.10.1.5:22 · admin</div></div>
+          <div><div style="color:var(--muted-2);font-size:10.5px">인증</div><div>🔑 SSH 키</div></div>
+          <div><div style="color:var(--muted-2);font-size:10.5px">주기</div><div>24시간마다 <span class="toggle" style="background:var(--teal)"><span class="k" style="right:2px"></span></span></div></div>
+          <div><div style="color:var(--muted-2);font-size:10.5px">다음 점검</div><div>내일 02:00</div></div>
+          <div style="align-self:center;margin-left:auto"><button class="btn sm">지금 점검</button></div>
+        </div>
+      </div>
+      <div class="sec" style="font-size:12px">📜 점검 이력</div><div class="card"><div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="color:var(--muted);font-family:Consolas,monospace">07-20 03:00</span><span><span class="rate" style="color:#f0a020">78%</span> <span style="color:#e2483d;font-size:11px">취약 3</span></span></div><div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="color:var(--muted);font-family:Consolas,monospace">07-19 15:22</span><span><span class="rate" style="color:#f0a020">72%</span> <span style="color:#e2483d;font-size:11px">취약 4</span></span></div><div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="color:var(--muted);font-family:Consolas,monospace">07-18 03:00</span><span><span class="rate" style="color:#f0a020">65%</span> <span style="color:#e2483d;font-size:11px">취약 6</span></span></div></div>
+    </div>
+  </div></body></html>

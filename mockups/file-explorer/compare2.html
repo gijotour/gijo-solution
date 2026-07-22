@@ -1,0 +1,123 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<title>왼쪽 패널 재구성 — 시안 3종</title>
+<style>
+  :root{
+    --bg:#0a1120; --panel:#0f1626; --panel-2:#121a2e; --panel-3:#0c1322;
+    --border:#1e2a44; --border-strong:#2a3a5e;
+    --blue:#3b82f6; --blue-light:#7ab0ff; --teal:#1eb980;
+    --text:#e6edf7; --muted:#8a97ad; --muted-2:#5f6b82;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;}
+  body{background:var(--bg);color:var(--text);padding:24px;}
+  h1{font-size:17px;font-weight:800;margin-bottom:4px;}
+  .sub{font-size:12.5px;color:var(--muted);margin-bottom:18px;line-height:1.6;max-width:1000px;}
+  .sub b{color:var(--blue-light);}
+  .row{display:flex;gap:26px;align-items:flex-start;flex-wrap:wrap;}
+  .col{width:250px;}
+  .cap{margin-top:10px;font-size:12px;color:var(--muted);line-height:1.55;}
+  .cap b{color:var(--blue-light);font-weight:800;font-size:12.5px;display:block;margin-bottom:3px;}
+  .tag{display:inline-block;font-size:10.5px;font-weight:700;color:var(--teal);background:rgba(30,185,128,.12);border:1px solid rgba(30,185,128,.4);border-radius:999px;padding:1px 7px;margin-top:6px;}
+
+  .exp{width:232px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:10px;}
+  .exp-head{display:flex;align-items:center;gap:6px;padding:2px 2px 9px;border-bottom:1px solid var(--border);margin-bottom:8px;}
+  .exp-head .t{font-size:12.5px;font-weight:800;}
+  .exp-head .acts{margin-left:auto;display:flex;gap:5px;}
+  .abtn{width:23px;height:23px;border-radius:7px;background:var(--panel-2);border:1px solid var(--border-strong);
+    display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted);}
+  .rootline{font-size:11px;color:var(--muted-2);padding:0 2px 6px;display:flex;align-items:center;gap:5px;}
+  .rootline b{color:var(--muted);font-weight:700;}
+
+  .it{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:7px;font-size:12px;color:var(--text);white-space:nowrap;overflow:hidden;}
+  .it .ic{width:15px;text-align:center;flex:0 0 auto;font-size:12px;}
+  .it .nm{overflow:hidden;text-overflow:ellipsis;}
+  .it.file .nm{color:var(--muted);}
+  .car{width:12px;text-align:center;color:var(--muted-2);font-size:10px;flex:0 0 auto;}
+  .d1{padding-left:14px;} .d2{padding-left:26px;}
+  .cnt{margin-left:auto;font-size:10px;color:var(--blue-light);background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.35);border-radius:999px;padding:0 6px;flex:0 0 auto;}
+  .ingest{margin:2px 0 6px 26px;}
+  .ingest b{font-size:10.5px;background:var(--teal);color:#04211d;border-radius:6px;padding:2px 8px;font-weight:800;}
+
+  /* 섹션 헤더 */
+  .sec{margin:10px 2px 5px;padding-top:9px;border-top:1px dashed var(--border-strong);font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.3px;display:flex;align-items:center;gap:6px;}
+  .sec .cs{font-size:9px;color:var(--muted-2);font-weight:600;margin-left:auto;}
+
+  /* 콘솔 크기 폰트(12px) 표시용 */
+  .console-note{font-size:9.5px;color:var(--muted-2);}
+
+  /* C 탭 */
+  .tabs{display:flex;gap:4px;background:var(--panel-3);border:1px solid var(--border);border-radius:8px;padding:3px;margin-bottom:9px;}
+  .tab{flex:1;text-align:center;font-size:11.5px;font-weight:700;color:var(--muted);padding:5px 0;border-radius:6px;cursor:pointer;}
+  .tab.on{background:var(--blue);color:#fff;}
+</style></head>
+<body>
+  <h1>왼쪽 패널 재구성 — 시안 3종</h1>
+  <div class="sub">공통: 상단 <b>📁 탐색기</b>(PC 파일 — 폴더 클릭 시 아래로 트리 펼침 ▸/▾, 파일 클릭 시 <b>🧠 분해해서 올리기</b>=RAG 인입). 아래 <b>AS 탐색기</b> 섹션(글씨 12px, 지휘 콘솔과 동일)에 <b>리포트</b>(리포트 메뉴의 등록 리포트)·<b>문서</b>(등록 문서 파일명+총 수량). <b>제품문서 항목 제거</b>. 전체 폰트는 Pretendard로 통일(코드·터미널만 Consolas 유지).</div>
+
+  <div class="row">
+
+    <!-- ── 시안 A: 2섹션 스택(트리형) ── -->
+    <div class="col">
+      <div class="exp">
+        <div class="exp-head"><span class="t">📁 탐색기</span>
+          <div class="acts"><div class="abtn">📁</div><div class="abtn">↻</div></div></div>
+        <div class="rootline">📂 <b>내 문서</b></div>
+        <div class="it"><span class="car">▾</span><span class="ic">📂</span><span class="nm">보안점검</span></div>
+        <div class="it file d1"><span class="ic">📄</span><span class="nm">2026-Q2-점검.pdf</span></div>
+        <div class="ingest"><b>🧠 분해해서 올리기</b></div>
+        <div class="it file d1"><span class="ic">📊</span><span class="nm">취약점-요약.xlsx</span></div>
+        <div class="it"><span class="car">▸</span><span class="ic">📁</span><span class="nm">로그</span></div>
+
+        <div class="sec">📋 AS 탐색기 <span class="cs">12px</span></div>
+        <div class="it"><span class="car">▾</span><span class="ic">📊</span><span class="nm">리포트</span><span class="cnt">3</span></div>
+        <div class="it file d1"><span class="ic">📄</span><span class="nm">2026-Q2 보안리포트.pdf</span></div>
+        <div class="it file d1"><span class="ic">📄</span><span class="nm">주간리포트_0714.docx</span></div>
+        <div class="it"><span class="car">▸</span><span class="ic">📄</span><span class="nm">문서</span><span class="cnt">12</span></div>
+      </div>
+      <div class="cap"><b>시안 A — 2섹션 스택 (트리형)</b>
+        파일 탐색기 아래에 구분선 + <b style="display:inline;color:#dfe8f7">AS 탐색기</b> 섹션. 리포트·문서를 폴더처럼 ▸ 펼쳐 목록을 그 자리에서 봄. 조작감이 위 파일트리와 동일.
+        <span class="tag">일관 · 한 화면에 다 보임</span></div>
+    </div>
+
+    <!-- ── 시안 B: 컴팩트 카운트 ── -->
+    <div class="col">
+      <div class="exp">
+        <div class="exp-head"><span class="t">📁 탐색기</span>
+          <div class="acts"><div class="abtn">📁</div><div class="abtn">↻</div></div></div>
+        <div class="rootline">📂 <b>내 문서</b></div>
+        <div class="it"><span class="car">▾</span><span class="ic">📂</span><span class="nm">보안점검</span></div>
+        <div class="it file d1"><span class="ic">📄</span><span class="nm">2026-Q2-점검.pdf</span></div>
+        <div class="ingest"><b>🧠 분해해서 올리기</b></div>
+        <div class="it"><span class="car">▸</span><span class="ic">📁</span><span class="nm">로그</span></div>
+
+        <div class="sec">📋 AS 탐색기 <span class="cs">12px</span></div>
+        <div class="it" style="background:rgba(255,255,255,.03);margin-bottom:3px;"><span class="ic">📊</span><span class="nm">리포트</span><span class="cnt">3건</span></div>
+        <div class="it" style="background:rgba(255,255,255,.03);"><span class="ic">📄</span><span class="nm">문서</span><span class="cnt">12개</span></div>
+        <div style="font-size:10px;color:var(--muted-2);padding:6px 6px 0;">항목을 누르면 아래로 목록이 펼쳐집니다</div>
+      </div>
+      <div class="cap"><b>시안 B — 컴팩트 카운트</b>
+        AS 탐색기는 <b style="display:inline;color:#dfe8f7">리포트·문서 2줄</b>만 딱. 각 줄에 수량 배지(3건·12개). 눌러야 펼쳐져 평소엔 깔끔. 파일 탐색기에 시선 집중.
+        <span class="tag">가장 간결 · 수량 한눈</span></div>
+    </div>
+
+    <!-- ── 시안 C: 탭 전환 ── -->
+    <div class="col">
+      <div class="exp">
+        <div class="exp-head"><span class="t">📁 탐색기</span>
+          <div class="acts"><div class="abtn">📁</div><div class="abtn">↻</div></div></div>
+        <div class="tabs"><div class="tab">📁 파일</div><div class="tab on">📋 AS</div></div>
+        <div class="it"><span class="car">▾</span><span class="ic">📊</span><span class="nm">리포트</span><span class="cnt">3</span></div>
+        <div class="it file d1"><span class="ic">📄</span><span class="nm">2026-Q2 보안리포트.pdf</span></div>
+        <div class="it file d1"><span class="ic">📄</span><span class="nm">주간리포트_0714.docx</span></div>
+        <div class="it file d1"><span class="ic">📄</span><span class="nm">월간_유지보수.docx</span></div>
+        <div class="it"><span class="car">▾</span><span class="ic">📄</span><span class="nm">문서</span><span class="cnt">12</span></div>
+        <div class="it file d1"><span class="ic">📄</span><span class="nm">Nessus_스캔결과.pdf</span></div>
+        <div class="it file d1"><span class="ic">📄</span><span class="nm">방화벽_정책.hwpx</span></div>
+        <div style="font-size:10px;color:var(--muted-2);padding:4px 8px 0;">…외 10개 · 총 12개</div>
+      </div>
+      <div class="cap"><b>시안 C — 탭 전환</b>
+        한 영역을 <b style="display:inline;color:#dfe8f7">[📁 파일 | 📋 AS]</b> 탭으로 전환(공간 절약). AS 탭에서 리포트·문서를 넓게 봄. 파일과 AS를 오가며 각각 크게.
+        <span class="tag">공간 절약 · 각 뷰 넓게</span></div>
+    </div>
+
+  </div>
+</body></html>

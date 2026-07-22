@@ -1,0 +1,37 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.16);--blue:#3b82f6;--blue-light:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--teal:#1eb980;--amber:#f0a020;}
+*{box-sizing:border-box;margin:0;padding:0;font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;}
+body{background:#070b14;color:var(--text);padding:20px;width:940px;}
+.wrap{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:16px 18px;}
+.top{display:flex;align-items:center;gap:10px;margin-bottom:4px;}
+.h{font-size:15px;font-weight:800;color:#fff;}
+.role{font-size:10.5px;font-weight:800;padding:2px 9px;border-radius:20px;background:rgba(59,130,246,.15);color:var(--blue-light);}
+.sub{font-size:11.5px;color:var(--muted);margin-bottom:14px;}
+.editbtn{margin-left:auto;background:transparent;border:1px solid var(--border-strong);color:var(--muted);border-radius:7px;padding:5px 12px;font-size:11.5px;font-weight:700;cursor:pointer;}
+.editbtn.on{border-color:var(--blue);color:var(--blue-light);}
+.seclabel{font-size:11px;font-weight:800;color:var(--muted-2);letter-spacing:.3px;margin:14px 2px 8px;display:flex;align-items:center;gap:7px;}
+.seclabel .cnt{color:var(--muted-2);font-weight:600;}
+.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;}
+.tile{background:var(--panel-2);border:1px solid var(--border);border-radius:11px;padding:12px 8px;text-align:center;cursor:pointer;position:relative;transition:.14s;}
+.tile:hover{border-color:var(--blue);transform:translateY(-2px);}
+.tile .ic{font-size:20px;display:block;margin-bottom:6px;}
+.tile .lb{font-size:11.5px;font-weight:700;color:#fff;}
+.tile.add{border-style:dashed;color:var(--muted);display:flex;flex-direction:column;align-items:center;justify-content:center;}
+.tile.add .ic{color:var(--blue-light);}
+.tile .x{position:absolute;top:4px;right:6px;width:17px;height:17px;border-radius:50%;background:rgba(226,72,61,.9);color:#fff;font-size:11px;line-height:17px;display:none;}
+.wrap.editing .tile .x{display:block;}
+.pin{position:absolute;top:5px;right:7px;font-size:12px;color:var(--amber);}
+.pill{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);border-radius:18px;padding:6px 14px;font-size:12px;font-weight:700;cursor:pointer;}
+.pill.on{background:rgba(59,130,246,.14);border-color:var(--blue);color:var(--blue-light);}
+.drawer{margin-top:14px;border-top:1px dashed var(--border-strong);padding-top:12px;}
+.dtitle{font-size:11.5px;font-weight:800;color:#fff;margin-bottom:9px;}
+.chips{display:flex;flex-wrap:wrap;gap:7px;}
+.chip{display:flex;align-items:center;gap:6px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:6px 11px;font-size:11.5px;font-weight:700;color:var(--text);cursor:pointer;}
+.chip .plus{color:var(--teal);font-weight:800;}
+.locked{font-size:9.5px;color:var(--muted-2);margin-left:5px;}
+</style></head><body><div class="wrap editing">
+  <div class="top"><span class="h">내 업무 바로가기</span><span class="role">👤 보안담당자</span><button class="editbtn on">✏ 편집 중</button></div><div class="sub">역할에 맞는 메뉴가 업무 주기별로 자동 배치됩니다. ✏편집에서 원하는 메뉴를 추가·제거하세요.</div>
+  <div class="seclabel">🔵 오늘 (매일) <span class="cnt">4</span></div><div class="grid"><div class="tile"><span class="x">×</span><span class="ic">📊</span><span class="lb">보안 분석</span></div><div class="tile"><span class="x">×</span><span class="ic">🔎</span><span class="lb">취약점</span></div><div class="tile"><span class="x">×</span><span class="ic">✅</span><span class="lb">조치·승인</span></div><div class="tile"><span class="x">×</span><span class="ic">🎯</span><span class="lb">위협 인텔</span></div><div class="tile add"><span class="ic">＋</span><span class="lb">메뉴 추가</span></div></div>
+  <div class="seclabel">🟢 이번 주 (주간) <span class="cnt">5</span></div><div class="grid"><div class="tile"><span class="x">×</span><span class="ic">📦</span><span class="lb">자산 목록</span></div><div class="tile"><span class="x">×</span><span class="ic">🧰</span><span class="lb">보안제품</span></div><div class="tile"><span class="x">×</span><span class="ic">🛰️</span><span class="lb">원격 정기점검</span></div><div class="tile"><span class="x">×</span><span class="ic">📜</span><span class="lb">작업 기록</span></div><div class="tile"><span class="x">×</span><span class="ic">💻</span><span class="lb">터미널</span></div><div class="tile add"><span class="ic">＋</span><span class="lb">메뉴 추가</span></div></div>
+  <div class="seclabel">🟡 이번 달 (월간) <span class="cnt">4</span></div><div class="grid"><div class="tile"><span class="x">×</span><span class="ic">📄</span><span class="lb">리포트</span></div><div class="tile"><span class="x">×</span><span class="ic">📋</span><span class="lb">컴플라이언스</span></div><div class="tile"><span class="x">×</span><span class="ic">🔧</span><span class="lb">유지보수</span></div><div class="tile"><span class="x">×</span><span class="ic">🚨</span><span class="lb">레드팀·가드레일</span></div><div class="tile add"><span class="ic">＋</span><span class="lb">메뉴 추가</span></div></div>
+  </div></body></html>

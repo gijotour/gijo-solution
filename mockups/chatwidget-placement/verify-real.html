@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>실제 chatwidget.js 검증</title>
+<style>
+  body{margin:0;font-family:sans-serif;background:#080c16;color:#e7eaf3;}
+  .content{padding:24px;height:100vh;box-sizing:border-box;overflow:auto;}
+  table{width:60%;border-collapse:collapse;}
+  td,th{border:1px solid #333;padding:8px;}
+</style>
+</head>
+<body>
+<div class="content">
+  <h2>위협 인텔리전스 (더미 콘텐츠)</h2>
+  <table><tr><th>CVE</th><th>상태</th></tr><tr><td>CVE-2026-1</td><td>대응중</td></tr></table>
+  <div id="gijoChatWidget" data-prompts='["우리 자산에 영향 있는 위협 있어?","최근 탐지 내역 알려줘"]' style="max-width:640px;margin-bottom:16px;"></div>
+</div>
+<script>
+  window.gijo = {
+    isAuthenticated: function(){ return true; },
+    createWorkSession: async function(){ return {id:"s1"}; },
+    sendInstruction: async function(text){
+      return { output: "테스트 응답: " + text + "\n\n1. 이건 긴 답변 예시입니다.\n2. 스크롤 없이 얼마나 보이는지 확인용.\n3. " + "본문 ".repeat(30) };
+    }
+  };
+</script>
+<script src="../../client/src/renderer/pages/chatwidget.js"></script>
+</body>
+</html>

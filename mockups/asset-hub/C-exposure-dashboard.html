@@ -1,0 +1,143 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
+<title>시안 C — 통합 노출 대시보드 (CTEM형)</title>
+<style>
+  :root{--bg:#080c16;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.16);
+    --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--blue:#3b82f6;--blue-light:#5fa1ff;--purple:#8b7cf0;--teal:#1eb980;--amber:#f0a020;--red:#e2483d;}
+  *{box-sizing:border-box;margin:0;font-family:'Segoe UI',sans-serif;}
+  body{background:var(--bg);color:var(--text);min-height:100vh;}
+  .shell{display:flex;min-height:100vh;}
+  .nav{width:210px;background:var(--panel);border-right:1px solid var(--border);padding:14px 10px;flex-shrink:0;}
+  .logo{font-weight:900;font-size:14px;margin-bottom:16px;padding:0 6px;}
+  .ni{padding:8px 11px;border-radius:8px;font-size:12px;color:var(--muted);margin-bottom:2px;}
+  .ni.active{background:var(--panel-2);color:#fff;font-weight:700;border-left:3px solid var(--blue);}
+  .main{flex:1;min-width:0;}
+  .top{padding:14px 24px;border-bottom:1px solid var(--border);}
+  .t1{font-size:18px;font-weight:800;}.t2{font-size:12px;color:var(--muted);margin-top:3px;}
+  .ai-badge{background:linear-gradient(90deg,#8b7cf0,#5fa1ff);color:#fff;font-size:9px;font-weight:800;padding:2px 7px;border-radius:20px;}
+  .content{padding:16px 24px;}
+  /* 상단: 통합 노출 요약 */
+  .expo{display:grid;grid-template-columns:1.4fr 1fr 1fr;gap:14px;margin-bottom:16px;}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;}
+  .ph{font-size:12px;font-weight:800;margin-bottom:10px;display:flex;align-items:center;gap:6px;}
+  .ph .hint{margin-left:auto;font-size:9.5px;color:var(--muted-2);font-weight:600;}
+  .score{display:flex;align-items:baseline;gap:8px;}
+  .score .big{font-size:38px;font-weight:900;color:#f5928a;}
+  .score .u{font-size:12px;color:var(--muted);}
+  .bars{margin-top:10px;display:flex;flex-direction:column;gap:6px;}
+  .bar{display:flex;align-items:center;gap:8px;font-size:11px;}
+  .bar .lb{width:80px;color:var(--muted);flex-shrink:0;} .bar .tr{flex:1;height:7px;background:var(--panel-2);border-radius:20px;overflow:hidden;}
+  .bar .fl{height:100%;border-radius:20px;} .bar .vv{width:34px;text-align:right;font-weight:700;flex-shrink:0;}
+  /* AI 위험 도넛(간이) */
+  .ai-risk-list{display:flex;flex-direction:column;gap:7px;}
+  .arl{display:flex;align-items:center;gap:8px;font-size:11px;}
+  .arl .code{font-size:9px;font-weight:800;color:#c9b8ff;background:rgba(139,124,240,.14);padding:2px 6px;border-radius:5px;flex-shrink:0;width:52px;text-align:center;}
+  .arl .n{margin-left:auto;font-weight:800;}
+  /* 필터바 */
+  .filters{display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap;}
+  .chip{font-size:11px;padding:6px 12px;border-radius:20px;background:var(--panel);border:1px solid var(--border-strong);color:var(--muted);cursor:pointer;}
+  .chip.on{background:var(--blue);color:#fff;border-color:var(--blue);}
+  .chip.ai{border-color:rgba(139,124,240,.5);color:#c9b8ff;}
+  /* 통합 자산 표 */
+  table.main-t{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;font-size:11.5px;}
+  .main-t th,.main-t td{padding:10px 12px;text-align:left;border-bottom:1px solid var(--border);}
+  .main-t th{color:var(--muted);font-weight:700;font-size:10.5px;background:var(--panel-2);}
+  .main-t tbody tr{cursor:pointer;} .main-t tbody tr:hover{background:rgba(59,130,246,.06);}
+  .nm{font-weight:700;color:#fff;display:flex;align-items:center;gap:7px;}
+  .kind{font-size:9px;font-weight:800;padding:2px 7px;border-radius:5px;flex-shrink:0;}
+  .kind.ai{background:rgba(139,124,240,.16);color:#c9b8ff;} .kind.it{background:var(--panel-2);color:var(--muted);}
+  .llm-cell{display:flex;gap:3px;flex-wrap:wrap;}
+  .llm{font-size:8.5px;padding:1px 5px;border-radius:4px;background:rgba(139,124,240,.14);color:#c9b8ff;font-weight:700;}
+  .bomcell{font-size:9.5px;color:var(--muted);}
+  .sev{font-weight:800;}.sev.c{color:#f5928a;}.sev.h{color:#f7c777;}
+  .risk{font-size:10px;font-weight:800;padding:2px 9px;border-radius:20px;}
+  .r-crit{background:rgba(226,72,61,.16);color:#f5928a;}.r-high{background:rgba(240,160,32,.16);color:#f7c777;}.r-ok{background:rgba(30,185,128,.16);color:#6fdcb5;}
+</style></head><body>
+<div class="shell">
+  <div class="nav">
+    <div class="logo">GIJO AS</div>
+    <div class="ni active">🛡 자산 허브</div>
+    <div class="ni">위협 인텔리전스</div><div class="ni">조치·승인</div><div class="ni">보안제품</div><div class="ni">컴플라이언스</div>
+  </div>
+  <div class="main">
+    <div class="top">
+      <div class="t1">🛡 자산 허브 — 통합 노출 관제 <span class="ai-badge">CTEM</span></div>
+      <div class="t2">전 자산의 위험을 하나의 노출 모델로 — AI 자산 위험을 별도로 계량하고, 자산·AI-BOM·취약점을 한 표에서 드릴다운</div>
+    </div>
+    <div class="content">
+      <div class="expo">
+        <div class="panel">
+          <div class="ph">📊 종합 노출도 <span class="hint">자산·취약점·AI위험 가중합</span></div>
+          <div class="score"><div class="big">74</div><div class="u">/ 100 · 🔴 높음</div></div>
+          <div class="bars">
+            <div class="bar"><span class="lb">AI 자산</span><div class="tr"><div class="fl" style="width:88%;background:#8b7cf0"></div></div><span class="vv" style="color:#c9b8ff">88</span></div>
+            <div class="bar"><span class="lb">웹/외부노출</span><div class="tr"><div class="fl" style="width:62%;background:var(--amber)"></div></div><span class="vv">62</span></div>
+            <div class="bar"><span class="lb">내부 인프라</span><div class="tr"><div class="fl" style="width:28%;background:var(--teal)"></div></div><span class="vv">28</span></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="ph">🤖 AI 위험 (OWASP LLM) <span class="hint">미대응 노출</span></div>
+          <div class="ai-risk-list">
+            <div class="arl"><span class="code">LLM01</span>프롬프트 인젝션<span class="n" style="color:#f5928a">3</span></div>
+            <div class="arl"><span class="code">LLM06</span>과도한 에이전트 권한<span class="n" style="color:#f7c777">2</span></div>
+            <div class="arl"><span class="code">LLM02</span>민감정보 유출<span class="n" style="color:#f7c777">2</span></div>
+            <div class="arl"><span class="code">LLM03</span>공급망(모델·데이터)<span class="n">1</span></div>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="ph">🩹 취약점 처리 <span class="hint">KEV 우선</span></div>
+          <div class="score"><div class="big" style="color:#f7c777;font-size:30px">14</div><div class="u">미조치 · KEV 2건</div></div>
+          <div class="bars">
+            <div class="bar"><span class="lb">Critical</span><div class="tr"><div class="fl" style="width:40%;background:var(--red)"></div></div><span class="vv">4</span></div>
+            <div class="bar"><span class="lb">High</span><div class="tr"><div class="fl" style="width:70%;background:var(--amber)"></div></div><span class="vv">7</span></div>
+            <div class="bar"><span class="lb">Medium</span><div class="tr"><div class="fl" style="width:30%;background:var(--blue)"></div></div><span class="vv">3</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="filters">
+        <span class="chip on">전체</span>
+        <span class="chip ai">🤖 AI 자산만</span>
+        <span class="chip">외부 노출</span>
+        <span class="chip">KEV 있음</span>
+        <span class="chip">SBOM 미생성</span>
+        <span class="chip">OWASP LLM 노출</span>
+      </div>
+      <table class="main-t">
+        <thead><tr><th>자산</th><th>구분</th><th>AI-BOM 구성</th><th>AI 위험(LLM)</th><th>취약점</th><th>노출점수</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><div class="nm">🧠 fraud-detect-llm <span class="kind ai">AI</span></div></td>
+            <td>LLM · 금융</td>
+            <td class="bomcell">모델3·데이터6·프롬프트4·도구9·인프라16</td>
+            <td><div class="llm-cell"><span class="llm">LLM01</span><span class="llm">LLM06</span></div></td>
+            <td><span class="sev c">Crit 1</span> · High 2</td>
+            <td><span class="risk r-crit">92</span></td>
+          </tr>
+          <tr>
+            <td><div class="nm">🧠 cs-rag-chatbot <span class="kind ai">AI</span></div></td>
+            <td>RAG · 고객지원</td>
+            <td class="bomcell">모델1·데이터3·프롬프트2·도구5·인프라13</td>
+            <td><div class="llm-cell"><span class="llm">LLM08</span><span class="llm">LLM02</span></div></td>
+            <td>High 1 · Med 1</td>
+            <td><span class="risk r-high">61</span></td>
+          </tr>
+          <tr>
+            <td><div class="nm">🌐 web-prod-01 <span class="kind it">IT</span></div></td>
+            <td>웹서버 · 10.0.1.5</td>
+            <td class="bomcell">—</td>
+            <td>—</td>
+            <td><span class="sev c">Crit 1</span> · High 3</td>
+            <td><span class="risk r-high">48</span></td>
+          </tr>
+          <tr>
+            <td><div class="nm">🗄 db-core-02 <span class="kind it">IT</span></div></td>
+            <td>DB · 10.0.1.9</td>
+            <td class="bomcell">—</td>
+            <td>—</td>
+            <td>Low 1</td>
+            <td><span class="risk r-ok">8</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div></body></html>

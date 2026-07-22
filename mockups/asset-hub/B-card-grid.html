@@ -1,0 +1,104 @@
+<!DOCTYPE html><html lang="ko"><head><meta charset="UTF-8">
+<title>시안 B — 카드 그리드 + 드릴다운</title>
+<style>
+  :root{--bg:#080c16;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.16);
+    --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--blue:#3b82f6;--blue-light:#5fa1ff;--purple:#8b7cf0;--teal:#1eb980;--amber:#f0a020;--red:#e2483d;}
+  *{box-sizing:border-box;margin:0;font-family:'Segoe UI',sans-serif;}
+  body{background:var(--bg);color:var(--text);min-height:100vh;}
+  .shell{display:flex;min-height:100vh;}
+  .nav{width:210px;background:var(--panel);border-right:1px solid var(--border);padding:14px 10px;flex-shrink:0;}
+  .logo{font-weight:900;font-size:14px;margin-bottom:16px;padding:0 6px;}
+  .ni{padding:8px 11px;border-radius:8px;font-size:12px;color:var(--muted);margin-bottom:2px;}
+  .ni.active{background:var(--panel-2);color:#fff;font-weight:700;border-left:3px solid var(--blue);}
+  .main{flex:1;min-width:0;}
+  .top{padding:14px 24px;border-bottom:1px solid var(--border);}
+  .t1{font-size:18px;font-weight:800;}.t2{font-size:12px;color:var(--muted);margin-top:3px;}
+  .ai-badge{background:linear-gradient(90deg,#8b7cf0,#5fa1ff);color:#fff;font-size:9px;font-weight:800;padding:2px 7px;border-radius:20px;}
+  .content{padding:18px 24px;}
+  .sec-h{font-size:13px;font-weight:800;margin:6px 0 12px;display:flex;align-items:center;gap:8px;}
+  .sec-h .cnt{color:var(--muted-2);font-weight:600;font-size:11.5px;}
+  /* AI 자산: 크게 강조 카드 */
+  .ai-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px;}
+  .aicard{background:linear-gradient(180deg,rgba(139,124,240,.1),transparent);border:1px solid rgba(139,124,240,.4);border-radius:14px;padding:16px;cursor:pointer;position:relative;}
+  .aicard:hover{border-color:var(--purple);}
+  .aic-top{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+  .aic-ic{width:40px;height:40px;border-radius:11px;background:rgba(139,124,240,.18);display:flex;align-items:center;justify-content:center;font-size:22px;}
+  .aic-nm{font-size:15px;font-weight:800;color:#fff;}
+  .aic-sub{font-size:11px;color:var(--muted);margin-top:2px;}
+  .aic-risk{position:absolute;top:14px;right:14px;font-size:10px;font-weight:800;padding:3px 9px;border-radius:20px;}
+  .r-crit{background:rgba(226,72,61,.16);color:#f5928a;}.r-high{background:rgba(240,160,32,.16);color:#f7c777;}.r-ok{background:rgba(30,185,128,.16);color:#6fdcb5;}
+  .aic-metrics{display:flex;gap:8px;margin-bottom:12px;}
+  .m{flex:1;background:var(--panel-2);border-radius:8px;padding:8px;text-align:center;}
+  .m .v{font-size:17px;font-weight:800;}.m .l{font-size:9px;color:var(--muted);margin-top:2px;}
+  .llm-row{display:flex;gap:5px;flex-wrap:wrap;}
+  .llm{font-size:9px;padding:3px 7px;border-radius:6px;background:rgba(139,124,240,.14);border:1px solid rgba(139,124,240,.3);color:#c9b8ff;font-weight:700;}
+  .bom-mini{display:flex;gap:4px;margin-top:11px;padding-top:11px;border-top:1px solid var(--border);font-size:9.5px;color:var(--muted);}
+  .bom-mini span{background:var(--panel-2);padding:2px 6px;border-radius:5px;}
+  /* IT 자산: 콤팩트 표 */
+  .it-table{width:100%;border-collapse:collapse;background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;font-size:12px;}
+  .it-table th,.it-table td{padding:11px 14px;text-align:left;border-bottom:1px solid var(--border);}
+  .it-table th{color:var(--muted);font-weight:700;font-size:11px;background:var(--panel-2);}
+  .it-table tr{cursor:pointer;} .it-table tbody tr:hover{background:rgba(59,130,246,.06);}
+  .sev{font-weight:800;}.sev.c{color:#f5928a;}.sev.h{color:#f7c777;}
+  .pill{font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:20px;}
+</style></head><body>
+<div class="shell">
+  <div class="nav">
+    <div class="logo">GIJO AS</div>
+    <div class="ni active">🛡 자산 허브</div>
+    <div class="ni">위협 인텔리전스</div><div class="ni">조치·승인</div><div class="ni">보안제품</div><div class="ni">컴플라이언스</div>
+  </div>
+  <div class="main">
+    <div class="top">
+      <div class="t1">🛡 자산 허브</div>
+      <div class="t2">AI 자산을 크게 앞세우고, 카드에서 바로 구성·취약점·AI 위험을 본다 — 클릭하면 3탭 상세로</div>
+    </div>
+    <div class="content">
+      <div class="sec-h">🤖 AI 자산 <span class="ai-badge">중점관리</span> <span class="cnt">· LLM·모델 자산 우선 노출</span></div>
+      <div class="ai-grid">
+        <div class="aicard">
+          <span class="aic-risk r-crit">위험 92</span>
+          <div class="aic-top"><div class="aic-ic">🧠</div><div><div class="aic-nm">fraud-detect-llm</div><div class="aic-sub">LLM · 금융 사기탐지 · Llama-3 70B</div></div></div>
+          <div class="aic-metrics">
+            <div class="m"><div class="v" style="color:#f7c777">5</div><div class="l">취약점</div></div>
+            <div class="m"><div class="v" style="color:#c9b8ff">2</div><div class="l">LLM 위험</div></div>
+            <div class="m"><div class="v">38</div><div class="l">컴포넌트</div></div>
+          </div>
+          <div class="llm-row"><span class="llm">LLM01 프롬프트인젝션</span><span class="llm">LLM06 과도한권한</span></div>
+          <div class="bom-mini"><span>🧠 모델3</span><span>📊 데이터6</span><span>💬 프롬프트4</span><span>🔧 도구9</span><span>☁ 인프라16</span></div>
+        </div>
+        <div class="aicard">
+          <span class="aic-risk r-high">위험 61</span>
+          <div class="aic-top"><div class="aic-ic">🧠</div><div><div class="aic-nm">cs-rag-chatbot</div><div class="aic-sub">RAG · 고객지원 · Mistral 7B</div></div></div>
+          <div class="aic-metrics">
+            <div class="m"><div class="v" style="color:#f7c777">2</div><div class="l">취약점</div></div>
+            <div class="m"><div class="v" style="color:#c9b8ff">2</div><div class="l">LLM 위험</div></div>
+            <div class="m"><div class="v">24</div><div class="l">컴포넌트</div></div>
+          </div>
+          <div class="llm-row"><span class="llm">LLM08 벡터/임베딩</span><span class="llm">LLM02 정보유출</span></div>
+          <div class="bom-mini"><span>🧠 모델1</span><span>📊 데이터3</span><span>💬 프롬프트2</span><span>🔧 도구5</span><span>☁ 인프라13</span></div>
+        </div>
+        <div class="aicard">
+          <span class="aic-risk r-ok">위험 12</span>
+          <div class="aic-top"><div class="aic-ic">🧠</div><div><div class="aic-nm">doc-classifier-02</div><div class="aic-sub">분류모델 · 문서 자동분류</div></div></div>
+          <div class="aic-metrics">
+            <div class="m"><div class="v" style="color:#6fdcb5">0</div><div class="l">취약점</div></div>
+            <div class="m"><div class="v" style="color:#c9b8ff">1</div><div class="l">LLM 위험</div></div>
+            <div class="m"><div class="v">11</div><div class="l">컴포넌트</div></div>
+          </div>
+          <div class="llm-row"><span class="llm">LLM04 데이터중독</span></div>
+          <div class="bom-mini"><span>🧠 모델1</span><span>📊 데이터4</span><span>🔧 도구2</span><span>☁ 인프라4</span></div>
+        </div>
+      </div>
+      <div class="sec-h">🖥 일반 IT 자산 <span class="cnt">· 9건</span></div>
+      <table class="it-table">
+        <thead><tr><th>자산</th><th>유형</th><th>호스트/IP</th><th>취약점</th><th>위험도</th></tr></thead>
+        <tbody>
+          <tr><td>web-prod-01</td><td>웹서버</td><td>10.0.1.5</td><td><span class="sev c">Crit 1</span> · High 3</td><td><span class="pill r-high">48</span></td></tr>
+          <tr><td>vpn-gw-01</td><td>VPN</td><td>10.0.1.2</td><td>High 2</td><td><span class="pill r-high">39</span></td></tr>
+          <tr><td>db-core-02</td><td>DB</td><td>10.0.1.9</td><td>Low 1</td><td><span class="pill r-ok">8</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div></body></html>

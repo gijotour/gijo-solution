@@ -1,0 +1,82 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.16);--blue:#3b82f6;--blue-light:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;}
+*{box-sizing:border-box;margin:0;padding:0;font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;}
+body{background:var(--bg);color:var(--text);padding:22px;width:1000px;}
+h2{font-size:19px;color:#fff;margin-bottom:3px;}
+.sub{font-size:12px;color:var(--muted);margin-bottom:16px;}
+.sec{font-size:13px;font-weight:800;color:#fff;margin:18px 0 9px;display:flex;align-items:center;gap:8px;}
+.sec .n{color:var(--muted-2);font-weight:600;font-size:11px;}
+.btn{background:var(--blue);color:#fff;border:0;border-radius:7px;padding:7px 13px;font-size:12px;font-weight:800;cursor:pointer;}
+.btn.ghost{background:transparent;border:1px solid var(--border-strong);color:var(--muted);}
+.btn.sm{padding:4px 9px;font-size:11px;}
+.card{background:var(--panel-2);border:1px solid var(--border);border-radius:11px;padding:14px 16px;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{text-align:left;color:var(--muted-2);font-size:10.5px;font-weight:700;padding:6px 9px;border-bottom:1px solid var(--border);}
+td{padding:8px 9px;border-bottom:1px solid var(--border);vertical-align:middle;}
+.chip{font-size:10px;font-weight:800;padding:2px 8px;border-radius:5px;}
+.chip.std{background:rgba(59,130,246,.15);color:#5fa1ff;}
+.chip.on{background:rgba(30,185,128,.15);color:#1eb980;}
+.chip.off{background:rgba(139,147,171,.15);color:#8b93ab;}
+.chip.warn{background:rgba(226,72,61,.15);color:#e2483d;}
+.rate{font-weight:800;}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+.toggle{width:34px;height:19px;border-radius:11px;position:relative;display:inline-block;}
+.toggle .k{width:15px;height:15px;border-radius:50%;background:#fff;position:absolute;top:2px;transition:.2s;}
+.form{background:var(--panel);border:1px dashed var(--border-strong);border-radius:10px;padding:13px 15px;margin-top:8px;display:grid;grid-template-columns:repeat(4,1fr);gap:9px;}
+.form label{font-size:10.5px;color:var(--muted-2);font-weight:700;display:block;margin-bottom:3px;}
+.form input,.form select{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:6px;padding:6px 8px;color:var(--text);font-size:11.5px;}
+.kpi{display:flex;gap:12px;margin-bottom:6px;}
+.kpi .k{flex:1;background:var(--panel-2);border:1px solid var(--border);border-radius:11px;padding:12px 15px;}
+.kpi .kv{font-size:23px;font-weight:800;}
+.kpi .kl{font-size:11px;color:var(--muted);margin-top:2px;}
+.tcard{background:var(--panel-2);border:1px solid var(--border);border-radius:11px;padding:13px 15px;}
+.tcard.warn{border-color:rgba(226,72,61,.4);}
+</style></head><body>
+  <h2>🛡 원격 정기점검 관리</h2><div class="sub">보안장비에 SSH로 접속해 하드닝(보안설정)을 주기적으로 자동 점검합니다.</div>
+  <div class="sec">🖥 점검 대상 <span class="n">4대</span><span style="margin-left:auto"><button class="btn sm">+ 대상 등록</button></span></div>
+  <div class="card"><table><thead><tr><th>장비</th><th>주소</th><th>인증</th><th>최근 준수율</th><th>작업</th></tr></thead><tbody><tr>
+    <td><b style="color:#fff">경계 방화벽 (FW-01)</b></td>
+    <td style="color:var(--muted);font-family:Consolas,monospace">10.10.1.5:22</td>
+    <td>🔑 SSH 키 · admin</td>
+    <td><span class="rate" style="color:#f0a020">78%</span></td>
+    <td><button class="btn sm">점검</button> <button class="btn sm ghost">삭제</button></td></tr><tr>
+    <td><b style="color:#fff">웹서버 (WEB-02)</b></td>
+    <td style="color:var(--muted);font-family:Consolas,monospace">10.10.1.20:22</td>
+    <td>🔑 SSH 키 · secadmin</td>
+    <td><span class="rate" style="color:#f0a020">67%</span></td>
+    <td><button class="btn sm">점검</button> <button class="btn sm ghost">삭제</button></td></tr><tr>
+    <td><b style="color:#fff">운영 리눅스 (self/local)</b></td>
+    <td style="color:var(--muted);font-family:Consolas,monospace">local</td>
+    <td>🖥 로컬</td>
+    <td><span class="rate" style="color:#e2483d">50%</span></td>
+    <td><button class="btn sm">점검</button> <button class="btn sm ghost">삭제</button></td></tr><tr>
+    <td><b style="color:#fff">DB서버 (DB-03)</b></td>
+    <td style="color:var(--muted);font-family:Consolas,monospace">10.10.1.30:2222</td>
+    <td>🔒 비밀번호 · dba</td>
+    <td><span class="rate" style="color:#8b93ab">—</span></td>
+    <td><button class="btn sm">점검</button> <button class="btn sm ghost">삭제</button></td></tr></tbody></table>
+  <div class="form"><div><label>장비 이름</label><input placeholder="경계 방화벽 (FW-01)"></div><div><label>호스트/IP</label><input placeholder="10.10.1.5"></div><div><label>포트</label><input value="22"></div><div><label>계정</label><input placeholder="admin"></div>
+  <div><label>인증 방식</label><select><option>SSH 키</option><option>비밀번호</option><option>로컬</option></select></div><div style="grid-column:span 2"><label>키 경로 / 비밀번호</label><input placeholder="/keys/id_ed25519"></div><div style="align-self:end"><button class="btn" style="width:100%">등록 + 접속확인</button></div></div></div>
+  <div class="sec">⏱ 정기점검 스케줄 <span class="n">활성 3</span><span style="margin-left:auto"><button class="btn sm">+ 스케줄 추가</button></span></div>
+  <div class="card"><table><thead><tr><th>대상</th><th>기준</th><th>주기</th><th>다음 점검</th><th>최근 결과</th><th>활성</th></tr></thead><tbody><tr>
+    <td><b style="color:#fff">경계 방화벽 (FW-01)</b></td>
+    <td><span class="chip std">KISA</span></td>
+    <td>24시간마다</td>
+    <td style="color:var(--muted)">내일 02:00</td>
+    <td><span class="rate" style="color:#f0a020">78%</span> </td>
+    <td><span class="toggle" style="background:var(--teal)"><span class="k" style="right:2px"></span></span></td></tr><tr>
+    <td><b style="color:#fff">웹서버 (WEB-02)</b></td>
+    <td><span class="chip std">CIS</span></td>
+    <td>12시간마다</td>
+    <td style="color:var(--muted)">오늘 20:00</td>
+    <td><span class="rate" style="color:#f0a020">67%</span> <span class="chip warn">▼ 악화</span></td>
+    <td><span class="toggle" style="background:var(--teal)"><span class="k" style="right:2px"></span></span></td></tr><tr>
+    <td><b style="color:#fff">운영 리눅스 (self/local)</b></td>
+    <td><span class="chip std">KISA</span></td>
+    <td>24시간마다</td>
+    <td style="color:var(--muted)">내일 03:00</td>
+    <td><span class="rate" style="color:#e2483d">50%</span> </td>
+    <td><span class="toggle" style="background:var(--teal)"><span class="k" style="right:2px"></span></span></td></tr></tbody></table></div>
+  <div class="sec">📜 최근 점검 이력</div>
+  <div class="card"><table><thead><tr><th>시각</th><th>대상</th><th>기준</th><th>준수율</th><th>취약</th><th>실행</th></tr></thead><tbody><tr><td style="color:var(--muted);font-family:Consolas,monospace">07-20 09:11</td><td>웹서버 (WEB-02)</td><td><span class="chip std">CIS</span></td><td><span class="rate" style="color:#f0a020">67%</span></td><td style="color:#e2483d">취약 2</td><td><span class="chip on">정기</span></td></tr><tr><td style="color:var(--muted);font-family:Consolas,monospace">07-20 03:00</td><td>경계 방화벽 (FW-01)</td><td><span class="chip std">KISA</span></td><td><span class="rate" style="color:#f0a020">78%</span></td><td style="color:#e2483d">취약 3</td><td><span class="chip on">정기</span></td></tr><tr><td style="color:var(--muted);font-family:Consolas,monospace">07-20 03:00</td><td>운영 리눅스 (self/local)</td><td><span class="chip std">KISA</span></td><td><span class="rate" style="color:#e2483d">50%</span></td><td style="color:#e2483d">취약 5</td><td><span class="chip on">정기</span></td></tr><tr><td style="color:var(--muted);font-family:Consolas,monospace">07-19 20:00</td><td>웹서버 (WEB-02)</td><td><span class="chip std">CIS</span></td><td><span class="rate" style="color:#f0a020">69%</span></td><td style="color:#e2483d">취약 2</td><td><span class="chip on">정기</span></td></tr><tr><td style="color:var(--muted);font-family:Consolas,monospace">07-19 15:22</td><td>경계 방화벽 (FW-01)</td><td><span class="chip std">KISA</span></td><td><span class="rate" style="color:#f0a020">72%</span></td><td style="color:#e2483d">취약 4</td><td><span class="chip off">수동</span></td></tr></tbody></table></div>
+  </body></html>
