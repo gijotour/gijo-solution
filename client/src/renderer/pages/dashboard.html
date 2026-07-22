@@ -90,7 +90,10 @@
   .dash-new{background:var(--blue);color:#fff;border:0;border-radius:6px;font-size:11px;font-weight:700;padding:4px 9px;cursor:pointer;}
   .dash-active-badge{background:rgba(30,185,128,.15);color:var(--teal);border:1px solid rgba(30,185,128,.35);border-radius:20px;font-size:10.5px;font-weight:800;padding:3px 10px;cursor:pointer;white-space:nowrap;}
   .dash-active-badge.zero{background:rgba(139,147,171,.12);color:var(--muted-2);border-color:transparent;}
-  .dash-slist{flex:1;overflow-y:auto;padding:2px 8px 8px;}
+  /* 실측(2026-07-22): 부모 grid에 높이 제약이 없어 flex:1이 무제한으로 늘어나 91개 항목이 스크롤
+     없이 전부 펼쳐져 있었다(4475px). 행높이 47px×14 = 약 660px로 캡 — sessions.html 작업세션
+     화면과 "14개 정도 보이게" 통일(사용자 요청). */
+  .dash-slist{flex:1;max-height:660px;overflow-y:auto;padding:2px 8px 8px;}
   /* 세션 행 v2(사용자 요청 2026-07-20) — 모든 세션 + 일자·주체·진행사항, 글자 작게. ✓ 완료 시 리포트 자동 생성. */
   .dash-sitem2{padding:6px 8px;border-radius:8px;cursor:pointer;border:1px solid transparent;margin-bottom:2px;}
   .dash-sitem2:hover{background:var(--panel-2);}
