@@ -17,8 +17,14 @@ describe("classifyModelLicense", () => {
     expect(classifyModelLicense("bartowski__Meta-Llama-3.1-8B-Instruct-GGUF").tier).toBe("restricted");
   });
   it("합성/개조/출처불명은 byom(상업 번들 금지)", () => {
-    expect(classifyModelLicense("merged-lily-gijo-loop-ai-securityllm").tier).toBe("byom");
     expect(classifyModelLicense("mradermacher__Qwen3-VL-8B-Instruct-abliterated-GGUF").tier).toBe("byom");
+    expect(classifyModelLicense("some-unknown-merged-model").tier).toBe("byom");
+  });
+  it("merged-lily는 출처 확정(Lily+ZySec 둘 다 Apache-2.0) → permissive", () => {
+    const m = classifyModelLicense("merged-lily-gijo-loop-ai-securityllm");
+    expect(m.tier).toBe("permissive");
+    expect(m.bundleSafe).toBe(true);
+    expect(m.license).toContain("Apache-2.0");
   });
   it("gijo-orchestrator-ko는 Gukbap(CC-BY-NC) 합성 확정 → restricted(비상업)", () => {
     const m = classifyModelLicense("gijo-orchestrator-ko");
@@ -41,11 +47,12 @@ describe("classifyAvailableModels", () => {
       "bartowski__Qwen2.5-3B-Instruct-GGUF", // restricted
       "gijo-main-orchestrator", // permissive (출처 확정 2026-07-22)
       "gijo-orchestrator-ko", // restricted (Gukbap CC-BY-NC 확정)
-      "merged-lily-gijo-loop-ai-securityllm", // byom
+      "merged-lily-gijo-loop-ai-securityllm", // permissive (Lily+ZySec Apache 확정)
+      "some-unknown-merged-model", // byom
     ]);
-    expect(r.summary.total).toBe(5);
-    expect(r.summary.permissive).toBe(2);
-    expect(r.summary.bundleSafe).toBe(2);
+    expect(r.summary.total).toBe(6);
+    expect(r.summary.permissive).toBe(3);
+    expect(r.summary.bundleSafe).toBe(3);
     expect(r.summary.restricted).toBe(2);
     expect(r.summary.byom).toBe(1);
   });

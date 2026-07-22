@@ -29,6 +29,10 @@ const RULES: { re: RegExp; tier: LicenseTier; license: string; note: string }[] 
   // gijo-orchestrator-ko — 출처 확정(2026-07-22): Gukbap-Qwen2.5-7B(CC-BY-NC-4.0, 비상업) 합성.
   // 파생물은 NC 제약을 상속 → 상업 번들 불가 + 고객 상업 환경 BYOM도 위반(권하지 말 것).
   { re: /^gijo-orchestrator-ko$/i, tier: "restricted", license: "CC-BY-NC-4.0 상속(Gukbap 합성)", note: "비상업 원본 합성 — 상업 번들·상업 BYOM 불가" },
+  // merged-lily — 출처 확정(2026-07-22): GGUF 메타에 mergekit base_model=SecurityLLM 기록 + HF 캐시
+  // 타임라인(01:19 ZySec-AI/SecurityLLM, 01:28 segolilylabs/Lily-Cybersecurity-7B-v0.2 → 01:47 합성).
+  // 두 원본 모두 HF 카드 Apache-2.0 확인 → 합성본 상업 번들 가능(저작권 고지 포함 의무만).
+  { re: /^merged-lily-gijo-loop-ai-securityllm$/i, tier: "permissive", license: "Apache-2.0(Lily+ZySec 합성)", note: "원본: Lily-Cybersecurity-7B-v0.2 + SecurityLLM SLERP — 상업 번들 가능" },
   { re: /bge|embed/i, tier: "permissive", license: "MIT/Apache-2.0(임베딩)", note: "임베딩 모델 — 대체로 관대" },
   // Qwen2.5-7B/14B/32B·Coder·Qwen3 등은 Apache-2.0. 단 Qwen2.5-3B는 비상업 연구 라이선스라 별도.
   { re: /qwen2\.5-3b/i, tier: "restricted", license: "Qwen Research License(비상업)", note: "3B는 비상업 라이선스 — 상업 번들 불가" },

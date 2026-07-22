@@ -73,8 +73,11 @@ restricted 모델에 경고 표시 유지 ③ 번들은 permissive만(본 문서
    ※ **gijo-orchestrator-ko는 상업 번들 불가 확정(2026-07-22)** — 합성 원본 Gukbap-Qwen2.5-7B가
    **CC-BY-NC-4.0(비상업)**으로 확인됨(HF 모델 카드). 파생물은 NC 제약 상속 → 번들·상업 BYOM 모두 불가.
    게이트 restricted 반영 완료. 한국어 강화가 필요하면 Kanana-1.5-8B(Apache-2.0) 합성으로 대체할 것.
-2. **전문가 슬롯**: merged-lily(자사 합성, 원본 라이선스 확정 전 BYOM) 대신 판매본에는 **Kanana-1.5-8B**를
-   기본 동봉하고, merged-lily는 원본(Lily·ZySec) 라이선스 확정 후 프리미엄 옵션으로.
+2. **전문가 슬롯 — 원본 확정 완료(2026-07-22)**: merged-lily = **Lily-Cybersecurity-7B-v0.2 + ZySec
+   SecurityLLM SLERP** (증거: GGUF 메타에 mergekit base_model=SecurityLLM 기록 + HF 캐시 01:19/01:28
+   다운로드 → 01:47 합성 타임라인). **두 원본 모두 HF 카드 Apache-2.0 확인 → 상업 번들 가능.**
+   게이트 permissive 승격 완료 — **현행 운영 2종(지휘+전문가) 모두 그대로 번들 가능**해짐.
+   Kanana-1.5-8B는 한국어 추가 강화 옵션으로 유지(필수 아님).
 3. modellicense.ts 규칙에 kanana·phi-4·gpt-oss·granite 패턴 추가(전부 permissive 분류) — 게이트 최신화.
 4. Kimi 등 초대형은 "클라우드 하이브리드"(이미 구현된 egress 승인 게이트) 경유로만 제공 — 온프렘 번들 아님.
 
