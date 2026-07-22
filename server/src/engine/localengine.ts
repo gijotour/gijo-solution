@@ -60,6 +60,43 @@ let embeddingProcess: ChildProcess | null = null;
 let embeddingModelId: string | null = null;
 
 const getStateStmt = db.prepare("SELECT value FROM app_state WHERE key = ?");
+
+// ── GIJO 구동 티어(Lite/Standard/Pro) ────────────────────────────────────────
+// GPU VRAM에 따라 동시 LLM 수·컨텍스트·오버헤드를 한 묶음으로 전환한다(VRAM 티어 구동 가이드라인의
+// 환경변수 3종을 묶은 것). 화면에서 고른 티어는 app_state("gijoTier")에 영속되며 환경변수보다
+// 우선한다 — 환경변수는 설치 시 기본값, 티어는 운영 중 조정값. 세 값 모두 함수 경유로 읽히므로
+// 노드 프로세스 재시작 없이 채팅 모델 풀 재기동만으로 적용된다(ctx는 스폰 인자라서).
+export interface GijoTierSpec {
+  id: "lite" | "standard" | "pro";
+  label: string;
+  vramLabel: string;
+  maxLoadedModels: number;
+  ctxSize: number;
+  overheadMb: number;
+  desc: string;
+}
+export const GIJO_TIERS: GijoTierSpec[] = [
+  { id: "lite", label: "Lite", vramLabel: "12GB급", maxLoadedModels: 1, ctxSize: 16384, overheadMb: 3500, desc: "채팅 LLM 1개 · 16K 컨텍스트 — 1인 담당자·엔트리 GPU" },
+  { id: "standard", label: "Standard", vramLabel: "24GB급", maxLoadedModels: 2, ctxSize: 32768, overheadMb: 5000, desc: "채팅 LLM 2개 · 32K — 2~3인 팀(현행 기본값)" },
+  { id: "pro", label: "Pro", vramLabel: "32GB급", maxLoadedModels: 3, ctxSize: 32768, overheadMb: 5000, desc: "채팅 LLM 3개 · 32K — SOC 팀·대용량 GPU" },
+];
+function storedTier(): GijoTierSpec | null {
+  try {
+    const v = (getStateStmt.get("gijoTier") as { value: string } | undefined)?.value;
+    return GIJO_TIERS.find((t) => t.id === v) ?? null;
+  } catch {
+    return null;
+  }
+}
+export function currentTierSettings(): { tier: GijoTierSpec["id"] | null; maxLoadedModels: number; ctxSize: number; overheadMb: number } {
+  const t = storedTier();
+  if (t) return { tier: t.id, maxLoadedModels: t.maxLoadedModels, ctxSize: t.ctxSize, overheadMb: t.overheadMb };
+  return { tier: null, maxLoadedModels: MAX_LOADED_MODELS, ctxSize: DEFAULT_CTX_SIZE, overheadMb: MODEL_VRAM_OVERHEAD_MB };
+}
+// VRAM 총량 기준 권장 티어 — tools/model-benchmark.mjs 판정과 동일 기준.
+export function recommendTier(totalMb: number): GijoTierSpec["id"] {
+  return totalMb < 16000 ? "lite" : totalMb < 28000 ? "standard" : "pro";
+}
 const setStateStmt = db.prepare(
   "INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
 );
@@ -204,11 +241,12 @@ function lruVictim(exceptId: string): string | null {
 
 // modelId를 새로 올릴 자리를 만든다. nvidia-smi 실측 여유가 필요량보다 작으면 LRU부터 내린다.
 async function makeRoomFor(modelId: string): Promise<void> {
-  const needMb = modelFileSizeMb(modelId) + MODEL_VRAM_OVERHEAD_MB;
+  const tier = currentTierSettings(); // 티어 전환이 즉시 반영되도록 호출 시점에 읽는다
+  const needMb = modelFileSizeMb(modelId) + tier.overheadMb;
   const free = await getFreeVramMb();
   if (free === null) {
     // nvidia-smi 없음 → 개수 상한 폴백
-    while (pool.size >= MAX_LOADED_MODELS) {
+    while (pool.size >= tier.maxLoadedModels) {
       const victim = lruVictim(modelId);
       if (!victim) break;
       emitLlmActivity({ kind: "swap", phase: "start", model: modelBasename(victim), detail: `VRAM 확보 위해 내림: ${modelBasename(victim)}` });
@@ -220,7 +258,7 @@ async function makeRoomFor(modelId: string): Promise<void> {
   while (freeMb < needMb) {
     const victim = lruVictim(modelId);
     if (!victim) break; // 더 내릴 게 없음 — 그냥 시도(정말 부족하면 llama가 실패)
-    const reclaimed = modelFileSizeMb(victim) + MODEL_VRAM_OVERHEAD_MB;
+    const reclaimed = modelFileSizeMb(victim) + tier.overheadMb;
     emitLlmActivity({ kind: "swap", phase: "start", model: modelBasename(victim), detail: `VRAM 확보 위해 내림: ${modelBasename(victim)}` });
     await unloadModel(victim);
     freeMb = (await getFreeVramMb()) ?? freeMb + reclaimed;
@@ -282,7 +320,7 @@ async function ensureModelLoaded(modelId: string): Promise<LoadedModel> {
   const port = allocPort();
   const spawned = spawn(
     LLAMA_SERVER_PATH,
-    ["-m", modelFilePath(modelId), "-ngl", "-1", "--ctx-size", String(DEFAULT_CTX_SIZE), "--port", String(port)],
+    ["-m", modelFilePath(modelId), "-ngl", "-1", "--ctx-size", String(currentTierSettings().ctxSize), "--port", String(port)],
     { stdio: "pipe" }
   );
   drainProcessOutput(spawned, `채팅 모델 ${modelId}`);
@@ -669,6 +707,47 @@ export function registerLocalEngineRoutes(app: Express): void {
   app.get("/api/localengine/status", authMiddleware, (_req, res) => {
     res.json(getLocalEngineStatus());
   });
+  // GIJO 구동 티어 조회 — GPU 실측 + 현재 티어 + 권장 판정 + 티어 사양표. 설정 화면 "구동 티어" 구역용.
+  app.get(
+    "/api/localengine/tier",
+    authMiddleware,
+    asyncRoute(async (_req, res) => {
+      const gpu = await getGpuUsage();
+      const current = currentTierSettings();
+      const recommended = gpu.available ? recommendTier(gpu.memTotalMb) : null;
+      res.json({
+        gpu: gpu.available ? { totalMb: gpu.memTotalMb, usedMb: gpu.memUsedMb, freeMb: gpu.memTotalMb - gpu.memUsedMb, utilization: gpu.utilization } : null,
+        current,
+        recommended,
+        reason: gpu.available
+          ? `총 VRAM ${(gpu.memTotalMb / 1024).toFixed(1)}GB — ${GIJO_TIERS.find((t) => t.id === recommended)?.desc ?? ""}`
+          : "NVIDIA GPU를 찾지 못했습니다(nvidia-smi 없음) — 로컬 LLM 구동 미지원 환경입니다.",
+        tiers: GIJO_TIERS,
+      });
+    })
+  );
+  // 티어 적용 — app_state 영속 후 채팅 모델 풀을 새 설정(ctx 등)으로 재기동한다. 임베딩 서버는
+  // 티어와 무관(고정 8192)하므로 건드리지 않는다. 재기동 완료를 기다리지 않고 바로 응답한다
+  // (모델 로드 ~30초 — 화면은 status 폴링으로 준비 상태를 본다).
+  app.post(
+    "/api/localengine/tier",
+    authMiddleware,
+    asyncRoute(async (req, res) => {
+      const tier = String(req.body?.tier ?? "");
+      const spec = GIJO_TIERS.find((t) => t.id === tier);
+      if (!spec) {
+        res.status(400).json({ error: "tier는 lite·standard·pro 중 하나여야 합니다" });
+        return;
+      }
+      setStateStmt.run("gijoTier", tier);
+      console.log(`[localengine] 구동 티어 변경: ${spec.label} (LLM ${spec.maxLoadedModels}개 · ctx ${spec.ctxSize}) — 채팅 모델 풀 재기동`);
+      const reloadId = pickAutoStartModelId();
+      void stopLocalEngine()
+        .then(() => (reloadId ? ensureModelLoaded(reloadId) : undefined))
+        .catch((err) => console.warn(`[localengine] 티어 적용 재기동 실패: ${err instanceof Error ? err.message : String(err)}`));
+      res.json({ applied: tier, settings: spec, restarting: true });
+    })
+  );
   app.get("/api/localengine/models", authMiddleware, (_req, res) => {
     res.json(listAvailableModels());
   });

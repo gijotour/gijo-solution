@@ -165,6 +165,33 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     </div>
 
     <div class="panel">
+      <div class="panel-title">🧠 GIJO 구동 티어</div>
+      <div class="panel-sub">GPU 성능(VRAM)에 맞춰 동시 LLM 수·컨텍스트를 Lite / Standard / Pro로 전환합니다. 서버 GPU를 실측해 권장 티어를 자동 판정합니다.</div>
+      <div id="tierGpuBox" style="background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:10px">
+        <div style="font-size:11px;color:var(--muted);display:flex;justify-content:space-between;margin-bottom:6px"><span id="tierGpuLabel">GPU 실측 중…</span><span id="tierGpuFree"></span></div>
+        <div style="height:8px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden"><div id="tierGpuBar" style="height:100%;width:0;background:linear-gradient(90deg,var(--teal,#1eb980),var(--blue,#3b82f6))"></div></div>
+      </div>
+      <div id="tierDiagBox" style="background:var(--panel-2);border:1px solid rgba(30,185,128,.4);border-radius:9px;padding:14px;text-align:center;margin-bottom:10px">
+        <div style="font-size:10px;font-weight:800;color:#6fdcb5">자동 판정</div>
+        <div id="tierDiagBig" style="font-size:16px;font-weight:800;color:#6fdcb5;margin:6px 0 4px">판정 중…</div>
+        <div id="tierDiagWhy" style="font-size:11px;color:var(--muted);line-height:1.6"></div>
+      </div>
+      <div class="field-row">
+        <button class="btn-primary" id="tierApplyBtn" disabled>권장 티어 적용</button>
+        <button class="btn-ghost" id="tierRefreshBtn">다시 진단</button>
+      </div>
+      <details style="margin-top:10px;font-size:12px;color:var(--muted)">
+        <summary style="cursor:pointer;font-weight:700">고급 — 티어 직접 선택</summary>
+        <div class="field-row" style="margin-top:8px">
+          <select id="tierManualSelect" style="flex:1;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 10px;color:var(--text);font-size:12.5px"></select>
+          <button class="btn-ghost" id="tierManualBtn">이 티어로 적용</button>
+        </div>
+      </details>
+      <div class="hint" style="color:var(--amber,#f0a020)">⚠ 티어를 변경하면 채팅 LLM이 새 설정으로 재기동됩니다(약 30초, 진행 중 대화가 끊길 수 있습니다). 지식 검색(임베딩)은 영향 없습니다.</div>
+      <div class="status-line" id="tierStatusLine"></div>
+    </div>
+
+    <div class="panel">
       <div class="panel-title">로컬 LLM 엔진</div>
       <div class="panel-sub">서버가 보유한 GPU 머신의 llama.cpp 프로세스를 원격으로 제어합니다.</div>
       <div id="engineStatusLine" style="font-size:12.5px;color:var(--muted);margin-bottom:14px">불러오는 중...</div>
@@ -456,6 +483,63 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     }
   }
 
+  // ── GIJO 구동 티어(Lite/Standard/Pro) — GPU 실측·자동 판정·원클릭 적용 ──
+  let tierInfo = null;
+  const tierEl = (id) => document.getElementById(id);
+  function tierName(id) { return id === "lite" ? "Lite" : id === "standard" ? "Standard" : id === "pro" ? "Pro" : id; }
+
+  async function loadTier() {
+    try {
+      tierInfo = await window.gijo.getLlmTier();
+    } catch (e) {
+      tierEl("tierDiagBig").textContent = "판정 실패";
+      tierEl("tierDiagWhy").textContent = e.message;
+      return;
+    }
+    const { gpu, current, recommended, reason, tiers } = tierInfo;
+    if (gpu) {
+      tierEl("tierGpuLabel").textContent = `GPU 총 ${(gpu.totalMb / 1024).toFixed(1)}GB · 사용 ${(gpu.usedMb / 1024).toFixed(1)}GB`;
+      tierEl("tierGpuFree").textContent = `여유 ${(gpu.freeMb / 1024).toFixed(1)}GB`;
+      tierEl("tierGpuBar").style.width = Math.min(100, Math.round((gpu.usedMb / gpu.totalMb) * 100)) + "%";
+    } else {
+      tierEl("tierGpuLabel").textContent = "NVIDIA GPU 없음 — 로컬 LLM 미지원 환경";
+      tierEl("tierGpuFree").textContent = "";
+    }
+    const curLabel = current.tier ? tierName(current.tier) : `기본값(LLM ${current.maxLoadedModels}개·${Math.round(current.ctxSize / 1024)}K)`;
+    if (recommended) {
+      const same = current.tier === recommended;
+      tierEl("tierDiagBig").textContent = `이 서버는 ${tierName(recommended)} 권장`;
+      tierEl("tierDiagWhy").textContent = `${reason} · 현재: ${curLabel}${same ? " ✓ (권장과 일치)" : ""}`;
+      const btn = tierEl("tierApplyBtn");
+      btn.disabled = same;
+      btn.textContent = same ? "✓ 권장 티어 적용됨" : `${tierName(recommended)} 티어 적용`;
+    } else {
+      tierEl("tierDiagBig").textContent = "판정 불가";
+      tierEl("tierDiagWhy").textContent = reason;
+      tierEl("tierApplyBtn").disabled = true;
+    }
+    const sel = tierEl("tierManualSelect");
+    sel.innerHTML = tiers.map((t) =>
+      `<option value="${t.id}"${current.tier === t.id ? " selected" : ""}>${t.label} — LLM ${t.maxLoadedModels}개 · ${Math.round(t.ctxSize / 1024)}K (${t.vramLabel})</option>`
+    ).join("");
+  }
+
+  async function applyTier(tierId) {
+    const line = tierEl("tierStatusLine");
+    line.textContent = `${tierName(tierId)} 적용 중 — LLM 재기동(약 30초)…`;
+    line.className = "status-line";
+    try {
+      await window.gijo.setLlmTier(tierId);
+      line.textContent = `✓ ${tierName(tierId)} 적용됨 — LLM이 새 설정으로 재기동 중입니다`;
+      line.className = "status-line status-ok";
+      await loadTier();
+      setTimeout(loadEngineStatus, 4000); // 재기동 반영된 엔진 상태 갱신
+    } catch (e) {
+      line.textContent = "적용 실패: " + e.message;
+      line.className = "status-line status-err";
+    }
+  }
+
   async function logout() {
     await window.gijo.logout();
     await window.gijo.navigateTo("login.html");
@@ -605,12 +689,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     setInterval(tick, 30000);
     serverUrlInput.value = window.gijo.getServerUrl();
     await loadUser();
-    await Promise.all([loadHealth(), loadEngineStatus(), loadSmtpConfig()]);
+    await Promise.all([loadHealth(), loadEngineStatus(), loadSmtpConfig(), loadTier()]);
 
     document.getElementById("testConnectionBtn").addEventListener("click", testConnection);
     document.getElementById("saveServerUrlBtn").addEventListener("click", saveServerUrl);
     document.getElementById("startEngineBtn").addEventListener("click", startEngine);
     document.getElementById("stopEngineBtn").addEventListener("click", stopEngine);
+    document.getElementById("tierApplyBtn").addEventListener("click", () => { if (tierInfo && tierInfo.recommended) applyTier(tierInfo.recommended); });
+    document.getElementById("tierRefreshBtn").addEventListener("click", loadTier);
+    document.getElementById("tierManualBtn").addEventListener("click", () => applyTier(document.getElementById("tierManualSelect").value));
     document.getElementById("saveSmtpBtn").addEventListener("click", saveSmtp);
     document.getElementById("saveSmtpInBtn").addEventListener("click", saveSmtpInbound);
     document.getElementById("saveCloudBtn").addEventListener("click", saveCloud);

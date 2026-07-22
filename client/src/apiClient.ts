@@ -751,11 +751,22 @@ export const llmApi = {
 };
 
 // ── 로컬 엔진(llama.cpp 서버) ─────────────────────────────────────────
+export interface GijoTierInfo {
+  gpu: { totalMb: number; usedMb: number; freeMb: number; utilization: number } | null;
+  current: { tier: "lite" | "standard" | "pro" | null; maxLoadedModels: number; ctxSize: number; overheadMb: number };
+  recommended: "lite" | "standard" | "pro" | null;
+  reason: string;
+  tiers: { id: string; label: string; vramLabel: string; maxLoadedModels: number; ctxSize: number; desc: string }[];
+}
+
 export const localEngineApi = {
   status: () => request("/api/localengine/status"),
   models: () => request<{ id: string; running: boolean }[]>("/api/localengine/models"),
   start: (modelId: string) => request("/api/localengine/start", { method: "POST", body: { modelId } }),
   stop: () => request("/api/localengine/stop", { method: "POST" }),
+  // GIJO 구동 티어(Lite/Standard/Pro) — GPU 실측·권장 판정 조회와 적용(채팅 모델 풀 재기동 수반).
+  tier: () => request<GijoTierInfo>("/api/localengine/tier"),
+  setTier: (tier: string) => request<{ applied: string; restarting: boolean }>("/api/localengine/tier", { method: "POST", body: { tier } }),
 };
 
 // ── 파인튜닝(학습 — 모델 가중치에 지식 내재화) ───────────────────────────

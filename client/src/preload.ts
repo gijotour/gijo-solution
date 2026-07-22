@@ -150,6 +150,8 @@ const gijoApi = {
   getLocalEngineStatus: () => api.localEngineApi.status(),
   startLocalEngine: (modelId: string) => api.localEngineApi.start(modelId),
   stopLocalEngine: () => api.localEngineApi.stop(),
+  getLlmTier: () => api.localEngineApi.tier(),
+  setLlmTier: (tier: string) => api.localEngineApi.setTier(tier),
   chat: (agentId: string, message: string) => api.llmApi.chat(agentId, message),
 
   // 장기 기억(RAG) / 파인튜닝(학습)

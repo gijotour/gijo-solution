@@ -1,0 +1,98 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<title>GIJO 티어(Lite/Standard/Pro) 전환 메뉴 — 시안 3종</title>
+<style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.1);--border-strong:rgba(255,255,255,.2);--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--blue:#3b82f6;--blue-light:#5fa1ff;--teal:#1eb980;--amber:#f0a020;--red:#e2483d;--purple:#8b7cf0;}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--text);font-family:'Malgun Gothic',sans-serif;padding:22px;}
+h1{font-size:18px;margin-bottom:4px;} .sub{font-size:11.5px;color:var(--muted);margin-bottom:18px;line-height:1.6;}
+.wrap{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:start;}
+.col{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;}
+.col h2{font-size:14px;margin-bottom:2px;} .col .d{font-size:10.5px;color:var(--muted);margin-bottom:12px;line-height:1.55;min-height:48px;}
+.mock{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;}
+.sec-t{font-size:12.5px;font-weight:800;color:#fff;margin-bottom:8px;display:flex;align-items:center;gap:6px;}
+.gpu{background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:10px;}
+.gpu .l{font-size:10px;color:var(--muted);display:flex;justify-content:space-between;margin-bottom:5px;}
+.bar{height:8px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden;}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--teal),var(--blue));}
+.badge{display:inline-block;font-size:9px;font-weight:800;padding:2px 7px;border-radius:10px;}
+.b-cur{background:rgba(59,130,246,.2);color:var(--blue-light);} .b-rec{background:rgba(30,185,128,.18);color:#6fdcb5;}
+.b-warn{background:rgba(240,160,32,.16);color:#f7c777;}
+.cards{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+.tcard{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:10px 9px;cursor:pointer;position:relative;}
+.tcard.on{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue);}
+.tcard.rec{border-color:rgba(30,185,128,.5);}
+.tcard .nm{font-size:12px;font-weight:800;} .tcard .vr{font-size:9.5px;color:var(--blue-light);font-weight:700;margin:2px 0 6px;}
+.tcard ul{list-style:none;font-size:9.5px;color:var(--muted);line-height:1.7;}
+.tcard .bd{position:absolute;top:8px;right:8px;}
+.btn{display:inline-block;background:var(--blue);color:#fff;border-radius:7px;padding:8px 14px;font-size:11px;font-weight:800;margin-top:10px;}
+.btn.gray{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);}
+.note{font-size:9.5px;color:var(--amber);margin-top:8px;line-height:1.5;}
+.diag{background:var(--panel-2);border:1px solid rgba(30,185,128,.4);border-radius:9px;padding:12px;text-align:center;margin-bottom:10px;}
+.diag .big{font-size:15px;font-weight:800;color:#6fdcb5;margin:6px 0 2px;}
+.diag .why{font-size:10px;color:var(--muted);line-height:1.6;}
+.adv{margin-top:10px;font-size:10.5px;color:var(--muted-2);} .adv summary{cursor:pointer;font-weight:700;}
+.advrow{display:flex;gap:6px;margin-top:6px;} .advrow input{flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:5px 7px;color:var(--text);font-size:10px;}
+.inline-row{display:flex;align-items:center;gap:8px;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:9px 10px;margin-bottom:8px;}
+.inline-row select{background:var(--bg);border:1px solid var(--border-strong);border-radius:6px;padding:6px 8px;color:var(--text);font-size:11px;}
+.mini{font-size:10px;color:var(--muted);}
+.kv{font-size:10px;color:var(--muted);line-height:1.8;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;margin-top:8px;}
+.kv b{color:var(--text);}
+</style></head><body>
+<h1>⚙ GIJO 티어(Lite / Standard / Pro) 전환 — 시안 3종</h1>
+<div class="sub">위치: 설정 허브 &gt; 설정 탭 "로컬 LLM 엔진" 구역. 티어 = 환경변수 3개(동시 LLM 수·컨텍스트·오버헤드) 자동 적용 + 엔진 재기동.<br>
+근거: VRAM 티어 구동 가이드라인 + LM Studio/LLM Configurator의 "하드웨어 실측 → 모델 추천" 패턴(총 VRAM만이 아니라 가용 VRAM도 표기).</div>
+<div class="wrap">
+
+<div class="col">
+  <h2>A안 — 요금제 카드형</h2>
+  <div class="d">티어 3종을 카드로 나란히. 실측 GPU 게이지 아래 카드에서 고르고 [적용]. 판매 라인업(Lite/Standard/Pro)과 화면이 1:1이라 영업·설치 때 설명이 쉬움.</div>
+  <div class="mock">
+    <div class="sec-t">🧠 GIJO 구동 티어</div>
+    <div class="gpu"><div class="l"><span>GPU: RTX 4090 · 총 24.0GB</span><span>사용 12.8GB · 여유 11.2GB</span></div><div class="bar"><i style="width:53%"></i></div></div>
+    <div class="cards">
+      <div class="tcard"><span class="bd badge b-warn">여유부족</span><div class="nm">Lite</div><div class="vr">12GB급</div><ul><li>LLM 1개</li><li>ctx 16K</li><li>1인 담당자</li></ul></div>
+      <div class="tcard on rec"><span class="bd badge b-cur">현재</span><div class="nm">Standard</div><div class="vr">24GB급</div><ul><li>LLM 2개</li><li>ctx 32K</li><li>2~3인 팀</li></ul></div>
+      <div class="tcard"><span class="bd badge b-warn">VRAM부족</span><div class="nm">Pro</div><div class="vr">32GB급</div><ul><li>LLM 3개</li><li>ctx 32K</li><li>SOC 팀</li></ul></div>
+    </div>
+    <span class="btn gray">현재 티어 유지 중</span>
+    <div class="note">⚠ 티어 변경 시 LLM 엔진이 재기동됩니다(약 30초, 진행 중 대화 끊김)</div>
+  </div>
+</div>
+
+<div class="col">
+  <h2>B안 — 자동 진단·원클릭형 (추천)</h2>
+  <div class="d">nvidia-smi 실측 → 판정 결과를 크게 보여주고 [권장 티어 적용] 원클릭. 수동 선택·환경변수는 "고급"으로 접음. 설치 실수 제거라는 가이드라인 취지에 가장 부합.</div>
+  <div class="mock">
+    <div class="sec-t">🧠 GIJO 구동 티어</div>
+    <div class="gpu"><div class="l"><span>GPU: RTX 4090 · 총 24.0GB</span><span>여유 11.2GB</span></div><div class="bar"><i style="width:53%"></i></div></div>
+    <div class="diag">
+      <span class="badge b-rec">자동 판정</span>
+      <div class="big">이 서버는 Standard 권장</div>
+      <div class="why">총 24GB — 채팅 LLM 2개 + 임베딩 동시 상주 가능 · 현재 설정도 Standard ✓</div>
+    </div>
+    <span class="btn">✓ 권장 티어 적용됨</span> <span class="btn gray">다시 진단</span>
+    <details class="adv"><summary>고급 — 수동 티어·환경변수 직접 설정</summary>
+      <div class="advrow"><input value="Lite ▾"><input value="MAX_MODELS=1"><input value="CTX=16384"></div>
+    </details>
+    <div class="note">⚠ 티어 변경 시 LLM 엔진 재기동(약 30초)</div>
+  </div>
+</div>
+
+<div class="col">
+  <h2>C안 — 인라인 슬림형</h2>
+  <div class="d">기존 "로컬 LLM 엔진" 구역에 한 줄만 추가(드롭다운+적용). 화면 변화 최소·구현 최단. 대신 티어별 차이 설명이 얇아 처음 보는 담당자에겐 불친절.</div>
+  <div class="mock">
+    <div class="sec-t">로컬 LLM 엔진</div>
+    <div class="inline-row"><span class="mini">모델 ID</span><input style="flex:1;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 8px;color:var(--muted);font-size:10px" value="gijo-main-orchestrator"><span class="btn gray" style="margin:0;padding:6px 10px">시작</span></div>
+    <div class="inline-row">
+      <span class="mini">구동 티어</span>
+      <select><option>Standard — LLM 2개·32K (현재·권장)</option><option>Lite — LLM 1개·16K</option><option>Pro — LLM 3개·32K</option></select>
+      <span class="badge b-cur">GPU 24GB</span>
+      <span class="btn" style="margin:0;padding:6px 12px">적용</span>
+    </div>
+    <div class="kv"><b>Standard</b>: 동시 LLM 2 · ctx 32K · 권장 VRAM 24GB — 변경 시 엔진 재기동</div>
+  </div>
+</div>
+
+</div>
+</body></html>
