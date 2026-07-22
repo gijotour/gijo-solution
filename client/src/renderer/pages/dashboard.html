@@ -91,22 +91,27 @@
   .dash-active-badge{background:rgba(30,185,128,.15);color:var(--teal);border:1px solid rgba(30,185,128,.35);border-radius:20px;font-size:10.5px;font-weight:800;padding:3px 10px;cursor:pointer;white-space:nowrap;}
   .dash-active-badge.zero{background:rgba(139,147,171,.12);color:var(--muted-2);border-color:transparent;}
   /* 실측(2026-07-22): 부모 grid에 높이 제약이 없어 flex:1이 무제한으로 늘어나 91개 항목이 스크롤
-     없이 전부 펼쳐져 있었다(4475px). 행높이 47px×14 = 약 660px로 캡 — sessions.html 작업세션
-     화면과 "14개 정도 보이게" 통일(사용자 요청). */
-  .dash-slist{flex:1;max-height:660px;overflow-y:auto;padding:2px 8px 8px;}
-  /* 세션 행 v2(사용자 요청 2026-07-20) — 모든 세션 + 일자·주체·진행사항, 글자 작게. ✓ 완료 시 리포트 자동 생성. */
-  .dash-sitem2{padding:6px 8px;border-radius:8px;cursor:pointer;border:1px solid transparent;margin-bottom:2px;}
-  .dash-sitem2:hover{background:var(--panel-2);}
-  .dash-sitem2 .s-r1{display:flex;align-items:center;gap:6px;}
-  .dash-sitem2 .s-dot{width:6px;height:6px;border-radius:50%;background:var(--teal);flex:none;}
-  .dash-sitem2.st-done .s-dot{background:var(--muted-2);}
-  .dash-sitem2.st-ignored .s-dot{background:#3d4560;}
-  .dash-sitem2 .t{flex:1;min-width:0;font-weight:700;font-size:11.5px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .dash-sitem2.st-done .t{color:var(--muted);}
+     없이 전부 펼쳐져 있었다(4475px). 행을 sessions.html과 동일한 .srow로 통일한 뒤 재실측한
+     행높이 49px×14 = 686px로 캡 — "14개 정도 보이게" + 두 화면 디자인 통일(사용자 요청). */
+  .dash-slist{flex:1;max-height:686px;overflow-y:auto;padding:2px 8px 8px;}
+  /* 세션 행 — sessions.html(작업 세션 열기 화면)의 .srow와 동일한 클래스·스타일을 그대로 써서
+     대시보드 패널과 전체 화면이 "동일하게" 보이도록 통일했다(사용자 지적, 2026-07-22:
+     두 화면의 세션 행 디자인이 서로 달랐음). */
+  .srow{display:flex;align-items:center;gap:11px;padding:9px 6px;border-bottom:1px solid var(--border);cursor:pointer;border-radius:6px;}
+  .srow:hover{background:var(--panel-2);}
+  .sdot{width:8px;height:8px;border-radius:50%;flex:none;background:var(--teal);}
+  .sdot.done{background:var(--muted-2);}.sdot.ignored{background:var(--muted-2);opacity:.5;}
+  .sr-main{flex:1;min-width:0;}
+  .sr-title{font-weight:700;font-size:12.5px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .sr-sub{font-size:10.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .sr-meta{font-size:10px;color:var(--muted-2);flex:none;text-align:right;white-space:nowrap;}
+  .badge{font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:20px;}
+  .b-active{color:var(--teal);background:rgba(30,185,128,.14);}.b-done{color:var(--muted-2);background:rgba(255,255,255,.05);}.b-ignored{color:var(--muted-2);background:rgba(255,255,255,.04);}
   .s-done{flex:none;font-size:9.5px;font-weight:700;color:var(--teal);border:1px solid rgba(30,185,128,.4);border-radius:5px;padding:1px 5px;opacity:0;cursor:pointer;white-space:nowrap;}
-  .dash-sitem2:hover .s-done{opacity:.9;}
+  .srow:hover .s-done{opacity:.9;}
   .s-done:hover{background:rgba(30,185,128,.15);}
-  .s-r2{font-size:10px;color:var(--muted-2);margin:2px 0 0 12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .sdel{color:var(--muted-2);font-size:12px;cursor:pointer;flex:none;padding:2px 4px;border-radius:4px;}
+  .sdel:hover{color:#f5928a;background:rgba(226,72,61,.12);}
   .dash-srep{font-size:10.5px;font-weight:700;color:var(--teal);padding:6px 10px;background:rgba(30,185,128,.08);border:1px solid rgba(30,185,128,.25);border-radius:7px;margin:4px 2px 6px;cursor:pointer;}
   .dash-sitem{padding:8px 8px 8px 10px;border-radius:8px;cursor:pointer;border:1px solid transparent;margin-bottom:2px;display:flex;align-items:center;gap:8px;}
   .dash-sitem:hover{background:var(--panel-2);}
@@ -1869,23 +1874,24 @@
         box.innerHTML = '<div style="font-size:11px;color:var(--muted-2);padding:10px 6px;line-height:1.6">아직 세션이 없습니다.<br>＋ 새 세션 또는 전체 화면의 탐색기 항목을 눌러 시작하세요.</div>';
         return;
       }
-      // 모든 세션(행위)을 나열 — 각 행: 제목 + [일자 · 주체 · 진행상태 · 턴수 — 마지막 내용].
+      // 모든 세션(행위)을 나열 — sessions.html(작업 세션 열기 화면)과 동일한 .srow 구조로 렌더한다.
       // ✓ 완료를 누르면 서버가 세션 리포트(DOCX)를 자동 생성한다(리포트 화면 이력에 표시).
+      const DASH_BADGE_CLASS = { active: "b-active", done: "b-done", ignored: "b-ignored" };
       box.innerHTML = list.map((s) => {
-        const who = s.lastRole === "user" ? "나" : s.lastRole === "assistant" ? "AI 팀" : "—";
         const d = new Date(s.updatedAt);
         const when = `${d.getMonth() + 1}.${d.getDate()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
         // 완료는 경위 구분 — 사용자 완료 "완료", 30분 무대화 등 자동 완료 "자동완료".
         const stL = s.status === "done" ? (s.doneBy === "auto" ? "자동완료" : "완료") : (DASH_STATUS_LABEL[s.status] || s.status);
-        const prev = s.lastPreview ? ` — ${s.lastPreview}` : "";
-        return `<div class="dash-sitem2 st-${s.status}" data-id="${s.id}">
-          <div class="s-r1"><span class="s-dot"></span><span class="t">${escT(s.title)}</span>` +
+        const sub = s.lastPreview ? escT(s.lastPreview) : "아직 대화 없음";
+        return `<div class="srow" data-id="${s.id}">
+          <span class="sdot ${s.status}"></span>
+          <div class="sr-main"><div class="sr-title">${escT(s.title)}</div><div class="sr-sub">${sub}</div></div>
+          <div class="sr-meta"><span class="badge ${DASH_BADGE_CLASS[s.status] || "b-active"}">${escT(stL)}</span><br>${when} · ${s.turnCount}턴</div>` +
           (s.status !== "done" ? `<span class="s-done" data-done="${s.id}" title="세션 완료 — 리포트 자동 생성">✓ 완료</span>` : "") +
-          `<span class="dash-sdel" data-del="${s.id}" title="세션 삭제">🗑</span></div>
-          <div class="s-r2">${when} · ${who} · ${stL} · ${s.turnCount}턴${escT(prev)}</div></div>`;
+          `<span class="sdel" data-del="${s.id}" title="세션 삭제">🗑</span></div>`;
       }).join("");
-      box.querySelectorAll(".dash-sitem2").forEach((el) => el.addEventListener("click", (e) => {
-        if (e.target.closest(".dash-sdel")) { e.stopPropagation(); deleteDashSession(el.dataset.id); return; }
+      box.querySelectorAll(".srow").forEach((el) => el.addEventListener("click", (e) => {
+        if (e.target.closest(".sdel")) { e.stopPropagation(); deleteDashSession(el.dataset.id); return; }
         if (e.target.closest(".s-done")) { e.stopPropagation(); completeDashSession(el.dataset.id); return; }
         openSessionPage(el.dataset.id);
       }));
