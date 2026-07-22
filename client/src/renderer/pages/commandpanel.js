@@ -50,7 +50,16 @@
       ".gcp-in:focus{border-color:var(--blue,#3b82f6);}" +
       ".gcp-send{background:var(--blue,#3b82f6);color:#fff;border:none;border-radius:9px;padding:0 15px;font-weight:800;font-size:12px;cursor:pointer;}" +
       ".gcp-sitem{font-size:11.5px;color:var(--text,#e6edf7);padding:6px 12px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid rgba(255,255,255,.03);}" +
-      ".gcp-sitem:hover{background:rgba(255,255,255,.04);}";
+      ".gcp-sitem:hover{background:rgba(255,255,255,.04);}" +
+      // 대시보드 작업 세션과 동일한 2줄 카드(상태 점·제목·날짜·주체·상태·턴수·미리보기).
+      ".gcp-scard{padding:8px 12px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04);}" +
+      ".gcp-scard:hover{background:rgba(255,255,255,.04);}" +
+      ".gcp-sr1{display:flex;align-items:center;gap:6px;}" +
+      ".gcp-sdot{width:7px;height:7px;border-radius:50%;background:var(--muted-2,#5f6b82);flex:0 0 auto;}" +
+      ".gcp-scard.st-active .gcp-sdot{background:var(--teal,#1eb980);}" +
+      ".gcp-scard.st-done .gcp-sdot{background:var(--muted-2,#5f6b82);}" +
+      ".gcp-st{font-size:12px;font-weight:700;color:var(--text,#e6edf7);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}" +
+      ".gcp-sr2{font-size:10px;color:var(--muted-2,#5f6b82);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}";
     document.head.appendChild(st);
   }
 
@@ -96,13 +105,23 @@
     try { localStorage.setItem(OPEN_KEY, on ? "1" : "0"); } catch (e) {}
   }
 
+  // 대시보드 작업 세션 패널과 같은 상태 표기(일관성 — 사용자 지적 2026-07-22: 두 곳이 달라 보임).
+  var STATUS_LABEL = { active: "진행중", done: "완료", ignored: "무시" };
   async function loadSessions() {
     if (!sessBody) return;
     try {
       var list = await window.gijo.listWorkSessions();
       if (!list || !list.length) { sessBody.innerHTML = '<div class="gcp-empty">작업 세션이 없습니다.</div>'; return; }
-      sessBody.innerHTML = list.slice(0, 20).map(function (s) {
-        return '<div class="gcp-sitem" data-sid="' + esc(s.id) + '" title="작업 세션 열기">🗂 ' + esc(s.title || s.id) + "</div>";
+      // 대시보드와 동일한 데이터·형식(상태 점·제목 / 날짜·주체·상태·턴수·미리보기). 전체를 보여준다.
+      sessBody.innerHTML = list.map(function (s) {
+        var who = s.lastRole === "user" ? "나" : s.lastRole === "assistant" ? "AI 팀" : "—";
+        var d = new Date(s.updatedAt);
+        var when = (d.getMonth() + 1) + "." + d.getDate() + " " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
+        var stL = s.status === "done" ? (s.doneBy === "auto" ? "자동완료" : "완료") : (STATUS_LABEL[s.status] || s.status);
+        var prev = s.lastPreview ? " — " + esc(s.lastPreview) : "";
+        return '<div class="gcp-scard st-' + esc(s.status) + '" data-sid="' + esc(s.id) + '" title="작업 세션 열기">' +
+          '<div class="gcp-sr1"><span class="gcp-sdot"></span><span class="gcp-st">' + esc(s.title || s.id) + "</span></div>" +
+          '<div class="gcp-sr2">' + when + " · " + who + " · " + stL + " · " + (s.turnCount || 0) + "턴" + prev + "</div></div>";
       }).join("");
       sessBody.querySelectorAll("[data-sid]").forEach(function (el) {
         el.addEventListener("click", function () {
