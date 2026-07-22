@@ -285,6 +285,14 @@ const gijoApi = {
     onProgress: (cb: (pct: number) => void) => ipcRenderer.on("update:progress", (_e, pct: number) => cb(pct)),
     listReleases: () => api.clientReleaseApi.listAll(),
   },
+  // 로그인 히스토리(접근 서버·ID·PW) — 빠른 선택용. PW는 메인 프로세스가 OS 키체인으로 암호화 저장.
+  creds: {
+    list: () => ipcRenderer.invoke("creds:list") as Promise<{ serverUrl: string; username: string; hasPw: boolean }[]>,
+    getPassword: (serverUrl: string, username: string) => ipcRenderer.invoke("creds:getPassword", serverUrl, username) as Promise<string>,
+    save: (serverUrl: string, username: string, password: string, savePw: boolean) => ipcRenderer.invoke("creds:save", serverUrl, username, password, savePw) as Promise<void>,
+    remove: (serverUrl: string, username: string) => ipcRenderer.invoke("creds:remove", serverUrl, username) as Promise<void>,
+    pwSupported: () => ipcRenderer.invoke("creds:pwSupported") as Promise<boolean>,
+  },
   // 챗봇 명령 정책 판정(허용목록/위험) — 렌더러가 승인 UI 결정에 쓴다.
   classifyCommand: (cmd: string) => classifyChatbotCommand(cmd),
   // 챗봇에게 명령 제안 받기(서버 LLM) — 제안만, 실행은 위 terminal.exec + 사람 승인.

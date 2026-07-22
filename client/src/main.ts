@@ -2,7 +2,7 @@
 // [CS 구조 변경] engine/ 모듈을 더 이상 임포트하지 않는다(전부 서버로 이전됨).
 // main.ts는 창 관리와 페이지 네비게이션만 담당하는 얇은 셸이다.
 
-import { app, BrowserWindow, ipcMain, dialog } from "electron";
+import { app, BrowserWindow, ipcMain, dialog, safeStorage } from "electron";
 import * as path from "path";
 import { spawn, ChildProcess } from "child_process";
 import * as os from "os";
@@ -31,6 +31,46 @@ ipcMain.on("auth:getState", (event) => {
 ipcMain.on("auth:setState", (_event, state: AuthState) => {
   authState = state;
 });
+
+// ── 로그인 히스토리(접근 서버·ID·PW) — 빠른 선택용 ─────────────────────────
+// 서버 주소·아이디는 평문(민감정보 아님), 비밀번호는 OS 키체인(safeStorage/DPAPI)으로 암호화해
+// userData 파일에 저장한다. 암호화가 불가한 환경(리눅스 키링 없음 등)에서는 비밀번호를 저장하지
+// 않는다(서버·ID만). 목록 조회 시 비밀번호 평문은 절대 반환하지 않는다(선택 시 별도 복호화 요청).
+interface LoginEntry { serverUrl: string; username: string; encPw: string | null; savedAt: number }
+const CREDS_FILE = path.join(app.getPath("userData"), "gijo-logins.json");
+function readCreds(): LoginEntry[] {
+  try { return JSON.parse(fs.readFileSync(CREDS_FILE, "utf-8")) as LoginEntry[]; } catch { return []; }
+}
+function writeCreds(list: LoginEntry[]): void {
+  try { fs.writeFileSync(CREDS_FILE, JSON.stringify(list.slice(0, 10)), "utf-8"); } catch { /* 저장 실패는 무시 */ }
+}
+const pwEncAvailable = () => { try { return safeStorage.isEncryptionAvailable(); } catch { return false; } };
+
+// 목록 — 최근순, 비밀번호 저장 여부(hasPw)만 노출(평문 아님).
+ipcMain.handle("creds:list", () =>
+  readCreds().sort((a, b) => b.savedAt - a.savedAt).map((e) => ({ serverUrl: e.serverUrl, username: e.username, hasPw: Boolean(e.encPw) }))
+);
+// 선택 시 그 항목의 비밀번호를 복호화해 돌려준다(로그인 폼 자동채움용).
+ipcMain.handle("creds:getPassword", (_e, serverUrl: string, username: string) => {
+  const hit = readCreds().find((e) => e.serverUrl === serverUrl && e.username === username);
+  if (!hit || !hit.encPw || !pwEncAvailable()) return "";
+  try { return safeStorage.decryptString(Buffer.from(hit.encPw, "base64")); } catch { return ""; }
+});
+// 로그인 성공 시 저장(같은 서버·ID는 갱신·최상단). savePw=false면 비밀번호는 저장하지 않는다.
+ipcMain.handle("creds:save", (_e, serverUrl: string, username: string, password: string, savePw: boolean) => {
+  if (!serverUrl || !username) return;
+  const list = readCreds().filter((e) => !(e.serverUrl === serverUrl && e.username === username));
+  let encPw: string | null = null;
+  if (savePw && password && pwEncAvailable()) {
+    try { encPw = safeStorage.encryptString(password).toString("base64"); } catch { encPw = null; }
+  }
+  list.unshift({ serverUrl, username, encPw, savedAt: Date.now() });
+  writeCreds(list);
+});
+ipcMain.handle("creds:remove", (_e, serverUrl: string, username: string) => {
+  writeCreds(readCreds().filter((e) => !(e.serverUrl === serverUrl && e.username === username)));
+});
+ipcMain.handle("creds:pwSupported", () => pwEncAvailable());
 
 /**
  * "단일 데스크톱 모드": 서버가 같은 배포 패키지에 동봉된 경우 클라이언트가 자체적으로
@@ -324,11 +364,38 @@ app.whenReady().then(() => {
   });
 });
 
-app.on("window-all-closed", () => {
-  if (bundledServerProcess) bundledServerProcess.kill();
-  if (process.platform !== "darwin") app.quit();
+// 창을 닫거나 앱을 종료할 때, 로그인돼 있으면 서버 세션을 먼저 끊는다(로그아웃).
+// 이렇게 하지 않으면 강제 로그인한 세션이 그대로 남아, 다음 실행 때 "이미 로그인 중"으로 막히거나
+// (동봉 서버 모드) 유령 세션이 남는다. 로그아웃은 서버를 죽이기 "전에" 해야 도달한다.
+let quitCleanupDone = false;
+async function logoutOnQuit(): Promise<void> {
+  if (quitCleanupDone) return;
+  quitCleanupDone = true;
+  if (authState.accessToken && authState.serverUrl) {
+    await new Promise<void>((resolve) => {
+      try {
+        const u = new URL(`${authState.serverUrl}/api/auth/logout`);
+        const lib = u.protocol === "https:" ? https : http;
+        const req = lib.request(
+          u,
+          { method: "POST", headers: { Authorization: `Bearer ${authState.accessToken}` }, timeout: 3000 },
+          (res) => { res.on("data", () => {}); res.on("end", () => resolve()); }
+        );
+        req.on("error", () => resolve());
+        req.on("timeout", () => { req.destroy(); resolve(); });
+        req.end();
+      } catch { resolve(); }
+    });
+  }
+  if (bundledServerProcess) { bundledServerProcess.kill(); bundledServerProcess = null; }
+}
+
+app.on("before-quit", (e) => {
+  if (quitCleanupDone) return; // 정리 끝 — 정상 종료 진행
+  e.preventDefault(); // 비동기 로그아웃을 기다렸다가 다시 종료
+  logoutOnQuit().finally(() => app.quit());
 });
 
-app.on("before-quit", () => {
-  if (bundledServerProcess) bundledServerProcess.kill();
+app.on("window-all-closed", () => {
+  if (process.platform !== "darwin") app.quit(); // → before-quit에서 세션 정리 후 종료
 });

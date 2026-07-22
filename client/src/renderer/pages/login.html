@@ -71,6 +71,22 @@
     min-height: 16px;
   }
   .hint { margin-top: 18px; font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+  .ver { margin-top: 14px; font-size: 10.5px; color: var(--muted); text-align: center; opacity: .8; }
+  /* 최근 로그인 빠른 선택 */
+  .recent { margin-bottom: 16px; }
+  .recent-t { font-size: 11px; color: var(--muted); margin-bottom: 7px; }
+  .rc { display: flex; align-items: center; gap: 8px; background: #0d1526; border: 1px solid var(--border); border-radius: 8px;
+        padding: 8px 10px; margin-bottom: 6px; cursor: pointer; }
+  .rc:hover { border-color: var(--blue); }
+  .rc-main { min-width: 0; flex: 1; }
+  .rc-id { font-size: 13px; color: var(--text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rc-srv { font-size: 10.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rc-key { font-size: 9.5px; color: var(--blue); flex: 0 0 auto; }
+  .rc-x { flex: 0 0 auto; color: var(--muted); font-size: 13px; padding: 0 3px; }
+  .rc-x:hover { color: #ff8080; }
+  .savepw { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--muted); margin: -4px 0 16px; cursor: pointer; }
+  .savepw input { width: auto; margin: 0; cursor: pointer; }
+  .savepw.dim { opacity: .5; }
 </style>
 </head>
 <body>
@@ -82,6 +98,11 @@
     <h1>GIJO AS 로그인</h1>
     <p class="sub">보안담당자 계정으로 서버에 연결합니다.</p>
 
+    <div class="recent" id="recentBox" style="display:none">
+      <div class="recent-t">최근 로그인 — 눌러서 빠르게 채우기</div>
+      <div id="recentList"></div>
+    </div>
+
     <div class="server-row">
       <input id="serverUrl" placeholder="서버 주소 (예: http://localhost:4000)" />
     </div>
@@ -92,12 +113,15 @@
     <label for="password">비밀번호</label>
     <input id="password" type="password" placeholder="비밀번호" autocomplete="current-password" />
 
+    <label class="savepw" id="savePwRow"><input type="checkbox" id="savePw" checked /> 이 PC에 로그인 정보 저장(서버·아이디·비밀번호)</label>
+
     <button id="loginBtn">로그인</button>
     <div class="err" id="errMsg"></div>
     <div class="hint">
       단일 데스크톱 모드: 서버가 이 PC에 동봉되어 있다면 기본 주소(localhost:4000)를 그대로 사용하세요.<br />
       분산 모드: 사내망 GPU 서버 주소를 입력하세요.
     </div>
+    <div class="ver" id="verLine">버전 확인 중…</div>
   </div>
 
   <script>
@@ -106,8 +130,59 @@
     const passInput = document.getElementById("password");
     const btn = document.getElementById("loginBtn");
     const errMsg = document.getElementById("errMsg");
+    const savePw = document.getElementById("savePw");
+    const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
     serverInput.value = window.gijo.getServerUrl();
+
+    // 지금 적용된(설치된) 클라이언트 버전 표시.
+    (async () => {
+      try { const v = await window.gijo.update.currentVersion(); document.getElementById("verLine").textContent = "GIJO AS 클라이언트 v" + v; }
+      catch (e) { document.getElementById("verLine").textContent = ""; }
+    })();
+
+    // 비밀번호 저장 지원 여부(OS 키체인) — 미지원이면 체크박스 문구를 낮추고 서버·ID만 저장.
+    let pwSupported = true;
+    (async () => {
+      try { pwSupported = await window.gijo.creds.pwSupported(); } catch (e) { pwSupported = false; }
+      if (!pwSupported) {
+        savePw.checked = false;
+        document.getElementById("savePwRow").innerHTML = '<input type="checkbox" id="savePw" checked disabled style="opacity:.4"> 이 PC에 서버·아이디 저장(비밀번호는 이 OS에서 안전 저장 미지원)';
+        document.getElementById("savePwRow").classList.add("dim");
+      }
+    })();
+
+    // 최근 로그인 히스토리 렌더 — 누르면 서버·ID·PW 자동 채움.
+    async function loadRecent() {
+      let list = [];
+      try { list = await window.gijo.creds.list(); } catch (e) { return; }
+      const box = document.getElementById("recentBox");
+      const ul = document.getElementById("recentList");
+      if (!list.length) { box.style.display = "none"; return; }
+      box.style.display = "";
+      ul.innerHTML = list.map((e, i) =>
+        '<div class="rc" data-i="' + i + '"><div class="rc-main"><div class="rc-id">' + esc(e.username) + "</div>" +
+        '<div class="rc-srv">' + esc(e.serverUrl) + "</div></div>" +
+        (e.hasPw ? '<span class="rc-key" title="비밀번호 저장됨">🔑</span>' : "") +
+        '<span class="rc-x" data-del="' + i + '" title="삭제">✕</span></div>'
+      ).join("");
+      ul.querySelectorAll(".rc").forEach((el) => el.addEventListener("click", async (ev) => {
+        if (ev.target.closest("[data-del]")) {
+          ev.stopPropagation();
+          const e = list[Number(ev.target.closest("[data-del]").dataset.del)];
+          await window.gijo.creds.remove(e.serverUrl, e.username);
+          loadRecent();
+          return;
+        }
+        const e = list[Number(el.dataset.i)];
+        serverInput.value = e.serverUrl;
+        userInput.value = e.username;
+        window.gijo.setServerUrl(e.serverUrl);
+        passInput.value = e.hasPw ? (await window.gijo.creds.getPassword(e.serverUrl, e.username)) : "";
+        (passInput.value ? btn : passInput).focus();
+      }));
+    }
+    loadRecent();
 
     async function doLogin(force) {
       errMsg.textContent = "";
@@ -117,6 +192,8 @@
         if (serverInput.value.trim()) window.gijo.setServerUrl(serverInput.value.trim());
         const result = await window.gijo.login(userInput.value.trim(), passInput.value, force);
         if (result.ok) {
+          // 로그인 성공 — 접근 서버·ID·PW를 이 PC에 저장(체크 시). PW는 메인 프로세스가 암호화.
+          try { await window.gijo.creds.save(serverInput.value.trim(), userInput.value.trim(), passInput.value, savePw.checked); } catch (e) {}
           window.gijoRealtime.connect();
           await window.gijo.navigateTo("dashboard.html");
           return;
