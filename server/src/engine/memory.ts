@@ -256,25 +256,43 @@ export async function ingestText(documentId: string, raw: string, scope: string 
   // 실패해 문서가 조용히 인입 안 되는 문제가 있다(2026-07-20 실측: 다중 청크 배치는 빠르게 실패,
   // 단건은 성공). 그래서 배치 실패 시 청크 단위로 쪼개 재시도한다 — 건강할 땐 빠르게, 불안정할 땐
   // 견고하게(느리지만 반드시 들어가게).
-  const EMBED_BATCH = 64;
+  // 배치 8: 청크당 ~500토큰 × 8 ≈ 4천 토큰으로 임베딩 서버 batch 한도(8192토큰) 안에 들어간다.
+  // 64로 보내면 요청당 ~3만 토큰이 되어 대용량 PDF(수천 청크)에서 임베딩 서버가 무응답으로
+  // 빠지고 워치독 재기동까지 이어졌다(2026-07-23 실측: Tenable 가이드 1.9M자 인입 실패).
+  const EMBED_BATCH = 8;
+  // 임베딩 서버가 워치독으로 재기동되는 동안(~15초)의 일시 오류는 기다렸다 재시도한다 —
+  // 수천 청크 인입 도중 한 번의 재기동으로 문서 전체가 실패하면 안 된다.
+  const embedWithRetry = async (texts: string[]): Promise<number[][]> => {
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      try {
+        return await embed(texts);
+      } catch (err) {
+        lastErr = err;
+        console.warn(`[memory] 임베딩 일시 실패(시도 ${attempt + 1}/5, ${texts.length}건) — 10초 후 재시도: ${err instanceof Error ? err.message : String(err)}`);
+        await new Promise((resolve) => setTimeout(resolve, 10_000));
+      }
+    }
+    throw lastErr;
+  };
   const vectors: number[][] = [];
   for (let i = 0; i < chunks.length; i += EMBED_BATCH) {
     const slice = chunks.slice(i, i + EMBED_BATCH);
     try {
-      const vecs = await embed(slice);
+      const vecs = await embedWithRetry(slice);
       for (const v of vecs) vectors.push(v);
     } catch (batchErr) {
-      if (slice.length === 1) throw batchErr; // 단건도 실패면 임베딩 서버 자체 문제 — 위로 던진다
+      if (slice.length === 1) throw batchErr; // 재시도까지 소진 — 임베딩 서버 자체 문제, 위로 던진다
       console.warn(`[memory] 배치 임베딩 실패(${slice.length}건) — 청크 단위로 재시도: ${batchErr instanceof Error ? batchErr.message : String(batchErr)}`);
-      // 청크를 곧바로 연속 호출하면 GPU를 수 분간 독점해 동시에 도는 채팅 모델이 hang 판정을
-      // 받는 연쇄가 실측됐다(2026-07-21: 64건 재시도 도중 gijo-main-orchestrator hang → 재기동).
-      // 매 청크 사이 짧게 쉬어 다른 모델도 GPU 틈을 얻게 한다(전체 지연은 미미: 64건×150ms≈10s).
+      // 청크 사이 짧게 쉬어 동시에 도는 채팅 모델도 GPU 틈을 얻게 한다(2026-07-21 hang 연쇄 실측).
       for (const c of slice) {
-        const v = await embed([c]);
+        const v = await embedWithRetry([c]);
         vectors.push(v[0]);
         await new Promise((resolve) => setTimeout(resolve, 150));
       }
     }
+    // 대용량 문서(수백 배치)에서도 다른 요청이 끼어들 틈을 준다.
+    if (i > 0 && i % (EMBED_BATCH * 25) === 0) await new Promise((resolve) => setTimeout(resolve, 300));
   }
   const rows: MemoryRow[] = chunks.map((text, i) => ({ documentId, chunkIndex: i, text, scope, vector: vectors[i] }));
 

@@ -244,6 +244,30 @@ async function waitForReady(model: LoadedModel, timeoutMs = READY_TIMEOUT_MS): P
   return false;
 }
 
+// llama-server 자식의 stdout/stderr를 반드시 소비한다 — stdio:"pipe"로 띄우고 아무도 읽지 않으면
+// 64KB 파이프 버퍼가 차는 순간 자식이 로그 쓰기에서 블록돼 **멈춘 것처럼 보인다**(2026-07-23 실측:
+// 대량 인입에서 요청 로그가 버퍼를 채우자 임베딩 서버가 1분 만에 무응답 → 워치독 재기동 루프).
+// 마지막 몇 줄은 링버퍼로 남겨 비정상 종료 진단에 쓴다.
+function drainProcessOutput(p: ChildProcess, label: string): () => string {
+  const tail: string[] = [];
+  const keep = (chunk: Buffer) => {
+    for (const line of chunk.toString("utf8").split("\n")) {
+      const t = line.trim();
+      if (!t) continue;
+      tail.push(t.slice(0, 300));
+      if (tail.length > 30) tail.shift();
+    }
+  };
+  p.stdout?.on("data", keep);
+  p.stderr?.on("data", keep);
+  p.on("exit", (code, signal) => {
+    if (code !== 0 && code !== null) {
+      console.warn(`[localengine] ${label} 비정상 종료(code=${code}, signal=${signal ?? "-"}) — 마지막 출력:\n${tail.slice(-8).join("\n")}`);
+    }
+  });
+  return () => tail.join("\n");
+}
+
 // modelId를 풀에 로드(또는 이미 있으면 재사용)하고 준비될 때까지 기다린다.
 async function ensureModelLoaded(modelId: string): Promise<LoadedModel> {
   const existing = pool.get(modelId);
@@ -261,6 +285,7 @@ async function ensureModelLoaded(modelId: string): Promise<LoadedModel> {
     ["-m", modelFilePath(modelId), "-ngl", "-1", "--ctx-size", String(DEFAULT_CTX_SIZE), "--port", String(port)],
     { stdio: "pipe" }
   );
+  drainProcessOutput(spawned, `채팅 모델 ${modelId}`);
   const model: LoadedModel = { modelId, port, process: spawned, ready: false, lastUsed: Date.now() };
   pool.set(modelId, model);
   setStateStmt.run("lastModelId", modelId);
@@ -373,6 +398,7 @@ function spawnEmbeddingServer(embPath: string): void {
     ["-m", embPath, "--embedding", "-ngl", "-1", "--ctx-size", "8192", "--batch-size", "8192", "--ubatch-size", "8192", "--port", String(EMBEDDING_PORT)],
     { stdio: "pipe" }
   );
+  drainProcessOutput(spawned, "임베딩 서버 bge-m3");
   embeddingProcess = spawned;
   embeddingModelId = EMBEDDING_MODEL_ID;
   spawned.on("exit", () => {
