@@ -115,11 +115,11 @@
   .dash-sfull:hover{background:var(--panel-2);}
   .explorer-title{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px;}
   /* 탐색기 파일 트리 글자 크기 — 기본(≈16px)이 커서 11.5px로 축소(파일명·폴더명). */
-  #explorerTree{font-size:11.5px;line-height:1.5;}
+  #explorerTree{font-size:12.5px;line-height:1.55;}
   .explorer-sub{font-size:11px;color:var(--blue-light);margin-bottom:10px;}
   .explorer-tree{font-size:12px;color:var(--muted);line-height:1.9;}
   /* 통일된 트리 탐색기 — 폴더(접기)·자식(가이드라인)·리프(항목)를 한 스타일로 */
-  .tree-folder{display:flex;align-items:center;gap:6px;padding:5px 5px;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--text);border-radius:6px;}
+  .tree-folder{display:flex;align-items:center;gap:7px;padding:6px 5px;cursor:pointer;font-size:13.5px;font-weight:800;color:#fff;border-radius:6px;}
   .tree-folder:hover{background:rgba(255,255,255,0.04);}
   /* 화면 이동용 폴더(접기 아님) — 클릭하면 해당 관리 화면으로. */
   .tree-nav{display:flex;align-items:center;gap:6px;padding:6px 5px;margin-top:3px;cursor:pointer;font-size:12.5px;font-weight:700;color:var(--blue-light);border-radius:6px;border:1px dashed rgba(59,130,246,0.35);}
@@ -128,28 +128,30 @@
   .tree-count{margin-left:auto;font-size:10px;color:var(--muted-2);font-weight:700;background:rgba(255,255,255,0.05);border-radius:9px;padding:0 7px;}
   .tree-act{color:var(--muted-2);cursor:pointer;font-size:11px;padding:0 2px;flex-shrink:0;}
   .tree-act:hover{color:var(--blue-light);}
-  .tree-children{margin:1px 0 4px 13px;padding-left:9px;border-left:1px solid var(--border);font-size:11.5px;line-height:1.8;}
+  .tree-children{margin:1px 0 4px 14px;padding-left:10px;border-left:1px solid var(--border-strong);font-size:12.5px;line-height:1.75;}
   .tree-children.collapsed{display:none;}
-  .tree-leaf{padding:3px 5px;font-size:11.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:5px;}
+  .tree-leaf{padding:4px 5px;font-size:12.5px;color:#aab2c6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-radius:5px;}
   .tree-leaf.click{cursor:pointer;}
   .tree-leaf.click:hover{background:rgba(255,255,255,0.04);color:var(--text);}
   .tree-leaf .sub{color:var(--muted-2);font-size:10px;}
   .tree-leaf .badge{color:var(--amber);font-size:10px;font-weight:700;}
   .tree-empty{padding:3px 5px;font-size:11px;color:var(--muted-2);}
   /* AS 탐색기 — 파일 탐색기 아래 2번째 섹션(리포트·문서). 글씨 12px = 지휘 콘솔과 동일. */
-  .as-explorer{margin-top:9px;padding-top:9px;border-top:1px dashed var(--border-strong);font-size:11.5px;}
-  .as-sec{font-size:11px;font-weight:800;color:var(--muted);letter-spacing:.3px;padding:1px 4px 5px;}
-  .asx-row{display:flex;align-items:center;gap:6px;padding:4px 6px;border-radius:7px;cursor:pointer;white-space:nowrap;overflow:hidden;}
+  .as-explorer{margin-top:10px;padding-top:10px;border-top:1px dashed var(--border-strong);font-size:12.5px;}
+  .as-sec{font-size:12.5px;font-weight:800;color:#c3cad9;letter-spacing:.2px;padding:1px 4px 6px;}
+  .asx-row{display:flex;align-items:center;gap:7px;padding:6px 6px;border-radius:7px;cursor:pointer;white-space:nowrap;overflow:hidden;font-size:13px;font-weight:700;}
   .asx-row:hover{background:rgba(255,255,255,.045);}
-  .asx-car{width:12px;text-align:center;color:var(--muted-2);font-size:10px;flex:0 0 auto;}
-  .asx-ic{width:15px;text-align:center;flex:0 0 auto;}
-  .asx-nm{overflow:hidden;text-overflow:ellipsis;color:#dfe8f7;}
-  .asx-cnt{margin-left:auto;font-size:10px;color:var(--blue-light);background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.35);border-radius:999px;padding:0 6px;flex:0 0 auto;}
-  .asx-body .asx-file{display:flex;align-items:center;gap:6px;padding:3px 6px 3px 20px;border-radius:7px;cursor:pointer;white-space:nowrap;overflow:hidden;font-size:11.5px;}
+  .asx-car{width:12px;text-align:center;color:var(--muted-2);font-size:11px;flex:0 0 auto;}
+  .asx-ic{width:16px;text-align:center;flex:0 0 auto;}
+  .asx-nm{overflow:hidden;text-overflow:ellipsis;color:#eef3fb;}
+  .asx-cnt{margin-left:auto;font-size:10.5px;color:var(--blue-light);background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.35);border-radius:999px;padding:0 7px;flex:0 0 auto;font-weight:700;}
+  /* 하위 파일(리포트/문서) — 왼쪽 가이드선 + 들여쓰기로 폴더 소속을 뚜렷이, 글씨 상향. */
+  .asx-body{margin-left:15px;border-left:1px solid var(--border-strong);}
+  .asx-body .asx-file{display:flex;align-items:center;gap:7px;padding:4px 6px 4px 12px;border-radius:0 6px 6px 0;cursor:pointer;white-space:nowrap;overflow:hidden;font-size:12.5px;}
   .asx-body .asx-file:hover{background:rgba(255,255,255,.045);}
-  .asx-body .asx-file .asx-nm{color:var(--muted);}
-  .asx-empty{padding:3px 6px 3px 22px;font-size:11px;color:var(--muted-2);}
-  .asx-total{font-size:10px;color:var(--muted-2);padding:3px 6px 2px 22px;}
+  .asx-body .asx-file .asx-nm{color:#aab2c6;}
+  .asx-empty{padding:4px 6px 4px 12px;font-size:12px;color:var(--muted-2);}
+  .asx-total{font-size:10.5px;color:var(--muted-2);padding:4px 6px 2px 12px;}
   /* 연동 서버 정보 카드 + 시작 가이드 슬롯 — 자산 탐색기 상단(GIJO AS Desktop 아래) */
   .server-card{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:8px 10px;margin:4px 0 6px;}
   .sc-nm{font-size:11.5px;font-weight:800;color:#fff;display:flex;align-items:center;gap:6px;}
@@ -160,7 +162,7 @@
   #gijoObSlot .ob-row{display:flex;align-items:center;gap:6px;background:rgba(139,124,240,0.08);border:1px solid rgba(139,124,240,0.35);border-radius:8px;padding:6px 9px;margin-bottom:8px;cursor:pointer;font-size:11px;font-weight:800;color:var(--purple);}
   #gijoObSlot .ob-row .pr{margin-left:auto;font-size:9.5px;background:rgba(139,124,240,0.18);padding:1px 6px;border-radius:5px;}
   /* AI 자산 하위 그룹(AI-BOM/SBOM) 헤더 */
-  .tree-sub{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:800;color:var(--blue-light);padding:3px 2px 1px;}
+  .tree-sub{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:800;color:var(--blue-light);padding:4px 2px 2px;}
   .tree-sub .cnt{font-size:9px;color:var(--muted-2);font-weight:700;}
   /* 자산·제품·문서 리프 상태 배지 */
   .tree-leaf.row{display:flex;align-items:center;gap:5px;}
