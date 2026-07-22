@@ -454,18 +454,20 @@ async function checkAndHealEmbedding(): Promise<void> {
   console.warn(`[localengine] 임베딩 서버 무응답 감지 (${embeddingProbeFailures}/${EMBED_FAIL_THRESHOLD})`);
   if (embeddingProbeFailures < EMBED_FAIL_THRESHOLD) return;
 
-  // 죽이기 전 최종 재확인 — 넉넉한 타임아웃으로 한 번 더. 되살아났으면 일시 지연이므로 재기동 취소.
-  if (await probeEmbeddingAlive(CONFIRM_TIMEOUT_MS)) {
-    embeddingProbeFailures = 0;
-    transientSkips += 1;
-    console.warn(`[localengine] 임베딩 서버 일시 지연(WSL2 GPU 추정) — 재확인 응답 정상, 재기동 취소 (누적 취소 ${transientSkips})`);
-    return;
-  }
-
-  // 최종 재확인도 실패 — 진짜 hang. 죽이고 새로 띄운다.
+  // 재확인·재기동 동안 다른 감시 틱이 겹치지 않게 **먼저** 잠근다. 재확인(CONFIRM_TIMEOUT_MS)이
+  // 감시 주기(30s)보다 길어질 수 있어, 잠금을 재확인 뒤로 두면 다음 틱이 중복 진입해 이중 재기동이
+  // 난다(실측 2026-07-22: 22:28:13 재기동 직후 22:28:18에 3/2로 또 재기동).
   embeddingRestarting = true;
-  healSettleUntil = Date.now() + HEAL_SETTLE_MS; // 채팅 감시도 잠시 진정(연쇄 재기동 방지)
   try {
+    // 죽이기 전 최종 재확인 — 넉넉한 타임아웃으로 한 번 더. 되살아났으면 일시 지연이므로 재기동 취소.
+    if (await probeEmbeddingAlive(CONFIRM_TIMEOUT_MS)) {
+      embeddingProbeFailures = 0;
+      transientSkips += 1;
+      console.warn(`[localengine] 임베딩 서버 일시 지연(WSL2 GPU 추정) — 재확인 응답 정상, 재기동 취소 (누적 취소 ${transientSkips})`);
+      return;
+    }
+    // 최종 재확인도 실패 — 진짜 hang. 죽이고 새로 띄운다.
+    healSettleUntil = Date.now() + HEAL_SETTLE_MS; // 채팅 감시도 잠시 진정(연쇄 재기동 방지)
     const diag = await captureHangDiagnostics().catch(() => "진단 실패");
     console.warn(`[localengine] 임베딩 서버 hang — 자동 재기동 | 진단: ${diag}`);
     await stopEmbeddingEngine().catch(() => {});
@@ -538,18 +540,20 @@ async function checkAndHealChat(): Promise<void> {
     console.warn(`[localengine] 채팅 모델 무응답 감지: ${m.modelId} (${fails}/${CHAT_FAIL_THRESHOLD})`);
     if (fails < CHAT_FAIL_THRESHOLD) continue;
 
-    // 죽이기 전 최종 재확인 — 넉넉한 타임아웃으로 한 번 더. 되살아났으면 일시 지연이므로 재기동 취소.
-    if (await probeChatAlive(m.port, CONFIRM_TIMEOUT_MS)) {
-      chatProbeFailures.set(m.modelId, 0);
-      transientSkips += 1;
-      console.warn(`[localengine] 채팅 모델 일시 지연(WSL2 GPU 추정) — 재확인 응답 정상, 재기동 취소: ${m.modelId} (누적 취소 ${transientSkips})`);
-      continue;
-    }
-
-    // 최종 재확인도 실패 — 진짜 hang. 한 번에 한 모델만 죽이고 새로 띄운다(GPU 부담·중복 방지).
+    // 재확인·재기동 동안 다른 감시 틱 겹침 방지 — **먼저** 잠근다(임베딩과 동일: 재확인이 주기보다 길어질 수 있음).
     chatHealing = true;
-    healSettleUntil = Date.now() + HEAL_SETTLE_MS; // 임베딩·다른 채팅 감시도 잠시 진정(연쇄 재기동 방지)
     try {
+      // 죽이기 전 최종 재확인 — 넉넉한 타임아웃으로 한 번 더. 되살아났으면 일시 지연이므로 재기동 취소.
+      if (await probeChatAlive(m.port, CONFIRM_TIMEOUT_MS)) {
+        chatProbeFailures.set(m.modelId, 0);
+        transientSkips += 1;
+        console.warn(`[localengine] 채팅 모델 일시 지연(WSL2 GPU 추정) — 재확인 응답 정상, 재기동 취소: ${m.modelId} (누적 취소 ${transientSkips})`);
+        chatHealing = false;
+        continue;
+      }
+
+      // 최종 재확인도 실패 — 진짜 hang. 한 번에 한 모델만 죽이고 새로 띄운다(GPU 부담·중복 방지).
+      healSettleUntil = Date.now() + HEAL_SETTLE_MS; // 임베딩·다른 채팅 감시도 잠시 진정(연쇄 재기동 방지)
       const diag = await captureHangDiagnostics().catch(() => "진단 실패");
       console.warn(`[localengine] 채팅 모델 hang — 자동 재기동: ${m.modelId} | 진단: ${diag}`);
       await unloadModel(m.modelId).catch(() => {});
