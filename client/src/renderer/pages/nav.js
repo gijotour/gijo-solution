@@ -5,62 +5,104 @@
 // 스타일은 페이지 :root 토큰(--panel-2·--border·--blue…)을 그대로 쓰므로 다크 테마와 일관된다.
 
 (function () {
-  // 대분류(레일 아이콘) → 기능(서브패널 항목). 24기능을 4대분류 + 안내 + 설정으로 간소화.
-  var GROUPS = [
-    { id: "monitor", ic: "🖥", label: "관제·모니터링", items: [
-      { page: "dashboard.html", label: "대시보드" },
-      { page: "kpi.html", label: "보안 KPI", bot: true },
-      { page: "analysis.html", label: "보안 분석 (통합 관제)", bot: true },
-      { page: "sessions.html", label: "작업 세션", bot: true },
-      { page: "threat.html", label: "위협 인텔리전스", bot: true },
+  // ── 메뉴 C안 통합 (2026-07-23): 32항목 → 11항목·3그룹 + 설정. 겹치는 화면은 허브 탭(hub.html)으로
+  // 병합 — 기존 페이지는 그대로 두고 iframe(embed=1)으로 품는다. 직접 URL 접근은 허브로 리다이렉트.
+  // 허브 정의는 hub.html과 공유(window.gijoHubs).
+  var HUBS = {
+    analysis: { ic: "📊", label: "보안 분석", tabs: [
+      { page: "analysis.html", label: "통합 관제" },
+      { page: "kpi.html", label: "보안 KPI" },
+    ]},
+    threat: { ic: "🎯", label: "위협 인텔리전스", tabs: [
+      { page: "threat.html", label: "위협 인텔" },
       { page: "mcp.html", label: "🔌 MCP 연동" },
     ]},
-    { id: "assets", ic: "🛡", label: "자산·취약점·대응", items: [
-      { page: "assethub.html", label: "🛡 자산 허브", bot: true },
-      { page: "inventory.html", label: "자산 목록", bot: true },
-      { page: "sbom.html", label: "AI-BOM 구성", bot: true },
-      { page: "vulnscan.html", label: "취약점", bot: true },
-      { page: "approvals.html", label: "조치·승인", bot: true },
-      { page: "products.html", label: "보안제품", bot: true },
-      { page: "opsguide.html", label: "유지보수", bot: true },
-      { page: "report.html", label: "리포트", bot: true },
-      { page: "compliance.html", label: "컴플라이언스", bot: true },
+    report: { ic: "📄", label: "리포트", tabs: [
+      { page: "report.html", label: "리포트" },
+      { page: "compliance.html", label: "컴플라이언스" },
     ]},
-    { id: "ai", ic: "🤖", label: "AI", items: [
+    assets: { ic: "🛡", label: "자산 허브", tabs: [
+      { page: "assethub.html", label: "통합 뷰" },
+      { page: "inventory.html", label: "자산 목록" },
+      { page: "sbom.html", label: "AI-BOM" },
+      { page: "vulnscan.html", label: "취약점" },
+    ]},
+    products: { ic: "🧰", label: "보안제품", tabs: [
+      { page: "products.html", label: "등록부" },
+      { page: "opsguide.html", label: "유지보수" },
+    ]},
+    inspect: { ic: "🛰", label: "점검 콘솔", tabs: [
+      { page: "hardening.html", label: "원격 정기점검" },
+      { page: "terminal.html", label: "터미널 (CLI)" },
+    ]},
+    aiteam: { ic: "🤖", label: "AI 팀", tabs: [
       { page: "agent.html", label: "에이전트 AI" },
-      { office: true, label: "🏢 팀 사무실 (창)" }, // 별도 창 — 페이지 이동이 아니라 office:open IPC
+      { office: true, label: "🏢 팀 사무실 (창)" },
+    ]},
+    aiknowledge: { ic: "🧠", label: "AI 지식·모델", tabs: [
+      { page: "memory.html", label: "기억·학습 (RAG)" },
+      { page: "ontology.html", label: "온톨로지" },
+      { page: "docenrich.html", label: "문서 보강" },
+      { page: "learnloop.html", label: "학습 루프" },
       { page: "merge.html", label: "LLM 합성" },
       { page: "llmguide.html", label: "LLM 가이드" },
-      { page: "memory.html", label: "기억·학습 (RAG)", bot: true },
-      { page: "docenrich.html", label: "문서 보강" },
-      { page: "ontology.html", label: "온톨로지", bot: true },
-      { page: "learnloop.html", label: "학습 루프" },
-      { page: "redteam.html", label: "레드팀·가드레일", bot: true },
     ]},
-    { id: "system", ic: "🛠", label: "시스템", items: [
+    settings: { ic: "⚙", label: "설정", tabs: [
+      { page: "settings.html", label: "설정" },
+      { page: "update.html", label: "업데이트" },
       { page: "logs.html", label: "로그" },
       { page: "audit.html", label: "작업 기록 (감사)" },
-      { page: "terminal.html", label: "터미널 (CLI)" },
-      { page: "hardening.html", label: "원격 정기점검", bot: true },
+      { page: "billing.html", label: "사용량·요금" },
+      { page: "reference.html", label: "기능 안내" },
     ]},
-    { id: "help", ic: "❓", label: "기능 안내", bottom: true, items: [
-      { page: "reference.html", label: "기능 안내 — 전체 기능·입력칸" },
+  };
+  window.gijoHubs = HUBS; // hub.html이 같은 정의를 사용
+
+  var GROUPS = [
+    { id: "monitor", ic: "🖥", label: "관제", items: [
+      { page: "dashboard.html", label: "대시보드" },
+      { page: "hub.html?g=analysis", label: "보안 분석", bot: true },
+      { page: "hub.html?g=threat", label: "위협 인텔리전스", bot: true },
+      { page: "hub.html?g=report", label: "리포트", bot: true },
+    ]},
+    { id: "assets", ic: "🛡", label: "자산·조치", items: [
+      { page: "hub.html?g=assets", label: "자산 허브", bot: true },
+      { page: "approvals.html", label: "조치·승인", bot: true },
+      { page: "hub.html?g=products", label: "보안제품", bot: true },
+      { page: "hub.html?g=inspect", label: "점검 콘솔", bot: true },
+    ]},
+    { id: "ai", ic: "🤖", label: "AI", items: [
+      { page: "hub.html?g=aiteam", label: "AI 팀" },
+      { page: "hub.html?g=aiknowledge", label: "AI 지식·모델", bot: true },
+      { page: "redteam.html", label: "레드팀·가드레일", bot: true },
     ]},
     { id: "settings", ic: "⚙", label: "설정", bottom: true, items: [
-      { page: "settings.html", label: "설정" },
-      { page: "billing.html", label: "사용량·요금" },
-      { page: "update.html", label: "업데이트" },
+      { page: "hub.html?g=settings", label: "설정" },
     ]},
   ];
+
+  // 탭으로 흡수된 페이지 → 허브 딥링크. 대시보드 바로가기·챗봇 navigateTo 등 기존 링크가
+  // 그대로 허브 탭으로 이어진다(embed 프레임 안에서는 리다이렉트하지 않는다).
+  var TAB_REDIRECT = {};
+  Object.keys(HUBS).forEach(function (g) {
+    HUBS[g].tabs.forEach(function (t) { if (t.page) TAB_REDIRECT[t.page] = "hub.html?g=" + g + "&t=" + t.page; });
+  });
 
   function currentPage() {
     return decodeURIComponent((location.pathname || "").split("/").pop() || "");
   }
+  // 허브 페이지는 파일명이 전부 hub.html이라 g 파라미터까지 붙여 항목과 매칭한다.
+  function currentKey() {
+    var file = currentPage();
+    if (file !== "hub.html") return file;
+    var m = /[?&]g=([a-z]+)/.exec(location.search || "");
+    return m ? "hub.html?g=" + m[1] : file;
+  }
   function go(page) { if (window.gijo && window.gijo.navigateTo) window.gijo.navigateTo(page); }
   function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
-  function groupOf(page) {
+  function groupOf(key) {
     for (var i = 0; i < GROUPS.length; i++) {
-      for (var j = 0; j < GROUPS[i].items.length; j++) if (GROUPS[i].items[j].page === page) return GROUPS[i];
+      for (var j = 0; j < GROUPS[i].items.length; j++) if (GROUPS[i].items[j].page === key) return GROUPS[i];
     }
     return GROUPS[0];
   }
@@ -103,7 +145,7 @@
     var root = document.getElementById("gijoNav");
     if (!root) return;
     injectCss();
-    var here = currentPage();
+    var here = currentKey();
     var activeGroup = groupOf(here);
     if (!shownGroupId) shownGroupId = activeGroup.id;
     var shown = GROUPS.filter(function (g) { return g.id === shownGroupId; })[0] || activeGroup;
@@ -153,7 +195,7 @@
         botMark.title = "이 화면 데이터는 챗봇에게 물어봐도 그대로 답합니다";
         el.appendChild(botMark);
       }
-      if (it.page === "update.html" && updateAvailable) {
+      if (it.page === "hub.html?g=settings" && updateAvailable) {
         var upBadge = document.createElement("span");
         upBadge.className = "gn-upbadge";
         upBadge.textContent = "1";
@@ -225,7 +267,23 @@
       .catch(function () {});
   }
 
+  // embed 모드 — 허브 탭(hub.html)의 iframe으로 품길 때(?embed=1). 사이드바·헤더·드로어를 숨기고
+  // 본문만 보인다(허브가 바깥에서 네비·헤더를 제공). 챗봇 위젯은 탭별 화면 맥락이 정확하도록 유지.
+  var IS_EMBED = /(^|[?&])embed=1(&|$)/.test(location.search);
+  function applyEmbed() {
+    loadDesignSystem();
+    var st = document.createElement("style");
+    st.textContent = ".header{display:none !important;}#gijoNav{display:none !important;}" +
+      ".app{grid-template-columns:1fr !important;display:block !important;}" +
+      ".main{padding-top:16px !important;}";
+    document.head.appendChild(st);
+  }
+
   function boot() {
+    if (IS_EMBED) { applyEmbed(); return; }
+    // 탭으로 흡수된 페이지에 직접 들어오면(대시보드 바로가기·챗봇 링크 등) 허브의 그 탭으로 보낸다.
+    var target = TAB_REDIRECT[currentPage()];
+    if (target && window.gijo && window.gijo.navigateTo) { window.gijo.navigateTo(target); return; }
     loadDesignSystem();
     render();
     loadOnboarding();

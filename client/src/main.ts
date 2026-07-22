@@ -125,6 +125,9 @@ function createMainWindow(): void {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // 허브 탭(hub.html)이 기존 페이지를 iframe으로 품는다 — 서브프레임에도 preload(window.gijo)를
+      // 주입해야 탭 안의 페이지가 동작한다(메뉴 C안 통합, 2026-07-23).
+      nodeIntegrationInSubFrames: true,
     },
   });
 
@@ -141,7 +144,11 @@ function createMainWindow(): void {
 
 ipcMain.handle("navigate:to", async (_e, page: string) => {
   if (!mainWindow) return;
-  await mainWindow.loadFile(path.join(__dirname, `../src/renderer/pages/${page}`));
+  // 허브 딥링크(hub.html?g=assets&t=vulnscan.html) 지원 — 파일 경로와 쿼리를 분리해 loadFile에 넘긴다.
+  const [file, qs] = String(page).split("?");
+  const query: Record<string, string> = {};
+  if (qs) for (const [k, v] of new URLSearchParams(qs)) query[k] = v;
+  await mainWindow.loadFile(path.join(__dirname, `../src/renderer/pages/${file}`), qs ? { query } : undefined);
 });
 
 // "우리 AI 팀 사무실" 별도 창 — 이미 열려 있으면 앞으로만 가져온다(중복 창 방지).

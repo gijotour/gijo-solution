@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>GIJO AS — 허브</title>
+<style>
+  :root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);--border-strong:rgba(255,255,255,0.16);
+    --blue:#3b82f6;--blue-light:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--teal:#1eb980;--red:#e2483d;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);height:100vh;overflow:hidden;}
+  .header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2);}
+  .header-left{display:flex;align-items:center;gap:12px;}
+  .header-left img{height:22px;}
+  .app-title{font-size:15px;font-weight:800;color:#fff;}
+  .clock{font-size:12px;color:var(--blue-light);font-weight:600;}
+  .header-right{display:flex;align-items:center;gap:10px;}
+  .status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
+  .status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
+  .beta-tag{background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
+  .avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+  .icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
+  .app{display:grid;grid-template-columns:220px 1fr;height:calc(100vh - 57px);}
+  .sidebar{min-height:0;}
+  .main{display:flex;flex-direction:column;min-width:0;min-height:0;}
+  /* 허브 탭바 — 제품 공통 톤(파란 활성 밑줄) */
+  .hub-bar{display:flex;align-items:center;gap:2px;padding:10px 20px 0;border-bottom:1px solid var(--border);flex:0 0 auto;background:var(--bg);}
+  .hub-title{font-size:15px;font-weight:800;color:#fff;margin-right:14px;display:flex;align-items:center;gap:7px;}
+  .hub-tab{padding:9px 14px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;}
+  .hub-tab:hover{color:#fff;}
+  .hub-tab.on{color:#fff;font-weight:700;border-bottom-color:var(--blue);}
+  .hub-tab.act{color:var(--blue-light);}
+  .hub-body{flex:1 1 auto;min-height:0;position:relative;}
+  .hub-frame{position:absolute;inset:0;width:100%;height:100%;border:0;display:none;background:var(--bg);}
+  .hub-frame.on{display:block;}
+  .hub-empty{color:var(--muted);font-size:13px;padding:40px;text-align:center;}
+</style>
+</head>
+<body class="g-ui">
+
+<div class="header">
+  <div class="header-left">
+    <span id="homeLink" title="대시보드로 이동" style="display:flex;align-items:center;gap:12px;cursor:pointer"><img src="https://gijo.ai/_nuxt/logo_gijo_white.CCh2YXJe.svg" alt="GIJO">
+    <div class="app-title">GIJO AS</div></span>
+    <div class="clock" id="clockEl">-</div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill" id="statusPill"><span class="dot"></span>연결 확인 중<span class="beta-tag">LIVE</span></div>
+    <div class="avatar-btn" id="avatarBtn">-</div>
+    <div class="icon-btn" id="settingsBtn" title="설정">⚙</div>
+  </div>
+</div>
+
+<div class="app">
+  <div class="sidebar" id="gijoNav"></div>
+  <div class="main">
+    <div class="hub-bar" id="hubBar"><div class="hub-title" id="hubTitle">허브</div></div>
+    <div class="hub-body" id="hubBody"><div class="hub-empty">불러오는 중…</div></div>
+  </div>
+</div>
+
+<script src="nav.js"></script>
+<script>
+(function () {
+  "use strict";
+  const $ = (id) => document.getElementById(id);
+  const params = new URLSearchParams(location.search);
+  const g = params.get("g") || "assets";
+
+  function tick() { $("clockEl").textContent = new Date().toLocaleString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: true, month: "2-digit", day: "2-digit" }); }
+  async function loadHealth() { try { await window.gijo.checkServerHealth(); $("statusPill").innerHTML = '<span class="dot"></span>운영중<span class="beta-tag">LIVE</span>'; } catch (e) { $("statusPill").innerHTML = '<span class="dot" style="background:#e2483d"></span>서버 연결 끊김'; } }
+  async function loadUser() { try { const u = await window.gijo.me(); $("avatarBtn").textContent = (u.displayName || u.username || "-").charAt(0); } catch (e) {} }
+
+  function boot() {
+    if (!window.gijo || !window.gijo.isAuthenticated()) { window.gijo && window.gijo.navigateTo("login.html"); return; }
+    const hubs = window.gijoHubs || {};
+    const hub = hubs[g];
+    if (!hub) { $("hubBody").innerHTML = '<div class="hub-empty">알 수 없는 허브: ' + g + "</div>"; return; }
+    document.title = "GIJO AS — " + hub.label;
+    $("hubTitle").textContent = hub.ic + " " + hub.label;
+
+    const body = $("hubBody");
+    body.innerHTML = "";
+    const frames = new Map(); // page → iframe (지연 생성)
+    let current = null;
+
+    function show(tab, el) {
+      if (tab.office) { window.gijo.openTeamOffice(); return; } // 창 열기 — 탭 전환 아님
+      document.querySelectorAll(".hub-tab").forEach((t) => t.classList.remove("on"));
+      el.classList.add("on");
+      if (current) current.classList.remove("on");
+      let f = frames.get(tab.page);
+      if (!f) {
+        f = document.createElement("iframe");
+        f.className = "hub-frame";
+        f.src = tab.page + "?embed=1"; // 페이지 쪽 nav.js가 embed 모드로 헤더·사이드바를 숨긴다
+        frames.set(tab.page, f);
+        body.appendChild(f);
+      }
+      f.classList.add("on");
+      current = f;
+    }
+
+    const bar = $("hubBar");
+    const initial = params.get("t");
+    let initialEl = null, firstEl = null, initialTab = null, firstTab = null;
+    hub.tabs.forEach((tab) => {
+      const el = document.createElement("div");
+      el.className = "hub-tab" + (tab.office ? " act" : "");
+      el.textContent = tab.label;
+      el.addEventListener("click", () => show(tab, el));
+      bar.appendChild(el);
+      if (!tab.office) {
+        if (!firstEl) { firstEl = el; firstTab = tab; }
+        if (tab.page === initial) { initialEl = el; initialTab = tab; }
+      }
+    });
+    if (initialEl) show(initialTab, initialEl);
+    else if (firstEl) show(firstTab, firstEl);
+
+    tick(); setInterval(tick, 30000);
+    loadHealth(); loadUser();
+    $("homeLink").addEventListener("click", () => window.gijo.navigateTo("dashboard.html"));
+    $("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("hub.html?g=settings"));
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+  else boot();
+})();
+</script>
+</body>
+</html>
