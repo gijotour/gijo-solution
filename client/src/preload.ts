@@ -24,6 +24,7 @@ const gijoApi = {
 
   // 계정 관리(admin 전용 목록/생성/삭제 — 본인 비밀번호 변경은 누구나)
   listUsers: () => api.usersApi.list(),
+  listAssignableUsers: () => api.usersApi.assignable(), // 담당자 배정용 — admin 아니어도 조회 가능
   createUser: (args: { username: string; password: string; displayName: string; role: "security_officer" | "admin" }) =>
     api.usersApi.create(args),
   deleteUser: (id: string) => api.usersApi.remove(id),
@@ -254,6 +255,9 @@ const gijoApi = {
   // 이메일(SMTP) 설정
   getSmtpConfig: () => api.emailApi.getConfig(),
   saveSmtpConfig: (config: api.SmtpConfigInput) => api.emailApi.saveConfig(config),
+  getSmtpInboundConfig: () => api.smtpInboundApi.getConfig(),
+  saveSmtpInboundConfig: (config: { enabled: boolean; port: number; allowedIpsText?: string }) => api.smtpInboundApi.saveConfig(config),
+  getSmtpInboundStatus: () => api.smtpInboundApi.getStatus(),
   sendReportEmail: (to: string[], subject: string, attachmentPath: string) =>
     api.emailApi.sendReport(to, subject, attachmentPath),
 

@@ -21,6 +21,7 @@ import { startHardeningScheduler, stopHardeningScheduler } from "./engine/harden
 import { startReportScheduler, stopReportScheduler } from "./engine/reportschedule";
 import { refreshKev } from "./engine/kev";
 import { bootstrapDocsBundleWithRetry } from "./engine/docsbundle";
+import { bootSmtpInboundIfEnabled, stopSmtpInbound } from "./engine/smtpinbound";
 import { closeHttpServer } from "./util/gracefulClose";
 
 // 가능한 한 이른 시점에 설치해야 이후의 console.log/warn/error가 전부 캡처된다.
@@ -62,6 +63,7 @@ httpServer.listen(PORT, () => {
       startEmbeddingMonitor();
       startChatMonitor(); // 채팅 모델도 hang(무응답) 감지·자동 재기동 — 임베딩과 동일 패턴
     });
+  void bootSmtpInboundIfEnabled(); // 인바운드 SMTP(알림 집수) — 설정에서 켜져 있으면 자동 기동
   startHardeningScheduler(); // 원격 SSH 정기점검 — 만기된 스케줄을 주기적으로 실행(LLM 무관·경량)
   startReportScheduler(); // 정기 리포트(주간/분기) 자동 생성 — 만기된 스케줄을 주기적으로 실행
   // CISA KEV 목록을 백그라운드로 최신화(공개 피드 다운로드 — 실패해도 캐시로 동작).
@@ -99,7 +101,7 @@ async function shutdown(signal: string): Promise<void> {
     stopChatMonitor();
     stopHardeningScheduler();
     stopReportScheduler();
-    await Promise.all([stopLocalEngine(), stopEmbeddingEngine()]);
+    await Promise.all([stopLocalEngine(), stopEmbeddingEngine(), stopSmtpInbound()]);
   } catch (err) {
     // 엔진 정리에 실패해도 종료는 계속한다 — 안 끝나는 것보다 낫다.
     console.error("[index] 로컬 LLM 엔진 정리 실패(종료는 계속):", err);

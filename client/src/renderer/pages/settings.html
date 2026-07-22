@@ -213,6 +213,27 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div class="status-line" id="smtpStatusLine"></div>
     </div>
 
+    <div class="panel" id="smtpInboundPanel" style="display:none">
+      <div class="panel-title">인바운드 SMTP (알림 집수) <span class="badge b-purple" style="margin-left:8px">admin 전용</span></div>
+      <div class="panel-sub">다른 보안장비·시스템이 SMTP로 보내는 알림 메일을 받아 통합 분석 허브에 자동 인입합니다. 완전한 메일 서버가 아니라 수신 전용 리스너입니다(외부로 메일을 보내지 않음).</div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);margin-bottom:14px;cursor:pointer">
+        <input type="checkbox" id="smtpInEnabledInput" style="width:auto">활성화
+      </label>
+      <div class="field-row">
+        <div class="field" style="max-width:110px">
+          <label for="smtpInPortInput">수신 포트</label>
+          <input id="smtpInPortInput" placeholder="2525" type="number">
+        </div>
+        <div class="field">
+          <label for="smtpInAllowInput">허용 발신 IP (쉼표·줄바꿈 구분, 비우면 전체 허용)</label>
+          <input id="smtpInAllowInput" placeholder="예: 10.0.1.5, 10.0.1.6">
+        </div>
+      </div>
+      <button class="btn-primary" id="saveSmtpInBtn">저장</button>
+      <div class="status-line" id="smtpInStatusLine"></div>
+      <div class="panel-sub" id="smtpInStatusInfo" style="margin-top:10px"></div>
+    </div>
+
     <div class="panel" id="cloudLlmPanel" style="display:none">
       <div class="panel-title">☁ 클라우드 LLM (선택) <span class="badge b-purple" style="margin-left:8px">admin 전용</span></div>
       <div class="panel-sub">
@@ -291,8 +312,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       if (user.role === "admin") {
         document.getElementById("userManagementPanel").style.display = "";
         document.getElementById("cloudLlmPanel").style.display = "";
+        document.getElementById("smtpInboundPanel").style.display = "";
         await loadUserList();
         await loadCloudConfig();
+        await loadSmtpInboundConfig();
       }
     } catch (e) {}
   }
@@ -483,6 +506,38 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     }
   }
 
+  // ── 인바운드 SMTP(알림 집수) 설정 (admin) ────────────────────────────
+  async function loadSmtpInboundConfig() {
+    try {
+      const cfg = await window.gijo.getSmtpInboundConfig();
+      document.getElementById("smtpInEnabledInput").checked = cfg.enabled;
+      document.getElementById("smtpInPortInput").value = cfg.port;
+      document.getElementById("smtpInAllowInput").value = (cfg.allowedIps || []).join(", ");
+      const status = await window.gijo.getSmtpInboundStatus();
+      const info = document.getElementById("smtpInStatusInfo");
+      info.textContent = status.running
+        ? `가동 중 · 누적 수신 ${status.receivedCount}건` + (status.lastReceivedAt ? ` · 최근 수신 ${new Date(status.lastReceivedAt).toLocaleString("sv-SE")}` : "")
+        : status.lastError ? `중지됨 · 오류: ${status.lastError}` : "중지됨";
+    } catch (e) {}
+  }
+  async function saveSmtpInbound() {
+    const line = document.getElementById("smtpInStatusLine");
+    const config = {
+      enabled: document.getElementById("smtpInEnabledInput").checked,
+      port: Number(document.getElementById("smtpInPortInput").value || 2525),
+      allowedIpsText: document.getElementById("smtpInAllowInput").value,
+    };
+    try {
+      await window.gijo.saveSmtpInboundConfig(config);
+      line.textContent = "✓ 저장되었습니다.";
+      line.className = "status-line status-ok";
+      await loadSmtpInboundConfig();
+    } catch (e) {
+      line.textContent = "✗ 저장 실패: " + e.message;
+      line.className = "status-line status-err";
+    }
+  }
+
   // ── 클라우드 LLM 설정 (admin) ────────────────────────────────────────
   let cloudCfg = null;
   function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
@@ -557,6 +612,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.getElementById("startEngineBtn").addEventListener("click", startEngine);
     document.getElementById("stopEngineBtn").addEventListener("click", stopEngine);
     document.getElementById("saveSmtpBtn").addEventListener("click", saveSmtp);
+    document.getElementById("saveSmtpInBtn").addEventListener("click", saveSmtpInbound);
     document.getElementById("saveCloudBtn").addEventListener("click", saveCloud);
     document.getElementById("cloudProviderSelect").addEventListener("change", syncCloudProviderFields);
     document.getElementById("changeMyPasswordBtn").addEventListener("click", changeMyPassword);

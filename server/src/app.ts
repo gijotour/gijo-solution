@@ -43,6 +43,7 @@ import { registerMaintenanceRoutes } from "./engine/maintenance";
 import { registerTodayRoutes } from "./engine/today";
 import { registerSecurityProductRoutes } from "./engine/securityproducts";
 import { registerEmailRoutes } from "./engine/email";
+import { registerSmtpInboundRoutes } from "./engine/smtpinbound";
 import { registerCloudLlmRoutes } from "./engine/cloudllm";
 import { registerDocEnrichRoutes } from "./engine/docenrich";
 import { registerSbomRoutes } from "./engine/sbom";
@@ -137,6 +138,7 @@ export function createApp(): Express {
   registerTodayRoutes(app);
   registerSecurityProductRoutes(app);
   registerEmailRoutes(app);
+  registerSmtpInboundRoutes(app);
   registerCloudLlmRoutes(app);
   registerDocEnrichRoutes(app);
   registerSbomRoutes(app);

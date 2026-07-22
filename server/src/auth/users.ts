@@ -161,6 +161,12 @@ export function registerUsersRoutes(app: Express): void {
     res.json(listUsers());
   });
 
+  // 조치 담당자 배정용 — 관리자 전용 /api/users와 달리 인증만 되면 누구나 조회 가능(최소 정보만).
+  // 승인 화면(approvals.html)의 담당자 자동완성이 이 목록을 쓴다. 계정 생성·삭제 권한은 없다.
+  app.get("/api/users/assignable", authMiddleware, (_req, res) => {
+    res.json(listUsers().map((u) => ({ id: u.id, displayName: u.displayName, role: u.role })));
+  });
+
   app.post("/api/users", authMiddleware, adminMiddleware, (req, res) => {
     try {
       const { username, password, displayName, role } = req.body as {

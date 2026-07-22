@@ -493,6 +493,33 @@ export function resetAnalysisHubForTests(): void {
   db.exec("DELETE FROM analysis_event_status");
 }
 
+// ── 소스 ⑤: 인바운드 SMTP — 다른 보안장비가 보낸 알림 메일을 이벤트로 투영 ─────────
+// 메일 본문을 기존 로그 탐지기(브루트포스·방화벽·웹공격)에 그대로 통과시킨다 — 많은 장비가
+// 알림 메일 본문에 로그 원문을 그대로 넣기 때문에 재사용이 잘 맞는다. 알려진 패턴이 하나도
+// 안 걸리면(장비마다 포맷이 달라 흔함) 정보 손실 없이 "메일 수신" 일반 이벤트를 하나 만든다.
+export function ingestMailAlert(from: string, subject: string, text: string): number {
+  const source = `메일:${from}`;
+  const r = parseSecurityLog(source, text || "");
+  r.events.forEach(saveEvent);
+  if (r.events.length === 0) {
+    saveEvent({
+      id: `mail:${from}:${crypto.createHash("md5").update(`${subject}:${text}`).digest("hex").slice(0, 10)}`,
+      source: "log",
+      title: subject || "(제목 없음)",
+      entity: from || "발신자 불명",
+      severity: "info",
+      priority: computePriority("info", ["메일수신"]),
+      detail: (text || "").slice(0, 500),
+      signals: ["메일수신"],
+      aiSummary: "",
+      ref: source,
+      at: Date.now(),
+    });
+    return 1;
+  }
+  return r.events.length;
+}
+
 // 드롭존 자동 판별: 파일명·내용으로 보안 로그 vs 운영 리포트를 가른다(결정적 규칙).
 // 취약점 스캔(.nessus/스캔 CSV)은 취약점 업로드가 담당하고 rebuildVulnEvents로 자동 반영되므로 여기서 제외.
 export function detectIngestKind(filename: string, content: string): "log" | "report" {

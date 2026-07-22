@@ -901,6 +901,26 @@ export const emailApi = {
   saveConfig: (config: SmtpConfigInput) => request<SmtpConfig>("/api/email/config", { method: "POST", body: config }),
 };
 
+// ── 인바운드 SMTP(알림 집수) ─────────────────────────────────────────
+export interface SmtpInboundConfig {
+  enabled: boolean;
+  port: number;
+  allowedIps: string[];
+  bannerName: string;
+}
+export interface SmtpInboundStatus {
+  running: boolean;
+  lastError: string | null;
+  lastReceivedAt: number | null;
+  receivedCount: number;
+}
+export const smtpInboundApi = {
+  getConfig: () => request<SmtpInboundConfig>("/api/smtp-inbound/config"),
+  saveConfig: (config: { enabled: boolean; port: number; allowedIpsText?: string }) =>
+    request<SmtpInboundConfig>("/api/smtp-inbound/config", { method: "POST", body: config }),
+  getStatus: () => request<SmtpInboundStatus>("/api/smtp-inbound/status"),
+};
+
 // ── SBOM ─────────────────────────────────────────────────────────────
 export const sbomApi = {
   generate: (assetId: string) => request(`/api/sbom/${assetId}/generate`, { method: "POST" }),
@@ -1121,6 +1141,8 @@ export interface GijoUserPublic {
 
 export const usersApi = {
   list: () => request<GijoUserPublic[]>("/api/users"),
+  // 조치 담당자 배정용(승인 화면 자동완성) — 관리자 아니어도 조회 가능.
+  assignable: () => request<{ id: string; displayName: string; role: string }[]>("/api/users/assignable"),
   create: (args: { username: string; password: string; displayName: string; role: "security_officer" | "admin" }) =>
     request<GijoUserPublic>("/api/users", { method: "POST", body: args }),
   remove: (id: string) => request(`/api/users/${id}`, { method: "DELETE" }),
