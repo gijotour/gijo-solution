@@ -18,8 +18,15 @@ describe("classifyModelLicense", () => {
   });
   it("합성/개조/출처불명은 byom(상업 번들 금지)", () => {
     expect(classifyModelLicense("merged-lily-gijo-loop-ai-securityllm").tier).toBe("byom");
-    expect(classifyModelLicense("gijo-main-orchestrator").tier).toBe("byom");
+    // -ko 변형은 Gukbap 합성 추정 — 그 라이선스 확인 전까지 일반 gijo-* 규칙(byom) 유지.
+    expect(classifyModelLicense("gijo-orchestrator-ko").tier).toBe("byom");
     expect(classifyModelLicense("mradermacher__Qwen3-VL-8B-Instruct-abliterated-GGUF").tier).toBe("byom");
+  });
+  it("gijo-main-orchestrator는 출처 확정(Qwen2.5-7B×2 SLERP, Apache-2.0) → permissive", () => {
+    const m = classifyModelLicense("gijo-main-orchestrator");
+    expect(m.tier).toBe("permissive");
+    expect(m.bundleSafe).toBe(true);
+    expect(m.license).toContain("Apache-2.0");
   });
 });
 
@@ -28,11 +35,12 @@ describe("classifyAvailableModels", () => {
     const r = classifyAvailableModels([
       "Qwen__Qwen2.5-Coder-7B-Instruct-GGUF", // permissive
       "bartowski__Qwen2.5-3B-Instruct-GGUF", // restricted
-      "gijo-main-orchestrator", // byom
+      "gijo-main-orchestrator", // permissive (출처 확정 2026-07-22)
+      "gijo-orchestrator-ko", // byom (Gukbap 라이선스 미확정)
     ]);
-    expect(r.summary.total).toBe(3);
-    expect(r.summary.permissive).toBe(1);
-    expect(r.summary.bundleSafe).toBe(1);
+    expect(r.summary.total).toBe(4);
+    expect(r.summary.permissive).toBe(2);
+    expect(r.summary.bundleSafe).toBe(2);
     expect(r.summary.byom).toBe(1);
   });
 });

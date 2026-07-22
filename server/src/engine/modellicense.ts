@@ -21,6 +21,11 @@ export interface ModelLicense {
 
 // 패턴 → 라이선스 추정. 위에서부터 먼저 매칭. 보수적으로: 확실치 않으면 review/byom.
 const RULES: { re: RegExp; tier: LicenseTier; license: string; note: string }[] = [
+  // gijo-main-orchestrator — 출처 확정(2026-07-22 조사): Qwen2.5-7B-Instruct + Qwen2.5-7B-Instruct-1M
+  // SLERP 합성(HF 캐시 02:01 다운로드 → 02:07 GGUF 생성 타임라인 + GGUF 메타 qwen2·7.6B·"Merged"로 확증).
+  // 두 원본 모두 Apache-2.0 → 합성본도 Apache-2.0 재배포 가능. 일반 gijo-* BYOM 규칙보다 먼저 매칭.
+  // (-ko 변형은 Gukbap-Qwen2.5-7B 합성 추정 — 그 라이선스 확인 전까지 일반 규칙(BYOM)에 남긴다.)
+  { re: /^gijo-main-orchestrator$/i, tier: "permissive", license: "Apache-2.0(Qwen2.5-7B 합성)", note: "원본: Qwen2.5-7B-Instruct + 1M SLERP — 상업 번들 가능" },
   { re: /bge|embed/i, tier: "permissive", license: "MIT/Apache-2.0(임베딩)", note: "임베딩 모델 — 대체로 관대" },
   // Qwen2.5-7B/14B/32B·Coder·Qwen3 등은 Apache-2.0. 단 Qwen2.5-3B는 비상업 연구 라이선스라 별도.
   { re: /qwen2\.5-3b/i, tier: "restricted", license: "Qwen Research License(비상업)", note: "3B는 비상업 라이선스 — 상업 번들 불가" },
