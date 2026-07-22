@@ -150,6 +150,12 @@ const PREAMBLE_SENTENCE_RE = /(답변|설명|작성|보고|안내|정리|요약|
 // "보안담당자입니다. 우리 회사는…"으로 시작하는 응답이 그대로 나갔다. 역할 명사+입니다 꼴만
 // 잡아 "조치가 필요합니다" 같은 실제 본문 문장(~합니다)은 건드리지 않는다.
 const SELF_INTRO_RE = /^((저는|제가|나는)\s.*(입니다|이에요|예요|담당(합니다|입니다)?)|[^\n.!?]{0,30}(담당자|어시스턴트|에이전트|보안 AI|AI)입니다)[.!?]?\s*$/;
+// 시스템 프롬프트 정체성 문장의 2인칭 복창 — "당신은 GIJO AS…를 담당하는 보안 AI입니다"를 모델이
+// 표현만 바꿔 첫머리에 옮긴다(실측 2026-07-20 dispatch: "당신은 안전한 AI입니다. 당신은 GIJO AS에서
+// AI 자산 보안 관리를 담당하고 있습니다…"). 정상 답변은 사용자를 "당신은 ○○ AI/담당"으로 서술할 일이
+// 없으므로, '당신은'으로 시작하고 역할·정체성 어휘를 품은 문장은 복창으로 본다.
+// (같은 증상을 잡았던 워크트리 커밋 37f5ca3의 패턴을 main에 흡수 — 미병합으로 남아 재발했었다.)
+const SYSTEM_ECHO_SENTENCE_RE = /^당신은\s[^\n]{0,160}(AI입니다|보안 AI|어시스턴트|GIJO\s?AS|보안 관리|담당하)/;
 // 모델이 붙인 제목/라벨 한 줄('[제목] …', '# …', '**…**', '제목: …') — 리포트 템플릿이 이미 제목을
 // 넣으므로 이 줄을 빼야 그 아래 인사말도 정리된다.
 const TITLE_LINE_RE = /^(\[[^\]\n]{1,20}\][^\n]{0,45}|【[^】\n]{1,20}】[^\n]{0,45}|#{1,6}\s[^\n]{1,45}|\*\*[^*\n]{1,45}\*\*|제목\s*[:：][^\n]{1,45})$/;
@@ -166,14 +172,16 @@ export function stripLeadingPreamble(text: string): string {
   }
   const afterGreet = t.replace(GREETING_PREFIX_RE, "").trim(); // "안녕하세요, 본문" → "본문"
   if (afterGreet) t = afterGreet; // 인사만 있고 뒤 본문이 없으면 원문 유지(빈 응답 방지)
-  for (let i = 0; i < 2; i++) {
+  // 상한 4문장: 정체성 복창은 두 문장 이상 이어지는 실측이 있어(위 SYSTEM_ECHO 주석) 2로는 모자라고,
+  // 매 문장이 패턴에 걸려야만 계속 지우므로 상한을 올려도 본문을 침범하지 않는다.
+  for (let i = 0; i < 4; i++) {
     const nl = t.indexOf("\n");
     const dot = t.search(/[.!?？。]/);
     const cut = dot >= 0 ? dot + 1 : nl >= 0 ? nl : -1;
     const first = (cut >= 0 ? t.slice(0, cut) : t).trim();
     const rest = cut >= 0 ? t.slice(cut).trim() : "";
     if (!first || !rest) break; // 뒤에 본문이 없으면 보존(전체 삭제 방지)
-    if (GREETING_PREFIX_RE.test(first) || SELF_INTRO_RE.test(first) || PREAMBLE_SENTENCE_RE.test(first)) {
+    if (GREETING_PREFIX_RE.test(first) || SELF_INTRO_RE.test(first) || PREAMBLE_SENTENCE_RE.test(first) || SYSTEM_ECHO_SENTENCE_RE.test(first)) {
       t = rest;
     } else break;
   }
@@ -229,11 +237,15 @@ const SCAFFOLD_MARKERS = ["참고 자료 — 사내 지식 베이스", "관련 �
 const PERSONA_ECHO_RE = /당신은[^\n.!?]{0,60}(AI|어시스턴트|에이전트)입니다/;
 
 export function hasPromptLeak(text: string): boolean {
-  const t = text ?? "";
+  const t = (text ?? "").trim();
   // ① 축자 복창 — 한 개는 우연히 인용했을 수 있으나(사용자가 규칙을 물어본 경우 등) 두 개 이상이면 복창.
   if (PROMPT_LEAK_MARKERS.filter((m) => t.includes(m)).length >= 2) return true;
-  // ② 페르소나 복창 — 2인칭 역할 서술은 단독으로도 확실한 누출 신호.
+  // ② 페르소나 복창 — 2인칭 역할 서술은 단독으로도 확실한 누출 신호. 본문 중간(PERSONA_ECHO_RE)과
+  //    첫 문장(SYSTEM_ECHO_SENTENCE_RE — 응답 전체가 복창이라 걷어낼 본문이 없을 때의 백스톱) 양쪽을 본다.
   if (PERSONA_ECHO_RE.test(t)) return true;
+  const cut = t.search(/[.!?？。\n]/);
+  const firstSentence = (cut >= 0 ? t.slice(0, cut + 1) : t).trim();
+  if (SYSTEM_ECHO_SENTENCE_RE.test(firstSentence)) return true;
   // ③ 풀어쓴 복창 — 응답-메타 어휘가 여럿 모이면 규칙을 옮긴 것이다.
   return RESPONSE_META_WORDS.filter((w) => t.includes(w)).length >= META_THRESHOLD;
 }

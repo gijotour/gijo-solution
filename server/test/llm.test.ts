@@ -292,3 +292,10 @@ describe("stripLeadingPreamble — 주어 없는 역할 자기소개 서두", ()
     expect(stripLeadingPreamble("보안담당자입니다.")).toBe("보안담당자입니다.");
   });
 });
+
+describe("stripLeadingPreamble — 2인칭 정체성 복창 서두(37f5ca3 흡수)", () => {
+  it("정체성 복창 두 문장을 걷어내고 본문을 남긴다", () => {
+    const echoed = "당신은 안전한 AI입니다. 당신은 GIJO AS에서 AI 자산 보안 관리를 담당하고 있습니다. 취약점 3건을 발견했습니다.";
+    expect(stripLeadingPreamble(echoed)).toBe("취약점 3건을 발견했습니다.");
+  });
+});
