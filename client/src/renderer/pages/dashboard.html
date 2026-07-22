@@ -2157,6 +2157,7 @@
   if (!root) return;
   // 전체 메뉴 카탈로그(page → 이름·아이콘). 대시보드 자신은 넣지 않는다.
   var CATALOG = {
+    "assethub.html": ["자산 허브", "🛡️"],
     "analysis.html": ["보안 분석", "📊"], "vulnscan.html": ["취약점", "🔎"], "approvals.html": ["조치·승인", "✅"], "threat.html": ["위협 인텔", "🎯"],
     "inventory.html": ["자산 목록", "📦"], "products.html": ["보안제품", "🧰"], "hardening.html": ["원격 정기점검", "🛰️"], "audit.html": ["작업 기록", "📜"], "terminal.html": ["터미널", "💻"],
     "report.html": ["리포트", "📄"], "compliance.html": ["컴플라이언스", "📋"], "opsguide.html": ["유지보수", "🔧"], "redteam.html": ["레드팀·가드레일", "🚨"],
@@ -2165,7 +2166,7 @@
   };
   // 역할 기본(보안담당자) — 업무 주기별. 관리자도 이걸 기본으로 쓰되 편집으로 무엇이든 담을 수 있다.
   var DEFAULT = {
-    daily: ["analysis.html", "vulnscan.html", "approvals.html", "threat.html"],
+    daily: ["assethub.html", "analysis.html", "vulnscan.html", "approvals.html", "threat.html"],
     weekly: ["inventory.html", "products.html", "hardening.html", "audit.html", "terminal.html"],
     monthly: ["report.html", "compliance.html", "opsguide.html", "redteam.html"]
   };

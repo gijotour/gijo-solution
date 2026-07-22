@@ -1,8 +1,10 @@
-// commandpanel.js — 전 페이지 공용 '오른쪽 작업 화면'(작업 세션 + 지휘 콘솔).
+// commandpanel.js — 전 페이지 공용 '오른쪽 작업 화면'(작업 세션 목록).
 // 대시보드에는 자체 패널이 박혀 있으므로 그 외 페이지에만 nav.js가 주입한다. 페이지 레이아웃은
 // 건드리지 않도록 고정(fixed) 슬라이드 드로어로 띄운다(기본 닫힘=가장자리 탭, 열면 오른쪽 오버레이).
-// 지시는 window.gijo.sendInstruction(text)로 오케스트레이터에 보내며, 서버가 현재 화면 경로를
-// 맥락으로 받아 해석한다(어느 화면에서든 AI에게 지시 가능). 협업 이벤트도 콘솔에 흘린다.
+//
+// 2026-07-22: 지휘 콘솔(입력형 챗봇)을 제거했다. 화면마다 인라인 "🤖 이 화면 챗봇" 위젯이 생기면서
+// 한 페이지에 챗봇이 둘이 되는 중복을 없앤다 — 오른쪽 드로어는 "작업 세션만" 보여준다(사용자 방침).
+// AI에게 지시하려면 화면의 인라인 챗봇 위젯을 쓴다.
 
 (function () {
   var here = decodeURIComponent((location.pathname || "").split("/").pop() || "");
@@ -13,9 +15,6 @@
 
   var OPEN_KEY = "gijo.cmdpanel.open";
   var esc = function (s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); };
-  // 응답의 가벼운 서식(굵게 **..**·줄바꿈)만 렌더 — 콘솔 답변 가독성.
-  var fmt = function (s) { return esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\n/g, "<br>"); };
-  var sessionId = null; // 첫 지시 때 지연 생성
 
   function injectCss() {
     if (document.getElementById("gijoCmdCss")) return;
@@ -55,54 +54,35 @@
     document.head.appendChild(st);
   }
 
-  var panel, tab, feed, input, sessBody, sessList;
+  var panel, tab, sessBody;
 
   function build() {
     injectCss();
     panel = document.createElement("div");
     panel.id = "gijoCmdPanel";
     panel.innerHTML =
-      '<div class="gcp-head"><span class="gcp-title">🗂 작업 화면</span>' +
-      '<button class="gcp-close" id="gcpClose" title="작업 화면 닫기">◧ 접기</button></div>' +
-      '<div class="gcp-acc gcp-sessions collapsed" id="gcpSessAcc">' +
-      '<div class="gcp-ah" data-acc="sess"><span class="gcp-car">▸</span><span class="gcp-at">💬 작업 세션</span></div>' +
-      '<div class="gcp-ab"><div class="gcp-sitem" id="gcpNewSess">＋ 새 작업 세션</div><div id="gcpSessList"><div class="gcp-empty">불러오는 중…</div></div></div></div>' +
-      '<div class="gcp-acc gcp-console" id="gcpConAcc">' +
-      '<div class="gcp-ah" data-acc="con"><span class="gcp-car">▾</span><span class="gcp-at">🧭 지휘 콘솔</span></div>' +
-      '<div class="gcp-ab"><div class="gcp-feed" id="gcpFeed"><div class="gcp-empty">이 화면에서 AI에게 지시하면 여기서 처리됩니다.</div></div>' +
-      '<div class="gcp-dock"><input class="gcp-in" id="gcpIn" placeholder="지시를 입력하세요…"><button class="gcp-send" id="gcpSend">전송</button></div></div></div>';
+      '<div class="gcp-head"><span class="gcp-title">🗂 작업 세션</span>' +
+      '<button class="gcp-close" id="gcpClose" title="작업 세션 닫기">◧ 접기</button></div>' +
+      '<div class="gcp-acc gcp-sessions" id="gcpSessAcc" style="flex:1 1 auto">' +
+      '<div class="gcp-ab" style="display:flex"><div class="gcp-sitem" id="gcpNewSess">＋ 새 작업 세션</div>' +
+      '<div id="gcpSessList" style="overflow-y:auto;flex:1 1 auto"><div class="gcp-empty">불러오는 중…</div></div></div></div>';
     document.body.appendChild(panel);
 
     tab = document.createElement("div");
     tab.id = "gijoCmdTab";
-    tab.title = "오른쪽 작업 화면 열기 (작업 세션·지휘 콘솔)";
-    tab.textContent = "◧ 작업 화면";
+    tab.title = "오른쪽 작업 세션 열기";
+    tab.textContent = "◧ 작업 세션";
     document.body.appendChild(tab);
 
-    feed = panel.querySelector("#gcpFeed");
-    input = panel.querySelector("#gcpIn");
     sessBody = panel.querySelector("#gcpSessList");
 
     tab.addEventListener("click", function () { setOpen(true); });
     panel.querySelector("#gcpClose").addEventListener("click", function () { setOpen(false); });
-    panel.querySelectorAll(".gcp-ah[data-acc]").forEach(function (h) {
-      h.addEventListener("click", function () {
-        var acc = h.closest(".gcp-acc");
-        var col = acc.classList.toggle("collapsed");
-        h.querySelector(".gcp-car").textContent = col ? "▸" : "▾";
-      });
+    // ＋ 새 작업 세션 — 작업 세션 화면에서 새 세션을 시작하도록 이동(지시는 인라인 챗봇으로).
+    panel.querySelector("#gcpNewSess").addEventListener("click", function () {
+      try { localStorage.removeItem("gijo:sessions:open"); } catch (e) {}
+      window.gijo.navigateTo("sessions.html");
     });
-    panel.querySelector("#gcpSend").addEventListener("click", send);
-    input.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } });
-    panel.querySelector("#gcpNewSess").addEventListener("click", function () { sessionId = null; feed.innerHTML = '<div class="gcp-empty">새 세션 — 지시를 입력하세요.</div>'; input.focus(); });
-
-    // 협업 이벤트를 콘솔에 흘린다(에이전트 활동 가시화).
-    if (window.gijo.onCollaborationEvent) {
-      window.gijo.onCollaborationEvent(function (evt) {
-        if (!panel.classList.contains("on")) return; // 열려 있을 때만 표시
-        if (evt && (evt.from || evt.message)) appendRow("reply", esc(evt.message || ""), (evt.from || "") + (evt.to ? " → " + evt.to : ""));
-      });
-    }
 
     // 초기 상태 복원(기본 닫힘).
     var open = false; try { open = localStorage.getItem(OPEN_KEY) === "1"; } catch (e) {}
@@ -114,36 +94,6 @@
     panel.classList.toggle("on", on);
     tab.classList.toggle("hide", on);
     try { localStorage.setItem(OPEN_KEY, on ? "1" : "0"); } catch (e) {}
-    if (on) setTimeout(function () { input && input.focus(); }, 240);
-  }
-
-  function appendRow(kind, html, who) {
-    var em = feed.querySelector(".gcp-empty"); if (em) em.remove();
-    var row = document.createElement("div");
-    row.className = "gcp-row " + (kind === "user" ? "user" : kind === "error" ? "error" : kind === "note" ? "note" : "");
-    row.innerHTML = (who ? '<div class="gcp-who">' + esc(who) + "</div>" : "") + html;
-    feed.appendChild(row);
-    feed.scrollTop = feed.scrollHeight;
-    return row;
-  }
-
-  async function send() {
-    var text = input.value.trim();
-    if (!text) return;
-    input.value = "";
-    appendRow("user", esc(text), "나");
-    var typing = appendRow("reply", "처리 중… <span style=\"color:var(--muted-2,#5f6b82);font-size:10.5px\">첫 응답은 모델 준비로 다소 걸릴 수 있어요</span>", "Security Orchestrator");
-    try {
-      if (!sessionId) { try { var s = await window.gijo.createWorkSession(text.slice(0, 30), "screen:" + here); sessionId = s && s.id; } catch (e) {} }
-      var r = await window.gijo.sendInstruction(text, sessionId || undefined);
-      typing.innerHTML = '<div class="gcp-who">Security Orchestrator</div>' + fmt(r.output || "(응답 없음)");
-      if (r.approval) appendRow("note", "⚖ 결재가 필요한 지시입니다 — 대시보드나 해당 화면에서 값을 확인하고 승인하세요.");
-      if (r.route && r.route.action === "scan") { /* 스캔류는 완료 후 화면 새로고침이 필요할 수 있음 */ }
-      loadSessions();
-    } catch (e) {
-      typing.className = "gcp-row error";
-      typing.innerHTML = "실패: " + esc((e && e.message) || e);
-    }
   }
 
   async function loadSessions() {
