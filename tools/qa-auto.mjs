@@ -305,6 +305,95 @@ async function runKnowledge() {
   save("qa-auto-knowledge.json");
 }
 
+// ──────────── 유지보수 계층(ver3: 보안 장비 매뉴얼·로그·유지보수 절차 시나리오) ────────────
+// 실무 유지보수 절차(정기점검→로그 판독→장애 대응) 순서를 그대로 시나리오로 옮겼다.
+async function runMaintenance() {
+  const BASE = process.env.QA_BASE || "http://localhost:4000";
+  const USER = process.env.QA_USER, PASS = process.env.QA_PASS;
+  if (!USER || !PASS) { console.error("QA_USER/QA_PASS 환경변수가 필요합니다"); process.exit(2); }
+  const login = await (await fetch(BASE + "/api/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: USER, password: PASS, force: true }) })).json();
+  const H = { "content-type": "application/json", authorization: `Bearer ${login.accessToken}` };
+  const post = async (p, body) => {
+    const res = await fetch(BASE + p, { method: "POST", headers: H, body: JSON.stringify(body) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 150)}`);
+    return res.json();
+  };
+  const ask = async (q) => {
+    const j = await post("/api/llm/chat", { agentId: "normaltic", message: q });
+    const reply = String(j.reply ?? "");
+    console.log(`\n──── 💬 실제 LLM 답변 (${q}) ────\n${reply}\n────────────────────────\n`);
+    if (/등록된 사내 자료에는 관련 내용이 없습니다/.test(reply)) throw new Error("그라운딩 실패 — 자료 못 찾음 답변");
+    return reply;
+  };
+
+  await scenario("QA-M01", "bge 검색", "정기점검 질문이 유지보수 문서를 찾는다", {
+    given: "장비 유지보수 절차 문서(월간 7항목 체크리스트)가 인입된 뒤",
+    when: "'FortiGate 정기점검 때 뭘 확인해야 해?'로 지식 검색하면",
+    then: "점검 항목(HA·시그니처·백업 등)이 담긴 청크가 검색된다",
+  }, async () => {
+    const chunks = await post("/api/memory/query", { question: "FortiGate 정기점검 때 뭘 확인해야 해?", topK: 4 });
+    const hit = chunks.findIndex((c) => /정기점검|FortiGuard|HA/.test(c));
+    if (hit < 0) throw new Error("관련 청크 없음");
+    return `청크 ${chunks.length}건, ${hit + 1}위 적중`;
+  });
+
+  await scenario("QA-M02", "bge 검색", "장비 로그 판독 질문이 로그체계 문서를 찾는다", {
+    given: "Cisco ASA 로그 메시지(302013/302014/106023) 문서가 인입된 뒤",
+    when: "'ASA 302014 로그가 무슨 뜻이야?'로 지식 검색하면",
+    then: "Teardown(연결 종료) 설명 청크가 검색된다",
+  }, async () => {
+    const chunks = await post("/api/memory/query", { question: "ASA 302014 로그가 무슨 뜻이야?", topK: 4 });
+    const hit = chunks.findIndex((c) => /302014|Teardown|종료/.test(c));
+    if (hit < 0) throw new Error("관련 청크 없음");
+    return `청크 ${chunks.length}건, ${hit + 1}위 적중`;
+  });
+
+  await scenario("QA-M03", "온톨로지", "장비 제조사 질문에 그래프 규칙이 걸린다", {
+    given: "장비-제조사 트리플(SNIPER→윈스 등)이 들어간 뒤",
+    when: "'SNIPER 장비 제조사가 어디야?'로 확장하면",
+    then: "윈스(한국)·IPS 관련 트리플이 동반 주입된다",
+  }, async () => {
+    const j = await post("/api/ontology/expand", { text: "SNIPER 장비 제조사가 어디야?" });
+    const txt = JSON.stringify(j);
+    if (!/윈스/.test(txt)) throw new Error(`SNIPER 트리플 미포함: ${txt.slice(0, 120)}`);
+    return `확장 결과에 윈스·IPS 규칙 포함`;
+  });
+
+  await scenario("QA-M04", "LLM 답변", "월간 정기점검 절차 안내 (시나리오: 점검일 아침)", {
+    given: "담당자가 월간 정기점검을 시작하며",
+    when: "'방화벽 월간 정기점검 절차를 알려줘'라고 물으면",
+    then: "자원·HA·시그니처·백업·로그 등 7항목 계열의 점검 절차를 안내한다",
+  }, async () => {
+    const reply = await ask("방화벽 월간 정기점검 절차를 알려줘");
+    const hits = ["HA", "시그니처", "백업"].filter((k) => new RegExp(k, "i").test(reply));
+    if (hits.length < 2) throw new Error(`핵심 항목 부족(${hits.join(",")})`);
+    return `답변 ${reply.length}자 — ${hits.join("·")} 포함`;
+  });
+
+  await scenario("QA-M05", "LLM 답변", "장애 대응 절차 안내 (시나리오: 장비 다운)", {
+    given: "방화벽 장애가 발생한 상황에서",
+    when: "'방화벽 장비가 갑자기 죽었어, 어떻게 대응해야 해?'라고 물으면",
+    then: "로그 확보(재부팅 전)·HA 확인·유지보수 접수 순의 표준 절차를 안내한다",
+  }, async () => {
+    const reply = await ask("방화벽 장비가 갑자기 죽었어. 어떻게 대응해야 해?");
+    const hits = ["로그", "HA|이중화|절체", "유지보수|벤더|접수"].filter((k) => new RegExp(k).test(reply));
+    if (hits.length < 2) throw new Error("표준 절차 요소 부족");
+    return `답변 ${reply.length}자 — 장애 절차 요소 ${hits.length}/3 포함`;
+  });
+
+  await scenario("QA-M06", "LLM 답변", "차단 로그 반복 판독 (시나리오: 로그 검토 중)", {
+    given: "정기점검 중 이상 이벤트를 리뷰하다가",
+    when: "'ASA 106023 로그가 한 IP에서 계속 올라오는데 무슨 의미야?'라고 물으면",
+    then: "ACL 차단이며 반복 시 스캔·공격 시도 의심임을 설명한다",
+  }, async () => {
+    const reply = await ask("ASA 106023 로그가 한 IP에서 계속 올라오는데 무슨 의미야?");
+    if (!/차단|Deny|ACL/i.test(reply)) throw new Error("차단 의미 미설명");
+    return `답변 ${reply.length}자 — ACL 차단·의심 징후 설명 포함`;
+  });
+
+  save("qa-auto-maintenance.json");
+}
+
 // ─────────────────────────── 클라 계층(헤드리스 실페이지) ───────────────────────────
 // 주의: Electron preload가 없는 환경이므로 window.gijo는 최소 스텁(인증·이동만).
 // 화면 로직·nav.js·hub.html·페이지 마크업은 전부 실물이 그대로 실행된다.
@@ -404,8 +493,8 @@ async function runClient() {
 // ─────────────────────────────────── 리포트 병합 ───────────────────────────────────
 function report() {
   const load = (n) => { try { return JSON.parse(fs.readFileSync(path.join(OUT_DIR, n), "utf8")); } catch { return null; } };
-  const sv = load("qa-auto-server.json"), cl = load("qa-auto-client.json"), kn = load("qa-auto-knowledge.json");
-  const all = [...(sv?.results ?? []), ...(kn?.results ?? []), ...(cl?.results ?? [])];
+  const sv = load("qa-auto-server.json"), cl = load("qa-auto-client.json"), kn = load("qa-auto-knowledge.json"), mt = load("qa-auto-maintenance.json");
+  const all = [...(sv?.results ?? []), ...(kn?.results ?? []), ...(mt?.results ?? []), ...(cl?.results ?? [])];
   const pass = all.filter((r) => r.pass).length;
   const lines = [];
   lines.push(`# QA Auto ver1 — 실행 결과`);
@@ -428,6 +517,7 @@ function report() {
 
 if (layer === "server") await runServer();
 else if (layer === "knowledge") await runKnowledge();
+else if (layer === "maintenance") await runMaintenance();
 else if (layer === "client") await runClient();
 else if (layer === "report" || process.argv.includes("--report")) report();
 else { console.error("--layer=server | --layer=client | --report 중 하나를 지정하세요"); process.exit(2); }
