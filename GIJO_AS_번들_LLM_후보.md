@@ -65,8 +65,10 @@ restricted 모델에 경고 표시 유지 ③ 번들은 permissive만(본 문서
 
 ## 6. 실행 제안
 
-1. **차기 기본(지휘) 모델**: 현행 gijo-main-orchestrator(9B, 출처불명→BYOM 분류) 대체로 **Qwen3-8B** 검증 —
-   라이선스 리스크 제로화 + 도구호출 정확도 기대. held-out 8문항 실측(기존 방법)으로 비교 후 전환.
+1. **차기 기본(지휘) 모델**: 현행 gijo-main-orchestrator는 **Qwen2.5-7B 아키텍처의 합성본**(GGUF 메타:
+   qwen2·7.6B·name="Merged" — 합성 원본 2종 기록 없음 → 게이트가 보수적으로 BYOM 분류)이다.
+   원본이 Qwen2.5-7B 계열(Apache-2.0)로 확인되면 permissive 승격 가능 — **합성 원본 추적이 1순위**.
+   병행으로 **Qwen3-8B** held-out 실측 비교(기존 8문항 방법) 후 전환 여부 결정.
 2. **전문가 슬롯**: merged-lily(자사 합성, 원본 라이선스 확정 전 BYOM) 대신 판매본에는 **Kanana-1.5-8B**를
    기본 동봉하고, merged-lily는 원본(Lily·ZySec) 라이선스 확정 후 프리미엄 옵션으로.
 3. modellicense.ts 규칙에 kanana·phi-4·gpt-oss·granite 패턴 추가(전부 permissive 분류) — 게이트 최신화.

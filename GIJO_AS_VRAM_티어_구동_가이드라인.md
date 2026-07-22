@@ -12,7 +12,7 @@
 
 | 상주 프로세스 | 모델 | 크기(파일) | 역할 |
 |---|---|---|---|
-| 채팅 ① | gijo-main-orchestrator (9B Q5) | ~5.3GB | 오케스트레이터 전용 — 도구 라우팅(JSON 결정) |
+| 채팅 ① | gijo-main-orchestrator (Qwen2.5-7B계 합성, 7.6B Q5) | ~5.4GB | 오케스트레이터 전용 — 도구 라우팅(JSON 결정) |
 | 채팅 ② | merged-lily(7B 합성, Q5) | ~4.6GB | 나머지 5개 에이전트(scan·analysis·report·ti·normaltic) 공용 |
 | 임베딩 | bge-m3 | 1.1GB | RAG 검색 — 상시 필수(스왑 대상 아님) |
 
