@@ -14,7 +14,9 @@
 > 증거: HF 캐시 타임라인(02:01 두 모델 다운로드 → 02:07 GGUF 생성) + GGUF 메타(qwen2·7.6B·name="Merged").
 > 1M(롱컨텍스트 변형) 합성이 아래 "32K 롱컨텍스트 강점"의 출처. **두 원본 모두 Apache-2.0 → 상업 번들 가능**
 > (라이선스 게이트 permissive 승격 완료, modellicense.ts). `-ko` 변형은 Gukbap-Qwen2.5-7B(11:57 다운로드
-> → 12:03 생성) 합성 추정 — Gukbap 라이선스 확인 전까지 BYOM 유지.
+> → 12:03 생성) 합성 — **Gukbap이 CC-BY-NC-4.0(비상업)으로 확인돼 상업 번들 불가 확정**(게이트 restricted).
+> 한국어 강화 merge는 Gukbap 대신 **Kanana-1.5-8B(Apache-2.0)** 계열로 할 것(단, Kanana는 llama 아키텍처라
+> Qwen2.5-7B와 SLERP 불가 — 한국어 Qwen2.5-7B 파인튜닝 모델 중 Apache 라이선스를 찾아야 함).
 
 | 강점 | 약점 |
 |---|---|

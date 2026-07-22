@@ -70,7 +70,9 @@ restricted 모델에 경고 표시 유지 ③ 번들은 permissive만(본 문서
    02:07 GGUF 생성 타임라인 + GGUF 메타 qwen2·7.6B·name="Merged" + 1M 변형의 롱컨텍스트 특성 부합).
    **두 원본 모두 Apache-2.0 → 합성본 상업 번들 가능.** 라이선스 게이트 permissive 승격 완료 —
    현행 모델 그대로 번들하면 되고 교체 불필요(운영 검증까지 끝난 모델). Qwen3-8B 비교는 성능 개선 목적으로만 선택.
-   ※ gijo-orchestrator-ko는 Gukbap-Qwen2.5-7B(한국어 튜닝) 합성 추정 — Gukbap 라이선스 확인 전까지 BYOM 유지.
+   ※ **gijo-orchestrator-ko는 상업 번들 불가 확정(2026-07-22)** — 합성 원본 Gukbap-Qwen2.5-7B가
+   **CC-BY-NC-4.0(비상업)**으로 확인됨(HF 모델 카드). 파생물은 NC 제약 상속 → 번들·상업 BYOM 모두 불가.
+   게이트 restricted 반영 완료. 한국어 강화가 필요하면 Kanana-1.5-8B(Apache-2.0) 합성으로 대체할 것.
 2. **전문가 슬롯**: merged-lily(자사 합성, 원본 라이선스 확정 전 BYOM) 대신 판매본에는 **Kanana-1.5-8B**를
    기본 동봉하고, merged-lily는 원본(Lily·ZySec) 라이선스 확정 후 프리미엄 옵션으로.
 3. modellicense.ts 규칙에 kanana·phi-4·gpt-oss·granite 패턴 추가(전부 permissive 분류) — 게이트 최신화.
