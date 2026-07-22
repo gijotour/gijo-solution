@@ -10,6 +10,12 @@
 `gijo-main-orchestrator` = **Qwen2.5-7B 아키텍처** (실측 `:8080` 메타: n_vocab 152064, n_embd 3584,
 7.6B params, 32K ctx, Q5_K_M).
 
+> ✅ **합성 원본 확정 (2026-07-22 추적)**: **Qwen2.5-7B-Instruct + Qwen2.5-7B-Instruct-1M SLERP**.
+> 증거: HF 캐시 타임라인(02:01 두 모델 다운로드 → 02:07 GGUF 생성) + GGUF 메타(qwen2·7.6B·name="Merged").
+> 1M(롱컨텍스트 변형) 합성이 아래 "32K 롱컨텍스트 강점"의 출처. **두 원본 모두 Apache-2.0 → 상업 번들 가능**
+> (라이선스 게이트 permissive 승격 완료, modellicense.ts). `-ko` 변형은 Gukbap-Qwen2.5-7B(11:57 다운로드
+> → 12:03 생성) 합성 추정 — Gukbap 라이선스 확인 전까지 BYOM 유지.
+
 | 강점 | 약점 |
 |---|---|
 | 오케스트레이션·작업분배, 한국어 준수, 32K 롱컨텍스트, 추론 빠름(triage 1.3~4s) | **중국어 드리프트**(구조화 출력 시 汉字 흘림 — 프롬프트로 억제 중), 보안 도메인 깊이가 범용 수준 |
