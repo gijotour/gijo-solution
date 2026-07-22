@@ -262,15 +262,20 @@ export async function ingestText(documentId: string, raw: string, scope: string 
   const EMBED_BATCH = 8;
   // 임베딩 서버가 워치독으로 재기동되는 동안(~15초)의 일시 오류는 기다렸다 재시도한다 —
   // 수천 청크 인입 도중 한 번의 재기동으로 문서 전체가 실패하면 안 된다.
+  // 테스트(vitest)는 임베딩 서버 부재를 의도적으로 시험하므로 재시도 없이 즉시 실패해야 한다
+  // (재시도 대기 50초가 테스트 타임아웃(15s)을 넘겨 autoupload 테스트가 죽는 회귀 실측).
+  const EMBED_RETRIES = process.env.VITEST ? 1 : Number(process.env.GIJO_EMBED_RETRIES ?? 5);
+  const EMBED_RETRY_DELAY_MS = process.env.VITEST ? 0 : Number(process.env.GIJO_EMBED_RETRY_DELAY_MS ?? 10_000);
   const embedWithRetry = async (texts: string[]): Promise<number[][]> => {
     let lastErr: unknown;
-    for (let attempt = 0; attempt < 5; attempt++) {
+    for (let attempt = 0; attempt < EMBED_RETRIES; attempt++) {
       try {
         return await embed(texts);
       } catch (err) {
         lastErr = err;
-        console.warn(`[memory] 임베딩 일시 실패(시도 ${attempt + 1}/5, ${texts.length}건) — 10초 후 재시도: ${err instanceof Error ? err.message : String(err)}`);
-        await new Promise((resolve) => setTimeout(resolve, 10_000));
+        if (attempt + 1 >= EMBED_RETRIES) break;
+        console.warn(`[memory] 임베딩 일시 실패(시도 ${attempt + 1}/${EMBED_RETRIES}, ${texts.length}건) — ${EMBED_RETRY_DELAY_MS / 1000}초 후 재시도: ${err instanceof Error ? err.message : String(err)}`);
+        await new Promise((resolve) => setTimeout(resolve, EMBED_RETRY_DELAY_MS));
       }
     }
     throw lastErr;

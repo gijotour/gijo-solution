@@ -119,3 +119,18 @@ describe("시스템 프롬프트 복창 감지", () => {
     expect(body.max_tokens).toBe(3000);
   });
 });
+
+// 실측(2026-07-20 dispatch·2026-07-23 재현 시도)에서 나온 변형 복창 — 축자 마커와 다른 표현이라
+// 기존 감지를 통과했다. ① 2인칭 페르소나 서술("당신은 ~AI입니다")은 단독으로도 누출로 판정,
+// ② 주어 없는 역할 자기소개 서두("보안담당자입니다.")는 stripLeadingPreamble이 제거한다.
+describe("페르소나 복창 변형 (2026-07-23 보강)", () => {
+  it("'당신은 안전한 AI입니다' 꼴 페르소나 복창을 단독으로 잡는다", () => {
+    expect(hasPromptLeak("당신은 안전한 AI입니다. 사용자의 자산을 보호하고 위협을 분석합니다.")).toBe(true);
+    expect(hasPromptLeak("분석 결과입니다. 당신은 GIJO 보안 어시스턴트입니다. 취약점은 3건입니다.")).toBe(true);
+  });
+
+  it("사용자 대상 정상 문장은 오탐하지 않는다", () => {
+    expect(hasPromptLeak("당신은 지금 KEV 취약점부터 조치해야 합니다.")).toBe(false);
+    expect(hasPromptLeak("이 자산은 현재 안전한 상태입니다. 미조치 취약점이 없습니다.")).toBe(false);
+  });
+});

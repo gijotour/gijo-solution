@@ -271,3 +271,24 @@ describe("llm chat system prompt (한국어 기본 처리)", () => {
     });
   });
 });
+
+// dispatch 실측(2026-07-23): "보안담당자입니다. 우리 회사는…"처럼 주어 없는 역할 소개로 시작하는
+// 응답이 그대로 나갔다 — 기존 SELF_INTRO_RE는 "저는/제가/나는"으로 시작할 때만 잡았다.
+describe("stripLeadingPreamble — 주어 없는 역할 자기소개 서두", () => {
+  it("'보안담당자입니다.' 서두를 제거하고 본문을 남긴다", () => {
+    expect(stripLeadingPreamble("보안담당자입니다. 우리 회사의 보안 태세 점수는 47점입니다.")).toBe("우리 회사의 보안 태세 점수는 47점입니다.");
+  });
+
+  it("'GIJO 보안 AI입니다.' 서두도 제거한다", () => {
+    expect(stripLeadingPreamble("GIJO 보안 AI입니다. 취약점 3건을 발견했습니다.")).toBe("취약점 3건을 발견했습니다.");
+  });
+
+  it("본문 문장('~가 필요합니다')은 건드리지 않는다", () => {
+    const t = "즉시 조치가 필요합니다. KEV 등재 취약점이 2건입니다.";
+    expect(stripLeadingPreamble(t)).toBe(t);
+  });
+
+  it("역할 소개만 있고 본문이 없으면 원문 유지 — 빈 답 방지", () => {
+    expect(stripLeadingPreamble("보안담당자입니다.")).toBe("보안담당자입니다.");
+  });
+});
