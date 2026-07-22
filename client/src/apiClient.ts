@@ -571,6 +571,9 @@ export const memoryApi = {
     request<{ chunkIndex: number; text: string }[]>("/api/memory/document/chunks", { method: "POST", body: { documentId, limit } }),
   deleteDocument: (documentId: string, withFile?: boolean) =>
     request<{ documentId: string; deletedChunks: number; deletedFile: boolean }>("/api/memory/document/delete", { method: "POST", body: { documentId, withFile } }),
+  // 서버에 보관된 업로드 원본(base64) — "원본 열기"용.
+  documentFile: (documentId: string) =>
+    request<{ filename: string; content: string }>("/api/memory/document/file", { method: "POST", body: { documentId } }),
 };
 
 export interface IngestResult {

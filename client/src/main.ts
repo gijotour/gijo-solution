@@ -2,7 +2,7 @@
 // [CS 구조 변경] engine/ 모듈을 더 이상 임포트하지 않는다(전부 서버로 이전됨).
 // main.ts는 창 관리와 페이지 네비게이션만 담당하는 얇은 셸이다.
 
-import { app, BrowserWindow, ipcMain, dialog, safeStorage } from "electron";
+import { app, BrowserWindow, ipcMain, dialog, safeStorage, shell } from "electron";
 import * as path from "path";
 import { spawn, ChildProcess } from "child_process";
 import * as os from "os";
@@ -226,8 +226,8 @@ ipcMain.handle("fs:list", async (_e, relPath: string) => {
 });
 
 // 탐색기에서 고른 파일 하나를 읽어 base64로 돌려준다(장기 기억에 올리기 등). 읽기 전용 원칙에 맞게
-// 파일 내용을 읽기만 하며, fs:list와 같은 루트 이탈 방지 + 크기 상한(50MB)을 건다.
-const FS_READ_MAX_BYTES = 50 * 1024 * 1024;
+// 파일 내용을 읽기만 하며, fs:list와 같은 루트 이탈 방지 + 크기 상한(200MB — 대용량 매뉴얼 PDF 허용)을 건다.
+const FS_READ_MAX_BYTES = 200 * 1024 * 1024;
 ipcMain.handle("fs:readFile", async (_e, relPath: string) => {
   const target = path.resolve(explorerRoot, relPath || ".");
   if (target !== explorerRoot && !target.startsWith(explorerRoot + path.sep)) {
@@ -235,9 +235,21 @@ ipcMain.handle("fs:readFile", async (_e, relPath: string) => {
   }
   const stat = await fs.promises.stat(target);
   if (!stat.isFile()) throw new Error("파일이 아닙니다");
-  if (stat.size > FS_READ_MAX_BYTES) throw new Error("파일이 너무 큽니다 (50MB 초과)");
+  if (stat.size > FS_READ_MAX_BYTES) throw new Error("파일이 너무 큽니다 (200MB 초과)");
   const buf = await fs.promises.readFile(target);
   return { name: path.basename(target), size: stat.size, content: buf.toString("base64") };
+});
+
+// 서버에 보관된 문서 원본(base64)을 임시 파일로 저장하고 OS 기본 프로그램(PDF 뷰어 등)으로 연다.
+// 렌더러가 base64를 preload(apiClient)로 받아 여기로 넘긴다 — 파일 쓰기·shell은 메인 프로세스 몫.
+ipcMain.handle("doc:open-temp", async (_e, filename: string, base64: string) => {
+  const dir = path.join(os.tmpdir(), "gijo-docs");
+  await fs.promises.mkdir(dir, { recursive: true });
+  const target = path.join(dir, path.basename(String(filename || "document")));
+  await fs.promises.writeFile(target, Buffer.from(String(base64), "base64"));
+  const errMsg = await shell.openPath(target); // 빈 문자열이면 성공
+  if (errMsg) throw new Error(`파일을 열 수 없습니다: ${errMsg}`);
+  return { path: target };
 });
 
 // 사용자가 작업 폴더를 직접 고른다(폴더 선택 다이얼로그). 선택하면 그 폴더가 새 루트가 된다.

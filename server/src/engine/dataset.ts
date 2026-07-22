@@ -27,7 +27,7 @@ export async function extractDocumentText(filename: string, base64: string): Pro
       execFile(
         "python",
         ["scripts/extract_doc.py", tmp],
-        { env: { ...process.env, PYTHONUTF8: "1" }, maxBuffer: 64 * 1024 * 1024 },
+        { env: { ...process.env, PYTHONUTF8: "1" }, maxBuffer: 256 * 1024 * 1024 },
         (err, stdout, stderr) => {
           if (stderr) recordProcessOutput("extract-doc", "warn", stderr);
           if (err) return reject(new Error(stderr.trim() || err.message));

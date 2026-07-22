@@ -159,6 +159,11 @@ const gijoApi = {
   listMemoryDocuments: () => api.memoryApi.listDocuments(),
   memoryDocumentChunks: (documentId: string, limit?: number) => api.memoryApi.documentChunks(documentId, limit),
   deleteMemoryDocument: (documentId: string, withFile?: boolean) => api.memoryApi.deleteDocument(documentId, withFile),
+  // 서버 보관 원본을 임시 파일로 받아 OS 기본 뷰어(PDF 등)로 연다.
+  openMemoryDocumentFile: async (documentId: string) => {
+    const f = await api.memoryApi.documentFile(documentId);
+    return ipcRenderer.invoke("doc:open-temp", f.filename, f.content) as Promise<{ path: string }>;
+  },
 
   // 선택적 클라우드 LLM 하이브리드(Gemini/Claude/OpenAI) — 기본 OFF·admin 설정, egress 게이트 통과분만.
   cloudStatus: () => api.cloudApi.status(),

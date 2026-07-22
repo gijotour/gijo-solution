@@ -50,7 +50,7 @@ describe("memory (장기 기억 / LanceDB) — 임베딩 모델 교체 자가 �
   it("ingestText with empty text stores nothing", async () => {
     embedDim = 3;
     const result = await ingestText("empty.txt", "   ", "global");
-    expect(result.chunks).toBe(1); // 공백도 청크 1개(원자적) — 빈 문자열만 0
+    expect(result.chunks).toBe(0); // 공백뿐인 문서는 저장 안 함 (2026-07-23 청킹 개선 — 예전엔 공백도 임베딩됐다)
     const zero = await ingestText("truly-empty.txt", "", "global");
     expect(zero.chunks).toBe(0);
     expect(zero.embeddingModel).toBe("none");
@@ -159,5 +159,42 @@ describe("memory scope (B — 에이전트별 지식 격리)", () => {
     const joined = hits.join(" ");
     expect(joined).not.toContain("Metasploit");
     expect(joined).toContain("보안팀에 즉시 신고");
+  });
+});
+
+const { chunkText, cleanExtractedText, classifyByContentHint } = await import("../src/engine/memory");
+
+describe("chunkText — 구조 인지 청킹 (2026-07-23 개선)", () => {
+  it("페이지 번호·반복 머리글을 제거한다", () => {
+    const raw = ["GIJO 보안 매뉴얼", "본문 첫 문단입니다.", " - 134 - ", "GIJO 보안 매뉴얼", "둘째 문단입니다.", "GIJO 보안 매뉴얼", "셋째 문단입니다."].join("\n");
+    const cleaned = cleanExtractedText(raw);
+    expect(cleaned).not.toContain("- 134 -");
+    expect(cleaned.match(/GIJO 보안 매뉴얼/g) ?? []).toHaveLength(0); // 3회 반복 머리글 제거
+    expect(cleaned).toContain("둘째 문단입니다.");
+  });
+
+  it("제목 줄이 다음 문단과 같은 청크에 붙는다 (제목 직후 절단 방지)", () => {
+    const doc = ["## 1. 개요", "", "가".repeat(700), "", "## 2. 장애 대응 표준 절차", "", "1단계 증상 기록. 2단계 로그 확보. 3단계 HA 확인."].join("\n");
+    const chunks = chunkText(doc, 800, 100);
+    const withHeading = chunks.find((c) => c.includes("장애 대응 표준 절차"));
+    expect(withHeading).toBeDefined();
+    expect(withHeading).toContain("1단계 증상 기록"); // 제목만 남고 본문이 다음 청크로 밀리지 않는다
+  });
+
+  it("긴 문단은 문장 경계로 나뉘고 20자 미만 잡음 청크는 버린다", () => {
+    const long = Array.from({ length: 40 }, (_, i) => `문장 ${i}번은 유지보수 절차를 설명한다.`).join(" ");
+    const chunks = chunkText(long, 300, 50);
+    expect(chunks.length).toBeGreaterThan(1);
+    for (const c of chunks) {
+      expect(c.length).toBeLessThanOrEqual(420); // size+overlap 여유 내
+      expect(c.length).toBeGreaterThanOrEqual(20);
+    }
+  });
+
+  it("classifyByContentHint — 매뉴얼 표지가 뚜렷하면 LLM 없이 확정, 경합이면 null", () => {
+    const manual = "이 문서는 사용법을 설명한다. 설정 방법은 메뉴 경로 시스템>업데이트에서 버튼 클릭. 명령어 예시와 로그 필드 정의 포함.";
+    expect(classifyByContentHint(manual)).toBe("매뉴얼");
+    const ambiguous = "동향 분석과 지침 준수를 함께 다루는 문서.";
+    expect(classifyByContentHint(ambiguous)).toBeNull();
   });
 });

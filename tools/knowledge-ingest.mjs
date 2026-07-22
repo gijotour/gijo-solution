@@ -20,10 +20,17 @@ if (!login.accessToken) { console.error("로그인 실패", login); process.exit
 const H = { "content-type": "application/json", authorization: `Bearer ${login.accessToken}` };
 const api = (p, body) => fetch(BASE + p, body ? { method: "POST", headers: H, body: JSON.stringify(body) } : { headers: H });
 
-// 선행 안전장치 — 임베딩 서버가 죽어 있으면 기존 문서를 지우기 전에 중단한다.
-// (삭제 후 재삽입이 실패하면 문서가 KB에서 증발한다 — 2026-07-23 실사고)
-const probe = await api("/api/localengine/status").then((r) => r.json()).catch(() => null);
-if (!probe?.embedding?.running) { console.error("임베딩 서버 미가동 — 인입 중단(문서 보존)"); process.exit(3); }
+// 선행 안전장치 — 임베딩이 실제로 동작해야 기존 문서를 지운다. 상태 API(embedding.running)는
+// 서버 재시작 직후 실제와 어긋날 수 있어(2026-07-23 2차 사고: running인데 호출은 연결 실패),
+// 진짜 임베딩 호출(/api/memory/query)이 성공할 때까지 최대 90초 기다린다.
+let embedReady = false;
+for (let i = 0; i < 18; i++) {
+  const r = await api("/api/memory/query", { question: "임베딩 헬스 프로브", topK: 1 }).catch(() => null);
+  if (r && r.ok) { embedReady = true; break; }
+  if (i === 0) console.log("임베딩 서버 대기 중…(최대 90초)");
+  await new Promise((res) => setTimeout(res, 5000));
+}
+if (!embedReady) { console.error("임베딩 서버 미가동 — 인입 중단(문서 보존)"); process.exit(3); }
 
 // ① RAG 인입 — 같은 파일명이 이미 있으면 지우고 다시 넣는다(멱등).
 const docs = [
@@ -31,6 +38,8 @@ const docs = [
   "GIJO_지식_취약점_식별체계.md",
   "GIJO_지식_보안장비_로그체계.md",
   "GIJO_지식_보안장비_유지보수절차.md",
+  "GIJO_지식_장비_콘솔_메뉴맵.md",
+  "GIJO_지식_장비_릴리즈노트_장애처리노트.md",
 ];
 const existing = await api("/api/memory/documents").then((r) => r.json());
 for (const name of docs) {
@@ -129,6 +138,14 @@ const deviceTriples = [
   D("유지보수 계약", "관리요소", "계약기간·SLA·모델/시리얼·EoS 일정·점검/장애/변경 이력"),
   D("NTP 시간동기", "중요성", "어긋나면 침해사고 때 장비 간 로그 대조가 불가능"),
   D("보안장비 유지보수", "제품연계", "GIJO AS 유지보수 메뉴(계약·일정)·보안제품 등록부(대장)·분석 허브(로그/리포트)·하드닝 kisa_net(설정 점검 자동화)"),
+  // 콘솔 메뉴 경로·릴리즈노트·장애처리
+  D("FortiGate 차단 로그", "확인경로", "Log & Report > Forward Traffic 에서 Action=deny 필터"),
+  D("FortiGate 컨서브 모드", "의미", "메모리가 위험 수준까지 차서 기능을 축소해 버티는 상태 — System Events에 conserve mode 메시지"),
+  D("FortiGate 컨서브 모드", "흔한원인", "IPS 엔진·WAD 프로세스의 메모리 점유 (diagnose sys top으로 확인)"),
+  D("PAN-OS 시그니처 업데이트", "메뉴경로", "Device > Dynamic Updates"),
+  D("PAN-OS 커밋 실패", "확인절차", "우하단 Tasks에서 Job ID와 Validation Error부터 확인"),
+  D("릴리즈노트", "확인항목", "Upgrade Path(경로)·Resolved Issues(해결)·Known Issues(잔존) 3가지"),
+  D("HA 스플릿 브레인", "흔한원인", "HA 하트비트 링크 단선 — 전용 케이블·스위치 포트부터 점검"),
 ];
 triples.push(...deviceTriples);
 const inserted = await api("/api/ontology/triples", { triples }).then((r) => r.json());

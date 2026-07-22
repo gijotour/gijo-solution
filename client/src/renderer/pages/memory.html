@@ -371,9 +371,13 @@ tr:last-child td{border-bottom:none;}
     const when = d.ingestedAt ? new Date(d.ingestedAt).toLocaleString("ko-KR") : "이전 업로드(시각 미기록)";
     const scopeShort = d.scope === "global" ? "전역" : d.scope;
     const scopeLabel = d.scope === "global" ? "전역(공유)" : d.scope + " 전용";
+    const classBadge = d.docClass ? ` · 분류: <b style="color:var(--blue-light)">${dmEsc(d.docClass)}</b>` : "";
+    const openBtn = d.hasSource
+      ? `<button id="dmOpenBtn" style="margin-left:auto;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:8px 14px;color:var(--text);font-size:12px;font-weight:700;cursor:pointer">📂 원본 열기</button>`
+      : "";
     detail.innerHTML =
       `<div class="dm-dtop"><div class="ic">${DM_ICON(documentId)}</div><div><div class="dm-dname">${dmEsc(documentId)}</div>` +
-      `<div class="dm-dmeta">${scopeLabel} 범위 · 업로드 ${dmEsc(when)}</div></div></div>` +
+      `<div class="dm-dmeta">${scopeLabel} 범위 · 업로드 ${dmEsc(when)}${classBadge}</div></div>${openBtn}</div>` +
       `<div class="dm-metric"><div class="dm-m"><b>${d.chunks}</b><span>임베딩 조각</span></div>` +
       `<div class="dm-m"><b>bge-m3</b><span>임베딩 모델</span></div>` +
       `<div class="dm-m"><b>${scopeShort}</b><span>검색 범위</span></div>` +
@@ -384,6 +388,17 @@ tr:last-child td{border-bottom:none;}
       `<label class="dm-opt${d.hasSource ? "" : " dis"}"><input type="radio" name="dmDel" value="file"${d.hasSource ? "" : " disabled"}><span><b>원본 파일까지 삭제</b><span class="t">${d.hasSource ? "임베딩 + 서버 원본 파일 완전 제거 · 복구 불가" : "서버에 저장된 원본이 없어 임베딩 제거로 완전 삭제됩니다"}</span></span></label>` +
       `</div><button class="dm-delbtn" id="dmDelBtn">삭제</button></div>`;
     document.getElementById("dmDelBtn").addEventListener("click", () => deleteDoc(documentId));
+    const openBtnEl = document.getElementById("dmOpenBtn");
+    if (openBtnEl) openBtnEl.addEventListener("click", async () => {
+      openBtnEl.disabled = true; openBtnEl.textContent = "여는 중...";
+      try {
+        await window.gijo.openMemoryDocumentFile(documentId); // 서버 원본 → 임시 저장 → OS 뷰어
+        openBtnEl.textContent = "📂 원본 열기";
+      } catch (err) {
+        openBtnEl.textContent = "열기 실패: " + (err && err.message ? err.message : err);
+        setTimeout(() => { openBtnEl.textContent = "📂 원본 열기"; }, 4000);
+      } finally { openBtnEl.disabled = false; }
+    });
   }
 
   async function deleteDoc(documentId) {

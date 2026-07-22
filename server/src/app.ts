@@ -97,7 +97,8 @@ export function createApp(): Express {
   app.use(securityHeaders);
   // 자산 탐지 결과·Nessus 스캔·매뉴얼(base64) 업로드가 클 수 있어 기본 100kb 제한을 올린다.
   // 50mb = 스캔 텍스트 ~49MB / base64 문서 원본 ~36MB까지. 폐쇄망 단일 서버라 메모리만 유의.
-  app.use(express.json({ limit: "50mb" }));
+  // 200mb: 대용량 보안운영 매뉴얼 PDF(base64로 약 1.33배 부풀음 — 실파일 ~150MB까지) 업로드 허용.
+  app.use(express.json({ limit: "200mb" }));
   app.use(usageLoggingMiddleware);
 
   registerAuthRoutes(app);

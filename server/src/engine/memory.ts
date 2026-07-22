@@ -68,9 +68,25 @@ const DOC_CLASSES = ["매뉴얼", "보고서", "정책", "기타"] as const;
 
 // 명시적 문서 종류 표기만 잡는 엄격판 — 매뉴얼 표기가 가장 강한 신호라 먼저 검사한다.
 function classifyByFilenameStrict(documentId: string): string | null {
-  if (/매뉴얼|manual|가이드|guide/i.test(documentId)) return "매뉴얼";
-  if (/보고서|report/i.test(documentId)) return "보고서";
-  if (/정책|지침|규정|policy/i.test(documentId)) return "정책";
+  // 릴리즈노트·장애처리(트러블슈팅) 문서는 제품 운영 문서라 매뉴얼 부류로 묶는다 — 보안제품 자동 연결 대상.
+  if (/매뉴얼|manual|가이드|guide|릴리즈|release\s?note|장애처리|트러블슈팅|troubleshoot|절차/i.test(documentId)) return "매뉴얼";
+  if (/보고서|report|동향|현황/i.test(documentId)) return "보고서";
+  if (/정책|지침|규정|policy|표준/i.test(documentId)) return "정책";
+  return null;
+}
+
+// 내용 기반 결정적 힌트 — 파일명에 신호가 없을 때 LLM보다 먼저 시도한다. 문서 첫 부분(2000자)에서
+// 부류별 강한 표지를 세어, 한 부류만 뚜렷하면 그 부류로 확정한다(둘 이상 경합/전무면 null → LLM).
+// 근거: LLM 단독 분류가 흔들려 같은 문서가 회차마다 기타/정책/보고서로 갈렸다(2026-07-23 실측).
+export function classifyByContentHint(text: string): string | null {
+  const head = text.slice(0, 2000);
+  const score = {
+    매뉴얼: (head.match(/사용법|설정 방법|메뉴 경로|버튼|클릭|화면에서|명령어|로그 필드|릴리즈|장애처리|트러블슈팅/g) ?? []).length,
+    보고서: (head.match(/동향|현황|분석 결과|통계|추이|전망|사례 분석/g) ?? []).length,
+    정책: (head.match(/지침|규정|준수|표준|의무|금지|승인 절차|인증기준/g) ?? []).length,
+  };
+  const sorted = Object.entries(score).sort((a, b) => b[1] - a[1]);
+  if (sorted[0][1] >= 3 && sorted[0][1] >= sorted[1][1] * 2) return sorted[0][0];
   return null;
 }
 
@@ -84,7 +100,7 @@ function classifyByFilename(documentId: string): string {
 async function classifyDocument(documentId: string, text: string): Promise<string> {
   emitCollaboration({ from: "scan", to: "analysis", message: `문서 분석·분류 요청: ${documentId}` });
   let docClass: string;
-  const byName = classifyByFilenameStrict(documentId);
+  const byName = classifyByFilenameStrict(documentId) ?? classifyByContentHint(text);
   if (byName) {
     docClass = byName;
   } else {
@@ -142,13 +158,84 @@ interface MemoryRow {
   vector: number[];
 }
 
-function chunkText(text: string, size = CHUNK_SIZE, overlap = CHUNK_OVERLAP): string[] {
-  const chunks: string[] = [];
-  for (let start = 0; start < text.length; start += size - overlap) {
-    chunks.push(text.slice(start, start + size));
-    if (start + size >= text.length) break;
+// PDF 추출물의 레이아웃 잡음을 지운다 — 페이지 번호 줄("- 134 -", "134"), 페이지마다 반복되는
+// 머리글/바닥글은 임베딩에 잡음이고 청크 앞머리를 차지해 검색 품질을 떨어뜨린다(FOCS 매뉴얼 실측).
+export function cleanExtractedText(text: string): string {
+  const lines = text.split("\n");
+  // 3회 이상 반복되는 짧은 줄(머리글/바닥글 후보) 수집 — 문서 제목이 매 페이지 반복되는 패턴.
+  const freq = new Map<string, number>();
+  for (const l of lines) {
+    const t = l.trim();
+    if (t.length > 0 && t.length <= 60) freq.set(t, (freq.get(t) ?? 0) + 1);
   }
-  return chunks;
+  const repeated = new Set([...freq.entries()].filter(([t, n]) => n >= 3 && !/[.다요]$/.test(t)).map(([t]) => t));
+  const kept = lines.filter((l) => {
+    const t = l.trim();
+    if (/^-?\s*\d{1,4}\s*-?$/.test(t)) return false; // 페이지 번호 줄
+    if (/^(page|페이지)\s*\d+/i.test(t)) return false;
+    if (repeated.has(t)) return false;
+    return true;
+  });
+  return kept.join("\n").replace(/\n{3,}/g, "\n\n");
+}
+
+// 구조 인지 청킹 — 고정 길이로 자르면 제목·문장 한가운데가 잘려 검색 1위 청크에 정작 본문이
+// 없는 문제가 실측됐다(2026-07-23: "장애 대응 표준 절차" 제목 직후 절단). 문단(빈 줄)과
+// 제목 줄(마크다운 #, "1." 번호, "제N장")을 경계로 블록을 만들고, 블록을 순서대로 담아
+// size를 넘기 전에 끊는다. 블록 하나가 size보다 크면 문장 경계로 나눈다.
+export function chunkText(text: string, size = CHUNK_SIZE, overlap = CHUNK_OVERLAP): string[] {
+  const cleaned = cleanExtractedText(text);
+  if (!cleaned.trim()) return [];
+
+  // 1) 블록 분해: 빈 줄 기준 문단 + 제목 줄은 다음 문단과 붙인다(제목만 남는 청크 방지).
+  const rawBlocks = cleaned.split(/\n\s*\n/).map((b) => b.trim()).filter(Boolean);
+  const blocks: string[] = [];
+  for (const b of rawBlocks) {
+    const isHeading = /^(#{1,6}\s|\d+(\.\d+)*[.)]\s|제\s?\d+\s?[장절조]|[■□◆▶●○]\s)/.test(b) && b.length <= 80;
+    if (isHeading && blocks.length >= 0) {
+      // 제목은 버퍼에 두었다가 다음 블록 앞에 붙인다.
+      blocks.push(b + "\n");
+    } else if (blocks.length > 0 && blocks[blocks.length - 1].endsWith("\n")) {
+      blocks[blocks.length - 1] += b;
+    } else {
+      blocks.push(b);
+    }
+  }
+
+  // 2) 큰 블록은 문장 경계로 쪼갠다.
+  const units: string[] = [];
+  for (const b of blocks) {
+    if (b.length <= size) {
+      units.push(b);
+      continue;
+    }
+    let buf = "";
+    for (const sent of b.split(/(?<=[.!?다요]\s)|(?<=\n)/)) {
+      if (buf.length + sent.length > size && buf.trim()) {
+        units.push(buf.trim());
+        buf = "";
+      }
+      buf += sent;
+    }
+    if (buf.trim()) units.push(buf.trim());
+  }
+
+  // 3) 블록을 담아 청크 구성 — 넘치기 전에 끊고, 직전 꼬리(overlap)를 이어붙여 맥락을 잇는다.
+  const chunks: string[] = [];
+  let cur = "";
+  for (const u of units) {
+    if (cur && cur.length + u.length + 2 > size) {
+      chunks.push(cur.trim());
+      cur = cur.slice(-overlap) + "\n" + u;
+    } else {
+      cur = cur ? cur + "\n\n" + u : u;
+    }
+  }
+  if (cur.trim()) chunks.push(cur.trim());
+  // 잡음만 남은 초단문 청크 제거 — 단, 문서 자체가 짧으면(전부 걸러지면) 원문을 보존한다.
+  const filtered = chunks.filter((c) => c.length >= 20);
+  if (filtered.length === 0 && cleaned.trim().length > 0) return [cleaned.trim().slice(0, size)];
+  return filtered;
 }
 
 export async function ingestDocument(filePath: string, scope: string = GLOBAL_SCOPE, classify = false): Promise<IngestResult> {
@@ -453,8 +540,20 @@ export function registerMemoryRoutes(app: Express): void {
           res.status(400).json({ error: "문서에서 텍스트를 추출하지 못했습니다 (빈 문서이거나 지원하지 않는 형식)" });
           return;
         }
+        // 원본 파일을 보관한다 — 담당자가 목록에서 "원본 열기"로 PDF 등을 그대로 볼 수 있게.
+        // (예전엔 텍스트만 남기고 원본을 버려 열람이 불가능했다.) 보관 실패는 인입을 막지 않는다.
+        let savedPath: string | undefined;
+        try {
+          const uploadsDir = path.join(INGEST_ROOT, "docs", "uploads");
+          await fs.mkdir(uploadsDir, { recursive: true });
+          savedPath = path.join(uploadsDir, path.basename(filename));
+          await fs.writeFile(savedPath, Buffer.from(content, "base64"));
+        } catch (saveErr) {
+          console.warn(`[memory] 원본 보관 실패(${filename}): ${saveErr instanceof Error ? saveErr.message : String(saveErr)}`);
+          savedPath = undefined;
+        }
         // 사용자 업로드 경로 — Scan·Analyze Agent 분류 포함.
-        res.json(await ingestText(filename, text, scope ?? GLOBAL_SCOPE, undefined, true));
+        res.json(await ingestText(filename, text, scope ?? GLOBAL_SCOPE, savedPath, true));
       } catch (err) {
         res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
       }
@@ -495,6 +594,31 @@ export function registerMemoryRoutes(app: Express): void {
       res.json(await getDocumentChunks(documentId, Math.min(Math.max(1, limit ?? 10), 50)));
     })
   );
+  // 원본 파일 내려받기 — 목록의 "원본 열기"용. 보관 경로가 INGEST_ROOT 안일 때만 내준다.
+  app.post(
+    "/api/memory/document/file",
+    authMiddleware,
+    asyncRoute(async (req, res) => {
+      const { documentId } = req.body as { documentId?: string };
+      if (!documentId) {
+        res.status(400).json({ error: "documentId가 필요합니다" });
+        return;
+      }
+      const meta = getDocMetaStmt.get(documentId) as { sourcePath?: string | null } | undefined;
+      if (!meta?.sourcePath) {
+        res.status(404).json({ error: "원본 파일이 보관되어 있지 않습니다 (원본 보관 기능 이전에 올린 문서)" });
+        return;
+      }
+      try {
+        const resolved = assertWithinIngestRoot(meta.sourcePath);
+        const buf = await fs.readFile(resolved);
+        res.json({ filename: path.basename(resolved), content: buf.toString("base64") });
+      } catch (err) {
+        res.status(404).json({ error: `원본 파일을 읽을 수 없습니다: ${err instanceof Error ? err.message : String(err)}` });
+      }
+    })
+  );
+
   // 문서 삭제. withFile=true면 원본 파일까지(경로가 기록된 경우).
   app.post(
     "/api/memory/document/delete",
