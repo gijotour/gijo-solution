@@ -19,6 +19,7 @@ import { listFindings } from "./cti";
 import { matchCtiToAssets } from "./ctimatch";
 import { listLearnloopRuns } from "./learnloop";
 import { listTasks } from "./tasks";
+import { buildHub } from "./assethub";
 
 export interface KpiSnapshot {
   date: string; // YYYY-MM-DD
@@ -57,6 +58,16 @@ export interface KpiSnapshot {
   posture: { score: number; band: "good" | "fair" | "poor"; factors: { label: string; value: number }[] };
   // MTTR(평균 조치 소요일) — 완료된 조치 태스크의 (완료−생성) 평균. 표본이 적으면 null(집계 중).
   mttrDays: number | null;
+  // AI 보안(LLM) — 자산 허브의 OWASP LLM 도출·AI-BOM·레드팀 견고성을 KPI로. 제품 차별점 강조.
+  aiSecurity: {
+    aiAssets: number; // AI 자산 수
+    owaspOpen: number; // AI 자산 전체의 미대응 OWASP LLM 위험 합
+    topRisk: { code: string; title: string; count: number } | null; // 가장 많이 미대응인 위험
+    aibomComplete: number; // AI-BOM/SBOM 생성된 AI 자산 수
+    aibomMissing: number; // AI-BOM 미생성 AI 자산 수
+    redteamTested: number; // 레드팀 견고성 점검된 AI 자산 수
+    avgRobustness: number | null; // 견고성 평균(점검된 자산 대상), 없으면 null
+  };
 }
 
 const todayStr = todayLocal;
@@ -197,6 +208,26 @@ function computePosture(
   };
 }
 
+// AI 보안 지표 — 자산 허브(assethub) 집계를 재사용해 OWASP LLM·AI-BOM·견고성을 KPI로 요약한다.
+function computeAiSecurity(): KpiSnapshot["aiSecurity"] {
+  const hub = buildHub();
+  const aiRows = hub.rows.filter((r) => r.isAi);
+  const tested = aiRows.filter((r) => r.robustnessScore != null);
+  const avgRobustness = tested.length
+    ? Math.round(tested.reduce((s, r) => s + (r.robustnessScore as number), 0) / tested.length)
+    : null;
+  const top = hub.summary.owaspOpenByCode[0] ?? null;
+  return {
+    aiAssets: aiRows.length,
+    owaspOpen: aiRows.reduce((s, r) => s + r.owaspOpen, 0),
+    topRisk: top ? { code: top.code, title: top.title, count: top.count } : null,
+    aibomComplete: aiRows.filter((r) => r.sbomGenerated).length,
+    aibomMissing: hub.summary.sbomMissing,
+    redteamTested: tested.length,
+    avgRobustness,
+  };
+}
+
 export async function computeKpiSnapshot(): Promise<KpiSnapshot> {
   const assets = listAssets();
 
@@ -251,6 +282,7 @@ export async function computeKpiSnapshot(): Promise<KpiSnapshot> {
     remediation: rem,
     posture: computePosture(vulns, rem, compRate, assetRisk),
     mttrDays: computeMttrDays(),
+    aiSecurity: computeAiSecurity(),
   };
 }
 

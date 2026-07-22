@@ -960,6 +960,10 @@ export interface KpiSnapshot {
   remediation?: { tasks: number; open: number; done: number; overdue: number; dueSoon: number; slaCompliance: number };
   posture?: { score: number; band: "good" | "fair" | "poor"; factors: { label: string; value: number }[] };
   mttrDays?: number | null;
+  aiSecurity?: {
+    aiAssets: number; owaspOpen: number; topRisk: { code: string; title: string; count: number } | null;
+    aibomComplete: number; aibomMissing: number; redteamTested: number; avgRobustness: number | null;
+  };
 }
 
 export interface BurndownPoint {

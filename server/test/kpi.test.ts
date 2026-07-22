@@ -46,6 +46,15 @@ describe("kpi (통합 보안 KPI 대시보드)", () => {
     expect(snap.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
+  it("AI 보안 지표(OWASP LLM·AI-BOM·견고성)를 포함한다", async () => {
+    const snap = await computeKpiSnapshot();
+    expect(snap.aiSecurity).toBeTruthy();
+    expect(snap.aiSecurity.aiAssets).toBeGreaterThanOrEqual(0);
+    expect(typeof snap.aiSecurity.owaspOpen).toBe("number");
+    expect(snap.aiSecurity).toHaveProperty("aibomComplete");
+    expect(snap.aiSecurity).toHaveProperty("redteamTested");
+  });
+
   it("종합 보안태세 점수와 요소 값을 포함한다(0~100)", async () => {
     const snap = await computeKpiSnapshot();
     expect(snap.posture).toBeTruthy();
