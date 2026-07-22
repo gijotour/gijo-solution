@@ -135,17 +135,18 @@
       var t = (a.assetType || "").toLowerCase();
       return t === "infra-host" || /infra|host|서버|server|(^|[^a-z])os([^a-z]|$)|runtime|런타임|네트워크|network|db|데이터베이스/.test(t);
     }
-    function assetLeaf(a, icon) {
-      return '<div class="se-leaf" data-type="asset" data-id="' + esc(a.id) + '" title="' + esc((a.name || a.id) + " · " + (a.assetType || "")) + '">' + icon + " " + esc(a.name || a.id) + "</div>";
+    // lvl2=하위폴더(인프라·SBOM/AI·ML) 아래 자산 — 더 깊은 들여쓰기·가이드선으로 계층을 뚜렷이.
+    function assetLeaf(a, icon, lvl2) {
+      return '<div class="se-leaf' + (lvl2 ? " se-l2" : "") + '" data-type="asset" data-id="' + esc(a.id) + '" title="' + esc((a.name || a.id) + " · " + (a.assetType || "")) + '">' + icon + " " + esc(a.name || a.id) + "</div>";
     }
     var infraAssets = caches.assets.filter(isInfraAsset);
     var mlAssets = caches.assets.filter(function (a) { return !isInfraAsset(a); });
     var infraLeaves = infraAssets.length
-      ? infraAssets.map(function (a) { return assetLeaf(a, "🖥"); }).join("")
-      : '<div class="se-empty">등록된 인프라 자산 없음</div>';
+      ? infraAssets.map(function (a) { return assetLeaf(a, "🖥", true); }).join("")
+      : '<div class="se-empty se-l2">등록된 인프라 자산 없음</div>';
     var mlLeaves = mlAssets.length
-      ? mlAssets.map(function (a) { return assetLeaf(a, "◆"); }).join("")
-      : '<div class="se-empty">등록된 AI/ML 자산 없음</div>';
+      ? mlAssets.map(function (a) { return assetLeaf(a, "◆", true); }).join("")
+      : '<div class="se-empty se-l2">등록된 AI/ML 자산 없음</div>';
     var prodLeaves = caches.products.length
       ? caches.products.map(function (p) { return '<div class="se-leaf" data-type="product" data-id="' + esc(p.id) + '" title="' + esc(p.name) + '">' + esc(p.name) + "</div>"; }).join("")
       : '<div class="se-empty">등록된 보안제품 없음</div>';
@@ -188,17 +189,23 @@
     var st = document.createElement("style");
     st.id = "gijoSeCss";
     st.textContent =
-      ".se-sec{margin-top:3px}" +
-      ".se-sechead{display:flex;align-items:center;gap:6px;padding:7px 8px;border-radius:7px;font-weight:800;font-size:12px;color:var(--text);cursor:pointer}" +
-      ".se-sechead:hover{background:var(--panel-2,#0e1526)}.se-car{font-size:10px;color:var(--muted-2,#5f6785);width:9px}" +
-      ".se-c{margin-left:auto;font-size:10px;color:var(--muted-2,#5f6785);font-weight:700}" +
-      ".se-subhead{display:flex;align-items:center;gap:6px;padding:5px 8px 4px 18px;font-weight:700;font-size:11px;color:var(--muted,#8b93ab);margin-top:2px}" +
-      ".se-run{margin:5px 8px 3px;display:block;width:calc(100% - 16px);background:rgba(30,185,128,.14);color:var(--teal,#1eb980);border:1px solid rgba(30,185,128,.3);border-radius:7px;padding:7px;font-size:11.5px;font-weight:800;cursor:pointer}" +
+      ".se-sec{margin-top:4px}" +
+      // 최상위 섹션 헤더 — 크게·또렷하게.
+      ".se-sechead{display:flex;align-items:center;gap:7px;padding:8px 8px;border-radius:7px;font-weight:800;font-size:13.5px;color:#fff;cursor:pointer}" +
+      ".se-sechead:hover{background:var(--panel-2,#0e1526)}.se-car{font-size:11px;color:var(--muted-2,#5f6785);width:10px;flex:0 0 auto}" +
+      ".se-c{margin-left:auto;font-size:10.5px;color:var(--muted-2,#5f6785);font-weight:700;background:rgba(255,255,255,.06);padding:1px 7px;border-radius:20px}" +
+      // 하위폴더(2단계) — 폴더답게: 들여쓰기 + 왼쪽 가이드선 + 옅은 배경 + 또렷한 글씨.
+      ".se-subhead{display:flex;align-items:center;gap:6px;margin:4px 0 2px 14px;padding:5px 8px 5px 10px;font-weight:800;font-size:12px;color:#c3cad9;border-left:2px solid var(--border-strong,rgba(255,255,255,.16));background:rgba(255,255,255,.02);border-radius:0 6px 6px 0}" +
+      ".se-run{margin:6px 8px 4px;display:block;width:calc(100% - 16px);background:rgba(30,185,128,.14);color:var(--teal,#1eb980);border:1px solid rgba(30,185,128,.3);border-radius:7px;padding:8px;font-size:12px;font-weight:800;cursor:pointer}" +
       ".se-run:hover{background:rgba(30,185,128,.22)}" +
-      ".se-leaf{display:flex;align-items:center;gap:6px;padding:6px 9px 6px 24px;color:var(--muted,#8b93ab);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;border-radius:6px;font-size:12px}" +
-      ".se-leaf:hover{color:#fff;background:var(--panel-2,#0e1526)}" +
+      // 리프 — 글씨 키우고 대비 상향(muted→밝게), 왼쪽 들여쓰기 가이드선으로 소속을 표시.
+      ".se-leaf{display:flex;align-items:center;gap:7px;padding:6px 9px 6px 12px;margin-left:14px;border-left:1px solid var(--border,rgba(255,255,255,.08));color:#aab2c6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer;font-size:12.5px}" +
+      ".se-leaf:hover{color:#fff;background:var(--panel-2,#0e1526);border-left-color:var(--blue,#3b82f6)}" +
+      // 하위폴더 아래 자산(3단계) — 한 단계 더 들여쓰기.
+      ".se-l2{margin-left:26px}" +
       ".se-act{color:var(--blue-light,#5fa1ff);font-weight:600}" +
-      ".se-empty{padding:4px 9px 4px 24px;color:var(--muted-2,#5f6785);font-size:11px}" +
+      ".se-empty{padding:5px 9px 5px 12px;margin-left:14px;border-left:1px solid var(--border,rgba(255,255,255,.08));color:var(--muted-2,#5f6785);font-size:11.5px}" +
+      ".se-empty.se-l2{margin-left:26px}" +
       ".se-pri{font-size:8.5px;font-weight:900;padding:1px 5px;border-radius:4px;flex-shrink:0}" +
       ".se-pri.P0{color:#f5928a;background:rgba(226,72,61,.16)}.se-pri.P1{color:var(--amber,#f0a020);background:rgba(240,160,32,.14)}" +
       ".se-pri.P2,.se-pri.P3{color:var(--muted-2,#5f6785);background:rgba(255,255,255,.06)}";
