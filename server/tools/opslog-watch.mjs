@@ -38,6 +38,14 @@ const PATTERNS = [
       "RAG 인입·기억 검색이 이 구간 동안 실패했을 수 있음. 반복되면 채팅 모델과 임베딩이 동시에 GPU를 다투는지(healSettleUntil 카스케이드 재발 여부) 확인.",
   },
   {
+    id: "transient-stall-skipped",
+    re: /일시 지연.*재기동 취소/,
+    title: "일시 지연 감지 → 재기동 취소(자가회복)",
+    severity: "low",
+    remediation:
+      "WSL2 GPU 계층의 일시 정지가 스스로 풀린 케이스 — 죽이기 전 재확인(CONFIRM_TIMEOUT_MS)에서 정상 응답해 불필요한 재기동을 막았다. 이 건수가 hang-restart보다 많으면, 과거 'hang'의 상당수가 자가회복 가능한 일시 지연이었다는 뜻(정상 동작). RAG·채팅 서비스 영향 없음.",
+  },
+  {
     id: "llama-boot-fail",
     re: /llama-server 기동 실패 \(model=(\S+)\)/,
     title: "llama-server 기동 실패",

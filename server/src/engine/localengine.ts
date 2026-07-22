@@ -433,6 +433,13 @@ const EMBED_FAIL_THRESHOLD = Number(process.env.GIJO_EMBED_FAIL_THRESHOLD ?? 2);
 let healSettleUntil = 0;
 const HEAL_SETTLE_MS = Number(process.env.GIJO_HEAL_SETTLE_MS ?? 60000);
 
+// 임계 도달 시 "죽이기 전에 한 번 더" 확인하는 관용 타임아웃. 실측(2026-07-22): CPU/GPU가 유휴인데
+// (실제 요청 없음) 프로브만 ~30s 타임아웃 → 재기동. WSL2 GPU 계층의 일시 정지가 스스로 풀리는
+// 경우가 많아, 넉넉히 한 번 더 기다려 응답하면 불필요한 재기동을 취소한다(진짜 hang과 일시 지연 구분).
+const CONFIRM_TIMEOUT_MS = Number(process.env.GIJO_HEAL_CONFIRM_TIMEOUT_MS ?? 25000);
+let transientSkips = 0; // 재기동을 취소한 "일시 지연" 횟수(운영 관측용)
+export function getTransientSkipCount(): number { return transientSkips; }
+
 async function checkAndHealEmbedding(): Promise<void> {
   if (embeddingRestarting || chatHealing) return; // 재기동 중이면 건너뜀(중복·GPU 경합 방지)
   if (Date.now() < healSettleUntil) { embeddingProbeFailures = 0; return; } // 최근 재기동 직후 진정 구간
@@ -447,7 +454,15 @@ async function checkAndHealEmbedding(): Promise<void> {
   console.warn(`[localengine] 임베딩 서버 무응답 감지 (${embeddingProbeFailures}/${EMBED_FAIL_THRESHOLD})`);
   if (embeddingProbeFailures < EMBED_FAIL_THRESHOLD) return;
 
-  // 임계 도달 — 죽이고 새로 띄운다.
+  // 죽이기 전 최종 재확인 — 넉넉한 타임아웃으로 한 번 더. 되살아났으면 일시 지연이므로 재기동 취소.
+  if (await probeEmbeddingAlive(CONFIRM_TIMEOUT_MS)) {
+    embeddingProbeFailures = 0;
+    transientSkips += 1;
+    console.warn(`[localengine] 임베딩 서버 일시 지연(WSL2 GPU 추정) — 재확인 응답 정상, 재기동 취소 (누적 취소 ${transientSkips})`);
+    return;
+  }
+
+  // 최종 재확인도 실패 — 진짜 hang. 죽이고 새로 띄운다.
   embeddingRestarting = true;
   healSettleUntil = Date.now() + HEAL_SETTLE_MS; // 채팅 감시도 잠시 진정(연쇄 재기동 방지)
   try {
@@ -523,7 +538,15 @@ async function checkAndHealChat(): Promise<void> {
     console.warn(`[localengine] 채팅 모델 무응답 감지: ${m.modelId} (${fails}/${CHAT_FAIL_THRESHOLD})`);
     if (fails < CHAT_FAIL_THRESHOLD) continue;
 
-    // 임계 도달 — 한 번에 한 모델만 죽이고 새로 띄운다(GPU 부담·중복 방지).
+    // 죽이기 전 최종 재확인 — 넉넉한 타임아웃으로 한 번 더. 되살아났으면 일시 지연이므로 재기동 취소.
+    if (await probeChatAlive(m.port, CONFIRM_TIMEOUT_MS)) {
+      chatProbeFailures.set(m.modelId, 0);
+      transientSkips += 1;
+      console.warn(`[localengine] 채팅 모델 일시 지연(WSL2 GPU 추정) — 재확인 응답 정상, 재기동 취소: ${m.modelId} (누적 취소 ${transientSkips})`);
+      continue;
+    }
+
+    // 최종 재확인도 실패 — 진짜 hang. 한 번에 한 모델만 죽이고 새로 띄운다(GPU 부담·중복 방지).
     chatHealing = true;
     healSettleUntil = Date.now() + HEAL_SETTLE_MS; // 임베딩·다른 채팅 감시도 잠시 진정(연쇄 재기동 방지)
     try {
