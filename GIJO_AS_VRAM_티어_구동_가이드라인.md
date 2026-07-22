@@ -125,6 +125,25 @@ GIJO_LOCAL_LLM_CTX_SIZE=32768
 - 16GB 티어(4080·4070 Ti Super)는 "채팅 1 + 32K" 또는 "채팅 2 + 8K" 중 택일 — 기본은 전자 권장.
 - 48GB+(A6000 Ada·듀얼 GPU)는 14B×2 + 7B + 임베딩 구성으로 역할별 전문화 확대 가능.
 
+## 부록 — 실측 결과 (2026-07-22, RTX 3090 · tools/model-benchmark.mjs)
+
+판매 구성 그대로의 실제 모델을 단독 로드해 측정(160토큰 생성, 프롬프트=한국어 보안 질문):
+
+| 모델 | ctx | 로드 | VRAM 점유 | 첫 토큰 | 생성 속도 |
+|---|---|---|---|---|---|
+| gijo-main-orchestrator (7.6B Q5) | 16K | 3.1s | **6.0GB** | 49ms | 118.5 tok/s |
+| gijo-main-orchestrator | 32K | 3.1s | **6.9GB** | 47ms | 115.8 tok/s |
+| merged-lily (7.2B Q5) | 16K | 2.6s | **7.1GB** | 44ms | 120.3 tok/s |
+| Qwen2.5-3B (Q4) | 8K | 3.6s | 2.4GB | 50ms | 207.1 tok/s |
+
+검증 포인트:
+- **16K→32K 컨텍스트 = +0.9GB** (본문 산정 "KV캐시 1~2GB" 범위와 일치)
+- **12GB Lite 검증**: 7B Q5 @16K(6~7.1GB) + bge-m3(~2GB) ≈ **8~9GB** → 12GB에서 안정 (본문 8.6GB 산정 일치)
+- **24GB Standard 검증**: 7B급 2개 @32K(~7GB×2) + 임베딩 ≈ **16GB** → 운영 실측치와 일치
+- 응답 체감: 두 운영 모델 모두 첫 토큰 50ms 미만·115~120 tok/s — 스왑 없이 즉답 품질
+- 재실행: `node tools/model-benchmark.mjs --ctx 16384` (여유 VRAM 부족 모델은 자동 스킵,
+  상주 서버는 `--probe 포트=이름`으로 로드 없이 속도만 측정)
+
 ## 출처
 
 - 운영 실측: RTX 3090 24GB, lily-7B+qwythos-9B+bge-m3 동시 상주 = 16GB (localengine.ts 주석·llmactivity 로그)
