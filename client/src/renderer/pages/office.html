@@ -192,9 +192,16 @@
     ];
     const COFFEE = { x: 156, y: 90 }; // 커피 코너(픽셀 좌표)
     const TABLE = { x: 78, y: 66 };   // 회의 테이블
-    // 외부 콘솔 접속자(시안 ②): 오른쪽 벽 출입문으로 걸어 들어와 회의 테이블에 합석한다.
+    // 외부 콘솔 접속자(클라이언트): 오른쪽 벽 출입문으로 걸어 들어와 보안총괄(오케스트레이터)
+    // 책상 옆으로 가서 지시한다 — 회의 테이블 합석에서 "보안총괄에게 직접 지시" 구도로 변경(2026-07-22).
     const DOOR = { x: W - 8, y: 46 };
-    const SEATS = [ { x: 68, y: 74 }, { x: 108, y: 74 }, { x: 74, y: 90 }, { x: 90, y: 90 }, { x: 106, y: 90 } ];
+    let orchestratorIdx = 0; // 보안총괄 = 오케스트레이터 에이전트의 책상 인덱스(setAgents에서 갱신)
+    // 보안총괄 책상 오른쪽에 줄지어 서는 지시 위치(여러 명이면 옆으로 늘어선다).
+    function directingSpot(slot) {
+      const d = DESKS[orchestratorIdx] || DESKS[0];
+      const homeX = d.x * 8 + 8, homeY = d.y * 8 + 26;
+      return { x: homeX + 16 + slot * 9, y: homeY };
+    }
     const VISITOR_COLORS = ["#e2b0ff", "#ffd28a", "#9fe8ff", "#ffb3c1", "#c5f0a4"];
     const HAIRS = ["#2b2f45", "#4a3020", "#1e2230", "#4a3020", "#2b2f45", "#1e2230"];
 
@@ -234,6 +241,9 @@
           desk: i,
         };
       });
+      // 보안총괄(오케스트레이터) 캐릭터를 이름으로 찾는다 — 방문자가 이 책상 옆으로 가 지시한다.
+      const oi = agents.findIndex((a) => /orchestr|총괄|지휘|chief|lead/i.test(a.name));
+      orchestratorIdx = oi >= 0 ? oi : 0;
     }
     function shortName(name) {
       // "Security Orchestrator" → "Orchestrator" 같은 축약 — 캔버스 라벨용
@@ -264,18 +274,17 @@
       const cx = x == null ? 92 : x, cy = y == null ? 60 : y;
       for (let i = 0; i < 7; i++) sparkles.push({ x: cx + (Math.random() * 16 - 8), y: cy + (Math.random() * 8 - 4), life: 40 + Math.random() * 20 });
     }
-    // 접속자 목록 반영: 새 접속자는 문에서 입장, 사라진 접속자는 문으로 퇴장.
+    // 접속자 목록 반영: 새 접속자는 문에서 입장해 보안총괄 옆 지시 위치로, 사라진 접속자는 문으로 퇴장.
     function setVisitors(list) {
       const seen = new Set(list.map((v) => v.username));
       list.forEach((v) => {
         if (visitors.some((x) => x.username === v.username)) return;
-        const used = new Set(visitors.map((x) => x.seat));
-        let seat = SEATS.findIndex((_, i) => !used.has(i));
-        if (seat < 0) seat = -1; // 좌석 초과 — 문 옆에 서 있는다
+        const used = new Set(visitors.map((x) => x.slot));
+        let slot = 0; while (used.has(slot)) slot++; // 보안총괄 옆으로 줄지어 선다
         visitors.push({
           username: v.username,
           color: VISITOR_COLORS[visitors.length % VISITOR_COLORS.length],
-          x: DOOR.x - 4, y: DOOR.y + 16, seat, phase: "enter", moving: true,
+          x: DOOR.x - 4, y: DOOR.y + 16, slot, phase: "enter", moving: true,
         });
         doorOpenT = 55;
       });
@@ -388,10 +397,28 @@
       const dot = a.state === "working" ? "#2ee6a0" : a.state === "watching" ? "#f0a020" : "#5f6785";
       drawChar(a.x, wy, a.color, HAIRS[a.desk], { typing: a.state === "working", moving: a.moving, dot, tag: a.shortName });
     }
-    // 외부 콘솔 접속자 — 셔츠는 개인색, 머리는 갈색, 이름표는 노란빛(사람임을 구분).
+    // 외부 콘솔 접속자(클라이언트) — 셔츠는 개인색, 머리는 갈색, 이름표는 노란빛(사람임을 구분).
+    // 지시 중이면 이름 앞에 🧑을 붙이고, 보안총괄 쪽으로 "지시" 말풍선을 띄운다.
     function drawVisitor(v) {
-      const wy = v.y + (v.phase === "seated" ? Math.sin(t / 40 + v.seat) * 1 : 0);
-      drawChar(v.x, wy, v.color, "#4a3020", { moving: v.moving, tag: v.username, tagColor: "#ffe9a8" });
+      const directing = v.phase === "directing";
+      const wy = v.y + (directing ? Math.sin(t / 40 + v.slot) * 1 : 0);
+      const tag = directing ? "🧑 " + v.username : v.username;
+      drawChar(v.x, wy, v.color, "#4a3020", { moving: v.moving, tag, tagColor: "#ffe9a8" });
+      if (directing) drawDirectBubble(v.x, wy);
+    }
+    // 방문자 머리 위 "지시 ▸" 말풍선 — 보안총괄에게 업무를 지시하는 중임을 나타낸다.
+    function drawDirectBubble(x, y) {
+      const msg = "지시 ▸";
+      ctx.font = `${3 * S}px 'Malgun Gothic',sans-serif`;
+      const tw = ctx.measureText(msg).width;
+      const w = tw + 3 * S, h = 5 * S;
+      const bx = Math.max(1 * S, (x + 3.5) * S - w / 2);
+      const by = (y - 26) * S;
+      ctx.fillStyle = "#ffe9a8";
+      ctx.fillRect(bx, by, w, h);
+      ctx.fillRect((x + 2) * S, by + h, 2 * S, 2 * S); // 꼬리
+      ctx.fillStyle = "#3a2c00";
+      ctx.fillText(msg, bx + 1.5 * S, by + 3.7 * S);
     }
     function drawParticles() {
       // 커피 김 — 위로 올라가며 옅어진다
@@ -453,14 +480,15 @@
         walkTo(a, goal.x, goal.y, 0.3);
       });
 
-      // 접속자: 입장 → 좌석, 퇴장 → 문에서 소멸
+      // 접속자: 입장 → 보안총괄 옆 지시 위치 → 지시(directing), 퇴장 → 문에서 소멸
       visitors = visitors.filter((v) => {
         if (v.phase === "enter") {
-          const seat = v.seat >= 0 ? SEATS[v.seat] : { x: DOOR.x - 16, y: DOOR.y + 20 };
-          if (walkTo(v, seat.x, seat.y, 0.6)) v.phase = "seated";
+          const spot = directingSpot(v.slot);
+          if (walkTo(v, spot.x, spot.y, 0.6)) { v.phase = "directing"; v.dirT = 0; }
           return true;
         }
         if (v.phase === "leave") return !walkTo(v, DOOR.x - 4, DOOR.y + 16, 0.7);
+        if (v.phase === "directing") v.dirT = (v.dirT || 0) + 1; // 지시 말풍선 점멸용 타이머
         return true;
       });
 
@@ -498,7 +526,7 @@
   let agentCounts = { working: 0, watching: 0, idle: 0 };
   let visitorCount = 0;
   function renderStat() {
-    statLine.innerHTML = `작업중 <b>${agentCounts.working}</b> · 주시 <b>${agentCounts.watching}</b> · 대기 <b>${agentCounts.idle}</b> · 🧑 접속 <b>${visitorCount}</b>`;
+    statLine.innerHTML = `작업중 <b>${agentCounts.working}</b> · 주시 <b>${agentCounts.watching}</b> · 대기 <b>${agentCounts.idle}</b> · 🧑 지시자 <b>${visitorCount}</b>`;
   }
 
   async function loadAgents() {
@@ -520,8 +548,8 @@
     const online = (sessions || []).filter((s) => Date.now() - s.lastSeenAt < ONLINE_WINDOW_MS);
     const names = new Set(online.map((s) => s.username));
     if (knownVisitors) {
-      for (const n of names) if (!knownVisitors.has(n)) feedLine("🚪 입장", `${n} 님이 외부 콘솔로 접속했습니다`, "#ffe9a8");
-      for (const n of knownVisitors) if (!names.has(n)) feedLine("🚪 퇴장", `${n} 님의 외부 콘솔 접속이 종료되었습니다`, "var(--muted)");
+      for (const n of names) if (!knownVisitors.has(n)) feedLine("🧑 지시", `${n} 님이 접속해 보안총괄에게 지시합니다`, "#ffe9a8");
+      for (const n of knownVisitors) if (!names.has(n)) feedLine("🚪 퇴장", `${n} 님의 접속이 종료되었습니다`, "var(--muted)");
     }
     knownVisitors = names;
     visitorCount = online.length;

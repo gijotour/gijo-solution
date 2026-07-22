@@ -61,7 +61,7 @@ await office.setViewportSize({ width: 1000, height: 760 }).catch(() => {});
 await sleep(4000); // 입장 걷기 연출 시간
 const stat1 = await office.textContent("#statLine");
 console.log("상태줄:", stat1.trim());
-if (!/접속 <?b?>?1/.test(stat1.replace(/<[^>]+>/g, ""))) console.log("⚠ 접속 1 미표시 — 확인 필요");
+if (!/지시자 <?b?>?1/.test(stat1.replace(/<[^>]+>/g, ""))) console.log("⚠ 지시자 1 미표시 — 확인 필요");
 await office.screenshot({ path: path.join(OUT, "live-visitor-self.png") });
 
 // ② guest1 HTTP 로그인 → 15초 폴링 내 입장
@@ -72,7 +72,7 @@ let entered = false;
 for (let i = 0; i < 12; i++) {
   await sleep(2500);
   const feed = await office.textContent("#feed");
-  if (feed.includes("guest1") && feed.includes("접속했습니다")) { entered = true; break; }
+  if (feed.includes("guest1") && feed.includes("지시")) { entered = true; break; }
 }
 console.log(entered ? "✓ guest1 입장 피드 확인" : "✗ 입장 피드 없음");
 await sleep(2500); // 문→좌석 걷기
