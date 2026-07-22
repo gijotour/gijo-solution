@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8"><title>시안 A — 상태 탭 + 리스트</title>
+<style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--panel-3:#16203a;--border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.16);--blue:#3b82f6;--blue-light:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);padding:24px 30px;}
+h1{font-size:20px;font-weight:800;color:#fff;}
+.sub{font-size:12.5px;color:var(--muted);margin:4px 0 18px;}
+.variant-tag{display:inline-block;background:rgba(139,124,240,.15);color:var(--purple);font-size:11px;font-weight:800;padding:3px 10px;border-radius:6px;margin-left:8px;vertical-align:middle;}
+.kpis{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;}
+.kpi{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:11px 16px;min-width:104px;}
+.kpi .n{font-size:22px;font-weight:800;color:#fff;}
+.kpi .l{font-size:11px;color:var(--muted);margin-top:2px;}
+.kpi.warn .n{color:var(--red);}
+.tabs{display:flex;gap:7px;margin-bottom:14px;flex-wrap:wrap;}
+.tab{font-size:12.5px;padding:7px 14px;border-radius:20px;background:var(--panel);border:1px solid var(--border-strong);color:var(--muted);cursor:pointer;}
+.tab b{margin-left:4px;color:var(--text);}
+.tab.on{background:var(--blue);border-color:var(--blue);color:#fff;}
+.tab.on b{color:#fff;}
+.item{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:14px 16px;margin-bottom:10px;}
+.item.overdue{border-color:rgba(226,72,61,.5);}
+.item-top{display:flex;align-items:center;gap:9px;flex-wrap:wrap;}
+.st{font-size:10.5px;font-weight:800;padding:2px 9px;border-radius:20px;white-space:nowrap;}
+.st.진행중{color:var(--blue-light);background:rgba(59,130,246,.15);}
+.st.검증{color:var(--purple);background:rgba(139,124,240,.16);}
+.st.반려{color:var(--muted-2);background:rgba(255,255,255,.05);}
+.st.완료{color:var(--teal);background:rgba(30,185,128,.14);}
+.st.미검토{color:var(--amber);background:rgba(240,160,32,.14);}
+.sev{font-size:10px;font-weight:800;padding:2px 8px;border-radius:6px;}
+.sev.critical,.sev.high{color:#f5928a;background:rgba(226,72,61,.14);}
+.sev.medium{color:var(--amber);background:rgba(240,160,32,.14);}
+.kev{color:#f5928a;background:rgba(226,72,61,.18);font-size:10px;font-weight:800;padding:2px 8px;border-radius:6px;}
+.ftype{font-size:14px;font-weight:800;color:#fff;}
+.fasset{font-size:11px;color:var(--purple);}
+.overdue-badge{color:#f5928a;background:rgba(226,72,61,.18);font-size:10px;font-weight:800;padding:2px 8px;border-radius:6px;margin-left:auto;}
+.assign-row{display:flex;align-items:center;gap:8px;margin-top:12px;flex-wrap:wrap;padding-top:11px;border-top:1px solid var(--border);}
+.lbl{font-size:10.5px;font-weight:700;color:var(--muted-2);}
+.who{font-size:11.5px;background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);border-radius:7px;padding:5px 10px;display:inline-flex;align-items:center;gap:5px;}
+.who .role{font-size:9px;color:var(--muted-2);font-weight:800;}
+.due{font-size:11.5px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;padding:5px 10px;color:var(--text);}
+.due.over{color:#f5928a;border-color:rgba(226,72,61,.4);}
+.spacer{margin-left:auto;}
+.btn{font-size:11.5px;font-weight:700;border-radius:7px;padding:6px 12px;cursor:pointer;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--text);}
+.btn.mail{border-color:rgba(59,130,246,.4);color:var(--blue-light);}
+.btn.verify{border-color:rgba(139,124,240,.45);color:var(--purple);background:rgba(139,124,240,.1);}
+.btn.reject{border-color:rgba(226,72,61,.4);color:#f5928a;}
+.btn.done{background:var(--teal);border-color:var(--teal);color:#06281c;}
+.verify-note{margin-top:10px;font-size:11px;color:var(--muted);background:rgba(139,124,240,.07);border:1px solid rgba(139,124,240,.25);border-radius:8px;padding:8px 11px;line-height:1.6;}
+.reject-note{margin-top:10px;font-size:11px;color:var(--muted);background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:8px 11px;}
+</style></head>
+<body>
+<h1>조치·승인 — Finding 검토 <span class="variant-tag">시안 A · 상태 탭 + 리스트</span></h1>
+<div class="sub">현재 화면을 진화시킨 형태 — 익숙한 세로 리스트에 상태 탭으로 진행중/검증/반려를 좁혀 본다. 각 항목에서 보안담당자·실수행담당자·기한·메일·검증·반려를 그 자리에서 처리.</div>
+
+<div class="kpis">
+  <div class="kpi"><div class="n">306</div><div class="l">미검토</div></div>
+  <div class="kpi"><div class="n">7</div><div class="l">진행중</div></div>
+  <div class="kpi"><div class="n">2</div><div class="l">검증 대기</div></div>
+  <div class="kpi"><div class="n">3</div><div class="l">반려</div></div>
+  <div class="kpi"><div class="n">12</div><div class="l">완료</div></div>
+  <div class="kpi warn"><div class="n">1</div><div class="l">지연</div></div>
+</div>
+
+<div class="tabs">
+  <div class="tab">전체<b>331</b></div>
+  <div class="tab">미검토<b>306</b></div>
+  <div class="tab on">진행중<b>7</b></div>
+  <div class="tab">검증<b>2</b></div>
+  <div class="tab">반려<b>3</b></div>
+  <div class="tab">완료<b>12</b></div>
+</div>
+
+<!-- 진행중 -->
+<div class="item">
+  <div class="item-top">
+    <span class="st 진행중">진행중</span><span class="sev critical">critical</span><span class="kev">🚨 KEV</span>
+    <span class="ftype">Apache Log4j2 Log4Shell (CVE-2021-44228)</span><span class="fasset">oracle.local (192.168.219.98)</span>
+  </div>
+  <div class="assign-row">
+    <span class="lbl">보안담당자</span><span class="who"><span class="role">감독</span>정요한</span>
+    <span class="lbl">실수행담당자</span><span class="who"><span class="role">조치</span>brian</span>
+    <span class="lbl">기한</span><span class="due">2026-07-25 📅</span>
+    <span class="spacer"></span>
+    <button class="btn mail">✉ 메일</button>
+    <button class="btn verify">🔁 검증 요청</button>
+    <button class="btn reject">반려 ▾</button>
+  </div>
+</div>
+
+<!-- 진행중 · 지연 -->
+<div class="item overdue">
+  <div class="item-top">
+    <span class="st 진행중">진행중</span><span class="sev high">high</span>
+    <span class="ftype">SMBv1 프로토콜 활성화</span><span class="fasset">file-svr-03 (10.0.2.31)</span>
+    <span class="overdue-badge">⚠ 기한 초과 D+2</span>
+  </div>
+  <div class="assign-row">
+    <span class="lbl">보안담당자</span><span class="who"><span class="role">감독</span>정요한</span>
+    <span class="lbl">실수행담당자</span><span class="who"><span class="role">조치</span>dohee</span>
+    <span class="lbl">기한</span><span class="due over">2026-07-20 📅</span>
+    <span class="spacer"></span>
+    <button class="btn mail">✉ 독촉 메일</button>
+    <button class="btn verify">🔁 검증 요청</button>
+    <button class="btn reject">반려 ▾</button>
+  </div>
+</div>
+
+<h1 style="font-size:13px;color:var(--muted-2);margin:22px 0 10px">↓ 탭을 "검증"으로 바꾸면 ↓</h1>
+
+<!-- 검증 -->
+<div class="item">
+  <div class="item-top">
+    <span class="st 검증">검증 대기</span><span class="sev high">high</span>
+    <span class="ftype">OpenSSL Heartbleed (CVE-2014-0160)</span><span class="fasset">was-order-01 (192.168.219.51)</span>
+  </div>
+  <div class="verify-note">🔁 <b>brian</b>이 조치 완료 보고(2026-07-22 14:10). 재스캔으로 실제 해결 여부를 확인합니다 — 다음 스캔에서 이 취약점이 사라지면 <b style="color:var(--teal)">완료</b>로, 여전히 검출되면 <b style="color:#f5928a">재조치</b>로 되돌립니다.</div>
+  <div class="assign-row">
+    <span class="lbl">보안담당자</span><span class="who"><span class="role">감독</span>정요한</span>
+    <span class="lbl">실수행담당자</span><span class="who"><span class="role">조치</span>brian</span>
+    <span class="spacer"></span>
+    <button class="btn">↩ 진행중으로</button>
+    <button class="btn verify">🔁 지금 재스캔</button>
+    <button class="btn done">✓ 해결 확인</button>
+  </div>
+</div>
+
+<h1 style="font-size:13px;color:var(--muted-2);margin:22px 0 10px">↓ 탭을 "반려"로 바꾸면 ↓</h1>
+
+<!-- 반려 -->
+<div class="item">
+  <div class="item-top">
+    <span class="st 반려">반려</span><span class="sev medium">medium</span>
+    <span class="ftype">취약한 SSH 암호 스위트</span><span class="fasset">db-prod-02 (10.0.3.14)</span>
+  </div>
+  <div class="reject-note">🛡 <b>다른 보안으로 방어 중</b> — 내부망 격리(bastion 경유만 SSH 허용), 외부 노출 없음. 반려: 정요한 · 2026-07-21</div>
+</div>
+</body></html>

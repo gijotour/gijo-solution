@@ -1460,30 +1460,45 @@ export const mergeApi = {
 };
 
 // ── 승인 워크플로우(스캔 finding 검토 → 승인/반려) ──────────────────────
+export type ApprovalStatus = "pending" | "in_progress" | "verifying" | "approved" | "rejected";
+export type RejectReason = "false_positive" | "compensating_control";
+
 export interface FindingReview {
   assetId: string;
   assetName: string;
   findingKey: string;
   finding: { finding_type: string; severity: "low" | "medium" | "high" | "critical"; evidence: string; source_tool: string };
-  status: "pending" | "approved" | "rejected";
+  status: ApprovalStatus;
   reviewedBy?: string;
   reviewedAt?: number;
   note?: string;
-  assignee?: string;
+  assignee?: string; // 실수행담당자
+  securityOwner?: string; // 보안담당자(감독)
   dueDate?: string;
+  rejectReason?: RejectReason;
+  verifyRequestedAt?: number;
+  verifyRequestedBy?: string;
+  resolvedAt?: number;
   overdue?: boolean;
+  gone?: boolean; // 재스캔에서 사라짐
 }
 
 export interface ReviewPatch {
-  status?: "approved" | "rejected" | "pending";
+  status?: ApprovalStatus;
   note?: string;
   assignee?: string;
+  securityOwner?: string;
   dueDate?: string;
+  rejectReason?: RejectReason | "";
+}
+
+export interface ApprovalSummary {
+  total: number; pending: number; in_progress: number; verifying: number; approved: number; rejected: number; overdue: number;
 }
 
 export const approvalsApi = {
   list: () =>
-    request<{ reviews: FindingReview[]; summary: { total: number; pending: number; approved: number; rejected: number; overdue: number } }>("/api/approvals"),
+    request<{ reviews: FindingReview[]; summary: ApprovalSummary }>("/api/approvals"),
   // status·note·assignee·dueDate를 부분 갱신(merge). 판정 없이 담당자·기한만 배정도 가능.
   set: (assetId: string, key: string, patch: ReviewPatch) =>
     request(`/api/approvals/${encodeURIComponent(assetId)}/${encodeURIComponent(key)}`, { method: "POST", body: patch }),

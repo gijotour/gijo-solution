@@ -77,7 +77,7 @@ export function performUndo(id?: string): { ok: boolean; message: string } {
   if (idx < 0) return { ok: false, message: "되돌릴 작업이 없습니다." };
   const entry = undoStack.splice(idx, 1)[0];
   for (const r of entry.restoreReviews) {
-    updateFindingReview(r.assetId, r.key, { status: r.prior.status as "pending" | "approved" | "rejected", assignee: r.prior.assignee, dueDate: r.prior.dueDate, note: r.prior.note }, "undo");
+    updateFindingReview(r.assetId, r.key, { status: r.prior.status as import("./approvals").ApprovalStatus, assignee: r.prior.assignee, dueDate: r.prior.dueDate, note: r.prior.note }, "undo");
   }
   for (const assetId of entry.deleteAssets) deleteAsset(assetId);
   const parts = [

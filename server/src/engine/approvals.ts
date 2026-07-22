@@ -18,7 +18,12 @@ import { PLAIN_LANGUAGE_RULE } from "./promptstyle";
 import { sendMail, getSmtpConfig } from "./email";
 import { recordAudit } from "./audit";
 
-export type ApprovalStatus = "pending" | "approved" | "rejected";
+// 조치 생애주기(2026-07-22 확장). 기존 3상태에 진행중·검증을 앞에 끼워 넣었다 — approved는
+// "완료(확정·해결)" 의미를 그대로 유지해 sbom/today/chatbot 등 기존 참조를 깨지 않는다.
+//   pending(미검토) → in_progress(진행중) → verifying(검증·재스캔대기) → approved(완료) / rejected(반려)
+export type ApprovalStatus = "pending" | "in_progress" | "verifying" | "approved" | "rejected";
+// 반려 사유(모범사례: 오탐과 보상통제를 반드시 구분). 증거·승인자·날짜는 note/reviewedBy/reviewedAt에 보존.
+export type RejectReason = "false_positive" | "compensating_control";
 
 export interface FindingApprovalRow {
   assetId: string;
@@ -28,8 +33,14 @@ export interface FindingApprovalRow {
   reviewedBy: string | null;
   reviewedAt: number | null;
   note: string | null;
-  assignee: string | null; // 조치 담당자
+  assignee: string | null; // 실제 수행 담당자(조치)
+  securityOwner: string | null; // 보안담당자(감독·검토·SLA 책임)
   dueDate: string | null; // 조치 기한(SLA) 'YYYY-MM-DD'
+  rejectReason: string | null; // 반려 사유(false_positive | compensating_control)
+  verifyRequestedAt: number | null; // 실수행담당자가 조치 완료 보고한 시각(→검증)
+  verifyRequestedBy: string | null;
+  resolvedAt: number | null; // 재스캔에서 사라져 해결 확인된 시각(→완료)
+  snapshot: string | null; // finding 내용 JSON — 재스캔에서 사라진 뒤에도 완료/검증 목록에 표시하려 보존
 }
 
 export interface FindingReview {
@@ -42,8 +53,14 @@ export interface FindingReview {
   reviewedAt?: number;
   note?: string;
   assignee?: string;
+  securityOwner?: string;
   dueDate?: string;
-  overdue?: boolean; // dueDate가 지났고 아직 조치 안 됨(rejected 제외)
+  rejectReason?: string;
+  verifyRequestedAt?: number;
+  verifyRequestedBy?: string;
+  resolvedAt?: number;
+  overdue?: boolean; // dueDate가 지났고 아직 미해결(rejected·approved 제외)
+  gone?: boolean; // 최신 스캔에 더는 없음(재스캔에서 사라짐) — 검증/완료 표시에 씀
 }
 
 // finding 내용으로 안정적인 키를 만든다 — 같은 finding이면 재스캔 후에도 검토 상태가 유지된다.
@@ -56,14 +73,19 @@ export function findingKey(assetId: string, f: StandardFinding): string {
 }
 
 const getStmt = db.prepare("SELECT * FROM finding_approvals WHERE assetId = ? AND findingKey = ?");
+const allRowsStmt = db.prepare("SELECT * FROM finding_approvals");
 const upsertStmt = db.prepare(`
-  INSERT INTO finding_approvals (assetId, findingKey, status, reviewedBy, reviewedAt, note, assignee, dueDate)
-  VALUES (@assetId, @findingKey, @status, @reviewedBy, @reviewedAt, @note, @assignee, @dueDate)
+  INSERT INTO finding_approvals (assetId, findingKey, status, reviewedBy, reviewedAt, note, assignee, securityOwner, dueDate, rejectReason, verifyRequestedAt, verifyRequestedBy, resolvedAt, snapshot)
+  VALUES (@assetId, @findingKey, @status, @reviewedBy, @reviewedAt, @note, @assignee, @securityOwner, @dueDate, @rejectReason, @verifyRequestedAt, @verifyRequestedBy, @resolvedAt, @snapshot)
   ON CONFLICT(assetId, findingKey) DO UPDATE SET
     status = excluded.status, reviewedBy = excluded.reviewedBy, reviewedAt = excluded.reviewedAt,
-    note = excluded.note, assignee = excluded.assignee, dueDate = excluded.dueDate
+    note = excluded.note, assignee = excluded.assignee, securityOwner = excluded.securityOwner,
+    dueDate = excluded.dueDate, rejectReason = excluded.rejectReason,
+    verifyRequestedAt = excluded.verifyRequestedAt, verifyRequestedBy = excluded.verifyRequestedBy,
+    resolvedAt = excluded.resolvedAt, snapshot = excluded.snapshot
 `);
 const deleteStmt = db.prepare("DELETE FROM finding_approvals WHERE assetId = ? AND findingKey = ?");
+const setResolvedStmt = db.prepare("UPDATE finding_approvals SET status='approved', resolvedAt=@at WHERE assetId=@assetId AND findingKey=@findingKey");
 
 function storedStatus(assetId: string, key: string): FindingApprovalRow | undefined {
   return getStmt.get(assetId, key) as FindingApprovalRow | undefined;
@@ -75,18 +97,45 @@ export function isFindingRejected(assetId: string, f: StandardFinding): boolean 
   return storedStatus(assetId, findingKey(assetId, f))?.status === "rejected";
 }
 
-// 조치 기한이 지났고 아직 조치되지 않았으면 overdue. rejected(오탐)는 조치 대상이 아니라 제외.
+// 조치 기한이 지났고 아직 미해결이면 overdue. 반려(오탐/보상통제)·완료(해결)는 조치 대상이 아니라 제외.
 function isOverdue(dueDate: string | null | undefined, status: ApprovalStatus): boolean {
-  if (!dueDate || status === "rejected") return false;
+  if (!dueDate || status === "rejected" || status === "approved") return false;
   return dueDate < todayLocal(); // 'YYYY-MM-DD' 로컬(KST) 달력 기준 비교
 }
 
+function rowToReview(row: FindingApprovalRow, finding: StandardFinding, assetName: string, gone: boolean): FindingReview {
+  return {
+    assetId: row.assetId,
+    assetName,
+    findingKey: row.findingKey,
+    finding,
+    status: row.status,
+    reviewedBy: row.reviewedBy ?? undefined,
+    reviewedAt: row.reviewedAt ?? undefined,
+    note: row.note ?? undefined,
+    assignee: row.assignee ?? undefined,
+    securityOwner: row.securityOwner ?? undefined,
+    dueDate: row.dueDate ?? undefined,
+    rejectReason: row.rejectReason ?? undefined,
+    verifyRequestedAt: row.verifyRequestedAt ?? undefined,
+    verifyRequestedBy: row.verifyRequestedBy ?? undefined,
+    resolvedAt: row.resolvedAt ?? undefined,
+    overdue: isOverdue(row.dueDate, row.status),
+    gone,
+  };
+}
+
 // 전체 자산의 finding을 검토 상태와 함께 나열한다(현재 asset.findings = 최신 스캔 결과 기준).
+// 재스캔에서 사라진 finding도 검증/진행중 상태였다면 "해결 확인(완료)"으로 되살려 목록에 남긴다.
 export function listFindingReviews(): FindingReview[] {
   const reviews: FindingReview[] = [];
+  const seen = new Set<string>();
+  const assetNameById = new Map<string, string>();
   for (const asset of listAssets()) {
+    assetNameById.set(asset.id, asset.name);
     for (const finding of asset.findings) {
       const key = findingKey(asset.id, finding);
+      seen.add(`${asset.id}\0${key}`);
       const row = storedStatus(asset.id, key);
       const status = row?.status ?? "pending";
       reviews.push({
@@ -99,10 +148,36 @@ export function listFindingReviews(): FindingReview[] {
         reviewedAt: row?.reviewedAt ?? undefined,
         note: row?.note ?? undefined,
         assignee: row?.assignee ?? undefined,
+        securityOwner: row?.securityOwner ?? undefined,
         dueDate: row?.dueDate ?? undefined,
+        rejectReason: row?.rejectReason ?? undefined,
+        verifyRequestedAt: row?.verifyRequestedAt ?? undefined,
+        verifyRequestedBy: row?.verifyRequestedBy ?? undefined,
+        resolvedAt: row?.resolvedAt ?? undefined,
         overdue: isOverdue(row?.dueDate, status),
+        gone: false,
       });
     }
+  }
+
+  // 최신 스캔에 더는 없는 저장 행 — 조치 흐름을 타던 건(진행중/검증/완료)은 스냅샷으로 이어 보여준다.
+  // 검증·진행중이던 것이 재스캔에서 사라졌으면 = 해결 확인 → 완료(approved)로 자동 확정한다(closed-loop).
+  for (const row of allRowsStmt.all() as FindingApprovalRow[]) {
+    if (seen.has(`${row.assetId}\0${row.findingKey}`)) continue;
+    if (!["in_progress", "verifying", "approved"].includes(row.status)) continue; // 미검토·반려는 사라지면 그냥 드롭
+    let finding: StandardFinding;
+    try {
+      finding = row.snapshot ? (JSON.parse(row.snapshot) as StandardFinding) : { finding_type: "(내용 없음)", severity: "low", evidence: "", source_tool: "" };
+    } catch {
+      finding = { finding_type: "(내용 없음)", severity: "low", evidence: "", source_tool: "" };
+    }
+    let effective = { ...row };
+    if (row.status === "in_progress" || row.status === "verifying") {
+      const at = Date.now();
+      setResolvedStmt.run({ assetId: row.assetId, findingKey: row.findingKey, at }); // 재스캔에서 사라짐 → 완료
+      effective = { ...row, status: "approved", resolvedAt: at };
+    }
+    reviews.push(rowToReview(effective, finding, assetNameById.get(row.assetId) ?? row.assetId, true));
   }
   return reviews;
 }
@@ -177,13 +252,15 @@ export async function buildTriageDraft(limit = 5, assetIds?: string[]): Promise<
 export interface ApprovalSummary {
   total: number;
   pending: number;
-  approved: number;
+  in_progress: number;
+  verifying: number;
+  approved: number; // 완료(해결·확정)
   rejected: number;
   overdue: number; // 기한 지난 미조치 건
 }
 
 export function approvalSummary(reviews: FindingReview[]): ApprovalSummary {
-  const s: ApprovalSummary = { total: reviews.length, pending: 0, approved: 0, rejected: 0, overdue: 0 };
+  const s: ApprovalSummary = { total: reviews.length, pending: 0, in_progress: 0, verifying: 0, approved: 0, rejected: 0, overdue: 0 };
   for (const r of reviews) {
     s[r.status]++;
     if (r.overdue) s.overdue++;
@@ -192,36 +269,71 @@ export function approvalSummary(reviews: FindingReview[]): ApprovalSummary {
 }
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+const VALID_STATUS: ApprovalStatus[] = ["pending", "in_progress", "verifying", "approved", "rejected"];
+const VALID_REJECT: RejectReason[] = ["false_positive", "compensating_control"];
 
 export interface ReviewPatch {
   status?: ApprovalStatus;
   note?: string;
-  assignee?: string;
+  assignee?: string; // 실수행담당자
+  securityOwner?: string; // 보안담당자(감독)
   dueDate?: string; // 'YYYY-MM-DD' 또는 ""(해제)
+  rejectReason?: RejectReason | ""; // 반려 사유
 }
 
-// 검토/조치 정보를 부분 갱신(merge)한다. 판정(status)·담당자(assignee)·기한(dueDate)·메모(note)를
-// 한 번에 또는 따로 설정할 수 있다. 아무 것도 없는 상태(pending·담당없음·기한없음·메모없음)가 되면
-// 저장 행을 지운다(=미검토·미배정 원상복귀).
+// 저장 행에 남길 게 있는지 — pending이면서 담당·기한·메모·사유가 전부 비면 삭제(미검토·미배정 원복).
+function isEmptyReview(status: ApprovalStatus, note: string | null, assignee: string | null, owner: string | null, dueDate: string | null): boolean {
+  return status === "pending" && !note && !assignee && !owner && !dueDate;
+}
+
+// 검토/조치 정보를 부분 갱신(merge)한다. 상태·담당자(2종)·기한·메모·반려사유를 한 번에 또는 따로 설정.
 export function updateFindingReview(assetId: string, key: string, patch: ReviewPatch, actor: string): void {
-  if (patch.status && !["approved", "rejected", "pending"].includes(patch.status)) {
-    throw new Error("status는 approved/rejected/pending만 가능합니다");
+  if (patch.status && !VALID_STATUS.includes(patch.status)) {
+    throw new Error(`status는 ${VALID_STATUS.join("/")}만 가능합니다`);
   }
   if (patch.dueDate && patch.dueDate !== "" && !DATE_RE.test(patch.dueDate)) {
     throw new Error("dueDate는 'YYYY-MM-DD' 형식이어야 합니다");
+  }
+  if (patch.rejectReason && !VALID_REJECT.includes(patch.rejectReason)) {
+    throw new Error("rejectReason은 false_positive/compensating_control만 가능합니다");
   }
   const prev = storedStatus(assetId, key);
   const status: ApprovalStatus = patch.status ?? prev?.status ?? "pending";
   const note = patch.note !== undefined ? (patch.note.trim() || null) : (prev?.note ?? null);
   const assignee = patch.assignee !== undefined ? (patch.assignee.trim() || null) : (prev?.assignee ?? null);
+  const securityOwner = patch.securityOwner !== undefined ? (patch.securityOwner.trim() || null) : (prev?.securityOwner ?? null);
   const dueDate = patch.dueDate !== undefined ? (patch.dueDate.trim() || null) : (prev?.dueDate ?? null);
+  // 반려 사유는 반려 상태일 때만 유지 — 다른 상태로 넘어가면 비운다(오탐 사유가 완료건에 남지 않게).
+  const rejectReason = status !== "rejected" ? null : (patch.rejectReason !== undefined ? (patch.rejectReason || null) : (prev?.rejectReason ?? null));
 
-  // 저장할 게 아무것도 없으면 행 삭제(미검토·미배정).
-  if (status === "pending" && !note && !assignee && !dueDate) {
+  if (isEmptyReview(status, note, assignee, securityOwner, dueDate)) {
     deleteStmt.run(assetId, key);
     return;
   }
-  upsertStmt.run({ assetId, findingKey: key, status, reviewedBy: actor, reviewedAt: Date.now(), note, assignee, dueDate });
+
+  // 검증 요청(진행중→검증) 시각·보고자 기록. 검증에서 벗어나면(되돌리거나 완료로 확정) 유지하되
+  // 다시 진행중 이전 상태로 돌아가면 지운다.
+  let verifyRequestedAt = prev?.verifyRequestedAt ?? null;
+  let verifyRequestedBy = prev?.verifyRequestedBy ?? null;
+  if (patch.status === "verifying" && prev?.status !== "verifying") {
+    verifyRequestedAt = Date.now();
+    verifyRequestedBy = actor;
+  } else if (status === "pending" || status === "in_progress") {
+    verifyRequestedAt = null;
+    verifyRequestedBy = null;
+  }
+  // 완료(approved) 확정 시각. 완료에서 벗어나면 초기화.
+  const resolvedAt = status === "approved" ? (prev?.resolvedAt ?? Date.now()) : null;
+
+  // finding 내용 스냅샷 — 재스캔에서 사라진 뒤에도 완료/검증 목록에 제목·심각도를 보여주려 저장.
+  let snapshot = prev?.snapshot ?? null;
+  const live = getAsset(assetId)?.findings.find((f) => findingKey(assetId, f) === key);
+  if (live) snapshot = JSON.stringify({ finding_type: live.finding_type, severity: live.severity, evidence: live.evidence, source_tool: live.source_tool });
+
+  upsertStmt.run({
+    assetId, findingKey: key, status, reviewedBy: actor, reviewedAt: Date.now(),
+    note, assignee, securityOwner, dueDate, rejectReason, verifyRequestedAt, verifyRequestedBy, resolvedAt, snapshot,
+  });
 }
 
 // 하위호환 래퍼(기존 호출부 유지).
@@ -252,13 +364,12 @@ export function registerApprovalsRoutes(app: Express): void {
     res.json(await buildTriageDraft(limit));
   }));
 
-  // finding 검토/조치 갱신. status(오탐 판정)·assignee(담당자)·dueDate(기한)·note를 부분 갱신할 수 있다.
-  // status만 보내면 기존 승인 동작과 동일(하위호환). assignee/dueDate만 보내면 판정 없이 배정만 한다.
+  // finding 검토/조치 갱신. 상태(생애주기)·담당자 2종·기한·메모·반려사유를 부분 갱신한다.
+  // status만 보내면 판정만, assignee/securityOwner/dueDate만 보내면 판정 없이 배정만 한다.
   app.post("/api/approvals/:assetId/:key", authMiddleware, (req, res) => {
     const body = req.body ?? {};
-    // status가 명시된 경우에만 유효성 검사(생략 시 기존 값 유지 = 배정만 하는 경우 허용).
-    if (body.status !== undefined && !["approved", "rejected", "pending"].includes(String(body.status))) {
-      res.status(400).json({ error: "status는 approved, rejected, pending만 가능합니다" });
+    if (body.status !== undefined && !VALID_STATUS.includes(String(body.status) as ApprovalStatus)) {
+      res.status(400).json({ error: `status는 ${VALID_STATUS.join(", ")}만 가능합니다` });
       return;
     }
     const user = (req as Request & { user?: GijoUser }).user;
@@ -266,7 +377,7 @@ export function registerApprovalsRoutes(app: Express): void {
       updateFindingReview(
         String(req.params.assetId),
         String(req.params.key),
-        { status: body.status, note: body.note, assignee: body.assignee, dueDate: body.dueDate },
+        { status: body.status, note: body.note, assignee: body.assignee, securityOwner: body.securityOwner, dueDate: body.dueDate, rejectReason: body.rejectReason },
         user?.displayName ?? "-"
       );
       res.json({ ok: true });
@@ -289,7 +400,8 @@ export function registerApprovalsRoutes(app: Express): void {
     const review = listFindingReviews().find((r) => r.assetId === assetId && r.findingKey === key);
     const title = finding?.finding_type ?? "취약점";
     const sev = finding?.severity ? finding.severity.toUpperCase() : "-";
-    const assignee = review?.assignee ?? "미지정";
+    const assignee = review?.assignee ?? "미지정"; // 실수행담당자
+    const owner = review?.securityOwner ?? "미지정"; // 보안담당자(감독)
     const due = review?.dueDate ? review.dueDate : "미정";
     const user = (req as Request & { user?: GijoUser }).user;
 
@@ -300,10 +412,12 @@ export function registerApprovalsRoutes(app: Express): void {
       `• 자산: ${asset?.name ?? assetId}`,
       `• 취약점: ${title}`,
       `• 심각도: ${sev}`,
-      `• 담당자: ${assignee}`,
+      `• 실수행 담당자: ${assignee}`,
+      `• 보안담당자(감독): ${owner}`,
       `• 조치 기한: ${due}`,
       finding?.evidence ? `• 근거: ${finding.evidence.slice(0, 300)}` : "",
       "",
+      `조치 완료 후에는 '검증(재스캔)'으로 실제 해결 여부를 확인합니다.`,
       `배정: ${user?.displayName ?? "-"} · ${new Date().toLocaleString("ko-KR")}`,
       "본 메일은 GIJO AS 조치·승인에서 자동 발송되었습니다.",
     ].filter(Boolean);

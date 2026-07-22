@@ -362,6 +362,19 @@ try {
 try { db.exec("ALTER TABLE finding_approvals ADD COLUMN assignee TEXT"); } catch { /* 이미 있으면 무시 */ }
 try { db.exec("ALTER TABLE finding_approvals ADD COLUMN dueDate TEXT"); } catch { /* 이미 있으면 무시 */ }
 
+// 마이그레이션(2026-07-22): Finding 검토 워크플로 확장 — 담당자 이원화(보안담당자/실수행담당자),
+// 검증(재스캔) 단계, 반려 사유 보존. 전부 nullable이라 기존 행에 무해하게 추가된다.
+for (const col of [
+  "securityOwner TEXT",       // 보안담당자(감독)
+  "rejectReason TEXT",        // 반려 사유(false_positive | compensating_control)
+  "verifyRequestedAt INTEGER",// 조치완료 보고 시각(→검증)
+  "verifyRequestedBy TEXT",
+  "resolvedAt INTEGER",       // 재스캔에서 사라져 해결 확인된 시각(→완료)
+  "snapshot TEXT",            // finding 내용 스냅샷(재스캔 후 목록 표시용)
+]) {
+  try { db.exec(`ALTER TABLE finding_approvals ADD COLUMN ${col}`); } catch { /* 이미 있으면 무시 */ }
+}
+
 // 마이그레이션: assets.service (이 자산이 지원·보호하는 업무 서비스). 서비스 영향도(serviceimpact.ts)
 // 산출용 — 자산에 문제가 생기면 어느 서비스가 영향받는지 집계한다. 선택 항목이라 nullable.
 try {

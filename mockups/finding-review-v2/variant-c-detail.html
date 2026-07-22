@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8"><title>시안 C — 마스터·디테일</title>
+<style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--panel-3:#16203a;--border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.16);--blue:#3b82f6;--blue-light:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);padding:24px 30px;}
+h1{font-size:20px;font-weight:800;color:#fff;}
+.sub{font-size:12.5px;color:var(--muted);margin:4px 0 18px;}
+.variant-tag{display:inline-block;background:rgba(139,124,240,.15);color:var(--purple);font-size:11px;font-weight:800;padding:3px 10px;border-radius:6px;margin-left:8px;vertical-align:middle;}
+.wrap{display:grid;grid-template-columns:340px 1fr;gap:14px;}
+.list-pane{background:var(--panel-2);border:1px solid var(--border);border-radius:12px;padding:10px;}
+.filt{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:9px;}
+.fchip{font-size:11px;padding:5px 10px;border-radius:20px;background:var(--panel);border:1px solid var(--border-strong);color:var(--muted);cursor:pointer;}
+.fchip b{margin-left:3px;color:var(--text);}
+.fchip.on{background:var(--blue);border-color:var(--blue);color:#fff;}.fchip.on b{color:#fff;}
+.row{display:flex;align-items:center;gap:9px;padding:10px;border-radius:9px;cursor:pointer;border:1px solid transparent;margin-bottom:3px;}
+.row:hover{background:var(--panel);}
+.row.on{background:var(--panel);border-color:rgba(59,130,246,.4);}
+.dot{width:8px;height:8px;border-radius:50%;flex:none;}
+.d-prog{background:var(--blue);}.d-verify{background:var(--purple);}.d-reject{background:var(--muted-2);}.d-over{background:var(--red);}
+.rmain{flex:1;min-width:0;}
+.rt{font-size:12.5px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rs{font-size:10.5px;color:var(--muted);margin-top:2px;}
+.rsev{font-size:9px;font-weight:800;padding:1px 6px;border-radius:5px;flex:none;}
+.rsev.critical,.rsev.high{color:#f5928a;background:rgba(226,72,61,.14);}
+.rsev.medium{color:var(--amber);background:rgba(240,160,32,.14);}
+
+.detail{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px 22px;}
+.dt-top{display:flex;align-items:center;gap:9px;flex-wrap:wrap;margin-bottom:6px;}
+.st{font-size:10.5px;font-weight:800;padding:2px 9px;border-radius:20px;}
+.st.진행중{color:var(--blue-light);background:rgba(59,130,246,.15);}
+.kev{color:#f5928a;background:rgba(226,72,61,.18);font-size:10px;font-weight:800;padding:2px 8px;border-radius:6px;}
+.dt-title{font-size:17px;font-weight:800;color:#fff;}
+.dt-asset{font-size:12px;color:var(--purple);margin-bottom:14px;}
+.evid{font-size:11.5px;color:var(--muted);background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;line-height:1.6;margin-bottom:16px;}
+.sec{margin-bottom:16px;}
+.sec-h{font-size:11px;font-weight:800;color:var(--muted-2);letter-spacing:.5px;margin-bottom:8px;text-transform:uppercase;}
+.frow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.field{flex:1;min-width:150px;}
+.field label{font-size:10.5px;color:var(--muted-2);font-weight:700;display:block;margin-bottom:4px;}
+.inp{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;padding:8px 10px;color:var(--text);font-size:12.5px;}
+.hint{font-size:10px;color:var(--muted-2);margin-top:4px;}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;}
+.btn{font-size:12px;font-weight:700;border-radius:8px;padding:8px 14px;cursor:pointer;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--text);}
+.btn.mail{border-color:rgba(59,130,246,.4);color:var(--blue-light);}
+.btn.verify{background:rgba(139,124,240,.14);border-color:rgba(139,124,240,.45);color:var(--purple);}
+.btn.reject{border-color:rgba(226,72,61,.4);color:#f5928a;}
+.timeline{border-left:2px solid var(--border);padding-left:14px;margin-left:4px;}
+.tl{position:relative;padding:0 0 12px;font-size:11.5px;color:var(--muted);}
+.tl::before{content:"";position:absolute;left:-20px;top:3px;width:8px;height:8px;border-radius:50%;background:var(--muted-2);}
+.tl.now::before{background:var(--purple);}
+.tl b{color:var(--text);}
+.tl .when{font-size:10px;color:var(--muted-2);}
+.verify-box{background:rgba(139,124,240,.08);border:1px solid rgba(139,124,240,.3);border-radius:10px;padding:13px 15px;}
+.verify-box .h{font-size:12px;font-weight:800;color:var(--purple);margin-bottom:6px;}
+.verify-box p{font-size:11.5px;color:var(--muted);line-height:1.6;}
+</style></head>
+<body>
+<h1>조치·승인 — Finding 검토 <span class="variant-tag">시안 C · 마스터·디테일(2단)</span></h1>
+<div class="sub">왼쪽에서 상태로 좁혀 고르고, 오른쪽 넓은 패널에서 보안담당자·실수행담당자 배정·기한·메일·검증(재스캔 이력)·반려 사유를 한 화면에서 처리. 조치 정보가 많은 취약점에 유리.</div>
+
+<div class="wrap">
+  <div class="list-pane">
+    <div class="filt">
+      <span class="fchip on">진행중<b>7</b></span><span class="fchip">검증<b>2</b></span><span class="fchip">반려<b>3</b></span><span class="fchip">완료<b>12</b></span>
+    </div>
+    <div class="row on"><span class="dot d-prog"></span><div class="rmain"><div class="rt">Apache Log4j2 Log4Shell</div><div class="rs">oracle.local · brian · 📅07-25</div></div><span class="rsev critical">crit</span></div>
+    <div class="row"><span class="dot d-over"></span><div class="rmain"><div class="rt">SMBv1 프로토콜 활성화</div><div class="rs">file-svr-03 · dohee · ⚠지연 D+2</div></div><span class="rsev high">high</span></div>
+    <div class="row"><span class="dot d-prog"></span><div class="rmain"><div class="rt">권한 상승 가능 서비스</div><div class="rs">win-dc-01 · brian · 📅07-28</div></div><span class="rsev high">high</span></div>
+    <div class="row"><span class="dot d-verify"></span><div class="rmain"><div class="rt">OpenSSL Heartbleed</div><div class="rs">was-order-01 · 검증 대기</div></div><span class="rsev high">high</span></div>
+    <div class="row"><span class="dot d-reject"></span><div class="rmain"><div class="rt">취약한 SSH 암호</div><div class="rs">db-prod-02 · 반려(다른방어)</div></div><span class="rsev medium">med</span></div>
+  </div>
+
+  <div class="detail">
+    <div class="dt-top"><span class="st 진행중">진행중</span><span class="kev">🚨 KEV</span><span style="font-size:10px;color:var(--muted-2)">CVE-2021-44228 · EPSS 97% · VPR 9.8</span></div>
+    <div class="dt-title">Apache Log4j2 Log4Shell</div>
+    <div class="dt-asset">oracle.local (192.168.219.98) · Nessus</div>
+    <div class="evid">Apache Log4j2 &lt;2.15.0 원격코드실행 — JNDI lookup으로 임의 코드 실행 가능. 실제 악용 확인(CISA KEV 등재). 즉시 조치 권고.</div>
+
+    <div class="sec">
+      <div class="sec-h">담당 배정</div>
+      <div class="frow">
+        <div class="field"><label>보안담당자 (감독·검토)</label><input class="inp" value="정요한" list="ul"><div class="hint">조치를 승인·감독하는 보안 담당자</div></div>
+        <div class="field"><label>실제 수행 담당자 (조치)</label><input class="inp" value="brian" list="ul"><div class="hint">실제로 패치·설정을 수행하는 개발/시스템 담당자</div></div>
+        <div class="field" style="max-width:170px"><label>조치 기한 (SLA)</label><input class="inp" type="date" value="2026-07-25"></div>
+      </div>
+      <div class="actions" style="margin-top:12px">
+        <button class="btn mail">✉ 배정 메일 보내기</button>
+        <button class="btn verify">🔁 검증 요청 (조치 완료 → 재스캔)</button>
+        <button class="btn reject">🛡 반려 ▾ (오탐 / 다른방어)</button>
+      </div>
+    </div>
+
+    <div class="sec">
+      <div class="sec-h">진행 이력</div>
+      <div class="timeline">
+        <div class="tl now"><b>진행중</b> — brian에게 배정, 기한 07-25 <span class="when">정요한 · 07-22 14:05</span></div>
+        <div class="tl"><b>승인(확정)</b> — 실제 취약점으로 판정 <span class="when">정요한 · 07-22 13:40</span></div>
+        <div class="tl"><b>검출</b> — Nessus 스캔에서 발견 <span class="when">07-22 11:42</span></div>
+      </div>
+    </div>
+
+    <div class="verify-box">
+      <div class="h">🔁 검증(재스캔)이란?</div>
+      <p>실수행담당자가 <b>조치 완료</b>를 보고하면 상태가 "검증"으로 넘어갑니다. 이후 이 자산을 <b>재스캔</b>해 같은 취약점이 사라졌는지 확인 — 사라지면 <b style="color:var(--teal)">완료</b>로 자동 확정, 여전히 검출되면 <b style="color:#f5928a">재조치</b>로 되돌립니다. (finding 키가 내용 기반이라 재스캔에도 동일 취약점을 추적)</p>
+    </div>
+  </div>
+</div>
+<datalist id="ul"><option value="정요한"><option value="brian"><option value="dohee"></datalist>
+</body></html>

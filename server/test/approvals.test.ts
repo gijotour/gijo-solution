@@ -55,7 +55,7 @@ describe("approvals (finding 검토 워크플로우)", () => {
     expect(res.body.reviews).toHaveLength(1);
     expect(res.body.reviews[0].status).toBe("pending");
     expect(res.body.reviews[0].assetName).toBe("모델1");
-    expect(res.body.summary).toEqual({ total: 1, pending: 1, approved: 0, rejected: 0, overdue: 0 });
+    expect(res.body.summary).toEqual({ total: 1, pending: 1, in_progress: 0, verifying: 0, approved: 0, rejected: 0, overdue: 0 });
   });
 
   it("조치 관리: 담당자·기한(SLA) 배정 — status 없이 배정만 가능", async () => {
@@ -195,6 +195,48 @@ describe("approvals (finding 검토 워크플로우)", () => {
     recordFindings("m1", [FINDING]); // 동일 finding 재스캔
     const list = (await request(app).get("/api/approvals").set(auth())).body;
     expect(list.reviews[0].status).toBe("approved"); // 상태 유지
+  });
+
+  it("워크플로 확장: 진행중→검증→재스캔에서 사라지면 완료로 자동 확정", async () => {
+    const key = findingKey("m1", FINDING);
+    // 담당자 2종 + 진행중
+    await request(app).post(`/api/approvals/m1/${key}`).set(auth())
+      .send({ status: "in_progress", assignee: "brian", securityOwner: "정요한", dueDate: "2999-12-31" });
+    let review = (await request(app).get("/api/approvals").set(auth())).body.reviews[0];
+    expect(review.status).toBe("in_progress");
+    expect(review.assignee).toBe("brian");
+    expect(review.securityOwner).toBe("정요한");
+
+    // 조치 완료 보고 → 검증
+    await request(app).post(`/api/approvals/m1/${key}`).set(auth()).send({ status: "verifying" });
+    review = (await request(app).get("/api/approvals").set(auth())).body.reviews[0];
+    expect(review.status).toBe("verifying");
+    expect(review.verifyRequestedBy).toBe("정요한");
+    expect(typeof review.verifyRequestedAt).toBe("number");
+
+    // 재스캔에서 이 finding이 사라짐 → 완료(approved)로 자동 확정, 스냅샷으로 목록 유지
+    recordFindings("m1", []); // 빈 스캔 = 해결됨
+    const body = (await request(app).get("/api/approvals").set(auth())).body;
+    const r = body.reviews.find((x: { findingKey: string }) => x.findingKey === key);
+    expect(r.status).toBe("approved"); // 검증 통과 → 완료
+    expect(r.gone).toBe(true);
+    expect(r.finding.finding_type).toBe("unsafe-pickle"); // 스냅샷에서 복원
+    expect(typeof r.resolvedAt).toBe("number");
+  });
+
+  it("워크플로 확장: 반려 사유(오탐/보상통제)와 승인자·날짜를 보존", async () => {
+    const key = findingKey("m1", FINDING);
+    await request(app).post(`/api/approvals/m1/${key}`).set(auth())
+      .send({ status: "rejected", rejectReason: "compensating_control", note: "내부망 격리로 방어 중" });
+    const review = (await request(app).get("/api/approvals").set(auth())).body.reviews[0];
+    expect(review.status).toBe("rejected");
+    expect(review.rejectReason).toBe("compensating_control");
+    expect(review.note).toBe("내부망 격리로 방어 중");
+    expect(review.reviewedBy).toBe("정요한"); // 승인자 보존
+    expect(typeof review.reviewedAt).toBe("number"); // 날짜 보존
+
+    // 잘못된 반려 사유는 400
+    expect((await request(app).post(`/api/approvals/m1/${key}`).set(auth()).send({ status: "rejected", rejectReason: "몰라" })).status).toBe(400);
   });
 
   it("담당자 메일 알림: 잘못된 이메일은 400, SMTP 미설정이면 안내와 함께 400", async () => {
