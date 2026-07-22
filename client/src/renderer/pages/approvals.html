@@ -83,7 +83,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     <div class="panel">
       <div class="panel-title">Finding 검토</div>
-      <div class="panel-sub">자산별 스캔 finding 목록. 승인 = 실제 위험으로 확정, 반려 = 오탐 처리(SBOM에서 제외).</div>
+      <div class="panel-sub">자산별 스캔 finding 목록. 승인 = 실제 위험으로 확정, 반려 = 오탐 처리(SBOM에서 제외). 아래 필터로 빠르게 좁혀 처리하세요.</div>
+      <div class="rv-filters" id="rvFilters">
+        <span class="rv-chip on" data-f="all">전체 <b id="fcAll">0</b></span>
+        <span class="rv-chip" data-f="pending">🔶 미검토 <b id="fcPending">0</b></span>
+        <span class="rv-chip" data-f="overdue">⚠ 지연 <b id="fcOverdue">0</b></span>
+        <span class="rv-chip" data-f="kev">🚨 KEV <b id="fcKev">0</b></span>
+        <span class="rv-chip" data-f="critical">Critical/High <b id="fcCrit">0</b></span>
+        <span class="rv-chip" data-f="unassigned">👤 미배정 <b id="fcUnassigned">0</b></span>
+      </div>
       <div id="reviewList" style="display:flex;flex-direction:column;gap:9px;margin-top:12px;">불러오는 중...</div>
     </div>
 
@@ -123,6 +131,18 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   .rv-assignee:focus,.rv-due:focus{border-color:var(--blue);}
   .rv-more{width:100%;margin-top:4px;background:var(--panel);border:1px solid var(--border-strong);color:var(--blue-light);border-radius:8px;padding:9px;font-size:12px;font-weight:700;cursor:pointer;}
   .rv-more:hover{border-color:var(--blue);}
+  /* 필터 칩 — 큐를 빠르게 좁힌다(트리아지 모범사례). */
+  .rv-filters{display:flex;gap:7px;flex-wrap:wrap;margin-top:12px;}
+  .rv-chip{font-size:11.5px;padding:6px 12px;border-radius:20px;background:var(--panel);border:1px solid var(--border-strong);color:var(--muted);cursor:pointer;user-select:none;}
+  .rv-chip b{color:var(--text);font-weight:800;margin-left:3px;}
+  .rv-chip:hover{color:#fff;}
+  .rv-chip.on{background:var(--blue);border-color:var(--blue);color:#fff;}
+  .rv-chip.on b{color:#fff;}
+  /* KEV 배지 + 담당자 메일 버튼 */
+  .rv-kev{color:#f5928a;background:rgba(226,72,61,0.18);font-size:10px;font-weight:800;padding:2px 8px;border-radius:6px;white-space:nowrap;}
+  .rv-mail{background:var(--panel);border:1px solid rgba(59,130,246,.4);color:var(--blue-light);border-radius:7px;padding:5px 10px;font-size:11.5px;font-weight:700;cursor:pointer;white-space:nowrap;}
+  .rv-mail:hover{background:rgba(59,130,246,.14);}
+  .rv-mail:disabled{opacity:.45;cursor:default;border-color:var(--border-strong);color:var(--muted-2);}
 </style>
 <datalist id="gijoUserList"></datalist>
 
@@ -143,6 +163,17 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   // 미검토·심각도 우선으로 정렬한 뒤 상위 RV_CAP건만 그리고, 나머지는 '전체 보기'로 펼친다.
   const RV_CAP = 50;
   let rvShowAll = false;
+  let rvFilter = "all"; // all | pending | overdue | kev | critical | unassigned
+  function matchFilter(r) {
+    switch (rvFilter) {
+      case "pending": return r.status === "pending";
+      case "overdue": return !!r.overdue;
+      case "kev": return !!(r.finding && r.finding.kev);
+      case "critical": return r.finding && (r.finding.severity === "critical" || r.finding.severity === "high");
+      case "unassigned": return r.status !== "rejected" && !r.assignee;
+      default: return true;
+    }
+  }
 
   function reviewHtml(r) {
     const actions =
@@ -154,7 +185,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       r.status !== "pending"
         ? `<div class="rv-meta">${RV_LABEL[r.status]} · ${esc(r.reviewedBy || "-")}${r.note ? " · " + esc(r.note) : ""}</div>`
         : "";
-    // 조치 관리 줄: 담당자·기한. 반려(오탐)는 조치 대상이 아니라 숨긴다.
+    // 조치 관리 줄: 담당자·기한 + 담당자 배정 시 메일 보내기. 반려(오탐)는 조치 대상이 아니라 숨긴다.
     const remediation =
       r.status === "rejected"
         ? ""
@@ -163,6 +194,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
           `<input class="rv-assignee" data-a="${esc(r.assetId)}" data-k="${esc(r.findingKey)}" value="${esc(r.assignee || "")}" placeholder="미배정" list="gijoUserList">` +
           `<span class="rv-remed-lbl">기한</span>` +
           `<input type="date" class="rv-due" data-a="${esc(r.assetId)}" data-k="${esc(r.findingKey)}" value="${esc(r.dueDate || "")}">` +
+          `<button class="rv-mail" data-mail="1" data-a="${esc(r.assetId)}" data-k="${esc(r.findingKey)}"${r.assignee ? "" : " disabled title='담당자를 먼저 배정하세요'"}>✉ 메일 보내기</button>` +
           (r.overdue ? `<span class="rv-badge rv-overdue">⚠ 지연</span>` : "") +
           `</div>`;
     return (
@@ -170,6 +202,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       `<div class="rv-top">` +
       `<span class="rv-badge rv-${r.status}">${RV_LABEL[r.status]}</span>` +
       `<span class="sev sev-${esc(r.finding.severity)}">${esc(r.finding.severity)}</span>` +
+      (r.finding.kev ? `<span class="rv-kev">🚨 KEV</span>` : "") +
       `<span class="rv-type">${esc(r.finding.finding_type)}</span>` +
       `<span class="rv-asset">${esc(r.assetName)}</span>` +
       `<span class="rv-actions">${actions}</span>` +
@@ -194,16 +227,25 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       const order = { pending: 0, approved: 1, rejected: 2 };
       const sev = { critical: 0, high: 1, medium: 2, low: 3 };
       reviews.sort((a, b) => (order[a.status] - order[b.status]) || (sev[a.finding.severity] - sev[b.finding.severity]));
-      if (!reviews.length) {
-        list.innerHTML = '<div style="color:var(--muted-2);font-size:12px">검토할 finding이 없습니다 — AI 자산에서 스캔을 먼저 실행하세요.</div>';
+      // 필터 칩 카운트(전체 기준) 갱신.
+      const cnt = (fn) => reviews.filter(fn).length;
+      document.getElementById("fcAll").textContent = reviews.length;
+      document.getElementById("fcPending").textContent = cnt((r) => r.status === "pending");
+      document.getElementById("fcOverdue").textContent = cnt((r) => r.overdue);
+      document.getElementById("fcKev").textContent = cnt((r) => r.finding && r.finding.kev);
+      document.getElementById("fcCrit").textContent = cnt((r) => r.finding && (r.finding.severity === "critical" || r.finding.severity === "high"));
+      document.getElementById("fcUnassigned").textContent = cnt((r) => r.status !== "rejected" && !r.assignee);
+      const filtered = reviews.filter(matchFilter);
+      if (!filtered.length) {
+        list.innerHTML = '<div style="color:var(--muted-2);font-size:12px">' + (reviews.length ? "이 필터에 해당하는 finding이 없습니다." : "검토할 finding이 없습니다 — AI 자산에서 스캔을 먼저 실행하세요.") + "</div>";
         return;
       }
-      const shown = rvShowAll ? reviews : reviews.slice(0, RV_CAP);
+      const shown = rvShowAll ? filtered : filtered.slice(0, RV_CAP);
       let html = shown.map(reviewHtml).join("");
-      if (reviews.length > RV_CAP) {
+      if (filtered.length > RV_CAP) {
         html += rvShowAll
           ? `<button class="rv-more" data-more="collapse">상위 ${RV_CAP}건만 보기 ▲</button>`
-          : `<button class="rv-more" data-more="expand">전체 ${reviews.length}건 중 ${RV_CAP}건 표시 — 전체 보기 ▼</button>`;
+          : `<button class="rv-more" data-more="expand">전체 ${filtered.length}건 중 ${RV_CAP}건 표시 — 전체 보기 ▼</button>`;
       }
       list.innerHTML = html;
     } catch (e) {
@@ -214,6 +256,23 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   async function onReviewClick(e) {
     const more = e.target.closest("[data-more]");
     if (more) { rvShowAll = more.dataset.more === "expand"; loadReviews(); return; }
+    // ✉ 메일 보내기 — 담당자에게 조치 배정 안내 메일. 수신 주소만 입력받고 본문은 서버가 구성.
+    const mail = e.target.closest("[data-mail]");
+    if (mail) {
+      if (mail.disabled) return;
+      const to = prompt("담당자에게 보낼 이메일 주소를 입력하세요:");
+      if (!to) return;
+      mail.disabled = true; const orig = mail.textContent; mail.textContent = "보내는 중…";
+      try {
+        await window.gijo.notifyAssignee(mail.dataset.a, mail.dataset.k, to.trim());
+        mail.textContent = "✓ 발송됨";
+        setTimeout(() => { mail.textContent = orig; mail.disabled = false; }, 2500);
+      } catch (err) {
+        alert("메일 발송 실패: " + ((err && err.message) || err));
+        mail.textContent = orig; mail.disabled = false;
+      }
+      return;
+    }
     const btn = e.target.closest("[data-act]");
     if (!btn) return;
     const { act, a, k } = btn.dataset;
@@ -272,6 +331,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const rl = document.getElementById("reviewList");
     rl.addEventListener("click", onReviewClick);
     rl.addEventListener("change", onRemediationChange);
+    // 필터 칩 — 클릭하면 그 조건만 보여준다(전체 카운트는 유지).
+    document.getElementById("rvFilters").addEventListener("click", (e) => {
+      const chip = e.target.closest(".rv-chip");
+      if (!chip) return;
+      rvFilter = chip.dataset.f;
+      rvShowAll = false;
+      document.querySelectorAll("#rvFilters .rv-chip").forEach((c) => c.classList.toggle("on", c === chip));
+      loadReviews();
+    });
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => {
       el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));

@@ -939,6 +939,9 @@ export const ctiApi = {
   findings: () => request("/api/cti/findings"),
   configureFeed: (feedId: string, apiKey: string) =>
     request(`/api/cti/feeds/${feedId}/configure`, { method: "POST", body: { apiKey } }),
+  // 커스텀 벤더 직접 추가 — 이름을 직접 입력해 등록·키 설정.
+  addCustomFeed: (name: string, apiKey: string) =>
+    request("/api/cti/feeds", { method: "POST", body: { name, apiKey } }),
   disconnectFeed: (feedId: string) => request(`/api/cti/feeds/${feedId}/disconnect`, { method: "POST" }),
   assetMatches: () =>
     request<{ matches: CtiAssetMatch[]; summary: { totalFindings: number; matchedFindings: number; affectedAssets: number; criticalMatches: number } }>(
@@ -1462,6 +1465,9 @@ export const approvalsApi = {
   // status·note·assignee·dueDate를 부분 갱신(merge). 판정 없이 담당자·기한만 배정도 가능.
   set: (assetId: string, key: string, patch: ReviewPatch) =>
     request(`/api/approvals/${encodeURIComponent(assetId)}/${encodeURIComponent(key)}`, { method: "POST", body: patch }),
+  // 담당자에게 조치 배정 메일 발송 — 서버가 배정 정보·취약점 내용으로 본문 구성, 수신 주소만 전달.
+  notify: (assetId: string, key: string, to: string) =>
+    request<{ ok: boolean }>(`/api/approvals/${encodeURIComponent(assetId)}/${encodeURIComponent(key)}/notify`, { method: "POST", body: { to } }),
   // 오늘의 조치 — 전 자산 finding을 KEV·EPSS·VPR·심각도로 정렬한 우선순위 목록.
   priorities: (limit = 10) =>
     request<{ items: (FindingReview & { score: number })[] }>(`/api/approvals/priorities?limit=${limit}`),

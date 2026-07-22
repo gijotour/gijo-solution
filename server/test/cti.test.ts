@@ -184,4 +184,30 @@ describe("cti feed key management", () => {
     const flashpoint = res.body.find((f: { id: string }) => f.id === "flashpoint");
     expect(flashpoint.hasApiKey).toBe(true);
   });
+
+  it("커스텀 벤더 직접 추가 — 이름 입력으로 새 피드를 만들고 키를 설정한다", async () => {
+    const res = await request(app)
+      .post("/api/cti/feeds")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ name: "우리회사 CTI", apiKey: "custom-key-1" });
+    expect(res.status).toBe(200);
+    expect(res.body.name).toBe("우리회사 CTI");
+    expect(res.body.connected).toBe(true);
+    expect(res.body.hasApiKey).toBe(true);
+    expect(res.body.id).toMatch(/^custom-/);
+    // 목록에 나타난다
+    const list = await request(app).get("/api/cti/feeds").set("Authorization", `Bearer ${token}`);
+    expect(list.body.some((f: { name: string }) => f.name === "우리회사 CTI")).toBe(true);
+    // 이름이 비면 400
+    const bad = await request(app).post("/api/cti/feeds").set("Authorization", `Bearer ${token}`).send({ name: "  ", apiKey: "x" });
+    expect(bad.status).toBe(400);
+  });
+
+  it("같은 이름의 커스텀 벤더는 새로 만들지 않고 키만 갱신한다", async () => {
+    const first = await request(app).post("/api/cti/feeds").set("Authorization", `Bearer ${token}`).send({ name: "동일벤더", apiKey: "k1" });
+    const second = await request(app).post("/api/cti/feeds").set("Authorization", `Bearer ${token}`).send({ name: "동일벤더", apiKey: "k2" });
+    expect(second.body.id).toBe(first.body.id);
+    const feeds = (await request(app).get("/api/cti/feeds").set("Authorization", `Bearer ${token}`)).body;
+    expect(feeds.filter((f: { name: string }) => f.name === "동일벤더").length).toBe(1);
+  });
 });

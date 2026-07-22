@@ -11,10 +11,12 @@ import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { todayLocal } from "../util/date";
 import { db } from "../db";
-import { listAssets } from "./assets";
+import { listAssets, getAsset } from "./assets";
 import type { StandardFinding } from "./bridge";
 import type { GijoUser } from "../auth/users";
 import { PLAIN_LANGUAGE_RULE } from "./promptstyle";
+import { sendMail, getSmtpConfig } from "./email";
+import { recordAudit } from "./audit";
 
 export type ApprovalStatus = "pending" | "approved" | "rejected";
 
@@ -272,4 +274,45 @@ export function registerApprovalsRoutes(app: Express): void {
       res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
     }
   });
+
+  // 담당자에게 조치 배정 메일 보내기 — 저장된 배정 정보(담당자·기한)와 취약점 내용으로 메일 본문을
+  // 서버가 구성해 발송한다. 수신 주소만 클라이언트가 준다. SMTP 미설정이면 안내와 함께 거절.
+  app.post("/api/approvals/:assetId/:key/notify", authMiddleware, asyncRoute(async (req, res) => {
+    const assetId = String(req.params.assetId);
+    const key = String(req.params.key);
+    const to = String(req.body?.to ?? "").trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) { res.status(400).json({ error: "받는 사람 이메일 주소가 올바르지 않습니다" }); return; }
+    if (!getSmtpConfig()) { res.status(400).json({ error: "메일 서버(SMTP)가 설정되지 않았습니다 — 설정 화면에서 먼저 등록하세요" }); return; }
+
+    const asset = getAsset(assetId);
+    const finding = asset?.findings.find((f) => findingKey(assetId, f) === key);
+    const review = listFindingReviews().find((r) => r.assetId === assetId && r.findingKey === key);
+    const title = finding?.finding_type ?? "취약점";
+    const sev = finding?.severity ? finding.severity.toUpperCase() : "-";
+    const assignee = review?.assignee ?? "미지정";
+    const due = review?.dueDate ? review.dueDate : "미정";
+    const user = (req as Request & { user?: GijoUser }).user;
+
+    const subject = `[GIJO AS] 취약점 조치 배정 — ${title}`;
+    const lines = [
+      `${assignee} 님께 취약점 조치가 배정되었습니다.`,
+      "",
+      `• 자산: ${asset?.name ?? assetId}`,
+      `• 취약점: ${title}`,
+      `• 심각도: ${sev}`,
+      `• 담당자: ${assignee}`,
+      `• 조치 기한: ${due}`,
+      finding?.evidence ? `• 근거: ${finding.evidence.slice(0, 300)}` : "",
+      "",
+      `배정: ${user?.displayName ?? "-"} · ${new Date().toLocaleString("ko-KR")}`,
+      "본 메일은 GIJO AS 조치·승인에서 자동 발송되었습니다.",
+    ].filter(Boolean);
+    try {
+      await sendMail({ to: [to], subject, text: lines.join("\n") });
+      recordAudit({ kind: "write", actor: user?.displayName ?? null, action: "조치 배정 메일 발송", target: `${asset?.name ?? assetId} · ${title}`, detail: `수신 ${to} · 담당 ${assignee}`, result: "ok" });
+      res.json({ ok: true });
+    } catch (err) {
+      res.status(500).json({ error: "메일 발송 실패: " + (err instanceof Error ? err.message : String(err)) });
+    }
+  }));
 }

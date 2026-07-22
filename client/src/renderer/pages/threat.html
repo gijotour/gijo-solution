@@ -214,9 +214,9 @@ tr:last-child td{border-bottom:none;}
 <div class="modal-overlay" id="apiKeyModal">
   <div class="modal">
     <div class="modal-title">CTI 피드 API 키 연동</div>
-    <div class="modal-sub">벤더에서 발급받은 API 키를 입력하면 서버가 해당 피드를 구독 상태로 표시합니다. 키는 서버에만 저장됩니다.</div>
-    <label for="feedSelect">벤더</label>
-    <select id="feedSelect"></select>
+    <div class="modal-sub">벤더 이름을 직접 입력하고 발급받은 API 키를 넣으면 서버가 해당 피드를 구독 상태로 표시합니다. 키는 서버에만 저장됩니다.</div>
+    <label for="feedNameInput">벤더 이름</label>
+    <input id="feedNameInput" type="text" placeholder="예: 우리회사 CTI, Recorded Future" autocomplete="off" />
     <label for="apiKeyInput">API 키</label>
     <input id="apiKeyInput" type="password" placeholder="벤더 API 키 붙여넣기" autocomplete="off" />
     <div class="modal-err" id="modalErr"></div>
@@ -313,8 +313,9 @@ tr:last-child td{border-bottom:none;}
     }
   }
   const modal = document.getElementById("apiKeyModal");
-  const feedSelect = document.getElementById("feedSelect");
+  const feedNameInput = document.getElementById("feedNameInput");
   const apiKeyInput = document.getElementById("apiKeyInput");
+  let editingFeedId = null; // 기존 피드 '키 설정'이면 그 id, 신규 직접 추가면 null
   const modalErr = document.getElementById("modalErr");
   const modalSaveBtn = document.getElementById("modalSaveBtn");
 
@@ -349,19 +350,24 @@ tr:last-child td{border-bottom:none;}
 
   async function loadFeeds() {
     feeds = await window.gijo.listCtiFeeds();
-    feedSelect.innerHTML = feeds
-      .filter((f) => !f.planned)
-      .map((f) => `<option value="${f.id}">${f.name}</option>`)
-      .join("");
     renderFeeds();
   }
 
+  // feedId를 주면 기존 피드의 키 재설정(이름 고정), 없으면 새 벤더 직접 추가.
   function openModal(feedId) {
     modalErr.textContent = "";
     apiKeyInput.value = "";
-    if (feedId) feedSelect.value = feedId;
+    editingFeedId = feedId || null;
+    if (feedId) {
+      const f = feeds.find((x) => x.id === feedId);
+      feedNameInput.value = f ? f.name : "";
+      feedNameInput.readOnly = true;
+    } else {
+      feedNameInput.value = "";
+      feedNameInput.readOnly = false;
+    }
     modal.classList.add("open");
-    apiKeyInput.focus();
+    (feedId ? apiKeyInput : feedNameInput).focus();
   }
 
   function closeModal() {
@@ -391,18 +397,18 @@ tr:last-child td{border-bottom:none;}
   });
 
   modalSaveBtn.addEventListener("click", async () => {
-    if (!apiKeyInput.value.trim()) {
-      modalErr.textContent = "API 키를 입력하세요.";
-      return;
-    }
+    const name = feedNameInput.value.trim();
+    if (!editingFeedId && !name) { modalErr.textContent = "벤더 이름을 입력하세요."; return; }
+    if (!apiKeyInput.value.trim()) { modalErr.textContent = "API 키를 입력하세요."; return; }
     modalSaveBtn.disabled = true;
     modalSaveBtn.textContent = "저장 중...";
     try {
-      await window.gijo.configureCtiFeed(feedSelect.value, apiKeyInput.value.trim());
+      if (editingFeedId) await window.gijo.configureCtiFeed(editingFeedId, apiKeyInput.value.trim());
+      else await window.gijo.addCustomCtiFeed(name, apiKeyInput.value.trim());
       closeModal();
       await loadFeeds();
     } catch (e) {
-      modalErr.textContent = "저장 실패: 서버 연결 상태를 확인하세요.";
+      modalErr.textContent = "저장 실패: " + ((e && e.message) || "서버 연결 상태를 확인하세요.");
     } finally {
       modalSaveBtn.disabled = false;
       modalSaveBtn.textContent = "저장";

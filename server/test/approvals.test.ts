@@ -196,4 +196,17 @@ describe("approvals (finding 검토 워크플로우)", () => {
     const list = (await request(app).get("/api/approvals").set(auth())).body;
     expect(list.reviews[0].status).toBe("approved"); // 상태 유지
   });
+
+  it("담당자 메일 알림: 잘못된 이메일은 400, SMTP 미설정이면 안내와 함께 400", async () => {
+    const key = findingKey("m1", FINDING);
+    await request(app).post(`/api/approvals/m1/${key}`).set(auth()).send({ assignee: "인프라팀" });
+    // 이메일 형식 오류
+    const bad = await request(app).post(`/api/approvals/m1/${key}/notify`).set(auth()).send({ to: "not-an-email" });
+    expect(bad.status).toBe(400);
+    expect(bad.body.error).toContain("이메일");
+    // 정상 이메일이지만 SMTP 미설정 → 안내 400(메일 서버 등록 유도)
+    const noSmtp = await request(app).post(`/api/approvals/m1/${key}/notify`).set(auth()).send({ to: "owner@corp.example" });
+    expect(noSmtp.status).toBe(400);
+    expect(noSmtp.body.error).toContain("SMTP");
+  });
 });

@@ -100,6 +100,21 @@ export function configureFeed(feedId: string, apiKey: string): CtiFeedPublic {
   return toPublic(getStmt.get(feedId) as CtiFeedRow);
 }
 
+// 커스텀 벤더 직접 추가 — 프리셋 목록에 없는 벤더를 이름으로 등록하고 그 자리에서 키를 설정한다.
+// id는 이름에서 만든 slug(중복 시 숫자 접미사). 이미 같은 이름의 커스텀 피드가 있으면 그 피드의 키만 갱신한다.
+export function configureCustomFeed(name: string, apiKey: string): CtiFeedPublic {
+  const nm = name.trim();
+  if (!nm) throw new Error("벤더 이름을 입력하세요");
+  // 같은 이름의 기존 피드가 있으면 재사용(키만 갱신).
+  const existing = (listStmt.all() as CtiFeedRow[]).find((r) => r.name === nm);
+  if (existing) return configureFeed(existing.id, apiKey);
+  const base = "custom-" + (nm.toLowerCase().replace(/[^a-z0-9가-힣]+/gi, "-").replace(/^-+|-+$/g, "") || "feed");
+  let id = base;
+  for (let i = 2; getStmt.get(id); i++) id = base + "-" + i; // 충돌 회피
+  seedStmt.run(id, nm);
+  return configureFeed(id, apiKey);
+}
+
 export function disconnectFeed(feedId: string): CtiFeedPublic {
   return configureFeed(feedId, "");
 }
@@ -217,6 +232,17 @@ seedSampleFindingsIfEmpty();
 
 export function registerCtiRoutes(app: Express): void {
   app.get("/api/cti/feeds", authMiddleware, (_req, res) => res.json(listFeeds()));
+  // 커스텀 벤더 직접 추가 — 이름을 직접 입력해 등록하고 키를 설정한다(프리셋 선택 대신).
+  app.post("/api/cti/feeds", authMiddleware, (req, res) => {
+    try {
+      const name = String(req.body?.name ?? "").trim();
+      const apiKey = String(req.body?.apiKey ?? "");
+      if (!name) { res.status(400).json({ error: "벤더 이름을 입력하세요" }); return; }
+      res.json(configureCustomFeed(name, apiKey));
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  });
   app.post("/api/cti/feeds/:id/configure", authMiddleware, (req, res) => {
     if (isPlannedFeed(String(req.params.id))) {
       res.status(400).json({ error: "지원 예정 벤더입니다 — 아직 키를 설정할 수 없습니다" });

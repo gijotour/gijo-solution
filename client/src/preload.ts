@@ -131,6 +131,7 @@ const gijoApi = {
   listApprovals: () => api.approvalsApi.list(),
   // status·note·assignee·dueDate를 부분 갱신. status만 주면 기존 승인/반려 동작과 동일.
   setFindingReview: (assetId: string, key: string, patch: api.ReviewPatch) => api.approvalsApi.set(assetId, key, patch),
+  notifyAssignee: (assetId: string, key: string, to: string) => api.approvalsApi.notify(assetId, key, to),
   listActionPriorities: (limit?: number) => api.approvalsApi.priorities(limit),
   aiTriage: (limit?: number) => api.approvalsApi.triage(limit),
   listCompliance: () => api.complianceApi.list(),
@@ -225,6 +226,7 @@ const gijoApi = {
   listCtiFindings: () => api.ctiApi.findings(),
   getCtiAssetMatches: () => api.ctiApi.assetMatches(),
   configureCtiFeed: (feedId: string, apiKey: string) => api.ctiApi.configureFeed(feedId, apiKey),
+  addCustomCtiFeed: (name: string, apiKey: string) => api.ctiApi.addCustomFeed(name, apiKey),
   disconnectCtiFeed: (feedId: string) => api.ctiApi.disconnectFeed(feedId),
 
   // 통합 보안 KPI 대시보드
