@@ -150,6 +150,18 @@
   .asx-body .asx-file{display:flex;align-items:center;gap:7px;padding:4px 6px 4px 12px;border-radius:0 6px 6px 0;cursor:pointer;white-space:nowrap;overflow:hidden;font-size:12.5px;}
   .asx-body .asx-file:hover{background:rgba(255,255,255,.045);}
   .asx-body .asx-file .asx-nm{color:#aab2c6;}
+  /* 리포트 바로 보기 아이콘 — 항목 오른쪽. 클릭하면 대시보드에서 PDF를 바로 띄운다. */
+  .asx-view{margin-left:auto;flex:0 0 auto;color:var(--muted-2);font-size:13px;padding:1px 5px;border-radius:5px;opacity:.75;}
+  .asx-view:hover{color:var(--blue-light);background:rgba(59,130,246,.14);opacity:1;}
+  /* 리포트 뷰어 모달(대시보드 내장) */
+  .rvm{position:fixed;inset:0;background:rgba(4,7,14,.8);z-index:1200;display:none;align-items:center;justify-content:center;}
+  .rvm.open{display:flex;}
+  .rvm-box{width:min(900px,92vw);height:88vh;background:var(--panel);border:1px solid var(--border-strong);border-radius:12px;display:flex;flex-direction:column;overflow:hidden;}
+  .rvm-head{display:flex;align-items:center;gap:10px;padding:11px 15px;border-bottom:1px solid var(--border);}
+  .rvm-t{font-size:13px;font-weight:800;color:#fff;}
+  .rvm-dl{margin-left:auto;background:rgba(59,130,246,.16);border:1px solid rgba(59,130,246,.4);color:var(--blue-light);font-size:11.5px;font-weight:700;border-radius:8px;padding:5px 11px;cursor:pointer;}
+  .rvm-x{background:transparent;border:1px solid var(--border-strong);color:var(--muted);font-size:12px;border-radius:8px;padding:5px 11px;cursor:pointer;}
+  .rvm-body{flex:1;min-height:0;background:#222;}
   .asx-empty{padding:4px 6px 4px 12px;font-size:12px;color:var(--muted-2);}
   .asx-total{font-size:10.5px;color:var(--muted-2);padding:4px 6px 2px 12px;}
   /* 연동 서버 정보 카드 + 시작 가이드 슬롯 — 자산 탐색기 상단(GIJO AS Desktop 아래) */
@@ -1963,12 +1975,72 @@
   function fillReports(box) {
     if (!asReportsCache.length) { box.innerHTML = '<div class="asx-empty">등록된 리포트 없음</div>'; return; }
     const typeLabel = (t) => t === "weekly" ? "주간" : t === "quarterly" ? "분기" : "수시";
-    box.innerHTML = asReportsCache.map((r) => {
+    box.innerHTML = asReportsCache.map((r, i) => {
       const d = r.createdAt ? new Date(r.createdAt).toLocaleDateString("ko-KR") : "";
+      const file = r.pdf || r.docx || "";
+      const view = file ? '<span class="asx-view" data-view="' + i + '" title="' + (r.pdf ? "리포트 바로 보기 (PDF)" : "파일 열기") + '">👁</span>' : "";
       return '<div class="asx-file" data-report="1" title="리포트 화면에서 열기"><span class="asx-ic">📄</span>' +
-        '<span class="asx-nm">' + escT(typeLabel(r.type) + " 리포트 · " + d) + '</span></div>';
+        '<span class="asx-nm">' + escT(typeLabel(r.type) + " 리포트 · " + d) + '</span>' + view + '</div>';
     }).join("");
+    // 👁 보기 — 대시보드에서 바로 PDF를 띄운다(행 클릭은 리포트 화면 이동, 아이콘 클릭은 여기서 보기).
+    box.querySelectorAll(".asx-view").forEach((el) => el.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openReportInline(asReportsCache[Number(el.dataset.view)]);
+    }));
     box.querySelectorAll("[data-report]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo("report.html")));
+  }
+
+  // 리포트 뷰어 — 저장된 PDF를 대시보드 모달에서 바로 띄운다. PDF가 없으면 파일을 내려받는다(정직한 폴백).
+  function ensureReportViewer() {
+    let m = document.getElementById("reportViewModal");
+    if (m) return m;
+    m = document.createElement("div");
+    m.id = "reportViewModal";
+    m.className = "rvm";
+    m.innerHTML = '<div class="rvm-box"><div class="rvm-head"><span class="rvm-t" id="rvmTitle">리포트</span>' +
+      '<button class="rvm-dl" id="rvmDl">⬇ 다운로드</button><button class="rvm-x" id="rvmX">✕ 닫기</button></div>' +
+      '<div class="rvm-body" id="rvmBody"></div></div>';
+    document.body.appendChild(m);
+    const close = () => { m.classList.remove("open"); if (m._url) { URL.revokeObjectURL(m._url); m._url = null; } document.getElementById("rvmBody").innerHTML = ""; };
+    m.querySelector("#rvmX").addEventListener("click", close);
+    m.addEventListener("click", (e) => { if (e.target === m) close(); });
+    return m;
+  }
+  async function reportBlobUrl(name) {
+    const f = await window.gijo.downloadReportFile(name);
+    const bytes = Uint8Array.from(atob(f.base64), (c) => c.charCodeAt(0));
+    return { url: URL.createObjectURL(new Blob([bytes], { type: f.mime })), file: f };
+  }
+  async function openReportInline(entry) {
+    if (!entry) return;
+    const typeLabel = (t) => t === "weekly" ? "주간" : t === "quarterly" ? "분기" : "수시";
+    // PDF가 있으면 모달 뷰어로 바로 보기, 없으면 DOCX 다운로드.
+    if (entry.pdf) {
+      const m = ensureReportViewer();
+      const body = document.getElementById("rvmBody");
+      document.getElementById("rvmTitle").textContent = typeLabel(entry.type) + " 리포트 · " + (entry.createdAt ? new Date(entry.createdAt).toLocaleString("ko-KR") : "");
+      body.innerHTML = '<div style="color:#ccc;padding:22px;font-size:12.5px">불러오는 중…</div>';
+      m.classList.add("open");
+      document.getElementById("rvmDl").onclick = () => downloadReport(entry.pdf);
+      try {
+        const { url } = await reportBlobUrl(entry.pdf);
+        m._url = url;
+        body.innerHTML = '<iframe src="' + url + '" style="width:100%;height:100%;border:0;"></iframe>';
+      } catch (e) {
+        body.innerHTML = '<div style="color:#f5928a;padding:22px;font-size:12.5px">PDF를 불러오지 못했습니다: ' + escT((e && e.message) || e) + "</div>";
+      }
+    } else if (entry.docx) {
+      downloadReport(entry.docx);
+    }
+  }
+  // 리포트 파일 다운로드(뷰어 없이도 저장) — report.html의 downloadReport와 동일 동작.
+  async function downloadReport(name) {
+    try {
+      const { url, file } = await reportBlobUrl(name);
+      const a = document.createElement("a"); a.href = url; a.download = file.name;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 8000);
+    } catch (e) { alert("리포트를 내려받지 못했습니다: " + ((e && e.message) || e)); }
   }
   function fillDocs(box) {
     if (!asDocsCache.length) { box.innerHTML = '<div class="asx-empty">등록된 문서 없음</div>'; return; }
