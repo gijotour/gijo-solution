@@ -5,7 +5,7 @@ import { computeKpiSnapshot, resetKpiForTests, vulnerabilityBurndown } from "../
 import { importVulnScan } from "../src/engine/vulnscan";
 import { resetKevForTests } from "../src/engine/kev";
 import { resetAssetsForTests, seedSampleAssetsIfEmpty } from "../src/engine/assets";
-import { createTask, resetTasksForTests } from "../src/engine/tasks";
+import { createTask, setTaskDone, resetTasksForTests } from "../src/engine/tasks";
 
 async function login(app: ReturnType<typeof createApp>) {
   const res = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" });
@@ -44,6 +44,28 @@ describe("kpi (통합 보안 KPI 대시보드)", () => {
       expect(snap[k]).toBeTruthy();
     }
     expect(snap.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it("종합 보안태세 점수와 요소 값을 포함한다(0~100)", async () => {
+    const snap = await computeKpiSnapshot();
+    expect(snap.posture).toBeTruthy();
+    expect(snap.posture.score).toBeGreaterThanOrEqual(0);
+    expect(snap.posture.score).toBeLessThanOrEqual(100);
+    expect(["good", "fair", "poor"]).toContain(snap.posture.band);
+    expect(snap.posture.factors.length).toBe(3);
+  });
+
+  it("MTTR: 완료건 3건 미만이면 null(집계 중), 3건↑이면 평균일을 계산한다", async () => {
+    // 완료건 없음 → null
+    expect((await computeKpiSnapshot()).mttrDays).toBeNull();
+    // vuln: 조치 태스크 3건 생성 후 완료 처리 → 완료시각 기록됨
+    const t1 = createTask({ text: "조치1", ref: "vuln:10.0.0.1" });
+    const t2 = createTask({ text: "조치2", ref: "vuln:10.0.0.2" });
+    const t3 = createTask({ text: "조치3", ref: "vuln:10.0.0.3" });
+    setTaskDone(t1.id, true); setTaskDone(t2.id, true); setTaskDone(t3.id, true);
+    const snap = await computeKpiSnapshot();
+    expect(snap.mttrDays).not.toBeNull();
+    expect(snap.mttrDays).toBeGreaterThanOrEqual(0); // 방금 완료 → 거의 0일
   });
 
   it("includes vulnerability remediation metrics (active/KEV/fixed) from vuln scans", async () => {

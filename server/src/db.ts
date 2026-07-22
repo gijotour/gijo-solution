@@ -473,3 +473,10 @@ migrate(
   "hardening-target-standard-2026-07-21",
   `ALTER TABLE hardening_targets ADD COLUMN standard TEXT NOT NULL DEFAULT 'kisa'`
 );
+
+// 조치 완료 시각 — MTTR(평균 조치 소요시간) 산출용. 완료 처리 시 채워지고, 다시 미완료로 되돌리면 비운다.
+// 기존 완료 태스크는 NULL(완료시각 미상)이라 MTTR 집계에서 제외된다 — 배포 후 완료건부터 누적.
+migrate(
+  "tasks-completedAt-2026-07-22",
+  `ALTER TABLE tasks ADD COLUMN completedAt INTEGER`
+);

@@ -53,6 +53,10 @@ export interface KpiSnapshot {
     dueSoon: number; // 3일 내 마감(미완료)
     slaCompliance: number; // 기한 초과 안 한 비율 %
   };
+  // 종합 보안태세 점수(0~100) — 기존 실지표를 가중 합성한 한 줄 대표값(임원 보고용). 규칙 기반.
+  posture: { score: number; band: "good" | "fair" | "poor"; factors: { label: string; value: number }[] };
+  // MTTR(평균 조치 소요일) — 완료된 조치 태스크의 (완료−생성) 평균. 표본이 적으면 null(집계 중).
+  mttrDays: number | null;
 }
 
 const todayStr = todayLocal;
@@ -155,6 +159,44 @@ function remediationMetrics(): KpiSnapshot["remediation"] {
   return { tasks: tasks.length, open, done, overdue, dueSoon, slaCompliance };
 }
 
+// MTTR(평균 조치 소요일) — 완료시각이 기록된 조치 태스크(vuln:)의 (완료−생성) 평균.
+// 표본이 3건 미만이면 신뢰할 수 없어 null(집계 중)로 둔다. 완료시각 컬럼 도입 전 완료건은 제외된다.
+function computeMttrDays(): number | null {
+  const done = listTasks().filter((t) => (t.ref ?? "").startsWith("vuln:") && t.done && t.completedAt && t.completedAt >= t.createdAt);
+  if (done.length < 3) return null;
+  const avgMs = done.reduce((s, t) => s + ((t.completedAt as number) - t.createdAt), 0) / done.length;
+  return Math.round((avgMs / 86400000) * 10) / 10; // 소수 1자리 일
+}
+
+// 종합 보안태세 점수(0~100) — 기존 실지표를 가중 합성. 높을수록 좋음. 규칙 기반(결정적).
+// 요소: 취약점 조치율·SLA 준수·컴플라이언스 대응률(양의 기여) + KEV/Critical·기한초과·고위험자산(감점).
+function computePosture(
+  v: KpiSnapshot["vulnerabilities"],
+  rem: KpiSnapshot["remediation"],
+  compRate: number,
+  assets: KpiSnapshot["assets"]
+): KpiSnapshot["posture"] {
+  const highRiskRatio = assets.total ? assets.highRisk / assets.total : 0;
+  // 100에서 시작해 위험 요인만큼 감점 — 각 요인은 상한이 있어 한 요인이 점수를 독식하지 않는다.
+  let score = 100;
+  score -= Math.min(25, v.kev * 8 + v.critical * 4); // 실제 악용·치명 취약점
+  score -= Math.min(15, rem.overdue * 5); // SLA 기한 초과
+  score -= Math.min(15, Math.round(highRiskRatio * 30)); // 고위험 자산 비중
+  score -= Math.min(15, Math.round((100 - rem.slaCompliance) * 0.15)); // SLA 미준수
+  score -= Math.min(15, Math.round((100 - compRate) * 0.15)); // 컴플라이언스 미대응
+  score = Math.max(0, Math.min(100, Math.round(score)));
+  const band = score >= 80 ? "good" : score >= 55 ? "fair" : "poor";
+  return {
+    score,
+    band,
+    factors: [
+      { label: "취약점 조치율", value: v.remediationRate },
+      { label: "SLA 준수율", value: rem.slaCompliance },
+      { label: "컴플라이언스 대응률", value: compRate },
+    ],
+  };
+}
+
 export async function computeKpiSnapshot(): Promise<KpiSnapshot> {
   const assets = listAssets();
 
@@ -173,10 +215,15 @@ export async function computeKpiSnapshot(): Promise<KpiSnapshot> {
 
   const runs = listLearnloopRuns();
 
+  const assetRisk = riskCounts();
+  const vulns = vulnerabilityMetrics();
+  const rem = remediationMetrics();
+  const compRate = applicable ? Math.round((covered / applicable) * 100) : 0;
+
   return {
     date: todayStr(),
     at: Date.now(),
-    assets: riskCounts(),
+    assets: assetRisk,
     findings: { total: fa.total, pending: fa.pending, approved: fa.approved, rejected: fa.rejected },
     inspections: {
       total: ms.total,
@@ -194,14 +241,16 @@ export async function computeKpiSnapshot(): Promise<KpiSnapshot> {
     compliance: {
       total: compliance.length,
       covered,
-      coverageRate: applicable ? Math.round((covered / applicable) * 100) : 0,
+      coverageRate: compRate,
     },
     learning: {
       totalRuns: runs.length,
       deployedModels: runs.filter((r) => r.stage === "done").length,
     },
-    vulnerabilities: vulnerabilityMetrics(),
-    remediation: remediationMetrics(),
+    vulnerabilities: vulns,
+    remediation: rem,
+    posture: computePosture(vulns, rem, compRate, assetRisk),
+    mttrDays: computeMttrDays(),
   };
 }
 

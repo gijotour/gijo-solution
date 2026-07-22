@@ -956,6 +956,10 @@ export interface KpiSnapshot {
   cti: { totalFindings: number; matchedFindings: number; affectedAssets: number; criticalMatches: number };
   compliance: { total: number; covered: number; coverageRate: number };
   learning: { totalRuns: number; deployedModels: number };
+  vulnerabilities?: { hosts: number; active: number; critical: number; high: number; medium: number; low: number; kev: number; newCount: number; resurfaced: number; newlyFixed: number; remediationRate: number };
+  remediation?: { tasks: number; open: number; done: number; overdue: number; dueSoon: number; slaCompliance: number };
+  posture?: { score: number; band: "good" | "fair" | "poor"; factors: { label: string; value: number }[] };
+  mttrDays?: number | null;
 }
 
 export interface BurndownPoint {

@@ -50,6 +50,25 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .footer{margin-top:20px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted-2);max-width:1040px;}
 .footer img{height:16px;opacity:0.6;}
 
+/* 종합 태세 히어로 + 임원 헤드라인 (인터넷 모범사례: 한 줄 대표 점수 + 7~8 핵심 지표) */
+.hero{display:grid;grid-template-columns:300px 1fr;gap:14px;max-width:1040px;margin-bottom:22px;}
+.posture{background:linear-gradient(180deg,rgba(59,130,246,.1),transparent);border:1px solid var(--border-strong);border-radius:14px;padding:18px;display:flex;flex-direction:column;}
+.posture .pl{font-size:12px;font-weight:800;color:var(--muted);}
+.posture .pscore{display:flex;align-items:baseline;gap:8px;margin:6px 0 4px;}
+.posture .pv{font-size:52px;font-weight:900;line-height:1;}
+.posture .pb{font-size:13px;font-weight:800;padding:3px 10px;border-radius:20px;}
+.pb.good{background:rgba(30,185,128,.16);color:#6fdcb5;} .pb.fair{background:rgba(240,160,32,.16);color:#f7c777;} .pb.poor{background:rgba(226,72,61,.16);color:#f5928a;}
+.posture .pf{margin-top:auto;display:flex;flex-direction:column;gap:6px;padding-top:12px;}
+.pf-row{display:flex;align-items:center;gap:8px;font-size:11px;} .pf-row .l{width:120px;color:var(--muted);flex-shrink:0;}
+.pf-row .tr{flex:1;height:6px;background:var(--panel-2);border-radius:20px;overflow:hidden;} .pf-row .fl{height:100%;border-radius:20px;} .pf-row .vv{width:34px;text-align:right;font-weight:700;flex-shrink:0;}
+.headline{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+.hcard{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;display:flex;flex-direction:column;justify-content:center;}
+.hcard .hl{font-size:11.5px;color:var(--muted);display:flex;align-items:center;gap:5px;}
+.hcard .hv{font-size:28px;font-weight:800;margin-top:6px;line-height:1;}
+.hcard .hd{font-size:11px;font-weight:700;margin-top:5px;}
+.hd.up{color:#f5928a;} .hd.down{color:#6fdcb5;} .hd.flat{color:var(--muted-2);}
+.hcard .hsub{font-size:10px;color:var(--muted-2);margin-top:3px;}
+
 /* 추세 */
 .trend-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;max-width:1040px;}
 .trend-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
@@ -85,7 +104,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       </div>
     </div>
 
-    <div id="gijoChatWidget" data-prompts='["보안 KPI 현황 알려줘"]' style="max-width:640px;margin-bottom:16px;"></div>
+    <div id="gijoChatWidget" data-start="collapsed" data-prompts='["보안 KPI 현황 알려줘"]'></div>
 
     <div id="kpiRoot"><div style="color:var(--muted)">불러오는 중...</div></div>
 
@@ -171,6 +190,50 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     return `<svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px">${grid}${line("active", "#f5928a", 2.2)}${line("kev", "#ff5a4d", 2)}${xl}</svg>`;
   }
 
+  // 임원 헤드라인 카드 — 값 + 기간 대비 증감(delta). down=좋아짐(초록), up=나빠짐(빨강).
+  // betterWhenDown: 값이 줄어드는 게 좋은 지표(취약점·KEV·기한초과)면 true.
+  function headlineCard(label, value, unit, series, betterWhenDown, sub) {
+    var arr = (series || []).filter(function (x) { return typeof x === "number"; });
+    var delta = arr.length >= 2 ? arr[arr.length - 1] - arr[arr.length - 2] : null;
+    var dHtml = "";
+    if (delta != null && delta !== 0) {
+      var improved = betterWhenDown ? delta < 0 : delta > 0;
+      dHtml = '<div class="hd ' + (improved ? "down" : "up") + '">' + (delta > 0 ? "▲" : "▼") + Math.abs(delta) + (unit || "") + " (전일 대비)</div>";
+    } else if (delta === 0) {
+      dHtml = '<div class="hd flat">— 전일과 동일</div>';
+    } else {
+      dHtml = '<div class="hd flat">추세 누적 중</div>';
+    }
+    return '<div class="hcard"><div class="hl">' + label + '</div><div class="hv">' + value + (unit || "") + "</div>" + dHtml + (sub ? '<div class="hsub">' + sub + "</div>" : "") + "</div>";
+  }
+
+  function heroBlock(c, v, rem, series) {
+    var p = c.posture || { score: 0, band: "poor", factors: [] };
+    var pfBar = function (f) {
+      var col = f.value >= 80 ? "var(--teal)" : f.value >= 55 ? "var(--amber)" : "#f5928a";
+      return '<div class="pf-row"><span class="l">' + f.label + '</span><div class="tr"><div class="fl" style="width:' + Math.min(100, f.value) + "%;background:" + col + '"></div></div><span class="vv" style="color:' + col + '">' + f.value + "%</span></div>";
+    };
+    var pcol = p.band === "good" ? "#6fdcb5" : p.band === "fair" ? "#f7c777" : "#f5928a";
+    var bandTxt = p.band === "good" ? "양호" : p.band === "fair" ? "보통" : "취약";
+    var mttr = c.mttrDays == null ? '<span style="color:var(--muted-2)">집계 중</span>' : c.mttrDays + "일";
+    var mttrSub = c.mttrDays == null ? "조치 완료건 3건↑ 쌓이면 표시" : "조치 태스크 완료 평균";
+    return (
+      '<div class="hero">' +
+      '<div class="posture"><div class="pl">🛡 종합 보안태세</div>' +
+      '<div class="pscore"><span class="pv" style="color:' + pcol + '">' + p.score + '</span><span class="pb ' + p.band + '">' + bandTxt + "</span></div>" +
+      '<div style="font-size:10.5px;color:var(--muted-2)">100점 만점 · 실지표 가중 합성(악용·기한초과·고위험자산 감점)</div>' +
+      '<div class="pf">' + p.factors.map(pfBar).join("") + "</div></div>" +
+      '<div class="headline">' +
+      headlineCard("🔴 열린 취약점", v.active, "건", series("vulnerabilities.active"), true, "fixed 제외 현재 노출") +
+      headlineCard("🚨 실제 악용(KEV)", v.kev, "건", series("vulnerabilities.kev"), true, "CISA KEV 등재 — 최우선") +
+      headlineCard("⏱ MTTR", mttr, "", null, true, mttrSub) +
+      headlineCard("📋 SLA 준수율", rem.slaCompliance, "%", series("remediation.slaCompliance"), false, "조치 기한 준수 비율") +
+      headlineCard("✓ 취약점 조치율", v.remediationRate, "%", null, false, "고쳐짐/(열림+고쳐짐)") +
+      headlineCard("📕 컴플라이언스 대응률", c.compliance.coverageRate, "%", series("compliance.coverageRate"), false, "KISA 위협 대응") +
+      "</div></div>"
+    );
+  }
+
   async function load() {
     const root = document.getElementById("kpiRoot");
     try {
@@ -182,6 +245,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       const rem = c.remediation || { tasks: 0, open: 0, done: 0, overdue: 0, dueSoon: 0, slaCompliance: 100 };
 
       root.innerHTML =
+        heroBlock(c, v, rem, series) +
         `<div class="cat"><div class="cat-title">🖥 자산 위험도</div><div class="tiles">` +
         tile("전체 자산", c.assets.total) +
         tile("고위험", c.assets.highRisk, "#f5928a") +
@@ -269,11 +333,13 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   const isPinnedCat = (t) => t.indexOf("📉") >= 0 || t.indexOf("📈") >= 0;
   function wireKpiCollapse() {
     const root = document.getElementById("kpiRoot");
-    // 번다운 섹션을 맨 위로(원래 상대순서 유지).
+    // 번다운 섹션을 위로(단, 종합 태세 히어로 바로 다음에 — 히어로는 항상 최상단 유지).
+    const hero = root.querySelector(".hero");
+    const anchor = hero ? hero.nextSibling : root.firstChild;
     [...root.querySelectorAll(".cat")]
       .filter((c) => isPinnedCat(c.querySelector(".cat-title") ? c.querySelector(".cat-title").textContent : ""))
       .reverse()
-      .forEach((c) => root.insertBefore(c, root.firstChild));
+      .forEach((c) => root.insertBefore(c, anchor));
     let saved = {};
     try { saved = JSON.parse(localStorage.getItem("gijo.kpi.collapsed") || "{}"); } catch (e) {}
     root.querySelectorAll(".cat").forEach((cat) => {

@@ -15,6 +15,7 @@ export interface TaskItem {
   dueAt?: number; // SLA 기한(ms). 없으면 기한 없음.
   assignee?: string; // 담당자
   ref?: string; // 연결된 취약점/자산 참조 (예: "vuln:192.168.219.98")
+  completedAt?: number; // 완료 처리 시각(ms) — MTTR 산출용. 미완료면 없음.
 }
 
 interface TaskRow {
@@ -27,6 +28,7 @@ interface TaskRow {
   dueAt: number | null;
   assignee: string | null;
   ref: string | null;
+  completedAt: number | null;
 }
 
 function fromRow(row: TaskRow): TaskItem {
@@ -40,14 +42,15 @@ function fromRow(row: TaskRow): TaskItem {
     dueAt: row.dueAt ?? undefined,
     assignee: row.assignee ?? undefined,
     ref: row.ref ?? undefined,
+    completedAt: row.completedAt ?? undefined,
   };
 }
 
 const insertStmt = db.prepare(
   "INSERT INTO tasks (id, priority, text, agentId, done, createdAt, dueAt, assignee, ref) VALUES (@id, @priority, @text, @agentId, @done, @createdAt, @dueAt, @assignee, @ref)"
 );
-const completeStmt = db.prepare("UPDATE tasks SET done = 1 WHERE id = ?");
-const setDoneStmt = db.prepare("UPDATE tasks SET done = ? WHERE id = ?");
+const completeStmt = db.prepare("UPDATE tasks SET done = 1, completedAt = COALESCE(completedAt, @now) WHERE id = @id");
+const setDoneStmt = db.prepare("UPDATE tasks SET done = @done, completedAt = @completedAt WHERE id = @id");
 const deleteStmt = db.prepare("DELETE FROM tasks WHERE id = ?");
 const updatePriorityStmt = db.prepare("UPDATE tasks SET priority = ? WHERE id = ?");
 const listStmt = db.prepare("SELECT * FROM tasks ORDER BY createdAt ASC");
@@ -86,13 +89,14 @@ export function createTask(args: {
 }
 
 export function completeTask(id: string): TaskItem[] {
-  completeStmt.run(id);
+  completeStmt.run({ id, now: Date.now() });
   return listTasks();
 }
 
 // 완료 ↔ 미완료 토글 (담당자가 체크박스로 진행 상태를 직접 바꾼다).
+// 완료로 바꾸면 완료시각을 남기고(MTTR용), 미완료로 되돌리면 비운다.
 export function setTaskDone(id: string, done: boolean): TaskItem[] {
-  setDoneStmt.run(done ? 1 : 0, id);
+  setDoneStmt.run({ id, done: done ? 1 : 0, completedAt: done ? Date.now() : null });
   return listTasks();
 }
 
