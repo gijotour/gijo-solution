@@ -125,6 +125,42 @@ GIJO_LOCAL_LLM_CTX_SIZE=32768
 - 16GB 티어(4080·4070 Ti Super)는 "채팅 1 + 32K" 또는 "채팅 2 + 8K" 중 택일 — 기본은 전자 권장.
 - 48GB+(A6000 Ada·듀얼 GPU)는 14B×2 + 7B + 임베딩 구성으로 역할별 전문화 확대 가능.
 
+## 7. 지원 환경 요건 — "Mac이나 CUDA 없는 서버는?"
+
+**현재 제품은 NVIDIA CUDA GPU(12GB+) 전용이다. Mac·AMD·CPU-only는 미지원.**
+
+| 환경 | 지원 | 사유 |
+|---|---|---|
+| **NVIDIA GPU (CUDA) 12GB+** | ✅ 유일한 지원 환경 | 동봉 llama-server가 CUDA 빌드, VRAM 예산·LRU 축출이 nvidia-smi 실측에 의존, 전 티어 실측 검증이 이 환경 기준 |
+| Mac (Apple Silicon) | ❌ 미지원 | 기반 엔진(llama.cpp)은 Metal을 지원하므로 **기술적으로 불가능하진 않으나**, 서버 배포 스크립트(WSL/systemd)·클라이언트 설치본(NSIS, Windows 전용)·nvidia-smi 의존 로직 전부 포팅+재검증 필요 — 로드맵 후보일 뿐 현재 제품 범위 밖 |
+| AMD GPU (ROCm/Vulkan) | ❌ 미지원 | llama.cpp가 지원은 하나 당사 빌드·검증 전무. VRAM 관리 로직도 nvidia-smi 전제 |
+| CPU-only | ❌ 실사용 불가 | 7B Q5가 CPU에서 ~2-5 tok/s 수준 — 챗봇·triage 응답이 분 단위가 되어 제품 경험 성립 안 함 |
+
+영업 화법: "NVIDIA GPU 12GB 이상이 설치 요건입니다. 보유 장비에 NVIDIA GPU가 없으면 GPU 1장
+추가(Lite 기준 미들급)가 선행돼야 합니다." — Mac 지원 문의는 로드맵 수요로 기록만.
+
+## 8. 실측 스크립트 사용법 — tools/model-benchmark.mjs
+
+설치 현장·데모에서 그 장비의 티어 판정 + 모델 실측을 한 번에 뽑는다. **출력 자체가 제품 가이드라인**
+(티어 판정·권장 환경변수·실측 표)이라 그대로 고객 제출용으로 쓸 수 있다.
+
+```bash
+# 기본: 이 장비 티어 판정 + models/ 아래 전 모델 실측(여유 VRAM에 안 들어가는 모델은 자동 스킵)
+node tools/model-benchmark.mjs
+
+# 특정 모델만, 컨텍스트 지정
+node tools/model-benchmark.mjs --models gijo-main-orchestrator,merged-lily-gijo-loop-ai-securityllm --ctx 16384
+
+# 이미 떠 있는(상주) 서버는 로드 없이 추론 속도만 측정 — 운영 중 안전
+node tools/model-benchmark.mjs --probe "8080=지휘모델"
+
+# 옵션: --ctx 8192|16384|32768 · --tokens 160(생성량) · --prompt "..."(측정 프롬프트)
+```
+
+출력 구성: ① GPU 실측(총/사용/여유 VRAM) ② **GIJO AS 티어 판정**(Lite/Standard/Pro + 설치 환경변수,
+NVIDIA 미감지 시 "미지원 환경" 안내) ③ 모델별 실측 표(로드시간·VRAM 점유·첫 토큰·tok/s, markdown).
+안전장치: 로드 전 여유 VRAM을 확인해 부족하면 스킵 — 운영 GPU를 밀어내지 않는다.
+
 ## 부록 — 실측 결과 (2026-07-22, RTX 3090 · tools/model-benchmark.mjs)
 
 판매 구성 그대로의 실제 모델을 단독 로드해 측정(160토큰 생성, 프롬프트=한국어 보안 질문):
@@ -143,6 +179,18 @@ GIJO_LOCAL_LLM_CTX_SIZE=32768
 - 응답 체감: 두 운영 모델 모두 첫 토큰 50ms 미만·115~120 tok/s — 스왑 없이 즉답 품질
 - 재실행: `node tools/model-benchmark.mjs --ctx 16384` (여유 VRAM 부족 모델은 자동 스킵,
   상주 서버는 `--probe 포트=이름`으로 로드 없이 속도만 측정)
+
+실행 시 티어 판정이 함께 출력된다(이 장비 예시):
+
+```
+## GIJO AS 티어 판정 (이 장비 기준)
+- 판정: 🟩 AS Standard (24GB급) — 총 VRAM 24.0GB
+- 권장 구성: 보안 LLM 2개(지휘+전문가) + RAG 임베딩 · 컨텍스트 32K
+- 설치 설정(환경변수):
+  GIJO_MAX_LOADED_MODELS=2
+  GIJO_LOCAL_LLM_CTX_SIZE=32768 (기본값 그대로)
+- 실측 근거: 7B급 2개 @32K ≈ 14GB + 임베딩 ≈ 2GB → 총 16GB(여유 8GB). 운영 검증 구성.
+```
 
 ## 출처
 

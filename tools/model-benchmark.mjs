@@ -116,11 +116,58 @@ async function benchLoad(model) {
 
 function row(cells) { return `| ${cells.join(" | ")} |`; }
 
+// GIJO AS VRAM 티어 판정 — GIJO_AS_VRAM_티어_구동_가이드라인.md의 표를 코드로 옮긴 것.
+// 총 VRAM 기준: <16GB → Lite(단일 LLM·16K) · 16~28GB → Standard(2개·32K) · ≥28GB → Pro(3개·32K).
+function tierJudgment(g) {
+  if (!g) return null;
+  const totalGb = g.total / 1024;
+  if (totalGb < 16) {
+    return {
+      name: "🟦 AS Lite (12GB급)", models: "보안 LLM 1개 + RAG 임베딩(bge-m3)", ctx: "16K(여유 우선 시 8K)",
+      env: ["GIJO_MAX_LOADED_MODELS=1", "GIJO_LOCAL_LLM_CTX_SIZE=16384", "GIJO_MODEL_VRAM_OVERHEAD_MB=3500"],
+      note: "실측 근거: 7B Q5 @16K ≈ 6~7GB + 임베딩 ≈ 2GB → 총 8~9GB. 두 번째 LLM 상주는 불가(스왑 교대만).",
+    };
+  }
+  if (totalGb < 28) {
+    return {
+      name: "🟩 AS Standard (24GB급)", models: "보안 LLM 2개(지휘+전문가) + RAG 임베딩", ctx: "32K",
+      env: ["GIJO_MAX_LOADED_MODELS=2", "GIJO_LOCAL_LLM_CTX_SIZE=32768 (기본값 그대로)"],
+      note: "실측 근거: 7B급 2개 @32K ≈ 14GB + 임베딩 ≈ 2GB → 총 16GB(여유 8GB). 운영 검증 구성.",
+    };
+  }
+  return {
+    name: "🟪 AS Pro (30GB+급)", models: "보안 LLM 3개(지휘+전문가+특화) + RAG 임베딩", ctx: "32K(3번째는 Q4·16K 권장)",
+    env: ["GIJO_MAX_LOADED_MODELS=3", "GIJO_LOCAL_LLM_CTX_SIZE=32768"],
+    note: "3번째 모델까지 ≈ 27~29GB — 32GB에서 3번째는 Q4·16K로 낮춰 여유 5GB 확보 권장.",
+  };
+}
+
+function printTier(g) {
+  const t = tierJudgment(g);
+  if (!t) {
+    console.log(`## GIJO AS 티어 판정 (이 장비 기준)`);
+    console.log(`- **판정: ❌ 미지원 환경** — NVIDIA GPU(nvidia-smi)가 감지되지 않음`);
+    console.log(`- 제품 요건: **NVIDIA CUDA GPU, VRAM 12GB 이상** (llama-server CUDA 빌드 + nvidia-smi VRAM 예산 관리)`);
+    console.log(`- Mac(Apple Silicon)·AMD·CPU-only는 현재 제품 빌드·검증 범위 밖 — 상세는 VRAM 티어 가이드라인 "지원 환경 요건" 참조`);
+    console.log("");
+    return;
+  }
+  console.log(`## GIJO AS 티어 판정 (이 장비 기준)`);
+  console.log(`- **판정: ${t.name}** — 총 VRAM ${(g.total / 1024).toFixed(1)}GB`);
+  console.log(`- 권장 구성: ${t.models} · 컨텍스트 ${t.ctx}`);
+  console.log(`- 설치 설정(환경변수):`);
+  for (const e of t.env) console.log(`  \`${e}\``);
+  console.log(`- ${t.note}`);
+  console.log(`- 상세: GIJO_AS_VRAM_티어_구동_가이드라인.md · 판매 라인업: GIJO_AS_제품_라인업_판매가이드.md`);
+  console.log("");
+}
+
 async function main() {
   const g = gpu();
   console.log(`# 모델 실측 벤치마크 (${new Date().toLocaleString("ko-KR")})`);
   console.log(`- GPU: ${g ? `total ${g.total}MB · used ${g.used}MB · free ${g.free}MB` : "nvidia-smi 없음"} · ctx=${CTX} · gen=${GEN_TOKENS}tok`);
   console.log("");
+  printTier(g);
 
   // --probe: 이미 떠 있는 서버(운영 상주 모델) 추론만 측정
   const probe = arg("probe", "");
