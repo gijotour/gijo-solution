@@ -215,6 +215,96 @@ async function runServer() {
   save("qa-auto-server.json");
 }
 
+// ──────────────────── 지식 계층(ver2: bge 검색→온톨로지→LLM 답변) ────────────────────
+// 인터넷 리서치 문서(knowledge/) 인입 후, 검색→그래프 확장→실 LLM 답변까지 실경로 검증.
+// LLM 답변은 판정과 별개로 전문을 출력한다 — 자동검사만 믿지 말고 사람이 읽는다.
+async function runKnowledge() {
+  const BASE = process.env.QA_BASE || "http://localhost:4000";
+  const USER = process.env.QA_USER, PASS = process.env.QA_PASS;
+  if (!USER || !PASS) { console.error("QA_USER/QA_PASS 환경변수가 필요합니다"); process.exit(2); }
+  const login = await (await fetch(BASE + "/api/auth/login", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ username: USER, password: PASS, force: true }) })).json();
+  const H = { "content-type": "application/json", authorization: `Bearer ${login.accessToken}` };
+  const post = async (p, body) => {
+    const res = await fetch(BASE + p, { method: "POST", headers: H, body: JSON.stringify(body) });
+    if (!res.ok) throw new Error(`HTTP ${res.status}: ${(await res.text()).slice(0, 150)}`);
+    return res.json();
+  };
+
+  await scenario("QA-K01", "bge 검색", "거버넌스 질문이 새 문서 청크를 찾는다", {
+    given: "NIST CSF 2.0 거버넌스 문서가 bge-m3 임베딩으로 인입된 뒤",
+    when: "'NIST CSF 2.0에서 거버넌스 기능이 뭐야?'로 지식 검색(/api/memory/query)하면",
+    then: "GOVERN/거버넌스가 담긴 청크가 상위로 검색된다",
+  }, async () => {
+    const chunks = await post("/api/memory/query", { question: "NIST CSF 2.0에서 거버넌스 기능이 뭐야?", topK: 4 });
+    const hit = chunks.findIndex((c) => /GOVERN|거버넌스/.test(c));
+    if (hit < 0) throw new Error("관련 청크 없음");
+    return `청크 ${chunks.length}건, ${hit + 1}위에 적중: "${chunks[hit].slice(0, 60)}…"`;
+  });
+
+  await scenario("QA-K02", "bge 검색", "CCE·CVE 차이 질문이 표준 문서를 찾는다", {
+    given: "취약점 식별체계 문서(CVE·CWE·CCE 구분)가 인입된 뒤",
+    when: "'CCE와 CVE의 차이가 뭐야?'로 지식 검색하면",
+    then: "설정(구성) 대 코드 결함 구분이 담긴 청크가 검색된다",
+  }, async () => {
+    const chunks = await post("/api/memory/query", { question: "CCE와 CVE의 차이가 뭐야?", topK: 4 });
+    const hit = chunks.findIndex((c) => /CCE/.test(c) && /설정|구성/.test(c));
+    if (hit < 0) throw new Error("관련 청크 없음");
+    return `청크 ${chunks.length}건, ${hit + 1}위에 적중`;
+  });
+
+  await scenario("QA-K03", "온톨로지", "우선순위 질문에 지식 그래프 규칙이 걸린다", {
+    given: "KEV·EPSS·CVSS 관계 트리플 37건이 온톨로지에 들어간 뒤",
+    when: "'KEV와 EPSS 중 뭘 먼저 봐야 해?'로 확장(/api/ontology/expand)하면",
+    then: "KEV 발행기관·조치원칙 등 관련 트리플이 동반 주입된다",
+  }, async () => {
+    const j = await post("/api/ontology/expand", { text: "KEV와 EPSS 중 뭘 먼저 봐야 해?" });
+    const txt = JSON.stringify(j);
+    if (!/CISA/.test(txt) || !/최우선/.test(txt)) throw new Error(`KEV 규칙 미포함: ${txt.slice(0, 120)}`);
+    const n = Array.isArray(j?.triples) ? j.triples.length : Array.isArray(j) ? j.length : "?";
+    return `확장 트리플 ${n}건 — CISA 발행·최우선 조치 규칙 포함`;
+  });
+
+  const ask = async (q) => {
+    const j = await post("/api/llm/chat", { agentId: "normaltic", message: q });
+    const reply = String(j.reply ?? "");
+    console.log(`\n──── 💬 실제 LLM 답변 (${q}) ────\n${reply}\n────────────────────────\n`);
+    if (/등록된 사내 자료에는 관련 내용이 없습니다/.test(reply)) throw new Error("그라운딩 실패 — 자료 못 찾음 답변");
+    return reply;
+  };
+
+  await scenario("QA-K04", "LLM 답변", "CVE·CWE·CCE 차이를 근거 기반으로 설명", {
+    given: "지식 해설 에이전트(normaltic, 참고자료만 근거로 답변)에",
+    when: "'CVE와 CWE, CCE의 차이를 설명해줘'라고 물으면",
+    then: "인입 문서 근거로 사건/원인유형/설정 구분을 설명한다(전문은 사람이 검독)",
+  }, async () => {
+    const reply = await ask("CVE와 CWE, CCE의 차이를 설명해줘");
+    if (!/CWE/.test(reply) || !/설정|구성/.test(reply)) throw new Error("핵심 구분 누락");
+    return `답변 ${reply.length}자 — CWE·설정 구분 포함`;
+  });
+
+  await scenario("QA-K05", "LLM 답변", "취약점 우선순위를 KEV 최우선으로 안내", {
+    given: "우선순위 지표 문서·트리플이 들어간 상태에서",
+    when: "'취약점이 수백 건인데 뭐부터 조치해야 해?'라고 물으면",
+    then: "KEV 최우선 → EPSS/Critical → CVSS 순서를 안내한다",
+  }, async () => {
+    const reply = await ask("취약점이 수백 건인데 뭐부터 조치해야 해? KEV, EPSS, CVSS 기준으로 알려줘");
+    if (!/KEV/.test(reply)) throw new Error("KEV 미언급");
+    return `답변 ${reply.length}자 — KEV 우선순위 포함`;
+  });
+
+  await scenario("QA-K06", "LLM 답변", "NIST CSF 2.0 신설 기능을 설명", {
+    given: "거버넌스 표준 문서가 들어간 상태에서",
+    when: "'NIST CSF 2.0에서 새로 생긴 기능이 뭐고 왜 중요해?'라고 물으면",
+    then: "GOVERN(거버넌스) 신설과 6기능 구조를 설명한다",
+  }, async () => {
+    const reply = await ask("NIST CSF 2.0에서 새로 생긴 기능이 뭐고 왜 중요해?");
+    if (!/거버넌스|GOVERN/i.test(reply)) throw new Error("거버넌스 미언급");
+    return `답변 ${reply.length}자 — 거버넌스 신설 포함`;
+  });
+
+  save("qa-auto-knowledge.json");
+}
+
 // ─────────────────────────── 클라 계층(헤드리스 실페이지) ───────────────────────────
 // 주의: Electron preload가 없는 환경이므로 window.gijo는 최소 스텁(인증·이동만).
 // 화면 로직·nav.js·hub.html·페이지 마크업은 전부 실물이 그대로 실행된다.
@@ -314,8 +404,8 @@ async function runClient() {
 // ─────────────────────────────────── 리포트 병합 ───────────────────────────────────
 function report() {
   const load = (n) => { try { return JSON.parse(fs.readFileSync(path.join(OUT_DIR, n), "utf8")); } catch { return null; } };
-  const sv = load("qa-auto-server.json"), cl = load("qa-auto-client.json");
-  const all = [...(sv?.results ?? []), ...(cl?.results ?? [])];
+  const sv = load("qa-auto-server.json"), cl = load("qa-auto-client.json"), kn = load("qa-auto-knowledge.json");
+  const all = [...(sv?.results ?? []), ...(kn?.results ?? []), ...(cl?.results ?? [])];
   const pass = all.filter((r) => r.pass).length;
   const lines = [];
   lines.push(`# QA Auto ver1 — 실행 결과`);
@@ -337,6 +427,7 @@ function report() {
 }
 
 if (layer === "server") await runServer();
+else if (layer === "knowledge") await runKnowledge();
 else if (layer === "client") await runClient();
 else if (layer === "report" || process.argv.includes("--report")) report();
 else { console.error("--layer=server | --layer=client | --report 중 하나를 지정하세요"); process.exit(2); }
