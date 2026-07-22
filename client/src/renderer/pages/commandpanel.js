@@ -51,15 +51,24 @@
       ".gcp-send{background:var(--blue,#3b82f6);color:#fff;border:none;border-radius:9px;padding:0 15px;font-weight:800;font-size:12px;cursor:pointer;}" +
       ".gcp-sitem{font-size:11.5px;color:var(--text,#e6edf7);padding:6px 12px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid rgba(255,255,255,.03);}" +
       ".gcp-sitem:hover{background:rgba(255,255,255,.04);}" +
-      // 대시보드 작업 세션과 동일한 2줄 카드(상태 점·제목·날짜·주체·상태·턴수·미리보기).
-      ".gcp-scard{padding:8px 12px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04);}" +
+      // 대시보드 작업 세션 패널과 동일한 카드(상태 점·제목·✓완료·🗑삭제 / 날짜·주체·상태·턴수·미리보기).
+      ".gcp-abadge{background:rgba(30,185,128,.15);color:var(--teal,#1eb980);border:1px solid rgba(30,185,128,.35);border-radius:20px;font-size:10.5px;font-weight:800;padding:3px 10px;white-space:nowrap;}" +
+      ".gcp-abadge.zero{background:rgba(139,147,171,.12);color:var(--muted-2,#5f6b82);border-color:transparent;}" +
+      ".gcp-scard{padding:7px 12px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04);}" +
       ".gcp-scard:hover{background:rgba(255,255,255,.04);}" +
       ".gcp-sr1{display:flex;align-items:center;gap:6px;}" +
-      ".gcp-sdot{width:7px;height:7px;border-radius:50%;background:var(--muted-2,#5f6b82);flex:0 0 auto;}" +
+      ".gcp-sdot{width:6px;height:6px;border-radius:50%;background:var(--muted-2,#5f6b82);flex:0 0 auto;}" +
       ".gcp-scard.st-active .gcp-sdot{background:var(--teal,#1eb980);}" +
       ".gcp-scard.st-done .gcp-sdot{background:var(--muted-2,#5f6b82);}" +
-      ".gcp-st{font-size:12px;font-weight:700;color:var(--text,#e6edf7);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}" +
-      ".gcp-sr2{font-size:10px;color:var(--muted-2,#5f6b82);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}";
+      ".gcp-st{font-size:12px;font-weight:700;color:#fff;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}" +
+      ".gcp-scard.st-done .gcp-st{color:var(--muted,#8b93ab);}" +
+      ".gcp-sdone{flex:none;font-size:9.5px;font-weight:700;color:var(--teal,#1eb980);border:1px solid rgba(30,185,128,.4);border-radius:5px;padding:1px 5px;opacity:0;cursor:pointer;white-space:nowrap;}" +
+      ".gcp-scard:hover .gcp-sdone{opacity:.9;}.gcp-sdone:hover{background:rgba(30,185,128,.15);}" +
+      ".gcp-sdel{flex:none;font-size:11px;color:var(--muted-2,#5f6b82);opacity:0;cursor:pointer;padding:1px 4px;border-radius:5px;}" +
+      ".gcp-scard:hover .gcp-sdel{opacity:.8;}.gcp-sdel:hover{opacity:1;color:#f5928a;background:rgba(226,72,61,.12);}" +
+      ".gcp-sr2{font-size:10px;color:var(--muted-2,#5f6b82);margin:2px 0 0 12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}" +
+      ".gcp-sfull{padding:9px 12px;border-top:1px solid var(--border,#1e2a44);font-size:11px;color:var(--blue-light,#7ab0ff);font-weight:700;cursor:pointer;text-align:center;flex:0 0 auto;}" +
+      ".gcp-sfull:hover{background:var(--panel-2,#0e1526);}";
     document.head.appendChild(st);
   }
 
@@ -70,11 +79,13 @@
     panel = document.createElement("div");
     panel.id = "gijoCmdPanel";
     panel.innerHTML =
-      '<div class="gcp-head"><span class="gcp-title">🗂 작업 세션</span>' +
-      '<button class="gcp-close" id="gcpClose" title="작업 세션 닫기">◧ 접기</button></div>' +
+      '<div class="gcp-head"><span class="gcp-title">💬 작업 세션</span>' +
+      '<span class="gcp-abadge zero" id="gcpActive">진행중 -</span>' +
+      '<button class="gcp-close" id="gcpClose" title="작업 세션 닫기" style="margin-left:auto">◧ 접기</button></div>' +
       '<div class="gcp-acc gcp-sessions" id="gcpSessAcc" style="flex:1 1 auto">' +
       '<div class="gcp-ab" style="display:flex"><div class="gcp-sitem" id="gcpNewSess">＋ 새 작업 세션</div>' +
-      '<div id="gcpSessList" style="overflow-y:auto;flex:1 1 auto"><div class="gcp-empty">불러오는 중…</div></div></div></div>';
+      '<div id="gcpSessList" style="overflow-y:auto;flex:1 1 auto"><div class="gcp-empty">불러오는 중…</div></div></div></div>' +
+      '<div class="gcp-sfull" id="gcpSessFull">전체 작업 세션 열기 ↗</div>';
     document.body.appendChild(panel);
 
     tab = document.createElement("div");
@@ -92,6 +103,8 @@
       try { localStorage.removeItem("gijo:sessions:open"); } catch (e) {}
       window.gijo.navigateTo("sessions.html");
     });
+    // 전체 작업 세션 열기 — 세션 화면으로(대시보드 패널과 동일한 푸터).
+    panel.querySelector("#gcpSessFull").addEventListener("click", function () { window.gijo.navigateTo("sessions.html"); });
 
     // 초기 상태 복원(기본 닫힘).
     var open = false; try { open = localStorage.getItem(OPEN_KEY) === "1"; } catch (e) {}
@@ -105,28 +118,49 @@
     try { localStorage.setItem(OPEN_KEY, on ? "1" : "0"); } catch (e) {}
   }
 
-  // 대시보드 작업 세션 패널과 같은 상태 표기(일관성 — 사용자 지적 2026-07-22: 두 곳이 달라 보임).
+  // 대시보드 작업 세션 패널과 완전히 동일한 형식·동작(상태 점·제목·✓완료·🗑삭제 / 메타 + 진행중 배지).
   var STATUS_LABEL = { active: "진행중", done: "완료", ignored: "무시" };
+  function openSessionPage(id) {
+    try { localStorage.setItem("gijo:sessions:open", id); } catch (e) {}
+    window.gijo.navigateTo("sessions.html");
+  }
+  async function completeSession(id) {
+    try { await window.gijo.updateWorkSession(id, { status: "done" }); await loadSessions(); }
+    catch (e) { /* 완료 실패는 조용히 — 다음 로드에서 상태 반영 */ }
+  }
+  async function deleteSession(id) {
+    if (!window.confirm("이 세션과 대화를 삭제할까요? 되돌릴 수 없습니다.")) return;
+    try { await window.gijo.deleteWorkSession(id); await loadSessions(); } catch (e) {}
+  }
   async function loadSessions() {
     if (!sessBody) return;
     try {
       var list = await window.gijo.listWorkSessions();
+      var badge = panel.querySelector("#gcpActive");
+      if (badge) {
+        var active = list.filter(function (s) { return s.status === "active"; }).length;
+        badge.textContent = "진행중 " + active;
+        badge.classList.toggle("zero", active === 0);
+      }
       if (!list || !list.length) { sessBody.innerHTML = '<div class="gcp-empty">작업 세션이 없습니다.</div>'; return; }
-      // 대시보드와 동일한 데이터·형식(상태 점·제목 / 날짜·주체·상태·턴수·미리보기). 전체를 보여준다.
+      // 대시보드와 동일: 상태 점·제목·✓완료·🗑삭제 / 날짜·주체·상태·턴수·미리보기. 전체를 보여준다.
       sessBody.innerHTML = list.map(function (s) {
         var who = s.lastRole === "user" ? "나" : s.lastRole === "assistant" ? "AI 팀" : "—";
         var d = new Date(s.updatedAt);
         var when = (d.getMonth() + 1) + "." + d.getDate() + " " + String(d.getHours()).padStart(2, "0") + ":" + String(d.getMinutes()).padStart(2, "0");
         var stL = s.status === "done" ? (s.doneBy === "auto" ? "자동완료" : "완료") : (STATUS_LABEL[s.status] || s.status);
         var prev = s.lastPreview ? " — " + esc(s.lastPreview) : "";
+        var doneBtn = s.status !== "done" ? '<span class="gcp-sdone" data-done="' + esc(s.id) + '" title="세션 완료 — 리포트 자동 생성">✓ 완료</span>' : "";
         return '<div class="gcp-scard st-' + esc(s.status) + '" data-sid="' + esc(s.id) + '" title="작업 세션 열기">' +
-          '<div class="gcp-sr1"><span class="gcp-sdot"></span><span class="gcp-st">' + esc(s.title || s.id) + "</span></div>" +
+          '<div class="gcp-sr1"><span class="gcp-sdot"></span><span class="gcp-st">' + esc(s.title || s.id) + "</span>" + doneBtn +
+          '<span class="gcp-sdel" data-del="' + esc(s.id) + '" title="세션 삭제">🗑</span></div>' +
           '<div class="gcp-sr2">' + when + " · " + who + " · " + stL + " · " + (s.turnCount || 0) + "턴" + prev + "</div></div>";
       }).join("");
       sessBody.querySelectorAll("[data-sid]").forEach(function (el) {
-        el.addEventListener("click", function () {
-          try { localStorage.setItem("gijo:sessions:open", el.getAttribute("data-sid")); } catch (e) {}
-          window.gijo.navigateTo("sessions.html");
+        el.addEventListener("click", function (e) {
+          if (e.target.closest(".gcp-sdel")) { e.stopPropagation(); deleteSession(el.getAttribute("data-sid")); return; }
+          if (e.target.closest(".gcp-sdone")) { e.stopPropagation(); completeSession(el.getAttribute("data-sid")); return; }
+          openSessionPage(el.getAttribute("data-sid"));
         });
       });
     } catch (e) { sessBody.innerHTML = '<div class="gcp-empty">세션을 불러오지 못했습니다.</div>'; }

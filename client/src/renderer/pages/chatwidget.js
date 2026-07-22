@@ -59,8 +59,9 @@
   function build() {
     injectCss();
     host.removeAttribute("style");
-    // 정보 밀도가 높은 화면(자산 허브 등)은 data-start="collapsed"로 접힌 채 시작 — 상세를 가리지 않게.
-    var startCollapsed = host.dataset.start === "collapsed";
+    // 모든 화면에서 접힌 채 시작한다(사용자 방침 2026-07-22) — 우하단 "🤖 챗봇" 알약을 눌러 편다.
+    // data-start="open"을 명시한 화면만 펼친 채 시작(현재는 없음).
+    var startCollapsed = host.dataset.start !== "open";
     host.className = "gcw" + (startCollapsed ? " collapsed" : "");
     host.innerHTML =
       '<div class="gcw-head"><span class="gcw-title">🤖 이 화면 챗봇</span><span class="gcw-toggle" id="gcwToggle">' + (startCollapsed ? "🤖 챗봇" : "✕ 접기") + "</span></div>" +
