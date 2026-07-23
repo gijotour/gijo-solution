@@ -73,6 +73,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .hcard.clk:hover{border-color:var(--blue);transform:translateY(-1px);}
 .tile.clk{cursor:pointer;transition:border-color .12s,transform .12s;}
 .tile.clk:hover{border-color:var(--purple);transform:translateY(-1px);}
+.trend-card.clk{cursor:pointer;transition:border-color .12s,transform .12s;}
+.trend-card.clk:hover{border-color:var(--blue);transform:translateY(-1px);}
+.cat-link{margin-left:auto;font-size:10.5px;font-weight:700;color:var(--blue-light);cursor:pointer;}
+.cat-link:hover{text-decoration:underline;}
 
 /* 📂 상세 지표 — 임원 요약 아래 전체 세부 지표를 접이식 한 판으로 통합(기본 접힘) */
 .detail-panel{max-width:1040px;margin-bottom:24px;border:1px solid var(--border);border-radius:12px;background:var(--panel-2);overflow:hidden;}
@@ -396,6 +400,34 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       card.classList.add("clk");
       card.title = "클릭하면 현재 지표로 종합 보안 리포트를 생성합니다";
       card.addEventListener("click", askReport);
+    });
+    // 상세 지표 각 섹션 → 관련 화면 연결(타일·추세카드·제목 링크 모두 이동).
+    // 제목의 고유 토큰으로 대상 화면을 판별한다(개별 tile 호출을 건드리지 않는 방식).
+    const SECTION_PAGE = [
+      { key: "자산 위험도", page: "assethub.html" },   // 🖥 → 자산 허브
+      { key: "취약점 승인", page: "approvals.html" },   // 🔎 → 조치·승인
+      { key: "유지보수", page: "products.html" },       // 🔧 → 보안제품 등록부
+      { key: "CTI", page: "threat.html" },              // 🎯 → 위협 인텔
+      { key: "조치 현황", page: "vulnscan.html" },      // 🛡 → 취약점
+      { key: "조치 항목", page: "approvals.html" },     // 📋 → 조치·승인
+      { key: "컴플라이언스", page: "compliance.html" }, // ✓ → 컴플라이언스
+      { key: "취약점 번다운", page: "vulnscan.html" },  // 📉 → 취약점
+      { key: "추세", page: "vulnscan.html" },           // 📈 → 취약점
+    ];
+    panel && panel.querySelectorAll(".detail-body .cat").forEach((cat) => {
+      const title = cat.querySelector(".cat-title");
+      if (!title) return;
+      const m = SECTION_PAGE.find((s) => title.textContent.indexOf(s.key) >= 0);
+      if (!m) return;
+      cat.querySelectorAll(".tile, .trend-card").forEach((el) => {
+        el.classList.add("clk");
+        el.addEventListener("click", () => window.gijo.navigateTo(m.page));
+      });
+      const link = document.createElement("span");
+      link.className = "cat-link";
+      link.textContent = "→ 화면 열기";
+      link.addEventListener("click", () => window.gijo.navigateTo(m.page));
+      title.appendChild(link);
     });
     // AI 보안 타일 등 data-page 요소 → 해당 화면으로 이동.
     root.querySelectorAll("[data-page]").forEach((el) => {
