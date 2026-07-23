@@ -106,12 +106,15 @@ export function groupNameFor(findingType: string): string {
   return name.length >= 3 ? name : s;
 }
 
-interface VulnGroup {
+// 대상 호스트 1대당 1줄로 묶는다(사용자 요청 2026-07-23): 브리핑은 "쉬운 내용"이 목표이므로
+// 제품(패치) 단위보다 "이 호스트에 취약점 점검이 필요하다"가 담당자에게 더 직관적이다.
+// 제품명들은 why의 "대상:"에 요약해 남긴다(상세는 취약점 화면).
+interface HostVulnGroup {
   assetId: string;
   assetName: string;
-  name: string;
   count: number;
   kev: boolean;
+  kevCount: number;
   maxEpss: number | null;
   worstSeverity: string;
   earliestDue: number | null;
@@ -121,28 +124,27 @@ interface VulnGroup {
 const SEV_RANK: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
 
 function vulnItems(now: number): TodayItem[] {
-  const groups = new Map<string, VulnGroup>();
+  const groups = new Map<string, HostVulnGroup>();
 
   for (const r of prioritizedReviews(500)) {
     if (r.status === "approved") continue; // 이미 조치 승인된 건 오늘 할 일이 아니다
     const f = r.finding;
-    const name = groupNameFor(f.finding_type);
-    const key = `${r.assetId}||${name}`;
+    const key = r.assetId; // 대상 호스트 단위로 묶는다
     const g =
       groups.get(key) ??
       ({
         assetId: r.assetId,
         assetName: r.assetName || r.assetId,
-        name,
         count: 0,
         kev: false,
+        kevCount: 0,
         maxEpss: null,
         worstSeverity: "",
         earliestDue: null,
-      } as VulnGroup);
+      } as HostVulnGroup);
 
     g.count++;
-    if ((f as { kev?: boolean }).kev) g.kev = true;
+    if ((f as { kev?: boolean }).kev) { g.kev = true; g.kevCount++; }
     const epss = (f as { epss?: number }).epss;
     if (typeof epss === "number") g.maxEpss = Math.max(g.maxEpss ?? 0, epss);
     if (f.severity && (SEV_RANK[f.severity] ?? 0) > (SEV_RANK[g.worstSeverity] ?? 0)) g.worstSeverity = f.severity;
@@ -164,29 +166,29 @@ function vulnItems(now: number): TodayItem[] {
 
     const badges: string[] = [];
     if (g.kev) badges.push("KEV");
-    if (g.count > 1) badges.push(`${g.count}건`);
+    badges.push(`${g.count}건`);
     if (due) badges.push(due.label);
 
-    // 근거는 계산된 사실만 — 모델이 지어낼 여지를 주지 않는다.
+    // 근거는 계산된 사실만(호스트 요약) — 제품·취약점 이름은 넣지 않는다: "쉬운 내용"이 목표이고,
+    // 이 문장이 LLM 브리핑 프롬프트로도 가므로 이름을 주면 모델이 목록을 복창한다(실측). 상세는 취약점 화면.
     const facts = [
-      g.kev ? "실제 악용 확인(CISA KEV)" : "",
-      g.maxEpss != null ? `최고 악용예측 ${Math.round(g.maxEpss * 100)}%` : "",
+      g.kev ? `실제 악용(KEV) ${g.kevCount}건` : "",
+      `취약점 ${g.count}건`,
       g.worstSeverity ? `최고 심각도 ${g.worstSeverity}` : "",
+      g.maxEpss != null ? `최고 악용예측 ${Math.round(g.maxEpss * 100)}%` : "",
       due ? due.label : "",
     ].filter(Boolean);
 
     out.push({
-      id: `vulngroup:${g.assetId}:${g.name}`,
+      id: `vulnhost:${g.assetId}`,
       axis: "vuln",
       urgency: g.kev || overdue ? "now" : "today",
-      title: g.count > 1 ? `${g.name} 패치 (${g.count}건)` : g.name,
-      subtitle: g.assetName,
+      title: "취약점 점검",
+      subtitle: g.assetName, // 대상 호스트
       why: facts.join(" · "),
       action: g.assignee
         ? `담당 ${g.assignee} 배정됨 — 조치 확인 필요`
-        : g.count > 1
-          ? `${g.count}건을 한 번에 조치할 수 있습니다 — AI 팀에 맡기거나 담당자를 지정하세요`
-          : "AI 팀에 조치를 맡기거나 담당자를 지정하세요",
+        : "이 호스트의 취약점을 AI 팀에 맡기거나 담당자를 지정하세요",
       badges,
       ref: g.assetId,
       kev: g.kev,
@@ -194,7 +196,7 @@ function vulnItems(now: number): TodayItem[] {
     });
   }
 
-  // 그룹 내 정렬: KEV → 악용예측 → 심각도 → 건수
+  // 호스트 정렬: KEV → 악용예측 → 심각도 → 건수
   out.sort((a, b) => {
     const ak = a.badges.includes("KEV") ? 1 : 0;
     const bk = b.badges.includes("KEV") ? 1 : 0;
@@ -229,7 +231,9 @@ function deviceItems(now: number): TodayItem[] {
     });
   }
 
-  // ② 유지보수 점검 — 예정일이 지났는데 아직 보고 안 됨 / 승인 대기
+  // ② 유지보수 점검 → "보안제품 관리"(사용자 요청 2026-07-23): 방화벽 정책 정기점검 등은
+  //    보안제품 등록부(제품) 기준으로 본다. 제목=보안제품 관리, 대상=등록부 제품명,
+  //    원래 점검 항목명(m.title)은 근거에 남긴다.
   for (const m of listMaintenanceItems()) {
     const dueAt = endOfDay(m.scheduleDate);
     if (m.status === "scheduled" && dueAt != null && dueAt <= endOfToday()) {
@@ -238,9 +242,9 @@ function deviceItems(now: number): TodayItem[] {
         id: `maint:${m.id}`,
         axis: "device",
         urgency: "today",
-        title: m.title,
-        subtitle: m.productName,
-        why: d.overdueDays > 0 ? `점검 예정일 ${d.overdueDays}일 지남` : "오늘 점검 예정",
+        title: "보안제품 관리",
+        subtitle: m.productName, // 등록부 제품명
+        why: `${m.title} — ${d.overdueDays > 0 ? `점검 예정일 ${d.overdueDays}일 지남` : "오늘 점검 예정"}`,
         action: "점검 후 결과를 등록하세요",
         badges: [d.label],
       });
@@ -249,9 +253,9 @@ function deviceItems(now: number): TodayItem[] {
         id: `maint:${m.id}`,
         axis: "device",
         urgency: "today",
-        title: `${m.title} — 승인 대기`,
-        subtitle: m.productName,
-        why: "점검 보고가 올라왔고 승인이 남았습니다",
+        title: "보안제품 관리",
+        subtitle: m.productName, // 등록부 제품명
+        why: `${m.title} — 점검 보고가 올라왔고 승인이 남았습니다`,
         action: "보고 내용을 확인하고 승인하세요",
         badges: ["승인 대기"],
       });
@@ -300,12 +304,17 @@ function coreName(title: string): string {
   return title.replace(/\s*패치\s*\(\d+건\)\s*$/, "").trim();
 }
 
-/** 화면에 이미 있는 항목명을 3개 이상 나열하면 "목록 복창"으로 본다. */
+/** 화면에 이미 있는 항목명을 3개 이상 나열하면 "목록 복창"으로 본다.
+ *  호스트 단위 집계 이후 제목은 "취약점 점검" 등으로 일반화됐으므로, 대상(호스트·제품명=subtitle)도
+ *  함께 센다 — 모델이 대상 목록을 그대로 읊는 것을 잡는다. 중복 이름은 한 번만 센다. */
 export function tooEnumerative(text: string, items: TodayItem[]): boolean {
-  const hits = items.filter((i) => {
-    const n = coreName(i.title);
-    return n.length >= 4 && text.includes(n);
-  }).length;
+  const names = new Set<string>();
+  for (const i of items) {
+    const t = coreName(i.title);
+    if (t.length >= 4) names.add(t);
+    if (i.subtitle && i.subtitle.length >= 4) names.add(i.subtitle);
+  }
+  const hits = [...names].filter((n) => text.includes(n)).length;
   return hits >= 3;
 }
 

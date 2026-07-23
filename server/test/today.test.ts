@@ -52,7 +52,7 @@ describe("오늘의 할일 — 가이드형 집계", () => {
   // 실측(2026-07-21 운영): 개별 finding을 그대로 올리니 KEV만 20건, 그중 6건이 같은 자산의
   // Oracle CPU였다. 담당자가 하는 일은 "Oracle DB 분기 패치 한 번"인데 20줄을 들이민 셈.
   // 아래 문자열은 전부 운영 DB의 실제 finding_type이다(지어낸 것 아님).
-  describe("조치 단위로 묶기 (자산 × 제품)", () => {
+  describe("취약점 묶기 (groupNameFor 정규화 + 호스트 단위)", () => {
     it("같은 제품의 버전·CPU·CVE 표기 차이를 한 이름으로 모은다", () => {
       expect(groupNameFor("Oracle Database Server (Apr 2024 CPU) (CVE-2022-34169 외 13건)")).toBe("Oracle Database Server");
       expect(groupNameFor("Oracle Database Server Multiple Vulnerabilities (Apr 2021 CPU)")).toBe("Oracle Database Server");
@@ -72,46 +72,52 @@ describe("오늘의 할일 — 가이드형 집계", () => {
       expect(groupNameFor("unsafe-pickle")).toBe("unsafe-pickle");
     });
 
-    it("같은 자산의 같은 제품 여러 건이 한 줄로 접히고 건수가 표시된다", async () => {
+    it("한 호스트의 취약점을 '취약점 점검' 한 줄로 묶고 대상=호스트·건수를 표시한다", async () => {
       recordFindings("srv-1", [
         { ...KEV_FINDING, finding_type: "Oracle Database Server (Apr 2024 CPU) (CVE-1 외 3건)" },
         { ...KEV_FINDING, finding_type: "Oracle Database Server (Oct 2020 CPU) (CVE-2 외 5건)" },
-        { ...KEV_FINDING, finding_type: "Oracle Database Server Multiple Vulnerabilities (Apr 2021 CPU)" },
+        { ...KEV_FINDING, finding_type: "Apache Log4j < 2.15.0 RCE (CVE-2021-44228)" },
       ] as StandardFinding[]);
 
       const t = await buildToday(false);
-      const oracle = t.items.filter((i) => i.title.includes("Oracle Database Server"));
-      expect(oracle).toHaveLength(1); // 3건 → 1줄
-      expect(oracle[0].title).toContain("(3건)");
-      expect(oracle[0].badges).toContain("3건");
-      expect(oracle[0].action).toContain("3건을 한 번에");
+      const host = t.items.filter((i) => i.axis === "vuln");
+      expect(host).toHaveLength(1); // 호스트 1대 → 1줄
+      expect(host[0].title).toBe("취약점 점검");
+      expect(host[0].subtitle).toBe("oracle.local"); // 대상 = 호스트
+      expect(host[0].badges).toContain("3건");
+      expect(host[0].why).toContain("취약점 3건");
+      // 제품·취약점 이름은 브리핑 문장에 넣지 않는다(LLM 나열 방지 + 쉬운 내용)
+      expect(host[0].why).not.toContain("Oracle");
     });
 
-    it("자산이 다르면 묶지 않는다 — 조치 대상이 다른 장비다", async () => {
+    it("호스트가 다르면 각각 한 줄이다 — 조치 대상이 다른 장비다", async () => {
       registerAsset({ id: "srv-2", name: "web-01", path: "hosts/web-01" });
       recordFindings("srv-1", [KEV_FINDING]);
       recordFindings("srv-2", [KEV_FINDING]);
       const t = await buildToday(false);
-      expect(t.items.filter((i) => i.title.includes("Log4j"))).toHaveLength(2);
+      const vuln = t.items.filter((i) => i.axis === "vuln");
+      expect(vuln).toHaveLength(2);
+      expect(new Set(vuln.map((i) => i.subtitle))).toEqual(new Set(["oracle.local", "web-01"]));
     });
   });
 
   it("KEV는 기한이 없어도 '지금'으로 올라온다 — CISA 관행(큐 건너뛰기)", async () => {
     recordFindings("srv-1", [KEV_FINDING]);
     const t = await buildToday(false);
-    const kev = t.items.find((i) => i.title.includes("Log4j"));
+    const kev = t.items.find((i) => i.axis === "vuln" && i.subtitle === "oracle.local");
     expect(kev).toBeDefined();
+    expect(kev?.title).toBe("취약점 점검");
     expect(kev?.urgency).toBe("now");
     expect(kev?.badges).toContain("KEV");
     // 근거는 계산된 사실만 — 모델이 지어낼 여지를 주지 않는다.
-    expect(kev?.why).toContain("실제 악용 확인");
+    expect(kev?.why).toContain("실제 악용(KEV)");
     expect(kev?.why).toContain("악용예측 94%");
   });
 
   it("기한이 안 걸린 일반 취약점은 오늘 목록에 넣지 않는다 — 화면을 백로그로 채우지 않는다", async () => {
     recordFindings("srv-1", [PLAIN_FINDING]);
     const t = await buildToday(false);
-    expect(t.items.find((i) => i.title.includes("OpenSSH"))).toBeUndefined();
+    expect(t.items.filter((i) => i.axis === "vuln")).toHaveLength(0);
   });
 
   it("기한이 지나면 '지금', 오늘까지면 '오늘'로 분류하고 일수를 계산한다", async () => {
@@ -120,7 +126,7 @@ describe("오늘의 할일 — 가이드형 집계", () => {
     updateFindingReview("srv-1", key, { dueDate: ymd(-3), assignee: "정요한" }, "tester");
 
     const t = await buildToday(false);
-    const item = t.items.find((i) => i.title.includes("OpenSSH"));
+    const item = t.items.find((i) => i.axis === "vuln" && i.subtitle === "oracle.local");
     expect(item?.urgency).toBe("now");
     // 기한은 그 날 23:59 기준이라 "3일 전 지정"은 경과 시각에 따라 2~3일 초과로 계산된다.
     // 정확한 일수보다 "초과로 분류되고 일수가 붙는다"가 검증 대상.
@@ -134,7 +140,7 @@ describe("오늘의 할일 — 가이드형 집계", () => {
     const key = findingKey("srv-1", KEV_FINDING);
     updateFindingReview("srv-1", key, { status: "approved" }, "tester");
     const t = await buildToday(false);
-    expect(t.items.find((i) => i.title.includes("Log4j"))).toBeUndefined();
+    expect(t.items.filter((i) => i.axis === "vuln")).toHaveLength(0);
   });
 
   // 실측(2026-07-21): 급한 취약점이 12건이라 상위 6칸을 다 먹어 장비 점검이 화면에서 사라졌다
@@ -155,11 +161,11 @@ describe("오늘의 할일 — 가이드형 집계", () => {
   });
 
   it("한쪽 축이 비면 남은 자리를 다른 축이 쓴다 — 화면을 낭비하지 않는다", async () => {
-    const many: StandardFinding[] = [];
-    for (let i = 0; i < 10; i++) {
-      many.push({ ...KEV_FINDING, finding_type: `제품${i} 취약점`, evidence: `CVE-8888-${i}` } as StandardFinding);
+    // 호스트 단위 집계이므로, 남는 자리를 채우려면 호스트가 여러 대여야 한다(6대 등록).
+    for (let i = 0; i < 6; i++) {
+      registerAsset({ id: `h-${i}`, name: `host-${i}.local`, path: `hosts/host-${i}` });
+      recordFindings(`h-${i}`, [KEV_FINDING]);
     }
-    recordFindings("srv-1", many);
     const t = await buildToday(false); // 장비 축 비어 있음
     expect(t.items.filter((i) => i.axis === "vuln").length).toBe(5); // 3 + 남은 2칸
   });
@@ -207,16 +213,15 @@ describe("오늘의 할일 — 가이드형 집계", () => {
 
     // 실측(2026-07-21): 프롬프트에 "목록을 다시 나열하지 마라"를 넣었는데 7B가 그대로 7개를
     // 나열했다. 화면 바로 아래 목록이 있으니 중복이고 브리핑 구실을 못 한다. 규칙으로 잡는다.
-    it("모델이 항목을 나열하면 규칙 문장으로 대체한다", async () => {
-      recordFindings("srv-1", [
-        KEV_FINDING,
-        { ...KEV_FINDING, finding_type: "Ivanti Connect Secure 버퍼 오버플로", evidence: "CVE-2024-21887" },
-        { ...KEV_FINDING, finding_type: "Citrix NetScaler CitrixBleed", evidence: "CVE-2023-4966" },
-      ] as StandardFinding[]);
-      // 운영에서 실제로 나온 나열형 응답
+    it("모델이 대상(호스트) 목록을 나열하면 규칙 문장으로 대체한다", async () => {
+      // 호스트 단위 집계 후엔 화면 목록이 호스트다 — 모델이 여러 호스트를 읊으면 목록 복창으로 본다.
+      for (const [id, name] of [["srv-1", "oracle.local"], ["srv-a", "web-01"], ["srv-b", "db-02"]] as const) {
+        if (id !== "srv-1") registerAsset({ id, name, path: `hosts/${name}` });
+        recordFindings(id, [KEV_FINDING]);
+      }
+      // 운영에서 실제로 나온 나열형 응답(대상 3개 이상 읊음)
       mockChat.mockResolvedValueOnce(
-        "오늘 아침의 주요 보안 위협으로 Apache Log4j RCE, Ivanti Connect Secure 버퍼 오버플로, " +
-          "Citrix NetScaler CitrixBleed가 있습니다. 이 중 Apache Log4j RCE를 먼저 처리하세요."
+        "오늘은 oracle.local, web-01, db-02의 취약점 점검이 필요합니다. 이 중 oracle.local을 먼저 처리하세요."
       );
       const t = await buildToday(true);
       expect(t.briefBy).toBe("rule");
