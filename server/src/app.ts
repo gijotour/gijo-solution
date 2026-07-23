@@ -65,6 +65,7 @@ import { registerAssetHubRoutes } from "./engine/assethub";
 import { registerLlmActivityRoutes } from "./engine/llmactivity";
 import { registerKevRoutes } from "./engine/kev";
 import { registerPlaybookRoutes } from "./engine/playbook";
+import { registerShadowAiRoutes } from "./engine/shadowai";
 import { registerOntologyRoutes } from "./engine/ontology";
 import { registerWorkSessionRoutes } from "./engine/worksessions";
 
@@ -162,6 +163,7 @@ export function createApp(): Express {
   registerLlmActivityRoutes(app);
   registerKevRoutes(app);
   registerPlaybookRoutes(app);
+  registerShadowAiRoutes(app);
   registerOntologyRoutes(app);
   registerWorkSessionRoutes(app);
 

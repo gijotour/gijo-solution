@@ -258,6 +258,10 @@ async function runOrchestration(instructionText: string, steps: OrchestrationSte
 const LEARN_TOPIC_RE = /학습\s*루프|파인\s*튜닝|learn\s*loop|fine[-\s]?tun/i;
 // "이 취약점 어떻게 조치해?/조치 방법/조치 절차/대응 방법" — 방법 문의(실행 지시 아님).
 const REMEDIATION_INTENT_RE = /(조치|대응|remediat|패치|수정)\s*(방법|절차|어떻게|가이드|플레이북|playbook)|어떻게\s*(조치|대응|패치|고쳐|해결)|대응\s*방안/i;
+// "Shadow AI/미등록 AI/비인가 모델 점검·확인"
+const SHADOW_AI_INTENT_RE = /shadow\s*ai|미등록\s*(ai|모델|엘엘엠|llm)|비인가\s*(ai|모델)|섀도우|(등록\s*안\s*된|등록되지\s*않은)\s*(ai|모델)/i;
+// "공격 경로 / 도달성 / 측면 이동" 분석
+const ATTACK_PATH_INTENT_RE = /공격\s*경로|attack\s*path|도달\s*(성|가능)|측면\s*이동|lateral|reachab|이동\s*경로/i;
 const LEARN_RUN_RE = /실행|시작|돌려|가동|run|start/i;
 
 async function learnloopConfirmResult(instructionText: string): Promise<DispatchResult> {
@@ -340,6 +344,22 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     const task = createTask({ text: instructionText, agentId: "orchestrator", priority: "P3" });
     completeTask(task.id);
     return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatScreenGuide(screen, instructionText) };
+  }
+
+  // "공격 경로 / 도달성 분석" — 3소스 상관으로 진입→거점→인접 경로를 결정적으로 구성.
+  if (ATTACK_PATH_INTENT_RE.test(instructionText)) {
+    const { formatAttackPaths } = await import("./analysishub.js");
+    const task = createTask({ text: instructionText, agentId: "orchestrator", priority: "P2" });
+    completeTask(task.id);
+    return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatAttackPaths() };
+  }
+
+  // "Shadow AI 점검해줘 / 미등록 AI 있어?" — 시스템 관측 신호로 미등록 모델을 결정적으로 찾는다.
+  if (SHADOW_AI_INTENT_RE.test(instructionText)) {
+    const { formatShadowAi } = await import("./shadowai.js");
+    const task = createTask({ text: instructionText, agentId: "orchestrator", priority: "P2" });
+    completeTask(task.id);
+    return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatShadowAi() };
   }
 
   // "이 취약점 조치 방법 알려줘" — 결정적 조치 플레이북으로 답한다(LLM 없이). 단계·담당·SLA를

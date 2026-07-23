@@ -420,6 +420,95 @@ export function computeCorrelations(events: AnalysisEvent[]): Correlation[] {
   return out;
 }
 
+// ── 공격 경로·도달성(2026-07-23 ③) ───────────────────────────────────────────
+// 경쟁 제품이 "고립된 심각도가 아니라 도달 가능성·공격 경로"로 이동 중이다. GIJO는 이미 확보한
+// 3소스 상관(entity 공유)에 거점→인접 자산 이동을 얹어, 관측된 신호로만 정직하게 경로를 구성한다.
+// 침투테스트가 아니라 "관측된 사실의 연결"이라는 점을 화면·요약에서 밝힌다.
+export interface AttackPathStep { kind: "entry" | "foothold" | "lateral"; entity: string; label: string; source: AnalysisSource; severity: Severity }
+export interface AttackPath {
+  id: string;
+  entity: string; // 거점(취약 자산)
+  reachability: "확인됨" | "높음" | "보통"; // 실제 공격 신호+KEV+외부노출로 등급
+  reachScore: number; // 0~100
+  steps: AttackPathStep[];
+  note: string;
+}
+
+// IP의 /24 대역 — 인접(측면 이동) 후보 판단용. IP가 아니면 null.
+function subnet24(entity: string): string | null {
+  const m = (entity ?? "").match(/^(\d{1,3}\.\d{1,3}\.\d{1,3})\.\d{1,3}$/);
+  return m ? m[1] : null;
+}
+const hasSignal = (e: AnalysisEvent, re: RegExp) => e.signals.some((s) => re.test(s)) || re.test(e.detail) || re.test(e.title);
+
+export function computeAttackPaths(events: AnalysisEvent[]): AttackPath[] {
+  const active = events.filter((e) => !RESOLVED.includes(e.status ?? "open"));
+  const byEntity = new Map<string, AnalysisEvent[]>();
+  for (const e of active) {
+    if (!e.entity) continue;
+    const arr = byEntity.get(e.entity) ?? [];
+    arr.push(e);
+    byEntity.set(e.entity, arr);
+  }
+  const paths: AttackPath[] = [];
+  for (const [entity, evs] of byEntity) {
+    const vulns = evs.filter((e) => e.source === "vuln");
+    if (vulns.length === 0) continue; // 취약점 없는 거점은 경로의 표적이 아님
+    const logs = evs.filter((e) => e.source === "log");
+    const worst = vulns.sort((a, b) => SEV_RANK[b.severity] - SEV_RANK[a.severity])[0];
+    const kev = vulns.some((v) => hasSignal(v, /kev|실제.?악용/i));
+    const external = evs.some((e) => hasSignal(e, /인터넷|외부|external|public/i));
+    const attacked = logs.some((l) => hasSignal(l, /브루트포스|포트\s*스캔|웹\s*공격|스캔|scan|brute/i));
+
+    // 도달성 점수: 실제 공격 신호(40) + KEV(30) + 외부노출(20) + 치명(10 cap)
+    let reachScore = (attacked ? 40 : 0) + (kev ? 30 : 0) + (external ? 20 : 0) + (worst.severity === "critical" ? 10 : 0);
+    reachScore = Math.min(100, reachScore);
+    const reachability = attacked ? "확인됨" : reachScore >= 40 ? "높음" : "보통";
+
+    const steps: AttackPathStep[] = [];
+    // ① 진입: 공격 신호를 낸 로그(있으면).
+    for (const l of logs.slice(0, 1)) steps.push({ kind: "entry", entity, label: l.title, source: "log", severity: l.severity });
+    // ② 거점: 취약 자산 자체.
+    steps.push({ kind: "foothold", entity, label: `${worst.title}${kev ? " (KEV)" : ""}`, source: "vuln", severity: worst.severity });
+    // ③ 측면 이동: 같은 /24의 다른 취약 자산.
+    const net = subnet24(entity);
+    if (net) {
+      for (const [other, oevs] of byEntity) {
+        if (other === entity) continue;
+        if (subnet24(other) !== net) continue;
+        const ov = oevs.find((e) => e.source === "vuln");
+        if (!ov) continue;
+        steps.push({ kind: "lateral", entity: other, label: `인접 자산 ${other} — ${ov.title}`, source: "vuln", severity: ov.severity });
+        if (steps.filter((s) => s.kind === "lateral").length >= 3) break;
+      }
+    }
+    const laterals = steps.filter((s) => s.kind === "lateral").length;
+    paths.push({
+      id: `path:${entity}`,
+      entity,
+      reachability,
+      reachScore,
+      steps,
+      note: `${entity}: ${attacked ? "실제 공격 신호 관측 + " : ""}${kev ? "KEV 취약점 + " : ""}${external ? "외부 노출 + " : ""}치명도 ${worst.severity}` +
+        `${laterals ? ` → 같은 대역 인접 자산 ${laterals}개로 측면 이동 가능` : ""}. (관측 신호 기반 추정, 침투테스트 아님)`,
+    });
+  }
+  // 도달성 높은 순.
+  paths.sort((a, b) => b.reachScore - a.reachScore);
+  return paths;
+}
+
+export function formatAttackPaths(): string {
+  const paths = computeAttackPaths(listAnalysisEvents());
+  if (paths.length === 0) return "🧭 공격 경로 분석 — 관측된 신호로 구성 가능한 공격 경로가 없습니다 ✓";
+  const L: string[] = [`🧭 공격 경로 분석 — 도달성 순 ${paths.length}건 (관측 신호 기반 추정)`];
+  for (const p of paths.slice(0, 6)) {
+    L.push(`\n[도달성 ${p.reachability}·${p.reachScore}점] ${p.entity}`);
+    L.push("  " + p.steps.map((s) => `${s.kind === "entry" ? "진입" : s.kind === "foothold" ? "거점" : "인접"}:${s.label}`).join(" → "));
+  }
+  return L.join("\n");
+}
+
 // ── 조회 ───────────────────────────────────────────────────────────────────
 const PRI_RANK: Record<Priority, number> = { P0: 0, P1: 1, P2: 2, P3: 3 };
 const isResolved = (e: AnalysisEvent): boolean => RESOLVED.includes(e.status ?? "open");
@@ -536,6 +625,10 @@ export function registerAnalysisHubRoutes(app: Express): void {
   app.get("/api/analysis-hub/events", authMiddleware, (_req, res) => {
     const events = listAnalysisEvents();
     res.json({ events, summary: analysisSummary(events), correlations: computeCorrelations(events) });
+  });
+  // 공격 경로·도달성(③) — 관측 신호로 구성한 진입→거점→인접 이동 경로.
+  app.get("/api/analysis-hub/attack-paths", authMiddleware, (_req, res) => {
+    res.json({ paths: computeAttackPaths(listAnalysisEvents()) });
   });
   // 취약점 소스 재빌드(자산 findings → 이벤트).
   app.post("/api/analysis-hub/rebuild-vuln", authMiddleware, (_req, res) => {
