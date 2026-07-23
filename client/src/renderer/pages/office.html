@@ -182,7 +182,7 @@
   const office = (function () {
     const canvas = document.getElementById("office");
     const ctx = canvas.getContext("2d");
-    const COLS = 22, ROWS = 12, S = 4; // 픽셀 스케일 3→4(2026-07-23, 더 큼·선명)
+    const COLS = 22, ROWS = 18, S = 4; // 방을 세로로 키워 라이브 화면 위·아래를 꽉 채운다(레터박스 제거, 2026-07-23)
     const W = COLS * 8, H = ROWS * 8;
     canvas.width = W * S; canvas.height = H * S;
     canvas.style.imageRendering = "pixelated";
@@ -192,15 +192,16 @@
       { x: 3, y: 2 }, { x: 9, y: 2 }, { x: 15, y: 2 },
       { x: 3, y: 5.4 }, { x: 9, y: 5.4 }, { x: 15, y: 5.4 },
     ];
-    const COFFEE = { x: 156, y: 90 }; // 커피 코너(픽셀 좌표)
-    const TABLE = { x: 78, y: 66 };   // 회의 테이블(장식용 소파존)
+    // 방을 세로로 키운 만큼(ROWS 12→18) 앞쪽(하단) 요소는 아래로 내려 균형을 맞춘다 — 바닥이 넓어져 위·아래가 꽉 찬다.
+    const COFFEE = { x: 156, y: 134 }; // 커피 코너(픽셀 좌표)
+    const TABLE = { x: 78, y: 104 };   // 라운지 소파존(중앙 바닥을 채운다)
     // 미팅룸(2026-07-23) — 외부 방문자가 여기 앉아 보안총괄에게 지시하고, 보안총괄이 합석한다.
     // 유리 파티션으로 내부 업무존과 분리(외부인은 내부 책상에 직접 접근하지 않는다).
-    const MEETING = { x0: 40, y0: 74, x1: 116, y1: 95 };
-    const MTABLE = { x: 60, y: 84, w: 30, h: 6 }; // 미팅 테이블(넓힘)
+    const MEETING = { x0: 40, y0: 118, x1: 116, y1: 139 };
+    const MTABLE = { x: 60, y: 128, w: 30, h: 6 }; // 미팅 테이블(넓힘)
     // 방문자 좌석(테이블 아래로 넉넉히 벌려 겹침 방지) / 보안총괄 합석 위치(테이블 상단 헤드 중앙).
     function meetingSeat(slot) {
-      const seats = [{ x: 48, y: 92 }, { x: 64, y: 93 }, { x: 82, y: 93 }, { x: 98, y: 92 }, { x: 108, y: 90 }];
+      const seats = [{ x: 48, y: 136 }, { x: 64, y: 137 }, { x: 82, y: 137 }, { x: 98, y: 136 }, { x: 108, y: 134 }];
       return seats[slot % seats.length];
     }
     function meetingHost() { return { x: MTABLE.x + MTABLE.w / 2 - 3, y: MTABLE.y - 4 }; }
@@ -354,8 +355,8 @@
           px(rx + 7, ry + 3 + u * 4, 1, 1, led);
         }
       }
-      // 화분·책장·커피 코너
-      plantAt(4, 86); plantAt(W - 10, 20);
+      // 화분·책장·커피 코너 — 좌하단 화분은 넓어진 바닥 하단으로.
+      plantAt(4, 130); plantAt(W - 10, 20);
       px(W - 26, 16, 14, 16, T.deskFace);
       for (let i = 0; i < 3; i++) px(W - 25, 18 + i * 5, 12, 3, ["#e2483d", "#5fa1ff", "#f0a020"][i]);
       px(COFFEE.x - 2, COFFEE.y - 12, 14, 16, T.deskFace);
