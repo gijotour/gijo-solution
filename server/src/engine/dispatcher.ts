@@ -262,6 +262,8 @@ const REMEDIATION_INTENT_RE = /(조치|대응|remediat|패치|수정)\s*(방법|
 const SHADOW_AI_INTENT_RE = /shadow\s*ai|미등록\s*(ai|모델|엘엘엠|llm)|비인가\s*(ai|모델)|섀도우|(등록\s*안\s*된|등록되지\s*않은)\s*(ai|모델)/i;
 // "공격 경로 / 도달성 / 측면 이동" 분석
 const ATTACK_PATH_INTENT_RE = /공격\s*경로|attack\s*path|도달\s*(성|가능)|측면\s*이동|lateral|reachab|이동\s*경로/i;
+// "지식베이스 정리·중복·상충 점검"
+const KB_HYGIENE_INTENT_RE = /(지식\s*베이스|지식|문서|rag|자료).{0,6}(정리|중복|상충|위생|점검|청소|정돈)|(중복|상충)\s*(문서|자료)/i;
 const LEARN_RUN_RE = /실행|시작|돌려|가동|run|start/i;
 
 async function learnloopConfirmResult(instructionText: string): Promise<DispatchResult> {
@@ -344,6 +346,14 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     const task = createTask({ text: instructionText, agentId: "orchestrator", priority: "P3" });
     completeTask(task.id);
     return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatScreenGuide(screen, instructionText) };
+  }
+
+  // "지식베이스 정리/중복 점검" — 상충·중복·신선도를 결정적으로 점검(삭제 없이 리포트).
+  if (KB_HYGIENE_INTENT_RE.test(instructionText)) {
+    const { scanKbHygiene, formatKbHygiene } = await import("./kbhygiene.js");
+    const task = createTask({ text: instructionText, agentId: "orchestrator", priority: "P3" });
+    completeTask(task.id);
+    return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatKbHygiene(await scanKbHygiene()) };
   }
 
   // "공격 경로 / 도달성 분석" — 3소스 상관으로 진입→거점→인접 경로를 결정적으로 구성.

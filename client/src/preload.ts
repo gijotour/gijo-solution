@@ -162,6 +162,8 @@ const gijoApi = {
   listMemoryDocuments: () => api.memoryApi.listDocuments(),
   memoryDocumentChunks: (documentId: string, limit?: number) => api.memoryApi.documentChunks(documentId, limit),
   deleteMemoryDocument: (documentId: string, withFile?: boolean) => api.memoryApi.deleteDocument(documentId, withFile),
+  kbHygiene: () => api.memoryApi.hygiene(),
+  kbHygieneScan: () => api.memoryApi.hygieneScan(),
   // 서버 보관 원본을 임시 파일로 받아 OS 기본 뷰어(PDF 등)로 연다.
   openMemoryDocumentFile: async (documentId: string) => {
     const f = await api.memoryApi.documentFile(documentId);

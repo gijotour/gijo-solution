@@ -574,7 +574,13 @@ export const memoryApi = {
   // 서버에 보관된 업로드 원본(base64) — "원본 열기"용.
   documentFile: (documentId: string) =>
     request<{ filename: string; content: string }>("/api/memory/document/file", { method: "POST", body: { documentId } }),
+  // 지식베이스 위생 점검(상충·중복·신선도) — 삭제는 하지 않고 리포트만.
+  hygiene: () => request<KbHygieneReport>("/api/kb-hygiene"),
+  hygieneScan: () => request<KbHygieneReport>("/api/kb-hygiene/scan", { method: "POST" }),
 };
+
+export interface KbHygieneFinding { type: "duplicate" | "version_conflict" | "stale"; severity: "high" | "medium" | "low"; documents: string[]; reason: string; suggestion: string }
+export interface KbHygieneReport { scannedAt: string; totalDocs: number; findings: KbHygieneFinding[]; clean: boolean }
 
 export interface IngestResult {
   documentId: string;

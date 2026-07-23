@@ -166,6 +166,14 @@ tr:last-child td{border-bottom:none;}
     .dm-delbtn{background:#e2483d;color:#fff;border:none;border-radius:9px;padding:0 18px;font-weight:800;font-size:12px;cursor:pointer;}
     .dm-delbtn:disabled{opacity:.5;cursor:not-allowed;}
     </style>
+    <div class="panel" id="hygienePanel" style="border-color:rgba(240,160,32,0.35)">
+      <div class="panel-title">🧹 지식베이스 정리 점검 <i class="gijo-info" data-topic="문서 관리"></i>
+        <button id="hygieneScanBtn" style="float:right;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;padding:5px 11px;color:var(--blue-light);font-size:11px;font-weight:700;cursor:pointer">다시 점검</button>
+      </div>
+      <div class="panel-sub">상충·중복·오래된 문서를 주기적으로 찾아 보여줍니다. <b style="color:var(--amber)">삭제는 자동으로 하지 않습니다</b> — 아래 목록에서 확인 후 지우세요.</div>
+      <div id="hygieneBody" style="font-size:12.5px;color:var(--muted);line-height:1.7">점검 중…</div>
+    </div>
+
     <div class="panel">
       <div class="panel-title">📚 올린 문서 확인 · 관리 <span id="dmSummary" style="font-size:11px;font-weight:600;color:var(--muted-2);margin-left:6px"></span></div>
       <div class="panel-sub">올린 문서가 <b style="color:var(--blue-light)">어떻게 학습(임베딩)됐는지</b>와 실제 조각을 확인하고, <b>장기기억/원본</b> 단위로 삭제합니다. (올린 문서는 파인튜닝이 아니라 검색용 임베딩 — 삭제하면 답변에서 즉시 빠집니다)</div>
@@ -329,6 +337,30 @@ tr:last-child td{border-bottom:none;}
   let dmConfirmId = null;
   const DM_ICON = (name) => /\.pdf$/i.test(name) ? "📕" : /\.hwpx?$/i.test(name) ? "📘" : /\.md$/i.test(name) ? "📝" : "📄";
   const dmEsc = (s) => String(s == null ? "" : s).replace(/</g, "&lt;");
+
+  // 지식베이스 위생 점검 — 상충·중복·신선도. 삭제는 하지 않고, 대상 문서를 클릭하면 아래 목록에서 선택된다.
+  async function loadHygiene(rescan) {
+    var body = document.getElementById("hygieneBody");
+    if (!body) return;
+    body.textContent = rescan ? "다시 점검 중…" : "점검 중…";
+    var r;
+    try { r = rescan ? await window.gijo.kbHygieneScan() : await window.gijo.kbHygiene(); }
+    catch (e) { body.innerHTML = '<span style="color:#f5928a">점검 실패: ' + dmEsc(e.message || e) + "</span>"; return; }
+    document.getElementById("hygienePanel").style.borderColor = r.clean ? "var(--border)" : "rgba(240,160,32,0.35)";
+    if (r.clean) { body.innerHTML = '<span style="color:var(--teal)">✓ 상충·중복 없음 — 문서 ' + r.totalDocs + '건 모두 깔끔합니다.</span>'; return; }
+    var label = { duplicate: "완전중복", version_conflict: "버전충돌", stale: "신선도검토" };
+    var color = { high: "#f5928a", medium: "#f7c777", low: "var(--muted)" };
+    body.innerHTML = r.findings.map(function (f) {
+      var docs = f.documents.map(function (id) { return '<span class="hy-doc" data-hy="' + dmEsc(id) + '" style="color:var(--blue-light);cursor:pointer;text-decoration:underline">' + dmEsc(id) + "</span>"; }).join(", ");
+      return '<div style="padding:8px 0;border-bottom:1px solid var(--border)">' +
+        '<b style="color:' + color[f.severity] + '">[' + label[f.type] + "]</b> " + dmEsc(f.reason) +
+        '<div style="margin-top:3px">대상: ' + docs + "</div>" +
+        '<div style="font-size:11px;color:var(--muted-2);margin-top:2px">→ ' + dmEsc(f.suggestion) + "</div></div>";
+    }).join("") + '<div style="font-size:11px;color:var(--amber);margin-top:8px">※ 삭제는 자동으로 하지 않습니다. 문서명을 눌러 아래에서 확인 후 지우세요.</div>';
+    body.querySelectorAll(".hy-doc").forEach(function (el) {
+      el.addEventListener("click", function () { selectDoc(el.getAttribute("data-hy")); document.getElementById("dmList").scrollIntoView({ behavior: "smooth", block: "center" }); });
+    });
+  }
 
   async function loadDocuments(keepSel) {
     const list = document.getElementById("dmList");
@@ -525,6 +557,8 @@ tr:last-child td{border-bottom:none;}
     await loadHealth();
     await loadAgentScopes();
     await loadDocuments();
+    loadHygiene();
+    document.getElementById("hygieneScanBtn").addEventListener("click", function (e) { e.stopPropagation(); loadHygiene(true); });
 
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.getElementById("learnloopLink").addEventListener("click", () => window.gijo.navigateTo("learnloop.html"));

@@ -67,6 +67,7 @@ import { registerKevRoutes } from "./engine/kev";
 import { registerPlaybookRoutes } from "./engine/playbook";
 import { registerShadowAiRoutes } from "./engine/shadowai";
 import { registerSiemRoutes } from "./engine/siem";
+import { registerKbHygieneRoutes } from "./engine/kbhygiene";
 import { registerOntologyRoutes } from "./engine/ontology";
 import { registerWorkSessionRoutes } from "./engine/worksessions";
 
@@ -166,6 +167,7 @@ export function createApp(): Express {
   registerPlaybookRoutes(app);
   registerShadowAiRoutes(app);
   registerSiemRoutes(app);
+  registerKbHygieneRoutes(app);
   registerOntologyRoutes(app);
   registerWorkSessionRoutes(app);
 
