@@ -52,11 +52,29 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .tile .v{font-size:24px;font-weight:800;margin-top:3px;}
 .tile .d{font-size:10.5px;color:var(--muted-2);margin-top:3px;}
 .tile.risk{background:linear-gradient(180deg,rgba(226,72,61,.1),transparent);border-color:rgba(226,72,61,.3);}
+.riskbar{background:linear-gradient(90deg,rgba(226,72,61,.1),transparent);border:1px solid rgba(226,72,61,.28);border-radius:12px;padding:12px 16px;margin-bottom:16px;}
+.riskbar .rb-main{font-size:15px;font-weight:800;color:#fff;}
+.riskbar .rb-lv{font-size:17px;}
+.riskbar .rb-pri{font-size:12px;font-weight:600;color:var(--muted);margin-left:8px;}
+.riskbar .rb-src{font-size:11.5px;color:var(--muted-2);margin-top:5px;}
+.riskbar .rb-src b{color:var(--text);font-weight:800;}
 
 .two{display:grid;grid-template-columns:1.5fr 1fr;gap:16px;align-items:start;}
 .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
 .ph{font-size:13.5px;font-weight:800;color:#fff;margin-bottom:4px;}
 .psub{font-size:11px;color:var(--muted-2);margin-bottom:10px;}
+.corr-line{font-size:11.5px;color:var(--muted);background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:7px 11px;margin:2px 0 10px;line-height:1.5;}
+.corr-line b{color:#f0a0c0;font-weight:800;}
+.corr-line .ask{color:var(--blue-light,#5fa1ff);cursor:pointer;text-decoration:underline;text-underline-offset:2px;}
+.graph-toggle{float:right;font-size:10px;display:inline-flex;gap:0;border:1px solid var(--border);border-radius:7px;overflow:hidden;}
+.graph-toggle .gt{padding:3px 9px;cursor:pointer;color:var(--muted);background:var(--panel-2);}
+.graph-toggle .gt.on{background:rgba(59,130,246,.18);color:#fff;}
+#pathGraph{margin-top:10px;}
+#pathGraph svg{width:100%;height:auto;display:block;}
+.graph-legend{font-size:10px;color:var(--muted-2);margin-top:8px;line-height:1.6;}
+.graph-legend .lg{display:inline-block;margin-right:10px;}
+.graph-legend .dot{display:inline-block;width:8px;height:8px;border-radius:50%;vertical-align:middle;margin-right:3px;}
+.task-done{background:rgba(30,185,128,.12);border:1px solid rgba(30,185,128,.4);border-radius:8px;padding:9px 12px;margin-bottom:10px;font-size:12px;color:#8fe3c0;line-height:1.5;}
 .filters{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;}
 .fchip{font-size:11.5px;padding:5px 11px;border-radius:20px;background:var(--panel-2);border:1px solid var(--border);color:var(--muted);cursor:pointer;}
 .fchip.active{background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.4);color:#fff;}
@@ -109,8 +127,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   <div class="main">
     <div class="topbar-row">
       <div>
-        <div class="page-title">🔬 보안 분석 · 통합 관제</div>
-        <div class="page-sub">전문 스캐너 리포트·보안 로그·보안제품 운영 리포트를 한곳에서 정규화해 <b>"지금 제일 위험한 것"부터</b> 우선순위로 보여주고, 소스 간 상관관계를 짚어줍니다.</div>
+        <div class="page-title">🔬 보안 분석 · 통합 관제 <i class="gijo-info" data-topic="통합 관제"></i></div>
       </div>
       <button class="btn-ghost" id="refreshBtn">↻ 새로고침</button>
     </div>
@@ -124,18 +141,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <input type="file" id="fileInput" multiple style="display:none">
     </div>
 
-    <div class="tiles">
-      <div class="tile risk"><div class="lab">종합 위험도</div><div class="v" id="tOverall" style="color:var(--red)">-</div><div class="d" id="tPri">P0 - · P1 - · P2 -</div></div>
-      <div class="tile"><div class="lab">🔍 취약점</div><div class="v" id="tVuln">-</div><div class="d">스캐너 리포트</div></div>
-      <div class="tile"><div class="lab">📊 보안 로그</div><div class="v" id="tLog">-</div><div class="d">방화벽·IDS·서버</div></div>
-      <div class="tile"><div class="lab">🧰 운영 리포트</div><div class="v" id="tProduct">-</div><div class="d">백신·EDR·DLP</div></div>
-      <div class="tile"><div class="lab">🛡 하드닝</div><div class="v" id="tHardening">-</div><div class="d">보안장비 점검</div></div>
+    <div class="riskbar">
+      <div class="rb-main">종합 위험도 <b id="tOverall" class="rb-lv">-</b> <span class="rb-pri" id="tPri">P0 - · P1 - · P2 -</span></div>
+      <div class="rb-src">🔍 취약점 <b id="tVuln">-</b> · 📊 보안로그 <b id="tLog">-</b> · 🧰 운영리포트 <b id="tProduct">-</b> · 🛡 하드닝 <b id="tHardening">-</b></div>
     </div>
 
     <div class="two">
       <div class="panel">
-        <div class="ph">통합 위험 우선순위 <span style="font-size:11px;color:var(--muted);font-weight:600">— 4소스 병합</span></div>
-        <div class="psub">모든 소스의 발견·이벤트를 위험도(노출·KEV·EPSS·반복·활성악용)로 통합 정렬</div>
+        <div class="ph">통합 위험 우선순위 <span style="font-size:11px;color:var(--muted);font-weight:600">— 4소스 병합</span> <i class="gijo-info" data-topic="위험 우선순위 산정"></i></div>
+        <div class="corr-line" id="corrLine" style="display:none"></div>
         <div class="filters" id="filters">
           <span class="fchip active" data-src="all">전체</span>
           <span class="fchip" data-src="vuln">🔍 취약점</span>
@@ -146,15 +160,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         <div class="risk-list" id="riskList"><div class="empty">불러오는 중…</div></div>
       </div>
       <div>
-        <div class="panel" id="corrPanel" style="margin-bottom:16px;display:none">
-          <div class="ph">🔗 소스 간 상관분석</div>
-          <div class="psub">같은 대상이 여러 소스에 걸쳐 나타난 교차 위험</div>
-          <div id="corrList"></div>
-        </div>
         <div class="panel" id="pathPanel" style="margin-bottom:16px;display:none">
-          <div class="ph">🧭 공격 경로 · 도달성</div>
-          <div class="psub">관측된 신호로 구성한 진입→거점→인접 이동 경로 (침투테스트 아님)</div>
-          <div id="pathList"></div>
+          <div class="ph">🧭 공격 경로 · 도달성
+            <span class="graph-toggle">
+              <span class="gt on" data-mode="source">소스별</span><span class="gt" data-mode="chain">전체 연관성</span>
+            </span>
+          </div>
+          <div id="pathGraph"><div class="empty">경로 데이터가 없습니다.</div></div>
+          <div class="graph-legend" id="graphLegend"></div>
         </div>
         <div class="panel ana">
           <div class="ph" id="anaTitle">항목을 선택하세요</div>
@@ -271,45 +284,127 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       selectEvent(id); // 요약 포함해 다시 렌더
     }catch(err){ if(box) box.innerHTML = '<div class="corr" style="color:#f5928a">AI 분석 실패: '+esc(err.message||err)+'</div>'; }
   }
+  // ⑤ 조치 생성·작업 등록 — 등록되면 대시보드 '오늘의 할일'로 가고,
+  //    이 화면에는 변화가 없어 "동작 안 함"으로 보였다. → 위험을 '처리중'으로 전환해 즉시 반영 + 배너 확인.
   async function createTask(e){
+    const btn = document.getElementById("mkTask");
     const text = '['+SRC_LABEL[e.source]+'] '+e.title + (e.entity?(' — '+e.entity):'');
+    if(btn){ btn.disabled=true; btn.textContent='⏳ 등록 중…'; }
     try{
       await window.gijo.addTask(text, { priority: PRI_TASK[e.priority]||"P2", ref: e.ref||undefined });
-      toast('작업 등록됨: '+text);
-    }catch(err){ toast('작업 등록 실패: '+(err.message||err)); }
-  }
-  function renderCorrelations(){
-    const panel = document.getElementById("corrPanel");
-    const list = document.getElementById("corrList");
-    if(!data.correlations.length){ panel.style.display="none"; return; }
-    panel.style.display="block";
-    list.innerHTML = data.correlations.slice(0,6).map(c => '<div class="corr">🔗 '+esc(c.note)+'</div>').join("");
+      try{ await window.gijo.analysisSetStatus(e.id, "inprogress"); }catch(_){}
+      data = await window.gijo.analysisEvents();
+      renderSummary(); renderList(); selectEvent(e.id);
+      const anaBody = document.getElementById("anaBody");
+      if(anaBody){
+        const b = document.createElement("div"); b.className="task-done";
+        b.innerHTML = '✅ <b>작업 등록 완료</b> — 대시보드 <b>오늘의 할일</b>에 추가됐고, 이 위험은 <b>처리중</b>으로 표시됩니다.'+
+                      '<div style="color:var(--muted-2);margin-top:3px">'+esc(text)+'</div>';
+        anaBody.insertBefore(b, anaBody.firstChild);
+      }
+      toast('작업 등록됨 · 대시보드 오늘의 할일에서 확인');
+    }catch(err){
+      if(btn){ btn.disabled=false; btn.textContent='▶ 조치 생성 · 작업 등록'; }
+      toast('작업 등록 실패: '+(err.message||err));
+    }
   }
 
-  // ③ 공격 경로·도달성 — 별도 API. 경로가 있으면 패널 표시.
-  async function renderAttackPaths(){
-    const panel = document.getElementById("pathPanel");
-    const list = document.getElementById("pathList");
-    if(!panel||!list) return;
-    let paths=[];
-    try{ paths=(await window.gijo.analysisAttackPaths()).paths||[]; }catch(e){ panel.style.display="none"; return; }
-    if(!paths.length){ panel.style.display="none"; return; }
-    var reachColor={ "확인됨":"#f5928a", "높음":"#f7c777", "보통":"#8fb8ff" };
-    var kindLabel={ entry:"진입", foothold:"거점", lateral:"인접" };
-    list.innerHTML = paths.slice(0,6).map(function(p){
-      var chain=p.steps.map(function(s){ return '<span style="color:var(--muted-2)">'+kindLabel[s.kind]+'</span> '+esc(s.label); }).join(' <span style="color:var(--muted-2)">→</span> ');
-      return '<div class="corr" style="border-left:3px solid '+(reachColor[p.reachability]||"#8fb8ff")+'">'+
-        '<b style="color:'+(reachColor[p.reachability]||"#8fb8ff")+'">도달성 '+esc(p.reachability)+' · '+p.reachScore+'점</b> '+esc(p.entity)+
-        '<div style="font-size:11.5px;margin-top:4px;line-height:1.6">'+chain+'</div></div>';
-    }).join("");
+  // 🔗 소스 간 상관분석 — 한 줄 요약만. 상세는 챗봇으로.
+  function renderCorrelations(){
+    const line = document.getElementById("corrLine");
+    if(!line) return;
+    const cs = (data.correlations)||[];
+    if(!cs.length){ line.style.display="none"; return; }
+    const more = cs.length>1 ? ' <span style="color:var(--muted-2)">외 '+(cs.length-1)+'건</span>' : '';
+    line.style.display="block";
+    line.innerHTML = '🔗 <b>소스 간 상관</b> '+esc(cs[0].note)+more+
+      ' <span class="ask" data-topic="소스 간 상관분석">· 챗봇에 묻기</span>';
+    const ask = line.querySelector(".ask");
+    if(ask) ask.addEventListener("click", ()=>{ if(window.gijoExplain) window.gijoExplain(ask.dataset.topic); });
+  }
+
+  // ③ 공격 경로·도달성 — 그래프 뷰(소스별 방사형 / 전체 연관성 체인). 커스텀 SVG(외부 의존 없음).
+  var attackPaths=[], graphMode="source";
+  function trunc(s,n){ s=String(s==null?"":s); return s.length>n ? s.slice(0,n-1)+"…" : s; }
+  function svgNode(x,y,o){
+    var r=o.r||18, s='<g>';
+    s+='<circle cx="'+x+'" cy="'+y+'" r="'+r+'" fill="'+o.fill+'" stroke="'+(o.stroke||"rgba(255,255,255,.28)")+'" stroke-width="2"/>';
+    if(o.icon) s+='<text x="'+x+'" y="'+(y+5)+'" text-anchor="middle" font-size="15">'+o.icon+'</text>';
+    if(o.label) s+='<text x="'+x+'" y="'+(y+r+13)+'" text-anchor="middle" font-size="10" font-weight="700" fill="#d3daec">'+esc(trunc(o.label,18))+'</text>';
+    if(o.sub) s+='<text x="'+x+'" y="'+(y+r+24)+'" text-anchor="middle" font-size="8.5" fill="#7f88a3">'+esc(trunc(o.sub,22))+'</text>';
+    if(o.badge){ var w=o.badge.length*6.2+10;
+      s+='<rect x="'+(x+r-4)+'" y="'+(y-r-8)+'" rx="4" height="14" width="'+w+'" fill="#e2483d"/>'+
+         '<text x="'+(x+r-4+w/2)+'" y="'+(y-r+2)+'" text-anchor="middle" font-size="8.5" font-weight="700" fill="#fff">'+esc(o.badge)+'</text>'; }
+    return s+'</g>';
+  }
+  function svgEdge(x1,y1,x2,y2,color,dashed){
+    return '<line x1="'+x1+'" y1="'+y1+'" x2="'+x2+'" y2="'+y2+'" stroke="'+color+'" stroke-width="1.8"'+
+      (dashed?' stroke-dasharray="4 3"':'')+' marker-end="url(#gah)"/>';
+  }
+  var GDEFS='<defs><marker id="gah" markerWidth="7" markerHeight="7" refX="6" refY="3.2" orient="auto">'+
+            '<path d="M0,0 L7,3.2 L0,6.4 Z" fill="#8b93ab"/></marker></defs>';
+  function findStep(p,kind){ return (p.steps||[]).find(function(s){ return s.kind===kind; }); }
+  // 소스별: 중심=거점 자산, 방사형으로 관측 신호(진입/거점취약점/인접이동)
+  function graphSource(p){
+    var cx=180, cy=130, R=94, steps=(p.steps||[]).slice(0,6);
+    var col={ entry:"#f5928a", foothold:"#f7c777", lateral:"#8fb8ff" };
+    var icon={ entry:"🌐", foothold:"⚠", lateral:"➡" };
+    var svg='<svg viewBox="0 0 360 264" role="img" aria-label="공격 경로 소스별 그래프">'+GDEFS;
+    var n=steps.length||1;
+    steps.forEach(function(s,i){
+      var a=-Math.PI/2 + i*(2*Math.PI/n);
+      var x=cx+R*Math.cos(a), y=cy+R*Math.sin(a);
+      svg+=svgEdge(cx,cy,x,y, "#5a637f", s.kind==="lateral");
+    });
+    steps.forEach(function(s,i){
+      var a=-Math.PI/2 + i*(2*Math.PI/n);
+      var x=cx+R*Math.cos(a), y=cy+R*Math.sin(a);
+      var badge = s.kind==="entry" && (p.reachability==="확인됨"||p.reachability==="높음") ? "인터넷 노출"
+                : (s.kind==="foothold" && /KEV/i.test(p.note||"")) ? "KEV" : null;
+      svg+=svgNode(x,y,{ r:16, fill:col[s.kind]||"#8fb8ff", icon:icon[s.kind]||"•", label:s.label, badge:badge });
+    });
+    svg+=svgNode(cx,cy,{ r:26, fill:"#20304e", stroke:"#5fa1ff", icon:"🖥", label:p.entity, sub:"도달성 "+p.reachability+" · "+p.reachScore+"점" });
+    return svg+'</svg>';
+  }
+  // 전체 연관성: 공격자 → 외부노출 → 취약점 → 대상자산 (경로별 한 행)
+  function graphChain(paths){
+    var rowH=80, W=360, H=paths.length*rowH+8;
+    var svg='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="공격 경로 전체 연관성 그래프">'+GDEFS;
+    var xs=[46,150,254,332];
+    paths.forEach(function(p,ri){
+      var y=44+ri*rowH;
+      var entry=findStep(p,"entry"), foot=findStep(p,"foothold");
+      var nodes=[
+        {x:xs[0],fill:"#e2483d",icon:"🥷",label:"공격자",sub:null},
+        {x:xs[1],fill:"#f5928a",icon:"🌐",label:entry?entry.label:"외부 노출",sub:null},
+        {x:xs[2],fill:"#f7c777",icon:"⚠",label:foot?foot.label:"취약점",sub:null},
+        {x:xs[3],fill:"#5fa1ff",icon:"🖥",label:p.entity,sub:"도달성 "+p.reachability}
+      ];
+      for(var i=0;i<nodes.length-1;i++){ svg+=svgEdge(nodes[i].x+16, y, nodes[i+1].x-16, y, "#8b93ab", false); }
+      nodes.forEach(function(nd){ svg+=svgNode(nd.x,y,{ r:15, fill:nd.fill, icon:nd.icon, label:nd.label, sub:nd.sub }); });
+    });
+    return svg+'</svg>';
+  }
+  function renderAttackGraph(){
+    var panel=document.getElementById("pathPanel"), box=document.getElementById("pathGraph"), legend=document.getElementById("graphLegend");
+    if(!panel||!box) return;
+    if(!attackPaths.length){ panel.style.display="none"; return; }
     panel.style.display="block";
+    box.innerHTML = graphMode==="chain" ? graphChain(attackPaths.slice(0,3)) : graphSource(attackPaths[0]);
+    legend.innerHTML = graphMode==="chain"
+      ? '<span class="lg"><span class="dot" style="background:#e2483d"></span>공격자</span><span class="lg"><span class="dot" style="background:#f5928a"></span>외부 노출</span><span class="lg"><span class="dot" style="background:#f7c777"></span>취약점</span><span class="lg"><span class="dot" style="background:#5fa1ff"></span>대상 자산</span> · 관측 신호 기반(침투테스트 아님)'
+      : '<span class="lg"><span class="dot" style="background:#f5928a"></span>진입</span><span class="lg"><span class="dot" style="background:#f7c777"></span>거점 취약점</span><span class="lg"><span class="dot" style="background:#8fb8ff"></span>인접 이동</span> · 중심=<b>'+esc(attackPaths[0].entity)+'</b>';
+  }
+  async function loadAttackPaths(){
+    try{ attackPaths=(await window.gijo.analysisAttackPaths()).paths||[]; }catch(e){ attackPaths=[]; }
+    renderAttackGraph();
   }
 
   async function refresh(){
     try{
       await window.gijo.analysisRebuildVuln();       // 취약점 소스를 자산 findings에서 최신화
       data = await window.gijo.analysisEvents();
-      renderSummary(); renderList(); renderCorrelations(); renderAttackPaths();
+      renderSummary(); renderList(); renderCorrelations(); loadAttackPaths();
       if(selectedId) selectEvent(selectedId);
     }catch(e){ document.getElementById("riskList").innerHTML = '<div class="empty">불러오기 실패: '+esc(e.message||e)+'</div>'; }
   }
@@ -339,6 +434,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     filter = c.dataset.src;
     document.querySelectorAll("#filters .fchip").forEach(x=>x.classList.toggle("active", x===c));
     renderList();
+  });
+  document.querySelector(".graph-toggle").addEventListener("click", (ev)=>{
+    const g = ev.target.closest(".gt"); if(!g) return;
+    graphMode = g.dataset.mode;
+    document.querySelectorAll(".graph-toggle .gt").forEach(x=>x.classList.toggle("on", x===g));
+    renderAttackGraph();
   });
   document.getElementById("refreshBtn").addEventListener("click", refresh);
   document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
