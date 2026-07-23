@@ -345,4 +345,48 @@ contextBridge.exposeInMainWorld("gijoRealtime", {
   connect: () => connectWebSocket(),
 });
 
+// ── 실사용 감지 keepalive ──────────────────────────────────────────────
+// 서버는 인증 REST 요청마다 세션의 lastSeenAt을 갱신하므로, 클릭·이동 등 조작을 하는
+// 동안엔 유휴(30분) 시계가 리셋돼 세션이 계속 살아있다. 다만 한 화면만 오래 "보고만"
+// 있으면 REST 호출이 없어 만료될 수 있다. → 실제 사용자 입력(마우스·키보드·스크롤)이
+// 최근에 있었으면 주기적으로 가벼운 인증 핑(me)을 보내 세션을 유지한다. 자리를 비우면
+// (지정 시간 이상 입력 없음) 핑을 멈춰 유휴 만료 규칙을 그대로 지킨다.
+//
+// 토큰(회전형 refresh)은 프레임마다 별도 메모리라, 여러 프레임이 동시에 refresh하면
+// 회전 경쟁이 난다. 그래서 타이머·핑은 최상위 프레임에서만 돌리고, iframe(허브 하위
+// 페이지)은 자신의 입력 활동만 top 프레임으로 전달한다.
+(() => {
+  const ACTIVITY_EVENTS = ["mousemove", "keydown", "mousedown", "wheel", "touchstart"];
+  const PING_INTERVAL_MS = 5 * 60 * 1000;   // 5분마다 점검
+  const ACTIVE_WINDOW_MS = 10 * 60 * 1000;  // 최근 10분 내 입력이 있어야 "사용 중"으로 보고 핑
+  const FORWARD_THROTTLE_MS = 15 * 1000;    // iframe→top 활동 전달 쓰로틀
+  const isTop = (() => { try { return window.top === window; } catch { return true; } })();
+
+  if (isTop) {
+    let lastActivity = Date.now();
+    const note = () => { lastActivity = Date.now(); };
+    ACTIVITY_EVENTS.forEach((ev) => window.addEventListener(ev, note, { passive: true, capture: true }));
+    // iframe에서 전달된 활동 신호
+    window.addEventListener("message", (m) => {
+      if (m && m.data && (m.data as { __gijoActivity?: boolean }).__gijoActivity) note();
+    });
+    setInterval(() => {
+      if (!api.isAuthenticated()) return;                        // 로그아웃 상태면 핑 안 함
+      if (Date.now() - lastActivity > ACTIVE_WINDOW_MS) return;  // 자리 비움 → 유휴 만료되게 둠
+      // me()는 인증 REST라 서버 lastSeenAt 갱신 + 액세스 토큰 만료 시 자동 재발급까지 처리한다.
+      api.authApi.me().catch(() => { /* 만료/네트워크 오류는 다음 API 호출의 가드가 처리 */ });
+    }, PING_INTERVAL_MS);
+  } else {
+    // iframe: 자신의 입력 활동을 top으로만 알린다(쓰로틀). 타이머·토큰은 top이 단독 관리.
+    let lastForward = 0;
+    const forward = () => {
+      const now = Date.now();
+      if (now - lastForward < FORWARD_THROTTLE_MS) return;
+      lastForward = now;
+      try { window.top?.postMessage({ __gijoActivity: true }, "*"); } catch { /* noop */ }
+    };
+    ACTIVITY_EVENTS.forEach((ev) => window.addEventListener(ev, forward, { passive: true, capture: true }));
+  }
+})();
+
 export type GijoApi = typeof gijoApi;
