@@ -45,11 +45,14 @@
   .kpi-mini-label{font-size:11px;color:var(--muted);font-weight:600;margin-bottom:6px;}
   .kpi-mini-value{font-size:19px;font-weight:800;color:#fff;}
 
-  .toolbar{display:flex;justify-content:space-between;align-items:center;background:var(--panel);border:1px solid var(--border);border-radius:12px 12px 0 0;padding:14px 18px;border-bottom:none;}
-  .search{display:flex;align-items:center;gap:10px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:8px 14px;width:280px;}
+  /* 반응형: 출처 행 + 위험 행 2줄. 창을 줄이면 각 행이 알아서 접힌다(flex-wrap). */
+  .toolbar{display:flex;flex-direction:column;gap:9px;align-items:stretch;background:var(--panel);border:1px solid var(--border);border-radius:12px 12px 0 0;padding:12px 18px;border-bottom:none;}
+  .tb-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .search{display:flex;align-items:center;gap:10px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:8px 14px;flex:1 1 190px;min-width:170px;max-width:340px;}
   .search input{background:transparent;border:none;outline:none;color:var(--text);font-size:13px;width:100%;}
   .search input::placeholder{color:var(--muted-2);}
-  .filters{display:flex;gap:8px;}
+  .filters{display:flex;gap:8px;flex-wrap:wrap;}
+  .page-count{color:var(--muted);font-weight:700;font-size:16px;}
   .filter-chip{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);padding:7px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;}
   .filter-chip.active{background:rgba(59,130,246,0.15);border-color:var(--blue);color:var(--blue-light);}
   .ochip-cnt{font-size:10px;font-weight:800;opacity:.72;margin-left:2px;}
@@ -207,8 +210,7 @@
   <div class="main">
     <div class="topbar-row">
       <div>
-        <div class="page-title">AI 자산</div>
-        <div class="page-sub">코드 저장소 자동 스캔 · 외부 탐지 결과 업로드 · 수동 등록으로 전사 AI 자산을 전수 파악 · 총 <span id="pageSubCount">-</span>건</div>
+        <div class="page-title">AI 자산 <span class="page-count">(<span id="pageSubCount">-</span>)</span></div>
       </div>
       <div style="display:flex;gap:8px;">
         <button class="btn-ghost" id="csvExportBtn">CSV 내보내기</button>
@@ -221,7 +223,7 @@
     <div id="gijoChatWidget" data-prompts='["자산 목록 보여줘","커버리지 빠진 자산 있어?"]' style="max-width:640px;margin-bottom:16px;"></div>
 
     <!-- 부가 패널은 기본으로 접는다 — 이 화면의 주인공은 자산 목록이다. 지우지 않고 감춘다. -->
-    <div id="extraToggle" style="font-size:12px;color:var(--muted-2);cursor:pointer;margin-bottom:12px;user-select:none;">▸ 저장소 스캔 · 위험 요약 · 서비스 영향도 보기</div>
+    <div id="extraToggle" style="font-size:13px;font-weight:700;color:var(--blue-light);cursor:pointer;margin-bottom:12px;user-select:none;">▸ 저장소 스캔 · 위험 요약 · 서비스 영향도 보기</div>
     <div id="extraPanels" style="display:none;">
     <div class="panel" style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:16px;">
       <div style="font-size:14.5px;font-weight:800;color:#fff;margin-bottom:4px;">코드 저장소 스캔 <span style="font-size:10.5px;font-weight:700;color:var(--teal);background:rgba(30,185,128,0.15);padding:2px 8px;border-radius:10px;margin-left:6px;">온프레미스 · 자체 탐지</span></div>
@@ -260,25 +262,30 @@
     <div id="listPane">
     <div class="sortnote" id="sortNote">가장 급한 결손으로 묶고, 그룹 안에서는 취약점 심각도 순으로 정렬 — 위에 있을수록 손이 필요합니다.</div>
     <div class="toolbar">
-      <div class="search">
-        <span style="color:var(--muted-2)">⌕</span>
-        <input id="searchInput" placeholder="모델명, 소유부서로 검색" aria-label="모델명, 소유부서로 검색">
+      <!-- 1행: 검색 + 출처(전체/스캐너/연동) + 표시항목 -->
+      <div class="tb-row">
+        <div class="search">
+          <span style="color:var(--muted-2)">⌕</span>
+          <input id="searchInput" placeholder="모델명, 소유부서로 검색" aria-label="모델명, 소유부서로 검색">
+        </div>
+        <div class="filters" id="originChips">
+          <div class="filter-chip active" data-origin="real">📋 전체 자산 <span class="ochip-cnt" data-ocnt="real">-</span></div>
+          <div class="filter-chip" data-origin="scanner">스캐너 탐지분 <span class="ochip-cnt" data-ocnt="scanner">-</span></div>
+          <div class="filter-chip" data-origin="registered">🔗 연동자산 <span class="ochip-cnt" data-ocnt="registered">-</span></div>
+        </div>
+        <button id="colBtn" class="filter-chip" style="margin-left:auto;font-weight:700" title="표시할 컬럼과 순서를 지정합니다">☰ 표시 항목</button>
       </div>
-      <!-- 출처 필터는 위험 필터와 축이 달라 따로 둔다. 기본은 스캐너 탐지분(실 자산). 각 칩에 건수 표기. -->
-      <div class="filters" id="originChips" style="margin-right:4px;">
-        <div class="filter-chip active" data-origin="scanner">스캐너 탐지분 <span class="ochip-cnt" data-ocnt="scanner">-</span></div>
-        <div class="filter-chip" data-origin="real">📋 전체 자산 <span class="ochip-cnt" data-ocnt="real">-</span></div>
-        <div class="filter-chip" data-origin="all">샘플 포함 <span class="ochip-cnt" data-ocnt="all">-</span></div>
+      <!-- 2행: 위험 구분(전체/실제악용/고위험/…) — 출처 행 아래에 -->
+      <div class="tb-row">
+        <div class="filters" id="filterChips">
+          <div class="filter-chip active" data-filter="all">전체</div>
+          <div class="filter-chip" data-filter="kev" style="color:#ff8a80">🔴 실제 악용(KEV)</div>
+          <div class="filter-chip" data-filter="high">고위험</div>
+          <div class="filter-chip" data-filter="nosbom">SBOM 미생성</div>
+          <div class="filter-chip" data-filter="unscanned">미스캔</div>
+          <div class="filter-chip" data-filter="recent">최근 등록</div>
+        </div>
       </div>
-      <div class="filters" id="filterChips">
-        <div class="filter-chip active" data-filter="all">전체</div>
-        <div class="filter-chip" data-filter="kev" style="color:#ff8a80">🔴 실제 악용(KEV)</div>
-        <div class="filter-chip" data-filter="high">고위험</div>
-        <div class="filter-chip" data-filter="nosbom">SBOM 미생성</div>
-        <div class="filter-chip" data-filter="unscanned">미스캔</div>
-        <div class="filter-chip" data-filter="recent">최근 등록</div>
-      </div>
-      <button id="colBtn" class="filter-chip" style="margin-left:auto;font-weight:700" title="표시할 컬럼과 순서를 지정합니다">☰ 표시 항목</button>
     </div>
 
     <!-- 시안 B: 좌측 카테고리 트리 + 우측 자산 표 -->
@@ -407,7 +414,7 @@
   // 커버리지는 서버가 계산한다 — 화면과 챗봇이 다른 숫자를 말하면 담당자는 둘 다 안 믿는다.
   let coverage = { total: 0, complete: 0, gaps: [], ranked: [] };
   let activeTab = "list";
-  let activeOrigin = "scanner"; // 기본은 실제로 들여온 자산만 — 시드 샘플은 숨긴다
+  let activeOrigin = "real"; // 기본 = 전체 자산(샘플 제외)
   let activeCategory = "all";   // ④ 좌측 카테고리 트리 선택('all' | '__none__' | 카테고리명)
   const selectedIds = new Set(); // ③ 일괄 삭제 선택 상태(재렌더에도 유지)
 
@@ -497,10 +504,11 @@
   }
 
   // 출처는 서버가 id로 정확히 판정해 내려준다(origin) — 화면에서 이름으로 추측하지 않는다.
+  // 전체 자산=샘플 제외 실자산 / 스캐너 탐지분=취약점 스캔 반입 / 연동자산=API·MCP·저장소·수동 등록.
   function passesOrigin(a) {
-    if (activeOrigin === "all") return true;
-    if (activeOrigin === "real") return a.origin !== "sample";
-    return a.origin === "scanner";
+    if (activeOrigin === "scanner") return a.origin === "scanner";
+    if (activeOrigin === "registered") return a.origin === "registered";
+    return a.origin !== "sample"; // real(전체 자산) 및 기본
   }
   // ④ 좌측 카테고리 트리 선택 필터.
   function passesCategory(a) {
@@ -669,14 +677,14 @@
       }
     }
     renderCatPanel();
-    const originNote = { scanner: "스캐너 탐지분", real: "전체 자산", all: "샘플 포함" }[activeOrigin];
-    paginationLabel.textContent = `${originNote} 기준 ${filtered.length}건 표시 · 등록된 자산 전체 ${allAssets.length}건`;
+    const originNote = { real: "전체 자산", scanner: "스캐너 탐지분", registered: "연동자산" }[activeOrigin] || "전체 자산";
+    paginationLabel.textContent = `${originNote} 기준 ${filtered.length}건 표시 · 등록된 자산 전체 ${allAssets.filter((a) => a.origin !== "sample").length}건`;
 
-    // ⑤ 출처 칩 건수 — 각 칩이 몇 건을 보여주는지 표기(전체 자산이 몇인지 한눈에).
+    // 출처 칩 건수 — 각 칩이 몇 건을 보여주는지 표기.
     const oCnt = {
-      scanner: allAssets.filter((a) => a.origin === "scanner").length,
       real: allAssets.filter((a) => a.origin !== "sample").length,
-      all: allAssets.length,
+      scanner: allAssets.filter((a) => a.origin === "scanner").length,
+      registered: allAssets.filter((a) => a.origin === "registered").length,
     };
     document.querySelectorAll(".ochip-cnt").forEach((el) => { el.textContent = oCnt[el.dataset.ocnt] ?? "-"; });
 
@@ -685,7 +693,7 @@
     [...selectedIds].forEach((id) => { if (!visibleIds.has(id)) selectedIds.delete(id); });
     updateBulkBar();
 
-    document.getElementById("pageSubCount").textContent = allAssets.length;
+    document.getElementById("pageSubCount").textContent = allAssets.filter((a) => a.origin !== "sample").length;
     document.getElementById("kpiTotal").textContent = allAssets.length;
     document.getElementById("kpiHigh").textContent = allAssets.filter((a) => riskOf(a).level === "high").length;
     document.getElementById("kpiMid").textContent = allAssets.filter((a) => riskOf(a).level === "mid").length;
