@@ -191,7 +191,17 @@
       { x: 3, y: 6.6 }, { x: 9, y: 6.6 }, { x: 15, y: 6.6 },
     ];
     const COFFEE = { x: 156, y: 90 }; // 커피 코너(픽셀 좌표)
-    const TABLE = { x: 78, y: 66 };   // 회의 테이블
+    const TABLE = { x: 78, y: 66 };   // 회의 테이블(장식용 소파존)
+    // 미팅룸(2026-07-23) — 외부 방문자가 여기 앉아 보안총괄에게 지시하고, 보안총괄이 합석한다.
+    // 유리 파티션으로 내부 업무존과 분리(외부인은 내부 책상에 직접 접근하지 않는다).
+    const MEETING = { x0: 44, y0: 74, x1: 104, y1: 94 };
+    const MTABLE = { x: 62, y: 82, w: 24, h: 6 }; // 미팅 테이블
+    // 방문자 좌석(테이블 아래·옆으로 줄지어) / 보안총괄 합석 위치(테이블 상단 헤드).
+    function meetingSeat(slot) {
+      const seats = [{ x: 50, y: 90 }, { x: 62, y: 91 }, { x: 76, y: 91 }, { x: 90, y: 90 }, { x: 98, y: 88 }];
+      return seats[slot % seats.length];
+    }
+    function meetingHost() { return { x: MTABLE.x + 6, y: MTABLE.y - 3 }; }
     // 외부 콘솔 접속자(클라이언트): 오른쪽 벽 출입문으로 걸어 들어와 보안총괄(오케스트레이터)
     // 책상 옆으로 가서 지시한다 — 회의 테이블 합석에서 "보안총괄에게 직접 지시" 구도로 변경(2026-07-22).
     const DOOR = { x: W - 8, y: 46 };
@@ -337,6 +347,25 @@
       px(COFFEE.x - 2, COFFEE.y - 12, 14, 16, T.deskFace);
       px(COFFEE.x, COFFEE.y - 10, 10, 12, "#3a4258");
       px(COFFEE.x + 2, COFFEE.y - 8, 6, 3, "#e2483d"); px(COFFEE.x + 3, COFFEE.y - 2, 3, 2, "#e7eaf3");
+      // 미팅룸 — 유리 파티션 바닥 + 상판 유리벽 + 미팅 테이블 + 의자 + 라벨.
+      const m = MEETING;
+      ctx.fillStyle = "rgba(64,160,255,.06)"; ctx.fillRect(m.x0 * S, m.y0 * S, (m.x1 - m.x0) * S, (m.y1 - m.y0) * S);
+      // 유리 파티션(상단·좌·우 라인, 문은 아래쪽에서 들어옴)
+      px(m.x0, m.y0, m.x1 - m.x0, 0.6, "rgba(95,161,255,.5)");
+      px(m.x0, m.y0, 0.6, m.y1 - m.y0, "rgba(95,161,255,.4)");
+      px(m.x1 - 0.6, m.y0, 0.6, m.y1 - m.y0, "rgba(95,161,255,.4)");
+      // 미팅 테이블(둥근 상판 느낌 + 서류)
+      px(MTABLE.x - 1, MTABLE.y - 1, MTABLE.w + 2, 2, T.deskEdge);
+      px(MTABLE.x, MTABLE.y + 1, MTABLE.w, MTABLE.h, T.deskTop);
+      px(MTABLE.x, MTABLE.y + MTABLE.h + 1, MTABLE.w, 2, T.deskFace);
+      px(MTABLE.x + 4, MTABLE.y + 2, 5, 3, "#e7eaf3"); px(MTABLE.x + 15, MTABLE.y + 2, 5, 3, "#cfd8ff");
+      // 의자(상단 헤드=보안총괄, 하단=방문자)
+      px(MTABLE.x + 5, MTABLE.y - 5, 4, 3, "#33405e");
+      px(MTABLE.x + 4, MTABLE.y + MTABLE.h + 3, 4, 3, "#33405e"); px(MTABLE.x + 14, MTABLE.y + MTABLE.h + 3, 4, 3, "#33405e");
+      // 라벨
+      ctx.font = `bold ${3 * S}px 'Malgun Gothic',monospace`; ctx.fillStyle = "rgba(95,161,255,.85)";
+      ctx.fillText("🔒 MEETING", (m.x0 + 2) * S, (m.y0 + 5) * S);
+
       // 출입문(프레임+명패) — 접속/퇴장 때 doorOpenT 동안 열린다
       px(DOOR.x - 1, DOOR.y - 1, 9, 18, T.deskEdge);
       if (doorOpenT > 0) { px(DOOR.x, DOOR.y, 8, 16, "#0d1322"); px(DOOR.x + 5, DOOR.y + 1, 2, 14, T.deskFace); }
@@ -458,8 +487,16 @@
       sparkles.forEach((p) => { p.y -= 0.25; p.life--; });
       sparkles = sparkles.filter((p) => p.life > 0);
 
-      agents.forEach((a) => {
+      // 미팅룸에 방문자가 지시 중이면 보안총괄이 합석 위치로 간다(회의 참석).
+      const meetingActive = visitors.some((v) => v.phase === "enter" || v.phase === "directing");
+      agents.forEach((a, ai) => {
         const hx = DESKS[a.desk].x * 8 + 8, hy = DESKS[a.desk].y * 8 + 26;
+        // 보안총괄(오케스트레이터)은 미팅 중이면 미팅 테이블 헤드로 이동해 지시를 받는다.
+        if (ai === orchestratorIdx && meetingActive && !a.visit) {
+          const h = meetingHost();
+          walkTo(a, h.x, h.y, 0.6);
+          return;
+        }
         // 협업 이벤트 방문(from→to) — 상대 책상 옆까지 걸어가 머문 뒤 복귀
         if (a.visit) {
           const target = agents[a.visit.to];
@@ -480,10 +517,10 @@
         walkTo(a, goal.x, goal.y, 0.3);
       });
 
-      // 접속자: 입장 → 보안총괄 옆 지시 위치 → 지시(directing), 퇴장 → 문에서 소멸
+      // 접속자: 입장 → 미팅룸 좌석으로 → 착석·지시(directing), 퇴장 → 문에서 소멸
       visitors = visitors.filter((v) => {
         if (v.phase === "enter") {
-          const spot = directingSpot(v.slot);
+          const spot = meetingSeat(v.slot);
           if (walkTo(v, spot.x, spot.y, 0.6)) { v.phase = "directing"; v.dirT = 0; }
           return true;
         }
@@ -548,7 +585,7 @@
     const online = (sessions || []).filter((s) => Date.now() - s.lastSeenAt < ONLINE_WINDOW_MS);
     const names = new Set(online.map((s) => s.username));
     if (knownVisitors) {
-      for (const n of names) if (!knownVisitors.has(n)) feedLine("🧑 지시", `${n} 님이 접속해 보안총괄에게 지시합니다`, "#ffe9a8");
+      for (const n of names) if (!knownVisitors.has(n)) feedLine("🧑 지시", `${n} 님이 미팅룸에서 보안총괄에게 지시합니다`, "#ffe9a8");
       for (const n of knownVisitors) if (!names.has(n)) feedLine("🚪 퇴장", `${n} 님의 접속이 종료되었습니다`, "var(--muted)");
     }
     knownVisitors = names;

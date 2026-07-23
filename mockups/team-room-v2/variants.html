@@ -1,0 +1,79 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>AI 팀 라이브 2D 방 — 시안 3종</title>
+<style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.1);--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--blue:#3b82f6;--blue-light:#5fa1ff;--teal:#1eb980;--amber:#f0a020;--purple:#8b7cf0;--pink:#f0a0c0;}
+*{box-sizing:border-box;margin:0;}body{background:var(--bg);color:var(--text);font-family:'Malgun Gothic',sans-serif;padding:22px;}
+h1{font-size:17px;margin-bottom:4px;}.sub{font-size:11px;color:var(--muted);margin-bottom:16px;line-height:1.6;}
+.wrap{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:start;}
+.col{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;}
+.col h2{font-size:13.5px;margin-bottom:3px;}.col .d{font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.5;min-height:70px;}
+.scene{border-radius:10px;padding:16px;height:300px;position:relative;overflow:hidden;}
+/* 아이소메트릭 바닥 */
+.floor{position:absolute;left:50%;top:52%;width:230px;height:230px;transform:translate(-50%,-50%) rotateX(58deg) rotateZ(45deg);transform-style:preserve-3d;}
+.tile{position:absolute;width:115px;height:115px;border:1px solid rgba(255,255,255,.06);}
+.desk{position:absolute;border-radius:5px;box-shadow:0 4px 0 rgba(0,0,0,.35);display:flex;align-items:center;justify-content:center;font-size:16px;}
+.ava{position:absolute;width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 3px 8px rgba(0,0,0,.4);border:2px solid rgba(255,255,255,.25);}
+.nm{position:absolute;font-size:8px;color:#fff;background:rgba(0,0,0,.5);padding:1px 5px;border-radius:8px;white-space:nowrap;transform:translateX(-50%);}
+.st{width:6px;height:6px;border-radius:50%;position:absolute;top:-2px;right:-2px;border:1px solid #0a0e1a;}
+.meet{position:absolute;border:2px dashed;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:8.5px;text-align:center;line-height:1.3;}
+.legend{font-size:9px;color:var(--muted-2);margin-top:8px;line-height:1.6;}
+.tag{display:inline-block;font-size:8px;font-weight:800;padding:1px 6px;border-radius:8px;margin-right:3px;}
+</style></head><body>
+<h1>🏢 AI 팀 라이브 — 2D 방(사이월드 감성) 시안 3종 <span style="font-size:11px;color:var(--muted)">+ 외부인 미팅룸 지시</span></h1>
+<div class="sub">공통: 사이월드 미니룸 <b>감성만</b> 차용(실제 에셋 미사용·CC0/자작). 에이전트=아바타(상태 점), 오늘의 할일=책상 위 오브젝트. <b style="color:var(--amber)">외부 방문자는 미팅룸에 앉아 오케스트레이터(보안총괄)에게만 지시</b>(내부 방 직접 접근 X).</div>
+<div class="wrap">
+
+<!-- A안: 사이월드 미니룸 정통 -->
+<div class="col">
+  <h2>A안 — 미니룸 정통 아이소메트릭</h2>
+  <div class="d">따뜻한 파스텔 벽지·러그·화분까지 미니룸 그대로의 아기자기함. 반가움 최고. 미팅룸은 방 한켠 유리벽 구역. 톤이 제품 다크와 가장 다름(호불호).</div>
+  <div class="scene" style="background:linear-gradient(160deg,#3a3550,#2a2740)">
+    <div class="floor">
+      <div class="tile" style="left:0;top:0;background:#c9a878"></div><div class="tile" style="left:115px;top:0;background:#bfa06e"></div>
+      <div class="tile" style="left:0;top:115px;background:#bfa06e"></div><div class="tile" style="left:115px;top:115px;background:#c9a878"></div>
+    </div>
+    <div class="desk" style="left:70px;top:120px;width:44px;height:26px;background:#8b6f47">🖥<span class="ava" style="background:var(--blue);left:8px;top:-24px">🧭<span class="st" style="background:var(--teal)"></span></span></div>
+    <div class="nm" style="left:96px;top:96px">보안총괄</div>
+    <div class="desk" style="left:170px;top:100px;width:40px;height:24px;background:#8b6f47">🔎<span class="ava" style="background:var(--teal);left:6px;top:-22px">◎</span></div>
+    <div class="desk" style="left:150px;top:160px;width:40px;height:24px;background:#8b6f47">📚<span class="ava" style="background:var(--purple);left:6px;top:-22px">▣</span></div>
+    <div style="position:absolute;left:14px;top:24px;font-size:20px">🪴</div><div style="position:absolute;right:16px;bottom:18px;font-size:18px">🖼</div>
+    <div class="meet" style="left:12px;bottom:14px;width:88px;height:64px;border-color:var(--amber);background:rgba(240,160,32,.1);color:#f7c777">🚪 미팅룸<br>👤 방문자<br><span style="color:#fff">→ 보안총괄 지시</span></div>
+  </div>
+  <div class="legend"><span class="tag" style="background:rgba(30,185,128,.2);color:#6fdcb5">● 작업중</span> 아바타 위 상태점 · 러그·화분 장식</div>
+</div>
+
+<!-- B안: GIJO 다크톤 절충 (추천) -->
+<div class="col">
+  <h2>B안 — GIJO 다크톤 접목 (추천)</h2>
+  <div class="d">아이소메트릭 방 구조·아바타는 미니룸 감성, 색은 제품 다크 네이비+블루 네온. 엔터프라이즈 톤과 충돌 없이 "귀엽되 프로페셔널". 미팅룸은 유리 파티션 구역.</div>
+  <div class="scene" style="background:radial-gradient(circle at 50% 40%,#16203a,#0a0e1a)">
+    <div class="floor">
+      <div class="tile" style="left:0;top:0;background:#1a2740"></div><div class="tile" style="left:115px;top:0;background:#16213a"></div>
+      <div class="tile" style="left:0;top:115px;background:#16213a"></div><div class="tile" style="left:115px;top:115px;background:#1a2740"></div>
+    </div>
+    <div class="desk" style="left:70px;top:118px;width:46px;height:26px;background:#20304e;border:1px solid rgba(95,161,255,.4)">🖥<span class="ava" style="background:var(--blue);left:9px;top:-24px;box-shadow:0 0 10px var(--blue)">🧭<span class="st" style="background:var(--teal)"></span></span></div>
+    <div class="nm" style="left:98px;top:94px;background:rgba(59,130,246,.3)">보안총괄</div>
+    <div class="desk" style="left:172px;top:100px;width:42px;height:24px;background:#20304e;border:1px solid rgba(30,185,128,.4)">🔎<span class="ava" style="background:var(--teal);left:7px;top:-22px">◎<span class="st" style="background:var(--amber)"></span></span></div>
+    <div class="desk" style="left:150px;top:162px;width:42px;height:24px;background:#20304e;border:1px solid rgba(139,124,240,.4)">📚<span class="ava" style="background:var(--purple);left:7px;top:-22px">▣</span></div>
+    <div style="position:absolute;left:16px;top:26px;font-size:18px;filter:hue-rotate(180deg)">🪴</div>
+    <div class="meet" style="left:12px;bottom:14px;width:90px;height:66px;border-color:var(--blue-light);background:rgba(59,130,246,.12);color:var(--blue-light)">🔒 미팅룸(유리)<br>👤 외부 방문자<br><span style="color:#fff">오케스트레이션 지시 →</span></div>
+  </div>
+  <div class="legend">다크 네이비 바닥 + 블루 네온 데스크. 상태점·이름표. 미팅룸=유리 파티션(외부 격리)</div>
+</div>
+
+<!-- C안: 현 픽셀 오피스 + 미니룸 가구 -->
+<div class="col">
+  <h2>C안 — 현 픽셀 오피스 + 미니룸 가구</h2>
+  <div class="d">지금 픽셀 오피스 레이아웃은 유지하고 미니룸 가구·소품(러그·소파·화분)과 미팅룸만 추가. 공수 최소·안정적. 대신 "새 화면" 임팩트는 가장 약함.</div>
+  <div class="scene" style="background:#0d1424;image-rendering:pixelated">
+    <div style="position:absolute;inset:14px;border:2px solid #2a3550;border-radius:6px;background:repeating-linear-gradient(90deg,#101a30 0 16px,#0e1728 16px 32px)"></div>
+    <div style="position:absolute;left:40px;top:60px;width:60px;height:38px;background:#20304e;border:2px solid #3a4a6a;border-radius:4px;text-align:center;font-size:9px;color:var(--muted);padding-top:3px">🧭 보안총괄<span class="st" style="position:static;display:inline-block;background:var(--teal);margin-left:3px"></span></div>
+    <div style="position:absolute;left:140px;top:50px;width:52px;height:34px;background:#20304e;border:2px solid #3a4a6a;border-radius:4px;text-align:center;font-size:9px;color:var(--muted);padding-top:3px">🔎 Scan</div>
+    <div style="position:absolute;left:150px;top:110px;width:52px;height:34px;background:#20304e;border:2px solid #3a4a6a;border-radius:4px;text-align:center;font-size:9px;color:var(--muted);padding-top:3px">📚 GIJO</div>
+    <div style="position:absolute;left:44px;top:120px;font-size:16px">🛋</div><div style="position:absolute;left:100px;top:130px;font-size:15px">🪴</div>
+    <div class="meet" style="left:24px;bottom:22px;width:96px;height:56px;border-color:var(--amber);background:rgba(240,160,32,.1);color:#f7c777">🚪 미팅룸<br>👤 방문자 → 🧭 지시</div>
+  </div>
+  <div class="legend">기존 데스크 카드 유지 + 소파·화분·미팅룸 코너 추가. 리스크 최저</div>
+</div>
+
+</div>
+</body></html>
