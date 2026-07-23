@@ -1,0 +1,121 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>보안팀 사무실 LIVE 재설계 — 시안 3종</title>
+<style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.1);--border-strong:rgba(255,255,255,.16);--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--blue:#3b82f6;--blue-light:#5fa1ff;--teal:#1eb980;--amber:#f0a020;--purple:#8b7cf0;}
+*{box-sizing:border-box;margin:0;}body{background:var(--bg);color:var(--text);font-family:'Malgun Gothic',sans-serif;padding:22px;font-size:13px;}
+h1{font-size:18px;margin-bottom:5px;}.lead{font-size:12px;color:var(--muted);margin-bottom:18px;line-height:1.7;max-width:1080px;}
+.lead b{color:var(--text);}
+.row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:start;}
+.col{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:13px;}
+.col h2{font-size:14px;margin-bottom:3px;}.col .d{font-size:10.5px;color:var(--muted);margin-bottom:10px;line-height:1.6;min-height:64px;}
+.d .k{color:var(--teal);font-weight:700;}
+/* 창 프레임 */
+.win{height:360px;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;overflow:hidden;}
+.wh{display:flex;align-items:center;justify-content:space-between;padding:7px 11px;border-bottom:1px solid var(--border);flex:0 0 auto;}
+.wh .t{font-size:12px;font-weight:800;}
+.live{font-size:8px;font-weight:800;color:var(--teal);border:1px solid rgba(30,185,128,.5);border-radius:8px;padding:1px 5px;margin-left:5px;}
+.wh .seg{display:flex;gap:2px;}.wh .seg span{width:16px;height:15px;border-radius:4px;background:var(--panel);display:flex;align-items:center;justify-content:center;font-size:8px;}
+/* 방(픽셀 오피스 자리표시) */
+.room{background:radial-gradient(circle at 50% 42%,#16203a,#0a0e1a);position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.room .floor{position:absolute;inset:14px;border:1px solid rgba(95,161,255,.14);border-radius:8px;background:repeating-linear-gradient(90deg,#101a30 0 14px,#0e1728 14px 28px);}
+.ava{position:absolute;width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;box-shadow:0 2px 6px rgba(0,0,0,.4);}
+.bub{position:absolute;background:#fff;color:#101828;font-size:8px;font-weight:700;padding:2px 6px;border-radius:7px;white-space:nowrap;box-shadow:0 3px 8px rgba(0,0,0,.4);}
+.bub::after{content:"";position:absolute;bottom:-3px;left:9px;border:4px solid transparent;border-top-color:#fff;border-bottom:0;}
+/* 오늘의 할일 */
+.todo{background:var(--panel);border-left:1px solid var(--border);display:flex;flex-direction:column;min-height:0;}
+.th{font-size:10.5px;font-weight:800;padding:8px 10px 5px;}
+.ti{background:var(--panel-2);border:1px solid var(--border);border-radius:6px;padding:5px 7px;margin:0 8px 5px;font-size:9px;line-height:1.4;}
+.ti .p{font-size:7.5px;font-weight:800;color:var(--amber);}
+.cta{flex:0 0 auto;padding:8px 11px;border-top:1px solid var(--border);}
+.cta .b{background:var(--teal);color:#04110b;border-radius:8px;padding:7px;text-align:center;font-size:11px;font-weight:800;}
+.cta .h{font-size:8.5px;color:var(--muted-2);margin-top:4px;line-height:1.4;}
+.legend{font-size:9.5px;color:var(--muted-2);margin-top:9px;line-height:1.6;}
+.tag{display:inline-block;font-size:8px;font-weight:800;padding:1px 6px;border-radius:8px;background:rgba(30,185,128,.2);color:#6fdcb5;}
+.note{font-size:10px;color:var(--blue-light);margin-top:6px;}
+</style></head><body>
+<h1>🏢 보안팀 사무실 LIVE — 재설계 시안 3종</h1>
+<div class="lead">요청: ① 방 화면을 <b>아래까지 꽉 채우기</b>(디자인 개선) · ② <b>팀 대화 피드 패널 삭제</b> → 캐릭터 말풍선으로 · ③ 오피스 대화는 <b>실시간 세션</b>(대시보드)에서 확인(이미 협업 이벤트로 흐름) · ④ <b>오늘의 할일 축소</b>·정보 밀도↑ · <b>하단 메뉴(운영 시작) 포함</b>. 방은 실제로는 픽셀 캔버스이며 아래는 배치 자리표시입니다.</div>
+<div class="row">
+
+<!-- 시안 A -->
+<div class="col">
+  <h2>A안 — 방 최대화 + 우측 슬림 할일</h2>
+  <div class="d">피드를 없앤 자리까지 <span class="k">방이 세로로 꽉</span> 채운다. 오른쪽 할일은 <span class="k">280→232px로 슬림</span>·행 간격 축소로 더 많이 보임. 하단에 운영 시작 메뉴. 공수 최소·안정적.</div>
+  <div class="win">
+    <div class="wh"><div class="t">🏢 보안팀 사무실 <span class="live">LIVE</span></div><div class="seg"><span>☀</span><span>🌃</span><span>🌊</span></div></div>
+    <div style="display:flex;flex:1;min-height:0;">
+      <div class="room" style="flex:1;">
+        <div class="floor"></div>
+        <div class="ava" style="background:var(--blue);left:38%;top:52%">🧭</div><div class="bub" style="left:40%;top:40%">취약점 3건 확인 중</div>
+        <div class="ava" style="background:var(--teal);left:60%;top:44%">🔎</div><div class="bub" style="left:60%;top:32%">스캔 완료</div>
+        <div class="ava" style="background:var(--purple);left:50%;top:66%">📚</div>
+      </div>
+      <div class="todo" style="width:112px;">
+        <div class="th">☑ 오늘의 할일 <span style="color:var(--muted-2)">7</span></div>
+        <div class="ti"><span class="p">P0</span> Log4Shell 조치</div>
+        <div class="ti"><span class="p">P1</span> 방화벽 룰 점검</div>
+        <div class="ti"><span class="p">P1</span> KEV 3건 재스캔</div>
+        <div class="ti"><span class="p">P2</span> 백신 리포트</div>
+      </div>
+    </div>
+    <div class="cta"><div class="b">▶ 운영 시작 — AI 팀에게 맡기기</div><div class="h">할 일이 비면 AI가 루틴을 채우고, 있으면 최우선을 지시</div></div>
+  </div>
+  <div class="legend"><span class="tag">추천</span> 방 최대화 · 할일 슬림·조밀 · 하단 메뉴 유지 · 리스크 최저</div>
+  <div class="note">대화는 캐릭터 말풍선 + 대시보드 실시간 세션</div>
+</div>
+
+<!-- 시안 B -->
+<div class="col">
+  <h2>B안 — 방 풀블리드 + 할일 오버레이</h2>
+  <div class="d">방이 <span class="k">가장자리까지 꽉</span>(몰입형 LIVE). 오늘의 할일은 <span class="k">반투명 오버레이</span>로 우측에 떠 있고 접을 수 있음. 하단 운영 시작은 <span class="k">플로팅 바</span>. 임팩트 최고, 할일이 방 위에 겹침.</div>
+  <div class="win">
+    <div class="wh"><div class="t">🏢 보안팀 사무실 <span class="live">LIVE</span></div><div class="seg"><span>☀</span><span>🌃</span><span>🌊</span></div></div>
+    <div class="room" style="flex:1;position:relative;">
+      <div class="floor" style="inset:8px;"></div>
+      <div class="ava" style="background:var(--blue);left:30%;top:50%">🧭</div><div class="bub" style="left:32%;top:38%">결재판 확인해줘</div>
+      <div class="ava" style="background:var(--teal);left:46%;top:42%">🔎</div>
+      <div class="ava" style="background:var(--purple);left:40%;top:66%">📚</div><div class="bub" style="left:41%;top:55%">RAG 근거 3건</div>
+      <div class="ava" style="background:var(--amber);left:58%;top:58%">🛡</div>
+      <!-- 오버레이 할일 -->
+      <div class="todo" style="position:absolute;right:8px;top:8px;bottom:8px;width:104px;background:rgba(18,26,46,.82);border:1px solid var(--border);border-radius:8px;backdrop-filter:blur(2px);">
+        <div class="th">☑ 할일 <span style="color:var(--muted-2)">7</span> ▸</div>
+        <div class="ti"><span class="p">P0</span> Log4Shell</div>
+        <div class="ti"><span class="p">P1</span> 방화벽 룰</div>
+        <div class="ti"><span class="p">P1</span> KEV 재스캔</div>
+        <div class="ti"><span class="p">P2</span> 백신 리포트</div>
+      </div>
+    </div>
+    <div style="position:relative;"><div class="cta" style="position:absolute;left:0;right:0;bottom:0;background:linear-gradient(0deg,var(--panel-2),transparent);border-top:0;"><div class="b">▶ 운영 시작 — AI 팀에게 맡기기</div></div></div>
+  </div>
+  <div class="legend">몰입형 · 할일 접이식 오버레이 · 플로팅 메뉴 · 겹침 주의</div>
+  <div class="note">대화는 캐릭터 말풍선 + 대시보드 실시간 세션</div>
+</div>
+
+<!-- 시안 C -->
+<div class="col">
+  <h2>C안 — 방 크게 + 할일 하단 가로 스트립</h2>
+  <div class="d">방을 <span class="k">위쪽에 크게</span>, 오늘의 할일은 <span class="k">하단 가로 스트립</span>(2~3열 카드)로 폭을 아껴 더 많이 보임. 그 아래 운영 시작 메뉴. 방 가로폭을 온전히 쓰되 할일이 하단 고정.</div>
+  <div class="win">
+    <div class="wh"><div class="t">🏢 보안팀 사무실 <span class="live">LIVE</span></div><div class="seg"><span>☀</span><span>🌃</span><span>🌊</span></div></div>
+    <div class="room" style="flex:1;">
+      <div class="floor"></div>
+      <div class="ava" style="background:var(--blue);left:40%;top:48%">🧭</div><div class="bub" style="left:42%;top:36%">지시 접수</div>
+      <div class="ava" style="background:var(--teal);left:56%;top:52%">🔎</div>
+      <div class="ava" style="background:var(--purple);left:48%;top:66%">📚</div>
+    </div>
+    <div style="flex:0 0 auto;border-top:1px solid var(--border);padding:6px 8px;">
+      <div class="th" style="padding:0 0 4px">☑ 오늘의 할일 <span style="color:var(--muted-2)">7</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;">
+        <div class="ti" style="margin:0"><span class="p">P0</span> Log4Shell 조치</div>
+        <div class="ti" style="margin:0"><span class="p">P1</span> 방화벽 룰 점검</div>
+        <div class="ti" style="margin:0"><span class="p">P1</span> KEV 3건 재스캔</div>
+        <div class="ti" style="margin:0"><span class="p">P2</span> 백신 리포트</div>
+      </div>
+    </div>
+    <div class="cta"><div class="b">▶ 운영 시작 — AI 팀에게 맡기기</div></div>
+  </div>
+  <div class="legend">방 가로 최대 · 할일 하단 가로 카드 · 세로가 짧아질 수 있음</div>
+  <div class="note">대화는 캐릭터 말풍선 + 대시보드 실시간 세션</div>
+</div>
+
+</div>
+</body></html>

@@ -33,18 +33,10 @@
     cursor: pointer; font-size: 12px; }
   .theme-seg button.on { background: rgba(59,130,246,.2); color: #fff; }
 
-  .body { display: grid; grid-template-columns: 1fr 280px; gap: 14px; padding: 0 18px; flex: 1 1 auto; min-height: 0; }
+  /* A안: 방(캔버스)을 아래까지 꽉 채운다(피드 삭제). 오른쪽 할일은 슬림하게. */
+  .body { display: grid; grid-template-columns: 1fr 236px; gap: 14px; padding: 0 18px; flex: 1 1 auto; min-height: 0; }
   .office-col { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-  canvas { width: 100%; max-width: 860px; margin: 0 auto; border-radius: 12px; border: 1px solid var(--border); background: #171f33; flex: 0 1 auto; min-height: 0; object-fit: contain; box-shadow: inset 0 0 40px rgba(0,0,0,.4); }
-
-  /* 팀 대화 피드 — 실제 협업 이벤트(WebSocket) */
-  .feed { margin-top: 10px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px;
-    padding: 6px 12px 8px; height: 118px; overflow-y: auto; font-size: 12px; flex: 0 0 auto; }
-  .f-note { color: var(--muted-2); font-size: 10.5px; padding: 3px 0 4px; }
-  .f-line { display: flex; gap: 8px; padding: 3px 0; animation: up .3s; align-items: baseline; }
-  @keyframes up { from { transform: translateY(5px); opacity: 0; } }
-  .f-who { font-weight: 800; min-width: 96px; flex: 0 0 auto; font-size: 11.5px; }
-  .f-msg { color: var(--muted); word-break: break-all; }
+  canvas { width: 100%; height: 100%; margin: 0 auto; border-radius: 12px; border: 1px solid var(--border); background: #171f33; flex: 1 1 auto; min-height: 0; object-fit: contain; box-shadow: inset 0 0 40px rgba(0,0,0,.4); }
 
   /* 오른쪽: 오늘의 할일 (실 작업 큐 — /api/tasks) */
   .todo { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; min-height: 0; }
@@ -63,9 +55,8 @@
              border: 1px solid var(--border-strong); border-radius: 9px; padding: 8px 10px;
              font-size: 11px; line-height: 1.6; margin-bottom: 7px; cursor: pointer; }
   .g-brief .g-by { display: block; font-size: 9.5px; font-weight: 800; color: var(--blue-light); margin-bottom: 3px; }
-  /* 기본은 2줄까지만 — 누르면 전문이 펼쳐진다. 브리핑이 패널 절반을 먹으면 안 된다. */
-  .g-brief .g-txt { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
-  .g-brief.open .g-txt { display: block; }
+  /* 브리핑은 하단 접이식 참고 섹션 — 펼치면 전문을 줄임 없이 그대로 보여준다(글자 안 짤림). */
+  .g-brief .g-txt { display: block; }
   /* 접이식: 기본은 한 줄(제목+배지)만. 펼쳐야 근거·대상·조치가 나온다.
      280px 패널에 5건을 다 펼쳐 놓으면 533px가 되어 브리핑이 밀려난다(실측). */
   .g-item { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
@@ -95,8 +86,17 @@
   .g-bd.kev { color: #f5928a; border-color: rgba(226,72,61,.45); background: rgba(226,72,61,.12); }
   .g-more { font-size: 10px; color: var(--muted-2); text-align: center; padding: 5px;
             border: 1px dashed var(--border); border-radius: 7px; }
+  /* 하단 접이식 "오늘 브리핑" — 참고용. 기본 접힘, 헤더를 누르면 전문이 펼쳐진다. */
+  .brief-sec { border-top: 1px solid var(--border); margin-top: 8px; }
+  .brief-toggle { display: flex; align-items: center; gap: 6px; padding: 9px 4px 8px; cursor: pointer;
+                  font-size: 11.5px; font-weight: 800; color: var(--blue-light); }
+  .brief-toggle .bt-hint { font-size: 9px; font-weight: 600; color: var(--muted-2); }
+  .brief-toggle .bt-caret { margin-left: auto; font-size: 9px; color: var(--muted-2); transition: transform .15s; }
+  .brief-sec.open .brief-toggle .bt-caret { transform: rotate(90deg); }
+  .brief-body { display: none; padding-bottom: 8px; }
+  .brief-sec.open .brief-body { display: block; }
   .my-h { font-size: 9.5px; font-weight: 800; color: var(--muted-2); padding: 6px 2px 2px; letter-spacing: .3px; }
-  .t-item { display: flex; gap: 8px; align-items: flex-start; padding: 8px 2px; border-bottom: 1px solid var(--border); font-size: 12.5px; }
+  .t-item { display: flex; gap: 7px; align-items: flex-start; padding: 6px 2px; border-bottom: 1px solid var(--border); font-size: 12px; }
   .t-item input { margin-top: 2px; accent-color: var(--teal); cursor: pointer; }
   .t-item.done .t-text { opacity: .45; text-decoration: line-through; }
   .t-text { flex: 1; min-width: 0; cursor: default; word-break: break-all; }
@@ -138,10 +138,8 @@
 
   <div class="body">
     <div class="office-col">
+      <!-- A안: 팀 대화 피드 삭제 — 대화는 캐릭터 말풍선 + 대시보드 실시간 세션에서 확인. 방을 아래까지 꽉. -->
       <canvas id="office"></canvas>
-      <div class="feed" id="feed">
-        <div class="f-note">팀 대화 피드 — 에이전트 협업 이벤트 실시간 스트림</div>
-      </div>
     </div>
     <div class="todo">
       <div class="t-head">☑ 오늘의 할일 <span class="t-cnt" id="todoCnt"></span></div>
@@ -150,14 +148,17 @@
         <button id="todoAddBtn" title="추가">＋</button>
       </div>
       <div class="t-list" id="todoList">
-        <!-- 가이드형(시안 C) — 서버(/api/today)가 취약점·정기점검·유지보수를 합쳐 계산한
-             브리핑 + 선택지. 이게 실패해도 아래 "내 할일"은 그대로 뜬다. -->
-        <div class="guide" id="guideBox" style="display:none">
-          <div class="g-brief" id="guideBrief"></div>
-          <div id="guideList"></div>
-          <div class="g-more" id="guideMore" style="display:none"></div>
-        </div>
         <div id="myTasks"><div class="t-empty">불러오는 중…</div></div>
+        <!-- 오늘 브리핑 — 하단·기본 접힘(참고용). 헤더를 누르면 전문이 줄임 없이 펼쳐진다.
+             서버(/api/today)가 취약점·정기점검·유지보수를 합쳐 계산한 브리핑 + 선택지. -->
+        <div class="brief-sec" id="guideBox" style="display:none">
+          <div class="brief-toggle" id="briefToggle">🧭 오늘 브리핑 <span class="bt-hint">참고 · 펼치기</span><span class="bt-caret">▶</span></div>
+          <div class="brief-body">
+            <div class="g-brief" id="guideBrief"></div>
+            <div id="guideList"></div>
+            <div class="g-more" id="guideMore" style="display:none"></div>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -608,6 +609,9 @@
   }
 
   function feedLine(from, msg, color) {
+    // A안: 팀 대화 피드 패널을 없앴다 — 대화는 캐릭터 말풍선(office.collabMove)과
+    // 대시보드 "실시간 세션"에서 확인한다. 피드 요소가 없으면 조용히 무시(호출부는 그대로 둠).
+    if (!feedEl) return;
     const div = document.createElement("div");
     div.className = "f-line";
     // 장문 LLM 응답이 피드를 도배하지 않게 잘라서 표시(전문은 에이전트 AI 페이지 협업 로그에서).
@@ -758,6 +762,9 @@
   }
 
   guideBrief.addEventListener("click", () => guideBrief.classList.toggle("open"));
+  // 하단 "오늘 브리핑" 접이식 — 헤더를 누르면 참고용 전문이 펼쳐진다(기본 접힘).
+  const briefToggle = document.getElementById("briefToggle");
+  if (briefToggle) briefToggle.addEventListener("click", () => guideBox.classList.toggle("open"));
 
   // 줄을 누르면 펼치기만 한다(아코디언 — 한 번에 하나). 실행은 펼친 뒤 버튼으로.
   // 처음엔 줄 클릭이 곧바로 지시를 보냈는데, 확인 없이 실행되는 건 위험하다 — 근거를 보고
