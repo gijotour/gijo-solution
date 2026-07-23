@@ -27,7 +27,7 @@
     var st = document.createElement("style");
     st.id = "gijoChatWidgetCss";
     st.textContent =
-      ".gcw{position:fixed;right:24px;bottom:24px;width:460px;max-width:92vw;height:620px;max-height:82vh;" +
+      ".gcw{position:fixed;right:24px;top:70px;bottom:auto;width:460px;max-width:92vw;height:620px;max-height:82vh;" +
       "background:var(--panel,#121a2e);border:1px solid rgba(139,124,240,.4);border-radius:14px;" +
       "box-shadow:0 12px 40px rgba(0,0,0,.5);padding:16px;display:flex;flex-direction:column;box-sizing:border-box;z-index:700;transition:height .15s,width .15s;}" +
       ".gcw.collapsed{height:auto;width:auto;padding:0;}" +

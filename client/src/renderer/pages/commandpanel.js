@@ -36,7 +36,15 @@
       ".gcp-at{font-size:12px;font-weight:800;color:#fff;}" +
       // 세션 영역이 패널 높이를 전부 쓴다 — 예전 지휘콘솔+세션 아코디언 시절의 max-height:180px가
       // 세션 전용 드로어에 남아 목록 하단이 잘렸다(2026-07-23 실측: 패널 900px에 목록 163px).
-      ".gcp-sessions{flex:1 1 auto;min-height:0;}.gcp-sessions .gcp-ab{flex:1 1 auto;min-height:0;overflow-y:auto;}" +
+      // 세션 목록은 내용만큼(최대 55vh), 남는 세로 공간은 아래 🏢 사무실 LIVE가 채운다(대시보드 패널과 동일).
+      ".gcp-sessions{flex:0 1 auto;min-height:0;max-height:55vh;}.gcp-sessions .gcp-ab{flex:0 1 auto;min-height:0;overflow-y:auto;max-height:55vh;}" +
+      ".gcp-office{flex:1 1 auto;min-height:110px;border-top:1px solid var(--border,#1e2a44);display:flex;flex-direction:column;}" +
+      ".gcp-oh{display:flex;align-items:center;gap:6px;padding:9px 12px 6px;font-size:11.5px;font-weight:800;color:#fff;cursor:pointer;}" +
+      ".gcp-olive{font-size:8.5px;font-weight:800;color:var(--teal,#1eb980);border:1px solid rgba(30,185,128,.5);border-radius:8px;padding:1px 6px;}" +
+      ".gcp-ofeed{flex:1 1 auto;min-height:0;overflow-y:auto;padding:2px 12px 10px;}" +
+      ".gcp-oline{padding:4px 0;border-bottom:1px solid var(--border,#1e2a44);}" +
+      ".gcp-owho{font-size:10px;font-weight:800;color:var(--blue-light,#7ab0ff);}" +
+      ".gcp-omsg{display:block;font-size:11px;color:var(--muted,#8b93ab);margin-top:1px;line-height:1.45;word-break:break-word;}" +
       ".gcp-console{flex:1 1 auto;min-height:0;}" +
       ".gcp-ab{display:flex;flex-direction:column;min-height:0;overflow:hidden;}" +
       ".gcp-acc.collapsed .gcp-ab{display:none;}" +
@@ -87,7 +95,10 @@
       '<div class="gcp-acc gcp-sessions" id="gcpSessAcc" style="flex:1 1 auto">' +
       '<div class="gcp-ab" style="display:flex"><div class="gcp-sitem" id="gcpNewSess">＋ 새 작업 세션</div>' +
       '<div id="gcpSessList" style="overflow-y:auto;flex:1 1 auto"><div class="gcp-empty">불러오는 중…</div></div></div></div>' +
-      '<div class="gcp-sfull" id="gcpSessFull">전체 작업 세션 열기 ↗</div>';
+      '<div class="gcp-sfull" id="gcpSessFull">전체 작업 세션 열기 ↗</div>' +
+      // 남는 공간에 🏢 보안팀 사무실 LIVE 대화(협업 이벤트) — 대시보드 패널과 동일.
+      '<div class="gcp-office" id="gcpOffice"><div class="gcp-oh" id="gcpOfficeHead" title="AI 팀 사무실 창 열기">🏢 보안팀 사무실 <span class="gcp-olive">LIVE</span></div>' +
+      '<div class="gcp-ofeed" id="gcpOfficeFeed"><div class="gcp-empty">팀이 움직이면 대화가 여기 실시간으로 흐릅니다.</div></div></div>';
     document.body.appendChild(panel);
 
     tab = document.createElement("div");
@@ -112,6 +123,35 @@
     var open = false; try { open = localStorage.getItem(OPEN_KEY) === "1"; } catch (e) {}
     setOpen(open);
     loadSessions();
+    // 🏢 사무실 LIVE — 대시보드 패널과 동일하게 협업 대화를 실시간으로 흘린다.
+    if (window.gijoRealtime && window.gijoRealtime.connect) window.gijoRealtime.connect(); // WS 보장(중복 연결은 가드됨)
+    initOfficeLive();
+  }
+
+  // 🏢 보안팀 사무실 LIVE — 사무실 창의 캐릭터 말풍선과 같은 협업 이벤트를 이 피드에도 흘린다.
+  var OFFICE_MAX = 40;
+  function appendOfficeLive(evt) {
+    var feed = document.getElementById("gcpOfficeFeed");
+    if (!feed || !evt || !evt.message) return;
+    var empty = feed.querySelector(".gcp-empty");
+    if (empty && empty.parentNode) empty.parentNode.removeChild(empty);
+    var who = (evt.from || "팀") + (evt.to ? " → " + evt.to : "");
+    var line = document.createElement("div");
+    line.className = "gcp-oline";
+    line.innerHTML = '<span class="gcp-owho">' + esc(who) + '</span><span class="gcp-omsg">' + esc(evt.message) + "</span>";
+    feed.appendChild(line);
+    while (feed.childElementCount > OFFICE_MAX) feed.removeChild(feed.firstChild);
+    feed.scrollTop = feed.scrollHeight;
+  }
+  function initOfficeLive() {
+    var head = document.getElementById("gcpOfficeHead");
+    if (head && window.gijo.openTeamOffice) head.addEventListener("click", function () { window.gijo.openTeamOffice(); });
+    if (window.gijo.onCollaborationEvent) window.gijo.onCollaborationEvent(appendOfficeLive);
+    if (window.gijo.listCollaborationHistory) {
+      window.gijo.listCollaborationHistory().then(function (hist) {
+        (hist || []).slice(-OFFICE_MAX).forEach(appendOfficeLive);
+      }).catch(function () {});
+    }
   }
 
   function setOpen(on) {

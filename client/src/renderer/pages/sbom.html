@@ -37,6 +37,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;}
 .page-title{font-size:21px;font-weight:800;color:#fff;}
 .page-sub{font-size:12.5px;color:var(--muted);margin-top:4px;}
+.bom-summary{font-size:13px;color:var(--muted);background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:9px 14px;margin-bottom:16px;}
+.bom-summary b{color:var(--text);font-weight:800;font-size:14px;}
+.bom-summary .bom-dim{color:var(--muted-2);margin-left:4px;}
+.bom-summary .bom-dim b{color:var(--muted);font-size:13px;}
 .btn-primary{background:var(--blue);color:#fff;border:none;padding:9px 18px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;}
 .btn-ghost{background:transparent;border:1px solid var(--border-strong);color:var(--text);padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;}
 .kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
@@ -132,8 +136,7 @@ tr:last-child td{border-bottom:none;}
   <div class="main">
     <div class="topbar-row">
       <div>
-        <div class="page-title">AI-BOM</div>
-        <div class="page-sub">코드 의존성(SBOM)을 넘어 모델 · 데이터 · 프롬프트 · 에이전트 도구 · 인프라 5영역을 명세해 블랙박스 AI 자산의 보안 리스크를 관리합니다.</div>
+        <div class="page-title">AI-BOM <i class="gijo-info" data-topic="AI-BOM"></i></div>
       </div>
       <div style="display:flex;gap:8px;">
         <button class="btn-ghost" id="bulkRegenBtn">전체 SBOM 없는 자산 일괄 생성</button>
@@ -143,11 +146,10 @@ tr:last-child td{border-bottom:none;}
     <div id="gijoChatWidget" data-prompts='["AI-BOM 현황 알려줘"]' style="max-width:640px;margin-bottom:16px;"></div>
 
 
-<div class="kpi-strip">
-  <div class="kpi-mini"><div class="kpi-mini-label">생성된 SBOM</div><div class="kpi-mini-value" id="kpiGenerated">-</div></div>
-  <div class="kpi-mini"><div class="kpi-mini-label">총 컴포넌트</div><div class="kpi-mini-value" id="kpiComponents">-</div></div>
-  <div class="kpi-mini"><div class="kpi-mini-label">미생성</div><div class="kpi-mini-value" id="kpiMissing" style="color:var(--amber)">-</div></div>
-  <div class="kpi-mini"><div class="kpi-mini-label">고유 라이선스 종류</div><div class="kpi-mini-value" id="kpiLicenses">-</div></div>
+<!-- 간략 요약 한 줄 — 상세는 아래 목록·상세에서. -->
+<div class="bom-summary">
+  생성 <b id="kpiGenerated">-</b> · 미생성 <b id="kpiMissing" style="color:var(--amber)">-</b>
+  <span class="bom-dim">· 컴포넌트 <b id="kpiComponents">-</b> · 라이선스 <b id="kpiLicenses">-</b>종</span>
 </div>
 
 <div class="toolbar">
