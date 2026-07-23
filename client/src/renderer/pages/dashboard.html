@@ -475,6 +475,7 @@
       <div class="app-title">GIJO AS</div></span>
       <div class="clock" id="clockEl">-</div>
       <div id="updateChip" title="새 버전으로 업데이트" style="display:none;align-items:center;gap:5px;background:rgba(240,160,32,.15);border:1px solid rgba(240,160,32,.45);color:var(--amber);padding:3px 10px;border-radius:16px;font-size:11px;font-weight:800;cursor:pointer">⬆ 업데이트 <span id="updateChipVer"></span></div>
+      <div id="sessionChip" title="남은 세션 시간 — 마우스·키보드를 쓰면 자동으로 연장됩니다. 클릭하면 지금 즉시 연장" style="display:none;align-items:center;gap:5px;background:rgba(30,185,128,.14);border:1px solid rgba(30,185,128,.4);color:var(--teal);padding:3px 10px;border-radius:16px;font-size:11px;font-weight:800;cursor:pointer">⏳ 세션 <span id="sessionChipTime">--:--</span> <span style="opacity:.7;font-weight:700">· 연장</span></div>
     </div>
     <div class="header-right">
       <div class="status-pill" id="statusPill"><span class="dot"></span>연결 확인 중<span class="beta-tag">LIVE</span></div>
@@ -690,6 +691,45 @@
       }
     } catch (e) {}
   }
+
+  // ① 남은 세션 시간 칩 — 시계 옆. 실사용 감지 keepalive의 마지막 활동 기준 잔여(유휴 만료까지).
+  // 마우스·키보드를 쓰면 자동 연장(칩이 다시 참). 클릭하면 즉시 연장(me 핑).
+  function renderSessionChip() {
+    const chip = document.getElementById("sessionChip");
+    if (!chip) return;
+    if (!window.gijo.sessionActivity || !window.gijo.isAuthenticated || !window.gijo.isAuthenticated()) {
+      chip.style.display = "none"; return;
+    }
+    let info; try { info = window.gijo.sessionActivity(); } catch (e) { return; }
+    const ms = Math.max(0, info.remainingMs);
+    const m = Math.floor(ms / 60000), s = Math.floor((ms % 60000) / 1000);
+    document.getElementById("sessionChipTime").textContent = m + ":" + String(s).padStart(2, "0");
+    // 색: 5분↑ teal · 2~5분 amber · 2분↓ red
+    const rgb = ms > 5 * 60000 ? "30,185,128" : ms > 2 * 60000 ? "240,160,32" : "226,72,61";
+    const col = ms > 5 * 60000 ? "var(--teal)" : ms > 2 * 60000 ? "var(--amber)" : "var(--red)";
+    chip.style.background = "rgba(" + rgb + ",.14)";
+    chip.style.borderColor = "rgba(" + rgb + ",.4)";
+    chip.style.color = col;
+    chip.style.display = "inline-flex";
+  }
+  (function initSessionChip() {
+    const chip = document.getElementById("sessionChip");
+    if (chip) {
+      chip.addEventListener("click", async () => {
+        const timeEl = document.getElementById("sessionChipTime");
+        const prev = timeEl ? timeEl.textContent : "";
+        try {
+          await window.gijo.extendSession();
+          renderSessionChip();
+          if (timeEl) { timeEl.textContent = "연장됨 ✓"; setTimeout(renderSessionChip, 1500); }
+        } catch (e) {
+          if (timeEl) { timeEl.textContent = "연장 실패"; setTimeout(() => { timeEl.textContent = prev; }, 1500); }
+        }
+      });
+    }
+    renderSessionChip();
+    setInterval(renderSessionChip, 1000);
+  })();
 
   const PRIORITY_ORDER = { P0: 0, P1: 1, P2: 2, P3: 3 };
   const PRIORITY_CLASS = { P0: "p0", P1: "p1", P2: "p1", P3: "p1" };

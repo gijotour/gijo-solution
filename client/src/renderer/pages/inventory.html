@@ -52,6 +52,7 @@
   .filters{display:flex;gap:8px;}
   .filter-chip{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);padding:7px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;}
   .filter-chip.active{background:rgba(59,130,246,0.15);border-color:var(--blue);color:var(--blue-light);}
+  .ochip-cnt{font-size:10px;font-weight:800;opacity:.72;margin-left:2px;}
 
   .table-panel{background:var(--panel);border:1px solid var(--border);border-radius:0 0 12px 12px;padding:0 18px 10px;margin-bottom:16px;}
   table{width:100%;border-collapse:collapse;font-size:13px;}
@@ -234,11 +235,11 @@
         <span style="color:var(--muted-2)">⌕</span>
         <input id="searchInput" placeholder="모델명, 소유부서로 검색" aria-label="모델명, 소유부서로 검색">
       </div>
-      <!-- 출처 필터는 위험 필터와 축이 달라 따로 둔다. 기본은 스캐너 유입분(실 자산). -->
+      <!-- 출처 필터는 위험 필터와 축이 달라 따로 둔다. 기본은 스캐너 탐지분(실 자산). 각 칩에 건수 표기. -->
       <div class="filters" id="originChips" style="margin-right:4px;">
-        <div class="filter-chip active" data-origin="scanner">스캐너 유입</div>
-        <div class="filter-chip" data-origin="real">샘플 제외 전체</div>
-        <div class="filter-chip" data-origin="all">샘플 포함</div>
+        <div class="filter-chip active" data-origin="scanner">스캐너 탐지분 <span class="ochip-cnt" data-ocnt="scanner">-</span></div>
+        <div class="filter-chip" data-origin="real">📋 전체 자산 <span class="ochip-cnt" data-ocnt="real">-</span></div>
+        <div class="filter-chip" data-origin="all">샘플 포함 <span class="ochip-cnt" data-ocnt="all">-</span></div>
       </div>
       <div class="filters" id="filterChips">
         <div class="filter-chip active" data-filter="all">전체</div>
@@ -250,11 +251,18 @@
       </div>
     </div>
 
+    <!-- ③ 일괄 선택 삭제 바 — 체크박스로 하나 이상 고르면 나타난다. -->
+    <div id="bulkBar" style="display:none;align-items:center;gap:12px;margin:0 0 10px;padding:8px 14px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.35);border-radius:10px;">
+      <span style="font-size:12.5px;font-weight:700;color:var(--blue-light)"><b id="bulkCount">0</b>개 선택됨</span>
+      <button id="bulkDeleteBtn" style="background:rgba(226,72,61,.16);border:1px solid rgba(226,72,61,.5);color:#f5928a;font-size:12px;font-weight:800;padding:6px 14px;border-radius:8px;cursor:pointer">🗑 선택 삭제</button>
+      <span id="bulkClear" style="cursor:pointer;font-size:12px;color:var(--muted);font-weight:600">선택 해제</span>
+    </div>
+
     <div class="table-panel">
       <table>
-        <tr><th>자산명</th><th>유형</th><th>소유부서</th><th>위험도</th><th>왜 지금 문제인가</th><th>최근 스캔</th><th>SBOM</th><th></th></tr>
+        <tr><th style="width:34px;text-align:center"><input type="checkbox" id="selectAllCb" title="보이는 자산 전체 선택" aria-label="전체 선택"></th><th>자산명</th><th>유형</th><th>소유부서</th><th>위험도</th><th>왜 지금 문제인가</th><th>최근 스캔</th><th>SBOM</th><th></th></tr>
         <tbody id="assetRows">
-          <tr><td colspan="8" style="color:var(--muted)">불러오는 중...</td></tr>
+          <tr><td colspan="9" style="color:var(--muted)">불러오는 중...</td></tr>
         </tbody>
       </table>
       <div class="pagination">
@@ -336,6 +344,7 @@
   let coverage = { total: 0, complete: 0, gaps: [], ranked: [] };
   let activeTab = "list";
   let activeOrigin = "scanner"; // 기본은 실제로 들여온 자산만 — 시드 샘플은 숨긴다
+  const selectedIds = new Set(); // ③ 일괄 삭제 선택 상태(재렌더에도 유지)
 
   function tick() {
     clockEl.textContent = new Date().toLocaleString("ko-KR", {
@@ -446,11 +455,22 @@
     return "none";
   }
 
+  // ③ 선택 삭제 바 갱신 — 선택 수 표기·표시/숨김, 전체선택 체크박스 상태 동기화.
+  function updateBulkBar() {
+    const bar = document.getElementById("bulkBar");
+    const cntEl = document.getElementById("bulkCount");
+    if (cntEl) cntEl.textContent = selectedIds.size;
+    if (bar) bar.style.display = selectedIds.size > 0 ? "flex" : "none";
+    const all = document.getElementById("selectAllCb");
+    const boxes = document.querySelectorAll("#assetRows .asset-cb");
+    if (all) all.checked = boxes.length > 0 && [...boxes].every((cb) => cb.checked);
+  }
+
   function render() {
     const filtered = sortByPriority(applyFilters(allAssets));
     const rankedById = new Map(coverage.ranked.map((r) => [r.id, r]));
     if (filtered.length === 0) {
-      assetRows.innerHTML = '<tr><td colspan="8" style="color:var(--muted)">조건에 맞는 자산이 없습니다</td></tr>';
+      assetRows.innerHTML = '<tr><td colspan="9" style="color:var(--muted)">조건에 맞는 자산이 없습니다</td></tr>';
     } else {
       // 그룹 머리글을 표 안에 끼워 넣는다. 비어 있는 그룹은 그리지 않는다 —
       // 빈 그룹을 남기면 "AI 자산이 0건"이 아니라 "필터에 걸렸다"는 걸 알기 어렵다.
@@ -478,13 +498,15 @@
           const action = isHost
             ? `<span class="row-actions" data-vulns="1" title="취약 자산관리에서 이 호스트의 취약점 보기">취약점 보기 →</span>`
             : `<span class="row-actions" data-scan="${a.id}">재스캔 →</span>`;
-          const del = `<span class="asset-del" data-del="${a.id}" data-name="${a.name}" title="자산 삭제">✕</span>`;
+          // ③ 삭제는 행별 ✕ 대신 체크박스 일괄 선택으로. 자산명 왼쪽 체크박스로 고른다.
+          const cb = `<td style="text-align:center"><input type="checkbox" class="asset-cb" data-id="${a.id}" data-name="${a.name}"${selectedIds.has(a.id) ? " checked" : ""} aria-label="선택"></td>`;
           // 담당부서가 비었거나 파일명이면 값 대신 지정 버튼을 둔다 — 잘못된 값을 사실처럼 보여주지 않는다.
           const ownerMissing = rk ? rk.gaps.includes("owner") : false;
           const ownerCell = ownerMissing
             ? `<span class="sbom-pending" style="cursor:pointer" data-fix-owner="${a.id}" title="담당부서 지정">지정하기</span>`
             : a.owner;
           return `<tr>
+            ${cb}
             <td><div class="asset-name">${a.name}${kevBadge}${maintBadge}${gapBadges}</div><div class="asset-sub">${os}</div></td>
             <td><span class="type-badge">${a.assetType}</span></td>
             <td class="owner">${ownerCell}</td>
@@ -492,7 +514,7 @@
             <td class="why-cell">${whyCell}</td>
             <td>${relativeTime(a.lastScannedAt)}</td>
             <td>${sbomCell}</td>
-            <td style="white-space:nowrap">${action} <span style="color:var(--muted-2)">·</span> ${del}</td>
+            <td style="white-space:nowrap">${action}</td>
           </tr>`;
       };
 
@@ -500,13 +522,13 @@
       // 그럴 땐 그룹 없이 평평하게 그리고 그 사실을 알린다.
       if (coverage.ranked.length === 0) {
         assetRows.innerHTML =
-          `<tr class="group-head"><td colspan="8"><span class="group-hint">결손 정보를 불러오지 못해 그룹 없이 표시합니다.</span></td></tr>` +
+          `<tr class="group-head"><td colspan="9"><span class="group-hint">결손 정보를 불러오지 못해 그룹 없이 표시합니다.</span></td></tr>` +
           filtered.map(rowHtml).join("");
       } else {
         assetRows.innerHTML = GAP_GROUPS.map((g) => {
           const members = filtered.filter((a) => primaryGap(rankedById.get(a.id)) === g.key);
           if (members.length === 0) return "";
-          const head = `<tr class="group-head"><td colspan="8">
+          const head = `<tr class="group-head"><td colspan="9">
             <span class="group-label">${g.label}</span>
             <span class="group-count">${members.length}건</span>
             <span class="group-hint">${g.hint}</span>
@@ -515,8 +537,21 @@
         }).join("");
       }
     }
-    const originNote = { scanner: "스캐너 유입분", real: "샘플 제외", all: "샘플 포함" }[activeOrigin];
+    const originNote = { scanner: "스캐너 탐지분", real: "전체 자산", all: "샘플 포함" }[activeOrigin];
     paginationLabel.textContent = `${originNote} 기준 ${filtered.length}건 표시 · 등록된 자산 전체 ${allAssets.length}건`;
+
+    // ⑤ 출처 칩 건수 — 각 칩이 몇 건을 보여주는지 표기(전체 자산이 몇인지 한눈에).
+    const oCnt = {
+      scanner: allAssets.filter((a) => a.origin === "scanner").length,
+      real: allAssets.filter((a) => a.origin !== "sample").length,
+      all: allAssets.length,
+    };
+    document.querySelectorAll(".ochip-cnt").forEach((el) => { el.textContent = oCnt[el.dataset.ocnt] ?? "-"; });
+
+    // ③ 선택 상태 동기화(재렌더 후) — 보이지 않게 된 자산 선택은 정리, 선택바·전체선택 갱신.
+    const visibleIds = new Set(filtered.map((a) => a.id));
+    [...selectedIds].forEach((id) => { if (!visibleIds.has(id)) selectedIds.delete(id); });
+    updateBulkBar();
 
     document.getElementById("pageSubCount").textContent = allAssets.length;
     document.getElementById("kpiTotal").textContent = allAssets.length;
@@ -907,17 +942,6 @@
         window.gijo.navigateTo("vulnscan.html");
         return;
       }
-      if (e.target.dataset.del) {
-        const id = e.target.dataset.del;
-        if (!confirm(`'${e.target.dataset.name}' 자산을 삭제할까요?\n스캔 이력·finding 승인 기록도 함께 삭제됩니다.`)) return;
-        try {
-          await window.gijo.deleteAsset(id);
-          await refresh();
-        } catch (err) {
-          alert("삭제 실패: " + (err.message || err));
-        }
-        return;
-      }
       if (genId) {
         await generateSbomFor(genId, e.target);
       } else if (scanId) {
@@ -925,6 +949,42 @@
         await window.gijo.sendInstruction(`${scanId} 스캔해줘`);
         await refresh();
       }
+    });
+
+    // ③ 체크박스 선택 → 일괄 삭제. 재렌더에도 selectedIds로 상태 유지.
+    assetRows.addEventListener("change", (e) => {
+      const cb = e.target.closest(".asset-cb");
+      if (!cb) return;
+      if (cb.checked) selectedIds.add(cb.dataset.id); else selectedIds.delete(cb.dataset.id);
+      updateBulkBar();
+    });
+    document.getElementById("selectAllCb").addEventListener("change", (e) => {
+      const on = e.target.checked;
+      document.querySelectorAll("#assetRows .asset-cb").forEach((cb) => {
+        cb.checked = on;
+        if (on) selectedIds.add(cb.dataset.id); else selectedIds.delete(cb.dataset.id);
+      });
+      updateBulkBar();
+    });
+    document.getElementById("bulkClear").addEventListener("click", () => {
+      selectedIds.clear();
+      document.querySelectorAll("#assetRows .asset-cb, #selectAllCb").forEach((cb) => { cb.checked = false; });
+      updateBulkBar();
+    });
+    document.getElementById("bulkDeleteBtn").addEventListener("click", async () => {
+      const ids = [...selectedIds];
+      if (!ids.length) return;
+      if (!confirm(`선택한 자산 ${ids.length}건을 삭제할까요?\n스캔 이력·finding 승인 기록도 함께 삭제됩니다.`)) return;
+      const btn = document.getElementById("bulkDeleteBtn");
+      btn.disabled = true; const prev = btn.textContent; btn.textContent = "삭제 중…";
+      let ok = 0, fail = 0;
+      for (const id of ids) {
+        try { await window.gijo.deleteAsset(id); ok++; selectedIds.delete(id); }
+        catch (err) { fail++; }
+      }
+      btn.disabled = false; btn.textContent = prev;
+      if (fail) alert(`${ok}건 삭제 완료 · ${fail}건 실패`);
+      await refresh();
     });
 
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));

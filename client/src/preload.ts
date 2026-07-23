@@ -9,6 +9,10 @@ import * as api from "./apiClient";
 import { connectWebSocket, onChannel } from "./wsClient";
 import { classifyChatbotCommand } from "./terminalPolicy";
 
+// keepalive/세션 상태 — 아래 IIFE(실사용 감지)와 gijoApi(세션 칩 UI)가 공유한다.
+// idleTimeoutMs는 서버 GIJO_IDLE_TIMEOUT_MS 기본값(30분)과 맞춘다.
+const keepalive = { lastActivity: Date.now(), idleTimeoutMs: 30 * 60 * 1000 };
+
 const gijoApi = {
   // 서버 연결 설정
   setServerUrl: (url: string) => api.setServerUrl(url),
@@ -21,6 +25,16 @@ const gijoApi = {
   me: () => api.authApi.me(),
   isAuthenticated: () => api.isAuthenticated(),
   listActiveSessions: () => api.authApi.sessions(), // 접속 중 클라이언트(외부 콘솔) — 팀 사무실 presence
+  // 세션 잔여 시간(유휴 만료까지) — 상단 세션 칩 표시용. 실사용 감지 keepalive가 찍는 마지막 활동 기준.
+  sessionActivity: () => ({
+    idleTimeoutMs: keepalive.idleTimeoutMs,
+    remainingMs: Math.max(0, keepalive.idleTimeoutMs - (Date.now() - keepalive.lastActivity)),
+  }),
+  // 세션 연장(상단 "연장" 버튼) — 활동 시각 리셋 + 인증 핑으로 서버 lastSeenAt 갱신.
+  extendSession: () => {
+    keepalive.lastActivity = Date.now();
+    return api.authApi.me();
+  },
 
   // 계정 관리(admin 전용 목록/생성/삭제 — 본인 비밀번호 변경은 누구나)
   listUsers: () => api.usersApi.list(),
@@ -363,16 +377,15 @@ contextBridge.exposeInMainWorld("gijoRealtime", {
   const isTop = (() => { try { return window.top === window; } catch { return true; } })();
 
   if (isTop) {
-    let lastActivity = Date.now();
-    const note = () => { lastActivity = Date.now(); };
+    const note = () => { keepalive.lastActivity = Date.now(); };
     ACTIVITY_EVENTS.forEach((ev) => window.addEventListener(ev, note, { passive: true, capture: true }));
     // iframe에서 전달된 활동 신호
     window.addEventListener("message", (m) => {
       if (m && m.data && (m.data as { __gijoActivity?: boolean }).__gijoActivity) note();
     });
     setInterval(() => {
-      if (!api.isAuthenticated()) return;                        // 로그아웃 상태면 핑 안 함
-      if (Date.now() - lastActivity > ACTIVE_WINDOW_MS) return;  // 자리 비움 → 유휴 만료되게 둠
+      if (!api.isAuthenticated()) return;                                    // 로그아웃 상태면 핑 안 함
+      if (Date.now() - keepalive.lastActivity > ACTIVE_WINDOW_MS) return;    // 자리 비움 → 유휴 만료되게 둠
       // me()는 인증 REST라 서버 lastSeenAt 갱신 + 액세스 토큰 만료 시 자동 재발급까지 처리한다.
       api.authApi.me().catch(() => { /* 만료/네트워크 오류는 다음 API 호출의 가드가 처리 */ });
     }, PING_INTERVAL_MS);
