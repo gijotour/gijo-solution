@@ -2248,12 +2248,27 @@
     "kpi.html": ["보안 KPI", "📈"], "sessions.html": ["작업 세션", "🗂️"], "sbom.html": ["AI-BOM", "🤖"], "agent.html": ["에이전트 AI", "🤝"], "merge.html": ["LLM 합성", "⚗️"],
     "memory.html": ["기억·학습(RAG)", "🧠"], "ontology.html": ["온톨로지", "🕸️"], "learnloop.html": ["학습 루프", "🔁"], "logs.html": ["로그", "📃"], "settings.html": ["설정", "⚙️"]
   };
-  // 역할 기본(보안담당자) — 업무 주기별. 관리자도 이걸 기본으로 쓰되 편집으로 무엇이든 담을 수 있다.
-  var DEFAULT = {
-    daily: ["assethub.html", "analysis.html", "vulnscan.html", "approvals.html", "threat.html"],
-    weekly: ["inventory.html", "products.html", "hardening.html", "audit.html", "terminal.html"],
-    monthly: ["report.html", "compliance.html", "opsguide.html", "redteam.html"]
+  // 역할 프리셋(2026-07-23 ④ 대시보드 프리셋 A안) — 역할별로 위젯 구성을 통째로 전환한다.
+  // SOC 대시보드 모범사례(역할 기반 프리셋). 프리셋을 고르면 layout이 그 구성으로 바뀌고,
+  // 이후 편집으로 개인화하면 그 개인화가 저장된다(프리셋은 시작점).
+  var PRESETS = {
+    officer: { label: "👤 1인 담당자", desc: "혼자 다 보는 담당자 — 발견→조치 흐름 위주", layout: {
+      daily: ["assethub.html", "vulnscan.html", "approvals.html", "threat.html", "analysis.html"],
+      weekly: ["inventory.html", "products.html", "hardening.html", "opsguide.html", "audit.html"],
+      monthly: ["report.html", "compliance.html", "redteam.html"] } },
+    soc: { label: "👔 SOC 매니저", desc: "팀 관제 — 태세·KPI·배정·보고 위주", layout: {
+      daily: ["kpi.html", "analysis.html", "approvals.html", "threat.html", "assethub.html"],
+      weekly: ["report.html", "compliance.html", "audit.html", "redteam.html", "sessions.html"],
+      monthly: ["hardening.html", "products.html"] } },
+    ops: { label: "🔧 운영자", desc: "점검·유지보수·장비 위주", layout: {
+      daily: ["hardening.html", "terminal.html", "opsguide.html", "products.html", "assethub.html"],
+      weekly: ["inventory.html", "vulnscan.html", "audit.html", "logs.html"],
+      monthly: ["report.html", "compliance.html"] } }
   };
+  var PKEY = "gijo.dashMenu.preset.v1";
+  function activePreset() { try { return localStorage.getItem(PKEY) || "officer"; } catch (e) { return "officer"; } }
+  // 역할 기본(보안담당자) — 프리셋 미선택 시 기본. officer 프리셋과 동일 구성.
+  var DEFAULT = PRESETS.officer.layout;
   var SEC = [["daily", "🔵 오늘 (매일)"], ["weekly", "🟢 이번 주 (주간)"], ["monthly", "🟡 이번 달 (월간)"]];
   var LKEY = "gijo.dashMenu.layout.v1", CKEY = "gijo.dashMenu.collapsed";
   function clone(o) { return JSON.parse(JSON.stringify(o)); }
@@ -2269,6 +2284,11 @@
     ".dm-top{display:flex;align-items:center;gap:9px;}" +
     ".dm-h{font-size:13.5px;font-weight:800;color:#fff;}" +
     ".dm-role{font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;background:rgba(59,130,246,.15);color:var(--blue-light);}" +
+    ".dm-presets{display:flex;gap:5px;margin:9px 0 2px;flex-wrap:wrap;}" +
+    ".dm-preset{font-size:11px;font-weight:700;padding:5px 12px;border-radius:18px;border:1px solid var(--border);color:var(--muted);cursor:pointer;background:var(--panel-2);}" +
+    ".dm-preset:hover{color:#fff;border-color:var(--blue);}" +
+    ".dm-preset.on{background:rgba(59,130,246,.15);border-color:var(--blue);color:var(--blue-light);}" +
+    ".dm-presetdesc{font-size:10px;color:var(--muted-2);margin:3px 2px 0;}" +
     ".dm-actions{margin-left:auto;display:flex;gap:6px;}" +
     ".dm-btn{background:transparent;border:1px solid var(--border-strong);color:var(--muted);border-radius:7px;padding:4px 10px;font-size:11px;font-weight:700;cursor:pointer;}" +
     ".dm-btn.on{border-color:var(--blue);color:var(--blue-light);}" +
@@ -2325,17 +2345,33 @@
       var addBtn = editing ? '<div class="dm-tile add" data-addcad="' + cad + '"><span class="dic">＋</span><span class="dlb">메뉴 추가</span></div>' : "";
       return '<div class="dm-sec">' + s[1] + " · " + layout[cad].length + "개</div><div class=\"dm-grid\">" + tiles + addBtn + "</div>";
     }).join("");
+    var pa = activePreset();
+    var presetTabs = Object.keys(PRESETS).map(function (k) {
+      return '<span class="dm-preset' + (k === pa ? " on" : "") + '" data-preset="' + k + '">' + PRESETS[k].label + "</span>";
+    }).join("");
     root.innerHTML =
       '<div class="dm-top"><span class="dm-h">🧭 내 업무 바로가기</span><span class="dm-role">👤 ' + esc(role) + "</span>" +
       '<div class="dm-actions">' +
-      '<button class="dm-btn" id="dmReset" title="역할 기본으로 초기화">↺ 기본</button>' +
+      '<button class="dm-btn" id="dmReset" title="현재 프리셋 기본으로 초기화">↺ 기본</button>' +
       '<button class="dm-btn' + (editing ? " on" : "") + '" id="dmEdit">✏ ' + (editing ? "완료" : "편집") + "</button>" +
       '<button class="dm-btn" id="dmCollapse">' + (collapsed ? "▼ 펼치기" : "▲ 접기") + "</button></div></div>" +
-      '<div class="dm-body">' + (editing ? '<div class="dm-sub">타일 ×로 제거, ＋메뉴 추가로 원하는 메뉴를 담으세요. 업무 주기별로 배치됩니다.</div>' : "") + body + "</div>";
+      '<div class="dm-body"><div class="dm-presets">' + presetTabs + "</div>" +
+      '<div class="dm-presetdesc">' + esc(PRESETS[pa] ? PRESETS[pa].desc : "") + " · 프리셋을 고른 뒤 편집으로 개인화할 수 있어요</div>" +
+      (editing ? '<div class="dm-sub">타일 ×로 제거, ＋메뉴 추가로 원하는 메뉴를 담으세요. 업무 주기별로 배치됩니다.</div>' : "") + body + "</div>";
+
+    root.querySelectorAll("[data-preset]").forEach(function (el) {
+      el.addEventListener("click", function () {
+        var k = el.getAttribute("data-preset");
+        if (k === activePreset()) return;
+        if (!confirm(PRESETS[k].label + " 프리셋으로 바꿀까요? 현재 구성이 이 프리셋으로 교체됩니다(편집으로 다시 개인화 가능).")) return;
+        try { localStorage.setItem(PKEY, k); } catch (e) {}
+        layout = clone(PRESETS[k].layout); save(); render();
+      });
+    });
 
     document.getElementById("dmEdit").addEventListener("click", function () { editing = !editing; closePicker(); render(); });
     document.getElementById("dmCollapse").addEventListener("click", function () { collapsed = !collapsed; try { localStorage.setItem(CKEY, collapsed ? "1" : "0"); } catch (e) {} render(); });
-    document.getElementById("dmReset").addEventListener("click", function () { if (confirm("업무 메뉴를 역할 기본값으로 되돌릴까요?")) { layout = clone(DEFAULT); save(); render(); } });
+    document.getElementById("dmReset").addEventListener("click", function () { var pa = activePreset(); var base = PRESETS[pa] ? PRESETS[pa].layout : DEFAULT; if (confirm("현재 프리셋(" + (PRESETS[pa] ? PRESETS[pa].label : "기본") + ") 기본 구성으로 되돌릴까요?")) { layout = clone(base); save(); render(); } });
     root.querySelectorAll("[data-go]").forEach(function (el) {
       el.addEventListener("click", function () { if (editing) return; window.gijo.navigateTo(el.getAttribute("data-go")); });
     });

@@ -4,11 +4,12 @@
 // dashboard.html에 <script src="onboarding.js"> 로 포함. 재열기용 플로팅 런처도 제공.
 
 (function () {
-  // [보류 2026-07-18] 시작 가이드(온보딩)는 향후 재정리 예정 — 그때까지 표시하지 않는다.
-  // DISABLED=true 동안 자동표시·런처 pill 모두 미표시. 재개하려면 false로만 바꾸면 됨(내용은 보존).
-  var DISABLED = true;
+  // 온보딩 재개(2026-07-23 ① C안: 빈상태 + 코치마크 하이브리드). 첫 실행 시 전체 체크리스트를
+  // 강제로 띄우지 않고(마찰↓), 핵심 지점에 코치마크 1개만 보여준다. 체크리스트는 런처로 접근.
+  var DISABLED = false;
   var CHECK_KEY = "gijo:onboarding:checked"; // 체크된 항목 id 배열
   var SEEN_KEY = "gijo:onboarding:seen";     // 최초 자동표시 1회 플래그
+  var COACH_KEY = "gijo:onboarding:coach";   // 코치마크 노출 1회 플래그
 
   // 단계별 체크 항목. page = 클릭 시 이동할 메뉴(그룹 대표 페이지).
   var STEPS = [
@@ -178,13 +179,47 @@
     document.body.appendChild(el);
   }
 
+  // ── 코치마크(C안): 첫 방문 시 핵심 지점에 말풍선 1개. 강요 없이, 닫으면 다시 안 뜬다. ──
+  function injectCoachCss() {
+    if (document.getElementById("gijoCoachCss")) return;
+    var st = document.createElement("style"); st.id = "gijoCoachCss";
+    st.textContent =
+      "#gijoCoach{position:fixed;z-index:9996;max-width:250px;background:var(--purple,#8b7cf0);color:#fff;padding:12px 14px;border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.5);font-size:12px;line-height:1.5;}" +
+      "#gijoCoach .ct{font-weight:800;margin-bottom:4px;}" +
+      "#gijoCoach .cx{position:absolute;top:6px;right:9px;cursor:pointer;opacity:.8;font-weight:800;}" +
+      "#gijoCoach .cb{margin-top:9px;display:flex;gap:7px;}" +
+      "#gijoCoach .cbtn{background:rgba(255,255,255,.2);border:0;color:#fff;font-size:11px;font-weight:700;padding:5px 11px;border-radius:7px;cursor:pointer;}" +
+      "#gijoCoach .cbtn.p{background:#fff;color:var(--purple,#8b7cf0);}";
+    document.head.appendChild(st);
+  }
+  function showCoach() {
+    injectCoachCss();
+    // 챗봇 알약(#gijoChatWidget)을 가리킨다 — "막히면 챗봇에게 물어보세요". 없으면 우하단 기본 위치.
+    var target = document.getElementById("gijoChatWidget");
+    var box = document.createElement("div");
+    box.id = "gijoCoach";
+    box.innerHTML =
+      '<span class="cx" id="gijoCoachX">✕</span><div class="ct">💡 막히면 AI에게 물어보세요</div>' +
+      "어느 화면이든 오른쪽 아래 챗봇, 또는 제목 옆 ⓘ를 누르면 그 화면 사용법을 바로 알려줘요." +
+      '<div class="cb"><button class="cbtn p" id="gijoCoachGuide">시작 가이드 보기</button><button class="cbtn" id="gijoCoachOk">알겠어요</button></div>';
+    document.body.appendChild(box);
+    // 위치: 타깃 위쪽, 없으면 우하단.
+    if (target) { var r = target.getBoundingClientRect(); box.style.bottom = (window.innerHeight - r.top + 10) + "px"; box.style.right = "20px"; }
+    else { box.style.bottom = "78px"; box.style.right = "20px"; }
+    function dismiss() { try { localStorage.setItem(COACH_KEY, "1"); } catch (e) {} if (box.parentNode) box.parentNode.removeChild(box); }
+    document.getElementById("gijoCoachX").addEventListener("click", dismiss);
+    document.getElementById("gijoCoachOk").addEventListener("click", dismiss);
+    document.getElementById("gijoCoachGuide").addEventListener("click", function () { dismiss(); open(); });
+    setTimeout(function () { if (box.parentNode) dismiss(); }, 15000); // 15초 후 자동 사라짐
+  }
+
   function init() {
-    if (DISABLED) return; // [보류] 시작 가이드 재정리 전까지 미표시(자동표시·런처 pill 모두 생략)
+    if (DISABLED) return;
     renderLauncher();
-    // 대시보드 최초 도착 시 1회 자동 표시.
     var onDash = (location.pathname || "").indexOf("dashboard.html") >= 0;
-    var seen = localStorage.getItem(SEEN_KEY) === "1";
-    if (onDash && !seen) { try { localStorage.setItem(SEEN_KEY, "1"); } catch (e) {} open(); }
+    // C안: 대시보드 첫 방문 시 전체 모달 대신 코치마크 1회(마찰 최소). 체크리스트는 런처로.
+    var coached = localStorage.getItem(COACH_KEY) === "1";
+    if (onDash && !coached) { try { localStorage.setItem(SEEN_KEY, "1"); } catch (e) {} setTimeout(showCoach, 1200); }
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
