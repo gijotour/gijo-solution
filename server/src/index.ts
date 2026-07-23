@@ -19,6 +19,7 @@ import { attachLearnloopSocket } from "./engine/learnloop";
 import { stopLocalEngine, stopEmbeddingEngine, autoStartLocalEngines, startEmbeddingMonitor, stopEmbeddingMonitor, startChatMonitor, stopChatMonitor } from "./engine/localengine";
 import { startHardeningScheduler, stopHardeningScheduler } from "./engine/hardeningtargets";
 import { startReportScheduler, stopReportScheduler } from "./engine/reportschedule";
+import { startBackupScheduler, stopBackupScheduler } from "./engine/backup";
 import { refreshKev } from "./engine/kev";
 import { bootstrapDocsBundleWithRetry } from "./engine/docsbundle";
 import { bootSmtpInboundIfEnabled, stopSmtpInbound } from "./engine/smtpinbound";
@@ -66,6 +67,7 @@ httpServer.listen(PORT, () => {
   void bootSmtpInboundIfEnabled(); // 인바운드 SMTP(알림 집수) — 설정에서 켜져 있으면 자동 기동
   startHardeningScheduler(); // 원격 SSH 정기점검 — 만기된 스케줄을 주기적으로 실행(LLM 무관·경량)
   startReportScheduler(); // 정기 리포트(주간/분기) 자동 생성 — 만기된 스케줄을 주기적으로 실행
+  startBackupScheduler(); // 자동 백업(하루 1회 + 최근 7개 보관) — 재해복구 시점 상시 확보
   // CISA KEV 목록을 백그라운드로 최신화(공개 피드 다운로드 — 실패해도 캐시로 동작).
   void refreshKev()
     .then((s) => console.log(`[kev] KEV 목록 ${s.count}건 (${s.source})`))

@@ -64,6 +64,7 @@ import { registerClientReleaseRoutes } from "./engine/clientrelease";
 import { registerAssetHubRoutes } from "./engine/assethub";
 import { registerLlmActivityRoutes } from "./engine/llmactivity";
 import { registerKevRoutes } from "./engine/kev";
+import { registerPlaybookRoutes } from "./engine/playbook";
 import { registerOntologyRoutes } from "./engine/ontology";
 import { registerWorkSessionRoutes } from "./engine/worksessions";
 
@@ -160,6 +161,7 @@ export function createApp(): Express {
   registerHardeningTargetRoutes(app);
   registerLlmActivityRoutes(app);
   registerKevRoutes(app);
+  registerPlaybookRoutes(app);
   registerOntologyRoutes(app);
   registerWorkSessionRoutes(app);
 

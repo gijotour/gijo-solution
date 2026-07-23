@@ -1,0 +1,69 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>① 온보딩·빈상태 시안 3종</title>
+<style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.1);--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--blue:#3b82f6;--blue-light:#5fa1ff;--teal:#1eb980;--amber:#f0a020;--purple:#8b7cf0;}
+*{box-sizing:border-box;margin:0;}body{background:var(--bg);color:var(--text);font-family:'Malgun Gothic',sans-serif;padding:22px;}
+h1{font-size:17px;margin-bottom:4px;}.sub{font-size:11px;color:var(--muted);margin-bottom:16px;line-height:1.6;}
+.wrap{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:start;}
+.col{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:15px;}
+.col h2{font-size:13.5px;margin-bottom:3px;}.col .d{font-size:10.5px;color:var(--muted);margin-bottom:12px;line-height:1.55;min-height:60px;}
+.mock{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:14px;min-height:280px;position:relative;}
+.pt{font-size:13px;font-weight:800;color:#fff;margin-bottom:8px;}
+.empty{border:1.5px dashed rgba(255,255,255,.15);border-radius:10px;padding:26px 16px;text-align:center;}
+.empty .ico{font-size:30px;opacity:.5;}.empty .t{font-size:12.5px;font-weight:700;color:#fff;margin:8px 0 4px;}
+.empty .s{font-size:10.5px;color:var(--muted);line-height:1.6;margin-bottom:12px;}
+.btn{display:inline-block;background:var(--blue);color:#fff;border-radius:7px;padding:8px 14px;font-size:11px;font-weight:700;cursor:pointer;}
+.btn.g{background:var(--panel-2);border:1px solid var(--border);color:var(--blue-light);}
+.ov{position:absolute;right:12px;bottom:12px;left:12px;background:var(--panel);border:1px solid rgba(139,124,240,.4);border-radius:12px;padding:12px;box-shadow:0 8px 24px rgba(0,0,0,.5);}
+.ov .h{font-size:11.5px;font-weight:800;color:#fff;display:flex;justify-content:space-between;margin-bottom:6px;}
+.pbar{height:6px;border-radius:20px;background:rgba(255,255,255,.08);overflow:hidden;margin:6px 0 8px;}.pbar i{display:block;height:100%;background:var(--teal);width:40%;}
+.step{font-size:10px;color:var(--muted);padding:3px 0;display:flex;gap:6px;}.step.done{color:var(--teal);}
+.chk{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;position:absolute;right:16px;bottom:16px;box-shadow:0 4px 14px rgba(0,0,0,.4);cursor:pointer;}
+.tip{position:absolute;background:var(--purple);color:#fff;font-size:10px;padding:6px 9px;border-radius:8px;max-width:150px;line-height:1.4;}
+.tip::after{content:'';position:absolute;border:6px solid transparent;}
+</style></head><body>
+<h1>① 온보딩 · 행동유도 빈상태 — 시안 3종</h1>
+<div class="sub">현재 onboarding.js는 DISABLED. 재개 방식 결정 필요. 근거: 빈상태=행동유도+샘플시딩, 점진적 온보딩(관련될 때 단계 노출), 보안 UI 고인지부하 → 마찰 최소.</div>
+<div class="wrap">
+
+<div class="col">
+  <h2>A안 — 행동유도 빈상태 중심 (추천)</h2>
+  <div class="d">별도 오버레이 없이, 각 화면의 빈 상태를 "다음 행동" 카드로. 데이터 있으면 자동 사라짐. 가장 자연스럽고 강요 없음. 우하단 진도 런처는 보조.</div>
+  <div class="mock">
+    <div class="pt">🛡 취약점</div>
+    <div class="empty"><div class="ico">📥</div><div class="t">아직 스캔 결과가 없습니다</div>
+      <div class="s">Nessus·Tenable CSV/JSON을 올리면<br>자동으로 자산별·KEV 우선순위로 정리됩니다</div>
+      <span class="btn">스캔 결과 올리기</span> <span class="btn g">샘플 데이터로 둘러보기</span></div>
+    <div class="chk">✓</div>
+  </div>
+</div>
+
+<div class="col">
+  <h2>B안 — 첫 실행 체크리스트 오버레이 재개</h2>
+  <div class="d">기존 onboarding.js를 켬(DISABLED=false). 우하단 진도 오버레이 + 단계별 이동. 구조가 이미 있어 공수 최소. 다만 화면과 별개 레이어라 능동적으로 열어야.</div>
+  <div class="mock">
+    <div class="pt">🖥 대시보드</div>
+    <div style="font-size:10.5px;color:var(--muted-2);padding:20px 0;text-align:center">(대시보드 위젯들…)</div>
+    <div class="ov"><div class="h"><span>🚀 시작 가이드</span><span style="color:var(--muted-2)">2/12</span></div>
+      <div class="pbar"><i style="width:17%"></i></div>
+      <div class="step done">✓ 로그인·비밀번호 변경</div>
+      <div class="step done">✓ AI 동작 확인</div>
+      <div class="step">○ AI 자산 등록 →</div>
+      <div class="step">○ 스캔 결과 올리기 →</div>
+    </div>
+  </div>
+</div>
+
+<div class="col">
+  <h2>C안 — 하이브리드(빈상태 + 코치마크)</h2>
+  <div class="d">A안 빈상태 + 첫 방문 시 핵심 요소에 말풍선 코치마크 1~2개(점진 노출). 가장 완성도 높지만 코치마크 위치 관리 공수 큼.</div>
+  <div class="mock">
+    <div class="pt">🛡 자산 허브</div>
+    <div class="empty"><div class="ico">🧬</div><div class="t">등록된 자산이 없습니다</div>
+      <div class="s">AI 자산부터 등록하면 AI-BOM·OWASP LLM<br>위험이 자동 분석됩니다</div>
+      <span class="btn">＋ 자산 등록</span></div>
+    <div class="tip" style="right:20px;top:44px">💡 여기 ⓘ를 누르면 챗봇이 화면 사용법을 설명해요<div style="position:absolute;left:30px;top:-11px;border-bottom-color:var(--purple);border-width:6px;border-style:solid;border-top:0;border-left-color:transparent;border-right-color:transparent"></div></div>
+  </div>
+</div>
+
+</div>
+</body></html>

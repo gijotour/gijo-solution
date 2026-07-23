@@ -1,0 +1,70 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>④ 대시보드 프리셋 시안 3종</title>
+<style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.1);--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--blue:#3b82f6;--blue-light:#5fa1ff;--teal:#1eb980;--amber:#f0a020;--purple:#8b7cf0;}
+*{box-sizing:border-box;margin:0;}body{background:var(--bg);color:var(--text);font-family:'Malgun Gothic',sans-serif;padding:22px;}
+h1{font-size:17px;margin-bottom:4px;}.sub{font-size:11px;color:var(--muted);margin-bottom:16px;line-height:1.6;}
+.wrap{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:start;}
+.col{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:15px;}
+.col h2{font-size:13.5px;margin-bottom:3px;}.col .d{font-size:10.5px;color:var(--muted);margin-bottom:12px;line-height:1.55;min-height:60px;}
+.mock{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;min-height:250px;}
+.tabs{display:flex;gap:4px;margin-bottom:10px;}
+.tab{font-size:10.5px;padding:5px 11px;border-radius:16px;border:1px solid var(--border);color:var(--muted);cursor:pointer;}
+.tab.on{background:rgba(59,130,246,.15);border-color:var(--blue);color:var(--blue-light);font-weight:700;}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+.w{background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:9px;font-size:10px;color:var(--muted);min-height:46px;}
+.w b{color:#fff;font-size:14px;display:block;}
+.w.big{grid-column:1/3;}
+.drag{border-style:dashed;color:var(--muted-2);text-align:center;display:flex;align-items:center;justify-content:center;}
+.sel{font-size:10.5px;background:var(--panel-2);border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:7px;padding:6px 10px;color:var(--blue-light);margin-bottom:10px;display:inline-block;}
+.hd{font-size:11px;color:var(--muted-2);margin:8px 0 5px;font-weight:700;}
+</style></head><body>
+<h1>④ 역할별 대시보드 프리셋 — 시안 3종</h1>
+<div class="sub">현재 "내 업무 바로가기"(역할 자동 큐레이션) 존재. 근거: SOC 대시보드는 역할 프리셋+위젯 드래그가 표준(NN/g·디자인가이드). 티어 판매(1인/SOC)와 연계.</div>
+<div class="wrap">
+
+<div class="col">
+  <h2>A안 — 프리셋 탭 전환 (추천)</h2>
+  <div class="d">상단 탭으로 역할 프리셋 선택 → 위젯 구성·순서가 통째로 바뀜. 구현 명확(프리셋별 위젯셋 정의), 담당자가 자기 역할만 누르면 끝. 커스터마이즈는 다음 단계.</div>
+  <div class="mock">
+    <div class="tabs"><span class="tab on">👤 1인 담당자</span><span class="tab">👔 SOC 매니저</span><span class="tab">🔧 운영자</span></div>
+    <div class="grid">
+      <div class="w big">🎯 내 업무 바로가기 <b style="font-size:11px;color:var(--amber)">오늘 급한 것 3</b></div>
+      <div class="w">미조치 Critical <b>14</b></div>
+      <div class="w">KEV <b>8</b></div>
+      <div class="w big">📥 스캔 결과 올리기 (빈상태 CTA)</div>
+    </div>
+    <div class="hd">SOC 매니저 탭이면 → 태세점수·MTTR·팀 배정 위주로 교체</div>
+  </div>
+</div>
+
+<div class="col">
+  <h2>B안 — 위젯 드래그 커스터마이즈</h2>
+  <div class="d">프리셋은 시작점일 뿐, 위젯을 직접 드래그·추가·제거. 자유도 최고(디자인가이드 권장)지만 구현 공수 최대(레이아웃 저장·드래그 엔진). 1인 담당자에겐 과할 수도.</div>
+  <div class="mock">
+    <span class="sel">프리셋: 1인 담당자 ▾ · ＋위젯 추가</span>
+    <div class="grid">
+      <div class="w">태세 점수 <b>47</b><span style="float:right;color:var(--muted-2)">⠿</span></div>
+      <div class="w">미조치 <b>313</b><span style="float:right;color:var(--muted-2)">⠿</span></div>
+      <div class="w big drag">＋ 여기로 위젯을 끌어놓기</div>
+    </div>
+    <div class="hd">⠿ 손잡이로 순서 변경 · localStorage 저장</div>
+  </div>
+</div>
+
+<div class="col">
+  <h2>C안 — 자동 적응(역할 감지)</h2>
+  <div class="d">사용자 role(admin/officer)과 사용 패턴으로 자동 구성, 선택 UI 없음. 마찰 0이지만 "왜 이 위젯이?" 통제감 부족. 수동 전환도 필요.</div>
+  <div class="mock">
+    <div style="font-size:10px;color:var(--teal);margin-bottom:8px">✨ 역할(담당자)에 맞춰 자동 구성됨 <span style="color:var(--blue-light);cursor:pointer">· 바꾸기</span></div>
+    <div class="grid">
+      <div class="w big">🎯 내 업무 바로가기</div>
+      <div class="w">미조치 Critical <b>14</b></div>
+      <div class="w">오늘 점검 <b>2</b></div>
+      <div class="w big">최근 상관 이벤트 2건</div>
+    </div>
+    <div class="hd">통제감 부족이 약점 — 최소한 "바꾸기"는 노출</div>
+  </div>
+</div>
+
+</div>
+</body></html>

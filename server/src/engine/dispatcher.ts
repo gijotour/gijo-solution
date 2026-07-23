@@ -256,6 +256,8 @@ async function runOrchestration(instructionText: string, steps: OrchestrationSte
 // 바로 실행하지 않는다(2026-07-17 확정 — 오발동 방지). Analyze Agent가 실행 계획·영향을
 // 안내하고 화면의 명시적 확인 버튼(대시보드 confirm 카드 / 학습 루프 화면)으로만 시작한다.
 const LEARN_TOPIC_RE = /학습\s*루프|파인\s*튜닝|learn\s*loop|fine[-\s]?tun/i;
+// "이 취약점 어떻게 조치해?/조치 방법/조치 절차/대응 방법" — 방법 문의(실행 지시 아님).
+const REMEDIATION_INTENT_RE = /(조치|대응|remediat|패치|수정)\s*(방법|절차|어떻게|가이드|플레이북|playbook)|어떻게\s*(조치|대응|패치|고쳐|해결)|대응\s*방안/i;
 const LEARN_RUN_RE = /실행|시작|돌려|가동|run|start/i;
 
 async function learnloopConfirmResult(instructionText: string): Promise<DispatchResult> {
@@ -338,6 +340,21 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     const task = createTask({ text: instructionText, agentId: "orchestrator", priority: "P3" });
     completeTask(task.id);
     return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatScreenGuide(screen, instructionText) };
+  }
+
+  // "이 취약점 조치 방법 알려줘" — 결정적 조치 플레이북으로 답한다(LLM 없이). 단계·담당·SLA를
+  // 규칙으로 제공해 MTTR을 줄인다. 실행 지시("조치해줘")가 아니라 방법 문의일 때만.
+  if (REMEDIATION_INTENT_RE.test(instructionText) && !/조치해|처리해|수정해|패치해/.test(instructionText)) {
+    const { formatRemediation } = await import("./playbook.js");
+    const task = createTask({ text: instructionText, agentId: "orchestrator", priority: "P3" });
+    completeTask(task.id);
+    const kev = /kev|실제.?악용|악용 중/i.test(instructionText);
+    const sev = /critical|치명/i.test(instructionText) ? "critical" : /high|높은/i.test(instructionText) ? "high" : "medium";
+    return {
+      task,
+      route: { agentId: "orchestrator", action: "chat" },
+      output: formatRemediation({ findingType: instructionText, severity: sev as "critical" | "high" | "medium", kev }),
+    };
   }
 
   // 학습 루프 실행 지시는 확인 절차로 우회 — 파이프라인을 타지 않는다.
