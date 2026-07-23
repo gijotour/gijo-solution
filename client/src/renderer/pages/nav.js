@@ -99,6 +99,11 @@
     return m ? "hub.html?g=" + m[1] : file;
   }
   function go(page) { if (window.gijo && window.gijo.navigateTo) window.gijo.navigateTo(page); }
+  // 허브에서 현재 열려 있는 탭(3단계) — t 파라미터. 없으면 null(첫 탭이 활성).
+  function currentTabPage() {
+    var m = /[?&]t=([^&]+)/.exec(location.search || "");
+    return m ? decodeURIComponent(m[1]) : null;
+  }
   function esc(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
   function groupOf(key) {
     for (var i = 0; i < GROUPS.length; i++) {
@@ -134,7 +139,13 @@
       ".gn-ic .gn-updot{position:absolute;top:4px;right:4px;width:8px;height:8px;border-radius:50%;background:var(--red);border:1.5px solid #0a1120;}" +
       ".gn-item .gn-upbadge{margin-left:auto;background:var(--red);color:#fff;font-size:9px;font-weight:800;padding:1px 6px;border-radius:20px;}" +
       // 챗봇에게 물어봐도 실데이터로 답하는 화면 표시 — 모든 메뉴에서 같은 자리(우측)에 일관되게.
-      ".gn-item .gn-bot{margin-left:auto;font-size:11px;opacity:.85;flex:0 0 auto;}";
+      ".gn-item .gn-bot{margin-left:auto;font-size:11px;opacity:.85;flex:0 0 auto;}" +
+      // ② 3단계(허브 탭) — 활성 2단계 항목 아래로 들여쓰기해 펼친다.
+      ".gn-tab{display:flex;align-items:center;gap:7px;padding:6px 13px 6px 28px;font-size:11.5px;color:var(--muted-2);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}" +
+      ".gn-tab:hover{color:#fff;background:rgba(255,255,255,.03);}" +
+      ".gn-tab.active{color:#fff;font-weight:700;}" +
+      ".gn-tab .gn-tdot{width:4px;height:4px;border-radius:50%;background:currentColor;flex:0 0 auto;}" +
+      ".gn-tab.active .gn-tdot{background:var(--blue-light);}";
     document.head.appendChild(st);
   }
 
@@ -208,6 +219,26 @@
         el.addEventListener("click", function () { go(it.page); });
       }
       sub.appendChild(el);
+
+      // ② 활성 2단계 항목이 허브면 그 탭(3단계)을 하위에 펼친다 — 상단 탭과 별개로 좌측에서도 이동.
+      var hubMatch = it.page && /^hub\.html\?g=([a-z]+)$/.exec(it.page);
+      if (it.page === here && hubMatch && HUBS[hubMatch[1]] && HUBS[hubMatch[1]].tabs.length > 1) {
+        var gid = hubMatch[1];
+        var curTab = currentTabPage();
+        HUBS[gid].tabs.forEach(function (t, idx) {
+          var isActive = curTab ? t.page === curTab : idx === 0;
+          var tabEl = document.createElement("div");
+          tabEl.className = "gn-tab" + (isActive ? " active" : "");
+          var dot = document.createElement("span"); dot.className = "gn-tdot"; tabEl.appendChild(dot);
+          var lbl = document.createElement("span"); lbl.textContent = t.label; tabEl.appendChild(lbl);
+          if (t.office) {
+            tabEl.addEventListener("click", function () { if (window.gijo && window.gijo.openTeamOffice) window.gijo.openTeamOffice(); });
+          } else if (t.page) {
+            tabEl.addEventListener("click", function () { go("hub.html?g=" + gid + "&t=" + encodeURIComponent(t.page)); });
+          }
+          sub.appendChild(tabEl);
+        });
+      }
     });
 
     root.innerHTML = "";
