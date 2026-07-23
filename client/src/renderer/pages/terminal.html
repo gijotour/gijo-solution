@@ -133,7 +133,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     <!-- ④ 챗봇에게 명령 요청 → 허용목록 판정 → 승인 후 실행 / 또는 "점검해줘" → 하드닝 점검 실행 -->
     <div class="askbar">
-      <input id="askInput" placeholder="챗봇에게 명령 요청 (예: 10.0.0.5 포트 스캔해줘 / 이 장비 하드닝 점검해줘)">
+      <input id="askInput" placeholder="챗봇에게 명령 요청 (예: 10.0.0.5 포트 스캔해줘 / 이 장비 하드닝 점검해줘)" aria-label="챗봇에게 명령 요청">
       <button id="askBtn">🤖 명령 제안 받기</button>
     </div>
     <div class="chips">
@@ -148,7 +148,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     <div class="term-wrap">
       <div class="term-bar"><span class="tt">&gt;_ 터미널</span><span class="badge" id="shellBadge">담당자 PC</span><span class="loc" id="termLoc">셸 시작 중…</span></div>
       <div class="term-out" id="termOut"></div>
-      <div class="term-in"><span class="ps">PS&gt;</span><input id="termInput" placeholder="명령 입력 후 Enter" autocomplete="off" spellcheck="false"></div>
+      <div class="term-in"><span class="ps">PS&gt;</span><input id="termInput" placeholder="명령 입력 후 Enter" autocomplete="off" spellcheck="false" aria-label="명령 입력 후 Enter"></div>
     </div>
   </div>
 </div>

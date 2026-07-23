@@ -586,6 +586,11 @@ export function registerMemoryRoutes(app: Express): void {
     "/api/memory/query",
     authMiddleware,
     asyncRoute(async (req, res) => {
+      // 입력 검증(2026-07-23): 빈 질문이 200에 무관한 최근접 청크를 돌려주던 것을 400+안내로.
+      if (!String(req.body?.question ?? "").trim()) {
+        res.status(400).json({ error: "검색할 질문을 입력하세요" });
+        return;
+      }
       // 지식 검색도 사용자 입력이 LLM(임베딩)에 닿는 경로라 관문을 지난다.
       // 여기가 비어 있어 인젝션 페이로드가 그대로 통과하던 것을 막는다(2026-07-19 실측).
       const gate = gateUserInput(String(req.body?.question ?? ""), "memory-query");

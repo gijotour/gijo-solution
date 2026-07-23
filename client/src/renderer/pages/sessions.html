@@ -202,7 +202,7 @@
     <!-- 좌: 세션 목록 -->
     <div class="panel">
       <div class="ph">세션 목록 <span id="listCount" style="font-size:11px;color:var(--muted-2);font-weight:600"></span></div>
-      <div class="search">🔎<input id="sessionSearch" placeholder="세션 검색…"></div>
+      <div class="search">🔎<input id="sessionSearch" placeholder="세션 검색…" aria-label="세션 검색"></div>
       <div class="filters" id="statusFilters">
         <span class="fchip active" data-st="all">전체</span>
         <span class="fchip" data-st="active">🟢 진행중</span>
@@ -236,7 +236,7 @@
         </div>
       </div>
       <div class="cin">
-        <input id="chatInput" placeholder="이 세션에 이어서 지시… (예: 오늘 제일 급한 취약점 뭐야?)" disabled>
+        <input id="chatInput" placeholder="이 세션에 이어서 지시… (예: 오늘 제일 급한 취약점 뭐야?)" disabled aria-label="이 세션에 이어서 지시">
         <button id="sendBtn" disabled>전송</button>
       </div>
     </div>

@@ -187,10 +187,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     <div class="cat-summary" id="catSummary"></div>
 
     <form class="reg-form" id="regForm">
-      <input type="text" id="pName" class="grow" placeholder="제품명 (예: 경계 방화벽 FW-01)" required>
+      <input type="text" id="pName" class="grow" placeholder="제품명 (예: 경계 방화벽 FW-01)" required aria-label="제품명">
       <select id="pCategory"></select>
-      <input type="text" id="pVendor" placeholder="제조사 (선택)" style="max-width:150px">
-      <input type="text" id="pModel" placeholder="모델/버전 (선택)" style="max-width:140px">
+      <input type="text" id="pVendor" placeholder="제조사 (선택)" style="max-width:150px" aria-label="제조사">
+      <input type="text" id="pModel" placeholder="모델/버전 (선택)" style="max-width:140px" aria-label="모델/버전">
       <select id="pAsset"><option value="">연결 자산 없음</option></select>
       <button type="submit">＋ 제품 등록</button>
     </form>
@@ -270,7 +270,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       `<div class="doc-col-title">${kind === "logManual" ? "🗒" : kind === "manual" ? "📘" : "📎"} ${esc(kindLabel)}</div>` +
       `<div class="doc-list">${list}</div>` +
       `<div class="doc-add" data-pid="${product.id}" data-kind="${kind}">` +
-      `<input type="text" placeholder="문서 제목 (파일 없이 제목만 등록도 가능)">` +
+      `<input type="text" placeholder="문서 제목 (파일 없이 제목만 등록도 가능)" aria-label="문서 제목">` +
       `<input type="file" accept=".pdf,.hwpx,.hwp,.txt,.md,.csv,.json,.log,.docx">` +
       `<button data-doc-add>＋ 추가</button>` +
       `<div class="doc-hint"></div>` +

@@ -190,6 +190,11 @@ export function registerOntologyRoutes(app: Express): void {
     "/api/ontology/triple",
     authMiddleware,
     asyncRoute(async (req, res) => {
+      // 입력 검증(2026-07-23): addTriple의 throw가 500으로 나가던 것을 400+안내로.
+      if (!String(req.body?.subject ?? "").trim() || !String(req.body?.predicate ?? "").trim() || !String(req.body?.object ?? "").trim()) {
+        res.status(400).json({ error: "주어(subject)·관계(predicate)·대상(object)을 모두 입력하세요" });
+        return;
+      }
       res.json(addTriple(req.body));
     })
   );

@@ -409,6 +409,11 @@ export function registerAssetsRoutes(app: Express): void {
     res.json(asset);
   });
   app.post("/api/assets", authMiddleware, (req, res) => {
+    // 입력 검증(2026-07-23 입력창 전수검증에서 발견): 빈 이름이 500으로 터지던 것을 400+안내로.
+    if (!String(req.body?.name ?? "").trim()) {
+      res.status(400).json({ error: "자산 이름(name)을 입력하세요" });
+      return;
+    }
     res.json(registerAsset(req.body));
   });
   // 경량 단건 재스캔 — 대시보드 자산 팝오버용. dispatch(의도분류·LLM 요약·부연) 없이 스캔

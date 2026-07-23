@@ -149,6 +149,11 @@ export function registerEmailRoutes(app: Express): void {
     res.json(getSmtpConfig() ?? null);
   });
   app.post("/api/email/config", authMiddleware, (req, res) => {
+    // 입력 검증(2026-07-23): 빈 호스트/발신주소가 500으로 터지던 것을 400+안내로.
+    if (!String(req.body?.host ?? "").trim() || !String(req.body?.fromAddress ?? "").trim()) {
+      res.status(400).json({ error: "SMTP 호스트와 발신 주소(fromAddress)는 필수입니다" });
+      return;
+    }
     res.json(saveSmtpConfig(req.body));
   });
   app.post(

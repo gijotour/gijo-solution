@@ -156,7 +156,7 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
       <div style="font-size:14.5px;font-weight:800;color:#fff;margin-bottom:4px;">스캔 결과 업로드</div>
       <div style="font-size:11.5px;color:var(--muted);margin-bottom:14px;">Nessus의 <b>.nessus(원본 XML)</b> · CSV · HTML 리포트를 그대로 올리면 됩니다. 플러그인 단위로 중복을 제거하고 호스트 정보(OS·DNS)·EPSS·VPR·KEV를 자동 인식합니다.</div>
       <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
-        <input id="sourceInput" placeholder="스캔 출처 라벨 (예: nessus-2026-07)" style="flex:1;min-width:200px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;">
+        <input id="sourceInput" placeholder="스캔 출처 라벨 (예: nessus-2026-07)" style="flex:1;min-width:200px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;" aria-label="스캔 출처 라벨">
         <input type="file" id="vulnFileInput" accept=".nessus,.xml,.json,.csv,.html,.htm" style="display:none">
         <button class="btn-primary" id="uploadBtn">파일 선택 & 업로드</button>
       </div>
@@ -195,7 +195,7 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
         <span class="vd-chip" data-sev="medium">Medium</span>
         <span class="vd-chip" data-sev="low">Low/Info</span>
         <span class="vd-chip" id="vdSortBtn" title="정렬 기준 전환 — EPSS는 30일 내 실제 악용될 확률">↕ 심각도 순</span>
-        <input class="vd-search" id="vdSearch" placeholder="취약점명 · CVE로 검색 (예: log4j, CVE-2021-44228, firefox)">
+        <input class="vd-search" id="vdSearch" placeholder="취약점명 · CVE로 검색 (예: log4j, CVE-2021-44228, firefox)" aria-label="취약점명 · CVE로 검색">
       </div>
       <div class="vd-list" id="vdList"></div>
     </div>

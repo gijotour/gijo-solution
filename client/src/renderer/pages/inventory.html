@@ -197,9 +197,9 @@
       <div style="font-size:14.5px;font-weight:800;color:#fff;margin-bottom:4px;">코드 저장소 스캔 <span style="font-size:10.5px;font-weight:700;color:var(--teal);background:rgba(30,185,128,0.15);padding:2px 8px;border-radius:10px;margin-left:6px;">온프레미스 · 자체 탐지</span></div>
       <div style="font-size:11.5px;color:var(--muted);margin-bottom:14px;">GitHub 조직/사용자의 저장소를 훑어 AI 라이브러리(openai·langchain·transformers 등) 의존성이 있는 repo를 개발형 AI 자산으로 자동 등록합니다. 토큰은 저장하지 않고 이 스캔에만 사용합니다. 온프레미스 GitHub Enterprise는 Base URL로 지정하세요.</div>
       <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-        <input id="repoOwnerInput" placeholder="조직 또는 사용자명 (예: my-company)" style="flex:1;min-width:200px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;">
-        <input id="repoTokenInput" type="password" placeholder="액세스 토큰 (선택 — 없으면 rate limit 낮음)" style="flex:1;min-width:200px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;">
-        <input id="repoBaseUrlInput" placeholder="Base URL (선택 — GitHub Enterprise)" style="flex:1;min-width:180px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;">
+        <input id="repoOwnerInput" placeholder="조직 또는 사용자명 (예: my-company)" style="flex:1;min-width:200px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;" aria-label="조직 또는 사용자명">
+        <input id="repoTokenInput" type="password" placeholder="액세스 토큰 (선택 — 없으면 rate limit 낮음)" style="flex:1;min-width:200px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;" aria-label="액세스 토큰">
+        <input id="repoBaseUrlInput" placeholder="Base URL (선택 — GitHub Enterprise)" style="flex:1;min-width:180px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;" aria-label="Base URL">
         <button class="btn-primary" id="repoScanBtn">스캔</button>
       </div>
       <div class="status-line" id="repoScanStatus" style="font-size:12.5px;margin-top:10px;"></div>
@@ -232,7 +232,7 @@
     <div class="toolbar">
       <div class="search">
         <span style="color:var(--muted-2)">⌕</span>
-        <input id="searchInput" placeholder="모델명, 소유부서로 검색">
+        <input id="searchInput" placeholder="모델명, 소유부서로 검색" aria-label="모델명, 소유부서로 검색">
       </div>
       <!-- 출처 필터는 위험 필터와 축이 달라 따로 둔다. 기본은 스캐너 유입분(실 자산). -->
       <div class="filters" id="originChips" style="margin-right:4px;">

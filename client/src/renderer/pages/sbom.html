@@ -151,7 +151,7 @@ tr:last-child td{border-bottom:none;}
 </div>
 
 <div class="toolbar">
-  <div class="search"><span style="color:var(--muted-2)">⌕</span><input id="searchInput" placeholder="자산명으로 검색"></div>
+  <div class="search"><span style="color:var(--muted-2)">⌕</span><input id="searchInput" placeholder="자산명으로 검색" aria-label="자산명으로 검색"></div>
   <div class="filters" id="filterChips">
     <div class="filter-chip active" data-filter="all">전체</div>
     <div class="filter-chip" data-filter="generated">생성됨</div>
@@ -414,7 +414,7 @@ tr:last-child td{border-bottom:none;}
     wrap.style.cssText = "display:flex;gap:6px;align-items:center;margin-top:5px";
     wrap.innerHTML =
       `<input id="whPathInput" placeholder="가중치 파일 경로(비우면 자산 path 사용) 예: D:\\models\\model.gguf"
-        style="flex:1;background:var(--panel);border:1px solid var(--border-strong);border-radius:6px;padding:5px 9px;color:var(--text);font-size:11px;outline:none">` +
+        style="flex:1;background:var(--panel);border:1px solid var(--border-strong);border-radius:6px;padding:5px 9px;color:var(--text);font-size:11px;outline:none" aria-label="가중치 파일 경로">` +
       `<button id="whCalcBtn" class="btn-ghost" style="padding:5px 10px;font-size:11px;white-space:nowrap">⚙ SHA-256 자동 계산</button>`;
     whEl.insertAdjacentElement("afterend", wrap);
     document.getElementById("whCalcBtn").addEventListener("click", async () => {

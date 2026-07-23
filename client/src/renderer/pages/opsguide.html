@@ -168,17 +168,17 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <!-- 지연/마감 점검 이메일 알림 — 기존 SMTP 설정(설정 화면) 재사용. -->
       <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
         <span style="font-size:12px;font-weight:700;color:var(--text);">📧 지연 점검 알림</span>
-        <input id="notifyEmails" placeholder="수신자 이메일(쉼표로 구분)" style="flex:1;min-width:200px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:8px 12px;color:var(--text);font-size:12.5px;outline:none;">
+        <input id="notifyEmails" placeholder="수신자 이메일(쉼표로 구분)" style="flex:1;min-width:200px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:8px 12px;color:var(--text);font-size:12.5px;outline:none;" aria-label="수신자 이메일">
         <button id="notifyBtn" class="ops-btn-secondary" type="button">지연 점검 메일 보내기</button>
         <span id="notifyLine" style="font-size:11.5px;color:var(--muted);"></span>
       </div>
 
       <form id="maintForm" class="maint-form">
-        <input id="mTitle" type="text" placeholder="점검 제목 (예: 방화벽 정책 점검)" required>
-        <input id="mProduct" type="text" placeholder="대상 제품/자산 (예: FW-01)" list="productOptions" required>
+        <input id="mTitle" type="text" placeholder="점검 제목 (예: 방화벽 정책 점검)" required aria-label="점검 제목">
+        <input id="mProduct" type="text" placeholder="대상 제품/자산 (예: FW-01)" list="productOptions" required aria-label="대상 제품/자산">
         <datalist id="productOptions"></datalist>
         <select id="mAsset" title="등록된 AI 자산과 연결(선택)"><option value="">AI 자산 연결 안 함</option></select>
-        <input id="mDate" type="date" required>
+        <input id="mDate" type="date" required title="점검일" aria-label="점검일">
         <select id="mInterval">
           <option value="">반복 없음</option>
           <option value="30">30일마다</option>
