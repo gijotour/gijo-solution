@@ -59,3 +59,21 @@ describe("screenguide — 화면별 가이드", () => {
     expect(txt).toContain("CIS");
   });
 });
+
+// 화면 가독성 개편(2026-07-23): 화면 상시 노출 설명을 panels로 이관 — 패널 이름을 물으면 상세만 답한다.
+describe("패널 단위 상세 안내", () => {
+  it("질문에 패널 이름이 있으면 그 상세만 답한다", async () => {
+    const { formatScreenGuide } = await import("../src/engine/screenguide");
+    const out = formatScreenGuide("settings.html", "SMTP 설정 방법 알려줘");
+    expect(out).toContain("설정 › SMTP");
+    expect(out).toContain("암호화 저장");
+    expect(out).not.toContain("이 화면에서 챗봇으로 할 수 있는 것");
+  });
+
+  it("패널 이름이 없으면 전체 안내 + 구역 목차를 준다", async () => {
+    const { formatScreenGuide } = await import("../src/engine/screenguide");
+    const out = formatScreenGuide("settings.html", "이 화면 뭐 할 수 있어?");
+    expect(out).toContain("구역별 상세");
+    expect(out).toContain("구동 티어");
+  });
+});

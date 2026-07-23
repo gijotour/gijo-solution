@@ -150,9 +150,7 @@ tr:last-child td{border-bottom:none;}
 <div class="content-grid">
   <div>
     <div class="panel">
-      <div class="panel-title">서비스별 이용량 · 예상 비용</div>
-      <div class="panel-sub">서버 프로세스 시작 이후 누적(재시작 시 초기화) · 로컬 LLM은 자체 호스팅으로 과금 없음</div>
-      <table>
+      <div class="panel-title">서비스별 이용량 · 예상 비용 <i class="gijo-info"></i></div><table>
         <tr><th>서비스</th><th>호출 수</th><th>예상 비용 (USD)</th></tr>
         <tbody id="usageRows">
           <tr><td colspan="3" style="color:var(--muted)">불러오는 중...</td></tr>
@@ -160,9 +158,7 @@ tr:last-child td{border-bottom:none;}
       </table>
     </div>
     <div class="panel">
-      <div class="panel-title">☁ 클라우드 LLM API 사용 <span style="font-size:10.5px;font-weight:400;color:var(--muted-2)">— 제공자별 호출·토큰·예상 비용</span></div>
-      <div class="panel-sub">클라우드 하이브리드를 켰을 때 실제로 외부 API에 나간 호출입니다. 비용은 <b>표준 요금 기준 예상</b>이며, 무료 등급이면 실제 $0입니다. 토큰은 API 응답에서 실측합니다.</div>
-      <table>
+      <div class="panel-title">☁ 클라우드 LLM API 사용 <span style="font-size:10.5px;font-weight:400;color:var(--muted-2)">— 제공자별 호출·토큰·예상 비용</span> <i class="gijo-info"></i></div><table>
         <tr><th>제공자 · 모델</th><th>호출</th><th>토큰(입력/출력)</th><th>예상 비용 (USD)</th></tr>
         <tbody id="cloudUsageRows">
           <tr><td colspan="4" style="color:var(--muted)">불러오는 중...</td></tr>
@@ -302,6 +298,8 @@ tr:last-child td{border-bottom:none;}
 
 
 
+<div id="gijoChatWidget" data-prompts='["이번 달 사용량 알려줘"]'></div>
 <script src="nav.js"></script>
+<script src="chatwidget.js"></script>
 </body>
 </html>

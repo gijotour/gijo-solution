@@ -1,0 +1,79 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8">
+<title>화면 가독성 개편 — 설명→챗봇 이관 시안 3종</title>
+<style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.1);--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--blue:#3b82f6;--blue-light:#5fa1ff;--amber:#f0a020;}
+*{box-sizing:border-box;margin:0;}
+body{background:var(--bg);color:var(--text);font-family:'Malgun Gothic',sans-serif;padding:22px;}
+h1{font-size:17px;margin-bottom:4px;} .sub{font-size:11px;color:var(--muted);margin-bottom:16px;line-height:1.6;}
+.wrap{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;align-items:start;}
+.col{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;}
+.col.cur{opacity:.8;border-style:dashed;}
+.col h2{font-size:13px;margin-bottom:2px;} .col .d{font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.55;min-height:56px;}
+.mock{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:12px;}
+.pt{font-size:13px;font-weight:800;color:#fff;display:flex;align-items:center;gap:6px;}
+.ps{font-size:10.5px;color:var(--muted);margin:4px 0 10px;line-height:1.6;}
+.ps.short{margin-bottom:10px;}
+.inp{background:var(--panel-2);border:1px solid var(--border);border-radius:7px;padding:8px 10px;font-size:10.5px;color:var(--muted-2);margin-bottom:6px;}
+.btn{display:inline-block;background:var(--blue);color:#fff;border-radius:6px;padding:6px 12px;font-size:10.5px;font-weight:700;}
+.hint{font-size:9.5px;color:var(--muted-2);margin-top:8px;line-height:1.5;}
+.warn{font-size:9.5px;color:var(--amber);margin-top:8px;}
+.info{width:16px;height:16px;border-radius:50%;background:rgba(59,130,246,.15);border:1px solid rgba(59,130,246,.45);color:var(--blue-light);font-size:10px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;}
+.more{color:var(--blue-light);font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap;}
+.topbtn{float:right;background:var(--panel-2);border:1px solid var(--border);border-radius:7px;padding:5px 10px;font-size:10px;color:var(--blue-light);font-weight:700;cursor:pointer;}
+.chat{margin-top:10px;background:var(--panel-2);border:1px solid rgba(59,130,246,.35);border-radius:8px;padding:8px 10px;font-size:9.5px;color:var(--muted);line-height:1.55;}
+.chat b{color:var(--blue-light);}
+</style></head><body>
+<h1>📖 화면 가독성 개편 — 설명을 챗봇으로 이관 (시안 3종)</h1>
+<div class="sub">공통: 사용법·배경 설명(15개 화면 ~60개 요소)을 화면에서 걷어내 챗봇 화면 가이드(즉답·LLM 비용 0)로 이동. <b style="color:var(--amber)">⚠ 위험 경고(재기동·삭제)는 화면에 남김.</b> 예시 패널: 설정 &gt; 이메일(SMTP)</div>
+<div class="wrap">
+
+<div class="col cur">
+  <h2>현행</h2>
+  <div class="d">패널마다 부제 2줄 + 하단 힌트 — 화면이 글로 빽빽함.</div>
+  <div class="mock">
+    <div class="pt">이메일(SMTP) 설정</div>
+    <div class="ps">내부 리포트를 이메일로 보낼 때 쓰는 사내 SMTP 서버 정보입니다. 비밀번호는 암호화되어 저장됩니다.</div>
+    <div class="inp">SMTP 호스트 · 포트 · 계정 · 비밀번호…</div>
+    <span class="btn">저장</span>
+    <div class="hint">비밀번호를 변경하지 않으려면 비워두세요. 발신 주소는 수신 서버 정책에 따라 …</div>
+  </div>
+</div>
+
+<div class="col">
+  <h2>A안 — 제목 옆 ⓘ (추천)</h2>
+  <div class="d">부제·힌트 삭제, 제목 옆 ⓘ만. 클릭하면 챗봇이 열리며 "SMTP 사용법 알려줘"가 자동 질의돼 즉답. 화면 최슬림 + 패널 단위 상세.</div>
+  <div class="mock">
+    <div class="pt">이메일(SMTP) 설정 <span class="info">i</span></div>
+    <div style="height:8px"></div>
+    <div class="inp">SMTP 호스트 · 포트 · 계정 · 비밀번호…</div>
+    <span class="btn">저장</span>
+    <div class="chat">💬 <b>챗봇(자동 열림)</b>: 설정 › SMTP — 내부 리포트를 이메일로 보낼 때 쓰는 사내 SMTP 서버 정보입니다. 비밀번호는 암호화 저장…</div>
+  </div>
+</div>
+
+<div class="col">
+  <h2>B안 — 한 줄 축약 + "자세히"</h2>
+  <div class="d">부제를 7단어 이내 한 줄로 남기고 끝에 [자세히 💬] 링크. 첫 사용자를 위한 최소 맥락은 화면에 유지 — 중간 절충.</div>
+  <div class="mock">
+    <div class="pt">이메일(SMTP) 설정</div>
+    <div class="ps short">리포트 발송용 사내 SMTP <span class="more">자세히 💬</span></div>
+    <div class="inp">SMTP 호스트 · 포트 · 계정 · 비밀번호…</div>
+    <span class="btn">저장</span>
+  </div>
+</div>
+
+<div class="col">
+  <h2>C안 — 화면당 안내 버튼 1개</h2>
+  <div class="d">패널 부제 전부 삭제, 화면 우상단 [❓ 화면 안내] 버튼 하나만. 클릭 시 화면 전체 가이드(구역 목차 포함). 가장 단순하지만 패널별 즉답은 한 단계 더 물어야.</div>
+  <div class="mock">
+    <span class="topbtn">❓ 화면 안내</span>
+    <div class="pt">이메일(SMTP) 설정</div>
+    <div style="height:8px"></div>
+    <div class="inp">SMTP 호스트 · 포트 · 계정 · 비밀번호…</div>
+    <span class="btn">저장</span>
+    <div class="chat">💬 설정 — 이 화면 사용 안내<br>구역별 상세: "서버 연결"·"계정"·"구동 티어"·"SMTP"… 이름을 넣어 물어보세요</div>
+  </div>
+</div>
+
+</div>
+</body></html>

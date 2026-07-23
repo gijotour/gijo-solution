@@ -337,7 +337,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   if (isHelpIntent(instructionText)) {
     const task = createTask({ text: instructionText, agentId: "orchestrator", priority: "P3" });
     completeTask(task.id);
-    return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatScreenGuide(screen) };
+    return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatScreenGuide(screen, instructionText) };
   }
 
   // 학습 루프 실행 지시는 확인 절차로 우회 — 파이프라인을 타지 않는다.

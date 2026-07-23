@@ -201,18 +201,14 @@ tr:last-child td{border-bottom:none;}
 </div>
 
 <div class="panel" id="rosterPanel">
-  <div class="panel-title">우리 팀 — 보안 에이전트 로스터</div>
-  <div class="panel-sub">각 에이전트는 역할에 맞는 전용 모델을 사용합니다. Security Orchestrator가 작업을 나누면 Scan → Analyze 결과를 GIJO Agent가 사내 지식으로 부연하고 Report Agent가 보고서로 정리하며, TI Agent는 CTI 위협을 상시 모니터링해 영향 자산을 알립니다</div>
-  <div class="agent-grid" id="agentGrid">
+  <div class="panel-title">우리 팀 — 보안 에이전트 로스터 <i class="gijo-info" data-topic="모델 배정"></i></div><div class="agent-grid" id="agentGrid">
     <div style="color:var(--muted)">불러오는 중...</div>
   </div>
 </div>
 
 <div class="content-grid">
   <div class="panel">
-    <div class="panel-title">터미널 — 협업 · LLM 실동작 로그</div>
-    <div class="panel-sub">에이전트 협업 이벤트와 로컬 LLM 실동작(추론·임베딩·모델 로드/스왑)을 시간순으로 스트리밍합니다. 각 추론의 모델·토큰 수·생성속도(tok/s)는 llama.cpp 실측치입니다. llama-server 자체 stdout/stderr는 좌측 "로그" 메뉴에서 확인할 수 있습니다.</div>
-    <div class="terminal" id="terminalLog">
+    <div class="panel-title">터미널 — 협업 · LLM 실동작 로그 <i class="gijo-info" data-topic="협업 피드"></i></div><div class="terminal" id="terminalLog">
       <div class="out">이벤트 대기 중...</div>
     </div>
   </div>
@@ -831,6 +827,8 @@ tr:last-child td{border-bottom:none;}
 
 
 
+<div id="gijoChatWidget" data-prompts='["팀 구성 알려줘","협업 피드 사용법 알려줘"]'></div>
 <script src="nav.js"></script>
+<script src="chatwidget.js"></script>
 </body>
 </html>

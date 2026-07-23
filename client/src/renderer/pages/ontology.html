@@ -116,9 +116,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     </div>
 
     <div class="panel">
-      <div class="panel-title">🔎 규칙 주입 미리보기</div>
-      <div class="panel-sub">질문을 입력하면, 채팅 시 이 질문에 <b>어떤 규칙·관계가 함께 주입되는지</b> 그대로 보여줍니다(하이브리드 확장). 예: "탈옥 대응", "관리자API 차단"</div>
-      <div class="field-row">
+      <div class="panel-title">🔎 규칙 주입 미리보기 <i class="gijo-info"></i></div><div class="field-row">
         <div class="field"><label for="expandInput">질문 / 텍스트</label><input id="expandInput" placeholder="예: 탈옥 위협에 어떻게 대응하나요?"></div>
         <button class="btn-primary" id="expandBtn" style="align-self:flex-end">확장</button>
       </div>
@@ -126,9 +124,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     </div>
 
     <div class="panel">
-      <div class="panel-title">🕸 관계 그래프</div>
-      <div class="panel-sub">현재 등록된 관계를 노드-링크로 시각화합니다. 노드에 마우스를 올리면 연결된 관계가 강조됩니다. (가독성을 위해 최대 <span id="graphCap">60</span>개 관계까지 표시)</div>
-      <div class="field-row" style="margin-bottom:12px">
+      <div class="panel-title">🕸 관계 그래프 <i class="gijo-info"></i></div><div class="field-row" style="margin-bottom:12px">
         <div class="field"><label for="filterSubject">특정 엔티티만 보기 (주어)</label><input id="filterSubject" placeholder="비워두면 전체 · 예: 탈옥"></div>
         <button class="btn-ghost" id="filterBtn" style="align-self:flex-end">필터</button>
         <button class="btn-ghost" id="filterClearBtn" style="align-self:flex-end">전체</button>
@@ -137,9 +133,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     </div>
 
     <div class="panel">
-      <div class="panel-title">＋ 관계 추가</div>
-      <div class="panel-sub">주어–관계–대상 형식으로 규칙을 직접 등록합니다. 예: <span class="chip chip-s">관리자API</span> <span class="pred">접근권한</span> <span class="chip chip-o">보안운영팀</span></div>
-      <div class="field-row">
+      <div class="panel-title">＋ 관계 추가 <i class="gijo-info"></i></div><div class="field-row">
         <div class="field"><label>주어 (Subject)</label><input id="addSubject" placeholder="관리자API"></div>
         <div class="field"><label>관계 (Predicate)</label><input id="addPredicate" placeholder="접근권한"></div>
         <div class="field"><label>대상 (Object)</label><input id="addObject" placeholder="보안운영팀"></div>

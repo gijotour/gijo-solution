@@ -52,7 +52,13 @@
       ".gcw-row.error{background:rgba(226,72,61,.12);border:1px solid rgba(226,72,61,.4);color:#f5928a;}" +
       ".gcw-dock{display:flex;gap:6px;margin-top:8px;flex-shrink:0;}" +
       ".gcw-dock input{flex:1;background:var(--panel-2,#0e1526);border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:8px;padding:9px 11px;color:var(--text,#e7eaf3);font-size:11.5px;outline:none;}" +
-      ".gcw-dock button{background:var(--blue,#3b82f6);color:#fff;border:0;border-radius:8px;padding:0 14px;font-size:11.5px;font-weight:700;cursor:pointer;}";
+      ".gcw-dock button{background:var(--blue,#3b82f6);color:#fff;border:0;border-radius:8px;padding:0 14px;font-size:11.5px;font-weight:700;cursor:pointer;}" +
+      // ⓘ 도움말 버튼(가독성 개편 2026-07-23) — 화면 상시 노출 설명을 걷어내고, 제목 옆 ⓘ를
+      // 누르면 챗봇이 열리며 해당 구역 사용법을 즉답(서버 screenguide, LLM 비용 0)한다.
+      ".gijo-info{width:17px;height:17px;border-radius:50%;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.45);" +
+      "color:var(--blue-light,#5fa1ff);font-size:10.5px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;" +
+      "cursor:pointer;vertical-align:middle;margin-left:6px;font-style:normal;flex:0 0 auto;}" +
+      ".gijo-info:hover{background:var(--blue,#3b82f6);color:#fff;}";
     document.head.appendChild(st);
   }
 
@@ -113,6 +119,18 @@
     input.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } });
     host.querySelectorAll(".gcw-chip").forEach(function (chip) {
       chip.addEventListener("click", function () { send(chip.textContent); });
+    });
+
+    // ⓘ → 챗봇 열고 해당 구역 사용법 질의. 페이지는 <i class="gijo-info" data-topic="SMTP">i</i>만 두면 된다.
+    window.gijoExplain = function (topic) {
+      host.classList.remove("collapsed");
+      toggle.textContent = "✕ 접기";
+      send(topic ? '"' + topic + '" 사용법 알려줘' : "이 화면 사용법 알려줘");
+    };
+    document.querySelectorAll(".gijo-info").forEach(function (el) {
+      if (!el.textContent.trim()) el.textContent = "i";
+      if (!el.title) el.title = (el.dataset.topic ? '"' + el.dataset.topic + '" ' : "이 화면 ") + "사용법을 챗봇이 설명합니다";
+      el.addEventListener("click", function () { window.gijoExplain(el.dataset.topic); });
     });
   }
 
