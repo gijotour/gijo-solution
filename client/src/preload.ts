@@ -141,6 +141,7 @@ const gijoApi = {
   importAssets: (content: string, format: "json" | "csv", source: string) => api.assetsApi.import(content, format, source),
   scanRepos: (args: { provider: string; owner: string; token?: string; baseUrl?: string; maxRepos?: number }) => api.assetsApi.scanRepos(args),
   updateAiBom: (id: string, aibom: unknown) => api.assetsApi.updateAiBom(id, aibom as import("./apiClient").AiBom),
+  setAssetCategory: (id: string, category: string | null) => api.assetsApi.setCategory(id, category),
   computeWeightsHash: (id: string, filePath?: string) => api.assetsApi.weightsHash(id, filePath),
   importVulnScan: (content: string, format: "json" | "csv" | "html" | "nessus", source: string) => api.assetsApi.importVulnScan(content, format, source),
   listModelDex: () => api.modelDexApi.list(),

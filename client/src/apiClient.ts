@@ -1320,7 +1320,11 @@ export interface Asset {
   components: AssetComponent[];
   findings: Finding[];
   aibom: AiBom;
+  category: string | null;
+  hostname: string | null;
+  ip: string | null;
   registeredAt: number;
+  updatedAt: number | null;
   lastScannedAt: number | null;
   sbomGeneratedAt: number | null;
 }
@@ -1423,6 +1427,9 @@ export const assetsApi = {
   scanRepos: (args: { provider: string; owner: string; token?: string; baseUrl?: string; maxRepos?: number }) =>
     request<{ scanned: number; registered: number; assets: Asset[] }>("/api/reposcan", { method: "POST", body: args }),
   updateAiBom: (id: string, aibom: AiBom) => request<Asset>(`/api/assets/${id}/aibom`, { method: "PUT", body: { aibom } }),
+  // ④ 카테고리(그룹) 지정/해제 — null이면 미분류.
+  setCategory: (id: string, category: string | null) =>
+    request<Asset>(`/api/assets/${encodeURIComponent(id)}/category`, { method: "PATCH", body: { category } }),
   weightsHash: (id: string, filePath?: string) =>
     request<{ assetId: string; filePath: string; sizeBytes: number; weightsHash: string }>(`/api/assets/${id}/aibom/weights-hash`, { method: "POST", body: { filePath } }),
   remove: (id: string) => request<{ ok: boolean }>(`/api/assets/${encodeURIComponent(id)}`, { method: "DELETE" }),

@@ -156,4 +156,35 @@ describe("assets", () => {
     const res = await request(app).put("/api/assets/ghost/aibom").set("Authorization", `Bearer ${token}`).send({ aibom: {} });
     expect(res.status).toBe(404);
   });
+
+  // ④⑥ 자산 화면 고도화 —
+  it("호스트명·IP를 자산명에서 유도하고, 새 자산은 category=null·updatedAt이 채워진다", async () => {
+    const res = await request(app)
+      .post("/api/assets")
+      .set("Authorization", `Bearer ${token}`)
+      .send({ id: "h1", name: "oracle.local (192.168.219.98)", path: "x", assetType: "infra-host" });
+    expect(res.status).toBe(200);
+    expect(res.body.hostname).toBe("oracle.local");
+    expect(res.body.ip).toBe("192.168.219.98");
+    expect(res.body.category).toBeNull();
+    expect(typeof res.body.updatedAt).toBe("number"); // 등록 시점이 최종수정으로 기록됨
+  });
+
+  it("PATCH /category 로 카테고리를 지정/해제하고 updatedAt이 갱신된다", async () => {
+    await request(app).post("/api/assets").set("Authorization", `Bearer ${token}`).send({ id: "c1", name: "c1", path: "x" });
+    const before = (await request(app).get("/api/assets/c1").set("Authorization", `Bearer ${token}`)).body.updatedAt;
+
+    const set = await request(app).patch("/api/assets/c1/category").set("Authorization", `Bearer ${token}`).send({ category: "인프라" });
+    expect(set.status).toBe(200);
+    expect(set.body.category).toBe("인프라");
+    expect(set.body.updatedAt).toBeGreaterThanOrEqual(before);
+
+    // 빈 값이면 미분류(null)로 해제
+    const clear = await request(app).patch("/api/assets/c1/category").set("Authorization", `Bearer ${token}`).send({ category: "  " });
+    expect(clear.body.category).toBeNull();
+
+    // 없는 자산 → 404, 인증 없으면 401
+    expect((await request(app).patch("/api/assets/ghost/category").set("Authorization", `Bearer ${token}`).send({ category: "x" })).status).toBe(404);
+    expect((await request(app).patch("/api/assets/c1/category").send({ category: "x" })).status).toBe(401);
+  });
 });

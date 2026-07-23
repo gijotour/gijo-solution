@@ -493,3 +493,15 @@ migrate(
   "tasks-completedAt-2026-07-22",
   `ALTER TABLE tasks ADD COLUMN completedAt INTEGER`
 );
+
+// 자산 화면 고도화(김도희 수정사항 ④⑥, 2026-07-23):
+//  category   — 담당자가 지정하는 그룹(카테고리). 미지정=null → 화면에서 '미분류'.
+//  updatedAt  — 자산 레코드 최종 수정 시각(등록·스캔·메타변경 시 갱신). registeredAt(등록일)과 별개.
+//  hostname/ip— 호스트명·IP를 독립 컬럼으로 보여주기 위한 필드. 미지정이면 화면이 name에서 유도.
+migrate(
+  "assets-category-hostip-2026-07-23",
+  `ALTER TABLE assets ADD COLUMN category TEXT;
+   ALTER TABLE assets ADD COLUMN updatedAt INTEGER;
+   ALTER TABLE assets ADD COLUMN hostname TEXT;
+   ALTER TABLE assets ADD COLUMN ip TEXT;`
+);

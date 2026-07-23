@@ -112,7 +112,11 @@ export interface Asset {
   findings: StandardFinding[]; // 가장 최근 스캔 결과만 — 현재 위험 상태
   scanHistory: ScanRun[]; // 스캔 전체 이력, 오래된 순
   aibom: AiBom; // AI-BOM 5영역 메타
+  category: string | null; // ④ 담당자 지정 그룹(카테고리). null이면 '미분류'.
+  hostname: string | null; // ⑥ 호스트명(미지정이면 name에서 유도)
+  ip: string | null;       // ⑥ IP 주소(미지정이면 name에서 유도)
   registeredAt: number;
+  updatedAt: number | null; // ④ 최종 수정 시각(등록·스캔·메타변경 시 갱신)
   lastScannedAt: number | null;
   sbomGeneratedAt: number | null;
 }
@@ -127,9 +131,24 @@ interface AssetRow {
   components: string;
   findings: string;
   aibom: string;
+  category: string | null;
+  hostname: string | null;
+  ip: string | null;
   registeredAt: number;
+  updatedAt: number | null;
   lastScannedAt: number | null;
   sbomGeneratedAt: number | null;
+}
+
+// 호스트명·IP를 자산명에서 유도한다(전용 필드가 비었을 때의 폴백) — 기존 임포터를 바꾸지 않고도
+// ⑥ 독립 컬럼을 채운다. 예: "oracle.local (192.168.219.98)" → host=oracle.local, ip=192.168.219.98.
+// 이름이 IP 그 자체면(예: "10.10.20.15") host=null, ip=그 값.
+export function deriveHostIp(name: string): { hostname: string | null; ip: string | null } {
+  const ipMatch = name.match(/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/);
+  const ip = ipMatch ? ipMatch[1] : null;
+  let hostname: string | null = name.replace(/\(?\s*\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\s*\)?/g, "").replace(/[()]/g, "").trim();
+  if (!hostname) hostname = null;
+  return { hostname, ip };
 }
 
 interface ScanRunRow {
@@ -158,11 +177,29 @@ const updateFindingsStmt = db.prepare("UPDATE assets SET findings = ?, lastScann
 const updateSbomStmt = db.prepare("UPDATE assets SET sbomGeneratedAt = ? WHERE id = ?");
 const updateAiBomStmt = db.prepare("UPDATE assets SET aibom = ? WHERE id = ?");
 const updateAssetMetaStmt = db.prepare("UPDATE assets SET name = ?, owner = ?, components = ? WHERE id = ?");
+const touchAssetStmt = db.prepare("UPDATE assets SET updatedAt = ? WHERE id = ?");
+const setCategoryStmt = db.prepare("UPDATE assets SET category = ?, updatedAt = ? WHERE id = ?");
+
+// 자산 레코드가 수정됐음을 기록(④ 최종수정일). 조용히 실패해도 본 기능엔 영향 없게.
+function touchAsset(id: string): void {
+  try { touchAssetStmt.run(Date.now(), id); } catch { /* 컬럼 미적용 등은 무시 */ }
+}
+
+// ④ 카테고리(그룹) 지정/해제 — 빈 값이면 null(미분류)로 저장. 최종수정일 갱신 + 실시간 브로드캐스트.
+export function setAssetCategory(id: string, category: string | null): Asset | undefined {
+  if (!getAssetRowStmt.get(id)) return undefined;
+  const value = category && category.trim() ? category.trim() : null;
+  setCategoryStmt.run(value, Date.now(), id);
+  const updated = getAsset(id);
+  if (updated) broadcastAssetUpdated(updated);
+  return updated;
+}
 
 // 이름·소유자·구성요소만 갱신한다(스캔 이력·findings·registeredAt는 보존). 재스캔 임포트가
 // registerAsset처럼 이력을 지우지 않고 호스트 메타만 최신화하는 용도(취약점 번다운/측정에 필요).
 export function updateAssetMeta(id: string, name: string, owner: string, components: AssetComponent[]): void {
   updateAssetMetaStmt.run(name, owner, JSON.stringify(components), id);
+  touchAsset(id); // ④ 최종수정일 갱신
 }
 
 // 담당부서·서비스만 고친다 — 자산 화면 커버리지 탭에서 결손을 메우는 경로.
@@ -174,6 +211,7 @@ export function updateAssetOwnership(id: string, patch: { owner?: string; servic
   const rawService = patch.service === undefined ? current.service : patch.service;
   const service = rawService === null || String(rawService).trim() === "" ? null : String(rawService).trim();
   db.prepare("UPDATE assets SET owner=?, service=? WHERE id=?").run(owner, service, id);
+  touchAsset(id); // ④ 최종수정일 갱신
   const updated = getAsset(id);
   if (updated) broadcastAssetUpdated(updated);
   return updated;
@@ -196,6 +234,7 @@ export function assetOriginOf(id: string): AssetOrigin {
 }
 
 function fromRow(row: AssetRow): Asset {
+  const derived = deriveHostIp(row.name);
   return {
     origin: assetOriginOf(row.id),
     id: row.id,
@@ -208,7 +247,11 @@ function fromRow(row: AssetRow): Asset {
     findings: JSON.parse(row.findings) as StandardFinding[],
     scanHistory: scanHistoryOf(row.id),
     aibom: mergeAiBom(row.aibom),
+    category: row.category ?? null,
+    hostname: row.hostname ?? derived.hostname,
+    ip: row.ip ?? derived.ip,
     registeredAt: row.registeredAt,
+    updatedAt: row.updatedAt ?? null,
     lastScannedAt: row.lastScannedAt,
     sbomGeneratedAt: row.sbomGeneratedAt,
   };
@@ -251,6 +294,7 @@ export function registerAsset(args: {
     lastScannedAt: null,
     sbomGeneratedAt: null,
   });
+  touchAsset(args.id); // ④ 등록 시점을 최종수정일로도 기록
   const asset = getAsset(args.id)!;
   broadcastAssetUpdated(asset);
   return asset;
@@ -268,6 +312,7 @@ export function recordFindings(assetId: string, findings: StandardFinding[]): As
     findings: JSON.stringify(findings),
   });
   updateFindingsStmt.run(JSON.stringify(findings), scannedAt, assetId);
+  touchAsset(assetId); // ④ 스캔 결과 반영도 최종수정으로 본다
 
   const asset = getAsset(assetId)!;
   broadcastAssetUpdated(asset);
@@ -457,6 +502,16 @@ export function registerAssetsRoutes(app: Express): void {
     const asset = updateAiBom(String(req.params.id), req.body.aibom);
     if (!asset) return res.status(404).json({ error: "asset not found" });
     res.json(asset);
+  });
+  // ④ 카테고리(그룹) 지정/해제 — 빈 값이면 미분류로. 자산 목록 좌측 카테고리 트리에서 사용.
+  app.patch("/api/assets/:id/category", authMiddleware, (req, res) => {
+    const raw = req.body?.category;
+    if (raw !== null && raw !== undefined && typeof raw !== "string") {
+      return res.status(400).json({ error: "category는 문자열이거나 null이어야 합니다" });
+    }
+    const updated = setAssetCategory(String(req.params.id), raw ?? null);
+    if (!updated) return res.status(404).json({ error: "asset not found" });
+    res.json(updated);
   });
   // 가중치 파일 SHA-256 자동 계산 — AI-BOM 무결성·출처 추적(모델 카드). 스트리밍 해시라 수 GB GGUF도 안전.
   // body.filePath(선택, 기본=자산 path). 파일이 없거나 디렉터리면 정직하게 400으로 알린다(추측·자동보정 없음).
