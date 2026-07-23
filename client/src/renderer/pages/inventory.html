@@ -53,6 +53,35 @@
   .filter-chip{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);padding:7px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;}
   .filter-chip.active{background:rgba(59,130,246,0.15);border-color:var(--blue);color:var(--blue-light);}
   .ochip-cnt{font-size:10px;font-weight:800;opacity:.72;margin-left:2px;}
+  /* 시안 B — 좌측 카테고리 트리 + 우측 표 */
+  .inv-layout{display:flex;gap:14px;align-items:flex-start;}
+  .inv-main{flex:1;min-width:0;}
+  .cat-panel{width:186px;flex:0 0 186px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:8px;}
+  .cat-grp{font-size:10px;color:var(--muted-2);font-weight:800;margin:4px 6px 6px;text-transform:uppercase;letter-spacing:.4px;}
+  .cat-item{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:7px 9px;border-radius:7px;cursor:pointer;font-size:12px;color:var(--muted);}
+  .cat-item:hover{background:var(--panel-2);}
+  .cat-item.on{background:rgba(59,130,246,.14);color:var(--blue-light);font-weight:700;}
+  .cat-item .c{font-size:10px;color:var(--muted-2);}
+  .cat-item.on .c{color:var(--blue-light);}
+  .cat-manage{font-size:11px;color:var(--muted-2);padding:8px 9px 4px;border-top:1px solid var(--border);margin-top:6px;}
+  /* ⑥ 컬럼 설정 드로어 */
+  .col-drawer-backdrop{position:fixed;inset:0;background:rgba(4,7,14,.5);z-index:899;display:none;}
+  .col-drawer{position:fixed;top:0;right:0;height:100vh;width:300px;background:var(--panel);border-left:1px solid var(--border-strong);z-index:900;transform:translateX(100%);transition:transform .2s;display:flex;flex-direction:column;box-shadow:-10px 0 40px rgba(0,0,0,.4);}
+  .col-drawer.open{transform:translateX(0);}
+  .cd-head{font-size:14px;font-weight:800;color:#fff;padding:18px 18px 10px;display:flex;justify-content:space-between;align-items:center;}
+  .cd-x{cursor:pointer;color:var(--muted);}
+  .cd-hint{font-size:11px;color:var(--muted-2);padding:0 18px 12px;line-height:1.6;}
+  .cd-list{flex:1;overflow-y:auto;padding:0 12px;}
+  .cd-row{display:flex;align-items:center;gap:9px;padding:8px 8px;border-radius:8px;}
+  .cd-row:hover{background:var(--panel-2);}
+  .cd-row input{accent-color:var(--blue);}
+  .cd-row .cd-label{flex:1;font-size:13px;}
+  .cd-row .cd-move{display:flex;gap:2px;}
+  .cd-row .cd-move span{cursor:pointer;color:var(--muted-2);font-size:12px;padding:1px 4px;border-radius:4px;}
+  .cd-row .cd-move span:hover{color:#fff;background:rgba(255,255,255,.08);}
+  .cd-row.fixed .cd-label{color:var(--muted);}
+  .cd-actions{display:flex;gap:8px;padding:14px 18px;border-top:1px solid var(--border);flex-wrap:wrap;}
+  .cd-actions .btn-primary{margin-left:auto;}
 
   .table-panel{background:var(--panel);border:1px solid var(--border);border-radius:0 0 12px 12px;padding:0 18px 10px;margin-bottom:16px;}
   table{width:100%;border-collapse:collapse;font-size:13px;}
@@ -249,24 +278,31 @@
         <div class="filter-chip" data-filter="unscanned">미스캔</div>
         <div class="filter-chip" data-filter="recent">최근 등록</div>
       </div>
+      <button id="colBtn" class="filter-chip" style="margin-left:auto;font-weight:700" title="표시할 컬럼과 순서를 지정합니다">☰ 표시 항목</button>
     </div>
 
-    <!-- ③ 일괄 선택 삭제 바 — 체크박스로 하나 이상 고르면 나타난다. -->
-    <div id="bulkBar" style="display:none;align-items:center;gap:12px;margin:0 0 10px;padding:8px 14px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.35);border-radius:10px;">
-      <span style="font-size:12.5px;font-weight:700;color:var(--blue-light)"><b id="bulkCount">0</b>개 선택됨</span>
-      <button id="bulkDeleteBtn" style="background:rgba(226,72,61,.16);border:1px solid rgba(226,72,61,.5);color:#f5928a;font-size:12px;font-weight:800;padding:6px 14px;border-radius:8px;cursor:pointer">🗑 선택 삭제</button>
-      <span id="bulkClear" style="cursor:pointer;font-size:12px;color:var(--muted);font-weight:600">선택 해제</span>
-    </div>
+    <!-- 시안 B: 좌측 카테고리 트리 + 우측 자산 표 -->
+    <div class="inv-layout">
+      <div class="cat-panel" id="catPanel"><div class="cat-grp">카테고리</div></div>
+      <div class="inv-main">
+        <!-- ③ 일괄 선택 삭제 바 — 체크박스로 하나 이상 고르면 나타난다. -->
+        <div id="bulkBar" style="display:none;align-items:center;gap:12px;margin:0 0 10px;padding:8px 14px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.35);border-radius:10px;">
+          <span style="font-size:12.5px;font-weight:700;color:var(--blue-light)"><b id="bulkCount">0</b>개 선택됨</span>
+          <button id="bulkDeleteBtn" style="background:rgba(226,72,61,.16);border:1px solid rgba(226,72,61,.5);color:#f5928a;font-size:12px;font-weight:800;padding:6px 14px;border-radius:8px;cursor:pointer">🗑 선택 삭제</button>
+          <span id="bulkClear" style="cursor:pointer;font-size:12px;color:var(--muted);font-weight:600">선택 해제</span>
+        </div>
 
-    <div class="table-panel">
-      <table>
-        <tr><th style="width:34px;text-align:center"><input type="checkbox" id="selectAllCb" title="보이는 자산 전체 선택" aria-label="전체 선택"></th><th>자산명</th><th>유형</th><th>소유부서</th><th>위험도</th><th>왜 지금 문제인가</th><th>최근 스캔</th><th>SBOM</th><th></th></tr>
-        <tbody id="assetRows">
-          <tr><td colspan="9" style="color:var(--muted)">불러오는 중...</td></tr>
-        </tbody>
-      </table>
-      <div class="pagination">
-        <span id="paginationLabel">-</span>
+        <div class="table-panel">
+          <table>
+            <thead><tr id="assetHead"></tr></thead>
+            <tbody id="assetRows">
+              <tr><td colspan="9" style="color:var(--muted)">불러오는 중...</td></tr>
+            </tbody>
+          </table>
+          <div class="pagination">
+            <span id="paginationLabel">-</span>
+          </div>
+        </div>
       </div>
     </div>
     </div>
@@ -293,6 +329,34 @@
     <div class="modal-actions">
       <button class="btn-ghost" id="fixCancelBtn">취소</button>
       <button class="btn-primary" id="fixSaveBtn">저장</button>
+    </div>
+  </div>
+</div>
+
+<!-- ⑥ 표시 컬럼 설정 드로어(우측 슬라이드) — 컬럼 on/off + 순서. 관리자 기본값·개인값 저장. -->
+<div class="col-drawer-backdrop" id="colDrawerBackdrop"></div>
+<aside class="col-drawer" id="colDrawer" aria-label="표시 항목 설정">
+  <div class="cd-head">☰ 표시 항목 · 순서<span class="cd-x" id="colDrawerClose">✕</span></div>
+  <div class="cd-hint">보이는 컬럼을 켜고, 위/아래로 순서를 바꿉니다. 자산명은 항상 표시됩니다.</div>
+  <div class="cd-list" id="colList"></div>
+  <div class="cd-actions">
+    <button class="btn-ghost" id="colResetBtn">기본값</button>
+    <button class="btn-ghost" id="colSaveDefaultBtn" title="이 구성을 조직 기본값으로(관리자)">관리자 기본값으로 저장</button>
+    <button class="btn-primary" id="colApplyBtn">적용</button>
+  </div>
+</aside>
+
+<!-- ④ 카테고리 지정 모달 -->
+<div class="modal-overlay" id="catModal">
+  <div class="modal">
+    <div class="modal-title">카테고리 지정</div>
+    <div id="catModalTarget" style="font-size:12px;color:var(--muted);margin-bottom:12px;"></div>
+    <label for="catInput">카테고리(그룹)</label>
+    <input id="catInput" list="catSuggest" placeholder="예: 인프라 · DB · AI 서비스 (비우면 미분류)">
+    <datalist id="catSuggest"></datalist>
+    <div class="modal-actions">
+      <button class="btn-ghost" id="catCancelBtn">취소</button>
+      <button class="btn-primary" id="catSaveBtn">저장</button>
     </div>
   </div>
 </div>
@@ -344,7 +408,44 @@
   let coverage = { total: 0, complete: 0, gaps: [], ranked: [] };
   let activeTab = "list";
   let activeOrigin = "scanner"; // 기본은 실제로 들여온 자산만 — 시드 샘플은 숨긴다
+  let activeCategory = "all";   // ④ 좌측 카테고리 트리 선택('all' | '__none__' | 카테고리명)
   const selectedIds = new Set(); // ③ 일괄 삭제 선택 상태(재렌더에도 유지)
+
+  // ⑥ 표시 컬럼 — 관리자가 켜고/끄고 순서 지정. 개인값(COL_KEY)>조직기본값(COL_DEFAULT_KEY)>기본.
+  const COL_KEY = "gijo:inv:cols";
+  const COL_DEFAULT_KEY = "gijo:inv:cols:orgdefault";
+  const ALL_COLS = [
+    { id: "name", label: "자산명", fixed: true },
+    { id: "hostname", label: "호스트명" },
+    { id: "ip", label: "IP 주소" },
+    { id: "os", label: "OS/구성" },
+    { id: "assetType", label: "유형" },
+    { id: "owner", label: "소유부서" },
+    { id: "category", label: "카테고리" },
+    { id: "risk", label: "위험도" },
+    { id: "why", label: "왜 지금 문제인가" },
+    { id: "registered", label: "등록일" },
+    { id: "updated", label: "최종수정" },
+    { id: "lastScanned", label: "최근 스캔" },
+    { id: "sbom", label: "SBOM" },
+  ];
+  const COL_LABEL = Object.fromEntries(ALL_COLS.map((c) => [c.id, c.label]));
+  const COL_IDS = ALL_COLS.map((c) => c.id);
+  const DEFAULT_COLS = ["name", "hostname", "ip", "os", "owner", "category", "risk", "updated", "sbom"];
+  function sanitizeCols(arr) {
+    if (!Array.isArray(arr)) return null;
+    const seen = new Set();
+    const out = arr.filter((id) => COL_IDS.includes(id) && !seen.has(id) && seen.add(id));
+    if (!out.includes("name")) out.unshift("name"); // 자산명은 항상 표시
+    return out.length ? out : null;
+  }
+  function loadCols() {
+    try { const p = sanitizeCols(JSON.parse(localStorage.getItem(COL_KEY) || "null")); if (p) return p; } catch (e) {}
+    try { const d = sanitizeCols(JSON.parse(localStorage.getItem(COL_DEFAULT_KEY) || "null")); if (d) return d; } catch (e) {}
+    return DEFAULT_COLS.slice();
+  }
+  let visibleCols = loadCols();
+  let drawerOrder = [], drawerOn = new Set(); // 드로어 편집용 임시 상태
 
   function tick() {
     clockEl.textContent = new Date().toLocaleString("ko-KR", {
@@ -401,11 +502,18 @@
     if (activeOrigin === "real") return a.origin !== "sample";
     return a.origin === "scanner";
   }
+  // ④ 좌측 카테고리 트리 선택 필터.
+  function passesCategory(a) {
+    if (activeCategory === "all") return true;
+    if (activeCategory === "__none__") return !a.category;
+    return a.category === activeCategory;
+  }
 
   function applyFilters(assets) {
     const q = searchInput.value.trim().toLowerCase();
     return assets.filter((a) => {
       if (!passesOrigin(a)) return false;
+      if (!passesCategory(a)) return false;
       if (q && !a.name.toLowerCase().includes(q) && !a.owner.toLowerCase().includes(q)) return false;
       const risk = riskOf(a).level;
       if (activeFilter === "kev" && !riskOf(a).kev) return false;
@@ -466,69 +574,92 @@
     if (all) all.checked = boxes.length > 0 && [...boxes].every((cb) => cb.checked);
   }
 
+  function fmtDate(ts) {
+    if (!ts) return "—";
+    const d = new Date(ts);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  }
+  // 한 행에 필요한 파생값을 미리 계산(컬럼 셀들이 공유).
+  function buildCtx(a, rk) {
+    const risk = riskOf(a);
+    const isHost = a.assetType === "infra-host";
+    return {
+      risk,
+      gapBadges: rk ? rk.gaps.map((g) => `<span class="gapbadge ${g}" title="${GAP_LABEL[g]} 정보가 없습니다">${GAP_LABEL[g]}</span>`).join("") : "",
+      whyCell: rk && rk.why ? rk.why : "",
+      sbomCell: a.sbomGeneratedAt ? '<span class="sbom-ok">완료</span>' : `<span class="sbom-pending" style="cursor:pointer" data-gen-sbom="${a.id}">생성하기</span>`,
+      maintBadge: maintByAsset[a.id]
+        ? ` <span data-open-ops="1" title="이 자산의 유지보수 점검 — 운영 가이드로 이동" style="cursor:pointer;font-size:10.5px;font-weight:700;color:${maintByAsset[a.id].overdue ? "#f5928a" : "var(--blue-light)"};background:rgba(59,130,246,0.14);padding:1px 7px;border-radius:6px;">🔧 점검 ${maintByAsset[a.id].total}${maintByAsset[a.id].overdue ? ` · 지연 ${maintByAsset[a.id].overdue}` : ""}</span>`
+        : "",
+      kevBadge: risk.kev ? ` <span title="실제 악용이 확인된 취약점(CISA KEV) 포함 — 최우선" style="font-size:10.5px;font-weight:800;color:#ff8a80;background:rgba(226,72,61,0.2);border:1px solid rgba(226,72,61,0.5);padding:1px 7px;border-radius:6px;">🔴 KEV</span>` : "",
+      os: a.components && a.components.length ? a.components[0].name : (isHost ? "—" : a.path),
+      action: isHost
+        ? `<span class="row-actions" data-vulns="1" title="취약 자산관리에서 이 호스트의 취약점 보기">취약점 보기 →</span>`
+        : `<span class="row-actions" data-scan="${a.id}">재스캔 →</span>`,
+      ownerCell: (rk && rk.gaps.includes("owner"))
+        ? `<span class="sbom-pending" style="cursor:pointer" data-fix-owner="${a.id}" title="담당부서 지정">지정하기</span>`
+        : esc(a.owner),
+    };
+  }
+  // ⑥ 컬럼 id → 셀 내부 HTML.
+  function cellHtml(id, a, ctx) {
+    switch (id) {
+      case "name": return `<div class="asset-name">${esc(a.name)}${ctx.kevBadge}${ctx.maintBadge}${ctx.gapBadges}</div>`;
+      case "hostname": return esc(a.hostname || "—");
+      case "ip": return esc(a.ip || "—");
+      case "os": return esc(ctx.os || "—");
+      case "assetType": return `<span class="type-badge">${esc(a.assetType)}</span>`;
+      case "owner": return ctx.ownerCell;
+      case "category": return a.category
+        ? `<span class="type-badge" style="cursor:pointer;background:rgba(139,124,240,.16);color:#b9aef5" data-set-cat="${a.id}" title="카테고리 변경">${esc(a.category)}</span>`
+        : `<span class="sbom-pending" style="cursor:pointer" data-set-cat="${a.id}" title="카테고리 지정">＋지정</span>`;
+      case "risk": return `<span class="risk-badge risk-${ctx.risk.level === "none" ? "low" : ctx.risk.level}"><span class="risk-dot"></span>${ctx.risk.label}</span>`;
+      case "why": return ctx.whyCell;
+      case "registered": return `<span class="mut">${fmtDate(a.registeredAt)}</span>`;
+      case "updated": return `<span class="mut">${fmtDate(a.updatedAt)}</span>`;
+      case "lastScanned": return relativeTime(a.lastScannedAt);
+      case "sbom": return ctx.sbomCell;
+      default: return "";
+    }
+  }
+  function cellClass(id) {
+    if (id === "owner") return "owner";
+    if (id === "why") return "why-cell";
+    return "";
+  }
+  function renderHead() {
+    const head = document.getElementById("assetHead");
+    if (!head) return;
+    head.innerHTML =
+      `<th style="width:34px;text-align:center"><input type="checkbox" id="selectAllCb" title="보이는 자산 전체 선택" aria-label="전체 선택"></th>` +
+      visibleCols.map((id) => `<th>${esc(COL_LABEL[id] || id)}</th>`).join("") +
+      `<th></th>`;
+  }
   function render() {
     const filtered = sortByPriority(applyFilters(allAssets));
     const rankedById = new Map(coverage.ranked.map((r) => [r.id, r]));
+    renderHead();
+    const colspan = visibleCols.length + 2; // 선택 체크박스 + 액션
     if (filtered.length === 0) {
-      assetRows.innerHTML = '<tr><td colspan="9" style="color:var(--muted)">조건에 맞는 자산이 없습니다</td></tr>';
+      assetRows.innerHTML = `<tr><td colspan="${colspan}" style="color:var(--muted)">조건에 맞는 자산이 없습니다</td></tr>`;
     } else {
-      // 그룹 머리글을 표 안에 끼워 넣는다. 비어 있는 그룹은 그리지 않는다 —
-      // 빈 그룹을 남기면 "AI 자산이 0건"이 아니라 "필터에 걸렸다"는 걸 알기 어렵다.
       const rowHtml = (a) => {
-          const rk = rankedById.get(a.id);
-          const gapBadges = rk
-            ? rk.gaps.map((g) => `<span class="gapbadge ${g}" title="${GAP_LABEL[g]} 정보가 없습니다">${GAP_LABEL[g]}</span>`).join("")
-            : "";
-          const whyCell = rk && rk.why ? rk.why : "";
-          const risk = riskOf(a);
-          const sbomCell = a.sbomGeneratedAt
-            ? '<span class="sbom-ok">완료</span>'
-            : `<span class="sbom-pending" style="cursor:pointer" data-gen-sbom="${a.id}">생성하기</span>`;
-          const mc = maintByAsset[a.id];
-          const maintBadge = mc
-            ? ` <span data-open-ops="1" title="이 자산의 유지보수 점검 — 운영 가이드로 이동" style="cursor:pointer;font-size:10.5px;font-weight:700;color:${mc.overdue ? "#f5928a" : "var(--blue-light)"};background:rgba(59,130,246,0.14);padding:1px 7px;border-radius:6px;">🔧 점검 ${mc.total}${mc.overdue ? ` · 지연 ${mc.overdue}` : ""}</span>`
-            : "";
-          const isHost = a.assetType === "infra-host";
-          // 실제 악용(KEV) 있으면 최우선 신호를 자산명 옆에 표시.
-          const kevBadge = risk.kev
-            ? ` <span title="실제 악용이 확인된 취약점(CISA KEV) 포함 — 최우선" style="font-size:10.5px;font-weight:800;color:#ff8a80;background:rgba(226,72,61,0.2);border:1px solid rgba(226,72,61,0.5);padding:1px 7px;border-radius:6px;">🔴 KEV</span>`
-            : "";
-          // 인프라 호스트는 IP 대신 OS(구성요소 첫 항목)를 부제로 — HTML 임포트로 채워진 정보.
-          const os = isHost && a.components && a.components.length ? a.components[0].name : a.path;
-          const action = isHost
-            ? `<span class="row-actions" data-vulns="1" title="취약 자산관리에서 이 호스트의 취약점 보기">취약점 보기 →</span>`
-            : `<span class="row-actions" data-scan="${a.id}">재스캔 →</span>`;
-          // ③ 삭제는 행별 ✕ 대신 체크박스 일괄 선택으로. 자산명 왼쪽 체크박스로 고른다.
-          const cb = `<td style="text-align:center"><input type="checkbox" class="asset-cb" data-id="${a.id}" data-name="${a.name}"${selectedIds.has(a.id) ? " checked" : ""} aria-label="선택"></td>`;
-          // 담당부서가 비었거나 파일명이면 값 대신 지정 버튼을 둔다 — 잘못된 값을 사실처럼 보여주지 않는다.
-          const ownerMissing = rk ? rk.gaps.includes("owner") : false;
-          const ownerCell = ownerMissing
-            ? `<span class="sbom-pending" style="cursor:pointer" data-fix-owner="${a.id}" title="담당부서 지정">지정하기</span>`
-            : a.owner;
-          return `<tr>
-            ${cb}
-            <td><div class="asset-name">${a.name}${kevBadge}${maintBadge}${gapBadges}</div><div class="asset-sub">${os}</div></td>
-            <td><span class="type-badge">${a.assetType}</span></td>
-            <td class="owner">${ownerCell}</td>
-            <td><span class="risk-badge risk-${risk.level === "none" ? "low" : risk.level}"><span class="risk-dot"></span>${risk.label}</span></td>
-            <td class="why-cell">${whyCell}</td>
-            <td>${relativeTime(a.lastScannedAt)}</td>
-            <td>${sbomCell}</td>
-            <td style="white-space:nowrap">${action}</td>
-          </tr>`;
+        const rk = rankedById.get(a.id);
+        const ctx = buildCtx(a, rk);
+        const cb = `<td style="text-align:center"><input type="checkbox" class="asset-cb" data-id="${a.id}" data-name="${esc(a.name)}"${selectedIds.has(a.id) ? " checked" : ""} aria-label="선택"></td>`;
+        const tds = visibleCols.map((id) => `<td class="${cellClass(id)}">${cellHtml(id, a, ctx)}</td>`).join("");
+        return `<tr>${cb}${tds}<td style="white-space:nowrap">${ctx.action}</td></tr>`;
       };
-
-      // 커버리지를 못 받았으면 결손을 모른다 — 전부 "정보 완비"로 몰아 보여주면 거짓말이 된다.
-      // 그럴 땐 그룹 없이 평평하게 그리고 그 사실을 알린다.
+      // 커버리지를 못 받았으면 결손을 모른다 — 그룹 없이 평평하게 그리고 그 사실을 알린다.
       if (coverage.ranked.length === 0) {
         assetRows.innerHTML =
-          `<tr class="group-head"><td colspan="9"><span class="group-hint">결손 정보를 불러오지 못해 그룹 없이 표시합니다.</span></td></tr>` +
+          `<tr class="group-head"><td colspan="${colspan}"><span class="group-hint">결손 정보를 불러오지 못해 그룹 없이 표시합니다.</span></td></tr>` +
           filtered.map(rowHtml).join("");
       } else {
         assetRows.innerHTML = GAP_GROUPS.map((g) => {
           const members = filtered.filter((a) => primaryGap(rankedById.get(a.id)) === g.key);
           if (members.length === 0) return "";
-          const head = `<tr class="group-head"><td colspan="9">
+          const head = `<tr class="group-head"><td colspan="${colspan}">
             <span class="group-label">${g.label}</span>
             <span class="group-count">${members.length}건</span>
             <span class="group-hint">${g.hint}</span>
@@ -537,6 +668,7 @@
         }).join("");
       }
     }
+    renderCatPanel();
     const originNote = { scanner: "스캐너 탐지분", real: "전체 자산", all: "샘플 포함" }[activeOrigin];
     paginationLabel.textContent = `${originNote} 기준 ${filtered.length}건 표시 · 등록된 자산 전체 ${allAssets.length}건`;
 
@@ -563,6 +695,85 @@
 
   function esc(s) {
     return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+  }
+
+  // ④ 좌측 카테고리 트리 — 출처 필터 안의 자산으로 카테고리별 건수를 세어 그린다.
+  function catCounts() {
+    const universe = allAssets.filter(passesOrigin);
+    const counts = new Map();
+    let uncategorized = 0;
+    universe.forEach((a) => { if (a.category) counts.set(a.category, (counts.get(a.category) || 0) + 1); else uncategorized++; });
+    return { universe, counts, uncategorized };
+  }
+  function renderCatPanel() {
+    const panel = document.getElementById("catPanel");
+    if (!panel) return;
+    const { universe, counts, uncategorized } = catCounts();
+    const item = (key, label, count) =>
+      `<div class="cat-item ${activeCategory === key ? "on" : ""}" data-cat="${esc(key)}"><span>${esc(label)}</span><span class="c">${count}</span></div>`;
+    let html = `<div class="cat-grp">카테고리</div>`;
+    html += item("all", "전체", universe.length);
+    [...counts.keys()].sort().forEach((c) => { html += item(c, c, counts.get(c)); });
+    if (uncategorized) html += item("__none__", "미분류", uncategorized);
+    html += `<div class="cat-manage">자산의 "카테고리" 컬럼 <b>＋지정</b>으로 그룹을 붙입니다.</div>`;
+    panel.innerHTML = html;
+  }
+
+  // ⑥ 표시 컬럼 드로어 — 열 때 현재 구성을 임시 상태로 복사, 적용 시 확정.
+  function openColDrawer() {
+    drawerOrder = visibleCols.concat(COL_IDS.filter((id) => !visibleCols.includes(id)));
+    drawerOn = new Set(visibleCols);
+    renderColList();
+    document.getElementById("colDrawer").classList.add("open");
+    document.getElementById("colDrawerBackdrop").style.display = "block";
+  }
+  function closeColDrawer() {
+    document.getElementById("colDrawer").classList.remove("open");
+    document.getElementById("colDrawerBackdrop").style.display = "none";
+  }
+  function renderColList() {
+    const list = document.getElementById("colList");
+    list.innerHTML = drawerOrder.map((id, i) => {
+      const fixed = id === "name";
+      return `<div class="cd-row ${fixed ? "fixed" : ""}">
+        <input type="checkbox" data-col="${id}" ${drawerOn.has(id) ? "checked" : ""} ${fixed ? "disabled" : ""}>
+        <span class="cd-label">${esc(COL_LABEL[id] || id)}${fixed ? " (고정)" : ""}</span>
+        <span class="cd-move"><span data-mv="up" data-i="${i}" title="위로">▲</span><span data-mv="down" data-i="${i}" title="아래로">▼</span></span>
+      </div>`;
+    }).join("");
+  }
+  function applyCols(save) {
+    const next = drawerOrder.filter((id) => drawerOn.has(id));
+    if (!next.includes("name")) next.unshift("name");
+    visibleCols = next;
+    try { localStorage.setItem(COL_KEY, JSON.stringify(visibleCols)); } catch (e) {}
+    if (save) { try { localStorage.setItem(COL_DEFAULT_KEY, JSON.stringify(visibleCols)); } catch (e) {} }
+    render();
+  }
+
+  // ④ 카테고리 지정 모달
+  let catTargetId = null;
+  function openCatModal(id) {
+    const a = allAssets.find((x) => x.id === id);
+    if (!a) return;
+    catTargetId = id;
+    document.getElementById("catModalTarget").textContent = `${a.name}`;
+    const input = document.getElementById("catInput");
+    input.value = a.category || "";
+    const { counts } = catCounts();
+    document.getElementById("catSuggest").innerHTML = [...counts.keys()].sort().map((c) => `<option value="${esc(c)}">`).join("");
+    document.getElementById("catModal").classList.add("open");
+    input.focus();
+  }
+  function closeCatModal() { document.getElementById("catModal").classList.remove("open"); catTargetId = null; }
+  async function saveCatModal() {
+    if (!catTargetId) return;
+    const value = document.getElementById("catInput").value.trim();
+    try {
+      await window.gijo.setAssetCategory(catTargetId, value || null);
+      closeCatModal();
+      await refresh();
+    } catch (e) { alert("카테고리 저장 실패: " + (e.message || e)); }
   }
 
   // 커버리지 탭 — 결손마다 "왜 문제인지"와 "무엇을 누르면 되는지"를 한 카드에 둔다.
@@ -942,6 +1153,11 @@
         window.gijo.navigateTo("vulnscan.html");
         return;
       }
+      const setCat = e.target.closest("[data-set-cat]");
+      if (setCat) {
+        openCatModal(setCat.dataset.setCat);
+        return;
+      }
       if (genId) {
         await generateSbomFor(genId, e.target);
       } else if (scanId) {
@@ -958,7 +1174,9 @@
       if (cb.checked) selectedIds.add(cb.dataset.id); else selectedIds.delete(cb.dataset.id);
       updateBulkBar();
     });
-    document.getElementById("selectAllCb").addEventListener("change", (e) => {
+    // 전체선택 체크박스는 헤더가 재렌더되며 새로 만들어지므로, 정적 부모(#assetHead)에 위임한다.
+    document.getElementById("assetHead").addEventListener("change", (e) => {
+      if (e.target.id !== "selectAllCb") return;
       const on = e.target.checked;
       document.querySelectorAll("#assetRows .asset-cb").forEach((cb) => {
         cb.checked = on;
@@ -986,6 +1204,46 @@
       if (fail) alert(`${ok}건 삭제 완료 · ${fail}건 실패`);
       await refresh();
     });
+
+    // ④ 좌측 카테고리 트리 클릭 → 필터.
+    document.getElementById("catPanel").addEventListener("click", (e) => {
+      const item = e.target.closest(".cat-item");
+      if (!item) return;
+      activeCategory = item.dataset.cat;
+      render();
+    });
+
+    // ⑥ 컬럼 설정 드로어
+    document.getElementById("colBtn").addEventListener("click", openColDrawer);
+    document.getElementById("colDrawerClose").addEventListener("click", closeColDrawer);
+    document.getElementById("colDrawerBackdrop").addEventListener("click", closeColDrawer);
+    document.getElementById("colApplyBtn").addEventListener("click", () => { applyCols(false); closeColDrawer(); });
+    document.getElementById("colSaveDefaultBtn").addEventListener("click", () => { applyCols(true); closeColDrawer(); });
+    document.getElementById("colResetBtn").addEventListener("click", () => {
+      drawerOrder = DEFAULT_COLS.concat(COL_IDS.filter((id) => !DEFAULT_COLS.includes(id)));
+      drawerOn = new Set(DEFAULT_COLS);
+      renderColList();
+    });
+    document.getElementById("colList").addEventListener("change", (e) => {
+      const id = e.target.dataset.col;
+      if (!id) return;
+      if (e.target.checked) drawerOn.add(id); else drawerOn.delete(id);
+    });
+    document.getElementById("colList").addEventListener("click", (e) => {
+      const mv = e.target.dataset.mv;
+      if (!mv) return;
+      const i = Number(e.target.dataset.i);
+      const j = mv === "up" ? i - 1 : i + 1;
+      if (j < 0 || j >= drawerOrder.length) return;
+      const t = drawerOrder[i]; drawerOrder[i] = drawerOrder[j]; drawerOrder[j] = t;
+      renderColList();
+    });
+
+    // ④ 카테고리 지정 모달
+    document.getElementById("catCancelBtn").addEventListener("click", closeCatModal);
+    document.getElementById("catSaveBtn").addEventListener("click", saveCatModal);
+    document.getElementById("catInput").addEventListener("keydown", (e) => { if (e.key === "Enter") saveCatModal(); });
+    document.getElementById("catModal").addEventListener("click", (e) => { if (e.target.id === "catModal") closeCatModal(); });
 
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => {
