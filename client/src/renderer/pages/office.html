@@ -35,7 +35,7 @@
 
   .body { display: grid; grid-template-columns: 1fr 280px; gap: 14px; padding: 0 18px; flex: 1 1 auto; min-height: 0; }
   .office-col { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-  canvas { width: 100%; border-radius: 12px; border: 1px solid var(--border); background: #171f33; flex: 0 1 auto; min-height: 0; object-fit: contain; }
+  canvas { width: 100%; max-width: 860px; margin: 0 auto; border-radius: 12px; border: 1px solid var(--border); background: #171f33; flex: 0 1 auto; min-height: 0; object-fit: contain; box-shadow: inset 0 0 40px rgba(0,0,0,.4); }
 
   /* 팀 대화 피드 — 실제 협업 이벤트(WebSocket) */
   .feed { margin-top: 10px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px;
@@ -181,7 +181,7 @@
   const office = (function () {
     const canvas = document.getElementById("office");
     const ctx = canvas.getContext("2d");
-    const COLS = 22, ROWS = 12, S = 3;
+    const COLS = 22, ROWS = 12, S = 4; // 픽셀 스케일 3→4(2026-07-23, 더 큼·선명)
     const W = COLS * 8, H = ROWS * 8;
     canvas.width = W * S; canvas.height = H * S;
     canvas.style.imageRendering = "pixelated";
@@ -340,6 +340,18 @@
       px(TABLE.x - 12, TABLE.y - 12, 52, 24, T.rug[0]); px(TABLE.x - 10, TABLE.y - 10, 48, 20, T.rug[1]);
       px(TABLE.x, TABLE.y - 2, 28, 4, T.deskEdge); px(TABLE.x, TABLE.y + 2, 28, 8, T.deskTop); px(TABLE.x, TABLE.y + 10, 28, 3, T.deskFace);
       px(TABLE.x + 4, TABLE.y + 3, 5, 3, "#e7eaf3"); px(TABLE.x + 18, TABLE.y + 4, 5, 3, "#cfd8ff");
+      // 작업존 러그(위쪽 데스크 뱅크를 시각적으로 묶는다) — 존 분리(gather.town식 배치 참고)
+      px(2, 22, 68, 30, "rgba(59,130,246,.05)"); px(2, 22, 68, 0.5, "rgba(95,161,255,.2)");
+      // 서버랙(SOC 정체성) — 오른쪽 벽, 깜빡이는 LED 랙 2기
+      for (let k = 0; k < 2; k++) {
+        const rx = 150 + k * 12, ry = 22;
+        px(rx, ry, 10, 30, "#0c1220"); px(rx, ry, 10, 1, "#2a3a55"); px(rx, ry, 1, 30, "#2a3a55"); px(rx + 9, ry, 1, 30, "#1a2740");
+        for (let u = 0; u < 6; u++) {
+          px(rx + 1, ry + 3 + u * 4, 8, 2, "#141c2e");
+          const led = (t + k * 7 + u * 3) % 40 < 20 ? (u % 2 ? "#1eb980" : "#40dcff") : "#20304e";
+          px(rx + 7, ry + 3 + u * 4, 1, 1, led);
+        }
+      }
       // 화분·책장·커피 코너
       plantAt(4, 86); plantAt(W - 10, 20);
       px(W - 26, 16, 14, 16, T.deskFace);
