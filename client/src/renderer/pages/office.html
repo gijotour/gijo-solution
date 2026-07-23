@@ -186,22 +186,23 @@
     canvas.width = W * S; canvas.height = H * S;
     canvas.style.imageRendering = "pixelated";
     const WALL_H = 14;
+    // 중간 열을 위로 올려(6.6→5.4) 에이전트 서는 자리가 미팅룸(하단)과 겹치지 않게 한다(2026-07-23 정돈).
     const DESKS = [
       { x: 3, y: 2 }, { x: 9, y: 2 }, { x: 15, y: 2 },
-      { x: 3, y: 6.6 }, { x: 9, y: 6.6 }, { x: 15, y: 6.6 },
+      { x: 3, y: 5.4 }, { x: 9, y: 5.4 }, { x: 15, y: 5.4 },
     ];
     const COFFEE = { x: 156, y: 90 }; // 커피 코너(픽셀 좌표)
     const TABLE = { x: 78, y: 66 };   // 회의 테이블(장식용 소파존)
     // 미팅룸(2026-07-23) — 외부 방문자가 여기 앉아 보안총괄에게 지시하고, 보안총괄이 합석한다.
     // 유리 파티션으로 내부 업무존과 분리(외부인은 내부 책상에 직접 접근하지 않는다).
-    const MEETING = { x0: 44, y0: 74, x1: 104, y1: 94 };
-    const MTABLE = { x: 62, y: 82, w: 24, h: 6 }; // 미팅 테이블
-    // 방문자 좌석(테이블 아래·옆으로 줄지어) / 보안총괄 합석 위치(테이블 상단 헤드).
+    const MEETING = { x0: 40, y0: 74, x1: 116, y1: 95 };
+    const MTABLE = { x: 60, y: 84, w: 30, h: 6 }; // 미팅 테이블(넓힘)
+    // 방문자 좌석(테이블 아래로 넉넉히 벌려 겹침 방지) / 보안총괄 합석 위치(테이블 상단 헤드 중앙).
     function meetingSeat(slot) {
-      const seats = [{ x: 50, y: 90 }, { x: 62, y: 91 }, { x: 76, y: 91 }, { x: 90, y: 90 }, { x: 98, y: 88 }];
+      const seats = [{ x: 48, y: 92 }, { x: 64, y: 93 }, { x: 82, y: 93 }, { x: 98, y: 92 }, { x: 108, y: 90 }];
       return seats[slot % seats.length];
     }
-    function meetingHost() { return { x: MTABLE.x + 6, y: MTABLE.y - 3 }; }
+    function meetingHost() { return { x: MTABLE.x + MTABLE.w / 2 - 3, y: MTABLE.y - 4 }; }
     // 외부 콘솔 접속자(클라이언트): 오른쪽 벽 출입문으로 걸어 들어와 보안총괄(오케스트레이터)
     // 책상 옆으로 가서 지시한다 — 회의 테이블 합석에서 "보안총괄에게 직접 지시" 구도로 변경(2026-07-22).
     const DOOR = { x: W - 8, y: 46 };
@@ -374,9 +375,9 @@
       // 의자(상단 헤드=보안총괄, 하단=방문자)
       px(MTABLE.x + 5, MTABLE.y - 5, 4, 3, "#33405e");
       px(MTABLE.x + 4, MTABLE.y + MTABLE.h + 3, 4, 3, "#33405e"); px(MTABLE.x + 14, MTABLE.y + MTABLE.h + 3, 4, 3, "#33405e");
-      // 라벨
-      ctx.font = `bold ${3 * S}px 'Malgun Gothic',monospace`; ctx.fillStyle = "rgba(95,161,255,.85)";
-      ctx.fillText("🔒 MEETING", (m.x0 + 2) * S, (m.y0 + 5) * S);
+      // 라벨 — 방 상단 모서리(캐릭터·테이블과 겹치지 않게 작게)
+      ctx.font = `bold ${2.6 * S}px 'Malgun Gothic',monospace`; ctx.fillStyle = "rgba(95,161,255,.75)";
+      ctx.fillText("🔒 MEETING ROOM", (m.x0 + 2) * S, (m.y0 - 1.5) * S);
 
       // 출입문(프레임+명패) — 접속/퇴장 때 doorOpenT 동안 열린다
       px(DOOR.x - 1, DOOR.y - 1, 9, 18, T.deskEdge);
