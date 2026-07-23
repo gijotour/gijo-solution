@@ -68,6 +68,21 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .hcard .hd{font-size:11px;font-weight:700;margin-top:5px;}
 .hd.up{color:#f5928a;} .hd.down{color:#6fdcb5;} .hd.flat{color:var(--muted-2);}
 .hcard .hsub{font-size:10px;color:var(--muted-2);margin-top:3px;}
+/* 클릭 가능한 카드/타일 — 상단 KPI는 리포트 출력, AI 보안 타일은 화면 이동 */
+.hcard.clk{cursor:pointer;transition:border-color .12s,transform .12s;}
+.hcard.clk:hover{border-color:var(--blue);transform:translateY(-1px);}
+.tile.clk{cursor:pointer;transition:border-color .12s,transform .12s;}
+.tile.clk:hover{border-color:var(--purple);transform:translateY(-1px);}
+
+/* 📂 상세 지표 — 임원 요약 아래 전체 세부 지표를 접이식 한 판으로 통합(기본 접힘) */
+.detail-panel{max-width:1040px;margin-bottom:24px;border:1px solid var(--border);border-radius:12px;background:var(--panel-2);overflow:hidden;}
+.detail-title{font-size:14px;font-weight:800;color:#fff;padding:14px 18px;display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;}
+.detail-title:hover{color:var(--blue-light);}
+.detail-title .dcar{color:var(--blue-light);font-size:11px;font-weight:900;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.35);flex:0 0 auto;}
+.detail-title .dsub{font-size:11px;font-weight:500;color:var(--muted-2);margin-left:auto;}
+.detail-body{padding:8px 18px 18px;}
+.detail-body .cat{max-width:none;margin-bottom:20px;}
+.detail-panel.closed .detail-body{display:none;}
 
 /* 추세 */
 .trend-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;max-width:1040px;}
@@ -242,16 +257,19 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     var robust = a.avgRobustness == null ? '<span style="color:var(--muted-2);font-size:16px">미점검</span>' : a.avgRobustness + "점";
     var robustCol = a.avgRobustness == null ? "var(--muted)" : a.avgRobustness >= 70 ? "var(--teal)" : a.avgRobustness >= 40 ? "var(--amber)" : "#f5928a";
     var top = a.topRisk ? a.topRisk.code + " " + a.topRisk.title + " (" + a.topRisk.count + ")" : "미대응 없음";
-    var aiTile = function (label, value, color, sub) {
-      return '<div class="tile" style="border-color:rgba(139,124,240,.28)"><div class="t-label">' + label + '</div><div class="t-value"' + (color ? ' style="color:' + color + '"' : "") + ">" + value + "</div>" + (sub ? '<div style="font-size:10px;color:var(--muted-2);margin-top:4px">' + sub + "</div>" : "") + "</div>";
+    // 타일 클릭 → 관련 화면으로 이동(page). 마지막 인자에 이동 대상 화면을 지정.
+    var aiTile = function (label, value, color, sub, page) {
+      var attr = page ? ' data-page="' + page + '" class="tile clk"' : ' class="tile"';
+      var hint = page ? '<div style="font-size:9.5px;color:var(--blue-light);margin-top:4px">→ 자세히 보기</div>' : "";
+      return '<div' + attr + ' style="border-color:rgba(139,124,240,.28)"><div class="t-label">' + label + '</div><div class="t-value"' + (color ? ' style="color:' + color + '"' : "") + ">" + value + "</div>" + (sub ? '<div style="font-size:10px;color:var(--muted-2);margin-top:4px">' + sub + "</div>" : "") + hint + "</div>";
     };
     return (
-      '<div class="cat"><div class="cat-title">🤖 AI 보안 (OWASP LLM Top 10) <span style="font-size:9px;font-weight:800;padding:2px 8px;border-radius:20px;background:linear-gradient(90deg,#8b7cf0,#5fa1ff);color:#fff">차별점</span></div>' +
+      '<div class="cat"><div class="cat-title">🤖 AI 보안 (OWASP LLM Top 10)</div>' +
       '<div class="tiles">' +
-      aiTile("AI 자산", a.aiAssets, "#c9b8ff", "LLM·모델 자산") +
-      aiTile("OWASP LLM 미대응", a.owaspOpen, a.owaspOpen ? "#f5928a" : "var(--teal)", top) +
-      aiTile("AI-BOM 생성률", bomRate + "%", bomRate >= 80 ? "var(--teal)" : bomRate >= 40 ? "var(--amber)" : "#f5928a", a.aibomComplete + "/" + a.aiAssets + " 자산") +
-      aiTile("레드팀 견고성", robust, robustCol, a.redteamTested + "/" + a.aiAssets + " 점검됨") +
+      aiTile("AI 자산", a.aiAssets, "#c9b8ff", "LLM·모델 자산", "assethub.html") +
+      aiTile("OWASP LLM 미대응", a.owaspOpen, a.owaspOpen ? "#f5928a" : "var(--teal)", top, "assethub.html") +
+      aiTile("AI-BOM 생성률", bomRate + "%", bomRate >= 80 ? "var(--teal)" : bomRate >= 40 ? "var(--amber)" : "#f5928a", a.aibomComplete + "/" + a.aiAssets + " 자산", "sbom.html") +
+      aiTile("레드팀 견고성", robust, robustCol, a.redteamTested + "/" + a.aiAssets + " 점검됨", "redteam.html") +
       "</div></div>"
     );
   }
@@ -266,9 +284,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       const v = c.vulnerabilities || { hosts: 0, active: 0, critical: 0, high: 0, medium: 0, low: 0, kev: 0, newCount: 0, resurfaced: 0, newlyFixed: 0, remediationRate: 0 };
       const rem = c.remediation || { tasks: 0, open: 0, done: 0, overdue: 0, dueSoon: 0, slaCompliance: 100 };
 
-      root.innerHTML =
-        heroBlock(c, v, rem, series) +
-        aiSecurityBlock(c) +
+      // 세부 지표는 임원 요약(히어로·AI 보안) 아래 '📂 상세 지표' 한 판으로 묶어 기본 접힘.
+      const detailSections =
         `<div class="cat"><div class="cat-title">🖥 자산 위험도</div><div class="tiles">` +
         tile("전체 자산", c.assets.total) +
         tile("고위험", c.assets.highRisk, "#f5928a") +
@@ -343,48 +360,78 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         trendCard("SLA 준수율", series("remediation.slaCompliance"), "var(--teal)", "%") +
         trendCard("조치 기한 초과", series("remediation.overdue"), "#f5928a", "건") +
         `</div></div>`;
-      wireKpiCollapse();
+
+      root.innerHTML =
+        heroBlock(c, v, rem, series) +
+        aiSecurityBlock(c) +
+        `<div class="detail-panel closed" id="detailPanel">` +
+        `<div class="detail-title" id="detailToggle"><span class="dcar">▸</span>📂 상세 지표` +
+        `<span class="dsub">자산·취약점·점검·CTI·컴플라이언스·추세 전체 지표</span></div>` +
+        `<div class="detail-body">` + detailSections + `</div></div>`;
+      wireKpi();
     } catch (e) {
       root.innerHTML = '<div style="color:#f5928a">KPI를 불러오지 못했습니다: ' + String(e.message || e).replace(/</g, "&lt;") + "</div>";
     }
   }
 
-  // 접이식 — 제목 클릭으로 접기/펴기. 카드가 많아 기본은 접힘. 단 '번다운' 2섹션(취약점 번다운·
-  // 추세 조치 번다운)은 맨 위로 올리고 기본 펼침(핀)으로 둔다. 개별 선택은 저장.
-  // 상단 고정·기본 펼침 대상 = 추세 그래프 2섹션뿐(📉 취약점 번다운 · 📈 추세 조치 번다운).
-  // "🛡 취약점 조치 현황 (번다운)"에도 '번다운'이 들어가므로 이모지로 정확히 구분한다.
-  const isPinnedCat = (t) => t.indexOf("📉") >= 0 || t.indexOf("📈") >= 0 || t.indexOf("🤖") >= 0;
-  function wireKpiCollapse() {
+  // 렌더 후 상호작용 배선 — ① 상세 지표 아코디언(기본 접힘) ② 상단 KPI 카드 → 리포트 출력
+  // ③ AI 보안 타일 → 관련 화면 이동. (data-page 배선은 kpiRoot가 async로 채워지므로 여기서 다시 건다.)
+  function wireKpi() {
     const root = document.getElementById("kpiRoot");
-    // 최상단 고정 순서: 히어로 → 🤖 AI 보안 → 📉 번다운 → 📈 추세. (AI 보안은 렌더 시 이미 히어로
-    // 다음에 있으므로, 번다운·추세만 AI 보안 다음으로 끌어올린다.)
-    const catTitle = (c) => (c.querySelector(".cat-title") ? c.querySelector(".cat-title").textContent : "");
-    const aiCat = [...root.querySelectorAll(".cat")].find((c) => catTitle(c).indexOf("🤖") >= 0);
-    const hero = root.querySelector(".hero");
-    const anchor = aiCat ? aiCat.nextSibling : hero ? hero.nextSibling : root.firstChild;
-    [...root.querySelectorAll(".cat")]
-      .filter((c) => catTitle(c).indexOf("📉") >= 0 || catTitle(c).indexOf("📈") >= 0)
-      .reverse()
-      .forEach((c) => root.insertBefore(c, anchor));
-    let saved = {};
-    try { saved = JSON.parse(localStorage.getItem("gijo.kpi.collapsed") || "{}"); } catch (e) {}
-    root.querySelectorAll(".cat").forEach((cat) => {
-      const title = cat.querySelector(".cat-title");
-      if (!title) return;
-      const key = title.textContent.trim();
-      const pinned = isPinnedCat(key);
-      let collapsed = saved[key] != null ? saved[key] : !pinned; // 번다운은 기본 펼침, 그 외 기본 접힘
-      const caret = document.createElement("span");
-      caret.className = "kcar";
-      title.insertBefore(caret, title.firstChild);
-      const apply = () => { cat.classList.toggle("collapsed", collapsed); caret.textContent = collapsed ? "▸" : "▾"; };
+    const panel = document.getElementById("detailPanel");
+    const toggle = document.getElementById("detailToggle");
+    if (panel && toggle) {
+      let open = false;
+      try { open = localStorage.getItem("gijo.kpi.detailOpen") === "1"; } catch (e) {}
+      const car = toggle.querySelector(".dcar");
+      const apply = () => { panel.classList.toggle("closed", !open); if (car) car.textContent = open ? "▾" : "▸"; };
       apply();
-      title.addEventListener("click", () => {
-        collapsed = !collapsed; apply();
-        saved[key] = collapsed;
-        try { localStorage.setItem("gijo.kpi.collapsed", JSON.stringify(saved)); } catch (e) {}
+      toggle.addEventListener("click", () => {
+        open = !open; apply();
+        try { localStorage.setItem("gijo.kpi.detailOpen", open ? "1" : "0"); } catch (e) {}
       });
+    }
+    // 상단 임원 KPI 카드 — 클릭하면 리포트 출력 여부를 묻는다.
+    root.querySelectorAll(".hero .hcard").forEach((card) => {
+      card.classList.add("clk");
+      card.title = "클릭하면 현재 지표로 종합 보안 리포트를 생성합니다";
+      card.addEventListener("click", askReport);
     });
+    // AI 보안 타일 등 data-page 요소 → 해당 화면으로 이동.
+    root.querySelectorAll("[data-page]").forEach((el) => {
+      el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
+    });
+  }
+
+  let reportBusy = false;
+  async function askReport() {
+    if (reportBusy) return;
+    if (!window.confirm("리포트를 출력할까요?\n현재 보안 지표로 종합 리포트(온디맨드)를 생성합니다.")) return;
+    reportBusy = true;
+    toast("📄 종합 보안 리포트 생성 중… (수십 초 걸릴 수 있습니다)");
+    try {
+      await window.gijo.generateReport({ type: "ondemand", format: "both" });
+      toast("✅ 리포트 생성 완료 — 리포트 화면으로 이동합니다", 1500);
+      setTimeout(() => window.gijo.navigateTo("report.html"), 700);
+    } catch (e) {
+      toast("⚠ 리포트 생성 실패: " + String((e && e.message) || e), 4000);
+    } finally {
+      reportBusy = false;
+    }
+  }
+
+  function toast(msg, ms) {
+    let t = document.getElementById("kpiToast");
+    if (!t) {
+      t = document.createElement("div");
+      t.id = "kpiToast";
+      t.style.cssText = "position:fixed;right:24px;bottom:24px;background:var(--panel);border:1px solid var(--border-strong);color:var(--text);padding:12px 18px;border-radius:10px;font-size:13px;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.4);max-width:340px;line-height:1.5;";
+      document.body.appendChild(t);
+    }
+    t.textContent = msg;
+    t.style.display = "block";
+    clearTimeout(t._h);
+    if (ms) t._h = setTimeout(() => { t.style.display = "none"; }, ms);
   }
 
   function init() {
