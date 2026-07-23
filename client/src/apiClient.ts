@@ -722,7 +722,11 @@ export const analysisHubApi = {
       method: "POST",
       body: { filename, content },
     }),
+  attackPaths: () => request<{ paths: AttackPath[] }>("/api/analysis-hub/attack-paths"),
 };
+
+export interface AttackPathStep { kind: "entry" | "foothold" | "lateral"; entity: string; label: string; source: string; severity: string }
+export interface AttackPath { id: string; entity: string; reachability: "확인됨" | "높음" | "보통"; reachScore: number; steps: AttackPathStep[]; note: string }
 
 // ── LLM 브리지 / 채팅 ─────────────────────────────────────────────────
 export const bridgeApi = {
@@ -1376,9 +1380,13 @@ export const serviceImpactApi = {
 };
 
 // 자산 허브(자산 목록·AI-BOM·취약점 통합 뷰) — 서버 assethub.ts 집계.
+export interface ShadowModel { modelId: string; sources: string[]; running: boolean; usedByAgents: string[]; severity: "high" | "medium"; suggestion: string }
+export interface ShadowAiReport { scannedAt: string; observedCount: number; governedCount: number; shadow: ShadowModel[] }
+
 export const assetHubApi = {
   overview: () => request<AssetHubOverview>("/api/assethub"),
   detail: (id: string) => request<AssetHubDetail>(`/api/assethub/${encodeURIComponent(id)}`),
+  shadowAi: () => request<ShadowAiReport>("/api/shadow-ai"),
 };
 
 export const assetsApi = {

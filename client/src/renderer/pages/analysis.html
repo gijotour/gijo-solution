@@ -151,6 +151,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
           <div class="psub">같은 대상이 여러 소스에 걸쳐 나타난 교차 위험</div>
           <div id="corrList"></div>
         </div>
+        <div class="panel" id="pathPanel" style="margin-bottom:16px;display:none">
+          <div class="ph">🧭 공격 경로 · 도달성</div>
+          <div class="psub">관측된 신호로 구성한 진입→거점→인접 이동 경로 (침투테스트 아님)</div>
+          <div id="pathList"></div>
+        </div>
         <div class="panel ana">
           <div class="ph" id="anaTitle">항목을 선택하세요</div>
           <div id="anaBody"><div class="empty">좌측에서 위험 항목을 누르면 상세 분석이 표시됩니다.</div></div>
@@ -281,11 +286,30 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     list.innerHTML = data.correlations.slice(0,6).map(c => '<div class="corr">🔗 '+esc(c.note)+'</div>').join("");
   }
 
+  // ③ 공격 경로·도달성 — 별도 API. 경로가 있으면 패널 표시.
+  async function renderAttackPaths(){
+    const panel = document.getElementById("pathPanel");
+    const list = document.getElementById("pathList");
+    if(!panel||!list) return;
+    let paths=[];
+    try{ paths=(await window.gijo.analysisAttackPaths()).paths||[]; }catch(e){ panel.style.display="none"; return; }
+    if(!paths.length){ panel.style.display="none"; return; }
+    var reachColor={ "확인됨":"#f5928a", "높음":"#f7c777", "보통":"#8fb8ff" };
+    var kindLabel={ entry:"진입", foothold:"거점", lateral:"인접" };
+    list.innerHTML = paths.slice(0,6).map(function(p){
+      var chain=p.steps.map(function(s){ return '<span style="color:var(--muted-2)">'+kindLabel[s.kind]+'</span> '+esc(s.label); }).join(' <span style="color:var(--muted-2)">→</span> ');
+      return '<div class="corr" style="border-left:3px solid '+(reachColor[p.reachability]||"#8fb8ff")+'">'+
+        '<b style="color:'+(reachColor[p.reachability]||"#8fb8ff")+'">도달성 '+esc(p.reachability)+' · '+p.reachScore+'점</b> '+esc(p.entity)+
+        '<div style="font-size:11.5px;margin-top:4px;line-height:1.6">'+chain+'</div></div>';
+    }).join("");
+    panel.style.display="block";
+  }
+
   async function refresh(){
     try{
       await window.gijo.analysisRebuildVuln();       // 취약점 소스를 자산 findings에서 최신화
       data = await window.gijo.analysisEvents();
-      renderSummary(); renderList(); renderCorrelations();
+      renderSummary(); renderList(); renderCorrelations(); renderAttackPaths();
       if(selectedId) selectEvent(selectedId);
     }catch(e){ document.getElementById("riskList").innerHTML = '<div class="empty">불러오기 실패: '+esc(e.message||e)+'</div>'; }
   }
