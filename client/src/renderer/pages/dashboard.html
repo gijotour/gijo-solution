@@ -474,6 +474,7 @@
       <span id="homeLink" data-page="dashboard.html" title="대시보드로 이동" style="display:flex;align-items:center;gap:12px;cursor:pointer"><img src="https://gijo.ai/_nuxt/logo_gijo_white.CCh2YXJe.svg" alt="GIJO">
       <div class="app-title">GIJO AS</div></span>
       <div class="clock" id="clockEl">-</div>
+      <div id="updateChip" title="새 버전으로 업데이트" style="display:none;align-items:center;gap:5px;background:rgba(240,160,32,.15);border:1px solid rgba(240,160,32,.45);color:var(--amber);padding:3px 10px;border-radius:16px;font-size:11px;font-weight:800;cursor:pointer">⬆ 업데이트 <span id="updateChipVer"></span></div>
     </div>
     <div class="header-right">
       <div class="status-pill" id="statusPill"><span class="dot"></span>연결 확인 중<span class="beta-tag">LIVE</span></div>
@@ -673,6 +674,21 @@
       hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: true,
       year: "numeric", month: "2-digit", day: "2-digit",
     });
+  }
+
+  // 업데이트 알림 — 시계 옆 칩. 새 버전이 있으면 표시, 누르면 업데이트 화면으로.
+  async function checkUpdateChip() {
+    const chip = document.getElementById("updateChip");
+    if (!chip || !window.gijo.update || !window.gijo.update.checkForUpdate) return;
+    try {
+      const r = await window.gijo.update.checkForUpdate();
+      if (r && r.updateAvailable) {
+        const ver = r.latest && r.latest.version ? r.latest.version : "";
+        document.getElementById("updateChipVer").textContent = ver ? "v" + ver : "";
+        chip.style.display = "inline-flex";
+        chip.addEventListener("click", () => window.gijo.navigateTo("update.html"), { once: true });
+      }
+    } catch (e) {}
   }
 
   const PRIORITY_ORDER = { P0: 0, P1: 1, P2: 2, P3: 3 };
@@ -2107,6 +2123,7 @@
   async function init() {
     tick();
     setInterval(tick, 1000);
+    checkUpdateChip(); // 시계 옆 업데이트 알림(비차단)
     await loadUser();
     greet();
     // renderTeam을 먼저 끝내 agentsById를 채운다 — 협업 이력(loadCollaboration)·서버 카드가 표시 이름/수를 쓰도록.
