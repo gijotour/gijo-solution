@@ -154,8 +154,8 @@
     injectCss();
     var p = progress();
     var el = document.createElement("div");
-    // 페이지가 슬롯(#gijoObSlot — 대시보드 자산 탐색기의 GIJO AS Desktop 카드 아래)을 제공하면
-    // 거기 인라인으로, 없으면 기존 우하단 플로팅으로. 슬롯 스타일은 페이지 CSS(.ob-row)가 담당.
+    // 페이지가 슬롯(#gijoObSlot — 대시보드 탐색기 카드)을 제공하면 거기 인라인으로만 노출한다.
+    // 슬롯이 없는 화면(대시보드 외 메뉴)에서는 시작 가이드를 띄우지 않는다. 슬롯 스타일은 페이지 CSS(.ob-row).
     var slot = document.getElementById("gijoObSlot");
     if (slot) {
       el.id = "gijoObLauncher";
@@ -173,10 +173,8 @@
       slot.appendChild(el);
       return;
     }
-    el.id = "gijoObLauncher";
-    el.innerHTML = p.done >= p.total ? "가이드 완료 ✓" : "🚀 시작 가이드 <b>" + p.done + "/" + p.total + "</b>";
-    el.addEventListener("click", open);
-    document.body.appendChild(el);
+    // 슬롯이 없는 화면(=대시보드가 아닌 메뉴)에서는 시작 가이드를 노출하지 않는다.
+    // (요청: 시작 가이드는 대시보드에만 표시)
   }
 
   // ── 코치마크(C안): 첫 방문 시 핵심 지점에 말풍선 1개. 강요 없이, 닫으면 다시 안 뜬다. ──
