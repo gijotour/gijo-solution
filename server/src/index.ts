@@ -20,6 +20,8 @@ import { stopLocalEngine, stopEmbeddingEngine, autoStartLocalEngines, startEmbed
 import { startHardeningScheduler, stopHardeningScheduler } from "./engine/hardeningtargets";
 import { startReportScheduler, stopReportScheduler } from "./engine/reportschedule";
 import { startBackupScheduler, stopBackupScheduler } from "./engine/backup";
+import { startEventLifecycleScheduler, stopEventLifecycleScheduler } from "./engine/analysishub";
+import { startSiemForwarding } from "./engine/siem";
 import { refreshKev } from "./engine/kev";
 import { bootstrapDocsBundleWithRetry } from "./engine/docsbundle";
 import { bootSmtpInboundIfEnabled, stopSmtpInbound } from "./engine/smtpinbound";
@@ -68,6 +70,8 @@ httpServer.listen(PORT, () => {
   startHardeningScheduler(); // 원격 SSH 정기점검 — 만기된 스케줄을 주기적으로 실행(LLM 무관·경량)
   startReportScheduler(); // 정기 리포트(주간/분기) 자동 생성 — 만기된 스케줄을 주기적으로 실행
   startBackupScheduler(); // 자동 백업(하루 1회 + 최근 7개 보관) — 재해복구 시점 상시 확보
+  startEventLifecycleScheduler(); // 이벤트 생애주기 — 해결 후 90일 지난 이벤트 자동 정리
+  startSiemForwarding(); // SIEM 아웃바운드 — 감사 이벤트를 고객 SIEM으로 전달(설정 켜진 경우만)
   // CISA KEV 목록을 백그라운드로 최신화(공개 피드 다운로드 — 실패해도 캐시로 동작).
   void refreshKev()
     .then((s) => console.log(`[kev] KEV 목록 ${s.count}건 (${s.source})`))

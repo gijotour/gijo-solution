@@ -939,6 +939,13 @@ export const smtpInboundApi = {
   getStatus: () => request<SmtpInboundStatus>("/api/smtp-inbound/status"),
 };
 
+export interface SiemConfig { enabled: boolean; host: string; port: number; format: "rfc5424" | "cef"; minSeverity: "info" | "high" | "critical" }
+export const siemApi = {
+  getConfig: () => request<SiemConfig>("/api/siem/config"),
+  saveConfig: (config: Partial<SiemConfig>) => request<SiemConfig>("/api/siem/config", { method: "POST", body: config }),
+  test: () => request<{ sent: boolean; format: string; target: string }>("/api/siem/test", { method: "POST" }),
+};
+
 // ── SBOM ─────────────────────────────────────────────────────────────
 export const sbomApi = {
   generate: (assetId: string) => request(`/api/sbom/${assetId}/generate`, { method: "POST" }),

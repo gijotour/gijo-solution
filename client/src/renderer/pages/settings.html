@@ -254,6 +254,43 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div class="panel-sub" id="smtpInStatusInfo" style="margin-top:10px"></div>
     </div>
 
+    <div class="panel" id="siemPanel" style="display:none">
+      <div class="panel-title">📡 SIEM 연동 (아웃바운드) <i class="gijo-info" data-topic="SIEM"></i><span class="badge b-purple" style="margin-left:8px">admin 전용</span></div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);margin-bottom:14px;cursor:pointer">
+        <input type="checkbox" id="siemEnabledInput" style="width:auto">GIJO 보안 이벤트를 SIEM으로 전달(syslog)
+      </label>
+      <div class="field-row">
+        <div class="field">
+          <label for="siemHostInput">SIEM 수집 서버 주소</label>
+          <input id="siemHostInput" placeholder="예: 10.0.1.20 (Splunk·QRadar 등)">
+        </div>
+        <div class="field" style="max-width:110px">
+          <label for="siemPortInput">포트</label>
+          <input id="siemPortInput" placeholder="514" type="number">
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field" style="max-width:180px">
+          <label for="siemFormatInput">포맷</label>
+          <select id="siemFormatInput" style="width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px">
+            <option value="rfc5424">RFC 5424 syslog</option>
+            <option value="cef">CEF (ArcSight·Splunk)</option>
+          </select>
+        </div>
+        <div class="field" style="max-width:180px">
+          <label for="siemMinSevInput">전송 최소 수준</label>
+          <select id="siemMinSevInput" style="width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px">
+            <option value="info">모두(info 이상)</option>
+            <option value="high">high 이상</option>
+            <option value="critical">critical만</option>
+          </select>
+        </div>
+      </div>
+      <button class="btn-primary" id="saveSiemBtn">저장</button>
+      <button class="btn-ghost" id="testSiemBtn">테스트 전송</button>
+      <div class="status-line" id="siemStatusLine"></div>
+    </div>
+
     <div class="panel" id="cloudLlmPanel" style="display:none">
       <div class="panel-title">☁ 클라우드 LLM (선택) <span class="badge b-purple" style="margin-left:8px">admin 전용</span></div>
       <div class="panel-sub">
@@ -333,9 +370,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         document.getElementById("userManagementPanel").style.display = "";
         document.getElementById("cloudLlmPanel").style.display = "";
         document.getElementById("smtpInboundPanel").style.display = "";
+        document.getElementById("siemPanel").style.display = "";
         await loadUserList();
         await loadCloudConfig();
         await loadSmtpInboundConfig();
+        await loadSiemConfig();
       }
     } catch (e) {}
   }
@@ -597,6 +636,40 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         : status.lastError ? `중지됨 · 오류: ${status.lastError}` : "중지됨";
     } catch (e) {}
   }
+  // ── SIEM 아웃바운드 커넥터 ──
+  async function loadSiemConfig() {
+    try {
+      const c = await window.gijo.getSiemConfig();
+      document.getElementById("siemEnabledInput").checked = c.enabled;
+      document.getElementById("siemHostInput").value = c.host || "";
+      document.getElementById("siemPortInput").value = c.port || 514;
+      document.getElementById("siemFormatInput").value = c.format || "rfc5424";
+      document.getElementById("siemMinSevInput").value = c.minSeverity || "info";
+    } catch (e) {}
+  }
+  async function saveSiem() {
+    const line = document.getElementById("siemStatusLine");
+    try {
+      await window.gijo.saveSiemConfig({
+        enabled: document.getElementById("siemEnabledInput").checked,
+        host: document.getElementById("siemHostInput").value.trim(),
+        port: Number(document.getElementById("siemPortInput").value || 514),
+        format: document.getElementById("siemFormatInput").value,
+        minSeverity: document.getElementById("siemMinSevInput").value,
+      });
+      line.textContent = "✓ 저장되었습니다."; line.className = "status-line status-ok";
+    } catch (e) { line.textContent = "✗ 저장 실패: " + e.message; line.className = "status-line status-err"; }
+  }
+  async function testSiem() {
+    const line = document.getElementById("siemStatusLine");
+    line.textContent = "테스트 전송 중…"; line.className = "status-line";
+    try {
+      const r = await window.gijo.testSiem();
+      line.textContent = r.sent ? `✓ ${r.target}로 ${r.format} 샘플 전송함 — SIEM에서 수신 확인하세요` : "✗ 전송 실패(주소·포트·네트워크 확인)";
+      line.className = "status-line " + (r.sent ? "status-ok" : "status-err");
+    } catch (e) { line.textContent = "✗ 테스트 실패: " + e.message; line.className = "status-line status-err"; }
+  }
+
   async function saveSmtpInbound() {
     const line = document.getElementById("smtpInStatusLine");
     const config = {
@@ -693,6 +766,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.getElementById("tierManualBtn").addEventListener("click", () => applyTier(document.getElementById("tierManualSelect").value));
     document.getElementById("saveSmtpBtn").addEventListener("click", saveSmtp);
     document.getElementById("saveSmtpInBtn").addEventListener("click", saveSmtpInbound);
+    document.getElementById("saveSiemBtn").addEventListener("click", saveSiem);
+    document.getElementById("testSiemBtn").addEventListener("click", testSiem);
     document.getElementById("saveCloudBtn").addEventListener("click", saveCloud);
     document.getElementById("cloudProviderSelect").addEventListener("change", syncCloudProviderFields);
     document.getElementById("changeMyPasswordBtn").addEventListener("click", changeMyPassword);

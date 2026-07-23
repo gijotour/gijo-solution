@@ -85,6 +85,47 @@ export function setEventStatus(eventId: string, status: EventStatus, note = "", 
   setStatusStmt.run({ eventId, status, note, at: Date.now(), by });
 }
 
+// ── 이벤트 생애주기(2026-07-23): 보관·자동정리 ──────────────────────────────
+// 이벤트가 무한정 쌓이면 조회가 느려지고 "지금 위험한 것"이 옛 완료건에 묻힌다. 해결(완료/무시)된
+// 이벤트를 처리 후 N일 지나면 정리한다. 미해결(open/ack/inprogress)은 절대 지우지 않는다(놓침 방지).
+// 취약점(vuln)은 rebuildVulnEvents가 자산 findings에서 재생성하므로 정리 대상에서 제외한다.
+const EVENT_RETENTION_DAYS = Number(process.env.GIJO_EVENT_RETENTION_DAYS ?? 90);
+const deleteEventStmt = db.prepare("DELETE FROM analysis_events WHERE id = ?");
+const deleteStatusStmt = db.prepare("DELETE FROM analysis_event_status WHERE eventId = ?");
+
+export function pruneResolvedEvents(retentionDays = EVENT_RETENTION_DAYS): number {
+  const cutoff = Date.now() - retentionDays * 86400_000;
+  // 해결 상태 + 상태변경 시각이 cutoff보다 오래된 것. status 테이블의 at을 처리시각으로 본다.
+  const rows = db
+    .prepare(
+      `SELECT s.eventId AS id FROM analysis_event_status s
+       JOIN analysis_events e ON e.id = s.eventId
+       WHERE s.status IN ('done','ignored') AND s.at < ? AND e.source != 'vuln'`
+    )
+    .all(cutoff) as { id: string }[];
+  const tx = db.transaction((ids: { id: string }[]) => {
+    for (const { id } of ids) {
+      deleteEventStmt.run(id);
+      deleteStatusStmt.run(id);
+    }
+  });
+  tx(rows);
+  if (rows.length) console.log(`[analysis-hub] 생애주기 정리: 해결 후 ${retentionDays}일 지난 이벤트 ${rows.length}건 삭제`);
+  return rows.length;
+}
+
+let lifecycleTimer: NodeJS.Timeout | null = null;
+export function startEventLifecycleScheduler(): void {
+  if (lifecycleTimer) return;
+  const tick = () => { try { pruneResolvedEvents(); } catch (e) { console.warn(`[analysis-hub] 생애주기 정리 실패: ${e instanceof Error ? e.message : String(e)}`); } };
+  lifecycleTimer = setInterval(tick, 24 * 3600_000);
+  if (lifecycleTimer.unref) lifecycleTimer.unref();
+  console.log(`[analysis-hub] 이벤트 생애주기 스케줄러 시작 (해결 후 ${EVENT_RETENTION_DAYS}일 보관)`);
+}
+export function stopEventLifecycleScheduler(): void {
+  if (lifecycleTimer) { clearInterval(lifecycleTimer); lifecycleTimer = null; }
+}
+
 interface EventRow extends Omit<AnalysisEvent, "signals" | "status" | "statusNote"> {
   signals: string;
 }

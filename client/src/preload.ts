@@ -267,6 +267,9 @@ const gijoApi = {
   getSmtpInboundConfig: () => api.smtpInboundApi.getConfig(),
   saveSmtpInboundConfig: (config: { enabled: boolean; port: number; allowedIpsText?: string }) => api.smtpInboundApi.saveConfig(config),
   getSmtpInboundStatus: () => api.smtpInboundApi.getStatus(),
+  getSiemConfig: () => api.siemApi.getConfig(),
+  saveSiemConfig: (config: Partial<import("./apiClient").SiemConfig>) => api.siemApi.saveConfig(config),
+  testSiem: () => api.siemApi.test(),
   sendReportEmail: (to: string[], subject: string, attachmentPath: string) =>
     api.emailApi.sendReport(to, subject, attachmentPath),
 
