@@ -7,7 +7,8 @@ import type { Express, Request } from "express";
 import * as bcrypt from "bcryptjs";
 import * as crypto from "crypto";
 import { db } from "../db";
-import { authMiddleware, adminMiddleware } from "./auth";
+import { authMiddleware, adminMiddleware, revokeUserSession, listActiveSessions } from "./auth";
+import { recordAudit } from "../engine/audit";
 
 export interface GijoUser {
   id: string;
@@ -95,6 +96,19 @@ export function deleteUser(id: string): void {
 export function changePassword(id: string, newPassword: string): void {
   if (!getByIdStmt.get(id)) throw new Error("존재하지 않는 계정입니다");
   updatePasswordStmt.run(bcrypt.hashSync(newPassword, 10), id);
+}
+
+const updateRoleStmt = db.prepare("UPDATE users SET role = ? WHERE id = ?");
+// 역할 변경(admin ↔ security_officer). 마지막 관리자를 담당자로 강등하는 건 막는다(잠금 방지).
+export function updateUserRole(id: string, role: GijoUser["role"]): GijoUserPublic {
+  const row = getByIdStmt.get(id) as UserRow | undefined;
+  if (!row) throw new Error("존재하지 않는 계정입니다");
+  if (role !== "admin" && role !== "security_officer") throw new Error("역할은 admin·security_officer 중 하나여야 합니다");
+  if (row.role === "admin" && role !== "admin" && (countAdminsStmt.get() as { n: number }).n <= 1) {
+    throw new Error("마지막 관리자 계정은 역할을 바꿀 수 없습니다");
+  }
+  updateRoleStmt.run(role, id);
+  return toPublic(getByIdStmt.get(id) as UserRow);
 }
 
 export function listUsers(): GijoUserPublic[] {
@@ -208,9 +222,41 @@ export function registerUsersRoutes(app: Express): void {
     try {
       validatePassword(password);
       changePassword(targetId, password);
+      // 관리자가 남의 비번을 초기화하면 그 사용자의 세션을 끊는다(초기화 후 재로그인 강제).
+      if (requester?.id !== targetId) {
+        revokeUserSession(targetId);
+        recordAudit({ kind: "config", actor: requester?.displayName ?? null, action: "비밀번호 초기화(관리자)", target: targetId });
+      }
       res.json({ ok: true });
     } catch (err) {
       res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
     }
+  });
+
+  // 역할 변경 — 관리자 전용. 마지막 관리자 강등은 updateUserRole이 막는다.
+  app.post("/api/users/:id/role", authMiddleware, adminMiddleware, (req, res) => {
+    const targetId = String(req.params.id);
+    const requester = (req as Request & { user?: GijoUser }).user;
+    try {
+      const updated = updateUserRole(targetId, (req.body as { role: GijoUser["role"] }).role);
+      recordAudit({ kind: "config", actor: requester?.displayName ?? null, action: `역할 변경 → ${updated.role}`, target: targetId });
+      res.json(updated);
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+
+  // 관리자용 접속 세션 목록 — 누가·어디서(IP)·언제부터 접속 중인지. (팀 사무실 presence와 같은 데이터)
+  app.get("/api/users/sessions", authMiddleware, adminMiddleware, (_req, res) => {
+    res.json(listActiveSessions());
+  });
+
+  // 세션 강제 종료 — 관리자가 특정 사용자의 접속을 원격으로 끊는다(유령·의심 세션 정리).
+  app.post("/api/users/:id/terminate-session", authMiddleware, adminMiddleware, (req, res) => {
+    const targetId = String(req.params.id);
+    const requester = (req as Request & { user?: GijoUser }).user;
+    const ended = revokeUserSession(targetId);
+    if (ended) recordAudit({ kind: "auth", actor: requester?.displayName ?? null, action: "세션 강제 종료(관리자)", target: targetId });
+    res.json({ terminated: ended });
   });
 }

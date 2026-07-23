@@ -395,13 +395,25 @@ async function logoutOnQuit(): Promise<void> {
       try {
         const u = new URL(`${authState.serverUrl}/api/auth/logout`);
         const lib = u.protocol === "https:" ? https : http;
+        // 세션은 refresh token으로 식별·정리되므로 반드시 본문에 실어 보낸다. 예전엔 access token 헤더만
+        // 보내 서버가 revoke할 refresh token을 못 받아, 창을 닫아도 세션이 안 끊기던 버그(2026-07-23 수정).
+        const body = JSON.stringify({ refreshToken: authState.refreshToken });
         const req = lib.request(
           u,
-          { method: "POST", headers: { Authorization: `Bearer ${authState.accessToken}` }, timeout: 3000 },
+          {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${authState.accessToken}`,
+              "Content-Type": "application/json",
+              "Content-Length": Buffer.byteLength(body),
+            },
+            timeout: 3000,
+          },
           (res) => { res.on("data", () => {}); res.on("end", () => resolve()); }
         );
         req.on("error", () => resolve());
         req.on("timeout", () => { req.destroy(); resolve(); });
+        req.write(body);
         req.end();
       } catch { resolve(); }
     });

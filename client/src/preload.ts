@@ -29,6 +29,9 @@ const gijoApi = {
     api.usersApi.create(args),
   deleteUser: (id: string) => api.usersApi.remove(id),
   changeUserPassword: (id: string, password: string) => api.usersApi.changePassword(id, password),
+  setUserRole: (id: string, role: "security_officer" | "admin") => api.usersApi.setRole(id, role),
+  listSessions: () => api.usersApi.sessions(),
+  terminateUserSession: (id: string) => api.usersApi.terminateSession(id),
 
   // 네비게이션(렌더러 내 페이지 전환은 메인 프로세스에 위임)
   navigateTo: (page: string) => ipcRenderer.invoke("navigate:to", page),

@@ -60,6 +60,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .user-row-sub{font-size:11px;color:var(--muted-2);margin-top:2px;}
 .user-row-del{color:#f5928a;font-size:12px;font-weight:700;cursor:pointer;}
 .user-row-del.disabled{color:var(--muted-2);cursor:default;}
+.ua-btn{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid var(--border-strong);color:var(--muted);cursor:pointer;white-space:nowrap;}
+.ua-btn:hover{color:#fff;border-color:var(--blue);}
+.ua-btn.danger{border-color:rgba(226,72,61,.5);color:#f5928a;}
+.ua-btn.danger:hover{border-color:var(--red);}
+.ua-btn.dis{color:var(--muted-2);border-color:var(--border);cursor:default;}
 .footer{margin-top:8px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted-2);}
 .footer img{height:16px;opacity:0.6;}
 .header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2);}
@@ -401,28 +406,58 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
   const ROLE_LABEL = { admin: "관리자", security_officer: "담당자" };
 
+  // 계정 관리(A안) — 계정 목록에 접속 상태·역할·비번초기화·세션종료·삭제를 통합.
   async function loadUserList() {
     const box = document.getElementById("userListBox");
     try {
       const users = await window.gijo.listUsers();
+      let sessions = [];
+      try { sessions = await window.gijo.listSessions(); } catch (e) {}
+      const online = {};
+      sessions.forEach((s) => { online[s.userId] = s; });
       box.innerHTML = users
         .map((u) => {
           const isSelf = currentUser && u.id === currentUser.id;
-          const delAction = isSelf
-            ? `<span class="user-row-del disabled">본인 계정</span>`
-            : `<span class="user-row-del" data-del-user="${u.id}">삭제</span>`;
+          const s = online[u.id];
+          const dot = s ? '<span style="color:var(--teal)">●</span>' : '<span style="color:var(--muted-2)">○</span>';
+          const sub = s ? `${u.username} · ${s.ip || "-"} · 접속 중` : `${u.username} · 오프라인`;
+          const roleBtn = `<span class="ua-btn" data-role="${u.id}" data-cur="${u.role}" title="역할 변경">역할↔</span>`;
+          const pwBtn = isSelf ? "" : `<span class="ua-btn" data-pw="${u.id}" title="비밀번호 초기화">비번↺</span>`;
+          const termBtn = s && !isSelf ? `<span class="ua-btn danger" data-term="${u.id}" title="세션 강제 종료">세션종료</span>` : "";
+          const delBtn = isSelf ? '<span class="ua-btn dis">본인</span>' : `<span class="ua-btn danger" data-del-user="${u.id}">삭제</span>`;
           return `<div class="user-row">
-            <div>
-              <div class="user-row-name">${u.displayName} <span class="badge ${u.role === "admin" ? "b-purple" : "b-teal"}" style="margin-left:4px">${ROLE_LABEL[u.role] || u.role}</span></div>
-              <div class="user-row-sub">${u.username}</div>
+            <div style="display:flex;align-items:center;gap:8px">${dot}
+              <div><div class="user-row-name">${u.displayName} <span class="badge ${u.role === "admin" ? "b-purple" : "b-teal"}" style="margin-left:4px">${ROLE_LABEL[u.role] || u.role}</span></div>
+              <div class="user-row-sub">${sub}</div></div>
             </div>
-            ${delAction}
+            <div style="display:flex;gap:5px;align-items:center">${roleBtn}${pwBtn}${termBtn}${delBtn}</div>
           </div>`;
         })
         .join("");
     } catch (e) {
       box.innerHTML = '<div style="color:var(--muted)">계정 목록을 불러오지 못했습니다</div>';
     }
+  }
+
+  async function setUserRoleRow(id, cur) {
+    const line = document.getElementById("userManagementStatusLine");
+    const next = cur === "admin" ? "security_officer" : "admin";
+    if (!confirm(`역할을 ${ROLE_LABEL[next] || next}(으)로 변경할까요?`)) return;
+    try { await window.gijo.setUserRole(id, next); await loadUserList(); line.textContent = "✓ 역할이 변경되었습니다."; line.className = "status-line status-ok"; }
+    catch (e) { line.textContent = "✗ 역할 변경 실패: " + e.message; line.className = "status-line status-err"; }
+  }
+  async function resetUserPw(id) {
+    const line = document.getElementById("userManagementStatusLine");
+    const pw = prompt("새 비밀번호(8자 이상) — 초기화하면 해당 사용자의 세션이 끊깁니다");
+    if (!pw) return;
+    try { await window.gijo.changeUserPassword(id, pw); await loadUserList(); line.textContent = "✓ 비밀번호를 초기화했습니다(세션 종료됨)."; line.className = "status-line status-ok"; }
+    catch (e) { line.textContent = "✗ 초기화 실패: " + e.message; line.className = "status-line status-err"; }
+  }
+  async function terminateSessionRow(id) {
+    const line = document.getElementById("userManagementStatusLine");
+    if (!confirm("이 사용자의 접속 세션을 강제로 종료할까요?")) return;
+    try { const r = await window.gijo.terminateUserSession(id); await loadUserList(); line.textContent = r.terminated ? "✓ 세션을 종료했습니다." : "종료할 활성 세션이 없습니다."; line.className = "status-line status-ok"; }
+    catch (e) { line.textContent = "✗ 종료 실패: " + e.message; line.className = "status-line status-err"; }
   }
 
   async function addUser() {
@@ -773,8 +808,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.getElementById("changeMyPasswordBtn").addEventListener("click", changeMyPassword);
     document.getElementById("addUserBtn").addEventListener("click", addUser);
     document.getElementById("userListBox").addEventListener("click", (e) => {
-      const id = e.target.dataset.delUser;
-      if (id) deleteUserRow(id);
+      const t = e.target;
+      if (t.dataset.delUser) deleteUserRow(t.dataset.delUser);
+      else if (t.dataset.role) setUserRoleRow(t.dataset.role, t.dataset.cur);
+      else if (t.dataset.pw) resetUserPw(t.dataset.pw);
+      else if (t.dataset.term) terminateSessionRow(t.dataset.term);
     });
     document.getElementById("logoutBtn").addEventListener("click", logout);
     document.getElementById("settingsBtn").addEventListener("click", () => {}); // 이미 설정 화면

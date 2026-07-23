@@ -21,6 +21,13 @@ if (process.env.NODE_ENV === "production" && !process.env.GIJO_JWT_SECRET) {
 const JWT_SECRET = process.env.GIJO_JWT_SECRET ?? "gijo-as-dev-secret-change-me";
 const ACCESS_TOKEN_TTL = process.env.GIJO_ACCESS_TOKEN_TTL ?? "15m";
 const REFRESH_TOKEN_TTL_MS = Number(process.env.GIJO_REFRESH_TOKEN_TTL_MS ?? 7 * 24 * 60 * 60 * 1000); // 7일
+// 유휴 타임아웃 — 마지막 활동 후 이 시간이 지나면 세션을 만료로 본다(0이면 비활성). 기본 30분.
+// 창 닫기 로그아웃과 별개의 방어선: 종료 신호를 못 받아 유령 세션이 남아도 유휴로 자동 소멸한다.
+const IDLE_TIMEOUT_MS = Number(process.env.GIJO_IDLE_TIMEOUT_MS ?? 30 * 60 * 1000);
+export function isIdleExpired(lastSeenAt: number): boolean {
+  return IDLE_TIMEOUT_MS > 0 && Date.now() - lastSeenAt > IDLE_TIMEOUT_MS;
+}
+export function idleTimeoutMs(): number { return IDLE_TIMEOUT_MS; }
 
 interface RefreshRecord {
   userId: string;
@@ -109,13 +116,22 @@ function revokeRefreshToken(token: string): void {
   }
 }
 
+// 관리자 원격 종료 — 특정 사용자의 활성 세션을 강제로 끊는다(유령 세션·의심 세션 정리·계정 잠금).
+export function revokeUserSession(userId: string): boolean {
+  const token = activeSessionByUser.get(userId);
+  if (!token) return false;
+  revokeRefreshToken(token);
+  return true;
+}
+
 // 이 userId로 아직 만료되지 않은 세션이 살아 있는지 — 로그인 중복 여부 판단 기준.
 function findActiveSession(userId: string): string | undefined {
   const token = activeSessionByUser.get(userId);
   if (!token) return undefined;
   const record = refreshTokens.get(token);
-  if (!record || record.expiresAt < Date.now()) {
-    activeSessionByUser.delete(userId);
+  // 만료(TTL) 또는 유휴 초과면 세션 없음으로 본다 — 중복로그인 판정에서 유령 세션이 막지 않게.
+  if (!record || record.expiresAt < Date.now() || isIdleExpired(record.lastSeenAt)) {
+    if (token) revokeRefreshToken(token);
     return undefined;
   }
   return token;
@@ -136,7 +152,7 @@ export function listActiveSessions(): ActiveSessionInfo[] {
   const out: ActiveSessionInfo[] = [];
   for (const [userId, token] of activeSessionByUser) {
     const record = refreshTokens.get(token);
-    if (!record || record.expiresAt < Date.now()) continue;
+    if (!record || record.expiresAt < Date.now() || isIdleExpired(record.lastSeenAt)) continue;
     const user = findUserById(userId);
     if (!user) continue;
     out.push({
@@ -233,6 +249,12 @@ export function registerAuthRoutes(app: Express): void {
     if (record.expiresAt < Date.now()) {
       refreshTokens.delete(refreshToken);
       res.status(401).json({ error: "refresh token expired" });
+      return;
+    }
+    // 유휴 타임아웃 — 마지막 활동 후 오래 방치된 세션은 갱신을 거부한다(재로그인 유도).
+    if (isIdleExpired(record.lastSeenAt)) {
+      revokeRefreshToken(refreshToken);
+      res.status(401).json({ error: "session_idle_expired", message: "오래 사용하지 않아 세션이 만료되었습니다. 다시 로그인하세요." });
       return;
     }
     // 다른 곳에서 강제 로그인해 이 세션이 대체됐는지 — activeSessionByUser가 갈아 끼워져 있다.

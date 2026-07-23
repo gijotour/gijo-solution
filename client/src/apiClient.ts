@@ -1179,7 +1179,13 @@ export const usersApi = {
   remove: (id: string) => request(`/api/users/${id}`, { method: "DELETE" }),
   changePassword: (id: string, password: string) =>
     request(`/api/users/${id}/password`, { method: "POST", body: { password } }),
+  setRole: (id: string, role: "security_officer" | "admin") =>
+    request<GijoUserPublic>(`/api/users/${id}/role`, { method: "POST", body: { role } }),
+  sessions: () => request<ActiveSessionInfo[]>("/api/users/sessions"),
+  terminateSession: (id: string) => request<{ terminated: boolean }>(`/api/users/${id}/terminate-session`, { method: "POST" }),
 };
+
+export interface ActiveSessionInfo { userId: string; username: string; displayName: string; role: "security_officer" | "admin"; ip: string | null; since: number; lastSeenAt: number }
 
 // ── 서버 로그 ─────────────────────────────────────────────────────────
 export interface LogEntry {
