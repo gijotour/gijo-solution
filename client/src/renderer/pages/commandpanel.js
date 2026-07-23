@@ -34,7 +34,9 @@
       ".gcp-ah:hover{background:#16213b;}" +
       ".gcp-car{color:var(--blue-light,#7ab0ff);font-size:11px;font-weight:900;width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:6px;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.35);flex:0 0 auto;}" +
       ".gcp-at{font-size:12px;font-weight:800;color:#fff;}" +
-      ".gcp-sessions{flex:0 0 auto;}.gcp-sessions .gcp-ab{max-height:180px;overflow-y:auto;}" +
+      // 세션 영역이 패널 높이를 전부 쓴다 — 예전 지휘콘솔+세션 아코디언 시절의 max-height:180px가
+      // 세션 전용 드로어에 남아 목록 하단이 잘렸다(2026-07-23 실측: 패널 900px에 목록 163px).
+      ".gcp-sessions{flex:1 1 auto;min-height:0;}.gcp-sessions .gcp-ab{flex:1 1 auto;min-height:0;overflow-y:auto;}" +
       ".gcp-console{flex:1 1 auto;min-height:0;}" +
       ".gcp-ab{display:flex;flex-direction:column;min-height:0;overflow:hidden;}" +
       ".gcp-acc.collapsed .gcp-ab{display:none;}" +
