@@ -93,7 +93,8 @@
   /* 실측(2026-07-22): 부모 grid에 높이 제약이 없어 flex:1이 무제한으로 늘어나 91개 항목이 스크롤
      없이 전부 펼쳐져 있었다(4475px). 행을 sessions.html과 동일한 .srow로 통일한 뒤 재실측한
      행높이 49px×14 = 686px로 캡 — "14개 정도 보이게" + 두 화면 디자인 통일(사용자 요청). */
-  .dash-slist{flex:1;max-height:686px;overflow-y:auto;padding:2px 8px 8px;}
+  /* 세션 목록은 내용만큼(최대 686px), 남는 세로 공간은 아래 사무실 LIVE가 채운다. */
+  .dash-slist{flex:0 1 auto;max-height:686px;overflow-y:auto;padding:2px 8px 8px;}
   /* 세션 행 — sessions.html(작업 세션 열기 화면)의 .srow와 동일한 클래스·스타일을 그대로 써서
      대시보드 패널과 전체 화면이 "동일하게" 보이도록 통일했다(사용자 지적, 2026-07-22:
      두 화면의 세션 행 디자인이 서로 달랐음). */
@@ -121,6 +122,19 @@
   .dash-sdel:hover{opacity:1;color:#f5928a;background:rgba(226,72,61,.12);}
   .dash-sfull{padding:9px 12px;border-top:1px solid var(--border);font-size:11px;color:var(--blue-light);font-weight:700;cursor:pointer;text-align:center;}
   .dash-sfull:hover{background:var(--panel-2);}
+  /* 🏢 보안팀 사무실 LIVE — 작업 세션 패널 하단 남는 공간. 협업 이벤트(대화)를 실시간으로. */
+  .dash-office-live{flex:1 1 auto;min-height:110px;border-top:1px solid var(--border);display:flex;flex-direction:column;}
+  .dol-head{display:flex;align-items:center;gap:6px;padding:9px 12px 6px;font-size:11.5px;font-weight:800;color:var(--text);cursor:pointer;}
+  .dol-head:hover{color:#fff;}
+  .dol-live{font-size:8.5px;font-weight:800;color:var(--teal);border:1px solid rgba(30,185,128,.5);border-radius:8px;padding:1px 6px;position:relative;}
+  .dol-live::before{content:"";display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--teal);margin-right:4px;vertical-align:middle;animation:dolpulse 1.4s infinite;}
+  @keyframes dolpulse{0%,100%{opacity:1}50%{opacity:.3}}
+  .dol-feed{flex:1 1 auto;min-height:0;overflow-y:auto;padding:2px 12px 10px;}
+  .dol-empty{font-size:10.5px;color:var(--muted-2);padding:6px 2px;line-height:1.6;}
+  .dol-line{padding:4px 0;border-bottom:1px solid var(--border);animation:dolup .25s;}
+  @keyframes dolup{from{transform:translateY(4px);opacity:0}}
+  .dol-who{font-size:10px;font-weight:800;color:var(--blue-light);}
+  .dol-msg{display:block;font-size:11px;color:var(--muted);margin-top:1px;line-height:1.45;word-break:break-word;}
   .explorer-title{display:flex;align-items:center;justify-content:space-between;font-size:12px;font-weight:700;color:var(--text);margin-bottom:3px;}
   /* 탐색기 파일 트리 글자 크기 — 기본(≈16px)이 커서 11.5px로 축소(파일명·폴더명). */
   #explorerTree{font-size:12.5px;line-height:1.55;}
@@ -594,6 +608,11 @@
       </div>
       <div class="dash-slist" id="dashSessionList"><div style="font-size:11px;color:var(--muted-2);padding:8px">불러오는 중…</div></div>
       <div class="dash-sfull" id="dashSessionsFull">전체 작업 세션 열기 ↗</div>
+      <!-- 남는 공간에 🏢 보안팀 사무실 LIVE 대화(협업 이벤트) — 팀이 움직이면 여기로 흐른다. -->
+      <div class="dash-office-live" id="dashOfficeLive">
+        <div class="dol-head" id="dolHead" title="AI 팀 사무실 창 열기">🏢 보안팀 사무실 <span class="dol-live">LIVE</span></div>
+        <div class="dol-feed" id="dolFeed"><div class="dol-empty">팀이 움직이면 대화가 여기 실시간으로 흐릅니다.</div></div>
+      </div>
     </div>
 
     <!-- 자산 상세 팝오버(시안2) — 탐색기 자산 클릭 시 옆에 뜬다 -->
@@ -1286,6 +1305,32 @@
     applyGlow();
     clearTimeout(busyTimer);
     busyTimer = setTimeout(() => { if (networkSvg) networkSvg.classList.remove("busy"); applyGlow(); }, 4000);
+  }
+
+  // ── 🏢 보안팀 사무실 LIVE 대화(작업 세션 패널 하단) ──────────────────────────
+  // 사무실 창의 캐릭터 말풍선과 같은 협업 이벤트(collaboration:event)를 이 피드에도 흘린다.
+  const dolFeed = document.getElementById("dolFeed");
+  const DOL_MAX = 40;
+  function appendOfficeLive(evt) {
+    if (!dolFeed || !evt || !evt.message) return;
+    const empty = dolFeed.querySelector(".dol-empty");
+    if (empty) empty.remove();
+    const who = (evt.from || "팀") + (evt.to ? " → " + evt.to : "");
+    const line = document.createElement("div");
+    line.className = "dol-line";
+    line.innerHTML = '<span class="dol-who">' + escB(who) + '</span><span class="dol-msg">' + escB(evt.message) + "</span>";
+    dolFeed.appendChild(line);
+    while (dolFeed.childElementCount > DOL_MAX) dolFeed.removeChild(dolFeed.firstChild);
+    dolFeed.scrollTop = dolFeed.scrollHeight;
+  }
+  async function initOfficeLive() {
+    const head = document.getElementById("dolHead");
+    if (head && window.gijo.openTeamOffice) head.addEventListener("click", () => window.gijo.openTeamOffice());
+    // 로드 시 최근 대화로 채운다(빈 화면 방지) — 사무실 창과 같은 협업 이력.
+    try {
+      const hist = (await window.gijo.listCollaborationHistory()) || [];
+      hist.slice(-DOL_MAX).forEach(appendOfficeLive);
+    } catch (e) { /* 이력 없으면 안내 문구 유지 */ }
   }
 
   // ── 실시간 에이전트 협업 라이브 피드(지휘 콘솔 아래 전체 폭) ─────────────────
@@ -2259,9 +2304,12 @@
 
     window.gijo.onCollaborationEvent((evt) => {
       appendCollabRow(evt);
+      appendOfficeLive(evt); // 🏢 보안팀 사무실 LIVE 대화(작업 세션 패널 하단)
       if (evt && evt.to) markWorking(evt.to);
       pulseBusy();
     });
+    // 사무실 LIVE 피드 — 로드 시 최근 대화를 채우고, 헤더를 누르면 사무실 창을 연다.
+    initOfficeLive();
     // 로컬 LLM이 실제로 추론/임베딩할 때마다도 작업 중으로 간주해 반짝임을 살린다.
     // 임베딩 이벤트는 로스터의 엔진 카드에도 따로 반영한다(파형·처리량).
     if (window.gijo.onLlmActivity) {
