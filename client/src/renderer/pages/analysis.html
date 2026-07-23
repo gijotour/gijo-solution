@@ -66,7 +66,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .corr-line{font-size:11.5px;color:var(--muted);background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:7px 11px;margin:2px 0 10px;line-height:1.5;}
 .corr-line b{color:#f0a0c0;font-weight:800;}
 .corr-line .ask{color:var(--blue-light,#5fa1ff);cursor:pointer;text-decoration:underline;text-underline-offset:2px;}
-.graph-toggle{float:right;font-size:10px;display:inline-flex;gap:0;border:1px solid var(--border);border-radius:7px;overflow:hidden;}
+.path-scope{font-size:11px;font-weight:600;color:var(--blue-light);margin-left:6px;}
+.path-collapse{font-size:10px;color:var(--muted);cursor:pointer;border:1px solid var(--border);border-radius:6px;padding:3px 8px;user-select:none;}
+.path-collapse:hover{color:#fff;border-color:var(--blue);}
+#pathPanel.collapsed #pathBody{display:none;}
+.graph-toggle{font-size:10px;display:inline-flex;gap:0;border:1px solid var(--border);border-radius:7px;overflow:hidden;}
 .graph-toggle .gt{padding:3px 9px;cursor:pointer;color:var(--muted);background:var(--panel-2);}
 .graph-toggle .gt.on{background:rgba(59,130,246,.18);color:#fff;}
 #pathGraph{margin-top:10px;}
@@ -146,6 +150,22 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div class="rb-src">🔍 취약점 <b id="tVuln">-</b> · 📊 보안로그 <b id="tLog">-</b> · 🧰 운영리포트 <b id="tProduct">-</b> · 🛡 하드닝 <b id="tHardening">-</b></div>
     </div>
 
+    <!-- 🧭 공격 경로·도달성 — 통합 위험 우선순위 위(전체 폭). 좌측 항목 선택 시 그 자산 기준으로 갱신. 접기 지원. -->
+    <div class="panel" id="pathPanel" style="margin-bottom:16px;display:none">
+      <div class="ph">🧭 공격 경로 · 도달성 <span class="path-scope" id="pathScope"></span>
+        <span style="float:right;display:inline-flex;gap:8px;align-items:center">
+          <span class="graph-toggle">
+            <span class="gt on" data-mode="source">소스별</span><span class="gt" data-mode="chain">전체 연관성</span>
+          </span>
+          <span class="path-collapse" id="pathCollapse" title="접기/펼치기">▾ 접기</span>
+        </span>
+      </div>
+      <div id="pathBody">
+        <div id="pathGraph"><div class="empty">경로 데이터가 없습니다.</div></div>
+        <div class="graph-legend" id="graphLegend"></div>
+      </div>
+    </div>
+
     <div class="two">
       <div class="panel">
         <div class="ph">통합 위험 우선순위 <span style="font-size:11px;color:var(--muted);font-weight:600">— 4소스 병합</span> <i class="gijo-info" data-topic="위험 우선순위 산정"></i></div>
@@ -159,20 +179,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         </div>
         <div class="risk-list" id="riskList"><div class="empty">불러오는 중…</div></div>
       </div>
-      <div>
-        <div class="panel" id="pathPanel" style="margin-bottom:16px;display:none">
-          <div class="ph">🧭 공격 경로 · 도달성
-            <span class="graph-toggle">
-              <span class="gt on" data-mode="source">소스별</span><span class="gt" data-mode="chain">전체 연관성</span>
-            </span>
-          </div>
-          <div id="pathGraph"><div class="empty">경로 데이터가 없습니다.</div></div>
-          <div class="graph-legend" id="graphLegend"></div>
-        </div>
-        <div class="panel ana">
-          <div class="ph" id="anaTitle">항목을 선택하세요</div>
-          <div id="anaBody"><div class="empty">좌측에서 위험 항목을 누르면 상세 분석이 표시됩니다.</div></div>
-        </div>
+      <div class="panel ana">
+        <div class="ph" id="anaTitle">항목을 선택하세요</div>
+        <div id="anaBody"><div class="empty">좌측에서 위험 항목을 누르면 상세 분석 + 위 공격 경로가 그 자산 기준으로 바뀝니다.</div></div>
       </div>
     </div>
 
@@ -239,6 +248,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const title = document.getElementById("anaTitle");
     const body = document.getElementById("anaBody");
     if(!e){ return; }
+    // 위 공격 경로 그래프를 이 자산 기준으로 갱신(소스별·전체 연관성 모두).
+    selectedPathEntity = e.entity || null;
+    renderAttackGraph();
     title.textContent = SRC_ICON[e.source] + " " + e.title;
     const corr = data.correlations.find(c => c.eventIds.includes(e.id));
     body.innerHTML =
@@ -324,7 +336,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   }
 
   // ③ 공격 경로·도달성 — 그래프 뷰(소스별 방사형 / 전체 연관성 체인). 커스텀 SVG(외부 의존 없음).
-  var attackPaths=[], graphMode="source";
+  var attackPaths=[], graphMode="source", selectedPathEntity=null;
+  // 선택 자산의 공격 경로(있으면), 없으면 최상위 경로.
+  function pathForSelected(){
+    if(selectedPathEntity){ var p=attackPaths.find(function(x){ return x.entity===selectedPathEntity; }); if(p) return p; }
+    return attackPaths[0];
+  }
   function trunc(s,n){ s=String(s==null?"":s); return s.length>n ? s.slice(0,n-1)+"…" : s; }
   function svgNode(x,y,o){
     var r=o.r||18, s='<g>';
@@ -386,14 +403,24 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     return svg+'</svg>';
   }
   function renderAttackGraph(){
-    var panel=document.getElementById("pathPanel"), box=document.getElementById("pathGraph"), legend=document.getElementById("graphLegend");
+    var panel=document.getElementById("pathPanel"), box=document.getElementById("pathGraph"), legend=document.getElementById("graphLegend"), scope=document.getElementById("pathScope");
     if(!panel||!box) return;
     if(!attackPaths.length){ panel.style.display="none"; return; }
     panel.style.display="block";
-    box.innerHTML = graphMode==="chain" ? graphChain(attackPaths.slice(0,3)) : graphSource(attackPaths[0]);
-    legend.innerHTML = graphMode==="chain"
-      ? '<span class="lg"><span class="dot" style="background:#e2483d"></span>공격자</span><span class="lg"><span class="dot" style="background:#f5928a"></span>외부 노출</span><span class="lg"><span class="dot" style="background:#f7c777"></span>취약점</span><span class="lg"><span class="dot" style="background:#5fa1ff"></span>대상 자산</span> · 관측 신호 기반(침투테스트 아님)'
-      : '<span class="lg"><span class="dot" style="background:#f5928a"></span>진입</span><span class="lg"><span class="dot" style="background:#f7c777"></span>거점 취약점</span><span class="lg"><span class="dot" style="background:#8fb8ff"></span>인접 이동</span> · 중심=<b>'+esc(attackPaths[0].entity)+'</b>';
+    var ap = pathForSelected();
+    var selMatched = selectedPathEntity && attackPaths.some(function(x){ return x.entity===selectedPathEntity; });
+    // 선택 자산 표기 — 경로가 있으면 그 자산, 없으면 최상위 표시 안내.
+    if(scope) scope.innerHTML = selMatched ? '· 선택: '+esc(selectedPathEntity)
+      : (selectedPathEntity ? '<span style="color:var(--muted-2)">· 선택 자산 경로 없음 → 최상위 표시</span>' : '');
+    if(!ap){ box.innerHTML='<div class="empty">경로 데이터가 없습니다.</div>'; if(legend) legend.innerHTML=''; return; }
+    if(graphMode==="chain"){
+      var chainPaths = selMatched ? [ap] : attackPaths.slice(0,3);
+      box.innerHTML = graphChain(chainPaths);
+      legend.innerHTML = '<span class="lg"><span class="dot" style="background:#e2483d"></span>공격자</span><span class="lg"><span class="dot" style="background:#f5928a"></span>외부 노출</span><span class="lg"><span class="dot" style="background:#f7c777"></span>취약점</span><span class="lg"><span class="dot" style="background:#5fa1ff"></span>대상 자산</span> · 관측 신호 기반(침투테스트 아님)';
+    } else {
+      box.innerHTML = graphSource(ap);
+      legend.innerHTML = '<span class="lg"><span class="dot" style="background:#f5928a"></span>진입</span><span class="lg"><span class="dot" style="background:#f7c777"></span>거점 취약점</span><span class="lg"><span class="dot" style="background:#8fb8ff"></span>인접 이동</span> · 중심=<b>'+esc(ap.entity)+'</b>';
+    }
   }
   async function loadAttackPaths(){
     try{ attackPaths=(await window.gijo.analysisAttackPaths()).paths||[]; }catch(e){ attackPaths=[]; }
@@ -441,6 +468,19 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.querySelectorAll(".graph-toggle .gt").forEach(x=>x.classList.toggle("on", x===g));
     renderAttackGraph();
   });
+  // 접기/펼치기 — 공격 경로 그래프를 접어 목록을 넓게 볼 수 있다. 상태는 저장.
+  (function(){
+    const panel = document.getElementById("pathPanel"), btn = document.getElementById("pathCollapse");
+    if(!panel || !btn) return;
+    function apply(collapsed){ panel.classList.toggle("collapsed", collapsed); btn.textContent = collapsed ? "▸ 펼치기" : "▾ 접기"; }
+    let init = false; try{ init = localStorage.getItem("gijo:analysis:pathCollapsed")==="1"; }catch(e){}
+    apply(init);
+    btn.addEventListener("click", ()=>{
+      const c = !panel.classList.contains("collapsed");
+      apply(c);
+      try{ localStorage.setItem("gijo:analysis:pathCollapsed", c?"1":"0"); }catch(e){}
+    });
+  })();
   document.getElementById("refreshBtn").addEventListener("click", refresh);
   document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
   document.querySelectorAll("[data-page]").forEach(el => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
