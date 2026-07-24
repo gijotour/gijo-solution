@@ -39,6 +39,11 @@ export interface DispatchResult {
   confirm?: { type: "learnloop"; datasets: { id: string; examples: number }[] };
   // 작업 세션에 속한 지시였으면 그 세션 id를 돌려준다(화면이 해당 세션 대화를 갱신하도록).
   sessionId?: string;
+  // ── 화면 액션 알약 조건부 노출용 신호 (2026-07-25) ──
+  // dataHits: 자산·취약점 등 특정 내부 데이터를 실제로 건드린 수 → 📄 리포트 알약을 그때만 띄운다.
+  // internalMiss: 일반 질의인데 사내 RAG 근거가 0(내부자료 없음) → ☁ 외부(클라우드) 추가질의를 그때만 띄운다.
+  dataHits?: number;
+  internalMiss?: boolean;
 }
 
 // ── 복합 지시(오케스트레이션) ─────────────────────────────────────────
@@ -304,12 +309,46 @@ export async function dispatchInstruction(instructionText: string, sessionId?: s
     // "어느 세션에서 온 작업인지"가 로그에 드러나게 한다(대시보드 📡 실시간 협업 피드에 표시).
     emitCollaboration({ from: "세션", to: "orchestrator", message: `💬 [${title}] ${instructionText}` });
   }
-  const result = await dispatchInstructionCore(instructionText, contextText, screen);
+  const core = await dispatchInstructionCore(instructionText, contextText, screen);
+  const result: DispatchResult = { ...core, ...(await computeOfferSignals(core, instructionText)) };
   if (session) {
     appendTurn(session.id, "assistant", result.output, turnToolTag(result));
     emitCollaboration({ from: "orchestrator", to: "세션", message: `💬 [${title}] ${result.output.slice(0, 600)}` });
   }
   return session ? { ...result, sessionId: session.id } : result;
+}
+
+// 화면 액션 알약(리포트·클라우드) 조건부 노출용 신호를 계산한다.
+// - dataHits: 자산·취약점 등 특정 내부 데이터를 실제로 건드렸는가(리포트로 정리할 거리가 있는가).
+// - internalMiss: 데이터 답이 아닌 일반 질의인데 사내 RAG 근거가 0인가(외부 자료가 필요한가).
+async function computeOfferSignals(
+  result: DispatchResult,
+  instructionText: string,
+): Promise<{ dataHits: number; internalMiss: boolean }> {
+  let dataHits = 0;
+  for (const s of result.steps ?? []) {
+    dataHits += (s.assetIds?.length ?? 0) + (s.findingCount ?? 0);
+  }
+  // 4분류 액션(스캔·분석·리포트)은 특정 데이터를 다룬 것으로 본다.
+  if (result.route && (result.route.action === "scan" || result.route.action === "analyze" || result.route.action === "report")) {
+    dataHits = Math.max(dataHits, 1);
+  }
+  // 에이전트 루프가 자산·취약점·분석·하드닝 등 데이터 조회 도구를 썼으면 특정 데이터를 조회한 것.
+  const DATA_TOOL_RE = /asset|finding|cti|vuln|sbom|analys|scan|search|hardening/i;
+  if (result.toolCalls?.some((c) => DATA_TOOL_RE.test(c.tool))) dataHits = Math.max(dataHits, 1);
+
+  // internalMiss는 데이터 답이 아니고(=일반 대화) 결재·확인 대기도 아닐 때만 판정한다.
+  let internalMiss = false;
+  if (dataHits === 0 && !result.approval && !result.confirm) {
+    try {
+      const { queryMemoryRelevant } = await import("./memory.js");
+      const rel = await queryMemoryRelevant(instructionText, 4).catch(() => null);
+      internalMiss = Array.isArray(rel) && rel.length === 0; // 검색 실패(null)면 미판정(false 유지)
+    } catch {
+      /* 메모리 모듈 로드 실패 시 미판정 */
+    }
+  }
+  return { dataHits, internalMiss };
 }
 
 // 응답 턴에 붙일 짧은 도구/경로 배지 — 화면에서 "무엇으로 처리됐는지"를 한눈에 보여준다.

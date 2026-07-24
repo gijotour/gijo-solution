@@ -294,6 +294,7 @@
   .cl-pill:hover{filter:brightness(1.15);}
   .cl-pill:disabled{opacity:.6;cursor:default;}
   .cl-pill.cloud{border-color:rgba(139,124,240,0.4);background:rgba(139,124,240,0.1);color:var(--purple);}
+  .cl-pill.task{border-color:rgba(240,160,32,0.4);background:rgba(240,160,32,0.1);color:var(--amber);}
   .cl-row.instr{border-color:rgba(59,130,246,0.35);}
   .cl-row.instr .cn{color:#fff;}
   /* 결재판(시안 B) — 쓰기 도구는 실행 전 여기서 값을 검토·승인한다. 값마다 출처를 표시해
@@ -1460,22 +1461,18 @@
     btn.textContent = label;
     btn.title = title;
     btn.addEventListener("click", onClick);
-    // 클라우드(Gemini 등) 추가질의는 새 줄이 아니라 직전 알약(리포트)과 같은 줄 오른쪽 끝에 붙인다.
-    if (cls === "cloud") {
-      const rows = clRows.querySelectorAll(".cl-pill-row");
-      const host = rows[rows.length - 1];
-      if (host && host === clRows.lastElementChild) {
-        btn.style.marginLeft = "auto";
-        host.appendChild(btn);
-        clRows.scrollTop = clRows.scrollHeight;
-        return btn;
-      }
+    // 클라우드(Gemini 등) 추가질의는 같은 줄 오른쪽 끝으로 민다.
+    if (cls === "cloud") btn.style.marginLeft = "auto";
+    // 답변 뒤 액션 알약(할일·리포트·Gemini)은 한 줄을 공유한다 — 직전이 알약 줄이면 이어 붙이고,
+    // 아니면 새 줄을 만든다.
+    let host = clRows.lastElementChild;
+    if (!(host && host.classList.contains("cl-pill-row"))) {
+      host = document.createElement("div");
+      host.className = "cl-pill-row";
+      clRows.appendChild(host);
+      while (clRows.childElementCount > CL_MAX) clRows.removeChild(clRows.firstChild);
     }
-    const row = document.createElement("div");
-    row.className = "cl-pill-row" + (cls === "cloud" ? " right" : "");
-    row.appendChild(btn);
-    clRows.appendChild(row);
-    while (clRows.childElementCount > CL_MAX) clRows.removeChild(clRows.firstChild);
+    host.appendChild(btn);
     clRows.scrollTop = clRows.scrollHeight;
     return btn;
   }
@@ -1488,6 +1485,34 @@
       `방금 ${label ? label + "의 " : ""}결과를 보고서로 정리할까요? — 리포트 만들기`,
       () => window.gijo.navigateTo("report.html")
     );
+  }
+
+  // 방금 지시를 "오늘 할 일"로 담는다 — AI 라이브(팀 사무실)에 쌓이고, 실제 처리는 '운영 시작'을 눌러야 시작된다.
+  function clOfferTodayTask(text) {
+    const btn = clAppendPill(
+      "task",
+      "☑ 오늘의 할일 넣기",
+      "이 지시를 오늘 할 일로 등록합니다 — AI 라이브(팀 사무실)에 쌓이고, 실제 처리는 '운영 시작'을 눌러야 시작됩니다.",
+      async () => {
+        if (btn.disabled) return;
+        btn.disabled = true;
+        const prev = btn.textContent;
+        btn.textContent = "☑ 담는 중…";
+        try {
+          await window.gijo.addTask(text);
+          btn.textContent = "✓ 오늘 할 일에 담김";
+          clAppend("event", {
+            icon: "🗒",
+            name: "오늘 할 일 등록",
+            message: `"${text}" 을(를) 오늘 할 일로 담았습니다. AI 라이브(팀 사무실)에 쌓였어요 — 실제 처리는 사무실 화면의 ▶ '운영 시작'을 눌러야 AI 팀이 시작합니다.`,
+          });
+        } catch (e) {
+          btn.disabled = false;
+          btn.textContent = prev;
+        }
+      }
+    );
+    return btn;
   }
 
   // 시안 B — 로컬 답변 뒤 "클라우드에도 물어보기". 클라우드가 켜져 있고(관리자 설정) 유출 게이트를
@@ -1725,7 +1750,13 @@
       // 답변이 "모델 미준비" 안내면 배너도 띄워 두 경로(모델 받기/서버 연결)를 바로 제시.
       const notReady = /모델이 아직 준비|로컬 LLM|localengine/.test(result.output || "");
       if (notReady) modelGuide().style.display = "block";
-      else { clOfferReport(orchLabel()); clCloudOffer(text); }
+      else {
+        // 액션 알약(한 줄): ☑ 할일 넣기는 항상 · 📄 리포트는 특정 데이터를 건드렸을 때만
+        // · ☁ Gemini는 내부자료(RAG 근거)가 없을 때만. (dataHits·internalMiss는 서버 신호)
+        clOfferTodayTask(text);
+        if (result.dataHits > 0) clOfferReport(orchLabel());
+        if (result.internalMiss) clCloudOffer(text);
+      }
       await loadTasks();
       if (result.route && result.route.action === "scan") await reloadDashExplorer();
       refreshTeamStatus();
@@ -1972,7 +2003,7 @@
       if (sess) { try { await window.gijo.addWorkSessionTurn(sess.id, "assistant", reply, label); } catch (e) {} }
       loadDashSessions();
       if (/모델이 아직 준비|로컬 LLM|localengine/.test(reply || "")) modelGuide().style.display = "block";
-      else clOfferReport(label);
+      else clOfferTodayTask(text); // 팀원 직접 대화는 데이터 신호가 없어 할일 넣기만(리포트·Gemini는 오케스트레이터 경로에서 조건부)
       refreshTeamStatus();
     } catch (e) {
       clReplaceTyping(typing, "error", { icon: "⚠", name: label, message: e.message });
