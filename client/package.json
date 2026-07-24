@@ -1,7 +1,7 @@
 {
   "name": "gijo-as-client",
   "productName": "GIJO AS",
-  "version": "2.7.21",
+  "version": "2.7.22",
   "description": "GIJO AS — AI Security Manager Platform (Electron client, connects to gijo-as-server)",
   "main": "dist/main.js",
   "scripts": {
@@ -46,8 +46,18 @@
     },
     "mac": {
       "target": [
-        { "target": "dmg", "arch": ["arm64"] },
-        { "target": "zip", "arch": ["arm64"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64"
+          ]
+        }
       ],
       "category": "public.app-category.business",
       "artifactName": "${productName}-${version}-${arch}.${ext}",
