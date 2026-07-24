@@ -91,7 +91,7 @@
     panel.innerHTML =
       '<div class="gcp-head"><span class="gcp-title">💬 작업 세션</span>' +
       '<span class="gcp-abadge zero" id="gcpActive">진행중 -</span>' +
-      '<button class="gcp-close" id="gcpClose" title="작업 세션 접기 (다시 열기: 오른쪽 가장자리 탭)" style="margin-left:auto">▷</button></div>' +
+      '</div>' +
       '<div class="gcp-acc gcp-sessions" id="gcpSessAcc" style="flex:1 1 auto">' +
       '<div class="gcp-ab" style="display:flex"><div class="gcp-sitem" id="gcpNewSess">＋ 새 작업 세션</div>' +
       '<div id="gcpSessList" style="overflow-y:auto;flex:1 1 auto"><div class="gcp-empty">불러오는 중…</div></div></div></div>' +
@@ -104,13 +104,13 @@
     tab = document.createElement("div");
     tab.id = "gijoCmdTab";
     tab.title = "오른쪽 작업 세션 열기";
-    tab.textContent = "◧ 작업 세션 열기"; // 대시보드 오른쪽 가장자리 탭과 동일 표현
+    tab.textContent = "◀ 작업 세션 열기"; // 라벨·위치는 setOpen이 상태에 맞게 갱신
     document.body.appendChild(tab);
 
     sessBody = panel.querySelector("#gcpSessList");
 
-    tab.addEventListener("click", function () { setOpen(true); });
-    panel.querySelector("#gcpClose").addEventListener("click", function () { setOpen(false); });
+    tab.addEventListener("click", function () { setOpen(!panel.classList.contains("on")); });
+    // 헤더 접기 버튼 제거(2026-07-25) — 가장자리 탭이 토글 담당
     // ＋ 새 작업 세션 — 작업 세션 화면에서 새 세션을 시작하도록 이동(지시는 인라인 챗봇으로).
     panel.querySelector("#gcpNewSess").addEventListener("click", function () {
       try { localStorage.removeItem("gijo:sessions:open"); } catch (e) {}
@@ -156,9 +156,20 @@
 
   function setOpen(on) {
     panel.classList.toggle("on", on);
-    tab.classList.toggle("hide", on);
     try { localStorage.setItem(OPEN_KEY, on ? "1" : "0"); } catch (e) {}
+    // 가장자리 세로 탭 — 항상 표시(2026-07-25 통일): 열림=드로어 왼쪽 경계에 반쯤(12px) 걸친 '접기'.
+    if (on) {
+      var w = panel.getBoundingClientRect().width || 360;
+      tab.style.right = Math.round(w - 12) + "px";
+      tab.style.borderRadius = "10px"; tab.style.padding = "10px 5px"; tab.style.letterSpacing = "1px";
+      tab.textContent = "▶ 접기"; tab.title = "작업 세션 패널 접기";
+    } else {
+      tab.style.right = "0px";
+      tab.style.borderRadius = "10px 0 0 10px"; tab.style.padding = "14px 6px"; tab.style.letterSpacing = "2px";
+      tab.textContent = "◀ 작업 세션 열기"; tab.title = "오른쪽 작업 세션 열기";
+    }
   }
+  window.addEventListener("resize", function () { setOpen(panel.classList.contains("on")); });
 
   // 대시보드 작업 세션 패널과 완전히 동일한 형식·동작(상태 점·제목·✓완료·🗑삭제 / 메타 + 진행중 배지).
   var STATUS_LABEL = { active: "진행중", done: "완료", ignored: "무시" };

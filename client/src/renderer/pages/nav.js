@@ -137,10 +137,11 @@
       // 패널 접기 버튼(좌우 공통 디자인, 2026-07-25 대칭 통일)
       ".gn-pcol{flex:0 0 auto;width:26px;height:26px;border-radius:7px;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);color:var(--blue-light);display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;}" +
       ".gn-pcol:hover{background:var(--blue);color:#fff;}" +
-      // 왼쪽 접힘 — 사이드바 숨김 + 가장자리 세로 '메뉴 열기' 탭(오른쪽 rightReopen과 대칭)
-      ".gn-edge{position:fixed;left:0;top:50%;transform:translateY(-50%);background:var(--blue);color:#fff;padding:14px 6px;border-radius:0 10px 10px 0;font-size:12px;font-weight:800;cursor:pointer;writing-mode:vertical-rl;letter-spacing:2px;z-index:900;box-shadow:2px 0 14px rgba(0,0,0,.45);display:none;}" +
+      // 왼쪽 가장자리 세로 토글 — 항상 표시(2026-07-25 통일): 접힘=화면 왼쪽 끝 '▶ 메뉴 열기',
+      // 열림=사이드바 오른쪽 경계에 반쯤 걸친 '◀ 접기'(콘텐츠 패딩 안으로 12px만 오버랩 — 여백 고려).
+      ".gn-edge{position:fixed;top:50%;transform:translateY(-50%);background:var(--blue);color:#fff;padding:14px 6px;border-radius:0 10px 10px 0;font-size:12px;font-weight:800;cursor:pointer;writing-mode:vertical-rl;letter-spacing:2px;z-index:900;box-shadow:2px 0 14px rgba(0,0,0,.45);}" +
+      ".gn-edge.open-state{border-radius:10px;padding:10px 5px;letter-spacing:1px;}" +
       ".gn-edge:hover{background:#3576e0;}" +
-      "body.gn-left-collapsed .gn-edge{display:block;}" +
       "body.gn-left-collapsed #gijoNav{display:none !important;}" +
       "body.gn-left-collapsed .app{grid-template-columns:1fr !important;}" +
       "body.gn-left-collapsed .explorer{display:none !important;}" +
@@ -217,25 +218,45 @@
     edge = document.createElement("div");
     edge.id = "gnLeftEdge";
     edge.className = "gn-edge";
-    edge.title = "왼쪽 메뉴 열기";
-    edge.textContent = "▶ 메뉴 열기";
-    edge.addEventListener("click", function () { window.gijoLeftCollapse(false); });
+    edge.addEventListener("click", function () {
+      window.gijoLeftCollapse(!document.body.classList.contains("gn-left-collapsed"));
+    });
     document.body.appendChild(edge);
     return edge;
   }
+  // 탭 위치·라벨 갱신 — 열림: 사이드바 오른쪽 경계에 반쯤(12px) 걸침 / 접힘: 화면 왼쪽 끝.
+  function updateLeftEdge() {
+    var edge = ensureLeftEdge();
+    var collapsed = document.body.classList.contains("gn-left-collapsed");
+    if (collapsed) {
+      edge.classList.remove("open-state");
+      edge.style.left = "0px";
+      edge.textContent = "▶ 메뉴 열기";
+      edge.title = "왼쪽 메뉴 열기";
+    } else {
+      var panel = document.getElementById("gijoNav") || document.querySelector(".explorer");
+      if (!panel) { edge.style.display = "none"; return; }
+      edge.style.display = "";
+      edge.classList.add("open-state");
+      edge.style.left = Math.max(0, Math.round(panel.getBoundingClientRect().right) - 12) + "px";
+      edge.textContent = "◀ 접기";
+      edge.title = "왼쪽 메뉴 접기";
+    }
+  }
   window.gijoLeftCollapse = function (on) {
     injectCss();
-    ensureLeftEdge();
     document.body.classList.toggle("gn-left-collapsed", !!on);
     try { localStorage.setItem(LEFT_KEY, on ? "1" : "0"); } catch (e) {}
+    updateLeftEdge();
   };
   function setupLeftCollapse() {
-    // 왼쪽 패널이 있는 화면에서만(login 제외). 저장 상태 복원.
+    // 왼쪽 패널이 있는 화면에서만(login 제외). 저장 상태 복원 + 탭 초기 배치.
     if (!document.getElementById("gijoNav") && !document.querySelector(".explorer")) return;
     injectCss();
-    ensureLeftEdge();
     var saved = null; try { saved = localStorage.getItem(LEFT_KEY); } catch (e) {}
     if (saved === "1") document.body.classList.add("gn-left-collapsed");
+    updateLeftEdge();
+    window.addEventListener("resize", updateLeftEdge); // 창 크기·배율 변경 시 경계 재계산
   }
 
   function render() {
@@ -250,17 +271,13 @@
     var sMenu = document.createElement("span"); sMenu.textContent = "☰ 전체메뉴"; sMenu.classList.add("on");
     sHome.addEventListener("click", function () { go("dashboard.html"); });
     seg.appendChild(sHome); seg.appendChild(sMenu); top.appendChild(seg);
-    var pcol = document.createElement("div");
-    pcol.className = "gn-pcol";
-    pcol.title = "사이드바 접기 (다시 열기: 왼쪽 가장자리 탭)";
-    pcol.textContent = "◧";
-    pcol.addEventListener("click", function () { window.gijoLeftCollapse(true); });
-    top.appendChild(pcol);
     root.appendChild(top);
     // 중앙 메뉴(스크롤)
     var mid = document.createElement("div"); mid.className = "gn-mid";
     buildMenu(mid); root.appendChild(mid);
     // 하단 사용자 영역은 titlebar.js가 #gijoNav 마지막 자식으로 마운트(관찰자).
+    // 접기/열기는 가장자리 세로 탭 하나로(헤더 버튼 없음 — 2026-07-25 통일). 위치 재계산.
+    updateLeftEdge();
   }
 
   function loadOnboarding() {

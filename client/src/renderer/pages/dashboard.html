@@ -607,7 +607,7 @@
       <div class="dash-right-head" id="dashRightHead">
         <span class="drh-t">💬 작업 세션</span>
         <span class="dash-active-badge zero" id="dashActiveBadge" title="진행중인 작업 세션 — 클릭하면 전체 작업 세션 화면으로">진행중 -</span>
-        <button class="drh-toggle" id="dashRightCollapse" title="오른쪽 작업 세션 패널 접기 (다시 열기: 오른쪽 가장자리 탭)">▷</button>
+        <!-- 접기 버튼 제거(2026-07-25) — 가장자리 세로 탭으로 통일 -->
       </div>
       <div class="dash-slist" id="dashSessionList"><div style="font-size:11px;color:var(--muted-2);padding:8px">불러오는 중…</div></div>
       <div class="dash-sfull" id="dashSessionsFull">전체 작업 세션 열기 ↗</div>
@@ -2305,10 +2305,29 @@
       bg.classList.toggle("no-right", hidden);
       const t = document.getElementById("toggleRightBtn");
       if (t) { t.classList.toggle("on", hidden); t.title = hidden ? "오른쪽 세션 패널 펴기" : "오른쪽 세션 패널 접기"; }
-      // 접혔을 때만 오른쪽 가장자리에 '◧ 패널' 열기 탭을 띄운다(다시 여는 확실한 버튼).
+      // 가장자리 세로 탭 — 항상 표시(2026-07-25 통일): 접힘=화면 오른쪽 끝 '열기',
+      // 열림=패널 왼쪽 경계에 반쯤(12px) 걸친 '접기'(왼쪽 gnLeftEdge와 대칭).
       const rr = document.getElementById("rightReopen");
-      if (rr) rr.classList.toggle("on", hidden);
+      if (rr) {
+        rr.classList.add("on");
+        if (hidden) {
+          rr.style.right = "0px"; rr.style.left = "auto";
+          rr.style.borderRadius = "10px 0 0 10px"; rr.style.padding = "14px 6px"; rr.style.letterSpacing = "2px";
+          rr.textContent = "◀ 작업 세션 열기"; rr.title = "오른쪽 작업 세션 패널 열기";
+        } else {
+          const panel = document.querySelector(".dash-sessions");
+          const leftPx = panel ? Math.max(0, Math.round(panel.getBoundingClientRect().left) - 12) : (window.innerWidth - 372);
+          rr.style.left = leftPx + "px"; rr.style.right = "auto";
+          rr.style.borderRadius = "10px"; rr.style.padding = "10px 5px"; rr.style.letterSpacing = "1px";
+          rr.textContent = "▶ 접기"; rr.title = "오른쪽 작업 세션 패널 접기";
+        }
+      }
     }
+    // 창 크기·배율 변경 시 열림 상태 탭의 경계 재계산
+    window.addEventListener("resize", () => {
+      const hidden = !!document.querySelector(".body-grid")?.classList.contains("no-right");
+      applyRightHidden(hidden);
+    });
     function toggleRight() {
       const hidden = !(document.querySelector(".body-grid")?.classList.contains("no-right"));
       try { localStorage.setItem(RIGHT_HIDDEN_KEY, hidden ? "1" : "0"); } catch (e) {}
