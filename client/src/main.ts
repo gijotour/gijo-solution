@@ -134,6 +134,9 @@ function createMainWindow(): void {
   // 상단 기본 메뉴바(File, Edit, View, Window, Help) 제거
   mainWindow.removeMenu();
 
+  // 저장된 화면 크기(배율)를 이 창에 적용 — 페이지를 옮겨도 유지되게 did-finish-load에 묶는다.
+  bindZoom(mainWindow);
+
   // 최초 화면은 로그인. 인증 성공 후 renderer/core.ts가 대시보드로 전환한다.
   mainWindow.loadFile(path.join(__dirname, "../src/renderer/pages/login.html"));
 
@@ -173,6 +176,7 @@ ipcMain.handle("office:open", async () => {
     },
   });
   officeWindow.removeMenu();
+  bindZoom(officeWindow); // 사무실 창도 같은 화면 크기를 따른다
   officeWindow.on("closed", () => { officeWindow = null; });
   await officeWindow.loadFile(path.join(__dirname, "../src/renderer/pages/office.html"));
 });
@@ -181,6 +185,68 @@ ipcMain.handle("office:open", async () => {
 ipcMain.handle("office:setAlwaysOnTop", async (_e, on: boolean) => {
   if (officeWindow && !officeWindow.isDestroyed()) officeWindow.setAlwaysOnTop(Boolean(on));
   return { on: Boolean(on) };
+});
+
+// ── 화면 크기(UI 배율) ────────────────────────────────────────────────────────
+// 담당자마다 모니터·시력이 달라 "한 화면에 더 많이" vs "글씨 크게"가 갈린다. 자동 반응형만으로는
+// 이 취향을 못 맞추므로 배율을 직접 고르게 한다(설정 › 화면 크기, 단축키 Cmd/Ctrl +·-·0).
+//
+// 렌더러의 webFrame이 아니라 webContents에 건다 — 허브(hub.html)가 화면을 iframe으로 품기 때문에
+// 프레임별로 걸면 탭 안쪽이 따로 놀지만, webContents 단위는 하위 프레임까지 한 번에 적용된다.
+// 값은 userData 파일에 남겨 다음 실행에도 유지한다(explorer-root.txt와 같은 방식).
+const ZOOM_MIN = 0.8;
+const ZOOM_MAX = 1.5;
+const ZOOM_STEPS = [0.8, 0.9, 1.0, 1.1, 1.25, 1.5];
+let uiZoom = 1;
+
+function zoomStateFile(): string {
+  return path.join(app.getPath("userData"), "ui-zoom.txt");
+}
+function clampZoom(v: number): number {
+  return Number.isFinite(v) ? Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, v)) : 1;
+}
+function loadSavedZoom(): void {
+  try {
+    uiZoom = clampZoom(Number(fs.readFileSync(zoomStateFile(), "utf-8").trim()));
+  } catch {
+    /* 저장값 없음 — 100% 유지 */
+  }
+}
+// 창이 새 페이지를 띄울 때마다 다시 걸어 준다. Chromium의 배율은 origin 단위로 기억되는데,
+// file:// 로딩에서는 유지가 보장되지 않아 did-finish-load마다 명시적으로 맞추는 편이 안전하다.
+function applyZoom(win: BrowserWindow | null): void {
+  if (win && !win.isDestroyed()) win.webContents.setZoomFactor(uiZoom);
+}
+function bindZoom(win: BrowserWindow): void {
+  win.webContents.on("did-finish-load", () => applyZoom(win));
+  applyZoom(win);
+}
+
+ipcMain.handle("ui:getZoom", () => ({ zoom: uiZoom, steps: ZOOM_STEPS, min: ZOOM_MIN, max: ZOOM_MAX }));
+ipcMain.handle("ui:setZoom", (_e, factor: number) => {
+  uiZoom = clampZoom(Number(factor));
+  try {
+    fs.writeFileSync(zoomStateFile(), String(uiZoom), "utf-8");
+  } catch {
+    /* 저장 실패는 무시 — 이번 실행에는 적용된다 */
+  }
+  for (const w of BrowserWindow.getAllWindows()) applyZoom(w);
+  return uiZoom;
+});
+// 단축키(+/-)용 — 현재 값에서 프리셋 한 칸 이동. 화면이 직접 계산하지 않게 여기서 처리한다.
+ipcMain.handle("ui:stepZoom", (_e, dir: number) => {
+  const d = Number(dir) > 0 ? 1 : -1;
+  let i = ZOOM_STEPS.findIndex((s) => Math.abs(s - uiZoom) < 0.001);
+  if (i === -1) i = ZOOM_STEPS.findIndex((s) => s >= uiZoom); // 프리셋 밖의 값이면 가까운 칸부터
+  if (i === -1) i = ZOOM_STEPS.length - 1;
+  uiZoom = ZOOM_STEPS[Math.min(ZOOM_STEPS.length - 1, Math.max(0, i + d))];
+  try {
+    fs.writeFileSync(zoomStateFile(), String(uiZoom), "utf-8");
+  } catch {
+    /* 저장 실패는 무시 */
+  }
+  for (const w of BrowserWindow.getAllWindows()) applyZoom(w);
+  return uiZoom;
 });
 
 // 읽기 전용 파일 탐색기 — 대시보드에서 폴더 트리를 본다. 명령 실행은 없다.
@@ -375,6 +441,7 @@ ipcMain.handle("update:install", async (event, version: string) => {
 
 app.whenReady().then(() => {
   loadSavedRoot(); // 마지막에 고른 파일 탐색기 폴더 복원 (userData는 ready 이후 접근)
+  loadSavedZoom(); // 마지막에 고른 화면 크기(배율) 복원
   maybeStartBundledServer();
   createMainWindow();
 

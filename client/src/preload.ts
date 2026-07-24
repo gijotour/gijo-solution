@@ -52,6 +52,12 @@ const gijoApi = {
   // "우리 AI 팀 사무실" 별도 창(시안 B) — 열기 + 항상 위 고정 토글
   openTeamOffice: () => ipcRenderer.invoke("office:open"),
   setOfficeAlwaysOnTop: (on: boolean) => ipcRenderer.invoke("office:setAlwaysOnTop", on),
+
+  // 화면 크기(UI 배율) — 설정 › 화면 크기와 단축키(Cmd/Ctrl +·-·0)가 쓴다.
+  // 배율은 메인 프로세스가 webContents 단위로 걸어 허브 iframe까지 함께 적용된다.
+  getUiZoom: () => ipcRenderer.invoke("ui:getZoom"),
+  setUiZoom: (factor: number) => ipcRenderer.invoke("ui:setZoom", factor),
+  stepUiZoom: (dir: number) => ipcRenderer.invoke("ui:stepZoom", dir),
   listDir: (relPath: string) => ipcRenderer.invoke("fs:list", relPath) as Promise<{ root: string; rootName: string; path: string; items: { name: string; dir: boolean }[] }>,
   pickWorkFolder: () => ipcRenderer.invoke("fs:pickRoot") as Promise<{ cancelled: boolean; root?: string; rootName?: string }>,
   readFile: (relPath: string) => ipcRenderer.invoke("fs:readFile", relPath) as Promise<{ name: string; size: number; content: string }>,

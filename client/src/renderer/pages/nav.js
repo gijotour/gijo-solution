@@ -330,7 +330,22 @@
     document.head.appendChild(st);
   }
 
+  // 화면 크기 단축키 — 데스크톱 앱 관례대로 Cmd/Ctrl + '＋·－·0'. 배율 계산·저장은 메인 프로세스가
+  // 하므로 여기서는 방향만 넘긴다. 입력 중(input/textarea)에도 동작해야 해서 대상은 가리지 않는다.
+  function bindZoomKeys() {
+    if (window.__gijoZoomKeys) return;
+    window.__gijoZoomKeys = true;
+    window.addEventListener("keydown", function (e) {
+      if (!(e.metaKey || e.ctrlKey) || e.altKey || !window.gijo) return;
+      var k = e.key;
+      if (k === "+" || k === "=" || k === "Add") { e.preventDefault(); window.gijo.stepUiZoom(1); }
+      else if (k === "-" || k === "_" || k === "Subtract") { e.preventDefault(); window.gijo.stepUiZoom(-1); }
+      else if (k === "0") { e.preventDefault(); window.gijo.setUiZoom(1); }
+    });
+  }
+
   function boot() {
+    bindZoomKeys();
     if (IS_EMBED) { applyEmbed(); return; }
     // 탭으로 흡수된 페이지에 직접 들어오면(대시보드 바로가기·챗봇 링크 등) 허브의 그 탭으로 보낸다.
     var target = TAB_REDIRECT[currentPage()];
