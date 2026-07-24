@@ -498,7 +498,8 @@
       <!-- 상단 바로가기 아이콘 줄은 제거(2026-07-25 사용자 결정) — '내 업무 바로가기' 본 패널로 충분하고,
            타이틀바 승격(C안) 후 헤더 폭이 좁아져 줄바꿈을 유발했다. renderTopShortcuts는 null 가드로 무해. -->
       <div class="avatar-btn" id="avatarBtn">-</div>
-      <div class="menu-btn" id="settingsBtn" title="전체 메뉴 — 보안 KPI 대시보드로 이동">☰ 전체메뉴</div>
+      <!-- ☰ 전체메뉴 버튼 제거(2026-07-25 사용자 결정) — 하단 세그먼트 [대시보드|전체메뉴]로 대체됨 -->
+
     </div>
   </div>
 
@@ -2255,7 +2256,7 @@
     await renderTeam();
     await Promise.all([loadHealth(), loadServerCard(), reloadDashExplorer(), loadCollaboration(), checkModelReady(), loadTodayPriority()]);
 
-    document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("kpi.html")); // 오른쪽 아이콘 → 보안 KPI 대시보드
+    // ☰ 전체메뉴 버튼 제거됨 — 하단 세그먼트가 대체 (요소가 없으므로 배선도 제거)
     document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
     const officeBtn = document.getElementById("officeBtn");
     if (officeBtn) officeBtn.addEventListener("click", () => window.gijo.openTeamOffice()); // 별도 창 — 페이지 이동 아님
