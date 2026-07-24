@@ -18,6 +18,13 @@
 - `server/src/engine/localengine.ts` — llama-server 프로세스 풀(VRAM 예산·LRU 스왑). 임베딩은 8081 별도 상주.
 - 운영: Windows PC의 WSL2 systemd(gijo-as.service, /home/gijo/gijo-as/server, 포트 4000).
 
+## 공용 슬래시 명령 (.claude/commands/ — 양 머신 공통, 워크플로 표준)
+- `/sync` — 작업 시작 전 hub 최신 받기(ff-only, 충돌 안내 포함)
+- `/handoff` — 작업 마무리: 커밋→(서버 변경 시)테스트→hub push→**상대 머신 인계 블록 출력**
+- `/deploy` — 운영(WSL) 배포. Windows=단계별 직접 수행, Mac=ssh 한 줄 안내/인계
+- `/publish` — 클라 빌드·게시. **Windows 전용**(claude-deploy 계정, 실화면 검증 필수)
+역할 고정: Mac은 hub push까지, 검토·배포·게시는 Windows. GitHub(origin)는 사용자 요청 시만.
+
 ## 2머신 개발환경 (Windows ↔ M1 Max) — GIJO_AS_2머신_개발환경_가이드.md
 - Windows(desktop-4qplvnc)=주개발·윈도우 클라 테스트·운영 WSL·git 허브(D:\gijo-hub.git)·WireGuard 서버(10.8.0.1).
 - Mac(M1 Max 32GB)=mac 올인원(서버+Metal LLM) 개발·검증. VPN=client-mac.conf(10.8.0.11). 코드는 GitHub 또는 `ssh://user@10.8.0.1/d:/gijo-hub.git`.
