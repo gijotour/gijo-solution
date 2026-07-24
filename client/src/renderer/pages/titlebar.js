@@ -75,6 +75,25 @@
     }
   }
 
+  // ── 업데이트 알림 배지 — 새 버전이 게시돼 있으면 ⚙에 빨간 점 + 메뉴 항목 강조(전 화면 공통) ──
+  var updateInfo = null; // { version } — 새 버전 있을 때만 채워짐
+  if (authed) {
+    (async function () {
+      try {
+        var r = await window.gijo.update.checkForUpdate();
+        if (r && r.updateAvailable && r.latest) {
+          updateInfo = { version: r.latest.version };
+          gear.style.position = "relative";
+          var dot = document.createElement("span");
+          dot.id = "gtbUpdateDot";
+          dot.style.cssText = "position:absolute;top:-3px;right:-3px;width:9px;height:9px;border-radius:50%;background:#f0a020;border:2px solid #0e1526;";
+          gear.appendChild(dot);
+          gear.title = "새 버전 v" + updateInfo.version + " 설치 가능";
+        }
+      } catch (e) { /* 미로그인/서버 미응답 — 배지 없이 조용히 */ }
+    })();
+  }
+
   var menuEl = null;
   function closeMenu() { if (menuEl) { menuEl.remove(); menuEl = null; } }
   function toggleMenu() { if (menuEl) closeMenu(); else openMenu(); }
@@ -152,9 +171,19 @@
     var ver = "";
     try { ver = await window.gijo.update.currentVersion(); } catch (e) {}
     if (authed) {
-      menuEl.appendChild(item("🔄", "업데이트 확인", ver ? "v" + ver : "", function () {
-        window.gijo.navigateTo("hub.html?g=settings&t=update.html");
-      }));
+      if (updateInfo) {
+        // 새 버전 있음 — 강조 표시로 바로 업데이트 화면 유도
+        var up = item("⬆", "새 버전 설치 가능", "v" + updateInfo.version, function () {
+          window.gijo.navigateTo("hub.html?g=settings&t=update.html");
+        });
+        up.style.background = "rgba(240,160,32,.12)";
+        up.style.border = "1px solid rgba(240,160,32,.4)";
+        menuEl.appendChild(up);
+      } else {
+        menuEl.appendChild(item("🔄", "업데이트 확인", ver ? "v" + ver : "", function () {
+          window.gijo.navigateTo("hub.html?g=settings&t=update.html");
+        }));
+      }
       menuEl.appendChild(item("⚙", "제품 설정 열기", "", function () {
         window.gijo.navigateTo("hub.html?g=settings&t=settings.html");
       }));
