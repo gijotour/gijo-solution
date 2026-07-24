@@ -13,6 +13,11 @@
 - 사고대응/클라우드/인증: `랜섬웨어_초동_대응`, `aws_s3_퍼블릭_점검`, `mfa_우선적용_대상`
 - AI 보안: `owasp_llm_top10_2025`
 - 보안장비 로그 포맷: `logformat_syslog_pri`, `logformat_cef`, `logformat_leef`, `logformat_fortigate`, `logformat_paloalto_panos`, `logformat_cisco_asa`, `logformat_suricata_eve`, `logformat_snort_alert` (국산 장비 SECUI·윈스·펜타 등은 샘플 로그 확보 시 추가)
+- 클라우드: `cloud_cspm`, `cloud_iam_least_privilege`, `cloud_cis_benchmark`
+- 금융권 규제: `fin_ciso_전자금융`, `fin_망분리_전자금융`, `fin_금융보안원`
+- SIEM/탐지: `siem_correlation_rule`, `siem_bruteforce_detection`, `siem_mitre_attack_mapping`
+
+> ⚠ 알려진 한계: 인입된 근거가 정확·최상위로 검색돼도, 온프렘 7B 모델이 강한 오답 prior를 가진 일부 주제(예: 금융권 망분리 근거)에서는 RAG를 무시하고 틀린 답을 낼 수 있다. 문서 문구로는 교정되지 않으며, 모델 교정·검증 하네스가 필요한 영역이다.
 
 근거 표준: CISA(KEV·BOD 22-01), FIRST(EPSS), Tenable(VPR), KISA U-시리즈, ISMS-P, 개인정보 보호법·시행령·안전성 확보조치 기준 고시, OWASP LLM Top 10(2025).
 
