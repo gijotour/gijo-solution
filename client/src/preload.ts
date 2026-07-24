@@ -58,6 +58,11 @@ const gijoApi = {
   getUiZoom: () => ipcRenderer.invoke("ui:getZoom"),
   setUiZoom: (factor: number) => ipcRenderer.invoke("ui:setZoom", factor),
   stepUiZoom: (dir: number) => ipcRenderer.invoke("ui:stepZoom", dir),
+  // 타이틀바 ⚙ 메뉴(C안): 전체화면 토글·앱 재시작·진단 정보(titlebar.js가 사용)
+  toggleFullscreen: () => ipcRenderer.invoke("ui:toggleFullscreen") as Promise<boolean>,
+  restartApp: () => ipcRenderer.invoke("app:restart"),
+  getAppInfo: () =>
+    ipcRenderer.invoke("app:info") as Promise<{ version: string; electron: string; platform: string; arch: string; osRelease: string }>,
   listDir: (relPath: string) => ipcRenderer.invoke("fs:list", relPath) as Promise<{ root: string; rootName: string; path: string; items: { name: string; dir: boolean }[] }>,
   pickWorkFolder: () => ipcRenderer.invoke("fs:pickRoot") as Promise<{ cancelled: boolean; root?: string; rootName?: string }>,
   readFile: (relPath: string) => ipcRenderer.invoke("fs:readFile", relPath) as Promise<{ name: string; size: number; content: string }>,

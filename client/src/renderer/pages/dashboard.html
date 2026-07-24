@@ -493,8 +493,8 @@
     </div>
     <div class="header-right">
       <div class="status-pill" id="statusPill"><span class="dot"></span>연결 확인 중<span class="beta-tag">LIVE</span></div>
-      <!-- 상단 툴바 = '내 업무 바로가기'에 등록된 항목만 동적 렌더(아래 dashMenu IIFE의 renderTopShortcuts). -->
-      <div class="icon-row" id="topShortcuts"></div>
+      <!-- 상단 바로가기 아이콘 줄은 제거(2026-07-25 사용자 결정) — '내 업무 바로가기' 본 패널로 충분하고,
+           타이틀바 승격(C안) 후 헤더 폭이 좁아져 줄바꿈을 유발했다. renderTopShortcuts는 null 가드로 무해. -->
       <div class="avatar-btn" id="avatarBtn">-</div>
       <div class="menu-btn" id="settingsBtn" title="전체 메뉴 — 보안 KPI 대시보드로 이동">☰ 전체메뉴</div>
     </div>
@@ -2514,5 +2514,6 @@
 })();
 </script>
 <script src="onboarding.js"></script>
+<script src="titlebar.js"></script>
 </body>
 </html>

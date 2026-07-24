@@ -120,6 +120,10 @@ function createMainWindow(): void {
     minHeight: 720,
     backgroundColor: "#0a0e1a",
     title: "GIJO AS — AI Security Manager OS",
+    // C안(2026-07-25): OS 타이틀바 제거 — 각 페이지의 .header가 타이틀바 역할(드래그 영역, titlebar.js).
+    // 창 컨트롤(─ ▢ ✕)은 OS가 오버레이로 그린다(직접 구현 안 함). mac은 신호등이 좌측 인셋.
+    titleBarStyle: "hidden",
+    titleBarOverlay: { color: "#0e1526", symbolColor: "#8b93ab", height: 46 },
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -248,6 +252,28 @@ ipcMain.handle("ui:stepZoom", (_e, dir: number) => {
   for (const w of BrowserWindow.getAllWindows()) applyZoom(w);
   return uiZoom;
 });
+
+// ── 타이틀바 ⚙ 메뉴용 IPC (C안, 2026-07-25) ─────────────────────────────────
+// 전체 화면(관제 모드) 토글 — 대형 모니터 상시 표시용. 현재 상태를 돌려줘 UI가 표시를 맞춘다.
+ipcMain.handle("ui:toggleFullscreen", () => {
+  if (!mainWindow || mainWindow.isDestroyed()) return false;
+  const next = !mainWindow.isFullScreen();
+  mainWindow.setFullScreen(next);
+  return next;
+});
+// 앱 재시작 — 업데이트 적용·화면 이상 시 원클릭 복구.
+ipcMain.handle("app:restart", () => {
+  app.relaunch();
+  app.exit(0);
+});
+// 진단 정보 — 문의/AS 때 "복사해서 붙여넣기" 용도. 서버 URL·사용자는 렌더러가 보태서 조합한다.
+ipcMain.handle("app:info", () => ({
+  version: app.getVersion(),
+  electron: process.versions.electron,
+  platform: process.platform,
+  arch: process.arch,
+  osRelease: os.release(),
+}));
 
 // 읽기 전용 파일 탐색기 — 대시보드에서 폴더 트리를 본다. 명령 실행은 없다.
 // 루트를 벗어나는 경로(.. 등)는 거부해 선택한 루트 밖이 노출되지 않게 한다.
