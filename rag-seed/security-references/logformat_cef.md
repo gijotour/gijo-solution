@@ -1,0 +1,11 @@
+# CEF(Common Event Format) — ArcSight 표준
+- 구조: `CEF:Version|Device Vendor|Device Product|Device Version|Signature ID|Name|Severity|Extension`
+- 헤더는 파이프(|)로 구분된 7개 필드 + 뒤에 Extension. (흔한 오해: 헤더에 출발지/목적지 IP·포트가 오지 않는다 — IP 등은 Extension의 key=value로 들어간다.)
+  - Version: 보통 0
+  - Device Vendor / Product / Version: 장비 제조사·제품·버전
+  - Signature ID: 이벤트 종류 식별자
+  - Name: 사람이 읽는 이벤트 이름
+  - Severity: 0~10 (높을수록 심각)
+- Extension: 공백으로 구분된 key=value 쌍. 표준 키(예): src(출발지 IP), dst(목적지 IP), spt(출발지 포트), dpt(목적지 포트), proto, act(행위), suser, duser, msg.
+- 예: `CEF:0|Security|threatmgr|1.0|100|worm detected|10|src=10.0.0.1 dst=2.1.2.2 spt=1232`
+- 담당자 요약: "CEF:0|벤더|제품|버전|시그니처ID|이름|심각도|key=value…. IP·포트는 헤더가 아니라 Extension(src/dst/spt/dpt)."
