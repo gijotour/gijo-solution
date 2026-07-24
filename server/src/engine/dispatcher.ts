@@ -318,6 +318,14 @@ export async function dispatchInstruction(instructionText: string, sessionId?: s
   return session ? { ...result, sessionId: session.id } : result;
 }
 
+// 인사·감사 같은 잡담 판별(외부 클라우드 제안 제외용). llm.smallTalkReply와 같은 취지지만
+// 여기 자체 내장한다 — dispatcher 테스트가 ./llm을 목킹하면 smallTalkReply export 접근만으로도 던진다.
+const SMALLTALK_RE = /^\s*(안녕(하세요|하십니까)?|하이|헬로|반가워요?|반갑습니다|ㅎㅇ|hi|hello|hey|고마워요?|감사(합니다|해요)?|수고(했어|하셨어요|하세요|해)?|잘했어|굿|good|thanks|thank you)[\s!?.~,ㅎㅋ]*$/i;
+function isSmallTalkInstruction(text: string): boolean {
+  const t = (text ?? "").trim();
+  return t.length > 0 && t.length <= 20 && SMALLTALK_RE.test(t);
+}
+
 // 화면 액션 알약(리포트·클라우드) 조건부 노출용 신호를 계산한다.
 // - dataHits: 자산·취약점 등 특정 내부 데이터를 실제로 건드렸는가(리포트로 정리할 거리가 있는가).
 // - internalMiss: 데이터 답이 아닌 일반 질의인데 사내 RAG 근거가 0인가(외부 자료가 필요한가).
@@ -338,8 +346,10 @@ async function computeOfferSignals(
   if (result.toolCalls?.some((c) => DATA_TOOL_RE.test(c.tool))) dataHits = Math.max(dataHits, 1);
 
   // internalMiss는 데이터 답이 아니고(=일반 대화) 결재·확인 대기도 아닐 때만 판정한다.
+  // 인사·감사 같은 잡담은 애초에 물어볼 자료가 아니므로 외부(클라우드) 제안을 띄우지 않는다.
+  // (llm.smallTalkReply를 쓰지 않고 자체 판별 — 테스트가 ./llm을 목킹하면 그 export 접근만으로도 던진다.)
   let internalMiss = false;
-  if (dataHits === 0 && !result.approval && !result.confirm) {
+  if (dataHits === 0 && !result.approval && !result.confirm && !isSmallTalkInstruction(instructionText)) {
     try {
       const { queryMemoryRelevant } = await import("./memory.js");
       const rel = await queryMemoryRelevant(instructionText, 4).catch(() => null);
