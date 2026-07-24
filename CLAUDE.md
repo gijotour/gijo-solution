@@ -19,10 +19,10 @@
 - 운영: Windows PC의 WSL2 systemd(gijo-as.service, /home/gijo/gijo-as/server, 포트 4000).
 
 ## 공용 슬래시 명령 (.claude/commands/ — 양 머신 공통, 워크플로 표준)
-- `/sync` — 작업 시작 전 hub 최신 받기(ff-only, 충돌 안내 포함)
-- `/handoff` — 작업 마무리: 커밋→(서버 변경 시)테스트→hub push→**상대 머신 인계 블록 출력**
-- `/deploy` — 운영(WSL) 배포. Windows=단계별 직접 수행, Mac=ssh 한 줄 안내/인계
-- `/publish` — 클라 빌드·게시. **Windows 전용**(claude-deploy 계정, 실화면 검증 필수)
+- `/동기화` — 작업 시작 전 hub 최신 받기(ff-only, 충돌 안내 포함)
+- `/인계` — 작업 마무리: 커밋→(서버 변경 시)테스트→hub push→**상대 머신 인계 블록 출력**
+- `/배포` — 운영(WSL) 배포. Windows=단계별 직접 수행, Mac=ssh 한 줄 안내/인계
+- `/게시` — 클라 빌드·게시. **Windows 전용**(claude-deploy 계정, 실화면 검증 필수)
 역할 고정: Mac은 hub push까지, 검토·배포·게시는 Windows. GitHub(origin)는 사용자 요청 시만.
 
 ## 2머신 개발환경 (Windows ↔ M1 Max) — GIJO_AS_2머신_개발환경_가이드.md
