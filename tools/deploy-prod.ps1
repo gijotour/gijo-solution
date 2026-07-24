@@ -37,7 +37,14 @@ wsl -d $distro -- bash -c "rsync -a --delete '/mnt/d/Connect AI/server/src/' '$w
 if ($LASTEXITCODE -ne 0) { throw "WSL 동기화/빌드 실패 — 배포 중단 (운영은 아직 이전 코드로 구동 중)" }
 
 Step "4/5 운영 프로세스 재시작 (systemd Restart=always)"
-wsl -d $distro -- bash -c "pid=`$(ps -eo pid,cmd | grep 'dist/index.js' | grep -v grep | awk '{print `$1}' | head -1); if [ -n \"`$pid\" ]; then kill `$pid; echo killed `$pid; else echo 'no running pid (systemd가 새로 띄움)'; fi"
+# grep/awk 파이프는 셸 경유 인용 문제로 빈 결과가 나는 함정(2026-07-24 실측) — systemd MainPID 직접 조회.
+$pid = (wsl -d $distro -- systemctl show gijo-as.service -p MainPID --value).Trim()
+if ($pid -and $pid -ne "0") {
+  wsl -d $distro -- kill $pid
+  Write-Output "killed $pid"
+} else {
+  Write-Output "no running pid (systemd가 새로 띄움)"
+}
 
 Step "5/5 health 확인 (최대 60초 대기)"
 $ok = $false
