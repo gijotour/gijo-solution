@@ -30,6 +30,15 @@
     ".gtb-gear{-webkit-app-region:no-drag;width:28px;height:28px;border-radius:8px;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);display:flex;align-items:center;justify-content:center;font-size:13px;color:#cfe0ff;cursor:pointer;position:relative;flex:0 0 auto;}",
     // ── 사용자 영역(왼쪽 패널 하단) ──
     ".gtb-userarea{border-top:1px solid rgba(255,255,255,.08);background:rgba(59,130,246,.05);padding:8px 10px;display:flex;flex-direction:column;gap:6px;z-index:60;}",
+    // 세그먼트 [🏠 대시보드 | ☰ 전체메뉴] — Claude.ai 홈/Code 전환 패턴
+    ".gtb-seg{display:flex;background:#0a1120;border:1px solid rgba(255,255,255,.16);border-radius:9px;padding:3px;gap:3px;}",
+    ".gtb-seg span{flex:1;text-align:center;padding:6px 4px;border-radius:7px;font-size:10.5px;font-weight:800;color:#8b93ab;cursor:pointer;border:1px solid transparent;}",
+    ".gtb-seg span.on{background:rgba(59,130,246,.22);color:#fff;border-color:rgba(59,130,246,.5);}",
+    // 대시보드 '전체메뉴' 모드 패널
+    ".gtb-menu-panel{padding:10px 8px;overflow-y:auto;}",
+    ".gtb-menu-panel .mp-g{font-size:9.5px;font-weight:800;color:#5f6785;letter-spacing:1px;margin:10px 6px 4px;}",
+    ".gtb-menu-panel .mp-i{padding:8px 12px;font-size:12.5px;font-weight:600;color:#8b93ab;border-radius:8px;cursor:pointer;margin-bottom:1px;}",
+    ".gtb-menu-panel .mp-i:hover{background:rgba(59,130,246,.12);color:#fff;}",
     ".gtb-userarea .ua-upd{display:none;align-items:center;gap:5px;background:rgba(240,160,32,.15);border:1px solid rgba(240,160,32,.45);color:#f0a020;padding:3px 9px;border-radius:14px;font-size:10.5px;font-weight:800;cursor:pointer;align-self:flex-start;}",
     ".gtb-userarea .ua-row{display:flex;align-items:center;gap:8px;cursor:pointer;}",
     ".gtb-userarea .ua-avatar{width:26px;height:26px;border-radius:50%;background:var(--blue,#3b82f6);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex:0 0 auto;}",
@@ -193,10 +202,64 @@
     document.body.appendChild(menuEl);
   }
 
-  // ── 사용자 영역 생성 — [⬆업데이트] / [아바타][풀네임][⚙] (Discord 좌하단 패턴) ──
-  function buildUserArea() {
+  // ── 대시보드 '전체메뉴' 패널 전환(①안: 화면 이동 없이 패널만 교체) ─────────
+  // 메뉴 구성은 nav.js GROUPS의 사본(대시보드는 nav.js를 안 쓰므로) — nav 메뉴 바뀌면 여기도 갱신.
+  var DASH_MENU = [
+    ["🖥 관제", [["대시보드", null], ["보안 분석", "hub.html?g=analysis"], ["위협 인텔리전스", "hub.html?g=threat"], ["리포트", "hub.html?g=report"]]],
+    ["🛡 자산·조치", [["자산 허브", "hub.html?g=assets"], ["조치·승인", "approvals.html"], ["보안제품", "hub.html?g=products"], ["점검 콘솔", "hub.html?g=inspect"]]],
+    ["🤖 AI", [["AI 팀", "hub.html?g=aiteam"], ["AI 지식·모델", "hub.html?g=aiknowledge"], ["레드팀·가드레일", "redteam.html"]]],
+    ["⚙ 설정", [["설정", "hub.html?g=settings"]]],
+  ];
+  var dashMenuMode = false;
+  function toggleDashPanel(toMenu, segEls) {
+    var exp = document.querySelector(".explorer");
+    if (!exp) return;
+    dashMenuMode = toMenu;
+    // 기존 콘텐츠 숨김/복원 (사용자 영역 제외)
+    [].forEach.call(exp.children, function (ch) {
+      if (ch.classList.contains("gtb-userarea") || ch.classList.contains("gtb-menu-panel")) return;
+      ch.style.display = toMenu ? "none" : "";
+    });
+    var mp = exp.querySelector(".gtb-menu-panel");
+    if (toMenu) {
+      if (!mp) {
+        mp = document.createElement("div");
+        mp.className = "gtb-menu-panel";
+        DASH_MENU.forEach(function (grp) {
+          var g = document.createElement("div"); g.className = "mp-g"; g.textContent = grp[0]; mp.appendChild(g);
+          grp[1].forEach(function (it) {
+            var d = document.createElement("div"); d.className = "mp-i"; d.textContent = it[0];
+            if (it[1]) d.addEventListener("click", function () { window.gijo.navigateTo(it[1]); });
+            else { d.style.color = "#fff"; d.style.background = "rgba(59,130,246,.12)"; } // 현재 화면(대시보드)
+            mp.appendChild(d);
+          });
+        });
+        exp.insertBefore(mp, exp.querySelector(".gtb-userarea"));
+      }
+      mp.style.display = "";
+    } else if (mp) { mp.style.display = "none"; }
+    if (segEls) { segEls.home.classList.toggle("on", !toMenu); segEls.menu.classList.toggle("on", toMenu); }
+  }
+
+  // ── 사용자 영역 생성 — [세그먼트] / [⬆업데이트] / [아바타][풀네임][⚙] ──
+  function buildUserArea(kind) {
     var area = document.createElement("div");
     area.className = "gtb-userarea";
+    // 세그먼트 [🏠 대시보드 | ☰ 전체메뉴] — 대시보드: 패널 전환 / nav 화면: 홈 이동
+    var seg = document.createElement("div");
+    seg.className = "gtb-seg";
+    var sHome = document.createElement("span"); sHome.textContent = "🏠 대시보드";
+    var sMenu = document.createElement("span"); sMenu.textContent = "☰ 전체메뉴";
+    seg.appendChild(sHome); seg.appendChild(sMenu);
+    area.appendChild(seg);
+    if (kind === "dash") {
+      sHome.classList.add("on");
+      sHome.addEventListener("click", function () { if (dashMenuMode) toggleDashPanel(false, { home: sHome, menu: sMenu }); });
+      sMenu.addEventListener("click", function () { if (!dashMenuMode) toggleDashPanel(true, { home: sHome, menu: sMenu }); });
+    } else {
+      sMenu.classList.add("on"); // nav 화면 = 전체메뉴가 이미 보이는 상태
+      sHome.addEventListener("click", function () { window.gijo.navigateTo("dashboard.html"); });
+    }
     var upd = document.createElement("div");
     upd.className = "ua-upd";
     upd.addEventListener("click", function () { window.gijo.navigateTo("hub.html?g=settings&t=update.html"); });
@@ -246,7 +309,7 @@
     if (sub) {
       // nav 사이드바(100vh 고정): absolute로 하단 고정
       sub.style.position = "relative";
-      var a = buildUserArea();
+      var a = buildUserArea("nav");
       a.style.cssText += "position:absolute;bottom:0;left:0;right:0;";
       sub.appendChild(a);
       return true;
@@ -254,7 +317,7 @@
     var exp = document.querySelector(".explorer");
     if (exp) {
       // dashboard 왼쪽 컬럼: sticky bottom — 스크롤과 무관하게 하단에 붙는다
-      var a2 = buildUserArea();
+      var a2 = buildUserArea("dash");
       a2.style.cssText += "position:sticky;bottom:0;margin:12px -12px 0;background:#0e1526;";
       exp.appendChild(a2);
       return true;
