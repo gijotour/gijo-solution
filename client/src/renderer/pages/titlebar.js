@@ -31,8 +31,8 @@
     // ── 사용자 영역(왼쪽 패널 하단) ──
     ".gtb-userarea{border-top:1px solid rgba(255,255,255,.08);background:rgba(59,130,246,.05);padding:8px 10px;display:flex;flex-direction:column;gap:6px;z-index:60;}",
     // 세그먼트 [🏠 대시보드 | ☰ 전체메뉴] — Claude.ai 홈/Code 전환 패턴
-    ".gtb-seg{display:flex;background:#0a1120;border:1px solid rgba(255,255,255,.16);border-radius:9px;padding:3px;gap:3px;}",
-    ".gtb-seg span{flex:1;text-align:center;padding:6px 4px;border-radius:7px;font-size:10.5px;font-weight:800;color:#8b93ab;cursor:pointer;border:1px solid transparent;}",
+    ".gtb-seg{display:flex;background:#0a1120;border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:9px;padding:3px;gap:3px;}",
+    ".gtb-seg span{flex:1;text-align:center;padding:6px 4px;border-radius:7px;font-size:11px;font-weight:800;color:var(--muted,#8b93ab);cursor:pointer;border:1px solid transparent;}",
     ".gtb-seg span.on{background:rgba(59,130,246,.22);color:#fff;border-color:rgba(59,130,246,.5);}",
     // 대시보드 '전체메뉴' 모드 패널
     ".gtb-menu-panel{padding:10px 8px;overflow-y:auto;}",

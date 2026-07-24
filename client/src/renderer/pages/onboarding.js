@@ -166,7 +166,7 @@
       el.style.boxShadow = "none";
       el.style.borderRadius = "8px";
       el.style.padding = "6px 9px";
-      el.style.fontSize = "11px";
+      el.style.fontSize = "12.5px"; // 탐색기 항목과 글자 크기 통일
       el.innerHTML = (p.done >= p.total ? "✅ 가이드 완료" : "🚀 시작 가이드") + ' <span class="pr">' + p.done + " / " + p.total + "</span>";
       el.addEventListener("click", open);
       slot.innerHTML = "";
