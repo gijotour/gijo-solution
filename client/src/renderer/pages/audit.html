@@ -95,8 +95,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   <div class="main">
     <div class="topbar-row">
       <div>
-        <div class="page-title">📜 작업 기록 (감사 로그)</div>
-        <div class="page-sub">누가 · 언제 · 무엇을 실행/승인/차단/변경했는지 한 타임라인에서 확인합니다. CLI 명령 실행, 챗봇 명령 승인·차단, 취약점 판정·담당 배정, 로그인이 전부 남습니다(끌 수 없음).</div>
+        <div class="page-title">📜 작업 기록 (감사 로그) <i class="gijo-info" data-topic="작업 기록 (감사 로그)"></i></div>
       </div>
     </div>
 
@@ -226,6 +225,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   else init();
 </script>
 
+<div id="gijoChatWidget" data-start="collapsed" data-prompts='["최근 작업 기록 알려줘"]'></div>
 <script src="nav.js"></script>
+<script src="chatwidget.js"></script>
 </body>
 </html>

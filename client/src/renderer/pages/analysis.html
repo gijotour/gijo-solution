@@ -66,15 +66,20 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .corr-line{font-size:11.5px;color:var(--muted);background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:7px 11px;margin:2px 0 10px;line-height:1.5;}
 .corr-line b{color:#f0a0c0;font-weight:800;}
 .corr-line .ask{color:var(--blue-light,#5fa1ff);cursor:pointer;text-decoration:underline;text-underline-offset:2px;}
-.path-scope{font-size:11px;font-weight:600;color:var(--blue-light);margin-left:6px;}
-.path-collapse{font-size:10px;color:var(--muted);cursor:pointer;border:1px solid var(--border);border-radius:6px;padding:3px 8px;user-select:none;}
-.path-collapse:hover{color:#fff;border-color:var(--blue);}
-#pathPanel.collapsed #pathBody{display:none;}
+.path-scope{font-size:11px;font-weight:600;color:var(--blue-light);}
 .graph-toggle{font-size:10px;display:inline-flex;gap:0;border:1px solid var(--border);border-radius:7px;overflow:hidden;}
 .graph-toggle .gt{padding:3px 9px;cursor:pointer;color:var(--muted);background:var(--panel-2);}
 .graph-toggle .gt.on{background:rgba(59,130,246,.18);color:#fff;}
+/* 상세 분석 / 공격경로 분석 탭 — 항목 선택 시에만 나타난다. */
+.ana-tabs{display:flex;gap:6px;margin:9px 0 11px;border-bottom:1px solid var(--border);padding-bottom:9px;}
+.atab{font-size:11.5px;font-weight:700;padding:5px 11px;border-radius:7px;background:var(--panel-2);border:1px solid var(--border);color:var(--muted);cursor:pointer;user-select:none;}
+.atab:hover{color:#fff;border-color:var(--blue);}
+.atab.on{background:rgba(59,130,246,.16);border-color:rgba(59,130,246,.45);color:#fff;}
+.path-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}
+/* 그래프는 viewBox 자연 크기까지만 — 폭에 맞춰 늘리면 노드·글자가 몇 배로 커진다.
+   실제 상한(max-width)은 내용(노드 수)에 따라 그리는 쪽에서 인라인으로 지정한다. */
 #pathGraph{margin-top:10px;}
-#pathGraph svg{width:100%;height:auto;display:block;}
+#pathGraph svg{width:100%;height:auto;display:block;margin:0 auto;}
 .graph-legend{font-size:10px;color:var(--muted-2);margin-top:8px;line-height:1.6;}
 .graph-legend .lg{display:inline-block;margin-right:10px;}
 .graph-legend .dot{display:inline-block;width:8px;height:8px;border-radius:50%;vertical-align:middle;margin-right:3px;}
@@ -150,22 +155,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div class="rb-src">🔍 취약점 <b id="tVuln">-</b> · 📊 보안로그 <b id="tLog">-</b> · 🧰 운영리포트 <b id="tProduct">-</b> · 🛡 하드닝 <b id="tHardening">-</b></div>
     </div>
 
-    <!-- 🧭 공격 경로·도달성 — 통합 위험 우선순위 위(전체 폭). 좌측 항목 선택 시 그 자산 기준으로 갱신. 접기 지원. -->
-    <div class="panel" id="pathPanel" style="margin-bottom:16px;display:none">
-      <div class="ph">🧭 공격 경로 · 도달성 <span class="path-scope" id="pathScope"></span>
-        <span style="float:right;display:inline-flex;gap:8px;align-items:center">
-          <span class="graph-toggle">
-            <span class="gt on" data-mode="source">소스별</span><span class="gt" data-mode="chain">전체 연관성</span>
-          </span>
-          <span class="path-collapse" id="pathCollapse" title="접기/펼치기">▾ 접기</span>
-        </span>
-      </div>
-      <div id="pathBody">
-        <div id="pathGraph"><div class="empty">경로 데이터가 없습니다.</div></div>
-        <div class="graph-legend" id="graphLegend"></div>
-      </div>
-    </div>
-
     <div class="two">
       <div class="panel">
         <div class="ph">통합 위험 우선순위 <span style="font-size:11px;color:var(--muted);font-weight:600">— 4소스 병합</span> <i class="gijo-info" data-topic="위험 우선순위 산정"></i></div>
@@ -181,7 +170,23 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       </div>
       <div class="panel ana">
         <div class="ph" id="anaTitle">항목을 선택하세요</div>
-        <div id="anaBody"><div class="empty">좌측에서 위험 항목을 누르면 상세 분석 + 위 공격 경로가 그 자산 기준으로 바뀝니다.</div></div>
+        <!-- 항목 선택 시 나타나는 탭. 공격 경로는 예전엔 전체 폭 패널이었으나, 선택한 자산 기준
+             분석이므로 상세 분석과 같은 오른쪽 화면에 탭으로 둔다. -->
+        <div class="ana-tabs" id="anaTabs" style="display:none">
+          <span class="atab on" data-tab="detail">📋 상세 분석</span>
+          <span class="atab" data-tab="path">🧭 공격경로 분석</span>
+        </div>
+        <div id="anaBody"><div class="empty">좌측에서 위험 항목을 누르면 상세 분석과 공격경로 분석이 여기에 나옵니다.</div></div>
+        <div id="pathBody" style="display:none">
+          <div class="path-head">
+            <span class="path-scope" id="pathScope"></span>
+            <span class="graph-toggle">
+              <span class="gt on" data-mode="source">소스별</span><span class="gt" data-mode="chain">전체 연관성</span>
+            </span>
+          </div>
+          <div id="pathGraph"><div class="empty">경로 데이터가 없습니다.</div></div>
+          <div class="graph-legend" id="graphLegend"></div>
+        </div>
       </div>
     </div>
 
@@ -248,8 +253,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const title = document.getElementById("anaTitle");
     const body = document.getElementById("anaBody");
     if(!e){ return; }
-    // 위 공격 경로 그래프를 이 자산 기준으로 갱신(소스별·전체 연관성 모두).
+    // 공격 경로 그래프를 이 자산 기준으로 갱신(소스별·전체 연관성 모두) + 탭 노출.
     selectedPathEntity = e.entity || null;
+    var tabs = document.getElementById("anaTabs");
+    if(tabs) tabs.style.display = "flex";
     renderAttackGraph();
     title.textContent = SRC_ICON[e.source] + " " + e.title;
     const corr = data.correlations.find(c => c.eventIds.includes(e.id));
@@ -275,6 +282,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const mk = document.getElementById("mkTask");
     if(mk) mk.addEventListener("click", () => createTask(e));
     body.querySelectorAll("[data-st]").forEach(b => b.addEventListener("click", () => setStatus(e.id, b.dataset.st)));
+    applyAnaTab();   // 선택을 바꿔도 보고 있던 탭을 유지한다.
   }
   async function setStatus(id, status){
     try{
@@ -336,7 +344,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   }
 
   // ③ 공격 경로·도달성 — 그래프 뷰(소스별 방사형 / 전체 연관성 체인). 커스텀 SVG(외부 의존 없음).
-  var attackPaths=[], graphMode="source", selectedPathEntity=null;
+  var attackPaths=[], graphMode="source", selectedPathEntity=null, anaTab="detail";
+  // 오른쪽 화면의 두 탭(상세 분석 / 공격경로 분석) 전환.
+  function applyAnaTab(){
+    var detail=document.getElementById("anaBody"), path=document.getElementById("pathBody");
+    if(detail) detail.style.display = anaTab==="path" ? "none" : "block";
+    if(path) path.style.display = anaTab==="path" ? "block" : "none";
+    document.querySelectorAll("#anaTabs .atab").forEach(function(t){ t.classList.toggle("on", t.dataset.tab===anaTab); });
+    if(anaTab==="path") renderAttackGraph();
+  }
   // 선택 자산의 공격 경로(있으면), 없으면 최상위 경로.
   function pathForSelected(){
     if(selectedPathEntity){ var p=attackPaths.find(function(x){ return x.entity===selectedPathEntity; }); if(p) return p; }
@@ -363,11 +379,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   function findStep(p,kind){ return (p.steps||[]).find(function(s){ return s.kind===kind; }); }
   // 소스별: 중심=거점 자산, 방사형으로 관측 신호(진입/거점취약점/인접이동)
   function graphSource(p){
-    var cx=180, cy=130, R=94, steps=(p.steps||[]).slice(0,6);
+    var steps=(p.steps||[]).slice(0,6);
+    var n=steps.length||1;
+    // 캔버스를 내용에 맞춘다 — 노드가 1~2개인데 6개용 반지름을 쓰면 여백만 커진다.
+    var R = n<=2 ? 66 : n<=4 ? 84 : 96;
+    var W = 2*R+150, H = 2*R+92, cx=W/2, cy=H/2;
     var col={ entry:"#f5928a", foothold:"#f7c777", lateral:"#8fb8ff" };
     var icon={ entry:"🌐", foothold:"⚠", lateral:"➡" };
-    var svg='<svg viewBox="0 0 360 264" role="img" aria-label="공격 경로 소스별 그래프">'+GDEFS;
-    var n=steps.length||1;
+    var svg='<svg viewBox="0 0 '+W+' '+H+'" style="max-width:'+W+'px" role="img" aria-label="공격 경로 소스별 그래프">'+GDEFS;
     steps.forEach(function(s,i){
       var a=-Math.PI/2 + i*(2*Math.PI/n);
       var x=cx+R*Math.cos(a), y=cy+R*Math.sin(a);
@@ -386,7 +405,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   // 전체 연관성: 공격자 → 외부노출 → 취약점 → 대상자산 (경로별 한 행)
   function graphChain(paths){
     var rowH=80, W=360, H=paths.length*rowH+8;
-    var svg='<svg viewBox="0 0 '+W+' '+H+'" role="img" aria-label="공격 경로 전체 연관성 그래프">'+GDEFS;
+    var svg='<svg viewBox="0 0 '+W+' '+H+'" style="max-width:'+W+'px" role="img" aria-label="공격 경로 전체 연관성 그래프">'+GDEFS;
     var xs=[46,150,254,332];
     paths.forEach(function(p,ri){
       var y=44+ri*rowH;
@@ -403,16 +422,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     return svg+'</svg>';
   }
   function renderAttackGraph(){
-    var panel=document.getElementById("pathPanel"), box=document.getElementById("pathGraph"), legend=document.getElementById("graphLegend"), scope=document.getElementById("pathScope");
-    if(!panel||!box) return;
-    if(!attackPaths.length){ panel.style.display="none"; return; }
-    panel.style.display="block";
-    var ap = pathForSelected();
+    var box=document.getElementById("pathGraph"), legend=document.getElementById("graphLegend"), scope=document.getElementById("pathScope");
+    if(!box) return;
+    var ap = attackPaths.length ? pathForSelected() : null;
     var selMatched = selectedPathEntity && attackPaths.some(function(x){ return x.entity===selectedPathEntity; });
     // 선택 자산 표기 — 경로가 있으면 그 자산, 없으면 최상위 표시 안내.
-    if(scope) scope.innerHTML = selMatched ? '· 선택: '+esc(selectedPathEntity)
-      : (selectedPathEntity ? '<span style="color:var(--muted-2)">· 선택 자산 경로 없음 → 최상위 표시</span>' : '');
-    if(!ap){ box.innerHTML='<div class="empty">경로 데이터가 없습니다.</div>'; if(legend) legend.innerHTML=''; return; }
+    if(scope) scope.innerHTML = selMatched ? '선택: '+esc(selectedPathEntity)
+      : (selectedPathEntity ? '<span style="color:var(--muted-2)">선택 자산 경로 없음 → 최상위 표시</span>' : '');
+    if(!ap){ box.innerHTML='<div class="empty">이 자산에 대한 공격 경로 데이터가 없습니다.</div>'; if(legend) legend.innerHTML=''; return; }
     if(graphMode==="chain"){
       var chainPaths = selMatched ? [ap] : attackPaths.slice(0,3);
       box.innerHTML = graphChain(chainPaths);
@@ -468,17 +485,16 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.querySelectorAll(".graph-toggle .gt").forEach(x=>x.classList.toggle("on", x===g));
     renderAttackGraph();
   });
-  // 접기/펼치기 — 공격 경로 그래프를 접어 목록을 넓게 볼 수 있다. 상태는 저장.
+  // 상세 분석 ↔ 공격경로 분석 탭 — 마지막으로 본 탭은 저장해 다음에도 같은 화면으로 연다.
   (function(){
-    const panel = document.getElementById("pathPanel"), btn = document.getElementById("pathCollapse");
-    if(!panel || !btn) return;
-    function apply(collapsed){ panel.classList.toggle("collapsed", collapsed); btn.textContent = collapsed ? "▸ 펼치기" : "▾ 접기"; }
-    let init = false; try{ init = localStorage.getItem("gijo:analysis:pathCollapsed")==="1"; }catch(e){}
-    apply(init);
-    btn.addEventListener("click", ()=>{
-      const c = !panel.classList.contains("collapsed");
-      apply(c);
-      try{ localStorage.setItem("gijo:analysis:pathCollapsed", c?"1":"0"); }catch(e){}
+    const tabs = document.getElementById("anaTabs");
+    if(!tabs) return;
+    try{ if(localStorage.getItem("gijo:analysis:anaTab")==="path") anaTab="path"; }catch(e){}
+    tabs.addEventListener("click", (ev)=>{
+      const t = ev.target.closest(".atab"); if(!t) return;
+      anaTab = t.dataset.tab;
+      try{ localStorage.setItem("gijo:analysis:anaTab", anaTab); }catch(e){}
+      applyAnaTab();
     });
   })();
   document.getElementById("refreshBtn").addEventListener("click", refresh);

@@ -68,8 +68,7 @@ tr:last-child td{border-bottom:none;}
   <div class="main">
     <div class="topbar-row">
       <div>
-        <div class="page-title">❓ 기능 안내</div>
-        <div class="page-sub">GIJO AS의 모든 기능과 각 기능에서 입력하는 칸을 한 곳에 정리했습니다. <b style="color:#f5928a">빨강</b>=필수. 오른쪽 <b style="color:var(--blue-light)">이동 →</b>을 누르면 해당 기능으로 바로 갑니다.</div>
+        <div class="page-title">❓ 기능 안내 <i class="gijo-info" data-topic="기능 안내"></i></div>
       </div>
     </div>
 
@@ -165,6 +164,8 @@ tr:last-child td{border-bottom:none;}
   else init();
 </script>
 
+<div id="gijoChatWidget" data-start="collapsed" data-prompts='["어떤 기능이 있어?"]'></div>
 <script src="nav.js"></script>
+<script src="chatwidget.js"></script>
 </body>
 </html>

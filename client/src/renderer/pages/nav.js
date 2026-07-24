@@ -99,6 +99,17 @@
     return m ? "hub.html?g=" + m[1] : file;
   }
   function go(page) { if (window.gijo && window.gijo.navigateTo) window.gijo.navigateTo(page); }
+  // 지금 보고 있는 화면의 챗봇을 연다. 일반 화면은 같은 문서에 위젯이 있고(gijoOpenChat),
+  // 허브는 화면을 iframe으로 품으므로 보이는 프레임에 postMessage로 넘긴다. 열 대상이 없으면 false.
+  function openChatHere() {
+    if (window.gijoOpenChat) { window.gijoOpenChat(); return true; }
+    var sent = false;
+    Array.prototype.forEach.call(document.querySelectorAll("iframe"), function (f) {
+      if (!f.offsetParent) return; // 숨어 있는 탭 프레임은 건너뛴다
+      try { f.contentWindow.postMessage({ type: "gijo:openChat" }, "*"); sent = true; } catch (e) {}
+    });
+    return sent;
+  }
   // 허브에서 현재 열려 있는 탭(3단계) — t 파라미터. 없으면 null(첫 탭이 활성).
   function currentTabPage() {
     var m = /[?&]t=([^&]+)/.exec(location.search || "");
@@ -138,8 +149,10 @@
       // 업데이트 가능 배지 — 레일 아이콘 모서리 점 + 서브패널 항목의 작은 뱃지.
       ".gn-ic .gn-updot{position:absolute;top:4px;right:4px;width:8px;height:8px;border-radius:50%;background:var(--red);border:1.5px solid #0a1120;}" +
       ".gn-item .gn-upbadge{margin-left:auto;background:var(--red);color:#fff;font-size:9px;font-weight:800;padding:1px 6px;border-radius:20px;}" +
-      // 챗봇에게 물어봐도 실데이터로 답하는 화면 표시 — 모든 메뉴에서 같은 자리(우측)에 일관되게.
-      ".gn-item .gn-bot{margin-left:auto;font-size:11px;opacity:.85;flex:0 0 auto;}" +
+      // 그 화면의 챗봇을 여는 버튼 — 모든 메뉴에서 같은 자리(우측)에 일관되게.
+      // (예전엔 단순 표시였고 챗봇은 우하단 플로팅 알약으로 열었다 → 입구를 여기로 일원화)
+      ".gn-item .gn-bot{margin-left:auto;font-size:12px;opacity:.75;flex:0 0 auto;cursor:pointer;border-radius:6px;padding:1px 5px;line-height:1.4;}" +
+      ".gn-item .gn-bot:hover{opacity:1;background:rgba(59,130,246,.22);}" +
       // ② 3단계(허브 탭) — 활성 2단계 항목 아래로 들여쓰기해 펼친다.
       ".gn-tab{display:flex;align-items:center;gap:7px;padding:6px 13px 6px 28px;font-size:11.5px;color:var(--muted-2);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}" +
       ".gn-tab:hover{color:#fff;background:rgba(255,255,255,.03);}" +
@@ -203,7 +216,14 @@
         var botMark = document.createElement("span");
         botMark.className = "gn-bot";
         botMark.textContent = "🤖";
-        botMark.title = "이 화면 데이터는 챗봇에게 물어봐도 그대로 답합니다";
+        botMark.title = it.label + " 화면의 챗봇 열기 — 그 화면 데이터로 바로 답합니다";
+        // 메뉴 이동(부모 el의 click)과 겹치지 않게 전파를 끊는다.
+        botMark.addEventListener("click", function (ev) {
+          ev.stopPropagation();
+          if (it.page === here && openChatHere()) return;
+          try { localStorage.setItem("gijo:openChatOnLoad", String(Date.now())); } catch (e) {}
+          if (it.page !== here) go(it.page);
+        });
         el.appendChild(botMark);
       }
       if (it.page === "hub.html?g=settings" && updateAvailable) {
