@@ -24,10 +24,16 @@ const OUT_DIR = DECK ? path.join(ROOT, "screenshots", "deck") : path.join(ROOT, 
 fs.mkdirSync(OUT_DIR, { recursive: true });
 
 async function main() {
+  // 라이브 운영서버(실데이터)로 찍을 때는 실계정 비번을 GIJO_SHOT_USER/GIJO_SHOT_PASSWORD로 준다.
+  // 중복 로그인 방지가 켜져 있으면 force로 밀어낸다(현재 앱 세션은 끊길 수 있음).
   const login = await fetch(`${BASE}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username: "jyh", password: "changeme" }),
+    body: JSON.stringify({
+      username: process.env.GIJO_SHOT_USER ?? "jyh",
+      password: process.env.GIJO_SHOT_PASSWORD ?? "changeme",
+      force: true,
+    }),
   }).then((r) => r.json());
   const token = login.accessToken;
   const auth = { headers: { Authorization: `Bearer ${token}` } };
@@ -200,6 +206,11 @@ async function main() {
       // (옆에 "GIJO AS" 텍스트가 이미 있어 로고가 빠져도 헤더가 비지 않는다.)
       await page.addStyleTag({ content: 'img[src*="gijo.ai"]{display:none!important}' });
       await page.waitForTimeout(1200); // 렌더/데이터 반영 대기
+      // 승인(마스터·디테일) 화면은 첫 finding을 자동 선택해 우측 상세(담당 배정·검증·타임라인)까지 담는다.
+      if (s.page === "approvals.html") {
+        await page.evaluate(() => document.querySelector("#rvList .rv-row")?.click());
+        await page.waitForTimeout(500);
+      }
       const outFile = path.join(OUT_DIR, `${s.name}.png`);
       if (DECK) {
         await page.screenshot({ path: outFile }); // 뷰포트만(16:10)
