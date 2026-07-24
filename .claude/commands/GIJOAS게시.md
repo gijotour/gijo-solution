@@ -1,6 +1,6 @@
-# /게시 — 클라이언트 빌드·게시 (Windows 전용)
+# /GIJOAS게시 — 클라이언트 빌드·게시 (Windows 전용)
 
-Electron 클라이언트를 빌드해 운영 서버에 게시한다(자동 업데이트 배포). **Windows에서만 수행** — macOS에서 이 명령을 받으면 "게시는 Windows 담당"이라 안내하고 /인계를 권할 것.
+Electron 클라이언트를 빌드해 운영 서버에 게시한다(자동 업데이트 배포). **Windows에서만 수행** — macOS에서 이 명령을 받으면 "게시는 Windows 담당"이라 안내하고 /GIJOAS인계를 권할 것.
 
 절차:
 
@@ -21,4 +21,4 @@ Electron 클라이언트를 빌드해 운영 서버에 게시한다(자동 업�
 5. **정리**: `git checkout -- client/server-dist/package.json client/server-dist/package-lock.json` (추적 산출물 원복) → 버전 bump 커밋("클라 X.Y.Z 게시 — …") → `git push hub main`.
 6. 보고: 버전·sha256·게시 노트·검증 결과.
 
-전제: 사용자가 게시를 지시했을 때만 실행("빌드 및 게시" 등). 서버 변경이 함께 있으면 /배포를 먼저.
+전제: 사용자가 게시를 지시했을 때만 실행("빌드 및 게시" 등). 서버 변경이 함께 있으면 /GIJOAS배포를 먼저.

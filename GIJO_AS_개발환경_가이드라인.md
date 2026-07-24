@@ -37,16 +37,16 @@
 ## 3. 일상 워크플로 — 공용 슬래시 명령 4종 (.claude/commands/)
 
 ```
-어느 머신이든:  /동기화 → 개발 → /인계
-운영 반영:     (Windows) /배포 → 클라 변경 있으면 /게시
+어느 머신이든:  /GIJOAS동기화 → 개발 → /GIJOAS인계
+운영 반영:     (Windows) /GIJOAS배포 → 클라 변경 있으면 /GIJOAS게시
 ```
 
 | 명령 | 용도 | 핵심 동작 |
 |---|---|---|
-| `/동기화` | 작업 시작 전 | hub 최신 받기(ff-only). 갈라졌으면 rebase 안내. 서버/클라 변경 감지 시 후속 조치 알림 |
-| `/인계` | 작업 마무리 | 커밋 → (서버 변경 시) `npm test` → hub push → **상대 머신 인계 블록 출력** |
-| `/배포` | 운영 배포 | Windows: 테스트 게이트(914개, 실패=중단)→WSL rsync·tsc→MainPID kill→health. Mac: ssh 한 줄 안내/인계 |
-| `/게시` | 클라 게시 | Windows 전용: 버전 bump→`npm run dist`→**실화면 검증 필수**→claude-deploy 게시→server-dist 원복→bump 커밋 |
+| `/GIJOAS동기화` | 작업 시작 전 | hub 최신 받기(ff-only). 갈라졌으면 rebase 안내. 서버/클라 변경 감지 시 후속 조치 알림 |
+| `/GIJOAS인계` | 작업 마무리 | 커밋 → (서버 변경 시) `npm test` → hub push → **상대 머신 인계 블록 출력** |
+| `/GIJOAS배포` | 운영 배포 | Windows: 테스트 게이트(914개, 실패=중단)→WSL rsync·tsc→MainPID kill→health. Mac: ssh 한 줄 안내/GIJOAS인계 |
+| `/GIJOAS게시` | 클라 게시 | Windows 전용: 버전 bump→`npm run dist`→**실화면 검증 필수**→claude-deploy 게시→server-dist 원복→bump 커밋 |
 
 수동 배포 한 줄(Mac 터미널에서): `ssh user@10.8.0.1 "powershell -NoProfile -ExecutionPolicy Bypass -File 'd:/Connect AI/tools/deploy-prod.ps1'"`
 역방향(Mac 갱신): `cd ~/gijo-as && ./tools/update-dev-mac.sh`
@@ -56,7 +56,7 @@
 - 늦게 push하는 쪽이 거부됨 → `git pull --rebase hub main` → push. **다른 파일이면 자동 병합, 코드 유실 없음.**
 - 같은 줄 충돌이면 그 머신의 Claude에게 "hub랑 충돌 났어, 정리해줘".
 - 배포/갱신 스크립트는 전부 **ff-only** — 정리 안 된 상태로는 운영에 절대 안 나감.
-- 예방: 작업 시작 전 `/동기화` 습관 + 가능하면 한 번에 한 머신 + 영역 분담(파일 안 겹치게).
+- 예방: 작업 시작 전 `/GIJOAS동기화` 습관 + 가능하면 한 번에 한 머신 + 영역 분담(파일 안 겹치게).
 
 ## 5. 인프라 상세
 
@@ -110,5 +110,5 @@
 | `GIJO_AS_2머신_개발환경_가이드.md` | 초기 구축 절차 상세 (1회성 세팅) |
 | `GIJO_AS_MAC_올인원_배포_가이드.md` | Mac Metal 빌드·데이터 이식 상세 |
 | `GIJO_AS_개발환경_테스트_매뉴얼.md` | 사용자 직접 검증 T1~T7 |
-| `.claude/commands/*.md` | /동기화·/인계·/배포·/게시 동작 정의 |
+| `.claude/commands/*.md` | /GIJOAS동기화·/GIJOAS인계·/GIJOAS배포·/GIJOAS게시 동작 정의 |
 | `tools/deploy-prod.ps1`, `tools/update-dev-mac.sh` | 배포·갱신 스크립트 본체 |
