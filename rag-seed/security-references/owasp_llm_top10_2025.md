@@ -1,0 +1,12 @@
+# OWASP LLM Top 10 (2025) — AI 모델 자산 점검 항목
+- LLM01 프롬프트 인젝션(Prompt Injection): 입력으로 모델 지시를 탈취·우회.
+- LLM02 민감정보 노출(Sensitive Information Disclosure): 학습·컨텍스트의 기밀·개인정보 유출.
+- LLM03 공급망(Supply Chain): 외부 모델·데이터셋·플러그인의 위·변조.
+- LLM04 데이터·모델 오염(Data and Model Poisoning): 학습/파인튜닝 데이터 조작.
+- LLM05 부적절한 출력 처리(Improper Output Handling): 모델 출력 미검증으로 XSS·SSRF·코드실행.
+- LLM06 과도한 위임(Excessive Agency): 에이전트에 과한 권한·도구 부여.
+- LLM07 시스템 프롬프트 유출(System Prompt Leakage): 시스템 프롬프트 내 비밀 노출.
+- LLM08 벡터·임베딩 취약점(Vector and Embedding Weaknesses): RAG 벡터 저장소 조작·유출.
+- LLM09 잘못된 정보(Misinformation): 환각·오정보의 신뢰성 위험.
+- LLM10 무제한 소비(Unbounded Consumption): 자원 고갈·비용 폭증·DoS.
+- 점검 방법: 자산의 AI-BOM을 기준으로 각 모델·RAG·에이전트에 대해 위 10항목을 매핑하고, 레드팀(프롬프트 인젝션 페이로드)·가드레일·출력 검증·최소권한을 적용해 점검.
