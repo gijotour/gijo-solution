@@ -45,8 +45,10 @@
 |---|---|---|
 | `/GIJOAS동기화` | 작업 시작 전 | hub 최신 받기(ff-only). 갈라졌으면 rebase 안내. 서버/클라 변경 감지 시 후속 조치 알림 |
 | `/GIJOAS인계` | 작업 마무리 | 커밋 → (서버 변경 시) `npm test` → hub push → **상대 머신 인계 블록 출력** |
-| `/GIJOAS배포` | 운영 배포 | Windows: 테스트 게이트(914개, 실패=중단)→WSL rsync·tsc→MainPID kill→health. Mac: ssh 한 줄 안내/GIJOAS인계 |
+| `/GIJOAS배포` | 운영 배포 | Windows: 테스트 게이트(914개, 실패=중단)→WSL rsync·tsc→MainPID kill→health. Mac: ssh 한 줄 안내 또는 인계 |
 | `/GIJOAS게시` | 클라 게시 | Windows 전용: 버전 bump→`npm run dist`→**실화면 검증 필수**→claude-deploy 게시→server-dist 원복→bump 커밋 |
+| `/GIJOAS서버시작` | 서버 기동 | Mac: 빌드·기동·health / Windows: 운영(WSL) 상태확인·재시작(사용자 확인 후) |
+| `/GIJOAS클라시작` | 클라 개발 실행 | 빌드 후 Electron 실행(CDP 9223 기본) — 설치본과 별개 |
 
 수동 배포 한 줄(Mac 터미널에서): `ssh user@10.8.0.1 "powershell -NoProfile -ExecutionPolicy Bypass -File 'd:/Connect AI/tools/deploy-prod.ps1'"`
 역방향(Mac 갱신): `cd ~/gijo-as && ./tools/update-dev-mac.sh`

@@ -21,8 +21,10 @@
 ## 공용 슬래시 명령 (.claude/commands/ — 양 머신 공통, 워크플로 표준)
 - `/GIJOAS동기화` — 작업 시작 전 hub 최신 받기(ff-only, 충돌 안내 포함)
 - `/GIJOAS인계` — 작업 마무리: 커밋→(서버 변경 시)테스트→hub push→**상대 머신 인계 블록 출력**
-- `/GIJOAS배포` — 운영(WSL) 배포. Windows=단계별 직접 수행, Mac=ssh 한 줄 안내/GIJOAS인계
+- `/GIJOAS배포` — 운영(WSL) 배포. Windows=단계별 직접 수행, Mac=ssh 한 줄 안내 또는 인계
 - `/GIJOAS게시` — 클라 빌드·게시. **Windows 전용**(claude-deploy 계정, 실화면 검증 필수)
+- `/GIJOAS서버시작` — Mac=개발 서버 빌드·기동·health / Windows=운영(WSL) 상태확인·재시작(사용자 확인 후)
+- `/GIJOAS클라시작` — 클라 빌드 후 Electron 개발 실행(CDP 9223 기본, electron.exe 직접 실행)
 역할 고정: Mac은 hub push까지, 검토·배포·게시는 Windows. GitHub(origin)는 사용자 요청 시만.
 
 ## 2머신 개발환경 (Windows ↔ M1 Max) — GIJO_AS_2머신_개발환경_가이드.md
