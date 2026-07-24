@@ -12,6 +12,7 @@
 - 컴플라이언스: `ismsp_접근권한_검토`, `개인정보_유출_통지_신고`, `개인정보_접속기록_보관`
 - 사고대응/클라우드/인증: `랜섬웨어_초동_대응`, `aws_s3_퍼블릭_점검`, `mfa_우선적용_대상`
 - AI 보안: `owasp_llm_top10_2025`
+- 보안장비 로그 포맷: `logformat_syslog_pri`, `logformat_cef`, `logformat_leef`, `logformat_fortigate`, `logformat_paloalto_panos`, `logformat_cisco_asa`, `logformat_suricata_eve`, `logformat_snort_alert` (국산 장비 SECUI·윈스·펜타 등은 샘플 로그 확보 시 추가)
 
 근거 표준: CISA(KEV·BOD 22-01), FIRST(EPSS), Tenable(VPR), KISA U-시리즈, ISMS-P, 개인정보 보호법·시행령·안전성 확보조치 기준 고시, OWASP LLM Top 10(2025).
 
