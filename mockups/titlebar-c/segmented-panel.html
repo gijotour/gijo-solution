@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>시안 — 왼쪽 패널 세그먼트 전환 [대시보드|전체메뉴]</title>
+<style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.16);--blue:#3b82f6;--blue-light:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--teal:#1eb980;--amber:#f0a020;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic",sans-serif;background:#1b2030;color:var(--text);padding:22px;}
+.note{font-size:12px;color:var(--muted);margin-bottom:12px;max-width:1100px;line-height:1.7;}
+.pair{display:flex;gap:22px;}
+.cap{font-size:12px;font-weight:800;color:#cfe0ff;margin:10px 0 6px;}
+.win{width:560px;border-radius:10px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.06);background:var(--bg);}
+.titlebar{display:flex;align-items:center;height:38px;background:var(--panel-2);border-bottom:1px solid var(--border);padding:0 12px;gap:8px;font-size:11px;}
+.logo{font-weight:900;font-size:12px;color:#fff;} .logo b{color:var(--blue-light);}
+.chip{display:inline-flex;align-items:center;gap:4px;padding:2px 8px;border-radius:14px;font-size:9.5px;font-weight:800;background:rgba(30,185,128,.15);border:1px solid rgba(30,185,128,.4);color:var(--teal);}
+.sp{flex:1;} .wc{color:var(--muted-2);letter-spacing:3px;font-size:10px;}
+.body{display:flex;height:430px;}
+.left{width:200px;background:var(--panel-2);border-right:1px solid var(--border);display:flex;flex-direction:column;font-size:11px;}
+.content{flex:1;padding:14px;filter:brightness(.5);font-size:11px;}
+.tile{background:var(--panel);border:1px solid var(--border);border-radius:8px;height:70px;margin-bottom:10px;}
+/* 패널 콘텐츠 */
+.pc{flex:1;overflow:hidden;padding:10px;}
+.globe{height:80px;display:flex;align-items:center;justify-content:center;font-size:30px;color:#2c3c66;}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:8px;color:var(--muted);line-height:1.5;font-size:10px;margin-bottom:8px;}
+.mi{padding:6px 10px;color:var(--muted);border-radius:6px;margin-bottom:2px;}
+.mi.on{background:rgba(59,130,246,.12);color:#fff;}
+.gtitle{font-size:9px;font-weight:800;color:var(--muted-2);letter-spacing:1px;margin:8px 6px 4px;}
+/* 하단 클러스터 */
+.bottom{border-top:1px solid var(--border);background:rgba(59,130,246,.05);padding:8px;display:flex;flex-direction:column;gap:6px;}
+.seg{display:flex;background:#0a1120;border:1px solid var(--border-strong);border-radius:9px;padding:3px;gap:3px;}
+.seg span{flex:1;text-align:center;padding:6px 4px;border-radius:7px;font-size:10.5px;font-weight:800;color:var(--muted);cursor:pointer;}
+.seg span.on{background:rgba(59,130,246,.22);color:#fff;border:1px solid rgba(59,130,246,.5);}
+.upd{display:inline-flex;align-items:center;gap:4px;background:rgba(240,160,32,.15);border:1px solid rgba(240,160,32,.45);color:var(--amber);padding:2px 8px;border-radius:12px;font-size:9.5px;font-weight:800;align-self:flex-start;}
+.ua{display:flex;align-items:center;gap:7px;}
+.av{width:22px;height:22px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;}
+.nm{flex:1;font-size:10.5px;font-weight:700;color:#dfe6ff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.gear{width:24px;height:24px;border-radius:7px;background:rgba(59,130,246,.16);border:1px solid rgba(59,130,246,.5);display:flex;align-items:center;justify-content:center;font-size:11px;color:#cfe0ff;}
+</style>
+</head>
+<body>
+<div class="note">
+<b>시안 — 왼쪽 패널 하단 세그먼트 전환 [🏠 대시보드 | ☰ 전체메뉴]</b> (①안: 화면 이동 없이 패널만 교체)<br>
+같은 대시보드 화면입니다. 세그먼트만 눌러 왼쪽 패널이 <b>탐색기 ↔ 전체 메뉴</b>로 바뀝니다(오른쪽 콘텐츠 유지).
+다른 화면에선 "전체메뉴"가 활성으로 시작하고, "대시보드"를 누르면 홈으로 이동합니다. 타이틀바의 ☰ 전체메뉴 버튼은 제거(중복 해소).
+</div>
+<div class="pair">
+  <div>
+    <div class="cap">Ⓐ "대시보드" 모드 (기본) — 탐색기 패널</div>
+    <div class="win">
+      <div class="titlebar"><span class="logo">G<b>I</b>JO</span><span style="font-weight:800">GIJO AS</span><span class="chip">● 양호</span><span class="chip">⏳ 29:56 ▾</span><span class="sp"></span><span class="wc">─ ▢ ✕</span></div>
+      <div class="body">
+        <div class="left">
+          <div class="pc">
+            <div class="globe">🌐</div>
+            <div class="card"><b style="color:#fff">● GIJO AS Desktop</b><br>연동 서버 localhost:4000<br>로컬 모델 3개 · 에이전트 6</div>
+            <div class="mi on">📁 탐색기</div>
+            <div class="mi">🚀 시작 가이드</div>
+            <div class="mi">리포트</div>
+            <div class="mi">문서</div>
+          </div>
+          <div class="bottom">
+            <div class="seg"><span class="on">🏠 대시보드</span><span>☰ 전체메뉴</span></div>
+            <span class="upd">⬆ 업데이트 v2.7.20</span>
+            <div class="ua"><span class="av">배</span><span class="nm">배포 자동화 전용</span><span class="gear">⚙</span></div>
+          </div>
+        </div>
+        <div class="content"><div class="tile"></div><div class="tile"></div><div class="tile" style="height:120px"></div></div>
+      </div>
+    </div>
+  </div>
+  <div>
+    <div class="cap">Ⓑ "전체메뉴" 모드 — 패널만 nav로 교체 (화면 유지)</div>
+    <div class="win">
+      <div class="titlebar"><span class="logo">G<b>I</b>JO</span><span style="font-weight:800">GIJO AS</span><span class="chip">● 양호</span><span class="chip">⏳ 29:56 ▾</span><span class="sp"></span><span class="wc">─ ▢ ✕</span></div>
+      <div class="body">
+        <div class="left">
+          <div class="pc">
+            <div class="gtitle">🖥 관제</div>
+            <div class="mi on">대시보드</div>
+            <div class="mi">보안 분석 🤖</div>
+            <div class="mi">위협 인텔리전스 🤖</div>
+            <div class="mi">리포트 🤖</div>
+            <div class="gtitle">🛡 자산·조치</div>
+            <div class="mi">자산 허브 🤖</div>
+            <div class="mi">조치·승인 🤖</div>
+            <div class="mi">보안제품 🤖</div>
+            <div class="mi">점검 콘솔 🤖</div>
+            <div class="gtitle">🤖 AI</div>
+            <div class="mi">AI 팀</div>
+            <div class="mi">AI 지식·모델 🤖</div>
+            <div class="mi">레드팀·가드레일 🤖</div>
+          </div>
+          <div class="bottom">
+            <div class="seg"><span>🏠 대시보드</span><span class="on">☰ 전체메뉴</span></div>
+            <span class="upd">⬆ 업데이트 v2.7.20</span>
+            <div class="ua"><span class="av">배</span><span class="nm">배포 자동화 전용</span><span class="gear">⚙</span></div>
+          </div>
+        </div>
+        <div class="content"><div class="tile"></div><div class="tile"></div><div class="tile" style="height:120px"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

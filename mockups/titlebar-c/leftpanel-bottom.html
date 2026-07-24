@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>시안 — 업데이트·사용자·설정을 왼쪽 고정 패널로 이동</title>
+<style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.16);--blue:#3b82f6;--blue-light:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--teal:#1eb980;--amber:#f0a020;}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic",sans-serif;background:#1b2030;color:var(--text);padding:24px;}
+.note{font-size:12px;color:var(--muted);margin-bottom:12px;max-width:900px;line-height:1.7;}
+.win{width:1180px;border-radius:10px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.06);background:var(--bg);}
+/* 타이틀바 — 홀쭉해짐: 로고·시계·상태·세션·전체메뉴만 */
+.titlebar{display:flex;align-items:center;height:44px;background:var(--panel-2);border-bottom:1px solid var(--border);padding:0 16px;gap:12px;}
+.logo{font-weight:900;font-size:14px;color:#fff;} .logo b{color:var(--blue-light);}
+.clock{font-size:11.5px;color:var(--blue-light);font-weight:600;}
+.chip{display:inline-flex;align-items:center;gap:5px;padding:3px 10px;border-radius:16px;font-size:11px;font-weight:800;}
+.ok{background:rgba(30,185,128,.15);border:1px solid rgba(30,185,128,.4);color:var(--teal);}
+.ses{background:rgba(30,185,128,.14);border:1px solid rgba(30,185,128,.4);color:var(--teal);}
+.drag{flex:1;text-align:center;font-size:10px;color:rgba(255,255,255,.12);letter-spacing:2px;}
+.fullmenu{border:1px solid var(--border-strong);border-radius:8px;padding:5px 12px;font-size:12px;font-weight:700;color:#dfe6ff;}
+.winctl{display:flex;margin-right:-16px;} .winctl span{width:46px;height:44px;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--muted);}
+/* 본문 */
+.body{display:grid;grid-template-columns:220px 1fr;height:520px;}
+.left{background:var(--panel-2);border-right:1px solid var(--border);display:flex;flex-direction:column;}
+/* ★ 이동된 컨트롤 줄 — 왼쪽 패널 최상단, 오른쪽 정렬. 패널이 고정이라 스크롤 무관 상시 노출 */
+.ctlrow{margin-top:auto;display:flex;align-items:center;justify-content:flex-end;gap:8px;padding:10px 12px;border-top:1px solid var(--border);background:rgba(59,130,246,.05);}
+.upd{display:inline-flex;align-items:center;gap:4px;background:rgba(240,160,32,.15);border:1px solid rgba(240,160,32,.45);color:var(--amber);padding:3px 9px;border-radius:14px;font-size:10.5px;font-weight:800;position:relative;}
+.avatar{width:28px;height:28px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;}
+.gear{width:28px;height:28px;border-radius:8px;background:rgba(59,130,246,.16);border:1px solid rgba(59,130,246,.5);display:flex;align-items:center;justify-content:center;font-size:13px;color:#cfe0ff;position:relative;}
+.gear .dot{position:absolute;top:-3px;right:-3px;width:8px;height:8px;border-radius:50%;background:var(--amber);border:2px solid var(--panel-2);}
+.globe{height:150px;display:flex;align-items:center;justify-content:center;color:#2c3c66;font-size:44px;}
+.card{margin:0 10px 10px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px;font-size:11px;color:var(--muted);line-height:1.6;}
+.card b{color:#fff;}
+.mitem{padding:8px 14px;font-size:12px;color:var(--muted);}
+.mitem.on{background:rgba(59,130,246,.12);color:#fff;border-radius:8px;margin:0 8px;}
+/* 오른쪽 콘텐츠(흐림) */
+.main{padding:18px 22px;filter:brightness(.55);}
+.tile{background:var(--panel);border:1px solid var(--border);border-radius:10px;height:100px;margin-bottom:12px;}
+.g3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+</style>
+</head>
+<body>
+<div class="note">
+<b>시안 — 업데이트·사용자·⚙설정을 왼쪽 고정 패널 하단으로 (VSCode 방식)</b><br>
+타이틀바는 로고·시계·연결상태·세션·전체메뉴만 남아 홀쭉해지고, 세 컨트롤은 스크롤과 무관하게 항상 보이는
+왼쪽 패널의 <b>하단</b>에 삽니다 — <b>Discord 좌하단 패턴</b>(아바타+사용자명 왼쪽 정렬, 같은 줄 오른쪽 끝 ⚙)과 동일 관례. ⚙ 클릭 시 메뉴(배율·서버·업데이트…)는 지금과 동일하게 열립니다(위치만 이동).
+새 버전이 있으면 ⚙에 점 + 위에 ⬆ 업데이트 칩이 나타납니다. <b>대시보드 적용안</b>이며, 왼쪽 패널이 없는
+다른 화면(KPI·자산 등)은 지금처럼 타이틀바 우측에 유지됩니다.
+</div>
+<div class="win">
+  <div class="titlebar">
+    <span class="logo">G<b>I</b>JO</span><span style="font-size:13.5px;font-weight:800">GIJO AS</span>
+    <span class="clock">07. 25. 오전 02:40</span>
+    <span class="chip ok">● 서버 연결상태 양호</span>
+    <span class="chip ses">⏳ 세션 29:56 ▾</span>
+    <span class="drag">· · · 드래그 영역 · · ·</span>
+    <span class="fullmenu">☰ 전체메뉴</span>
+    <div class="winctl"><span>─</span><span>▢</span><span>✕</span></div>
+  </div>
+  <div class="body">
+    <div class="left">
+            <div class="globe">🌐</div>
+      <div class="card"><b>● GIJO AS Desktop</b><br>연동 서버 <b>localhost:4000</b> · 운영중<br>로컬 모델 <b>3</b>개 로드 · 에이전트 <b>6</b></div>
+      <div class="mitem on">📁 탐색기</div>
+      <div class="mitem">🚀 시작 가이드</div>
+      <div class="mitem">리포트</div>
+      <div class="mitem">문서</div>
+      <div style="margin-top:auto"></div>
+      <div class="ctlrow" style="margin-top:0;border-top:none;padding-bottom:4px;justify-content:flex-start"><span class="upd">⬆ 업데이트 v2.7.20</span></div>
+      <div class="ctlrow" style="margin-top:0;justify-content:flex-start"><span class="avatar">배</span><span style="font-size:11.5px;font-weight:700;color:#dfe6ff;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">배포 자동화 전용</span><span class="gear">⚙<span class="dot"></span></span></div>
+    </div>
+    <div class="main">
+      <div class="tile"></div>
+      <div class="g3"><div class="tile"></div><div class="tile"></div><div class="tile"></div></div>
+      <div class="tile" style="height:140px"></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>
