@@ -91,7 +91,7 @@
     panel.innerHTML =
       '<div class="gcp-head"><span class="gcp-title">💬 작업 세션</span>' +
       '<span class="gcp-abadge zero" id="gcpActive">진행중 -</span>' +
-      '<button class="gcp-close" id="gcpClose" title="작업 세션 닫기" style="margin-left:auto">◧ 접기</button></div>' +
+      '<button class="gcp-close" id="gcpClose" title="작업 세션 접기 (다시 열기: 오른쪽 가장자리 탭)" style="margin-left:auto">▷</button></div>' +
       '<div class="gcp-acc gcp-sessions" id="gcpSessAcc" style="flex:1 1 auto">' +
       '<div class="gcp-ab" style="display:flex"><div class="gcp-sitem" id="gcpNewSess">＋ 새 작업 세션</div>' +
       '<div id="gcpSessList" style="overflow-y:auto;flex:1 1 auto"><div class="gcp-empty">불러오는 중…</div></div></div></div>' +

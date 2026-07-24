@@ -238,7 +238,16 @@
     var sHome = document.createElement("span"); sHome.textContent = "🧭 탐색기"; sHome.classList.add("on");
     var sMenu = document.createElement("span"); sMenu.textContent = "☰ 전체메뉴";
     seg.appendChild(sHome); seg.appendChild(sMenu);
+    wrap.style.display = "flex"; wrap.style.gap = "6px"; wrap.style.alignItems = "center";
+    seg.style.flex = "1";
     wrap.appendChild(seg);
+    // 접기 버튼(좌우 공통 디자인) — nav.js의 gijoLeftCollapse 사용(dashboard도 nav.js 로드됨)
+    var pcol = document.createElement("div");
+    pcol.className = "gn-pcol";
+    pcol.title = "사이드바 접기 (다시 열기: 왼쪽 가장자리 탭)";
+    pcol.textContent = "◧";
+    pcol.addEventListener("click", function () { if (window.gijoLeftCollapse) window.gijoLeftCollapse(true); });
+    wrap.appendChild(pcol);
     sHome.addEventListener("click", function () { if (dashMenuMode) toggleDashPanel(false, { home: sHome, menu: sMenu }); });
     sMenu.addEventListener("click", function () { if (!dashMenuMode) toggleDashPanel(true, { home: sHome, menu: sMenu }); });
     return wrap;
