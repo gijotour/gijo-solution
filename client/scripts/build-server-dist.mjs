@@ -73,12 +73,18 @@ const electronVersion = require("electron/package.json").version;
 await rebuild({ buildPath: outDir, electronVersion, onlyModules: ["better-sqlite3"], force: true });
 
 console.log("[build-server-dist] 5/5 불필요한 파일 정리 (용량 최적화)...");
-const prunePaths = [
-  path.join(outDir, "node_modules", "onnxruntime-web"),
-  path.join(outDir, "node_modules", "onnxruntime-node", "bin", "napi-v3", "darwin"),
-  path.join(outDir, "node_modules", "onnxruntime-node", "bin", "napi-v3", "linux"),
-  path.join(outDir, "node_modules", "onnxruntime-node", "bin", "napi-v3", "win32", "arm64")
-];
+// onnxruntime-node는 플랫폼별 바이너리(darwin/linux/win32)를 모두 담고 온다. 빌드하는 플랫폼의
+// 것만 남기고 나머지는 지운다 — Windows 빌드는 darwin/linux를, macOS(Apple Silicon) 빌드는
+// win32/linux를 버린다. (mac 올인원 배포용 — 이걸 분기하지 않으면 mac 설치본에서 darwin 바이너리가
+// 통째로 삭제돼 임베딩/onnx가 죽는다.)
+const plat = process.platform; // 'win32' | 'darwin' | 'linux'
+const ortBase = path.join(outDir, "node_modules", "onnxruntime-node", "bin", "napi-v3");
+const prunePaths = [path.join(outDir, "node_modules", "onnxruntime-web")];
+for (const other of ["darwin", "linux", "win32"]) {
+  if (other !== plat) prunePaths.push(path.join(ortBase, other));
+}
+// Windows는 x64만 쓰므로 win32/arm64는 제거(기존 회귀 유지). darwin은 arm64만 쓰므로 그대로 둔다.
+if (plat === "win32") prunePaths.push(path.join(ortBase, "win32", "arm64"));
 
 for (const prunePath of prunePaths) {
   if (fs.existsSync(prunePath)) {

@@ -163,7 +163,11 @@ export function pickAutoStartModelId(): string | null {
 }
 
 // ── VRAM 예산 & 포트 할당 ────────────────────────────────────────────────────
+// Apple Silicon(mac)은 통합메모리라 GPU(Metal)가 시스템 RAM을 공유한다 — nvidia-smi가 없으므로
+// "여유 VRAM" = 여유 시스템 메모리로 본다. 이렇게 하면 makeRoom·티어 판정이 mac에서도 실수치로 돈다.
+const IS_MAC = process.platform === "darwin";
 function getFreeVramMb(): Promise<number | null> {
+  if (IS_MAC) return Promise.resolve(Math.round(os.freemem() / 1024 / 1024));
   return new Promise((resolve) => {
     execFile("nvidia-smi", ["--query-gpu=memory.free", "--format=csv,noheader,nounits"], (err, stdout) => {
       if (err) return resolve(null);
@@ -184,6 +188,19 @@ export interface GpuUsage {
   memPercent: number; // 0~100
 }
 export function getGpuUsage(): Promise<GpuUsage> {
+  // mac(Metal): nvidia-smi가 없다. 통합메모리를 "GPU 메모리"로 간주해 available:true로 보고한다
+  // → 티어 자동판정·구동 가능 판정이 mac에서도 동작(utilization은 별도 도구 없이 못 재므로 0).
+  if (IS_MAC) {
+    const totalMb = Math.round(os.totalmem() / 1024 / 1024);
+    const usedMb = Math.round((os.totalmem() - os.freemem()) / 1024 / 1024);
+    return Promise.resolve({
+      available: true,
+      utilization: 0,
+      memUsedMb: usedMb,
+      memTotalMb: totalMb,
+      memPercent: totalMb > 0 ? Math.round((usedMb / totalMb) * 100) : 0,
+    });
+  }
   return new Promise((resolve) => {
     execFile(
       "nvidia-smi",
@@ -720,7 +737,9 @@ export function registerLocalEngineRoutes(app: Express): void {
         current,
         recommended,
         reason: gpu.available
-          ? `총 VRAM ${(gpu.memTotalMb / 1024).toFixed(1)}GB — ${GIJO_TIERS.find((t) => t.id === recommended)?.desc ?? ""}`
+          ? IS_MAC
+            ? `Apple Metal · 통합메모리 ${(gpu.memTotalMb / 1024).toFixed(1)}GB — ${GIJO_TIERS.find((t) => t.id === recommended)?.desc ?? ""}`
+            : `총 VRAM ${(gpu.memTotalMb / 1024).toFixed(1)}GB — ${GIJO_TIERS.find((t) => t.id === recommended)?.desc ?? ""}`
           : "NVIDIA GPU를 찾지 못했습니다(nvidia-smi 없음) — 로컬 LLM 구동 미지원 환경입니다.",
         tiers: GIJO_TIERS,
       });

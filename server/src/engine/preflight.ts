@@ -4,6 +4,7 @@
 
 import type { Express } from "express";
 import * as fs from "fs";
+import * as os from "os";
 import { execFileSync } from "child_process";
 import { authMiddleware, adminMiddleware } from "../auth/auth";
 import { llamaBinPath } from "../util/llamabin";
@@ -16,6 +17,11 @@ export interface PreflightCheck {
 }
 
 function gpuAvailable(): { ok: boolean; detail: string } {
+  // macOS(Apple Silicon)는 Metal GPU + 통합메모리를 쓴다 — nvidia-smi가 없어도 정상 구동 환경이다.
+  if (process.platform === "darwin") {
+    const totalGb = (os.totalmem() / 1024 / 1024 / 1024).toFixed(0);
+    return { ok: true, detail: `Apple Metal · 통합메모리 ${totalGb}GB` };
+  }
   try {
     const out = execFileSync("nvidia-smi", ["--query-gpu=name,memory.total", "--format=csv,noheader"], { timeout: 5000 }).toString().trim();
     return { ok: true, detail: out.split("\n")[0] || "GPU 감지" };
@@ -33,7 +39,7 @@ export async function runPreflight(): Promise<{ checks: PreflightCheck[]; ready:
 
   // GPU
   const gpu = gpuAvailable();
-  checks.push({ name: "GPU (nvidia-smi)", status: gpu.ok ? "pass" : "warn", detail: gpu.detail });
+  checks.push({ name: process.platform === "darwin" ? "GPU (Metal)" : "GPU (nvidia-smi)", status: gpu.ok ? "pass" : "warn", detail: gpu.detail });
 
   // llama-server 바이너리 — env 미설정이면 플랫폼별 기본 경로(win: Release/*.exe, linux: */name)를 점검한다.
   const llamaPath = process.env.GIJO_LLAMA_SERVER_PATH ?? llamaBinPath("llama-server");
