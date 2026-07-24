@@ -203,21 +203,15 @@
   }
 
   // ── 대시보드 '전체메뉴' 패널 전환(①안: 화면 이동 없이 패널만 교체) ─────────
-  // 메뉴 구성은 nav.js GROUPS의 사본(대시보드는 nav.js를 안 쓰므로) — nav 메뉴 바뀌면 여기도 갱신.
-  var DASH_MENU = [
-    ["🖥 관제", [["대시보드", null], ["보안 분석", "hub.html?g=analysis"], ["위협 인텔리전스", "hub.html?g=threat"], ["리포트", "hub.html?g=report"]]],
-    ["🛡 자산·조치", [["자산 허브", "hub.html?g=assets"], ["조치·승인", "approvals.html"], ["보안제품", "hub.html?g=products"], ["점검 콘솔", "hub.html?g=inspect"]]],
-    ["🤖 AI", [["AI 팀", "hub.html?g=aiteam"], ["AI 지식·모델", "hub.html?g=aiknowledge"], ["레드팀·가드레일", "redteam.html"]]],
-    ["⚙ 설정", [["설정", "hub.html?g=settings"]]],
-  ];
+  // 메뉴는 nav.js의 공용 렌더러(window.gijoRenderMenu, 단일 소스)로 그린다 — 복사본 폐기(2026-07-25).
   var dashMenuMode = false;
   function toggleDashPanel(toMenu, segEls) {
     var exp = document.querySelector(".explorer");
     if (!exp) return;
     dashMenuMode = toMenu;
-    // 기존 콘텐츠 숨김/복원 (사용자 영역 제외)
+    // 탐색기 콘텐츠 숨김/복원 (세그먼트·사용자 영역·메뉴패널 제외)
     [].forEach.call(exp.children, function (ch) {
-      if (ch.classList.contains("gtb-userarea") || ch.classList.contains("gtb-menu-panel")) return;
+      if (ch.classList.contains("gtb-userarea") || ch.classList.contains("gtb-menu-panel") || ch.classList.contains("gtb-seg-wrap")) return;
       ch.style.display = toMenu ? "none" : "";
     });
     var mp = exp.querySelector(".gtb-menu-panel");
@@ -225,41 +219,35 @@
       if (!mp) {
         mp = document.createElement("div");
         mp.className = "gtb-menu-panel";
-        DASH_MENU.forEach(function (grp) {
-          var g = document.createElement("div"); g.className = "mp-g"; g.textContent = grp[0]; mp.appendChild(g);
-          grp[1].forEach(function (it) {
-            var d = document.createElement("div"); d.className = "mp-i"; d.textContent = it[0];
-            if (it[1]) d.addEventListener("click", function () { window.gijo.navigateTo(it[1]); });
-            else { d.style.color = "#fff"; d.style.background = "rgba(59,130,246,.12)"; } // 현재 화면(대시보드)
-            mp.appendChild(d);
-          });
-        });
         exp.insertBefore(mp, exp.querySelector(".gtb-userarea"));
       }
+      // 진짜 nav 메뉴를 렌더(현재 화면=대시보드가 자동 강조됨)
+      if (window.gijoRenderMenu) window.gijoRenderMenu(mp);
+      else mp.textContent = "메뉴 로딩 중…";
       mp.style.display = "";
     } else if (mp) { mp.style.display = "none"; }
     if (segEls) { segEls.home.classList.toggle("on", !toMenu); segEls.menu.classList.toggle("on", toMenu); }
   }
 
-  // ── 사용자 영역 생성 — [세그먼트] / [⬆업데이트] / [아바타][풀네임][⚙] ──
-  function buildUserArea(kind) {
-    var area = document.createElement("div");
-    area.className = "gtb-userarea";
-    // 세그먼트 [🏠 대시보드 | ☰ 전체메뉴] — 대시보드: 패널 전환 / nav 화면: 홈 이동
+  // ── 대시보드 상단 세그먼트 [🧭 탐색기 | ☰ 전체메뉴] (nav 화면은 nav.js가 세그먼트 렌더) ──
+  function buildDashSegment() {
+    var wrap = document.createElement("div");
+    wrap.className = "gtb-seg-wrap";
     var seg = document.createElement("div");
     seg.className = "gtb-seg";
-    var sHome = document.createElement("span"); sHome.textContent = "🏠 대시보드";
+    var sHome = document.createElement("span"); sHome.textContent = "🧭 탐색기"; sHome.classList.add("on");
     var sMenu = document.createElement("span"); sMenu.textContent = "☰ 전체메뉴";
     seg.appendChild(sHome); seg.appendChild(sMenu);
-    area.appendChild(seg);
-    if (kind === "dash") {
-      sHome.classList.add("on");
-      sHome.addEventListener("click", function () { if (dashMenuMode) toggleDashPanel(false, { home: sHome, menu: sMenu }); });
-      sMenu.addEventListener("click", function () { if (!dashMenuMode) toggleDashPanel(true, { home: sHome, menu: sMenu }); });
-    } else {
-      sMenu.classList.add("on"); // nav 화면 = 전체메뉴가 이미 보이는 상태
-      sHome.addEventListener("click", function () { window.gijo.navigateTo("dashboard.html"); });
-    }
+    wrap.appendChild(seg);
+    sHome.addEventListener("click", function () { if (dashMenuMode) toggleDashPanel(false, { home: sHome, menu: sMenu }); });
+    sMenu.addEventListener("click", function () { if (!dashMenuMode) toggleDashPanel(true, { home: sHome, menu: sMenu }); });
+    return wrap;
+  }
+
+  // ── 사용자 영역 생성 — [⬆업데이트] / [아바타][풀네임][⚙] (세그먼트는 별도) ──
+  function buildUserArea() {
+    var area = document.createElement("div");
+    area.className = "gtb-userarea";
     var upd = document.createElement("div");
     upd.className = "ua-upd";
     upd.addEventListener("click", function () { window.gijo.navigateTo("hub.html?g=settings&t=update.html"); });
@@ -302,23 +290,26 @@
     return area;
   }
 
-  // ── 마운트 — 화면 유형별 왼쪽 패널 하단 ─────────────────────────────────
+  // ── 마운트 — 화면 유형별 왼쪽 패널 ─────────────────────────────────────
   function mountUserArea() {
     if (document.querySelector(".gtb-userarea")) return true;
-    var sub = document.querySelector("#gijoNav .gn-sub");
-    if (sub) {
-      // nav 사이드바(100vh 고정): absolute로 하단 고정
-      sub.style.position = "relative";
-      var a = buildUserArea("nav");
-      a.style.cssText += "position:absolute;bottom:0;left:0;right:0;";
-      sub.appendChild(a);
+    // nav 화면: #gijoNav는 flex 컬럼(gn-top·gn-mid). 사용자 영역을 마지막 flex 자식으로.
+    var navRoot = document.getElementById("gijoNav");
+    if (navRoot && navRoot.querySelector(".gn-mid")) {
+      var a = buildUserArea();
+      a.style.cssText += "flex:0 0 auto;";
+      navRoot.appendChild(a);
       return true;
     }
+    // dashboard: .explorer를 100vh 고정 컬럼으로 — 세그먼트(sticky top)·탐색기/메뉴(scroll)·사용자(sticky bottom).
     var exp = document.querySelector(".explorer");
     if (exp) {
-      // dashboard 왼쪽 컬럼: sticky bottom — 스크롤과 무관하게 하단에 붙는다
-      var a2 = buildUserArea("dash");
-      a2.style.cssText += "position:sticky;bottom:0;margin:12px -12px 0;background:#0e1526;";
+      exp.style.cssText += "position:sticky;top:0;height:100vh;overflow-y:auto;";
+      var seg = buildDashSegment();
+      seg.style.cssText = "position:sticky;top:0;z-index:6;background:var(--panel-2,#0e1526);margin:-18px -12px 10px;padding:8px 12px;border-bottom:1px solid var(--border);";
+      exp.insertBefore(seg, exp.firstChild);
+      var a2 = buildUserArea();
+      a2.style.cssText += "position:sticky;bottom:0;margin:12px -12px -18px;background:#0e1526;";
       exp.appendChild(a2);
       return true;
     }
@@ -333,7 +324,7 @@
 
   var navRoot = document.getElementById("gijoNav");
   if (navRoot || document.querySelector(".explorer")) {
-    // nav.js는 titlebar.js보다 늦게(또는 재렌더로) .gn-sub를 만들 수 있다 — 관찰자를 먼저 걸고
+    // nav.js는 titlebar.js보다 늦게(또는 재렌더로) .gn-mid를 만들 수 있다 — 관찰자를 먼저 걸고
     // 지금도 한 번 시도한다. 재렌더(root.innerHTML='')로 사라져도 자동 재마운트.
     if (mountUserArea()) afterMount();
     if (navRoot) {

@@ -128,146 +128,94 @@
     var st = document.createElement("style");
     st.id = "gijoNavCss";
     st.textContent =
-      // 사이드바 열을 레일+서브패널 폭으로. #gijoNav(=.sidebar)의 기존 패딩·테두리·min-height 무력화.
-      ".app{grid-template-columns:auto 1fr !important;}" +
-      "#gijoNav{padding:0 !important;border-right:0 !important;min-height:0 !important;display:flex;position:sticky;top:0;height:100vh;align-self:start;z-index:20;}" +
-      // 레일(54)+서브패널(166)=220px — 기존 사이드바 폭과 동일하게 맞춰 본문이 좁아지지 않게 한다.
-      ".gn-rail{width:54px;background:#0a1120;border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;padding:8px 0;gap:3px;height:100vh;}" +
-      ".gn-ic{width:42px;height:42px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;color:var(--muted);cursor:pointer;flex:0 0 auto;}" +
-      ".gn-ic:hover{background:rgba(255,255,255,.05);color:#fff;}" +
-      ".gn-ic.active{background:rgba(59,130,246,.16);color:var(--blue-light);}" +
-      ".gn-ic.hasactive::after{content:'';position:absolute;margin-top:26px;margin-left:26px;width:6px;height:6px;border-radius:50%;background:var(--blue);}" +
-      ".gn-spacer{flex:1 1 auto;}" +
-      ".gn-sub{width:166px;background:var(--panel-2);border-right:1px solid var(--border);height:100vh;overflow-y:auto;padding:6px 0;}" +
-      ".gn-subtitle{font-size:11.5px;font-weight:800;color:#fff;padding:14px 13px 9px;letter-spacing:.2px;}" +
-      ".gn-item{padding:8px 13px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}" +
-      ".gn-item:hover{color:#fff;background:rgba(255,255,255,.03);}" +
-      ".gn-item.active{color:var(--blue-light);box-shadow:inset 3px 0 0 var(--blue);background:rgba(59,130,246,.08);cursor:default;}" +
-      // 레일(54px)에선 가로 워드마크가 잘리므로, 앞의 마크만 보이게 크롭한다(overflow hidden + 좌측 정렬).
-      ".gn-logo{height:30px;width:30px;overflow:hidden;display:flex;align-items:center;justify-content:flex-start;margin:0 auto 8px;cursor:pointer;}" +
-      ".gn-logo img{height:24px;width:auto;max-width:none;flex:0 0 auto;object-position:left center;}" +
-      // 업데이트 가능 배지 — 레일 아이콘 모서리 점 + 서브패널 항목의 작은 뱃지.
-      ".gn-ic .gn-updot{position:absolute;top:4px;right:4px;width:8px;height:8px;border-radius:50%;background:var(--red);border:1.5px solid #0a1120;}" +
-      ".gn-item .gn-upbadge{margin-left:auto;background:var(--red);color:#fff;font-size:9px;font-weight:800;padding:1px 6px;border-radius:20px;}" +
-      // 그 화면의 챗봇을 여는 버튼 — 모든 메뉴에서 같은 자리(우측)에 일관되게.
-      // (예전엔 단순 표시였고 챗봇은 우하단 플로팅 알약으로 열었다 → 입구를 여기로 일원화)
-      ".gn-item .gn-bot{margin-left:auto;font-size:12px;opacity:.75;flex:0 0 auto;cursor:pointer;border-radius:6px;padding:1px 5px;line-height:1.4;}" +
+      // 통일 사이드바(2026-07-25): 아이콘 레일 폐기 → 단일 232px 3단 컬럼(상단 세그먼트 고정 · 중앙
+      // 메뉴 스크롤 · 하단 사용자 영역 titlebar.js). 전 화면 100vh 고정으로 통일.
+      ".app{grid-template-columns:232px 1fr !important;}" +
+      "#gijoNav{padding:0 !important;border-right:1px solid var(--border) !important;min-height:0 !important;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;align-self:start;z-index:20;background:var(--panel-2);}" +
+      ".gn-top{padding:8px;border-bottom:1px solid var(--border);flex:0 0 auto;}" +
+      ".gn-seg{display:flex;background:#0a1120;border:1px solid var(--border-strong);border-radius:9px;padding:3px;gap:3px;}" +
+      ".gn-seg span{flex:1;text-align:center;padding:6px 4px;border-radius:7px;font-size:11px;font-weight:800;color:var(--muted);cursor:pointer;border:1px solid transparent;}" +
+      ".gn-seg span.on{background:rgba(59,130,246,.22);color:#fff;border-color:rgba(59,130,246,.5);}" +
+      ".gn-mid{flex:1 1 auto;overflow-y:auto;padding:8px 6px;}" +
+      ".gn-mid::-webkit-scrollbar{width:5px;} .gn-mid::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:3px;}" +
+      // 그룹 헤더(대문자 스타일 소제목) + 항목(텍스트 중심, 아이콘 최소).
+      ".gn-g{font-size:9.5px;font-weight:800;color:var(--muted-2);letter-spacing:1.2px;margin:12px 10px 5px;}" +
+      ".gn-g:first-child{margin-top:2px;}" +
+      ".gn-item{display:flex;align-items:center;gap:7px;padding:8px 11px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:1px;white-space:nowrap;overflow:hidden;}" +
+      ".gn-item:hover{color:#fff;background:rgba(255,255,255,.04);}" +
+      ".gn-item.active{color:#fff;background:rgba(59,130,246,.14);box-shadow:inset 3px 0 0 var(--blue);cursor:default;}" +
+      ".gn-item .gn-label{flex:1;overflow:hidden;text-overflow:ellipsis;}" +
+      // 그 화면의 챗봇을 여는 버튼 — 모든 항목에서 같은 자리(우측).
+      ".gn-item .gn-bot{flex:0 0 auto;font-size:12px;opacity:.7;cursor:pointer;border-radius:6px;padding:1px 5px;line-height:1.4;}" +
       ".gn-item .gn-bot:hover{opacity:1;background:rgba(59,130,246,.22);}" +
-      // ② 3단계(허브 탭) — 활성 2단계 항목 아래로 들여쓰기해 펼친다.
-      ".gn-tab{display:flex;align-items:center;gap:7px;padding:6px 13px 6px 28px;font-size:11.5px;color:var(--muted-2);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}" +
-      ".gn-tab:hover{color:#fff;background:rgba(255,255,255,.03);}" +
-      ".gn-tab.active{color:#fff;font-weight:700;}" +
-      ".gn-tab .gn-tdot{width:4px;height:4px;border-radius:50%;background:currentColor;flex:0 0 auto;}" +
-      ".gn-tab.active .gn-tdot{background:var(--blue-light);}";
+      // 업데이트 가능 배지(설정 항목).
+      ".gn-item .gn-upbadge{flex:0 0 auto;background:var(--amber,#f0a020);color:#3a2a00;font-size:9px;font-weight:900;border-radius:20px;padding:1px 6px;}";
     document.head.appendChild(st);
   }
 
-  var shownGroupId = null; // 현재 서브패널에 펼친 대분류(초기값=현재 페이지의 대분류)
   var updateAvailable = false; // 클라이언트 새 버전 존재 여부(checkUpdateBadge가 채움)
+
+  // 2단(그룹+항목) 메뉴를 container에 렌더한다 — nav 사이드바와 대시보드 '전체메뉴' 모드가 공유하는
+  // 단일 소스(복사본 폐기, 2026-07-25). 3단계 탭은 제거(허브 화면 상단 탭이 그 역할).
+  function buildMenu(container) {
+    injectCss(); // 대시보드('전체메뉴' 모드)에서 render()를 안 거쳐도 gn-* 스타일이 있게.
+    container.innerHTML = "";
+    var here = currentKey();
+    GROUPS.forEach(function (g) {
+      var gh = document.createElement("div"); gh.className = "gn-g"; gh.textContent = g.label; container.appendChild(gh);
+      g.items.forEach(function (it) {
+        var el = document.createElement("div");
+        el.className = "gn-item" + (it.page === here ? " active" : "");
+        var lab = document.createElement("span"); lab.className = "gn-label"; lab.textContent = it.label; el.appendChild(lab);
+        if (it.bot) {
+          var botMark = document.createElement("span");
+          botMark.className = "gn-bot";
+          botMark.textContent = "🤖";
+          botMark.title = it.label + " 화면의 챗봇 열기 — 그 화면 데이터로 바로 답합니다";
+          botMark.addEventListener("click", function (ev) {
+            ev.stopPropagation();
+            if (it.page === here && openChatHere()) return;
+            try { localStorage.setItem("gijo:openChatOnLoad", String(Date.now())); } catch (e) {}
+            if (it.page !== here) go(it.page);
+          });
+          el.appendChild(botMark);
+        }
+        if (it.page === "hub.html?g=settings" && updateAvailable) {
+          var upBadge = document.createElement("span"); upBadge.className = "gn-upbadge"; upBadge.textContent = "1"; upBadge.title = "새 버전 있음"; el.appendChild(upBadge);
+        }
+        if (it.office) {
+          el.addEventListener("click", function () { if (window.gijo && window.gijo.openTeamOffice) window.gijo.openTeamOffice(); });
+        } else if (it.page !== here) {
+          el.addEventListener("click", function () { go(it.page); });
+        }
+        container.appendChild(el);
+      });
+    });
+  }
+  // 대시보드가 '전체메뉴' 모드에서 같은 메뉴를 렌더하도록 공개(단일 소스).
+  window.gijoRenderMenu = buildMenu;
 
   function render() {
     var root = document.getElementById("gijoNav");
     if (!root) return;
     injectCss();
-    var here = currentKey();
-    var activeGroup = groupOf(here);
-    if (!shownGroupId) shownGroupId = activeGroup.id;
-    var shown = GROUPS.filter(function (g) { return g.id === shownGroupId; })[0] || activeGroup;
-
-    // 레일
-    var rail = document.createElement("div");
-    rail.className = "gn-rail";
-    var logo = document.createElement("div");
-    logo.className = "gn-logo";
-    logo.title = "대시보드로";
-    logo.innerHTML = '<img src="https://gijo.ai/_nuxt/logo_gijo_only_white.ATZVOJtw.svg" alt="GIJO">';
-    logo.addEventListener("click", function () { go("dashboard.html"); });
-    rail.appendChild(logo);
-    var spacerAdded = false;
-    GROUPS.forEach(function (g) {
-      if (g.bottom && !spacerAdded) { var sp = document.createElement("div"); sp.className = "gn-spacer"; rail.appendChild(sp); spacerAdded = true; }
-      var ic = document.createElement("div");
-      ic.className = "gn-ic" + (g.id === shown.id ? " active" : "") + (g.id === activeGroup.id && g.id !== shown.id ? " hasactive" : "");
-      ic.style.position = "relative";
-      ic.title = g.label + (g.id === "settings" && updateAvailable ? " — 업데이트 가능" : "");
-      ic.textContent = g.ic;
-      if (g.id === "settings" && updateAvailable) {
-        var dot = document.createElement("span");
-        dot.className = "gn-updot";
-        ic.appendChild(dot);
-      }
-      ic.addEventListener("click", function () { shownGroupId = g.id; render(); });
-      rail.appendChild(ic);
-    });
-
-    // 서브패널
-    var sub = document.createElement("div");
-    sub.className = "gn-sub";
-    var title = document.createElement("div");
-    title.className = "gn-subtitle";
-    title.textContent = shown.ic + " " + shown.label;
-    sub.appendChild(title);
-    shown.items.forEach(function (it) {
-      var el = document.createElement("div");
-      el.className = "gn-item" + (it.page === here ? " active" : "");
-      el.style.display = "flex";
-      el.textContent = it.label;
-      if (it.bot) {
-        var botMark = document.createElement("span");
-        botMark.className = "gn-bot";
-        botMark.textContent = "🤖";
-        botMark.title = it.label + " 화면의 챗봇 열기 — 그 화면 데이터로 바로 답합니다";
-        // 메뉴 이동(부모 el의 click)과 겹치지 않게 전파를 끊는다.
-        botMark.addEventListener("click", function (ev) {
-          ev.stopPropagation();
-          if (it.page === here && openChatHere()) return;
-          try { localStorage.setItem("gijo:openChatOnLoad", String(Date.now())); } catch (e) {}
-          if (it.page !== here) go(it.page);
-        });
-        el.appendChild(botMark);
-      }
-      if (it.page === "hub.html?g=settings" && updateAvailable) {
-        var upBadge = document.createElement("span");
-        upBadge.className = "gn-upbadge";
-        upBadge.textContent = "1";
-        el.appendChild(upBadge);
-      }
-      if (it.office) {
-        // 페이지 이동이 아니라 별도 창(우리 AI 팀 사무실)을 연다.
-        el.addEventListener("click", function () { if (window.gijo && window.gijo.openTeamOffice) window.gijo.openTeamOffice(); });
-      } else if (it.page !== here) {
-        el.addEventListener("click", function () { go(it.page); });
-      }
-      sub.appendChild(el);
-
-      // ② 활성 2단계 항목이 허브면 그 탭(3단계)을 하위에 펼친다 — 상단 탭과 별개로 좌측에서도 이동.
-      var hubMatch = it.page && /^hub\.html\?g=([a-z]+)$/.exec(it.page);
-      if (it.page === here && hubMatch && HUBS[hubMatch[1]] && HUBS[hubMatch[1]].tabs.length > 1) {
-        var gid = hubMatch[1];
-        var curTab = currentTabPage();
-        HUBS[gid].tabs.forEach(function (t, idx) {
-          var isActive = curTab ? t.page === curTab : idx === 0;
-          var tabEl = document.createElement("div");
-          tabEl.className = "gn-tab" + (isActive ? " active" : "");
-          var dot = document.createElement("span"); dot.className = "gn-tdot"; tabEl.appendChild(dot);
-          var lbl = document.createElement("span"); lbl.textContent = t.label; tabEl.appendChild(lbl);
-          if (t.office) {
-            tabEl.addEventListener("click", function () { if (window.gijo && window.gijo.openTeamOffice) window.gijo.openTeamOffice(); });
-          } else if (t.page) {
-            tabEl.addEventListener("click", function () { go("hub.html?g=" + gid + "&t=" + encodeURIComponent(t.page)); });
-          }
-          sub.appendChild(tabEl);
-        });
-      }
-    });
-
     root.innerHTML = "";
-    root.appendChild(rail);
-    root.appendChild(sub);
+    // 상단 세그먼트 [🏠 대시보드 | ☰ 전체메뉴] — nav 화면은 '전체메뉴'가 이미 활성.
+    var top = document.createElement("div"); top.className = "gn-top";
+    var seg = document.createElement("div"); seg.className = "gn-seg";
+    var sHome = document.createElement("span"); sHome.textContent = "🏠 대시보드";
+    var sMenu = document.createElement("span"); sMenu.textContent = "☰ 전체메뉴"; sMenu.classList.add("on");
+    sHome.addEventListener("click", function () { go("dashboard.html"); });
+    seg.appendChild(sHome); seg.appendChild(sMenu); top.appendChild(seg); root.appendChild(top);
+    // 중앙 메뉴(스크롤)
+    var mid = document.createElement("div"); mid.className = "gn-mid";
+    buildMenu(mid); root.appendChild(mid);
+    // 하단 사용자 영역은 titlebar.js가 #gijoNav 마지막 자식으로 마운트(관찰자).
   }
 
   function loadOnboarding() {
     if (document.getElementById("gijoObScript")) return;
+    if (document.querySelector('script[src*="onboarding.js"]')) return; // 대시보드는 자체 로드 — 중복 방지
     var s = document.createElement("script");
     s.id = "gijoObScript";
     s.src = "onboarding.js";
