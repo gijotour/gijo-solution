@@ -110,8 +110,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   <div class="main">
     <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px">
       <div>
-        <div class="page-title">🔌 MCP 연동</div>
-        <div class="page-sub">MCP(Model Context Protocol)로 AI 에이전트를 외부 도구·데이터(위협 인텔·취약점 스캐너·티켓·SIEM 등)에 표준으로 연결합니다. 온프렘 보안 원칙에 따라 <b style="color:#dfe8f7">기본 OFF·관리자 게이팅</b>, 외부로 데이터가 나가는 <b style="color:var(--amber)">원격 서버는 egress 승인</b>을 받아야 활성화되며, 에이전트별 도구 허용과 호출 감사를 남깁니다.</div>
+        <div class="page-title">🔌 MCP 연동 <i class="gijo-info" data-topic="MCP 연동"></i></div>
       </div>
       <button class="btn pri" id="addBtn" style="white-space:nowrap">＋ MCP 서버 추가</button>
     </div>
@@ -295,6 +294,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   if (!window.gijo.isAuthenticated()) window.gijo.navigateTo("login.html");
   else wire();
 </script>
+<div id="gijoChatWidget" data-start="collapsed" data-prompts='["MCP 연동 상태 알려줘"]'></div>
 <script src="nav.js"></script>
+<script src="chatwidget.js"></script>
 </body>
 </html>

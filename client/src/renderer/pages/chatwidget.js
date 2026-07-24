@@ -30,16 +30,14 @@
       ".gcw{position:fixed;right:24px;top:70px;bottom:auto;width:460px;max-width:92vw;height:620px;max-height:82vh;" +
       "background:var(--panel,#121a2e);border:1px solid rgba(139,124,240,.4);border-radius:14px;" +
       "box-shadow:0 12px 40px rgba(0,0,0,.5);padding:16px;display:flex;flex-direction:column;box-sizing:border-box;z-index:700;transition:height .15s,width .15s;}" +
-      ".gcw.collapsed{height:auto;width:auto;padding:0;}" +
+      // 닫힌 상태는 완전히 숨긴다 — 예전엔 우하단 "🤖 챗봇" 알약이 떠 있었으나,
+      // 여는 입구를 좌측 메뉴의 🤖 아이콘 하나로 일원화했다(2026-07-24).
+      ".gcw.collapsed{display:none;}" +
       ".gcw-head{font-size:13.5px;font-weight:800;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:4px;}" +
       ".gcw-head .gcw-title{display:flex;align-items:center;gap:6px;}" +
       ".gcw-toggle{cursor:pointer;font-size:11px;color:var(--muted,#8b93ab);border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:20px;padding:3px 10px;flex-shrink:0;}" +
       ".gcw-toggle:hover{color:#fff;border-color:var(--blue,#3b82f6);}" +
-      ".gcw.collapsed .gcw-head{background:var(--panel,#121a2e);border:1px solid rgba(139,124,240,.4);border-radius:24px;box-shadow:0 6px 18px rgba(0,0,0,.4);padding:2px;margin:0;}" +
-      ".gcw.collapsed .gcw-title{display:none;}" +
-      ".gcw.collapsed .gcw-toggle{border:0;padding:10px 18px;font-size:12px;font-weight:700;color:#fff;}" +
       ".gcw-body{display:flex;flex-direction:column;flex:1;min-height:0;}" +
-      ".gcw.collapsed .gcw-body,.gcw.collapsed .gcw-sub{display:none;}" +
       ".gcw-sub{font-size:10.5px;color:var(--muted-2,#5f6785);margin-bottom:10px;}" +
       ".gcw-guide{background:var(--panel-2,#0e1526);border:1px solid var(--border,rgba(255,255,255,.08));border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:11px;color:var(--muted,#8b93ab);line-height:1.7;flex-shrink:0;}" +
       ".gcw-chip{display:inline-block;background:var(--panel-2,#0e1526);border:1px solid var(--border-strong,rgba(255,255,255,.16));color:var(--blue-light,#5fa1ff);font-size:10.5px;padding:4px 10px;border-radius:20px;margin:3px 4px 0 0;cursor:pointer;}" +
@@ -53,6 +51,26 @@
       ".gcw-dock{display:flex;gap:6px;margin-top:8px;flex-shrink:0;}" +
       ".gcw-dock input{flex:1;background:var(--panel-2,#0e1526);border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:8px;padding:9px 11px;color:var(--text,#e7eaf3);font-size:11.5px;outline:none;}" +
       ".gcw-dock button{background:var(--blue,#3b82f6);color:#fff;border:0;border-radius:8px;padding:0 14px;font-size:11.5px;font-weight:700;cursor:pointer;}" +
+      // 확인 후 실행 — 쓰기 작업은 답만 하고 끝내지 않고, 무엇을 어떤 값으로 실행할지 카드로
+      // 보여 준 뒤 승인해야 실행한다(대시보드 지휘 콘솔의 결재판과 같은 규약).
+      ".gcw-ap{background:rgba(240,160,32,.07);border:1px solid rgba(240,160,32,.42);border-radius:10px;padding:10px 12px;font-size:11.5px;}" +
+      ".gcw-ap-head{font-weight:800;color:#f3c06a;margin-bottom:3px;}" +
+      ".gcw-ap-intro{color:var(--muted,#8b93ab);font-size:10.5px;margin-bottom:8px;line-height:1.6;}" +
+      ".gcw-ap-f{display:flex;align-items:center;gap:6px;margin-bottom:5px;}" +
+      ".gcw-ap-k{font-size:10.5px;color:var(--muted,#8b93ab);width:78px;flex:0 0 auto;}" +
+      ".gcw-ap-k .req{color:var(--red,#e2483d);margin-left:2px;}" +
+      ".gcw-ap-in{flex:1;min-width:0;background:var(--panel-2,#0e1526);border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:6px;padding:5px 8px;color:var(--text,#e7eaf3);font-size:11px;outline:none;}" +
+      ".gcw-ap-in.need{border-color:rgba(226,72,61,.55);}" +
+      ".gcw-ap-effect{background:var(--panel-2,#0e1526);border-radius:7px;padding:7px 9px;margin-top:7px;font-size:10.5px;color:var(--muted,#8b93ab);line-height:1.6;}" +
+      ".gcw-ap-actions{display:flex;gap:6px;margin-top:9px;}" +
+      ".gcw-ap-actions button{border:0;border-radius:7px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;}" +
+      ".gcw-ap-go{background:var(--teal,#1eb980);color:#04150f;}" +
+      ".gcw-ap-go:disabled{opacity:.5;cursor:not-allowed;}" +
+      ".gcw-ap-no{background:transparent;color:var(--muted,#8b93ab);border:1px solid var(--border-strong,rgba(255,255,255,.16)) !important;}" +
+      ".gcw-undo{margin-top:7px;background:transparent;border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:7px;color:var(--muted,#8b93ab);font-size:10.5px;padding:4px 10px;cursor:pointer;}" +
+      // 해석 배지 — "무엇으로 이해했는지"를 답 위에 한 줄로 보여 준다.
+      ".gcw-read{font-size:10px;color:var(--muted-2,#5f6785);margin-bottom:4px;}" +
+      ".gcw-read b{color:var(--blue-light,#5fa1ff);font-weight:700;}" +
       // ⓘ 도움말 버튼(가독성 개편 2026-07-23) — 화면 상시 노출 설명을 걷어내고, 제목 옆 ⓘ를
       // 누르면 챗봇이 열리며 해당 구역 사용법을 즉답(서버 screenguide, LLM 비용 0)한다.
       ".gijo-info{width:17px;height:17px;border-radius:50%;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.45);" +
@@ -65,12 +83,19 @@
   function build() {
     injectCss();
     host.removeAttribute("style");
-    // 모든 화면에서 접힌 채 시작한다(사용자 방침 2026-07-22) — 우하단 "🤖 챗봇" 알약을 눌러 편다.
+    // 모든 화면에서 닫힌 채 시작한다(사용자 방침 2026-07-22) — 좌측 메뉴의 🤖 아이콘으로 연다.
     // data-start="open"을 명시한 화면만 펼친 채 시작(현재는 없음).
     var startCollapsed = host.dataset.start !== "open";
+    // 메뉴의 🤖를 눌러 다른 화면으로 이동해 온 경우엔 도착하자마자 열어 준다.
+    // 위젯 없는 화면을 거쳐 깃발이 남는 걸 막으려고 10초 안에 찍힌 것만 인정한다.
+    try {
+      var flag = localStorage.getItem("gijo:openChatOnLoad");
+      localStorage.removeItem("gijo:openChatOnLoad");
+      if (flag && Date.now() - Number(flag) < 10000) startCollapsed = false;
+    } catch (e) {}
     host.className = "gcw" + (startCollapsed ? " collapsed" : "");
     host.innerHTML =
-      '<div class="gcw-head"><span class="gcw-title">🤖 이 화면 챗봇</span><span class="gcw-toggle" id="gcwToggle">' + (startCollapsed ? "🤖 챗봇" : "✕ 접기") + "</span></div>" +
+      '<div class="gcw-head"><span class="gcw-title">🤖 이 화면 챗봇</span><span class="gcw-toggle" id="gcwToggle">✕ 닫기</span></div>' +
       '<div class="gcw-body">' +
       '<div class="gcw-sub">이 화면 데이터에 실시간으로 접근 — 궁금한 걸 바로 물어보세요.</div>' +
       (prompts.length
@@ -84,9 +109,18 @@
     var input = document.getElementById("gcwIn");
     var toggle = document.getElementById("gcwToggle");
 
-    toggle.addEventListener("click", function () {
-      var collapsed = host.classList.toggle("collapsed");
-      toggle.textContent = collapsed ? "🤖 챗봇" : "✕ 접기";
+    // 닫기 전용 — 다시 여는 입구는 좌측 메뉴의 🤖 아이콘이다.
+    toggle.addEventListener("click", function () { host.classList.add("collapsed"); });
+
+    function openChat() {
+      host.classList.remove("collapsed");
+      try { input.focus(); } catch (e) {}
+    }
+    // 같은 문서에 네비가 있는 일반 화면용.
+    window.gijoOpenChat = openChat;
+    // 허브(hub.html)는 화면을 iframe으로 품으므로 네비가 부모, 챗봇은 자식에 있다 → postMessage로 받는다.
+    window.addEventListener("message", function (ev) {
+      if (ev && ev.data && ev.data.type === "gijo:openChat") openChat();
     });
 
     function appendRow(kind, html) {
@@ -99,6 +133,86 @@
       return row;
     }
 
+    // "무엇으로 이해했는지" 한 줄. 서버가 정한 경로(route)·실행한 도구를 그대로 보여 준다.
+    var ACTION_LABEL = { scan: "점검·스캔", analyze: "분석", report: "리포트", chat: "질의응답" };
+    function readBadge(r) {
+      var bits = [];
+      if (r.route && r.route.action) bits.push(ACTION_LABEL[r.route.action] || r.route.action);
+      if (r.route && r.route.targetAssetId) bits.push("대상 " + r.route.targetAssetId);
+      if (r.steps && r.steps.length) bits.push(r.steps.length + "단계");
+      if (r.toolCalls && r.toolCalls.length) bits.push("도구 " + r.toolCalls.map(function (t) { return t.tool; }).join(", "));
+      if (!bits.length) return "";
+      return '<div class="gcw-read">이렇게 이해했어요 — <b>' + esc(bits.join(" · ")) + "</b></div>";
+    }
+
+    // 쓰기 작업 결재판 — 실행 전에 도구·인자를 보여 주고, 승인해야 실제로 실행한다.
+    // (서버가 지시만으로는 쓰기 도구를 실행하지 않고 approval을 돌려준다. 승인은 approveAgentTool 경유.)
+    function appendApproval(ap) {
+      var row = appendRow("bot", "");
+      row.className = "gcw-row gcw-ap";
+      row.style.maxWidth = "100%";
+      var fields = ap.fields || [];
+      row.innerHTML =
+        '<div class="gcw-ap-head">🗂️ 실행 승인 — ' + esc(ap.label || ap.tool) + "</div>" +
+        '<div class="gcw-ap-intro">지시를 아래와 같이 정리했습니다. 값을 확인·수정한 뒤 승인하면 실행합니다.</div>' +
+        fields.map(function (f) {
+          return '<div class="gcw-ap-f"><span class="gcw-ap-k">' + esc(f.label || f.key) + (f.required ? '<span class="req">*</span>' : "") + "</span>" +
+            '<input class="gcw-ap-in' + (f.source === "empty" ? " need" : "") + '" data-k="' + esc(f.key) + '" value="' + esc(f.value || "") + '" placeholder="' + esc(f.hint || "") + '"></div>';
+        }).join("") +
+        (ap.effect || ap.undo
+          ? '<div class="gcw-ap-effect">' + (ap.effect ? "<b>실행되면:</b> " + esc(ap.effect) + "<br>" : "") + (ap.undo ? "<b>되돌리기:</b> " + esc(ap.undo) : "") + "</div>"
+          : "") +
+        '<div class="gcw-ap-actions"><button class="gcw-ap-go">✓ 승인하고 실행</button><button class="gcw-ap-no">취소</button></div>';
+
+      var go = row.querySelector(".gcw-ap-go");
+      var inputs = Array.prototype.slice.call(row.querySelectorAll(".gcw-ap-in"));
+      var collect = function () {
+        var o = {};
+        inputs.forEach(function (i) { o[i.dataset.k] = i.value.trim(); });
+        return o;
+      };
+      // 필수값이 비면 승인을 잠근다(서버도 재검증하지만 화면에서 먼저 막는다).
+      var required = fields.filter(function (f) { return f.required; }).map(function (f) { return f.key; });
+      var sync = function () {
+        var args = collect();
+        var missing = required.filter(function (k) { return !args[k]; });
+        go.disabled = missing.length > 0;
+        go.textContent = missing.length ? "✓ 승인 (" + missing.length + "개 입력 필요)" : "✓ 승인하고 실행";
+      };
+      inputs.forEach(function (i) { i.addEventListener("input", sync); });
+      sync();
+
+      row.querySelector(".gcw-ap-no").addEventListener("click", function () {
+        row.className = "gcw-row bot";
+        row.innerHTML = "✕ 실행하지 않았습니다 — " + esc(ap.label || ap.tool);
+      });
+      go.addEventListener("click", async function () {
+        go.disabled = true;
+        go.textContent = "실행 중…";
+        try {
+          var r = await window.gijo.approveAgentTool(ap.tool, collect(), ap.instruction || "");
+          row.className = "gcw-row bot";
+          row.innerHTML = "✅ <b>실행 완료</b> — " + esc(ap.tool) + "<br>" + fmt((r && r.output) || "");
+          if (r && r.undoId) {
+            var ub = document.createElement("button");
+            ub.className = "gcw-undo";
+            ub.textContent = "↩ 방금 실행 취소";
+            ub.addEventListener("click", async function () {
+              ub.disabled = true;
+              try { var u = await window.gijo.undoAgentTool(r.undoId); ub.remove(); appendRow("bot", "↩ " + esc((u && u.message) || "되돌렸습니다.")); }
+              catch (e) { ub.disabled = false; appendRow("error", "되돌리기 실패: " + esc((e && e.message) || e)); }
+            });
+            row.appendChild(ub);
+          }
+        } catch (e) {
+          go.disabled = false;
+          go.textContent = "✓ 승인하고 실행";
+          appendRow("error", "실행 실패: " + esc((e && e.message) || e));
+        }
+        msgs.scrollTop = msgs.scrollHeight;
+      });
+    }
+
     async function send(text) {
       text = (text || input.value).trim();
       if (!text) return;
@@ -108,7 +222,30 @@
       try {
         if (!sessionId) { try { var s = await window.gijo.createWorkSession(text.slice(0, 30), "screen:" + here); sessionId = s && s.id; } catch (e) {} }
         var r = await window.gijo.sendInstruction(text, sessionId || undefined);
-        typing.innerHTML = fmt(r.output || "(응답 없음)");
+        typing.innerHTML = readBadge(r) + fmt(r.output || "(응답 없음)");
+        // 실행이 필요한 지시면 여기서 끝내지 않고 확인 카드를 띄운다.
+        if (r.approval) appendApproval(r.approval);
+        else if (r.confirm && r.confirm.type === "learnloop") {
+          var cRow = appendRow("bot", "");
+          cRow.className = "gcw-row gcw-ap";
+          cRow.style.maxWidth = "100%";
+          var ds = (r.confirm.datasets || []).map(function (d) { return d.id + "(" + d.examples + "건)"; }).join(", ");
+          cRow.innerHTML = '<div class="gcw-ap-head">🔁 학습 루프 실행 확인</div>' +
+            '<div class="gcw-ap-intro">대상 데이터셋: ' + esc(ds || "(없음)") + '<br>오발동을 막기 위해 확인을 눌러야 시작합니다.</div>' +
+            '<div class="gcw-ap-actions"><button class="gcw-ap-go">✓ 학습 시작</button><button class="gcw-ap-no">취소</button></div>';
+          cRow.querySelector(".gcw-ap-no").addEventListener("click", function () {
+            cRow.className = "gcw-row bot"; cRow.innerHTML = "✕ 학습을 시작하지 않았습니다.";
+          });
+          cRow.querySelector(".gcw-ap-go").addEventListener("click", async function () {
+            var b = cRow.querySelector(".gcw-ap-go"); b.disabled = true; b.textContent = "시작 중…";
+            try {
+              var d0 = (r.confirm.datasets || [])[0];
+              await window.gijo.startLearnloopRun(d0 && d0.id);
+              cRow.className = "gcw-row bot"; cRow.innerHTML = "✅ 학습 루프를 시작했습니다.";
+            } catch (e) { b.disabled = false; b.textContent = "✓ 학습 시작"; appendRow("error", "학습 시작 실패: " + esc((e && e.message) || e)); }
+          });
+        }
+        msgs.scrollTop = msgs.scrollHeight;
       } catch (e) {
         typing.className = "gcw-row error";
         typing.innerHTML = "실패: " + esc((e && e.message) || e);
@@ -123,8 +260,7 @@
 
     // ⓘ → 챗봇 열고 해당 구역 사용법 질의. 페이지는 <i class="gijo-info" data-topic="SMTP">i</i>만 두면 된다.
     window.gijoExplain = function (topic) {
-      host.classList.remove("collapsed");
-      toggle.textContent = "✕ 접기";
+      openChat();
       send(topic ? '"' + topic + '" 사용법 알려줘' : "이 화면 사용법 알려줘");
     };
     document.querySelectorAll(".gijo-info").forEach(function (el) {
