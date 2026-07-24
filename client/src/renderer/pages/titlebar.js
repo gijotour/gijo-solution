@@ -17,7 +17,9 @@
     // 헤더 = 타이틀바(드래그). 높이는 페이지 자연값 유지 — 강제하면 밀도 높은 헤더(dashboard)가
     // 줄바꿈으로 깨진다(실측). 우측은 OS 창 컨트롤(env(titlebar-area-*)) 자리만 비운다.
     // mac 신호등(좌측)은 titlebar-area-x가 왼쪽 인셋을 알려주므로 같은 식으로 커버된다.
-    ".header{-webkit-app-region:drag;",
+    // sticky: 타이틀바는 스크롤해도 상단 고정이어야 한다(2026-07-25 양 플랫폼 실증 버그) —
+    // 반응형 레이어가 overflow-x를 hidden 아닌 clip으로 쓴 덕에 sticky가 깨지지 않는다.
+    ".header{position:sticky;top:0;z-index:850;background:var(--panel-2,#0e1526);-webkit-app-region:drag;",
     "padding-right:calc(100vw - env(titlebar-area-width,100vw) - env(titlebar-area-x,0px) + 12px);",
     "padding-left:calc(env(titlebar-area-x,0px) + 20px);}",
     // 인터랙티브 요소는 드래그 제외(클릭 가능해야 함)
