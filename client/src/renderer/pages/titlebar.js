@@ -119,9 +119,11 @@
         zrow.appendChild(b);
       });
     } catch (e) { zrow.textContent = "배율 조회 실패"; }
-    menuEl.appendChild(item("➕", "확대", "Ctrl +", function () { window.gijo.stepUiZoom(1); }));
-    menuEl.appendChild(item("➖", "축소", "Ctrl −", function () { window.gijo.stepUiZoom(-1); }));
-    menuEl.appendChild(item("🖥", "전체 화면 (관제 모드)", "F11", function () { window.gijo.toggleFullscreen(); closeMenu(); }));
+    // 단축키 라벨 플랫폼 분기(mac 실측 회신 반영) — 동작은 공통, 표기만 관례에 맞춘다.
+    var isMac = navigator.platform.indexOf("Mac") === 0;
+    menuEl.appendChild(item("➕", "확대", isMac ? "⌘ +" : "Ctrl +", function () { window.gijo.stepUiZoom(1); }));
+    menuEl.appendChild(item("➖", "축소", isMac ? "⌘ −" : "Ctrl −", function () { window.gijo.stepUiZoom(-1); }));
+    menuEl.appendChild(item("🖥", "전체 화면 (관제 모드)", isMac ? "⌃⌘F" : "F11", function () { window.gijo.toggleFullscreen(); closeMenu(); }));
 
     // [연결] — 로그인 상태에서만
     if (authed) {
