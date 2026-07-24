@@ -278,8 +278,8 @@
   }
 
   async function loadHealth() {
-    try { await window.gijo.checkServerHealth(); statusPill.innerHTML = '<span class="dot"></span>운영중<span class="beta-tag">LIVE</span>'; }
-    catch (e) { statusPill.innerHTML = '<span class="dot" style="background:#e2483d"></span>서버 연결 끊김'; }
+    try { await window.gijo.checkServerHealth(); statusPill.innerHTML = '<span class="dot"></span>서버 연결상태 양호'; }
+    catch (e) { statusPill.innerHTML = '<span class="dot" style="background:#e2483d"></span>서버 연결상태 불량'; }
   }
   async function loadUser() {
     try { const u = await window.gijo.me(); avatarBtn.textContent = (u.displayName || u.username || "-").charAt(0); } catch (e) {}

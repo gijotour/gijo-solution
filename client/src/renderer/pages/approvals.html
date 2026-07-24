@@ -402,9 +402,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     setInterval(tick, 30000);
     try {
       await window.gijo.checkServerHealth();
-      statusPill.innerHTML = '<span class="dot"></span>운영중<span class="beta-tag">LIVE</span>';
+      statusPill.innerHTML = '<span class="dot"></span>서버 연결상태 양호';
     } catch (e) {
-      statusPill.innerHTML = '<span class="dot" style="background:#e2483d"></span>서버 연결 끊김';
+      statusPill.innerHTML = '<span class="dot" style="background:#e2483d"></span>서버 연결상태 불량';
     }
     try {
       const user = await window.gijo.me();

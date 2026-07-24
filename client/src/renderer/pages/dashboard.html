@@ -29,7 +29,8 @@
   .app-title{font-size:15px;font-weight:800;color:#fff;}
   .clock{font-size:12.5px;color:var(--blue-light);font-weight:600;}
   .header-right{display:flex;align-items:center;gap:10px;}
-  .status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
+  /* 세션 칩과 나란히 놓이므로 같은 규격(11px·3×10 패딩)으로 통일 — 2026-07-25 사용자 요청 */
+  .status-pill{display:flex;align-items:center;gap:5px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:3px 10px;border-radius:16px;font-size:11px;font-weight:800;}
   .status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
   .beta-tag{background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
   .icon-row{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;}
@@ -489,10 +490,11 @@
       <div class="app-title">GIJO AS</div></span>
       <div class="clock" id="clockEl">-</div>
       <div id="updateChip" title="새 버전으로 업데이트" style="display:none;align-items:center;gap:5px;background:rgba(240,160,32,.15);border:1px solid rgba(240,160,32,.45);color:var(--amber);padding:3px 10px;border-radius:16px;font-size:11px;font-weight:800;cursor:pointer">⬆ 업데이트 <span id="updateChipVer"></span></div>
-      <div id="sessionChip" title="남은 세션 시간 — 마우스·키보드를 쓰면 자동으로 연장됩니다. 클릭하면 지금 즉시 연장" style="display:none;align-items:center;gap:5px;background:rgba(30,185,128,.14);border:1px solid rgba(30,185,128,.4);color:var(--teal);padding:3px 10px;border-radius:16px;font-size:11px;font-weight:800;cursor:pointer">⏳ 세션 <span id="sessionChipTime">--:--</span> <span style="opacity:.7;font-weight:700">· 연장</span></div>
+      <!-- 서버 연결상태 pill을 세션 칩 앞으로 이동(2026-07-25 사용자 결정). 문구는 양호/불량. -->
+      <div class="status-pill" id="statusPill"><span class="dot"></span>연결 확인 중</div>
+      <div id="sessionChip" title="남은 세션 시간 — 마우스·키보드를 쓰면 자동 연장. 클릭하면 연장/관제 선택" style="display:none;align-items:center;gap:5px;background:rgba(30,185,128,.14);border:1px solid rgba(30,185,128,.4);color:var(--teal);padding:3px 10px;border-radius:16px;font-size:11px;font-weight:800;cursor:pointer;position:relative">⏳ 세션 <span id="sessionChipTime">--:--</span> <span style="opacity:.7;font-weight:700">▾</span></div>
     </div>
     <div class="header-right">
-      <div class="status-pill" id="statusPill"><span class="dot"></span>연결 확인 중<span class="beta-tag">LIVE</span></div>
       <!-- 상단 바로가기 아이콘 줄은 제거(2026-07-25 사용자 결정) — '내 업무 바로가기' 본 패널로 충분하고,
            타이틀바 승격(C안) 후 헤더 폭이 좁아져 줄바꿈을 유발했다. renderTopShortcuts는 null 가드로 무해. -->
       <div class="avatar-btn" id="avatarBtn">-</div>
@@ -711,18 +713,30 @@
     } catch (e) {}
   }
 
-  // ① 남은 세션 시간 칩 — 시계 옆. 실사용 감지 keepalive의 마지막 활동 기준 잔여(유휴 만료까지).
-  // 마우스·키보드를 쓰면 자동 연장(칩이 다시 참). 클릭하면 즉시 연장(me 핑).
+  // ① 남은 세션 시간 칩 — 실사용 감지 keepalive의 마지막 활동 기준 잔여(유휴 만료까지).
+  // 클릭하면 선택지 2개(2026-07-25 사용자 결정): 세션 연장(30분) / 관제(계속·만료 없음).
+  // 관제 모드는 5분마다 자동 연장해 대형 모니터 상시 표시용 — 보안상 앱 재시작 시 해제(영속 안 함).
+  let sessionMonitorMode = false;
+  let sessionMonitorTimer = null;
   function renderSessionChip() {
     const chip = document.getElementById("sessionChip");
     if (!chip) return;
     if (!window.gijo.sessionActivity || !window.gijo.isAuthenticated || !window.gijo.isAuthenticated()) {
       chip.style.display = "none"; return;
     }
+    const timeEl = document.getElementById("sessionChipTime");
+    if (sessionMonitorMode) {
+      timeEl.textContent = "관제(계속)";
+      chip.style.background = "rgba(139,124,240,.16)";
+      chip.style.borderColor = "rgba(139,124,240,.5)";
+      chip.style.color = "var(--purple)";
+      chip.style.display = "inline-flex";
+      return;
+    }
     let info; try { info = window.gijo.sessionActivity(); } catch (e) { return; }
     const ms = Math.max(0, info.remainingMs);
     const m = Math.floor(ms / 60000), s = Math.floor((ms % 60000) / 1000);
-    document.getElementById("sessionChipTime").textContent = m + ":" + String(s).padStart(2, "0");
+    timeEl.textContent = m + ":" + String(s).padStart(2, "0");
     // 색: 5분↑ teal · 2~5분 amber · 2분↓ red
     const rgb = ms > 5 * 60000 ? "30,185,128" : ms > 2 * 60000 ? "240,160,32" : "226,72,61";
     const col = ms > 5 * 60000 ? "var(--teal)" : ms > 2 * 60000 ? "var(--amber)" : "var(--red)";
@@ -731,19 +745,45 @@
     chip.style.color = col;
     chip.style.display = "inline-flex";
   }
+  function setMonitorMode(on) {
+    sessionMonitorMode = on;
+    if (sessionMonitorTimer) { clearInterval(sessionMonitorTimer); sessionMonitorTimer = null; }
+    if (on) {
+      window.gijo.extendSession().catch(() => {});
+      sessionMonitorTimer = setInterval(() => { window.gijo.extendSession().catch(() => {}); }, 5 * 60 * 1000);
+    }
+    renderSessionChip();
+  }
   (function initSessionChip() {
     const chip = document.getElementById("sessionChip");
     if (chip) {
-      chip.addEventListener("click", async () => {
-        const timeEl = document.getElementById("sessionChipTime");
-        const prev = timeEl ? timeEl.textContent : "";
-        try {
-          await window.gijo.extendSession();
-          renderSessionChip();
-          if (timeEl) { timeEl.textContent = "연장됨 ✓"; setTimeout(renderSessionChip, 1500); }
-        } catch (e) {
-          if (timeEl) { timeEl.textContent = "연장 실패"; setTimeout(() => { timeEl.textContent = prev; }, 1500); }
+      let pop = null;
+      const closePop = () => { if (pop) { pop.remove(); pop = null; } };
+      document.addEventListener("click", (e) => { if (pop && !pop.contains(e.target) && !chip.contains(e.target)) closePop(); });
+      chip.addEventListener("click", () => {
+        if (pop) { closePop(); return; }
+        pop = document.createElement("div");
+        pop.style.cssText = "position:absolute;top:26px;left:0;min-width:172px;background:#151d33;border:1px solid var(--border-strong);border-radius:10px;box-shadow:0 14px 40px rgba(0,0,0,.5);padding:6px;z-index:960;";
+        const mk = (label, sub, fn) => {
+          const d = document.createElement("div");
+          d.style.cssText = "padding:8px 10px;border-radius:7px;font-size:12px;color:var(--text);cursor:pointer;font-weight:700;";
+          d.innerHTML = label + (sub ? '<div style="font-size:10px;color:var(--muted-2);font-weight:500;margin-top:2px">' + sub + "</div>" : "");
+          d.addEventListener("mouseenter", () => (d.style.background = "rgba(59,130,246,.12)"));
+          d.addEventListener("mouseleave", () => (d.style.background = ""));
+          d.addEventListener("click", (e) => { e.stopPropagation(); fn(); closePop(); });
+          return d;
+        };
+        pop.appendChild(mk("⏳ 세션 연장(30분)", "지금부터 30분으로 재설정", async () => {
+          const timeEl = document.getElementById("sessionChipTime");
+          try { await window.gijo.extendSession(); timeEl.textContent = "연장됨 ✓"; setTimeout(renderSessionChip, 1200); }
+          catch (e) { timeEl.textContent = "연장 실패"; setTimeout(renderSessionChip, 1500); }
+        }));
+        if (sessionMonitorMode) {
+          pop.appendChild(mk("⏹ 관제 종료", "일반 세션(30분 유휴 만료)으로 복귀", () => setMonitorMode(false)));
+        } else {
+          pop.appendChild(mk("🖥 관제(계속)", "만료 없이 유지 — 관제 모니터용, 앱 종료까지", () => setMonitorMode(true)));
         }
+        chip.appendChild(pop);
       });
     }
     renderSessionChip();
@@ -756,9 +796,9 @@
   async function loadHealth() {
     try {
       await window.gijo.checkServerHealth();
-      statusPill.innerHTML = '<span class="dot"></span>운영중<span class="beta-tag">LIVE</span>';
+      statusPill.innerHTML = '<span class="dot"></span>서버 연결상태 양호';
     } catch (e) {
-      statusPill.innerHTML = '<span class="dot" style="background:#e2483d"></span>서버 연결 끊김';
+      statusPill.innerHTML = '<span class="dot" style="background:#e2483d"></span>서버 연결상태 불량';
       statusPill.style.background = "rgba(226,72,61,0.15)";
       statusPill.style.borderColor = "rgba(226,72,61,0.4)";
       statusPill.style.color = "#f5928a";
