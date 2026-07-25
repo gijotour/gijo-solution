@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>시안 — 인수인계 마법사 (지식 이관 + 자동 검증)</title>
+<style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.16);
+--blue:#3b82f6;--blue-light:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--teal:#1eb980;--amber:#f0a020;--purple:#8b7cf0;--red:#e2483d;}
+*{box-sizing:border-box;margin:0;padding:0;font-family:"Pretendard","Malgun Gothic",sans-serif;}
+body{background:var(--bg);color:var(--text);padding:22px;}
+.note{max-width:1040px;margin:0 auto 14px;font-size:12px;color:var(--muted);line-height:1.7;} .note b{color:#cfe0ff;}
+.wrap{max-width:1040px;margin:0 auto;}
+.page-title{font-size:17px;font-weight:900;color:#fff;margin-bottom:2px;}
+.page-sub{font-size:11.5px;color:var(--muted);margin-bottom:14px;}
+/* 스테퍼 */
+.steps{display:flex;gap:8px;margin-bottom:16px;}
+.step{flex:1;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:9px 12px;font-size:11.5px;font-weight:700;color:var(--muted-2);display:flex;gap:8px;align-items:center;}
+.step .n{width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;font-size:10.5px;flex:0 0 auto;}
+.step.done{color:#6fdcb5;border-color:rgba(30,185,128,.4);} .step.done .n{background:rgba(30,185,128,.18);color:#6fdcb5;}
+.step.on{color:#fff;border-color:rgba(59,130,246,.55);box-shadow:0 0 0 1px rgba(59,130,246,.25);} .step.on .n{background:var(--blue);color:#fff;}
+/* 패널 */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:14px;}
+.p-title{font-size:13.5px;font-weight:800;color:#fff;margin-bottom:10px;display:flex;align-items:center;gap:7px;}
+.p-title .badge{font-size:9px;font-weight:800;padding:1px 8px;border-radius:20px;background:rgba(30,185,128,.14);border:1px solid rgba(30,185,128,.4);color:#6fdcb5;}
+/* 검증 테이블 */
+table{width:100%;border-collapse:collapse;font-size:11.5px;}
+th{color:var(--muted-2);font-weight:800;text-align:left;padding:7px 9px;border-bottom:1px solid var(--border-strong);font-size:10px;}
+td{padding:9px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--muted);line-height:1.55;}
+td.doc{color:#dfe6ff;font-weight:700;max-width:210px;}
+.q{color:#cfd6ea;} .src{font-size:10px;color:#6fdcb5;}
+.ok{display:inline-flex;align-items:center;gap:4px;font-weight:800;color:#6fdcb5;font-size:11px;}
+.no{display:inline-flex;align-items:center;gap:4px;font-weight:800;color:#f5928a;font-size:11px;}
+/* 요약 카드 */
+.sum{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px;}
+.sum .c{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:11px 13px;}
+.sum .k{font-size:10px;color:var(--muted-2);font-weight:800;margin-bottom:3px;}
+.sum .v{font-size:19px;font-weight:900;color:#fff;} .sum .v.t{color:#6fdcb5;}
+.bar{height:8px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden;margin-top:6px;}
+.bar i{display:block;height:100%;width:92%;background:linear-gradient(90deg,var(--teal),var(--blue));}
+/* 체크리스트 */
+.chk{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+.chk label{display:flex;gap:8px;align-items:flex-start;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:9px 11px;font-size:11.5px;color:var(--muted);line-height:1.5;cursor:pointer;}
+.chk input{margin-top:2px;accent-color:var(--blue);}
+.chk b{color:#dfe6ff;}
+/* 버튼 */
+.acts{display:flex;gap:8px;flex-wrap:wrap;}
+.btn{font-size:11.5px;font-weight:700;padding:8px 14px;border-radius:8px;cursor:pointer;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--text);}
+.btn.primary{background:rgba(59,130,246,.16);border-color:rgba(59,130,246,.5);color:#cfe0ff;}
+.btn.go{background:var(--teal);border-color:var(--teal);color:#04281c;font-weight:800;}
+.hint{font-size:10.5px;color:var(--muted-2);margin-top:8px;line-height:1.6;}
+.upl{border:1.5px dashed rgba(59,130,246,.4);border-radius:10px;padding:16px;text-align:center;font-size:11.5px;color:var(--muted);background:rgba(59,130,246,.04);}
+.upl b{color:var(--blue-light);}
+.fname{font-size:10.5px;color:#cfd6ea;background:var(--panel-2);border:1px solid var(--border);border-radius:6px;padding:3px 8px;display:inline-block;margin:3px 3px 0 0;}
+</style>
+</head>
+<body>
+<div class="note">
+<b>시안 — 인수인계 마법사</b> (신설 화면 handover.html — <b>AI 지식·모델</b> 그룹, 기억·학습(RAG) 옆 탭)<br>
+근거: 오프보딩 체크리스트 UX 모범사례(단계형 마법사+진행률) · 방금 운영 실측(자동 검증 2/2 인용 100%) · 기존 자산 재사용(제품 등록부 일괄 업로드·/api/memory/ingest-file·/api/handover/verify·근거 배지).<br>
+③단계 표의 질문·근거는 <b>오늘 운영 서버 실측값 그대로</b>입니다 — 가짜 UI 아님.
+</div>
+
+<div class="wrap">
+  <div class="page-title">🎒 인수인계 — 업무 지식을 GIJO AS에 남기고 떠나기</div>
+  <div class="page-sub">문서를 올리면 즉시 AI의 지식이 됩니다(재학습 불필요). 마지막에 <b>AI가 스스로 검증</b>해 "후임자가 물어보면 진짜 답이 나오는지" 확인하고 이관 리포트를 남깁니다.</div>
+
+  <div class="steps">
+    <div class="step done"><span class="n">✓</span>1. 무엇을 남길지 (체크리스트)</div>
+    <div class="step done"><span class="n">✓</span>2. 문서 올리기 (자동 분류)</div>
+    <div class="step on"><span class="n">3</span>3. AI 자동 검증</div>
+    <div class="step"><span class="n">4</span>4. 이관 리포트</div>
+  </div>
+
+  <!-- 1단계 (접힌 요약 상태) -->
+  <div class="panel">
+    <div class="p-title">1. 무엇을 남길지 — 체크리스트 <span class="badge">6/8 준비됨</span></div>
+    <div class="chk">
+      <label><input type="checkbox" checked><span><b>보안제품 운영 문서</b> — 정책 설정·차단 로그 분석·예외 처리 절차</span></label>
+      <label><input type="checkbox" checked><span><b>장애·오탐 족보</b> — 반복 장애 패턴, 자주 나는 오탐 케이스와 처리</span></label>
+      <label><input type="checkbox" checked><span><b>정기 점검·승인 라인</b> — 점검 주기, 승인 워크플로 담당자</span></label>
+      <label><input type="checkbox"><span><b>사내 특화 프로세스</b> — 예외 계정 신청, IP 차단 해제 승인 절차</span></label>
+    </div>
+    <div class="hint">✍ 작성 팁: 파일명은 <b>[제품명]_[문서종류]_[내용]</b>(자동 분류에 쓰임), 서술보다 <b>1) 2) 3) 단계식</b>이 AI가 가장 잘 찾습니다.</div>
+  </div>
+
+  <!-- 2단계 (완료 요약) -->
+  <div class="panel">
+    <div class="p-title">2. 문서 올리기 <span class="badge">4개 인입 완료</span></div>
+    <div class="upl">📥 파일을 끌어다 놓으세요 — 파일명으로 <b>제품·문서종류 자동 분류</b>(제품 매뉴얼은 등록부에도 연결), 올리는 즉시 지식베이스(RAG) 반영<br>
+      <span class="fname">경계방화벽_logManual_반복차단IP_대응절차.pdf ✓</span>
+      <span class="fname">EDR_manual_예외정책_등록가이드.docx ✓</span>
+      <span class="fname">fin_망분리_전자금융.md ✓</span>
+      <span class="fname">logformat_fortigate.md ✓</span>
+    </div>
+  </div>
+
+  <!-- 3단계: 자동 검증 (핵심) -->
+  <div class="panel">
+    <div class="p-title">3. AI 자동 검증 — 후임자가 물어보면 진짜 답이 나올까?</div>
+    <table>
+      <thead><tr><th style="width:200px">올린 문서</th><th>AI가 만든 검증 질문</th><th style="width:190px">답변 근거(인용된 문서)</th><th style="width:64px">판정</th></tr></thead>
+      <tbody>
+        <tr>
+          <td class="doc">fin_망분리_전자금융.md</td>
+          <td class="q">"금융권 망분리는 어떤 규정에 근거하고 무엇을 분리해야 하나?"</td>
+          <td class="src">fin_망분리_전자금융.md ✓<br>fin_ciso_전자금융.md</td>
+          <td><span class="ok">✓ 인용됨</span></td>
+        </tr>
+        <tr>
+          <td class="doc">logformat_fortigate.md</td>
+          <td class="q">"방화벽 로그에서 차단 여부와 출발지·목적지 IP는 어떤 필드로 보나?"</td>
+          <td class="src">logformat_fortigate.md ✓<br>방화벽_차단로그_분석절차.txt</td>
+          <td><span class="ok">✓ 인용됨</span></td>
+        </tr>
+        <tr>
+          <td class="doc">EDR_manual_예외정책_등록가이드.docx</td>
+          <td class="q">"EDR 예외 정책 등록 시 승인 라인은 어떻게 되나?"</td>
+          <td class="src">(다른 문서만 인용됨)</td>
+          <td><span class="no">✗ 미인용</span></td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="hint">✗ 미인용 문서는 <b>제목·키워드를 보강해 다시 올리면</b> 대부분 해결됩니다(파일명 규칙 참고). [다시 검증]으로 재확인하세요.</div>
+    <div class="acts" style="margin-top:10px"><button class="btn primary">↻ 다시 검증</button><button class="btn">미인용 문서만 재검증</button></div>
+  </div>
+
+  <!-- 4단계: 리포트 -->
+  <div class="panel">
+    <div class="p-title">4. 이관 리포트 — 감사 증적</div>
+    <div class="sum">
+      <div class="c"><div class="k">이관 문서</div><div class="v">4</div></div>
+      <div class="c"><div class="k">검증 통과(인용)</div><div class="v t">3</div></div>
+      <div class="c"><div class="k">통과율</div><div class="v t">75%</div><div class="bar"><i style="width:75%"></i></div></div>
+      <div class="c"><div class="k">이관자 / 일시</div><div class="v" style="font-size:12.5px;line-height:1.5">김도희<br><span style="color:var(--muted-2);font-weight:600">2026-07-25 15:30</span></div></div>
+    </div>
+    <div class="acts">
+      <button class="btn go">✓ 인수인계 완료 처리 (감사 로그 기록)</button>
+      <button class="btn primary">📄 이관 리포트 다운로드</button>
+      <button class="btn">후임자 안내 페이지 보기</button>
+    </div>
+    <div class="hint">완료 처리하면 감사 로그에 이관자·문서 목록·검증 통과율이 남고, 후임자는 챗봇에 물어보는 것만으로 전임자의 노하우를 근거(📄 배지)와 함께 조회합니다. 유지보수 점검 일정·승인자는 <b>유지보수</b> 탭에서 후임자로 변경하세요.</div>
+  </div>
+</div>
+</body>
+</html>
