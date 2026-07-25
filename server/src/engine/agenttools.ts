@@ -36,6 +36,7 @@ import { listAnalysisEvents, analysisSummary, computeCorrelations } from "./anal
 import { computeKpiSnapshot } from "./kpi";
 import { listSessions as listWorkSessions } from "./worksessions";
 import { canonicalize, suggestionsFor } from "./terms";
+import { lawAnswer, type LawTarget } from "./lawinfo";
 
 export interface AgentToolParam {
   name: string;
@@ -268,6 +269,18 @@ function noHitMessage(q: string): string {
     lines.push("", "찾는 대상의 이름·분류를 조금 더 알려주시면 다시 찾아보겠습니다.");
   }
   return lines.join("\n");
+}
+
+// 법령·판례 조회 — 원문 링크와 면책을 반드시 함께 준다(lawinfo.ts가 형식을 만든다).
+async function runLawLookup(args: Record<string, string>): Promise<string> {
+  const t = (args.target || "law").trim() as LawTarget;
+  const target = (["law", "admrul", "prec"] as const).includes(t as never) ? t : "law";
+  try {
+    return await lawAnswer(args.query.trim(), target);
+  } catch (e) {
+    // 꺼져 있거나 외부가 막힌 상황은 담당자가 조치할 수 있게 그대로 알린다(조용히 실패 금지).
+    return `법령 조회를 하지 못했습니다 — ${e instanceof Error ? e.message : String(e)}`;
+  }
 }
 
 async function runSearch(args: Record<string, string>): Promise<string> {
@@ -1167,6 +1180,24 @@ const TOOLS: AgentTool[] = [
     description: "장기기억(RAG) 문서와 온톨로지 트리플이 얼마나 쌓였는지 본다. 답변 품질의 근거가 되는 자료 현황이다.",
     params: [],
     run: runKnowledgeStatus,
+  },
+  {
+    // 법령 조회 — 인터넷이 필요해 기본은 꺼져 있다(설정에서 법제처 인증키를 넣으면 켜진다).
+    // 조문 원문과 링크를 찾아주는 데까지만 한다 — 법률 자문이 아니다(면책 문구 자동 첨부).
+    name: "law_lookup",
+    label: "법령·판례 조회",
+    domain: "cross",
+    write: false,
+    description:
+      '개인정보보호법·정보통신망법 같은 IT보안 관련 법령·시행령·고시(행정규칙)·판례를 국가법령정보센터에서 찾는다. "개인정보보호법 뭐라고 돼 있어?", "안전성 확보조치 기준 찾아줘", "유출 신고 관련 판례 있어?"에 쓴다. target: law(법령·기본)·admrul(고시·훈령)·prec(판례). 예: {"query":"개인정보 보호법"}',
+    params: [
+      { name: "query", label: "검색어", description: "법령명·고시명·판례 키워드", required: true },
+      { name: "target", label: "종류", description: "law(법령)·admrul(고시)·prec(판례) — 비우면 법령", required: false },
+    ],
+    // 결과가 이미 사람이 읽기 좋고 원문 링크가 붙어 있다 — LLM이 재작성하면 조문을 바꿔 쓸 위험이
+    // 있어(법률은 지어내면 가장 위험한 영역) 그대로 내보낸다.
+    directAnswer: true,
+    run: runLawLookup,
   },
   {
     name: "product_status",
