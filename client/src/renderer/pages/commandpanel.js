@@ -1,19 +1,21 @@
-// commandpanel.js — 전 페이지 공용 '오른쪽 작업 화면'(작업 세션 목록).
-// 대시보드에는 자체 패널이 박혀 있으므로 그 외 페이지에만 nav.js가 주입한다. 페이지 레이아웃은
-// 건드리지 않도록 고정(fixed) 슬라이드 드로어로 띄운다(기본 닫힘=가장자리 탭, 열면 오른쪽 오버레이).
+// commandpanel.js — 전 화면 공용 오른쪽 가장자리 메뉴(작업 세션·AI 라이브 오피스).
 //
-// 2026-07-22: 지휘 콘솔(입력형 챗봇)을 제거했다. 화면마다 인라인 "🤖 이 화면 챗봇" 위젯이 생기면서
-// 한 페이지에 챗봇이 둘이 되는 중복을 없앤다 — 오른쪽 드로어는 "작업 세션만" 보여준다(사용자 방침).
-// AI에게 지시하려면 화면의 인라인 챗봇 위젯을 쓴다.
+// v2(2026-07-26, 챗 중심 개편 후속·사용자 승인 시안 v5):
+//  · 대시보드 포함 모든 화면에서 동일하게 — 가장자리 세로 탭 2개 + 크기 차등 팝업.
+//    (대시보드 자체 구현을 없애고 이 파일 하나로 통일 — "대시보드에서 안 열림" 결함의 재발 방지)
+//  · 작업 세션 = 소형 팝업(340px). 사무실 LIVE 채팅은 여기서 제거(사용자 결정) —
+//    오피스 팝업(office.html)의 오른쪽 열로 이관.
+//  · AI 라이브 오피스 = 중앙을 거의 덮는 대형 팝업(office.html?embed=1 iframe, 첫 열림에만 로드).
+//  · 서로 배타적으로 열리고 ESC·✕·탭 재클릭으로 닫힌다. 기본은 항상 닫힘(상태 저장 안 함).
 
 (function () {
   var here = decodeURIComponent((location.pathname || "").split("/").pop() || "");
-  // 대시보드(자체 패널)·로그인·별도 창(사무실)에는 띄우지 않는다.
-  if (here === "dashboard.html" || here === "login.html" || here === "office.html" || here === "") return;
+  // 로그인·사무실 창 자체·임베드 프레임(허브 iframe 내부)에는 띄우지 않는다.
+  if (here === "login.html" || here === "office.html" || here === "") return;
+  if (/[?&]embed=1/.test(location.search || "")) return;
   if (!window.gijo || !window.gijo.isAuthenticated || !window.gijo.isAuthenticated()) return;
-  if (document.getElementById("gijoCmdPanel")) return;
+  if (document.getElementById("gijoEdgeRail")) return;
 
-  var OPEN_KEY = "gijo.cmdpanel.open";
   var esc = function (s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); };
 
   function injectCss() {
@@ -21,49 +23,36 @@
     var st = document.createElement("style");
     st.id = "gijoCmdCss";
     st.textContent =
-      "#gijoCmdPanel{position:fixed;top:0;right:0;height:100vh;width:360px;max-width:92vw;background:var(--panel,#0f1626);border-left:1px solid var(--border,#1e2a44);z-index:900;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .22s ease;box-shadow:-8px 0 28px rgba(0,0,0,.45);}" +
-      "#gijoCmdPanel.on{transform:translateX(0);}" +
-      "#gijoCmdTab{position:fixed;right:0;top:50%;transform:translateY(-50%);background:var(--blue,#3b82f6);color:#fff;padding:14px 6px;border-radius:10px 0 0 10px;font-size:12px;font-weight:800;cursor:pointer;writing-mode:vertical-rl;letter-spacing:2px;z-index:901;box-shadow:-2px 0 14px rgba(0,0,0,.45);}" +
-      "#gijoCmdTab.hide{display:none;}" +
+      // 가장자리 세로 메뉴 — 화면 오른쪽 상단부터, 아이콘 없이 텍스트만(깔끔 원칙)
+      "#gijoEdgeRail{position:fixed;right:6px;top:70px;display:flex;flex-direction:column;gap:10px;z-index:901;}" +
+      ".gijo-etab{writing-mode:vertical-rl;letter-spacing:2px;font-size:11px;font-weight:800;color:var(--muted,#8b93ab);padding:13px 7px;border:1px solid var(--border,#1e2a44);border-radius:10px;cursor:pointer;background:var(--panel-2,#0e1526);user-select:none;box-shadow:-2px 0 10px rgba(0,0,0,.35);}" +
+      ".gijo-etab:hover{color:var(--blue-light,#7ab0ff);border-color:var(--blue,#3b82f6);}" +
+      ".gijo-etab.on{color:#fff;background:rgba(59,130,246,.22);border-color:rgba(59,130,246,.55);}" +
+      ".gijo-etab b{writing-mode:horizontal-tb;font-size:9px;background:var(--blue,#3b82f6);color:#fff;border-radius:8px;padding:0 5px;margin-bottom:6px;}" +
+      // 작업 세션 — 소형 팝업(중앙 위 오버레이)
+      "#gijoCmdPanel{display:none;position:fixed;top:64px;right:52px;bottom:14px;width:340px;max-width:88vw;background:var(--panel-2,#0e1526);border:1px solid var(--border-strong,#2a3a5e);border-radius:14px;z-index:900;flex-direction:column;box-shadow:-14px 0 44px rgba(0,0,0,.55);overflow:hidden;animation:gijoedgein .18s ease-out;}" +
+      "#gijoCmdPanel.on{display:flex;}" +
+      "@keyframes gijoedgein{from{transform:translateX(22px);opacity:0}to{transform:none;opacity:1}}" +
+      // AI 라이브 오피스 — 대형 팝업(중앙을 거의 덮음, 크기 차등)
+      "#gijoOfficePop{display:none;position:fixed;top:56px;left:246px;right:52px;bottom:14px;background:var(--panel-2,#0e1526);border:1px solid var(--border-strong,#2a3a5e);border-radius:14px;z-index:900;flex-direction:column;box-shadow:0 18px 60px rgba(0,0,0,.6);overflow:hidden;animation:gijoedgein .18s ease-out;}" +
+      "#gijoOfficePop.on{display:flex;}" +
+      "body.gn-left-collapsed #gijoOfficePop{left:14px;}" + // 왼쪽 메뉴 접힘이면 전체 폭 사용
+      ".gcp-oph{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--border,#1e2a44);font-weight:800;font-size:12.5px;color:#fff;flex:0 0 auto;}" +
+      ".gcp-olive{font-size:9px;font-weight:800;color:#fff;background:#e2483d;border-radius:8px;padding:1px 7px;letter-spacing:1px;}" +
+      ".gcp-opx{margin-left:auto;color:var(--muted-2,#5f6b82);cursor:pointer;font-size:14px;padding:2px 6px;}" +
+      ".gcp-opx:hover{color:#fff;}" +
+      "#gijoOfficeFrame{flex:1;border:none;width:100%;background:var(--bg,#0a0e1a);}" +
+      // 세션 팝업 내부(기존 카드 형식 유지)
       ".gcp-head{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border,#1e2a44);background:var(--panel-3,#0c1322);flex:0 0 auto;}" +
       ".gcp-title{font-size:12px;font-weight:800;color:#fff;}" +
-      ".gcp-close{margin-left:auto;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);color:var(--blue-light,#7ab0ff);font-size:11px;font-weight:700;border-radius:8px;padding:5px 10px;cursor:pointer;}" +
-      ".gcp-close:hover{background:var(--blue,#3b82f6);color:#fff;}" +
-      ".gcp-acc{display:flex;flex-direction:column;border-bottom:1px solid var(--border,#1e2a44);min-height:0;}" +
-      ".gcp-ah{display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;background:var(--panel-2,#121a2e);user-select:none;flex:0 0 auto;}" +
-      ".gcp-ah:hover{background:#16213b;}" +
-      ".gcp-car{color:var(--blue-light,#7ab0ff);font-size:11px;font-weight:900;width:20px;height:20px;display:flex;align-items:center;justify-content:center;border-radius:6px;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.35);flex:0 0 auto;}" +
-      ".gcp-at{font-size:12px;font-weight:800;color:#fff;}" +
-      // 세션 영역이 패널 높이를 전부 쓴다 — 예전 지휘콘솔+세션 아코디언 시절의 max-height:180px가
-      // 세션 전용 드로어에 남아 목록 하단이 잘렸다(2026-07-23 실측: 패널 900px에 목록 163px).
-      // 세션 목록은 내용만큼(최대 55vh), 남는 세로 공간은 아래 🏢 사무실 LIVE가 채운다(대시보드 패널과 동일).
-      ".gcp-sessions{flex:0 1 auto;min-height:0;max-height:55vh;}.gcp-sessions .gcp-ab{flex:0 1 auto;min-height:0;overflow-y:auto;max-height:55vh;}" +
-      ".gcp-office{flex:1 1 auto;min-height:110px;border-top:1px solid var(--border,#1e2a44);display:flex;flex-direction:column;}" +
-      ".gcp-oh{display:flex;align-items:center;gap:6px;padding:9px 12px 6px;font-size:11.5px;font-weight:800;color:#fff;cursor:pointer;}" +
-      ".gcp-olive{font-size:8.5px;font-weight:800;color:var(--teal,#1eb980);border:1px solid rgba(30,185,128,.5);border-radius:8px;padding:1px 6px;}" +
-      ".gcp-ofeed{flex:1 1 auto;min-height:0;overflow-y:auto;padding:2px 12px 10px;}" +
-      ".gcp-oline{padding:4px 0;border-bottom:1px solid var(--border,#1e2a44);}" +
-      ".gcp-owho{font-size:10px;font-weight:800;color:var(--blue-light,#7ab0ff);}" +
-      ".gcp-omsg{display:block;font-size:11px;color:var(--muted,#8b93ab);margin-top:1px;line-height:1.45;word-break:break-word;}" +
-      ".gcp-console{flex:1 1 auto;min-height:0;}" +
-      ".gcp-ab{display:flex;flex-direction:column;min-height:0;overflow:hidden;}" +
-      ".gcp-acc.collapsed .gcp-ab{display:none;}" +
-      ".gcp-feed{flex:1 1 auto;overflow-y:auto;padding:10px 12px;display:flex;flex-direction:column;gap:7px;}" +
-      ".gcp-empty{font-size:11px;color:var(--muted-2,#5f6b82);padding:6px;}" +
-      ".gcp-row{font-size:12px;line-height:1.5;padding:7px 9px;border-radius:9px;background:var(--panel-2,#121a2e);border:1px solid var(--border,#1e2a44);word-break:break-word;}" +
-      ".gcp-row.user{background:rgba(59,130,246,.1);border-color:rgba(59,130,246,.3);}" +
-      ".gcp-row.error{background:rgba(226,72,61,.1);border-color:rgba(226,72,61,.4);color:#f5928a;}" +
-      ".gcp-row.note{background:rgba(240,160,32,.1);border-color:rgba(240,160,32,.4);color:var(--amber,#f0a020);}" +
-      ".gcp-row .gcp-who{font-size:10px;font-weight:800;color:var(--blue-light,#7ab0ff);margin-bottom:2px;}" +
-      ".gcp-dock{display:flex;gap:7px;padding:10px 12px;border-top:1px solid var(--border,#1e2a44);background:var(--panel-2,#121a2e);flex:0 0 auto;}" +
-      ".gcp-in{flex:1;background:var(--panel,#0f1626);border:1px solid var(--border-strong,#2a3a5e);border-radius:9px;padding:9px 11px;color:var(--text,#e6edf7);font-size:12px;outline:none;}" +
-      ".gcp-in:focus{border-color:var(--blue,#3b82f6);}" +
-      ".gcp-send{background:var(--blue,#3b82f6);color:#fff;border:none;border-radius:9px;padding:0 15px;font-weight:800;font-size:12px;cursor:pointer;}" +
-      ".gcp-sitem{font-size:11.5px;color:var(--text,#e6edf7);padding:6px 12px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid rgba(255,255,255,.03);}" +
-      ".gcp-sitem:hover{background:rgba(255,255,255,.04);}" +
-      // 대시보드 작업 세션 패널과 동일한 카드(상태 점·제목·✓완료·🗑삭제 / 날짜·주체·상태·턴수·미리보기).
       ".gcp-abadge{background:rgba(30,185,128,.15);color:var(--teal,#1eb980);border:1px solid rgba(30,185,128,.35);border-radius:20px;font-size:10.5px;font-weight:800;padding:3px 10px;white-space:nowrap;}" +
       ".gcp-abadge.zero{background:rgba(139,147,171,.12);color:var(--muted-2,#5f6b82);border-color:transparent;}" +
+      ".gcp-x{margin-left:auto;color:var(--muted-2,#5f6b82);cursor:pointer;font-size:13px;padding:2px 6px;}" +
+      ".gcp-x:hover{color:#fff;}" +
+      ".gcp-sitem{font-size:11.5px;color:var(--text,#e6edf7);padding:7px 12px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-bottom:1px solid rgba(255,255,255,.03);flex:0 0 auto;}" +
+      ".gcp-sitem:hover{background:rgba(255,255,255,.04);}" +
+      "#gcpSessList{overflow-y:auto;flex:1 1 auto;min-height:0;}" +
+      ".gcp-empty{font-size:11px;color:var(--muted-2,#5f6b82);padding:8px 12px;}" +
       ".gcp-scard{padding:7px 12px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04);}" +
       ".gcp-scard:hover{background:rgba(255,255,255,.04);}" +
       ".gcp-sr1{display:flex;align-items:center;gap:6px;}" +
@@ -82,96 +71,71 @@
     document.head.appendChild(st);
   }
 
-  var panel, tab, sessBody;
+  var panel, officePop, tabSess, tabOffice, sessBody;
+
+  function setPop(name) {
+    panel.classList.toggle("on", name === "sess");
+    officePop.classList.toggle("on", name === "office");
+    tabSess.classList.toggle("on", name === "sess");
+    tabOffice.classList.toggle("on", name === "office");
+    if (name === "office") {
+      var f = document.getElementById("gijoOfficeFrame");
+      if (!f.src) f.src = "office.html?embed=1"; // 첫 열림에만 로드
+    }
+  }
 
   function build() {
     injectCss();
+    // 세션 소형 팝업 — LIVE 채팅 없음(오피스로 이관, 2026-07-26 사용자 결정)
     panel = document.createElement("div");
     panel.id = "gijoCmdPanel";
     panel.innerHTML =
-      '<div class="gcp-head"><span class="gcp-title">💬 작업 세션</span>' +
+      '<div class="gcp-head"><span class="gcp-title">작업 세션</span>' +
       '<span class="gcp-abadge zero" id="gcpActive">진행중 -</span>' +
-      '</div>' +
-      '<div class="gcp-acc gcp-sessions" id="gcpSessAcc" style="flex:1 1 auto">' +
-      '<div class="gcp-ab" style="display:flex"><div class="gcp-sitem" id="gcpNewSess">＋ 새 작업 세션</div>' +
-      '<div id="gcpSessList" style="overflow-y:auto;flex:1 1 auto"><div class="gcp-empty">불러오는 중…</div></div></div></div>' +
-      '<div class="gcp-sfull" id="gcpSessFull">전체 작업 세션 열기 ↗</div>' +
-      // 남는 공간에 🏢 보안팀 사무실 LIVE 대화(협업 이벤트) — 대시보드 패널과 동일.
-      '<div class="gcp-office" id="gcpOffice"><div class="gcp-oh" id="gcpOfficeHead" title="AI 팀 사무실 창 열기">🏢 보안팀 사무실 <span class="gcp-olive">LIVE</span></div>' +
-      '<div class="gcp-ofeed" id="gcpOfficeFeed"><div class="gcp-empty">팀이 움직이면 대화가 여기 실시간으로 흐릅니다.</div></div></div>';
+      '<span class="gcp-x" id="gcpClose" title="닫기">✕</span></div>' +
+      '<div class="gcp-sitem" id="gcpNewSess">＋ 새 작업 세션</div>' +
+      '<div id="gcpSessList"><div class="gcp-empty">불러오는 중…</div></div>' +
+      '<div class="gcp-sfull" id="gcpSessFull">전체 작업 세션 열기 ↗</div>';
     document.body.appendChild(panel);
 
-    tab = document.createElement("div");
-    tab.id = "gijoCmdTab";
-    tab.title = "오른쪽 작업 세션 열기";
-    tab.textContent = "◀ 작업 세션 열기"; // 라벨·위치는 setOpen이 상태에 맞게 갱신
-    document.body.appendChild(tab);
+    // 오피스 대형 팝업 — 실내용은 office.html(할일 왼쪽·오피스 중앙·LIVE 채팅 오른쪽) 임베드
+    officePop = document.createElement("div");
+    officePop.id = "gijoOfficePop";
+    officePop.innerHTML =
+      '<div class="gcp-oph">AI 전용 라이브 오피스 <span class="gcp-olive">LIVE</span>' +
+      '<span class="gcp-opx" id="gcpOfficeClose" title="닫기">✕</span></div>' +
+      '<iframe id="gijoOfficeFrame" title="AI 전용 라이브 오피스"></iframe>';
+    document.body.appendChild(officePop);
 
+    // 가장자리 세로 메뉴(탭 2개)
+    var rail = document.createElement("div");
+    rail.id = "gijoEdgeRail";
+    rail.innerHTML =
+      '<div class="gijo-etab" id="gijoEdgeSess" title="작업 세션">작업 세션 <b id="gijoEdgeSessCnt">-</b></div>' +
+      '<div class="gijo-etab" id="gijoEdgeOffice" title="AI 전용 라이브 오피스">AI 라이브 오피스</div>';
+    document.body.appendChild(rail);
+
+    tabSess = document.getElementById("gijoEdgeSess");
+    tabOffice = document.getElementById("gijoEdgeOffice");
     sessBody = panel.querySelector("#gcpSessList");
 
-    tab.addEventListener("click", function () { setOpen(!panel.classList.contains("on")); });
-    // 헤더 접기 버튼 제거(2026-07-25) — 가장자리 탭이 토글 담당
-    // ＋ 새 작업 세션 — 작업 세션 화면에서 새 세션을 시작하도록 이동(지시는 인라인 챗봇으로).
+    tabSess.addEventListener("click", function () { setPop(panel.classList.contains("on") ? null : "sess"); });
+    tabOffice.addEventListener("click", function () { setPop(officePop.classList.contains("on") ? null : "office"); });
+    document.getElementById("gcpClose").addEventListener("click", function () { setPop(null); });
+    document.getElementById("gcpOfficeClose").addEventListener("click", function () { setPop(null); });
+    document.addEventListener("keydown", function (e) { if (e.key === "Escape") setPop(null); });
+
     panel.querySelector("#gcpNewSess").addEventListener("click", function () {
       try { localStorage.removeItem("gijo:sessions:open"); } catch (e) {}
       window.gijo.navigateTo("sessions.html");
     });
-    // 전체 작업 세션 열기 — 세션 화면으로(대시보드 패널과 동일한 푸터).
     panel.querySelector("#gcpSessFull").addEventListener("click", function () { window.gijo.navigateTo("sessions.html"); });
 
-    // 초기 상태 복원(기본 닫힘).
-    var open = false; try { open = localStorage.getItem(OPEN_KEY) === "1"; } catch (e) {}
-    setOpen(open);
     loadSessions();
-    // 🏢 사무실 LIVE — 대시보드 패널과 동일하게 협업 대화를 실시간으로 흘린다.
-    if (window.gijoRealtime && window.gijoRealtime.connect) window.gijoRealtime.connect(); // WS 보장(중복 연결은 가드됨)
-    initOfficeLive();
+    if (window.gijoRealtime && window.gijoRealtime.connect) window.gijoRealtime.connect(); // 오피스 iframe이 협업 이벤트를 받도록 WS 보장
   }
 
-  // 🏢 보안팀 사무실 LIVE — 사무실 창의 캐릭터 말풍선과 같은 협업 이벤트를 이 피드에도 흘린다.
-  var OFFICE_MAX = 40;
-  function appendOfficeLive(evt) {
-    var feed = document.getElementById("gcpOfficeFeed");
-    if (!feed || !evt || !evt.message) return;
-    var empty = feed.querySelector(".gcp-empty");
-    if (empty && empty.parentNode) empty.parentNode.removeChild(empty);
-    var who = (evt.from || "팀") + (evt.to ? " → " + evt.to : "");
-    var line = document.createElement("div");
-    line.className = "gcp-oline";
-    line.innerHTML = '<span class="gcp-owho">' + esc(who) + '</span><span class="gcp-omsg">' + esc(evt.message) + "</span>";
-    feed.appendChild(line);
-    while (feed.childElementCount > OFFICE_MAX) feed.removeChild(feed.firstChild);
-    feed.scrollTop = feed.scrollHeight;
-  }
-  function initOfficeLive() {
-    var head = document.getElementById("gcpOfficeHead");
-    if (head && window.gijo.openTeamOffice) head.addEventListener("click", function () { window.gijo.openTeamOffice(); });
-    if (window.gijo.onCollaborationEvent) window.gijo.onCollaborationEvent(appendOfficeLive);
-    if (window.gijo.listCollaborationHistory) {
-      window.gijo.listCollaborationHistory().then(function (hist) {
-        (hist || []).slice(-OFFICE_MAX).forEach(appendOfficeLive);
-      }).catch(function () {});
-    }
-  }
-
-  function setOpen(on) {
-    panel.classList.toggle("on", on);
-    try { localStorage.setItem(OPEN_KEY, on ? "1" : "0"); } catch (e) {}
-    // 가장자리 세로 탭 — 항상 표시(2026-07-25 통일): 열림=드로어 왼쪽 경계에 반쯤(12px) 걸친 '접기'.
-    if (on) {
-      var w = panel.getBoundingClientRect().width || 360;
-      tab.style.right = Math.round(w - 12) + "px";
-      tab.style.borderRadius = "10px"; tab.style.padding = "10px 5px"; tab.style.letterSpacing = "1px";
-      tab.textContent = "▶ 접기"; tab.title = "작업 세션 패널 접기";
-    } else {
-      tab.style.right = "0px";
-      tab.style.borderRadius = "10px 0 0 10px"; tab.style.padding = "14px 6px"; tab.style.letterSpacing = "2px";
-      tab.textContent = "◀ 작업 세션 열기"; tab.title = "오른쪽 작업 세션 열기";
-    }
-  }
-  window.addEventListener("resize", function () { setOpen(panel.classList.contains("on")); });
-
-  // 대시보드 작업 세션 패널과 완전히 동일한 형식·동작(상태 점·제목·✓완료·🗑삭제 / 메타 + 진행중 배지).
+  // 세션 카드 — 대시보드 시절 패널과 동일한 형식·동작(상태 점·제목·✓완료·🗑삭제 / 메타).
   var STATUS_LABEL = { active: "진행중", done: "완료", ignored: "무시" };
   function openSessionPage(id) {
     try { localStorage.setItem("gijo:sessions:open", id); } catch (e) {}
@@ -189,14 +153,12 @@
     if (!sessBody) return;
     try {
       var list = await window.gijo.listWorkSessions();
+      var active = list.filter(function (s) { return s.status === "active"; }).length;
       var badge = panel.querySelector("#gcpActive");
-      if (badge) {
-        var active = list.filter(function (s) { return s.status === "active"; }).length;
-        badge.textContent = "진행중 " + active;
-        badge.classList.toggle("zero", active === 0);
-      }
+      if (badge) { badge.textContent = "진행중 " + active; badge.classList.toggle("zero", active === 0); }
+      var cnt = document.getElementById("gijoEdgeSessCnt");
+      if (cnt) cnt.textContent = String(active);
       if (!list || !list.length) { sessBody.innerHTML = '<div class="gcp-empty">작업 세션이 없습니다.</div>'; return; }
-      // 대시보드와 동일: 상태 점·제목·✓완료·🗑삭제 / 날짜·주체·상태·턴수·미리보기. 전체를 보여준다.
       sessBody.innerHTML = list.map(function (s) {
         var who = s.lastRole === "user" ? "나" : s.lastRole === "assistant" ? "AI 팀" : "—";
         var d = new Date(s.updatedAt);

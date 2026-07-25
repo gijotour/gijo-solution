@@ -505,7 +505,7 @@
 
 
   /* ═══ 챗 중심 대시보드(2026-07-26 시안 v4) — 깔끔·보기 쉽게·아이콘 최소 ═══ */
-  .body-grid{grid-template-columns:232px 1fr 42px !important;position:relative;}
+  .body-grid{grid-template-columns:232px 1fr !important;position:relative;}
   #gijoNav{order:0;}
   .explorer{display:none !important;}
   .right-reopen{display:none !important;}
@@ -544,7 +544,7 @@
   .etab.on{color:#fff;background:rgba(59,130,246,.2);border-color:rgba(59,130,246,.5);}
   .etab b{writing-mode:horizontal-tb;font-size:9px;background:var(--blue);color:#fff;border-radius:8px;padding:0 5px;margin-bottom:6px;}
   .dash-sessions{display:none;position:absolute;top:14px;right:52px;bottom:14px;width:340px;z-index:60;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:14px;box-shadow:-14px 0 44px rgba(0,0,0,.55);animation:edgein .18s ease-out;overflow:hidden;}
-  body.pop-sess .dash-sessions{display:flex;flex-direction:column;}
+  /* v5: 자체 세션 팝업 폐기 — commandpanel 공용 팝업이 대체 */
   .dash-sessions .dash-office-live{display:none !important;}
   @keyframes edgein{from{transform:translateX(22px);opacity:0}to{transform:none;opacity:1}}
   .office-pop{display:none;position:absolute;top:12px;left:14px;right:52px;bottom:12px;z-index:60;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:14px;box-shadow:0 18px 60px rgba(0,0,0,.6);animation:edgein .18s ease-out;overflow:hidden;}
@@ -755,15 +755,7 @@
       </div>
     </div>
 
-    <!-- 오른쪽 가장자리 세로 메뉴 + 대형 오피스 팝업(크기 차등: 세션=소형, 오피스=중앙 전면) -->
-    <div class="edge-rail">
-      <div class="etab" id="etabSess">작업 세션 <b id="edgeSessCnt">-</b></div>
-      <div class="etab" id="etabOffice">AI 라이브 오피스</div>
-    </div>
-    <div class="office-pop" id="officePop">
-      <div class="op-h">AI 전용 라이브 오피스 <span class="live-b">LIVE</span><span class="op-x" id="officeClose">✕</span></div>
-      <iframe id="officeFrame" title="AI 전용 라이브 오피스"></iframe>
-    </div>
+    <!-- 엣지 탭·팝업(작업 세션·AI 라이브 오피스)은 전 화면 공용 commandpanel.js가 담당(v5 통일 2026-07-26) -->
     <!-- 오늘 확인할 항목 · 운영 시작 · 오늘의 조치는 "작업 세션"(sessions.html) 자산 탐색기로 이관됨.
          거기서 항목을 누르면 그 대상의 상태를 보여주는 대화 세션이 열린다(💬 헤더 아이콘). -->
   </div>
@@ -2657,8 +2649,8 @@
   (function chatFirst() {
     // nav.js가 나중에 주입하는 접힘 상태 그리드(1fr 360px)를 덮어쓴다 — head 맨 끝에 추가해 우선.
     const st = document.createElement("style");
-    st.textContent = "body.gn-left-collapsed .body-grid{grid-template-columns:1fr 42px !important;}" +
-      ".body-grid{grid-template-columns:232px 1fr 42px !important;}";
+    st.textContent = "body.gn-left-collapsed .body-grid{grid-template-columns:1fr !important;}" +
+      ".body-grid{grid-template-columns:232px 1fr !important;}";
     document.head.appendChild(st);
     // 인사 — 실제 로그인 사용자명
     window.gijo.me().then((u) => {
@@ -2676,33 +2668,23 @@
     const startChat = () => document.body.classList.add("chatting");
     ["dockSend", "dockAll", "dockUpload"].forEach((id) => document.getElementById(id)?.addEventListener("click", startChat));
     document.getElementById("chatInput")?.addEventListener("keydown", (e) => { if (e.key === "Enter") startChat(); });
-    // 가장자리 탭 — 세션(소형)/오피스(대형) 팝업, 서로 배타 + ✕/ESC 닫기
+    // 엣지 탭·세션·오피스 팝업은 공용 commandpanel.js가 담당(v5 통일) — 여기선 quick 팝업만.
     const B = document.body;
-    const setPop = (name) => {
-      ["pop-sess", "pop-office", "pop-quick"].forEach((c) => B.classList.remove(c));
-      document.querySelectorAll(".etab").forEach((e) => e.classList.remove("on"));
-      if (name === "sess") { B.classList.add("pop-sess"); document.getElementById("etabSess").classList.add("on"); }
-      if (name === "office") {
-        const f = document.getElementById("officeFrame");
-        if (!f.src) f.src = "office.html?embed=1"; // 첫 열림에만 로드(리소스 절약)
-        B.classList.add("pop-office"); document.getElementById("etabOffice").classList.add("on");
-      }
-      if (name === "quick") B.classList.add("pop-quick");
-    };
-    document.getElementById("etabSess").addEventListener("click", () => setPop(B.classList.contains("pop-sess") ? null : "sess"));
-    document.getElementById("etabOffice").addEventListener("click", () => setPop(B.classList.contains("pop-office") ? null : "office"));
-    document.getElementById("officeClose").addEventListener("click", () => setPop(null));
+    const setPop = (name) => { B.classList.toggle("pop-quick", name === "quick"); };
     document.getElementById("quickClose").addEventListener("click", () => setPop(null));
     document.addEventListener("keydown", (e) => { if (e.key === "Escape") setPop(null); });
-    // 세션 진행중 수를 가장자리 탭 배지에 미러링(기존 dashActiveBadge가 진실 원천)
-    const badge = document.getElementById("dashActiveBadge");
-    const mirror = () => {
-      const m = /([0-9]+)/.exec(badge?.textContent || "");
-      document.getElementById("edgeSessCnt").textContent = m ? m[1] : "-";
-    };
-    if (badge) { new MutationObserver(mirror).observe(badge, { childList: true, characterData: true, subtree: true }); mirror(); }
-    // 왼쪽 메뉴 "내 업무 바로가기"(?quick=1) → 중앙 팝업으로
     if (/[?&]quick=1/.test(location.search)) setPop("quick");
+    // 하단 사용자 영역(titlebar.js) 재배치 — titlebar가 nav 렌더보다 먼저 돌면 숨은 탐색기에
+    // 붙는다(2026-07-26 실측). 사이드바 하단으로 옮겨 다른 화면과 동일하게 보이게 한다.
+    const fixUserArea = () => {
+      const ua = document.querySelector(".gtb-userarea");
+      const nav = document.getElementById("gijoNav");
+      if (ua && nav && !nav.contains(ua)) {
+        ua.style.cssText += "position:static;margin:0;flex:0 0 auto;";
+        nav.appendChild(ua);
+      }
+    };
+    setTimeout(fixUserArea, 300); setTimeout(fixUserArea, 1500);
     // 하단 한 줄 요약 — 실데이터(조치 우선순위)만, 없으면 비움
     window.gijo.listActionPriorities(5).then(({ items }) => {
       if (!items || !items.length) return;
@@ -2894,5 +2876,6 @@
      제공한다 — '전체메뉴' 모드가 진짜 메뉴를 그리도록(복사본 폐기). render()는 조기 반환. -->
 <script src="nav.js"></script>
 <script src="titlebar.js"></script>
+<script src="commandpanel.js"></script>
 </body>
 </html>
