@@ -10,12 +10,13 @@
 // dispatcher가 sessionId와 함께 지시를 받으면: ① 지시를 user 턴으로, ② 응답을 assistant 턴으로
 // 여기 기록하고, ③ recentTurnsText로 직전 턴들을 모델 맥락에 실어 "이어서" 지시가 되게 한다.
 
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { randomUUID } from "crypto";
 import * as fsp from "fs/promises";
 import * as path from "path";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from "docx";
 import { authMiddleware } from "../auth/auth";
+import type { GijoUser } from "../auth/users";
 import { asyncRoute } from "../util/asyncRoute";
 import { onAudit } from "./audit";
 import { db } from "../db";
@@ -50,6 +51,8 @@ migrate("work_sessions-contextRef", "ALTER TABLE work_sessions ADD COLUMN contex
 // 자동 완료·감사 단발행위 등 시스템 완료) / null(아직 완료 아님). 사용자 완료와 자동 완료를 화면에서
 // 구분해 표시하기 위함(2026-07-20 요청). done이 아닌 상태로 되돌리면 null로 지운다.
 migrate("work_sessions-doneBy", "ALTER TABLE work_sessions ADD COLUMN doneBy TEXT");
+// 누가 시작한 세션인지 — 여러 담당자가 쓰는데 목록만 보고는 알 수 없었다(2026-07-26 사용자 지적).
+migrate("work_sessions-createdBy", "ALTER TABLE work_sessions ADD COLUMN createdBy TEXT");
 
 // status: active(진행중) | done(완료) | ignored(무시). 새 세션은 active로 시작한다.
 export type SessionStatus = "active" | "done" | "ignored";
@@ -74,6 +77,7 @@ export interface WorkSession {
   status: SessionStatus;
   doneBy?: DoneBy; // status가 done일 때만 채워짐(user/auto). 그 외엔 undefined.
   contextRef?: string; // 탐색기 대상 참조(asset:.. / vuln:.. / product:.. / today). 없으면 일반 세션.
+  createdBy?: string;  // 이 세션을 시작한 사람(표시 이름). 자동 생성이면 "시스템".
   createdAt: number;
   updatedAt: number;
 }
@@ -91,6 +95,7 @@ interface SessionRow {
   status: string;
   doneBy: string | null;
   contextRef: string | null;
+  createdBy: string | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -111,6 +116,7 @@ function rowToSession(r: SessionRow): WorkSession {
     status,
     doneBy: status === "done" && (r.doneBy === "user" || r.doneBy === "auto") ? r.doneBy : undefined,
     contextRef: r.contextRef ?? undefined,
+    createdBy: r.createdBy ?? undefined,
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
   };
@@ -119,11 +125,14 @@ function rowToTurn(r: TurnRow): SessionTurn {
   return { id: r.id, sessionId: r.sessionId, role: r.role === "assistant" ? "assistant" : "user", content: r.content, tool: r.tool ?? undefined, at: r.at };
 }
 
-export function createSession(title?: string, contextRef?: string): WorkSession {
+export function createSession(title?: string, contextRef?: string, createdBy?: string): WorkSession {
   const now = Date.now();
-  const s: WorkSession = { id: randomUUID(), title: (title && title.trim()) || DEFAULT_TITLE, status: "active", contextRef: contextRef || undefined, createdAt: now, updatedAt: now };
-  db.prepare("INSERT INTO work_sessions (id, title, status, contextRef, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)").run(
-    s.id, s.title, s.status, s.contextRef ?? null, s.createdAt, s.updatedAt
+  const s: WorkSession = {
+    id: randomUUID(), title: (title && title.trim()) || DEFAULT_TITLE, status: "active",
+    contextRef: contextRef || undefined, createdBy: createdBy || undefined, createdAt: now, updatedAt: now,
+  };
+  db.prepare("INSERT INTO work_sessions (id, title, status, contextRef, createdBy, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)").run(
+    s.id, s.title, s.status, s.contextRef ?? null, s.createdBy ?? null, s.createdAt, s.updatedAt
   );
   return s;
 }
@@ -259,7 +268,7 @@ onAudit((e) => {
   if (SESSION_EXCLUDED_ACTIONS.has(e.action)) return;
   try {
     const title = `[${AUDIT_KIND_LABEL[e.kind] ?? e.kind}] ${e.action}${e.target ? " — " + e.target : ""}`.slice(0, 90);
-    const s = createSession(title);
+    const s = createSession(title, undefined, e.actor ?? "시스템");
     // 주체: scheduler(자동 점검)는 AI 팀(assistant), 그 외(담당자 행위)는 나(user)로 — 목록의 "주체" 표기용.
     const role = e.actor === "scheduler" ? "assistant" : "user";
     const body = (e.detail || e.action) + (e.result !== "ok" ? ` (결과: ${e.result})` : "");
@@ -370,7 +379,8 @@ export function registerWorkSessionRoutes(app: Express): void {
   app.post("/api/work-sessions", authMiddleware, (req, res) => {
     const title = typeof req.body?.title === "string" ? req.body.title : undefined;
     const contextRef = typeof req.body?.contextRef === "string" ? req.body.contextRef : undefined;
-    res.json(createSession(title, contextRef));
+    const who = (req as Request & { user?: GijoUser }).user?.displayName ?? undefined;
+    res.json(createSession(title, contextRef, who));
   });
 
   app.get("/api/work-sessions/:id", authMiddleware, (req, res) => {

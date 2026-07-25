@@ -20,7 +20,7 @@ import { undoSnapshot, undoCommit } from "./undo";
 import { gateUserInput } from "./gateway";
 import { toolDomainsForScreen } from "./screencontext";
 import { isHelpIntent, formatScreenGuide } from "./screenguide";
-import { isOutOfScope, outOfScopeAnswer } from "./scopeguard";
+import { isOutOfScope, outOfScopeAnswer, isTooVague, vagueAnswer } from "./scopeguard";
 import { analyzeFindings } from "./analysis";
 import { recordFindings, getAsset, listAssets } from "./assets";
 import { listFindings } from "./cti";
@@ -340,8 +340,10 @@ async function learnloopConfirmResult(instructionText: string): Promise<Dispatch
 // sessionId가 없으면 자동으로 새 세션을 만들어 기록한다(사용자 요청 2026-07-20 — "모든 행위를
 // 작업 세션에": 팀 사무실 CTA·에이전트 페이지 등 세션 없이 오던 지시도 이력에 남게).
 // 응답의 sessionId를 클라이언트가 저장하면 그 세션으로 "이어서" 지시가 된다.
-export async function dispatchInstruction(instructionText: string, sessionId?: string, screen?: string): Promise<DispatchResult> {
-  const session = (sessionId ? getSession(sessionId) : null) ?? createSession();
+export async function dispatchInstruction(instructionText: string, sessionId?: string, screen?: string, actor?: string): Promise<DispatchResult> {
+  // 세션을 새로 만들 땐 지시한 사람을 실행자로 남긴다 — 여러 담당자가 쓰는데 목록만 보고는
+  // 누가 한 일인지 알 수 없었다(2026-07-26 사용자 지적).
+  const session = (sessionId ? getSession(sessionId) : null) ?? createSession(undefined, undefined, actor);
   // 맥락은 이번 지시를 기록하기 "전" 시점의 대화로 계산한다(방금 넣은 user 턴이 맥락에 중복되지 않게).
   const contextText = session ? recentTurnsText(session.id) : "";
   let title = session?.title;
@@ -440,6 +442,14 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
       route: { agentId: "orchestrator", action: "chat" },
       output: `🛡 가드레일이 이 요청을 차단했습니다 — 프롬프트 인젝션 시도로 판단(${guard.categories.join(", ")}). 정상 요청이면 표현을 바꿔 다시 시도하거나, 설정에서 가드레일 모드를 조정하세요.`,
     };
+  }
+
+  // 뜻을 알 수 없는 입력("1", ".", "ㅁ")은 LLM에 보내지 않는다 — 헤매다 10초를 쓰고
+  // 그게 "오래 걸리는 작업"으로 판정돼 리포트까지 만들어졌다(2026-07-26 실측).
+  if (isTooVague(instructionText)) {
+    const task = createTask({ text: instructionText, agentId: "orchestrator", priority: "P3" });
+    completeTask(task.id);
+    return { task, route: { agentId: "orchestrator", action: "chat" }, output: vagueAnswer() };
   }
 
   // 보안 업무 밖 질문은 일관되게 거절하고 할 수 있는 것으로 되돌린다(2026-07-26 사용자 결정 ②).
@@ -589,7 +599,7 @@ export function registerDispatcherRoutes(app: Express): void {
 
       // 10초 안에 안 끝나면 "리포트로 작성해 드리겠다"고 답하고 물러난다(사용자 결정 2026-07-26).
       // 작업은 뒤에서 계속 돌고, 끝나면 리포트로 저장한 뒤 화면에 팝업으로 알린다.
-      const work = dispatchInstruction(text, sessionId, screen);
+      const work = dispatchInstruction(text, sessionId, screen, user?.displayName);
       let handedOff = false;
       const timer = new Promise<null>((resolve) => setTimeout(() => resolve(null), LONG_ANSWER_MS));
       const first = await Promise.race([work, timer]);

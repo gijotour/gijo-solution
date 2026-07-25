@@ -40,3 +40,28 @@ export function outOfScopeAnswer(): string {
     "사내 자료와 등록된 도구로 답할 수 있는 것만 다룹니다(외부로 질문을 보내지 않습니다).",
   ].join("\n");
 }
+
+// 뜻을 알 수 없는 입력 — 한두 글자, 기호·자음만, 숫자만. LLM에 보내면 헤매다 10초를 쓰고
+// 그게 "오래 걸리는 작업"으로 오해돼 리포트까지 만들어졌다(2026-07-26 실측: "1"·"?"·"ㅁ" 모두 10.4초).
+// 보내기 전에 되묻는 게 빠르고 정직하다.
+const MEANINGLESS_RE = /^[\s.,!?~\-_'"`\/\|@#$%^&*()\[\]{}<>:;+=]*$|^[ㄱ-ㅎㅏ-ㅣ]+$/;
+export function isTooVague(text: string): boolean {
+  const t = String(text ?? "").trim();
+  if (!t) return true;
+  if (MEANINGLESS_RE.test(t)) return true;   // 기호·자음만
+  if (/^\d+$/.test(t)) return true;          // 숫자만("1")
+  return t.replace(/\s/g, "").length <= 2;   // 두 글자 이하
+}
+
+/** 되물음 — 예시를 함께 줘서 다음 입력이 쉬워지게 한다. */
+export function vagueAnswer(): string {
+  return [
+    "무엇을 도와드릴까요?",
+    "",
+    '  · "오늘 뭐부터 볼까?"      — 급한 조치 순서',
+    '  · "미조치 취약점 알려줘"   — 남은 취약점과 담당',
+    '  · "이번 주 점검 일정"      — 예정된 유지보수',
+    "",
+    "파일을 올리시려면 왼쪽 ＋ 를 누르세요.",
+  ].join("\n");
+}
