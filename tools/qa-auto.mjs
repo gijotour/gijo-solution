@@ -450,14 +450,15 @@ async function runClient() {
   await scenario("QA-C03", "메뉴 C안", "설정 허브 + 업데이트 배지", {
     given: "새 버전이 있다고 서버가 알려줄 때",
     when: "hub.html?g=settings 를 열면",
-    then: "설정 계열 6탭이 뜨고 사이드바 설정 항목에 업데이트 배지가 표시된다",
+    then: "설정 계열 4탭(설정·업데이트·로그·작업 기록)이 뜨고 사이드바 설정 항목에 업데이트 배지가 표시된다",
   }, async () => {
     await open("hub.html?g=settings");
     const tabs = await page.evaluate(() => document.querySelectorAll(".hub-tab").length);
-    if (tabs !== 6) throw new Error(`탭 ${tabs}개`);
+    // 메뉴 정리(2026-07-25): 사용량·요금·기능 안내 제거로 6→4탭
+    if (tabs !== 4) throw new Error(`탭 ${tabs}개`);
     const badge = await page.evaluate(() => !!document.querySelector(".gn-upbadge"));
     if (!badge) throw new Error("업데이트 배지 없음");
-    return `탭 6개 + 업데이트 배지 표시`;
+    return `탭 4개 + 업데이트 배지 표시`;
   });
 
   await scenario("QA-C04", "작업 세션", "허브에서 작업 세션 드로어 기본 접힘", {
@@ -475,16 +476,16 @@ async function runClient() {
     return `탭 '${r.tab}' 존재, 기본 접힘`;
   });
 
-  await scenario("QA-C05", "메뉴 C안", "AI 지식·모델 허브 7탭", {
-    given: "AI 계열 화면이 허브 하나로 통합된 뒤(인수인계 탭 추가로 6→7, 2026-07-25 갱신)",
+  await scenario("QA-C05", "메뉴 C안", "AI 지식·모델 허브 6탭", {
+    given: "AI 계열 화면이 허브 하나로 통합된 뒤(문서 보강은 기억·학습에 병합 — 2026-07-25 메뉴 정리)",
     when: "hub.html?g=aiknowledge 를 열면",
-    then: "기억·학습(RAG)/인수인계/온톨로지/문서 보강/학습 루프/LLM 합성/LLM 가이드 7탭이 뜬다",
+    then: "기억·학습(RAG)/인수인계/온톨로지/학습 루프/LLM 합성/LLM 가이드 6탭이 뜬다",
   }, async () => {
     await open("hub.html?g=aiknowledge");
     const tabs = await page.evaluate(() => [...document.querySelectorAll(".hub-tab")].map((t) => t.textContent));
-    if (tabs.length !== 7) throw new Error(`탭 ${tabs.length}개: ${tabs.join(",")}`);
+    if (tabs.length !== 6) throw new Error(`탭 ${tabs.length}개: ${tabs.join(",")}`);
     if (!tabs.some((t) => t.includes("인수인계"))) throw new Error("인수인계 탭 누락");
-    return `탭 7개: ${tabs.join("·")}`;
+    return `탭 6개: ${tabs.join("·")}`;
   });
 
   await browser.close();

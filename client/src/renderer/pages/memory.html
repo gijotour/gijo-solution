@@ -194,6 +194,40 @@ tr:last-child td{border-bottom:none;}
     .dm-delbtn{background:#e2483d;color:#fff;border:none;border-radius:9px;padding:0 18px;font-weight:800;font-size:12px;cursor:pointer;}
     .dm-delbtn:disabled{opacity:.5;cursor:not-allowed;}
     </style>
+    <!-- 문서 보강 인입 — docenrich.html에서 병합(메뉴 정리 2026-07-25). 장애노트(수동)와
+         매뉴얼 보강(AI 번역·구조화). 상시 기능이 아니라 기본 접힘. -->
+    <div class="panel">
+      <details id="enrichDetails">
+        <summary style="cursor:pointer;font-size:13.5px;font-weight:800;color:#fff;">📥 문서 보강 인입 — 장애노트 · 매뉴얼 보강(AI) <i class="gijo-info" data-topic="문서 보강"></i></summary>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:12px;">
+          <div style="border:1px solid var(--border);border-radius:10px;padding:12px;">
+            <div style="font-size:12.5px;font-weight:800;margin-bottom:8px;">🩹 장애노트 작성 <span style="font-size:10px;color:var(--amber);border:1px solid rgba(240,160,32,.4);border-radius:20px;padding:0 7px;">AI 미사용 · 즉시 저장</span></div>
+            <input id="mProduct" placeholder="제품/대상 (예: Tenable Security Center)" style="width:100%;margin-bottom:6px;">
+            <input id="mTitle" placeholder="제목 (예: 예약 스캔 진행 중 멈춤)" style="width:100%;margin-bottom:6px;">
+            <input id="mSymptom" placeholder="증상 — 무엇이 잘못됐나" style="width:100%;margin-bottom:6px;">
+            <input id="mCause" placeholder="원인 (선택)" style="width:100%;margin-bottom:6px;">
+            <textarea id="mFix" rows="3" placeholder="해결 방법 — 명령어·경로는 원문 그대로" style="width:100%;margin-bottom:8px;"></textarea>
+            <button class="btn" id="mSave">💾 장애노트 저장</button>
+            <div class="status-line" id="mStatus"></div>
+          </div>
+          <div style="border:1px solid var(--border);border-radius:10px;padding:12px;">
+            <div style="font-size:12.5px;font-weight:800;margin-bottom:8px;">📄 매뉴얼 보강 (AI 번역·구조화)</div>
+            <input id="dProduct" placeholder="제품/대상" style="width:100%;margin-bottom:6px;">
+            <input id="dSection" placeholder="섹션 이름 (예: 진단 파일 로그 옵션)" style="width:100%;margin-bottom:6px;">
+            <textarea id="dText" rows="5" placeholder="매뉴얼 한 섹션 붙여넣기 (한 번에 ~6,000자)" style="width:100%;margin-bottom:6px;"></textarea>
+            <select id="dMode" style="width:100%;margin-bottom:8px;">
+              <option value="auto">⚙ 자동 — 클라우드 되면 쓰고, 내부정보·비활성이면 로컬</option>
+              <option value="cloud">☁ 클라우드 — 품질↑ (벤더 공개자료만)</option>
+              <option value="local">💻 로컬 — 무료·폐쇄망 (온프렘 7B)</option>
+            </select>
+            <button class="btn" id="dRun">▶ 보강해서 저장</button>
+            <div class="status-line" id="dStatus"></div>
+          </div>
+        </div>
+        <div id="enrichResList" style="font-size:11.5px;color:var(--muted);margin-top:8px;"></div>
+      </details>
+    </div>
+
     <div class="panel" id="hygienePanel" style="border-color:rgba(240,160,32,0.35)">
       <div class="panel-title">🧹 지식베이스 정리 점검 <i class="gijo-info" data-topic="문서 관리"></i>
         <button id="hygieneScanBtn" style="float:right;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;padding:5px 11px;color:var(--blue-light);font-size:11px;font-weight:700;cursor:pointer">다시 점검</button>
@@ -343,6 +377,52 @@ tr:last-child td{border-bottom:none;}
     e.target.value = "";
     loadDocuments(); // 올린 문서 목록 즉시 갱신
   }
+
+  // ── 문서 보강 인입(docenrich에서 병합, 메뉴 정리 2026-07-25) — 장애노트·매뉴얼 보강 ──
+  (function initEnrich() {
+    const enrichResults = [];
+    function addEnrichResult(r) {
+      enrichResults.unshift(r);
+      document.getElementById("enrichResList").innerHTML = "이번 세션 인입: " + enrichResults.map((x) =>
+        `${x.documentId} (${x.via} · ${x.chunks}청크${x.triples ? " · 관계 " + x.triples : ""})`).join(" · ");
+    }
+    document.getElementById("mSave")?.addEventListener("click", async () => {
+      const btn = document.getElementById("mSave"), st = document.getElementById("mStatus");
+      const v = (id) => document.getElementById(id).value.trim();
+      const product = v("mProduct"), title = v("mTitle"), symptom = v("mSymptom"), cause = v("mCause"), fix = v("mFix");
+      if (!product || !title || !symptom || !fix) { st.textContent = "제품·제목·증상·해결은 필수입니다."; st.className = "status-line status-err"; return; }
+      const korean = ["증상: " + symptom, cause ? "원인: " + cause : "", "해결: " + fix].filter(Boolean).join("\n");
+      const triples = [];
+      if (cause) triples.push({ subject: title, predicate: "원인", object: cause });
+      triples.push({ subject: title, predicate: "해결", object: fix });
+      btn.disabled = true; st.textContent = "저장 중…"; st.className = "status-line";
+      try {
+        const r = await window.gijo.enrichIngest({ productName: product, sourceDoc: "현장 장애노트", section: title, mode: "manual", korean, triples });
+        st.textContent = `✓ 저장됨 — ${r.chunks}청크 · 관계 ${r.triples}개. 이제 검색됩니다.`; st.className = "status-line status-ok";
+        addEnrichResult(r);
+        ["mTitle", "mSymptom", "mCause", "mFix"].forEach((id) => document.getElementById(id).value = "");
+        loadDocuments();
+      } catch (e) { st.textContent = "✗ 실패: " + e.message; st.className = "status-line status-err"; }
+      btn.disabled = false;
+    });
+    document.getElementById("dRun")?.addEventListener("click", async () => {
+      const btn = document.getElementById("dRun"), st = document.getElementById("dStatus");
+      const v = (id) => document.getElementById(id).value.trim();
+      const productName = v("dProduct"), section = v("dSection"), text = v("dText");
+      const mode = document.getElementById("dMode").value;
+      if (!productName || !section || !text) { st.textContent = "제품·섹션·원본 텍스트는 필수입니다."; st.className = "status-line status-err"; return; }
+      btn.disabled = true; st.textContent = (mode === "local" ? "로컬 7B로 " : "") + "번역·구조화 중… (수십 초 걸릴 수 있어요)"; st.className = "status-line";
+      try {
+        const r = await window.gijo.enrichIngest({ text, productName, sourceDoc: productName + " 매뉴얼", section, mode });
+        const via = r.via === "cloud" ? "클라우드" : r.via === "local" ? "로컬" : r.via === "manual" ? "수동" : "원문";
+        st.textContent = `✓ 저장됨(${via}) — ${r.chunks}청크${r.triples ? " · 관계 " + r.triples + "개" : ""}${r.translated ? "" : " · 번역 실패로 원문 저장"}`; st.className = "status-line status-ok";
+        addEnrichResult(r);
+        document.getElementById("dText").value = "";
+        loadDocuments();
+      } catch (e) { st.textContent = "✗ 실패: " + e.message; st.className = "status-line status-err"; }
+      btn.disabled = false;
+    });
+  })();
 
   // ── 승인카드(시안 승인 2026-07-25) — 업로드된 문서의 업무영역을 확인·수정한다.
   // 확실(≠일반)=청록 배지+[수정▾], 확신 낮음(일반)=호박 배지+되물음. 문서는 이미 저장돼 있어

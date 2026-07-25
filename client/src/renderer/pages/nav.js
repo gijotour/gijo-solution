@@ -43,7 +43,6 @@
       { page: "memory.html", label: "기억·학습 (RAG)" },
       { page: "handover.html", label: "인수인계" },
       { page: "ontology.html", label: "온톨로지" },
-      { page: "docenrich.html", label: "문서 보강" },
       { page: "learnloop.html", label: "학습 루프" },
       { page: "merge.html", label: "LLM 합성" },
       { page: "llmguide.html", label: "LLM 가이드" },
@@ -53,8 +52,6 @@
       { page: "update.html", label: "업데이트" },
       { page: "logs.html", label: "로그" },
       { page: "audit.html", label: "작업 기록 (감사)" },
-      { page: "billing.html", label: "사용량·요금" },
-      { page: "reference.html", label: "기능 안내" },
     ]},
   };
   window.gijoHubs = HUBS; // hub.html이 같은 정의를 사용
@@ -88,6 +85,12 @@
   Object.keys(HUBS).forEach(function (g) {
     HUBS[g].tabs.forEach(function (t) { if (t.page) TAB_REDIRECT[t.page] = "hub.html?g=" + g + "&t=" + t.page; });
   });
+  // 메뉴 정리(2026-07-25, 29→26)로 없어진 화면의 옛 주소 — 기존 링크·바로가기가 깨지지 않게
+  // 흡수처로 보낸다. 기능 안내→챗봇이 대신(설정으로), 사용량·요금→설정 클라우드 구역,
+  // 문서 보강→기억·학습에 병합.
+  TAB_REDIRECT["reference.html"] = "hub.html?g=settings&t=settings.html";
+  TAB_REDIRECT["billing.html"] = "hub.html?g=settings&t=settings.html";
+  TAB_REDIRECT["docenrich.html"] = "hub.html?g=aiknowledge&t=memory.html";
 
   function currentPage() {
     return decodeURIComponent((location.pathname || "").split("/").pop() || "");

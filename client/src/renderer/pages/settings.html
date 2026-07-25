@@ -344,6 +344,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
       <div style="margin-top:18px;font-size:12px;font-weight:700;color:var(--muted);">🛡 유출 방지 감사 로그 <span style="color:var(--muted-2);font-weight:400;">— 클라우드로 나간·차단된 질문(최근 50)</span></div>
       <div id="cloudEgressLog" style="font-size:11px;margin-top:6px;"></div>
+
+      <!-- 사용량·예상 비용 — 사용량·요금 화면 제거(메뉴 정리 2026-07-25)로 여기로 이관.
+           서버 살아있는 동안의 인메모리 누적(재시작 시 초기화). -->
+      <div style="margin-top:18px;font-size:12px;font-weight:700;color:var(--muted);">📊 클라우드 API 사용량 <span style="color:var(--muted-2);font-weight:400;">— 제공자별 호출·토큰·예상 비용 (서버 기동 후 누적)</span></div>
+      <table style="width:100%;font-size:11.5px;margin-top:6px;border-collapse:collapse;">
+        <thead><tr style="color:var(--muted-2);text-align:left;"><th style="padding:4px 6px;">제공자·모델</th><th>호출</th><th>토큰(입력/출력)</th><th>예상 비용</th></tr></thead>
+        <tbody id="cloudUsageRows"><tr><td colspan="4" style="color:var(--muted);padding:4px 6px;">불러오는 중...</td></tr></tbody>
+      </table>
     </div>
 
     <div class="footer">
@@ -394,6 +402,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         document.getElementById("siemPanel").style.display = "";
         await loadUserList();
         await loadCloudConfig();
+      await loadCloudUsage();
         await loadSmtpInboundConfig();
         await loadSiemConfig();
       }
@@ -742,6 +751,25 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   // ── 클라우드 LLM 설정 (admin) ────────────────────────────────────────
   let cloudCfg = null;
   function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  // 클라우드 API 사용량 표 — 사용량·요금 화면 제거(메뉴 정리 2026-07-25)로 이관.
+  async function loadCloudUsage() {
+    const rows = document.getElementById("cloudUsageRows");
+    if (!rows) return;
+    try {
+      const u = await window.gijo.cloudUsage();
+      if (!u.rows || !u.rows.length) {
+        rows.innerHTML = '<tr><td colspan="4" style="color:var(--muted);padding:4px 6px;">아직 클라우드 API 호출이 없습니다 (미사용 또는 호출 전)</td></tr>';
+        return;
+      }
+      rows.innerHTML = u.rows.map((r) =>
+        `<tr><td style="padding:4px 6px;">${r.providerLabel} <span style="color:var(--muted-2);font-size:10.5px;">${r.model}</span></td>` +
+        `<td>${r.calls.toLocaleString()}건</td><td>${r.inTokens.toLocaleString()} / ${r.outTokens.toLocaleString()}</td>` +
+        `<td>$${r.estimatedCost.toFixed(4)}</td></tr>`).join("");
+    } catch (e) {
+      rows.innerHTML = '<tr><td colspan="4" style="color:var(--muted);padding:4px 6px;">사용량을 불러오지 못했습니다</td></tr>';
+    }
+  }
+
   async function loadCloudConfig() {
     try {
       cloudCfg = await window.gijo.getCloudConfig();
