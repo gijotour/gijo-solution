@@ -13,6 +13,7 @@ import { registerAsset, updateAssetMeta, recordFindings, getAsset, Asset, AssetC
 import type { StandardFinding } from "./bridge";
 import { kevMatches } from "./kev";
 import { parseWebVulnReport } from "./webreport";
+import { syncDocTriples, webReportTriples } from "./docgraph";
 
 export interface VulnScanResult {
   hosts: number;
@@ -381,6 +382,11 @@ export function importVulnScan(content: string, format: VulnFormat, sourceLabel:
   // HTML·.nessus 리포트에는 CSV에 없는 호스트 정보(DNS 이름·OS)가 있다 — 자산 이름·구성요소로 채운다.
   // 국내 웹취약점 보고서는 서비스명(=dnsName)·점검 대상 표를 함께 주므로 meta로 실어 자산 이름에 반영한다.
   const webReport = format === "webreport" ? parseWebVulnReport(content) : null;
+  // 온톨로지 연결(GraphRAG-lite) — 보고서↔자산↔취약점 관계를 그래프에 심어 "이 자산 관련
+  // 문서·취약점" 같은 연결 질문의 근거가 되게 한다. 실패해도 취약점 등록은 계속(syncDocTriples가 삼킴).
+  if (webReport && webReport.vulns.length > 0) {
+    syncDocTriples(sourceLabel, webReportTriples(sourceLabel, webReport));
+  }
   const withMeta =
     format === "html"
       ? parseNessusHtml(content)

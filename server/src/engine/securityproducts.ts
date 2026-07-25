@@ -13,6 +13,7 @@ import { db } from "../db";
 import type { GijoUser } from "../auth/users";
 import { chat } from "./llm";
 import { addTriple, listTriples, deleteTriple } from "./ontology";
+import { syncDocTriples, manualTriples } from "./docgraph";
 
 // 보안제품 종류 카탈로그 — 대시보드/등록 폼에서 공용으로 쓴다. 한국 중소기업 보안팀이 흔히
 // 운영하는 제품군 위주(과한 세분화 지양). "기타"로 흡수 가능.
@@ -409,6 +410,9 @@ export function importManual(
   const name = nameOverride?.trim() || guessProductName(filename);
   const product = matched ?? createProduct({ name, category: c.category, note: "매뉴얼 업로드로 자동 등록" });
   addProductDoc(product.id, { kind, title: stem, docName }, uploadedBy);
+  // 온톨로지 연결(GraphRAG-lite) — (제품명)-[제품/로그 매뉴얼]->(파일명). 제품명이 질문에
+  // 나오면 매뉴얼 파일명이 관계 근거로 채팅에 주입된다. 실패해도 등록은 계속(내부 삼킴).
+  syncDocTriples(filename, manualTriples(filename, product.name, kind));
   return {
     filename,
     productId: product.id,
@@ -434,6 +438,8 @@ export function attachManualToExistingProduct(
   const stem = filename.replace(/\.[^.]+$/, "");
   if ((c.product.docs ?? []).some((d) => d.docName === docName || d.title === stem)) return null; // 이미 연결됨
   addProductDoc(c.product.id, { kind: c.kind, title: stem, docName }, uploadedBy);
+  // 온톨로지 연결 — importManual과 같은 관계를 자동 연결 경로에서도 심는다.
+  syncDocTriples(filename, manualTriples(filename, c.product.name, c.kind));
   return {
     filename,
     productId: c.product.id,

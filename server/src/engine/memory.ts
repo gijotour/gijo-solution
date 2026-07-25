@@ -741,6 +741,13 @@ export interface DeleteDocumentResult {
 // withFile=true면 서버에 경로가 기록된 원본 파일도 함께 삭제(복구 불가). base64 업로드 문서는
 // 서버에 원본이 없어 임베딩 제거가 곧 완전 삭제이며 파일 삭제는 no-op이다.
 export async function deleteDocument(documentId: string, withFile = false): Promise<DeleteDocumentResult> {
+  // 이 문서가 온톨로지에 심은 관계(문서↔자산↔제품↔취약점)도 함께 지운다 — 고아 트리플 방지.
+  try {
+    const { removeDocTriples } = await import("./docgraph.js");
+    removeDocTriples(documentId);
+  } catch {
+    /* 그래프는 보조 계층 — 정리 실패가 삭제를 막지 않는다 */
+  }
   const ldb = await lancedb.connect(DB_PATH);
   const names = await ldb.tableNames();
   let deletedChunks = 0;

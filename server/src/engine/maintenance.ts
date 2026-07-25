@@ -11,6 +11,7 @@ import { todayLocal } from "../util/date";
 import { db, assertTestDb } from "../db";
 import type { GijoUser } from "../auth/users";
 import { sendMail } from "./email";
+import { syncDocTriples, maintenanceReportTriples } from "./docgraph";
 
 export type MaintenanceStatus = "scheduled" | "reported" | "approved" | "rejected";
 
@@ -263,6 +264,11 @@ export function submitReport(
     updatedAt: now,
   });
   recordEvent(id, "reported", reportedBy, args.note);
+  // 온톨로지 연결(GraphRAG-lite) — (제품명)-[점검 리포트]->(점검서 파일명). 제품명으로 물으면
+  // 최근 점검서가 관계 근거로 붙는다. 실패해도 보고 처리는 계속(내부 삼킴).
+  if (args.reportDocName) {
+    syncDocTriples(args.reportDocName, maintenanceReportTriples(args.reportDocName, item.productName));
+  }
   return saved;
 }
 
