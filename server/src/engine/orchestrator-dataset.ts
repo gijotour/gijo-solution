@@ -45,6 +45,10 @@ export const SEED_DECISIONS: DecisionPair[] = [
   // 조회 — list_assets / get_asset
   { instruction: "등록된 AI 자산 목록 보여줘", decision: t("list_assets") },
   { instruction: "우리 AI 자산 뭐뭐 있어?", decision: t("list_assets") },
+  // 짧은 개수 질문 — "우리" 없이 물으면 도구를 안 타고 RAG(벤더 매뉴얼)로 새어
+  // "알 수 없다"고 답하던 실측 결함(2026-07-25 입력·디스패치 테스트) 교정용.
+  { instruction: "자산 몇 개야?", decision: t("list_assets") },
+  { instruction: "자산 개수 알려줘", decision: t("list_assets") },
   { instruction: "ai-secbot-01 상세 보여줘", decision: t("get_asset", { assetId: "ai-secbot-01" }) },
   { instruction: "ai-doccls-02 자세히 봐줘", decision: t("get_asset", { assetId: "ai-doccls-02" }) },
   // 조회 — search / explain (메뉴 가로지르기)
