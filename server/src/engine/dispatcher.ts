@@ -126,7 +126,7 @@ interface ActionResult {
   approval?: PendingApproval;
 }
 
-async function executeRoutedAction(route: RoutedIntent, instructionText: string, contextText = ""): Promise<ActionResult> {
+async function executeRoutedAction(route: RoutedIntent, instructionText: string, contextText = "", screen?: string): Promise<ActionResult> {
   switch (route.action) {
     case "scan": {
       const assetId = route.targetAssetId ?? "unknown-asset";
@@ -147,7 +147,7 @@ async function executeRoutedAction(route: RoutedIntent, instructionText: string,
       const message = contextText ? `${contextText}\n\n[현재 지시] ${instructionText}` : instructionText;
       // trusted: 지시문은 dispatchInstructionCore에서 이미 관문을 지났다(이중 집계 방지).
       // explain: 지휘 콘솔에 그대로 표시되는 답변이다.
-      return { output: await chat({ agentId: route.agentId, message, remember: true, trusted: true, explain: true }) };
+      return { output: await chat({ agentId: route.agentId, message, remember: true, trusted: true, explain: true, screen }) };
     }
   }
 }
@@ -313,7 +313,7 @@ export async function dispatchInstruction(instructionText: string, sessionId?: s
     emitCollaboration({ from: "세션", to: "orchestrator", message: `💬 [${title}] ${instructionText}` });
   }
   const core = await dispatchInstructionCore(instructionText, contextText, screen);
-  const result: DispatchResult = { ...core, ...(await computeOfferSignals(core, instructionText)) };
+  const result: DispatchResult = { ...core, ...(await computeOfferSignals(core, instructionText, screen)) };
   if (session) {
     appendTurn(session.id, "assistant", result.output, turnToolTag(result));
     emitCollaboration({ from: "orchestrator", to: "세션", message: `💬 [${title}] ${result.output.slice(0, 600)}` });
@@ -337,6 +337,7 @@ function isSmallTalkInstruction(text: string): boolean {
 async function computeOfferSignals(
   result: DispatchResult,
   instructionText: string,
+  screen?: string,
 ): Promise<{ dataHits: number; internalMiss: boolean; sources?: string[] }> {
   let dataHits = 0;
   for (const s of result.steps ?? []) {
@@ -359,7 +360,7 @@ async function computeOfferSignals(
   if (dataHits === 0 && !result.approval && !result.confirm && !isSmallTalkInstruction(instructionText)) {
     try {
       const { queryMemoryScored, RAG_RELEVANCE_MAX_DISTANCE } = await import("./memory.js");
-      const scored = await queryMemoryScored(instructionText, 4).catch(() => null);
+      const scored = await queryMemoryScored(instructionText, 4, undefined, screen).catch(() => null);
       if (Array.isArray(scored)) {
         const relevant = scored.filter((c) => c.distance <= RAG_RELEVANCE_MAX_DISTANCE);
         internalMiss = relevant.length === 0; // 검색 실패(null)면 미판정(false 유지)
@@ -507,7 +508,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   let toolCalls: AgentToolCall[] | undefined;
   let approval: PendingApproval | undefined;
   try {
-    const result = await executeRoutedAction(route, instructionText, contextText);
+    const result = await executeRoutedAction(route, instructionText, contextText, screen);
     output = result.output;
     toolCalls = result.toolCalls;
     approval = result.approval;

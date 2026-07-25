@@ -7,6 +7,9 @@ import {
   hasExactCode,
   fuseResults,
   isRelevant,
+  applyCategoryBoost,
+  categoryForScreen,
+  CATEGORY_BOOST,
   RRF_K,
   type FusedChunk,
 } from "../src/engine/hybridsearch";
@@ -135,6 +138,51 @@ describe("RRF 순위 융합", () => {
 
   it("빈 입력에도 죽지 않는다", () => {
     expect(fuseResults({ vector: [], lexical: [] }, [])).toEqual([]);
+  });
+});
+
+describe("화면 맥락 부스트(업무영역) — soft boost 원칙", () => {
+  const chunk = (over: Partial<FusedChunk>): FusedChunk => ({
+    text: "t", documentId: "d", distance: 0.7, lexicalHit: false, rrf: 0.01, ...over,
+  });
+
+  it("화면→업무영역 매핑: 대표 화면들이 올바른 영역으로 간다", () => {
+    expect(categoryForScreen("opsguide.html")).toBe("장비운영");
+    expect(categoryForScreen("compliance.html")).toBe("사내규정");
+    expect(categoryForScreen("vulnscan.html")).toBe("취약점");
+    expect(categoryForScreen("threat.html")).toBe("위협대응");
+    expect(categoryForScreen("dashboard.html")).toBeUndefined(); // 전 영역 화면 — 부스트 없음
+    expect(categoryForScreen(undefined)).toBeUndefined();
+  });
+
+  it("hub.html?g=X&t=vulnscan.html 형태(iframe 탭)도 파일명을 뽑아 매핑한다", () => {
+    expect(categoryForScreen("hub.html?g=vuln&t=vulnscan.html")).toBe("취약점");
+  });
+
+  it("관련도가 비슷하면 화면 영역 문서가 위로 온다", () => {
+    const a = chunk({ text: "규정 문서", category: "사내규정", rrf: 0.016 });
+    const b = chunk({ text: "장비 문서", category: "장비운영", rrf: 0.0165 });
+    const boosted = applyCategoryBoost([b, a], "사내규정");
+    expect(boosted[0].text).toBe("규정 문서");
+  });
+
+  it("압도적으로 관련 높은 다른 영역 문서는 뒤집지 못한다(soft — 정답 보존)", () => {
+    const winner = chunk({ text: "정답", category: "취약점", rrf: 0.03 }); // 양쪽 검색 상위
+    const same = chunk({ text: "영역만 같음", category: "사내규정", rrf: 0.01 });
+    const boosted = applyCategoryBoost([winner, same], "사내규정");
+    expect(boosted[0].text).toBe("정답");
+    expect(CATEGORY_BOOST).toBeLessThan(0.02); // 부스트가 RRF 1위 점수를 넘지 않는 설계 확인
+  });
+
+  it("preferred가 없으면(매핑 안 된 화면) 순서가 그대로다", () => {
+    const list = [chunk({ text: "1", rrf: 0.02 }), chunk({ text: "2", rrf: 0.01 })];
+    expect(applyCategoryBoost(list, undefined).map((c) => c.text)).toEqual(["1", "2"]);
+  });
+
+  it("부스트는 순위만 바꾸고 관련성 게이트(거리)에는 영향이 없다", () => {
+    const far = chunk({ distance: 1.2, category: "사내규정", rrf: 0.01 });
+    const boosted = applyCategoryBoost([far], "사내규정")[0];
+    expect(isRelevant(boosted, MAX_DIST)).toBe(false); // 부스트돼도 무관 조각은 여전히 게이트 밖
   });
 });
 

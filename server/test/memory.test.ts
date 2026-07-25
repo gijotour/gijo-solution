@@ -198,3 +198,28 @@ describe("chunkText — 구조 인지 청킹 (2026-07-23 개선)", () => {
     expect(classifyByContentHint(ambiguous)).toBeNull();
   });
 });
+
+const { categorizeByRules } = await import("../src/engine/memory");
+
+describe("categorizeByRules — 업무영역 5종 (2026-07-25 RAG 전면 검토)", () => {
+  it("파일명 신호로 4대 업무영역을 정확히 가른다", () => {
+    expect(categorizeByRules("(주)안전대부 웹취약점 점검 결과 보고서.pdf", "")).toBe("취약점");
+    expect(categorizeByRules("FW-2000_운영_매뉴얼.pdf", "")).toBe("장비운영");
+    expect(categorizeByRules("개인정보_내부관리계획_지침.docx", "")).toBe("사내규정");
+    expect(categorizeByRules("랜섬웨어_초동_대응.md", "")).toBe("위협대응");
+  });
+
+  it("운영 실측 오분류 사례가 바로잡힌다 — 방화벽 룰·SIEM 룰이 '보고서'로 뭉개지던 문제", () => {
+    expect(categorizeByRules("방화벽_any_any_규칙.md", "")).toBe("장비운영");
+    expect(categorizeByRules("siem_correlation_rule.md", "")).toBe("위협대응");
+  });
+
+  it("파일명이 무정보면 내용 신호로 정한다", () => {
+    const vulnText = "이번 점검에서 발견된 취약점은 CVE-2024-1234이며 CVSS 9.8, 조치 기한은 30일이다. 취약점 세부 내역은 아래와 같다.";
+    expect(categorizeByRules("문서1.pdf", vulnText)).toBe("취약점");
+  });
+
+  it("확신이 없으면 null — 억지 분류는 오분류보다 나쁘다", () => {
+    expect(categorizeByRules("메모.txt", "오늘 회의는 3시입니다.")).toBeNull();
+  });
+});

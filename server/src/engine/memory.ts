@@ -19,18 +19,24 @@ import {
   shouldRunLexical,
   fuseResults,
   isRelevant,
+  applyCategoryBoost,
+  categoryForScreen,
+  CATEGORIES,
+  type Category,
   type FusedChunk,
 } from "./hybridsearch";
 
 // 문서 단위 메타데이터(업로드 시각·원본 경로)는 SQLite에 둔다 — LanceDB 스키마는 건드리지 않는다.
 migrate("memory_documents-uploadedBy", "ALTER TABLE memory_documents ADD COLUMN uploadedBy TEXT"); // 작업 귀속(누가 올렸나) 표시용(2026-07-25)
+migrate("memory_documents-category", "ALTER TABLE memory_documents ADD COLUMN category TEXT"); // 업무영역 5종 — 화면 맥락 검색용(2026-07-25 RAG 전면 검토)
 const upsertDocMetaStmt = db.prepare(
-  `INSERT INTO memory_documents (documentId, scope, chunks, embeddingModel, sourcePath, ingestedAt, uploadedBy)
-   VALUES (@documentId, @scope, @chunks, @embeddingModel, @sourcePath, @ingestedAt, @uploadedBy)
+  `INSERT INTO memory_documents (documentId, scope, chunks, embeddingModel, sourcePath, ingestedAt, uploadedBy, category)
+   VALUES (@documentId, @scope, @chunks, @embeddingModel, @sourcePath, @ingestedAt, @uploadedBy, @category)
    ON CONFLICT(documentId) DO UPDATE SET
      scope=excluded.scope, chunks=excluded.chunks, embeddingModel=excluded.embeddingModel,
      sourcePath=COALESCE(excluded.sourcePath, memory_documents.sourcePath), ingestedAt=excluded.ingestedAt,
-     uploadedBy=COALESCE(excluded.uploadedBy, memory_documents.uploadedBy)`
+     uploadedBy=COALESCE(excluded.uploadedBy, memory_documents.uploadedBy),
+     category=COALESCE(excluded.category, memory_documents.category)`
 );
 const getDocMetaStmt = db.prepare("SELECT * FROM memory_documents WHERE documentId = ?");
 const deleteDocMetaStmt = db.prepare("DELETE FROM memory_documents WHERE documentId = ?");
@@ -66,6 +72,7 @@ export interface IngestResult {
   scope: string;
   docClass?: string; // classify=true로 수집 시 Scan·Analyze Agent가 판별한 분류(매뉴얼/보고서/정책/기타)
   linkedProduct?: string; // '매뉴얼'로 분류돼 기존 보안제품에 자동 연결됐으면 그 제품명
+  category?: string; // 업무영역 5종(취약점·장비운영·사내규정·위협대응·일반) — 화면 맥락 검색·승인카드 표시용
 }
 
 // ── 문서 자동 분류 — 올린 문서를 Scan·Analyze Agent가 분석해 종류를 판별한다 ─────────
@@ -105,6 +112,55 @@ function classifyByFilename(documentId: string): string {
     classifyByFilenameStrict(documentId) ??
     (/동향|현황|분석/i.test(documentId) ? "보고서" : /표준/i.test(documentId) ? "정책" : "기타")
   );
+}
+
+// ── 업무영역(category) 분류 — 화면 맥락 검색의 축 (2026-07-25 RAG 전면 검토) ─────────
+// docClass(문서 형태: 매뉴얼/보고서/…)와 별개 축이다. docClass는 제품 자동 연결 등 기존
+// 동작에 계속 쓰고, category는 "무슨 업무 자료인가"로 검색 순위에 쓴다.
+// 결정적 규칙을 먼저 — 같은 파일은 언제나 같은 결과가 나와야 하고, 인입 경로(업로드 라우팅)가
+// 이미 답을 아는 경우가 많다. LLM은 규칙이 못 정할 때만 부른다.
+
+/** 파일명·내용 선두로 업무영역을 정한다. 확신이 없으면 null(호출자가 LLM 또는 기본값). */
+export function categorizeByRules(documentId: string, text: string): Category | null {
+  const name = documentId;
+  const head = text.slice(0, 2000);
+  // 순서 중요 — 더 구체적인 신호를 먼저 본다.
+  if (/취약점|점검\s*결과|vuln|CVE-\d{4}|스캔|pentest|모의해킹/i.test(name)) return "취약점";
+  if (/정책|지침|규정|표준|준수|컴플라이언스|policy|compliance|개인정보|isms/i.test(name)) return "사내규정";
+  if (/랜섬웨어|침해|위협|공격|탐지|대응|ioc|siem|snort|cti|threat|incident/i.test(name)) return "위협대응";
+  if (/매뉴얼|manual|장비|방화벽|스위치|유지보수|점검표|릴리즈|release|장애처리|트러블슈팅|troubleshoot/i.test(name)) return "장비운영";
+  // 내용 신호(선두 2000자) — 파일명이 무정보일 때.
+  const score: Record<Category, number> = { 취약점: 0, 장비운영: 0, 사내규정: 0, 위협대응: 0, 일반: 0 };
+  score["취약점"] = (head.match(/취약점|CVE-\d{4}|CVSS|위험도|조치\s*(기한|방안)|스캔/g) ?? []).length;
+  score["장비운영"] = (head.match(/설정\s*방법|명령어|콘솔|장비|펌웨어|유지보수|정기\s*점검|로그\s*필드/g) ?? []).length;
+  score["사내규정"] = (head.match(/규정|지침|준수|의무|금지|승인\s*절차|보관\s*(기간|의무)|법령/g) ?? []).length;
+  score["위협대응"] = (head.match(/공격|침해|탐지\s*룰|시그니처|차단|대응\s*절차|IOC|악성/g) ?? []).length;
+  const best = (Object.entries(score) as [Category, number][]).sort((a, b) => b[1] - a[1])[0];
+  // 최고점이 2점 이상이고 2위와 차이가 나야 확신으로 본다 — 억지 분류가 오분류보다 나쁘다.
+  const second = (Object.entries(score) as [Category, number][]).sort((a, b) => b[1] - a[1])[1];
+  if (best[1] >= 2 && best[1] > second[1]) return best[0];
+  return null;
+}
+
+/** 업무영역 확정 — 규칙 → (허용 시) LLM → "일반". LLM 실패해도 인입은 계속된다. */
+async function categorizeDocument(documentId: string, text: string, allowLlm: boolean): Promise<Category> {
+  const byRule = categorizeByRules(documentId, text);
+  if (byRule) return byRule;
+  if (!allowLlm) return "일반";
+  try {
+    const reply = await chat({
+      agentId: "analysis",
+      message: [
+        "다음 문서가 어느 업무 자료인지 아래 5가지 중 정확히 한 단어로만 분류하라. 다른 텍스트 없이 그 한 단어만 출력한다.",
+        "선택지: 취약점(점검 결과·CVE·조치), 장비운영(장비 매뉴얼·설정·유지보수), 사내규정(정책·지침·컴플라이언스), 위협대응(공격 탐지·침해 대응·룰), 일반(그 외)",
+        `파일명: ${documentId}`,
+        `내용 일부: ${text.slice(0, 800)}`,
+      ].join("\n"),
+    });
+    return CATEGORIES.find((c) => reply.includes(c)) ?? "일반";
+  } catch {
+    return "일반";
+  }
 }
 
 async function classifyDocument(documentId: string, text: string): Promise<string> {
@@ -166,6 +222,7 @@ interface MemoryRow {
   text: string;
   scope: string;
   vector: number[];
+  category?: string; // 업무영역 5종. 컬럼 추가(2026-07-25) 이전에 만들어진 조각은 없을 수 있다.
 }
 
 // PDF 추출물의 레이아웃 잡음을 지운다 — 페이지 번호 줄("- 134 -", "134"), 페이지마다 반복되는
@@ -256,9 +313,15 @@ export async function ingestDocument(filePath: string, scope: string = GLOBAL_SC
 
 // 이미 추출된 텍스트를 지식 베이스에 직접 넣는다 — 파일 업로드(PDF/HWPX 추출 후)나
 // 서버 밖 클라이언트에서 올린 문서용. ingestDocument는 파일을 읽어 이 함수로 위임한다.
-export async function ingestText(documentId: string, raw: string, scope: string = GLOBAL_SCOPE, sourcePath?: string, classify = false, uploadedBy?: string): Promise<IngestResult> {
+export async function ingestText(documentId: string, raw: string, scope: string = GLOBAL_SCOPE, sourcePath?: string, classify = false, uploadedBy?: string, category?: string): Promise<IngestResult> {
   const chunks = chunkText(raw);
   if (chunks.length === 0) return { documentId, chunks: 0, embeddingModel: "none", scope };
+
+  // 업무영역 확정 — 인입 경로가 이미 아는 경우(취약점 리포트 라우팅 등) 그 값을 쓰고,
+  // 모르면 규칙 → (사용자 업로드 경로에서만) LLM 순으로 정한다. 검색 순위(화면 맥락)에 쓰인다.
+  const resolvedCategory: Category = CATEGORIES.includes(category as Category)
+    ? (category as Category)
+    : await categorizeDocument(documentId, raw, classify);
 
   // 대용량 문서(수백~수천 청크)를 한 번에 임베딩하면 임베딩 서버 요청이 제한시간(120s)을 넘겨
   // 통째로 실패(embed가 연결오류로 표기)한다. 배치로 나눠 각 요청이 시간 안에 끝나게 한다.
@@ -309,7 +372,7 @@ export async function ingestText(documentId: string, raw: string, scope: string 
     // 대용량 문서(수백 배치)에서도 다른 요청이 끼어들 틈을 준다.
     if (i > 0 && i % (EMBED_BATCH * 25) === 0) await new Promise((resolve) => setTimeout(resolve, 300));
   }
-  const rows: MemoryRow[] = chunks.map((text, i) => ({ documentId, chunkIndex: i, text, scope, vector: vectors[i] }));
+  const rows: MemoryRow[] = chunks.map((text, i) => ({ documentId, chunkIndex: i, text, scope, vector: vectors[i], category: resolvedCategory }));
 
   const db = await lancedb.connect(DB_PATH);
   const names = await db.tableNames();
@@ -336,6 +399,9 @@ export async function ingestText(documentId: string, raw: string, scope: string 
       try {
         // 재인입 멱등성: 같은 documentId의 옛 청크를 먼저 지운다. 안 그러면 add만 해서 옛/새 청크가
         // 중복 누적된다(2026-07-25 실측: 같은 파일 재업로드/재시드가 KB에 중복 조각을 남김).
+        // ⚠ 순서 중요: category 컬럼 보장이 add보다 먼저다. 옛 스키마 테이블에 category 든 행을
+        // add하면 스키마 에러 → 아래 최후 안전망(테이블 재생성)이 발동해 기존 지식 전체가 날아간다.
+        await ensureCategoryColumn(table);
         await table.delete(`documentId = '${escapeLiteral(documentId)}'`);
         await table.add(records);
         // 새 조각을 전문 검색(BM25)에서도 찾을 수 있게 인덱스를 갱신한다. 인덱스는 생성 시점의
@@ -363,6 +429,7 @@ export async function ingestText(documentId: string, raw: string, scope: string 
       sourcePath: sourcePath ?? null,
       ingestedAt: new Date().toISOString(),
       uploadedBy: uploadedBy ?? null, // 작업 귀속 — 누가 올렸는지(화면 표시용)
+      category: resolvedCategory,
     });
   } catch (err) {
     console.warn(`[memory] 문서 메타데이터 기록 실패: ${err instanceof Error ? err.message : String(err)}`);
@@ -382,7 +449,7 @@ export async function ingestText(documentId: string, raw: string, scope: string 
     }
   }
 
-  return { documentId, chunks: chunks.length, embeddingModel: "local-embedding-server", scope, docClass, linkedProduct };
+  return { documentId, chunks: chunks.length, embeddingModel: "local-embedding-server", scope, docClass, linkedProduct, category: resolvedCategory };
 }
 
 // SQL 문자열 injection 방지 — scope는 LanceDB where 절에 문자열로 들어간다. 에이전트 id와
@@ -409,6 +476,20 @@ export interface ScoredChunk {
   distance: number;
   documentId: string; // 근거(출처) 표시용 — 어느 문서의 조각인지
   lexicalHit?: boolean; // 질의의 코드(CVE·IW·U-01 등)가 이 조각에 글자 그대로 있었나
+}
+
+// LanceDB 테이블에 category 컬럼을 보장한다(2026-07-25 업무영역 축 추가). 기존 조각의
+// 기본값은 '일반' — 운영 마이그레이션(tools/migrate-category)이 문서별로 재분류해 채운다.
+// 프로세스당 한 번만 실제 확인한다(schema() 호출 절약).
+let categoryColumnEnsured = false;
+async function ensureCategoryColumn(table: lancedb.Table): Promise<void> {
+  if (categoryColumnEnsured) return;
+  const schema = await table.schema();
+  if (!schema.fields.some((f) => f.name === "category")) {
+    await table.addColumns([{ name: "category", valueSql: "'일반'" }]);
+    console.log("[memory] 지식 베이스에 업무영역(category) 컬럼을 추가했습니다 — 기존 조각은 '일반'");
+  }
+  categoryColumnEnsured = true;
 }
 
 // 전문 검색(BM25) 인덱스는 한 번만 만들면 되지만, 프로세스가 뜬 뒤 첫 검색에서 확인한다.
@@ -489,7 +570,7 @@ async function refreshFtsIndex(table: lancedb.Table): Promise<void> {
  * 관련성 게이트(0.95 임계값)를 그대로 유지할 수 있기 때문이다. 순위 점수만 남으면
  * "무관한 질문에 잡음 조각 주입" 사고가 다시 열린다.
  */
-async function hybridSearch(question: string, topK: number, agentId?: string): Promise<FusedChunk[]> {
+async function hybridSearch(question: string, topK: number, agentId?: string, screen?: string): Promise<FusedChunk[]> {
   const db = await lancedb.connect(DB_PATH);
   const names = await db.tableNames();
   if (!names.includes(TABLE_NAME)) return [];
@@ -501,7 +582,7 @@ async function hybridSearch(question: string, topK: number, agentId?: string): P
   // 융합 전에는 각 검색이 넉넉히 후보를 내야 한다 — 한쪽에서 밀린 정답을 다른 쪽이 살린다.
   const candidates = Math.max(topK * 2, 10);
 
-  let vector: { text: string; documentId: string; distance: number }[] = [];
+  let vector: { text: string; documentId: string; distance: number; category?: string }[] = [];
   try {
     const rows = (await table.search(queryVector).where(whereClause).limit(candidates).toArray()) as (MemoryRow & {
       _distance?: number;
@@ -510,6 +591,7 @@ async function hybridSearch(question: string, topK: number, agentId?: string): P
       text: r.text,
       documentId: r.documentId,
       distance: Number(r._distance ?? Number.POSITIVE_INFINITY),
+      ...(r.category ? { category: r.category } : {}),
     }));
   } catch (err) {
     console.warn(`[memory] 지식 베이스 검색 실패: ${err instanceof Error ? err.message : String(err)}`);
@@ -517,7 +599,7 @@ async function hybridSearch(question: string, topK: number, agentId?: string): P
   }
 
   const terms = extractLexicalTerms(question);
-  let lexical: { text: string; documentId: string }[] = [];
+  let lexical: { text: string; documentId: string; category?: string }[] = [];
   if (shouldRunLexical(terms) && (await ensureFtsIndex(table))) {
     try {
       const rows = (await table
@@ -526,19 +608,22 @@ async function hybridSearch(question: string, topK: number, agentId?: string): P
         .where(whereClause)
         .limit(candidates)
         .toArray()) as MemoryRow[];
-      lexical = rows.map((r) => ({ text: r.text, documentId: r.documentId }));
+      lexical = rows.map((r) => ({ text: r.text, documentId: r.documentId, ...(r.category ? { category: r.category } : {}) }));
     } catch (err) {
       // 전문 검색만 실패하면 벡터 결과로 계속 간다 — 기존 품질은 보장된다.
       console.warn(`[memory] 전문 검색 실패 — 벡터 결과만 사용합니다: ${err instanceof Error ? err.message : String(err)}`);
     }
   }
 
-  return fuseResults({ vector, lexical }, terms.codes).slice(0, topK);
+  // 화면 맥락 부스트 — 유지보수 화면에선 장비 문서가, 컴플라이언스 화면에선 규정 문서가 먼저.
+  // soft boost라 다른 영역 문서도 밀려날 뿐 사라지지 않는다(관련성 게이트는 부스트와 무관).
+  const fused = fuseResults({ vector, lexical }, terms.codes);
+  return applyCategoryBoost(fused, categoryForScreen(screen)).slice(0, topK);
 }
 
-/** 거리까지 함께 돌려주는 검색. 그라운딩 판단(관련 자료가 있는가)에 쓴다. */
-export async function queryMemoryScored(question: string, topK = 5, agentId?: string): Promise<ScoredChunk[]> {
-  const fused = await hybridSearch(question, topK, agentId);
+/** 거리까지 함께 돌려주는 검색. 그라운딩 판단(관련 자료가 있는가)에 쓴다. screen을 주면 그 화면의 업무영역 문서를 우선한다. */
+export async function queryMemoryScored(question: string, topK = 5, agentId?: string, screen?: string): Promise<ScoredChunk[]> {
+  const fused = await hybridSearch(question, topK, agentId, screen);
   return fused.map((c) => ({
     text: c.text,
     distance: c.distance,
@@ -548,8 +633,8 @@ export async function queryMemoryScored(question: string, topK = 5, agentId?: st
 }
 
 /** 관련 있는 청크만 남긴다(벡터 거리 임계값 또는 코드 정확 일치). 관련 자료가 없으면 빈 배열. */
-export async function queryMemoryRelevant(question: string, topK = 5, agentId?: string): Promise<string[]> {
-  const fused = await hybridSearch(question, topK, agentId);
+export async function queryMemoryRelevant(question: string, topK = 5, agentId?: string, screen?: string): Promise<string[]> {
+  const fused = await hybridSearch(question, topK, agentId, screen);
   return fused.filter((c) => isRelevant(c, RAG_RELEVANCE_MAX_DISTANCE)).map((c) => c.text);
 }
 
@@ -563,8 +648,8 @@ export async function getDocumentSample(documentId: string): Promise<string | nu
 }
 
 /** 임계값 없이 상위 topK를 그대로 돌려주는 검색(문서 검색 화면·도구용). 순위는 하이브리드로 낸다. */
-export async function queryMemory(question: string, topK = 5, agentId?: string): Promise<string[]> {
-  const fused = await hybridSearch(question, topK, agentId);
+export async function queryMemory(question: string, topK = 5, agentId?: string, screen?: string): Promise<string[]> {
+  const fused = await hybridSearch(question, topK, agentId, screen);
   return fused.map((c) => c.text);
 }
 
@@ -577,6 +662,7 @@ export interface MemoryDocument {
   hasSource: boolean; // 서버에 원본 파일 경로가 기록돼 있어 '원본까지 삭제'가 가능한지
   docClass: string | null; // Scan·Analyze Agent 분류(매뉴얼/보고서/정책/기타) — 분류 전 문서는 null
   uploadedBy: string | null; // 작업 귀속 — 누가 올렸는지(2026-07-25)
+  category: string | null; // 업무영역 5종(취약점·장비운영·사내규정·위협대응·일반) — 마이그레이션 전 문서는 null
 }
 
 // 장기기억에 저장된 문서 목록. 조각 수·scope의 진실 원천은 LanceDB(실제 임베딩),
@@ -600,7 +686,7 @@ export async function listDocuments(): Promise<MemoryDocument[]> {
     }
   }
   const metaRows = db.prepare("SELECT * FROM memory_documents").all() as {
-    documentId: string; embeddingModel: string | null; sourcePath: string | null; ingestedAt: string; docClass: string | null; uploadedBy: string | null;
+    documentId: string; embeddingModel: string | null; sourcePath: string | null; ingestedAt: string; docClass: string | null; uploadedBy: string | null; category: string | null;
   }[];
   const metaById = new Map(metaRows.map((m) => [m.documentId, m]));
   const out: MemoryDocument[] = [];
@@ -615,6 +701,7 @@ export async function listDocuments(): Promise<MemoryDocument[]> {
       hasSource: !!meta?.sourcePath,
       docClass: meta?.docClass ?? null,
       uploadedBy: meta?.uploadedBy ?? null,
+      category: meta?.category ?? null,
     });
   }
   out.sort((a, b) => (b.ingestedAt ?? "").localeCompare(a.ingestedAt ?? "") || b.chunks - a.chunks);

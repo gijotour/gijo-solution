@@ -31,6 +31,9 @@ export interface ChatArgs {
   // 검사한 뒤 같은 텍스트를 넘기는 내부 재진입에서만 쓴다 — 안 그러면 한 요청이 두 번 집계된다.
   // 사용자 입력을 처음 받는 경로에서는 절대 켜지 않는다.
   trusted?: boolean;
+  // 현재 화면(예: "opsguide.html") — RAG 검색에서 그 화면의 업무영역 문서를 우선하는 soft boost용.
+  // 없어도 동작한다(부스트 없이 기존과 동일).
+  screen?: string;
   // true면 답변 끝에 어려운 용어 쉬운 풀이(glossary)를 붙인다 — 사람이 읽는 답변 전용.
   //
   // 기본값이 false인 이유: 이 후처리를 chat() 전체에 무조건 걸었더니(2026-07-20), 사람이 읽지 않는
@@ -62,13 +65,14 @@ export function resetChatHistoryForTests(): void {
 // 임베딩 서버가 없거나 지식 베이스가 비어 있으면 조용히 생략한다 — RAG가 안 된다고
 // 채팅 자체가 죽으면 안 된다. (memory.ts가 llm.ts의 embed를 쓰므로 순환 참조를 피해
 // 호출 시점에 동적 import.)
-async function ragContextFor(message: string, agentId: string): Promise<string | null> {
+async function ragContextFor(message: string, agentId: string, screen?: string): Promise<string | null> {
   try {
     const { queryMemoryRelevant } = await import("./memory.js");
     // 에이전트 전용 지식 + 전역 지식만 검색 (다른 에이전트 전용 문서는 제외).
     // 거리 임계값을 넘는 청크는 버린다 — 무관한 조각을 "참고 자료"로 붙이면 모델이 그걸
     // 근거인 양 답한다(memory.ts의 RAG_RELEVANCE_MAX_DISTANCE 주석 참고).
-    const chunks = await queryMemoryRelevant(message, 4, agentId);
+    // screen이 있으면 그 화면의 업무영역 문서를 우선한다(soft boost — 다른 영역도 배제 안 함).
+    const chunks = await queryMemoryRelevant(message, 4, agentId, screen);
 
     const parts: string[] = [];
     if (chunks.length > 0) {
@@ -370,7 +374,7 @@ export async function chat(args: ChatArgs): Promise<string> {
   }
 
   const history = args.remember ? (histories.get(args.agentId) ?? []) : [];
-  const rag = args.remember ? await ragContextFor(args.message, args.agentId) : null;
+  const rag = args.remember ? await ragContextFor(args.message, args.agentId, args.screen) : null;
 
   // RAG 참고자료는 별도 system 메시지가 아니라 시스템 프롬프트에 합친다 — Mistral 계열
   // (Lily 포함) 채팅 템플릿은 system 메시지 2개를 "roles must alternate" 에러로 거부한다.

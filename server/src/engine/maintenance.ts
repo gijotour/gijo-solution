@@ -511,7 +511,8 @@ export function registerMaintenanceRoutes(app: Express): void {
         const text = await extractDocumentText(filename, content);
         if (text.trim()) {
           const { ingestText, GLOBAL_SCOPE } = await import("./memory.js");
-          await ingestText(filename, text, GLOBAL_SCOPE);
+          // 유지보수 점검 리포트는 업무영역이 자명하다 — 장비운영으로 확정 인입(화면 맥락 검색용).
+          await ingestText(filename, text, GLOBAL_SCOPE, undefined, false, undefined, "장비운영");
           reportDocName = filename;
         }
       }

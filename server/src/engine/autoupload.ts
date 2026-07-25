@@ -24,7 +24,9 @@ export interface AutoUploadResult {
   guessProductName?: string; // 결정 필요 시 신규 제품명 추천값(사용자가 확인·수정 가능, 필요시 수동입력)
   vulnscan?: { hosts: number; findings: number };
   manual?: { productName: string; kind: string; createdProduct: boolean };
-  memory?: { chunks: number; docClass?: string; linkedProduct?: string };
+  memory?: { chunks: number; docClass?: string; linkedProduct?: string; category?: string };
+  /** 확정된 업무영역(취약점·장비운영·사내규정·위협대응·일반) — 승인카드에 "이렇게 분류했습니다" 표시용. */
+  category?: string;
 }
 
 // 파일명으로 애매할 때의 추천 유형. 취약점 리포트·로그·가이드라인·매뉴얼 신호를 순서대로 본다.
@@ -61,13 +63,21 @@ function looksLikeVulnJson(text: string): boolean {
 }
 
 // RAG(임베딩) 수집은 임베딩 서버가 죽어 있어도 등록/처리를 막지 않도록 항상 비치명적으로 시도한다.
-async function tryIngest(filename: string, base64: string, classify = false): Promise<{ chunks: number; docClass?: string; linkedProduct?: string; docName?: string } | null> {
+// category: 라우팅 경로가 이미 아는 업무영역(취약점 리포트→취약점 등) — 인입 시 그대로 기록된다.
+// uploadedBy: 작업 귀속(누가 올렸나) — 전 경로에서 기록한다(2026-07-25 RAG 전면 검토).
+async function tryIngest(
+  filename: string,
+  base64: string,
+  classify = false,
+  category?: string,
+  uploadedBy?: string
+): Promise<{ chunks: number; docClass?: string; linkedProduct?: string; docName?: string; category?: string } | null> {
   try {
     const { extractDocumentText } = await import("./dataset.js");
     const text = await extractDocumentText(filename, base64);
     if (!text.trim()) return null;
-    const r = await ingestText(filename, text, GLOBAL_SCOPE, undefined, classify);
-    return { chunks: r.chunks, docClass: r.docClass, linkedProduct: r.linkedProduct, docName: filename };
+    const r = await ingestText(filename, text, GLOBAL_SCOPE, undefined, classify, uploadedBy, category);
+    return { chunks: r.chunks, docClass: r.docClass, linkedProduct: r.linkedProduct, docName: filename, category: r.category };
   } catch {
     return null; // 임베딩 미기동 등 — 검색 수집만 생략, 상위 처리는 계속
   }
@@ -76,7 +86,7 @@ async function tryIngest(filename: string, base64: string, classify = false): Pr
 // 국내 웹취약점 점검 결과보고서(PDF·DOCX 등 서술형)를 규칙 파서로 시도한다.
 // 성공(자산·취약점 1건 이상)하면 취약점으로 반영하고, 원문도 RAG에 남겨 근거 조회가 가능하게 한다.
 // 실패하면 null을 돌려 호출자가 다음 경로(Nessus HTML → 문서 저장)로 넘어간다.
-async function tryWebReport(filename: string, base64: string): Promise<AutoUploadResult | null> {
+async function tryWebReport(filename: string, base64: string, uploadedBy?: string): Promise<AutoUploadResult | null> {
   try {
     const { extractDocumentText } = await import("./dataset.js");
     const text = await extractDocumentText(filename, base64);
@@ -87,7 +97,7 @@ async function tryWebReport(filename: string, base64: string): Promise<AutoUploa
     if (parsed.vulns.length === 0) return null; // 규칙으로 못 잡음 → 호출자가 다음 경로(문서 저장/LLM 폴백)
     const r = importVulnScan(text, "webreport", filename);
     // 원문은 지식베이스에도 남긴다 — 취약점 등록과 별개로 "보고서 내용"을 챗봇이 근거로 인용할 수 있게.
-    const ing = await tryIngest(filename, base64);
+    const ing = await tryIngest(filename, base64, false, "취약점", uploadedBy);
     emitCollaboration({
       from: "scan",
       to: "orchestrator",
@@ -101,8 +111,9 @@ async function tryWebReport(filename: string, base64: string): Promise<AutoUploa
       filename,
       routedTo: "vulnscan",
       reason: `국내 웹취약점 점검 보고서 파싱 — ${parsed.notes.join(" · ")}`,
+      category: "취약점",
       vulnscan: { hosts: r.hosts, findings: r.findings },
-      memory: ing ? { chunks: ing.chunks, docClass: ing.docClass } : undefined,
+      memory: ing ? { chunks: ing.chunks, docClass: ing.docClass, category: ing.category } : undefined,
     };
   } catch {
     return null; // 텍스트 추출 실패 등 — 다음 경로로
@@ -111,17 +122,19 @@ async function tryWebReport(filename: string, base64: string): Promise<AutoUploa
 
 // 사용자가 유형을 지정(결정창)했을 때 그 유형으로 바로 라우팅한다.
 // productName: 결정 카드에서 사용자가 확인·수정한 제품명(신규 등록 시에만 반영, 없으면 자동 추천값).
-async function routeByType(filename: string, base64: string, type: UploadType, productName?: string): Promise<AutoUploadResult> {
+// 라우팅 경로가 업무영역(category)을 이미 아는 경우 그 값을 인입에 그대로 전달한다 —
+// 제품 매뉴얼=장비운영, 취약점 리포트=취약점. LLM 분류보다 정확하고 결정적이다.
+async function routeByType(filename: string, base64: string, type: UploadType, productName?: string, uploadedBy?: string): Promise<AutoUploadResult> {
   if (type === "asset" || type === "log") {
-    const ing = await tryIngest(filename, base64);
+    const ing = await tryIngest(filename, base64, false, "장비운영", uploadedBy);
     const m = importManual(filename, ing?.docName, undefined, type === "log" ? "logManual" : "manual", productName);
     emitCollaboration({ from: "scan", to: "orchestrator", message: `${filename} → 보안제품 '${m.productName}'에 ${type === "log" ? "로그" : "제품"} 매뉴얼로 등록${m.createdProduct ? " (신규 제품 자동 등록)" : ""}${ing ? "" : " · 검색수집 보류(임베딩 미기동)"}` });
-    return { filename, routedTo: "product-manual", reason: `사용자 지정: ${type === "log" ? "로그 매뉴얼" : "보안제품 자산"}`, manual: { productName: m.productName, kind: m.kind, createdProduct: m.createdProduct } };
+    return { filename, routedTo: "product-manual", reason: `사용자 지정: ${type === "log" ? "로그 매뉴얼" : "보안제품 자산"}`, category: "장비운영", manual: { productName: m.productName, kind: m.kind, createdProduct: m.createdProduct } };
   }
   if (type === "vulnreport") {
     // ① 국내 웹취약점 점검 보고서(PDF/DOCX 서술형) — 텍스트를 추출해 규칙 파서로 시도한다.
     //    Nessus 계열이 아니라 예전엔 문서로만 저장돼 자산·취약점이 안 만들어졌다(2026-07-25 사용자 지적).
-    const web = await tryWebReport(filename, base64);
+    const web = await tryWebReport(filename, base64, uploadedBy);
     if (web) return web;
     // ② Nessus 스타일 HTML(호스트/취약점 헤더) 구조로 시도 — 다른 스캐너(Oracle 등) 자체 포맷은
     // 구조가 달라 인식 못 할 수 있다. 그럴 땐 데이터를 잃지 않도록 문서로라도 저장한다(투명하게 사유 표시).
@@ -129,33 +142,36 @@ async function routeByType(filename: string, base64: string, type: UploadType, p
     const r = importVulnScan(textish, "html", filename);
     if (r.hosts > 0) {
       emitCollaboration({ from: "scan", to: "orchestrator", message: `${filename} → 취약점 스캔으로 등록 — 호스트 ${r.hosts}·finding ${r.findings}건` });
-      return { filename, routedTo: "vulnscan", reason: "사용자 지정: 취약점 리포트/로그 (Nessus 스타일 HTML 파싱)", vulnscan: { hosts: r.hosts, findings: r.findings } };
+      return { filename, routedTo: "vulnscan", reason: "사용자 지정: 취약점 리포트/로그 (Nessus 스타일 HTML 파싱)", category: "취약점", vulnscan: { hosts: r.hosts, findings: r.findings } };
     }
-    const ing = await tryIngest(filename, base64);
+    const ing = await tryIngest(filename, base64, false, "취약점", uploadedBy);
     emitCollaboration({ from: "scan", to: "orchestrator", message: `${filename} → 알려진 스캐너 형식(Nessus 등)이 아니라 구조화 파싱 실패 — 문서로 저장${ing ? "" : " · 검색수집 보류(임베딩 미기동)"}` });
     return {
       filename,
       routedTo: "memory",
       reason: "사용자 지정: 취약점 리포트/로그 — 알려진 스캐너 HTML 구조가 아니라 findings로 반영하지 못함, 문서로 저장",
-      memory: { chunks: ing?.chunks ?? 0, docClass: "취약점 리포트" },
+      category: "취약점",
+      memory: { chunks: ing?.chunks ?? 0, docClass: "취약점 리포트", category: "취약점" },
     };
   }
   // document / guideline → 장기기억(RAG). guideline은 분류 생략(가이드로 태깅만).
-  const ing = await tryIngest(filename, base64, type === "document");
+  // 업무영역은 지정하지 않는다 — ingestText가 규칙(→ document는 LLM까지)으로 정한다.
+  const ing = await tryIngest(filename, base64, type === "document", undefined, uploadedBy);
   if (!ing) {
     return { filename, routedTo: "memory", reason: `사용자 지정: ${type === "guideline" ? "가이드라인" : "문서"} · 검색수집 보류(임베딩 미기동)`, memory: { chunks: 0, docClass: type === "guideline" ? "가이드라인" : undefined } };
   }
-  return { filename, routedTo: "memory", reason: `사용자 지정: ${type === "guideline" ? "가이드라인" : "문서"}`, memory: { chunks: ing.chunks, docClass: type === "guideline" ? "가이드라인" : ing.docClass, linkedProduct: ing.linkedProduct } };
+  return { filename, routedTo: "memory", reason: `사용자 지정: ${type === "guideline" ? "가이드라인" : "문서"}`, category: ing.category, memory: { chunks: ing.chunks, docClass: type === "guideline" ? "가이드라인" : ing.docClass, linkedProduct: ing.linkedProduct, category: ing.category } };
 }
 
 export async function autoRouteUpload(
   filename: string,
   base64: string,
   forceType?: UploadType,
-  productName?: string
+  productName?: string,
+  uploadedBy?: string
 ): Promise<AutoUploadResult> {
   // 사용자가 결정창에서 유형을 골랐으면 그대로 라우팅(판별 생략).
-  if (forceType) return routeByType(filename, base64, forceType, productName);
+  if (forceType) return routeByType(filename, base64, forceType, productName, uploadedBy);
 
   const textish = Buffer.from(base64, "base64").toString("utf-8");
   const ext = (filename.match(/\.[^.]+$/)?.[0] ?? "").toLowerCase();
@@ -180,21 +196,21 @@ export async function autoRouteUpload(
   if (vulnFormat) {
     const r = importVulnScan(textish, vulnFormat, filename);
     emitCollaboration({ from: "scan", to: "orchestrator", message: `${filename} → 취약점 스캔으로 자동 반영 — 호스트 ${r.hosts}·finding ${r.findings}건` });
-    return { filename, routedTo: "vulnscan", reason: vulnReason, vulnscan: { hosts: r.hosts, findings: r.findings } };
+    return { filename, routedTo: "vulnscan", reason: vulnReason, category: "취약점", vulnscan: { hosts: r.hosts, findings: r.findings } };
   }
 
   // ①-b 국내 웹취약점 점검 결과보고서(PDF/DOCX 서술형) — 제목·[IW-NN] 코드체계로 판별되고
   // 규칙 파서가 취약점을 실제로 뽑아낼 때만 취약점으로 반영한다(못 뽑으면 아래 경로로 계속).
-  const webAuto = await tryWebReport(filename, base64);
+  const webAuto = await tryWebReport(filename, base64, uploadedBy);
   if (webAuto) return webAuto;
 
   // ② 기존 제품과 확실히 매칭되면(모델/벤더/종류 일치) 자동으로 그 제품 매뉴얼로.
   const c = classifyManual(filename, listProducts());
   if (c.reason !== "new-product") {
-    const ing = await tryIngest(filename, base64);
+    const ing = await tryIngest(filename, base64, false, "장비운영", uploadedBy);
     const m = importManual(filename, ing?.docName);
     emitCollaboration({ from: "scan", to: "orchestrator", message: `${filename} → 보안제품 '${m.productName}'에 ${m.kind === "logManual" ? "로그" : "제품"} 매뉴얼로 자동 연결` });
-    return { filename, routedTo: "product-manual", reason: `기존 제품 매칭(${c.reason})`, manual: { productName: m.productName, kind: m.kind, createdProduct: m.createdProduct } };
+    return { filename, routedTo: "product-manual", reason: `기존 제품 매칭(${c.reason})`, category: "장비운영", manual: { productName: m.productName, kind: m.kind, createdProduct: m.createdProduct } };
   }
 
   // ③ 파일명만으로는 취약점 리포트/자산/로그/문서/가이드라인을 확신하기 어렵다 → 사용자 결정 요청(추천 유형 첨부).
@@ -227,7 +243,9 @@ export function registerAutoUploadRoutes(app: Express): void {
       }
       const valid =
         forceType && ["asset", "log", "document", "guideline", "vulnreport"].includes(forceType) ? forceType : undefined;
-      const result = await autoRouteUpload(filename.trim(), content, valid, productName);
+      // 작업 귀속 — 인입되는 문서에 "누가 올렸는지"를 함께 기록한다(2026-07-25 RAG 전면 검토).
+      const uploader = (req as Request & { user?: { displayName?: string; username?: string } }).user;
+      const result = await autoRouteUpload(filename.trim(), content, valid, productName, uploader?.displayName ?? uploader?.username);
       // 유형이 확정돼 실제 반영된 업로드만 기록(needsDecision=재질문 단계는 행위가 아직 아님).
       if (!(result as { needsDecision?: boolean }).needsDecision) {
         const user = (req as Request & { user?: { displayName?: string } }).user;
