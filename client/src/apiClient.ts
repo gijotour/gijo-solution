@@ -640,10 +640,11 @@ export interface OntologyTriple {
   createdAt: number;
 }
 export const ontologyApi = {
-  list: (filter?: { scope?: string; subject?: string }) => {
+  list: (filter?: { scope?: string; subject?: string; source?: string }) => {
     const q = new URLSearchParams();
     if (filter?.scope) q.set("scope", filter.scope);
     if (filter?.subject) q.set("subject", filter.subject);
+    if (filter?.source) q.set("source", filter.source); // 문서 파일별 관리 — "이 파일이 만든 연결" 조회
     const qs = q.toString();
     return request<OntologyTriple[]>(`/api/ontology/triples${qs ? `?${qs}` : ""}`);
   },

@@ -218,7 +218,7 @@ const gijoApi = {
   enrichIngest: (a: import("./apiClient").EnrichIngestArgs) => api.docsApi.enrichIngest(a),
 
   // 온톨로지(지식 그래프)
-  listOntology: (filter?: { scope?: string; subject?: string }) => api.ontologyApi.list(filter),
+  listOntology: (filter?: { scope?: string; subject?: string; source?: string }) => api.ontologyApi.list(filter),
   addOntologyTriple: (t: { subject: string; predicate: string; object: string; scope?: string; source?: string }) => api.ontologyApi.add(t),
   removeOntologyTriple: (id: string) => api.ontologyApi.remove(id),
   expandOntology: (text: string, agentId?: string) => api.ontologyApi.expand(text, agentId),

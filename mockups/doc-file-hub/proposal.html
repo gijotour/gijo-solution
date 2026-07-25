@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>문서 파일별 관리 시안 — 기억·학습 문서 관리 개편 (자산허브 패턴)</title>
+<style>
+  :root{--bg:#0d1117;--panel:#161b22;--panel2:#0a1120;--border:#30363d;--border-strong:#484f58;--text:#e6edf3;--muted:#8b949e;--muted2:#6e7681;--teal:#2dd4bf;--amber:#fbbf24;--blue:#58a6ff;--purple:#bc8cff;--red:#f85149;}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI','Malgun Gothic',sans-serif;font-size:13px;margin:0;padding:26px;line-height:1.5}
+  h1{font-size:16px;margin:0 0 4px}
+  .note{color:var(--muted);font-size:12px;margin-bottom:18px}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;max-width:880px}
+  .ptitle{font-weight:800;font-size:13.5px;margin-bottom:4px}
+  .psub{color:var(--muted);font-size:12px;margin-bottom:12px}
+  /* 업무영역 세그먼트 — assethub hub-seg와 동일 문법 */
+  .seg{display:flex;background:var(--panel2);border:1px solid var(--border-strong);border-radius:9px;padding:3px;gap:3px;width:max-content;margin-bottom:12px;flex-wrap:wrap}
+  .seg span{padding:5px 12px;border-radius:7px;font-size:11px;font-weight:800;color:var(--muted);cursor:pointer;border:1px solid transparent}
+  .seg span.on{background:rgba(59,130,246,.22);color:#fff;border-color:rgba(59,130,246,.5)}
+  .seg b{font-weight:800;color:var(--muted2);margin-left:4px}
+  .wrap{display:grid;grid-template-columns:290px 1fr;gap:14px}
+  .list{border:1px solid var(--border);border-radius:10px;background:var(--panel2);max-height:330px;overflow:auto}
+  .li{display:flex;align-items:center;gap:7px;padding:8px 11px;border-bottom:1px solid var(--border);cursor:pointer;font-size:12px}
+  .li:hover{background:rgba(88,166,255,.05)}
+  .li.sel{background:rgba(88,166,255,.12)}
+  .li .nm{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cat{border:1px solid rgba(45,212,191,.4);color:var(--teal);border-radius:20px;padding:0 7px;font-size:10px;white-space:nowrap}
+  .cat.g일반{border-color:var(--border-strong);color:var(--muted)}
+  .cat.g위협{border-color:rgba(248,81,73,.45);color:#ff9d97}
+  .cat.g규정{border-color:rgba(188,140,255,.45);color:var(--purple)}
+  .cat.g취약{border-color:rgba(251,191,36,.45);color:var(--amber)}
+  .ck{color:var(--muted2);font-size:10.5px}
+  .detail{border:1px solid var(--border);border-radius:10px;padding:14px}
+  .dname{font-weight:800;font-size:13px}
+  .dmeta{color:var(--muted);font-size:11.5px;margin-top:3px}
+  .fix{background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:11px;padding:1px 8px;margin-left:6px;cursor:pointer}
+  .sec{margin-top:12px;border-top:1px dashed var(--border);padding-top:10px}
+  .sec .h{font-weight:700;font-size:12px;margin-bottom:6px}
+  .rel{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin:3px 0}
+  .rel b{color:var(--text);font-weight:600}
+  .rel .p{color:var(--blue);font-size:11px;border:1px solid rgba(88,166,255,.35);border-radius:20px;padding:0 7px}
+  .rel a{color:var(--teal);text-decoration:none;font-size:11px}
+  .chunk{background:var(--panel2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:11.5px;color:var(--muted);margin-top:6px}
+  .btns{display:flex;gap:8px;margin-top:12px}
+  .btn{background:var(--panel2);border:1px solid var(--border-strong);border-radius:8px;padding:7px 13px;color:var(--text);font-size:12px;font-weight:700;cursor:pointer}
+  .btn.danger{color:var(--red);border-color:rgba(248,81,73,.4)}
+</style>
+</head>
+<body>
+<h1>시안 (추천 1종) — 문서 파일별 관리: 기억·학습 「올린 문서 확인·관리」 개편</h1>
+<div class="note">자산허브 [자산별|파일별] 패턴을 문서에 적용 — <b>업무영역 세그먼트</b>로 장비관리·사내문서·거버넌스 문서를 파일 단위로 관리. 기존 기능(조각·원본·삭제)은 그대로 유지하고 <b>영역 배지·수정 + 연결 관계</b>가 추가됨.</div>
+
+<div class="panel">
+  <div class="ptitle">📚 올린 문서 확인 · 관리 <span style="color:var(--muted2);font-size:11px;font-weight:600">· 81개 문서 · 4,213조각</span></div>
+  <div class="psub">업무영역별로 파일을 모아 보고, 파일이 시스템과 어떻게 연결됐는지 확인·관리합니다.</div>
+
+  <div class="seg">
+    <span>전체 <b>81</b></span>
+    <span>🩹 취약점 <b>12</b></span>
+    <span class="on">🔧 장비운영 <b>13</b></span>
+    <span>📜 사내규정 <b>12</b></span>
+    <span>🛡 위협대응 <b>16</b></span>
+    <span>📄 일반 <b>28</b></span>
+  </div>
+
+  <div class="wrap">
+    <div class="list">
+      <div class="li sel"><span>📕</span><span class="nm">FW-2000_운영_매뉴얼.pdf</span><span class="cat">장비운영</span><span class="ck">34</span></div>
+      <div class="li"><span>📄</span><span class="nm">MF2_차단로그_필드해설.txt</span><span class="cat">장비운영</span><span class="ck">2</span></div>
+      <div class="li"><span>📄</span><span class="nm">IPS-9000_2분기_점검서.pdf</span><span class="cat">장비운영</span><span class="ck">6</span></div>
+      <div class="li"><span>📕</span><span class="nm">Tenable_VM_User_Guide.pdf</span><span class="cat">장비운영</span><span class="ck">980</span></div>
+      <div class="li" style="opacity:.45"><span>…</span><span class="nm">(선택한 영역의 파일만 표시)</span></div>
+    </div>
+
+    <div class="detail">
+      <div class="dname">📕 FW-2000_운영_매뉴얼.pdf</div>
+      <div class="dmeta">전역(공유) · 업로드 2026-07-25 · 올린이: <b style="color:#6fdcb5">brian</b> · 분류: 매뉴얼
+        · <span class="cat">🗂 장비운영</span><button class="fix">영역 수정 ▾</button></div>
+
+      <div class="sec">
+        <div class="h">🔗 이 파일이 만든 연결 <span style="color:var(--muted2);font-weight:400;font-size:11px">(지식 그래프 — 챗봇이 관계 질문에 근거로 씀)</span></div>
+        <div class="rel"><span class="p">보안제품</span><b>FW-2000</b> ←[제품 매뉴얼] <a href="#">제품 화면에서 보기 ↗</a></div>
+        <div class="rel" style="color:var(--muted2);font-size:11px">※ 취약점 보고서라면 여기에 자산·취약점 연결이, 점검서라면 점검 대상 제품이 표시됩니다. 연결이 없으면 "연결 없음".</div>
+      </div>
+
+      <div class="sec">
+        <div class="h">🧩 조각 미리보기 <span style="color:var(--muted2);font-weight:400;font-size:11px">34조각 · bge-m3</span></div>
+        <div class="chunk">[1] 제3장 정책 설정 — 방화벽 정책은 콘솔에서 Policy > Rule 메뉴로 진입해…</div>
+        <div class="chunk">[2] 로그 필드 해설 — action=deny는 차단, src/dst는 출발·목적지 주소…</div>
+      </div>
+
+      <div class="btns">
+        <button class="btn">📂 원본 열기</button>
+        <button class="btn danger">🗑 삭제 (장기기억만/원본까지)</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="note" style="margin-top:14px;max-width:880px">
+설계 근거 — ① 세그먼트·배지 문법을 자산허브와 동일하게(학습 비용 0) · ② "연결" 구역은 P3 그래프(doc: 트리플)를 그대로 보여줌 — 지어내지 않음, 연결 없으면 없음 표시 · ③ 기존 삭제·원본·조각 기능 그대로 유지(회귀 없음) · ④ 영역 수정은 승인카드와 같은 API·같은 UX.
+</div>
+</body>
+</html>

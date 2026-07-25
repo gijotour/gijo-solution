@@ -83,7 +83,7 @@ export function addTriples(inputs: TripleInput[]): Triple[] {
   return tx(inputs);
 }
 
-export function listTriples(filter?: { scope?: string; subject?: string }): Triple[] {
+export function listTriples(filter?: { scope?: string; subject?: string; source?: string }): Triple[] {
   const clauses: string[] = [];
   const params: Record<string, string> = {};
   if (filter?.scope) {
@@ -93,6 +93,11 @@ export function listTriples(filter?: { scope?: string; subject?: string }): Trip
   if (filter?.subject) {
     clauses.push("subject = @subject");
     params.subject = filter.subject;
+  }
+  if (filter?.source) {
+    // 문서 파일별 관리 화면의 "이 파일이 만든 연결"용 — source="doc:<파일명>"으로 조회(2026-07-25).
+    clauses.push("source = @source");
+    params.source = filter.source;
   }
   const where = clauses.length ? `WHERE ${clauses.join(" AND ")}` : "";
   return db
@@ -219,6 +224,7 @@ export function registerOntologyRoutes(app: Express): void {
         listTriples({
           scope: req.query.scope as string | undefined,
           subject: req.query.subject as string | undefined,
+          source: req.query.source as string | undefined,
         })
       );
     })
