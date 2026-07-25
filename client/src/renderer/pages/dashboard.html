@@ -2649,8 +2649,11 @@
   (function chatFirst() {
     // nav.js가 나중에 주입하는 접힘 상태 그리드(1fr 360px)를 덮어쓴다 — head 맨 끝에 추가해 우선.
     const st = document.createElement("style");
-    st.textContent = "body.gn-left-collapsed .body-grid{grid-template-columns:1fr !important;}" +
-      ".body-grid{grid-template-columns:232px 1fr !important;}";
+    st.textContent = "html,body{height:100%;overflow:hidden;}" +
+      ".app-shell{height:100vh;display:flex;flex-direction:column;overflow:hidden;}" +
+      ".body-grid{flex:1 1 auto;min-height:0;grid-template-columns:232px 1fr !important;margin-right:46px;}" + // 우측 46px=엣지 탭 거터
+      ".center-stage{overflow-y:auto;height:100%;min-height:0 !important;}" +
+      "body.gn-left-collapsed .body-grid{grid-template-columns:1fr !important;}";
     document.head.appendChild(st);
     // 인사 — 실제 로그인 사용자명
     window.gijo.me().then((u) => {

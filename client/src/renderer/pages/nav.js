@@ -135,7 +135,15 @@
     st.textContent =
       // 통일 사이드바(2026-07-25): 아이콘 레일 폐기 → 단일 232px 3단 컬럼(상단 세그먼트 고정 · 중앙
       // 메뉴 스크롤 · 하단 사용자 영역 titlebar.js). 전 화면 100vh 고정으로 통일.
-      ".app{grid-template-columns:232px 1fr !important;}" +
+      ".app{grid-template-columns:232px minmax(0,1fr) 46px !important;height:100vh;}"
+      // 창 고정(2026-07-26 사용자 결정): 페이지 스크롤 없음 — 본문 열만 내부 스크롤, 오른쪽 46px는
+      // 엣지 탭 거터(스크롤바와 절대 안 겹침). 임베드 프레임은 아래 applyEmbed에서 원복.
+      + "html,body{height:100%;overflow:hidden;}"
+      + ".app > *:nth-child(2){overflow-y:auto;height:100vh;min-height:0;}"
+      + "*::-webkit-scrollbar{width:8px;height:8px;}*::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:4px;}*::-webkit-scrollbar-track{background:transparent;}"
+      // 긴 목록 패널 내부 스크롤(2026-07-26 사용자 결정) — 창 고정 원칙과 세트.
+      + ".scroll-list{max-height:calc(100vh - 300px);min-height:260px;overflow-y:auto;}"
+      + ".scroll-list thead th{position:sticky;top:0;background:var(--panel,#121a2e);z-index:1;}" +
       "#gijoNav{padding:0 !important;border-right:1px solid var(--border) !important;min-height:0 !important;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;align-self:start;z-index:20;background:var(--panel-2);}" +
       ".gn-top{padding:8px;border-bottom:1px solid var(--border);flex:0 0 auto;display:flex;align-items:center;gap:6px;}" +
       ".gn-top .gn-seg{flex:1;}" +
@@ -144,18 +152,19 @@
       ".gn-pcol:hover{background:var(--blue);color:#fff;}" +
       // 왼쪽 가장자리 세로 토글 — 항상 표시(2026-07-25 통일): 접힘=화면 왼쪽 끝 '▶ 메뉴 열기',
       // 열림=사이드바 오른쪽 경계에 반쯤 걸친 '◀ 접기'(콘텐츠 패딩 안으로 12px만 오버랩 — 여백 고려).
-      ".gn-edge{position:fixed;top:50%;transform:translateY(-50%);background:var(--blue);color:#fff;padding:14px 6px;border-radius:0 10px 10px 0;font-size:12px;font-weight:800;cursor:pointer;writing-mode:vertical-rl;letter-spacing:2px;z-index:900;box-shadow:2px 0 14px rgba(0,0,0,.45);}" +
+      ".gn-edge{position:fixed;top:50%;transform:translateY(-50%);background:var(--panel-2,#0e1526);color:var(--muted,#8b93ab);border:1px solid var(--border,#1e2a44);padding:13px 7px;border-radius:10px;font-size:11px;font-weight:800;cursor:pointer;writing-mode:vertical-rl;letter-spacing:2px;z-index:900;box-shadow:2px 0 10px rgba(0,0,0,.35);}" +
       ".gn-edge.open-state{border-radius:10px;padding:10px 5px;letter-spacing:1px;}" +
-      ".gn-edge:hover{background:#3576e0;}" +
+      ".gn-edge:hover{color:var(--blue-light,#7ab0ff);border-color:var(--blue,#3b82f6);}" +
       "body.gn-left-collapsed #gijoNav{display:none !important;}" +
-      "body.gn-left-collapsed .app{grid-template-columns:1fr !important;}" +
+      "body.gn-left-collapsed .app{grid-template-columns:minmax(0,1fr) 46px !important;}" +
       "body.gn-left-collapsed .explorer{display:none !important;}" +
       "body.gn-left-collapsed .body-grid{grid-template-columns:1fr 360px !important;}" +
       "body.gn-left-collapsed .body-grid.no-right{grid-template-columns:1fr !important;}" +
       ".gn-seg{display:flex;background:#0a1120;border:1px solid var(--border-strong);border-radius:9px;padding:3px;gap:3px;}" +
       ".gn-seg span{flex:1;text-align:center;padding:6px 4px;border-radius:7px;font-size:11px;font-weight:800;color:var(--muted);cursor:pointer;border:1px solid transparent;}" +
       ".gn-seg span.on{background:rgba(59,130,246,.22);color:#fff;border-color:rgba(59,130,246,.5);}" +
-      ".gn-mid{flex:1 1 auto;overflow-y:auto;padding:8px 6px;}" +
+      ".gn-mid{flex:1 1 auto;min-height:0;overflow-y:auto;padding:8px 6px;}"
+      + "#gijoNav .gtb-userarea{flex:0 0 auto;position:sticky;bottom:0;background:var(--panel-2,#0e1526);}" +
       ".gn-mid::-webkit-scrollbar{width:5px;} .gn-mid::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:3px;}" +
       // 그룹 헤더(대문자 스타일 소제목) + 항목(텍스트 중심, 아이콘 최소).
       ".gn-g{font-size:9.5px;font-weight:800;color:var(--muted-2);letter-spacing:1.2px;margin:12px 10px 5px;}" +
@@ -344,7 +353,12 @@
   function applyEmbed() {
     loadDesignSystem();
     var st = document.createElement("style");
-    st.textContent = ".header{display:none !important;}#gijoNav{display:none !important;}" +
+    st.textContent = "html,body{overflow:auto !important;height:auto !important;}" +
+      // 긴 목록 내부 스크롤은 임베드에서도 동일(허브 탭 안의 threat·audit 등)
+      ".scroll-list{max-height:calc(100vh - 260px);min-height:260px;overflow-y:auto;}" +
+      ".scroll-list thead th{position:sticky;top:0;background:var(--panel,#121a2e);z-index:1;}" +
+      "*::-webkit-scrollbar{width:8px;height:8px;}*::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:4px;}*::-webkit-scrollbar-track{background:transparent;}" +
+      ".header{display:none !important;}#gijoNav{display:none !important;}" +
       ".app{grid-template-columns:1fr !important;display:block !important;}" +
       ".main{padding-top:16px !important;}";
     document.head.appendChild(st);

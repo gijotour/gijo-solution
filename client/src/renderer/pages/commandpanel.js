@@ -24,17 +24,17 @@
     st.id = "gijoCmdCss";
     st.textContent =
       // 가장자리 세로 메뉴 — 화면 오른쪽 상단부터, 아이콘 없이 텍스트만(깔끔 원칙)
-      "#gijoEdgeRail{position:fixed;right:6px;top:70px;display:flex;flex-direction:column;gap:10px;z-index:901;}" +
+      "#gijoEdgeRail{position:fixed;right:18px;top:70px;display:flex;flex-direction:column;gap:10px;z-index:901;}" +
       ".gijo-etab{writing-mode:vertical-rl;letter-spacing:2px;font-size:11px;font-weight:800;color:var(--muted,#8b93ab);padding:13px 7px;border:1px solid var(--border,#1e2a44);border-radius:10px;cursor:pointer;background:var(--panel-2,#0e1526);user-select:none;box-shadow:-2px 0 10px rgba(0,0,0,.35);}" +
       ".gijo-etab:hover{color:var(--blue-light,#7ab0ff);border-color:var(--blue,#3b82f6);}" +
       ".gijo-etab.on{color:#fff;background:rgba(59,130,246,.22);border-color:rgba(59,130,246,.55);}" +
       ".gijo-etab b{writing-mode:horizontal-tb;font-size:9px;background:var(--blue,#3b82f6);color:#fff;border-radius:8px;padding:0 5px;margin-bottom:6px;}" +
       // 작업 세션 — 소형 팝업(중앙 위 오버레이)
-      "#gijoCmdPanel{display:none;position:fixed;top:64px;right:52px;bottom:14px;width:340px;max-width:88vw;background:var(--panel-2,#0e1526);border:1px solid var(--border-strong,#2a3a5e);border-radius:14px;z-index:900;flex-direction:column;box-shadow:-14px 0 44px rgba(0,0,0,.55);overflow:hidden;animation:gijoedgein .18s ease-out;}" +
+      "#gijoCmdPanel{display:none;position:fixed;top:64px;right:62px;bottom:14px;width:340px;max-width:88vw;background:var(--panel-2,#0e1526);border:1px solid var(--border-strong,#2a3a5e);border-radius:14px;z-index:900;flex-direction:column;box-shadow:-14px 0 44px rgba(0,0,0,.55);overflow:hidden;animation:gijoedgein .18s ease-out;}" +
       "#gijoCmdPanel.on{display:flex;}" +
       "@keyframes gijoedgein{from{transform:translateX(22px);opacity:0}to{transform:none;opacity:1}}" +
       // AI 라이브 오피스 — 대형 팝업(중앙을 거의 덮음, 크기 차등)
-      "#gijoOfficePop{display:none;position:fixed;top:56px;left:246px;right:52px;bottom:14px;background:var(--panel-2,#0e1526);border:1px solid var(--border-strong,#2a3a5e);border-radius:14px;z-index:900;flex-direction:column;box-shadow:0 18px 60px rgba(0,0,0,.6);overflow:hidden;animation:gijoedgein .18s ease-out;}" +
+      "#gijoOfficePop{display:none;position:fixed;top:56px;left:246px;right:62px;bottom:14px;background:var(--panel-2,#0e1526);border:1px solid var(--border-strong,#2a3a5e);border-radius:14px;z-index:900;flex-direction:column;box-shadow:0 18px 60px rgba(0,0,0,.6);overflow:hidden;animation:gijoedgein .18s ease-out;}" +
       "#gijoOfficePop.on{display:flex;}" +
       "body.gn-left-collapsed #gijoOfficePop{left:14px;}" + // 왼쪽 메뉴 접힘이면 전체 폭 사용
       ".gcp-oph{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--border,#1e2a44);font-weight:800;font-size:12.5px;color:#fff;flex:0 0 auto;}" +

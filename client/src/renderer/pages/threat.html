@@ -175,12 +175,14 @@ tr:last-child td{border-bottom:none;}
     <div class="panel">
       <div class="panel-title">최근 탐지 내역</div>
       <div class="panel-sub">구독 중인 딥웹 · 다크웹 CTI 피드 기반 자동 탐지</div>
+      <div class="scroll-list"><!-- 긴 목록은 패널 안에서 스크롤(창 고정 원칙, 2026-07-26) -->
       <table>
         <thead><tr><th>탐지일</th><th>유형</th><th>대상 자산 · 도메인</th><th>출처</th><th>심각도</th></tr></thead>
         <tbody id="findingsBody">
           <tr><td colspan="5" style="color:var(--muted);text-align:center;padding:28px 10px">불러오는 중...</td></tr>
         </tbody>
       </table>
+      </div>
     </div>
   </div>
   <div>
