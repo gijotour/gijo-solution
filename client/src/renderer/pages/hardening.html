@@ -86,12 +86,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     <div id="gijoChatWidget" data-prompts='["하드닝 점검해줘"]' style="max-width:640px;margin-bottom:16px;"></div>
 
-    <div class="page-guide">
-      <b>점검 방법</b> — 오른쪽 위 <b>＋ 대상 등록</b>에서 <b>연결 가능한 장비의 IP</b>와 SSH 접속 정보를 넣고, 장비 유형(점검 기준)을 고르면 그 IP에 접속해 실제로 점검합니다.
-      기준은 4종입니다: <span class="std">리눅스 서버(U-시리즈)</span> · <span class="std">CIS Benchmark</span> · <span class="std">Windows PC(PC-시리즈)</span> · <span class="std">네트워크 장비(N-시리즈·Cisco)</span>.
-      점검은 <b>읽기 전용 진단 명령만</b> 실행하며(설정을 바꾸지 않음), 방화벽에서 대상 장비의 SSH 포트(기본 22)가 열려 있어야 합니다.
-      서버 자신을 점검하려면 인증 방식을 <b>로컬</b>로 등록하세요.
-    </div>
+    <!-- 설명은 화면에 늘어놓지 않고 챗봇(ⓘ '점검 방법')이 담당한다 — 2026-07-25 원칙. -->
+    <div class="page-guide">읽기 전용 진단 명령만 실행합니다(설정 변경 없음). <i class="gijo-info" data-topic="점검 방법"></i></div>
 
     <div class="kpis" id="kpiRow"></div>
     <div class="sec">🖥 장비별 현황 <span id="cntLbl" style="color:var(--muted-2);font-weight:600;font-size:var(--g-t-xs)"></span></div>
@@ -103,12 +99,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 <div class="g-modal-bg" id="regModal">
   <div class="g-modal" style="width:560px">
     <div class="mt">점검 대상(장비) 등록</div>
-    <div class="reg-guide">
-      <b>연결 가능한 장비의 IP를 넣으면 그 장비에 접속해 실제로 점검합니다.</b><br>
-      · <b>점검 기준</b>에서 장비 유형을 고르면 그에 맞는 명령으로 점검합니다 (리눅스=U-시리즈, Windows PC=PC-시리즈, 네트워크 장비=N-시리즈 Cisco).<br>
-      · <b>인증</b>: 리눅스·네트워크 장비는 SSH 키(권장) 또는 비밀번호, Windows PC는 OpenSSH 서버가 켜져 있어야 원격 점검됩니다.<br>
-      · 방화벽에서 담당자 서버 → 대상 장비 <b>SSH 포트(기본 22)</b>가 열려 있어야 합니다. 등록 시 <b>접속확인</b>으로 연결을 먼저 검사합니다.
-    </div>
+    <div class="reg-guide">연결 가능한 장비의 IP와 SSH 정보를 넣으면 그 장비에 접속해 점검합니다. <i class="gijo-info" data-topic="대상 등록"></i></div>
     <div class="frow">
       <div class="g-field"><label>장비 이름</label><input class="g-input" id="rLabel" placeholder="경계 방화벽 (FW-01)"></div>
       <div class="g-field"><label>점검 기준(장비 유형)</label><select class="g-input" id="rStd"><option value="kisa">국내 CCE — 리눅스 서버 (U-시리즈)</option><option value="cis">CIS Benchmark (리눅스)</option><option value="kisa_pc">국내 CCE — Windows PC (PC-시리즈)</option><option value="kisa_net">국내 CCE — 네트워크 장비 (N-시리즈)</option></select></div>

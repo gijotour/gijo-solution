@@ -154,11 +154,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       </div>
     </div>
 
-    <div class="notice">
-      · <b>폐쇄형</b>: 대화·데이터셋·학습·배포 전 과정이 이 서버(GPU 머신) 안에서만 이루어지고 외부로 나가지 않습니다.<br>
-      · 루프 실행 중에는 GPU를 학습이 독점하므로 <b>채팅·문서검색(RAG)이 일시 중지</b>됐다가 끝나면 자동 재개됩니다.<br>
-      · 베이스 모델(기본 <b>Hermes 3 · Llama 3.1 8B</b>)의 학습용 원본 가중치는 첫 실행 전에 미리 받아둬야 합니다 — 폐쇄망 이전 시 <b>hf download NousResearch/Hermes-3-Llama-3.1-8B</b> 선행. 배포 모델은 <b>버전(-v1, -v2…)</b>으로 쌓여 언제든 이전 버전으로 되돌릴 수 있습니다.
-    </div>
+    <div class="notice">⚠ 루프 실행 중에는 채팅·문서검색(RAG)이 일시 중지됩니다(끝나면 자동 재개). <i class="gijo-info" data-topic="학습 루프 실행"></i></div>
 
     <div class="loop-strip">
       <div class="loop-card"><div class="lc-step">STEP 1</div><div class="lc-name">📥 수집</div><div class="lc-desc">에이전트 실제 대화(질문·답변)를 자동 저장 — 아래 목록에서 확인</div></div>

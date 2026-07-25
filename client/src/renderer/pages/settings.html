@@ -317,10 +317,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     <div class="panel" id="cloudLlmPanel" style="display:none">
       <div class="panel-title">☁ 클라우드 LLM (선택) <span class="badge b-purple" style="margin-left:8px">admin 전용</span></div>
-      <div class="panel-sub">
-        온프레미스가 기본입니다. 켜면 대화에서 <b>내부 정보가 없는 일반 질문</b>에 한해 "클라우드에도 물어보기"로 보조 답변을 받을 수 있습니다.
-        자산·사설 IP·담당자·사내 문서가 섞인 질문은 <b>유출 방지 게이트가 자동 차단</b>하며, 클라우드에는 RAG·내부 맥락 없이 질문 본문만 전송됩니다. API 키는 암호화 저장됩니다.
-      </div>
+      <div class="panel-sub">온프레미스가 기본입니다 — 끄면 모든 답변이 로컬 LLM으로만 처리됩니다. <i class="gijo-info" data-topic="클라우드 LLM"></i></div>
       <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);margin-bottom:14px;cursor:pointer">
         <input type="checkbox" id="cloudEnabledInput" style="width:auto">클라우드 사용 허용 (끄면 모든 답변이 로컬 LLM으로만 처리 — 완전 폐쇄)
       </label>
