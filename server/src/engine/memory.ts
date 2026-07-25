@@ -13,6 +13,14 @@ import { embed, chat } from "./llm";
 import { db, migrate } from "../db";
 import { emitCollaboration } from "./collaboration";
 import { gateUserInput } from "./gateway";
+import {
+  extractLexicalTerms,
+  buildFtsPlan,
+  shouldRunLexical,
+  fuseResults,
+  isRelevant,
+  type FusedChunk,
+} from "./hybridsearch";
 
 // 문서 단위 메타데이터(업로드 시각·원본 경로)는 SQLite에 둔다 — LanceDB 스키마는 건드리지 않는다.
 migrate("memory_documents-uploadedBy", "ALTER TABLE memory_documents ADD COLUMN uploadedBy TEXT"); // 작업 귀속(누가 올렸나) 표시용(2026-07-25)
@@ -330,6 +338,9 @@ export async function ingestText(documentId: string, raw: string, scope: string 
         // 중복 누적된다(2026-07-25 실측: 같은 파일 재업로드/재시드가 KB에 중복 조각을 남김).
         await table.delete(`documentId = '${escapeLiteral(documentId)}'`);
         await table.add(records);
+        // 새 조각을 전문 검색(BM25)에서도 찾을 수 있게 인덱스를 갱신한다. 인덱스는 생성 시점의
+        // 데이터만 담으므로, 이걸 빠뜨리면 방금 올린 문서가 코드 검색에서만 조용히 빠진다.
+        await refreshFtsIndex(table);
       } catch (err) {
         // 최후의 안전망: 위 검사로 못 잡은 스키마 불일치로 add가 실패해도 채팅/수집이
         // 죽지 않게 재생성한다(빈 테이블이 옛 스키마인 경우 등).
@@ -397,10 +408,88 @@ export interface ScoredChunk {
   text: string;
   distance: number;
   documentId: string; // 근거(출처) 표시용 — 어느 문서의 조각인지
+  lexicalHit?: boolean; // 질의의 코드(CVE·IW·U-01 등)가 이 조각에 글자 그대로 있었나
 }
 
-/** 거리까지 함께 돌려주는 검색. 그라운딩 판단(관련 자료가 있는가)에 쓴다. */
-export async function queryMemoryScored(question: string, topK = 5, agentId?: string): Promise<ScoredChunk[]> {
+// 전문 검색(BM25) 인덱스는 한 번만 만들면 되지만, 프로세스가 뜬 뒤 첫 검색에서 확인한다.
+// 실패해도 검색이 죽지 않게 플래그로 기억하고 벡터 단독으로 넘어간다.
+let ftsIndexChecked = false;
+let ftsIndexReady = false;
+// 인덱스 옵션을 바꿀 때 이 문자열을 올리면 다음 기동의 첫 검색에서 한 번 재색인된다.
+const FTS_GENERATION = "2-with-position";
+const FTS_GEN_KEY = "memory:ftsIndexGeneration";
+const getFtsGenStmt = db.prepare("SELECT value FROM app_state WHERE key = ?");
+const setFtsGenStmt = db.prepare(
+  "INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
+);
+
+/**
+ * text 컬럼에 전문 검색 인덱스를 보장한다. 토크나이저는 기본 "simple"을 쓴다 —
+ * 한국어 형태소 분석기(lindera ko-dic)는 별도 모델 파일이 필요해 오프라인 번들에 부담이고,
+ * 한국어 의미 검색은 벡터(bge-m3)가 이미 담당한다. BM25가 맡을 몫은 CVE·IW-32 같은
+ * 영숫자 코드의 정확 매칭이라 simple 토크나이저로 충분하다.
+ */
+async function ensureFtsIndex(table: lancedb.Table): Promise<boolean> {
+  if (ftsIndexChecked) return ftsIndexReady;
+  ftsIndexChecked = true;
+  try {
+    const indices = await table.listIndices();
+    const existing = indices.find((i) => i.columns.includes("text"));
+    // withPosition(토큰 위치 저장)은 구문 검색의 전제다. 이 옵션 없이 만든 1세대 인덱스가 남아
+    // 있으면 구문 검색이 조용히 빈 결과를 내므로, 세대를 app_state에 기록해 한 번만 교체한다
+    // (프로세스 메모리에만 두면 재기동마다 대용량 재색인이 돌아 기동이 느려진다).
+    const generation = getFtsGenStmt.get(FTS_GEN_KEY) as { value?: string } | undefined;
+    if (!existing || generation?.value !== FTS_GENERATION) {
+      if (existing) await table.dropIndex(existing.name);
+      await table.createIndex("text", {
+        config: lancedb.Index.fts({ lowercase: true, asciiFolding: true, withPosition: true }),
+      });
+      setFtsGenStmt.run(FTS_GEN_KEY, FTS_GENERATION);
+      console.log("[memory] 전문 검색(BM25) 인덱스를 생성했습니다 — 코드·고유명사 정확 매칭 활성");
+    }
+    ftsIndexReady = true;
+  } catch (err) {
+    // 인덱스가 없어도 제품이 멈추면 안 된다 — 벡터 단독으로 계속 동작한다(기존 동작).
+    console.warn(`[memory] 전문 검색 인덱스 준비 실패 — 벡터 검색만 사용합니다: ${err instanceof Error ? err.message : String(err)}`);
+    ftsIndexReady = false;
+  }
+  return ftsIndexReady;
+}
+
+/**
+ * 질의 계획을 LanceDB 전문 검색 객체로 조립한다.
+ * 코드는 PhraseQuery로 토큰 인접을 요구하고(U-07이 [u, 07]로 쪼개져도 정확히 맞는다),
+ * 낱말은 MatchQuery로 둔다. 여러 개면 Should로 묶어 하나만 맞아도 후보에 들어오게 한다 —
+ * 최종 통과 여부는 뒤의 관련성 게이트가 결정하므로 여기서 좁힐 필요가 없다.
+ */
+function buildFtsLanceQuery(terms: ReturnType<typeof extractLexicalTerms>): lancedb.FullTextQuery | string {
+  const plan = buildFtsPlan(terms);
+  const clauses: [lancedb.Occur, lancedb.FullTextQuery][] = [
+    ...plan.phrases.map((p) => [lancedb.Occur.Should, new lancedb.PhraseQuery(p, "text")] as [lancedb.Occur, lancedb.FullTextQuery]),
+    ...plan.words.map((w) => [lancedb.Occur.Should, new lancedb.MatchQuery(w, "text")] as [lancedb.Occur, lancedb.FullTextQuery]),
+  ];
+  if (clauses.length === 0) return "";
+  if (clauses.length === 1) return clauses[0][1];
+  return new lancedb.BooleanQuery(clauses);
+}
+
+/** 문서를 새로 넣은 뒤 전문 검색 인덱스가 새 조각을 포함하도록 갱신. 실패해도 인입은 성공 처리. */
+async function refreshFtsIndex(table: lancedb.Table): Promise<void> {
+  if (!ftsIndexReady) return;
+  try {
+    await table.optimize();
+  } catch (err) {
+    console.warn(`[memory] 전문 검색 인덱스 갱신 실패(다음 검색에 일부 조각 누락 가능): ${err instanceof Error ? err.message : String(err)}`);
+  }
+}
+
+/**
+ * 하이브리드 검색 — 벡터(의미)와 BM25(글자 그대로)를 각각 돌려 RRF로 순위를 합친다.
+ * LanceDB의 rerank API를 쓰지 않고 직접 융합하는 이유: 벡터 거리(_distance)를 보존해야
+ * 관련성 게이트(0.95 임계값)를 그대로 유지할 수 있기 때문이다. 순위 점수만 남으면
+ * "무관한 질문에 잡음 조각 주입" 사고가 다시 열린다.
+ */
+async function hybridSearch(question: string, topK: number, agentId?: string): Promise<FusedChunk[]> {
   const db = await lancedb.connect(DB_PATH);
   const names = await db.tableNames();
   if (!names.includes(TABLE_NAME)) return [];
@@ -409,21 +498,59 @@ export async function queryMemoryScored(question: string, topK = 5, agentId?: st
   const [queryVector] = await embed([question]);
   const scopes = agentId && agentId !== GLOBAL_SCOPE ? [GLOBAL_SCOPE, safeScope(agentId)] : [GLOBAL_SCOPE];
   const whereClause = `scope IN (${scopes.map((s) => `'${s}'`).join(", ")})`;
+  // 융합 전에는 각 검색이 넉넉히 후보를 내야 한다 — 한쪽에서 밀린 정답을 다른 쪽이 살린다.
+  const candidates = Math.max(topK * 2, 10);
+
+  let vector: { text: string; documentId: string; distance: number }[] = [];
   try {
-    const results = (await table.search(queryVector).where(whereClause).limit(topK).toArray()) as (MemoryRow & {
+    const rows = (await table.search(queryVector).where(whereClause).limit(candidates).toArray()) as (MemoryRow & {
       _distance?: number;
     })[];
-    return results.map((r) => ({ text: r.text, distance: Number(r._distance ?? Number.POSITIVE_INFINITY), documentId: r.documentId }));
+    vector = rows.map((r) => ({
+      text: r.text,
+      documentId: r.documentId,
+      distance: Number(r._distance ?? Number.POSITIVE_INFINITY),
+    }));
   } catch (err) {
     console.warn(`[memory] 지식 베이스 검색 실패: ${err instanceof Error ? err.message : String(err)}`);
     return [];
   }
+
+  const terms = extractLexicalTerms(question);
+  let lexical: { text: string; documentId: string }[] = [];
+  if (shouldRunLexical(terms) && (await ensureFtsIndex(table))) {
+    try {
+      const rows = (await table
+        .query()
+        .fullTextSearch(buildFtsLanceQuery(terms))
+        .where(whereClause)
+        .limit(candidates)
+        .toArray()) as MemoryRow[];
+      lexical = rows.map((r) => ({ text: r.text, documentId: r.documentId }));
+    } catch (err) {
+      // 전문 검색만 실패하면 벡터 결과로 계속 간다 — 기존 품질은 보장된다.
+      console.warn(`[memory] 전문 검색 실패 — 벡터 결과만 사용합니다: ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+
+  return fuseResults({ vector, lexical }, terms.codes).slice(0, topK);
 }
 
-/** 관련 있는 청크만 남긴다(거리 임계값 적용). 관련 자료가 없으면 빈 배열. */
+/** 거리까지 함께 돌려주는 검색. 그라운딩 판단(관련 자료가 있는가)에 쓴다. */
+export async function queryMemoryScored(question: string, topK = 5, agentId?: string): Promise<ScoredChunk[]> {
+  const fused = await hybridSearch(question, topK, agentId);
+  return fused.map((c) => ({
+    text: c.text,
+    distance: c.distance,
+    documentId: c.documentId,
+    lexicalHit: c.lexicalHit,
+  }));
+}
+
+/** 관련 있는 청크만 남긴다(벡터 거리 임계값 또는 코드 정확 일치). 관련 자료가 없으면 빈 배열. */
 export async function queryMemoryRelevant(question: string, topK = 5, agentId?: string): Promise<string[]> {
-  const scored = await queryMemoryScored(question, topK, agentId);
-  return scored.filter((c) => c.distance <= RAG_RELEVANCE_MAX_DISTANCE).map((c) => c.text);
+  const fused = await hybridSearch(question, topK, agentId);
+  return fused.filter((c) => isRelevant(c, RAG_RELEVANCE_MAX_DISTANCE)).map((c) => c.text);
 }
 
 /** 문서의 첫 조각 텍스트 — 인수인계 자동 검증의 질문 생성용. 없으면 null. */
@@ -435,24 +562,10 @@ export async function getDocumentSample(documentId: string): Promise<string | nu
   return rows[0]?.text ?? null;
 }
 
+/** 임계값 없이 상위 topK를 그대로 돌려주는 검색(문서 검색 화면·도구용). 순위는 하이브리드로 낸다. */
 export async function queryMemory(question: string, topK = 5, agentId?: string): Promise<string[]> {
-  const db = await lancedb.connect(DB_PATH);
-  const names = await db.tableNames();
-  if (!names.includes(TABLE_NAME)) return [];
-
-  const table = await db.openTable(TABLE_NAME);
-  const [queryVector] = await embed([question]);
-  const scopes =
-    agentId && agentId !== GLOBAL_SCOPE ? [GLOBAL_SCOPE, safeScope(agentId)] : [GLOBAL_SCOPE];
-  const whereClause = `scope IN (${scopes.map((s) => `'${s}'`).join(", ")})`;
-  try {
-    const results = (await table.search(queryVector).where(whereClause).limit(topK).toArray()) as MemoryRow[];
-    return results.map((r) => r.text);
-  } catch (err) {
-    // 차원 불일치(임베딩 모델 교체 후 재수집 전) 등 — 검색 실패가 채팅을 죽이면 안 된다.
-    console.warn(`[memory] 지식 베이스 검색 실패 (문서 재수집 필요할 수 있음): ${err instanceof Error ? err.message : String(err)}`);
-    return [];
-  }
+  const fused = await hybridSearch(question, topK, agentId);
+  return fused.map((c) => c.text);
 }
 
 export interface MemoryDocument {
