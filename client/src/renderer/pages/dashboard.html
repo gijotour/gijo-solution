@@ -1451,6 +1451,27 @@
     if (typingEl && typingEl.parentNode) typingEl.remove();
     return clAppend(kind, entry);
   }
+  // 근거(출처) 배지 — 답변 그라운딩에 쓰인 사내 문서명(서버 sources)을 답변 아래 붙인다.
+  // 담당자가 "이 답이 어느 문서에서 왔는지"를 즉시 보고, 인수인계 검증(올린 문서가 인용되는가)에도 쓰인다.
+  function clAppendSourcesTo(row, sources) {
+    if (!row || !Array.isArray(sources) || sources.length === 0) return;
+    const cb = row.querySelector(".cb");
+    if (!cb) return;
+    const d = document.createElement("div");
+    d.style.cssText = "margin-top:6px;display:flex;flex-wrap:wrap;gap:4px;align-items:center;";
+    const lab = document.createElement("span");
+    lab.textContent = "📄 근거";
+    lab.style.cssText = "font-size:9.5px;font-weight:800;color:var(--muted-2);";
+    d.appendChild(lab);
+    sources.slice(0, 4).forEach((s) => {
+      const b = document.createElement("span");
+      b.textContent = s;
+      b.title = "사내 지식베이스에서 이 답변의 근거로 검색된 문서";
+      b.style.cssText = "font-size:9.5px;font-weight:700;padding:1px 7px;border-radius:5px;background:rgba(30,185,128,.12);border:1px solid rgba(30,185,128,.35);color:#6fdcb5;max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;";
+      d.appendChild(b);
+    });
+    cb.appendChild(d);
+  }
   // 답변 뒤 붙는 작은 제안 알약 — 이름/설명 문장 없이 아이콘+짧은 라벨만(시안 B).
   // title(툴팁)에 원래 설명 문장을 그대로 남겨 정보 손실 없이 자리만 줄인다.
   function clAppendPill(cls, label, title, onClick) {
@@ -1732,7 +1753,8 @@
       loadDashSessions(); // 작업 세션 목록(제목·미리보기·턴수) 갱신
       const who = result.route && result.route.agentId && result.route.agentId !== "orchestrator"
         ? `${orchLabel()} → ${agentLabel(result.route.agentId)}` : orchLabel();
-      clReplaceTyping(typing, "reply", { icon: "🧭", name: who, message: result.output });
+      const replyRow = clReplaceTyping(typing, "reply", { icon: "🧭", name: who, message: result.output });
+      clAppendSourcesTo(replyRow, result.sources);
       // 쓰기 지시 — 서버가 실행하지 않고 결재판을 돌려줬다. 값을 검토·승인해야 실행된다(시안 B).
       if (result.approval) {
         clApproval(result.approval);

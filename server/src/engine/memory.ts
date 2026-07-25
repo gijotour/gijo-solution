@@ -393,6 +393,7 @@ export const RAG_RELEVANCE_MAX_DISTANCE = 0.95;
 export interface ScoredChunk {
   text: string;
   distance: number;
+  documentId: string; // 근거(출처) 표시용 — 어느 문서의 조각인지
 }
 
 /** 거리까지 함께 돌려주는 검색. 그라운딩 판단(관련 자료가 있는가)에 쓴다. */
@@ -409,7 +410,7 @@ export async function queryMemoryScored(question: string, topK = 5, agentId?: st
     const results = (await table.search(queryVector).where(whereClause).limit(topK).toArray()) as (MemoryRow & {
       _distance?: number;
     })[];
-    return results.map((r) => ({ text: r.text, distance: Number(r._distance ?? Number.POSITIVE_INFINITY) }));
+    return results.map((r) => ({ text: r.text, distance: Number(r._distance ?? Number.POSITIVE_INFINITY), documentId: r.documentId }));
   } catch (err) {
     console.warn(`[memory] 지식 베이스 검색 실패: ${err instanceof Error ? err.message : String(err)}`);
     return [];
@@ -420,6 +421,15 @@ export async function queryMemoryScored(question: string, topK = 5, agentId?: st
 export async function queryMemoryRelevant(question: string, topK = 5, agentId?: string): Promise<string[]> {
   const scored = await queryMemoryScored(question, topK, agentId);
   return scored.filter((c) => c.distance <= RAG_RELEVANCE_MAX_DISTANCE).map((c) => c.text);
+}
+
+/** 문서의 첫 조각 텍스트 — 인수인계 자동 검증의 질문 생성용. 없으면 null. */
+export async function getDocumentSample(documentId: string): Promise<string | null> {
+  const db = await lancedb.connect(DB_PATH);
+  if (!(await db.tableNames()).includes(TABLE_NAME)) return null;
+  const table = await db.openTable(TABLE_NAME);
+  const rows = (await table.query().where(`documentId = '${escapeLiteral(documentId)}'`).limit(1).toArray()) as MemoryRow[];
+  return rows[0]?.text ?? null;
 }
 
 export async function queryMemory(question: string, topK = 5, agentId?: string): Promise<string[]> {

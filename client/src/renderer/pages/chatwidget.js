@@ -223,6 +223,12 @@
         if (!sessionId) { try { var s = await window.gijo.createWorkSession(text.slice(0, 30), "screen:" + here); sessionId = s && s.id; } catch (e) {} }
         var r = await window.gijo.sendInstruction(text, sessionId || undefined);
         typing.innerHTML = readBadge(r) + fmt(r.output || "(응답 없음)");
+        // 근거(출처) 배지 — 답변 그라운딩에 쓰인 사내 문서명(서버 sources). 인수인계 검증에도 쓰인다.
+        if (Array.isArray(r.sources) && r.sources.length) {
+          typing.innerHTML +=
+            '<div style="margin-top:6px;font-size:9.5px;font-weight:700;color:#6fdcb5">📄 근거: ' +
+            r.sources.slice(0, 4).map(esc).join(" · ") + "</div>";
+        }
         // 실행이 필요한 지시면 여기서 끝내지 않고 확인 카드를 띄운다.
         if (r.approval) appendApproval(r.approval);
         else if (r.confirm && r.confirm.type === "learnloop") {

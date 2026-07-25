@@ -18,6 +18,7 @@ import { registerModelDexRoutes } from "./engine/modeldex";
 import { registerMergeRoutes } from "./engine/merge";
 import { registerDispatcherRoutes } from "./engine/dispatcher";
 import { registerMemoryRoutes } from "./engine/memory";
+import { registerHandoverRoutes } from "./engine/handover";
 import { registerBridgeRoutes } from "./engine/bridge";
 import { registerCollaborationRoutes } from "./engine/collaboration";
 import { registerDatasetRoutes } from "./engine/dataset";
@@ -118,6 +119,7 @@ export function createApp(): Express {
   registerMergeRoutes(app);
   registerDispatcherRoutes(app);
   registerMemoryRoutes(app);
+  registerHandoverRoutes(app);
   registerBridgeRoutes(app);
   registerCollaborationRoutes(app);
   registerDatasetRoutes(app);

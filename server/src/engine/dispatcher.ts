@@ -44,6 +44,9 @@ export interface DispatchResult {
   // internalMiss: 일반 질의인데 사내 RAG 근거가 0(내부자료 없음) → ☁ 외부(클라우드) 추가질의를 그때만 띄운다.
   dataHits?: number;
   internalMiss?: boolean;
+  // 답변 그라운딩에 쓰인(검색된) 사내 문서 ID — 화면이 "근거: 문서명" 배지로 표시한다.
+  // 인수인계 자동 검증도 이 필드로 "올린 문서가 실제로 인용되는가"를 판정한다.
+  sources?: string[];
 }
 
 // ── 복합 지시(오케스트레이션) ─────────────────────────────────────────
@@ -334,7 +337,7 @@ function isSmallTalkInstruction(text: string): boolean {
 async function computeOfferSignals(
   result: DispatchResult,
   instructionText: string,
-): Promise<{ dataHits: number; internalMiss: boolean }> {
+): Promise<{ dataHits: number; internalMiss: boolean; sources?: string[] }> {
   let dataHits = 0;
   for (const s of result.steps ?? []) {
     dataHits += (s.assetIds?.length ?? 0) + (s.findingCount ?? 0);
@@ -350,17 +353,23 @@ async function computeOfferSignals(
   // internalMiss는 데이터 답이 아니고(=일반 대화) 결재·확인 대기도 아닐 때만 판정한다.
   // 인사·감사 같은 잡담은 애초에 물어볼 자료가 아니므로 외부(클라우드) 제안을 띄우지 않는다.
   // (llm.smallTalkReply를 쓰지 않고 자체 판별 — 테스트가 ./llm을 목킹하면 그 export 접근만으로도 던진다.)
+  // 같은 검색(임베딩 1회)에서 근거 문서 ID(sources)도 뽑는다 — 화면 "근거" 배지·인수인계 검증용.
   let internalMiss = false;
+  let sources: string[] | undefined;
   if (dataHits === 0 && !result.approval && !result.confirm && !isSmallTalkInstruction(instructionText)) {
     try {
-      const { queryMemoryRelevant } = await import("./memory.js");
-      const rel = await queryMemoryRelevant(instructionText, 4).catch(() => null);
-      internalMiss = Array.isArray(rel) && rel.length === 0; // 검색 실패(null)면 미판정(false 유지)
+      const { queryMemoryScored, RAG_RELEVANCE_MAX_DISTANCE } = await import("./memory.js");
+      const scored = await queryMemoryScored(instructionText, 4).catch(() => null);
+      if (Array.isArray(scored)) {
+        const relevant = scored.filter((c) => c.distance <= RAG_RELEVANCE_MAX_DISTANCE);
+        internalMiss = relevant.length === 0; // 검색 실패(null)면 미판정(false 유지)
+        if (relevant.length > 0) sources = [...new Set(relevant.map((c) => c.documentId).filter(Boolean))];
+      }
     } catch {
       /* 메모리 모듈 로드 실패 시 미판정 */
     }
   }
-  return { dataHits, internalMiss };
+  return { dataHits, internalMiss, ...(sources ? { sources } : {}) };
 }
 
 // 응답 턴에 붙일 짧은 도구/경로 배지 — 화면에서 "무엇으로 처리됐는지"를 한눈에 보여준다.
