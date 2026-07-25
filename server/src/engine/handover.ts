@@ -6,9 +6,11 @@
 // 회귀 하네스(tools/regress)와 같은 "생성-실행-대조" 메커니즘이고, sources 인프라(근거 배지)를 재사용한다.
 // 결과 리포트는 퇴사 절차의 감사 증적(무엇을 이관했고 검증 통과율 몇 %)으로 쓸 수 있다.
 
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { authMiddleware } from "../auth/auth";
+import type { GijoUser } from "../auth/users";
 import { asyncRoute } from "../util/asyncRoute";
+import { recordAudit } from "./audit";
 
 export interface HandoverCheck {
   documentId: string;
@@ -104,6 +106,30 @@ export function registerHandoverRoutes(app: Express): void {
         return;
       }
       res.json(await verifyHandover(ids));
+    })
+  );
+
+  // 인수인계 완료 처리 — 이관자·문서 목록·검증 통과율을 감사 로그(작업 기록)에 증적으로 남긴다.
+  app.post(
+    "/api/handover/complete",
+    authMiddleware,
+    asyncRoute(async (req, res) => {
+      const ids = Array.isArray(req.body?.documentIds)
+        ? (req.body.documentIds as unknown[]).filter((x): x is string => typeof x === "string")
+        : [];
+      const cited = Number(req.body?.cited ?? 0);
+      const total = Number(req.body?.total ?? ids.length);
+      const passRate = Number(req.body?.passRate ?? 0);
+      const actor = (req as Request & { user?: GijoUser }).user?.displayName ?? null;
+      recordAudit({
+        kind: "write",
+        actor,
+        action: "인수인계 완료",
+        target: null,
+        detail: `문서 ${total}건 이관 · 검증 인용 ${cited}/${total} (${passRate}%) — ${ids.slice(0, 10).join(", ")}${ids.length > 10 ? " 외" : ""}`,
+        result: "ok",
+      });
+      res.json({ ok: true });
     })
   );
 }

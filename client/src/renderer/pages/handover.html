@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 인수인계</title>
+<style>
+:root{
+  --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
+.app{display:grid;grid-template-columns:220px 1fr;}
+.sidebar{padding:22px 14px;border-right:1px solid var(--border);min-height:900px;}
+.main{padding:26px 30px 48px;max-width:1120px;}
+.header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2);}
+.header-left{display:flex;align-items:center;gap:12px;}
+.header-left img{height:22px;}
+.app-title{font-size:15px;font-weight:800;color:#fff;}
+.clock{font-size:11.5px;color:var(--muted-2);}
+.header-right{display:flex;align-items:center;gap:10px;}
+.status-pill{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--teal);background:rgba(30,185,128,0.1);border:1px solid rgba(30,185,128,0.35);padding:3px 10px;border-radius:14px;}
+.status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
+.status-pill.err{color:#f5928a;background:rgba(226,72,61,0.1);border-color:rgba(226,72,61,0.4);}
+.status-pill.err .dot{background:var(--red);}
+.avatar-btn{width:28px;height:28px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+.icon-btn{width:28px;height:28px;border-radius:8px;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);display:flex;align-items:center;justify-content:center;font-size:13px;color:#cfe0ff;cursor:pointer;}
+.page-title{font-size:20px;font-weight:800;color:#fff;}
+.page-sub{font-size:12px;color:var(--muted);margin:4px 0 16px;line-height:1.65;max-width:860px;}
+/* 스테퍼 */
+.steps{display:flex;gap:8px;margin-bottom:16px;}
+.step{flex:1;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:9px 12px;font-size:11.5px;font-weight:700;color:var(--muted-2);display:flex;gap:8px;align-items:center;}
+.step .n{width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;font-size:10.5px;flex:0 0 auto;}
+.step.done{color:#6fdcb5;border-color:rgba(30,185,128,.4);} .step.done .n{background:rgba(30,185,128,.18);color:#6fdcb5;}
+.step.on{color:#fff;border-color:rgba(59,130,246,.55);} .step.on .n{background:var(--blue);color:#fff;}
+/* 패널 */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:14px;}
+.p-title{font-size:13.5px;font-weight:800;color:#fff;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.p-badge{font-size:9px;font-weight:800;padding:1px 8px;border-radius:20px;background:rgba(30,185,128,.14);border:1px solid rgba(30,185,128,.4);color:#6fdcb5;}
+.hint{font-size:10.5px;color:var(--muted-2);margin-top:8px;line-height:1.6;}
+/* 체크리스트 */
+.chk{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+.chk label{display:flex;gap:8px;align-items:flex-start;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:9px 11px;font-size:11.5px;color:var(--muted);line-height:1.5;cursor:pointer;}
+.chk input{margin-top:2px;accent-color:var(--blue);}
+.chk b{color:#dfe6ff;}
+/* 업로드/문서 */
+.upl{border:1.5px dashed rgba(59,130,246,.4);border-radius:10px;padding:16px;text-align:center;font-size:11.5px;color:var(--muted);background:rgba(59,130,246,.04);cursor:pointer;}
+.upl b{color:var(--blue-light);}
+.doclist{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px;}
+.docchip{font-size:10.5px;color:#cfd6ea;background:var(--panel-2);border:1px solid var(--border);border-radius:6px;padding:3px 8px;display:inline-flex;align-items:center;gap:6px;}
+.docchip .x{cursor:pointer;color:var(--muted-2);} .docchip .x:hover{color:#f5928a;}
+/* 검증 테이블 */
+table{width:100%;border-collapse:collapse;font-size:11.5px;}
+th{color:var(--muted-2);font-weight:800;text-align:left;padding:7px 9px;border-bottom:1px solid var(--border-strong);font-size:10px;}
+td{padding:9px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--muted);line-height:1.55;}
+td.doc{color:#dfe6ff;font-weight:700;max-width:220px;word-break:break-all;}
+.src{font-size:10px;color:#6fdcb5;} .ok{font-weight:800;color:#6fdcb5;font-size:11px;} .no{font-weight:800;color:#f5928a;font-size:11px;}
+/* 요약 */
+.sum{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px;}
+.sum .c{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:11px 13px;}
+.sum .k{font-size:10px;color:var(--muted-2);font-weight:800;margin-bottom:3px;}
+.sum .v{font-size:19px;font-weight:900;color:#fff;} .sum .v.t{color:#6fdcb5;}
+.bar{height:8px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden;margin-top:6px;}
+.bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--teal),var(--blue));transition:width .4s;}
+/* 버튼 */
+.acts{display:flex;gap:8px;flex-wrap:wrap;}
+.btn{font-size:11.5px;font-weight:700;padding:8px 14px;border-radius:8px;cursor:pointer;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--text);}
+.btn.primary{background:rgba(59,130,246,.16);border-color:rgba(59,130,246,.5);color:#cfe0ff;}
+.btn.go{background:var(--teal);border-color:var(--teal);color:#04281c;font-weight:800;}
+.btn:disabled{opacity:.5;cursor:default;}
+.btn:hover:not(:disabled){filter:brightness(1.15);}
+.gijo-info{display:inline-flex;width:15px;height:15px;border-radius:50%;border:1px solid var(--muted-2);color:var(--muted-2);font-size:10px;align-items:center;justify-content:center;cursor:pointer;font-style:normal;vertical-align:2px;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <span id="homeLink" data-page="dashboard.html" title="대시보드로 이동" style="display:flex;align-items:center;gap:12px;cursor:pointer"><img src="https://gijo.ai/_nuxt/logo_gijo_white.CCh2YXJe.svg" alt="GIJO">
+    <div class="app-title">GIJO AS</div></span>
+    <div class="clock" id="clockEl">-</div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill" id="statusPill"><span class="dot"></span><span id="statusTxt">연결 확인 중</span></div>
+    <div class="avatar-btn" id="avatarBtn">-</div>
+    <div class="icon-btn" id="settingsBtn">⚙</div>
+  </div>
+</div>
+
+<div class="app">
+  <div class="sidebar" id="gijoNav"></div>
+
+  <div class="main">
+    <div class="page-title">🎒 인수인계 <i class="gijo-info" data-topic="인수인계"></i></div>
+    <div class="page-sub">업무 지식·노하우를 GIJO AS에 남기고 떠나세요. 문서를 올리면 <b>즉시 AI의 지식</b>이 되고(재학습 불필요), 마지막에 <b>AI가 스스로 검증</b>해 "후임자가 물어보면 진짜 답이 나오는지" 확인한 뒤 이관 리포트를 증적으로 남깁니다.</div>
+
+    <div class="steps">
+      <div class="step" id="st1"><span class="n">1</span>무엇을 남길지</div>
+      <div class="step" id="st2"><span class="n">2</span>문서 올리기</div>
+      <div class="step" id="st3"><span class="n">3</span>AI 자동 검증</div>
+      <div class="step" id="st4"><span class="n">4</span>이관 리포트</div>
+    </div>
+
+    <!-- 1단계 -->
+    <div class="panel">
+      <div class="p-title">1. 무엇을 남길지 — 체크리스트 <span class="p-badge" id="chkBadge">0/6</span></div>
+      <div class="chk" id="chkList">
+        <label><input type="checkbox" data-k="prod"><span><b>보안제품 운영 문서</b> — 정책 설정·차단 로그 분석·예외 처리 절차</span></label>
+        <label><input type="checkbox" data-k="incident"><span><b>장애·오탐 족보</b> — 반복 장애 패턴, 자주 나는 오탐 케이스와 처리법</span></label>
+        <label><input type="checkbox" data-k="maint"><span><b>정기 점검·승인 라인</b> — 점검 주기, 승인 워크플로 담당자</span></label>
+        <label><input type="checkbox" data-k="process"><span><b>사내 특화 프로세스</b> — 예외 계정 신청, IP 차단 해제 승인 절차</span></label>
+        <label><input type="checkbox" data-k="contact"><span><b>협력사·비상 연락망</b> — 유지보수 업체, 장애 시 에스컬레이션 순서</span></label>
+        <label><input type="checkbox" data-k="cred"><span><b>계정·권한 정리</b> — 관리 계정 목록(비밀번호 제외), 권한 회수 대상</span></label>
+      </div>
+      <div class="hint">✍ 작성 팁: 파일명은 <b>[제품명]_[문서종류]_[내용]</b>(자동 분류에 쓰임), 서술보다 <b>1) 2) 3) 단계식</b>이 AI가 가장 잘 찾습니다. ⚠ 비밀번호·개인정보는 문서에 넣지 마세요.</div>
+    </div>
+
+    <!-- 2단계 -->
+    <div class="panel">
+      <div class="p-title">2. 문서 올리기 <span class="p-badge" id="docBadge">0개</span></div>
+      <div class="upl" id="uplBox">📥 여기를 눌러 파일 선택 (여러 개 가능) — 올리는 즉시 지식베이스(RAG)에 반영됩니다<br><span style="font-size:10px;color:var(--muted-2)">PDF · DOCX · HWPX · TXT · MD 지원. 보안제품 매뉴얼은 <b>보안제품 &gt; 등록부</b>의 일괄 업로드를 쓰면 제품 카드에도 연결됩니다.</span></div>
+      <input type="file" id="fileInput" multiple style="display:none">
+      <div class="doclist" id="docList"></div>
+      <div class="acts" style="margin-top:9px"><button class="btn" id="pickExistingBtn">🗂 이미 올린 문서에서 고르기</button></div>
+      <div id="existingBox" style="display:none;margin-top:8px;max-height:180px;overflow-y:auto;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:8px"></div>
+    </div>
+
+    <!-- 3단계 -->
+    <div class="panel">
+      <div class="p-title">3. AI 자동 검증 — 후임자가 물어보면 진짜 답이 나올까?</div>
+      <div class="acts"><button class="btn primary" id="verifyBtn">▶ 검증 시작 (문서마다 AI가 질문을 만들어 실제로 물어봅니다)</button><button class="btn" id="verifyFailBtn" style="display:none">미인용 문서만 재검증</button></div>
+      <div id="verifyStatus" class="hint"></div>
+      <div id="verifyTableWrap" style="display:none;margin-top:10px">
+        <table>
+          <thead><tr><th style="width:210px">올린 문서</th><th>AI가 만든 검증 질문</th><th style="width:200px">답변 근거(인용된 문서)</th><th style="width:64px">판정</th></tr></thead>
+          <tbody id="verifyBody"></tbody>
+        </table>
+        <div class="hint">✗ 미인용 문서는 <b>제목·키워드를 보강해 다시 올리면</b> 대부분 해결됩니다(파일명 규칙 참고).</div>
+      </div>
+    </div>
+
+    <!-- 4단계 -->
+    <div class="panel">
+      <div class="p-title">4. 이관 리포트 — 감사 증적</div>
+      <div class="sum">
+        <div class="c"><div class="k">이관 문서</div><div class="v" id="sumTotal">-</div></div>
+        <div class="c"><div class="k">검증 통과(인용)</div><div class="v t" id="sumCited">-</div></div>
+        <div class="c"><div class="k">통과율</div><div class="v t" id="sumRate">-</div><div class="bar"><i id="sumBar"></i></div></div>
+        <div class="c"><div class="k">이관자 / 일시</div><div class="v" style="font-size:12.5px;line-height:1.5" id="sumWho">-</div></div>
+      </div>
+      <div class="acts">
+        <button class="btn go" id="completeBtn" disabled>✓ 인수인계 완료 처리 (감사 로그 기록)</button>
+        <button class="btn primary" id="downloadBtn" disabled>📄 이관 리포트 다운로드</button>
+      </div>
+      <div class="hint" id="completeHint">검증을 먼저 실행하세요. 완료 처리하면 감사 로그에 이관자·문서 목록·검증 통과율이 남고, 후임자는 챗봇에 물어보는 것만으로 전임자의 노하우를 근거(📄 배지)와 함께 조회합니다. 유지보수 점검 일정의 담당자는 <b>보안제품 &gt; 유지보수</b> 탭에서 후임자로 변경하세요.</div>
+    </div>
+  </div>
+</div>
+
+<div id="gijoChatWidget" data-start="collapsed" data-prompts='["인수인계는 어떻게 해?"]'></div>
+<script src="nav.js"></script>
+<script src="chatwidget.js"></script>
+<script>
+(() => {
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const CHK_KEY = "gijo:handover:checklist";
+  const DOCS_KEY = "gijo:handover:docs";
+  let docs = []; // 이관 대상 documentId 목록
+  let lastReport = null;
+  let meName = "";
+
+  // ── 헤더(시계·연결·사용자) ──
+  function tick() { document.getElementById("clockEl").textContent = new Date().toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }); }
+  async function loadHealth() {
+    const pill = document.getElementById("statusPill");
+    try { await window.gijo.checkServerHealth(); pill.classList.remove("err"); document.getElementById("statusTxt").textContent = "서버 연결상태 양호"; }
+    catch (e) { pill.classList.add("err"); document.getElementById("statusTxt").textContent = "서버 연결 실패"; }
+  }
+  async function loadUser() {
+    try { const u = await window.gijo.me(); meName = u.displayName || u.username || ""; document.getElementById("avatarBtn").textContent = (meName || "-").charAt(0); } catch (e) {}
+  }
+
+  // ── 스테퍼 상태 ──
+  function refreshSteps() {
+    const chkDone = document.querySelectorAll("#chkList input:checked").length;
+    const set = (id, done, on) => { const el = document.getElementById(id); el.classList.toggle("done", !!done); el.classList.toggle("on", !!on && !done); el.querySelector(".n").textContent = done ? "✓" : id.slice(-1); };
+    set("st1", chkDone >= 3, chkDone < 3);
+    set("st2", docs.length > 0, chkDone >= 3 && docs.length === 0);
+    set("st3", !!lastReport, docs.length > 0 && !lastReport);
+    set("st4", false, !!lastReport);
+  }
+
+  // ── 1단계: 체크리스트(localStorage) ──
+  function initChecklist() {
+    let saved = {};
+    try { saved = JSON.parse(localStorage.getItem(CHK_KEY) || "{}"); } catch (e) {}
+    document.querySelectorAll("#chkList input").forEach((c) => {
+      c.checked = !!saved[c.dataset.k];
+      c.addEventListener("change", () => {
+        const cur = {}; document.querySelectorAll("#chkList input").forEach((x) => { cur[x.dataset.k] = x.checked; });
+        try { localStorage.setItem(CHK_KEY, JSON.stringify(cur)); } catch (e) {}
+        renderChk();
+      });
+    });
+    renderChk();
+  }
+  function renderChk() {
+    const n = document.querySelectorAll("#chkList input:checked").length;
+    document.getElementById("chkBadge").textContent = `${n}/6 준비됨`;
+    refreshSteps();
+  }
+
+  // ── 2단계: 업로드 + 기존 문서 선택 ──
+  function saveDocs() { try { localStorage.setItem(DOCS_KEY, JSON.stringify(docs)); } catch (e) {} refreshSteps(); }
+  function renderDocs() {
+    const box = document.getElementById("docList");
+    box.innerHTML = docs.map((d) => `<span class="docchip">📄 ${esc(d)} <span class="x" data-rm="${esc(d)}">✕</span></span>`).join("");
+    document.getElementById("docBadge").textContent = `${docs.length}개`;
+    box.querySelectorAll("[data-rm]").forEach((x) => x.addEventListener("click", () => { docs = docs.filter((d) => d !== x.dataset.rm); saveDocs(); renderDocs(); }));
+    refreshSteps();
+  }
+  function addDoc(id) { if (id && !docs.includes(id)) { docs.push(id); saveDocs(); renderDocs(); } }
+
+  async function uploadFiles(files) {
+    const box = document.getElementById("uplBox");
+    for (const f of files) {
+      box.innerHTML = `⏳ ${esc(f.name)} 인입 중… (조각내기·임베딩)`;
+      try {
+        const buf = await f.arrayBuffer();
+        let bin = ""; const bytes = new Uint8Array(buf);
+        for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
+        const r = await window.gijo.ingestMemoryFile(f.name, btoa(bin), "global");
+        addDoc(r.documentId || f.name);
+      } catch (e) {
+        alert(`${f.name} 인입 실패: ${e.message}`);
+      }
+    }
+    box.innerHTML = '📥 여기를 눌러 파일 선택 (여러 개 가능) — 올리는 즉시 지식베이스(RAG)에 반영됩니다<br><span style="font-size:10px;color:var(--muted-2)">PDF · DOCX · HWPX · TXT · MD 지원. 보안제품 매뉴얼은 <b>보안제품 &gt; 등록부</b>의 일괄 업로드를 쓰면 제품 카드에도 연결됩니다.</span>';
+  }
+
+  async function showExisting() {
+    const box = document.getElementById("existingBox");
+    if (box.style.display !== "none") { box.style.display = "none"; return; }
+    box.style.display = "block";
+    box.innerHTML = '<span style="font-size:11px;color:var(--muted)">불러오는 중…</span>';
+    try {
+      const list = await window.gijo.listMemoryDocuments();
+      box.innerHTML = (list || []).slice(0, 60).map((d) =>
+        `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 2px;font-size:11px;border-bottom:1px solid var(--border)">
+          <span style="color:#cfd6ea;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%">📄 ${esc(d.documentId)}</span>
+          <button class="btn" style="padding:2px 9px;font-size:10px" data-add="${esc(d.documentId)}">담기</button></div>`).join("") || '<span style="font-size:11px;color:var(--muted-2)">올린 문서가 없습니다</span>';
+      box.querySelectorAll("[data-add]").forEach((b) => b.addEventListener("click", () => addDoc(b.dataset.add)));
+    } catch (e) { box.innerHTML = `<span style="font-size:11px;color:#f5928a">목록 실패: ${esc(e.message)}</span>`; }
+  }
+
+  // ── 3단계: 자동 검증 ──
+  function renderReport(report, merge) {
+    if (merge && lastReport) {
+      // 재검증 결과를 문서 단위로 반영
+      const byId = new Map(report.results.map((r) => [r.documentId, r]));
+      lastReport.results = lastReport.results.map((r) => byId.get(r.documentId) || r);
+      lastReport.cited = lastReport.results.filter((r) => r.cited).length;
+      lastReport.total = lastReport.results.length;
+      lastReport.passRate = lastReport.total ? Math.round((lastReport.cited / lastReport.total) * 100) : 0;
+    } else {
+      lastReport = report;
+    }
+    const body = document.getElementById("verifyBody");
+    body.innerHTML = lastReport.results.map((r) => `<tr>
+      <td class="doc">${esc(r.documentId)}</td>
+      <td>${r.error ? `<span style="color:#f5928a">${esc(r.error)}</span>` : esc(r.question)}</td>
+      <td class="src">${(r.sources || []).slice(0, 3).map((s) => esc(s) + (s === r.documentId ? " ✓" : "")).join("<br>") || "(인용 없음)"}</td>
+      <td>${r.cited ? '<span class="ok">✓ 인용됨</span>' : '<span class="no">✗ 미인용</span>'}</td></tr>`).join("");
+    document.getElementById("verifyTableWrap").style.display = "block";
+    document.getElementById("verifyFailBtn").style.display = lastReport.results.some((r) => !r.cited) ? "" : "none";
+    // 4단계 요약
+    document.getElementById("sumTotal").textContent = lastReport.total;
+    document.getElementById("sumCited").textContent = lastReport.cited;
+    document.getElementById("sumRate").textContent = lastReport.passRate + "%";
+    document.getElementById("sumBar").style.width = lastReport.passRate + "%";
+    document.getElementById("sumWho").innerHTML = `${esc(meName || "-")}<br><span style="color:var(--muted-2);font-weight:600;font-size:10.5px">${new Date().toLocaleString("ko-KR")}</span>`;
+    document.getElementById("completeBtn").disabled = false;
+    document.getElementById("downloadBtn").disabled = false;
+    refreshSteps();
+  }
+
+  async function runVerify(ids, merge) {
+    if (!ids.length) { alert("2단계에서 검증할 문서를 먼저 담아주세요."); return; }
+    const st = document.getElementById("verifyStatus");
+    const btn = document.getElementById("verifyBtn");
+    btn.disabled = true;
+    st.textContent = `⏳ ${ids.length}개 문서 검증 중 — 문서마다 AI가 질문을 만들어 실제로 물어봅니다(문서당 수십 초)…`;
+    try {
+      const report = await window.gijo.handoverVerify(ids);
+      renderReport(report, merge);
+      st.textContent = `✅ 검증 완료 — ${report.cited}/${report.total} 인용`;
+    } catch (e) {
+      st.textContent = `✗ 검증 실패: ${e.message}`;
+    }
+    btn.disabled = false;
+  }
+
+  // ── 4단계: 완료·리포트 ──
+  async function complete() {
+    if (!lastReport) return;
+    const btn = document.getElementById("completeBtn");
+    btn.disabled = true;
+    try {
+      await window.gijo.handoverComplete({ documentIds: docs, cited: lastReport.cited, total: lastReport.total, passRate: lastReport.passRate });
+      btn.textContent = "✓ 완료 처리됨 (감사 로그 기록)";
+      document.getElementById("completeHint").textContent = "감사 로그에 기록되었습니다. 후임자는 챗봇에 물어보는 것만으로 노하우를 근거와 함께 조회합니다.";
+    } catch (e) { btn.disabled = false; alert("완료 처리 실패: " + e.message); }
+  }
+  function download() {
+    if (!lastReport) return;
+    const lines = [
+      `# 인수인계 이관 리포트`, ``,
+      `- 이관자: ${meName || "-"}`, `- 일시: ${new Date().toLocaleString("ko-KR")}`,
+      `- 이관 문서: ${lastReport.total}건 · 검증 인용 ${lastReport.cited}건 (통과율 ${lastReport.passRate}%)`, ``,
+      `| 문서 | 검증 질문 | 판정 |`, `|---|---|---|`,
+      ...lastReport.results.map((r) => `| ${r.documentId} | ${(r.question || r.error || "").replace(/\|/g, "/")} | ${r.cited ? "✓ 인용됨" : "✗ 미인용"} |`),
+    ];
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/markdown;charset=utf-8" }));
+    a.download = `인수인계_리포트_${new Date().toISOString().slice(0, 10)}.md`;
+    a.click();
+  }
+
+  function init() {
+    tick(); setInterval(tick, 30000);
+    loadUser(); loadHealth();
+    initChecklist();
+    try { docs = JSON.parse(localStorage.getItem(DOCS_KEY) || "[]"); } catch (e) { docs = []; }
+    renderDocs();
+    document.getElementById("uplBox").addEventListener("click", () => document.getElementById("fileInput").click());
+    document.getElementById("fileInput").addEventListener("change", (e) => uploadFiles([...e.target.files]));
+    document.getElementById("pickExistingBtn").addEventListener("click", showExisting);
+    document.getElementById("verifyBtn").addEventListener("click", () => runVerify(docs, false));
+    document.getElementById("verifyFailBtn").addEventListener("click", () => runVerify(lastReport ? lastReport.results.filter((r) => !r.cited).map((r) => r.documentId) : [], true));
+    document.getElementById("completeBtn").addEventListener("click", complete);
+    document.getElementById("downloadBtn").addEventListener("click", download);
+    document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
+    document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
+    if (window.gijoRealtime) window.gijoRealtime.connect();
+    refreshSteps();
+  }
+  document.addEventListener("DOMContentLoaded", init);
+})();
+</script>
+</body>
+</html>

@@ -557,6 +557,28 @@ export const docsApi = {
 };
 
 // ── 장기 기억(RAG) ────────────────────────────────────────────────────
+// 인수인계(Knowledge Transfer) — 올린 문서가 실제 답변 근거로 인용되는지 자동 검증 + 완료 증적.
+export interface HandoverCheck {
+  documentId: string;
+  question: string;
+  cited: boolean;
+  sources: string[];
+  answerPreview: string;
+  error?: string;
+}
+export interface HandoverReport {
+  total: number;
+  cited: number;
+  passRate: number;
+  results: HandoverCheck[];
+}
+export const handoverApi = {
+  verify: (documentIds: string[]) =>
+    request<HandoverReport>("/api/handover/verify", { method: "POST", body: { documentIds } }),
+  complete: (p: { documentIds: string[]; cited: number; total: number; passRate: number }) =>
+    request<{ ok: boolean }>("/api/handover/complete", { method: "POST", body: p }),
+};
+
 export const memoryApi = {
   ingest: (path: string, scope?: string) =>
     request<IngestResult>("/api/memory/ingest", { method: "POST", body: { path, scope } }),
