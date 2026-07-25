@@ -475,15 +475,16 @@ async function runClient() {
     return `탭 '${r.tab}' 존재, 기본 접힘`;
   });
 
-  await scenario("QA-C05", "메뉴 C안", "AI 지식·모델 허브 6탭", {
-    given: "AI 계열 6개 화면이 허브 하나로 통합된 뒤",
+  await scenario("QA-C05", "메뉴 C안", "AI 지식·모델 허브 7탭", {
+    given: "AI 계열 화면이 허브 하나로 통합된 뒤(인수인계 탭 추가로 6→7, 2026-07-25 갱신)",
     when: "hub.html?g=aiknowledge 를 열면",
-    then: "기억·학습(RAG)/온톨로지/문서 보강/학습 루프/LLM 합성/LLM 가이드 6탭이 뜬다",
+    then: "기억·학습(RAG)/인수인계/온톨로지/문서 보강/학습 루프/LLM 합성/LLM 가이드 7탭이 뜬다",
   }, async () => {
     await open("hub.html?g=aiknowledge");
     const tabs = await page.evaluate(() => [...document.querySelectorAll(".hub-tab")].map((t) => t.textContent));
-    if (tabs.length !== 6) throw new Error(`탭 ${tabs.length}개: ${tabs.join(",")}`);
-    return `탭 6개: ${tabs.join("·")}`;
+    if (tabs.length !== 7) throw new Error(`탭 ${tabs.length}개: ${tabs.join(",")}`);
+    if (!tabs.some((t) => t.includes("인수인계"))) throw new Error("인수인계 탭 누락");
+    return `탭 7개: ${tabs.join("·")}`;
   });
 
   await browser.close();
