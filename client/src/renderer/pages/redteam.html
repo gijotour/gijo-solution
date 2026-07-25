@@ -129,15 +129,16 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div>
         <div class="page-title">AI 견고성 · 레드팀 · 가드레일 <i class="gijo-info" data-topic="AI 견고성 (레드팀·가드레일)"></i></div>
       </div>
-      <div style="display:flex;align-items:flex-end;gap:10px">
-        <div>
-          <label for="targetSelect" style="display:block;font-size:11px;color:var(--muted);margin-bottom:5px">점검 대상</label>
-          <select id="targetSelect" style="min-width:280px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;outline:none">
-            <option value="orchestrator">오케스트레이터 (내 메인 LLM)</option>
-          </select>
-        </div>
-        <button class="btn-primary" id="runBtn">▶ 레드팀 실행</button>
+    </div>
+    <!-- 점검 대상·실행 버튼을 제목 아래 줄로(2026-07-26) — 제목 옆에 두면 버튼 글자가 줄바꿈됐다. -->
+    <div style="display:flex;align-items:flex-end;gap:10px;margin:10px 0 14px;flex-wrap:wrap">
+      <div>
+        <label for="targetSelect" style="display:block;font-size:11px;color:var(--muted);margin-bottom:5px">점검 대상</label>
+        <select id="targetSelect" style="min-width:280px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;outline:none">
+          <option value="orchestrator">오케스트레이터 (내 메인 LLM)</option>
+        </select>
       </div>
+      <button class="btn-primary" id="runBtn" style="white-space:nowrap">▶ 레드팀 실행</button>
     </div>
 
     <div id="gijoChatWidget" data-prompts='["이 자산 레드팀 점검해줘"]' style="max-width:640px;margin-bottom:16px;"></div>
