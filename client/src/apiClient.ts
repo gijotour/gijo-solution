@@ -1514,6 +1514,14 @@ export const longAnswerApi = {
   ack: (id: string) => request<{ ok: true }>(`/api/long-answers/${encodeURIComponent(id)}/ack`, { method: "POST" }),
 };
 
+// 명령창 아래 팁 — 질문 예시(화면별)와 알아두기(제품 규칙). 규칙은 서버가 단일 출처라
+// 규칙이 바뀌어도 클라이언트를 다시 게시할 필요가 없다(2026-07-26 사용자 지시).
+export interface ScreenTips { title: string; examples: string[]; rules: string[] }
+export const screenTipsApi = {
+  get: (screen?: string) =>
+    request<ScreenTips>(`/api/screen-tips${screen ? `?screen=${encodeURIComponent(screen)}` : ""}`),
+};
+
 export const assetsApi = {
   list: () => request<Asset[]>("/api/assets"),
   get: (id: string) => request<Asset>(`/api/assets/${id}`),

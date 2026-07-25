@@ -529,6 +529,25 @@
   .cl-chips{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;justify-content:center;}
   .cl-chips span{border:1px solid var(--border);border-radius:20px;padding:5px 13px;font-size:11.5px;color:var(--muted);cursor:pointer;}
   .cl-chips span:hover{border-color:var(--blue);color:var(--blue-light);}
+  /* 명령창 아래 팁 — 대화가 시작되면 칩 대신 이 얇은 줄이 남는다(2026-07-26). */
+  .tips{display:flex;align-items:center;gap:7px;margin-top:9px;padding:0 3px;font-size:11.5px;color:var(--muted-2);flex-wrap:wrap;}
+  .tips .lb{font-weight:800;color:var(--muted);white-space:nowrap;}
+  .tips b{font-weight:400;color:var(--muted);border-bottom:1px dotted var(--border-strong);cursor:pointer;white-space:nowrap;}
+  .tips b:hover{color:var(--blue-light);border-bottom-color:var(--blue);}
+  .tips .more{margin-left:auto;color:var(--muted-2);cursor:pointer;white-space:nowrap;}
+  .tips .more:hover{color:var(--blue-light);}
+  .hero-foot.clickable{cursor:pointer;border-bottom:1px dotted var(--border-strong);}
+  .hero-foot.clickable:hover{color:var(--blue-light);border-bottom-color:var(--blue);}
+  .hello-ask{display:inline-block;margin-left:8px;padding:2px 10px;border-radius:14px;cursor:pointer;
+    background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);color:var(--blue-light);font-size:11.5px;font-weight:700;}
+  .hello-ask:hover{background:rgba(59,130,246,.26);}
+  .tips.rule{margin-top:6px;}
+  .tips .rl{color:var(--amber);}
+  .tips.rule{align-items:flex-start;}
+  .tips .rt{color:var(--muted);display:flex;flex-wrap:wrap;gap:3px 14px;flex:1;line-height:1.75;}
+  .tips .rt .rn{position:relative;padding-left:11px;}
+  .tips .rt .rn::before{content:"·";position:absolute;left:2px;color:var(--amber);font-weight:800;}
+  body.chatting .tips{display:flex !important;}
   .hero-foot{margin-top:16px;color:var(--muted-2);font-size:10.5px;min-height:14px;text-align:center;}
   body.chatting .hero-orb{width:120px;}
   body.chatting .hero-orb .network-svg{max-width:120px;}
@@ -747,7 +766,15 @@
           <div class="cl-chips" id="clChips">
             <span>오늘 뭐부터 볼까?</span><span>긴급한 취약점 알려줘</span><span>이번 주 점검 일정</span><span>보고서 만들어줘</span>
           </div>
+          <!-- 대화 중에도 남는 얇은 팁 — 질문 예시와 제품 규칙(알아두기). 내용은 서버가 준다. -->
+          <div class="tips" id="tipsAsk" style="display:none">
+            <span class="lb">이렇게 물어보세요</span><span id="tipsAskList"></span>
+            <span class="more" id="tipsMore">이 화면에서 할 수 있는 것 →</span>
+          </div>
           <div class="hero-foot" id="heroFoot"></div>
+          <div class="tips rule" id="tipsRule" style="display:none">
+            <span class="lb rl">알아두기</span><span class="rt" id="tipsRuleText"></span>
+          </div>
         </div>
       </div>
     </div>
@@ -770,6 +797,36 @@
   const teamGrid = document.getElementById("teamGrid");
   const dockWho = document.getElementById("dockWho");
   const chatInput = document.getElementById("chatInput");
+
+  // 명령창 아래 팁 — 질문 예시(화면별)와 알아두기(제품 규칙). 둘 다 서버가 단일 출처라
+  // 규칙이 바뀌면 서버만 배포하면 되고 클라이언트를 다시 게시하지 않아도 된다(2026-07-26).
+  // 서버가 못 주면(구버전·네트워크 오류) 조용히 접는다 — 팁이 없다고 화면이 망가지진 않는다.
+  async function loadComposerTips() {
+    const askRow = document.getElementById("tipsAsk");
+    const ruleRow = document.getElementById("tipsRule");
+    if (!askRow || !ruleRow || !window.gijo.screenTips) return;
+    let tips;
+    try { tips = await window.gijo.screenTips("dashboard.html"); } catch (e) { return; }
+
+    const list = document.getElementById("tipsAskList");
+    const ex = (tips.examples || []).slice(0, 4);
+    if (ex.length && list) {
+      list.innerHTML = ex.map((q) => `<b>${escT(q)}</b>`).join('<span> · </span>');
+      list.querySelectorAll("b").forEach((el) => el.addEventListener("click", () => {
+        chatInput.value = el.textContent; chatInput.focus();
+      }));
+      askRow.style.display = "flex";
+    }
+    document.getElementById("tipsMore")?.addEventListener("click", () => sendToOrchestrator("이 화면 뭐 할 수 있어?"));
+
+    // 규칙은 돌리지 않고 전부 보여준다(2026-07-26 사용자 지시) — 순환하면 지금 안 보이는 규칙을
+    // 놓치고, 담당자가 몰라서 사고 나는 것을 막자고 만든 줄이라 다 보이는 편이 목적에 맞다.
+    const rules = tips.rules || [];
+    if (!rules.length) return;
+    const txt = document.getElementById("tipsRuleText");
+    txt.innerHTML = rules.map((r) => `<span class="rn">${escT(r)}</span>`).join("");
+    ruleRow.style.display = "flex";
+  }
   const AGENT_ICON = { orchestrator: "🧭", scan: "⊘", analysis: "◎", report: "▣", ti: "🛰", normaltic: "📚" };
   const STATUS_META = {
     working: { cls: "working", badge: "작업 중", bcls: "tc-work" },
@@ -1950,7 +2007,16 @@
   function greet() {
     const hour = new Date().getHours();
     const greeting = hour < 12 ? "좋은 아침입니다" : hour < 18 ? "안녕하세요" : "좋은 저녁입니다";
-    clAppend("reply", { icon: "🧭", name: orchLabel(), message: `${greeting}${displayName ? ", " + displayName + "님" : ""}. 팀원을 고르고 아래 대화 독에서 지시하세요.` });
+    // 팀원을 골라 지시하던 방식은 없어졌다(아이콘은 표시 전용) — 바로 물어보라고 안내하고,
+    // 가장 많이 쓰는 질문을 눌러 보낼 수 있게 둔다(2026-07-26 사용자 지시).
+    const hello = clAppend("reply", { icon: "🧭", name: orchLabel(),
+      message: `${greeting}${displayName ? ", " + displayName + "님" : ""}. 무엇이든 물어보세요.` });
+    const askBtn = document.createElement("span");
+    askBtn.className = "hello-ask";
+    askBtn.textContent = "오늘 뭐부터 볼까?";
+    askBtn.title = "눌러서 바로 물어보기";
+    askBtn.addEventListener("click", () => sendToOrchestrator("오늘 뭐부터 볼까?"));
+    hello?.querySelector(".cm")?.appendChild(askBtn);
   }
 
   // ── 시안3: 팀 카드 그리드 + 하단 대화 독 ─────────────────────────────
@@ -2205,6 +2271,9 @@
     const to = String(evt.to || "");
     // 세션 태그 이벤트(from/to="세션")는 대시보드에서 상태 카드·대화 독으로 이미 직접 표시하므로 중복 방지.
     if (from === "세션" || to === "세션") return;
+    // "작업 완료: <답변 전문>"은 바로 뒤에 최종 답변이 그대로 또 나온다 — 같은 글이 두 번 보였다
+    // (2026-07-26 사용자 지적). 협업 피드는 활동 기록이지 답변 채널이 아니므로 콘솔에서는 건너뛴다.
+    if (/^(작업 |실행 |부연 |단계 \d+ )?완료[:：]/.test(String(evt.message || ""))) return;
     clAppend("event", {
       icon: AGENT_ICON[from] || "◆",
       name: `${agentLabel(from)} → ${agentLabel(to)}`,
@@ -2532,6 +2601,8 @@
       sendToOrchestrator("오늘 확인할 항목을 우선순위대로 에이전트 팀에게 위임해서 처리해줘");
     });
 
+    loadComposerTips();
+
     // 작업 세션 열 — 목록 로드 + 새 세션/전체 화면 진입(전용 화면으로 딥링크).
     loadDashSessions();
     const dashActiveBadge = document.getElementById("dashActiveBadge");
@@ -2705,8 +2776,13 @@
       if (!items || !items.length) return;
       const kev = items.filter((r) => r.finding && r.finding.kev).length;
       const crit = items.filter((r) => r.finding && (r.finding.severity === "critical" || r.finding.severity === "high")).length;
-      document.getElementById("heroFoot").textContent =
+      const foot = document.getElementById("heroFoot");
+      foot.textContent =
         `미조치 상위 ${items.length}건${crit ? ` · 높음 이상 ${crit}건` : ""}${kev ? ` · KEV ${kev}건` : ""} — "오늘 뭐부터 볼까?"로 확인`;
+      // 안내대로 시켜주는 게 맞다 — 글자만 있고 눌러도 아무 일이 없었다(2026-07-26 사용자 지시).
+      foot.classList.add("clickable");
+      foot.title = "눌러서 바로 물어보기";
+      foot.addEventListener("click", () => sendToOrchestrator("오늘 뭐부터 볼까?"));
     }).catch(() => {});
   })();
 </script>

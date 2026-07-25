@@ -190,6 +190,7 @@ const gijoApi = {
   setDocCategory: (documentId: string, category: string) => api.memoryApi.setDocumentCategory(documentId, category),
   setAssetDisplayName: (id: string, displayName: string | null) => api.assetHubApi.setDisplayName(id, displayName),
   saveIngestReport: (input: Parameters<typeof api.ingestReportApi.save>[0]) => api.ingestReportApi.save(input),
+  screenTips: (screen?: string) => api.screenTipsApi.get(screen),
   longAnswersPending: () => api.longAnswerApi.pending(),
   longAnswerAck: (id: string) => api.longAnswerApi.ack(id),
   handoverVerify: (documentIds: string[]) => api.handoverApi.verify(documentIds),

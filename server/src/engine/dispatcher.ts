@@ -28,6 +28,13 @@ import { generateReport } from "./report";
 import { appendTurn, recentTurnsText, getSession, createSession } from "./worksessions";
 import { LONG_ANSWER_MS, startLongAnswer, finishLongAnswer, failLongAnswer } from "./longanswer";
 
+// 협업 로그는 "무슨 일이 있었나"를 남기는 활동 기록이다 — 답변 전문을 그대로 실으면 화면에
+// 같은 글이 두 번 보인다(2026-07-26 사용자 지적: 같은 답이 연달아 두 번 나옴). 앞부분만 남긴다.
+function collabNote(text: string): string {
+  const t = String(text ?? "").replace(/\s+/g, " ").trim();
+  return t.length > 90 ? t.slice(0, 90) + "…" : t;
+}
+
 export interface DispatchResult {
   task: TaskItem;
   route: RoutedIntent;
@@ -176,7 +183,7 @@ async function runGijoEnrichment(results: StepResult[], fromAgentId: string): Pr
   } catch (err) {
     output = `부연 생략: ${err instanceof Error ? err.message : String(err)}`;
   }
-  emitCollaboration({ from: "normaltic", to: "orchestrator", message: `부연 완료: ${output.slice(0, 600)}` });
+  emitCollaboration({ from: "normaltic", to: "orchestrator", message: `부연 완료: ${collabNote(output)}` });
   resetAgentToDefault("normaltic");
   return { action: "enrich", label: "용어 해설·사례 부연", output };
 }
@@ -244,7 +251,7 @@ async function runOrchestration(instructionText: string, steps: OrchestrationSte
       output = `단계 실패: ${err instanceof Error ? err.message : String(err)}`;
     }
 
-    emitCollaboration({ from: agentId, to: "orchestrator", message: `단계 ${i + 1} 완료: ${output.slice(0, 600)}` });
+    emitCollaboration({ from: agentId, to: "orchestrator", message: `단계 ${i + 1} 완료: ${collabNote(output)}` });
     resetAgentToDefault(agentId);
     results.push({ action: step.action, label: step.label, output, assetIds, findingCount });
 
@@ -484,7 +491,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `지시 처리: "${instructionText}"` });
     // 완료 이벤트는 실제 답변을 실어 나른다 — 120자로 자르면 지휘 콘솔 대화가 목록 중간에서 끊긴다
     // (2026-07-20 사용자 지적). 화면 쪽이 4줄 클램프+더보기로 접으므로 여기선 넉넉히 보낸다.
-    emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `완료: ${loop.output.slice(0, 1500)}` });
+    emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `완료: ${collabNote(loop.output)}` });
     resetAgentToDefault("orchestrator");
     const updated = completeTask(loopTask.id);
     return {
@@ -520,7 +527,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     output = `실행 실패: ${err instanceof Error ? err.message : String(err)}`;
   }
 
-  emitCollaboration({ from: route.agentId, to: "orchestrator", message: `작업 완료: ${output}` });
+  emitCollaboration({ from: route.agentId, to: "orchestrator", message: `작업 완료: ${collabNote(output)}` });
   resetAgentToDefault(route.agentId);
   const updatedTasks = completeTask(task.id);
   const completedTask = updatedTasks.find((t) => t.id === task.id) ?? task;
@@ -598,7 +605,7 @@ export function registerDispatcherRoutes(app: Express): void {
         const undoBefore = undoSnapshot(); // #7: 실행 전 상태 스냅샷(원클릭 undo용)
         const output = await executeApprovedTool(toolName, args);
         const undoId = undoCommit(toolName, output.slice(0, 50), undoBefore); // 변화 있으면 되돌리기 항목 등록
-        emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `실행 완료: ${output.slice(0, 600)}` });
+        emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `실행 완료: ${collabNote(output)}` });
         // 작업 기록(감사 로그) — 승인된 쓰기 실행을 남긴다(챗봇 제안 → 사람 승인).
         recordAudit({ kind: "write", actor, action: `승인 실행: ${toolName}`, target: args.assetId ?? args.code ?? null, detail: `${instruction ? instruction + " → " : ""}${output.slice(0, 200)}`, result: "ok" });
         // 사람이 승인한 (지시→도구) = 검증된 정답. 파인튜닝 골드 예시로 누적한다(Phase 4, 자가강화).

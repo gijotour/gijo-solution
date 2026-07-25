@@ -7,6 +7,9 @@
 // dispatcher가 도움말 의도를 감지하면 이 모듈을 먼저 태워 화면 가이드를 답으로 준다. 화면을
 // 모르면 전체 개요를 준다. 화면이 늘면 여기 GUIDES에 한 줄 추가한다.
 
+import type { Express } from "express";
+import { authMiddleware } from "../auth/auth";
+
 export interface ScreenGuide {
   title: string;
   what: string; // 이 화면이 하는 일 (한 줄)
@@ -402,6 +405,32 @@ const OVERVIEW: ScreenGuide = {
   tip: "쓰기 작업(등록·수정·조치)은 바로 반영되지 않고 결재판으로 떠서, 확인 후 승인해야 실행됩니다.",
 };
 
+// ── 제품 규칙(알아두기) — 명령창 아래 팁 줄에 돌아가며 뜬다 ─────────────────────
+// 여기가 유일한 출처다(2026-07-26 사용자 지시: "우리 규칙이 변경되면 같이 반영해줘").
+// 화면에 하드코딩하지 않고 서버가 내려주므로, 규칙이 바뀌면 이 배열만 고쳐 배포하면
+// 클라이언트를 다시 게시하지 않아도 전 화면에 반영된다.
+// 쓸 때 지킬 것: 담당자가 몰라서 사고 날 수 있는 것만. 자랑·홍보 문구는 넣지 않는다.
+export const PRODUCT_RULES: string[] = [
+  "자료를 바꾸는 일(등록·수정·삭제)은 승인 창을 띄운 뒤에만 실행합니다 — 지시만으로 바뀌지 않습니다.",
+  "답변 아래 근거 문서가 붙습니다. 근거가 없으면 지어낸 답일 수 있으니 확인하세요.",
+  "10초가 넘는 작업은 리포트로 작성해 저장하고, 다 되면 알려드립니다.",
+  "＋로 파일을 올리면 종류를 자동으로 가려 취약점·매뉴얼·문서로 나눠 넣습니다.",
+  "모든 처리는 사내에서만 이뤄집니다 — 외부로 자료가 나가지 않습니다.",
+  "못 찾았다는 답이 곧 없다는 뜻은 아닙니다 — 다른 말로 한 번 더 물어보세요.",
+];
+
+/** 명령창 아래 팁 — 질문 예시(화면별)와 알아두기(공통)를 함께 준다. */
+export function screenTips(screen?: string): { title: string; examples: string[]; rules: string[] } {
+  const g = getScreenGuide(screen);
+  // can 항목은 '"오늘 뭐부터 볼까?" — 오늘의 우선 업무 브리핑' 꼴 — 따옴표 안의 질문만 뽑는다.
+  // 따옴표가 없는 설명 문장은 눌러 넣을 질문이 아니므로 버린다.
+  const examples = g.can
+    .map((c) => c.match(/"([^"]{2,40})"/)?.[1])
+    .filter((q): q is string => Boolean(q))
+    .slice(0, 4);
+  return { title: g.title, examples, rules: PRODUCT_RULES };
+}
+
 export function getScreenGuide(screen?: string): ScreenGuide {
   if (!screen) return OVERVIEW;
   const key = screen.split(/[\\/]/).pop() ?? screen;
@@ -433,4 +462,13 @@ export function formatScreenGuide(screen?: string, question?: string): string {
   }
   if (g.tip) { L.push(""); L.push(`💡 ${g.tip}`); }
   return L.join("\n");
+}
+
+// 명령창 아래 팁 줄이 읽어가는 곳. 규칙(PRODUCT_RULES)이 바뀌면 서버만 배포하면 되고
+// 클라이언트를 다시 게시할 필요가 없다 — 규칙은 한 곳에서만 관리한다는 원칙(2026-07-26).
+export function registerScreenGuideRoutes(app: Express): void {
+  app.get("/api/screen-tips", authMiddleware, (req, res) => {
+    const screen = typeof req.query.screen === "string" ? req.query.screen : undefined;
+    res.json(screenTips(screen));
+  });
 }

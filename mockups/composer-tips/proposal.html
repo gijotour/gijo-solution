@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>명령창 아래 질문 팁 — 시안</title>
+<style>
+  :root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.08);
+        --border-strong:rgba(255,255,255,.16);--blue:#3b82f6;--blue-light:#5fa1ff;
+        --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--teal:#1eb980;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font:13px/1.6 "Malgun Gothic","Apple SD Gothic Neo",sans-serif;padding:24px}
+  .wrap{max-width:980px;margin:0 auto}
+  .note{background:rgba(59,130,246,.1);border:1px solid var(--border-strong);border-radius:10px;padding:12px 14px;margin-bottom:20px;font-size:12.5px;color:var(--muted)}
+  .note b{color:var(--text)}
+  h2{font-size:13px;color:var(--muted);margin:22px 0 9px;font-weight:700}
+  .stage{background:var(--panel-2);border:1px solid var(--border);border-radius:13px;padding:18px}
+  .msgs{max-height:190px;overflow:hidden;margin-bottom:14px}
+  .msg{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:9px;font-size:12.5px}
+  .msg .who{font-size:11px;font-weight:800;color:var(--blue-light);margin-bottom:3px}
+  .msg.me .who{color:var(--teal)}
+  .dock{display:flex;align-items:center;gap:9px;background:var(--panel);border:1px solid var(--border-strong);border-radius:13px;padding:9px 10px}
+  .plus{width:38px;height:38px;border-radius:10px;background:var(--panel-2);border:1px solid var(--border-strong);color:var(--blue-light);font-size:17px;cursor:pointer}
+  .dock input{flex:1;background:transparent;border:none;outline:none;color:var(--text);font-size:13.5px;padding:0 4px}
+  .dock input::placeholder{color:var(--muted-2)}
+  .send{background:var(--blue);border:none;color:#fff;border-radius:10px;padding:0 18px;height:38px;font-size:13px;font-weight:800;cursor:pointer}
+
+  /* 지금: 대화 시작 전에만 보이는 큰 칩 */
+  .chips{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;justify-content:center}
+  .chips span{border:1px solid var(--border);border-radius:20px;padding:5px 13px;font-size:11.5px;color:var(--muted);cursor:pointer}
+
+  /* 바뀌는 것: 대화 중에도 남는 얇은 팁 줄 */
+  .tips{display:flex;align-items:center;gap:7px;margin-top:9px;padding:0 3px;font-size:11.5px;color:var(--muted-2);flex-wrap:wrap}
+  .tips .lb{font-weight:800;color:var(--muted);white-space:nowrap}
+  .tips b{font-weight:400;color:var(--muted);border-bottom:1px dotted var(--border-strong);cursor:pointer;white-space:nowrap}
+  .tips b:hover{color:var(--blue-light);border-bottom-color:var(--blue)}
+  .tips .more{margin-left:auto;color:var(--muted-2);cursor:pointer;white-space:nowrap}
+  .tips .more:hover{color:var(--blue-light)}
+  .tips.rule{margin-top:6px}
+  .tips .rl{color:#f0a020}
+  .tips .rt{color:var(--muted)}
+  .tips .rt u{color:var(--text);text-decoration:none;border-bottom:1px solid rgba(240,160,32,.5)}
+  .tips .dots{margin-left:auto;display:flex;gap:4px}
+  .tips .dots i{width:5px;height:5px;border-radius:50%;background:var(--border-strong);display:block}
+  .tips .dots i.on{background:#f0a020}
+  .rules div{padding:8px 2px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted)}
+  .rules div:last-child{border-bottom:none}
+  .rules u{color:var(--text);text-decoration:none;border-bottom:1px solid rgba(240,160,32,.5)}
+  .rules .lb{font-weight:800;margin-right:7px}
+</style></head><body>
+<div class="wrap">
+
+  <div class="note">
+    <b>지금 문제</b> — 명령창 아래에 예시 칩이 있긴 한데, <b>대화가 시작되면 통째로 사라집니다.</b>
+    정작 무엇을 더 물어볼 수 있는지 알고 싶은 건 대화 중일 때입니다.<br>
+    <b>바꾸는 것</b> — ① 대화 전에는 지금처럼 큰 칩을 그대로 둡니다. ② 대화가 시작되면
+    <b>한 줄짜리 얇은 팁</b>으로 줄어들어 계속 남습니다. 눌러 넣기도 그대로 됩니다.
+    ③ <b>더보기</b>로 이 화면에서 할 수 있는 것 전체(챗봇 안내)를 엽니다.
+  </div>
+
+  <h2>① 대화 시작 전 — 지금 그대로</h2>
+  <div class="stage">
+    <div class="dock">
+      <button class="plus">＋</button>
+      <input placeholder="보안 총괄에게 지시…">
+      <button class="send">전송</button>
+    </div>
+    <div class="chips">
+      <span>오늘 뭐부터 볼까?</span><span>긴급한 취약점 알려줘</span><span>이번 주 점검 일정</span><span>보고서 만들어줘</span>
+    </div>
+  </div>
+
+  <h2>② 대화 중 — 여기가 바뀝니다 (전에는 아무것도 없었음)</h2>
+  <div class="stage">
+    <div class="msgs">
+      <div class="msg me"><div class="who">정요한 → 보안 총괄</div>보안장비 리스트</div>
+      <div class="msg"><div class="who">보안 총괄</div>보안제품 리스트: FOCS 메뉴얼 ver1 2, Tenable Security Center, Tenable Vulnerability Management, Tenable Web App Scanning</div>
+    </div>
+    <div class="dock">
+      <button class="plus">＋</button>
+      <input placeholder="이 세션에 이어서 지시…">
+      <button class="send">전송</button>
+    </div>
+    <div class="tips">
+      <span class="lb">이렇게 물어보세요</span>
+      <b>오늘 뭐부터 볼까?</b><span>·</span>
+      <b>긴급한 취약점 알려줘</b><span>·</span>
+      <b>이번 주 점검 일정</b><span>·</span>
+      <b>보고서 만들어줘</b>
+      <span class="more">이 화면에서 할 수 있는 것 →</span>
+    </div>
+    <div class="tips rule">
+      <span class="lb rl">알아두기</span>
+      <span class="rt">자료를 바꾸는 일(등록·수정·삭제)은 <u>승인 창을 띄운 뒤</u>에만 실행합니다 — 지시만으로 바뀌지 않습니다.</span>
+      <span class="dots"><i class="on"></i><i></i><i></i><i></i></span>
+    </div>
+  </div>
+
+  <h2>③ "알아두기" 줄은 몇 초마다 바뀝니다 — 담을 내용</h2>
+  <div class="stage">
+    <div class="rules">
+      <div><span class="lb rl">알아두기</span> 자료를 바꾸는 일(등록·수정·삭제)은 <u>승인 창을 띄운 뒤</u>에만 실행합니다 — 지시만으로 바뀌지 않습니다.</div>
+      <div><span class="lb rl">알아두기</span> 답변 아래 <u>근거 문서</u>가 붙습니다. 근거가 없으면 지어낸 답일 수 있으니 확인하세요.</div>
+      <div><span class="lb rl">알아두기</span> <u>10초가 넘는 작업</u>은 리포트로 작성해 저장하고, 다 되면 알려드립니다.</div>
+      <div><span class="lb rl">알아두기</span> ＋로 파일을 올리면 <u>종류를 자동으로 가려</u> 취약점·매뉴얼·문서로 나눠 넣습니다.</div>
+      <div><span class="lb rl">알아두기</span> 모든 처리는 <u>사내에서만</u> 이뤄집니다 — 외부로 자료가 나가지 않습니다.</div>
+      <div><span class="lb rl">알아두기</span> 못 찾았다는 답이 곧 <u>없다는 뜻은 아닙니다</u> — 다른 말로 한 번 더 물어보세요.</div>
+    </div>
+  </div>
+
+  <div class="note" style="margin-top:22px;background:transparent">
+    질문 예시는 <b>화면마다 다르게</b> 나옵니다 — 취약점 화면에서는 취약점 예시가, 자산 화면에서는
+    자산 예시가 뜹니다(챗봇 화면 안내에 이미 화면별로 정리돼 있어 그걸 씁니다).
+    <b>알아두기</b>는 전 화면 공통이고 6개가 8초마다 돌아갑니다.
+  </div>
+
+</div></body></html>
