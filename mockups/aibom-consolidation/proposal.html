@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>AI 자산 관리 통합 시안 — 통합 뷰·자산 목록·AI-BOM 역할 정리</title>
+<style>
+  :root{--bg:#0a0e1a;--panel:#121a2e;--panel2:#0e1526;--border:rgba(255,255,255,.08);--bs:rgba(255,255,255,.16);--text:#e7eaf3;--muted:#8b93ab;--muted2:#5f6785;--blue:#3b82f6;--bl:#5fa1ff;--teal:#1eb980;--amber:#f0a020;--red:#e2483d;--purple:#8b7cf0;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI','Malgun Gothic',sans-serif;font-size:13px;padding:22px;line-height:1.5}
+  h1{font-size:17px;margin-bottom:4px}
+  .lead{color:var(--muted);font-size:12.5px;margin-bottom:18px}
+  .cmp{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:22px}
+  .box{border:1px solid var(--border);border-radius:12px;padding:14px 16px;background:var(--panel2)}
+  .box.bad{border-color:rgba(226,72,61,.35)}
+  .box.good{border-color:rgba(30,185,128,.4)}
+  .bt{font-size:12.5px;font-weight:800;margin-bottom:8px}
+  .bad .bt{color:#f5928a}.good .bt{color:var(--teal)}
+  .box ul{margin:0 0 0 16px;color:var(--muted);font-size:12px;line-height:1.9}
+  .box b{color:var(--text)}
+  .tabs{display:flex;gap:6px;margin-bottom:12px}
+  .tab{padding:7px 14px;border-radius:9px;font-size:12px;font-weight:800;color:var(--muted);border:1px solid var(--border);background:var(--panel2);}
+  .tab.on{background:rgba(59,130,246,.18);color:#fff;border-color:rgba(59,130,246,.5)}
+  .screen{border:1px solid var(--bs);border-radius:12px;background:var(--panel2);padding:16px;margin-bottom:18px}
+  .st{font-size:14px;font-weight:800;margin-bottom:3px}
+  .ss{font-size:11.5px;color:var(--muted);margin-bottom:12px}
+  .shadow{background:rgba(240,160,32,.08);border:1px solid rgba(240,160,32,.4);border-radius:10px;padding:11px 14px;margin-bottom:12px}
+  .shadow .h{font-size:12.5px;font-weight:800;color:#f7c777;margin-bottom:5px}
+  .shadow .l{font-size:11.5px;color:var(--muted);line-height:1.8}
+  .shadow .btn{display:inline-block;margin-top:7px;border:1px solid rgba(240,160,32,.5);color:#f7c777;border-radius:7px;padding:3px 10px;font-size:11px;font-weight:700}
+  .split{display:grid;grid-template-columns:300px 1fr;gap:12px}
+  .list{border:1px solid var(--border);border-radius:10px;background:var(--panel);overflow:hidden}
+  .lh{padding:8px 12px;font-size:11px;font-weight:800;color:var(--muted2);border-bottom:1px solid var(--border)}
+  .row{padding:9px 12px;border-bottom:1px solid var(--border);cursor:pointer}
+  .row.sel{background:rgba(59,130,246,.12)}
+  .row .n{font-size:12.5px;font-weight:700}
+  .row .m{font-size:10.5px;color:var(--muted2);margin-top:2px}
+  .chip{font-size:9.5px;border-radius:20px;padding:0 7px;border:1px solid var(--bs);color:var(--muted);margin-left:5px}
+  .chip.ok{border-color:rgba(30,185,128,.45);color:var(--teal)}
+  .chip.warn{border-color:rgba(240,160,32,.5);color:var(--amber)}
+  .detail{border:1px solid var(--border);border-radius:10px;background:var(--panel);padding:14px}
+  .dh{font-size:13px;font-weight:800;margin-bottom:10px}
+  .fields{display:grid;grid-template-columns:1fr 1fr;gap:9px 14px}
+  .f{border-bottom:1px dashed var(--border);padding-bottom:6px}
+  .f .k{font-size:10.5px;color:var(--muted2)}
+  .f .v{font-size:12px;margin-top:2px}
+  .f .v.empty{color:var(--muted2)}
+  .secline{grid-column:1/-1;font-size:11px;font-weight:800;color:var(--bl);margin-top:8px;padding-top:4px}
+  .rob{display:flex;align-items:center;gap:10px;margin-top:12px;padding-top:10px;border-top:1px solid var(--border)}
+  .rob .sc{font-size:20px;font-weight:800;color:var(--teal)}
+  .seg{display:flex;background:var(--panel2);border:1px solid var(--bs);border-radius:9px;padding:3px;gap:3px;width:max-content;margin-bottom:10px}
+  .seg span{padding:5px 12px;border-radius:7px;font-size:11px;font-weight:800;color:var(--muted)}
+  .seg span.on{background:rgba(59,130,246,.22);color:#fff}
+  .note{font-size:11.5px;color:var(--muted2);margin-top:10px;line-height:1.7}
+  .link{color:var(--bl);font-size:11.5px}
+</style>
+</head>
+<body>
+
+<h1>AI 자산 관리 통합 — 세 화면의 역할 정리 (추천 시안)</h1>
+<div class="lead">현재 AI 전용 내용(AI-BOM 5영역·Shadow AI)이 <b>통합 뷰</b>에 섞여 있어 목적이 흐려집니다. AI 보안 자료를 <b>AI-BOM 메뉴 한 곳</b>으로 모으고, 통합 뷰는 전체 자산 관제로, 자산 목록은 이름을 바로잡습니다.</div>
+
+<div class="cmp">
+  <div class="box bad">
+    <div class="bt">✗ 지금 (역할이 섞임)</div>
+    <ul>
+      <li><b>통합 뷰</b>: 전체 자산 + <b>AI-BOM 5영역</b> + <b>Shadow AI 배너</b> — AI 전용 정보가 일반 관제에 섞임. 5영역은 값이 없어도 "0"으로 항상 노출</li>
+      <li><b>자산 목록</b>: 제목이 <b>"AI 자산 (6)"</b>인데 실제 6건은 AI 3 + IT 3 <b>전체</b> — 이름이 틀림</li>
+      <li><b>AI-BOM</b>: 코드 의존성 SBOM 표가 중심 — "AI 자산을 모아 관리"라는 원래 목적이 안 보임</li>
+    </ul>
+  </div>
+  <div class="box good">
+    <div class="bt">✓ 제안 (한 목적 = 한 화면)</div>
+    <ul>
+      <li><b>통합 뷰</b>: IT+AI <b>전체 자산 관제</b>에 집중 — AI 전용 블록은 빼고, AI 자산이면 "AI-BOM에서 보기 →" 링크 하나</li>
+      <li><b>자산 목록</b>: 제목 <b>"자산 목록 (6)"</b>으로 정정 + [전체 | AI | IT] 세그먼트</li>
+      <li><b>AI-BOM</b>: <b>AI 자산 전용 관리 화면</b> — Shadow AI 발견 → AI 자산 목록 → 5영역 명세 → 견고성까지 한 흐름</li>
+    </ul>
+  </div>
+</div>
+
+<div class="tabs"><span class="tab">통합 뷰</span><span class="tab">자산 목록</span><span class="tab on">AI-BOM</span><span class="tab">취약점</span></div>
+
+<div class="screen">
+  <div class="st">AI-BOM — AI 자산 전용 관리</div>
+  <div class="ss">스캔·등록된 AI 자산을 모아 구성(AI-BOM)·견고성을 관리합니다. <span style="color:var(--muted2)">일반 IT 자산은 통합 뷰·자산 목록에서.</span></div>
+
+  <div class="shadow">
+    <div class="h">🕵 Shadow AI — 미등록 AI 모델 3개 발견 <span style="font-weight:400;color:var(--muted2);font-size:11px">(통합 뷰에서 이관)</span></div>
+    <div class="l">
+      · <b style="color:#f7c777">사용 중</b> merged-lily-gijo-loop-ai-securityllm — 모델 파일(models/), 엔진 풀 상주, 에이전트 배정 6명<br>
+      · 배치만 gijo-orchestrator-ko · qwen2.5-14b-instruct
+    </div>
+    <div class="btn">＋ AI 자산으로 등록하고 AI-BOM 작성</div>
+  </div>
+
+  <div class="split">
+    <div class="list">
+      <div class="lh">AI 자산 3건 — 등록·스캔으로 확인된 것만</div>
+      <div class="row sel"><div class="n">사내 보안 어시스턴트 <span class="chip ok">SBOM ✓</span></div><div class="m">LLM 서비스 · 견고성 82 · OWASP LLM01·LLM06</div></div>
+      <div class="row"><div class="n">이상거래 탐지 AI(FDS) <span class="chip ok">SBOM ✓</span></div><div class="m">이상탐지 모델 · 견고성 미점검</div></div>
+      <div class="row"><div class="n">고객상담 RAG 챗봇 <span class="chip warn">5영역 미완</span></div><div class="m">LLM 서비스 · 견고성 74</div></div>
+    </div>
+
+    <div class="detail">
+      <div class="dh">AI-BOM 구성 명세 — 사내 보안 어시스턴트</div>
+      <div class="fields">
+        <div class="secline">① 모델</div>
+        <div class="f"><div class="k">파운데이션 모델</div><div class="v">Qwen2.5-7B-Instruct</div></div>
+        <div class="f"><div class="k">파인튜닝 이력</div><div class="v">SLERP 합성(Lily+ZySec) · 2026-07-20</div></div>
+        <div class="f"><div class="k">아키텍처 · 가중치 해시</div><div class="v">Qwen2 · sha256:7f2a…</div></div>
+        <div class="f"><div class="k">서빙 모델 참조</div><div class="v">models/merged-lily</div></div>
+        <div class="secline">② 데이터</div>
+        <div class="f"><div class="k">데이터 출처</div><div class="v">사내 보안문서 81건(RAG)</div></div>
+        <div class="f"><div class="k">벡터DB 위치</div><div class="v">data/memory.lancedb (온프렘)</div></div>
+        <div class="secline">③ 프롬프트 · 가드레일</div>
+        <div class="f"><div class="k">시스템 프롬프트</div><div class="v">보안 오케스트레이터 v3</div></div>
+        <div class="f"><div class="k">가드레일</div><div class="v">인젝션 차단 14종 · egress 게이트</div></div>
+        <div class="secline">④ 에이전트 도구 · ⑤ 인프라</div>
+        <div class="f"><div class="k">API · MCP 서버</div><div class="v empty">미기재</div></div>
+        <div class="f"><div class="k">컴퓨트 · 호스팅</div><div class="v">RTX 4090 24GB · 온프레미스</div></div>
+      </div>
+      <div class="rob"><span class="sc">82</span><span style="font-size:11.5px;color:var(--muted)">견고성 점수 / 100 · 레드팀 14 페이로드 중 2건 취약 · <span class="link">레드팀 다시 실행 →</span></span></div>
+    </div>
+  </div>
+  <div class="note">※ 5영역 값은 <b>스캔·등록으로 실제 확인된 것만</b> 채워집니다(없으면 "미기재"). 통합 뷰처럼 값 없이 "0"만 나열하지 않습니다.</div>
+</div>
+
+<div class="cmp">
+  <div class="screen" style="margin:0">
+    <div class="st">통합 뷰 (정리 후)</div>
+    <div class="ss">IT+AI 전체 자산 관제 — 노출점수·취약점·커버리지</div>
+    <div class="list">
+      <div class="lh">자산 6건</div>
+      <div class="row"><div class="n">🧠 사내 보안 어시스턴트</div><div class="m">노출 14 · 미조치 3 · <span class="link">AI-BOM에서 보기 →</span></div></div>
+      <div class="row"><div class="n">🌐 안전대부 본인인증 웹 서버</div><div class="m">노출 9 · 미조치 3 · IW-32 외</div></div>
+      <div class="row" style="opacity:.5"><div class="n">🖥 샘플-웹서버 …</div><div class="m">…</div></div>
+    </div>
+    <div class="note">AI-BOM 5영역 블록·Shadow AI 배너 <b>제거</b> → AI 자산엔 링크 한 줄만.</div>
+  </div>
+
+  <div class="screen" style="margin:0">
+    <div class="st">자산 목록 (정리 후)</div>
+    <div class="ss">등록·스캔된 모든 자산의 인벤토리 — 등록·편집·가져오기</div>
+    <div class="seg"><span class="on">전체 6</span><span>AI 3</span><span>IT 3</span></div>
+    <div class="list">
+      <div class="lh">이름 · 유형 · 담당 · 최근 점검</div>
+      <div class="row"><div class="n">사내 보안 어시스턴트</div><div class="m">LLM 서비스 · 보안팀</div></div>
+      <div class="row"><div class="n">안전대부 본인인증 웹 서버</div><div class="m">웹 서버 · 미지정</div></div>
+    </div>
+    <div class="note">제목 <b>"AI 자산 (6)" → "자산 목록 (6)"</b>. AI만 보려면 세그먼트.</div>
+  </div>
+</div>
+
+<div class="box" style="border-color:rgba(59,130,246,.35)">
+  <div class="bt" style="color:var(--bl)">구현 시 이동·수정 목록 (기능 손실 없음)</div>
+  <ul>
+    <li>Shadow AI 배너: assethub → sbom(AI-BOM) 상단으로 <b>이동</b> (탐지 로직·등록 동작 그대로)</li>
+    <li>AI-BOM 5영역 블록: assethub 상세에서 제거 → AI-BOM 화면의 명세 패널로 일원화(이미 존재)</li>
+    <li>AI-BOM 화면: 상단에 <b>AI 자산 목록</b> 신설(isAi 필터) — 기존 SBOM 표는 "코드 의존성" 구역으로 유지</li>
+    <li>자산 목록: 제목 <b>"자산 목록 (N)"</b> + [전체|AI|IT] 세그먼트 추가</li>
+    <li>통합 뷰 상세: AI 자산이면 "AI-BOM에서 보기 →" 링크 한 줄</li>
+  </ul>
+</div>
+
+</body>
+</html>
