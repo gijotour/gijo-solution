@@ -328,7 +328,9 @@ tr:last-child td{border-bottom:none;}
     } catch (e) {}
   }
 
-  const TYPE_LABEL = { weekly: "정기 · 주간", quarterly: "정기 · 분기", ondemand: "온디맨드" };
+  // answer = 오래 걸려 뒤에서 작성한 답(2026-07-26). ingest = 파일 인입 진행내역.
+  const TYPE_LABEL = { weekly: "정기 · 주간", quarterly: "정기 · 분기", ondemand: "온디맨드",
+    answer: "AI 작성 자료", ingest: "파일 처리 내역" };
 
   // 생성된 리포트 파일을 서버에서 받아(base64) blob으로 열기/저장. 서버가 다른 머신이어도 동작.
   async function downloadReport(name, btn) {

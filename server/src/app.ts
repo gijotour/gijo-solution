@@ -21,6 +21,7 @@ import { registerMemoryRoutes } from "./engine/memory";
 import { registerHandoverRoutes } from "./engine/handover";
 import { registerDataCleanupRoutes } from "./engine/datacleanup";
 import { registerIngestReportRoutes } from "./engine/ingestreport";
+import { registerLongAnswerRoutes, reapStaleRunning } from "./engine/longanswer";
 import { registerBridgeRoutes } from "./engine/bridge";
 import { registerCollaborationRoutes } from "./engine/collaboration";
 import { registerDatasetRoutes } from "./engine/dataset";
@@ -124,6 +125,8 @@ export function createApp(): Express {
   registerHandoverRoutes(app);
   registerDataCleanupRoutes(app);
   registerIngestReportRoutes(app);
+  registerLongAnswerRoutes(app);
+  reapStaleRunning(); // 서버가 죽었다 살아나면 진행 중이던 건 정리한다(영원히 대기 방지)
   registerBridgeRoutes(app);
   registerCollaborationRoutes(app);
   registerDatasetRoutes(app);

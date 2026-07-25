@@ -26,6 +26,7 @@ import { listFindings } from "./cti";
 import { matchCtiToAssets } from "./ctimatch";
 import { generateReport } from "./report";
 import { appendTurn, recentTurnsText, getSession, createSession } from "./worksessions";
+import { LONG_ANSWER_MS, startLongAnswer, finishLongAnswer, failLongAnswer } from "./longanswer";
 
 export interface DispatchResult {
   task: TaskItem;
@@ -535,7 +536,40 @@ export function registerDispatcherRoutes(app: Express): void {
       const sessionId = typeof req.body?.sessionId === "string" ? req.body.sessionId : undefined;
       // screen — 클라이언트가 보내는 현재 화면(예: "vulnscan.html"). 없어도 동작한다(구버전 호환).
       const screen = typeof req.body?.screen === "string" ? req.body.screen : undefined;
-      res.json(await dispatchInstruction(String(req.body?.text ?? ""), sessionId, screen));
+      const text = String(req.body?.text ?? "");
+      const user = (req as Request & { user?: GijoUser }).user;
+
+      // 10초 안에 안 끝나면 "리포트로 작성해 드리겠다"고 답하고 물러난다(사용자 결정 2026-07-26).
+      // 작업은 뒤에서 계속 돌고, 끝나면 리포트로 저장한 뒤 화면에 팝업으로 알린다.
+      const work = dispatchInstruction(text, sessionId, screen);
+      let handedOff = false;
+      const timer = new Promise<null>((resolve) => setTimeout(() => resolve(null), LONG_ANSWER_MS));
+      const first = await Promise.race([work, timer]);
+
+      if (first !== null) {
+        res.json(first);
+        return;
+      }
+
+      handedOff = true;
+      const longId = startLongAnswer(text, user?.id ?? null);
+      const actor = user?.displayName ?? null;
+      work
+        .then(async (r) => {
+          if (!handedOff) return;
+          await finishLongAnswer(longId, r.output || "(내용 없음)", actor);
+        })
+        .catch((e: unknown) => {
+          failLongAnswer(longId, e instanceof Error ? e.message : String(e));
+        });
+
+      res.json({
+        task: { id: longId, text, agentId: "orchestrator", priority: "P2", status: "working", createdAt: Date.now() },
+        route: { agentId: "orchestrator", agentName: "보안 총괄", reason: "오래 걸리는 작업" },
+        output:
+          "시간이 걸리는 작업이라 리포트로 작성해 드리겠습니다. 다 되면 알려드릴게요 — 다른 일 보셔도 됩니다.",
+        longAnswerId: longId,
+      });
     })
   );
   // 실행 없이 지시가 몇 단계로 계획되는지 미리 보여준다(복합 지시 여부 확인용).

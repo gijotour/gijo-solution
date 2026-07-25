@@ -319,6 +319,15 @@
 
   // 공용 '오른쪽 작업 화면'(작업 세션 + 지휘 콘솔)을 모든 페이지에 주입한다 — 어느 화면에서든
   // AI에게 지시할 수 있게. 대시보드는 자체 패널이 있어 commandpanel.js가 스스로 건너뛴다.
+  // 오래 걸려 리포트로 돌린 요청의 완료 알림 — 전 화면 공통(맨 바깥 창에서만 뜬다).
+  function loadLongNotice() {
+    if (document.getElementById("gijoLnScript")) return;
+    var s = document.createElement("script");
+    s.id = "gijoLnScript";
+    s.src = "longnotice.js";
+    document.body.appendChild(s);
+  }
+
   function loadCommandPanel() {
     if (document.getElementById("gijoCmdScript")) return;
     var s = document.createElement("script");
@@ -393,6 +402,7 @@
     render();
     loadOnboarding();
     loadCommandPanel();
+    loadLongNotice();
     checkUpdateBadge();
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);

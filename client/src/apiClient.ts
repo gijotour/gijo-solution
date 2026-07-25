@@ -1504,6 +1504,16 @@ export const ingestReportApi = {
     request<{ base: string; path: string; savedAt: number }>("/api/upload/ingest-report", { method: "POST", body: input }),
 };
 
+// 오래 걸려 리포트로 돌린 요청 — 다 되면 화면이 팝업으로 알린다(2026-07-26).
+export interface LongAnswerNotice {
+  id: string; instruction: string; status: "done" | "failed";
+  reportBase: string | null; error: string | null; startedAt: number; finishedAt: number | null;
+}
+export const longAnswerApi = {
+  pending: () => request<{ notices: LongAnswerNotice[] }>("/api/long-answers/pending"),
+  ack: (id: string) => request<{ ok: true }>(`/api/long-answers/${encodeURIComponent(id)}/ack`, { method: "POST" }),
+};
+
 export const assetsApi = {
   list: () => request<Asset[]>("/api/assets"),
   get: (id: string) => request<Asset>(`/api/assets/${id}`),
