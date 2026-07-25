@@ -73,6 +73,42 @@ async function tryIngest(filename: string, base64: string, classify = false): Pr
   }
 }
 
+// 국내 웹취약점 점검 결과보고서(PDF·DOCX 등 서술형)를 규칙 파서로 시도한다.
+// 성공(자산·취약점 1건 이상)하면 취약점으로 반영하고, 원문도 RAG에 남겨 근거 조회가 가능하게 한다.
+// 실패하면 null을 돌려 호출자가 다음 경로(Nessus HTML → 문서 저장)로 넘어간다.
+async function tryWebReport(filename: string, base64: string): Promise<AutoUploadResult | null> {
+  try {
+    const { extractDocumentText } = await import("./dataset.js");
+    const text = await extractDocumentText(filename, base64);
+    if (!text.trim()) return null;
+    const { looksLikeWebVulnReport, parseWebVulnReport } = await import("./webreport.js");
+    if (!looksLikeWebVulnReport(text)) return null;
+    const parsed = parseWebVulnReport(text);
+    if (parsed.vulns.length === 0) return null; // 규칙으로 못 잡음 → 호출자가 다음 경로(문서 저장/LLM 폴백)
+    const r = importVulnScan(text, "webreport", filename);
+    // 원문은 지식베이스에도 남긴다 — 취약점 등록과 별개로 "보고서 내용"을 챗봇이 근거로 인용할 수 있게.
+    const ing = await tryIngest(filename, base64);
+    emitCollaboration({
+      from: "scan",
+      to: "orchestrator",
+      message: `${filename} → 웹취약점 보고서로 인식 — 자산 ${r.hosts}·취약점 ${r.findings}건 등록${
+        parsed.declaredTotal !== undefined && parsed.declaredTotal !== parsed.vulns.length
+          ? ` ⚠ 문서 명시 총계 ${parsed.declaredTotal}건과 불일치 — 확인 필요`
+          : ""
+      }${ing ? "" : " · 검색수집 보류(임베딩 미기동)"}`,
+    });
+    return {
+      filename,
+      routedTo: "vulnscan",
+      reason: `국내 웹취약점 점검 보고서 파싱 — ${parsed.notes.join(" · ")}`,
+      vulnscan: { hosts: r.hosts, findings: r.findings },
+      memory: ing ? { chunks: ing.chunks, docClass: ing.docClass } : undefined,
+    };
+  } catch {
+    return null; // 텍스트 추출 실패 등 — 다음 경로로
+  }
+}
+
 // 사용자가 유형을 지정(결정창)했을 때 그 유형으로 바로 라우팅한다.
 // productName: 결정 카드에서 사용자가 확인·수정한 제품명(신규 등록 시에만 반영, 없으면 자동 추천값).
 async function routeByType(filename: string, base64: string, type: UploadType, productName?: string): Promise<AutoUploadResult> {
@@ -83,7 +119,11 @@ async function routeByType(filename: string, base64: string, type: UploadType, p
     return { filename, routedTo: "product-manual", reason: `사용자 지정: ${type === "log" ? "로그 매뉴얼" : "보안제품 자산"}`, manual: { productName: m.productName, kind: m.kind, createdProduct: m.createdProduct } };
   }
   if (type === "vulnreport") {
-    // Nessus 스타일 HTML(호스트/취약점 헤더) 구조로 우선 시도 — 다른 스캐너(Oracle 등) 자체 포맷은
+    // ① 국내 웹취약점 점검 보고서(PDF/DOCX 서술형) — 텍스트를 추출해 규칙 파서로 시도한다.
+    //    Nessus 계열이 아니라 예전엔 문서로만 저장돼 자산·취약점이 안 만들어졌다(2026-07-25 사용자 지적).
+    const web = await tryWebReport(filename, base64);
+    if (web) return web;
+    // ② Nessus 스타일 HTML(호스트/취약점 헤더) 구조로 시도 — 다른 스캐너(Oracle 등) 자체 포맷은
     // 구조가 달라 인식 못 할 수 있다. 그럴 땐 데이터를 잃지 않도록 문서로라도 저장한다(투명하게 사유 표시).
     const textish = Buffer.from(base64, "base64").toString("utf-8");
     const r = importVulnScan(textish, "html", filename);
@@ -142,6 +182,11 @@ export async function autoRouteUpload(
     emitCollaboration({ from: "scan", to: "orchestrator", message: `${filename} → 취약점 스캔으로 자동 반영 — 호스트 ${r.hosts}·finding ${r.findings}건` });
     return { filename, routedTo: "vulnscan", reason: vulnReason, vulnscan: { hosts: r.hosts, findings: r.findings } };
   }
+
+  // ①-b 국내 웹취약점 점검 결과보고서(PDF/DOCX 서술형) — 제목·[IW-NN] 코드체계로 판별되고
+  // 규칙 파서가 취약점을 실제로 뽑아낼 때만 취약점으로 반영한다(못 뽑으면 아래 경로로 계속).
+  const webAuto = await tryWebReport(filename, base64);
+  if (webAuto) return webAuto;
 
   // ② 기존 제품과 확실히 매칭되면(모델/벤더/종류 일치) 자동으로 그 제품 매뉴얼로.
   const c = classifyManual(filename, listProducts());

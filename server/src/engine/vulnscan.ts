@@ -12,6 +12,7 @@ import { authMiddleware } from "../auth/auth";
 import { registerAsset, updateAssetMeta, recordFindings, getAsset, Asset, AssetComponent } from "./assets";
 import type { StandardFinding } from "./bridge";
 import { kevMatches } from "./kev";
+import { parseWebVulnReport } from "./webreport";
 
 export interface VulnScanResult {
   hosts: number;
@@ -305,10 +306,12 @@ export function parseNessusXml(xml: string): { vulns: ParsedVuln[]; meta: Map<st
   return { vulns, meta };
 }
 
-export type VulnFormat = "json" | "csv" | "html" | "nessus";
+// webreport = 국내 웹취약점 점검 결과보고서(PDF/DOCX 텍스트) — engine/webreport.ts 규칙 파서.
+export type VulnFormat = "json" | "csv" | "html" | "nessus" | "webreport";
 
 export function parseVulnReport(content: string, format: VulnFormat): ParsedVuln[] {
   if (format === "html") return parseNessusHtml(content).vulns;
+  if (format === "webreport") return parseWebVulnReport(content).vulns;
   if (format === "nessus") return parseNessusXml(content).vulns;
   const rows = format === "csv" ? parseCsv(content) : parseJson(content);
   return rows
@@ -376,7 +379,19 @@ function applyStateTracking(prev: StandardFinding[], current: StandardFinding[],
 
 export function importVulnScan(content: string, format: VulnFormat, sourceLabel: string): VulnScanResult {
   // HTML·.nessus 리포트에는 CSV에 없는 호스트 정보(DNS 이름·OS)가 있다 — 자산 이름·구성요소로 채운다.
-  const withMeta = format === "html" ? parseNessusHtml(content) : format === "nessus" ? parseNessusXml(content) : null;
+  // 국내 웹취약점 보고서는 서비스명(=dnsName)·점검 대상 표를 함께 주므로 meta로 실어 자산 이름에 반영한다.
+  const webReport = format === "webreport" ? parseWebVulnReport(content) : null;
+  const withMeta =
+    format === "html"
+      ? parseNessusHtml(content)
+      : format === "nessus"
+        ? parseNessusXml(content)
+        : webReport
+          ? {
+              vulns: webReport.vulns,
+              meta: new Map<string, HostMeta>(webReport.assets.map((a) => [a.host, { dnsName: a.name }])),
+            }
+          : null;
   const parsed = withMeta ? withMeta.vulns : parseVulnReport(content, format);
   const metaOf = (host: string): HostMeta => withMeta?.meta.get(host) ?? {};
   // 호스트별로 그룹핑 — 한 호스트 = 한 자산, 그 호스트의 취약점들 = findings
