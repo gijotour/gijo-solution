@@ -5,7 +5,11 @@ Electron 클라이언트를 빌드해 운영 서버에 게시한다(자동 업�
 절차:
 
 1. **버전 bump**: client/package.json의 version을 패치 올림(예: 2.7.16→2.7.17). 게시 노트에 쓸 변경 요약을 git log에서 뽑아 정리.
-2. **빌드**: `cd client && npm run dist` (백그라운드 권장, 수 분 소요. NSIS exe 생성 확인)
+2. **빌드**: 먼저 **실행 중인 앱을 모두 종료**한다 — 개발 실행·설치본이 `client/server-dist`를
+   잡고 있으면 빌드가 폴더 삭제에 실패한다(2026-07-26 실사고, exe가 안 나오는데 exit 0으로 끝남).
+   `Get-Process -Name electron,"GIJO AS" | Where-Object { $_.Path -like "D:\Connect AI\*" } | Stop-Process -Force`
+   그 뒤 `cd client && npm run dist` (백그라운드 권장, 수 분 소요. **NSIS exe가 실제로 생겼는지 확인** —
+   빌드 로그 tail만 보고 성공으로 판단하지 말 것)
 3. **게시 전 실화면 검증(필수)**: release/win-unpacked의 새 빌드를 `--remote-debugging-port=9223`으로 띄우고 playwright-core CDP로:
    - claude-deploy 계정으로 로그인 (운영 localhost:4000)
    - 이번 변경 화면 + 회귀 표본 1~2개 렌더·동작 확인, 스크린샷

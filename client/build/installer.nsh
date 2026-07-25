@@ -12,7 +12,11 @@
 ; 로고가 바뀌면 그 스크립트만 다시 돌리면 되고, 손으로 만든 바이너리가 낡을 일이 없다.
 ; NSIS는 24비트 BMP만 받는다(PNG 불가).
 
+; electron-builder가 기본 그림(nsis3-metro.bmp)을 먼저 !define 해 둔다 — 그냥 !define 하면
+; "already defined!"로 빌드가 죽는다(2026-07-26 실측). 지우고 다시 정의해야 한다.
+!undef MUI_WELCOMEFINISHPAGE_BITMAP
 !define MUI_WELCOMEFINISHPAGE_BITMAP "${BUILD_RESOURCES_DIR}\welcome.bmp"
+!undef MUI_UNWELCOMEFINISHPAGE_BITMAP
 !define MUI_UNWELCOMEFINISHPAGE_BITMAP "${BUILD_RESOURCES_DIR}\welcome.bmp"
 !define MUI_HEADERIMAGE
 !define MUI_HEADERIMAGE_RIGHT
