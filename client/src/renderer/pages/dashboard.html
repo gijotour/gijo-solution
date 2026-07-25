@@ -1139,6 +1139,39 @@
     if (r.routedTo === "product-manual") return `보안제품 '${r.manual.productName}'에 ${r.manual.kind === "logManual" ? "로그" : "제품"} 매뉴얼로 연결${r.manual.createdProduct ? " · 신규 제품 자동 등록" : ""} (${r.reason})`;
     return `장기기억 ${r.memory.chunks}청크 수집${r.memory.docClass ? ` · 분류 ${r.memory.docClass}` : ""}${r.memory.linkedProduct ? ` · 제품 '${r.memory.linkedProduct}' 연결` : ""} (${r.reason})`;
   }
+  // 업로드 결과에서 리포트에 담을 진행내역을 뽑는다(파서가 준 근거·건수 그대로 — 지어내지 않는다).
+  function ingestPayload(name, r) {
+    const steps = String(r.reason || "").split(" · ").map((x) => x.trim()).filter(Boolean);
+    return {
+      filename: name,
+      routedTo: r.routedTo,
+      reason: r.reason || "",
+      steps,
+      hosts: r.vulnscan ? r.vulnscan.hosts : undefined,
+      findings: r.vulnscan ? r.vulnscan.findings : undefined,
+      chunks: r.memory ? r.memory.chunks : undefined,
+    };
+  }
+  // 처리 완료 뒤 "진행내역 리포트로 저장" 알약 — 누르면 저장되고 리포트 이력에서 볼 수 있다.
+  function offerIngestReport(name, r) {
+    if (!r || r.needsDecision) return;
+    const btn = clAppendPill("", "📄 진행내역 리포트로 저장", "이 파일이 무엇을 등록했는지 기록을 리포트 이력에 남깁니다(감사·인수인계 증빙).", async () => {
+      if (btn.disabled) return;
+      btn.disabled = true;
+      const prev = btn.textContent;
+      btn.textContent = "저장 중…";
+      try {
+        const saved = await window.gijo.saveIngestReport(ingestPayload(name, r));
+        btn.textContent = "✓ 리포트 저장됨";
+        clAppend("event", { icon: "📄", name: "진행내역 리포트", message: `${name} 처리 기록을 저장했습니다 (${saved.base}). 리포트 화면 이력에서 볼 수 있습니다.` });
+      } catch (e) {
+        btn.disabled = false;
+        btn.textContent = prev;
+        alert("리포트 저장 실패: " + e.message);
+      }
+    });
+  }
+
   // 시안 B — 애매하면 콘솔 인라인 결정 카드(5유형). 확실하면 바로 결과 표시.
   const UPLOAD_TYPES = [
     { t: "vulnreport", label: "🩹 취약점 리포트/로그" },
@@ -1166,6 +1199,9 @@
       return;
     }
     if (cm) cm.textContent = `${name} → ${uploadResultMsg(r)}`;
+    // 파일 처리 진행내역을 리포트로 남길지 제안한다(선택) — 감사·인수인계 증빙용.
+    // 설명은 화면에 늘어놓지 않고 ⓘ(screenguide '진행내역 리포트')가 담당한다.
+    offerIngestReport(name, r);
     await Promise.all([reloadDashExplorer(), loadTodayPriority()]);
   }
   smartInput.addEventListener("change", async () => {

@@ -579,30 +579,33 @@ export interface ReportHistoryEntry {
   summary?: string;
   docx?: string;
   pdf?: string;
+  md?: string; // 진행내역 리포트(파일 인입 기록)는 마크다운으로 저장된다 — ingestreport.ts
   createdBy?: string; // 작업 귀속 — 누가 생성했는지
 }
 
 export async function listReportHistory(limit = 100): Promise<ReportHistoryEntry[]> {
   await fs.mkdir(REPORT_DIR, { recursive: true });
   const files = await fs.readdir(REPORT_DIR);
-  const byBase = new Map<string, { docx?: string; pdf?: string; meta?: string }>();
+  const byBase = new Map<string, { docx?: string; pdf?: string; md?: string; meta?: string }>();
   for (const f of files) {
-    const m = /^(.+)\.(docx|pdf|json)$/i.exec(f);
+    // md = 파일 인입 진행내역 리포트(ingestreport.ts). 같은 이력 목록에 함께 나열한다.
+    const m = /^(.+)\.(docx|pdf|md|json)$/i.exec(f);
     if (!m) continue;
     const base = m[1];
     const e = byBase.get(base) ?? {};
     if (/docx/i.test(m[2])) e.docx = f;
     else if (/pdf/i.test(m[2])) e.pdf = f;
+    else if (/md/i.test(m[2])) e.md = f;
     else e.meta = f;
     byBase.set(base, e);
   }
   // 1) 파일명(`type-timestamp`)으로 값싸게 정렬용 시각을 뽑아 최신순 정렬 후 상한만 남긴다.
   //    (리포트가 수백~수천 개 쌓여도 사이드카 JSON을 그 상한만큼만 읽어 비용을 억제한다.)
   const bases = [...byBase.entries()]
-    .filter(([, e]) => e.docx || e.pdf) // 메타만 있고 문서 없는 건 제외
+    .filter(([, e]) => e.docx || e.pdf || e.md) // 메타만 있고 문서 없는 건 제외
     .map(([base, e]) => {
       // session-*: 작업 세션 종료 리포트(worksessions.ts) — 같은 이력에 함께 나열된다.
-      const fm = /^(?:weekly|quarterly|ondemand|session)-(\d+)$/.exec(base);
+      const fm = /^(?:weekly|quarterly|ondemand|session|ingest)-(\d+)$/.exec(base);
       return { base, e, ts: fm ? Number(fm[1]) : 0 };
     })
     .sort((a, b) => b.ts - a.ts)
@@ -610,7 +613,7 @@ export async function listReportHistory(limit = 100): Promise<ReportHistoryEntry
   // 2) 상한 안의 항목만 사이드카(대상 자산·독자·요약)로 보강한다.
   const out: ReportHistoryEntry[] = [];
   for (const { base, e, ts } of bases) {
-    const fm = /^(weekly|quarterly|ondemand|session)-\d+$/.exec(base);
+    const fm = /^(weekly|quarterly|ondemand|session|ingest)-\d+$/.exec(base);
     const entry: ReportHistoryEntry = {
       base,
       type: fm ? fm[1] : "ondemand",
@@ -619,6 +622,7 @@ export async function listReportHistory(limit = 100): Promise<ReportHistoryEntry
       assetNames: [],
       docx: e.docx,
       pdf: e.pdf,
+      md: e.md,
     };
     if (e.meta) {
       try {
@@ -636,7 +640,7 @@ export async function listReportHistory(limit = 100): Promise<ReportHistoryEntry
     }
     if (!entry.createdAt) {
       try {
-        entry.createdAt = Math.floor((await fs.stat(path.join(REPORT_DIR, (e.docx || e.pdf) as string))).mtimeMs);
+        entry.createdAt = Math.floor((await fs.stat(path.join(REPORT_DIR, (e.docx || e.pdf || e.md) as string))).mtimeMs);
       } catch {
         /* stat 실패 시 0 유지 */
       }

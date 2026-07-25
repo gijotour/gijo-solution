@@ -104,6 +104,9 @@ export interface Asset {
   origin: AssetOrigin;
   id: string;
   name: string;
+  // 담당자가 보기 쉽게 붙인 표시 이름(별칭). null이면 name을 그대로 쓴다.
+  // 원래 name·id·호스트는 보존해 재점검·이력 추적에 영향이 없다(2026-07-25 사용자 요청).
+  displayName: string | null;
   path: string;
   assetType: string;
   owner: string;
@@ -124,6 +127,7 @@ export interface Asset {
 interface AssetRow {
   id: string;
   name: string;
+  displayName: string | null;
   path: string;
   assetType: string;
   owner: string;
@@ -197,6 +201,17 @@ export function setAssetCategory(id: string, category: string | null): Asset | u
 
 // 이름·소유자·구성요소만 갱신한다(스캔 이력·findings·registeredAt는 보존). 재스캔 임포트가
 // registerAsset처럼 이력을 지우지 않고 호스트 메타만 최신화하는 용도(취약점 번다운/측정에 필요).
+// 표시 이름(별칭)만 바꾼다. 원래 name·id·호스트는 건드리지 않아 재점검 상태추적·이력이 그대로다.
+// null·빈 문자열을 주면 별칭을 지워 원래 이름으로 되돌린다.
+const setDisplayNameStmt = db.prepare("UPDATE assets SET displayName = ? WHERE id = ?");
+export function updateAssetDisplayName(id: string, displayName: string | null): Asset | undefined {
+  if (!getAssetRowStmt.get(id)) return undefined;
+  const trimmed = (displayName ?? "").trim();
+  setDisplayNameStmt.run(trimmed.length ? trimmed.slice(0, 120) : null, id);
+  touchAsset(id);
+  return getAsset(id);
+}
+
 export function updateAssetMeta(id: string, name: string, owner: string, components: AssetComponent[]): void {
   updateAssetMetaStmt.run(name, owner, JSON.stringify(components), id);
   touchAsset(id); // ④ 최종수정일 갱신
@@ -239,6 +254,7 @@ function fromRow(row: AssetRow): Asset {
     origin: assetOriginOf(row.id),
     id: row.id,
     name: row.name,
+    displayName: row.displayName ?? null,
     path: row.path,
     assetType: row.assetType,
     owner: row.owner,
@@ -535,6 +551,26 @@ export function registerAssetsRoutes(app: Express): void {
       updateAiBom(asset.id, { ...asset.aibom, model: { ...asset.aibom.model, weightsHash } });
       res.json({ assetId: asset.id, filePath, sizeBytes: stat.size, weightsHash });
     });
+  });
+  // 표시 이름(별칭) 변경 — 보기 쉬운 이름으로 관리한다. 원래 name·id는 보존(추적성).
+  // displayName을 비우거나 null로 주면 원래 이름으로 되돌린다. 변경은 감사 로그에 남는다.
+  app.post("/api/assets/:id/display-name", authMiddleware, (req, res) => {
+    const id = String(req.params.id);
+    const before = getAsset(id);
+    if (!before) return res.status(404).json({ error: "asset not found" });
+    const raw = req.body?.displayName;
+    const next = typeof raw === "string" ? raw : null;
+    const updated = updateAssetDisplayName(id, next);
+    const actor = (req as import("express").Request & { user?: { displayName?: string } }).user?.displayName ?? null;
+    recordAudit({
+      kind: "write",
+      actor,
+      action: updated?.displayName ? "자산 표시 이름 변경" : "자산 표시 이름 원복",
+      target: id,
+      detail: `${before.displayName ?? before.name} → ${updated?.displayName ?? updated?.name ?? "-"}`,
+      result: "ok",
+    });
+    res.json(updated);
   });
   app.delete("/api/assets/:id", authMiddleware, (req, res) => {
     const ok = deleteAsset(String(req.params.id));

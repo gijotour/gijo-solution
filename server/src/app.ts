@@ -20,6 +20,7 @@ import { registerDispatcherRoutes } from "./engine/dispatcher";
 import { registerMemoryRoutes } from "./engine/memory";
 import { registerHandoverRoutes } from "./engine/handover";
 import { registerDataCleanupRoutes } from "./engine/datacleanup";
+import { registerIngestReportRoutes } from "./engine/ingestreport";
 import { registerBridgeRoutes } from "./engine/bridge";
 import { registerCollaborationRoutes } from "./engine/collaboration";
 import { registerDatasetRoutes } from "./engine/dataset";
@@ -122,6 +123,7 @@ export function createApp(): Express {
   registerMemoryRoutes(app);
   registerHandoverRoutes(app);
   registerDataCleanupRoutes(app);
+  registerIngestReportRoutes(app);
   registerBridgeRoutes(app);
   registerCollaborationRoutes(app);
   registerDatasetRoutes(app);

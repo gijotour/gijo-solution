@@ -26,6 +26,8 @@ export interface VulnCounts { critical: number; high: number; medium: number; lo
 export interface AssetHubRow {
   id: string;
   name: string;
+  displayName: string | null; // 담당자가 붙인 표시 이름(별칭) — 있으면 화면은 이걸 보여준다
+  sourceFile: string | null; // 이 자산이 등록된 출처 파일(finding.source_tool). 직접 등록이면 null
   assetType: string;
   isAi: boolean;
   owner: string;
@@ -149,6 +151,65 @@ function hostOf(a: Asset): string | null {
   return filled(infra.hostingProvider) ? infra.hostingProvider.trim() : (a.service ? a.service : null);
 }
 
+// 이 자산이 어느 파일로 등록됐는지 — findings의 source_tool(업로드 파일명)에서 뽑는다.
+// 취약점 임포터(vulnscan/webreport)가 sourceLabel로 파일명을 넣으므로 별도 저장이 필요 없다.
+// 여러 파일이 섞이면(재점검 등) 가장 많이 등장한 것을 대표로 본다. findings가 없으면 null(직접 등록).
+export function sourceFileOf(a: Asset): string | null {
+  const tally = new Map<string, number>();
+  for (const f of a.findings) {
+    const src = (f.source_tool ?? "").trim();
+    if (src) tally.set(src, (tally.get(src) ?? 0) + 1);
+  }
+  if (tally.size === 0) return null;
+  return [...tally.entries()].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]))[0][0];
+}
+
+// 파일(출처) 단위 묶음 — "올린 파일 기준으로 자산을 정리해서 본다"(2026-07-25 사용자 요청).
+export interface HubSourceGroup {
+  sourceFile: string | null; // null = 직접 등록(파일 없음)
+  label: string; // 화면 표시용 이름
+  assetIds: string[];
+  assetCount: number;
+  vuln: VulnCounts; // 이 파일이 가져온 취약점 합계
+  lastScannedAt: number | null; // 이 묶음의 최근 점검 시각
+}
+
+export function buildSourceGroups(rows: AssetHubRow[], assets: Asset[]): HubSourceGroup[] {
+  const byId = new Map(assets.map((a) => [a.id, a]));
+  const groups = new Map<string, HubSourceGroup>();
+  for (const r of rows) {
+    const key = r.sourceFile ?? "";
+    const cur =
+      groups.get(key) ??
+      ({
+        sourceFile: r.sourceFile,
+        label: r.sourceFile ?? "직접 등록 (파일 없음)",
+        assetIds: [],
+        assetCount: 0,
+        vuln: { open: 0, critical: 0, high: 0, medium: 0, low: 0, kev: 0 },
+        lastScannedAt: null,
+      });
+    cur.assetIds.push(r.id);
+    cur.assetCount++;
+    cur.vuln = {
+      open: cur.vuln.open + r.vuln.open,
+      critical: cur.vuln.critical + r.vuln.critical,
+      high: cur.vuln.high + r.vuln.high,
+      medium: cur.vuln.medium + r.vuln.medium,
+      low: cur.vuln.low + r.vuln.low,
+      kev: cur.vuln.kev + r.vuln.kev,
+    };
+    const scanned = byId.get(r.id)?.lastScannedAt ?? null;
+    if (scanned && (!cur.lastScannedAt || scanned > cur.lastScannedAt)) cur.lastScannedAt = scanned;
+    groups.set(key, cur);
+  }
+  // 파일로 등록된 묶음을 먼저(취약점 많은 순), 직접 등록은 마지막.
+  return [...groups.values()].sort((x, y) => {
+    if (!x.sourceFile !== !y.sourceFile) return x.sourceFile ? -1 : 1;
+    return y.vuln.open - x.vuln.open || x.label.localeCompare(y.label);
+  });
+}
+
 export function buildHubRow(a: Asset): AssetHubRow {
   const ai = isAiAsset(a);
   const v = vulnCounts(a.findings);
@@ -160,6 +221,8 @@ export function buildHubRow(a: Asset): AssetHubRow {
   return {
     id: a.id,
     name: a.name,
+    displayName: a.displayName ?? null,
+    sourceFile: sourceFileOf(a),
     assetType: a.assetType,
     isAi: ai,
     owner: a.owner,
@@ -187,7 +250,7 @@ export interface HubSummary {
   sbomMissing: number;
 }
 
-export function buildHub(): { summary: HubSummary; rows: AssetHubRow[] } {
+export function buildHub(): { summary: HubSummary; rows: AssetHubRow[]; sourceGroups: HubSourceGroup[] } {
   const assets = listAssets();
   const rows = assets.map(buildHubRow);
   // AI 자산을 노출점수 내림차순으로 먼저, 그 다음 IT 자산.
@@ -232,7 +295,7 @@ export function buildHub(): { summary: HubSummary; rows: AssetHubRow[] } {
     vuln,
     sbomMissing: aiRows.filter((r) => !r.sbomGenerated).length,
   };
-  return { summary, rows };
+  return { summary, rows, sourceGroups: buildSourceGroups(rows, assets) };
 }
 
 // 자산 상세(허브 디테일 탭용) — 허브 row + OWASP 전체 상태 + 취약점 목록.

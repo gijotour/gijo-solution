@@ -1388,7 +1388,10 @@ export type OwaspStatus = "open" | "covered" | "na";
 export interface OwaspRiskState { code: string; title: string; status: OwaspStatus; evidence: string }
 export interface AssetHubVuln { critical: number; high: number; medium: number; low: number; kev: number; open: number }
 export interface AssetHubRow {
-  id: string; name: string; assetType: string; isAi: boolean; owner: string; service: string | null; host: string | null;
+  id: string; name: string;
+  displayName: string | null; // 담당자가 붙인 표시 이름(별칭) — 화면은 있으면 이걸 보여준다
+  sourceFile: string | null;  // 이 자산이 등록된 출처 파일. 직접 등록이면 null
+  assetType: string; isAi: boolean; owner: string; service: string | null; host: string | null;
   vuln: AssetHubVuln;
   bomAreas: { model: number; dataset: number; prompt: number; agentTool: number; infrastructure: number; total: number };
   sbomGenerated: boolean; robustnessScore: number | null; owaspOpen: number; owaspTopCodes: string[];
@@ -1401,7 +1404,16 @@ export interface AssetHubSummary {
   vuln: { open: number; critical: number; high: number; medium: number; kev: number };
   sbomMissing: number;
 }
-export interface AssetHubOverview { summary: AssetHubSummary; rows: AssetHubRow[] }
+// 파일(출처) 단위 묶음 — 올린 파일 기준으로 자산을 정리해 본다.
+export interface HubSourceGroup {
+  sourceFile: string | null;
+  label: string;
+  assetIds: string[];
+  assetCount: number;
+  vuln: AssetHubVuln;
+  lastScannedAt: number | null;
+}
+export interface AssetHubOverview { summary: AssetHubSummary; rows: AssetHubRow[]; sourceGroups: HubSourceGroup[] }
 export interface AssetHubDetail {
   row: AssetHubRow;
   owasp: OwaspRiskState[];
@@ -1434,6 +1446,19 @@ export const assetHubApi = {
   overview: () => request<AssetHubOverview>("/api/assethub"),
   detail: (id: string) => request<AssetHubDetail>(`/api/assethub/${encodeURIComponent(id)}`),
   shadowAi: () => request<ShadowAiReport>("/api/shadow-ai"),
+  // 표시 이름(별칭) 변경 — null/빈 문자열이면 원래 이름으로 되돌린다.
+  setDisplayName: (id: string, displayName: string | null) =>
+    request<Asset>(`/api/assets/${encodeURIComponent(id)}/display-name`, { method: "POST", body: { displayName } }),
+};
+
+// 파일 업로드 진행내역 리포트(선택 저장) — 감사·인수인계 증빙용.
+export interface IngestReportInput {
+  filename: string; routedTo: string; reason: string;
+  steps?: string[]; assetIds?: string[]; hosts?: number; findings?: number; chunks?: number;
+}
+export const ingestReportApi = {
+  save: (input: IngestReportInput) =>
+    request<{ base: string; path: string; savedAt: number }>("/api/upload/ingest-report", { method: "POST", body: input }),
 };
 
 export const assetsApi = {

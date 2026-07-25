@@ -10,7 +10,7 @@
 - **정직한 구현** — 가짜 UI 금지, 실제 end-to-end 검증 + 테스트. 테스트가 env를 덮어써서 제품 아닌 테스트를 검증하는 함정 주의. 폴백 문구가 나오면 FAIL로 취급.
 - **로컬 커밋 자유 · GitHub push는 사용자가 요청할 때만.** (2머신 git 허브 `hub` remote push는 동기화용이라 자유.)
 - 문서(가이드·PDF·Notion 등) 갱신은 요청받을 때만.
-- 화면 설명은 서버 screenguide panels + ⓘ(gijo-info) 컨벤션. 화면엔 정체성 한 줄만.
+- **화면 설명·기능 안내는 전부 챗봇(서버 screenguide panels + ⓘ gijo-info)으로.** 화면엔 정체성 한 줄과 ⚠경고만 둔다 — 사용법·주의사항·용어 풀이는 screenguide에 쓰고 ⓘ로 연다. **신규 작업은 무조건 이 방식, 기존 화면도 발견하는 대로 이관**(2026-07-25 사용자 지시 강화).
 
 ## 구조 요약
 - `client/` — Electron. 화면=src/renderer/pages/*.html (hub.html?g=X가 iframe 탭 컨테이너, nav.js 공용 사이드바). 빌드 `npm run dist`, 게시 `npm run publish-release`(서버 자체가 배포처).

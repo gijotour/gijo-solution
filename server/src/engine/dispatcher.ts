@@ -402,7 +402,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
 
   // 도움말/사용법 의도는 화면별 가이드로 결정적으로 답한다(LLM·도구 없이). "이 화면 뭐 할 수 있어?"
   // 같은 질문이 예전엔 일반 대화로 떨어져 화면과 무관한 답을 냈다 — screenguide로 그라운딩한다.
-  if (isHelpIntent(instructionText)) {
+  if (isHelpIntent(instructionText, screen)) {
     const task = createTask({ text: instructionText, agentId: "orchestrator", priority: "P3" });
     completeTask(task.id);
     return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatScreenGuide(screen, instructionText) };

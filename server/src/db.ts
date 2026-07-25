@@ -324,6 +324,14 @@ try {
   /* 컬럼이 이미 있으면 정상 — 무시 */
 }
 
+// 마이그레이션: assets.displayName — 담당자가 보기 쉽게 붙이는 표시 이름(별칭). 원래 name·id는
+// 그대로 보관해 재점검·이력 추적에 영향이 없다(2026-07-25 사용자 요청).
+try {
+  db.exec("ALTER TABLE assets ADD COLUMN displayName TEXT");
+} catch {
+  /* 이미 있으면 무시 */
+}
+
 db.exec(`
   -- "오늘 확인할 항목"에 팀장이 직접 추가한 일과(engine/tasks.ts) — 추천 가이드의 학습 신호.
   -- 추천 프롬프트에 인용되고, datasets/routine-feedback.json(파인튜닝 데이터셋)에도 함께 축적된다.

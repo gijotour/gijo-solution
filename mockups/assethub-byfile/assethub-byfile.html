@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>시안 — 자산 허브: 파일 기준 정리 + 이름 변경</title>
+<style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.16);
+--blue:#3b82f6;--blue-light:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--teal:#1eb980;--amber:#f0a020;--purple:#8b7cf0;--red:#e2483d;}
+*{box-sizing:border-box;margin:0;padding:0;font-family:"Pretendard","Malgun Gothic",sans-serif;}
+body{background:var(--bg);color:var(--text);padding:20px;}
+.note{max-width:1180px;margin:0 auto 14px;font-size:12px;color:var(--muted);line-height:1.75;} .note b{color:#cfe0ff;}
+.wrap{max-width:1180px;margin:0 auto;}
+.page-title{font-size:18px;font-weight:900;color:#fff;margin-bottom:3px;}
+.page-sub{font-size:11.5px;color:var(--muted);margin-bottom:14px;}
+/* 상단 전환 세그먼트 */
+.topbar{display:flex;align-items:center;gap:10px;margin-bottom:12px;}
+.seg{display:flex;background:#0a1120;border:1px solid var(--border-strong);border-radius:9px;padding:3px;gap:3px;}
+.seg span{padding:6px 14px;border-radius:7px;font-size:11.5px;font-weight:800;color:var(--muted);cursor:pointer;border:1px solid transparent;}
+.seg span.on{background:rgba(59,130,246,.22);color:#fff;border-color:rgba(59,130,246,.5);}
+.topbar .sp{flex:1;}
+.srch{background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:6px 11px;font-size:11.5px;color:var(--muted);min-width:200px;}
+/* 본문 2컬럼 */
+.body{display:grid;grid-template-columns:400px 1fr;gap:12px;}
+.master{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:10px;max-height:640px;overflow-y:auto;}
+.detail{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
+/* 파일 그룹 */
+.fgrp{margin-bottom:8px;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--panel-2);}
+.fhd{display:flex;align-items:center;gap:8px;padding:10px 11px;cursor:pointer;}
+.fhd.on{background:rgba(59,130,246,.13);box-shadow:inset 3px 0 0 var(--blue);}
+.fhd .ic{font-size:15px;flex:0 0 auto;}
+.fhd .nm{flex:1;min-width:0;font-size:12px;font-weight:800;color:#dfe6ff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.fhd .cnt{font-size:9.5px;font-weight:800;color:var(--blue-light);background:rgba(59,130,246,.16);border-radius:20px;padding:1px 7px;flex:0 0 auto;}
+.fmeta{padding:0 11px 8px 34px;font-size:10px;color:var(--muted-2);}
+.fchild{border-top:1px solid var(--border);}
+.arow{display:flex;align-items:center;gap:8px;padding:8px 11px 8px 30px;cursor:pointer;border-bottom:1px solid rgba(255,255,255,.04);}
+.arow:last-child{border-bottom:none;}
+.arow.on{background:rgba(59,130,246,.1);}
+.arow .an{flex:1;min-width:0;font-size:11.5px;font-weight:700;color:#cfd6ea;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.arow .sub{font-size:9.5px;color:var(--muted-2);}
+.sevdots{display:flex;gap:3px;flex:0 0 auto;}
+.sd{font-size:9px;font-weight:800;padding:1px 5px;border-radius:4px;}
+.sd.c{background:rgba(226,72,61,.18);color:#f5928a;} .sd.h{background:rgba(240,160,32,.18);color:#f7c777;}
+.sd.m{background:rgba(59,130,246,.18);color:#8fb8ff;} .sd.l{background:rgba(30,185,128,.16);color:#6fdcb5;}
+/* 상세 */
+.dh{display:flex;align-items:flex-start;gap:10px;margin-bottom:12px;padding-bottom:12px;border-bottom:1px solid var(--border);}
+.dh .t{flex:1;}
+.dh .t .big{font-size:15.5px;font-weight:900;color:#fff;display:flex;align-items:center;gap:7px;}
+.dh .t .sub{font-size:11px;color:var(--muted-2);margin-top:3px;}
+.btn{font-size:11px;font-weight:700;padding:6px 11px;border-radius:7px;cursor:pointer;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--text);}
+.btn.primary{background:rgba(59,130,246,.16);border-color:rgba(59,130,246,.5);color:#cfe0ff;}
+.btn:hover{filter:brightness(1.15);}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:14px;}
+.kpi{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;}
+.kpi .k{font-size:9.5px;color:var(--muted-2);font-weight:800;margin-bottom:3px;}
+.kpi .v{font-size:17px;font-weight:900;color:#fff;} .kpi .v.t{color:#6fdcb5;} .kpi .v.a{color:var(--amber);}
+.sect{font-size:12px;font-weight:800;color:#cfe0ff;margin:14px 0 8px;}
+table{width:100%;border-collapse:collapse;font-size:11.5px;}
+th{color:var(--muted-2);font-weight:800;text-align:left;padding:6px 8px;border-bottom:1px solid var(--border-strong);font-size:9.5px;}
+td{padding:8px;border-bottom:1px solid var(--border);color:var(--muted);vertical-align:top;line-height:1.5;}
+td.nm{color:#dfe6ff;font-weight:700;}
+.sev{font-size:9.5px;font-weight:800;padding:1px 7px;border-radius:5px;}
+.sev.m{background:rgba(59,130,246,.18);color:#8fb8ff;} .sev.l{background:rgba(30,185,128,.16);color:#6fdcb5;}
+/* 이름 변경 인라인 편집 */
+.rename{background:rgba(139,124,240,.07);border:1px solid rgba(139,124,240,.35);border-radius:9px;padding:11px 13px;margin-bottom:12px;}
+.rename .rt{font-size:11.5px;font-weight:800;color:#b3a6ff;margin-bottom:7px;}
+.rename .row{display:flex;gap:7px;align-items:center;}
+.rename input{flex:1;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;padding:7px 10px;color:var(--text);font-size:12px;outline:none;}
+.rename .hint{font-size:10px;color:var(--muted-2);margin-top:6px;line-height:1.55;}
+.pill{display:inline-block;font-size:9.5px;font-weight:800;padding:1px 7px;border-radius:5px;background:rgba(139,124,240,.16);border:1px solid rgba(139,124,240,.4);color:#b3a6ff;}
+.orig{font-family:monospace;font-size:10px;color:var(--muted-2);}
+/* ④ 업로드 진행내역 카드 */
+.ingest{background:linear-gradient(180deg,rgba(30,185,128,.08),rgba(59,130,246,.05));border:1px solid rgba(30,185,128,.4);border-radius:12px;padding:13px 15px;margin-bottom:13px;}
+.ih{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px;}
+.ih .ic{font-size:16px;flex:0 0 auto;}
+.ih .it{flex:1;min-width:0;}
+.ih .t1{font-size:12.5px;font-weight:800;color:#fff;margin-bottom:2px;}
+.ih .t2{font-size:11px;color:#cfe0ff;} .ih .t2 b{color:#6fdcb5;}
+.isteps{display:grid;grid-template-columns:1fr 1fr;gap:4px 14px;padding:9px 11px;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;}
+.st{display:flex;align-items:center;gap:7px;font-size:10.5px;color:var(--muted);}
+.st .dot{width:6px;height:6px;border-radius:50%;flex:0 0 auto;}
+.st .dot.ok{background:var(--teal);}
+.ihint{font-size:10px;color:var(--muted-2);margin-top:8px;line-height:1.6;} .ihint b{color:#cfd6ea;}
+</style>
+</head>
+<body>
+<div class="note">
+<b>시안 — 자산 허브: 파일 기준 정리 + 이름 변경 관리</b> (assethub.html 확장)<br>
+근거: 출처 파일명이 이미 데이터에 있음(<b>finding.source_tool</b> = 업로드 파일명 — 실측 확인). 자산 목록을 <b>[자산별 | 파일별]</b>로 전환하고, 파일별 모드에서 <b>파일 → 그 파일로 등록된 자산 → 취약점</b> 계층으로 본다. 별칭(표시 이름)은 자산에 <b>displayName</b>을 더해 목록·상세·리포트에 반영하고 원래 ID는 병기해 추적성을 지킨다.<br>
+아래 데이터는 <b>오늘 운영 서버 실제 값</b>입니다(안전대부 보고서 2자산 5취약점 · 샘플 웹서버).
+</div>
+
+<div class="wrap">
+  <div class="page-title">🛡 자산 허브</div>
+  <div class="page-sub">올린 파일(점검 보고서·스캔 결과) 기준으로 자산을 묶어 봅니다. 이름은 보기 쉽게 바꿔 관리할 수 있습니다.</div>
+
+  <div class="topbar">
+    <div class="seg"><span>🗂 자산별</span><span class="on">📄 파일별</span></div>
+    <div class="sp"></div>
+    <input class="srch" placeholder="자산·파일 검색…">
+    <button class="btn">＋ 파일 올리기</button>
+  </div>
+
+  <!-- ④ 업로드 직후 나타나는 진행내역 카드 — "리포트로 저장할까요?" -->
+  <div class="ingest">
+    <div class="ih">
+      <span class="ic">✅</span>
+      <div class="it">
+        <div class="t1">파일 처리 완료 — (주)안전대부 서비스 웹취약점 점검 결과 보고서_v1.0.pdf</div>
+        <div class="t2">웹취약점 보고서로 인식 · 자산 <b>2개</b> 등록 · 취약점 <b>5건</b> 반영 · 원문 <b>31조각</b> 지식베이스 수집</div>
+      </div>
+      <button class="btn primary">📄 진행내역 리포트로 저장</button>
+      <button class="btn">닫기</button>
+    </div>
+    <div class="isteps">
+      <div class="st"><span class="dot ok"></span>파일 유형 판별 — 국내 웹취약점 점검 보고서</div>
+      <div class="st"><span class="dot ok"></span>점검 대상 표에서 자산 2개 인식 (cert / certify.aj-safe.co.kr · IP 211.241.238.1)</div>
+      <div class="st"><span class="dot ok"></span>진단항목 사전 34종 인식 → 위험도 매핑(상/중/하)</div>
+      <div class="st"><span class="dot ok"></span>상세 절에서 취약점 5건 추출 · 조치 가이드 장 제외</div>
+      <div class="st"><span class="dot ok"></span>문서 자체 합계(5건)와 일치 — 누락 없음</div>
+      <div class="st"><span class="dot ok"></span>원문 31조각 임베딩 — 챗봇이 근거로 인용</div>
+    </div>
+    <div class="ihint">리포트로 저장하면 <b>리포트 이력</b>에 남아 "이 파일이 언제·무엇을 등록했는지"를 나중에 증빙할 수 있습니다(감사 대응·인수인계용). 저장하지 않아도 자산·취약점 등록은 그대로 유지됩니다.</div>
+  </div>
+
+  <div class="body">
+    <!-- 왼쪽: 파일 기준 트리 -->
+    <div class="master">
+      <div class="fgrp">
+        <div class="fhd on"><span class="ic">📄</span><span class="nm">(주)안전대부 서비스 웹취약점 점검 결과 보고서_v1.0.pdf</span><span class="cnt">자산 2</span></div>
+        <div class="fmeta">웹취약점 보고서 · 2026-07-25 인입 · 올린이 ext-tester1 · 취약점 5건</div>
+        <div class="fchild">
+          <div class="arow on"><span class="an">안전대부 본인인증 <span class="pill">별칭</span></span><span class="sevdots"><span class="sd m">중1</span><span class="sd l">하2</span></span></div>
+          <div class="arow"><span class="an">SafeKey 발급 웹 서버</span><span class="sevdots"><span class="sd l">하2</span></span></div>
+        </div>
+      </div>
+
+      <div class="fgrp">
+        <div class="fhd"><span class="ic">📄</span><span class="nm">샘플 (온보딩 예시 데이터)</span><span class="cnt">자산 1</span></div>
+        <div class="fmeta">제품 내장 예시 · 실제 스캔을 올리면 사라집니다 · 취약점 4건</div>
+        <div class="fchild">
+          <div class="arow"><span class="an">샘플-웹서버 (10.0.0.100)</span><span class="sevdots"><span class="sd c">치명1</span><span class="sd h">상1</span><span class="sd m">중1</span></span></div>
+        </div>
+      </div>
+
+      <div class="fgrp">
+        <div class="fhd"><span class="ic">🤖</span><span class="nm">직접 등록 (파일 없음)</span><span class="cnt">자산 3</span></div>
+        <div class="fmeta">화면·챗봇으로 등록한 AI 자산 — AI-BOM 관리 대상</div>
+        <div class="fchild">
+          <div class="arow"><span class="an">사내 보안 어시스턴트</span><span class="sub">LLM 서비스</span></div>
+          <div class="arow"><span class="an">이상거래 탐지 AI(FDS)</span><span class="sub">이상탐지 모델</span></div>
+          <div class="arow"><span class="an">고객상담 RAG 챗봇</span><span class="sub">LLM 서비스</span></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 오른쪽: 선택한 자산 상세(+이름 변경) -->
+    <div class="detail">
+      <div class="dh">
+        <div class="t">
+          <div class="big">안전대부 본인인증 <span class="pill">별칭</span></div>
+          <div class="sub">원래 이름: <span class="orig">안전대부 본인인증 웹 서버 (certify.aj-safe.co.kr)</span> · ID <span class="orig">vuln:certify.aj-safe.co.kr</span> · IP 211.241.238.1</div>
+        </div>
+        <button class="btn primary">✎ 이름 변경</button>
+      </div>
+
+      <!-- 이름 변경 (버튼 누르면 펼침) -->
+      <div class="rename">
+        <div class="rt">✎ 표시 이름 변경</div>
+        <div class="row">
+          <input value="안전대부 본인인증">
+          <button class="btn primary">저장</button>
+          <button class="btn">원래대로</button>
+        </div>
+        <div class="hint">이 이름이 자산 목록·취약점 화면·리포트·챗봇 답변에 쓰입니다. 원래 이름과 ID·호스트는 그대로 보관돼 재점검·이력 추적에 영향이 없습니다. 변경은 작업 기록(감사 로그)에 남습니다.</div>
+      </div>
+
+      <div class="kpis">
+        <div class="kpi"><div class="k">출처 파일</div><div class="v" style="font-size:11.5px;line-height:1.45">안전대부 웹취약점<br>보고서 v1.0</div></div>
+        <div class="kpi"><div class="k">취약점</div><div class="v a">3</div></div>
+        <div class="kpi"><div class="k">최고 심각도</div><div class="v a" style="font-size:14px">medium</div></div>
+        <div class="kpi"><div class="k">점검일</div><div class="v" style="font-size:12.5px">2025-06-13</div></div>
+      </div>
+
+      <div class="sect">🩹 이 자산의 취약점 (출처: 안전대부 보고서)</div>
+      <table>
+        <thead><tr><th style="width:170px">취약점</th><th style="width:60px">심각도</th><th>증적</th><th style="width:80px">상태</th></tr></thead>
+        <tbody>
+          <tr><td class="nm">[IW-32] 데이터 평문 전송</td><td><span class="sev m">medium</span></td><td>http 로 접근 시 https 로 자동 리다이렉트 되지 않음</td><td>미조치</td></tr>
+          <tr><td class="nm">[IW-20] 디렉토리 인덱싱</td><td><span class="sev l">low</span></td><td>경로 탐색 기능이 설정되어 목록 조회 가능</td><td>미조치</td></tr>
+          <tr><td class="nm">[IW-27] 임시/백업 파일 노출</td><td><span class="sev l">low</span></td><td>웹 루트 하위에 test 페이지 존재</td><td>미조치</td></tr>
+        </tbody>
+      </table>
+
+      <div class="sect">📄 출처 파일 정보</div>
+      <table>
+        <tbody>
+          <tr><td class="nm" style="width:130px">파일</td><td>(주)안전대부 서비스 웹취약점 점검 결과 보고서_v1.0.pdf</td></tr>
+          <tr><td class="nm">이 파일의 자산</td><td>2개 — 안전대부 본인인증(3건) · SafeKey 발급 웹 서버(2건)</td></tr>
+          <tr><td class="nm">파싱 근거</td><td>진단항목 사전 34종 · 상세 절 5건 추출 · ✓ 문서 자체 합계(5건)와 일치</td></tr>
+          <tr><td class="nm">원문</td><td><span style="color:var(--blue-light);cursor:pointer">📂 원본 PDF 열기</span> · 챗봇이 이 문서를 근거로 답합니다</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</body>
+</html>

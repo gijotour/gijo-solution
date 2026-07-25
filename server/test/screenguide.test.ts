@@ -77,3 +77,33 @@ describe("패널 단위 상세 안내", () => {
     expect(out).toContain("구동 티어");
   });
 });
+
+// 패널 이름으로 물어도 화면 가이드가 답하는지 — "기능 설명은 챗봇이 담당" 원칙(2026-07-25 사용자 지시).
+// 실측 배경: "표시 이름은 어떻게 바꿔?"가 HELP_RE에 안 걸려 RAG로 새고 엉뚱한 벤더 매뉴얼로 답했다.
+describe("패널 이름 기반 도움말 의도", () => {
+  it("패널명 + 설명 요구 말투면 도움말로 인정한다(현재 화면 기준)", () => {
+    expect(isHelpIntent("표시 이름은 어떻게 바꿔?", "assethub.html")).toBe(true);
+    expect(isHelpIntent("진행내역 리포트가 뭐야?", "assethub.html")).toBe(true);
+    expect(isHelpIntent("파일별 보기 사용법 알려줘", "assethub.html")).toBe(true);
+  });
+
+  it("해당 화면에 없는 패널명이면 인정하지 않는다", () => {
+    expect(isHelpIntent("표시 이름은 어떻게 바꿔?", "kpi.html")).toBe(false);
+  });
+
+  it("패널명이 있어도 설명 요구가 아니면 도구가 처리하게 남긴다", () => {
+    expect(isHelpIntent("표시 이름 목록 CSV로 내려줘", "assethub.html")).toBe(false);
+  });
+
+  it("화면을 모르면 기존 HELP_RE만 적용된다", () => {
+    expect(isHelpIntent("사용법 알려줘")).toBe(true);
+    expect(isHelpIntent("표시 이름은 어떻게 바꿔?")).toBe(false);
+  });
+
+  it("패널 상세를 물으면 그 패널 설명만 답한다", () => {
+    const out = formatScreenGuide("assethub.html", "표시 이름은 어떻게 바꿔?");
+    expect(out).toContain("표시 이름");
+    expect(out).toContain("원래대로");
+    expect(out).not.toContain("파일별 보기 —"); // 다른 패널 설명이 섞이지 않는다
+  });
+});
