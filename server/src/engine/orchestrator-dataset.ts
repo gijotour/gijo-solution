@@ -134,6 +134,50 @@ export function collectDecisionPairs(): DecisionPair[] {
   return [...seedOnly, ...gold];
 }
 
+// ── 골드 few-shot 동적 주입 (파인튜닝 대체) ────────────────────────────────
+// Phase 4 파인튜닝은 held-out 실측 하락(8/8→7/8)으로 폐기됐지만 이 데이터(시드+승인 골드)는 살아
+// 있다 — 결정 프롬프트에 지시와 유사한 예시 2~3건을 주입해 도구 선택을 돕는다. 외부 실측 근거:
+// 유사 예시 3건 동적 주입으로 도구선택 정확도가 크게 오르며 정적 예시보다 낫다(LangChain 벤치).
+// 유사도는 한글 bigram Dice — 임베딩 호출 없이 결정적·<1ms라 디스패치 지연이 없고 오프라인 완동.
+function bigrams(s: string): Set<string> {
+  const t = s.toLowerCase().replace(/\s+/g, "");
+  const out = new Set<string>();
+  for (let i = 0; i < t.length - 1; i++) out.add(t.slice(i, i + 2));
+  return out;
+}
+function diceSim(a: Set<string>, b: Set<string>): number {
+  if (a.size === 0 || b.size === 0) return 0;
+  let inter = 0;
+  for (const g of a) if (b.has(g)) inter++;
+  return (2 * inter) / (a.size + b.size);
+}
+
+// 지시와 유사한 결정 쌍 상위 k건. allowedTools가 오면 현재 카탈로그에 없는 도구 예시는 제외한다
+// (좁힌 카탈로그 밖 도구를 예시로 보여주면 모델이 없는 도구를 부를 수 있다). final 예시는 항상 허용.
+const FEWSHOT_MIN_SIM = 0.2; // 이하면 무관 — 안 붙인다(무관 예시는 오히려 오염)
+export function findSimilarDecisions(instruction: string, k = 3, allowedTools?: Set<string>): DecisionPair[] {
+  const q = bigrams(instruction);
+  return collectDecisionPairs()
+    .filter((p) => p.decision.action === "final" || !allowedTools || allowedTools.has(p.decision.tool ?? ""))
+    .map((p) => ({ p, s: diceSim(q, bigrams(p.instruction)) }))
+    .filter((x) => x.s >= FEWSHOT_MIN_SIM)
+    .sort((x, y) => y.s - x.s)
+    .slice(0, k)
+    .map((x) => x.p);
+}
+
+// 결정 프롬프트에 붙일 예시 블록(없으면 빈 문자열). 7B는 프롬프트가 길어지면 페르소나로 흘러
+// 도구를 안 부른 실측(2026-07-17)이 있어 최대 3건·한 줄씩만 붙인다.
+export function fewshotBlockFor(instruction: string, allowedTools?: Set<string>): string {
+  const hits = findSimilarDecisions(instruction, 3, allowedTools);
+  if (hits.length === 0) return "";
+  return [
+    "",
+    "승인·검증된 예시 — 비슷한 지시는 같은 방식으로 결정하라:",
+    ...hits.map((h) => `지시 "${h.instruction}" → ${JSON.stringify(h.decision)}`),
+  ].join("\n");
+}
+
 // ── 증폭(지시문만 패러프레이즈) ────────────────────────────────────────────
 // 소량 시드(31건)로 학습하면 과적합한다(실측: loss 0.009). 다양한 표현을 늘려 완화한다.
 // 핵심: 지시문의 *표현*만 바꾸고 도구·인자(assetId·finding·status 의도)는 고정한다. dataset.ts의

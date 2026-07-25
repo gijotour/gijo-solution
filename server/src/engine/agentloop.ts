@@ -93,7 +93,7 @@ function parseDecision(raw: string): Decision | null {
   }
 }
 
-function decisionPrompt(instruction: string, calls: AgentToolCall[], context = "", scope?: ToolScope): string {
+function decisionPrompt(instruction: string, calls: AgentToolCall[], context = "", scope?: ToolScope, fewshot = ""): string {
   const ctx = context ? ["", context, '위는 같은 세션의 이전 대화다. 지시가 "이어서/그거/방금"처럼 앞을 가리키면 이 맥락을 근거로 해석하라.'] : [];
   const history = calls.length
     ? [
@@ -114,6 +114,7 @@ function decisionPrompt(instruction: string, calls: AgentToolCall[], context = "
     '- 반드시 JSON 객체 하나만 출력한다: {"action":"tool","tool":"도구이름","args":{...}} 또는 {"action":"final","answer":"직접 답변"}',
     "- 지시와 맞는 도구가 없으면 action=final로 답한다. 도구 이름을 지어내지 않는다.",
     "- args 값은 모두 문자열로 쓴다.",
+    ...(fewshot ? [fewshot] : []),
     ...ctx,
     ...history,
     ...anaphoraHint(instruction),
@@ -299,11 +300,20 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
     }
   }
 
+  // 골드 few-shot(파인튜닝 대체) — 시드+승인 골드에서 유사 예시 2~3건을 첫 결정에만 주입한다.
+  // (2번째 스텝부터는 도구 결과 history가 이미 근거라 안 붙인다 — 프롬프트 길이 절약.)
+  // 좁힌 카탈로그에 없는 도구 예시는 제외(없는 도구 호출 유도 방지). 동적 import는 순환 회피
+  // (orchestrator-dataset이 buildDecisionPrompt를 import한다).
+  const allowedTools = new Set(listToolsFor(scope?.domains, scope?.role).map((t) => t.name));
+  const fewshot = await import("./orchestrator-dataset.js")
+    .then((m) => m.fewshotBlockFor(instruction, allowedTools))
+    .catch(() => "");
+
   const calls: AgentToolCall[] = [];
   for (let step = 0; step < MAX_STEPS; step++) {
     const raw = await chat({
       agentId: "orchestrator",
-      message: decisionPrompt(instruction, calls, context, scope),
+      message: decisionPrompt(instruction, calls, context, scope, calls.length === 0 ? fewshot : ""),
       responseSchema: DECISION_SCHEMA,
       maxTokens: 300,
     }).catch(() => "");
