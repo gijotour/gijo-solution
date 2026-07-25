@@ -371,7 +371,7 @@ tr:last-child td{border-bottom:none;}
     const note = document.getElementById("viewNote");
     document.getElementById("viewTitle").textContent =
       `${TYPE_LABEL[entry.type] || entry.type} · ${entry.createdAt ? new Date(entry.createdAt).toLocaleString("ko-KR") : ""}`;
-    document.getElementById("viewDownloadBtn").onclick = () => downloadReport(entry.pdf || entry.docx);
+    document.getElementById("viewDownloadBtn").onclick = () => downloadReport(entry.pdf || entry.docx || entry.md);
     body.innerHTML = '<div style="color:#555;padding:22px">불러오는 중…</div>';
     note.textContent = "";
     viewModal.classList.add("open");
@@ -385,6 +385,18 @@ tr:last-child td{border-bottom:none;}
         note.textContent = "저장된 PDF를 그대로 표시합니다.";
       } catch (e) {
         body.innerHTML = '<div style="color:#b00020;padding:22px">PDF를 불러오지 못했습니다: ' + esc(e.message) + "</div>";
+      }
+    } else if (entry.md) {
+      // 마크다운 리포트(AI 작성 자료·파일 처리 내역)는 본문을 그대로 보여준다.
+      // [2026-07-26 사용자 지적] 요약만 띄우는 바람에 "보고서 만들어줘" 한 줄만 나오고
+      // 정작 AI가 작성한 내용이 안 보였다 — 본문이 있는데 안 읽던 것.
+      try {
+        const f = await window.gijo.downloadReportFile(entry.md);
+        const text = new TextDecoder("utf-8").decode(Uint8Array.from(atob(f.base64), (c) => c.charCodeAt(0)));
+        body.innerHTML = `<div style="padding:24px;color:#222;font-size:13px;line-height:1.9;white-space:pre-wrap;">${esc(text)}</div>`;
+        note.textContent = "저장된 본문(마크다운)을 그대로 표시합니다.";
+      } catch (e) {
+        body.innerHTML = '<div style="color:#b00020;padding:22px">본문을 불러오지 못했습니다: ' + esc(e.message) + "</div>";
       }
     } else {
       body.innerHTML = `<div style="padding:24px;color:#222;font-size:13px;line-height:1.9;white-space:pre-wrap;">${esc(entry.summary || "저장된 요약이 없습니다. DOCX를 내려받아 확인하세요.")}</div>`;

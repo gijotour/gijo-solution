@@ -34,7 +34,7 @@
   .theme-seg button.on { background: rgba(59,130,246,.2); color: #fff; }
 
   /* A안: 방(캔버스)을 아래까지 꽉 채운다(피드 삭제). 오른쪽 할일은 슬림하게. */
-  .body { display: grid; grid-template-columns: 236px 1fr; grid-template-rows: minmax(0,1fr) 170px; gap: 14px; padding: 0 18px 14px; flex: 1 1 auto; min-height: 0; }
+  .body { display: grid; grid-template-columns: 236px 1fr; grid-template-rows: minmax(0,1fr) 170px; gap: 10px; padding: 0 10px 10px; flex: 1 1 auto; min-height: 0; }
   /* v5(2026-07-26): 할일=왼쪽, 오피스=중앙, LIVE 채팅=오른쪽(세션 팝업에서 이관) */
   .todo { order: 0; grid-column: 1; grid-row: 1; }
   .office-col { order: 1; grid-column: 2; grid-row: 1; } /* 위 화면 꽉 차게 */
@@ -46,7 +46,10 @@
   .ol-who { font-size: 10px; font-weight: 800; color: var(--blue-light, #7ab0ff); }
   .ol-msg { display: block; font-size: 11px; color: var(--muted); margin-top: 1px; line-height: 1.45; word-break: break-word; }
   .office-col { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-  canvas { width: 100%; height: 100%; margin: 0 auto; border-radius: 12px; border: 1px solid var(--border); background: #171f33; flex: 1 1 auto; min-height: 0; object-fit: contain; box-shadow: inset 0 0 40px rgba(0,0,0,.4); }
+  /* 사무실 그림은 창을 꽉 채운다(2026-07-26 사용자 지시: "여백없게").
+     contain은 비율이 안 맞는 만큼 위아래·좌우에 검은 띠를 남겼다 — cover로 채우고 넘치는 만큼만 자른다
+     (픽셀 그림은 늘리면 뭉개지므로 fill은 쓰지 않는다). */
+  canvas { width: 100%; height: 100%; margin: 0; border-radius: 0; border: 0; background: #171f33; flex: 1 1 auto; min-height: 0; object-fit: cover; }
 
   /* 오른쪽: 오늘의 할일 (실 작업 큐 — /api/tasks) */
   .todo { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; min-height: 0; }

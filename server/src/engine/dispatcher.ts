@@ -134,6 +134,28 @@ interface ActionResult {
   approval?: PendingApproval;
 }
 
+// 보고서 지시에 "무엇을·누구에게"가 빠졌는지. 이 중 하나라도 있으면 되묻지 않는다.
+const REPORT_DETAIL_RE = /취약점|자산|점검|하드닝|주간|월간|분기|경영진|임원|감사|내부|대외|제출|이번\s*주|지난\s*달|이번\s*달|kev|컴플라이언스|규정|인수인계/i;
+function needsReportDetail(text: string): boolean {
+  const t = text.trim();
+  // 아주 짧은 지시("보고서 만들어줘", "리포트 뽑아줘")만 되묻는다 — 길게 설명했으면 그대로 진행.
+  return t.length <= 30 && !REPORT_DETAIL_RE.test(t);
+}
+
+// 되물음 문구 — 담당자가 그대로 골라 말할 수 있게 실제 만들 수 있는 것만 제시한다.
+function reportClarification(): string {
+  return [
+    "어떤 보고서를 만들까요? 아래처럼 말씀해 주세요.",
+    "",
+    "  · \"미조치 취약점 보고서 만들어줘\"  — 남은 취약점과 우선순위",
+    "  · \"이번 주 점검 결과 보고서\"       — 하드닝·정기점검 결과",
+    "  · \"경영진 보고용으로 만들어줘\"     — 격식 있는 요약본(대외·감사 제출용)",
+    "  · \"○○ 자산 보고서 만들어줘\"       — 특정 자산만",
+    "",
+    "리포트 화면의 [＋ 리포트 생성]에서 종류·대상·형식(DOCX·PDF)을 직접 고를 수도 있습니다.",
+  ].join("\n");
+}
+
 async function executeRoutedAction(route: RoutedIntent, instructionText: string, contextText = "", screen?: string): Promise<ActionResult> {
   switch (route.action) {
     case "scan": {
@@ -146,8 +168,18 @@ async function executeRoutedAction(route: RoutedIntent, instructionText: string,
       const analysis = await analyzeFindings(findings);
       return { output: analysis.summary, findings };
     }
+    case "report": {
+      // [2026-07-26 사용자 지적] "보고서 만들어줘"에 벤더 매뉴얼을 인용한 엉뚱한 설명이 나왔다.
+      // report 액션이 그냥 chat으로 흘러 RAG가 "report"라는 낱말에 걸린 문서를 끌어온 것.
+      // 무엇을 담을 보고서인지 모르는 채 만들면 쓸모없는 문서가 나온다 — 먼저 되묻는다.
+      // 대상·종류가 이미 지시에 있으면 되묻지 않고 그대로 진행한다.
+      if (needsReportDetail(instructionText)) return { output: reportClarification() };
+      const message = contextText ? `${contextText}
+
+[현재 지시] ${instructionText}` : instructionText;
+      return { output: await chat({ agentId: route.agentId, message, remember: true, trusted: true, explain: true, screen }) };
+    }
     case "analyze":
-    case "report":
     case "chat":
     default: {
       // 모델 로드·선택은 chat() 내부(ensureAgentModel)에서 처리된다.

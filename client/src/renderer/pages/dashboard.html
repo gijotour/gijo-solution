@@ -2273,11 +2273,18 @@
     if (from === "세션" || to === "세션") return;
     // "작업 완료: <답변 전문>"은 바로 뒤에 최종 답변이 그대로 또 나온다 — 같은 글이 두 번 보였다
     // (2026-07-26 사용자 지적). 협업 피드는 활동 기록이지 답변 채널이 아니므로 콘솔에서는 건너뛴다.
-    if (/^(작업 |실행 |부연 |단계 \d+ )?완료[:：]/.test(String(evt.message || ""))) return;
+    const msg = String(evt.message || "");
+    if (/^(작업 |실행 |부연 |단계 \d+ )?완료[:：]/.test(msg)) return;
+    // "지시 처리: …"는 바로 위에 내가 보낸 지시가 그대로 보이므로 군더더기다. 게다가 화면을 열 때
+    // 지난 이력을 다시 채우면서 내가 방금 시키지도 않은 지시가 먼저 뜬 것처럼 보였다
+    // (2026-07-26 사용자 지적: "요청 안 했는데 나오는 거 맞지?").
+    if (/^지시 처리[:：]/.test(msg)) return;
+    // 같은 줄이 연달아 두 번 오면 한 번만 보여준다.
+    if (clRows.lastElementChild && clRows.lastElementChild.querySelector(".cm")?.textContent.trim() === msg.trim()) return;
     clAppend("event", {
       icon: AGENT_ICON[from] || "◆",
       name: `${agentLabel(from)} → ${agentLabel(to)}`,
-      message: String(evt.message || ""),
+      message: msg,
     });
   }
 

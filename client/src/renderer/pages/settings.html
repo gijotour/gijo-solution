@@ -315,6 +315,25 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div class="status-line" id="siemStatusLine"></div>
     </div>
 
+    <!-- 법령·판례 조회 — 인터넷이 필요해 기본 꺼짐. 키를 넣어야 켜진다(2026-07-26). -->
+    <div class="panel" id="lawPanel" style="display:none">
+      <div class="panel-title">⚖ 법령·판례 조회 (선택) <i class="gijo-info" data-topic="법령 조회"></i><span class="badge b-purple" style="margin-left:8px">admin 전용</span></div>
+      <div class="panel-sub">개인정보보호법·정보통신망법 같은 IT보안 법령과 고시·판례를 국가법령정보센터에서 찾아옵니다. <b>인터넷 연결이 필요합니다</b> — 폐쇄망이면 켜지 마세요.</div>
+      <div class="field-row">
+        <div class="field">
+          <label for="lawKeyInput">법제처 인증키(OC)</label>
+          <input id="lawKeyInput" placeholder="법제처에서 발급받은 인증값 — 비우고 저장하면 꺼집니다" autocomplete="off">
+        </div>
+      </div>
+      <div style="font-size:11.5px;color:var(--muted-2);line-height:1.7;margin:-4px 0 12px">
+        키가 없으면 <b style="color:var(--blue-light)">open.law.go.kr</b> → OPEN API 신청에서 무료로 받습니다(가입 후 신청, 인증값은 가입 이메일의 아이디 부분).
+        조회는 원문과 링크를 찾아주는 데까지이며 법률 자문이 아닙니다.
+      </div>
+      <button class="btn-primary" id="saveLawBtn">저장</button>
+      <button class="btn-ghost" id="testLawBtn">연결 확인</button>
+      <div class="status-line" id="lawStatusLine"></div>
+    </div>
+
     <div class="panel" id="cloudLlmPanel" style="display:none">
       <div class="panel-title">☁ 클라우드 LLM (선택) <span class="badge b-purple" style="margin-left:8px">admin 전용</span></div>
       <div class="panel-sub">온프레미스가 기본입니다 — 끄면 모든 답변이 로컬 LLM으로만 처리됩니다. <i class="gijo-info" data-topic="클라우드 LLM"></i></div>
@@ -400,6 +419,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         document.getElementById("cloudLlmPanel").style.display = "";
         document.getElementById("smtpInboundPanel").style.display = "";
         document.getElementById("siemPanel").style.display = "";
+        document.getElementById("lawPanel").style.display = "";
+        await loadLawConfig();
         await loadUserList();
         await loadCloudConfig();
       await loadCloudUsage();
@@ -770,6 +791,49 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     }
   }
 
+  // ── 법령·판례 조회(선택) ─────────────────────────────────────────────
+  // 키를 넣으면 켜지고 비우면 꺼진다. 원문 키는 서버가 암호화 보관하고 화면으로 돌려주지 않으므로
+  // 입력칸은 항상 비워두고 "설정됨/안 됨"만 알린다(CTI 피드와 같은 계약).
+  async function loadLawConfig() {
+    try {
+      const c = await window.gijo.lawConfig();
+      const line = document.getElementById("lawStatusLine");
+      line.textContent = c.enabled
+        ? "켜짐 — 인증키가 설정되어 있습니다" + (c.updatedAt ? " (" + new Date(c.updatedAt).toLocaleString("ko-KR") + ")" : "")
+        : "꺼짐 — 인증키를 넣으면 켜집니다";
+      line.style.color = c.enabled ? "var(--teal)" : "var(--muted)";
+    } catch (e) { /* 구버전 서버면 조용히 넘어간다 */ }
+  }
+  async function saveLawConfig() {
+    const line = document.getElementById("lawStatusLine");
+    const key = document.getElementById("lawKeyInput").value;
+    line.textContent = "저장 중…"; line.style.color = "var(--muted)";
+    try {
+      const c = await window.gijo.setLawKey(key);
+      document.getElementById("lawKeyInput").value = "";
+      line.textContent = c.enabled ? "저장했습니다 — 법령 조회가 켜졌습니다" : "인증키를 지웠습니다 — 법령 조회가 꺼졌습니다";
+      line.style.color = c.enabled ? "var(--teal)" : "var(--muted)";
+    } catch (e) {
+      line.textContent = "저장 실패: " + (e && e.message ? e.message : e);
+      line.style.color = "var(--red)";
+    }
+  }
+  // 연결 확인 — 실제로 한 건 찾아본다. "저장은 됐는데 정작 안 되는" 상태를 그냥 두지 않기 위함.
+  async function testLawConfig() {
+    const line = document.getElementById("lawStatusLine");
+    line.textContent = "확인 중… (개인정보 보호법으로 조회)"; line.style.color = "var(--muted)";
+    try {
+      const r = await window.gijo.lawSearch("개인정보 보호법", "law", 1);
+      const hit = (r.hits || [])[0];
+      if (!hit) { line.textContent = "연결은 됐지만 결과가 없습니다 — 인증키를 확인하세요"; line.style.color = "var(--amber)"; return; }
+      line.textContent = "정상 — " + hit.title + " (" + hit.meta + ")";
+      line.style.color = "var(--teal)";
+    } catch (e) {
+      line.textContent = "확인 실패: " + (e && e.message ? e.message : e);
+      line.style.color = "var(--red)";
+    }
+  }
+
   async function loadCloudConfig() {
     try {
       cloudCfg = await window.gijo.getCloudConfig();
@@ -847,6 +911,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.getElementById("saveSmtpInBtn").addEventListener("click", saveSmtpInbound);
     document.getElementById("saveSiemBtn").addEventListener("click", saveSiem);
     document.getElementById("testSiemBtn").addEventListener("click", testSiem);
+    document.getElementById("saveLawBtn").addEventListener("click", saveLawConfig);
+    document.getElementById("testLawBtn").addEventListener("click", testLawConfig);
+
     document.getElementById("saveCloudBtn").addEventListener("click", saveCloud);
     document.getElementById("cloudProviderSelect").addEventListener("change", syncCloudProviderFields);
     document.getElementById("changeMyPasswordBtn").addEventListener("click", changeMyPassword);
