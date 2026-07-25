@@ -26,7 +26,8 @@
 !macro customWelcomePage
   !define MUI_WELCOMEPAGE_TITLE "GIJO AS 설치를 시작합니다"
   ; 본문은 짧게 — 왼쪽 그림이 핵심 3가지를 이미 말한다. 길면 페이지 높이를 넘어 잘린다(실측).
-  !define MUI_WELCOMEPAGE_TEXT "사내에서만 도는 AI 보안관제 플랫폼입니다.$\r$\n$\r$\n  ·  취약점 스캐너 · 보안로그 · 보안제품 리포트를 한곳에서 분석$\r$\n  ·  로컬 LLM 기반 — 사내 데이터가 외부로 나가지 않습니다$\r$\n  ·  AI-BOM · 레드팀 · 가드레일로 AI 자산까지 보호$\r$\n$\r$\n설치 후 사내 GIJO 서버 주소로 로그인하면 바로 쓸 수 있습니다.$\r$\n$\r$\n계속하려면 [다음]을 누르세요."
+  ; 줄이 길면 NSIS가 임의로 접어 글이 깨져 보인다(실측 2026-07-26) — 짧게 끊고 사이를 띄운다.
+  !define MUI_WELCOMEPAGE_TEXT "사내에서만 도는 AI 보안관제 플랫폼입니다.$\r$\n$\r$\n   ·  취약점 · 로그 · 리포트를 한곳에서 분석$\r$\n$\r$\n   ·  로컬 LLM — 자료가 외부로 나가지 않습니다$\r$\n$\r$\n   ·  AI-BOM · 레드팀으로 AI 자산까지 보호$\r$\n$\r$\n설치 후 사내 GIJO 서버 주소로 로그인하면$\r$\n바로 쓸 수 있습니다.$\r$\n$\r$\n계속하려면 [다음]을 누르세요."
   !insertmacro MUI_PAGE_WELCOME
 !macroend
 

@@ -34,6 +34,21 @@
   .theme-seg button.on { background: rgba(59,130,246,.2); color: #fff; }
 
   /* A안: 방(캔버스)을 아래까지 꽉 채운다(피드 삭제). 오른쪽 할일은 슬림하게. */
+  /* LIVE 로그 — 관제 로그답게 고정폭 글꼴, 한 줄 말줄임(2026-07-26). 전에는 글이 잘려 보였다. */
+  .ol-feed .ol-line{display:flex;gap:8px;white-space:nowrap;font-family:"Consolas","D2Coding",monospace;font-size:11px;line-height:1.85;}
+  .ol-line .ol-ts{color:#4a5570;flex:none;}
+  .ol-line .ol-tag{flex:none;font-weight:700;}
+  .ol-line .ol-tag.ok{color:#4fd39a}.ol-line .ol-tag.warn{color:var(--amber)}
+  .ol-line .ol-tag.info{color:var(--blue-light)}.ol-line .ol-tag.crit{color:#ff7a6e}
+  .ol-line .ol-msg{color:#9aa4bd;overflow:hidden;text-overflow:ellipsis;}
+  .socbar{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--border);
+    border-top:1px solid var(--border);border-bottom:1px solid var(--border);flex:0 0 auto;}
+  .socbar .st{background:var(--panel-2);padding:7px 12px;}
+  .socbar .l{font-size:10px;color:var(--muted-2);}
+  .socbar .v{font-size:16px;font-weight:800;margin-top:1px;font-variant-numeric:tabular-nums;}
+  .socbar .v small{font-size:10px;font-weight:600;color:var(--muted);margin-left:3px;}
+  .socbar .v.red{color:#ff7a6e}.socbar .v.amber{color:var(--amber)}
+  .socbar .v.teal{color:#4fd39a}.socbar .v.blue{color:var(--blue-light)}
   .body { display: grid; grid-template-columns: 236px 1fr; grid-template-rows: minmax(0,1fr) 170px; gap: 10px; padding: 0 10px 10px; flex: 1 1 auto; min-height: 0; }
   /* v5(2026-07-26): 할일=왼쪽, 오피스=중앙, LIVE 채팅=오른쪽(세션 팝업에서 이관) */
   .todo { order: 0; grid-column: 1; grid-row: 1; }
@@ -49,7 +64,7 @@
   /* 사무실 그림은 창을 꽉 채운다(2026-07-26 사용자 지시: "여백없게").
      contain은 비율이 안 맞는 만큼 위아래·좌우에 검은 띠를 남겼다 — cover로 채우고 넘치는 만큼만 자른다
      (픽셀 그림은 늘리면 뭉개지므로 fill은 쓰지 않는다). */
-  canvas { width: 100%; height: 100%; margin: 0; border-radius: 0; border: 0; background: #171f33; flex: 1 1 auto; min-height: 0; object-fit: cover; }
+  canvas { width: 100%; height: 100%; margin: 0; border-radius: 0; border: 0; background: #171f33; flex: 1 1 auto; min-height: 0; object-fit: contain; }
 
   /* 오른쪽: 오늘의 할일 (실 작업 큐 — /api/tasks) */
   .todo { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; min-height: 0; }
@@ -152,6 +167,15 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
     </div>
   </div>
 
+  <!-- 관제 상태 띠(2026-07-26 재설계) — 보안 화면은 "지금 위험한가"가 먼저 보여야 한다. -->
+  <div class="socbar" id="socBar">
+    <div class="st"><div class="l">미조치 취약점</div><div class="v red" id="socOpen">-</div></div>
+    <div class="st"><div class="l">실제 악용(KEV)</div><div class="v amber" id="socKev">-</div></div>
+    <div class="st"><div class="l">오늘 처리</div><div class="v teal" id="socDone">-</div></div>
+    <div class="st"><div class="l">AI 엔진</div><div class="v teal" id="socEngine">-</div></div>
+    <div class="st"><div class="l">근무 중</div><div class="v blue" id="socStaff">-</div></div>
+  </div>
+
   <div class="body">
     <div class="office-col">
       <!-- A안: 팀 대화 피드 삭제 — 대화는 캐릭터 말풍선 + 대시보드 실시간 세션에서 확인. 방을 아래까지 꽉. -->
@@ -201,7 +225,9 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
   const office = (function () {
     const canvas = document.getElementById("office");
     const ctx = canvas.getContext("2d");
-    const COLS = 22, ROWS = 18, S = 4; // 방을 세로로 키워 라이브 화면 위·아래를 꽉 채운다(레터박스 제거, 2026-07-23)
+    // 방 비율은 화면 칸 비율에 맞춘다(2026-07-26). 전에는 방이 세로로 길고(1.22) 칸은 가로로 길어(2.2)
+    // cover가 위·아래를 잘라냈다 — 이름표까지 사라졌다. 가로로 넓혀 잘림도 여백도 없게 한다.
+    const COLS = 40, ROWS = 18, S = 4;
     const W = COLS * 8, H = ROWS * 8;
     canvas.width = W * S; canvas.height = H * S;
     canvas.style.imageRendering = "pixelated";
@@ -235,7 +261,16 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
       return { x: homeX + 16 + slot * 9, y: homeY };
     }
     const VISITOR_COLORS = ["#e2b0ff", "#ffd28a", "#9fe8ff", "#ffb3c1", "#c5f0a4"];
-    const HAIRS = ["#2b2f45", "#4a3020", "#1e2230", "#4a3020", "#2b2f45", "#1e2230"];
+    // 팀은 남녀가 섞여 있고 생김새도 제각각이다(2026-07-26 사용자 지적 — 다섯이 다 똑같아 보였다).
+    // 자리(desk 번호)마다 머리 모양·머리색·피부톤을 고정해 늘 같은 사람으로 보이게 한다.
+    const LOOKS = [
+      { hair: "short", col: "#2b2f45", skin: "#e8c39e" },
+      { hair: "long",  col: "#4a3020", skin: "#f0d6b4" },
+      { hair: "bun",   col: "#1e2230", skin: "#e8c39e" },
+      { hair: "curly", col: "#4a3020", skin: "#d9ab7e" },
+      { hair: "short", col: "#5a5a62", skin: "#e8c39e" },
+      { hair: "long",  col: "#1e2230", skin: "#d9ab7e" },
+    ];
 
     // 아트 무드 3종 — 사용자 전환(☀🌃🌊), 선택은 localStorage 저장. 레이아웃·동작은 동일.
     const THEMES = {
@@ -449,16 +484,38 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
       px(x, y - 8 + bob, 7, 6, shirt); px(x + 5, y - 8 + bob, 2, 6, "rgba(0,0,0,.25)");
       px(x - 1, y - 7 + bob, 1, 4, shirt); px(x + 7, y - 7 + bob, 1, 4, shirt); // 팔
       if (o.typing && !o.moving) px(x - 1 + (bob ? 1 : 0), y - 4, 2, 2, "#e8c39e");
-      px(x + 1, y - 13 + bob, 5, 5, "#e8c39e"); // 얼굴
+      const skin = o.skin || "#e8c39e";
+      px(x + 1, y - 13 + bob, 5, 5, skin); // 얼굴
       px(x + 2, y - 11 + bob, 1, 1, "#1c1f2b"); px(x + 4, y - 11 + bob, 1, 1, "#1c1f2b"); // 눈
-      px(x, y - 15 + bob, 7, 3, hair); px(x, y - 13 + bob, 1, 2, hair); px(x + 6, y - 13 + bob, 1, 2, hair);
+      // 머리 모양 — short(짧은) · long(긴) · bun(묶은) · curly(곱슬)
+      const hs = o.hairStyle || "short";
+      px(x, y - 15 + bob, 7, 3, hair);
+      if (hs === "long") {
+        px(x - 1, y - 13 + bob, 2, 6, hair); px(x + 6, y - 13 + bob, 2, 6, hair);
+      } else if (hs === "bun") {
+        px(x, y - 13 + bob, 1, 2, hair); px(x + 6, y - 13 + bob, 1, 2, hair);
+        px(x + 2, y - 17 + bob, 3, 2, hair);
+      } else if (hs === "curly") {
+        px(x, y - 13 + bob, 1, 3, hair); px(x + 6, y - 13 + bob, 1, 3, hair);
+        px(x, y - 16 + bob, 2, 1, hair); px(x + 5, y - 16 + bob, 2, 1, hair);
+      } else {
+        px(x, y - 13 + bob, 1, 2, hair); px(x + 6, y - 13 + bob, 1, 2, hair);
+      }
+      // 헤드셋 — 관제 요원임을 드러낸다(머리 모양을 가리지 않게 바깥쪽에만).
+      px(x - 1, y - 13 + bob, 1, 3, "#4a5878"); px(x + 7, y - 13 + bob, 1, 3, "#4a5878");
+      px(x, y - 16 + bob, 7, 1, "#4a5878");
+      if (o.typing) px(x - 1, y - 10 + bob, 1, 1, "#2ee6a0"); // 마이크 불(작업 중)
       if (o.dot) px(x + 3, y - 18, 2, 2, o.dot);
       if (o.tag) nameTag(o.tag, x + 3.5, y + 5, o.tagColor || "rgba(231,234,243,.8)");
     }
     function drawAgent(a) {
       const wy = a.y + (a.state === "idle" && !a.moving ? Math.sin(t / 30 + a.desk) * 1.5 : 0);
       const dot = a.state === "working" ? "#2ee6a0" : a.state === "watching" ? "#f0a020" : "#5f6785";
-      drawChar(a.x, wy, a.color, HAIRS[a.desk], { typing: a.state === "working", moving: a.moving, dot, tag: a.shortName });
+      const look = LOOKS[a.desk % LOOKS.length];
+      drawChar(a.x, wy, a.color, look.col, {
+        typing: a.state === "working", moving: a.moving, dot, tag: a.shortName,
+        hairStyle: look.hair, skin: look.skin,
+      });
     }
     // 외부 콘솔 접속자(클라이언트) — 셔츠는 개인색, 머리는 갈색, 이름표는 노란빛(사람임을 구분).
     // 지시 중이면 이름 앞에 🧑을 붙이고, 보안총괄 쪽으로 "지시" 말풍선을 띄운다.
@@ -590,12 +647,22 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
     if (!feed || !message) return;
     const first = feed.firstElementChild;
     if (first && !first.classList.contains("ol-line")) feed.removeChild(first); // 빈 안내 제거
+    // SOC 로그 형식(2026-07-26 재설계): 시각 · 심각도 태그 · 내용.
+    // 전에는 "orchestrator → orchestrator / 작업 할당: ." 처럼 내부 용어가 그대로 나와
+    // 무슨 일이 일어나는지 읽히지 않았다. 한 줄로 자르고 태그로 구분한다.
+    const msg = String(message).replace(/\s+/g, " ").trim();
+    const tag = /KEV|실제 악용|critical|치명/i.test(msg) ? ["crit", "[KEV]"]
+      : /^(작업 |실행 |부연 |단계 \d+ )?완료|성공|통과/.test(msg) ? ["ok", "[완료]"]
+      : /승인|대기|필요/.test(msg) ? ["warn", "[대기]"]
+      : /인입|수집|업로드|스캔/.test(msg) ? ["info", "[수집]"]
+      : ["info", "[진행]"];
     const line = document.createElement("div");
     line.className = "ol-line";
-    const who = (from || "팀") + (to ? " → " + to : "");
-    line.innerHTML = '<span class="ol-who"></span><span class="ol-msg"></span>';
-    line.querySelector(".ol-who").textContent = who;
-    line.querySelector(".ol-msg").textContent = message;
+    line.innerHTML = '<span class="ol-ts"></span><span class="ol-tag"></span><span class="ol-msg"></span>';
+    line.querySelector(".ol-ts").textContent = new Date().toLocaleTimeString("ko-KR", { hour12: false });
+    const tg = line.querySelector(".ol-tag");
+    tg.textContent = tag[1]; tg.className = "ol-tag " + tag[0];
+    line.querySelector(".ol-msg").textContent = (from && from !== "orchestrator" ? from + " · " : "") + msg;
     feed.appendChild(line);
     while (feed.childElementCount > OLIVE_MAX) feed.removeChild(feed.firstChild);
     feed.scrollTop = feed.scrollHeight;
@@ -918,6 +985,34 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
   markTheme();
 
   // ── 부팅 ──
+  // 관제 상태 띠 — 실데이터만 채운다(없으면 "-" 그대로 둔다, 가짜 숫자 금지).
+  async function loadSocBar() {
+    const set = (id, html, cls) => {
+      const e = document.getElementById(id); if (!e) return;
+      e.innerHTML = html; if (cls) e.className = "v " + cls;
+    };
+    try {
+      const { items } = await window.gijo.listActionPriorities(50);
+      const open = (items || []).length;
+      const kev = (items || []).filter((r) => r.finding && r.finding.kev).length;
+      set("socOpen", open + '<small>건</small>', open ? "red" : "teal");
+      set("socKev", kev + '<small>건</small>', kev ? "amber" : "teal");
+    } catch (e) { /* 조회 실패는 "-"로 남긴다 */ }
+    try {
+      const st = await window.gijo.getLocalEngineStatus();
+      const alive = st && st.running ? 1 : 0;
+      set("socEngine", (st && st.modelId ? "가동" : alive ? "가동" : "중지"), alive || (st && st.modelId) ? "teal" : "amber");
+    } catch (e) {}
+    try {
+      // 오늘 처리 = 완료된 작업 수(실데이터). 없으면 "-" 그대로 둔다.
+      const tasks = await window.gijo.listTasks();
+      const done = (tasks || []).filter((t) => t.status === "done").length;
+      set("socDone", done + '<small>건</small>', "teal");
+    } catch (e) {}
+    const st2 = document.getElementById("socStaff");
+    if (st2) st2.innerHTML = (agentCounts.working + agentCounts.watching + agentCounts.idle) + '<small>명</small>';
+  }
+
   (async function boot() {
     try {
       await window.gijo.checkServerHealth();
@@ -928,7 +1023,8 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
     }
     try {
       // loadGuide는 실패해도 나머지를 막지 않는다(내부에서 자체 처리) — Promise.all에 함께 둔다.
-      await Promise.all([loadAgents(), loadTasks(), loadSessions(), loadGuide()]);
+      await Promise.all([loadAgents(), loadTasks(), loadSessions(), loadGuide(), loadSocBar()]);
+      setInterval(loadSocBar, 60000); // 관제 상태 띠 갱신(1분)
       const history = await window.gijo.listCollaborationHistory();
       (history || []).slice(-40).forEach((e) => appendOlive(e.from, e.to, e.message)); // LIVE 채팅 초기 채움(v5)
       (history || []).slice(-8).forEach((evt) => feedLine(evt.from + (evt.to ? " → " + evt.to : ""), evt.message, AGENT_COLOR[evt.from]));

@@ -87,17 +87,14 @@ window.__done = (async () => {
   // 구분선
   g.strokeStyle = "rgba(255,255,255,.14)"; g.beginPath();
   g.moveTo(34, 222); g.lineTo(130, 222); g.stroke();
-  // 한 줄 정체성 + 핵심 3가지
-  g.fillStyle = "#8b93ab";
-  g.font = "400 10.5px 'Malgun Gothic', sans-serif";
-  g.fillText("사내에서만 도는", 82, 240);
-  g.fillText("AI 보안관제 플랫폼", 82, 255);
+  // 핵심 3가지만 — 오른쪽 본문과 같은 말을 또 쓰지 않는다(정체성 문구는 본문이 맡는다).
+  // 줄 간격을 넉넉히 둬서 좁은 폭에서도 답답해 보이지 않게 한다.
   g.textAlign = "left";
-  g.fillStyle = "#6f7a95";
   g.font = "400 9.5px 'Malgun Gothic', sans-serif";
   ["취약점 · 로그 · 리포트 통합", "로컬 LLM — 외부 전송 없음", "AI 자산까지 보호"].forEach((t, i) => {
-    g.fillStyle = "#3b82f6"; g.fillText("·", 24, 277 + i * 14);
-    g.fillStyle = "#6f7a95"; g.fillText(t, 32, 277 + i * 14);
+    const y = 252 + i * 20;
+    g.fillStyle = "#3b82f6"; g.fillText("·", 26, y);
+    g.fillStyle = "#7d879f"; g.fillText(t, 35, y);
   });
   return Array.from(g.getImageData(0, 0, 164, 314).data);
 })();

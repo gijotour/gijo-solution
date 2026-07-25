@@ -79,7 +79,16 @@ tr:last-child td{border-bottom:none;}
 .progress-fill{height:100%;border-radius:20px;}
 .content-grid{display:grid;grid-template-columns:1.7fr 1fr;gap:16px;}
 
-.terminal{background:#05070d;border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-family:"Consolas","Menlo",monospace;font-size:11.5px;line-height:1.9;color:#8fd6a8;margin-top:8px;max-height:calc(100vh - 340px);min-height:240px;overflow-y:auto;}
+/* 로그는 오른쪽 열 높이만큼 늘어나 아래 공백을 채운다(2026-07-26 사용자 요청).
+   고정 max-height는 화면이 커도 로그 아래가 텅 비게 만들었다. */
+.terminal{background:#05070d;border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-family:"Consolas","Menlo",monospace;font-size:11.5px;line-height:1.9;color:#8fd6a8;margin-top:8px;flex:1 1 auto;min-height:240px;overflow-y:auto;}
+.content-grid > .panel{display:flex;flex-direction:column;min-height:0;}
+/* 성능 한눈에 — 큰 숫자 4칸 */
+.perf-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;}
+.perf-cell{background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;}
+.perf-cell .l{font-size:10.5px;color:var(--muted-2);}
+.perf-cell .v{font-size:15px;font-weight:800;color:#fff;margin-top:2px;}
+.perf-cell .v small{font-size:10px;font-weight:600;color:var(--muted);margin-left:2px;}
 .terminal .prompt{color:var(--blue-light);}
 .terminal .out{color:var(--muted);}
 .model-search{display:flex;gap:8px;margin-bottom:12px;}
@@ -284,6 +293,17 @@ tr:last-child td{border-bottom:none;}
     <div class="panel">
       <div class="panel-title">AI 엔진 상태</div>
       <div id="engineStatusRow" class="brain-row"><span>llama-server</span><span>불러오는 중...</span></div>
+    </div>
+    <div class="panel">
+      <div class="panel-title">성능 <i class="gijo-info" data-topic="성능"></i></div>
+      <div class="panel-sub">왼쪽 로그에 흐르는 실제 추론 기록을 요약합니다.</div>
+      <div class="perf-grid">
+        <div class="perf-cell"><div class="l">최근 속도</div><div class="v" id="perfTps">-</div></div>
+        <div class="perf-cell"><div class="l">최근 응답</div><div class="v" id="perfLat">-</div></div>
+        <div class="perf-cell"><div class="l">평균 속도</div><div class="v" id="perfAvgTps">-</div></div>
+        <div class="perf-cell"><div class="l">이번 접속 추론</div><div class="v" id="perfCount">-</div></div>
+      </div>
+      <div style="font-size:11px;color:var(--muted-2);margin-top:8px" id="perfNote">아직 추론 기록이 없습니다.</div>
     </div>
     <div class="panel">
       <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
@@ -635,6 +655,24 @@ tr:last-child td{border-bottom:none;}
     return `<div class="out">[${time}] ${evt.from} → ${evt.to}: ${evt.message}</div>`;
   }
 
+  // ── 성능 한눈에 — 로그와 같은 이벤트를 세어 보여준다(별도 조회 없음, 숫자는 실측값 그대로) ──
+  // 임베딩·모델 로드는 빼고 채팅 추론만 센다 — 담당자가 체감하는 "답변 속도"가 그것이다.
+  const perf = { count: 0, tpsSum: 0, tpsN: 0 };
+  function recordPerf(evt) {
+    if (!evt || evt.kind !== "chat" || evt.phase !== "done") return;
+    perf.count++;
+    const set = (id, html) => { const e = document.getElementById(id); if (e) e.innerHTML = html; };
+    if (evt.tokensPerSec != null) {
+      perf.tpsSum += evt.tokensPerSec; perf.tpsN++;
+      set("perfTps", Math.round(evt.tokensPerSec) + '<small>tok/s</small>');
+      set("perfAvgTps", Math.round(perf.tpsSum / perf.tpsN) + '<small>tok/s</small>');
+    }
+    if (evt.latencyMs != null) set("perfLat", (evt.latencyMs / 1000).toFixed(1) + '<small>초</small>');
+    set("perfCount", perf.count + '<small>회</small>');
+    const note = document.getElementById("perfNote");
+    if (note) note.textContent = (evt.model ? evt.model + " · " : "") + new Date().toLocaleTimeString("ko-KR", { hour12: false }) + " 기준";
+  }
+
   // ── 로컬 LLM 실동작 이벤트(llm:event) — 실제 추론/임베딩/모델 로드를 사람이 읽는 한 줄로 ──
   function fmtLlm(evt) {
     const icon = evt.kind === "embed" ? "🔎" : (evt.kind === "load" || evt.kind === "swap") ? "⚙️" : "🧠";
@@ -847,7 +885,7 @@ tr:last-child td{border-bottom:none;}
 
     if (window.gijoRealtime) window.gijoRealtime.connect();
     window.gijo.onCollaborationEvent(appendLiveEvent);
-    window.gijo.onLlmActivity(appendLlmEvent);
+    window.gijo.onLlmActivity((evt) => { appendLlmEvent(evt); recordPerf(evt); });
     window.gijo.onHfDownloadProgress(onHfJobUpdate);
     window.gijo
       .listHfDownloadJobs()

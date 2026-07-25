@@ -526,12 +526,9 @@
   .agent-dock{position:static !important;background:var(--panel) !important;border:1px solid var(--border-strong) !important;border-radius:16px !important;padding:10px 12px !important;margin-top:10px;box-shadow:0 8px 30px rgba(0,0,0,.35);gap:8px !important;}
   .agent-dock input{background:none !important;border:none !important;font-size:14px !important;height:34px;}
   .dock-plus,.dock-send{border-radius:10px;}
-  .cl-chips{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;justify-content:center;}
-  .cl-chips span{border:1px solid var(--border);border-radius:20px;padding:5px 13px;font-size:11.5px;color:var(--muted);cursor:pointer;}
-  .cl-chips span:hover{border-color:var(--blue);color:var(--blue-light);}
   /* 명령창 아래 팁 — 대화가 시작되면 칩 대신 이 얇은 줄이 남는다(2026-07-26). */
-  .tips{display:flex;align-items:center;gap:7px;margin-top:9px;padding:0 3px;font-size:11.5px;color:var(--muted-2);flex-wrap:wrap;}
-  .tips .lb{font-weight:800;color:var(--muted);white-space:nowrap;}
+  .tips{display:flex;align-items:flex-start;gap:8px;margin-top:10px;padding:0 4px;font-size:11.5px;color:var(--muted-2);flex-wrap:nowrap;}
+  .tips .lb{font-weight:800;color:var(--muted);white-space:nowrap;min-width:74px;}
   .tips b{font-weight:400;color:var(--muted);border-bottom:1px dotted var(--border-strong);cursor:pointer;white-space:nowrap;}
   .tips b:hover{color:var(--blue-light);border-bottom-color:var(--blue);}
   .tips .more{margin-left:auto;color:var(--muted-2);cursor:pointer;white-space:nowrap;}
@@ -543,15 +540,20 @@
   .hello-ask:hover{background:rgba(59,130,246,.26);}
   .tips.rule{margin-top:6px;}
   .tips .rl{color:var(--amber);}
-  .tips.rule{align-items:flex-start;}
-  .tips .rt{color:var(--muted);display:flex;flex-wrap:wrap;gap:3px 14px;flex:1;line-height:1.75;}
+  .tips.rule{margin-top:8px;padding-top:8px;border-top:1px solid var(--border);}
+  /* 규칙은 한 줄에 두 개씩 가지런히 — 들쭉날쭉하면 읽히지 않는다(2026-07-26 정리). */
+  .tips .rt{color:var(--muted);display:grid;grid-template-columns:1fr 1fr;gap:5px 22px;flex:1;line-height:1.7;}
   .tips .rt .rn{position:relative;padding-left:11px;}
-  .tips .rt .rn::before{content:"·";position:absolute;left:2px;color:var(--amber);font-weight:800;}
-  body.chatting .tips{display:flex !important;}
+  .tips .rt .rn::before{content:"·";position:absolute;left:0;color:var(--amber);font-weight:800;}
+  #tipsAskList{display:flex;flex-wrap:wrap;gap:3px 10px;flex:1;}
+  .hero-foot{margin-top:8px;padding:0 4px 0 82px;text-align:left;color:var(--muted-2);}
+  /* 대화가 시작되면 접는다(2026-07-26 사용자 결정) — 그 자리는 대화에 내준다.
+     빈 화면에서만 안내가 필요하고, 대화 중엔 오히려 화면을 좁힌다. */
+  body.chatting .tips,body.chatting .hero-foot{display:none !important;}
   .hero-foot{margin-top:16px;color:var(--muted-2);font-size:10.5px;min-height:14px;text-align:center;}
   body.chatting .hero-orb{width:120px;}
   body.chatting .hero-orb .network-svg{max-width:120px;}
-  body.chatting .hero-hello,body.chatting .hero-sub,body.chatting .cl-chips{display:none;}
+  body.chatting .hero-hello,body.chatting .hero-sub{display:none;}
   body.chatting .ai-team{margin-top:4px !important;}
   body.chatting #accConsole .cl-rows{max-height:52vh;margin-top:10px;}
   body.chatting .center-stage{justify-content:flex-start;padding-top:14px !important;}
@@ -763,9 +765,8 @@
             <input id="chatInput" placeholder="지시를 입력하세요…" aria-label="지시를 입력하세요">
             <button class="dock-send" id="dockSend">전송</button>
           </div>
-          <div class="cl-chips" id="clChips">
-            <span>오늘 뭐부터 볼까?</span><span>긴급한 취약점 알려줘</span><span>이번 주 점검 일정</span><span>보고서 만들어줘</span>
-          </div>
+          <!-- 큰 칩은 없앴다(2026-07-26) — 아래 "이렇게 물어보세요"와 같은 질문이 두 번 나왔다.
+               팁 줄은 화면별로 서버가 주므로(단일 출처) 그쪽만 남긴다. -->
           <!-- 대화 중에도 남는 얇은 팁 — 질문 예시와 제품 규칙(알아두기). 내용은 서버가 준다. -->
           <div class="tips" id="tipsAsk" style="display:none">
             <span class="lb">이렇게 물어보세요</span><span id="tipsAskList"></span>
@@ -2744,12 +2745,7 @@
       const n = (u && (u.displayName || u.username)) || "";
       document.getElementById("heroHello").textContent = n ? `안녕하세요, ${n}님` : "안녕하세요";
     }).catch(() => {});
-    // 추천 칩 → 입력창 채우고 즉시 전송(기존 콘솔 로직 그대로 탄다)
-    document.querySelectorAll("#clChips span").forEach((c) => c.addEventListener("click", () => {
-      const inp = document.getElementById("chatInput");
-      inp.value = c.textContent;
-      document.getElementById("dockSend").click();
-    }));
+    // 추천 칩은 제거됐다(팁 줄이 대신한다) — 죽은 리스너를 남기지 않는다.
     // 대화 시작은 "사용자 행동"으로만 판정 — 협업 로그 재생만으로 히어로가 접히지 않게
     // (실측 2026-07-26: 재생 로그가 cl-row를 만들어 첫 화면이 곧장 축소돼 버림).
     const startChat = () => document.body.classList.add("chatting");

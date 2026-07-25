@@ -1,0 +1,169 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>AI 전용 라이브 오피스 — SOC 관제형 재설계 시안</title>
+<style>
+  :root{--bg:#070b14;--panel:#0f1626;--panel-2:#0b1120;--line:rgba(255,255,255,.07);
+        --line2:rgba(255,255,255,.14);--text:#e7eaf3;--muted:#8b93ab;--muted2:#5f6785;
+        --blue:#3b82f6;--blue2:#5fa1ff;--teal:#1eb980;--amber:#f0a020;--red:#e2483d;--purple:#8b7cf0;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#1a1d24;color:var(--text);font:13px/1.55 "Malgun Gothic","Apple SD Gothic Neo",sans-serif;padding:20px}
+  .note{max-width:1180px;margin:0 auto 16px;background:rgba(59,130,246,.1);border:1px solid var(--line2);border-radius:10px;padding:12px 14px;font-size:12.5px;color:var(--muted)}
+  .note b{color:var(--text)}
+  .win{max-width:1180px;margin:0 auto;background:var(--bg);border:1px solid var(--line2);border-radius:12px;overflow:hidden;
+       display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;height:760px}
+
+  /* ① 타이틀 */
+  .tb{display:flex;align-items:center;gap:10px;padding:9px 14px;background:var(--panel-2);border-bottom:1px solid var(--line)}
+  .tb .t{font-size:13px;font-weight:800}
+  .tb .live{font-size:9.5px;font-weight:800;background:var(--red);color:#fff;border-radius:8px;padding:1px 7px;letter-spacing:1px}
+  .tb .x{margin-left:auto;color:var(--muted2);cursor:pointer}
+
+  /* ② 관제 상태 띠 — IT보안 화면답게 지금 위험 상태를 맨 위에 */
+  .status{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--line);border-bottom:1px solid var(--line)}
+  .st{background:var(--panel-2);padding:8px 12px}
+  .st .l{font-size:10px;color:var(--muted2);letter-spacing:.3px}
+  .st .v{font-size:17px;font-weight:800;margin-top:1px;font-variant-numeric:tabular-nums}
+  .st .s{font-size:10px;color:var(--muted2);margin-left:4px;font-weight:600}
+  .v.red{color:#ff7a6e}.v.amber{color:var(--amber)}.v.teal{color:#4fd39a}.v.blue{color:var(--blue2)}
+
+  /* ③ 본체 — 좌 할일 / 우 관제실 */
+  .body{display:grid;grid-template-columns:250px minmax(0,1fr);gap:10px;padding:10px;min-height:0}
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:10px;display:flex;flex-direction:column;min-height:0}
+  .card>.h{display:flex;align-items:center;gap:7px;padding:9px 11px;border-bottom:1px solid var(--line);font-size:12px;font-weight:800}
+  .card>.h .cnt{margin-left:auto;font-size:10.5px;color:var(--muted2);font-weight:700}
+  .card>.b{padding:9px 11px;overflow:auto;min-height:0}
+
+  .add{display:flex;gap:6px;margin-bottom:9px}
+  .add input{flex:1;min-width:0;background:var(--panel-2);border:1px solid var(--line2);border-radius:7px;padding:7px 9px;color:var(--text);font-size:11.5px;outline:none}
+  .add button{width:32px;border:0;border-radius:7px;background:var(--teal);color:#04150d;font-size:15px;font-weight:800;cursor:pointer}
+  .todo{display:flex;gap:7px;padding:7px 0;border-bottom:1px solid var(--line);font-size:11.5px;align-items:flex-start}
+  .todo:last-child{border-bottom:0}
+  .todo .bx{width:13px;height:13px;border:1px solid var(--line2);border-radius:3px;flex:none;margin-top:2px}
+  .todo .tx{flex:1;min-width:0;line-height:1.5}
+  .todo .tx b{display:block;font-weight:400;color:var(--text);
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .pri{font-size:9.5px;font-weight:800;border-radius:5px;padding:1px 5px;flex:none;margin-top:1px}
+  .p1{background:rgba(226,72,61,.16);color:#ff8b80}.p2{background:rgba(240,160,32,.16);color:var(--amber)}
+
+  /* ④ 관제실 — 잘리지 않게 비율을 지켜 안에 맞춘다 */
+  .room{position:relative;background:#0d1424;border:1px solid var(--line);border-radius:10px;overflow:hidden;
+        display:flex;align-items:center;justify-content:center;min-height:0}
+  .room canvas{display:block;max-width:100%;max-height:100%}
+  .room .badge{position:absolute;left:10px;top:9px;font-size:10px;font-weight:800;color:var(--muted2);letter-spacing:1.5px}
+  .room .who{position:absolute;right:10px;top:9px;font-size:10.5px;color:var(--muted2)}
+  .room .who i{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--teal);margin-right:5px}
+
+  /* ⑤ LIVE 로그 — 관제 로그답게 고정폭 글꼴 + 시각 + 심각도 색 */
+  .log{margin:0 10px 10px;background:#05070d;border:1px solid var(--line);border-radius:10px;
+       display:flex;flex-direction:column;height:186px;min-height:0}
+  .log .h{display:flex;align-items:center;gap:7px;padding:8px 11px;border-bottom:1px solid var(--line);font-size:11.5px;font-weight:800}
+  .log .h .lv{font-size:9px;font-weight:800;background:var(--red);color:#fff;border-radius:7px;padding:1px 6px;letter-spacing:1px}
+  .log .h .rt{margin-left:auto;font-size:10.5px;color:var(--muted2);font-weight:600}
+  .log .b{flex:1;min-height:0;overflow:auto;padding:6px 11px 9px;font-family:"Consolas","D2Coding",monospace;font-size:11px;line-height:1.85}
+  .ln{display:flex;gap:8px;white-space:nowrap}
+  .ln .ts{color:#4a5570;flex:none}
+  .ln .tag{flex:none;font-weight:700}
+  .ln .msg{color:#9aa4bd;overflow:hidden;text-overflow:ellipsis}
+  .tag.ok{color:#4fd39a}.tag.warn{color:var(--amber)}.tag.info{color:var(--blue2)}.tag.crit{color:#ff7a6e}
+
+  .foot{padding:0 10px 10px}
+  .go{width:100%;border:0;border-radius:10px;padding:12px;font-size:13.5px;font-weight:800;cursor:pointer;
+      background:linear-gradient(180deg,#1eb980,#159467);color:#04150d}
+</style></head><body>
+
+<div class="note">
+  <b>고친 것</b> — ① 관제실 그림이 <b>잘리지 않습니다</b>. 비율을 지켜 안에 맞추되(letterbox 아님) 방 크기를
+  칸에 맞춰 다시 그립니다. ② LIVE 로그 글이 잘리던 것 → <b>고정폭 글꼴 + 한 줄 말줄임</b>으로 정돈.
+  <br><b>IT보안답게 바꾼 것</b> — ③ 맨 위에 <b>관제 상태 띠</b>(미조치·KEV·오늘 처리·엔진·응답속도)를 둡니다.
+  보안 화면은 "지금 위험한가"가 먼저 보여야 합니다. ④ LIVE 로그를 <b>SOC 로그 형식</b>(시각 · 심각도 태그 · 내용)으로.
+  ⑤ 사람 이름 대신 <b>역할</b>을 함께 표기해 누가 무엇을 맡는지 드러냅니다.
+</div>
+
+<div class="win">
+  <div class="tb"><span class="t">AI 전용 라이브 오피스</span><span class="live">LIVE</span><span class="x">✕</span></div>
+
+  <div class="status">
+    <div class="st"><div class="l">미조치 취약점</div><div class="v red">12<span class="s">건</span></div></div>
+    <div class="st"><div class="l">실제 악용(KEV)</div><div class="v amber">1<span class="s">건</span></div></div>
+    <div class="st"><div class="l">오늘 처리</div><div class="v teal">8<span class="s">건</span></div></div>
+    <div class="st"><div class="l">AI 엔진</div><div class="v teal">3<span class="s">개 상주</span></div></div>
+    <div class="st"><div class="l">응답 속도</div><div class="v blue">127<span class="s">tok/s</span></div></div>
+  </div>
+
+  <div class="body">
+    <div class="card">
+      <div class="h">☑ 오늘의 할일 <span class="cnt">7건</span></div>
+      <div class="b">
+        <div class="add"><input placeholder="할 일 추가… (Enter)"><button>＋</button></div>
+        <div class="todo"><span class="bx"></span><span class="tx"><b>[운영리포트] 반복 탐지 — 5.5.13.3</b></span><span class="pri p1">P1</span></div>
+        <div class="todo"><span class="bx"></span><span class="tx"><b>OpenSSH 9.6 미만 사용자 열거 조치</b></span><span class="pri p1">P1</span></div>
+        <div class="todo"><span class="bx"></span><span class="tx"><b>주간 점검 결과 보고서 작성</b></span><span class="pri p2">P2</span></div>
+        <div class="todo"><span class="bx"></span><span class="tx"><b>안전대부 본인인증 서버 담당부서 지정</b></span><span class="pri p2">P2</span></div>
+        <div style="font-size:10.5px;color:var(--muted2);padding-top:8px">이후 기한 할일 3건은 AI 팀 화면에서</div>
+      </div>
+    </div>
+
+    <div class="room">
+      <span class="badge">GIJO SOC</span>
+      <span class="who"><i></i>6명 근무 중 · 2명 작업</span>
+      <canvas id="room" width="880" height="420"></canvas>
+    </div>
+  </div>
+
+  <div class="log">
+    <div class="h">사무실 LIVE 로그 <span class="lv">LIVE</span><span class="rt">최근 20줄 · 자동 갱신</span></div>
+    <div class="b">
+      <div class="ln"><span class="ts">05:21:44</span><span class="tag crit">[KEV]</span><span class="msg">CVE-2024-6387 — 샘플-웹서버(10.0.0.100) 실제 악용 확인, 즉시 조치 대상</span></div>
+      <div class="ln"><span class="ts">05:21:41</span><span class="tag info">[분석]</span><span class="msg">최부장 → 김과장 · 취약점 우선순위 재계산 요청 (KEV→EPSS→VPR)</span></div>
+      <div class="ln"><span class="ts">05:21:39</span><span class="tag ok">[완료]</span><span class="msg">이과장 · 하드닝 점검 U-07 재검사 통과 — 준수율 82% → 86%</span></div>
+      <div class="ln"><span class="ts">05:21:32</span><span class="tag warn">[대기]</span><span class="msg">승인 필요 — 담당부서 지정(안전대부 본인인증 웹 서버) 결재판에 올림</span></div>
+      <div class="ln"><span class="ts">05:21:20</span><span class="tag info">[수집]</span><span class="msg">송이사 · Tenable 스캔 결과 인입 — 자산 2건 · 취약점 5건 반영</span></div>
+      <div class="ln"><span class="ts">05:21:02</span><span class="tag ok">[완료]</span><span class="msg">정대리 · 주간 리포트 초안 작성 — 리포트 이력에 저장</span></div>
+    </div>
+  </div>
+
+  <div class="foot"><button class="go">▶ 운영 시작 — AI 팀에게 맡기기</button></div>
+</div>
+
+<script>
+// 관제실 그림 — 칸 크기에 맞춰 그리므로 잘리지 않는다(지금은 cover라 아래가 잘렸다).
+const c = document.getElementById("room"), g = c.getContext("2d");
+const W = c.width, H = c.height;
+g.fillStyle = "#0d1424"; g.fillRect(0, 0, W, H);
+// 바닥 격자
+g.strokeStyle = "rgba(255,255,255,.035)";
+for (let x = 0; x <= W; x += 44) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); }
+for (let y = 0; y <= H; y += 44) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
+// 서버랙(오른쪽) — 보안관제실 느낌
+g.fillStyle = "#141d33"; g.fillRect(W - 92, 30, 70, H - 74);
+g.fillStyle = "#0b1120"; g.fillRect(W - 84, 40, 54, H - 94);
+for (let i = 0; i < 12; i++) {
+  g.fillStyle = i % 3 === 0 ? "#4fd39a" : i % 4 === 0 ? "#f0a020" : "#2a3a5c";
+  g.fillRect(W - 78, 48 + i * 24, 6, 6);
+  g.fillStyle = "#1b2740"; g.fillRect(W - 66, 48 + i * 24, 34, 6);
+}
+// 자리 4개(2x2) + 팀장석
+const seats = [
+  { x: 120, y: 92, name: "김과장", role: "취약점", color: "#7fd6a8", busy: false },
+  { x: 330, y: 92, name: "이과장", role: "점검", color: "#e2483d", busy: true },
+  { x: 540, y: 92, name: "송이사", role: "수집", color: "#8bd3e6", busy: false },
+  { x: 120, y: 250, name: "정대리", role: "리포트", color: "#c4a8f0", busy: false },
+  { x: 380, y: 250, name: "최부장", role: "총괄", color: "#f0b840", busy: true },
+];
+for (const s of seats) {
+  // 책상
+  g.fillStyle = "#16203a"; g.fillRect(s.x - 46, s.y + 30, 116, 34);
+  g.fillStyle = "#0b1120"; g.fillRect(s.x - 34, s.y + 4, 62, 30);   // 모니터
+  g.fillStyle = s.busy ? "#2b6cb0" : "#1b2740"; g.fillRect(s.x - 30, s.y + 8, 54, 22);
+  // 사람
+  g.fillStyle = "#e8c9a0"; g.fillRect(s.x - 12, s.y - 22, 26, 22);   // 얼굴
+  g.fillStyle = "#2a2118"; g.fillRect(s.x - 14, s.y - 26, 30, 8);    // 머리
+  g.fillStyle = s.color; g.fillRect(s.x - 18, s.y + 2, 38, 30);      // 몸
+  // 이름 + 역할
+  g.textAlign = "center";
+  g.fillStyle = "#e7eaf3"; g.font = "700 12px 'Malgun Gothic', sans-serif";
+  g.fillText(s.name, s.x, s.y + 82);
+  g.fillStyle = s.busy ? "#f0a020" : "#5f6785"; g.font = "700 10px 'Malgun Gothic', sans-serif";
+  g.fillText(s.busy ? "작업 중 · " + s.role : s.role, s.x, s.y + 96);
+}
+</script>
+</body></html>

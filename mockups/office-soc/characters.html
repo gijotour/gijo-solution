@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>SOC 요원 캐릭터 시안</title>
+<style>
+  :root{--bg:#070b14;--panel:#0f1626;--line:rgba(255,255,255,.08);--text:#e7eaf3;--muted:#8b93ab;--muted2:#5f6785;
+        --blue2:#5fa1ff;--teal:#4fd39a;--amber:#f0a020;--red:#ff7a6e}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#12151c;color:var(--text);font:13px/1.6 "Malgun Gothic",sans-serif;padding:22px}
+  .wrap{max-width:1080px;margin:0 auto}
+  .note{background:rgba(59,130,246,.1);border:1px solid rgba(255,255,255,.14);border-radius:10px;padding:12px 14px;margin-bottom:18px;font-size:12.5px;color:var(--muted)}
+  .note b{color:var(--text)}
+  h2{font-size:12.5px;color:var(--muted);margin:20px 0 9px;font-weight:700;letter-spacing:.3px}
+  .box{background:var(--bg);border:1px solid var(--line);border-radius:11px;padding:16px}
+  .row{display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap}
+  .cell{text-align:center}
+  .cell .cap{font-size:10.5px;color:var(--muted2);margin-top:6px}
+  .cell .cap b{display:block;color:var(--text);font-size:11.5px;font-weight:700}
+  .tag{display:inline-block;font-size:9.5px;font-weight:800;border-radius:6px;padding:1px 7px;margin-top:4px}
+  .t-idle{background:rgba(95,103,133,.2);color:var(--muted)}
+  .t-busy{background:rgba(240,160,32,.16);color:var(--amber)}
+  .t-alert{background:rgba(226,72,61,.18);color:var(--red)}
+  .rec{display:inline-block;background:rgba(30,185,128,.16);color:var(--teal);border-radius:6px;padding:1px 8px;font-size:10.5px;font-weight:800;margin-left:6px}
+</style></head><body>
+<div class="wrap">
+
+<div class="note">
+  캐릭터는 그림 파일이 아니라 <b>코드로 그립니다</b> — 픽셀 하나 단위로 바꿀 수 있어 수정이 어렵지 않습니다.
+  지금은 사람 형태만 있어서 보안관제실인지 일반 사무실인지 구분이 안 됩니다.
+  <b>앉은 자세 · 헤드셋 · 모니터 불빛</b>을 넣고, <b>지금 무슨 상태인지</b>를 색과 표시로 드러내는 쪽을 권합니다.
+</div>
+
+<h2>지금 — 서 있는 사람 형태만</h2>
+<div class="box"><div class="row" id="rowOld"></div></div>
+
+<h2>제안 <span class="rec">추천</span> — 자리에 앉아 일하는 SOC 요원 (머리 모양·머리색·피부톤을 사람마다 다르게)</h2>
+<div class="box"><div class="row" id="rowNew"></div></div>
+
+<h2>상태 표현 — 한눈에 누가 무엇을 하는지</h2>
+<div class="box"><div class="row" id="rowState"></div></div>
+
+<div class="note" style="margin-top:18px;background:transparent">
+  <b>바뀌는 점</b> · 앉은 자세 + 책상·모니터가 한 덩어리라 "근무 중"이 자연스럽게 읽힙니다 ·
+  헤드셋으로 관제 요원임을 드러냅니다 · 모니터 화면색이 상태를 말합니다(파랑=평시, 주황=작업 중, 빨강=경보 대응) ·
+  머리 위 표시로 지금 하는 일을 알립니다.
+</div>
+</div>
+
+<script>
+const S = 3; // 픽셀 배율
+function mk(w, h) {
+  const c = document.createElement("canvas");
+  c.width = w * S; c.height = h * S;
+  c.style.imageRendering = "pixelated";
+  const g = c.getContext("2d"); g.imageSmoothingEnabled = false;
+  g.setTransform(S, 0, 0, S, 0, 0); // 배율은 한 번만 — scale을 겹쳐 걸면 그림이 화면 밖으로 나간다
+  return { c, g };
+}
+const px = (g, x, y, w, h, col) => { g.fillStyle = col; g.fillRect(x, y, w, h); };
+
+// ── 지금: 서 있는 사람
+function drawOld(color) {
+  const { c, g } = mk(40, 52);
+  px(g, 0, 0, 40, 52, "#0d1424");
+  px(g, 13, 6, 14, 11, "#e8c9a0");   // 얼굴
+  px(g, 12, 3, 16, 5, "#2a2118");    // 머리
+  px(g, 11, 18, 18, 16, color);      // 몸
+  return c;
+}
+
+// ── 제안: 앉아서 일하는 요원(책상·모니터·헤드셋)
+function drawAgent(color, mode, look) {
+  look = look || {};
+  const hair = look.hair || "short";      // short · long · bun · curly
+  const hairCol = look.hairCol || "#2a2118";
+  const skin = look.skin || "#e8c9a0";
+  const { c, g } = mk(46, 56);
+  px(g, 0, 0, 46, 56, "#0d1424");
+  // 모니터 — 화면색이 곧 상태
+  const scr = mode === "alert" ? "#7a2620" : mode === "busy" ? "#8a5a12" : "#1b3a63";
+  px(g, 9, 4, 28, 17, "#0a0f1c");
+  px(g, 11, 6, 24, 13, scr);
+  if (mode !== "idle") { // 화면 속 그래프 몇 줄
+    px(g, 13, 15, 5, 2, "#cfe3ff"); px(g, 19, 12, 4, 5, "#cfe3ff"); px(g, 24, 9, 4, 8, "#cfe3ff");
+  }
+  px(g, 20, 21, 6, 3, "#111a2e"); px(g, 15, 24, 16, 2, "#111a2e"); // 받침
+  // 책상
+  px(g, 3, 40, 40, 5, "#16203a"); px(g, 3, 45, 40, 2, "#0e1730");
+  // 의자 등받이
+  px(g, 15, 31, 16, 10, "#16203a");
+  // 사람 — 어깨/팔
+  px(g, 14, 33, 18, 8, color);
+  px(g, 11, 36, 4, 5, color); px(g, 31, 36, 4, 5, color);   // 팔
+  px(g, 12, 39, 6, 3, "#e8c9a0"); px(g, 28, 39, 6, 3, "#e8c9a0"); // 손(책상 위)
+  // 머리 — 사람마다 다르게(팀이 다 똑같아 보이지 않게).
+  px(g, 16, 24, 14, 10, skin);
+  if (hair === "long") {                       // 어깨까지 내려오는 머리
+    px(g, 14, 22, 18, 5, hairCol);
+    px(g, 13, 26, 3, 11, hairCol); px(g, 30, 26, 3, 11, hairCol);
+  } else if (hair === "bun") {                 // 묶은 머리
+    px(g, 15, 22, 16, 4, hairCol);
+    px(g, 13, 25, 3, 5, hairCol); px(g, 30, 25, 3, 5, hairCol);
+    px(g, 20, 18, 6, 5, hairCol); px(g, 21, 16, 4, 3, hairCol);
+  } else if (hair === "curly") {               // 곱슬·볼륨
+    px(g, 14, 21, 18, 5, hairCol);
+    px(g, 13, 23, 2, 4, hairCol); px(g, 31, 23, 2, 4, hairCol);
+    px(g, 16, 19, 4, 3, hairCol); px(g, 26, 19, 4, 3, hairCol);
+  } else {                                     // 짧은 머리
+    px(g, 15, 22, 16, 4, hairCol);
+  }
+  // 헤드셋 — 관제 요원 표시(머리 위로 올려 머리 모양을 가리지 않게)
+  px(g, 14, 25, 2, 6, "#3b4763"); px(g, 30, 25, 2, 6, "#3b4763");
+  px(g, 15, 20, 16, 2, "#4a5878");
+  px(g, 12, 27, 3, 3, mode === "idle" ? "#3b4763" : "#4fd39a"); // 마이크 불
+  return c;
+}
+
+// 머리 위 상태 표시
+function withBadge(canvas, mode) {
+  const g = canvas.getContext("2d");
+  if (mode === "idle") return canvas;
+  g.save(); g.setTransform(S, 0, 0, S, 0, 0);
+  const col = mode === "alert" ? "#ff7a6e" : "#f0a020";
+  px(g, 20, 15, 6, 2, col); px(g, 22, 13, 2, 6, col); // 작은 십자(작업 신호)
+  g.restore();
+  return canvas;
+}
+
+// 팀은 남녀가 섞여 있다(2026-07-26 사용자 지적) — 머리 모양·머리색·피부톤을 사람마다 달리해
+// 다섯이 다 똑같아 보이지 않게 한다.
+const ROLES = [
+  { n: "김과장", r: "취약점", c: "#7fd6a8", look: { hair: "short", hairCol: "#2a2118" } },
+  { n: "이과장", r: "점검", c: "#e2483d", look: { hair: "long", hairCol: "#3a2418", skin: "#f0d6b4" } },
+  { n: "송이사", r: "수집", c: "#8bd3e6", look: { hair: "bun", hairCol: "#1f1a16" } },
+  { n: "정대리", r: "리포트", c: "#c4a8f0", look: { hair: "curly", hairCol: "#4a3020", skin: "#d9ab7e" } },
+  { n: "최부장", r: "총괄", c: "#f0b840", look: { hair: "short", hairCol: "#4a4a52" } },
+];
+const add = (root, canvas, name, sub, tag) => {
+  const d = document.createElement("div"); d.className = "cell";
+  // ⚠ innerHTML += 로 캡션을 붙이면 이미 그려둔 캔버스가 새로 만들어져 그림이 지워진다(실측).
+  const cap = document.createElement("div"); cap.className = "cap";
+  cap.innerHTML = `<b>${name}</b>${sub}${tag ? `<span class="tag ${tag[0]}">${tag[1]}</span>` : ""}`;
+  d.appendChild(canvas); d.appendChild(cap);
+  root.appendChild(d);
+};
+ROLES.forEach((x) => add(document.getElementById("rowOld"), drawOld(x.c), x.n, x.r));
+ROLES.forEach((x) => add(document.getElementById("rowNew"), drawAgent(x.c, "idle", x.look), x.n, x.r));
+[["idle", "t-idle", "대기"], ["busy", "t-busy", "작업 중"], ["alert", "t-alert", "경보 대응"]].forEach(([m, cls, label], i) => {
+  add(document.getElementById("rowState"), withBadge(drawAgent(ROLES[i].c, m, ROLES[i].look), m), ROLES[i].n, ROLES[i].r, [cls, label]);
+});
+</script>
+</body></html>
