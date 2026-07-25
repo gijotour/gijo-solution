@@ -2,7 +2,7 @@
 // [CS 구조 변경] engine/ 모듈을 더 이상 임포트하지 않는다(전부 서버로 이전됨).
 // main.ts는 창 관리와 페이지 네비게이션만 담당하는 얇은 셸이다.
 
-import { app, BrowserWindow, ipcMain, dialog, safeStorage, shell } from "electron";
+import { app, BrowserWindow, ipcMain, dialog, safeStorage, shell, screen } from "electron";
 import * as path from "path";
 import { spawn, ChildProcess } from "child_process";
 import * as os from "os";
@@ -166,9 +166,11 @@ ipcMain.handle("office:open", async () => {
     return;
   }
   officeWindow = new BrowserWindow({
-    width: 1000,
-    height: 760,
-    minWidth: 820,
+    // 3열(할일 236 · 사무실 · 브리핑 250)이 다 들어가야 글이 안 잘린다(2026-07-26 사용자 결정).
+    // 화면이 작으면 그 화면에 맞춰 줄인다 — 창이 화면 밖으로 나가는 게 더 나쁘다.
+    width: Math.min(1360, Math.max(1000, screen.getPrimaryDisplay().workAreaSize.width - 120)),
+    height: Math.min(840, Math.max(700, screen.getPrimaryDisplay().workAreaSize.height - 120)),
+    minWidth: 1080,
     minHeight: 620,
     backgroundColor: "#0a0e1a",
     title: "GIJO AS — 우리 AI 팀 사무실",
