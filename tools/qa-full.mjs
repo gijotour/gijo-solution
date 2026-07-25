@@ -1,0 +1,109 @@
+#!/usr/bin/env node
+// QA 전수조사 — 변경사항을 확인하고 영향 계층만 골라 도는 오케스트레이터 (2026-07-25).
+//
+// 동작: ① 마지막 실행 마커(.tmp-reports/qa-last-run.json)의 커밋 이후 변경 파일을 git으로 수집
+//      ② 변경 영역 → QA 계층 매핑으로 돌릴 것을 선택(변경 없어도 스모크=서버 계층은 항상)
+//      ③ 계층별 실행 → 결과 요약 + 마커 갱신 + .tmp-reports/qa-full-report.md
+//
+// 사용: QA_USER=... QA_PASS=... node tools/qa-full.mjs [--all] [--fast]
+//   --all  변경과 무관하게 전 계층 실행
+//   --fast 서버 단위테스트(vitest, ~90초)와 LLM 시나리오 계층 생략(빠른 확인용)
+//
+// 계층 목록(무엇을 검증하나):
+//   server      운영 HTTP 13 시나리오 (qa-auto --layer=server) — 항상 실행(스모크)
+//   vitest      서버 단위테스트 전체 (server/ npm test)
+//   client      실페이지 렌더 5 시나리오 (qa-auto --layer=client)
+//   knowledge   RAG 검색 6 시나리오 (qa-auto --layer=knowledge)
+//   maintenance 유지보수 실 LLM 6 시나리오 (qa-auto --layer=maintenance)
+//   regress     답변 회귀 하네스 11케이스 (tools/regress/run.mjs)
+//   sweep       Electron 전 화면 스윕 (menu-sweep — CDP 9223 필요, 없으면 안내 후 스킵)
+
+import fs from "node:fs";
+import path from "node:path";
+import { execSync, spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
+
+const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+const OUT = path.join(ROOT, ".tmp-reports");
+fs.mkdirSync(OUT, { recursive: true });
+const MARKER = path.join(OUT, "qa-last-run.json");
+const ALL = process.argv.includes("--all");
+const FAST = process.argv.includes("--fast");
+
+const USER = process.env.QA_USER || process.env.GIJO_ADMIN_USER;
+const PASS = process.env.QA_PASS || process.env.GIJO_ADMIN_PASSWORD;
+if (!USER || !PASS) { console.error("QA_USER/QA_PASS (또는 GIJO_ADMIN_*) 환경변수가 필요합니다"); process.exit(2); }
+const env = { ...process.env, QA_USER: USER, QA_PASS: PASS, GIJO_ADMIN_USER: USER, GIJO_ADMIN_PASSWORD: PASS };
+
+// ── ① 변경사항 수집 — 마커 커밋..HEAD + 미커밋(working tree) ─────────────────────
+const git = (cmd) => execSync(`git ${cmd}`, { cwd: ROOT, encoding: "utf8" }).trim();
+const head = git("rev-parse HEAD");
+let since = null;
+try { since = JSON.parse(fs.readFileSync(MARKER, "utf8")).commit; git(`cat-file -t ${since}`); } catch { since = null; }
+let changed = [];
+if (since && since !== head) changed = git(`diff --name-only ${since}..HEAD`).split("\n").filter(Boolean);
+changed = [...new Set([...changed, ...git("status --porcelain").split("\n").filter(Boolean).map((l) => l.slice(3).trim())])];
+
+// ── ② 변경 영역 → 계층 매핑 ─────────────────────────────────────────────────────
+// 답변 품질에 닿는 엔진(LLM·RAG·라우팅·그래프)이 바뀌면 지식·시나리오·회귀까지 돈다.
+const QUALITY_RE = /^server\/src\/engine\/(llm|memory|hybridsearch|dispatcher|agentloop|intent|orchestrator-|ontology|docgraph|gateway|screenguide|agenttools|webreport|vulnscan)/;
+const picks = new Set(["server"]); // 스모크는 항상
+const reasons = [];
+for (const f of changed) {
+  if (QUALITY_RE.test(f)) { picks.add("knowledge"); picks.add("maintenance"); picks.add("regress"); picks.add("vitest"); reasons.push(`${f} → 지식·시나리오·회귀`); }
+  else if (f.startsWith("server/")) { picks.add("vitest"); reasons.push(`${f} → 서버 단위테스트`); }
+  else if (f.startsWith("client/src/")) { picks.add("client"); picks.add("sweep"); reasons.push(`${f} → 클라 실페이지·스윕`); }
+  else if (f.startsWith("tools/regress/") || f.startsWith("rag-seed/")) { picks.add("regress"); reasons.push(`${f} → 회귀 하네스`); }
+}
+if (ALL) for (const l of ["vitest", "client", "knowledge", "maintenance", "regress", "sweep"]) picks.add(l);
+if (FAST) { picks.delete("vitest"); picks.delete("maintenance"); }
+
+console.log(`■ QA 전수조사 — 기준: ${since ? since.slice(0, 8) + "..HEAD" : "(첫 실행 — 마커 없음, 전 계층)"}`);
+if (!since) for (const l of ["vitest", "client", "knowledge", "maintenance", "regress", "sweep"]) { if (!FAST || (l !== "vitest" && l !== "maintenance")) picks.add(l); }
+console.log(`  변경 파일 ${changed.length}개 → 계층 [${[...picks].join(", ")}]${ALL ? " (--all)" : ""}${FAST ? " (--fast)" : ""}`);
+for (const r of reasons.slice(0, 8)) console.log(`   · ${r}`);
+if (reasons.length > 8) console.log(`   · … 외 ${reasons.length - 8}건`);
+
+// ── ③ 계층 실행 ─────────────────────────────────────────────────────────────────
+const results = [];
+function run(name, cmd, args, opts = {}) {
+  if (!picks.has(name)) return;
+  const t = Date.now();
+  console.log(`\n── [${name}] ${cmd} ${args.join(" ")}`);
+  const r = spawnSync(cmd, args, { cwd: opts.cwd ?? ROOT, env, stdio: "inherit", shell: process.platform === "win32" });
+  results.push({ name, ok: r.status === 0, ms: Date.now() - t });
+}
+
+// Electron 스윕은 CDP가 살아 있을 때만 — 없으면 스킵 사유를 남긴다(자동 기동은 하지 않음: 세션 방해 금지).
+if (picks.has("sweep")) {
+  const cdpUp = await fetch("http://127.0.0.1:9223/json/version").then((r) => r.ok).catch(() => false);
+  if (!cdpUp) {
+    console.log("\n── [sweep] 스킵 — Electron(CDP 9223) 미기동. /GIJOAS클라시작 후 로그인하고 다시 돌리면 포함됩니다.");
+    picks.delete("sweep");
+    results.push({ name: "sweep", ok: null, ms: 0, note: "스킵(Electron 미기동)" });
+  }
+}
+
+run("server", "node", ["tools/qa-auto.mjs", "--layer=server"]);
+run("vitest", "npm", ["test"], { cwd: path.join(ROOT, "server") });
+run("client", "node", ["tools/qa-auto.mjs", "--layer=client"]);
+run("knowledge", "node", ["tools/qa-auto.mjs", "--layer=knowledge"]);
+run("maintenance", "node", ["tools/qa-auto.mjs", "--layer=maintenance"]);
+run("regress", "node", ["tools/regress/run.mjs"]);
+run("sweep", "node", ["tools/menu-sweep.mjs"]);
+
+// ── ④ 요약·마커·리포트 ──────────────────────────────────────────────────────────
+const fails = results.filter((r) => r.ok === false);
+console.log("\n■ 전수조사 결과");
+for (const r of results) console.log(`  ${r.ok === null ? "―" : r.ok ? "✓" : "✗"} ${r.name} (${(r.ms / 1000).toFixed(0)}s)${r.note ? " — " + r.note : ""}`);
+console.log(fails.length ? `\n✗ 실패 ${fails.length}계층 — 마커를 갱신하지 않습니다(다음 실행이 같은 변경을 다시 봄)` : "\n✓ 전 계층 통과");
+
+if (!fails.length) fs.writeFileSync(MARKER, JSON.stringify({ commit: head, at: new Date().toISOString(), layers: [...picks] }, null, 2));
+fs.writeFileSync(path.join(OUT, "qa-full-report.md"), [
+  `# QA 전수조사 (${new Date().toISOString().slice(0, 16)})`,
+  `- 기준: ${since ? since.slice(0, 8) : "(첫 실행)"} → ${head.slice(0, 8)} · 변경 ${changed.length}파일`,
+  `- 계층: ${results.map((r) => `${r.name}=${r.ok === null ? "스킵" : r.ok ? "통과" : "실패"}`).join(" · ")}`,
+  "", "## 변경 파일", ...changed.map((f) => `- ${f}`),
+].join("\n"));
+console.log(`리포트: .tmp-reports/qa-full-report.md`);
+process.exit(fails.length ? 1 : 0);
