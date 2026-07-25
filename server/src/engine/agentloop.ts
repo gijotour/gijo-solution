@@ -13,6 +13,7 @@
 import { chat } from "./llm";
 import { listAgentTools, listToolsFor, findAgentTool, toolCatalogText, validateToolArgs, buildApproval, PendingApproval, NO_HIT_PREFIX } from "./agenttools";
 import { emitCollaboration } from "./collaboration";
+import { listProducts } from "./securityproducts";
 
 const MAX_STEPS = 5;
 
@@ -298,8 +299,30 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }
     args: {},
   },
 ];
+// 등록된 보안제품 이름을 콕 집어 "설명해줘"라고 물으면 그 제품의 사내 근거(매뉴얼·온톨로지)를
+// 모아 답한다. [2026-07-26 실사용] "Tenable Web App Scanning 주요기능 설명해줘"에 도구를 하나도
+// 안 쓰고 "이 자산 취약점 1건" 같은 엉뚱한 답이 나왔다 — 매뉴얼이 들어 있는데도 찾아보지 않았다.
+// 어느 도구로 갈지 정해두지 않으면 LLM이 그냥 지어낸다.
+const EXPLAIN_VERB_RE = /설명|주요\s*기능|무슨\s*(제품|기능)|뭐(야|하는)|어떤\s*(제품|기능|역할)|알려줘|소개/;
+function namedProductIn(instruction: string): string | null {
+  const q = instruction.replace(/\s+/g, "").toLowerCase();
+  // 긴 이름부터 본다 — "Tenable Security Center"가 "Tenable"보다 먼저 걸리게.
+  const names = listProducts()
+    .map((p) => p.name)
+    .filter((n) => n && n.replace(/\s+/g, "").length >= 4)
+    .sort((a, b) => b.length - a.length);
+  for (const n of names) if (q.includes(n.replace(/\s+/g, "").toLowerCase())) return n;
+  return null;
+}
+
 function forcedToolFor(instruction: string, scope?: ToolScope): { tool: string; args: Record<string, string> } | null {
   const available = new Set(listToolsFor(scope?.domains, scope?.role).map((t) => t.name));
+
+  if (available.has("explain") && EXPLAIN_VERB_RE.test(instruction)) {
+    const product = namedProductIn(instruction);
+    if (product) return { tool: "explain", args: { topic: product } };
+  }
+
   // "가장 급한 취약점 담당자·기한 배정해줘"처럼 배정/지정 지시면 우선순위 조회(today)로 못박지 않는다
   // — LLM이 assign_finding(쓰기)을 고르도록 둔다(실측: today 강제가 배정 명령까지 흡수했었음).
   const isAssign = /배정|담당자\s*(를|을|.{0,2})?(지정|정해|배치|맡|줘|넣)|기한\s*(을|를)?\s*(지정|정해|설정|잡)|맡겨|배치해줘/.test(instruction);
