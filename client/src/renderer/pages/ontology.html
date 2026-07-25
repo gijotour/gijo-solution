@@ -215,7 +215,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const svg = document.getElementById("graph");
     const W = 900, H = 440, cx = W / 2, cy = H / 2, R = 165;
     const shown = triples.slice(0, GRAPH_CAP);
-    document.getElementById("graphCap").textContent = GRAPH_CAP;
+    const capEl = document.getElementById("graphCap"); // 요소는 개편 때 제거됨 — 잔존 참조가 그래프 렌더를 죽였다(2026-07-25 스윕 발견)
+    if (capEl) capEl.textContent = GRAPH_CAP;
     const nodeNames = [];
     const seen = new Set();
     for (const t of shown) { for (const n of [t.subject, t.object]) if (!seen.has(n)) { seen.add(n); nodeNames.push(n); } }

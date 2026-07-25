@@ -456,11 +456,12 @@ tr:last-child td{border-bottom:none;}
             ? r.assetNames.join(", ")
             : (r.assetIds && r.assetIds.length ? r.assetIds.join(", ") : "전체 자산");
           const when = r.createdAt ? new Date(r.createdAt).toLocaleString("ko-KR") : "-";
+          const who = r.createdBy ? `<br><span style="font-size:10px;color:#6fdcb5" title="이 리포트를 만든 사람">👤 ${esc(r.createdBy)}</span>` : ""; // 작업 귀속(2026-07-25)
           const files = (r.docx ? dlBtn(r.docx) : "") + (r.pdf ? dlBtn(r.pdf) : "");
           return `<tr>
             <td><span class="badge b-blue">${TYPE_LABEL[r.type] || r.type}</span><br><span style="font-size:10px;color:var(--muted-2);white-space:nowrap">${audLabel}</span></td>
             <td>${esc(target)}</td>
-            <td>${when}</td>
+            <td>${when}${who}</td>
             <td class="row-actions" style="white-space:nowrap">${viewBtn(r.base)}${files}${delBtn(r.base)}</td>
           </tr>`;
         })

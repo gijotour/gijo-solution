@@ -27,6 +27,7 @@ export interface ReportRequest {
   format?: "docx" | "pdf" | "both"; // 기본 docx. pdf/both면 PDF도 생성(개선 #3).
   // 대상 독자: internal=내부 검토용(격식 없이 액션 중심) / official=보고용(격식·거버넌스 강조). 기본 official.
   audience?: "internal" | "official";
+  createdBy?: string; // 작업 귀속 — 누가 생성했는지(라우트=로그인 사용자, 스케줄러="정기 스케줄")
 }
 
 export interface ReportResult {
@@ -557,6 +558,7 @@ export async function generateReport(req: ReportRequest): Promise<ReportResult> 
       docx: path.basename(filePath),
       pdf: result.pdfPath ? path.basename(result.pdfPath) : undefined,
       summary: executiveSummary.slice(0, 400),
+      createdBy: req.createdBy, // 작업 귀속
     };
     await fs.writeFile(path.join(REPORT_DIR, `${base}.json`), JSON.stringify(meta, null, 2), "utf-8");
   } catch {
@@ -577,6 +579,7 @@ export interface ReportHistoryEntry {
   summary?: string;
   docx?: string;
   pdf?: string;
+  createdBy?: string; // 작업 귀속 — 누가 생성했는지
 }
 
 export async function listReportHistory(limit = 100): Promise<ReportHistoryEntry[]> {
@@ -626,6 +629,7 @@ export async function listReportHistory(limit = 100): Promise<ReportHistoryEntry
         entry.assetIds = meta.assetIds ?? [];
         entry.assetNames = meta.assetNames ?? [];
         entry.summary = meta.summary;
+        entry.createdBy = meta.createdBy; // 작업 귀속 — 화면에 "생성자" 표시
       } catch {
         /* 메타 깨졌으면 파일명 기반 폴백 유지 */
       }
@@ -865,9 +869,9 @@ export function registerReportRoutes(app: Express): void {
     "/api/report/generate",
     authMiddleware,
     asyncRoute(async (req, res) => {
-      const result = await generateReport(req.body);
-      // 작업 기록(감사)에 남긴다 → onAudit 훅으로 작업 세션 목록에도 자동 반영("모든 행위" 요청).
       const actor = (req as ExpressRequestWithUser).user?.displayName ?? null;
+      const result = await generateReport({ ...req.body, createdBy: actor ?? undefined }); // 작업 귀속 — 생성자 기록
+      // 작업 기록(감사)에 남긴다 → onAudit 훅으로 작업 세션 목록에도 자동 반영("모든 행위" 요청).
       recordAudit({
         kind: "write", actor, action: `리포트 생성 (${req.body?.type ?? "ondemand"})`,
         target: path.basename(result.filePath), detail: result.executiveSummary.slice(0, 200), result: "ok",

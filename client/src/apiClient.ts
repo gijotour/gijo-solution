@@ -621,6 +621,7 @@ export interface MemoryDocument {
   ingestedAt: string | null;
   hasSource: boolean;
   docClass: string | null;
+  uploadedBy?: string | null; // 작업 귀속 — 누가 올렸는지
 }
 
 // ── 온톨로지 (지식 그래프 / 하이브리드 지식모델의 의미 계층) ──────────────
@@ -1089,6 +1090,7 @@ export interface ReportHistoryEntry {
   summary?: string;
   docx?: string;
   pdf?: string;
+  createdBy?: string; // 작업 귀속 — 누가 생성했는지
 }
 
 // ── 정기 리포트(주간/분기) 자동 생성 스케줄 ────────────────────────────────

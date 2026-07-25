@@ -235,7 +235,7 @@ async function runOrchestration(instructionText: string, steps: OrchestrationSte
       } else {
         // report — 앞 단계에서 스캔한 자산이 있으면 그 범위로, 없으면 전체로 보고서를 만든다.
         const scoped = scannedAssetIds.size ? [...scannedAssetIds] : undefined;
-        const r = await generateReport({ type: "ondemand", assetIds: scoped });
+        const r = await generateReport({ type: "ondemand", assetIds: scoped, createdBy: "AI 팀(오케스트레이터)" });
         assetIds = scoped;
         output = `${r.executiveSummary}\n(리포트 파일: ${r.filePath})`;
       }

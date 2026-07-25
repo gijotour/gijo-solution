@@ -397,12 +397,13 @@ tr:last-child td{border-bottom:none;}
     const scopeShort = d.scope === "global" ? "전역" : d.scope;
     const scopeLabel = d.scope === "global" ? "전역(공유)" : d.scope + " 전용";
     const classBadge = d.docClass ? ` · 분류: <b style="color:var(--blue-light)">${dmEsc(d.docClass)}</b>` : "";
+    const whoBadge = d.uploadedBy ? ` · 올린이: <b style="color:#6fdcb5">${dmEsc(d.uploadedBy)}</b>` : ""; // 작업 귀속(2026-07-25)
     const openBtn = d.hasSource
       ? `<button id="dmOpenBtn" style="margin-left:auto;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:8px 14px;color:var(--text);font-size:12px;font-weight:700;cursor:pointer">📂 원본 열기</button>`
       : "";
     detail.innerHTML =
       `<div class="dm-dtop"><div class="ic">${DM_ICON(documentId)}</div><div><div class="dm-dname">${dmEsc(documentId)}</div>` +
-      `<div class="dm-dmeta">${scopeLabel} 범위 · 업로드 ${dmEsc(when)}${classBadge}</div></div>${openBtn}</div>` +
+      `<div class="dm-dmeta">${scopeLabel} 범위 · 업로드 ${dmEsc(when)}${whoBadge}${classBadge}</div></div>${openBtn}</div>` +
       `<div class="dm-metric"><div class="dm-m"><b>${d.chunks}</b><span>임베딩 조각</span></div>` +
       `<div class="dm-m"><b>bge-m3</b><span>임베딩 모델</span></div>` +
       `<div class="dm-m"><b>${scopeShort}</b><span>검색 범위</span></div>` +
@@ -560,7 +561,7 @@ tr:last-child td{border-bottom:none;}
     document.getElementById("hygieneScanBtn").addEventListener("click", function (e) { e.stopPropagation(); loadHygiene(true); });
 
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
-    document.getElementById("learnloopLink").addEventListener("click", () => window.gijo.navigateTo("learnloop.html"));
+    // learnloopLink 요소는 IA 통합 때 제거됨 — 잔존 배선이 null 크래시로 아래 업로드 버튼까지 죽였다(2026-07-25 스윕 발견).
     document.querySelectorAll("[data-page]").forEach((el) => {
       el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
     });

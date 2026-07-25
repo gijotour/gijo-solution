@@ -10,17 +10,19 @@ import * as lancedb from "@lancedb/lancedb";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { embed, chat } from "./llm";
-import { db } from "../db";
+import { db, migrate } from "../db";
 import { emitCollaboration } from "./collaboration";
 import { gateUserInput } from "./gateway";
 
 // 문서 단위 메타데이터(업로드 시각·원본 경로)는 SQLite에 둔다 — LanceDB 스키마는 건드리지 않는다.
+migrate("memory_documents-uploadedBy", "ALTER TABLE memory_documents ADD COLUMN uploadedBy TEXT"); // 작업 귀속(누가 올렸나) 표시용(2026-07-25)
 const upsertDocMetaStmt = db.prepare(
-  `INSERT INTO memory_documents (documentId, scope, chunks, embeddingModel, sourcePath, ingestedAt)
-   VALUES (@documentId, @scope, @chunks, @embeddingModel, @sourcePath, @ingestedAt)
+  `INSERT INTO memory_documents (documentId, scope, chunks, embeddingModel, sourcePath, ingestedAt, uploadedBy)
+   VALUES (@documentId, @scope, @chunks, @embeddingModel, @sourcePath, @ingestedAt, @uploadedBy)
    ON CONFLICT(documentId) DO UPDATE SET
      scope=excluded.scope, chunks=excluded.chunks, embeddingModel=excluded.embeddingModel,
-     sourcePath=COALESCE(excluded.sourcePath, memory_documents.sourcePath), ingestedAt=excluded.ingestedAt`
+     sourcePath=COALESCE(excluded.sourcePath, memory_documents.sourcePath), ingestedAt=excluded.ingestedAt,
+     uploadedBy=COALESCE(excluded.uploadedBy, memory_documents.uploadedBy)`
 );
 const getDocMetaStmt = db.prepare("SELECT * FROM memory_documents WHERE documentId = ?");
 const deleteDocMetaStmt = db.prepare("DELETE FROM memory_documents WHERE documentId = ?");
@@ -238,15 +240,15 @@ export function chunkText(text: string, size = CHUNK_SIZE, overlap = CHUNK_OVERL
   return filtered;
 }
 
-export async function ingestDocument(filePath: string, scope: string = GLOBAL_SCOPE, classify = false): Promise<IngestResult> {
+export async function ingestDocument(filePath: string, scope: string = GLOBAL_SCOPE, classify = false, uploadedBy?: string): Promise<IngestResult> {
   const resolved = assertWithinIngestRoot(filePath);
   const raw = await fs.readFile(resolved, "utf-8");
-  return ingestText(path.basename(resolved), raw, scope, resolved, classify);
+  return ingestText(path.basename(resolved), raw, scope, resolved, classify, uploadedBy);
 }
 
 // 이미 추출된 텍스트를 지식 베이스에 직접 넣는다 — 파일 업로드(PDF/HWPX 추출 후)나
 // 서버 밖 클라이언트에서 올린 문서용. ingestDocument는 파일을 읽어 이 함수로 위임한다.
-export async function ingestText(documentId: string, raw: string, scope: string = GLOBAL_SCOPE, sourcePath?: string, classify = false): Promise<IngestResult> {
+export async function ingestText(documentId: string, raw: string, scope: string = GLOBAL_SCOPE, sourcePath?: string, classify = false, uploadedBy?: string): Promise<IngestResult> {
   const chunks = chunkText(raw);
   if (chunks.length === 0) return { documentId, chunks: 0, embeddingModel: "none", scope };
 
@@ -349,6 +351,7 @@ export async function ingestText(documentId: string, raw: string, scope: string 
       embeddingModel: "local-embedding-server",
       sourcePath: sourcePath ?? null,
       ingestedAt: new Date().toISOString(),
+      uploadedBy: uploadedBy ?? null, // 작업 귀속 — 누가 올렸는지(화면 표시용)
     });
   } catch (err) {
     console.warn(`[memory] 문서 메타데이터 기록 실패: ${err instanceof Error ? err.message : String(err)}`);
@@ -460,6 +463,7 @@ export interface MemoryDocument {
   ingestedAt: string | null; // 없으면 이 기능 이전에 수집된 문서
   hasSource: boolean; // 서버에 원본 파일 경로가 기록돼 있어 '원본까지 삭제'가 가능한지
   docClass: string | null; // Scan·Analyze Agent 분류(매뉴얼/보고서/정책/기타) — 분류 전 문서는 null
+  uploadedBy: string | null; // 작업 귀속 — 누가 올렸는지(2026-07-25)
 }
 
 // 장기기억에 저장된 문서 목록. 조각 수·scope의 진실 원천은 LanceDB(실제 임베딩),
@@ -483,7 +487,7 @@ export async function listDocuments(): Promise<MemoryDocument[]> {
     }
   }
   const metaRows = db.prepare("SELECT * FROM memory_documents").all() as {
-    documentId: string; embeddingModel: string | null; sourcePath: string | null; ingestedAt: string; docClass: string | null;
+    documentId: string; embeddingModel: string | null; sourcePath: string | null; ingestedAt: string; docClass: string | null; uploadedBy: string | null;
   }[];
   const metaById = new Map(metaRows.map((m) => [m.documentId, m]));
   const out: MemoryDocument[] = [];
@@ -497,6 +501,7 @@ export async function listDocuments(): Promise<MemoryDocument[]> {
       ingestedAt: meta?.ingestedAt ?? null,
       hasSource: !!meta?.sourcePath,
       docClass: meta?.docClass ?? null,
+      uploadedBy: meta?.uploadedBy ?? null,
     });
   }
   out.sort((a, b) => (b.ingestedAt ?? "").localeCompare(a.ingestedAt ?? "") || b.chunks - a.chunks);
@@ -555,7 +560,7 @@ export function registerMemoryRoutes(app: Express): void {
     authMiddleware,
     asyncRoute(async (req, res) => {
       // 사용자 업로드 경로 — Scan·Analyze Agent 분류 포함(classify:false로 끌 수 있음).
-      res.json(await ingestDocument(req.body.path, req.body.scope ?? GLOBAL_SCOPE, req.body.classify !== false));
+      res.json(await ingestDocument(req.body.path, req.body.scope ?? GLOBAL_SCOPE, req.body.classify !== false, (req as unknown as { user?: { displayName?: string } }).user?.displayName));
     })
   );
   // 파일 업로드 → 텍스트 추출(PDF/HWPX/TXT) → 지식 베이스 수집. 담당자가 경로를 타이핑하지 않고
@@ -589,7 +594,7 @@ export function registerMemoryRoutes(app: Express): void {
           savedPath = undefined;
         }
         // 사용자 업로드 경로 — Scan·Analyze Agent 분류 포함.
-        res.json(await ingestText(filename, text, scope ?? GLOBAL_SCOPE, savedPath, true));
+        res.json(await ingestText(filename, text, scope ?? GLOBAL_SCOPE, savedPath, true, (req as unknown as { user?: { displayName?: string } }).user?.displayName));
       } catch (err) {
         res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
       }
