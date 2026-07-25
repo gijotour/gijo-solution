@@ -27,6 +27,12 @@
     "#gijoTitlebarStrip{position:fixed;top:0;left:0;right:0;height:" + BAR_H + "px;-webkit-app-region:drag;z-index:800;display:flex;align-items:center;justify-content:flex-end;",
     "padding-right:calc(100vw - env(titlebar-area-width,100vw) - env(titlebar-area-x,0px) + 10px);}",
     // ⚙ 버튼 공통
+    // 세션 칩(전 화면 공용, 2026-07-26 이관) — 남은 유휴 시간 표시 + 클릭 시 연장/관제 메뉴.
+    ".gtb-sess{-webkit-app-region:no-drag;display:none;align-items:center;gap:5px;background:rgba(30,185,128,.14);border:1px solid rgba(30,185,128,.4);color:var(--teal,#1eb980);padding:3px 10px;border-radius:16px;font-size:11px;font-weight:800;cursor:pointer;position:relative;white-space:nowrap;}",
+    ".gtb-sess-pop{position:absolute;top:26px;right:0;min-width:186px;background:#151d33;border:1px solid rgba(255,255,255,.16);border-radius:10px;box-shadow:0 14px 40px rgba(0,0,0,.5);padding:6px;z-index:960;text-align:left;}",
+    ".gtb-sess-mi{padding:8px 10px;border-radius:7px;font-size:12px;color:#e7eaf3;cursor:pointer;font-weight:700;}",
+    ".gtb-sess-mi:hover{background:rgba(59,130,246,.12);}",
+    ".gtb-sess-mi .sub{font-size:10px;color:#5f6785;font-weight:500;margin-top:2px;}",
     ".gtb-gear{-webkit-app-region:no-drag;width:28px;height:28px;border-radius:8px;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);display:flex;align-items:center;justify-content:center;font-size:13px;color:#cfe0ff;cursor:pointer;position:relative;flex:0 0 auto;}",
     // ── 사용자 영역(왼쪽 패널 하단) ──
     ".gtb-userarea{border-top:1px solid rgba(255,255,255,.08);background:rgba(59,130,246,.05);padding:8px 10px;display:flex;flex-direction:column;gap:6px;z-index:60;}",
@@ -291,6 +297,92 @@
     return area;
   }
 
+  // ── 세션 칩 — 전 화면 공용(2026-07-26 이관: 예전엔 dashboard.html에만 있어 다른 화면엔 안 보였다) ──
+  // 유휴 만료까지 남은 시간을 초 단위로 보여주고, 클릭하면 [세션 연장 30분 / 관제(계속)]을 고른다.
+  // 관제 모드는 5분마다 자동 연장(대형 모니터 상시 표시용) — 보안상 앱 재시작 시 해제(영속 안 함).
+  var sessMonitor = false, sessTimer = null, sessChip = null, sessTimeEl = null, sessPop = null;
+
+  function renderSessChip() {
+    if (!sessChip) return;
+    if (!window.gijo || !window.gijo.sessionActivity || !window.gijo.isAuthenticated || !window.gijo.isAuthenticated()) {
+      sessChip.style.display = "none"; return;
+    }
+    if (sessMonitor) {
+      sessTimeEl.textContent = "관제(계속)";
+      sessChip.style.background = "rgba(139,124,240,.16)";
+      sessChip.style.borderColor = "rgba(139,124,240,.5)";
+      sessChip.style.color = "#8b7cf0";
+      sessChip.style.display = "inline-flex";
+      return;
+    }
+    var info; try { info = window.gijo.sessionActivity(); } catch (e) { return; }
+    var ms = Math.max(0, info.remainingMs);
+    var m = Math.floor(ms / 60000), s = Math.floor((ms % 60000) / 1000);
+    sessTimeEl.textContent = m + ":" + String(s).padStart(2, "0");
+    var rgb = ms > 300000 ? "30,185,128" : ms > 120000 ? "240,160,32" : "226,72,61";
+    var col = ms > 300000 ? "#1eb980" : ms > 120000 ? "#f0a020" : "#e2483d";
+    sessChip.style.background = "rgba(" + rgb + ",.14)";
+    sessChip.style.borderColor = "rgba(" + rgb + ",.4)";
+    sessChip.style.color = col;
+    sessChip.style.display = "inline-flex";
+  }
+
+  function setSessMonitor(on) {
+    sessMonitor = on;
+    if (sessTimer) { clearInterval(sessTimer); sessTimer = null; }
+    if (on) {
+      window.gijo.extendSession().catch(function () {});
+      sessTimer = setInterval(function () { window.gijo.extendSession().catch(function () {}); }, 300000);
+    }
+    renderSessChip();
+  }
+
+  function mountSessChip() {
+    var hdr = document.querySelector(".header");
+    if (!hdr || document.querySelector(".gtb-sess")) return;
+    // 대시보드에 이미 자체 칩(#sessionChip)이 있으면 그걸 쓰고 공용은 만들지 않는다(중복 방지).
+    if (document.getElementById("sessionChip")) return;
+    // 순서 통일(2026-07-26): 대시보드와 동일하게 [서버 연결상태] → [세션] 순으로 놓는다.
+    // 연결상태 칩 바로 뒤에 붙이고, 없으면 우측 영역 끝에.
+    var right = hdr.querySelector(".header-right") || hdr.lastElementChild || hdr;
+    var statusPill = hdr.querySelector("#statusPill, .status-pill");
+    sessChip = document.createElement("div");
+    sessChip.className = "gtb-sess";
+    sessChip.title = "남은 세션 시간 — 마우스·키보드를 쓰면 자동 연장. 클릭하면 연장/관제 선택";
+    sessChip.innerHTML = '⏳ 세션 <span class="t">--:--</span> <span style="opacity:.7">▾</span>';
+    sessTimeEl = sessChip.querySelector(".t");
+    if (statusPill && statusPill.parentNode) statusPill.parentNode.insertBefore(sessChip, statusPill.nextSibling);
+    else right.appendChild(sessChip);
+
+    var closePop = function () { if (sessPop) { sessPop.remove(); sessPop = null; } };
+    document.addEventListener("click", function (e) {
+      if (sessPop && !sessPop.contains(e.target) && !sessChip.contains(e.target)) closePop();
+    });
+    sessChip.addEventListener("click", function () {
+      if (sessPop) { closePop(); return; }
+      sessPop = document.createElement("div");
+      sessPop.className = "gtb-sess-pop";
+      var mk = function (label, sub, fn) {
+        var d = document.createElement("div");
+        d.className = "gtb-sess-mi";
+        d.innerHTML = label + (sub ? '<div class="sub">' + sub + "</div>" : "");
+        d.addEventListener("click", function (e) { e.stopPropagation(); fn(); closePop(); });
+        return d;
+      };
+      sessPop.appendChild(mk("⏳ 세션 연장(30분)", "지금부터 30분으로 재설정", function () {
+        window.gijo.extendSession()
+          .then(function () { sessTimeEl.textContent = "연장됨 ✓"; setTimeout(renderSessChip, 1200); })
+          .catch(function () { sessTimeEl.textContent = "연장 실패"; setTimeout(renderSessChip, 1500); });
+      }));
+      sessPop.appendChild(sessMonitor
+        ? mk("⏹ 관제 종료", "일반 세션(30분 유휴 만료)으로 복귀", function () { setSessMonitor(false); })
+        : mk("🖥 관제(계속)", "만료 없이 유지 — 관제 모니터용, 앱 종료까지", function () { setSessMonitor(true); }));
+      sessChip.appendChild(sessPop);
+    });
+    renderSessChip();
+    setInterval(renderSessChip, 1000);
+  }
+
   // ── 마운트 — 화면 유형별 왼쪽 패널 ─────────────────────────────────────
   function mountUserArea() {
     if (document.querySelector(".gtb-userarea")) return true;
@@ -318,6 +410,7 @@
   }
 
   function afterMount() {
+    mountSessChip(); // 세션 칩(전 화면 공용)
     // 타이틀바의 기존 ⚙(진짜 기어만) 숨김 — 사용자 영역으로 이사 완료
     var oldGear = document.getElementById("settingsBtn");
     if (oldGear && oldGear.textContent.trim() === "⚙") oldGear.style.display = "none";

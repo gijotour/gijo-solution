@@ -1,0 +1,125 @@
+<!doctype html><html lang="ko"><head><meta charset="utf-8"><title>보안 KPI 대시보드 재설계 — 시안 3종</title>
+<style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.1);--border-strong:rgba(255,255,255,.16);--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--blue:#3b82f6;--blue-light:#5fa1ff;--teal:#1eb980;--amber:#f0a020;--red:#e2483d;--purple:#8b7cf0;}
+*{box-sizing:border-box;margin:0;}body{background:var(--bg);color:var(--text);font-family:'Malgun Gothic',sans-serif;padding:22px;font-size:13px;}
+h1{font-size:18px;margin-bottom:5px;}.lead{font-size:12px;color:var(--muted);margin-bottom:8px;line-height:1.7;max-width:1120px;}
+.lead b{color:var(--text);}.cite{font-size:10.5px;color:var(--muted-2);margin-bottom:18px;}
+.row{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:start;}
+.col{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:13px;}
+.col h2{font-size:14px;margin-bottom:3px;}.col .d{font-size:10.5px;color:var(--muted);margin-bottom:11px;line-height:1.6;min-height:70px;}
+.d .k{color:var(--teal);font-weight:700;}
+.screen{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:11px;}
+.posture{display:flex;align-items:center;gap:9px;background:linear-gradient(90deg,rgba(226,72,61,.12),transparent);border:1px solid rgba(226,72,61,.3);border-radius:9px;padding:8px 11px;margin-bottom:9px;}
+.posture .sc{font-size:20px;font-weight:800;color:#f5928a;}
+.posture .pl{font-size:11px;color:var(--muted);}
+.kgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:9px;}
+.kc{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:7px 8px;cursor:pointer;position:relative;}
+.kc:hover{border-color:var(--blue);}
+.kc .kl{font-size:8.5px;color:var(--muted);}
+.kc .kv{font-size:15px;font-weight:800;margin-top:2px;}
+.kc .rep{position:absolute;top:5px;right:6px;font-size:8px;color:var(--muted-2);}
+.cat-t{font-size:11px;font-weight:800;color:#fff;margin:10px 0 6px;display:flex;align-items:center;gap:6px;}
+.ai{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;}
+.at{background:var(--panel);border:1px solid rgba(139,124,240,.3);border-radius:8px;padding:7px 8px;cursor:pointer;}
+.at:hover{border-color:var(--purple);}
+.at .al{font-size:8.5px;color:var(--muted);}
+.at .av{font-size:14px;font-weight:800;margin-top:2px;}
+.at .go{font-size:8px;color:var(--blue-light);margin-top:2px;}
+.acc{border:1px solid var(--border);border-radius:8px;margin-top:10px;overflow:hidden;}
+.acc-h{display:flex;align-items:center;gap:6px;padding:8px 10px;background:var(--panel);font-size:11px;font-weight:800;cursor:pointer;}
+.acc-b{padding:8px 10px;font-size:10px;color:var(--muted);border-top:1px solid var(--border);line-height:1.6;}
+.tabs{display:flex;gap:5px;margin:10px 0 7px;}
+.tab{font-size:10px;padding:4px 9px;border-radius:7px;background:var(--panel);border:1px solid var(--border);color:var(--muted);}
+.tab.on{background:rgba(59,130,246,.16);color:var(--blue-light);font-weight:700;border-color:var(--blue);}
+.mini{font-size:9.5px;color:var(--muted);background:var(--panel);border:1px solid var(--border);border-radius:7px;padding:6px 8px;margin-top:5px;}
+.legend{font-size:9.5px;color:var(--muted-2);margin-top:9px;line-height:1.6;}
+.tag{display:inline-block;font-size:8px;font-weight:800;padding:1px 6px;border-radius:8px;background:rgba(30,185,128,.2);color:#6fdcb5;}
+.note{font-size:10px;color:var(--blue-light);margin-top:5px;}
+</style></head><body>
+<h1>📊 보안 KPI 대시보드 재설계 — 시안 3종</h1>
+<div class="lead">요청: <b>상단 KPI 클릭→리포트 출력 확인</b> · AI 보안 <b>"차별점" 배지 삭제 + 타일 클릭→관련 화면</b> · <b>AI 보안 이하 하단(조치·SLA·컴플라이언스·AI학습·번다운·추세)을 통합/정리(상세 보기화)</b>.</div>
+<div class="cite">모범사례(SOC KPI 대시보드): 한 뷰에 <b>7~8개 핵심 지표만</b>(과부하 회피) · <b>드릴다운</b>으로 상세 접근 · 신호등·추세·고위험 강조. 출처: UpGuard·SecurityScorecard·ArmorPoint·FanRuan(2025).</div>
+<div class="row">
+
+<!-- A안 -->
+<div class="col">
+  <h2>A안 — 임원 요약 + 상세 지표 아코디언</h2>
+  <div class="d">상단은 <span class="k">임원 요약</span>(태세+7 KPI, 클릭→리포트). AI 보안은 배지 없이 타일 클릭→화면. 하단 세부(번다운·추세·조치·컴플라이언스·AI학습)는 <span class="k">"📂 상세 지표" 한 아코디언</span>으로 접어 통합. 공수 최소·현 구조 보존.</div>
+  <div class="screen">
+    <div class="posture"><span>🛡</span><span class="sc">62</span><span class="pl">종합 보안태세 · 주의</span></div>
+    <div class="kgrid">
+      <div class="kc"><span class="rep">🖨</span><div class="kl">🔴 열린 취약점</div><div class="kv" style="color:#f5928a">313</div></div>
+      <div class="kc"><span class="rep">🖨</span><div class="kl">🚨 KEV</div><div class="kv" style="color:#ff8a80">14</div></div>
+      <div class="kc"><span class="rep">🖨</span><div class="kl">⏱ MTTR</div><div class="kv">4.2d</div></div>
+      <div class="kc"><span class="rep">🖨</span><div class="kl">📋 SLA</div><div class="kv">88%</div></div>
+      <div class="kc"><span class="rep">🖨</span><div class="kl">✓ 조치율</div><div class="kv" style="color:var(--teal)">71%</div></div>
+      <div class="kc"><span class="rep">🖨</span><div class="kl">📕 컴플</div><div class="kv">64%</div></div>
+    </div>
+    <div class="cat-t">🤖 AI 보안 (OWASP LLM Top 10)</div>
+    <div class="ai">
+      <div class="at"><div class="al">OWASP LLM 미대응</div><div class="av" style="color:#f5928a">3</div><div class="go">→ 자산 허브</div></div>
+      <div class="at"><div class="al">AI-BOM 생성률</div><div class="av" style="color:var(--amber)">55%</div><div class="go">→ AI-BOM</div></div>
+      <div class="at"><div class="al">레드팀 견고성</div><div class="av" style="color:var(--teal)">72</div><div class="go">→ 레드팀</div></div>
+    </div>
+    <div class="acc"><div class="acc-h">📂 상세 지표 <span style="margin-left:auto;color:var(--muted-2)">▸ 펼치기</span></div>
+      <div class="acc-b">번다운 · 추세 · 조치/SLA · 컴플라이언스 · AI 학습을 이 안에 접어둠 (기본 접힘)</div></div>
+  </div>
+  <div class="legend"><span class="tag">추천</span> 현 구조 보존·과부하 해소 · 리스크 최저</div>
+  <div class="note">상단 클릭=리포트 / AI·상세=화면</div>
+</div>
+
+<!-- B안 -->
+<div class="col">
+  <h2>B안 — 임원 요약 + 상세 탭(드릴다운)</h2>
+  <div class="d">상단 동일. 하단 세부를 <span class="k">탭 3개</span>로 나눠 한 번에 하나만: 취약점·조치 / 컴플라이언스·AI 학습 / 추세·번다운. 모범사례의 <span class="k">역할별 드릴다운</span>에 가장 부합. 탭 전환 학습 약간 필요.</div>
+  <div class="screen">
+    <div class="posture"><span>🛡</span><span class="sc">62</span><span class="pl">종합 보안태세 · 주의</span></div>
+    <div class="kgrid">
+      <div class="kc"><span class="rep">🖨</span><div class="kl">🔴 취약점</div><div class="kv" style="color:#f5928a">313</div></div>
+      <div class="kc"><span class="rep">🖨</span><div class="kl">🚨 KEV</div><div class="kv" style="color:#ff8a80">14</div></div>
+      <div class="kc"><span class="rep">🖨</span><div class="kl">⏱ MTTR</div><div class="kv">4.2d</div></div>
+      <div class="kc"><span class="rep">🖨</span><div class="kl">📋 SLA</div><div class="kv">88%</div></div>
+      <div class="kc"><span class="rep">🖨</span><div class="kl">✓ 조치율</div><div class="kv" style="color:var(--teal)">71%</div></div>
+      <div class="kc"><span class="rep">🖨</span><div class="kl">📕 컴플</div><div class="kv">64%</div></div>
+    </div>
+    <div class="cat-t">🤖 AI 보안</div>
+    <div class="ai">
+      <div class="at"><div class="al">OWASP 미대응</div><div class="av" style="color:#f5928a">3</div><div class="go">→ 자산 허브</div></div>
+      <div class="at"><div class="al">AI-BOM</div><div class="av" style="color:var(--amber)">55%</div><div class="go">→ AI-BOM</div></div>
+      <div class="at"><div class="al">레드팀</div><div class="av" style="color:var(--teal)">72</div><div class="go">→ 레드팀</div></div>
+    </div>
+    <div class="tabs"><span class="tab on">취약점·조치</span><span class="tab">컴플·AI학습</span><span class="tab">추세·번다운</span></div>
+    <div class="mini">📉 취약점 번다운(재스캔마다) + 조치/SLA 상세 — 선택 탭만 표시</div>
+  </div>
+  <div class="legend">드릴다운 부합 · 상세를 탭으로 분리 · 스크롤 짧음</div>
+  <div class="note">상단 클릭=리포트 / AI·탭=상세</div>
+</div>
+
+<!-- C안 -->
+<div class="col">
+  <h2>C안 — 순수 임원 대시보드(상세는 각 화면)</h2>
+  <div class="d">대시보드는 <span class="k">태세+7 KPI+AI 보안만</span>(딱 8개, 모범사례 정석). 하단 세부 섹션은 <span class="k">제거</span> — 각 카드/타일 클릭 시 해당 도메인 화면(취약점·조치·컴플라이언스·학습·레드팀)으로 이동해 상세를 봄. 가장 깔끔하나 기존 차트가 화면에서 빠짐.</div>
+  <div class="screen">
+    <div class="posture"><span>🛡</span><span class="sc">62</span><span class="pl">종합 보안태세 · 주의 <span style="color:var(--muted-2)">▸ 상세 리포트</span></span></div>
+    <div class="kgrid">
+      <div class="kc"><div class="kl">🔴 취약점</div><div class="kv" style="color:#f5928a">313</div><div class="go" style="font-size:8px;color:var(--blue-light)">→ 취약점</div></div>
+      <div class="kc"><div class="kl">🚨 KEV</div><div class="kv" style="color:#ff8a80">14</div><div class="go" style="font-size:8px;color:var(--blue-light)">→ 취약점</div></div>
+      <div class="kc"><div class="kl">⏱ MTTR</div><div class="kv">4.2d</div><div class="go" style="font-size:8px;color:var(--blue-light)">→ 조치</div></div>
+      <div class="kc"><div class="kl">📋 SLA</div><div class="kv">88%</div><div class="go" style="font-size:8px;color:var(--blue-light)">→ 조치</div></div>
+      <div class="kc"><div class="kl">✓ 조치율</div><div class="kv" style="color:var(--teal)">71%</div><div class="go" style="font-size:8px;color:var(--blue-light)">→ 취약점</div></div>
+      <div class="kc"><div class="kl">📕 컴플</div><div class="kv">64%</div><div class="go" style="font-size:8px;color:var(--blue-light)">→ 컴플</div></div>
+    </div>
+    <div class="cat-t">🤖 AI 보안</div>
+    <div class="ai">
+      <div class="at"><div class="al">OWASP 미대응</div><div class="av" style="color:#f5928a">3</div><div class="go">→ 자산 허브</div></div>
+      <div class="at"><div class="al">AI-BOM</div><div class="av" style="color:var(--amber)">55%</div><div class="go">→ AI-BOM</div></div>
+      <div class="at"><div class="al">레드팀</div><div class="av" style="color:var(--teal)">72</div><div class="go">→ 레드팀</div></div>
+    </div>
+    <div class="mini" style="text-align:center;color:var(--muted-2)">— 상세 차트는 각 도메인 화면에서 —</div>
+  </div>
+  <div class="legend">모범사례 정석(8개) · 최고로 깔끔 · 화면 내 추세 차트는 사라짐(각 화면으로)</div>
+  <div class="note">상단 카드=화면 이동(태세만 리포트)</div>
+</div>
+
+</div>
+</body></html>

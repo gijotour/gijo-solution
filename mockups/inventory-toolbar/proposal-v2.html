@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>자산 목록 툴바 재설계 v2 — 드롭다운으로 고르고, 칩으로 보여주기</title>
+<style>
+  :root{--bg:#0a0e1a;--panel:#121a2e;--panel2:#0e1526;--panel3:#0c1322;--border:rgba(255,255,255,.08);--bs:rgba(255,255,255,.16);--text:#e7eaf3;--muted:#8b93ab;--muted2:#5f6785;--blue:#3b82f6;--bl:#5fa1ff;--teal:#1eb980;--amber:#f0a020;--red:#e2483d;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI','Malgun Gothic',sans-serif;font-size:13px;padding:22px;line-height:1.5}
+  h1{font-size:17px;margin-bottom:4px}
+  .lead{color:var(--muted);font-size:12.5px;margin-bottom:8px}
+  .refs{font-size:11.5px;color:var(--muted2);margin-bottom:18px}
+  .refs b{color:var(--bl);font-weight:600}
+  .screen{border:1px solid var(--bs);border-radius:12px;background:var(--panel2);padding:16px;margin-bottom:16px}
+  .cap{font-size:11.5px;font-weight:800;color:var(--bl);margin-bottom:9px}
+  /* 헤더 */
+  .hdr{display:flex;align-items:center;gap:10px;margin-bottom:13px}
+  .ttl{font-size:18px;font-weight:800}
+  .ttl .c{color:var(--muted2);font-weight:600;font-size:14px}
+  .hbtn{border:1px solid var(--bs);border-radius:8px;padding:7px 13px;font-size:12px;color:var(--text);background:var(--panel);white-space:nowrap}
+  .hbtn.pri{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700}
+  .push{margin-left:auto;display:flex;gap:7px}
+  /* 툴바 1행 — 고르는 곳(컨트롤) */
+  .tb{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px}
+  .search{display:flex;align-items:center;gap:7px;background:var(--panel);border:1px solid var(--bs);border-radius:9px;padding:8px 12px;flex:1;min-width:260px}
+  .search input{background:none;border:none;color:var(--text);font-size:12.5px;outline:none;width:100%}
+  .dd{display:flex;align-items:center;gap:7px;background:var(--panel);border:1px solid var(--bs);border-radius:9px;padding:8px 12px;font-size:12.5px;cursor:pointer;white-space:nowrap}
+  .dd .k{color:var(--muted2);font-size:11px}
+  .dd .v{font-weight:700}
+  .dd .v.set{color:var(--bl)}
+  .dd .ar{color:var(--muted2);font-size:9px}
+  .dd.icon{color:var(--muted)}
+  .sep{width:1px;height:24px;background:var(--border);margin:0 2px}
+  /* 툴바 2행 — 보여주는 곳(적용된 필터 칩) */
+  .active{display:flex;align-items:center;gap:7px;flex-wrap:wrap;background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.25);border-radius:9px;padding:7px 11px;margin-bottom:11px;font-size:11.5px}
+  .active .lb{color:var(--muted2);font-weight:700;margin-right:2px}
+  .fchip{display:inline-flex;align-items:center;gap:6px;background:rgba(59,130,246,.16);border:1px solid rgba(59,130,246,.45);border-radius:20px;padding:3px 6px 3px 11px;color:#dfe9ff;font-weight:600}
+  .fchip .x{color:var(--bl);font-size:12px;cursor:pointer;padding:0 3px}
+  .fchip.warn{background:rgba(226,72,61,.14);border-color:rgba(226,72,61,.45);color:#ffb3ac}
+  .clear{margin-left:auto;color:var(--muted);cursor:pointer;font-weight:600}
+  .clear:hover{color:#fff}
+  /* 표 */
+  .tbl{border:1px solid var(--border);border-radius:10px;background:var(--panel);overflow:hidden}
+  .th,.tr{display:grid;grid-template-columns:26px 1.7fr 1.2fr .8fr .8fr .7fr .8fr;gap:10px;padding:9px 13px;font-size:11.5px;align-items:center}
+  .th{color:var(--muted2);font-weight:700;border-bottom:1px solid var(--border);background:var(--panel3)}
+  .th .srt{color:var(--bl)}
+  .tr{border-bottom:1px solid var(--border)}
+  .tr .n{font-weight:700;font-size:12.5px}
+  .tr .m{color:var(--muted2);font-size:10.5px;margin-top:1px}
+  .grp{padding:7px 13px;background:rgba(240,160,32,.08);font-size:11px;font-weight:800;color:var(--amber);border-bottom:1px solid var(--border)}
+  .lnk{color:var(--bl)}
+  .note{font-size:11.5px;color:var(--muted2);margin-top:11px;line-height:1.75}
+  .note b{color:var(--text)}
+  /* 드롭다운 펼침 예시 */
+  .pop{position:relative;display:inline-block}
+  .menu{margin-top:6px;background:var(--panel);border:1px solid var(--bs);border-radius:10px;padding:6px;width:210px;box-shadow:0 12px 30px rgba(0,0,0,.5)}
+  .mi{display:flex;align-items:center;gap:8px;padding:7px 9px;border-radius:7px;font-size:12px;color:var(--text)}
+  .mi:hover{background:rgba(255,255,255,.05)}
+  .mi.on{background:rgba(59,130,246,.15);color:#fff;font-weight:700}
+  .mi .cn{margin-left:auto;color:var(--muted2);font-size:10.5px}
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .box{border:1px solid var(--border);border-radius:12px;padding:13px 15px;background:var(--panel2)}
+  .box .bt{font-size:12.5px;font-weight:800;margin-bottom:7px}
+  .box ul{margin:0 0 0 16px;color:var(--muted);font-size:12px;line-height:1.85}
+  .box b{color:var(--text)}
+  .moved{border:1px dashed rgba(59,130,246,.5);border-radius:10px;padding:12px 14px;background:rgba(59,130,246,.05)}
+  .moved .h{font-size:12.5px;font-weight:800;color:var(--bl);margin-bottom:5px}
+  .moved .l{font-size:11.5px;color:var(--muted);line-height:1.75}
+</style>
+</head>
+<body>
+
+<h1>자산 목록 툴바 재설계 v2 — "드롭다운으로 고르고, 칩으로 보여준다"</h1>
+<div class="lead">필터가 세 곳(출처 칩·위험 칩·좌측 카테고리 트리)에 흩어져 있던 것을 <b>한 줄 컨트롤 + 적용 칩</b> 구조로 정리합니다.</div>
+<div class="refs">근거(2026 모범사례 조사): 목록이 길면 <b>드롭다운이 공간 효율</b>·칩은 <b>지금 걸린 필터를 보여주는 용도</b> / <b>적용된 필터는 항상 보이게</b>, 개별 ✕·전체 해제 제공 / <b>검색·필터·정렬은 시각적으로 구분</b></div>
+
+<div class="screen">
+  <div class="cap">상태 ① 필터 없음 — 툴바 한 줄, 칩 줄은 아예 안 나옴</div>
+  <div class="hdr">
+    <span class="ttl">자산 목록 <span class="c">(6)</span> ⓘ</span>
+    <span class="push"><span class="hbtn">CSV 내보내기</span><span class="hbtn">탐지 결과 가져오기</span><span class="hbtn pri">+ 자산 등록</span></span>
+  </div>
+  <div class="tb">
+    <div class="search"><span style="color:var(--muted2)">⌕</span><input placeholder="자산명 · 호스트 · 소유부서로 검색"></div>
+    <div class="dd"><span class="k">카테고리</span><span class="v">전체</span><span class="ar">▾</span></div>
+    <div class="dd"><span class="k">출처</span><span class="v">전체</span><span class="ar">▾</span></div>
+    <div class="dd"><span class="k">위험·상태</span><span class="v">전체</span><span class="ar">▾</span></div>
+    <div class="sep"></div>
+    <div class="dd icon">⇅ 정렬 <span class="v" style="color:var(--text)">급한 순</span><span class="ar">▾</span></div>
+  </div>
+  <!-- 하단 줄: 표시 항목(컬럼) — 필터가 없어도 항상 이 줄에 있다(사용자 요청 2026-07-26) -->
+  <div class="active" style="background:rgba(255,255,255,.03);border-color:var(--border)">
+    <span class="lb">표시 항목</span>
+    <span class="fchip" style="background:rgba(255,255,255,.06);border-color:var(--bs);color:var(--text)">호스트명 <span class="x" style="color:var(--muted2)">✕</span></span>
+    <span class="fchip" style="background:rgba(255,255,255,.06);border-color:var(--bs);color:var(--text)">소유부서 <span class="x" style="color:var(--muted2)">✕</span></span>
+    <span class="fchip" style="background:rgba(255,255,255,.06);border-color:var(--bs);color:var(--text)">카테고리 <span class="x" style="color:var(--muted2)">✕</span></span>
+    <span class="fchip" style="background:rgba(255,255,255,.06);border-color:var(--bs);color:var(--text)">위험도 <span class="x" style="color:var(--muted2)">✕</span></span>
+    <span class="fchip" style="background:rgba(255,255,255,.06);border-color:var(--bs);color:var(--text)">SBOM <span class="x" style="color:var(--muted2)">✕</span></span>
+    <span class="dd" style="padding:2px 9px;font-size:11px">＋ 항목 추가 <span class="ar">▾</span></span>
+    <span class="clear">기본값</span>
+  </div>
+  <div class="tbl">
+    <div class="th"><span></span><span>자산명</span><span>호스트명</span><span>소유부서</span><span>카테고리</span><span class="srt">위험도 ↓</span><span>SBOM</span></div>
+    <div class="grp">담당부서 없음 2건 — 사고가 나도 연락할 대상이 없습니다</div>
+    <div class="tr"><span>☐</span><span><div class="n">안전대부 본인인증 웹 서버</div><div class="m">웹 서버</div></span><span>certify.aj-safe.co.kr</span><span class="lnk">지정하기</span><span class="lnk">＋ 지정</span><span style="color:var(--amber)">중 · 3건</span><span>완료</span></div>
+    <div class="tr"><span>☐</span><span><div class="n">SafeKey 발급 웹 서버</div><div class="m">웹 서버</div></span><span>cert.aj-safe.co.kr</span><span class="lnk">지정하기</span><span class="lnk">＋ 지정</span><span style="color:var(--teal)">낮음 · 2건</span><span>완료</span></div>
+    <div class="tr"><span>☐</span><span><div class="n">사내 보안 어시스턴트</div><div class="m">LLM 서비스</div></span><span>—</span><span>보안관제팀</span><span>AI</span><span style="color:var(--teal)">낮음</span><span>완료</span></div>
+  </div>
+  <div class="note">좌측 카테고리 트리를 없애 <b>표가 전체 폭</b>을 씁니다 — 호스트명·OS가 두 줄로 접히던 문제 해소. 카테고리는 <b>컬럼</b>으로 보이고, 거를 땐 드롭다운으로.</div>
+</div>
+
+<div class="screen">
+  <div class="cap">상태 ② 필터 적용 — 무엇으로 걸렀는지 칩으로 항상 보이고, 하나씩/한번에 해제</div>
+  <div class="tb">
+    <div class="search"><span style="color:var(--muted2)">⌕</span><input placeholder="자산명 · 호스트 · 소유부서로 검색" value="safe" style="color:#fff"></div>
+    <div class="dd"><span class="k">카테고리</span><span class="v set">미분류</span><span class="ar">▾</span></div>
+    <div class="dd"><span class="k">출처</span><span class="v">전체</span><span class="ar">▾</span></div>
+    <div class="dd"><span class="k">위험·상태</span><span class="v set">2개</span><span class="ar">▾</span></div>
+    <div class="sep"></div>
+    <div class="dd icon">⇅ 정렬 <span class="v" style="color:var(--text)">급한 순</span><span class="ar">▾</span></div>
+  </div>
+  <div class="active">
+    <span class="lb">적용됨</span>
+    <span class="fchip">검색: safe <span class="x">✕</span></span>
+    <span class="fchip">카테고리: 미분류 <span class="x">✕</span></span>
+    <span class="fchip warn">🔴 실제 악용(KEV) <span class="x">✕</span></span>
+    <span class="fchip">SBOM 미생성 <span class="x">✕</span></span>
+    <span class="clear">전체 해제</span>
+  </div>
+  <div class="active" style="background:rgba(255,255,255,.03);border-color:var(--border)">
+    <span class="lb">표시 항목</span>
+    <span class="fchip" style="background:rgba(255,255,255,.06);border-color:var(--bs);color:var(--text)">호스트명 <span class="x" style="color:var(--muted2)">✕</span></span>
+    <span class="fchip" style="background:rgba(255,255,255,.06);border-color:var(--bs);color:var(--text)">소유부서 <span class="x" style="color:var(--muted2)">✕</span></span>
+    <span class="fchip" style="background:rgba(255,255,255,.06);border-color:var(--bs);color:var(--text)">카테고리 <span class="x" style="color:var(--muted2)">✕</span></span>
+    <span class="fchip" style="background:rgba(255,255,255,.06);border-color:var(--bs);color:var(--text)">위험도 <span class="x" style="color:var(--muted2)">✕</span></span>
+    <span class="fchip" style="background:rgba(255,255,255,.06);border-color:var(--bs);color:var(--text)">SBOM <span class="x" style="color:var(--muted2)">✕</span></span>
+    <span class="dd" style="padding:2px 9px;font-size:11px">＋ 항목 추가 <span class="ar">▾</span></span>
+    <span class="clear">기본값</span>
+  </div>
+  <div class="tbl">
+    <div class="th"><span></span><span>자산명</span><span>호스트명</span><span>소유부서</span><span>카테고리</span><span class="srt">위험도 ↓</span><span>SBOM</span></div>
+    <div class="tr"><span>☐</span><span><div class="n">안전대부 본인인증 웹 서버</div><div class="m">웹 서버</div></span><span>certify.aj-safe.co.kr</span><span class="lnk">지정하기</span><span class="lnk">＋ 지정</span><span style="color:var(--amber)">중 · 3건</span><span>완료</span></div>
+    <div class="tr" style="opacity:.55"><span colspan="7" style="grid-column:1/-1;color:var(--muted2);font-size:11.5px;padding:4px 0">조건에 맞는 자산 1건 · 전체 6건 중</span></div>
+  </div>
+
+  <div style="margin-top:12px;display:flex;gap:14px;align-items:flex-start">
+    <div class="pop">
+      <div class="dd"><span class="k">위험·상태</span><span class="v set">2개</span><span class="ar">▴</span></div>
+      <div class="menu">
+        <div class="mi on">☑ 🔴 실제 악용(KEV) <span class="cn">1</span></div>
+        <div class="mi">☐ 고위험 <span class="cn">2</span></div>
+        <div class="mi on">☑ SBOM 미생성 <span class="cn">3</span></div>
+        <div class="mi">☐ 미스캔 <span class="cn">0</span></div>
+        <div class="mi">☐ 최근 등록(7일) <span class="cn">2</span></div>
+      </div>
+    </div>
+    <div class="note" style="margin:0;flex:1">위험·상태는 <b>여러 개 동시 선택</b>이 자연스러워 체크형 드롭다운으로 묶었습니다(값 옆 건수 표시 — 0건이면 고를 이유가 없다는 것도 바로 보임). 카테고리·출처는 하나만 고르는 단일 선택.</div>
+  </div>
+</div>
+
+<div class="cols">
+  <div class="box">
+    <div class="bt" style="color:var(--bl)">바뀌는 것</div>
+    <ul>
+      <li>툴바 <b>2행 → 1행</b>(검색 · 카테고리 · 출처 · 위험·상태 · 정렬) + <b>하단 줄에 표시 항목(컬럼) 칩</b> — ✕로 숨기고 ＋로 추가</li>
+      <li>좌측 카테고리 트리 <b>제거</b> → 표 전체 폭 + <b>카테고리 컬럼</b>으로 표시</li>
+      <li><b>적용된 필터 칩 줄</b> 신설 — 걸린 게 없으면 안 보임</li>
+      <li>정렬을 필터와 분리(현재는 "가장 급한 결손" 문구로만 안내)</li>
+    </ul>
+  </div>
+  <div class="box">
+    <div class="bt" style="color:var(--teal)">그대로 두는 것</div>
+    <ul>
+      <li>카테고리 <b>지정 모달</b>·＋지정 링크·일괄 선택 삭제</li>
+      <li>전체 목록 / 커버리지 탭, 그룹 헤더(담당부서 없음 등)</li>
+      <li>CSV 내보내기·탐지 결과 가져오기·자산 등록</li>
+      <li>위험 요약·서비스 영향도 접힘 패널</li>
+    </ul>
+  </div>
+</div>
+
+<div class="moved" style="margin-top:14px">
+  <div class="h">＋ 코드 저장소 스캔 → AI-BOM 화면으로 이동</div>
+  <div class="l">GitHub 조직/사용자 저장소를 훑어 AI 라이브러리 의존성 repo를 <b>개발형 AI 자산으로 자동 등록</b>하는 기능입니다. Shadow AI(미등록 AI 모델 발견)와 목적이 같으므로 AI-BOM 상단 <b>Shadow AI 바로 아래</b>에 둡니다 — "AI 자산을 찾아 등록 → 5영역 명세"가 한 흐름이 됩니다. 입력칸·스캔 동작은 그대로, 스캔 완료 시 AI 자산 목록 자동 새로고침.</div>
+</div>
+
+</body>
+</html>
