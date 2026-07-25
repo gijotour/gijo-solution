@@ -73,7 +73,7 @@ async function ragContextFor(message: string, agentId: string): Promise<string |
     const parts: string[] = [];
     if (chunks.length > 0) {
       parts.push(
-        "참고 자료 — 사내 지식 베이스(장기 기억)에서 검색된 관련 내용입니다. 답변에 활용하되, 질문과 무관하면 무시하세요.\n" +
+        "참고 자료 — 사내 지식 베이스(장기 기억)에서 검색된 관련 내용입니다. 질문과 관련된 내용이면 네 사전지식과 다르더라도 이 자료를 우선 근거로 삼아 답하고, 질문과 무관하면 무시하세요.\n" +
           chunks.map((c, i) => `[${i + 1}] ${c}`).join("\n")
       );
     }
