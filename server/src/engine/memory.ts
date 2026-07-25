@@ -324,6 +324,9 @@ export async function ingestText(documentId: string, raw: string, scope: string 
       await db.createTable(TABLE_NAME, records);
     } else {
       try {
+        // 재인입 멱등성: 같은 documentId의 옛 청크를 먼저 지운다. 안 그러면 add만 해서 옛/새 청크가
+        // 중복 누적된다(2026-07-25 실측: 같은 파일 재업로드/재시드가 KB에 중복 조각을 남김).
+        await table.delete(`documentId = '${escapeLiteral(documentId)}'`);
         await table.add(records);
       } catch (err) {
         // 최후의 안전망: 위 검사로 못 잡은 스키마 불일치로 add가 실패해도 채팅/수집이
