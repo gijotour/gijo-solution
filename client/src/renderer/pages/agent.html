@@ -79,7 +79,7 @@ tr:last-child td{border-bottom:none;}
 .progress-fill{height:100%;border-radius:20px;}
 .content-grid{display:grid;grid-template-columns:1.7fr 1fr;gap:16px;}
 
-.terminal{background:#05070d;border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-family:"Consolas","Menlo",monospace;font-size:11.5px;line-height:1.9;color:#8fd6a8;margin-top:8px;}
+.terminal{background:#05070d;border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-family:"Consolas","Menlo",monospace;font-size:11.5px;line-height:1.9;color:#8fd6a8;margin-top:8px;max-height:calc(100vh - 340px);min-height:240px;overflow-y:auto;}
 .terminal .prompt{color:var(--blue-light);}
 .terminal .out{color:var(--muted);}
 .model-search{display:flex;gap:8px;margin-bottom:12px;}
@@ -187,10 +187,7 @@ tr:last-child td{border-bottom:none;}
     </div>
 
 
-<div class="task-bar">
-  <input id="taskBarInput" placeholder="예: fraud-detect-llm 취약점 전체 재스캔하고 우선순위 정리해서 리포트까지 작성해줘">
-  <button class="btn-cta" id="taskBarBtn">▶ 에이전트 팀에게 지시하기</button>
-</div>
+<!-- 지시 입력바 제거(2026-07-26 사용자 결정) — 지시는 대시보드 컴포저·화면 챗봇이 담당 -->
 
 <div class="kpi-strip">
   <div class="kpi-mini"><div class="kpi-mini-label">전체 에이전트</div><div class="kpi-mini-value" id="kpiAgents">-</div></div>
@@ -301,13 +298,7 @@ tr:last-child td{border-bottom:none;}
   </div>
 </div>
 
-<div class="panel">
-  <div class="panel-title">실시간 협업 현황<span class="panel-link" id="clearFeedBtn">지우기</span></div>
-  <div class="panel-sub">에이전트 간 작업 위임 · 🧠 로컬 LLM 추론 실황 (WebSocket 실시간 수신 — 모델·토큰·생성속도 실측)</div>
-  <div class="chat-feed" id="chatFeed">
-    <div style="color:var(--muted);font-size:12px">불러오는 중...</div>
-  </div>
-</div>
+<!-- 실시간 협업 현황 제거(2026-07-26) — AI 라이브 오피스의 사무실 LIVE 채팅에서 확인 -->
 
 
     <div class="footer">
@@ -336,9 +327,9 @@ tr:last-child td{border-bottom:none;}
   const statusPill = document.getElementById("statusPill");
   const avatarBtn = document.getElementById("avatarBtn");
   const agentGrid = document.getElementById("agentGrid");
-  const chatFeed = document.getElementById("chatFeed");
+  const chatFeed = document.getElementById("chatFeed") || document.createElement("div"); // 패널 제거(2026-07-26) — 참조 안전용 더미
   const terminalLog = document.getElementById("terminalLog");
-  const taskBarInput = document.getElementById("taskBarInput");
+  const taskBarInput = document.getElementById("taskBarInput") || document.createElement("input"); // 지시바 제거 — 참조 안전용 더미
 
   const AGENT_STYLE = {
     orchestrator: { icon: "◆", color: "var(--blue-light)", bg: "rgba(59,130,246,0.18)" },
@@ -867,7 +858,7 @@ tr:last-child td{border-bottom:none;}
     document.querySelectorAll("[data-page]").forEach((el) => {
       el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
     });
-    document.getElementById("taskBarBtn").addEventListener("click", sendInstruction);
+    document.getElementById("taskBarBtn")?.addEventListener("click", sendInstruction); // 지시바 제거(2026-07-26) — 가드
     taskBarInput.addEventListener("keydown", (e) => { if (e.key === "Enter") sendInstruction(); });
 
     document.getElementById("hfSearchBtn").addEventListener("click", searchHf);
@@ -907,7 +898,7 @@ tr:last-child td{border-bottom:none;}
       }
     });
 
-    document.getElementById("clearFeedBtn").addEventListener("click", () => {
+    document.getElementById("clearFeedBtn")?.addEventListener("click", () => { // 협업현황 패널 제거 — 가드
       chatFeed.innerHTML = '<div style="color:var(--muted);font-size:12px">지워졌습니다 (서버 이력은 유지됩니다)</div>';
     });
     // 두 버튼 모두 팀 설정 모달을 연다. "추가"는 역할이 고정이라 실제 추가는 없고, 모달이

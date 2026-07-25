@@ -143,7 +143,10 @@
       + "*::-webkit-scrollbar{width:8px;height:8px;}*::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:4px;}*::-webkit-scrollbar-track{background:transparent;}"
       // 긴 목록 패널 내부 스크롤(2026-07-26 사용자 결정) — 창 고정 원칙과 세트.
       + ".scroll-list{max-height:calc(100vh - 300px);min-height:260px;overflow-y:auto;}"
-      + ".scroll-list thead th{position:sticky;top:0;background:var(--panel,#121a2e);z-index:1;}" +
+      + ".scroll-list thead th{position:sticky;top:0;background:var(--panel,#121a2e);z-index:1;}"
+      // 하단 로고·저작권 푸터 제거(2026-07-26 사용자 결정) — 정보 가치가 없고 화면마다
+      // 잘려 보였다. 개별 HTML은 건드리지 않고 공용 CSS로 한 번에 숨긴다.
+      + ".footer{display:none !important;}.main{padding-bottom:20px;}" +
       "#gijoNav{padding:0 !important;border-right:1px solid var(--border) !important;min-height:0 !important;display:flex;flex-direction:column;position:sticky;top:0;height:100vh;align-self:start;z-index:20;background:var(--panel-2);}" +
       ".gn-top{padding:8px;border-bottom:1px solid var(--border);flex:0 0 auto;display:flex;align-items:center;gap:6px;}" +
       ".gn-top .gn-seg{flex:1;}" +
@@ -357,6 +360,7 @@
       // 긴 목록 내부 스크롤은 임베드에서도 동일(허브 탭 안의 threat·audit 등)
       ".scroll-list{max-height:calc(100vh - 260px);min-height:260px;overflow-y:auto;}" +
       ".scroll-list thead th{position:sticky;top:0;background:var(--panel,#121a2e);z-index:1;}" +
+      ".footer{display:none !important;}" +
       "*::-webkit-scrollbar{width:8px;height:8px;}*::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:4px;}*::-webkit-scrollbar-track{background:transparent;}" +
       ".header{display:none !important;}#gijoNav{display:none !important;}" +
       ".app{grid-template-columns:1fr !important;display:block !important;}" +
