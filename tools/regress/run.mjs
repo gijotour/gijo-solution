@@ -47,32 +47,42 @@ async function dispatch(text) {
   return { ms: Date.now() - t0, output: j.output || "", dataHits: j.dataHits, internalMiss: j.internalMiss };
 }
 
-let fail = 0;
+// 한 케이스를 1회 실행해 {ok, why, out, ms}를 돌려준다.
+async function runCase(c) {
+  const why = [];
+  const r = await dispatch(c.q);
+  if (FALLBACK_RE.test(r.output)) why.push("폴백/오류 문구");
+  for (const p of c.expect ?? []) if (!new RegExp(p, "i").test(r.output)) why.push(`누락: /${p}/`);
+  for (const p of c.forbid ?? []) if (new RegExp(p, "i").test(r.output)) why.push(`금지 포함: /${p}/`);
+  for (const [k, v] of Object.entries(c.signals ?? {})) if (r[k] !== v) why.push(`신호 ${k}=${r[k]} (기대 ${v})`);
+  return { ok: why.length === 0, why, out: r.output, ms: r.ms };
+}
+
+let fail = 0, flaky = 0;
 const t0 = Date.now();
 for (const c of cases) {
-  let verdict = "PASS";
-  const why = [];
-  let out = "";
   try {
-    const r = await dispatch(c.q);
-    out = r.output;
-    if (FALLBACK_RE.test(out)) { verdict = "FAIL"; why.push("폴백/오류 문구"); }
-    for (const p of c.expect ?? []) {
-      if (!new RegExp(p, "i").test(out)) { verdict = "FAIL"; why.push(`누락: /${p}/`); }
+    let r = await runCase(c);
+    if (!r.ok) {
+      // LLM 샘플링 비결정성으로 1회성 이탈이 있다(실측 2026-07-25: kisa-u01 1/4회 이탈).
+      // 1회 재시도해 통과하면 FLAKY로 표기 — 통과로 치되 눈에 띄게 남겨 반복되면 조사한다.
+      const retry = await runCase(c);
+      if (retry.ok) {
+        flaky++;
+        console.log(`~ ${c.id} [${(retry.ms / 1000).toFixed(1)}s] — FLAKY(1차 실패→재시도 통과: ${r.why.join(", ")})`);
+        continue;
+      }
+      r = retry;
     }
-    for (const p of c.forbid ?? []) {
-      if (new RegExp(p, "i").test(out)) { verdict = "FAIL"; why.push(`금지 포함: /${p}/`); }
+    console.log(`${r.ok ? "✓" : "✗"} ${c.id} [${(r.ms / 1000).toFixed(1)}s]${r.why.length ? " — " + r.why.join(", ") : ""}`);
+    if (!r.ok) {
+      console.log(`    출력: ${r.out.replace(/\s+/g, " ").slice(0, 200)}`);
+      fail++;
     }
-    for (const [k, v] of Object.entries(c.signals ?? {})) {
-      if (r[k] !== v) { verdict = "FAIL"; why.push(`신호 ${k}=${r[k]} (기대 ${v})`); }
-    }
-    console.log(`${verdict === "PASS" ? "✓" : "✗"} ${c.id} [${(r.ms / 1000).toFixed(1)}s]${why.length ? " — " + why.join(", ") : ""}`);
-    if (verdict === "FAIL") console.log(`    출력: ${out.replace(/\s+/g, " ").slice(0, 200)}`);
   } catch (e) {
-    verdict = "FAIL";
+    fail++;
     console.log(`✗ ${c.id} — 요청 실패: ${e.name || e.message}`);
   }
-  if (verdict === "FAIL") fail++;
 }
-console.log(`\n결과: ${cases.length - fail}/${cases.length} 통과 (${((Date.now() - t0) / 1000).toFixed(0)}s)`);
+console.log(`\n결과: ${cases.length - fail}/${cases.length} 통과${flaky ? ` (FLAKY ${flaky})` : ""} (${((Date.now() - t0) / 1000).toFixed(0)}s)`);
 process.exit(fail ? 1 : 0);
