@@ -64,6 +64,9 @@
   table td{word-break:break-word;}
   table td:nth-child(2){max-width:220px;}
   table td:nth-child(3){max-width:180px;}
+  /* 스캔 파일: 이름이 길어 표를 밀어내므로 한 줄로 자르고 전체는 툴팁으로 본다. */
+  .src-file{display:inline-block;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    vertical-align:bottom;color:var(--muted,#8b96b3);}
   /* 재설계 툴바(2026-07-26) */
   .tb-dd{position:relative;display:inline-flex;align-items:center;gap:7px;background:var(--panel);border:1px solid var(--border-strong);border-radius:9px;padding:8px 12px;font-size:12.5px;cursor:pointer;white-space:nowrap;outline:none;}
   .tb-dd:hover,.tb-dd:focus{border-color:var(--blue);}
@@ -448,8 +451,20 @@
     { id: "registered", label: "등록일" },
     { id: "updated", label: "최종수정" },
     { id: "lastScanned", label: "최근 스캔" },
+    { id: "sourceFile", label: "스캔 파일" },
     { id: "sbom", label: "SBOM" },
   ];
+  // 이 자산이 어느 스캔 파일로 등록됐는지 — finding의 source_tool(업로드 파일명)에서 뽑는다.
+  // 여러 파일이 섞이면(재점검 등) 가장 많이 나온 것을 대표로. findings가 없으면 직접 등록.
+  function sourceFileOf(a) {
+    const tally = new Map();
+    for (const f of a.findings || []) {
+      const src = String(f.source_tool || "").trim();
+      if (src) tally.set(src, (tally.get(src) || 0) + 1);
+    }
+    if (!tally.size) return null;
+    return [...tally.entries()].sort((x, y) => y[1] - x[1] || x[0].localeCompare(y[0]))[0][0];
+  }
   const COL_LABEL = Object.fromEntries(ALL_COLS.map((c) => [c.id, c.label]));
   const COL_IDS = ALL_COLS.map((c) => c.id);
   // 기본 컬럼은 6개로(2026-07-26): 9개면 폭이 눌려 머리글이 세로로 쪼개졌다(실측).
@@ -642,6 +657,10 @@
       case "registered": return `<span class="mut">${fmtDate(a.registeredAt)}</span>`;
       case "updated": return `<span class="mut">${fmtDate(a.updatedAt)}</span>`;
       case "lastScanned": return relativeTime(a.lastScannedAt);
+      case "sourceFile": {
+        const src = sourceFileOf(a);
+        return src ? `<span class="src-file" title="${esc(src)}">📄 ${esc(src)}</span>` : `<span class="mut">직접 등록</span>`;
+      }
       case "sbom": return ctx.sbomCell;
       default: return "";
     }
