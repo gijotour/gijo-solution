@@ -1,7 +1,7 @@
 {
   "name": "gijo-as-client",
   "productName": "GIJO AS",
-  "version": "2.7.31",
+  "version": "2.7.32",
   "description": "GIJO AS — AI Security Manager Platform (Electron client, connects to gijo-as-server)",
   "main": "dist/main.js",
   "scripts": {
@@ -66,6 +66,13 @@
     },
     "dmg": {
       "title": "${productName} ${version}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": false,
+      "runAfterFinish": true,
+      "include": "build/installer.nsh"
     }
   }
 }
