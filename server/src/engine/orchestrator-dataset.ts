@@ -50,6 +50,13 @@ export const SEED_DECISIONS: DecisionPair[] = [
   // 조회 — search / explain (메뉴 가로지르기)
   { instruction: "Log4Shell 관련된 거 다 찾아줘", decision: t("search", { query: "Log4Shell" }) },
   { instruction: "프롬프트 인젝션 어디에 있는지 찾아줘", decision: t("search", { query: "프롬프트 인젝션" }) },
+  // 조직·서비스·호스트 이름으로 묻는 조회 — 실측(2026-07-25): 웹취약점 보고서로 등록된 자산을
+  // "안전대부 웹서버 취약점 알려줘"로 물었을 때 도구를 안 부르고 일반지식으로 답했다(자산명에
+  // "안전대부"가 있어 search면 정확히 나오는 상황). 조직/서비스명 조회 예시를 가중해 교정한다.
+  { instruction: "안전대부 웹서버 취약점 알려줘", decision: t("search", { query: "안전대부" }) },
+  { instruction: "certify.aj-safe.co.kr 취약점 뭐 있어?", decision: t("search", { query: "certify.aj-safe.co.kr" }) },
+  { instruction: "결제 서비스 쪽에 뭐 걸린 거 있어?", decision: t("search", { query: "결제" }) },
+  { instruction: "본인인증 서버 점검 결과 보여줘", decision: t("search", { query: "본인인증" }) },
   { instruction: "프롬프트 인젝션이 뭐야?", decision: t("explain", { topic: "프롬프트 인젝션" }) },
   { instruction: "모델 탈옥 관련해서 우리 통제가 뭐가 있는지 설명해줘", decision: t("explain", { topic: "모델 탈옥" }) },
   // 조회 — today / threats

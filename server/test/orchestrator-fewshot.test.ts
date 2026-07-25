@@ -55,3 +55,46 @@ describe("fewshotBlockFor", () => {
     expect(SEED_DECISIONS.length).toBeGreaterThanOrEqual(30);
   });
 });
+
+// ── 도구 결과 부정 방지 안전망 ──────────────────────────────────────────────
+// 실측(2026-07-25): search가 자산·취약점을 반환했는데 7B 최종답이 "찾을 수 없습니다"로 뒤집었다.
+// 프롬프트 강화로도 재발 → 코드로 막는다(7B 교정은 코드로 한다는 원칙).
+import { guardAgainstDenial } from "../src/engine/agentloop";
+
+describe("guardAgainstDenial", () => {
+  const dataCall = [
+    {
+      tool: "search",
+      args: { query: "안전대부" },
+      result:
+        "AI 자산 1건:\n  - vuln:certify.aj-safe.co.kr | 안전대부 본인인증 웹 서버 | infra-host | finding 3건\n취약점 3건(우선순위순):\n  - [medium] [IW-32] 데이터 평문 전송",
+    },
+  ];
+
+  it("도구가 데이터를 줬는데 LLM이 부정하면 조회 결과 원문으로 되돌린다", () => {
+    const out = guardDenial("안전대부 웹서버에 대한 취약점 정보를 찾을 수 없습니다.", dataCall);
+    expect(out).toContain("조회 결과입니다");
+    expect(out).toContain("IW-32");
+  });
+
+  it("정상 답변(데이터를 다룬 답)은 그대로 통과시킨다", () => {
+    const good = "안전대부 본인인증 웹 서버에서 3건이 확인됐습니다. [IW-32] 데이터 평문 전송이 medium으로 가장 시급합니다.";
+    expect(guardDenial(good, dataCall)).toBe(good);
+  });
+
+  it("도구 결과가 실제로 0건이면 '없다'는 답을 유지한다(거짓 양성 방지)", () => {
+    const empty = [{ tool: "search", args: { query: "없는것" }, result: '"없는것"에 해당하는 자산·취약점·보안제품·문서·온톨로지 관계를 찾지 못했습니다.' }];
+    const ans = "해당 자산을 찾을 수 없습니다.";
+    expect(guardDenial(ans, empty)).toBe(ans);
+  });
+
+  it("도구 호출이 없으면 그대로 통과", () => {
+    const ans = "관련 정보를 찾을 수 없습니다.";
+    expect(guardDenial(ans, [])).toBe(ans);
+  });
+});
+
+// 헬퍼 — 테스트 가독성을 위해 인자 타입만 좁혀 감싼다.
+function guardDenial(answer: string, calls: { tool: string; args: Record<string, string>; result: string }[]): string {
+  return guardAgainstDenial(answer, calls);
+}

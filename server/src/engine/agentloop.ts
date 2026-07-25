@@ -169,6 +169,32 @@ function directAnswerFor(calls: AgentToolCall[]): string | null {
 // 최종 답 길이 상한 — 도구 결과를 프롬프트에 다시 실을 때 과도하게 커지지 않게 자른다(멈춤 방지).
 const MAX_FACT_CHARS = 1800;
 
+// LLM이 최종답에서 "없다"고 부정하는 문구. 도구가 실제 데이터를 돌려줬는데 이런 답이 나오면
+// 사용자에게는 "제품이 자기 데이터를 못 찾는다"로 보인다 — 실사용 신뢰를 직접 깨는 회귀다.
+const DENIAL_RE = /찾을 수 없|찾지 못|정보가 없|확인되지 않|해당하는 (자산|취약점|데이터).{0,10}없|존재하지 않습니다|없습니다\.?$/;
+// 도구 결과가 "실제 데이터를 담고 있는가" — 도구들이 0건일 때 쓰는 문구를 부정형으로 판별한다.
+const EMPTY_RESULT_RE = /찾지 못했습니다|없습니다|0건|해당 없음/;
+
+/**
+ * 도구가 데이터를 돌려줬는데 LLM 최종답이 그것을 부정하면, 조회 결과 원문으로 되돌린다.
+ * 실측(2026-07-25): search가 자산 1건·취약점 3건을 반환했는데도 7B가 "취약점 정보를 찾을 수
+ * 없습니다"로 답했다. 프롬프트 강화(위 지시문)로도 재발했다 — 7B 행동 교정은 프롬프트로 하지
+ * 않는다는 원칙에 따라 코드로 막는다. 사람이 읽을 수 있는 원본을 그대로 주는 편이 정직하다.
+ */
+export function guardAgainstDenial(answer: string, calls: AgentToolCall[]): string {
+  const hasData = calls.some(
+    (c) => !INTERNAL_TOOL_ERROR_RE.test(c.result) && c.result.trim().length > 40 && !EMPTY_RESULT_RE.test(c.result)
+  );
+  if (!hasData) return answer; // 도구가 실제로 0건이면 "없다"가 정답
+  const short = answer.trim().length < 400; // 긴 답변은 데이터를 다뤘을 가능성이 높다
+  if (!(DENIAL_RE.test(answer) && short)) return answer;
+  const facts = calls
+    .filter((c) => !INTERNAL_TOOL_ERROR_RE.test(c.result))
+    .map((c) => c.result.trim())
+    .join("\n\n");
+  return `조회 결과입니다.\n\n${facts}`.slice(0, 3000);
+}
+
 async function composeFinalAnswer(instruction: string, calls: AgentToolCall[], context = ""): Promise<string> {
   const usefulCalls = calls.filter((c) => !INTERNAL_TOOL_ERROR_RE.test(c.result));
   const facts = (usefulCalls.length ? usefulCalls : calls)
@@ -186,6 +212,10 @@ async function composeFinalAnswer(instruction: string, calls: AgentToolCall[], c
       facts,
       "",
       "위 데이터만 근거로 지시에 대한 최종 답변을 작성하라. 데이터에 없는 내용은 지어내지 마라.",
+      // 실측(2026-07-25): search가 자산·취약점 3건을 정확히 돌려줬는데도 7B가 최종답에서
+      // "취약점 정보를 찾을 수 없습니다"로 뒤집었다(도구 결과 무시). RAG 그라운딩과 같은 처방 —
+      // "위 데이터가 곧 조회 결과"임을 명시하고, 결과가 있으면 없다고 말하지 못하게 못박는다.
+      "위 데이터는 이미 시스템이 조회해 확보한 실제 결과다. 데이터에 항목이 하나라도 있으면 '찾을 수 없다·정보가 없다·확인되지 않는다'고 답하지 말고, 그 항목들을 그대로 정리해 답하라. 데이터가 비어 있을 때만 없다고 답한다.",
       "지시에 비교 대상이나 조건이 여러 개 있으면(예: 자산 2개 비교) 하나만 다루고 끝내지 말고 전부 빠짐없이 다뤄라.",
       "같은 판단·결론을 문장만 바꿔 반복하지 마라 — 한 번만 명확히 말하고 끝내라.",
       "도구·시스템 내부 동작(어떤 도구를 썼는지, 도구가 있는지 없는지 등)은 언급하지 말고, 데이터에서 얻은 결론만 말하라.",
@@ -293,7 +323,7 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
         const result = String(await tool.run(forced.args));
         const calls: AgentToolCall[] = [{ tool: forced.tool, args: forced.args, result }];
         const direct = directAnswerFor(calls);
-        return { output: direct ?? (await composeFinalAnswer(instruction, calls, context)), toolCalls: calls };
+        return { output: guardAgainstDenial(direct ?? (await composeFinalAnswer(instruction, calls, context)), calls), toolCalls: calls };
       } catch {
         /* 강제 실행 실패 시 아래 일반 루프로 폴백 */
       }
@@ -323,7 +353,7 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
     if (decision.action === "final") {
       if (calls.length === 0) return null; // 도구가 필요 없는 일반 대화 → 기존 채팅(RAG·이력)이 더 낫다
       const direct = directAnswerFor(calls);
-      const output = direct ?? (await composeFinalAnswer(instruction, calls, context));
+      const output = guardAgainstDenial(direct ?? (await composeFinalAnswer(instruction, calls, context)), calls);
       return { output, toolCalls: calls };
     }
 
@@ -375,6 +405,6 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
   // 반복 상한 도달 — 지금까지 모은 결과로라도 답을 만든다(도구를 썼을 때만).
   if (calls.length === 0) return null;
   const direct = directAnswerFor(calls);
-  const output = direct ?? (await composeFinalAnswer(instruction, calls, context));
+  const output = guardAgainstDenial(direct ?? (await composeFinalAnswer(instruction, calls, context)), calls);
   return { output, toolCalls: calls };
 }
