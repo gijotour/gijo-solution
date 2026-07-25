@@ -162,6 +162,19 @@ tr:last-child td{border-bottom:none;}
   <div style="font-size:11px;color:var(--muted-2);margin-top:6px;">시스템에서 쓰이는데 자산으로 등록되지 않은 AI 모델입니다 — 등록하면 AI-BOM·OWASP LLM 위험 점검 대상이 됩니다.</div>
 </div>
 
+<!-- 코드 저장소 스캔 — 자산 목록에서 이동(2026-07-26). AI 라이브러리 의존성 repo를 개발형 AI 자산으로 자동 등록. -->
+<div class="panel" id="repoScanPanel" style="margin-bottom:16px">
+  <div class="panel-title">코드 저장소 스캔 <span style="font-size:10.5px;font-weight:700;color:var(--teal);background:rgba(30,185,128,0.15);padding:2px 8px;border-radius:10px;">온프레미스 · 자체 탐지</span></div>
+  <div class="panel-sub">GitHub 조직/사용자의 저장소를 훑어 AI 라이브러리(openai·langchain·transformers 등) 의존성이 있는 repo를 개발형 AI 자산으로 자동 등록합니다. 토큰은 저장하지 않고 이 스캔에만 사용합니다. 온프레미스 GitHub Enterprise는 Base URL로 지정하세요.</div>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+    <input id="repoOwnerInput" placeholder="조직 또는 사용자명 (예: my-company)" style="flex:1;min-width:200px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;" aria-label="조직 또는 사용자명">
+    <input id="repoTokenInput" type="password" placeholder="액세스 토큰 (선택 — 없으면 rate limit 낮음)" style="flex:1;min-width:200px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;" aria-label="액세스 토큰">
+    <input id="repoBaseUrlInput" placeholder="Base URL (선택 — GitHub Enterprise)" style="flex:1;min-width:180px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;" aria-label="Base URL">
+    <button class="btn-primary" id="repoScanBtn">스캔</button>
+  </div>
+  <div class="status-line" id="repoScanStatus" style="font-size:12.5px;margin-top:10px;"></div>
+</div>
+
 <!-- AI 자산 목록 — 이 화면의 주인공(스캔·등록으로 확인된 AI 자산만). 클릭하면 아래 5영역 명세가 열린다. -->
 <div class="panel" id="aiAssetsPanel" style="margin-bottom:16px">
   <div class="panel-title">AI 자산 <span id="aiAssetCount" style="color:var(--muted-2);font-weight:600;font-size:12px"></span></div>
@@ -665,6 +678,27 @@ tr:last-child td{border-bottom:none;}
     }));
   }
 
+
+  // ── 코드 저장소 스캔(자산 목록에서 이동 2026-07-26) — AI 의존성 repo를 개발형 AI 자산으로 등록 ──
+  async function runRepoScan() {
+    const btn = document.getElementById("repoScanBtn"), status = document.getElementById("repoScanStatus");
+    const owner = document.getElementById("repoOwnerInput").value.trim();
+    if (!owner) { status.textContent = "조직 또는 사용자명을 입력하세요."; status.style.color = "#f5928a"; return; }
+    const token = document.getElementById("repoTokenInput").value.trim() || undefined;
+    const baseUrl = document.getElementById("repoBaseUrlInput").value.trim() || undefined;
+    btn.disabled = true; status.style.color = "var(--muted)"; status.textContent = "저장소를 훑는 중… (조직 규모에 따라 수십 초)";
+    try {
+      const r = await window.gijo.scanRepos({ provider: "github", owner, token, baseUrl });
+      status.style.color = "var(--teal)";
+      status.textContent = `✓ 스캔 완료 — 저장소 ${r.scanned}개 중 ${r.registered}개를 AI 자산으로 등록했습니다.`;
+      await refresh(); // SBOM 표 + AI 자산 목록 동시 갱신
+    } catch (e) {
+      status.style.color = "#f5928a";
+      status.textContent = "✗ 스캔 실패: " + (e && e.message ? e.message : e);
+    }
+    btn.disabled = false;
+  }
+
   // ── Shadow AI — 미등록 AI 모델(통합 뷰에서 이관 2026-07-26) ──
   async function loadShadowAi() {
     try {
@@ -697,6 +731,7 @@ tr:last-child td{border-bottom:none;}
     await loadThreatMap();
     await refresh();
     loadShadowAi(); // 비치명적 — 실패해도 화면은 정상
+    document.getElementById("repoScanBtn")?.addEventListener("click", runRepoScan);
 
     searchInput.addEventListener("input", render);
     filterChips.addEventListener("click", (e) => {
