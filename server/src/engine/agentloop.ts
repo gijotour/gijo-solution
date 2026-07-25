@@ -11,7 +11,7 @@
 // 채팅 경로로 폴백한다. 즉 루프 도입으로 기존 동작이 나빠지는 회귀가 없다.
 
 import { chat } from "./llm";
-import { listAgentTools, listToolsFor, findAgentTool, toolCatalogText, validateToolArgs, buildApproval, PendingApproval } from "./agenttools";
+import { listAgentTools, listToolsFor, findAgentTool, toolCatalogText, validateToolArgs, buildApproval, PendingApproval, NO_HIT_PREFIX } from "./agenttools";
 import { emitCollaboration } from "./collaboration";
 
 const MAX_STEPS = 5;
@@ -163,6 +163,9 @@ function directAnswerFor(calls: AgentToolCall[]): string | null {
   if (calls.length !== 1) return null;
   const only = calls[0];
   if (INTERNAL_TOOL_ERROR_RE.test(only.result)) return null; // 실패 결과는 재작성 경로에서 안내
+  // "못 찾았다"는 답은 그대로 내보낸다 — 재작성을 거치면 "존재하지 않습니다"로 부풀려
+  // 담당자가 "우리 회사엔 없구나"로 오해하는 사고가 있었다(2026-07-26 실사용).
+  if (only.result.startsWith(NO_HIT_PREFIX)) return only.result;
   return findAgentTool(only.tool)?.directAnswer ? only.result : null;
 }
 
@@ -265,6 +268,14 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }
   {
     re: /통합\s*(보안\s*)?(분석|관제)|보안\s*분석\s*(현황|어때|보여)|관제\s*현황/,
     tool: "analysis_status",
+    args: {},
+  },
+  // 보유 보안제품 목록 — 담당자는 "보안장비"라고도 부른다(2026-07-26 실사용: "보안장비 리스트"가
+  // 통합 검색으로 가서 0건 → "존재하지 않습니다"로 답했다. 실제로는 3건 등록돼 있었다).
+  // 하드닝 점검("보안장비 점검해줘")과 겹치지 않게 목록·현황을 묻는 말투일 때만 잡는다.
+  {
+    re: /(보안\s*(장비|제품|솔루션|기기))\s*(목록|리스트|현황|뭐|어떤|들)|(보유|도입)한?\s*보안\s*(장비|제품|솔루션)/,
+    tool: "product_status",
     args: {},
   },
   // 보안 KPI 현황 — "KPI"는 영문이라 대소문자 무관하게 잡는다.

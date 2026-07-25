@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>리포트 화면 — 요약 상단 배치 시안</title>
+<style>
+  :root{--bg:#0a1020;--panel:#121a2e;--panel-2:#0e1626;--border:#1e2a44;--border-strong:#2a3a5c;
+        --text:#e8eefc;--muted:#8b96b3;--blue:#4a7dff;--blue-light:#7aa2ff;--green:#22c55e;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:13px/1.6 "Malgun Gothic","Apple SD Gothic Neo",sans-serif;padding:22px;}
+  .wrap{max-width:1000px;margin:0 auto}
+  .note{background:rgba(74,125,255,.1);border:1px solid var(--border-strong);border-radius:10px;padding:12px 14px;margin-bottom:18px;font-size:12.5px;color:var(--muted)}
+  .note b{color:var(--text)}
+  h1{font-size:16px;margin:0 0 4px}
+  .head{display:flex;align-items:center;gap:10px;margin-bottom:14px}
+  .head .t{font-size:19px;font-weight:800}
+  .head .c{color:var(--muted);font-size:13px}
+  .spacer{flex:1}
+  .btn{background:var(--panel);border:1px solid var(--border-strong);color:var(--text);border-radius:9px;padding:8px 13px;font-size:12px;font-weight:700;cursor:pointer}
+  .btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:15px 16px;margin-bottom:14px}
+  .ptitle{font-size:13.5px;font-weight:800;display:flex;align-items:center;gap:7px;margin-bottom:3px}
+  .psub{font-size:11.5px;color:var(--muted);margin-bottom:10px}
+  .icon-btn{background:rgba(74,125,255,.14);border:1px solid var(--border-strong);color:var(--blue-light);
+    border-radius:8px;padding:5px 10px;font-size:11.5px;font-weight:800;cursor:pointer;white-space:nowrap}
+  .icon-btn:hover{background:rgba(74,125,255,.24)}
+  .sum{font-size:12.5px;line-height:1.85}
+  .sum .meta{color:var(--muted);font-size:11.5px;margin-bottom:8px}
+  table{width:100%;border-collapse:collapse;margin-top:8px}
+  th{text-align:left;font-size:11.5px;color:var(--muted);font-weight:600;padding:7px 8px;border-bottom:1px solid var(--border)}
+  td{padding:9px 8px;border-bottom:1px solid var(--border);font-size:12px;vertical-align:middle}
+  .tag{display:inline-block;background:rgba(74,125,255,.16);color:var(--blue-light);border-radius:6px;padding:2px 7px;font-size:10.5px;font-weight:800}
+  .tag.od{background:rgba(34,197,94,.14);color:#6ee7a0}
+  .mini{color:var(--muted);font-size:11px}
+  .act{display:flex;gap:5px}
+  .sbtn{border-radius:6px;padding:4px 9px;font-size:11px;font-weight:700;cursor:pointer;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--text)}
+  .sbtn.go{background:rgba(34,197,94,.16);border-color:#22c55e;color:#6ee7a0}
+  .sbtn.del{background:transparent;border-color:#e2483d;color:#f5928a}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
+  .kpi{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:11px 13px}
+  .kpi .l{font-size:11px;color:var(--muted)}
+  .kpi .v{font-size:19px;font-weight:800;margin-top:2px}
+  .tools{display:flex;align-items:center;gap:6px}
+  .sel{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);border-radius:6px;padding:4px 7px;font-size:11.5px}
+  .dbtn{font-size:11.5px;border-radius:6px;padding:5px 10px;cursor:pointer;font-weight:700;background:transparent;border:1px solid #e2483d;color:#f5928a}
+</style></head><body>
+<div class="wrap">
+
+  <div class="note">
+    <b>바뀌는 점</b> — ① <b>경영진 요약 미리보기</b>를 오른쪽 좁은 칸에서 <b>리포트 이력 위 전체 폭</b>으로 올립니다.
+    지금은 폭이 좁아 문장이 두세 글자씩 끊겨 읽기 어렵습니다.
+    ② 요약 패널 오른쪽에 <b>＋ 리포트 생성</b> 버튼을 둡니다 — 요약을 보다가 바로 새로 만들 수 있게.
+    ③ 아래 리포트 이력도 전체 폭이 되어 대상 자산 이름이 줄바꿈 없이 보입니다.
+  </div>
+
+  <div class="head">
+    <div class="t">📄 내부 리포트</div><div class="c">ⓘ</div>
+    <div class="spacer"></div>
+    <button class="btn">템플릿 관리</button>
+    <button class="btn primary">＋ 리포트 생성</button>
+  </div>
+
+  <div class="kpis">
+    <div class="kpi"><div class="l">이번 세션 생성</div><div class="v">3</div></div>
+    <div class="kpi"><div class="l">자동 생성 예약</div><div class="v">1</div></div>
+    <div class="kpi"><div class="l">평균 생성 시간</div><div class="v">-</div></div>
+    <div class="kpi"><div class="l">최근 생성</div><div class="v" style="font-size:15px">07. 25. 오후 05:49</div></div>
+  </div>
+
+  <!-- ① 경영진 요약 — 상단 전체 폭 -->
+  <div class="panel">
+    <div style="display:flex;align-items:flex-start;gap:12px">
+      <div style="flex:1">
+        <div class="ptitle">🧾 경영진 요약 미리보기</div>
+        <div class="psub">ingest · 최근 저장 리포트 요약</div>
+      </div>
+      <button class="icon-btn">＋ 리포트 생성</button>
+    </div>
+    <div class="sum">
+      (주)안전대부 서비스 웹취약점 점검 결과 보고서_v1.0.pdf — 취약점 스캔 결과로 반영(자산·취약점 등록) · 취약점 5건
+    </div>
+  </div>
+
+  <!-- ② 리포트 이력 — 전체 폭 -->
+  <div class="panel">
+    <div style="display:flex;align-items:flex-start;gap:12px">
+      <div style="flex:1"><div class="ptitle">리포트 이력 <span style="color:var(--muted);font-weight:400">ⓘ</span></div></div>
+      <div class="tools">
+        <span class="mini">오래된 리포트 정리</span>
+        <select class="sel"><option>30일 이전</option></select>
+        <button class="dbtn">일괄 삭제</button>
+        <button class="dbtn" style="background:rgba(226,72,61,.14)">🗑 전체 삭제</button>
+      </div>
+    </div>
+    <table>
+      <tr><th style="width:96px">유형</th><th>대상 자산</th><th style="width:150px">생성일시</th><th style="width:180px"></th></tr>
+      <tr>
+        <td><span class="tag">ingest</span><div class="mini">📄 보고용</div></td>
+        <td>SafeKey 발급 웹 서버 (cert.aj-safe.co.kr), 안전대부 본인인증</td>
+        <td>2026. 7. 25. 오후 5:49:32<div class="mini">👤 배포 자동화 전용</div></td>
+        <td><div class="act"><button class="sbtn go">👁 보기</button><button class="sbtn del">🗑</button></div></td>
+      </tr>
+      <tr>
+        <td><span class="tag od">온디맨드</span><div class="mini">🔍 내부용</div></td>
+        <td>사내 보안 어시스턴트(오케스트레이터), 이상거래 탐지 AI(FDS), 고객상담 RAG 챗봇, 샘플-웹서버 (10.0.0.100)</td>
+        <td>2026. 7. 25. 오후 4:26:34<div class="mini">👤 배포 자동화 전용</div></td>
+        <td><div class="act"><button class="sbtn go">👁 보기</button><button class="sbtn">📄 DOCX</button><button class="sbtn del">🗑</button></div></td>
+      </tr>
+      <tr>
+        <td><span class="tag od">온디맨드</span><div class="mini">📄 보고용</div></td>
+        <td>10.10.20.15</td>
+        <td>2026. 7. 23. 오후 3:46:48</td>
+        <td><div class="act"><button class="sbtn go">👁 보기</button><button class="sbtn">📄 DOCX</button><button class="sbtn">📄 PDF</button><button class="sbtn del">🗑</button></div></td>
+      </tr>
+    </table>
+  </div>
+
+  <div class="panel">
+    <div class="ptitle">정기 리포트 스케줄</div>
+    <div class="psub">주간·분기 리포트를 지정한 요일·시각에 자동 생성합니다.</div>
+  </div>
+
+</div></body></html>

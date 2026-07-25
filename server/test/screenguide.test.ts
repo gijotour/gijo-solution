@@ -30,6 +30,24 @@ describe("screenguide — 도움말 의도 감지", () => {
       expect(isHelpIntent(q), q).toBe(false);
     }
   });
+
+  // 2026-07-26 실사용 사고: 벤더 제품을 물었는데 대시보드 사용 안내가 돌아왔다.
+  // "기능 설명"만 걸린 약한 신호였고, 제품 이름이라는 분명한 대상이 함께 있었다.
+  it("특정 제품·파일을 집어 물으면 화면 안내로 가로채지 않는다", () => {
+    for (const q of [
+      "Tenable Web App Scanning 주요기능 설명해줘",
+      "FOCS 메뉴얼 ver1 2 기능 알려줘",
+      "Tenable_Security_Center-User_Guide.pdf 기능 설명",
+      "CVE-2021-44228 기능 설명해줘",
+    ]) {
+      expect(isHelpIntent(q, "dashboard.html"), q).toBe(false);
+    }
+  });
+
+  it("화면을 가리키면 제품 이름이 섞여 있어도 화면 안내다", () => {
+    expect(isHelpIntent("이 화면에서 Tenable 결과 어떻게 봐?", "dashboard.html")).toBe(true);
+    expect(isHelpIntent("여기 사용법 알려줘", "dashboard.html")).toBe(true);
+  });
 });
 
 describe("screenguide — 화면별 가이드", () => {

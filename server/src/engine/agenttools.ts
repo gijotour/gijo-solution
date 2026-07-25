@@ -35,6 +35,7 @@ import { listSchedules as listReportSchedules, scheduleSummaryText } from "./rep
 import { listAnalysisEvents, analysisSummary, computeCorrelations } from "./analysishub";
 import { computeKpiSnapshot } from "./kpi";
 import { listSessions as listWorkSessions } from "./worksessions";
+import { canonicalize, suggestionsFor } from "./terms";
 
 export interface AgentToolParam {
   name: string;
@@ -253,13 +254,40 @@ async function searchOne(q: string): Promise<string[]> {
 }
 
 // search — 메뉴를 가로지르는 단일 검색. LLM이 "어느 메뉴를 봐야 하나"를 풀지 않아도 되게 한다.
+// 0건일 때 붙이는 머리말. 이걸로 시작하는 결과는 LLM 재작성 없이 그대로 나간다(agentloop) —
+// "못 찾았다"를 "존재하지 않는다"로 부풀려 답하던 사고(2026-07-26)를 구조적으로 막는다.
+export const NO_HIT_PREFIX = "🔎 찾지 못했습니다 —";
+
+function noHitMessage(q: string): string {
+  const lines = [`${NO_HIT_PREFIX} "${q}"로는 결과가 없습니다.`, `(등록된 게 없다는 뜻이 아니라, 이 말로는 못 찾았다는 뜻입니다.)`];
+  const cands = suggestionsFor(q);
+  if (cands.length) {
+    lines.push("", "혹시 이걸 찾으시나요?");
+    for (const c of cands) lines.push(`  · ${c.hint}  →  "${c.canonical} 목록" 이라고 말해보세요`);
+  } else {
+    lines.push("", "찾는 대상의 이름·분류를 조금 더 알려주시면 다시 찾아보겠습니다.");
+  }
+  return lines.join("\n");
+}
+
 async function runSearch(args: Record<string, string>): Promise<string> {
   const q = args.query.trim();
   const terms = splitQueryTerms(q);
 
   if (terms.length === 1) {
     const out = await searchOne(terms[0]);
-    if (out.length === 0) return `"${q}"에 해당하는 자산·취약점·보안제품·문서·온톨로지 관계를 찾지 못했습니다.`;
+    if (out.length === 0) {
+      // 같은 것을 가리키는 다른 말일 수 있다 — 표준 말로 바꿔 한 번 더 찾아본다.
+      const canon = canonicalize(terms[0]);
+      if (canon !== terms[0]) {
+        const retry = await searchOne(canon);
+        if (retry.length) {
+          return [`"${terms[0]}"는 이 제품에서 "${canon}"이라고 부릅니다 — 그걸로 찾은 결과입니다.`, ...retry]
+            .join("\n").slice(0, 2500);
+        }
+      }
+      return noHitMessage(q);
+    }
     return out.join("\n").slice(0, 2500);
   }
 

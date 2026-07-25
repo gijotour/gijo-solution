@@ -22,7 +22,9 @@ export interface ScreenGuide {
 // ⚠"어떻게 해"는 여기에 넣지 않는다(2026-07-25 실측): "리눅스 SSH root 로그인 차단 어떻게 해"처럼
 // 업무 질문 대부분이 이 말끝을 쓰는데, 잡아버리면 도구·RAG가 답해야 할 질문이 화면 안내로 새 나간다.
 // 화면 사용법을 묻는 "이 화면 어떻게 해?"는 앞의 (이 화면|여기|…) 절이 이미 잡는다.
-const HELP_RE = /(이\s*화면|여기|이\s*메뉴|이\s*페이지).{0,6}(뭐|무엇|어떻게|할\s*수|사용|기능)|도움말|사용법|사용\s*방법|어떻게\s*(써|쓰|사용)|가이드\s*(줘|알려|보여)|help\b|무엇을\s*할\s*수|뭐\s*할\s*수|기능\s*(안내|설명|알려)/i;
+// "이 화면/메뉴/페이지"는 대상이 분명하므로 사이에 말이 좀 끼어도(대상 이름 등) 화면 안내로 본다.
+// "여기"는 장소를 뜻할 때가 많아 좁게 둔다("여기 있는 CVE-… 위험도 뭐야?"까지 삼키지 않게).
+const HELP_RE = /(이\s*화면|이\s*메뉴|이\s*페이지|현재\s*화면).{0,24}(뭐|무엇|어떻게|할\s*수|사용|기능|봐|보나|보면)|여기.{0,6}(뭐|무엇|어떻게|할\s*수|사용|기능)|도움말|사용법|사용\s*방법|어떻게\s*(써|쓰|사용)|가이드\s*(줘|알려|보여)|help\b|무엇을\s*할\s*수|뭐\s*할\s*수|기능\s*(안내|설명|알려)/i;
 
 // 화면의 구역(패널) 이름이 질문에 그대로 들어 있으면 도움말 의도로 본다.
 // 근거(실측 2026-07-25): "표시 이름은 어떻게 바꿔?"·"진행내역 리포트가 뭐야?"처럼 실사용자가
@@ -37,9 +39,27 @@ function panelNameHit(text: string, screen?: string): boolean {
   return Object.keys(g.panels).some((name) => q.includes(name.replace(/\s/g, "")));
 }
 
+// "기능 설명/안내/알려"는 화면 사용법일 수도, 특정 제품 질문일 수도 있는 약한 신호다.
+// 나머지(도움말·사용법·이 화면 …)는 화면을 가리키는 게 분명한 강한 신호.
+const WEAK_HELP_RE = /기능\s*(안내|설명|알려)/i;
+// 특정 대상을 콕 집은 질문인지 — 영문 고유명사(제품·도구 이름), 취약점 코드, 파일 확장자.
+// 다만 도움말 자체를 뜻하는 영어 낱말은 대상이 아니므로 세어주지 않는다.
+const SPECIFIC_SUBJECT_RE = /[A-Za-z][A-Za-z0-9._-]{2,}|(CVE|CWE|KEV|CCE)-?\d|\.(pdf|docx?|xlsx?|csv|log)\b/i;
+function hasSpecificSubject(text: string): boolean {
+  return SPECIFIC_SUBJECT_RE.test(text.replace(/\b(help|guide|gijo|as)\b/gi, ""));
+}
+
+// [2026-07-26 실사용 사고] "Tenable Web App Scanning 주요기능 설명해줘"가 화면 사용 안내로 샜다.
+// HELP_RE의 `기능 설명` 가지에 걸린 것 — 벤더 제품을 물었는데 대시보드 사용법이 돌아왔다.
+// 약한 신호뿐인데 특정 대상(제품명 등)이 함께 있으면 화면 안내가 아니다.
+// 프롬프트로 달랠 문제가 아니라 라우팅 조건으로 막는다.
 export function isHelpIntent(text: string, screen?: string): boolean {
-  if (panelNameHit(text.trim(), screen)) return true;
-  return HELP_RE.test(text.trim());
+  const t = text.trim();
+  const strong = HELP_RE.test(t) && !(WEAK_HELP_RE.test(t) && !/(이\s*화면|여기|이\s*메뉴|이\s*페이지|도움말|사용법|사용\s*방법)/.test(t));
+  if (strong) return true;
+  if (WEAK_HELP_RE.test(t) && !hasSpecificSubject(t)) return true;
+  if (panelNameHit(t, screen)) return !hasSpecificSubject(t);
+  return false;
 }
 
 const GUIDES: Record<string, ScreenGuide> = {
