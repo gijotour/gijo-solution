@@ -14,14 +14,17 @@ Electron 클라이언트를 빌드해 운영 서버에 게시한다(자동 업�
    - claude-deploy 계정으로 로그인 (운영 localhost:4000)
    - 이번 변경 화면 + 회귀 표본 1~2개 렌더·동작 확인, 스크린샷
    - 허브 iframe은 스테일 중복 프레임이 있을 수 있음 — **렌더된 프레임을 골라** 검사할 것
-4. **게시**: 반드시 claude-deploy로 (jyh 실사용 세션 보호):
+4. **게시**: **게시 전용 계정 gijo-publish**로 (사람이 쓰는 세션은 어느 것도 안 끊긴다):
    ```powershell
    cd "D:\Connect AI\client"
-   $env:GIJO_ADMIN_USER=[Environment]::GetEnvironmentVariable("GIJO_ADMIN_USER","User")
-   $env:GIJO_ADMIN_PASSWORD=[Environment]::GetEnvironmentVariable("GIJO_ADMIN_PASSWORD","User")
+   $env:GIJO_PUBLISH_USER=[Environment]::GetEnvironmentVariable("GIJO_PUBLISH_USER","User")
+   $env:GIJO_PUBLISH_PASSWORD=[Environment]::GetEnvironmentVariable("GIJO_PUBLISH_PASSWORD","User")
    npm run publish-release -- --force --notes "<버전 - 변경 요약>"
    ```
-   (User 스코프 env가 셸에 상속 안 되므로 위처럼 명시 로드. --force는 claude-deploy 자기 세션만 교체라 안전)
+   (User 스코프 env가 셸에 상속 안 되므로 위처럼 명시 로드)
+   ⚠ **claude-deploy로 게시하지 말 것**(2026-07-26 실사고): 게시는 --force로 로그인하므로
+   그 계정으로 앱에 로그인해 두면 작업 중이던 앱이 로그인 화면으로 튕긴다.
+   claude-deploy는 앱 테스트용, gijo-publish는 게시용으로 나눠 쓴다.
 5. **정리**: `git checkout -- client/server-dist/package.json client/server-dist/package-lock.json` (추적 산출물 원복) → 버전 bump 커밋("클라 X.Y.Z 게시 — …") → `git push hub main`.
 6. 보고: 버전·sha256·게시 노트·검증 결과.
 

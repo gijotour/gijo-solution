@@ -4,7 +4,8 @@
 // application/octet-stream으로 그대로 업로드한다.
 //
 // 사용: node scripts/publish-release.mjs --notes "버그 수정" [--server http://localhost:4000] [--user jyh] [--password changeme] [--force]
-// 자격증명은 인자 대신 환경변수(GIJO_ADMIN_USER/GIJO_ADMIN_PASSWORD)로도 줄 수 있다.
+// 자격증명은 인자 대신 환경변수로도 준다 — 게시 전용 GIJO_PUBLISH_USER/PASSWORD가 우선,
+// 없으면 GIJO_ADMIN_USER/PASSWORD로 폴백한다.
 // --force: 그 계정이 이미 다른 곳(앱 등)에 로그인 중이면 강제 전환(그 세션은 끊긴다).
 
 import * as fs from "node:fs";
@@ -20,8 +21,11 @@ function arg(name, fallback) {
 }
 
 const serverUrl = (arg("server", process.env.GIJO_SERVER_URL || "http://localhost:4000")).replace(/\/+$/, "");
-const username = arg("user", process.env.GIJO_ADMIN_USER || "");
-const password = arg("password", process.env.GIJO_ADMIN_PASSWORD || "");
+// 게시 전용 계정(GIJO_PUBLISH_*)을 먼저 본다 — 게시할 때마다 --force로 로그인하는데, 그 계정으로
+// 앱에 로그인해 두면 그 세션이 끊긴다(2026-07-26 실사고: 작업 중이던 앱이 로그인 화면으로 튕겼다).
+// 게시에만 쓰는 계정을 따로 두면 사람이 쓰는 세션은 어떤 것도 끊기지 않는다.
+const username = arg("user", process.env.GIJO_PUBLISH_USER || process.env.GIJO_ADMIN_USER || "");
+const password = arg("password", process.env.GIJO_PUBLISH_PASSWORD || process.env.GIJO_ADMIN_PASSWORD || "");
 const notes = arg("notes", "");
 const force = process.argv.includes("--force");
 
