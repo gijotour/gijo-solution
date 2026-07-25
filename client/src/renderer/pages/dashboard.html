@@ -67,7 +67,6 @@
   .acc-b-console .agent-dock input{padding:9px 12px;font-size:14px;height:38px;box-sizing:border-box;}
   .acc-b-console .dock-plus{width:38px;height:38px;font-size:16px;border-radius:9px;}
   .acc-b-console .dock-send{height:38px;padding:0 14px;font-size:13px;border-radius:9px;}
-  .acc-b-console .dock-all{height:38px;padding:0 10px;font-size:11.5px;border-radius:9px;}
   .acc-b-console .model-guide{margin:8px 12px;max-width:none;}
   /* 오른쪽 작업 세션 패널만 숨기기(② 요청) — 왼쪽 탐색기는 남기고 중앙만 넓힌다. */
   .body-grid.no-right{grid-template-columns:220px 1fr;}
@@ -501,7 +500,6 @@
   .cl-upd-btns button.reco{background:rgba(59,130,246,0.14);border-color:var(--blue);color:var(--blue-light);}
   .cl-upd-btns button:hover{border-color:var(--blue);}
   .dock-send{background:var(--blue);color:#fff;border:none;border-radius:10px;padding:0 20px;height:44px;font-weight:800;cursor:pointer;}
-  .dock-all{background:var(--panel);border:1px solid var(--border-strong);color:var(--blue-light);font-weight:800;font-size:11.5px;border-radius:10px;padding:0 13px;height:44px;white-space:nowrap;cursor:pointer;}
 
 
   /* ═══ 챗 중심 대시보드(2026-07-26 시안 v4) — 깔끔·보기 쉽게·아이콘 최소 ═══ */
@@ -527,7 +525,7 @@
   #accConsole .cl-empty{display:none;}
   .agent-dock{position:static !important;background:var(--panel) !important;border:1px solid var(--border-strong) !important;border-radius:16px !important;padding:10px 12px !important;margin-top:10px;box-shadow:0 8px 30px rgba(0,0,0,.35);gap:8px !important;}
   .agent-dock input{background:none !important;border:none !important;font-size:14px !important;height:34px;}
-  .dock-plus,.dock-send,.dock-all{border-radius:10px;}
+  .dock-plus,.dock-send{border-radius:10px;}
   .cl-chips{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;justify-content:center;}
   .cl-chips span{border:1px solid var(--border);border-radius:20px;padding:5px 13px;font-size:11.5px;color:var(--muted);cursor:pointer;}
   .cl-chips span:hover{border-color:var(--blue);color:var(--blue-light);}
@@ -745,7 +743,6 @@
             <button class="dock-plus" id="dockUpload" title="파일 올리기 — 자동 분류(취약점·매뉴얼·문서). 애매하면 유형을 물어봅니다">＋</button>
             <input id="chatInput" placeholder="지시를 입력하세요…" aria-label="지시를 입력하세요">
             <button class="dock-send" id="dockSend">전송</button>
-            <button class="dock-all" id="dockAll">전체 지시</button>
           </div>
           <div class="cl-chips" id="clChips">
             <span>오늘 뭐부터 볼까?</span><span>긴급한 취약점 알려줘</span><span>이번 주 점검 일정</span><span>보고서 만들어줘</span>
@@ -2527,10 +2524,8 @@
     });
     document.getElementById("dockSend").addEventListener("click", dockSubmit);
     document.getElementById("dockUpload").addEventListener("click", () => smartInput.click());
-    document.getElementById("dockAll").addEventListener("click", () => {
-      dashCurrentSession = null; chatInput.placeholder = "지시를 입력하세요…"; // 세션 해제 — 일반 지시
-      selectAgent("orchestrator"); dockSubmit();
-    });
+    // "전체 지시" 버튼은 제거했다(2026-07-26 사용자 결정) — 전송이 이미 보안 총괄(오케스트레이터)로
+    // 가므로 차이는 진행 중인 세션을 끊는 것뿐이었고, 그건 작업 세션 쪽 "새 세션"이 담당한다.
 
     const todayCtaBtn = document.getElementById("todayCtaBtn");
     if (todayCtaBtn) todayCtaBtn.addEventListener("click", () => {
@@ -2669,7 +2664,7 @@
     // 대화 시작은 "사용자 행동"으로만 판정 — 협업 로그 재생만으로 히어로가 접히지 않게
     // (실측 2026-07-26: 재생 로그가 cl-row를 만들어 첫 화면이 곧장 축소돼 버림).
     const startChat = () => document.body.classList.add("chatting");
-    ["dockSend", "dockAll", "dockUpload"].forEach((id) => document.getElementById(id)?.addEventListener("click", startChat));
+    ["dockSend", "dockUpload"].forEach((id) => document.getElementById(id)?.addEventListener("click", startChat));
     document.getElementById("chatInput")?.addEventListener("keydown", (e) => { if (e.key === "Enter") startChat(); });
     // 엣지 탭·세션·오피스 팝업은 공용 commandpanel.js가 담당(v5 통일) — 여기선 quick 팝업만.
     const B = document.body;

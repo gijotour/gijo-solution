@@ -56,25 +56,62 @@ interface RequestOpts {
 // access token이 만료돼 401이 오면, refresh token으로 한 번만 조용히 재발급받고 원 요청을 재시도한다.
 // refresh도 실패하면(만료/폐기) 토큰을 지워서 다음 API 호출들이 즉시 401로 실패 -> 각 페이지의
 // isAuthenticated() 가드가 로그인 화면으로 돌려보낸다.
-async function tryRefresh(): Promise<boolean> {
-  if (!refreshToken) return false;
-  const res = await fetch(`${serverUrl}/api/auth/refresh`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ refreshToken }),
-  }).catch(() => null);
-  if (!res || !res.ok) {
-    setAuthTokens(null);
-    return false;
+//
+// [2026-07-26 실사용 사고] 서버의 refresh token은 회전형(한 번 쓰면 즉시 폐기)이다. 그런데
+// 토큰 사본이 이 모듈의 지역 변수에도 있어서, 창·프레임이 여럿이면 각자 낡은 사본을 들고 있다.
+// 한 창이 갱신에 성공해 토큰이 회전하면 나머지는 폐기된 토큰으로 갱신을 시도해 실패하고,
+// 실패 처리로 공용 상태까지 지워버려 멀쩡하던 세션이 통째로 끊겼다
+// (증상: 업로드는 되는데 "리포트 저장 실패 401 unauthorized").
+// 그래서 ① 갱신은 이 컨텍스트에서 한 번만 돌고(single-flight), ② 갱신 전후로 메인 프로세스의
+// 공용 상태를 다시 읽어 남이 이미 갱신했으면 그 토큰을 받아 쓰고, ③ 내가 쓴 토큰이 여전히
+// 최신일 때만 지운다.
+function readShared(): AuthState {
+  const s = ipcRenderer.sendSync("auth:getState") as AuthState;
+  accessToken = s.accessToken;
+  refreshToken = s.refreshToken;
+  if (s.serverUrl) serverUrl = s.serverUrl;
+  return s;
+}
+
+let refreshInFlight: Promise<boolean> | null = null;
+
+async function tryRefresh(usedAccessToken: string | null): Promise<boolean> {
+  if (refreshInFlight) return refreshInFlight;
+  refreshInFlight = (async () => {
+    // 다른 창이 이미 갱신했다면 새 토큰을 받아 쓰기만 하면 된다.
+    const shared = readShared();
+    if (shared.accessToken && shared.accessToken !== usedAccessToken) return true;
+    if (!refreshToken) return false;
+
+    const usedRefresh = refreshToken;
+    const res = await fetch(`${serverUrl}/api/auth/refresh`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ refreshToken: usedRefresh }),
+    }).catch(() => null);
+
+    if (!res || !res.ok) {
+      // 내가 보내는 사이에 남이 갱신했을 수 있다 — 다시 읽어 확인하고, 그래도 그대로면 그때 지운다.
+      const after = readShared();
+      if (after.accessToken && after.accessToken !== usedAccessToken) return true;
+      if (after.refreshToken === usedRefresh) setAuthTokens(null);
+      return false;
+    }
+    const result = (await res.json()) as { accessToken: string; refreshToken: string };
+    setAuthTokens(result);
+    return true;
+  })();
+  try {
+    return await refreshInFlight;
+  } finally {
+    refreshInFlight = null;
   }
-  const result = (await res.json()) as { accessToken: string; refreshToken: string };
-  setAuthTokens(result);
-  return true;
 }
 
 async function request<T = unknown>(path: string, opts: RequestOpts = {}): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (accessToken) headers["Authorization"] = `Bearer ${accessToken}`;
+  const sentToken = accessToken;
+  if (sentToken) headers["Authorization"] = `Bearer ${sentToken}`;
 
   const res = await fetch(`${serverUrl}${path}`, {
     method: opts.method ?? "GET",
@@ -82,7 +119,7 @@ async function request<T = unknown>(path: string, opts: RequestOpts = {}): Promi
     body: opts.body !== undefined ? JSON.stringify(opts.body) : undefined,
   });
 
-  if (res.status === 401 && !opts.skipAuthRetry && (await tryRefresh())) {
+  if (res.status === 401 && !opts.skipAuthRetry && (await tryRefresh(sentToken))) {
     return request<T>(path, { ...opts, skipAuthRetry: true });
   }
 
