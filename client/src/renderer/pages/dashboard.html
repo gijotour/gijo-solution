@@ -503,6 +503,61 @@
   .dock-send{background:var(--blue);color:#fff;border:none;border-radius:10px;padding:0 20px;height:44px;font-weight:800;cursor:pointer;}
   .dock-all{background:var(--panel);border:1px solid var(--border-strong);color:var(--blue-light);font-weight:800;font-size:11.5px;border-radius:10px;padding:0 13px;height:44px;white-space:nowrap;cursor:pointer;}
 
+
+  /* ═══ 챗 중심 대시보드(2026-07-26 시안 v4) — 깔끔·보기 쉽게·아이콘 최소 ═══ */
+  .body-grid{grid-template-columns:232px 1fr 42px !important;position:relative;}
+  #gijoNav{order:0;}
+  .explorer{display:none !important;}
+  .right-reopen{display:none !important;}
+  .asset-pop{display:none !important;}
+  .center-stage{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:calc(100vh - 64px);padding:20px 24px !important;}
+  .hero{display:flex;flex-direction:column;align-items:center;}
+  .hero-orb{width:280px;transition:width .25s ease;}
+  .hero-orb .network-svg{max-width:280px;}
+  .hero-hello{font-size:24px;font-weight:800;color:#fff;margin-top:6px;}
+  .hero-sub{color:var(--muted);font-size:13px;margin-top:6px;}
+  .ai-team{background:none !important;border:none !important;padding:0 !important;margin:14px 0 0 !important;width:auto !important;box-shadow:none !important;}
+  .ai-team-h{display:flex;flex-direction:column;align-items:center;gap:7px;}
+  .team-grid.icons-only{justify-content:center;}
+  .team-grid.icons-only .tcard{width:46px;}
+  .ai-team-sub{font-size:10.5px;color:var(--muted-2);}
+  .acc.ai-team#accConsole{width:min(760px,100%);margin-top:16px !important;}
+  #accConsole .acc-b-console{background:none;border:none;padding:0;}
+  #accConsole .cl-rows{max-height:0;overflow:auto;transition:max-height .25s ease;background:none;border:none;padding:0 2px;width:100%;}
+  #accConsole .cl-empty{display:none;}
+  .agent-dock{position:static !important;background:var(--panel) !important;border:1px solid var(--border-strong) !important;border-radius:16px !important;padding:10px 12px !important;margin-top:10px;box-shadow:0 8px 30px rgba(0,0,0,.35);gap:8px !important;}
+  .agent-dock input{background:none !important;border:none !important;font-size:14px !important;height:34px;}
+  .dock-plus,.dock-send,.dock-all{border-radius:10px;}
+  .cl-chips{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;justify-content:center;}
+  .cl-chips span{border:1px solid var(--border);border-radius:20px;padding:5px 13px;font-size:11.5px;color:var(--muted);cursor:pointer;}
+  .cl-chips span:hover{border-color:var(--blue);color:var(--blue-light);}
+  .hero-foot{margin-top:16px;color:var(--muted-2);font-size:10.5px;min-height:14px;text-align:center;}
+  body.chatting .hero-orb{width:120px;}
+  body.chatting .hero-orb .network-svg{max-width:120px;}
+  body.chatting .hero-hello,body.chatting .hero-sub,body.chatting .cl-chips{display:none;}
+  body.chatting .ai-team{margin-top:4px !important;}
+  body.chatting #accConsole .cl-rows{max-height:52vh;margin-top:10px;}
+  body.chatting .center-stage{justify-content:flex-start;padding-top:14px !important;}
+  .edge-rail{order:3;align-self:stretch;display:flex;flex-direction:column;align-items:center;gap:10px;padding-top:14px;background:var(--panel-2);border-left:1px solid var(--border);}
+  .etab{writing-mode:vertical-rl;letter-spacing:2px;font-size:11px;font-weight:800;color:var(--muted);padding:13px 7px;border:1px solid var(--border);border-radius:10px;cursor:pointer;background:var(--bg);user-select:none;}
+  .etab:hover{color:var(--blue-light);border-color:var(--blue);}
+  .etab.on{color:#fff;background:rgba(59,130,246,.2);border-color:rgba(59,130,246,.5);}
+  .etab b{writing-mode:horizontal-tb;font-size:9px;background:var(--blue);color:#fff;border-radius:8px;padding:0 5px;margin-bottom:6px;}
+  .dash-sessions{display:none;position:absolute;top:14px;right:52px;bottom:14px;width:340px;z-index:60;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:14px;box-shadow:-14px 0 44px rgba(0,0,0,.55);animation:edgein .18s ease-out;overflow:hidden;}
+  body.pop-sess .dash-sessions{display:flex;flex-direction:column;}
+  .dash-sessions .dash-office-live{display:none !important;}
+  @keyframes edgein{from{transform:translateX(22px);opacity:0}to{transform:none;opacity:1}}
+  .office-pop{display:none;position:absolute;top:12px;left:14px;right:52px;bottom:12px;z-index:60;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:14px;box-shadow:0 18px 60px rgba(0,0,0,.6);animation:edgein .18s ease-out;overflow:hidden;}
+  body.pop-office .office-pop{display:flex;flex-direction:column;}
+  .op-h{display:flex;align-items:center;gap:8px;padding:11px 14px;border-bottom:1px solid var(--border);font-weight:800;font-size:12.5px;}
+  .live-b{font-size:9px;color:#fff;background:#e2483d;border-radius:8px;padding:1px 7px;letter-spacing:1px;}
+  .op-x{margin-left:auto;color:var(--muted-2);cursor:pointer;font-size:14px;padding:2px 6px;}
+  .op-x:hover{color:#fff;}
+  #officeFrame{flex:1;border:none;width:100%;background:var(--bg);}
+  .quick-pop{display:none;position:absolute;top:24px;left:50%;transform:translateX(-50%);width:min(720px,92%);max-height:calc(100% - 48px);overflow:auto;z-index:70;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:14px;box-shadow:0 18px 60px rgba(0,0,0,.6);padding:8px 14px 14px;}
+  body.pop-quick .quick-pop{display:block;}
+  .quick-x{position:sticky;top:2px;float:right;color:var(--muted-2);cursor:pointer;font-size:14px;padding:4px 6px;z-index:2;}
+  .quick-x:hover{color:#fff;}
 </style>
 </head>
 <body class="g-ui">
@@ -533,10 +588,46 @@
   </div>
 
   <div class="body-grid">
+    <div class="sidebar" id="gijoNav"></div>
     <div class="explorer">
       <!-- 시작 가이드 슬롯 — 탐색기 맨 위(2026-07-25 사용자 요청). onboarding.js가 여기에 렌더. -->
       <div id="gijoObSlot"></div>
-      <div class="stage-core stage-core-left">
+      <!-- 구체는 챗 중심 히어로로 이동(2026-07-26) -->
+      <div class="server-card">
+        <div class="sc-nm"><span class="sc-dot" id="scDot"></span>GIJO AS Desktop</div>
+        <div class="sc-meta" id="scMeta">연동 서버 정보 불러오는 중…</div>
+      </div>
+      <div class="explorer-title"><span>📁 탐색기</span><span class="tree-act" id="pickRootBtn" title="폴더 선택 — 이 폴더가 탐색 루트가 됩니다" style="margin-left:auto">📁</span><span class="tree-act" id="refreshFilesBtn" title="새로고침">↻</span></div>
+      <div class="fx-rootline" id="fxRootLine" style="font-size:11px;color:var(--muted-2);padding:3px 4px 7px;display:flex;align-items:center;gap:5px;border-bottom:1px solid var(--border);margin-bottom:6px;" title="현재 탐색 루트 폴더 — 📁 버튼으로 변경">📂 <b id="fxRoot" style="color:var(--muted);font-weight:700">루트</b></div>
+      <!-- 스마트 업로드 입력(숨김). 트리거는 통합 탐색기의 "문서·분석 > 📥 파일 올리기"에서 호출. -->
+      <input type="file" id="smartUploadInput" multiple style="display:none">
+      <div id="explorerTree">불러오는 중...</div>
+    </div>
+
+    <!-- 오른쪽 패널 — 작업 세션만(2026-07-21: 지휘 콘솔은 중앙 AI 팀 아래로 이관돼 여기선 뺌). -->
+    <div class="dash-sessions" id="dashRight">
+      <div class="dash-right-head" id="dashRightHead">
+        <span class="drh-t">💬 작업 세션</span>
+        <span class="dash-active-badge zero" id="dashActiveBadge" title="진행중인 작업 세션 — 클릭하면 전체 작업 세션 화면으로">진행중 -</span>
+        <!-- 접기 버튼 제거(2026-07-25) — 가장자리 세로 탭으로 통일 -->
+      </div>
+      <div class="dash-slist" id="dashSessionList"><div style="font-size:11px;color:var(--muted-2);padding:8px">불러오는 중…</div></div>
+      <div class="dash-sfull" id="dashSessionsFull">전체 작업 세션 열기 ↗</div>
+      <!-- 남는 공간에 🏢 보안팀 사무실 LIVE 대화(협업 이벤트) — 팀이 움직이면 여기로 흐른다. -->
+      <div class="dash-office-live" id="dashOfficeLive">
+        <div class="dol-head" id="dolHead" title="AI 팀 사무실 창 열기">🏢 보안팀 사무실 <span class="dol-live">LIVE</span></div>
+        <div class="dol-feed" id="dolFeed"><div class="dol-empty">팀이 움직이면 대화가 여기 실시간으로 흐릅니다.</div></div>
+      </div>
+    </div>
+
+    <!-- 자산 상세 팝오버(시안2) — 탐색기 자산 클릭 시 옆에 뜬다 -->
+    <div class="asset-pop" id="assetPop"></div>
+
+    <div class="center-stage">
+
+      <!-- 챗 중심 히어로(2026-07-26 시안 v4 승인): 구체, 인사, AI팀, 컴포저, 칩. 깔끔·아이콘 최소. -->
+      <div class="hero" id="heroBlock">
+        <div class="hero-orb"><div class="hero-orb-in">
       <svg class="network-svg" viewBox="0 0 600 440" xmlns="http://www.w3.org/2000/svg">
         <defs>
           <radialGradient id="nodeFill" cx="50%" cy="42%" r="60%">
@@ -620,58 +711,28 @@
 <circle class="spark-extra" cx="255" cy="345" r="2.3" fill="#dcebff" filter="url(#sparkGlow)" style="animation-delay:.25s"/>
 <image href="assets/gijo-center.png" x="196" y="116" width="208" height="208" preserveAspectRatio="xMidYMid meet"/>
       </svg>
+      </div></div>
+        <div class="hero-hello" id="heroHello">안녕하세요</div>
+        <div class="hero-sub">지시하거나 파일을 올리면 AI 팀이 처리합니다</div>
       </div>
-      <div class="server-card">
-        <div class="sc-nm"><span class="sc-dot" id="scDot"></span>GIJO AS Desktop</div>
-        <div class="sc-meta" id="scMeta">연동 서버 정보 불러오는 중…</div>
-      </div>
-      <div class="explorer-title"><span>📁 탐색기</span><span class="tree-act" id="pickRootBtn" title="폴더 선택 — 이 폴더가 탐색 루트가 됩니다" style="margin-left:auto">📁</span><span class="tree-act" id="refreshFilesBtn" title="새로고침">↻</span></div>
-      <div class="fx-rootline" id="fxRootLine" style="font-size:11px;color:var(--muted-2);padding:3px 4px 7px;display:flex;align-items:center;gap:5px;border-bottom:1px solid var(--border);margin-bottom:6px;" title="현재 탐색 루트 폴더 — 📁 버튼으로 변경">📂 <b id="fxRoot" style="color:var(--muted);font-weight:700">루트</b></div>
-      <!-- 스마트 업로드 입력(숨김). 트리거는 통합 탐색기의 "문서·분석 > 📥 파일 올리기"에서 호출. -->
-      <input type="file" id="smartUploadInput" multiple style="display:none">
-      <div id="explorerTree">불러오는 중...</div>
-    </div>
 
-    <!-- 오른쪽 패널 — 작업 세션만(2026-07-21: 지휘 콘솔은 중앙 AI 팀 아래로 이관돼 여기선 뺌). -->
-    <div class="dash-sessions" id="dashRight">
-      <div class="dash-right-head" id="dashRightHead">
-        <span class="drh-t">💬 작업 세션</span>
-        <span class="dash-active-badge zero" id="dashActiveBadge" title="진행중인 작업 세션 — 클릭하면 전체 작업 세션 화면으로">진행중 -</span>
-        <!-- 접기 버튼 제거(2026-07-25) — 가장자리 세로 탭으로 통일 -->
-      </div>
-      <div class="dash-slist" id="dashSessionList"><div style="font-size:11px;color:var(--muted-2);padding:8px">불러오는 중…</div></div>
-      <div class="dash-sfull" id="dashSessionsFull">전체 작업 세션 열기 ↗</div>
-      <!-- 남는 공간에 🏢 보안팀 사무실 LIVE 대화(협업 이벤트) — 팀이 움직이면 여기로 흐른다. -->
-      <div class="dash-office-live" id="dashOfficeLive">
-        <div class="dol-head" id="dolHead" title="AI 팀 사무실 창 열기">🏢 보안팀 사무실 <span class="dol-live">LIVE</span></div>
-        <div class="dol-feed" id="dolFeed"><div class="dol-empty">팀이 움직이면 대화가 여기 실시간으로 흐릅니다.</div></div>
-      </div>
-    </div>
-
-    <!-- 자산 상세 팝오버(시안2) — 탐색기 자산 클릭 시 옆에 뜬다 -->
-    <div class="asset-pop" id="assetPop"></div>
-
-    <div class="center-stage">
-
-      <!-- 담당자 업무 메뉴 — 역할 자동 큐레이션 + 업무 주기별(오늘/주간/월간) + 담당자 직접 담기(편집). -->
-      <div class="dash-menu" id="dashMenu"></div>
+      <!-- 내 업무 바로가기 — 왼쪽 메뉴에서 여는 중앙 팝업 -->
+      <div class="quick-pop" id="quickPop"><span class="quick-x" id="quickClose">✕</span>
+      <div class="dash-menu" id="dashMenu"></div></div>
 
       <!-- AI 팀 — 에이전트 로스터(에이전트 + 임베딩 엔진 + 가드레일)를 하나의 '울타리'로 묶는다.
            헤더에 🏢 팀 사무실(별도 창) 바로 열기. 가드레일도 이 울타리 안 팀원으로 표시된다. -->
       <div class="ai-team">
         <!-- AI 팀 로스터를 '아이콘만'으로 헤더의 오피스 버튼 옆에 인라인 배치(2026-07-25 사용자 결정).
              카드 클릭 선택은 없음(선택은 아래 지휘 콘솔에서). 동작 시 아이콘 펄스 움직임만. -->
-        <div class="ai-team-h"><span class="ai-team-t">🤖 AI 팀</span>
-          <button class="ai-team-office" id="teamOfficeBtn" title="우리 AI 팀 사무실 (별도 창으로 열기)">🏢 AI 전용 라이프 오피스</button>
-          <div class="team-grid icons-only" id="teamGrid"><span style="color:var(--muted);font-size:11px">불러오는 중…</span></div>
+        <div class="ai-team-h"><div class="team-grid icons-only" id="teamGrid"><span style="color:var(--muted);font-size:11px">불러오는 중…</span></div>
           <span class="ai-team-sub" id="aiTeamSub"></span></div>
       </div>
 
       <!-- 지휘 콘솔 — AI 팀 바로 아래, 같은 폭의 박스로(2026-07-21 사용자 요청 — 오른쪽 패널에서 이관). -->
       <div class="acc ai-team" id="accConsole">
-        <div class="acc-h" data-acc="console"><span class="car">▾</span><span class="acc-t">🧭 지휘 콘솔</span>
-          <span class="acc-sp"><span class="cl-status" id="clStatus"><span class="cl-dot"></span>대기 중</span></span></div>
         <div class="acc-b acc-b-console">
+          <span class="cl-status" id="clStatus" style="display:none"><span class="cl-dot"></span>대기 중</span>
           <div class="cl-rows" id="clRows"><div class="cl-empty">지시하면 여기서 실시간으로 흐릅니다.</div></div>
           <div class="model-guide" id="modelGuide" style="display:none">
             <div class="mg-title">⚠ AI 모델이 준비되지 않았습니다 — 답변을 받으려면 아래 중 하나를 하세요</div>
@@ -684,10 +745,24 @@
             <button class="dock-plus" id="dockUpload" title="파일 올리기 — 자동 분류(취약점·매뉴얼·문서). 애매하면 유형을 물어봅니다">＋</button>
             <input id="chatInput" placeholder="지시를 입력하세요…" aria-label="지시를 입력하세요">
             <button class="dock-send" id="dockSend">전송</button>
-            <button class="dock-all" id="dockAll">◉ 전체 지시</button>
+            <button class="dock-all" id="dockAll">전체 지시</button>
           </div>
+          <div class="cl-chips" id="clChips">
+            <span>오늘 뭐부터 볼까?</span><span>긴급한 취약점 알려줘</span><span>이번 주 점검 일정</span><span>보고서 만들어줘</span>
+          </div>
+          <div class="hero-foot" id="heroFoot"></div>
         </div>
       </div>
+    </div>
+
+    <!-- 오른쪽 가장자리 세로 메뉴 + 대형 오피스 팝업(크기 차등: 세션=소형, 오피스=중앙 전면) -->
+    <div class="edge-rail">
+      <div class="etab" id="etabSess">작업 세션 <b id="edgeSessCnt">-</b></div>
+      <div class="etab" id="etabOffice">AI 라이브 오피스</div>
+    </div>
+    <div class="office-pop" id="officePop">
+      <div class="op-h">AI 전용 라이브 오피스 <span class="live-b">LIVE</span><span class="op-x" id="officeClose">✕</span></div>
+      <iframe id="officeFrame" title="AI 전용 라이브 오피스"></iframe>
     </div>
     <!-- 오늘 확인할 항목 · 운영 시작 · 오늘의 조치는 "작업 세션"(sessions.html) 자산 탐색기로 이관됨.
          거기서 항목을 누르면 그 대상의 상태를 보여주는 대화 세션이 열린다(💬 헤더 아이콘). -->
@@ -2577,6 +2652,66 @@
     window.gijoRealtime.connect();
     init();
   }
+
+  // ═══ 챗 중심 대시보드 동작(2026-07-26) ═══════════════════════════════════
+  (function chatFirst() {
+    // nav.js가 나중에 주입하는 접힘 상태 그리드(1fr 360px)를 덮어쓴다 — head 맨 끝에 추가해 우선.
+    const st = document.createElement("style");
+    st.textContent = "body.gn-left-collapsed .body-grid{grid-template-columns:1fr 42px !important;}" +
+      ".body-grid{grid-template-columns:232px 1fr 42px !important;}";
+    document.head.appendChild(st);
+    // 인사 — 실제 로그인 사용자명
+    window.gijo.me().then((u) => {
+      const n = (u && (u.displayName || u.username)) || "";
+      document.getElementById("heroHello").textContent = n ? `안녕하세요, ${n}님` : "안녕하세요";
+    }).catch(() => {});
+    // 추천 칩 → 입력창 채우고 즉시 전송(기존 콘솔 로직 그대로 탄다)
+    document.querySelectorAll("#clChips span").forEach((c) => c.addEventListener("click", () => {
+      const inp = document.getElementById("chatInput");
+      inp.value = c.textContent;
+      document.getElementById("dockSend").click();
+    }));
+    // 대화 시작은 "사용자 행동"으로만 판정 — 협업 로그 재생만으로 히어로가 접히지 않게
+    // (실측 2026-07-26: 재생 로그가 cl-row를 만들어 첫 화면이 곧장 축소돼 버림).
+    const startChat = () => document.body.classList.add("chatting");
+    ["dockSend", "dockAll", "dockUpload"].forEach((id) => document.getElementById(id)?.addEventListener("click", startChat));
+    document.getElementById("chatInput")?.addEventListener("keydown", (e) => { if (e.key === "Enter") startChat(); });
+    // 가장자리 탭 — 세션(소형)/오피스(대형) 팝업, 서로 배타 + ✕/ESC 닫기
+    const B = document.body;
+    const setPop = (name) => {
+      ["pop-sess", "pop-office", "pop-quick"].forEach((c) => B.classList.remove(c));
+      document.querySelectorAll(".etab").forEach((e) => e.classList.remove("on"));
+      if (name === "sess") { B.classList.add("pop-sess"); document.getElementById("etabSess").classList.add("on"); }
+      if (name === "office") {
+        const f = document.getElementById("officeFrame");
+        if (!f.src) f.src = "office.html?embed=1"; // 첫 열림에만 로드(리소스 절약)
+        B.classList.add("pop-office"); document.getElementById("etabOffice").classList.add("on");
+      }
+      if (name === "quick") B.classList.add("pop-quick");
+    };
+    document.getElementById("etabSess").addEventListener("click", () => setPop(B.classList.contains("pop-sess") ? null : "sess"));
+    document.getElementById("etabOffice").addEventListener("click", () => setPop(B.classList.contains("pop-office") ? null : "office"));
+    document.getElementById("officeClose").addEventListener("click", () => setPop(null));
+    document.getElementById("quickClose").addEventListener("click", () => setPop(null));
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") setPop(null); });
+    // 세션 진행중 수를 가장자리 탭 배지에 미러링(기존 dashActiveBadge가 진실 원천)
+    const badge = document.getElementById("dashActiveBadge");
+    const mirror = () => {
+      const m = /([0-9]+)/.exec(badge?.textContent || "");
+      document.getElementById("edgeSessCnt").textContent = m ? m[1] : "-";
+    };
+    if (badge) { new MutationObserver(mirror).observe(badge, { childList: true, characterData: true, subtree: true }); mirror(); }
+    // 왼쪽 메뉴 "내 업무 바로가기"(?quick=1) → 중앙 팝업으로
+    if (/[?&]quick=1/.test(location.search)) setPop("quick");
+    // 하단 한 줄 요약 — 실데이터(조치 우선순위)만, 없으면 비움
+    window.gijo.listActionPriorities(5).then(({ items }) => {
+      if (!items || !items.length) return;
+      const kev = items.filter((r) => r.finding && r.finding.kev).length;
+      const crit = items.filter((r) => r.finding && (r.finding.severity === "critical" || r.finding.severity === "high")).length;
+      document.getElementById("heroFoot").textContent =
+        `미조치 상위 ${items.length}건${crit ? ` · 높음 이상 ${crit}건` : ""}${kev ? ` · KEV ${kev}건` : ""} — "오늘 뭐부터 볼까?"로 확인`;
+    }).catch(() => {});
+  })();
 </script>
 
 <script>
@@ -2755,7 +2890,7 @@
 })();
 </script>
 <script src="onboarding.js"></script>
-<!-- nav.js: 대시보드에선 사이드바를 렌더하지 않지만(#gijoNav 없음) 공용 메뉴 렌더러(window.gijoRenderMenu)를
+<!-- nav.js: 챗 중심 개편(2026-07-26)으로 대시보드에도 #gijoNav 사이드바를 렌더한다. 공용 메뉴 렌더러(window.gijoRenderMenu)를
      제공한다 — '전체메뉴' 모드가 진짜 메뉴를 그리도록(복사본 폐기). render()는 조기 반환. -->
 <script src="nav.js"></script>
 <script src="titlebar.js"></script>

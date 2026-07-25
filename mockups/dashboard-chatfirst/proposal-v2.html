@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>대시보드 챗 중심 시안 v2 — 아이콘 제거·구체 이미지·세션 패널 통일·상단바 유지</title>
+<style>
+  :root{--bg:#0b0f17;--panel:#131926;--panel2:#0d1320;--border:#232c3d;--border-strong:#37425a;--text:#e6edf3;--muted:#8b949e;--muted2:#5f6b7f;--blue:#4c8dff;--blue-light:#79b0ff;--teal:#2dd4bf;--amber:#fbbf24;--red:#f87171;--green:#34d399;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI','Malgun Gothic',sans-serif;font-size:13px;height:100vh;overflow:hidden;display:grid;grid-template-rows:44px 1fr;}
+  /* ── 상단 고정바 — 기존 titlebar 그대로 유지 ─────────────────────────────── */
+  .topbar{display:flex;align-items:center;gap:12px;padding:0 14px;background:#0a0e15;border-bottom:1px solid var(--border);}
+  .topbar .lg{display:flex;align-items:center;gap:8px;font-weight:800;font-size:13px;}
+  .topbar .lg .g{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#4c8dff,#2dd4bf);display:flex;align-items:center;justify-content:center;color:#fff;font-size:12px;font-weight:900;}
+  .topbar .dt{color:var(--blue-light);font-size:12px;font-weight:700;}
+  .topbar .sp{margin-left:auto;display:flex;gap:8px;}
+  .pill{border:1px solid rgba(52,211,153,.4);color:var(--green);border-radius:16px;padding:3px 11px;font-size:11px;font-weight:700;}
+  .pill.sess{border-color:rgba(76,141,255,.4);color:var(--blue-light);}
+  .main{display:grid;grid-template-columns:236px 1fr 330px;min-height:0;}
+  /* ── 왼쪽 메뉴 — 아이콘 없음(텍스트만) ──────────────────────────────────── */
+  .side{background:var(--panel2);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:12px 10px;}
+  .side .fold{align-self:flex-end;color:var(--muted2);font-size:13px;cursor:pointer;padding:0 6px 8px;}
+  .mi{padding:10px 12px;border-radius:9px;font-size:12.5px;cursor:pointer;display:flex;align-items:center;}
+  .mi:hover{background:rgba(76,141,255,.08)}
+  .mi.on{background:rgba(76,141,255,.16);border:1px solid rgba(76,141,255,.35);font-weight:700;}
+  .mi .tag{margin-left:auto;font-size:9.5px;color:var(--muted2);border:1px solid var(--border);border-radius:10px;padding:0 6px;white-space:nowrap;}
+  .sec{font-size:10.5px;color:var(--muted2);font-weight:800;letter-spacing:.5px;padding:16px 12px 6px;}
+  .grp{padding:8px 12px;border-radius:8px;color:var(--muted);font-size:12px;cursor:pointer;display:flex;align-items:center;}
+  .grp:hover{color:var(--text);background:rgba(76,141,255,.06)}
+  .grp .tri{margin-left:auto;font-size:9px;color:var(--muted2)}
+  .sub{padding:2px 12px 4px 22px;color:var(--muted2);font-size:11.5px;line-height:1.9;}
+  .sub span{cursor:pointer}.sub span:hover{color:var(--blue-light)}
+  .user{margin-top:auto;border-top:1px solid var(--border);padding:12px 10px 4px;display:flex;align-items:center;gap:10px;cursor:pointer;}
+  .user .av{width:30px;height:30px;border-radius:50%;background:#1d2a44;display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--blue-light);}
+  .user small{display:block;color:var(--muted2);font-size:10.5px}
+  .user .set{margin-left:auto;color:var(--muted2);font-size:12px;}
+  /* ── 중앙 — 구체(네트워크 오브) + 채팅 컴포저 ───────────────────────────── */
+  .center{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:26px;position:relative;}
+  /* 구체: 실구현은 대시보드 탐색기의 기존 이미지 자산을 그대로 사용 — 여기선 CSS 근사 */
+  .orb-wrap{position:relative;width:190px;height:190px;}
+  .orb-ring{position:absolute;inset:0;border:1px solid rgba(76,141,255,.25);border-radius:50%;}
+  .orb-ring.r2{inset:14px;border-color:rgba(76,141,255,.15);}
+  .orb-dot{position:absolute;width:7px;height:7px;border-radius:50%;background:var(--blue-light);box-shadow:0 0 8px rgba(121,176,255,.9);}
+  .orb-core{position:absolute;inset:44px;border-radius:50%;background:radial-gradient(circle at 38% 32%, #3f6db3 0%, #1c3560 45%, #0d1b36 80%);box-shadow:0 0 60px rgba(76,141,255,.35), inset -8px -10px 30px rgba(0,0,0,.5);}
+  .orb-mesh{position:absolute;inset:44px;border-radius:50%;background:
+    linear-gradient(115deg, transparent 46%, rgba(121,176,255,.35) 48%, transparent 52%),
+    linear-gradient(60deg, transparent 44%, rgba(121,176,255,.28) 47%, transparent 51%),
+    linear-gradient(160deg, transparent 55%, rgba(45,212,191,.25) 58%, transparent 62%);}
+  h1{font-size:24px;margin-top:20px;font-weight:800;}
+  .sub-hello{color:var(--muted);margin-top:6px;font-size:13px;}
+  .composer{width:min(700px,94%);margin-top:24px;background:var(--panel);border:1px solid var(--border-strong);border-radius:16px;padding:14px 16px;box-shadow:0 8px 30px rgba(0,0,0,.35);}
+  .composer .in{color:var(--muted2);font-size:14px;padding:2px 2px 24px;}
+  .composer .row{display:flex;align-items:center;gap:8px;}
+  .cbtn{width:30px;height:30px;border-radius:50%;border:1px solid var(--border-strong);background:none;color:var(--muted);font-size:15px;cursor:pointer;}
+  .send{margin-left:auto;width:32px;height:32px;border-radius:50%;background:var(--blue);border:none;color:#fff;font-size:15px;cursor:pointer;}
+  .chips{display:flex;gap:8px;margin-top:13px;flex-wrap:wrap;justify-content:center;}
+  .chip{border:1px solid var(--border);border-radius:20px;padding:5px 13px;font-size:11.5px;color:var(--muted);cursor:pointer;}
+  .chip:hover{border-color:var(--blue);color:var(--blue-light)}
+  .team{margin-top:28px;text-align:center;}
+  .team .t{font-size:11px;color:var(--muted2);font-weight:700;margin-bottom:9px;}
+  .team .row{display:flex;gap:13px;justify-content:center;}
+  .agent{width:52px;cursor:pointer;}
+  .agent .a{width:42px;height:42px;border-radius:12px;background:var(--panel);border:1px solid var(--border-strong);display:flex;align-items:center;justify-content:center;font-size:19px;margin:0 auto;position:relative;}
+  .agent .a i{position:absolute;right:-2px;bottom:-2px;width:9px;height:9px;border-radius:50%;background:var(--teal);border:2px solid var(--bg);}
+  .agent .a i.idle{background:var(--muted2)}
+  .agent .n{font-size:9.5px;color:var(--muted2);margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .foot-note{position:absolute;bottom:12px;color:var(--muted2);font-size:10.5px;}
+  /* ── 오른쪽 패널 — 오피스/작업 세션 동일 형태(탭 전환) ──────────────────── */
+  .right{background:var(--panel2);border-left:1px solid var(--border);display:flex;flex-direction:column;min-height:0;}
+  .rtabs{display:flex;gap:4px;padding:9px 10px;border-bottom:1px solid var(--border);}
+  .rtab{flex:1;text-align:center;padding:7px 0;border-radius:8px;font-size:11.5px;font-weight:800;color:var(--muted);cursor:pointer;border:1px solid transparent;}
+  .rtab.on{background:rgba(76,141,255,.16);color:#fff;border-color:rgba(76,141,255,.4);}
+  .rbody{flex:1;overflow:auto;min-height:0;}
+  /* 작업 세션 — 오른쪽 패널과 동일한 카드 형태 */
+  .sess-sum{display:flex;align-items:center;gap:8px;padding:11px 14px;font-size:11.5px;color:var(--muted);}
+  .sess-sum b{color:var(--text)}
+  .badge-run{font-size:9.5px;color:#fff;background:var(--blue);border-radius:9px;padding:1px 8px;}
+  .si{margin:0 10px 8px;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px 12px;cursor:pointer;}
+  .si:hover{border-color:var(--blue)}
+  .si .t{font-size:12px;font-weight:700;display:flex;align-items:center;gap:7px;}
+  .si .t .dot{width:7px;height:7px;border-radius:50%;background:var(--green);}
+  .si .t .st{margin-left:auto;font-size:9.5px;color:var(--blue-light);border:1px solid rgba(76,141,255,.35);border-radius:9px;padding:0 7px;}
+  .si .m{color:var(--muted2);font-size:11px;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .rfoot{border-top:1px solid var(--border);padding:10px 14px;font-size:11.5px;color:var(--blue-light);text-align:center;cursor:pointer;}
+</style>
+</head>
+<body>
+
+<!-- 상단 고정바 (기존 그대로 유지 — 질문 ④ 답: 네, 항상 보입니다) -->
+<div class="topbar">
+  <div class="lg"><div class="g">G</div>GIJO AS</div>
+  <div class="dt">2026. 07. 25. 오후 10:41</div>
+  <div class="sp"><span class="pill">● 서버 연결상태 양호</span><span class="pill sess">🕒 세션 26:47</span></div>
+</div>
+
+<div class="main">
+  <!-- 왼쪽 메뉴 — 아이콘 없음 -->
+  <div class="side">
+    <div class="fold">⟨⟨ 접기</div>
+    <div class="mi on">대시보드</div>
+    <div class="mi">내 업무 바로가기</div>
+    <div class="mi">AI 전용 라이브 오피스 <span class="tag">오른쪽 열림</span></div>
+    <div class="sec">전체 메뉴</div>
+    <div class="grp">관제 <span class="tri">▾</span></div>
+    <div class="sub"><span>보안 분석</span> · <span>위협 인텔</span> · <span>리포트</span></div>
+    <div class="grp">자산·조치 <span class="tri">▾</span></div>
+    <div class="sub"><span>자산 허브</span> · <span>조치·승인</span> · <span>보안제품</span> · <span>점검 콘솔</span></div>
+    <div class="grp">AI <span class="tri">▸</span></div>
+    <div class="grp">설정 <span class="tri">▸</span></div>
+    <div class="user"><div class="av">브</div><div><b>brian</b><small>보안담당자 · gijo01</small></div><span class="set">설정</span></div>
+  </div>
+
+  <!-- 중앙 — 구체 이미지(기존 대시보드 자산 그대로 사용) + 채팅 컴포저 -->
+  <div class="center">
+    <div class="orb-wrap">
+      <div class="orb-ring"></div><div class="orb-ring r2"></div>
+      <div class="orb-core"></div><div class="orb-mesh"></div>
+      <div class="orb-dot" style="top:2px;left:50%"></div>
+      <div class="orb-dot" style="top:26px;left:14px"></div>
+      <div class="orb-dot" style="top:26px;right:14px"></div>
+      <div class="orb-dot" style="top:50%;left:-1px"></div>
+      <div class="orb-dot" style="top:50%;right:-1px"></div>
+      <div class="orb-dot" style="bottom:26px;left:14px"></div>
+      <div class="orb-dot" style="bottom:26px;right:14px"></div>
+      <div class="orb-dot" style="bottom:2px;left:50%"></div>
+    </div>
+    <h1>안녕하세요, brian님</h1>
+    <div class="sub-hello">지시하거나 파일을 올리면 AI 팀이 처리합니다</div>
+
+    <div class="composer">
+      <div class="in">무엇이든 지시하세요 — 예: "긴급한 취약점 정리해줘"</div>
+      <div class="row">
+        <button class="cbtn" title="파일 업로드">＋</button>
+        <button class="cbtn" title="화면 안내">ⓘ</button>
+        <button class="send">↑</button>
+      </div>
+    </div>
+    <div class="chips">
+      <span class="chip">오늘 뭐부터 볼까?</span>
+      <span class="chip">긴급한 취약점 알려줘</span>
+      <span class="chip">이번 주 점검 일정</span>
+      <span class="chip">보고서 만들어줘</span>
+    </div>
+
+    <div class="team">
+      <div class="t">AI 팀 — 6명 대기 중</div>
+      <div class="row">
+        <div class="agent"><div class="a">👑<i></i></div><div class="n">오케스트라</div></div>
+        <div class="agent"><div class="a">🔍<i></i></div><div class="n">스캔</div></div>
+        <div class="agent"><div class="a">📊<i></i></div><div class="n">분석</div></div>
+        <div class="agent"><div class="a">📝<i class="idle"></i></div><div class="n">리포트</div></div>
+        <div class="agent"><div class="a">🌐<i class="idle"></i></div><div class="n">CTI</div></div>
+        <div class="agent"><div class="a">🛡<i></i></div><div class="n">GIJO</div></div>
+      </div>
+    </div>
+    <div class="foot-note">⚠ 미조치 Critical 2건 · 지연 점검 1건 — "오늘 뭐부터 볼까?"로 확인</div>
+  </div>
+
+  <!-- 오른쪽 — 작업 세션 · 라이브 오피스가 같은 형태의 패널(탭 전환) -->
+  <div class="right">
+    <div class="rtabs">
+      <div class="rtab on">💬 작업 세션 <span class="badge-run">13</span></div>
+      <div class="rtab">🏢 라이브 오피스</div>
+    </div>
+    <div class="rbody">
+      <div class="sess-sum"><b>진행중 13</b> · 오늘 5건 갱신</div>
+      <div class="si"><div class="t"><span class="dot"></span>방화벽 정기 점검 절차<span class="st">진행중</span></div><div class="m">방화벽 정기 점검 절차는 다음과 같습니다…</div></div>
+      <div class="si"><div class="t"><span class="dot"></span>안전대부 웹서버 취약점<span class="st">진행중</span></div><div class="m">[medium] [IW-32] 데이터 평문 전송 외 4건…</div></div>
+      <div class="si"><div class="t"><span class="dot"></span>KEV 등재 취약점 조치<span class="st">진행중</span></div><div class="m">KEV에 등재된 취약점의 조치 기한은…</div></div>
+      <div class="si"><div class="t"><span class="dot" style="background:var(--muted2)"></span>주간 리포트 검토<span class="st" style="color:var(--muted2);border-color:var(--border)">완료</span></div><div class="m">주간 보안 리포트가 생성되었습니다…</div></div>
+    </div>
+    <div class="rfoot">전체 작업 세션 열기 ↗</div>
+  </div>
+</div>
+
+</body>
+</html>

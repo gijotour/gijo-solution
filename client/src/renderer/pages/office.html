@@ -124,6 +124,9 @@
 </style>
 </head>
 <body class="g-ui">
+<script>/* 대시보드 대형 팝업 임베드(2026-07-26): 자체 헤더를 숨겨 이중 타이틀 방지 */
+if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add("office-embed");</script>
+<style>.office-embed .head{display:none!important}</style>
   <div class="head">
     <div class="h-title">🏢 보안팀 사무실 <span class="live" id="liveBadge">LIVE</span></div>
     <div class="h-right">

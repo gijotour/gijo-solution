@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>대시보드 챗 중심 시안 — llama.cpp 스타일 (추천 1종)</title>
+<style>
+  :root{--bg:#0b0f17;--panel:#131926;--panel2:#0d1320;--border:#232c3d;--border-strong:#37425a;--text:#e6edf3;--muted:#8b949e;--muted2:#5f6b7f;--blue:#4c8dff;--blue-light:#79b0ff;--teal:#2dd4bf;--amber:#fbbf24;--red:#f87171;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI','Malgun Gothic',sans-serif;font-size:13px;height:100vh;overflow:hidden;display:grid;grid-template-columns:250px 1fr 330px;}
+  /* ── 왼쪽: 열린 메뉴(햄버거로 접힘 — 접히면 중앙이 더 넓어짐) ───────────────── */
+  .side{background:var(--panel2);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:10px;}
+  .side .head{display:flex;align-items:center;gap:8px;padding:6px 8px 14px;}
+  .side .head .glogo{width:26px;height:26px;border-radius:8px;background:linear-gradient(135deg,#4c8dff,#2dd4bf);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;color:#fff;}
+  .side .head b{font-size:13.5px}
+  .side .head .fold{margin-left:auto;color:var(--muted2);font-size:14px;cursor:pointer;}
+  .mi{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;color:var(--text);font-size:12.5px;cursor:pointer;}
+  .mi:hover{background:rgba(76,141,255,.08)}
+  .mi.on{background:rgba(76,141,255,.16);border:1px solid rgba(76,141,255,.35)}
+  .mi .ic{width:18px;text-align:center}
+  .mi .tag{margin-left:auto;font-size:9.5px;color:var(--muted2);border:1px solid var(--border);border-radius:10px;padding:0 6px;}
+  .sec{font-size:10.5px;color:var(--muted2);font-weight:800;letter-spacing:.5px;padding:14px 10px 6px;}
+  .grp{padding:7px 10px;border-radius:8px;color:var(--muted);font-size:12px;cursor:pointer;display:flex;gap:9px;align-items:center;}
+  .grp:hover{color:var(--text);background:rgba(76,141,255,.06)}
+  .grp .tri{margin-left:auto;font-size:9px;color:var(--muted2)}
+  .sub{padding:2px 10px 2px 34px;color:var(--muted2);font-size:11.5px;line-height:1.9;}
+  .sub span{cursor:pointer}.sub span:hover{color:var(--blue-light)}
+  .user{margin-top:auto;border-top:1px solid var(--border);padding:12px 8px 4px;display:flex;align-items:center;gap:10px;cursor:pointer;border-radius:9px;}
+  .user:hover{background:rgba(76,141,255,.07)}
+  .user .av{width:30px;height:30px;border-radius:50%;background:#1d2a44;display:flex;align-items:center;justify-content:center;font-weight:800;color:var(--blue-light);}
+  .user small{display:block;color:var(--muted2);font-size:10.5px}
+  .user .gear{margin-left:auto;color:var(--muted2)}
+  /* ── 중앙: 챗 중심 히어로 ──────────────────────────────────────────────── */
+  .center{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:30px;position:relative;}
+  .hero-logo{width:74px;height:74px;border-radius:20px;background:linear-gradient(135deg,#4c8dff,#2dd4bf);display:flex;align-items:center;justify-content:center;font-size:36px;font-weight:900;color:#fff;box-shadow:0 10px 40px rgba(76,141,255,.25);}
+  h1{font-size:26px;margin-top:18px;font-weight:800;}
+  .sub-hello{color:var(--muted);margin-top:6px;font-size:13.5px;}
+  .composer{width:min(720px,92%);margin-top:26px;background:var(--panel);border:1px solid var(--border-strong);border-radius:16px;padding:14px 16px;box-shadow:0 8px 30px rgba(0,0,0,.35);}
+  .composer .in{color:var(--muted2);font-size:14px;padding:2px 2px 26px;}
+  .composer .row{display:flex;align-items:center;gap:8px;}
+  .cbtn{width:30px;height:30px;border-radius:50%;border:1px solid var(--border-strong);background:none;color:var(--muted);font-size:15px;cursor:pointer;}
+  .cbtn:hover{color:var(--text);border-color:var(--blue)}
+  .send{margin-left:auto;width:32px;height:32px;border-radius:50%;background:var(--blue);border:none;color:#fff;font-size:15px;cursor:pointer;}
+  .chips{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;justify-content:center;}
+  .chip{border:1px solid var(--border);border-radius:20px;padding:5px 13px;font-size:11.5px;color:var(--muted);cursor:pointer;}
+  .chip:hover{border-color:var(--blue);color:var(--blue-light)}
+  /* AI 팀 아이콘 행 */
+  .team{margin-top:34px;text-align:center;}
+  .team .t{font-size:11px;color:var(--muted2);font-weight:700;letter-spacing:.5px;margin-bottom:10px;}
+  .team .row{display:flex;gap:14px;justify-content:center;}
+  .agent{width:52px;cursor:pointer;}
+  .agent .a{width:44px;height:44px;border-radius:13px;background:var(--panel);border:1px solid var(--border-strong);display:flex;align-items:center;justify-content:center;font-size:20px;margin:0 auto;position:relative;}
+  .agent:hover .a{border-color:var(--blue)}
+  .agent .a i{position:absolute;right:-2px;bottom:-2px;width:10px;height:10px;border-radius:50%;background:var(--teal);border:2px solid var(--bg);font-style:normal;}
+  .agent .a i.idle{background:var(--muted2)}
+  .agent .n{font-size:9.5px;color:var(--muted2);margin-top:5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .foot-note{position:absolute;bottom:14px;color:var(--muted2);font-size:10.5px;}
+  /* ── 오른쪽: AI 전용 라이브 오피스(메뉴 3번 클릭 시 열림) ─────────────────── */
+  .office{background:var(--panel2);border-left:1px solid var(--border);display:flex;flex-direction:column;}
+  .office .oh{display:flex;align-items:center;gap:8px;padding:13px 14px;border-bottom:1px solid var(--border);font-weight:800;font-size:12.5px;}
+  .office .oh .live{font-size:9px;color:#fff;background:var(--red);border-radius:8px;padding:1px 7px;letter-spacing:1px;}
+  .office .oh .x{margin-left:auto;color:var(--muted2);cursor:pointer;}
+  .pixel{margin:12px;height:150px;border-radius:12px;background:linear-gradient(#101a2e,#0c1424);border:1px solid var(--border);position:relative;overflow:hidden;}
+  .desk{position:absolute;width:44px;height:30px;border-radius:6px;background:#1b2740;border:1px solid #2d3c5e;}
+  .bot{position:absolute;font-size:15px;}
+  .feed{flex:1;overflow:auto;padding:0 14px;}
+  .fi{border-left:2px solid var(--border-strong);padding:7px 0 7px 11px;margin-bottom:2px;font-size:11.5px;color:var(--muted);}
+  .fi b{color:var(--text);font-weight:600}
+  .fi .tm{color:var(--muted2);font-size:10px;}
+  .todo{border-top:1px solid var(--border);padding:12px 14px;}
+  .todo .t{font-size:11px;font-weight:800;margin-bottom:8px;}
+  .todo .i{display:flex;gap:8px;font-size:11.5px;color:var(--muted);padding:4px 0;}
+  .todo .i b{color:var(--amber);font-weight:700}
+</style>
+</head>
+<body>
+
+<!-- 왼쪽 열림 메뉴 — 요청 5항목 순서 그대로 -->
+<div class="side">
+  <div class="head"><div class="glogo">G</div><b>GIJO AS</b><span class="fold">⟨⟨</span></div>
+  <div class="mi on"><span class="ic">🏠</span>대시보드</div>
+  <div class="mi"><span class="ic">⭐</span>내 업무 바로가기</div>
+  <div class="mi"><span class="ic">🏢</span>AI 전용 라이브 오피스 <span class="tag">오른쪽 열림</span></div>
+  <div class="sec">전체 메뉴</div>
+  <div class="grp">🖥 관제 <span class="tri">▾</span></div>
+  <div class="sub"><span>보안 분석</span> · <span>위협 인텔</span> · <span>리포트</span></div>
+  <div class="grp">🛡 자산·조치 <span class="tri">▾</span></div>
+  <div class="sub"><span>자산 허브</span> · <span>조치·승인</span> · <span>보안제품</span> · <span>점검 콘솔</span></div>
+  <div class="grp">🤖 AI <span class="tri">▸</span></div>
+  <div class="grp">⚙ 설정 <span class="tri">▸</span></div>
+  <div class="user"><div class="av">브</div><div><b>brian</b><small>보안담당자 · gijo01</small></div><span class="gear">⚙</span></div>
+</div>
+
+<!-- 중앙 챗 중심 히어로 -->
+<div class="center">
+  <div class="hero-logo">G</div>
+  <h1>안녕하세요, brian님</h1>
+  <div class="sub-hello">지시하거나 파일을 올리면 AI 팀이 처리합니다</div>
+
+  <div class="composer">
+    <div class="in">무엇이든 지시하세요 — 예: "긴급한 취약점 정리해줘"</div>
+    <div class="row">
+      <button class="cbtn" title="파일 업로드(스마트 라우팅)">＋</button>
+      <button class="cbtn" title="화면 안내 ⓘ">ⓘ</button>
+      <button class="send">↑</button>
+    </div>
+  </div>
+  <div class="chips">
+    <span class="chip">오늘 뭐부터 볼까?</span>
+    <span class="chip">긴급한 취약점 알려줘</span>
+    <span class="chip">이번 주 점검 일정</span>
+    <span class="chip">보고서 만들어줘</span>
+  </div>
+
+  <div class="team">
+    <div class="t">AI 팀 — 6명 대기 중 (클릭=대화 대상 지정)</div>
+    <div class="row">
+      <div class="agent"><div class="a">👑<i></i></div><div class="n">오케스트라</div></div>
+      <div class="agent"><div class="a">🔍<i></i></div><div class="n">스캔</div></div>
+      <div class="agent"><div class="a">📊<i></i></div><div class="n">분석</div></div>
+      <div class="agent"><div class="a">📝<i class="idle"></i></div><div class="n">리포트</div></div>
+      <div class="agent"><div class="a">🌐<i class="idle"></i></div><div class="n">CTI</div></div>
+      <div class="agent"><div class="a">🛡<i></i></div><div class="n">GIJO</div></div>
+    </div>
+  </div>
+
+  <div class="foot-note">⚠ 미조치 Critical 2건 · 지연 점검 1건 — 자세히는 "오늘 뭐부터 볼까?"</div>
+</div>
+
+<!-- 오른쪽: AI 전용 라이브 오피스(메뉴에서 열고 닫음) -->
+<div class="office">
+  <div class="oh">🏢 AI 전용 라이브 오피스 <span class="live">LIVE</span><span class="x">✕</span></div>
+  <div class="pixel">
+    <div class="desk" style="left:16px;top:22px"></div><div class="bot" style="left:28px;top:26px">👑</div>
+    <div class="desk" style="left:86px;top:22px"></div><div class="bot" style="left:98px;top:26px">🔍</div>
+    <div class="desk" style="left:156px;top:22px"></div><div class="bot" style="left:168px;top:26px">📊</div>
+    <div class="desk" style="left:16px;top:86px"></div><div class="bot" style="left:28px;top:90px">📝</div>
+    <div class="desk" style="left:86px;top:86px"></div><div class="bot" style="left:98px;top:90px">🌐</div>
+    <div class="desk" style="left:156px;top:86px"></div><div class="bot" style="left:168px;top:90px">🛡</div>
+  </div>
+  <div class="feed">
+    <div class="fi"><b>scan → analysis</b> 문서 분석·분류 요청 <span class="tm">· 방금</span></div>
+    <div class="fi"><b>analysis</b> 업무영역 분류: 장비운영 <span class="tm">· 1분 전</span></div>
+    <div class="fi"><b>orchestrator</b> 취약점 우선순위 정리 완료 <span class="tm">· 3분 전</span></div>
+    <div class="fi"><b>GIJO</b> 용어 해설 부연 <span class="tm">· 5분 전</span></div>
+  </div>
+  <div class="todo">
+    <div class="t">📌 오늘의 할 일</div>
+    <div class="i"><b>P1</b> Critical 취약점 2건 조치 확인</div>
+    <div class="i"><b>P2</b> FW-2000 분기 점검(지연)</div>
+    <div class="i"><b>P3</b> 주간 리포트 검토</div>
+  </div>
+</div>
+
+</body>
+</html>

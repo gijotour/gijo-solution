@@ -59,6 +59,7 @@
   var GROUPS = [
     { id: "monitor", ic: "🖥", label: "관제", items: [
       { page: "dashboard.html", label: "대시보드" },
+      { page: "dashboard.html?quick=1", label: "내 업무 바로가기" }, // 대시보드 위 팝업으로 열림(챗 중심 개편 2026-07-26)
       { page: "hub.html?g=analysis", label: "보안 분석", bot: true },
       { page: "hub.html?g=threat", label: "위협 인텔리전스", bot: true },
       { page: "hub.html?g=report", label: "리포트", bot: true },
