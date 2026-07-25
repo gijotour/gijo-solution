@@ -267,7 +267,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       `<div class="doc-list">${list}</div>` +
       `<div class="doc-add" data-pid="${product.id}" data-kind="${kind}">` +
       `<input type="text" placeholder="문서 제목 (파일 없이 제목만 등록도 가능)" aria-label="문서 제목">` +
-      `<input type="file" accept=".pdf,.hwpx,.hwp,.txt,.md,.csv,.json,.log,.docx">` +
+      // id 부여(2026-07-25 입력 점검): 기능상 필수는 아니나(맥락 조회) 자동화·접근성 도구가 식별하게.
+      `<input type="file" id="docFile-${product.id}-${kind}" accept=".pdf,.hwpx,.hwp,.txt,.md,.csv,.json,.log,.docx">` +
       `<button data-doc-add>＋ 추가</button>` +
       `<div class="doc-hint"></div>` +
       `</div>` +

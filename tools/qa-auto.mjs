@@ -436,12 +436,12 @@ async function runClient() {
   await scenario("QA-C02", "메뉴 C안", "구주소 자동 리다이렉트", {
     given: "예전 즐겨찾기·바로가기가 kpi.html을 직접 가리킬 때",
     when: "kpi.html을 열면",
-    then: "hub.html?g=analysis&t=kpi.html 로 이동하고 '보안 KPI' 탭이 활성화된다",
+    then: "hub.html?g=report&t=kpi.html 로 이동하고 '보안 KPI' 탭이 활성화된다(KPI는 리포트 그룹 — 2026-07-25 이동)",
   }, async () => {
     await open("kpi.html");
     await page.waitForTimeout(600);
     const url = page.url();
-    if (!/hub\.html\?g=analysis&t=kpi\.html/.test(url)) throw new Error(`URL=${url}`);
+    if (!/hub\.html\?g=report&t=kpi\.html/.test(url)) throw new Error(`URL=${url}`);
     const onTab = await page.evaluate(() => document.querySelector(".hub-tab.on")?.textContent);
     if (onTab !== "보안 KPI") throw new Error(`활성 탭=${onTab}`);
     return `kpi.html → ${url.split("/").pop()}, 활성 탭 '보안 KPI'`;
@@ -450,15 +450,15 @@ async function runClient() {
   await scenario("QA-C03", "메뉴 C안", "설정 허브 + 업데이트 배지", {
     given: "새 버전이 있다고 서버가 알려줄 때",
     when: "hub.html?g=settings 를 열면",
-    then: "설정 계열 4탭(설정·업데이트·로그·작업 기록)이 뜨고 사이드바 설정 항목에 업데이트 배지가 표시된다",
+    then: "설정 계열 5탭(설정·MCP 연동·업데이트·로그·작업 기록)이 뜨고 사이드바 설정 항목에 업데이트 배지가 표시된다",
   }, async () => {
     await open("hub.html?g=settings");
     const tabs = await page.evaluate(() => document.querySelectorAll(".hub-tab").length);
-    // 메뉴 정리(2026-07-25): 사용량·요금·기능 안내 제거로 6→4탭
-    if (tabs !== 4) throw new Error(`탭 ${tabs}개`);
+    // 메뉴 정리(2026-07-25): 사용량·요금·기능 안내 제거, MCP 연동 이동 편입 → 5탭
+    if (tabs !== 5) throw new Error(`탭 ${tabs}개`);
     const badge = await page.evaluate(() => !!document.querySelector(".gn-upbadge"));
     if (!badge) throw new Error("업데이트 배지 없음");
-    return `탭 4개 + 업데이트 배지 표시`;
+    return `탭 5개 + 업데이트 배지 표시`;
   });
 
   await scenario("QA-C04", "작업 세션", "허브에서 작업 세션 드로어 기본 접힘", {

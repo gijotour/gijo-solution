@@ -11,14 +11,13 @@
   var HUBS = {
     analysis: { ic: "📊", label: "보안 분석", tabs: [
       { page: "analysis.html", label: "통합 관제" },
-      { page: "kpi.html", label: "보안 KPI" },
     ]},
     threat: { ic: "🎯", label: "위협 인텔리전스", tabs: [
       { page: "threat.html", label: "위협 인텔" },
-      { page: "mcp.html", label: "🔌 MCP 연동" },
     ]},
     report: { ic: "📄", label: "리포트", tabs: [
       { page: "report.html", label: "리포트" },
+      { page: "kpi.html", label: "보안 KPI" }, // 보고용 스냅샷·추세 — 리포트 곁이 자연스러움(2026-07-25 이동)
       { page: "compliance.html", label: "컴플라이언스" },
     ]},
     assets: { ic: "🛡", label: "자산 허브", tabs: [
@@ -49,6 +48,7 @@
     ]},
     settings: { ic: "⚙", label: "설정", tabs: [
       { page: "settings.html", label: "설정" },
+      { page: "mcp.html", label: "🔌 MCP 연동" }, // 연동·정책 관리 — 위협 그룹에서 이동(2026-07-25)
       { page: "update.html", label: "업데이트" },
       { page: "logs.html", label: "로그" },
       { page: "audit.html", label: "작업 기록 (감사)" },
