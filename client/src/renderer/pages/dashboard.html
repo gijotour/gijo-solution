@@ -480,6 +480,17 @@
   .dock-plus:hover{background:rgba(59,130,246,0.26);}
   /* 스마트 업로드 결정 카드(콘솔 인라인) — 애매할 때 유형 4택 */
   .cl-updecide{background:rgba(240,160,32,0.06);border:1px solid rgba(240,160,32,0.3);border-radius:10px;padding:11px 13px;margin-top:6px;}
+  /* 승인카드 — 업로드 분류 결과 배지·수정·되물음(시안 승인 2026-07-25) */
+  .cl-cat-badge{display:inline-block;border:1px solid rgba(45,212,191,.45);color:var(--teal);border-radius:20px;padding:0 9px;font-size:11.5px;margin-left:6px;white-space:nowrap;}
+  .cl-cat-badge.low{border-color:rgba(251,191,36,.5);color:#fbbf24;}
+  .cl-cat-fix{background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:11.5px;padding:1px 8px;margin-left:6px;cursor:pointer;}
+  .cl-cat-fix:hover{border-color:var(--border-strong);color:var(--text);}
+  .cl-cat-ask{margin-top:8px;padding:9px 11px;border:1px solid var(--border);border-radius:8px;background:rgba(88,166,255,.04);}
+  .cl-cat-q{font-size:12px;margin-bottom:7px;}
+  .cl-cat-opts{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
+  .cl-cat-opt{border:1px solid var(--border-strong);background:none;border-radius:20px;color:var(--text);font-size:11.5px;padding:2px 11px;cursor:pointer;}
+  .cl-cat-opt:hover{border-color:var(--teal);color:var(--teal);}
+  .cl-cat-opt.cur{border-color:var(--border);color:var(--muted);}
   .cl-upd-h{font-size:12px;font-weight:800;color:#fff;margin-bottom:3px;}
   .cl-upd-f{font-size:11px;color:var(--amber);margin-bottom:7px;word-break:break-all;}
   .cl-upd-pname{margin-bottom:7px;}
@@ -895,7 +906,7 @@
             try {
               const f = await window.gijo.readFile(itemPath);
               const r = await window.gijo.ingestMemoryFile(f.name, f.content, "global");
-              st.textContent = `✓ ${r.chunks}개 청크 저장 · 분류: ${r.docClass || "기타"}${r.linkedProduct ? ` · 보안제품 '${r.linkedProduct}'에 연결됨` : ""}`;
+              st.textContent = `✓ ${r.chunks}개 청크 저장 · 분류: ${r.docClass || "기타"}${r.category ? ` · 영역 ${r.category}` : ""}${r.linkedProduct ? ` · 보안제품 '${r.linkedProduct}'에 연결됨` : ""}`;
               st.style.color = "var(--teal)";
               // 파일 행에 분류 배지 즉시 반영(다음 새로고침 전에도 보이게).
               docClassMap.set(f.name, r.docClass || "기타");
@@ -1139,6 +1150,55 @@
     if (r.routedTo === "product-manual") return `보안제품 '${r.manual.productName}'에 ${r.manual.kind === "logManual" ? "로그" : "제품"} 매뉴얼로 연결${r.manual.createdProduct ? " · 신규 제품 자동 등록" : ""} (${r.reason})`;
     return `장기기억 ${r.memory.chunks}청크 수집${r.memory.docClass ? ` · 분류 ${r.memory.docClass}` : ""}${r.memory.linkedProduct ? ` · 제품 '${r.memory.linkedProduct}' 연결` : ""} (${r.reason})`;
   }
+  // ── 승인카드(시안 승인 2026-07-25) — "AI가 분류하고, 담당자는 확인만" ─────────────
+  // 자동 분류가 확실하면(영역≠일반) 청록 배지+[영역 수정▾], 확신 낮으면(일반) 호박 배지+되물음.
+  // 어느 쪽이든 문서는 이미 저장돼 있어 재업로드가 없다 — 영역 표만 바뀌고 감사 로그에 남는다.
+  const RAG_CATEGORIES = ["취약점", "장비운영", "사내규정", "위협대응", "일반"];
+  function categoryFixRow(documentId, current, onDone) {
+    const wrap = document.createElement("div");
+    wrap.className = "cl-cat-opts";
+    RAG_CATEGORIES.forEach((c) => {
+      const b = document.createElement("button");
+      b.className = "cl-cat-opt" + (c === current ? " cur" : "");
+      b.textContent = c === current ? `${c}(현재)` : c;
+      b.addEventListener("click", async () => {
+        if (c === current) { onDone(current, false); return; }
+        b.disabled = true;
+        try { await window.gijo.setDocCategory(documentId, c); onDone(c, true); }
+        catch (e) { b.disabled = false; alert("영역 수정 실패: " + e.message); }
+      });
+      wrap.appendChild(b);
+    });
+    return wrap;
+  }
+  function renderApprovalCard(cm, name, r) {
+    const cat = r.category || (r.memory && r.memory.category) || "";
+    const confident = cat && cat !== "일반";
+    // RAG에 실제 인입된 문서만 영역 수정이 가능하다(문서ID=파일명). 스캔 전용 반영(Nessus 등)은 배지만.
+    const editable = !!(r.memory && r.memory.chunks > 0) || r.routedTo === "memory";
+    const badge = cat ? `<span class="cl-cat-badge${confident ? "" : " low"}">🗂 ${escB(cat)}${confident ? "" : " (확신 낮음)"}</span>` : "";
+    cm.innerHTML = `<span>${escB(name)} → ${escB(uploadResultMsg(r))}</span> ${badge}${confident && editable ? ' <button class="cl-cat-fix">영역 수정 ▾</button>' : ""}`;
+    if (!editable || !cat) return;
+    const done = (c, changed) => {
+      const row = cm.querySelector(".cl-cat-opts"); if (row) row.remove();
+      const bd = cm.querySelector(".cl-cat-badge");
+      if (bd && changed) { bd.classList.remove("low"); bd.textContent = `🗂 ${c}`; }
+      if (changed) clAppend("event", { icon: "🗂", name: "업무영역 확정", message: `${name} → ${c} (감사 기록됨). 이제 해당 화면에서 물으면 이 문서가 우선 인용됩니다.` });
+    };
+    if (confident) {
+      cm.querySelector(".cl-cat-fix")?.addEventListener("click", (ev) => {
+        if (cm.querySelector(".cl-cat-opts")) { cm.querySelector(".cl-cat-opts").remove(); return; }
+        ev.target.after(categoryFixRow(name, cat, done));
+      });
+    } else {
+      // 되물음 — 확신 낮음(일반)일 때만. 무시해도 '일반'으로 이미 검색된다.
+      const ask = document.createElement("div");
+      ask.className = "cl-cat-ask";
+      ask.innerHTML = `<div class="cl-cat-q">💬 이 문서, 주로 어느 업무에 쓰는 자료인가요? (그대로 둬도 됩니다)</div>`;
+      ask.appendChild(categoryFixRow(name, cat, done));
+      cm.appendChild(ask);
+    }
+  }
   // 업로드 결과에서 리포트에 담을 진행내역을 뽑는다(파서가 준 근거·건수 그대로 — 지어내지 않는다).
   function ingestPayload(name, r) {
     const steps = String(r.reason || "").split(" · ").map((x) => x.trim()).filter(Boolean);
@@ -1198,7 +1258,7 @@
       }));
       return;
     }
-    if (cm) cm.textContent = `${name} → ${uploadResultMsg(r)}`;
+    if (cm) renderApprovalCard(cm, name, r);
     // 파일 처리 진행내역을 리포트로 남길지 제안한다(선택) — 감사·인수인계 증빙용.
     // 설명은 화면에 늘어놓지 않고 ⓘ(screenguide '진행내역 리포트')가 담당한다.
     offerIngestReport(name, r);

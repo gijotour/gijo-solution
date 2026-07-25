@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>RAG 승인카드 시안 — 업로드 분류 결과 확인·수정</title>
+<style>
+  :root{--bg:#0d1117;--panel:#161b22;--border:#30363d;--border-strong:#484f58;--text:#e6edf3;--muted:#8b949e;--teal:#2dd4bf;--amber:#fbbf24;--blue:#58a6ff;--purple:#bc8cff;}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI','Malgun Gothic',sans-serif;font-size:13px;margin:0;padding:28px;line-height:1.5}
+  h1{font-size:16px;margin:0 0 6px}
+  .note{color:var(--muted);font-size:12px;margin-bottom:22px}
+  .stage{max-width:660px;margin-bottom:26px}
+  .stage-label{font-size:11.5px;color:var(--purple);margin-bottom:6px;font-weight:600}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+  .row1{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .ok{color:var(--teal);font-weight:600}
+  .file{font-weight:600}
+  .badge{display:inline-flex;align-items:center;gap:4px;border:1px solid var(--border-strong);border-radius:20px;padding:1px 9px;font-size:11.5px;color:var(--muted)}
+  .badge.cat{border-color:rgba(45,212,191,.45);color:var(--teal)}
+  .fix{background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:11.5px;padding:2px 8px;cursor:pointer}
+  .fix:hover{border-color:var(--border-strong);color:var(--text)}
+  .detail{color:var(--muted);font-size:12px;margin-top:6px}
+  .why{color:var(--muted);font-size:11.5px;margin-top:8px;border-top:1px dashed var(--border);padding-top:8px}
+  .why b{color:var(--text);font-weight:600}
+  .picker{margin-top:10px;padding:10px;border:1px solid var(--border);border-radius:8px;background:rgba(88,166,255,.04)}
+  .picker .q{font-size:12.5px;margin-bottom:8px}
+  .opts{display:flex;gap:6px;flex-wrap:wrap}
+  .opt{border:1px solid var(--border-strong);background:none;border-radius:20px;color:var(--text);font-size:12px;padding:3px 12px;cursor:pointer}
+  .opt:hover{border-color:var(--blue);color:var(--blue)}
+  .opt.rec{border-color:var(--teal);color:var(--teal)}
+  .opt.rec::after{content:" ✓추천";font-size:10.5px}
+  .arrow{color:var(--muted);text-align:center;margin:4px 0;font-size:11px}
+</style>
+</head>
+<body>
+<h1>승인카드 시안 (추천 1종) — "AI가 분류하고, 담당자는 확인만"</h1>
+<div class="note">적용 위치: 대시보드 스마트 업로드 결과 + 기억·학습(memory.html) 업로드 결과 · 기존 유형 결정카드는 그대로 두고 <b>결과 단계</b>만 추가</div>
+
+<div class="stage">
+  <div class="stage-label">상태 ① 분류 확실 — 자동 등록 + 승인카드 (대부분의 경우, 클릭 0회)</div>
+  <div class="card">
+    <div class="row1">
+      <span class="ok">✓ 등록 완료</span>
+      <span class="file">FW-2000_운영_매뉴얼.pdf</span>
+      <span class="badge">34조각</span>
+      <span class="badge cat">🗂 장비운영</span>
+      <button class="fix">영역 수정 ▾</button>
+    </div>
+    <div class="detail">보안제품 'FW-2000'에 제품 매뉴얼로 연결 · 올린 사람: brian</div>
+    <div class="why"><b>왜 이렇게 분류했나:</b> 파일명에 '매뉴얼' — 제품 매뉴얼 자동 매칭. 이제 유지보수·터미널 화면에서 물으면 이 문서가 우선 인용됩니다.</div>
+  </div>
+</div>
+
+<div class="arrow">▼ "영역 수정"을 누르면 그 자리에서 펼쳐짐 (팝업 없음)</div>
+
+<div class="stage">
+  <div class="stage-label">상태 ② 분류 모호 — 되물음 (규칙·AI가 확신 못 한 경우에만)</div>
+  <div class="card">
+    <div class="row1">
+      <span class="ok">✓ 등록 완료</span>
+      <span class="file">2026_상반기_보안점검_종합.pdf</span>
+      <span class="badge">57조각</span>
+      <span class="badge cat" style="border-color:rgba(251,191,36,.5);color:var(--amber)">🗂 일반 (확신 낮음)</span>
+    </div>
+    <div class="picker">
+      <div class="q">💬 문서에 <b>취약점 조치</b>와 <b>방화벽 설정</b> 내용이 함께 있습니다. 주로 어느 업무에 쓰는 자료인가요?</div>
+      <div class="opts">
+        <button class="opt rec">취약점</button>
+        <button class="opt">장비운영</button>
+        <button class="opt">사내규정</button>
+        <button class="opt">위협대응</button>
+        <button class="opt">일반(그대로)</button>
+      </div>
+    </div>
+    <div class="why"><b>동작:</b> 어느 쪽을 눌러도 문서는 이미 저장돼 있음(재업로드 불필요) — 영역 표만 바뀌고 감사 로그에 남습니다. 무시하고 지나가도 '일반'으로 검색됩니다.</div>
+  </div>
+</div>
+
+<div class="note" style="margin-top:4px">
+설계 근거 — ① 자동이 기본, 확인은 선택(클릭 0회 원칙): AI 분류가 맞으면 아무것도 안 눌러도 됨 ·
+② 되물음은 "확신 낮음"일 때만 떠서 피로 없음 · ③ 수정은 재업로드 없이 즉시(새 API) + 감사 기록 ·
+④ 배지 색: 확정=청록, 확신 낮음=호박색.
+</div>
+</body>
+</html>

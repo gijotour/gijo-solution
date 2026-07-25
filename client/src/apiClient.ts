@@ -462,7 +462,8 @@ export interface AutoUploadResult {
   guessProductName?: string;
   vulnscan?: { hosts: number; findings: number };
   manual?: { productName: string; kind: string; createdProduct: boolean };
-  memory?: { chunks: number; docClass?: string; linkedProduct?: string };
+  memory?: { chunks: number; docClass?: string; linkedProduct?: string; category?: string };
+  category?: string; // 확정된 업무영역(취약점·장비운영·사내규정·위협대응·일반) — 승인카드 표시용
 }
 export const uploadApi = {
   auto: (filename: string, content: string, forceType?: UploadType, productName?: string) =>
@@ -591,6 +592,9 @@ export const memoryApi = {
     request<MemoryDocument[]>("/api/memory/documents"),
   documentChunks: (documentId: string, limit?: number) =>
     request<{ chunkIndex: number; text: string }[]>("/api/memory/document/chunks", { method: "POST", body: { documentId, limit } }),
+  // 업무영역(취약점·장비운영·사내규정·위협대응·일반) 수정 — 승인카드의 [영역 수정]용.
+  setDocumentCategory: (documentId: string, category: string) =>
+    request<{ ok: boolean; documentId: string; category: string }>("/api/memory/document/category", { method: "POST", body: { documentId, category } }),
   deleteDocument: (documentId: string, withFile?: boolean) =>
     request<{ documentId: string; deletedChunks: number; deletedFile: boolean }>("/api/memory/document/delete", { method: "POST", body: { documentId, withFile } }),
   // 서버에 보관된 업로드 원본(base64) — "원본 열기"용.
@@ -611,6 +615,7 @@ export interface IngestResult {
   scope: string;
   docClass?: string; // Scan·Analyze Agent 분류(매뉴얼/보고서/정책/기타)
   linkedProduct?: string; // '매뉴얼' 분류 시 자동 연결된 기존 보안제품명
+  category?: string; // 업무영역 5종 — 화면 맥락 검색·승인카드 표시용
 }
 
 export interface MemoryDocument {

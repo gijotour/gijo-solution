@@ -223,3 +223,11 @@ describe("categorizeByRules — 업무영역 5종 (2026-07-25 RAG 전면 검토)
     expect(categorizeByRules("메모.txt", "오늘 회의는 3시입니다.")).toBeNull();
   });
 });
+
+describe("categorizeDocument의 LLM 게이트 — 신호 0이면 묻지 않는다(코드로 해결 원칙)", () => {
+  it("도메인 신호가 전무한 문서는 규칙이 null을 내고, 신호 점수도 전부 0이다", () => {
+    // categorizeDocument 내부 게이트의 전제 조건을 순수 함수 수준에서 고정한다 —
+    // 회의 메모가 LLM에 넘어가 아무 영역이나 배정받던 회귀(2026-07-25 E2E 실측) 방지.
+    expect(categorizeByRules("회의메모.txt", "다음 회의는 8월 첫 주로 예정. 참석자 명단은 추후 공지.")).toBeNull();
+  });
+});

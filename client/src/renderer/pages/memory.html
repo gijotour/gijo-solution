@@ -39,6 +39,17 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .result-chunk{padding:8px 0;border-bottom:1px solid var(--border);line-height:1.6;}
 .result-chunk:last-child{border-bottom:none;}
 .status-line{font-size:12.5px;margin-top:10px;}
+/* 승인카드 — 업로드 문서의 업무영역 배지·수정·되물음(시안 승인 2026-07-25) */
+.mem-cat-row{margin-top:7px;font-size:12px;color:var(--muted);}
+.mem-cat-file{color:var(--text);font-weight:600;}
+.mem-cat-badge{display:inline-block;border:1px solid rgba(45,212,191,.45);color:var(--teal);border-radius:20px;padding:0 9px;font-size:11.5px;margin-left:6px;}
+.mem-cat-badge.low{border-color:rgba(251,191,36,.5);color:#fbbf24;}
+.mem-cat-fix{background:none;border:1px solid var(--border);border-radius:6px;color:var(--muted);font-size:11.5px;padding:1px 8px;margin-left:6px;cursor:pointer;}
+.mem-cat-fix:hover{border-color:var(--border-strong);color:var(--text);}
+.mem-cat-q{font-size:12px;margin-top:6px;color:var(--text);}
+.mem-cat-opts{display:inline-flex;gap:6px;flex-wrap:wrap;margin-top:6px;margin-left:2px;}
+.mem-cat-opt{border:1px solid var(--border-strong);background:none;border-radius:20px;color:var(--text);font-size:11.5px;padding:2px 11px;cursor:pointer;}
+.mem-cat-opt:hover{border-color:var(--teal);color:var(--teal);}
 .status-ok{color:var(--teal);}
 .status-err{color:#f5928a;}
 .hint{font-size:11.5px;color:var(--muted-2);margin-top:8px;line-height:1.6;}
@@ -289,6 +300,7 @@ tr:last-child td{border-bottom:none;}
     const scope = document.getElementById("ingestScopeSelect").value;
     const status = document.getElementById("memFileStatus");
     let ok = 0, totalChunks = 0;
+    const results = []; // 승인카드용 — 파일별 분류(업무영역) 결과
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       status.textContent = `장기 기억에 올리는 중... (${i + 1}/${files.length}) ${file.name}`;
@@ -297,6 +309,7 @@ tr:last-child td{border-bottom:none;}
         const result = await window.gijo.ingestMemoryFile(file.name, await fileToBase64(file), scope);
         totalChunks += result.chunks || 0;
         ok++;
+        results.push({ name: file.name, category: result.category || "" });
       } catch (err) {
         status.textContent = `✗ ${file.name} 실패: ${err.message}`;
         status.className = "status-line status-err";
@@ -307,8 +320,71 @@ tr:last-child td{border-bottom:none;}
     const scopeLabel = scope === "global" ? "전체 공유" : `${scope} 전용`;
     status.textContent = `✓ ${ok}개 문서를 장기 기억에 저장했습니다 (총 ${totalChunks}개 청크 · ${scopeLabel}). 이제 채팅에서 자동으로 참고합니다.`;
     status.className = "status-line status-ok";
+    renderCategoryCards(status, results);
     e.target.value = "";
     loadDocuments(); // 올린 문서 목록 즉시 갱신
+  }
+
+  // ── 승인카드(시안 승인 2026-07-25) — 업로드된 문서의 업무영역을 확인·수정한다.
+  // 확실(≠일반)=청록 배지+[수정▾], 확신 낮음(일반)=호박 배지+되물음. 문서는 이미 저장돼 있어
+  // 어느 쪽을 눌러도 재업로드 없이 영역 표만 바뀌고 감사 로그에 남는다.
+  const RAG_CATEGORIES = ["취약점", "장비운영", "사내규정", "위협대응", "일반"];
+  function renderCategoryCards(statusEl, results) {
+    let box = document.getElementById("memCatCards");
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "memCatCards";
+      statusEl.after(box);
+    }
+    box.innerHTML = "";
+    for (const r of results) {
+      if (!r.category) continue;
+      const low = r.category === "일반";
+      const row = document.createElement("div");
+      row.className = "mem-cat-row";
+      row.innerHTML = `<span class="mem-cat-file">${r.name}</span> <span class="mem-cat-badge${low ? " low" : ""}">🗂 ${r.category}${low ? " (확신 낮음)" : ""}</span>`;
+      const makeOpts = (current) => {
+        const opts = document.createElement("span");
+        opts.className = "mem-cat-opts";
+        RAG_CATEGORIES.forEach((c) => {
+          const b = document.createElement("button");
+          b.className = "mem-cat-opt";
+          b.textContent = c === current ? `${c}(현재)` : c;
+          b.addEventListener("click", async () => {
+            if (c === current) { opts.remove(); return; }
+            b.disabled = true;
+            try {
+              await window.gijo.setDocCategory(r.name, c);
+              const bd = row.querySelector(".mem-cat-badge");
+              bd.classList.remove("low");
+              bd.textContent = `🗂 ${c}`;
+              opts.remove();
+              loadDocuments();
+            } catch (err) { b.disabled = false; alert("영역 수정 실패: " + err.message); }
+          });
+          opts.appendChild(b);
+        });
+        return opts;
+      };
+      if (low) {
+        // 되물음 — 무시하고 지나가도 '일반'으로 검색된다.
+        const q = document.createElement("div");
+        q.className = "mem-cat-q";
+        q.textContent = "💬 주로 어느 업무에 쓰는 자료인가요? (그대로 둬도 됩니다)";
+        row.appendChild(q);
+        row.appendChild(makeOpts(r.category));
+      } else {
+        const fix = document.createElement("button");
+        fix.className = "mem-cat-fix";
+        fix.textContent = "영역 수정 ▾";
+        fix.addEventListener("click", () => {
+          const ex = row.querySelector(".mem-cat-opts");
+          if (ex) ex.remove(); else row.appendChild(makeOpts(r.category));
+        });
+        row.appendChild(fix);
+      }
+      box.appendChild(row);
+    }
   }
 
   async function ingest() {

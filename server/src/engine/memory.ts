@@ -120,25 +120,31 @@ function classifyByFilename(documentId: string): string {
 // 결정적 규칙을 먼저 — 같은 파일은 언제나 같은 결과가 나와야 하고, 인입 경로(업로드 라우팅)가
 // 이미 답을 아는 경우가 많다. LLM은 규칙이 못 정할 때만 부른다.
 
+// 내용 신호 점수 — 4개 영역별 도메인 어휘 등장 횟수(선두 2000자). 규칙 분류와
+// "LLM에게 물을 가치가 있는가" 판단(신호 전무면 묻지 않음)에 함께 쓴다.
+function categorySignalScores(text: string): Record<Exclude<Category, "일반">, number> {
+  const head = text.slice(0, 2000);
+  return {
+    취약점: (head.match(/취약점|CVE-\d{4}|CVSS|위험도|조치\s*(기한|방안)|스캔/g) ?? []).length,
+    장비운영: (head.match(/설정\s*방법|명령어|콘솔|장비|펌웨어|유지보수|정기\s*점검|로그\s*필드/g) ?? []).length,
+    사내규정: (head.match(/규정|지침|준수|의무|금지|승인\s*절차|보관\s*(기간|의무)|법령/g) ?? []).length,
+    위협대응: (head.match(/공격|침해|탐지\s*룰|시그니처|차단|대응\s*절차|IOC|악성/g) ?? []).length,
+  };
+}
+
 /** 파일명·내용 선두로 업무영역을 정한다. 확신이 없으면 null(호출자가 LLM 또는 기본값). */
 export function categorizeByRules(documentId: string, text: string): Category | null {
   const name = documentId;
-  const head = text.slice(0, 2000);
   // 순서 중요 — 더 구체적인 신호를 먼저 본다.
   if (/취약점|점검\s*결과|vuln|CVE-\d{4}|스캔|pentest|모의해킹/i.test(name)) return "취약점";
   if (/정책|지침|규정|표준|준수|컴플라이언스|policy|compliance|개인정보|isms/i.test(name)) return "사내규정";
   if (/랜섬웨어|침해|위협|공격|탐지|대응|ioc|siem|snort|cti|threat|incident/i.test(name)) return "위협대응";
   if (/매뉴얼|manual|장비|방화벽|스위치|유지보수|점검표|릴리즈|release|장애처리|트러블슈팅|troubleshoot/i.test(name)) return "장비운영";
-  // 내용 신호(선두 2000자) — 파일명이 무정보일 때.
-  const score: Record<Category, number> = { 취약점: 0, 장비운영: 0, 사내규정: 0, 위협대응: 0, 일반: 0 };
-  score["취약점"] = (head.match(/취약점|CVE-\d{4}|CVSS|위험도|조치\s*(기한|방안)|스캔/g) ?? []).length;
-  score["장비운영"] = (head.match(/설정\s*방법|명령어|콘솔|장비|펌웨어|유지보수|정기\s*점검|로그\s*필드/g) ?? []).length;
-  score["사내규정"] = (head.match(/규정|지침|준수|의무|금지|승인\s*절차|보관\s*(기간|의무)|법령/g) ?? []).length;
-  score["위협대응"] = (head.match(/공격|침해|탐지\s*룰|시그니처|차단|대응\s*절차|IOC|악성/g) ?? []).length;
-  const best = (Object.entries(score) as [Category, number][]).sort((a, b) => b[1] - a[1])[0];
+  // 내용 신호 — 파일명이 무정보일 때.
+  const score = categorySignalScores(text);
+  const sorted = (Object.entries(score) as [Category, number][]).sort((a, b) => b[1] - a[1]);
   // 최고점이 2점 이상이고 2위와 차이가 나야 확신으로 본다 — 억지 분류가 오분류보다 나쁘다.
-  const second = (Object.entries(score) as [Category, number][]).sort((a, b) => b[1] - a[1])[1];
-  if (best[1] >= 2 && best[1] > second[1]) return best[0];
+  if (sorted[0][1] >= 2 && sorted[0][1] > sorted[1][1]) return sorted[0][0];
   return null;
 }
 
@@ -147,6 +153,10 @@ async function categorizeDocument(documentId: string, text: string, allowLlm: bo
   const byRule = categorizeByRules(documentId, text);
   if (byRule) return byRule;
   if (!allowLlm) return "일반";
+  // 보안 도메인 신호가 전무한 문서(회의 메모 등)는 LLM에게 묻지 않는다 — 근거 없는 질문에
+  // 7B가 아무 영역이나 지어낸다(2026-07-25 E2E 실측: 회의 메모→"장비운영"). 코드로 차단.
+  const scores = Object.values(categorySignalScores(text));
+  if (scores.every((s) => s === 0)) return "일반";
   try {
     const reply = await chat({
       agentId: "analysis",
@@ -838,6 +848,47 @@ export function registerMemoryRoutes(app: Express): void {
         return;
       }
       res.json(await getDocumentChunks(documentId, Math.min(Math.max(1, limit ?? 10), 50)));
+    })
+  );
+  // 업무영역(category) 수정 — 승인카드의 [수정]용. AI 분류가 틀렸을 때 담당자가 바로잡는다
+  // (Human-in-the-Loop). 재임베딩 없이 SQLite·LanceDB 메타만 바꾸므로 즉시 끝난다.
+  app.post(
+    "/api/memory/document/category",
+    authMiddleware,
+    asyncRoute(async (req, res) => {
+      const { documentId, category } = req.body as { documentId?: string; category?: string };
+      if (!documentId || !category) {
+        res.status(400).json({ error: "documentId와 category가 필요합니다" });
+        return;
+      }
+      if (!CATEGORIES.includes(category as Category)) {
+        res.status(400).json({ error: `category는 ${CATEGORIES.join("·")} 중 하나여야 합니다` });
+        return;
+      }
+      if (!getDocMetaStmt.get(documentId)) {
+        res.status(404).json({ error: "해당 문서를 찾을 수 없습니다" });
+        return;
+      }
+      db.prepare("UPDATE memory_documents SET category = ? WHERE documentId = ?").run(category, documentId);
+      try {
+        const ldb = await lancedb.connect(DB_PATH);
+        if ((await ldb.tableNames()).includes(TABLE_NAME)) {
+          const table = await ldb.openTable(TABLE_NAME);
+          await table.update({ where: `documentId = '${escapeLiteral(documentId)}'`, values: { category } });
+          // update는 테이블 조각을 재작성한다 — 갱신 없이는 BM25 구문 검색이 조용히 0건이 된다
+          // (2026-07-25 마이그레이션에서 실측한 함정). 실패해도 분류 변경 자체는 성공 처리.
+          await table.optimize().catch(() => undefined);
+        }
+      } catch (err) {
+        console.warn(`[memory] LanceDB category 갱신 실패(${documentId}): ${err instanceof Error ? err.message : String(err)}`);
+      }
+      const user = (req as unknown as { user?: { displayName?: string } }).user;
+      const { recordAudit } = await import("./audit.js");
+      recordAudit({
+        kind: "write", actor: user?.displayName ?? null, action: "문서 업무영역 수정",
+        target: documentId, detail: `→ ${category}`, result: "ok",
+      });
+      res.json({ ok: true, documentId, category });
     })
   );
   // 원본 파일 내려받기 — 목록의 "원본 열기"용. 보관 경로가 INGEST_ROOT 안일 때만 내준다.

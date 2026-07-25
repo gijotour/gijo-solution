@@ -187,6 +187,7 @@ const gijoApi = {
   // 장기 기억(RAG) / 파인튜닝(학습)
   ingestDocument: (path: string, scope?: string) => api.memoryApi.ingest(path, scope),
   ingestMemoryFile: (filename: string, content: string, scope?: string) => api.memoryApi.ingestFile(filename, content, scope),
+  setDocCategory: (documentId: string, category: string) => api.memoryApi.setDocumentCategory(documentId, category),
   setAssetDisplayName: (id: string, displayName: string | null) => api.assetHubApi.setDisplayName(id, displayName),
   saveIngestReport: (input: Parameters<typeof api.ingestReportApi.save>[0]) => api.ingestReportApi.save(input),
   handoverVerify: (documentIds: string[]) => api.handoverApi.verify(documentIds),
