@@ -357,7 +357,8 @@
   </div>
 </div>
 
-<!-- ⑥ 표시 컬럼 설정 드로어(우측 슬라이드) — 컬럼 on/off + 순서. 관리자 기본값·개인값 저장. -->
+<!-- ⑥ 표시 컬럼 설정 드로어(우측 슬라이드) — 컬럼 on/off + 순서.
+     저장은 이 PC에만(localStorage) — 조직 전체로 퍼지지 않으므로 버튼 이름도 "이 PC"로 못박는다(2026-07-26). -->
 <div class="col-drawer-backdrop" id="colDrawerBackdrop"></div>
 <aside class="col-drawer" id="colDrawer" aria-label="표시 항목 설정">
   <div class="cd-head">☰ 표시 항목 · 순서<span class="cd-x" id="colDrawerClose">✕</span></div>
@@ -365,7 +366,7 @@
   <div class="cd-list" id="colList"></div>
   <div class="cd-actions">
     <button class="btn-ghost" id="colResetBtn">기본값</button>
-    <button class="btn-ghost" id="colSaveDefaultBtn" title="이 구성을 조직 기본값으로(관리자)">관리자 기본값으로 저장</button>
+    <button class="btn-ghost" id="colSaveDefaultBtn" title="이 구성을 이 PC의 기본 표시로 기억합니다(다른 PC에는 적용되지 않습니다)">이 PC 기본값으로 저장</button>
     <button class="btn-primary" id="colApplyBtn">적용</button>
   </div>
 </aside>
@@ -435,7 +436,8 @@
   let activeCategory = "all";   // ④ 좌측 카테고리 트리 선택('all' | '__none__' | 카테고리명)
   const selectedIds = new Set(); // ③ 일괄 삭제 선택 상태(재렌더에도 유지)
 
-  // ⑥ 표시 컬럼 — 관리자가 켜고/끄고 순서 지정. 개인값(COL_KEY)>조직기본값(COL_DEFAULT_KEY)>기본.
+  // ⑥ 표시 컬럼 — 켜고/끄고 순서 지정. 우선순위: 이번에 고른 값(COL_KEY) > 이 PC 기본값(COL_DEFAULT_KEY) > 제품 기본.
+  // 둘 다 localStorage라 PC 단위다. 조직 전체 기본값이 필요해지면 서버 설정으로 옮겨야 한다.
   const COL_KEY = "gijo:inv:cols";
   const COL_DEFAULT_KEY = "gijo:inv:cols:orgdefault";
   const ALL_COLS = [
