@@ -943,14 +943,19 @@ export function registerReportRoutes(app: Express): void {
     authMiddleware,
     asyncRoute(async (req, res) => {
       const name = path.basename(String(req.params.name)); // 경로 순회(../) 방지
-      if (!/\.(docx|pdf)$/i.test(name)) {
-        res.status(400).json({ error: "docx/pdf 파일만 받을 수 있습니다" });
+      // md도 받는다 — AI 작성 자료·파일 처리 내역은 마크다운으로 저장되고 화면이 본문을 그대로
+      // 보여준다(2026-07-26 실사고: 뷰어가 md를 요청했는데 400으로 막혀 본문이 안 나왔다).
+      if (!/\.(docx|pdf|md)$/i.test(name)) {
+        res.status(400).json({ error: "docx·pdf·md 파일만 받을 수 있습니다" });
         return;
       }
       try {
         const buf = await fs.readFile(path.join(REPORT_DIR, name));
-        const mime = name.toLowerCase().endsWith(".pdf")
+        const lower = name.toLowerCase();
+        const mime = lower.endsWith(".pdf")
           ? "application/pdf"
+          : lower.endsWith(".md")
+          ? "text/markdown; charset=utf-8"
           : "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
         res.json({ name, mime, base64: buf.toString("base64") });
       } catch {

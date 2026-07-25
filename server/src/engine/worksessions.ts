@@ -250,8 +250,13 @@ export function recentTurnsText(sessionId: string, maxTurns = 6): string {
 const AUDIT_KIND_LABEL: Record<string, string> = {
   cli: "CLI", approval: "승인", write: "실행", block: "차단", config: "설정",
 };
+// 담당자가 한 일이 아니라 시스템이 스스로 남긴 기록은 세션 목록에 넣지 않는다 — 목록이 도배된다.
+// (2026-07-26: "오래 걸린 요청을 리포트로 저장"이 세션 목록에 [실행] long_answer_saved로 쌓였다.
+//  그 요청 자체는 이미 담당자의 세션으로 남아 있어 같은 일이 두 번 보이는 셈이었다.)
+const SESSION_EXCLUDED_ACTIONS = new Set(["long_answer_saved"]);
 onAudit((e) => {
   if (e.kind === "auth") return;
+  if (SESSION_EXCLUDED_ACTIONS.has(e.action)) return;
   try {
     const title = `[${AUDIT_KIND_LABEL[e.kind] ?? e.kind}] ${e.action}${e.target ? " — " + e.target : ""}`.slice(0, 90);
     const s = createSession(title);

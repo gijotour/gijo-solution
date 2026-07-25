@@ -2261,6 +2261,7 @@
     const text = chatInput.value.trim();
     if (!text) return;
     chatInput.value = "";
+    if (window.gijoClearDraft) window.gijoClearDraft(); // 보냈으니 임시 저장도 지운다
     if (currentTarget === "orchestrator") sendToOrchestrator(text);
     else sendToAgent(currentTarget, text);
   }
@@ -2275,10 +2276,11 @@
     // (2026-07-26 사용자 지적). 협업 피드는 활동 기록이지 답변 채널이 아니므로 콘솔에서는 건너뛴다.
     const msg = String(evt.message || "");
     if (/^(작업 |실행 |부연 |단계 \d+ )?완료[:：]/.test(msg)) return;
-    // "지시 처리: …"는 바로 위에 내가 보낸 지시가 그대로 보이므로 군더더기다. 게다가 화면을 열 때
+    // "지시 처리: …"·"작업 할당: …"은 바로 위에 내가 보낸 지시가 그대로 보이므로 군더더기다.
+    // 게다가 답변보다 늦게 도착해 순서가 뒤집혀 보이기도 했다. 화면을 열 때
     // 지난 이력을 다시 채우면서 내가 방금 시키지도 않은 지시가 먼저 뜬 것처럼 보였다
     // (2026-07-26 사용자 지적: "요청 안 했는데 나오는 거 맞지?").
-    if (/^지시 처리[:：]/.test(msg)) return;
+    if (/^(지시 처리|작업 할당)[:：]/.test(msg)) return;
     // 같은 줄이 연달아 두 번 오면 한 번만 보여준다.
     if (clRows.lastElementChild && clRows.lastElementChild.querySelector(".cm")?.textContent.trim() === msg.trim()) return;
     clAppend("event", {
@@ -2594,6 +2596,15 @@
     if (todayItems) todayItems.addEventListener("click", onTaskAction);
     document.getElementById("mgDownloadBtn").addEventListener("click", () => window.gijo.navigateTo("llmguide.html"));
     document.getElementById("mgServerBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
+
+    // 쓰다 만 지시를 지켜준다(2026-07-26 사용자 요청) — 화면을 옮겼다 돌아오거나 앱을 다시 켜도
+    // 입력칸에 그대로 남는다. 보내고 나면 지운다(보낸 글이 계속 남아 있으면 두 번 보내기 쉽다).
+    const DRAFT_KEY = "gijo:dash:draft";
+    try { const d = localStorage.getItem(DRAFT_KEY); if (d && !chatInput.value) chatInput.value = d; } catch (e) {}
+    chatInput.addEventListener("input", () => {
+      try { localStorage.setItem(DRAFT_KEY, chatInput.value); } catch (e) {}
+    });
+    window.gijoClearDraft = () => { try { localStorage.removeItem(DRAFT_KEY); } catch (e) {} };
 
     chatInput.addEventListener("keydown", (e) => {
       if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); dockSubmit(); }
