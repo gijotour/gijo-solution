@@ -23,6 +23,10 @@ import { db, assertTestDb } from "../db";
 import { emitCollaboration } from "./collaboration";
 import { recordAudit } from "./audit";
 import { setAgentStatus, resetAgentToDefault } from "./agents";
+// 스캔 결과가 들어오면 자산 기본 담당자에게 자동 배정한다(미배정 적체 재발 방지).
+// approvals를 거쳐 다시 assets로 돌아오는 순환 참조가 있으나, 호출이 모듈 로드가 아닌
+// 런타임이라 안전하다.
+import { autoAssignFindings, setDefaultAssignee } from "./autoassign";
 import { computeAssetCoverage } from "./assetcoverage";
 
 export interface AssetComponent {
@@ -330,6 +334,14 @@ export function recordFindings(assetId: string, findings: StandardFinding[]): As
   updateFindingsStmt.run(JSON.stringify(findings), scannedAt, assetId);
   touchAsset(assetId); // ④ 스캔 결과 반영도 최종수정으로 본다
 
+  // 자산에 기본 담당자가 지정돼 있으면 새 취약점을 바로 배정한다(미배정 적체 재발 방지).
+  // 이미 배정된 건은 건드리지 않으며, 실패해도 스캔 결과 저장에는 영향을 주지 않는다.
+  // (autoassign → approvals → assets 순환 참조가 있지만 호출이 런타임이라 안전하다.
+  //  ⚠ 여기서 require()를 쓰면 ESM에서 조용히 실패한다 — 실제로 그렇게 한 번 놓쳤다.)
+  try {
+    autoAssignFindings(assetId, findings);
+  } catch { /* 자동 배정 실패가 스캔을 막지는 않는다 */ }
+
   const asset = getAsset(assetId)!;
   broadcastAssetUpdated(asset);
   return asset;
@@ -468,6 +480,13 @@ export function registerAssetsRoutes(app: Express): void {
     const asset = getAsset(String(req.params.id));
     if (!asset) return res.status(404).json({ error: "asset not found" });
     res.json(asset);
+  });
+  // 자산 기본 담당자 — 새 취약점이 이 사람에게 자동 배정된다(미배정 적체 재발 방지).
+  app.post("/api/assets/:id/default-assignee", authMiddleware, (req, res) => {
+    const id = String(req.params.id);
+    if (!getAsset(id)) return res.status(404).json({ error: "asset not found" });
+    const v = setDefaultAssignee(id, (req.body as { assignee?: string })?.assignee ?? null);
+    res.json({ assetId: id, defaultAssignee: v });
   });
   app.post("/api/assets", authMiddleware, (req, res) => {
     // 입력 검증(2026-07-23 입력창 전수검증에서 발견): 빈 이름이 500으로 터지던 것을 400+안내로.

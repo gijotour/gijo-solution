@@ -17,6 +17,7 @@ import { updateFindingReview } from "./approvals";
 import { canVerifyAsset } from "./verifyaccess";
 import { buildVerifyItems, runVerifyItems, summarize, type VerifyOutcome } from "./verifyengine";
 import { attachBasis } from "./verifyrag";
+import { netmikoRunnerFor } from "./netmikorunner";
 import { getTarget, listTargets } from "./hardeningtargets";
 import { targetRunner, type RunFn, type HardeningTarget } from "./hardeningscan";
 
@@ -97,7 +98,9 @@ export function registerVerifyRoutes(app: Express): void {
         return;
       }
 
-      const run: RunFn = targetRunner(target);
+      // 장비(Cisco·FortiGate 등)로 식별되면 Netmiko 브리지로, 아니면 기존 SSH 실행기로.
+      // 판정 코드는 그대로다 — 실행 엔진만 갈아끼운다(실행 엔진 하나 원칙).
+      const run: RunFn = netmikoRunnerFor(target) ?? targetRunner(target);
       const raw: VerifyOutcome[] = await runVerifyItems(items, run);
       const sum = summarize(raw);
       // 사내 문서 근거 붙이기(Phase 3) — 보상통제·장비 확인법·사내 기준.
