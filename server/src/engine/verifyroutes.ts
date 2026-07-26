@@ -16,6 +16,7 @@ import { getAsset } from "./assets";
 import { updateFindingReview } from "./approvals";
 import { canVerifyAsset } from "./verifyaccess";
 import { buildVerifyItems, runVerifyItems, summarize, type VerifyOutcome } from "./verifyengine";
+import { attachBasis } from "./verifyrag";
 import { getTarget, listTargets } from "./hardeningtargets";
 import { targetRunner, type RunFn, type HardeningTarget } from "./hardeningscan";
 
@@ -97,13 +98,17 @@ export function registerVerifyRoutes(app: Express): void {
       }
 
       const run: RunFn = targetRunner(target);
-      const results: VerifyOutcome[] = await runVerifyItems(items, run);
-      const sum = summarize(results);
+      const raw: VerifyOutcome[] = await runVerifyItems(items, run);
+      const sum = summarize(raw);
+      // 사내 문서 근거 붙이기(Phase 3) — 보상통제·장비 확인법·사내 기준.
+      // ⚠ 근거는 제안일 뿐 판정을 바꾸지 않는다. RAG가 실패해도 검증 결과는 그대로 나간다.
+      let results: unknown[] = raw;
+      try { results = await attachBasis(raw, asset.name); } catch { results = raw; }
 
       // 조치가 확인된 건은 검증 요청 시각을 남겨 approvals 흐름에 반영한다.
       // ⚠ 자동으로 '완료(approved)'까지 올리지는 않는다 — 확인은 사람이 한다.
       //   기계 판정만으로 상태를 끝내면 오판 하나가 조용히 완료로 굳는다.
-      for (const r of results.filter((x) => x.status === "PASS")) {
+      for (const r of raw.filter((x) => x.status === "PASS")) {
         try {
           updateFindingReview(assetId, r.findingKey, { status: "verifying" }, user?.displayName ?? "조치 검증");
         } catch { /* 상태 전이 불가(이미 완료 등)면 건너뛴다 */ }

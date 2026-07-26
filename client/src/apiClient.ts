@@ -1696,6 +1696,9 @@ export interface VerifyOutcome {
   status: "PASS" | "FAIL" | "WARN" | "NA"; // PASS=조치확인 · FAIL=미조치 · NA=수동확인 필요
   evidence: string;                        // 실행한 명령과 출력 — 담당자가 판정을 믿을 근거
   expectedKind: "version" | "absent" | "config" | "cert" | "manual";
+  // 사내 문서 근거(RAG) — 보상통제·장비 확인법·사내 기준. ⚠ 제안일 뿐 판정을 바꾸지 않는다.
+  basis?: { kind: "device_howto" | "compensating" | "internal_rule"; label: string; excerpt: string; documentId: string }[];
+  hint?: { need: string }; // 근거가 없을 때 "어떤 문서가 있으면 되는지"
 }
 export interface VerifyRunResult {
   assetId: string;

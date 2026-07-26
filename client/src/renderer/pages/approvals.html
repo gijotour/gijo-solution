@@ -138,6 +138,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   .vmain{flex:1;min-width:0;}
   .vt{font-size:11.5px;font-weight:700;}
   .vev{font-size:10px;color:var(--muted-2);font-family:Consolas,"D2Coding",monospace;margin-top:3px;white-space:pre-wrap;line-height:1.5;word-break:break-all;}
+  /* 사내 문서 근거 — 판정 아래에 붙는다. ⚠ 근거는 제안이지 결론이 아니다(확정은 담당자). */
+  .vbasis{margin-top:6px;padding:6px 9px;background:rgba(59,130,246,.09);border-left:2px solid var(--blue);border-radius:0 7px 7px 0;font-size:10.5px;line-height:1.6;}
+  .vbasis b{color:var(--blue-light);font-size:10.5px;}
+  .vbasis .vb-src{color:var(--muted-2);margin-left:6px;font-size:9.5px;}
+  .vbasis .vb-ex{color:var(--muted);margin-top:2px;}
+  .vhint{margin-top:6px;font-size:10.5px;color:var(--muted-2);line-height:1.6;}
   .verify-deny{background:rgba(226,72,61,.1);border:1px solid rgba(226,72,61,.4);border-radius:9px;padding:9px 12px;font-size:11px;color:#f5a8a1;line-height:1.7;white-space:pre-line;margin-top:8px;}
   .fchip{font-size:11px;padding:5px 10px;border-radius:20px;background:var(--panel);border:1px solid var(--border-strong);color:var(--muted);cursor:pointer;user-select:none;}
   .fchip b{margin-left:3px;color:var(--text);font-weight:800;}
@@ -354,7 +360,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div class="vres-b">${res.results.map((x) => `
         <div class="vrow">
           <span class="vbadge v-${esc(x.status)}">${esc(V_LABEL[x.status] || x.status)}</span>
-          <div class="vmain"><div class="vt">${esc(x.title)}</div><div class="vev">${esc(x.evidence)}</div></div>
+          <div class="vmain"><div class="vt">${esc(x.title)}</div><div class="vev">${esc(x.evidence)}</div>
+            ${(x.basis || []).map((b) => `<div class="vbasis"><b>${esc(b.label)}</b><span class="vb-src">📄 ${esc(b.documentId)}</span><div class="vb-ex">${esc(b.excerpt)}</div></div>`).join("")}
+            ${x.hint ? `<div class="vhint">💡 ${esc(x.hint.need)}</div>` : ""}
+          </div>
           ${x.status === "PASS" ? `<button class="btn done" data-vdone="${esc(x.findingKey)}">완료 처리</button>` : ""}
         </div>`).join("")}</div>
     </div>`;
