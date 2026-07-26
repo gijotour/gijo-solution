@@ -38,6 +38,25 @@ describe("deriveExpected — 스캐너 문구에서 기대 상태 읽기", () =>
     expect(deriveExpected(F({ finding_type: "SSL 인증서 만료 임박" })).kind).toBe("cert");
   });
 
+  it("근거에 인증서 경로가 있으면 그 파일을 대상으로 잡는다", () => {
+    const e = deriveExpected(F({ finding_type: "SSL 인증서 만료 임박", evidence: "대상: /etc/ssl/certs/web.pem" }));
+    expect(e).toEqual({ kind: "cert", notAfter: "/etc/ssl/certs/web.pem" });
+  });
+
+  // 설정 판정은 "무엇이 옳은 값인지"를 스캐너가 말해줬을 때만 — 추측하면 오판이 된다.
+  it("파일+기대값이 명시되면 config", () => {
+    const e = deriveExpected(F({
+      finding_type: "SSH 설정 미흡",
+      evidence: "파일: /etc/ssh/ssh_config\n기대: Protocol 2",
+    }));
+    expect(e).toEqual({ kind: "config", path: "/etc/ssh/ssh_config", expect: "Protocol 2" });
+  });
+
+  it("파일만 있고 기대값이 없으면 config로 만들지 않는다(추측 금지)", () => {
+    const e = deriveExpected(F({ finding_type: "SSH 설정 미흡", evidence: "파일: /etc/ssh/ssh_config" }));
+    expect(e.kind).toBe("manual");
+  });
+
   it("평문 프로토콜은 absent(포트까지 잡는다)", () => {
     const e = deriveExpected(F({ finding_type: "Telnet 평문 서비스 사용", evidence: "포트: tcp/23" }));
     expect(e).toEqual({ kind: "absent", pattern: ":23" });
@@ -101,6 +120,33 @@ describe("probeFor(absent) — 서비스가 꺼졌는가", () => {
     const p = probeFor({ kind: "absent", pattern: ":23" });
     const r = await p(fakeRun({}));
     expect(r.status).toBe("PASS");
+  });
+});
+
+describe("probeFor(cert) — 경로를 모르면 실행하지 않는다", () => {
+  it("경로 없으면 명령을 아예 안 보내고 NA", async () => {
+    let called = false;
+    const run: RunFn = async () => { called = true; return { code: 0, out: "", err: "" }; };
+    const r = await probeFor({ kind: "cert", notAfter: "" })(run);
+    expect(called).toBe(false); // 추측 경로로 엉뚱한 인증서를 보지 않는다
+    expect(r.status).toBe("NA");
+    expect(r.evidence).toContain("경로");
+  });
+
+  it("경로가 있으면 그 파일의 만료일로 판정한다", async () => {
+    const future = new Date(Date.now() + 200 * 86400000).toUTCString();
+    const r = await probeFor({ kind: "cert", notAfter: "/etc/ssl/certs/web.pem" })(
+      fakeRun({ "openssl x509": `notAfter=${future}` })
+    );
+    expect(r.status).toBe("PASS");
+  });
+
+  it("만료가 30일 안이면 FAIL", async () => {
+    const soon = new Date(Date.now() + 5 * 86400000).toUTCString();
+    const r = await probeFor({ kind: "cert", notAfter: "/etc/ssl/certs/web.pem" })(
+      fakeRun({ "openssl x509": `notAfter=${soon}` })
+    );
+    expect(r.status).toBe("FAIL");
   });
 });
 

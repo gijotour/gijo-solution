@@ -99,9 +99,21 @@ export function deriveExpected(f: StandardFinding): ExpectedState {
   const ev = String(f.evidence || "");
   const all = `${title}\n${ev}`;
 
-  // 인증서 — 만료는 버전과 무관한 별도 판정
+  // 인증서 — 만료는 버전과 무관한 별도 판정. 근거에 파일 경로가 있으면 그 인증서를 본다.
+  // 경로가 없으면 빈 값으로 두고, probe가 "위치를 몰라 판정 못 함(NA)"으로 정직하게 답한다
+  // — 경로를 추측해 엉뚱한 인증서를 검사하면 "괜찮다"는 오답이 나온다.
   if (/인증서|certificate/i.test(all) && /만료|expir/i.test(all)) {
-    return { kind: "cert", notAfter: "" };
+    const p = ev.match(/(\/[\w./-]+\.(?:pem|crt|cer))/);
+    return { kind: "cert", notAfter: p ? p[1] : "" };
+  }
+
+  // 설정값 — 스캐너가 **파일과 기대값을 명시했을 때만** 자동 판정한다.
+  // "설정이 미흡하다" 정도로는 무엇이 옳은 값인지 알 수 없어 추측하면 오판이 된다.
+  // 인식하는 표기: "파일: /etc/ssh/ssh_config" + "기대: PermitRootLogin no"
+  const cfgPath = ev.match(/(?:파일|경로|file)\s*[:：]\s*(\/[\w./-]+)/i);
+  const cfgWant = ev.match(/(?:기대|권장|설정값|expect)\s*[:：]\s*([^\n]+)/i);
+  if (cfgPath && cfgWant) {
+    return { kind: "config", path: cfgPath[1], expect: cfgWant[1].trim() };
   }
 
   const product = productOf(all);
@@ -204,14 +216,20 @@ export function probeFor(expected: ExpectedState): (run: RunFn) => Promise<Verif
   }
 
   if (expected.kind === "cert") {
-    // 인증서는 대상 경로·포트를 알아야 정확하다 — 지금은 만료일 조회만 시도하고,
-    // 실패하면 NA. (경로를 추측해 엉뚱한 인증서를 보는 것보다 모른다고 답하는 편이 낫다.)
-    const cmd = "openssl x509 -enddate -noout -in /etc/ssl/certs/server.crt 2>&1";
+    // 근거에 인증서 경로가 있을 때만 검사한다. 없으면 실행하지 않고 NA —
+    // 경로를 추측해 엉뚱한 인증서를 보면 "괜찮다"는 오답이 나온다(가장 나쁜 방향).
+    if (!expected.notAfter) {
+      return async () => ({
+        status: "NA",
+        evidence: "인증서 파일 경로를 알 수 없어 자동 판정하지 않았습니다 — 근거에 경로(예: /etc/ssl/certs/서버.pem)가 있으면 자동으로 확인합니다.",
+      });
+    }
+    const cmd = `openssl x509 -enddate -noout -in '${expected.notAfter}' 2>&1`;
     return async (run) => {
       const r = await run(cmd);
       const m = `${r.out}${r.err}`.match(/notAfter=(.+)/);
       if (!m) {
-        return { status: "NA", evidence: `${shortEvidence(cmd, r.out + r.err)}\n→ 인증서 위치를 알 수 없어 자동 판정하지 못했습니다.` };
+        return { status: "NA", evidence: `${shortEvidence(cmd, r.out + r.err)}\n→ 인증서를 읽지 못해 자동 판정하지 못했습니다.` };
       }
       const until = new Date(m[1].trim());
       const days = Math.floor((until.getTime() - Date.now()) / 86_400_000);
