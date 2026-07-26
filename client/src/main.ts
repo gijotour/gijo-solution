@@ -205,25 +205,34 @@ ipcMain.handle("shell:popout", async (_e, page: string, title?: string, orient?:
     existing.focus();
     return;
   }
-  // 세로 모드: 세로로 세운 모니터가 있으면 그 모니터에 꽉 차게 자동 배치하고,
-  // 없으면 주 모니터에서 세로 비율(높이 최대, 폭은 높이의 62%)로 띄운다 — 옮겨 쓰라는 뜻.
-  let pb: { x?: number; y?: number; width: number; height: number } | null = null;
+  // 분리창은 "화면 절반"으로 연다(2026-07-26 사용자 요청) — 나머지 절반을 다른 용도로 쓰고,
+  // 위아래 크기는 자유롭게 조정한다(minHeight를 낮게 둬 절반보다 더 줄일 수도 있게).
+  // · 가로(🗗): 그 모니터의 오른쪽 절반 — 왼쪽에 대시보드를 두고 보면서 지시하는 배치.
+  // · 세로(⇳): 세로로 세운 모니터가 있으면 그 모니터의 위쪽 절반, 없으면 주 모니터에 세로 비율 절반.
+  let pb: { x?: number; y?: number; width: number; height: number };
   if (portrait) {
     const pd = screen.getAllDisplays().find((d) => d.workAreaSize.height > d.workAreaSize.width);
     if (pd) {
-      pb = { x: pd.workArea.x + 12, y: pd.workArea.y + 12, width: pd.workArea.width - 24, height: pd.workArea.height - 24 };
+      pb = { x: pd.workArea.x + 12, y: pd.workArea.y + 12, width: pd.workArea.width - 24, height: Math.round(pd.workArea.height / 2) };
     } else {
       const wa = screen.getPrimaryDisplay().workAreaSize;
-      pb = { width: Math.min(1000, Math.max(760, Math.round(wa.height * 0.62))), height: wa.height - 40 };
+      pb = { width: Math.min(1000, Math.max(760, Math.round(wa.height * 0.62))), height: Math.round(wa.height / 2) };
     }
+  } else {
+    // 대시보드(메인 창)가 떠 있는 모니터 기준 — 주 모니터가 세로형이면 절반이 너무 좁아진다.
+    // 절반이 콘텐츠 최소폭(760)보다 좁으면 760까지는 보장한다.
+    const disp = mainWindow && !mainWindow.isDestroyed() ? screen.getDisplayMatching(mainWindow.getBounds()) : screen.getPrimaryDisplay();
+    const wa = disp.workArea;
+    const half = Math.max(760, Math.round(wa.width / 2));
+    pb = { x: wa.x + Math.max(0, wa.width - half), y: wa.y, width: Math.min(half, wa.width), height: wa.height };
   }
   const win = new BrowserWindow({
-    x: pb && pb.x !== undefined ? pb.x : undefined,
-    y: pb && pb.y !== undefined ? pb.y : undefined,
-    width: pb ? pb.width : Math.min(1280, Math.max(960, screen.getPrimaryDisplay().workAreaSize.width - 160)),
-    height: pb ? pb.height : Math.min(860, Math.max(680, screen.getPrimaryDisplay().workAreaSize.height - 140)),
-    minWidth: portrait ? 700 : 900,
-    minHeight: 600,
+    x: pb.x,
+    y: pb.y,
+    width: pb.width,
+    height: pb.height,
+    minWidth: portrait ? 700 : 760,
+    minHeight: 420,
     backgroundColor: "#0a0e1a",
     title: title ? `GIJO AS — ${title}` : "GIJO AS",
     webPreferences: {
