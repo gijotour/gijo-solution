@@ -60,22 +60,23 @@
     { id: "monitor", ic: "🖥", label: "관제", items: [
       { page: "dashboard.html", label: "대시보드" },
       { page: "dashboard.html?quick=1", label: "내 업무 바로가기" }, // 대시보드 위 팝업으로 열림(챗 중심 개편 2026-07-26)
-      // popup: 대시보드 팝업 셸(혼합 방식, 2026-07-26 결정)에서 팝업으로 열리는 화면 — 1차 파일럿 3종.
+      // popup: 대시보드 팝업 셸(혼합 방식, 2026-07-26 결정)에서 팝업으로 열리는 화면.
+      // 1차 파일럿 3종 검증 후 챗봇 메뉴 9종 전체 확장(같은 날 사용자 지시 "나머지도 다").
       // 대시보드가 아닌 화면(gijoShell 없음)에서는 지금처럼 전체 화면으로 이동한다.
       { page: "hub.html?g=analysis", label: "보안 분석", bot: true, popup: true },
-      { page: "hub.html?g=threat", label: "위협 인텔리전스", bot: true },
+      { page: "hub.html?g=threat", label: "위협 인텔리전스", bot: true, popup: true },
       { page: "hub.html?g=report", label: "리포트", bot: true, popup: true },
     ]},
     { id: "assets", ic: "🛡", label: "자산·조치", items: [
       { page: "hub.html?g=assets", label: "자산 허브", bot: true, popup: true },
-      { page: "approvals.html", label: "조치·승인", bot: true },
-      { page: "hub.html?g=products", label: "보안제품", bot: true },
-      { page: "hub.html?g=inspect", label: "점검 콘솔", bot: true },
+      { page: "approvals.html", label: "조치·승인", bot: true, popup: true },
+      { page: "hub.html?g=products", label: "보안제품", bot: true, popup: true },
+      { page: "hub.html?g=inspect", label: "점검 콘솔", bot: true, popup: true },
     ]},
     { id: "ai", ic: "🤖", label: "AI", items: [
       { page: "hub.html?g=aiteam", label: "AI 팀" },
-      { page: "hub.html?g=aiknowledge", label: "AI 지식·모델", bot: true },
-      { page: "redteam.html", label: "레드팀·가드레일", bot: true },
+      { page: "hub.html?g=aiknowledge", label: "AI 지식·모델", bot: true, popup: true },
+      { page: "redteam.html", label: "레드팀·가드레일", bot: true, popup: true },
     ]},
     { id: "settings", ic: "⚙", label: "설정", bottom: true, items: [
       { page: "hub.html?g=settings", label: "설정" },
@@ -232,6 +233,13 @@
           el.addEventListener("click", function () {
             // 팝업 셸(대시보드)에서는 팝업으로 — 이동하지 않으니 명령창·대화·진행 작업이 유지된다.
             if (it.popup && window.gijoShell) { window.gijoShell.open(it.page, it.label); return; }
+            // "내 업무 바로가기" — 대시보드에 있으면 리로드 없이 그 자리에서 연다(대화 보호).
+            // 셸 팝업이 떠 있으면 먼저 접는다(z가 낮아 바로가기가 뒤에 가려진다).
+            if (it.page.indexOf("dashboard.html?quick") === 0 && window.gijoOpenQuick) {
+              if (window.gijoShell && window.gijoShell.hide) window.gijoShell.hide();
+              window.gijoOpenQuick();
+              return;
+            }
             go(it.page);
           });
         }

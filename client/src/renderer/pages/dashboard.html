@@ -2808,6 +2808,9 @@
     document.getElementById("quickClose").addEventListener("click", () => setPop(null));
     document.addEventListener("keydown", (e) => { if (e.key === "Escape") setPop(null); });
     if (/[?&]quick=1/.test(location.search)) setPop("quick");
+    // 대시보드에 있으면서 "내 업무 바로가기"를 누르면 리로드 없이 그 자리에서 연다(nav.js가 부른다)
+    // — dashboard.html?quick=1 재이동은 페이지 전체를 다시 읽어 대화·팝업이 날아갔다(2026-07-26).
+    window.gijoOpenQuick = () => setPop("quick");
     // 하단 사용자 영역(titlebar.js) 재배치 — titlebar가 nav 렌더보다 먼저 돌면 숨은 탐색기에
     // 붙는다(2026-07-26 실측). 사이드바 하단으로 옮겨 다른 화면과 동일하게 보이게 한다.
     // 대시보드 하단 사용자·설정 — 다른 화면과 동일하게 사이드바 최하단에 항상 둔다.

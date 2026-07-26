@@ -157,10 +157,30 @@
     toast._h = setTimeout(function () { toast.style.display = "none"; }, 3000);
   }
 
-  // 사용자가 고른 팝업 높이(px) — 없으면 자동(컴포저 위까지 꽉 차게). 기억한다.
+  // 사용자가 고른 팝업 높이(px) — 없으면 자동(내용에 맞추되 컴포저 위까지가 최대). 기억한다.
   var HKEY = "gijo:shell:height";
   var userH = null;
   try { userH = Number(localStorage.getItem(HKEY)) || null; } catch (e) {}
+
+  // 화면 내용의 실제 높이 — 내용이 짧은 화면에서 팝업이 빈 공간으로 길게 남지 않게(2026-07-26
+  // 사용자 지적 "메뉴별 빈 화면 다 없애줘"). 허브면 탭바 + 활성 탭 문서 높이, 단독 페이지면 문서 높이.
+  // 같은 출처(file://)라 중첩 프레임까지 읽을 수 있다. 아직 로딩 중이면 null(=꽉 차게).
+  function contentHeight(s) {
+    try {
+      var doc = s.el.contentDocument;
+      if (!doc || !doc.body) return null;
+      var inner = doc.querySelector(".hub-frame.on");
+      if (inner) {
+        var barH = 46;
+        var hb = doc.querySelector(".hub-bar");
+        if (hb) barH = hb.offsetHeight;
+        var d2 = inner.contentDocument;
+        if (!d2 || !d2.body) return null;
+        return barH + Math.max(d2.documentElement.scrollHeight, d2.body.scrollHeight);
+      }
+      return Math.max(doc.documentElement.scrollHeight, doc.body.scrollHeight);
+    } catch (e) { return null; }
+  }
 
   // ── 위치 계산 — 사이드바 오른쪽 ~ 엣지 거터(46px), 관리 바 아래 ~ 컴포저 위 ──
   function layout() {
@@ -174,20 +194,36 @@
     var acc = document.getElementById("accConsole");
     var accH = acc ? acc.offsetHeight : 120;
     var right = 54; // 엣지 탭 거터 46px + 여백
-    // 높이: 자동=컴포저 위까지. 사용자가 손잡이로 줄였으면 그 높이(최소 240px, 컴포저 침범 금지).
-    // 팝업을 줄여 생긴 빈 공간은 대화 이력(cl-rows)이 받아 늘어난다(2026-07-26 사용자 요청)
-    // — 팝업을 올리면 메시지 창이 같이 올라와 이력을 확인할 수 있다.
+    // 높이: 자동=내용 높이에 맞춤(최대는 컴포저 위까지 — 내용이 짧으면 팝업도 짧게, 빈 공간 없음).
+    // 손잡이로 직접 줄였으면 그 높이 우선(최소 240px, 컴포저 침범 금지).
+    // 팝업 아래 남는 공간은 대화 이력(cl-rows)이 받아 늘어난다(2026-07-26 사용자 요청).
     var rows = acc ? acc.querySelector(".cl-rows") : null;
     var rowsH = rows ? rows.offsetHeight : 0;
     var nonRows = accH - rowsH; // 이력을 뺀 컴포저 몸통(입력줄·팁 등) 높이
     var baseMinGap = (nonRows + 110) + 20; // 이력이 기본(110px)일 때 필요한 최소 바닥 여백
-    var gap;
+    var wantH = null; // 팝업이 갖고 싶은 높이
     if (userH) {
-      gap = Math.max(baseMinGap, window.innerHeight - top - Math.max(240, userH));
+      wantH = Math.max(240, userH);
+    } else {
+      var s0 = findSlot(activeKey);
+      var ch = s0 ? contentHeight(s0) : null;
+      var headH = document.getElementById("shellHead").offsetHeight || 38;
+      if (ch) {
+        // 자동 축소 하한 = 가용 높이의 55% — 일부 화면은 요소 높이가 뷰포트에 묶여 있어
+        // 측정값이 실제보다 작게 나온다(실측: 우선순위 목록이 잘림). 덜 줄이는 쪽이 안전하고,
+        // 남는 내용은 팝업 안 스크롤로 본다(창 고정 원칙과 동일).
+        var maxFit = window.innerHeight - top - baseMinGap;
+        var minFit = Math.max(360, Math.round(maxFit * 0.55));
+        wantH = Math.min(maxFit, Math.max(minFit, ch + headH + 12));
+      }
+    }
+    var gap;
+    if (wantH) {
+      gap = Math.max(baseMinGap, window.innerHeight - top - wantH);
       // 이력 확장: 팝업 아래 공간(gap)에서 컴포저 몸통·여백을 뺀 만큼
       if (rows) rows.style.maxHeight = Math.max(110, gap - 16 - nonRows) + "px";
     } else {
-      if (rows) rows.style.maxHeight = ""; // 자동 모드 — 기본 110px(CSS)로 복귀
+      if (rows) rows.style.maxHeight = ""; // 아직 내용을 모르면 기본(꽉 차게)
       gap = (acc ? acc.offsetHeight : accH) + 20;
     }
     layer.style.left = navRight + "px";
@@ -254,6 +290,21 @@
   // ── 동작 ────────────────────────────────────────────────────────────
   function embedSrc(page) { return page + (page.indexOf("?") >= 0 ? "&" : "?") + "embed=1"; }
 
+  // 팝업 iframe 생성 공통 — 서브프레임 preload 주입 경합을 피한다(실측 플레이크):
+  // ① src는 붙인 뒤 다음 프레임에 설정 ② load 직후 gijo 없으면 즉시 1회 재로드(치유).
+  function makeFrame(page, s) {
+    var f = document.createElement("iframe");
+    document.getElementById("shellBody").appendChild(f);
+    f.addEventListener("load", function () {
+      try {
+        if (f.contentDocument && !f.contentWindow.gijo && !s.healed) { s.healed = true; f.src = embedSrc(page); return; }
+      } catch (e) {}
+      setTimeout(layout, 300); // 내용 높이 반영
+    });
+    requestAnimationFrame(function () { f.src = embedSrc(page); });
+    return f;
+  }
+
   function open(page, label, opts) {
     opts = opts || {};
     var s = findSlot(page);
@@ -265,10 +316,8 @@
         showToast('"' + victims[0].label + '" 팝업을 자동으로 닫았습니다 (동시 5개까지)');
         close(victims[0].key, true);
       }
-      var f = document.createElement("iframe");
-      f.src = embedSrc(page);
-      document.getElementById("shellBody").appendChild(f);
-      s = { key: page, label: label || page, pinned: false, lastActive: Date.now(), curTab: null, curLabel: null, el: f };
+      s = { key: page, label: label || page, pinned: false, lastActive: Date.now(), curTab: null, curLabel: null, el: null };
+      s.el = makeFrame(page, s);
       slots.push(s);
     }
     focusSlot(page);
@@ -277,6 +326,23 @@
     }
   }
 
+  // 내용은 데이터가 도착하며 자라거나 준다 — 보이는 동안 1.2초마다 가볍게 재계산(DOM 읽기뿐).
+  // 같은 주기에 preload 주입 누락도 치유한다: 서브프레임 preload(window.gijo)가 간헐적으로
+  // 안 실리는 Electron 플레이크가 실측됨(허브 탭 0개·isAuthenticated undefined) — 1회 재로드로 회복.
+  function healMissingPreload() {
+    slots.forEach(function (s) {
+      try {
+        if (!s.healed && s.el.contentDocument && s.el.contentDocument.readyState === "complete" && !s.el.contentWindow.gijo) {
+          s.healed = true; // 무한 재로드 방지 — 한 번만
+          s.el.src = s.el.src;
+        }
+      } catch (e) {}
+    });
+  }
+  var layoutTimer = null;
+  function startWatch() { if (!layoutTimer) layoutTimer = setInterval(function () { if (visible) { healMissingPreload(); layout(); } }, 1200); }
+  function stopWatch() { if (layoutTimer) { clearInterval(layoutTimer); layoutTimer = null; } }
+
   function focusSlot(key) {
     var s = findSlot(key);
     if (!s) return;
@@ -284,6 +350,7 @@
     s.lastActive = Date.now();
     ctxDash = false; // 팝업을 열거나 전환하면 그 화면이 곧 지시 맥락
     visible = true;
+    startWatch();
     document.body.classList.add("shell-popped");
     layer.classList.add("on");
     dim.classList.add("on");
@@ -294,6 +361,7 @@
 
   function minimize() { // 팝업은 슬롯에 살아있고 화면만 대시보드로
     visible = false;
+    stopWatch();
     layer.classList.remove("on");
     dim.classList.remove("on");
     document.body.classList.remove("shell-popped");
@@ -384,9 +452,15 @@
 
   // ＋ 메뉴 — 팝업으로 열 수 있는 화면 목록(nav.js GROUPS의 popup:true와 같은 목록 유지)
   var PLUS_ITEMS = [
-    { page: "hub.html?g=assets", label: "🛡 자산 허브" },
     { page: "hub.html?g=analysis", label: "📈 보안 분석" },
+    { page: "hub.html?g=threat", label: "🌐 위협 인텔리전스" },
     { page: "hub.html?g=report", label: "📄 리포트" },
+    { page: "hub.html?g=assets", label: "🛡 자산 허브" },
+    { page: "approvals.html", label: "✅ 조치·승인" },
+    { page: "hub.html?g=products", label: "🧰 보안제품" },
+    { page: "hub.html?g=inspect", label: "🛰 점검 콘솔" },
+    { page: "hub.html?g=aiknowledge", label: "🧠 AI 지식·모델" },
+    { page: "redteam.html", label: "🛡 레드팀·가드레일" },
   ];
   document.getElementById("sbPlus").addEventListener("click", function (ev) {
     ev.stopPropagation();
@@ -419,12 +493,13 @@
     if (!s) return;
     s.curTab = d.page;
     s.curLabel = d.label;
-    if (s.key === activeKey) renderHead();
+    if (s.key === activeKey) { renderHead(); layout(); } // 탭이 바뀌면 내용 높이도 다시 잰다
   });
 
   // ── 공개 API ────────────────────────────────────────────────────────
   window.gijoShell = {
     open: open,
+    hide: minimize, // "내 업무 바로가기" 등 대시보드 위 다른 팝업이 먼저 접으라고 부른다
     // 지시의 화면 맥락 — 팝업이 보이는 동안은 그 팝업(허브면 활성 탭 파일명).
     // 사용자가 칩으로 "대시보드 맥락"을 골랐으면 팝업이 떠 있어도 대시보드 기본.
     activeScreen: function () {
@@ -436,17 +511,22 @@
   };
 
   // ── 복원 — 대시보드를 다시 열어도 팝업 구성이 살아난다(화면 내부 상태는 새로 로드) ──
-  try {
-    var saved = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
-    if (saved && saved.slots && saved.slots.length) {
-      saved.slots.slice(0, MAX).forEach(function (s0) {
-        var f = document.createElement("iframe");
-        f.src = embedSrc(s0.key);
-        document.getElementById("shellBody").appendChild(f);
-        slots.push({ key: s0.key, label: s0.label, pinned: Boolean(s0.pinned), lastActive: Date.now(), curTab: null, curLabel: null, el: f });
-      });
-      renderBar();
-      if (saved.visible && saved.active && findSlot(saved.active)) focusSlot(saved.active);
-    }
-  } catch (e) {}
+  // 문서 파싱 중에 iframe을 만들면 서브프레임 preload 주입이 간헐적으로 빠진다(실측) —
+  // 페이지 load 후로 미룬다(위 heal이 이중 안전망).
+  function restoreSaved() {
+    try {
+      var saved = JSON.parse(localStorage.getItem(STORE_KEY) || "null");
+      if (saved && saved.slots && saved.slots.length) {
+        saved.slots.slice(0, MAX).forEach(function (s0) {
+          var s = { key: s0.key, label: s0.label, pinned: Boolean(s0.pinned), lastActive: Date.now(), curTab: null, curLabel: null, el: null };
+          s.el = makeFrame(s0.key, s);
+          slots.push(s);
+        });
+        renderBar();
+        if (saved.visible && saved.active && findSlot(saved.active)) focusSlot(saved.active);
+      }
+    } catch (e) {}
+  }
+  if (document.readyState === "complete") setTimeout(restoreSaved, 200);
+  else window.addEventListener("load", function () { setTimeout(restoreSaved, 200); });
 })();
