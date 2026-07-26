@@ -118,13 +118,38 @@
   document.body.appendChild(plus);
 
   // 명령 맥락 칩 — 컴포저(agentDock) 바로 위에 끼운다.
+  // "| 대시보드 맥락으로"는 팝업을 접지 않는다 — 팝업은 그대로 두고 지시 맥락만 토글한다
+  // (2026-07-26 사용자 결정: 별도 화면 전환이 아니라 기존 화면 통합. 접기는 ▁·Esc·배경막이 담당).
+  var ctxDash = false; // 팝업이 떠 있는 동안 사용자가 "대시보드 맥락"을 고른 상태
   var ctx = document.createElement("div");
   ctx.id = "shellCtx";
   ctx.innerHTML = '<span class="chip">🎯 명령 맥락: <b id="shCtxLabel"></b></span>' +
     '<span class="sw" id="shCtxSwitch">| 대시보드 맥락으로</span>' +
-    '<span style="font-size:10.5px;color:var(--muted-2,#5c6580)">보이는 화면을 향해 바로 지시 — 답은 이 대화에 쌓입니다</span>';
+    '<span id="shCtxHint" style="font-size:10.5px;color:var(--muted-2,#5c6580)"></span>';
   var dock = document.getElementById("agentDock");
   if (dock) dock.insertAdjacentElement("beforebegin", ctx);
+
+  // 지시창(입력) 안내문도 맥락을 따라간다 — 어디에 대고 말하는지 입력창만 봐도 알게.
+  var chatInputEl = document.getElementById("chatInput");
+  var basePlaceholder = chatInputEl ? chatInputEl.placeholder : "";
+  function renderCtx() {
+    var lb = document.getElementById("shCtxLabel");
+    var sw = document.getElementById("shCtxSwitch");
+    var hint = document.getElementById("shCtxHint");
+    if (!lb || !sw) return;
+    var s = findSlot(activeKey);
+    if (ctxDash || !s) {
+      lb.textContent = "대시보드";
+      sw.textContent = "| 보이는 화면 맥락으로";
+      if (hint) hint.textContent = "전체 현황 기준으로 답합니다 — 팝업은 그대로 열려 있습니다";
+      if (chatInputEl) chatInputEl.placeholder = "대시보드 맥락으로 지시… (전체 현황 기준)";
+    } else {
+      lb.textContent = s.curLabel || s.label;
+      sw.textContent = "| 대시보드 맥락으로";
+      if (hint) hint.textContent = "보이는 화면을 향해 바로 지시 — 답은 이 대화에 쌓입니다";
+      if (chatInputEl) chatInputEl.placeholder = "「" + (s.curLabel || s.label) + "」 화면에 대해 지시…";
+    }
+  }
 
   function showToast(msg) {
     toast.textContent = msg;
@@ -224,8 +249,7 @@
     if (!s) return;
     document.getElementById("shTitle").textContent = s.curLabel || s.label;
     document.getElementById("shPin").classList.toggle("pin-on", Boolean(s.pinned));
-    var lb = document.getElementById("shCtxLabel");
-    if (lb) lb.textContent = s.curLabel || s.label;
+    renderCtx();
   }
 
   // ── 동작 ────────────────────────────────────────────────────────────
@@ -259,6 +283,7 @@
     if (!s) return;
     activeKey = key;
     s.lastActive = Date.now();
+    ctxDash = false; // 팝업을 열거나 전환하면 그 화면이 곧 지시 맥락
     visible = true;
     document.body.classList.add("shell-popped");
     layer.classList.add("on");
@@ -279,6 +304,7 @@
       var rows = acc.querySelector(".cl-rows");
       if (rows) rows.style.maxHeight = ""; // 확장했던 이력 높이 원복
     }
+    if (chatInputEl && basePlaceholder) chatInputEl.placeholder = basePlaceholder; // 안내문 원복
     renderBar(); persist();
   }
 
@@ -381,9 +407,9 @@
   });
   document.addEventListener("click", function () { plus.style.display = "none"; });
 
-  // 대시보드 맥락 전환(칩) — 팝업은 그대로 두고 지시 맥락만 대시보드로 = 접기와 동일
+  // 맥락 전환(칩) — 팝업은 그대로 두고 지시 맥락만 토글(대시보드 ↔ 보이는 화면)
   var sw = document.getElementById("shCtxSwitch");
-  if (sw) sw.addEventListener("click", minimize);
+  if (sw) sw.addEventListener("click", function () { ctxDash = !ctxDash; renderCtx(); });
 
   // ── 허브 활성 탭 통지 수신 — 명령 맥락(screen)이 탭 단위로 정확해진다 ──
   window.addEventListener("message", function (ev) {
@@ -402,9 +428,10 @@
   // ── 공개 API ────────────────────────────────────────────────────────
   window.gijoShell = {
     open: open,
-    // 지시의 화면 맥락 — 팝업이 보이는 동안은 그 팝업(허브면 활성 탭 파일명), 아니면 대시보드 기본.
+    // 지시의 화면 맥락 — 팝업이 보이는 동안은 그 팝업(허브면 활성 탭 파일명).
+    // 사용자가 칩으로 "대시보드 맥락"을 골랐으면 팝업이 떠 있어도 대시보드 기본.
     activeScreen: function () {
-      if (!visible) return undefined;
+      if (!visible || ctxDash) return undefined;
       var s = findSlot(activeKey);
       if (!s) return undefined;
       return s.curTab || (s.key.indexOf("hub.html") === 0 ? undefined : s.key);

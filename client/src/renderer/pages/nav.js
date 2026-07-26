@@ -203,8 +203,12 @@
         if (it.bot) {
           var botMark = document.createElement("span");
           botMark.className = "gn-bot";
-          botMark.textContent = "🤖";
-          botMark.title = it.label + " 화면의 챗봇 열기 — 그 화면 데이터로 바로 답합니다";
+          // 팝업으로 열리는 메뉴는 팝업 그림(⧉)으로 — 챗봇(🤖)이 아니라 "대시보드 위 팝업"임을 표시
+          // (2026-07-26 사용자 결정. 팝업 미지원 메뉴는 기존 챗봇 열기 그대로.)
+          botMark.textContent = it.popup ? "⧉" : "🤖";
+          botMark.title = it.popup
+            ? it.label + " 화면을 팝업으로 열기 — 대시보드 명령창·대화가 유지됩니다"
+            : it.label + " 화면의 챗봇 열기 — 그 화면 데이터로 바로 답합니다";
           botMark.addEventListener("click", function (ev) {
             ev.stopPropagation();
             if (it.page === here && openChatHere()) return;
