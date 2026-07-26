@@ -461,19 +461,26 @@ async function runClient() {
     return `탭 5개 + 업데이트 배지 표시`;
   });
 
+  // 2026-07-26 기대값 현행화: 엣지 탭 v5 개편(커밋 b2b0914)으로 요소가 바뀌었다.
+  //   gijoCmdTab → gijoEdgeRail 안의 gijoEdgeSess(작업 세션)·gijoEdgeOffice(AI 라이브 오피스)
+  //   패널 열림 클래스 open → on
+  // 화면은 정상이었고(실화면·스윕 확인) QA 기대값만 낡아 있었다.
   await scenario("QA-C04", "작업 세션", "허브에서 작업 세션 드로어 기본 접힘", {
     given: "허브 화면(임베드 아님, 최상위)에서",
     when: "페이지 로드가 끝나면",
-    then: "'◧ 작업 세션 열기' 탭이 있고 패널은 접힌 상태가 기본이다",
+    then: "오른쪽 가장자리에 '작업 세션'·'AI 라이브 오피스' 탭이 있고 패널은 접힌 상태가 기본이다",
   }, async () => {
     await open("hub.html?g=assets");
     const r = await page.evaluate(() => ({
-      tab: document.getElementById("gijoCmdTab")?.textContent ?? null,
-      open: document.getElementById("gijoCmdPanel")?.classList?.contains("open") ?? false,
+      rail: Boolean(document.getElementById("gijoEdgeRail")),
+      sess: document.getElementById("gijoEdgeSess")?.textContent?.trim() ?? null,
+      office: Boolean(document.getElementById("gijoEdgeOffice")),
+      open: document.getElementById("gijoCmdPanel")?.classList?.contains("on") ?? false,
     }));
-    if (!r.tab) throw new Error("드로어 탭 없음");
+    if (!r.rail || !r.sess) throw new Error("엣지 탭(작업 세션) 없음");
+    if (!r.office) throw new Error("AI 라이브 오피스 탭 없음");
     if (r.open) throw new Error("기본이 펼침 상태");
-    return `탭 '${r.tab}' 존재, 기본 접힘`;
+    return `탭 '${r.sess}'·오피스 존재, 기본 접힘`;
   });
 
   await scenario("QA-C05", "메뉴 C안", "AI 지식·모델 허브 6탭", {
@@ -523,3 +530,12 @@ else if (layer === "maintenance") await runMaintenance();
 else if (layer === "client") await runClient();
 else if (layer === "report" || process.argv.includes("--report")) report();
 else { console.error("--layer=server | --layer=client | --report 중 하나를 지정하세요"); process.exit(2); }
+
+// ⚠ 케이스가 실패하면 반드시 0이 아닌 코드로 끝낸다(2026-07-26 발견).
+// 이게 없어서 qa-full이 개별 실패를 안고도 계층을 "통과"로 표시했다 —
+// 실패를 감추는 QA는 없는 것보다 나쁘다.
+const failedCases = results.filter((r) => r.pass === false);
+if (failedCases.length) {
+  console.error(`\n✗ 실패 ${failedCases.length}건: ${failedCases.map((r) => r.id).join(", ")}`);
+  process.exit(1);
+}

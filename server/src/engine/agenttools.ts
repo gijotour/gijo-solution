@@ -25,7 +25,7 @@ import { listCompliance, setComplianceStatus } from "./compliance";
 import { generateSbom } from "./sbom";
 import type { ComplianceStatus } from "./compliance";
 import { countTriples } from "./ontology";
-import { listDocuments } from "./memory";
+import { listDocuments, queryMemoryRelevant } from "./memory";
 import { listFindings as listCtiFindings } from "./cti";
 import { matchCtiToAssets } from "./ctimatch";
 import { dailyBriefingText } from "./briefing";
@@ -162,17 +162,34 @@ async function runExplain(args: Record<string, string>): Promise<string> {
   const triples = ontologyLinesFor(topic, 12);
   if (triples.length) out.push(`사내 온톨로지 관계 — "${topic}" 관련:`, ...triples);
 
-  // 업로드·자동분류된 사내 문서 중 제목이 걸리는 것(있으면 근거로 제시).
+  // 사내 문서 **본문**을 근거로 싣는다.
+  // ⚠ 2026-07-26 QA에서 잡힌 결함: 예전에는 문서 "제목과 조각 수"만 돌려줬다.
+  //   LLM이 받는 건 파일명뿐이라, 지식베이스에 답이 있어도(예: 유지보수 7항목 — 자원·HA·
+  //   시그니처·백업·로그) 일반론으로 답했다. 근거 배지에는 그 문서가 떠서 더 헷갈렸다.
+  //   제목만으로는 근거가 아니다 — 본문을 줘야 근거다.
+  try {
+    const chunks = await queryMemoryRelevant(topic, 4);
+    if (chunks.length) {
+      out.push(
+        `사내 문서 근거(발췌) ${chunks.length}건:`,
+        ...chunks.slice(0, 3).map((c) => `  · ${String(c).replace(/\s+/g, " ").slice(0, 600)}`)
+      );
+    }
+  } catch {
+    /* 임베딩 미기동 등 — 본문 근거 없이 계속 */
+  }
+
+  // 어느 문서에서 왔는지도 함께(담당자가 원문을 찾아갈 수 있게).
   try {
     const docs = (await listDocuments()).filter((d) => matches(d.documentId, topic));
     if (docs.length) {
       out.push(
-        `사내 문서(장기기억) ${docs.length}건:`,
+        `관련 사내 문서 ${docs.length}건:`,
         ...docs.slice(0, 5).map((d) => `  - ${d.documentId}${d.docClass ? ` [${d.docClass}]` : ""} (조각 ${d.chunks})`)
       );
     }
   } catch {
-    /* 임베딩 미기동 등 — 문서 근거 없이 계속 */
+    /* 목록 조회 실패는 무시 */
   }
 
   // 보유 보안제품 중 관련된 것(대응 수단 제시).
@@ -187,7 +204,7 @@ async function runExplain(args: Record<string, string>): Promise<string> {
   if (out.length === 0) {
     return `"${topic}"에 대해 사내 온톨로지·문서·보안제품 등록부에서 찾은 근거가 없습니다. 일반 지식으로만 답하거나, 관련 문서를 업로드하면 근거가 쌓입니다.`;
   }
-  return out.join("\n").slice(0, 2500);
+  return out.join("\n").slice(0, 3500); // 본문 발췌가 들어가 상한을 늘렸다(2500이면 근거가 잘렸다)
 }
 
 // 느슨한 부분일치 — 한국어는 형태소 분석 없이 공백 토큰화가 불안정해 정규화 후 부분문자열로 본다
