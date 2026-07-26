@@ -57,6 +57,17 @@ const gijoApi = {
   openShellPopout: (page: string, title?: string, orient?: string) => ipcRenderer.invoke("shell:popout", page, title, orient),
   // 분리창 자신이 가로/세로를 전환한다(hub.html 헤더 버튼) — 모니터 배치는 그 창에서.
   setPopoutOrientation: (orient: string) => ipcRenderer.invoke("shell:popoutOrient", orient),
+  // 분리창이 "지금 보고 있는 탭"을 대시보드에 알린다 — 그 화면을 향해 바로 지시할 수 있게.
+  reportPopoutTab: (page: string, label: string) => ipcRenderer.invoke("shell:popoutTab", page, label),
+  // 대시보드가 분리창의 포커스·탭·닫힘을 받아 명령 맥락에 반영한다.
+  onPopoutContext: (cb: (kind: "focus" | "tab" | "closed", info: Record<string, unknown>) => void) => {
+    ipcRenderer.removeAllListeners("shell:popoutFocus");
+    ipcRenderer.removeAllListeners("shell:popoutTab");
+    ipcRenderer.removeAllListeners("shell:popoutClosed");
+    ipcRenderer.on("shell:popoutFocus", (_e, i) => cb("focus", i));
+    ipcRenderer.on("shell:popoutTab", (_e, i) => cb("tab", i));
+    ipcRenderer.on("shell:popoutClosed", (_e, i) => cb("closed", i));
+  },
 
   // 화면 크기(UI 배율) — 설정 › 화면 크기와 단축키(Cmd/Ctrl +·-·0)가 쓴다.
   // 배율은 메인 프로세스가 webContents 단위로 걸어 허브 iframe까지 함께 적용된다.

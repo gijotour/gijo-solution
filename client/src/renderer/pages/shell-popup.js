@@ -120,6 +120,13 @@
   // "| 대시보드 맥락으로"는 팝업을 접지 않는다 — 팝업은 그대로 두고 지시 맥락만 토글한다
   // (2026-07-26 사용자 결정: 별도 화면 전환이 아니라 기존 화면 통합. 접기는 ▁·Esc·배경막이 담당).
   var ctxDash = false; // 팝업이 떠 있는 동안 사용자가 "대시보드 맥락"을 고른 상태
+
+  // 분리창(별도 창) 맥락 — 2026-07-26 사용자 요청.
+  // 규칙은 단순하게 **보고 있는 것이 맥락**: 분리창을 클릭해 포커스하면 그 창이 맥락이 되고,
+  // 창을 닫으면 해제된다. 담당자가 따로 지정할 필요 없이 화면을 보며 바로 지시할 수 있다.
+  // (앱 안 팝업은 postMessage로 알리지만 별도 창은 부모가 없어 메인 프로세스를 거쳐 온다.)
+  var popouts = {};      // key → { label, tab, tabLabel }
+  var activePopout = null; // 지금 맥락인 분리창 key(대시보드를 보고 있으면 null)
   var ctx = document.createElement("div");
   ctx.id = "shellCtx";
   ctx.innerHTML = '<span class="chip">🎯 명령 맥락: <b id="shCtxLabel"></b></span>' +
@@ -136,6 +143,18 @@
     var sw = document.getElementById("shCtxSwitch");
     var hint = document.getElementById("shCtxHint");
     if (!lb || !sw) return;
+
+    // 분리창을 보고 있으면 그것이 맥락이다(팝업보다 우선 — 사용자가 방금 그 창을 봤다는 뜻).
+    if (activePopout && popouts[activePopout] && !ctxDash) {
+      var p = popouts[activePopout];
+      lb.textContent = "🗗 " + (p.tabLabel || p.label);
+      sw.textContent = "| 대시보드 맥락으로";
+      if (hint) hint.textContent = "별도 창에서 보고 계신 화면입니다 — 그대로 지시하세요";
+      if (chatInputEl) chatInputEl.placeholder = "「" + (p.tabLabel || p.label) + "」 화면에 대해 지시…";
+      document.body.classList.add("shell-popped"); // 맥락 칩이 보이게(팝업이 없어도)
+      return;
+    }
+
     var s = findSlot(activeKey);
     if (ctxDash || !s) {
       lb.textContent = "대시보드";
@@ -498,9 +517,40 @@
   });
   document.addEventListener("click", function () { plus.style.display = "none"; });
 
-  // 맥락 전환(칩) — 팝업은 그대로 두고 지시 맥락만 토글(대시보드 ↔ 보이는 화면)
+  // 맥락 전환(칩) — 팝업·분리창은 그대로 두고 지시 맥락만 토글(대시보드 ↔ 보고 있는 화면)
   var sw = document.getElementById("shCtxSwitch");
   if (sw) sw.addEventListener("click", function () { ctxDash = !ctxDash; renderCtx(); });
+
+  // ── 분리창 맥락 수신 ────────────────────────────────────────────────
+  if (window.gijo && window.gijo.onPopoutContext) {
+    window.gijo.onPopoutContext(function (kind, info) {
+      var key = info && info.key;
+      if (!key) return;
+      if (kind === "closed") {
+        delete popouts[key];
+        if (activePopout === key) activePopout = null;
+      } else if (kind === "focus") {
+        popouts[key] = popouts[key] || { label: info.label || key };
+        popouts[key].key = key;
+        activePopout = key;   // 그 창을 봤다 = 그 화면이 맥락
+        ctxDash = false;      // 새 창을 보면 대시보드 고정은 푼다
+      } else if (kind === "tab") {
+        popouts[key] = popouts[key] || { label: info.label || key };
+        popouts[key].key = key;
+        popouts[key].tab = info.page;
+        popouts[key].tabLabel = info.label;
+        if (info.focused) { activePopout = key; ctxDash = false; }
+      }
+      renderCtx();
+    });
+  }
+
+  // ⚠ 대시보드에 포커스가 왔다고 분리창 맥락을 풀지 않는다.
+  //    처음엔 "보고 있는 창이 맥락"으로 만들었다가 실화면 검증에서 설계 결함이 드러났다:
+  //    **명령을 치려면 대시보드에 포커스해야 하는데**, 그 순간 맥락이 사라져 기능이 무용지물이 된다.
+  //    모니터 2대에서 분리창을 보며 대시보드에 지시하는 것이 바로 이 기능의 목적이다.
+  //    그래서 분리창은 **마지막으로 본 창**으로 유지하고, 해제는 칩(대시보드 맥락으로)이나
+  //    창을 닫을 때만 한다.
 
   // ── 허브 활성 탭 통지 수신 — 명령 맥락(screen)이 탭 단위로 정확해진다 ──
   window.addEventListener("message", function (ev) {
@@ -530,6 +580,11 @@
     // 지시의 화면 맥락 — 팝업이 보이는 동안은 그 팝업(허브면 활성 탭 파일명).
     // 사용자가 칩으로 "대시보드 맥락"을 골랐으면 팝업이 떠 있어도 대시보드 기본.
     activeScreen: function () {
+      // 분리창을 보고 있으면 그 화면이 맥락(팝업보다 우선).
+      if (activePopout && popouts[activePopout] && !ctxDash) {
+        var p = popouts[activePopout];
+        return p.tab || (p.key && p.key.indexOf("hub.html") === 0 ? undefined : p.key);
+      }
       if (!visible || ctxDash) return undefined;
       var s = findSlot(activeKey);
       if (!s) return undefined;

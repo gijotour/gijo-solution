@@ -110,8 +110,12 @@
       f.classList.add("on");
       current = f;
       // 팝업 셸(부모 창)에 활성 탭을 알린다 — 컴포저의 "명령 맥락"이 이 탭이 된다.
+      const tabLabel = hub.ic + " " + hub.label + " — " + tab.label;
       if (window.parent !== window) {
-        try { window.parent.postMessage({ type: "gijo:hubTab", g: g, page: tab.page, label: hub.ic + " " + hub.label + " — " + tab.label }, "*"); } catch (e) {}
+        try { window.parent.postMessage({ type: "gijo:hubTab", g: g, page: tab.page, label: tabLabel }, "*"); } catch (e) {}
+      } else if (params.get("popout") === "1" && window.gijo.reportPopoutTab) {
+        // 분리창은 부모가 없다 — 메인 프로세스를 거쳐 대시보드에 알린다(명령 맥락용).
+        try { window.gijo.reportPopoutTab(tab.page, tabLabel); } catch (e) {}
       }
     }
     // 팝업 셸이 보낸 "챗봇 열기"를 지금 보이는 탭 프레임으로 중계한다(위젯은 탭 페이지에 있다).

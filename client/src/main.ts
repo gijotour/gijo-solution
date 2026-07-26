@@ -274,13 +274,36 @@ ipcMain.handle("shell:popout", async (_e, page: string, title?: string, orient?:
   win.removeMenu();
   bindZoom(win); // 분리 창도 같은 화면 크기를 따른다
   popoutWindows.set(key, win);
-  win.on("closed", () => { popoutWindows.delete(key); });
+
+  // 분리창도 대시보드의 "명령 맥락"이 된다(2026-07-26 사용자 요청).
+  // 규칙은 단순하게 — **보고 있는 것이 맥락**: 창을 클릭해 포커스하면 그 창이 맥락이 되고,
+  // 닫으면 해제된다. 담당자가 따로 지정할 필요 없이 화면을 보며 바로 지시할 수 있다.
+  const notifyMain = (channel: string, payload: unknown) => {
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send(channel, payload);
+  };
+  win.on("focus", () => notifyMain("shell:popoutFocus", { key, label: title ?? key }));
+  win.on("closed", () => {
+    popoutWindows.delete(key);
+    notifyMain("shell:popoutClosed", { key });
+  });
   // popout=1·orient — 분리창임을 페이지에 알린다(허브가 가로/세로 전환 버튼을 그린다).
   // ⚠ 로드 주소에 창 구분용 접미사를 섞으면 g 파라미터가 오염돼 "알 수 없는 허브"가 뜬다(실측 버그).
   const [file, qs] = String(page).split("?");
   const query: Record<string, string> = { popout: "1", orient: portrait ? "portrait" : "landscape" };
   if (qs) for (const [k, v] of new URLSearchParams(qs)) query[k] = v;
   await win.loadFile(path.join(__dirname, `../src/renderer/pages/${file}`), { query });
+});
+
+// 분리창이 "지금 어느 탭을 보고 있는지"를 대시보드에 알린다 — 명령 맥락이 탭 단위로 정확해진다.
+// (앱 안 팝업은 postMessage로 부모에게 알리지만, 별도 창은 부모가 없어 메인 프로세스를 거친다.)
+ipcMain.handle("shell:popoutTab", async (e, page: string, label: string) => {
+  const win = BrowserWindow.fromWebContents(e.sender);
+  if (!win) return { ok: false };
+  const key = [...popoutWindows.entries()].find(([, w]) => w === win)?.[0];
+  if (key && mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("shell:popoutTab", { key, page, label, focused: win.isFocused() });
+  }
+  return { ok: true };
 });
 
 // 분리창 안에서 가로/세로 전환(2026-07-26 사용자 결정 — 모니터 배치는 그 창에서 바꾼다).
