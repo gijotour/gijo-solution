@@ -18,6 +18,7 @@
 //   regress     답변 회귀 하네스 11케이스 (tools/regress/run.mjs)
 //   verify      조치 검증·VEX·자산 기본 담당자 (tools/qa-verify.mjs — 운영 서버 자신을 점검 대상으로)
 //   shell       대시보드 팝업 셸 (tools/qa-shell.mjs — CDP 9223 필요)
+//   download    파일 받기가 실제로 저장되는가 (tools/qa-download.mjs — ⚠ Playwright 금지·순수 CDP)
 //   sweep       Electron 전 화면 스윕 (menu-sweep — CDP 9223 필요, 없으면 안내 후 스킵)
 
 import fs from "node:fs";
@@ -54,19 +55,22 @@ const reasons = [];
 // 조치 검증 계열은 "판정을 어디에 쓰는가"가 위험 지점이라 실 상태전이까지 보는 계층을 따로 둔다.
 const VERIFY_RE = /^server\/src\/engine\/(verify|vexexport|autoassign|versioncmp|netmikorunner|approvals|hardening)/;
 const SHELL_RE = /^client\/src\/renderer\/pages\/(shell-popup|dashboard|nav|hub)/;
+// 파일 받기는 메인 프로세스(will-download)·preload·받기 버튼이 걸린 화면이 바뀌면 다시 본다.
+const DOWNLOAD_RE = /^client\/src\/(main|preload)\.ts$|^client\/src\/renderer\/pages\/(approvals|report)\.html$/;
 for (const f of changed) {
   if (VERIFY_RE.test(f)) { picks.add("verify"); picks.add("vitest"); reasons.push(`${f} → 조치검증·VEX 계층`); }
   if (SHELL_RE.test(f)) { picks.add("shell"); reasons.push(`${f} → 팝업 셸 계층`); }
+  if (DOWNLOAD_RE.test(f)) { picks.add("download"); reasons.push(`${f} → 파일 받기 계층`); }
   if (QUALITY_RE.test(f)) { picks.add("knowledge"); picks.add("maintenance"); picks.add("regress"); picks.add("vitest"); reasons.push(`${f} → 지식·시나리오·회귀`); }
   else if (f.startsWith("server/")) { picks.add("vitest"); reasons.push(`${f} → 서버 단위테스트`); }
   else if (f.startsWith("client/src/")) { picks.add("client"); picks.add("sweep"); reasons.push(`${f} → 클라 실페이지·스윕`); }
   else if (f.startsWith("tools/regress/") || f.startsWith("rag-seed/")) { picks.add("regress"); reasons.push(`${f} → 회귀 하네스`); }
 }
-if (ALL) for (const l of ["vitest", "client", "knowledge", "maintenance", "regress", "verify", "shell", "sweep"]) picks.add(l);
+if (ALL) for (const l of ["vitest", "client", "knowledge", "maintenance", "regress", "verify", "shell", "download", "sweep"]) picks.add(l);
 if (FAST) { picks.delete("vitest"); picks.delete("maintenance"); }
 
 console.log(`■ QA 전수조사 — 기준: ${since ? since.slice(0, 8) + "..HEAD" : "(첫 실행 — 마커 없음, 전 계층)"}`);
-if (!since) for (const l of ["vitest", "client", "knowledge", "maintenance", "regress", "verify", "shell", "sweep"]) { if (!FAST || (l !== "vitest" && l !== "maintenance")) picks.add(l); }
+if (!since) for (const l of ["vitest", "client", "knowledge", "maintenance", "regress", "verify", "shell", "download", "sweep"]) { if (!FAST || (l !== "vitest" && l !== "maintenance")) picks.add(l); }
 console.log(`  변경 파일 ${changed.length}개 → 계층 [${[...picks].join(", ")}]${ALL ? " (--all)" : ""}${FAST ? " (--fast)" : ""}`);
 for (const r of reasons.slice(0, 8)) console.log(`   · ${r}`);
 if (reasons.length > 8) console.log(`   · … 외 ${reasons.length - 8}건`);
@@ -83,11 +87,11 @@ function run(name, cmd, args, opts = {}) {
 
 // Electron이 필요한 계층(스윕·팝업 셸)은 CDP가 살아 있을 때만 — 없으면 스킵 사유를 남긴다
 // (자동 기동은 하지 않는다: 쓰고 있는 세션을 방해하지 않기 위해).
-if (picks.has("sweep") || picks.has("shell")) {
+if (picks.has("sweep") || picks.has("shell") || picks.has("download")) {
   const cdpUp = await fetch("http://127.0.0.1:9223/json/version").then((r) => r.ok).catch(() => false);
   if (!cdpUp) {
-    console.log("\n── [sweep/shell] 스킵 — Electron(CDP 9223) 미기동. /GIJOAS클라시작 후 로그인하고 다시 돌리면 포함됩니다.");
-    for (const l of ["sweep", "shell"]) {
+    console.log("\n── [sweep/shell/download] 스킵 — Electron(CDP 9223) 미기동. /GIJOAS클라시작 후 로그인하고 다시 돌리면 포함됩니다.");
+    for (const l of ["sweep", "shell", "download"]) {
       if (picks.has(l)) { picks.delete(l); results.push({ name: l, ok: null, ms: 0, note: "스킵(Electron 미기동)" }); }
     }
   }
@@ -101,6 +105,7 @@ run("maintenance", "node", ["tools/qa-auto.mjs", "--layer=maintenance"]);
 run("regress", "node", ["tools/regress/run.mjs"]);
 run("verify", "node", ["tools/qa-verify.mjs"]);
 run("shell", "node", ["tools/qa-shell.mjs"]);
+run("download", "node", ["tools/qa-download.mjs"]);
 run("sweep", "node", ["tools/menu-sweep.mjs"]);
 
 // ── ④ 요약·마커·리포트 ──────────────────────────────────────────────────────────
