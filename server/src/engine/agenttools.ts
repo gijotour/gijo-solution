@@ -36,7 +36,7 @@ import { listAnalysisEvents, analysisSummary, computeCorrelations } from "./anal
 import { computeKpiSnapshot } from "./kpi";
 import { listSessions as listWorkSessions } from "./worksessions";
 import { canonicalize, suggestionsFor } from "./terms";
-import { lawAnswer, type LawTarget } from "./lawinfo";
+import { lawAnswer, getLawConfig, type LawTarget } from "./lawinfo";
 
 export interface AgentToolParam {
   name: string;
@@ -1633,7 +1633,16 @@ export function findAgentTool(name: string): AgentTool | undefined {
  *                오케스트레이터가 애초에 후보로 삼지 못하게 해, 권한 없는 실행 시도 자체를 없앤다.
  */
 export function listToolsFor(domains?: string[], role?: string): AgentTool[] {
+  // 꺼져 있는 선택 기능의 도구는 아예 목록에서 뺀다.
+  // ⚠ 2026-07-26 회귀: 법령 조회(기본 꺼짐)를 켜지 않은 상태에서도 law_lookup이 목록에 남아,
+  //   "금융권 망분리의 법적 근거는?" 같은 질문이 그리로 가서 "인증키를 넣으세요"로 막혔다.
+  //   예전에는 사내 문서(RAG)로 답하던 질문이다 — 꺼진 기능이 멀쩡하던 답을 빼앗으면 안 된다.
+  //   목록에서 빼면 에이전트가 explain·search로 돌아가 원래대로 답한다.
+  let lawOn = false;
+  try { lawOn = getLawConfig().enabled; } catch { lawOn = false; }
+
   return TOOLS.filter((t) => {
+    if (t.name === "law_lookup" && !lawOn) return false;
     if (t.requiredRole === "admin" && role !== "admin") return false;
     if (!domains || domains.length === 0) return true;
     return t.domain === "cross" || domains.includes(t.domain);

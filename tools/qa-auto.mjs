@@ -27,18 +27,36 @@ const layer = (process.argv.find((a) => a.startsWith("--layer=")) || "").split("
 
 // ─────────────────────────────────── 공통 러너 ───────────────────────────────────
 const results = [];
-async function scenario(id, area, title, gwt, fn) {
+// opts.retries — LLM 답변 케이스처럼 **같은 질문에 답이 달라질 수 있는** 것만 재시도를 허용한다
+// (2026-07-26 사용자 결정). 결정적 검사(HTTP·렌더)는 재시도하지 않는다 — 거기서 흔들리면 그건 버그다.
+// ⚠ 재시도로 통과해도 **몇 번째에 통과했는지 반드시 남긴다.** 흔들린 사실을 지우면 재시도는
+//   실패를 감추는 장치가 된다(그 함정 때문에 방금 qa-auto 종료코드를 고쳤다).
+async function scenario(id, area, title, gwt, fn, opts = {}) {
   const started = Date.now();
-  let pass = false, evidence = "";
-  try {
-    evidence = await fn();
-    pass = true;
-  } catch (e) {
-    evidence = `실패: ${e.message}`;
+  const maxTry = 1 + (opts.retries ?? 0);
+  let pass = false, evidence = "", attempts = 0, firstError = "";
+  for (let i = 1; i <= maxTry; i++) {
+    attempts = i;
+    try {
+      evidence = await fn();
+      pass = true;
+      break;
+    } catch (e) {
+      if (i === 1) firstError = e.message;
+      evidence = `실패: ${e.message}`;
+    }
   }
-  results.push({ id, area, title, ...gwt, pass, evidence, ms: Date.now() - started });
-  console.log(`${pass ? "✅" : "❌"} ${id} ${title} (${Date.now() - started}ms) — ${evidence}`);
+  if (pass && attempts > 1) evidence += ` [${attempts}번째 시도에 통과 — 1차: ${firstError}]`;
+  if (!pass && maxTry > 1) evidence += ` [${maxTry}회 모두 실패]`;
+  results.push({ id, area, title, ...gwt, pass, evidence, attempts, ms: Date.now() - started });
+  console.log(`${pass ? (attempts > 1 ? "⚠️" : "✅") : "❌"} ${id} ${title} (${Date.now() - started}ms) — ${evidence}`);
 }
+// LLM 답변 케이스 전용 옵션 — 같은 질문에 답이 달라질 수 있어 최대 3회 시도한다.
+// (결정적 검사에는 절대 쓰지 않는다. 재시도로 통과하면 ⚠️와 함께 몇 번째였는지 남는다.)
+// ⚠ 3회로 정한 근거: 단독 실행에서는 3/3 통과하는 케이스가 전체 실행(앞 계층의 LLM 호출 뒤)에서는
+//   2회까지 흔들리는 것을 실측했다(2026-07-26 QA-M04). 흔들림 자체는 결과에 남으므로 감춰지지 않는다.
+const LLM_RETRY = { retries: 2 };
+
 function save(name) {
   fs.writeFileSync(path.join(OUT_DIR, name), JSON.stringify({ at: new Date().toISOString(), results }, null, 2));
 }
@@ -280,7 +298,7 @@ async function runKnowledge() {
     const reply = await ask("CVE와 CWE, CCE의 차이를 설명해줘");
     if (!/CWE/.test(reply) || !/설정|구성/.test(reply)) throw new Error("핵심 구분 누락");
     return `답변 ${reply.length}자 — CWE·설정 구분 포함`;
-  });
+  }, LLM_RETRY);
 
   await scenario("QA-K05", "LLM 답변", "취약점 우선순위를 KEV 최우선으로 안내", {
     given: "우선순위 지표 문서·트리플이 들어간 상태에서",
@@ -290,7 +308,7 @@ async function runKnowledge() {
     const reply = await ask("취약점이 수백 건인데 뭐부터 조치해야 해? KEV, EPSS, CVSS 기준으로 알려줘");
     if (!/KEV/.test(reply)) throw new Error("KEV 미언급");
     return `답변 ${reply.length}자 — KEV 우선순위 포함`;
-  });
+  }, LLM_RETRY);
 
   await scenario("QA-K06", "LLM 답변", "NIST CSF 2.0 신설 기능을 설명", {
     given: "거버넌스 표준 문서가 들어간 상태에서",
@@ -300,7 +318,7 @@ async function runKnowledge() {
     const reply = await ask("NIST CSF 2.0에서 새로 생긴 기능이 뭐고 왜 중요해?");
     if (!/거버넌스|GOVERN/i.test(reply)) throw new Error("거버넌스 미언급");
     return `답변 ${reply.length}자 — 거버넌스 신설 포함`;
-  });
+  }, LLM_RETRY);
 
   save("qa-auto-knowledge.json");
 }
@@ -368,7 +386,7 @@ async function runMaintenance() {
     const hits = ["HA", "시그니처", "백업"].filter((k) => new RegExp(k, "i").test(reply));
     if (hits.length < 2) throw new Error(`핵심 항목 부족(${hits.join(",")})`);
     return `답변 ${reply.length}자 — ${hits.join("·")} 포함`;
-  });
+  }, LLM_RETRY);
 
   await scenario("QA-M05", "LLM 답변", "장애 대응 절차 안내 (시나리오: 장비 다운)", {
     given: "방화벽 장애가 발생한 상황에서",
@@ -379,7 +397,7 @@ async function runMaintenance() {
     const hits = ["로그", "HA|이중화|절체", "유지보수|벤더|접수"].filter((k) => new RegExp(k).test(reply));
     if (hits.length < 2) throw new Error("표준 절차 요소 부족");
     return `답변 ${reply.length}자 — 장애 절차 요소 ${hits.length}/3 포함`;
-  });
+  }, LLM_RETRY);
 
   await scenario("QA-M06", "LLM 답변", "차단 로그 반복 판독 (시나리오: 로그 검토 중)", {
     given: "정기점검 중 이상 이벤트를 리뷰하다가",
@@ -389,7 +407,7 @@ async function runMaintenance() {
     const reply = await ask("ASA 106023 로그가 한 IP에서 계속 올라오는데 무슨 의미야?");
     if (!/차단|Deny|ACL/i.test(reply)) throw new Error("차단 의미 미설명");
     return `답변 ${reply.length}자 — ACL 차단·의심 징후 설명 포함`;
-  });
+  }, LLM_RETRY);
 
   save("qa-auto-maintenance.json");
 }
