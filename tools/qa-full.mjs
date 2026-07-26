@@ -104,16 +104,69 @@ run("shell", "node", ["tools/qa-shell.mjs"]);
 run("sweep", "node", ["tools/menu-sweep.mjs"]);
 
 // ── ④ 요약·마커·리포트 ──────────────────────────────────────────────────────────
-const fails = results.filter((r) => r.ok === false);
-console.log("\n■ 전수조사 결과");
-for (const r of results) console.log(`  ${r.ok === null ? "―" : r.ok ? "✓" : "✗"} ${r.name} (${(r.ms / 1000).toFixed(0)}s)${r.note ? " — " + r.note : ""}`);
-console.log(fails.length ? `\n✗ 실패 ${fails.length}계층 — 마커를 갱신하지 않습니다(다음 실행이 같은 변경을 다시 봄)` : "\n✓ 전 계층 통과");
+// 알려진 이슈 — 원인이 규명됐고 사용자가 "지금은 이대로 둔다"고 결정한 것만(tools/qa-known-issues.json).
+// ⚠ 감추지 않는다: 매 실행 ⚠로 계속 출력하고 리포트에도 남긴다. 구분하는 이유는 하나 —
+//   **새로 생긴 실패**가 이미 아는 실패에 묻히지 않게 하기 위해서다.
+let known = [];
+try {
+  known = (JSON.parse(fs.readFileSync(path.join(ROOT, "tools", "qa-known-issues.json"), "utf8")).issues ?? []);
+} catch { /* 파일이 없으면 알려진 이슈 없음 */ }
+const knownIds = new Set(known.map((k) => k.id));
 
-if (!fails.length) fs.writeFileSync(MARKER, JSON.stringify({ commit: head, at: new Date().toISOString(), layers: [...picks] }, null, 2));
+// 계층 실패가 "알려진 이슈 그것 하나뿐"인지 판정한다 — qa-auto가 실패 id를 stdout에 남기므로
+// 여기서는 계층 이름만으로 판정할 수 없다. 계층별 결과 JSON에서 실패 케이스 id를 읽어 대조한다.
+function failedCaseIds(layer) {
+  const f = { server: "qa-auto-server.json", client: "qa-auto-client.json", knowledge: "qa-auto-knowledge.json", maintenance: "qa-auto-maintenance.json" }[layer];
+  if (!f) return null; // 케이스 단위 결과가 없는 계층(vitest·regress 등)은 대조 불가
+  try {
+    return (JSON.parse(fs.readFileSync(path.join(OUT, f), "utf8")).results ?? [])
+      .filter((r) => r.pass === false).map((r) => r.id);
+  } catch { return null; }
+}
+
+const rawFails = results.filter((r) => r.ok === false);
+const fails = [];
+const knownOnly = [];
+for (const r of rawFails) {
+  const ids = failedCaseIds(r.name);
+  if (ids && ids.length && ids.every((id) => knownIds.has(id))) knownOnly.push({ ...r, ids });
+  else fails.push(r);
+}
+
+console.log("\n■ 전수조사 결과");
+for (const r of results) {
+  const k = knownOnly.find((x) => x.name === r.name);
+  const mark = r.ok === null ? "―" : r.ok ? "✓" : k ? "⚠" : "✗";
+  const tail = k ? ` — 알려진 이슈만(${k.ids.join(", ")})` : r.note ? " — " + r.note : "";
+  console.log(`  ${mark} ${r.name} (${(r.ms / 1000).toFixed(0)}s)${tail}`);
+}
+if (knownOnly.length) {
+  console.log("\n⚠ 알려진 이슈(원인 규명·수용됨) — 해결되면 tools/qa-known-issues.json에서 지웁니다");
+  for (const k of knownOnly) {
+    for (const id of k.ids) {
+      const info = known.find((x) => x.id === id);
+      console.log(`   · ${id}: ${info?.무엇이 ?? ""}`);
+      if (info?.결정) console.log(`     결정: ${info.결정}`);
+    }
+  }
+}
+console.log(fails.length ? `\n✗ 실패 ${fails.length}계층 — 마커를 갱신하지 않습니다(다음 실행이 같은 변경을 다시 봄)` : "\n✓ 전 계층 통과" + (knownOnly.length ? " (알려진 이슈 제외)" : ""));
+
+if (!fails.length) fs.writeFileSync(MARKER, JSON.stringify({ commit: head, at: new Date().toISOString(), layers: [...picks], knownIssues: [...knownIds] }, null, 2));
 fs.writeFileSync(path.join(OUT, "qa-full-report.md"), [
   `# QA 전수조사 (${new Date().toISOString().slice(0, 16)})`,
   `- 기준: ${since ? since.slice(0, 8) : "(첫 실행)"} → ${head.slice(0, 8)} · 변경 ${changed.length}파일`,
-  `- 계층: ${results.map((r) => `${r.name}=${r.ok === null ? "스킵" : r.ok ? "통과" : "실패"}`).join(" · ")}`,
+  `- 계층: ${results.map((r) => {
+    const k = knownOnly.find((x) => x.name === r.name);
+    return `${r.name}=${r.ok === null ? "스킵" : r.ok ? "통과" : k ? "알려진이슈" : "실패"}`;
+  }).join(" · ")}`,
+  ...(knownOnly.length
+    ? ["", "## ⚠ 알려진 이슈(원인 규명·수용됨)",
+       ...knownOnly.flatMap((k) => k.ids.map((id) => {
+         const i = known.find((x) => x.id === id);
+         return `- **${id}** — ${i?.무엇이 ?? ""}\n  - 원인: ${i?.원인 ?? "-"}\n  - 결정: ${i?.결정 ?? "-"}`;
+       }))]
+    : []),
   "", "## 변경 파일", ...changed.map((f) => `- ${f}`),
 ].join("\n"));
 console.log(`리포트: .tmp-reports/qa-full-report.md`);
