@@ -1,0 +1,123 @@
+# GIJO AS — 조치 검증 기능 계획서
+
+작성 2026-07-26 (Windows). Mac 초안(설계·실측)을 **이 저장소 기준으로 다시 세운 실행 계획**이다.
+한 줄 요약: **"취약점을 더 찾는" 기능이 아니라 "찾은 것을 닫는" 기능을 만든다.**
+
+## 0. 역할 분담 (2026-07-26 사용자 결정)
+
+| | |
+|---|---|
+| **Windows (여기)** | **개발** — 구현·단위 테스트·코드 리뷰 |
+| **Mac** | **검증** — 실데이터(취약점 313건·자산 16대)로 실환경 확인 |
+
+이 분담이 중요한 이유: 아래 §1처럼 **운영(Windows) DB에는 검증할 실물이 거의 없다.**
+그래서 "돌아가는 것처럼 보이는" 코드를 막으려면 **실데이터 판정은 Mac에서 확인**해야 한다.
+Windows에서는 **RunFn을 주입한 단위 테스트**로 판정 로직을 고정한다(실 SSH 없이 검증 가능한 구조).
+
+## 1. 데이터 현황 — Mac 초안 수치와 다르다 (실측 대조)
+
+| 항목 | Mac 개발 DB(초안) | **Windows 운영 실측(2026-07-26)** |
+|---|---|---|
+| 취약점(findings) | 313건 | **9건** |
+| 미검토 | 305건(97%) | **0건** (승인대기 2건: in_progress 1·rejected 1) |
+| 자산 | 16대 | **6대** |
+| oracle.local (282건, 90%) | 계획 근간 | **없음** |
+| hardening_targets(SSH 접속 대상) | — | **0건** |
+| users | admin 2·officer 10 | **admin 3·officer 8** (총 11, team 컬럼 없음) |
+| assets.owner | 7종 | 보안관제팀·금융보안팀·고객서비스팀·샘플(예시)·빈값 2 |
+
+**결론**: 초안의 "미검토 305건 감소"라는 성공 기준은 이 환경에서 성립하지 않는다.
+성공 기준을 **"판정 정확도"**로 바꾸고, 규모 검증은 Mac이 맡는다.
+
+## 2. 초안 검토 결과 — 코드 전제는 전부 사실
+
+실제 코드와 대조해 확인했다(그대로 재사용 가능):
+
+- `hardeningscan.ts` — `RunFn`(수집)과 `CheckItem.check`(판정)이 이미 분리돼 있다. **타입 수정 불필요.**
+- `ShellKind = "linux" | "windows" | "network"`, `kisa_net`(Cisco IOS) 표준 이미 존재.
+- `probeTarget()` 재사용 가능.
+- `finding_approvals`에 `verifyRequestedAt`·`verifyRequestedBy`·`resolvedAt`·`snapshot` **이미 있다 — 컬럼 추가 없이 연결된다.**
+- 상태 흐름 `pending → in_progress → verifying → approved/rejected` 구현·화면 렌더까지 완료.
+- `RAG_RELEVANCE_MAX_DISTANCE = 0.95` 존재(근거 없으면 manual로 떨어뜨리는 안전장치).
+
+즉 **"실행 엔진 하나, 항목 생성기 둘"** 설계는 현 코드 위에 그대로 얹힌다.
+
+## 3. 설계 (초안 승인분 유지)
+
+```
+HardeningTarget → targetRunner() → RunFn        (수집: 기존·공유)
+                        ↓
+  ① CheckItem   정적 체크리스트 (기존, U-47 등)
+  ② VerifyItem  취약점에서 동적 생성 (신규)      (판정: 분기)
+                        ↓
+  versioncmp.ts / RAG 조회 / VEX 출력            (근거: 신규)
+```
+
+- **명칭은 "조치 검증"** — "스캐너" 금지(Nessus 연상 → "왜 CVE가 안 나오죠?" 기대 불일치).
+- **manual은 1급 시민** — 자동 검증 불가를 정직하게 표기하는 게 억지 판정보다 신뢰를 만든다.
+- **버전 비교는 코드로, LLM 금지** — 비결정적 판정은 제품 신뢰를 무너뜨린다.
+- **RAG는 3곳에만**: ① 장비별 확인 방법(국내 장비 지식=사내 문서에만 있음) ② **보상통제 판정(최대 차별점)** ③ 사내 조치 기준.
+
+### 권한 (보안 제품이므로 API 계층에서 강제)
+- `admin` → 전체 / `security_officer` → `user.team === asset.owner` 이거나 본인이 assignee·securityOwner
+- ❌ 화면에서 버튼만 숨기기(=API 직접 호출로 우회) · ✅ API 검사 + **거부도 audit 기록**
+- 거부 메시지는 행동 가능하게: "이 자산은 인프라운영팀 소관입니다 → 담당자에게 요청하거나 관리자에게 권한 요청"
+
+## 4. 실행 순서 (이 환경 기준으로 재배열)
+
+| Phase | 내용 | 상태 |
+|---|---|---|
+| **2-a** | **`versioncmp.ts` + 단위 테스트** — DB·UI와 무관해 선행 가능 | ✅ **완료**(테스트 30개 통과) |
+| **2-b** | `VerifyItem` 생성기 + 판정기 — RunFn 주입 단위 테스트로 고정 | 진행 |
+| **1-a** | `users.team`(선택 목록) + 자산 기본 담당자 — 백엔드 | 대기 |
+| **1-b** | 배정 UX 화면 — **시안 승인 후 구현**(UI 규칙) | 시안 대기 |
+| **2-c** | approvals "검증(재스캔)" 버튼 연결 + 권한 게이트 + audit | 대기 |
+| **0** | 접속성 실측 — ⚠ `hardening_targets` 0건이라 **대상 등록이 선행**. Mac 실데이터에서 수행 | Mac |
+| **3** | RAG 근거(보상통제·사내 기준·manual 사유 안내) | 대기 |
+| **5** | VEX/CSAF 출력 (미검토=under_investigation·진행중=affected·승인=fixed·반려=not_affected) | 대기 |
+| **4** | 장비 어댑터(Netmiko) — 대상 9건(3%)뿐이라 가치 대비 비용 높음 | 보류 |
+
+**초안 대비 바뀐 점**
+- 순서를 "Part 1 먼저"에서 **"판정 코어 먼저"**로 바꿨다 — Part 1의 일괄 배정 도구는 305건 적체 해소가 목적인데 이 환경엔 적체가 없다(미검토 0건). 지금 만들면 쓸 데이터가 없는 코드가 된다.
+- Phase 0(접속성 실측)은 `hardening_targets`가 0건이라 **여기서는 수행 불가** → Mac 담당으로 이관.
+
+## 5. 완료된 것 — `versioncmp.ts` (2026-07-26)
+
+`server/src/engine/versioncmp.ts` + `server/test/versioncmp.test.ts` (테스트 30개 통과)
+
+```ts
+parseVersion(raw): number[]                       // "15.2(4)M7" → [15,2,4,7]
+trainOf(raw): string | null                       // Cisco 계열 문자(M·S)
+compareVersions(a, b): -1 | 0 | 1                 // 3.0.10 > 3.0.9 (문자열 비교면 오판)
+isFixed(current, fixedFrom): VersionVerdict       // "fixed" | "vulnerable" | "unknown"
+extractVersion(product, cmdOutput): string | null // 제품별 정규식 표(축적 자산)
+```
+
+**초안과 다른 점 1가지(의도적)**: `isFixed`의 반환을 `boolean`이 아니라 **3값(`fixed`/`vulnerable`/`unknown`)**으로 했다.
+boolean이면 "판정 불가"를 표현할 자리가 없어 false(=취약)로 뭉개지는데, 그건 오판이다.
+`unknown`은 호출자가 **manual로 떨어뜨리는 신호**이며, 초안의 "manual을 1급 시민으로" 원칙과 일치한다.
+
+`unknown`을 주는 경우: 버전 파싱 실패 · Cisco 트레인 불일치(15.2(4)S vs 15.2(4)M — 숫자가 커도 최신이 아님).
+
+## 6. 리스크
+
+| 수준 | 내용 | 대응 |
+|---|---|---|
+| 높음 | **검증할 실데이터가 여기 없다**(9건·SSH 대상 0건) | 판정은 RunFn 주입 단위 테스트로 고정, 실환경 판정은 Mac |
+| 중간 | 버전 파싱 실패 → 오판정 | ✅ 해소 — 실패 시 `unknown`(코드로 고정, 테스트됨) |
+| 중간 | `users.team` ↔ `assets.owner` 문자열 매칭 오타 | 팀 값은 **선택 목록**(자유 입력 금지). 현 owner 값에서 목록 생성 |
+| 낮음 | RAG 근거 부족 → 판단불가 다수 | 정직하게 표기 + "어떤 문서가 필요한지" 안내 |
+| 낮음 | 하드닝 점검과 혼동 | 하나의 엔진·하나의 화면. 별도 제품화 금지 |
+
+## 7. 채택/기각 (초안 유지)
+
+- ✅ **VEX/CSAF** — 기존 승인 상태와 1:1 대응. 출력 포맷 하나 추가로 국제 표준 준수 + AI-BOM 결합 차별화
+- ✅ **Netmiko**(MIT, 후순위) — 장비는 `ssh host "cmd"`가 잘 안 통함(페이징·enable·배너). 기존 Python 브릿지 패턴 재사용
+- ❌ **OpenSCAP/OVAL/XCCDF** — XML 정의 필요 → "사내 문서를 그냥 넣으면 된다"는 이 제품의 차별점과 충돌. 국산 장비 커버리지 없음 (단 XCCDF/ARF **리포트 export**는 후일 공공 제출용으로 검토 가치)
+- ❌ **semver 라이브러리** — `15.2(4)M` 형식 처리 불가 → 직접 구현(완료)
+
+## 8. 미결정
+
+- Windows 자산 지원 시점(WinRM 필요, 현재 대상 자산 없음 → 후순위)
+- 읽기 전용 점검 계정 정책(자산마다 별도 점검 계정을 둘 것인가)
+- 팀 목록의 출처 — `assets.owner` 실값에서 뽑을지, 별도 팀 마스터를 둘지
