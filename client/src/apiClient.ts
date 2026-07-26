@@ -1540,6 +1540,18 @@ export const screenTipsApi = {
     request<ScreenTips>(`/api/screen-tips${screen ? `?screen=${encodeURIComponent(screen)}` : ""}`),
 };
 
+// 화면 안내 본문 — 화면을 열면 대시보드 대화가 이걸 그대로 띄운다(ⓘ 아이콘 대체, 2026-07-27).
+export interface ScreenGuideText { title: string; text: string }
+export const screenGuideApi = {
+  get: (screen?: string, question?: string) => {
+    const q = new URLSearchParams();
+    if (screen) q.set("screen", screen);
+    if (question) q.set("question", question);
+    const qs = q.toString();
+    return request<ScreenGuideText>(`/api/screen-guide${qs ? `?${qs}` : ""}`);
+  },
+};
+
 export const assetsApi = {
   list: () => request<Asset[]>("/api/assets"),
   get: (id: string) => request<Asset>(`/api/assets/${id}`),

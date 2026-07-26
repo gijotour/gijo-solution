@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>GIJO AS — 팝업 요약 카드 우선 시안</title>
+<style>
+  :root{--bg:#0a0f1e;--panel:#121a2e;--panel-2:#0e1526;--border:#1e2a44;--border-strong:#28365a;
+    --text:#e6eaf3;--muted:#8b93ab;--muted-2:#5c6580;--blue:#3b82f6;--blue-light:#7ab0ff;
+    --teal:#2dd4bf;--amber:#f0a020;--red:#e2483d;--purple:#8b7cf0;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:"Pretendard","Malgun Gothic",sans-serif;padding:0 0 40px;}
+  .note{background:#1a2340;border-bottom:1px solid var(--border-strong);padding:9px 18px;font-size:12px;color:var(--blue-light);}
+  .note b{color:#fff;}
+  .wrap{max-width:1120px;margin:0 auto;padding:18px;}
+  h2{font-size:14px;font-weight:800;margin:24px 0 4px;display:flex;align-items:center;gap:8px;}
+  h2 .n{background:var(--blue);color:#fff;width:20px;height:20px;border-radius:6px;font-size:11px;display:flex;align-items:center;justify-content:center;}
+  .sub{font-size:11.5px;color:var(--muted);margin-bottom:10px;}
+  .cmt{background:#131c33;border-left:3px solid var(--blue);padding:8px 12px;font-size:11px;color:var(--muted);margin:8px 0 16px;line-height:1.75;border-radius:0 8px 8px 0;}
+  .cmt b{color:var(--blue-light);}
+  /* 팝업 틀 */
+  .pop{background:var(--panel);border:1px solid var(--border-strong);border-radius:12px;overflow:hidden;box-shadow:0 14px 44px rgba(0,0,0,.5);}
+  .pop-h{display:flex;align-items:center;gap:9px;padding:8px 12px;background:var(--panel-2);border-bottom:1px solid var(--border);font-size:12.5px;font-weight:800;}
+  .pop-h .sp{flex:1;}
+  .pop-h .ic{width:22px;height:22px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:11px;color:var(--muted);}
+  .tabs{display:flex;gap:2px;padding:9px 14px 0;border-bottom:1px solid var(--border);background:var(--bg);}
+  .tabs .t{padding:7px 12px;font-size:12px;color:var(--muted);border-bottom:2px solid transparent;}
+  .tabs .t.on{color:#fff;font-weight:700;border-bottom-color:var(--blue);}
+  .body{padding:14px;}
+  /* 요약 카드 */
+  .sumcard{background:var(--panel-2);border:1px solid var(--border);border-radius:11px;padding:12px 14px;}
+  .sum-top{display:flex;align-items:center;gap:8px;margin-bottom:10px;}
+  .sum-t{font-size:12.5px;font-weight:800;}
+  .info{width:15px;height:15px;border-radius:50%;border:1px solid rgba(59,130,246,.45);background:rgba(59,130,246,.14);color:var(--blue-light);font-size:9.5px;display:inline-flex;align-items:center;justify-content:center;font-style:normal;}
+  .sum-act{margin-left:auto;display:flex;gap:6px;}
+  .btn{background:var(--panel);border:1px solid var(--border-strong);color:var(--muted);border-radius:7px;padding:4px 10px;font-size:11px;font-weight:800;}
+  .btn.pri{background:rgba(59,130,246,.16);border-color:var(--blue);color:var(--blue-light);}
+  .kpis{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;}
+  .kpi{background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:9px 11px;}
+  .kpi .l{font-size:10px;color:var(--muted-2);font-weight:700;}
+  .kpi .v{font-size:19px;font-weight:800;margin-top:2px;}
+  .kpi.warn{border-color:rgba(240,160,32,.5);background:rgba(240,160,32,.07);}
+  .kpi.warn .v{color:var(--amber);}
+  /* 접힌 경계선 */
+  .foldline{display:flex;align-items:center;gap:8px;margin:12px 0 0;color:var(--muted-2);font-size:10.5px;}
+  .foldline::before,.foldline::after{content:"";flex:1;height:1px;background:var(--border);}
+  .below{opacity:.45;padding:12px 0 2px;}
+  .row{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:9px 12px;margin-bottom:7px;font-size:11.5px;color:var(--muted);}
+  .cut{border-top:2px dashed rgba(59,130,246,.5);margin:0 -14px;padding:6px 14px 0;font-size:10.5px;color:var(--blue-light);font-weight:700;}
+</style>
+</head>
+<body>
+
+<div class="note">
+  <span><b>팝업을 열면 그 메뉴의 요약 카드만 한눈에</b> — 더 필요하면 아래로 스크롤. 화면 큰 제목(H1)은 없앱니다(팝업 머리글에 이미 있음).</span>
+</div>
+
+<div class="wrap">
+
+  <h2><span class="n">1</span>보안제품 — 유지보수</h2>
+  <div class="sub">지금은 "🛠 보안제품 운영 가이드" 제목과 설명 문단이 위를 다 차지해, 정작 숫자를 보려면 스크롤해야 합니다.</div>
+  <div class="pop">
+    <div class="pop-h">🧰 보안제품 — 유지보수 <span class="sp"></span>
+      <span class="ic">📌</span><span class="ic">⟳</span><span class="ic">🗗</span><span class="ic">⛶</span><span class="ic">▁</span><span class="ic">✕</span></div>
+    <div class="tabs"><span class="t">보안제품</span><span class="t">등록부</span><span class="t on">유지보수</span></div>
+    <div class="body">
+      <div class="sumcard">
+        <div class="sum-top"><span class="sum-t">유지보수 현황</span><i class="info">i</i>
+          <span class="sum-act"><button class="btn">＋ 일정 등록</button><button class="btn pri">검색</button></span></div>
+        <div class="kpis">
+          <div class="kpi"><div class="l">전체 점검</div><div class="v">9</div></div>
+          <div class="kpi warn"><div class="l">⚠ 지연</div><div class="v">3</div></div>
+          <div class="kpi"><div class="l">승인 대기</div><div class="v" style="color:var(--blue-light)">1</div></div>
+          <div class="kpi"><div class="l">승인 완료</div><div class="v" style="color:var(--teal)">2</div></div>
+          <div class="kpi"><div class="l">승인율</div><div class="v" style="color:var(--teal)">67%</div></div>
+        </div>
+      </div>
+      <div class="cut">↑ 팝업 기본 높이는 여기까지 — 아래는 스크롤</div>
+      <div class="below">
+        <div class="row">📋 점검 일정 목록 · 점검서 · 승인 이력…</div>
+        <div class="row">🔎 지식베이스 검색(매뉴얼·케이스·에러로그)</div>
+      </div>
+    </div>
+  </div>
+  <div class="cmt"><b>왜 이렇게:</b> 담당자가 팝업을 여는 이유는 대개 <b>"지금 몇 건이지?"</b>입니다. 그 답이 스크롤 없이 보이고, 상세는 필요할 때만 내려 봅니다. 설명 문단은 <b>ⓘ(챗봇)</b>로 옮깁니다.</div>
+
+  <h2><span class="n">2</span>자산 허브 — 자산 목록</h2>
+  <div class="pop">
+    <div class="pop-h">🛡 자산 허브 — 자산 목록 <span class="sp"></span>
+      <span class="ic">📌</span><span class="ic">⟳</span><span class="ic">🗗</span><span class="ic">⛶</span><span class="ic">▁</span><span class="ic">✕</span></div>
+    <div class="tabs"><span class="t">자산 허브</span><span class="t">통합 뷰</span><span class="t on">자산 목록</span><span class="t">AI-BOM</span><span class="t">취약점</span></div>
+    <div class="body">
+      <div class="sumcard">
+        <div class="sum-top"><span class="sum-t">자산 현황</span><i class="info">i</i>
+          <span class="sum-act"><button class="btn">CSV 내보내기</button><button class="btn pri">＋ 자산 등록</button></span></div>
+        <div class="kpis">
+          <div class="kpi"><div class="l">전체 자산</div><div class="v">7</div></div>
+          <div class="kpi"><div class="l">고위험</div><div class="v" style="color:#f5928a">1</div></div>
+          <div class="kpi"><div class="l">중위험</div><div class="v" style="color:var(--amber)">1</div></div>
+          <div class="kpi"><div class="l">저위험</div><div class="v" style="color:var(--teal)">5</div></div>
+          <div class="kpi warn"><div class="l">SBOM 미생성</div><div class="v">1</div></div>
+        </div>
+      </div>
+      <div class="cut">↑ 팝업 기본 높이는 여기까지 — 아래는 스크롤</div>
+      <div class="below">
+        <div class="row">🔎 검색·필터 툴바 · 표시 항목</div>
+        <div class="row">📦 자산 표(자산명·호스트·소유부서·기본 담당자·위험도…)</div>
+      </div>
+    </div>
+  </div>
+
+  <h2><span class="n">3</span>공통 규칙</h2>
+  <div class="cmt">
+    · <b>요약 카드는 항상 맨 위 첫 요소</b> — 제목·설명 문단보다 먼저.<br>
+    · 카드 안에는 <b>그 메뉴 전체를 대표하는 숫자 5개 이내</b>와, 그 자리에서 가장 많이 쓰는 <b>버튼 1~2개</b>.<br>
+    · <b>화면 큰 제목(H1)은 제거</b> — 팝업 머리글 "🧰 보안제품 — 유지보수"에 이미 있습니다.<br>
+    · 설명 문단도 제거하고 <b>ⓘ → 대시보드 챗봇</b>이 설명합니다.<br>
+    · 팝업 기본 높이 = <b>요약 카드까지</b>. 더 보려면 스크롤(전체 화면 ⛶·분리창 🗗은 그대로).
+  </div>
+
+</div>
+</body>
+</html>

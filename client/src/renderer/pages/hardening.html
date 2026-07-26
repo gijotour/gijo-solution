@@ -79,7 +79,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   <div class="main">
     <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:16px">
       <div>
-        <div class="page-title">🛡 원격 정기점검 관제 <i class="gijo-info" data-topic="원격 정기점검 (하드닝)"></i></div>
+        <div class="page-title">🛡 원격 정기점검 관제</div>
       </div>
       <button class="g-btn g-primary" id="addBtn">＋ 대상 등록</button>
     </div>
@@ -87,9 +87,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     <div id="gijoChatWidget" data-prompts='["하드닝 점검해줘"]' style="max-width:640px;margin-bottom:16px;"></div>
 
     <!-- 설명은 화면에 늘어놓지 않고 챗봇(ⓘ '점검 방법')이 담당한다 — 2026-07-25 원칙. -->
-    <div class="page-guide">읽기 전용 진단 명령만 실행합니다(설정 변경 없음). <i class="gijo-info" data-topic="점검 방법"></i></div>
+    <div class="page-guide">읽기 전용 진단 명령만 실행합니다(설정 변경 없음).</div>
 
-    <div class="kpis" id="kpiRow"></div>
+    <div class="kpis" id="kpiRow" data-gijo-summary></div>
     <div class="sec">🖥 장비별 현황 <span id="cntLbl" style="color:var(--muted-2);font-weight:600;font-size:var(--g-t-xs)"></span></div>
     <div id="cardGrid" class="grid"></div>
   </div>
@@ -99,7 +99,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 <div class="g-modal-bg" id="regModal">
   <div class="g-modal" style="width:560px">
     <div class="mt">점검 대상(장비) 등록</div>
-    <div class="reg-guide">연결 가능한 장비의 IP와 SSH 정보를 넣으면 그 장비에 접속해 점검합니다. <i class="gijo-info" data-topic="대상 등록"></i></div>
+    <div class="reg-guide">연결 가능한 장비의 IP와 SSH 정보를 넣으면 그 장비에 접속해 점검합니다.</div>
     <div class="frow">
       <div class="g-field"><label>장비 이름</label><input class="g-input" id="rLabel" placeholder="경계 방화벽 (FW-01)"></div>
       <div class="g-field"><label>점검 기준(장비 유형)</label><select class="g-input" id="rStd"><option value="kisa">국내 CCE — 리눅스 서버 (U-시리즈)</option><option value="cis">CIS Benchmark (리눅스)</option><option value="kisa_pc">국내 CCE — Windows PC (PC-시리즈)</option><option value="kisa_net">국내 CCE — 네트워크 장비 (N-시리즈)</option></select></div>

@@ -397,6 +397,10 @@
       "*::-webkit-scrollbar{width:8px;height:8px;}*::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:4px;}*::-webkit-scrollbar-track{background:transparent;}" +
       ".header{display:none !important;}#gijoNav{display:none !important;}" +
       ".app{grid-template-columns:1fr !important;display:block !important;}" +
+      // 화면 안 챗봇 위젯은 팝업에서 숨긴다(2026-07-27). 지시와 설명은 대시보드 대화 한 곳에서만
+      // 하기로 했는데, 이 위젯이 화면 맨 위를 차지해 정작 봐야 할 요약 카드를 아래로 밀어냈다.
+      // ⚠ 분리창(별도 창)에서는 대시보드가 없으므로 지우지 않는다 — embed(팝업 안)에서만.
+      "#gijoChatWidget{display:none !important;}" +
       ".main{padding-top:16px !important;}";
     document.head.appendChild(st);
   }

@@ -158,7 +158,7 @@ tr:last-child td{border-bottom:none;}
   <div class="main">
     <div class="topbar-row">
       <div>
-        <div class="page-title">내부 리포트 <i class="gijo-info" data-topic="리포트"></i></div>
+        <div class="page-title">내부 리포트</div>
       </div>
       <div style="display:flex;gap:8px;">
         <button class="btn-ghost" id="templateBtn">템플릿 관리</button><button class="btn-primary" id="genReportBtn">+ 리포트 생성</button>
@@ -168,7 +168,7 @@ tr:last-child td{border-bottom:none;}
     <div id="gijoChatWidget" data-prompts='["다음 정기 리포트 언제야?","이번 주 리포트 스케줄 확인해줘"]' style="max-width:640px;margin-bottom:16px;"></div>
 
 
-<div class="kpi-strip">
+<div class="kpi-strip" data-gijo-summary>
   <div class="kpi-mini"><div class="kpi-mini-label">이번 세션 생성</div><div class="kpi-mini-value" id="kpiSessionCount">0</div></div>
   <div class="kpi-mini"><div class="kpi-mini-label">자동 생성 예약</div><div class="kpi-mini-value" id="kpiActiveSchedules">-</div></div>
   <div class="kpi-mini"><div class="kpi-mini-label">평균 생성 시간</div><div class="kpi-mini-value" id="kpiAvgTime">-</div></div>
@@ -196,7 +196,7 @@ tr:last-child td{border-bottom:none;}
     <div class="panel">
       <div style="display:flex;align-items:flex-start;gap:12px;">
         <div style="flex:1;">
-          <div class="panel-title">리포트 이력 <i class="gijo-info"></i></div></div>
+          <div class="panel-title">리포트 이력</div></div>
         <div style="display:flex;align-items:center;gap:6px;white-space:nowrap;padding-top:2px;">
           <span style="font-size:11.5px;color:var(--muted)">오래된 리포트 정리</span>
           <select id="pruneDays" style="font-size:11.5px;background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);border-radius:6px;padding:4px 7px;outline:none;">

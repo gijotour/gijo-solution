@@ -29,7 +29,10 @@ describe("스마트 통합 업로드 — 파일 유형 자동 판별·라우팅"
       .send({ filename: "scan.csv", content: b64("Host,Name,Risk,CVE\n10.9.9.9,Test Vuln,High,CVE-2024-1") });
     expect(res.status).toBe(200);
     expect(res.body.routedTo).toBe("vulnscan");
-    expect(res.body.vulnscan).toEqual({ hosts: 1, findings: 1 });
+    // uncredentialedHosts는 비인증(원격) 스캔 경고용으로 함께 실려 온다 — 취약점 화면 업로더를
+    // 없애고 인입을 대시보드 ＋로 모으면서(2026-07-27) 그 경고를 여기로 옮겼기 때문이다.
+    // 이 CSV에는 인증 여부 정보가 없어 빈 배열이 정상.
+    expect(res.body.vulnscan).toEqual({ hosts: 1, findings: 1, uncredentialedHosts: [] });
     const asset = await request(app).get("/api/assets/vuln:10.9.9.9").set("Authorization", `Bearer ${token}`);
     expect(asset.status).toBe(200);
   });

@@ -267,7 +267,13 @@ await page.evaluate(() => {
 });
 await page.waitForTimeout(300);
 const h1 = await page.evaluate(() => document.getElementById("shellLayer").offsetHeight);
-ok("손잡이 드래그로 높이 줄이기", h1 <= h0 - 150, `${h0} → ${h1}`);
+// 200px 끌어올리면 그만큼 줄되, 팝업은 240px 아래로는 안 내려간다(그 밑은 쓸 수 없는 크기).
+// 예전에는 자동 높이가 늘 커서 "150px 이상 줄어든다"만 봐도 통과했다. 지금은 요약 카드까지만
+// 여는 화면이 있어(2026-07-27) 시작 높이가 307px처럼 작을 수 있고, 그러면 200px을 끌어도
+// 바닥(240)에 걸려 67px만 준다 — 제품이 맞고 기대값이 낡은 것이다. 규칙 그대로 확인한다.
+const FLOOR = 240;
+const 예상 = Math.max(FLOOR, h0 - 200);
+ok("손잡이 드래그로 높이 줄이기(최소 240 유지)", h1 < h0 && Math.abs(h1 - 예상) <= 8, `${h0} → ${h1} (예상 ${예상})`);
 const persisted = await page.evaluate(() => localStorage.getItem("gijo:shell:height"));
 ok("높이 선택 기억", Boolean(persisted), String(persisted));
 // 팝업을 줄인 만큼 대화 이력이 늘어나야 한다(2026-07-26 요청)

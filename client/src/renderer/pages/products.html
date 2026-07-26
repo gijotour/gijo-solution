@@ -40,20 +40,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .notice b{color:var(--blue-light);}
 
 /* 매뉴얼 일괄 업로드 */
-.bulk-panel{background:var(--panel);border:1px solid rgba(59,130,246,0.35);border-radius:12px;padding:14px 16px;margin-bottom:20px;max-width:1040px;}
-.bulk-title{font-size:14px;font-weight:800;color:#fff;margin-bottom:4px;}
-.bulk-sub{font-size:11.5px;color:var(--muted);line-height:1.7;margin-bottom:10px;}
-.bulk-sub b{color:var(--blue-light);}
-.bulk-row input[type=file]{font-size:12px;color:var(--muted);}
-.bulk-results{display:flex;flex-direction:column;gap:5px;margin-top:8px;}
-.bulk-line{display:flex;align-items:center;gap:8px;background:var(--panel-2);border:1px solid var(--border);border-radius:7px;padding:7px 10px;font-size:11.5px;color:var(--text);flex-wrap:wrap;}
-.bulk-line.err{border-color:rgba(226,72,61,0.5);color:#f5928a;}
-.bulk-file{font-weight:700;}
-.bulk-arrow{color:var(--muted-2);}
-.bulk-target{color:var(--blue-light);font-weight:700;}
-.bulk-kind{font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:rgba(139,124,240,0.16);color:var(--purple);}
-.bulk-new{font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:rgba(30,185,128,0.16);color:var(--teal);}
-.bulk-rag{font-size:10px;font-weight:800;padding:1px 7px;border-radius:5px;background:rgba(240,160,32,0.16);color:var(--amber);}
 
 /* 종류 요약 칩 */
 .cat-summary{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:20px;max-width:1040px;}
@@ -106,7 +92,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .doc-empty{font-size:11px;color:var(--muted-2);padding:2px 0 6px;}
 .doc-add{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
 .doc-add input[type=text]{flex:1;min-width:120px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;padding:6px 9px;color:var(--text);font-size:11.5px;outline:none;}
-.doc-add input[type=file]{font-size:10.5px;color:var(--muted);max-width:150px;}
 .doc-add button{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);border-radius:7px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;}
 .doc-add button:disabled{opacity:.5;cursor:default;}
 .doc-hint{font-size:10.5px;color:var(--muted-2);min-height:12px;flex-basis:100%;}
@@ -198,24 +183,20 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   <div class="main">
     <div class="topbar-row">
       <div>
-        <div class="page-title">🧰 보안제품 관리 <i class="gijo-info" data-topic="보안제품"></i></div>
+        <div class="page-title">🧰 보안제품 관리</div>
       </div>
     </div>
 
     <div id="gijoChatWidget" data-prompts='["보안제품 뭐 등록돼 있어?"]' style="max-width:640px;margin-bottom:16px;"></div>
 
-    <div class="notice">첨부한 매뉴얼은 지식베이스에 자동 수집돼 챗봇이 참고합니다. <i class="gijo-info" data-topic="매뉴얼 관리"></i></div>
+    <div class="notice">첨부한 매뉴얼은 지식베이스에 자동 수집돼 챗봇이 참고합니다.</div>
 
-    <div class="bulk-panel">
-      <div class="bulk-title">📥 매뉴얼 일괄 업로드 — 파일만 올리면 자동 반영</div>
-      <div class="bulk-sub">취약점 스캔(Nessus) 업로드처럼, 매뉴얼 파일을 올리면 파일명으로 <b>어느 제품 문서인지 자동 매칭</b>하고(매칭할 제품이 없으면 제품까지 자동 등록), 로그 관련 파일은 <b>로그 매뉴얼</b>로 분류합니다. 처음 세팅할 때 매뉴얼들을 한꺼번에 올리세요.</div>
-      <div class="bulk-row">
-        <input type="file" id="bulkInput" multiple accept=".pdf,.hwpx,.hwp,.txt,.md,.csv,.json,.log,.docx">
-      </div>
-      <div id="bulkResults" class="bulk-results"></div>
+    <div class="upload-note">
+      <span class="un-ic">📥</span>
+      <span>매뉴얼은 <b>대시보드 아래 ＋</b>에서 올리세요 — 파일명으로 <b>어느 제품 문서인지 자동 매칭</b>하고(맞는 제품이 없으면 제품까지 자동 등록), 로그 관련 파일은 <b>로그 매뉴얼</b>로 분류합니다. 처음 세팅할 때 여러 개를 한꺼번에 올리면 됩니다.</span>
     </div>
 
-    <div class="cat-summary" id="catSummary"></div>
+    <div class="cat-summary" id="catSummary" data-gijo-summary></div>
 
     <form class="reg-form" id="regForm">
       <input type="text" id="pName" class="grow" placeholder="제품명 (예: 경계 방화벽 FW-01)" required aria-label="제품명">
@@ -301,9 +282,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       `<div class="doc-col-title">${kind === "logManual" ? "🗒" : kind === "manual" ? "📘" : "📎"} ${esc(kindLabel)}</div>` +
       `<div class="doc-list">${list}</div>` +
       `<div class="doc-add" data-pid="${product.id}" data-kind="${kind}">` +
-      `<input type="text" placeholder="문서 제목 (파일 없이 제목만 등록도 가능)" aria-label="문서 제목">` +
-      // id 부여(2026-07-25 입력 점검): 기능상 필수는 아니나(맥락 조회) 자동화·접근성 도구가 식별하게.
-      `<input type="file" id="docFile-${product.id}-${kind}" accept=".pdf,.hwpx,.hwp,.txt,.md,.csv,.json,.log,.docx">` +
+      // 파일 첨부는 대시보드 ＋로 통일(2026-07-27) — 여기는 "제목만" 등록(문서가 어디 있는지
+      // 기록해 두는 용도)만 남는다. 실물 파일은 대시보드에서 올리면 파일명으로 이 제품에 붙는다.
+      `<input type="text" placeholder="문서 제목 — 파일은 대시보드 ＋로" aria-label="문서 제목">` +
       `<button data-doc-add>＋ 추가</button>` +
       `<div class="doc-hint"></div>` +
       `</div>` +
@@ -600,16 +581,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       const box = docAdd.closest(".doc-add");
       const pid = box.dataset.pid, kind = box.dataset.kind;
       const titleInput = box.querySelector('input[type=text]');
-      const fileInput = box.querySelector('input[type=file]');
       const hint = box.querySelector(".doc-hint");
-      const file = fileInput.files[0];
       const title = titleInput.value.trim();
-      if (!title && !file) { hint.textContent = "제목을 입력하거나 파일을 선택하세요."; return; }
-      docAdd.disabled = true; hint.textContent = file ? "업로드·지식베이스 수집 중..." : "추가 중...";
+      if (!title) { hint.textContent = "문서 제목을 입력하세요 (파일은 대시보드 ＋로 올립니다)."; return; }
+      docAdd.disabled = true; hint.textContent = "추가 중...";
       try {
-        const args = { kind, title };
-        if (file) { args.filename = file.name; args.content = await fileToBase64(file); }
-        await window.gijo.addProductDoc(pid, args);
+        await window.gijo.addProductDoc(pid, { kind, title });
         await loadProducts();
       } catch (err) {
         hint.textContent = "✗ " + ((err && err.message) || err);
@@ -658,34 +635,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     "category-best": "종류 내 최적 매칭",
     "new-product": "제품 자동 등록",
   };
-  async function handleBulkUpload(e) {
-    const files = [...e.target.files];
-    if (!files.length) return;
-    const box = document.getElementById("bulkResults");
-    for (const file of files) {
-      const line = document.createElement("div");
-      line.className = "bulk-line";
-      line.innerHTML = `<span class="bulk-file">${esc(file.name)}</span><span class="bulk-arrow">분류·수집 중...</span>`;
-      box.appendChild(line);
-      try {
-        const content = await fileToBase64(file);
-        const r = await window.gijo.importProductManual(file.name, content);
-        line.innerHTML =
-          `<span class="bulk-file">✓ ${esc(file.name)}</span>` +
-          `<span class="bulk-arrow">→</span>` +
-          `<span class="bulk-target">${esc(catLabel(r.category))} · ${esc(r.productName)}</span>` +
-          `<span class="bulk-kind">${r.kind === "logManual" ? "🗒 로그 매뉴얼" : "📘 제품 매뉴얼"}</span>` +
-          (r.createdProduct ? `<span class="bulk-new">＋ 제품 자동 등록</span>` : "") +
-          (r.docName ? `<span class="bulk-rag">🔍 검색가능</span>` : "") +
-          `<span style="color:var(--muted-2);font-size:10.5px">${REASON_LABEL[r.reason] || r.reason}</span>`;
-      } catch (err) {
-        line.className = "bulk-line err";
-        line.innerHTML = `<span class="bulk-file">✗ ${esc(file.name)}</span><span>${esc((err && err.message) || err)}</span>`;
-      }
-    }
-    e.target.value = "";
-    await loadProducts(); // 자동 등록된 제품·문서가 바로 목록에 보이게
-  }
+  // 매뉴얼 일괄 업로드는 대시보드 ＋로 통일(2026-07-27) — 자동 매칭·제품 자동 등록은
+  // 서버 /api/upload/auto가 그대로 수행한다(같은 파이프라인, 입구만 하나로).
 
   async function init() {
     tick();
@@ -698,7 +649,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
     document.getElementById("regForm").addEventListener("submit", onRegister);
-    document.getElementById("bulkInput").addEventListener("change", handleBulkUpload);
     document.getElementById("groups").addEventListener("click", onGroupsClick);
     document.getElementById("groups").addEventListener("input", onGroupsInput);
     document.getElementById("groups").addEventListener("change", onGroupsChange);

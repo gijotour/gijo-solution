@@ -46,7 +46,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .chk input{margin-top:2px;accent-color:var(--blue);}
 .chk b{color:#dfe6ff;}
 /* 업로드/문서 */
-.upl{border:1.5px dashed rgba(59,130,246,.4);border-radius:10px;padding:16px;text-align:center;font-size:11.5px;color:var(--muted);background:rgba(59,130,246,.04);cursor:pointer;}
 .upl b{color:var(--blue-light);}
 .doclist{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px;}
 .docchip{font-size:10.5px;color:#cfd6ea;background:var(--panel-2);border:1px solid var(--border);border-radius:6px;padding:3px 8px;display:inline-flex;align-items:center;gap:6px;}
@@ -71,7 +70,6 @@ td.doc{color:#dfe6ff;font-weight:700;max-width:220px;word-break:break-all;}
 .btn.go{background:var(--teal);border-color:var(--teal);color:#04281c;font-weight:800;}
 .btn:disabled{opacity:.5;cursor:default;}
 .btn:hover:not(:disabled){filter:brightness(1.15);}
-.gijo-info{display:inline-flex;width:15px;height:15px;border-radius:50%;border:1px solid var(--muted-2);color:var(--muted-2);font-size:10px;align-items:center;justify-content:center;cursor:pointer;font-style:normal;vertical-align:2px;}
 </style>
 </head>
 <body>
@@ -93,8 +91,8 @@ td.doc{color:#dfe6ff;font-weight:700;max-width:220px;word-break:break-all;}
   <div class="sidebar" id="gijoNav"></div>
 
   <div class="main">
-    <div class="page-title">🎒 인수인계 <i class="gijo-info" data-topic="인수인계"></i></div>
-    <div class="page-sub">업무 지식·노하우를 남기고 떠나는 화면입니다. <i class="gijo-info" data-topic="이관 절차"></i></div>
+    <div class="page-title">🎒 인수인계</div>
+    <div class="page-sub">업무 지식·노하우를 남기고 떠나는 화면입니다.</div>
 
     <div class="steps">
       <div class="step" id="st1"><span class="n">1</span>무엇을 남길지</div>
@@ -120,8 +118,10 @@ td.doc{color:#dfe6ff;font-weight:700;max-width:220px;word-break:break-all;}
     <!-- 2단계 -->
     <div class="panel">
       <div class="p-title">2. 문서 올리기 <span class="p-badge" id="docBadge">0개</span></div>
-      <div class="upl" id="uplBox">📥 여기를 눌러 파일 선택 (여러 개 가능) — 올리는 즉시 지식베이스(RAG)에 반영됩니다<br><span style="font-size:10px;color:var(--muted-2)">PDF · DOCX · HWPX · TXT · MD 지원. 보안제품 매뉴얼은 <b>보안제품 &gt; 등록부</b>의 일괄 업로드를 쓰면 제품 카드에도 연결됩니다.</span></div>
-      <input type="file" id="fileInput" multiple style="display:none">
+      <div class="upload-note">
+        <span class="un-ic">📥</span>
+        <span>문서는 <b>대시보드 아래 ＋</b>에서 올리세요 — 올리는 즉시 지식베이스(RAG)에 들어갑니다. 그다음 아래 <b>이미 올린 문서에서 고르기</b>로 이 인수인계에 담으세요.</span>
+      </div>
       <div class="doclist" id="docList"></div>
       <div class="acts" style="margin-top:9px"><button class="btn" id="pickExistingBtn">🗂 이미 올린 문서에서 고르기</button></div>
       <div id="existingBox" style="display:none;margin-top:8px;max-height:180px;overflow-y:auto;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:8px"></div>
@@ -154,7 +154,7 @@ td.doc{color:#dfe6ff;font-weight:700;max-width:220px;word-break:break-all;}
         <button class="btn go" id="completeBtn" disabled>✓ 인수인계 완료 처리 (감사 로그 기록)</button>
         <button class="btn primary" id="downloadBtn" disabled>📄 이관 리포트 다운로드</button>
       </div>
-      <div class="hint" id="completeHint">검증을 먼저 실행하세요. <i class="gijo-info" data-topic="완료 처리"></i></div>
+      <div class="hint" id="completeHint">검증을 먼저 실행하세요.</div>
     </div>
   </div>
 </div>
@@ -222,23 +222,6 @@ td.doc{color:#dfe6ff;font-weight:700;max-width:220px;word-break:break-all;}
     refreshSteps();
   }
   function addDoc(id) { if (id && !docs.includes(id)) { docs.push(id); saveDocs(); renderDocs(); } }
-
-  async function uploadFiles(files) {
-    const box = document.getElementById("uplBox");
-    for (const f of files) {
-      box.innerHTML = `⏳ ${esc(f.name)} 인입 중… (조각내기·임베딩)`;
-      try {
-        const buf = await f.arrayBuffer();
-        let bin = ""; const bytes = new Uint8Array(buf);
-        for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000));
-        const r = await window.gijo.ingestMemoryFile(f.name, btoa(bin), "global");
-        addDoc(r.documentId || f.name);
-      } catch (e) {
-        alert(`${f.name} 인입 실패: ${e.message}`);
-      }
-    }
-    box.innerHTML = '📥 여기를 눌러 파일 선택 (여러 개 가능) — 올리는 즉시 지식베이스(RAG)에 반영됩니다<br><span style="font-size:10px;color:var(--muted-2)">PDF · DOCX · HWPX · TXT · MD 지원. 보안제품 매뉴얼은 <b>보안제품 &gt; 등록부</b>의 일괄 업로드를 쓰면 제품 카드에도 연결됩니다.</span>';
-  }
 
   async function showExisting() {
     const box = document.getElementById("existingBox");
@@ -334,8 +317,7 @@ td.doc{color:#dfe6ff;font-weight:700;max-width:220px;word-break:break-all;}
     initChecklist();
     try { docs = JSON.parse(localStorage.getItem(DOCS_KEY) || "[]"); } catch (e) { docs = []; }
     renderDocs();
-    document.getElementById("uplBox").addEventListener("click", () => document.getElementById("fileInput").click());
-    document.getElementById("fileInput").addEventListener("change", (e) => uploadFiles([...e.target.files]));
+    // 파일 올리기는 대시보드 ＋로 통일(2026-07-27) — 여기서는 이미 올린 문서를 고르기만 한다.
     document.getElementById("pickExistingBtn").addEventListener("click", showExisting);
     document.getElementById("verifyBtn").addEventListener("click", () => runVerify(docs, false));
     document.getElementById("verifyFailBtn").addEventListener("click", () => runVerify(lastReport ? lastReport.results.filter((r) => !r.cited).map((r) => r.documentId) : [], true));

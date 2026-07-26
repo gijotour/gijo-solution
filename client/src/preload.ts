@@ -226,6 +226,7 @@ const gijoApi = {
   setAssetDisplayName: (id: string, displayName: string | null) => api.assetHubApi.setDisplayName(id, displayName),
   saveIngestReport: (input: Parameters<typeof api.ingestReportApi.save>[0]) => api.ingestReportApi.save(input),
   screenTips: (screen?: string) => api.screenTipsApi.get(screen),
+  screenGuide: (screen?: string, question?: string) => api.screenGuideApi.get(screen, question),
   longAnswersPending: () => api.longAnswerApi.pending(),
   longAnswerAck: (id: string) => api.longAnswerApi.ack(id),
   handoverVerify: (documentIds: string[]) => api.handoverApi.verify(documentIds),

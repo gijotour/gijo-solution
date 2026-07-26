@@ -107,7 +107,7 @@
   <div class="sidebar" id="gijoNav"></div>
   <div class="main">
     <div>
-      <div class="page-title">🛡 자산 허브 <span class="ai-badge">AI 자산 우선</span> <i class="gijo-info" data-topic="자산 허브"></i></div>
+      <div class="page-title">🛡 자산 허브 <span class="ai-badge">AI 자산 우선</span></div>
     </div>
 
     <div id="gijoChatWidget" data-start="collapsed" data-prompts='["AI 자산 위험 현황 알려줘","미조치 취약점 몇 건이야?"]'></div>
@@ -251,7 +251,7 @@
       <button class="btn-s p" id="renameBtn" style="margin-left:auto">✎ 이름 변경</button></div>
       <div class="d-sub">${esc(r.assetType)}${r.owner?" · 소유: "+esc(r.owner):""}${r.host?" · "+esc(r.host):""}${r.service?" · 서비스: "+esc(r.service):""}</div>
       ${r.displayName?`<div class="src-line">원래 이름 ${esc(r.name)} · ID ${esc(r.id)}</div>`:`<div class="src-line">ID ${esc(r.id)}</div>`}
-      ${r.sourceFile?`<div class="src-line">출처 파일 <b>${esc(r.sourceFile)}</b> <i class="gijo-info" data-topic="파일별 보기"></i></div>`:""}
+      ${r.sourceFile?`<div class="src-line">출처 파일 <b>${esc(r.sourceFile)}</b></div>`:""}
       <div class="rn" id="renameBox" style="display:none">
         <div class="row"><input id="renameInput" maxlength="120" placeholder="보기 쉬운 이름"><button class="btn-s p" id="renameSave">저장</button><button class="btn-s" id="renameReset">원래대로</button></div>
       </div>`;
@@ -278,7 +278,7 @@
         const g=(OVERVIEW&&OVERVIEW.sourceGroups||[]).find(x=>x.sourceFile===r.sourceFile);
         const byId=new Map((OVERVIEW&&OVERVIEW.rows||[]).map(x=>[x.id,x]));
         const sibs=g? g.assetIds.map(id=>byId.get(id)).filter(Boolean) : [];
-        body+=`<div class="block"><div class="bh">📄 출처 파일 <i class="gijo-info" data-topic="파일별 보기"></i></div>
+        body+=`<div class="block"><div class="bh">📄 출처 파일</div>
           <div style="font-size:12px;color:#dfe6ff;font-weight:700;margin-bottom:5px">${esc(r.sourceFile)}</div>
           <div style="font-size:11px;color:var(--muted);line-height:1.75">
             이 파일의 자산 ${sibs.length}개 · 취약점 ${g?g.vuln.open:0}건${g&&g.lastScannedAt?` · 최근 점검 ${new Date(g.lastScannedAt).toLocaleDateString("ko-KR")}`:""}<br>

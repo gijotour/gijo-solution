@@ -243,7 +243,7 @@
   <div class="main">
     <div class="topbar-row">
       <div>
-        <div class="page-title">자산 목록 <span class="page-count">(<span id="pageSubCount">-</span>)</span> <i class="gijo-info" data-topic="자산 목록"></i></div>
+        <div class="page-title">자산 목록 <span class="page-count">(<span id="pageSubCount">-</span>)</span></div>
       </div>
       <div style="display:flex;gap:8px;">
         <button class="btn-ghost" id="csvExportBtn">CSV 내보내기</button>
@@ -255,18 +255,18 @@
 
     <div id="gijoChatWidget" data-prompts='["자산 목록 보여줘","커버리지 빠진 자산 있어?"]' style="max-width:640px;margin-bottom:16px;"></div>
 
-    <!-- 부가 패널은 기본으로 접는다 — 이 화면의 주인공은 자산 목록이다. 지우지 않고 감춘다. -->
-    <div id="extraToggle" style="font-size:13px;font-weight:700;color:var(--blue-light);cursor:pointer;margin-bottom:12px;user-select:none;">▸ 위험 요약 · 서비스 영향도 보기</div>
-    <div id="extraPanels" style="display:none;">
-    <!-- 코드 저장소 스캔은 AI-BOM 화면으로 이동(2026-07-26) — AI 자산을 찾아 등록하는 기능이라 Shadow AI와 한 흐름 -->
-
-    <div class="kpi-strip">
+    <div class="kpi-strip" data-gijo-summary>
       <div class="kpi-mini"><div class="kpi-mini-label">전체 자산</div><div class="kpi-mini-value" id="kpiTotal">-</div></div>
       <div class="kpi-mini"><div class="kpi-mini-label">고위험</div><div class="kpi-mini-value" id="kpiHigh" style="color:#f5928a">-</div></div>
       <div class="kpi-mini"><div class="kpi-mini-label">중위험</div><div class="kpi-mini-value" id="kpiMid" style="color:#f7c777">-</div></div>
       <div class="kpi-mini"><div class="kpi-mini-label">저위험</div><div class="kpi-mini-value" id="kpiLow" style="color:#6fdcb5">-</div></div>
       <div class="kpi-mini"><div class="kpi-mini-label">SBOM 미생성</div><div class="kpi-mini-value" id="kpiNoSbom" style="color:var(--amber)">-</div></div>
     </div>
+
+    <!-- 부가 패널은 기본으로 접는다 — 이 화면의 주인공은 자산 목록이다. 지우지 않고 감춘다. -->
+    <div id="extraToggle" style="font-size:13px;font-weight:700;color:var(--blue-light);cursor:pointer;margin-bottom:12px;user-select:none;">▸ 서비스 영향도 보기</div>
+    <div id="extraPanels" style="display:none;">
+    <!-- 코드 저장소 스캔은 AI-BOM 화면으로 이동(2026-07-26) — AI 자산을 찾아 등록하는 기능이라 Shadow AI와 한 흐름 -->
 
     <!-- 서비스 영향도: 자산에 문제가 생기면 어느 업무 서비스가 영향받는지 자동 집계(자산 위험·CTI 위협·지연 점검). -->
     <div style="background:var(--panel);border:1px solid rgba(240,160,32,0.3);border-radius:12px;padding:16px 18px;margin-bottom:16px;">

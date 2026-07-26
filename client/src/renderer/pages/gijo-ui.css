@@ -220,3 +220,20 @@ html, body { overflow-x: clip; }
 #riskList.risk-list { max-height: clamp(240px, calc(100vh - 565px), 900px); }
 .two.two > * { min-width: 0; }
 @container (max-width: 920px) { .two.two { grid-template-columns: minmax(0, 1fr); } }
+
+/* ── 화면 제목 숨김 · 업로드 안내 (2026-07-27 사용자 지시) ───────────────
+ * ① 화면 큰 제목(.page-title)은 전 메뉴에서 숨긴다. 왼쪽 메뉴와 팝업 머리글이
+ *    이미 "지금 어느 화면인지"를 말해 주므로 같은 말을 세 번 하는 셈이었다.
+ *    지우지 않고 숨기는 이유: 제목 안에 살아 있는 카운트(예: 자산 목록 (7))를
+ *    JS가 참조한다 — DOM에서 빼면 그 코드가 죽는다.
+ * ② 파일 업로드는 대시보드 ＋ 한 곳으로 모았다. 각 화면에는 그 자리를 대신할
+ *    안내 한 줄만 둔다(.upload-note). */
+.g-ui .page-title { display: none !important; }
+.g-ui .upload-note {
+  display: flex; align-items: center; gap: 8px;
+  border: 1px dashed var(--border-strong, #28365a); border-radius: 10px;
+  background: var(--panel-2, #0e1526); padding: 9px 13px; margin-bottom: 14px;
+  font-size: 11.5px; color: var(--muted, #8b93ab); line-height: 1.6;
+}
+.g-ui .upload-note b { color: var(--blue-light, #7ab0ff); }
+.g-ui .upload-note .un-ic { font-size: 14px; flex: 0 0 auto; }

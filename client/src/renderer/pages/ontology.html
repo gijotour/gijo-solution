@@ -101,21 +101,21 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   <div class="main">
     <div class="topbar-row">
       <div>
-        <div class="page-title">온톨로지 · 지식 그래프 <i class="gijo-info" data-topic="온톨로지"></i></div>
+        <div class="page-title">온톨로지 · 지식 그래프</div>
       </div>
       <button class="btn-primary" id="seedBtn" title="KISA AI 보안 위협 카탈로그를 트리플로 불러옵니다">＋ 샘플 지식 불러오기 (KISA 위협)</button>
     </div>
 
     <div id="gijoChatWidget" data-prompts='["온톨로지에 몇 건 들어있어?"]' style="max-width:640px;margin-bottom:16px;"></div>
 
-    <div class="stat-row">
+    <div class="stat-row" data-gijo-summary>
       <div class="stat-card"><div class="stat-num" id="statCount">-</div><div class="stat-label">전체 관계(트리플)</div></div>
       <div class="stat-card"><div class="stat-num" id="statEntities">-</div><div class="stat-label">엔티티(노드)</div></div>
       <div class="stat-card"><div class="stat-num" id="statPreds">-</div><div class="stat-label">관계 종류</div></div>
     </div>
 
     <div class="panel">
-      <div class="panel-title">🔎 규칙 주입 미리보기 <i class="gijo-info"></i></div><div class="field-row">
+      <div class="panel-title">🔎 규칙 주입 미리보기</div><div class="field-row">
         <div class="field"><label for="expandInput">질문 / 텍스트</label><input id="expandInput" placeholder="예: 탈옥 위협에 어떻게 대응하나요?"></div>
         <button class="btn-primary" id="expandBtn" style="align-self:flex-end">확장</button>
       </div>
@@ -123,7 +123,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     </div>
 
     <div class="panel">
-      <div class="panel-title">🕸 관계 그래프 <i class="gijo-info"></i></div><div class="field-row" style="margin-bottom:12px">
+      <div class="panel-title">🕸 관계 그래프</div><div class="field-row" style="margin-bottom:12px">
         <div class="field"><label for="filterSubject">특정 엔티티만 보기 (주어)</label><input id="filterSubject" placeholder="비워두면 전체 · 예: 탈옥"></div>
         <button class="btn-ghost" id="filterBtn" style="align-self:flex-end">필터</button>
         <button class="btn-ghost" id="filterClearBtn" style="align-self:flex-end">전체</button>
@@ -132,7 +132,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     </div>
 
     <div class="panel">
-      <div class="panel-title">＋ 관계 추가 <i class="gijo-info"></i></div><div class="field-row">
+      <div class="panel-title">＋ 관계 추가</div><div class="field-row">
         <div class="field"><label>주어 (Subject)</label><input id="addSubject" placeholder="관리자API"></div>
         <div class="field"><label>관계 (Predicate)</label><input id="addPredicate" placeholder="접근권한"></div>
         <div class="field"><label>대상 (Object)</label><input id="addObject" placeholder="보안운영팀"></div>

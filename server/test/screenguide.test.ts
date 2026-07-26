@@ -1,6 +1,8 @@
 // 화면별 챗봇 가이드 — 도움말 의도 감지와 화면별 안내 텍스트를 검증.
 // 실 데이터 질문("취약점 몇 건")은 도움말로 오인하지 않아야 한다(도구가 답해야 하므로).
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
+import request from "supertest";
+import { createApp } from "../src/app";
 import { isHelpIntent, getScreenGuide, formatScreenGuide } from "../src/engine/screenguide";
 
 describe("screenguide — 도움말 의도 감지", () => {
@@ -123,5 +125,39 @@ describe("패널 이름 기반 도움말 의도", () => {
     expect(out).toContain("표시 이름");
     expect(out).toContain("원래대로");
     expect(out).not.toContain("파일별 보기 —"); // 다른 패널 설명이 섞이지 않는다
+  });
+});
+
+// 화면을 열면 대시보드 대화가 이 라우트로 안내를 받아 띄운다(ⓘ 아이콘 대체, 2026-07-27).
+// LLM을 거치지 않으므로 응답이 매번 같고 빨라야 한다.
+describe("screenguide — /api/screen-guide 라우트", () => {
+  let app: ReturnType<typeof createApp>;
+  let token: string;
+
+  beforeEach(async () => {
+    app = createApp();
+    const res = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" });
+    token = res.body.accessToken as string;
+  });
+
+  it("화면 이름을 주면 그 화면 안내를 그대로 준다", async () => {
+    const res = await request(app).get("/api/screen-guide?screen=assethub.html").set("Authorization", `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.title).toBe(getScreenGuide("assethub.html").title);
+    expect(res.body.text).toBe(formatScreenGuide("assethub.html"));
+  });
+
+  it("구역 이름을 함께 주면 그 구역 설명만 준다", async () => {
+    const res = await request(app)
+      .get("/api/screen-guide?screen=assethub.html&question=" + encodeURIComponent("표시 이름은 어떻게 바꿔?"))
+      .set("Authorization", `Bearer ${token}`);
+    expect(res.status).toBe(200);
+    expect(res.body.text).toContain("표시 이름");
+    expect(res.body.text).not.toContain("파일별 보기 —");
+  });
+
+  it("인증 없이는 열리지 않는다", async () => {
+    const res = await request(app).get("/api/screen-guide?screen=assethub.html");
+    expect(res.status).toBe(401);
   });
 });

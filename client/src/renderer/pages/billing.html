@@ -132,7 +132,7 @@ tr:last-child td{border-bottom:none;}
   <div class="main">
     <div class="topbar-row">
       <div>
-        <div class="page-title">사용량 · 요금 <i class="gijo-info" data-topic="사용량·요금"></i></div>
+        <div class="page-title">사용량 · 요금</div>
       </div>
       <div style="display:flex;gap:8px;">
         <button class="btn-ghost" id="csvExportBtn">사용량 CSV 내보내기</button>
@@ -140,7 +140,7 @@ tr:last-child td{border-bottom:none;}
     </div>
 
 
-<div class="kpi-strip">
+<div class="kpi-strip" data-gijo-summary>
   <div class="kpi-mini"><div class="kpi-mini-label">누적 예상 비용 (USD)</div><div class="kpi-mini-value" id="kpiCost">-</div></div>
   <div class="kpi-mini"><div class="kpi-mini-label">추적 중인 서비스</div><div class="kpi-mini-value" id="kpiServices">-</div></div>
   <div class="kpi-mini"><div class="kpi-mini-label">총 호출 수</div><div class="kpi-mini-value" id="kpiCalls">-</div></div>
@@ -149,7 +149,7 @@ tr:last-child td{border-bottom:none;}
 <div class="content-grid">
   <div>
     <div class="panel">
-      <div class="panel-title">서비스별 이용량 · 예상 비용 <i class="gijo-info"></i></div><table>
+      <div class="panel-title">서비스별 이용량 · 예상 비용</div><table>
         <tr><th>서비스</th><th>호출 수</th><th>예상 비용 (USD)</th></tr>
         <tbody id="usageRows">
           <tr><td colspan="3" style="color:var(--muted)">불러오는 중...</td></tr>
@@ -157,7 +157,7 @@ tr:last-child td{border-bottom:none;}
       </table>
     </div>
     <div class="panel">
-      <div class="panel-title">☁ 클라우드 LLM API 사용 <span style="font-size:10.5px;font-weight:400;color:var(--muted-2)">— 제공자별 호출·토큰·예상 비용</span> <i class="gijo-info"></i></div><table>
+      <div class="panel-title">☁ 클라우드 LLM API 사용 <span style="font-size:10.5px;font-weight:400;color:var(--muted-2)">— 제공자별 호출·토큰·예상 비용</span></div><table>
         <tr><th>제공자 · 모델</th><th>호출</th><th>토큰(입력/출력)</th><th>예상 비용 (USD)</th></tr>
         <tbody id="cloudUsageRows">
           <tr><td colspan="4" style="color:var(--muted)">불러오는 중...</td></tr>

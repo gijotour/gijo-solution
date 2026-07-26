@@ -70,13 +70,7 @@
       ".gcw-undo{margin-top:7px;background:transparent;border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:7px;color:var(--muted,#8b93ab);font-size:10.5px;padding:4px 10px;cursor:pointer;}" +
       // 해석 배지 — "무엇으로 이해했는지"를 답 위에 한 줄로 보여 준다.
       ".gcw-read{font-size:10px;color:var(--muted-2,#5f6785);margin-bottom:4px;}" +
-      ".gcw-read b{color:var(--blue-light,#5fa1ff);font-weight:700;}" +
-      // ⓘ 도움말 버튼(가독성 개편 2026-07-23) — 화면 상시 노출 설명을 걷어내고, 제목 옆 ⓘ를
-      // 누르면 챗봇이 열리며 해당 구역 사용법을 즉답(서버 screenguide, LLM 비용 0)한다.
-      ".gijo-info{width:17px;height:17px;border-radius:50%;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.45);" +
-      "color:var(--blue-light,#5fa1ff);font-size:10.5px;font-weight:800;display:inline-flex;align-items:center;justify-content:center;" +
-      "cursor:pointer;vertical-align:middle;margin-left:6px;font-style:normal;flex:0 0 auto;}" +
-      ".gijo-info:hover{background:var(--blue,#3b82f6);color:#fff;}";
+      ".gcw-read b{color:var(--blue-light,#5fa1ff);font-weight:700;}";
     document.head.appendChild(st);
   }
 
@@ -264,16 +258,25 @@
       chip.addEventListener("click", function () { send(chip.textContent); });
     });
 
-    // ⓘ → 챗봇 열고 해당 구역 사용법 질의. 페이지는 <i class="gijo-info" data-topic="SMTP">i</i>만 두면 된다.
+    // 화면 설명은 대시보드 대화 한 곳에서만 한다(2026-07-27 사용자 지시) — 화면마다 있던 ⓘ와
+    // 그 배선을 걷어냈다. 설명은 화면을 여는 순간 대시보드가 띄우고(shell-popup → gijoScreenGuide),
+    // 다시 보고 싶으면 "이 화면 사용법 알려줘"라고 물으면 된다.
+    // gijoExplain은 남겨 둔다 — 화면 안에서 프로그램적으로 사용법을 물어 오는 기존 호출부가
+    // 있고, 대시보드가 없는 분리창에서는 이 위젯이 유일한 답변 창구다.
     window.gijoExplain = function (topic) {
+      var q = topic ? '"' + topic + '" 사용법 알려줘' : "이 화면 사용법 알려줘";
+      // 대시보드가 살아 있으면(팝업 안 화면) 설명은 그쪽 대화로 보낸다.
+      try {
+        var top = window.parent && window.parent !== window ? window.parent : null;
+        var host = top && top.gijoScreenGuide ? top : (top && top.parent && top.parent.gijoScreenGuide ? top.parent : null);
+        if (host) {
+          host.gijoScreenGuide(location.pathname.split("/").pop(), topic || undefined, { question: topic, force: true });
+          return;
+        }
+      } catch (e) { /* 교차 프레임 접근 불가 — 아래 위젯으로 답한다 */ }
       openChat();
-      send(topic ? '"' + topic + '" 사용법 알려줘' : "이 화면 사용법 알려줘");
+      send(q);
     };
-    document.querySelectorAll(".gijo-info").forEach(function (el) {
-      if (!el.textContent.trim()) el.textContent = "i";
-      if (!el.title) el.title = (el.dataset.topic ? '"' + el.dataset.topic + '" ' : "이 화면 ") + "사용법을 챗봇이 설명합니다";
-      el.addEventListener("click", function () { window.gijoExplain(el.dataset.topic); });
-    });
   }
 
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", build);

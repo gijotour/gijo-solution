@@ -22,7 +22,10 @@ export interface AutoUploadResult {
   needsDecision?: boolean; // true면 프론트가 결정 카드(4유형)를 띄운다
   guess?: UploadType; // 결정 필요 시 추천 유형(미리 선택)
   guessProductName?: string; // 결정 필요 시 신규 제품명 추천값(사용자가 확인·수정 가능, 필요시 수동입력)
-  vulnscan?: { hosts: number; findings: number };
+  /** uncredentialedHosts: 비인증(원격) 스캔으로 잡힌 호스트 — 로컬 취약점을 놓칠 수 있어
+   *  조치 검증 신뢰도가 떨어진다. 취약점 화면 업로더에만 있던 경고인데, 파일 인입을 대시보드
+   *  ＋로 모으면서(2026-07-27) 이 경고까지 사라지면 안 되므로 결과에 함께 싣는다. */
+  vulnscan?: { hosts: number; findings: number; uncredentialedHosts?: string[] };
   manual?: { productName: string; kind: string; createdProduct: boolean };
   memory?: { chunks: number; docClass?: string; linkedProduct?: string; category?: string };
   /** 확정된 업무영역(취약점·장비운영·사내규정·위협대응·일반) — 승인카드에 "이렇게 분류했습니다" 표시용. */
@@ -112,7 +115,7 @@ async function tryWebReport(filename: string, base64: string, uploadedBy?: strin
       routedTo: "vulnscan",
       reason: `국내 웹취약점 점검 보고서 파싱 — ${parsed.notes.join(" · ")}`,
       category: "취약점",
-      vulnscan: { hosts: r.hosts, findings: r.findings },
+      vulnscan: { hosts: r.hosts, findings: r.findings, uncredentialedHosts: r.uncredentialedHosts },
       memory: ing ? { chunks: ing.chunks, docClass: ing.docClass, category: ing.category } : undefined,
     };
   } catch {
@@ -142,7 +145,7 @@ async function routeByType(filename: string, base64: string, type: UploadType, p
     const r = importVulnScan(textish, "html", filename);
     if (r.hosts > 0) {
       emitCollaboration({ from: "scan", to: "orchestrator", message: `${filename} → 취약점 스캔으로 등록 — 호스트 ${r.hosts}·finding ${r.findings}건` });
-      return { filename, routedTo: "vulnscan", reason: "사용자 지정: 취약점 리포트/로그 (Nessus 스타일 HTML 파싱)", category: "취약점", vulnscan: { hosts: r.hosts, findings: r.findings } };
+      return { filename, routedTo: "vulnscan", reason: "사용자 지정: 취약점 리포트/로그 (Nessus 스타일 HTML 파싱)", category: "취약점", vulnscan: { hosts: r.hosts, findings: r.findings, uncredentialedHosts: r.uncredentialedHosts } };
     }
     const ing = await tryIngest(filename, base64, false, "취약점", uploadedBy);
     emitCollaboration({ from: "scan", to: "orchestrator", message: `${filename} → 알려진 스캐너 형식(Nessus 등)이 아니라 구조화 파싱 실패 — 문서로 저장${ing ? "" : " · 검색수집 보류(임베딩 미기동)"}` });
@@ -196,7 +199,7 @@ export async function autoRouteUpload(
   if (vulnFormat) {
     const r = importVulnScan(textish, vulnFormat, filename);
     emitCollaboration({ from: "scan", to: "orchestrator", message: `${filename} → 취약점 스캔으로 자동 반영 — 호스트 ${r.hosts}·finding ${r.findings}건` });
-    return { filename, routedTo: "vulnscan", reason: vulnReason, category: "취약점", vulnscan: { hosts: r.hosts, findings: r.findings } };
+    return { filename, routedTo: "vulnscan", reason: vulnReason, category: "취약점", vulnscan: { hosts: r.hosts, findings: r.findings, uncredentialedHosts: r.uncredentialedHosts } };
   }
 
   // ①-b 국내 웹취약점 점검 결과보고서(PDF/DOCX 서술형) — 제목·[IW-NN] 코드체계로 판별되고

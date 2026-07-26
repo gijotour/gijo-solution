@@ -109,14 +109,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   <div class="main">
     <div class="topbar-row">
       <div>
-        <div class="page-title">설정 <i class="gijo-info" data-topic="설정"></i></div>
+        <div class="page-title">설정</div>
       </div>
     </div>
 
     <!-- 화면 크기 — 모니터·시력이 사람마다 달라 자동 반응형만으로는 못 맞추는 취향을 여기서 고른다.
          배율은 앱 전체(허브 탭 포함)에 걸리고 다음 실행에도 유지된다. -->
     <div class="panel">
-      <div class="panel-title">🔍 화면 크기 <i class="gijo-info" data-topic="화면 크기"></i></div>
+      <div class="panel-title">🔍 화면 크기</div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6">
         글씨와 여백이 함께 커지고 작아집니다. <b>작게</b>는 한 화면에 더 많이, <b>크게</b>는 읽기 편하게.
         단축키 <b>⌘/Ctrl +</b> · <b>−</b> · <b>0</b>(기본값)으로도 바꿀 수 있습니다.
@@ -126,7 +126,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     </div>
 
     <div class="panel">
-      <div class="panel-title">서버 연결 <i class="gijo-info" data-topic="서버 연결"></i></div>
+      <div class="panel-title">서버 연결</div>
       <div class="field">
         <label for="serverUrlInput">서버 주소</label>
         <div class="field-row">
@@ -157,7 +157,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     </div>
 
     <div class="panel" id="userManagementPanel" style="display:none">
-      <div class="panel-title">계정 관리 <i class="gijo-info" data-topic="계정"></i><span class="badge b-teal" style="margin-left:8px">admin 전용</span></div>
+      <div class="panel-title">계정 관리<span class="badge b-teal" style="margin-left:8px">admin 전용</span></div>
       <div id="userListBox" style="margin-bottom:16px"></div>
       <div class="field-row">
         <div class="field">
@@ -187,7 +187,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     </div>
 
     <div class="panel">
-      <div class="panel-title">🧠 GIJO 구동 티어 <i class="gijo-info" data-topic="구동 티어"></i></div>
+      <div class="panel-title">🧠 GIJO 구동 티어</div>
       <div id="tierGpuBox" style="background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:10px">
         <div style="font-size:11px;color:var(--muted);display:flex;justify-content:space-between;margin-bottom:6px"><span id="tierGpuLabel">GPU 실측 중…</span><span id="tierGpuFree"></span></div>
         <div style="height:8px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden"><div id="tierGpuBar" style="height:100%;width:0;background:linear-gradient(90deg,var(--teal,#1eb980),var(--blue,#3b82f6))"></div></div>
@@ -213,7 +213,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     </div>
 
     <div class="panel">
-      <div class="panel-title">로컬 LLM 엔진 <i class="gijo-info" data-topic="로컬 LLM 엔진"></i></div>
+      <div class="panel-title">로컬 LLM 엔진</div>
       <div id="engineStatusLine" style="font-size:12.5px;color:var(--muted);margin-bottom:14px">불러오는 중...</div>
       <div class="field">
         <label for="modelIdInput">모델 ID</label>
@@ -226,7 +226,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       </div>
 
     <div class="panel">
-      <div class="panel-title">이메일(SMTP) 설정 <i class="gijo-info" data-topic="SMTP"></i></div>
+      <div class="panel-title">이메일(SMTP) 설정</div>
       <div class="field-row">
         <div class="field">
           <label for="smtpHostInput">SMTP 호스트</label>
@@ -259,7 +259,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     </div>
 
     <div class="panel" id="smtpInboundPanel" style="display:none">
-      <div class="panel-title">인바운드 SMTP (알림 집수) <i class="gijo-info" data-topic="메일 수신"></i><span class="badge b-purple" style="margin-left:8px">admin 전용</span></div>
+      <div class="panel-title">인바운드 SMTP (알림 집수)<span class="badge b-purple" style="margin-left:8px">admin 전용</span></div>
       <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);margin-bottom:14px;cursor:pointer">
         <input type="checkbox" id="smtpInEnabledInput" style="width:auto">활성화
       </label>
@@ -279,7 +279,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     </div>
 
     <div class="panel" id="siemPanel" style="display:none">
-      <div class="panel-title">📡 SIEM 연동 (아웃바운드) <i class="gijo-info" data-topic="SIEM"></i><span class="badge b-purple" style="margin-left:8px">admin 전용</span></div>
+      <div class="panel-title">📡 SIEM 연동 (아웃바운드)<span class="badge b-purple" style="margin-left:8px">admin 전용</span></div>
       <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);margin-bottom:14px;cursor:pointer">
         <input type="checkbox" id="siemEnabledInput" style="width:auto">GIJO 보안 이벤트를 SIEM으로 전달(syslog)
       </label>
@@ -317,7 +317,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     <!-- 법령·판례 조회 — 인터넷이 필요해 기본 꺼짐. 키를 넣어야 켜진다(2026-07-26). -->
     <div class="panel" id="lawPanel" style="display:none">
-      <div class="panel-title">⚖ 법령·판례 조회 (선택) <i class="gijo-info" data-topic="법령 조회"></i><span class="badge b-purple" style="margin-left:8px">admin 전용</span></div>
+      <div class="panel-title">⚖ 법령·판례 조회 (선택)<span class="badge b-purple" style="margin-left:8px">admin 전용</span></div>
       <div class="panel-sub">개인정보보호법·정보통신망법 같은 IT보안 법령과 고시·판례를 국가법령정보센터에서 찾아옵니다. <b>인터넷 연결이 필요합니다</b> — 폐쇄망이면 켜지 마세요.</div>
       <div class="field-row">
         <div class="field">
@@ -336,7 +336,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     <div class="panel" id="cloudLlmPanel" style="display:none">
       <div class="panel-title">☁ 클라우드 LLM (선택) <span class="badge b-purple" style="margin-left:8px">admin 전용</span></div>
-      <div class="panel-sub">온프레미스가 기본입니다 — 끄면 모든 답변이 로컬 LLM으로만 처리됩니다. <i class="gijo-info" data-topic="클라우드 LLM"></i></div>
+      <div class="panel-sub">온프레미스가 기본입니다 — 끄면 모든 답변이 로컬 LLM으로만 처리됩니다.</div>
       <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);margin-bottom:14px;cursor:pointer">
         <input type="checkbox" id="cloudEnabledInput" style="width:auto">클라우드 사용 허용 (끄면 모든 답변이 로컬 LLM으로만 처리 — 완전 폐쇄)
       </label>

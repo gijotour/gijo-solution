@@ -201,6 +201,33 @@
     } catch (e) { return null; }
   }
 
+  // 요약 카드까지의 높이 — 팝업을 열면 그 메뉴 전체를 요약한 카드가 먼저 보이고,
+  // 더 볼 게 있으면 아래로 스크롤한다(2026-07-27 사용자 지시).
+  // 화면이 [data-gijo-summary]로 "여기까지가 요약"이라고 표시해 둔 경우에만 쓴다 —
+  // 표식이 없으면 null을 돌려 기존 '내용 전체 맞춤' 방식으로 떨어진다.
+  function summaryHeight(s) {
+    try {
+      var doc = s.el.contentDocument;
+      if (!doc || !doc.body) return null;
+      var offset = 0;
+      var inner = doc.querySelector(".hub-frame.on");
+      if (inner) {
+        // ⚠ 허브 탭 줄(.hub-bar) 높이만 더하면 5~20px씩 모자라 카드 아랫줄이 잘렸다(실측).
+        //    탭 줄 말고도 감싸는 여백이 있기 때문이다. 안쪽 프레임이 실제로 어디서 시작하는지를
+        //    직접 재면 그 여백이 무엇이든 정확히 반영된다.
+        offset = Math.round(inner.getBoundingClientRect().top + (doc.documentElement.scrollTop || doc.body.scrollTop || 0));
+        doc = inner.contentDocument;
+        if (!doc || !doc.body) return null;
+      }
+      var el = doc.querySelector("[data-gijo-summary]");
+      if (!el) return null;
+      var r = el.getBoundingClientRect();
+      if (r.height === 0) return null; // 아직 데이터가 안 채워진 빈 카드 — 다음 주기에 다시 잰다
+      var scrollTop = doc.documentElement.scrollTop || doc.body.scrollTop || 0;
+      return offset + Math.round(r.bottom + scrollTop) + 14; // 카드 아래 숨 쉴 여백
+    } catch (e) { return null; }
+  }
+
   // ── 위치 계산 — 사이드바 오른쪽 ~ 엣지 거터(46px), 관리 바 아래 ~ 컴포저 위 ──
   function layout() {
     if (!visible) return;
@@ -225,15 +252,24 @@
       wantH = Math.max(240, userH);
     } else {
       var s0 = findSlot(activeKey);
-      var ch = s0 ? contentHeight(s0) : null;
       var headH = document.getElementById("shellHead").offsetHeight || 38;
-      if (ch) {
-        // 자동 축소 하한 = 가용 높이의 55% — 일부 화면은 요소 높이가 뷰포트에 묶여 있어
-        // 측정값이 실제보다 작게 나온다(실측: 우선순위 목록이 잘림). 덜 줄이는 쪽이 안전하고,
-        // 남는 내용은 팝업 안 스크롤로 본다(창 고정 원칙과 동일).
-        var maxFit = window.innerHeight - top - baseMinGap;
-        var minFit = Math.max(360, Math.round(maxFit * 0.55));
-        wantH = Math.min(maxFit, Math.max(minFit, ch + headH + 12));
+      var maxFit = window.innerHeight - top - baseMinGap;
+      var sh = s0 ? summaryHeight(s0) : null;
+      if (sh) {
+        // 요약 카드가 있는 화면 — 딱 그 카드까지만 연다. 여기서는 55% 하한을 쓰지 않는다:
+        // 그 하한은 '내용 전체'를 잴 때 측정이 빗나가는 걸 막으려던 안전장치인데,
+        // 요약 카드는 특정 요소를 직접 재므로 값이 정확하고, 하한을 두면 카드보다
+        // 한참 큰 팝업이 열려 "요약만 보이게" 하려는 목적 자체가 사라진다.
+        wantH = Math.min(maxFit, Math.max(200, sh + headH));
+      } else {
+        var ch = s0 ? contentHeight(s0) : null;
+        if (ch) {
+          // 자동 축소 하한 = 가용 높이의 55% — 일부 화면은 요소 높이가 뷰포트에 묶여 있어
+          // 측정값이 실제보다 작게 나온다(실측: 우선순위 목록이 잘림). 덜 줄이는 쪽이 안전하고,
+          // 남는 내용은 팝업 안 스크롤로 본다(창 고정 원칙과 동일).
+          var minFit = Math.max(360, Math.round(maxFit * 0.55));
+          wantH = Math.min(maxFit, Math.max(minFit, ch + headH + 12));
+        }
       }
     }
     var gap;
@@ -363,6 +399,16 @@
     if (opts.chat) { // 챗봇 열기 — 이미 떠 있던 팝업이면 메시지로, 새로 열리면 openChatOnLoad 플래그가 처리
       setTimeout(function () { try { s.el.contentWindow.postMessage({ type: "gijo:openChat" }, "*"); } catch (e) {} }, 600);
     }
+    // 이 화면이 뭘 하는 곳인지 대시보드 대화에 띄운다(화면당 한 번).
+    // 허브 팝업은 여기서 탭을 아직 모를 수 있다 — 그때는 아래 gijo:hubTab 통지가 받아서 부른다.
+    announceGuide(opts.tab || (page.indexOf("hub.html") === 0 ? null : page), label);
+  }
+
+  // 화면 안내를 대시보드 대화로 보낸다. 대시보드가 이 함수를 갖고 있지 않은 상황
+  // (아직 로드 전)에서도 조용히 넘어간다 — 안내는 부가 정보지 동작 조건이 아니다.
+  function announceGuide(screen, label) {
+    if (!screen) return;
+    try { if (window.gijoScreenGuide) window.gijoScreenGuide(screen, label); } catch (e) {}
   }
 
   // 내용은 데이터가 도착하며 자라거나 준다 — 보이는 동안 1.2초마다 가볍게 재계산(DOM 읽기뿐).
@@ -374,6 +420,19 @@
         if (!s.healed && s.el.contentDocument && s.el.contentDocument.readyState === "complete" && !s.el.contentWindow.gijo) {
           s.healed = true; // 무한 재로드 방지 — 한 번만
           s.el.src = s.el.src;
+          return;
+        }
+        // 허브 팝업은 프레임이 두 겹이다(hub.html 안에 실제 화면). 바깥이 멀쩡해도
+        // 안쪽만 preload를 놓치는 경우가 있다 — 그러면 화면은 그려지는데 데이터가 영영
+        // 안 들어온다(실측 2026-07-27: 유지보수 KPI가 계속 "-"). 바깥만 보던 치유를
+        // 안쪽까지 넓힌다. 표시는 프레임 엘리먼트에 달아 탭마다 한 번씩만 고친다.
+        var doc = s.el.contentDocument;
+        if (!doc || !s.el.contentWindow.gijo) return;
+        var inner = doc.querySelector(".hub-frame.on");
+        if (!inner || inner.__gijoHealed) return;
+        if (inner.contentDocument && inner.contentDocument.readyState === "complete" && !inner.contentWindow.gijo) {
+          inner.__gijoHealed = true;
+          inner.src = inner.src;
         }
       } catch (e) {}
     });
@@ -540,6 +599,8 @@
         popouts[key].tab = info.page;
         popouts[key].tabLabel = info.label;
         if (info.focused) { activePopout = key; ctxDash = false; }
+        // 분리창에서 화면을 옮겨도 안내는 대시보드 대화에 뜬다 — 설명 창구는 한 곳뿐이다.
+        announceGuide(info.page, info.label);
       }
       renderCtx();
     });
@@ -564,6 +625,8 @@
     s.curTab = d.page;
     s.curLabel = d.label;
     if (s.key === activeKey) { renderHead(); layout(); } // 탭이 바뀌면 내용 높이도 다시 잰다
+    // 탭도 하나의 화면이다 — 탭을 옮기면 그 탭의 안내를 띄운다(탭당 한 번).
+    announceGuide(d.page, d.label);
   });
 
   // ── 공개 API ────────────────────────────────────────────────────────

@@ -147,7 +147,7 @@ tr:last-child td{border-bottom:none;}
   <div class="main">
     <div class="topbar-row">
       <div>
-        <div class="page-title">위협 인텔리전스 <i class="gijo-info" data-topic="위협 인텔리전스"></i></div>
+        <div class="page-title">위협 인텔리전스</div>
       </div>
       <div style="display:flex;gap:8px;">
         <button class="btn-primary" data-page="mcp.html" title="AI 에이전트를 외부 CTI·보안도구에 MCP로 연결" style="background:var(--panel);border:1px solid var(--border-strong);color:var(--blue-light)">🔌 MCP 연동</button>
@@ -158,7 +158,7 @@ tr:last-child td{border-bottom:none;}
     <div id="gijoChatWidget" data-prompts='["우리 자산에 영향 있는 위협 있어?","최근 탐지 내역 알려줘"]' style="max-width:640px;margin-bottom:16px;"></div>
 
 
-<div class="kpi-strip" style="grid-template-columns:repeat(4,1fr)">
+<div class="kpi-strip" style="grid-template-columns:repeat(4,1fr)" data-gijo-summary>
   <div class="kpi-mini"><div class="kpi-mini-label">연동된 CTI 벤더</div><div class="kpi-mini-value" id="connectedFeedCount">-</div></div>
   <div class="kpi-mini"><div class="kpi-mini-label">탐지 내역</div><div class="kpi-mini-value" id="findingCount">-</div></div>
   <div class="kpi-mini"><div class="kpi-mini-label">긴급 탐지</div><div class="kpi-mini-value" style="color:#f5928a" id="criticalCount">-</div></div>
@@ -167,7 +167,7 @@ tr:last-child td{border-bottom:none;}
 
 <!-- CTI ↔ 내부 자산 자동 매칭: "지금 우리에게 영향 있는 위협"을 자동 산출해 수작업 대조를 없앤다. -->
 <div class="panel" style="border-color:rgba(240,160,32,0.35)">
-  <div class="panel-title">🎯 내부 자산에 영향을 주는 위협 <span style="font-size:11px;font-weight:600;color:var(--muted)">CTI ↔ 자산 자동 매칭</span> <i class="gijo-info" data-topic="자산 매칭"></i></div><div id="ctiMatchBody" style="margin-top:10px;display:flex;flex-direction:column;gap:9px;">불러오는 중...</div>
+  <div class="panel-title">🎯 내부 자산에 영향을 주는 위협 <span style="font-size:11px;font-weight:600;color:var(--muted)">CTI ↔ 자산 자동 매칭</span></div><div id="ctiMatchBody" style="margin-top:10px;display:flex;flex-direction:column;gap:9px;">불러오는 중...</div>
 </div>
 
 <div class="content-grid">
@@ -187,7 +187,7 @@ tr:last-child td{border-bottom:none;}
   </div>
   <div>
     <div class="panel">
-      <div class="panel-title">구독 중인 CTI 피드 <i class="gijo-info" data-topic="피드 구독"></i></div><div id="feedList"><div style="font-size:12px;color:var(--muted)">불러오는 중...</div></div>
+      <div class="panel-title">구독 중인 CTI 피드</div><div id="feedList"><div style="font-size:12px;color:var(--muted)">불러오는 중...</div></div>
       <div style="margin-top:14px"><button class="btn-ghost" style="width:100%" id="addFeedBtn2">+ 피드 구독 추가</button></div>
     </div>
     <div class="panel">
