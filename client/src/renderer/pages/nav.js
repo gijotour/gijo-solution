@@ -60,12 +60,14 @@
     { id: "monitor", ic: "🖥", label: "관제", items: [
       { page: "dashboard.html", label: "대시보드" },
       { page: "dashboard.html?quick=1", label: "내 업무 바로가기" }, // 대시보드 위 팝업으로 열림(챗 중심 개편 2026-07-26)
-      { page: "hub.html?g=analysis", label: "보안 분석", bot: true },
+      // popup: 대시보드 팝업 셸(혼합 방식, 2026-07-26 결정)에서 팝업으로 열리는 화면 — 1차 파일럿 3종.
+      // 대시보드가 아닌 화면(gijoShell 없음)에서는 지금처럼 전체 화면으로 이동한다.
+      { page: "hub.html?g=analysis", label: "보안 분석", bot: true, popup: true },
       { page: "hub.html?g=threat", label: "위협 인텔리전스", bot: true },
-      { page: "hub.html?g=report", label: "리포트", bot: true },
+      { page: "hub.html?g=report", label: "리포트", bot: true, popup: true },
     ]},
     { id: "assets", ic: "🛡", label: "자산·조치", items: [
-      { page: "hub.html?g=assets", label: "자산 허브", bot: true },
+      { page: "hub.html?g=assets", label: "자산 허브", bot: true, popup: true },
       { page: "approvals.html", label: "조치·승인", bot: true },
       { page: "hub.html?g=products", label: "보안제품", bot: true },
       { page: "hub.html?g=inspect", label: "점검 콘솔", bot: true },
@@ -207,6 +209,8 @@
             ev.stopPropagation();
             if (it.page === here && openChatHere()) return;
             try { localStorage.setItem("gijo:openChatOnLoad", String(Date.now())); } catch (e) {}
+            // 팝업 셸이 있으면(대시보드) 화면을 팝업으로 열고 챗봇도 켠다 — 명령창·대화 유지.
+            if (it.popup && window.gijoShell) { window.gijoShell.open(it.page, it.label, { chat: true }); return; }
             if (it.page !== here) go(it.page);
           });
           el.appendChild(botMark);
@@ -217,7 +221,11 @@
         if (it.office) {
           el.addEventListener("click", function () { if (window.gijo && window.gijo.openTeamOffice) window.gijo.openTeamOffice(); });
         } else if (it.page !== here) {
-          el.addEventListener("click", function () { go(it.page); });
+          el.addEventListener("click", function () {
+            // 팝업 셸(대시보드)에서는 팝업으로 — 이동하지 않으니 명령창·대화·진행 작업이 유지된다.
+            if (it.popup && window.gijoShell) { window.gijoShell.open(it.page, it.label); return; }
+            go(it.page);
+          });
         }
         container.appendChild(el);
       });

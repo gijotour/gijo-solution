@@ -2005,7 +2005,9 @@
     try {
       // 지휘 콘솔의 모든 지시를 작업 세션에 기록한다(열린 세션이 없으면 새로 만들어 이어감).
       const sess = await ensureDashSession();
-      const result = await window.gijo.sendInstruction(text, sess ? sess.id : undefined);
+      // 팝업 셸이 떠 있으면 그 화면(허브면 활성 탭)이 지시의 맥락(screen)이 된다 — "정리해줘"가
+      // 취약점 팝업 앞에서는 취약점 우선순위 정리로 해석된다(server/engine/screencontext.ts).
+      const result = await window.gijo.sendInstruction(text, sess ? sess.id : undefined, window.gijoShell ? window.gijoShell.activeScreen() : undefined);
       // 서버가 세션을 새로 열었을 수도 있다 — 돌려준 id를 기억해야 다음에 이어서 볼 수 있다.
       if (result && result.sessionId) {
         setDashSession({ id: result.sessionId, title: (dashCurrentSession && dashCurrentSession.title) || "" });
@@ -3031,5 +3033,8 @@
 <script src="nav.js"></script>
 <script src="titlebar.js"></script>
 <script src="commandpanel.js"></script>
+<!-- 팝업 셸(혼합 방식 2026-07-26) — 챗봇 메뉴를 팝업으로 열어 명령창·대화·진행 작업을 유지한다.
+     대시보드 전용: 다른 화면에는 gijoShell이 없어 nav.js가 기존대로 이동한다. -->
+<script src="shell-popup.js"></script>
 </body>
 </html>

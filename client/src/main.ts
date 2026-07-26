@@ -193,6 +193,62 @@ ipcMain.handle("office:setAlwaysOnTop", async (_e, on: boolean) => {
   return { on: Boolean(on) };
 });
 
+// 팝업 셸 "창으로 분리"(혼합 방식, 2026-07-26 결정) — 대시보드 위 팝업으로 보던 화면을
+// 사무실 창처럼 별도 창으로 떼어낸다(모니터 2대에서 화면을 펼쳐놓고 대시보드에서 지시하는 용도).
+// 페이지당 1개 — 이미 떠 있으면 앞으로만 가져온다. 인증은 메인 프로세스 authState 공유.
+const popoutWindows = new Map<string, BrowserWindow>();
+ipcMain.handle("shell:popout", async (_e, page: string, title?: string, orient?: string) => {
+  const portrait = orient === "portrait"; // 세로(피벗) 모니터 관제용 — 2026-07-26 사용자 요청
+  const key = String(page) + (portrait ? "#portrait" : "");
+  const existing = popoutWindows.get(key);
+  if (existing && !existing.isDestroyed()) {
+    existing.focus();
+    return;
+  }
+  // 세로 모드: 세로로 세운 모니터가 있으면 그 모니터에 꽉 차게 자동 배치하고,
+  // 없으면 주 모니터에서 세로 비율(높이 최대, 폭은 높이의 62%)로 띄운다 — 옮겨 쓰라는 뜻.
+  let pb: { x?: number; y?: number; width: number; height: number } | null = null;
+  if (portrait) {
+    const pd = screen.getAllDisplays().find((d) => d.workAreaSize.height > d.workAreaSize.width);
+    if (pd) {
+      pb = { x: pd.workArea.x + 12, y: pd.workArea.y + 12, width: pd.workArea.width - 24, height: pd.workArea.height - 24 };
+    } else {
+      const wa = screen.getPrimaryDisplay().workAreaSize;
+      pb = { width: Math.min(1000, Math.max(760, Math.round(wa.height * 0.62))), height: wa.height - 40 };
+    }
+  }
+  const win = new BrowserWindow({
+    x: pb && pb.x !== undefined ? pb.x : undefined,
+    y: pb && pb.y !== undefined ? pb.y : undefined,
+    width: pb ? pb.width : Math.min(1280, Math.max(960, screen.getPrimaryDisplay().workAreaSize.width - 160)),
+    height: pb ? pb.height : Math.min(860, Math.max(680, screen.getPrimaryDisplay().workAreaSize.height - 140)),
+    minWidth: portrait ? 700 : 900,
+    minHeight: 600,
+    backgroundColor: "#0a0e1a",
+    title: title ? `GIJO AS — ${title}` : "GIJO AS",
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      // 분리 창은 허브(hub.html)를 띄운다 — 허브는 화면을 iframe으로 품으므로 서브프레임에도
+      // preload(window.gijo)가 필요하다(메인 창과 동일). 빠뜨리면 탭 안이 "불러오지 못했습니다"로 죽는다
+      // (2026-07-26 실화면 검증에서 실제로 잡은 버그).
+      nodeIntegrationInSubFrames: true,
+    },
+  });
+  win.removeMenu();
+  bindZoom(win); // 분리 창도 같은 화면 크기를 따른다
+  popoutWindows.set(key, win);
+  win.on("closed", () => { popoutWindows.delete(key); });
+  // ⚠ 로드는 원래 page로 — key에는 창 구분용 "#portrait"가 붙어 있어 그대로 쓰면
+  //   g 파라미터가 "analysis#portrait"가 되어 "알 수 없는 허브"가 뜬다(실화면 검증에서 잡은 버그).
+  const [file, qs] = String(page).split("?");
+  const query: Record<string, string> = {};
+  if (qs) for (const [k, v] of new URLSearchParams(qs)) query[k] = v;
+  await win.loadFile(path.join(__dirname, `../src/renderer/pages/${file}`), qs ? { query } : undefined);
+});
+
 // ── 화면 크기(UI 배율) ────────────────────────────────────────────────────────
 // 담당자마다 모니터·시력이 달라 "한 화면에 더 많이" vs "글씨 크게"가 갈린다. 자동 반응형만으로는
 // 이 취향을 못 맞추므로 배율을 직접 고르게 한다(설정 › 화면 크기, 단축키 Cmd/Ctrl +·-·0).

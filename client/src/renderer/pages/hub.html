@@ -65,6 +65,17 @@
   const $ = (id) => document.getElementById(id);
   const params = new URLSearchParams(location.search);
   const g = params.get("g") || "assets";
+  // 팝업 셸의 iframe으로 품길 때(?embed=1) — nav.js applyEmbed가 높이를 auto로 풀어버려
+  // 허브의 100vh 플렉스 레이아웃(hub-body 절대배치 프레임)이 무너진다. 여기서 되고정한다.
+  // (이 style은 nav.js 것보다 나중에 붙어 !important 동순위에서 이긴다.)
+  const EMBEDDED = /(^|[?&])embed=1(&|$)/.test(location.search);
+  if (EMBEDDED) {
+    const st = document.createElement("style");
+    st.textContent = "html,body{overflow:hidden !important;height:100% !important;}" +
+      ".app{display:block !important;height:100vh !important;}" +
+      ".main{height:100%;}";
+    document.head.appendChild(st);
+  }
 
   function tick() { $("clockEl").textContent = new Date().toLocaleString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: true, month: "2-digit", day: "2-digit" }); }
   async function loadHealth() { try { await window.gijo.checkServerHealth(); $("statusPill").innerHTML = '<span class="dot"></span>서버 연결상태 양호'; } catch (e) { $("statusPill").innerHTML = '<span class="dot" style="background:#e2483d"></span>서버 연결상태 불량'; } }
@@ -98,7 +109,17 @@
       }
       f.classList.add("on");
       current = f;
+      // 팝업 셸(부모 창)에 활성 탭을 알린다 — 컴포저의 "명령 맥락"이 이 탭이 된다.
+      if (window.parent !== window) {
+        try { window.parent.postMessage({ type: "gijo:hubTab", g: g, page: tab.page, label: hub.ic + " " + hub.label + " — " + tab.label }, "*"); } catch (e) {}
+      }
     }
+    // 팝업 셸이 보낸 "챗봇 열기"를 지금 보이는 탭 프레임으로 중계한다(위젯은 탭 페이지에 있다).
+    window.addEventListener("message", (ev) => {
+      if (ev && ev.data && ev.data.type === "gijo:openChat" && current) {
+        try { current.contentWindow.postMessage(ev.data, "*"); } catch (e) {}
+      }
+    });
 
     const bar = $("hubBar");
     const initial = params.get("t");

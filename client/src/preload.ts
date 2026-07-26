@@ -52,6 +52,9 @@ const gijoApi = {
   // "우리 AI 팀 사무실" 별도 창(시안 B) — 열기 + 항상 위 고정 토글
   openTeamOffice: () => ipcRenderer.invoke("office:open"),
   setOfficeAlwaysOnTop: (on: boolean) => ipcRenderer.invoke("office:setAlwaysOnTop", on),
+  // 팝업 셸 "창으로 분리"(혼합 방식) — 팝업으로 보던 화면을 별도 창으로 떼어낸다(shell-popup.js가 사용).
+  // orient="portrait"면 세로(피벗) 모니터용 길쭉한 창 — 세로 모니터가 있으면 거기 자동 배치.
+  openShellPopout: (page: string, title?: string, orient?: string) => ipcRenderer.invoke("shell:popout", page, title, orient),
 
   // 화면 크기(UI 배율) — 설정 › 화면 크기와 단축키(Cmd/Ctrl +·-·0)가 쓴다.
   // 배율은 메인 프로세스가 webContents 단위로 걸어 허브 iframe까지 함께 적용된다.
@@ -73,7 +76,8 @@ const gijoApi = {
   setAgentName: (agentId: string, name: string | null) => api.agentsApi.setName(agentId, name),
   getAgentRecommendations: () => api.modelDexApi.agentRecommendations(),
   listModels: () => api.localEngineApi.models(),
-  sendInstruction: (text: string, sessionId?: string) => api.dispatchApi.send(text, sessionId),
+  // screen: 지시가 들어온 화면 맥락 — 팝업 셸에서는 "지금 보고 있는 팝업"이 맥락이 된다(없으면 현재 문서).
+  sendInstruction: (text: string, sessionId?: string, screen?: string) => api.dispatchApi.send(text, sessionId, screen),
   // 결재판 승인 실행 — 쓰기 도구는 이 경로로만 실행된다(지시만으로는 실행 안 됨).
   approveAgentTool: (tool: string, args: Record<string, string>, instruction = "") => api.dispatchApi.approve(tool, args, instruction),
   undoAgentTool: (id?: string) => api.dispatchApi.undo(id),
