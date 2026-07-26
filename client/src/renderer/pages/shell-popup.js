@@ -100,8 +100,7 @@
     '<span class="t" id="shTitle"></span><span class="sp"></span>' +
     '<span class="hb" id="shPin" title="핀 — 자동 닫힘에서 제외">📌</span>' +
     '<span class="hb" id="shReload" title="새로고침">⟳</span>' +
-    '<span class="hb" id="shPopout" title="창으로 분리 — 별도 창으로 떼어냄(모니터 2대용)">🗗</span>' +
-    '<span class="hb" id="shPopoutV" title="세로 창으로 분리 — 세로(피벗) 모니터 관제용. 세로 모니터가 있으면 거기에 꽉 차게 열립니다">⇳</span>' +
+    '<span class="hb" id="shPopout" title="창으로 분리 — 별도 창으로 떼어냄. 가로/세로 배치는 그 창 안에서 바꿉니다">🗗</span>' +
     '<span class="hb" id="shFull" title="전체 화면으로 이동(기존 방식)">⛶</span>' +
     '<span class="hb" id="shMin" title="대시보드로 (팝업은 위 슬롯에 유지)">▁</span>' +
     '<span class="hb" id="shClose" title="닫기">✕</span></div>' +
@@ -335,16 +334,14 @@
     var s = findSlot(activeKey); if (!s) return;
     try { s.el.contentWindow.location.reload(); } catch (e) { s.el.src = embedSrc(s.key); }
   });
-  function popout(orient) {
+  document.getElementById("shPopout").addEventListener("click", function () {
     var s = findSlot(activeKey); if (!s) return;
     if (window.gijo && window.gijo.openShellPopout) {
-      window.gijo.openShellPopout(s.key, s.label, orient);
+      window.gijo.openShellPopout(s.key, s.label);
       close(s.key, true); // 분리한 창은 슬롯에서 빠진다(상한 미점유)
-      showToast('"' + s.label + '"을(를) ' + (orient === "portrait" ? "세로 " : "") + "별도 창으로 분리했습니다");
+      showToast('"' + s.label + '"을(를) 별도 창으로 분리했습니다 — 가로/세로는 그 창에서 바꿉니다');
     }
-  }
-  document.getElementById("shPopout").addEventListener("click", function () { popout(); });
-  document.getElementById("shPopoutV").addEventListener("click", function () { popout("portrait"); });
+  });
   document.getElementById("shFull").addEventListener("click", function () {
     var s = findSlot(activeKey); if (!s) return;
     if (window.gijo && window.gijo.navigateTo) window.gijo.navigateTo(s.key);

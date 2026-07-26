@@ -55,6 +55,8 @@ const gijoApi = {
   // 팝업 셸 "창으로 분리"(혼합 방식) — 팝업으로 보던 화면을 별도 창으로 떼어낸다(shell-popup.js가 사용).
   // orient="portrait"면 세로(피벗) 모니터용 길쭉한 창 — 세로 모니터가 있으면 거기 자동 배치.
   openShellPopout: (page: string, title?: string, orient?: string) => ipcRenderer.invoke("shell:popout", page, title, orient),
+  // 분리창 자신이 가로/세로를 전환한다(hub.html 헤더 버튼) — 모니터 배치는 그 창에서.
+  setPopoutOrientation: (orient: string) => ipcRenderer.invoke("shell:popoutOrient", orient),
 
   // 화면 크기(UI 배율) — 설정 › 화면 크기와 단축키(Cmd/Ctrl +·-·0)가 쓴다.
   // 배율은 메인 프로세스가 webContents 단위로 걸어 허브 iframe까지 함께 적용된다.

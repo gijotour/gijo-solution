@@ -142,6 +142,29 @@
     loadHealth(); loadUser();
     $("homeLink").addEventListener("click", () => window.gijo.navigateTo("dashboard.html"));
     $("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("hub.html?g=settings"));
+
+    // 분리창(popout=1)일 때 — 가로/세로 전환 버튼(2026-07-26 사용자 결정: 모니터 배치는 이 창에서).
+    // 버튼에는 "누르면 바뀔 방향"을 쓴다: 가로 창이면 [세로], 세로 창이면 [가로].
+    if (params.get("popout") === "1" && window.gijo.setPopoutOrientation) {
+      let orient = params.get("orient") === "portrait" ? "portrait" : "landscape";
+      const ob = document.createElement("div");
+      ob.className = "icon-btn";
+      ob.id = "orientBtn";
+      ob.style.cssText = "width:auto;padding:0 10px;font-size:11px;font-weight:800;";
+      const renderOb = () => {
+        ob.textContent = orient === "portrait" ? "↔ 가로" : "↕ 세로";
+        ob.title = orient === "portrait"
+          ? "가로 창으로 전환 — 모니터 오른쪽 절반"
+          : "세로 창으로 전환 — 세로(피벗) 모니터 관제용, 세로 모니터가 있으면 거기로";
+      };
+      renderOb();
+      ob.addEventListener("click", async () => {
+        orient = orient === "portrait" ? "landscape" : "portrait";
+        try { await window.gijo.setPopoutOrientation(orient); } catch (e) {}
+        renderOb();
+      });
+      $("settingsBtn").insertAdjacentElement("beforebegin", ob);
+    }
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
   else boot();

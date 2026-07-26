@@ -14,6 +14,7 @@ import { isDangerous } from "./terminalPolicy";
 
 let mainWindow: BrowserWindow | null = null;
 let officeWindow: BrowserWindow | null = null; // "우리 AI 팀 사무실" 별도 창(시안 B) — 관제 모니터 상시용
+let quitConfirmed = false; // 메인 창 닫기 확인을 통과했는가 — 재시작·업데이트는 true로 건너뛴다
 let bundledServerProcess: ChildProcess | null = null;
 
 // 페이지 전체 네비게이션(loadFile) 시마다 preload가 재실행되어 사라지는 인증 토큰/서버 주소를
@@ -144,6 +145,27 @@ function createMainWindow(): void {
   // 최초 화면은 로그인. 인증 성공 후 renderer/core.ts가 대시보드로 전환한다.
   mainWindow.loadFile(path.join(__dirname, "../src/renderer/pages/login.html"));
 
+  // 대시보드(메인) 창 닫기 확인(2026-07-26 사용자 요청) — 진행 중 대화·열린 팝업이 있는 채로
+  // 실수로 X를 눌러 통째로 잃는 것을 막는다. 팝업·사무실·분리 창은 해당 없음(닫아도 잃을 게 없다).
+  // 앱 재시작(app:restart)·업데이트 설치는 quitConfirmed로 확인 없이 지나간다.
+  mainWindow.on("close", (e) => {
+    if (quitConfirmed || !mainWindow) return;
+    const r = dialog.showMessageBoxSync(mainWindow, {
+      type: "question",
+      buttons: ["닫기", "취소"],
+      defaultId: 1,
+      cancelId: 1,
+      title: "GIJO AS 종료",
+      message: "GIJO AS를 닫을까요?",
+      detail: "진행 중인 대화와 열린 팝업 화면이 함께 닫힙니다.\n대화는 작업 세션에 저장돼 다음 접속 때 이어볼 수 있습니다.",
+    });
+    if (r !== 0) {
+      e.preventDefault();
+      return;
+    }
+    quitConfirmed = true;
+  });
+
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
@@ -197,41 +219,44 @@ ipcMain.handle("office:setAlwaysOnTop", async (_e, on: boolean) => {
 // 사무실 창처럼 별도 창으로 떼어낸다(모니터 2대에서 화면을 펼쳐놓고 대시보드에서 지시하는 용도).
 // 페이지당 1개 — 이미 떠 있으면 앞으로만 가져온다. 인증은 메인 프로세스 authState 공유.
 const popoutWindows = new Map<string, BrowserWindow>();
+
+// 분리창은 "화면 절반"으로 연다(2026-07-26 사용자 요청) — 나머지 절반을 다른 용도로 쓰고,
+// 위아래 크기는 자유롭게 조정한다(minHeight를 낮게 둬 절반보다 더 줄일 수도 있게).
+// · 가로: 기준 창이 떠 있는 모니터의 오른쪽 절반 — 왼쪽에 대시보드를 두고 보면서 지시하는 배치.
+//   절반이 콘텐츠 최소폭(760)보다 좁으면 760까지는 보장(주 모니터가 세로형인 환경 실측).
+// · 세로: 세로로 세운 모니터가 있으면 그 모니터의 위쪽 절반, 없으면 기준 모니터에 세로 비율 절반.
+// 가로/세로 전환은 분리창 자신이 헤더 버튼으로 요청한다(shell:popoutOrient) — 2026-07-26 사용자 결정.
+function popoutBounds(portrait: boolean, ref?: Electron.Rectangle): { x?: number; y?: number; width: number; height: number } {
+  if (portrait) {
+    const pd = screen.getAllDisplays().find((d) => d.workAreaSize.height > d.workAreaSize.width);
+    if (pd) {
+      return { x: pd.workArea.x + 12, y: pd.workArea.y + 12, width: pd.workArea.width - 24, height: Math.round(pd.workArea.height / 2) };
+    }
+    const wa = (ref ? screen.getDisplayMatching(ref) : screen.getPrimaryDisplay()).workArea;
+    return { width: Math.min(1000, Math.max(760, Math.round(wa.height * 0.62))), height: Math.round(wa.height / 2) };
+  }
+  const base = ref ?? (mainWindow && !mainWindow.isDestroyed() ? mainWindow.getBounds() : undefined);
+  const disp = base ? screen.getDisplayMatching(base) : screen.getPrimaryDisplay();
+  const wa = disp.workArea;
+  const half = Math.max(760, Math.round(wa.width / 2));
+  return { x: wa.x + Math.max(0, wa.width - half), y: wa.y, width: Math.min(half, wa.width), height: wa.height };
+}
+
 ipcMain.handle("shell:popout", async (_e, page: string, title?: string, orient?: string) => {
-  const portrait = orient === "portrait"; // 세로(피벗) 모니터 관제용 — 2026-07-26 사용자 요청
-  const key = String(page) + (portrait ? "#portrait" : "");
+  const portrait = orient === "portrait";
+  const key = String(page); // 페이지당 창 1개 — 가로/세로는 그 창 안에서 전환하므로 키에 넣지 않는다
   const existing = popoutWindows.get(key);
   if (existing && !existing.isDestroyed()) {
     existing.focus();
     return;
   }
-  // 분리창은 "화면 절반"으로 연다(2026-07-26 사용자 요청) — 나머지 절반을 다른 용도로 쓰고,
-  // 위아래 크기는 자유롭게 조정한다(minHeight를 낮게 둬 절반보다 더 줄일 수도 있게).
-  // · 가로(🗗): 그 모니터의 오른쪽 절반 — 왼쪽에 대시보드를 두고 보면서 지시하는 배치.
-  // · 세로(⇳): 세로로 세운 모니터가 있으면 그 모니터의 위쪽 절반, 없으면 주 모니터에 세로 비율 절반.
-  let pb: { x?: number; y?: number; width: number; height: number };
-  if (portrait) {
-    const pd = screen.getAllDisplays().find((d) => d.workAreaSize.height > d.workAreaSize.width);
-    if (pd) {
-      pb = { x: pd.workArea.x + 12, y: pd.workArea.y + 12, width: pd.workArea.width - 24, height: Math.round(pd.workArea.height / 2) };
-    } else {
-      const wa = screen.getPrimaryDisplay().workAreaSize;
-      pb = { width: Math.min(1000, Math.max(760, Math.round(wa.height * 0.62))), height: Math.round(wa.height / 2) };
-    }
-  } else {
-    // 대시보드(메인 창)가 떠 있는 모니터 기준 — 주 모니터가 세로형이면 절반이 너무 좁아진다.
-    // 절반이 콘텐츠 최소폭(760)보다 좁으면 760까지는 보장한다.
-    const disp = mainWindow && !mainWindow.isDestroyed() ? screen.getDisplayMatching(mainWindow.getBounds()) : screen.getPrimaryDisplay();
-    const wa = disp.workArea;
-    const half = Math.max(760, Math.round(wa.width / 2));
-    pb = { x: wa.x + Math.max(0, wa.width - half), y: wa.y, width: Math.min(half, wa.width), height: wa.height };
-  }
+  const pb = popoutBounds(portrait);
   const win = new BrowserWindow({
     x: pb.x,
     y: pb.y,
     width: pb.width,
     height: pb.height,
-    minWidth: portrait ? 700 : 760,
+    minWidth: 700,
     minHeight: 420,
     backgroundColor: "#0a0e1a",
     title: title ? `GIJO AS — ${title}` : "GIJO AS",
@@ -250,12 +275,22 @@ ipcMain.handle("shell:popout", async (_e, page: string, title?: string, orient?:
   bindZoom(win); // 분리 창도 같은 화면 크기를 따른다
   popoutWindows.set(key, win);
   win.on("closed", () => { popoutWindows.delete(key); });
-  // ⚠ 로드는 원래 page로 — key에는 창 구분용 "#portrait"가 붙어 있어 그대로 쓰면
-  //   g 파라미터가 "analysis#portrait"가 되어 "알 수 없는 허브"가 뜬다(실화면 검증에서 잡은 버그).
+  // popout=1·orient — 분리창임을 페이지에 알린다(허브가 가로/세로 전환 버튼을 그린다).
+  // ⚠ 로드 주소에 창 구분용 접미사를 섞으면 g 파라미터가 오염돼 "알 수 없는 허브"가 뜬다(실측 버그).
   const [file, qs] = String(page).split("?");
-  const query: Record<string, string> = {};
+  const query: Record<string, string> = { popout: "1", orient: portrait ? "portrait" : "landscape" };
   if (qs) for (const [k, v] of new URLSearchParams(qs)) query[k] = v;
-  await win.loadFile(path.join(__dirname, `../src/renderer/pages/${file}`), qs ? { query } : undefined);
+  await win.loadFile(path.join(__dirname, `../src/renderer/pages/${file}`), { query });
+});
+
+// 분리창 안에서 가로/세로 전환(2026-07-26 사용자 결정 — 모니터 배치는 그 창에서 바꾼다).
+ipcMain.handle("shell:popoutOrient", async (e, orient: string) => {
+  const win = BrowserWindow.fromWebContents(e.sender);
+  if (!win || win.isDestroyed()) return { orient };
+  const cur = win.getBounds();
+  const pb = popoutBounds(orient === "portrait", cur);
+  win.setBounds({ x: pb.x ?? cur.x, y: pb.y ?? cur.y, width: pb.width, height: pb.height });
+  return { orient };
 });
 
 // ── 화면 크기(UI 배율) ────────────────────────────────────────────────────────
@@ -330,6 +365,7 @@ ipcMain.handle("ui:toggleFullscreen", () => {
 });
 // 앱 재시작 — 업데이트 적용·화면 이상 시 원클릭 복구.
 ipcMain.handle("app:restart", () => {
+  quitConfirmed = true; // 의도된 재시작 — 닫기 확인을 띄우지 않는다
   app.relaunch();
   app.exit(0);
 });
@@ -528,6 +564,7 @@ ipcMain.handle("update:install", async (event, version: string) => {
   );
   const child = spawn(dest, [], { detached: true, stdio: "ignore" });
   child.unref();
+  quitConfirmed = true; // 업데이트 설치를 위한 의도된 종료 — 닫기 확인을 띄우지 않는다
   setTimeout(() => app.quit(), 300); // 설치 프로그램이 뜰 시간을 살짝 준다
   return { ok: true };
 });

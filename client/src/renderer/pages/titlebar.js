@@ -139,6 +139,12 @@
     menuEl.appendChild(item("➕", "확대", isMac ? "⌘ +" : "Ctrl +", function () { window.gijo.stepUiZoom(1); }));
     menuEl.appendChild(item("➖", "축소", isMac ? "⌘ −" : "Ctrl −", function () { window.gijo.stepUiZoom(-1); }));
     menuEl.appendChild(item("🖥", "전체 화면 (관제 모드)", isMac ? "⌃⌘F" : "F11", function () { window.gijo.toggleFullscreen(); closeMenu(); }));
+    // 창 배치 — 가로/세로 절반(2026-07-26 사용자 요청: 전체적으로). 어느 창(대시보드·사무실·분리창)에서
+    // 열어도 자기 창이 움직인다. 세로는 세로(피벗) 모니터가 있으면 그 모니터로 간다.
+    if (window.gijo.setPopoutOrientation) {
+      menuEl.appendChild(item("↔", "이 창을 가로 절반으로", "", function () { window.gijo.setPopoutOrientation("landscape"); closeMenu(); }));
+      menuEl.appendChild(item("↕", "이 창을 세로 절반으로", "세로 모니터", function () { window.gijo.setPopoutOrientation("portrait"); closeMenu(); }));
+    }
 
     if (authed) {
       menuEl.appendChild(sep());

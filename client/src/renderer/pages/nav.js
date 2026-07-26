@@ -207,14 +207,18 @@
           // (2026-07-26 사용자 결정. 팝업 미지원 메뉴는 기존 챗봇 열기 그대로.)
           botMark.textContent = it.popup ? "⧉" : "🤖";
           botMark.title = it.popup
-            ? it.label + " 화면을 팝업으로 열기 — 대시보드 명령창·대화가 유지됩니다"
+            ? it.label + " — 별도 창으로 열기. 가로/세로 배치는 그 창 안에서 바꿉니다"
             : it.label + " 화면의 챗봇 열기 — 그 화면 데이터로 바로 답합니다";
           botMark.addEventListener("click", function (ev) {
             ev.stopPropagation();
+            // ⧉ = 별도 창으로 열기(2026-07-26 사용자 결정) — 어느 화면에서든 동작.
+            // 메뉴 이름 클릭은 대시보드에선 팝업, 다른 화면에선 이동(기존 그대로).
+            if (it.popup && window.gijo && window.gijo.openShellPopout) {
+              window.gijo.openShellPopout(it.page, it.label);
+              return;
+            }
             if (it.page === here && openChatHere()) return;
             try { localStorage.setItem("gijo:openChatOnLoad", String(Date.now())); } catch (e) {}
-            // 팝업 셸이 있으면(대시보드) 화면을 팝업으로 열고 챗봇도 켠다 — 명령창·대화 유지.
-            if (it.popup && window.gijoShell) { window.gijoShell.open(it.page, it.label, { chat: true }); return; }
             if (it.page !== here) go(it.page);
           });
           el.appendChild(botMark);
