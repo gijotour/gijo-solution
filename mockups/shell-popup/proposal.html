@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>대시보드 고정 + 메뉴 팝업 — 구조 시안</title>
+<style>
+  :root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--line:rgba(255,255,255,.08);
+        --line2:rgba(255,255,255,.16);--text:#e7eaf3;--muted:#8b93ab;--muted2:#5f6785;
+        --blue:#3b82f6;--blue2:#5fa1ff;--teal:#1eb980;--amber:#f0a020;--red:#e2483d;--purple:#8b7cf0;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#171a21;color:var(--text);font:13px/1.6 "Malgun Gothic","Apple SD Gothic Neo",sans-serif;padding:20px}
+  .wrap{max-width:1240px;margin:0 auto}
+  .note{background:rgba(59,130,246,.1);border:1px solid var(--line2);border-radius:10px;padding:13px 15px;margin-bottom:16px;font-size:12.5px;color:var(--muted)}
+  .note b{color:var(--text)}
+  h2{font-size:12.5px;color:var(--muted);margin:20px 0 9px;font-weight:700}
+
+  .app{background:var(--bg);border:1px solid var(--line2);border-radius:12px;overflow:hidden;position:relative;height:700px}
+  .tb{display:flex;align-items:center;gap:10px;padding:8px 14px;background:var(--panel-2);border-bottom:1px solid var(--line);font-size:12px}
+  .tb .b{font-weight:800}
+  .tb .sp{flex:1}
+  .pill{font-size:11px;border:1px solid var(--line2);border-radius:20px;padding:3px 10px;color:var(--muted)}
+
+  /* ① 팝업 관리 바 — 대시보드에 상주 */
+  .dock{display:flex;align-items:center;gap:7px;padding:7px 12px;background:#0c1322;border-bottom:1px solid var(--line);overflow-x:auto}
+  .dock .lb{font-size:10.5px;font-weight:800;color:var(--muted2);white-space:nowrap;margin-right:3px}
+  .tab{display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--line2);border-radius:8px;
+       padding:5px 9px;font-size:11.5px;white-space:nowrap;cursor:pointer}
+  .tab.on{border-color:var(--blue);background:rgba(59,130,246,.14);color:var(--blue2)}
+  .tab .x{color:var(--muted2);font-size:11px}
+  .tab .dot{width:6px;height:6px;border-radius:50%;background:var(--teal)}
+  .tab .dot.warn{background:var(--amber)}
+  .add{background:none;border:1px dashed var(--line2);color:var(--muted);border-radius:8px;padding:5px 10px;font-size:11.5px;cursor:pointer}
+  .dock .right{margin-left:auto;display:flex;gap:6px}
+  .mini{font-size:10.5px;color:var(--muted2);border:1px solid var(--line);border-radius:7px;padding:4px 8px;cursor:pointer;white-space:nowrap}
+
+  /* ② 대시보드(껍데기) — 늘 살아 있다 */
+  .stage{display:grid;grid-template-columns:214px 1fr;height:calc(100% - 74px)}
+  .side{border-right:1px solid var(--line);padding:12px 10px;font-size:12px;color:var(--muted)}
+  .side .g{font-size:10px;color:var(--muted2);margin:12px 4px 5px;font-weight:700}
+  .side .it{padding:7px 9px;border-radius:7px;cursor:pointer}
+  .side .it:hover{background:rgba(255,255,255,.04);color:var(--text)}
+  .side .it.on{background:rgba(59,130,246,.12);color:#fff;box-shadow:inset 3px 0 0 var(--blue)}
+  .main{position:relative;padding:16px 18px;display:flex;flex-direction:column;min-height:0}
+  .chat{flex:1;min-height:0;overflow:auto;display:flex;flex-direction:column;gap:8px}
+  .row{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:9px 12px;font-size:12.5px}
+  .row .w{font-size:11px;font-weight:800;color:var(--blue2);margin-bottom:2px}
+  .row.me .w{color:var(--teal)}
+  .composer{display:flex;gap:8px;align-items:center;background:var(--panel);border:1px solid var(--line2);border-radius:12px;padding:8px 10px;margin-top:10px}
+  .composer input{flex:1;background:none;border:0;outline:none;color:var(--text);font-size:13px}
+  .composer .go{background:var(--blue);border:0;color:#fff;border-radius:9px;padding:8px 16px;font-weight:800;font-size:12.5px}
+  .tips{font-size:11px;color:var(--muted2);margin-top:8px;padding:0 3px}
+  .tips b{color:var(--muted);font-weight:800;margin-right:6px}
+
+  /* ③ 팝업 — 화면을 덮되 대시보드는 뒤에 살아 있다 */
+  .pop{position:absolute;left:236px;right:18px;top:96px;bottom:96px;background:var(--panel-2);
+       border:1px solid var(--line2);border-radius:12px;box-shadow:0 24px 70px rgba(0,0,0,.55);display:flex;flex-direction:column}
+  .pop .h{display:flex;align-items:center;gap:9px;padding:9px 13px;border-bottom:1px solid var(--line);font-size:12.5px;font-weight:800}
+  .pop .h .sp{flex:1}
+  .pop .h .ic{font-size:11px;color:var(--muted2);cursor:pointer;border:1px solid var(--line);border-radius:6px;padding:3px 7px}
+  .pop .b{flex:1;padding:14px;overflow:auto;color:var(--muted);font-size:12px}
+  .fake{background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:11px 13px;margin-bottom:9px}
+  .fake .t{color:#fff;font-weight:700;font-size:12.5px;margin-bottom:4px}
+  table{width:100%;border-collapse:collapse;font-size:11.5px}
+  th{text-align:left;color:var(--muted2);font-weight:600;padding:6px 8px;border-bottom:1px solid var(--line)}
+  td{padding:7px 8px;border-bottom:1px solid var(--line);color:var(--text)}
+</style></head><body>
+<div class="wrap">
+
+<div class="note">
+  <b>무엇이 달라지나</b> — 로그인하면 <b>대시보드가 껍데기로 고정</b>되고 닫히지 않습니다.
+  메뉴는 그 위에 <b>팝업</b>으로 열립니다. 대시보드는 뒤에 살아 있으므로 대화·입력·진행 중 작업이 사라지지 않습니다.
+  <br><b>핵심</b> — 상단에 <b>팝업 관리 바</b>를 둡니다. 지금 열린 화면이 한 줄로 보이고, 눌러 전환·닫기 합니다.
+  화면이 살아 있으니 다시 열 때 <b>즉시</b> 뜹니다(지금은 매번 1~2초 다시 읽습니다).
+</div>
+
+<h2>기본 — 팝업이 열린 상태</h2>
+<div class="app">
+  <div class="tb"><span class="b">GIJO AS</span><span class="pill">● 서버 연결 양호</span><span class="sp"></span><span class="pill">⏳ 세션 29:41</span></div>
+
+  <!-- ① 팝업 관리 바 -->
+  <div class="dock">
+    <span class="lb">열린 화면</span>
+    <span class="tab on"><span class="dot"></span>취약점<span class="x">✕</span></span>
+    <span class="tab"><span class="dot"></span>자산 허브<span class="x">✕</span></span>
+    <span class="tab"><span class="dot warn"></span>조치·승인 <b style="color:var(--amber)">2</b><span class="x">✕</span></span>
+    <button class="add">＋ 메뉴 열기</button>
+    <span class="right">
+      <span class="mini">모두 닫기</span>
+      <span class="mini">⤢ 넓게</span>
+    </span>
+  </div>
+
+  <div class="stage">
+    <div class="side">
+      <div class="g">관제</div>
+      <div class="it on">대시보드</div>
+      <div class="it">내 업무 바로가기</div>
+      <div class="it">보안 분석</div>
+      <div class="it">위협 인텔리전스</div>
+      <div class="g">자산·조치</div>
+      <div class="it">자산 허브</div>
+      <div class="it">조치·승인</div>
+      <div class="it">보안제품</div>
+    </div>
+
+    <div class="main">
+      <div class="chat">
+        <div class="row me"><div class="w">정요한 → 보안 총괄</div>미조치 취약점 알려줘</div>
+        <div class="row"><div class="w">보안 총괄</div>미조치 12건 중 KEV 1건입니다. 샘플-웹서버의 OpenSSH 취약점이 가장 급합니다.</div>
+        <div class="row me"><div class="w">정요한 → 보안 총괄</div>그거 담당 지정해줘</div>
+      </div>
+      <div class="composer"><span style="color:var(--blue2)">＋</span><input placeholder="보안 총괄에게 지시…"><button class="go">전송</button></div>
+      <div class="tips"><b>이렇게 물어보세요</b>오늘 뭐부터 볼까? · 긴급한 취약점 알려줘 · 이번 주 점검 일정</div>
+    </div>
+  </div>
+
+  <!-- ③ 팝업 -->
+  <div class="pop">
+    <div class="h">🩹 취약점<span class="sp"></span>
+      <span class="ic">⤢ 넓게</span><span class="ic">— 내리기</span><span class="ic">✕ 닫기</span></div>
+    <div class="b">
+      <div class="fake"><div class="t">미조치 12건 · KEV 1건</div>급한 순서(KEV→EPSS→VPR)로 정렬됩니다.</div>
+      <table>
+        <tr><th>심각도</th><th>취약점</th><th>자산</th><th>담당</th></tr>
+        <tr><td style="color:#ff7a6e">high</td><td>OpenSSH &lt; 9.6 사용자 열거 (CVE-2024-6387)</td><td>샘플-웹서버</td><td>미지정</td></tr>
+        <tr><td style="color:var(--amber)">medium</td><td>Oracle DB CPU 미적용 (외 16건)</td><td>샘플-웹서버</td><td>미지정</td></tr>
+        <tr><td style="color:var(--amber)">medium</td><td>[IW-32] 데이터 평문 전송</td><td>안전대부 본인인증</td><td>미지정</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="note" style="margin-top:18px">
+  <b>팝업 관리 바가 하는 일</b><br>
+  · 열린 화면을 한 줄로 — 눌러서 전환, ✕로 닫기<br>
+  · <b>점 색으로 상태</b> — 초록=평시, 주황=처리 대기(예: 승인 2건). 닫아둬도 알림이 뜹니다<br>
+  · <b>＋ 메뉴 열기</b> — 전체 메뉴에서 골라 새 팝업<br>
+  · <b>모두 닫기</b> — 대시보드만 남깁니다. 자원이 쌓이는 걸 담당자가 직접 정리<br>
+  · <b>⤢ 넓게</b> — 팝업을 화면 가득(대시보드는 뒤에 그대로)
+</div>
+
+<div class="note" style="background:rgba(240,160,32,.1)">
+  <b>정하고 갈 것 3가지</b><br>
+  ① <b>동시에 몇 개까지</b> 열어둘지 — 화면마다 15~30초 폴링이 돌아, 5개면 서버 부하 5배입니다.
+  제안: <b>최대 4개</b>, 넘으면 가장 오래된 것 자동 닫기. 안 보이는 팝업은 폴링을 멈춥니다.<br>
+  ② <b>허브 탭과의 관계</b> — 지금 화면을 탭으로 묶는 hub가 이미 있습니다. 여는 길이 둘이면 헷갈립니다.
+  제안: <b>팝업으로 일원화</b>하고 허브 탭은 걷어냅니다.<br>
+  ③ <b>어디부터</b> — 26개를 한 번에 옮기지 않습니다. 제안: <b>취약점 · 자산 허브 · 조치·승인</b> 3개 먼저,
+  자원·체감을 재고 나머지를 판단합니다.
+</div>
+
+</div></body></html>
