@@ -57,6 +57,9 @@
     "#shellHead .hb:hover{color:#fff;border-color:var(--border-strong,#28365a);background:rgba(255,255,255,.05);}" +
     "#shellHead .hb.pin-on{color:var(--amber,#f0a020);border-color:rgba(240,160,32,.5);}" +
     "#shellBody{flex:1;min-height:0;position:relative;background:var(--bg,#0a0f1e);}" +
+    // 아래 모서리 크기조절 손잡이(2026-07-26 사용자 요청 — 위아래 자유) — 끌면 높이 조절, 더블클릭=자동.
+    "#shellGrip{position:absolute;left:0;right:0;bottom:0;height:8px;cursor:ns-resize;z-index:6;}" +
+    "#shellGrip:hover,#shellGrip.drag{background:linear-gradient(to top,rgba(59,130,246,.45),transparent);}" +
     "#shellBody iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:none;}" +
     "#shellBody iframe.on{display:block;}" +
     // 팝업이 떠 있는 동안 — 컴포저(지휘 콘솔 박스)를 하단에 고정해 늘 보이게, 활동 로그는 낮게.
@@ -101,7 +104,8 @@
     '<span class="hb" id="shFull" title="전체 화면으로 이동(기존 방식)">⛶</span>' +
     '<span class="hb" id="shMin" title="대시보드로 (팝업은 위 슬롯에 유지)">▁</span>' +
     '<span class="hb" id="shClose" title="닫기">✕</span></div>' +
-    '<div id="shellBody"></div>';
+    '<div id="shellBody"></div>' +
+    '<div id="shellGrip" title="끌어서 높이 조절 · 더블클릭 = 자동(꽉 차게)"></div>';
   document.body.appendChild(layer);
 
   var toast = document.createElement("div");
@@ -128,6 +132,11 @@
     toast._h = setTimeout(function () { toast.style.display = "none"; }, 3000);
   }
 
+  // 사용자가 고른 팝업 높이(px) — 없으면 자동(컴포저 위까지 꽉 차게). 기억한다.
+  var HKEY = "gijo:shell:height";
+  var userH = null;
+  try { userH = Number(localStorage.getItem(HKEY)) || null; } catch (e) {}
+
   // ── 위치 계산 — 사이드바 오른쪽 ~ 엣지 거터(46px), 관리 바 아래 ~ 컴포저 위 ──
   function layout() {
     if (!visible) return;
@@ -140,10 +149,16 @@
     var acc = document.getElementById("accConsole");
     var accH = acc ? acc.offsetHeight : 120;
     var right = 54; // 엣지 탭 거터 46px + 여백
+    // 높이: 자동=컴포저 위까지. 사용자가 손잡이로 줄였으면 그 높이(최소 240px, 컴포저 침범 금지).
+    var minGap = accH + 20;
+    var gap = minGap;
+    if (userH) {
+      gap = Math.max(minGap, window.innerHeight - top - Math.max(240, userH));
+    }
     layer.style.left = navRight + "px";
     layer.style.top = top + "px";
     layer.style.right = right + "px";
-    layer.style.bottom = (accH + 20) + "px";
+    layer.style.bottom = gap + "px";
     // 배경막 — 관리 바 아래 전부(사이드바 제외). 오른쪽 엣지 탭(z900)은 위에 떠서 계속 눌린다.
     dim.style.left = navRight + "px";
     dim.style.top = Math.round(bar.getBoundingClientRect().bottom) + "px";
@@ -301,6 +316,33 @@
   });
   window.addEventListener("keydown", function (e) { if (e.key === "Escape" && visible) minimize(); });
   dim.addEventListener("click", minimize); // 배경막 클릭 = 대시보드로(모달 관례)
+
+  // 아래 모서리 끌어서 높이 조절 — 드래그 중엔 iframe이 마우스를 삼키지 않게 잠시 꺼둔다.
+  var grip = document.getElementById("shellGrip");
+  grip.addEventListener("mousedown", function (e) {
+    e.preventDefault();
+    var startY = e.clientY, startH = layer.offsetHeight;
+    grip.classList.add("drag");
+    document.body.style.userSelect = "none";
+    var frames = document.querySelectorAll("#shellBody iframe");
+    Array.prototype.forEach.call(frames, function (f) { f.style.pointerEvents = "none"; });
+    function mv(ev) { userH = Math.max(240, startH + (ev.clientY - startY)); layout(); }
+    function up() {
+      document.removeEventListener("mousemove", mv);
+      document.removeEventListener("mouseup", up);
+      grip.classList.remove("drag");
+      document.body.style.userSelect = "";
+      Array.prototype.forEach.call(frames, function (f) { f.style.pointerEvents = ""; });
+      try { localStorage.setItem(HKEY, String(Math.round(userH))); } catch (e2) {}
+    }
+    document.addEventListener("mousemove", mv);
+    document.addEventListener("mouseup", up);
+  });
+  grip.addEventListener("dblclick", function () { // 자동(꽉 차게)으로 복귀
+    userH = null;
+    try { localStorage.removeItem(HKEY); } catch (e) {}
+    layout();
+  });
 
   // ＋ 메뉴 — 팝업으로 열 수 있는 화면 목록(nav.js GROUPS의 popup:true와 같은 목록 유지)
   var PLUS_ITEMS = [
