@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>GIJO AS — VEX 내보내기 · 자산 기본 담당자 진입점 시안</title>
+<style>
+  :root{--bg:#0a0f1e;--panel:#121a2e;--panel-2:#0e1526;--border:#1e2a44;--border-strong:#28365a;
+    --text:#e6eaf3;--muted:#8b93ab;--muted-2:#5c6580;--blue:#3b82f6;--blue-light:#7ab0ff;
+    --teal:#2dd4bf;--amber:#f0a020;--purple:#8b7cf0;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:"Pretendard","Malgun Gothic",sans-serif;padding:0 0 40px;}
+  .note{background:#1a2340;border-bottom:1px solid var(--border-strong);padding:9px 18px;font-size:12px;color:var(--blue-light);}
+  .note b{color:#fff;}
+  .wrap{max-width:1080px;margin:0 auto;padding:18px;}
+  h2{font-size:14px;font-weight:800;margin:22px 0 4px;display:flex;align-items:center;gap:8px;}
+  h2 .n{background:var(--blue);color:#fff;width:20px;height:20px;border-radius:6px;font-size:11px;display:flex;align-items:center;justify-content:center;}
+  .sub{font-size:11.5px;color:var(--muted);margin-bottom:10px;}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;}
+  .bar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .btn{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);border-radius:8px;padding:6px 12px;font-size:11.5px;font-weight:800;cursor:pointer;}
+  .btn.pri{background:rgba(59,130,246,.16);border-color:var(--blue);color:var(--blue-light);}
+  .btn.gh{background:rgba(139,124,240,.14);border-color:var(--purple);color:#cfc4ff;}
+  .info{width:15px;height:15px;border-radius:50%;border:1px solid var(--border-strong);color:var(--muted-2);font-size:9.5px;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;}
+  .chips{display:flex;gap:6px;margin-left:auto;}
+  .chip{font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;}
+  .c-inv{color:var(--amber);background:rgba(240,160,32,.15);}
+  .c-aff{color:#f5928a;background:rgba(226,72,61,.15);}
+  .c-fix{color:var(--teal);background:rgba(45,212,191,.15);}
+  .c-na{color:var(--muted);background:rgba(255,255,255,.07);}
+  table{width:100%;border-collapse:collapse;font-size:12px;}
+  th{text-align:left;font-size:10.5px;color:var(--muted-2);font-weight:800;padding:7px 8px;border-bottom:1px solid var(--border);}
+  td{padding:9px 8px;border-bottom:1px solid rgba(255,255,255,.05);}
+  select,input{background:#0a1120;border:1px solid var(--border-strong);color:var(--text);border-radius:7px;padding:5px 9px;font-size:11.5px;}
+  .cmt{background:#131c33;border-left:3px solid var(--blue);padding:8px 12px;font-size:11px;color:var(--muted);margin:6px 0 14px;line-height:1.7;border-radius:0 8px 8px 0;}
+  .cmt b{color:var(--blue-light);}
+</style>
+</head>
+<body>
+
+<div class="note">
+  <span><b>만들어졌지만 화면에서 닿을 수 없던 두 기능</b>의 진입점입니다 — 새 화면 없이, 버튼 하나·칸 하나만 더합니다.</span>
+</div>
+
+<div class="wrap">
+
+  <h2><span class="n">1</span>VEX 내보내기 — 조치·승인 화면 상단</h2>
+  <div class="sub">협력사·고객사가 "그 CVE 괜찮나요?" 물을 때 캡처 대신 표준 파일 하나로 답합니다.</div>
+  <div class="panel">
+    <div class="bar">
+      <b style="font-size:13px">조치·승인 — Finding 검토</b>
+      <span class="info">i</span>
+      <div class="chips">
+        <span class="chip c-inv">조사중 2</span>
+        <span class="chip c-aff">영향있음 1</span>
+        <span class="chip c-fix">조치됨 0</span>
+        <span class="chip c-na">영향없음 0</span>
+      </div>
+      <button class="btn gh">⬇ VEX 내보내기</button>
+    </div>
+  </div>
+  <div class="cmt">
+    <b>왜 이렇게:</b> 버튼 왼쪽에 <b>지금 내보내면 어떤 상태로 나가는지</b>를 칩으로 미리 보여줍니다.
+    파일을 열어봐야 아는 것보다 낫고, "영향없음 0"이 보이면 반려 사유를 안 적었다는 신호도 됩니다.
+    자세한 설명(무엇이고 왜 사유가 필요한지)은 <b>ⓘ → 챗봇</b>에 넣었습니다 — 화면엔 라벨만 둡니다.
+  </div>
+
+  <h2><span class="n">2</span>자산 기본 담당자 — 자산 목록 행</h2>
+  <div class="sub">새로 발견되는 취약점이 이 사람에게 자동 배정됩니다(미배정이 다시 쌓이지 않게).</div>
+  <div class="panel">
+    <table>
+      <tr><th>자산</th><th style="width:120px">소유 팀</th><th style="width:190px">기본 담당자</th><th style="width:90px">위험도</th></tr>
+      <tr>
+        <td>안전대부 본인인증 웹 서버<div style="font-size:10.5px;color:var(--muted-2)">certify.aj-safe.co.kr</div></td>
+        <td style="color:var(--muted)">인프라운영팀</td>
+        <td><select><option>— 지정 안 함</option><option selected>김인프라</option><option>이보안</option></select></td>
+        <td><span style="color:var(--amber)">● 중간</span></td>
+      </tr>
+      <tr>
+        <td>SafeKey 발급 웹 서버<div style="font-size:10.5px;color:var(--muted-2)">cert.aj-safe.co.kr</div></td>
+        <td style="color:var(--muted)">보안관제팀</td>
+        <td><select><option selected>— 지정 안 함</option><option>김인프라</option><option>이보안</option></select></td>
+        <td><span style="color:var(--teal)">● 낮음</span></td>
+      </tr>
+    </table>
+  </div>
+  <div class="cmt">
+    <b>왜 이렇게:</b> 자산 목록의 <b>표시 항목 하나</b>로 넣습니다(별도 설정 화면을 만들지 않습니다).
+    담당자 후보는 계정 목록에서 가져오고, "지정 안 함"이 기본입니다 — 비워 두면 예전처럼 미배정으로 남습니다.
+    ⚠ 이미 담당자가 정해진 취약점은 <b>덮어쓰지 않습니다</b>(사람이 정한 배정이 우선).
+  </div>
+
+</div>
+</body>
+</html>
