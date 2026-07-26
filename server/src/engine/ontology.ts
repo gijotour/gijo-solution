@@ -13,10 +13,12 @@
 // 질문에 등장하는 엔티티를 이 모듈이 그래프에서 찾아 1~2홉 관계를 "관련 규칙·관계"로 동반 주입한다.
 // 새 인프라(Neo4j 등) 없이 기존 SQLite(better-sqlite3)에 트리플을 담는다 — 온프레미스 원칙 유지.
 
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { randomUUID } from "crypto";
 import { authMiddleware } from "../auth/auth";
+import type { GijoUser } from "../auth/users";
 import { asyncRoute } from "../util/asyncRoute";
+import { recordAudit } from "./audit";
 import { db } from "../db";
 
 // memory.ts와 동일한 스코프 규칙 — 'global'은 모든 에이전트가 공유, 그 외는 해당 agentId 전용 지식.
@@ -233,7 +235,9 @@ export function registerOntologyRoutes(app: Express): void {
     "/api/ontology/triple/:id",
     authMiddleware,
     asyncRoute(async (req, res) => {
-      res.json({ deleted: deleteTriple(req.params.id) });
+      const deleted = deleteTriple(req.params.id);
+      if (deleted) recordAudit({ kind: "write", action: "온톨로지 관계 삭제", target: String(req.params.id), actor: (req as Request & { user?: GijoUser }).user?.displayName ?? null });
+      res.json({ deleted });
     })
   );
   // 확장 미리보기 — 특정 질문/텍스트에 어떤 규칙이 동반 주입될지 화면에서 확인·디버깅용.

@@ -12,6 +12,7 @@ import { asyncRoute } from "../util/asyncRoute";
 import { db } from "../db";
 import type { GijoUser } from "../auth/users";
 import { chat } from "./llm";
+import { recordAudit } from "./audit";
 import { addTriple, listTriples, deleteTriple } from "./ontology";
 import { syncDocTriples, manualTriples } from "./docgraph";
 
@@ -563,6 +564,13 @@ export async function draftProductFields(productName: string, text: string): Pro
   return PRODUCT_FIELD_SCHEMA.map((f) => ({ key: f.key, label: f.label, value: String(parsed[f.key] ?? "").trim() }));
 }
 
+
+// 보안제품 화면에는 감사 기록이 하나도 없었다(2026-07-26 발견) — 제품이 지워져도 누가 언제 지웠는지
+// 알 길이 없고, 그 제품에 걸려 있던 매뉴얼만 지식베이스에 고아로 남는다. 실제로 그렇게 됐다.
+// 등록·수정·삭제는 자산·취약점과 같은 급의 변경이므로 같은 수준으로 남긴다.
+const whoOf = (req: Request): string | null =>
+  (req as Request & { user?: GijoUser }).user?.displayName ?? null;
+
 export function registerSecurityProductRoutes(app: Express): void {
   app.get("/api/security-products", authMiddleware, (_req, res) => res.json(listProducts()));
   app.get("/api/security-products/grouped", authMiddleware, (_req, res) => res.json(productsByCategory()));
@@ -573,7 +581,9 @@ export function registerSecurityProductRoutes(app: Express): void {
   app.post("/api/security-products", authMiddleware, (req, res) => {
     try {
       const { name, category, vendor, model, assetId, note } = req.body ?? {};
-      res.json(createProduct({ name, category, vendor, model, assetId, note }));
+      const created = createProduct({ name, category, vendor, model, assetId, note });
+      recordAudit({ kind: "write", action: "보안제품 등록", target: created.name, detail: `분류 ${created.category ?? "-"}`, actor: whoOf(req) });
+      res.json(created);
     } catch (err) {
       res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
     }
@@ -585,11 +595,23 @@ export function registerSecurityProductRoutes(app: Express): void {
       res.status(404).json({ error: "존재하지 않는 보안제품입니다" });
       return;
     }
+    recordAudit({ kind: "write", action: "보안제품 수정", target: updated.name, detail: Object.keys(req.body ?? {}).join("·") || "-", actor: whoOf(req) });
     res.json(updated);
   });
 
   app.delete("/api/security-products/:id", authMiddleware, (req, res) => {
-    res.status(deleteProduct(String(req.params.id)) ? 200 : 404).json({ ok: true });
+    // 지우기 전에 이름과 걸려 있던 매뉴얼을 확보한다 — 지운 뒤에는 무엇이 사라졌는지 알 수 없다.
+    const before = getProduct(String(req.params.id));
+    const docs = (before?.docs ?? []).map((d) => d.docName || d.title).filter(Boolean);
+    const ok = deleteProduct(String(req.params.id));
+    if (ok) {
+      recordAudit({
+        kind: "write", action: "보안제품 삭제", target: before?.name ?? String(req.params.id),
+        detail: docs.length ? `연결돼 있던 매뉴얼 ${docs.length}건(지식베이스에는 남음): ${docs.join(", ").slice(0, 200)}` : "연결 매뉴얼 없음",
+        actor: whoOf(req),
+      });
+    }
+    res.status(ok ? 200 : 404).json({ ok: true });
   });
 
   // 정형 정보(온톨로지 기반 양식) — 조회 · 저장 · AI 초안.
@@ -674,7 +696,9 @@ export function registerSecurityProductRoutes(app: Express): void {
   );
 
   app.delete("/api/security-products/docs/:docId", authMiddleware, (req, res) => {
-    res.status(deleteProductDoc(String(req.params.docId)) ? 200 : 404).json({ ok: true });
+    const ok = deleteProductDoc(String(req.params.docId));
+    if (ok) recordAudit({ kind: "write", action: "보안제품 문서 삭제", target: String(req.params.docId), actor: whoOf(req) });
+    res.status(ok ? 200 : 404).json({ ok: true });
   });
 
   // 매뉴얼 자동 분류 임포트 — 파일만 올리면 제품 매칭(없으면 자동 등록)·종류·문서구분까지

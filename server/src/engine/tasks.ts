@@ -1,8 +1,10 @@
 // engine/tasks.ts — 작업 큐 (서버 측, 전 클라이언트 공유, SQLite 영속화)
 
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import { authMiddleware } from "../auth/auth";
+import type { GijoUser } from "../auth/users";
 import { asyncRoute } from "../util/asyncRoute";
+import { recordAudit } from "./audit";
 import { db, assertTestDb } from "../db";
 
 export interface TaskItem {
@@ -220,5 +222,8 @@ export function registerTasksRoutes(app: Express): void {
   });
   app.post("/api/tasks/:id/complete", authMiddleware, (req, res) => res.json(completeTask(String(req.params.id))));
   app.post("/api/tasks/:id/toggle", authMiddleware, (req, res) => res.json(setTaskDone(String(req.params.id), !!req.body.done)));
-  app.delete("/api/tasks/:id", authMiddleware, (req, res) => res.json(deleteTask(String(req.params.id))));
+  app.delete("/api/tasks/:id", authMiddleware, (req, res) => {
+    recordAudit({ kind: "write", action: "작업 삭제", target: String(req.params.id), actor: (req as Request & { user?: GijoUser }).user?.displayName ?? null });
+    res.json(deleteTask(String(req.params.id)));
+  });
 }

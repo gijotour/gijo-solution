@@ -18,7 +18,7 @@ import { Document, Packer, Paragraph, TextRun, HeadingLevel } from "docx";
 import { authMiddleware } from "../auth/auth";
 import type { GijoUser } from "../auth/users";
 import { asyncRoute } from "../util/asyncRoute";
-import { onAudit } from "./audit";
+import { onAudit, recordAudit } from "./audit";
 import { db } from "../db";
 import { migrate } from "../db";
 
@@ -265,6 +265,9 @@ const AUDIT_KIND_LABEL: Record<string, string> = {
 const SESSION_EXCLUDED_ACTIONS = new Set(["long_answer_saved"]);
 onAudit((e) => {
   if (e.kind === "auth") return;
+  // config = 전 메뉴 사용 기록(activityaudit 미들웨어). 요청마다 하나씩 남으므로 세션으로 옮기면
+  // 목록이 도배된다 — 감사 화면에서만 본다(2026-07-26 테스트가 잡아냈다: 세션 27→28).
+  if (e.kind === "config") return;
   if (SESSION_EXCLUDED_ACTIONS.has(e.action)) return;
   try {
     const title = `[${AUDIT_KIND_LABEL[e.kind] ?? e.kind}] ${e.action}${e.target ? " — " + e.target : ""}`.slice(0, 90);
@@ -424,7 +427,12 @@ export function registerWorkSessionRoutes(app: Express): void {
   });
 
   app.delete("/api/work-sessions/:id", authMiddleware, (req, res) => {
-    res.json({ ok: deleteSession(req.params.id) });
+    // 지우기 전에 제목을 확보한다 — 지운 뒤에는 무엇이 사라졌는지 알 수 없다.
+    const before = getSession(req.params.id);
+    const ok = deleteSession(req.params.id);
+    if (ok) recordAudit({ kind: "write", action: "작업 세션 삭제", target: before?.title ?? req.params.id,
+      detail: before?.createdBy ? `담당 ${before.createdBy}` : undefined, actor: (req as Request & { user?: GijoUser }).user?.displayName ?? null });
+    res.json({ ok });
   });
 
   // 세션에 턴을 직접 추가(주로 dispatcher가 서버 내부에서 호출하지만, 화면에서 메모성 턴을 남길 여지).

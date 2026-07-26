@@ -14,14 +14,16 @@
 // dataset.ts를 정적으로 불러오면 안 된다(llm→learnloop→dataset→llm 순환) — saveDataset은
 // buildDatasetFromLogs() 안에서 동적 import한다(memory.ts의 dataset 동적 import와 같은 선례).
 
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import type { WebSocketServer } from "ws";
 import { spawn, spawnSync } from "child_process";
 import * as fs from "fs";
 import * as os from "os";
 import * as path from "path";
 import { authMiddleware } from "../auth/auth";
+import type { GijoUser } from "../auth/users";
 import { asyncRoute } from "../util/asyncRoute";
+import { recordAudit } from "./audit";
 import { llamaBinPath } from "../util/llamabin";
 import { db, assertTestDb } from "../db";
 import { startFinetune, isFinetuneRunning } from "./finetune";
@@ -604,6 +606,7 @@ export function registerLearnloopRoutes(app: Express): void {
   app.delete("/api/learnloop/logs/:id", authMiddleware, (req, res) => {
     try {
       deleteChatLog(String(req.params.id));
+      recordAudit({ kind: "write", action: "학습 대화기록 삭제", target: String(req.params.id), actor: (req as Request & { user?: GijoUser }).user?.displayName ?? null });
       res.json({ ok: true });
     } catch (err) {
       res.status(404).json({ error: err instanceof Error ? err.message : String(err) });

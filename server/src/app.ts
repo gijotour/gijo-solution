@@ -24,6 +24,7 @@ import { registerIngestReportRoutes } from "./engine/ingestreport";
 import { registerLongAnswerRoutes, reapStaleRunning } from "./engine/longanswer";
 import { registerScreenGuideRoutes } from "./engine/screenguide";
 import { registerLawRoutes } from "./engine/lawinfo";
+import { registerActivityAudit } from "./engine/activityaudit";
 import { registerBridgeRoutes } from "./engine/bridge";
 import { registerCollaborationRoutes } from "./engine/collaboration";
 import { registerDatasetRoutes } from "./engine/dataset";
@@ -110,6 +111,9 @@ export function createApp(): Express {
   // 200mb: 대용량 보안운영 매뉴얼 PDF(base64로 약 1.33배 부풀음 — 실파일 ~150MB까지) 업로드 허용.
   app.use(express.json({ limit: "200mb" }));
   app.use(usageLoggingMiddleware);
+  // 담당자가 화면에서 한 "바꾸는 행위"를 전 메뉴에서 자동으로 남긴다(2026-07-26 사용자 지시).
+  // 라우트마다 손으로 붙이면 반드시 빠진다 — 실제로 보안제품 화면 전체에 감사가 없었다.
+  registerActivityAudit(app);
 
   registerAuthRoutes(app);
   registerUsersRoutes(app);
