@@ -26,6 +26,7 @@
 import type { RunFn, ScanStatus } from "./hardeningscan";
 import { isFixed, extractVersion, type VersionVerdict } from "./versioncmp";
 import type { StandardFinding } from "./bridge";
+import { findingKey } from "./approvals";
 
 /** 검증 대상의 "기대 상태" — 무엇이 참이어야 조치 완료인가. */
 export type ExpectedState =
@@ -232,7 +233,11 @@ export function buildVerifyItems(assetId: string, findings: StandardFinding[]): 
     .map((f) => {
       const expected = deriveExpected(f);
       return {
-        findingKey: f.key ?? f.finding_type,
+        // ⚠ approvals의 정식 키(sha1 해시)를 써야 한다. 스캐너가 준 f.key를 쓰면 승인 테이블의
+        //   어느 행과도 안 맞아, 상태를 고아 행에 쓰게 된다. 그 고아 행은 "재스캔에서 사라진
+        //   건"으로 오인돼 자동 완료(approved)로 뒤집히고, 목록에 유령 '완료'가 생긴다.
+        //   (2026-07-26 로컬 시나리오 e2e에서 실제로 잡힌 버그 — 단위 테스트로는 못 잡았다.)
+        findingKey: findingKey(assetId, f),
         assetId,
         cve: extractCve(`${f.finding_type}\n${f.evidence}`),
         title: f.finding_type,

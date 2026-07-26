@@ -6,6 +6,7 @@ import {
 } from "../src/engine/verifyengine";
 import type { StandardFinding } from "../src/engine/bridge";
 import type { RunFn } from "../src/engine/hardeningscan";
+import { findingKey } from "../src/engine/approvals";
 
 /** 명령 → 출력을 흉내내는 가짜 실행기. 매칭 안 되면 빈 출력. */
 function fakeRun(map: Record<string, string>): RunFn {
@@ -123,14 +124,22 @@ describe("buildVerifyItems / runVerifyItems", () => {
 
   it("이미 조치된(fixed) 건은 대상에서 뺀다", () => {
     const items = buildVerifyItems("asset-1", findings);
-    expect(items.map((i) => i.findingKey)).toEqual(["k-ssh", "k-manual"]);
+    expect(items).toHaveLength(2);
+    expect(items.map((i) => i.title)).toEqual([findings[0].finding_type, findings[2].finding_type]);
+  });
+
+  // 승인 테이블과 같은 키를 써야 한다 — 다르면 상태가 고아 행에 쓰이고 유령 '완료'가 생긴다.
+  it("findingKey는 approvals의 정식 키(sha1)와 같다", () => {
+    const items = buildVerifyItems("asset-1", findings);
+    expect(items[0].findingKey).toBe(findingKey("asset-1", findings[0]));
+    expect(items[0].findingKey).not.toBe(findings[0].key); // 스캐너 원본 키가 아니다
   });
 
   it("실행 결과에 findingKey·CVE·유형이 실린다", async () => {
     const items = buildVerifyItems("asset-1", findings);
     const res = await runVerifyItems(items, fakeRun({ "ssh -V": "OpenSSH_9.6p1" }));
-    expect(res[0]).toMatchObject({ findingKey: "k-ssh", status: "PASS", cve: "CVE-2024-6387", expectedKind: "version" });
-    expect(res[1]).toMatchObject({ findingKey: "k-manual", status: "NA", expectedKind: "manual" });
+    expect(res[0]).toMatchObject({ findingKey: findingKey("asset-1", findings[0]), status: "PASS", cve: "CVE-2024-6387", expectedKind: "version" });
+    expect(res[1]).toMatchObject({ findingKey: findingKey("asset-1", findings[2]), status: "NA", expectedKind: "manual" });
   });
 
   it("명령이 터져도 NA로 기록하고 계속 진행한다(조치됨으로 오해 금지)", async () => {
