@@ -597,7 +597,7 @@ export function registerDispatcherRoutes(app: Express): void {
       const text = String(req.body?.text ?? "");
       const user = (req as Request & { user?: GijoUser }).user;
 
-      // 10초 안에 안 끝나면 "리포트로 작성해 드리겠다"고 답하고 물러난다(사용자 결정 2026-07-26).
+      // 30초 안에 안 끝나면 "리포트로 작성해 드리겠다"고 답하고 물러난다(사용자 결정 2026-07-26, 10초→30초).
       // 작업은 뒤에서 계속 돌고, 끝나면 리포트로 저장한 뒤 화면에 팝업으로 알린다.
       const work = dispatchInstruction(text, sessionId, screen, user?.displayName);
       let handedOff = false;

@@ -23,8 +23,8 @@ beforeEach(() => {
 });
 
 describe("longanswer — 오래 걸린 요청을 리포트로", () => {
-  it("기본 전환 시간은 10초다(사용자 결정)", () => {
-    expect(LONG_ANSWER_MS).toBe(10_000);
+  it("기본 전환 시간은 30초다(사용자 결정 2026-07-26, 10초→30초 상향)", () => {
+    expect(LONG_ANSWER_MS).toBe(30_000);
   });
 
   it("작성이 끝나면 리포트 파일과 사이드카를 남긴다", async () => {
