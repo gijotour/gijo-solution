@@ -41,6 +41,25 @@ function relevant(chunks: ScoredChunk[]): ScoredChunk[] {
   return chunks.filter((c) => c.distance <= RAG_RELEVANCE_MAX_DISTANCE || c.lexicalHit);
 }
 
+/**
+ * 이 조각이 **이 취약점 이야기인가**를 한 번 더 본다.
+ * 검색이 가까워도 주제가 다른 문서가 섞일 수 있는데(임베딩은 문체·분야가 비슷해도 가까워진다),
+ * 근거로 화면에 박히면 담당자가 그걸 믿는다. CVE 번호나 제품/키워드가 실제로 겹칠 때만 근거로 쓴다.
+ */
+function anchored(chunk: string, title: string, cve?: string): boolean {
+  const text = chunk.toLowerCase();
+  if (cve && text.includes(cve.toLowerCase())) return true;
+
+  // 앵커는 **식별력 있는 토큰**만 인정한다 — CVE 번호, 또는 제품/기술 이름(영문 4자 이상).
+  // 한글 일반어("관리자"·"권한"·"서버")로 앵커를 잡으면 사용자 매뉴얼처럼 아무 문서나 걸린다
+  // (2026-07-26 실측: "관리자 권한 상승 가능성"에 제품 매뉴얼이 보상통제 후보로 붙었다).
+  // 앵커가 없으면 근거를 안 붙이고, 대신 "어떤 문서가 있으면 되는지" 힌트를 준다 —
+  // 틀린 근거를 보여주는 것보다 없다고 말하는 편이 담당자에게 낫다.
+  const tokens = (title.toLowerCase().match(/[a-z][a-z0-9.\-_]{3,}/g) ?? [])
+    .filter((t) => !["보안", "취약", "사용", "서버", "system", "version", "remote", "code"].includes(t));
+  return tokens.some((t) => text.includes(t));
+}
+
 function excerptOf(text: string, max = 220): string {
   const t = String(text || "").replace(/\s+/g, " ").trim();
   return t.length > max ? t.slice(0, max) + "…" : t;
@@ -69,11 +88,18 @@ export async function collectBasis(args: {
 
   // ① 아직 취약(FAIL)하거나 판단 불가(NA)일 때만 보상통제를 찾는다.
   //    이미 조치된 건에 "안 고쳐도 된다"는 근거를 들이밀 이유가 없다.
+  //
+  // ⚠ 질의는 **취약점 자체(q)로만** 던진다. 예전에는 "차단 완화 보상통제 IPS WAF 격리" 같은
+  //    단어를 붙여 검색했는데, 그 단어들이 검색을 지배해 취약점과 무관한 문서(제품소개·WAF
+  //    일반 설명)가 "보상통제 후보"로 붙었다(2026-07-26 실측). 틀린 근거는 없는 근거보다 나쁘다 —
+  //    담당자가 그걸 믿고 반려하면 진짜 취약점이 닫힌 것으로 굳는다.
+  //    검색은 취약점에 고정하고, 보상통제인지 여부는 아래 어휘 필터로만 가린다.
   if (args.status === "FAIL" || args.status === "NA") {
     try {
-      const hits = relevant(await queryMemoryScored(`${q} 차단 완화 보상통제 IPS WAF 격리`, 4));
+      const hits = relevant(await queryMemoryScored(q, 5));
       for (const h of hits) {
         if (!COMPENSATING_HINTS.test(h.text)) continue;
+        if (!anchored(h.text, args.title, args.cve)) continue; // 이 취약점 이야기인지 확인
         basis.push({
           kind: "compensating",
           label: "다른 보안으로 방어 중일 수 있습니다 — 반려 후보(확정은 담당자가)",
@@ -88,9 +114,10 @@ export async function collectBasis(args: {
   // ② 자동 판정이 안 된 건(NA)에는 "이 장비는 어디서 확인하나"를 붙인다 — 사람이 직접 볼 차례라서.
   if (args.status === "NA") {
     try {
-      const hits = relevant(await queryMemoryScored(`${q} 관리 콘솔 메뉴 버전 확인 방법`, 4));
+      const hits = relevant(await queryMemoryScored(q, 5)); // 질의는 취약점에 고정(키워드로 검색을 끌지 않는다)
       for (const h of hits) {
         if (!/메뉴|콘솔|경로|>|확인/.test(h.text)) continue;
+        if (!anchored(h.text, args.title, args.cve)) continue;
         basis.push({
           kind: "device_howto",
           label: "이 장비는 이렇게 확인합니다",
@@ -105,9 +132,10 @@ export async function collectBasis(args: {
   // ③ 사내 조치 기준 — 우선순위·예외 규칙이 있으면 알려준다.
   if (args.status === "FAIL") {
     try {
-      const hits = relevant(await queryMemoryScored(`${q} 사내 조치 기준 우선순위 예외`, 4));
+      const hits = relevant(await queryMemoryScored(q, 5)); // 질의는 취약점에 고정
       for (const h of hits) {
         if (!RULE_HINTS.test(h.text)) continue;
+        if (!anchored(h.text, args.title, args.cve)) continue;
         basis.push({
           kind: "internal_rule",
           label: "사내 조치 기준",
