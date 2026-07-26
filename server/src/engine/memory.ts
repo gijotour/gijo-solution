@@ -933,7 +933,17 @@ export function registerMemoryRoutes(app: Express): void {
         res.status(400).json({ error: "documentId가 필요합니다" });
         return;
       }
-      res.json(await deleteDocument(documentId, !!withFile));
+      const result = await deleteDocument(documentId, !!withFile);
+      // 지식 삭제는 되돌리기 어렵다 — 무엇을 얼마나 지웠는지 반드시 남긴다.
+      const { recordAudit } = await import("./audit.js");
+      recordAudit({
+        kind: "write",
+        action: "지식베이스 문서 삭제",
+        target: documentId,
+        detail: `조각 ${result.deletedChunks}건 제거${result.deletedFile ? " · 원본 파일까지 삭제(복구 불가)" : ""}`,
+        actor: (req as unknown as { user?: { displayName?: string } }).user?.displayName ?? null,
+      });
+      res.json(result);
     })
   );
 }

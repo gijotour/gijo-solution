@@ -140,6 +140,41 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .footer{margin-top:22px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted-2);max-width:1040px;}
 .footer img{height:16px;opacity:0.6;}
 .empty-all{color:var(--muted);font-size:13px;padding:30px 0;}
+
+/* 제품 삭제 확인창 — 되돌릴 수 없는 동작이라 무엇이 함께 사라지는지 파일명으로 보여준다.
+   "3건"이라고만 쓰면 담당자가 실수를 알아채지 못한다(2026-07-26). */
+.ovl{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;z-index:900;}
+.ovl.on{display:flex;}
+.dlg{width:520px;max-width:calc(100vw - 40px);max-height:calc(100vh - 60px);display:flex;flex-direction:column;
+     background:var(--panel-2,#0e1526);border:1px solid var(--border-strong);border-radius:13px;box-shadow:0 26px 70px rgba(0,0,0,.6);}
+.dlg-h{display:flex;align-items:center;gap:9px;padding:14px 17px;border-bottom:1px solid var(--border);}
+.dlg-h .ico{width:26px;height:26px;border-radius:8px;background:rgba(226,72,61,.16);border:1px solid rgba(226,72,61,.4);display:grid;place-items:center;font-size:13px;flex:none;}
+.dlg-h .t{font-size:14px;font-weight:800;}
+.dlg-h .sub{font-size:11.5px;color:var(--muted-2);margin-top:1px;}
+.dlg-b{padding:15px 17px;overflow:auto;}
+.dlg-f{display:flex;gap:8px;justify-content:flex-end;padding:12px 17px;border-top:1px solid var(--border);background:rgba(0,0,0,.16);}
+.dlg-btn{border:1px solid var(--border-strong);background:none;color:var(--muted);border-radius:9px;padding:8px 15px;font-size:12.5px;cursor:pointer;}
+.dlg-btn.go{background:#e2483d;border-color:#e2483d;color:#fff;font-weight:800;}
+.dlg-btn:disabled{opacity:.5;cursor:default;}
+.del-what{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:13px;}
+.del-what .lb{font-size:10.5px;font-weight:800;color:var(--muted-2);margin-bottom:7px;}
+.del-doc{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12.5px;border-bottom:1px dashed rgba(255,255,255,.05);}
+.del-doc:last-child{border-bottom:none;}
+.del-doc .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.del-tag{font-size:10.5px;border-radius:5px;padding:2px 7px;white-space:nowrap;font-weight:700;flex:none;}
+.del-tag.del{background:rgba(226,72,61,.15);color:#ff8b80;border:1px solid rgba(226,72,61,.35);}
+.del-tag.keep{background:rgba(30,185,128,.13);color:#4fd6a4;border:1px solid rgba(30,185,128,.3);}
+.del-shared{font-size:11px;color:var(--muted-2);padding:3px 0 0 12px;}
+.del-opts{display:flex;flex-direction:column;gap:7px;margin-bottom:12px;}
+.del-opt{display:flex;gap:9px;align-items:flex-start;background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:9px 11px;cursor:pointer;}
+.del-opt.on{border-color:var(--blue);background:rgba(59,130,246,.1);}
+.del-opt.danger.on{border-color:#e2483d;background:rgba(226,72,61,.1);}
+.del-opt .rd{width:14px;height:14px;border-radius:50%;border:1.6px solid var(--muted-2);margin-top:2px;flex:none;}
+.del-opt.on .rd{border-color:var(--blue);box-shadow:inset 0 0 0 3px var(--blue);}
+.del-opt.danger.on .rd{border-color:#e2483d;box-shadow:inset 0 0 0 3px #e2483d;}
+.del-opt .ot{font-size:12.5px;font-weight:700;}
+.del-opt .od{font-size:11.5px;color:var(--muted);margin-top:1px;line-height:1.5;}
+.del-warn{display:flex;gap:8px;background:rgba(240,160,32,.1);border:1px solid rgba(240,160,32,.3);border-radius:9px;padding:9px 11px;font-size:11.5px;color:#f5c877;}
 </style>
 </head>
 <body>
@@ -552,12 +587,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       return;
     }
     const prodDel = e.target.closest("[data-prod-del]");
-    if (prodDel) {
-      if (!confirm(`"${prodDel.dataset.name}" 제품과 첨부 문서를 모두 삭제할까요?`)) return;
-      try { await window.gijo.deleteSecurityProduct(prodDel.dataset.prodDel); await loadProducts(); }
-      catch (err) { alert("삭제 실패: " + ((err && err.message) || err)); }
-      return;
-    }
+    if (prodDel) { await openDeleteDialog(prodDel.dataset.prodDel, prodDel.dataset.name); return; }
     const docDel = e.target.closest("[data-doc-del]");
     if (docDel) {
       if (!confirm("이 문서를 삭제할까요?")) return;
@@ -680,6 +710,90 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     });
   }
 
+  // ── 제품 삭제 확인창 ─────────────────────────────────────────────────────────
+  // 예전엔 confirm() 한 줄로 "첨부 문서도 모두 삭제"라고 했지만 실제로는 지식베이스의 매뉴얼이
+  // 그대로 남았다. 그래서 없어진 장비의 매뉴얼로 AI가 계속 답했다. 이제 무엇이 함께 사라지는지
+  // 파일명으로 보여주고, 어디까지 지울지 담당자가 고른다(되돌릴 수 없는 동작이므로).
+  let delTarget = null;      // { id, name }
+  let delMode = "kb";        // keep | kb | file — 기본은 되돌릴 여지가 있는 중간 강도
+
+  async function openDeleteDialog(id, name) {
+    delTarget = { id, name };
+    delMode = "kb";
+    const ovl = document.getElementById("delOvl");
+    document.getElementById("delTitle").textContent = `${name} 를 삭제합니다`;
+    document.getElementById("delWhat").innerHTML = '<div class="lb">매뉴얼 확인 중…</div>';
+    ovl.classList.add("on");
+    paintDelOpts();
+    let preview;
+    try {
+      preview = await window.gijo.previewDeleteSecurityProduct(id);
+    } catch (err) {
+      document.getElementById("delWhat").innerHTML =
+        `<div class="lb">연결 매뉴얼을 확인하지 못했습니다</div><div style="font-size:11.5px;color:var(--muted)">${esc((err && err.message) || String(err))}</div>`;
+      return;
+    }
+    const box = document.getElementById("delWhat");
+    if (!preview.manuals.length) {
+      box.innerHTML = '<div class="lb">연결된 매뉴얼 없음</div><div style="font-size:11.5px;color:var(--muted)">제품 등록 정보만 삭제됩니다.</div>';
+      return;
+    }
+    box.innerHTML =
+      `<div class="lb">함께 정리될 매뉴얼 ${preview.manuals.length}건</div>` +
+      preview.manuals.map((m) => {
+        const shared = m.sharedWith.length > 0;
+        return `<div class="del-doc"><span class="n" title="${esc(m.docName)}">${esc(m.docName)}</span>` +
+          `<span class="del-tag ${shared ? "keep" : "del"}">${shared ? "보존" : "함께 삭제"}</span></div>` +
+          (shared ? `<div class="del-shared">└ <b style="color:var(--muted)">${esc(m.sharedWith.join(", "))}</b> 도 쓰고 있어 남깁니다</div>` : "");
+      }).join("");
+  }
+
+  function paintDelOpts() {
+    document.querySelectorAll("#delOvl .del-opt").forEach((el) => {
+      el.classList.toggle("on", el.dataset.mode === delMode);
+    });
+    const go = document.getElementById("delGo");
+    go.textContent = delMode === "keep" ? "제품만 삭제" : delMode === "file" ? "매뉴얼 원본까지 삭제" : "제품과 매뉴얼 삭제";
+  }
+
+  function closeDeleteDialog() {
+    document.getElementById("delOvl").classList.remove("on");
+    delTarget = null;
+  }
+
+  // ⚠ 다이얼로그 마크업은 이 스크립트보다 뒤(body 끝)에 있다 — getElementById로 바로 잡으면
+  // null이라 여기서 터지고, 아래 init()이 아예 실행되지 않아 화면이 "불러오는 중..."에서 멈춘다
+  // (2026-07-26 실화면 검증이 잡아냈다). document 위임으로 붙여 순서에 기대지 않는다.
+  document.addEventListener("click", async (e) => {
+    if (!e.target.closest || !e.target.closest("#delOvl")) return;
+    if (e.target.id === "delOvl" || e.target.closest("[data-del-cancel]")) { closeDeleteDialog(); return; }
+    const opt = e.target.closest(".del-opt");
+    if (opt) { delMode = opt.dataset.mode; paintDelOpts(); return; }
+    if (e.target.closest("#delGo")) {
+      if (!delTarget) return;
+      const go = document.getElementById("delGo");
+      go.disabled = true;
+      try {
+        const r = await window.gijo.deleteSecurityProduct(delTarget.id, delMode);
+        closeDeleteDialog();
+        await loadProducts();
+        if (r && r.removed && r.removed.length) {
+          alert(`삭제했습니다.\n\n지식베이스에서 함께 지운 매뉴얼 ${r.removed.length}건:\n${r.removed.join("\n")}` +
+            (r.keptShared && r.keptShared.length ? `\n\n다른 제품도 쓰고 있어 남긴 매뉴얼 ${r.keptShared.length}건` : ""));
+        }
+      } catch (err) {
+        alert("삭제 실패: " + ((err && err.message) || err));
+      } finally {
+        go.disabled = false;
+      }
+    }
+  });
+
+  document.addEventListener("keydown", (e) => {
+    const ovl = document.getElementById("delOvl");
+    if (e.key === "Escape" && ovl && ovl.classList.contains("on")) closeDeleteDialog();
+  });
+
   if (!window.gijo.isAuthenticated()) {
     window.gijo.navigateTo("login.html");
   } else {
@@ -688,6 +802,35 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 </script>
 
 
+
+<div class="ovl" id="delOvl">
+  <div class="dlg">
+    <div class="dlg-h">
+      <span class="ico">🗑</span>
+      <div><div class="t" id="delTitle">제품을 삭제합니다</div>
+           <div class="sub">등록부에서 제외되고, 이 제품으로는 더 이상 답하지 않습니다</div></div>
+    </div>
+    <div class="dlg-b">
+      <div class="del-what" id="delWhat"></div>
+      <div class="del-opts">
+        <div class="del-opt" data-mode="kb"><span class="rd"></span>
+          <div><div class="ot">지식베이스에서 삭제 <span style="color:var(--blue-light);font-size:11px">· 권장</span></div>
+               <div class="od">AI가 더는 이 매뉴얼로 답하지 않습니다. 서버에 원본 파일이 있으면 다시 올려 되살릴 수 있습니다.</div></div></div>
+        <div class="del-opt" data-mode="keep"><span class="rd"></span>
+          <div><div class="ot">지식베이스에 남기기</div>
+               <div class="od">제품 등록부에서만 뺍니다. 매뉴얼은 그대로 두고 나중에 다른 제품에 붙일 때 고릅니다.</div></div></div>
+        <div class="del-opt danger" data-mode="file"><span class="rd"></span>
+          <div><div class="ot" style="color:#ff8b80">원본 파일까지 완전 삭제</div>
+               <div class="od">서버 디스크의 원본 문서까지 지웁니다. <b style="color:#ff8b80">되돌릴 수 없습니다.</b> 퇴역 장비 자료를 흔적 없이 없앨 때만 쓰세요.</div></div></div>
+      </div>
+      <div class="del-warn">⚠ <span>업로드로 올린 문서는 서버에 원본이 없어, <b>지식베이스에서 지우면 그게 곧 완전 삭제</b>입니다. 원본 파일을 갖고 계신지 확인하세요.</span></div>
+    </div>
+    <div class="dlg-f">
+      <button class="dlg-btn" data-del-cancel>취소</button>
+      <button class="dlg-btn go" id="delGo">제품과 매뉴얼 삭제</button>
+    </div>
+  </div>
+</div>
 
 <script src="nav.js"></script>
 <script src="chatwidget.js"></script>

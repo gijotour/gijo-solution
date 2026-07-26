@@ -123,7 +123,8 @@ const gijoApi = {
     api.securityProductsApi.create(args),
   updateSecurityProduct: (id: string, patch: { name?: string; category?: string; vendor?: string; model?: string; assetId?: string; note?: string }) =>
     api.securityProductsApi.update(id, patch),
-  deleteSecurityProduct: (id: string) => api.securityProductsApi.remove(id),
+  previewDeleteSecurityProduct: (id: string) => api.securityProductsApi.deletePreview(id),
+  deleteSecurityProduct: (id: string, manuals?: "keep" | "kb" | "file") => api.securityProductsApi.remove(id, manuals ?? "keep"),
   addProductDoc: (id: string, args: { kind: string; title: string; note?: string; filename?: string; content?: string }) =>
     api.securityProductsApi.addDoc(id, args),
   deleteProductDoc: (docId: string) => api.securityProductsApi.removeDoc(docId),

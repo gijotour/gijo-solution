@@ -433,7 +433,20 @@ export const securityProductsApi = {
     request<SecurityProduct>("/api/security-products", { method: "POST", body: args }),
   update: (id: string, patch: { name?: string; category?: string; vendor?: string; model?: string; assetId?: string; note?: string }) =>
     request<SecurityProduct>(`/api/security-products/${encodeURIComponent(id)}`, { method: "PUT", body: patch }),
-  remove: (id: string) => request<{ ok: boolean }>(`/api/security-products/${encodeURIComponent(id)}`, { method: "DELETE" }),
+  // 제품을 지우면 걸려 있던 매뉴얼이 어떻게 되는지 미리 본다(다른 제품과 공용인 건 보존된다).
+  deletePreview: (id: string) =>
+    request<{
+      productName: string;
+      manuals: { docName: string; title: string; sharedWith: string[] }[];
+      removable: number;
+      shared: number;
+    }>(`/api/security-products/${encodeURIComponent(id)}/delete-preview`),
+  // manuals: keep=지식베이스에 남김 · kb=임베딩만 삭제(재업로드로 복구) · file=원본까지 삭제(복구 불가)
+  remove: (id: string, manuals: "keep" | "kb" | "file" = "keep") =>
+    request<{ ok: boolean; removed: string[]; keptShared: { docName: string; sharedWith: string[] }[] }>(
+      `/api/security-products/${encodeURIComponent(id)}?manuals=${manuals}`,
+      { method: "DELETE" }
+    ),
   addDoc: (id: string, args: { kind: string; title: string; note?: string; filename?: string; content?: string }) =>
     request<ProductDoc>(`/api/security-products/${encodeURIComponent(id)}/docs`, { method: "POST", body: args }),
   removeDoc: (docId: string) =>

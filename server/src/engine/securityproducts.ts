@@ -274,6 +274,76 @@ export function deleteProductDoc(docId: string): boolean {
   return true;
 }
 
+// ── 제품 삭제 시 매뉴얼 동반 정리 ────────────────────────────────────────────────
+// 왜(2026-07-26 사용자 지시 "앞으로 사용자가 삭제하면 같이삭제"): 지금까지는 제품만 지워지고
+// 매뉴얼은 지식베이스에 그대로 남았다. 그래서 없어진 장비의 매뉴얼을 AI가 계속 근거로 들고
+// 답하는 상태가 됐다(실제로 FOCS가 그랬다). 등록부에서 뺐으면 지식에서도 빠져야 맞다.
+//
+// 단, 되돌릴 수 없는 동작이므로 두 가지 안전장치를 둔다.
+//  ① 다른 제품에도 걸려 있는 매뉴얼은 절대 지우지 않는다 — 한 제품을 지웠다고 남의 자료가 사라지면 안 된다.
+//  ② 무엇이 지워지는지 미리 보여주고 담당자가 범위를 고른다(preview → 확인 → 삭제).
+
+export type ManualDisposition = {
+  docName: string;
+  title: string;
+  /** 이 매뉴얼을 함께 쓰고 있는 다른 제품 이름들 — 비어 있지 않으면 보존한다. */
+  sharedWith: string[];
+};
+
+/** 이 제품을 지우면 어떤 매뉴얼이 함께 지워지는지(그리고 무엇이 남는지) 미리 계산한다. */
+export function manualsOnDelete(productId: string): ManualDisposition[] {
+  const product = getProduct(productId);
+  if (!product) return [];
+  const others = listProducts().filter((p) => p.id !== productId);
+  const out: ManualDisposition[] = [];
+  for (const d of product.docs ?? []) {
+    if (!d.docName) continue; // 파일 없이 제목만 적어 둔 항목은 지식베이스에 실체가 없다
+    if (out.some((o) => o.docName === d.docName)) continue; // 같은 제품 안 중복 연결
+    const sharedWith = others
+      .filter((p) => (p.docs ?? []).some((x) => x.docName === d.docName))
+      .map((p) => p.name);
+    out.push({ docName: d.docName, title: d.title, sharedWith });
+  }
+  return out;
+}
+
+export type ManualCleanupMode = "keep" | "kb" | "file";
+
+export type ManualCleanupResult = {
+  removed: string[];
+  keptShared: { docName: string; sharedWith: string[] }[];
+};
+
+/**
+ * 제품에 걸려 있던 매뉴얼을 지식베이스에서 정리한다. **제품을 지우기 전에** 호출해야 한다
+ * (제품이 사라지면 무엇이 걸려 있었는지 알 수 없다).
+ *  - keep: 아무것도 지우지 않는다(기존 동작)
+ *  - kb:   임베딩만 제거 — AI 답변에서 빠지고, 원본이 서버에 있으면 재업로드로 되살릴 수 있다
+ *  - file: 서버의 원본 파일까지 제거 — 되돌릴 수 없다
+ */
+export async function cleanupProductManuals(
+  productId: string,
+  mode: ManualCleanupMode
+): Promise<ManualCleanupResult> {
+  const plan = manualsOnDelete(productId);
+  const keptShared = plan.filter((p) => p.sharedWith.length > 0).map((p) => ({ docName: p.docName, sharedWith: p.sharedWith }));
+  if (mode === "keep") return { removed: [], keptShared };
+  const removed: string[] = [];
+  // 동적 import — memory는 무거운 모듈(LanceDB)이고, 정적으로 물면 순환 참조가 된다.
+  const { deleteDocument } = await import("./memory.js");
+  for (const p of plan) {
+    if (p.sharedWith.length > 0) continue;
+    try {
+      await deleteDocument(p.docName, mode === "file");
+      removed.push(p.docName);
+    } catch (err) {
+      // 한 건 실패가 제품 삭제 자체를 막지 않는다 — 남은 문서는 화면에서 지울 수 있다.
+      console.warn(`[securityproducts] 매뉴얼 삭제 실패(${p.docName}): ${err instanceof Error ? err.message : String(err)}`);
+    }
+  }
+  return { removed, keptShared };
+}
+
 // ── 매뉴얼 자동 분류 임포트 — Nessus 업로드처럼 "파일만 올리면 알아서 반영" ─────────
 // 파일명으로 ① 어느 제품 문서인지(기존 제품 매칭, 없으면 자동 등록) ② 제품 종류(category)
 // ③ 제품 매뉴얼인지 로그 매뉴얼인지(kind)를 판별한다. 내용이 아니라 파일명 휴리스틱이다 —
@@ -599,20 +669,53 @@ export function registerSecurityProductRoutes(app: Express): void {
     res.json(updated);
   });
 
-  app.delete("/api/security-products/:id", authMiddleware, (req, res) => {
-    // 지우기 전에 이름과 걸려 있던 매뉴얼을 확보한다 — 지운 뒤에는 무엇이 사라졌는지 알 수 없다.
-    const before = getProduct(String(req.params.id));
-    const docs = (before?.docs ?? []).map((d) => d.docName || d.title).filter(Boolean);
-    const ok = deleteProduct(String(req.params.id));
-    if (ok) {
-      recordAudit({
-        kind: "write", action: "보안제품 삭제", target: before?.name ?? String(req.params.id),
-        detail: docs.length ? `연결돼 있던 매뉴얼 ${docs.length}건(지식베이스에는 남음): ${docs.join(", ").slice(0, 200)}` : "연결 매뉴얼 없음",
-        actor: whoOf(req),
-      });
+  // 삭제 미리보기 — 무엇이 함께 사라지는지 담당자가 보고 결정하게 한다(되돌릴 수 없으므로).
+  app.get("/api/security-products/:id/delete-preview", authMiddleware, (req, res) => {
+    const product = getProduct(String(req.params.id));
+    if (!product) {
+      res.status(404).json({ error: "존재하지 않는 보안제품입니다" });
+      return;
     }
-    res.status(ok ? 200 : 404).json({ ok: true });
+    const manuals = manualsOnDelete(product.id);
+    res.json({
+      productName: product.name,
+      manuals,
+      removable: manuals.filter((m) => m.sharedWith.length === 0).length,
+      shared: manuals.filter((m) => m.sharedWith.length > 0).length,
+    });
   });
+
+  app.delete(
+    "/api/security-products/:id",
+    authMiddleware,
+    asyncRoute(async (req, res) => {
+      // 지우기 전에 이름과 걸려 있던 매뉴얼을 확보한다 — 지운 뒤에는 무엇이 사라졌는지 알 수 없다.
+      const before = getProduct(String(req.params.id));
+      if (!before) {
+        res.status(404).json({ ok: false });
+        return;
+      }
+      // 기본은 keep — 범위를 명시하지 않은 오래된 클라이언트가 모르는 사이에 지식을 지우면 안 된다.
+      const raw = String(req.query.manuals ?? "keep");
+      const mode: ManualCleanupMode = raw === "kb" || raw === "file" ? raw : "keep";
+      const cleanup = await cleanupProductManuals(before.id, mode);
+      const docs = (before.docs ?? []).map((d) => d.docName || d.title).filter(Boolean);
+      const ok = deleteProduct(before.id);
+      if (ok) {
+        const what =
+          mode === "keep"
+            ? `연결 매뉴얼 ${docs.length}건은 지식베이스에 남김`
+            : `매뉴얼 ${cleanup.removed.length}건 ${mode === "file" ? "원본까지 완전 삭제" : "지식베이스에서 삭제"}` +
+              (cleanup.keptShared.length ? ` · 다른 제품과 공용이라 보존 ${cleanup.keptShared.length}건` : "");
+        recordAudit({
+          kind: "write", action: "보안제품 삭제", target: before.name,
+          detail: `${what}${docs.length ? `: ${docs.join(", ").slice(0, 200)}` : ""}`,
+          actor: whoOf(req),
+        });
+      }
+      res.status(ok ? 200 : 404).json({ ok, ...cleanup });
+    })
+  );
 
   // 정형 정보(온톨로지 기반 양식) — 조회 · 저장 · AI 초안.
   app.get("/api/security-products/:id/fields", authMiddleware, (req, res) => {

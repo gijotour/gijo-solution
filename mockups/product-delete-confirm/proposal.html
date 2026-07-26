@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>보안제품 삭제 확인창 — 시안</title>
+<style>
+  :root{--bg:#0a0e1a;--panel:#121a2e;--panel2:#0e1526;--line:rgba(255,255,255,.08);
+        --line2:rgba(255,255,255,.16);--text:#e7eaf3;--muted:#8b93ab;--muted2:#5f6785;
+        --blue:#3b82f6;--blue2:#5fa1ff;--teal:#1eb980;--amber:#f0a020;--red:#e2483d;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:#171a21;color:var(--text);font:13px/1.65 "Malgun Gothic","Apple SD Gothic Neo",sans-serif;padding:22px}
+  .wrap{max-width:1080px;margin:0 auto}
+  .note{background:rgba(59,130,246,.1);border:1px solid var(--line2);border-radius:10px;padding:13px 15px;margin-bottom:18px;font-size:12.5px;color:var(--muted)}
+  .note b{color:var(--text)}
+  h2{font-size:12.5px;color:var(--muted);margin:22px 0 10px;font-weight:700}
+
+  .scene{background:var(--bg);border:1px solid var(--line2);border-radius:12px;padding:26px;display:flex;justify-content:center}
+
+  .modal{width:520px;background:var(--panel2);border:1px solid var(--line2);border-radius:13px;
+         box-shadow:0 26px 70px rgba(0,0,0,.6);overflow:hidden}
+  .mh{display:flex;align-items:center;gap:9px;padding:14px 17px;border-bottom:1px solid var(--line)}
+  .mh .ico{width:26px;height:26px;border-radius:8px;background:rgba(226,72,61,.16);border:1px solid rgba(226,72,61,.4);
+           display:grid;place-items:center;font-size:13px}
+  .mh .t{font-size:14px;font-weight:800}
+  .mh .sub{font-size:11.5px;color:var(--muted2);margin-top:1px}
+  .mb{padding:15px 17px}
+
+  .what{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:11px 13px;margin-bottom:13px}
+  .what .lb{font-size:10.5px;font-weight:800;color:var(--muted2);letter-spacing:.3px;margin-bottom:7px}
+  .doc{display:flex;align-items:center;gap:8px;padding:5px 0;font-size:12.5px;border-bottom:1px dashed rgba(255,255,255,.05)}
+  .doc:last-child{border-bottom:0}
+  .doc .n{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .tag{font-size:10.5px;border-radius:5px;padding:2px 7px;white-space:nowrap;font-weight:700}
+  .tag.del{background:rgba(226,72,61,.15);color:#ff8b80;border:1px solid rgba(226,72,61,.35)}
+  .tag.keep{background:rgba(30,185,128,.13);color:#4fd6a4;border:1px solid rgba(30,185,128,.3)}
+  .shared{font-size:11px;color:var(--muted2);padding:3px 0 0 22px}
+
+  .opts{display:flex;flex-direction:column;gap:7px;margin-bottom:12px}
+  .opt{display:flex;gap:9px;align-items:flex-start;background:var(--panel);border:1px solid var(--line);
+       border-radius:9px;padding:9px 11px;cursor:pointer}
+  .opt.on{border-color:var(--blue);background:rgba(59,130,246,.1)}
+  .opt.danger.on{border-color:var(--red);background:rgba(226,72,61,.1)}
+  .rd{width:14px;height:14px;border-radius:50%;border:1.6px solid var(--muted2);margin-top:2px;flex:none}
+  .opt.on .rd{border-color:var(--blue);box-shadow:inset 0 0 0 3px var(--blue)}
+  .opt.danger.on .rd{border-color:var(--red);box-shadow:inset 0 0 0 3px var(--red)}
+  .opt .ot{font-size:12.5px;font-weight:700}
+  .opt .od{font-size:11.5px;color:var(--muted);margin-top:1px;line-height:1.5}
+
+  .warn{display:flex;gap:8px;background:rgba(240,160,32,.1);border:1px solid rgba(240,160,32,.3);
+        border-radius:9px;padding:9px 11px;font-size:11.5px;color:#f5c877;margin-bottom:4px}
+
+  .mf{display:flex;gap:8px;justify-content:flex-end;padding:12px 17px;border-top:1px solid var(--line);background:rgba(0,0,0,.16)}
+  .btn{border:1px solid var(--line2);background:none;color:var(--muted);border-radius:9px;padding:8px 15px;font-size:12.5px;cursor:pointer}
+  .btn.go{background:var(--red);border-color:var(--red);color:#fff;font-weight:800}
+</style></head><body>
+<div class="wrap">
+
+<div class="note">
+  <b>바뀌는 점</b> — 지금은 <b>"제품과 첨부 문서를 모두 삭제할까요?"</b> 한 줄만 뜨고, 실제로는 지식베이스의
+  매뉴얼이 <b>그대로 남았습니다</b>. 그래서 없어진 장비의 매뉴얼을 AI가 계속 근거로 들고 답했습니다(FOCS가 그랬습니다).<br>
+  이제 <b>무엇이 함께 사라지는지 목록으로 보여주고</b>, 어디까지 지울지 담당자가 고릅니다.
+</div>
+
+<h2>보안제품 화면 → ✕ 제품 삭제</h2>
+<div class="scene">
+  <div class="modal">
+    <div class="mh">
+      <span class="ico">🗑</span>
+      <div><div class="t">FOCS 를 삭제합니다</div>
+           <div class="sub">등록부에서 제외되고, 이 제품으로는 더 이상 답하지 않습니다</div></div>
+    </div>
+
+    <div class="mb">
+      <div class="what">
+        <div class="lb">함께 정리될 매뉴얼 3건</div>
+        <div class="doc"><span class="n">FOCS-메뉴얼-ver1.2.pdf</span><span class="tag del">함께 삭제</span></div>
+        <div class="doc"><span class="n">FOCS_로그필드_해설.txt</span><span class="tag del">함께 삭제</span></div>
+        <div class="doc"><span class="n">통합보안_운영지침_v3.pdf</span><span class="tag keep">보존</span></div>
+        <div class="shared">└ <b style="color:var(--muted)">경계 방화벽 (FW-01)</b> 도 쓰고 있어 남깁니다</div>
+      </div>
+
+      <div class="opts">
+        <div class="opt on"><span class="rd"></span>
+          <div><div class="ot">지식베이스에서 삭제 <span style="color:var(--blue2);font-size:11px">· 권장</span></div>
+               <div class="od">AI가 더는 이 매뉴얼로 답하지 않습니다. 서버에 원본 파일이 있으면 다시 올려 되살릴 수 있습니다.</div></div></div>
+
+        <div class="opt"><span class="rd"></span>
+          <div><div class="ot">지식베이스에 남기기</div>
+               <div class="od">제품 등록부에서만 뺍니다. 매뉴얼은 그대로 두고 나중에 다른 제품에 붙일 때 고릅니다.</div></div></div>
+
+        <div class="opt danger"><span class="rd"></span>
+          <div><div class="ot" style="color:#ff8b80">원본 파일까지 완전 삭제</div>
+               <div class="od">서버 디스크의 원본 문서까지 지웁니다. <b style="color:#ff8b80">되돌릴 수 없습니다.</b> 퇴역 장비 자료를 흔적 없이 없앨 때만 쓰세요.</div></div></div>
+      </div>
+
+      <div class="warn">⚠ <span>업로드로 올린 문서는 서버에 원본이 없어, <b>지식베이스에서 지우면 그게 곧 완전 삭제</b>입니다.
+        원본 파일을 갖고 계신지 확인하세요.</span></div>
+    </div>
+
+    <div class="mf">
+      <button class="btn">취소</button>
+      <button class="btn go">제품과 매뉴얼 삭제</button>
+    </div>
+  </div>
+</div>
+
+<div class="note" style="margin-top:20px">
+  <b>이렇게 설계한 이유</b><br>
+  · <b>목록을 먼저 보여줍니다</b> — "몇 건"이 아니라 파일명을 봐야 실수를 알아챕니다.<br>
+  · <b>공용 매뉴얼은 자동 보존</b>하고 <u>어느 제품이 쓰는지</u> 함께 적습니다. 한 제품을 지웠다고 남의 자료가 사라지면 안 됩니다.<br>
+  · <b>기본값은 "지식베이스에서 삭제"</b> — 요청하신 동작이면서, 원본이 있으면 되돌릴 수 있는 중간 강도입니다.
+    완전 삭제는 빨간색으로 따로 떼어 손이 미끄러지지 않게 했습니다.<br>
+  · 무엇을 어떤 범위로 지웠는지 <b>감사 기록에 남습니다</b>.
+</div>
+
+</div></body></html>
