@@ -2235,7 +2235,11 @@
       }
       refreshEmbeddingCard();
       refreshGuardCard();
-      if (!agentsById[currentTarget]) currentTarget = agents[0] ? agents[0].id : "orchestrator";
+      // ⚠ 예전엔 목록에 없으면 첫 팀원으로 바꿨는데, 그 탓에 지휘 콘솔 지시가 개별 팀원 경로로 새고
+      // 작업 세션이 안 잡혔다(2026-07-26: 대화 이어보기가 안 되던 진짜 원인).
+      // 팀원 카드는 클릭 선택이 없으므로 지시 대상은 늘 보안 총괄(오케스트레이터)이다.
+      const orch = agents.find((a) => /orchestrator/i.test(a.id));
+      currentTarget = orch ? orch.id : "orchestrator";
       selectAgent(currentTarget);
     } catch (e) {
       teamGrid.innerHTML = '<div style="grid-column:1/-1;text-align:center;color:var(--muted-2);font-size:12px">팀원을 불러오지 못했습니다</div>';
@@ -2308,7 +2312,7 @@
     if (!text) return;
     chatInput.value = "";
     if (window.gijoClearDraft) window.gijoClearDraft(); // 보냈으니 임시 저장도 지운다
-    if (currentTarget === "orchestrator") sendToOrchestrator(text);
+    if (/orchestrator/i.test(currentTarget)) sendToOrchestrator(text);
     else sendToAgent(currentTarget, text);
   }
 
