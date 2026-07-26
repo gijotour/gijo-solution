@@ -305,6 +305,22 @@
     return f;
   }
 
+  // 화면 파일명(예: vulnscan.html) → 팝업 대상 해석 — 허브에 품긴 화면이면 그 허브+탭으로.
+  // "내 업무 바로가기" 타일이 쓴다(옛날처럼 전체 이동하지 않게, 2026-07-26 사용자 요청).
+  function resolvePage(page) {
+    if (/^hub\.html/.test(page)) return { key: page.split("&t=")[0].split("?t=")[0], label: page, tab: null };
+    if (page === "approvals.html") return { key: page, label: "조치·승인", tab: null };
+    if (page === "redteam.html") return { key: page, label: "레드팀·가드레일", tab: null };
+    var hubs = window.gijoHubs || {};
+    for (var g in hubs) {
+      var tabs = hubs[g].tabs || [];
+      for (var i = 0; i < tabs.length; i++) {
+        if (tabs[i].page === page) return { key: "hub.html?g=" + g, label: hubs[g].ic + " " + hubs[g].label, tab: page };
+      }
+    }
+    return null;
+  }
+
   function open(page, label, opts) {
     opts = opts || {};
     var s = findSlot(page);
@@ -317,8 +333,12 @@
         close(victims[0].key, true);
       }
       s = { key: page, label: label || page, pinned: false, lastActive: Date.now(), curTab: null, curLabel: null, el: null };
-      s.el = makeFrame(page, s);
+      // 시작 탭 지정(opts.tab) — 허브 첫 로드부터 그 탭이 뜨게 t 파라미터로
+      s.el = makeFrame(opts.tab ? page + (page.indexOf("?") >= 0 ? "&" : "?") + "t=" + opts.tab : page, s);
       slots.push(s);
+    } else if (opts.tab) {
+      // 이미 떠 있는 허브 팝업이면 메시지로 탭만 전환
+      setTimeout(function () { try { s.el.contentWindow.postMessage({ type: "gijo:showTab", page: opts.tab }, "*"); } catch (e) {} }, 100);
     }
     focusSlot(page);
     if (opts.chat) { // 챗봇 열기 — 이미 떠 있던 팝업이면 메시지로, 새로 열리면 openChatOnLoad 플래그가 처리
@@ -500,6 +520,13 @@
   window.gijoShell = {
     open: open,
     hide: minimize, // "내 업무 바로가기" 등 대시보드 위 다른 팝업이 먼저 접으라고 부른다
+    // 화면 파일명으로 열기 — 허브 소속이면 그 허브+탭 팝업. 못 풀면 false(호출자가 기존 이동).
+    openPage: function (page) {
+      var r = resolvePage(page);
+      if (!r) return false;
+      open(r.key, r.label, { tab: r.tab });
+      return true;
+    },
     // 지시의 화면 맥락 — 팝업이 보이는 동안은 그 팝업(허브면 활성 탭 파일명).
     // 사용자가 칩으로 "대시보드 맥락"을 골랐으면 팝업이 떠 있어도 대시보드 기본.
     activeScreen: function () {

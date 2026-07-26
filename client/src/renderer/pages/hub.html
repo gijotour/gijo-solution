@@ -124,6 +124,7 @@
     const bar = $("hubBar");
     const initial = params.get("t");
     let initialEl = null, firstEl = null, initialTab = null, firstTab = null;
+    const tabEntries = []; // 팝업 셸의 "gijo:showTab" 전환 요청용(page → 탭)
     hub.tabs.forEach((tab) => {
       const el = document.createElement("div");
       el.className = "hub-tab" + (tab.office ? " act" : "");
@@ -131,8 +132,16 @@
       el.addEventListener("click", () => show(tab, el));
       bar.appendChild(el);
       if (!tab.office) {
+        tabEntries.push({ tab, el });
         if (!firstEl) { firstEl = el; firstTab = tab; }
         if (tab.page === initial) { initialEl = el; initialTab = tab; }
+      }
+    });
+    // 팝업 셸이 보낸 탭 전환 — "내 업무 바로가기" 타일이 이미 떠 있는 허브 팝업의 탭을 바꿀 때.
+    window.addEventListener("message", (ev) => {
+      if (ev && ev.data && ev.data.type === "gijo:showTab") {
+        const ent = tabEntries.find((x) => x.tab.page === ev.data.page);
+        if (ent) show(ent.tab, ent.el);
       }
     });
     if (initialEl) show(initialTab, initialEl);
