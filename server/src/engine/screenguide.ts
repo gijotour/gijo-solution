@@ -33,13 +33,43 @@ const HELP_RE = /(이\s*화면|이\s*메뉴|이\s*페이지|현재\s*화면).{0,
 // 근거(실측 2026-07-25): "표시 이름은 어떻게 바꿔?"·"진행내역 리포트가 뭐야?"처럼 실사용자가
 // 자유롭게 물으면 HELP_RE에 안 걸려 RAG로 새고, 엉뚱한 문서(벤더 매뉴얼 등)를 근거로 답했다.
 // 기능 설명은 화면이 아니라 챗봇이 담당한다는 원칙(사용자 지시)을 지키려면 이 경로가 넓어야 한다.
+// 화면에 실제로 적힌 구역 이름 ↔ 안내(panels) 이름이 다른 곳을 이어 준다.
+// 구역을 기본으로 접게 되면서(2026-07-27) 담당자는 "그거 어디 있지?"를 챗봇에 묻게 되는데,
+// 사람은 **화면에 보이는 글자 그대로** 말한다("구독 중인 CTI 피드 어디 있어?").
+// 안내 본문을 복사하지 않고 이름만 이어 준다 — 설명은 한 곳에만 있어야 어긋나지 않는다.
+const PANEL_ALIASES: Record<string, Record<string, string>> = {
+  "threat.html": { "구독 중인 CTI 피드": "피드 구독", "모니터링 대상": "감시 대상" },
+  "agent.html": { "환경별 모델 선택 가이드": "환경별 모델 선택", "에이전트별 브레인 모델": "모델 배정", "터미널 — 협업": "협업 피드" },
+  "opsguide.html": { "유지보수 일정 · 점검서 · 승인": "점검 승인", "지식베이스 — 매뉴얼·케이스·에러로그": "문서 관리" },
+  "settings.html": { "이메일(SMTP) 설정": "SMTP" },
+};
+
+/** panel = 안내에서 찾은 구역, matched = 질문 안에서 실제로 걸린 글자(별명일 수 있다). */
+function resolvePanelHit(screen: string | undefined, q: string): { panel: string; matched: string } | null {
+  const g = screen ? GUIDES[screen] : undefined;
+  if (!g?.panels) return null;
+  for (const name of Object.keys(g.panels)) {
+    if (q.includes(name.replace(/\s/g, ""))) return { panel: name, matched: name };
+  }
+  const alias = screen ? PANEL_ALIASES[screen] : undefined;
+  if (alias) {
+    for (const [shown, real] of Object.entries(alias)) {
+      if (q.includes(shown.replace(/\s/g, "")) && g.panels[real]) return { panel: real, matched: shown };
+    }
+  }
+  return null;
+}
+function resolvePanel(screen: string | undefined, q: string): string | null {
+  return resolvePanelHit(screen, q)?.panel ?? null;
+}
+
 function panelNameHit(text: string, screen?: string): boolean {
   const g = screen ? GUIDES[screen] : undefined;
   if (!g?.panels) return false;
   const q = text.replace(/\s/g, "");
   // 설명을 구하는 말투일 때만(단순히 패널명이 스친 지시는 도구가 처리해야 한다).
   if (!/(뭐|무엇|어떻게|어디|누가|언제|사용|설명|알려|방법|바꿔|바꾸|변경|저장할|왜|가능|되나|하나요|해\?|돼\?)/.test(text)) return false;
-  return Object.keys(g.panels).some((name) => q.includes(name.replace(/\s/g, "")));
+  return resolvePanel(screen, q) !== null;
 }
 
 // "기능 설명/안내/알려"는 화면 사용법일 수도, 특정 제품 질문일 수도 있는 약한 신호다.
@@ -61,7 +91,16 @@ export function isHelpIntent(text: string, screen?: string): boolean {
   const strong = HELP_RE.test(t) && !(WEAK_HELP_RE.test(t) && !/(이\s*화면|여기|이\s*메뉴|이\s*페이지|도움말|사용법|사용\s*방법)/.test(t));
   if (strong) return true;
   if (WEAK_HELP_RE.test(t) && !hasSpecificSubject(t)) return true;
-  if (panelNameHit(t, screen)) return !hasSpecificSubject(t);
+  const hit = resolvePanelHit(screen, t.replace(/\s/g, ""));
+  if (hit && panelNameHit(t, screen)) {
+    // ⚠ 구역 이름 자체에 영문이 들어 있으면(예: "구독 중인 CTI 피드", "이메일(SMTP) 설정")
+    //   그 영문을 "특정 제품을 콕 집은 질문"으로 오해해 화면 안내를 막아 버렸다(2026-07-27 실측).
+    //   질문에서 걸린 구역 이름을 지운 뒤 남는 말로 판단한다 — 그래야 진짜 제품명만 걸러진다.
+    //   띄어쓰기가 다를 수 있어 글자 사이 공백을 허용하는 형태로 지운다.
+    const loose = hit.matched.replace(/\s/g, "").split("").map((c) => c.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s*");
+    const rest = t.replace(new RegExp(loose, "gi"), " ");
+    return !hasSpecificSubject(rest);
+  }
   return false;
 }
 
@@ -488,11 +527,9 @@ export function formatScreenGuide(screen?: string, question?: string): string {
   const g = getScreenGuide(screen);
   const q = (question ?? "").replace(/\s/g, "");
   if (g.panels && q) {
-    for (const [name, detail] of Object.entries(g.panels)) {
-      if (q.includes(name.replace(/\s/g, ""))) {
-        return `🤖 ${g.title} › ${name}\n${detail}`;
-      }
-    }
+    // 화면에 적힌 이름으로 물어도 찾도록 별명표까지 본다(PANEL_ALIASES).
+    const hit = resolvePanel(screen, q);
+    if (hit) return `🤖 ${g.title} › ${hit}\n${g.panels[hit]}`;
   }
   const L: string[] = [];
   L.push(`🤖 ${g.title} — 이 화면 사용 안내`);
@@ -523,6 +560,8 @@ export function registerScreenGuideRoutes(app: Express): void {
     const screen = typeof req.query.screen === "string" ? req.query.screen : undefined;
     const question = typeof req.query.question === "string" ? req.query.question : undefined;
     const g = getScreenGuide(screen);
-    res.json({ title: g.title, text: formatScreenGuide(screen, question) });
+    // what = "이 화면이 하는 일" 한 줄. 팝업 머리 아래 얇은 줄이 이것만 쓴다(2026-07-27).
+    // text = 전문. 담당자가 그 줄을 눌렀을 때만 대화로 보낸다.
+    res.json({ title: g.title, what: g.what, text: formatScreenGuide(screen, question) });
   });
 }

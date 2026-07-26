@@ -170,6 +170,13 @@
   <div class="sidebar" id="gijoNav"></div>
 
 <div class="v3-main">
+  <!-- 작업 세션 요약 — "지금 뭐가 돌고 있나"를 먼저 보여 준다(2026-07-27).
+       값은 아래 목록 데이터로 계산한다(추가 서버 호출 없음). -->
+  <div class="ws-sum" data-gijo-summary style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px;">
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:13px 15px;"><div style="font-size:11px;color:var(--muted);margin-bottom:5px;">진행중</div><div style="font-size:19px;font-weight:800;color:var(--teal);" id="wsActive">-</div></div>
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:13px 15px;"><div style="font-size:11px;color:var(--muted);margin-bottom:5px;">오늘 생성</div><div style="font-size:19px;font-weight:800;color:#fff;" id="wsToday">-</div></div>
+    <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:13px 15px;"><div style="font-size:11px;color:var(--muted);margin-bottom:5px;">완료</div><div style="font-size:19px;font-weight:800;color:var(--muted);" id="wsDone">-</div></div>
+  </div>
   <div class="topbar-row">
     <div>
       <div class="page-title">💬 작업 세션</div>
@@ -343,9 +350,19 @@
       sessionListEl.innerHTML = `<div class="list-empty">세션을 불러오지 못했습니다.</div>`;
       return;
     }
+    renderSummary();
     renderTiles();
     renderSessionList();
     if (selectFirst && !currentId && sessions.length) openSession(sessions[0].id);
+  }
+
+  // 상단 요약 — 목록 데이터로 계산한다(서버 호출을 늘리지 않는다).
+  function renderSummary() {
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.textContent = v; };
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    set("wsActive", sessions.filter((s) => s.status === "active").length);
+    set("wsToday", sessions.filter((s) => new Date(s.createdAt || s.updatedAt) >= today).length);
+    set("wsDone", sessions.filter((s) => s.status === "done").length);
   }
 
   // ── 대화(선택된 세션) ────────────────────────────────────────────────

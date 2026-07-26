@@ -60,6 +60,9 @@
     { id: "monitor", ic: "🖥", label: "관제", items: [
       { page: "dashboard.html", label: "대시보드" },
       { page: "dashboard.html?quick=1", label: "내 업무 바로가기" }, // 대시보드 위 팝업으로 열림(챗 중심 개편 2026-07-26)
+      // 작업 세션 — 오른쪽 가장자리의 세로 글씨 탭에서 옮겨 왔다(2026-07-27).
+      // 세로로 쓴 글씨는 읽는 데만 시간이 걸리고, 어차피 sessions.html이라는 화면이 이미 있었다.
+      { page: "sessions.html", label: "작업 세션", bot: true, popup: true },
       // popup: 대시보드 팝업 셸(혼합 방식, 2026-07-26 결정)에서 팝업으로 열리는 화면.
       // 1차 파일럿 3종 검증 후 챗봇 메뉴 9종 전체 확장(같은 날 사용자 지시 "나머지도 다").
       // 대시보드가 아닌 화면(gijoShell 없음)에서는 지금처럼 전체 화면으로 이동한다.
@@ -156,10 +159,10 @@
       // 패널 접기 버튼(좌우 공통 디자인, 2026-07-25 대칭 통일)
       ".gn-pcol{flex:0 0 auto;width:26px;height:26px;border-radius:7px;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);color:var(--blue-light);display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;}" +
       ".gn-pcol:hover{background:var(--blue);color:#fff;}" +
-      // 왼쪽 가장자리 세로 토글 — 항상 표시(2026-07-25 통일): 접힘=화면 왼쪽 끝 '▶ 메뉴 열기',
-      // 열림=사이드바 오른쪽 경계에 반쯤 걸친 '◀ 접기'(콘텐츠 패딩 안으로 12px만 오버랩 — 여백 고려).
-      ".gn-edge{position:fixed;top:50%;transform:translateY(-50%);background:var(--panel-2,#0e1526);color:var(--muted,#8b93ab);border:1px solid var(--border,#1e2a44);padding:13px 7px;border-radius:10px;font-size:11px;font-weight:800;cursor:pointer;writing-mode:vertical-rl;letter-spacing:2px;z-index:900;box-shadow:2px 0 10px rgba(0,0,0,.35);}" +
-      ".gn-edge.open-state{border-radius:10px;padding:10px 5px;letter-spacing:1px;}" +
+      // 왼쪽 가장자리 토글 — 접힘=화면 왼쪽 끝, 열림=사이드바 경계에 반쯤 걸침.
+      // ⚠ 예전엔 '◀ 접기'를 세로로 눕혀 썼다. 세로 글씨는 읽는 데만 시간이 걸려서
+      //    화살표 하나로 줄였다(2026-07-27). 뜻은 툴팁이 말한다.
+      ".gn-edge{position:fixed;top:50%;transform:translateY(-50%);width:18px;height:44px;background:var(--panel-2,#0e1526);color:var(--muted,#8b93ab);border:1px solid var(--border,#1e2a44);border-radius:8px;font-size:11px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:900;box-shadow:2px 0 10px rgba(0,0,0,.35);}" +
       ".gn-edge:hover{color:var(--blue-light,#7ab0ff);border-color:var(--blue,#3b82f6);}" +
       "body.gn-left-collapsed #gijoNav{display:none !important;}" +
       "body.gn-left-collapsed .app{grid-template-columns:minmax(0,1fr) 46px !important;}" +
@@ -270,17 +273,15 @@
     var edge = ensureLeftEdge();
     var collapsed = document.body.classList.contains("gn-left-collapsed");
     if (collapsed) {
-      edge.classList.remove("open-state");
       edge.style.left = "0px";
-      edge.textContent = "▶ 메뉴 열기";
+      edge.textContent = "▶";
       edge.title = "왼쪽 메뉴 열기";
     } else {
       var panel = document.getElementById("gijoNav") || document.querySelector(".explorer");
       if (!panel) { edge.style.display = "none"; return; }
       edge.style.display = "";
-      edge.classList.add("open-state");
-      edge.style.left = Math.max(0, Math.round(panel.getBoundingClientRect().right) - 12) + "px";
-      edge.textContent = "◀ 접기";
+      edge.style.left = Math.max(0, Math.round(panel.getBoundingClientRect().right) - 9) + "px";
+      edge.textContent = "◀";
       edge.title = "왼쪽 메뉴 접기";
     }
   }
@@ -305,14 +306,10 @@
     if (!root) return;
     injectCss();
     root.innerHTML = "";
-    // 상단 세그먼트 [🏠 대시보드 | ☰ 전체메뉴] — nav 화면은 '전체메뉴'가 이미 활성.
-    var top = document.createElement("div"); top.className = "gn-top";
-    var seg = document.createElement("div"); seg.className = "gn-seg";
-    var sHome = document.createElement("span"); sHome.textContent = "🏠 대시보드";
-    var sMenu = document.createElement("span"); sMenu.textContent = "☰ 전체메뉴"; sMenu.classList.add("on");
-    sHome.addEventListener("click", function () { go("dashboard.html"); });
-    seg.appendChild(sHome); seg.appendChild(sMenu); top.appendChild(seg);
-    root.appendChild(top);
+    // 상단 세그먼트 [🏠 대시보드 | ☰ 전체메뉴]는 없앴다(2026-07-27).
+    // 두 칸짜리 토글처럼 보였지만 실제로는 토글이 아니었다: '전체메뉴'는 언제나 켜진 채
+    // 아무 동작도 하지 않았고(지금 보고 있는 게 이미 전체메뉴다), '대시보드'는 바로 아래
+    // 메뉴 첫 항목과 같은 곳으로 갔다. 누르면 뭐가 달라지는지 알 수 없는 버튼은 조작만 늘린다.
     // 중앙 메뉴(스크롤)
     var mid = document.createElement("div"); mid.className = "gn-mid";
     buildMenu(mid); root.appendChild(mid);
@@ -349,6 +346,16 @@
     var s = document.createElement("script");
     s.id = "gijoLnScript";
     s.src = "longnotice.js";
+    document.body.appendChild(s);
+  }
+
+  // 구역 접기 도우미 — 전 화면 공용. embed(팝업 안)에서도 실어야 한다: 접기가 가장 필요한 곳이
+  // 바로 팝업 안이다(높이가 고정이라 세로로 긴 화면은 스크롤이 길어진다).
+  function loadFold() {
+    if (document.getElementById("gijoFoldScript")) return;
+    var s = document.createElement("script");
+    s.id = "gijoFoldScript";
+    s.src = "fold.js";
     document.body.appendChild(s);
   }
 
@@ -421,6 +428,7 @@
 
   function boot() {
     bindZoomKeys();
+    loadFold(); // embed에서도 실어야 한다 — 팝업 안이 접기가 가장 필요한 곳이다
     if (IS_EMBED) { applyEmbed(); return; }
     // 탭으로 흡수된 페이지에 직접 들어오면(대시보드 바로가기·챗봇 링크 등) 허브의 그 탭으로 보낸다.
     var target = TAB_REDIRECT[currentPage()];
@@ -430,6 +438,7 @@
     render();
     loadOnboarding();
     loadCommandPanel();
+
     loadLongNotice();
     checkUpdateBadge();
   }

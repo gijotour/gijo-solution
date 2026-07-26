@@ -113,12 +113,26 @@ function maybeStartBundledServer(): void {
   });
 }
 
+// 본 창 크기 — 화면(작업영역)에 맞춘다.
+// ⚠ 예전에는 1440×900·최소 1180으로 숫자가 박혀 있었다. 세로 모니터(예: 1080×1920)에서는
+//    창이 화면보다 넓게 열리려다 잘리고, 최소 너비(1180)가 화면 너비(1080)보다 커서
+//    담당자가 창을 화면에 맞게 줄일 수조차 없었다(2026-07-27 실측). 사무실 창은 이미
+//    작업영역을 보고 여는데 본 창만 안 하고 있었다 — 같은 방식으로 맞춘다.
+function mainWindowBounds(): { width: number; height: number; minWidth: number; minHeight: number } {
+  const wa = screen.getPrimaryDisplay().workAreaSize;
+  return {
+    // 넉넉한 화면이면 1440×900을 넘지 않고, 좁은 화면이면 화면에 맞춘다(가장자리 여백 40px).
+    width: Math.max(720, Math.min(1440, wa.width - 40)),
+    height: Math.max(600, Math.min(900, wa.height - 40)),
+    // 최소 크기는 화면보다 클 수 없다 — 크면 창을 화면 안에 넣을 방법이 없어진다.
+    minWidth: Math.min(900, Math.max(600, wa.width - 40)),
+    minHeight: Math.min(620, Math.max(480, wa.height - 40)),
+  };
+}
+
 function createMainWindow(): void {
   mainWindow = new BrowserWindow({
-    width: 1440,
-    height: 900,
-    minWidth: 1180,
-    minHeight: 720,
+    ...mainWindowBounds(),
     backgroundColor: "#0a0e1a",
     title: "GIJO AS — AI Security Manager OS",
     // C안(2026-07-25): OS 타이틀바 제거 — 각 페이지의 .header가 타이틀바 역할(드래그 영역, titlebar.js).

@@ -519,7 +519,27 @@
   .team-grid.icons-only{justify-content:center;}
   .team-grid.icons-only .tcard{width:46px;}
   .ai-team-sub{font-size:10.5px;color:var(--muted-2);}
-  .acc.ai-team#accConsole{width:min(760px,100%);margin-top:16px !important;}
+  /* 대화·입력줄 폭 — 팝업이 떠 있을 때(shell-popup.js CHAT_MAX_W)와 같은 900px로 맞춘다.
+     달라지면 팝업을 열고 닫을 때마다 입력줄 너비가 바뀌어 눈에 거슬린다. */
+  /* 오늘 할 일 — 히어로 바로 아래, 컴포저와 같은 폭. 대화가 시작되면 숨는다(아래 body.chatting). */
+  .today-tasks{width:min(900px,100%);margin-top:14px;display:flex;flex-direction:column;gap:6px;}
+  .tt-h{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:800;color:var(--muted-2);padding:0 2px 2px;}
+  .tt-h .cnt{color:var(--blue-light);}
+  .tt-row{display:flex;align-items:center;gap:9px;background:var(--panel-2);border:1px solid var(--border);
+    border-radius:10px;padding:9px 11px;cursor:pointer;text-align:left;}
+  .tt-row:hover{border-color:var(--blue);background:rgba(59,130,246,.06);}
+  .tt-sev{font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:5px;flex:0 0 auto;}
+  .tt-sev.p0{background:rgba(226,72,61,.2);color:#f5928a;}
+  .tt-sev.p1{background:rgba(240,160,32,.18);color:var(--amber);}
+  .tt-sev.p2{background:rgba(59,130,246,.16);color:var(--blue-light);}
+  .tt-t{font-size:12px;color:#dfe6ff;font-weight:700;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .tt-why{font-size:10.5px;color:var(--muted-2);flex:0 0 auto;white-space:nowrap;}
+  .tt-go{font-size:10px;font-weight:800;color:var(--blue-light);flex:0 0 auto;}
+  .tt-empty{font-size:11.5px;color:var(--muted-2);padding:10px 2px;}
+
+  /* ⚠ !important가 필요하다: 바로 위 .ai-team 규칙이 width:auto !important를 걸어 두어
+     그냥 쓰면 내용 크기(실측 572px)로 줄어든다(2026-07-27 실측으로 발견). */
+  .acc.ai-team#accConsole{width:min(900px,100%) !important;margin-top:16px !important;}
   #accConsole .acc-b-console{background:none;border:none;padding:0;}
   #accConsole .cl-rows{max-height:0;overflow:auto;transition:max-height .25s ease;background:none;border:none;padding:0 2px;width:100%;}
   #accConsole .cl-empty{display:none;}
@@ -554,6 +574,9 @@
   body.chatting .hero-orb{width:120px;}
   body.chatting .hero-orb .network-svg{max-width:120px;}
   body.chatting .hero-hello,body.chatting .hero-sub{display:none;}
+  /* 대화가 시작되면 오늘 할 일은 물러난다 — 그때 주인공은 대화다. 다시 보려면 새 세션. */
+  body.chatting .today-tasks{display:none !important;}
+  body.shell-popped .today-tasks{display:none !important;}
   body.chatting .ai-team{margin-top:4px !important;}
   body.chatting #accConsole .cl-rows{max-height:52vh;margin-top:10px;}
   body.chatting .center-stage{justify-content:flex-start;padding-top:14px !important;}
@@ -736,6 +759,13 @@
         <div class="hero-sub">지시하거나 파일을 올리면 AI 팀이 처리합니다</div>
       </div>
 
+      <!-- 오늘 할 일 — 첫 화면이 "무엇이 급한지"부터 보여 준다(2026-07-27).
+           SOC 화면의 기본 원칙: 순서는 데이터가 있는 순서가 아니라 급한 순서다.
+           우선순위 계산(KEV·EPSS·VPR)은 원래 있었는데 화면에 자리가 없어 죽어 있었다
+           (todayPriorityList 요소가 개편 중 사라져 JS만 남아 있었음 — 실측 확인).
+           출처 셋을 합친다: 취약점 우선순위 · 기한 지난 점검 · 승인 대기. -->
+      <div class="today-tasks" id="todayTasks" style="display:none"></div>
+
       <!-- 내 업무 바로가기 — 왼쪽 메뉴에서 여는 중앙 팝업 -->
       <div class="quick-pop" id="quickPop"><span class="quick-x" id="quickClose">✕</span>
       <div class="dash-menu" id="dashMenu"></div></div>
@@ -821,12 +851,33 @@
     }
     document.getElementById("tipsMore")?.addEventListener("click", () => sendToOrchestrator("이 화면 뭐 할 수 있어?"));
 
-    // 규칙은 돌리지 않고 전부 보여준다(2026-07-26 사용자 지시) — 순환하면 지금 안 보이는 규칙을
-    // 놓치고, 담당자가 몰라서 사고 나는 것을 막자고 만든 줄이라 다 보이는 편이 목적에 맞다.
+    // 규칙(알아두기)은 하나도 빼지 않는다(2026-07-26 사용자 지시) — 순환시키면 지금 안 보이는
+    // 규칙을 놓치고, 담당자가 몰라서 사고 나는 것을 막자고 만든 줄이기 때문이다.
+    // 다만 7줄이 첫 화면에 늘 펼쳐져 있어 "설명은 화면에 두지 않는다"는 원칙과 부딪혔다
+    // (2026-07-27 실화면 점검). 그래서 **기본은 한 줄로 접고, 누르면 전부** 펼친다 —
+    // 빼는 게 아니라 접는 것이라 두 지시가 다 지켜진다. 펼침 상태는 기억한다.
     const rules = tips.rules || [];
     if (!rules.length) return;
     const txt = document.getElementById("tipsRuleText");
-    txt.innerHTML = rules.map((r) => `<span class="rn">${escT(r)}</span>`).join("");
+    const lb = ruleRow.querySelector(".lb");
+    const RKEY = "gijo:dash:rulesOpen";
+    let open = false;
+    try { open = localStorage.getItem(RKEY) === "1"; } catch (e) {}
+    const paint = () => {
+      txt.innerHTML = open ? rules.map((r) => `<span class="rn">${escT(r)}</span>`).join("") : "";
+      if (lb) lb.textContent = open ? `알아두기 ▴` : `알아두기 ${rules.length} ▾`;
+      txt.style.display = open ? "" : "none";
+    };
+    if (lb) {
+      lb.style.cursor = "pointer";
+      lb.title = "제품을 쓸 때 알아둘 규칙 — 눌러서 펼치기/접기";
+      lb.addEventListener("click", () => {
+        open = !open;
+        try { localStorage.setItem(RKEY, open ? "1" : "0"); } catch (e) {}
+        paint();
+      });
+    }
+    paint();
     ruleRow.style.display = "flex";
   }
   const AGENT_ICON = { orchestrator: "🧭", scan: "⊘", analysis: "◎", report: "▣", ti: "🛰", normaltic: "📚" };
@@ -2386,27 +2437,72 @@
   }
 
   // 오늘의 조치 — 전 자산 취약점 우선순위 상위 5(KEV·EPSS·VPR 순). 클릭은 data-page로 취약점 관리 이동.
+  // 오늘 할 일 — 급한 순서로 최대 5개. 세 출처를 합친다.
+  //   ① 취약점 우선순위(KEV·EPSS·VPR 계산은 서버가 이미 한다)
+  //   ② 기한 지난 유지보수 점검
+  //   ③ 승인 대기 중인 점검 보고
+  // ⚠ 여기서 순위를 새로 계산하지 않는다 — 서버가 정한 순서를 그대로 쓰고, 셋을 섞을 때만
+  //   등급(P0/P1/P2)으로 줄 세운다. 화면이 서버와 다른 답을 내면 담당자가 둘 중 뭘 믿을지 모른다.
   async function loadTodayPriority() {
-    const box = document.getElementById("todayPriorityList");
+    const box = document.getElementById("todayTasks");
     if (!box) return;
+    const rows = [];
+    // ① 취약점
     try {
       const { items } = await window.gijo.listActionPriorities(5);
-      if (!items || !items.length) { box.innerHTML = '<span style="color:var(--muted-2)">조치 대상 취약점 없음</span>'; return; }
-      const dot = { critical: "#e2483d", high: "#f5928a", medium: "#f0a020", low: "#5f6785" };
-      box.innerHTML = items.map((r, i) => {
+      for (const r of items || []) {
         const f = r.finding;
-        const tag = f.kev ? '<span style="color:#f5928a;font-weight:800">KEV</span>'
-          : (f.epss != null ? `<span style="color:var(--amber)">EPSS ${Math.round(f.epss * 100)}%</span>` : "");
-        const nm = (f.finding_type || "").length > 32 ? f.finding_type.slice(0, 31) + "…" : (f.finding_type || "");
-        return `<div style="display:flex;align-items:center;gap:7px;padding:4px 0;">` +
-          `<span style="color:var(--muted-2);width:12px">${i + 1}</span>` +
-          `<span style="width:7px;height:7px;border-radius:50%;background:${dot[f.severity] || "#5f6785"};flex:0 0 auto"></span>` +
-          `<span style="color:var(--text);flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${escT(nm)}</span>` +
-          `<span style="font-size:10px">${tag}</span></div>`;
-      }).join("");
-    } catch (e) {
-      box.innerHTML = '<span style="color:var(--muted-2)">불러오지 못함</span>';
+        const why = f.kev ? "KEV · 실제 악용" : (f.epss != null ? `악용확률 ${Math.round(f.epss * 100)}%` : (f.severity || ""));
+        rows.push({
+          rank: f.kev ? 0 : (f.severity === "critical" || f.severity === "high" ? 1 : 2),
+          sev: f.kev ? "p0" : (f.severity === "critical" || f.severity === "high" ? "p1" : "p2"),
+          title: f.finding_type || "이름 없는 취약점",
+          why, go: "조치", page: "approvals.html",
+        });
+      }
+    } catch (e) { /* 취약점을 못 읽어도 아래 둘은 보여 준다 */ }
+    // ②③ 점검
+    try {
+      const list = (await window.gijo.listMaintenance()) || [];
+      const today = new Date().toISOString().slice(0, 10);
+      const overdue = list.filter((m) => m.status === "scheduled" && m.scheduleDate <= today);
+      const pending = list.filter((m) => m.status === "reported");
+      if (overdue.length) {
+        const d = Math.max(0, Math.round((Date.now() - new Date(overdue[0].scheduleDate).getTime()) / 86400000));
+        rows.push({ rank: 1, sev: "p1", title: `${overdue[0].title} — 점검 기한 초과`,
+          why: overdue.length > 1 ? `외 ${overdue.length - 1}건 · ${d}일 지연` : `${d}일 지연`, go: "점검", page: "opsguide.html" });
+      }
+      if (pending.length) {
+        rows.push({ rank: 2, sev: "p2", title: `점검 보고 승인 대기 ${pending.length}건`,
+          why: pending[0].productName || "", go: "검토", page: "opsguide.html" });
+      }
+    } catch (e) { /* 점검을 못 읽어도 취약점은 보여 준다 */ }
+
+    if (!rows.length) {
+      box.style.display = "block";
+      box.innerHTML = '<div class="tt-empty">지금 급한 일은 없습니다. 아래에 무엇이든 물어보거나 시키세요.</div>';
+      return;
     }
+    rows.sort((a, b) => a.rank - b.rank);
+    const top = rows.slice(0, 5);
+    box.style.display = "flex";
+    box.innerHTML =
+      `<div class="tt-h">🎯 오늘 할 일 <span class="cnt">${top.length}</span>${rows.length > top.length ? `<span style="font-weight:600">· 외 ${rows.length - top.length}건</span>` : ""}</div>` +
+      top.map((r) =>
+        `<div class="tt-row" data-go="${escT(r.page)}" role="button" tabindex="0">` +
+        `<span class="tt-sev ${r.sev}">${r.sev.toUpperCase()}</span>` +
+        `<span class="tt-t">${escT(r.title)}</span>` +
+        `<span class="tt-why">${escT(r.why)}</span>` +
+        `<span class="tt-go">${escT(r.go)} →</span></div>`).join("");
+    box.querySelectorAll(".tt-row").forEach((el) => {
+      const open = () => {
+        const p = el.dataset.go;
+        if (window.gijoShell && window.gijoShell.openPage && window.gijoShell.openPage(p)) return;
+        window.gijo.navigateTo(p);
+      };
+      el.addEventListener("click", open);
+      el.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); open(); } });
+    });
   }
 
   // ── 작업 세션 열(탐색기 옆) ────────────────────────────────────────────

@@ -1541,7 +1541,7 @@ export const screenTipsApi = {
 };
 
 // 화면 안내 본문 — 화면을 열면 대시보드 대화가 이걸 그대로 띄운다(ⓘ 아이콘 대체, 2026-07-27).
-export interface ScreenGuideText { title: string; text: string }
+export interface ScreenGuideText { title: string; what: string; text: string }
 export const screenGuideApi = {
   get: (screen?: string, question?: string) => {
     const q = new URLSearchParams();

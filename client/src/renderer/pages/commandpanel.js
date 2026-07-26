@@ -14,7 +14,7 @@
   if (here === "login.html" || here === "office.html" || here === "") return;
   if (/[?&]embed=1/.test(location.search || "")) return;
   if (!window.gijo || !window.gijo.isAuthenticated || !window.gijo.isAuthenticated()) return;
-  if (document.getElementById("gijoEdgeRail")) return;
+  if (document.getElementById("gcpPanel") || window.gijoOpenSessions) return; // 이미 만들었으면 건너뜀
 
   var esc = function (s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); };
 
@@ -24,11 +24,6 @@
     st.id = "gijoCmdCss";
     st.textContent =
       // 가장자리 세로 메뉴 — 화면 오른쪽 상단부터, 아이콘 없이 텍스트만(깔끔 원칙)
-      "#gijoEdgeRail{position:fixed;right:18px;top:70px;display:flex;flex-direction:column;gap:10px;z-index:901;}" +
-      ".gijo-etab{writing-mode:vertical-rl;letter-spacing:2px;font-size:11px;font-weight:800;color:var(--muted,#8b93ab);padding:13px 7px;border:1px solid var(--border,#1e2a44);border-radius:10px;cursor:pointer;background:var(--panel-2,#0e1526);user-select:none;box-shadow:-2px 0 10px rgba(0,0,0,.35);}" +
-      ".gijo-etab:hover{color:var(--blue-light,#7ab0ff);border-color:var(--blue,#3b82f6);}" +
-      ".gijo-etab.on{color:#fff;background:rgba(59,130,246,.22);border-color:rgba(59,130,246,.55);}" +
-      ".gijo-etab b{writing-mode:horizontal-tb;font-size:9px;background:var(--blue,#3b82f6);color:#fff;border-radius:8px;padding:0 5px;margin-bottom:6px;}" +
       // 작업 세션 — 소형 팝업(중앙 위 오버레이)
       "#gijoCmdPanel{display:none;position:fixed;top:64px;right:62px;bottom:14px;width:340px;max-width:88vw;background:var(--panel-2,#0e1526);border:1px solid var(--border-strong,#2a3a5e);border-radius:14px;z-index:900;flex-direction:column;box-shadow:-14px 0 44px rgba(0,0,0,.55);overflow:hidden;animation:gijoedgein .18s ease-out;}" +
       "#gijoCmdPanel.on{display:flex;}" +
@@ -71,13 +66,11 @@
     document.head.appendChild(st);
   }
 
-  var panel, officePop, tabSess, tabOffice, sessBody;
+  var panel, officePop, sessBody;
 
   function setPop(name) {
     panel.classList.toggle("on", name === "sess");
     officePop.classList.toggle("on", name === "office");
-    tabSess.classList.toggle("on", name === "sess");
-    tabOffice.classList.toggle("on", name === "office");
     if (name === "office") {
       var f = document.getElementById("gijoOfficeFrame");
       if (!f.src) f.src = "office.html?embed=1"; // 첫 열림에만 로드
@@ -107,20 +100,16 @@
       '<iframe id="gijoOfficeFrame" title="AI 전용 라이브 오피스"></iframe>';
     document.body.appendChild(officePop);
 
-    // 가장자리 세로 메뉴(탭 2개)
-    var rail = document.createElement("div");
-    rail.id = "gijoEdgeRail";
-    rail.innerHTML =
-      '<div class="gijo-etab" id="gijoEdgeSess" title="작업 세션">작업 세션 <b id="gijoEdgeSessCnt">-</b></div>' +
-      '<div class="gijo-etab" id="gijoEdgeOffice" title="AI 전용 라이브 오피스">AI 라이브 오피스</div>';
-    document.body.appendChild(rail);
-
-    tabSess = document.getElementById("gijoEdgeSess");
-    tabOffice = document.getElementById("gijoEdgeOffice");
+    // 가장자리 세로 글씨 탭 2개는 없앴다(2026-07-27).
+    //  · "작업 세션"  → 왼쪽 메뉴 '관제 > 작업 세션'(sessions.html)으로 옮겼다.
+    //  · "AI 라이브 오피스" → 'AI 팀 > 🏢 팀 사무실(창)'과 같은 것이라 개념이 둘로 나뉘어 있었다.
+    // 세로로 눕힌 글씨는 읽는 데만 시간이 걸리고, 둘 다 이미 정식 화면이 있었다.
+    // 팝업 몸통(panel·officePop)은 남겨 둔다 — 아래 window.gijoOpenSessions/OpenOffice로 부를 수 있고,
+    // 화면 없이 겹쳐 보고 싶을 때 쓴다. 다만 상시 노출되는 입구는 두지 않는다.
     sessBody = panel.querySelector("#gcpSessList");
+    window.gijoOpenSessions = function () { setPop(panel.classList.contains("on") ? null : "sess"); };
+    window.gijoOpenOffice = function () { setPop(officePop.classList.contains("on") ? null : "office"); };
 
-    tabSess.addEventListener("click", function () { setPop(panel.classList.contains("on") ? null : "sess"); });
-    tabOffice.addEventListener("click", function () { setPop(officePop.classList.contains("on") ? null : "office"); });
     document.getElementById("gcpClose").addEventListener("click", function () { setPop(null); });
     document.getElementById("gcpOfficeClose").addEventListener("click", function () { setPop(null); });
     document.addEventListener("keydown", function (e) { if (e.key === "Escape") setPop(null); });
@@ -156,8 +145,6 @@
       var active = list.filter(function (s) { return s.status === "active"; }).length;
       var badge = panel.querySelector("#gcpActive");
       if (badge) { badge.textContent = "진행중 " + active; badge.classList.toggle("zero", active === 0); }
-      var cnt = document.getElementById("gijoEdgeSessCnt");
-      if (cnt) cnt.textContent = String(active);
       if (!list || !list.length) { sessBody.innerHTML = '<div class="gcp-empty">작업 세션이 없습니다.</div>'; return; }
       sessBody.innerHTML = list.map(function (s) {
         var who = s.lastRole === "user" ? "나" : s.lastRole === "assistant" ? "AI 팀" : "—";

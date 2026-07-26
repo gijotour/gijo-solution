@@ -479,26 +479,30 @@ async function runClient() {
     return `탭 5개 + 업데이트 배지 표시`;
   });
 
-  // 2026-07-26 기대값 현행화: 엣지 탭 v5 개편(커밋 b2b0914)으로 요소가 바뀌었다.
-  //   gijoCmdTab → gijoEdgeRail 안의 gijoEdgeSess(작업 세션)·gijoEdgeOffice(AI 라이브 오피스)
-  //   패널 열림 클래스 open → on
-  // 화면은 정상이었고(실화면·스윕 확인) QA 기대값만 낡아 있었다.
-  await scenario("QA-C04", "작업 세션", "허브에서 작업 세션 드로어 기본 접힘", {
+  // 2026-07-27 기대값 현행화: 오른쪽 가장자리 세로 글씨 탭 2개를 없앴다.
+  //   · "작업 세션" → 왼쪽 메뉴 '관제 > 작업 세션'(sessions.html)
+  //   · "AI 라이브 오피스" → 'AI 팀 > 팀 사무실(창)'과 같은 것이라 개념이 둘로 나뉘어 있었다
+  // 세로로 눕힌 글씨는 읽는 데만 시간이 걸린다는 판단(실화면 점검). 팝업 몸통은 남아 있고
+  // window.gijoOpenSessions/OpenOffice로 부를 수 있다 — 상시 노출되는 입구만 없앴다.
+  await scenario("QA-C04", "작업 세션", "작업 세션은 왼쪽 메뉴에 있고 세로 글씨 탭은 없다", {
     given: "허브 화면(임베드 아님, 최상위)에서",
     when: "페이지 로드가 끝나면",
-    then: "오른쪽 가장자리에 '작업 세션'·'AI 라이브 오피스' 탭이 있고 패널은 접힌 상태가 기본이다",
+    then: "왼쪽 메뉴에 '작업 세션'이 있고, 가장자리 세로 글씨 탭은 하나도 없다",
   }, async () => {
     await open("hub.html?g=assets");
     const r = await page.evaluate(() => ({
       rail: Boolean(document.getElementById("gijoEdgeRail")),
-      sess: document.getElementById("gijoEdgeSess")?.textContent?.trim() ?? null,
-      office: Boolean(document.getElementById("gijoEdgeOffice")),
+      menuSess: [...document.querySelectorAll("#gijoNav *")].some((e) => e.children.length === 0 && e.textContent.trim() === "작업 세션"),
+      vertical: [...document.querySelectorAll("*")].filter((e) => getComputedStyle(e).writingMode.startsWith("vertical") && e.offsetParent).length,
+      openApi: typeof window.gijoOpenSessions === "function",
       open: document.getElementById("gijoCmdPanel")?.classList?.contains("on") ?? false,
     }));
-    if (!r.rail || !r.sess) throw new Error("엣지 탭(작업 세션) 없음");
-    if (!r.office) throw new Error("AI 라이브 오피스 탭 없음");
+    if (r.rail) throw new Error("가장자리 레일이 아직 있음");
+    if (!r.menuSess) throw new Error("왼쪽 메뉴에 '작업 세션' 없음");
+    if (r.vertical > 0) throw new Error("세로로 쓴 글씨 " + r.vertical + "개 남음");
+    if (!r.openApi) throw new Error("gijoOpenSessions 함수 없음(팝업 몸통 유실)");
     if (r.open) throw new Error("기본이 펼침 상태");
-    return `탭 '${r.sess}'·오피스 존재, 기본 접힘`;
+    return "메뉴에 작업 세션 있음, 세로 글씨 0개, 팝업 기본 접힘";
   });
 
   await scenario("QA-C05", "메뉴 C안", "AI 지식·모델 허브 6탭", {

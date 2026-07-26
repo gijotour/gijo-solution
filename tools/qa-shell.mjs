@@ -118,7 +118,9 @@ const icons = await page.evaluate(() => {
   const bots = items.map((e) => { const b = e.querySelector(".gn-bot"); return b ? b.textContent : null; }).filter(Boolean);
   return { total: bots.length, popup: bots.filter((t) => t === "⧉").length };
 });
-ok("챗봇 메뉴 9종 전부 ⧉", icons.total === 9 && icons.popup === 9, JSON.stringify(icons));
+// 개수를 못 박지 않는다 — 메뉴는 늘고 준다(2026-07-27 '작업 세션'이 오른쪽 세로 탭에서
+// 왼쪽 메뉴로 옮겨 오며 9→10이 됐다). 중요한 건 "챗봇 메뉴는 전부 ⧉"라는 규칙이다.
+ok("챗봇 메뉴는 전부 ⧉(팝업)", icons.total >= 9 && icons.popup === icons.total, JSON.stringify(icons));
 
 // 5-d) 2차 메뉴 팝업 — 단독 페이지(레드팀)도 팝업으로 열린다
 await page.evaluate(() => {
@@ -283,9 +285,13 @@ await page.screenshot({ path: SHOT + "shell-popup-resized.png" });
 await page.evaluate(() => { const g = document.getElementById("shellGrip"); const r = g.getBoundingClientRect(); g.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: r.left + 10, clientY: r.top + 3 })); });
 await page.waitForTimeout(300);
 const h2 = await page.evaluate(() => document.getElementById("shellLayer").offsetHeight);
-const hKeyCleared = await page.evaluate(() => localStorage.getItem("gijo:shell:height") === null);
-// 자동 = 이제 "내용 맞춤"이라 꽉 차게가 아닐 수 있다 — 수동값 해제 + 수동보다 커졌는지로 판정
-ok("더블클릭 = 자동(내용 맞춤) 복귀", hKeyCleared && h2 >= h1, `${h1} → ${h2} (기억 해제=${hKeyCleared})`);
+const hSaved = await page.evaluate(() => Number(localStorage.getItem("gijo:shell:height") || 0));
+// 팝업 높이가 고정으로 바뀌면서(2026-07-27) 더블클릭의 뜻도 바뀌었다:
+// 예전엔 "자동 모드로 되돌리기"(저장값 삭제)였는데, 이제 되돌릴 자동 모드가 없다.
+// 지금은 "지금 보이는 화면에 맞춰 다시 재서 그 값으로 고정"이다 — 그래서 저장값은 지워지지
+// 않고 새 값으로 바뀐다. 손으로 줄인 값(h1)보다 커지고, 그 값이 저장돼 있으면 통과.
+ok("더블클릭 = 이 화면에 맞춰 다시 맞춤", h2 >= h1 && Math.abs(hSaved - h2) <= 8,
+  `${h1} → ${h2} (저장값 ${hSaved})`);
 
 // 10-b) ⧉ 메뉴 아이콘 = 별도 창으로 열기 + 그 창 안에서 가로/세로 전환(2026-07-26 결정)
 const vPromise = ctx.waitForEvent("page", { timeout: 10_000 }).catch(() => null);

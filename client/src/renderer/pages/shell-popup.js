@@ -96,16 +96,20 @@
 
   var layer = document.createElement("div");
   layer.id = "shellLayer";
-  layer.innerHTML = '<div id="shellHead">' +
+  // 머리 버튼은 3개만 내놓는다(2026-07-27). 예전엔 📌⟳🗗⛶▁✕ 여섯 개가 늘 보여서
+  // "이게 뭐 하는 건지" 배울 게 여섯 가지였다. 자주 쓰는 셋만 남기고,
+  // 나머지(핀·새로고침·접기)는 **머리를 우클릭**하면 나오는 메뉴로 옮겼다 — 기능은 그대로다.
+  layer.innerHTML = '<div id="shellHead" title="우클릭하면 핀·새로고침·접기">' +
     '<span class="t" id="shTitle"></span><span class="sp"></span>' +
-    '<span class="hb" id="shPin" title="핀 — 자동 닫힘에서 제외">📌</span>' +
-    '<span class="hb" id="shReload" title="새로고침">⟳</span>' +
-    '<span class="hb" id="shPopout" title="창으로 분리 — 별도 창으로 떼어냄. 가로/세로 배치는 그 창 안에서 바꿉니다">🗗</span>' +
-    '<span class="hb" id="shFull" title="전체 화면으로 이동(기존 방식)">⛶</span>' +
-    '<span class="hb" id="shMin" title="대시보드로 (팝업은 위 슬롯에 유지)">▁</span>' +
-    '<span class="hb" id="shClose" title="닫기">✕</span></div>' +
+    '<span class="hb" id="shPopout" title="창으로 분리 — 별도 창으로 떼어냄. 가로/세로는 그 창 안에서">🗗</span>' +
+    '<span class="hb" id="shFull" title="전체 화면으로 보기">⛶</span>' +
+    '<span class="hb" id="shClose" title="닫기">✕</span>' +
+    // 숨은 버튼 — 우클릭 메뉴가 이 요소들을 그대로 눌러 쓴다(배선을 한 벌만 유지).
+    '<span class="hb" id="shPin" title="핀" style="display:none">📌</span>' +
+    '<span class="hb" id="shReload" title="새로고침" style="display:none">⟳</span>' +
+    '<span class="hb" id="shMin" title="접기" style="display:none">▁</span></div>' +
     '<div id="shellBody"></div>' +
-    '<div id="shellGrip" title="끌어서 높이 조절 · 더블클릭 = 자동(꽉 차게)"></div>';
+    '<div id="shellGrip" title="끌어서 높이 조절 · 더블클릭 = 지금 화면에 맞춰 다시"></div>';
   document.body.appendChild(layer);
 
   var toast = document.createElement("div");
@@ -177,9 +181,13 @@
   }
 
   // 사용자가 고른 팝업 높이(px) — 없으면 자동(내용에 맞추되 컴포저 위까지가 최대). 기억한다.
+  // 대화·입력줄의 최대 폭. 넘는 만큼은 양옆 여백이 되고 가운데 정렬된다.
+  var CHAT_MAX_W = 900;
+
+  // 팝업 셸의 고정 높이. 화면·탭을 바꿔도, 구역을 펼쳐도 이 값 그대로다.
   var HKEY = "gijo:shell:height";
-  var userH = null;
-  try { userH = Number(localStorage.getItem(HKEY)) || null; } catch (e) {}
+  var shellH = null;
+  try { shellH = Number(localStorage.getItem(HKEY)) || null; } catch (e) {}
 
   // 화면 내용의 실제 높이 — 내용이 짧은 화면에서 팝업이 빈 공간으로 길게 남지 않게(2026-07-26
   // 사용자 지적 "메뉴별 빈 화면 다 없애줘"). 허브면 탭바 + 활성 탭 문서 높이, 단독 페이지면 문서 높이.
@@ -228,6 +236,29 @@
     } catch (e) { return null; }
   }
 
+  // 지금 보이는 화면 기준으로 "이 정도면 알맞다"는 높이를 계산한다.
+  // 높이를 처음 정할 때와, 손잡이를 더블클릭해 다시 맞출 때만 쓴다 — 평소에는 안 부른다.
+  // 아직 화면을 못 읽었으면(로딩 중) null을 돌려, 잘못된 값으로 고정되는 걸 막는다.
+  function autoHeight(maxFit) {
+    var s0 = findSlot(activeKey);
+    if (!s0) return null;
+    var headH = document.getElementById("shellHead").offsetHeight || 38;
+    var sh = summaryHeight(s0);
+    if (sh) {
+      // 요약 카드가 있는 화면 — 딱 그 카드까지만. 여기서는 55% 하한을 쓰지 않는다:
+      // 그 하한은 '내용 전체'를 잴 때 측정이 빗나가는 걸 막으려던 안전장치인데,
+      // 요약 카드는 특정 요소를 직접 재므로 값이 정확하고, 하한을 두면 카드보다
+      // 한참 큰 팝업이 열려 "요약만 보이게" 하려는 목적 자체가 사라진다.
+      return Math.min(maxFit, Math.max(200, sh + headH));
+    }
+    var ch = contentHeight(s0);
+    if (!ch) return null;
+    // 요약 표식이 없는 화면 — 내용 전체를 재는데 값이 실제보다 작게 나오는 경우가 있어
+    // (요소 높이가 뷰포트에 묶인 화면) 덜 줄이는 쪽으로 하한을 둔다.
+    var minFit = Math.max(360, Math.round(maxFit * 0.55));
+    return Math.min(maxFit, Math.max(minFit, ch + headH + 12));
+  }
+
   // ── 위치 계산 — 사이드바 오른쪽 ~ 엣지 거터(46px), 관리 바 아래 ~ 컴포저 위 ──
   function layout() {
     if (!visible) return;
@@ -247,29 +278,24 @@
     var rowsH = rows ? rows.offsetHeight : 0;
     var nonRows = accH - rowsH; // 이력을 뺀 컴포저 몸통(입력줄·팁 등) 높이
     var baseMinGap = (nonRows + 110) + 20; // 이력이 기본(110px)일 때 필요한 최소 바닥 여백
+    // ── 높이는 고정이다(2026-07-27 결정) ──────────────────────────────────
+    // 예전에는 보이는 화면 내용에 맞춰 매번 다시 쟀다. 그러면 탭을 옮길 때마다 팝업이
+    // 커졌다 작아지고, 그만큼 아래 명령창·대화가 위아래로 밀린다(실측: 리포트 259 →
+    // 보안KPI 387 → 컴플라이언스 221, 한 번에 166px). 구역 접기가 들어오면 펼칠 때마다
+    // 또 출렁여서 접기 자체가 불쾌해진다. 그래서 높이는 한 번 정하면 그대로 둔다.
+    //   · 저장값이 있으면 그 값(손잡이로 조절했거나, 예전에 자동으로 정해 둔 값)
+    //   · 없으면 지금 보이는 화면의 요약 카드 기준으로 정하고 **바로 저장**한다
+    //   · 손잡이 더블클릭 = 지금 화면 기준으로 다시 맞춰 저장(아래 dblclick 참고)
+    var maxFit = window.innerHeight - top - baseMinGap;
     var wantH = null; // 팝업이 갖고 싶은 높이
-    if (userH) {
-      wantH = Math.max(240, userH);
+    if (shellH) {
+      wantH = Math.min(maxFit, Math.max(240, shellH));
     } else {
-      var s0 = findSlot(activeKey);
-      var headH = document.getElementById("shellHead").offsetHeight || 38;
-      var maxFit = window.innerHeight - top - baseMinGap;
-      var sh = s0 ? summaryHeight(s0) : null;
-      if (sh) {
-        // 요약 카드가 있는 화면 — 딱 그 카드까지만 연다. 여기서는 55% 하한을 쓰지 않는다:
-        // 그 하한은 '내용 전체'를 잴 때 측정이 빗나가는 걸 막으려던 안전장치인데,
-        // 요약 카드는 특정 요소를 직접 재므로 값이 정확하고, 하한을 두면 카드보다
-        // 한참 큰 팝업이 열려 "요약만 보이게" 하려는 목적 자체가 사라진다.
-        wantH = Math.min(maxFit, Math.max(200, sh + headH));
-      } else {
-        var ch = s0 ? contentHeight(s0) : null;
-        if (ch) {
-          // 자동 축소 하한 = 가용 높이의 55% — 일부 화면은 요소 높이가 뷰포트에 묶여 있어
-          // 측정값이 실제보다 작게 나온다(실측: 우선순위 목록이 잘림). 덜 줄이는 쪽이 안전하고,
-          // 남는 내용은 팝업 안 스크롤로 본다(창 고정 원칙과 동일).
-          var minFit = Math.max(360, Math.round(maxFit * 0.55));
-          wantH = Math.min(maxFit, Math.max(minFit, ch + headH + 12));
-        }
+      var auto = autoHeight(maxFit);
+      if (auto) {
+        wantH = auto;
+        shellH = auto;
+        try { localStorage.setItem(HKEY, String(Math.round(auto))); } catch (e) {}
       }
     }
     var gap;
@@ -290,9 +316,15 @@
     dim.style.top = Math.round(bar.getBoundingClientRect().bottom) + "px";
     dim.style.right = "0";
     dim.style.bottom = "0";
-    if (acc) { // 컴포저 고정 폭도 팝업과 맞춘다
-      acc.style.left = navRight + "px";
-      acc.style.right = right + "px";
+    if (acc) {
+      // 대화·입력줄은 **읽기 좋은 폭으로 가운데** 둔다(2026-07-27).
+      // 팝업은 표·목록이라 넓을수록 좋지만, 대화는 글이라 줄이 길면 다음 줄을 눈으로 찾다가
+      // 이해가 떨어진다(권장 한 줄 45~75자 ≈ 660~780px). 실측 1056px은 한글 약 90자로 너무 길었다.
+      // 우리 대화에는 승인 카드·근거 배지·KPI 줄이 섞여 들어와 순수 글보다 조금 넓은 900px로 잡는다.
+      var bandW = window.innerWidth - navRight - right;
+      var pad = Math.max(0, Math.round((bandW - Math.min(CHAT_MAX_W, bandW)) / 2));
+      acc.style.left = (navRight + pad) + "px";
+      acc.style.right = (right + pad) + "px";
     }
   }
   window.addEventListener("resize", layout);
@@ -404,11 +436,43 @@
     announceGuide(opts.tab || (page.indexOf("hub.html") === 0 ? null : page), label);
   }
 
-  // 화면 안내를 대시보드 대화로 보낸다. 대시보드가 이 함수를 갖고 있지 않은 상황
-  // (아직 로드 전)에서도 조용히 넘어간다 — 안내는 부가 정보지 동작 조건이 아니다.
+  // 화면 안내 — 팝업 머리 아래 **얇은 한 줄**로 보여 준다(2026-07-27 개편).
+  //
+  // ⚠ 처음에는 이 안내를 대시보드 대화에 띄웠다. 실화면을 보니 대화가 안내 게시판이 됐다 —
+  //   화면을 셋 열면 안내 카드도 셋이 쌓여 정작 사용자 대화가 밀려났다(대화는 10줄만 남는다).
+  //   안내는 "그 화면에 대한 것"이므로 그 화면 위에 있는 게 맞다. 대화는 대화에만 쓴다.
+  // 한 줄에는 화면이 하는 일만 적고, 누르면 자세한 안내를 대화로 보낸다(그때는 사용자가 원한 것).
+  var guideBar = null;
+  var guideFor = null;   // 지금 줄이 설명하고 있는 화면
+  function ensureGuideBar() {
+    if (guideBar) return guideBar;
+    guideBar = document.createElement("div");
+    guideBar.id = "shellGuide";
+    guideBar.style.cssText = "display:none;align-items:center;gap:7px;padding:5px 12px;" +
+      "background:rgba(59,130,246,.08);border-bottom:1px solid var(--border,#1e2a44);" +
+      "font-size:11px;color:var(--muted,#8b93ab);line-height:1.5;cursor:pointer;flex:0 0 auto;" +
+      "white-space:nowrap;overflow:hidden;text-overflow:ellipsis;";
+    guideBar.title = "눌러서 이 화면 사용법을 자세히 보기";
+    guideBar.addEventListener("click", function () {
+      if (!guideFor) return;
+      try { if (window.gijoScreenGuide) window.gijoScreenGuide(guideFor.screen, guideFor.label, { force: true }); } catch (e) {}
+    });
+    var head = document.getElementById("shellHead");
+    head.parentNode.insertBefore(guideBar, head.nextSibling);
+    return guideBar;
+  }
   function announceGuide(screen, label) {
-    if (!screen) return;
-    try { if (window.gijoScreenGuide) window.gijoScreenGuide(screen, label); } catch (e) {}
+    var bar = ensureGuideBar();
+    if (!screen) { bar.style.display = "none"; guideFor = null; return; }
+    guideFor = { screen: screen, label: label };
+    bar.style.display = "none";
+    if (!window.gijo || !window.gijo.screenGuide) return;
+    window.gijo.screenGuide(screen).then(function (g) {
+      if (!g || !g.what || !guideFor || guideFor.screen !== screen) return;
+      bar.textContent = "🤖 " + g.what;
+      bar.style.display = "flex";
+      layout(); // 줄이 생기면 안쪽 높이가 줄어든다 — 요약 카드가 잘리지 않게 다시 잰다
+    }).catch(function () { /* 안내를 못 받아도 화면 사용에는 지장 없다 */ });
   }
 
   // 내용은 데이터가 도착하며 자라거나 준다 — 보이는 동안 1.2초마다 가볍게 재계산(DOM 읽기뿐).
@@ -514,6 +578,44 @@
   });
   document.getElementById("shMin").addEventListener("click", minimize);
   document.getElementById("shClose").addEventListener("click", function () { close(activeKey); });
+
+  // 머리 우클릭 메뉴 — 자주 안 쓰는 셋(핀·새로고침·접기)이 여기로 들어왔다.
+  // 숨겨 둔 버튼을 그대로 눌러 실행하므로 동작 코드는 위 한 벌만 유지된다.
+  var headMenu = document.createElement("div");
+  headMenu.id = "shellHeadMenu";
+  headMenu.style.cssText = "position:fixed;display:none;z-index:1300;background:var(--panel-2,#0e1526);" +
+    "border:1px solid var(--border-strong,#28365a);border-radius:9px;padding:5px;min-width:150px;" +
+    "box-shadow:0 10px 30px rgba(0,0,0,.55);font-size:12px;";
+  document.body.appendChild(headMenu);
+  function hideHeadMenu() { headMenu.style.display = "none"; }
+  document.addEventListener("click", hideHeadMenu);
+  window.addEventListener("blur", hideHeadMenu);
+  document.getElementById("shellHead").addEventListener("contextmenu", function (e) {
+    e.preventDefault();
+    var s = findSlot(activeKey);
+    headMenu.innerHTML = "";
+    [
+      { label: (s && s.pinned ? "📌 핀 풀기" : "📌 핀 고정 — 자동 닫힘에서 제외"), id: "shPin" },
+      { label: "⟳ 새로고침", id: "shReload" },
+      { label: "▁ 접기 — 대시보드로 (팝업은 유지)", id: "shMin" },
+    ].forEach(function (it) {
+      var b = document.createElement("div");
+      b.textContent = it.label;
+      b.style.cssText = "padding:7px 10px;border-radius:6px;cursor:pointer;color:var(--text,#e6eaf3);white-space:nowrap;";
+      b.addEventListener("mouseenter", function () { b.style.background = "rgba(255,255,255,.06)"; });
+      b.addEventListener("mouseleave", function () { b.style.background = ""; });
+      b.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        hideHeadMenu();
+        document.getElementById(it.id).click();
+      });
+      headMenu.appendChild(b);
+    });
+    headMenu.style.display = "block";
+    // 화면 밖으로 나가지 않게 오른쪽·아래를 넘으면 안쪽으로 당긴다.
+    headMenu.style.left = Math.min(e.clientX, window.innerWidth - headMenu.offsetWidth - 8) + "px";
+    headMenu.style.top = Math.min(e.clientY, window.innerHeight - headMenu.offsetHeight - 8) + "px";
+  });
   document.getElementById("sbCloseAll").addEventListener("click", function () {
     slots.slice().forEach(function (s) { close(s.key, true); });
     showToast("팝업을 모두 닫았습니다");
@@ -530,22 +632,33 @@
     document.body.style.userSelect = "none";
     var frames = document.querySelectorAll("#shellBody iframe");
     Array.prototype.forEach.call(frames, function (f) { f.style.pointerEvents = "none"; });
-    function mv(ev) { userH = Math.max(240, startH + (ev.clientY - startY)); layout(); }
+    function mv(ev) { shellH = Math.max(240, startH + (ev.clientY - startY)); layout(); }
     function up() {
       document.removeEventListener("mousemove", mv);
       document.removeEventListener("mouseup", up);
       grip.classList.remove("drag");
       document.body.style.userSelect = "";
       Array.prototype.forEach.call(frames, function (f) { f.style.pointerEvents = ""; });
-      try { localStorage.setItem(HKEY, String(Math.round(userH))); } catch (e2) {}
+      try { localStorage.setItem(HKEY, String(Math.round(shellH))); } catch (e2) {}
     }
     document.addEventListener("mousemove", mv);
     document.addEventListener("mouseup", up);
   });
-  grip.addEventListener("dblclick", function () { // 자동(꽉 차게)으로 복귀
-    userH = null;
-    try { localStorage.removeItem(HKEY); } catch (e) {}
+  // 더블클릭 = "지금 보이는 화면에 맞춰 다시" — 예전엔 자동 모드로 되돌리는 뜻이었는데,
+  // 높이가 고정으로 바뀐 뒤로는 되돌릴 자동 모드가 없다. 대신 이 화면 기준으로 한 번
+  // 다시 재서 그 값으로 고정한다(요약 카드까지). 화면마다 알맞은 크기를 되찾는 길이다.
+  grip.addEventListener("dblclick", function () {
+    var top = Math.round(bar.getBoundingClientRect().bottom) + 8;
+    var acc = document.getElementById("accConsole");
+    var accH = acc ? acc.offsetHeight : 120;
+    var rows = acc ? acc.querySelector(".cl-rows") : null;
+    var nonRows = accH - (rows ? rows.offsetHeight : 0);
+    var h = autoHeight(window.innerHeight - top - (nonRows + 110 + 20));
+    if (!h) { showToast("화면을 아직 읽는 중입니다 — 잠시 후 다시 눌러 주세요"); return; }
+    shellH = h;
+    try { localStorage.setItem(HKEY, String(Math.round(h))); } catch (e) {}
     layout();
+    showToast("이 화면에 맞춰 팝업 높이를 " + Math.round(h) + "px로 맞췄습니다");
   });
 
   // ＋ 메뉴 — 팝업으로 열 수 있는 화면 목록(nav.js GROUPS의 popup:true와 같은 목록 유지)

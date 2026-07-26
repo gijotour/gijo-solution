@@ -128,6 +128,32 @@ describe("패널 이름 기반 도움말 의도", () => {
   });
 });
 
+// 구역을 기본으로 접게 되면서(2026-07-27) 담당자는 화면에 보이는 글자 그대로 물어본다.
+// 안내(panels) 이름과 화면 구역 이름이 다른 곳은 별명표(PANEL_ALIASES)가 이어 준다.
+describe("screenguide — 화면에 적힌 구역 이름으로 물어도 찾는다", () => {
+  it("위협 인텔: '구독 중인 CTI 피드' → '피드 구독' 설명", () => {
+    expect(isHelpIntent("구독 중인 CTI 피드 어디 있어?", "threat.html")).toBe(true);
+    const out = formatScreenGuide("threat.html", "구독 중인 CTI 피드 어디 있어?");
+    expect(out).toContain("피드 구독");
+    expect(out).toContain("벤더명");
+  });
+
+  it("유지보수: '유지보수 일정 · 점검서 · 승인' → '점검 승인' 설명", () => {
+    const out = formatScreenGuide("opsguide.html", "유지보수 일정 · 점검서 · 승인 어떻게 써?");
+    expect(out).toContain("점검 승인");
+  });
+
+  it("설정: '이메일(SMTP) 설정' → 'SMTP' 설명", () => {
+    const out = formatScreenGuide("settings.html", "이메일(SMTP) 설정 어떻게 해?");
+    expect(out).toContain("SMTP");
+  });
+
+  it("별명이 없는 화면·이름은 예전처럼 전체 안내로 떨어진다", () => {
+    const out = formatScreenGuide("threat.html", "없는구역이름 알려줘");
+    expect(out).toContain("이 화면 사용 안내");
+  });
+});
+
 // 화면을 열면 대시보드 대화가 이 라우트로 안내를 받아 띄운다(ⓘ 아이콘 대체, 2026-07-27).
 // LLM을 거치지 않으므로 응답이 매번 같고 빨라야 한다.
 describe("screenguide — /api/screen-guide 라우트", () => {

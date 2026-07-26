@@ -36,6 +36,7 @@ import { listAnalysisEvents, analysisSummary, computeCorrelations } from "./anal
 import { computeKpiSnapshot } from "./kpi";
 import { listSessions as listWorkSessions } from "./worksessions";
 import { canonicalize, suggestionsFor } from "./terms";
+import { listAudit, type AuditEntry } from "./audit";
 import { lawAnswer, getLawConfig, type LawTarget } from "./lawinfo";
 
 export interface AgentToolParam {
@@ -1092,6 +1093,104 @@ function runWorkSessionStatus(args: Record<string, string>): string {
 
 // ── 「지식·모델」 도메인 도구 ────────────────────────────────────────────
 // 답변 품질은 지식베이스가 좌우한다. "무엇이 들어 있고 얼마나 연결됐는가"를 본다.
+// ── 작업 기록(감사) 조회 ────────────────────────────────────────────────
+// "지난주에 누가 뭘 지웠어?"는 사고 조사에서 가장 먼저 나오는 질문인데, 지금까지는 감사 화면을
+// 눈으로 훑어야 답할 수 있었다(2026-07-27 도구 공백 점검). 기록은 이미 다 쌓여 있었다.
+async function runAuditSearch(args: Record<string, string>): Promise<string> {
+  const q = (args.query ?? "").trim();
+  const days = Math.min(Math.max(Number(args.days ?? 7) || 7, 1), 90);
+  const since = Date.now() - days * 86400000;
+  // 넉넉히 받아 기간·검색어로 거른다(감사 테이블은 최신순 정렬이라 앞쪽만 봐도 충분하다).
+  const rows = listAudit({ limit: 1000 }).filter((e: AuditEntry) => e.at >= since);
+  const hit = q
+    ? rows.filter((e) =>
+        [e.action, e.target, e.actor, e.detail].some((v) => (v ?? "").toLowerCase().includes(q.toLowerCase())))
+    : rows;
+  if (hit.length === 0) {
+    return `최근 ${days}일 작업 기록에서 ${q ? `"${q}"에 해당하는 ` : ""}내역을 찾지 못했습니다.`;
+  }
+  const failed = hit.filter((e) => e.result !== "ok").length;
+  const byActor = hit.reduce<Record<string, number>>((a, e) => {
+    const who = e.actor ?? "(알 수 없음)";
+    a[who] = (a[who] ?? 0) + 1;
+    return a;
+  }, {});
+  const lines = hit.slice(0, 12).map((e) =>
+    `- ${koDateTimeString(e.at)} · ${e.actor ?? "?"} · ${e.action}${e.target ? ` → ${e.target}` : ""}` +
+    `${e.result !== "ok" ? ` [${e.result}]` : ""}`);
+  return [
+    `최근 ${days}일 ${q ? `"${q}" ` : ""}작업 기록 ${hit.length}건${failed ? ` (실패·차단 ${failed}건)` : ""}`,
+    `사람별: ${Object.entries(byActor).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, v]) => `${k} ${v}`).join(" · ")}`,
+    "",
+    ...lines,
+    hit.length > 12 ? `… 외 ${hit.length - 12}건 (작업 기록 화면에서 전체 확인)` : "",
+  ].filter(Boolean).join("\n");
+}
+
+// ── 인수인계 진행 상황 ──────────────────────────────────────────────────
+// 인수인계는 4단계 마법사인데 "어디까지 됐나"를 물어볼 길이 없었다.
+// 담은 문서는 담당자 브라우저에만 있어 서버가 모른다 — 지식베이스 쪽 사실만 정직하게 답한다.
+async function runHandoverStatus(): Promise<string> {
+  const docs = await listDocuments();
+  if (docs.length === 0) {
+    return "아직 지식베이스에 올린 문서가 없습니다. 인수인계는 대시보드 아래 ＋로 문서를 올리는 것부터 시작합니다.";
+  }
+  const chunks = docs.reduce((n, d) => n + (d.chunks ?? 0), 0);
+  const recent = docs.slice(-5).reverse().map((d) => `- ${d.documentId}`);
+  return [
+    `지식베이스에 문서 ${docs.length}건(조각 ${chunks}개)이 쌓여 있습니다 — 인수인계에 담을 수 있는 자료입니다.`,
+    "",
+    "최근 올린 문서:",
+    ...recent,
+    "",
+    "⚠ 어떤 문서를 이번 인수인계에 담았는지와 검증 통과율은 담당자 PC에 저장되어 서버가 알지 못합니다.",
+    "   인수인계 화면에서 [검증 시작]을 눌러야 통과율이 나오고, 그 결과만 감사 기록에 남습니다.",
+  ].join("\n");
+}
+
+// ── 서버 로그 상태 ──────────────────────────────────────────────────────
+// "서버에 오류 났어?"에 답한다. 실제 로그 파일이 아니라 감사 기록의 실패·차단을 본다 —
+// 담당자가 알아야 하는 건 "무엇이 실패했나"이고, 그건 감사 기록에 남는다.
+async function runSystemLogStatus(args: Record<string, string>): Promise<string> {
+  const days = Math.min(Math.max(Number(args.days ?? 1) || 1, 1), 30);
+  const since = Date.now() - days * 86400000;
+  const rows = listAudit({ limit: 1000 }).filter((e: AuditEntry) => e.at >= since);
+  const bad = rows.filter((e) => e.result !== "ok");
+  if (rows.length === 0) return `최근 ${days}일간 기록된 작업이 없습니다.`;
+  if (bad.length === 0) return `최근 ${days}일간 작업 ${rows.length}건 모두 정상 처리됐습니다. 실패·차단 없음.`;
+  const byResult = bad.reduce<Record<string, number>>((a, e) => {
+    a[e.result] = (a[e.result] ?? 0) + 1;
+    return a;
+  }, {});
+  return [
+    `최근 ${days}일간 작업 ${rows.length}건 중 ${bad.length}건이 정상 처리되지 않았습니다.`,
+    `구분: ${Object.entries(byResult).map(([k, v]) => `${k} ${v}`).join(" · ")}`,
+    "",
+    ...bad.slice(0, 10).map((e) =>
+      `- ${koDateTimeString(e.at)} · ${e.actor ?? "?"} · ${e.action}${e.target ? ` → ${e.target}` : ""} [${e.result}]` +
+      `${e.detail ? `\n    ${e.detail.slice(0, 120)}` : ""}`),
+  ].join("\n");
+}
+
+// ── 온톨로지(표준 코드 교차연결) 조회 ───────────────────────────────────
+// KISA·OWASP·NIST·CWE·ATT&CK·ATLAS 코드가 서로 어떻게 연결돼 있는지 묻는 길이 없었다.
+// 이 교차연결은 제품 차별점인데 챗봇으로 확인이 안 됐다(2026-07-27).
+async function runOntologyQuery(args: Record<string, string>): Promise<string> {
+  const q = (args.query ?? "").trim();
+  if (!q) return "무엇의 연결 관계를 찾을지 알려주세요. 예: \"CWE-79 뭐랑 연결돼 있어?\"";
+  const total = countTriples();
+  if (total === 0) return "온톨로지에 등록된 관계가 없습니다. 표준 번들을 먼저 임포트하세요.";
+  const rel = expandOntology(q, undefined, { hops: 2, limit: 15 });
+  if (rel.length === 0) {
+    return `"${q}"와 연결된 관계를 찾지 못했습니다 (전체 ${total}개 관계 중). 표준 코드(CWE-79·A03:2021 등)나 정확한 이름으로 물어보세요.`;
+  }
+  return [
+    `"${q}" 관련 연결 ${rel.length}건 (전체 ${total}개 관계에서):`,
+    "",
+    ...rel.map((t) => `- ${t.subject} —[${t.predicate}]→ ${t.object}${t.source ? ` (출처: ${t.source})` : ""}`),
+  ].join("\n");
+}
+
 async function runKnowledgeStatus(): Promise<string> {
   const docs = await listDocuments(); // lancedb 조회라 비동기다
   const triples = countTriples();
@@ -1197,6 +1296,59 @@ const TOOLS: AgentTool[] = [
     description: "장기기억(RAG) 문서와 온톨로지 트리플이 얼마나 쌓였는지 본다. 답변 품질의 근거가 되는 자료 현황이다.",
     params: [],
     run: runKnowledgeStatus,
+  },
+  {
+    // 도구가 하나도 없던 화면들을 메운다(2026-07-27 공백 점검) — 기록은 이미 쌓여 있는데
+    // 물어볼 길이 없어 챗봇이 일반 지식으로 얼버무리던 자리들이다.
+    name: "audit_search",
+    label: "작업 기록 조회",
+    domain: "cross",
+    write: false,
+    // 설명을 넓게 쓰면 일반 검색 질문까지 끌려온다(ontology_query에서 겪은 문제) — 대상을 못 박는다.
+    description:
+      '**우리 시스템에서 사람이 한 조작 이력**(작업 기록·감사 로그)만 조회한다. "지난주에 누가 뭘 지웠어?", ' +
+      '"삭제 기록 보여줘", "○○이 한 작업 알려줘"처럼 행위자·시점을 물을 때만 쓴다. ' +
+      '보안 지식·취약점 내용을 묻는 질문에는 쓰지 않는다. 예: {"query":"삭제","days":"7"}',
+    params: [
+      { name: "query", label: "검색어", description: "작업·대상·사람 이름 일부(비우면 전체)", required: false },
+      { name: "days", label: "기간(일)", description: "최근 며칠 — 기본 7, 최대 90", required: false },
+    ],
+    run: runAuditSearch,
+  },
+  {
+    name: "handover_status",
+    label: "인수인계 현황",
+    domain: "knowledge",
+    write: false,
+    description: '인수인계에 쓸 문서가 얼마나 쌓였는지 본다. "인수인계 어디까지 됐어?", "인수인계 준비됐어?"에 쓴다.',
+    params: [],
+    run: runHandoverStatus,
+  },
+  {
+    name: "system_log_status",
+    label: "처리 실패 내역",
+    domain: "cross",
+    write: false,
+    description:
+      '최근 작업 중 실패·차단된 것이 있는지 본다. "서버에 오류 났어?", "실패한 작업 있어?", "뭐가 막혔어?"에 쓴다. 예: {"days":"1"}',
+    params: [{ name: "days", label: "기간(일)", description: "최근 며칠 — 기본 1, 최대 30", required: false }],
+    run: runSystemLogStatus,
+  },
+  {
+    name: "ontology_query",
+    label: "표준 코드 연결 조회",
+    domain: "knowledge",
+    write: false,
+    // ⚠ 설명에 표준 이름(KISA·OWASP…)을 나열했더니 "KISA 어떤 점검항목이야?" 같은
+    //   **단순 지식 질문까지 이 도구로 끌려왔다**(2026-07-27 회귀 하네스에서 발견 — 도구를
+    //   늘리면 라우팅이 흔들린다는 걸 실제로 확인). 이 도구는 "A와 B가 어떻게 이어지나"만 답한다.
+    //   항목이 무엇인지 묻는 질문은 지식(RAG)이 답해야 하므로 설명에서 표준 이름을 뺐다.
+    description:
+      '두 표준 코드가 서로 **어떻게 이어져 있는지**(연결 관계)만 찾는다. "CWE-79는 뭐랑 연결돼 있어?", ' +
+      '"이 코드에 매핑된 다른 표준 알려줘"처럼 연결·매핑을 물을 때만 쓴다. ' +
+      '어떤 점검항목이 무엇인지·조치 방법 같은 일반 질문에는 쓰지 않는다(그건 지식 검색이 답한다). 예: {"query":"CWE-79"}',
+    params: [{ name: "query", label: "검색어", description: "연결을 볼 표준 코드", required: true }],
+    run: runOntologyQuery,
   },
   {
     // 법령 조회 — 인터넷이 필요해 기본은 꺼져 있다(설정에서 법제처 인증키를 넣으면 켜진다).
