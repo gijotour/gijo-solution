@@ -461,6 +461,13 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       try { sessions = await window.gijo.listSessions(); } catch (e) {}
       const online = {};
       sessions.forEach((s) => { online[s.userId] = s; });
+      // 소속 팀 후보 — 실제 자산 소유팀에서 뽑는다. 자유 입력을 두면 오타 한 글자로
+      // 권한 매칭이 조용히 실패하므로 선택 목록만 제공한다(2026-07-26 조치 검증).
+      let teams = [];
+      try {
+        const assets = await window.gijo.listAssets();
+        teams = Array.from(new Set((assets || []).map((a) => (a.owner || "").trim()).filter((t) => t && t !== "-"))).sort();
+      } catch (e) {}
       box.innerHTML = users
         .map((u) => {
           const isSelf = currentUser && u.id === currentUser.id;
@@ -471,12 +478,18 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
           const pwBtn = isSelf ? "" : `<span class="ua-btn" data-pw="${u.id}" title="비밀번호 초기화">비번↺</span>`;
           const termBtn = s && !isSelf ? `<span class="ua-btn danger" data-term="${u.id}" title="세션 강제 종료">세션종료</span>` : "";
           const delBtn = isSelf ? '<span class="ua-btn dis">본인</span>' : `<span class="ua-btn danger" data-del-user="${u.id}">삭제</span>`;
+          // 소속 팀 — 자산 소유팀과 매칭해 조치 검증 실행 권한을 정한다(관리자는 팀과 무관하게 전체).
+          const teamSel = u.role === "admin" ? '<span class="user-row-sub" style="min-width:132px">전체 자산(관리자)</span>' :
+            `<select class="inp" data-team="${u.id}" style="min-width:132px;padding:3px 6px;font-size:11px">
+               <option value=""${!u.team ? " selected" : ""}>— 소속 팀 없음</option>
+               ${teams.map((t) => `<option value="${t}"${u.team === t ? " selected" : ""}>${t}</option>`).join("")}
+             </select>`;
           return `<div class="user-row">
             <div style="display:flex;align-items:center;gap:8px">${dot}
               <div><div class="user-row-name">${u.displayName} <span class="badge ${u.role === "admin" ? "b-purple" : "b-teal"}" style="margin-left:4px">${ROLE_LABEL[u.role] || u.role}</span></div>
               <div class="user-row-sub">${sub}</div></div>
             </div>
-            <div style="display:flex;gap:5px;align-items:center">${roleBtn}${pwBtn}${termBtn}${delBtn}</div>
+            <div style="display:flex;gap:5px;align-items:center">${teamSel}${roleBtn}${pwBtn}${termBtn}${delBtn}</div>
           </div>`;
         })
         .join("");
@@ -924,6 +937,21 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       else if (t.dataset.role) setUserRoleRow(t.dataset.role, t.dataset.cur);
       else if (t.dataset.pw) resetUserPw(t.dataset.pw);
       else if (t.dataset.term) terminateSessionRow(t.dataset.term);
+    });
+    // 소속 팀 변경 — 선택 즉시 저장(자산 접근 권한의 근거라 감사에도 남는다).
+    document.getElementById("userListBox").addEventListener("change", async (e) => {
+      const id = e.target.dataset && e.target.dataset.team;
+      if (!id) return;
+      const line = document.getElementById("userManagementStatusLine");
+      try {
+        const u = await window.gijo.setUserTeam(id, e.target.value || null);
+        line.textContent = `✓ ${u.displayName}의 소속 팀: ${u.team || "없음"}`;
+        line.className = "status-line status-ok";
+      } catch (err) {
+        line.textContent = "✗ 소속 팀 변경 실패: " + ((err && err.message) || err);
+        line.className = "status-line status-err";
+        await loadUserList();
+      }
     });
     document.getElementById("logoutBtn").addEventListener("click", logout);
     document.getElementById("settingsBtn").addEventListener("click", () => {}); // 이미 설정 화면

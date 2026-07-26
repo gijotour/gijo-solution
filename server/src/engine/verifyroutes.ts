@@ -71,7 +71,7 @@ export function registerVerifyRoutes(app: Express): void {
           action: "조치 검증 거부",
           target: assetId,
           detail: decision.reason.split("\n")[0],
-          result: "failure",
+          result: "blocked", // 권한으로 막힌 시도 — 오류가 아니라 차단이다
         });
         res.status(403).json({ error: decision.reason });
         return;

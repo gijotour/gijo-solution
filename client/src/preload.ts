@@ -170,6 +170,11 @@ const gijoApi = {
   // status·note·assignee·dueDate를 부분 갱신. status만 주면 기존 승인/반려 동작과 동일.
   setFindingReview: (assetId: string, key: string, patch: api.ReviewPatch) => api.approvalsApi.set(assetId, key, patch),
   notifyAssignee: (assetId: string, key: string, to: string) => api.approvalsApi.notify(assetId, key, to),
+  // 조치 검증 — 찾은 취약점이 실제로 닫혔는지 대상에 접속해 확인(판정 근거까지 함께 받는다)
+  canVerify: (assetId: string, key?: string) => api.verifyApi.can(assetId, key),
+  runVerify: (assetId: string, key?: string) => api.verifyApi.run(assetId, key),
+  // 소속 팀 지정(관리자) — 자산 접근 권한의 근거
+  setUserTeam: (id: string, team: string | null) => api.usersApi.setTeam(id, team),
   listActionPriorities: (limit?: number) => api.approvalsApi.priorities(limit),
   aiTriage: (limit?: number) => api.approvalsApi.triage(limit),
   listCompliance: () => api.complianceApi.list(),

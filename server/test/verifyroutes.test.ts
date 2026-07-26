@@ -84,7 +84,7 @@ describe("POST /api/verify/run — 실행", () => {
     expect(row).toBeTruthy();
     expect(row!.actor).toBe("박담당");
     expect(row!.target).toBe(ASSET);
-    expect(row!.result).toBe("failure");
+    expect(row!.result).toBe("blocked"); // 권한 차단은 error가 아니라 blocked(감사 어휘)
   });
 
   it("접속 대상이 없으면 실행을 거절한다 — '이상 없음'처럼 보이면 안 된다", async () => {

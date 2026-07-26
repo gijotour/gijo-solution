@@ -87,9 +87,10 @@ export function createUser(args: {
     passwordHash: bcrypt.hashSync(args.password, 10),
     displayName: args.displayName,
     role: args.role,
+    team: null, // 소속 팀은 생성 후 관리자가 지정한다(기본 null = 어떤 자산도 안 열림)
     createdAt: Date.now(),
   };
-  insertStmt.run(row);
+  insertStmt.run({ ...row, team: undefined } as unknown as UserRow); // INSERT 문에 team 컬럼은 없다(ALTER로 추가된 기본 null)
   return toPublic(row);
 }
 

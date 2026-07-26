@@ -1247,13 +1247,17 @@ export interface GijoUserPublic {
   username: string;
   displayName: string;
   role: "security_officer" | "admin";
+  team: string | null; // 소속 팀 — 자산(owner)과 매칭해 조치 검증 권한을 판정
   createdAt: number;
 }
 
 export const usersApi = {
   list: () => request<GijoUserPublic[]>("/api/users"),
   // 조치 담당자 배정용(승인 화면 자동완성) — 관리자 아니어도 조회 가능.
-  assignable: () => request<{ id: string; displayName: string; role: string }[]>("/api/users/assignable"),
+  assignable: () => request<{ id: string; displayName: string; role: string; team: string | null }[]>("/api/users/assignable"),
+  // 소속 팀 지정 — assets.owner와 매칭해 조치 검증 실행 권한을 판정한다(관리자 전용).
+  setTeam: (id: string, team: string | null) =>
+    request<GijoUserPublic>(`/api/users/${encodeURIComponent(id)}/team`, { method: "POST", body: { team } }),
   create: (args: { username: string; password: string; displayName: string; role: "security_officer" | "admin" }) =>
     request<GijoUserPublic>("/api/users", { method: "POST", body: args }),
   remove: (id: string) => request(`/api/users/${id}`, { method: "DELETE" }),
@@ -1681,6 +1685,35 @@ export const approvalsApi = {
     request<{ items: (FindingReview & { score: number })[] }>(`/api/approvals/priorities?limit=${limit}`),
   // AI 조치 브리핑 — 상위 취약점 [근거·권장조치·기한] 초안(로컬 LLM).
   triage: (limit = 5) => request<{ draft: string; count: number }>("/api/approvals/triage", { method: "POST", body: { limit } }),
+};
+
+// ── 조치 검증 — 찾은 취약점이 실제로 닫혔는지 대상에 접속해 확인한다 ───────────
+// 스캐너가 아니다(더 찾지 않는다). 판정은 서버가 결정적으로 하고, 화면은 근거를 그대로 보여준다.
+export interface VerifyOutcome {
+  findingKey: string;
+  title: string;
+  cve?: string;
+  status: "PASS" | "FAIL" | "WARN" | "NA"; // PASS=조치확인 · FAIL=미조치 · NA=수동확인 필요
+  evidence: string;                        // 실행한 명령과 출력 — 담당자가 판정을 믿을 근거
+  expectedKind: "version" | "absent" | "config" | "cert" | "manual";
+}
+export interface VerifyRunResult {
+  assetId: string;
+  assetName?: string;
+  target: string;
+  results: VerifyOutcome[];
+  summary: { total: number; fixed: number; still: number; manual: number };
+  note?: string;
+}
+export const verifyApi = {
+  // 이 자산을 검증할 수 있는가(권한 + 접속 대상 등록 여부). 버튼 상태를 정하는 데 쓴다 —
+  // 최종 판단은 서버 실행 API가 다시 한다(화면 판단만 믿으면 우회된다).
+  can: (assetId: string, findingKey?: string) =>
+    request<{ allowed: boolean; reason: string; hasTarget: boolean; targetLabel: string | null }>(
+      `/api/verify/can/${encodeURIComponent(assetId)}${findingKey ? `?key=${encodeURIComponent(findingKey)}` : ""}`
+    ),
+  run: (assetId: string, findingKey?: string) =>
+    request<VerifyRunResult>("/api/verify/run", { method: "POST", body: { assetId, ...(findingKey ? { findingKey } : {}) } }),
 };
 
 export const complianceApi = {

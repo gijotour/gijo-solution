@@ -72,10 +72,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     <div id="gijoChatWidget" data-prompts='["검토 대기 몇 건이야?","기한 지난 미조치 있어?"]' style="max-width:640px;margin-bottom:16px;"></div>
 
-    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:16px;max-width:960px;">
+    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:16px;max-width:1100px;">
       <div class="panel" style="margin:0"><div class="panel-sub" style="margin:0 0 6px">미검토</div><div style="font-size:20px;font-weight:800;color:var(--amber)" id="kPending">-</div></div>
       <div class="panel" style="margin:0"><div class="panel-sub" style="margin:0 0 6px">진행중</div><div style="font-size:20px;font-weight:800;color:var(--blue-light)" id="kProg">-</div></div>
       <div class="panel" style="margin:0"><div class="panel-sub" style="margin:0 0 6px">검증</div><div style="font-size:20px;font-weight:800;color:var(--purple)" id="kVerify">-</div></div>
+      <!-- 미배정 = 병목(검증은 배정된 건에만 실행 가능). 클릭하면 미배정만 걸러 본다. -->
+      <div class="panel kpi-unassigned" id="kUnassignedCard" title="담당자가 없는 건 — 클릭하면 미배정만 봅니다" style="margin:0;cursor:pointer"><div class="panel-sub" style="margin:0 0 6px">⚠ 미배정</div><div style="font-size:20px;font-weight:800;color:var(--amber)" id="kUnassigned">-</div></div>
       <div class="panel" style="margin:0"><div class="panel-sub" style="margin:0 0 6px">완료</div><div style="font-size:20px;font-weight:800;color:var(--teal)" id="kApproved">-</div></div>
       <div class="panel" style="margin:0"><div class="panel-sub" style="margin:0 0 6px">반려</div><div style="font-size:20px;font-weight:800;color:var(--muted)" id="kRejected">-</div></div>
       <div class="panel" style="margin:0"><div class="panel-sub" style="margin:0 0 6px">지연</div><div style="font-size:20px;font-weight:800;color:#f5928a" id="kOverdue">-</div></div>
@@ -90,8 +92,17 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
           <span class="fchip" data-f="rejected">반려 <b id="fcRejected">0</b></span>
           <span class="fchip" data-f="approved">완료 <b id="fcApproved">0</b></span>
           <span class="fchip" data-f="pending">미검토 <b id="fcPending">0</b></span>
+          <span class="fchip" data-f="unassigned">미배정 <b id="fcUnassigned">0</b></span>
         </div>
-        <div id="rvList" class="rv-rows">불러오는 중...</div>
+        <!-- 일괄 배정 — 선택한 건이 있을 때만 나타난다(평소엔 목록을 가리지 않는다). -->
+        <div class="bulk-bar" id="bulkBar" style="display:none">
+          <b><span id="bulkCount">0</span>건 선택</b>
+          <input class="inp bulk-in" id="bulkAssignee" placeholder="담당자" list="gijoUserList">
+          <input class="inp bulk-in" type="date" id="bulkDue" style="max-width:132px">
+          <button class="btn primary" id="btnBulkAssign">일괄 배정</button>
+          <button class="btn" id="btnBulkClear">해제</button>
+        </div>
+        <div id="rvList" class="rv-rows scroll-list">불러오는 중...</div>
       </div>
       <div class="rv-detail" id="rvDetail"><div class="rv-empty">왼쪽에서 finding을 선택하세요.</div></div>
     </div>
@@ -108,6 +119,26 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   .rv-wrap{display:grid;grid-template-columns:360px 1fr;gap:14px;}
   .rv-list-pane{background:var(--panel-2);border:1px solid var(--border);border-radius:12px;padding:10px;min-height:520px;}
   .rv-filt{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:9px;}
+  /* 미배정 = 병목이라 다른 지표와 구분해 보이게 한다(2026-07-26 조치 검증). */
+  .kpi-unassigned{border-color:rgba(240,160,32,.5) !important;background:rgba(240,160,32,.07) !important;}
+  /* 일괄 배정 바 — 선택했을 때만 뜬다. */
+  .bulk-bar{display:flex;align-items:center;gap:7px;background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.35);border-radius:9px;padding:7px 10px;margin-bottom:8px;font-size:11.5px;flex-wrap:wrap;}
+  .bulk-bar .bulk-in{padding:4px 8px;font-size:11px;max-width:130px;}
+  .rv-row .rv-ck{flex:0 0 auto;width:13px;height:13px;margin-right:2px;cursor:pointer;}
+  /* 조치 검증 결과 — 판정 배지 + 근거(실행한 명령·출력). 목록이 길어지면 내부 스크롤. */
+  .vres{border:1px solid var(--border-strong);border-radius:10px;overflow:hidden;margin-top:10px;}
+  .vres-h{background:var(--panel-2);padding:8px 12px;font-size:11.5px;font-weight:800;display:flex;align-items:center;gap:8px;flex-wrap:wrap;cursor:pointer;}
+  .vres-b{max-height:300px;overflow-y:auto;}
+  .vres.collapsed .vres-b{display:none;}
+  .vrow{display:flex;gap:9px;padding:9px 12px;border-top:1px solid rgba(255,255,255,.05);align-items:flex-start;}
+  .vbadge{flex:0 0 auto;font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:6px;margin-top:1px;white-space:nowrap;}
+  .v-PASS{color:var(--teal);background:rgba(30,185,128,.16);}
+  .v-FAIL{color:#f5928a;background:rgba(226,72,61,.15);}
+  .v-NA,.v-WARN{color:var(--muted);background:rgba(255,255,255,.07);}
+  .vmain{flex:1;min-width:0;}
+  .vt{font-size:11.5px;font-weight:700;}
+  .vev{font-size:10px;color:var(--muted-2);font-family:Consolas,"D2Coding",monospace;margin-top:3px;white-space:pre-wrap;line-height:1.5;word-break:break-all;}
+  .verify-deny{background:rgba(226,72,61,.1);border:1px solid rgba(226,72,61,.4);border-radius:9px;padding:9px 12px;font-size:11px;color:#f5a8a1;line-height:1.7;white-space:pre-line;margin-top:8px;}
   .fchip{font-size:11px;padding:5px 10px;border-radius:20px;background:var(--panel);border:1px solid var(--border-strong);color:var(--muted);cursor:pointer;user-select:none;}
   .fchip b{margin-left:3px;color:var(--text);font-weight:800;}
   .fchip.on{background:var(--blue);border-color:var(--blue);color:#fff;}.fchip.on b{color:#fff;}
@@ -195,10 +226,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   const fmtDate = (ms) => ms ? new Date(ms).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : "";
 
   let allReviews = [];
-  let rvFilter = "active"; // active(미검토+진행중+검증) | in_progress | verifying | rejected | approved | pending
+  let rvFilter = "active"; // active | in_progress | verifying | rejected | approved | pending | unassigned
   let currentKey = null;   // "assetId\0findingKey"
+  const selected = new Set(); // 일괄 배정용 선택(키 = assetId\0findingKey)
 
   function keyOf(r) { return `${r.assetId}\0${r.findingKey}`; }
+  // 미배정 = 실수행 담당자가 없는 조치 대상. 검증은 배정된 건에만 실행되므로 병목이다.
+  function isUnassigned(r) {
+    return !r.assignee && ["pending", "in_progress", "verifying"].includes(r.status);
+  }
   function matchFilter(r) {
     switch (rvFilter) {
       case "active": return r.status === "pending" || r.status === "in_progress" || r.status === "verifying";
@@ -207,6 +243,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       case "rejected": return r.status === "rejected";
       case "approved": return r.status === "approved";
       case "pending": return r.status === "pending";
+      case "unassigned": return isUnassigned(r);
       default: return true;
     }
   }
@@ -231,6 +268,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       document.getElementById("fcRejected").textContent = summary.rejected;
       document.getElementById("fcApproved").textContent = summary.approved;
       document.getElementById("fcPending").textContent = summary.pending;
+      const unassigned = cnt(isUnassigned);
+      document.getElementById("kUnassigned").textContent = unassigned;
+      document.getElementById("fcUnassigned").textContent = unassigned;
       renderList();
       // 선택 유지 — 갱신 후에도 열려 있던 finding의 상세를 다시 그린다.
       if (keepSelection && currentKey) {
@@ -260,20 +300,73 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       else if (r.status === "rejected") bits.push(REJ_LABEL[r.rejectReason] || "반려");
       else if (r.overdue) bits.push("⚠지연");
       else if (r.dueDate) bits.push("📅" + esc(r.dueDate.slice(5)));
+      if (!r.assignee && r.status !== "rejected" && r.status !== "approved") bits.push("미배정");
       // 구분자(\0)는 HTML 속성에서 유실되므로 assetId·findingKey를 별도 data 속성으로 싣는다.
+      const ck = r.status === "rejected" || r.status === "approved" ? "" :
+        `<input type="checkbox" class="rv-ck" data-ck="1"${selected.has(keyOf(r)) ? " checked" : ""}>`;
       return `<div class="rv-row${keyOf(r) === currentKey ? " on" : ""}" data-a="${esc(r.assetId)}" data-k="${esc(r.findingKey)}">
-        <span class="rv-dot ${dot}"></span>
+        ${ck}<span class="rv-dot ${dot}"></span>
         <div class="rv-rmain"><div class="rv-rt">${esc(r.finding.finding_type)}</div><div class="rv-rs">${bits.join(" · ")}</div></div>
         <span class="sev sev-${esc(r.finding.severity)}">${esc(r.finding.severity)}</span>
       </div>`;
     }).join("");
-    list.querySelectorAll(".rv-row").forEach((el) => el.addEventListener("click", () => {
+    list.querySelectorAll(".rv-row").forEach((el) => el.addEventListener("click", (ev) => {
       const r = allReviews.find((x) => x.assetId === el.dataset.a && x.findingKey === el.dataset.k);
-      if (r) { currentKey = keyOf(r); renderList(); renderDetail(r); }
+      if (!r) return;
+      if (ev.target.dataset.ck) { // 체크박스는 선택 토글만(상세 열지 않음)
+        ev.stopPropagation();
+        const k = keyOf(r);
+        if (ev.target.checked) selected.add(k); else selected.delete(k);
+        renderBulkBar();
+        return;
+      }
+      currentKey = keyOf(r); renderList(); renderDetail(r);
     }));
+    renderBulkBar();
+  }
+
+  // 일괄 배정 바 — 선택이 있을 때만 보인다(평소엔 목록을 가리지 않는다).
+  function renderBulkBar() {
+    const bar = document.getElementById("bulkBar");
+    document.getElementById("bulkCount").textContent = selected.size;
+    bar.style.display = selected.size ? "flex" : "none";
   }
 
   function clearDetail() { document.getElementById("rvDetail").innerHTML = '<div class="rv-empty">왼쪽에서 finding을 선택하세요.</div>'; }
+
+  // 검증 결과 렌더 — 판정 배지 + 근거(명령·출력). 접기 가능하고 목록은 내부 스크롤.
+  // ⚠ PASS여도 '완료'로 자동 확정하지 않는다 — 사람이 [완료 처리]를 눌러야 끝난다.
+  const V_LABEL = { PASS: "조치확인", FAIL: "미조치", NA: "수동확인", WARN: "확인필요" };
+  function renderVerifyResult(box, res) {
+    if (!res.results || !res.results.length) {
+      box.innerHTML = '<div style="font-size:11px;color:var(--muted-2);padding:8px 2px">' + esc(res.note || "검증할 항목이 없습니다.") + "</div>";
+      return;
+    }
+    const s = res.summary;
+    box.innerHTML = `<div class="vres" id="vresBox">
+      <div class="vres-h" id="vresHead" title="클릭하면 접기/펼치기">🔍 조치 검증 결과 — ${esc(res.assetName || res.assetId)}
+        <span style="font-weight:600;color:var(--muted-2)">대상 ${esc(res.target)}</span>
+        <span style="margin-left:auto">
+          <span class="vbadge v-PASS">조치확인 ${s.fixed}</span>
+          <span class="vbadge v-FAIL">미조치 ${s.still}</span>
+          <span class="vbadge v-NA">수동확인 ${s.manual}</span>
+        </span></div>
+      <div class="vres-b">${res.results.map((x) => `
+        <div class="vrow">
+          <span class="vbadge v-${esc(x.status)}">${esc(V_LABEL[x.status] || x.status)}</span>
+          <div class="vmain"><div class="vt">${esc(x.title)}</div><div class="vev">${esc(x.evidence)}</div></div>
+          ${x.status === "PASS" ? `<button class="btn done" data-vdone="${esc(x.findingKey)}">완료 처리</button>` : ""}
+        </div>`).join("")}</div>
+    </div>`;
+    document.getElementById("vresHead").addEventListener("click", () =>
+      document.getElementById("vresBox").classList.toggle("collapsed"));
+    // 사람이 누르는 완료 확정 — 기계 판정만으로 상태를 끝내지 않는다.
+    box.querySelectorAll("[data-vdone]").forEach((b) => b.addEventListener("click", async () => {
+      b.disabled = true;
+      try { await window.gijo.setFindingReview(res.assetId, b.dataset.vdone, { status: "approved" }); await loadReviews(); }
+      catch (err) { alert("완료 처리 실패: " + ((err && err.message) || err)); b.disabled = false; }
+    }));
+  }
 
   function renderDetail(r) {
     const f = r.finding;
@@ -302,12 +395,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     if (r.status === "pending") {
       stageActions = `<div class="actions"><button class="btn primary" data-set="in_progress">▶ 승인 · 조치 시작(진행중)</button><button class="btn reject" id="btnRejectOpen">🛡 반려 ▾</button></div>`;
     } else if (r.status === "in_progress") {
-      stageActions = `<div class="actions"><button class="btn verify" data-set="verifying">🔁 조치 완료 → 검증 요청</button><button class="btn reject" id="btnRejectOpen">🛡 반려 ▾</button></div>`;
+      stageActions = `<div class="actions"><button class="btn verify" data-set="verifying">🔁 조치 완료 → 검증 요청</button><button class="btn verify" id="btnVerifyRun">🔍 조치 검증 실행</button><button class="btn reject" id="btnRejectOpen">🛡 반려 ▾</button></div>
+        <div id="verifyOut"></div>`;
     } else if (r.status === "verifying") {
       stageActions = `
         <div class="verify-box"><div class="h">🔁 검증(재스캔)</div>
           <p>${r.verifyRequestedBy ? `<b>${esc(r.verifyRequestedBy)}</b>이(가) ${fmtDate(r.verifyRequestedAt)} 조치 완료 보고. ` : ""}이 자산을 재스캔해 같은 취약점이 사라졌는지 확인합니다 — 사라지면 <b style="color:var(--teal)">완료</b>로 자동 확정, 여전히 검출되면 <b style="color:#f5928a">재조치</b>로 되돌립니다.</p></div>
-        <div class="actions"><button class="btn verify" id="btnRescan">🔁 지금 재스캔</button><button class="btn done" data-set="approved">✓ 해결 확인(수동 완료)</button><button class="btn" data-set="in_progress">↩ 진행중으로</button></div>`;
+        <div class="actions"><button class="btn verify" id="btnVerifyRun">🔍 조치 검증 실행</button><button class="btn verify" id="btnRescan">🔁 지금 재스캔</button><button class="btn done" data-set="approved">✓ 해결 확인(수동 완료)</button><button class="btn" data-set="in_progress">↩ 진행중으로</button></div>
+        <div id="verifyOut"></div>`;
     } else if (r.status === "approved") {
       stageActions = `<div class="actions"><button class="btn" data-set="in_progress">↩ 진행중으로 되돌리기</button></div>`;
     } else if (r.status === "rejected") {
@@ -367,6 +462,23 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       try { await window.gijo.notifyAssignee(a, k, to.trim()); btn.textContent = "✓ 발송됨"; setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 2500); }
       catch (err) { alert("메일 발송 실패: " + ((err && err.message) || err)); btn.textContent = orig; btn.disabled = false; }
     });
+    // 조치 검증 — 대상에 접속해 "정말 고쳐졌는지" 읽기 전용으로 확인한다(스캐너가 아니다).
+    // 판정(PASS/FAIL/NA)과 함께 **실행한 명령·출력**을 그대로 보여준다 — 근거 없이는 못 믿는다.
+    if ($("btnVerifyRun")) $("btnVerifyRun").addEventListener("click", async () => {
+      const btn = $("btnVerifyRun"); const out = $("verifyOut");
+      btn.disabled = true; const orig = btn.textContent; btn.textContent = "검증 중…";
+      out.innerHTML = '<div style="font-size:11px;color:var(--muted-2);padding:8px 2px">대상에 접속해 확인하는 중…</div>';
+      try {
+        const res = await window.gijo.runVerify(a, k);
+        renderVerifyResult(out, res);
+        await loadReviews(); // PASS 건은 서버가 '검증 대기'로 올려둔다 — 목록 갱신
+      } catch (err) {
+        // 권한 거부(403)·대상 미등록(400)은 잘못이 아니라 안내다 — 다음에 뭘 할지 그대로 보여준다.
+        const msg = (err && err.message) || String(err);
+        const clean = msg.replace(/^GIJO AS 서버 오류 \d+ \S+ /, "").replace(/^\{"error":"?/, "").replace(/"?\}$/, "").replace(/\\n/g, "\n");
+        out.innerHTML = '<div class="verify-deny">⛔ ' + esc(clean) + "</div>";
+      } finally { btn.textContent = orig; btn.disabled = false; }
+    });
     // 재스캔 — 실제로 자산을 재스캔한 뒤 목록 갱신(사라졌으면 서버가 완료로 자동 확정).
     if ($("btnRescan")) $("btnRescan").addEventListener("click", async () => {
       const btn = $("btnRescan"); btn.disabled = true; const orig = btn.textContent; btn.textContent = "재스캔 중…";
@@ -419,6 +531,32 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       rvFilter = chip.dataset.f;
       document.querySelectorAll("#rvFilt .fchip").forEach((c) => c.classList.toggle("on", c === chip));
       renderList();
+    });
+    // 미배정 카드 클릭 = 미배정만 보기(병목을 바로 열어본다)
+    document.getElementById("kUnassignedCard").addEventListener("click", () => {
+      rvFilter = "unassigned";
+      document.querySelectorAll("#rvFilt .fchip").forEach((c) => c.classList.toggle("on", c.dataset.f === "unassigned"));
+      renderList();
+    });
+    // 일괄 배정 — 한 건씩 배정은 건수가 늘면 현실적이지 않다.
+    document.getElementById("btnBulkClear").addEventListener("click", () => { selected.clear(); renderList(); });
+    document.getElementById("btnBulkAssign").addEventListener("click", async () => {
+      const assignee = document.getElementById("bulkAssignee").value.trim();
+      const dueDate = document.getElementById("bulkDue").value;
+      if (!assignee && !dueDate) { alert("담당자나 기한 중 하나는 입력하세요."); return; }
+      const btn = document.getElementById("btnBulkAssign");
+      btn.disabled = true; const orig = btn.textContent; btn.textContent = "배정 중…";
+      const patch = { ...(assignee ? { assignee } : {}), ...(dueDate ? { dueDate } : {}) };
+      let ok = 0; const fails = [];
+      for (const key of Array.from(selected)) {
+        const [aid, fkey] = key.split("\0");
+        try { await window.gijo.setFindingReview(aid, fkey, patch); ok++; }
+        catch (e) { fails.push((e && e.message) || String(e)); }
+      }
+      selected.clear();
+      btn.textContent = orig; btn.disabled = false;
+      await loadReviews();
+      if (fails.length) alert(`${ok}건 배정 완료 · ${fails.length}건 실패\n${fails[0]}`);
     });
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => {
