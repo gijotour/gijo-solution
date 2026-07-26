@@ -8,10 +8,10 @@
 
 import type { Express } from "express";
 import { authMiddleware } from "../auth/auth";
-import { listDocuments, getDocumentChunks, type MemoryDocument } from "./memory";
+import { listDocuments, getDocumentChunks, queryMemoryScored, RAG_RELEVANCE_MAX_DISTANCE, type MemoryDocument } from "./memory";
 import { db } from "../db";
 
-export type HygieneType = "duplicate" | "version_conflict" | "stale";
+export type HygieneType = "duplicate" | "version_conflict" | "stale" | "demo_overlap";
 export interface HygieneFinding {
   type: HygieneType;
   severity: "high" | "medium" | "low";
@@ -105,6 +105,43 @@ export async function scanKbHygiene(): Promise<HygieneReport> {
     });
   }
 
+  // ④ 데모·샘플 문서가 실제 문서와 같은 주제를 다루는 경우.
+  //
+  // 왜 필요한가(2026-07-26 실측): "샘플_방화벽_정책_점검_절차.txt"(데모 2조각)가 검색 1위를 차지해,
+  // 실제 지식 문서(보안장비 유지보수절차의 월간 7항목 — 자원·HA·시그니처·백업·로그)를 밀어냈다.
+  // 답변은 데모 내용만으로 만들어졌고, 위 세 규칙(중복·버전충돌·신선도)은 이름도 내용도 달라
+  // 하나도 잡지 못했다. 이름이 달라도 **같은 질문에 함께 걸리면** 경합이다.
+  //
+  // 판정 방법: 데모 문서의 본문으로 지식베이스를 검색해, 데모가 아닌 문서가 관련 범위 안에
+  // 함께 나오면 "주제가 겹친다"고 본다. 추측이 아니라 실제 검색 결과로 판단한다.
+  const isDemoName = (id: string) => /^(샘플|데모|sample|demo|test)[_\-\s]/i.test(id) || /(샘플|데모)\.(txt|md|pdf)$/i.test(id);
+  for (const d of docs.filter((x) => isDemoName(x.documentId))) {
+    try {
+      const chunks = await getDocumentChunks(d.documentId, 1);
+      const probe = (chunks[0]?.text ?? "").replace(/\s+/g, " ").slice(0, 300);
+      if (probe.length < 30) continue;
+      const hits = await queryMemoryScored(probe, 5);
+      const rivals = [...new Set(
+        hits
+          .filter((h) => h.distance <= RAG_RELEVANCE_MAX_DISTANCE)
+          .map((h) => h.documentId)
+          .filter((id) => id && id !== d.documentId && !isDemoName(id))
+      )];
+      if (!rivals.length) continue;
+      findings.push({
+        type: "demo_overlap",
+        severity: "medium",
+        documents: [d.documentId, ...rivals.slice(0, 3)],
+        reason:
+          `데모·샘플 문서 "${d.documentId}"가 실제 문서(${rivals.slice(0, 3).join(", ")})와 같은 주제를 다룹니다 — ` +
+          `같은 질문에 둘 다 걸려, 데모 내용이 실제 자료를 밀어내고 답변에 쓰일 수 있습니다.`,
+        suggestion: "실사용 전환 시 데모 문서를 삭제 검토. 남겨두려면 답변이 어느 쪽을 근거로 쓰는지 확인하세요(자동 삭제 금지).",
+      });
+    } catch {
+      /* 임베딩 미기동 등 — 이 항목만 건너뛴다 */
+    }
+  }
+
   // ③ 신선도 — 오래된 문서는 "삭제"가 아니라 "검토" 플래그만.
   const cutoff = Date.now() - STALE_DAYS * 86400_000;
   const stale = docs.filter((d) => d.ingestedAt && new Date(d.ingestedAt).getTime() < cutoff);
@@ -144,7 +181,7 @@ export function lastKbHygieneReport(): HygieneReport | null {
 export function formatKbHygiene(r: HygieneReport): string {
   if (r.clean) return `🧹 지식베이스 점검 — 상충·중복 없음 ✓ (문서 ${r.totalDocs}건)`;
   const L: string[] = [`🧹 지식베이스 점검 — 정리 필요 ${r.findings.length}건 (문서 ${r.totalDocs}건)`];
-  const label = { duplicate: "완전중복", version_conflict: "버전충돌", stale: "신선도검토" } as const;
+  const label = { duplicate: "완전중복", version_conflict: "버전충돌", stale: "신선도검토", demo_overlap: "데모경합" } as const;
   for (const f of r.findings) {
     L.push(`\n[${label[f.type]}] ${f.reason}`);
     L.push(`  대상: ${f.documents.slice(0, 5).join(", ")}${f.documents.length > 5 ? ` 외 ${f.documents.length - 5}건` : ""}`);
