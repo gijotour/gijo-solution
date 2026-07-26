@@ -66,6 +66,7 @@ import { registerAuditRoutes } from "./engine/audit";
 import { registerCmdSuggestRoutes } from "./engine/cmdsuggest";
 import { registerHardeningRoutes } from "./engine/hardeningscan";
 import { registerHardeningTargetRoutes } from "./engine/hardeningtargets";
+import { registerVerifyRoutes } from "./engine/verifyroutes";
 import { registerReportScheduleRoutes } from "./engine/reportschedule";
 import { registerClientReleaseRoutes } from "./engine/clientrelease";
 import { registerAssetHubRoutes } from "./engine/assethub";
@@ -179,6 +180,7 @@ export function createApp(): Express {
   registerCmdSuggestRoutes(app);
   registerHardeningRoutes(app);
   registerHardeningTargetRoutes(app);
+  registerVerifyRoutes(app); // 조치 검증(찾은 취약점이 닫혔는지 확인) — 하드닝과 수집 계층 공유
   registerLlmActivityRoutes(app);
   registerKevRoutes(app);
   registerPlaybookRoutes(app);

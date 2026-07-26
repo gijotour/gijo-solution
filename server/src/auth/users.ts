@@ -16,6 +16,7 @@ export interface GijoUser {
   passwordHash: string; // bcrypt 해시 — auth.ts 로그인 라우트에서 bcrypt.compareSync로 검증
   displayName: string;
   role: "security_officer" | "admin";
+  team?: string | null; // 소속 팀 — assets.owner와 매칭해 자산 접근 권한을 판정한다(조치 검증)
 }
 
 // 클라이언트에는 해시를 절대 내려주지 않는다.
@@ -24,6 +25,7 @@ export interface GijoUserPublic {
   username: string;
   displayName: string;
   role: GijoUser["role"];
+  team: string | null;
   createdAt: number;
 }
 
@@ -33,8 +35,15 @@ interface UserRow {
   passwordHash: string;
   displayName: string;
   role: GijoUser["role"];
+  team: string | null;
   createdAt: number;
 }
+
+// 소속 팀(2026-07-26 조치 검증) — 담당자가 "자기 팀 자산"에만 검증을 실행하게 하는 근거.
+// 기존 계정은 null이라 아무 자산도 안 열린다(admin만 접근) = 안전한 기본값.
+// ⚠ assets.owner가 자유 문자열이라 오타 한 글자면 매칭이 조용히 실패한다 —
+//   그래서 값은 화면에서 선택 목록으로만 고르게 하고(자유 입력 금지), 서버도 저장 전 다듬는다.
+try { db.exec("ALTER TABLE users ADD COLUMN team TEXT"); } catch { /* 이미 있으면 무시 */ }
 
 const insertStmt = db.prepare(
   "INSERT INTO users (id, username, passwordHash, displayName, role, createdAt) VALUES (@id, @username, @passwordHash, @displayName, @role, @createdAt)"
@@ -47,7 +56,7 @@ const updatePasswordStmt = db.prepare("UPDATE users SET passwordHash = ? WHERE i
 const countAdminsStmt = db.prepare("SELECT COUNT(*) as n FROM users WHERE role = 'admin'");
 
 function toPublic(row: UserRow): GijoUserPublic {
-  return { id: row.id, username: row.username, displayName: row.displayName, role: row.role, createdAt: row.createdAt };
+  return { id: row.id, username: row.username, displayName: row.displayName, role: row.role, team: row.team ?? null, createdAt: row.createdAt };
 }
 
 function newId(): string {
@@ -96,6 +105,16 @@ export function deleteUser(id: string): void {
 export function changePassword(id: string, newPassword: string): void {
   if (!getByIdStmt.get(id)) throw new Error("존재하지 않는 계정입니다");
   updatePasswordStmt.run(bcrypt.hashSync(newPassword, 10), id);
+}
+
+const updateTeamStmt = db.prepare("UPDATE users SET team = ? WHERE id = ?");
+/** 소속 팀 지정(빈 값이면 해제). 앞뒤 공백은 다듬는다 — assets.owner 매칭이 공백 하나로 깨지지 않게. */
+export function updateUserTeam(id: string, team: string | null): GijoUserPublic {
+  const row = getByIdStmt.get(id) as UserRow | undefined;
+  if (!row) throw new Error("존재하지 않는 계정입니다");
+  const t = (team ?? "").trim();
+  updateTeamStmt.run(t || null, id);
+  return toPublic(getByIdStmt.get(id) as UserRow);
 }
 
 const updateRoleStmt = db.prepare("UPDATE users SET role = ? WHERE id = ?");
@@ -178,7 +197,24 @@ export function registerUsersRoutes(app: Express): void {
   // 조치 담당자 배정용 — 관리자 전용 /api/users와 달리 인증만 되면 누구나 조회 가능(최소 정보만).
   // 승인 화면(approvals.html)의 담당자 자동완성이 이 목록을 쓴다. 계정 생성·삭제 권한은 없다.
   app.get("/api/users/assignable", authMiddleware, (_req, res) => {
-    res.json(listUsers().map((u) => ({ id: u.id, displayName: u.displayName, role: u.role })));
+    res.json(listUsers().map((u) => ({ id: u.id, displayName: u.displayName, role: u.role, team: u.team })));
+  });
+
+  // 소속 팀 지정(관리자 전용) — 자산 접근 권한의 근거라 admin만 바꿀 수 있다.
+  app.post("/api/users/:id/team", authMiddleware, adminMiddleware, (req, res) => {
+    try {
+      const updated = updateUserTeam(String(req.params.id), (req.body as { team?: string })?.team ?? null);
+      recordAudit({
+        kind: "write",
+        actor: (req as Request & { user?: { displayName?: string } }).user?.displayName ?? null,
+        action: "소속 팀 변경",
+        target: updated.displayName,
+        detail: `팀: ${updated.team ?? "(없음)"}`,
+      });
+      res.json(updated);
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+    }
   });
 
   app.post("/api/users", authMiddleware, adminMiddleware, (req, res) => {
