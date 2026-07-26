@@ -577,6 +577,25 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     }
     window.gijoRefreshVex = loadVexSummary; // 목록이 갱신되면 칩도 다시 센다
     loadVexSummary();
+    // 저장 결과를 화면에 남긴다 — "받았다는데 어디 있지?"가 되지 않게 경로와 [폴더 열기]를 준다.
+    // (Electron은 저장 경로를 정해줘야 파일이 실제로 생긴다 — main.ts will-download)
+    if (window.gijo.onDownloadDone) {
+      window.gijo.onDownloadDone((info) => {
+        const box = document.getElementById("vexChips");
+        const btn = document.getElementById("btnVexExport");
+        if (btn) { btn.textContent = "⬇ 파일 받기"; btn.disabled = false; }
+        if (!box) return;
+        if (info.ok) {
+          box.innerHTML = `<span class="muted-s">✓ 저장됨: ${esc(info.filename)}</span>` +
+            ` <span class="muted-s" id="vexReveal" style="cursor:pointer;text-decoration:underline">폴더 열기</span>`;
+          const rv = document.getElementById("vexReveal");
+          if (rv) rv.addEventListener("click", () => window.gijo.revealDownload(info.path));
+          setTimeout(loadVexSummary, 6000); // 잠시 뒤 원래 칩으로
+        } else {
+          box.innerHTML = `<span class="muted-s" style="color:#f5928a">저장 실패(${esc(info.state)})</span>`;
+        }
+      });
+    }
     document.getElementById("btnVexExport").addEventListener("click", async () => {
       const btn = document.getElementById("btnVexExport");
       btn.disabled = true; const orig = btn.textContent; btn.textContent = "만드는 중…";
@@ -588,8 +607,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         a.download = `gijo-vex-${new Date().toISOString().slice(0, 10)}.json`;
         document.body.appendChild(a); a.click(); a.remove();
         setTimeout(() => URL.revokeObjectURL(a.href), 8000);
-        btn.textContent = "✓ 받았습니다";
-        setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 2500);
+        btn.textContent = "저장 중…"; // 실제 완료는 download:done이 알려준다
       } catch (e) {
         alert("VEX 내보내기 실패: " + ((e && e.message) || e));
         btn.textContent = orig; btn.disabled = false;

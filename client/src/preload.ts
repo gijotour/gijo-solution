@@ -175,6 +175,13 @@ const gijoApi = {
   runVerify: (assetId: string, key?: string) => api.verifyApi.run(assetId, key),
   // 소속 팀 지정(관리자) — 자산 접근 권한의 근거
   setUserTeam: (id: string, team: string | null) => api.usersApi.setTeam(id, team),
+  // 파일 받기 결과 — Electron은 저장 경로를 정해줘야 실제로 파일이 생긴다(main.ts will-download).
+  // 화면은 "어디에 저장됐는지"를 사용자에게 알려줘야 한다 — 받았다는데 안 보이면 실패로 느낀다.
+  onDownloadDone: (cb: (info: { ok: boolean; path: string | null; filename: string; state: string }) => void) => {
+    ipcRenderer.removeAllListeners("download:done");
+    ipcRenderer.on("download:done", (_e, info) => cb(info));
+  },
+  revealDownload: (filePath: string) => ipcRenderer.invoke("download:reveal", filePath),
   // VEX — 승인 상태를 국제 표준 문서로 내보내기(요약 미리보기 + 파일)
   vexSummary: (assetId?: string) => api.vexApi.summary(assetId),
   vexExport: (assetId?: string) => api.vexApi.exportDoc(assetId),

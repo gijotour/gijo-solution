@@ -2,7 +2,7 @@
 // [CS 구조 변경] engine/ 모듈을 더 이상 임포트하지 않는다(전부 서버로 이전됨).
 // main.ts는 창 관리와 페이지 네비게이션만 담당하는 얇은 셸이다.
 
-import { app, BrowserWindow, ipcMain, dialog, safeStorage, shell, screen } from "electron";
+import { app, BrowserWindow, ipcMain, dialog, safeStorage, shell, screen, session } from "electron";
 import * as path from "path";
 import { spawn, ChildProcess } from "child_process";
 import * as os from "os";
@@ -569,9 +569,44 @@ ipcMain.handle("update:install", async (event, version: string) => {
   return { ok: true };
 });
 
+// 파일 내려받기 — Electron은 브라우저와 다르다. will-download를 처리하지 않으면 저장 경로가
+// 정해지지 않아 **파일이 그냥 사라진다**(2026-07-26 실측: VEX·리포트 받기를 눌러도 아무 일도
+// 안 일어났다. 화면은 성공으로 표시돼 더 헷갈렸다).
+// 그래서 여기서 저장 위치를 정하고, 끝나면 어디에 저장됐는지 화면에 알려준다.
+function setupDownloads(): void {
+  session.defaultSession.on("will-download", (_e, item, contents) => {
+    const dir = app.getPath("downloads");
+    // 같은 이름이 있으면 덮어쓰지 않고 (1), (2)를 붙인다 — 이전 리포트를 날리면 안 된다.
+    const base = item.getFilename();
+    const ext = path.extname(base);
+    const stem = base.slice(0, base.length - ext.length);
+    let dest = path.join(dir, base);
+    for (let i = 1; fs.existsSync(dest); i++) dest = path.join(dir, `${stem} (${i})${ext}`);
+    item.setSavePath(dest);
+
+    item.once("done", (_ev, state) => {
+      const win = BrowserWindow.fromWebContents(contents);
+      // 렌더러가 "어디에 저장됐는지"를 사용자에게 보여줄 수 있게 알린다.
+      win?.webContents.send("download:done", {
+        ok: state === "completed",
+        path: state === "completed" ? dest : null,
+        filename: path.basename(dest),
+        state,
+      });
+    });
+  });
+}
+
+// 저장된 파일이 있는 폴더 열기 — "받았다는데 어디 있지?"를 없앤다.
+ipcMain.handle("download:reveal", async (_e, filePath: string) => {
+  if (filePath && fs.existsSync(filePath)) shell.showItemInFolder(filePath);
+  return { ok: true };
+});
+
 app.whenReady().then(() => {
   loadSavedRoot(); // 마지막에 고른 파일 탐색기 폴더 복원 (userData는 ready 이후 접근)
   loadSavedZoom(); // 마지막에 고른 화면 크기(배율) 복원
+  setupDownloads(); // 파일 받기 저장 경로 — 이게 없으면 내려받기가 조용히 실패한다
   maybeStartBundledServer();
   createMainWindow();
 
