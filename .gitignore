@@ -51,3 +51,6 @@ vk_swiftshader_icd.json
 server/outputs/
 unsloth_compiled_cache/
 server/unsloth_compiled_cache/
+
+# QA·검증 산출물(스크린샷·리포트·마커) — 로컬 작업물이라 저장소에 넣지 않는다
+.tmp-reports/
