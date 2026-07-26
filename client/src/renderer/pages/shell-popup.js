@@ -45,7 +45,8 @@
     "#shellBar .sb-btn:hover{color:#fff;border-color:var(--blue,#3b82f6);}" +
     // 배경막 — 팝업·컴포저 틈으로 뒤 대시보드(히어로·AI팀)가 비쳐 지저분한 것을 가린다(실화면 검증에서 발견).
     // 사이드바는 덮지 않는다 — 메뉴를 눌러 다른 팝업을 바로 열 수 있어야 한다. 클릭하면 대시보드로.
-    "#shellDim{display:none;position:fixed;z-index:690;background:rgba(6,10,20,.82);}" +
+    // 어둡기 .93 — 히어로 구체·인사말처럼 밝은 요소는 .82로는 비쳐 보인다(팝업을 줄였을 때 실측).
+    "#shellDim{display:none;position:fixed;z-index:690;background:rgba(6,10,20,.93);}" +
     "#shellDim.on{display:block;}" +
     // 팝업 레이어 — 중앙 무대 위에 고정. 위치·크기는 JS가 계산(사이드바·컴포저를 피해서).
     "#shellLayer{display:none;position:fixed;z-index:700;background:var(--panel,#121a2e);border:1px solid var(--border-strong,#28365a);border-radius:12px;box-shadow:0 18px 60px rgba(0,0,0,.65);overflow:hidden;flex-direction:column;}" +
@@ -150,10 +151,20 @@
     var accH = acc ? acc.offsetHeight : 120;
     var right = 54; // 엣지 탭 거터 46px + 여백
     // 높이: 자동=컴포저 위까지. 사용자가 손잡이로 줄였으면 그 높이(최소 240px, 컴포저 침범 금지).
-    var minGap = accH + 20;
-    var gap = minGap;
+    // 팝업을 줄여 생긴 빈 공간은 대화 이력(cl-rows)이 받아 늘어난다(2026-07-26 사용자 요청)
+    // — 팝업을 올리면 메시지 창이 같이 올라와 이력을 확인할 수 있다.
+    var rows = acc ? acc.querySelector(".cl-rows") : null;
+    var rowsH = rows ? rows.offsetHeight : 0;
+    var nonRows = accH - rowsH; // 이력을 뺀 컴포저 몸통(입력줄·팁 등) 높이
+    var baseMinGap = (nonRows + 110) + 20; // 이력이 기본(110px)일 때 필요한 최소 바닥 여백
+    var gap;
     if (userH) {
-      gap = Math.max(minGap, window.innerHeight - top - Math.max(240, userH));
+      gap = Math.max(baseMinGap, window.innerHeight - top - Math.max(240, userH));
+      // 이력 확장: 팝업 아래 공간(gap)에서 컴포저 몸통·여백을 뺀 만큼
+      if (rows) rows.style.maxHeight = Math.max(110, gap - 16 - nonRows) + "px";
+    } else {
+      if (rows) rows.style.maxHeight = ""; // 자동 모드 — 기본 110px(CSS)로 복귀
+      gap = (acc ? acc.offsetHeight : accH) + 20;
     }
     layer.style.left = navRight + "px";
     layer.style.top = top + "px";
@@ -263,7 +274,11 @@
     dim.classList.remove("on");
     document.body.classList.remove("shell-popped");
     var acc = document.getElementById("accConsole");
-    if (acc) { acc.style.left = ""; acc.style.right = ""; }
+    if (acc) {
+      acc.style.left = ""; acc.style.right = "";
+      var rows = acc.querySelector(".cl-rows");
+      if (rows) rows.style.maxHeight = ""; // 확장했던 이력 높이 원복
+    }
     renderBar(); persist();
   }
 
