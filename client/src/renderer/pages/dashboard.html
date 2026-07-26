@@ -1665,6 +1665,40 @@
     clRows.scrollTop = clRows.scrollHeight;
     return el;
   }
+
+  // ── 대화 이어보기(서버 세션 기준) ────────────────────────────────────
+  // 이 앱은 메뉴를 옮길 때마다 페이지를 새로 읽는다(loadFile) — 그래서 대시보드로 돌아오면
+  // 늘 처음 화면이었다(2026-07-26 사용자 지적).
+  // ⚠ 화면 글을 브라우저에 따로 복사해 두는 방식은 쓰지 않는다: 대화는 이미 서버 작업 세션에
+  //   쌓이고 있어(dispatcher가 사용자/AI 턴을 append) 복사본을 두면 진실이 둘이 되고,
+  //   복원된 줄은 승인 카드·근거 배지가 죽은 껍데기가 된다. 세션 id 하나만 기억하고
+  //   대화는 서버에서 받아 그린다 — 다른 PC에서 로그인해도 이어진다.
+  const SESSION_KEY = "gijo:dash:session";
+  const rememberSession = (id) => { try { id ? localStorage.setItem(SESSION_KEY, id) : localStorage.removeItem(SESSION_KEY); } catch (e) {} };
+  // 세션 지정은 반드시 이 함수로 — 대입 지점이 여러 곳이라 하나만 빠져도 복원이 조용히 깨진다.
+  function setDashSession(s) {
+    dashCurrentSession = s ? { id: s.id, title: s.title || "" } : null;
+    rememberSession(s ? s.id : null);
+    return dashCurrentSession;
+  }
+  window.gijoClearChatLog = () => rememberSession(null); // "새 세션"이 부른다
+
+  async function restoreChatLog() {
+    let id = null;
+    try { id = localStorage.getItem(SESSION_KEY); } catch (e) { return false; }
+    if (!id) return false;
+    let s;
+    try { s = await window.gijo.getWorkSession(id); } catch (e) { rememberSession(null); return false; }
+    const turns = (s && s.turns) || [];
+    if (!turns.length) return false;
+    setDashSession(s);
+    for (const t of turns.slice(-12)) {
+      if (t.role === "user") clAppend("me", { icon: "정", name: `${displayName || "나"} → ${orchLabel()}`, message: t.content });
+      else clAppend("reply", { icon: "🧭", name: orchLabel(), message: t.content });
+    }
+    document.body.classList.add("chatting");
+    return true;
+  }
   function clReplaceTyping(typingEl, kind, entry) {
     if (typingEl && typingEl.parentNode) typingEl.remove();
     return clAppend(kind, entry);
@@ -1954,8 +1988,12 @@
     if (dashCurrentSession) return dashCurrentSession;
     try {
       const s = await window.gijo.createWorkSession();
-      dashCurrentSession = { id: s.id, title: s.title };
-    } catch (e) { dashCurrentSession = null; }
+      setDashSession(s);
+    } catch (e) {
+      // 조용히 삼키면 "대화가 안 이어진다"는 증상만 남고 원인을 못 찾는다(2026-07-26 실사고).
+      console.warn("[dash] 작업 세션 생성 실패 — 대화 이어보기가 동작하지 않습니다:", e && e.message ? e.message : e);
+      dashCurrentSession = null;
+    }
     return dashCurrentSession;
   }
   async function sendToOrchestrator(text) {
@@ -1968,6 +2006,10 @@
       // 지휘 콘솔의 모든 지시를 작업 세션에 기록한다(열린 세션이 없으면 새로 만들어 이어감).
       const sess = await ensureDashSession();
       const result = await window.gijo.sendInstruction(text, sess ? sess.id : undefined);
+      // 서버가 세션을 새로 열었을 수도 있다 — 돌려준 id를 기억해야 다음에 이어서 볼 수 있다.
+      if (result && result.sessionId) {
+        setDashSession({ id: result.sessionId, title: (dashCurrentSession && dashCurrentSession.title) || "" });
+      }
       loadDashSessions(); // 작업 세션 목록(제목·미리보기·턴수) 갱신
       const who = result.route && result.route.agentId && result.route.agentId !== "orchestrator"
         ? `${orchLabel()} → ${agentLabel(result.route.agentId)}` : orchLabel();
@@ -2005,7 +2047,10 @@
     }
   }
 
-  function greet() {
+  async function greet() {
+    // 하던 대화가 있으면 인사 대신 그 대화를 이어 보여준다(2026-07-26) — 메뉴를 옮겼다 돌아왔을 때
+    // 처음 화면으로 되돌아가던 문제. 대화를 지우려면 "새 세션"을 쓴다.
+    if (await restoreChatLog()) return;
     const hour = new Date().getHours();
     const greeting = hour < 12 ? "좋은 아침입니다" : hour < 18 ? "안녕하세요" : "좋은 저녁입니다";
     // 팀원을 골라 지시하던 방식은 없어졌다(아이콘은 표시 전용) — 바로 물어보라고 안내하고,
@@ -2535,7 +2580,7 @@
     try {
       const s = await window.gijo.createWorkSession(ctx.title, type + ":" + id);
       await window.gijo.addWorkSessionTurn(s.id, "assistant", ctx.statusText, "상태");
-      dashCurrentSession = { id: s.id, title: s.title || ctx.title };
+      setDashSession({ id: s.id, title: s.title || ctx.title });
       chatInput.placeholder = `“${ctx.title}”에 이어서 지시… (또는 위 추천 클릭)`;
       chatInput.focus();
       loadDashSessions();

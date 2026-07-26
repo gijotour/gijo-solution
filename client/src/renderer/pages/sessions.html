@@ -327,7 +327,7 @@
       return `<div class="srow ${s.id === currentId ? "on" : ""}" data-id="${s.id}">
         <span class="sdot ${st}"></span>
         <div class="sr-main"><div class="sr-title">${esc(s.title)}</div><div class="sr-sub">${preview}</div></div>
-        <div class="sr-meta"><span class="badge ${STATUS_BADGE[st] || "b-active"}">${label}</span><br>${fmtTime(s.updatedAt)} · ${s.turnCount || 0}턴</div>
+        <div class="sr-meta"><span class="badge ${STATUS_BADGE[st] || "b-active"}">${label}</span><br>${s.createdBy ? "👤 " + esc(s.createdBy) + "<br>" : ""}${fmtTime(s.updatedAt)} · ${s.turnCount || 0}턴</div>
         <span class="sdel" data-del="${s.id}" title="세션 삭제">🗑</span>
       </div>`;
     }).join("");
@@ -397,7 +397,7 @@
       const { session, turns } = await window.gijo.getWorkSession(id);
       currentSession = session;
       document.getElementById("convTitle").textContent = session.title;
-      document.getElementById("convMeta").textContent = `오케스트레이터 · ${new Date(session.createdAt).toLocaleDateString("ko-KR")} 시작 · ${turns.length}턴`;
+      document.getElementById("convMeta").textContent = `👤 ${session.createdBy || "담당자 미기록"} · ${new Date(session.createdAt).toLocaleDateString("ko-KR")} 시작 · ${turns.length}턴`;
       document.getElementById("convStatus").value = session.status;
       renderConversation(turns);
       chatInput.focus();
@@ -430,7 +430,7 @@
       const { session, turns } = await window.gijo.getWorkSession(currentId);
       currentSession = session;
       document.getElementById("convTitle").textContent = session.title;
-      document.getElementById("convMeta").textContent = `오케스트레이터 · ${new Date(session.createdAt).toLocaleDateString("ko-KR")} 시작 · ${turns.length}턴`;
+      document.getElementById("convMeta").textContent = `👤 ${session.createdBy || "담당자 미기록"} · ${new Date(session.createdAt).toLocaleDateString("ko-KR")} 시작 · ${turns.length}턴`;
       renderConversation(turns);
       await loadSessions(false);
     } catch (e) {
