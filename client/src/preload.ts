@@ -175,6 +175,11 @@ const gijoApi = {
   runVerify: (assetId: string, key?: string) => api.verifyApi.run(assetId, key),
   // 소속 팀 지정(관리자) — 자산 접근 권한의 근거
   setUserTeam: (id: string, team: string | null) => api.usersApi.setTeam(id, team),
+  // VEX — 승인 상태를 국제 표준 문서로 내보내기(요약 미리보기 + 파일)
+  vexSummary: (assetId?: string) => api.vexApi.summary(assetId),
+  vexExport: (assetId?: string) => api.vexApi.exportDoc(assetId),
+  // 자산 기본 담당자 — 새 취약점이 이 사람에게 자동 배정된다
+  setAssetDefaultAssignee: (assetId: string, assignee: string | null) => api.assetsApi.setDefaultAssignee(assetId, assignee),
   listActionPriorities: (limit?: number) => api.approvalsApi.priorities(limit),
   aiTriage: (limit?: number) => api.approvalsApi.triage(limit),
   listCompliance: () => api.complianceApi.list(),

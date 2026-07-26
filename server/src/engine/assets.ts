@@ -122,6 +122,8 @@ export interface Asset {
   category: string | null; // ④ 담당자 지정 그룹(카테고리). null이면 '미분류'.
   hostname: string | null; // ⑥ 호스트명(미지정이면 name에서 유도)
   ip: string | null;       // ⑥ IP 주소(미지정이면 name에서 유도)
+  // 새 취약점이 자동 배정될 담당자(2026-07-26). null이면 자동 배정 안 함 = 미배정으로 남는다.
+  defaultAssignee: string | null;
   registeredAt: number;
   updatedAt: number | null; // ④ 최종 수정 시각(등록·스캔·메타변경 시 갱신)
   lastScannedAt: number | null;
@@ -142,6 +144,7 @@ interface AssetRow {
   category: string | null;
   hostname: string | null;
   ip: string | null;
+  defaultAssignee: string | null; // autoassign.ts가 ALTER로 추가한 컬럼
   registeredAt: number;
   updatedAt: number | null;
   lastScannedAt: number | null;
@@ -270,6 +273,7 @@ function fromRow(row: AssetRow): Asset {
     category: row.category ?? null,
     hostname: row.hostname ?? derived.hostname,
     ip: row.ip ?? derived.ip,
+    defaultAssignee: row.defaultAssignee ?? null, // 새 취약점 자동 배정 대상(자산 목록에서 지정)
     registeredAt: row.registeredAt,
     updatedAt: row.updatedAt ?? null,
     lastScannedAt: row.lastScannedAt,

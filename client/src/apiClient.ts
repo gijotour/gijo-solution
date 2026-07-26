@@ -1407,6 +1407,7 @@ export interface Asset {
   category: string | null;
   hostname: string | null;
   ip: string | null;
+  defaultAssignee?: string | null; // 새 취약점이 자동 배정될 담당자(없으면 미배정 유지)
   registeredAt: number;
   updatedAt: number | null;
   lastScannedAt: number | null;
@@ -1544,6 +1545,11 @@ export const assetsApi = {
   get: (id: string) => request<Asset>(`/api/assets/${id}`),
   // 경량 단건 재스캔(대시보드 팝오버) — dispatch 파이프라인 없이 어댑터만 실행.
   scan: (id: string) => request<{ assetId: string; findings: number }>(`/api/assets/${id}/scan`, { method: "POST" }),
+  // 기본 담당자 — 이 자산에서 새로 발견되는 취약점이 자동 배정된다(빈 값이면 해제).
+  setDefaultAssignee: (id: string, assignee: string | null) =>
+    request<{ assetId: string; defaultAssignee: string | null }>(`/api/assets/${encodeURIComponent(id)}/default-assignee`, {
+      method: "POST", body: { assignee },
+    }),
   register: (args: { id: string; name: string; path: string; assetType?: string; owner?: string; service?: string; components?: AssetComponent[] }) =>
     request<Asset>("/api/assets", { method: "POST", body: args }),
   import: (content: string, format: "json" | "csv", source: string) =>
@@ -1708,6 +1714,17 @@ export interface VerifyRunResult {
   summary: { total: number; fixed: number; still: number; manual: number };
   note?: string;
 }
+// VEX — 승인 상태를 국제 표준 문서로 내보낸다(협력사·규제기관 문의에 캡처 대신 파일로 답).
+export const vexApi = {
+  summary: (assetId?: string) =>
+    request<{ total: number; byState: Record<string, number>; withoutCve: number }>(
+      `/api/vex/summary${assetId ? `?assetId=${encodeURIComponent(assetId)}` : ""}`
+    ),
+  // 파일 본문(JSON 문자열) — 화면이 blob으로 만들어 저장한다.
+  exportDoc: (assetId?: string) =>
+    request<Record<string, unknown>>(`/api/vex/export${assetId ? `?assetId=${encodeURIComponent(assetId)}` : ""}`),
+};
+
 export const verifyApi = {
   // 이 자산을 검증할 수 있는가(권한 + 접속 대상 등록 여부). 버튼 상태를 정하는 데 쓴다 —
   // 최종 판단은 서버 실행 API가 다시 한다(화면 판단만 믿으면 우회된다).

@@ -447,6 +447,8 @@
     { id: "os", label: "OS/구성" },
     { id: "assetType", label: "유형" },
     { id: "owner", label: "소유부서" },
+    // 이 자산에서 새로 발견되는 취약점이 자동 배정될 사람(2026-07-26). 비워 두면 미배정으로 남는다.
+    { id: "defaultAssignee", label: "기본 담당자" },
     { id: "category", label: "카테고리" },
     { id: "risk", label: "위험도" },
     { id: "why", label: "왜 지금 문제인가" },
@@ -576,6 +578,17 @@
     }
   }
 
+  // 기본 담당자 셀 — 지정/미지정을 한눈에. 미지정은 눌러서 넣으라는 뜻으로 점선 표시.
+  (function () {
+    const st = document.createElement("style");
+    st.textContent =
+      ".dfa-set{cursor:pointer;color:var(--text);border-bottom:1px dashed var(--border-strong);}" +
+      ".dfa-set:hover{color:var(--blue-light);}" +
+      ".dfa-none{cursor:pointer;color:var(--muted-2);font-size:11px;border:1px dashed var(--border-strong);border-radius:6px;padding:1px 7px;}" +
+      ".dfa-none:hover{color:var(--blue-light);border-color:var(--blue);}";
+    document.head.appendChild(st);
+  })();
+
   const GAP_LABEL = { owner: "담당부서", service: "서비스", sbom: "SBOM", unscanned: "미점검" };
 
   // 서버가 매긴 우선순위(취약점 심각도 × 결손 × KEV) 순으로 목록을 세운다.
@@ -651,6 +664,11 @@
       case "os": return esc(ctx.os || "—");
       case "assetType": return `<span class="type-badge">${esc(a.assetType)}</span>`;
       case "owner": return ctx.ownerCell;
+      // 기본 담당자 — 눌러서 바로 지정한다(별도 설정 화면을 만들지 않는다).
+      // 여기 값이 있어야 새 취약점이 자동 배정된다. 비어 있으면 예전처럼 미배정으로 남는다.
+      case "defaultAssignee": return a.defaultAssignee
+        ? `<span class="dfa-set" data-dfa="${esc(a.id)}" title="눌러서 변경">${esc(a.defaultAssignee)}</span>`
+        : `<span class="dfa-none" data-dfa="${esc(a.id)}" title="눌러서 지정 — 새 취약점이 이 사람에게 자동 배정됩니다">＋ 지정</span>`;
       case "category": return a.category
         ? `<span class="type-badge" style="cursor:pointer;background:rgba(139,124,240,.16);color:#b9aef5" data-set-cat="${a.id}" title="카테고리 변경">${esc(a.category)}</span>`
         : `<span class="sbom-pending" style="cursor:pointer" data-set-cat="${a.id}" title="카테고리 지정">＋지정</span>`;
@@ -877,6 +895,27 @@
       searchInput.value = ""; activeCategory = "all"; activeOrigin = "real"; activeFilter = "all";
       render(); renderToolbar();
     });
+    // 기본 담당자 지정 — 행이 다시 그려져도 살아 있게 위임으로 붙인다(마크업 순서에 기대지 않음).
+    // 후보는 계정 목록에서 가져와 보여주고, 비우면 해제된다.
+    assetRows.addEventListener("click", async (e) => {
+      const el = e.target.closest("[data-dfa]");
+      if (!el) return;
+      e.stopPropagation(); // 행 클릭(상세 열기)과 겹치지 않게
+      const id = el.dataset.dfa;
+      const cur = el.classList.contains("dfa-set") ? el.textContent.trim() : "";
+      let names = "";
+      try {
+        const users = await window.gijo.listAssignableUsers();
+        names = (users || []).map((u) => u.displayName).join(", ");
+      } catch (err) { /* 목록 못 받아도 직접 입력은 가능 */ }
+      const v = prompt(`기본 담당자 — 이 자산에서 새로 발견되는 취약점이 이 사람에게 자동 배정됩니다.\n비우면 해제됩니다.${names ? `\n\n계정: ${names}` : ""}`, cur);
+      if (v === null) return; // 취소
+      try {
+        await window.gijo.setAssetDefaultAssignee(id, v.trim() || null);
+        await refresh(); // 목록 다시 읽어 화면에 반영
+      } catch (err) { alert("기본 담당자 지정 실패: " + ((err && err.message) || err)); }
+    });
+
     document.getElementById("tbColReset")?.addEventListener("click", () => {
       visibleCols = DEFAULT_COLS.slice();
       try { localStorage.setItem(COL_KEY, JSON.stringify(visibleCols)); } catch (e) {}

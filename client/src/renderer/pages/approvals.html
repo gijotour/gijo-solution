@@ -72,6 +72,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     <div id="gijoChatWidget" data-prompts='["검토 대기 몇 건이야?","기한 지난 미조치 있어?"]' style="max-width:640px;margin-bottom:16px;"></div>
 
+    <!-- VEX 내보내기 — 지금 내보내면 어떤 상태로 나가는지 칩으로 미리 보여준다.
+         '영향없음 0'이 보이면 반려 사유를 안 적었다는 신호이기도 하다. 설명은 ⓘ(챗봇). -->
+    <div class="vex-bar">
+      <span class="vex-lb">VEX 내보내기 <i class="gijo-info" data-topic="VEX 내보내기"></i></span>
+      <span id="vexChips" class="vex-chips"><span class="muted-s">집계 중…</span></span>
+      <button class="btn vex-btn" id="btnVexExport">⬇ 파일 받기</button>
+    </div>
+
     <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:16px;max-width:1100px;">
       <div class="panel" style="margin:0"><div class="panel-sub" style="margin:0 0 6px">미검토</div><div style="font-size:20px;font-weight:800;color:var(--amber)" id="kPending">-</div></div>
       <div class="panel" style="margin:0"><div class="panel-sub" style="margin:0 0 6px">진행중</div><div style="font-size:20px;font-weight:800;color:var(--blue-light)" id="kProg">-</div></div>
@@ -119,6 +127,17 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   .rv-wrap{display:grid;grid-template-columns:360px 1fr;gap:14px;}
   .rv-list-pane{background:var(--panel-2);border:1px solid var(--border);border-radius:12px;padding:10px;min-height:520px;}
   .rv-filt{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:9px;}
+  /* VEX 내보내기 줄 — 상태 미리보기 + 파일 받기. */
+  .vex-bar{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:9px 13px;margin-bottom:14px;max-width:1100px;flex-wrap:wrap;}
+  .vex-lb{font-size:12px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:5px;}
+  .vex-chips{display:flex;gap:5px;flex-wrap:wrap;}
+  .vex-chips .vc{font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;}
+  .vc-under{color:var(--amber);background:rgba(240,160,32,.15);}
+  .vc-aff{color:#f5928a;background:rgba(226,72,61,.15);}
+  .vc-fix{color:var(--teal);background:rgba(30,185,128,.16);}
+  .vc-not{color:var(--muted);background:rgba(255,255,255,.07);}
+  .vex-btn{margin-left:auto;}
+  .muted-s{font-size:11px;color:var(--muted-2);}
   /* 미배정 = 병목이라 다른 지표와 구분해 보이게 한다(2026-07-26 조치 검증). */
   .kpi-unassigned{border-color:rgba(240,160,32,.5) !important;background:rgba(240,160,32,.07) !important;}
   /* 일괄 배정 바 — 선택했을 때만 뜬다. */
@@ -278,6 +297,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       document.getElementById("kUnassigned").textContent = unassigned;
       document.getElementById("fcUnassigned").textContent = unassigned;
       renderList();
+      // 상태가 바뀌면 VEX로 나갈 값도 바뀐다 — 칩을 같이 갱신한다(선언과 화면이 어긋나지 않게).
+      if (window.gijoRefreshVex) window.gijoRefreshVex();
       // 선택 유지 — 갱신 후에도 열려 있던 finding의 상세를 다시 그린다.
       if (keepSelection && currentKey) {
         const cur = allReviews.find((r) => keyOf(r) === currentKey);
@@ -541,6 +562,40 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       document.querySelectorAll("#rvFilt .fchip").forEach((c) => c.classList.toggle("on", c === chip));
       renderList();
     });
+    // VEX — 내보내기 전에 "지금 어떤 상태로 나가는지"를 먼저 보여준다.
+    const VEX_LABEL = { under_investigation: ["조사중", "vc-under"], affected: ["영향있음", "vc-aff"], fixed: ["조치됨", "vc-fix"], not_affected: ["영향없음", "vc-not"] };
+    async function loadVexSummary() {
+      const box = document.getElementById("vexChips");
+      try {
+        const s = await window.gijo.vexSummary();
+        const parts = Object.entries(VEX_LABEL).map(([k, [lb, cls]]) =>
+          `<span class="vc ${cls}">${lb} ${s.byState?.[k] ?? 0}</span>`);
+        // CVE 번호가 없는 건은 VEX에 담기지 않는다 — 왜 개수가 다른지 그 자리에서 알려준다.
+        if (s.withoutCve > 0) parts.push(`<span class="muted-s">· CVE 없어 제외 ${s.withoutCve}건</span>`);
+        box.innerHTML = parts.join("");
+      } catch (e) { box.innerHTML = '<span class="muted-s">집계를 불러오지 못했습니다</span>'; }
+    }
+    window.gijoRefreshVex = loadVexSummary; // 목록이 갱신되면 칩도 다시 센다
+    loadVexSummary();
+    document.getElementById("btnVexExport").addEventListener("click", async () => {
+      const btn = document.getElementById("btnVexExport");
+      btn.disabled = true; const orig = btn.textContent; btn.textContent = "만드는 중…";
+      try {
+        const doc = await window.gijo.vexExport();
+        const blob = new Blob([JSON.stringify(doc, null, 2)], { type: "application/json" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = `gijo-vex-${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(() => URL.revokeObjectURL(a.href), 8000);
+        btn.textContent = "✓ 받았습니다";
+        setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 2500);
+      } catch (e) {
+        alert("VEX 내보내기 실패: " + ((e && e.message) || e));
+        btn.textContent = orig; btn.disabled = false;
+      }
+    });
+
     // 미배정 카드 클릭 = 미배정만 보기(병목을 바로 열어본다)
     document.getElementById("kUnassignedCard").addEventListener("click", () => {
       rvFilter = "unassigned";
