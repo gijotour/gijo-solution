@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>GIJO AS — 팝업 셸 v2 시안 (동시 5개 · 챗봇 메뉴 대상)</title>
+<style>
+  :root{
+    --bg:#0a0f1e; --panel:#121a2e; --panel-2:#0e1526; --border:#1e2a44; --border-strong:#28365a;
+    --text:#e6eaf3; --muted:#8b93ab; --muted-2:#5c6580; --blue:#3b82f6; --blue-light:#7ab0ff;
+    --teal:#2dd4bf; --amber:#f0a020; --red:#e2483d;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:"Pretendard","Malgun Gothic",sans-serif;height:100vh;overflow:hidden;display:flex;flex-direction:column;}
+
+  /* ── 설명 배너(시안 전용 — 실제 화면엔 없음) ─────────────────────── */
+  .note{background:#1a2340;border-bottom:1px solid var(--border-strong);padding:8px 16px;font-size:12px;color:var(--blue-light);display:flex;gap:18px;align-items:center;flex-wrap:wrap;}
+  .note b{color:#fff;}
+  .note .tag{background:rgba(59,130,246,.2);border:1px solid rgba(59,130,246,.45);border-radius:20px;padding:1px 9px;font-size:10.5px;font-weight:800;}
+
+  /* ── ① 팝업 관리 바 (대시보드 상단 고정) ────────────────────────── */
+  .popbar{display:flex;align-items:center;gap:6px;padding:7px 12px;background:var(--panel-2);border-bottom:1px solid var(--border);flex:0 0 auto;}
+  .popbar .pb-title{font-size:10px;font-weight:800;color:var(--muted-2);letter-spacing:1px;margin-right:4px;}
+  .slot{display:flex;align-items:center;gap:6px;background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:12px;font-weight:700;color:var(--muted);cursor:pointer;}
+  .slot .dot{width:6px;height:6px;border-radius:50%;background:var(--muted-2);}
+  .slot.on{background:rgba(59,130,246,.18);border-color:rgba(59,130,246,.55);color:#fff;}
+  .slot.on .dot{background:var(--teal);box-shadow:0 0 6px var(--teal);}
+  .slot .pin{font-size:10px;opacity:.9;}
+  .slot .x{font-size:11px;color:var(--muted-2);padding:0 2px;border-radius:4px;}
+  .slot .x:hover{color:#fff;background:rgba(226,72,61,.4);}
+  .slot.ghost{border-style:dashed;color:var(--muted-2);font-weight:600;cursor:default;background:transparent;}
+  .pb-right{margin-left:auto;display:flex;gap:6px;}
+  .pb-btn{background:var(--panel);border:1px solid var(--border-strong);border-radius:8px;padding:5px 11px;font-size:11.5px;font-weight:800;color:var(--blue-light);cursor:pointer;}
+  .pb-btn:hover{background:var(--blue);color:#fff;}
+  .pb-btn.warn{color:var(--muted);}
+
+  /* ── 본문: 뒤에 깔린 대시보드 + 위에 뜬 팝업 ────────────────────── */
+  .stage{flex:1;position:relative;min-height:0;}
+  .dash-behind{position:absolute;inset:0;padding:18px 22px;filter:brightness(.55) saturate(.8);pointer-events:none;}
+  .dash-behind .hero{font-size:20px;font-weight:800;margin-bottom:6px;}
+  .dash-behind .sub{font-size:12px;color:var(--muted);}
+  .dash-behind .cards{display:flex;gap:10px;margin-top:14px;}
+  .dash-behind .card{flex:1;background:var(--panel);border:1px solid var(--border);border-radius:12px;height:90px;padding:10px;font-size:11px;color:var(--muted);}
+
+  /* 팝업 창 — iframe이 실화면(hub.html?g=assets)을 품는 자리 */
+  .popup{position:absolute;left:50%;top:46%;transform:translate(-50%,-50%);width:min(86%,1180px);height:76%;
+    background:var(--panel);border:1px solid var(--border-strong);border-radius:14px;box-shadow:0 18px 60px rgba(0,0,0,.65);
+    display:flex;flex-direction:column;overflow:hidden;}
+  .p-head{display:flex;align-items:center;gap:10px;padding:9px 14px;background:var(--panel-2);border-bottom:1px solid var(--border);flex:0 0 auto;}
+  .p-head .t{font-size:13px;font-weight:800;}
+  .p-head .crumb{font-size:10.5px;color:var(--muted-2);}
+  .p-head .sp{flex:1;}
+  .p-head .hbtn{width:24px;height:24px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:12px;color:var(--muted);cursor:pointer;border:1px solid transparent;}
+  .p-head .hbtn:hover{color:#fff;border-color:var(--border-strong);background:rgba(255,255,255,.05);}
+  .p-head .hbtn.pin-on{color:var(--amber);border-color:rgba(240,160,32,.5);}
+  .p-body{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:repeating-linear-gradient(45deg,#0d1424,#0d1424 14px,#0f1729 14px,#0f1729 28px);}
+  .p-body .ph{text-align:center;color:var(--muted);font-size:13px;line-height:2;}
+  .p-body .ph b{color:var(--blue-light);font-size:15px;}
+
+  /* ── ② 명령창(컴포저) — 대시보드 하단에 늘 살아있음 ─────────────── */
+  .composer{flex:0 0 auto;padding:10px 16px 12px;background:var(--panel-2);border-top:1px solid var(--border);z-index:5;}
+  .ctx-row{display:flex;align-items:center;gap:8px;margin-bottom:7px;}
+  .ctx-chip{display:inline-flex;align-items:center;gap:6px;background:rgba(45,212,191,.12);border:1px solid rgba(45,212,191,.4);color:var(--teal);border-radius:20px;padding:3px 11px;font-size:11px;font-weight:800;}
+  .ctx-chip .sw{color:var(--muted-2);font-weight:600;cursor:pointer;}
+  .ctx-chip .sw:hover{color:#fff;}
+  .ctx-hint{font-size:10.5px;color:var(--muted-2);}
+  .c-box{display:flex;gap:8px;}
+  .c-input{flex:1;background:#0a1120;border:1px solid var(--border-strong);border-radius:10px;padding:11px 14px;font-size:13px;color:var(--muted);}
+  .c-send{background:var(--blue);border:none;border-radius:10px;padding:0 22px;font-size:13px;font-weight:800;color:#fff;}
+  .c-tips{margin-top:6px;font-size:10.5px;color:var(--muted-2);}
+
+  /* ── 규칙 카드(시안 설명 — 실제 화면엔 없음) ────────────────────── */
+  .rules{position:absolute;right:16px;top:14px;width:295px;background:rgba(10,15,30,.94);border:1px solid var(--border-strong);border-radius:12px;padding:13px 15px;font-size:11.5px;line-height:1.75;color:var(--muted);z-index:9;}
+  .rules h3{font-size:12px;color:#fff;margin-bottom:6px;}
+  .rules b{color:var(--blue-light);}
+  .rules .sec{margin-top:9px;padding-top:8px;border-top:1px dashed var(--border);}
+</style>
+</head>
+<body>
+
+<div class="note">
+  <span class="tag">추천 시안 v2 · 혼합 방식 확정</span>
+  <span><b>로그인 후 대시보드는 셸로 고정</b> — 🤖 챗봇 메뉴는 그 위 <b>팝업</b>으로 열려, 명령창·대화·진행 작업이 절대 사라지지 않는다</span>
+  <span>동시 <b>5개</b> · 넘치면 핀 없는 가장 오래된 것부터 자동 닫힘 · 🗗 창으로 분리 지원</span>
+</div>
+
+<!-- ① 팝업 관리 바 -->
+<div class="popbar">
+  <span class="pb-title">열린 화면</span>
+  <div class="slot on"><span class="dot"></span>🛡 자산 허브 · 취약점 <span class="x">✕</span></div>
+  <div class="slot"><span class="pin">📌</span><span class="dot"></span>📈 보안 분석 <span class="x">✕</span></div>
+  <div class="slot"><span class="dot"></span>📄 리포트 <span class="x">✕</span></div>
+  <div class="slot ghost">빈 슬롯</div>
+  <div class="slot ghost">빈 슬롯</div>
+  <div class="pb-right">
+    <div class="pb-btn">＋ 메뉴 열기</div>
+    <div class="pb-btn warn">모두 닫기</div>
+  </div>
+</div>
+
+<div class="stage">
+  <!-- 뒤에 깔린 대시보드(살아있음 — 흐림은 시각 표현일 뿐) -->
+  <div class="dash-behind">
+    <div class="hero">무엇을 도와드릴까요, 정요한님</div>
+    <div class="sub">대화 7턴 진행 중 · 세션: 취약점 우선순위 정리 — 화면을 옮겨도 이 대화는 그대로 있습니다</div>
+    <div class="cards"><div class="card">오늘의 할일</div><div class="card">보안 상태</div><div class="card">진행 중 작업</div></div>
+  </div>
+
+  <!-- 팝업(활성): 실제 구현은 이 자리에 iframe(hub.html?g=assets&t=vulnscan.html) -->
+  <div class="popup">
+    <div class="p-head">
+      <span class="t">🛡 자산 허브 — 취약점</span>
+      <span class="crumb">허브 탭 그대로: 통합 뷰 · 자산 목록 · AI-BOM · <b style="color:var(--blue-light)">취약점</b></span>
+      <span class="sp"></span>
+      <span class="hbtn" title="핀 — 자동 닫힘 제외">📌</span>
+      <span class="hbtn" title="새로고침">⟳</span>
+      <span class="hbtn" title="창으로 분리 — 사무실 창처럼 별도 창으로 떼어냄(모니터 2대용)">🗗</span>
+      <span class="hbtn" title="전체 화면으로(기존 방식)">⛶</span>
+      <span class="hbtn" title="닫기">✕</span>
+    </div>
+    <div class="p-body">
+      <div class="ph">
+        <b>iframe: hub.html?g=assets&t=vulnscan.html</b><br>
+        기존 허브(2단 탭) 화면이 통째로 이 안에 뜬다 — 화면 코드 수정 없음<br>
+        같은 출처(file://)라 렌더러 프로세스 공유 → 팝업당 추가 부담은 DOM뿐
+      </div>
+    </div>
+  </div>
+
+  <!-- 규칙 요약(시안 설명) -->
+  <div class="rules">
+    <h3>동작 규칙 (제안)</h3>
+    <div>· 대상: <b>🤖 챗봇 아이콘 메뉴 9종</b> — 보안 분석·위협 인텔·리포트·자산 허브·조치 승인·보안제품·점검 콘솔·AI 지식·레드팀</div>
+    <div>· 🤖 없는 메뉴(설정·AI 팀)는 지금처럼 전체 화면 이동, 사무실은 별도 창 유지</div>
+    <div class="sec">· <b>동시 5개</b> — 6번째를 열면 핀 없는 가장 오래 안 본 팝업이 자동으로 닫히고 토스트로 알림</div>
+    <div>· 📌 핀 = 자동 닫힘 제외. 5개 모두 핀이면 새로 못 열고 안내</div>
+    <div>· 슬롯 클릭 = 팝업 전환(숨김 유지 — 상태 보존)</div>
+    <div class="sec">· <b>명령 맥락 연동</b>: 활성 팝업이 컴포저의 화면 맥락이 된다 — 취약점을 보며 "정리해줘" = 취약점 우선순위 정리 (서버 screen 파라미터, 이미 지원)</div>
+    <div class="sec">· <b>🗗 창으로 분리(혼합 방식, 2026-07-26 결정)</b>: 팝업을 사무실 창처럼 별도 창으로 떼어냄 — 모니터 2대에서 화면을 펼쳐놓고 대시보드에서 지시. 떼어낸 창은 슬롯에서 빠지고(상한 5개 미점유) 창 닫으면 끝</div>
+    <div>· ⛶ = 팝업을 기존 전체 화면 이동으로 전환(탈출구)</div>
+  </div>
+</div>
+
+<!-- ② 명령창 — 늘 하단에 살아있음 -->
+<div class="composer">
+  <div class="ctx-row">
+    <span class="ctx-chip">🎯 명령 맥락: 자산 허브 — 취약점 <span class="sw">| 대시보드로 전환</span></span>
+    <span class="ctx-hint">열려 있는 팝업을 보면서 바로 지시 — 답은 이 대화에 쌓입니다</span>
+  </div>
+  <div class="c-box">
+    <div class="c-input">지금 보이는 미조치 상위 5건 조치 계획 세워줘…</div>
+    <div class="c-send">지시</div>
+  </div>
+  <div class="c-tips">💡 화면을 콕 집어 물으면 그 화면 데이터로 답합니다 · 10초 넘는 작업은 리포트로 저장돼요</div>
+</div>
+
+</body>
+</html>
