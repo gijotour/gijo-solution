@@ -140,6 +140,16 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
 
     <div id="gijoChatWidget" data-prompts='["미조치 Critical 몇 건이야?","KEV 있는 거 있어?"]' style="max-width:640px;margin-bottom:16px;"></div>
 
+    <!-- 취약점 현황 — 이 화면 전체를 대표하는 숫자다. 팝업은 여기까지만 열린다(2026-07-27).
+         "오늘의 조치" 목록보다 위에 둔다: 목록은 무엇부터 할지고, 이 줄은 지금 얼마나 남았나다. -->
+    <div class="kpi-strip" data-gijo-summary>
+      <div class="kpi-mini"><div class="kpi-mini-label">스캔 호스트</div><div class="kpi-mini-value" id="kpiHosts">-</div></div>
+      <div class="kpi-mini"><div class="kpi-mini-label">Critical</div><div class="kpi-mini-value" id="kpiCrit" style="color:#f5928a">-</div></div>
+      <div class="kpi-mini"><div class="kpi-mini-label">High</div><div class="kpi-mini-value" id="kpiHigh" style="color:#f7a86a">-</div></div>
+      <div class="kpi-mini"><div class="kpi-mini-label">Medium</div><div class="kpi-mini-value" id="kpiMed" style="color:var(--amber)">-</div></div>
+      <div class="kpi-mini"><div class="kpi-mini-label">Low/Info</div><div class="kpi-mini-value" id="kpiLow" style="color:var(--muted)">-</div></div>
+    </div>
+
     <!-- 오늘의 조치: 전 자산을 가로질러 KEV·EPSS·VPR로 정렬한 우선순위 목록 ("오늘 뭐부터") -->
     <div class="panel" id="todayPanel" style="border-color:rgba(59,130,246,0.4)">
       <div style="display:flex;align-items:baseline;gap:10px;margin-bottom:4px;flex-wrap:wrap;">
@@ -154,14 +164,6 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
     <div class="upload-note">
       <span class="un-ic">📥</span>
       <span>스캔 결과(<b>.nessus</b> · CSV · JSON · HTML)는 <b>대시보드 아래 ＋</b>에서 올리세요 — 형식을 자동 인식해 플러그인 단위로 중복을 제거하고 호스트 정보(OS·DNS)·EPSS·VPR·KEV까지 반영합니다. 출처 라벨은 파일명이 그대로 쓰입니다.</span>
-    </div>
-
-    <div class="kpi-strip">
-      <div class="kpi-mini"><div class="kpi-mini-label">스캔 호스트</div><div class="kpi-mini-value" id="kpiHosts">-</div></div>
-      <div class="kpi-mini"><div class="kpi-mini-label">Critical</div><div class="kpi-mini-value" id="kpiCrit" style="color:#f5928a">-</div></div>
-      <div class="kpi-mini"><div class="kpi-mini-label">High</div><div class="kpi-mini-value" id="kpiHigh" style="color:#f7a86a">-</div></div>
-      <div class="kpi-mini"><div class="kpi-mini-label">Medium</div><div class="kpi-mini-value" id="kpiMed" style="color:var(--amber)">-</div></div>
-      <div class="kpi-mini"><div class="kpi-mini-label">Low/Info</div><div class="kpi-mini-value" id="kpiLow" style="color:var(--muted)">-</div></div>
     </div>
 
     <div class="table-panel">

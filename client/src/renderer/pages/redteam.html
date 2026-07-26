@@ -144,6 +144,18 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     <div id="gijoChatWidget" data-prompts='["이 자산 레드팀 점검해줘"]' style="max-width:640px;margin-bottom:16px;"></div>
     <div id="targetNote" style="font-size:11.5px;color:var(--teal);margin:-6px 0 14px;display:none">📦 AI-BOM 자산을 선택했습니다 — 점검 결과(견고성 점수)가 그 자산의 AI-BOM에 자동 기록됩니다.</div>
 
+    <!-- 레드팀 요약 — 이 화면 전체를 대표하는 숫자다. 팝업은 여기까지만 열린다(2026-07-27).
+         가드레일 패널보다 위에 둔다: 담당자가 먼저 알고 싶은 건 "지금 얼마나 튼튼한가"다. -->
+    <div class="kpis" id="kpis" data-gijo-summary>
+      <div class="kpi donut">
+        <svg width="66" height="66" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="#0e1526" stroke-width="4"/><circle id="scoreArc" cx="18" cy="18" r="15.9" fill="none" stroke="#e2483d" stroke-width="4" stroke-dasharray="0 100" stroke-linecap="round" transform="rotate(-90 18 18)"/><text id="scoreText" x="18" y="21" text-anchor="middle" font-size="9" fill="#e7eaf3" font-weight="700">-</text></svg>
+        <div><div class="v" id="verdictWord" style="font-size:16px">-</div><div class="k">견고성 점수 / 100</div></div>
+      </div>
+      <div class="kpi"><div class="v" id="kVuln" style="color:var(--red)">-</div><div class="k">뚫린 공격</div></div>
+      <div class="kpi"><div class="v" id="kSafe" style="color:var(--teal)">-</div><div class="k">방어한 공격</div></div>
+      <div class="kpi"><div class="v" id="kTotal">-</div><div class="k">총 페이로드</div></div>
+    </div>
+
     <!-- 가드레일: 실시간 방어 -->
     <div class="panel">
       <div class="panel-title">🛡 런타임 가드레일 <span class="muted" style="font-size:11px;font-weight:600">— 실시간 인젝션 방어</span></div><div class="guard-row">
@@ -156,17 +168,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         <div class="guard-counts">누적 탐지 <b id="gFlagged">0</b> · 차단 <b id="gBlocked">0</b></div>
       </div>
       <div class="glog" id="guardLog"></div>
-    </div>
-
-    <!-- 레드팀 요약 위젯 -->
-    <div class="kpis" id="kpis">
-      <div class="kpi donut">
-        <svg width="66" height="66" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="#0e1526" stroke-width="4"/><circle id="scoreArc" cx="18" cy="18" r="15.9" fill="none" stroke="#e2483d" stroke-width="4" stroke-dasharray="0 100" stroke-linecap="round" transform="rotate(-90 18 18)"/><text id="scoreText" x="18" y="21" text-anchor="middle" font-size="9" fill="#e7eaf3" font-weight="700">-</text></svg>
-        <div><div class="v" id="verdictWord" style="font-size:16px">-</div><div class="k">견고성 점수 / 100</div></div>
-      </div>
-      <div class="kpi"><div class="v" id="kVuln" style="color:var(--red)">-</div><div class="k">뚫린 공격</div></div>
-      <div class="kpi"><div class="v" id="kSafe" style="color:var(--teal)">-</div><div class="k">방어한 공격</div></div>
-      <div class="kpi"><div class="v" id="kTotal">-</div><div class="k">총 페이로드</div></div>
     </div>
 
     <div class="cols">

@@ -235,8 +235,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     var bandTxt = p.band === "good" ? "양호" : p.band === "fair" ? "보통" : "취약";
     var mttr = c.mttrDays == null ? '<span style="color:var(--muted-2)">집계 중</span>' : c.mttrDays + "일";
     var mttrSub = c.mttrDays == null ? "조치 완료건 3건↑ 쌓이면 표시" : "조치 태스크 완료 평균";
+    // 이 화면은 전부 지표라 "요약 카드"를 새로 만들 게 아니라, 임원 요약(히어로)이 곧 요약이다.
+    // 팝업은 여기까지만 열리고 상세 지표는 스크롤로 본다(2026-07-27).
     return (
-      '<div class="hero">' +
+      '<div class="hero" data-gijo-summary>' +
       '<div class="posture"><div class="pl">🛡 종합 보안태세</div>' +
       '<div class="pscore"><span class="pv" style="color:' + pcol + '">' + p.score + '</span><span class="pb ' + p.band + '">' + bandTxt + "</span></div>" +
       '<div style="font-size:10.5px;color:var(--muted-2)">100점 만점 · 실지표 가중 합성(악용·기한초과·고위험자산 감점)</div>' +
