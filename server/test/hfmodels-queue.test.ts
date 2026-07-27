@@ -54,7 +54,10 @@ describe("hfmodels 다운로드 큐 — 백그라운드 처리 + 진행률 브�
 
     const final = getHfDownloadJob(job.id)!;
     expect(final.status).toBe("error");
-    expect(final.error).toContain("GGUF");
+    // 문구를 'GGUF'로 못박지 않는다(2026-07-28): HF는 없는 저장소에 401을 주므로 인터넷이
+    // 닿을 때는 "저장소를 볼 수 없습니다", 닿지 않을 때는 "받을 .gguf 파일을 찾지 못했습니다"가
+    // 나온다. 둘 다 담당자가 저장소를 다시 보게 만드는 안내라는 점이 이 시험의 핵심이다.
+    expect(final.error).toMatch(/저장소/);
 
     // 큐 처리 과정이 WebSocket으로 순서대로 브로드캐스트됐는지(queued -> downloading -> error)
     const statuses = collected.filter((j) => j.id === job.id).map((j) => j.status);

@@ -41,20 +41,35 @@ const PANEL_ALIASES: Record<string, Record<string, string>> = {
   "threat.html": { "구독 중인 CTI 피드": "피드 구독", "모니터링 대상": "감시 대상" },
   "agent.html": { "환경별 모델 선택 가이드": "환경별 모델 선택", "에이전트별 브레인 모델": "모델 배정", "터미널 — 협업": "협업 피드" },
   "opsguide.html": { "유지보수 일정 · 점검서 · 승인": "점검 승인", "지식베이스 — 매뉴얼·케이스·에러로그": "문서 관리" },
-  "settings.html": { "이메일(SMTP) 설정": "SMTP" },
+  "settings.html": {
+    "이메일(SMTP) 설정": "SMTP",
+    // 담당자는 구역 이름보다 "허깅페이스 토큰"이라고 부른다
+    "HuggingFace 토큰": "모델 받기 · 인증",
+    "허깅페이스 토큰": "모델 받기 · 인증",
+    "gated 모델": "모델 받기 · 인증",
+    "게이티드 모델": "모델 받기 · 인증",
+  },
 };
+
+// 화면에 보이는 구역 이름에는 보기 좋으라고 넣은 구분 기호가 섞여 있다("모델 받기 · 인증").
+// 담당자는 그 기호를 타이핑하지 않는다 — 안 지우면 "모델 받기 인증 뭐야?"가 안 걸려 LLM 일반
+// 답변으로 새고, 사내 문서에서 엉뚱한 내용을 끌어온다(2026-07-28 실측: 무관한 반입 절차를 답함).
+function normalizeName(s: string): string {
+  return s.replace(/[\s·・ㆍ]/g, "");
+}
 
 /** panel = 안내에서 찾은 구역, matched = 질문 안에서 실제로 걸린 글자(별명일 수 있다). */
 function resolvePanelHit(screen: string | undefined, q: string): { panel: string; matched: string } | null {
   const g = screen ? GUIDES[screen] : undefined;
   if (!g?.panels) return null;
+  const nq = normalizeName(q);
   for (const name of Object.keys(g.panels)) {
-    if (q.includes(name.replace(/\s/g, ""))) return { panel: name, matched: name };
+    if (nq.includes(normalizeName(name))) return { panel: name, matched: name };
   }
   const alias = screen ? PANEL_ALIASES[screen] : undefined;
   if (alias) {
     for (const [shown, real] of Object.entries(alias)) {
-      if (q.includes(shown.replace(/\s/g, "")) && g.panels[real]) return { panel: real, matched: shown };
+      if (nq.includes(normalizeName(shown)) && g.panels[real]) return { panel: real, matched: shown };
     }
   }
   return null;
@@ -355,6 +370,7 @@ const GUIDES: Record<string, ScreenGuide> = {
       "서버 연결": "단일 데스크톱 모드는 기본 주소(localhost:4000) 그대로, 사내망 GPU 서버를 쓰는 분산 모드는 그 서버 주소로 변경합니다. 연결 테스트로 확인 후 저장하세요.",
       "계정": "보안팀 계정을 추가·삭제합니다. 역할은 admin(관리자)과 security_officer(담당자) 둘입니다. 계정당 로그인 세션은 1개만 허용됩니다.",
       "구동 티어": "GPU 성능(VRAM)에 맞춰 동시 LLM 수·컨텍스트를 Lite(12GB급·LLM1·16K)/Standard(24GB급·2개·32K)/Pro(32GB급·3개)로 전환합니다. 서버 GPU를 실측해 권장 티어를 자동 판정하며, 적용하면 채팅 LLM이 약 30초 재기동됩니다(지식 검색은 영향 없음).",
+      "모델 받기 · 인증": "라이선스 동의가 필요한 모델(gated — HuggingFace에서 '동의' 버튼을 눌러야 받을 수 있는 모델)을 내려받을 때 쓰는 인증입니다. HuggingFace 토큰을 한 번 등록해 두면 이후 모델을 받을 때 서버가 자동으로 씁니다 — 예전처럼 서버에 직접 들어가 'hf auth login'을 칠 필요가 없습니다. 토큰은 암호화해 보관하고 화면에는 끝 4자만 보여주며, 다시 꺼내 보여주지 않습니다. 사내망에서 인터넷으로 바로 못 나가는 환경이라면 프록시 주소도 함께 넣으세요. '연결 시험'은 실제로 HuggingFace에 한 번 물어봐서 토큰이 살아 있는지 확인합니다. admin 전용입니다.",
       "로컬 LLM 엔진": "서버 GPU 머신의 llama.cpp 프로세스를 원격 제어합니다. 모델 ID를 바꿔 다시 시작하면 기존 프로세스를 정상 종료한 뒤 새 모델로 교체(스왑)합니다.",
       "SMTP": "내부 리포트를 이메일로 보낼 때 쓰는 사내 SMTP 서버 정보입니다. 비밀번호는 암호화 저장됩니다.",
       "메일 수신": "다른 보안장비가 SMTP로 보내는 알림 메일을 받아 통합 분석 허브에 자동 인입합니다. 수신 전용 리스너라 외부로 메일을 보내지 않습니다.",

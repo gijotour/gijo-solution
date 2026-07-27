@@ -18,6 +18,7 @@ import * as fs from "fs";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { attachProcessLogging, recordProcessOutput } from "./logs";
+import { getModelAuthSecrets } from "./modelauth";
 
 const HF_API_BASE = "https://huggingface.co/api";
 
@@ -28,9 +29,18 @@ export interface HfModelResult {
   downloads: number;
 }
 
+/**
+ * 조회에 붙일 인증 헤더(2026-07-28). 등록된 토큰이 있으면 쓴다.
+ * 없어도 공개 저장소는 그대로 보이므로 실패하지 않는다.
+ */
+function hfHeaders(): Record<string, string> {
+  const { token } = getModelAuthSecrets();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
 export async function searchHfModels(query: string): Promise<HfModelResult[]> {
   const url = `${HF_API_BASE}/models?search=${encodeURIComponent(query)}&filter=gguf&limit=20`;
-  const res = await fetch(url).catch(() => null);
+  const res = await fetch(url, { headers: hfHeaders() }).catch(() => null);
   if (!res || !res.ok) return [];
   const data = (await res.json()) as { id: string; tags?: string[]; downloads?: number }[];
   return data.map((m) => ({
@@ -42,11 +52,36 @@ export async function searchHfModels(query: string): Promise<HfModelResult[]> {
 }
 
 // 저장소에 들어 있는 .gguf 파일 목록 (HF 모델 info의 siblings).
+// ⚠ 401/403은 "파일이 없다"가 아니라 "볼 권한이 없다"다 — 구분해서 던져야 담당자가 토큰을 등록한다.
 async function fetchRepoGgufFiles(modelId: string): Promise<string[]> {
-  const res = await fetch(`${HF_API_BASE}/models/${modelId}`).catch(() => null);
+  const res = await fetch(`${HF_API_BASE}/models/${modelId}`, { headers: hfHeaders() }).catch(() => null);
+  // ⚠ HF는 **없는 저장소에도 401**을 준다(존재 자체를 숨긴다). 그래서 "gated다"라고 단정하면
+  //    단순 오타를 인증 문제로 오진한다 — 두 가능성을 함께 알린다.
+  if (res && (res.status === 401 || res.status === 403)) {
+    throw new Error(
+      getModelAuthSecrets().token
+        ? `이 저장소를 볼 수 없습니다(${res.status}). 저장소 이름이 맞는지, 그리고 HuggingFace에서 이 모델의 라이선스에 동의했는지 확인하세요.`
+        : `이 저장소를 볼 수 없습니다(${res.status}). 저장소 이름이 틀렸거나, 라이선스 동의가 필요한(gated) 모델일 수 있습니다 — 후자라면 설정 > 모델 받기·인증에 HuggingFace 토큰을 등록하세요.`
+    );
+  }
   if (!res || !res.ok) return [];
   const data = (await res.json()) as { siblings?: { rfilename: string }[] };
   return (data.siblings ?? []).map((s) => s.rfilename).filter((f) => /\.gguf$/i.test(f));
+}
+
+/**
+ * 다운로드 프로세스에 넘길 환경변수(2026-07-28).
+ * ⚠ 토큰은 명령 인자가 아니라 **환경변수**로 넘긴다 — 인자로 주면 프로세스 목록(ps)에 그대로 보인다.
+ */
+export function buildDownloadEnv(base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
+  const { token, proxyUrl } = getModelAuthSecrets();
+  const env: NodeJS.ProcessEnv = { ...base };
+  if (token) env.HF_TOKEN = token;
+  if (proxyUrl) {
+    env.HTTPS_PROXY = proxyUrl;
+    env.HTTP_PROXY = proxyUrl;
+  }
+  return env;
 }
 
 // 분할(-00001-of-000NN) 파일인지.
@@ -115,8 +150,18 @@ async function runHfDownload(modelId: string, onProgress: (pct: number) => void)
   const cli = resolveHfCli();
   let stderr = "";
   await new Promise<void>((resolve, reject) => {
-    recordProcessOutput("hf-download", "log", `$ ${cli} download ${modelId} ${chosen} --local-dir ${localDir}`);
-    const proc = spawn(cli, ["download", modelId, chosen, "--local-dir", localDir]);
+    // 설정에 등록해 둔 인증 정보를 그대로 쓴다(2026-07-28) — 담당자가 서버에 들어가
+    // 'hf auth login'을 칠 일이 없어진다. 없으면 예전처럼 익명으로 받는다.
+    // ⚠ 토큰은 인자가 아니라 **환경변수**로 넘긴다. 인자로 주면 프로세스 목록(ps)에 그대로 보인다.
+    const { token, proxyUrl } = getModelAuthSecrets();
+    const env = buildDownloadEnv();
+    recordProcessOutput(
+      "hf-download",
+      "log",
+      `$ ${cli} download ${modelId} ${chosen} --local-dir ${localDir}` +
+        `${token ? " (등록된 토큰 사용)" : ""}${proxyUrl ? ` (프록시 ${proxyUrl})` : ""}`
+    );
+    const proc = spawn(cli, ["download", modelId, chosen, "--local-dir", localDir], { env });
     attachProcessLogging(proc, "hf-download");
     proc.stderr?.on("data", (d) => {
       const text = String(d);

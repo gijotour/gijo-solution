@@ -348,6 +348,16 @@ const gijoApi = {
   sendReportEmail: (to: string[], subject: string, attachmentPath: string) =>
     api.emailApi.sendReport(to, subject, attachmentPath),
 
+  // 법령·판례 조회(법제처) — settings.html이 부르는데 통로가 빠져 있었다(2026-07-28 발견)
+  lawConfig: () => api.lawApi.getConfig(),
+  setLawKey: (key: string) => api.lawApi.setKey(key),
+  lawSearch: (query: string, target?: string, limit?: number) => api.lawApi.search(query, target, limit),
+
+  // 모델 받기 인증(HuggingFace 토큰·프록시) — 토큰은 넣기만 하고 다시 나오지 않는다
+  getModelAuth: () => api.modelAuthApi.get(),
+  saveModelAuth: (patch: { token?: string; proxyUrl?: string }) => api.modelAuthApi.save(patch),
+  testModelAuth: () => api.modelAuthApi.test(),
+
   // 사용량 · 요금
   getUsageSummary: (sinceMs?: number) => api.usageApi.summary(sinceMs),
 

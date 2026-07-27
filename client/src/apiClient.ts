@@ -1024,6 +1024,34 @@ export const smtpInboundApi = {
   getStatus: () => request<SmtpInboundStatus>("/api/smtp-inbound/status"),
 };
 
+// 법령·판례 조회(법제처 OPEN API). 인증키는 서버가 암호화 보관하고 돌려주지 않는다 — 켜짐/꺼짐만 온다.
+export interface LawConfig { enabled: boolean; updatedAt: number | null }
+export interface LawHit { title: string; meta: string; link: string; mst?: string }
+export const lawApi = {
+  getConfig: () => request<LawConfig>("/api/law/config"),
+  setKey: (key: string) => request<LawConfig>("/api/law/config", { method: "POST", body: { key } }),
+  search: (query: string, target = "law", limit = 5) =>
+    request<{ hits: LawHit[]; disclaimer: string }>(
+      `/api/law/search?query=${encodeURIComponent(query)}&target=${encodeURIComponent(target)}&limit=${limit}`
+    ),
+};
+
+// 모델 받기 인증(HuggingFace 토큰·프록시). 토큰 자체는 서버에서 돌아오지 않는다 — 끝 4자만 온다.
+export interface ModelAuthPublic {
+  hasToken: boolean;
+  tokenTail: string | null;
+  proxyUrl: string;
+  updatedAt: number | null;
+  updatedBy: string | null;
+}
+export interface ModelAuthTestResult { ok: boolean; message: string; whoami?: string }
+export const modelAuthApi = {
+  get: () => request<ModelAuthPublic>("/api/model-auth"),
+  save: (patch: { token?: string; proxyUrl?: string }) =>
+    request<ModelAuthPublic>("/api/model-auth", { method: "POST", body: patch }),
+  test: () => request<ModelAuthTestResult>("/api/model-auth/test", { method: "POST", body: {} }),
+};
+
 export interface SiemConfig { enabled: boolean; host: string; port: number; format: "rfc5424" | "cef"; minSeverity: "info" | "high" | "critical" }
 export const siemApi = {
   getConfig: () => request<SiemConfig>("/api/siem/config"),

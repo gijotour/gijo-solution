@@ -229,19 +229,57 @@ function splitQueryTerms(q: string): string[] {
   return parts.length > 1 ? parts : [q];
 }
 
+// [2026-07-28 회귀 하네스가 잡음] "안전대부 웹서버 취약점 알려줘"가 0건이었다.
+// matches()는 공백만 지운 통 문자열 비교라 "안전대부웹서버취약점"을 통째로 찾는데,
+// 자산 이름은 "안전대부 본인인증 웹 서버 (certify.aj-safe.co.kr)"라 안 걸린다.
+// 호스트명을 정확히 친 사람만 답을 받고, 조직 이름으로 물은 담당자는 문서 요약만 받았다.
+// → 통 문자열이 0건이면 **낱말 단위 AND**로 한 번 더 본다. 이때 "취약점·알려줘" 같은
+//   조회 의도어는 대상이 아니므로 뺀다(안 빼면 AND가 절대 안 맞는다).
+const QUERY_STOPWORD_RE =
+  /^(취약점|취약|점검|목록|리스트|현황|상태|전부|모두|알려줘|알려|보여줘|보여|확인|조회|정보|내역|결과|있어|있나|뭐|뭐야|해줘|주세요)$/;
+function queryTokens(q: string): string[] {
+  return q
+    .split(/\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length >= 2 && !QUERY_STOPWORD_RE.test(s));
+}
+/** 통 문자열이 안 걸리면 낱말 전부가 들어 있는지로 한 번 더 본다(둘 다 아니면 미매칭). */
+function matchesLoose(haystack: string, q: string, tokens: string[]): boolean {
+  if (matches(haystack, q)) return true;
+  return tokens.length > 0 && tokens.every((t) => matches(haystack, t));
+}
+
 async function searchOne(q: string): Promise<string[]> {
   const out: string[] = [];
+  const tokens = queryTokens(q);
 
   const assets = listAssets().filter(
-    (a) => matches(a.id, q) || matches(a.name, q) || matches(a.assetType, q) || a.components.some((c) => matches(c.name, q))
+    (a) =>
+      matchesLoose(a.id, q, tokens) ||
+      matchesLoose(a.name, q, tokens) ||
+      matchesLoose(a.assetType, q, tokens) ||
+      a.components.some((c) => matchesLoose(c.name, q, tokens))
   );
   if (assets.length) {
     out.push(`AI 자산 ${assets.length}건:`, ...assets.slice(0, 6).map((a) => `  - ${a.id} | ${a.name} | ${a.assetType} | ${findingSummary(a)}`));
+    // 대상이 좁혀졌으면 취약점 **이름**까지 준다(2026-07-28 실측).
+    // 건수만 주면 LLM은 아는 만큼만 말해 "medium 1건, low 2건"으로 끝난다 — 담당자가 알고 싶은 건
+    // "무엇이" 취약한가다. 아래 취약점 섹션은 우선순위 상위 100건만 보므로 낮은 위험은 거기서 샌다.
+    for (const a of assets.slice(0, 3)) {
+      if (!a.findings.length) continue;
+      out.push(
+        `  · ${a.name} 취약점 ${a.findings.length}건:`,
+        ...a.findings.slice(0, 8).map((f) => `      - [${f.severity}] ${f.finding_type}`)
+      );
+    }
   }
 
   // 취약점 — 전 자산을 가로질러 우선순위 상위에서 찾는다(자산별로 뒤지지 않아도 되게).
   const vulns = prioritizedReviews(100).filter(
-    (r) => matches(r.finding.finding_type, q) || matches(r.finding.evidence, q) || matches(r.assetName, q)
+    (r) =>
+      matchesLoose(r.finding.finding_type, q, tokens) ||
+      matchesLoose(r.finding.evidence, q, tokens) ||
+      matchesLoose(r.assetName, q, tokens)
   );
   if (vulns.length) {
     // assetId를 함께 준다 — LLM이 이어서 get_asset(assetId)을 부를 수 있어야 한다.
@@ -252,7 +290,7 @@ async function searchOne(q: string): Promise<string[]> {
     );
   }
 
-  const products = listProducts().filter((p) => matches(`${p.name} ${p.category} ${p.vendor ?? ""}`, q));
+  const products = listProducts().filter((p) => matchesLoose(`${p.name} ${p.category} ${p.vendor ?? ""}`, q, tokens));
   if (products.length) {
     out.push(`보안제품 ${products.length}건:`, ...products.slice(0, 5).map((p) => `  - ${p.name} (${p.category})`));
   }

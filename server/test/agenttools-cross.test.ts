@@ -78,6 +78,25 @@ describe("search — 메뉴를 가로지르는 단일 검색", () => {
     expect(out).toContain("db-02");
   });
 
+  // 회귀 하네스가 잡음(2026-07-28): "안전대부 웹서버 취약점 알려줘"가 0건이 돼, 호스트명을
+  // 정확히 친 사람만 답을 받고 조직 이름으로 물은 담당자는 문서 요약만 받았다.
+  // 통 문자열이 안 걸리면 낱말 AND로 한 번 더 본다 — 조회 의도어(취약점·알려줘)는 대상에서 뺀다.
+  it("자산 이름을 통째로 안 치고 낱말로 물어도 찾는다", async () => {
+    registerAsset({ id: "vuln:certify.example.co.kr", name: "안전대부 본인인증 웹 서버 (certify.example.co.kr)", path: "p" });
+    recordFindings("vuln:certify.example.co.kr", [
+      { finding_type: "[IW-32] 데이터 평문 전송", severity: "low", evidence: "평문 전송", source_tool: "웹취약점 보고서" },
+    ]);
+    const out = await run("search", { query: "안전대부 웹서버 취약점" });
+    expect(out).toContain("certify.example.co.kr");
+    expect(out).toContain("IW-32");
+  });
+
+  it("낱말 중 하나라도 안 맞으면 억지로 끌어오지 않는다", async () => {
+    registerAsset({ id: "web-01", name: "안전대부 본인인증 웹 서버", path: "p" });
+    const out = await run("search", { query: "국민은행 웹서버" });
+    expect(out).toContain("찾지 못했습니다");
+  });
+
   it("'A와 B' 형태(한국어 조사)도 나눠 찾는다", async () => {
     registerAsset({ id: "web-01", name: "웹서비스", path: "p" });
     registerAsset({ id: "db-02", name: "DB서버", path: "p" });

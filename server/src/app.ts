@@ -23,6 +23,7 @@ import { registerDataCleanupRoutes } from "./engine/datacleanup";
 import { registerIngestReportRoutes } from "./engine/ingestreport";
 import { registerLongAnswerRoutes, reapStaleRunning } from "./engine/longanswer";
 import { registerScreenGuideRoutes } from "./engine/screenguide";
+import { registerModelAuthRoutes } from "./engine/modelauth";
 import { registerLawRoutes } from "./engine/lawinfo";
 import { registerActivityAudit } from "./engine/activityaudit";
 import { registerBridgeRoutes } from "./engine/bridge";
@@ -130,6 +131,7 @@ export function createApp(): Express {
   registerMergeRoutes(app);
   registerDispatcherRoutes(app);
   registerMemoryRoutes(app);
+  registerModelAuthRoutes(app);
   registerHandoverRoutes(app);
   registerDataCleanupRoutes(app);
   registerIngestReportRoutes(app);

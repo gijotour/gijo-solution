@@ -50,6 +50,16 @@ describe("screenguide — 도움말 의도 감지", () => {
     expect(isHelpIntent("이 화면에서 Tenable 결과 어떻게 봐?", "dashboard.html")).toBe(true);
     expect(isHelpIntent("여기 사용법 알려줘", "dashboard.html")).toBe(true);
   });
+
+  // 2026-07-28 실측: 구역 이름에 보기 좋으라고 넣은 가운뎃점("모델 받기 · 인증") 때문에
+  // 담당자가 실제로 치는 "모델 받기 인증 뭐야?"가 안 걸려, LLM이 사내 문서에서 무관한
+  // 반입 절차를 끌어와 답했다. 표기 기호는 무시하고 이름만 본다.
+  it("구역 이름의 표기 기호(·)를 안 쳐도 그 구역 안내로 간다", () => {
+    for (const q of ["모델 받기 인증 뭐야?", "모델받기인증 어떻게 써?", "허깅페이스 토큰 어디서 등록해?", "gated 모델 받는 법 알려줘"]) {
+      expect(isHelpIntent(q, "settings.html"), q).toBe(true);
+    }
+    expect(formatScreenGuide("settings.html", "모델 받기 인증 뭐야?")).toContain("HuggingFace 토큰");
+  });
 });
 
 describe("screenguide — 화면별 가이드", () => {
