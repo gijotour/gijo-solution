@@ -574,8 +574,10 @@
   body.chatting .hero-orb{width:120px;}
   body.chatting .hero-orb .network-svg{max-width:120px;}
   body.chatting .hero-hello,body.chatting .hero-sub{display:none;}
-  /* 대화가 시작되면 오늘 할 일은 물러난다 — 그때 주인공은 대화다. 다시 보려면 새 세션. */
-  body.chatting .today-tasks{display:none !important;}
+  /* 대화가 시작되면 오늘 할 일은 물러난다 — 그때 주인공은 대화다.
+     ⚠ 단, 팝업이 떠 있을 때는 지우지 않고 **흐리게 남긴다**(아래 shell-popped 규칙).
+     뒤에 아무것도 없으면 반투명 대화판이 비칠 대상이 없어 층이 안 느껴진다. */
+  body.chatting:not(.shell-popped) .today-tasks{display:none !important;}
   /* 팝업이 떠 있을 때 뒤에 무엇을 남길지 — 두 번 고쳐서 여기까지 왔다(2026-07-27).
      ① 구체·인사말은 숨긴다. 밝고 움직여서 팝업 뒤로 비치면 어수선하다(원래 배경막을
         .93까지 올리게 만든 원인이 이것이었다).

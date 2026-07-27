@@ -144,12 +144,23 @@ await page.evaluate(() => {
   it.querySelector(".gn-label").click();
 });
 await page.waitForTimeout(3500); // 데이터 로드 + 감시 주기
-const fit = await page.evaluate(() => ({
-  layerH: document.getElementById("shellLayer").offsetHeight,
-  availH: window.innerHeight,
-  rowsMax: parseInt(document.querySelector("#accConsole .cl-rows").style.maxHeight || "0", 10),
-}));
-ok("내용 맞춤 — 짧은 화면은 팝업 축소·이력 확장", fit.layerH < fit.availH - 400 && fit.rowsMax > 110, JSON.stringify(fit));
+// 이력 높이를 픽셀로 맞추던 방식은 없앴다(2026-07-27) — 팝업과 대화 사이에 빈 공간이 남아
+// "뒷배경이 안 좋다"는 지적을 받았다. 지금은 컴포저가 팝업 아래부터 화면 바닥까지 차지하고
+// 이력이 그 안에서 flex로 늘어난다. 그래서 재는 것도 "픽셀"이 아니라 "빈틈 없이 채웠나"로 바꾼다.
+const fit = await page.evaluate(() => {
+  const layer = document.getElementById("shellLayer").getBoundingClientRect();
+  const acc = document.getElementById("accConsole").getBoundingClientRect();
+  return {
+    layerH: Math.round(layer.height),
+    availH: window.innerHeight,
+    사이간격: Math.round(acc.top - layer.bottom),
+    컴포저바닥여백: Math.round(window.innerHeight - acc.bottom),
+    컴포저높이: Math.round(acc.height),
+  };
+});
+ok("팝업 아래를 대화 영역이 빈틈없이 채운다",
+  fit.layerH < fit.availH - 400 && fit.사이간격 >= 0 && fit.사이간격 <= 32 && fit.컴포저바닥여백 <= 20 && fit.컴포저높이 > 200,
+  JSON.stringify(fit));
 await page.screenshot({ path: SHOT + "shell-fit-analysis.png" });
 await page.evaluate(() => { const s = Array.from(document.querySelectorAll("#sbSlots .sb-slot")).find((e) => e.textContent.includes("보안 분석")); s.querySelector(".x").click(); });
 await page.waitForTimeout(400);
@@ -279,8 +290,12 @@ ok("손잡이 드래그로 높이 줄이기(최소 240 유지)", h1 < h0 && Math
 const persisted = await page.evaluate(() => localStorage.getItem("gijo:shell:height"));
 ok("높이 선택 기억", Boolean(persisted), String(persisted));
 // 팝업을 줄인 만큼 대화 이력이 늘어나야 한다(2026-07-26 요청)
-const rowsMax = await page.evaluate(() => parseInt(document.querySelector("#accConsole .cl-rows").style.maxHeight || "0", 10));
-ok("줄인 공간만큼 대화 이력 확장", rowsMax > 200, "cl-rows max=" + rowsMax + "px (기본 110)");
+const grew = await page.evaluate(() => {
+  const layer = document.getElementById("shellLayer").getBoundingClientRect();
+  const acc = document.getElementById("accConsole").getBoundingClientRect();
+  return { 컴포저높이: Math.round(acc.height), 팝업높이: Math.round(layer.height), 사이간격: Math.round(acc.top - layer.bottom) };
+});
+ok("줄인 만큼 대화 영역이 커진다", grew.컴포저높이 > 300 && grew.사이간격 <= 32, JSON.stringify(grew));
 await page.screenshot({ path: SHOT + "shell-popup-resized.png" });
 await page.evaluate(() => { const g = document.getElementById("shellGrip"); const r = g.getBoundingClientRect(); g.dispatchEvent(new MouseEvent("dblclick", { bubbles: true, clientX: r.left + 10, clientY: r.top + 3 })); });
 await page.waitForTimeout(300);

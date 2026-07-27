@@ -73,8 +73,24 @@
     "#shellBody iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:none;}" +
     "#shellBody iframe.on{display:block;}" +
     // 팝업이 떠 있는 동안 — 컴포저(지휘 콘솔 박스)를 하단에 고정해 늘 보이게, 활동 로그는 낮게.
-    "body.shell-popped #accConsole{position:fixed;bottom:8px;z-index:720;background:var(--panel,#121a2e);box-shadow:0 -8px 30px rgba(0,0,0,.45);}" +
-    "body.shell-popped #accConsole .cl-rows{max-height:110px;}" +
+    // ⚠ background에 !important가 필요하다: 대시보드의 .ai-team 규칙이 background:none !important를
+    //   걸어 두어, 그냥 쓰면 컴포저가 **배경 없이** 그려진다(실측: rgba(0,0,0,0)).
+    //   배경막을 연하게 바꾼 뒤로는 그 탓에 대화 카드가 허공에 뜬 것처럼 보였다(2026-07-27 지적).
+    //   대화 영역은 하나의 판으로 보여야 읽힌다.
+    // 대화 판은 **반투명 + 흐림**으로 둔다(2026-07-27, 표준 참고).
+    //  · 불투명하게 채웠더니 뒤가 하나도 안 보여, "팝업이 대시보드 위에 얹혀 있다"는 느낌이
+    //    다시 사라졌다(사용자가 계속 지적한 부분).
+    //  · 그렇다고 그냥 투명하게 두면 뒤 글자와 겹쳐 대화가 안 읽힌다(이전 상태).
+    //  → 반투명(약 78%)으로 깔고 뒤를 흐리게(blur 16px) 만든다. 뒤의 색·형태는 비치지만
+    //    글자는 뭉개져 대화를 방해하지 않는다. 통설도 "채움 20~40% + blur 10~30px"을 권한다.
+    //    우리 배경은 어두워 대비를 지키려면 채움을 더 진하게 잡아야 한다(글자 대비 우선).
+    "body.shell-popped #accConsole{position:fixed;bottom:8px;z-index:720;" +
+    "background:rgba(14,21,38,.78) !important;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);" +
+    "border:1px solid var(--border,#1e2a44) !important;" +
+    "border-radius:12px !important;padding:4px 8px 8px !important;box-shadow:0 -8px 30px rgba(0,0,0,.45);}" +
+    // 이력은 컴포저가 차지한 높이를 그대로 쓴다(layout이 top을 잡아 준다) — 고정 110px이면
+    // 팝업과 대화 사이가 텅 비어 보인다.
+    "body.shell-popped #accConsole .cl-rows{max-height:none;flex:1 1 auto;min-height:0;}" +
     // 명령 맥락 칩 — 컴포저 바로 위. 팝업이 떠 있을 때만 보인다.
     "#shellCtx{display:none;align-items:center;gap:8px;margin:0 0 6px;}" +
     "body.shell-popped #shellCtx{display:flex;}" +
@@ -310,12 +326,12 @@
     var gap;
     if (wantH) {
       gap = Math.max(baseMinGap, window.innerHeight - top - wantH);
-      // 이력 확장: 팝업 아래 공간(gap)에서 컴포저 몸통·여백을 뺀 만큼
-      if (rows) rows.style.maxHeight = Math.max(110, gap - 16 - nonRows) + "px";
     } else {
-      if (rows) rows.style.maxHeight = ""; // 아직 내용을 모르면 기본(꽉 차게)
       gap = (acc ? acc.offsetHeight : accH) + 20;
     }
+    // 이력 높이는 더 이상 계산하지 않는다 — 컴포저가 팝업 아래 공간을 통째로 차지하고(top 지정),
+    // 이력이 그 안에서 flex로 늘어난다. 픽셀로 맞추던 방식은 빈 공간을 남겼다.
+    if (rows) rows.style.maxHeight = "";
     layer.style.left = navRight + "px";
     layer.style.top = top + "px";
     layer.style.right = right + "px";
@@ -326,6 +342,10 @@
     dim.style.right = "0";
     dim.style.bottom = "0";
     if (acc) {
+      // 팝업 아래부터 화면 바닥까지를 대화 영역이 채운다(2026-07-27).
+      // 예전에는 컴포저가 내용 높이만큼만 차지해, 팝업과 대화 사이에 넓은 빈 공간이 남았다.
+      // 팝업 높이가 고정으로 바뀌면서 그 공백이 더 눈에 띄었다("뒷배경이 더 안 좋아졌다").
+      acc.style.top = (top + (wantH || 0) + 8) + "px";
       // 대화·입력줄은 **읽기 좋은 폭으로 가운데** 둔다(2026-07-27).
       // 팝업은 표·목록이라 넓을수록 좋지만, 대화는 글이라 줄이 길면 다음 줄을 눈으로 찾다가
       // 이해가 떨어진다(권장 한 줄 45~75자 ≈ 660~780px). 실측 1056px은 한글 약 90자로 너무 길었다.
@@ -538,7 +558,8 @@
     document.body.classList.remove("shell-popped");
     var acc = document.getElementById("accConsole");
     if (acc) {
-      acc.style.left = ""; acc.style.right = "";
+      // top도 반드시 지운다 — 안 지우면 팝업을 닫은 뒤에도 컴포저가 화면 중간에 붙어 있다.
+      acc.style.left = ""; acc.style.right = ""; acc.style.top = "";
       var rows = acc.querySelector(".cl-rows");
       if (rows) rows.style.maxHeight = ""; // 확장했던 이력 높이 원복
     }

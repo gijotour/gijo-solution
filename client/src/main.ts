@@ -588,18 +588,36 @@ function downloadToFile(urlStr: string, headers: Record<string, string>, destPat
   });
 }
 
-// 다운로드 → NSIS 설치파일 실행(현재 빌드는 oneClick·조용히 진행되며 설치 후 앱을 자동 재기동) → 종료.
+// 다운로드 → NSIS 설치파일 실행 → 이 앱 종료 → 설치 후 새 버전 자동 실행.
 // 설치 프로그램이 실행 중인 exe를 덮어써야 하므로, spawn 직후 반드시 이 앱을 끝내야 한다.
+//
+// ⚠ 인자 두 개가 반드시 함께 필요하다(2026-07-27 실측으로 확인).
+//   이 빌드는 oneClick=false(마법사형)라 electron-builder의 installSection.nsh가 이렇게 판단한다:
+//       ${if} ${isForceRun} ${andIf} ${Silent} → 앱 실행
+//   즉 **/S(무인)와 --force-run을 둘 다** 줘야 설치 후 앱이 다시 켜진다.
+//   예전에는 인자 없이 띄워서 ① 제품 소개부터 시작하는 설치 마법사가 다시 떴고
+//   ② [마침]을 누르지 않으면 앱이 안 켜졌다. 업데이트는 이미 앱에서 확인을 받았으니
+//   설치 화면을 또 보여줄 이유가 없다 — 조용히 깔고 바로 다시 켠다.
 ipcMain.handle("update:install", async (event, version: string) => {
   if (!authState.serverUrl || !authState.accessToken) throw new Error("로그인이 필요합니다");
   const dest = path.join(os.tmpdir(), `GIJO-AS-Setup-${version}.exe`);
+  // ⚠ 진행률은 **호출한 프레임**으로 보내야 한다. 업데이트 화면은 허브 탭(iframe) 안에 있는데
+  //   webContents.send()는 맨 바깥 프레임에만 닿아, 다운로드는 되면서 막대가 0%에 멈춰 있었다
+  //   (2026-07-27 사용자 지적). senderFrame으로 보내면 그 iframe이 받는다.
+  const sendProgress = (pct: number) => {
+    try {
+      const f = event.senderFrame;
+      if (f) { f.send("update:progress", pct); return; }
+    } catch { /* 프레임이 이미 사라졌으면 아래 폴백 */ }
+    try { event.sender.send("update:progress", pct); } catch { /* 창이 닫혔다 — 무시 */ }
+  };
   await downloadToFile(
     `${authState.serverUrl}/api/client/download/${encodeURIComponent(version)}`,
     { Authorization: `Bearer ${authState.accessToken}` },
     dest,
-    (pct) => event.sender.send("update:progress", pct)
+    sendProgress
   );
-  const child = spawn(dest, [], { detached: true, stdio: "ignore" });
+  const child = spawn(dest, ["/S", "--force-run"], { detached: true, stdio: "ignore" });
   child.unref();
   quitConfirmed = true; // 업데이트 설치를 위한 의도된 종료 — 닫기 확인을 띄우지 않는다
   setTimeout(() => app.quit(), 300); // 설치 프로그램이 뜰 시간을 살짝 준다
