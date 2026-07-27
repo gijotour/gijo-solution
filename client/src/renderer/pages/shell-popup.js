@@ -654,26 +654,113 @@
   dim.addEventListener("click", minimize); // 배경막 클릭 = 대시보드로(모달 관례)
 
   // 아래 모서리 끌어서 높이 조절 — 드래그 중엔 iframe이 마우스를 삼키지 않게 잠시 꺼둔다.
+  //
+  // ⚠ 예전에는 document의 mousemove/mouseup으로 처리했다. 그러면 **놓는 순간을 놓칠 수 있다** —
+  //   창 밖에서 버튼을 떼거나, 드래그 중 앱이 포커스를 잃거나, 다른 창이 위로 올라오면
+  //   mouseup이 안 온다. 그러면 드래그가 영원히 켜진 채로 남아 마우스를 움직일 때마다 팝업이
+  //   따라다니고, 그 상태에서는 **입력칸을 눌러도 클릭이 안 먹는다**(2026-07-27 사용자 지적).
+  //   포인터 캡처를 쓰면 브라우저가 놓는 이벤트를 보장한다. 그래도 빠져나갈 길을 여럿 둔다:
+  //   pointerup · pointercancel · 창 blur · ESC · 감시(아래 watchdog).
   var grip = document.getElementById("shellGrip");
-  grip.addEventListener("mousedown", function (e) {
+  var dragState = null; // { pointerId, startY, startH, at } — 드래그 중일 때만 값이 있다
+
+  function endDrag() {
+    if (!dragState) return;
+    try { grip.releasePointerCapture(dragState.pointerId); } catch (e) {}
+    dragState = null;
+    grip.classList.remove("drag");
+    document.body.style.userSelect = "";
+    // 잠가 둔 iframe을 반드시 되돌린다 — 안 풀면 팝업 안 화면이 안 눌린다.
+    Array.prototype.forEach.call(document.querySelectorAll("#shellBody iframe"), function (f) {
+      f.style.pointerEvents = "";
+    });
+    try { localStorage.setItem(HKEY, String(Math.round(shellH))); } catch (e) {}
+  }
+
+  grip.addEventListener("pointerdown", function (e) {
+    if (e.button !== 0) return;
     e.preventDefault();
-    var startY = e.clientY, startH = layer.offsetHeight;
+    dragState = { pointerId: e.pointerId, startY: e.clientY, startH: layer.offsetHeight, at: Date.now() };
+    try { grip.setPointerCapture(e.pointerId); } catch (err) { /* 캡처 실패해도 아래 안전망이 받는다 */ }
     grip.classList.add("drag");
     document.body.style.userSelect = "none";
-    var frames = document.querySelectorAll("#shellBody iframe");
-    Array.prototype.forEach.call(frames, function (f) { f.style.pointerEvents = "none"; });
-    function mv(ev) { shellH = Math.max(240, startH + (ev.clientY - startY)); layout(); }
-    function up() {
-      document.removeEventListener("mousemove", mv);
-      document.removeEventListener("mouseup", up);
-      grip.classList.remove("drag");
-      document.body.style.userSelect = "";
-      Array.prototype.forEach.call(frames, function (f) { f.style.pointerEvents = ""; });
-      try { localStorage.setItem(HKEY, String(Math.round(shellH))); } catch (e2) {}
-    }
-    document.addEventListener("mousemove", mv);
-    document.addEventListener("mouseup", up);
+    Array.prototype.forEach.call(document.querySelectorAll("#shellBody iframe"), function (f) {
+      f.style.pointerEvents = "none";
+    });
   });
+  grip.addEventListener("pointermove", function (e) {
+    if (!dragState || e.pointerId !== dragState.pointerId) return;
+    dragState.at = Date.now();
+    shellH = Math.max(240, dragState.startH + (e.clientY - dragState.startY));
+    layout();
+  });
+  grip.addEventListener("pointerup", endDrag);
+  grip.addEventListener("pointercancel", endDrag);
+  grip.addEventListener("lostpointercapture", endDrag);
+  window.addEventListener("blur", endDrag);       // 다른 창으로 갔다 = 드래그 끝
+  window.addEventListener("keydown", function (e) { if (e.key === "Escape") endDrag(); });
+  // 감시 — 어떤 이유로든 끝나지 않은 드래그는 3초 뒤 스스로 푼다.
+  setInterval(function () {
+    if (dragState && Date.now() - dragState.at > 3000) endDrag();
+  }, 1000);
+
+  // ── 입력칸 감지 모드 — 못 누르는 상태를 스스로 찾아 되돌린다 ─────────────
+  //
+  // 왜 필요한가: 화면을 이리저리 옮겨 다니다 보면 무엇이 입력칸을 가리거나, 위치가 어긋나거나,
+  // 잠긴 채 남는 일이 생긴다(2026-07-27 사용자 지적). 원인을 하나씩 막는 것과 별개로,
+  // **막혔으면 알아서 풀리는 안전망**을 둔다 — 담당자가 앱을 껐다 켜지 않아도 되게.
+  //
+  // 판정: 입력칸 한가운데에서 맨 위에 잡히는 요소가 입력칸이 아니면 "가려졌다"고 본다.
+  // 고칠 때는 원인 후보를 순서대로 되돌리고, 무엇을 고쳤는지 기록에 남긴다(원인 추적용).
+  var lastHeal = 0;
+  function healComposer() {
+    var inp = document.getElementById("chatInput");
+    var acc = document.getElementById("accConsole");
+    if (!inp || !acc) return;
+    var r = inp.getBoundingClientRect();
+    if (r.width < 2 || r.height < 2) return; // 아직 안 그려짐 — 다음 주기에
+
+    // ⚠ 잠긴 팝업은 입력칸과 무관하게 따로 본다. 크기조절 중이 아닌데 iframe이 잠겨 있으면
+    //   그건 언제나 비정상이다(놓는 순간을 놓친 흔적). 입력칸이 멀쩡해도 팝업 안이 안 눌린다.
+    var locked = [].filter.call(document.querySelectorAll("#shellBody iframe"), function (f) {
+      return f.style.pointerEvents === "none";
+    });
+    var 팝업잠김 = !dragState && locked.length > 0;
+
+    var 화면밖 = r.bottom > window.innerHeight + 2 || r.top < 0 || r.right > window.innerWidth + 2;
+    var top = document.elementFromPoint(Math.round(r.left + r.width / 2), Math.round(r.top + r.height / 2));
+    var 가려짐 = !(top === inp || inp.contains(top) || (top && top.contains(inp)));
+    if (!화면밖 && !가려짐 && !dragState && !팝업잠김) return;
+    if (Date.now() - lastHeal < 2000) return; // 너무 잦은 되돌림 방지
+    lastHeal = Date.now();
+
+    var 한일 = [];
+    if (dragState) { endDrag(); 한일.push("끝나지 않은 크기조절 해제"); }
+    if (locked.length) { locked.forEach(function (f) { f.style.pointerEvents = ""; }); 한일.push("팝업 잠금 해제 " + locked.length); }
+    // 팝업이 없는데 배경막이 남아 있으면 걷어낸다
+    if (!visible && dim.classList.contains("on")) { dim.classList.remove("on"); 한일.push("남은 배경막 제거"); }
+    // 팝업이 없는데 컴포저에 위치가 박혀 있으면 지운다
+    if (!visible && (acc.style.top || acc.style.left || acc.style.right)) {
+      acc.style.top = ""; acc.style.left = ""; acc.style.right = "";
+      한일.push("컴포저 위치 원복");
+    }
+    if (visible) layout(); // 자리 다시 계산
+    if (화면밖 && !visible) { acc.style.top = ""; 한일.push("화면 밖으로 나간 컴포저 복귀"); }
+
+    if (한일.length) {
+      console.warn("[shell] 입력칸이 막혀 스스로 되돌렸습니다:", 한일.join(" · "),
+        "| 가린 요소:", top ? (top.id ? "#" + top.id : top.className || top.tagName) : "(없음)");
+    }
+  }
+  setInterval(healComposer, 1200);
+
+  // 마지막 안전망 — 컴포저 아무 데나 누르면 입력칸에 초점이 간다.
+  // 투명한 무언가가 위에 얹혀 있어도 담당자는 "눌렀는데 안 된다"를 겪지 않는다.
+  document.getElementById("accConsole")?.addEventListener("mousedown", function (e) {
+    if (e.target.closest("button, a, input, textarea, select, .cl-row, .cl-pill")) return;
+    var inp = document.getElementById("chatInput");
+    if (inp) setTimeout(function () { try { inp.focus(); } catch (err) {} }, 0);
+  }, true);
   // 더블클릭 = "지금 보이는 화면에 맞춰 다시" — 예전엔 자동 모드로 되돌리는 뜻이었는데,
   // 높이가 고정으로 바뀐 뒤로는 되돌릴 자동 모드가 없다. 대신 이 화면 기준으로 한 번
   // 다시 재서 그 값으로 고정한다(요약 카드까지). 화면마다 알맞은 크기를 되찾는 길이다.

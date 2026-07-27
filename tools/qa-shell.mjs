@@ -271,12 +271,18 @@ await page.waitForTimeout(500);
 const h0 = await page.evaluate(() => document.getElementById("shellLayer").offsetHeight);
 // 자동 맞춤이 수시로 미세 조정해 실마우스가 손잡이를 빗나간다 — 요소를 직접 잡는 합성 이벤트로
 await page.evaluate(() => {
+  // 손잡이는 포인터 이벤트로 바뀌었다(2026-07-27) — 마우스 이벤트로는 드래그가 시작되지 않는다.
+  // 왜 바꿨나: document의 mouseup은 창 밖에서 버튼을 떼면 오지 않아 드래그가 영원히 켜진 채
+  // 남았고, 그 상태에서는 입력칸 클릭이 안 먹었다. 포인터 캡처는 놓는 이벤트를 보장한다.
   const grip = document.getElementById("shellGrip");
   const r = grip.getBoundingClientRect();
-  const ev = (type, y) => new MouseEvent(type, { bubbles: true, clientX: r.left + r.width / 2, clientY: y });
-  grip.dispatchEvent(ev("mousedown", r.top + 3));
-  document.dispatchEvent(ev("mousemove", r.top + 3 - 200));
-  document.dispatchEvent(ev("mouseup", r.top + 3 - 200));
+  const ev = (type, y) => new PointerEvent(type, {
+    bubbles: true, pointerId: 1, pointerType: "mouse", isPrimary: true, button: 0, buttons: 1,
+    clientX: r.left + r.width / 2, clientY: y,
+  });
+  grip.dispatchEvent(ev("pointerdown", r.top + 3));
+  grip.dispatchEvent(ev("pointermove", r.top + 3 - 200));
+  grip.dispatchEvent(ev("pointerup", r.top + 3 - 200));
 });
 await page.waitForTimeout(300);
 const h1 = await page.evaluate(() => document.getElementById("shellLayer").offsetHeight);
