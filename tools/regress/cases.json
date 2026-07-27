@@ -36,7 +36,7 @@
       "id": "kev-deadline",
       "q": "KEV에 등재된 취약점 조치 기한은 어떤 지침에 근거하고 며칠이야?",
       "expect": [
-        "BOD\\s*22-01",
+        "BOD\\s*22-01|Binding\\s*Operational\\s*Directive\\s*22-01",
         "2주|14일"
       ]
     },
