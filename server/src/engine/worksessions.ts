@@ -12,6 +12,7 @@
 
 import type { Express, Request } from "express";
 import { randomUUID } from "crypto";
+import * as fs from "fs";
 import * as fsp from "fs/promises";
 import * as path from "path";
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from "docx";
@@ -142,8 +143,16 @@ export function getSession(id: string): WorkSession | null {
   return row ? rowToSession(row) : null;
 }
 
-export function listSessions(): SessionSummary[] {
-  const rows = db.prepare("SELECT * FROM work_sessions ORDER BY updatedAt DESC").all() as SessionRow[];
+// 화면에 보여줄 최대 개수. 그보다 오래된 것은 파일로 옮긴다(archiveOldSessions).
+// 왜 자르나: 세션은 대화할 때마다 늘어 실제로 824건까지 쌓였다(2026-07-27 실측).
+// 목록이 길어지면 찾기만 어려워지고, 담당자가 실제로 되짚는 건 최근 것뿐이다.
+// 지우는 게 아니라 **파일로 옮기는** 것이라 나중에 찾아볼 수 있다.
+export const SESSION_KEEP = Number(process.env.GIJO_SESSION_KEEP ?? 100);
+
+export function listSessions(limit = SESSION_KEEP): SessionSummary[] {
+  const rows = db
+    .prepare("SELECT * FROM work_sessions ORDER BY updatedAt DESC LIMIT ?")
+    .all(Math.max(1, limit)) as SessionRow[];
   const countStmt = db.prepare("SELECT COUNT(*) AS n FROM work_session_turns WHERE sessionId = ?");
   const lastStmt = db.prepare("SELECT role, content FROM work_session_turns WHERE sessionId = ? ORDER BY at DESC, rowid DESC LIMIT 1");
   return rows.map((r) => {
@@ -230,6 +239,57 @@ export function pruneSessions(olderThanDays: number): number {
   return ids.length;
 }
 
+// ── 오래된 세션을 파일로 옮기기 ─────────────────────────────────────────
+// 최근 SESSION_KEEP건만 DB에 두고, 그보다 오래된 것은 대화까지 통째로 파일에 적은 뒤 지운다.
+// 형식은 JSONL(한 줄에 세션 하나) — 나중에 사람이 열어 읽을 수도, 도구로 다시 읽을 수도 있다.
+//
+// ⚠ 파일에 다 쓴 것을 **확인한 뒤에만** DB에서 지운다. 순서가 바뀌면 기록이 사라진다.
+export function sessionArchiveDir(): string {
+  return process.env.GIJO_SESSION_ARCHIVE_DIR ?? path.join("data", "session-archive");
+}
+
+export interface ArchiveResult {
+  archived: number;
+  file: string | null;
+  remaining: number;
+}
+
+export function archiveOldSessions(keep = SESSION_KEEP): ArchiveResult {
+  const { n: total } = db.prepare("SELECT COUNT(*) AS n FROM work_sessions").get() as { n: number };
+  if (total <= keep) return { archived: 0, file: null, remaining: total };
+
+  // 최근 keep건을 뺀 나머지(오래된 순으로 골라야 최근 것이 남는다)
+  const rows = db
+    .prepare("SELECT * FROM work_sessions ORDER BY updatedAt DESC LIMIT -1 OFFSET ?")
+    .all(keep) as SessionRow[];
+  if (rows.length === 0) return { archived: 0, file: null, remaining: total };
+
+  const dir = sessionArchiveDir();
+  fs.mkdirSync(dir, { recursive: true });
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const file = path.join(dir, `sessions-${stamp}.jsonl`);
+
+  const turnStmt = db.prepare("SELECT * FROM work_session_turns WHERE sessionId = ? ORDER BY at ASC, rowid ASC");
+  const lines = rows.map((r) => {
+    const turns = (turnStmt.all(r.id) as TurnRow[]).map(rowToTurn);
+    return JSON.stringify({ ...rowToSession(r), turns });
+  });
+  // 먼저 쓰고 디스크에 내려간 것을 확인한 뒤에 지운다.
+  fs.writeFileSync(file, lines.join("\n") + "\n", "utf-8");
+  const written = fs.statSync(file).size;
+  if (written <= 0) throw new Error(`세션 보관 파일이 비어 있습니다 — 삭제를 중단합니다 (${file})`);
+
+  const ids = rows.map((r) => r.id);
+  const tx = db.transaction(() => {
+    for (const id of ids) {
+      db.prepare("DELETE FROM work_session_turns WHERE sessionId = ?").run(id);
+      db.prepare("DELETE FROM work_sessions WHERE id = ?").run(id);
+    }
+  });
+  tx();
+  return { archived: ids.length, file, remaining: total - ids.length };
+}
+
 // 전체 세션 삭제(대화 포함).
 export function deleteAllSessions(): number {
   const { n } = db.prepare("SELECT COUNT(*) AS n FROM work_sessions").get() as { n: number };
@@ -262,13 +322,22 @@ const AUDIT_KIND_LABEL: Record<string, string> = {
 // 담당자가 한 일이 아니라 시스템이 스스로 남긴 기록은 세션 목록에 넣지 않는다 — 목록이 도배된다.
 // (2026-07-26: "오래 걸린 요청을 리포트로 저장"이 세션 목록에 [실행] long_answer_saved로 쌓였다.
 //  그 요청 자체는 이미 담당자의 세션으로 남아 있어 같은 일이 두 번 보이는 셈이었다.)
+// ⚠ 세션 자체를 손대는 행위는 반드시 제외해야 한다 — 안 그러면 스스로를 먹는 고리가 된다.
+//   세션 삭제 → 감사 기록 → 이 훅이 새 세션 생성 → 그것도 지우면 또 새 세션…
+//   실제로 목록이 "[실행] 작업 세션 삭제 — [실행] 작업 세션 삭제 — …"로 재귀 제목이 되어 있었고,
+//   테스트 세션 2,100건을 지워도 총계가 824건 그대로였다(2026-07-27 정리 중 발견).
+//   보관(archive)도 같은 이유로 제외한다.
 const SESSION_EXCLUDED_ACTIONS = new Set(["long_answer_saved"]);
+// 문자열을 하나씩 나열하면 나중에 행위가 늘 때 빠뜨린다 — 접두사로 통째로 막는다.
+// "작업 세션"으로 시작하는 행위(삭제·전체 삭제·정리·보관…)는 세션으로 만들지 않는다.
+const SESSION_SELF_ACTION_RE = /^작업\s*세션/;
 onAudit((e) => {
   if (e.kind === "auth") return;
   // config = 전 메뉴 사용 기록(activityaudit 미들웨어). 요청마다 하나씩 남으므로 세션으로 옮기면
   // 목록이 도배된다 — 감사 화면에서만 본다(2026-07-26 테스트가 잡아냈다: 세션 27→28).
   if (e.kind === "config") return;
   if (SESSION_EXCLUDED_ACTIONS.has(e.action)) return;
+  if (SESSION_SELF_ACTION_RE.test(e.action)) return; // 스스로를 먹는 고리 차단(위 주석 참고)
   try {
     const title = `[${AUDIT_KIND_LABEL[e.kind] ?? e.kind}] ${e.action}${e.target ? " — " + e.target : ""}`.slice(0, 90);
     const s = createSession(title, undefined, e.actor ?? "시스템");
@@ -311,6 +380,13 @@ if (process.env.GIJO_DB_PATH !== ":memory:" && process.env.NODE_ENV !== "test") 
       if (n > 0) console.log(`[worksessions] 30분 무대화 세션 ${n}건 자동 완료`);
     } catch (e) {
       console.error("[worksessions] 자동 완료 스위프 실패:", e instanceof Error ? e.message : e);
+    }
+    // 보관은 따로 감싼다 — 보관이 실패해도 자동 완료는 계속되어야 한다(그 반대도 마찬가지).
+    try {
+      const r = archiveOldSessions();
+      if (r.archived > 0) console.log(`[worksessions] 오래된 세션 ${r.archived}건을 파일로 옮김 → ${r.file} (남은 ${r.remaining}건)`);
+    } catch (e) {
+      console.error("[worksessions] 세션 보관 실패(기록은 그대로 남습니다):", e instanceof Error ? e.message : e);
     }
   }, 5 * 60 * 1000);
   timer.unref?.(); // 이 타이머가 프로세스 종료를 막지 않게
@@ -424,6 +500,16 @@ export function registerWorkSessionRoutes(app: Express): void {
   });
   app.post("/api/work-sessions/delete-all", authMiddleware, (_req, res) => {
     res.json({ deleted: deleteAllSessions() });
+  });
+  // 오래된 세션을 지금 바로 파일로 옮긴다(평소엔 5분 스위프가 알아서 한다).
+  // keep을 주면 그만큼만 남긴다 — 기본은 SESSION_KEEP(100).
+  app.post("/api/work-sessions/archive", authMiddleware, (req, res) => {
+    try {
+      const keep = Number(req.body?.keep);
+      res.json(archiveOldSessions(Number.isFinite(keep) && keep >= 1 ? keep : SESSION_KEEP));
+    } catch (e) {
+      res.status(500).json({ error: (e as Error).message });
+    }
   });
 
   app.delete("/api/work-sessions/:id", authMiddleware, (req, res) => {

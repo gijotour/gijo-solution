@@ -172,11 +172,14 @@
 <div class="v3-main">
   <!-- 작업 세션 요약 — "지금 뭐가 돌고 있나"를 먼저 보여 준다(2026-07-27).
        값은 아래 목록 데이터로 계산한다(추가 서버 호출 없음). -->
+  <!-- 목록은 서버가 최근 100건만 준다(2026-07-27). 그보다 오래된 세션은 지워진 게 아니라
+       data/session-archive/ 아래 파일로 옮겨져 있다 — 아래 안내 줄이 그 사실을 말해 준다. -->
   <div class="ws-sum" data-gijo-summary style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:14px;">
     <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:13px 15px;"><div style="font-size:11px;color:var(--muted);margin-bottom:5px;">진행중</div><div style="font-size:19px;font-weight:800;color:var(--teal);" id="wsActive">-</div></div>
     <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:13px 15px;"><div style="font-size:11px;color:var(--muted);margin-bottom:5px;">오늘 생성</div><div style="font-size:19px;font-weight:800;color:#fff;" id="wsToday">-</div></div>
     <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:13px 15px;"><div style="font-size:11px;color:var(--muted);margin-bottom:5px;">완료</div><div style="font-size:19px;font-weight:800;color:var(--muted);" id="wsDone">-</div></div>
   </div>
+  <div id="wsArchiveNote" style="display:none;font-size:11px;color:var(--muted-2);margin:-6px 0 12px 2px;"></div>
   <div class="topbar-row">
     <div>
       <div class="page-title">💬 작업 세션</div>
@@ -363,6 +366,17 @@
     set("wsActive", sessions.filter((s) => s.status === "active").length);
     set("wsToday", sessions.filter((s) => new Date(s.createdAt || s.updatedAt) >= today).length);
     set("wsDone", sessions.filter((s) => s.status === "done").length);
+
+    // 목록이 상한(100)에 닿았으면 "더 있는데 안 보이는" 상태다 — 어디로 갔는지 말해 준다.
+    // 말 안 하면 담당자는 예전 세션이 지워진 줄 안다(실제로는 파일로 옮겨져 있다).
+    const note = document.getElementById("wsArchiveNote");
+    if (note) {
+      const capped = sessions.length >= 100;
+      note.textContent = capped
+        ? "최근 100건만 보입니다 — 그보다 오래된 세션은 서버의 data/session-archive/ 폴더에 파일로 보관돼 있습니다."
+        : "";
+      note.style.display = capped ? "block" : "none";
+    }
   }
 
   // ── 대화(선택된 세션) ────────────────────────────────────────────────
