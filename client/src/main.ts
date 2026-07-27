@@ -581,7 +581,17 @@ function downloadToFile(urlStr: string, headers: Record<string, string>, destPat
       });
       res.pipe(file);
       file.on("finish", () => file.close(() => resolve()));
-      file.on("error", reject);
+      // 시스템 오류 코드(EBUSY·ENOSPC 등)가 그대로 화면에 나가면 담당자가 뭘 해야 할지 모른다.
+      // 무엇이 막혔고 어떻게 풀지를 한국어로 알려 준다.
+      file.on("error", (err: NodeJS.ErrnoException) => {
+        if (err.code === "EBUSY" || err.code === "EPERM") {
+          reject(new Error("설치 파일을 저장하지 못했습니다 — 이전 설치 프로그램이 아직 실행 중일 수 있습니다. 그 창을 닫고 다시 시도하세요."));
+        } else if (err.code === "ENOSPC") {
+          reject(new Error("디스크 공간이 부족해 설치 파일을 받지 못했습니다 (약 200MB 필요)."));
+        } else {
+          reject(err);
+        }
+      });
       res.on("error", reject);
     });
     req.on("error", reject);
@@ -600,7 +610,20 @@ function downloadToFile(urlStr: string, headers: Record<string, string>, destPat
 //   설치 화면을 또 보여줄 이유가 없다 — 조용히 깔고 바로 다시 켠다.
 ipcMain.handle("update:install", async (event, version: string) => {
   if (!authState.serverUrl || !authState.accessToken) throw new Error("로그인이 필요합니다");
-  const dest = path.join(os.tmpdir(), `GIJO-AS-Setup-${version}.exe`);
+  // ⚠ 받는 파일 이름을 버전마다 고정하면 안 된다(2026-07-27 실사고).
+  //   앞서 받다 만 파일이나 아직 떠 있는 설치 프로그램이 그 파일을 잡고 있으면
+  //   덮어쓰기가 EBUSY로 죽는다 — 담당자 화면에 영문 오류가 그대로 나갔다
+  //   ("EBUSY: resource busy or locked, open '...GIJO-AS-Setup-3.6.1.exe'").
+  //   매번 다른 이름으로 받으면 남의 파일을 건드릴 일이 없다.
+  const dest = path.join(os.tmpdir(), `GIJO-AS-Setup-${version}-${Date.now()}.exe`);
+  // 지난 번에 남은 설치 파일은 지워 둔다(용량 회수). 잠겨 있으면 그냥 넘어간다 —
+  // 여기서 실패한다고 이번 업데이트를 막을 이유가 없다.
+  try {
+    for (const f of fs.readdirSync(os.tmpdir())) {
+      if (!/^GIJO-AS-Setup-.*\.exe$/i.test(f)) continue;
+      try { fs.unlinkSync(path.join(os.tmpdir(), f)); } catch { /* 잠김 — 다음에 */ }
+    }
+  } catch { /* 임시 폴더를 못 읽어도 진행 */ }
   // ⚠ 진행률은 **호출한 프레임**으로 보내야 한다. 업데이트 화면은 허브 탭(iframe) 안에 있는데
   //   webContents.send()는 맨 바깥 프레임에만 닿아, 다운로드는 되면서 막대가 0%에 멈춰 있었다
   //   (2026-07-27 사용자 지적). senderFrame으로 보내면 그 iframe이 받는다.
