@@ -118,6 +118,36 @@
         try { window.gijo.reportPopoutTab(tab.page, tabLabel); } catch (e) {}
       }
     }
+    // ── 탭 화면에 데이터가 안 들어오는 것을 스스로 고친다 ─────────────────────
+    //
+    // 무슨 문제였나: 탭은 iframe이고, 그 안 페이지가 서버와 대화하려면 preload(window.gijo)가
+    // 실려야 한다. Electron이 이 주입을 간헐적으로 빠뜨린다(실측). 그러면 화면 틀은 그려지는데
+    // **데이터가 영영 안 들어온다** — 담당자에겐 "빈 화면"으로 보인다.
+    //
+    // ⚠ 여태 이 치유는 대시보드 팝업 셸(shell-popup.js)에만 있었다. 그래서 **분리창과
+    //   전체화면 허브는 무방비**였다(2026-07-28 사용자 지적: "별도 팝업에 데이터가 안 나온다").
+    //   프레임을 만드는 주인이 여기(hub.html)이므로 치유도 여기 둔다 — 세 경우가 한 번에 덮인다.
+    //
+    // 한 프레임당 두 번까지만 다시 읽는다. 무한 새로고침은 빈 화면보다 나쁘다.
+    // ⚠ frames 맵이 아니라 **화면에 실제로 있는 프레임**을 훑는다. 맵에만 의존하면
+    //   나중에 다른 경로로 붙은 프레임을 놓치고, 시험으로 확인하기도 어렵다.
+    const HEAL_MAX = 2;
+    function healFrames() {
+      body.querySelectorAll(".hub-frame").forEach((f) => {
+        try {
+          const d = f.contentDocument;
+          if (!d || d.readyState !== "complete") return;      // 아직 읽는 중
+          if (f.contentWindow.gijo) { f.dataset.healed = ""; return; } // 정상
+          const n = Number(f.dataset.healTries || 0);
+          if (n >= HEAL_MAX) return;
+          f.dataset.healTries = String(n + 1);
+          console.warn("[hub] 탭에 연결 통로가 안 실렸습니다 — 다시 읽습니다:", f.src.split("/").pop(), `(${n + 1}/${HEAL_MAX})`);
+          f.src = f.src;
+        } catch (e) { /* 교차 출처 등 — 건드리지 않는다 */ }
+      });
+    }
+    setInterval(healFrames, 1500);
+
     // 팝업 셸이 보낸 "챗봇 열기"를 지금 보이는 탭 프레임으로 중계한다(위젯은 탭 페이지에 있다).
     window.addEventListener("message", (ev) => {
       if (ev && ev.data && ev.data.type === "gijo:openChat" && current) {
