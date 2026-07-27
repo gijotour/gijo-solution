@@ -17,7 +17,7 @@ import express from "express";
 import { authMiddleware, adminMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { db, migrate } from "../db";
-import { recordAudit } from "./audit";
+import { recordAudit, listAudit } from "./audit";
 import type { GijoUser } from "../auth/users";
 
 migrate(
@@ -128,7 +128,30 @@ export function registerClientReleaseRoutes(app: Express): void {
       res.status(404).json({ error: "설치 파일을 찾을 수 없습니다" });
       return;
     }
+    // 누가 어떤 버전을 받았는지 남긴다(2026-07-28 사용자 요청).
+    // 게시·삭제는 기록이 있었는데 **받는 것만 없어서**, 어느 담당자가 어느 판을 쓰는지
+    // 알 길이 없었다. 업데이트 화면이 이 기록을 그대로 보여 준다.
+    // kind는 config로 둔다 — 작업 세션 목록에 쌓이지 않는 종류다(세션 도배 방지).
+    const who = (req as Request & { user?: GijoUser }).user;
+    recordAudit({
+      kind: "config",
+      actor: actorOf(req),
+      action: "클라이언트 업데이트 받음",
+      target: r.version,
+      detail: who?.displayName ? `이름 ${who.displayName}` : undefined,
+      result: "ok",
+    });
     res.download(filePath, r.filename);
+  });
+
+  // 어떤 계정이 어떤 버전을 받았는지 — 업데이트 화면이 읽어 간다.
+  // 관리자만 본다: 다른 담당자가 무엇을 쓰는지는 운영 정보다.
+  app.get("/api/client/download-log", authMiddleware, adminMiddleware, (_req, res) => {
+    const rows = listAudit({ kind: "config", limit: 1000 })
+      .filter((e) => e.action === "클라이언트 업데이트 받음")
+      .slice(0, 50)
+      .map((e) => ({ at: e.at, actor: e.actor, version: e.target, detail: e.detail }));
+    res.json({ downloads: rows });
   });
 
   app.post(

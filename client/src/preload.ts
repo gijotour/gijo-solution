@@ -375,6 +375,7 @@ const gijoApi = {
     install: (version: string) => ipcRenderer.invoke("update:install", version) as Promise<{ ok: boolean }>,
     onProgress: (cb: (pct: number) => void) => ipcRenderer.on("update:progress", (_e, pct: number) => cb(pct)),
     listReleases: () => api.clientReleaseApi.listAll(),
+    downloadLog: () => api.clientReleaseApi.downloadLog(),
   },
   // 로그인 히스토리(접근 서버·ID·PW) — 빠른 선택용. PW는 메인 프로세스가 OS 키체인으로 암호화 저장.
   creds: {

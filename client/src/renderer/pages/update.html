@@ -113,6 +113,17 @@ td{padding:9px 6px;border-bottom:1px solid var(--border);}
       </table>
     </div>
 
+    <!-- 누가 어떤 판을 받았는지 — 예전엔 게시·삭제만 기록되고 '받은 것'은 남지 않아
+         어느 담당자가 어느 버전을 쓰는지 알 길이 없었다(2026-07-28 사용자 요청). -->
+    <div class="panel" id="downloadLogPanel" style="display:none;max-width:820px" data-gijo-fold="받은 기록">
+      <div class="panel-title">누가 받았나(관리자)</div>
+      <div class="panel-sub">담당자가 업데이트를 내려받은 기록입니다. 어느 PC가 아직 옛 버전인지 가늠할 때 씁니다.</div>
+      <table>
+        <tr><th>받은 사람</th><th>버전</th><th>받은 일시</th></tr>
+        <tbody id="downloadRows"><tr><td colspan="3" style="color:var(--muted)">불러오는 중…</td></tr></tbody>
+      </table>
+    </div>
+
     <div class="footer">
       <img src="https://gijo.ai/_nuxt/logo_gijo_only_white.ATZVOJtw.svg" alt="GIJO">
       <span>© 2026 GIJO Technology · GIJO AS Platform · Confidential</span>
@@ -239,6 +250,26 @@ td{padding:9px 6px;border-bottom:1px solid var(--border);}
         : '<tr><td colspan="4" style="color:var(--muted)">게시된 배포판이 없습니다</td></tr>';
     } catch (e) {
       rows.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">불러오지 못했습니다</td></tr>';
+    }
+
+    // 받은 기록 — 서버가 다운로드 요청마다 남긴다. 아직 아무도 안 받았으면 그렇게 말한다.
+    document.getElementById("downloadLogPanel").style.display = "";
+    const dlRows = document.getElementById("downloadRows");
+    try {
+      const d = await window.gijo.update.downloadLog();
+      const list = d.downloads || [];
+      dlRows.innerHTML = list.length
+        ? list
+            .map((x) => {
+              // detail에 "이름 홍길동" 형태로 표시 이름이 들어 있다 — 있으면 아이디 옆에 붙인다.
+              const nm = /이름\s+(.+)$/.exec(x.detail || "")?.[1];
+              return `<tr><td>${esc(x.actor || "-")}${nm ? ` <span style="color:var(--muted-2)">(${esc(nm)})</span>` : ""}</td>` +
+                `<td>${esc(x.version || "-")}</td><td>${new Date(x.at).toLocaleString("ko-KR")}</td></tr>`;
+            })
+            .join("")
+        : '<tr><td colspan="3" style="color:var(--muted)">아직 받은 기록이 없습니다 — 이 기능이 들어간 뒤부터 쌓입니다</td></tr>';
+    } catch (e) {
+      dlRows.innerHTML = '<tr><td colspan="3" style="color:var(--muted)">불러오지 못했습니다</td></tr>';
     }
   }
 

@@ -1239,6 +1239,11 @@ export const clientReleaseApi = {
   checkLatest: (currentVersion: string) => request<ClientUpdateCheckResult>(`/api/client/latest-release?current=${encodeURIComponent(currentVersion)}`),
   // 관리자 전용 — 게시 이력 전체(update.html의 관리자 패널).
   listAll: () => request<{ releases: ClientReleaseFull[] }>("/api/client/releases"),
+  // 관리자 전용 — 누가 어떤 버전을 받았는지(2026-07-28 신설). 어느 PC가 아직 옛 버전인지 가늠용.
+  downloadLog: () =>
+    request<{ downloads: { at: number; actor: string | null; version: string | null; detail: string | null }[] }>(
+      "/api/client/download-log"
+    ),
 };
 
 // ── 계정 관리 (admin 전용 목록/생성/삭제, 본인 비밀번호 변경은 누구나) ──────
