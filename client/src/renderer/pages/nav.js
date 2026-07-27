@@ -78,6 +78,10 @@
     ]},
     { id: "ai", ic: "🤖", label: "AI", items: [
       { page: "hub.html?g=aiteam", label: "AI 팀" },
+      // 팀 사무실 — 예전엔 오른쪽 가장자리 세로 탭이었고, 그걸 없앤 뒤로는 'AI 팀' 허브의
+      // 두 번째 탭에만 있어 두 번 눌러야 나왔다("안 보인다" 지적, 2026-07-27).
+      // 별도 창으로 바로 여는 항목이라 여기 직접 둔다 — 한 번 클릭.
+      { office: true, label: "🏢 팀 사무실 (창)" },
       { page: "hub.html?g=aiknowledge", label: "AI 지식·모델", bot: true, popup: true },
       { page: "redteam.html", label: "레드팀·가드레일", bot: true, popup: true },
     ]},
@@ -186,7 +190,15 @@
       ".gn-item .gn-bot{flex:0 0 auto;font-size:12px;opacity:.7;cursor:pointer;border-radius:6px;padding:1px 5px;line-height:1.4;}" +
       ".gn-item .gn-bot:hover{opacity:1;background:rgba(59,130,246,.22);}" +
       // 업데이트 가능 배지(설정 항목).
-      ".gn-item .gn-upbadge{flex:0 0 auto;background:var(--amber,#f0a020);color:#3a2a00;font-size:9px;font-weight:900;border-radius:20px;padding:1px 6px;}";
+      ".gn-item .gn-upbadge{flex:0 0 auto;background:var(--amber,#f0a020);color:#3a2a00;font-size:9px;font-weight:900;border-radius:20px;padding:1px 6px;}" +
+      // 대시보드 — 다른 화면에서 돌아오는 '집' 자리다. 가장 자주 누르므로 한눈에 찾히게
+      // 테두리를 준다(2026-07-27 사용자 요청). 지금 대시보드에 있으면 이미 .active가 있어
+      // 테두리를 빼서, "돌아갈 곳"일 때만 눈에 띄게 한다.
+      ".gn-item.gn-home{color:#cfe0ff;border:1px solid rgba(59,130,246,.42);background:rgba(59,130,246,.07);margin-bottom:5px;}" +
+      ".gn-item.gn-home:hover{background:rgba(59,130,246,.16);border-color:var(--blue,#3b82f6);color:#fff;}" +
+      // 팝업이 떠 있으면 대시보드는 "돌아갈 곳"이라 누를 수 있어야 한다(아래 클릭 처리).
+      ".gn-item.gn-home.active{cursor:pointer;}" +
+      ".gn-item.gn-home .gn-label::before{content:'🏠 ';}";
     document.head.appendChild(st);
   }
 
@@ -202,7 +214,7 @@
       var gh = document.createElement("div"); gh.className = "gn-g"; gh.textContent = g.label; container.appendChild(gh);
       g.items.forEach(function (it) {
         var el = document.createElement("div");
-        el.className = "gn-item" + (it.page === here ? " active" : "");
+        el.className = "gn-item" + (it.page === here ? " active" : "") + (it.page === "dashboard.html" ? " gn-home" : "");
         var lab = document.createElement("span"); lab.className = "gn-label"; lab.textContent = it.label; el.appendChild(lab);
         if (it.bot) {
           var botMark = document.createElement("span");
@@ -230,8 +242,24 @@
         if (it.page === "hub.html?g=settings" && updateAvailable) {
           var upBadge = document.createElement("span"); upBadge.className = "gn-upbadge"; upBadge.textContent = "1"; upBadge.title = "새 버전 있음"; el.appendChild(upBadge);
         }
+        // 진행중인 작업 세션 개수 — 예전 세로 탭에 붙어 있던 정보다. 탭을 없애면서 같이
+        // 사라졌는데, "몇 건 돌고 있나"는 눌러 보지 않아도 알아야 하는 값이라 되살린다.
+        if (it.page === "sessions.html") {
+          var sBadge = document.createElement("span");
+          sBadge.className = "gn-upbadge gn-sessbadge";
+          sBadge.style.display = "none";
+          sBadge.title = "진행중인 작업 세션";
+          el.appendChild(sBadge);
+        }
         if (it.office) {
           el.addEventListener("click", function () { if (window.gijo && window.gijo.openTeamOffice) window.gijo.openTeamOffice(); });
+        } else if (it.page === "dashboard.html" && it.page === here) {
+          // 팝업 셸에서는 화면을 열어도 주소가 dashboard.html 그대로다. 그래서 '대시보드'가
+          // 늘 현재 페이지로 잡혀 눌러도 아무 일이 없었다 — 정작 팝업을 덮어쓴 상태에서
+          // 돌아가려고 누르는 자리인데(2026-07-27 사용자 지적). 팝업을 접어 준다.
+          el.addEventListener("click", function () {
+            if (window.gijoShell && window.gijoShell.hide) window.gijoShell.hide();
+          });
         } else if (it.page !== here) {
           el.addEventListener("click", function () {
             // 팝업 셸(대시보드)에서는 팝업으로 — 이동하지 않으니 명령창·대화·진행 작업이 유지된다.
@@ -393,6 +421,10 @@
   // embed 모드 — 허브 탭(hub.html)의 iframe으로 품길 때(?embed=1). 사이드바·헤더·드로어를 숨기고
   // 본문만 보인다(허브가 바깥에서 네비·헤더를 제공). 챗봇 위젯은 탭별 화면 맥락이 정확하도록 유지.
   var IS_EMBED = /(^|[?&])embed=1(&|$)/.test(location.search);
+  // 분리창(별도 창) — 이 창은 "한 화면을 크게 보려고" 떼어낸 것이다. 왼쪽 메뉴로 다른 데를
+  // 가려는 창이 아니고(그건 대시보드가 한다), 좁은 폭에서 메뉴가 자리만 먹는다.
+  // 그래서 메뉴를 숨기고 폭을 다 준다(2026-07-27 사용자 지적).
+  var IS_POPOUT = /(^|[?&])popout=1(&|$)/.test(location.search);
   function applyEmbed() {
     loadDesignSystem();
     var st = document.createElement("style");
@@ -409,6 +441,31 @@
       // ⚠ 분리창(별도 창)에서는 대시보드가 없으므로 지우지 않는다 — embed(팝업 안)에서만.
       "#gijoChatWidget{display:none !important;}" +
       ".main{padding-top:16px !important;}";
+    document.head.appendChild(st);
+  }
+
+  // 작업 세션 배지 — 진행중 건수를 메뉴에 띄운다. 0이면 배지를 감춘다("진행중 0"은 알릴 일이 아니다).
+  // 실패해도 조용히 넘어간다 — 배지가 없다고 메뉴가 망가지진 않는다.
+  function refreshSessionBadge() {
+    if (!window.gijo || !window.gijo.listWorkSessions) return;
+    window.gijo.listWorkSessions().then(function (list) {
+      var n = (list || []).filter(function (s) { return s.status === "active"; }).length;
+      document.querySelectorAll(".gn-sessbadge").forEach(function (b) {
+        b.textContent = String(n);
+        b.style.display = n > 0 ? "" : "none";
+      });
+    }).catch(function () {});
+  }
+
+  // 분리창 — 왼쪽 메뉴를 지우고 내용이 창 폭을 다 쓰게 한다. 가장자리 토글도 두지 않는다:
+  // 이 창에서 메뉴를 열 일이 없고(이동은 대시보드에서), 토글만 남으면 그게 또 하나의 조작이 된다.
+  function applyPopout() {
+    var st = document.createElement("style");
+    st.textContent =
+      "#gijoNav{display:none !important;}" +
+      ".app{grid-template-columns:minmax(0,1fr) !important;display:block !important;}" +
+      ".explorer{display:none !important;}" +
+      ".main{padding-left:18px !important;padding-right:18px !important;}";
     document.head.appendChild(st);
   }
 
@@ -434,10 +491,12 @@
     var target = TAB_REDIRECT[currentPage()];
     if (target && window.gijo && window.gijo.navigateTo) { window.gijo.navigateTo(target); return; }
     loadDesignSystem();
+    if (IS_POPOUT) { applyPopout(); loadLongNotice(); return; } // 분리창은 메뉴 없이 내용만
     setupLeftCollapse(); // 왼쪽 접기 인프라(대시보드 포함) — 저장 상태 복원 + 가장자리 탭
     render();
     loadOnboarding();
     loadCommandPanel();
+    refreshSessionBadge();
 
     loadLongNotice();
     checkUpdateBadge();

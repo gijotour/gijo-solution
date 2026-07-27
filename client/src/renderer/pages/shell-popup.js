@@ -46,7 +46,12 @@
     // 배경막 — 팝업·컴포저 틈으로 뒤 대시보드(히어로·AI팀)가 비쳐 지저분한 것을 가린다(실화면 검증에서 발견).
     // 사이드바는 덮지 않는다 — 메뉴를 눌러 다른 팝업을 바로 열 수 있어야 한다. 클릭하면 대시보드로.
     // 어둡기 .93 — 히어로 구체·인사말처럼 밝은 요소는 .82로는 비쳐 보인다(팝업을 줄였을 때 실측).
-    "#shellDim{display:none;position:fixed;z-index:690;background:rgba(6,10,20,.93);}" +
+    // 배경막 — 뒤가 **연하게 비쳐** 보여야 "대시보드 위에 얹힌 창"이라는 게 느껴진다.
+    // ⚠ 예전에 .82 → .93으로 진하게 올린 적이 있다(2b4f76c). 이유는 히어로 구체·인사말 같은
+    //   밝은 요소가 팝업 뒤로 비쳐 어수선했기 때문인데, 그러면서 뒤가 아예 안 보이게 됐다.
+    //   지금은 팝업이 뜨면 그 밝은 요소들을 숨기므로(dashboard.html body.shell-popped)
+    //   원인이 사라졌다 — 다시 연하게 되돌린다(2026-07-27 사용자 지적).
+    "#shellDim{display:none;position:fixed;z-index:690;background:rgba(6,10,20,.78);}" +
     "#shellDim.on{display:block;}" +
     // 팝업 레이어 — 중앙 무대 위에 고정. 위치·크기는 JS가 계산(사이드바·컴포저를 피해서).
     "#shellLayer{display:none;position:fixed;z-index:700;background:var(--panel,#121a2e);border:1px solid var(--border-strong,#28365a);border-radius:12px;box-shadow:0 18px 60px rgba(0,0,0,.65);overflow:hidden;flex-direction:column;}" +
