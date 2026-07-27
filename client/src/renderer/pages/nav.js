@@ -451,7 +451,12 @@
     window.gijo.listWorkSessions().then(function (list) {
       var n = (list || []).filter(function (s) { return s.status === "active"; }).length;
       document.querySelectorAll(".gn-sessbadge").forEach(function (b) {
-        b.textContent = String(n);
+        // 99를 넘으면 99+로 — 세 자리가 되면 배지가 늘어나 옆 글자를 밀어내고, 그쯤 되면
+        // 정확한 숫자는 의미가 없다(배지 설계 통례). QA·회귀가 세션을 만들어 실제로 60건을
+        // 넘긴 적이 있어 남의 일이 아니다.
+        b.textContent = n > 99 ? "99+" : String(n);
+        // 색·숫자만으로는 읽어주는 도구가 뜻을 모른다 — 말로도 남긴다.
+        b.setAttribute("aria-label", "진행중인 작업 세션 " + n + "건");
         b.style.display = n > 0 ? "" : "none";
       });
     }).catch(function () {});

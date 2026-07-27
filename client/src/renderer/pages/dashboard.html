@@ -576,13 +576,17 @@
   body.chatting .hero-hello,body.chatting .hero-sub{display:none;}
   /* 대화가 시작되면 오늘 할 일은 물러난다 — 그때 주인공은 대화다. 다시 보려면 새 세션. */
   body.chatting .today-tasks{display:none !important;}
-  body.shell-popped .today-tasks{display:none !important;}
-  /* 팝업이 뜨면 밝은 요소(구체·인사말·AI팀 아이콘)는 물러난다 — 배경막을 연하게 두려면
-     뒤가 조용해야 한다. 어수선해서 배경막을 진하게 올렸던 이력을 이렇게 되돌린다. */
+  /* 팝업이 떠 있을 때 뒤에 무엇을 남길지 — 두 번 고쳐서 여기까지 왔다(2026-07-27).
+     ① 구체·인사말은 숨긴다. 밝고 움직여서 팝업 뒤로 비치면 어수선하다(원래 배경막을
+        .93까지 올리게 만든 원인이 이것이었다).
+     ② "오늘 할 일"은 **남긴다**. 뒤가 텅 비면 배경막을 아무리 연하게 해도 볼 게 없어서
+        "떠 있다"는 느낌이 안 난다. 정보가 비쳐야 층이 느껴진다.
+        글자는 읽히지 않을 만큼만 흐리게 — 읽으라는 게 아니라 "거기 있다"는 표시다. */
   body.shell-popped .hero-orb,
   body.shell-popped .hero-hello,
   body.shell-popped .hero-sub,
   body.shell-popped .ai-team .ai-team-h{opacity:0;transition:opacity .2s;}
+  body.shell-popped .today-tasks{opacity:.5;transition:opacity .2s;pointer-events:none;}
   body.chatting .ai-team{margin-top:4px !important;}
   body.chatting #accConsole .cl-rows{max-height:52vh;margin-top:10px;}
   body.chatting .center-stage{justify-content:flex-start;padding-top:14px !important;}

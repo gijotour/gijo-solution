@@ -51,7 +51,11 @@
     //   밝은 요소가 팝업 뒤로 비쳐 어수선했기 때문인데, 그러면서 뒤가 아예 안 보이게 됐다.
     //   지금은 팝업이 뜨면 그 밝은 요소들을 숨기므로(dashboard.html body.shell-popped)
     //   원인이 사라졌다 — 다시 연하게 되돌린다(2026-07-27 사용자 지적).
-    "#shellDim{display:none;position:fixed;z-index:690;background:rgba(6,10,20,.78);}" +
+    // ⚠ 이 팝업은 **모달이 아니다** — 뒤에 있는 명령창에 그대로 타이핑할 수 있다.
+    //   모달이 아닌데 배경막을 짙게 깔면 "뒤는 못 쓴다"는 잘못된 신호를 준다.
+    //   표준(Material scrim)도 상황에 맞춰 옅게 쓰라고 한다. .93 → .55로 낮춘다.
+    //   층은 배경막이 아니라 그림자·테두리가 만든다(#shellLayer의 box-shadow).
+    "#shellDim{display:none;position:fixed;z-index:690;background:rgba(6,10,20,.55);}" +
     "#shellDim.on{display:block;}" +
     // 팝업 레이어 — 중앙 무대 위에 고정. 위치·크기는 JS가 계산(사이드바·컴포저를 피해서).
     "#shellLayer{display:none;position:fixed;z-index:700;background:var(--panel,#121a2e);border:1px solid var(--border-strong,#28365a);border-radius:12px;box-shadow:0 18px 60px rgba(0,0,0,.65);overflow:hidden;flex-direction:column;}" +
