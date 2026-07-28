@@ -73,9 +73,10 @@
     "logs.html": "audit.html",
     "llmguide.html": "settings.html?s=ai",      // 추천 모델 목록 → 설정 서버·AI
     "docenrich.html": "memory.html",            // 문서 보강 → 기억·학습에 병합
-    // 허브는 4.0.0에서 없앴다 — 옛 허브 주소로 들어오면 그 허브의 첫 화면으로 보낸다.
-    "hub.html": "dashboard.html",
+    // 허브는 4.0.0에서 없앴다 — 옛 허브 주소로 들어오면 셸로 보낸다.
+    "hub.html": "app.html",
   };
+  window.gijoRedirects = TAB_REDIRECT; // QA가 "죽은 링크인지 흡수처인지" 가릴 때 쓴다
 
   function currentPage() {
     return decodeURIComponent((location.pathname || "").split("/").pop() || "");
@@ -158,9 +159,19 @@
       ".gn-mid{flex:1 1 auto;min-height:0;overflow-y:auto;padding:8px 6px;}"
       + "#gijoNav .gtb-userarea{flex:0 0 auto;position:sticky;bottom:0;background:var(--panel-2,#0e1526);}" +
       ".gn-mid::-webkit-scrollbar{width:5px;} .gn-mid::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:3px;}" +
-      // 그룹 헤더(대문자 스타일 소제목) + 항목(텍스트 중심, 아이콘 최소).
-      ".gn-g{font-size:9.5px;font-weight:800;color:var(--muted-2);letter-spacing:1.2px;margin:12px 10px 5px;}" +
+      // 그룹 헤더 = 트리의 가지. 눌러서 접었다 편다(4.0.0: 허브를 풀어 항목이 30개가 되면서
+      // 한 번에 다 보이면 훑기 어렵다 — 안 쓰는 그룹은 접어 둘 수 있게).
+      ".gn-g{display:flex;align-items:center;gap:6px;font-size:9.5px;font-weight:800;color:var(--muted-2);" +
+      "letter-spacing:1.2px;margin:12px 6px 5px;padding:4px 4px;border-radius:6px;cursor:pointer;user-select:none;}" +
+      ".gn-g:hover{color:var(--blue-light,#7ab0ff);background:rgba(255,255,255,.03);}" +
+      ".gn-g .car{font-size:8px;width:9px;flex:0 0 auto;transition:transform .13s;}" +
+      ".gn-g.open .car{transform:rotate(90deg);}" +
+      ".gn-g .cnt{margin-left:auto;font-size:9px;font-weight:700;color:var(--muted-2);opacity:.75;}" +
+      ".gn-g.open .cnt{opacity:0;}" + // 펼치면 개수는 군더더기 — 눈으로 보인다
       ".gn-g:first-child{margin-top:2px;}" +
+      ".gn-kids{display:block;}" +
+      ".gn-kids.closed{display:none;}" +
+      ".gn-kids .gn-item{padding-left:20px;}" + // 한 칸 들여써서 가지에 달린 것임을 보인다
       ".gn-item{display:flex;align-items:center;gap:7px;padding:8px 11px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:1px;white-space:nowrap;overflow:hidden;}" +
       ".gn-item:hover{color:#fff;background:rgba(255,255,255,.04);}" +
       ".gn-item.active{color:#fff;background:rgba(59,130,246,.14);box-shadow:inset 3px 0 0 var(--blue);cursor:default;}" +
@@ -183,14 +194,51 @@
 
   var updateAvailable = false; // 클라이언트 새 버전 존재 여부(checkUpdateBadge가 채움)
 
-  // 2단(그룹+항목) 메뉴를 container에 렌더한다 — nav 사이드바와 대시보드 '전체메뉴' 모드가 공유하는
-  // 단일 소스(복사본 폐기, 2026-07-25). 3단계 탭은 제거(허브 화면 상단 탭이 그 역할).
+  // 그룹 접힘 상태 — 담당자가 고른 대로 기억한다. 저장이 없으면 전부 펼침(처음엔 다 보여야 찾는다).
+  var FOLD_KEY = "gijo:menu:folded";
+  function foldedSet() {
+    try { return new Set(JSON.parse(localStorage.getItem(FOLD_KEY) || "[]")); } catch (e) { return new Set(); }
+  }
+  function saveFolded(set) {
+    try { localStorage.setItem(FOLD_KEY, JSON.stringify([...set])); } catch (e) {}
+  }
+
+  // 트리 메뉴를 container에 렌더한다 — nav 사이드바와 대시보드 '전체메뉴' 모드가 공유하는 단일 소스.
+  // 4.0.0에서 허브를 풀어 항목이 30개가 되면서, 그룹을 가지처럼 접었다 펼 수 있게 했다
+  // (안 쓰는 그룹은 접어 두면 30개여도 훑기 쉽다 — 2026-07-28 사용자 요청).
   function buildMenu(container) {
     injectCss(); // 대시보드('전체메뉴' 모드)에서 render()를 안 거쳐도 gn-* 스타일이 있게.
     container.innerHTML = "";
     var here = currentKey();
+    var folded = foldedSet();
     GROUPS.forEach(function (g) {
-      var gh = document.createElement("div"); gh.className = "gn-g"; gh.textContent = g.label; container.appendChild(gh);
+      // 지금 보고 있는 화면이 든 가지는 접혀 있어도 펼쳐 준다 — 어디에 있는지 보여야 한다.
+      var hasHere = g.items.some(function (it) { return it.page === here; });
+      var open = hasHere || !folded.has(g.id);
+
+      var gh = document.createElement("div");
+      gh.className = "gn-g" + (open ? " open" : "");
+      gh.setAttribute("role", "button");
+      gh.title = (open ? "접기" : "펼치기") + " — " + g.label;
+      var car = document.createElement("span"); car.className = "car"; car.textContent = "▶";
+      var nm = document.createElement("span"); nm.textContent = g.label;
+      var cnt = document.createElement("span"); cnt.className = "cnt"; cnt.textContent = g.items.length;
+      gh.appendChild(car); gh.appendChild(nm); gh.appendChild(cnt);
+      container.appendChild(gh);
+
+      var kids = document.createElement("div");
+      kids.className = "gn-kids" + (open ? "" : " closed");
+      container.appendChild(kids);
+
+      gh.addEventListener("click", function () {
+        var nowOpen = kids.classList.toggle("closed") === false;
+        gh.classList.toggle("open", nowOpen);
+        gh.title = (nowOpen ? "접기" : "펼치기") + " — " + g.label;
+        var s = foldedSet();
+        if (nowOpen) s.delete(g.id); else s.add(g.id);
+        saveFolded(s);
+      });
+
       g.items.forEach(function (it) {
         var el = document.createElement("div");
         el.className = "gn-item" + (it.page === here ? " active" : "") + (it.page === "dashboard.html" ? " gn-home" : "");
@@ -243,7 +291,7 @@
             go(it.page);
           });
         }
-        container.appendChild(el);
+        kids.appendChild(el);
       });
     });
   }

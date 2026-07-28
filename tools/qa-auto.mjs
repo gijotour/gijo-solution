@@ -432,37 +432,54 @@ async function runClient() {
   await page.addInitScript(stub);
   const open = async (rel) => { await page.goto("file://" + path.join(PAGES, rel).replace(/\\/g, "/")); await page.waitForTimeout(1200); };
 
-  await scenario("QA-C01", "메뉴 C안", "자산 허브 탭 컨테이너 렌더", {
-    given: "메뉴 C안(32→11항목) 적용 클라에서",
-    when: "hub.html?g=assets 를 열면",
-    then: "탭 4개(통합 뷰·자산 목록·AI-BOM·취약점)와 embed iframe이 뜨고, iframe 안 페이지의 자체 헤더는 숨겨진다",
+  // 4.0.0 — 허브(2단 탭)를 없애고 화면을 셸 탭으로 연다. 겹이 셸→실화면 2겹으로 고정되는 것이
+  // 이 구조의 핵심이다(3겹이던 시절 레이아웃이 0으로 굳어 빈 화면이 됐다 — 2026-07-28).
+  await scenario("QA-C01", "탭 셸", "메뉴를 누르면 화면이 탭으로 열린다(이동 아님)", {
+    given: "탭 셸(app.html)에서",
+    when: "왼쪽 메뉴의 '취약점'을 누르면",
+    then: "주소는 셸 그대로이고 탭이 하나 생기며, 탭 안은 vulnscan.html을 **직접** 품는다(중간에 허브가 없다)",
   }, async () => {
-    await open("hub.html?g=assets");
-    const tabs = await page.evaluate(() => [...document.querySelectorAll(".hub-tab")].map((t) => t.textContent));
-    if (tabs.length !== 4) throw new Error(`탭 ${tabs.length}개`);
-    const src = await page.evaluate(() => document.querySelector(".hub-frame.on")?.getAttribute("src"));
-    if (!/assethub\.html\?embed=1/.test(src || "")) throw new Error(`iframe src=${src}`);
-    const dupHeader = await page.evaluate(() => {
-      const f = document.querySelector(".hub-frame.on");
-      const h = f?.contentDocument?.querySelector(".header");
-      return h ? getComputedStyle(h).display : "none";
+    await open("app.html");
+    await page.waitForTimeout(1500);
+    const before = page.url();
+    await page.evaluate(() => {
+      const it = [...document.querySelectorAll("#gijoNav .gn-item")].find((e) => e.querySelector(".gn-label")?.textContent === "취약점");
+      it?.querySelector(".gn-label").click();
     });
-    if (dupHeader !== "none") throw new Error("iframe 안 헤더가 보임(중복 크롬)");
-    return `탭[${tabs.join("·")}], iframe=${src}, 중복 헤더 없음`;
+    await page.waitForTimeout(1200);
+    if (page.url() !== before) throw new Error(`셸을 떠났다: ${page.url().split("/").pop()}`);
+    const st = await page.evaluate(() => ({
+      탭: [...document.querySelectorAll("#tabBar .tab .nm")].map((t) => t.textContent),
+      활성: document.querySelector("#tabBar .tab.on .nm")?.textContent,
+      src: decodeURIComponent(document.querySelector("#screens iframe.on")?.getAttribute("src") || ""),
+    }));
+    if (!st.탭.includes("취약점")) throw new Error(`탭 없음: ${st.탭.join(",")}`);
+    if (!/^vulnscan\.html\?embed=1/.test(st.src)) throw new Error(`탭 안이 직접 화면이 아님: ${st.src}`);
+    return `탭[${st.탭.join("·")}] 활성=${st.활성}, 안=${st.src}`;
   });
 
-  await scenario("QA-C02", "메뉴 C안", "구주소 자동 리다이렉트", {
-    given: "예전 즐겨찾기·바로가기가 kpi.html을 직접 가리킬 때",
-    when: "kpi.html을 열면",
-    then: "hub.html?g=report&t=kpi.html 로 이동하고 '보안 KPI' 탭이 활성화된다(KPI는 리포트 그룹 — 2026-07-25 이동)",
+  await scenario("QA-C02", "탭 셸", "탭을 옮겨도 앞서 보던 탭이 살아 있다", {
+    given: "화면 두 개를 탭으로 열어 둔 상태에서",
+    when: "다른 탭으로 갔다가 돌아오면",
+    then: "iframe이 그대로 살아 있어 다시 읽히지 않는다(보던 상태가 유지된다 — 팝업을 없앨 수 있는 근거)",
   }, async () => {
-    await open("kpi.html");
+    await page.evaluate(() => {
+      const it = [...document.querySelectorAll("#gijoNav .gn-item")].find((e) => e.querySelector(".gn-label")?.textContent === "자산 목록");
+      it?.querySelector(".gn-label").click();
+    });
+    await page.waitForTimeout(1500);
+    // 살아 있는지 표시를 남기고 탭을 옮겼다 돌아온다 — 리로드되면 표시가 사라진다.
+    await page.evaluate(() => { const f = document.querySelector("#screens iframe.on"); f.contentWindow.__gijoAlive = "표시"; });
+    await page.evaluate(() => [...document.querySelectorAll("#tabBar .tab")].find((t) => t.textContent.includes("취약점"))?.click());
     await page.waitForTimeout(600);
-    const url = page.url();
-    if (!/hub\.html\?g=report&t=kpi\.html/.test(url)) throw new Error(`URL=${url}`);
-    const onTab = await page.evaluate(() => document.querySelector(".hub-tab.on")?.textContent);
-    if (onTab !== "보안 KPI") throw new Error(`활성 탭=${onTab}`);
-    return `kpi.html → ${url.split("/").pop()}, 활성 탭 '보안 KPI'`;
+    await page.evaluate(() => [...document.querySelectorAll("#tabBar .tab")].find((t) => t.textContent.includes("자산 목록"))?.click());
+    await page.waitForTimeout(800);
+    const alive = await page.evaluate(() => {
+      const f = document.querySelector("#screens iframe.on");
+      return { mark: f.contentWindow.__gijoAlive || null, frames: document.querySelectorAll("#screens iframe").length };
+    });
+    if (alive.mark !== "표시") throw new Error("돌아오니 다시 읽혔다(보던 상태 유실)");
+    return `프레임 ${alive.frames}개가 살아 있고 표시가 남아 있다`;
   });
 
   await scenario("QA-C03", "메뉴 C안", "설정 허브 + 업데이트 배지", {
@@ -470,13 +487,15 @@ async function runClient() {
     when: "hub.html?g=settings 를 열면",
     then: "설정 5탭(내 설정·서버·AI·연동·관리자·기록 보기)이 뜨고 사이드바 설정 항목에 업데이트 배지가 표시된다",
   }, async () => {
-    await open("hub.html?g=settings");
-    const tabs = await page.evaluate(() => document.querySelectorAll(".hub-tab").length);
-    // 메뉴 정리(2026-07-25): 사용량·요금·기능 안내 제거, MCP 연동 이동 편입 → 5탭
-    if (tabs !== 5) throw new Error(`탭 ${tabs}개`);
-    const badge = await page.evaluate(() => !!document.querySelector(".gn-upbadge"));
-    if (!badge) throw new Error("업데이트 배지 없음");
-    return `탭 5개 + 업데이트 배지 표시`;
+    await open("app.html");
+    await page.waitForTimeout(1500);
+    const r = await page.evaluate(() => {
+      const labels = [...document.querySelectorAll("#gijoNav .gn-item .gn-label")].map((e) => e.textContent);
+      return { 설정구역: labels.filter((l) => ["내 설정", "서버·AI", "연동", "관리자", "기록 보기"].includes(l)), 배지: !!document.querySelector(".gn-upbadge") };
+    });
+    if (r.설정구역.length !== 5) throw new Error(`설정 구역 ${r.설정구역.length}개: ${r.설정구역.join(",")}`);
+    if (!r.배지) throw new Error("업데이트 배지 없음");
+    return `설정 5구역(${r.설정구역.join("·")}) + 업데이트 배지 표시`;
   });
 
   // 2026-07-27 기대값 현행화: 오른쪽 가장자리 세로 글씨 탭 2개를 없앴다.
@@ -489,7 +508,8 @@ async function runClient() {
     when: "페이지 로드가 끝나면",
     then: "왼쪽 메뉴에 '작업 세션'이 있고, 가장자리 세로 글씨 탭은 하나도 없다",
   }, async () => {
-    await open("hub.html?g=assets");
+    await open("app.html");
+    await page.waitForTimeout(1200);
     const r = await page.evaluate(() => ({
       rail: Boolean(document.getElementById("gijoEdgeRail")),
       menuSess: [...document.querySelectorAll("#gijoNav *")].some((e) => e.children.length === 0 && e.textContent.trim() === "작업 세션"),
@@ -505,62 +525,64 @@ async function runClient() {
     return "메뉴에 작업 세션 있음, 세로 글씨 0개, 팝업 기본 접힘";
   });
 
-  await scenario("QA-C05", "메뉴 C안", "AI 지식·모델 허브 5탭", {
-    given: "AI 계열 화면이 허브 하나로 통합된 뒤(문서 보강은 기억·학습에 병합 — 2026-07-25 메뉴 정리)",
-    when: "hub.html?g=aiknowledge 를 열면",
-    // 2026-07-28 기대값 현행화: 'LLM 가이드' 화면을 없애고 내용을 설정 > 서버·AI >
-    // '추천 모델 목록'으로 옮겼다(받는 자리와 고르는 자리가 갈려 있었다) → 6탭 → 5탭.
-    then: "기억·학습(RAG)/인수인계/온톨로지/학습 루프/LLM 합성 5탭이 뜬다",
+  await scenario("QA-C05", "전체메뉴", "허브를 걷어낸 평평한 메뉴", {
+    given: "4.0.0에서 허브(2단 탭)를 없앤 뒤",
+    when: "셸의 왼쪽 메뉴를 보면",
+    then: "4그룹에 화면이 그대로 늘어서고(약 30개), 허브 주소나 없어진 화면이 남아 있지 않다",
   }, async () => {
-    await open("hub.html?g=aiknowledge");
-    const tabs = await page.evaluate(() => [...document.querySelectorAll(".hub-tab")].map((t) => t.textContent));
-    if (tabs.length !== 5) throw new Error(`탭 ${tabs.length}개: ${tabs.join(",")}`);
-    if (!tabs.some((t) => t.includes("인수인계"))) throw new Error("인수인계 탭 누락");
-    if (tabs.some((t) => t.includes("LLM 가이드"))) throw new Error("LLM 가이드 탭이 아직 있음(설정으로 이관됨)");
-    return `탭 5개: ${tabs.join("·")}`;
+    await open("app.html");
+    await page.waitForTimeout(1500);
+    // 트리 구조 — 그룹 헤더(.gn-g) 다음에 자식 묶음(.gn-kids)이 온다.
+    const m = await page.evaluate(() => {
+      const groups = [...document.querySelectorAll("#gijoNav .gn-g")].map((gh) => ({
+        g: gh.querySelector(".cnt") ? gh.textContent.replace(/\d+$/, "").replace("▶", "").trim() : gh.textContent.trim(),
+        items: [...(gh.nextElementSibling?.querySelectorAll(".gn-item .gn-label") || [])].map((e) => e.textContent),
+      }));
+      return { groups: groups.map((x) => x.g), total: groups.reduce((n, x) => n + x.items.length, 0), all: groups.flatMap((x) => x.items) };
+    });
+    if (m.groups.length !== 4) throw new Error(`그룹 ${m.groups.length}개: ${m.groups.join(",")}`);
+    if (m.total < 28) throw new Error(`항목 ${m.total}개 — 허브가 덜 풀렸다`);
+    // 허브 안에서만 통하던 짧은 이름이 남으면 밖에서 무엇의 '통합 뷰'인지 알 수 없다.
+    for (const bad of ["통합 뷰", "등록부", "유지보수"]) if (m.all.includes(bad)) throw new Error(`홀로 못 서는 이름 남음: ${bad}`);
+    // 없앤 화면이 메뉴에 남아 있으면 눌러도 죽는다.
+    for (const gone of ["LLM 가이드", "MCP 연동", "업데이트", "로그"]) if (m.all.includes(gone)) throw new Error(`없앤 화면이 메뉴에 남음: ${gone}`);
+    return `${m.groups.join("·")} / 항목 ${m.total}개`;
   });
 
-  // 화면이 허브 탭으로 흡수되면 링크는 t=<탭 주소>로 바뀌어야 한다. 허브는 이 값을 탭 주소와
-  // **글자 그대로** 대조하고, 안 맞으면 조용히 첫 탭으로 떨어진다 — 링크가 죽어도 화면은
+  // 코드가 가리키는 화면이 **실제로 있는 파일**인지 전수 대조한다. 링크가 죽어도 화면은
   // 멀쩡히 뜨니 렌더만 보는 스윕으로는 절대 안 잡힌다.
-  // 실사고(2026-07-28): 설정 5탭 재편 뒤에도 링크가 update.html·settings.html 옛 주소로 남아
-  // 왼쪽 아래 '업데이트'를 눌러도 관리자 탭이 아니라 '내 설정'이 열렸다 → "업데이트 화면이 없다".
-  await scenario("QA-C06", "링크 무결성", "허브로 흡수된 화면을 가리키는 링크가 실제 탭과 맞는다", {
-    given: "화면들이 허브 탭으로 흡수된 뒤(설정 5탭 등)",
-    when: "코드에 남아 있는 hub.html?...&t=<주소> 링크를 전부 모아 실제 탭 목록과 대조하면",
-    then: "모든 t= 값이 실존하는 탭 주소와 정확히 일치한다(첫 탭으로 떨어지는 링크가 없다)",
+  // 실사고(2026-07-28): 설정 5구역 재편 뒤에도 링크가 update.html 옛 주소로 남아 '업데이트'를
+  // 눌러도 엉뚱한 곳이 열렸다 → "업데이트 화면이 없다". 4.0.0에서 허브를 없애 딥링크는
+  // 사라졌지만, **없어진 화면을 가리키는 링크**는 여전히 생길 수 있다(hub.html·shell-popup.js처럼).
+  await scenario("QA-C06", "링크 무결성", "navigateTo가 가리키는 화면이 실제로 있다", {
+    given: "허브를 걷어내 화면이 곧 주소가 된 뒤",
+    when: "코드의 navigateTo(\"…\") 대상을 전부 모아 실제 파일 목록과 대조하면",
+    then: "모두 존재하는 화면이거나, nav.js가 흡수처로 돌려보내는 옛 주소다(죽은 링크 없음)",
   }, async () => {
     const pagesDir = path.join(ROOT, "client", "src", "renderer", "pages");
     const files = fs.readdirSync(pagesDir).filter((f) => /\.(html|js)$/.test(f));
-    // 허브별 실제 탭 주소 — nav.js의 정의를 그대로 읽어 온다(단일 소스).
-    await open("hub.html?g=settings");
-    const hubs = await page.evaluate(() => {
-      const out = {};
-      for (const g in window.gijoHubs) out[g] = (window.gijoHubs[g].tabs || []).filter((t) => t.page).map((t) => t.page);
-      return out;
-    });
+    const exists = new Set(files.filter((f) => f.endsWith(".html")));
+    // 없어진 화면을 되돌려 보내는 표(nav.js TAB_REDIRECT) — 여기 있으면 죽은 링크가 아니다.
+    await open("app.html");
+    await page.waitForTimeout(1200);
+    const redirects = await page.evaluate(() => Object.keys(window.gijoRedirects || {}));
     const bad = [];
     let checked = 0;
     for (const f of files) {
       const src = fs.readFileSync(path.join(pagesDir, f), "utf8");
-      // "hub.html?g=<허브>&t=" 뒤에 오는 리터럴 주소(따옴표 안)만 본다. 변수로 만든 건 건너뛴다.
-      const re = /hub\.html\?g=([a-z]+)&t=([^"'`+)\s]+)/g;
+      const re = /navigateTo\(\s*["'`]([^"'`]+)["'`]/g;
       let m;
       while ((m = re.exec(src))) {
-        const [, g, rawT] = m;
-        let t = rawT;
-        try { t = decodeURIComponent(rawT); } catch (e) {}
+        const target = m[1].split("?")[0];
+        if (!target.endsWith(".html")) continue;   // 변수 조합 등은 건너뛴다
         checked++;
-        if (!hubs[g]) { bad.push(`${f}: 없는 허브 g=${g}`); continue; }
-        if (!hubs[g].includes(t)) bad.push(`${f}: t=${t} → g=${g} 탭에 없음(첫 탭으로 떨어짐)`);
+        if (!exists.has(target) && !redirects.includes(target)) bad.push(`${f}: → ${target} (없는 화면)`);
       }
     }
-    // ⚠ 아무것도 못 찾으면 그건 통과가 아니라 **검사기가 고장 난 것**이다(정규식·경로 변경 등).
-    //   실패할 수 없는 검사는 QA가 아니다.
-    if (checked === 0) throw new Error("t= 링크를 하나도 못 찾음 — 검사기 자체가 고장(정규식/경로 확인)");
+    // ⚠ 아무것도 못 찾으면 통과가 아니라 **검사기가 고장 난 것**이다. 실패할 수 없는 검사는 QA가 아니다.
+    if (checked === 0) throw new Error("navigateTo 링크를 하나도 못 찾음 — 검사기 자체가 고장(정규식/경로 확인)");
     if (bad.length) throw new Error(bad.join(" / "));
-    const total = Object.values(hubs).reduce((n, a) => n + a.length, 0);
-    return `링크 ${checked}개 전수 대조 통과 (허브 ${Object.keys(hubs).length}개·탭 ${total}개 기준)`;
+    return `링크 ${checked}개 전수 대조 통과 (화면 ${exists.size}개 + 흡수처 ${redirects.length}개 기준)`;
   });
 
   // ⚠ "관리자 탭에 업데이트가 펼쳐져 보이는가"는 여기(헤드리스 client 계층)에 두지 않는다.
