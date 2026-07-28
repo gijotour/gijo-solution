@@ -503,15 +503,16 @@ async function runClient() {
     return `설정 5구역(${r.설정구역.join("·")}) + 업데이트 배지 표시`;
   });
 
-  // 2026-07-27 기대값 현행화: 오른쪽 가장자리 세로 글씨 탭 2개를 없앴다.
-  //   · "작업 세션" → 왼쪽 메뉴 '관제 > 작업 세션'(sessions.html)
-  //   · "AI 라이브 오피스" → 'AI 팀 > 팀 사무실(창)'과 같은 것이라 개념이 둘로 나뉘어 있었다
-  // 세로로 눕힌 글씨는 읽는 데만 시간이 걸린다는 판단(실화면 점검). 팝업 몸통은 남아 있고
-  // window.gijoOpenSessions/OpenOffice로 부를 수 있다 — 상시 노출되는 입구만 없앴다.
-  await scenario("QA-C04", "작업 세션", "작업 세션은 왼쪽 메뉴에 있고 세로 글씨 탭은 없다", {
-    given: "허브 화면(임베드 아님, 최상위)에서",
+  // 4.0.0 기대값 현행화: 오른쪽 숨은 팝업(commandpanel.js)을 통째로 삭제했다.
+  //   · "작업 세션" → 왼쪽 메뉴 맨 위 고정(sessions.html) — 정식 화면이다
+  //   · "AI 라이브 오피스" → '🏢 팀 사무실 (창)'과 같은 것이라 개념이 둘로 나뉘어 있었다
+  // 2026-07-27에 입구인 가장자리 세로 탭을 먼저 없앴고, 그때는 팝업 몸통을 남겨 뒀다.
+  // 그 결과 **아무도 못 여는 숨은 DOM과 iframe**이 전 화면에 실렸다 — 4.0.0의 "내부 팝업
+  // 전체 삭제" 지시에 따라 파일째 걷어냈다. 이 검사는 그게 되살아나지 않는지를 지킨다.
+  await scenario("QA-C04", "작업 세션", "작업 세션은 메뉴에 있고 숨은 팝업은 없다", {
+    given: "셸(app.html)에서",
     when: "페이지 로드가 끝나면",
-    then: "왼쪽 메뉴에 '작업 세션'이 있고, 가장자리 세로 글씨 탭은 하나도 없다",
+    then: "왼쪽 메뉴에 '작업 세션'이 있고, 가장자리 세로 탭도 숨은 팝업 몸통도 하나도 없다",
   }, async () => {
     await open("app.html");
     await page.waitForTimeout(1200);
@@ -519,15 +520,19 @@ async function runClient() {
       rail: Boolean(document.getElementById("gijoEdgeRail")),
       menuSess: [...document.querySelectorAll("#gijoNav *")].some((e) => e.children.length === 0 && e.textContent.trim() === "작업 세션"),
       vertical: [...document.querySelectorAll("*")].filter((e) => getComputedStyle(e).writingMode.startsWith("vertical") && e.offsetParent).length,
-      openApi: typeof window.gijoOpenSessions === "function",
-      open: document.getElementById("gijoCmdPanel")?.classList?.contains("on") ?? false,
+      // 숨은 팝업의 흔적 — 스크립트·패널·오피스 iframe·전역 함수 어느 하나도 남으면 안 된다
+      잔재: [
+        document.getElementById("gijoCmdScript") && "commandpanel 스크립트",
+        document.getElementById("gijoCmdPanel") && "작업세션 팝업 몸통",
+        document.getElementById("gijoOfficePop") && "오피스 팝업 몸통",
+        typeof window.gijoOpenSessions === "function" && "gijoOpenSessions 전역",
+      ].filter(Boolean),
     }));
     if (r.rail) throw new Error("가장자리 레일이 아직 있음");
     if (!r.menuSess) throw new Error("왼쪽 메뉴에 '작업 세션' 없음");
     if (r.vertical > 0) throw new Error("세로로 쓴 글씨 " + r.vertical + "개 남음");
-    if (!r.openApi) throw new Error("gijoOpenSessions 함수 없음(팝업 몸통 유실)");
-    if (r.open) throw new Error("기본이 펼침 상태");
-    return "메뉴에 작업 세션 있음, 세로 글씨 0개, 팝업 기본 접힘";
+    if (r.잔재.length) throw new Error("숨은 팝업 잔재: " + r.잔재.join(", "));
+    return "메뉴에 작업 세션 있음, 세로 글씨 0개, 숨은 팝업 잔재 0개";
   });
 
   // 메뉴 CSS는 자바스크립트 문자열을 + 로 이어 붙여 만든다. 중간에 + 하나를 빠뜨리면
