@@ -297,7 +297,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     <!-- 업데이트 — update.html 화면에서 이관(2026-07-28, 설정 통합 ③단계).
          '버전을 올린다'는 관리자의 일이라 계정 관리와 같은 탭에 둔다. -->
-    <div data-sec="admin" class="panel" data-gijo-fold="업데이트">
+    <!-- 기본 펼침 — 업데이트 알림을 눌러 도착하는 자리다. 접혀 있으면 "업데이트 화면이 없다"가 된다. -->
+    <div data-sec="admin" class="panel" data-gijo-fold="업데이트" data-gijo-fold-open>
       <div class="panel-title">업데이트</div>
       <dl class="kv">
         <dt>설치된 버전</dt><dd id="currentVersion">-</dd>

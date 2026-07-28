@@ -116,10 +116,14 @@
     entries.push(e);
 
     var hot = paintBadges(e);
-    // 저장된 선택이 우선. 저장이 없고 위험 신호가 있으면 펼친 채로 시작한다.
+    // 저장된 선택이 우선. 저장이 없으면 위험 신호(hot)나 '기본 펼침' 표시가 있을 때 펼친다.
+    // data-gijo-fold-open — 그 구역을 보러 들어오는 자리라 접혀 있으면 안 되는 것에 붙인다.
+    // (2026-07-28 실사고: 업데이트 알림을 눌러 왔는데 업데이트 구역이 접혀 있어
+    //  "업데이트 화면이 없다"가 됐다. 담당자가 직접 접으면 그 선택은 그대로 존중된다.)
+    var openByDefault = target.hasAttribute("data-gijo-fold-open");
     var saved = null;
     try { saved = localStorage.getItem(KEY_PREFIX + screenKey() + ":" + name); } catch (err) {}
-    setOpen(e, saved === "1" ? true : (saved === "0" ? false : hot), false);
+    setOpen(e, saved === "1" ? true : (saved === "0" ? false : (hot || openByDefault)), false);
 
     function toggle() { setOpen(e, e.target.style.display === "none", true); }
     head.addEventListener("click", toggle);

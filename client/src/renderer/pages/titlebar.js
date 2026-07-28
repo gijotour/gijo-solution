@@ -69,6 +69,15 @@
   var authed = false;
   try { authed = window.gijo && window.gijo.isAuthenticated(); } catch (e) {}
 
+  // ── 설정 허브로 가는 주소는 여기 한 곳에서만 만든다 ──────────────────────────
+  // ⚠ 허브는 t= 값을 탭 주소와 **글자 그대로** 대조하고, 안 맞으면 조용히 첫 탭으로 떨어진다.
+  //   설정 통합(2026-07-28)으로 탭이 settings.html?s=xxx 꼴로 바뀌었는데 여기 링크는
+  //   update.html·settings.html 옛 주소로 남아, 업데이트를 눌러도 '내 설정'이 열렸다
+  //   (2026-07-28 사용자 지적: "업데이트 화면이 안 보인다"). 주소를 흩어 두면 또 어긋나므로 모은다.
+  function settingsTab(page) { return "hub.html?g=settings&t=" + encodeURIComponent(page); }
+  var TAB_UPDATE = settingsTab("settings.html?s=admin"); // 업데이트 패널은 관리자 구역에 있다
+  var TAB_SETTINGS = settingsTab("settings.html?s=ai");  // 쿼리 없는 옛 설정 링크의 흡수처(nav.js와 동일)
+
   // ── 업데이트 알림 상태 — 사용자 영역의 ⬆칩 + ⚙점 배지를 채운다 ──
   var updateInfo = null;
   var updateWatchers = []; // 영역 생성 후 반영할 콜백들
@@ -171,18 +180,18 @@
     if (authed) {
       if (updateInfo) {
         var up = item("⬆", "새 버전 설치 가능", "v" + updateInfo.version, function () {
-          window.gijo.navigateTo("hub.html?g=settings&t=update.html");
+          window.gijo.navigateTo(TAB_UPDATE);
         });
         up.style.background = "rgba(240,160,32,.12)";
         up.style.border = "1px solid rgba(240,160,32,.4)";
         menuEl.appendChild(up);
       } else {
         menuEl.appendChild(item("🔄", "업데이트 확인", ver ? "v" + ver : "", function () {
-          window.gijo.navigateTo("hub.html?g=settings&t=update.html");
+          window.gijo.navigateTo(TAB_UPDATE);
         }));
       }
       menuEl.appendChild(item("⚙", "제품 설정 열기", "", function () {
-        window.gijo.navigateTo("hub.html?g=settings&t=settings.html");
+        window.gijo.navigateTo(TAB_SETTINGS);
       }));
     }
     menuEl.appendChild(item("📋", "진단 정보 복사", "", async function (el) {
@@ -263,7 +272,7 @@
     area.className = "gtb-userarea";
     var upd = document.createElement("div");
     upd.className = "ua-upd";
-    upd.addEventListener("click", function () { window.gijo.navigateTo("hub.html?g=settings&t=update.html"); });
+    upd.addEventListener("click", function () { window.gijo.navigateTo(TAB_UPDATE); });
     area.appendChild(upd);
     var row = document.createElement("div");
     row.className = "ua-row";

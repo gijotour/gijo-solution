@@ -520,6 +520,54 @@ async function runClient() {
     return `탭 5개: ${tabs.join("·")}`;
   });
 
+  // 화면이 허브 탭으로 흡수되면 링크는 t=<탭 주소>로 바뀌어야 한다. 허브는 이 값을 탭 주소와
+  // **글자 그대로** 대조하고, 안 맞으면 조용히 첫 탭으로 떨어진다 — 링크가 죽어도 화면은
+  // 멀쩡히 뜨니 렌더만 보는 스윕으로는 절대 안 잡힌다.
+  // 실사고(2026-07-28): 설정 5탭 재편 뒤에도 링크가 update.html·settings.html 옛 주소로 남아
+  // 왼쪽 아래 '업데이트'를 눌러도 관리자 탭이 아니라 '내 설정'이 열렸다 → "업데이트 화면이 없다".
+  await scenario("QA-C06", "링크 무결성", "허브로 흡수된 화면을 가리키는 링크가 실제 탭과 맞는다", {
+    given: "화면들이 허브 탭으로 흡수된 뒤(설정 5탭 등)",
+    when: "코드에 남아 있는 hub.html?...&t=<주소> 링크를 전부 모아 실제 탭 목록과 대조하면",
+    then: "모든 t= 값이 실존하는 탭 주소와 정확히 일치한다(첫 탭으로 떨어지는 링크가 없다)",
+  }, async () => {
+    const pagesDir = path.join(ROOT, "client", "src", "renderer", "pages");
+    const files = fs.readdirSync(pagesDir).filter((f) => /\.(html|js)$/.test(f));
+    // 허브별 실제 탭 주소 — nav.js의 정의를 그대로 읽어 온다(단일 소스).
+    await open("hub.html?g=settings");
+    const hubs = await page.evaluate(() => {
+      const out = {};
+      for (const g in window.gijoHubs) out[g] = (window.gijoHubs[g].tabs || []).filter((t) => t.page).map((t) => t.page);
+      return out;
+    });
+    const bad = [];
+    let checked = 0;
+    for (const f of files) {
+      const src = fs.readFileSync(path.join(pagesDir, f), "utf8");
+      // "hub.html?g=<허브>&t=" 뒤에 오는 리터럴 주소(따옴표 안)만 본다. 변수로 만든 건 건너뛴다.
+      const re = /hub\.html\?g=([a-z]+)&t=([^"'`+)\s]+)/g;
+      let m;
+      while ((m = re.exec(src))) {
+        const [, g, rawT] = m;
+        let t = rawT;
+        try { t = decodeURIComponent(rawT); } catch (e) {}
+        checked++;
+        if (!hubs[g]) { bad.push(`${f}: 없는 허브 g=${g}`); continue; }
+        if (!hubs[g].includes(t)) bad.push(`${f}: t=${t} → g=${g} 탭에 없음(첫 탭으로 떨어짐)`);
+      }
+    }
+    // ⚠ 아무것도 못 찾으면 그건 통과가 아니라 **검사기가 고장 난 것**이다(정규식·경로 변경 등).
+    //   실패할 수 없는 검사는 QA가 아니다.
+    if (checked === 0) throw new Error("t= 링크를 하나도 못 찾음 — 검사기 자체가 고장(정규식/경로 확인)");
+    if (bad.length) throw new Error(bad.join(" / "));
+    const total = Object.values(hubs).reduce((n, a) => n + a.length, 0);
+    return `링크 ${checked}개 전수 대조 통과 (허브 ${Object.keys(hubs).length}개·탭 ${total}개 기준)`;
+  });
+
+  // ⚠ "관리자 탭에 업데이트가 펼쳐져 보이는가"는 여기(헤드리스 client 계층)에 두지 않는다.
+  //    이 하네스는 preload(window.gijo)도 로그인도 없어서 설정 화면 **안**이 아예 안 그려지고,
+  //    file:// iframe은 서로 다른 출처라 contentDocument도 null이다(2026-07-28 실측).
+  //    실제 앱으로 도는 shell 계층(tools/qa-shell.mjs)에 두었다 — 거기서만 진짜로 확인된다.
+
   await browser.close();
   save("qa-auto-client.json");
 }

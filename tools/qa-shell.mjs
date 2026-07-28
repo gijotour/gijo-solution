@@ -361,7 +361,40 @@ const st9 = await page.evaluate(() => ({
 }));
 ok("모두 닫기 → 바 숨김·초안 유지", st9.slots === 0 && !st9.barShown && st9.draft.includes("남아있어야"), JSON.stringify(st9));
 
-// 12) JS 오류 — preload 주입 플레이크의 1회성 오류(치유 전 프레임 소음)는 구분 집계
+// 12) 업데이트를 보러 온 사람이 업데이트를 볼 수 있는가 — 두 번 깨졌던 자리다(2026-07-28):
+//     ① 링크가 옛 주소(update.html)라 관리자 탭이 아니라 '내 설정'이 열렸고
+//     ② 관리자 탭에 닿아도 업데이트 구역이 접힌 채라 화면에 아무것도 없었다.
+//     둘 다 "화면은 멀쩡히 뜬다"라서 렌더만 보는 스윕으로는 안 잡힌다. 실제 앱·실제 로그인이
+//     있어야 설정 화면 안이 그려지므로 이 검사는 여기(shell)에만 둔다.
+await page.evaluate(() => { try { document.getElementById("sbCloseAll").click(); } catch (e) {} });
+await page.waitForTimeout(600);
+await page.evaluate(() => window.gijo.navigateTo("hub.html?g=settings&t=" + encodeURIComponent("settings.html?s=admin"))).catch(() => {});
+await page.waitForTimeout(1500);
+const setPage = ctx.pages().find((p) => p.url().includes("g=settings"));
+let upd = { err: "설정 허브 페이지 없음" };
+if (setPage) {
+  await setPage.waitForTimeout(4000);
+  upd = await setPage.evaluate(() => {
+    const tab = document.querySelector(".hub-tab.on");
+    const fr = document.querySelector(".hub-frame.on");
+    const d = fr && fr.contentDocument;
+    if (!d) return { err: "탭 프레임 문서 없음" };
+    const panel = [...d.querySelectorAll(".panel")].find((p) => ((p.querySelector(".panel-title") || {}).textContent || "").trim().startsWith("업데이트"));
+    return {
+      탭: tab ? tab.textContent.trim() : null,
+      보임: panel ? !!panel.offsetParent : false,
+      버전: panel && panel.querySelector("#currentVersion") ? panel.querySelector("#currentVersion").textContent.trim() : null,
+    };
+  }).catch((e) => ({ err: String(e).slice(0, 60) }));
+}
+ok("설정 관리자 탭에 업데이트가 펼쳐져 보인다", !upd.err && upd.탭 === "관리자" && upd.보임 && !!upd.버전, JSON.stringify(upd));
+await (setPage || page).screenshot({ path: SHOT + "shell-settings-update.png" });
+// 대시보드로 복귀(이후 정리 단계가 대시보드 기준)
+await (setPage || page).evaluate(() => window.gijo.navigateTo("dashboard.html")).catch(() => {});
+await page.waitForTimeout(3000);
+page = ctx.pages().find((p) => p.url().includes("dashboard.html")) || page;
+
+// 13) JS 오류 — preload 주입 플레이크의 1회성 오류(치유 전 프레임 소음)는 구분 집계
 const transient = jsErrors.filter((e) => e.includes("reading 'isAuthenticated'"));
 const real = jsErrors.filter((e) => !e.includes("reading 'isAuthenticated'"));
 ok("JS 오류 0건(주입 플레이크 소음 제외)", real.length === 0, (real.join(" | ") || "없음") + (transient.length ? ` / 주입플레이크 소음 ${transient.length}건(치유됨)` : ""));
