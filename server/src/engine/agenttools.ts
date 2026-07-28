@@ -295,10 +295,28 @@ async function searchOne(q: string): Promise<string[]> {
     out.push(`보안제품 ${products.length}건:`, ...products.slice(0, 5).map((p) => `  - ${p.name} (${p.category})`));
   }
 
+  // 사내 문서는 **본문 발췌까지** 싣는다.
+  // ⚠ 2026-07-26에 runExplain에서 똑같은 결함을 잡아 고쳤는데(제목만 주면 LLM이 근거를 못 읽어
+  //   일반론으로 답한다) 이 도구에는 적용되지 않아 남아 있었다. 실사고(2026-07-28 회귀):
+  //   "안전대부 웹서버 취약점 알려줘" → 자산 DB의 finding은 scan_error 1건뿐이라
+  //   **"취약점 1건"**이라고 답했다. 정작 같은 답변에 이름이 실린 진단 보고서에는 5건이
+  //   적혀 있었다(평문 전송·디렉토리 인덱싱 등). 근거 문서를 찾아 놓고 제목만 읽은 셈이다.
+  //   숫자가 틀린 답은 없느니만 못하다 — 담당자가 그 숫자로 보고를 쓴다.
   try {
     const docs = (await listDocuments()).filter((d) => matches(d.documentId, q));
     if (docs.length) {
       out.push(`사내 문서 ${docs.length}건:`, ...docs.slice(0, 5).map((d) => `  - ${d.documentId}${d.docClass ? ` [${d.docClass}]` : ""}`));
+      try {
+        const chunks = await queryMemoryRelevant(q, 4);
+        if (chunks.length) {
+          out.push(
+            `사내 문서 근거(발췌) ${chunks.length}건:`,
+            ...chunks.slice(0, 3).map((c) => `  · ${String(c).replace(/\s+/g, " ").slice(0, 600)}`)
+          );
+        }
+      } catch {
+        /* 임베딩 미기동 — 발췌 없이 제목만이라도 남긴다 */
+      }
     }
   } catch {
     /* 임베딩 미기동 — 문서 검색 생략 */

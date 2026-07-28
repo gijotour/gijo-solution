@@ -57,6 +57,13 @@ for (const t of pages) {
   try {
     // 4.0.0 — 메뉴를 누르면 셸이 그 화면을 탭으로 연다(이동 아님). 셸은 그대로 있으므로
     // 컨텍스트가 깨지지 않는다.
+    // ⚠ 탭은 8개까지만 열린다(4.0.0). 훑는 동안 탭이 차면 9번째부터는 **안 열리고 경고만**
+    //   뜨는데, 이 스크립트는 dialog를 자동 수락하므로 조용히 넘어간다. 그러면 활성 탭은
+    //   직전 화면 그대로고, 아래 검사는 그 남의 화면을 보고 "내용 있음"이라 통과시킨다.
+    //   실제로 28개 중 20개가 report.html을 보고 ✓를 받았다(2026-07-28 실측).
+    //   그래서 매번 탭을 비우고 한 개만 연다.
+    await p.evaluate(() => { if (window.gijoTabs) window.gijoTabs.closeAll(); });
+    await p.waitForTimeout(400);
     await p.evaluate((label) => {
       const it = Array.from(document.querySelectorAll("#gijoNav .gn-item"))
         .find((e) => e.querySelector(".gn-label") && e.querySelector(".gn-label").textContent.trim() === label);
@@ -72,6 +79,7 @@ for (const t of pages) {
       const txt = d.body.innerText || "";
       return {
         page: decodeURIComponent(f.src.split("/").pop() || "").split("?")[0],
+        activeLabel: window.gijoTabs ? window.gijoTabs.activeLabel() : null,
         title: ((d.querySelector(".page-title, .panel-title, h1") || {}).textContent || d.title || "").trim().slice(0, 24),
         bodyLen: txt.length,
         loading: /불러오는 중|로딩 중/.test(txt) ? "로딩잔류?" : "",
@@ -79,6 +87,11 @@ for (const t of pages) {
     });
     t.page = info.page || t.label;
     if (info.err) errors.push(info.err);
+    // 내용이 있다는 것만으론 부족하다 — **누른 그 화면**이 열렸는지 봐야 한다.
+    // (탭 상한·리다이렉트로 엉뚱한 화면이 활성인 채 통과하던 구멍을 막는다.)
+    if (!info.err && info.activeLabel !== t.label) {
+      errors.push(`다른 화면이 열렸다: 누름="${t.label}" 활성="${info.activeLabel}"`);
+    }
     // 리소스 404 등 네트워크성 콘솔 에러와 실제 JS 에러를 함께 본다(중복 제거).
     const uniq = [...new Set(errors)].filter((e) => !/favicon|net::ERR_ABORTED/.test(e));
     const ok = uniq.length === 0 && info.bodyLen > 80;

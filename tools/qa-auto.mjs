@@ -1,4 +1,4 @@
-#!/usr/bin/env node
+﻿#!/usr/bin/env node
 // QA Auto ver1 — GIJO AS 자동 QA 하네스
 //
 // 근거(리서치): 스모크 우선(빌드 헬스체크) → 위험도 기반 선별(사용 빈도·이번 주 변경 영역 우선),
@@ -206,8 +206,8 @@ async function runServer() {
     return `스케줄 ${arr.length}건`;
   });
 
-  await scenario("QA-S12", "작업 세션", "작업 세션 목록 조회", {
-    given: "대시보드·드로어가 공유하는 작업 세션 저장소에서",
+  await scenario("QA-S12", "작업 내역", "작업 내역 목록 조회", {
+    given: "작업 내역 저장소(work_sessions)에서",
     when: "GET /api/work-sessions 를 호출하면",
     then: "세션 배열이 반환된다",
   }, async () => {
@@ -509,16 +509,18 @@ async function runClient() {
   // 2026-07-27에 입구인 가장자리 세로 탭을 먼저 없앴고, 그때는 팝업 몸통을 남겨 뒀다.
   // 그 결과 **아무도 못 여는 숨은 DOM과 iframe**이 전 화면에 실렸다 — 4.0.0의 "내부 팝업
   // 전체 삭제" 지시에 따라 파일째 걷어냈다. 이 검사는 그게 되살아나지 않는지를 지킨다.
-  await scenario("QA-C04", "작업 세션", "작업 세션은 메뉴에 있고 숨은 팝업은 없다", {
+  // 이름은 '작업 세션' → '작업 내역'으로 바꿨다(2026-07-28 사용자 지시) — '세션'은 로그인
+  // 세션과도 겹치는 개발자 말이고, 이 화면은 결국 한 일의 기록이다.
+  await scenario("QA-C04", "작업 내역", "작업 내역은 메뉴에 있고 숨은 팝업은 없다", {
     given: "셸(app.html)에서",
     when: "페이지 로드가 끝나면",
-    then: "왼쪽 메뉴에 '작업 세션'이 있고, 가장자리 세로 탭도 숨은 팝업 몸통도 하나도 없다",
+    then: "왼쪽 메뉴에 '작업 내역'이 있고, 가장자리 세로 탭도 숨은 팝업 몸통도 하나도 없다",
   }, async () => {
     await open("app.html");
     await page.waitForTimeout(1200);
     const r = await page.evaluate(() => ({
       rail: Boolean(document.getElementById("gijoEdgeRail")),
-      menuSess: [...document.querySelectorAll("#gijoNav *")].some((e) => e.children.length === 0 && e.textContent.trim() === "작업 세션"),
+      menuSess: [...document.querySelectorAll("#gijoNav *")].some((e) => e.children.length === 0 && e.textContent.trim() === "작업 내역"),
       vertical: [...document.querySelectorAll("*")].filter((e) => getComputedStyle(e).writingMode.startsWith("vertical") && e.offsetParent).length,
       // 숨은 팝업의 흔적 — 스크립트·패널·오피스 iframe·전역 함수 어느 하나도 남으면 안 된다
       잔재: [
@@ -529,10 +531,10 @@ async function runClient() {
       ].filter(Boolean),
     }));
     if (r.rail) throw new Error("가장자리 레일이 아직 있음");
-    if (!r.menuSess) throw new Error("왼쪽 메뉴에 '작업 세션' 없음");
+    if (!r.menuSess) throw new Error("왼쪽 메뉴에 '작업 내역' 없음");
     if (r.vertical > 0) throw new Error("세로로 쓴 글씨 " + r.vertical + "개 남음");
     if (r.잔재.length) throw new Error("숨은 팝업 잔재: " + r.잔재.join(", "));
-    return "메뉴에 작업 세션 있음, 세로 글씨 0개, 숨은 팝업 잔재 0개";
+    return "메뉴에 작업 내역 있음, 세로 글씨 0개, 숨은 팝업 잔재 0개";
   });
 
   // 메뉴 CSS는 자바스크립트 문자열을 + 로 이어 붙여 만든다. 중간에 + 하나를 빠뜨리면
@@ -577,20 +579,26 @@ async function runClient() {
     await open("app.html");
     await page.waitForTimeout(1500);
     // 트리 구조 — 그룹 헤더(.gn-g) 다음에 자식 묶음(.gn-kids)이 온다.
+    // ⚠ 세는 범위에 **맨 위 고정 3자리(.gn-top-fixed)**를 함께 넣는다. 대시보드·팀 사무실·
+    //   작업 내역을 가지 밖으로 빼 늘 보이게 했는데(2026-07-28 사용자 지시), 가지만 세면
+    //   화면이 3개 줄어든 것처럼 보인다 — 자리를 옮겼을 뿐 화면은 그대로다.
     const m = await page.evaluate(() => {
       const groups = [...document.querySelectorAll("#gijoNav .gn-g")].map((gh) => ({
         g: gh.querySelector(".cnt") ? gh.textContent.replace(/\d+$/, "").replace("▶", "").trim() : gh.textContent.trim(),
         items: [...(gh.nextElementSibling?.querySelectorAll(".gn-item .gn-label") || [])].map((e) => e.textContent),
       }));
-      return { groups: groups.map((x) => x.g), total: groups.reduce((n, x) => n + x.items.length, 0), all: groups.flatMap((x) => x.items) };
+      const fixed = [...document.querySelectorAll("#gijoNav .gn-top-fixed .gn-item .gn-label")].map((e) => e.textContent);
+      const all = groups.flatMap((x) => x.items).concat(fixed);
+      return { groups: groups.map((x) => x.g), fixed, total: all.length, all };
     });
     if (m.groups.length !== 4) throw new Error(`그룹 ${m.groups.length}개: ${m.groups.join(",")}`);
+    if (m.fixed.length !== 3) throw new Error(`맨 위 고정이 ${m.fixed.length}자리: ${m.fixed.join(",")}`);
     if (m.total < 28) throw new Error(`항목 ${m.total}개 — 허브가 덜 풀렸다`);
     // 허브 안에서만 통하던 짧은 이름이 남으면 밖에서 무엇의 '통합 뷰'인지 알 수 없다.
     for (const bad of ["통합 뷰", "등록부", "유지보수"]) if (m.all.includes(bad)) throw new Error(`홀로 못 서는 이름 남음: ${bad}`);
     // 없앤 화면이 메뉴에 남아 있으면 눌러도 죽는다.
     for (const gone of ["LLM 가이드", "MCP 연동", "업데이트", "로그"]) if (m.all.includes(gone)) throw new Error(`없앤 화면이 메뉴에 남음: ${gone}`);
-    return `${m.groups.join("·")} / 항목 ${m.total}개`;
+    return `${m.groups.join("·")} / 항목 ${m.total}개(고정 ${m.fixed.length} 포함)`;
   });
 
   // 코드가 가리키는 화면이 **실제로 있는 파일**인지 전수 대조한다. 링크가 죽어도 화면은
