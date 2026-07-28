@@ -45,18 +45,13 @@
   .grip i{width:44px;height:3px;border-radius:2px;background:rgba(255,255,255,.18);}
   .grip:hover i{background:var(--blue);}
 
-  /* 콘솔 — 전 화면 공용. 셸에 있으므로 탭을 옮겨도 대화가 끊기지 않는다. */
+  /* 콘솔 — 셸에 있으므로 탭을 옮겨도 대화가 끊기지 않는다. 겉모습은 console.js가 넣는다. */
   .console{flex:0 0 auto;display:flex;flex-direction:column;min-height:0;background:var(--panel-2);border-top:1px solid var(--border);}
-  .cs-head{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:7px 14px;font-size:11px;color:var(--muted);}
-  .cs-ctx{background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);color:var(--blue-light);border-radius:14px;padding:2px 10px;font-weight:800;white-space:nowrap;}
-  .cs-hint{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-  .cs-body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:0 14px;}
-  .cs-empty{color:var(--muted-2);font-size:12px;padding:10px 0;}
-  .cs-dock{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:9px 14px 12px;}
-  .cs-dock input{flex:1;background:var(--panel);border:1px solid var(--border-strong);border-radius:11px;color:var(--text);font-size:13px;padding:11px 14px;outline:none;font-family:inherit;}
-  .cs-dock input:focus{border-color:var(--blue);}
-  .cs-send{background:var(--blue);color:#fff;border:none;border-radius:11px;font-size:12.5px;font-weight:800;padding:11px 18px;cursor:pointer;}
-  .cs-send:hover{background:#2f6fd0;}
+  /* 창으로 빼냈을 때 — 손잡이·콘솔을 접고 안내만 얇게 남긴다(화면이 100%가 된다) */
+  .console-out{display:none;flex:0 0 auto;align-items:center;justify-content:center;gap:10px;padding:9px 14px;
+    border-top:1px solid var(--border);background:var(--panel-2);font-size:11.5px;color:var(--muted);}
+  body.console-popped .console,body.console-popped .grip{display:none;}
+  body.console-popped .console-out{display:flex;}
 </style>
 </head>
 <body class="g-ui">
@@ -73,16 +68,12 @@
     </div>
     <div class="screens" id="screens"><div class="blank">왼쪽 메뉴에서 화면을 고르면 탭으로 열립니다.</div></div>
     <div class="grip" id="grip" title="드래그해서 화면과 대화의 비율을 바꿉니다"><i></i></div>
-    <div class="console" id="console">
-      <div class="cs-head">
-        <span class="cs-ctx" id="csCtx">대시보드</span>
-        <span class="cs-hint" id="csHint">보고 있는 화면 기준으로 지시합니다</span>
-      </div>
-      <div class="cs-body" id="csBody"><div class="cs-empty">지시하면 여기서 실시간으로 흐릅니다.</div></div>
-      <div class="cs-dock">
-        <input id="chatInput" placeholder="지시를 입력하세요…" aria-label="지시를 입력하세요">
-        <button class="cs-send" id="dockSend">전송</button>
-      </div>
+    <!-- 콘솔은 console.js가 그린다 — 별도 창(console.html)과 같은 파일을 쓴다(자리만 다르다). -->
+    <div class="console" id="console"><div id="consoleHost" data-mode="dock"></div></div>
+    <!-- 콘솔을 창으로 빼냈을 때 자리에 남는 안내 -->
+    <div class="console-out" id="consoleOut">
+      <span>대화를 별도 창으로 빼놨습니다.</span>
+      <button class="tb-btn" id="csBackBtn">⇤ 여기로 다시 붙이기</button>
     </div>
   </div>
 </div>
@@ -241,10 +232,23 @@
 
   // 명령 맥락 — 보고 있는 탭이 곧 지시 대상이다. 팝업 시절처럼 어느 슬롯이 맥락인지 따로
   // 추적할 필요가 없다(화면이 하나뿐이라 애매함이 없다).
+  // 콘솔이 도킹이면 그 자리에서 바로 읽고, 창으로 빠져 있으면 메인 프로세스를 거쳐 알린다.
   function setCtx(label) {
-    $("csCtx").textContent = label || "대시보드";
-    $("chatInput").placeholder = label ? "「" + label + "」 화면에 대해 지시…" : "지시를 입력하세요…";
+    if (window.gijoConsoleSyncCtx) window.gijoConsoleSyncCtx();
+    if (popped && window.gijo && window.gijo.sendConsoleContext) {
+      window.gijo.sendConsoleContext(active ? active.page : null, label || null);
+    }
   }
+
+  // ── 콘솔 자리(아래 도킹 ↔ 별도 창) ────────────────────────────────────
+  var popped = false;
+  function setPopped(on) {
+    popped = !!on;
+    document.body.classList.toggle("console-popped", popped);
+    try { localStorage.setItem("gijo:console:popped", popped ? "1" : "0"); } catch (e) {}
+    if (popped) setCtx(active ? active.label : null); // 창에 지금 맥락을 즉시 알린다
+  }
+  window.gijoConsoleHidden = setPopped; // console.js가 '창으로' 눌렀을 때 셸에 알린다
 
   // ── 화면/대화 비율 ────────────────────────────────────────────────────
   function applyH(h) {
@@ -290,6 +294,9 @@
   window.gijoShell = window.gijoTabs; // 옛 이름 호환(이관 끝나면 정리)
 
   $("tbCloseAll").addEventListener("click", closeAll);
+  $("csBackBtn").addEventListener("click", function () { if (window.gijo && window.gijo.dockConsoleWindow) window.gijo.dockConsoleWindow(); });
+  // 콘솔 창을 닫으면 다시 아래에 붙인다 — 안 그러면 대화할 곳이 사라진다.
+  if (window.gijo && window.gijo.onConsoleClosed) window.gijo.onConsoleClosed(function () { setPopped(false); });
   $("tbPopout").addEventListener("click", function () {
     if (!active) return;
     if (window.gijo && window.gijo.openShellPopout) window.gijo.openShellPopout(active.page, active.label);
@@ -310,11 +317,16 @@
     } else {
       open("dashboard.html", "대시보드"); // 첫 실행 — 대시보드도 여러 탭 중 하나다
     }
+    // 지난번에 콘솔을 창으로 빼놨으면 그대로 이어간다(모니터가 여럿인 담당자는 한 번만 빼면 된다).
+    var wasPopped = "0";
+    try { wasPopped = localStorage.getItem("gijo:console:popped") || "0"; } catch (e) {}
+    if (wasPopped === "1" && window.gijo.openConsoleWindow) { setPopped(true); window.gijo.openConsoleWindow(); }
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
   else boot();
 })();
 </script>
+<script src="console.js"></script>
 <script src="nav.js"></script>
 <script src="titlebar.js"></script>
 </body>

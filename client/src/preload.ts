@@ -59,6 +59,21 @@ const gijoApi = {
   setPopoutOrientation: (orient: string) => ipcRenderer.invoke("shell:popoutOrient", orient),
   // 분리창이 "지금 보고 있는 탭"을 대시보드에 알린다 — 그 화면을 향해 바로 지시할 수 있게.
   reportPopoutTab: (page: string, label: string) => ipcRenderer.invoke("shell:popoutTab", page, label),
+  // ── 대화 콘솔 창(4.0.0) — 기본은 셸 아래 도킹, 모니터가 여럿이면 창으로 빼낸다.
+  openConsoleWindow: () => ipcRenderer.invoke("console:popout"),
+  dockConsoleWindow: () => ipcRenderer.invoke("console:dock"),
+  // 셸이 "지금 보고 있는 탭"을 콘솔 창에 알린다(별도 창은 활성 탭을 직접 못 본다).
+  sendConsoleContext: (screen: string | null, label: string | null) => ipcRenderer.invoke("console:context", screen, label),
+  onConsoleContext: (cb: (info: { screen: string | null; label: string | null }) => void) => {
+    ipcRenderer.removeAllListeners("console:context");
+    ipcRenderer.on("console:context", (_e, i) => cb(i));
+  },
+  // 콘솔 창이 닫히면 셸이 다시 아래에 붙인다 — 안 그러면 대화할 곳이 사라진다.
+  onConsoleClosed: (cb: () => void) => {
+    ipcRenderer.removeAllListeners("console:closed");
+    ipcRenderer.on("console:closed", () => cb());
+  },
+
   // 대시보드가 분리창의 포커스·탭·닫힘을 받아 명령 맥락에 반영한다.
   onPopoutContext: (cb: (kind: "focus" | "tab" | "closed", info: Record<string, unknown>) => void) => {
     ipcRenderer.removeAllListeners("shell:popoutFocus");

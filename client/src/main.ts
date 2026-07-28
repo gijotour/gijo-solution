@@ -320,6 +320,58 @@ ipcMain.handle("shell:popoutTab", async (e, page: string, label: string) => {
   return { ok: true };
 });
 
+// ── 대화 콘솔 창(4.0.0) ──────────────────────────────────────────────────────
+// 콘솔은 기본적으로 셸 아래에 붙어 있지만, 모니터가 여럿이면 별도 창으로 빼내는 편이 낫다
+// (화면은 100%로 넓어지고 대화도 원하는 만큼 커진다 — 2026-07-28 사용자 결정).
+// 빼낸 상태는 렌더러가 기억하고, 여기서는 창의 생사와 맥락 중계만 맡는다.
+let consoleWindow: BrowserWindow | null = null;
+// 마지막 맥락을 기억한다 — 창이 뜨는 데 시간이 걸려서, 셸이 곧바로 보낸 맥락은 아직 듣는 쪽이
+// 없어 그대로 유실된다(2026-07-28 실측: 창을 빼면 맥락이 '대시보드'로 남았다).
+let lastConsoleContext: { screen: string | null; label: string | null } = { screen: null, label: null };
+
+ipcMain.handle("console:popout", async () => {
+  if (consoleWindow && !consoleWindow.isDestroyed()) { consoleWindow.focus(); return { ok: true }; }
+  const wa = screen.getPrimaryDisplay().workArea;
+  const w = Math.max(420, Math.round(wa.width * 0.28));
+  consoleWindow = new BrowserWindow({
+    x: wa.x + wa.width - w, y: wa.y, width: w, height: wa.height,
+    minWidth: 360, minHeight: 320,
+    backgroundColor: "#0e1526",
+    title: "GIJO AS — 대화",
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+  consoleWindow.removeMenu();
+  bindZoom(consoleWindow);
+  consoleWindow.on("closed", () => {
+    consoleWindow = null;
+    // 창이 닫히면 셸이 콘솔을 다시 아래에 붙여야 한다 — 안 알리면 대화할 곳이 사라진다.
+    if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("console:closed", {});
+  });
+  // 창이 다 뜬 뒤 기억해 둔 맥락을 건넨다 — 이때가 듣는 쪽이 준비된 첫 시점이다.
+  consoleWindow.webContents.once("did-finish-load", () => {
+    if (consoleWindow && !consoleWindow.isDestroyed()) consoleWindow.webContents.send("console:context", lastConsoleContext);
+  });
+  await consoleWindow.loadFile(path.join(__dirname, "../src/renderer/pages/console.html"));
+  return { ok: true };
+});
+
+ipcMain.handle("console:dock", async () => {
+  if (consoleWindow && !consoleWindow.isDestroyed()) consoleWindow.close(); // closed 이벤트가 셸에 알린다
+  return { ok: true };
+});
+
+// 셸 → 콘솔 창: "지금 보고 있는 탭이 맥락이다". 콘솔이 별도 창이면 활성 탭을 직접 못 보므로 중계한다.
+ipcMain.handle("console:context", async (_e, screenPage: string | null, label: string | null) => {
+  lastConsoleContext = { screen: screenPage, label };
+  if (consoleWindow && !consoleWindow.isDestroyed()) consoleWindow.webContents.send("console:context", lastConsoleContext);
+  return { ok: true };
+});
+
 // 분리창 안에서 가로/세로 전환(2026-07-26 사용자 결정 — 모니터 배치는 그 창에서 바꾼다).
 ipcMain.handle("shell:popoutOrient", async (e, orient: string) => {
   const win = BrowserWindow.fromWebContents(e.sender);
