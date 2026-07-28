@@ -73,6 +73,18 @@ const t0 = Date.now();
 for (const c of cases) {
   try {
     let r = await runCase(c);
+    // noRetry — "가끔 맞는 것"이 결함인 케이스는 재시도로 가리면 안 된다.
+    // 재시도는 원래 **드문 1회성 이탈**(2026-07-25 kisa-u01 1/4회)을 걸러 내려고 둔 것인데,
+    // 성공률 자체가 낮은 케이스에 쓰면 두 번 중 한 번만 맞아도 ✓가 찍혀 결함이 사라져 보인다.
+    // 실제로 webreport-asset-query가 그렇게 통과했다(2026-07-28) — 알려진 이슈로 등록해 둔
+    // 결함인데 전수조사에서는 ✓로 나와, 등록해 둔 의미가 없어질 뻔했다.
+    if (!r.ok && c.noRetry) {
+      caseResults.push({ id: c.id, pass: false, why: r.why });
+      console.log(`✗ ${c.id} [${(r.ms / 1000).toFixed(1)}s] — ${r.why.join(", ")} (재시도 없음: 성공률 자체가 쟁점인 케이스)`);
+      console.log(`    출력: ${r.out.replace(/\s+/g, " ").slice(0, 200)}`);
+      fail++;
+      continue;
+    }
     if (!r.ok) {
       // LLM 샘플링 비결정성으로 1회성 이탈이 있다(실측 2026-07-25: kisa-u01 1/4회 이탈).
       // 1회 재시도해 통과하면 FLAKY로 표기 — 통과로 치되 눈에 띄게 남겨 반복되면 조사한다.
