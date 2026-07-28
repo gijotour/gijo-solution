@@ -1,0 +1,321 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>GIJO AS</title>
+<style>
+  :root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);--border-strong:rgba(255,255,255,0.16);
+    --blue:#3b82f6;--blue-light:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--teal:#1eb980;--red:#e2483d;--amber:#f0a020;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{height:100%;overflow:hidden;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
+
+  /* 셸 뼈대 — 왼쪽 메뉴 고정, 오른쪽은 [탭줄 / 화면 / 손잡이 / 콘솔] 세로 4단 */
+  .app{display:grid;grid-template-columns:232px minmax(0,1fr);height:100vh;}
+  #gijoNav{border-right:1px solid var(--border);background:var(--panel-2);min-height:0;display:flex;flex-direction:column;}
+  .work{display:flex;flex-direction:column;min-width:0;min-height:0;}
+
+  /* 탭줄 */
+  .tabbar{flex:0 0 auto;display:flex;align-items:stretch;gap:2px;padding:7px 10px 0;border-bottom:1px solid var(--border);background:var(--panel-2);overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;}
+  .tabbar::-webkit-scrollbar{height:5px;}
+  .tabbar::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:3px;}
+  .tab{display:flex;align-items:center;gap:7px;padding:8px 10px 8px 12px;border-radius:9px 9px 0 0;font-size:12.5px;font-weight:600;
+    color:var(--muted);cursor:pointer;white-space:nowrap;border:1px solid transparent;border-bottom:none;max-width:230px;flex:0 0 auto;}
+  .tab:hover{color:#fff;background:rgba(255,255,255,.04);}
+  .tab.on{color:#fff;background:var(--bg);border-color:var(--border);font-weight:700;}
+  .tab .nm{overflow:hidden;text-overflow:ellipsis;}
+  .tab .x{flex:0 0 auto;opacity:0;font-size:12px;color:var(--muted-2);border-radius:5px;padding:0 4px;line-height:1.5;}
+  .tab:hover .x,.tab.on .x{opacity:.75;}
+  .tab .x:hover{opacity:1;color:#fff;background:rgba(226,72,61,.4);}
+  .tab.pinned .x{display:none;}
+  .tab .pin{flex:0 0 auto;font-size:9px;color:var(--blue-light);}
+  .tabbar .spacer{flex:1 1 auto;}
+  .tb-act{flex:0 0 auto;display:flex;align-items:center;gap:4px;padding-bottom:6px;}
+  .tb-btn{font-size:11px;font-weight:700;color:var(--muted);background:transparent;border:1px solid var(--border);border-radius:7px;padding:4px 9px;cursor:pointer;white-space:nowrap;}
+  .tb-btn:hover{color:#fff;border-color:var(--blue);}
+
+  /* 화면 영역 — 탭마다 iframe 하나, 활성만 보인다(숨겨도 살아 있어 보던 상태가 유지된다) */
+  .screens{flex:1 1 auto;position:relative;min-height:0;background:var(--bg);}
+  .screen{position:absolute;inset:0;width:100%;height:100%;border:0;display:none;background:var(--bg);}
+  .screen.on{display:block;}
+  .screens .blank{display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted-2);font-size:13px;}
+
+  /* 손잡이 — 위(화면)/아래(콘솔) 비율 조절 */
+  .grip{flex:0 0 auto;height:9px;cursor:ns-resize;display:flex;align-items:center;justify-content:center;background:var(--panel-2);border-top:1px solid var(--border);}
+  .grip i{width:44px;height:3px;border-radius:2px;background:rgba(255,255,255,.18);}
+  .grip:hover i{background:var(--blue);}
+
+  /* 콘솔 — 전 화면 공용. 셸에 있으므로 탭을 옮겨도 대화가 끊기지 않는다. */
+  .console{flex:0 0 auto;display:flex;flex-direction:column;min-height:0;background:var(--panel-2);border-top:1px solid var(--border);}
+  .cs-head{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:7px 14px;font-size:11px;color:var(--muted);}
+  .cs-ctx{background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);color:var(--blue-light);border-radius:14px;padding:2px 10px;font-weight:800;white-space:nowrap;}
+  .cs-hint{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .cs-body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:0 14px;}
+  .cs-empty{color:var(--muted-2);font-size:12px;padding:10px 0;}
+  .cs-dock{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:9px 14px 12px;}
+  .cs-dock input{flex:1;background:var(--panel);border:1px solid var(--border-strong);border-radius:11px;color:var(--text);font-size:13px;padding:11px 14px;outline:none;font-family:inherit;}
+  .cs-dock input:focus{border-color:var(--blue);}
+  .cs-send{background:var(--blue);color:#fff;border:none;border-radius:11px;font-size:12.5px;font-weight:800;padding:11px 18px;cursor:pointer;}
+  .cs-send:hover{background:#2f6fd0;}
+</style>
+</head>
+<body class="g-ui">
+
+<div class="app">
+  <div id="gijoNav"></div>
+  <div class="work">
+    <div class="tabbar" id="tabBar">
+      <div class="spacer"></div>
+      <div class="tb-act">
+        <button class="tb-btn" id="tbPopout" title="지금 탭을 별도 창으로 빼냅니다 — 두 화면을 나란히 볼 때">⧉ 창으로</button>
+        <button class="tb-btn" id="tbCloseAll" title="고정하지 않은 탭을 모두 닫습니다">모두 닫기</button>
+      </div>
+    </div>
+    <div class="screens" id="screens"><div class="blank">왼쪽 메뉴에서 화면을 고르면 탭으로 열립니다.</div></div>
+    <div class="grip" id="grip" title="드래그해서 화면과 대화의 비율을 바꿉니다"><i></i></div>
+    <div class="console" id="console">
+      <div class="cs-head">
+        <span class="cs-ctx" id="csCtx">대시보드</span>
+        <span class="cs-hint" id="csHint">보고 있는 화면 기준으로 지시합니다</span>
+      </div>
+      <div class="cs-body" id="csBody"><div class="cs-empty">지시하면 여기서 실시간으로 흐릅니다.</div></div>
+      <div class="cs-dock">
+        <input id="chatInput" placeholder="지시를 입력하세요…" aria-label="지시를 입력하세요">
+        <button class="cs-send" id="dockSend">전송</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// app.html — 앱 탭 셸 (4.0.0).
+//
+// 왜 만들었나: 여태 화면을 "대시보드 위 팝업"으로 띄웠는데 겹이 3중(대시보드→허브→실화면)이라
+// 레이아웃이 0으로 굳어 빈 화면이 되는 사고가 났다(2026-07-28). 분리창은 2겹이라 멀쩡했다.
+// 그래서 겹을 **셸→실화면 2겹으로 고정**하고, 여러 화면은 팝업 대신 탭으로 유지한다.
+// 탭은 숨겨도 iframe이 살아 있어 스크롤·필터·입력 같은 "보던 상태"가 그대로 남는다.
+//
+// 콘솔이 셸에 있는 것이 핵심이다 — 셸은 리로드되지 않으므로 탭을 아무리 옮겨도 대화가 안 끊긴다.
+// (팝업이 존재하던 유일한 이유가 "이동하지 않아 대화가 유지된다"였는데, 그걸 구조로 해결한다.)
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  var KEY_TABS = "gijo:tabs:v1";
+  var KEY_H = "gijo:console:height";
+  var MAX_TABS = 8;          // 살아있는 iframe이라 무한정 열면 메모리를 먹는다
+  var MIN_CONSOLE = 120, MIN_SCREEN = 200;
+
+  var tabs = [];             // {page, label, el, frame, pinned}
+  var active = null;
+
+  function save() {
+    try {
+      localStorage.setItem(KEY_TABS, JSON.stringify({
+        open: tabs.map(function (t) { return { page: t.page, label: t.label, pinned: !!t.pinned }; }),
+        active: active ? active.page : null,
+      }));
+    } catch (e) {}
+  }
+
+  function embedSrc(page) { return page + (page.indexOf("?") >= 0 ? "&" : "?") + "embed=1"; }
+
+  function find(page) {
+    for (var i = 0; i < tabs.length; i++) if (tabs[i].page === page) return tabs[i];
+    return null;
+  }
+
+  // 탭 안 화면에 데이터가 안 들어오는 것을 스스로 고친다 — 겹을 줄여도 이 플레이크는 남을 수 있어
+  // 안전망은 유지한다(2026-07-28 실측: 다시 읽으면 살아난다, 리플로우로는 안 살아난다).
+  var HEAL_MAX = 2;
+  function healFrames() {
+    tabs.forEach(function (t) {
+      var f = t.frame;
+      try {
+        var d = f.contentDocument;
+        if (!d || d.readyState !== "complete") return;
+        var n = Number(f.dataset.healTries || 0);
+        if (!f.contentWindow.gijo) {
+          if (n >= HEAL_MAX) return;
+          f.dataset.healTries = String(n + 1);
+          console.warn("[shell] 탭에 연결 통로가 안 실렸습니다 — 다시 읽습니다:", t.page, "(" + (n + 1) + "/" + HEAL_MAX + ")");
+          f.src = f.src;
+          return;
+        }
+        if (t !== active) { f.dataset.emptyTicks = "0"; return; } // 숨은 탭은 원래 글자가 안 잡힌다
+        var blank = !((d.body && d.body.innerText || "").trim().length);
+        f.dataset.emptyTicks = blank ? String(Number(f.dataset.emptyTicks || 0) + 1) : "0";
+        if (blank && Number(f.dataset.emptyTicks) >= 2 && n < HEAL_MAX) {
+          f.dataset.healTries = String(n + 1);
+          f.dataset.emptyTicks = "0";
+          console.warn("[shell] 탭이 빈 화면입니다 — 다시 읽습니다:", t.page, "(" + (n + 1) + "/" + HEAL_MAX + ")");
+          f.src = f.src;
+        }
+      } catch (e) { /* 교차 출처 등 */ }
+    });
+  }
+  setInterval(healFrames, 1500);
+
+  function renderTab(t) {
+    var el = document.createElement("div");
+    el.className = "tab" + (t.pinned ? " pinned" : "");
+    el.title = t.label;
+    var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = t.label;
+    el.appendChild(nm);
+    if (t.pinned) { var p = document.createElement("span"); p.className = "pin"; p.textContent = "📌"; el.appendChild(p); }
+    var x = document.createElement("span"); x.className = "x"; x.textContent = "✕"; x.title = "탭 닫기";
+    x.addEventListener("click", function (ev) { ev.stopPropagation(); close(t.page); });
+    el.appendChild(x);
+    el.addEventListener("click", function () { show(t.page); });
+    // 가운데 버튼으로 닫기 — 브라우저 관례
+    el.addEventListener("auxclick", function (ev) { if (ev.button === 1) { ev.preventDefault(); close(t.page); } });
+    // 더블클릭 = 고정 토글(고정한 탭은 '모두 닫기'에도 안 닫힌다)
+    el.addEventListener("dblclick", function () { t.pinned = !t.pinned; redraw(); save(); });
+    t.el = el;
+    return el;
+  }
+
+  function redraw() {
+    var bar = $("tabBar");
+    Array.prototype.slice.call(bar.querySelectorAll(".tab")).forEach(function (e) { e.remove(); });
+    var anchor = bar.querySelector(".spacer");
+    tabs.forEach(function (t) {
+      var el = renderTab(t);
+      el.classList.toggle("on", t === active);
+      bar.insertBefore(el, anchor);
+    });
+    var blank = $("screens").querySelector(".blank");
+    if (blank) blank.style.display = tabs.length ? "none" : "";
+  }
+
+  function open(page, label) {
+    if (!page) return;
+    var t = find(page);
+    if (!t) {
+      if (tabs.length >= MAX_TABS) {
+        // 상한 초과 — 고정 안 된 것 중 가장 오래 안 본 탭을 닫는다(전부 고정이면 거절)
+        var victim = null;
+        for (var i = 0; i < tabs.length; i++) if (!tabs[i].pinned && tabs[i] !== active) { victim = tabs[i]; break; }
+        if (!victim) { alert("탭이 가득 찼습니다. 고정을 풀거나 탭을 닫고 다시 열어 주세요."); return; }
+        close(victim.page, true);
+      }
+      var f = document.createElement("iframe");
+      f.className = "screen";
+      f.title = label || page;
+      $("screens").appendChild(f);
+      // 문서 파싱 중에 src를 붙이면 서브프레임 preload 주입이 간헐적으로 빠진다(실측) — 다음 프레임에.
+      (function (frame, p) { requestAnimationFrame(function () { frame.src = embedSrc(p); }); })(f, page);
+      t = { page: page, label: label || page, frame: f, pinned: false };
+      tabs.push(t);
+    }
+    show(page);
+  }
+
+  function show(page) {
+    var t = find(page);
+    if (!t) return;
+    active = t;
+    tabs.forEach(function (x) { x.frame.classList.toggle("on", x === t); });
+    redraw();
+    setCtx(t.label);
+    save();
+  }
+
+  function close(page, quiet) {
+    var t = find(page);
+    if (!t) return;
+    var idx = tabs.indexOf(t);
+    t.frame.remove();
+    tabs.splice(idx, 1);
+    if (active === t) {
+      active = tabs[Math.min(idx, tabs.length - 1)] || null;
+      if (active) active.frame.classList.add("on");
+      setCtx(active ? active.label : "대시보드");
+    }
+    if (!quiet) { redraw(); save(); }
+  }
+
+  function closeAll() {
+    tabs.slice().forEach(function (t) { if (!t.pinned) close(t.page, true); });
+    redraw(); save();
+  }
+
+  // 명령 맥락 — 보고 있는 탭이 곧 지시 대상이다. 팝업 시절처럼 어느 슬롯이 맥락인지 따로
+  // 추적할 필요가 없다(화면이 하나뿐이라 애매함이 없다).
+  function setCtx(label) {
+    $("csCtx").textContent = label || "대시보드";
+    $("chatInput").placeholder = label ? "「" + label + "」 화면에 대해 지시…" : "지시를 입력하세요…";
+  }
+
+  // ── 화면/대화 비율 ────────────────────────────────────────────────────
+  function applyH(h) {
+    var max = window.innerHeight - MIN_SCREEN;
+    h = Math.max(MIN_CONSOLE, Math.min(h, Math.max(MIN_CONSOLE, max)));
+    $("console").style.height = h + "px";
+    return h;
+  }
+  (function setupGrip() {
+    var saved = 0;
+    try { saved = Number(localStorage.getItem(KEY_H) || 0); } catch (e) {}
+    applyH(saved || Math.round(window.innerHeight * 0.32));
+    var dragging = false, startY = 0, startH = 0;
+    $("grip").addEventListener("mousedown", function (e) {
+      dragging = true; startY = e.clientY; startH = $("console").getBoundingClientRect().height;
+      document.body.style.userSelect = "none"; e.preventDefault();
+    });
+    window.addEventListener("mousemove", function (e) {
+      if (!dragging) return;
+      applyH(startH + (startY - e.clientY));
+    });
+    window.addEventListener("mouseup", function () {
+      if (!dragging) return;
+      dragging = false; document.body.style.userSelect = "";
+      try { localStorage.setItem(KEY_H, String(Math.round($("console").getBoundingClientRect().height))); } catch (e) {}
+    });
+    window.addEventListener("resize", function () { applyH($("console").getBoundingClientRect().height); });
+  })();
+
+  // ── 공개 API ──────────────────────────────────────────────────────────
+  // nav.js가 메뉴 클릭 때 이걸 보고 "이동" 대신 "탭 열기"를 한다.
+  // activeScreen()은 팝업 셸(window.gijoShell)이 쓰던 이름을 그대로 유지한다 — 콘솔·서버 쪽이
+  // 그 이름으로 "지금 보는 화면"을 묻고 있어서, 이관 중에도 깨지지 않게 한다.
+  window.gijoTabs = {
+    open: open,
+    show: show,
+    close: close,
+    closeAll: closeAll,
+    list: function () { return tabs.map(function (t) { return { page: t.page, label: t.label, pinned: t.pinned }; }); },
+    activeScreen: function () { return active ? active.page : null; },
+    activeLabel: function () { return active ? active.label : null; },
+  };
+  window.gijoShell = window.gijoTabs; // 옛 이름 호환(이관 끝나면 정리)
+
+  $("tbCloseAll").addEventListener("click", closeAll);
+  $("tbPopout").addEventListener("click", function () {
+    if (!active) return;
+    if (window.gijo && window.gijo.openShellPopout) window.gijo.openShellPopout(active.page, active.label);
+  });
+
+  // ── 복원 ──────────────────────────────────────────────────────────────
+  function boot() {
+    if (!window.gijo || !window.gijo.isAuthenticated || !window.gijo.isAuthenticated()) {
+      if (window.gijo && window.gijo.navigateTo) window.gijo.navigateTo("login.html");
+      return;
+    }
+    var st = null;
+    try { st = JSON.parse(localStorage.getItem(KEY_TABS) || "null"); } catch (e) {}
+    if (st && st.open && st.open.length) {
+      st.open.forEach(function (o) { open(o.page, o.label); if (o.pinned) { var t = find(o.page); if (t) t.pinned = true; } });
+      if (st.active && find(st.active)) show(st.active);
+      redraw();
+    } else {
+      open("dashboard.html", "대시보드"); // 첫 실행 — 대시보드도 여러 탭 중 하나다
+    }
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
+  else boot();
+})();
+</script>
+<script src="nav.js"></script>
+<script src="titlebar.js"></script>
+</body>
+</html>

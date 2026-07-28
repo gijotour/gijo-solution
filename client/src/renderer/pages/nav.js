@@ -152,14 +152,18 @@
     if (document.getElementById("gijoNavCss")) return;
     var st = document.createElement("style");
     st.id = "gijoNavCss";
+    // 탭 셸(app.html) 안에서는 셸이 이미 자기 격자를 갖는다 — 여기서 .app을 다시 잡으면
+    // 탭줄·화면·콘솔 4단 배치가 무너진다(4.0.0). 사이드바 모양만 주고 레이아웃은 셸에 맡긴다.
+    var IN_SHELL = !!window.gijoTabs;
     st.textContent =
       // 통일 사이드바(2026-07-25): 아이콘 레일 폐기 → 단일 232px 3단 컬럼(상단 세그먼트 고정 · 중앙
       // 메뉴 스크롤 · 하단 사용자 영역 titlebar.js). 전 화면 100vh 고정으로 통일.
+      (IN_SHELL ? "" :
       ".app{grid-template-columns:232px minmax(0,1fr) 46px !important;height:100vh;}"
       // 창 고정(2026-07-26 사용자 결정): 페이지 스크롤 없음 — 본문 열만 내부 스크롤, 오른쪽 46px는
       // 엣지 탭 거터(스크롤바와 절대 안 겹침). 임베드 프레임은 아래 applyEmbed에서 원복.
       + "html,body{height:100%;overflow:hidden;}"
-      + ".app > *:nth-child(2){overflow-y:auto;height:100vh;min-height:0;}"
+      + ".app > *:nth-child(2){overflow-y:auto;height:100vh;min-height:0;}")
       + "*::-webkit-scrollbar{width:8px;height:8px;}*::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:4px;}*::-webkit-scrollbar-track{background:transparent;}"
       // 긴 목록 패널 내부 스크롤(2026-07-26 사용자 결정) — 창 고정 원칙과 세트.
       + ".scroll-list{max-height:calc(100vh - 300px);min-height:260px;overflow-y:auto;}"
@@ -263,6 +267,10 @@
         }
         if (it.office) {
           el.addEventListener("click", function () { if (window.gijo && window.gijo.openTeamOffice) window.gijo.openTeamOffice(); });
+        } else if (window.gijoTabs) {
+          // 탭 셸(app.html) 안 — 화면을 옮기지 않고 탭으로 연다. 셸이 리로드되지 않으므로
+          // 대화·입력 중 초안·진행 중 작업이 그대로 유지된다(4.0.0 탭 구조).
+          el.addEventListener("click", function () { window.gijoTabs.open(it.page, it.label); });
         } else if (it.page === "dashboard.html" && it.page === here) {
           // 팝업 셸에서는 화면을 열어도 주소가 dashboard.html 그대로다. 그래서 '대시보드'가
           // 늘 현재 페이지로 잡혀 눌러도 아무 일이 없었다 — 정작 팝업을 덮어쓴 상태에서
