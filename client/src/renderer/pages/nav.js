@@ -45,12 +45,15 @@
       { page: "learnloop.html", label: "학습 루프" },
       { page: "merge.html", label: "LLM 합성" },
     ]},
+    // 설정 5탭 재편(2026-07-28) — 기준은 기능이 아니라 **결정권자**다.
+    // 내 것 / 모두의 것(서버·AI) / 바깥과 잇는 것 / 관리자만 / 보기만.
+    // 같은 settings.html을 ?s= 로 걸러 보여준다(파일을 쪼개면 공통 스크립트가 어긋난다).
     settings: { ic: "⚙", label: "설정", tabs: [
-      { page: "settings.html", label: "설정" },
-      { page: "mcp.html", label: "🔌 MCP 연동" }, // 연동·정책 관리 — 위협 그룹에서 이동(2026-07-25)
-      { page: "update.html", label: "업데이트" },
-      { page: "logs.html", label: "로그" },
-      { page: "audit.html", label: "작업 기록 (감사)" },
+      { page: "settings.html?s=my", label: "내 설정" },
+      { page: "settings.html?s=ai", label: "서버·AI" },
+      { page: "settings.html?s=link", label: "연동" },
+      { page: "settings.html?s=admin", label: "관리자" },
+      { page: "audit.html", label: "기록 보기" },
     ]},
   };
   window.gijoHubs = HUBS; // hub.html이 같은 정의를 사용
@@ -95,13 +98,19 @@
   // 그대로 허브 탭으로 이어진다(embed 프레임 안에서는 리다이렉트하지 않는다).
   var TAB_REDIRECT = {};
   Object.keys(HUBS).forEach(function (g) {
-    HUBS[g].tabs.forEach(function (t) { if (t.page) TAB_REDIRECT[t.page] = "hub.html?g=" + g + "&t=" + t.page; });
+    HUBS[g].tabs.forEach(function (t) { if (t.page) TAB_REDIRECT[t.page] = "hub.html?g=" + g + "&t=" + encodeURIComponent(t.page); });
   });
   // 메뉴 정리(2026-07-25, 29→26)로 없어진 화면의 옛 주소 — 기존 링크·바로가기가 깨지지 않게
   // 흡수처로 보낸다. 기능 안내→챗봇이 대신(설정으로), 사용량·요금→설정 클라우드 구역,
   // 문서 보강→기억·학습에 병합.
-  TAB_REDIRECT["reference.html"] = "hub.html?g=settings&t=settings.html";
-  TAB_REDIRECT["billing.html"] = "hub.html?g=settings&t=settings.html";
+  // settings.html을 쿼리 없이 연 옛 링크는 서버·AI 탭으로(가장 많이 쓰던 내용이 그쪽에 있다)
+  TAB_REDIRECT["settings.html"] = "hub.html?g=settings&t=" + encodeURIComponent("settings.html?s=ai");
+  TAB_REDIRECT["reference.html"] = "hub.html?g=settings&t=" + encodeURIComponent("settings.html?s=my");
+  TAB_REDIRECT["billing.html"] = "hub.html?g=settings&t=audit.html";
+  // 2026-07-28 설정 5탭 재편으로 흡수된 화면들
+  TAB_REDIRECT["mcp.html"] = "hub.html?g=settings&t=" + encodeURIComponent("settings.html?s=link");
+  TAB_REDIRECT["update.html"] = "hub.html?g=settings&t=" + encodeURIComponent("settings.html?s=admin");
+  TAB_REDIRECT["logs.html"] = "hub.html?g=settings&t=audit.html";
   TAB_REDIRECT["docenrich.html"] = "hub.html?g=aiknowledge&t=memory.html";
 
   function currentPage() {
@@ -494,7 +503,9 @@
     loadFold(); // embed에서도 실어야 한다 — 팝업 안이 접기가 가장 필요한 곳이다
     if (IS_EMBED) { applyEmbed(); return; }
     // 탭으로 흡수된 페이지에 직접 들어오면(대시보드 바로가기·챗봇 링크 등) 허브의 그 탭으로 보낸다.
-    var target = TAB_REDIRECT[currentPage()];
+    // ⚠ 설정처럼 한 파일이 여러 탭인 화면은 **쿼리까지 봐야** 한다(2026-07-28 실측):
+    //    쿼리를 무시하면 ?s=link로 들어와도 서버·AI 탭으로 끌려가 늘 같은 화면만 보인다.
+    var target = TAB_REDIRECT[currentPage() + (location.search || "")] || TAB_REDIRECT[currentPage()];
     if (target && window.gijo && window.gijo.navigateTo) { window.gijo.navigateTo(target); return; }
     loadDesignSystem();
     if (IS_POPOUT) { applyPopout(); loadLongNotice(); return; } // 분리창은 메뉴 없이 내용만

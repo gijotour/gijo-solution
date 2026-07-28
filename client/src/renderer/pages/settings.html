@@ -128,6 +128,73 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .usage-kpi{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;}
 .usage-kpi .l{font-size:10.5px;color:var(--muted-2);font-weight:700;}
 .usage-kpi .v{font-size:16px;font-weight:800;color:#fff;margin-top:3px;}
+/* 업데이트 — update.html에서 이관(2026-07-28) */
+.kv{display:grid;grid-template-columns:120px 1fr;gap:10px 12px;font-size:13px;margin-bottom:16px;}
+.kv dt{color:var(--muted);}
+.kv dd{color:var(--text);font-weight:600;}
+.notes{font-size:12.5px;color:var(--text);line-height:1.7;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:14px;white-space:pre-wrap;}
+.progress-track{height:8px;border-radius:20px;background:rgba(255,255,255,0.08);overflow:hidden;margin:12px 0 4px;display:none;}
+.progress-fill{height:100%;border-radius:20px;background:var(--blue);width:0%;transition:width .2s;}
+.progress-label{font-size:11.5px;color:var(--muted);display:none;}
+/* MCP 연동 — mcp.html에서 이관(2026-07-28) */
+.note{margin:14px 0 0;background:rgba(240,160,32,.08);border:1px solid rgba(240,160,32,.35);border-radius:10px;padding:10px 13px;font-size:12px;color:var(--amber);line-height:1.5;}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--g-s3);margin:18px 0 8px;}
+.sec{font-size:var(--g-t-h2);font-weight:800;color:#fff;margin:26px 0 12px;display:flex;align-items:center;gap:8px;}
+.srv{background:var(--g-surface-1);border:1px solid var(--border);border-radius:12px;padding:13px 15px;margin-bottom:10px;box-shadow:var(--g-shadow-1);}
+.srv.warn{border-color:rgba(226,72,61,.4);}
+.srv-h{display:flex;align-items:center;gap:9px;}
+.srv-ic{width:30px;height:30px;border-radius:9px;background:var(--panel-2);border:1px solid var(--border-strong);display:flex;align-items:center;justify-content:center;font-size:15px;flex:0 0 auto;}
+.srv-nm{font-size:14px;font-weight:700;color:#fff;}
+.dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto;}
+.dot.on{background:var(--teal);box-shadow:0 0 6px var(--teal);}
+.dot.off{background:var(--muted-2);}
+.dot.pend{background:var(--amber);box-shadow:0 0 6px var(--amber);}
+.tbadge{font-size:10px;font-weight:800;border-radius:6px;padding:2px 8px;}
+.b-local{color:var(--teal);background:rgba(30,185,128,.14);border:1px solid rgba(30,185,128,.35);}
+.b-remote{color:var(--amber);background:rgba(240,160,32,.14);border:1px solid rgba(240,160,32,.35);}
+.srv-acts{margin-left:auto;display:flex;align-items:center;gap:10px;}
+.gate{font-size:10.5px;font-weight:800;color:var(--amber);background:rgba(240,160,32,.12);border:1px solid rgba(240,160,32,.45);border-radius:7px;padding:5px 10px;cursor:pointer;}
+.gate.approved{color:var(--teal);background:rgba(30,185,128,.12);border-color:rgba(30,185,128,.4);cursor:default;}
+.toggle{width:38px;height:21px;border-radius:999px;background:var(--panel-2);border:1px solid var(--border-strong);position:relative;cursor:pointer;flex:0 0 auto;transition:.15s;}
+.toggle.on{background:rgba(59,130,246,.45);border-color:var(--blue);}
+.toggle.dis{opacity:.4;cursor:not-allowed;}
+.toggle i{position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:var(--muted);transition:.15s;}
+.toggle.on i{left:19px;background:#fff;}
+.srv-meta{font-size:11px;color:var(--muted-2);margin-top:8px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
+.srv-meta .k{color:var(--muted);}.srv-meta code{font-family:Consolas,monospace;color:var(--blue-light);}
+.expand{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:none;}
+.srv.open .expand{display:block;}
+.caret{color:var(--muted-2);font-size:11px;cursor:pointer;user-select:none;margin-left:2px;}
+.tool{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--blue-light);background:var(--panel-2);border:1px solid var(--border);border-radius:7px;padding:3px 9px;margin:4px 5px 0 0;}
+.tool .x{color:var(--teal);}
+.perm-row{font-size:11.5px;color:var(--muted);margin-top:8px;}
+.perm-row .ag{display:inline-flex;align-items:center;gap:4px;margin:3px 8px 0 0;cursor:pointer;padding:2px 8px;border-radius:6px;border:1px solid var(--border);background:var(--panel-2);}
+.perm-row .ag.on{color:var(--teal);border-color:rgba(30,185,128,.4);background:rgba(30,185,128,.1);}
+.del{font-size:11px;color:var(--red);cursor:pointer;background:none;border:1px solid rgba(226,72,61,.35);border-radius:7px;padding:5px 9px;}
+.mtx-wrap{overflow-x:auto;}
+.mtx{border-collapse:collapse;font-size:11.5px;min-width:520px;}
+.mtx th,.mtx td{border:1px solid var(--border);padding:6px 10px;text-align:center;color:var(--muted);}
+.mtx th{color:#dfe8f7;font-weight:700;background:var(--panel-2);}
+.mtx td.tool-c{text-align:left;color:#dfe8f7;font-family:Consolas,monospace;}
+.mtx .y{color:var(--teal);font-weight:800;}.mtx .n{color:var(--muted-2);}
+.audit{background:var(--g-surface-1);border:1px solid var(--border);border-radius:12px;padding:8px 6px;}
+.au-row{font-size:11.5px;color:var(--muted);padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.03);display:flex;gap:10px;}
+.au-row:last-child{border-bottom:0;}.au-row .t{color:var(--muted-2);font-family:Consolas,monospace;flex:0 0 auto;}
+.empty{color:var(--muted);font-size:12px;padding:28px;text-align:center;border:1px dashed var(--border-strong);border-radius:12px;}
+.mbg{position:fixed;inset:0;background:rgba(4,8,16,.62);display:none;align-items:center;justify-content:center;z-index:60;}
+.mbg.on{display:flex;}
+.modal{background:var(--panel);border:1px solid var(--border-strong);border-radius:14px;padding:20px;width:460px;max-width:94vw;}
+.modal h3{font-size:15px;color:#fff;margin-bottom:14px;}
+.fld{margin-bottom:11px;}.fld label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px;}
+.fld input,.fld select{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 11px;color:var(--text);font-size:12.5px;outline:none;}
+.fld input:focus,.fld select:focus{border-color:var(--blue);}
+.seg{display:flex;gap:6px;}.seg label{flex:1;text-align:center;padding:8px;border:1px solid var(--border-strong);border-radius:8px;cursor:pointer;font-size:12px;color:var(--muted);}
+.seg input{display:none;}.seg input:checked+span{color:#fff;}
+.seg label:has(input:checked){border-color:var(--blue);background:rgba(59,130,246,.14);}
+.m-acts{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;}
+.btn{font-size:12.5px;font-weight:800;border-radius:9px;padding:9px 16px;cursor:pointer;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--text);}
+.btn.pri{background:var(--blue);border-color:var(--blue);color:#fff;}
+.err{color:var(--red);font-size:11.5px;min-height:14px;margin-top:2px;}
 </style>
 </head>
 <body>
@@ -157,7 +224,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     <!-- 화면 크기 — 모니터·시력이 사람마다 달라 자동 반응형만으로는 못 맞추는 취향을 여기서 고른다.
          배율은 앱 전체(허브 탭 포함)에 걸리고 다음 실행에도 유지된다. -->
-    <div class="panel">
+    <div data-sec="my" class="panel">
       <div class="panel-title">🔍 화면 크기</div>
       <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6">
         글씨와 여백이 함께 커지고 작아집니다. <b>작게</b>는 한 화면에 더 많이, <b>크게</b>는 읽기 편하게.
@@ -167,7 +234,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div class="status-line" id="zoomStatusLine"></div>
     </div>
 
-    <div class="panel" data-gijo-fold="서버 연결">
+    <div data-sec="ai" class="panel" data-gijo-fold="서버 연결">
       <div class="panel-title">서버 연결</div>
       <div class="field">
         <label for="serverUrlInput">서버 주소</label>
@@ -180,7 +247,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div class="status-line" id="serverStatusLine"></div>
     </div>
 
-    <div class="panel" data-gijo-fold="계정">
+    <div data-sec="my" class="panel" data-gijo-fold="계정">
       <div class="panel-title">계정</div>
       <dl class="kv" id="accountKv">
         <dt>아이디</dt><dd id="accountUsername">-</dd>
@@ -198,7 +265,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <button class="btn-danger" id="logoutBtn">로그아웃</button>
     </div>
 
-    <div class="panel" id="userManagementPanel" style="display:none">
+    <div data-sec="admin" class="panel" id="userManagementPanel" style="display:none">
       <div class="panel-title">계정 관리<span class="badge b-teal" style="margin-left:8px">admin 전용</span></div>
       <div id="userListBox" style="margin-bottom:16px"></div>
       <div class="field-row">
@@ -228,7 +295,51 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div class="status-line" id="userManagementStatusLine"></div>
     </div>
 
-    <div class="panel" data-gijo-fold="구동 티어">
+    <!-- 업데이트 — update.html 화면에서 이관(2026-07-28, 설정 통합 ③단계).
+         '버전을 올린다'는 관리자의 일이라 계정 관리와 같은 탭에 둔다. -->
+    <div data-sec="admin" class="panel" data-gijo-fold="업데이트">
+      <div class="panel-title">업데이트</div>
+      <dl class="kv">
+        <dt>설치된 버전</dt><dd id="currentVersion">-</dd>
+        <dt>상태</dt><dd id="statusBadge"><span class="badge b-muted">확인 중…</span></dd>
+      </dl>
+      <button class="btn-ghost" id="checkBtn">지금 확인</button>
+      <div id="updatePanel" style="display:none;margin-top:16px">
+        <div style="font-size:12.5px;font-weight:800;color:#fff;margin-bottom:8px">새 버전 사용 가능</div>
+        <dl class="kv">
+          <dt>버전</dt><dd id="latestVersion">-</dd>
+          <dt>게시일</dt><dd id="latestPublished">-</dd>
+          <dt>크기</dt><dd id="latestSize">-</dd>
+        </dl>
+        <div class="notes" id="latestNotes"></div>
+        <button class="btn-primary" id="installBtn">지금 업데이트</button>
+        <div class="progress-track" id="progressTrack"><div class="progress-fill" id="progressFill"></div></div>
+        <div class="progress-label" id="progressLabel">다운로드 중… 0%</div>
+        <div class="status-line" id="installStatus"></div>
+      </div>
+    </div>
+
+    <div data-sec="admin" class="panel" id="adminPanel" style="display:none" data-gijo-fold="게시된 배포판">
+      <div class="panel-title">게시된 배포판<span class="badge b-teal" style="margin-left:8px">admin 전용</span></div>
+      <div class="panel-sub">서버에 게시된 전체 버전 이력입니다.</div>
+      <table style="width:100%;font-size:11.5px;border-collapse:collapse">
+        <thead><tr style="color:var(--muted-2);text-align:left"><th style="padding:4px 6px;font-weight:600">버전</th><th style="font-weight:600">메모</th><th style="font-weight:600">크기</th><th style="font-weight:600">게시일시</th></tr></thead>
+        <tbody id="releaseRows"><tr><td colspan="4" style="color:var(--muted);padding:4px 6px;">불러오는 중…</td></tr></tbody>
+      </table>
+    </div>
+
+    <!-- 누가 어떤 판을 받았는지 — 예전엔 게시·삭제만 기록되고 '받은 것'은 남지 않아
+         어느 담당자가 어느 버전을 쓰는지 알 길이 없었다(2026-07-28 사용자 요청). -->
+    <div data-sec="admin" class="panel" id="downloadLogPanel" style="display:none" data-gijo-fold="누가 받았나">
+      <div class="panel-title">누가 받았나<span class="badge b-teal" style="margin-left:8px">admin 전용</span></div>
+      <div class="panel-sub">담당자가 업데이트를 내려받은 기록입니다. 어느 PC가 아직 옛 버전인지 가늠할 때 씁니다.</div>
+      <table style="width:100%;font-size:11.5px;border-collapse:collapse">
+        <thead><tr style="color:var(--muted-2);text-align:left"><th style="padding:4px 6px;font-weight:600">받은 사람</th><th style="font-weight:600">버전</th><th style="font-weight:600">받은 일시</th></tr></thead>
+        <tbody id="downloadRows"><tr><td colspan="3" style="color:var(--muted);padding:4px 6px;">불러오는 중…</td></tr></tbody>
+      </table>
+    </div>
+
+    <div data-sec="ai" class="panel" data-gijo-fold="구동 티어">
       <div class="panel-title">🧠 GIJO 구동 티어</div>
       <div id="tierGpuBox" style="background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:10px">
         <div style="font-size:11px;color:var(--muted);display:flex;justify-content:space-between;margin-bottom:6px"><span id="tierGpuLabel">GPU 실측 중…</span><span id="tierGpuFree"></span></div>
@@ -258,7 +369,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
          라이선스 동의가 필요한(gated) 모델을 받으려면 토큰이 필요한데 앱에 넣을 곳이 없어,
          담당자가 서버에 직접 들어가 'hf auth login'을 쳐야 했다. 여기 한 번 넣으면 서버가 알아서 쓴다.
          ⚠ 토큰은 서버에 암호화해 두고 화면엔 끝 4자만 — 다시 꺼내 보여주지 않는다. -->
-    <div class="panel" id="modelAuthPanel" style="display:none" data-gijo-fold="모델 받기 · 인증">
+    <div data-sec="ai" class="panel" id="modelAuthPanel" style="display:none" data-gijo-fold="모델 받기 · 인증">
       <div class="panel-title">모델 받기 · 인증<span class="badge b-teal" style="margin-left:8px">admin 전용</span></div>
       <div class="panel-sub">라이선스 동의가 필요한 모델(gated)을 받을 때 쓰는 인증입니다. 한 번 등록하면 서버가 받을 때 자동으로 씁니다.</div>
       <div class="field">
@@ -285,7 +396,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     <!-- 모델 검색 · 받기 — AI 팀 화면에서 이관(2026-07-28, 설정 통합 ②단계).
          인증 바로 아래에 둔다: 토큰을 왜 넣는지가 여기서 드러난다. -->
-    <div class="panel" data-gijo-fold="모델 검색 · 받기">
+    <div data-sec="ai" class="panel" data-gijo-fold="모델 검색 · 받기">
       <div class="panel-title">모델 검색 · 받기</div>
       <div class="panel-sub">보안 특화 오픈소스 모델을 이름으로 찾아 이 서버에 내려받습니다. 받는 동안 다른 화면으로 가도 계속됩니다.</div>
       <div class="model-search"><input id="hfSearchInput" placeholder="예: cybersecurity, WhiteRabbitNeo, Foundation-Sec"><button id="hfSearchBtn">검색</button></div>
@@ -295,7 +406,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     <!-- 추천 모델 목록 — llmguide.html 화면을 통째로 이관(2026-07-28).
          "무엇을 받을지 모르겠다"는 물음의 답이 받는 자리에서 바로 보여야 한다. -->
-    <div class="panel" data-gijo-fold="추천 모델 목록">
+    <div data-sec="ai" class="panel" data-gijo-fold="추천 모델 목록">
       <div class="panel-title">추천 모델 목록</div>
       <div class="panel-sub">용도별로 검증된 모델입니다. 모두 GGUF(로컬 구동)이며 Q4_K_M 한 개만 받습니다.</div>
       <div id="llmGuide"><div style="color:var(--muted);font-size:12px">불러오는 중...</div></div>
@@ -303,14 +414,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     <!-- 에이전트 모델 배정 — AI 팀 화면에서 이관(2026-07-28, 설정 통합 ③단계).
          받은 모델을 누구에게 줄지는 '엔진·티어'와 같은 결정이라 여기 둔다. -->
-    <div class="panel" id="agentModelPanel" style="display:none" data-gijo-fold="에이전트 모델 배정">
+    <div data-sec="ai" class="panel" id="agentModelPanel" style="display:none" data-gijo-fold="에이전트 모델 배정">
       <div class="panel-title">에이전트 모델 배정<span class="badge b-teal" style="margin-left:8px">admin 전용</span></div>
       <div class="panel-sub">AI 팀원마다 어떤 모델로 생각할지 정합니다. 비워 두면 전역 모델을 그대로 씁니다.</div>
       <div id="agentModelRows" style="font-size:12px;color:var(--muted)">불러오는 중...</div>
       <div class="status-line" id="agentModelStatusLine"></div>
     </div>
 
-    <div class="panel" data-gijo-fold="로컬 LLM 엔진">
+    <div data-sec="ai" class="panel" data-gijo-fold="로컬 LLM 엔진">
       <div class="panel-title">로컬 LLM 엔진</div>
       <div id="engineStatusLine" style="font-size:12.5px;color:var(--muted);margin-bottom:14px">불러오는 중...</div>
       <div class="field">
@@ -326,29 +437,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     <!-- 사용량 · 비용 — 클라우드 패널 안에 묻혀 있던 표를 꺼내고, 그동안 아무도 못 보던
          로컬/외부 서비스 사용량(billing.html)을 여기로 합쳤다(2026-07-28). 바꾸는 곳이 아니라
          보는 곳이다. -->
-    <div class="panel" data-gijo-fold="사용량 · 비용">
-      <div class="panel-title">사용량 · 비용</div>
-      <div class="panel-sub">서버를 켠 뒤 누적된 호출량입니다. 온프레미스 로컬 LLM은 비용이 들지 않으며, 외부 서비스를 쓴 경우에만 예상 비용이 잡힙니다.</div>
-      <div class="usage-kpis">
-        <div class="usage-kpi"><div class="l">예상 비용 합계</div><div class="v" id="kpiCost">-</div></div>
-        <div class="usage-kpi"><div class="l">외부 서비스</div><div class="v" id="kpiServices">-</div></div>
-        <div class="usage-kpi"><div class="l">호출 수</div><div class="v" id="kpiCalls">-</div></div>
-      </div>
-      <div style="margin-top:14px;font-size:12px;font-weight:700;color:var(--muted);">외부 서비스별</div>
-      <table style="width:100%;font-size:11.5px;margin-top:6px;border-collapse:collapse">
-        <thead><tr style="color:var(--muted-2);text-align:left"><th style="padding:4px 6px;font-weight:600">서비스</th><th style="font-weight:600">호출</th><th style="font-weight:600">예상 비용</th></tr></thead>
-        <tbody id="usageRows"><tr><td colspan="3" style="color:var(--muted);padding:4px 6px;">불러오는 중...</td></tr></tbody>
-      </table>
-      <div style="margin-top:18px;font-size:12px;font-weight:700;color:var(--muted);">📊 클라우드 API 사용량 <span style="color:var(--muted-2);font-weight:400;">— 제공자별 호출·토큰·예상 비용 (서버 기동 후 누적)</span></div>
-      <table style="width:100%;font-size:11.5px;margin-top:6px;border-collapse:collapse;">
-        <thead><tr style="color:var(--muted-2);text-align:left;"><th style="padding:4px 6px;">제공자·모델</th><th>호출</th><th>토큰(입력/출력)</th><th>예상 비용</th></tr></thead>
-        <tbody id="cloudUsageRows"><tr><td colspan="4" style="color:var(--muted);padding:4px 6px;">불러오는 중...</td></tr></tbody>
-      </table>
-      <button class="btn-ghost" id="csvExportBtn" style="margin-top:12px">사용량 CSV 내보내기</button>
-      <div class="status-line" id="usageStatusLine"></div>
-    </div>
+    
 
-    <div class="panel" data-gijo-fold="이메일(SMTP) 설정">
+    <div data-sec="ai" class="panel" data-gijo-fold="이메일(SMTP) 설정">
       <div class="panel-title">이메일(SMTP) 설정</div>
       <div class="field-row">
         <div class="field">
@@ -381,7 +472,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div class="status-line" id="smtpStatusLine"></div>
     </div>
 
-    <div class="panel" id="smtpInboundPanel" style="display:none">
+    <div data-sec="link" class="panel" id="smtpInboundPanel" style="display:none">
       <div class="panel-title">인바운드 SMTP (알림 집수)<span class="badge b-purple" style="margin-left:8px">admin 전용</span></div>
       <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);margin-bottom:14px;cursor:pointer">
         <input type="checkbox" id="smtpInEnabledInput" style="width:auto">활성화
@@ -401,7 +492,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div class="panel-sub" id="smtpInStatusInfo" style="margin-top:10px"></div>
     </div>
 
-    <div class="panel" id="siemPanel" style="display:none">
+    <div data-sec="link" class="panel" id="siemPanel" style="display:none">
       <div class="panel-title">📡 SIEM 연동 (아웃바운드)<span class="badge b-purple" style="margin-left:8px">admin 전용</span></div>
       <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);margin-bottom:14px;cursor:pointer">
         <input type="checkbox" id="siemEnabledInput" style="width:auto">GIJO 보안 이벤트를 SIEM으로 전달(syslog)
@@ -439,7 +530,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     </div>
 
     <!-- 법령·판례 조회 — 인터넷이 필요해 기본 꺼짐. 키를 넣어야 켜진다(2026-07-26). -->
-    <div class="panel" id="lawPanel" style="display:none">
+    <div data-sec="link" class="panel" id="lawPanel" style="display:none">
       <div class="panel-title">⚖ 법령·판례 조회 (선택)<span class="badge b-purple" style="margin-left:8px">admin 전용</span></div>
       <div class="panel-sub">개인정보보호법·정보통신망법 같은 IT보안 법령과 고시·판례를 국가법령정보센터에서 찾아옵니다. <b>인터넷 연결이 필요합니다</b> — 폐쇄망이면 켜지 마세요.</div>
       <div class="field-row">
@@ -457,7 +548,24 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div class="status-line" id="lawStatusLine"></div>
     </div>
 
-    <div class="panel" id="cloudLlmPanel" style="display:none">
+    <!-- MCP 연동 — mcp.html 화면에서 이관(2026-07-28, 설정 통합 ③단계).
+         나가는 통로를 한 탭에서 본다. ⚠ 정의·정책만 등록되고 실제 연결은 아직 없다. -->
+    <div data-sec="link" class="panel" data-gijo-fold="MCP 연동">
+      <div class="panel-title">🔌 MCP 연동
+        <button class="btn-ghost" id="addBtn" style="margin-left:auto">＋ MCP 서버 추가</button>
+      </div>
+      <div class="panel-sub">외부 도구를 AI가 쓸 수 있게 등록하는 곳입니다. 원격(HTTP) 서버는 나가는 연결을 승인해야 켜집니다.</div>
+      <div class="note">⚠ 현재는 정의·정책만 등록됩니다(상태: 정의됨 · 연동 대기).</div>
+      <div class="kpis" id="kpis"></div>
+      <div class="sec">🔌 등록된 MCP 서버</div>
+      <div id="srvList"></div>
+      <div class="sec">🔐 에이전트 × 도구 허용 매트릭스</div>
+      <div class="mtx-wrap"><table class="mtx" id="mtx"></table></div>
+      <div class="sec">🧾 MCP 감사 로그</div>
+      <div class="audit" id="audit"></div>
+    </div>
+
+    <div data-sec="link" class="panel" id="cloudLlmPanel" style="display:none">
       <div class="panel-title">☁ 클라우드 LLM (선택) <span class="badge b-purple" style="margin-left:8px">admin 전용</span></div>
       <div class="panel-sub">온프레미스가 기본입니다 — 끄면 모든 답변이 로컬 LLM으로만 처리됩니다.</div>
       <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);margin-bottom:14px;cursor:pointer">
@@ -545,8 +653,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         await loadModelAuth();
         await loadLawConfig();
         await loadUserList();
+        await loadReleases().catch(() => {});
+        // admin 패널을 되살린 뒤 구역 필터를 다시 적용한다 — 순서가 뒤집히면
+        // 다른 탭 것이 섞여 보인다(admin 게이트가 display를 비우기 때문).
+        reapplySectionFilter();
         await loadCloudConfig();
-      await loadCloudUsage();
         await loadSmtpInboundConfig();
         await loadSiemConfig();
       }
@@ -907,67 +1018,21 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
   // ── 클라우드 LLM 설정 (admin) ────────────────────────────────────────
   let cloudCfg = null;
+  // 구역(탭) 필터 — 주소의 ?s= 가 가리키는 구역만 남긴다(2026-07-28, 설정 5탭 재편).
+  // ⚠ JS로 하나씩 감추면 안 된다. admin 게이트가 나중에 style.display=""로 되살리고,
+  //   접기(fold.js)가 만드는 제목 줄은 나중에 생겨서 못 잡는다 — 실제로 다른 탭 제목이
+  //   줄줄이 남았다(2026-07-28 실측). CSS 규칙 한 줄이면 나중에 생기는 것까지 걸린다.
+  const CURRENT_SECTION = new URLSearchParams(location.search).get("s") || "";
+  function reapplySectionFilter() {
+    if (!CURRENT_SECTION || document.getElementById("gijoSecCss")) return;
+    const st = document.createElement("style");
+    st.id = "gijoSecCss";
+    st.textContent = `[data-sec]:not([data-sec="${CURRENT_SECTION}"]){display:none !important}`;
+    document.head.appendChild(st);
+  }
+
   function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
   // 클라우드 API 사용량 표 — 사용량·요금 화면 제거(메뉴 정리 2026-07-25)로 이관.
-  // ── 사용량 · 비용 (2026-07-28 billing.html에서 합침) ──────────────────
-  let lastUsage = [];
-  async function loadUsage() {
-    const rows = document.getElementById("usageRows");
-    if (!rows) return;
-    try {
-      lastUsage = (await window.gijo.getUsageSummary()) || [];
-      rows.innerHTML = lastUsage.length
-        ? lastUsage.map((u) =>
-            `<tr><td style="padding:4px 6px;">${esc(u.service)}</td><td>${u.callCount.toLocaleString()}건</td>` +
-            `<td>${u.estimatedCost.toFixed(4)}</td></tr>`).join("")
-        : '<tr><td colspan="3" style="color:var(--muted);padding:4px 6px;">아직 외부 서비스 호출이 없습니다 (온프레미스만 쓰는 중)</td></tr>';
-      document.getElementById("kpiCost").textContent = "$" + lastUsage.reduce((a, u) => a + u.estimatedCost, 0).toFixed(4);
-      document.getElementById("kpiServices").textContent = lastUsage.length;
-      document.getElementById("kpiCalls").textContent = lastUsage.reduce((a, u) => a + u.callCount, 0).toLocaleString();
-    } catch (e) {
-      rows.innerHTML = '<tr><td colspan="3" style="color:var(--muted);padding:4px 6px;">사용량을 불러오지 못했습니다</td></tr>';
-    }
-  }
-
-  function exportUsageCsv() {
-    const line = document.getElementById("usageStatusLine");
-    if (!lastUsage.length) {
-      line.className = "status-line status-err";
-      line.textContent = "내보낼 사용량이 없습니다";
-      return;
-    }
-    const rows = [["서비스", "호출 수", "예상 비용(USD)"]];
-    for (const u of lastUsage) rows.push([u.service, u.callCount, u.estimatedCost.toFixed(4)]);
-    const csv = rows.map((r) => r.map((c) => '"' + String(c).replace(/"/g, '""') + '"').join(",")).join("\n");
-    // BOM을 붙여야 엑셀에서 한글이 안 깨진다
-    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = "gijo-as-usage-summary.csv";
-    a.click();
-    URL.revokeObjectURL(a.href);
-    line.className = "status-line status-ok";
-    line.textContent = "gijo-as-usage-summary.csv 로 내보냈습니다";
-  }
-
-  async function loadCloudUsage() {
-    const rows = document.getElementById("cloudUsageRows");
-    if (!rows) return;
-    try {
-      const u = await window.gijo.cloudUsage();
-      if (!u.rows || !u.rows.length) {
-        rows.innerHTML = '<tr><td colspan="4" style="color:var(--muted);padding:4px 6px;">아직 클라우드 API 호출이 없습니다 (미사용 또는 호출 전)</td></tr>';
-        return;
-      }
-      rows.innerHTML = u.rows.map((r) =>
-        `<tr><td style="padding:4px 6px;">${r.providerLabel} <span style="color:var(--muted-2);font-size:10.5px;">${r.model}</span></td>` +
-        `<td>${r.calls.toLocaleString()}건</td><td>${r.inTokens.toLocaleString()} / ${r.outTokens.toLocaleString()}</td>` +
-        `<td>$${r.estimatedCost.toFixed(4)}</td></tr>`).join("");
-    } catch (e) {
-      rows.innerHTML = '<tr><td colspan="4" style="color:var(--muted);padding:4px 6px;">사용량을 불러오지 못했습니다</td></tr>';
-    }
-  }
-
   // ── 법령·판례 조회(선택) ─────────────────────────────────────────────
   // 키를 넣으면 켜지고 비우면 꺼진다. 원문 키는 서버가 암호화 보관하고 화면으로 돌려주지 않으므로
   // 입력칸은 항상 비워두고 "설정됨/안 됨"만 알린다(CTI 피드와 같은 계약).
@@ -1164,6 +1229,249 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     }
   }
 
+  // ── 업데이트 (2026-07-28 update.html에서 이관) ──────────────────────
+  function fmtBytes(n) { return n ? (n / 1024 / 1024).toFixed(1) + " MB" : "-"; }
+  let latestRelease = null;
+
+  async function checkUpdate() {
+    const badge = document.getElementById("statusBadge");
+    const btn = document.getElementById("checkBtn");
+    badge.innerHTML = '<span class="badge b-muted">확인 중…</span>';
+    btn.disabled = true;
+    const orig = btn.textContent;
+    btn.textContent = "확인 중…";
+    try {
+      document.getElementById("currentVersion").textContent = await window.gijo.update.currentVersion();
+      const r = await window.gijo.update.checkForUpdate();
+      latestRelease = r.latest;
+      if (r.updateAvailable && r.latest) {
+        badge.innerHTML = '<span class="badge b-amber">업데이트 가능</span>';
+        document.getElementById("updatePanel").style.display = "";
+        document.getElementById("latestVersion").textContent = r.latest.version;
+        document.getElementById("latestPublished").textContent = new Date(r.latest.publishedAt).toLocaleString("ko-KR");
+        document.getElementById("latestSize").textContent = fmtBytes(r.latest.size);
+        document.getElementById("latestNotes").textContent = r.latest.notes || "(릴리스 노트 없음)";
+      } else {
+        badge.innerHTML = '<span class="badge b-teal">최신 버전입니다</span>';
+        document.getElementById("updatePanel").style.display = "none";
+      }
+    } catch (e) {
+      badge.innerHTML = '<span class="badge b-muted">확인 실패: ' + esc((e && e.message) || e) + "</span>";
+    } finally {
+      btn.disabled = false;
+      btn.textContent = orig;
+    }
+  }
+
+  async function installUpdate() {
+    if (!latestRelease) return;
+    if (!confirm(latestRelease.version + " 버전으로 지금 업데이트할까요? 다운로드가 끝나면 앱이 자동으로 종료되고 설치가 진행됩니다.")) return;
+    const btn = document.getElementById("installBtn");
+    const track = document.getElementById("progressTrack");
+    const fill = document.getElementById("progressFill");
+    const label = document.getElementById("progressLabel");
+    const line = document.getElementById("installStatus");
+    btn.disabled = true;
+    btn.textContent = "준비 중…";
+    track.style.display = "block";
+    label.style.display = "block";
+    fill.style.width = "0%";
+    label.textContent = "다운로드 준비 중…";
+    line.textContent = "";
+    line.className = "status-line";
+    window.gijo.update.onProgress((pct) => {
+      btn.textContent = "다운로드 중…";
+      fill.style.width = pct + "%";
+      label.textContent = "다운로드 중… " + pct + "%";
+    });
+    try {
+      await window.gijo.update.install(latestRelease.version);
+      btn.textContent = "설치 실행됨";
+      label.textContent = "설치 프로그램 실행 중… 곧 앱이 종료됩니다.";
+      line.className = "status-line status-ok";
+      line.textContent = "다운로드·무결성 검증 완료 — 설치가 진행되면 앱이 자동으로 닫힙니다.";
+    } catch (e) {
+      line.className = "status-line status-err";
+      line.textContent = "업데이트 실패: " + ((e && e.message) || e);
+      btn.disabled = false;
+      btn.textContent = "지금 업데이트";
+      label.textContent = "실패";
+    }
+  }
+
+  async function loadReleases() {
+    document.getElementById("adminPanel").style.display = "";
+    const rows = document.getElementById("releaseRows");
+    try {
+      const r = await window.gijo.update.listReleases();
+      const releases = r.releases || [];
+      rows.innerHTML = releases.length
+        ? releases.map((rel) =>
+            `<tr><td style="padding:4px 6px;">${esc(rel.version)}</td><td>${esc(rel.notes || "-")}</td>` +
+            `<td>${fmtBytes(rel.size)}</td><td>${new Date(rel.publishedAt).toLocaleString("ko-KR")}</td></tr>`).join("")
+        : '<tr><td colspan="4" style="color:var(--muted);padding:4px 6px;">게시된 배포판이 없습니다</td></tr>';
+    } catch (e) {
+      rows.innerHTML = '<tr><td colspan="4" style="color:var(--muted);padding:4px 6px;">불러오지 못했습니다</td></tr>';
+    }
+
+    // 받은 기록 — 서버가 다운로드 요청마다 남긴다. 아직 아무도 안 받았으면 그렇게 말한다.
+    document.getElementById("downloadLogPanel").style.display = "";
+    const dlRows = document.getElementById("downloadRows");
+    try {
+      const d = await window.gijo.update.downloadLog();
+      const list = d.downloads || [];
+      dlRows.innerHTML = list.length
+        ? list.map((x) => {
+            // detail에 "이름 홍길동" 형태로 표시 이름이 들어 있다 — 있으면 아이디 옆에 붙인다.
+            const nm = /이름\s+(.+)$/.exec(x.detail || "")?.[1];
+            return `<tr><td style="padding:4px 6px;">${esc(x.actor || "-")}${nm ? ` <span style="color:var(--muted-2)">(${esc(nm)})</span>` : ""}</td>` +
+              `<td>${esc(x.version || "-")}</td><td>${new Date(x.at).toLocaleString("ko-KR")}</td></tr>`;
+          }).join("")
+        : '<tr><td colspan="3" style="color:var(--muted);padding:4px 6px;">아직 받은 기록이 없습니다 — 이 기능이 들어간 뒤부터 쌓입니다</td></tr>';
+    } catch (e) {
+      dlRows.innerHTML = '<tr><td colspan="3" style="color:var(--muted);padding:4px 6px;">불러오지 못했습니다</td></tr>';
+    }
+  }
+
+  // ── MCP 연동 (2026-07-28 mcp.html에서 이관) ─────────────────────────
+  const $ = (id) => document.getElementById(id);
+
+
+  // 에이전트(보안팀) — 도구 권한 부여 대상. 제품 로스터와 맞춤.
+  const AGENTS = [["vuln", "취약점"], ["analyze", "분석"], ["cti", "CTI"], ["report", "리포트"]];
+  const AGENT_NAME = Object.fromEntries(AGENTS.map((a) => [a[0], a[1]]));
+
+  const LKEY = "gijo.mcp.servers.v1", AKEY = "gijo.mcp.audit.v1";
+  function mcpLoadServers() { try { const s = JSON.parse(localStorage.getItem(LKEY)); if (Array.isArray(s)) return s; } catch (e) {} return SEED(); }
+  function mcpSaveServers() { try { localStorage.setItem(LKEY, JSON.stringify(servers)); } catch (e) {} }
+  function mcpLoadAudit() { try { const a = JSON.parse(localStorage.getItem(AKEY)); if (Array.isArray(a)) return a; } catch (e) {} return []; }
+  function mcpAudit(msg) { auditLog.unshift({ t: Date.now(), msg }); auditLog = auditLog.slice(0, 40); try { localStorage.setItem(AKEY, JSON.stringify(auditLog)); } catch (e) {} renderAudit(); }
+  // 예시 정의(연동 대기) — CTI 소스 중심.
+  function SEED() {
+    return [
+      { id: "s1", name: "VirusTotal (CTI)", icon: "🎯", transport: "http", endpoint: "https://mcp.virustotal.com", enabled: false, egressApproved: false, tools: [{ name: "vt_lookup", agents: ["cti", "analyze"] }, { name: "vt_report", agents: ["cti"] }] },
+      { id: "s2", name: "MISP 위협 피드", icon: "🧬", transport: "http", endpoint: "https://misp.local/mcp", enabled: false, egressApproved: false, tools: [{ name: "search_iocs", agents: ["cti"] }, { name: "get_events", agents: ["cti", "analyze"] }] },
+      { id: "s3", name: "Nessus 스캐너", icon: "🛡", transport: "stdio", endpoint: "./mcp/nessus", enabled: false, egressApproved: true, tools: [{ name: "scan_host", agents: ["vuln"] }, { name: "get_findings", agents: ["vuln", "analyze"] }] },
+    ];
+  }
+  let servers = mcpLoadServers();
+  let auditLog = mcpLoadAudit();
+
+  const isRemote = (s) => s.transport === "http";
+  const canEnable = (s) => !isRemote(s) || s.egressApproved;
+
+  function renderKpis() {
+    const total = servers.length;
+    const active = servers.filter((s) => s.enabled).length;
+    const remote = servers.filter(isRemote).length;
+    const tools = servers.reduce((n, s) => n + s.tools.length, 0);
+    $("kpis").innerHTML = [
+      ["등록 서버", total, "var(--blue-light)"], ["활성", active, "var(--teal)"],
+      ["원격(egress)", remote, "var(--amber)"], ["도구 정의", tools, "#fff"],
+    ].map(([k, v, c]) => `<div class="g-kpi"><div class="g-kpi-label">${k}</div><div class="g-kpi-value" style="color:${c}">${v}</div></div>`).join("");
+  }
+
+  function renderServers() {
+    if (!servers.length) { $("srvList").innerHTML = '<div class="empty">등록된 MCP 서버가 없습니다 — 우측 상단 “＋ MCP 서버 추가”로 등록하세요.</div>'; return; }
+    $("srvList").innerHTML = servers.map((s) => {
+      const remote = isRemote(s);
+      const enableable = canEnable(s);
+      const gate = remote ? (s.egressApproved
+        ? '<span class="gate approved" title="외부 전송 승인됨">✓ egress 승인됨</span>'
+        : `<span class="gate" data-egress="${s.id}" title="외부로 데이터가 나갑니다 — 승인해야 활성화">⚠ egress 승인</span>`) : "";
+      const toggle = `<div class="toggle ${s.enabled ? "on" : ""} ${enableable ? "" : "dis"}" data-toggle="${s.id}" title="${enableable ? "활성/비활성" : "egress 승인 후 활성화 가능"}"><i></i></div>`;
+      const tools = s.tools.map((t) => `<span class="tool"><span class="x">✓</span>${esc(t.name)}</span>`).join("");
+      const perms = s.tools.map((t, ti) => `<div class="perm-row"><code style="color:var(--blue-light)">${esc(t.name)}</code> — ${AGENTS.map((a) => `<span class="ag ${t.agents.includes(a[0]) ? "on" : ""}" data-perm="${s.id}:${ti}:${a[0]}">${a[1]}</span>`).join("")}</div>`).join("");
+      return `<div class="srv ${remote && !s.egressApproved ? "warn" : ""} ${s._open ? "open" : ""}" >
+        <div class="srv-h">
+          <span class="srv-ic">${esc(s.icon || "🔌")}</span>
+          <span class="srv-nm">${esc(s.name)}</span>
+          <span class="tbadge ${remote ? "b-remote" : "b-local"}">${remote ? "원격·HTTP egress⚠" : "로컬·stdio 안전"}</span>
+          <span class="dot ${s.enabled ? "on" : "pend"}"></span>
+          <span class="caret" data-open="${s.id}">${s._open ? "▾ 접기" : "▸ 상세"}</span>
+          <div class="srv-acts">${gate}${toggle}</div>
+        </div>
+        <div class="srv-meta"><span><span class="k">상태</span> ${s.enabled ? "활성" : "정의됨 · 연동 대기"}</span><span><span class="k">엔드포인트</span> <code>${esc(s.endpoint || "-")}</code></span><span><span class="k">도구</span> ${s.tools.length}</span></div>
+        <div class="expand">
+          <div style="font-size:11.5px;color:var(--muted);margin-bottom:2px">노출 도구</div>
+          <div>${tools || '<span style="color:var(--muted-2);font-size:11px">정의된 도구 없음</span>'}</div>
+          <div style="font-size:11.5px;color:var(--muted);margin:10px 0 2px">에이전트 권한 (도구별 허용)</div>
+          ${perms}
+          <div style="margin-top:12px"><button class="del" data-del="${s.id}">서버 삭제</button></div>
+        </div>
+      </div>`;
+    }).join("");
+    // 배선
+    $("srvList").querySelectorAll("[data-open]").forEach((el) => el.addEventListener("click", () => { const s = servers.find((x) => x.id === el.dataset.open); s._open = !s._open; renderServers(); }));
+    $("srvList").querySelectorAll("[data-toggle]").forEach((el) => el.addEventListener("click", () => {
+      const s = servers.find((x) => x.id === el.dataset.toggle); if (!s) return;
+      if (!canEnable(s)) { mcpAudit(`⚠ '${s.name}' 활성 시도 거부 — egress 미승인`); return; }
+      s.enabled = !s.enabled; mcpSaveServers(); mcpAudit(`${s.enabled ? "활성" : "비활성"}: ${s.name}`); mcpRender();
+    }));
+    $("srvList").querySelectorAll("[data-egress]").forEach((el) => el.addEventListener("click", () => {
+      const s = servers.find((x) => x.id === el.dataset.egress); if (!s) return;
+      if (!confirm(`'${s.name}'는 원격(HTTP) 서버로 외부로 데이터가 나갈 수 있습니다.\negress를 승인하시겠습니까? (관리자 책임)`)) return;
+      s.egressApproved = true; mcpSaveServers(); mcpAudit(`egress 승인: ${s.name} (${s.endpoint})`); mcpRender();
+    }));
+    $("srvList").querySelectorAll("[data-perm]").forEach((el) => el.addEventListener("click", () => {
+      const [sid, ti, ag] = el.dataset.perm.split(":");
+      const s = servers.find((x) => x.id === sid); if (!s) return;
+      const tool = s.tools[+ti]; const i = tool.agents.indexOf(ag);
+      if (i >= 0) tool.agents.splice(i, 1); else tool.agents.push(ag);
+      mcpSaveServers(); mcpAudit(`권한 변경: ${s.name}/${tool.name} → ${AGENT_NAME[ag]} ${i >= 0 ? "해제" : "허용"}`); mcpRender();
+    }));
+    $("srvList").querySelectorAll("[data-del]").forEach((el) => el.addEventListener("click", () => {
+      const s = servers.find((x) => x.id === el.dataset.del); if (!s) return;
+      if (!confirm(`'${s.name}' 서버 정의를 삭제할까요?`)) return;
+      servers = servers.filter((x) => x.id !== s.id); mcpSaveServers(); mcpAudit(`삭제: ${s.name}`); mcpRender();
+    }));
+  }
+
+  function renderMatrix() {
+    // 도구(활성 서버) × 에이전트. 활성+권한이 있어야 실제 허용.
+    const rows = [];
+    servers.forEach((s) => s.tools.forEach((t) => rows.push({ s, t })));
+    if (!rows.length) { $("mtx").innerHTML = '<tr><td style="padding:14px;color:var(--muted)">정의된 도구가 없습니다.</td></tr>'; return; }
+    const head = `<tr><th style="text-align:left">도구 (서버)</th>${AGENTS.map((a) => `<th>${a[1]}</th>`).join("")}</tr>`;
+    const body = rows.map(({ s, t }) => {
+      const live = s.enabled && canEnable(s);
+      return `<tr><td class="tool-c">${esc(t.name)} <span style="color:var(--muted-2)">· ${esc(s.name)}</span>${live ? "" : ' <span style="color:var(--amber);font-size:9.5px">(대기)</span>'}</td>` +
+        AGENTS.map((a) => `<td class="${t.agents.includes(a[0]) ? "y" : "n"}">${t.agents.includes(a[0]) ? "✓" : "–"}</td>`).join("") + "</tr>";
+    }).join("");
+    $("mtx").innerHTML = head + body;
+  }
+
+  function renderAudit() {
+    if (!auditLog.length) { $("audit").innerHTML = '<div class="au-row" style="color:var(--muted-2)">감사 로그가 아직 없습니다.</div>'; return; }
+    $("audit").innerHTML = auditLog.map((a) => `<div class="au-row"><span class="t">${new Date(a.t).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}</span><span>${esc(a.msg)}</span></div>`).join("");
+  }
+
+  function mcpRender() { renderKpis(); renderServers(); renderMatrix(); }
+
+  // ── 추가 모달 ──
+  function openAdd() { $("mTitle").textContent = "＋ MCP 서버 추가"; $("fName").value = ""; $("fIcon").value = "🔌"; $("fEndpoint").value = ""; $("fTools").value = ""; document.querySelector('input[name=tr][value=stdio]').checked = true; updEpLbl(); $("mErr").textContent = ""; $("mbg").classList.add("on"); setTimeout(() => $("fName").focus(), 30); }
+  function updEpLbl() { const t = document.querySelector("input[name=tr]:checked").value; $("epLbl").textContent = t === "http" ? "엔드포인트 URL (HTTP·원격)" : "명령/경로 (stdio·로컬)"; }
+  function saveNew() {
+    const name = $("fName").value.trim();
+    if (!name) { $("mErr").textContent = "이름을 입력하세요."; return; }
+    const transport = document.querySelector("input[name=tr]:checked").value;
+    const tools = $("fTools").value.split(",").map((x) => x.trim()).filter(Boolean).map((n) => ({ name: n, agents: [] }));
+    const s = { id: "s" + Date.now().toString(36), name, icon: $("fIcon").value.trim() || "🔌", transport, endpoint: $("fEndpoint").value.trim(), enabled: false, egressApproved: transport !== "http", tools, _open: true };
+    servers.push(s); mcpSaveServers(); mcpAudit(`서버 추가: ${name} (${transport === "http" ? "원격·HTTP" : "로컬·stdio"})`); $("mbg").classList.remove("on"); mcpRender();
+  }
+
+  function mcpWire() {
+    tick(); setInterval(tick, 30000); loadUser(); loadHealth();
+    $("addBtn").addEventListener("click", openAdd);
+    $("mCancel").addEventListener("click", () => $("mbg").classList.remove("on"));
+    $("mSave").addEventListener("click", saveNew);
+    $("mbg").addEventListener("click", (e) => { if (e.target === $("mbg")) $("mbg").classList.remove("on"); });
+    document.querySelectorAll("input[name=tr]").forEach((r) => r.addEventListener("change", updEpLbl));
+
+    mcpRender(); renderAudit();
+  }
+
+
   async function loadLawConfig() {
     try {
       const c = await window.gijo.lawConfig();
@@ -1272,8 +1580,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     document.getElementById("testConnectionBtn").addEventListener("click", testConnection);
     document.getElementById("saveServerUrlBtn").addEventListener("click", saveServerUrl);
-    document.getElementById("csvExportBtn").addEventListener("click", exportUsageCsv);
-    loadUsage();
+    mcpWire();
+    document.getElementById("checkBtn").addEventListener("click", checkUpdate);
+    document.getElementById("installBtn").addEventListener("click", installUpdate);
+    checkUpdate().catch(() => {});
     // 에이전트 모델 배정 — 고르면 바로 저장한다
     document.getElementById("agentModelRows").addEventListener("change", async (e) => {
       const sel = e.target.closest(".am-select");
@@ -1428,6 +1738,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     paint();
   }
 
+  reapplySectionFilter(); // 로그인 확인 전에 걸어 둔다 — 잠깐이라도 다른 탭 것이 비치지 않게
   if (!window.gijo.isAuthenticated()) {
     window.gijo.navigateTo("login.html");
   } else {
@@ -1436,6 +1747,25 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 </script>
 
 
+
+<!-- 서버 추가/편집 모달 -->
+<div class="mbg" id="mbg">
+  <div class="modal">
+    <h3 id="mTitle">＋ MCP 서버 추가</h3>
+    <div class="fld"><label>이름</label><input id="fName" placeholder="예: VirusTotal, Nessus 스캐너"></div>
+    <div class="fld"><label>아이콘(이모지)</label><input id="fIcon" placeholder="예: 🎯" maxlength="4"></div>
+    <div class="fld"><label>전송 방식</label>
+      <div class="seg">
+        <label><input type="radio" name="tr" value="stdio" checked><span>🖥 stdio (로컬·안전)</span></label>
+        <label><input type="radio" name="tr" value="http"><span>🌐 HTTP (원격·egress)</span></label>
+      </div>
+    </div>
+    <div class="fld"><label id="epLbl">명령/경로 (stdio)</label><input id="fEndpoint" placeholder="예: ./mcp/nessus  또는  https://mcp.vendor.com"></div>
+    <div class="fld"><label>도구 이름(쉼표로 구분 — 정의용)</label><input id="fTools" placeholder="예: scan_host, get_findings"></div>
+    <div class="err" id="mErr"></div>
+    <div class="m-acts"><button class="btn" id="mCancel">취소</button><button class="btn pri" id="mSave">저장</button></div>
+  </div>
+</div>
 
 <div id="gijoChatWidget" data-prompts='["구동 티어 사용법 알려줘","SMTP 설정 방법 알려줘"]'></div>
 <script src="nav.js"></script>

@@ -107,6 +107,9 @@
     var car = document.createElement("span"); car.className = "car"; car.textContent = "▶";
     var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = name;
     head.appendChild(car); head.appendChild(nm);
+    // 구역(탭)으로 나뉜 화면에서는 제목 줄도 같은 구역에 속해야 한다(2026-07-28).
+    // 안 물려주면 다른 탭 구역의 제목 줄만 남아 "여긴 왜 이게 있지"가 된다.
+    if (target.dataset && target.dataset.sec) head.dataset.sec = target.dataset.sec;
     target.parentNode.insertBefore(head, target);
 
     var e = { target: target, head: head, name: name, badges: parseBadges(target.getAttribute("data-gijo-fold-badges")) };

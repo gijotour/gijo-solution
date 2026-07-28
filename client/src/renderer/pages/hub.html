@@ -103,7 +103,9 @@
       if (!f) {
         f = document.createElement("iframe");
         f.className = "hub-frame";
-        f.src = tab.page + "?embed=1"; // 페이지 쪽 nav.js가 embed 모드로 헤더·사이드바를 숨긴다
+        // 페이지 쪽 nav.js가 embed 모드로 헤더·사이드바를 숨긴다.
+        // 탭 주소에 이미 물음표가 있으면(설정 구역 ?s=ai 같은) &로 이어야 한다 — 2026-07-28.
+        f.src = tab.page + (tab.page.includes("?") ? "&" : "?") + "embed=1";
         frames.set(tab.page, f);
         body.appendChild(f);
       }

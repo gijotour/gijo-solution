@@ -929,7 +929,7 @@
         const ver = r.latest && r.latest.version ? r.latest.version : "";
         document.getElementById("updateChipVer").textContent = ver ? "v" + ver : "";
         chip.style.display = "inline-flex";
-        chip.addEventListener("click", () => window.gijo.navigateTo("update.html"), { once: true });
+        chip.addEventListener("click", () => window.gijo.navigateTo("settings.html?s=admin"), { once: true });
       }
     } catch (e) {}
   }
@@ -3012,7 +3012,7 @@
     "inventory.html": ["자산 목록", "📦"], "products.html": ["보안제품", "🧰"], "hardening.html": ["원격 정기점검", "🛰️"], "audit.html": ["작업 기록", "📜"], "terminal.html": ["터미널", "💻"],
     "report.html": ["리포트", "📄"], "compliance.html": ["컴플라이언스", "📋"], "opsguide.html": ["유지보수", "🔧"], "redteam.html": ["레드팀·가드레일", "🚨"],
     "kpi.html": ["보안 KPI", "📈"], "sessions.html": ["작업 세션", "🗂️"], "sbom.html": ["AI-BOM", "🤖"], "agent.html": ["에이전트 AI", "🤝"], "merge.html": ["LLM 합성", "⚗️"],
-    "memory.html": ["기억·학습(RAG)", "🧠"], "ontology.html": ["온톨로지", "🕸️"], "learnloop.html": ["학습 루프", "🔁"], "logs.html": ["로그", "📃"], "settings.html": ["설정", "⚙️"]
+    "memory.html": ["기억·학습(RAG)", "🧠"], "ontology.html": ["온톨로지", "🕸️"], "learnloop.html": ["학습 루프", "🔁"], "audit.html": ["기록 보기", "📃"], "settings.html": ["설정", "⚙️"]
   };
   // 역할 프리셋(2026-07-23 ④ 대시보드 프리셋 A안) — 역할별로 위젯 구성을 통째로 전환한다.
   // SOC 대시보드 모범사례(역할 기반 프리셋). 프리셋을 고르면 layout이 그 구성으로 바뀌고,
@@ -3028,7 +3028,7 @@
       monthly: ["hardening.html", "products.html"] } },
     ops: { label: "🔧 운영자", desc: "점검·유지보수·장비 위주", layout: {
       daily: ["hardening.html", "terminal.html", "opsguide.html", "products.html", "assethub.html"],
-      weekly: ["inventory.html", "vulnscan.html", "audit.html", "logs.html"],
+      weekly: ["inventory.html", "vulnscan.html", "audit.html"],
       monthly: ["report.html", "compliance.html"] } }
   };
   var PKEY = "gijo.dashMenu.preset.v1";

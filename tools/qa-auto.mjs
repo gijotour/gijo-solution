@@ -468,7 +468,7 @@ async function runClient() {
   await scenario("QA-C03", "메뉴 C안", "설정 허브 + 업데이트 배지", {
     given: "새 버전이 있다고 서버가 알려줄 때",
     when: "hub.html?g=settings 를 열면",
-    then: "설정 계열 5탭(설정·MCP 연동·업데이트·로그·작업 기록)이 뜨고 사이드바 설정 항목에 업데이트 배지가 표시된다",
+    then: "설정 5탭(내 설정·서버·AI·연동·관리자·기록 보기)이 뜨고 사이드바 설정 항목에 업데이트 배지가 표시된다",
   }, async () => {
     await open("hub.html?g=settings");
     const tabs = await page.evaluate(() => document.querySelectorAll(".hub-tab").length);

@@ -72,6 +72,27 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .kpi-mini .v{font-size:18px;font-weight:800;color:#fff;}
 .footer{margin-top:14px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted-2);}
 .footer img{height:16px;opacity:0.6;}
+/* 시스템 로그 — logs.html에서 이관(2026-07-28) */
+.topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;}
+.filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
+.filter-chip{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;}
+.filter-chip.active{background:rgba(59,130,246,0.15);border-color:var(--blue);color:var(--blue-light);}
+.log-console{background:#05070d;border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;height:calc(100vh - 320px);min-height:360px;overflow-y:auto;font-family:"Consolas","Cascadia Mono",monospace;font-size:11.5px;line-height:1.65;}
+.log-line{white-space:pre-wrap;word-break:break-all;}
+.log-line.log-warn{color:var(--amber);}
+.log-line.log-error{color:#f5928a;}
+.log-ts{color:var(--muted-2);margin-right:6px;}
+.log-src{display:inline-block;min-width:88px;margin-right:8px;padding:0 6px;border-radius:4px;font-size:10px;font-weight:800;text-align:center;background:rgba(255,255,255,0.06);color:var(--muted);}
+.log-src.s-console{color:var(--muted-2);}
+.log-src.s-modelscan{background:rgba(139,124,240,0.15);color:var(--purple);}
+.log-src.s-reposcan{background:rgba(59,130,246,0.15);color:var(--blue-light);}
+.log-src.s-extract-doc{background:rgba(30,185,128,0.13);color:var(--teal);}
+.log-src.s-finetune{background:rgba(240,160,32,0.15);color:var(--amber);}
+.log-src.s-hf-download{background:rgba(30,185,128,0.15);color:var(--teal);}
+.usage-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px;}
+.usage-kpi{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;}
+.usage-kpi .l{font-size:10.5px;color:var(--muted-2);font-weight:700;}
+.usage-kpi .v{font-size:16px;font-weight:800;color:#fff;margin-top:3px;}
 </style>
 </head>
 <body>
@@ -116,6 +137,46 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     </div>
 
     <div class="panel scroll-list" id="auditPanel"><div class="empty">불러오는 중…</div></div>
+
+    <!-- 시스템 로그 — logs.html 화면에서 이관(2026-07-28). 작업 기록이 '누가 무엇을 했나'라면
+         이쪽은 '서버가 무엇을 했나'다. 같은 탭에서 위아래로 대조할 수 있어야 한다. -->
+    <div class="panel" data-gijo-fold="시스템 로그">
+      <div class="panel-title">시스템 로그</div>
+      <div class="panel-sub">서버와 도구가 실제로 무엇을 했는지 흐르는 그대로 보여줍니다.</div>
+      <div class="filters" id="sourceFilters">
+        <div class="filter-chip active" data-src="all">전체</div>
+        <div class="filter-chip" data-src="console">서버 콘솔</div>
+        <div class="filter-chip" data-src="modelscan">모델 스캔</div>
+        <div class="filter-chip" data-src="reposcan">저장소 스캔</div>
+        <div class="filter-chip" data-src="extract-doc">문서 추출</div>
+        <div class="filter-chip" data-src="finetune">파인튜닝</div>
+        <div class="filter-chip" data-src="hf-download">모델 다운로드</div>
+      </div>
+      <div class="log-console" id="logConsole"></div>
+    </div>
+
+    <!-- 사용량·비용 — 설정에서 이관(2026-07-28). 바꾸는 곳이 아니라 보는 곳이다. -->
+    <div class="panel" data-gijo-fold="사용량 · 비용">
+    <div class="panel-title">사용량 · 비용</div>
+    <div class="panel-sub">서버를 켠 뒤 누적된 호출량입니다. 온프레미스 로컬 LLM은 비용이 들지 않으며, 외부 서비스를 쓴 경우에만 예상 비용이 잡힙니다.</div>
+    <div class="usage-kpis">
+    <div class="usage-kpi"><div class="l">예상 비용 합계</div><div class="v" id="kpiCost">-</div></div>
+    <div class="usage-kpi"><div class="l">외부 서비스</div><div class="v" id="kpiServices">-</div></div>
+    <div class="usage-kpi"><div class="l">호출 수</div><div class="v" id="kpiCalls">-</div></div>
+    </div>
+    <div style="margin-top:14px;font-size:12px;font-weight:700;color:var(--muted);">외부 서비스별</div>
+    <table style="width:100%;font-size:11.5px;margin-top:6px;border-collapse:collapse">
+    <thead><tr style="color:var(--muted-2);text-align:left"><th style="padding:4px 6px;font-weight:600">서비스</th><th style="font-weight:600">호출</th><th style="font-weight:600">예상 비용</th></tr></thead>
+    <tbody id="usageRows"><tr><td colspan="3" style="color:var(--muted);padding:4px 6px;">불러오는 중...</td></tr></tbody>
+    </table>
+    <div style="margin-top:18px;font-size:12px;font-weight:700;color:var(--muted);">📊 클라우드 API 사용량 <span style="color:var(--muted-2);font-weight:400;">— 제공자별 호출·토큰·예상 비용 (서버 기동 후 누적)</span></div>
+    <table style="width:100%;font-size:11.5px;margin-top:6px;border-collapse:collapse;">
+    <thead><tr style="color:var(--muted-2);text-align:left;"><th style="padding:4px 6px;">제공자·모델</th><th>호출</th><th>토큰(입력/출력)</th><th>예상 비용</th></tr></thead>
+    <tbody id="cloudUsageRows"><tr><td colspan="4" style="color:var(--muted);padding:4px 6px;">불러오는 중...</td></tr></tbody>
+    </table>
+    <button class="btn-ghost" id="csvExportBtn" style="margin-top:12px">사용량 CSV 내보내기</button>
+    <div class="status-line" id="usageStatusLine"></div>
+    </div>
 
     <div class="footer">
       <img src="https://gijo.ai/_nuxt/logo_gijo_only_white.ATZVOJtw.svg" alt="GIJO">
@@ -203,7 +264,123 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(a.href);
   }
 
+  // ── 시스템 로그 (2026-07-28 logs.html에서 이관) ──────────────────────
+  // 시계·헤더·사용자 표시는 이 화면(작업 기록)에 이미 있다 — 가져오지 않는다.
+  const logConsole = document.getElementById("logConsole");
+  let activeFilter = "all";
+  let logEntries = [];
+
+  function lineHtml(entry) {
+    const src = entry.source || "console";
+    const cls = "log-line" + (entry.level === "warn" ? " log-warn" : entry.level === "error" ? " log-error" : "");
+    const time = new Date(entry.timestamp).toLocaleTimeString("ko-KR", { hour12: false });
+    const srcClass = "log-src s-" + src.replace(/[^a-z0-9-]/gi, "");
+    return `<div class="${cls}"><span class="log-ts">${time}</span><span class="${srcClass}">${src}</span>${String(entry.message).replace(/</g, "&lt;")}</div>`;
+  }
+
+  function renderLogs() {
+    const shown = activeFilter === "all" ? logEntries : logEntries.filter((e) => (e.source || "console") === activeFilter);
+    logConsole.innerHTML = shown.map(lineHtml).join("") || '<div style="color:var(--muted)">표시할 로그가 없습니다.</div>';
+    logConsole.scrollTop = logConsole.scrollHeight;
+  }
+
+  function appendLogEntry(entry) {
+    logEntries.push(entry);
+    if (logEntries.length > 500) logEntries.shift();
+    // 현재 필터에 맞으면 append + 스크롤 (전체 재렌더 비용 절감)
+    if (activeFilter === "all" || (entry.source || "console") === activeFilter) {
+      logConsole.insertAdjacentHTML("beforeend", lineHtml(entry));
+      while (logConsole.childElementCount > 500) logConsole.removeChild(logConsole.firstChild);
+      logConsole.scrollTop = logConsole.scrollHeight;
+    }
+  }
+
+  async function loadLogs() {
+    try {
+      logEntries = await window.gijo.listLogs();
+      renderLogs();
+    } catch (e) {
+      logConsole.textContent = "로그를 불러오지 못했습니다: " + e.message;
+    }
+  }
+
+
+  // ── 사용량 · 비용 (2026-07-28 설정에서 이관) ────────────────────────
+  let lastUsage = [];
+  async function loadUsage() {
+    const rows = document.getElementById("usageRows");
+    if (!rows) return;
+    try {
+      lastUsage = (await window.gijo.getUsageSummary()) || [];
+      rows.innerHTML = lastUsage.length
+        ? lastUsage.map((u) =>
+            `<tr><td style="padding:4px 6px;">${esc(u.service)}</td><td>${u.callCount.toLocaleString()}건</td>` +
+            `<td>${u.estimatedCost.toFixed(4)}</td></tr>`).join("")
+        : '<tr><td colspan="3" style="color:var(--muted);padding:4px 6px;">아직 외부 서비스 호출이 없습니다 (온프레미스만 쓰는 중)</td></tr>';
+      document.getElementById("kpiCost").textContent = "$" + lastUsage.reduce((a, u) => a + u.estimatedCost, 0).toFixed(4);
+      document.getElementById("kpiServices").textContent = lastUsage.length;
+      document.getElementById("kpiCalls").textContent = lastUsage.reduce((a, u) => a + u.callCount, 0).toLocaleString();
+    } catch (e) {
+      rows.innerHTML = '<tr><td colspan="3" style="color:var(--muted);padding:4px 6px;">사용량을 불러오지 못했습니다</td></tr>';
+    }
+  }
+
+  function exportUsageCsv() {
+    const line = document.getElementById("usageStatusLine");
+    if (!lastUsage.length) {
+      line.className = "status-line status-err";
+      line.textContent = "내보낼 사용량이 없습니다";
+      return;
+    }
+    const rows = [["서비스", "호출 수", "예상 비용(USD)"]];
+    for (const u of lastUsage) rows.push([u.service, u.callCount, u.estimatedCost.toFixed(4)]);
+    const csv = rows.map((r) => r.map((c) => '"' + String(c).replace(/"/g, '""') + '"').join(",")).join("\n");
+    // BOM을 붙여야 엑셀에서 한글이 안 깨진다
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "gijo-as-usage-summary.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    line.className = "status-line status-ok";
+    line.textContent = "gijo-as-usage-summary.csv 로 내보냈습니다";
+  }
+
+  async function loadCloudUsage() {
+    const rows = document.getElementById("cloudUsageRows");
+    if (!rows) return;
+    try {
+      const u = await window.gijo.cloudUsage();
+      if (!u.rows || !u.rows.length) {
+        rows.innerHTML = '<tr><td colspan="4" style="color:var(--muted);padding:4px 6px;">아직 클라우드 API 호출이 없습니다 (미사용 또는 호출 전)</td></tr>';
+        return;
+      }
+      rows.innerHTML = u.rows.map((r) =>
+        `<tr><td style="padding:4px 6px;">${r.providerLabel} <span style="color:var(--muted-2);font-size:10.5px;">${r.model}</span></td>` +
+        `<td>${r.calls.toLocaleString()}건</td><td>${r.inTokens.toLocaleString()} / ${r.outTokens.toLocaleString()}</td>` +
+        `<td>$${r.estimatedCost.toFixed(4)}</td></tr>`).join("");
+    } catch (e) {
+      rows.innerHTML = '<tr><td colspan="4" style="color:var(--muted);padding:4px 6px;">사용량을 불러오지 못했습니다</td></tr>';
+    }
+  }
+
+
   async function init() {
+    // 시스템 로그 · 사용량 (2026-07-28 이관)
+    document.getElementById("sourceFilters").addEventListener("click", (e) => {
+      const chip = e.target.closest(".filter-chip");
+      if (!chip) return;
+      document.querySelectorAll("#sourceFilters .filter-chip").forEach((c) => c.classList.remove("active"));
+      chip.classList.add("active");
+      activeFilter = chip.dataset.src;
+      renderLogs();
+    });
+    document.getElementById("csvExportBtn").addEventListener("click", exportUsageCsv);
+    window.gijo.onLogEvent(appendLogEntry);
+    loadLogs().catch(() => {});
+    loadUsage().catch(() => {});
+    loadCloudUsage().catch(() => {});
+
     tick(); setInterval(tick, 30000);
     await loadUser();
     loadHealth();
