@@ -69,14 +69,12 @@
   var authed = false;
   try { authed = window.gijo && window.gijo.isAuthenticated(); } catch (e) {}
 
-  // ── 설정 허브로 가는 주소는 여기 한 곳에서만 만든다 ──────────────────────────
-  // ⚠ 허브는 t= 값을 탭 주소와 **글자 그대로** 대조하고, 안 맞으면 조용히 첫 탭으로 떨어진다.
-  //   설정 통합(2026-07-28)으로 탭이 settings.html?s=xxx 꼴로 바뀌었는데 여기 링크는
-  //   update.html·settings.html 옛 주소로 남아, 업데이트를 눌러도 '내 설정'이 열렸다
-  //   (2026-07-28 사용자 지적: "업데이트 화면이 안 보인다"). 주소를 흩어 두면 또 어긋나므로 모은다.
-  function settingsTab(page) { return "hub.html?g=settings&t=" + encodeURIComponent(page); }
-  var TAB_UPDATE = settingsTab("settings.html?s=admin"); // 업데이트 패널은 관리자 구역에 있다
-  var TAB_SETTINGS = settingsTab("settings.html?s=ai");  // 쿼리 없는 옛 설정 링크의 흡수처(nav.js와 동일)
+  // ── 설정로 가는 주소는 여기 한 곳에서만 만든다 ────────────────────────────────
+  // 4.0.0에서 허브를 걷어내 화면이 곧 주소가 됐다 — 딥링크(hub.html?g=…&t=…)가 필요 없다.
+  // ⚠ 주소를 여기저기 흩어 두면 화면 구조가 바뀔 때 또 어긋난다(2026-07-28 실사고:
+  //   업데이트를 눌러도 '내 설정'이 열렸다). 그래서 한 곳에 모아 둔다.
+  var TAB_UPDATE = "settings.html?s=admin"; // 업데이트 패널은 관리자 구역에 있다
+  var TAB_SETTINGS = "settings.html?s=ai";  // 쿼리 없는 옛 설정 링크의 흡수처(nav.js와 동일)
 
   // ── 업데이트 알림 상태 — 사용자 영역의 ⬆칩 + ⚙점 배지를 채운다 ──
   var updateInfo = null;

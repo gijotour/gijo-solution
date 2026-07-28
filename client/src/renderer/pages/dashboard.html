@@ -2974,9 +2974,8 @@
       ua.innerHTML = '<div class="ua-avatar" style="width:26px;height:26px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800">-</div>' +
         '<div class="ua-name" style="flex:1;font-size:11.5px;font-weight:700;color:#dfe6ff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">사용자</div>' +
         '<div class="ua-gear" title="설정" style="color:var(--muted-2);font-size:13px">⚙</div>';
-      // 설정 탭 주소는 t=로 글자 그대로 대조된다 — 쿼리 없는 옛 주소를 쓰면 '내 설정'으로
-      // 떨어진다(2026-07-28 실사고). nav.js·titlebar.js와 같은 흡수처(서버·AI)로 보낸다.
-      ua.addEventListener("click", () => window.gijo.navigateTo("hub.html?g=settings&t=" + encodeURIComponent("settings.html?s=ai")));
+      // 허브를 걷어낸 뒤(4.0.0)로는 화면이 곧 주소다. nav.js·titlebar.js와 같은 흡수처(서버·AI).
+      ua.addEventListener("click", () => window.gijo.navigateTo("settings.html?s=ai"));
       window.gijo.me().then((u) => {
         const nm = (u && (u.displayName || u.username)) || "사용자";
         ua.querySelector(".ua-name").textContent = nm;

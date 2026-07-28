@@ -5,123 +5,88 @@
 // 스타일은 페이지 :root 토큰(--panel-2·--border·--blue…)을 그대로 쓰므로 다크 테마와 일관된다.
 
 (function () {
-  // ── 메뉴 C안 통합 (2026-07-23): 32항목 → 11항목·3그룹 + 설정. 겹치는 화면은 허브 탭(hub.html)으로
-  // 병합 — 기존 페이지는 그대로 두고 iframe(embed=1)으로 품는다. 직접 URL 접근은 허브로 리다이렉트.
-  // 허브 정의는 hub.html과 공유(window.gijoHubs).
-  var HUBS = {
-    analysis: { ic: "📊", label: "보안 분석", tabs: [
+  // 4.0.0에서 허브(2단 탭)를 걷어냈다 — 화면이 곧 메뉴 항목이고, 여러 화면은 셸 탭으로 열어 둔다.
+  // ── 전체메뉴(4.0.0) — 허브(2단 탭)를 없애고 화면을 그대로 늘어놓는다 ──────────
+  //
+  // 왜 풀었나: 화면을 탭으로 열어 두는 구조가 되면서 "탭 안의 탭"이 생겼다. 셸 탭 → 허브 →
+  // 실화면이면 겹이 3중이 되는데, 그 3중이 바로 빈 화면 사고의 자리였다(2026-07-28).
+  // 겹을 셸→실화면 2겹으로 고정하려면 중간의 허브를 걷어내야 한다.
+  //
+  // 메뉴가 11개에서 30개로 다시 길어진다(2026-07-23 통합을 되돌리는 셈). 그래도 괜찮은 이유는
+  // 메뉴의 역할이 달라졌기 때문이다 — 자주 쓰는 화면은 탭으로 열어 두고 오가므로, 메뉴는
+  // "처음 한 번 찾으러 가는 곳"이 된다. 그룹 4개는 그대로 둬서 훑기 쉽게 한다.
+  //
+  // 이름은 홀로 서게 지었다: 허브 안에서 '통합 뷰'·'등록부'로 충분하던 것이 밖으로 나오면
+  // 무엇의 통합 뷰인지 알 수 없다 → '자산 통합 뷰'·'보안제품 등록부'.
+  var GROUPS = [
+    { id: "monitor", ic: "🖥", label: "관제", items: [
+      { page: "dashboard.html", label: "대시보드" },
+      { page: "dashboard.html?quick=1", label: "내 업무 바로가기" },
+      // 작업 세션은 탐색기·목록·대화 3열이라 좁은 자리에 넣으면 셋 다 못 쓴다(2026-07-27) — 넓게 본다.
+      { page: "sessions.html", label: "작업 세션" },
       { page: "analysis.html", label: "통합 관제" },
-    ]},
-    threat: { ic: "🎯", label: "위협 인텔리전스", tabs: [
       { page: "threat.html", label: "위협 인텔" },
-    ]},
-    report: { ic: "📄", label: "리포트", tabs: [
       { page: "report.html", label: "리포트" },
-      { page: "kpi.html", label: "보안 KPI" }, // 보고용 스냅샷·추세 — 리포트 곁이 자연스러움(2026-07-25 이동)
+      { page: "kpi.html", label: "보안 KPI" },
       { page: "compliance.html", label: "컴플라이언스" },
     ]},
-    assets: { ic: "🛡", label: "자산 허브", tabs: [
-      { page: "assethub.html", label: "통합 뷰" },
+    { id: "assets", ic: "🛡", label: "자산·조치", items: [
+      { page: "assethub.html", label: "자산 통합 뷰" },
       { page: "inventory.html", label: "자산 목록" },
       { page: "sbom.html", label: "AI-BOM" },
       { page: "vulnscan.html", label: "취약점" },
-    ]},
-    products: { ic: "🧰", label: "보안제품", tabs: [
-      { page: "products.html", label: "등록부" },
-      { page: "opsguide.html", label: "유지보수" },
-    ]},
-    inspect: { ic: "🛰", label: "점검 콘솔", tabs: [
+      { page: "approvals.html", label: "조치·승인" },
+      { page: "products.html", label: "보안제품 등록부" },
+      { page: "opsguide.html", label: "제품 유지보수" },
       { page: "hardening.html", label: "원격 정기점검" },
       { page: "terminal.html", label: "터미널 (CLI)" },
     ]},
-    aiteam: { ic: "🤖", label: "AI 팀", tabs: [
+    { id: "ai", ic: "🤖", label: "AI", items: [
       { page: "agent.html", label: "에이전트 AI" },
       { office: true, label: "🏢 팀 사무실 (창)" },
-    ]},
-    aiknowledge: { ic: "🧠", label: "AI 지식·모델", tabs: [
       { page: "memory.html", label: "기억·학습 (RAG)" },
       { page: "handover.html", label: "인수인계" },
       { page: "ontology.html", label: "온톨로지" },
       { page: "learnloop.html", label: "학습 루프" },
       { page: "merge.html", label: "LLM 합성" },
+      { page: "redteam.html", label: "레드팀·가드레일" },
     ]},
-    // 설정 5탭 재편(2026-07-28) — 기준은 기능이 아니라 **결정권자**다.
+    // 설정 5구역(2026-07-28) — 기준은 기능이 아니라 **결정권자**다.
     // 내 것 / 모두의 것(서버·AI) / 바깥과 잇는 것 / 관리자만 / 보기만.
     // 같은 settings.html을 ?s= 로 걸러 보여준다(파일을 쪼개면 공통 스크립트가 어긋난다).
-    settings: { ic: "⚙", label: "설정", tabs: [
+    { id: "settings", ic: "⚙", label: "설정", bottom: true, items: [
       { page: "settings.html?s=my", label: "내 설정" },
       { page: "settings.html?s=ai", label: "서버·AI" },
       { page: "settings.html?s=link", label: "연동" },
       { page: "settings.html?s=admin", label: "관리자" },
       { page: "audit.html", label: "기록 보기" },
     ]},
-  };
-  window.gijoHubs = HUBS; // hub.html이 같은 정의를 사용
-
-  var GROUPS = [
-    { id: "monitor", ic: "🖥", label: "관제", items: [
-      { page: "dashboard.html", label: "대시보드" },
-      { page: "dashboard.html?quick=1", label: "내 업무 바로가기" }, // 대시보드 위 팝업으로 열림(챗 중심 개편 2026-07-26)
-      // 작업 세션 — 오른쪽 가장자리의 세로 글씨 탭에서 옮겨 왔다(2026-07-27).
-      // 세로로 쓴 글씨는 읽는 데만 시간이 걸리고, 어차피 sessions.html이라는 화면이 이미 있었다.
-      // 팝업으로 열지 않는다(2026-07-27 사용자 지적) — 작업 세션은 탐색기·목록·대화 3열이라
-      // 좁은 팝업에 넣으면 셋 다 못 쓴다. 예전처럼 화면을 옮겨서 넓게 본다.
-      { page: "sessions.html", label: "작업 세션" },
-      // popup: 대시보드 팝업 셸(혼합 방식, 2026-07-26 결정)에서 팝업으로 열리는 화면.
-      // 1차 파일럿 3종 검증 후 챗봇 메뉴 9종 전체 확장(같은 날 사용자 지시 "나머지도 다").
-      // 대시보드가 아닌 화면(gijoShell 없음)에서는 지금처럼 전체 화면으로 이동한다.
-      { page: "hub.html?g=analysis", label: "보안 분석", bot: true, popup: true },
-      { page: "hub.html?g=threat", label: "위협 인텔리전스", bot: true, popup: true },
-      { page: "hub.html?g=report", label: "리포트", bot: true, popup: true },
-    ]},
-    { id: "assets", ic: "🛡", label: "자산·조치", items: [
-      { page: "hub.html?g=assets", label: "자산 허브", bot: true, popup: true },
-      { page: "approvals.html", label: "조치·승인", bot: true, popup: true },
-      { page: "hub.html?g=products", label: "보안제품", bot: true, popup: true },
-      { page: "hub.html?g=inspect", label: "점검 콘솔", bot: true, popup: true },
-    ]},
-    { id: "ai", ic: "🤖", label: "AI", items: [
-      { page: "hub.html?g=aiteam", label: "AI 팀" },
-      // 팀 사무실 — 예전엔 오른쪽 가장자리 세로 탭이었고, 그걸 없앤 뒤로는 'AI 팀' 허브의
-      // 두 번째 탭에만 있어 두 번 눌러야 나왔다("안 보인다" 지적, 2026-07-27).
-      // 별도 창으로 바로 여는 항목이라 여기 직접 둔다 — 한 번 클릭.
-      { office: true, label: "🏢 팀 사무실 (창)" },
-      { page: "hub.html?g=aiknowledge", label: "AI 지식·모델", bot: true, popup: true },
-      { page: "redteam.html", label: "레드팀·가드레일", bot: true, popup: true },
-    ]},
-    { id: "settings", ic: "⚙", label: "설정", bottom: true, items: [
-      { page: "hub.html?g=settings", label: "설정" },
-    ]},
   ];
 
-  // 탭으로 흡수된 페이지 → 허브 딥링크. 대시보드 바로가기·챗봇 navigateTo 등 기존 링크가
-  // 그대로 허브 탭으로 이어진다(embed 프레임 안에서는 리다이렉트하지 않는다).
-  var TAB_REDIRECT = {};
-  Object.keys(HUBS).forEach(function (g) {
-    HUBS[g].tabs.forEach(function (t) { if (t.page) TAB_REDIRECT[t.page] = "hub.html?g=" + g + "&t=" + encodeURIComponent(t.page); });
-  });
-  // 메뉴 정리(2026-07-25, 29→26)로 없어진 화면의 옛 주소 — 기존 링크·바로가기가 깨지지 않게
-  // 흡수처로 보낸다. 기능 안내→챗봇이 대신(설정으로), 사용량·요금→설정 클라우드 구역,
-  // 문서 보강→기억·학습에 병합.
-  // settings.html을 쿼리 없이 연 옛 링크는 서버·AI 탭으로(가장 많이 쓰던 내용이 그쪽에 있다)
-  TAB_REDIRECT["settings.html"] = "hub.html?g=settings&t=" + encodeURIComponent("settings.html?s=ai");
-  TAB_REDIRECT["reference.html"] = "hub.html?g=settings&t=" + encodeURIComponent("settings.html?s=my");
-  TAB_REDIRECT["billing.html"] = "hub.html?g=settings&t=audit.html";
-  // 2026-07-28 설정 5탭 재편으로 흡수된 화면들
-  TAB_REDIRECT["mcp.html"] = "hub.html?g=settings&t=" + encodeURIComponent("settings.html?s=link");
-  TAB_REDIRECT["update.html"] = "hub.html?g=settings&t=" + encodeURIComponent("settings.html?s=admin");
-  TAB_REDIRECT["logs.html"] = "hub.html?g=settings&t=audit.html";
-  TAB_REDIRECT["docenrich.html"] = "hub.html?g=aiknowledge&t=memory.html";
+  // 없어진 화면의 옛 주소 → 흡수처. 허브를 걷어낸 뒤로는 화면이 곧 주소라 딥링크가 필요 없고,
+  // **사라진 화면만** 여기서 돌려보낸다(기존 바로가기·챗봇 링크가 죽지 않게).
+  var TAB_REDIRECT = {
+    "reference.html": "settings.html?s=my",     // 기능 안내 → 챗봇이 대신(2026-07-25)
+    "billing.html": "audit.html",               // 사용량·요금 → 기록 보기
+    "mcp.html": "settings.html?s=link",         // 2026-07-28 설정 5구역으로 흡수
+    "update.html": "settings.html?s=admin",
+    "logs.html": "audit.html",
+    "llmguide.html": "settings.html?s=ai",      // 추천 모델 목록 → 설정 서버·AI
+    "docenrich.html": "memory.html",            // 문서 보강 → 기억·학습에 병합
+    // 허브는 4.0.0에서 없앴다 — 옛 허브 주소로 들어오면 그 허브의 첫 화면으로 보낸다.
+    "hub.html": "dashboard.html",
+  };
 
   function currentPage() {
     return decodeURIComponent((location.pathname || "").split("/").pop() || "");
   }
-  // 허브 페이지는 파일명이 전부 hub.html이라 g 파라미터까지 붙여 항목과 매칭한다.
+  // 지금 보고 있는 화면 = 메뉴 항목의 주소. 설정처럼 한 파일이 여러 구역인 화면은 쿼리까지 봐야
+  // 어느 항목이 활성인지 가려진다(settings.html?s=admin ≠ settings.html?s=ai).
   function currentKey() {
     var file = currentPage();
-    if (file !== "hub.html") return file;
-    var m = /[?&]g=([a-z]+)/.exec(location.search || "");
-    return m ? "hub.html?g=" + m[1] : file;
+    var q = location.search || "";
+    var m = /[?&]s=([a-z]+)/.exec(q);
+    return m ? file + "?s=" + m[1] : file;
   }
   function go(page) { if (window.gijo && window.gijo.navigateTo) window.gijo.navigateTo(page); }
   // 지금 보고 있는 화면의 챗봇을 연다. 일반 화면은 같은 문서에 위젯이 있고(gijoOpenChat),
@@ -253,7 +218,7 @@
           });
           el.appendChild(botMark);
         }
-        if (it.page === "hub.html?g=settings" && updateAvailable) {
+        if (it.page === "settings.html?s=admin" && updateAvailable) {
           var upBadge = document.createElement("span"); upBadge.className = "gn-upbadge"; upBadge.textContent = "1"; upBadge.title = "새 버전 있음"; el.appendChild(upBadge);
         }
         // 진행중인 작업 세션 개수 — 예전 세로 탭에 붙어 있던 정보다. 탭을 없애면서 같이

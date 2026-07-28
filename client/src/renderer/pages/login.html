@@ -195,7 +195,8 @@
           // 로그인 성공 — 접근 서버·ID·PW를 이 PC에 저장(체크 시). PW는 메인 프로세스가 암호화.
           try { await window.gijo.creds.save(serverInput.value.trim(), userInput.value.trim(), passInput.value, savePw.checked); } catch (e) {}
           window.gijoRealtime.connect();
-          await window.gijo.navigateTo("dashboard.html");
+          // 4.0.0 — 앱의 집은 탭 셸이다. 대시보드는 셸이 처음 여는 탭 중 하나일 뿐.
+          await window.gijo.navigateTo("app.html");
           return;
         }
         if (result.code === "already_logged_in") {
