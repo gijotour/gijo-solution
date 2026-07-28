@@ -112,6 +112,7 @@ const gijoApi = {
 
   // 작업 세션(대화 세션형) — 오케스트레이터 지시·응답을 세션 대화로 묶어 관리.
   listWorkSessions: () => api.workSessionsApi.list(),
+  sessionPatterns: (days?: number) => api.workSessionsApi.patterns(days),
   createWorkSession: (title?: string, contextRef?: string) => api.workSessionsApi.create(title, contextRef),
   getWorkSession: (id: string) => api.workSessionsApi.get(id),
   updateWorkSession: (id: string, patch: { title?: string; status?: import("./apiClient").WorkSessionStatus }) => api.workSessionsApi.update(id, patch),

@@ -180,6 +180,18 @@
     <div style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:13px 15px;"><div style="font-size:11px;color:var(--muted);margin-bottom:5px;">완료</div><div style="font-size:19px;font-weight:800;color:var(--muted);" id="wsDone">-</div></div>
   </div>
   <div id="wsArchiveNote" style="display:none;font-size:11px;color:var(--muted-2);margin:-6px 0 12px 2px;"></div>
+
+  <!-- 쌓인 내역에서 뽑은 업무 패턴(2026-07-28 사용자 요청) — 나중에 참고할 자료로 둔다.
+       ⚠ 여기 결과를 자동으로 어디에 먹이지 않는다. 대화를 그대로 지식으로 삼으면 잡담·오답이
+         멀쩡한 문서를 밀어낸다(QA-M04에서 겪었다). 사람이 읽고 판단하는 자리다.
+       기본은 접혀 있다 — 매일 볼 것은 아니다. -->
+  <details class="ws-pat" style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:0 15px;margin-bottom:14px;">
+    <summary style="cursor:pointer;padding:12px 0;font-size:12.5px;font-weight:800;color:var(--text);list-style:none;">
+      🔎 업무 패턴 <span id="patPeriod" style="font-weight:600;color:var(--muted-2);font-size:11px"></span>
+      <span style="float:right;color:var(--muted-2);font-weight:600;font-size:11px">펼치기</span>
+    </summary>
+    <div id="patBody" style="padding:2px 0 14px;font-size:12px;color:var(--muted);">불러오는 중…</div>
+  </details>
   <div class="topbar-row">
     <div>
       <div class="page-title">💬 작업 내역</div>
@@ -546,9 +558,55 @@
     } catch (e) { alert("전체 삭제 실패: " + ((e && e.message) || e)); }
   }
 
+  // ── 업무 패턴 요약 ───────────────────────────────────────────────────
+  // 펼칠 때 한 번만 부른다 — 화면 열 때마다 계산하면 목록 뜨는 게 느려진다.
+  let patLoaded = false;
+  async function loadPatterns() {
+    const box = document.getElementById("patBody");
+    try {
+      const r = await window.gijo.sessionPatterns(30);
+      document.getElementById("patPeriod").textContent =
+        `최근 ${r.기간일수}일 · 내역 ${r.총계.세션}건 · 지시 ${r.총계.지시}건`;
+      const 줄 = (t) => `<div style="padding:4px 0">${esc(t)}</div>`;
+      const 제목 = (t) => `<div style="font-weight:800;color:var(--text);margin:12px 0 4px">${t}</div>`;
+      let h = "";
+
+      h += 제목("자주 하는 지시");
+      h += r.반복지시.length
+        ? r.반복지시.slice(0, 8).map((x) =>
+            `<div style="display:flex;gap:8px;padding:4px 0"><b style="color:var(--blue-light);min-width:34px">${x.횟수}회</b>` +
+            `<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(x.대표문장)}</span></div>`).join("")
+        : 줄("아직 두 번 이상 반복된 지시가 없습니다.");
+
+      h += 제목("답을 못 준 질문 — 이 주제 문서를 올리면 다음부터 답합니다");
+      h += r.지식공백.length
+        ? r.지식공백.slice(0, 8).map((g) =>
+            `<div style="display:flex;gap:8px;padding:4px 0"><span style="color:var(--amber);min-width:96px;font-size:11px">${esc(g.이유)}</span>` +
+            `<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(g.질문)}</span></div>`).join("")
+        : 줄("답을 못 준 질문이 없습니다.");
+
+      h += 제목("무엇에 시간을 쓰나");
+      h += r.주제분포.length
+        ? `<div style="display:flex;flex-wrap:wrap;gap:6px;padding:2px 0">` +
+          r.주제분포.map((t) =>
+            `<span style="background:var(--panel-2);border:1px solid var(--border);border-radius:14px;padding:3px 10px;font-size:11.5px">` +
+            `${esc(t.주제)} <b style="color:var(--text)">${t.건수}</b></span>`).join("") + `</div>`
+        : 줄("집계할 지시가 없습니다.");
+      if (r.잡담.건수) h += `<div style="padding:6px 0 0;color:var(--muted-2);font-size:11px">그 밖에 인사·잡담 ${r.잡담.건수}건(${r.잡담.비율}%)은 집계에서 뺐습니다.</div>`;
+
+      if (r.비고.length) h += `<div style="margin-top:12px;padding-top:10px;border-top:1px solid var(--border);color:var(--muted-2);font-size:11px;line-height:1.8">` +
+        r.비고.map((b) => `· ${esc(b)}`).join("<br>") + `</div>`;
+      box.innerHTML = h;
+    } catch (e) {
+      box.innerHTML = '<div style="color:var(--muted-2)">패턴을 불러오지 못했습니다.</div>';
+    }
+  }
+
   async function init() {
     tick(); setInterval(tick, 30000);
     await loadUser(); await loadHealth();
+    const pat = document.querySelector(".ws-pat");
+    if (pat) pat.addEventListener("toggle", () => { if (pat.open && !patLoaded) { patLoaded = true; loadPatterns(); } });
     await loadExplorerData();
     // 다른 화면에서 넘어온 딥링크(localStorage) — 특정 내역 열기.
     // 'gijo:sessions:new'(새 세션으로 시작) 갈래는 ＋ 새 세션과 함께 없앴다. 옛 앱이 남긴

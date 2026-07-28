@@ -297,8 +297,22 @@ export interface WorkSessionTurn {
   tool?: string;
   at: number;
 }
+// 작업 내역 패턴 요약 — 쌓인 지시·답변에서 "무엇이 반복되고 무엇을 못 답했는가"를 뽑는다.
+// 판정은 서버가 코드로 한다(LLM 아님) — 같은 입력에 같은 결과가 나와야 지난주와 비교할 수 있다.
+export interface SessionPatternReport {
+  기간일수: number;
+  집계시각: number;
+  총계: { 세션: number; 지시: number; 답변: number };
+  반복지시: { 대표문장: string; 횟수: number; 마지막: number }[];
+  주제분포: { 주제: string; 건수: number }[];
+  지식공백: { 질문: string; 이유: string; when: number }[];
+  잡담: { 건수: number; 비율: number };
+  비고: string[];
+}
+
 export const workSessionsApi = {
   list: () => request<WorkSessionSummary[]>("/api/work-sessions"),
+  patterns: (days = 30) => request<SessionPatternReport>(`/api/session-patterns?days=${days}`),
   create: (title?: string, contextRef?: string) =>
     request<WorkSession>("/api/work-sessions", { method: "POST", body: { ...(title ? { title } : {}), ...(contextRef ? { contextRef } : {}) } }),
   get: (id: string) => request<{ session: WorkSession; turns: WorkSessionTurn[] }>(`/api/work-sessions/${id}`),
