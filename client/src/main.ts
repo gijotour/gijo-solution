@@ -733,17 +733,41 @@ ipcMain.handle("download:reveal", async (_e, filePath: string) => {
   return { ok: true };
 });
 
-app.whenReady().then(() => {
-  loadSavedRoot(); // 마지막에 고른 파일 탐색기 폴더 복원 (userData는 ready 이후 접근)
-  loadSavedZoom(); // 마지막에 고른 화면 크기(배율) 복원
-  setupDownloads(); // 파일 받기 저장 경로 — 이게 없으면 내려받기가 조용히 실패한다
-  maybeStartBundledServer();
-  createMainWindow();
-
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
+// 클라이언트는 한 번에 하나만 뜬다(2026-07-28 사용자 지시).
+//
+// 왜 막아야 하나 — 서버는 담당자 한 명당 세션 하나만 인정한다. 앱을 두 번째로 띄우고
+// 로그인하면 **먼저 쓰던 앱이 로그인 화면으로 튕기고**, 그쪽에서 열어 둔 탭·걸어 둔 필터·
+// 내려 둔 스크롤이 통째로 날아간다. 게시 계정으로 같은 사고를 이미 겪었다(CLAUDE.md 주의사항).
+// 아이콘을 두 번 눌렀을 뿐인데 하던 일이 사라지는 건 사람 잘못이 아니라 앱이 막았어야 할 일이다.
+//
+// 두 번째 프로세스는 조용히 물러나고, 대신 이미 떠 있는 창을 앞으로 가져온다 —
+// "안 떠요"가 아니라 "아, 이미 떠 있었네"가 되게.
+//
+// ⚠ 잠금은 userData 기준이라 **개발 실행과 설치본이 같은 잠금을 쓴다**. 게시 전 실화면
+//   검증을 할 땐 개발 앱을 먼저 닫아야 한다(/GIJOAS게시 절차가 이미 그렇게 시킨다).
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on("second-instance", () => {
+    const win = mainWindow ?? BrowserWindow.getAllWindows()[0];
+    if (!win) return;
+    if (win.isMinimized()) win.restore();
+    if (!win.isVisible()) win.show();
+    win.focus();
   });
-});
+
+  app.whenReady().then(() => {
+    loadSavedRoot(); // 마지막에 고른 파일 탐색기 폴더 복원 (userData는 ready 이후 접근)
+    loadSavedZoom(); // 마지막에 고른 화면 크기(배율) 복원
+    setupDownloads(); // 파일 받기 저장 경로 — 이게 없으면 내려받기가 조용히 실패한다
+    maybeStartBundledServer();
+    createMainWindow();
+
+    app.on("activate", () => {
+      if (BrowserWindow.getAllWindows().length === 0) createMainWindow();
+    });
+  });
+}
 
 // 창을 닫거나 앱을 종료할 때, 로그인돼 있으면 서버 세션을 먼저 끊는다(로그아웃).
 // 이렇게 하지 않으면 강제 로그인한 세션이 그대로 남아, 다음 실행 때 "이미 로그인 중"으로 막히거나
