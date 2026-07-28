@@ -80,10 +80,27 @@ await page.waitForTimeout(2500);
 const st2 = await page.evaluate(() => {
   const f = document.querySelector("#shellBody iframe.on");
   let inner = null;
-  try { inner = { url: f.contentWindow.location.href.split("/").pop(), tabs: f.contentDocument.querySelectorAll(".hub-tab").length, navHidden: !f.contentDocument.getElementById("gijoNav").offsetParent }; } catch (e) { inner = { err: String(e).slice(0, 80) }; }
+  try {
+    inner = { url: f.contentWindow.location.href.split("/").pop(), tabs: f.contentDocument.querySelectorAll(".hub-tab").length, navHidden: !f.contentDocument.getElementById("gijoNav").offsetParent };
+    // 탭 안(실제 화면)에 내용이 그려졌는지 — 여태 탭 개수만 보느라 "탭은 있는데 속은 빈 화면"을
+    // 통과시켰다(2026-07-28 실사고: 자산 허브 팝업이 통째로 비어 보임). 보이는 글자로 확인한다.
+    const tabFrame = f.contentDocument.querySelector(".hub-frame.on");
+    inner.tabScreen = tabFrame ? tabFrame.src.split("/").pop() : null;
+    inner.tabText = tabFrame && tabFrame.contentDocument ? (tabFrame.contentDocument.body.innerText || "").trim().length : -1;
+  } catch (e) { inner = { err: String(e).slice(0, 80) }; }
   return { inner, ctxLabel: document.getElementById("shCtxLabel").textContent, screen: window.gijoShell.activeScreen() };
 });
-ok("허브가 embed로 렌더(탭 존재·사이드바 숨김)", st2.inner && st2.inner.tabs >= 3 && st2.inner.navHidden, JSON.stringify(st2.inner));
+ok("허브가 embed로 렌더(탭 존재·사이드바 숨김)", st2.inner && st2.inner.tabs >= 3 && st2.inner.navHidden, JSON.stringify({ url: st2.inner.url, tabs: st2.inner.tabs, navHidden: st2.inner.navHidden }));
+// 빈 화면 회귀 방지 — 탭 안 실제 화면에 글자가 있어야 한다(치유가 늦게 돌 수 있어 넉넉히 기다린다).
+if (st2.inner && st2.inner.tabText === 0) { await page.waitForTimeout(6000); }
+const tabText = await page.evaluate(() => {
+  try {
+    const f = document.querySelector("#shellBody iframe.on");
+    const t = f.contentDocument.querySelector(".hub-frame.on");
+    return { len: (t.contentDocument.body.innerText || "").trim().length, screen: t.src.split("/").pop(), heal: t.dataset.healTries || "0" };
+  } catch (e) { return { len: -1, err: String(e).slice(0, 60) }; }
+});
+ok("팝업 탭 안에 실제 내용이 있다(빈 화면 아님)", tabText.len > 200, JSON.stringify(tabText));
 ok("맥락 칩 갱신", /자산 허브/.test(st2.ctxLabel), st2.ctxLabel);
 ok("activeScreen=허브 활성 탭", typeof st2.screen === "string" && st2.screen.endsWith(".html"), String(st2.screen));
 await page.screenshot({ path: SHOT + "shell-popup-1.png" });

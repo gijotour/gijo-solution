@@ -345,9 +345,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.querySelectorAll("#anaTabs .atab").forEach(function(t){ t.classList.toggle("on", t.dataset.tab===anaTab); });
     if(anaTab==="path") renderAttackGraph();
   }
-  // 선택 자산의 공격 경로(있으면), 없으면 최상위 경로.
+  // 선택 자산의 공격 경로. **없으면 없다고 한다** — 예전엔 못 찾으면 attackPaths[0]을 대신
+  // 그렸는데, 그러면 무엇을 골라도 같은 그림이 나오고(2026-07-28 사용자 지적) 더 나쁘게는
+  // 남의 자산 경로를 이 자산 것처럼 보여준다. 아무것도 안 고른 상태에서만 최상위를 보여준다.
   function pathForSelected(){
-    if(selectedPathEntity){ var p=attackPaths.find(function(x){ return x.entity===selectedPathEntity; }); if(p) return p; }
+    if(selectedPathEntity) return attackPaths.find(function(x){ return x.entity===selectedPathEntity; }) || null;
     return attackPaths[0];
   }
   function trunc(s,n){ s=String(s==null?"":s); return s.length>n ? s.slice(0,n-1)+"…" : s; }
@@ -418,10 +420,20 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     if(!box) return;
     var ap = attackPaths.length ? pathForSelected() : null;
     var selMatched = selectedPathEntity && attackPaths.some(function(x){ return x.entity===selectedPathEntity; });
-    // 선택 자산 표기 — 경로가 있으면 그 자산, 없으면 최상위 표시 안내.
-    if(scope) scope.innerHTML = selMatched ? '선택: '+esc(selectedPathEntity)
-      : (selectedPathEntity ? '<span style="color:var(--muted-2)">선택 자산 경로 없음 → 최상위 표시</span>' : '');
-    if(!ap){ box.innerHTML='<div class="empty">이 자산에 대한 공격 경로 데이터가 없습니다.</div>'; if(legend) legend.innerHTML=''; return; }
+    // 선택 자산 표기 — 고른 자산을 그대로 쓴다(경로가 없어도 남의 것으로 바꿔치지 않는다).
+    if(scope) scope.innerHTML = selectedPathEntity
+      ? '선택: '+esc(selectedPathEntity)+(selMatched ? '' : ' <span style="color:var(--muted-2)">· 경로 없음</span>')
+      : '<span style="color:var(--muted-2)">전체 상위 경로</span>';
+    if(!ap){
+      // 경로는 "취약점이 확인된 자산"에만 생긴다(서버 computeAttackPaths). 로그·리포트·점검만
+      // 있는 자산은 경로가 없다 — 왜 비었는지 화면에서 바로 알 수 있게 이유를 적는다.
+      box.innerHTML = '<div class="empty">'
+        + (selectedPathEntity ? esc(selectedPathEntity)+'에 대해 ' : '')
+        + '관측된 공격 경로가 없습니다.<br><span style="font-size:11px;color:var(--muted-2)">'
+        + '공격 경로는 <b>취약점이 확인된 자산</b>에만 만들어집니다. 이 자산은 아직 취약점 소스가 없어 경로를 그릴 근거가 없습니다.</span></div>';
+      if(legend) legend.innerHTML='';
+      return;
+    }
     if(graphMode==="chain"){
       var chainPaths = selMatched ? [ap] : attackPaths.slice(0,3);
       box.innerHTML = graphChain(chainPaths);
