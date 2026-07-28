@@ -11,9 +11,16 @@ import { createRequire } from "module";
 import { fileURLToPath, pathToFileURL } from "url";
 
 const ROOT = path.resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
-// playwright-core는 client 워크스페이스에 설치돼 있으므로 그쪽 기준으로 require 한다(이식성).
-const require = createRequire(pathToFileURL(path.join(ROOT, "client", "package.json")));
-const { chromium } = require("playwright-core");
+// playwright-core는 client 또는 server 워크스페이스 중 설치된 쪽 기준으로 require 한다(이식성).
+function requirePlaywright() {
+  for (const ws of ["client", "server"]) {
+    try {
+      return createRequire(pathToFileURL(path.join(ROOT, ws, "package.json")))("playwright-core");
+    } catch (e) { /* 다음 워크스페이스 시도 */ }
+  }
+  throw new Error("playwright-core를 client/server 어느 node_modules에서도 찾지 못했습니다");
+}
+const { chromium } = requirePlaywright();
 
 const BASE = process.env.GIJO_SHOT_BASE ?? "http://localhost:4068";
 const PAGES_DIR = path.join(ROOT, "client", "src", "renderer", "pages");
@@ -90,6 +97,13 @@ async function main() {
     redteamLast: await g("/api/redteam/last"),
     redteamTargets: await g("/api/redteam/targets"),
     logs: await g("/api/logs"),
+    // 매뉴얼 v3.3.3 갱신분 — 신규 화면(팀 사무실·인수인계·작업기록·원격 정기점검) 백데이터.
+    today: await g("/api/today?brief=0"),
+    activeSessions: await g("/api/auth/sessions"),
+    audit: await g("/api/audit?limit=200"),
+    hardeningTargets: await g("/api/hardening/targets"),
+    hardeningSchedules: await g("/api/hardening/schedules"),
+    hardeningRuns: await g("/api/hardening/runs"),
   };
 
   // 브라우저에 주입할 window.gijo 스텁(읽기=주입 데이터 반환, 쓰기/구독=no-op). 페이지 스크립트보다 먼저 실행.
@@ -148,6 +162,20 @@ async function main() {
       listSecurityProductsGrouped: () => R(DATA.securityProductsGrouped),
       getProductCategories: () => R(DATA.productCategories),
       listSecurityProducts: () => R(DATA.securityProducts),
+      // 신규 화면용 — 팀 사무실·인수인계·작업기록·원격 정기점검.
+      getToday: () => R(DATA.today),
+      listActiveSessions: () => R(DATA.activeSessions || []),
+      listAudit: () => R(DATA.audit),
+      hardeningTargets: { list: () => R(DATA.hardeningTargets) },
+      hardeningSchedules: { list: () => R(DATA.hardeningSchedules) },
+      hardeningRuns: () => R(DATA.hardeningRuns),
+      onCollaborationEvent: noop,
+      // 터미널 화면 — 실제 로컬 셸 스폰 없이 빈 상태(대기 화면)만 보여준다.
+      terminal: {
+        start: () => R({ shell: "PowerShell", cwd: "C:\\Users\\user" }),
+        exec: () => R({ blocked: false, output: "" }),
+        onData: noop,
+      },
     };
     // 이벤트 구독 + 나머지 모든 메서드는 no-op(스크린샷은 사용자 조작이 없으므로 안전).
     return new Proxy(gijo, {
@@ -180,6 +208,13 @@ async function main() {
     { page: "merge.html", name: "18-LLM합성-모델머지" },
     { page: "logs.html", name: "20-시스템로그" },
     { page: "settings.html", name: "21-설정-사용자관리" },
+    // 매뉴얼 v3.3.3 갱신분 — 이전엔 없던 화면.
+    { page: "office.html", name: "22-팀사무실" },
+    { page: "handover.html", name: "23-인수인계" },
+    { page: "audit.html", name: "24-작업기록-감사" },
+    { page: "hardening.html", name: "25-원격정기점검" },
+    { page: "mcp.html", name: "26-MCP연동" },
+    { page: "terminal.html", name: "27-터미널CLI" },
   ];
 
   // GIJO_SHOT_ONLY="05,06" — 일부 화면만 다시 찍고 싶을 때(파일명 접두 번호로 필터). 없으면 전체.
