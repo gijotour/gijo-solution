@@ -1,4 +1,4 @@
-// engine/tasks.ts — 작업 큐 (서버 측, 전 클라이언트 공유, SQLite 영속화)
+﻿// engine/tasks.ts — 작업 큐 (서버 측, 전 클라이언트 공유, SQLite 영속화)
 
 import type { Express, Request } from "express";
 import { authMiddleware } from "../auth/auth";
@@ -90,9 +90,12 @@ export function createTask(args: {
   return item;
 }
 
+// ⚠ 돌려주는 목록에 실행 기록까지 포함한다. 디스패처가 방금 만든 자기 기록을 이 목록에서
+//   되찾아 응답에 싣기 때문이다(dispatcher.ts) — 걸러 버리면 못 찾아서 "완료 안 됨"으로
+//   응답한다. 화면에 뿌릴 때 거르는 일은 라우트가 한다.
 export function completeTask(id: string): TaskItem[] {
   completeStmt.run({ id, now: Date.now() });
-  return listTasks();
+  return listTasks({ includeAgentRuns: true });
 }
 
 // 완료 ↔ 미완료 토글 (담당자가 체크박스로 진행 상태를 직접 바꾼다).
@@ -112,8 +115,18 @@ export function updateTaskPriority(id: string, priority: TaskItem["priority"]): 
   return listTasks();
 }
 
-export function listTasks(): TaskItem[] {
-  return (listStmt.all() as TaskRow[]).map(fromRow);
+// ⚠ 이 표에는 성격이 다른 둘이 섞여 있다(2026-07-28 실측으로 드러남).
+//   ① 담당자의 할 일 — 화면에서 적었거나 조치로 등록된 것. agentId가 비어 있다.
+//   ② 지시 실행 기록 — dispatchInstruction이 지시 한 건마다 만들고 곧바로 완료 처리하는 것.
+//      어느 에이전트가 처리했는지 남기려는 것이라 agentId가 반드시 있다.
+// 화면의 "오늘 할 일"에 ②까지 나오는 바람에, 운영 DB에 1,688건이 쌓여 정작 할 일이 그 밑에
+// 파묻혔다 — "대한민국 수도가 어디야?", "고마워 수고했어" 같은 챗봇 질문이 할 일로 보였다.
+// 그래서 **기본은 ①만** 준다. ②가 필요한 자리(디스패처 자신)는 명시적으로 켠다.
+// 표를 나누지 않은 이유: agentId가 이미 정확한 구분자라 옮길 게 없고, 마이그레이션으로 남의
+// 기록을 건드릴 위험도 없다.
+export function listTasks(opts?: { includeAgentRuns?: boolean }): TaskItem[] {
+  const all = (listStmt.all() as TaskRow[]).map(fromRow);
+  return opts?.includeAgentRuns ? all : all.filter((t) => !t.agentId);
 }
 
 // 테스트 전용: db는 모듈 싱글턴이라 createApp()을 새로 호출해도 초기화되지 않는다.
@@ -220,7 +233,11 @@ export function registerTasksRoutes(app: Express): void {
     const priority = ["P0", "P1", "P2", "P3"].includes(b.priority as string) ? b.priority : undefined;
     res.json(createTask({ text: String(b.text), priority, dueAt: typeof b.dueAt === "number" ? b.dueAt : undefined, assignee: b.assignee, ref: b.ref }));
   });
-  app.post("/api/tasks/:id/complete", authMiddleware, (req, res) => res.json(completeTask(String(req.params.id))));
+  // completeTask는 디스패처를 위해 실행 기록까지 돌려준다 — 화면에 줄 땐 거른다.
+  app.post("/api/tasks/:id/complete", authMiddleware, (req, res) => {
+    completeTask(String(req.params.id));
+    res.json(listTasks());
+  });
   app.post("/api/tasks/:id/toggle", authMiddleware, (req, res) => res.json(setTaskDone(String(req.params.id), !!req.body.done)));
   app.delete("/api/tasks/:id", authMiddleware, (req, res) => {
     recordAudit({ kind: "write", action: "작업 삭제", target: String(req.params.id), actor: (req as Request & { user?: GijoUser }).user?.displayName ?? null });

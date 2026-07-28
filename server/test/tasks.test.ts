@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import { createApp } from "../src/app";
-import { resetTasksForTests } from "../src/engine/tasks";
+import { resetTasksForTests, createTask, listTasks, completeTask } from "../src/engine/tasks";
 
 async function login(app: ReturnType<typeof createApp>) {
   const res = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" });
@@ -79,5 +79,32 @@ describe("tasks (오늘 확인할 항목)", () => {
   it("requires auth", async () => {
     expect((await request(app).get("/api/tasks")).status).toBe(401);
     expect((await request(app).delete("/api/tasks/x")).status).toBe(401);
+  });
+
+  // 실사고(2026-07-28): 지시 한 건마다 디스패처가 만드는 '실행 기록'이 같은 표에 들어가는데
+  // 화면의 "오늘 할 일"이 그것까지 보여 줬다. 운영 DB에 1,688건이 쌓여 "대한민국 수도가
+  // 어디야?" 같은 챗봇 질문이 할 일로 보였고, 정작 할 일이 그 밑에 파묻혔다.
+  // 구분자는 agentId — 디스패처만 채우고 사람이 만드는 할 일에는 없다.
+  it("에이전트 실행 기록은 '오늘 할 일'에 안 섞인다 (agentId로 가른다)", async () => {
+    await addTask("방화벽 룰 점검");                                    // 사람이 적은 할 일
+    createTask({ text: "대한민국 수도가 어디야?", agentId: "orchestrator" }); // 지시 실행 기록
+
+    // 화면이 받는 목록 — 사람 할 일만
+    const list = await request(app).get("/api/tasks").set(auth());
+    expect(list.body).toHaveLength(1);
+    expect(list.body[0].text).toBe("방화벽 룰 점검");
+
+    // 기록 자체는 지워지지 않는다 — 필요한 쪽은 켜서 본다
+    expect(listTasks({ includeAgentRuns: true })).toHaveLength(2);
+  });
+
+  // 디스패처는 completeTask가 돌려준 목록에서 방금 만든 자기 기록을 되찾아 응답에 싣는다.
+  // 여기서 걸러 버리면 못 찾아 "완료 안 됨"으로 응답한다 — 그래서 이 함수만 전부 돌려준다.
+  it("completeTask는 실행 기록도 돌려준다 (디스패처가 자기 건을 되찾는다)", async () => {
+    const run = createTask({ text: "지시 실행", agentId: "orchestrator" });
+    const updated = completeTask(run.id);
+    const found = updated.find((t) => t.id === run.id);
+    expect(found).toBeDefined();
+    expect(found!.done).toBe(true);
   });
 });
