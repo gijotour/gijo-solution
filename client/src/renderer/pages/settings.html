@@ -1287,10 +1287,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     });
     try {
       await window.gijo.update.install(latestRelease.version);
-      btn.textContent = "설치 실행됨";
-      label.textContent = "설치 프로그램 실행 중… 곧 앱이 종료됩니다.";
+      btn.textContent = "설치 창 열림";
+      label.textContent = "설치 창이 열립니다 — 안내를 따라 진행해 주세요.";
       line.className = "status-line status-ok";
-      line.textContent = "다운로드·무결성 검증 완료 — 설치가 진행되면 앱이 자동으로 닫힙니다.";
+      // 예전엔 무음 설치라 아무 화면도 안 나와 "그냥 앱이 죽었다"로 보였다(2026-07-29 신고).
+      // 이제 설치 창이 뜨므로, 무엇을 보게 될지 미리 말해 준다.
+      line.textContent = "다운로드·무결성 검증 완료 — 잠시 뒤 설치 창이 뜨고 이 앱은 닫힙니다. 설치가 끝나면 새 버전이 자동으로 열립니다.";
     } catch (e) {
       line.className = "status-line status-err";
       line.textContent = "업데이트 실패: " + ((e && e.message) || e);

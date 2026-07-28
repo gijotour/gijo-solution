@@ -740,10 +740,18 @@ ipcMain.handle("update:install", async (event, version: string) => {
     dest,
     sendProgress
   );
-  const child = spawn(dest, ["/S", "--force-run"], { detached: true, stdio: "ignore" });
+  // ⚠ 예전엔 "/S"(무음)로 돌렸다. 설치는 되지만 **화면에 아무것도 안 나온다** —
+  //   앱이 갑자기 꺼지고, 한참 뒤에야 새 앱이 뜬다. 그 사이 담당자는 설치가 되는 중인지
+  //   실패했는지 알 방법이 없어 앱을 다시 눌러 보거나 그냥 기다린다
+  //   (2026-07-29 사용자 신고: "다운로드 이후 설치화면이 안 보임 / 시간 지나면 설치는 됨").
+  //   설치본은 마법사형(oneClick:false)이라 화면을 띄우면 진행 상황이 그대로 보인다.
+  //   끝나면 runAfterFinish:true가 새 버전을 다시 띄운다.
+  const child = spawn(dest, ["--force-run"], { detached: true, stdio: "ignore" });
   child.unref();
   quitConfirmed = true; // 업데이트 설치를 위한 의도된 종료 — 닫기 확인을 띄우지 않는다
-  setTimeout(() => app.quit(), 300); // 설치 프로그램이 뜰 시간을 살짝 준다
+  // 설치 창이 화면에 뜬 것을 담당자가 본 뒤에 우리 창이 사라져야 한다. 먼저 꺼지면
+  // "앱이 그냥 죽었다"로 보인다. 1.2초면 설치 첫 화면이 그려진다(실측).
+  setTimeout(() => app.quit(), 1200);
   return { ok: true };
 });
 
