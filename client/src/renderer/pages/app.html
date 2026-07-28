@@ -152,7 +152,11 @@
   function renderTab(t) {
     var el = document.createElement("div");
     el.className = "tab" + (t.pinned ? " pinned" : "");
-    el.title = t.label;
+    // 고정은 더블클릭인데, 더블클릭은 화면에 흔적이 없어 아무도 모른다(사용자가 "탭 고정키는
+    // 어떻게 쓰냐"고 물어 왔다 — 2026-07-28). 말로 적어 둔다.
+    el.title = t.label + "\n" + (t.pinned
+      ? "📌 고정됨 — 두 번 클릭하면 고정이 풀립니다"
+      : "두 번 클릭하면 고정됩니다 (고정한 탭은 ✕와 「모두 닫기」로 닫히지 않습니다)");
     var nm = document.createElement("span"); nm.className = "nm"; nm.textContent = t.label;
     el.appendChild(nm);
     if (t.pinned) { var p = document.createElement("span"); p.className = "pin"; p.textContent = "📌"; el.appendChild(p); }
@@ -185,12 +189,18 @@
     if (!page) return;
     var t = find(page);
     if (!t) {
+      // 상한에 닿으면 **열지 않고 알린다**(2026-07-28 사용자 지시).
+      // 전에는 가장 오래 안 본 탭을 조용히 닫고 새 탭을 열었다. 그게 더 매끄러워 보였지만,
+      // 담당자는 그 탭에서 필터를 걸고 스크롤을 내려 둔 상태였다 — 말없이 사라지면 그 작업이
+      // 통째로 날아간다. 무엇을 버릴지는 사람이 정할 일이다.
       if (tabs.length >= MAX_TABS) {
-        // 상한 초과 — 고정 안 된 것 중 가장 오래 안 본 탭을 닫는다(전부 고정이면 거절)
-        var victim = null;
-        for (var i = 0; i < tabs.length; i++) if (!tabs[i].pinned && tabs[i] !== active) { victim = tabs[i]; break; }
-        if (!victim) { alert("탭이 가득 찼습니다. 고정을 풀거나 탭을 닫고 다시 열어 주세요."); return; }
-        close(victim.page, true);
+        var free = tabs.filter(function (x) { return !x.pinned; }).length;
+        alert("화면은 한 번에 " + MAX_TABS + "개까지 열 수 있습니다.\n\n" +
+          "보던 화면이 말없이 닫히면 걸어 둔 조건과 스크롤이 사라지므로, 여기서 멈춥니다.\n\n" +
+          (free > 0
+            ? "필요 없는 탭을 ✕로 닫고 다시 열어 주세요."
+            : "지금은 " + MAX_TABS + "개가 모두 📌 고정 상태입니다.\n닫으려는 탭을 두 번 클릭해 고정을 푼 뒤 ✕로 닫아 주세요."));
+        return;
       }
       var f = document.createElement("iframe");
       f.className = "screen";

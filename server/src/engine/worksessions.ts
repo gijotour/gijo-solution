@@ -58,7 +58,12 @@ migrate("work_sessions-createdBy", "ALTER TABLE work_sessions ADD COLUMN created
 // status: active(진행중) | done(완료) | ignored(무시). 새 세션은 active로 시작한다.
 export type SessionStatus = "active" | "done" | "ignored";
 const STATUSES: SessionStatus[] = ["active", "done", "ignored"];
-const DEFAULT_TITLE = "새 세션";
+// 화면에서 '작업 세션'을 '작업 내역'으로 바꾸면서 이 기본 제목도 함께 바꿨다(2026-07-28 사용자 지시).
+// '세션'은 로그인 세션과도 겹치는 개발자 말이라 담당자에게는 '작업'이 곧다.
+const DEFAULT_TITLE = "새 작업";
+// 이미 DB에 "새 세션"으로 저장된 건들이 있다. 아래 자동 제목 붙이기가 그것들도 계속
+// "제목 없음"으로 보고 첫 지시로 이름을 달아 주도록 옛 이름도 같이 본다.
+const UNTITLED = new Set([DEFAULT_TITLE, "새 세션"]);
 
 export interface SessionTurn {
   id: string;
@@ -188,7 +193,7 @@ export function appendTurn(sessionId: string, role: "user" | "assistant", conten
   );
   // 첫 user 턴이면 자동 제목. (제목이 기본값이고 아직 user 턴이 없던 경우에만)
   let title = session.title;
-  if (role === "user" && session.title === DEFAULT_TITLE) {
+  if (role === "user" && UNTITLED.has(session.title)) {
     const priorUser = db.prepare("SELECT COUNT(*) AS n FROM work_session_turns WHERE sessionId = ? AND role = 'user'").get(sessionId) as { n: number };
     if (priorUser.n <= 1) title = autoTitleFrom(content);
   }

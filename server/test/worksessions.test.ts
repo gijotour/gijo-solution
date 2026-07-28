@@ -1,4 +1,4 @@
-// 작업 세션(대화 세션형) — 세션·턴 CRUD, 자동 제목, 목록 미리보기, 맥락 텍스트.
+﻿// 작업 세션(대화 세션형) — 세션·턴 CRUD, 자동 제목, 목록 미리보기, 맥락 텍스트.
 import { describe, it, expect, beforeEach } from "vitest";
 import { db } from "../src/db";
 import {
@@ -19,9 +19,9 @@ beforeEach(() => {
 });
 
 describe("worksessions — 세션 생성·조회", () => {
-  it("새 세션은 기본 제목·active 상태로 생성된다", () => {
+  it("새 작업은 기본 제목·active 상태로 생성된다", () => {
     const s = createSession();
-    expect(s.title).toBe("새 세션");
+    expect(s.title).toBe("새 작업");
     expect(s.status).toBe("active");
     expect(getSession(s.id)?.id).toBe(s.id);
   });
@@ -110,7 +110,7 @@ describe("worksessions — 이름·상태·삭제", () => {
   it("rename은 제목을 바꾸고 빈 값이면 기본 제목", () => {
     const s = createSession("원래");
     expect(renameSession(s.id, "바뀜")?.title).toBe("바뀜");
-    expect(renameSession(s.id, "   ")?.title).toBe("새 세션");
+    expect(renameSession(s.id, "   ")?.title).toBe("새 작업");
   });
 
   it("상태를 done/ignored로 바꿀 수 있다", () => {

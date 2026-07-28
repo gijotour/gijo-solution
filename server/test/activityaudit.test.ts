@@ -7,7 +7,7 @@ import { describePath } from "../src/engine/activityaudit";
 describe("전 메뉴 감사 — 경로 해석", () => {
   it("메뉴 이름을 사람이 읽는 말로 바꾼다", () => {
     expect(describePath("/api/security-products/abc").menu).toBe("보안제품");
-    expect(describePath("/api/work-sessions/xyz").menu).toBe("작업 세션");
+    expect(describePath("/api/work-sessions/xyz").menu).toBe("작업 내역");
     expect(describePath("/api/assets/vuln:web01/scan").menu).toBe("자산");
     expect(describePath("/api/law/config").menu).toBe("법령 조회");
   });

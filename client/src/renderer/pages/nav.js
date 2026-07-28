@@ -22,11 +22,12 @@
   // 하루에 몇 번씩 돌아오는 곳이라 가지에 넣어 두면 접었다 폈다 해야 한다.
   //  · 대시보드   — 어디로 갈지 정하는 집
   //  · 팀 사무실  — AI 근무 현황·오늘 브리핑(별도 창이라 주소가 없다 → 별표 대상 아님)
-  //  · 작업 세션  — 지금까지 AI와 한 일
+  //  · 작업 내역  — 지금까지 AI와 한 일. '작업 세션'에서 이름을 바꿨다(2026-07-28 사용자 지시)
+  //    — '세션'은 로그인 세션과도 헷갈리는 개발자 말이고, 이 화면은 결국 한 일의 기록이다.
   var TOP = [
     { page: "dashboard.html", label: "대시보드" },
-    { office: true, label: "🏢 팀 사무실 (창)" },
-    { page: "sessions.html", label: "작업 세션" },
+    { office: true, label: "팀 사무실 (창)", ic: "🏢" },
+    { page: "sessions.html", label: "작업 내역" },
   ];
 
   var GROUPS = [
@@ -224,7 +225,13 @@
       ".gn-item.gn-home:hover{background:rgba(59,130,246,.16);border-color:var(--blue,#3b82f6);color:#fff;}" +
       // 팝업이 떠 있으면 대시보드는 "돌아갈 곳"이라 누를 수 있어야 한다(아래 클릭 처리).
       ".gn-item.gn-home.active{cursor:pointer;}" +
-      ".gn-item.gn-home .gn-label::before{content:'🏠 ';}";
+      ".gn-item.gn-home .gn-label::before{content:'🏠 ';}" +
+      // 고정 세 자리에 아이콘을 맞춘다(2026-07-28 사용자 요청) — 팀 사무실만 🏢가 있고 작업 세션은
+      // 맨몸이라 줄이 어긋나 보였다. 아이콘은 CSS ::before로 붙인다 — label 자체에 넣으면
+      // 그 label이 탭 이름으로도 쓰여 탭줄에까지 이모지가 따라간다.
+      ".gn-item.gn-sess .gn-label::before{content:'💬 ';}" +
+      // ic를 준 항목(팀 사무실 등)은 인라인 변수로 아이콘을 받는다
+      ".gn-label[style*='--gn-ic']::before{content:var(--gn-ic);}";
     document.head.appendChild(st);
   }
 
@@ -264,8 +271,12 @@
   // 두 곳에 적으면 반드시 한쪽만 고치게 된다).
   function makeItem(it, here, favs, container) {
     var el = document.createElement("div");
-    el.className = "gn-item" + (it.page === here ? " active" : "") + (it.page === "dashboard.html" ? " gn-home" : "");
+    el.className = "gn-item" + (it.page === here ? " active" : "") +
+      (it.page === "dashboard.html" ? " gn-home" : "") + (it.page === "sessions.html" ? " gn-sess" : "");
     var lab = document.createElement("span"); lab.className = "gn-label"; lab.textContent = it.label; el.appendChild(lab);
+    // 아이콘은 CSS ::before로만 붙인다 — label에 이모지를 넣으면 그 label이 탭 이름·즐겨찾기·
+    // 검색 결과에 그대로 따라다닌다. 고정 세 자리가 각기 다른 방식이라 줄이 어긋나 보였다.
+    if (it.ic) lab.style.setProperty("--gn-ic", "'" + it.ic + " '");
 
     // ☆ 별표 — 별도 창으로 여는 항목(팀 사무실)은 주소가 없어 즐겨찾기에 넣을 수 없다.
     if (it.page) {
@@ -290,7 +301,7 @@
       var sBadge = document.createElement("span");
       sBadge.className = "gn-upbadge gn-sessbadge";
       sBadge.style.display = "none";
-      sBadge.title = "진행중인 작업 세션";
+      sBadge.title = "진행중인 작업";
       el.appendChild(sBadge);
     }
 
@@ -556,13 +567,7 @@
     document.body.appendChild(s);
   }
 
-  function loadCommandPanel() {
-    if (document.getElementById("gijoCmdScript")) return;
-    var s = document.createElement("script");
-    s.id = "gijoCmdScript";
-    s.src = "commandpanel.js";
-    document.body.appendChild(s);
-  }
+  // (commandpanel.js는 4.0.0에서 없앴다 — 아래 boot() 주석 참고)
 
   // 클라이언트 자동 업데이트 확인 — 앱 시작 시 1회(+페이지 이동마다 10분 캐시로 재확인).
   // 로그인 전(login.html은 gijoNav가 없어 render() 자체를 안 함)에는 자연히 건너뛴다.
@@ -635,7 +640,7 @@
         // 넘긴 적이 있어 남의 일이 아니다.
         b.textContent = n > 99 ? "99+" : String(n);
         // 색·숫자만으로는 읽어주는 도구가 뜻을 모른다 — 말로도 남긴다.
-        b.setAttribute("aria-label", "진행중인 작업 세션 " + n + "건");
+        b.setAttribute("aria-label", "진행중인 작업 " + n + "건");
         b.style.display = n > 0 ? "" : "none";
       });
     }).catch(function () {});
@@ -707,7 +712,10 @@
     setupLeftCollapse(); // 왼쪽 접기 인프라(대시보드 포함) — 저장 상태 복원 + 가장자리 탭
     render();
     loadOnboarding();
-    loadCommandPanel();
+    // commandpanel.js(오른쪽 숨은 팝업 — 작업 세션·AI 오피스)는 4.0.0에서 삭제했다.
+    // 2026-07-27에 입구인 가장자리 세로 탭을 이미 없앤 상태였고, 두 기능 모두 정식 화면이
+    // 됐다(관제 > 작업 세션 / 🏢 팀 사무실 창). 남은 건 아무도 못 여는 숨은 DOM과 iframe이
+    // 전 화면에 실리는 것뿐이라, "메뉴에 있는 내부팝업 전체 삭제" 지시에 따라 걷어냈다.
     refreshSessionBadge();
 
     loadLongNotice();

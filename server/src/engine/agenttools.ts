@@ -1116,17 +1116,17 @@ async function runKpiStatus(): Promise<string> {
 // 작업 세션(대화 세션형, sessions.html) 현황 — 최근 대화 이력을 챗봇이 그대로 알 수 있게 한다.
 function runWorkSessionStatus(args: Record<string, string>): string {
   const sessions = listWorkSessions();
-  if (!sessions.length) return "작업 세션이 없습니다.";
+  if (!sessions.length) return "작업 내역이 없습니다.";
   const status = (args.status ?? "").trim();
   const filtered = status === "active" || status === "done" ? sessions.filter((s) => s.status === status) : sessions;
-  if (!filtered.length) return `"${status}" 상태의 작업 세션이 없습니다.`;
+  if (!filtered.length) return `"${status}" 상태의 작업 내역이 없습니다.`;
   const active = sessions.filter((s) => s.status === "active").length;
   const done = sessions.filter((s) => s.status === "done").length;
   const STATUS_LABEL: Record<string, string> = { active: "진행중", done: "완료", ignored: "무시" };
   const top = filtered.slice(0, 8).map(
     (s) => `- [${STATUS_LABEL[s.status] ?? s.status}] ${s.title}${s.turnCount ? ` (턴 ${s.turnCount}건)` : ""}${s.lastPreview ? ` · 최근 "${s.lastPreview.slice(0, 30)}"` : ""}`
   );
-  return `작업 세션 ${sessions.length}건 — 진행중 ${active} · 완료 ${done}\n최근 세션:\n${top.join("\n")}`;
+  return `작업 내역 ${sessions.length}건 — 진행중 ${active} · 완료 ${done}\n최근 작업:\n${top.join("\n")}`;
 }
 
 // ── 「지식·모델」 도메인 도구 ────────────────────────────────────────────
@@ -1317,11 +1317,11 @@ const TOOLS: AgentTool[] = [
   },
   {
     name: "work_session_status",
-    label: "작업 세션 현황",
+    label: "작업 내역 현황",
     domain: "cross", // 어느 화면에서 시작했든(자산·취약점·오늘 등) 가로지르는 대화 이력
     write: false,
     description:
-      '작업 세션(대화 세션형) 현황을 조회한다 — 진행중/완료 건수와 최근 세션 제목·턴 수·마지막 대화 미리보기. "작업 세션 뭐있어?", "지난 세션 확인해줘", "최근 대화 세션"에 쓴다. status로 active/done만 좁힐 수 있다. 예: {} 또는 {"status":"active"}',
+      '작업 내역 현황을 조회한다 — 진행중/완료 건수와 최근 작업 제목·턴 수·마지막 대화 미리보기. "작업 내역 뭐있어?", "지난 작업 확인해줘", "최근 대화"에 쓴다. (예전 이름인 "작업 세션", "지난 세션"으로 물어도 같은 것이다.) status로 active/done만 좁힐 수 있다. 예: {} 또는 {"status":"active"}',
     directAnswer: true,
     params: [{ name: "status", label: "상태", description: "active(진행중) 또는 done(완료) — 비우면 전체", required: false }],
     run: runWorkSessionStatus,

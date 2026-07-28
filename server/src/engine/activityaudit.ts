@@ -22,7 +22,7 @@ const SKIP_RE =
 // 경로 → 사람이 읽는 메뉴 이름. 없으면 경로 첫 마디를 그대로 쓴다.
 const MENU: Record<string, string> = {
   assets: "자산", "security-products": "보안제품", vulnscan: "취약점", approvals: "조치·승인",
-  report: "리포트", "work-sessions": "작업 세션", memory: "AI 기억·학습", ontology: "온톨로지",
+  report: "리포트", "work-sessions": "작업 내역", memory: "AI 기억·학습", ontology: "온톨로지",
   hardening: "하드닝 점검", "analysis-hub": "보안 분석", cti: "위협 인텔리전스", threat: "위협 인텔리전스",
   users: "계정 관리", settings: "설정", law: "법령 조회", tasks: "작업", learnloop: "학습 루프",
   dispatch: "지시", terminal: "CLI 터미널", redteam: "레드팀", sbom: "AI-BOM", compliance: "컴플라이언스",
