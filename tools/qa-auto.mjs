@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env node
+#!/usr/bin/env node
 // QA Auto ver1 — GIJO AS 자동 QA 하네스
 //
 // 근거(리서치): 스모크 우선(빌드 헬스체크) → 위험도 기반 선별(사용 빈도·이번 주 변경 영역 우선),

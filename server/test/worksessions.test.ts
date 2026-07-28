@@ -1,4 +1,4 @@
-﻿// 작업 세션(대화 세션형) — 세션·턴 CRUD, 자동 제목, 목록 미리보기, 맥락 텍스트.
+// 작업 세션(대화 세션형) — 세션·턴 CRUD, 자동 제목, 목록 미리보기, 맥락 텍스트.
 import { describe, it, expect, beforeEach } from "vitest";
 import { db } from "../src/db";
 import {

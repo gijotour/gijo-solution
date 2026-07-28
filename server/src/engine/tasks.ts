@@ -1,4 +1,4 @@
-﻿// engine/tasks.ts — 작업 큐 (서버 측, 전 클라이언트 공유, SQLite 영속화)
+// engine/tasks.ts — 작업 큐 (서버 측, 전 클라이언트 공유, SQLite 영속화)
 
 import type { Express, Request } from "express";
 import { authMiddleware } from "../auth/auth";
