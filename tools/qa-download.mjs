@@ -68,7 +68,20 @@ if (t) {
 }
 
 // ② 조치·승인으로 이동
-t = await attach(/dashboard\.html|approvals\.html/);
+// ⚠ 앱이 어느 화면에 있든 스스로 되돌린다(2026-07-28). 예전엔 대시보드에 있을 때만 통과해서,
+//    같은 전수조사 안의 sweep 계층(허브 화면을 요구)과 서로의 상태를 깨뜨렸다 — 한 번에 둘 다
+//    통과할 수 없는 구조였다. 어느 계층이 먼저 돌든 상관없게 만든다.
+t = await attach(/dashboard\.html|approvals\.html/, 3);
+if (!t) {
+  const any = await attach(/\.html/, 3);
+  if (any) {
+    const c = conn(any); await c.ready; await c.send("Runtime.enable");
+    await c.evalx(`(location.href = 'dashboard.html'), 'go'`);
+    c.ws.close();
+    await new Promise((r) => setTimeout(r, 7000));
+    t = await attach(/dashboard\.html|approvals\.html/);
+  }
+}
 if (!t) { ok("앱 화면 도달", false, "대시보드를 찾지 못함"); process.exit(1); }
 if (/dashboard\.html/.test(t.url)) {
   const c = conn(t); await c.ready; await c.send("Runtime.enable");
