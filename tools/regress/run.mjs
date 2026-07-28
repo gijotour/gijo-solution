@@ -50,6 +50,10 @@ async function dispatch(text) {
 // 한 케이스를 1회 실행해 {ok, why, out, ms}를 돌려준다.
 async function runCase(c) {
   const why = [];
+  // 케이스에 질문이 없으면 **검사 자체가 무효**다 — 빈 지시를 보내면 서버가 "무엇을 도와드릴까요?"로
+  // 되묻고, 그 답은 당연히 기대와 안 맞아 "실패"로 찍힌다. 판정은 맞는데 근거가 엉뚱해진다.
+  // (2026-07-28 실사고: 케이스를 손보다 "q" 줄을 떨어뜨렸는데 0.1초 만에 그럴듯하게 실패했다.)
+  if (!String(c.q ?? "").trim()) throw new Error(`케이스에 q(질문)가 없다 — cases.json의 "${c.id}" 확인`);
   const r = await dispatch(c.q);
   if (FALLBACK_RE.test(r.output)) why.push("폴백/오류 문구");
   for (const p of c.expect ?? []) if (!new RegExp(p, "i").test(r.output)) why.push(`누락: /${p}/`);
@@ -57,6 +61,12 @@ async function runCase(c) {
   for (const [k, v] of Object.entries(c.signals ?? {})) if (r[k] !== v) why.push(`신호 ${k}=${r[k]} (기대 ${v})`);
   return { ok: why.length === 0, why, out: r.output, ms: r.ms };
 }
+
+// 케이스별 판정을 파일로도 남긴다 — qa-full이 "이 계층 실패가 알려진 이슈뿐인가"를 판정하려면
+// 케이스 id 단위 결과가 필요하다. 예전엔 regress가 이걸 안 남겨 **어떤 regress 실패도 알려진
+// 이슈로 구분될 수 없었다**(qa-full의 failedCaseIds가 regress에 null을 돌려줬다).
+// 감추려는 게 아니라 구분하려는 것이다 — 새로 생긴 실패가 아는 실패에 묻히면 안 된다.
+const caseResults = [];
 
 let fail = 0, flaky = 0;
 const t0 = Date.now();
@@ -69,11 +79,13 @@ for (const c of cases) {
       const retry = await runCase(c);
       if (retry.ok) {
         flaky++;
+        caseResults.push({ id: c.id, pass: true, flaky: true, why: r.why });
         console.log(`~ ${c.id} [${(retry.ms / 1000).toFixed(1)}s] — FLAKY(1차 실패→재시도 통과: ${r.why.join(", ")})`);
         continue;
       }
       r = retry;
     }
+    caseResults.push({ id: c.id, pass: r.ok, why: r.why });
     console.log(`${r.ok ? "✓" : "✗"} ${c.id} [${(r.ms / 1000).toFixed(1)}s]${r.why.length ? " — " + r.why.join(", ") : ""}`);
     if (!r.ok) {
       console.log(`    출력: ${r.out.replace(/\s+/g, " ").slice(0, 200)}`);
@@ -81,8 +93,15 @@ for (const c of cases) {
     }
   } catch (e) {
     fail++;
+    caseResults.push({ id: c.id, pass: false, why: ["요청 실패: " + (e.name || e.message)] });
     console.log(`✗ ${c.id} — 요청 실패: ${e.name || e.message}`);
   }
 }
 console.log(`\n결과: ${cases.length - fail}/${cases.length} 통과${flaky ? ` (FLAKY ${flaky})` : ""} (${((Date.now() - t0) / 1000).toFixed(0)}s)`);
+try {
+  const outDir = new URL("../../.tmp-reports/", import.meta.url);
+  await fs.mkdir(outDir, { recursive: true });
+  await fs.writeFile(new URL("qa-auto-regress.json", outDir),
+    JSON.stringify({ at: new Date().toISOString(), results: caseResults }, null, 2));
+} catch { /* 결과 파일을 못 써도 판정 자체는 위 종료코드로 전달된다 */ }
 process.exit(fail ? 1 : 0);

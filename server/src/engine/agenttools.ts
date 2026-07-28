@@ -25,7 +25,7 @@ import { listCompliance, setComplianceStatus } from "./compliance";
 import { generateSbom } from "./sbom";
 import type { ComplianceStatus } from "./compliance";
 import { countTriples } from "./ontology";
-import { listDocuments, queryMemoryRelevant } from "./memory";
+import { listDocuments, queryMemory, queryMemoryRelevant } from "./memory";
 import { listFindings as listCtiFindings } from "./cti";
 import { matchCtiToAssets } from "./ctimatch";
 import { dailyBriefingText } from "./briefing";
@@ -307,11 +307,18 @@ async function searchOne(q: string): Promise<string[]> {
     if (docs.length) {
       out.push(`사내 문서 ${docs.length}건:`, ...docs.slice(0, 5).map((d) => `  - ${d.documentId}${d.docClass ? ` [${d.docClass}]` : ""}`));
       try {
-        const chunks = await queryMemoryRelevant(q, 4);
+        // ⚠ queryMemoryRelevant(거리 임계값)가 아니라 queryMemory를 쓴다.
+        //   임계값 버전은 같은 질문에 4건 중 1건만 남겼고, 하필 남은 하나가 표지·목차
+        //   조각이었다(실측 2026-07-28) — 정작 필요한 "평문 전송·디렉토리 인덱싱" 대목이
+        //   잘려 나가 답이 그대로 틀렸다.
+        //   여기는 **문서 제목이 질문과 맞는 것을 이미 확인한 뒤**(위 docs.length) 그 안을
+        //   발췌하는 자리다. 문을 한 번 통과했는데 절대 거리로 또 거를 이유가 없다.
+        //   memory.ts도 이 함수를 "문서 검색 화면·도구용"이라고 못박아 두었다.
+        const chunks = await queryMemory(q, 5);
         if (chunks.length) {
           out.push(
             `사내 문서 근거(발췌) ${chunks.length}건:`,
-            ...chunks.slice(0, 3).map((c) => `  · ${String(c).replace(/\s+/g, " ").slice(0, 600)}`)
+            ...chunks.slice(0, 4).map((c) => `  · ${String(c).replace(/\s+/g, " ").slice(0, 600)}`)
           );
         }
       } catch {

@@ -121,8 +121,14 @@ const knownIds = new Set(known.map((k) => k.id));
 // 계층 실패가 "알려진 이슈 그것 하나뿐"인지 판정한다 — qa-auto가 실패 id를 stdout에 남기므로
 // 여기서는 계층 이름만으로 판정할 수 없다. 계층별 결과 JSON에서 실패 케이스 id를 읽어 대조한다.
 function failedCaseIds(layer) {
-  const f = { server: "qa-auto-server.json", client: "qa-auto-client.json", knowledge: "qa-auto-knowledge.json", maintenance: "qa-auto-maintenance.json" }[layer];
-  if (!f) return null; // 케이스 단위 결과가 없는 계층(vitest·regress 등)은 대조 불가
+  const f = {
+    server: "qa-auto-server.json", client: "qa-auto-client.json",
+    knowledge: "qa-auto-knowledge.json", maintenance: "qa-auto-maintenance.json",
+    // regress도 2026-07-28부터 케이스별 판정을 남긴다 — 그전에는 어떤 regress 실패도
+    // 알려진 이슈로 구분될 수 없어 늘 새 실패처럼 보였다.
+    regress: "qa-auto-regress.json",
+  }[layer];
+  if (!f) return null; // 케이스 단위 결과가 없는 계층(vitest 등)은 대조 불가
   try {
     return (JSON.parse(fs.readFileSync(path.join(OUT, f), "utf8")).results ?? [])
       .filter((r) => r.pass === false).map((r) => r.id);
