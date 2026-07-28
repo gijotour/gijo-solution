@@ -18,16 +18,21 @@
   //
   // 이름은 홀로 서게 지었다: 허브 안에서 '통합 뷰'·'등록부'로 충분하던 것이 밖으로 나오면
   // 무엇의 통합 뷰인지 알 수 없다 → '자산 통합 뷰'·'보안제품 등록부'.
+  // 항상 맨 위에 고정되는 세 자리(2026-07-28 사용자 지시) — 즐겨찾기보다도 위다.
+  // 하루에 몇 번씩 돌아오는 곳이라 가지에 넣어 두면 접었다 폈다 해야 한다.
+  //  · 대시보드   — 어디로 갈지 정하는 집
+  //  · 팀 사무실  — AI 근무 현황·오늘 브리핑(별도 창이라 주소가 없다 → 별표 대상 아님)
+  //  · 작업 세션  — 지금까지 AI와 한 일
+  var TOP = [
+    { page: "dashboard.html", label: "대시보드" },
+    { office: true, label: "🏢 팀 사무실 (창)" },
+    { page: "sessions.html", label: "작업 세션" },
+  ];
+
   var GROUPS = [
     { id: "monitor", ic: "🖥", label: "관제", items: [
-      { page: "dashboard.html", label: "대시보드" },
       // '내 업무 바로가기'는 즐겨찾기로 대신한다(2026-07-28 사용자 결정) — 원래 대시보드 위
       // 팝업으로 열리던 기능인데 팝업을 없앴고, "자주 가는 화면을 빨리"는 별표가 더 곧다.
-      // 팀 사무실은 AI 근무 현황·오늘 브리핑을 보는 자리라 관제에 둔다(2026-07-28 사용자 지시).
-      // 별도 창으로 열리므로 주소가 없다 — 즐겨찾기(별표) 대상은 아니다.
-      { office: true, label: "🏢 팀 사무실 (창)" },
-      // 작업 세션은 탐색기·목록·대화 3열이라 좁은 자리에 넣으면 셋 다 못 쓴다(2026-07-27) — 넓게 본다.
-      { page: "sessions.html", label: "작업 세션" },
       { page: "analysis.html", label: "통합 관제" },
       { page: "threat.html", label: "위협 인텔" },
       { page: "report.html", label: "리포트" },
@@ -177,6 +182,24 @@
       ".gn-kids{display:block;}" +
       ".gn-kids.closed{display:none;}" +
       ".gn-kids .gn-item{padding-left:20px;}" + // 한 칸 들여써서 가지에 달린 것임을 보인다
+      // 맨 위 고정 세 자리 — 가지에 안 달렸으니 들여쓰지 않고, 아래에 얇은 금으로 구분한다.
+      ".gn-top-fixed{padding-bottom:7px;margin-bottom:3px;border-bottom:1px solid rgba(255,255,255,.07);}" +
+      ".gn-top-fixed .gn-item{padding-left:11px;}" +
+      // 찾기 — 가지를 기본으로 접어 두니(4.0.0) "어느 가지에 있더라"를 모르면 하나씩 열어봐야 한다.
+      // 이름만 알면 바로 닿는 길을 둔다. 상시 보이게 두는 게 중요하다 — 단축키만 있으면 모르는
+      // 사람은 영영 못 쓴다(담당자가 다 개발자는 아니다).
+      ".gn-find{position:relative;margin:2px 6px 6px;}" +
+      ".gn-find input{width:100%;background:#0a1120;border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:9px;" +
+      "color:var(--text,#e7eaf3);font-size:12px;padding:7px 26px 7px 28px;outline:none;font-family:inherit;}" +
+      ".gn-find input:focus{border-color:var(--blue,#3b82f6);}" +
+      ".gn-find input::placeholder{color:var(--muted-2,#5f6785);}" +
+      ".gn-find .ic{position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--muted-2,#5f6785);pointer-events:none;}" +
+      ".gn-find .clr{position:absolute;right:7px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--muted-2,#5f6785);cursor:pointer;display:none;padding:2px 4px;border-radius:5px;}" +
+      ".gn-find .clr:hover{color:#fff;background:rgba(255,255,255,.08);}" +
+      ".gn-find.has .clr{display:block;}" +
+      ".gn-hitwrap{padding-top:2px;}" +
+      ".gn-hit-g{font-size:10px;color:var(--muted-2,#5f6785);margin-left:auto;font-weight:700;}" +
+      ".gn-none{font-size:11.5px;color:var(--muted-2,#5f6785);padding:10px 12px;}" +
       ".gn-fav-g{color:var(--amber,#f0a020);}" +
       // ☆ 별표 — 평소엔 숨어 있다가 그 줄에 마우스를 올리면 나온다(30줄에 별이 다 떠 있으면
       // 시끄럽다). 이미 넣은 것(★)은 항상 보인다 — 무엇이 즐겨찾기인지 알아야 하니까.
@@ -206,6 +229,7 @@
   }
 
   var updateAvailable = false; // 클라이언트 새 버전 존재 여부(checkUpdateBadge가 채움)
+  var findQuery = "";          // 메뉴 찾기 입력값(메뉴를 다시 그려도 유지된다)
 
   // ── 즐겨찾기 ───────────────────────────────────────────────────────────
   // 화면이 30개라 자주 가는 곳까지 매번 훑어 내려가야 한다. 별표한 화면을 맨 위 가지에 모은다.
@@ -225,13 +249,15 @@
     favSave(arr);
   }
 
-  // 그룹 접힘 상태 — 담당자가 고른 대로 기억한다. 저장이 없으면 전부 펼침(처음엔 다 보여야 찾는다).
-  var FOLD_KEY = "gijo:menu:folded";
-  function foldedSet() {
-    try { return new Set(JSON.parse(localStorage.getItem(FOLD_KEY) || "[]")); } catch (e) { return new Set(); }
+  // 그룹 펼침 상태 — **기본은 접힘**(2026-07-28 사용자 지시). 자주 가는 곳은 위 고정 세 자리와
+  // 즐겨찾기로 닿으므로, 나머지 30줄을 늘 펼쳐 둘 이유가 없다. 편 것만 기억한다.
+  // (예전엔 "접은 것"을 기억했다 — 기본이 뒤집혔으므로 키도 바꿔 옛 값이 섞이지 않게 한다.)
+  var OPEN_KEY = "gijo:menu:opened";
+  function openedSet() {
+    try { return new Set(JSON.parse(localStorage.getItem(OPEN_KEY) || "[]")); } catch (e) { return new Set(); }
   }
-  function saveFolded(set) {
-    try { localStorage.setItem(FOLD_KEY, JSON.stringify([...set])); } catch (e) {}
+  function saveOpened(set) {
+    try { localStorage.setItem(OPEN_KEY, JSON.stringify([...set])); } catch (e) {}
   }
 
   // 메뉴 한 줄을 만든다 — 즐겨찾기 가지와 본 가지가 **같은 함수**를 쓴다(이름·배지·동작을
@@ -288,10 +314,65 @@
     injectCss(); // 대시보드('전체메뉴' 모드)에서 render()를 안 거쳐도 gn-* 스타일이 있게.
     container.innerHTML = "";
     var here = currentKey();
-    var folded = foldedSet();
+    var opened = openedSet();
     var favs = favList();
 
-    // ⭐ 즐겨찾기 가지 — 별표한 화면이 있을 때만 맨 위에 나온다(없으면 자리를 차지하지 않는다).
+    // ── 찾기 칸 — 이름만 알면 가지를 안 펴고 바로 닿는다(Ctrl/Cmd+K로 여기 포커스).
+    var find = document.createElement("div");
+    find.className = "gn-find";
+    find.innerHTML = '<span class="ic">🔍</span><input id="gnFind" type="text" placeholder="화면 찾기  (Ctrl+K)" ' +
+      'aria-label="화면 찾기" autocomplete="off" spellcheck="false"><span class="clr" title="지우기">✕</span>';
+    container.appendChild(find);
+    var findInput = find.querySelector("input");
+    findInput.value = findQuery;
+    if (findQuery) find.classList.add("has");
+    findInput.addEventListener("input", function () {
+      findQuery = findInput.value;
+      buildMenu(container);
+      var again = container.querySelector("#gnFind");
+      if (again) { again.focus(); again.setSelectionRange(again.value.length, again.value.length); }
+    });
+    findInput.addEventListener("keydown", function (e) {
+      if (e.key === "Escape") { e.preventDefault(); findQuery = ""; buildMenu(container); return; }
+      if (e.key === "Enter") {   // 첫 결과를 연다 — 타이핑하다 바로 Enter가 가장 빠른 길이다
+        var first = container.querySelector(".gn-hitwrap .gn-item .gn-label");
+        if (first) first.click();
+      }
+    });
+    find.querySelector(".clr").addEventListener("click", function () { findQuery = ""; buildMenu(container); });
+
+    // 찾는 중에는 트리를 접고 **걸린 것만** 보여준다 — 접힌 가지 안까지 뒤진다.
+    if (findQuery.trim()) {
+      var q = findQuery.trim().toLowerCase();
+      var wrap = document.createElement("div");
+      wrap.className = "gn-kids gn-hitwrap";
+      container.appendChild(wrap);
+      var hits = 0;
+      var add = function (it, gLabel) {
+        if ((it.label || "").toLowerCase().indexOf(q) < 0) return;
+        var row = makeItem(it, here, favs, container);
+        if (gLabel) { var g = document.createElement("span"); g.className = "gn-hit-g"; g.textContent = gLabel; row.insertBefore(g, row.querySelector(".gn-star") || null); }
+        wrap.appendChild(row);
+        hits++;
+      };
+      TOP.forEach(function (it) { add(it, null); });
+      GROUPS.forEach(function (g) { g.items.forEach(function (it) { add(it, g.label); }); });
+      if (!hits) {
+        var none = document.createElement("div");
+        none.className = "gn-none";
+        none.textContent = "'" + findQuery.trim() + "'에 맞는 화면이 없습니다.";
+        wrap.appendChild(none);
+      }
+      return; // 찾는 동안에는 고정·즐겨찾기·가지를 그리지 않는다(결과에만 집중)
+    }
+
+    // ── 맨 위 고정 세 자리 — 가지에 넣지 않는다(접혀 있으면 매번 펴야 한다).
+    var top = document.createElement("div");
+    top.className = "gn-kids gn-top-fixed";
+    TOP.forEach(function (it) { top.appendChild(makeItem(it, here, favs, container)); });
+    container.appendChild(top);
+
+    // ⭐ 즐겨찾기 가지 — 별표한 화면이 있을 때만 나온다(없으면 자리를 차지하지 않는다).
     if (favs.length) {
       var fh = document.createElement("div");
       fh.className = "gn-g open gn-fav-g";
@@ -302,16 +383,19 @@
       var fcnt = document.createElement("span"); fcnt.className = "cnt"; fcnt.textContent = favs.length;
       fh.appendChild(fcar); fh.appendChild(fnm); fh.appendChild(fcnt);
       container.appendChild(fh);
+      // 즐겨찾기는 **기본 펼침** — 내가 직접 꽂아 둔 것들이라 접어 두면 꽂은 뜻이 없어진다.
+      // (다른 가지와 반대로, 여기만 "접은 것"을 기억한다.)
+      var favClosed = opened.has("__favClosed");
       var fkids = document.createElement("div");
-      fkids.className = "gn-kids" + (folded.has("__fav") ? " closed" : "");
-      if (folded.has("__fav")) fh.classList.remove("open");
+      fkids.className = "gn-kids" + (favClosed ? " closed" : "");
+      if (favClosed) fh.classList.remove("open");
       container.appendChild(fkids);
       fh.addEventListener("click", function () {
         var nowOpen = fkids.classList.toggle("closed") === false;
         fh.classList.toggle("open", nowOpen);
-        var s = foldedSet();
-        if (nowOpen) s.delete("__fav"); else s.add("__fav");
-        saveFolded(s);
+        var s = openedSet();
+        if (nowOpen) s.delete("__favClosed"); else s.add("__favClosed");
+        saveOpened(s);
       });
       // 메뉴 정의에서 그 화면을 찾아 같은 모양으로 그린다(이름·배지를 두 곳에 적지 않는다).
       favs.forEach(function (page) {
@@ -322,9 +406,10 @@
     }
 
     GROUPS.forEach(function (g) {
-      // 지금 보고 있는 화면이 든 가지는 접혀 있어도 펼쳐 준다 — 어디에 있는지 보여야 한다.
-      var hasHere = g.items.some(function (it) { return it.page === here; });
-      var open = hasHere || !folded.has(g.id);
+      // 기본은 접힘 — 편 가지만 기억한다. (보고 있는 화면을 따라 자동으로 펴지 않는다:
+      // 그러면 화면을 열 때마다 가지가 벌어져 "기본 접힘"이 무의미해진다. 지금 무엇을 보는지는
+      // 위쪽 탭줄이 말해 준다.)
+      var open = opened.has(g.id);
 
       var gh = document.createElement("div");
       gh.className = "gn-g" + (open ? " open" : "");
@@ -344,9 +429,9 @@
         var nowOpen = kids.classList.toggle("closed") === false;
         gh.classList.toggle("open", nowOpen);
         gh.title = (nowOpen ? "접기" : "펼치기") + " — " + g.label;
-        var s = foldedSet();
-        if (nowOpen) s.delete(g.id); else s.add(g.id);
-        saveFolded(s);
+        var s = openedSet();
+        if (nowOpen) s.add(g.id); else s.delete(g.id);
+        saveOpened(s);
       });
 
       g.items.forEach(function (it) { kids.appendChild(makeItem(it, here, favs, container)); });
@@ -356,6 +441,7 @@
   window.gijoRenderMenu = buildMenu;
   // 화면 주소 → 메뉴에 적힌 이름. 셸이 탭 이름을 붙일 때 쓴다(이름을 두 곳에 적지 않으려고).
   window.gijoMenuLabel = function (page) {
+    for (var k = 0; k < TOP.length; k++) if (TOP[k].page === page) return TOP[k].label;
     for (var i = 0; i < GROUPS.length; i++) {
       for (var j = 0; j < GROUPS[i].items.length; j++) {
         if (GROUPS[i].items[j].page === page) return GROUPS[i].items[j].label;
@@ -593,6 +679,12 @@
     if (window.__gijoZoomKeys) return;
     window.__gijoZoomKeys = true;
     window.addEventListener("keydown", function (e) {
+      // Ctrl/Cmd+K — 화면 찾기로 바로 커서를 옮긴다(익숙한 관례). 칸은 늘 보이므로
+      // 단축키를 몰라도 쓸 수 있고, 아는 사람은 손을 마우스로 안 옮겨도 된다.
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === "k" || e.key === "K")) {
+        var box = document.getElementById("gnFind");
+        if (box) { e.preventDefault(); box.focus(); box.select(); return; }
+      }
       if (!(e.metaKey || e.ctrlKey) || e.altKey || !window.gijo) return;
       var k = e.key;
       if (k === "+" || k === "=" || k === "Add") { e.preventDefault(); window.gijo.stepUiZoom(1); }
