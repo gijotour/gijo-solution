@@ -9,18 +9,36 @@ const { chromium } = require("playwright-core");
 
 const b = await chromium.connectOverCDP("http://127.0.0.1:9223");
 const ctx = b.contexts()[0];
-const p = ctx.pages()[0];
+// ⚠ 첫 페이지가 셸이라는 보장이 없다 — 분리창·콘솔 창이 떠 있거나, 앞선 검사가 앱을 다른
+//   화면에 두고 끝났을 수 있다(실측: sweep이 0/29, "현재: threat.html"). 셸로 돌려놓고 시작한다.
+let p = ctx.pages().find((x) => x.url().includes("app.html"));
+if (!p) {
+  const any = ctx.pages().find((x) => !/login\.html|console\.html|popout=1/.test(x.url())) || ctx.pages()[0];
+  if (!any) { console.error("Electron 페이지를 찾지 못했습니다"); process.exit(2); }
+  await any.evaluate(() => window.gijo && window.gijo.navigateTo("app.html")).catch(() => {});
+  await any.waitForTimeout(4000);
+  p = ctx.pages().find((x) => x.url().includes("app.html"));
+}
+if (!p) {
+  console.error("탭 셸(app.html)로 들어가지 못했습니다 — 로그인 상태인지 확인하세요. 현재:",
+    ctx.pages().map((x) => x.url().split("/").pop()).join(", "));
+  process.exit(2);
+}
 p.on("dialog", (d) => d.accept().catch(() => {}));
+await p.waitForTimeout(1500);
 
 // nav.js 메뉴에서 전체 화면 목록을 뽑는다(코드가 곧 목록 — 드리프트 없음).
 // 4.0.0에서 허브를 없앴으므로 메뉴 항목이 곧 화면이다. 별도 창으로 여는 항목(팀 사무실)은 뺀다.
 await p.waitForTimeout(500);
 const pages = await p.evaluate(() => {
   const out = [];
+  const seen = new Set(); // 즐겨찾기 가지에 같은 화면이 또 있다 — 두 번 훑을 필요는 없다
   document.querySelectorAll("#gijoNav .gn-item").forEach((el) => {
     var lab = el.querySelector(".gn-label");
     if (!lab) return;
     var label = lab.textContent.trim();
+    if (seen.has(label)) return;
+    seen.add(label);
     if (label.indexOf("사무실") >= 0) return; // 별도 창 — 탭으로 안 연다
     out.push({ label: label });
   });

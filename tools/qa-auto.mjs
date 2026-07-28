@@ -468,18 +468,23 @@ async function runClient() {
       it?.querySelector(".gn-label").click();
     });
     await page.waitForTimeout(1500);
-    // 살아 있는지 표시를 남기고 탭을 옮겼다 돌아온다 — 리로드되면 표시가 사라진다.
-    await page.evaluate(() => { const f = document.querySelector("#screens iframe.on"); f.contentWindow.__gijoAlive = "표시"; });
+    // ⚠ 프레임 **안**(contentWindow)은 이 하네스에서 못 만진다 — file://이 서로 다른 출처라
+    //   SecurityError가 난다(2026-07-28 실측). 그래서 프레임 **요소**에 표시를 남겨,
+    //   탭을 옮겼다 돌아왔을 때 그 요소가 그대로인지(=지워지고 다시 만들어지지 않았는지) 본다.
+    //   안쪽 내용까지 살아 있는지는 실제 앱으로 도는 shell 계층이 확인한다.
+    await page.evaluate(() => { document.querySelector("#screens iframe.on").dataset.qaMark = "표시"; });
+    const srcBefore = await page.evaluate(() => document.querySelector("#screens iframe.on").src);
     await page.evaluate(() => [...document.querySelectorAll("#tabBar .tab")].find((t) => t.textContent.includes("취약점"))?.click());
     await page.waitForTimeout(600);
     await page.evaluate(() => [...document.querySelectorAll("#tabBar .tab")].find((t) => t.textContent.includes("자산 목록"))?.click());
     await page.waitForTimeout(800);
     const alive = await page.evaluate(() => {
       const f = document.querySelector("#screens iframe.on");
-      return { mark: f.contentWindow.__gijoAlive || null, frames: document.querySelectorAll("#screens iframe").length };
+      return { mark: f.dataset.qaMark || null, src: f.src, frames: document.querySelectorAll("#screens iframe").length };
     });
-    if (alive.mark !== "표시") throw new Error("돌아오니 다시 읽혔다(보던 상태 유실)");
-    return `프레임 ${alive.frames}개가 살아 있고 표시가 남아 있다`;
+    if (alive.mark !== "표시") throw new Error("돌아오니 프레임이 새로 만들어졌다(보던 상태 유실)");
+    if (alive.src !== srcBefore) throw new Error(`돌아온 프레임 주소가 바뀌었다: ${alive.src}`);
+    return `프레임 ${alive.frames}개가 살아 있고 같은 프레임으로 돌아왔다`;
   });
 
   await scenario("QA-C03", "메뉴 C안", "설정 허브 + 업데이트 배지", {
@@ -523,6 +528,40 @@ async function runClient() {
     if (!r.openApi) throw new Error("gijoOpenSessions 함수 없음(팝업 몸통 유실)");
     if (r.open) throw new Error("기본이 펼침 상태");
     return "메뉴에 작업 세션 있음, 세로 글씨 0개, 팝업 기본 접힘";
+  });
+
+  // 메뉴 CSS는 자바스크립트 문자열을 + 로 이어 붙여 만든다. 중간에 + 하나를 빠뜨리면
+  // **그 뒤 CSS가 통째로 조용히 버려진다** — 문법 오류도 안 나고 화면도 뜬다. 그래서 못 알아챈다.
+  // 실사고(2026-07-28): 별표 규칙 끝에 +가 빠져 .gn-item 글씨 크기·배지·대시보드 테두리가
+  // 전부 사라졌고, 메뉴 글씨가 기본값 16px로 커진 뒤에야 발견됐다.
+  await scenario("QA-C4B", "메뉴", "메뉴 CSS가 끝까지 살아 있다", {
+    given: "메뉴 스타일을 문자열로 이어 붙여 만드는 구조에서",
+    when: "셸을 열고 주입된 스타일의 규칙을 세어 보면",
+    then: "핵심 규칙(.gn-item·배지·활성표시)이 모두 파싱돼 있고, 글씨 크기가 기본값(16px)으로 튀지 않는다",
+  }, async () => {
+    await open("app.html");
+    await page.waitForTimeout(1500);
+    const r = await page.evaluate(() => {
+      const n = document.getElementById("gijoNavCss");
+      if (!n) return { err: "메뉴 스타일이 없음" };
+      const sheet = [...document.styleSheets].find((s) => s.ownerNode === n);
+      let sels = [];
+      try { sels = [...sheet.cssRules].map((x) => x.selectorText || ""); } catch (e) { return { err: "규칙을 읽지 못함" }; }
+      const item = document.querySelector("#gijoNav .gn-item");
+      return {
+        규칙수: sels.length,
+        gnItem: sels.includes(".gn-item"),
+        배지: sels.some((s) => s.indexOf("gn-upbadge") >= 0),
+        활성: sels.some((s) => s.indexOf(".gn-item.active") >= 0),
+        글씨: item ? getComputedStyle(item).fontSize : null,
+      };
+    });
+    if (r.err) throw new Error(r.err);
+    if (!r.gnItem) throw new Error(`.gn-item 규칙이 파싱되지 않음 — 앞쪽에서 CSS가 끊겼다(규칙 ${r.규칙수}개)`);
+    if (!r.배지) throw new Error("배지 규칙이 없음 — CSS가 중간에 끊겼다");
+    if (!r.활성) throw new Error("활성 항목 규칙이 없음 — CSS가 중간에 끊겼다");
+    if (parseFloat(r.글씨) >= 16) throw new Error(`메뉴 글씨가 기본값으로 튐(${r.글씨}) — 스타일이 안 먹었다`);
+    return `규칙 ${r.규칙수}개 · 항목 글씨 ${r.글씨}`;
   });
 
   await scenario("QA-C05", "전체메뉴", "허브를 걷어낸 평평한 메뉴", {

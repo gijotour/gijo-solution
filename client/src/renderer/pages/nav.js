@@ -23,6 +23,9 @@
       { page: "dashboard.html", label: "대시보드" },
       // '내 업무 바로가기'는 즐겨찾기로 대신한다(2026-07-28 사용자 결정) — 원래 대시보드 위
       // 팝업으로 열리던 기능인데 팝업을 없앴고, "자주 가는 화면을 빨리"는 별표가 더 곧다.
+      // 팀 사무실은 AI 근무 현황·오늘 브리핑을 보는 자리라 관제에 둔다(2026-07-28 사용자 지시).
+      // 별도 창으로 열리므로 주소가 없다 — 즐겨찾기(별표) 대상은 아니다.
+      { office: true, label: "🏢 팀 사무실 (창)" },
       // 작업 세션은 탐색기·목록·대화 3열이라 좁은 자리에 넣으면 셋 다 못 쓴다(2026-07-27) — 넓게 본다.
       { page: "sessions.html", label: "작업 세션" },
       { page: "analysis.html", label: "통합 관제" },
@@ -44,7 +47,6 @@
     ]},
     { id: "ai", ic: "🤖", label: "AI", items: [
       { page: "agent.html", label: "에이전트 AI" },
-      { office: true, label: "🏢 팀 사무실 (창)" },
       { page: "memory.html", label: "기억·학습 (RAG)" },
       { page: "handover.html", label: "인수인계" },
       { page: "ontology.html", label: "온톨로지" },
@@ -162,12 +164,14 @@
       ".gn-mid::-webkit-scrollbar{width:5px;} .gn-mid::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:3px;}" +
       // 그룹 헤더 = 트리의 가지. 눌러서 접었다 편다(4.0.0: 허브를 풀어 항목이 30개가 되면서
       // 한 번에 다 보이면 훑기 어렵다 — 안 쓰는 그룹은 접어 둘 수 있게).
-      ".gn-g{display:flex;align-items:center;gap:6px;font-size:9.5px;font-weight:800;color:var(--muted-2);" +
-      "letter-spacing:1.2px;margin:12px 6px 5px;padding:4px 4px;border-radius:6px;cursor:pointer;user-select:none;}" +
+      // 가지 이름은 메뉴를 훑는 기준점이라 본문 항목과 비슷한 크기로 둔다. 예전 9.5px·자간 1.2px는
+      // 영문 대문자 소제목용 값이라 한글에서는 작고 성글어 읽히지 않았다(2026-07-28 사용자 지적).
+      ".gn-g{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:800;color:var(--muted);" +
+      "letter-spacing:.2px;margin:13px 6px 5px;padding:5px 5px;border-radius:6px;cursor:pointer;user-select:none;}" +
       ".gn-g:hover{color:var(--blue-light,#7ab0ff);background:rgba(255,255,255,.03);}" +
-      ".gn-g .car{font-size:8px;width:9px;flex:0 0 auto;transition:transform .13s;}" +
+      ".gn-g .car{font-size:9px;width:10px;flex:0 0 auto;transition:transform .13s;}" +
       ".gn-g.open .car{transform:rotate(90deg);}" +
-      ".gn-g .cnt{margin-left:auto;font-size:9px;font-weight:700;color:var(--muted-2);opacity:.75;}" +
+      ".gn-g .cnt{margin-left:auto;font-size:10px;font-weight:700;color:var(--muted-2);opacity:.75;}" +
       ".gn-g.open .cnt{opacity:0;}" + // 펼치면 개수는 군더더기 — 눈으로 보인다
       ".gn-g:first-child{margin-top:2px;}" +
       ".gn-kids{display:block;}" +
@@ -179,8 +183,9 @@
       ".gn-item .gn-star{flex:0 0 auto;font-size:11px;color:var(--muted-2,#5f6785);opacity:0;cursor:pointer;padding:0 3px;border-radius:5px;}" +
       ".gn-item:hover .gn-star{opacity:.65;}" +
       ".gn-item .gn-star:hover{opacity:1;color:var(--amber,#f0a020);background:rgba(240,160,32,.14);}" +
-      ".gn-item .gn-star.on{opacity:1;color:var(--amber,#f0a020);}"
-      ".gn-item{display:flex;align-items:center;gap:7px;padding:8px 11px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:1px;white-space:nowrap;overflow:hidden;}" +
+      ".gn-item .gn-star.on{opacity:1;color:var(--amber,#f0a020);}" +
+      // 메뉴 한 줄 — 가지 이름(12px)보다 살짝 크게 둬서 "무엇을 고르는가"가 주인공이 되게 한다.
+      ".gn-item{display:flex;align-items:center;gap:7px;padding:8px 11px;border-radius:8px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:1px;white-space:nowrap;overflow:hidden;}" +
       ".gn-item:hover{color:#fff;background:rgba(255,255,255,.04);}" +
       ".gn-item.active{color:#fff;background:rgba(59,130,246,.14);box-shadow:inset 3px 0 0 var(--blue);cursor:default;}" +
       ".gn-item .gn-label{flex:1;overflow:hidden;text-overflow:ellipsis;}" +
