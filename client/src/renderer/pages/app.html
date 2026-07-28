@@ -291,10 +291,35 @@
     activeScreen: function () { return active ? active.page : null; },
     activeLabel: function () { return active ? active.label : null; },
   };
-  window.gijoShell = window.gijoTabs; // 옛 이름 호환(이관 끝나면 정리)
+  // (옛 이름 window.gijoShell 별칭은 두지 않는다 — 팝업 셸을 지운 뒤 부르는 곳이 없다.
+  //  이름을 남겨 두면 "아직 팝업이 있나" 하고 헷갈릴 뿐이다.)
+
+  // 탭 안 화면이 셸에 부탁하는 것들.
+  window.addEventListener("message", function (ev) {
+    var d = ev && ev.data;
+    if (!d) return;
+    // ① "이 화면 열어줘" — 자기 자리를 갈아치우지 않고 새 탭으로(대시보드 바로가기 타일 등).
+    if (d.type === "gijo:openTab" && d.page) {
+      var known = window.gijoMenuLabel ? window.gijoMenuLabel(d.page) : null;
+      open(d.page, d.label || known || d.page);
+      return;
+    }
+    // ② "이 화면 설명해줘"(ⓘ) — 화면 안 챗봇을 없앴으므로 콘솔이 답한다.
+    if (d.type === "gijo:explain" && window.gijoConsole) {
+      window.gijoConsole.ask(d.topic ? '"' + d.topic + '" 사용법 알려줘' : "이 화면에서 뭐 할 수 있어?");
+    }
+  });
 
   $("tbCloseAll").addEventListener("click", closeAll);
   $("csBackBtn").addEventListener("click", function () { if (window.gijo && window.gijo.dockConsoleWindow) window.gijo.dockConsoleWindow(); });
+  // 빼낸 창을 클릭해 보고 있으면 그 화면이 맥락이다 — 규칙은 하나: **보고 있는 것이 맥락**.
+  // 창을 닫으면 다시 활성 탭으로 돌아온다.
+  if (window.gijo && window.gijo.onPopoutContext) {
+    window.gijo.onPopoutContext(function (kind, info) {
+      if (kind === "focus" && info && info.label) setCtx(String(info.label));
+      else if (kind === "closed") setCtx(active ? active.label : null);
+    });
+  }
   // 콘솔 창을 닫으면 다시 아래에 붙인다 — 안 그러면 대화할 곳이 사라진다.
   if (window.gijo && window.gijo.onConsoleClosed) window.gijo.onConsoleClosed(function () { setPopped(false); });
   $("tbPopout").addEventListener("click", function () {

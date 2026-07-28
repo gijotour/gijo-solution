@@ -236,24 +236,10 @@
           // 탭 셸(app.html) 안 — 화면을 옮기지 않고 탭으로 연다. 셸이 리로드되지 않으므로
           // 대화·입력 중 초안·진행 중 작업이 그대로 유지된다(4.0.0 탭 구조).
           el.addEventListener("click", function () { window.gijoTabs.open(it.page, it.label); });
-        } else if (it.page === "dashboard.html" && it.page === here) {
-          // 팝업 셸에서는 화면을 열어도 주소가 dashboard.html 그대로다. 그래서 '대시보드'가
-          // 늘 현재 페이지로 잡혀 눌러도 아무 일이 없었다 — 정작 팝업을 덮어쓴 상태에서
-          // 돌아가려고 누르는 자리인데(2026-07-27 사용자 지적). 팝업을 접어 준다.
-          el.addEventListener("click", function () {
-            if (window.gijoShell && window.gijoShell.hide) window.gijoShell.hide();
-          });
         } else if (it.page !== here) {
+          // 셸 밖(분리창 등)에서는 화면을 옮긴다 — 그 창은 한 화면만 보는 자리다.
           el.addEventListener("click", function () {
-            // 팝업 셸(대시보드)에서는 팝업으로 — 이동하지 않으니 명령창·대화·진행 작업이 유지된다.
-            if (it.popup && window.gijoShell) { window.gijoShell.open(it.page, it.label); return; }
-            // "내 업무 바로가기" — 대시보드에 있으면 리로드 없이 그 자리에서 연다(대화 보호).
-            // 셸 팝업이 떠 있으면 먼저 접는다(z가 낮아 바로가기가 뒤에 가려진다).
-            if (it.page.indexOf("dashboard.html?quick") === 0 && window.gijoOpenQuick) {
-              if (window.gijoShell && window.gijoShell.hide) window.gijoShell.hide();
-              window.gijoOpenQuick();
-              return;
-            }
+            if (it.page.indexOf("dashboard.html?quick") === 0 && window.gijoOpenQuick) { window.gijoOpenQuick(); return; }
             go(it.page);
           });
         }
@@ -263,6 +249,15 @@
   }
   // 대시보드가 '전체메뉴' 모드에서 같은 메뉴를 렌더하도록 공개(단일 소스).
   window.gijoRenderMenu = buildMenu;
+  // 화면 주소 → 메뉴에 적힌 이름. 셸이 탭 이름을 붙일 때 쓴다(이름을 두 곳에 적지 않으려고).
+  window.gijoMenuLabel = function (page) {
+    for (var i = 0; i < GROUPS.length; i++) {
+      for (var j = 0; j < GROUPS[i].items.length; j++) {
+        if (GROUPS[i].items[j].page === page) return GROUPS[i].items[j].label;
+      }
+    }
+    return null;
+  };
 
   // ── 왼쪽 패널 접기/열기(전 화면 공통, 오른쪽 rightReopen과 대칭) ────────────
   // 접힘=body 클래스(레이아웃은 위 CSS가 처리) + 가장자리 '메뉴 열기' 탭. 상태는 기억.
@@ -401,9 +396,19 @@
       .catch(function () {});
   }
 
-  // embed 모드 — 허브 탭(hub.html)의 iframe으로 품길 때(?embed=1). 사이드바·헤더·드로어를 숨기고
-  // 본문만 보인다(허브가 바깥에서 네비·헤더를 제공). 챗봇 위젯은 탭별 화면 맥락이 정확하도록 유지.
+  // embed 모드 — 셸 탭(app.html)의 iframe으로 품길 때(?embed=1). 사이드바·헤더를 숨기고 본문만
+  // 보인다(셸이 바깥에서 메뉴·탭줄·콘솔을 제공).
   var IS_EMBED = /(^|[?&])embed=1(&|$)/.test(location.search);
+  // 탭 안 화면이 다른 화면을 열 때 쓰는 다리 — 자기 자리를 갈아치우지 않고 **셸에 새 탭을 부탁**한다.
+  // (대시보드 바로가기 타일처럼 "여기서 저기로" 보내는 자리들이 이걸 쓴다.)
+  window.gijoOpenScreen = function (page, label) {
+    if (window.gijoTabs) { window.gijoTabs.open(page, label); return true; }   // 셸 자신
+    if (window.parent !== window) {                                            // 탭 안
+      try { window.parent.postMessage({ type: "gijo:openTab", page: page, label: label || null }, "*"); return true; } catch (e) {}
+    }
+    go(page);                                                                  // 그 외(분리창 등)는 이동
+    return true;
+  };
   // 분리창(별도 창) — 이 창은 "한 화면을 크게 보려고" 떼어낸 것이다. 왼쪽 메뉴로 다른 데를
   // 가려는 창이 아니고(그건 대시보드가 한다), 좁은 폭에서 메뉴가 자리만 먹는다.
   // 그래서 메뉴를 숨기고 폭을 다 준다(2026-07-27 사용자 지적).
@@ -453,8 +458,28 @@
       "#gijoNav{display:none !important;}" +
       ".app{grid-template-columns:minmax(0,1fr) !important;display:block !important;}" +
       ".explorer{display:none !important;}" +
-      ".main{padding-left:18px !important;padding-right:18px !important;}";
+      ".main{padding-left:18px !important;padding-right:18px !important;}" +
+      // 가로/세로 전환 — 예전엔 허브가 그렸는데 허브를 없애서(4.0.0) 여기로 옮겼다.
+      // 세로(피벗) 모니터를 쓰는 관제실이 있어 남겨 둔다.
+      ".gijo-orient{position:fixed;top:10px;right:14px;z-index:950;background:var(--panel-2,#0e1526);color:var(--muted,#8b93ab);" +
+      "border:1px solid var(--border,#1e2a44);border-radius:8px;font-size:11px;font-weight:800;padding:5px 10px;cursor:pointer;}" +
+      ".gijo-orient:hover{color:#fff;border-color:var(--blue,#3b82f6);}";
     document.head.appendChild(st);
+    if (!window.gijo || !window.gijo.setPopoutOrientation) return;
+    var orient = /[?&]orient=portrait(&|$)/.test(location.search) ? "portrait" : "landscape";
+    var b = document.createElement("div");
+    b.className = "gijo-orient";
+    var paint = function () {
+      b.textContent = orient === "portrait" ? "↔ 가로" : "↕ 세로";
+      b.title = orient === "portrait" ? "가로 창으로 — 모니터 오른쪽 절반" : "세로 창으로 — 세로(피벗) 모니터 관제용";
+    };
+    paint();
+    b.addEventListener("click", function () {
+      orient = orient === "portrait" ? "landscape" : "portrait";
+      try { window.gijo.setPopoutOrientation(orient); } catch (e) {}
+      paint();
+    });
+    document.body.appendChild(b);
   }
 
   // 화면 크기 단축키 — 데스크톱 앱 관례대로 Cmd/Ctrl + '＋·－·0'. 배율 계산·저장은 메인 프로세스가

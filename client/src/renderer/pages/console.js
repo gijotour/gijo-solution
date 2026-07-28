@@ -203,7 +203,14 @@
     restore();
   }
 
-  window.gijoConsole = { append: append, syncCtx: readCtxFromShell, submit: submit };
+  // ask() — 화면이 ⓘ로 "설명해줘"를 부탁할 때처럼, 담당자가 타이핑하지 않아도 콘솔이 대신 묻는다.
+  function ask(text) {
+    var input = document.getElementById("chatInput");
+    if (!input) return;
+    input.value = text;
+    submit();
+  }
+  window.gijoConsole = { append: append, syncCtx: readCtxFromShell, submit: submit, ask: ask };
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
   else boot();
 })();

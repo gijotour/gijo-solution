@@ -13,6 +13,23 @@
   if (!host) return;
   if (!window.gijo || !window.gijo.isAuthenticated || !window.gijo.isAuthenticated()) return;
 
+  // 4.0.0 — 셸 탭 안(?embed=1)에서는 이 위젯을 만들지 않는다. 지시와 설명은 **셸 콘솔 한 곳**에서만
+  // 한다(2026-07-27 결정의 연장). 화면마다 챗봇이 또 있으면 담당자가 매번 "어디에 물어야 하나"를
+  // 판단해야 하고, 같은 질문에 두 자리가 각각 답해 대화가 갈라진다.
+  // ⚠ 화면 파일 26개를 각각 고치는 대신 여기 한 곳에서 끊는다 — 파일을 26번 손대면 그중
+  //   하나를 빠뜨리기 마련이고, 빠뜨린 화면만 위젯이 남아 더 헷갈린다.
+  // 분리창(popout)에는 콘솔이 없으므로 위젯을 남긴다 — 거기선 이게 유일한 답변 창구다.
+  if (/(^|[?&])embed=1(&|$)/.test(location.search || "")) {
+    host.style.display = "none";
+    // 화면 안에서 프로그램적으로 설명을 부르는 호출부(gijoExplain)는 셸 콘솔로 넘긴다.
+    window.gijoExplain = function (topic) {
+      try {
+        window.parent.postMessage({ type: "gijo:explain", screen: decodeURIComponent((location.pathname || "").split("/").pop() || ""), topic: topic || null }, "*");
+      } catch (e) {}
+    };
+    return;
+  }
+
   var here = decodeURIComponent((location.pathname || "").split("/").pop() || "");
   var esc = function (s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); };
   var fmt = function (s) { return esc(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/\n/g, "<br>"); };

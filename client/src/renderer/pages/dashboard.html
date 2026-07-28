@@ -2105,7 +2105,9 @@
       const sess = await ensureDashSession();
       // 팝업 셸이 떠 있으면 그 화면(허브면 활성 탭)이 지시의 맥락(screen)이 된다 — "정리해줘"가
       // 취약점 팝업 앞에서는 취약점 우선순위 정리로 해석된다(server/engine/screencontext.ts).
-      const result = await window.gijo.sendInstruction(text, sess ? sess.id : undefined, window.gijoShell ? window.gijoShell.activeScreen() : undefined);
+      // 4.0.0 — 대시보드는 셸 탭 하나다. 이 콘솔에서 보낸 지시의 맥락은 대시보드 자신이다
+      // (다른 화면을 향한 지시는 셸 콘솔이 그 탭을 맥락으로 보낸다).
+      const result = await window.gijo.sendInstruction(text, sess ? sess.id : undefined, "dashboard.html");
       // 서버가 세션을 새로 열었을 수도 있다 — 돌려준 id를 기억해야 다음에 이어서 볼 수 있다.
       if (result && result.sessionId) {
         setDashSession({ id: result.sessionId, title: (dashCurrentSession && dashCurrentSession.title) || "" });
@@ -2509,7 +2511,8 @@
     box.querySelectorAll(".tt-row").forEach((el) => {
       const open = () => {
         const p = el.dataset.go;
-        if (window.gijoShell && window.gijoShell.openPage && window.gijoShell.openPage(p)) return;
+        // 셸 탭 안이면 자기 자리를 갈아치우지 않고 새 탭으로 연다(4.0.0).
+        if (window.gijoOpenScreen) { window.gijoOpenScreen(p); return; }
         window.gijo.navigateTo(p);
       };
       el.addEventListener("click", open);
@@ -3143,9 +3146,10 @@
       el.addEventListener("click", function () {
         if (editing) return;
         var page = el.getAttribute("data-go");
-        // 업무 클릭 = 대시보드 위 팝업으로(2026-07-26 사용자 요청) — 옛날처럼 전체 이동하면
-        // 대화·명령창이 끊긴다. 바로가기 창은 닫고, 해당 허브의 그 탭이 팝업으로 뜬다.
-        if (window.gijoShell && window.gijoShell.openPage && window.gijoShell.openPage(page)) {
+        // 업무 클릭 = 새 탭으로(4.0.0). 옛날처럼 전체 이동하면 대화·명령창이 끊겼는데,
+        // 이제 콘솔이 셸에 있어 그럴 일이 없다. 바로가기 창은 닫고 그 화면을 탭으로 연다.
+        if (window.gijoOpenScreen) {
+          window.gijoOpenScreen(page);
           if (window.gijoCloseQuick) window.gijoCloseQuick();
           return;
         }
@@ -3191,8 +3195,7 @@
 <script src="nav.js"></script>
 <script src="titlebar.js"></script>
 <script src="commandpanel.js"></script>
-<!-- 팝업 셸(혼합 방식 2026-07-26) — 챗봇 메뉴를 팝업으로 열어 명령창·대화·진행 작업을 유지한다.
-     대시보드 전용: 다른 화면에는 gijoShell이 없어 nav.js가 기존대로 이동한다. -->
-<script src="shell-popup.js"></script>
+<!-- 팝업 셸(shell-popup.js)은 4.0.0에서 없앴다. 그 역할(여러 화면 유지 + 대화 안 끊김)은
+     탭 셸(app.html)이 대신하고, 대시보드는 그 안의 탭 하나가 됐다. -->
 </body>
 </html>

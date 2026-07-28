@@ -279,8 +279,8 @@ ipcMain.handle("shell:popout", async (_e, page: string, title?: string, orient?:
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      // 분리 창은 허브(hub.html)를 띄운다 — 허브는 화면을 iframe으로 품으므로 서브프레임에도
-      // preload(window.gijo)가 필요하다(메인 창과 동일). 빠뜨리면 탭 안이 "불러오지 못했습니다"로 죽는다
+      // 4.0.0에서 분리창은 화면 하나를 직접 띄운다(허브가 없어졌다). 그래도 서브프레임 주입은
+      // 켜 둔다 — 화면 안에 iframe을 쓰는 곳이 있고, 빠뜨리면 그 안이 "불러오지 못했습니다"로 죽는다
       // (2026-07-26 실화면 검증에서 실제로 잡은 버그).
       nodeIntegrationInSubFrames: true,
     },
@@ -300,8 +300,8 @@ ipcMain.handle("shell:popout", async (_e, page: string, title?: string, orient?:
     popoutWindows.delete(key);
     notifyMain("shell:popoutClosed", { key });
   });
-  // popout=1·orient — 분리창임을 페이지에 알린다(허브가 가로/세로 전환 버튼을 그린다).
-  // ⚠ 로드 주소에 창 구분용 접미사를 섞으면 g 파라미터가 오염돼 "알 수 없는 허브"가 뜬다(실측 버그).
+  // popout=1·orient — 분리창임을 페이지에 알린다(nav.js가 메뉴를 숨기고 가로/세로 버튼을 그린다).
+  // ⚠ 로드 주소에 창 구분용 접미사를 섞으면 화면 자신의 쿼리(?s=ai 등)가 오염된다(실측 버그).
   const [file, qs] = String(page).split("?");
   const query: Record<string, string> = { popout: "1", orient: portrait ? "portrait" : "landscape" };
   if (qs) for (const [k, v] of new URLSearchParams(qs)) query[k] = v;
