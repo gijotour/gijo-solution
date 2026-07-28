@@ -70,6 +70,16 @@
     color: #ff8080;
     min-height: 16px;
   }
+  /* 중복 로그인 확인 — 화면 안에서 묻는다(네이티브 모달은 렌더러를 멈춘다) */
+  .dup { margin-top: 12px; padding: 12px 14px; border: 1px solid rgba(240,160,32,.45);
+    background: rgba(240,160,32,.10); border-radius: 10px; }
+  .dup-t { font-size: 12.5px; font-weight: 800; color: #f0a020; }
+  .dup-d { margin-top: 5px; font-size: 11.5px; color: var(--muted); line-height: 1.6; }
+  .dup-a { display: flex; gap: 8px; margin-top: 10px; }
+  .dup-ok, .dup-no { font-size: 12px; font-weight: 700; border-radius: 8px; padding: 7px 13px; cursor: pointer; }
+  .dup-ok { background: #f0a020; color: #21160a; border: 0; }
+  .dup-no { background: transparent; color: var(--muted); border: 1px solid rgba(255,255,255,.16); }
+  .dup-no:hover { color: #fff; }
   .hint { margin-top: 18px; font-size: 11.5px; color: var(--muted); line-height: 1.5; }
   .ver { margin-top: 14px; font-size: 10.5px; color: var(--muted); text-align: center; opacity: .8; }
   /* 최근 로그인 빠른 선택 */
@@ -117,6 +127,19 @@
 
     <button id="loginBtn">로그인</button>
     <div class="err" id="errMsg"></div>
+    <!-- 중복 로그인 확인 — 화면 안에서 묻는다(4.1.0).
+         예전엔 window.confirm을 썼는데, Electron에서는 그게 **OS 네이티브 모달**이라
+         렌더러가 통째로 멈춘다. 사람이 직접 누르기 전까지 아무것도 못 하고, 자동화는
+         닫지도 못한다(Playwright: "No dialog is showing") — 우리 QA가 로그인을 통과
+         못 하던 진짜 이유였다. 화면 안에서 물으면 앱과 어울리고 검사도 통과한다. -->
+    <div class="dup" id="dupBox" style="display:none">
+      <div class="dup-t">이미 다른 곳에서 로그인 중입니다</div>
+      <div class="dup-d">강제로 로그인하면 그 세션은 로그아웃됩니다. 계속할까요?</div>
+      <div class="dup-a">
+        <button id="dupForce" class="dup-ok">강제 로그인</button>
+        <button id="dupCancel" class="dup-no">취소</button>
+      </div>
+    </div>
     <div class="hint">
       단일 데스크톱 모드: 서버가 이 PC에 동봉되어 있다면 기본 주소(localhost:4000)를 그대로 사용하세요.<br />
       분산 모드: 사내망 GPU 서버 주소를 입력하세요.
@@ -184,8 +207,13 @@
     }
     loadRecent();
 
+    const dupBox = document.getElementById("dupBox");
+    document.getElementById("dupForce").addEventListener("click", () => { dupBox.style.display = "none"; doLogin(true); });
+    document.getElementById("dupCancel").addEventListener("click", () => { dupBox.style.display = "none"; });
+
     async function doLogin(force) {
       errMsg.textContent = "";
+      dupBox.style.display = "none";
       btn.disabled = true;
       btn.textContent = "연결 중...";
       try {
@@ -200,12 +228,13 @@
           return;
         }
         if (result.code === "already_logged_in") {
-          const confirmed = window.confirm("이미 다른 곳에서 로그인 중입니다.\n강제로 로그인하면 그 세션은 로그아웃됩니다. 계속할까요?");
+          // ⚠ window.confirm을 쓰지 않는다 — Electron에서는 OS 네이티브 모달이라 렌더러가
+          //   통째로 멈춘다. 사람이 직접 누르기 전까지 아무것도 못 하고, 자동화는 닫지도
+          //   못한다(2026-07-29 실측: Playwright가 "No dialog is showing"으로 실패).
+          //   화면 안에서 물으면 앱과 어울리고 검사도 통과한다.
+          dupBox.style.display = "block";
           btn.disabled = false;
           btn.textContent = "로그인";
-          if (confirmed) {
-            await doLogin(true);
-          }
           return;
         }
         errMsg.textContent = result.code === "locked"

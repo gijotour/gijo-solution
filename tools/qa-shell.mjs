@@ -54,7 +54,13 @@ await page.fill("#password", PW);
 await page.evaluate(() => { const c = document.getElementById("savePw"); if (c && c.checked) c.click(); }).catch(() => {});
 page.on("dialog", (d) => d.accept().catch(() => {}));
 await page.click("#loginBtn");
-await page.waitForTimeout(6000);
+await page.waitForTimeout(3000);
+// 이미 다른 곳에서 로그인 중이면 화면 안에 확인이 뜬다 — 눌러서 강제 로그인한다.
+// (4.1.0 전에는 window.confirm이었는데 Electron에서 네이티브 모달이라 자동화가 닫지 못해
+//  여기서 영원히 막혔다 — shell 계층이 늘 "login.html"로 실패하던 원인.)
+const dup = await page.$("#dupForce");
+if (dup && await dup.isVisible()) { await dup.click(); await page.waitForTimeout(3000); }
+await page.waitForTimeout(3000);
 page = ctx.pages().find((p) => p.url().includes("app.html")) || page;
 ok("로그인하면 탭 셸로 들어간다", page.url().includes("app.html"), page.url().split("/").pop());
 await page.waitForTimeout(4000);

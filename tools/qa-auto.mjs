@@ -582,17 +582,28 @@ async function runClient() {
     // ⚠ 세는 범위에 **맨 위 고정 3자리(.gn-top-fixed)**를 함께 넣는다. 대시보드·팀 사무실·
     //   작업 내역을 가지 밖으로 빼 늘 보이게 했는데(2026-07-28 사용자 지시), 가지만 세면
     //   화면이 3개 줄어든 것처럼 보인다 — 자리를 옮겼을 뿐 화면은 그대로다.
+    // ⚠ ⭐즐겨찾기는 **내용 그룹이 아니다** — 내가 꽂아 둔 화면을 모아 두는 바로가기 가지다.
+    //   4.1.0부터 비어 있어도 늘 보이게 했으므로(그전엔 별표한 게 없으면 아예 안 그렸다)
+    //   같이 세면 "그룹 5개"가 되어 헛되이 실패한다. 그래서 빼고 세되, **있는지는 따로 본다.**
     const m = await page.evaluate(() => {
-      const groups = [...document.querySelectorAll("#gijoNav .gn-g")].map((gh) => ({
+      const groups = [...document.querySelectorAll("#gijoNav .gn-g:not(.gn-fav-g)")].map((gh) => ({
         g: gh.querySelector(".cnt") ? gh.textContent.replace(/\d+$/, "").replace("▶", "").trim() : gh.textContent.trim(),
         items: [...(gh.nextElementSibling?.querySelectorAll(".gn-item .gn-label") || [])].map((e) => e.textContent),
       }));
       const fixed = [...document.querySelectorAll("#gijoNav .gn-top-fixed .gn-item .gn-label")].map((e) => e.textContent);
       const all = groups.flatMap((x) => x.items).concat(fixed);
-      return { groups: groups.map((x) => x.g), fixed, total: all.length, all };
+      const favG = document.querySelector("#gijoNav .gn-fav-g");
+      return {
+        groups: groups.map((x) => x.g), fixed, total: all.length, all,
+        // 즐겨찾기 가지는 비어 있어도 보여야 한다 — 안 보이면 '별표'라는 기능이 있는 줄도 모른다
+        // (4.1.0에서 고친 실사고). 세는 데선 뺐으니 존재는 여기서 따로 지킨다.
+        fav: !!favG,
+        favHint: document.querySelector("#gijoNav .gn-favhint")?.textContent || "",
+      };
     });
     if (m.groups.length !== 4) throw new Error(`그룹 ${m.groups.length}개: ${m.groups.join(",")}`);
     if (m.fixed.length !== 3) throw new Error(`맨 위 고정이 ${m.fixed.length}자리: ${m.fixed.join(",")}`);
+    if (!m.fav) throw new Error("⭐즐겨찾기 가지가 안 보인다 — 비어 있어도 보여야 한다");
     if (m.total < 28) throw new Error(`항목 ${m.total}개 — 허브가 덜 풀렸다`);
     // 허브 안에서만 통하던 짧은 이름이 남으면 밖에서 무엇의 '통합 뷰'인지 알 수 없다.
     for (const bad of ["통합 뷰", "등록부", "유지보수"]) if (m.all.includes(bad)) throw new Error(`홀로 못 서는 이름 남음: ${bad}`);
