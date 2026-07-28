@@ -320,6 +320,54 @@ ipcMain.handle("shell:popoutTab", async (e, page: string, label: string) => {
   return { ok: true };
 });
 
+// ── 열린 창 목록 / 창 앞으로 (4.0.1) ────────────────────────────────────────
+// 왜 필요한가: 화면이나 대화를 별도 창으로 빼내면 그 창이 **본창 뒤로 숨는다.** 담당자는
+// 빼낸 것을 잃어버리고 "아까 그거 어디 갔지"가 된다(2026-07-28 사용자가 실제로 겪음 —
+// 본창 뒤에 반쯤 걸친 창을 보고 "저게 뭐냐"고 물었다).
+// 작업표시줄에도 뜨지만 아이콘이 다 같아 구분이 안 된다. 앱이 자기 창을 알고 있으니
+// 앱이 알려주는 게 맞다.
+type WinKind = "main" | "popout" | "console" | "office";
+function listAppWindows(): { id: string; kind: WinKind; label: string; focused: boolean; minimized: boolean }[] {
+  const out: { id: string; kind: WinKind; label: string; focused: boolean; minimized: boolean }[] = [];
+  const add = (id: string, kind: WinKind, label: string, w: BrowserWindow | null) => {
+    if (!w || w.isDestroyed()) return;
+    out.push({ id, kind, label, focused: w.isFocused(), minimized: w.isMinimized() });
+  };
+  add("main", "main", "본 창 (탭)", mainWindow);
+  for (const [key, w] of popoutWindows) {
+    // 창 제목이 "GIJO AS — 취약점" 꼴이라 뒷부분만 쓰면 사람이 읽는 이름이 된다.
+    const t = w.isDestroyed() ? "" : w.getTitle();
+    add("popout:" + key, "popout", t.replace(/^GIJO AS\s*—\s*/, "") || key, w);
+  }
+  add("console", "console", "대화", consoleWindow);
+  add("office", "office", "팀 사무실", officeWindow);
+  return out;
+}
+function findAppWindow(id: string): BrowserWindow | null {
+  if (id === "main") return mainWindow;
+  if (id === "console") return consoleWindow;
+  if (id === "office") return officeWindow;
+  if (id.startsWith("popout:")) return popoutWindows.get(id.slice(7)) ?? null;
+  return null;
+}
+ipcMain.handle("windows:list", async () => listAppWindows());
+ipcMain.handle("windows:focus", async (_e, id: string) => {
+  const w = findAppWindow(String(id));
+  if (!w || w.isDestroyed()) return { ok: false };
+  // 최소화돼 있으면 먼저 복원해야 한다 — focus()만으로는 아이콘 상태 그대로다.
+  if (w.isMinimized()) w.restore();
+  w.show();
+  w.focus();
+  return { ok: true };
+});
+ipcMain.handle("windows:close", async (_e, id: string) => {
+  const w = findAppWindow(String(id));
+  // 본 창은 이 메뉴로 닫지 않는다 — 앱이 통째로 꺼져 놀란다. 창 버튼(✕)이 그 자리다.
+  if (!w || w.isDestroyed() || w === mainWindow) return { ok: false };
+  w.close();
+  return { ok: true };
+});
+
 // ── 대화 콘솔 창(4.0.0) ──────────────────────────────────────────────────────
 // 콘솔은 기본적으로 셸 아래에 붙어 있지만, 모니터가 여럿이면 별도 창으로 빼내는 편이 낫다
 // (화면은 100%로 넓어지고 대화도 원하는 만큼 커진다 — 2026-07-28 사용자 결정).
