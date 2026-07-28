@@ -44,7 +44,6 @@
       { page: "ontology.html", label: "온톨로지" },
       { page: "learnloop.html", label: "학습 루프" },
       { page: "merge.html", label: "LLM 합성" },
-      { page: "llmguide.html", label: "LLM 가이드" },
     ]},
     settings: { ic: "⚙", label: "설정", tabs: [
       { page: "settings.html", label: "설정" },

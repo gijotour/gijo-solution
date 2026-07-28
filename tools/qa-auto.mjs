@@ -505,16 +505,19 @@ async function runClient() {
     return "메뉴에 작업 세션 있음, 세로 글씨 0개, 팝업 기본 접힘";
   });
 
-  await scenario("QA-C05", "메뉴 C안", "AI 지식·모델 허브 6탭", {
+  await scenario("QA-C05", "메뉴 C안", "AI 지식·모델 허브 5탭", {
     given: "AI 계열 화면이 허브 하나로 통합된 뒤(문서 보강은 기억·학습에 병합 — 2026-07-25 메뉴 정리)",
     when: "hub.html?g=aiknowledge 를 열면",
-    then: "기억·학습(RAG)/인수인계/온톨로지/학습 루프/LLM 합성/LLM 가이드 6탭이 뜬다",
+    // 2026-07-28 기대값 현행화: 'LLM 가이드' 화면을 없애고 내용을 설정 > 서버·AI >
+    // '추천 모델 목록'으로 옮겼다(받는 자리와 고르는 자리가 갈려 있었다) → 6탭 → 5탭.
+    then: "기억·학습(RAG)/인수인계/온톨로지/학습 루프/LLM 합성 5탭이 뜬다",
   }, async () => {
     await open("hub.html?g=aiknowledge");
     const tabs = await page.evaluate(() => [...document.querySelectorAll(".hub-tab")].map((t) => t.textContent));
-    if (tabs.length !== 6) throw new Error(`탭 ${tabs.length}개: ${tabs.join(",")}`);
+    if (tabs.length !== 5) throw new Error(`탭 ${tabs.length}개: ${tabs.join(",")}`);
     if (!tabs.some((t) => t.includes("인수인계"))) throw new Error("인수인계 탭 누락");
-    return `탭 6개: ${tabs.join("·")}`;
+    if (tabs.some((t) => t.includes("LLM 가이드"))) throw new Error("LLM 가이드 탭이 아직 있음(설정으로 이관됨)");
+    return `탭 5개: ${tabs.join("·")}`;
   });
 
   await browser.close();

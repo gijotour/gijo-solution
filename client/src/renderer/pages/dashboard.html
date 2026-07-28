@@ -799,7 +799,7 @@
           <div class="model-guide" id="modelGuide" style="display:none">
             <div class="mg-title">⚠ AI 모델이 준비되지 않았습니다 — 답변을 받으려면 아래 중 하나를 하세요</div>
             <div class="mg-actions">
-              <button class="mg-btn primary" id="mgDownloadBtn">📥 이 PC에 모델 받기 · 추천 LLM 가이드</button>
+              <button class="mg-btn primary" id="mgDownloadBtn">📥 이 PC에 모델 받기 (설정 > 서버·AI)</button>
               <button class="mg-btn" id="mgServerBtn">🖧 사내 GPU 서버에 연결 · 설정</button>
             </div>
           </div>
@@ -2789,7 +2789,7 @@
     if (todoAddBtn) todoAddBtn.addEventListener("click", addTodo);
     if (todoInput) todoInput.addEventListener("keydown", (e) => { if (e.key === "Enter") addTodo(); });
     if (todayItems) todayItems.addEventListener("click", onTaskAction);
-    document.getElementById("mgDownloadBtn").addEventListener("click", () => window.gijo.navigateTo("llmguide.html"));
+    document.getElementById("mgDownloadBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.getElementById("mgServerBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
 
     // 쓰다 만 지시를 지켜준다(2026-07-26 사용자 요청) — 화면을 옮겼다 돌아오거나 앱을 다시 켜도

@@ -430,8 +430,8 @@ export async function chat(args: ChatArgs): Promise<string> {
   if (!res || !res.ok) {
     emitLlmActivity({ kind: "chat", phase: "error", agent: agentName, detail: "로컬 LLM 연결 실패" });
     // 최종 사용자용 안내(개발자용 원인 대신). 두 경로를 함께 제시한다:
-    // ① 이 PC에서 완결 — '추천 LLM 가이드'에서 모델 내려받아 로드  ② 사내 GPU 서버에 연결 — 설정에서 서버 주소 입력.
-    return "⚠ AI 모델이 아직 준비되지 않았습니다. 다음 중 하나로 해결하세요 — ① 상단 '추천 LLM 가이드'에서 모델을 내려받아 로드(에이전트 AI 화면), 또는 ② 설정에서 모델이 있는 사내 GPU 서버 주소를 입력해 연결.";
+    // ① 이 PC에서 완결 — 설정 > 서버·AI에서 모델 내려받아 로드  ② 사내 GPU 서버에 연결 — 설정에서 서버 주소 입력.
+    return "⚠ AI 모델이 아직 준비되지 않았습니다. 다음 중 하나로 해결하세요 — ① 설정 > 서버·AI > 모델 검색·받기에서 모델을 내려받아 로드, 또는 ② 설정에서 모델이 있는 사내 GPU 서버 주소를 입력해 연결.";
   }
   const data = (await res.json()) as {
     choices?: { message?: { content?: string } }[];

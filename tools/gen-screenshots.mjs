@@ -166,7 +166,6 @@ async function main() {
     { page: "opsguide.html", name: "04-운영가이드-점검거버넌스" },
     { page: "approvals.html", name: "05-승인워크플로우" },
     { page: "learnloop.html", name: "06-헤르메스학습루프" },
-    { page: "llmguide.html", name: "07-추천LLM가이드" },
     { page: "agent.html", name: "08-에이전트AI" },
     { page: "compliance.html", name: "09-컴플라이언스" },
     { page: "sbom.html", name: "10-AI-BOM-SBOM" },

@@ -86,6 +86,39 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .beta-tag{background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
 .avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
 .icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
+
+/* 모델 검색·받기 — agent.html에서 이관(2026-07-28) */
+.model-search{display:flex;gap:8px;margin-bottom:12px;}
+.model-search input{flex:1;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:0 12px;height:34px;color:var(--text);font-size:12px;outline:none;}
+.model-search button{background:var(--blue);color:#fff;border:none;border-radius:8px;padding:0 16px;font-size:12px;font-weight:700;cursor:pointer;}
+.hf-result{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);font-size:12px;}
+.hf-result:last-child{border-bottom:none;}
+.hf-load{background:transparent;border:1px solid var(--border-strong);color:var(--blue-light);padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;}
+.hf-sub{font-size:11px;color:var(--muted-2);margin-top:2px;}
+/* 추천 모델 목록 — llmguide.html에서 이관(2026-07-28) */
+.cat{margin-bottom:22px;}
+.cat-head{display:flex;align-items:baseline;gap:10px;margin-bottom:4px;}
+.cat-title{font-size:14px;font-weight:800;color:#fff;}
+.cat-intro{font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6;}
+.model-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:12px;}
+.model-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px;}
+.mc-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.mc-name{font-size:13.5px;font-weight:800;color:#fff;}
+.mc-size{font-size:10.5px;font-weight:800;color:var(--blue-light);background:rgba(59,130,246,0.14);padding:2px 8px;border-radius:6px;}
+.mc-tag{font-size:10px;font-weight:800;color:var(--teal);background:rgba(30,185,128,0.14);padding:2px 7px;border-radius:6px;}
+.mc-desc{font-size:12px;color:var(--text);line-height:1.65;flex:1;}
+.mc-id{font-size:10.5px;color:var(--muted-2);font-family:'Consolas','Menlo',monospace;word-break:break-all;}
+.mc-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:2px;}
+.mc-gb{font-size:11px;color:var(--muted);}
+.mc-dl{background:var(--blue);color:#fff;border:none;border-radius:7px;padding:7px 14px;font-size:12px;font-weight:800;cursor:pointer;}
+.mc-dl:disabled{opacity:.55;cursor:default;}
+.mc-installed{font-size:11.5px;font-weight:800;color:var(--teal);}
+.mc-agents{display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-top:2px;}
+.mc-agents-label{font-size:10px;color:var(--muted-2);font-weight:700;}
+.mc-agent{font-size:10px;font-weight:700;color:var(--blue-light);background:rgba(59,130,246,0.14);padding:2px 8px;border-radius:6px;}
+.mc-status{font-size:11px;min-height:14px;color:var(--muted);}
+.mc-status.err{color:#f5928a;}
+.mc-status.ok{color:var(--teal);}
 </style>
 </head>
 <body>
@@ -239,6 +272,24 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         <button class="btn-primary" id="testHfBtn">연결 시험</button>
       </div>
       <div class="status-line" id="modelAuthStatusLine"></div>
+    </div>
+
+    <!-- 모델 검색 · 받기 — AI 팀 화면에서 이관(2026-07-28, 설정 통합 ②단계).
+         인증 바로 아래에 둔다: 토큰을 왜 넣는지가 여기서 드러난다. -->
+    <div class="panel" data-gijo-fold="모델 검색 · 받기">
+      <div class="panel-title">모델 검색 · 받기</div>
+      <div class="panel-sub">보안 특화 오픈소스 모델을 이름으로 찾아 이 서버에 내려받습니다. 받는 동안 다른 화면으로 가도 계속됩니다.</div>
+      <div class="model-search"><input id="hfSearchInput" placeholder="예: cybersecurity, WhiteRabbitNeo, Foundation-Sec"><button id="hfSearchBtn">검색</button></div>
+      <div id="hfResults" style="font-size:12px;color:var(--muted-2)">검색어를 입력하고 검색 버튼을 눌러주세요.</div>
+      <div id="hfJobs" style="font-size:12px;margin-top:8px"></div>
+    </div>
+
+    <!-- 추천 모델 목록 — llmguide.html 화면을 통째로 이관(2026-07-28).
+         "무엇을 받을지 모르겠다"는 물음의 답이 받는 자리에서 바로 보여야 한다. -->
+    <div class="panel" data-gijo-fold="추천 모델 목록">
+      <div class="panel-title">추천 모델 목록</div>
+      <div class="panel-sub">용도별로 검증된 모델입니다. 모두 GGUF(로컬 구동)이며 Q4_K_M 한 개만 받습니다.</div>
+      <div id="llmGuide"><div style="color:var(--muted);font-size:12px">불러오는 중...</div></div>
     </div>
 
     <div class="panel" data-gijo-fold="로컬 LLM 엔진">
@@ -871,6 +922,142 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     }
   }
 
+  // ── 모델 검색·받기 + 추천 목록 (2026-07-28 이관) ─────────────────────
+  // 받기는 서버 백그라운드 큐가 처리한다 — 이 화면을 떠나도 계속되고, 돌아오면 이어서 보여준다.
+  const dirNameOf = (id) => id.replace(/\//g, "__");
+  const hfJobs = new Map();
+  let recByModel = {};
+
+  function renderHfJobs() {
+    const el = document.getElementById("hfJobs");
+    const items = Array.from(hfJobs.values()).sort((a, b) => b.createdAt - a.createdAt).slice(0, 5);
+    if (!items.length) { el.innerHTML = ""; return; }
+    el.innerHTML = items.map((j) => {
+      const label =
+        j.status === "queued" ? "대기 중…" :
+        j.status === "downloading" ? `받는 중… ${j.progress || 0}%` :
+        j.status === "done" ? "✓ 완료 — 모델 목록에서 선택할 수 있습니다" :
+        "✗ 실패: " + (j.error || "");
+      const color = j.status === "error" ? "#f5928a" : j.status === "done" ? "var(--teal)" : "var(--muted-2)";
+      return `<div style="color:${color};padding:2px 0">${esc(j.modelId)} — ${esc(label)}</div>`;
+    }).join("");
+  }
+
+  // 추천 카드에도 같은 잡 상태를 반영한다(검색 결과와 카드가 따로 놀지 않게).
+  function applyJobToCard(job) {
+    const card = document.querySelector(`.model-card[data-dir="${dirNameOf(job.modelId)}"]`);
+    if (!card) return;
+    const btn = card.querySelector(".mc-dl");
+    const status = card.querySelector(".mc-status");
+    if (!status) return;
+    if (job.status === "queued") {
+      if (btn) { btn.disabled = true; btn.textContent = "대기 중..."; }
+      status.className = "mc-status"; status.textContent = "대기열에 추가됨…";
+    } else if (job.status === "downloading") {
+      if (btn) { btn.disabled = true; btn.textContent = "받는 중..."; }
+      status.className = "mc-status";
+      status.textContent = job.progress > 0
+        ? `받는 중… ${job.progress}% (다른 화면으로 가도 계속됩니다)`
+        : "받는 중… 큰 모델은 수 분 걸립니다.";
+    } else if (job.status === "done") {
+      if (btn) { btn.textContent = "완료"; btn.disabled = true; }
+      status.className = "mc-status ok"; status.textContent = `✓ 설치됨: ${esc(job.file || job.modelId)}`;
+    } else if (job.status === "error") {
+      if (btn) { btn.disabled = false; btn.textContent = "다시 시도"; }
+      status.className = "mc-status err"; status.textContent = "✗ " + esc(job.error || "받기 실패");
+    }
+  }
+
+  function onHfJobUpdate(job) {
+    hfJobs.set(job.id, job);
+    renderHfJobs();
+    applyJobToCard(job);
+    if (job.status === "done") { loadEngineStatus().catch(() => {}); }
+  }
+
+  async function searchHf() {
+    const q = document.getElementById("hfSearchInput").value.trim();
+    const resultsEl = document.getElementById("hfResults");
+    if (!q) return;
+    resultsEl.textContent = "검색 중...";
+    try {
+      const results = await window.gijo.searchHfModels(q);
+      resultsEl.innerHTML = results.length
+        ? results.slice(0, 8).map((r) =>
+            `<div class="hf-result"><span>${esc(r.id)}<div class="hf-sub">${esc(r.format)} · 받은 횟수 ${r.downloads.toLocaleString()}</div></span>` +
+            `<button class="hf-load" data-load="${esc(r.id)}">받기</button></div>`).join("")
+        : '<div style="color:var(--muted-2)">검색 결과가 없습니다</div>';
+    } catch (e) {
+      resultsEl.textContent = "검색 실패: " + ((e && e.message) || e);
+    }
+  }
+
+  function modelCardHtml(m, installed) {
+    const tag = m.tag ? `<span class="mc-tag">${esc(m.tag)}</span>` : "";
+    const foot = installed
+      ? `<span class="mc-gb">${esc(m.approxGb)}</span><span class="mc-installed">✓ 설치됨</span>`
+      : `<span class="mc-gb">${esc(m.approxGb)}</span><button class="mc-dl" data-load="${esc(m.id)}">받기</button>`;
+    const agents = recByModel[m.id];
+    const agentsRow = agents && agents.length
+      ? `<div class="mc-agents"><span class="mc-agents-label">🤖 추천 에이전트</span>${agents.map((n) => `<span class="mc-agent">${esc(n)}</span>`).join("")}</div>`
+      : "";
+    return `<div class="model-card" data-dir="${esc(dirNameOf(m.id))}">` +
+      `<div class="mc-top"><span class="mc-name">${esc(m.name)}</span><span class="mc-size">${esc(m.size)}</span>${tag}</div>` +
+      `<div class="mc-desc">${esc(m.desc)}</div>` + agentsRow +
+      `<div class="mc-id">${esc(m.id)}</div>` +
+      `<div class="mc-foot">${foot}</div><div class="mc-status"></div></div>`;
+  }
+
+  async function loadLlmGuide() {
+    const root = document.getElementById("llmGuide");
+    if (!root) return;
+    try {
+      const [cats, models, recs, agents] = await Promise.all([
+        window.gijo.listLlmGuide(),
+        window.gijo.listModels().catch(() => []),
+        window.gijo.getAgentRecommendations().catch(() => ({})),
+        window.gijo.listAgents().catch(() => []),
+      ]);
+      const installed = new Set((models || []).map((x) => x.id));
+      const agentName = Object.fromEntries((agents || []).map((a) => [a.id, a.name]));
+      recByModel = {};
+      for (const [agentId, r] of Object.entries(recs || {})) {
+        (recByModel[r.id] = recByModel[r.id] || []).push(agentName[agentId] || agentId);
+      }
+      root.innerHTML = cats.map((c) =>
+        `<div class="cat"><div class="cat-head"><span style="font-size:16px">${esc(c.icon)}</span>` +
+        `<span class="cat-title">${esc(c.title)}</span></div>` +
+        `<div class="cat-intro">${esc(c.intro)}</div>` +
+        `<div class="model-grid">${c.models.map((m) => modelCardHtml(m, installed.has(dirNameOf(m.id)))).join("")}</div></div>`
+      ).join("");
+      // 이미 받는 중인 게 있으면 카드에 이어서 표시
+      const jobs = await window.gijo.listHfDownloadJobs().catch(() => []);
+      jobs.filter((j) => j.status === "queued" || j.status === "downloading").forEach(applyJobToCard);
+    } catch (e) {
+      root.innerHTML = '<div style="color:#f5928a;font-size:12px">추천 목록을 불러오지 못했습니다: ' + esc((e && e.message) || e) + "</div>";
+    }
+  }
+
+  // 받기 버튼 — 검색 결과와 추천 카드 양쪽에서 같은 방식으로 처리한다.
+  async function queueDownload(modelId, btn, statusEl) {
+    btn.disabled = true;
+    btn.textContent = "대기열에 추가...";
+    if (statusEl) { statusEl.className = "mc-status"; statusEl.textContent = "대기열에 추가하는 중..."; }
+    try {
+      onHfJobUpdate(await window.gijo.loadHfModel(modelId));
+      if (!statusEl) btn.textContent = "대기열에 추가됨 ↓";
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = "다시 시도";
+      // 서버가 보낸 본문({error:"..."})을 뽑아 사람이 읽게 보여준다.
+      let msg = (err && err.message) || String(err);
+      const brace = msg.indexOf("{");
+      if (brace >= 0) { try { const j = JSON.parse(msg.slice(brace)); if (j.error) msg = j.error; } catch (_) {} }
+      if (statusEl) { statusEl.className = "mc-status err"; statusEl.textContent = "✗ " + msg; }
+      else { btn.title = msg; alert("받기 실패: " + msg); }
+    }
+  }
+
   async function loadLawConfig() {
     try {
       const c = await window.gijo.lawConfig();
@@ -979,6 +1166,23 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     document.getElementById("testConnectionBtn").addEventListener("click", testConnection);
     document.getElementById("saveServerUrlBtn").addEventListener("click", saveServerUrl);
+    // 모델 검색·받기
+    document.getElementById("hfSearchBtn").addEventListener("click", searchHf);
+    document.getElementById("hfSearchInput").addEventListener("keydown", (e) => { if (e.key === "Enter") searchHf(); });
+    document.getElementById("hfResults").addEventListener("click", (e) => {
+      const id = e.target.dataset.load;
+      if (id) queueDownload(id, e.target, null);
+    });
+    document.getElementById("llmGuide").addEventListener("click", (e) => {
+      const btn = e.target.closest(".mc-dl");
+      if (!btn) return;
+      queueDownload(btn.dataset.load, btn, btn.closest(".model-card").querySelector(".mc-status"));
+    });
+    window.gijo.onHfDownloadProgress(onHfJobUpdate);
+    window.gijo.listHfDownloadJobs()
+      .then((jobs) => jobs.filter((j) => j.status === "queued" || j.status === "downloading").forEach(onHfJobUpdate))
+      .catch(() => {});
+    loadLlmGuide();
     // 모델 받기 인증(2026-07-28) — 토큰은 넣기만 하고 다시 보여주지 않는다.
     document.getElementById("saveHfTokenBtn").addEventListener("click", () => {
       const v = document.getElementById("hfTokenInput").value.trim();

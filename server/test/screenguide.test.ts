@@ -60,6 +60,14 @@ describe("screenguide — 도움말 의도 감지", () => {
     }
     expect(formatScreenGuide("settings.html", "모델 받기 인증 뭐야?")).toContain("HuggingFace 토큰");
   });
+
+  // 2026-07-28: "어떤 모델 받으면 좋아?"가 안 걸려 사내 문서에서 SBOM 라이브러리를 끌어와 답했다.
+  it("고르는 말투('좋아?')도 그 구역 안내로 간다", () => {
+    expect(isHelpIntent("어떤 모델 받으면 좋아?", "settings.html")).toBe(true);
+    expect(formatScreenGuide("settings.html", "어떤 모델 받으면 좋아?")).toContain("추천 에이전트");
+    // 구역 이름이 없으면 말투만으로는 화면 안내가 열리지 않는다(도구·대화가 처리해야 한다)
+    expect(isHelpIntent("이 취약점 어떻게 고치면 좋아?", "settings.html")).toBe(false);
+  });
 });
 
 describe("screenguide — 화면별 가이드", () => {

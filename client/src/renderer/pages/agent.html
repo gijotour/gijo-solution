@@ -273,7 +273,7 @@ tr:last-child td{border-bottom:none;}
   </div>
   <div class="mg-acts">
     <button class="mg-btn primary" id="mgTierBtn">⚙ 설정에서 티어 적용 (동시 모델·문맥)</button>
-    <button class="mg-btn" id="mgGuideBtn">📚 추천 LLM 가이드 — 어떤 모델 받을지</button>
+    <button class="mg-btn" id="mgGuideBtn">📚 추천 모델 목록 — 어떤 모델 받을지 (설정)</button>
     <button class="mg-btn" id="mgRosterBtn">🧩 에이전트별 모델 지정 (로스터로)</button>
   </div>
 </div>
@@ -305,15 +305,11 @@ tr:last-child td{border-bottom:none;}
       </div>
       <div style="font-size:11px;color:var(--muted-2);margin-top:8px" id="perfNote">아직 추론 기록이 없습니다.</div>
     </div>
+    <!-- 모델 검색·받기는 설정 > 서버·AI로 옮겼습니다(2026-07-28) — 토큰 등록과 같은 자리에 있어야
+         "왜 토큰이 필요한지"가 드러납니다. 여기엔 가는 길만 남깁니다. -->
     <div class="panel">
-      <div class="panel-title" style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-        <span>HuggingFace 모델 검색 · 불러오기</span>
-        <span class="panel-link" id="llmGuideBtn" title="용도별 추천 LLM 가이드 열기" style="cursor:pointer">❓ 도움</span>
-      </div>
-      <div class="panel-sub">보안 특화 오픈소스 모델을 검색해 로컬로 내려받습니다. 뭘 받아야 할지 모르겠다면 <b style="color:var(--blue-light);cursor:pointer" id="llmGuideLink">❓ 도움(추천 LLM 가이드)</b>에서 용도별 추천 모델을 확인하세요.</div>
-      <div class="model-search"><input id="hfSearchInput" placeholder="예: cybersecurity, WhiteRabbitNeo, Foundation-Sec"><button id="hfSearchBtn">검색</button></div>
-      <div id="hfResults" style="font-size:12px;color:var(--muted-2)">검색어를 입력하고 검색 버튼을 눌러주세요.</div>
-      <div id="hfJobs" style="font-size:12px;margin-top:8px"></div>
+      <div class="panel-title">모델 받기</div>
+      <div class="panel-sub">모델 검색·받기와 추천 목록은 <b style="color:var(--blue-light);cursor:pointer" id="goModelSettings">설정 &gt; 서버·AI</b>로 옮겼습니다. 라이선스 동의가 필요한 모델을 위한 토큰 등록도 그곳에 함께 있습니다.</div>
     </div>
   </div>
 </div>
@@ -471,8 +467,9 @@ tr:last-child td{border-bottom:none;}
         btn.textContent = "대기열 추가...";
         try {
           await window.gijo.loadHfModel(modelId);
-          btn.textContent = "받는 중 ↓";
-          // 하단 다운로드 패널(onHfDownloadProgress)이 진행률을 보여주고, 완료 시 카드가 갱신된다.
+          btn.textContent = "받는 중";
+          btn.title = "진행률은 설정 > 서버·AI > 모델 검색·받기에서 볼 수 있습니다";
+          // 진행률 패널은 설정 화면으로 옮겼다(2026-07-28). 받기 자체는 서버 큐가 계속 처리한다.
         } catch (err) {
           btn.disabled = false;
           btn.textContent = "받기";
@@ -786,52 +783,6 @@ tr:last-child td{border-bottom:none;}
     }
   }
 
-  // HF 다운로드는 서버 백그라운드 큐에서 처리된다 — 이 목록은 현재 세션에서 본 잡들을 보여줄 뿐,
-  // 페이지를 벗어나거나 재검색으로 hfResults가 갈아치워져도 다운로드 자체는 서버에서 계속된다.
-  const hfJobs = new Map();
-  function renderHfJobs() {
-    const el = document.getElementById("hfJobs");
-    const items = Array.from(hfJobs.values()).sort((a, b) => b.createdAt - a.createdAt).slice(0, 5);
-    if (!items.length) { el.innerHTML = ""; return; }
-    el.innerHTML = items
-      .map((j) => {
-        const label =
-          j.status === "queued" ? "대기 중…" :
-          j.status === "downloading" ? `받는 중… ${j.progress || 0}%` :
-          j.status === "done" ? "✓ 완료 — 모델 드롭다운에서 선택 가능" :
-          "✗ 실패: " + (j.error || "");
-        const color = j.status === "error" ? "#f5928a" : j.status === "done" ? "var(--teal)" : "var(--muted-2)";
-        return `<div style="color:${color};padding:2px 0">${j.modelId} — ${label}</div>`;
-      })
-      .join("");
-  }
-  function onHfJobUpdate(job) {
-    hfJobs.set(job.id, job);
-    renderHfJobs();
-    // 다운로드가 끝나면 모델이 로컬에 생겨서 추천 "받기"→"적용" 전환 + 엔진 목록 갱신이 필요하다.
-    if (job.status === "done") { loadEngineStatus(); loadAgents(); }
-  }
-
-  async function searchHf() {
-    const q = document.getElementById("hfSearchInput").value.trim();
-    const resultsEl = document.getElementById("hfResults");
-    if (!q) return;
-    resultsEl.textContent = "검색 중...";
-    try {
-      const results = await window.gijo.searchHfModels(q);
-      resultsEl.innerHTML = results.length
-        ? results
-            .slice(0, 8)
-            .map(
-              (r) => `<div class="hf-result"><span>${r.id}<div class="brain-path">${r.format} · 다운로드 ${r.downloads.toLocaleString()}</div></span><button class="hf-load" data-load="${r.id}">불러오기</button></div>`
-            )
-            .join("")
-        : '<div style="color:var(--muted-2)">검색 결과가 없습니다</div>';
-    } catch (e) {
-      resultsEl.textContent = "검색 실패: " + e.message;
-    }
-  }
-
   // 에이전트 구성(이름·모델)은 관리자만 — 담당자(security_officer)는 정의된 팀을 그대로 쓴다.
   // 로스터 카드(이름변경 클릭)와 설정 모달이 둘 다 여기 안에 있어서, 패널+버튼을 감추면
   // 커스터마이즈 진입점이 통째로 사라진다(서버도 adminMiddleware로 이중 방어).
@@ -886,11 +837,6 @@ tr:last-child td{border-bottom:none;}
     if (window.gijoRealtime) window.gijoRealtime.connect();
     window.gijo.onCollaborationEvent(appendLiveEvent);
     window.gijo.onLlmActivity((evt) => { appendLlmEvent(evt); recordPerf(evt); });
-    window.gijo.onHfDownloadProgress(onHfJobUpdate);
-    window.gijo
-      .listHfDownloadJobs()
-      .then((jobs) => jobs.filter((j) => j.status === "queued" || j.status === "downloading").forEach(onHfJobUpdate))
-      .catch(() => {});
 
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => {
@@ -899,11 +845,8 @@ tr:last-child td{border-bottom:none;}
     document.getElementById("taskBarBtn")?.addEventListener("click", sendInstruction); // 지시바 제거(2026-07-26) — 가드
     taskBarInput.addEventListener("keydown", (e) => { if (e.key === "Enter") sendInstruction(); });
 
-    document.getElementById("hfSearchBtn").addEventListener("click", searchHf);
-    document.getElementById("hfSearchInput").addEventListener("keydown", (e) => { if (e.key === "Enter") searchHf(); });
-    const goGuide = () => window.gijo.navigateTo("llmguide.html");
-    document.getElementById("llmGuideBtn").addEventListener("click", goGuide);
-    document.getElementById("llmGuideLink").addEventListener("click", goGuide);
+    const goGuide = () => window.gijo.navigateTo("settings.html");
+    document.getElementById("goModelSettings").addEventListener("click", goGuide);
     // 환경별 모델 선택 가이드 — 액션 배선
     document.getElementById("mgTierBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.getElementById("mgGuideBtn").addEventListener("click", goGuide);
@@ -914,27 +857,6 @@ tr:last-child td{border-bottom:none;}
       if (sel) setTimeout(() => { try { sel.focus(); } catch (e) {} }, 400);
     });
     loadModelGuide();
-    document.getElementById("hfResults").addEventListener("click", async (e) => {
-      const modelId = e.target.dataset.load;
-      if (!modelId) return;
-      const btn = e.target;
-      btn.textContent = "대기열에 추가...";
-      btn.disabled = true;
-      try {
-        const job = await window.gijo.loadHfModel(modelId);
-        onHfJobUpdate(job);
-        btn.textContent = "대기열에 추가됨 ↓";
-      } catch (err) {
-        btn.textContent = "실패";
-        btn.disabled = false;
-        // 서버가 보낸 에러 본문({error:"..."})을 뽑아 사람이 읽게 표시
-        let msg = (err && err.message) || String(err);
-        const brace = msg.indexOf("{");
-        if (brace >= 0) { try { const j = JSON.parse(msg.slice(brace)); if (j.error) msg = j.error; } catch (_) {} }
-        btn.title = msg;
-        alert("다운로드 실패: " + msg);
-      }
-    });
 
     document.getElementById("clearFeedBtn")?.addEventListener("click", () => { // 협업현황 패널 제거 — 가드
       chatFeed.innerHTML = '<div style="color:var(--muted);font-size:12px">지워졌습니다 (서버 이력은 유지됩니다)</div>';
