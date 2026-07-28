@@ -63,7 +63,6 @@ const SCREENS: Record<string, ScreenContext> = {
   "docenrich.html": { label: "문서 보강", domain: "문서 보강 인입" },
   "logs.html": { label: "로그", domain: "시스템 로그" },
   "settings.html": { label: "설정", domain: "서버·계정·엔진 설정" },
-  "billing.html": { label: "사용량·요금", domain: "사용량 집계" },
 };
 
 export function getScreenContext(screen?: string): ScreenContext | undefined {

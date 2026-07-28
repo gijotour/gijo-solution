@@ -119,6 +119,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .mc-status{font-size:11px;min-height:14px;color:var(--muted);}
 .mc-status.err{color:#f5928a;}
 .mc-status.ok{color:var(--teal);}
+.am-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);}
+.am-row:last-child{border-bottom:none;}
+.am-name{flex:0 0 150px;font-size:12px;font-weight:700;color:var(--text);}
+.am-select{flex:1;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:6px;padding:6px 8px;color:var(--text);font-size:11.5px;outline:none;cursor:pointer;}
+.am-select:disabled{opacity:.6;cursor:default;}
+.usage-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px;}
+.usage-kpi{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;}
+.usage-kpi .l{font-size:10.5px;color:var(--muted-2);font-weight:700;}
+.usage-kpi .v{font-size:16px;font-weight:800;color:#fff;margin-top:3px;}
 </style>
 </head>
 <body>
@@ -292,6 +301,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div id="llmGuide"><div style="color:var(--muted);font-size:12px">불러오는 중...</div></div>
     </div>
 
+    <!-- 에이전트 모델 배정 — AI 팀 화면에서 이관(2026-07-28, 설정 통합 ③단계).
+         받은 모델을 누구에게 줄지는 '엔진·티어'와 같은 결정이라 여기 둔다. -->
+    <div class="panel" id="agentModelPanel" style="display:none" data-gijo-fold="에이전트 모델 배정">
+      <div class="panel-title">에이전트 모델 배정<span class="badge b-teal" style="margin-left:8px">admin 전용</span></div>
+      <div class="panel-sub">AI 팀원마다 어떤 모델로 생각할지 정합니다. 비워 두면 전역 모델을 그대로 씁니다.</div>
+      <div id="agentModelRows" style="font-size:12px;color:var(--muted)">불러오는 중...</div>
+      <div class="status-line" id="agentModelStatusLine"></div>
+    </div>
+
     <div class="panel" data-gijo-fold="로컬 LLM 엔진">
       <div class="panel-title">로컬 LLM 엔진</div>
       <div id="engineStatusLine" style="font-size:12.5px;color:var(--muted);margin-bottom:14px">불러오는 중...</div>
@@ -304,6 +322,31 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         </div>
       </div>
       </div>
+
+    <!-- 사용량 · 비용 — 클라우드 패널 안에 묻혀 있던 표를 꺼내고, 그동안 아무도 못 보던
+         로컬/외부 서비스 사용량(billing.html)을 여기로 합쳤다(2026-07-28). 바꾸는 곳이 아니라
+         보는 곳이다. -->
+    <div class="panel" data-gijo-fold="사용량 · 비용">
+      <div class="panel-title">사용량 · 비용</div>
+      <div class="panel-sub">서버를 켠 뒤 누적된 호출량입니다. 온프레미스 로컬 LLM은 비용이 들지 않으며, 외부 서비스를 쓴 경우에만 예상 비용이 잡힙니다.</div>
+      <div class="usage-kpis">
+        <div class="usage-kpi"><div class="l">예상 비용 합계</div><div class="v" id="kpiCost">-</div></div>
+        <div class="usage-kpi"><div class="l">외부 서비스</div><div class="v" id="kpiServices">-</div></div>
+        <div class="usage-kpi"><div class="l">호출 수</div><div class="v" id="kpiCalls">-</div></div>
+      </div>
+      <div style="margin-top:14px;font-size:12px;font-weight:700;color:var(--muted);">외부 서비스별</div>
+      <table style="width:100%;font-size:11.5px;margin-top:6px;border-collapse:collapse">
+        <thead><tr style="color:var(--muted-2);text-align:left"><th style="padding:4px 6px;font-weight:600">서비스</th><th style="font-weight:600">호출</th><th style="font-weight:600">예상 비용</th></tr></thead>
+        <tbody id="usageRows"><tr><td colspan="3" style="color:var(--muted);padding:4px 6px;">불러오는 중...</td></tr></tbody>
+      </table>
+      <div style="margin-top:18px;font-size:12px;font-weight:700;color:var(--muted);">📊 클라우드 API 사용량 <span style="color:var(--muted-2);font-weight:400;">— 제공자별 호출·토큰·예상 비용 (서버 기동 후 누적)</span></div>
+      <table style="width:100%;font-size:11.5px;margin-top:6px;border-collapse:collapse;">
+        <thead><tr style="color:var(--muted-2);text-align:left;"><th style="padding:4px 6px;">제공자·모델</th><th>호출</th><th>토큰(입력/출력)</th><th>예상 비용</th></tr></thead>
+        <tbody id="cloudUsageRows"><tr><td colspan="4" style="color:var(--muted);padding:4px 6px;">불러오는 중...</td></tr></tbody>
+      </table>
+      <button class="btn-ghost" id="csvExportBtn" style="margin-top:12px">사용량 CSV 내보내기</button>
+      <div class="status-line" id="usageStatusLine"></div>
+    </div>
 
     <div class="panel" data-gijo-fold="이메일(SMTP) 설정">
       <div class="panel-title">이메일(SMTP) 설정</div>
@@ -446,11 +489,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
       <!-- 사용량·예상 비용 — 사용량·요금 화면 제거(메뉴 정리 2026-07-25)로 여기로 이관.
            서버 살아있는 동안의 인메모리 누적(재시작 시 초기화). -->
-      <div style="margin-top:18px;font-size:12px;font-weight:700;color:var(--muted);">📊 클라우드 API 사용량 <span style="color:var(--muted-2);font-weight:400;">— 제공자별 호출·토큰·예상 비용 (서버 기동 후 누적)</span></div>
-      <table style="width:100%;font-size:11.5px;margin-top:6px;border-collapse:collapse;">
-        <thead><tr style="color:var(--muted-2);text-align:left;"><th style="padding:4px 6px;">제공자·모델</th><th>호출</th><th>토큰(입력/출력)</th><th>예상 비용</th></tr></thead>
-        <tbody id="cloudUsageRows"><tr><td colspan="4" style="color:var(--muted);padding:4px 6px;">불러오는 중...</td></tr></tbody>
-      </table>
+
     </div>
 
     <div class="footer">
@@ -501,6 +540,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         document.getElementById("siemPanel").style.display = "";
         document.getElementById("lawPanel").style.display = "";
         document.getElementById("modelAuthPanel").style.display = "";
+        document.getElementById("agentModelPanel").style.display = "";
+        await loadAgentModels();
         await loadModelAuth();
         await loadLawConfig();
         await loadUserList();
@@ -868,6 +909,47 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   let cloudCfg = null;
   function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
   // 클라우드 API 사용량 표 — 사용량·요금 화면 제거(메뉴 정리 2026-07-25)로 이관.
+  // ── 사용량 · 비용 (2026-07-28 billing.html에서 합침) ──────────────────
+  let lastUsage = [];
+  async function loadUsage() {
+    const rows = document.getElementById("usageRows");
+    if (!rows) return;
+    try {
+      lastUsage = (await window.gijo.getUsageSummary()) || [];
+      rows.innerHTML = lastUsage.length
+        ? lastUsage.map((u) =>
+            `<tr><td style="padding:4px 6px;">${esc(u.service)}</td><td>${u.callCount.toLocaleString()}건</td>` +
+            `<td>${u.estimatedCost.toFixed(4)}</td></tr>`).join("")
+        : '<tr><td colspan="3" style="color:var(--muted);padding:4px 6px;">아직 외부 서비스 호출이 없습니다 (온프레미스만 쓰는 중)</td></tr>';
+      document.getElementById("kpiCost").textContent = "$" + lastUsage.reduce((a, u) => a + u.estimatedCost, 0).toFixed(4);
+      document.getElementById("kpiServices").textContent = lastUsage.length;
+      document.getElementById("kpiCalls").textContent = lastUsage.reduce((a, u) => a + u.callCount, 0).toLocaleString();
+    } catch (e) {
+      rows.innerHTML = '<tr><td colspan="3" style="color:var(--muted);padding:4px 6px;">사용량을 불러오지 못했습니다</td></tr>';
+    }
+  }
+
+  function exportUsageCsv() {
+    const line = document.getElementById("usageStatusLine");
+    if (!lastUsage.length) {
+      line.className = "status-line status-err";
+      line.textContent = "내보낼 사용량이 없습니다";
+      return;
+    }
+    const rows = [["서비스", "호출 수", "예상 비용(USD)"]];
+    for (const u of lastUsage) rows.push([u.service, u.callCount, u.estimatedCost.toFixed(4)]);
+    const csv = rows.map((r) => r.map((c) => '"' + String(c).replace(/"/g, '""') + '"').join(",")).join("\n");
+    // BOM을 붙여야 엑셀에서 한글이 안 깨진다
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "gijo-as-usage-summary.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    line.className = "status-line status-ok";
+    line.textContent = "gijo-as-usage-summary.csv 로 내보냈습니다";
+  }
+
   async function loadCloudUsage() {
     const rows = document.getElementById("cloudUsageRows");
     if (!rows) return;
@@ -1058,6 +1140,30 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     }
   }
 
+  // ── 에이전트 모델 배정 (2026-07-28 이관) ────────────────────────────
+  async function loadAgentModels() {
+    const box = document.getElementById("agentModelRows");
+    if (!box) return;
+    try {
+      const [agents, models] = await Promise.all([
+        window.gijo.listAgents(),
+        window.gijo.listModels().catch(() => []),
+      ]);
+      const running = new Set((models || []).filter((m) => m.running).map((m) => m.id));
+      const opts = (sel) =>
+        ['<option value="">전역 모델 따름</option>']
+          .concat((models || []).map((m) =>
+            `<option value="${esc(m.id)}"${sel === m.id ? " selected" : ""}>${esc(m.id)}${running.has(m.id) ? " (실행중)" : ""}</option>`))
+          .join("");
+      box.innerHTML = (agents || []).map((a) =>
+        `<div class="am-row"><span class="am-name">${esc(a.name || a.id)}</span>` +
+        `<select class="am-select" data-agent="${esc(a.id)}">${opts(a.assignedModelId || "")}</select></div>`
+      ).join("") || '<div style="color:var(--muted)">등록된 에이전트가 없습니다</div>';
+    } catch (e) {
+      box.innerHTML = '<div style="color:var(--muted)">배정 현황을 불러오지 못했습니다</div>';
+    }
+  }
+
   async function loadLawConfig() {
     try {
       const c = await window.gijo.lawConfig();
@@ -1166,6 +1272,28 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     document.getElementById("testConnectionBtn").addEventListener("click", testConnection);
     document.getElementById("saveServerUrlBtn").addEventListener("click", saveServerUrl);
+    document.getElementById("csvExportBtn").addEventListener("click", exportUsageCsv);
+    loadUsage();
+    // 에이전트 모델 배정 — 고르면 바로 저장한다
+    document.getElementById("agentModelRows").addEventListener("change", async (e) => {
+      const sel = e.target.closest(".am-select");
+      if (!sel) return;
+      const line = document.getElementById("agentModelStatusLine");
+      line.className = "status-line";
+      line.textContent = "저장 중…";
+      sel.disabled = true;
+      try {
+        await window.gijo.setAgentModel(sel.dataset.agent, sel.value || null);
+        line.className = "status-line status-ok";
+        line.textContent = sel.value ? `배정했습니다 — ${sel.value}` : "전역 모델을 따르도록 되돌렸습니다";
+      } catch (err) {
+        line.className = "status-line status-err";
+        line.textContent = "저장 실패: " + ((err && err.message) || err);
+        await loadAgentModels(); // 실패했는데 화면만 바뀐 채로 두지 않는다
+      } finally {
+        sel.disabled = false;
+      }
+    });
     // 모델 검색·받기
     document.getElementById("hfSearchBtn").addEventListener("click", searchHf);
     document.getElementById("hfSearchInput").addEventListener("keydown", (e) => { if (e.key === "Enter") searchHf(); });

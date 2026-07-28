@@ -178,7 +178,6 @@ async function main() {
     { page: "ontology.html", name: "16-지식모델-온톨로지" },
     { page: "memory.html", name: "17-기억학습-문서관리" },
     { page: "merge.html", name: "18-LLM합성-모델머지" },
-    { page: "billing.html", name: "19-사용량-요금" },
     { page: "logs.html", name: "20-시스템로그" },
     { page: "settings.html", name: "21-설정-사용자관리" },
   ];
