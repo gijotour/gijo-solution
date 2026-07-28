@@ -24,10 +24,11 @@
   //  · 팀 사무실  — AI 근무 현황·오늘 브리핑(별도 창이라 주소가 없다 → 별표 대상 아님)
   //  · 작업 내역  — 지금까지 AI와 한 일. '작업 세션'에서 이름을 바꿨다(2026-07-28 사용자 지시)
   //    — '세션'은 로그인 세션과도 헷갈리는 개발자 말이고, 이 화면은 결국 한 일의 기록이다.
+  // fixed:true — 이 셋은 늘 맨 위에 있으므로 즐겨찾기 별표를 달지 않는다.
   var TOP = [
-    { page: "dashboard.html", label: "대시보드" },
-    { office: true, label: "팀 사무실 (창)", ic: "🏢" },
-    { page: "sessions.html", label: "작업 내역" },
+    { page: "dashboard.html", label: "대시보드", fixed: true },
+    { office: true, label: "팀 사무실 (창)", ic: "🏢", fixed: true },
+    { page: "sessions.html", label: "작업 내역", fixed: true },
   ];
 
   var GROUPS = [
@@ -204,8 +205,12 @@
       ".gn-fav-g{color:var(--amber,#f0a020);}" +
       // ☆ 별표 — 평소엔 숨어 있다가 그 줄에 마우스를 올리면 나온다(30줄에 별이 다 떠 있으면
       // 시끄럽다). 이미 넣은 것(★)은 항상 보인다 — 무엇이 즐겨찾기인지 알아야 하니까.
-      ".gn-item .gn-star{flex:0 0 auto;font-size:11px;color:var(--muted-2,#5f6785);opacity:0;cursor:pointer;padding:0 3px;border-radius:5px;}" +
-      ".gn-item:hover .gn-star{opacity:.65;}" +
+      // ☆는 **늘 흐리게 보인다**(2026-07-28). opacity:0으로 숨겨 뒀더니 마우스를 올려야만
+      // 보여서, 처음 쓰는 사람은 즐겨찾기라는 기능이 있는 줄도 몰랐다("즐겨찾기 안 보임" 신고).
+      // 있다는 건 알리되 시끄럽지 않게 — 흐리게 두고 올리면 진해진다.
+      ".gn-item .gn-star{flex:0 0 auto;font-size:11px;color:var(--muted-2,#5f6785);opacity:.28;cursor:pointer;padding:0 3px;border-radius:5px;}" +
+      ".gn-item:hover .gn-star{opacity:.7;}" +
+      ".gn-favhint{padding:5px 10px 7px 22px;font-size:11px;color:var(--muted-2,#5f6785);line-height:1.6;}" +
       ".gn-item .gn-star:hover{opacity:1;color:var(--amber,#f0a020);background:rgba(240,160,32,.14);}" +
       ".gn-item .gn-star.on{opacity:1;color:var(--amber,#f0a020);}" +
       // 메뉴 한 줄 — 가지 이름(12px)보다 살짝 크게 둬서 "무엇을 고르는가"가 주인공이 되게 한다.
@@ -279,7 +284,9 @@
     if (it.ic) lab.style.setProperty("--gn-ic", "'" + it.ic + " '");
 
     // ☆ 별표 — 별도 창으로 여는 항목(팀 사무실)은 주소가 없어 즐겨찾기에 넣을 수 없다.
-    if (it.page) {
+    // 맨 위 고정 세 자리도 뺀다: **이미 늘 보이는 것을 또 꽂는 건 뜻이 없고**, 실제로 눌러도
+    // 즐겨찾기 목록은 그룹만 뒤져 그리므로 아무 일도 안 일어났다(2026-07-28 검증에서 잡음).
+    if (it.page && !it.fixed) {
       var on = favs.indexOf(it.page) >= 0;
       var star = document.createElement("span");
       star.className = "gn-star" + (on ? " on" : "");
@@ -337,20 +344,36 @@
     var findInput = find.querySelector("input");
     findInput.value = findQuery;
     if (findQuery) find.classList.add("has");
+    // ⚠ 여기서 buildMenu(전체 재생성)를 부르면 **한글을 못 친다**(2026-07-28 사용자 신고).
+    //   한글은 ㅎ→하→한처럼 조합 중인 상태로 입력칸에 머무는데, 글자마다 입력칸을 새로 만들면
+    //   그 조합이 매번 끊긴다. 영문은 한 글자가 곧 완성이라 증상이 안 보였다.
+    //   그래서 **입력칸은 그대로 두고 아래 결과만** 다시 그린다.
     findInput.addEventListener("input", function () {
       findQuery = findInput.value;
-      buildMenu(container);
-      var again = container.querySelector("#gnFind");
-      if (again) { again.focus(); again.setSelectionRange(again.value.length, again.value.length); }
+      find.classList.toggle("has", !!findQuery);
+      renderBody(container, find);
     });
     findInput.addEventListener("keydown", function (e) {
-      if (e.key === "Escape") { e.preventDefault(); findQuery = ""; buildMenu(container); return; }
+      if (e.key === "Escape") { e.preventDefault(); findQuery = ""; findInput.value = ""; find.classList.remove("has"); renderBody(container, find); return; }
       if (e.key === "Enter") {   // 첫 결과를 연다 — 타이핑하다 바로 Enter가 가장 빠른 길이다
         var first = container.querySelector(".gn-hitwrap .gn-item .gn-label");
         if (first) first.click();
       }
     });
-    find.querySelector(".clr").addEventListener("click", function () { findQuery = ""; buildMenu(container); });
+    find.querySelector(".clr").addEventListener("click", function () {
+      findQuery = ""; findInput.value = ""; find.classList.remove("has");
+      renderBody(container, find); findInput.focus();
+    });
+
+    renderBody(container, find);
+  }
+
+  // 찾기 칸 **아래쪽만** 다시 그린다 — 입력칸을 건드리지 않는 것이 핵심이다(한글 조합 보호).
+  function renderBody(container, find) {
+    while (find.nextSibling) container.removeChild(find.nextSibling);
+    var here = currentKey();
+    var opened = openedSet();
+    var favs = favList();
 
     // 찾는 중에는 트리를 접고 **걸린 것만** 보여준다 — 접힌 가지 안까지 뒤진다.
     if (findQuery.trim()) {
@@ -383,8 +406,11 @@
     TOP.forEach(function (it) { top.appendChild(makeItem(it, here, favs, container)); });
     container.appendChild(top);
 
-    // ⭐ 즐겨찾기 가지 — 별표한 화면이 있을 때만 나온다(없으면 자리를 차지하지 않는다).
-    if (favs.length) {
+    // ⭐ 즐겨찾기 가지 — **비어 있어도 보여준다**(2026-07-28 사용자 신고: "즐겨찾기 안 보임").
+    //   전에는 별표한 게 하나도 없으면 가지를 통째로 안 그렸다. 그런데 별표는 마우스를 올려야
+    //   보이는 흐린 ☆라, 처음 쓰는 사람은 **기능이 있다는 것도, 넣는 방법도 알 수 없었다.**
+    //   빈 자리에 "☆를 눌러 꽂으세요" 한 줄을 두는 편이 낫다 — 한 줄 자리값보다 발견이 중요하다.
+    {
       var fh = document.createElement("div");
       fh.className = "gn-g open gn-fav-g";
       fh.setAttribute("role", "button");
@@ -414,6 +440,12 @@
         GROUPS.forEach(function (g) { g.items.forEach(function (it) { if (it.page === page) found = it; }); });
         if (found) fkids.appendChild(makeItem(found, here, favs, container));
       });
+      if (!favs.length) {
+        var hint = document.createElement("div");
+        hint.className = "gn-favhint";
+        hint.textContent = "자주 가는 화면 옆 ☆를 누르면 여기 꽂힙니다";
+        fkids.appendChild(hint);
+      }
     }
 
     GROUPS.forEach(function (g) {
