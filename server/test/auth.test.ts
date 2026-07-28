@@ -20,6 +20,19 @@ describe("auth", () => {
     expect(res.status).toBe(401);
   });
 
+  // 실사고(2026-07-29): /api/auth/me가 user 객체를 통째로 돌려줘 **passwordHash(bcrypt)가
+  // 클라이언트로 나갔다**. 내 계정 해시라 해도 나갈 이유가 없다 — 렌더러 메모리·로그·오류
+  // 리포트에 묻어 나가면 오프라인 크래킹 대상이 된다. 보안 제품이 자기 비밀을 흘리면 안 된다.
+  it("내 정보에 비밀번호 해시가 절대 실리지 않는다", async () => {
+    const login = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme", force: true });
+    const me = await request(app).get("/api/auth/me").set("Authorization", `Bearer ${login.body.accessToken}`);
+    expect(me.status).toBe(200);
+    expect(me.body.username).toBe("jyh");
+    expect(me.body.passwordHash).toBeUndefined();
+    // 필드 이름이 바뀌어도 잡히게 — 응답 어디에도 bcrypt 해시 모양이 있으면 안 된다.
+    expect(JSON.stringify(me.body)).not.toMatch(/\$2[aby]\$\d{2}\$/);
+  });
+
   it("rejects protected routes without a token", async () => {
     const res = await request(app).get("/api/agents");
     expect(res.status).toBe(401);

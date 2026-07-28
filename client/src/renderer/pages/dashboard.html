@@ -46,12 +46,46 @@
   .scr-id .ask{margin-left:2px;color:var(--blue-l);cursor:pointer;font-weight:700;}
   .scr-id .ask:hover{text-decoration:underline;}
 
+  /* 머리(시안 C) — [사람: 인사·사용법 3단계] | [기계: 서버·엔진·리소스·AI 팀] */
+  .head{display:flex;gap:16px;margin-bottom:16px;flex-wrap:wrap;align-items:stretch;}
+  .hello{flex:1 1 420px;min-width:0;background:linear-gradient(180deg,rgba(59,130,246,.08),transparent);
+    border:1px solid var(--border);border-radius:12px;padding:16px 18px;
+    display:flex;flex-direction:column;justify-content:center;}
+  .hi{font-size:23px;font-weight:800;color:#fff;letter-spacing:-.3px;}
+  .how{margin-top:8px;font-size:13px;color:var(--muted);line-height:1.7;}
+  .steps{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+  .step{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted);
+    background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:6px 10px;}
+  .step b{color:var(--blue-l);font-weight:700;}
+  .step .n{flex:0 0 auto;width:16px;height:16px;border-radius:50%;background:rgba(59,130,246,.18);
+    color:var(--blue-l);font-size:10px;font-weight:800;display:flex;align-items:center;justify-content:center;}
+
+  /* 상태 판 — 서버·엔진·리소스·AI 팀 */
+  .state{flex:0 1 430px;min-width:0;background:var(--panel);border:1px solid var(--border);
+    border-radius:12px;padding:13px 15px;}
+  .state h4{font-size:11px;font-weight:800;color:var(--muted-2);margin-bottom:10px;letter-spacing:.3px;
+    display:flex;align-items:center;gap:7px;}
+  .st{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;}
+  .s{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11.5px;color:var(--muted);padding:3px 0;min-width:0;}
+  .s b{color:var(--text);font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .s .l{display:flex;align-items:center;flex:0 0 auto;}
+  .s .dot{width:6px;height:6px;border-radius:50%;background:var(--muted-2);margin-right:5px;flex:0 0 auto;}
+  .s.on .dot{background:var(--teal);}
+  .s.off{color:#f5928a;} .s.off .dot{background:#f5928a;} .s.off b{color:#f5928a;}
+  .vram{margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06);}
+  .vram .t{display:flex;justify-content:space-between;gap:8px;font-size:11.5px;color:var(--muted);margin-bottom:5px;}
+  .vram .t b{color:var(--text);font-weight:700;}
+  .vram .sub{margin-top:5px;font-size:10.5px;color:var(--muted-2);}
+  .bar{height:5px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden;}
+  .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--teal),var(--blue));}
+  .team{display:flex;align-items:center;gap:6px;margin-top:10px;padding-top:10px;
+    border-top:1px solid rgba(255,255,255,.06);cursor:pointer;}
+  .eng-load{font-size:11.5px;color:var(--muted-2);}
+
   /* AI 팀 아이콘 줄 — 로고 + 팀원 아이콘. 브리핑 위에 얇게 얹는다. */
-  .team-row{display:flex;align-items:center;gap:12px;margin-bottom:12px;cursor:pointer;
-    padding:7px 12px;border:1px solid var(--border);border-radius:11px;background:var(--panel);}
-  .team-row:hover{border-color:rgba(59,130,246,.42);}
-  .team-logo{width:20px;height:20px;flex:0 0 auto;border-radius:5px;opacity:.92;}
-  .team-icons{display:flex;align-items:center;gap:9px;flex-wrap:wrap;min-width:0;}
+  .team:hover .team-sum{color:var(--blue-l);}
+  .team-logo{width:18px;height:18px;flex:0 0 auto;border-radius:5px;opacity:.92;}
+  .team-icons{display:flex;align-items:center;gap:7px;flex-wrap:wrap;min-width:0;width:100%;}
   .team-load{font-size:11.5px;color:var(--muted-2);}
   .tm{display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;
     font-size:13px;background:#0e1526;border:1px solid var(--border);color:var(--muted);}
@@ -121,9 +155,40 @@
          밀어내므로, 아이콘 + 마우스 올렸을 때 설명만 둔다. 작업 중이면 아이콘이 숨 쉰다.
          ⚠ 로고는 **로컬 파일**을 쓴다 — 다른 화면들은 https://gijo.ai/… 를 부르는데
            폐쇄망에서는 그림이 안 뜬다(온프렘 제품에서 외부 주소는 안 된다). -->
-    <div class="team-row" id="teamRow" title="AI 팀 — 누르면 에이전트 AI 화면으로">
-      <img class="team-logo" src="gijo-logo.png" alt="GIJO">
-      <div class="team-icons" id="teamIcons"><span class="team-load">AI 팀 확인 중…</span></div>
+    <!-- 환영 인사 + 사용법 — 3.8.2에 있던 것을 되살렸다(2026-07-29 사용자 요청).
+         브리핑이 "무엇이 급한가"를 말한다면, 이 줄은 "여기서 무엇을 어떻게 하는가"를 말한다.
+         처음 쓰는 사람은 화면만 보고는 어디에 지시해야 하는지 모른다 — 한 줄이면 된다. -->
+    <!-- 머리 — 왼쪽은 사람(인사·사용법), 오른쪽은 기계(엔진·AI 팀).
+         세로로 세 줄 쌓으면 브리핑이 아래로 밀린다. 한 줄에 좌우로 나눠 얹는다.
+         좁아지면(1000px 미만) 자연히 위아래로 접힌다. -->
+    <!-- 머리 — 시안 C(2026-07-29 사용자 결정).
+         왼쪽은 사람: 인사 + **사용법 3단계**. 대시보드는 하루에 몇 번씩 돌아오는 곳이라
+         여기 적어 두면 쓰는 법이 저절로 각인된다(처음 쓰는 사람은 어디에 지시하는지 모른다).
+         오른쪽은 기계: 서버·엔진·리소스·AI 팀을 한 판에. "AI가 왜 답을 안 하지?"의 답이
+         대개 여기 있다 — 모델이 안 떴거나, 임베딩이 죽었거나, VRAM이 없거나. -->
+    <div class="head">
+      <div class="hello">
+        <div class="hi" id="helloLine">안녕하세요</div>
+        <div class="how">오늘 무엇부터 볼지 AI가 아래에 정리해 뒀습니다.</div>
+        <div class="steps">
+          <span class="step"><span class="n">1</span>왼쪽 메뉴에서 화면을 고르면 <b>탭</b>으로 열립니다</span>
+          <span class="step"><span class="n">2</span>지시는 <b>아래 대화창</b>에 적습니다</span>
+          <span class="step"><span class="n">3</span>지금 보는 탭이 곧 지시의 대상입니다</span>
+        </div>
+      </div>
+
+      <div class="state">
+        <h4><img class="team-logo" src="gijo-logo.png" alt="GIJO">서버 · 엔진 · 리소스</h4>
+        <div class="st" id="stateGrid"><span class="eng-load">상태 확인 중…</span></div>
+        <div class="vram" id="vramBox" style="display:none">
+          <div class="t"><span>GPU 메모리</span><b id="vramNum">-</b></div>
+          <div class="bar"><i id="vramBar" style="width:0%"></i></div>
+          <div class="sub" id="tierSub"></div>
+        </div>
+        <div class="team" id="teamRow" title="AI 팀 — 누르면 에이전트 AI 화면으로">
+          <div class="team-icons" id="teamIcons"><span class="team-load">AI 팀 확인 중…</span></div>
+        </div>
+      </div>
     </div>
 
     <div class="brief dim" id="brief">
@@ -170,6 +235,78 @@
     return "approvals.html";
   }
 
+  // ── 환영 인사 ────────────────────────────────────────────────────────
+  // 이름을 불러 준다 — 여럿이 쓰는 서버라 "지금 누구로 들어와 있나"가 그 자체로 정보다.
+  async function loadHello() {
+    if (!window.gijo || !window.gijo.me) return;
+    try {
+      var u = await window.gijo.me();
+      var name = (u && (u.displayName || u.username)) || "";
+      $("helloLine").textContent = name ? "안녕하세요, " + name + "님" : "안녕하세요";
+    } catch (e) { /* 이름을 못 읽어도 인사는 남는다 */ }
+  }
+
+  // ── 엔진 상태 ────────────────────────────────────────────────────────
+  // "AI가 왜 답을 안 하지?"의 답이 대개 여기 있다 — 모델이 안 떠 있거나 임베딩이 죽었거나.
+  // 숫자를 늘어놓지 않고 **살아 있나/몇 개인가**만 본다.
+  function stateRow(on, 이름, 값, 설명) {
+    return '<div class="s ' + (on ? "on" : "off") + '" title="' + esc(설명 || "") + '">' +
+      '<span class="l"><span class="dot"></span>' + esc(이름) + "</span><b>" + esc(값) + "</b></div>";
+  }
+  async function loadEngines() {
+    var grid = $("stateGrid");
+    if (!window.gijo || !window.gijo.getLocalEngineStatus) { grid.textContent = ""; return; }
+    var rows = [];
+
+    // 서버 — health가 돌면 운영 중이다. 여기가 꺼져 있으면 나머지는 볼 것도 없다.
+    try {
+      var h = await window.gijo.checkServerHealth();
+      rows.push(stateRow(!!(h && (h.ok || h.status === "ok")), "서버", "운영 중", "연동 서버가 응답합니다"));
+    } catch (e) { rows.push(stateRow(false, "서버", "응답 없음", "연동 서버에 닿지 못합니다")); }
+
+    try {
+      var s = await window.gijo.getLocalEngineStatus();
+      var loaded = (s && s.loaded) || [];
+      var ready = loaded.filter(function (m) { return m.ready; }).length;
+      rows.push(stateRow(!!(s && s.running) && ready > 0, "로컬 LLM", ready ? ready + "개 로드" : "미기동",
+        loaded.map(function (m) { return m.modelId; }).join(", ") || "로드된 모델이 없습니다"));
+      var emb = s && s.embedding;
+      rows.push(stateRow(!!(emb && emb.running), "임베딩", (emb && emb.modelId) || "미기동",
+        "문서 검색(RAG)에 씁니다 — 꺼져 있으면 사내 자료를 못 찾습니다"));
+    } catch (e) {
+      rows.push(stateRow(false, "로컬 LLM", "확인 불가", "엔진 상태를 못 읽었습니다"));
+    }
+
+    try {
+      var g = await window.gijo.guardrailStatus();
+      var on = g && g.mode && g.mode !== "off";
+      rows.push(stateRow(!!on, "가드레일",
+        on ? (g.mode === "block" ? "차단" : "탐지") + (g.flaggedCount ? " · " + g.flaggedCount + "건" : "") : "꺼짐",
+        "프롬프트 공격을 걸러 냅니다"));
+    } catch (e) { /* 못 읽으면 그 줄만 빠진다 */ }
+    grid.innerHTML = rows.join("");
+
+    // GPU 메모리 — 숫자만으로는 여유가 얼마인지 감이 안 온다. 막대로 보여 준다.
+    // ⚠ GPU가 없는 환경(CPU 전용·Mac)도 있다 — 그때는 이 구획을 통째로 감춘다.
+    //   빈 막대를 0%로 그려 두면 "GPU가 꽉 찼나?"로 오해한다.
+    try {
+      var t = await window.gijo.getLlmTier();
+      var gpu = t && t.gpu;
+      if (gpu && gpu.totalMb > 0) {
+        var GB = function (mb) { return (mb / 1024).toFixed(1); };
+        $("vramNum").textContent = GB(gpu.usedMb) + " / " + GB(gpu.totalMb) + " GB · 여유 " + GB(gpu.freeMb) + "GB";
+        $("vramBar").style.width = Math.max(0, Math.min(100, Math.round((gpu.usedMb / gpu.totalMb) * 100))) + "%";
+        var cur = t.current || {};
+        $("tierSub").textContent = cur.tier
+          ? "구동 티어 " + cur.tier.charAt(0).toUpperCase() + cur.tier.slice(1) +
+            (cur.maxLoadedModels ? " — 채팅 LLM " + cur.maxLoadedModels + "개" : "") +
+            (cur.ctxSize ? " · " + Math.round(cur.ctxSize / 1024) + "K 컨텍스트" : "")
+          : "";
+        $("vramBox").style.display = "";
+      }
+    } catch (e) { /* GPU 정보를 못 읽으면 막대 없이 간다 */ }
+  }
+
   // ── AI 팀 아이콘 줄 ──────────────────────────────────────────────────
   // "지금 누가 일하고 있나"만 보여준다. 이름·역할·배지를 다 늘어놓으면 브리핑이 아래로 밀린다.
   var AGENT_ICON = { orchestrator: "🧭", scan: "⊘", analysis: "◎", report: "▣", ti: "🛰", normaltic: "📚" };
@@ -187,7 +324,8 @@
         var tip = (a.name || a.id) + (a.role ? " · " + a.role : "") + " — " + STATUS_KO[st];
         return '<span class="tm ' + st + '" title="' + esc(tip) + '">' + (AGENT_ICON[a.id] || "◆") + "</span>";
       }).join("") +
-        '<span class="team-sum">' + (일하는중 ? "작업 중 " + 일하는중 + "명" : "모두 대기") + "</span>";
+        '<span class="team-sum">AI 팀 ' + agents.length + "명 · " +
+        (일하는중 ? "작업 중 " + 일하는중 + "명" : "모두 대기") + "</span>";
     } catch (e) {
       box.innerHTML = '<span class="team-load">AI 팀 상태를 불러오지 못했습니다</span>';
     }
@@ -393,6 +531,8 @@
     try { window.gijo.onAssetUpdated(function () { loadToday(false); loadKpi(); }); } catch (e) {}
   }
 
+  loadHello();
+  loadEngines();
   loadTeam();
   loadToday(false);
   loadTasks();

@@ -1,0 +1,47 @@
+/* 대시보드 머리 시안 공통 — 실제 앱과 같은 색·글꼴 토큰 */
+:root{
+  --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.08);
+  --blue:#3b82f6;--blue-l:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;
+  --teal:#1eb980;--red:#e2483d;--amber:#f0a020;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;}
+.note{background:#111a2e;border-bottom:1px solid var(--border);padding:10px 18px;font-size:12px;color:var(--muted);}
+.note b{color:var(--blue-l);}
+.wrap{padding:18px 22px;max-width:1500px;}
+.scr-id{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);margin-bottom:14px;}
+.scr-id b{color:var(--text);font-weight:800;}
+.scr-id .ask{color:var(--blue-l);font-weight:700;}
+
+/* 아래 공통(브리핑·카드) — 머리가 어떻게 앉는지 보이려고 함께 그린다 */
+.brief{background:linear-gradient(180deg,rgba(59,130,246,.10),transparent);border:1px solid rgba(59,130,246,.30);
+  border-radius:14px;padding:16px 18px;margin-bottom:14px;max-width:1220px;}
+.brief .who{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--blue-l);font-weight:800;margin-bottom:8px;}
+.brief .who .dot{width:6px;height:6px;border-radius:50%;background:var(--teal);}
+.brief p{font-size:14.5px;line-height:1.8;color:#dfe6f7;}
+.brief b{color:#fff;}
+.acts{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+.act{background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.42);color:#cfe0ff;border-radius:9px;padding:7px 12px;font-size:12px;font-weight:700;}
+.act.ghost{background:transparent;border-color:rgba(255,255,255,.14);color:var(--muted);}
+.grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:12px 14px;}
+.card h3{font-size:12px;font-weight:800;margin-bottom:8px;color:var(--muted);display:flex;gap:6px;}
+.card h3 .cnt{margin-left:auto;color:var(--muted-2);}
+.li{display:flex;align-items:center;gap:8px;padding:6px 0;border-top:1px solid rgba(255,255,255,.05);font-size:12.5px;}
+.li .b{width:5px;height:5px;border-radius:50%;}
+.b.red{background:#f5928a}.b.amber{background:var(--amber)}.b.blue{background:var(--blue-l)}.b.gray{background:var(--muted-2)}
+.li .tx{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.li .m{font-size:10.5px;color:var(--muted-2);}
+.big{font-size:21px;font-weight:800;}
+.kv{display:flex;justify-content:space-between;align-items:baseline;padding:5px 0;border-top:1px solid rgba(255,255,255,.05);}
+.kv span:first-child{font-size:11.5px;color:var(--muted);}
+
+/* 공통 조각 */
+.hi{font-size:19px;font-weight:800;color:#fff;letter-spacing:-.2px;}
+.how{margin-top:5px;font-size:12.5px;color:var(--muted);line-height:1.75;}
+.how b{color:var(--blue-l);font-weight:700;}
+.tm{display:inline-flex;align-items:center;justify-content:center;width:25px;height:25px;border-radius:50%;
+  font-size:12.5px;background:var(--panel-2);border:1px solid var(--border);color:var(--muted);}
+.tm.on{border-color:rgba(30,185,128,.55);color:var(--teal);}
+.bar{height:5px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden;}
+.bar i{display:block;height:100%;background:linear-gradient(90deg,var(--teal),var(--blue));}

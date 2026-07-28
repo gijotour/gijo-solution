@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="UTF-8"><title>시안 B — 카드 3장</title>
+<link rel="stylesheet" href="_base.css">
+<style>
+  .head{display:grid;grid-template-columns:1.35fr 1fr 1fr;gap:12px;margin-bottom:16px;}
+  .hcard{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;min-width:0;}
+  .hcard h4{font-size:11px;font-weight:800;color:var(--muted-2);margin-bottom:9px;letter-spacing:.3px;}
+  .row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:12px;color:var(--muted);}
+  .row b{color:var(--text);font-weight:700;}
+  .ok{color:var(--teal);font-weight:700;}
+  .team-wrap{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:8px;}
+  .team-logo{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#5fa1ff,#2f6fd0);}
+  .vram{margin-top:8px;}
+  .vram .t{display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:5px;}
+  .vram .t b{color:var(--text);}
+</style></head><body>
+<div class="note"><b>시안 B — 카드 3장.</b> [인사·사용법] [서버·리소스] [AI 팀]을 나란히 둡니다.
+  각 영역이 또렷하고 리소스에 <b>막대</b>를 넣을 자리가 생깁니다. 대신 머리가 두꺼워져 브리핑이 아래로 내려갑니다.</div>
+<div class="wrap">
+  <div class="scr-id">🏠 <b>대시보드</b> — 오늘 무엇이 급한지 AI가 먼저 알려주는 자리입니다. <span class="ask">· 이 화면 설명 듣기</span></div>
+
+  <div class="head">
+    <div class="hcard">
+      <div class="hi">안녕하세요, 정요한님</div>
+      <div class="how">화면은 <b>왼쪽 메뉴</b>에서 골라 탭으로 열고,<br>지시는 <b>아래 대화창</b>에 적습니다.<br>
+        지금 보고 있는 탭이 곧 지시의 대상입니다.</div>
+    </div>
+
+    <div class="hcard">
+      <h4>서버 · 리소스</h4>
+      <div class="row"><span>연동 서버</span><b>localhost:4000</b></div>
+      <div class="row"><span>상태</span><span class="ok">● 운영 중</span></div>
+      <div class="vram">
+        <div class="t"><span>GPU 메모리</span><b>9.1 / 24.0 GB</b></div>
+        <div class="bar"><i style="width:38%"></i></div>
+      </div>
+      <div class="row" style="margin-top:7px"><span>구동 티어</span><b>Standard · LLM 2개 · 32K</b></div>
+    </div>
+
+    <div class="hcard">
+      <h4>AI 팀 · 엔진</h4>
+      <div class="team-wrap">
+        <span class="team-logo"></span>
+        <span class="tm on">🧭</span><span class="tm">⊘</span><span class="tm">◎</span>
+        <span class="tm">▣</span><span class="tm">🛰</span><span class="tm">📚</span>
+      </div>
+      <div class="row"><span>작업 중</span><b>1명 / 6명</b></div>
+      <div class="row"><span>임베딩</span><b>bge-m3</b></div>
+      <div class="row"><span>가드레일</span><b>탐지 모드 · 37건</b></div>
+    </div>
+  </div>
+
+  <div class="brief">
+    <div class="who"><span class="dot"></span>AI 팀 브리핑 · 09:12 기준</div>
+    <p>급한 악용 사례는 없으나, <b>경계 방화벽(FW-01)</b>의 정기 점검이 12일 지났습니다. 먼저 이것부터 처리하시길 권합니다.</p>
+    <div class="acts"><span class="act">🔧 이것부터 — 경계 방화벽(FW-01)</span><span class="act ghost">나머지 4건 보기</span><span class="act ghost">브리핑 다시 만들기</span></div>
+  </div>
+
+  <div class="grid">
+    <div class="card"><h3>🔥 급한 것 <span class="cnt">5</span></h3>
+      <div class="li"><span class="b red"></span><span class="tx">경계 방화벽(FW-01) — 보안제품 관리</span><span class="m">12일 초과</span></div>
+      <div class="li"><span class="b amber"></span><span class="tx">보안 상담 챗봇 — 보안제품 관리</span><span class="m">승인 대기</span></div>
+      <div class="li"><span class="b amber"></span><span class="tx">원격접속 VPN (SonicWall SMA)</span><span class="m">3일 초과</span></div>
+    </div>
+    <div class="card"><h3>☑ 오늘 할 일 <span class="cnt">남은 3건</span></h3>
+      <div class="li"><span class="b gray"></span><span class="tx">OpenSSH 업데이트 — 샘플-웹서버</span><span class="m">P1</span></div>
+      <div class="li"><span class="b gray"></span><span class="tx">방화벽 EDR 이상 알림 확인</span><span class="m">P2</span></div>
+    </div>
+    <div class="card"><h3>📊 한눈에</h3>
+      <div style="padding:4px 0 8px"><span class="big" style="color:var(--teal)">82</span> <span style="font-size:11px;color:var(--muted)">/100 보안 태세 · 양호</span></div>
+      <div class="kv"><span>미조치 취약점</span><b style="color:#f5928a">47</b></div>
+      <div class="kv"><span>승인 대기</span><b>57</b></div>
+      <div class="kv"><span>자산</span><b>50</b></div>
+    </div>
+  </div>
+</div></body></html>

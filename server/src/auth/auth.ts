@@ -276,7 +276,14 @@ export function registerAuthRoutes(app: Express): void {
   });
 
   app.get("/api/auth/me", authMiddleware, (req, res) => {
-    res.json((req as Request & { user?: GijoUser }).user);
+    // ⚠ user 객체를 그대로 내보내면 **passwordHash(bcrypt)가 클라이언트로 나간다**
+    //   (2026-07-29 실측: 응답에 "$2b$10$…"가 그대로 들어 있었다).
+    //   내 계정의 해시라 해도 나갈 이유가 전혀 없다 — 렌더러 메모리·로그·오류 리포트에
+    //   묻어 나가면 오프라인 크래킹 대상이 된다. 보안 제품이 자기 비밀을 흘리면 안 된다.
+    //   목록(listUsers)과 로그인 응답은 이미 필요한 것만 골라 보내고 있었다 — 여기만 빠져 있었다.
+    const u = (req as Request & { user?: GijoUser }).user;
+    if (!u) { res.status(401).json({ error: "unauthorized" }); return; }
+    res.json({ id: u.id, username: u.username, displayName: u.displayName, role: u.role, team: u.team ?? null });
   });
 
   // 접속 중 클라이언트(외부 콘솔) 목록 — 팀 사무실 창의 presence 표시용.

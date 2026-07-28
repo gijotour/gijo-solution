@@ -598,12 +598,19 @@ async function runClient() {
         // 즐겨찾기 가지는 비어 있어도 보여야 한다 — 안 보이면 '별표'라는 기능이 있는 줄도 모른다
         // (4.1.0에서 고친 실사고). 세는 데선 뺐으니 존재는 여기서 따로 지킨다.
         fav: !!favG,
-        favHint: document.querySelector("#gijoNav .gn-favhint")?.textContent || "",
+        // 안내 문구는 없앴다(2026-07-29) — 좁은 폭에서 두 줄로 접혀 어설펐다.
+        // 대신 **☆가 마우스 없이도 보이는지**를 지킨다. 그게 원래 목적이었다:
+        // opacity:0으로 숨겨 뒀더니 즐겨찾기라는 기능이 있는 줄도 몰랐다(4.1.0 실사고).
+        starOpacity: (() => {
+          const s = document.querySelector("#gijoNav .gn-kids .gn-item .gn-star");
+          return s ? Number(getComputedStyle(s).opacity) : 0;
+        })(),
       };
     });
     if (m.groups.length !== 4) throw new Error(`그룹 ${m.groups.length}개: ${m.groups.join(",")}`);
     if (m.fixed.length !== 3) throw new Error(`맨 위 고정이 ${m.fixed.length}자리: ${m.fixed.join(",")}`);
     if (!m.fav) throw new Error("⭐즐겨찾기 가지가 안 보인다 — 비어 있어도 보여야 한다");
+    if (!(m.starOpacity > 0.15)) throw new Error(`☆가 마우스 없이는 안 보인다(opacity ${m.starOpacity}) — 즐겨찾기를 발견할 수 없다`);
     if (m.total < 28) throw new Error(`항목 ${m.total}개 — 허브가 덜 풀렸다`);
     // 허브 안에서만 통하던 짧은 이름이 남으면 밖에서 무엇의 '통합 뷰'인지 알 수 없다.
     for (const bad of ["통합 뷰", "등록부", "유지보수"]) if (m.all.includes(bad)) throw new Error(`홀로 못 서는 이름 남음: ${bad}`);

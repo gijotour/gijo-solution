@@ -210,7 +210,6 @@
       // 있다는 건 알리되 시끄럽지 않게 — 흐리게 두고 올리면 진해진다.
       ".gn-item .gn-star{flex:0 0 auto;font-size:11px;color:var(--muted-2,#5f6785);opacity:.28;cursor:pointer;padding:0 3px;border-radius:5px;}" +
       ".gn-item:hover .gn-star{opacity:.7;}" +
-      ".gn-favhint{padding:5px 10px 7px 22px;font-size:11px;color:var(--muted-2,#5f6785);line-height:1.6;}" +
       ".gn-item .gn-star:hover{opacity:1;color:var(--amber,#f0a020);background:rgba(240,160,32,.14);}" +
       ".gn-item .gn-star.on{opacity:1;color:var(--amber,#f0a020);}" +
       // 메뉴 한 줄 — 가지 이름(12px)보다 살짝 크게 둬서 "무엇을 고르는가"가 주인공이 되게 한다.
@@ -440,12 +439,9 @@
         GROUPS.forEach(function (g) { g.items.forEach(function (it) { if (it.page === page) found = it; }); });
         if (found) fkids.appendChild(makeItem(found, here, favs, container));
       });
-      if (!favs.length) {
-        var hint = document.createElement("div");
-        hint.className = "gn-favhint";
-        hint.textContent = "자주 가는 화면 옆 ☆를 누르면 여기 꽂힙니다";
-        fkids.appendChild(hint);
-      }
+      // 비었을 때 안내 문구는 두지 않는다(2026-07-29 사용자 결정).
+      // ☆를 늘 보이게 바꾼 뒤로는 문구 없이도 알 수 있고, 좁은 메뉴 폭에서 두 줄로 접혀
+      // 어설퍼 보였다. 가지 이름(⭐ 즐겨찾기)과 늘 보이는 ☆만으로 충분하다.
     }
 
     GROUPS.forEach(function (g) {
