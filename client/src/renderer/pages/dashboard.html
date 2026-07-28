@@ -32,7 +32,13 @@
   body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;}
   .app{display:grid;grid-template-columns:212px 1fr;min-height:100vh;}
   .sidebar{border-right:1px solid var(--border);background:#0b1020;}
-  .main{padding:18px 22px 40px;max-width:1220px;}
+  /* 넓은 화면에서 오른쪽이 비지 않게 — 실측(2026-07-28) FHD에서 탭 안 2168px 중 948px가
+     빈 채로 남았다(44%). 다만 **글과 목록은 성격이 다르다**:
+       · 브리핑은 읽는 글이다. 한 줄이 너무 길면 눈이 다음 줄 첫머리를 못 찾는다 → 폭을 묶는다.
+       · 카드는 훑는 목록이다. 넓을수록 취약점 이름이 안 잘린다 → 화면을 채운다.
+     그래서 .main의 상한을 풀고, 브리핑에만 상한을 준다. */
+  .main{padding:18px 22px 40px;max-width:1800px;}
+  .brief{max-width:1220px;}
 
   /* 정체성 한 줄 — 사용법·용어 풀이는 ⓘ로 챗봇에서(프로젝트 원칙) */
   .scr-id{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);margin-bottom:14px;}
