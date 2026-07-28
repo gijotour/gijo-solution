@@ -13,13 +13,24 @@
   html,body{height:100%;overflow:hidden;}
   body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
 
-  /* 셸 뼈대 — 왼쪽 메뉴 고정, 오른쪽은 [탭줄 / 화면 / 손잡이 / 콘솔] 세로 4단 */
+  /* 셸 뼈대 — 왼쪽 메뉴 고정, 오른쪽은 [탭줄 / 화면 / 콘솔] 세로 3단 */
   .app{display:grid;grid-template-columns:232px minmax(0,1fr);height:100vh;}
   #gijoNav{border-right:1px solid var(--border);background:var(--panel-2);min-height:0;display:flex;flex-direction:column;}
   .work{display:flex;flex-direction:column;min-width:0;min-height:0;}
 
-  /* 탭줄 */
-  .tabbar{flex:0 0 auto;display:flex;align-items:stretch;gap:2px;padding:7px 10px 0;border-bottom:1px solid var(--border);background:var(--panel-2);overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;}
+  /* 탭줄
+     ⚠ 오른쪽 끝은 **비워 둬야 한다.** 이 앱은 OS 타이틀바를 숨기고(titleBarStyle:hidden)
+       창 컨트롤(─ ▢ ✕)을 오버레이로 그리게 해 뒀는데(main.ts, 높이 46px), 그 자리가 바로
+       탭줄 오른쪽이다. 그냥 두면 「⧉ 창으로」·「모두 닫기」가 창 버튼 **밑에 깔린다** —
+       좁을 땐 탭에 가려 안 보이다가 창을 넓히면 삐져나오고, 겹친 가장자리는 클릭도 된다
+       (2026-07-28 사용자 신고: "오른쪽 위 종료 버튼 있는 데 뒤에 뭐가 보인다").
+     ⚠ 폭을 숫자로 박지 않는다 — 창 버튼 너비는 OS·테마·배율마다 다르다.
+       브라우저가 알려주는 실제 값(env(titlebar-area-*))으로 남는 폭만큼만 비운다.
+       그 값이 없는 환경(오버레이 미사용)에서는 fallback으로 0이 된다. */
+  .tabbar{flex:0 0 auto;display:flex;align-items:stretch;gap:2px;
+    padding:7px 10px 0;
+    padding-right:calc(10px + 100vw - env(titlebar-area-width, 100vw) - env(titlebar-area-x, 0px));
+    border-bottom:1px solid var(--border);background:var(--panel-2);overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;}
   .tabbar::-webkit-scrollbar{height:5px;}
   .tabbar::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:3px;}
   .tab{display:flex;align-items:center;gap:7px;padding:8px 10px 8px 12px;border-radius:9px 9px 0 0;font-size:12.5px;font-weight:600;
@@ -43,17 +54,18 @@
   .screen.on{display:block;}
   .screens .blank{display:flex;align-items:center;justify-content:center;height:100%;color:var(--muted-2);font-size:13px;}
 
-  /* 손잡이 — 위(화면)/아래(콘솔) 비율 조절 */
-  .grip{flex:0 0 auto;height:9px;cursor:ns-resize;display:flex;align-items:center;justify-content:center;background:var(--panel-2);border-top:1px solid var(--border);}
-  .grip i{width:44px;height:3px;border-radius:2px;background:rgba(255,255,255,.18);}
-  .grip:hover i{background:var(--blue);}
 
-  /* 콘솔 — 셸에 있으므로 탭을 옮겨도 대화가 끊기지 않는다. 겉모습은 console.js가 넣는다. */
-  .console{flex:0 0 auto;display:flex;flex-direction:column;min-height:0;background:var(--panel-2);border-top:1px solid var(--border);}
+  /* 콘솔 — 셸에 있으므로 탭을 옮겨도 대화가 끊기지 않는다. 겉모습은 console.js가 넣는다.
+     높이는 **대화 4줄이 보이는 만큼으로 고정**한다(2026-07-28 사용자 결정).
+       맥락 줄 34 + 대화 4줄(22px×4=88) + 입력 52 + 여백 16 ≒ 190px
+     끌어서 늘리는 손잡이는 없앴다 — 끄는 동안 아래 iframe이 매번 다시 그려져 버벅였다.
+     더 넓게 보려면 「⧉ 창으로」로 빼면 된다. */
+  .console{flex:0 0 auto;display:flex;flex-direction:column;height:190px;min-height:190px;
+    background:var(--panel-2);border-top:1px solid var(--border);}
   /* 창으로 빼냈을 때 — 손잡이·콘솔을 접고 안내만 얇게 남긴다(화면이 100%가 된다) */
   .console-out{display:none;flex:0 0 auto;align-items:center;justify-content:center;gap:10px;padding:9px 14px;
     border-top:1px solid var(--border);background:var(--panel-2);font-size:11.5px;color:var(--muted);}
-  body.console-popped .console,body.console-popped .grip{display:none;}
+  body.console-popped .console{display:none;}
   body.console-popped .console-out{display:flex;}
 </style>
 </head>
@@ -69,9 +81,7 @@
         <button class="tb-btn" id="tbCloseAll" title="고정하지 않은 탭을 모두 닫습니다">모두 닫기</button>
       </div>
     </div>
-    <div class="screens" id="screens"><div class="blank">왼쪽 메뉴에서 화면을 고르면 탭으로 열립니다.</div></div>
-    <div class="grip" id="grip" title="드래그해서 화면과 대화의 비율을 바꿉니다"><i></i></div>
-    <!-- 콘솔은 console.js가 그린다 — 별도 창(console.html)과 같은 파일을 쓴다(자리만 다르다). -->
+    <div class="screens" id="screens"><div class="blank">왼쪽 메뉴에서 화면을 고르면 탭으로 열립니다.</div></div>    <!-- 콘솔은 console.js가 그린다 — 별도 창(console.html)과 같은 파일을 쓴다(자리만 다르다). -->
     <div class="console" id="console"><div id="consoleHost" data-mode="dock"></div></div>
     <!-- 콘솔을 창으로 빼냈을 때 자리에 남는 안내 -->
     <div class="console-out" id="consoleOut">
@@ -95,9 +105,7 @@
   "use strict";
   var $ = function (id) { return document.getElementById(id); };
   var KEY_TABS = "gijo:tabs:v1";
-  var KEY_H = "gijo:console:height";
   var MAX_TABS = 8;          // 살아있는 iframe이라 무한정 열면 메모리를 먹는다
-  var MIN_CONSOLE = 120, MIN_SCREEN = 200;
 
   var tabs = [];             // {page, label, el, frame, pinned}
   var active = null;
@@ -264,32 +272,11 @@
   window.gijoConsoleHidden = setPopped; // console.js가 '창으로' 눌렀을 때 셸에 알린다
 
   // ── 화면/대화 비율 ────────────────────────────────────────────────────
-  function applyH(h) {
-    var max = window.innerHeight - MIN_SCREEN;
-    h = Math.max(MIN_CONSOLE, Math.min(h, Math.max(MIN_CONSOLE, max)));
-    $("console").style.height = h + "px";
-    return h;
-  }
-  (function setupGrip() {
-    var saved = 0;
-    try { saved = Number(localStorage.getItem(KEY_H) || 0); } catch (e) {}
-    applyH(saved || Math.round(window.innerHeight * 0.32));
-    var dragging = false, startY = 0, startH = 0;
-    $("grip").addEventListener("mousedown", function (e) {
-      dragging = true; startY = e.clientY; startH = $("console").getBoundingClientRect().height;
-      document.body.style.userSelect = "none"; e.preventDefault();
-    });
-    window.addEventListener("mousemove", function (e) {
-      if (!dragging) return;
-      applyH(startH + (startY - e.clientY));
-    });
-    window.addEventListener("mouseup", function () {
-      if (!dragging) return;
-      dragging = false; document.body.style.userSelect = "";
-      try { localStorage.setItem(KEY_H, String(Math.round($("console").getBoundingClientRect().height))); } catch (e) {}
-    });
-    window.addEventListener("resize", function () { applyH($("console").getBoundingClientRect().height); });
-  })();
+  // 콘솔 높이는 **고정**이다(2026-07-28 사용자 결정). 예전엔 손잡이를 끌어 비율을 바꿨는데
+  // 움직임이 매끄럽지 않았다 — mousemove마다 높이를 바꾸면 그 아래 iframe이 통째로 다시
+  // 레이아웃되기 때문이다(무거운 화면일수록 끊긴다). 끌면서 계속 버벅이는 조작은 없느니만 못하다.
+  // 대신 넓게 보고 싶으면 「⧉ 창으로」가 있다 — 그쪽이 본래 그 용도다.
+  // 옛 저장값(gijo:console:height)은 더 쓰지 않는다 — 남아 있어도 무시된다.
 
   // ── 공개 API ──────────────────────────────────────────────────────────
   // nav.js가 메뉴 클릭 때 이걸 보고 "이동" 대신 "탭 열기"를 한다.
