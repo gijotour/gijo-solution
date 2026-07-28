@@ -21,7 +21,8 @@
   var GROUPS = [
     { id: "monitor", ic: "🖥", label: "관제", items: [
       { page: "dashboard.html", label: "대시보드" },
-      { page: "dashboard.html?quick=1", label: "내 업무 바로가기" },
+      // '내 업무 바로가기'는 즐겨찾기로 대신한다(2026-07-28 사용자 결정) — 원래 대시보드 위
+      // 팝업으로 열리던 기능인데 팝업을 없앴고, "자주 가는 화면을 빨리"는 별표가 더 곧다.
       // 작업 세션은 탐색기·목록·대화 3열이라 좁은 자리에 넣으면 셋 다 못 쓴다(2026-07-27) — 넓게 본다.
       { page: "sessions.html", label: "작업 세션" },
       { page: "analysis.html", label: "통합 관제" },
@@ -172,6 +173,13 @@
       ".gn-kids{display:block;}" +
       ".gn-kids.closed{display:none;}" +
       ".gn-kids .gn-item{padding-left:20px;}" + // 한 칸 들여써서 가지에 달린 것임을 보인다
+      ".gn-fav-g{color:var(--amber,#f0a020);}" +
+      // ☆ 별표 — 평소엔 숨어 있다가 그 줄에 마우스를 올리면 나온다(30줄에 별이 다 떠 있으면
+      // 시끄럽다). 이미 넣은 것(★)은 항상 보인다 — 무엇이 즐겨찾기인지 알아야 하니까.
+      ".gn-item .gn-star{flex:0 0 auto;font-size:11px;color:var(--muted-2,#5f6785);opacity:0;cursor:pointer;padding:0 3px;border-radius:5px;}" +
+      ".gn-item:hover .gn-star{opacity:.65;}" +
+      ".gn-item .gn-star:hover{opacity:1;color:var(--amber,#f0a020);background:rgba(240,160,32,.14);}" +
+      ".gn-item .gn-star.on{opacity:1;color:var(--amber,#f0a020);}"
       ".gn-item{display:flex;align-items:center;gap:7px;padding:8px 11px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:1px;white-space:nowrap;overflow:hidden;}" +
       ".gn-item:hover{color:#fff;background:rgba(255,255,255,.04);}" +
       ".gn-item.active{color:#fff;background:rgba(59,130,246,.14);box-shadow:inset 3px 0 0 var(--blue);cursor:default;}" +
@@ -194,6 +202,24 @@
 
   var updateAvailable = false; // 클라이언트 새 버전 존재 여부(checkUpdateBadge가 채움)
 
+  // ── 즐겨찾기 ───────────────────────────────────────────────────────────
+  // 화면이 30개라 자주 가는 곳까지 매번 훑어 내려가야 한다. 별표한 화면을 맨 위 가지에 모은다.
+  // **직접 고르게** 한다(2026-07-28 사용자 결정) — 사용 빈도로 자동 정렬하면 "왜 이게 여기
+  // 있지 / 어제 있던 게 왜 없지"가 생겨 오히려 못 찾는다. 내가 꽂은 것만 있어야 예측이 된다.
+  var FAV_KEY = "gijo:menu:favorites";
+  function favList() {
+    try { return JSON.parse(localStorage.getItem(FAV_KEY) || "[]"); } catch (e) { return []; }
+  }
+  function favSave(arr) {
+    try { localStorage.setItem(FAV_KEY, JSON.stringify(arr)); } catch (e) {}
+  }
+  function favToggle(page) {
+    var arr = favList();
+    var i = arr.indexOf(page);
+    if (i >= 0) arr.splice(i, 1); else arr.push(page); // 꽂은 순서를 지킨다(마지막이 아래로)
+    favSave(arr);
+  }
+
   // 그룹 접힘 상태 — 담당자가 고른 대로 기억한다. 저장이 없으면 전부 펼침(처음엔 다 보여야 찾는다).
   var FOLD_KEY = "gijo:menu:folded";
   function foldedSet() {
@@ -201,6 +227,53 @@
   }
   function saveFolded(set) {
     try { localStorage.setItem(FOLD_KEY, JSON.stringify([...set])); } catch (e) {}
+  }
+
+  // 메뉴 한 줄을 만든다 — 즐겨찾기 가지와 본 가지가 **같은 함수**를 쓴다(이름·배지·동작을
+  // 두 곳에 적으면 반드시 한쪽만 고치게 된다).
+  function makeItem(it, here, favs, container) {
+    var el = document.createElement("div");
+    el.className = "gn-item" + (it.page === here ? " active" : "") + (it.page === "dashboard.html" ? " gn-home" : "");
+    var lab = document.createElement("span"); lab.className = "gn-label"; lab.textContent = it.label; el.appendChild(lab);
+
+    // ☆ 별표 — 별도 창으로 여는 항목(팀 사무실)은 주소가 없어 즐겨찾기에 넣을 수 없다.
+    if (it.page) {
+      var on = favs.indexOf(it.page) >= 0;
+      var star = document.createElement("span");
+      star.className = "gn-star" + (on ? " on" : "");
+      star.textContent = on ? "★" : "☆";
+      star.title = on ? "즐겨찾기에서 빼기" : "즐겨찾기에 넣기 — 맨 위에서 바로 갑니다";
+      star.addEventListener("click", function (ev) {
+        ev.stopPropagation();          // 별을 누른 것이지 화면을 연 것이 아니다
+        favToggle(it.page);
+        buildMenu(container);          // 즐겨찾기 가지까지 한 번에 다시 그린다
+      });
+      el.appendChild(star);
+    }
+
+    if (it.page === "settings.html?s=admin" && updateAvailable) {
+      var upBadge = document.createElement("span"); upBadge.className = "gn-upbadge"; upBadge.textContent = "1"; upBadge.title = "새 버전 있음"; el.appendChild(upBadge);
+    }
+    // 진행중인 작업 세션 개수 — "몇 건 돌고 있나"는 눌러 보지 않아도 알아야 하는 값이다.
+    if (it.page === "sessions.html") {
+      var sBadge = document.createElement("span");
+      sBadge.className = "gn-upbadge gn-sessbadge";
+      sBadge.style.display = "none";
+      sBadge.title = "진행중인 작업 세션";
+      el.appendChild(sBadge);
+    }
+
+    if (it.office) {
+      el.addEventListener("click", function () { if (window.gijo && window.gijo.openTeamOffice) window.gijo.openTeamOffice(); });
+    } else if (window.gijoTabs) {
+      // 탭 셸(app.html) 안 — 화면을 옮기지 않고 탭으로 연다. 셸이 리로드되지 않으므로
+      // 대화·입력 중 초안·진행 중 작업이 그대로 유지된다(4.0.0 탭 구조).
+      el.addEventListener("click", function () { window.gijoTabs.open(it.page, it.label); });
+    } else if (it.page !== here) {
+      // 셸 밖(분리창 등)에서는 화면을 옮긴다 — 그 창은 한 화면만 보는 자리다.
+      el.addEventListener("click", function () { go(it.page); });
+    }
+    return el;
   }
 
   // 트리 메뉴를 container에 렌더한다 — nav 사이드바와 대시보드 '전체메뉴' 모드가 공유하는 단일 소스.
@@ -211,6 +284,38 @@
     container.innerHTML = "";
     var here = currentKey();
     var folded = foldedSet();
+    var favs = favList();
+
+    // ⭐ 즐겨찾기 가지 — 별표한 화면이 있을 때만 맨 위에 나온다(없으면 자리를 차지하지 않는다).
+    if (favs.length) {
+      var fh = document.createElement("div");
+      fh.className = "gn-g open gn-fav-g";
+      fh.setAttribute("role", "button");
+      fh.title = "즐겨찾기 접기/펼치기 — 항목 위 ☆를 눌러 넣고 뺍니다";
+      var fcar = document.createElement("span"); fcar.className = "car"; fcar.textContent = "▶";
+      var fnm = document.createElement("span"); fnm.textContent = "⭐ 즐겨찾기";
+      var fcnt = document.createElement("span"); fcnt.className = "cnt"; fcnt.textContent = favs.length;
+      fh.appendChild(fcar); fh.appendChild(fnm); fh.appendChild(fcnt);
+      container.appendChild(fh);
+      var fkids = document.createElement("div");
+      fkids.className = "gn-kids" + (folded.has("__fav") ? " closed" : "");
+      if (folded.has("__fav")) fh.classList.remove("open");
+      container.appendChild(fkids);
+      fh.addEventListener("click", function () {
+        var nowOpen = fkids.classList.toggle("closed") === false;
+        fh.classList.toggle("open", nowOpen);
+        var s = foldedSet();
+        if (nowOpen) s.delete("__fav"); else s.add("__fav");
+        saveFolded(s);
+      });
+      // 메뉴 정의에서 그 화면을 찾아 같은 모양으로 그린다(이름·배지를 두 곳에 적지 않는다).
+      favs.forEach(function (page) {
+        var found = null;
+        GROUPS.forEach(function (g) { g.items.forEach(function (it) { if (it.page === page) found = it; }); });
+        if (found) fkids.appendChild(makeItem(found, here, favs, container));
+      });
+    }
+
     GROUPS.forEach(function (g) {
       // 지금 보고 있는 화면이 든 가지는 접혀 있어도 펼쳐 준다 — 어디에 있는지 보여야 한다.
       var hasHere = g.items.some(function (it) { return it.page === here; });
@@ -239,60 +344,7 @@
         saveFolded(s);
       });
 
-      g.items.forEach(function (it) {
-        var el = document.createElement("div");
-        el.className = "gn-item" + (it.page === here ? " active" : "") + (it.page === "dashboard.html" ? " gn-home" : "");
-        var lab = document.createElement("span"); lab.className = "gn-label"; lab.textContent = it.label; el.appendChild(lab);
-        if (it.bot) {
-          var botMark = document.createElement("span");
-          botMark.className = "gn-bot";
-          // 팝업으로 열리는 메뉴는 팝업 그림(⧉)으로 — 챗봇(🤖)이 아니라 "대시보드 위 팝업"임을 표시
-          // (2026-07-26 사용자 결정. 팝업 미지원 메뉴는 기존 챗봇 열기 그대로.)
-          botMark.textContent = it.popup ? "⧉" : "🤖";
-          botMark.title = it.popup
-            ? it.label + " — 별도 창으로 열기. 가로/세로 배치는 그 창 안에서 바꿉니다"
-            : it.label + " 화면의 챗봇 열기 — 그 화면 데이터로 바로 답합니다";
-          botMark.addEventListener("click", function (ev) {
-            ev.stopPropagation();
-            // ⧉ = 별도 창으로 열기(2026-07-26 사용자 결정) — 어느 화면에서든 동작.
-            // 메뉴 이름 클릭은 대시보드에선 팝업, 다른 화면에선 이동(기존 그대로).
-            if (it.popup && window.gijo && window.gijo.openShellPopout) {
-              window.gijo.openShellPopout(it.page, it.label);
-              return;
-            }
-            if (it.page === here && openChatHere()) return;
-            try { localStorage.setItem("gijo:openChatOnLoad", String(Date.now())); } catch (e) {}
-            if (it.page !== here) go(it.page);
-          });
-          el.appendChild(botMark);
-        }
-        if (it.page === "settings.html?s=admin" && updateAvailable) {
-          var upBadge = document.createElement("span"); upBadge.className = "gn-upbadge"; upBadge.textContent = "1"; upBadge.title = "새 버전 있음"; el.appendChild(upBadge);
-        }
-        // 진행중인 작업 세션 개수 — 예전 세로 탭에 붙어 있던 정보다. 탭을 없애면서 같이
-        // 사라졌는데, "몇 건 돌고 있나"는 눌러 보지 않아도 알아야 하는 값이라 되살린다.
-        if (it.page === "sessions.html") {
-          var sBadge = document.createElement("span");
-          sBadge.className = "gn-upbadge gn-sessbadge";
-          sBadge.style.display = "none";
-          sBadge.title = "진행중인 작업 세션";
-          el.appendChild(sBadge);
-        }
-        if (it.office) {
-          el.addEventListener("click", function () { if (window.gijo && window.gijo.openTeamOffice) window.gijo.openTeamOffice(); });
-        } else if (window.gijoTabs) {
-          // 탭 셸(app.html) 안 — 화면을 옮기지 않고 탭으로 연다. 셸이 리로드되지 않으므로
-          // 대화·입력 중 초안·진행 중 작업이 그대로 유지된다(4.0.0 탭 구조).
-          el.addEventListener("click", function () { window.gijoTabs.open(it.page, it.label); });
-        } else if (it.page !== here) {
-          // 셸 밖(분리창 등)에서는 화면을 옮긴다 — 그 창은 한 화면만 보는 자리다.
-          el.addEventListener("click", function () {
-            if (it.page.indexOf("dashboard.html?quick") === 0 && window.gijoOpenQuick) { window.gijoOpenQuick(); return; }
-            go(it.page);
-          });
-        }
-        kids.appendChild(el);
-      });
+      g.items.forEach(function (it) { kids.appendChild(makeItem(it, here, favs, container)); });
     });
   }
   // 대시보드가 '전체메뉴' 모드에서 같은 메뉴를 렌더하도록 공개(단일 소스).
