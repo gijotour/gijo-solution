@@ -33,6 +33,7 @@ import { runRedTeam, makeServedCaller } from "./redteam";
 import { runHardeningScan, scanSummaryText, isStandard } from "./hardeningscan";
 import { listSchedules as listReportSchedules, scheduleSummaryText } from "./reportschedule";
 import { listSchedules as listHardeningSchedules } from "./hardeningtargets";
+import { timeSavedText } from "./timesaved";
 import { listAnalysisEvents, analysisSummary, computeCorrelations } from "./analysishub";
 import { computeKpiSnapshot } from "./kpi";
 import { listSessions as listWorkSessions } from "./worksessions";
@@ -1351,6 +1352,17 @@ const TOOLS: AgentTool[] = [
     directAnswer: true,
     params: [],
     run: runHardeningScheduleList,
+  },
+  {
+    name: "time_saved",
+    label: "AI가 아낀 시간",
+    domain: "report",
+    write: false,
+    description:
+      'AI 자동화가 대신 처리한 일을 시간으로 환산해 보여준다. 무엇을 몇 건 했고 어떤 기준시간을 곱했는지도 함께 낸다. "AI가 시간을 얼마나 아꼈어?", "자동화 효과 정리해줘", "이번 달 절감 시간"에 쓴다. 예: {} 또는 {"days":"90"}',
+    directAnswer: true,
+    params: [{ name: "days", label: "기간(일)", description: "며칠치인지 — 기본 30일", required: false }],
+    run: (a) => timeSavedText(Math.min(Math.max(Number(a.days) || 30, 1), 365)),
   },
   {
     name: "analysis_status",

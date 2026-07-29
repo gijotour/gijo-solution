@@ -17,6 +17,8 @@ import { listTasks, TaskItem } from "./tasks";
 import { prioritizedReviews, buildTriageDraft, type PrioritizedFinding } from "./approvals";
 import { aibomThreatMatches, type AiBomThreatReport } from "./compliance";
 import { recordAudit } from "./audit";
+import { recordWork } from "./worklog";
+import { timeSavedReport, fmtDuration } from "./timesaved";
 import type { GijoUser } from "../auth/users";
 
 type ExpressRequestWithUser = Request & { user?: GijoUser };
@@ -273,6 +275,9 @@ async function buildDocx(
           ...Object.entries(counts).map(
             ([severity, count]) => new Paragraph({ children: [new TextRun(`${severity}: ${count}건`)] })
           ),
+          // AI 자동화 처리량 — 계획서 중-2. 절감 시간은 추정이므로 가정·한계를 같은 자리에 적는다.
+          // 처리 기록이 없으면 이 절 자체를 넣지 않는다(빈 표로 자리만 채우지 않는다).
+          ...timeSavedSection(),
           new Paragraph({ text: "취약점 조치 현황", heading: HeadingLevel.HEADING_1 }),
           new Paragraph({
             children: [
@@ -487,6 +492,29 @@ export function stripMetaPreamble(text: string): string {
   return out.join("\n").trim();
 }
 
+// AI 자동화 처리량 절(계획서 중-2). 임원 보고에 자동으로 실린다.
+// 정직 규칙(전-6): ① "추정"이라고 먼저 말한다 ② 무엇에 몇 분을 곱했는지 전부 적는다
+// ③ 보수 조정한 하한~산정값을 범위로 낸다 ④ 처리 기록이 없으면 절을 아예 넣지 않는다.
+function timeSavedSection(): Paragraph[] {
+  const t = timeSavedReport(30);
+  if (t.rows.length === 0) return [];
+  const cases = t.rows.reduce((s, r) => s + r.count, 0);
+  return [
+    new Paragraph({ text: "AI 자동화 처리량 (최근 30일)", heading: HeadingLevel.HEADING_1 }),
+    new Paragraph({
+      children: [
+        new TextRun(
+          `AI가 대신 처리한 일 ${cases}건 — 담당자가 손으로 했다면 약 ` +
+            `${fmtDuration(t.totalMinutes * (1 - t.riskAdjustment))}~${fmtDuration(t.totalMinutes)}`
+        ),
+      ],
+    }),
+    new Paragraph({ children: [new TextRun({ text: "산출 근거(처리 건수 × 조직이 정한 기준시간):", bold: true, size: 20 })] }),
+    ...t.assumptions.map((a) => new Paragraph({ children: [new TextRun({ text: `· ${a}`, size: 18 })] })),
+    new Paragraph({ children: [new TextRun({ text: t.note, italics: true, size: 18 })] }),
+  ];
+}
+
 export async function generateReport(req: ReportRequest): Promise<ReportResult> {
   const assets = collectAssets(req);
   const counts = severityCounts(assets);
@@ -564,6 +592,8 @@ export async function generateReport(req: ReportRequest): Promise<ReportResult> 
   } catch {
     /* 메타 저장 실패해도 리포트 자체는 유효 — 이력에선 파일명 기반으로 폴백 표시 */
   }
+  // 자동화 작업 원장(계획서 중-2) — 보고서 작성은 담당자가 손으로 하면 가장 오래 걸리는 일이다.
+  recordWork({ kind: "report_generated", detail: `${req.type}/${audience}`, actor: req.createdBy ?? null, source: req.createdBy ? "chat" : "schedule" });
   return result;
 }
 

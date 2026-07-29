@@ -14,6 +14,7 @@ import { chat } from "./llm";
 import { listAgentTools, listToolsFor, findAgentTool, toolCatalogText, validateToolArgs, buildApproval, PendingApproval, NO_HIT_PREFIX } from "./agenttools";
 import { emitCollaboration } from "./collaboration";
 import { listProducts } from "./securityproducts";
+import { recordWork, TOOL_WORK_KIND } from "./worklog";
 
 const MAX_STEPS = 5;
 
@@ -245,6 +246,7 @@ export interface ToolScope {
   domains?: string[];
   role?: string;
   qa?: boolean;
+  actor?: string; // 지시한 사람 — 작업 원장(중-2)에 누가 시킨 일인지 남긴다
 }
 
 // 제품 핵심 문구인데 LLM이 "일반 질문"으로 오인해 도구를 건너뛰고 잡담으로 답하던 의도를
@@ -373,6 +375,14 @@ function forcedToolFor(instruction: string, scope?: ToolScope): { tool: string; 
   return null;
 }
 
+// 자동화 작업 원장 기록(계획서 중-2). 매핑에 없는 도구는 세지 않고, 평가 게이트·QA 실행은
+// scope.qa로 걸러 아예 담지 않는다 — 시험이 고객의 절감 숫자를 만들면 안 된다.
+function recordToolWork(toolName: string, scope?: ToolScope): void {
+  const kind = TOOL_WORK_KIND[toolName];
+  if (!kind) return;
+  recordWork({ kind, detail: toolName, actor: scope?.actor ?? null, source: "chat", qa: scope?.qa });
+}
+
 export async function runAgentLoop(instruction: string, context = "", scope?: ToolScope): Promise<AgentLoopResult | null> {
   // 범위를 적용한 뒤 쓸 도구가 하나도 없으면 루프를 돌 이유가 없다(호출자가 채팅으로 폴백).
   if (listToolsFor(scope?.domains, scope?.role).length === 0) return null;
@@ -384,6 +394,7 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
     if (tool && !tool.write) {
       try {
         const result = String(await tool.run(forced.args));
+        recordToolWork(forced.tool, scope);
         const calls: AgentToolCall[] = [{ tool: forced.tool, args: forced.args, result }];
         const direct = directAnswerFor(calls);
         return { output: guardAgainstDenial(direct ?? (await composeFinalAnswer(instruction, calls, context)), calls), toolCalls: calls };
@@ -462,6 +473,7 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
         emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `도구 실행: ${tool.name}(${JSON.stringify(args)})` });
         try {
           result = String(await tool.run(args));
+          recordToolWork(tool.name, scope);
         } catch (err) {
           result = `도구 실행 실패: ${err instanceof Error ? err.message : String(err)}`;
         }

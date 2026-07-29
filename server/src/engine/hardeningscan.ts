@@ -13,6 +13,7 @@
 // runner를 SSH(`ssh user@host "cmd"`)로 바꾸면 실제 원격 보안장비에도 그대로 적용된다.
 
 import type { Express } from "express";
+import { recordWork } from "./worklog";
 import { execFile } from "node:child_process";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
@@ -611,6 +612,8 @@ export async function runHardeningScan(opts: { standard: StandardId; target?: st
   const warn = items.filter((i) => i.status === "WARN").length;
   const scored = total - na;
   const rate = scored ? Math.round((pass / scored) * 100) : 0;
+  // 자동화 작업 원장(중-2) — 손으로 하면 항목마다 명령을 치고 결과를 표로 옮겨야 하는 일이다.
+  recordWork({ kind: "hardening_scanned", detail: `${opts.standard}/${target}`, source: opts.target ? "schedule" : "chat" });
   return {
     standard: opts.standard,
     standardLabel: std.label,

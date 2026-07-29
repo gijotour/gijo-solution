@@ -641,6 +641,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   const loop = await runAgentLoop(instructionText, contextText, {
     domains: toolDomainsForScreen(screen),
     qa,
+    actor,
   }).catch(() => null);
   if (loop) {
     const loopTask = createTask({ text: instructionText, agentId: "orchestrator", priority: "P2" });

@@ -811,7 +811,13 @@ export function registerMemoryRoutes(app: Express): void {
           savedPath = undefined;
         }
         // 사용자 업로드 경로 — Scan·Analyze Agent 분류 포함.
-        res.json(await ingestText(filename, text, scope ?? GLOBAL_SCOPE, savedPath, true, (req as unknown as { user?: { displayName?: string } }).user?.displayName));
+        const actor = (req as unknown as { user?: { displayName?: string } }).user?.displayName;
+        const ingested = await ingestText(filename, text, scope ?? GLOBAL_SCOPE, savedPath, true, actor);
+        // 자동화 작업 원장(중-2) — 사람이 하면 읽고 요약하고 분류해 넣어야 하는 일이다.
+        // 부팅 시 기본 코퍼스 인입(docsbundle)은 이 경로를 타지 않으므로 제품 자랑에 섞이지 않는다.
+        const { recordWork } = await import("./worklog.js");
+        recordWork({ kind: "document_ingested", detail: filename, actor: actor ?? null, source: "api" });
+        res.json(ingested);
       } catch (err) {
         res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
       }

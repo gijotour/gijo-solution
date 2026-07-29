@@ -13,6 +13,7 @@
 import { chat } from "./llm";
 import { queryMemoryScored, listDocuments, RAG_RELEVANCE_MAX_DISTANCE } from "./memory";
 import { getLawConfig, searchLaw, LEGAL_DISCLAIMER, LawHit } from "./lawinfo";
+import { recordWork } from "./worklog";
 
 // 판정 자체의 면책 — 로폼 대법원 판결(2026) 함의: "구체적 사안에 대한 법률적 판단"으로 읽히면
 // 위법 소지가 있다. 이 기능은 **사내 규정 문서와의 대조**이고 법령은 원문 링크 안내까지만이다.
@@ -181,5 +182,7 @@ export async function runActionCheck(question: string): Promise<ActionCheckResul
     lines.push("", lawNote);
   }
   lines.push("", ACTION_DISCLAIMER, LEGAL_DISCLAIMER);
+  // 근거를 찾아 판정까지 한 경우만 작업 원장에 남긴다(중-2) — 판단 불가(NA)는 일한 게 아니다.
+  recordWork({ kind: "action_checked", detail: question.slice(0, 60), source: "chat" });
   return { output: lines.join("\n"), sources: docs };
 }

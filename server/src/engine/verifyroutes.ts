@@ -8,6 +8,7 @@
 //   허용뿐 아니라 **거부도 감사에 남긴다**(누가 권한 없는 자산에 시도했는지가 보안 정보다).
 
 import type { Express, Request } from "express";
+import { recordWork } from "./worklog";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import type { GijoUser } from "../auth/users";
@@ -124,6 +125,8 @@ export function registerVerifyRoutes(app: Express): void {
         target: `${asset.name} (${target.label})`,
         detail: `대상 ${sum.total}건 — 조치확인 ${sum.fixed} · 미조치 ${sum.still} · 수동확인 ${sum.manual}`,
       });
+      // 자동화 작업 원장(중-2) — 손으로 하면 취약점마다 다시 접속해 확인해야 하는 일이다.
+      recordWork({ kind: "verification_run", detail: `${asset.name} ${sum.total}건`, actor: user?.displayName ?? null, source: "api" });
 
       res.json({ assetId, assetName: asset.name, target: target.label, results, summary: sum });
     })
