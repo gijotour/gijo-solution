@@ -50,6 +50,12 @@
       ".cs-row .cm{font-size:12.5px;color:var(--text,#e7eaf3);white-space:pre-wrap;word-break:break-word;line-height:1.62;}",
       ".cs-row .cm.clamp{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer;}",
       ".cs-row .cl-more{font-size:10.5px;font-weight:700;color:var(--blue-light,#5fa1ff);cursor:pointer;}",
+      // 「이 답 이상해요」 지적(중-1) — 평소엔 숨고 마우스를 올리거나 키보드로 짚으면 드러난다.
+      // 호버만으로 드러내면 키보드 사용자가 못 쓴다(탭 닫기 ✕와 같은 방식).
+      ".cs-row .cs-flag{display:none;margin-top:4px;font-size:10px;font-weight:700;color:var(--muted-2,#5f6785);background:none;border:1px solid rgba(255,255,255,.10);border-radius:999px;padding:2px 8px;cursor:pointer;min-height:24px;}",
+      ".cs-row:hover .cs-flag,.cs-row .cs-flag:focus-visible{display:inline-block;}",
+      ".cs-row .cs-flag:hover,.cs-row .cs-flag:focus-visible{color:var(--amber,#f59e0b);border-color:rgba(245,158,11,.45);}",
+      ".cs-row .cs-flag.done{display:inline-block;color:var(--teal,#1eb980);border-color:rgba(30,185,128,.4);cursor:default;}",
       ".cs-row.error .cm{color:#f5928a;}",
       ".cs-typing span{display:inline-block;width:5px;height:5px;margin-right:3px;border-radius:50%;background:var(--muted,#8b93ab);animation:csb 1s infinite;}",
       ".cs-typing span:nth-child(2){animation-delay:.15s}.cs-typing span:nth-child(3){animation-delay:.3s}",
@@ -114,6 +120,107 @@
         if (window.gijoConsoleHidden) window.gijoConsoleHidden(true); // 셸이 도킹 자리를 접는다
       }
     });
+  }
+
+  // ── 「이 답 이상해요」 지적 (계획서 중-1) ─────────────────────────────
+  // 회귀 문항은 전부 우리가 상상한 질문이라, 실사용자가 겪는 오답은 거기 없다.
+  // 담당자의 지적 한 줄이 문항 하나보다 값지다 — 그래서 답변 옆에서 바로 남길 수 있게 한다.
+  //
+  // ⚠ 카드는 **화면 기준으로 띄운다**(position:fixed, document.body에 붙임).
+  //   대시보드에 붙은 콘솔은 대화 영역이 90px 남짓이라(콘솔 전체 190px 고정) 말풍선 안에
+  //   넣으면 스크롤 컨테이너에 잘려 보이지 않는다. 아래가 좁으면 위로 뒤집는다.
+  var FLAG_KINDS = [
+    { k: "wrong", label: "❌ 틀린 답", hint: "사실이 틀림" },
+    { k: "missing", label: "🔍 못 찾음", hint: "있는데 못 찾아 답함" },
+    { k: "style", label: "💬 말투", hint: "말투·형식이 어색함" },
+  ];
+  var flagCard = null;
+  function closeFlagCard() { if (flagCard) { flagCard.remove(); flagCard = null; } }
+
+  function openFlagCard(btn, question, answer) {
+    closeFlagCard();
+    var c = document.createElement("div");
+    c.style.cssText =
+      "position:fixed;z-index:9999;width:300px;max-width:calc(100vw - 24px);background:var(--panel,#151922);" +
+      "border:1px solid var(--border-strong,#2a3040);border-radius:10px;box-shadow:0 18px 44px rgba(0,0,0,.55);padding:12px 13px;";
+    c.innerHTML =
+      '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:9px">' +
+      '<div style="flex:1;min-width:0;font-size:10.5px;color:var(--muted-2,#5f6785);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
+      esc(String(answer).slice(0, 40)) + "…</div>" +
+      '<span id="fbX" role="button" tabindex="0" style="cursor:pointer;color:var(--muted,#8b93ab);font-size:13px;line-height:1">✕</span></div>' +
+      '<div id="fbKinds" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px"></div>' +
+      '<div id="fbHint" style="font-size:10px;color:var(--muted-2,#5f6785);margin-bottom:9px;min-height:13px"></div>' +
+      '<textarea id="fbNote" rows="2" placeholder="무엇이 틀렸나요? (선택)" style="width:100%;box-sizing:border-box;background:var(--panel-2,#11151d);border:1px solid var(--border,#222836);border-radius:7px;padding:7px 9px;color:var(--text,#e7eaf3);font-size:11.5px;resize:vertical;margin-bottom:7px"></textarea>' +
+      '<textarea id="fbExp" rows="2" placeholder="혹시 정답을 아신다면 (선택)" style="width:100%;box-sizing:border-box;background:var(--panel-2,#11151d);border:1px solid var(--border,#222836);border-radius:7px;padding:7px 9px;color:var(--text,#e7eaf3);font-size:11.5px;resize:vertical"></textarea>' +
+      '<div style="font-size:9.5px;color:var(--muted-2,#5f6785);margin:5px 0 10px">적어 주시면 앞으로 이 질문을 검사 문항으로 씁니다.</div>' +
+      '<div style="display:flex;justify-content:flex-end;gap:7px">' +
+      '<button id="fbCancel" style="background:none;border:1px solid var(--border,#222836);border-radius:7px;padding:5px 12px;color:var(--muted,#8b93ab);font-size:11.5px;cursor:pointer">취소</button>' +
+      '<button id="fbSend" style="background:var(--blue,#3b82f6);border:none;border-radius:7px;padding:5px 14px;color:#fff;font-size:11.5px;font-weight:700;cursor:pointer">전송</button></div>';
+    document.body.appendChild(c);
+    flagCard = c;
+
+    var picked = "wrong";
+    var kinds = c.querySelector("#fbKinds"), hint = c.querySelector("#fbHint");
+    FLAG_KINDS.forEach(function (k) {
+      var b = document.createElement("button");
+      b.textContent = k.label;
+      b.style.cssText = "background:none;border:1px solid var(--border,#222836);border-radius:999px;padding:4px 10px;color:var(--text,#e7eaf3);font-size:11px;cursor:pointer;min-height:24px;";
+      b.onclick = function () {
+        picked = k.k;
+        hint.textContent = k.hint;
+        [].forEach.call(kinds.children, function (x) { x.style.borderColor = "var(--border,#222836)"; x.style.color = "var(--text,#e7eaf3)"; });
+        b.style.borderColor = "var(--amber,#f59e0b)"; b.style.color = "var(--amber,#f59e0b)";
+      };
+      kinds.appendChild(b);
+      if (k.k === "wrong") b.onclick();
+    });
+
+    // 위치 — 버튼 아래에 붙이되 아래가 좁으면 위로 뒤집는다(도킹 콘솔은 아래 공간이 거의 없다).
+    var r = btn.getBoundingClientRect();
+    var h = c.offsetHeight || 300;
+    var top = r.bottom + 6;
+    if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 6);
+    c.style.top = top + "px";
+    c.style.left = Math.max(8, Math.min(r.left, window.innerWidth - c.offsetWidth - 8)) + "px";
+
+    var esc2 = function (ev) { if (ev.key === "Escape") { closeFlagCard(); document.removeEventListener("keydown", esc2); } };
+    document.addEventListener("keydown", esc2);
+    var outside = function (ev) { if (flagCard && !flagCard.contains(ev.target) && ev.target !== btn) { closeFlagCard(); document.removeEventListener("mousedown", outside); } };
+    setTimeout(function () { document.addEventListener("mousedown", outside); }, 0);
+
+    c.querySelector("#fbX").onclick = closeFlagCard;
+    c.querySelector("#fbCancel").onclick = closeFlagCard;
+    c.querySelector("#fbSend").onclick = async function () {
+      var note = c.querySelector("#fbNote").value.trim();
+      var exp = c.querySelector("#fbExp").value.trim();
+      try {
+        await window.gijo.sendAnswerFeedback({
+          kind: picked, question: question, answer: answer,
+          note: note || undefined, expected: exp || undefined, screen: ctx.screen || undefined,
+        });
+        closeFlagCard();
+        btn.textContent = "✓ 지적 접수됨";
+        btn.className = "cs-flag done";
+        btn.disabled = true;
+        // 과한 기대를 만들지 않는다 — 자동 반영이 아니라 사람이 검토한다.
+        append("event", { icon: "📝", name: "지적 접수", message: "접수했습니다. 사람이 검토 후 검사 문항으로 씁니다(자동 반영 아님)." });
+      } catch (e) {
+        hint.textContent = "보내지 못했습니다: " + ((e && e.message) || e);
+        hint.style.color = "#f5928a";
+      }
+    };
+  }
+
+  // 답변 줄에 지적 버튼을 단다. 질문(직전 지시)과 답을 짝지어 보내야 문항이 될 수 있다.
+  function attachFlag(el, question, answer) {
+    if (!question) return; // 무엇에 대한 지적인지 모르면 남길 수 없다
+    var b = document.createElement("button");
+    b.className = "cs-flag";
+    b.type = "button";
+    b.textContent = "▶ 이 답 이상해요";
+    b.onclick = function () { openFlagCard(b, question, answer); };
+    var cb = el.querySelector(".cb");
+    if (cb) cb.appendChild(b);
   }
 
   // ── 대화 줄 ───────────────────────────────────────────────────────────
@@ -185,7 +292,9 @@
         session = { id: r.sessionId };
         try { localStorage.setItem(SESS_KEY, JSON.stringify(session)); } catch (e) {}
       }
-      replaceTyping(typing, "reply", { icon: "🧭", name: "AI 팀", message: (r && r.output) || "(응답 없음)" });
+      var replyEl = replaceTyping(typing, "reply", { icon: "🧭", name: "AI 팀", message: (r && r.output) || "(응답 없음)" });
+      // 지적 버튼 — 방금 보낸 질문과 이 답을 짝지어 둔다(중-1 피드백 루프).
+      attachFlag(replyEl, text, (r && r.output) || "");
     } catch (e) {
       replaceTyping(typing, "error", { icon: "⚠", name: "오류", message: (e && e.message) || String(e) });
     } finally {

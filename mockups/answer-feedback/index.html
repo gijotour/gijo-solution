@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<!--
+  ================================================================================================
+  GIJO AS — 대화 콘솔 "이 답 이상해요" 지적 버튼 시안 (console.js에 추가 예정) · 추천 시안 1개
+  ================================================================================================
+  대상 화면: client/src/renderer/pages/console.js (도킹: app.html #consoleHost / 창: console.html — 같은 파일 2곳)
+  대상 API : POST /api/answer-feedback  { kind, question, answer, note?, expected?, screen? }  (이미 구현·배포됨)
+             GET  /api/answer-feedback?days=7                          (server/src/engine/answerfeedback.ts)
+  참고 코드: console.js  — .cs-row/.ci/.cb/.cn/.cm 실제 답변 행 마크업, .cs-updec 인라인 결정 패널(자리 참고)
+             app.html    — .tab .x{opacity:0→hover} 호버 노출 패턴, .winpop 앵커형 팝오버(바깥클릭·Esc로 닫힘),
+                           콘솔 도킹 높이 실측 주석("맥락 34 + 대화 4줄 88 + 입력 52 + 여백 16 ≒ 190px, 손잡이 없음")
+             nav.js      — 좌측 메뉴 구조·기본 접힘 상태(OPEN_KEY 없으면 전부 닫힘)
+             gijo-ui.css — .g-chip/.g-badge/:focus-visible (아래 스타일에 값 그대로 복사, 링크는 안 걸었다 — 자체완결 규칙)
+
+  [배경 — 왜 필요한가] (계획서 중-1 "파일럿 실사용 피드백 루프 — 오답·미답 지적은 회귀셋으로 흡수"의 UI 몫)
+  회귀 하네스 11문항 + 평가 게이트 99문항은 전부 우리가 상상한 질문이다. 2026-07-21 사고(테스트 758건이
+  통과하는 동안 KEV 오답이 실사용자에게 나감)가 그 증거다. 담당자의 "이거 틀렸어" 한 줄이 문항 하나보다
+  값지다. 서버(answerfeedback.ts)는 이미 접수·요약·게이트 초안화까지 구현됐다 — 이 시안은 그 접수 통로의
+  화면만 그린다. 지적은 자동으로 문항이 되지 않는다(사람이 검토 후 편입) — 이 사실을 과한 기대를 막기
+  위해 접수 문구에 그대로 남긴다(요구 4).
+
+  [설계 전 조사 — 근거]
+  1) Amershi 외, "Guidelines for Human-AI Interaction" (Microsoft Research, CHI 2019, 18개 지침) —
+     G8 효율적인 취소 지원, G9 효율적인 정정 지원, G15 세분화된 피드백 유도, G16 사용자 행동의 결과
+     알리기. 이 네 가지가 이번 요구사항 5(취소·닫기)·1(진입 쉬움)·2(3종 분류)·4(접수 후 안내)에 각각
+     대응한다 — 새로 지어낸 원칙이 아니라 20년 축적된 HCI 연구의 짧은 요약이다.
+     https://www.microsoft.com/en-us/research/publication/guidelines-for-human-ai-interaction/
+  2) WCAG 2.2 SC 2.5.8 Target Size(Minimum, Level AA, 2023 W3C 권고) — 포인터 목표는 24×24 CSS px
+     이상(예외 있음). 아이콘 글자 자체는 작게 두되, 버튼의 실제 클릭 영역(패딩 포함 높이)은 24px 이상을
+     지켰다(.af-trigger min-height:24px).
+     https://www.w3.org/WAI/WCAG22/Understanding/target-size-minimum.html
+  3) Progressive Disclosure(단계적 노출, IxDF/LogRocket 등 다수 UX 문헌 공통) — 평소엔 숨기고 필요할 때만
+     드러낸다. 단, "호버로만 드러내면 마우스 없는 사용자는 그 존재 자체를 모른다"는 접근성 경고가 함께
+     따른다 — 그래서 :hover뿐 아니라 :focus-visible(Tab 이동)에도 똑같이 드러나게 했다(아래 CSS).
+  4) 업계 실사례 — ChatGPT의 👎 피드백 흐름은 "짧은 분류 칩 몇 개 + 선택적 자유 입력 한 칸"과 동일한
+     골격이다(오답·무관·불완전 등 클릭 후 짧은 상세 입력). 이 시안의 "3종 분류 + 자유 입력 2칸" 구조가
+     혼자만의 발명이 아니라 업계에서 검증된 모양임을 보여준다.
+
+  [기존 코드에서 그대로 가져온 것 — 새로 지어내지 않음]
+  · 답변 행 마크업(.cs-row.reply/.ci/.cb/.cn/.cm, 클램프+"더보기")은 console.js 원문 그대로 복사했다.
+  · 호버로 드러나는 방식은 app.html의 탭 닫기(✕) 버튼(.tab .x{opacity:0}→hover{opacity:.75})과 같은
+    메커니즘이다 — 이 제품에 이미 있는 패턴이라 사용자가 다시 배울 필요가 없다.
+  · 뜨는 방식(앵커형 팝오버, 바깥 클릭·Esc로 닫힘)은 app.html의 "열린 창 목록"(.winpop) 그대로다.
+    그림자값(0 12px 34px rgba(0,0,0,.5))까지 그 컴포넌트에서 그대로 가져왔다.
+  · 칩·배지 색은 gijo-ui.css의 .g-chip/.g-badge 톤(빨강=위험·주황=경고·파랑=중간)을 재사용했다 —
+    "틀린 답"은 사실 오류(빨강), "못 찾음"은 누락 경고(주황), "말투"는 경미(파랑)로 자연스럽게 대응된다.
+
+  [핵심 설계 결정 — 왜 이렇게 배치했나]
+  · 진입점은 인라인 추가 텍스트가 아니라 답변 아래 "footer 줄" 하나로 분리했다 — 긴 답변의 "더보기"
+    토글과 같은 줄에 있으면 좁은 폭에서 서로 겹친다. footer를 따로 두면 답변이 몇 줄이든(요구 6) 항상
+    맨 아래에 얌전히 붙는다.
+  · 패널은 인라인 삽입이 아니라 뷰포트 기준 뜬 카드(position:fixed)로 만들었다 — 이유는 아래 [실측
+    발견]과 같다: 도킹 콘솔은 대화 표시 영역이 실측 90px 남짓이라, 카드를 그 안에 밀어 넣으면
+    스크롤 컨테이너에 잘려 아래가 안 보인다. 뜬 카드는 대화 목록의 순서·높이를 전혀 밀지 않으므로
+    "대화 흐름을 가리지 않아야 한다"는 요구 1을 가장 직접적으로 만족한다(다른 말풍선이 밀리지 않음).
+  · 모달 배경 어둡게 깔기(.g-modal-bg류)는 쓰지 않았다 — 배경을 어둡게 깔면 그 자체가 "대화를 가리는"
+    행위다. .winpop처럼 배경 없이 카드만 뜨고, 바깥을 클릭하면 그대로 대화가 이어진다.
+  · 질문·답변을 다시 타이핑하게 하지 않았다 — 이미 화면에 보이는 그 텍스트(요청 API의 question/answer)를
+    그대로 쓴다. 패널 맨 위에 답변을 짧게 인용해 "지금 어느 답에 대한 지적인지"만 확인시킨다. 사람이
+    적는 건 분류(필수)와 note/expected(선택) 뿐이라 입력 부담이 가장 적다.
+  · 3종 분류는 라디오처럼 하나만 고를 수 있다(서버 kind가 단일 값) — 고르기 전엔 전송 비활성.
+  · 닫는 길을 넷으로 뒀다(✕ 아이콘·취소 버튼·Esc·바깥 클릭) — 요구 5 "실수로 열었을 때 빠져나오기
+    쉬워야" 를 문자 그대로 satisfy. 취소에 "정말 나가시겠습니까" 확인창을 넣지 않았다 — 입력이 짧아
+    잃을 게 적고, 요구사항이 이미 "쉬워야 한다"고 명시했다(확인창은 그 반대 방향이다).
+  · 제출 후 문구는 과제가 준 문장을 토씨 하나 안 바꾸고 그대로 썼다("접수했습니다. 사람이 검토 후
+    검사 문항으로 씁니다(자동 반영 아님)."). 닫으면 같은 자리가 색깔 있는 작은 배지("🚩 지적함 · OO")로
+    바뀌어 늘 보인다 — "내가 이미 지적했다"를 다시 열지 않아도 알 수 있어야 중복 지적을 덜 만든다.
+  · 이 패널엔 별도 ⓘ 설명 아이콘을 달지 않았다. 2026-07-27부로 화면별 ⓘ은 걷어내고 콘솔 대화로
+    설명을 일원화하기로 했는데, 이 패널은 이미 그 콘솔 "안"에 떠 있다 — 궁금하면 바로 아래 입력창에
+    물어보면 된다. 같은 화면에 설명 창구를 두 번 만들 이유가 없다.
+
+  [실측 발견 — 구현 시 반드시 참고]
+  ⚠ 도킹 콘솔은 .cs-body{overflow-y:auto}가 스크롤을 자르는 컨테이너이고, 전체 높이가 190px 고정이다
+    (app.html 주석 실측: 맥락줄 34 + 대화 4줄 88 + 입력 52 + 여백 16 ≒ 190, 끄는 손잡이 없음 — 즉
+    대화가 실제로 보이는 영역은 90px이 채 안 된다). 지적 카드(약 220px)를 행의 자식으로 absolute
+    배치하면 도킹 모드에서 카드 아랫부분이 그대로 잘려 버튼이 안 보이는 결과가 난다(이 목업에서 재현·
+    확인함). 그래서 카드는 행의 자식이 아니라 **document.body에 위치:fixed로 올리고, 트리거 버튼의
+    화면 좌표로 위치를 계산**한다 — 아래 공간이 부족하면 자동으로 위로 뒤집는다(JS positionPanel()).
+    아래 "① 도킹 모드" 데모에서 아무 "이 답 이상해요"나 눌러 실제로 확인할 수 있다.
+
+  [정직한 구현 고지 — 이 파일에서 실제로 동작하는 것과 안 하는 것]
+  · 실제로 동작함: 호버/포커스로 드러나는 트리거, 카드 열기/닫기(✕·취소·Esc·바깥클릭), 분류 칩 선택,
+    긴 답변 "더보기/접기", 카드의 화면 기준 자동 위/아래 뒤집기, 좁은 폭 리사이즈.
+  · 실제로 안 함(연출): "전송"은 POST /api/answer-feedback을 부르지 않는다 — 0.5초 지연 후 접수 문구를
+    보여주는 타이밍 연출이다(서버·CDP 어디에도 연결하지 않았다). 좌측 메뉴·탭줄은 배치 맥락 재현용
+    정적 스냅샷이라 클릭해도 반응하지 않는다(nav.js를 불러오지 않는다).
+  · 자체완결 — 외부 CDN·폰트·이미지 없음. 실제 제품은 gijo-ui.css가 Pretendard(woff2)를 번들로 주입
+    하지만, 이 파일은 그 폰트 파일을 동봉하지 않으므로 시스템 폴백(맑은 고딕/Segoe UI)으로 보인다.
+  ================================================================================================
+-->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>시안 — 대화 콘솔 "이 답 이상해요" 지적 버튼</title>
+<style>
+/* ── 토큰: console.html/app.html :root를 그대로 복사(추측 금지 — 실제 파일에서 가져옴) ───────── */
+:root{
+  --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;
+  --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--teal:#1eb980;--red:#e2483d;--amber:#f0a020;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:#05070d;color:var(--text);padding:28px;font-size:13px;}
+button,textarea{font-family:inherit;border:none;background:none;color:inherit;}
+/* 포커스 링 — gijo-ui.css의 :focus-visible 규칙 그대로(마우스 클릭엔 안 뜨고 Tab 이동에만 뜬다) */
+:focus-visible{outline:2px solid var(--blue-light);outline-offset:1px;}
+h1{font-size:19px;color:#fff;margin-bottom:5px;}
+.lead{color:var(--muted);font-size:12.5px;line-height:1.65;max-width:1000px;margin-bottom:18px;}
+
+/* ── 시안 검토용 리본 — 실제 화면에는 없다. 제품 팔레트와 다른 자홍색이라 절대 안 헷갈린다 ── */
+.mockctl{background:repeating-linear-gradient(135deg,#2a0e2e,#2a0e2e 10px,#38123f 10px,#38123f 20px);
+  border:2px dashed #d946ef;border-radius:10px;padding:10px 16px;margin-bottom:22px;max-width:1100px;
+  font-size:11.5px;color:#f3d9ff;line-height:1.75;}
+.mockctl b{color:#f0abfc;}
+
+/* ── 설계 근거 요약(화면에서 바로 읽는 문서) ── */
+.rationale{border:1px dashed var(--border-strong);border-radius:12px;background:var(--panel-2);
+  padding:16px 18px;margin-bottom:26px;max-width:1000px;}
+.rationale h2{font-size:13px;color:#fff;margin-bottom:9px;}
+.rationale ol{padding-left:19px;color:var(--muted);font-size:12px;line-height:1.8;}
+.rationale li{margin-bottom:2px;}
+.rationale b{color:var(--blue-light);}
+.rationale .src{margin-top:10px;font-size:10.5px;color:var(--muted-2);line-height:1.7;}
+
+/* ── 구역 구분선 ── */
+.divider{max-width:1100px;margin:34px 0 16px;text-align:center;position:relative;color:var(--blue-light);
+  font-size:11px;font-weight:800;letter-spacing:.3px;}
+.divider::before,.divider::after{content:"";position:absolute;top:50%;width:26%;border-top:1px dashed var(--border-strong);}
+.divider::before{left:0;} .divider::after{right:0;}
+.frame-cap{font-size:11px;color:var(--muted-2);margin:0 0 8px;max-width:1100px;line-height:1.6;}
+
+/* ── 실측 발견 콜아웃 ── */
+.callout{max-width:1100px;background:rgba(240,160,32,.07);border:1px solid rgba(240,160,32,.35);
+  border-left:3px solid var(--amber);border-radius:10px;padding:11px 15px;font-size:11.5px;color:var(--muted);
+  line-height:1.75;margin:14px 0 22px;}
+.callout b{color:#fff;}
+
+/* ── 셸 프레임(배치 맥락 — 정적 스냅샷, 실제 스크립트 없음) ── */
+.frame{max-width:1100px;border:1px solid var(--border);border-radius:12px;overflow:hidden;
+  background:var(--bg);box-shadow:0 8px 30px rgba(0,0,0,.35);margin-bottom:6px;}
+.dock-shell{display:grid;grid-template-columns:232px minmax(0,1fr);height:560px;}
+#mockNav{border-right:1px solid var(--border);background:var(--panel-2);overflow:auto;padding:14px 10px;min-height:0;}
+.mockwork{display:flex;flex-direction:column;min-width:0;min-height:0;}
+
+/* 사이드바(nav.js 스냅샷 — 클릭 비활성, 배치 맥락용) */
+.gn-find{position:relative;margin:2px 4px 10px;}
+.gn-find input{width:100%;background:#0a1120;border:1px solid var(--border-strong);border-radius:9px;
+  height:30px;padding:0 10px 0 26px;color:var(--muted-2);font-size:11.5px;}
+.gn-find .ic{position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--muted-2);}
+.gn-top-fixed{padding-bottom:7px;margin-bottom:7px;border-bottom:1px solid rgba(255,255,255,.07);}
+.gn-item{display:flex;align-items:center;gap:7px;padding:8px 11px;border-radius:8px;font-size:13px;
+  font-weight:600;color:var(--muted);margin-bottom:1px;cursor:default;}
+.gn-item.active{color:#fff;background:rgba(59,130,246,.14);box-shadow:inset 3px 0 0 var(--blue);}
+.gn-item.gn-home{color:#cfe0ff;border:1px solid rgba(59,130,246,.42);background:rgba(59,130,246,.07);margin-bottom:5px;}
+.gn-g{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:800;color:var(--muted);padding:9px 11px 6px;cursor:default;}
+.gn-g .car{font-size:9px;margin-left:auto;}
+
+/* 탭줄(app.html 스냅샷 — 클릭 비활성) */
+.tabbar{flex:0 0 auto;display:flex;align-items:stretch;gap:2px;padding:7px 10px 0;
+  border-bottom:1px solid var(--border);background:var(--panel-2);}
+.tab{display:flex;align-items:center;gap:7px;padding:8px 10px 8px 12px;border-radius:9px 9px 0 0;
+  font-size:12.5px;font-weight:600;color:var(--muted);cursor:default;white-space:nowrap;
+  border:1px solid transparent;border-bottom:none;}
+.tab.on{color:#fff;background:var(--bg);border-color:var(--border);font-weight:700;}
+.tabbar .spacer{flex:1 1 auto;}
+.tb-act{flex:0 0 auto;display:flex;align-items:center;gap:4px;padding-bottom:6px;}
+.tb-btn{font-size:11px;font-weight:700;color:var(--muted);border:1px solid var(--border);border-radius:7px;
+  padding:4px 9px;cursor:default;white-space:nowrap;}
+
+/* 화면 자리(placeholder — 이 시안의 대상 아님) */
+.screens-ph{flex:1 1 auto;min-height:0;background:var(--bg);display:flex;align-items:center;
+  justify-content:center;color:var(--muted-2);font-size:12px;text-align:center;padding:20px;}
+
+/* ══ 콘솔(console.js injectCss()의 실제 값 그대로 복사) ══════════════════════════════════════ */
+.console-demo{flex:0 0 auto;height:190px;min-height:190px;display:flex;flex-direction:column;
+  background:var(--panel-2);border-top:1px solid var(--border);}
+.console-demo.tall{height:420px;min-height:420px;border-top:none;border:1px solid var(--border);border-radius:12px;}
+.cs-head{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:7px 14px;font-size:11px;
+  color:var(--muted);border-bottom:1px solid rgba(255,255,255,.05);}
+.cs-ctx{background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);color:var(--blue-light);
+  border-radius:14px;padding:2px 10px;font-weight:800;white-space:nowrap;}
+.cs-hint{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}
+.cs-body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:8px 14px;}
+.cs-row{display:flex;gap:9px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.03);}
+.cs-row:hover{background:rgba(255,255,255,.02);} /* 신규 — 행이 호버 가능함을 알리는 최소 신호 */
+.cs-row .ci{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:rgba(59,130,246,.16);
+  display:flex;align-items:center;justify-content:center;font-size:11px;}
+.cs-row.instr .ci{background:rgba(30,185,128,.16);}
+.cs-row .cb{flex:1;min-width:0;}
+.cs-row .cn{font-size:10.5px;font-weight:800;color:var(--muted);margin-bottom:2px;}
+.cs-row .cn .ct{font-weight:500;color:var(--muted-2);margin-left:6px;}
+.cs-row .cm{font-size:12.5px;color:var(--text);white-space:pre-wrap;word-break:break-word;line-height:1.62;}
+.cs-row .cm.clamp{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer;}
+.cs-row .cl-more{font-size:10.5px;font-weight:700;color:var(--blue-light);cursor:pointer;}
+.cs-dock{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:9px 14px 12px;}
+.cs-dock input{flex:1;background:var(--panel);border:1px solid var(--border-strong);border-radius:11px;
+  color:var(--text);font-size:13px;padding:11px 14px;outline:none;}
+.cs-plus{flex:0 0 auto;width:38px;height:38px;border-radius:11px;background:var(--panel);color:var(--muted);
+  border:1px solid var(--border-strong);font-size:17px;line-height:1;cursor:default;display:flex;align-items:center;justify-content:center;}
+.cs-send{background:var(--blue);color:#fff;border-radius:11px;font-size:12.5px;font-weight:800;padding:11px 18px;cursor:default;}
+
+/* ══ 신규 — "이 답 이상해요" (af- 접두사로 분리, 기존 cs-*와 안 섞임) ═══════════════════════════ */
+
+/* footer 줄 — .cm(과 있으면 .cl-more) 다음에 오는 별도 줄이라 "더보기"와 절대 안 겹친다(요구 6) */
+.af-foot{margin-top:4px;display:flex;}
+
+/* 진입점 — 평소엔 투명. 호버(마우스)뿐 아니라 :focus-visible(Tab 키보드)에도 드러난다 — 근거 3 */
+.af-trigger{opacity:0;transition:opacity .12s;display:inline-flex;align-items:center;gap:5px;
+  font-size:11px;font-weight:700;color:var(--muted);border:1px solid var(--border-strong);
+  border-radius:20px;padding:4px 11px;cursor:pointer;min-height:24px;} /* 24px = WCAG 2.5.8 최소 목표 크기 — 근거 2 */
+.cs-row:hover .af-trigger,.af-trigger:focus-visible{opacity:1;}
+.af-trigger:hover{color:#fff;border-color:var(--blue);} /* app.html .cs-btn:hover와 동일 톤 재사용 */
+
+/* 이미 지적한 답 — 항상 보이는 색 배지(호버 불필요, "내가 이미 눌렀다"는 상태 정보이기 때문) */
+.af-flagged{opacity:1;display:inline-flex;align-items:center;gap:5px;font-size:10.5px;font-weight:800;
+  padding:3px 10px;border-radius:20px;cursor:pointer;border:1px solid;min-height:24px;}
+.af-flagged.k-wrong{background:rgba(226,72,61,.14);border-color:rgba(226,72,61,.4);color:#f5928a;}
+.af-flagged.k-missing{background:rgba(240,160,32,.14);border-color:rgba(240,160,32,.4);color:var(--amber);}
+.af-flagged.k-style{background:rgba(59,130,246,.14);border-color:rgba(59,130,246,.4);color:var(--blue-light);}
+
+/* 뜨는 카드 — position:fixed로 body 최상위에 붙는다(도킹 190px의 overflow 클리핑을 피하려고, 실측 발견 참고) */
+.af-panel{position:fixed;z-index:2000;width:min(340px,92vw);background:var(--panel);
+  border:1px solid var(--border-strong);border-radius:12px;box-shadow:0 12px 34px rgba(0,0,0,.5); /* .winpop과 동일 그림자값 재사용 */
+  padding:12px 14px;font-size:12px;}
+.af-quote{display:flex;align-items:flex-start;gap:8px;margin-bottom:10px;}
+.af-quote span{flex:1;min-width:0;font-style:italic;color:var(--muted);font-size:11px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.af-x{flex:0 0 auto;width:22px;height:22px;border-radius:6px;display:flex;align-items:center;
+  justify-content:center;color:var(--muted-2);cursor:pointer;font-size:12px;}
+.af-x:hover{color:#fff;background:rgba(255,255,255,.08);}
+.af-chips{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:7px;}
+.af-chip{display:inline-flex;align-items:center;gap:5px;height:27px;padding:0 11px;border-radius:20px;
+  font-size:11.5px;font-weight:700;cursor:pointer;border:1px solid var(--border-strong);
+  background:var(--panel-2);color:var(--muted);} /* gijo-ui.css .g-chip 톤 재사용(색만 종류별로 나눔) */
+.af-chip.k-wrong{border-color:rgba(226,72,61,.35);background:rgba(226,72,61,.08);color:#f5928a;}
+.af-chip.k-missing{border-color:rgba(240,160,32,.35);background:rgba(240,160,32,.08);color:var(--amber);}
+.af-chip.k-style{border-color:rgba(59,130,246,.35);background:rgba(59,130,246,.08);color:var(--blue-light);}
+.af-chip.sel{box-shadow:0 0 0 1px currentColor inset;font-weight:800;}
+.af-chip.k-wrong.sel{background:rgba(226,72,61,.22);}
+.af-chip.k-missing.sel{background:rgba(240,160,32,.22);}
+.af-chip.k-style.sel{background:rgba(59,130,246,.22);}
+.af-hint{font-size:10.5px;color:var(--muted-2);margin-bottom:10px;line-height:1.6;}
+.af-input{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:9px;
+  color:var(--text);font-size:12px;padding:7px 9px;outline:none;resize:vertical;margin-bottom:4px;}
+.af-input:focus{border-color:var(--blue);}
+.af-fcap{font-size:10px;color:var(--muted-2);margin-bottom:10px;line-height:1.6;} /* 요구 3의 "짧은 안내" 그 자리 */
+.af-actions{display:flex;justify-content:flex-end;gap:7px;margin-top:2px;flex-wrap:wrap;}
+.af-btn{font-size:11.5px;font-weight:700;border-radius:9px;padding:7px 13px;cursor:pointer;
+  border:1px solid var(--border-strong);color:var(--muted);}
+.af-btn:hover{color:#fff;border-color:var(--blue);}
+.af-btn.primary{background:var(--blue);border-color:var(--blue);color:#fff;}
+.af-btn.primary:hover{background:#2f6fd0;}
+.af-btn.primary:disabled{opacity:.45;cursor:default;background:var(--blue);color:#fff;}
+.af-btn.primary:hover:disabled{background:var(--blue);}
+.af-done-line{color:#bff3de;font-size:12px;line-height:1.65;margin-bottom:11px;}
+
+/* 좁은 폭 데모 — 직접 드래그로 줄여볼 수 있게 실제로 resize:horizontal을 걸었다 */
+.narrow-wrap{resize:horizontal;overflow:auto;width:320px;min-width:230px;max-width:900px;
+  border:1px solid var(--border-strong);border-radius:12px;}
+.narrow-cap{font-size:10.5px;color:var(--muted-2);margin-top:8px;max-width:1100px;line-height:1.6;}
+
+/* 요구사항 대조표 */
+.reqtable{max-width:1100px;width:100%;border-collapse:collapse;font-size:12px;margin:8px 0 30px;}
+.reqtable th{text-align:left;color:var(--muted-2);font-size:10.5px;font-weight:700;padding:8px 10px;border-bottom:1px solid var(--border);}
+.reqtable td{padding:9px 10px;border-bottom:1px solid var(--border);color:var(--muted);vertical-align:top;line-height:1.55;}
+.reqtable td:first-child{color:#fff;font-weight:800;width:26px;}
+
+.foot{max-width:1100px;margin-top:6px;padding-top:16px;border-top:1px solid var(--border);
+  font-size:11px;color:var(--muted-2);line-height:1.85;}
+
+@media (max-width:760px){
+  .dock-shell{grid-template-columns:1fr;height:auto;}
+  #mockNav{display:none;} /* 좁은 화면에서는 배치 맥락 대신 콘솔 자체에 집중 */
+}
+</style>
+</head>
+<body>
+
+<div class="mockctl">
+  🔧 <b>시안 검토 문서</b>(실제 화면 아님, 자홍색이라 제품 화면과 안 헷갈립니다) — 순서: ① 설계 근거 요약
+  → ② 도킹 모드(190px, 가장 좁은 실제 조건) → ③ 별도 창 모드(전체 높이) → ④ 좁은 폭(직접 드래그로 줄여
+  보세요) → ⑤ 요구사항 대조표. <b>"이 답 이상해요"는 실제로 눌러볼 수 있습니다</b>(전송만 서버로 안 나감).
+</div>
+
+<h1>대화 콘솔 — "이 답 이상해요" 지적 버튼</h1>
+<p class="lead">
+  담당자가 챗봇 답변이 틀렸거나·못 찾았거나·말투가 어색할 때 한 번에 지적하는 버튼입니다.
+  서버(<code>POST /api/answer-feedback</code>)는 이미 구현·배포되어 있고, 이 시안은 그 접수 통로의
+  화면만 그립니다. 지적은 자동으로 검사 문항이 되지 않습니다 — 사람이 검토 후 편입합니다.
+</p>
+
+<div class="rationale">
+  <h2>① 이 시안을 만든 이유(요약) — 자세한 출처·수치는 이 파일 맨 위 주석에 있습니다</h2>
+  <ol>
+    <li>진입점은 평소엔 투명하고, 행에 마우스를 올리거나 <b>Tab으로 초점이 가면</b> 나타납니다 — 이미
+      제품에 있는 탭 닫기(✕) 버튼과 같은 방식이라 새로 배울 게 없습니다.</li>
+    <li>지적 입력은 새 창(모달)이 아니라 그 답변 옆에 살짝 뜨는 <b>작은 카드</b>입니다 — 나머지 대화는
+      그대로 보이고 흐려지지 않습니다. 카드가 떠도 다른 말풍선은 한 줄도 밀리지 않습니다.</li>
+    <li>3가지 분류는 <b>색으로도</b> 구분됩니다(빨강=틀린 답 · 주황=못 찾음 · 파랑=말투). 제출 후에는
+      같은 색의 작은 배지로 남아 "이미 지적했다"를 다시 열지 않아도 알 수 있습니다.</li>
+    <li>도킹 모드(앱 아래 붙은 콘솔)는 대화가 실제로 보이는 영역이 실측 <b>90px 남짓</b>뿐입니다(코드
+      주석 실측치). 그래서 카드를 그 좁은 영역 안에 끼워 넣지 않고 화면 기준으로 띄워, 아래 공간이
+      부족하면 자동으로 위로 뒤집습니다.</li>
+    <li>질문·답변은 이미 화면에 보이는 그 텍스트를 그대로 씁니다 — 다시 타이핑하지 않습니다. 사람이
+      적는 건 "무엇이 틀렸는지"·"정답(아는 경우)"뿐이라 부담이 가장 적습니다.</li>
+    <li>나가는 길이 넷입니다(✕ · 취소 · Esc · 바깥 클릭) — 실수로 열었을 때 어느 쪽으로든 바로 빠져나올
+      수 있습니다.</li>
+  </ol>
+  <div class="src">근거: Microsoft "Guidelines for Human-AI Interaction"(G8·G9·G15·G16) · WCAG 2.2 SC 2.5.8
+    Target Size(24×24px) · Progressive Disclosure + 접근성 보완(호버만이 아니라 포커스도) · ChatGPT류
+    "분류 칩+자유입력" 실사례. 상세 인용은 파일 맨 위 HTML 주석 참고.</div>
+</div>
+
+<div class="divider">② 도킹 모드 재현 — app.html 셸, 콘솔 높이 고정 190px(가장 좁은 실제 조건)</div>
+<p class="frame-cap">왼쪽 메뉴·탭줄은 배치 맥락 재현용 정적 스냅샷입니다(클릭 비활성, nav.js 미로딩).
+  아래 콘솔만 실제로 동작합니다 — "이 답 이상해요"를 눌러 보세요.</p>
+
+<div class="frame">
+  <div class="dock-shell">
+    <div id="mockNav">
+      <div class="gn-find"><span class="ic">🔍</span><input type="text" placeholder="화면 찾기 (Ctrl+K)" disabled></div>
+      <div class="gn-top-fixed">
+        <div class="gn-item gn-home">대시보드</div>
+        <div class="gn-item">🏢 팀 사무실 (창)</div>
+        <div class="gn-item">💬 작업 내역</div>
+      </div>
+      <div class="gn-g">🖥 관제 <span class="car">▸</span></div>
+      <div class="gn-g">🛡 자산·조치 <span class="car">▸</span></div>
+      <div class="gn-g">🤖 AI <span class="car">▸</span></div>
+      <div class="gn-g">⚙ 설정 <span class="car">▸</span></div>
+    </div>
+    <div class="mockwork">
+      <div class="tabbar">
+        <div class="tab on">대시보드</div>
+        <div class="spacer"></div>
+        <div class="tb-act">
+          <span class="tb-btn">⧉ 창으로</span><span class="tb-btn">모두 닫기</span><span class="tb-btn">🗔 창</span>
+        </div>
+      </div>
+      <div class="screens-ph">🖥 지금 보는 화면(예: 대시보드) — 이 시안은 아래 콘솔 부분만 다룹니다</div>
+      <div class="console-demo" id="dockConsole"></div>
+    </div>
+  </div>
+</div>
+
+<div class="callout">
+  ⚠ <b>구현 시 참고(이 목업에서 실측·해결)</b> — 도킹 콘솔의 대화 영역은 <code>.cs-body{overflow-y:auto}</code>로
+  잘리는 스크롤 컨테이너이고 전체 높이가 190px 고정입니다(맥락줄 34 + 대화 4줄 88 + 입력 52 + 여백 16).
+  지적 카드(약 220px)를 행의 자식으로 넣으면 도킹 모드에서 아래가 잘립니다. 그래서 카드는
+  <b>document.body에 position:fixed로 얹고</b>, 트리거 버튼의 화면 좌표로 위치를 계산합니다(아래 공간이
+  부족하면 위로 뒤집힘) — 위 데모에서 실제로 이렇게 동작합니다.
+</div>
+
+<div class="divider">③ 별도 창 모드 — console.html(전체 높이, 여유로움)</div>
+<p class="frame-cap">모니터가 여럿일 때 콘솔만 빼내는 창입니다(같은 console.js). 공간이 넉넉해 도킹
+  모드보다 쉬운 조건이지만, 같은 컴포넌트가 그대로 작동함을 보여줍니다.</p>
+<div class="frame" style="padding:0;">
+  <div class="console-demo tall" id="windowConsole"></div>
+</div>
+
+<div class="divider">④ 좁은 폭에서도 자연스럽게</div>
+<p class="frame-cap">아래 박스 오른쪽 아래 모서리를 드래그해 직접 좁혀 보세요. (카드 자체는 화면 기준
+  고정 폭이라 이 박스를 좁혀도 카드 폭은 안 바뀝니다 — 좁아지는 건 대화 행·트리거 쪽입니다.)</p>
+<div class="narrow-wrap">
+  <div class="console-demo tall" id="narrowConsole" style="height:300px;min-height:300px;border-radius:12px;"></div>
+</div>
+<p class="narrow-cap">위 박스를 320px 근처로 좁혀도 "⚑ 이 답 이상해요" 라벨이 줄바꿈될 뿐 잘리거나
+  겹치지 않습니다 — footer가 메시지와 별도 줄이기 때문입니다.</p>
+
+<div class="divider">⑤ 요구사항 대조표</div>
+<table class="reqtable">
+  <thead><tr><th>#</th><th>요구사항</th><th>이 시안의 처리</th></tr></thead>
+  <tbody>
+    <tr><td>1</td><td>답변에 붙는 진입점 · 평소 안 거슬림 · 호버 시 드러남 · 대화 안 가림</td>
+      <td>행 호버·포커스 시에만 나타나는 유령 버튼(⚑). 카드는 뷰포트 기준 플로팅이라 다른 말풍선을 밀지 않음.</td></tr>
+    <tr><td>2</td><td>3종 선택 · 짧은 한글 라벨 · 한눈에</td>
+      <td>❌ 틀린 답 / 🔍 못 찾음 / 💬 말투 — 색으로도 구분(빨강·주황·파랑), 캡션 한 줄로 뜻 보완.</td></tr>
+    <tr><td>3</td><td>자유 입력 2칸(무엇이 틀렸나·정답) + 정답 칸 짧은 안내</td>
+      <td>note/expected 텍스트 영역, "적어 주시면 앞으로 이 질문을 검사 문항으로 씁니다" 캡션 상시 표시.</td></tr>
+    <tr><td>4</td><td>보낸 뒤 피드백 문구</td>
+      <td>"접수했습니다. 사람이 검토 후 검사 문항으로 씁니다(자동 반영 아님)." 문구 그대로 표시.</td></tr>
+    <tr><td>5</td><td>취소·닫기 명확 · 실수로 열었을 때 빠져나오기 쉬움</td>
+      <td>✕ 아이콘 · 취소 버튼 · Esc 키 · 바깥 클릭 — 4중 종료 경로, 확인창 없이 즉시 닫힘.</td></tr>
+    <tr><td>6</td><td>답변이 길 때/짧을 때 모두 자연스러움</td>
+      <td>짧은 답변·클램프(더보기)된 긴 답변 모두 시연 — 트리거는 별도 footer 줄이라 "더보기"와 안 겹침.</td></tr>
+  </tbody>
+</table>
+
+<div class="foot">
+  이 파일은 시안입니다. "전송"을 눌러도 실제 서버(<code>POST /api/answer-feedback</code>)를 부르지
+  않습니다 — 접수 문구가 뜨는 타이밍만 흉내냅니다(0.5초 지연은 연출용). 왼쪽 메뉴·탭줄은 배치 맥락
+  재현용 정적 스냅샷이며 클릭해도 반응하지 않습니다. 서버(localhost:4000)·CDP 어디에도 연결하지
+  않았습니다.<br>
+  대상 코드: <code>client/src/renderer/pages/console.js</code>(행 마크업·도킹 CSS) ·
+  <code>client/src/renderer/pages/app.html</code>(셸 그리드·콘솔 190px 고정·winpop 팝오버 패턴) ·
+  <code>client/src/renderer/pages/nav.js</code>(사이드바 스냅샷) ·
+  <code>client/src/renderer/pages/gijo-ui.css</code>(.g-chip/.g-badge 톤, 인라인 복사) ·
+  <code>server/src/engine/answerfeedback.ts</code>(API 계약).
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ── 예시 행 데이터 — question/answer는 실제로는 화면에 이미 보이는 텍스트를 그대로 읽는다.
+  //    이 목업은 시연 편의상 data-af-q/-a 속성에 복제했다(실제 구현에서는 별도 속성 없이 .cm을 읽으면 됨).
+  var ROWS_DOCK = [
+    { kind: "instr", name: "나 → AI 팀", time: "09:11:40", msg: "지난주 발견된 Apache 취약점, 우리 웹서버는 안전해?" },
+    { kind: "reply", id: "r2", name: "AI 팀", time: "09:12:04",
+      msg: "web-01·web-02 모두 지난달에 패치가 적용되어 안전한 상태로 확인됩니다.",
+      flaggedSeed: "wrong" }, // 이미 지적된 예시 — 배경의 2026-07-21 사고 유형(패치 오답)을 일부러 재현
+    { kind: "instr", name: "나 → AI 팀", time: "09:14:02", msg: "그럼 전체 패치 현황 요약해줘" },
+    { kind: "reply", id: "r4", name: "AI 팀", time: "09:14:31", long: true,
+      msg: "최근 30일 기준 전체 자산 42대 중 취약점이 발견된 자산은 18대이며, 이 중 조치가 완료된 자산은 " +
+        "13대(72%)입니다. 남은 5대 중 2대는 승인 대기, 2대는 조치 담당자 미배정, 1대는 재부팅 일정 " +
+        "조율 중입니다. 심각도 '치명적'인 항목은 모두 조치 완료 상태이며, '높음' 항목 3건이 이번 주 " +
+        "마감(SLA) 예정입니다." }
+  ];
+  var ROWS_WINDOW = [
+    { kind: "instr", name: "나 → AI 팀", time: "10:02:11", msg: "우리 방화벽 인바운드 규칙 몇 개나 열려있어?" },
+    { kind: "reply", id: "r6", name: "AI 팀", time: "10:02:29",
+      msg: "현재 인바운드 허용 규칙은 14개이며, 그중 3개는 전체 대역(0.0.0.0/0) 허용입니다." }
+  ];
+  var ROWS_NARROW = [
+    { kind: "instr", name: "나 → AI 팀", time: "08:40:05", msg: "오늘 할 일 뭐 있어?" },
+    { kind: "reply", id: "r8", name: "AI 팀", time: "08:40:12",
+      msg: "오늘 마감인 조치 3건이 있습니다 — 취약점 화면에서 확인하세요." }
+  ];
+
+  var KIND_LABEL = { wrong: "틀린 답", missing: "못 찾음", style: "말투" };
+  var FLAGGED = {}; // rowId -> kind (제출 완료된 것들 — 위 flaggedSeed로 하나 미리 채움)
+
+  function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); }
+  function truncate(s, n) { s = s || ""; return s.length > n ? s.slice(0, n) + "…" : s; }
+
+  function rowHtml(r) {
+    if (r.kind === "instr") {
+      return '<div class="cs-row instr"><div class="ci">나</div><div class="cb">' +
+        '<div class="cn">' + esc(r.name) + '<span class="ct">' + r.time + '</span></div>' +
+        '<div class="cm">' + esc(r.msg) + '</div></div></div>';
+    }
+    var clamp = r.long ? " clamp" : "";
+    var more = r.long ? '<span class="cl-more">더보기 ▾</span>' : "";
+    return '<div class="cs-row reply" data-af-id="' + r.id + '" data-af-a="' + esc(r.msg) + '">' +
+      '<div class="ci">🧭</div><div class="cb">' +
+      '<div class="cn">' + esc(r.name) + '<span class="ct">' + r.time + '</span></div>' +
+      '<div class="cm' + clamp + '">' + esc(r.msg) + '</div>' + more +
+      '<div class="af-foot" data-af-foot></div></div></div>';
+  }
+
+  function mount(hostId, rows) {
+    var host = document.getElementById(hostId);
+    host.innerHTML =
+      '<div class="cs-head"><span class="cs-ctx">대시보드</span><span class="cs-hint">보고 있는 화면 기준으로 지시합니다</span></div>' +
+      '<div class="cs-body">' + rows.map(rowHtml).join("") + '</div>' +
+      '<div class="cs-dock"><div class="cs-plus">＋</div><input placeholder="지시를 입력하세요…" disabled><div class="cs-send">전송</div></div>';
+    rows.forEach(function (r) { if (r.id && r.flaggedSeed) FLAGGED[r.id] = r.flaggedSeed; });
+  }
+
+  mount("dockConsole", ROWS_DOCK);
+  mount("windowConsole", ROWS_WINDOW);
+  mount("narrowConsole", ROWS_NARROW);
+
+  // ── 긴 답변 더보기/접기 — console.js의 실제 clamp 토글 그대로 재현 ──
+  document.querySelectorAll(".cm.clamp").forEach(function (cm) {
+    var more = cm.parentNode.querySelector(".cl-more");
+    if (!more) return;
+    function toggle() { more.textContent = cm.classList.toggle("clamp") ? "더보기 ▾" : "접기 ▴"; }
+    cm.addEventListener("click", toggle);
+    more.addEventListener("click", toggle);
+  });
+
+  // ── foot 렌더 — 지적 안 한 행은 유령 트리거, 지적한 행은 항상 보이는 색 배지 ──
+  function renderFoot(row) {
+    var id = row.getAttribute("data-af-id");
+    var foot = row.querySelector("[data-af-foot]");
+    if (!foot) return;
+    var k = FLAGGED[id];
+    if (k) {
+      foot.innerHTML = '<button type="button" class="af-flagged k-' + k + '" data-af-reopen="' + id + '">🚩 지적함 · ' + KIND_LABEL[k] + '</button>';
+    } else {
+      foot.innerHTML = '<button type="button" class="af-trigger" data-af-open="' + id + '">⚑ 이 답 이상해요</button>';
+    }
+  }
+  document.querySelectorAll("[data-af-id]").forEach(renderFoot);
+
+  // ── 패널 열기/닫기/제출 — 한 번에 하나만 열린다. body 최상위에 fixed로 얹는다(실측 발견 참고) ──
+  var openState = null; // { id, panelEl, kind }
+
+  function panelHtml(a) {
+    return (
+      '<div class="af-quote"><span title="' + esc(a) + '">"' + esc(truncate(a, 46)) + '" 답변에 대해</span>' +
+        '<span class="af-x" data-af-cancel title="닫기">✕</span></div>' +
+      '<div class="af-chips">' +
+        '<button type="button" class="af-chip k-wrong" data-kind="wrong">❌ 틀린 답</button>' +
+        '<button type="button" class="af-chip k-missing" data-kind="missing">🔍 못 찾음</button>' +
+        '<button type="button" class="af-chip k-style" data-kind="style">💬 말투</button>' +
+      '</div>' +
+      '<div class="af-hint">틀린 답=사실이 틀림 · 못 찾음=있는데 못 찾아 답함 · 말투=말투·형식이 어색함</div>' +
+      '<textarea class="af-input" rows="2" placeholder="무엇이 틀렸나요? (선택)" aria-label="무엇이 틀렸나요(선택)" data-f="note"></textarea>' +
+      '<textarea class="af-input" rows="2" placeholder="혹시 정답을 아신다면 (선택)" aria-label="혹시 정답을 아신다면(선택)" data-f="expected"></textarea>' +
+      '<div class="af-fcap">적어 주시면 앞으로 이 질문을 검사 문항으로 씁니다.</div>' +
+      '<div class="af-actions">' +
+        '<button type="button" class="af-btn" data-af-cancel>취소</button>' +
+        '<button type="button" class="af-btn primary" data-af-send disabled>전송</button>' +
+      '</div>'
+    );
+  }
+
+  function positionPanel(panel, triggerEl) {
+    var r = triggerEl.getBoundingClientRect();
+    var vw = window.innerWidth, vh = window.innerHeight;
+    panel.style.visibility = "hidden";
+    panel.style.left = "0px"; panel.style.top = "0px";
+    var pw = panel.offsetWidth, ph = panel.offsetHeight;
+    var left = Math.min(Math.max(8, r.left), Math.max(8, vw - pw - 8));
+    var top = r.bottom + 6;
+    if (top + ph > vh - 8) top = Math.max(8, r.top - ph - 6); // 아래 공간 부족 — 위로 뒤집기
+    panel.style.left = left + "px";
+    panel.style.top = top + "px";
+    panel.style.visibility = "visible";
+  }
+
+  function openPanel(id, triggerEl) {
+    closePanel();
+    var row = document.querySelector('[data-af-id="' + id + '"]');
+    var a = row ? row.getAttribute("data-af-a") : "";
+    var panel = document.createElement("div");
+    panel.className = "af-panel";
+    panel.innerHTML = panelHtml(a);
+    document.body.appendChild(panel);
+    positionPanel(panel, triggerEl);
+    openState = { id: id, panelEl: panel, kind: null };
+  }
+
+  function closePanel() {
+    if (!openState) return;
+    var id = openState.id;
+    if (openState.panelEl && openState.panelEl.parentNode) openState.panelEl.parentNode.removeChild(openState.panelEl);
+    openState = null;
+    var row = document.querySelector('[data-af-id="' + id + '"]');
+    if (row) renderFoot(row); // 제출됐으면 배지로, 취소했으면 원래 유령 트리거로
+  }
+
+  function selectChip(chip) {
+    if (!openState) return;
+    openState.kind = chip.getAttribute("data-kind");
+    openState.panelEl.querySelectorAll(".af-chip").forEach(function (c) { c.classList.toggle("sel", c === chip); });
+    var sendBtn = openState.panelEl.querySelector("[data-af-send]");
+    if (sendBtn) sendBtn.disabled = false;
+  }
+
+  function submitFeedback() {
+    if (!openState || !openState.kind) return;
+    var panel = openState.panelEl, id = openState.id, kind = openState.kind;
+    var sendBtn = panel.querySelector("[data-af-send]");
+    sendBtn.disabled = true; sendBtn.textContent = "보내는 중…";
+    // 실제 구현에서는 여기서 POST /api/answer-feedback을 호출하고 응답을 기다린다.
+    // 이 목업은 서버를 부르지 않고 타이밍만 흉내낸다(정직한 구현 고지 — 파일 상단 주석).
+    setTimeout(function () {
+      if (!openState || openState.panelEl !== panel) return; // 그새 닫혔으면 아무것도 안 함
+      FLAGGED[id] = kind;
+      panel.innerHTML =
+        '<div class="af-done-line">✓ 접수했습니다. 사람이 검토 후 검사 문항으로 씁니다(자동 반영 아님).</div>' +
+        '<div class="af-actions"><button type="button" class="af-btn" data-af-donecloser>닫기</button></div>';
+    }, 500);
+  }
+
+  document.addEventListener("click", function (e) {
+    var openBtn = e.target.closest("[data-af-open],[data-af-reopen]");
+    if (openBtn) {
+      e.stopPropagation();
+      var id = openBtn.getAttribute("data-af-open") || openBtn.getAttribute("data-af-reopen");
+      if (openState && openState.id === id) { closePanel(); return; }
+      openPanel(id, openBtn);
+      return;
+    }
+    if (e.target.closest(".af-x") || e.target.closest("[data-af-cancel]") || e.target.closest("[data-af-donecloser]")) {
+      e.stopPropagation(); closePanel(); return;
+    }
+    var chip = e.target.closest(".af-chip");
+    if (chip) { e.stopPropagation(); selectChip(chip); return; }
+    if (e.target.closest("[data-af-send]")) { e.stopPropagation(); submitFeedback(); return; }
+    // 바깥 클릭 — 열린 패널이 있고 그 안을 클릭한 게 아니면 닫는다
+    if (openState && openState.panelEl && !openState.panelEl.contains(e.target)) closePanel();
+  });
+
+  document.addEventListener("keydown", function (e) { if (e.key === "Escape" && openState) closePanel(); });
+
+  // 스크롤·창 크기 변경 시엔 위치가 어긋나므로 다시 계산하는 대신 닫는다(더 단순하고 안전함)
+  document.querySelectorAll(".cs-body").forEach(function (b) { b.addEventListener("scroll", function () { if (openState) closePanel(); }); });
+  window.addEventListener("resize", function () { if (openState) closePanel(); });
+})();
+</script>
+</body>
+</html>

@@ -260,6 +260,7 @@ const gijoApi = {
   kbHygiene: () => api.memoryApi.hygiene(),
   kbHygieneScan: () => api.memoryApi.hygieneScan(),
   knowledgeBundleStatus: () => api.memoryApi.knowledgeBundleStatus(),
+  sendAnswerFeedback: (b: { kind: string; question: string; answer: string; note?: string; expected?: string; screen?: string }) => api.answerFeedbackApi.send(b),
   timeSaved: (days?: number) => api.timeSavedApi.status(days),
   setTimeSavedBaseline: (kind: string, minutes: number) => api.timeSavedApi.setBaseline(kind, minutes),
   // 서버 보관 원본을 임시 파일로 받아 OS 기본 뷰어(PDF 등)로 연다.

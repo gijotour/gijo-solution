@@ -684,6 +684,13 @@ export const memoryApi = {
   knowledgeBundleStatus: () => request<KnowledgeBundleStatus>("/api/knowledge-bundle/status"),
 };
 
+
+// 답변 지적(중-1) — "이 답 이상해요"를 회귀 문항 후보로 보낸다.
+export const answerFeedbackApi = {
+  send: (b: { kind: string; question: string; answer: string; note?: string; expected?: string; screen?: string }) =>
+    request<{ id: number }>("/api/answer-feedback", { method: "POST", body: b }),
+  list: (days = 7) => request<{ entries: unknown[]; summary: string }>(`/api/answer-feedback?days=${days}`),
+};
 // "AI가 아낀 시간"(중-2) — 자동화 처리량을 시간으로 환산한 추정치.
 export const timeSavedApi = {
   status: (days = 30) => request<TimeSavedStatus>(`/api/time-saved?days=${days}`),
