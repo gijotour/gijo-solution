@@ -655,6 +655,31 @@ async function runClient() {
     return `링크 ${checked}개 전수 대조 통과 (화면 ${exists.size}개 + 흡수처 ${redirects.length}개 기준)`;
   });
 
+  // 서버가 적어 보낸 사유를 담당자가 **읽을 수 있어야** 한다. 이 메시지 형식은 모든 화면이 쓴다.
+  // 실사고(2026-07-29): 법령 조회가 실패했는데 화면에 뜬 첫 줄이
+  //   "GIJO AS 서버 오류 500 /api/law/search?query=%EA%B0%9C%EC%9D%B8…" 였다.
+  //   서버는 "인증값(OC)을 확인하세요"라고 한글로 적어 보냈는데 URL·JSON 뒤에 묻혀 못 읽었다.
+  //   사유를 아는데 못 읽게 만드는 건 없느니만 못하다.
+  // ⚠ 이 계층은 로그인·preload가 없어 실제 API를 못 부른다 — 그래서 **코드를 읽어** 확인한다.
+  await scenario("QA-C07", "오류 메시지", "서버가 준 사유가 앞에 온다", {
+    given: "서버가 error/message에 한글 사유를 담아 보낼 때",
+    when: "클라이언트가 그 실패를 Error로 바꾸면",
+    then: "사유가 첫 줄에 오고, URL·JSON 같은 기술 정보는 뒤로 간다",
+  }, async () => {
+    const src = fs.readFileSync(path.join(ROOT, "client", "src", "apiClient.ts"), "utf8");
+    const 시작 = src.indexOf("if (!res.ok)");
+    if (시작 < 0) throw new Error("응답 오류 처리부를 못 찾음 — apiClient.ts 구조가 바뀌었나");
+    const 조각 = src.slice(시작, 시작 + 1400);
+    if (!/body\?\.error\s*\?\?\s*body\?\.message|body\.error|body\.message/.test(조각)) {
+      throw new Error("서버가 준 error/message를 읽지 않는다");
+    }
+    // 사유가 있을 때 그것을 **앞에** 세우는지 — 템플릿 첫 자리가 사유여야 한다
+    if (!/\$\{\s*사유\s*\}\\n|^\s*사유\s*\n?\s*\?/m.test(조각) && !/사유\s*\?\s*`\$\{\s*사유\s*\}/.test(조각)) {
+      throw new Error("사유를 첫 줄에 세우지 않는다(URL·상태코드가 앞에 오면 못 읽는다)");
+    }
+    return "서버 사유를 첫 줄에 세우고 기술 정보는 뒤로 보낸다";
+  });
+
   // ⚠ "관리자 탭에 업데이트가 펼쳐져 보이는가"는 여기(헤드리스 client 계층)에 두지 않는다.
   //    이 하네스는 preload(window.gijo)도 로그인도 없어서 설정 화면 **안**이 아예 안 그려지고,
   //    file:// iframe은 서로 다른 출처라 contentDocument도 null이다(2026-07-28 실측).

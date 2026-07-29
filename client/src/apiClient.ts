@@ -124,13 +124,26 @@ async function request<T = unknown>(path: string, opts: RequestOpts = {}): Promi
   }
 
   if (!res.ok) {
+    // ⚠ 담당자가 읽는 첫 줄이 무엇인지가 중요하다.
+    //   예전엔 "GIJO AS 서버 오류 500 /api/law/search?query=%EA%B0%9C%EC%9D%B8… {"error":"…"}"
+    //   처럼 **인코딩된 URL과 JSON 껍데기가 앞에** 오고, 정작 서버가 적어 보낸 한글 사유는
+    //   저 뒤에 묻혔다(2026-07-29 실측). 사유를 아는데 못 읽게 만드는 건 없느니만 못하다.
+    //   서버가 error/message를 주면 **그걸 그대로 앞에** 세우고, 기술 정보는 뒤에 괄호로 붙인다.
+    let 사유 = "";
     let detail = "";
     try {
-      detail = JSON.stringify(await res.json());
+      const body = (await res.json()) as Record<string, unknown>;
+      detail = JSON.stringify(body);
+      const m = body?.error ?? body?.message;
+      if (typeof m === "string" && m.trim()) 사유 = m.trim();
     } catch {
       /* 응답 본문이 JSON이 아닌 경우 무시 */
     }
-    throw new Error(`GIJO AS 서버 오류 ${res.status} ${path} ${detail}`);
+    throw new Error(
+      사유
+        ? `${사유}\n(서버 오류 ${res.status} · ${path.split("?")[0]})`
+        : `GIJO AS 서버 오류 ${res.status} ${path} ${detail}`
+    );
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
