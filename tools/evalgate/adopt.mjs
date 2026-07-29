@@ -106,6 +106,24 @@ if (passed) {
 }
 
 await api(H2, "POST", `/api/agents/${encodeURIComponent(agentId)}/model`, { modelId: before });
+
+// ⚠ [2026-07-30 실사고] 배정만 되돌리면 부족하다. 엔진의 "마지막 사용 모델"(app_state.lastModelId)이
+//   여전히 후보를 가리켜, **서버가 재시작되면 탈락한 모델로 조용히 되돌아간다** — 실제로 재시작 후
+//   운영이 느린 합성 모델로 떠 있었다. 후보가 물고 있던 VRAM도 그대로였다.
+//   그래서 엔진을 통째로 내리고 원래 모델만 다시 올린다(마지막 사용 모델 기록도 이때 바로잡힌다).
+try {
+  console.log("엔진 정리 — 후보 모델을 내리고 원래 모델을 다시 올립니다");
+  await api(H2, "POST", "/api/localengine/stop", {});
+  const restoreId = before ?? (await api(H2, "GET", "/api/localengine/models")).find((m) => m.id)?.id;
+  if (restoreId) await api(H2, "POST", "/api/localengine/start", { modelId: restoreId });
+  // 되돌린 뒤 **실제로 답이 나오는지** 확인한다 — "원복했다"는 말만 남기고 챗봇이 죽어 있으면
+  // 그게 더 나쁘다(조용한 고장).
+  const probe = await api(H2, "POST", "/api/dispatch", { text: "SQL 인젝션이 뭐야?", qa: true });
+  const alive = !/모델이 아직 준비되지 않았습니다/.test(String(probe.output ?? ""));
+  console.log(alive ? "   확인: 챗봇이 정상 응답합니다" : "   ⚠ 경고: 되돌렸는데 챗봇이 응답하지 않습니다 — 엔진 상태를 확인하세요");
+} catch (e) {
+  console.error(`   ⚠ 엔진 정리 실패: ${e.message} — 수동으로 설정 > 서버·AI에서 모델을 다시 올리세요`);
+}
 await api(H2, "POST", "/api/model-adoptions", {
   agentId, fromModel: before, toModel: candidate, verdict: "hold", gate: evidence,
   note: note ?? "평가 게이트 보류 — 원래 모델로 되돌림",

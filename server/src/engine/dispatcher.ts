@@ -411,7 +411,14 @@ export async function dispatchInstruction(instructionText: string, sessionId?: s
   // 평가 게이트/QA 실행(중-3): 작업 세션·협업 피드에 기록하지 않는다 — 게이트 문답 수백 건이
   // 작업내역에 쌓이면 학습 후보함(출처 B)과 담당자의 작업 이력을 오염시킨다. 맥락도 싣지 않아
   // 문항 간 독립(재현성)을 보장한다. 라우팅·RAG·가드레일 등 제품 판단 경로는 전부 동일하다.
-  if (qa) return dispatchInstructionCore(instructionText, "", screen, actor, true);
+  if (qa) {
+    const core = await dispatchInstructionCore(instructionText, "", screen, actor, true);
+    // ⚠ 신호(dataHits·internalMiss·sources)는 **답의 일부**다 — 기록이 아니라 계산이라서
+    //   qa에서도 그대로 내야 한다. 여기서 건너뛰었더니 회귀 하네스가 internalMiss=undefined로
+    //   깨졌다(2026-07-30 실측). 게이트 문항은 이 신호를 안 써서 게이트 결과는 무사했지만,
+    //   "시험 경로가 실사용과 같은 답을 본다"는 전제가 조용히 깨져 있었다.
+    return { ...core, ...(await computeOfferSignals(core, instructionText, screen)) };
+  }
   // 세션을 새로 만들 땐 지시한 사람을 실행자로 남긴다 — 여러 담당자가 쓰는데 목록만 보고는
   // 누가 한 일인지 알 수 없었다(2026-07-26 사용자 지적).
   const session = (sessionId ? getSession(sessionId) : null) ?? createSession(undefined, undefined, actor);

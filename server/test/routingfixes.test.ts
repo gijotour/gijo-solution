@@ -161,3 +161,21 @@ describe("⑦ 검토가 잡은 결함 — 점검 스케줄 정규식 과포착",
     expect(scanRuns.length).toBe(before + 1);
   });
 });
+
+// [실측 수리 2026-07-30] qa 경로가 신호 계산(computeOfferSignals)까지 건너뛰어 회귀 하네스가
+// internalMiss=undefined로 깨졌다. 신호는 기록이 아니라 **답의 일부**다 — qa에서도 나와야
+// "시험 경로가 실사용과 같은 답을 본다"는 전제가 성립한다.
+describe("⑧ qa 경로도 답의 신호를 낸다", () => {
+  it("qa=true 응답에 internalMiss·dataHits가 들어 있다", async () => {
+    const r = await dispatchInstruction("고마워 수고했어", undefined, undefined, undefined, true);
+    expect(r.internalMiss).toBeDefined();
+    expect(r.dataHits).toBeDefined();
+  });
+
+  it("qa=false(실사용)와 신호 형태가 같다", async () => {
+    const a = await dispatchInstruction("고마워 수고했어", undefined, undefined, undefined, true);
+    const b = await dispatchInstruction("고마워 수고했어");
+    expect(typeof a.internalMiss).toBe(typeof b.internalMiss);
+    expect(typeof a.dataHits).toBe(typeof b.dataHits);
+  });
+});

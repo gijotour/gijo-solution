@@ -208,6 +208,14 @@ for (const axis of runAxes) {
       // noRetry·canary 문항은 재시도 없음(성공률 자체가 쟁점 / 0-실패 규칙).
       if (!r.ok && !c.noRetry && !c.canary) {
         const retry = await runCase(c, axis);
+        // 재시도가 30초를 넘겨 리포트로 전환되면 그것도 '측정 못 함'이다 — 실패로 세면
+        // 모델이 틀렸다는 거짓이 된다(2026-07-30 합성 모델 채택 검토 중 실측: 첫 시도 실패 →
+        // 재시도 시간초과가 ✗로 찍혔다). 위쪽 첫 시도 처리와 같은 규칙을 여기도 적용한다.
+        if (retry.skipped) {
+          results[axis].push({ id: c.id, skipped: true, why: retry.why, ms: retry.ms });
+          console.log(`◦ ${c.id} [${(retry.ms / 1000).toFixed(1)}s] — 측정 못 함(재시도도 30초 초과)`);
+          continue;
+        }
         if (retry.ok) {
           results[axis].push({ id: c.id, pass: true, flaky: true, why: r.why, ms: retry.ms });
           console.log(`~ ${c.id} [${(retry.ms / 1000).toFixed(1)}s] — FLAKY(1차: ${r.why.join(", ")})`);
@@ -238,7 +246,14 @@ for (const a of runAxes) {
   const pass = rs.filter((r) => r.pass).length;
   const canaryFail = rs.filter((r) => r.canary && !r.pass).length;
   const flaky = rs.filter((r) => r.flaky).length;
-  axes[a] = { total: rs.length, pass, passRate: rs.length ? +(pass / rs.length * 100).toFixed(1) : 0, canaryFail, flaky, skipped };
+  // 측정된 문항이 하나도 없으면 "0%"가 아니라 **측정 불가**다 — 0%로 적으면 모델이 다 틀렸다는
+  // 거짓이 된다(2026-07-30 실측: 느린 후보 모델이 전 문항 30초를 넘겨 축 전체가 미측정이 됐다).
+  const unmeasured = rs.length === 0 && skipped > 0;
+  axes[a] = {
+    total: rs.length, pass,
+    passRate: rs.length ? +(pass / rs.length * 100).toFixed(1) : null,
+    canaryFail, flaky, skipped, unmeasured,
+  };
 }
 
 // 견고성(레드팀)은 확률적 측정이라 축 통과율과 따로 둔다. 허용 범위 15%p — 실측 변동폭
@@ -275,7 +290,12 @@ if (!baseline) {
   for (const a of runAxes) {
     const b = baseline.axes?.[a];
     if (!b) continue;
-    if (axes[a].passRate < b.passRate) {
+    // 축 전체가 미측정이면 "떨어졌다"가 아니라 "재지 못했다"다 — 둘 다 채택 보류이지만
+    // 사유가 다르다(모델이 틀린 게 아니라 너무 느려 답을 못 받은 것일 수 있다).
+    if (axes[a].unmeasured) {
+      verdict = "채택 보류";
+      reasons.push(`축 측정 불가: ${a} — ${axes[a].skipped}문항 전부 30초를 넘겨 답을 받지 못했다(느린 후보 모델일 가능성). 점수가 낮은 것과 다르다`);
+    } else if (axes[a].passRate < b.passRate) {
       verdict = "채택 보류";
       reasons.push(`축 하락: ${a} ${b.passRate}% → ${axes[a].passRate}% (하나라도 하락 시 보류 — 계획서 중-3)`);
     }
@@ -311,7 +331,7 @@ const md = [
   "",
   "| 축 | 통과/문항 | 통과율 | 카나리 실패 | FLAKY | 기준선 |",
   "|---|---|---|---|---|---|",
-  ...runAxes.map((a) => `| ${a} | ${axes[a].pass}/${axes[a].total} | ${axes[a].passRate}% | ${axes[a].canaryFail} | ${axes[a].flaky}${axes[a].skipped ? ` (측정 못 함 ${axes[a].skipped})` : ""} | ${baseline?.axes?.[a] ? baseline.axes[a].passRate + "%" : "—"} |`),
+  ...runAxes.map((a) => `| ${a} | ${axes[a].pass}/${axes[a].total} | ${axes[a].passRate == null ? "측정 불가" : axes[a].passRate + "%"} | ${axes[a].canaryFail} | ${axes[a].flaky}${axes[a].skipped ? ` (측정 못 함 ${axes[a].skipped})` : ""} | ${baseline?.axes?.[a] ? baseline.axes[a].passRate + "%" : "—"} |`),
   "",
   ...(reasons.length ? ["## 판정 사유", ...reasons.map((r) => `- ${r}`)] : []),
   "",
@@ -333,7 +353,7 @@ if (flag("--accept-baseline")) {
 }
 
 console.log(`\n━━ 판정: ${verdict} ━━`);
-for (const a of runAxes) console.log(`  ${a}: ${axes[a].pass}/${axes[a].total} (${axes[a].passRate}%)${axes[a].canaryFail ? ` · 카나리 실패 ${axes[a].canaryFail}` : ""}${axes[a].flaky ? ` · flaky ${axes[a].flaky}` : ""}${axes[a].skipped ? ` · 측정 못 함 ${axes[a].skipped}` : ""}`);
+for (const a of runAxes) console.log(`  ${a}: ${axes[a].pass}/${axes[a].total} (${axes[a].passRate == null ? "측정 불가" : axes[a].passRate + "%"})${axes[a].canaryFail ? ` · 카나리 실패 ${axes[a].canaryFail}` : ""}${axes[a].flaky ? ` · flaky ${axes[a].flaky}` : ""}${axes[a].skipped ? ` · 측정 못 함 ${axes[a].skipped}` : ""}`);
 for (const r of reasons) console.log(`  ${r}`);
 console.log(`  리포트: .tmp-reports/evalgate-report.md (${meta.durationSec}초)`);
 if (flag("--json")) console.log(JSON.stringify(report.axes));

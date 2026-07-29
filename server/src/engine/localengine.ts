@@ -8,7 +8,7 @@
 // nvidia-smi가 없으면 개수 상한(MAX_LOADED_MODELS)으로 폴백한다.
 
 import type { Express } from "express";
-import { spawn, execFile, ChildProcess } from "child_process";
+import { spawn, execFile, execFileSync, ChildProcess } from "child_process";
 import * as path from "path";
 import * as fs from "fs";
 import * as os from "os";
@@ -402,7 +402,39 @@ export async function stopLocalEngine(): Promise<void> {
 
 // ── 부팅 자동 시작 (index.ts에서 1회 호출) ──────────────────────────────────
 // createApp()에서 부르지 않는다 — 테스트가 실제 llama-server를 스폰하면 안 되므로 부트 전용.
+/**
+ * 지난 프로세스가 남긴 llama-server 고아를 정리한다(임베딩은 살려 둔다).
+ *
+ * ⚠ [2026-07-30 실사고] 서비스가 재시작되자(systemd Restart) 이전 Node가 띄운 llama-server
+ *   자식들이 **고아로 남아 VRAM을 붙들었다** — 합성 모델 3벌이 23.6GB/24.6GB를 먹어
+ *   새 엔진이 뜨지 못하고 "AI 모델이 아직 준비되지 않았습니다"만 나왔다. 화면은 멀쩡한데
+ *   챗봇이 통째로 죽은, 이 프로젝트가 가장 경계하는 '조용한 고장'이다.
+ *   재시작마다 우리 것이 아닌 채팅 모델 프로세스를 먼저 걷어 낸다.
+ *   임베딩(8081)은 재사용 설계라 건드리지 않는다.
+ */
+function reapOrphanEngines(): void {
+  if (process.platform === "win32") return; // 운영은 리눅스(WSL) — 개발 머신에서는 건너뛴다
+  try {
+    // 우리가 방금 띄운 것은 아직 없다(부팅 시점) — 채팅 모델 프로세스는 전부 고아다.
+    const out = execFileSync("pgrep", ["-af", "llama-server"], { encoding: "utf-8" });
+    const orphans = out
+      .split("\n")
+      .filter((l) => l.includes("llama-server") && !l.includes("--embedding") && !l.includes("pgrep"))
+      .map((l) => Number(l.trim().split(/\s+/)[0]))
+      .filter((pid) => Number.isFinite(pid) && pid !== process.pid);
+    for (const pid of orphans) {
+      try {
+        process.kill(pid, "SIGKILL");
+        console.log(`[localengine] 고아 llama-server 정리: pid ${pid}`);
+      } catch { /* 이미 죽었으면 무시 */ }
+    }
+  } catch {
+    /* pgrep 없음·매칭 0건 — 정리할 것이 없다는 뜻이라 조용히 넘긴다 */
+  }
+}
+
 export async function autoStartLocalEngines(): Promise<void> {
+  reapOrphanEngines();
   const chatModelId = pickAutoStartModelId();
   if (chatModelId) {
     console.log(`[localengine] 부팅 자동 시작: ${chatModelId} (마지막 사용 모델 또는 기본 모델)`);
