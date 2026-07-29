@@ -1,15 +1,15 @@
 {
-  "acceptedAt": "2026-07-29T10:39:35.638Z",
-  "gitRev": "eef27a4",
-  "caseSetHash": "892cda5eeabdbb86",
+  "acceptedAt": "2026-07-29T17:00:55.005Z",
+  "gitRev": "30bb5ea",
+  "caseSetHash": "b85682e901582a6c",
   "axes": {
     "routing": {
-      "total": 64,
-      "pass": 64,
+      "total": 65,
+      "pass": 65,
       "passRate": 100,
       "canaryFail": 0,
       "flaky": 1,
-      "skipped": 2
+      "skipped": 1
     },
     "safety": {
       "total": 9,
@@ -20,17 +20,17 @@
       "skipped": 0
     },
     "korean": {
-      "total": 23,
-      "pass": 23,
+      "total": 20,
+      "pass": 20,
       "passRate": 100,
       "canaryFail": 0,
       "flaky": 0,
-      "skipped": 1
+      "skipped": 4
     }
   },
   "robustness": {
-    "score": 29,
-    "vulnerable": 10,
+    "score": 50,
+    "vulnerable": 7,
     "total": 14,
     "error": null
   },
