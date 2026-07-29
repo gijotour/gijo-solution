@@ -28,6 +28,7 @@ import { matchCtiToAssets } from "./ctimatch";
 import { generateReport } from "./report";
 import { listFindingReviews } from "./approvals";
 import { listMaintenanceItems } from "./maintenance";
+import { ACTION_CHECK_RE, runActionCheck } from "./actioncheck";
 import { appendTurn, recentTurnsText, getSession, createSession } from "./worksessions";
 import { LONG_ANSWER_MS, startLongAnswer, finishLongAnswer, failLongAnswer } from "./longanswer";
 
@@ -449,7 +450,11 @@ async function computeOfferSignals(
   // 같은 검색(임베딩 1회)에서 근거 문서 ID(sources)도 뽑는다 — 화면 "근거" 배지·인수인계 검증용.
   let internalMiss = false;
   let sources: string[] | undefined;
-  if (dataHits === 0 && !result.approval && !result.confirm && !isSmallTalkInstruction(instructionText)) {
+  // 답을 만든 쪽이 근거를 이미 확정했으면(빈 배열 포함) 여기서 다시 채우지 않는다 —
+  // 행동 대조가 "판정 근거 없음(NA)"으로 답했는데 이 재검색이 참고 문서를 근거 배지로
+  // 둔갑시키는 실측 사고가 있었다(2026-07-29, Tenable 가이드가 NA 답의 근거로 표시됨).
+  const sourcesAlreadyDecided = result.sources !== undefined;
+  if (!sourcesAlreadyDecided && dataHits === 0 && !result.approval && !result.confirm && !isSmallTalkInstruction(instructionText)) {
     try {
       const { queryMemoryScored, RAG_RELEVANCE_MAX_DISTANCE } = await import("./memory.js");
       const scored = await queryMemoryScored(instructionText, 4, undefined, screen).catch(() => null);
@@ -573,6 +578,21 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     const completedTask = updated.find((t) => t.id === task.id) ?? task;
     const output = stepResults.map((r, i) => `【${i + 1}. ${r.label}】 ${r.output}`).join("\n\n");
     return { task: completedTask, route: { agentId: "orchestrator", action: "chat" }, output, steps: stepResults };
+  }
+
+  // ── 행동 대조 (2026-07-29, 계획서 전-2) — "이거 해도 돼?"는 검색이 아니라 판정 질문이다 ──
+  // 사내규정(RAG)으로만 판정하고, 법령은 원문 링크로 안내, 근거 없으면 판정하지 않는다(NA 계약).
+  if (ACTION_CHECK_RE.test(instructionText)) {
+    const task = createTask({ text: instructionText, agentId: "analysis", priority: "P2" });
+    const r = await runActionCheck(instructionText);
+    completeTask(task.id);
+    return {
+      task,
+      route: { agentId: "analysis", action: "chat" },
+      output: r.output,
+      sources: r.sources,
+      dataHits: r.sources.length,
+    };
   }
 
   // ── 시연 실측이 잡은 라우팅 결함 2건의 결정적 분기 (2026-07-29, 계획서 전-1) ──────────
