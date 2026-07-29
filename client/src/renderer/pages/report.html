@@ -411,7 +411,7 @@ tr:last-child td{border-bottom:none;}
 
   async function pruneOld() {
     const days = Number(document.getElementById("pruneDays").value);
-    if (!confirm(`${days}일 이전에 생성된 리포트를 모두 삭제할까요? DOCX·PDF·요약이 함께 삭제되며 되돌릴 수 없습니다.`)) return;
+    if (!await gijoAsk(`${days}일 이전에 생성된 리포트를 모두 삭제할까요? DOCX·PDF·요약이 함께 삭제되며 되돌릴 수 없습니다.`)) return;
     const btn = document.getElementById("pruneBtn");
     const orig = btn.textContent;
     btn.disabled = true; btn.textContent = "삭제 중…";
@@ -419,17 +419,17 @@ tr:last-child td{border-bottom:none;}
       const r = await window.gijo.pruneReports(days);
       await loadHistory();
       renderReportRows();
-      alert(`${days}일 이전 리포트 ${r.deletedReports}건(파일 ${r.deletedFiles}개)을 삭제했습니다.`);
+      gijoTell(`${days}일 이전 리포트 ${r.deletedReports}건(파일 ${r.deletedFiles}개)을 삭제했습니다.`);
     } catch (e) {
-      alert("일괄 삭제 실패: " + ((e && e.message) || e));
+      gijoTell("일괄 삭제 실패: " + ((e && e.message) || e));
     } finally {
       btn.disabled = false; btn.textContent = orig;
     }
   }
 
   async function deleteAllReports() {
-    if (!confirm("저장된 모든 리포트를 삭제할까요? DOCX·PDF·요약이 전부 삭제되며 되돌릴 수 없습니다.")) return;
-    if (!confirm("정말 전체 삭제할까요? 이 작업은 되돌릴 수 없습니다.")) return; // 파괴적 — 2단계 확인
+    if (!await gijoAsk("저장된 모든 리포트를 삭제할까요? DOCX·PDF·요약이 전부 삭제되며 되돌릴 수 없습니다.")) return;
+    if (!await gijoAsk("정말 전체 삭제할까요? 이 작업은 되돌릴 수 없습니다.")) return; // 파괴적 — 2단계 확인
     const btn = document.getElementById("deleteAllBtn");
     const orig = btn.textContent;
     btn.disabled = true; btn.textContent = "삭제 중…";
@@ -437,23 +437,23 @@ tr:last-child td{border-bottom:none;}
       const r = await window.gijo.deleteAllReports();
       await loadHistory();
       renderReportRows();
-      alert(`리포트 ${r.deletedReports}건(파일 ${r.deletedFiles}개)을 전부 삭제했습니다.`);
+      gijoTell(`리포트 ${r.deletedReports}건(파일 ${r.deletedFiles}개)을 전부 삭제했습니다.`);
     } catch (e) {
-      alert("전체 삭제 실패: " + ((e && e.message) || e));
+      gijoTell("전체 삭제 실패: " + ((e && e.message) || e));
     } finally {
       btn.disabled = false; btn.textContent = orig;
     }
   }
 
   async function deleteReportRow(base, btn) {
-    if (!confirm("이 리포트를 삭제할까요? DOCX·PDF·요약 파일이 함께 삭제되며 되돌릴 수 없습니다.")) return;
+    if (!await gijoAsk("이 리포트를 삭제할까요? DOCX·PDF·요약 파일이 함께 삭제되며 되돌릴 수 없습니다.")) return;
     if (btn) btn.disabled = true;
     try {
       await window.gijo.deleteReport(base);
       await loadHistory();
       renderReportRows();
     } catch (e) {
-      alert("삭제 실패: " + ((e && e.message) || e));
+      gijoTell("삭제 실패: " + ((e && e.message) || e));
       if (btn) btn.disabled = false;
     }
   }
@@ -761,12 +761,12 @@ tr:last-child td{border-bottom:none;}
       renderScheduleList();
       await renderScheduleDetail();
     } catch (e) {
-      alert("변경 실패: " + ((e && e.message) || e));
+      gijoTell("변경 실패: " + ((e && e.message) || e));
     }
   }
 
   async function deleteScheduleRow(id) {
-    if (!confirm("이 스케줄을 삭제할까요? 이미 생성된 리포트는 그대로 남습니다.")) return;
+    if (!await gijoAsk("이 스케줄을 삭제할까요? 이미 생성된 리포트는 그대로 남습니다.")) return;
     try {
       await window.gijo.reportSchedules.remove(id);
       selectedScheduleId = null;
@@ -774,7 +774,7 @@ tr:last-child td{border-bottom:none;}
       renderScheduleList();
       await renderScheduleDetail();
     } catch (e) {
-      alert("삭제 실패: " + ((e && e.message) || e));
+      gijoTell("삭제 실패: " + ((e && e.message) || e));
     }
   }
 
@@ -789,7 +789,7 @@ tr:last-child td{border-bottom:none;}
       renderScheduleList();
       await renderScheduleDetail();
     } catch (e) {
-      alert("실행 실패: " + ((e && e.message) || e));
+      gijoTell("실행 실패: " + ((e && e.message) || e));
     }
   }
 
@@ -837,7 +837,7 @@ tr:last-child td{border-bottom:none;}
     document.getElementById("pruneBtn").addEventListener("click", pruneOld);
     document.getElementById("deleteAllBtn").addEventListener("click", deleteAllReports);
     document.getElementById("templateBtn").addEventListener("click", () => {
-      alert("템플릿 관리 기능은 아직 구현되지 않았습니다.");
+      gijoTell("템플릿 관리 기능은 아직 구현되지 않았습니다.");
     });
     document.getElementById("schedAddBtn").addEventListener("click", renderNewScheduleForm);
   }

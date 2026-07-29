@@ -446,17 +446,17 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         await window.gijo.reportMaintenance(id, args);
         await loadMaintenance();
       } catch (err) {
-        alert("보고 실패: " + ((err && err.message) || err));
+        gijoTell("보고 실패: " + ((err && err.message) || err));
         btn.disabled = false;
         btn.textContent = "제출";
       }
     } else if (action === "approve") {
-      if (!confirm("이 점검을 승인하시겠습니까?")) return;
+      if (!await gijoAsk("이 점검을 승인하시겠습니까?")) return;
       try {
         await window.gijo.approveMaintenance(id);
         await loadMaintenance();
       } catch (err) {
-        alert("승인 실패: " + ((err && err.message) || err));
+        gijoTell("승인 실패: " + ((err && err.message) || err));
       }
     } else if (action === "reject") {
       const reason = prompt("반려 사유를 입력하세요");
@@ -465,7 +465,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         await window.gijo.rejectMaintenance(id, reason);
         await loadMaintenance();
       } catch (err) {
-        alert("반려 실패: " + ((err && err.message) || err));
+        gijoTell("반려 실패: " + ((err && err.message) || err));
       }
     }
   }
@@ -512,7 +512,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       document.getElementById("mDate").value = todayStr();
       await loadMaintenance();
     } catch (err) {
-      alert("등록 실패: " + ((err && err.message) || err));
+      gijoTell("등록 실패: " + ((err && err.message) || err));
     }
   }
 

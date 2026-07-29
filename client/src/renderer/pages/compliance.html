@@ -204,7 +204,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       sel.addEventListener("change", async (e) => {
         const code = e.target.dataset.status;
         const note = cats.querySelector(`input[data-note="${code}"]`).value;
-        try { await window.gijo.setComplianceStatus(code, e.target.value, note); catalog = await window.gijo.listCompliance(); render(); } catch (err) { alert("저장 실패: " + err.message); }
+        try { await window.gijo.setComplianceStatus(code, e.target.value, note); catalog = await window.gijo.listCompliance(); render(); } catch (err) { gijoTell("저장 실패: " + err.message); }
       });
     });
     cats.querySelectorAll("input[data-note]").forEach((inp) => {
@@ -212,7 +212,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         const code = e.target.dataset.note;
         const t = catalog.find((x) => x.code === code);
         if (t && t.note === e.target.value) return;
-        try { await window.gijo.setComplianceStatus(code, t.status, e.target.value); catalog = await window.gijo.listCompliance(); } catch (err) { alert("저장 실패: " + err.message); }
+        try { await window.gijo.setComplianceStatus(code, t.status, e.target.value); catalog = await window.gijo.listCompliance(); } catch (err) { gijoTell("저장 실패: " + err.message); }
       });
     });
     // AI 초안 — 위협의 양호/취약 기준 + 자산 현황으로 대응 상태 초안을 채운다(검토 후 조정 가능).
@@ -228,7 +228,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
           expanded.add(code); // 근거를 바로 볼 수 있게 펼침
           render();
         } catch (err) {
-          alert("AI 초안 실패: " + ((err && err.message) || err));
+          gijoTell("AI 초안 실패: " + ((err && err.message) || err));
           btn.disabled = false; btn.textContent = orig;
         }
       });

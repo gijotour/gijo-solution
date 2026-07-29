@@ -253,7 +253,7 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
     } catch (err) {
       btn.disabled = false;
       btn.textContent = "＋ 조치 등록";
-      alert("조치 등록 실패: " + (err.message || err));
+      gijoTell("조치 등록 실패: " + (err.message || err));
     }
   }
 

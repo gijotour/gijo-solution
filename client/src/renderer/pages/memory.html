@@ -428,7 +428,7 @@ tr:last-child td{border-bottom:none;}
               bd.textContent = `🗂 ${c}`;
               opts.remove();
               loadDocuments();
-            } catch (err) { b.disabled = false; alert("영역 수정 실패: " + err.message); }
+            } catch (err) { b.disabled = false; gijoTell("영역 수정 실패: " + err.message); }
           });
           opts.appendChild(b);
         });
@@ -639,7 +639,7 @@ tr:last-child td{border-bottom:none;}
             await window.gijo.setDocCategory(documentId, c);
             d.category = c; // 로컬 반영 후 목록·상세 재렌더(선택 유지)
             renderDmList(documentId);
-          } catch (err) { b.disabled = false; alert("영역 수정 실패: " + err.message); }
+          } catch (err) { b.disabled = false; gijoTell("영역 수정 실패: " + err.message); }
         });
         opts.appendChild(b);
       });

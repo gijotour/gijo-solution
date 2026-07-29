@@ -439,7 +439,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   let reportBusy = false;
   async function askReport() {
     if (reportBusy) return;
-    if (!window.confirm("리포트를 출력할까요?\n현재 보안 지표로 종합 리포트(온디맨드)를 생성합니다.")) return;
+    if (!await gijoAsk("리포트를 출력할까요?\n현재 보안 지표로 종합 리포트(온디맨드)를 생성합니다.")) return;
     reportBusy = true;
     toast("📄 종합 보안 리포트 생성 중… (수십 초 걸릴 수 있습니다)");
     try {

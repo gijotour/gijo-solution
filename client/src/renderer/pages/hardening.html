@@ -235,7 +235,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   }
   async function removeTarget(id) {
     const t = TARGETS.find((x) => x.id === id); if (!t) return;
-    if (!confirm(`'${t.label}' 대상과 관련 스케줄을 삭제할까요? (점검 이력은 보존됩니다)`)) return;
+    if (!await gijoAsk(`'${t.label}' 대상과 관련 스케줄을 삭제할까요? (점검 이력은 보존됩니다)`)) return;
     await window.gijo.hardeningTargets.remove(id); toast("대상 삭제됨"); await loadAll();
   }
 

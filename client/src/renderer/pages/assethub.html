@@ -309,7 +309,7 @@
           OVERVIEW=await window.gijo.assetHub();   // 목록·묶음 라벨 즉시 갱신
           renderMaster();
           await selectAsset(r.id);
-        }catch(e){ alert("이름 변경 실패: "+e.message); }
+        }catch(e){ gijoTell("이름 변경 실패: "+e.message); }
       };
       $("renameSave").addEventListener("click",()=>apply(inp.value.trim()));
       $("renameReset").addEventListener("click",()=>apply(null));

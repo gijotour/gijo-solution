@@ -496,7 +496,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       btn.textContent = "✓ 저장됨";
       setTimeout(() => { btn.textContent = "✓ 정형 정보 저장"; btn.disabled = false; }, 1500);
     } catch (e) {
-      alert("저장 실패: " + ((e && e.message) || e));
+      gijoTell("저장 실패: " + ((e && e.message) || e));
       btn.textContent = "✓ 정형 정보 저장";
       btn.disabled = false;
     }
@@ -554,7 +554,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       await window.gijo.createSecurityProduct(args);
       e.target.reset();
       await loadProducts();
-    } catch (err) { alert("등록 실패: " + ((err && err.message) || err)); }
+    } catch (err) { gijoTell("등록 실패: " + ((err && err.message) || err)); }
   }
 
   async function onGroupsClick(e) {
@@ -571,9 +571,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     if (prodDel) { await openDeleteDialog(prodDel.dataset.prodDel, prodDel.dataset.name); return; }
     const docDel = e.target.closest("[data-doc-del]");
     if (docDel) {
-      if (!confirm("이 문서를 삭제할까요?")) return;
+      if (!await gijoAsk("이 문서를 삭제할까요?")) return;
       try { await window.gijo.deleteProductDoc(docDel.dataset.docDel); await loadProducts(); }
-      catch (err) { alert("삭제 실패: " + ((err && err.message) || err)); }
+      catch (err) { gijoTell("삭제 실패: " + ((err && err.message) || err)); }
       return;
     }
     const docAdd = e.target.closest("[data-doc-add]");
@@ -728,11 +728,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         closeDeleteDialog();
         await loadProducts();
         if (r && r.removed && r.removed.length) {
-          alert(`삭제했습니다.\n\n지식베이스에서 함께 지운 매뉴얼 ${r.removed.length}건:\n${r.removed.join("\n")}` +
+          gijoTell(`삭제했습니다.\n\n지식베이스에서 함께 지운 매뉴얼 ${r.removed.length}건:\n${r.removed.join("\n")}` +
             (r.keptShared && r.keptShared.length ? `\n\n다른 제품도 쓰고 있어 남긴 매뉴얼 ${r.keptShared.length}건` : ""));
         }
       } catch (err) {
-        alert("삭제 실패: " + ((err && err.message) || err));
+        gijoTell("삭제 실패: " + ((err && err.message) || err));
       } finally {
         go.disabled = false;
       }

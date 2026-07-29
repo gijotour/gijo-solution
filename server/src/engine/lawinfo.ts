@@ -108,7 +108,24 @@ async function callApi(path: string, params: Record<string, string>): Promise<un
   try {
     const res = await fetch(url, { signal: ctl.signal });
     if (!res.ok) throw new Error(`법제처 응답 오류 ${res.status}`);
-    return await res.json();
+    const data = await res.json();
+    // ⚠ 법제처는 인증 실패·잘못된 요청에도 **HTTP 200**으로 답한다. 본문에만 result/msg가 담긴다.
+    //   그걸 안 보면 목록 키가 없으니 그대로 "0건"이 되어, 담당자는 "법이 없나 보다"로 오해한다.
+    //   실사고(2026-07-29): OC를 넣었는데 검색이 늘 0건이었다. 원인은 법제처가
+    //   "필수입력요소 검증에 실패하였습니다"를 돌려주고 있었던 것 — 우리가 삼켰다.
+    //   인증 문제는 결과 없음이 아니다. 있는 그대로 알린다.
+    if (data && typeof data === "object" && !Array.isArray(data)) {
+      const d = data as Record<string, unknown>;
+      if (d.result != null && d.msg != null) {
+        const 원문 = `${String(d.result)} ${String(d.msg)}`.replace(/\s+/g, " ").trim();
+        throw new Error(
+          `법제처가 요청을 받지 않았습니다 — ${원문}\n` +
+          `설정 → 연동 → 법령·판례 조회의 인증값(OC)을 확인하세요. ` +
+          `OC는 국가법령정보 공동활용 사이트에 **신청·승인된 이메일 아이디**(@ 앞부분)입니다.`
+        );
+      }
+    }
+    return data;
   } catch (e) {
     if (e instanceof Error && e.name === "AbortError") throw new Error("법제처 응답이 없습니다(시간 초과)");
     throw e;

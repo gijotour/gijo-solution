@@ -226,7 +226,7 @@
       // 통째로 날아간다. 무엇을 버릴지는 사람이 정할 일이다.
       if (tabs.length >= MAX_TABS) {
         var free = tabs.filter(function (x) { return !x.pinned; }).length;
-        alert("화면은 한 번에 " + MAX_TABS + "개까지 열 수 있습니다.\n\n" +
+        gijoTell("화면은 한 번에 " + MAX_TABS + "개까지 열 수 있습니다.\n\n" +
           "보던 화면이 말없이 닫히면 걸어 둔 조건과 스크롤이 사라지므로, 여기서 멈춥니다.\n\n" +
           (free > 0
             ? "필요 없는 탭을 ✕로 닫고 다시 열어 주세요."

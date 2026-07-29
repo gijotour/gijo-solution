@@ -475,7 +475,7 @@ tr:last-child td{border-bottom:none;}
         } catch (err) {
           btn.disabled = false;
           btn.textContent = "받기";
-          alert("다운로드 시작 실패: " + ((err && err.message) || err));
+          gijoTell("다운로드 시작 실패: " + ((err && err.message) || err));
         }
       });
     });
@@ -487,7 +487,7 @@ tr:last-child td{border-bottom:none;}
           await loadAgents();
         } catch (err) {
           btn.disabled = false;
-          alert("적용 실패: " + ((err && err.message) || err));
+          gijoTell("적용 실패: " + ((err && err.message) || err));
         }
       });
     });
@@ -501,7 +501,7 @@ tr:last-child td{border-bottom:none;}
           await window.gijo.setAgentModel(agentId, modelId);
           await loadAgents();
         } catch (err) {
-          alert("모델 할당 실패: " + err.message);
+          gijoTell("모델 할당 실패: " + err.message);
           e.target.disabled = false;
         }
       });
@@ -529,7 +529,7 @@ tr:last-child td{border-bottom:none;}
           try {
             await window.gijo.setAgentName(agentId, input.value.trim() || null);
           } catch (err) {
-            alert("이름 변경 실패: " + err.message);
+            gijoTell("이름 변경 실패: " + err.message);
           }
           await loadAgents();
         };
@@ -620,20 +620,20 @@ tr:last-child td{border-bottom:none;}
     // 이름 초기화
     const resetId = e.target.dataset.reset;
     if (resetId) {
-      try { await window.gijo.setAgentName(resetId, null); await openAgentSettings(); } catch (err) { alert("초기화 실패: " + err.message); }
+      try { await window.gijo.setAgentName(resetId, null); await openAgentSettings(); } catch (err) { gijoTell("초기화 실패: " + err.message); }
       return;
     }
     // 모델 변경
     if (e.target.classList.contains("as-model")) {
       const id = e.target.dataset.agent;
       e.target.disabled = true;
-      try { await window.gijo.setAgentModel(id, e.target.value || null); } catch (err) { alert("모델 할당 실패: " + err.message); }
+      try { await window.gijo.setAgentModel(id, e.target.value || null); } catch (err) { gijoTell("모델 할당 실패: " + err.message); }
       e.target.disabled = false;
     }
   }
 
   async function commitAgentName(input) {
-    try { await window.gijo.setAgentName(input.dataset.agent, input.value.trim() || null); } catch (err) { alert("이름 변경 실패: " + err.message); }
+    try { await window.gijo.setAgentName(input.dataset.agent, input.value.trim() || null); } catch (err) { gijoTell("이름 변경 실패: " + err.message); }
   }
 
   async function loadTaskKpis() {
@@ -781,7 +781,7 @@ tr:last-child td{border-bottom:none;}
       }
       await Promise.all([loadAgents(), loadTaskKpis()]);
     } catch (e) {
-      alert("지시 처리 중 오류가 발생했습니다: " + e.message);
+      gijoTell("지시 처리 중 오류가 발생했습니다: " + e.message);
     }
   }
 

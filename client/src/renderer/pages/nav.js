@@ -595,6 +595,17 @@
     document.body.appendChild(s);
   }
 
+  // 화면 안 대화상자(gijoAsk/gijoTell) — **모든 화면·모든 겹에 실어야 한다.**
+  // window.confirm/alert은 Electron에서 OS 네이티브 모달이라 뜨는 순간 렌더러가 통째로 멈춘다
+  // (탭 안이든 셸이든 같은 렌더러를 쓴다). 그래서 embed·분리창에서도 빠뜨리지 않는다.
+  function loadDialog() {
+    if (window.gijoAsk || document.getElementById("gijoDlgScript")) return;
+    var s = document.createElement("script");
+    s.id = "gijoDlgScript";
+    s.src = "dialog.js";
+    (document.body || document.documentElement).appendChild(s);
+  }
+
   // (commandpanel.js는 4.0.0에서 없앴다 — 아래 boot() 주석 참고)
 
   // 클라이언트 자동 업데이트 확인 — 앱 시작 시 1회(+페이지 이동마다 10분 캐시로 재확인).
@@ -728,6 +739,7 @@
 
   function boot() {
     bindZoomKeys();
+    loadDialog(); // 어느 겹에서든 먼저 — 네이티브 모달이 뜨면 그 순간 모두 멈춘다
     loadFold(); // embed에서도 실어야 한다 — 팝업 안이 접기가 가장 필요한 곳이다
     if (IS_EMBED) { applyEmbed(); return; }
     // 탭으로 흡수된 페이지에 직접 들어오면(대시보드 바로가기·챗봇 링크 등) 허브의 그 탭으로 보낸다.

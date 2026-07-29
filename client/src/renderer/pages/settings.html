@@ -736,7 +736,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   async function setUserRoleRow(id, cur) {
     const line = document.getElementById("userManagementStatusLine");
     const next = cur === "admin" ? "security_officer" : "admin";
-    if (!confirm(`역할을 ${ROLE_LABEL[next] || next}(으)로 변경할까요?`)) return;
+    if (!await gijoAsk(`역할을 ${ROLE_LABEL[next] || next}(으)로 변경할까요?`)) return;
     try { await window.gijo.setUserRole(id, next); await loadUserList(); line.textContent = "✓ 역할이 변경되었습니다."; line.className = "status-line status-ok"; }
     catch (e) { line.textContent = "✗ 역할 변경 실패: " + e.message; line.className = "status-line status-err"; }
   }
@@ -749,7 +749,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   }
   async function terminateSessionRow(id) {
     const line = document.getElementById("userManagementStatusLine");
-    if (!confirm("이 사용자의 접속 세션을 강제로 종료할까요?")) return;
+    if (!await gijoAsk("이 사용자의 접속 세션을 강제로 종료할까요?")) return;
     try { const r = await window.gijo.terminateUserSession(id); await loadUserList(); line.textContent = r.terminated ? "✓ 세션을 종료했습니다." : "종료할 활성 세션이 없습니다."; line.className = "status-line status-ok"; }
     catch (e) { line.textContent = "✗ 종료 실패: " + e.message; line.className = "status-line status-err"; }
   }
@@ -1202,7 +1202,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       const brace = msg.indexOf("{");
       if (brace >= 0) { try { const j = JSON.parse(msg.slice(brace)); if (j.error) msg = j.error; } catch (_) {} }
       if (statusEl) { statusEl.className = "mc-status err"; statusEl.textContent = "✗ " + msg; }
-      else { btn.title = msg; alert("받기 실패: " + msg); }
+      else { btn.title = msg; gijoTell("받기 실패: " + msg); }
     }
   }
 
@@ -1266,7 +1266,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
   async function installUpdate() {
     if (!latestRelease) return;
-    if (!confirm(latestRelease.version + " 버전으로 지금 업데이트할까요? 다운로드가 끝나면 앱이 자동으로 종료되고 설치가 진행됩니다.")) return;
+    if (!await gijoAsk(latestRelease.version + " 버전으로 지금 업데이트할까요? 다운로드가 끝나면 앱이 자동으로 종료되고 설치가 진행됩니다.")) return;
     const btn = document.getElementById("installBtn");
     const track = document.getElementById("progressTrack");
     const fill = document.getElementById("progressFill");
@@ -1411,9 +1411,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       if (!canEnable(s)) { mcpAudit(`⚠ '${s.name}' 활성 시도 거부 — egress 미승인`); return; }
       s.enabled = !s.enabled; mcpSaveServers(); mcpAudit(`${s.enabled ? "활성" : "비활성"}: ${s.name}`); mcpRender();
     }));
-    $("srvList").querySelectorAll("[data-egress]").forEach((el) => el.addEventListener("click", () => {
+    $("srvList").querySelectorAll("[data-egress]").forEach((el) => el.addEventListener("click", async () => {
       const s = servers.find((x) => x.id === el.dataset.egress); if (!s) return;
-      if (!confirm(`'${s.name}'는 원격(HTTP) 서버로 외부로 데이터가 나갈 수 있습니다.\negress를 승인하시겠습니까? (관리자 책임)`)) return;
+      if (!(await gijoAsk(`'${s.name}'는 원격(HTTP) 서버로 외부로 데이터가 나갈 수 있습니다.\negress를 승인하시겠습니까? (관리자 책임)`, { ok: "승인" }))) return;
       s.egressApproved = true; mcpSaveServers(); mcpAudit(`egress 승인: ${s.name} (${s.endpoint})`); mcpRender();
     }));
     $("srvList").querySelectorAll("[data-perm]").forEach((el) => el.addEventListener("click", () => {
@@ -1423,9 +1423,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       if (i >= 0) tool.agents.splice(i, 1); else tool.agents.push(ag);
       mcpSaveServers(); mcpAudit(`권한 변경: ${s.name}/${tool.name} → ${AGENT_NAME[ag]} ${i >= 0 ? "해제" : "허용"}`); mcpRender();
     }));
-    $("srvList").querySelectorAll("[data-del]").forEach((el) => el.addEventListener("click", () => {
+    $("srvList").querySelectorAll("[data-del]").forEach((el) => el.addEventListener("click", async () => {
       const s = servers.find((x) => x.id === el.dataset.del); if (!s) return;
-      if (!confirm(`'${s.name}' 서버 정의를 삭제할까요?`)) return;
+      if (!(await gijoAsk(`'${s.name}' 서버 정의를 삭제할까요?`, { ok: "삭제", danger: true }))) return;
       servers = servers.filter((x) => x.id !== s.id); mcpSaveServers(); mcpAudit(`삭제: ${s.name}`); mcpRender();
     }));
   }
@@ -1635,8 +1635,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       }
       saveModelAuth({ token: v }, "토큰을 등록했습니다 — 이제 gated 모델도 받을 수 있습니다");
     });
-    document.getElementById("clearHfTokenBtn").addEventListener("click", () => {
-      if (!confirm("등록된 토큰을 지울까요? gated 모델은 다시 받을 수 없게 됩니다.")) return;
+    document.getElementById("clearHfTokenBtn").addEventListener("click", async () => {
+      if (!(await gijoAsk("등록된 토큰을 지울까요? gated 모델은 다시 받을 수 없게 됩니다.", { ok: "지우기", danger: true }))) return;
       saveModelAuth({ token: "" }, "토큰을 지웠습니다");
     });
     document.getElementById("saveHfProxyBtn").addEventListener("click", () => {

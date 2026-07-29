@@ -365,13 +365,13 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     if (!item) return;
     const id = item.dataset.id;
     if (e.target.dataset.del) {
-      await window.gijo.deleteLearnloopLog(id).catch((err) => alert("삭제 실패: " + err.message));
+      await window.gijo.deleteLearnloopLog(id).catch((err) => gijoTell("삭제 실패: " + err.message));
       await loadLogs();
     } else if (e.target.dataset.rate) {
       const val = Number(e.target.dataset.rate);
       // 같은 버튼을 다시 누르면 평가 해제
       const already = (val === 1 && e.target.classList.contains("on-up")) || (val === -1 && e.target.classList.contains("on-down"));
-      await window.gijo.rateLearnloopLog(id, already ? 0 : val).catch((err) => alert("평가 실패: " + err.message));
+      await window.gijo.rateLearnloopLog(id, already ? 0 : val).catch((err) => gijoTell("평가 실패: " + err.message));
       await loadLogs();
     }
   }
@@ -413,8 +413,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const btn = document.getElementById("runBtn");
     const line = document.getElementById("actionLine");
     // 사전 점검이 실패 상태면 한 번 더 경고(그래도 강행은 허용 — 기존 데이터셋만 있으면 될 수도 있음).
-    if (preflightReady === false && !confirm("사전 점검에서 빠진 준비물이 있습니다.\n이대로 실행하면 도중에 실패할 수 있어요.\n그래도 계속할까요?")) return;
-    if (!confirm("학습 루프를 실행합니다.\n진행 중에는 채팅·문서검색이 일시 중지됩니다 (완료 후 자동 재개).\n계속할까요?")) return;
+    if (preflightReady === false && !await gijoAsk("사전 점검에서 빠진 준비물이 있습니다.\n이대로 실행하면 도중에 실패할 수 있어요.\n그래도 계속할까요?")) return;
+    if (!await gijoAsk("학습 루프를 실행합니다.\n진행 중에는 채팅·문서검색이 일시 중지됩니다 (완료 후 자동 재개).\n계속할까요?")) return;
     btn.disabled = true;
     line.textContent = "";
     try {

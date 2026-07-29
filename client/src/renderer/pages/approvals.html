@@ -394,7 +394,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     box.querySelectorAll("[data-vdone]").forEach((b) => b.addEventListener("click", async () => {
       b.disabled = true;
       try { await window.gijo.setFindingReview(res.assetId, b.dataset.vdone, { status: "approved" }); await loadReviews(); }
-      catch (err) { alert("완료 처리 실패: " + ((err && err.message) || err)); b.disabled = false; }
+      catch (err) { gijoTell("완료 처리 실패: " + ((err && err.message) || err)); b.disabled = false; }
     }));
   }
 
@@ -475,14 +475,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.querySelectorAll("#rvDetail [data-set]").forEach((b) => b.addEventListener("click", async () => {
       b.disabled = true;
       try { await window.gijo.setFindingReview(a, k, { status: b.dataset.set }); await loadReviews(); }
-      catch (err) { alert("처리 실패: " + ((err && err.message) || err)); b.disabled = false; }
+      catch (err) { gijoTell("처리 실패: " + ((err && err.message) || err)); b.disabled = false; }
     }));
     // 배정 저장
     if ($("btnSaveAssign")) $("btnSaveAssign").addEventListener("click", async () => {
       const patch = { securityOwner: $("fOwner").value, assignee: $("fAssignee").value, dueDate: $("fDue").value };
       $("btnSaveAssign").disabled = true;
       try { await window.gijo.setFindingReview(a, k, patch); await loadReviews(); }
-      catch (err) { alert("저장 실패: " + ((err && err.message) || err)); $("btnSaveAssign").disabled = false; }
+      catch (err) { gijoTell("저장 실패: " + ((err && err.message) || err)); $("btnSaveAssign").disabled = false; }
     });
     // 메일
     if ($("btnMail")) $("btnMail").addEventListener("click", async () => {
@@ -490,7 +490,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       const to = prompt("담당자에게 보낼 이메일 주소:"); if (!to) return;
       btn.disabled = true; const orig = btn.textContent; btn.textContent = "보내는 중…";
       try { await window.gijo.notifyAssignee(a, k, to.trim()); btn.textContent = "✓ 발송됨"; setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 2500); }
-      catch (err) { alert("메일 발송 실패: " + ((err && err.message) || err)); btn.textContent = orig; btn.disabled = false; }
+      catch (err) { gijoTell("메일 발송 실패: " + ((err && err.message) || err)); btn.textContent = orig; btn.disabled = false; }
     });
     // 조치 검증 — 대상에 접속해 "정말 고쳐졌는지" 읽기 전용으로 확인한다(스캐너가 아니다).
     // 판정(PASS/FAIL/NA)과 함께 **실행한 명령·출력**을 그대로 보여준다 — 근거 없이는 못 믿는다.
@@ -513,7 +513,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     if ($("btnRescan")) $("btnRescan").addEventListener("click", async () => {
       const btn = $("btnRescan"); btn.disabled = true; const orig = btn.textContent; btn.textContent = "재스캔 중…";
       try { await window.gijo.scanAsset(a); await loadReviews(); }
-      catch (err) { alert("재스캔 실패: " + ((err && err.message) || err)); btn.textContent = orig; btn.disabled = false; }
+      catch (err) { gijoTell("재스캔 실패: " + ((err && err.message) || err)); btn.textContent = orig; btn.disabled = false; }
     });
     // 반려 패널 열기/확정/취소
     if ($("btnRejectOpen")) $("btnRejectOpen").addEventListener("click", () => { $("rejectPanel").style.display = "block"; });
@@ -523,7 +523,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       const note = $("rejectNote").value;
       $("btnRejectConfirm").disabled = true;
       try { await window.gijo.setFindingReview(a, k, { status: "rejected", rejectReason: reason, note }); await loadReviews(); }
-      catch (err) { alert("반려 실패: " + ((err && err.message) || err)); $("btnRejectConfirm").disabled = false; }
+      catch (err) { gijoTell("반려 실패: " + ((err && err.message) || err)); $("btnRejectConfirm").disabled = false; }
     });
   }
 
@@ -609,7 +609,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         setTimeout(() => URL.revokeObjectURL(a.href), 8000);
         btn.textContent = "저장 중…"; // 실제 완료는 download:done이 알려준다
       } catch (e) {
-        alert("VEX 내보내기 실패: " + ((e && e.message) || e));
+        gijoTell("VEX 내보내기 실패: " + ((e && e.message) || e));
         btn.textContent = orig; btn.disabled = false;
       }
     });
@@ -625,7 +625,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.getElementById("btnBulkAssign").addEventListener("click", async () => {
       const assignee = document.getElementById("bulkAssignee").value.trim();
       const dueDate = document.getElementById("bulkDue").value;
-      if (!assignee && !dueDate) { alert("담당자나 기한 중 하나는 입력하세요."); return; }
+      if (!assignee && !dueDate) { gijoTell("담당자나 기한 중 하나는 입력하세요."); return; }
       const btn = document.getElementById("btnBulkAssign");
       btn.disabled = true; const orig = btn.textContent; btn.textContent = "배정 중…";
       const patch = { ...(assignee ? { assignee } : {}), ...(dueDate ? { dueDate } : {}) };
@@ -638,7 +638,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       selected.clear();
       btn.textContent = orig; btn.disabled = false;
       await loadReviews();
-      if (fails.length) alert(`${ok}건 배정 완료 · ${fails.length}건 실패\n${fails[0]}`);
+      if (fails.length) gijoTell(`${ok}건 배정 완료 · ${fails.length}건 실패\n${fails[0]}`);
     });
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => {
