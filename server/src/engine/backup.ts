@@ -81,6 +81,21 @@ function pruneOldBackups(dir: string): number {
 }
 
 let backupTimer: NodeJS.Timeout | null = null;
+/** 마지막 스냅샷이 주기보다 오래됐는가(없으면 true). 기동 직후 백업 여부를 이걸로 정한다. */
+export function backupOverdue(): boolean {
+  const dir = backupDir();
+  try {
+    const times = fs
+      .readdirSync(dir)
+      .filter((f) => f.endsWith(".sqlite"))
+      .map((f) => fs.statSync(path.join(dir, f)).mtimeMs);
+    if (times.length === 0) return true;
+    return Date.now() - Math.max(...times) >= AUTO_BACKUP_INTERVAL_MS;
+  } catch {
+    return true; // 폴더가 없으면 한 번도 안 한 것이다
+  }
+}
+
 export function startBackupScheduler(): void {
   if (!AUTO_BACKUP_ENABLED || backupTimer) return;
   const tick = () => {
@@ -89,6 +104,21 @@ export function startBackupScheduler(): void {
       .catch((e) => console.warn(`[backup] 자동 백업 실패: ${e instanceof Error ? e.message : String(e)}`));
   };
   console.log(`[backup] 자동 백업 스케줄러 시작 (주기 ${Math.round(AUTO_BACKUP_INTERVAL_MS / 3600_000)}시간, 최근 ${BACKUP_KEEP}개 보관)`);
+
+  // ⚠ [2026-07-29 자가 진단이 잡은 실사고] setInterval만 걸면 **첫 백업이 기동 24시간 뒤**다.
+  // 운영 서버는 배포·모델 재시작으로 그보다 자주 재시작된다 — 그래서 이 기능이 만들어진
+  // 2026-07-23 이후 엿새 동안 운영에 백업이 **단 한 개도 없었다**(폴더조차 없었다).
+  // 기동 직후에도 한 번 확인해 밀렸으면 즉시 뜬다. 재시작이 잦아도 백업 폭풍이 나지 않는 이유는
+  // "마지막 스냅샷이 주기보다 오래됐을 때만" 돌기 때문이다.
+  const firstDelay = Number(process.env.GIJO_BACKUP_FIRST_DELAY_MS ?? 60_000); // 기동 부하가 지난 뒤
+  const first = setTimeout(() => {
+    if (backupOverdue()) {
+      console.log("[backup] 마지막 백업이 주기를 넘겨 기동 직후 1회 실행합니다");
+      tick();
+    }
+  }, firstDelay);
+  if (first.unref) first.unref();
+
   backupTimer = setInterval(tick, AUTO_BACKUP_INTERVAL_MS);
   if (backupTimer.unref) backupTimer.unref();
 }

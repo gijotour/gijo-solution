@@ -51,6 +51,7 @@ import { registerWorkLogRoutes } from "./engine/worklog";
 import { registerTimeSavedRoutes } from "./engine/timesaved";
 import { registerAnswerFeedbackRoutes } from "./engine/answerfeedback";
 import { registerModelAdoptionRoutes } from "./engine/modeladoption";
+import { registerObservabilityRoutes } from "./engine/observability";
 import { registerToolsRoutes } from "./engine/tools";
 import { registerTasksRoutes } from "./engine/tasks";
 import { registerMaintenanceRoutes } from "./engine/maintenance";
@@ -171,6 +172,7 @@ export function createApp(): Express {
   registerTimeSavedRoutes(app); // "AI가 아낀 시간" KPI(중-2)
   registerAnswerFeedbackRoutes(app); // 답변 지적 → 회귀셋 흡수(중-1)
   registerModelAdoptionRoutes(app); // 모델 채택 원장 — 게이트 통과분만 배포(중-4)
+  registerObservabilityRoutes(app); // 자가 진단(후-1 관측성)
   registerToolsRoutes(app);
   registerTasksRoutes(app);
   registerMaintenanceRoutes(app);

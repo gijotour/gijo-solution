@@ -36,6 +36,7 @@ import { listSchedules as listHardeningSchedules } from "./hardeningtargets";
 import { timeSavedText } from "./timesaved";
 import { feedbackSummaryText } from "./answerfeedback";
 import { adoptionSummaryText } from "./modeladoption";
+import { systemHealthText } from "./observability";
 import { listAnalysisEvents, analysisSummary, computeCorrelations } from "./analysishub";
 import { computeKpiSnapshot } from "./kpi";
 import { listSessions as listWorkSessions } from "./worksessions";
@@ -1387,6 +1388,17 @@ const TOOLS: AgentTool[] = [
     directAnswer: true,
     params: [],
     run: () => adoptionSummaryText(10),
+  },
+  {
+    name: "system_health",
+    label: "시스템 자가 진단",
+    domain: "cross",
+    write: false,
+    description:
+      '이 시스템이 지금 정상인지 스스로 점검해 보여준다 — 백업 최신성·지식베이스·데이터베이스·최근 오류·디스크 여유. 문제가 있으면 무엇을 하면 되는지까지 알려준다. "시스템 괜찮아?", "서버 상태 점검해줘", "이상 없어?"에 쓴다. 예: {}',
+    directAnswer: true,
+    params: [],
+    run: () => systemHealthText(),
   },
   {
     name: "analysis_status",
