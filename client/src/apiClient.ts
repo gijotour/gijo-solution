@@ -680,7 +680,18 @@ export const memoryApi = {
   // 지식베이스 위생 점검(상충·중복·신선도) — 삭제는 하지 않고 리포트만.
   hygiene: () => request<KbHygieneReport>("/api/kb-hygiene"),
   hygieneScan: () => request<KbHygieneReport>("/api/kb-hygiene/scan", { method: "POST" }),
+  // 기본 지식 번들(전-4) — 설치 시 실려 나가는 표준 지식의 버전·적용 상태.
+  knowledgeBundleStatus: () => request<KnowledgeBundleStatus>("/api/knowledge-bundle/status"),
 };
+
+export interface KnowledgeBundleStatus {
+  bundleVersion: string;
+  applied: { version: string; at: number; triples: number; docsIngested: number; docsSkipped: number } | null;
+  upToDate: boolean;
+  ontology: { sources: string[]; triples: number };
+  docs: { total: number; withFile: number };
+  attributions: string[];
+}
 
 export interface KbHygieneFinding { type: "duplicate" | "version_conflict" | "stale"; severity: "high" | "medium" | "low"; documents: string[]; reason: string; suggestion: string }
 export interface KbHygieneReport { scannedAt: string; totalDocs: number; findings: KbHygieneFinding[]; clean: boolean }

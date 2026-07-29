@@ -83,7 +83,11 @@ export async function bootstrapDocsBundle(): Promise<DocsBundleResult> {
   const existing = new Set((await listDocuments()).map((d) => d.documentId));
 
   for (const entry of manifest.files) {
-    if (existing.has(entry.file)) {
+    // 문서 id는 **파일명**이다 — 매니페스트 항목이 하위 폴더 경로(knowledge/…)여도 id에
+    // 접두를 남기면 안 된다(2026-07-29 실측 함정: 운영에 파일명 id로 이미 인입된 지식 문서가
+    // 경로 id로 한 번 더 들어가 중복 문서 = 검색 경합이 될 뻔했다).
+    const docId = path.basename(entry.file);
+    if (existing.has(docId)) {
       result.skipped.push(entry.file);
       continue;
     }
@@ -97,7 +101,7 @@ export async function bootstrapDocsBundle(): Promise<DocsBundleResult> {
       // classify=false로 넣는다. ① 분류는 LLM을 호출하는데 부팅 직후엔 아직 안 떠 있을 수 있고,
       // ② '매뉴얼'로 분류되면 보안제품 등록부에 자동 연결되는데(memory.linkManualToProduct)
       // GIJO 자체 매뉴얼이 남의 벤더 제품 매뉴얼로 붙는 건 등록부 오염이다.
-      await ingestText(entry.file, raw, scope, docPath, false);
+      await ingestText(docId, raw, scope, docPath, false);
       result.ingested.push(entry.file);
     } catch (err) {
       result.failed.push({ file: entry.file, reason: err instanceof Error ? err.message : String(err) });

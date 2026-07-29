@@ -54,8 +54,12 @@ if (fs.existsSync(manifestSrc)) {
   const missing = [];
   for (const entry of manifest.files ?? []) {
     const src = path.join(repoRoot, entry.file);
-    if (fs.existsSync(src)) fs.copyFileSync(src, path.join(docsOut, entry.file));
-    else missing.push(entry.file);
+    if (fs.existsSync(src)) {
+      const dest = path.join(docsOut, entry.file);
+      // 지식 번들(전-4)이 knowledge/ 하위 문서를 편입했다 — 하위 폴더 항목도 복사되게.
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.copyFileSync(src, dest);
+    } else missing.push(entry.file);
   }
   // 문서가 빠지면 설치본의 지식베이스가 그만큼 비어 채로 나간다 — 조용히 넘기면 배포 후에야
   // "설명을 못 한다"로 드러나므로 빌드를 세운다.

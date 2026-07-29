@@ -46,6 +46,7 @@ import { registerLocalEngineRoutes } from "./engine/localengine";
 import { registerFinetuneRoutes } from "./engine/finetune";
 import { registerLearnloopRoutes } from "./engine/learnloop";
 import { registerLearnCandidateRoutes } from "./engine/learncandidates";
+import { registerKnowledgeBundleRoutes } from "./engine/knowledgebundle";
 import { registerToolsRoutes } from "./engine/tools";
 import { registerTasksRoutes } from "./engine/tasks";
 import { registerMaintenanceRoutes } from "./engine/maintenance";
@@ -161,6 +162,7 @@ export function createApp(): Express {
   registerFinetuneRoutes(app);
   registerLearnloopRoutes(app);
   registerLearnCandidateRoutes(app); // 학습 후보함(환류 1단계, 2026-07-29)
+  registerKnowledgeBundleRoutes(app); // 기본 지식 번들(전-4, 2026-07-29)
   registerToolsRoutes(app);
   registerTasksRoutes(app);
   registerMaintenanceRoutes(app);

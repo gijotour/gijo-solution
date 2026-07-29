@@ -139,6 +139,10 @@ tr:last-child td{border-bottom:none;}
         <span class="un-ic">📥</span>
         <span>문서(PDF · HWPX · 텍스트)는 <b>아래 대화 콘솔의 ＋</b>에서 올리세요 — 올리는 즉시 장기 기억에 들어가고, 업무영역도 자동 분류됩니다. 올린 문서는 아래 <b>문서 관리</b>에서 확인·수정합니다.</span>
       </div>
+      <!-- 기본 지식 번들 상태(전-4) — 실데이터 한 줄. 설명·용어는 screenguide "기본 지식 번들" 패널로. -->
+      <div id="bundleStatusLine" class="upload-note" style="display:none;margin-top:8px">
+        <span class="un-ic">📦</span><span id="bundleStatusText"></span>
+      </div>
       <div class="field-row" style="align-items:flex-end">
         <div class="field">
           <label for="ingestScopeSelect">대상 에이전트 (아래 경로 수집에 적용)</label>
@@ -332,6 +336,19 @@ tr:last-child td{border-bottom:none;}
       const user = await window.gijo.me();
       avatarBtn.textContent = (user.displayName || user.username || "-").charAt(0);
     } catch (e) {}
+  }
+
+  // 기본 지식 번들 상태 — 서버 실측값 한 줄. 실패하면 줄 자체를 숨긴다(가짜 문구 금지).
+  async function loadBundleStatus() {
+    try {
+      const st = await window.gijo.knowledgeBundleStatus();
+      const el = document.getElementById("bundleStatusText");
+      const when = st.applied ? new Date(st.applied.at).toLocaleDateString("ko-KR") : null;
+      el.innerHTML = st.applied
+        ? `기본 지식 번들 <b>${st.bundleVersion}</b> 적용됨 (${when}) — 표준 관계 ${st.ontology.triples.toLocaleString()}개 · 기본 문서 ${st.docs.total}종${st.upToDate ? "" : " · <span style='color:var(--amber)'>새 버전 대기</span>"}`
+        : `기본 지식 번들 <b>${st.bundleVersion}</b> — 아직 적용 전(서버 재시작 시 자동 적용)`;
+      document.getElementById("bundleStatusLine").style.display = "";
+    } catch (e) { /* 구서버(라우트 없음)면 조용히 숨김 유지 */ }
   }
 
   async function loadAgentScopes() {
@@ -837,6 +854,8 @@ tr:last-child td{border-bottom:none;}
     await loadUser();
     await loadHealth();
     await loadAgentScopes();
+    loadBundleStatus(); // 실패해도 화면 로드는 계속 — await 안 한다
+
     await loadDocuments();
     loadHygiene();
     document.getElementById("hygieneScanBtn").addEventListener("click", function (e) { e.stopPropagation(); loadHygiene(true); });

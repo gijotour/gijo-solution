@@ -25,6 +25,7 @@ import { startSiemForwarding } from "./engine/siem";
 import { startKbHygieneScheduler } from "./engine/kbhygiene";
 import { refreshKev } from "./engine/kev";
 import { bootstrapDocsBundleWithRetry } from "./engine/docsbundle";
+import { ensureKnowledgeBundle } from "./engine/knowledgebundle";
 import { bootSmtpInboundIfEnabled, stopSmtpInbound } from "./engine/smtpinbound";
 import { closeHttpServer } from "./util/gracefulClose";
 
@@ -81,6 +82,7 @@ httpServer.listen(PORT, () => {
   // 제품 문서 기본 코퍼스를 지식베이스에 인입 — 이게 있어야 "이 화면 뭐예요"에 근거를 갖고
   // 답한다(비어 있으면 지어내거나 '자료 없음'만 답한다). 임베딩 서버 기동을 기다려 재시도한다.
   void bootstrapDocsBundleWithRetry();
+  void ensureKnowledgeBundle(); // 기본 지식 번들 버전 확인·자동 적용(멱등, 전-4)
 });
 
 // 서버 프로세스 종료 시 자식으로 띄운 llama-server가 고아 프로세스로 남지 않도록 함께 정리한다.

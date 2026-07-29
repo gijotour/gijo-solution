@@ -73,6 +73,36 @@ describe("docsbundle — 제품 문서 기본 코퍼스 부트스트랩", () => 
     expect(r.skipped).toEqual(["매뉴얼.md"]);
   });
 
+  // [전중후 계획서 정렬: 전-4] 지식 번들이 knowledge/ 하위 경로 항목을 편입하면서 생긴 함정 —
+  // 운영에는 같은 문서가 이미 **파일명 id**로 수동 인입돼 있다. 경로째 id를 쓰면 같은 내용이
+  // 두 id로 이중 인입되어 검색 경합(QA-M04류)이 된다. id는 언제나 basename이어야 한다.
+  it("하위 폴더 항목은 파일명이 id — 같은 파일명이 이미 있으면 경로가 달라도 건너뛴다", async () => {
+    const sub = path.join(DOCS_DIR, "knowledge");
+    fs.mkdirSync(sub, { recursive: true });
+    fs.writeFileSync(path.join(sub, "지침.md"), "# 취약점 관리 지침\n(번들 사본)", "utf-8");
+    writeManifest([{ file: "knowledge/지침.md" }]);
+
+    const before = (await listDocuments()).length;
+    const r = await bootstrapDocsBundle();
+
+    expect(r.skipped).toEqual(["knowledge/지침.md"]); // 기존 "지침.md"(파일명 id)와 일치 → 스킵
+    expect(r.ingested).toEqual([]);
+    expect((await listDocuments()).length).toBe(before); // 문서 수 불변 — 중복 없음
+  });
+
+  it("하위 폴더의 새 문서는 파일명 id로 인입된다 (경로 접두가 id에 남지 않는다)", async () => {
+    const sub = path.join(DOCS_DIR, "knowledge");
+    fs.writeFileSync(path.join(sub, "번들전용.md"), "# 번들 전용 지식\n제로트러스트는 신뢰하지 않고 검증합니다.", "utf-8");
+    writeManifest([{ file: "knowledge/번들전용.md" }]);
+
+    const r = await bootstrapDocsBundle();
+
+    expect(r.ingested).toEqual(["knowledge/번들전용.md"]);
+    const ids = (await listDocuments()).map((d) => d.documentId);
+    expect(ids).toContain("번들전용.md"); // basename id
+    expect(ids).not.toContain("knowledge/번들전용.md"); // 경로 id 금지
+  });
+
   it("매니페스트가 없으면 조용히 아무것도 하지 않는다 (서버 기동을 막지 않는다)", async () => {
     process.env.GIJO_DOCS_MANIFEST = path.join(tmp, "없는매니페스트.json");
     try {
