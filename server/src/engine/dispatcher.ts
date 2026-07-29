@@ -26,6 +26,8 @@ import { recordFindings, getAsset, listAssets } from "./assets";
 import { listFindings } from "./cti";
 import { matchCtiToAssets } from "./ctimatch";
 import { generateReport } from "./report";
+import { listFindingReviews } from "./approvals";
+import { listMaintenanceItems } from "./maintenance";
 import { appendTurn, recentTurnsText, getSession, createSession } from "./worksessions";
 import { LONG_ANSWER_MS, startLongAnswer, finishLongAnswer, failLongAnswer } from "./longanswer";
 
@@ -155,6 +157,53 @@ function reportClarification(): string {
     "",
     "리포트 화면의 [＋ 리포트 생성]에서 종류·대상·형식(DOCX·PDF)을 직접 고를 수도 있습니다.",
   ].join("\n");
+}
+
+// ── 시연 실측(2026-07-29, 계획서 전-1)이 잡은 라우팅 결함용 결정적 분기 재료 ──────────
+// "보고서를 만들어 달라"는 의도 — 조회(스케줄·이력)와 갈라야 한다.
+export const REPORT_CREATE_RE = /(리포트|보고서)[^\n]{0,12}(만들|생성|작성|뽑|출력)|(만들|생성|작성)[^\n]{0,8}(리포트|보고서)/;
+export const REPORT_QUERY_EXCLUDE_RE = /스케줄|일정|예약|언제|이력|목록/;
+
+// "반려 사유가 주로 뭐였어?" — 사내 이력 질문. 데이터는 취약점 검토·유지보수 점검 두 곳에 실재한다.
+export const REJECT_HISTORY_RE = /반려[^\n]{0,10}(사유|이유|왜|뭐|얼마나|몇|이력|내역)|(오탐|보상통제)[^\n]{0,8}(이력|내역|얼마나|몇\s*건)/;
+
+const REJECT_REASON_LABEL: Record<string, string> = { false_positive: "오탐", compensating_control: "보상통제" };
+
+/** 반려 이력을 실데이터로 요약한다 — LLM 없이. 지시문에 대상 낱말이 있으면 그걸로 거른다. */
+export function formatRejectHistory(instructionText: string): string {
+  const STOP = /^(반려|사유|이유|주로|뭐였어|뭐야|왜|이력|내역|알려줘|보여줘|얼마나|몇|건|의|은|는)$/;
+  const keywords = instructionText.split(/\s+/).map((w) => w.replace(/[?.,!]/g, "")).filter((w) => w.length >= 2 && !STOP.test(w));
+
+  const vulnAll = listFindingReviews().filter((r) => r.status === "rejected");
+  const maintAll = listMaintenanceItems().filter((m) => m.status === "rejected");
+  const hits = (text: string) => keywords.some((k) => text.toLowerCase().includes(k.toLowerCase()));
+  let vuln = keywords.length ? vulnAll.filter((r) => hits(`${r.assetId} ${r.findingKey} ${r.note ?? ""}`)) : vulnAll;
+  let maint = keywords.length ? maintAll.filter((m) => hits(`${m.title} ${m.reviewNote ?? ""}`)) : maintAll;
+  let scopeNote = "";
+  if (keywords.length && vuln.length + maint.length === 0) {
+    // 대상 낱말로는 0건 — 억지로 좁히지 말고 전체를 보여주되 그 사실을 말한다(정직).
+    vuln = vulnAll; maint = maintAll;
+    scopeNote = `\n(※ "${keywords.join(" ")}"에 해당하는 반려는 없어 전체 이력을 보여드립니다)`;
+  }
+  if (vuln.length + maint.length === 0) {
+    return "반려 이력이 아직 없습니다 — 취약점 검토(조치·승인 화면)나 유지보수 점검에서 반려가 생기면 여기 사유별로 집계됩니다.";
+  }
+  const byReason = new Map<string, number>();
+  for (const r of vuln) byReason.set(REJECT_REASON_LABEL[r.rejectReason ?? ""] ?? "사유 미기재", (byReason.get(REJECT_REASON_LABEL[r.rejectReason ?? ""] ?? "사유 미기재") ?? 0) + 1);
+  const fmt = (ms: number | null | undefined) => (ms ? new Date(ms).toLocaleDateString("ko-KR", { month: "2-digit", day: "2-digit" }) : "-");
+  const lines: string[] = [
+    `반려 이력 요약 — 취약점 검토 ${vuln.length}건 · 유지보수 점검 ${maint.length}건${scopeNote}`,
+  ];
+  if (byReason.size) lines.push(`사유 분포(취약점): ${[...byReason.entries()].map(([k, v]) => `${k} ${v}건`).join(" · ")}`);
+  const recentV = [...vuln].sort((a, b) => (b.reviewedAt ?? 0) - (a.reviewedAt ?? 0)).slice(0, 5);
+  for (const r of recentV) {
+    lines.push(`  - [취약점] ${r.findingKey} @ ${r.assetId} — ${REJECT_REASON_LABEL[r.rejectReason ?? ""] ?? "사유 미기재"}${r.note ? ` · ${String(r.note).slice(0, 60)}` : ""} (${r.reviewedBy ?? "-"}, ${fmt(r.reviewedAt)})`);
+  }
+  const recentM = [...maint].sort((a, b) => (b.reviewedAt ?? 0) - (a.reviewedAt ?? 0)).slice(0, 5);
+  for (const m of recentM) {
+    lines.push(`  - [점검] ${m.title} — ${m.reviewNote ? String(m.reviewNote).slice(0, 60) : "사유 미기재"} (${m.reviewedBy ?? "-"}, ${fmt(m.reviewedAt)})`);
+  }
+  return lines.join("\n");
 }
 
 async function executeRoutedAction(route: RoutedIntent, instructionText: string, contextText = "", screen?: string): Promise<ActionResult> {
@@ -355,7 +404,7 @@ export async function dispatchInstruction(instructionText: string, sessionId?: s
     // "어느 세션에서 온 작업인지"가 로그에 드러나게 한다(대시보드 📡 실시간 협업 피드에 표시).
     emitCollaboration({ from: "세션", to: "orchestrator", message: `💬 [${title}] ${instructionText}` });
   }
-  const core = await dispatchInstructionCore(instructionText, contextText, screen);
+  const core = await dispatchInstructionCore(instructionText, contextText, screen, actor);
   const result: DispatchResult = { ...core, ...(await computeOfferSignals(core, instructionText, screen)) };
   if (session) {
     appendTurn(session.id, "assistant", result.output, turnToolTag(result));
@@ -426,7 +475,7 @@ function turnToolTag(r: DispatchResult): string | undefined {
   return undefined;
 }
 
-async function dispatchInstructionCore(instructionText: string, contextText = "", screen?: string): Promise<DispatchResult> {
+async function dispatchInstructionCore(instructionText: string, contextText = "", screen?: string, actor?: string): Promise<DispatchResult> {
   // 런타임 가드레일 — 입력의 프롬프트 인젝션 시도를 실시간 검사. block 모드면 거절, flag면 기록·경고 후 진행.
   // guardInput을 직접 부르지 않고 게이트웨이를 거친다 — 검사 지점을 한 곳으로 모아, 앞으로
   // 검사가 늘어도(PII·출력 필터 등) 모든 입구에 자동으로 적용되게 하기 위함이다.
@@ -524,6 +573,38 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     const completedTask = updated.find((t) => t.id === task.id) ?? task;
     const output = stepResults.map((r, i) => `【${i + 1}. ${r.label}】 ${r.output}`).join("\n\n");
     return { task: completedTask, route: { agentId: "orchestrator", action: "chat" }, output, steps: stepResults };
+  }
+
+  // ── 시연 실측이 잡은 라우팅 결함 2건의 결정적 분기 (2026-07-29, 계획서 전-1) ──────────
+  // ① "방화벽 반려 사유는 주로 뭐였어?" — 사내 반려 이력이 있는데 LLM 일반론으로 답했다.
+  //    반려 데이터는 두 곳(취약점 검토·유지보수 점검)에 실재하므로 코드가 직접 센다.
+  if (REJECT_HISTORY_RE.test(instructionText)) {
+    const task = createTask({ text: instructionText, agentId: "orchestrator", priority: "P3" });
+    completeTask(task.id);
+    return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatRejectHistory(instructionText) };
+  }
+  // ② "주간 보안 리포트 작성해줘" — 생성이 아니라 스케줄 조회 도구로 샜다(루프가 먼저 먹음).
+  //    생성 의도는 루프보다 먼저 잡아 실제 파일을 만든다. 대상이 불명확하면 기존 되물음.
+  if (REPORT_CREATE_RE.test(instructionText) && !REPORT_QUERY_EXCLUDE_RE.test(instructionText)) {
+    const task = createTask({ text: instructionText, agentId: "report", priority: "P2" });
+    if (needsReportDetail(instructionText)) {
+      completeTask(task.id);
+      return { task, route: { agentId: "report", action: "report" }, output: reportClarification() };
+    }
+    const audience = /경영진|임원|대외|제출|감사|공식/.test(instructionText) ? "official" : "internal";
+    const mentioned = listAssets().find((a) => instructionText.includes(a.name) || instructionText.includes(a.id));
+    const r = await generateReport({
+      type: "ondemand",
+      assetIds: mentioned ? [mentioned.id] : undefined,
+      audience,
+      createdBy: actor ?? "챗봇 지시",
+    });
+    completeTask(task.id);
+    return {
+      task,
+      route: { agentId: "report", action: "report" },
+      output: `${r.executiveSummary}\n\n(리포트 파일 생성됨: ${r.filePath} — 리포트 화면에서 열람·다운로드할 수 있습니다)`,
+    };
   }
 
   // 에이전트 루프를 intent 분류보다 **먼저** 시도한다. 등록된 도구로 답할 수 있으면 그것으로 끝낸다.

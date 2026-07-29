@@ -315,6 +315,15 @@ function namedProductIn(instruction: string): string | null {
   return null;
 }
 
+// [2026-07-29 시연 실측, 계획서 전-1] "SonicWall VPN 인증서 점검은 어떻게 해?"가 안내 대신
+// **실제 하드닝 점검을 실행**했다. 방법을 묻는 말과 실행 지시는 다르다 — 방법 질문이면
+// 점검 도구를 쓰지 않고 지식(RAG·채팅)으로 답한다. 실행은 명령형(점검해줘·실행·돌려)일 때만.
+export function isHowtoNotCommand(instruction: string): boolean {
+  const howto = /어떻게|어떤\s*방법|방법(을|이|은)?\s*(알려|뭐|있)|절차(가|를|는)?\s*(알려|뭐|어떻)|뭘\s*봐야/.test(instruction);
+  const imperative = /(점검|진단|스캔)\s*(해\s*줘|해줘|해라|하자|실행|시작|돌려)|돌려\s*줘|실행해/.test(instruction);
+  return howto && !imperative;
+}
+
 function forcedToolFor(instruction: string, scope?: ToolScope): { tool: string; args: Record<string, string> } | null {
   const available = new Set(listToolsFor(scope?.domains, scope?.role).map((t) => t.name));
 
@@ -332,6 +341,7 @@ function forcedToolFor(instruction: string, scope?: ToolScope): { tool: string; 
       if (f.tool === "briefing" && /리포트|보고서|report/i.test(instruction)) continue; // 문서 리포트는 briefing 아님
       // 하드닝 점검 기준 선택: CIS 명시→cis, PC/윈도우→kisa_pc, 네트워크 장비→kisa_net, 그 외→국내 CCE(kisa).
       if (f.tool === "run_hardening_scan") {
+        if (isHowtoNotCommand(instruction)) continue; // 방법 질문은 실행하지 않는다(2026-07-29)
         const standard = /\bcis\b|국제/i.test(instruction) ? "cis"
           : /\bpc\b|피시|윈도우|windows/i.test(instruction) ? "kisa_pc"
           : /네트워크\s*장비|스위치|라우터|cisco/i.test(instruction) ? "kisa_net"
@@ -406,6 +416,11 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
     let result: string;
     if (!tool) {
       result = `존재하지 않는 도구: ${decision.tool ?? "(없음)"}. 사용 가능한 도구 중에서만 골라라.`;
+    } else if (tool.name === "run_hardening_scan" && isHowtoNotCommand(instruction)) {
+      // LLM이 스스로 점검 도구를 골라도 방법 질문이면 실행을 막는다(2026-07-29 시연 실측).
+      // 첫 수라면 루프를 접고 지식(RAG·채팅)으로 넘긴다 — 그쪽이 방법 설명을 잘한다.
+      if (calls.length === 0) return null;
+      result = "이 지시는 점검 '방법'을 묻는 질문이라 점검을 실행하지 않았다. 아는 지식으로 절차를 설명하라.";
     } else if (tool.write) {
       // 쓰기 도구는 여기서 실행하지 않는다 — 값을 결재판으로 만들어 돌려주고, 사람이 승인해야
       // /api/agent/approve에서 실행된다(오발동 방지). 루프는 여기서 끝난다.
