@@ -105,6 +105,22 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 /* 수집 로그 */
 .log-list{display:flex;flex-direction:column;gap:8px;}
 .log-item{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:11px 14px;}
+/* 학습 후보함(환류 1단계, 2026-07-29) */
+.lc-card{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:12px 14px;margin-bottom:8px;}
+.lc-card.lc-dim{opacity:.75;}
+.lc-top{display:flex;gap:6px;align-items:center;margin-bottom:7px;flex-wrap:wrap;}
+.lc-sig{font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:5px;}
+.lc-doc{color:var(--teal);background:rgba(30,185,128,.13);}
+.lc-tool{color:var(--blue-light);background:rgba(59,130,246,.13);}
+.lc-ok{color:var(--teal);background:rgba(30,185,128,.08);}
+.lc-src{color:var(--muted);background:rgba(255,255,255,.06);}
+.lc-weak{color:#f5928a;background:rgba(226,72,61,.12);}
+.lc-q{font-size:12.5px;font-weight:700;color:#fff;margin-bottom:4px;word-break:break-all;}
+.lc-a{font-size:11.5px;color:var(--muted);line-height:1.65;word-break:break-all;}
+.lc-act{display:flex;gap:6px;margin-top:9px;}
+.lc-yes{background:var(--teal);color:#06281c;border:none;border-radius:7px;padding:6px 14px;font-size:11.5px;font-weight:800;cursor:pointer;}
+.lc-no{background:transparent;color:var(--muted);border:1px solid var(--border-strong);border-radius:7px;padding:6px 12px;font-size:11.5px;cursor:pointer;}
+.lc-yes:disabled,.lc-no:disabled{opacity:.5;cursor:default;}
 .log-q{font-size:12.5px;font-weight:700;color:#fff;line-height:1.5;}
 .log-a{font-size:12px;color:var(--muted);line-height:1.6;margin-top:4px;max-height:60px;overflow:hidden;}
 .log-foot{display:flex;align-items:center;gap:8px;margin-top:8px;}
@@ -203,6 +219,30 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         <button class="btn-ghost" id="cfgSaveBtn">저장</button>
         <span class="run-line" id="cfgLine"></span>
       </div>
+    </div>
+
+    <!-- 학습 후보함 — 환류 1단계(2026-07-29 시안 승인, 계획서 전-3).
+         진단 실측: 로그 200건 중 👍 1건, 학습 실행 0회 — 버튼을 기다리는 설계가 굶어 죽었다.
+         코드가 후보를 골라 내밀고(전부 결정적 규칙, LLM 없음) 담당자는 승인 한 번만 한다.
+         승인 = 👍 기록 → 아래 기존 정제·데이터셋·학습 흐름이 그대로 이어받는다. -->
+    <div class="cat" data-gijo-fold="학습 후보함" data-gijo-fold-open data-gijo-fold-badges="lcStrong:신호 강함:warn">
+      <div class="cat-head"><span style="font-size:18px">🗳</span><span class="cat-title">학습 후보함</span></div>
+      <div class="cat-intro">쌓인 대화·작업 내역에서 <b>배울 만한 문답을 코드가 골라</b> 놓았습니다. 승인하면 👍로 기록되어 다음 학습에 채택됩니다 — 승인 없이 자동으로 학습되는 일은 없습니다. 잘못 승인해도 아래 수집된 대화에서 👎로 되돌리면 됩니다.</div>
+      <div class="kpi-grid" style="margin-bottom:10px">
+        <div class="kpi"><div class="k-label">후보</div><div class="k-value" id="lcCount">-</div></div>
+        <div class="kpi"><div class="k-label">신호 강함(3점↑)</div><div class="k-value" id="lcStrong" style="color:var(--amber)">-</div></div>
+        <div class="kpi"><div class="k-label">승인됨(👍 대기)</div><div class="k-value" id="lcApproved" style="color:var(--teal)">-</div></div>
+        <div class="kpi"><div class="k-label">지식 구멍</div><div class="k-value" id="lcGaps" style="color:var(--amber)">-</div></div>
+      </div>
+      <div id="lcGapLine" style="display:none;align-items:center;gap:8px;background:rgba(240,160,32,.07);border:1px solid rgba(240,160,32,.25);border-radius:9px;padding:9px 12px;font-size:12px;margin-bottom:10px">
+        💡 <b style="color:var(--amber)">못 답한 질문 <span id="lcGapN">0</span>건</b> — 학습이 아니라 <b>문서가 없어서</b>입니다. 그 문서를 올리면 재학습 없이 바로 답합니다.
+        <span id="lcGapGo" style="margin-left:auto;color:var(--blue-light);cursor:pointer;white-space:nowrap">작업 내역의 패턴 보기 →</span>
+      </div>
+      <div class="actions-row" style="margin-bottom:8px">
+        <button class="btn-primary" id="lcBulkBtn">신호 강한 후보 모두 승인</button>
+        <span class="run-line" id="lcLine"></span>
+      </div>
+      <div id="lcList"><div style="color:var(--muted);font-size:12px">불러오는 중...</div></div>
     </div>
 
     <div class="cat">
@@ -327,6 +367,86 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   }
 
   // ── KPI + 로그 목록 ────────────────────────────────────────────────
+  // ── 학습 후보함 (환류 1단계, 2026-07-29) ──────────────────────────────
+  function lcSignalTags(c) {
+    const t = [];
+    if (c.signals.cite) t.push('<span class="lc-sig lc-doc">📄 근거 인용</span>');
+    if (c.signals.tool) t.push('<span class="lc-sig lc-tool">🔧 도구 성공</span>');
+    if (c.signals.accepted) t.push('<span class="lc-sig lc-ok">수용됨</span>');
+    t.push(`<span class="lc-sig lc-src">출처: ${c.source === "worksession" ? "작업 내역" : "대화 로그"} ${new Date(c.createdAt).toLocaleDateString("ko-KR", { month: "2-digit", day: "2-digit" })}</span>`);
+    if (c.score < 3) t.push('<span class="lc-sig lc-weak">신호 약함</span>');
+    return t.join("");
+  }
+
+  async function loadCandidates() {
+    const list = document.getElementById("lcList");
+    try {
+      const [r, patterns] = await Promise.all([
+        window.gijo.listLearnCandidates(),
+        window.gijo.sessionPatterns(30).catch(() => null),
+      ]);
+      document.getElementById("lcCount").textContent = r.kpis.candidates;
+      document.getElementById("lcStrong").textContent = r.kpis.strong;
+      const gaps = patterns && patterns.지식공백 ? patterns.지식공백.length : 0;
+      document.getElementById("lcGaps").textContent = gaps;
+      if (gaps > 0) {
+        document.getElementById("lcGapLine").style.display = "flex";
+        document.getElementById("lcGapN").textContent = gaps;
+      } else {
+        document.getElementById("lcGapLine").style.display = "none";
+      }
+      // 승인됨(👍 대기) = 기존 KPI의 미사용 👍 수와 같은 값 — loadLogs가 채우는 것을 재사용
+      try { document.getElementById("lcApproved").textContent = document.getElementById("kpiPositive").textContent; } catch (e) {}
+      list.innerHTML = r.candidates.length
+        ? r.candidates.map((c) =>
+            `<div class="lc-card${c.score < 3 ? " lc-dim" : ""}" data-id="${esc(c.id)}">` +
+            `<div class="lc-top">${lcSignalTags(c)}</div>` +
+            `<div class="lc-q">Q. ${esc(c.question).slice(0, 160)}</div>` +
+            `<div class="lc-a">A. ${esc(c.answer).slice(0, 220)}</div>` +
+            `<div class="lc-act"><button class="lc-yes" data-accept="1">✓ 승인 — 학습에 채택</button>` +
+            `<button class="lc-no" data-accept="0">✕ 제외</button></div></div>`
+          ).join("")
+        : '<div style="color:var(--muted);font-size:12px">지금은 후보가 없습니다 — 대화가 더 쌓이면 코드가 다시 골라 놓습니다.</div>';
+    } catch (e) {
+      list.innerHTML = '<div style="color:#f5928a;font-size:12px">후보를 불러오지 못했습니다: ' + esc((e && e.message) || e) + "</div>";
+    }
+  }
+
+  async function onCandidateAction(e) {
+    const btn = e.target.closest("[data-accept]");
+    if (!btn) return;
+    const card = btn.closest(".lc-card");
+    const id = card.dataset.id;
+    btn.disabled = true;
+    try {
+      await window.gijo.decideLearnCandidate(id, btn.dataset.accept === "1");
+      card.style.opacity = ".35";
+      card.querySelectorAll("button").forEach((b) => (b.disabled = true));
+      // 승인은 👍 수에 바로 반영된다 — KPI를 다시 읽어 화면 숫자가 거짓말하지 않게.
+      await loadLogs();
+      try { document.getElementById("lcApproved").textContent = document.getElementById("kpiPositive").textContent; } catch (err) {}
+    } catch (err) {
+      btn.disabled = false;
+      gijoTell("처리 실패: " + ((err && err.message) || err));
+    }
+  }
+
+  async function onBulkAccept() {
+    const line = document.getElementById("lcLine");
+    const strong = Number(document.getElementById("lcStrong").textContent) || 0;
+    if (!strong) { line.textContent = "신호 강한 후보가 없습니다"; return; }
+    if (!(await gijoAsk(`신호 강한 후보 ${strong}건을 모두 승인할까요?\n승인 = 👍 기록 — 다음 데이터셋에 채택됩니다.`, { ok: "모두 승인" }))) return;
+    line.textContent = "승인 중…";
+    try {
+      const r = await window.gijo.acceptStrongLearnCandidates(3);
+      line.textContent = `✓ ${r.accepted}건 승인됨 — 아래 '데이터셋만 만들기'로 바로 이을 수 있습니다`;
+      await loadCandidates();
+      await loadLogs();
+    } catch (e) {
+      line.textContent = "실패: " + ((e && e.message) || e);
+    }
+  }
+
   async function loadLogs() {
     try {
       const { logs, kpis } = await window.gijo.listLearnloopLogs(50, 0);
@@ -517,6 +637,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.getElementById("pfBtn").addEventListener("click", loadPreflight);
     document.getElementById("cfgSaveBtn").addEventListener("click", saveConfig);
     document.getElementById("logList").addEventListener("click", onLogAction);
+    // 학습 후보함(환류 1단계)
+    loadCandidates();
+    document.getElementById("lcList").addEventListener("click", onCandidateAction);
+    document.getElementById("lcBulkBtn").addEventListener("click", onBulkAccept);
+    document.getElementById("lcGapGo").addEventListener("click", () => window.gijo.navigateTo("sessions.html"));
   }
 
   if (!window.gijo.isAuthenticated()) {

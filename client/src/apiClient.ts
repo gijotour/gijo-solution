@@ -961,6 +961,19 @@ export const learnloopApi = {
   buildDataset: (includeUnrated?: boolean) =>
     request<{ datasetId: string; examples: number }>("/api/learnloop/build-dataset", { method: "POST", body: { includeUnrated } }),
   run: (datasetId?: string) => request<LearnloopRun>("/api/learnloop/run", { method: "POST", body: { datasetId } }),
+  // 학습 후보함(환류 1단계, 2026-07-29) — 코드가 고른 후보를 승인/제외. 승인=👍 기록.
+  candidates: (days?: number, limit?: number) =>
+    request<{
+      candidates: {
+        id: string; source: "chatlog" | "worksession"; question: string; answer: string; createdAt: number;
+        signals: { cite: boolean; tool: boolean; accepted: boolean; lengthOk: boolean }; score: number;
+      }[];
+      kpis: { candidates: number; strong: number; excludedByReason: Record<string, number> };
+    }>(`/api/learnloop/candidates?days=${days ?? 30}&limit=${limit ?? 60}`),
+  decideCandidate: (id: string, accept: boolean) =>
+    request<{ ok: true }>("/api/learnloop/candidates/decide", { method: "POST", body: { id, accept } }),
+  acceptStrongCandidates: (minScore?: number) =>
+    request<{ accepted: number }>("/api/learnloop/candidates/accept-strong", { method: "POST", body: { minScore } }),
   status: () => request<{ running: boolean; run: LearnloopRun | null }>("/api/learnloop/status"),
   runs: () => request<LearnloopRun[]>("/api/learnloop/runs"),
   getConfig: () => request<LearnloopConfig>("/api/learnloop/config"),
