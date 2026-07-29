@@ -13,7 +13,7 @@
 //   3) 실사용만 — QA·평가 게이트가 만든 문답은 애초에 세션에 안 남으므로 여기 섞이지 않는다.
 import type { Express, Request } from "express";
 import { db, migrate } from "../db";
-import { authMiddleware } from "../auth/auth";
+import { authMiddleware, adminMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { recordAudit } from "./audit";
 import type { GijoUser } from "../auth/users";
@@ -193,13 +193,21 @@ export function registerAnswerFeedbackRoutes(app: Express): void {
     res.json({ days, entries: listFeedback(days), summary: feedbackSummaryText(days) });
   });
 
-  app.post("/api/answer-feedback/:id/status", authMiddleware, (req, res) => {
+  // 상태 변경은 admin — 지적을 회귀 문항으로 편입할지 접을지는 품질 판단이다(등록·조회는 누구나).
+  app.post("/api/answer-feedback/:id/status", authMiddleware, adminMiddleware, (req, res) => {
     const status = String((req.body as { status?: string })?.status ?? "");
     if (!["open", "promoted", "dismissed"].includes(status)) {
       res.status(400).json({ error: "status는 open·promoted·dismissed 중 하나여야 합니다" });
       return;
     }
-    setFeedbackStatus(Number(req.params.id), status as AnswerFeedback["status"], (req as Request & { user?: GijoUser }).user?.displayName);
+    const id = Number(req.params.id);
+    // 없는 id에 200을 돌려주면 화면이 처리된 줄 안다 — 없으면 없다고 말한다.
+    const exists = db.prepare("SELECT 1 FROM answer_feedback WHERE id = ?").get(id);
+    if (!exists) {
+      res.status(404).json({ error: "해당 지적을 찾지 못했습니다" });
+      return;
+    }
+    setFeedbackStatus(id, status as AnswerFeedback["status"], (req as Request & { user?: GijoUser }).user?.displayName);
     res.json({ ok: true });
   });
 

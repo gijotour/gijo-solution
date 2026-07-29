@@ -63,7 +63,7 @@ export function createAlertSchedule(kind: AlertKind, hourLocal: number, recipien
   if (!Number.isInteger(hourLocal) || hourLocal < 0 || hourLocal > 23) throw new Error("시각은 0~23 사이 정수여야 합니다");
   const to = recipients.map((r) => r.trim()).filter(Boolean);
   if (to.length === 0) throw new Error("받는 사람이 최소 한 명 필요합니다");
-  const id = `alert-${kind}-${Date.now().toString(36)}`;
+  const id = `alert-${kind}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`; // 같은 ms에 두 개 만들어도 겹치지 않게
   db.prepare(
     "INSERT INTO alert_schedules (id, kind, hourLocal, recipients, enabled, lastRunAt, lastResult, lastError, createdAt) VALUES (?,?,?,?,1,NULL,NULL,NULL,?)"
   ).run(id, kind, hourLocal, to.join(","), Date.now());

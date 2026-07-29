@@ -39,6 +39,23 @@ function collabNote(text: string): string {
   return t.length > 90 ? t.slice(0, 90) + "…" : t;
 }
 
+// 평가 게이트/QA 실행은 담당자의 작업 목록·활동 이력에 남기지 않는다(검토 지적 2026-07-29).
+// 게이트 1회는 99문항이라 협업 피드 링버퍼(500)를 밀어내고 작업 내역을 99건 부풀린다.
+// 판단 경로는 그대로 두고 "기록"만 비켜 간다 — 반환 형태는 같아야 하므로 임시 작업 객체를 만든다.
+function mkTask(qa: boolean | undefined, args: Parameters<typeof createTask>[0]): TaskItem {
+  if (!qa) return createTask(args);
+  return {
+    id: `qa-${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
+    priority: args.priority ?? "P2",
+    text: args.text,
+    agentId: args.agentId,
+    done: true,
+    createdAt: Date.now(),
+  } as TaskItem;
+}
+function collab(qa: boolean | undefined, e: Parameters<typeof emitCollaboration>[0]): void {
+  if (!qa) emitCollaboration(e);
+}
 export interface DispatchResult {
   task: TaskItem;
   route: RoutedIntent;
@@ -248,14 +265,14 @@ const AGENT_FOR_ACTION: Record<OrchestrationStep["action"], string> = { scan: "s
 // GIJO Agent(normaltic) 부연 — 스캔·분석 결과에 나온 용어·탐지 항목을 사내 지식베이스(RAG) 근거로
 // 해설하고 실제 사례를 부연한다. 단계마다 부르면 LLM 호출이 배로 늘어 파이프라인이 느려지므로
 // 스캔·분석이 모두 끝난 지점에 1회만 투입한다(2026-07-17 확정). 실패해도 파이프라인은 계속(보조 단계).
-async function runGijoEnrichment(results: StepResult[], fromAgentId: string): Promise<StepResult> {
+async function runGijoEnrichment(results: StepResult[], fromAgentId: string, qa?: boolean): Promise<StepResult> {
   const source = results
     .filter((r) => r.action === "scan" || r.action === "analyze")
     .map((r) => `[${r.label}] ${r.output}`)
     .join("\n")
     .slice(0, 1500); // 프롬프트 폭주 방지 — 용어 추출에는 앞부분 요약이면 충분
   setAgentStatus("normaltic", "working");
-  emitCollaboration({ from: fromAgentId, to: "normaltic", message: "스캔·분석 결과 용어 해설·사례 부연 요청" });
+  collab(qa, { from: fromAgentId, to: "normaltic", message: "스캔·분석 결과 용어 해설·사례 부연 요청" });
   let output: string;
   try {
     output = await chat({
@@ -266,7 +283,7 @@ async function runGijoEnrichment(results: StepResult[], fromAgentId: string): Pr
   } catch (err) {
     output = `부연 생략: ${err instanceof Error ? err.message : String(err)}`;
   }
-  emitCollaboration({ from: "normaltic", to: "orchestrator", message: `부연 완료: ${collabNote(output)}` });
+  collab(qa, { from: "normaltic", to: "orchestrator", message: `부연 완료: ${collabNote(output)}` });
   resetAgentToDefault("normaltic");
   return { action: "enrich", label: "용어 해설·사례 부연", output };
 }
@@ -282,10 +299,10 @@ async function runOrchestration(instructionText: string, steps: OrchestrationSte
   // 대조해 영향 자산을 찾고, 결과를 협업 피드로 알린다(매칭 자체는 규칙 엔진 ctimatch가 수행).
   const ctiAffected = async (): Promise<string[]> => {
     setAgentStatus("ti", "working");
-    emitCollaboration({ from: "orchestrator", to: "ti", message: "CTI ↔ 자산 자동 매칭 요청 — 위협 인텔을 자산 인벤토리와 대조" });
+    collab(qa, { from: "orchestrator", to: "ti", message: "CTI ↔ 자산 자동 매칭 요청 — 위협 인텔을 자산 인벤토리와 대조" });
     const findings = await listFindings();
     const ids = [...new Set(matchCtiToAssets(findings, listAssets()).matches.flatMap((m) => m.matchedAssets.map((a) => a.assetId)))];
-    emitCollaboration({ from: "ti", to: "orchestrator", message: ids.length ? `영향 자산 ${ids.length}개 매칭: ${ids.join(", ").slice(0, 100)}` : "영향 자산 없음 — 현재 CTI 위협과 매칭되는 자산이 없습니다" });
+    collab(qa, { from: "ti", to: "orchestrator", message: ids.length ? `영향 자산 ${ids.length}개 매칭: ${ids.join(", ").slice(0, 100)}` : "영향 자산 없음 — 현재 CTI 위협과 매칭되는 자산이 없습니다" });
     resetAgentToDefault("ti");
     return ids;
   };
@@ -296,7 +313,7 @@ async function runOrchestration(instructionText: string, steps: OrchestrationSte
     const step = steps[i];
     const agentId = AGENT_FOR_ACTION[step.action];
     setAgentStatus(agentId, "working");
-    emitCollaboration({ from: "orchestrator", to: agentId, message: `단계 ${i + 1}/${steps.length} — ${step.label}` });
+    collab(qa, { from: "orchestrator", to: agentId, message: `단계 ${i + 1}/${steps.length} — ${step.label}` });
 
     let output = "";
     let assetIds: string[] | undefined;
@@ -334,14 +351,14 @@ async function runOrchestration(instructionText: string, steps: OrchestrationSte
       output = `단계 실패: ${err instanceof Error ? err.message : String(err)}`;
     }
 
-    emitCollaboration({ from: agentId, to: "orchestrator", message: `단계 ${i + 1} 완료: ${collabNote(output)}` });
+    collab(qa, { from: agentId, to: "orchestrator", message: `단계 ${i + 1} 완료: ${collabNote(output)}` });
     resetAgentToDefault(agentId);
     results.push({ action: step.action, label: step.label, output, assetIds, findingCount });
 
     // 마지막 스캔/분석 단계가 끝나면 GIJO Agent가 결과 용어·사례를 부연한다.
     // 부연할 거리가 없으면(스캔 finding 0건 + 분석 단계도 없음) 건너뛴다.
     if (i === lastInterpretIdx && (accumulated.length > 0 || step.action === "analyze")) {
-      results.push(await runGijoEnrichment(results, agentId));
+      results.push(await runGijoEnrichment(results, agentId, qa));
     }
   }
 
@@ -365,9 +382,9 @@ const ATTACK_PATH_INTENT_RE = /공격\s*경로|attack\s*path|도달\s*(성|가�
 const KB_HYGIENE_INTENT_RE = /(지식\s*베이스|지식|문서|rag|자료).{0,6}(정리|중복|상충|위생|점검|청소|정돈)|(중복|상충)\s*(문서|자료)/i;
 const LEARN_RUN_RE = /실행|시작|돌려|가동|run|start/i;
 
-async function learnloopConfirmResult(instructionText: string): Promise<DispatchResult> {
+async function learnloopConfirmResult(instructionText: string, qa?: boolean): Promise<DispatchResult> {
   setAgentStatus("analysis", "working");
-  emitCollaboration({ from: "orchestrator", to: "analysis", message: "학습 루프 실행 요청 — 확인 절차 안내" });
+  collab(qa, { from: "orchestrator", to: "analysis", message: "학습 루프 실행 요청 — 확인 절차 안내" });
   const { listDatasets } = await import("./dataset.js");
   const datasets = listDatasets();
   const output = [
@@ -377,9 +394,9 @@ async function learnloopConfirmResult(instructionText: string): Promise<Dispatch
       ? `사용 가능한 데이터셋 ${datasets.length}개: ${datasets.map((d) => `${d.id}(${d.examples}건)`).join(", ")}`
       : "사용 가능한 데이터셋이 없습니다 — 학습 루프 화면에서 대화 로그로 데이터셋을 먼저 만들어 주세요.",
   ].join("\n");
-  emitCollaboration({ from: "analysis", to: "orchestrator", message: "학습 루프 실행 대기 — 화면에서 확인 필요" });
+  collab(qa, { from: "analysis", to: "orchestrator", message: "학습 루프 실행 대기 — 화면에서 확인 필요" });
   resetAgentToDefault("analysis");
-  const task = createTask({ text: instructionText, agentId: "analysis", priority: "P2" });
+  const task = mkTask(qa, { text: instructionText, agentId: "analysis", priority: "P2" });
   const updated = completeTask(task.id);
   const completedTask = updated.find((t) => t.id === task.id) ?? task;
   return { task: completedTask, route: { agentId: "analysis", action: "chat" }, output, confirm: { type: "learnloop", datasets } };
@@ -407,13 +424,13 @@ export async function dispatchInstruction(instructionText: string, sessionId?: s
     title = getSession(session.id)?.title ?? title;
     // 작업 세션의 지시를 실시간 에이전트 협업 로그에도 흘린다 — 세션 제목으로 꼬리표를 달아
     // "어느 세션에서 온 작업인지"가 로그에 드러나게 한다(대시보드 📡 실시간 협업 피드에 표시).
-    emitCollaboration({ from: "세션", to: "orchestrator", message: `💬 [${title}] ${instructionText}` });
+    collab(qa, { from: "세션", to: "orchestrator", message: `💬 [${title}] ${instructionText}` });
   }
   const core = await dispatchInstructionCore(instructionText, contextText, screen, actor);
   const result: DispatchResult = { ...core, ...(await computeOfferSignals(core, instructionText, screen)) };
   if (session) {
     appendTurn(session.id, "assistant", result.output, turnToolTag(result));
-    emitCollaboration({ from: "orchestrator", to: "세션", message: `💬 [${title}] ${result.output.slice(0, 600)}` });
+    collab(qa, { from: "orchestrator", to: "세션", message: `💬 [${title}] ${result.output.slice(0, 600)}` });
   }
   return session ? { ...result, sessionId: session.id } : result;
 }
@@ -490,10 +507,10 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   // 검사가 늘어도(PII·출력 필터 등) 모든 입구에 자동으로 적용되게 하기 위함이다.
   const guard = gateUserInput(instructionText, "dispatch");
   if (guard.flagged) {
-    emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `🛡 가드레일: 프롬프트 인젝션 시도 감지(${guard.categories.join(", ")})${guard.allowed ? " — 기록 후 진행" : " — 차단"}` });
+    collab(qa, { from: "orchestrator", to: "orchestrator", message: `🛡 가드레일: 프롬프트 인젝션 시도 감지(${guard.categories.join(", ")})${guard.allowed ? " — 기록 후 진행" : " — 차단"}` });
   }
   if (!guard.allowed) {
-    const task = createTask({ text: instructionText, agentId: "orchestrator", priority: "P1" });
+    const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P1" });
     completeTask(task.id);
     return {
       task,
@@ -505,7 +522,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   // 뜻을 알 수 없는 입력("1", ".", "ㅁ")은 LLM에 보내지 않는다 — 헤매다 10초를 쓰고
   // 그게 "오래 걸리는 작업"으로 판정돼 리포트까지 만들어졌다(2026-07-26 실측).
   if (isTooVague(instructionText)) {
-    const task = createTask({ text: instructionText, agentId: "orchestrator", priority: "P3" });
+    const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
     completeTask(task.id);
     return { task, route: { agentId: "orchestrator", action: "chat" }, output: vagueAnswer() };
   }
@@ -513,7 +530,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   // 보안 업무 밖 질문은 일관되게 거절하고 할 수 있는 것으로 되돌린다(2026-07-26 사용자 결정 ②).
   // 도구·RAG를 타기 전에 걸러야 한다 — 안 그러면 사내 문서에서 아무거나 끌어와 그럴듯하게 답한다.
   if (isOutOfScope(instructionText)) {
-    const task = createTask({ text: instructionText, agentId: "orchestrator", priority: "P3" });
+    const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
     completeTask(task.id);
     return { task, route: { agentId: "orchestrator", action: "chat" }, output: outOfScopeAnswer() };
   }
@@ -521,7 +538,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   // 도움말/사용법 의도는 화면별 가이드로 결정적으로 답한다(LLM·도구 없이). "이 화면 뭐 할 수 있어?"
   // 같은 질문이 예전엔 일반 대화로 떨어져 화면과 무관한 답을 냈다 — screenguide로 그라운딩한다.
   if (isHelpIntent(instructionText, screen)) {
-    const task = createTask({ text: instructionText, agentId: "orchestrator", priority: "P3" });
+    const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
     completeTask(task.id);
     return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatScreenGuide(screen, instructionText) };
   }
@@ -529,7 +546,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   // "지식베이스 정리/중복 점검" — 상충·중복·신선도를 결정적으로 점검(삭제 없이 리포트).
   if (KB_HYGIENE_INTENT_RE.test(instructionText)) {
     const { scanKbHygiene, formatKbHygiene } = await import("./kbhygiene.js");
-    const task = createTask({ text: instructionText, agentId: "orchestrator", priority: "P3" });
+    const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
     completeTask(task.id);
     return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatKbHygiene(await scanKbHygiene()) };
   }
@@ -537,7 +554,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   // "공격 경로 / 도달성 분석" — 3소스 상관으로 진입→거점→인접 경로를 결정적으로 구성.
   if (ATTACK_PATH_INTENT_RE.test(instructionText)) {
     const { formatAttackPaths } = await import("./analysishub.js");
-    const task = createTask({ text: instructionText, agentId: "orchestrator", priority: "P2" });
+    const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P2" });
     completeTask(task.id);
     return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatAttackPaths() };
   }
@@ -545,7 +562,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   // "Shadow AI 점검해줘 / 미등록 AI 있어?" — 시스템 관측 신호로 미등록 모델을 결정적으로 찾는다.
   if (SHADOW_AI_INTENT_RE.test(instructionText)) {
     const { formatShadowAi } = await import("./shadowai.js");
-    const task = createTask({ text: instructionText, agentId: "orchestrator", priority: "P2" });
+    const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P2" });
     completeTask(task.id);
     return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatShadowAi() };
   }
@@ -554,7 +571,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   // 규칙으로 제공해 MTTR을 줄인다. 실행 지시("조치해줘")가 아니라 방법 문의일 때만.
   if (REMEDIATION_INTENT_RE.test(instructionText) && !/조치해|처리해|수정해|패치해/.test(instructionText)) {
     const { formatRemediation } = await import("./playbook.js");
-    const task = createTask({ text: instructionText, agentId: "orchestrator", priority: "P3" });
+    const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
     completeTask(task.id);
     const kev = /kev|실제.?악용|악용 중/i.test(instructionText);
     const sev = /critical|치명/i.test(instructionText) ? "critical" : /high|높은/i.test(instructionText) ? "high" : "medium";
@@ -567,15 +584,15 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
 
   // 학습 루프 실행 지시는 확인 절차로 우회 — 파이프라인을 타지 않는다.
   if (LEARN_TOPIC_RE.test(instructionText) && LEARN_RUN_RE.test(instructionText)) {
-    return learnloopConfirmResult(instructionText);
+    return learnloopConfirmResult(instructionText, qa);
   }
 
   // 복합 지시(2단계 이상)면 오케스트레이션으로 순차 실행한다.
   const steps = planInstruction(instructionText);
   if (steps.length >= 2) {
-    const task = createTask({ text: instructionText, agentId: "orchestrator", priority: "P1" });
+    const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P1" });
     setAgentStatus("orchestrator", "working");
-    emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `복합 지시 ${steps.length}단계 실행: ${steps.map((s) => s.label).join(" → ")}` });
+    collab(qa, { from: "orchestrator", to: "orchestrator", message: `복합 지시 ${steps.length}단계 실행: ${steps.map((s) => s.label).join(" → ")}` });
     const stepResults = await runOrchestration(instructionText, steps, task, qa);
     resetAgentToDefault("orchestrator");
     const updated = completeTask(task.id);
@@ -587,7 +604,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   // ── 행동 대조 (2026-07-29, 계획서 전-2) — "이거 해도 돼?"는 검색이 아니라 판정 질문이다 ──
   // 사내규정(RAG)으로만 판정하고, 법령은 원문 링크로 안내, 근거 없으면 판정하지 않는다(NA 계약).
   if (ACTION_CHECK_RE.test(instructionText)) {
-    const task = createTask({ text: instructionText, agentId: "analysis", priority: "P2" });
+    const task = mkTask(qa, { text: instructionText, agentId: "analysis", priority: "P2" });
     const r = await runActionCheck(instructionText, qa);
     completeTask(task.id);
     return {
@@ -603,14 +620,14 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   // ① "방화벽 반려 사유는 주로 뭐였어?" — 사내 반려 이력이 있는데 LLM 일반론으로 답했다.
   //    반려 데이터는 두 곳(취약점 검토·유지보수 점검)에 실재하므로 코드가 직접 센다.
   if (REJECT_HISTORY_RE.test(instructionText)) {
-    const task = createTask({ text: instructionText, agentId: "orchestrator", priority: "P3" });
+    const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
     completeTask(task.id);
     return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatRejectHistory(instructionText) };
   }
   // ② "주간 보안 리포트 작성해줘" — 생성이 아니라 스케줄 조회 도구로 샜다(루프가 먼저 먹음).
   //    생성 의도는 루프보다 먼저 잡아 실제 파일을 만든다. 대상이 불명확하면 기존 되물음.
   if (REPORT_CREATE_RE.test(instructionText) && !REPORT_QUERY_EXCLUDE_RE.test(instructionText)) {
-    const task = createTask({ text: instructionText, agentId: "report", priority: "P2" });
+    const task = mkTask(qa, { text: instructionText, agentId: "report", priority: "P2" });
     if (needsReportDetail(instructionText)) {
       completeTask(task.id);
       return { task, route: { agentId: "report", action: "report" }, output: reportClarification() };
@@ -645,12 +662,12 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     actor,
   }).catch(() => null);
   if (loop) {
-    const loopTask = createTask({ text: instructionText, agentId: "orchestrator", priority: "P2" });
+    const loopTask = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P2" });
     setAgentStatus("orchestrator", "working");
-    emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `지시 처리: "${instructionText}"` });
+    collab(qa, { from: "orchestrator", to: "orchestrator", message: `지시 처리: "${instructionText}"` });
     // 완료 이벤트는 실제 답변을 실어 나른다 — 120자로 자르면 지휘 콘솔 대화가 목록 중간에서 끊긴다
     // (2026-07-20 사용자 지적). 화면 쪽이 4줄 클램프+더보기로 접으므로 여기선 넉넉히 보낸다.
-    emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `완료: ${collabNote(loop.output)}` });
+    collab(qa, { from: "orchestrator", to: "orchestrator", message: `완료: ${collabNote(loop.output)}` });
     resetAgentToDefault("orchestrator");
     const updated = completeTask(loopTask.id);
     return {
@@ -666,10 +683,10 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   const route = await routeIntent(instructionText, screen);
   const agent = getAgentById(route.agentId);
 
-  const task = createTask({ text: instructionText, agentId: route.agentId, priority: priorityForAction(route.action) });
+  const task = mkTask(qa, { text: instructionText, agentId: route.agentId, priority: priorityForAction(route.action) });
 
   setAgentStatus(route.agentId, "working");
-  emitCollaboration({ from: "orchestrator", to: route.agentId, message: `작업 할당: "${instructionText}"` });
+  collab(qa, { from: "orchestrator", to: route.agentId, message: `작업 할당: "${instructionText}"` });
 
   let output: string;
   let toolCalls: AgentToolCall[] | undefined;
@@ -686,7 +703,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     output = `실행 실패: ${err instanceof Error ? err.message : String(err)}`;
   }
 
-  emitCollaboration({ from: route.agentId, to: "orchestrator", message: `작업 완료: ${collabNote(output)}` });
+  collab(qa, { from: route.agentId, to: "orchestrator", message: `작업 완료: ${collabNote(output)}` });
   resetAgentToDefault(route.agentId);
   const updatedTasks = completeTask(task.id);
   const completedTask = updatedTasks.find((t) => t.id === task.id) ?? task;
@@ -759,15 +776,16 @@ export function registerDispatcherRoutes(app: Express): void {
       // 화면에서 온 값만 문자열로 받는다(타입 오염 방어).
       const args: Record<string, string> = {};
       for (const [k, v] of Object.entries(rawArgs)) if (typeof v === "string") args[k] = v;
-      const task = createTask({ text: `[승인 실행] ${toolName}`, agentId: "orchestrator", priority: "P2" });
+      // 승인 실행은 사람이 화면에서 직접 누른 행위다 — 게이트가 탈 일이 없으므로 항상 기록한다.
+      const task = mkTask(undefined, { text: `[승인 실행] ${toolName}`, agentId: "orchestrator", priority: "P2" });
       setAgentStatus("orchestrator", "working");
-      emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `승인됨 — ${toolName} 실행` });
+      collab(undefined, { from: "orchestrator", to: "orchestrator", message: `승인됨 — ${toolName} 실행` });
       const actor = (req as Request & { user?: GijoUser }).user?.displayName ?? null;
       try {
         const undoBefore = undoSnapshot(); // #7: 실행 전 상태 스냅샷(원클릭 undo용)
         const output = await executeApprovedTool(toolName, args);
         const undoId = undoCommit(toolName, output.slice(0, 50), undoBefore); // 변화 있으면 되돌리기 항목 등록
-        emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `실행 완료: ${collabNote(output)}` });
+        collab(undefined, { from: "orchestrator", to: "orchestrator", message: `실행 완료: ${collabNote(output)}` });
         // 작업 기록(감사 로그) — 승인된 쓰기 실행을 남긴다(챗봇 제안 → 사람 승인).
         recordAudit({ kind: "write", actor, action: `승인 실행: ${toolName}`, target: args.assetId ?? args.code ?? null, detail: `${instruction ? instruction + " → " : ""}${output.slice(0, 200)}`, result: "ok" });
         // 사람이 승인한 (지시→도구) = 검증된 정답. 파인튜닝 골드 예시로 누적한다(Phase 4, 자가강화).

@@ -358,7 +358,13 @@ export function isHowtoNotCommand(instruction: string): boolean {
 }
 
 function forcedToolFor(instruction: string, scope?: ToolScope): { tool: string; args: Record<string, string> } | null {
-  const available = new Set(listToolsFor(scope?.domains, scope?.role).map((t) => t.name));
+  // ⚠ 강제 분기는 **화면 도메인 좁히기를 따르지 않는다**(검토 지적 2026-07-29).
+  //   도메인 좁히기의 목적은 "LLM에게 보여 줄 도구 목록을 짧게 유지해 선택이 흔들리지 않게" 하는
+  //   것인데, 강제 분기는 LLM을 아예 거치지 않는다 — 좁힐 이유가 없다. 그런데 좁힌 목록으로
+  //   확인하는 바람에, 유지보수 화면에서만 보이는 도구를 취약점 화면에서 부르면 분기가 조용히
+  //   비켜났다. 게이트가 잡아 고친 바로 그 오답이 다른 화면에서 그대로 재현되던 것이다.
+  //   권한(role)은 그대로 지킨다 — admin 전용 도구가 강제 분기로 새면 안 된다.
+  const available = new Set(listToolsFor(undefined, scope?.role).map((t) => t.name));
 
   if (available.has("explain") && EXPLAIN_VERB_RE.test(instruction)) {
     const product = namedProductIn(instruction);

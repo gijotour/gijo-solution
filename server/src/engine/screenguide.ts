@@ -454,6 +454,8 @@ const GUIDES: Record<string, ScreenGuide> = {
       "\"PC 점검해줘\" — Windows PC(PC-시리즈)",
       "\"네트워크 장비 점검해줘\" — Cisco(N-시리즈)",
       "\"CIS 기준으로 점검해줘\" — CIS Benchmark",
+      "\"정기점검 언제 돌아?\" — 등록된 스케줄·최근 준수율",
+      "\"시스템 괜찮아?\" — 백업·지식베이스·디스크 자가 진단",
     ],
     tip: "특정 장비는 ＋대상 등록에서 IP·장비유형을 먼저 등록하세요.",
     panels: {
