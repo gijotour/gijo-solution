@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+<!--
+  ================================================================================================
+  GIJO AS — "AI가 아낀 시간" 구역 시안 (kpi.html에 추가 예정)  ·  추천 시안 1개 (2026-07-25 사용자 결정: 3종→1종)
+  ================================================================================================
+  대상 화면: client/src/renderer/pages/kpi.html (제품 코드 미수정 — 이 파일은 mockups/ 안에서만 완결)
+  대상 API : GET  /api/time-saved?days=N        (server/src/engine/timesaved.ts — 이미 구현·배포됨)
+             POST /api/time-saved/baseline      ({kind,minutes}, admin 전용 — 기준시간 조정)
+  참고 코드: server/src/engine/worklog.ts (WORK_KINDS 9종 — 작업 종류 이름의 단일 출처)
+
+  [설계 전 조사 — 근거] (요청: "설계 전 인터넷에서 표준·모범사례 조사 후 근거 제시")
+  1) Splunk SOAR "ROI and business value" 대시보드 — 절감 시간을 "액션당 분(기본값) × 처리 건수"로
+     내고, 액션당 분·연봉 등은 전부 고객이 설정하는 값이다. 즉 실측이 아니라 "선언된 가정"이며 관리자가
+     바꿀 수 있게 열어 둔다. → 이 시안의 "④ 기준시간 조정(관리자)" 진입점의 직접 근거.
+     https://help.splunk.com/en/splunk-soar/soar-cloud/administer-soar-cloud/introduction-to-splunk-soar-cloud/splunk-soar-dashboard/roi-and-business-value
+  2) Swimlane·Cortex XSOAR도 같은 패턴(작업/인시던트 유형별 manual effort 분을 관리자가 등록)이라
+     업계 공통 관행임을 재확인했다(서버 timesaved.ts 주석에 이미 인용됨 — 화면 표시 방식에도 동일 적용).
+  3) Forrester Total Economic Impact(TEI) 방법론 — 편익 산정에 risk adjustment를 적용해 보수화한다
+     (Island·Microsoft Zero Trust 스터디 실사례 10~20% 하향). 서버가 이미 20%를 깎은 adjustedHours를
+     내려주므로, 화면은 이 하한을 감추지 않고 오히려 앞세운다(요구사항 ① 범위 표기, 하한 먼저).
+  4) "AI Dashboard Design Best Practices 2026"(Orbix) — 불확실성을 예외가 아니라 "1급 상태"로
+     다뤄야 한다: 추정치를 확정치처럼 보여주면 신뢰를 빨리 잃는다. "Badge UI Design"(Eleken) — 배지는
+     1~2단어로 간결해야 한다(길면 배지가 아니라 툴팁). → "추정" 배지를 한 단어로 유지한 근거.
+     https://www.orbix.studio/blogs/ai-dashboard-design-best-practices , https://www.eleken.co/blog-posts/badge-ui-design
+  5) METR 2025 연구(서버 주석 인용) — "체감상 빨라졌다"는 응답과 실측이 반대로 나온 사례. 큰 숫자는
+     신뢰를 얻는 게 아니라 잃을 수 있다는, 이 기능 자체의 핵심 위험(부풀린 ROI)을 뒷받침하는 근거.
+
+  [배치 제안]
+  히어로(종합 보안태세)·AI 보안 블록 "아래", 접힌 "📂 상세 지표" 패널 "위"에 상시 노출 카드로 둔다.
+  이유: 이 지표는 위험도가 아니라 ROI 성격이라 보안 히어로에 섞으면 "값이 클수록 좋다"는 오해가 생기고,
+  그렇다고 접어 버리면 "자랑을 숨기는 모양"이 되어 오히려 이 기능의 목적(신뢰 형성)과 어긋난다.
+  AI 보안 블록과 같은 "상시 노출·색이 다른 특별 구역" 급으로 취급했다. (아래 화면에 실제로 배치해 보임)
+
+  [핵심 설계 결정 — 왜 이렇게 했나]
+  · 단일 숫자 대신 "약 하한~상한" 범위, 보수 조정된 하한(adjustedHours)을 항상 먼저 쓴다(요구 ①).
+  · 숫자 옆에 "추정" 배지 상시 노출(요구 ②) — 스크롤 없이도 측정값이 아님이 보인다.
+  · 내역 표 모든 줄에 근거(source)를 함께 두고, 조직이 바꾼 값은 "우리 조직 설정" 배지로 구분(요구 ③).
+  · 기준시간 조정은 실제 입력 UI(9개 작업 종류 × 분 입력)까지 시안에 포함하되 관리자 전용 표기(요구 ④).
+  · 한계 문구(note)는 화면에서 숨기지 않고 항상 보이되, 표·헤드라인 "아래"에 작은 글씨로 둬서 방해되지
+    않게 하고, "조직이 더 안전해졌다는 뜻이 아닙니다" 구절은 굵게 강조해 반드시 읽히게 했다(요구 ⑤).
+  · coversWholePeriod=false 경고는 note 문자열에 기대지 않고 구조화된 필드(coversWholePeriod·
+    ledgerStart)로 별도 줄을 만든다(요구 ⑥) — 문자열 파싱은 서버 문구가 바뀌면 조용히 깨진다.
+  · 1시간 미만은 항상 "분"으로 표기(요구 ⑦) — 서버 fmtDuration과 같은 규칙을 화면에도 복제했고,
+    헤드라인 범위도 상한(totalMinutes)이 60분 미만이면 전체를 분 단위로 전환한다.
+  · 데이터 없음은 꾸미지 않는다 — 빈 표·가짜 0시간 대신 문장 하나로 정직하게 알린다(요구 ⑧).
+  · "화면엔 정체성 한 줄 + 경고만" 원칙: 구역 제목(⏱ AI가 아낀 시간) 외에는 "사용법 설명"을 화면에
+    늘어놓지 않았다. note·경고 줄은 "사용법"이 아니라 이 숫자 자체에 붙는 데이터 각주(재무제표의
+    각주와 같은 성격)라 예외로 남겨 뒀다 — 화면 설명 챗봇(ⓘ)이 담당하는 "이 화면 쓰는 법"과는 다르다.
+    (참고: 2026-07-27부로 화면별 ⓘ 아이콘은 걷어내고 대시보드 대화로 일원화됐다 — 이 시안도 그 규칙을
+    따라 별도 ⓘ 아이콘을 새로 달지 않았다.)
+
+  [교차검증 중 발견한 것 — 구현 시 참고]
+  · 서버 fmtDuration()과 totalHours/adjustedHours 산식은 반올림 규칙이 "다르다": 전자(개별 줄·근거
+    문장용)는 10시간 이상이면 소수점을 버리고(예: 18.58h → "19시간"), 후자(헤드라인·합계용)는 규모와
+    무관하게 항상 소수점 1자리를 유지한다(18.58h → 18.6). 화면 안에서 같은 총합이 서로 다른 두 숫자로
+    보이는 모순을 피하려고, 이 시안은 "개별 줄=fmtDuration, 헤드라인·표 합계=totalHours 방식"으로
+    용도를 분리했다. 데이터가 커지면(리포트 10건↑ 등) 실제로 드러날 차이라 서버 쪽 fmtDuration도
+    항상 1자리 소수로 통일하는 걸 제안한다.
+  · 서버 note 문자열에는 ledgerStart 경고 문장이 원래 포함돼 있지만(timesaved.ts), 화면은 이를 그대로
+    붙이지 않고 구조화된 필드로 별도 줄을 만들고 note에서는 그 문장을 뺐다(중복 방지). 실제 구현 시
+    서버가 note 끝에 그 문장을 계속 붙여 보내면, 화면단에서 마지막 문장을 잘라내거나 서버가 note와
+    분리된 필드를 추가하는 편이 안전하다.
+  · custom:true는 "값이 기본과 달라서"가 아니라 "관리자가 저장한 적이 있어서"다(서버 customBaselines
+    로직 — 값 존재 여부로 판단). 예시의 현황 집계(5분)는 기본값과 같은 값을 저장한 경우라 그대로
+    재현했다 — "기본값으로 되돌리기"를 누르고 저장해도 배지가 안 사라질 수 있다는 뜻이므로, 완전
+    초기화가 필요하면 서버에 삭제 API 추가를 검토할 것.
+  · 이 파일은 시안이라 "저장"·"원장 보기" 버튼은 실제로 동작하지 않는다(정직한 구현 원칙) — 눌러도
+    저장되지 않는다는 토스트만 뜬다. 좌측 사이드바·상단 히어로·AI 보안 블록은 배치 맥락 재현용 정적
+    스냅샷이며(2026-07-29 기준 실제 코드에서 옮김) nav.js 등 실제 스크립트를 불러오지 않는다.
+  · 화면 상단의 자홍색 점선 리본은 이 목업 파일에만 있는 검토 도구다(실제 화면에는 없음) — "예시
+    데이터/소량 예시/빈 상태" 3버튼으로 요구된 상태를 한 파일에서 전환해 보여준다.
+-->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>시안 — AI가 아낀 시간 (보안 KPI)</title>
+<style>
+/* ── 토큰: kpi.html :root를 그대로 복사(추측 금지 원칙 — 실제 파일에서 가져옴) ───────────── */
+:root{
+  --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+  /* gijo-ui.css 컴포넌트(.g-*)를 그대로 붙여 쓰기 위한 별칭 — 값은 위 원본과 동일 */
+  --g-surface-1:var(--panel);--g-surface-2:var(--panel-2);--g-border:var(--border);--g-border-strong:var(--border-strong);
+  --g-blue:var(--blue);--g-blue-light:var(--blue-light);--g-teal:var(--teal);--g-amber:var(--amber);
+  --g-red:var(--red);--g-purple:var(--purple);--g-text:var(--text);--g-muted:var(--muted);--g-muted-2:var(--muted-2);
+  --g-s1:4px;--g-s2:8px;--g-s3:12px;--g-s4:16px;--g-s5:24px;--g-s6:32px;
+  --g-r-sm:8px;--g-r:12px;--g-r-lg:16px;--g-r-pill:999px;
+  --g-shadow-1:0 2px 8px rgba(0,0,0,.3);--g-shadow-2:0 8px 24px rgba(0,0,0,.4);--g-shadow-modal:0 20px 60px rgba(0,0,0,.5);
+  --g-t-h1:22px;--g-t-h2:16px;--g-t-md:14.5px;--g-t-sm:13px;--g-t-xs:11px;--g-t-kpi:27px;
+  --g-btn-h:36px;--g-input-h:36px;--g-focus:0 0 0 3px rgba(59,130,246,.28);
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
+/* 실제 제품은 gijo-ui.css가 Pretendard 번들(fonts/PretendardVariable.woff2)을 주입하지만, 이 목업은
+   자체완결 규칙(외부·상대경로 폰트 파일 참조 금지) 때문에 시스템 폴백(맑은 고딕/Segoe UI)만 쓴다. */
+
+/* ── 기존 화면 골격 복사: header/app/sidebar/hero/tiles (client/src/renderer/pages/kpi.html 발췌) ── */
+.header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2);}
+.header-left{display:flex;align-items:center;gap:12px;}
+.wordmark{font-size:15px;font-weight:900;letter-spacing:.3px;color:#fff;} .wordmark span{color:var(--teal);}
+.clock{font-size:12px;color:var(--blue-light);font-weight:600;}
+.header-right{display:flex;align-items:center;gap:10px;}
+.status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
+.status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
+.beta-tag{background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
+.avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+.icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:default;}
+
+.app{display:grid;grid-template-columns:220px 1fr;}
+.sidebar{padding:18px 12px;border-right:1px solid var(--border);min-height:100vh;}
+.main{padding:28px 32px 48px;}
+
+/* 좌측 메뉴 — nav.js가 실제로 그리는 트리(대시보드 등 3고정+4그룹)를 정적 스냅샷으로 재현.
+   실제 검색·접기 동작은 없다(cursor:default) — 이 목업은 배치 맥락 설명용일 뿐이다. */
+.gn-find{position:relative;margin:2px 4px 10px;}
+.gn-find input{width:100%;background:#0a1120;border:1px solid var(--border-strong);border-radius:9px;height:30px;padding:0 10px 0 26px;color:var(--muted-2);font-size:11.5px;}
+.gn-find .ic{position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--muted-2);}
+.gn-top-fixed{padding-bottom:7px;margin-bottom:7px;border-bottom:1px solid rgba(255,255,255,.07);}
+.gn-item{display:flex;align-items:center;gap:7px;padding:8px 11px;border-radius:8px;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:1px;cursor:default;}
+.gn-item.active{color:#fff;background:rgba(59,130,246,.14);box-shadow:inset 3px 0 0 var(--blue);}
+.gn-item.gn-home{color:#cfe0ff;border:1px solid rgba(59,130,246,.42);background:rgba(59,130,246,.07);margin-bottom:5px;}
+.gn-g{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:800;color:var(--muted);padding:9px 11px 6px;cursor:default;}
+.gn-g .car{font-size:9px;margin-left:auto;}
+.gn-g.open .car{display:inline-block;transform:rotate(90deg);}
+.gn-kids{padding-left:2px;margin-bottom:6px;}
+.gn-kids .gn-item{padding-left:20px;}
+
+.ctx-label,.tsv-divider{max-width:1100px;margin:6px 0 18px;text-align:center;position:relative;color:var(--muted-2);font-size:10.5px;font-weight:800;letter-spacing:.3px;}
+.tsv-divider{color:var(--blue-light);margin:26px auto 18px;}
+.ctx-label::before,.ctx-label::after,.tsv-divider::before,.tsv-divider::after{content:"";position:absolute;top:50%;width:32%;border-top:1px dashed var(--border-strong);}
+.ctx-label::before,.tsv-divider::before{left:0;} .ctx-label::after,.tsv-divider::after{right:0;}
+
+.hero{display:grid;grid-template-columns:280px 1fr;gap:14px;max-width:1100px;margin-bottom:22px;}
+.posture{background:linear-gradient(180deg,rgba(59,130,246,.1),transparent);border:1px solid var(--border-strong);border-radius:14px;padding:18px;display:flex;flex-direction:column;}
+.posture .pl{font-size:12px;font-weight:800;color:var(--muted);}
+.posture .pscore{display:flex;align-items:baseline;gap:8px;margin:6px 0 4px;}
+.posture .pv{font-size:44px;font-weight:900;line-height:1;}
+.posture .pb{font-size:13px;font-weight:800;padding:3px 10px;border-radius:20px;}
+.pb.fair{background:rgba(240,160,32,.16);color:#f7c777;}
+.posture .pf{margin-top:auto;display:flex;flex-direction:column;gap:6px;padding-top:12px;}
+.pf-row{display:flex;align-items:center;gap:8px;font-size:11px;} .pf-row .l{width:100px;color:var(--muted);flex-shrink:0;}
+.pf-row .tr{flex:1;height:6px;background:var(--panel-2);border-radius:20px;overflow:hidden;} .pf-row .fl{height:100%;border-radius:20px;} .pf-row .vv{width:34px;text-align:right;font-weight:700;flex-shrink:0;}
+.headline{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;}
+.hcard{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;}
+.hcard .hl{font-size:11.5px;color:var(--muted);}
+.hcard .hv{font-size:26px;font-weight:800;margin-top:6px;line-height:1;}
+.hcard .hd{font-size:11px;font-weight:700;margin-top:5px;}
+.hd.down{color:#6fdcb5;} .hd.flat{color:var(--muted-2);}
+
+.cat{margin-bottom:24px;max-width:1100px;}
+.cat-title{font-size:14px;font-weight:800;color:#fff;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+.tile{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+.tile .t-label{font-size:11px;color:var(--muted);margin-bottom:6px;}
+.tile .t-value{font-size:22px;font-weight:800;color:#fff;}
+
+.detail-panel{max-width:1100px;margin-bottom:24px;border:1px solid var(--border);border-radius:12px;background:var(--panel-2);overflow:hidden;}
+.detail-title{font-size:14px;font-weight:800;color:#fff;padding:14px 18px;display:flex;align-items:center;gap:10px;cursor:default;}
+.detail-title .dcar{color:var(--blue-light);font-size:11px;font-weight:900;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.35);flex:0 0 auto;}
+.detail-title .dsub{font-size:11px;font-weight:500;color:var(--muted-2);margin-left:auto;}
+
+.footer{margin-top:20px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted-2);max-width:1100px;}
+
+/* ── gijo-ui.css 컴포넌트 그대로 복사(.g-*) — 표·배지·버튼·모달·입력 ─────────────────────── */
+.g-btn{height:var(--g-btn-h);display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:0 var(--g-s4);border-radius:var(--g-r);font-size:var(--g-t-sm);font-weight:700;cursor:pointer;border:1px solid transparent;transition:background .12s,border-color .12s,color .12s,transform .12s;white-space:nowrap;}
+.g-btn:active{transform:translateY(1px);}
+.g-btn.g-ghost{background:transparent;border-color:var(--g-border-strong);color:var(--g-muted);}
+.g-btn.g-ghost:hover{color:#fff;border-color:var(--g-blue);}
+.g-btn.g-sm{height:28px;font-size:var(--g-t-xs);padding:0 12px;border-radius:var(--g-r-sm);}
+.g-btn:disabled,.g-btn.g-disabled{opacity:.45;cursor:default;}
+.g-badge{display:inline-flex;align-items:center;font-size:var(--g-t-xs);font-weight:800;padding:2px 9px;border-radius:var(--g-r-pill);white-space:nowrap;}
+.g-input{background:var(--g-surface-2);border:1px solid var(--g-border-strong);border-radius:var(--g-r);padding:0 12px;height:var(--g-input-h);color:var(--g-text);font-size:var(--g-t-sm);outline:none;width:100%;}
+.g-input:focus{border-color:var(--g-blue);box-shadow:var(--g-focus);}
+.g-table{width:100%;border-collapse:collapse;font-size:var(--g-t-sm);}
+.g-table th{text-align:left;color:var(--g-muted-2);font-size:var(--g-t-xs);font-weight:700;padding:var(--g-s3);border-bottom:1px solid var(--g-border);}
+.g-table td{padding:var(--g-s3);border-bottom:1px solid var(--g-border);vertical-align:middle;}
+.g-table tbody tr:hover{background:rgba(255,255,255,.02);}
+.g-modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;z-index:1000;}
+.g-modal-bg.g-on{display:flex;}
+.g-modal{width:520px;max-width:92vw;background:var(--g-surface-1);border:1px solid var(--g-border-strong);border-radius:var(--g-r);padding:var(--g-s5);box-shadow:var(--g-shadow-modal);}
+.g-modal .mt{font-size:var(--g-t-md);font-weight:800;color:#fff;margin-bottom:var(--g-s3);}
+.g-modal .macts{display:flex;gap:var(--g-s2);justify-content:flex-end;margin-top:var(--g-s5);}
+
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   신규: "AI가 아낀 시간" 구역 (.tsv- 접두 — 이번 시안의 실제 산출물)
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+.tsv-cat .cat-title{margin-bottom:12px;}
+.tsv-admin-entry{margin-left:auto;font-size:11.5px;font-weight:700;color:var(--blue-light);cursor:pointer;display:flex;align-items:center;gap:4px;}
+.tsv-admin-entry:hover{color:#fff;}
+.tsv-admin-entry em{font-style:normal;color:var(--muted-2);font-weight:600;font-size:10.5px;}
+
+.tsv-hero{display:flex;gap:22px;align-items:center;background:var(--panel);border:1px solid var(--border-strong);border-radius:14px;padding:20px 22px;flex-wrap:wrap;}
+.tsv-hero-num{flex:1 1 280px;min-width:230px;}
+.tsv-range{display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;}
+.tsv-pre{font-size:15px;color:var(--muted);font-weight:700;}
+.tsv-lo,.tsv-hi{font-size:40px;font-weight:900;color:#fff;line-height:1;}
+.tsv-tilde{font-size:22px;color:var(--muted-2);font-weight:700;}
+.tsv-unit{font-size:18px;color:var(--muted);font-weight:800;margin-right:2px;}
+.tsv-hero-sub{font-size:11.5px;color:var(--muted);margin-top:9px;line-height:1.6;}
+.tsv-hero-bar{flex:1 1 220px;min-width:200px;}
+.tsv-hero-bar-cap{font-size:10px;color:var(--muted-2);margin-bottom:6px;}
+.tsv-stack{display:flex;height:14px;border-radius:8px;overflow:hidden;background:var(--panel-2);}
+.tsv-seg{min-width:6px;}
+.tsv-seg:not(:last-child){border-right:1px solid rgba(0,0,0,.35);}
+
+.g-badge.tsv-b-est{background:rgba(240,160,32,.18);color:var(--amber);border:1px solid rgba(240,160,32,.4);cursor:help;}
+.g-badge.tsv-b-custom{background:rgba(59,130,246,.14);color:var(--blue-light);border:1px solid rgba(59,130,246,.35);margin-left:6px;font-weight:700;}
+
+.tsv-warn{display:flex;align-items:center;gap:8px;background:var(--panel-2);border:1px solid var(--border);border-left:3px solid var(--amber);border-radius:10px;padding:9px 14px;font-size:11.5px;color:var(--muted);line-height:1.6;margin:12px 0;}
+.tsv-warn b{color:#fff;}
+
+.tsv-table-wrap{overflow-x:auto;margin:14px 0;border-radius:10px;border:1px solid var(--border);}
+.tsv-table{min-width:600px;}
+.tsv-table th:nth-child(2),.tsv-table th:nth-child(3),.tsv-table th:nth-child(4){text-align:right;}
+.tsv-table td:nth-child(2),.tsv-table td:nth-child(3){text-align:right;color:var(--muted);white-space:nowrap;}
+.tsv-kind-label{font-weight:700;color:#fff;}
+.tsv-kind-src{font-size:10.5px;color:var(--muted-2);margin-top:2px;max-width:380px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.tsv-conv{text-align:right;font-weight:800;color:var(--teal);white-space:nowrap;}
+.tsv-total-row td{border-top:2px solid var(--border-strong);border-bottom:none;font-weight:800;color:#fff;background:rgba(255,255,255,.02);}
+.tsv-total-row .tsv-conv{color:#fff;}
+.tsv-arrow{font-size:10.5px;color:var(--muted-2);font-weight:600;margin:0 4px;}
+
+.tsv-note{background:var(--panel-2);border:1px solid var(--border);border-left:3px solid var(--blue);border-radius:10px;padding:11px 15px;margin-top:4px;}
+.tsv-note-line{font-size:11.5px;color:var(--muted);line-height:1.8;}
+.tsv-note-line b{color:#fff;}
+.tsv-more{color:var(--blue-light);font-weight:700;cursor:pointer;white-space:nowrap;}
+.tsv-more:hover{text-decoration:underline;}
+.tsv-assumptions{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);font-size:11px;color:var(--muted-2);}
+.tsv-assumptions ul{padding-left:18px;line-height:1.85;}
+
+.tsv-footlinks{margin-top:10px;}
+.tsv-link{font-size:11px;color:var(--muted-2);cursor:pointer;border:1px dashed var(--border-strong);border-radius:20px;padding:5px 12px;display:inline-block;}
+.tsv-link:hover{color:var(--blue-light);border-color:var(--blue);}
+
+.tsv-empty{text-align:center;padding:36px 20px;background:var(--panel);border:1px dashed var(--border-strong);border-radius:14px;color:var(--muted);}
+.tsv-empty-ic{font-size:26px;margin-bottom:8px;opacity:.7;}
+.tsv-empty-title{font-size:14px;font-weight:800;color:#fff;}
+.tsv-empty-sub{font-size:11.5px;margin-top:6px;line-height:1.7;max-width:480px;margin-left:auto;margin-right:auto;}
+
+/* 관리자 모달(기준시간 조정) */
+.tsv-modal-tag{font-size:10px;font-weight:800;color:var(--amber);border:1px solid rgba(240,160,32,.4);background:rgba(240,160,32,.12);padding:2px 8px;border-radius:20px;margin-left:8px;vertical-align:middle;}
+.tsv-modal-warn{font-size:11px;color:var(--amber);background:rgba(240,160,32,.08);border:1px solid rgba(240,160,32,.3);border-radius:8px;padding:8px 12px;margin-bottom:14px;line-height:1.6;}
+.tsv-modal-list{max-height:360px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;padding-right:4px;}
+.tsv-mrow{display:flex;align-items:center;gap:10px;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;}
+.tsv-mrow-label{flex:1;font-size:12px;font-weight:700;color:var(--text);min-width:0;}
+.tsv-mrow-hint{font-size:10px;color:var(--muted-2);font-weight:500;margin-top:2px;}
+.tsv-mrow-input{display:flex;align-items:center;gap:4px;flex:0 0 auto;}
+.tsv-mrow-input input{width:64px;height:30px;padding:0 8px;text-align:right;}
+.tsv-mrow-suffix{font-size:11px;color:var(--muted-2);}
+.tsv-mrow-save{flex:0 0 auto;}
+
+/* 시안 검토 전용 리본 — 실제 화면에는 없다. 제품 팔레트와 다른 색(자홍)으로 절대 혼동되지 않게 한다. */
+.mockctl{position:sticky;top:0;z-index:1200;background:repeating-linear-gradient(135deg,#2a0e2e,#2a0e2e 10px,#38123f 10px,#38123f 20px);border-bottom:2px dashed #d946ef;padding:9px 16px;display:flex;align-items:center;gap:12px;flex-wrap:wrap;font-size:11.5px;color:#f3d9ff;}
+.mockctl b{color:#f0abfc;}
+.mockctl-btns{display:flex;gap:6px;}
+.mockctl-btn{background:rgba(255,255,255,.08);border:1px solid rgba(240,171,252,.5);color:#f3d9ff;border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer;}
+.mockctl-btn:hover{background:rgba(240,171,252,.18);}
+.mockctl-btn.on{background:#d946ef;color:#2a0e2e;border-color:#d946ef;}
+
+.tsv-toast{position:fixed;right:24px;bottom:24px;background:var(--panel);border:1px solid var(--border-strong);color:var(--text);padding:12px 18px;border-radius:10px;font-size:12.5px;z-index:9999;box-shadow:0 8px 24px rgba(0,0,0,.4);max-width:360px;line-height:1.6;display:none;}
+
+@media (max-width:760px){
+  .hero{grid-template-columns:1fr;}
+  .headline{grid-template-columns:repeat(2,1fr);}
+  .tiles{grid-template-columns:repeat(2,1fr);}
+  .tsv-hero{flex-direction:column;align-items:stretch;}
+  .tsv-lo,.tsv-hi{font-size:32px;}
+  .tsv-kind-src{display:none;}
+  .g-modal{width:94vw;}
+}
+</style>
+</head>
+<body>
+
+<!-- 시안 검토용 도구 — 실제 kpi.html에는 없는 요소. 요구된 4가지 데이터 상태를 한 파일에서 확인하기 위함. -->
+<div class="mockctl">
+  <span>🔧 <b>시안 검토 도구</b>(실제 화면에는 없음) — 데이터 상태 미리보기:</span>
+  <div class="mockctl-btns">
+    <button class="mockctl-btn on" id="mockctl-main">① 예시 데이터(30일)</button>
+    <button class="mockctl-btn" id="mockctl-small">② 소량 예시(분 단위 확인)</button>
+    <button class="mockctl-btn" id="mockctl-empty">③ 빈 상태</button>
+  </div>
+</div>
+
+<div class="header">
+  <div class="header-left">
+    <div class="wordmark">GIJO<span>AS</span></div>
+    <div class="clock" id="clockEl">-</div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill"><span class="dot"></span>운영중<span class="beta-tag">LIVE</span></div>
+    <div class="avatar-btn">관</div>
+    <div class="icon-btn">⚙</div>
+  </div>
+</div>
+
+<div class="app">
+  <!-- 좌측 메뉴 — nav.js 정적 스냅샷(배치 맥락 설명용, 실제 스크립트 로드 안 함) -->
+  <div class="sidebar">
+    <div class="gn-find"><span class="ic">🔍</span><input type="text" placeholder="화면 찾기 (Ctrl+K)" disabled></div>
+    <div class="gn-top-fixed">
+      <div class="gn-item gn-home">대시보드</div>
+      <div class="gn-item">🏢 팀 사무실 (창)</div>
+      <div class="gn-item">💬 작업 내역</div>
+    </div>
+    <div class="gn-g open">🖥 관제 <span class="car">▸</span></div>
+    <div class="gn-kids">
+      <div class="gn-item">통합 관제</div>
+      <div class="gn-item">위협 인텔</div>
+      <div class="gn-item">리포트</div>
+      <div class="gn-item active">보안 KPI</div>
+      <div class="gn-item">컴플라이언스</div>
+    </div>
+    <div class="gn-g">🛡 자산·조치 <span class="car">▸</span></div>
+    <div class="gn-g">🤖 AI <span class="car">▸</span></div>
+    <div class="gn-g">⚙ 설정 <span class="car">▸</span></div>
+  </div>
+
+  <div class="main">
+    <div class="ctx-label">↓ 기존 화면 상단 맥락 재현 — 참고용, 실제 수치 아님 ↓</div>
+
+    <!-- 기존 히어로(종합 보안태세) — 정적 스냅샷 -->
+    <div class="hero">
+      <div class="posture">
+        <div class="pl">🛡 종합 보안태세</div>
+        <div class="pscore"><span class="pv" style="color:#f7c777">71</span><span class="pb fair">보통</span></div>
+        <div style="font-size:10.5px;color:var(--muted-2)">100점 만점 · 실지표 가중 합성</div>
+        <div class="pf">
+          <div class="pf-row"><span class="l">패치·조치</span><div class="tr"><div class="fl" style="width:66%;background:var(--amber)"></div></div><span class="vv">66%</span></div>
+          <div class="pf-row"><span class="l">노출·악용</span><div class="tr"><div class="fl" style="width:82%;background:var(--teal)"></div></div><span class="vv">82%</span></div>
+          <div class="pf-row"><span class="l">자산 위험도</span><div class="tr"><div class="fl" style="width:58%;background:var(--amber)"></div></div><span class="vv">58%</span></div>
+        </div>
+      </div>
+      <div class="headline">
+        <div class="hcard"><div class="hl">🔴 열린 취약점</div><div class="hv">42건</div><div class="hd down">▼3건 (전일 대비)</div></div>
+        <div class="hcard"><div class="hl">🚨 실제 악용(KEV)</div><div class="hv">2건</div><div class="hd flat">— 전일과 동일</div></div>
+        <div class="hcard"><div class="hl">⏱ MTTR</div><div class="hv">6일</div></div>
+        <div class="hcard"><div class="hl">📋 SLA 준수율</div><div class="hv">88%</div></div>
+        <div class="hcard"><div class="hl">✓ 취약점 조치율</div><div class="hv">74%</div></div>
+        <div class="hcard"><div class="hl">📕 컴플라이언스 대응률</div><div class="hv">80%</div></div>
+      </div>
+    </div>
+
+    <!-- 기존 AI 보안 블록 — 정적 스냅샷 -->
+    <div class="cat">
+      <div class="cat-title">🤖 AI 보안 (OWASP LLM Top 10)</div>
+      <div class="tiles">
+        <div class="tile" style="border-color:rgba(139,124,240,.28)"><div class="t-label">AI 자산</div><div class="t-value" style="color:#c9b8ff">6</div></div>
+        <div class="tile" style="border-color:rgba(139,124,240,.28)"><div class="t-label">OWASP LLM 미대응</div><div class="t-value" style="color:var(--teal)">0</div></div>
+        <div class="tile" style="border-color:rgba(139,124,240,.28)"><div class="t-label">AI-BOM 생성률</div><div class="t-value" style="color:var(--teal)">83%</div></div>
+        <div class="tile" style="border-color:rgba(139,124,240,.28)"><div class="t-label">레드팀 견고성</div><div class="t-value" style="color:var(--teal)">76점</div></div>
+      </div>
+    </div>
+
+    <div class="tsv-divider">↓ 이번 시안 — 새로 추가되는 구역 ↓</div>
+
+    <!-- ══════════════════════════════════════════════════════════════════════════════════
+         이번 시안의 실제 산출물: "AI가 아낀 시간"
+         ══════════════════════════════════════════════════════════════════════════════════ -->
+    <div class="cat tsv-cat" data-gijo-summary>
+      <div class="cat-title">
+        ⏱ AI가 아낀 시간
+        <span class="tsv-admin-entry" id="tsvAdminBtn">⚙ 기준시간 조정 <em>(관리자)</em></span>
+      </div>
+
+      <div id="tsvHeroArea"><!-- renderSection()이 채움 --></div>
+      <div class="tsv-warn" id="tsvWarn" hidden></div>
+      <div class="tsv-table-wrap" id="tsvTableWrap"></div>
+      <div class="tsv-note" id="tsvNote" hidden></div>
+      <div class="tsv-footlinks">
+        <span class="tsv-link" id="tsvLedgerLink">📋 처리 내역 원장 보기(근거)</span>
+      </div>
+    </div>
+
+    <div class="tsv-divider">↓ 기존 화면 계속 (접힘 · 재현 생략) ↓</div>
+
+    <!-- 기존 상세 지표 패널 — 기본 접힘 상태 그대로, 내용은 재현 생략(이 시안의 대상이 아님) -->
+    <div class="detail-panel">
+      <div class="detail-title"><span class="dcar">▸</span>📂 상세 지표<span class="dsub">자산·취약점·점검·CTI·컴플라이언스·추세 전체 지표</span></div>
+    </div>
+
+    <div class="footer">
+      <div class="wordmark" style="font-size:11px;opacity:.6">GIJO<span>AS</span></div>
+      <span>© 2026 GIJO Technology · GIJO AS Platform · Confidential</span>
+    </div>
+  </div>
+</div>
+
+<!-- 관리자 전용 모달: 기준시간 조정 (요구 ④ — 실제 입력 UI까지 포함) -->
+<div class="g-modal-bg" id="tsvModalBg">
+  <div class="g-modal">
+    <div class="mt">⚙ 절감 기준시간 조정<span class="tsv-modal-tag">관리자 전용</span></div>
+    <div class="tsv-modal-warn">⚠ 이 값을 바꾸면 조직 전체의 절감 보고 수치가 함께 바뀝니다. 실제 소요 시간과 최대한 가깝게 두세요.</div>
+    <div class="tsv-modal-list" id="tsvModalList"></div>
+    <div class="macts">
+      <button class="g-btn g-ghost" id="tsvModalClose">닫기</button>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════════════════════════════
+   아래 스크립트는 서버 timesaved.ts의 계산식을 그대로 재현한다(교차검증 목적).
+   실제 구현에서는 이 계산을 서버가 하고 화면은 결과 JSON을 그대로 그린다 — 여기서는 목업이라
+   "서버 응답 예시"를 클라이언트에서 흉내 낸다(픽스처 3종으로 요구된 상태를 모두 보여준다).
+   ══════════════════════════════════════════════════════════════════════════════════════════ */
+
+// ── 예시 데이터(픽스처) — ①은 과제 원문 API 예시와 동일 값, ②③은 요구사항 ⑥⑦⑧을 증명하기 위한 값
+var STATES = {
+  main: {
+    days: 30, riskAdjustment: 0.2, coversWholePeriod: false, ledgerStart: 1785000000000,
+    rows: [
+      { kind:"report_generated", label:"보고서 작성", count:4, minutesEach:120, minutes:480,
+        source:"자체 추정 — 데이터 수집·표 작성·문장 다듬기를 포함한 보고서 1건", custom:false },
+      { kind:"finding_triaged", label:"취약점 분류·우선순위 판단", count:22, minutesEach:15, minutes:330,
+        source:"자체 추정 — 취약점 목록을 놓고 심각도·악용가능성·자산 중요도를 따져 순서를 정하는 시간", custom:false },
+      { kind:"status_compiled", label:"현황 집계(여러 화면 대신 확인)", count:61, minutesEach:5, minutes:305,
+        source:"우리 조직 설정값", custom:true }
+    ]
+  },
+  // 소량 예시 — 총합이 1시간 미만이라 "0시간"이 아니라 "분"으로 나오는지 증명한다(요구 ⑦).
+  // coversWholePeriod:true라 경고 줄이 없는 상태(요구 ⑥의 반대 경우)도 함께 보여준다.
+  small: {
+    days: 7, riskAdjustment: 0.2, coversWholePeriod: true, ledgerStart: 1779000000000,
+    rows: [
+      { kind:"finding_triaged", label:"취약점 분류·우선순위 판단", count:2, minutesEach:15, minutes:30,
+        source:"자체 추정 — 취약점 목록을 놓고 심각도·악용가능성·자산 중요도를 따져 순서를 정하는 시간", custom:false },
+      { kind:"status_compiled", label:"현황 집계(여러 화면 대신 확인)", count:5, minutesEach:5, minutes:25,
+        source:"우리 조직 설정값", custom:true }
+    ]
+  },
+  // 빈 상태 — 요구 ⑧: 숫자를 지어내지 않고 정직하게 "기록 없음"만 보인다.
+  empty: { days: 30, riskAdjustment: 0.2, coversWholePeriod: false, ledgerStart: null, rows: [] }
+};
+
+// 관리자가 조직 값으로 바꿔 둔 기준시간(전역 설정 — 조회 기간과 무관하게 항상 같은 값이어야 실제와 맞다)
+var CUSTOM_BASELINES = { status_compiled: 5 };
+var WORK_KIND_ORDER = ["report_generated","finding_triaged","status_compiled","remediation_guided","question_answered","hardening_scanned","document_ingested","action_checked","verification_run"];
+// 라벨·기본 기준시간·근거 — server/src/engine/timesaved.ts DEFAULT_BASELINES·worklog.ts WORK_KINDS 그대로
+var WORK_KIND_META = {
+  report_generated:      { label:"보고서 작성", def:120, src:"자체 추정 — 데이터 수집·표 작성·문장 다듬기를 포함한 보고서 1건" },
+  finding_triaged:        { label:"취약점 분류·우선순위 판단", def:15, src:"자체 추정 — 취약점 목록을 놓고 심각도·악용가능성·자산 중요도를 따져 순서를 정하는 시간" },
+  status_compiled:        { label:"현황 집계(여러 화면 대신 확인)", def:5, src:"자체 추정 — 화면 두세 곳을 열어 숫자를 모으는 시간" },
+  remediation_guided:     { label:"조치 절차 안내", def:20, src:"자체 추정 — 조치 방법을 자료에서 찾아 절차로 정리하는 시간" },
+  question_answered:      { label:"질문 답변(자료 찾아 정리)", def:10, src:"자체 추정 — 사내 문서를 찾아 읽고 정리하는 데 걸리는 시간(보수적)" },
+  hardening_scanned:       { label:"보안설정 점검 실행·정리", def:45, src:"자체 추정 — 점검 항목마다 명령을 실행하고 결과를 표로 옮기는 시간" },
+  document_ingested:       { label:"문서 정리·분류(지식화)", def:15, src:"자체 추정 — 문서를 읽고 분류해 정리하는 시간" },
+  action_checked:          { label:"규정 대조 판정", def:20, src:"자체 추정 — 규정 문서에서 해당 조항을 찾아 대조하는 시간" },
+  verification_run:       { label:"조치 검증", def:30, src:"자체 추정 — 조치했는지 장비에 다시 접속해 확인하는 시간" }
+};
+
+function escapeHtml(s){
+  return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+}
+
+// 서버 fmtDuration()과 동일 — 개별 줄(절감 환산)·근거 문장 전용. 10시간 이상이면 소수점을 버리는
+// 서버 쪽 특성까지 그대로 재현한다(화면 문구와 챗봇 문구가 어긋나지 않도록 교차검증).
+function fmtDuration(min){
+  if (min < 60) return Math.round(min) + "분";
+  var h = min / 60;
+  return (h < 10 ? Math.round(h * 10) / 10 : Math.round(h)) + "시간";
+}
+
+// 서버 totalHours 산식과 동일(항상 소수점 1자리 유지) — 헤드라인·표 합계 전용.
+// fmtDuration과 규칙이 다른 이유는 파일 상단 주석 "교차검증 중 발견한 것" 참고.
+function hoursRounded(min){ return Math.round((min / 60) * 10) / 10; }
+
+function headlineRange(totalMinutes, riskAdjustment){
+  if (totalMinutes < 60) {
+    return { lo: String(Math.round(totalMinutes * (1 - riskAdjustment))), hi: String(Math.round(totalMinutes)), unit: "분" };
+  }
+  var totalHours = hoursRounded(totalMinutes);
+  var adjustedHours = Math.round(totalHours * (1 - riskAdjustment) * 10) / 10;
+  return { lo: String(adjustedHours), hi: String(totalHours), unit: "시간" };
+}
+
+// server/src/engine/timesaved.ts timeSavedReport()의 assumptions·note 생성부를 그대로 옮김.
+// (note에서 ledgerStart 문장은 뺐다 — 화면에서는 별도 경고 줄로 표시하기 위해서. 상단 주석 참고.)
+function computeDerived(state){
+  var totalMinutes = state.rows.reduce(function (acc, r) { return acc + r.minutes; }, 0);
+  var assumptions = state.rows.map(function (r) {
+    return r.label + " " + r.count + "건 × " + r.minutesEach + "분 = " + fmtDuration(r.minutes) + " (" + r.source + ")";
+  });
+  var note = [
+    "이 수치는 실제로 처리된 건수에 조직이 정한 기준시간을 곱한 **추정**입니다 — 측정값이 아닙니다.",
+    "불확실성을 감안해 산정값에서 " + Math.round(state.riskAdjustment * 100) + "%를 깎아 보고합니다(보수 조정).",
+    "'시간을 아꼈다'는 일을 얼마나 처리했는지이지 조직이 더 안전해졌다는 뜻이 아닙니다 — 위험 감소는 조치율·기한 준수율로 따로 보세요.",
+    "사람이 결재해 실행한 변경(자산 등록·상태 변경 등)은 사람의 판단이라 절감으로 세지 않습니다."
+  ].join(" ");
+  return { totalMinutes: totalMinutes, assumptions: assumptions, note: note };
+}
+
+// note 문자열의 "**추정**" 마크다운 강조를 <b>로 바꾸고, "안전해졌다는 뜻이 아니다" 구절은
+// 서버 문구가 고정 상수라(가변 데이터 아님) 안전한 부분일치로 항상 굵게 강조한다(요구 ⑤).
+function renderNoteHtml(note){
+  var t = escapeHtml(note);
+  t = t.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+  t = t.replace("조직이 더 안전해졌다는 뜻이 아닙니다", "<b>조직이 더 안전해졌다는 뜻이 아닙니다</b>");
+  return t;
+}
+
+var PALETTE = ["var(--blue-light)", "var(--teal)", "var(--purple)", "var(--amber)", "var(--red)", "var(--muted-2)"];
+
+function heroHtml(state, derived, range){
+  var count = state.rows.reduce(function (acc, r) { return acc + r.count; }, 0);
+  var bar = state.rows.map(function (r, i) {
+    var pct = Math.max(4, Math.round((r.minutes / derived.totalMinutes) * 1000) / 10);
+    return '<div class="tsv-seg" style="flex:' + pct + ' 0 auto;background:' + PALETTE[i % PALETTE.length] + '" title="' + escapeHtml(r.label) + ' — ' + fmtDuration(r.minutes) + ' (' + pct + '%)"></div>';
+  }).join("");
+  return (
+    '<div class="tsv-hero">' +
+      '<div class="tsv-hero-num">' +
+        '<div class="tsv-range"><span class="tsv-pre">약</span> ' +
+          '<span class="tsv-lo">' + range.lo + '</span><span class="tsv-tilde">~</span><span class="tsv-hi">' + range.hi + '</span>' +
+          '<span class="tsv-unit">' + range.unit + '</span>' +
+          '<span class="g-badge tsv-b-est" title="측정값이 아니라 처리 건수 × 기준시간(분)으로 계산한 추정치입니다">추정</span>' +
+        '</div>' +
+        '<div class="tsv-hero-sub">최근 ' + state.days + '일 · AI가 대신 처리한 일 ' + count + '건 · 하한은 보수 조정(' + Math.round(state.riskAdjustment * 100) + '%↓) 적용값</div>' +
+      '</div>' +
+      '<div class="tsv-hero-bar"><div class="tsv-hero-bar-cap">작업 종류별 비중(가리키면 상세)</div><div class="tsv-stack">' + bar + '</div></div>' +
+    '</div>'
+  );
+}
+
+function tableHtml(state, range){
+  var rows = state.rows.slice().sort(function (a, b) { return b.minutes - a.minutes; });
+  var body = rows.map(function (r) {
+    var customBadge = r.custom ? ' <span class="g-badge tsv-b-custom">우리 조직 설정</span>' : "";
+    return (
+      '<tr>' +
+        '<td><div class="tsv-kind-label">' + escapeHtml(r.label) + customBadge + '</div>' +
+            '<div class="tsv-kind-src" title="' + escapeHtml(r.source) + '">' + escapeHtml(r.source) + '</div></td>' +
+        '<td>' + r.count + '건</td>' +
+        '<td>' + r.minutesEach + '분</td>' +
+        '<td class="tsv-conv">' + fmtDuration(r.minutes) + '</td>' +
+      '</tr>'
+    );
+  }).join("");
+  var totalCount = rows.reduce(function (acc, r) { return acc + r.count; }, 0);
+  var footer = (
+    '<tr class="tsv-total-row">' +
+      '<td>합계</td><td>' + totalCount + '건</td><td>—</td>' +
+      '<td class="tsv-conv">' + range.hi + range.unit + ' <span class="tsv-arrow">→ 보수 조정 후</span> <b>' + range.lo + range.unit + '</b></td>' +
+    '</tr>'
+  );
+  return (
+    '<table class="g-table tsv-table"><thead><tr>' +
+      '<th>작업 종류</th><th>건수</th><th>기준시간(분)</th><th>절감 환산</th>' +
+    '</tr></thead><tbody>' + body + footer + '</tbody></table>'
+  );
+}
+
+function noteHtml(derived){
+  return (
+    '<div class="tsv-note-line">※ ' + renderNoteHtml(derived.note) +
+      ' <span class="tsv-more" id="tsvMoreBtn">근거 문장 보기 ▾</span></div>' +
+    '<div class="tsv-assumptions" id="tsvAssumptions" hidden><ul>' +
+      derived.assumptions.map(function (a) { return '<li>' + escapeHtml(a) + '</li>'; }).join("") +
+    '</ul></div>'
+  );
+}
+
+function emptyStateHtml(state){
+  var sub = state.ledgerStart == null
+    ? "이 기능이 배포된 뒤부터 자동으로 쌓입니다."
+    : ("최근 " + state.days + "일 동안 처리된 자동화 기록이 없습니다.");
+  return (
+    '<div class="tsv-empty">' +
+      '<div class="tsv-empty-ic">🕒</div>' +
+      '<div class="tsv-empty-title">아직 집계할 자동화 처리 기록이 없습니다</div>' +
+      '<div class="tsv-empty-sub">' + sub + ' 지금은 보여줄 절감 시간이 없습니다 — 숫자를 지어내지 않습니다.</div>' +
+    '</div>'
+  );
+}
+
+function wireAssumptionsToggle(){
+  var btn = document.getElementById("tsvMoreBtn");
+  var box = document.getElementById("tsvAssumptions");
+  if (!btn || !box) return;
+  btn.onclick = function () {
+    var willOpen = box.hidden;
+    box.hidden = !willOpen;
+    btn.textContent = willOpen ? "근거 문장 접기 ▴" : "근거 문장 보기 ▾";
+  };
+}
+
+function renderSection(key){
+  var state = STATES[key];
+  var heroEl = document.getElementById("tsvHeroArea");
+  var warnEl = document.getElementById("tsvWarn");
+  var tableEl = document.getElementById("tsvTableWrap");
+  var noteEl = document.getElementById("tsvNote");
+
+  if (!state.rows.length) {
+    heroEl.innerHTML = emptyStateHtml(state);
+    warnEl.hidden = true; warnEl.innerHTML = "";
+    tableEl.innerHTML = "";
+    noteEl.hidden = true; noteEl.innerHTML = "";
+  } else {
+    var derived = computeDerived(state);
+    var range = headlineRange(derived.totalMinutes, state.riskAdjustment);
+    heroEl.innerHTML = heroHtml(state, derived, range);
+    tableEl.innerHTML = tableHtml(state, range);
+    noteEl.hidden = false;
+    noteEl.innerHTML = noteHtml(derived);
+    wireAssumptionsToggle();
+    // 요구 ⑥: coversWholePeriod=false면 경고 줄. note 문자열을 파싱하지 않고 구조화 필드로만 만든다.
+    if (!state.coversWholePeriod && state.ledgerStart != null) {
+      warnEl.hidden = false;
+      warnEl.innerHTML = "⚠ 기록은 <b>" + new Date(state.ledgerStart).toLocaleDateString("ko-KR") + "</b>부터 쌓였습니다 — 그 이전 기간은 이번 집계에 포함되지 않았습니다.";
+    } else {
+      warnEl.hidden = true; warnEl.innerHTML = "";
+    }
+  }
+
+  ["main", "small", "empty"].forEach(function (k) {
+    var b = document.getElementById("mockctl-" + k);
+    if (b) b.classList.toggle("on", k === key);
+  });
+}
+
+function buildModalList(){
+  return WORK_KIND_ORDER.map(function (k) {
+    var meta = WORK_KIND_META[k];
+    var isCustom = CUSTOM_BASELINES[k] != null;
+    var cur = isCustom ? CUSTOM_BASELINES[k] : meta.def;
+    return (
+      '<div class="tsv-mrow" data-kind="' + k + '">' +
+        '<div class="tsv-mrow-label">' + meta.label + (isCustom ? ' <span class="g-badge tsv-b-custom">우리 조직 설정</span>' : '') +
+          '<div class="tsv-mrow-hint">기본값 ' + meta.def + '분' + (isCustom ? ' · 현재 ' + cur + '분으로 조정됨' : '') + '</div></div>' +
+        '<div class="tsv-mrow-input"><input type="number" class="g-input" min="0" max="600" value="' + cur + '" data-orig="' + cur + '"><span class="tsv-mrow-suffix">분</span></div>' +
+        '<button class="g-btn g-sm g-ghost tsv-mrow-save" disabled>저장</button>' +
+      '</div>'
+    );
+  }).join("");
+}
+
+function toast(msg){
+  var t = document.getElementById("tsvToast");
+  if (!t) { t = document.createElement("div"); t.id = "tsvToast"; t.className = "tsv-toast"; document.body.appendChild(t); }
+  t.textContent = msg;
+  t.style.display = "block";
+  clearTimeout(t._h);
+  t._h = setTimeout(function () { t.style.display = "none"; }, 3400);
+}
+
+function wireModal(){
+  document.getElementById("tsvModalList").innerHTML = buildModalList();
+  Array.prototype.forEach.call(document.querySelectorAll(".tsv-mrow"), function (row) {
+    var input = row.querySelector("input");
+    var btn = row.querySelector(".tsv-mrow-save");
+    input.addEventListener("input", function () {
+      btn.disabled = (input.value === input.dataset.orig);
+    });
+    btn.addEventListener("click", function () {
+      // 정직한 구현 원칙 — 시안의 버튼은 실제로 저장하지 않는다. 실제 화면은 여기서
+      // POST /api/time-saved/baseline {kind,minutes} 를 호출한다(admin 전용, timesaved.ts).
+      toast("(시안) 실제로 저장되지 않습니다 — 실제 화면은 POST /api/time-saved/baseline 을 호출해 조직 설정으로 반영합니다.");
+      btn.disabled = true;
+    });
+  });
+}
+
+function init(){
+  function tick(){
+    var el = document.getElementById("clockEl");
+    if (el) el.textContent = new Date().toLocaleString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: true, year: "numeric", month: "2-digit", day: "2-digit" });
+  }
+  tick(); setInterval(tick, 30000);
+
+  renderSection("main");
+  document.getElementById("mockctl-main").addEventListener("click", function () { renderSection("main"); });
+  document.getElementById("mockctl-small").addEventListener("click", function () { renderSection("small"); });
+  document.getElementById("mockctl-empty").addEventListener("click", function () { renderSection("empty"); });
+
+  document.getElementById("tsvAdminBtn").addEventListener("click", function () {
+    wireModal();
+    document.getElementById("tsvModalBg").classList.add("g-on");
+  });
+  document.getElementById("tsvModalClose").addEventListener("click", function () {
+    document.getElementById("tsvModalBg").classList.remove("g-on");
+  });
+  document.getElementById("tsvModalBg").addEventListener("click", function (e) {
+    if (e.target === this) this.classList.remove("g-on");
+  });
+  document.getElementById("tsvLedgerLink").addEventListener("click", function () {
+    // 정직한 구현 원칙 — 이 시안에는 실제 원장 화면 연결이 없다. 실제로는 /api/work-log(작업 원장)로 이동해
+    // 이 숫자를 만든 건별 근거(worklog.ts recordWork)를 보여주는 안을 제안한다(요구사항 밖 추가 제안).
+    toast("(시안) 이 시안에서는 연결되어 있지 않습니다 — 실제로는 처리 원장(/api/work-log)으로 이동해 건별 근거를 보여줍니다.");
+  });
+}
+
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", init);
+} else {
+  init();
+}
+</script>
+</body>
+</html>

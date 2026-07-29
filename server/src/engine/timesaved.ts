@@ -123,8 +123,10 @@ export interface TimeSavedReport {
  */
 export function fmtDuration(minutes: number): string {
   if (minutes < 60) return `${Math.round(minutes)}분`;
-  const h = minutes / 60;
-  return `${h < 10 ? Math.round(h * 10) / 10 : Math.round(h)}시간`;
+  // 반올림 규칙은 하나뿐이어야 한다 — 소수 첫째 자리 고정.
+  // (시안 검토 2026-07-29: 10시간 이상만 정수로 자르면 같은 합계가 화면에서 "19시간"과
+  //  "18.6시간" 두 가지로 보인다. 숫자가 스스로 어긋나면 그 숫자를 믿지 않게 된다.)
+  return `${Math.round((minutes / 60) * 10) / 10}시간`;
 }
 
 export function timeSavedReport(days = 30): TimeSavedReport {

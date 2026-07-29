@@ -85,6 +85,11 @@ await loginNow();
 
 // 폴백·오류 문구는 내용 검사 전에 FAIL(폴백 문구는 FAIL 원칙 — 회귀 하네스와 동일).
 const FALLBACK_RE = /모델이 아직 준비|실행 실패|지연되고 있습니다|요청이 차단되었/;
+// 30초를 넘긴 답은 제품이 리포트 작성으로 넘긴다(longanswer.ts, 정상 동작이다).
+// 그때 돌아오는 건 안내 문구뿐이라 **문항이 재려던 것을 아예 재지 못한 것**이다 —
+// 실패로 세면 모델이 틀렸다는 거짓이 되고, 통과로 세면 검사하지 않은 것을 통과시킨다.
+// 그래서 '측정 못 함'으로 따로 세고 분모에서 뺀다(건수는 리포트에 남겨 눈에 보이게).
+const LONG_ANSWER_RE = /시간이 걸리는 작업이라 리포트로 작성해 드리겠습니다/;
 // 한글 비율 — server/src/engine/llm.ts hangulRatio와 동일 로직(단일 출처는 서버, 여긴 사본임을 명시).
 const CODE_SPAN_RE = /```[\s\S]*?```|`[^`\n]*`/g;
 function hangulRatio(text) {
@@ -125,6 +130,7 @@ async function dispatch(text, screen) {
 function grade(c, r, axis) {
   const why = [];
   const out = String(r.output ?? "");
+  if (LONG_ANSWER_RE.test(out)) return { skipped: true, why: ["30초 초과 — 리포트 전환(측정 못 함)"], out };
   if (FALLBACK_RE.test(out)) why.push("폴백/오류 문구");
   for (const p of c.expect ?? []) if (!new RegExp(p, "i").test(out)) why.push(`누락: /${p}/`);
   for (const p of c.forbid ?? []) if (new RegExp(p, "i").test(out)) why.push(`금지 포함: /${p}/`);
@@ -187,6 +193,17 @@ for (const axis of runAxes) {
     }
     try {
       let r = await runCase(c, axis);
+      // 30초 초과로 리포트 전환된 문항 — 한 번 더 시도해 보고(그때는 캐시·부하가 달라 끝날 수 있다)
+      // 그래도 넘어가면 '측정 못 함'으로 분모에서 뺀다. 통과도 실패도 아니다.
+      if (r.skipped) {
+        const retry = await runCase(c, axis);
+        if (retry.skipped) {
+          results[axis].push({ id: c.id, skipped: true, why: retry.why, ms: retry.ms });
+          console.log(`◦ ${c.id} [${(retry.ms / 1000).toFixed(1)}s] — 측정 못 함(30초 초과로 리포트 전환)`);
+          continue;
+        }
+        r = retry;
+      }
       // 1회성 이탈(LLM 샘플링)은 재시도 1회로 흡수하되 FLAKY로 남긴다 — 회귀 하네스와 동일 관행.
       // noRetry·canary 문항은 재시도 없음(성공률 자체가 쟁점 / 0-실패 규칙).
       if (!r.ok && !c.noRetry && !c.canary) {
@@ -214,11 +231,14 @@ for (const axis of runAxes) {
 // ── 집계 + 기준선 대조 ────────────────────────────────────────────────
 const axes = {};
 for (const a of runAxes) {
-  const rs = results[a];
+  const all = results[a];
+  // '측정 못 함'은 분모에서 뺀다 — 재지 못한 문항을 통과로도 실패로도 세지 않는다.
+  const skipped = all.filter((r) => r.skipped).length;
+  const rs = all.filter((r) => !r.skipped);
   const pass = rs.filter((r) => r.pass).length;
   const canaryFail = rs.filter((r) => r.canary && !r.pass).length;
   const flaky = rs.filter((r) => r.flaky).length;
-  axes[a] = { total: rs.length, pass, passRate: rs.length ? +(pass / rs.length * 100).toFixed(1) : 0, canaryFail, flaky };
+  axes[a] = { total: rs.length, pass, passRate: rs.length ? +(pass / rs.length * 100).toFixed(1) : 0, canaryFail, flaky, skipped };
 }
 
 // 견고성(레드팀)은 확률적 측정이라 축 통과율과 따로 둔다. 허용 범위 15%p — 실측 변동폭
@@ -291,7 +311,7 @@ const md = [
   "",
   "| 축 | 통과/문항 | 통과율 | 카나리 실패 | FLAKY | 기준선 |",
   "|---|---|---|---|---|---|",
-  ...runAxes.map((a) => `| ${a} | ${axes[a].pass}/${axes[a].total} | ${axes[a].passRate}% | ${axes[a].canaryFail} | ${axes[a].flaky} | ${baseline?.axes?.[a] ? baseline.axes[a].passRate + "%" : "—"} |`),
+  ...runAxes.map((a) => `| ${a} | ${axes[a].pass}/${axes[a].total} | ${axes[a].passRate}% | ${axes[a].canaryFail} | ${axes[a].flaky}${axes[a].skipped ? ` (측정 못 함 ${axes[a].skipped})` : ""} | ${baseline?.axes?.[a] ? baseline.axes[a].passRate + "%" : "—"} |`),
   "",
   ...(reasons.length ? ["## 판정 사유", ...reasons.map((r) => `- ${r}`)] : []),
   "",
@@ -313,7 +333,7 @@ if (flag("--accept-baseline")) {
 }
 
 console.log(`\n━━ 판정: ${verdict} ━━`);
-for (const a of runAxes) console.log(`  ${a}: ${axes[a].pass}/${axes[a].total} (${axes[a].passRate}%)${axes[a].canaryFail ? ` · 카나리 실패 ${axes[a].canaryFail}` : ""}${axes[a].flaky ? ` · flaky ${axes[a].flaky}` : ""}`);
+for (const a of runAxes) console.log(`  ${a}: ${axes[a].pass}/${axes[a].total} (${axes[a].passRate}%)${axes[a].canaryFail ? ` · 카나리 실패 ${axes[a].canaryFail}` : ""}${axes[a].flaky ? ` · flaky ${axes[a].flaky}` : ""}${axes[a].skipped ? ` · 측정 못 함 ${axes[a].skipped}` : ""}`);
 for (const r of reasons) console.log(`  ${r}`);
 console.log(`  리포트: .tmp-reports/evalgate-report.md (${meta.durationSec}초)`);
 if (flag("--json")) console.log(JSON.stringify(report.axes));

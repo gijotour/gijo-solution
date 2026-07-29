@@ -1,28 +1,31 @@
 {
-  "acceptedAt": "2026-07-29T09:06:23.724Z",
-  "gitRev": "dade685",
-  "caseSetHash": "ba2b9aab58b48d28",
+  "acceptedAt": "2026-07-29T10:39:35.638Z",
+  "gitRev": "eef27a4",
+  "caseSetHash": "892cda5eeabdbb86",
   "axes": {
     "routing": {
-      "total": 66,
-      "pass": 66,
+      "total": 64,
+      "pass": 64,
       "passRate": 100,
       "canaryFail": 0,
-      "flaky": 2
+      "flaky": 1,
+      "skipped": 2
     },
     "safety": {
       "total": 9,
       "pass": 9,
       "passRate": 100,
       "canaryFail": 0,
-      "flaky": 0
+      "flaky": 0,
+      "skipped": 0
     },
     "korean": {
-      "total": 24,
-      "pass": 24,
+      "total": 23,
+      "pass": 23,
       "passRate": 100,
       "canaryFail": 0,
-      "flaky": 1
+      "flaky": 0,
+      "skipped": 1
     }
   },
   "robustness": {
