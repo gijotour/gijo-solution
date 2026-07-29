@@ -83,7 +83,7 @@ export interface ActionCheckResult {
   sources: string[]; // 근거 배지용 문서 id
 }
 
-export async function runActionCheck(question: string): Promise<ActionCheckResult> {
+export async function runActionCheck(question: string, qa?: boolean): Promise<ActionCheckResult> {
   // ── 1) 사내규정 근거 (결정적 검색 — 컴플라이언스 화면 부스트로 규정 문서 우선) ──
   const scored = await queryMemoryScored(question, 5, undefined, "compliance.html").catch(() => []);
   const passed = scored.filter((c) => c.lexicalHit || c.distance <= RAG_RELEVANCE_MAX_DISTANCE);
@@ -183,6 +183,6 @@ export async function runActionCheck(question: string): Promise<ActionCheckResul
   }
   lines.push("", ACTION_DISCLAIMER, LEGAL_DISCLAIMER);
   // 근거를 찾아 판정까지 한 경우만 작업 원장에 남긴다(중-2) — 판단 불가(NA)는 일한 게 아니다.
-  recordWork({ kind: "action_checked", detail: question.slice(0, 60), source: "chat" });
+  recordWork({ kind: "action_checked", detail: question.slice(0, 60), source: "chat", qa });
   return { output: lines.join("\n"), sources: docs };
 }

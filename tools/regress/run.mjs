@@ -32,6 +32,9 @@ if (!login.accessToken) {
   process.exit(1);
 }
 
+// qa:true — 이 하네스의 문답도 시험이다. 세션·학습 수집·작업 원장에 남기지 않는다.
+// (2026-07-29 검토 지적: 평가 게이트 커밋이 "회귀 하네스도 막혔다"고 적었는데 실제로는
+//  여기 플래그가 없어 그대로 새고 있었다 — 적어 놓은 것과 코드가 달랐다.)
 // 폴백·오류 문구가 나오면 내용 검사 전에 FAIL 처리한다(폴백 문구는 FAIL 원칙).
 const FALLBACK_RE = /모델이 아직 준비|실행 실패|지연되고 있습니다|요청이 차단/;
 
@@ -40,7 +43,7 @@ async function dispatch(text) {
   const r = await fetch(base + "/api/dispatch", {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: "Bearer " + login.accessToken },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify({ text, qa: true }),
     signal: AbortSignal.timeout(180000),
   });
   const j = await r.json();

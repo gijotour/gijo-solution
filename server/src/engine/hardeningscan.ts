@@ -589,7 +589,7 @@ function verdictOf(fail: number): string {
   return fail === 0 ? "🟢 양호" : fail <= 2 ? "🟡 보통(취약 항목 조치 필요)" : "🔴 미흡(다수 취약)";
 }
 
-export async function runHardeningScan(opts: { standard: StandardId; target?: string; run?: RunFn }): Promise<ScanReport> {
+export async function runHardeningScan(opts: { standard: StandardId; target?: string; run?: RunFn; skipWorkLog?: boolean }): Promise<ScanReport> {
   const std = STANDARDS[opts.standard];
   const run = opts.run ?? defaultRunnerFor(opts.standard);
   const target = opts.target || "localhost (this-appliance)";
@@ -613,7 +613,10 @@ export async function runHardeningScan(opts: { standard: StandardId; target?: st
   const scored = total - na;
   const rate = scored ? Math.round((pass / scored) * 100) : 0;
   // 자동화 작업 원장(중-2) — 손으로 하면 항목마다 명령을 치고 결과를 표로 옮겨야 하는 일이다.
-  recordWork({ kind: "hardening_scanned", detail: `${opts.standard}/${target}`, source: opts.target ? "schedule" : "chat" });
+  // 챗봇 경로는 agentloop이 이미 원장에 남긴다(TOOL_WORK_KIND) — 여기서 또 남기면 1회 점검이
+  // 2건으로 잡혀 절감 시간이 2배가 된다(검토 지적 2026-07-29). 그래서 도구 경로는 skipWorkLog로 끈다.
+  // 스케줄러·화면 실행은 agentloop을 안 타므로 여기서 남겨야 한다.
+  if (!opts.skipWorkLog) recordWork({ kind: "hardening_scanned", detail: `${opts.standard}/${target}`, source: "schedule" });
   return {
     standard: opts.standard,
     standardLabel: std.label,

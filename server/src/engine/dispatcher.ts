@@ -326,7 +326,7 @@ async function runOrchestration(instructionText: string, steps: OrchestrationSte
       } else {
         // report — 앞 단계에서 스캔한 자산이 있으면 그 범위로, 없으면 전체로 보고서를 만든다.
         const scoped = scannedAssetIds.size ? [...scannedAssetIds] : undefined;
-        const r = await generateReport({ type: "ondemand", assetIds: scoped, createdBy: "AI 팀(오케스트레이터)" });
+        const r = await generateReport({ type: "ondemand", assetIds: scoped, createdBy: "AI 팀(오케스트레이터)", qa });
         assetIds = scoped;
         output = `${r.executiveSummary}\n(리포트 파일: ${r.filePath})`;
       }
@@ -588,7 +588,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   // 사내규정(RAG)으로만 판정하고, 법령은 원문 링크로 안내, 근거 없으면 판정하지 않는다(NA 계약).
   if (ACTION_CHECK_RE.test(instructionText)) {
     const task = createTask({ text: instructionText, agentId: "analysis", priority: "P2" });
-    const r = await runActionCheck(instructionText);
+    const r = await runActionCheck(instructionText, qa);
     completeTask(task.id);
     return {
       task,
@@ -622,6 +622,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
       assetIds: mentioned ? [mentioned.id] : undefined,
       audience,
       createdBy: actor ?? "챗봇 지시",
+      qa,
     });
     completeTask(task.id);
     return {

@@ -71,7 +71,19 @@ const gate = spawnSync(process.execPath, [path.join(here, "run.mjs")], {
   env: { ...process.env },
   stdio: "inherit",
 });
-const passed = gate.status === 0;
+// 종료코드 0만으로는 부족하다 — 게이트는 "기준선 없음"(첫 실행)에도 0을 낸다.
+// 그걸 채택으로 기록하면 **기준선과 대조한 적 없는 채택**이 원장에 "✅ 게이트 통과"로 남는다
+// (검토 지적 2026-07-29). 리포트의 판정이 '통과'일 때만 채택으로 본다.
+const gateVerdict = (() => {
+  try {
+    return JSON.parse(fs.readFileSync(path.join(repoRoot, ".tmp-reports", "evalgate-report.json"), "utf8")).verdict;
+  } catch { return null; }
+})();
+const passed = gate.status === 0 && gateVerdict === "통과";
+if (gate.status === 0 && gateVerdict !== "통과") {
+  console.log(`\n판정이 "${gateVerdict ?? "확인 불가"}"입니다 — 기준선과 대조된 통과가 아니라 채택하지 않습니다.`);
+  console.log("   기준선이 없거나 문항셋이 바뀐 상태라면, 먼저 `node tools/evalgate/run.mjs --accept-baseline`으로 기준선을 확정하세요.");
+}
 
 // 게이트가 남긴 리포트를 근거로 싣는다(직접 계산하지 않는다 — 판정의 단일 출처는 게이트다).
 let gateReport = null;

@@ -27,7 +27,7 @@ vi.mock("../src/engine/hardeningscan", async (importOriginal) => ({
 }));
 
 import { dispatchInstruction, formatRejectHistory, REPORT_CREATE_RE, REPORT_QUERY_EXCLUDE_RE } from "../src/engine/dispatcher";
-import { isHowtoNotCommand } from "../src/engine/agentloop";
+import { isHowtoNotCommand, ontologyQueryOf } from "../src/engine/agentloop";
 import { resetAssetsForTests, registerAsset, recordFindings } from "../src/engine/assets";
 import { updateFindingReview, findingKey } from "../src/engine/approvals";
 import { db } from "../src/db";
@@ -124,6 +124,40 @@ describe("⑤ 평가 게이트가 잡은 공백 — 원격 정기점검 스케�
   it("실행 명령('하드닝 점검해줘')은 종전대로 점검을 실행한다 — 조회와 실행이 안 섞인다", async () => {
     const before = scanRuns.length;
     await dispatchInstruction("하드닝 점검해줘");
+    expect(scanRuns.length).toBe(before + 1);
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// [검토 지적 수리 2026-07-29] 검토관이 잡은 라우팅 결함 3건 고정.
+describe("⑥ 검토가 잡은 결함 — 온톨로지 강제분기가 검색어 없이 부르던 것", () => {
+  it("질문에서 검색어를 뽑는다", () => {
+    expect(ontologyQueryOf("Log4Shell 완화 방법을 온톨로지에서 찾아줘")).toBe("Log4Shell 완화 방법");
+    expect(ontologyQueryOf("온톨로지에서 KEV 관계 조회해줘")).toContain("KEV");
+  });
+
+  it("현황 질문('뭐 들어있어')은 검색어가 아니라 빈 문자열 — 강제하지 않고 LLM에 맡긴다", () => {
+    expect(ontologyQueryOf("온톨로지에 뭐 들어있어?")).toBe("");
+    expect(ontologyQueryOf("지식 그래프 보여줘")).toBe("");
+  });
+});
+
+describe("⑦ 검토가 잡은 결함 — 점검 스케줄 정규식 과포착", () => {
+  it("유지보수 점검 일정은 하드닝 스케줄로 삼키지 않는다", async () => {
+    const r = await dispatchInstruction("유지보수 점검 일정 알려줘");
+    expect((r.toolCalls ?? []).map((t) => t.tool)).not.toContain("hardening_schedule_list");
+  });
+
+  it("'하드닝 점검 스케줄 알려줘'는 조회지 실행이 아니다", async () => {
+    const before = scanRuns.length;
+    const r = await dispatchInstruction("하드닝 점검 스케줄 알려줘");
+    expect(scanRuns.length).toBe(before); // 점검이 돌면 안 된다
+    expect((r.toolCalls ?? []).map((t) => t.tool)).toContain("hardening_schedule_list");
+  });
+
+  it("'정기점검 돌려줘'는 실행이다", async () => {
+    const before = scanRuns.length;
+    await dispatchInstruction("정기점검 돌려줘");
     expect(scanRuns.length).toBe(before + 1);
   });
 });

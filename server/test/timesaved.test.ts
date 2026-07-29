@@ -103,3 +103,24 @@ describe("시간 환산", () => {
     expect(t).toContain("안전해졌다는 뜻이 아닙니다"); // 활동지표를 위험감소로 읽지 않게
   });
 });
+
+// [검토 지적 수리 2026-07-29] qa 플래그가 4개 경로에서 새어 평가 게이트 실행이 절감 시간을
+// 부풀리고 있었다. worklog 첫머리에 "시험 흔적은 처음부터 배제"라 적어 놓고 지키지 못한 것이다.
+describe("게이트 오염 차단 — 원장에 쓰는 모든 경로", () => {
+  it("qa면 어떤 종류든 담지 않는다", () => {
+    for (const kind of ["report_generated", "action_checked", "hardening_scanned", "verification_run", "document_ingested"] as const) {
+      recordWork({ kind, qa: true });
+    }
+    expect(countWorkByKind(Date.now() - 1000)).toEqual({});
+  });
+
+  it("qa가 아니면 담는다 — 플래그가 실제 분기임을 못박는다", () => {
+    recordWork({ kind: "report_generated" });
+    expect(countWorkByKind(Date.now() - 1000).report_generated).toBe(1);
+  });
+
+  it("하드닝 점검은 도구 매핑에만 있다 — 엔진이 또 남기면 1회가 2건이 된다", () => {
+    // agentloop(TOOL_WORK_KIND) 한 곳에서만 기록하고, hardeningscan은 skipWorkLog로 비켜난다.
+    expect(TOOL_WORK_KIND.run_hardening_scan).toBe("hardening_scanned");
+  });
+});

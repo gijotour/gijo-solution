@@ -30,6 +30,8 @@ export interface ReportRequest {
   // 대상 독자: internal=내부 검토용(격식 없이 액션 중심) / official=보고용(격식·거버넌스 강조). 기본 official.
   audience?: "internal" | "official";
   createdBy?: string; // 작업 귀속 — 누가 생성했는지(라우트=로그인 사용자, 스케줄러="정기 스케줄")
+  // 평가 게이트/QA 실행 표시 — 작업 원장에 담지 않는다(시험이 절감 숫자를 만들면 안 된다).
+  qa?: boolean;
 }
 
 export interface ReportResult {
@@ -593,7 +595,7 @@ export async function generateReport(req: ReportRequest): Promise<ReportResult> 
     /* 메타 저장 실패해도 리포트 자체는 유효 — 이력에선 파일명 기반으로 폴백 표시 */
   }
   // 자동화 작업 원장(계획서 중-2) — 보고서 작성은 담당자가 손으로 하면 가장 오래 걸리는 일이다.
-  recordWork({ kind: "report_generated", detail: `${req.type}/${audience}`, actor: req.createdBy ?? null, source: req.createdBy ? "chat" : "schedule" });
+  recordWork({ kind: "report_generated", detail: `${req.type}/${audience}`, actor: req.createdBy ?? null, source: req.createdBy ? "chat" : "schedule", qa: req.qa });
   return result;
 }
 

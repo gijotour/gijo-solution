@@ -261,7 +261,7 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }
   },
   // 보안장비 하드닝(보안설정) 점검 — 명백한 문구는 곧장 스캔 도구로. CIS를 명시하면 cis, 아니면 국내 CCE(kisa).
   {
-    re: /(하드닝|보안\s*설정)\s*(점검|진단|스캔|체크)|CCE\s*(점검|진단|기준)|(장비|서버|시스템)\s*(보안\s*)?(점검|진단)해|기준.{0,3}(점검|진단)|취약점\s*진단해/,
+    re: /(하드닝|보안\s*설정)\s*(점검|진단|스캔|체크)|CCE\s*(점검|진단|기준)|(장비|서버|시스템)\s*(보안\s*)?(점검|진단)해|기준.{0,3}(점검|진단)|취약점\s*진단해|정기\s*점검\s*(돌려|실행|해)/,
     tool: "run_hardening_scan",
     args: {},
   },
@@ -310,7 +310,10 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }
   // 스케줄·주기를 묻는 말투일 때만 잡고, 실행 명령형은 위 run_hardening_scan으로 그대로 간다.
   // [2026-07-29 평가 게이트가 잡음] "원격 정기점검 스케줄 어떻게 되어 있어?"에 자산 취약점 답이 나왔다.
   {
-    re: /(원격\s*)?(정기\s*)?점검\s*(스케줄|일정|주기)|정기점검.{0,6}(언제|어떻게|돌|확인|알려|보여)|점검.{0,4}자동.{0,6}(돌|실행|되)/,
+    // ⚠ 좁게 잡는다(검토 지적 2026-07-29). 앞의 '원격/정기'를 선택으로 두면 맨 "점검 일정"만으로
+    // 걸려 **유지보수 점검**(maintenance_items — 다른 기능이다) 질문까지 삼켰다. 또 "정기점검
+    // 돌려줘"는 실행 명령인데 조회로 갔다 — 명령형 어미는 여기서 제외하고 run_hardening_scan에 맡긴다.
+    re: /(원격|하드닝|정기)\s*점검\s*(스케줄|일정|주기)|정기점검.{0,6}(언제|어떻게|확인|알려|보여)|(원격|하드닝)\s*점검.{0,4}자동.{0,6}(돌|실행|되)/,
     tool: "hardening_schedule_list",
     args: {},
   },
@@ -372,16 +375,44 @@ function forcedToolFor(instruction: string, scope?: ToolScope): { tool: string; 
       // 하드닝 점검 기준 선택: CIS 명시→cis, PC/윈도우→kisa_pc, 네트워크 장비→kisa_net, 그 외→국내 CCE(kisa).
       if (f.tool === "run_hardening_scan") {
         if (isHowtoNotCommand(instruction)) continue; // 방법 질문은 실행하지 않는다(2026-07-29)
+        // 스케줄·주기를 묻는 말은 조회다 — 배열 순서상 실행이 먼저 걸리므로 여기서 비켜 준다
+        // ("하드닝 점검 스케줄 알려줘"가 실제 점검을 돌리던 것, 검토 지적 2026-07-29).
+        if (/스케줄|일정|주기/.test(instruction) && !/돌려|실행해|지금\s*해/.test(instruction)) continue;
         const standard = /\bcis\b|국제/i.test(instruction) ? "cis"
           : /\bpc\b|피시|윈도우|windows/i.test(instruction) ? "kisa_pc"
           : /네트워크\s*장비|스위치|라우터|cisco/i.test(instruction) ? "kisa_net"
           : "kisa";
         return { tool: f.tool, args: { standard } };
       }
+      // 온톨로지 조회는 **검색어가 필수**다(agenttools: query required). 빈 인자로 부르면 도구가
+      // "무엇의 연결 관계를 찾을지 알려주세요"를 돌려주고, 강제 경로는 예외가 아니면 폴백하지
+      // 않으므로 그 되물음이 유일한 근거가 되어 답이 만들어진다 — 도구는 불렀는데 답은 빈
+      // '거짓 통과'다(검토 지적 2026-07-29). 질문에서 검색어를 뽑고, 못 뽑으면 강제하지 않는다.
+      if (f.tool === "ontology_query") {
+        const query = ontologyQueryOf(instruction);
+        if (!query) continue; // LLM이 고르게 둔다 — 빈 조회로 되묻느니 낫다
+        return { tool: f.tool, args: { query } };
+      }
       return { tool: f.tool, args: f.args };
     }
   }
   return null;
+}
+
+/**
+ * "Log4Shell 완화 방법을 온톨로지에서 찾아줘" → "Log4Shell 완화 방법"
+ * 온톨로지·지식그래프라는 말 자체와 지시 어미를 걷어 낸 나머지가 검색어다.
+ */
+export function ontologyQueryOf(instruction: string): string {
+  const q = instruction
+    .replace(/온톨로지|지식\s*그래프|트리플/g, " ")
+    // "뭐 들어있어?" 같은 되묻기 말은 검색어가 아니라 **현황 질문**이다 — 걷어 내면 빈 문자열이
+    // 되어 강제 분기가 물러나고, 그런 질문은 LLM이 knowledge_status로 보낸다.
+    .replace(/뭐|무엇|어떤\s*것|들어\s*있|들어|있어|있나|있는지|내용/g, " ")
+    .replace(/에서|에|을|를|좀|한번|찾아|검색|조회|보여|알려|해|줘|주세요|봐|봐줘|줄래|해줘|하기|\?|!|\./g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return q.length >= 2 ? q.slice(0, 60) : "";
 }
 
 // 자동화 작업 원장 기록(계획서 중-2). 매핑에 없는 도구는 세지 않고, 평가 게이트·QA 실행은

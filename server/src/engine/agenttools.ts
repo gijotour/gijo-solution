@@ -541,7 +541,8 @@ async function runHardeningScanTool(args: Record<string, string>): Promise<strin
     : /net|네트워크|스위치|라우터|cisco/.test(raw) ? "kisa_net"
     : "kisa";
   const target = (args.target ?? "").trim() || undefined;
-  const report = await runHardeningScan({ standard, target });
+  // skipWorkLog: 이 경로는 agentloop이 원장에 남긴다(qa 판정까지 거기서 한다) — 중복 기록 방지.
+  const report = await runHardeningScan({ standard, target, skipWorkLog: true });
   return scanSummaryText(report);
 }
 
