@@ -680,6 +680,30 @@ async function runClient() {
     return "서버 사유를 첫 줄에 세우고 기술 정보는 뒤로 보낸다";
   });
 
+  // 온프렘(폐쇄망) 제품은 **바깥으로 아무것도 부르면 안 된다.**
+  // 실사고(2026-07-29): 화면 46곳이 로고를 https://gijo.ai/_nuxt/… 에서 불러오고 있었다.
+  //   개발 PC는 인터넷이 되니 멀쩡해 보였지만, 고객사 폐쇄망에서는 로고가 깨진 채로 뜬다.
+  //   자산을 동봉해 로컬 파일로 바꿨다 — 다시 새 화면이 외부 주소를 물고 오지 않게 지킨다.
+  await scenario("QA-C08", "온프렘", "화면이 바깥 주소를 부르지 않는다", {
+    given: "폐쇄망에 설치되는 온프렘 제품에서",
+    when: "화면들의 src/href를 전부 훑으면",
+    then: "http(s) 바깥 주소가 하나도 없다(그림·글꼴·스크립트 모두 동봉)",
+  }, async () => {
+    const pagesDir = path.join(ROOT, "client", "src", "renderer", "pages");
+    const files = fs.readdirSync(pagesDir).filter((f) => /\.(html|js|css)$/.test(f));
+    const 바깥 = [];
+    for (const f of files) {
+      const s = fs.readFileSync(path.join(pagesDir, f), "utf8");
+      for (const m of s.matchAll(/(?:src|href)\s*=\s*["'](https?:\/\/[^"']+)["']/g)) {
+        // w3.org는 XML 네임스페이스 **이름표**다 — 네트워크를 타지 않는다.
+        if (/^https?:\/\/(?:www\.)?w3\.org\//.test(m[1])) continue;
+        바깥.push(`${f} → ${m[1].slice(0, 60)}`);
+      }
+    }
+    if (바깥.length) throw new Error(`바깥 주소 ${바깥.length}곳: ${바깥.slice(0, 3).join(" | ")}`);
+    return `화면 ${files.length}개 — 바깥 주소 0곳`;
+  });
+
   // ⚠ "관리자 탭에 업데이트가 펼쳐져 보이는가"는 여기(헤드리스 client 계층)에 두지 않는다.
   //    이 하네스는 preload(window.gijo)도 로그인도 없어서 설정 화면 **안**이 아예 안 그려지고,
   //    file:// iframe은 서로 다른 출처라 contentDocument도 null이다(2026-07-28 실측).
