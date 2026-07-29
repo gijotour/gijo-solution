@@ -684,6 +684,37 @@ export const memoryApi = {
   knowledgeBundleStatus: () => request<KnowledgeBundleStatus>("/api/knowledge-bundle/status"),
 };
 
+// "AI가 아낀 시간"(중-2) — 자동화 처리량을 시간으로 환산한 추정치.
+export const timeSavedApi = {
+  status: (days = 30) => request<TimeSavedStatus>(`/api/time-saved?days=${days}`),
+  setBaseline: (kind: string, minutes: number) =>
+    request<TimeSavedStatus>("/api/time-saved/baseline", { method: "POST", body: { kind, minutes } }),
+};
+
+export interface TimeSavedRow {
+  kind: string;
+  label: string;
+  count: number;
+  minutesEach: number;
+  minutes: number;
+  source: string;
+  custom: boolean;
+}
+export interface TimeSavedStatus {
+  days: number;
+  rows: TimeSavedRow[];
+  totalMinutes: number;
+  totalHours: number;
+  adjustedHours: number;
+  riskAdjustment: number;
+  coversWholePeriod: boolean;
+  ledgerStart: number | null;
+  assumptions: string[];
+  note: string;
+  baselines?: Record<string, { minutes: number; source: string }>;
+  custom?: Record<string, number>;
+}
+
 export interface KnowledgeBundleStatus {
   bundleVersion: string;
   applied: { version: string; at: number; triples: number; docsIngested: number; docsSkipped: number } | null;

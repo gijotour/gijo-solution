@@ -78,6 +78,32 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .cat-link{margin-left:auto;font-size:10.5px;font-weight:700;color:var(--blue-light);cursor:pointer;}
 .cat-link:hover{text-decoration:underline;}
 
+/* ⏱ AI가 아낀 시간(중-2) — 승인된 시안(mockups/kpi-time-saved) 그대로.
+   배치 근거: 위험도 히어로에 섞으면 "클수록 좋다"로 읽히므로 AI 보안 아래·상세 지표 위 별도 카드.
+   신뢰 장치: 단일 숫자 대신 범위(보수 하한 먼저) + '추정' 배지 + 근거 표 + 한계 문구 상시 노출. */
+.tsv-hero{display:flex;align-items:center;gap:18px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px 18px;}
+.tsv-range{font-size:30px;font-weight:900;color:var(--teal);line-height:1.1;}
+.tsv-range small{font-size:14px;font-weight:700;color:var(--muted);}
+.tsv-badge{display:inline-block;font-size:10px;font-weight:800;color:var(--amber);border:1px solid rgba(245,158,11,.4);background:rgba(245,158,11,.10);border-radius:999px;padding:2px 8px;vertical-align:middle;margin-left:8px;}
+.tsv-sub{font-size:11px;color:var(--muted-2);margin-top:6px;}
+.tsv-warn{margin-top:10px;font-size:11.5px;color:var(--amber);background:rgba(245,158,11,.08);border-left:3px solid var(--amber);border-radius:0 6px 6px 0;padding:8px 12px;}
+.tsv-table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12px;}
+.tsv-table th{text-align:left;font-size:10.5px;font-weight:700;color:var(--muted-2);padding:6px 10px;border-bottom:1px solid var(--border);}
+.tsv-table th.num,.tsv-table td.num{text-align:right;}
+.tsv-table td{padding:9px 10px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:top;}
+.tsv-table tr:last-child td{border-bottom:none;}
+.tsv-src{display:block;font-size:10px;color:var(--muted-2);margin-top:3px;}
+.tsv-own{display:inline-block;font-size:9.5px;font-weight:700;color:var(--blue-light);border:1px solid rgba(59,130,246,.35);border-radius:999px;padding:1px 6px;margin-left:6px;}
+.tsv-sum td{font-weight:800;color:#fff;border-top:1px solid var(--border-strong);}
+.tsv-note{margin-top:12px;font-size:11px;line-height:1.7;color:var(--muted);background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;}
+.tsv-note b{color:var(--text);}
+.tsv-admin{margin-left:auto;font-size:10.5px;font-weight:700;color:var(--blue-light);cursor:pointer;}
+.tsv-admin:hover{text-decoration:underline;}
+.tsv-edit{display:grid;grid-template-columns:1fr auto;gap:8px 12px;align-items:center;margin-top:12px;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;}
+.tsv-edit label{font-size:11.5px;color:var(--text);}
+.tsv-edit input{width:80px;background:var(--panel);border:1px solid var(--border-strong);border-radius:6px;padding:5px 8px;color:var(--text);font-size:12px;text-align:right;}
+.tsv-empty{font-size:12px;color:var(--muted);padding:14px 2px;}
+
 /* 📂 상세 지표 — 임원 요약 아래 전체 세부 지표를 접이식 한 판으로 통합(기본 접힘) */
 .detail-panel{max-width:1040px;margin-bottom:24px;border:1px solid var(--border);border-radius:12px;background:var(--panel-2);overflow:hidden;}
 .detail-title{font-size:14px;font-weight:800;color:#fff;padding:14px 18px;display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;}
@@ -279,6 +305,80 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     );
   }
 
+  // ⏱ AI가 아낀 시간(중-2) — 서버가 이미 보수 조정한 값을 그대로 보여준다(화면이 다시 계산하지 않는다).
+  // 1시간 미만은 분으로, 그 이상은 소수 1자리 — 서버 fmtDuration과 같은 규칙(숫자가 두 곳에서 달라 보이면 못 믿는다).
+  function tsvDur(minutes) {
+    if (minutes < 60) return Math.round(minutes) + "분";
+    return Math.round((minutes / 60) * 10) / 10 + "시간";
+  }
+
+  function timeSavedBlock(t) {
+    if (!t || !t.rows || t.rows.length === 0) {
+      return (
+        '<div class="cat" data-gijo-summary><div class="cat-title">⏱ AI가 아낀 시간</div>' +
+        '<div class="tsv-empty">아직 집계할 자동화 기록이 없습니다 — AI가 일을 처리하면 여기에 쌓입니다.</div></div>'
+      );
+    }
+    const cases = t.rows.reduce((s, r) => s + r.count, 0);
+    const lo = tsvDur(t.totalMinutes * (1 - t.riskAdjustment));
+    const hi = tsvDur(t.totalMinutes);
+    const warn = t.coversWholePeriod || !t.ledgerStart ? "" :
+      '<div class="tsv-warn">⚠ 기록은 <b>' + new Date(t.ledgerStart).toLocaleDateString("ko-KR") +
+      '</b>부터 쌓였습니다 — 그 이전 기간은 이번 집계에 들어 있지 않습니다.</div>';
+    const rows = t.rows.map((r) =>
+      "<tr><td>" + r.label + (r.custom ? '<span class="tsv-own">우리 조직 설정</span>' : "") +
+      '<span class="tsv-src">' + String(r.source).replace(/</g, "&lt;") + "</span></td>" +
+      '<td class="num">' + r.count + "건</td>" +
+      '<td class="num">' + r.minutesEach + "분</td>" +
+      '<td class="num" style="color:var(--teal)">' + tsvDur(r.minutes) + "</td></tr>"
+    ).join("");
+    return (
+      '<div class="cat" data-gijo-summary><div class="cat-title">⏱ AI가 아낀 시간' +
+      '<span class="tsv-admin" id="tsvAdminBtn">⚙ 기준시간 조정 (관리자)</span></div>' +
+      '<div class="tsv-hero"><div>' +
+      '<div class="tsv-range">약 ' + lo + " ~ " + hi + '<span class="tsv-badge">추정</span></div>' +
+      '<div class="tsv-sub">최근 ' + t.days + "일 · AI가 대신 처리한 일 " + cases + "건 · 앞의 값은 보수 조정(20%↓) 적용값</div>" +
+      "</div></div>" + warn +
+      '<table class="tsv-table"><thead><tr><th>작업 종류</th><th class="num">건수</th><th class="num">기준시간</th><th class="num">절감 환산</th></tr></thead>' +
+      "<tbody>" + rows +
+      '<tr class="tsv-sum"><td>합계</td><td class="num">' + cases + '건</td><td class="num">—</td><td class="num">' + hi + " → 보수 조정 " + lo + "</td></tr>" +
+      "</tbody></table>" +
+      '<div class="tsv-note">' + String(t.note).replace(/</g, "&lt;").replace(/\*\*(.+?)\*\*/g, "<b>$1</b>") + "</div>" +
+      '<div class="tsv-edit" id="tsvEdit" hidden></div>' +
+      "</div>"
+    );
+  }
+
+  // 기준시간 조정 — 관리자만 성공한다(서버가 판단한다). 실패하면 이유를 그대로 보여준다.
+  function wireTimeSaved(t) {
+    const btn = document.getElementById("tsvAdminBtn");
+    const box = document.getElementById("tsvEdit");
+    if (!btn || !box || !t) return;
+    btn.onclick = () => {
+      if (!box.hidden) { box.hidden = true; return; }
+      const all = t.baselines || {};
+      box.innerHTML =
+        '<div style="grid-column:1/-1;font-size:11px;color:var(--amber)">⚠ 이 값을 바꾸면 조직 전체의 절감 보고 수치가 함께 바뀝니다. 0분으로 두면 그 작업은 아예 세지 않습니다.</div>' +
+        Object.keys(all).map((k) => {
+          const label = (t.rows.find((r) => r.kind === k) || {}).label || k;
+          const cur = (t.custom && t.custom[k] != null) ? t.custom[k] : all[k].minutes;
+          return '<label for="tsv-' + k + '">' + label + "</label>" +
+            '<input id="tsv-' + k + '" type="number" min="0" max="600" value="' + cur + '" data-kind="' + k + '">';
+        }).join("");
+      box.hidden = false;
+      box.querySelectorAll("input").forEach((el) => {
+        el.onchange = async () => {
+          try {
+            await window.gijo.setTimeSavedBaseline(el.dataset.kind, Number(el.value));
+            load(); // 바뀐 값으로 다시 그린다 — 화면과 저장값이 어긋나지 않게
+          } catch (e) {
+            await window.gijoTell("기준시간을 바꾸지 못했습니다: " + (e.message || e));
+          }
+        };
+      });
+    };
+  }
+
   async function load() {
     const root = document.getElementById("kpiRoot");
     try {
@@ -366,14 +466,19 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         trendCard("조치 기한 초과", series("remediation.overdue"), "#f5928a", "건") +
         `</div></div>`;
 
+      // "AI가 아낀 시간"은 서버가 아직 없는 구버전에서도 화면이 죽지 않아야 한다 — 실패하면 빈 값.
+      const timeSaved = await window.gijo.timeSaved(30).catch(() => null);
+
       root.innerHTML =
         heroBlock(c, v, rem, series) +
         aiSecurityBlock(c) +
+        timeSavedBlock(timeSaved) +
         `<div class="detail-panel closed" id="detailPanel">` +
         `<div class="detail-title" id="detailToggle"><span class="dcar">▸</span>📂 상세 지표` +
         `<span class="dsub">자산·취약점·점검·CTI·컴플라이언스·추세 전체 지표</span></div>` +
         `<div class="detail-body">` + detailSections + `</div></div>`;
       wireKpi();
+      wireTimeSaved(timeSaved);
     } catch (e) {
       root.innerHTML = '<div style="color:#f5928a">KPI를 불러오지 못했습니다: ' + String(e.message || e).replace(/</g, "&lt;") + "</div>";
     }
