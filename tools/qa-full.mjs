@@ -54,12 +54,16 @@ const picks = new Set(["server"]); // 스모크는 항상
 const reasons = [];
 // 조치 검증 계열은 "판정을 어디에 쓰는가"가 위험 지점이라 실 상태전이까지 보는 계층을 따로 둔다.
 const VERIFY_RE = /^server\/src\/engine\/(verify|vexexport|autoassign|versioncmp|netmikorunner|approvals|hardening)/;
-const SHELL_RE = /^client\/src\/renderer\/pages\/(shell-popup|dashboard|nav|hub)/;
+// 탭 셸(4.0.0)의 구성 파일 — shell-popup·hub는 삭제됐고 app(셸)·console(대화)·dialog(확인창)가
+// 그 자리다. 옛 이름을 그대로 두면 셸을 고친 커밋이 정작 셸 검사(qa-shell 25검사)를 건너뛴다
+// (2026-07-29 검토 #2 — 69867ca·9fc74da에서 실제로 그랬다).
+// ⚠ 이름 뒤에 점(.)을 요구한다 — 안 그러면 app이 approvals.html까지 잡는다(2026-07-29 실측).
+const SHELL_RE = /^client\/src\/renderer\/pages\/(app|console|dialog|dashboard|nav)\./;
 // 파일 받기는 메인 프로세스(will-download)·preload·받기 버튼이 걸린 화면이 바뀌면 다시 본다.
 const DOWNLOAD_RE = /^client\/src\/(main|preload)\.ts$|^client\/src\/renderer\/pages\/(approvals|report)\.html$/;
 for (const f of changed) {
   if (VERIFY_RE.test(f)) { picks.add("verify"); picks.add("vitest"); reasons.push(`${f} → 조치검증·VEX 계층`); }
-  if (SHELL_RE.test(f)) { picks.add("shell"); reasons.push(`${f} → 팝업 셸 계층`); }
+  if (SHELL_RE.test(f)) { picks.add("shell"); reasons.push(`${f} → 탭 셸 계층`); }
   if (DOWNLOAD_RE.test(f)) { picks.add("download"); reasons.push(`${f} → 파일 받기 계층`); }
   if (QUALITY_RE.test(f)) { picks.add("knowledge"); picks.add("maintenance"); picks.add("regress"); picks.add("vitest"); reasons.push(`${f} → 지식·시나리오·회귀`); }
   else if (f.startsWith("server/")) { picks.add("vitest"); reasons.push(`${f} → 서버 단위테스트`); }

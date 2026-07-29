@@ -83,8 +83,12 @@
     "logs.html": "audit.html",
     "llmguide.html": "settings.html?s=ai",      // 추천 모델 목록 → 설정 서버·AI
     "docenrich.html": "memory.html",            // 문서 보강 → 기억·학습에 병합
-    // 허브는 4.0.0에서 없앴다 — 옛 허브 주소로 들어오면 셸로 보낸다.
-    "hub.html": "app.html",
+    // 쿼리 없는 옛 설정 링크(각 화면 헤더 ⚙ 등 20곳) — 5구역 어느 것도 아니면 서버·AI로.
+    // 빠뜨리면 분리창에서 설정 20구역이 한 화면에 전부 쌓인다(2026-07-29 검토 #3).
+    // ⚠ ?s=가 붙은 정상 링크는 아래 boot의 "빈 쿼리일 때만 흡수" 규칙 덕에 여길 안 탄다.
+    "settings.html": "settings.html?s=ai",
+    // hub.html 리다이렉트는 여기 둘 수 없다(2026-07-29 검토 #8) — 파일이 삭제돼 nav.js가
+    // 실리기 전에 로드가 실패한다. 없는 화면의 안전망은 main.ts navigate:to가 맡는다.
   };
   window.gijoRedirects = TAB_REDIRECT; // QA가 "죽은 링크인지 흡수처인지" 가릴 때 쓴다
 
@@ -745,7 +749,9 @@
     // 탭으로 흡수된 페이지에 직접 들어오면(대시보드 바로가기·챗봇 링크 등) 허브의 그 탭으로 보낸다.
     // ⚠ 설정처럼 한 파일이 여러 탭인 화면은 **쿼리까지 봐야** 한다(2026-07-28 실측):
     //    쿼리를 무시하면 ?s=link로 들어와도 서버·AI 탭으로 끌려가 늘 같은 화면만 보인다.
-    var target = TAB_REDIRECT[currentPage() + (location.search || "")] || TAB_REDIRECT[currentPage()];
+    //    단, 파일명 흡수처는 **쿼리가 없을 때만** 탄다 — settings.html?s=my처럼 쿼리로 구역을
+    //    고른 주소가 파일명 항목(settings.html→?s=ai)에 끌려가면 어느 구역을 눌러도 서버·AI만 열린다.
+    var target = TAB_REDIRECT[currentPage() + (location.search || "")] || (location.search ? null : TAB_REDIRECT[currentPage()]);
     if (target && window.gijo && window.gijo.navigateTo) { window.gijo.navigateTo(target); return; }
     loadDesignSystem();
     if (IS_POPOUT) { applyPopout(); loadLongNotice(); return; } // 분리창은 메뉴 없이 내용만

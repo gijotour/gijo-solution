@@ -187,11 +187,21 @@ function createMainWindow(): void {
 
 ipcMain.handle("navigate:to", async (_e, page: string) => {
   if (!mainWindow) return;
-  // 허브 딥링크(hub.html?g=assets&t=vulnscan.html) 지원 — 파일 경로와 쿼리를 분리해 loadFile에 넘긴다.
+  // 파일 경로와 쿼리를 분리해 loadFile에 넘긴다(settings.html?s=ai 같은 구역 딥링크 지원).
   const [file, qs] = String(page).split("?");
   const query: Record<string, string> = {};
   if (qs) for (const [k, v] of new URLSearchParams(qs)) query[k] = v;
-  await mainWindow.loadFile(path.join(__dirname, `../src/renderer/pages/${file}`), qs ? { query } : undefined);
+  let target = path.join(__dirname, `../src/renderer/pages/${file}`);
+  // 없는 화면의 안전망(2026-07-29 검토 #8) — 삭제된 화면(hub.html 등)을 옛 바로가기·링크가
+  // 부르면 loadFile이 실패해 흰 오류 화면이 뜬다. 예전엔 nav.js의 리다이렉트가 안전망인 척
+  // 했지만 파일이 없으면 nav.js 자체가 실리지 못한다 — 안전망은 로드 전에, 여기서만 가능하다.
+  if (!fs.existsSync(target)) {
+    console.warn(`[navigate] 없는 화면 ${file} → app.html로 대체`);
+    target = path.join(__dirname, "../src/renderer/pages/app.html");
+    await mainWindow.loadFile(target);
+    return;
+  }
+  await mainWindow.loadFile(target, qs ? { query } : undefined);
 });
 
 // "우리 AI 팀 사무실" 별도 창 — 이미 열려 있으면 앞으로만 가져온다(중복 창 방지).
@@ -799,8 +809,13 @@ ipcMain.handle("download:reveal", async (_e, filePath: string) => {
 // 두 번째 프로세스는 조용히 물러나고, 대신 이미 떠 있는 창을 앞으로 가져온다 —
 // "안 떠요"가 아니라 "아, 이미 떠 있었네"가 되게.
 //
-// ⚠ 잠금은 userData 기준이라 **개발 실행과 설치본이 같은 잠금을 쓴다**. 게시 전 실화면
-//   검증을 할 땐 개발 앱을 먼저 닫아야 한다(/GIJOAS게시 절차가 이미 그렇게 시킨다).
+// ⚠ 잠금은 userData 기준이다. 예전엔 개발 실행과 설치본이 같은 잠금을 써서, 담당자가
+//   설치본을 쓰고 있으면 개발 실행이 조용히 물러났다(2026-07-29 실측 — 검증하려면 사용자
+//   앱을 꺼야 했다). 개발 실행(비패키지)은 프로필을 분리해 설치본과 공존시킨다 —
+//   담당자의 앱을 건드리지 않고 개발·검증할 수 있어야 한다.
+if (!app.isPackaged) {
+  app.setPath("userData", path.join(app.getPath("appData"), "gijo-as-client-dev"));
+}
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {

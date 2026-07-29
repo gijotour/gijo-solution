@@ -36,7 +36,7 @@ const SCREENS: Record<string, ScreenContext> = {
   "dashboard.html": { label: "대시보드", domain: "전체 현황 — 어느 영역이든 지시가 올 수 있다" },
   "kpi.html": { label: "보안 KPI", domain: "보안 지표 추이" },
   "analysis.html": { label: "통합 관제", domain: "스캐너·로그·운영리포트 통합 분석", defaultAction: "analyze" },
-  "sessions.html": { label: "작업 세션", domain: "진행 중인 작업 대화" },
+  "sessions.html": { label: "작업 내역", domain: "진행 중인 작업 대화" }, // 1bc03f8 개명 누락분(2026-07-29 검토 #8)
 
   // 자산과 취약점은 붙어 다닌다 — 자산 목록에서 "이 자산 취약점 담당자 배정해줘"가 자연스럽다.
   "assethub.html": { label: "자산 허브", domain: "자산·AI-BOM·취약점·AI위험 통합", toolDomains: ["assets", "vuln", "sbom"] },

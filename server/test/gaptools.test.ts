@@ -86,7 +86,8 @@ describe("인수인계 현황 (handover_status)", () => {
   it("문서가 없으면 어디서 올리는지 알려 준다", async () => {
     mockListDocuments.mockResolvedValueOnce([]);
     const out = await run("handover_status");
-    expect(out).toContain("대시보드 아래 ＋");
+    // 4.0.0에서 ＋가 대화 콘솔로 이사(2026-07-29 검토 #1) — 안내도 그리로.
+    expect(out).toContain("대화 콘솔의 ＋");
   });
 
   it("서버가 모르는 것(담은 문서·통과율)은 모른다고 밝힌다", async () => {

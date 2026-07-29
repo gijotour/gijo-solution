@@ -1196,7 +1196,7 @@ async function runAuditSearch(args: Record<string, string>): Promise<string> {
 async function runHandoverStatus(): Promise<string> {
   const docs = await listDocuments();
   if (docs.length === 0) {
-    return "아직 지식베이스에 올린 문서가 없습니다. 인수인계는 대시보드 아래 ＋로 문서를 올리는 것부터 시작합니다.";
+    return "아직 지식베이스에 올린 문서가 없습니다. 인수인계는 아래 대화 콘솔의 ＋로 문서를 올리는 것부터 시작합니다.";
   }
   const chunks = docs.reduce((n, d) => n + (d.chunks ?? 0), 0);
   const recent = docs.slice(-5).reverse().map((d) => `- ${d.documentId}`);

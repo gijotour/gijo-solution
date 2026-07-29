@@ -145,7 +145,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
       <div class="upload-note">
         <span class="un-ic">📥</span>
-        <span>매뉴얼·케이스·에러로그는 <b>대시보드 아래 ＋</b>에서 올리세요 — 올리는 즉시 여기 검색에 잡힙니다.</span>
+        <span>매뉴얼·케이스·에러로그는 <b>아래 대화 콘솔의 ＋</b>에서 올리세요 — 올리는 즉시 여기 검색에 잡힙니다.</span>
       </div>
       <div class="kb-row">
         <button id="kbSampleBtn" class="ops-btn-secondary">샘플 문서 추가</button>
@@ -459,7 +459,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         gijoTell("승인 실패: " + ((err && err.message) || err));
       }
     } else if (action === "reject") {
-      const reason = prompt("반려 사유를 입력하세요");
+      // prompt()도 렌더러를 멈추는 네이티브 모달(2026-07-29 검토) — 화면 안 입력으로.
+      const reason = await gijoPrompt("반려 사유를 입력하세요", { placeholder: "예: 점검 결과 증빙 누락", ok: "반려", danger: true });
       if (!reason) return;
       try {
         await window.gijo.rejectMaintenance(id, reason);

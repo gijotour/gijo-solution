@@ -742,7 +742,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   }
   async function resetUserPw(id) {
     const line = document.getElementById("userManagementStatusLine");
-    const pw = prompt("새 비밀번호(8자 이상) — 초기화하면 해당 사용자의 세션이 끊깁니다");
+    // prompt()도 렌더러를 멈추는 네이티브 모달(2026-07-29 검토) — 화면 안 입력으로. 비밀번호라 가림 입력.
+    const pw = await gijoPrompt("새 비밀번호(8자 이상) — 초기화하면 해당 사용자의 세션이 끊깁니다", { password: true, ok: "초기화", danger: true });
     if (!pw) return;
     try { await window.gijo.changeUserPassword(id, pw); await loadUserList(); line.textContent = "✓ 비밀번호를 초기화했습니다(세션 종료됨)."; line.className = "status-line status-ok"; }
     catch (e) { line.textContent = "✗ 초기화 실패: " + e.message; line.className = "status-line status-err"; }

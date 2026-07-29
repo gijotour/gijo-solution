@@ -908,7 +908,8 @@
         const users = await window.gijo.listAssignableUsers();
         names = (users || []).map((u) => u.displayName).join(", ");
       } catch (err) { /* 목록 못 받아도 직접 입력은 가능 */ }
-      const v = prompt(`기본 담당자 — 이 자산에서 새로 발견되는 취약점이 이 사람에게 자동 배정됩니다.\n비우면 해제됩니다.${names ? `\n\n계정: ${names}` : ""}`, cur);
+      // prompt()도 렌더러를 멈추는 네이티브 모달(2026-07-29 검토) — 화면 안 입력으로. 빈 값=해제라 null만 취소다.
+      const v = await gijoPrompt(`기본 담당자 — 이 자산에서 새로 발견되는 취약점이 이 사람에게 자동 배정됩니다.\n비우면 해제됩니다.${names ? `\n\n계정: ${names}` : ""}`, { value: cur, ok: "지정" });
       if (v === null) return; // 취소
       try {
         await window.gijo.setAssetDefaultAssignee(id, v.trim() || null);

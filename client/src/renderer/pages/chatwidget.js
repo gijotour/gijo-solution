@@ -282,15 +282,9 @@
     // 있고, 대시보드가 없는 분리창에서는 이 위젯이 유일한 답변 창구다.
     window.gijoExplain = function (topic) {
       var q = topic ? '"' + topic + '" 사용법 알려줘' : "이 화면 사용법 알려줘";
-      // 대시보드가 살아 있으면(팝업 안 화면) 설명은 그쪽 대화로 보낸다.
-      try {
-        var top = window.parent && window.parent !== window ? window.parent : null;
-        var host = top && top.gijoScreenGuide ? top : (top && top.parent && top.parent.gijoScreenGuide ? top.parent : null);
-        if (host) {
-          host.gijoScreenGuide(location.pathname.split("/").pop(), topic || undefined, { question: topic, force: true });
-          return;
-        }
-      } catch (e) { /* 교차 프레임 접근 불가 — 아래 위젯으로 답한다 */ }
+      // (2026-07-29 검토 #8) 부모 창의 gijoScreenGuide로 넘기던 분기를 지웠다 — 그 함수는
+      // 삭제된 shell-popup.js의 것이라 이제 어떤 부모에도 없다. 죽은 경로를 남겨 두면
+      // "대시보드로 보내는 기능이 있다"고 다음 사람이 착각한다. 지금은 이 위젯이 직접 답한다.
       openChat();
       send(q);
     };

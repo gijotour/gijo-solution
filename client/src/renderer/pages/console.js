@@ -19,7 +19,8 @@
   var SESS_KEY = "gijo:console:session";
   var CL_MAX = 40;           // 대화가 길어지면 오래된 줄부터 덜어낸다(메모리)
   var CLAMP_LEN = 140;       // 이보다 길면 접어 두고 '더보기'
-  var esc = function (s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;"); };
+  // 속성 자리(value="...")에도 들어가는 값이라 따옴표까지 걸러야 한다(2026-07-29 검토 #4 — 파일명 유래 값 주입 여지).
+  var esc = function (s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); };
 
   var ctx = { screen: null, label: null };
   var session = null;

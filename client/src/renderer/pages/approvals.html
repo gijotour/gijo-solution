@@ -487,7 +487,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     // 메일
     if ($("btnMail")) $("btnMail").addEventListener("click", async () => {
       const btn = $("btnMail"); if (btn.disabled) return;
-      const to = prompt("담당자에게 보낼 이메일 주소:"); if (!to) return;
+      // prompt()도 confirm처럼 렌더러를 통째로 멈추는 네이티브 모달이다(2026-07-29 검토) — 화면 안 입력으로.
+      const to = await gijoPrompt("담당자에게 보낼 이메일 주소:", { placeholder: "예: hong@company.co.kr", ok: "보내기" }); if (!to) return;
       btn.disabled = true; const orig = btn.textContent; btn.textContent = "보내는 중…";
       try { await window.gijo.notifyAssignee(a, k, to.trim()); btn.textContent = "✓ 발송됨"; setTimeout(() => { btn.textContent = orig; btn.disabled = false; }, 2500); }
       catch (err) { gijoTell("메일 발송 실패: " + ((err && err.message) || err)); btn.textContent = orig; btn.disabled = false; }
