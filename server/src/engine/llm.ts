@@ -23,6 +23,11 @@ export interface ChatArgs {
   // true면 단기 기억(대화 이력)과 장기 기억(RAG) 자동 주입을 켠다 — 대화형 채팅 라우트 전용.
   // dispatcher/analysis 같은 프로그램적 단발 호출은 기본값(false)으로 이력에 끼어들지 않는다.
   remember?: boolean;
+  // 평가 게이트/QA 실행 표시(중-3). RAG·가드레일 등 제품 경로는 그대로 타되
+  // ① 대화 이력을 읽지도 남기지도 않고(문항 간 독립 — 재현성) ② 학습 수집(recordChatLog)을
+  // 건너뛴다 — 게이트 문답 수백 건이 학습 후보함에 흘러들면 실사용 데이터를 오염시킨다
+  // (기존 regress 11문항도 같은 경로로 새고 있었다, 2026-07-29 발견).
+  qa?: boolean;
   // 지정 시 llama.cpp json_schema 강제 디코딩 — 출력이 스키마에 맞는 JSON임을 샘플러 수준에서
   // 보장한다(에이전트 루프의 도구 선택 등). 이 경로는 결정 호출이므로 temperature 0으로 고정하고,
   // 인사말 제거·중국어 재생성 후처리를 건너뛴다(JSON을 훼손할 수 있으므로).
@@ -373,7 +378,7 @@ export async function chat(args: ChatArgs): Promise<string> {
     }
   }
 
-  const history = args.remember ? (histories.get(args.agentId) ?? []) : [];
+  const history = args.remember && !args.qa ? (histories.get(args.agentId) ?? []) : [];
   const rag = args.remember ? await ragContextFor(args.message, args.agentId, args.screen) : null;
 
   // RAG 참고자료는 별도 system 메시지가 아니라 시스템 프롬프트에 합친다 — Mistral 계열
@@ -516,7 +521,7 @@ export async function chat(args: ChatArgs): Promise<string> {
     detail: "응답 완료",
   });
 
-  if (args.remember && reply) {
+  if (args.remember && !args.qa && reply) {
     const updated = [...history, { role: "user" as const, content: args.message }, { role: "assistant" as const, content: reply }];
     histories.set(args.agentId, updated.slice(-HISTORY_LIMIT));
     // 헤르메스 학습 루프 ① 수집: 실제 대화만 영속 저장한다(연결 실패 문자열은 위에서 조기 반환돼

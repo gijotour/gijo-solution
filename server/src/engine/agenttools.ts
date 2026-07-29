@@ -32,6 +32,7 @@ import { dailyBriefingText } from "./briefing";
 import { runRedTeam, makeServedCaller } from "./redteam";
 import { runHardeningScan, scanSummaryText, isStandard } from "./hardeningscan";
 import { listSchedules as listReportSchedules, scheduleSummaryText } from "./reportschedule";
+import { listSchedules as listHardeningSchedules } from "./hardeningtargets";
 import { listAnalysisEvents, analysisSummary, computeCorrelations } from "./analysishub";
 import { computeKpiSnapshot } from "./kpi";
 import { listSessions as listWorkSessions } from "./worksessions";
@@ -1106,6 +1107,28 @@ function runReportScheduleList(): string {
   return scheduleSummaryText(listReportSchedules());
 }
 
+// 원격 정기점검(하드닝) 스케줄 조회 — [2026-07-29 평가 게이트(중-3) 첫 실행이 잡은 공백]
+// "원격 정기점검 스케줄 어떻게 되어 있어?"에 자산 취약점 이야기가 나왔다. 화면(hardening.html)과
+// 데이터(hardening_schedules)는 있는데 챗봇이 들여다볼 도구가 없었다 — 화면에만 있고 챗봇엔 없는
+// 기능은 "화면 설명·기능 안내는 전부 챗봇으로" 원칙에 어긋난다.
+function runHardeningScheduleList(): string {
+  const rows = listHardeningSchedules();
+  if (rows.length === 0) {
+    return [
+      "등록된 원격 정기점검 스케줄이 없습니다.",
+      "원격 정기점검 화면에서 점검 대상(장비)을 등록하고 주기를 정하면 자동으로 돌아갑니다 — 기준은 국내 CCE(KISA U-시리즈) 또는 CIS 중에 고릅니다.",
+    ].join("\n");
+  }
+  const fmt = (t: number | null) => (t ? new Date(t).toLocaleString("ko-KR") : "-");
+  const lines = rows.map((r) => {
+    const state = r.enabled ? "가동" : "중지";
+    const last = r.lastRunAt ? `최근 ${fmt(r.lastRunAt)} · 준수율 ${r.lastRate ?? "-"}%${r.lastFail ? ` · 취약 ${r.lastFail}건` : ""}` : "아직 실행 전";
+    return `- ${r.targetLabel} — ${r.standard.toUpperCase()} 기준 · ${r.intervalHours}시간마다 · ${state} · 다음 ${fmt(r.nextRunAt)} (${last})`;
+  });
+  const on = rows.filter((r) => r.enabled).length;
+  return [`원격 정기점검 스케줄 ${rows.length}건(가동 ${on} · 중지 ${rows.length - on})`, ...lines].join("\n");
+}
+
 // 통합 보안 분석(관제) 현황 — 제품 1차 목표 화면(analysis.html). 취약점·보안로그·운영리포트·
 // 하드닝 4소스를 정규화한 이벤트를 그대로 요약하고, 소스 간 상관관계(같은 자산이 여러 소스에
 // 동시 출현)도 함께 짚어준다.
@@ -1317,6 +1340,17 @@ const TOOLS: AgentTool[] = [
     directAnswer: true,
     params: [],
     run: runReportScheduleList,
+  },
+  {
+    name: "hardening_schedule_list",
+    label: "원격 정기점검 스케줄 조회",
+    domain: "maintenance", // 정기 점검 축 — 실행(run_hardening_scan)은 cross지만 스케줄 조회는 점검 업무다
+    write: false,
+    description:
+      '등록된 원격 정기점검(하드닝) 스케줄을 조회한다. 점검 대상 장비·기준(CCE/CIS)·주기·다음 실행 시각·최근 준수율을 보여준다. "원격 정기점검 스케줄 어떻게 되어 있어?", "정기점검 언제 돌아?", "점검 자동으로 돌고 있어?"에 쓴다. 예: {}',
+    directAnswer: true,
+    params: [],
+    run: runHardeningScheduleList,
   },
   {
     name: "analysis_status",

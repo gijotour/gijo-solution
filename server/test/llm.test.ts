@@ -182,6 +182,31 @@ describe("llm chat system prompt (한국어 기본 처리)", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  // [전중후 계획서 정렬: 중-3] 평가 게이트 오염 차단 — 게이트 문답은 제품 경로(RAG 등)는
+  // 그대로 타되 학습 수집(chat_logs)과 대화 이력에 남으면 안 된다. 기존 regress 11문항이
+  // 실제로 학습 후보함에 새고 있었다(2026-07-29 발견) — 그 구멍을 막았음을 고정한다.
+  it("qa:true — 답변은 정상, chat_logs·대화 이력에는 남지 않는다 (게이트 오염 차단)", async () => {
+    vi.doMock("../src/engine/memory", () => ({ queryMemory: vi.fn().mockResolvedValue([]) }));
+    const { db } = await import("../src/db");
+    const count = () => (db.prepare("SELECT COUNT(*) AS n FROM chat_logs").get() as { n: number }).n;
+
+    const before = count();
+    const reply = await (stubLlm("게이트 검증 답변"), chat({ agentId: "orchestrator", message: "평가 게이트 문항 1", remember: true, qa: true }));
+    expect(reply).toContain("게이트 검증");
+    expect(count()).toBe(before); // 학습 수집 없음
+
+    // 이력 미저장·미주입 — 다음 qa 호출의 메시지에 직전 문답이 없다(문항 간 독립)
+    const fetchMock2 = stubLlm("다음 답변");
+    await chat({ agentId: "orchestrator", message: "평가 게이트 문항 2", remember: true, qa: true });
+    const body = JSON.parse(fetchMock2.mock.calls[0][1].body);
+    expect(JSON.stringify(body.messages)).not.toContain("평가 게이트 문항 1");
+
+    // 대조: qa 없는 같은 호출은 수집된다 — 플래그가 실제 분기임을 못박는다
+    stubLlm("실사용 답변");
+    await chat({ agentId: "orchestrator", message: "실사용 질문", remember: true });
+    expect(count()).toBe(before + 1);
+  });
+
   it("history is capped at 20 messages (컨텍스트 창 보호)", async () => {
     vi.doMock("../src/engine/memory", () => ({ queryMemory: vi.fn().mockResolvedValue([]) }));
     for (let i = 0; i < 15; i++) {

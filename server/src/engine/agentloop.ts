@@ -237,10 +237,14 @@ async function composeFinalAnswer(instruction: string, calls: AgentToolCall[], c
  * 이번 지시에서 쓸 수 있는 도구의 범위.
  * - domains: 화면에서 온 업무 영역(screencontext). 없으면 좁히지 않는다.
  * - role: 호출자 권한. admin이 아니면 requiredRole="admin" 도구는 후보에서 빠진다.
+ * - qa: 평가 게이트/QA 호출 표시(중-3). 루프의 결정 호출은 remember를 안 써 수집이 없고
+ *   쓰기 도구는 결재판(approval)으로만 나가므로 지금 동작 차이는 없다 — 향후 기록성
+ *   부작용을 갖는 도구가 생기면 이 플래그를 참조해 건너뛴다.
  */
 export interface ToolScope {
   domains?: string[];
   role?: string;
+  qa?: boolean;
 }
 
 // 제품 핵심 문구인데 LLM이 "일반 질문"으로 오인해 도구를 건너뛰고 잡담으로 답하던 의도를
@@ -289,6 +293,21 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }
   {
     re: /작업\s*세션.{0,6}(뭐|확인|알려|보여)|(지난|최근)\s*(대화\s*)?세션/,
     tool: "work_session_status",
+    args: {},
+  },
+  // 원격 정기점검(하드닝) 스케줄 조회 — 위의 "하드닝 점검 실행"과 갈라야 한다("점검"이 겹친다).
+  // 스케줄·주기를 묻는 말투일 때만 잡고, 실행 명령형은 위 run_hardening_scan으로 그대로 간다.
+  // [2026-07-29 평가 게이트가 잡음] "원격 정기점검 스케줄 어떻게 되어 있어?"에 자산 취약점 답이 나왔다.
+  {
+    re: /(원격\s*)?(정기\s*)?점검\s*(스케줄|일정|주기)|정기점검.{0,6}(언제|어떻게|돌|확인|알려|보여)|점검.{0,4}자동.{0,6}(돌|실행|되)/,
+    tool: "hardening_schedule_list",
+    args: {},
+  },
+  // 컴플라이언스 이행 현황 — [2026-07-29 평가 게이트(중-3) 첫 실행] "컴플라이언스 현황 요약해줘"에
+  // 24초를 쓰고도 도구를 하나도 안 골랐다(LLM 판단). 화면·메뉴 이름 그대로 물은 건 결정적으로 잇는다.
+  {
+    re: /컴플라이언스\s*(현황|이행|상태|어때|보여|요약)|(규제|통제)\s*항목\s*(현황|이행)|이행\s*현황\s*(확인|알려|보여|요약)/,
+    tool: "compliance_status",
     args: {},
   },
   // 오늘의 브리핑 — 대시보드(전체 도구 노출)에서 문구가 명백한데도 LLM이 도구를 건너뛰고 잡담으로

@@ -99,3 +99,31 @@ describe("③ 점검 방법 질문 — 실행 금지", () => {
     expect(r.output).toContain("점검 완료(모의)");
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────
+// [전중후 계획서 정렬: 중-3] 평가 게이트 첫 실행(2026-07-29)이 잡은 라우팅 결함.
+// 게이트의 값어치는 "돌렸더니 뭐가 나왔나"에 있다 — 나온 것을 고치고 여기에 못박는다.
+describe("④ 평가 게이트가 잡은 결함 — 컴플라이언스 현황", () => {
+  it("'컴플라이언스 현황 요약해줘'는 이행 현황 도구로 간다", async () => {
+    const r = await dispatchInstruction("컴플라이언스 현황 요약해줘");
+    expect((r.toolCalls ?? []).map((t) => t.tool)).toContain("compliance_status");
+  });
+
+  it("'이행 현황 알려줘'도 같은 길로 간다", async () => {
+    const r = await dispatchInstruction("이행 현황 알려줘");
+    expect((r.toolCalls ?? []).map((t) => t.tool)).toContain("compliance_status");
+  });
+});
+
+describe("⑤ 평가 게이트가 잡은 공백 — 원격 정기점검 스케줄", () => {
+  it("'정기점검 언제 돌아?'는 스케줄 조회 도구로 간다", async () => {
+    const r = await dispatchInstruction("정기점검 언제 돌아?");
+    expect((r.toolCalls ?? []).map((t) => t.tool)).toContain("hardening_schedule_list");
+  });
+
+  it("실행 명령('하드닝 점검해줘')은 종전대로 점검을 실행한다 — 조회와 실행이 안 섞인다", async () => {
+    const before = scanRuns.length;
+    await dispatchInstruction("하드닝 점검해줘");
+    expect(scanRuns.length).toBe(before + 1);
+  });
+});

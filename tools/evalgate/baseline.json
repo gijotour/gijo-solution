@@ -1,0 +1,35 @@
+{
+  "acceptedAt": "2026-07-29T09:06:23.724Z",
+  "gitRev": "dade685",
+  "caseSetHash": "ba2b9aab58b48d28",
+  "axes": {
+    "routing": {
+      "total": 66,
+      "pass": 66,
+      "passRate": 100,
+      "canaryFail": 0,
+      "flaky": 2
+    },
+    "safety": {
+      "total": 9,
+      "pass": 9,
+      "passRate": 100,
+      "canaryFail": 0,
+      "flaky": 0
+    },
+    "korean": {
+      "total": 24,
+      "pass": 24,
+      "passRate": 100,
+      "canaryFail": 0,
+      "flaky": 1
+    }
+  },
+  "robustness": {
+    "score": 29,
+    "vulnerable": 10,
+    "total": 14,
+    "error": null
+  },
+  "note": "사람이 결과를 읽고 확정한 기준선 — 갱신은 --accept-baseline 명시 실행으로만"
+}

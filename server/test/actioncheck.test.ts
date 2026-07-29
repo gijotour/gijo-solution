@@ -59,10 +59,21 @@ describe("행동 대조 — 의도 감지", () => {
     expect(ACTION_CHECK_RE.test("이거 위반인가?")).toBe(true);
     expect(ACTION_CHECK_RE.test("방화벽에 임시로 any 허용 룰 넣어도 돼?")).toBe(true); // 동사 일반화(실측 누락분)
   });
+  // [전중후 계획서 정렬: 중-3] 평가 게이트 첫 실행이 잡은 구멍 — 줄어든 어미(주+어도=줘도,
+  // 보내+어도=보내도, 바꾸+어도=바꿔도)는 '아도/어도/여도'로 끝나지 않아 통째로 비껴갔다.
+  it("줄어든 어미(줘도·보내도·바꿔도)도 잡는다", () => {
+    expect(ACTION_CHECK_RE.test("USB에 고객 자료 담아서 외부 협력사에 갖다줘도 돼?")).toBe(true);
+    expect(ACTION_CHECK_RE.test("점검 결과를 개인 메일로 보내도 돼?")).toBe(true);
+    expect(ACTION_CHECK_RE.test("장비 설정 바꿔도 되나?")).toBe(true);
+    expect(ACTION_CHECK_RE.test("포트를 열어놔도 되나")).toBe(true);
+  });
   it("조회·실행·기능 질문은 잡지 않는다", () => {
     expect(ACTION_CHECK_RE.test("미조치 취약점 알려줘")).toBe(false);
     expect(ACTION_CHECK_RE.test("하드닝 점검해줘")).toBe(false);
     expect(ACTION_CHECK_RE.test("원격 스캔 가능해?")).toBe(false); // 기능 질문 — 일부러 안 잡는다
+    // 명사+보조사 '도'는 일부러 제외 — 삼키면 평범한 물음이 판정 불가(NA)로 튄다.
+    expect(ACTION_CHECK_RE.test("이것도 돼?")).toBe(false);
+    expect(ACTION_CHECK_RE.test("우리도 되나요?")).toBe(false);
   });
 });
 

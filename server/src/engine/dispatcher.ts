@@ -207,7 +207,7 @@ export function formatRejectHistory(instructionText: string): string {
   return lines.join("\n");
 }
 
-async function executeRoutedAction(route: RoutedIntent, instructionText: string, contextText = "", screen?: string): Promise<ActionResult> {
+async function executeRoutedAction(route: RoutedIntent, instructionText: string, contextText = "", screen?: string, qa?: boolean): Promise<ActionResult> {
   switch (route.action) {
     case "scan": {
       const assetId = route.targetAssetId ?? "unknown-asset";
@@ -228,7 +228,7 @@ async function executeRoutedAction(route: RoutedIntent, instructionText: string,
       const message = contextText ? `${contextText}
 
 [현재 지시] ${instructionText}` : instructionText;
-      return { output: await chat({ agentId: route.agentId, message, remember: true, trusted: true, explain: true, screen }) };
+      return { output: await chat({ agentId: route.agentId, message, remember: true, trusted: true, explain: true, screen, qa }) };
     }
     case "analyze":
     case "chat":
@@ -238,7 +238,7 @@ async function executeRoutedAction(route: RoutedIntent, instructionText: string,
       const message = contextText ? `${contextText}\n\n[현재 지시] ${instructionText}` : instructionText;
       // trusted: 지시문은 dispatchInstructionCore에서 이미 관문을 지났다(이중 집계 방지).
       // explain: 지휘 콘솔에 그대로 표시되는 답변이다.
-      return { output: await chat({ agentId: route.agentId, message, remember: true, trusted: true, explain: true, screen }) };
+      return { output: await chat({ agentId: route.agentId, message, remember: true, trusted: true, explain: true, screen, qa }) };
     }
   }
 }
@@ -273,7 +273,7 @@ async function runGijoEnrichment(results: StepResult[], fromAgentId: string): Pr
 
 // 복합 지시를 순차 실행한다. 각 단계는 협업 로그로 실시간 브로드캐스트되고, 스캔 결과(findings)는
 // 다음 단계(분석·리포트)로 누적 전달된다.
-async function runOrchestration(instructionText: string, steps: OrchestrationStep[], task: TaskItem): Promise<StepResult[]> {
+async function runOrchestration(instructionText: string, steps: OrchestrationStep[], task: TaskItem, qa?: boolean): Promise<StepResult[]> {
   const results: StepResult[] = [];
   const accumulated: StandardFinding[] = [];
   const scannedAssetIds = new Set<string>();
@@ -322,7 +322,7 @@ async function runOrchestration(instructionText: string, steps: OrchestrationSte
       } else if (step.action === "analyze") {
         output = accumulated.length
           ? (await analyzeFindings(accumulated)).summary
-          : await chat({ agentId: "analysis", message: instructionText, remember: true, trusted: true });
+          : await chat({ agentId: "analysis", message: instructionText, remember: true, trusted: true, qa });
       } else {
         // report — 앞 단계에서 스캔한 자산이 있으면 그 범위로, 없으면 전체로 보고서를 만든다.
         const scoped = scannedAssetIds.size ? [...scannedAssetIds] : undefined;
@@ -390,7 +390,11 @@ async function learnloopConfirmResult(instructionText: string): Promise<Dispatch
 // sessionId가 없으면 자동으로 새 세션을 만들어 기록한다(사용자 요청 2026-07-20 — "모든 행위를
 // 작업 세션에": 팀 사무실 CTA·에이전트 페이지 등 세션 없이 오던 지시도 이력에 남게).
 // 응답의 sessionId를 클라이언트가 저장하면 그 세션으로 "이어서" 지시가 된다.
-export async function dispatchInstruction(instructionText: string, sessionId?: string, screen?: string, actor?: string): Promise<DispatchResult> {
+export async function dispatchInstruction(instructionText: string, sessionId?: string, screen?: string, actor?: string, qa?: boolean): Promise<DispatchResult> {
+  // 평가 게이트/QA 실행(중-3): 작업 세션·협업 피드에 기록하지 않는다 — 게이트 문답 수백 건이
+  // 작업내역에 쌓이면 학습 후보함(출처 B)과 담당자의 작업 이력을 오염시킨다. 맥락도 싣지 않아
+  // 문항 간 독립(재현성)을 보장한다. 라우팅·RAG·가드레일 등 제품 판단 경로는 전부 동일하다.
+  if (qa) return dispatchInstructionCore(instructionText, "", screen, actor, true);
   // 세션을 새로 만들 땐 지시한 사람을 실행자로 남긴다 — 여러 담당자가 쓰는데 목록만 보고는
   // 누가 한 일인지 알 수 없었다(2026-07-26 사용자 지적).
   const session = (sessionId ? getSession(sessionId) : null) ?? createSession(undefined, undefined, actor);
@@ -480,7 +484,7 @@ function turnToolTag(r: DispatchResult): string | undefined {
   return undefined;
 }
 
-async function dispatchInstructionCore(instructionText: string, contextText = "", screen?: string, actor?: string): Promise<DispatchResult> {
+async function dispatchInstructionCore(instructionText: string, contextText = "", screen?: string, actor?: string, qa?: boolean): Promise<DispatchResult> {
   // 런타임 가드레일 — 입력의 프롬프트 인젝션 시도를 실시간 검사. block 모드면 거절, flag면 기록·경고 후 진행.
   // guardInput을 직접 부르지 않고 게이트웨이를 거친다 — 검사 지점을 한 곳으로 모아, 앞으로
   // 검사가 늘어도(PII·출력 필터 등) 모든 입구에 자동으로 적용되게 하기 위함이다.
@@ -572,7 +576,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     const task = createTask({ text: instructionText, agentId: "orchestrator", priority: "P1" });
     setAgentStatus("orchestrator", "working");
     emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `복합 지시 ${steps.length}단계 실행: ${steps.map((s) => s.label).join(" → ")}` });
-    const stepResults = await runOrchestration(instructionText, steps, task);
+    const stepResults = await runOrchestration(instructionText, steps, task, qa);
     resetAgentToDefault("orchestrator");
     const updated = completeTask(task.id);
     const completedTask = updated.find((t) => t.id === task.id) ?? task;
@@ -636,6 +640,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   // 화면을 모르거나 전역 화면(대시보드)이면 undefined라 종전대로 전체가 후보가 된다.
   const loop = await runAgentLoop(instructionText, contextText, {
     domains: toolDomainsForScreen(screen),
+    qa,
   }).catch(() => null);
   if (loop) {
     const loopTask = createTask({ text: instructionText, agentId: "orchestrator", priority: "P2" });
@@ -668,7 +673,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   let toolCalls: AgentToolCall[] | undefined;
   let approval: PendingApproval | undefined;
   try {
-    const result = await executeRoutedAction(route, instructionText, contextText, screen);
+    const result = await executeRoutedAction(route, instructionText, contextText, screen, qa);
     output = result.output;
     toolCalls = result.toolCalls;
     approval = result.approval;
@@ -697,10 +702,13 @@ export function registerDispatcherRoutes(app: Express): void {
       const screen = typeof req.body?.screen === "string" ? req.body.screen : undefined;
       const text = String(req.body?.text ?? "");
       const user = (req as Request & { user?: GijoUser }).user;
+      // qa=true — 평가 게이트/QA 호출 표시(중-3). 세션·학습 수집을 건너뛴다(오염 방지).
+      // 판단 경로는 동일하므로 이 플래그로 점수가 후해지는 일은 없다.
+      const qa = req.body?.qa === true;
 
       // 30초 안에 안 끝나면 "리포트로 작성해 드리겠다"고 답하고 물러난다(사용자 결정 2026-07-26, 10초→30초).
       // 작업은 뒤에서 계속 돌고, 끝나면 리포트로 저장한 뒤 화면에 팝업으로 알린다.
-      const work = dispatchInstruction(text, sessionId, screen, user?.displayName);
+      const work = dispatchInstruction(text, sessionId, screen, user?.displayName, qa);
       let handedOff = false;
       const timer = new Promise<null>((resolve) => setTimeout(() => resolve(null), LONG_ANSWER_MS));
       const first = await Promise.race([work, timer]);
