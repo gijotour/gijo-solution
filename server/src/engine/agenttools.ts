@@ -34,6 +34,7 @@ import { runHardeningScan, scanSummaryText, isStandard } from "./hardeningscan";
 import { listSchedules as listReportSchedules, scheduleSummaryText } from "./reportschedule";
 import { listSchedules as listHardeningSchedules } from "./hardeningtargets";
 import { timeSavedText } from "./timesaved";
+import { feedbackSummaryText } from "./answerfeedback";
 import { listAnalysisEvents, analysisSummary, computeCorrelations } from "./analysishub";
 import { computeKpiSnapshot } from "./kpi";
 import { listSessions as listWorkSessions } from "./worksessions";
@@ -1363,6 +1364,17 @@ const TOOLS: AgentTool[] = [
     directAnswer: true,
     params: [{ name: "days", label: "기간(일)", description: "며칠치인지 — 기본 30일", required: false }],
     run: (a) => timeSavedText(Math.min(Math.max(Number(a.days) || 30, 1), 365)),
+  },
+  {
+    name: "answer_feedback_status",
+    label: "답변 지적 현황",
+    domain: "knowledge",
+    write: false,
+    description:
+      '담당자가 남긴 답변 지적(틀린 답·못 찾음·말투)을 모아 보여준다. "이번 주 지적 뭐 있었어?", "답변 피드백 현황 알려줘", "틀렸다고 한 거 뭐야"에 쓴다. 예: {} 또는 {"days":"30"}',
+    directAnswer: true,
+    params: [{ name: "days", label: "기간(일)", description: "며칠치인지 — 기본 7일", required: false }],
+    run: (a) => feedbackSummaryText(Math.min(Math.max(Number(a.days) || 7, 1), 365)),
   },
   {
     name: "analysis_status",

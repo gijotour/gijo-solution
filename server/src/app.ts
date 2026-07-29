@@ -49,6 +49,7 @@ import { registerLearnCandidateRoutes } from "./engine/learncandidates";
 import { registerKnowledgeBundleRoutes } from "./engine/knowledgebundle";
 import { registerWorkLogRoutes } from "./engine/worklog";
 import { registerTimeSavedRoutes } from "./engine/timesaved";
+import { registerAnswerFeedbackRoutes } from "./engine/answerfeedback";
 import { registerToolsRoutes } from "./engine/tools";
 import { registerTasksRoutes } from "./engine/tasks";
 import { registerMaintenanceRoutes } from "./engine/maintenance";
@@ -167,6 +168,7 @@ export function createApp(): Express {
   registerKnowledgeBundleRoutes(app); // 기본 지식 번들(전-4, 2026-07-29)
   registerWorkLogRoutes(app); // 자동화 작업 원장(중-2, 2026-07-29)
   registerTimeSavedRoutes(app); // "AI가 아낀 시간" KPI(중-2)
+  registerAnswerFeedbackRoutes(app); // 답변 지적 → 회귀셋 흡수(중-1)
   registerToolsRoutes(app);
   registerTasksRoutes(app);
   registerMaintenanceRoutes(app);
