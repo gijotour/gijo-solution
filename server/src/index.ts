@@ -20,6 +20,7 @@ import { stopLocalEngine, stopEmbeddingEngine, autoStartLocalEngines, startEmbed
 import { startHardeningScheduler, stopHardeningScheduler } from "./engine/hardeningtargets";
 import { startReportScheduler, stopReportScheduler } from "./engine/reportschedule";
 import { startBackupScheduler, stopBackupScheduler } from "./engine/backup";
+import { startAlertScheduler, stopAlertScheduler } from "./engine/alertschedule";
 import { startEventLifecycleScheduler, stopEventLifecycleScheduler } from "./engine/analysishub";
 import { startSiemForwarding } from "./engine/siem";
 import { startKbHygieneScheduler } from "./engine/kbhygiene";
@@ -72,6 +73,7 @@ httpServer.listen(PORT, () => {
   startHardeningScheduler(); // 원격 SSH 정기점검 — 만기된 스케줄을 주기적으로 실행(LLM 무관·경량)
   startReportScheduler(); // 정기 리포트(주간/분기) 자동 생성 — 만기된 스케줄을 주기적으로 실행
   startBackupScheduler(); // 자동 백업(하루 1회 + 최근 7개 보관) — 재해복구 시점 상시 확보
+  startAlertScheduler(); // 정기 알림(기한 임박·시스템 이상·오늘 할 일) — 화면을 안 봐도 놓치지 않게
   startEventLifecycleScheduler(); // 이벤트 생애주기 — 해결 후 90일 지난 이벤트 자동 정리
   startSiemForwarding(); // SIEM 아웃바운드 — 감사 이벤트를 고객 SIEM으로 전달(설정 켜진 경우만)
   startKbHygieneScheduler(); // 지식베이스 위생 — 주 1회 상충·중복 점검(삭제 없이 리포트만)
@@ -111,6 +113,8 @@ async function shutdown(signal: string): Promise<void> {
     stopChatMonitor();
     stopHardeningScheduler();
     stopReportScheduler();
+    stopAlertScheduler();
+    stopBackupScheduler();
     await Promise.all([stopLocalEngine(), stopEmbeddingEngine(), stopSmtpInbound()]);
   } catch (err) {
     // 엔진 정리에 실패해도 종료는 계속한다 — 안 끝나는 것보다 낫다.

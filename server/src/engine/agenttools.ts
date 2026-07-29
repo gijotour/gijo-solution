@@ -37,6 +37,7 @@ import { timeSavedText } from "./timesaved";
 import { feedbackSummaryText } from "./answerfeedback";
 import { adoptionSummaryText } from "./modeladoption";
 import { systemHealthText } from "./observability";
+import { alertScheduleText } from "./alertschedule";
 import { listAnalysisEvents, analysisSummary, computeCorrelations } from "./analysishub";
 import { computeKpiSnapshot } from "./kpi";
 import { listSessions as listWorkSessions } from "./worksessions";
@@ -1399,6 +1400,17 @@ const TOOLS: AgentTool[] = [
     directAnswer: true,
     params: [],
     run: () => systemHealthText(),
+  },
+  {
+    name: "alert_schedule_status",
+    label: "정기 알림 현황",
+    domain: "report",
+    write: false,
+    description:
+      '등록된 정기 알림(오늘 할 일·조치 기한 임박·시스템 이상)을 보여준다. 언제 누구에게 가는지, 최근 발송이 됐는지 실패했는지까지. "정기 알림 뭐 걸려 있어?", "알림 설정 확인해줘"에 쓴다. 예: {}',
+    directAnswer: true,
+    params: [],
+    run: () => alertScheduleText(),
   },
   {
     name: "analysis_status",
