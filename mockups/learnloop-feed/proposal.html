@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>시안 — 학습 후보함 (학습 루프 환류 1단계)</title>
+<style>
+:root{
+  --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;
+  --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);padding:26px;max-width:1060px;margin:0 auto;}
+h1{font-size:19px;margin-bottom:4px;}
+.sub{font-size:12.5px;color:var(--muted);margin-bottom:18px;line-height:1.7;}
+h2{font-size:14.5px;margin:22px 0 8px;color:#fff;}
+h2 .n{display:inline-flex;width:20px;height:20px;border-radius:50%;background:var(--blue);color:#fff;font-size:11px;align-items:center;justify-content:center;margin-right:7px;}
+.box{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:12px;}
+table{width:100%;border-collapse:collapse;font-size:11.5px;margin:8px 0 4px;}
+th{color:var(--muted-2);text-align:left;font-weight:600;padding:4px 8px;border-bottom:1px solid var(--border);}
+td{padding:5px 8px;border-bottom:1px solid var(--border);vertical-align:top;line-height:1.6;}
+code{background:var(--panel-2);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:10.5px;}
+.tag{font-size:10px;font-weight:800;padding:2px 7px;border-radius:6px;}
+.t-new{color:var(--teal);background:rgba(30,185,128,.14);}
+.t-keep{color:var(--blue-light);background:rgba(59,130,246,.14);}
+/* ── 목업 본체 ── */
+.mock{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:14px;padding:18px;margin:10px 0;}
+.mock-label{font-size:10px;color:var(--muted-2);letter-spacing:1.5px;font-weight:800;margin-bottom:10px;}
+.fold-h{display:flex;align-items:center;gap:9px;padding:10px 12px;border:1px solid var(--border);border-radius:10px;background:var(--panel);margin-bottom:8px;font-size:12.5px;font-weight:700;color:#dfe6ff;}
+.fold-h .car{color:var(--muted-2);font-size:10px;}
+.badge{font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;background:rgba(255,255,255,.06);color:var(--muted);}
+.badge.hot{background:rgba(240,160,32,.16);color:var(--amber);}
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;}
+.kpi{background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:9px 11px;}
+.kpi .l{font-size:10px;color:var(--muted-2);font-weight:700;}
+.kpi .v{font-size:16px;font-weight:800;color:#fff;margin-top:2px;}
+.kpi .v em{font-style:normal;font-size:10.5px;color:var(--muted-2);font-weight:600;}
+.gap-line{display:flex;align-items:center;gap:8px;background:rgba(240,160,32,.07);border:1px solid rgba(240,160,32,.25);border-radius:9px;padding:9px 12px;font-size:12px;margin-bottom:12px;}
+.gap-line b{color:var(--amber);}
+.gap-line .go{margin-left:auto;font-size:11px;color:var(--blue-light);cursor:pointer;white-space:nowrap;}
+.cand{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:12px 14px;margin-bottom:8px;}
+.cand-top{display:flex;gap:6px;align-items:center;margin-bottom:7px;flex-wrap:wrap;}
+.sig{font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:5px;}
+.sig.doc{color:var(--teal);background:rgba(30,185,128,.13);}
+.sig.tool{color:var(--blue-light);background:rgba(59,130,246,.13);}
+.sig.src{color:var(--muted);background:rgba(255,255,255,.06);}
+.q{font-size:12.5px;font-weight:700;color:#fff;margin-bottom:4px;}
+.a{font-size:11.5px;color:var(--muted);line-height:1.65;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.cand-act{display:flex;gap:6px;margin-top:9px;}
+.b-ok{background:var(--teal);color:#06281c;border:none;border-radius:7px;padding:6px 14px;font-size:11.5px;font-weight:800;cursor:pointer;}
+.b-no{background:transparent;color:var(--muted);border:1px solid var(--border-strong);border-radius:7px;padding:6px 12px;font-size:11.5px;cursor:pointer;}
+.bulk{display:flex;gap:8px;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid var(--border);}
+.b-bulk{background:var(--blue);color:#fff;border:none;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:800;cursor:pointer;}
+.bulk .note{font-size:11px;color:var(--muted-2);}
+.flow{display:flex;gap:6px;align-items:center;font-size:11px;color:var(--muted);flex-wrap:wrap;margin:6px 0;}
+.flow .st{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-weight:700;color:#dfe6ff;white-space:nowrap;}
+.flow .st.new{border-color:var(--teal);color:var(--teal);}
+.flow .ar{color:var(--muted-2);}
+.why{font-size:11.5px;color:var(--muted);line-height:1.75;}
+.why b{color:var(--blue-light);}
+.ev{font-size:11px;color:var(--muted-2);line-height:1.7;margin-top:6px;}
+</style>
+</head>
+<body>
+
+<h1>시안 — 학습 후보함 <span class="tag t-new">학습 루프 환류 1단계</span></h1>
+<div class="sub">
+  진단 실측(2026-07-29): 대화 로그 <b>200건</b> 자동 수집 중 · 담당자 👍 <b>1건</b> · 학습 실행 <b>0회</b>.
+  루프는 완성돼 있는데 <b>"좋은 답에 👍를 눌러 달라"가 아무의 업무에도 없어서</b> 굶어 죽었습니다.
+  200개를 훑으라는 대신, 코드가 후보를 골라 놓고 담당자는 <b>한 번의 승인</b>만 하게 바꿉니다.
+</div>
+
+<h2><span class="n">1</span>어디에 놓이나 — 학습 루프 화면, STEP 2(정제) 자리</h2>
+<div class="flow">
+  <span class="st">STEP 1 수집 (있음 · 자동)</span><span class="ar">→</span>
+  <span class="st new">학습 후보함 (신설 — 코드가 고르고 사람이 승인)</span><span class="ar">→</span>
+  <span class="st">승인 = 👍 기록 (기존 정제 루프에 그대로 꽂힘)</span><span class="ar">→</span>
+  <span class="st">STEP 3~5 데이터셋·학습·배포 (있음)</span>
+</div>
+<div class="why">기존 👍/👎 개별 버튼·데이터셋·학습 단계는 <b>하나도 안 바꿉니다</b>. 후보함은 그 앞에 붙는 깔때기입니다 —
+승인하면 내부적으로 👍가 기록되므로, 이후는 이미 검증된 흐름이 그대로 돕니다.</div>
+
+<h2><span class="n">2</span>화면 목업</h2>
+<div class="mock">
+  <div class="mock-label">LEARNLOOP.HTML — 새 구역 (접기 기본, 후보 있으면 배지)</div>
+  <div class="fold-h"><span class="car">▼</span> 학습 후보함 <span class="badge hot">후보 12</span><span class="badge">승인 3/최소 5</span></div>
+
+  <div class="kpis">
+    <div class="kpi"><div class="l">이번 주 후보</div><div class="v">12 <em>/ 로그 200</em></div></div>
+    <div class="kpi"><div class="l">승인됨(👍)</div><div class="v" style="color:var(--teal)">3 <em>/ 최소 5</em></div></div>
+    <div class="kpi"><div class="l">제외됨</div><div class="v">2</div></div>
+    <div class="kpi"><div class="l">지식 구멍</div><div class="v" style="color:var(--amber)">7</div></div>
+  </div>
+
+  <div class="gap-line">💡 <b>못 답한 질문 7건</b> — 학습이 아니라 <b>문서가 없어서</b>입니다. 그 문서를 올리면 다음부터 바로 답합니다(재학습 불필요).
+    <span class="go">패턴 리포트 보기 →</span></div>
+
+  <div class="cand">
+    <div class="cand-top"><span class="sig doc">📄 근거 인용</span><span class="sig tool">🔧 도구 성공</span><span class="sig src">출처: 작업내역 7/28</span></div>
+    <div class="q">Q. ASA 106023 로그가 한 IP에서 계속 올라오는데 무슨 의미야?</div>
+    <div class="a">A. 액세스 리스트(ACL)에서 차단된 패킷 기록입니다. 한 IP에서 반복되면 스캔·공격 시도 의심 — 차단 유지 상태에서 출발지 평판을…</div>
+    <div class="cand-act"><button class="b-ok">✓ 승인 — 학습에 채택</button><button class="b-no">✕ 제외</button></div>
+  </div>
+  <div class="cand">
+    <div class="cand-top"><span class="sig doc">📄 근거 인용</span><span class="sig src">출처: 대화 로그 7/29</span></div>
+    <div class="q">Q. KEV에 오른 취약점 조치 기한이 언제까지야?</div>
+    <div class="a">A. KEV 등재 취약점은 BOD 22-01 기준으로 등재일로부터 2주(신규)~… 사내 SLA는 Critical 7일이 우선 적용됩니다…</div>
+    <div class="cand-act"><button class="b-ok">✓ 승인 — 학습에 채택</button><button class="b-no">✕ 제외</button></div>
+  </div>
+  <div class="cand" style="opacity:.75">
+    <div class="cand-top"><span class="sig src">출처: 대화 로그 7/29</span><span class="sig" style="color:#f5928a;background:rgba(226,72,61,.12)">신호 약함 — 아래로 정렬</span></div>
+    <div class="q">Q. 이번 주 점검 일정 알려줘</div>
+    <div class="a">A. 이번 주 예정된 유지보수 점검은 2건입니다…</div>
+    <div class="cand-act"><button class="b-ok">✓ 승인</button><button class="b-no">✕ 제외</button></div>
+  </div>
+
+  <div class="bulk">
+    <button class="b-bulk">신호 강한 9건 모두 승인</button>
+    <span class="note">승인 = 👍 기록. 잘못 승인해도 로그에서 👎로 되돌리면 다음 데이터셋부터 빠집니다.</span>
+  </div>
+</div>
+
+<h2><span class="n">3</span>후보 선별 규칙 — 전부 코드로(LLM 없음), 자동 반영 없음</h2>
+<div class="box">
+  <table>
+    <tr><th>단계</th><th>규칙</th><th>왜</th></tr>
+    <tr><td rowspan="4"><b>제외</b></td><td>회피·폴백 문구(<code>찾을 수 없</code>·<code>무엇을 도와드릴까요</code> 등)</td><td>그건 학습감이 아니라 <b>지식 구멍</b> — 위 💡줄로 보낸다</td></tr>
+    <tr><td>잡담·인사(기존 SMALLTALK 규칙 재사용)</td><td>말투가 아니라 잡담 자체를 배우게 된다</td></tr>
+    <tr><td>비밀 흔적(<code>hf_…</code>·<code>password=</code>·<code>BEGIN …KEY</code> 등)</td><td>모델 가중치에 비밀이 각인되면 지울 수 없다</td></tr>
+    <tr><td>도구 원출력 복창(<code>id=vuln:</code>류)·중복(정규화 일치)</td><td>내부 id를 말하는 버릇·같은 문답 반복 학습 방지</td></tr>
+    <tr><td rowspan="4"><b>가점(정렬)</b></td><td>📄 근거 문서 인용 포함</td><td>사내 지식이 녹은 답 — 가장 배울 가치가 큼</td></tr>
+    <tr><td>🔧 도구 실행 성공 뒤의 요약형 답</td><td>실데이터를 요약한 답 = 형식 학습에 적합</td></tr>
+    <tr><td>직후 재질문·고쳐 묻기 없음(수용 신호)</td><td>암묵 신호가 명시 버튼보다 13배 밀도(조사 근거) — 재질문은 강한 거부 신호</td></tr>
+    <tr><td>적정 길이(80~1,200자)</td><td>한 줄 답·통짜 덤프 모두 학습 신호가 약함</td></tr>
+  </table>
+  <div class="why" style="margin-top:8px">
+    ⚠ 원칙 유지 — sessionpatterns의 확정 원칙 <b>"자동으로 어디에도 먹이지 않는다"</b>는 그대로입니다.
+    코드는 <b>후보 제시까지만</b> 하고, 데이터셋에 들어가는 유일한 문은 담당자의 승인(=👍)입니다.
+    파인튜닝 대상은 용어·형식·사내 말투로 좁힙니다 — 라우팅·판단 학습은 금지(실측: 튜닝이 라우팅 8/8→7/8로 깎음, 어댑터 폐기 이력).
+  </div>
+</div>
+
+<h2><span class="n">4</span>표준 조사 근거 (설계 전 조사 — 2026-07-29 완료)</h2>
+<div class="box">
+  <div class="why" id="research">
+    · <b>👍 1/200은 게으름이 아니라 구조다</b> — Meta 대규모 배포(524만 발화)에서도 thumbs 반응은 대화의 19%뿐이고,
+      소규모 배포는 <b>턴의 0.6%</b>까지 떨어진다(arXiv:2306.04707 · 2507.23158). 우리 0.5%는 정상 범주 — 버튼을 기다리는 설계 자체가 틀렸다.<br>
+    · <b>👍는 "옳음"이 아니라 "즉각 만족"</b> — 판단력을 잠식하는 나쁜 답이 오히려 👍를 더 받는다는 실증(Anthropic disempowerment 연구).
+      보안 조언 제품에서 이 간극은 위험하므로 <b>최종 게이트는 반드시 사람 승인</b> — 후보함이 그 문이다.<br>
+    · <b>승인 카드 패턴은 프로덕션 검증됨</b> — 오픈소스 Argilla가 "모델 제안을 미리 채우고 검수자는 승인/수정만" UI로 동일 패턴을 실증.
+      도구 도입은 우리 규모에 과해 패턴만 차용.<br>
+    · <b>적은 고품질 &gt; 많은 저품질</b> — 수작업 수천 개(LIMA)가 기계생성 5만 개(Alpaca)를 이김. OpenAI 공식 가이드도 50~100개면 효과.
+      후보함의 목표는 "많이"가 아니라 <b>승인된 좋은 문답 50~100개</b>.<br>
+    · <b>LoRA는 행동·형식 적응용</b> — 지식 주입엔 약하고 말투·형식엔 강하다는 이론·실측 일치(Raschka, "LoRA Learns Less and Forgets Less").
+      우리 결정(용어·형식·말투로 좁힘, 지식은 RAG)과 정확히 부합.<br>
+    · <b>⚠ 망각은 얼리스토핑으로 못 피한다</b> — 파인튜닝 손실 개선과 망각이 역선형(R²=0.94+, arXiv:2401.05605).
+      같은 논문: 도메인 튜닝이 <b>유해 요청 거부율을 32/50→16/50으로 반토막</b> 낸 실증 — 보안 제품엔 직접 경고.
+      → 채택 전 회귀셋은 업계 최소 <b>100~200문항</b>(우리 8문항은 부족), 축 3개(라우팅·안전 경계·일반 한국어) 중 하나라도 떨어지면 채택 보류를 하드 게이트로.<br>
+    · <b>비밀 필터</b> — Presidio(탐지+마스킹 분리) 패턴 참고하되, 범용 도구보다 <b>우리 도메인 정규식 3~5종</b>(사내 IP대역·hf_토큰·키 블록 등) 직접 추가가 비용 대비 효과 큼.<br>
+    · <b>카나리 배포는 우리 규모(사용자 1~수명)에 불가</b> — "승인 없이 자동 배포 안 함 + 즉시 롤백 스위치"로 치환.
+  </div>
+  <div class="ev">출처: arXiv 2306.04707 · 2507.23158 · 2509.18361 · 2407.10944 · 2401.05605 · Anthropic disempowerment-patterns · Meta AI PEFT 가이드(LIMA) · OpenAI 파인튜닝 가이드 · Argilla · Microsoft Presidio · Raschka. 일부 수치는 요약 경유 인용(원문 표 미대조) — 조사 보고서에 명시됨.</div>
+</div>
+
+<h2><span class="n">5</span>범위 — 이번에 하는 것 / 안 하는 것</h2>
+<div class="box">
+  <table>
+    <tr><th></th><th>내용</th></tr>
+    <tr><td><span class="tag t-new">이번</span></td><td>후보 선별 엔진(결정적 규칙) · 후보함 API · 학습 루프 화면 후보함 구역 · 승인→👍 연결 · 지식 구멍 줄(기존 패턴 리포트 링크)</td></tr>
+    <tr><td><span class="tag t-keep">유지</span></td><td>수집·개별 👍/👎·데이터셋·학습·배포 — 전부 그대로(후보함은 앞단 깔때기)</td></tr>
+    <tr><td><span class="tag t-keep">다음</span></td><td>held-out 평가 게이트 — 회귀셋 100~200문항·3축(라우팅/안전 경계/일반 한국어)·하나라도 하락 시 채택 보류(조사 근거) · 골드 few-shot 승격 경로 · 작업내역 대량 소급</td></tr>
+  </table>
+</div>
+
+</body>
+</html>
