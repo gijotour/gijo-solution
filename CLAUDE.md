@@ -29,6 +29,10 @@
 - `/GIJOAS클라시작` — 클라 빌드 후 Electron 개발 실행(CDP 9223 기본, electron.exe 직접 실행)
 역할 고정: Mac은 hub push까지, 검토·배포·게시는 Windows. GitHub(origin)는 사용자 요청 시만.
 
+## 서브에이전트 (.claude/agents/ — 양 머신 공통, 2026-07-29 도입)
+- `gijo-scout` — **읽기 전용 조사 전담**: 영향범위 전수 수색·설계 전 표준 조사·문서↔코드 대조. 대규모 읽기 조사는 위임 가능(쓰기·실행 도구가 아예 없음).
+- **검증·배포·게시·QA는 어떤 에이전트에도 위임 금지** — 운영 서버(4000)·CDP(9223)·로그인 세션(계정당 1개)이 직렬 자원이라 병렬 실행이 서로를 깨뜨린다(2026-07-28 실측). 이 일들은 메인이 순서대로 수행.
+
 ## 2머신 개발환경 (Windows ↔ M1 Max) — GIJO_AS_2머신_개발환경_가이드.md
 - Windows(desktop-4qplvnc)=주개발·윈도우 클라 테스트·운영 WSL·git 허브(D:\gijo-hub.git)·WireGuard 서버(10.8.0.1).
 - Mac(M1 Max 32GB)=mac 올인원(서버+Metal LLM) 개발·검증. VPN=client-mac.conf(10.8.0.11). 코드는 GitHub 또는 `ssh://user@10.8.0.1/d:/gijo-hub.git`.
