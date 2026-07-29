@@ -35,6 +35,7 @@ import { listSchedules as listReportSchedules, scheduleSummaryText } from "./rep
 import { listSchedules as listHardeningSchedules } from "./hardeningtargets";
 import { timeSavedText } from "./timesaved";
 import { feedbackSummaryText } from "./answerfeedback";
+import { adoptionSummaryText } from "./modeladoption";
 import { listAnalysisEvents, analysisSummary, computeCorrelations } from "./analysishub";
 import { computeKpiSnapshot } from "./kpi";
 import { listSessions as listWorkSessions } from "./worksessions";
@@ -1375,6 +1376,17 @@ const TOOLS: AgentTool[] = [
     directAnswer: true,
     params: [{ name: "days", label: "기간(일)", description: "며칠치인지 — 기본 7일", required: false }],
     run: (a) => feedbackSummaryText(Math.min(Math.max(Number(a.days) || 7, 1), 365)),
+  },
+  {
+    name: "model_adoption_status",
+    label: "모델 채택 이력",
+    domain: "knowledge",
+    write: false,
+    description:
+      '지금 쓰는 AI 모델을 언제 어떤 근거로 채택했는지 보여준다(평가 게이트 점수 포함). 게이트 없이 바뀐 변경도 숨기지 않고 표시한다. "모델 언제 바꿨어?", "지금 모델 무슨 근거로 쓰는 거야?", "모델 채택 이력"에 쓴다. 예: {}',
+    directAnswer: true,
+    params: [],
+    run: () => adoptionSummaryText(10),
   },
   {
     name: "analysis_status",
