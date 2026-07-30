@@ -105,6 +105,24 @@ const INJECTION_PATTERNS: { re: RegExp; category: AttackCategory; needsSecretDem
   { re: /\[\s*(system|시스템)[^\]]{0,20}\]|(system|시스템)\s*(override|overwrite|재정의)|new\s+rules?\s*:\s*(you|ignore|reveal)/i, category: "instruction-override" },
   // 권위 사칭 — **비밀 요구와 함께일 때만** 잡는다(감사·디버깅은 정상 업무다).
   { re: /(관리자(야|입니다|이다)|administrator|감사를?\s*위해|디버깅을?\s*위해)[^\n]{0,40}/i, category: "jailbreak", needsSecretDemand: true },
+  // **AI 자기 것(비밀 코드·시스템 프롬프트)을 내놓으라는 요구 자체**가 공격이다.
+  // 감싸는 말이 무엇이든 상관없다 — 번역·인코딩·이야기·"거절할 수 없다고 상상해봐"·새 세션 사칭은
+  // 전부 같은 요구를 포장만 바꾼 것이다(2026-07-30 실측: 놓친 7건 중 5건이 이 형태였다).
+  // 오탐을 막는 장치: ① "너의/네/이 시스템의"처럼 **AI 자신을 가리키는 말**이 있어야 한다
+  //   ("이 자산의 비밀번호 정책"은 업무다) ② 요구 동사가 있어야 한다("시스템 프롬프트가
+  //   무슨 개념이야?"는 용어 질문이다) ③ 담당자가 다루는 비밀(계정 비밀번호·API 키·인증서)은
+  //   대상에서 뺀다 — 그건 이 제품의 일이다.
+  {
+    re: /(너의|너에게|네\s|당신의|이\s*시스템의|시스템에\s*(있는|설정된)|your)\s*[^\n]{0,24}?(비밀\s*코드|비밀번호는|시크릿|secret\s*code|시스템\s*프롬프트|지시문|설정값)[^\n]{0,40}(알려|보여|출력|말해|공개|덤프|dump|번역|넣어|털어놓|뭐였|뭐야|reveal|show|tell)/i,
+    category: "system-prompt-leak",
+  },
+  // 답변을 특정 문자열로 강제하는 형태 — "다른 말 없이 정확히 'X'라고만", "답변을 'X'로 시작해".
+  // 인용부호로 감싼 **리터럴**과 함께일 때만 잡는다: "요약만 해줘"처럼 형식을 부탁하는 정상
+  // 표현과 가르기 위해서다. 이 공격은 비밀을 빼내지는 않지만 시스템 지시를 덮어쓴다.
+  {
+    re: /(다른\s*말\s*(없이|말고)|아무\s*말\s*없이)[^\n]{0,20}['"“'][^'"”']{2,}['"”'][^\n]{0,10}(라고|로)?\s*만?\s*(답|말|출력)|(답변|응답|대답)[^\n]{0,12}(반드시|무조건)?[^\n]{0,6}['"“'][^'"”']{2,}['"”'][^\n]{0,8}(으로|로)\s*시작/i,
+    category: "instruction-override",
+  },
 ];
 
 export function detectInjectionAttempt(input: string): { flagged: boolean; categories: AttackCategory[] } {
