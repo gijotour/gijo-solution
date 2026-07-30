@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { hasPromptLeak, stripScaffoldEcho } from "../src/engine/llm";
+import { hasPromptLeak, stripScaffoldEcho, dropEchoSentences } from "../src/engine/llm";
 
 // 실측(2026-07-19)에서 나온 실제 복창 사례
 const LEAKED =
@@ -143,5 +143,63 @@ describe("정체성 문장 2인칭 복창 (37f5ca3 흡수)", () => {
 
   it("'당신은 지금 조치해야 합니다' 같은 권고문은 오탐하지 않는다", () => {
     expect(hasPromptLeak("당신은 지금 KEV 등재 취약점부터 조치해야 합니다. 기한이 지났습니다.")).toBe(false);
+  });
+});
+
+// ── 1인칭 복창 + 최종 방어선 (2026-07-30) ────────────────────────────────────
+// 실측: 평가 게이트 실행 중 답변으로 이것이 나갔다 —
+//   "저는 GIJO AS의 AI 보안 자산 관리 플랫폼에서 작동하고 있습니다. 응답에서는 반드시 한국어로…
+//    응답 규칙은 다음과 같습니다: - 첫 문장에는 인사말, 서두, 예고 없이 바로 본론으로 시작합니다."
+// 감지는 됐지만(마커 2개) **재생성이 같은 것을 내놔 원본이 그대로 사용자에게 갔다.**
+// 언어 드리프트는 원본 유지가 옳지만(내용은 맞다), 지시문 복창은 답도 아니고 내부 누출이다.
+describe("1인칭 지시 언급 복창", () => {
+  it("자기에게 주어진 지시·규칙을 옮기는 꼴을 잡는다", () => {
+    expect(hasPromptLeak("저는 한국어로만 답하도록 지시받았습니다.")).toBe(true);
+    expect(hasPromptLeak("제게 주어진 규칙에 따라 인사말 없이 답변합니다.")).toBe(true);
+    expect(hasPromptLeak("시스템 프롬프트에 그렇게 적혀 있습니다.")).toBe(true);
+    expect(hasPromptLeak("응답 규칙은 다음과 같습니다: 인사말 없이 시작합니다.")).toBe(true);
+  });
+
+  // ⚠ 1인칭 자기소개 자체는 막지 않는다 — "너 뭐야?"에 답할 수 있어야 한다.
+  //   업무 서술도 당연히 통과해야 한다. 여기가 오탐 나면 정상 답변이 대체 문구로 바뀐다.
+  it("자기소개·업무 서술은 오탐하지 않는다", () => {
+    for (const s of [
+      "저는 방화벽 정책을 확인했습니다. 차단 규칙 3건이 있습니다.",
+      "제 판단으로는 이 취약점을 먼저 조치하는 것이 좋겠습니다.",
+      "오늘 조치 우선순위 상위 5건입니다.",
+      "로그 보관 기간은 개인정보처리시스템 기준 최소 1년입니다.",
+      "이 화면에서는 자산을 등록하고 담당자를 배정합니다.",
+    ]) {
+      expect(hasPromptLeak(s), `오탐: ${s}`).toBe(false);
+    }
+  });
+});
+
+describe("최종 방어선 — 복창 문장만 걷어내고 살릴 수 있으면 살린다", () => {
+  it("답 뒤에 규칙이 붙었으면 규칙만 잘라내고 답을 남긴다", () => {
+    const mixed =
+      "오늘 조치할 취약점은 3건입니다. CVE-2024-1234는 KEV에 등재되어 기한이 지났습니다.\n" +
+      "저는 한국어로만 답하도록 지시받았습니다.";
+    const kept = dropEchoSentences(mixed);
+    expect(kept).toBeTruthy();
+    expect(kept).toContain("CVE-2024-1234");
+    expect(kept).not.toContain("지시받았");
+    expect(hasPromptLeak(kept!)).toBe(false); // 걷어낸 결과가 다시 복창이면 살린 게 아니다
+  });
+
+  it("전부 복창이면 살리지 않는다(null) — 껍데기를 답인 척 내보내지 않는다", () => {
+    const allEcho =
+      "저는 GIJO AS의 AI 보안 자산 관리 플랫폼에서 작동하고 있습니다. 응답 규칙은 다음과 같습니다: " +
+      "첫 문장에는 인사말, 서두, 예고 없이 바로 본론으로 시작합니다.";
+    expect(hasPromptLeak(allEcho)).toBe(true);
+    expect(dropEchoSentences(allEcho)).toBeNull();
+  });
+
+  // 지울 줄이 없으면 null을 돌려준다 — 정상 답변을 **건드리지 않는다**는 뜻이다.
+  // (호출부는 hasPromptLeak일 때만 부르므로, null이면 대체 문구로 간다.)
+  it("정상 답변은 아예 손대지 않는다(null)", () => {
+    const normal = ["오늘 조치 우선순위 상위 5건입니다.", "1. CVE-2024-1234 (KEV)", "2. CVE-2024-5678"].join("\n");
+    expect(dropEchoSentences(normal)).toBeNull();
+    expect(hasPromptLeak(normal)).toBe(false);
   });
 });

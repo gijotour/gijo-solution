@@ -245,6 +245,41 @@ const SCAFFOLD_MARKERS = ["참고 자료 — 사내 지식 베이스", "관련 �
 // 규정할 일은 없으므로 이 꼴은 한 번만 나와도 복창으로 본다(scaffold 머리말과 같은 판단).
 const PERSONA_ECHO_RE = /당신은[^\n.!?]{0,60}(AI|어시스턴트|에이전트)입니다/;
 
+// 1인칭 지시 언급 — "저는 한국어로만 답하도록 지시받았습니다", "제게 주어진 규칙에 따라…".
+// 2인칭 페르소나 복창(PERSONA_ECHO_RE)만 보던 탓에 이 꼴이 통째로 새어 나갔다(2026-07-30 실측:
+// 1인칭 변형 5개 중 5개를 놓쳤다). 정상 답변이 **자기에게 주어진 지시**를 언급할 이유가 없다.
+//
+// ⚠ 1인칭 자기소개 자체는 잡지 않는다 — "저는 GIJO AS의 보안 AI입니다"는 정체를 묻는 질문에
+//   대한 정상 답일 수 있다. 규칙·지시를 옮기는 것만 잡는다. 업무 서술("저는 방화벽 정책을
+//   확인했습니다", "제 판단으로는 …")도 당연히 통과해야 한다.
+const INSTRUCTION_MENTION_RE =
+  /(지시받았|지시를?\s*받아|주어진\s*(지시|규칙|지침|프롬프트)|제게\s*주어진|시스템\s*프롬프트(에|를|은|이)|답하도록\s*(지시|설정)|응답\s*규칙(에|은|을))/;
+
+/**
+ * 복창으로 보이는 **문장만** 걷어내고 쓸 만한 본문이 남으면 그것을 돌려준다(없으면 null).
+ * 답 전체를 버리기 전에 살릴 수 있는지 먼저 본다 — 규칙 한 줄이 뒤에 붙었을 뿐인데 답까지
+ * 버리면 담당자는 아무것도 못 받는다. 남은 게 너무 짧으면(한 문장 미만) 살린 것이 아니다.
+ */
+export function dropEchoSentences(text: string): string | null {
+  // ⚠ **줄 단위로만** 걷어낸다. 마침표로 문장을 쪼개면 "1. CVE-2024-1234" 같은 번호 목록이
+  //   잘려 정상 답변이 망가진다(2026-07-30 시험이 잡았다). 규칙 복창은 대개 줄이 나뉘어
+  //   붙으므로 줄 단위로 충분하고, 한 줄에 섞인 경우는 살리지 않고 대체 문구로 간다 —
+  //   답을 반쯤 고쳐 내보내느니 못 만들었다고 말하는 편이 정직하다.
+  const lines = (text ?? "").split("\n");
+  const isEcho = (s: string): boolean => {
+    const t = s.trim();
+    if (!t) return false;
+    if (INSTRUCTION_MENTION_RE.test(t) || PERSONA_ECHO_RE.test(t) || SYSTEM_ECHO_SENTENCE_RE.test(t)) return true;
+    if (PROMPT_LEAK_MARKERS.some((m) => t.includes(m))) return true;
+    return RESPONSE_META_WORDS.filter((w) => t.includes(w)).length >= 2;
+  };
+  if (!lines.some(isEcho)) return null; // 줄 단위로 지울 게 없으면 살릴 방법이 없다
+  const kept = lines.filter((s) => !isEcho(s)).join("\n").trim();
+  // 걷어낸 뒤에도 여전히 복창이면 살린 것이 아니다. 너무 짧아도(껍데기만 남음) 마찬가지.
+  if (kept.length < 20 || hasPromptLeak(kept)) return null;
+  return kept;
+}
+
 export function hasPromptLeak(text: string): boolean {
   const t = (text ?? "").trim();
   // ① 축자 복창 — 한 개는 우연히 인용했을 수 있으나(사용자가 규칙을 물어본 경우 등) 두 개 이상이면 복창.
@@ -252,6 +287,8 @@ export function hasPromptLeak(text: string): boolean {
   // ② 페르소나 복창 — 2인칭 역할 서술은 단독으로도 확실한 누출 신호. 본문 중간(PERSONA_ECHO_RE)과
   //    첫 문장(SYSTEM_ECHO_SENTENCE_RE — 응답 전체가 복창이라 걷어낼 본문이 없을 때의 백스톱) 양쪽을 본다.
   if (PERSONA_ECHO_RE.test(t)) return true;
+  //    1인칭으로 자기 지시·규칙을 옮기는 꼴도 같은 누출이다(2026-07-30 추가).
+  if (INSTRUCTION_MENTION_RE.test(t)) return true;
   const cut = t.search(/[.!?？。\n]/);
   const firstSentence = (cut >= 0 ? t.slice(0, cut + 1) : t).trim();
   if (SYSTEM_ECHO_SENTENCE_RE.test(firstSentence)) return true;
@@ -505,6 +542,21 @@ export async function chat(args: ChatArgs): Promise<string> {
       const retryData = (await retryRes.json()) as { choices?: { message?: { content?: string } }[] };
       const retryReply = stripScaffoldEcho(stripLeadingPreamble(retryData.choices?.[0]?.message?.content ?? ""));
       if (retryReply && drift.isBetter(retryReply, reply)) reply = retryReply;
+    }
+
+    // ── 최종 방어선 ────────────────────────────────────────────────────────
+    // 재생성이 실패하거나(시간 초과·오류) 다시 받은 답도 복창이면, 여기까지는 **원래 답을
+    // 그대로 내보냈다**. 언어 드리프트(중국어·영어)는 그래도 된다 — 내용은 맞고 표기만 틀리다.
+    // 그러나 **지시문 복창은 다르다**: 답이 아닐뿐더러 우리 내부 지시문이 화면에 그대로 나간다.
+    // 보안 제품이 자기 시스템 프롬프트를 사용자에게 뿌리는 것은 그 자체가 누출이다.
+    // (2026-07-30 실측: 게이트 실행 중 "저는 GIJO AS의 … 응답 규칙은 다음과 같습니다: …"가
+    //  답변으로 나갔다. 감지는 됐는데 재생성이 같은 것을 내놔 원본이 통과했다.)
+    if (hasPromptLeak(reply)) {
+      const salvaged = dropEchoSentences(reply);
+      reply = salvaged
+        ? salvaged
+        : "답변을 만들지 못했습니다(내부 지시문이 섞여 걷어냈습니다). 질문을 조금 더 구체적으로 적어 다시 시도해 주세요.";
+      emitLlmActivity({ kind: "chat", phase: "start", agent: agentName, detail: salvaged ? "복창 문장 제거" : "복창 지속 — 답변 대체" });
     }
   }
 
