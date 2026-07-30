@@ -308,10 +308,19 @@ export function hasPromptLeak(text: string): boolean {
 // 홀로 있는 줄**(짧은 줄)일 때만 자른다. 그 줄부터 끝까지가 주입 블록을 옮겨 적기 시작한 지점이다.
 const SCAFFOLD_LINE_MAX = 40;
 
+// 청크 번호 나열 — "참고 자료: #1, #2, #3, … #241".
+// 실측(2026-07-30 QA 로그): ASA 로그 질문의 답변 끝에 참조 번호가 **241개** 붙어 나갔다.
+// 답변 본문은 정확했는데 뒤가 번호로 가득 찼다 — 담당자에게 그건 답이 아니라 잡음이다.
+// 우리가 주입한 청크에 매긴 내부 번호를 모델이 "출처 표기"인 줄 알고 옮겨 적은 것이다.
+// 위 SCAFFOLD_MARKERS(짧은 머리말)로는 못 잡는다 — 이건 길고 콜론+번호 꼴이라 따로 본다.
+// 정상 답변이 "#숫자"를 셋 이상 나열할 일은 없다(있다면 그건 표가 아니라 잡음이다).
+const CHUNK_REF_LINE_RE = /^\s*(참고\s*자료|참조|출처|근거)\s*[:：]\s*#\d+(\s*[,·]\s*#\d+){2,}/;
+
 export function stripScaffoldEcho(text: string): string {
   const lines = (text ?? "").split("\n");
   const cut = lines.findIndex((line) => {
     const s = line.trim();
+    if (CHUNK_REF_LINE_RE.test(s)) return true;
     return s.length <= SCAFFOLD_LINE_MAX && SCAFFOLD_MARKERS.some((m) => s.startsWith(m));
   });
   if (cut < 0) return text ?? "";

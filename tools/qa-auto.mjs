@@ -405,7 +405,10 @@ async function runMaintenance() {
     then: "ACL 차단이며 반복 시 스캔·공격 시도 의심임을 설명한다",
   }, async () => {
     const reply = await ask("ASA 106023 로그가 한 IP에서 계속 올라오는데 무슨 의미야?");
-    if (!/차단|Deny|ACL/i.test(reply)) throw new Error("차단 의미 미설명");
+    // ⚠ 영문 약어만 보면 **옳은 답을 실패로 찍는다**(2026-07-30 실측): 모델이 "액세스 리스트에
+    //   의해 거부당한 패킷"이라고 **한글로** 정확히 설명했는데 ACL·Deny·차단이 없어 실패했다.
+    //   이 제품은 한국어로 답하는 것이 규칙이다 — 검사가 그 규칙과 싸우면 안 된다.
+    if (!/차단|거부|Deny|ACL|액세스\s*리스트|접근\s*(제어|통제)/i.test(reply)) throw new Error("차단 의미 미설명");
     return `답변 ${reply.length}자 — ACL 차단·의심 징후 설명 포함`;
   }, LLM_RETRY);
 
