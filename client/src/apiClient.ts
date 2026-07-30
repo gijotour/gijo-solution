@@ -1232,11 +1232,30 @@ export const modelAuthApi = {
   test: () => request<ModelAuthTestResult>("/api/model-auth/test", { method: "POST", body: {} }),
 };
 
-export interface SiemConfig { enabled: boolean; host: string; port: number; format: "rfc5424" | "cef"; minSeverity: "info" | "high" | "critical" }
+// 전송 수단 — udp만 도착 확인이 안 된다(2026-07-31 확장).
+export interface SiemConfig {
+  enabled: boolean;
+  host: string;
+  port: number;
+  format: "rfc5424" | "cef" | "json";
+  transport: "udp" | "tcp" | "tls" | "hec";
+  minSeverity: "info" | "high" | "critical";
+  hecToken?: string;
+  hecTokenSet?: boolean;
+  hecPath?: string;
+  tlsRejectUnauthorized?: boolean;
+  stats?: SiemStats;
+}
+export interface SiemStats {
+  sent: number; failed: number; dropped: number; queued: number;
+  lastSuccessAt: number | null; lastFailureAt: number | null; lastError: string | null;
+  deliveryConfirmed: boolean;
+}
 export const siemApi = {
   getConfig: () => request<SiemConfig>("/api/siem/config"),
   saveConfig: (config: Partial<SiemConfig>) => request<SiemConfig>("/api/siem/config", { method: "POST", body: config }),
-  test: () => request<{ sent: boolean; format: string; target: string }>("/api/siem/test", { method: "POST" }),
+  test: () => request<{ ok: boolean; error?: string; confirmed: boolean; target: string }>("/api/siem/test", { method: "POST" }),
+  stats: () => request<SiemStats>("/api/siem/stats"),
 };
 
 // ── SBOM ─────────────────────────────────────────────────────────────
