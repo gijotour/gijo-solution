@@ -65,3 +65,18 @@ describe("두 점수를 섞지 않는다", () => {
     expect(effectiveReportText(r)).not.toContain("맨몸");
   });
 });
+
+// ⚠ 결과가 메모리에만 있으면 **재시작하면 사라진다.** 운영 서버는 코드 갱신·복구로 자주
+//   재시작하는데, 이 점수는 조달·보안성 검토에 쓰는 값이라 "마지막에 몇 점이었나"가 남아야 한다.
+//   같은 실수를 가드레일 모드에서 이미 한 번 했다(설정이 조용히 기본값으로 풀렸다).
+describe("마지막 결과는 재시작에도 남는다", () => {
+  it("점검 결과가 DB에 저장되고 그대로 다시 읽힌다", async () => {
+    const { getLastEffectiveReport } = await import("../src/engine/redteam");
+    const r = await runEffectiveRedTeam(async () => "🛡 가드레일이 이 요청을 차단했습니다");
+    const saved = getLastEffectiveReport();
+    expect(saved, "저장된 결과가 없다 — 재시작하면 사라진다는 뜻이다").toBeTruthy();
+    expect(saved!.effectiveScore).toBe(r.effectiveScore);
+    expect(saved!.total).toBe(r.total);
+    expect(saved!.ranAt).toBe(r.ranAt);
+  });
+});

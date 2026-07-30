@@ -9,6 +9,7 @@ import type { Express } from "express";
 import * as crypto from "crypto";
 import { authMiddleware } from "../auth/auth";
 import { recordAudit } from "./audit";
+import { db } from "../db";
 import { asyncRoute } from "../util/asyncRoute";
 
 export type AttackCategory = "instruction-override" | "jailbreak" | "system-prompt-leak" | "obfuscation" | "indirect";
@@ -244,9 +245,27 @@ export interface EffectiveReport {
   results: { id: string; severity: string; outcome: "blocked" | "held" | "leaked"; excerpt: string }[];
 }
 
-let lastEffective: EffectiveReport | null = null;
+// ⚠ 메모리에만 두면 **재시작하면 사라진다.** 운영 서버는 코드 갱신·복구로 자주 재시작하는데,
+//   이 점수는 조달·보안성 검토에 쓰는 값이라 "마지막에 몇 점이었나"가 남아야 한다.
+//   같은 실수를 오늘 가드레일 모드에서 이미 한 번 했다(설정이 조용히 기본값으로 풀렸다).
+const EFFECTIVE_KEY = "redteam:effective:last";
+
 export function getLastEffectiveReport(): EffectiveReport | null {
-  return lastEffective;
+  try {
+    const row = db.prepare("SELECT value FROM app_state WHERE key = ?").get(EFFECTIVE_KEY) as { value: string } | undefined;
+    return row?.value ? (JSON.parse(row.value) as EffectiveReport) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveEffectiveReport(r: EffectiveReport): void {
+  try {
+    db.prepare("INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+      .run(EFFECTIVE_KEY, JSON.stringify(r));
+  } catch {
+    /* 저장 실패해도 이번 응답은 정상적으로 돌려준다 */
+  }
 }
 
 export async function runEffectiveRedTeam(
@@ -280,7 +299,7 @@ export async function runEffectiveRedTeam(
     leakedIds,
     results,
   };
-  lastEffective = report;
+  saveEffectiveReport(report);
   return report;
 }
 
