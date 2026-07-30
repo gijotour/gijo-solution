@@ -11,6 +11,7 @@
 import type { Express } from "express";
 import * as fs from "fs";
 import * as path from "path";
+import * as os from "os";
 import { db } from "../db";
 import { authMiddleware, adminMiddleware } from "../auth/auth";
 
@@ -80,6 +81,146 @@ function pruneOldBackups(dir: string): number {
   return pruned;
 }
 
+// ── 복원 가능성 검증 ────────────────────────────────────────────────────────
+// **"백업이 있다"와 "그 백업으로 복구된다"는 다른 말이다.** 여기까지 이 제품은 파일이 있는지와
+// 만든 시각만 봤다(backupOverdue·자가진단). 그래서 스냅샷이 0바이트여도, 중간에 잘려도,
+// 스키마가 뒤처져 지금 코드로 열 수 없어도 전부 "백업 정상"으로 통과했다.
+// 재해가 났을 때 처음 알게 되는 종류의 결함이라, 평소에 확인해 둔다.
+//
+// 검증은 **읽기 전용으로 열어서만** 한다 — 스냅샷을 고치거나 마이그레이션을 걸지 않는다.
+// 복원 자체는 서버를 세우고 파일을 바꿔야 해서 자동화하지 않는다(오조작이 곧 데이터 파괴다).
+// 대신 검증 결과에 정확한 복원 절차를 함께 실어 보낸다 — 가이드를 못 찾아도 화면에서 보이게.
+
+/** 복원에 필수인 표 — 이게 비어 있으면 복원해도 제품이 제 기능을 못 한다. */
+const ESSENTIAL_TABLES = ["users", "schema_migrations", "assets", "audit_log"];
+
+export interface BackupVerifyResult {
+  ok: boolean;
+  file: string | null;
+  createdAt: number | null;
+  sizeBytes: number;
+  integrity: string | null; // SQLite integrity_check 결과("ok"면 정상)
+  tables: Record<string, number | null>; // 표별 행 수(못 읽으면 null)
+  schemaLatest: string | null; // 스냅샷의 마이그레이션 최신 id
+  schemaMatchesNow: boolean | null; // 지금 코드의 스키마와 같은가
+  lanceIncluded: boolean;
+  lanceSizeBytes: number;
+  problems: string[]; // 복구를 **막는** 것만 넣는다(비어 있으면 이 백업으로 복구할 수 있다)
+  // 알아두면 좋지만 복구를 막지는 않는 것. problems에 섞으면 정상 상황에서도 경고가 떠
+  // 자가 진단이 늘 노랑이 되고, 그러면 아무도 안 본다.
+  notes: string[];
+  restoreSteps: string[]; // 복원 절차 — 위험한 작업이라 자동 실행하지 않고 안내만 한다
+}
+
+const RESTORE_STEPS = [
+  "① 서버를 정지한다 (WSL: systemctl stop gijo-as, 또는 프로세스 종료)",
+  "② 지금 data/gijo-as.sqlite 와 data/memory.lancedb 를 **다른 이름으로 옮겨 둔다** — 지우지 말 것(복원이 잘못되면 되돌아갈 자리다)",
+  "③ 스냅샷 gijo-as-<시각>.sqlite 를 data/gijo-as.sqlite 로 복사한다",
+  "④ 짝 폴더 gijo-as-<같은 시각>.lancedb 를 data/memory.lancedb 로 복사한다 (빠뜨리면 지식베이스가 빈 상태로 뜬다)",
+  "⑤ 서버를 다시 켜고 자가 진단(설정 > 시스템 자가 진단)에서 지식베이스·DB 항목이 정상인지 확인한다",
+  "※ 모델 파일(models/)은 백업 대상이 아니다 — 다시 받거나 별도 이미지 백업에서 되살린다",
+];
+
+/** 최신(또는 지정한) 스냅샷이 실제로 열리고 내용이 들어 있는지 확인한다. 원본은 건드리지 않는다. */
+export function verifyBackupSnapshot(fileName?: string): BackupVerifyResult {
+  const dir = backupDir();
+  const empty: BackupVerifyResult = {
+    ok: false, file: null, createdAt: null, sizeBytes: 0, integrity: null, tables: {},
+    schemaLatest: null, schemaMatchesNow: null, lanceIncluded: false, lanceSizeBytes: 0,
+    problems: [], notes: [], restoreSteps: RESTORE_STEPS,
+  };
+  let target = fileName ?? null;
+  try {
+    if (!target) {
+      const snaps = fs.readdirSync(dir)
+        .filter((f) => f.endsWith(".sqlite"))
+        .map((f) => ({ f, at: fs.statSync(path.join(dir, f)).mtimeMs }))
+        .sort((a, b) => b.at - a.at);
+      target = snaps[0]?.f ?? null;
+    }
+  } catch {
+    return { ...empty, problems: ["백업 폴더가 없습니다 — 아직 한 번도 백업하지 않았습니다."] };
+  }
+  if (!target) return { ...empty, problems: ["백업 스냅샷이 없습니다 — 아직 한 번도 백업하지 않았습니다."] };
+
+  const full = path.join(dir, target);
+  const problems: string[] = [];
+  const notes: string[] = [];
+  let sizeBytes = 0;
+  let createdAt: number | null = null;
+  try {
+    const st = fs.statSync(full);
+    sizeBytes = st.size;
+    createdAt = st.mtimeMs;
+  } catch {
+    return { ...empty, file: target, problems: [`스냅샷 파일을 읽을 수 없습니다: ${target}`] };
+  }
+  if (sizeBytes === 0) problems.push("스냅샷이 0바이트입니다 — 백업이 만들어지다 실패했습니다.");
+
+  // ⚠ **임시 사본**을 열어 검사한다. readonly로 열어도 WAL 모드 DB는 곁에 -shm/-wal 파일을
+  //   만든다 — 실측으로 확인했다(2026-07-30: 검증 한 번에 백업 폴더에 두 파일이 생겼다).
+  //   백업 폴더는 재해복구의 마지막 자리다. 거기에 무엇도 쓰지 않는 것이 원칙이라,
+  //   사본을 만들어 검사하고 사본만 지운다.
+  let integrity: string | null = null;
+  const tables: Record<string, number | null> = {};
+  let schemaLatest: string | null = null;
+  let snap: import("better-sqlite3").Database | null = null;
+  const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "gijo-verify-"));
+  const workFile = path.join(workDir, "snapshot.sqlite");
+  try {
+    fs.copyFileSync(full, workFile);
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const Database = require("better-sqlite3") as typeof import("better-sqlite3");
+    snap = new Database(workFile, { readonly: true, fileMustExist: true });
+    integrity = (snap.pragma("integrity_check", { simple: true }) as string) ?? null;
+    if (integrity !== "ok") problems.push(`스냅샷이 손상됐습니다(integrity_check: ${integrity}) — 이 백업으로는 복구할 수 없습니다.`);
+    for (const t of ESSENTIAL_TABLES) {
+      try {
+        tables[t] = (snap.prepare(`SELECT COUNT(*) AS n FROM ${t}`).get() as { n: number }).n;
+      } catch {
+        tables[t] = null;
+        problems.push(`필수 표 '${t}'가 스냅샷에 없습니다 — 복원해도 제품이 제 기능을 못 합니다.`);
+      }
+    }
+    if (tables.users === 0) problems.push("계정이 0건입니다 — 복원하면 아무도 로그인할 수 없습니다.");
+    try {
+      const row = snap.prepare("SELECT id FROM schema_migrations ORDER BY appliedAt DESC, id DESC LIMIT 1").get() as { id: string } | undefined;
+      schemaLatest = row?.id ?? null;
+    } catch { /* 위에서 이미 문제로 잡혔다 */ }
+  } catch (e) {
+    problems.push(`스냅샷을 열 수 없습니다: ${e instanceof Error ? e.message : String(e)}`);
+  } finally {
+    try { snap?.close(); } catch { /* 무시 */ }
+    try { fs.rmSync(workDir, { recursive: true, force: true }); } catch { /* 무시 */ }
+  }
+
+  // 스키마가 지금 코드보다 뒤처지면, 복원은 되지만 그 뒤 마이그레이션이 필요하다는 뜻이다.
+  let nowLatest: string | null = null;
+  try {
+    nowLatest = (db.prepare("SELECT id FROM schema_migrations ORDER BY appliedAt DESC, id DESC LIMIT 1").get() as { id: string } | undefined)?.id ?? null;
+  } catch { /* 무시 */ }
+  const schemaMatchesNow = schemaLatest && nowLatest ? schemaLatest === nowLatest : null;
+  if (schemaMatchesNow === false) {
+    notes.push(
+      `스냅샷의 DB 구조가 지금 코드보다 뒤처집니다(스냅샷 ${schemaLatest} / 지금 ${nowLatest}). ` +
+      "복원은 되지만 서버가 뜰 때 남은 갱신이 자동으로 적용됩니다 — 복원 후 자가 진단을 확인하세요."
+    );
+  }
+
+  // 짝 LanceDB(지식베이스) — 빠지면 복원해도 지식베이스가 빈 상태로 뜬다.
+  const lanceDir = path.join(dir, target.replace(/\.sqlite$/, ".lancedb"));
+  const lanceIncluded = fs.existsSync(lanceDir);
+  const lanceSizeBytes = lanceIncluded ? dirSize(lanceDir) : 0;
+  if (!lanceIncluded) problems.push("짝 지식베이스(.lancedb) 폴더가 없습니다 — 복원하면 지식 검색이 빈 상태가 됩니다.");
+  else if (lanceSizeBytes === 0) problems.push("짝 지식베이스 폴더가 비어 있습니다 — 복원하면 지식 검색이 빈 상태가 됩니다.");
+
+  return {
+    ok: problems.length === 0,
+    file: target, createdAt, sizeBytes, integrity, tables, schemaLatest, schemaMatchesNow,
+    lanceIncluded, lanceSizeBytes, problems, notes, restoreSteps: RESTORE_STEPS,
+  };
+}
+
 let backupTimer: NodeJS.Timeout | null = null;
 let firstBackupTimer: NodeJS.Timeout | null = null;
 /** 마지막 스냅샷이 주기보다 오래됐는가(없으면 true). 기동 직후 백업 여부를 이걸로 정한다. */
@@ -135,6 +276,23 @@ export function registerBackupRoutes(app: Express): void {
     try {
       const r = await performBackup();
       res.json({ ok: true, ...r });
+    } catch (e) {
+      res.status(500).json({ error: (e as Error).message });
+    }
+  });
+
+  // 복원 가능성 검증 — "백업이 있다"와 "그 백업으로 복구된다"는 다른 말이다.
+  // 스냅샷을 읽기 전용으로 열어 무결성·필수 표·스키마·짝 지식베이스를 확인하고, 복원 절차를 함께 준다.
+  // 복원 자체는 자동화하지 않는다(오조작이 곧 데이터 파괴다) — 절차 안내까지가 여기 몫이다.
+  app.get("/api/admin/backup/verify", authMiddleware, adminMiddleware, (req, res) => {
+    const file = typeof req.query.file === "string" ? req.query.file : undefined;
+    // 경로 조작 방지 — 백업 폴더 안의 파일만 검증한다.
+    if (file && (file.includes("/") || file.includes("\\") || file.includes(".."))) {
+      res.status(400).json({ error: "bad_file", message: "백업 폴더 안의 파일 이름만 지정할 수 있습니다." });
+      return;
+    }
+    try {
+      res.json(verifyBackupSnapshot(file));
     } catch (e) {
       res.status(500).json({ error: (e as Error).message });
     }

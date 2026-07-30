@@ -18,6 +18,7 @@ import path from "path";
 import { db } from "../db";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
+import { verifyBackupSnapshot } from "./backup";
 
 export type CheckLevel = "ok" | "warn" | "fail" | "unknown";
 
@@ -68,12 +69,38 @@ function checkBackup(): HealthCheck {
   const latest = snaps[0];
   const hours = (Date.now() - latest.at) / 3600000;
   // 자동 백업은 하루 1회다 — 48시간이 넘으면 스케줄러가 안 도는 것으로 본다.
-  const level: CheckLevel = hours > 72 ? "fail" : hours > 48 ? "warn" : "ok";
-  return {
-    id: "backup", label: "백업", level,
-    detail: `최근 백업 ${ago(latest.at)} (보관 ${snaps.length}개)`,
-    ...(level === "ok" ? {} : { action: "자동 백업이 멈췄을 수 있습니다 — 서버 재시작 후에도 갱신되지 않으면 디스크 여유와 GIJO_AUTO_BACKUP 설정을 확인하세요." }),
-  };
+  let level: CheckLevel = hours > 72 ? "fail" : hours > 48 ? "warn" : "ok";
+  let detail = `최근 백업 ${ago(latest.at)} (보관 ${snaps.length}개)`;
+  let action = level === "ok" ? undefined
+    : "자동 백업이 멈췄을 수 있습니다 — 서버 재시작 후에도 갱신되지 않으면 디스크 여유와 GIJO_AUTO_BACKUP 설정을 확인하세요.";
+
+  // ⚠ 여기까지는 "파일이 있고 최근인가"만 봤다. 그것만으로는 **복구된다는 보장이 없다** —
+  //   0바이트여도, 중간에 잘려도, 계정 표가 비어도 통과했다(2026-07-30 발견).
+  //   재해가 난 뒤에 처음 알게 되는 종류의 결함이라, 최신 스냅샷을 실제로 열어 확인한다.
+  //   (읽기 전용 열기 + 표 몇 개 COUNT — 자가 진단 한 번에 수십 ms 수준)
+  try {
+    const v = verifyBackupSnapshot(latest.f);
+    if (!v.ok) {
+      // 파일이 최근이어도 복구가 안 되면 백업이 없는 것과 같다 — 최소 warn, 손상이면 fail.
+      const 손상 = v.integrity !== "ok" || v.sizeBytes === 0 || v.tables.users === 0 || v.tables.users == null;
+      level = 손상 ? "fail" : level === "ok" ? "warn" : level;
+      detail += ` · ⚠ 복원 점검 실패: ${v.problems[0]}`;
+      action = 손상
+        ? "이 스냅샷으로는 복구할 수 없습니다. 설정 > 관리자에서 백업을 지금 한 번 실행해 새 스냅샷을 만들고, 디스크 여유를 확인하세요."
+        : (v.problems.find((p) => p.includes("지식베이스"))
+            ? "백업에 지식베이스(.lancedb) 짝 폴더가 빠졌습니다 — 백업을 다시 실행하세요(복원 시 지식 검색이 빈 상태가 됩니다)."
+            : action ?? "설정 > 관리자 > 백업 검증에서 자세한 사유를 확인하세요.");
+    } else {
+      detail += ` · 복원 점검 통과(자산 ${v.tables.assets ?? "?"}건·계정 ${v.tables.users ?? "?"}건, 지식베이스 동반)`;
+    }
+  } catch {
+    // 검증 자체를 못 했으면 정상으로 세지 않는다(정직 규칙) — 모른다고 적는다.
+    detail += " · 복원 점검을 수행하지 못했습니다";
+    if (level === "ok") level = "warn";
+    action = action ?? "설정 > 관리자 > 백업 검증을 직접 실행해 사유를 확인하세요.";
+  }
+
+  return { id: "backup", label: "백업", level, detail, ...(action ? { action } : {}) };
 }
 
 /** ② 지식베이스 — 비어 있으면 답변이 통째로 근거를 잃는다(2026-07-19 실사고). */
