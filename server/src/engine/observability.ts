@@ -19,6 +19,7 @@ import { db } from "../db";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { verifyBackupSnapshot } from "./backup";
+import { auditRetentionDays } from "./audit";
 
 export type CheckLevel = "ok" | "warn" | "fail" | "unknown";
 
@@ -125,7 +126,27 @@ function checkDatabase(): HealthCheck {
   if (size == null) {
     return { id: "database", label: "데이터베이스", level: "unknown", detail: "파일 크기를 확인하지 못했습니다(경로 설정 확인 필요)" };
   }
-  return { id: "database", label: "데이터베이스", level: mig > 0 ? "ok" : "warn", detail: `${mb(size)} · 스키마 이력 ${mig}건` };
+  // 감사 로그는 지우지 않으면 무한히 쌓인다(실측 2026-07-30: 하루 점검만으로 138건).
+  // 디스크가 차면 백업도 DB도 못 쓴다 — 그전에 눈에 보여야 한다.
+  let auditNote = "";
+  let auditLevel: CheckLevel = "ok";
+  try {
+    const n = (db.prepare("SELECT COUNT(*) AS n FROM audit_log").get() as { n: number } | undefined)?.n ?? 0;
+    const days = auditRetentionDays();
+    auditNote = ` · 작업 기록 ${n.toLocaleString("ko-KR")}건(보관 ${days > 0 ? `${days}일` : "무제한"})`;
+    // 50만 건이 넘으면 조회가 느려지고 DB가 커진다 — 보관 기간을 줄일 때가 됐다는 신호.
+    if (n > 500_000) auditLevel = "warn";
+  } catch {
+    /* 표가 없으면 넘어간다 */
+  }
+  const level: CheckLevel = mig > 0 ? auditLevel : "warn";
+  return {
+    id: "database", label: "데이터베이스", level,
+    detail: `${mb(size)} · 스키마 이력 ${mig}건${auditNote}`,
+    ...(auditLevel === "warn"
+      ? { action: "작업 기록이 많이 쌓였습니다 — 보관 기간(GIJO_AUDIT_RETENTION_DAYS, 기본 1095일)을 줄이면 오래된 것부터 자동 정리됩니다." }
+      : {}),
+  };
 }
 
 /** ④ 최근 오류 — 감사 로그의 error/blocked. 조용한 고장을 드러낸다. */

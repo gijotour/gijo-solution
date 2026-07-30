@@ -20,6 +20,7 @@ import { stopLocalEngine, stopEmbeddingEngine, autoStartLocalEngines, startEmbed
 import { startHardeningScheduler, stopHardeningScheduler } from "./engine/hardeningtargets";
 import { startReportScheduler, stopReportScheduler } from "./engine/reportschedule";
 import { startBackupScheduler, stopBackupScheduler } from "./engine/backup";
+import { startAuditPruneScheduler, stopAuditPruneScheduler } from "./engine/audit";
 import { startAlertScheduler, stopAlertScheduler } from "./engine/alertschedule";
 import { startEventLifecycleScheduler, stopEventLifecycleScheduler } from "./engine/analysishub";
 import { startSiemForwarding } from "./engine/siem";
@@ -75,6 +76,7 @@ httpServer.listen(PORT, () => {
   startBackupScheduler(); // 자동 백업(하루 1회 + 최근 7개 보관) — 재해복구 시점 상시 확보
   startAlertScheduler(); // 정기 알림(기한 임박·시스템 이상·오늘 할 일) — 화면을 안 봐도 놓치지 않게
   startEventLifecycleScheduler(); // 이벤트 생애주기 — 해결 후 90일 지난 이벤트 자동 정리
+  startAuditPruneScheduler(); // 감사 로그 보관 정리(기본 3년) — 무한히 쌓여 디스크를 채우지 않게
   startSiemForwarding(); // SIEM 아웃바운드 — 감사 이벤트를 고객 SIEM으로 전달(설정 켜진 경우만)
   startKbHygieneScheduler(); // 지식베이스 위생 — 주 1회 상충·중복 점검(삭제 없이 리포트만)
   // CISA KEV 목록을 백그라운드로 최신화(공개 피드 다운로드 — 실패해도 캐시로 동작).
@@ -115,6 +117,7 @@ async function shutdown(signal: string): Promise<void> {
     stopReportScheduler();
     stopAlertScheduler();
     stopBackupScheduler();
+    stopAuditPruneScheduler();
     await Promise.all([stopLocalEngine(), stopEmbeddingEngine(), stopSmtpInbound()]);
   } catch (err) {
     // 엔진 정리에 실패해도 종료는 계속한다 — 안 끝나는 것보다 낫다.

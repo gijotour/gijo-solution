@@ -234,18 +234,21 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     panel.innerHTML = rows.length ? rows.map(rowHtml).join("") : '<div class="empty">해당 조건의 작업 기록이 없습니다.</div>';
   }
 
-  function renderKpi(summary) {
+  function renderKpi(summary, retention) {
     const el = document.getElementById("kpiRow");
     const order = ["cli", "approval", "write", "block", "auth"];
     el.innerHTML = `<div class="kpi-mini"><div class="l">전체</div><div class="v">${summary.total}</div></div>` +
-      order.map((k) => `<div class="kpi-mini"><div class="l">${KIND_LABEL[k]}</div><div class="v">${summary.byKind[k] || 0}</div></div>`).join("");
+      order.map((k) => `<div class="kpi-mini"><div class="l">${KIND_LABEL[k]}</div><div class="v">${summary.byKind[k] || 0}</div></div>`).join("") +
+      // 보관 기간을 같이 보여준다 — 감사 대응 때 "옛날 기록이 왜 없나"를 여기서 바로 답한다.
+      (retention ? `<div class="kpi-mini"><div class="l">보관 기간</div><div class="v" style="font-size:15px;">` +
+        (retention.unlimited ? "무제한" : Math.round(retention.days / 365 * 10) / 10 + "년") + "</div></div>" : "");
   }
 
   async function load() {
     try {
       const r = await window.gijo.listAudit(undefined, 500);
       entries = r.entries || [];
-      renderKpi(r.summary || { total: entries.length, byKind: {} });
+      renderKpi(r.summary || { total: entries.length, byKind: {} }, r.retention);
       render();
     } catch (e) {
       panel.innerHTML = `<div class="empty">불러오지 못했습니다: ${esc(e.message || e)}</div>`;

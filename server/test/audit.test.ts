@@ -9,7 +9,8 @@ vi.mock("../src/engine/llm", () => ({
 }));
 
 import { createApp } from "../src/app";
-import { recordAudit, listAudit, auditSummary, resetAuditForTests } from "../src/engine/audit";
+import { recordAudit, listAudit, auditSummary, resetAuditForTests, pruneAuditLog, startAuditPruneScheduler, stopAuditPruneScheduler } from "../src/engine/audit";
+import { db } from "../src/db";
 import { resetAssetsForTests, registerAsset, getAsset } from "../src/engine/assets";
 
 async function login(app: ReturnType<typeof createApp>, password = "changeme") {
@@ -95,5 +96,66 @@ describe("작업 기록(감사 로그)", () => {
     const writes = listAudit({ kind: "write" });
     expect(writes.some((e) => e.action.includes("register_asset"))).toBe(true);
     expect(getAsset("감사테스트봇-01")).toBeDefined();
+  });
+});
+
+// ── 보관 기간 정책 ─────────────────────────────────────────────────────────
+// 감사 로그를 지우는 코드는 **잘못 돌면 증거를 없앤다**. 그래서 경계를 못으로 박는다:
+// ① 보관 기간이 안 지난 것은 절대 안 지운다 ② 0이면 아무것도 안 지운다
+// ③ 지웠으면 그 사실이 감사에 남는다(조용히 줄어들면 사고인지 정책인지 알 수 없다).
+describe("감사 로그 보관 기간 정리", () => {
+  beforeEach(() => resetAuditForTests());
+
+  // at을 직접 박아야 "오래된 기록"을 만들 수 있다 — recordAudit은 항상 지금 시각을 쓴다.
+  function 과거기록(일전: number, action: string) {
+    recordAudit({ kind: "block", action, result: "blocked" });
+    const row = listAudit({ limit: 1 })[0];
+    db.prepare("UPDATE audit_log SET at = ? WHERE id = ?").run(Date.now() - 일전 * 86400_000, row.id);
+  }
+
+  it("보관 기간이 지난 것만 지운다 — 기간 내 기록은 남는다", () => {
+    과거기록(400, "아주 오래된 차단");
+    과거기록(10, "최근 차단");
+    const n = pruneAuditLog(365);
+    expect(n).toBe(1);
+    const 남은것 = listAudit({ kind: "block" }).map((e) => e.action);
+    expect(남은것).toContain("최근 차단");
+    expect(남은것).not.toContain("아주 오래된 차단");
+  });
+
+  it("경계에서 하루라도 덜 지난 기록은 안 지운다", () => {
+    과거기록(364, "경계 직전");
+    expect(pruneAuditLog(365)).toBe(0);
+    expect(listAudit({ kind: "block" })).toHaveLength(1);
+  });
+
+  it("보관 0이면 아무것도 지우지 않는다 — 무제한 보관을 원하는 기관용", () => {
+    과거기록(5000, "13년 된 기록");
+    expect(pruneAuditLog(0)).toBe(0);
+    expect(pruneAuditLog(-1)).toBe(0);
+    expect(listAudit({ kind: "block" })).toHaveLength(1);
+  });
+
+  it("지웠으면 그 사실을 감사에 남긴다 — 몇 건인지까지", () => {
+    과거기록(400, "오래된 것 1");
+    과거기록(400, "오래된 것 2");
+    pruneAuditLog(365);
+    const 정리기록 = listAudit({ kind: "config" }).filter((e) => e.action.includes("보관 정리"));
+    expect(정리기록).toHaveLength(1);
+    expect(정리기록[0].action).toContain("2건");
+    expect(정리기록[0].actor).toBe("system");
+  });
+
+  it("지울 게 없으면 기록도 남기지 않는다 — 매일 도는 정리가 로그를 채우면 본말전도", () => {
+    과거기록(10, "최근 것");
+    pruneAuditLog(365);
+    expect(listAudit({ kind: "config" }).filter((e) => e.action.includes("보관 정리"))).toHaveLength(0);
+  });
+
+  it("스케줄러는 두 번 걸어도 타이머가 하나다", () => {
+    startAuditPruneScheduler();
+    startAuditPruneScheduler();
+    stopAuditPruneScheduler(); // 하나만 걸렸다면 이 한 번으로 완전히 멈춘다
+    stopAuditPruneScheduler(); // 두 번 멈춰도 터지지 않는다
   });
 });

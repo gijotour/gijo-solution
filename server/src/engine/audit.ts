@@ -84,6 +84,54 @@ export function auditSummary(): { total: number; byKind: Record<string, number> 
   return { total, byKind };
 }
 
+// ── 보관 기간 정책 ──────────────────────────────────────────────────────────
+// **감사 로그를 지우는 것은 그 자체가 위험한 행위다.** 그래서 이 정리는 세 가지를 지킨다:
+//   ① 기본값은 **아주 길게**(3년) — 짧게 잡아 조사에 필요한 기록을 잃는 것이 더 나쁘다.
+//      국내 실무에서 접속기록 보관은 최소 1년(개인정보처리시스템 기준 2년)이라 그보다 길게 둔다.
+//   ② **무엇을 몇 건 지웠는지 감사 로그에 남긴다** — 정리 자체가 추적 가능해야 한다.
+//   ③ 기관이 더 길게(또는 무제한) 두고 싶으면 환경변수로 바꾼다. 0이면 정리하지 않는다.
+//
+// 왜 필요한가: 지금까지 정리가 전혀 없어 무한히 쌓였다(실측 2026-07-30: 하루 QA·점검만으로
+// 차단 기록 138건). 디스크가 차면 백업도 못 만들고 DB도 못 쓴다 — 그때는 감사 기록을 지키려다
+// 시스템 전체를 잃는다. 오래된 것을 정리하는 편이 안전하다.
+const AUDIT_RETENTION_DAYS = Number(process.env.GIJO_AUDIT_RETENTION_DAYS ?? 1095); // 3년
+const AUDIT_PRUNE_INTERVAL_MS = Number(process.env.GIJO_AUDIT_PRUNE_INTERVAL_MS ?? 24 * 3600_000);
+
+export function auditRetentionDays(): number {
+  return AUDIT_RETENTION_DAYS;
+}
+
+/** 보관 기간이 지난 기록을 지운다. 지운 건수를 돌려주고, 지웠다면 그 사실도 감사에 남긴다. */
+export function pruneAuditLog(retentionDays = AUDIT_RETENTION_DAYS): number {
+  if (!(retentionDays > 0)) return 0; // 0·음수 = 정리 안 함(기관이 무제한을 원할 때)
+  const cutoff = Date.now() - retentionDays * 24 * 3600_000;
+  const oldest = db.prepare("SELECT MIN(at) AS m FROM audit_log").get() as { m: number | null };
+  const n = (db.prepare("DELETE FROM audit_log WHERE at < ?").run(cutoff) as { changes: number }).changes;
+  if (n > 0) {
+    // ⚠ 정리 자체를 기록한다 — 감사 로그가 조용히 줄어들면 그것이 사고인지 정책인지 알 수 없다.
+    recordAudit({
+      kind: "config", actor: "system",
+      action: `감사 로그 보관 정리 — ${n}건 삭제(보관 ${retentionDays}일)`,
+      detail: oldest.m ? `가장 오래된 기록 ${new Date(oldest.m).toISOString().slice(0, 10)} 이전분` : null,
+      result: "ok",
+    });
+  }
+  return n;
+}
+
+let pruneTimer: NodeJS.Timeout | null = null;
+export function startAuditPruneScheduler(): void {
+  if (pruneTimer) return;
+  console.log(`[audit] 보관 정리 스케줄러 시작 (보관 ${AUDIT_RETENTION_DAYS}일, 주기 ${Math.round(AUDIT_PRUNE_INTERVAL_MS / 3600_000)}시간)`);
+  // 기동 직후 한 번 — setInterval만 걸면 24시간 안에 재시작되는 서버에서는 영원히 안 돈다
+  // (백업 스케줄러에서 같은 실수를 했다가 엿새 동안 백업이 0건이었다, 2026-07-29).
+  setTimeout(() => { try { pruneAuditLog(); } catch { /* 정리 실패가 기동을 막지 않는다 */ } }, 90_000).unref?.();
+  pruneTimer = setInterval(() => { try { pruneAuditLog(); } catch { /* 무시 */ } }, AUDIT_PRUNE_INTERVAL_MS);
+}
+export function stopAuditPruneScheduler(): void {
+  if (pruneTimer) { clearInterval(pruneTimer); pruneTimer = null; }
+}
+
 // 테스트 전용.
 export function resetAuditForTests(): void {
   db.exec("DELETE FROM audit_log");
@@ -96,7 +144,13 @@ export function registerAuditRoutes(app: Express): void {
     asyncRoute(async (req, res) => {
       const kind = req.query.kind as AuditKind | undefined;
       const limit = req.query.limit ? Number(req.query.limit) : undefined;
-      res.json({ entries: listAudit({ kind, limit }), summary: auditSummary() });
+      // 보관 기간을 함께 준다 — "이 화면에 언제까지의 기록이 남는가"는 담당자가 알아야 할 정보다
+      // (감사 대응 때 "3년 전 것은 왜 없나"를 화면에서 바로 답할 수 있게).
+      res.json({
+        entries: listAudit({ kind, limit }),
+        summary: auditSummary(),
+        retention: { days: AUDIT_RETENTION_DAYS, unlimited: !(AUDIT_RETENTION_DAYS > 0) },
+      });
     })
   );
   // 클라이언트가 남기는 기록 — CLI 실행/차단(담당자 PC 터미널)과 화면 메모.
