@@ -558,15 +558,6 @@
     updateLeftEdge();
   }
 
-  function loadOnboarding() {
-    if (document.getElementById("gijoObScript")) return;
-    if (document.querySelector('script[src*="onboarding.js"]')) return; // 대시보드는 자체 로드 — 중복 방지
-    var s = document.createElement("script");
-    s.id = "gijoObScript";
-    s.src = "onboarding.js";
-    document.body.appendChild(s);
-  }
-
   // 공용 디자인 시스템(gijo-ui.css)을 모든 페이지에 주입한다 — .g-* 컴포넌트 사용 가능 + body.g-ui로
   // 안전한 전역 베이스라인(스크롤바·포커스링·폰트 스무딩)만 통일(레이아웃은 안 건드림).
   function loadDesignSystem() {
@@ -757,7 +748,9 @@
     if (IS_POPOUT) { applyPopout(); loadLongNotice(); return; } // 분리창은 메뉴 없이 내용만
     setupLeftCollapse(); // 왼쪽 접기 인프라(대시보드 포함) — 저장 상태 복원 + 가장자리 탭
     render();
-    loadOnboarding();
+    // 온보딩 오버레이(onboarding.js) 로드는 2026-07-30에 지웠다 — 대시보드의 "시작 가이드 카드"가
+    // 대신한다. 오버레이는 평소에 안 보여 "있는 줄 모르는 기능"이 됐고, 같은 일을 하는 자리가
+    // 둘이면 조작 개념만 늘어난다(3.5.0 직관성 개편 원칙).
     // commandpanel.js(오른쪽 숨은 팝업 — 작업 세션·AI 오피스)는 4.0.0에서 삭제했다.
     // 2026-07-27에 입구인 가장자리 세로 탭을 이미 없앤 상태였고, 두 기능 모두 정식 화면이
     // 됐다(관제 > 작업 세션 / 🏢 팀 사무실 창). 남은 건 아무도 못 여는 숨은 DOM과 iframe이

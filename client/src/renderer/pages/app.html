@@ -330,6 +330,13 @@
     // ② "이 화면 설명해줘"(ⓘ) — 화면 안 챗봇을 없앴으므로 콘솔이 답한다.
     if (d.type === "gijo:explain" && window.gijoConsole) {
       window.gijoConsole.ask(d.topic ? '"' + d.topic + '" 사용법 알려줘' : "이 화면에서 뭐 할 수 있어?");
+      return;
+    }
+    // ③ "이 지시를 대신 물어봐" — 콘솔은 셸에 있고 화면은 iframe 안이라 화면이 직접 못 부른다.
+    //    대시보드 시작 가이드 카드가 "해보기"를 누를 때 쓴다. ②와 달리 문구를 감싸지 않고
+    //    **담당자가 직접 친 것과 똑같이** 보낸다 — 카드가 가르치는 것이 곧 실제로 쓰는 말이어야 한다.
+    if (d.type === "gijo:ask" && d.text && window.gijoConsole) {
+      window.gijoConsole.ask(String(d.text));
     }
   });
 
