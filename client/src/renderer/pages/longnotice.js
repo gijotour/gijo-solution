@@ -12,6 +12,10 @@
   if (window.top !== window) return;
 
   var POLL_MS = 15000;
+  // 화면에 동시에 띄우는 최대 개수. 넘으면 오래된 것부터 접는다 — 알림이 화면을 덮어
+  // 그 아래를 못 누르게 되는 일을 막는다(놓쳐도 리포트 화면에 그대로 남는다).
+  var MAX_NOTICES = 3;
+  var seen = {}; // 이미 띄운 알림 id — ack가 실패해도 같은 것을 다시 띄우지 않는다
   var api = window.gijo;
   if (!api || typeof api.longAnswersPending !== "function") return; // 구버전 클라 호환
 
@@ -76,9 +80,15 @@
         el.remove();
       });
     });
-    wrap().appendChild(el);
-    // 실패 알림은 남겨두고, 성공은 한참 뒤 자동으로 접는다(놓쳐도 리포트 이력에 남아 있다).
-    if (ok) setTimeout(function () { el.remove(); }, 60000);
+    var w = wrap();
+    w.appendChild(el);
+    // ⚠ 개수 상한 — 알림이 쌓이면 화면 오른쪽을 덮어 **그 아래 버튼을 못 누른다**.
+    //   실측(2026-07-30): QA가 탭 셸 검사를 하다 클릭이 막혔다("gijoLnWrap subtree intercepts
+    //   pointer events") — 담당자도 긴 작업을 몇 개 돌리면 똑같이 겪는다.
+    //   놓친 알림은 리포트 화면에 그대로 남아 있으니, 화면을 가리면서까지 붙들 이유가 없다.
+    while (w.children.length > MAX_NOTICES) w.removeChild(w.firstChild);
+    // 성공은 한참 뒤 자동으로 접는다. 실패도 영영 두지 않는다 — 리포트 이력에 남아 있다.
+    setTimeout(function () { el.remove(); }, ok ? 60000 : 600000);
   }
 
   async function poll() {
@@ -86,8 +96,14 @@
       var r = await api.longAnswersPending();
       var list = (r && r.notices) || [];
       for (var i = 0; i < list.length; i++) {
+        // ⚠ **이미 보여준 것은 다시 띄우지 않는다.** ack(서버에 "봤다" 표시)가 실패하면 서버가
+        //   같은 알림을 계속 내려주는데, 예전 코드는 그때마다 새 알림을 만들었다 — 폴링 주기마다
+        //   하나씩 쌓여 화면이 알림으로 덮인다(2026-07-30 QA에서 클릭이 막혀 드러났다).
+        //   ack는 "서버 정리"용이고, 화면에 띄울지는 이쪽이 판단한다.
+        if (seen[list[i].id]) continue;
+        seen[list[i].id] = true;
         show(list[i]);
-        try { await api.longAnswerAck(list[i].id); } catch (e) {}
+        try { await api.longAnswerAck(list[i].id); } catch (e) { /* 다음 주기에 서버가 다시 준다 */ }
       }
     } catch (e) {
       /* 로그인 전·네트워크 오류는 조용히 넘긴다 — 다음 주기에 다시 본다 */
