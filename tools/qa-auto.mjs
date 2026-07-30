@@ -670,8 +670,13 @@ async function runClient() {
     const 시작 = src.indexOf("if (!res.ok)");
     if (시작 < 0) throw new Error("응답 오류 처리부를 못 찾음 — apiClient.ts 구조가 바뀌었나");
     const 조각 = src.slice(시작, 시작 + 1400);
-    if (!/body\?\.error\s*\?\?\s*body\?\.message|body\.error|body\.message/.test(조각)) {
-      throw new Error("서버가 준 error/message를 읽지 않는다");
+    // ⚠ 예전 검사는 `body?.error ?? body?.message` **순서를 못박고** 있었다. 그런데 그 순서가
+    //   틀렸다(2026-07-30 발견): error는 "password_required" 같은 **기계 코드**이고 message가
+    //   사람이 읽는 문장이다. 둘 다 있을 때 error를 고르면 담당자 화면 첫 줄에 영문 코드가 나온다.
+    //   그래서 제품을 message 우선으로 고쳤고, 검사도 **그 순서를 요구**하도록 바꾼다.
+    //   (검사가 낡은 동작을 지키고 있으면, 옳은 수정이 실패로 찍혀 되돌리게 된다.)
+    if (!/body\?\.message\s*\?\?\s*body\?\.error/.test(조각)) {
+      throw new Error("사람이 읽는 message를 기계 코드 error보다 앞세우지 않는다");
     }
     // 사유가 있을 때 그것을 **앞에** 세우는지 — 템플릿 첫 자리가 사유여야 한다
     if (!/\$\{\s*사유\s*\}\\n|^\s*사유\s*\n?\s*\?/m.test(조각) && !/사유\s*\?\s*`\$\{\s*사유\s*\}/.test(조각)) {
