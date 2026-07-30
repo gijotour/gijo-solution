@@ -2000,3 +2000,26 @@ export const docboxApi = {
       `/api/docbox/search?q=${encodeURIComponent(q)}`
     ),
 };
+
+// 문서함 요청 만들기 — 서버가 문서를 조립하고, **파일 저장은 클라이언트가 한다**
+// (사용자 결정 2026-07-30: 전달은 담당자가 파일을 직접 다룬다 — 메일 발송 없음).
+export const docRequestApi = {
+  build: (input: {
+    kind: "bug" | "feature" | "ui" | "etc";
+    title: string;
+    tried: string;
+    happened: string;
+    images: string[];
+    screen?: string;
+    clientVersion?: string;
+    platform?: string;
+  }) =>
+    request<{ fileName: string; markdown: string; maskedCount: number; maskedKinds: string[]; imageCount: number; sizeBytes: number }>(
+      "/api/docbox/request",
+      { method: "POST", body: input }
+    ),
+  list: () =>
+    request<{ requests: { id: string; at: number; kind: string; title: string; actor: string | null; fileName: string }[] }>(
+      "/api/docbox/requests"
+    ),
+};
