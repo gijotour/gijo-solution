@@ -215,6 +215,12 @@ async function composeFinalAnswer(instruction: string, calls: AgentToolCall[], c
     agentId: "orchestrator",
     // explain: 도구 실행 후 사용자에게 그대로 보여주는 최종 답변이다.
     explain: true,
+    // ⚠ trusted — 이 message는 사용자 입력이 아니라 **우리가 조립한 내부 프롬프트**다
+    //   (지시문 사본 + 도구 결과 + 작성 규칙). 사용자 지시 자체는 dispatcher가 이미
+    //   gateUserInput으로 검사했다. 이걸 안 켜면 우리 프롬프트가 사용자 입력으로 다시 검사되어
+    //   가드레일 로그가 내부 문구로 가득 차고, 차단 모드에서는 **제품이 자기 자신을 막는다**
+    //   (2026-07-30 실사고: 도구 결정 0/4, A/B/A로 확인). gateway.ts 주석이 지키라던 규칙이다.
+    trusted: true,
     message: [
       ...(context ? [context, ""] : []),
       `사용자 지시: "${instruction}"`,
@@ -472,6 +478,11 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
       message: decisionPrompt(instruction, calls, context, scope, calls.length === 0 ? fewshot : ""),
       responseSchema: DECISION_SCHEMA,
       maxTokens: 300,
+      // ⚠ trusted — 이 message는 **도구 카탈로그가 실린 우리 결정 프롬프트**다. 사용자 지시는
+      //   dispatcher가 이미 검사했다. 안 켜면 우리 프롬프트가 검사 대상이 되는데, 도구 설명에
+      //   "탈옥·프롬프트 주입" 같은 보안 낱말이 들어 있어 **우리 규칙에 우리가 걸린다**.
+      //   flag 모드에서는 로그만 쌓여 보이지 않았고, 차단 모드에서 제품이 죽었다(2026-07-30).
+      trusted: true,
     }).catch(() => "");
     const decision = parseDecision(raw);
     if (!decision) return null; // LLM 다운·형식 불가 → 기존 채팅 폴백

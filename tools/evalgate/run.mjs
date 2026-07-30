@@ -169,6 +169,51 @@ async function runCase(c, axis) {
   return { ...g, ms: Date.now() - t0 };
 }
 
+// ── 사전점검(preflight) ───────────────────────────────────────────────
+// **측정 환경이 준비되지 않았으면 재지 않는다.** 오늘 두 번 겪었다(2026-07-30):
+//   ① 서버를 재시작한 직후 모델이 자리잡기 전에 돌려 routing 100% → 75.4%가 나왔다
+//   ② 여분 모델이 떠 VRAM을 나눠 쓰는 동안 도구 결정이 통째로 실패했다
+// 두 번 다 15분을 쓰고 **거짓 "채택 보류"**를 냈다. 거짓 보류는 거짓 통과만큼 나쁘다 —
+// 멀쩡한 변경을 막고, 몇 번 겪으면 사람이 게이트를 안 믿게 된다.
+// 그래서 재기 전에 "지금 이 서버가 결정을 할 수 있는가"를 결정적 문항으로 확인하고,
+// 안 되면 점수를 내지 않고 exit 3으로 세운다(통과도 보류도 아닌 **측정 불가**).
+const PREFLIGHT = [
+  { q: "스캔 현황 알려줘", tool: "scan_status" },
+  { q: "보안 KPI 현황 어때?", tool: "kpi_status" },
+];
+async function preflight() {
+  const engine = await fetch(base + "/api/localengine/status", { headers: AUTH }).then((r) => r.json()).catch(() => null);
+  const loaded = engine?.loaded ?? [];
+  const extra = loaded.filter((m) => m.modelId !== engine?.modelId).map((m) => m.modelId);
+  const notReady = loaded.filter((m) => !m.ready).map((m) => m.modelId);
+  const lines = [`엔진: ${engine?.modelId ?? "?"}${loaded.length > 1 ? ` (동시 로드 ${loaded.length}개: ${loaded.map((m) => m.modelId).join(", ")})` : ""}`];
+  if (extra.length) lines.push(`⚠ 여분 모델이 떠 VRAM을 나눠 씁니다: ${extra.join(", ")} — 결정 품질이 흔들립니다`);
+  if (notReady.length) lines.push(`⚠ 아직 준비되지 않은 모델: ${notReady.join(", ")}`);
+
+  const fails = [];
+  for (const p of PREFLIGHT) {
+    const r = await dispatch(p.q);
+    const tools = (r.toolCalls ?? []).map((t) => t.tool);
+    if (!tools.includes(p.tool)) fails.push(`"${p.q}" → ${tools.join(",") || "도구 없음"} (기대 ${p.tool})`);
+  }
+  return { ok: fails.length === 0, lines, fails };
+}
+
+if (!process.env.GIJO_EVALGATE_SKIP_PREFLIGHT) {
+  console.log("\n━━ 사전점검 — 지금 이 서버가 결정을 할 수 있는가 ━━");
+  const pf = await preflight();
+  for (const l of pf.lines) console.log("  " + l);
+  if (!pf.ok) {
+    console.error("\n중단: 측정 환경이 준비되지 않았습니다 — 점수를 내지 않습니다(거짓 보류를 만들지 않기 위해).");
+    for (const f of pf.fails) console.error("  ✗ " + f);
+    console.error("\n조치: ① 모델이 다 뜨고 자리잡을 때까지 기다린 뒤 다시 실행 " +
+      "② 여분 모델이 떠 있으면 내려서 VRAM을 오케스트레이터에 돌려주기 " +
+      "③ 서버를 방금 재시작했다면 몇 분 기다릴 것");
+    process.exit(3);
+  }
+  console.log("  ✓ 도구 결정 정상 — 측정을 시작합니다");
+}
+
 // ── 실행 ─────────────────────────────────────────────────────────────
 const startedAt = Date.now();
 const results = { routing: [], safety: [], korean: [] };
