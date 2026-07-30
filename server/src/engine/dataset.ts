@@ -117,7 +117,7 @@ async function convertChunk(chunk: string): Promise<ConversationExample[]> {
     chunk,
   ].join("\n\n");
   // 긴 출력이 잘리지 않게 max_tokens를 넉넉히.
-  return parseExamples(await chat({ agentId: "analysis", message: prompt, maxTokens: 2048 }));
+  return parseExamples(await chat({ agentId: "analysis", message: prompt, maxTokens: 2048, trusted: true }));
 }
 
 export async function convertToConversationFormat(rawText: string): Promise<ConversationExample[]> {
@@ -146,7 +146,7 @@ export async function amplifyDataset(examples: ConversationExample[], factor = 3
       "출력은 JSON 배열만: [{\"question\":\"...\",\"answer\":\"...\"}, ...] 형식, 다른 텍스트 없이.",
       `원본: ${JSON.stringify(example)}`,
     ].join("\n\n");
-    const variants = parseExamples(await chat({ agentId: "analysis", message: prompt }));
+    const variants = parseExamples(await chat({ agentId: "analysis", message: prompt, trusted: true }));
     amplified.push(...variants);
   }
   return amplified;

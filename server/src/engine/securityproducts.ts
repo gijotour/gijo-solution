@@ -624,6 +624,8 @@ export async function draftProductFields(productName: string, text: string): Pro
     message: buildFieldDraftPrompt(productName, text),
     responseSchema: FIELD_DRAFT_SCHEMA,
     maxTokens: 500,
+    // trusted — 문서 내용이 들어가지만 '사용자 지시'가 아니라 자료다. 보안 문서에는 '탈옥·인젝션' 같은 낱말이 당연히 들어 있어, 입력 차단으로 막으면 정상 문서 인입이 통째로 실패한다. 자료 안의 지시를 따르지 않게 하는 것은 프롬프트 구조(자료/지시 분리)의 몫이다.
+    trusted: true,
   });
   let parsed: Record<string, unknown>;
   try {

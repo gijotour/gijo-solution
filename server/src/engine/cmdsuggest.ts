@@ -36,6 +36,8 @@ export async function suggestCommand(reqText: string): Promise<{ command: string
     message: buildPrompt(reqText),
     responseSchema: SUGGEST_SCHEMA,
     maxTokens: 200,
+    // trusted — 라우트가 gateUserInput으로 이미 검사한 입력의 재진입이다 — 두 번 검사하면 이중 집계되고, 차단 모드에서는 우리 프롬프트가 걸린다.
+    trusted: true,
   });
   try {
     const p = JSON.parse(raw) as { command?: string; explanation?: string };

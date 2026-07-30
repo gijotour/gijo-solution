@@ -245,7 +245,7 @@ export async function buildTriageDraft(limit = 5, assetIds?: string[]): Promise<
     /* 온톨로지 없으면 근거 없이 진행 */
   }
   const { chat } = await import("./llm.js");
-  const draft = await chat({ agentId: "orchestrator", message: buildTriagePrompt(top, ontologyContext), remember: false, maxTokens: 800 });
+  const draft = await chat({ agentId: "orchestrator", message: buildTriagePrompt(top, ontologyContext), remember: false, maxTokens: 800, trusted: true });
   return { draft, count: top.length };
 }
 

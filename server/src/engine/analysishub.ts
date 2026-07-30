@@ -613,7 +613,7 @@ export async function analyzeEvent(id: string): Promise<string> {
   const e = getAnalysisEvent(id);
   if (!e) throw new Error("이벤트를 찾을 수 없습니다.");
   const corr = computeCorrelations(listAnalysisEvents()).find((c) => c.eventIds.includes(id));
-  const summary = (await chat({ agentId: "analysis", message: buildAnalysisPrompt(e, corr) })).trim();
+  const summary = (await chat({ agentId: "analysis", message: buildAnalysisPrompt(e, corr), trusted: true })).trim();
   saveEvent({ ...e, aiSummary: summary });
   return summary;
 }

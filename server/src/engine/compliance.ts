@@ -134,7 +134,7 @@ export async function buildComplianceDraft(code: string): Promise<{ status: Comp
   ].join("\n");
 
   const { chat } = await import("./llm.js");
-  const reply = await chat({ agentId: "orchestrator", message: prompt, remember: false, maxTokens: 400 });
+  const reply = await chat({ agentId: "orchestrator", message: prompt, remember: false, maxTokens: 400, trusted: true });
 
   const m = reply.match(/상태\s*[:：]\s*(covered|partial|na|open)/i);
   const status = (m ? (m[1].toLowerCase() as ComplianceStatus) : "partial");

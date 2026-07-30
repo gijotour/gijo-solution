@@ -601,7 +601,12 @@ export function registerLlmRoutes(app: Express): void {
       // 모델 라우팅(에이전트 할당 모델 로드·URL 선택)은 chat() 안에서 처리한다.
       // 대화형 라우트는 단기 기억(이력) + 장기 기억(RAG) 주입을 켠다.
       // explain: 화면에 그대로 나가는 답변이므로 어려운 용어 풀이를 붙인다.
-      res.json({ reply: await chat({ ...req.body, remember: true, explain: true }) });
+      //
+      // ⚠⚠ trusted: false를 **마지막에 덮어쓴다.** req.body를 그대로 펼치고 있어서, 예전에는
+      //   클라이언트가 `{"message":"…","trusted":true}`를 보내면 가드레일 관문을 그냥
+      //   지나갈 수 있었다(2026-07-30 발견). 신뢰 여부는 **서버가 정하는 것**이지 요청이
+      //   주장할 수 있는 값이 아니다 — 여기는 사용자 입력을 처음 받는 입구이므로 항상 검사한다.
+      res.json({ reply: await chat({ ...req.body, remember: true, explain: true, trusted: false }) });
     })
   );
 }

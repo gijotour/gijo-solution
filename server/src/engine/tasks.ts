@@ -183,6 +183,8 @@ export async function routineSuggestions(): Promise<RoutineSuggestion[]> {
         fb.length ? `팀장이 직접 추가해온 일과(우선 반영): ${fb.slice(0, 5).join(" / ")}` : "",
         chunks.length ? `사내 자료 발췌:\n${chunks.join("\n").slice(0, 1200)}` : "",
       ].filter(Boolean).join("\n"),
+      // trusted — 이 message는 사용자 입력이 아니라 우리가 조립한 내부 프롬프트다(gateway.ts 규칙).
+      trusted: true,
     });
     const m = reply.match(/\[[\s\S]*\]/);
     const rows = m ? (JSON.parse(m[0]) as { cadence?: string; text?: string }[]) : [];

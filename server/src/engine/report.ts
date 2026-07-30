@@ -542,6 +542,8 @@ export async function generateReport(req: ReportRequest): Promise<ReportResult> 
       `유지보수 점검: 전체 ${ms.total}건 중 지연 ${ms.overdue}건, 승인 대기 ${ms.reported}건, 반려 ${ms.rejected}건.${caseHint} ` +
       `KEV와 기한 초과, 그리고 EPSS가 높은 취약점을 우선순위로 강조해줘. ` +
       `중요: 위에 제시된 수치만 사용하고, 제시되지 않은 숫자(호스트 대수 등)를 새로 지어내지 마세요. 스캔 호스트는 정확히 ${vuln.hosts}대입니다.`,
+    // trusted — 이 message는 사용자 입력이 아니라 우리가 조립한 내부 프롬프트다(gateway.ts 규칙).
+    trusted: true,
   }));
 
   // 우선순위 조치 목록(개선 #2)과 AI 브리핑(개선 #4)을 보고서에 포함.

@@ -396,6 +396,8 @@ export async function buildToday(withBrief = true): Promise<TodayBrief> {
       message: buildBriefPrompt(all),
       remember: false,
       maxTokens: 300,
+      // trusted — 이 message는 사용자 입력이 아니라 우리가 조립한 내부 프롬프트다(gateway.ts 규칙).
+      trusted: true,
     });
     const text = (reply ?? "").trim();
     // 연결 실패 안내문(⚠로 시작)이나 빈 응답이면 규칙 문장을 쓴다.

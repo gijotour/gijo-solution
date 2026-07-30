@@ -89,7 +89,7 @@ export async function enrichChunk(text: string, productName: string, mode: Enric
 
   // 로컬 폴백(또는 mode=local·내부정보 감지) — 온프렘 7B로 번역·추출. 품질은 낮지만 폐쇄망에서도 된다.
   try {
-    const parsed = parseEnrichJson(await chat({ agentId: "analysis", message: `${ENRICH_SYSTEM}\n\n${prompt}` }));
+    const parsed = parseEnrichJson(await chat({ agentId: "analysis", message: `${ENRICH_SYSTEM}\n\n${prompt}`, trusted: true }));
     if (parsed?.korean) return { korean: parsed.korean, triples: parsed.triples, translated: true, via: "local" };
   } catch {
     /* 로컬도 실패 → 원문 저장 */

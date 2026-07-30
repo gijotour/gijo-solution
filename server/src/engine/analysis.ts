@@ -74,6 +74,6 @@ export async function analyzeFindings(findings: StandardFinding[]): Promise<Find
   if (findings.length === 0) {
     return { summary: "발견된 취약점이 없습니다.", prioritized: [], plainExplanation: "" };
   }
-  const raw = await chat({ agentId: "analysis", message: buildPrompt(findings) });
+  const raw = await chat({ agentId: "analysis", message: buildPrompt(findings), trusted: true });
   return parseAnalysis(raw, findings.length);
 }

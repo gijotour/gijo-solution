@@ -223,7 +223,10 @@ function parseStringArray(raw: string): string[] {
   return out;
 }
 
-type ChatFn = (args: { agentId: string; message: string; maxTokens?: number }) => Promise<string>;
+// trusted: 이 프롬프트는 학습 데이터 증폭용으로 우리가 조립한 것이다 — 사용자 입력이 아니다.
+// 타입에 넣어 두지 않으면 llm.chat에 넘길 때 그 표시가 빠져, 우리 프롬프트가 가드레일 검사를
+// 받는다(차단 모드에서 데이터셋 생성이 통째로 실패한다).
+type ChatFn = (args: { agentId: string; message: string; maxTokens?: number; trusted?: boolean }) => Promise<string>;
 
 async function instructionVariants(pair: DecisionPair, n: number, chat: ChatFn): Promise<string[]> {
   if (n <= 0) return [];
@@ -239,7 +242,7 @@ async function instructionVariants(pair: DecisionPair, n: number, chat: ChatFn):
   ].join("\n");
   let raw = "";
   try {
-    raw = await chat({ agentId: "analysis", message: prompt, maxTokens: 512 });
+    raw = await chat({ agentId: "analysis", message: prompt, maxTokens: 512, trusted: true });
   } catch {
     return [];
   }
