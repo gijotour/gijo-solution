@@ -203,7 +203,27 @@ export function guardAgainstDenial(answer: string, calls: AgentToolCall[]): stri
     .filter((c) => !INTERNAL_TOOL_ERROR_RE.test(c.result))
     .map((c) => c.result.trim())
     .join("\n\n");
+  // 원자료를 통째로 쏟는 것은 마지막 수단이다 — **사람이 읽을 근거가 있으면 그것만** 추린다.
+  // 실측(2026-07-30): 이 함수가 발동해 "조회 결과입니다 + 자산 원문(id=vuln:… 내부 식별자
+  // 포함)"을 그대로 내보냈다. 담당자에게 내부 id 덤프는 답이 아니고, 없다는 답보다 조금 나을
+  // 뿐이다. 도구가 이미 사람이 읽는 문장(문서 발췌)을 담고 있으면 그쪽을 쓴다.
+  const 발췌 = extractQuotedEvidence(facts);
+  if (발췌) return `찾은 근거입니다.\n\n${발췌}`.slice(0, 3000);
   return `조회 결과입니다.\n\n${facts}`.slice(0, 3000);
+}
+
+/** 도구 결과에서 사람이 읽는 근거(사내 문서 발췌)만 골라낸다. 없으면 null. */
+function extractQuotedEvidence(facts: string): string | null {
+  const lines = facts.split("\n");
+  const start = lines.findIndex((l) => l.includes("사내 문서 근거(발췌)"));
+  if (start < 0) return null;
+  const kept: string[] = [];
+  for (const line of lines.slice(start + 1)) {
+    if (!line.startsWith("  · ") && !line.startsWith("      ")) break; // 발췌 블록이 끝났다
+    kept.push(line.replace(/^\s*·\s*/, "  · "));
+  }
+  if (!kept.length) return null;
+  return kept.join("\n");
 }
 
 async function composeFinalAnswer(instruction: string, calls: AgentToolCall[], context = ""): Promise<string> {

@@ -98,13 +98,33 @@ export interface AgentTool {
 
 const SEVERITY_ORDER = ["critical", "high", "medium", "low"] as const;
 
+/**
+ * scan_error는 **스캔이 실패했다는 운영 기록이지 취약점이 아니다.**
+ * AI-BOM(sbom.ts)은 진작 제외하고 있었는데 이 도구들은 취약점으로 세고 있었다.
+ *
+ * 실사고(2026-07-28 회귀, 2026-07-30 규명): "안전대부 웹서버 취약점 알려줘"에
+ * **"취약점 1건 — scan_error"**라고 답했다. 같은 답변에 이름이 실린 진단 보고서에는
+ * 5건이 적혀 있었고(평문 전송·디렉토리 인덱싱 등) 발췌까지 도구 결과에 실려 있었는데도,
+ * 앞줄에 "취약점 1건"이 박혀 있으니 모델이 그것을 답으로 삼았다.
+ * 스캔 실패를 취약점으로 세지 않으면 그 자산의 DB 취약점은 0건이 되고, 모델은 근거로
+ * 문서 발췌를 쓸 수밖에 없다 — **틀린 숫자를 먼저 보여주지 않는 것이 처방이다.**
+ * (숫자가 틀린 답은 없느니만 못하다. 담당자가 그 숫자로 보고를 쓴다.)
+ */
+export function isRealVulnerability(f: { finding_type?: string }): boolean {
+  return f.finding_type !== "scan_error";
+}
+
 function findingSummary(asset: Asset): string {
-  if (asset.findings.length === 0) return "finding 없음";
-  const counts = SEVERITY_ORDER.map((s) => [s, asset.findings.filter((f) => f.severity === s).length] as const)
+  const real = asset.findings.filter(isRealVulnerability);
+  const scanErrors = asset.findings.length - real.length;
+  // 스캔 실패는 감추지 않는다 — 취약점이 아니라고 말할 뿐이다. 감추면 "왜 결과가 없지?"가 된다.
+  const errNote = scanErrors ? ` · 스캔 실패 ${scanErrors}건(취약점 아님 — 재스캔 필요)` : "";
+  if (real.length === 0) return `finding 없음${errNote}`;
+  const counts = SEVERITY_ORDER.map((s) => [s, real.filter((f) => f.severity === s).length] as const)
     .filter(([, n]) => n > 0)
     .map(([s, n]) => `${s} ${n}`)
     .join(", ");
-  return `finding ${asset.findings.length}건 (${counts})`;
+  return `finding ${real.length}건 (${counts})${errNote}`;
 }
 
 function runListAssets(): string {
@@ -211,7 +231,36 @@ async function runExplain(args: Record<string, string>): Promise<string> {
   if (out.length === 0) {
     return `"${topic}"에 대해 사내 온톨로지·문서·보안제품 등록부에서 찾은 근거가 없습니다. 일반 지식으로만 답하거나, 관련 문서를 업로드하면 근거가 쌓입니다.`;
   }
-  return out.join("\n").slice(0, 3500); // 본문 발췌가 들어가 상한을 늘렸다(2500이면 근거가 잘렸다)
+  return orderForSmallModel(out).join("\n").slice(0, 3500); // 본문 발췌가 들어가 상한을 늘렸다(2500이면 근거가 잘렸다)
+}
+
+/**
+ * 7B는 도구 결과의 **앞부분을 답으로 삼는다**(실측 반복 확인).
+ * 자산 DB가 비었는데 문서 발췌에 답이 있으면, 발췌를 앞으로 올린다.
+ *
+ * 실사고(2026-07-28~30): "안전대부 웹서버 취약점 알려줘"에 자산 DB는 0건인데 진단 보고서
+ * 발췌에는 5건이 적혀 있었다. 발췌가 뒤에 있으니 모델이 앞의 "finding 없음"만 보고
+ * **"취약점이 없는 것으로 판단됩니다"**라고 답했다. 근거를 찾아 놓고 안 읽은 셈이다.
+ *
+ * 프롬프트로 "뒤도 읽어라"라고 시키지 않는다 — 이 크기 모델에 규칙을 더해 행동을 교정하려는
+ * 시도는 이 프로젝트에서 반복적으로 실패했다. 대신 **읽을 것을 앞에 둔다**(배치는 결정적이다).
+ */
+function orderForSmallModel(lines: string[]): string[] {
+  const 발췌시작 = lines.findIndex((l) => l.startsWith("사내 문서 근거(발췌)"));
+  if (발췌시작 < 0) return lines;
+  // 자산 쪽이 "찾은 것이 없다"고 말하고 있는가 — 그때만 순서를 바꾼다.
+  const 앞부분 = lines.slice(0, 발췌시작).join("\n");
+  const 자산비었음 = /finding 없음/.test(앞부분) && !/취약점 \d+건\(우선순위순\)/.test(앞부분);
+  if (!자산비었음) return lines;
+  const 발췌 = lines.slice(발췌시작);
+  const 나머지 = lines.slice(0, 발췌시작);
+  return [
+    "※ 자산 등록부에는 이 대상의 취약점이 아직 등록돼 있지 않습니다 — 아래 **사내 문서 근거**가 답입니다.",
+    ...발췌,
+    "",
+    "(참고) 자산 등록부 정보:",
+    ...나머지,
+  ];
 }
 
 // 느슨한 부분일치 — 한국어는 형태소 분석 없이 공백 토큰화가 불안정해 정규화 후 부분문자열로 본다
@@ -272,10 +321,12 @@ async function searchOne(q: string): Promise<string[]> {
     // 건수만 주면 LLM은 아는 만큼만 말해 "medium 1건, low 2건"으로 끝난다 — 담당자가 알고 싶은 건
     // "무엇이" 취약한가다. 아래 취약점 섹션은 우선순위 상위 100건만 보므로 낮은 위험은 거기서 샌다.
     for (const a of assets.slice(0, 3)) {
-      if (!a.findings.length) continue;
+      // scan_error는 취약점 목록에 넣지 않는다(위 isRealVulnerability 주석 참고).
+      const real = a.findings.filter(isRealVulnerability);
+      if (!real.length) continue;
       out.push(
-        `  · ${a.name} 취약점 ${a.findings.length}건:`,
-        ...a.findings.slice(0, 8).map((f) => `      - [${f.severity}] ${f.finding_type}`)
+        `  · ${a.name} 취약점 ${real.length}건:`,
+        ...real.slice(0, 8).map((f) => `      - [${f.severity}] ${f.finding_type}`)
       );
     }
   }
@@ -283,9 +334,10 @@ async function searchOne(q: string): Promise<string[]> {
   // 취약점 — 전 자산을 가로질러 우선순위 상위에서 찾는다(자산별로 뒤지지 않아도 되게).
   const vulns = prioritizedReviews(100).filter(
     (r) =>
-      matchesLoose(r.finding.finding_type, q, tokens) ||
-      matchesLoose(r.finding.evidence, q, tokens) ||
-      matchesLoose(r.assetName, q, tokens)
+      isRealVulnerability(r.finding) && // 스캔 실패는 취약점 목록에 넣지 않는다
+      (matchesLoose(r.finding.finding_type, q, tokens) ||
+        matchesLoose(r.finding.evidence, q, tokens) ||
+        matchesLoose(r.assetName, q, tokens))
   );
   if (vulns.length) {
     // assetId를 함께 준다 — LLM이 이어서 get_asset(assetId)을 부를 수 있어야 한다.
