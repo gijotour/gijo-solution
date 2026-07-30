@@ -20,6 +20,7 @@ import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { verifyBackupSnapshot } from "./backup";
 import { auditRetentionDays } from "./audit";
+import { dbCryptStatus } from "./dbcrypt";
 
 export type CheckLevel = "ok" | "warn" | "fail" | "unknown";
 
@@ -139,15 +140,38 @@ function checkDatabase(): HealthCheck {
   } catch {
     /* 표가 없으면 넘어간다 */
   }
-  const level: CheckLevel = mig > 0 ? auditLevel : "warn";
+  let level: CheckLevel = mig > 0 ? auditLevel : "warn";
   // 저장 암호화 상태 — 켰다고 믿는데 꺼져 있는 것이 최악이라 자가 진단에 상시 표시한다.
   const enc = isDbEncrypted() ? "저장 암호화 켬" : "저장 암호화 끔";
+  let action: string | undefined =
+    auditLevel === "warn"
+      ? "작업 기록이 많이 쌓였습니다 — 보관 기간(GIJO_AUDIT_RETENTION_DAYS, 기본 1095일)을 줄이면 오래된 것부터 자동 정리됩니다."
+      : undefined;
+
+  // ⚠ 암호화를 켰는데 **평문 사본이 남아 있으면 암호화가 무의미하다** — 훔치는 쪽은 잠긴 파일
+  //   대신 옆의 .bak을 가져가면 그만이다. 운영 전환 직후 실측에서 10개가 남아 있었다(2026-07-30).
+  //   담당자가 알아서 눈치채길 기대하지 않고 여기서 세어 알린다.
+  // ⚠ 정적 import로 부른다 — require()는 ESM에서 조용히 던지고 catch가 삼켜 검사가 아예
+  //   안 돈다(오늘 cloudegress에서 같은 실수를 하고 시험이 잡았다, 2026-07-30).
+  let plaintextNote = "";
+  try {
+    const p = dbCryptStatus().plaintextCopies;
+    if (p.count > 0) {
+      plaintextNote = ` · ⚠ 평문 사본 ${p.count}개(${p.totalMb}MB)`;
+      level = "warn";
+      action =
+        `암호화를 켰지만 **평문 DB 사본이 ${p.count}개** 남아 있습니다(${p.files.slice(0, 3).join(", ")}${p.count > 3 ? " 외" : ""}). ` +
+        "파일을 가져가려는 쪽은 잠긴 DB 대신 이 사본을 가져갑니다 — 내용을 확인한 뒤 지우세요. " +
+        "자동 백업본은 보관 주기(기본 7개)가 지나면 암호화된 것으로 교체됩니다.";
+    }
+  } catch {
+    /* 조회 실패는 판단하지 않는다(정직 규칙) */
+  }
+
   return {
     id: "database", label: "데이터베이스", level,
-    detail: `${mb(size)} · 스키마 이력 ${mig}건 · ${enc}${auditNote}`,
-    ...(auditLevel === "warn"
-      ? { action: "작업 기록이 많이 쌓였습니다 — 보관 기간(GIJO_AUDIT_RETENTION_DAYS, 기본 1095일)을 줄이면 오래된 것부터 자동 정리됩니다." }
-      : {}),
+    detail: `${mb(size)} · 스키마 이력 ${mig}건 · ${enc}${plaintextNote}${auditNote}`,
+    ...(action ? { action } : {}),
   };
 }
 

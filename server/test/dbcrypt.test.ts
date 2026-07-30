@@ -48,3 +48,31 @@ describe("저장 암호화 API", () => {
       .expect(400);
   });
 });
+
+// ── 평문 사본 탐지 ────────────────────────────────────────────────────────
+// 암호화를 켰는데 옆에 평문 사본이 남아 있으면 **암호화가 무의미하다** — 훔치는 쪽은
+// 잠긴 DB 대신 .bak을 가져간다. 운영 전환 직후 실측에서 10개가 남아 있었다(2026-07-30).
+describe("평문 사본 경고", () => {
+  it("상태에 평문 사본 항목이 항상 있다", () => {
+    const s = dbCryptStatus();
+    expect(s.plaintextCopies).toBeDefined();
+    expect(typeof s.plaintextCopies.count).toBe("number");
+    expect(Array.isArray(s.plaintextCopies.files)).toBe(true);
+  });
+
+  it("암호화가 꺼져 있으면 세지 않는다 — 평문이 당연한 상태다", () => {
+    // 테스트 DB(:memory:)는 암호화 꺼짐 → 경고할 이유가 없다(늘 노랑이면 아무도 안 본다).
+    expect(dbCryptStatus().encrypted).toBe(false);
+    expect(dbCryptStatus().plaintextCopies.count).toBe(0);
+  });
+
+  it("자가 진단이 평문 사본을 실제로 조회한다 — 코드에서(주석 아님)", async () => {
+    const fs = await import("fs");
+    const path = await import("path");
+    const src = fs.readFileSync(path.join(__dirname, "..", "src", "engine", "observability.ts"), "utf8");
+    const code = src.split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");
+    expect(code).toMatch(/dbCryptStatus\(\)\.plaintextCopies/);
+    // ⚠ require()로 부르면 ESM에서 조용히 실패해 검사가 안 돈다(오늘 두 번 겪었다).
+    expect(code).not.toMatch(/require\(["']\.\/dbcrypt["']\)/);
+  });
+});
