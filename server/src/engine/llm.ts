@@ -77,7 +77,13 @@ async function ragContextFor(message: string, agentId: string, screen?: string):
     // 거리 임계값을 넘는 청크는 버린다 — 무관한 조각을 "참고 자료"로 붙이면 모델이 그걸
     // 근거인 양 답한다(memory.ts의 RAG_RELEVANCE_MAX_DISTANCE 주석 참고).
     // screen이 있으면 그 화면의 업무영역 문서를 우선한다(soft boost — 다른 영역도 배제 안 함).
-    const chunks = await queryMemoryRelevant(message, 4, agentId, screen);
+    const raw = await queryMemoryRelevant(message, 4, agentId, screen);
+    // ⚠ 살균 — 검색된 문서 조각은 **검사를 한 번도 안 거치고** 프롬프트에 실린다.
+    //   가드레일은 사용자가 타이핑한 입력만 본다. 그래서 문서에 심어둔 지시문이 그대로
+    //   실행됐다(2026-07-30 실측: 카나리가 답변 맨 앞에 출력됨 — chat·dispatch 양쪽).
+    //   모델에 닿기 전에 지시문 문장을 잘라낸다. 안 본 문장은 따를 수 없다.
+    const { sanitizeRagChunks } = await import("./ragsanitize.js");
+    const chunks = sanitizeRagChunks(raw, { source: `rag:${agentId}`, question: message }).chunks;
 
     const parts: string[] = [];
     if (chunks.length > 0) {

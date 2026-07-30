@@ -331,6 +331,28 @@ export async function ingestText(documentId: string, raw: string, scope: string 
   const chunks = chunkText(raw);
   if (chunks.length === 0) return { documentId, chunks: 0, embeddingModel: "none", scope };
 
+  // 인입 점검 — 문서에 AI를 조종하려는 지시문이 숨어 있는지 미리 본다.
+  // **막지는 않는다**: 보안 회사 문서에는 공격 예시가 정당하게 실린다(레드팀 보고서·사례집).
+  // 대신 담당자가 알 수 있게 기록한다. 실제 무력화는 검색 결과를 프롬프트에 실을 때
+  // ragsanitize가 문장 단위로 처리한다(밖에서 받은 문서가 우리 AI를 바꾸는 것을 막는다).
+  try {
+    const { scanDocumentForInjection } = await import("./ragsanitize.js");
+    const scan = scanDocumentForInjection(raw);
+    if (scan.found > 0) {
+      const { recordAudit } = await import("./audit.js");
+      recordAudit({
+        kind: "block", actor: uploadedBy ?? "system",
+        action: `올린 문서에 숨은 지시문 ${scan.found}문장 발견(인입은 허용, 답변에는 반영 안 됨)`,
+        target: documentId,
+        detail: `유형: ${scan.labels.join(", ")}\n예: ${scan.samples.join(" / ")}`,
+        result: "blocked",
+      });
+      console.warn(`[memory] ${documentId}: 숨은 지시문 ${scan.found}건 — ${scan.labels.join(", ")}`);
+    }
+  } catch {
+    /* 점검 실패가 인입을 막지 않는다 */
+  }
+
   // 업무영역 확정 — 인입 경로가 이미 아는 경우(취약점 리포트 라우팅 등) 그 값을 쓰고,
   // 모르면 규칙 → (사용자 업로드 경로에서만) LLM 순으로 정한다. 검색 순위(화면 맥락)에 쓰인다.
   const resolvedCategory: Category = CATEGORIES.includes(category as Category)

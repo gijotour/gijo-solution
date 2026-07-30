@@ -195,7 +195,11 @@ async function runExplain(args: Record<string, string>): Promise<string> {
   //   시그니처·백업·로그) 일반론으로 답했다. 근거 배지에는 그 문서가 떠서 더 헷갈렸다.
   //   제목만으로는 근거가 아니다 — 본문을 줘야 근거다.
   try {
-    const chunks = await queryMemoryRelevant(topic, 4);
+    const raw = await queryMemoryRelevant(topic, 4);
+    // 도구 결과도 그대로 프롬프트에 재주입된다 — 여기서도 문서에 숨은 지시문을 잘라낸다
+    // (llm.ts ragContextFor와 같은 이유. 한 곳만 막으면 다른 경로로 그대로 들어온다).
+    const { sanitizeRagChunks } = await import("./ragsanitize.js");
+    const chunks = sanitizeRagChunks(raw, { source: "tool:explain", question: topic }).chunks;
     if (chunks.length) {
       out.push(
         `사내 문서 근거(발췌) ${chunks.length}건:`,
@@ -372,7 +376,9 @@ async function searchOne(q: string): Promise<string[]> {
         //   여기는 **문서 제목이 질문과 맞는 것을 이미 확인한 뒤**(위 docs.length) 그 안을
         //   발췌하는 자리다. 문을 한 번 통과했는데 절대 거리로 또 거를 이유가 없다.
         //   memory.ts도 이 함수를 "문서 검색 화면·도구용"이라고 못박아 두었다.
-        const chunks = await queryMemory(q, 5);
+        const rawChunks = await queryMemory(q, 5);
+        const { sanitizeRagChunks } = await import("./ragsanitize.js");
+        const chunks = sanitizeRagChunks(rawChunks.map(String), { source: "tool:search", question: q }).chunks;
         if (chunks.length) {
           out.push(
             `사내 문서 근거(발췌) ${chunks.length}건:`,
