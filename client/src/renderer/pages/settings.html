@@ -61,6 +61,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;}
 .b-teal{background:rgba(30,185,128,0.15);color:var(--teal);}
 .b-amber{background:rgba(240,160,32,0.15);color:var(--amber);}
+/* 2차 인증 상태 배지 — 꺼짐(회색)·확인 실패(빨강). 없으면 배지가 글자만 남아 상태가 안 읽힌다. */
+.b-grey{background:rgba(139,147,171,0.15);color:var(--muted);}
+.b-red{background:rgba(226,72,61,0.15);color:var(--red);}
 .b-purple{background:rgba(139,124,240,0.15);color:var(--purple);}
 .user-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);font-size:12.5px;}
 .user-row:last-child{border-bottom:none;}
@@ -265,6 +268,17 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <button class="btn-danger" id="logoutBtn">로그아웃</button>
     </div>
 
+    <!-- 2차 인증 — 비밀번호가 새어도 휴대폰 없이는 못 들어오게. 화면엔 정체성 한 줄과 ⚠경고만
+         두고, 준비물·복구·시각 어긋남 대처는 서버 screenguide에 적어 대화로 안내한다. -->
+    <!-- 접힌 채로도 켜짐/꺼짐이 보여야 한다 — 접어서 상태를 가리면 "내가 켰던가?"가 된다.
+         fold 배지는 #mfaBadge의 글자를 그대로 읽는다(loadMfa 뒤 gijoFold.refresh()로 갱신). -->
+    <div data-sec="my" class="panel" data-gijo-fold="2차 인증" data-gijo-fold-badges="mfaBadge">
+      <div class="panel-title">2차 인증<span class="badge" id="mfaBadge" style="margin-left:8px">확인 중</span></div>
+      <div class="panel-sub">비밀번호에 휴대폰 인증앱의 6자리 숫자를 한 단계 더 붙입니다.</div>
+      <div id="mfaBody"></div>
+      <div class="status-line" id="mfaStatusLine"></div>
+    </div>
+
     <div data-sec="admin" class="panel" id="userManagementPanel" style="display:none">
       <div class="panel-title">계정 관리<span class="badge b-teal" style="margin-left:8px">admin 전용</span></div>
       <div id="userListBox" style="margin-bottom:16px"></div>
@@ -293,6 +307,20 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         <button class="btn-primary" id="addUserBtn">추가</button>
       </div>
       <div class="status-line" id="userManagementStatusLine"></div>
+    </div>
+
+    <!-- 계정별 2차 인증(관리자) — 기기를 잃은 담당자를 여기서 풀어 준다. 해제는 감사에 남는다. -->
+    <div data-sec="admin" class="panel" id="mfaAdminPanel" style="display:none" data-gijo-fold="계정별 2차 인증" data-gijo-fold-badges="mfaEnabledCount">
+      <div class="panel-title">계정별 2차 인증<span class="badge b-teal" style="margin-left:8px">admin 전용</span><span id="mfaEnabledCount" style="display:none"></span></div>
+      <div id="mfaUserListBox" style="margin-bottom:14px"></div>
+      <div class="field-row" style="align-items:flex-start;gap:12px">
+        <div style="flex:1">
+          <div style="font-size:12.5px;font-weight:700">관리자 계정은 2차 인증 필수</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:3px">국가 사이버보안 기본지침 — 관리자·원격근무 인증에 다중인증 적용</div>
+        </div>
+        <button class="btn-ghost" id="mfaPolicyBtn">확인 중</button>
+      </div>
+      <div class="status-line" id="mfaPolicyStatusLine"></div>
     </div>
 
     <!-- 업데이트 — update.html 화면에서 이관(2026-07-28, 설정 통합 ③단계).
@@ -642,8 +670,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       document.getElementById("accountUsername").textContent = user.username || "-";
       document.getElementById("accountDisplayName").textContent = user.displayName || "-";
       document.getElementById("accountRole").textContent = user.role || "-";
+      await loadMfa();
       if (user.role === "admin") {
         document.getElementById("userManagementPanel").style.display = "";
+        document.getElementById("mfaAdminPanel").style.display = "";
+        await loadMfaAdmin();
         document.getElementById("cloudLlmPanel").style.display = "";
         document.getElementById("smtpInboundPanel").style.display = "";
         document.getElementById("siemPanel").style.display = "";
@@ -681,6 +712,273 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       line.className = "status-line status-ok";
     } catch (e) {
       line.textContent = "✗ 변경 실패: " + e.message;
+      line.className = "status-line status-err";
+    }
+  }
+
+  // ── 2차 인증(내 계정) ──────────────────────────────────────────────────────
+  // 상태 4가지를 한 자리에서 그린다: 꺼짐 → 등록 중(QR) → 복구 코드 보여주기 → 켜짐.
+  // 복구 코드는 **이때 한 번만** 볼 수 있으므로 화면을 떠나기 전에 저장하도록 붙잡는다.
+  const mfaEsc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+  let mfaEnrollUri = null;
+
+  function mfaSay(msg, ok) {
+    const line = document.getElementById("mfaStatusLine");
+    line.textContent = msg;
+    line.className = "status-line " + (ok === true ? "status-ok" : ok === false ? "status-err" : "");
+  }
+
+  async function loadMfa() {
+    const badge = document.getElementById("mfaBadge");
+    const body = document.getElementById("mfaBody");
+    try {
+      const s = await window.gijo.mfaStatus();
+      const drift = Math.round((s.serverTime - Date.now()) / 1000);
+      const driftWarn = Math.abs(drift) >= 30
+        ? `<div class="hint" style="color:var(--amber)">⚠ 이 PC와 서버 시각이 ${Math.abs(drift)}초 차이납니다. 6자리는 시계로 만들어지므로 시각을 자동으로 맞춰 주세요.</div>`
+        : "";
+      if (s.enabled) {
+        badge.textContent = "켜짐";
+        badge.className = "badge b-teal";
+        const low = s.recoveryRemaining <= 2;
+        body.innerHTML = `
+          <dl class="kv">
+            <dt>등록</dt><dd>${s.enabledAt ? new Date(s.enabledAt).toLocaleString("ko-KR") : "-"}</dd>
+            <dt>마지막 사용</dt><dd>${s.lastUsedAt ? new Date(s.lastUsedAt).toLocaleString("ko-KR") : "-"}</dd>
+            <dt>남은 복구 코드</dt><dd${low ? ' style="color:var(--amber);font-weight:700"' : ""}>${s.recoveryRemaining}개${low ? " — 다시 만들어 두세요" : ""}</dd>
+          </dl>
+          <div class="field">
+            <label for="mfaPwInput">아래 작업에는 지금 쓰는 비밀번호가 필요합니다</label>
+            <div class="field-row">
+              <input id="mfaPwInput" type="password" placeholder="비밀번호" autocomplete="current-password">
+              <button class="btn-ghost" id="mfaRegenBtn">복구 코드 다시 만들기</button>
+              <button class="btn-danger" id="mfaDisableBtn"${s.requiredForAdmin && currentUser && currentUser.role === "admin" ? " disabled title=\"관리자 필수 정책이 켜져 있어 끌 수 없습니다\"" : ""}>끄기</button>
+            </div>
+          </div>
+          ${driftWarn}`;
+        document.getElementById("mfaRegenBtn").addEventListener("click", mfaRegenerate);
+        document.getElementById("mfaDisableBtn").addEventListener("click", mfaDisable);
+        return;
+      }
+      badge.textContent = s.enrolling ? "등록 중" : "꺼짐";
+      badge.className = "badge " + (s.enrolling ? "b-amber" : "b-grey");
+      body.innerHTML = `
+        <button class="btn-primary" id="mfaStartBtn">2차 인증 켜기</button>
+        <div class="hint">준비물: 휴대폰 인증앱(Google Authenticator·Microsoft Authenticator 등). 인터넷 연결은 필요 없습니다.</div>
+        ${driftWarn}`;
+      document.getElementById("mfaStartBtn").addEventListener("click", mfaStart);
+    } catch (e) {
+      badge.textContent = "확인 실패";
+      badge.className = "badge b-red";
+      body.innerHTML = "";
+      mfaSay("✗ 상태를 불러오지 못했습니다: " + e.message, false);
+    } finally {
+      // 이 구역은 기본으로 접혀 있다 — 접힌 머리줄의 배지를 지금 읽은 상태로 다시 그린다.
+      // (fold는 화면이 뜰 때 한 번 그리므로, 그때는 아직 "확인 중"이다.)
+      if (window.gijoFold) window.gijoFold.refresh();
+    }
+  }
+
+  async function mfaStart() {
+    mfaSay("등록 정보를 만들고 있습니다…");
+    try {
+      const r = await window.gijo.mfaStart();
+      mfaEnrollUri = r.uri;
+      document.getElementById("mfaBadge").textContent = "등록 중";
+      document.getElementById("mfaBadge").className = "badge b-amber";
+      document.getElementById("mfaBody").innerHTML = `
+        <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
+          <div style="background:#fff;padding:8px;border-radius:8px;width:192px;height:192px;flex:0 0 auto">
+            ${r.qrSvg || '<div style="color:#333;font-size:11px;padding:8px">QR을 그리지 못했습니다 — 옆의 키를 직접 넣으세요</div>'}
+          </div>
+          <div style="flex:1;min-width:200px">
+            <div style="font-size:11.5px;color:var(--muted);font-weight:600;margin-bottom:6px">앱으로 왼쪽 그림을 찍으세요. 카메라를 못 쓰면 이 키를 직접 넣습니다.</div>
+            <div style="font-family:Consolas,monospace;font-size:12.5px;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--teal);word-break:break-all">${mfaEsc(r.secretDisplay)}</div>
+            <div class="field" style="margin-top:14px">
+              <label for="mfaConfirmInput">앱에 뜬 6자리를 넣어 확인</label>
+              <div class="field-row">
+                <input id="mfaConfirmInput" inputmode="numeric" maxlength="7" placeholder="000000" autocomplete="one-time-code">
+                <button class="btn-primary" id="mfaConfirmBtn">확인하고 켜기</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="hint">⚠ 이 그림과 키는 이 서버 안에서 만들어집니다 — 외부로 나가지 않습니다.</div>`;
+      const input = document.getElementById("mfaConfirmInput");
+      document.getElementById("mfaConfirmBtn").addEventListener("click", mfaConfirm);
+      input.addEventListener("keydown", (e) => { if (e.key === "Enter") mfaConfirm(); });
+      input.focus();
+      mfaSay("");
+    } catch (e) {
+      mfaSay("✗ " + e.message, false);
+    }
+  }
+
+  async function mfaConfirm() {
+    const code = (document.getElementById("mfaConfirmInput").value || "").trim();
+    if (!code) { mfaSay("6자리 숫자를 넣으세요.", false); return; }
+    mfaSay("확인 중…");
+    try {
+      const r = await window.gijo.mfaConfirm(code);
+      showRecoveryCodes(r.recoveryCodes, "2차 인증이 켜졌습니다. 복구 코드를 지금 저장하세요.");
+    } catch (e) {
+      mfaSay("✗ " + e.message, false);
+    }
+  }
+
+  async function mfaRegenerate() {
+    const pw = (document.getElementById("mfaPwInput").value || "");
+    if (!pw) { mfaSay("비밀번호를 넣으세요.", false); return; }
+    mfaSay("새 복구 코드를 만들고 있습니다…");
+    try {
+      const r = await window.gijo.mfaRegenerateRecovery(pw);
+      showRecoveryCodes(r.recoveryCodes, "새 복구 코드입니다. 예전 코드는 모두 무효가 되었습니다.");
+    } catch (e) {
+      mfaSay("✗ " + e.message, false);
+    }
+  }
+
+  async function mfaDisable() {
+    const pw = (document.getElementById("mfaPwInput").value || "");
+    if (!pw) { mfaSay("비밀번호를 넣으세요.", false); return; }
+    try {
+      await window.gijo.mfaDisable(pw);
+      await loadMfa();
+      mfaSay("✓ 2차 인증을 껐습니다. 이제 비밀번호만으로 로그인합니다.", true);
+    } catch (e) {
+      mfaSay("✗ " + e.message, false);
+    }
+  }
+
+  // 복구 코드는 다시 볼 수 없다 — 저장 확인을 누를 때까지 화면에 붙잡아 둔다.
+  function showRecoveryCodes(codes, headline) {
+    const body = document.getElementById("mfaBody");
+    body.innerHTML = `
+      <div style="font-size:12.5px;font-weight:700;color:var(--amber);margin-bottom:4px">${mfaEsc(headline)}</div>
+      <div class="panel-sub">휴대폰을 잃어버렸을 때 들어올 유일한 길입니다. <b>다시 볼 수 없습니다.</b></div>
+      <div style="font-family:Consolas,monospace;font-size:12.5px;display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:12px">
+        ${codes.map((c) => `<span>${mfaEsc(c)}</span>`).join("")}
+      </div>
+      <div class="field-row" style="margin-top:12px">
+        <button class="btn-ghost" id="mfaCopyBtn">복사</button>
+        <button class="btn-ghost" id="mfaSaveFileBtn">파일로 내리기</button>
+        <button class="btn-primary" id="mfaSavedBtn">저장했습니다</button>
+      </div>
+      <div class="hint">인쇄해 잠긴 곳에 두는 편이 폐쇄망 환경에 맞습니다. 화면 캡처는 남기지 마세요.</div>`;
+    const text = codes.join("\n");
+    document.getElementById("mfaCopyBtn").addEventListener("click", async () => {
+      try { await navigator.clipboard.writeText(text); mfaSay("✓ 복사했습니다.", true); }
+      catch (e) { mfaSay("✗ 복사하지 못했습니다 — 화면의 코드를 직접 적어 주세요.", false); }
+    });
+    document.getElementById("mfaSaveFileBtn").addEventListener("click", () => {
+      // 파일로 내리기 — 담당자가 잠긴 폴더/인쇄로 옮길 수 있게. 서버로 보내지 않는다.
+      try {
+        const blob = new Blob([`GIJO AS 2차 인증 복구 코드\n계정: ${currentUser ? currentUser.username : "-"}\n발급: ${new Date().toLocaleString("ko-KR")}\n\n${text}\n\n※ 한 코드는 한 번만 쓸 수 있습니다. 잠긴 곳에 보관하세요.\n`], { type: "text/plain;charset=utf-8" });
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "gijo-as-복구코드.txt";
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+        mfaSay("✓ 파일로 내렸습니다.", true);
+      } catch (e) { mfaSay("✗ 파일로 내리지 못했습니다: " + e.message, false); }
+    });
+    document.getElementById("mfaSavedBtn").addEventListener("click", async () => {
+      await loadMfa();
+      if (currentUser && currentUser.role === "admin") await loadMfaAdmin().catch(() => {});
+      mfaSay("✓ 2차 인증이 켜져 있습니다.", true);
+    });
+  }
+
+  // ── 계정별 2차 인증(관리자) ────────────────────────────────────────────────
+  async function loadMfaAdmin() {
+    const box = document.getElementById("mfaUserListBox");
+    try {
+      const rows = await window.gijo.mfaUserList();
+      box.innerHTML = rows.map((u) => {
+        const state = u.enabled
+          ? `<span class="badge b-teal">켜짐</span> <span class="user-row-sub">복구 ${u.recoveryRemaining}개</span>`
+          : '<span class="badge b-grey">꺼짐</span>';
+        const btn = u.enabled ? `<span class="ua-btn danger" data-mfa-reset="${u.id}" title="이 계정의 2차 인증을 해제">해제</span>` : "";
+        return `<div class="user-row">
+          <div style="flex:1">
+            <div style="font-size:12.5px;font-weight:600">${mfaEsc(u.displayName)} <span class="user-row-sub">${mfaEsc(u.username)} · ${ROLE_LABEL[u.role] || u.role}</span></div>
+          </div>
+          <div style="display:flex;gap:8px;align-items:center">${state}${btn}</div>
+        </div>`;
+      }).join("") || '<div style="color:var(--muted)">계정이 없습니다</div>';
+      box.querySelectorAll("[data-mfa-reset]").forEach((el) => {
+        el.addEventListener("click", () => mfaResetUser(el.getAttribute("data-mfa-reset")));
+      });
+      // 접힌 머리줄에 "몇 계정이 켰나"를 보여준다 — 접어서 가리면 관리자가 현황을 못 본다.
+      const on = rows.filter((u) => u.enabled).length;
+      document.getElementById("mfaEnabledCount").textContent = `${on}/${rows.length} 계정 켜짐`;
+    } catch (e) {
+      box.innerHTML = '<div style="color:var(--muted)">불러오지 못했습니다</div>';
+    }
+    await loadMfaPolicy();
+    if (window.gijoFold) window.gijoFold.refresh();
+  }
+
+  async function mfaResetUser(id) {
+    const line = document.getElementById("mfaPolicyStatusLine");
+    try {
+      await window.gijo.mfaResetUser(id);
+      await loadMfaAdmin();
+      if (currentUser && id === currentUser.id) await loadMfa();
+      line.textContent = "✓ 해제했습니다. 그 계정은 다시 등록할 때까지 비밀번호만으로 로그인합니다(감사 기록에 남았습니다).";
+      line.className = "status-line status-ok";
+    } catch (e) {
+      line.textContent = "✗ " + e.message;
+      line.className = "status-line status-err";
+    }
+  }
+
+  async function loadMfaPolicy() {
+    const btn = document.getElementById("mfaPolicyBtn");
+    try {
+      const p = await window.gijo.mfaPolicy();
+      btn.textContent = p.requireForAdmin ? "필수 — 끄기" : "선택 — 필수로 켜기";
+      btn.className = p.requireForAdmin ? "btn-danger" : "btn-ghost";
+      btn.onclick = () => mfaTogglePolicy(!p.requireForAdmin, p.blocked);
+    } catch (e) {
+      btn.textContent = "확인 실패";
+    }
+  }
+
+  // ⚠ 켜면 등록 안 한 admin 계정이 등록 전까지 다른 기능을 못 쓴다 — **사람이 없는 자동화
+  //   (게시·QA 전수조사·평가 게이트)도 6자리를 넣을 수 없어 같이 막힌다.** 그래서 켜기 전에
+  //   막히는 계정을 그대로 보여주고 한 번 더 확인을 받는다(추측하게 두지 않는다).
+  let mfaPolicyPending = null;
+  async function mfaTogglePolicy(on, blocked) {
+    const line = document.getElementById("mfaPolicyStatusLine");
+    if (on && !mfaPolicyPending) {
+      const names = (blocked || []).map((b) => b.username).join(", ") || "없음";
+      mfaPolicyPending = true;
+      line.innerHTML = `<div style="color:var(--amber);line-height:1.7">
+        ⚠ 켜면 <b>2차 인증을 등록하지 않은 관리자 계정(${names})</b>은 등록을 마칠 때까지 다른 기능을 쓸 수 없습니다.
+        <b>사람이 없는 자동화(게시·QA·평가 게이트)도 함께 막힙니다</b> — 스크립트는 6자리를 넣을 수 없습니다.<br>
+        <button class="btn-danger" id="mfaPolicyGo" style="margin-top:8px">알고 있습니다 — 켜기</button>
+        <button class="btn-ghost" id="mfaPolicyNo" style="margin-top:8px">취소</button></div>`;
+      line.className = "status-line";
+      document.getElementById("mfaPolicyGo").addEventListener("click", () => mfaTogglePolicy(true, blocked));
+      document.getElementById("mfaPolicyNo").addEventListener("click", () => {
+        mfaPolicyPending = null;
+        line.textContent = "";
+        line.className = "status-line";
+      });
+      return;
+    }
+    mfaPolicyPending = null;
+    try {
+      const r = await window.gijo.mfaSetPolicy(on);
+      await loadMfaAdmin();
+      await loadMfa();
+      line.textContent = r.requireForAdmin
+        ? "✓ 관리자 계정 2차 인증을 필수로 켰습니다."
+        : "✓ 필수를 껐습니다. 계정별로 선택해 쓸 수 있습니다.";
+      line.className = "status-line status-ok";
+    } catch (e) {
+      line.textContent = "✗ " + e.message;
       line.className = "status-line status-err";
     }
   }

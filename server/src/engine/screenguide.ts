@@ -51,6 +51,19 @@ const PANEL_ALIASES: Record<string, Record<string, string>> = {
     // "어떤 모델 받으면 좋아?"가 안 걸려 사내 문서에서 무관한 답(SBOM 라이브러리)을 냈다(2026-07-28 실측)
     "어떤 모델": "추천 모델 목록",
     "모델 추천": "추천 모델 목록",
+    // 담당자는 "2차 인증"보다 이 말들을 먼저 쓴다 — 안 걸리면 일반 LLM 답변으로 샌다.
+    "OTP": "2차 인증",
+    "otp": "2차 인증",
+    "MFA": "2차 인증",
+    "2FA": "2차 인증",
+    "이중 인증": "2차 인증",
+    "다중 인증": "2차 인증",
+    "인증앱": "2차 인증",
+    "복구 코드": "2차 인증",
+    "복구코드": "2차 인증",
+    "일회용 비밀번호": "2차 인증",
+    "2차 인증 해제": "계정별 2차 인증",
+    "OTP 해제": "계정별 2차 인증",
   },
 };
 
@@ -66,16 +79,26 @@ function resolvePanelHit(screen: string | undefined, q: string): { panel: string
   const g = screen ? GUIDES[screen] : undefined;
   if (!g?.panels) return null;
   const nq = normalizeName(q);
+  // ⚠ 가장 **긴**(구체적인) 이름이 이긴다. 선언 순서로 고르면 "2차 인증"이 "계정별 2차 인증"을
+  //   가려, "담당자 2차 인증 해제하는 방법"에 내 계정 안내가 나왔다(2026-07-30 실측).
+  //   이름이 포개지는 구역(계정 ⊂ 계정별 …)은 앞으로도 생기니 순서에 기대지 않는다.
+  let best: { panel: string; matched: string } | null = null;
   for (const name of Object.keys(g.panels)) {
-    if (nq.includes(normalizeName(name))) return { panel: name, matched: name };
+    const n = normalizeName(name);
+    if (nq.includes(n) && (!best || n.length > normalizeName(best.matched).length)) {
+      best = { panel: name, matched: name };
+    }
   }
   const alias = screen ? PANEL_ALIASES[screen] : undefined;
   if (alias) {
     for (const [shown, real] of Object.entries(alias)) {
-      if (nq.includes(normalizeName(shown)) && g.panels[real]) return { panel: real, matched: shown };
+      const n = normalizeName(shown);
+      if (nq.includes(n) && g.panels[real] && (!best || n.length > normalizeName(best.matched).length)) {
+        best = { panel: real, matched: shown };
+      }
     }
   }
-  return null;
+  return best;
 }
 function resolvePanel(screen: string | undefined, q: string): string | null {
   return resolvePanelHit(screen, q)?.panel ?? null;
@@ -88,7 +111,11 @@ function panelNameHit(text: string, screen?: string): boolean {
   // 설명을 구하는 말투일 때만(단순히 패널명이 스친 지시는 도구가 처리해야 한다).
   // "좋아·좋을까·추천"은 고르는 질문의 말투다("어떤 모델 받으면 좋아?"). 구역 이름이 함께
   // 걸릴 때만 쓰이므로(아래 resolvePanel), 이 낱말만으로 화면 안내가 열리지는 않는다.
-  if (!/(뭐|무엇|어떻게|어디|누가|언제|사용|설명|알려|방법|바꿔|바꾸|변경|저장할|왜|가능|되나|하나요|좋아|좋을까|추천|해\?|돼\?)/.test(text)) return false;
+  // 곤란을 털어놓는 말투도 안내를 구하는 것이다 — "복구 코드 잃어버렸어"에 일반 LLM이
+  // "지원 센터에 문의하세요"라고 답했다(2026-07-30 실측). 폐쇄망 제품에 지원 센터는 없다.
+  // 넓혀도 안전한 이유: 아래 resolvePanel이 **구역 이름 전체**가 질문에 들어 있을 때만 참이라,
+  // "스캔 실패했어"처럼 이름이 안 걸리는 하소연은 여전히 도구·LLM이 맡는다.
+  if (!/(뭐|무엇|어떻게|어디|누가|언제|사용|설명|알려|방법|바꿔|바꾸|변경|저장할|왜|가능|되나|하나요|좋아|좋을까|추천|해\?|돼\?|잃어버|분실|못\s*찾|안\s*보여|막혔|어떡)/.test(text)) return false;
   return resolvePanel(screen, q) !== null;
 }
 
@@ -394,6 +421,8 @@ const GUIDES: Record<string, ScreenGuide> = {
     panels: {
       "서버 연결": "단일 데스크톱 모드는 기본 주소(localhost:4000) 그대로, 사내망 GPU 서버를 쓰는 분산 모드는 그 서버 주소로 변경합니다. 연결 테스트로 확인 후 저장하세요.",
       "계정": "보안팀 계정을 추가·삭제합니다. 역할은 admin(관리자)과 security_officer(담당자) 둘입니다. 계정당 로그인 세션은 1개만 허용됩니다.",
+      "2차 인증": "비밀번호에 **휴대폰 인증앱의 6자리 숫자**를 한 단계 더 붙입니다 — 비밀번호가 새어도 휴대폰 없이는 못 들어옵니다. 준비물은 인증앱(Google Authenticator·Microsoft Authenticator 등)뿐이고 인터넷 연결은 필요 없습니다. 켜는 순서: ① '2차 인증 켜기' ② 화면의 QR을 앱으로 찍기(카메라를 못 쓰면 옆의 키를 직접 넣습니다) ③ 앱에 뜬 6자리로 확인 ④ **복구 코드 10개를 저장** — 이 코드는 그때 한 번만 보이고 다시 볼 수 없습니다. 휴대폰을 잃었을 때 들어올 유일한 길이니 인쇄해 잠긴 곳에 두는 편이 폐쇄망 환경에 맞습니다(화면 캡처는 남기지 마세요). 복구 코드는 한 개씩 1회용이며, 다 썼거나 잃어버렸으면 관리자에게 해제를 요청하세요. 끄기·복구 코드 재발급에는 지금 쓰는 비밀번호를 다시 넣게 합니다(자리를 비운 화면에서 남이 몰래 끄지 못하게). ⚠ 숫자가 계속 틀리면 **휴대폰과 서버의 시각이 어긋난 것**입니다 — 이 방식은 시계로 숫자를 만들기 때문입니다. 화면이 서버 시각을 함께 보여주니 비교해 보고, 휴대폰의 시각을 '자동'으로 맞추세요. 등록에 쓴 숫자는 소진되므로 곧바로 로그인할 때는 다음 숫자를 기다립니다.",
+      "계정별 2차 인증": "관리자가 계정마다 2차 인증이 켜졌는지 보고, 휴대폰을 잃고 복구 코드도 없는 담당자를 **해제**해 주는 곳입니다. 해제하면 그 계정은 다시 등록할 때까지 비밀번호만으로 로그인하며, '누가 누구의 2차 인증을 풀었는지'가 감사 기록에 남습니다. 아래 '관리자 계정은 2차 인증 필수'는 「국가 사이버보안 기본지침」(2026-05-01 시행)이 원격근무자·정보시스템 관리자에게 다중인증을 의무화한 데 대응하는 스위치로, 기본값은 꺼짐(계정별 선택)입니다. ⚠ 켜면 아직 등록하지 않은 관리자 계정은 등록을 마칠 때까지 다른 기능을 쓸 수 없고, **사람이 없는 자동화(게시·QA 전수조사·평가 게이트)도 6자리를 넣을 수 없어 함께 막힙니다** — 그래서 켜기 전에 막히는 계정을 그대로 보여주고 한 번 더 확인을 받습니다. admin 전용입니다.",
       "구동 티어": "GPU 성능(VRAM)에 맞춰 동시 LLM 수·컨텍스트를 Lite(12GB급·LLM1·16K)/Standard(24GB급·2개·32K)/Pro(32GB급·3개)로 전환합니다. 서버 GPU를 실측해 권장 티어를 자동 판정하며, 적용하면 채팅 LLM이 약 30초 재기동됩니다(지식 검색은 영향 없음).",
       "업데이트": "GIJO AS 클라이언트의 새 버전을 확인하고 설치합니다(배포처는 사내 GIJO 서버입니다 — 인터넷에 나가지 않습니다). '지금 확인'을 누르면 서버에 올라온 최신 판과 지금 설치된 판을 견줍니다. 설치를 시작하면 내려받는 동안 진행률이 보이고, 다 되면 앱이 스스로 닫혔다가 새 버전으로 다시 열립니다(2026-07-28 업데이트 화면에서 이 자리로 옮김).",
       "게시된 배포판": "서버에 올라와 있는 전체 버전 이력입니다. 어떤 버전이 언제 게시됐고 메모가 무엇인지 봅니다. admin 전용입니다.",

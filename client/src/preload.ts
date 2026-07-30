@@ -21,6 +21,18 @@ const gijoApi = {
 
   // 인증(보안담당자별 로그인) — force: 이미 다른 곳에서 로그인 중이어도 강제로 이 세션을 새 세션으로 대체
   login: (username: string, password: string, force?: boolean) => api.authApi.login(username, password, force),
+  // 로그인 2단계(2차 인증) — login()이 code:"mfa_required"와 함께 준 mfaToken을 들고 6자리를 보낸다.
+  loginMfa: (mfaToken: string, code: string, isRecovery?: boolean) => api.authApi.loginMfa(mfaToken, code, isRecovery),
+  // 2차 인증 등록·해제·관리(설정 화면). 등록 확인이 성공하면 apiClient가 토큰 승격까지 처리한다.
+  mfaStatus: () => api.authApi.mfaStatus(),
+  mfaStart: () => api.authApi.mfaStart(),
+  mfaConfirm: (code: string) => api.authApi.mfaConfirm(code),
+  mfaDisable: (password: string) => api.authApi.mfaDisable(password),
+  mfaRegenerateRecovery: (password: string) => api.authApi.mfaRegenerateRecovery(password),
+  mfaUserList: () => api.authApi.mfaUserList(),
+  mfaResetUser: (userId: string) => api.authApi.mfaResetUser(userId),
+  mfaPolicy: () => api.authApi.mfaPolicy(),
+  mfaSetPolicy: (on: boolean) => api.authApi.mfaSetPolicy(on),
   logout: () => api.authApi.logout(),
   me: () => api.authApi.me(),
   isAuthenticated: () => api.isAuthenticated(),

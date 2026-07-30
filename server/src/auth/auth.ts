@@ -10,6 +10,7 @@ import * as jwt from "jsonwebtoken";
 import * as bcrypt from "bcryptjs";
 import { findUserByUsername, findUserById, GijoUser } from "./users";
 import { recordAudit } from "../engine/audit";
+import { isMfaEnabled, verifyLoginCode, consumeRecoveryCode, mfaRequiredForAdmin } from "./mfa";
 
 // 프로덕션에서 기본 개발용 시크릿이 그대로 쓰이면(토큰 위조 가능) 서버가 아예 뜨지 않게 막는다 —
 // "설정을 깜빡했다"가 "취약한 상태로 조용히 운영 중이었다"보다 훨씬 안전한 실패 모드다.
@@ -36,6 +37,9 @@ interface RefreshRecord {
   ip?: string;
   since: number; // 최초 로그인 시각
   lastSeenAt: number; // 마지막 인증 요청 시각 — presence 판정 기준
+  // 2차 인증 등록만 허용하는 제한 세션인가(아래 ENROLL_ONLY_PATHS 참고).
+  // ⚠ 회전 때 반드시 이어받아야 한다 — 안 그러면 refresh 한 번으로 제한이 풀린다.
+  enroll?: boolean;
 }
 
 const refreshTokens = new Map<string, RefreshRecord>();
@@ -86,11 +90,15 @@ export interface TokenPair {
   refreshToken: string;
 }
 
-function signAccessToken(userId: string): string {
-  return jwt.sign({ sub: userId }, JWT_SECRET, { expiresIn: ACCESS_TOKEN_TTL } as jwt.SignOptions);
+function signAccessToken(userId: string, enroll = false): string {
+  return jwt.sign(
+    enroll ? { sub: userId, enroll: true } : { sub: userId },
+    JWT_SECRET,
+    { expiresIn: ACCESS_TOKEN_TTL } as jwt.SignOptions
+  );
 }
 
-function issueRefreshToken(userId: string, meta?: { ip?: string; since?: number }): string {
+function issueRefreshToken(userId: string, meta?: { ip?: string; since?: number; enroll?: boolean }): string {
   const token = crypto.randomBytes(32).toString("hex");
   const now = Date.now();
   refreshTokens.set(token, {
@@ -99,13 +107,42 @@ function issueRefreshToken(userId: string, meta?: { ip?: string; since?: number 
     ip: meta?.ip,
     since: meta?.since ?? now, // 회전 시 최초 로그인 시각을 이어받는다
     lastSeenAt: now,
+    enroll: meta?.enroll,
   });
   activeSessionByUser.set(userId, token);
   return token;
 }
 
-function issueTokenPair(userId: string, meta?: { ip?: string; since?: number }): TokenPair {
-  return { accessToken: signAccessToken(userId), refreshToken: issueRefreshToken(userId, meta) };
+function issueTokenPair(userId: string, meta?: { ip?: string; since?: number; enroll?: boolean }): TokenPair {
+  return { accessToken: signAccessToken(userId, meta?.enroll), refreshToken: issueRefreshToken(userId, meta) };
+}
+
+// ── 2차 인증 중간 토큰 ───────────────────────────────────────────────────────
+// 비밀번호는 맞았지만 아직 6자리를 못 받은 상태. 이 토큰으로는 **아무 API도 못 부른다**
+// (authMiddleware가 purpose를 보고 거부한다) — 오직 /api/auth/login/mfa 한 곳에서만 쓰인다.
+// 수명을 5분으로 짧게 둔다: 비밀번호만 안 사람이 코드를 구할 시간을 주지 않는다.
+const MFA_TOKEN_TTL = process.env.GIJO_MFA_TOKEN_TTL ?? "5m";
+function signMfaToken(userId: string, force: boolean): string {
+  return jwt.sign({ sub: userId, purpose: "mfa", force }, JWT_SECRET, {
+    expiresIn: MFA_TOKEN_TTL,
+  } as jwt.SignOptions);
+}
+
+// 등록 전용(enroll) 세션이 부를 수 있는 경로. 관리자 필수 정책을 켰는데 아직 2차 인증을
+// 등록하지 않은 계정은 "등록만 할 수 있는" 세션을 받는다 — 로그인 자체를 막으면 등록할
+// 방법이 없어지는 순환(로그인해야 등록, 등록해야 로그인)에 빠지기 때문이다.
+const ENROLL_ONLY_PATHS = new Set([
+  "/api/auth/me",
+  "/api/auth/logout",
+  "/api/auth/mfa/status",
+  "/api/auth/mfa/start",
+  "/api/auth/mfa/confirm",
+]);
+
+// 2차 인증 등록을 막 끝낸 제한 세션에 정상 세션을 내준다 — 그 순간 비밀번호(이 세션)와
+// 인증앱(방금 확인)이라는 두 요소가 모두 증명됐으므로 승격 근거가 있다.
+export function upgradeEnrollSession(userId: string, ip?: string): TokenPair {
+  return issueTokenPair(userId, { ip });
 }
 
 function revokeRefreshToken(token: string): void {
@@ -184,12 +221,28 @@ export function authMiddleware(req: Request, res: Response, next: NextFunction):
   }
   try {
     const payload = jwt.verify(token, JWT_SECRET) as jwt.JwtPayload;
+    // 2차 인증 중간 토큰은 로그인을 끝내지 못한 상태다 — 어떤 API도 이걸로 부를 수 없다.
+    if (payload.purpose === "mfa") {
+      res.status(401).json({ error: "mfa_incomplete", message: "2차 인증이 끝나지 않았습니다." });
+      return;
+    }
     const user = typeof payload.sub === "string" ? findUserById(payload.sub) : undefined;
     if (!user) {
       res.status(401).json({ error: "unauthorized" });
       return;
     }
+    // 등록 전용 제한 세션 — 2차 인증 등록 관련 경로만 통과시킨다.
+    if (payload.enroll === true && !ENROLL_ONLY_PATHS.has(req.path)) {
+      res.status(403).json({
+        error: "mfa_enrollment_required",
+        message: "관리자 계정은 2차 인증을 등록해야 사용할 수 있습니다. 설정 > 계정에서 등록하세요.",
+      });
+      return;
+    }
     (req as Request & { user?: GijoUser }).user = user;
+    // 등록 전용 세션인지 라우트가 알 수 있게 표시한다 — 등록을 끝내면 정상 세션으로 올려주기 위해.
+    // (클라이언트가 헤더로 주장하게 두면 위조 가능하니 토큰에서만 읽는다.)
+    (req as Request & { enrollOnly?: boolean }).enrollOnly = payload.enroll === true;
     // presence 갱신 — 이 사용자의 현재 세션이 살아 있으면 마지막 활동 시각을 찍는다(Map 조회 2회, 저비용).
     const sessionToken = activeSessionByUser.get(user.id);
     if (sessionToken) {
@@ -233,10 +286,119 @@ export function registerAuthRoutes(app: Express): void {
       res.status(409).json({ error: "already_logged_in", message: "이미 다른 곳에서 로그인 중입니다. 강제 로그인하시겠습니까?" });
       return;
     }
+    // ── 2차 인증 ─────────────────────────────────────────────────────────────
+    // 여기까지 왔으면 비밀번호는 맞다. 코드가 필요한 계정에는 **토큰을 내주지 않고** 중간
+    // 토큰만 준다. 중복 로그인 확인(위 409)을 코드 입력 **전에** 끝낸 이유는, 6자리를 다
+    // 넣은 뒤에 "이미 로그인 중"이라며 거절하면 헛수고가 되기 때문이다.
+    if (isMfaEnabled(user.id)) {
+      // ⚠ 여기서 실패 카운터를 지우면 안 된다(2026-07-30 시험이 잡은 결함).
+      //   지우면 비밀번호를 아는 공격자가 "비밀번호 → 6자리 1회 시도 → 다시 비밀번호"를 반복해
+      //   **횟수 제한 없이 6자리를 추측**할 수 있다 — 비밀번호가 새도 버티는 것이 2차 인증의
+      //   존재 이유인데 그 자리가 뚫린다. 카운터는 2단계까지 **끝낸 뒤에만** 지운다.
+      res.json({
+        mfaRequired: true,
+        mfaToken: signMfaToken(user.id, Boolean(force)),
+        user: { id: user.id, displayName: user.displayName, role: user.role },
+      });
+      return;
+    }
+
+    // 관리자 필수 정책이 켜져 있는데 아직 등록하지 않았다면 — 등록만 가능한 제한 세션을 준다.
+    // 로그인을 아예 막으면 등록할 길이 없어진다(로그인해야 등록, 등록해야 로그인).
+    const enrollOnly = user.role === "admin" && mfaRequiredForAdmin();
     loginAttempts.delete(key); // 성공 시 카운터 초기화
+    const tokens = issueTokenPair(user.id, { ip: req.ip ?? undefined, enroll: enrollOnly || undefined });
+    recordAudit({
+      kind: "auth", actor: user.displayName,
+      action: enrollOnly ? "로그인(2차 인증 등록 필요)" : force ? "강제 로그인" : "로그인",
+      target: req.ip ?? null, result: "ok",
+    });
+    res.json({
+      ...tokens,
+      enrollRequired: enrollOnly || undefined,
+      user: { id: user.id, displayName: user.displayName, role: user.role },
+    });
+  });
+
+  // 로그인 2단계 — 인증앱의 6자리 또는 복구 코드. 여기서만 중간 토큰(mfaToken)을 받는다.
+  app.post("/api/auth/login/mfa", (req, res) => {
+    const { mfaToken, code, recoveryCode } = req.body as {
+      mfaToken?: string; code?: string; recoveryCode?: string;
+    };
+    let payload: jwt.JwtPayload;
+    try {
+      payload = jwt.verify(String(mfaToken ?? ""), JWT_SECRET) as jwt.JwtPayload;
+    } catch {
+      res.status(401).json({ error: "mfa_token_invalid", message: "인증 시간이 지났습니다. 다시 로그인하세요." });
+      return;
+    }
+    if (payload.purpose !== "mfa" || typeof payload.sub !== "string") {
+      res.status(401).json({ error: "mfa_token_invalid", message: "인증 시간이 지났습니다. 다시 로그인하세요." });
+      return;
+    }
+    const user = findUserById(payload.sub);
+    if (!user) {
+      res.status(401).json({ error: "unauthorized" });
+      return;
+    }
+    // 코드 추측도 무차별 대입이다 — 비밀번호와 같은 카운터·잠금을 적용한다.
+    // (NIST SP 800-63B: 6자리처럼 짧은 값에는 횟수 제한이 필수)
+    const key = loginKey(req, user.username);
+    const lockMs = loginLockRemaining(key);
+    if (lockMs > 0) {
+      res.status(429).json({ error: `시도가 너무 많습니다. ${Math.ceil(lockMs / 60000)}분 후 다시 시도하세요.` });
+      return;
+    }
+
+    const usedRecovery = Boolean(recoveryCode && !code);
+    let ok = false;
+    let reason: string | undefined;
+    let remaining = 0;
+    if (usedRecovery) {
+      const r = consumeRecoveryCode(user.id, String(recoveryCode));
+      ok = r.ok;
+      remaining = r.remaining;
+      reason = r.ok ? undefined : "복구 코드가 맞지 않습니다(이미 쓴 코드일 수 있습니다).";
+    } else {
+      const r = verifyLoginCode(user.id, String(code ?? ""));
+      ok = r.ok;
+      reason =
+        r.reason === "재사용" ? "이미 쓴 숫자입니다. 다음 숫자가 나오면 넣으세요."
+        : r.reason === "복구불가" ? "서버의 암호화 키를 열 수 없어 코드를 확인할 수 없습니다. 복구 코드를 쓰거나 관리자에게 2차 인증 해제를 요청하세요."
+        : r.reason === "형식" ? "6자리 숫자를 넣으세요."
+        : r.ok ? undefined : "숫자가 맞지 않습니다. 휴대폰과 서버의 시각이 어긋났는지 확인하세요.";
+    }
+
+    if (!ok) {
+      recordLoginFail(key);
+      recordAudit({
+        kind: "auth", actor: user.displayName,
+        action: usedRecovery ? "복구 코드 실패" : "2차 인증 실패",
+        target: req.ip ?? null, result: "error",
+      });
+      res.status(401).json({ error: "mfa_failed", message: reason });
+      return;
+    }
+    loginAttempts.delete(key);
+
+    // 비밀번호 단계와 코드 단계 사이에 다른 곳에서 로그인했을 수 있다 — 다시 확인한다.
+    const force = payload.force === true;
+    if (findActiveSession(user.id) && !force) {
+      res.status(409).json({ error: "already_logged_in", message: "이미 다른 곳에서 로그인 중입니다. 강제 로그인하시겠습니까?" });
+      return;
+    }
     const tokens = issueTokenPair(user.id, { ip: req.ip ?? undefined });
-    recordAudit({ kind: "auth", actor: user.displayName, action: force ? "강제 로그인" : "로그인", target: req.ip ?? null, result: "ok" });
-    res.json({ ...tokens, user: { id: user.id, displayName: user.displayName, role: user.role } });
+    recordAudit({
+      kind: "auth", actor: user.displayName,
+      action: usedRecovery ? `복구 코드로 로그인(남은 코드 ${remaining}개)` : force ? "강제 로그인(2차 인증)" : "로그인(2차 인증)",
+      target: req.ip ?? null, result: "ok",
+    });
+    res.json({
+      ...tokens,
+      recoveryUsed: usedRecovery || undefined,
+      recoveryRemaining: usedRecovery ? remaining : undefined,
+      user: { id: user.id, displayName: user.displayName, role: user.role },
+    });
   });
 
   app.post("/api/auth/refresh", (req, res) => {
@@ -265,8 +427,10 @@ export function registerAuthRoutes(app: Express): void {
     }
     // 회전(rotation): 재사용 방지를 위해 사용된 refresh token은 즉시 폐기하고 새 쌍을 발급한다.
     // 접속 메타(IP·최초 로그인 시각)는 이어받는다 — presence 표시가 회전 때마다 리셋되지 않게.
+    // ⚠ enroll(등록 전용 제한)도 반드시 이어받는다 — 안 이어받으면 refresh 한 번으로 제한이 풀려
+    //   "관리자 2차 인증 필수" 정책이 아무 의미가 없어진다.
     refreshTokens.delete(refreshToken);
-    res.json(issueTokenPair(record.userId, { ip: record.ip, since: record.since }));
+    res.json(issueTokenPair(record.userId, { ip: record.ip, since: record.since, enroll: record.enroll }));
   });
 
   app.post("/api/auth/logout", authMiddleware, (req, res) => {

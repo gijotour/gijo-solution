@@ -134,7 +134,10 @@ async function request<T = unknown>(path: string, opts: RequestOpts = {}): Promi
     try {
       const body = (await res.json()) as Record<string, unknown>;
       detail = JSON.stringify(body);
-      const m = body?.error ?? body?.message;
+      // message(사람이 읽는 문장)를 error(기계 코드)보다 **앞세운다**. 둘 다 있으면 예전 코드가
+      // error를 골라 "password_required" 같은 영문 코드를 담당자에게 첫 줄로 보여줬다
+      // (2026-07-30 발견). 코드는 클라이언트가 분기용으로 쓰는 값이고 사람에게 읽힐 말이 아니다.
+      const m = body?.message ?? body?.error;
       if (typeof m === "string" && m.trim()) 사유 = m.trim();
     } catch {
       /* 응답 본문이 JSON이 아닌 경우 무시 */
@@ -155,9 +158,39 @@ async function request<T = unknown>(path: string, opts: RequestOpts = {}): Promi
 // 결과를 구조화된 값으로 돌려준다 — 렌더러가 "강제 로그인하시겠습니까?" 확인 UI를 그릴 수 있게.
 export interface LoginResult {
   ok: boolean;
-  code?: "already_logged_in" | "invalid_credentials" | "locked" | "error";
+  code?: "already_logged_in" | "invalid_credentials" | "locked" | "error" | "mfa_required";
   message?: string;
   user?: { id: string; displayName: string; role: string };
+  // 2차 인증이 켜진 계정 — 이 값을 들고 loginMfa()로 6자리(또는 복구 코드)를 보낸다.
+  // ⚠ 이 시점에는 아직 세션이 없다(setAuthTokens를 부르지 않는다) — 토큰은 2단계 성공 때만 저장한다.
+  mfaToken?: string;
+  // 관리자 2차 인증 필수 정책이 켜졌는데 아직 등록하지 않은 계정 — 등록 화면으로 보내야 한다.
+  // 이 세션은 등록 관련 API만 부를 수 있다(서버가 그 밖의 경로를 403으로 막는다).
+  enrollRequired?: boolean;
+  // 복구 코드로 들어왔을 때 — 남은 개수를 알려 다시 발급하도록 유도한다.
+  recoveryUsed?: boolean;
+  recoveryRemaining?: number;
+}
+
+interface LoginBody {
+  accessToken?: string;
+  refreshToken?: string;
+  user?: { id: string; displayName: string; role: string };
+  error?: string;
+  message?: string;
+  mfaRequired?: boolean;
+  mfaToken?: string;
+  enrollRequired?: boolean;
+  recoveryUsed?: boolean;
+  recoveryRemaining?: number;
+}
+
+function loginFailure(status: number, data: LoginBody): LoginResult {
+  const code =
+    status === 409 && data.error === "already_logged_in" ? "already_logged_in"
+    : status === 429 ? "locked"
+    : "invalid_credentials";
+  return { ok: false, code, message: data.message ?? data.error ?? "로그인에 실패했습니다." };
 }
 
 export const authApi = {
@@ -168,24 +201,68 @@ export const authApi = {
       body: JSON.stringify({ username, password, ...(force ? { force: true } : {}) }),
     }).catch(() => null);
     if (!res) return { ok: false, code: "error", message: "서버에 연결할 수 없습니다." };
-    const data = (await res.json().catch(() => ({}))) as {
-      accessToken?: string;
-      refreshToken?: string;
-      user?: { id: string; displayName: string; role: string };
-      error?: string;
-      message?: string;
-    };
-    if (!res.ok) {
-      const code = res.status === 409 && data.error === "already_logged_in" ? "already_logged_in" : res.status === 429 ? "locked" : "invalid_credentials";
-      return { ok: false, code, message: data.message ?? data.error ?? "로그인에 실패했습니다." };
+    const data = (await res.json().catch(() => ({}))) as LoginBody;
+    if (!res.ok) return loginFailure(res.status, data);
+    // 2차 인증이 켜진 계정 — 아직 로그인이 끝나지 않았다. 토큰을 저장하지 않는다.
+    if (data.mfaRequired) {
+      return { ok: false, code: "mfa_required", mfaToken: data.mfaToken, user: data.user };
     }
     setAuthTokens({ accessToken: data.accessToken!, refreshToken: data.refreshToken! });
-    return { ok: true, user: data.user };
+    return { ok: true, user: data.user, enrollRequired: data.enrollRequired };
+  },
+
+  // 로그인 2단계 — 인증앱의 6자리 또는 복구 코드 하나.
+  loginMfa: async (mfaToken: string, code: string, isRecovery = false): Promise<LoginResult> => {
+    const res = await fetch(`${serverUrl}/api/auth/login/mfa`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ mfaToken, ...(isRecovery ? { recoveryCode: code } : { code }) }),
+    }).catch(() => null);
+    if (!res) return { ok: false, code: "error", message: "서버에 연결할 수 없습니다." };
+    const data = (await res.json().catch(() => ({}))) as LoginBody;
+    if (!res.ok) return loginFailure(res.status, data);
+    setAuthTokens({ accessToken: data.accessToken!, refreshToken: data.refreshToken! });
+    return {
+      ok: true, user: data.user,
+      recoveryUsed: data.recoveryUsed, recoveryRemaining: data.recoveryRemaining,
+    };
   },
   logout: async () => {
     await request("/api/auth/logout", { method: "POST", body: { refreshToken } });
     setAuthTokens(null);
   },
+  // 2차 인증 — 로그인 뒤(설정 화면)에서 쓰는 등록·해제·관리자 관리.
+  mfaStatus: () =>
+    request<{
+      enabled: boolean; enrolling: boolean; enabledAt: number | null; lastUsedAt: number | null;
+      recoveryRemaining: number; serverTime: number; stepSeconds: number; requiredForAdmin: boolean;
+    }>("/api/auth/mfa/status"),
+  mfaStart: () =>
+    request<{ secretDisplay: string; uri: string; qrSvg: string | null }>("/api/auth/mfa/start", { method: "POST" }),
+  mfaConfirm: (code: string) =>
+    request<{ ok: boolean; recoveryCodes: string[]; accessToken?: string; refreshToken?: string }>(
+      "/api/auth/mfa/confirm", { method: "POST", body: { code } }
+    ).then((r) => {
+      // 등록 전용 제한 세션이었다면 서버가 정상 세션으로 올려 준다 — 받은 자리에서 갈아 끼운다.
+      if (r.accessToken && r.refreshToken) setAuthTokens({ accessToken: r.accessToken, refreshToken: r.refreshToken });
+      return r;
+    }),
+  mfaDisable: (password: string) => request<{ ok: boolean }>("/api/auth/mfa/disable", { method: "POST", body: { password } }),
+  mfaRegenerateRecovery: (password: string) =>
+    request<{ ok: boolean; recoveryCodes: string[] }>("/api/auth/mfa/recovery", { method: "POST", body: { password } }),
+  mfaUserList: () =>
+    request<{ id: string; username: string; displayName: string; role: string; enabled: boolean; enabledAt: number | null; recoveryRemaining: number }[]>(
+      "/api/users/mfa"
+    ),
+  mfaResetUser: (userId: string) => request<{ ok: boolean }>(`/api/users/${userId}/mfa/reset`, { method: "POST" }),
+  mfaPolicy: () =>
+    request<{ requireForAdmin: boolean; blocked: { id: string; username: string; displayName: string }[] }>(
+      "/api/auth/mfa/policy"
+    ),
+  mfaSetPolicy: (on: boolean) =>
+    request<{ ok: boolean; requireForAdmin: boolean; blocked: { username: string }[] }>(
+      "/api/auth/mfa/policy", { method: "POST", body: { on } }
+    ),
   me: () => request("/api/auth/me"),
   sessions: () => request<ActiveSessionInfo[]>("/api/auth/sessions"),
 };
@@ -1327,7 +1404,9 @@ export const usageApi = {
 
 // ── 서버 헬스체크 ─────────────────────────────────────────────────────
 export const healthApi = {
-  check: () => request<{ ok: boolean; service: string }>("/api/health"),
+  // serverTime: 2차 인증 6자리는 시계로 만들어진다 — 로그인 화면이 인증 전에 시각 차이를
+  // 비교해 보여주려면 무인증 응답에서 서버 시각을 받아야 한다.
+  check: () => request<{ ok: boolean; service: string; serverTime?: number }>("/api/health"),
 };
 
 // ── 클라이언트(Electron) 설치파일 배포 — 이 서버 자체가 배포처(외부 서비스 없음) ──────────

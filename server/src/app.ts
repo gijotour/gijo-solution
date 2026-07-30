@@ -6,6 +6,7 @@ import cors from "cors";
 import { schemaVersion } from "./db";
 
 import { registerAuthRoutes } from "./auth/auth";
+import { registerMfaRoutes } from "./auth/mfaroutes";
 import { registerUsersRoutes } from "./auth/users";
 import { registerAgentsRoutes } from "./engine/agents";
 import { registerAssetsRoutes } from "./engine/assets";
@@ -128,6 +129,7 @@ export function createApp(): Express {
   registerActivityAudit(app);
 
   registerAuthRoutes(app);
+  registerMfaRoutes(app);
   registerUsersRoutes(app);
   registerAgentsRoutes(app);
   registerAssetsRoutes(app);
@@ -212,7 +214,11 @@ export function createApp(): Express {
   registerWorkSessionRoutes(app);
   registerSessionPatternRoutes(app);
 
-  app.get("/api/health", (_req, res) => res.json({ ok: true, service: "gijo-as-server", schema: schemaVersion() }));
+  // serverTime: 2차 인증 6자리는 **시계**로 만들어진다 — 휴대폰과 서버 시각이 어긋나면 아무도
+  // 못 들어온다. 로그인 화면이 아직 인증 전이라 이 무인증 응답으로 서버 시각을 비교해 보여준다.
+  app.get("/api/health", (_req, res) =>
+    res.json({ ok: true, service: "gijo-as-server", schema: schemaVersion(), serverTime: Date.now() })
+  );
 
   return app;
 }

@@ -80,6 +80,24 @@
   .dup-ok { background: #f0a020; color: #21160a; border: 0; }
   .dup-no { background: transparent; color: var(--muted); border: 1px solid rgba(255,255,255,.16); }
   .dup-no:hover { color: #fff; }
+  /* 로그인 2단계(2차 인증) */
+  .mfa { margin-top: 12px; padding: 14px; border: 1px solid rgba(59,130,246,.4);
+    background: rgba(59,130,246,.08); border-radius: 10px; }
+  .mfa-t { font-size: 11.5px; font-weight: 700; color: var(--muted); margin-bottom: 7px; }
+  .mfa-code { letter-spacing: 9px; text-align: center; font-size: 20px; font-weight: 700;
+    font-variant-numeric: tabular-nums; }
+  .mfa-reco { letter-spacing: 3px; text-align: center; font-weight: 700; }
+  .mfa-d { margin-top: 8px; font-size: 11px; color: var(--muted); line-height: 1.6; }
+  .mfa-alt { margin-top: 10px; background: transparent; border: 1px solid rgba(255,255,255,.16);
+    color: var(--muted); font-size: 11.5px; font-weight: 700; }
+  .mfa-alt:hover { color: #fff; }
+  /* 2단계에 들어가면 1단계 입력을 치운다 — 안 치우면 담당자가 위 '로그인'을 다시 눌러
+     방금 받은 인증 대기를 스스로 무효로 만든다(2026-07-30 실화면 확인). */
+  body.mfa-step #recentBox, body.mfa-step .server-row, body.mfa-step #username,
+  body.mfa-step #password, body.mfa-step #savePwRow, body.mfa-step #loginBtn,
+  body.mfa-step label[for="username"], body.mfa-step label[for="password"] { display: none !important; }
+  .mfa-who { font-size: 11.5px; color: var(--muted); margin-bottom: 10px; }
+  .mfa-who b { color: var(--text); }
   .hint { margin-top: 18px; font-size: 11.5px; color: var(--muted); line-height: 1.5; }
   .ver { margin-top: 14px; font-size: 10.5px; color: var(--muted); text-align: center; opacity: .8; }
   /* 최근 로그인 빠른 선택 */
@@ -139,6 +157,23 @@
         <button id="dupForce" class="dup-ok">강제 로그인</button>
         <button id="dupCancel" class="dup-no">취소</button>
       </div>
+    </div>
+    <!-- 로그인 2단계(2차 인증) — 비밀번호는 맞았고 인증앱의 6자리만 남은 상태.
+         여기서도 OS 네이티브 모달을 쓰지 않는다(위 중복 로그인 주석과 같은 이유). -->
+    <div class="mfa" id="mfaBox" style="display:none">
+      <div class="mfa-who" id="mfaWho"></div>
+      <div class="mfa-t">인증앱의 6자리 숫자</div>
+      <input id="mfaCode" class="mfa-code" inputmode="numeric" maxlength="7" placeholder="000000" autocomplete="one-time-code" aria-label="인증앱 6자리 숫자" />
+      <button id="mfaBtn">확인</button>
+      <div class="mfa-d" id="mfaTimeLine"></div>
+      <button id="mfaRecoToggle" class="mfa-alt">휴대폰을 못 쓰는 경우</button>
+      <div id="mfaRecoWrap" style="display:none">
+        <div class="mfa-t" style="margin-top:12px">복구 코드 한 개</div>
+        <input id="mfaReco" class="mfa-reco" maxlength="12" placeholder="XXXX-XXXX" aria-label="복구 코드" />
+        <button id="mfaRecoBtn">복구 코드로 로그인</button>
+        <div class="mfa-d">복구 코드는 한 번 쓰면 사라집니다. 다 썼으면 관리자에게 2차 인증 해제를 요청하세요.</div>
+      </div>
+      <button id="mfaCancel" class="mfa-alt">← 다른 계정으로 로그인</button>
     </div>
     <div class="hint">
       단일 데스크톱 모드: 서버가 이 PC에 동봉되어 있다면 기본 주소(localhost:4000)를 그대로 사용하세요.<br />
@@ -211,20 +246,119 @@
     document.getElementById("dupForce").addEventListener("click", () => { dupBox.style.display = "none"; doLogin(true); });
     document.getElementById("dupCancel").addEventListener("click", () => { dupBox.style.display = "none"; });
 
+    // ── 로그인 2단계(2차 인증) ────────────────────────────────────────────────
+    // 비밀번호는 맞았고 인증앱의 6자리만 남은 상태를 이 안에서 처리한다.
+    const mfaBox = document.getElementById("mfaBox");
+    const mfaCode = document.getElementById("mfaCode");
+    const mfaBtn = document.getElementById("mfaBtn");
+    const mfaReco = document.getElementById("mfaReco");
+    const mfaRecoBtn = document.getElementById("mfaRecoBtn");
+    const mfaRecoWrap = document.getElementById("mfaRecoWrap");
+    const mfaTimeLine = document.getElementById("mfaTimeLine");
+    let mfaToken = null;
+
+    document.getElementById("mfaRecoToggle").addEventListener("click", () => {
+      const on = mfaRecoWrap.style.display === "none";
+      mfaRecoWrap.style.display = on ? "block" : "none";
+      if (on) mfaReco.focus();
+    });
+
+    // 2단계 화면 켜기/끄기 — 1단계 입력을 감춰(body.mfa-step) 실수로 다시 누르지 못하게 한다.
+    function setMfaStep(on, who) {
+      document.body.classList.toggle("mfa-step", !!on);
+      mfaBox.style.display = on ? "block" : "none";
+      if (!on) { mfaToken = null; mfaRecoWrap.style.display = "none"; mfaCode.value = ""; mfaReco.value = ""; }
+      else if (who) document.getElementById("mfaWho").innerHTML = "<b>" + who + "</b> 계정의 2차 인증";
+    }
+    document.getElementById("mfaCancel").addEventListener("click", () => {
+      setMfaStep(false);
+      errMsg.textContent = "";
+      resetBtn();
+      passInput.value = "";
+      userInput.focus();
+    });
+
+    // 이 방식은 시계로 숫자를 만든다 — 서버와 이 PC의 시각이 크게 어긋나면 원인이 그것이다.
+    // 무인증 health 응답의 serverTime과 비교해 미리 알려 준다(추측하게 두지 않는다).
+    async function showClockHint() {
+      mfaTimeLine.textContent = "";
+      try {
+        const h = await window.gijo.checkServerHealth();
+        if (!h || !h.serverTime) return;
+        const diffSec = Math.round((h.serverTime - Date.now()) / 1000);
+        const serverClock = new Date(h.serverTime).toLocaleTimeString("ko-KR");
+        mfaTimeLine.textContent = Math.abs(diffSec) >= 30
+          ? `⚠ 서버 시각 ${serverClock} — 이 PC와 ${Math.abs(diffSec)}초 차이. 휴대폰 시각을 자동으로 맞춰 주세요.`
+          : `서버 시각 ${serverClock} · 30초마다 숫자가 바뀝니다`;
+      } catch (e) { /* 시각 안내는 부가 정보라 실패해도 로그인을 막지 않는다 */ }
+    }
+
+    // 로그인 성공 뒤 공통 마무리 — 1단계로 끝난 경우와 2단계까지 간 경우가 같아야 한다.
+    async function finishLogin() {
+      // 접근 서버·ID·PW를 이 PC에 저장(체크 시). PW는 메인 프로세스가 암호화.
+      try { await window.gijo.creds.save(serverInput.value.trim(), userInput.value.trim(), passInput.value, savePw.checked); } catch (e) {}
+      window.gijoRealtime.connect();
+      // 4.0.0 — 앱의 집은 탭 셸이다. 대시보드는 셸이 처음 여는 탭 중 하나일 뿐.
+      await window.gijo.navigateTo("app.html");
+    }
+
+    async function submitMfa(value, isRecovery) {
+      if (!mfaToken) return;
+      const code = String(value ?? "").trim();
+      if (!code) { errMsg.textContent = isRecovery ? "복구 코드를 넣으세요." : "6자리 숫자를 넣으세요."; return; }
+      errMsg.textContent = "";
+      mfaBtn.disabled = true; mfaRecoBtn.disabled = true;
+      try {
+        const r = await window.gijo.loginMfa(mfaToken, code, isRecovery);
+        if (r.ok) {
+          if (r.recoveryUsed) {
+            // 복구 코드를 썼다면 남은 개수를 알려야 한다 — 다 쓰면 관리자 해제밖에 남지 않는다.
+            try { window.localStorage.setItem("gijo:recoveryRemaining", String(r.recoveryRemaining ?? "")); } catch (e) {}
+          }
+          await finishLogin();
+          return;
+        }
+        if (r.code === "already_logged_in") {
+          // 코드를 넣는 동안 다른 곳에서 로그인됐다 — 처음부터 강제 로그인으로 다시 한다.
+          setMfaStep(false);
+          dupBox.style.display = "block";
+          return;
+        }
+        errMsg.textContent = r.message || "인증에 실패했습니다.";
+        if (r.code === "invalid_credentials" && !r.message) errMsg.textContent = "숫자가 맞지 않습니다.";
+        // 중간 토큰이 만료됐으면 처음부터 다시 — 6자리만 계속 넣어도 통하지 않는다.
+        if (/다시 로그인/.test(r.message || "")) { setMfaStep(false); resetBtn(); }
+      } finally {
+        mfaBtn.disabled = false; mfaRecoBtn.disabled = false;
+      }
+    }
+    mfaBtn.addEventListener("click", () => submitMfa(mfaCode.value, false));
+    mfaCode.addEventListener("keydown", (e) => { if (e.key === "Enter") submitMfa(mfaCode.value, false); });
+    mfaRecoBtn.addEventListener("click", () => submitMfa(mfaReco.value, true));
+    mfaReco.addEventListener("keydown", (e) => { if (e.key === "Enter") submitMfa(mfaReco.value, true); });
+
+    function resetBtn() { btn.disabled = false; btn.textContent = "로그인"; }
+
     async function doLogin(force) {
       errMsg.textContent = "";
       dupBox.style.display = "none";
+      setMfaStep(false);
       btn.disabled = true;
       btn.textContent = "연결 중...";
       try {
         if (serverInput.value.trim()) window.gijo.setServerUrl(serverInput.value.trim());
         const result = await window.gijo.login(userInput.value.trim(), passInput.value, force);
         if (result.ok) {
-          // 로그인 성공 — 접근 서버·ID·PW를 이 PC에 저장(체크 시). PW는 메인 프로세스가 암호화.
-          try { await window.gijo.creds.save(serverInput.value.trim(), userInput.value.trim(), passInput.value, savePw.checked); } catch (e) {}
-          window.gijoRealtime.connect();
-          // 4.0.0 — 앱의 집은 탭 셸이다. 대시보드는 셸이 처음 여는 탭 중 하나일 뿐.
-          await window.gijo.navigateTo("app.html");
+          await finishLogin();
+          return;
+        }
+        // 2차 인증이 켜진 계정 — 아직 로그인이 끝나지 않았다. 6자리를 받는다.
+        if (result.code === "mfa_required") {
+          mfaToken = result.mfaToken;
+          setMfaStep(true, (result.user && result.user.displayName) || userInput.value.trim());
+          mfaCode.focus();
+          resetBtn();
+          showClockHint();
           return;
         }
         if (result.code === "already_logged_in") {

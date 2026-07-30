@@ -114,6 +114,20 @@ describe("패널 단위 상세 안내", () => {
     expect(out).toContain("구역별 상세");
     expect(out).toContain("구동 티어");
   });
+
+  // 이름이 포개지는 구역은 **더 구체적인 쪽**이 이겨야 한다. 선언 순서로 고르면 짧은 이름이
+  // 긴 이름을 가려, "담당자 2차 인증 해제하는 방법"에 내 계정 안내가 나왔다(2026-07-30 실측).
+  it("이름이 포개질 때 더 구체적인 구역이 이긴다", () => {
+    const out = formatScreenGuide("settings.html", "담당자 2차 인증 해제하는 방법");
+    expect(out).toContain("계정별 2차 인증");
+    expect(out).toContain("감사 기록"); // 관리자 해제 안내가 실제로 실렸는지
+  });
+
+  it("짧은 이름만 물으면 그쪽이 답한다(구체적 이름 우선이 반대로 새지 않는다)", () => {
+    const out = formatScreenGuide("settings.html", "2차 인증 사용법 알려줘");
+    expect(out).toContain("설정 › 2차 인증");
+    expect(out).toContain("인증앱");
+  });
 });
 
 // 패널 이름으로 물어도 화면 가이드가 답하는지 — "기능 설명은 챗봇이 담당" 원칙(2026-07-25 사용자 지시).
@@ -131,6 +145,19 @@ describe("패널 이름 기반 도움말 의도", () => {
 
   it("패널명이 있어도 설명 요구가 아니면 도구가 처리하게 남긴다", () => {
     expect(isHelpIntent("표시 이름 목록 CSV로 내려줘", "assethub.html")).toBe(false);
+  });
+
+  // 곤란을 털어놓는 말투도 안내를 구하는 것이다 — "복구 코드 잃어버렸어"에 일반 LLM이
+  // "지원 센터에 문의하세요"라고 답했다(2026-07-30 실측). 폐쇄망 제품에 지원 센터는 없다.
+  it("곤란 말투(잃어버렸어·안 보여)도 구역 이름이 걸리면 안내로 본다", () => {
+    expect(isHelpIntent("복구 코드 잃어버렸어", "settings.html")).toBe(true);
+    expect(isHelpIntent("2차 인증 막혔어", "settings.html")).toBe(true);
+  });
+
+  it("⚠ 구역 이름이 없는 하소연은 여전히 도구·LLM 몫이다(안내로 가로채지 않는다)", () => {
+    expect(isHelpIntent("스캔 실패했어", "settings.html")).toBe(false);
+    expect(isHelpIntent("서버가 안 보여", "kpi.html")).toBe(false);
+    expect(isHelpIntent("자산을 못 찾겠어", "assethub.html")).toBe(false);
   });
 
   it("화면을 모르면 기존 HELP_RE만 적용된다", () => {

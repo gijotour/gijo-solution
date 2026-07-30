@@ -1,0 +1,291 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<title>GIJO AS — 2차 인증(OTP) 시안</title>
+<style>
+:root{
+  --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);padding:28px;line-height:1.5;}
+h1{font-size:19px;font-weight:800;margin-bottom:4px;}
+.lead{font-size:12.5px;color:var(--muted);margin-bottom:22px;}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:20px;align-items:start;max-width:1220px;}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;}
+.card-tag{font-size:10px;font-weight:800;letter-spacing:1.1px;color:var(--muted-2);margin-bottom:12px;}
+.panel-title{font-size:14px;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:8px;}
+.panel-sub{font-size:11.5px;color:var(--muted);margin-bottom:16px;}
+.badge{font-size:10px;font-weight:700;padding:2px 7px;border-radius:20px;}
+.b-teal{background:rgba(30,185,128,.16);color:var(--teal);}
+.b-amber{background:rgba(240,160,32,.16);color:var(--amber);}
+.b-red{background:rgba(226,72,61,.16);color:var(--red);}
+.b-grey{background:rgba(139,147,171,.16);color:var(--muted);}
+.field{margin-bottom:14px;}
+.field label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:6px;font-weight:600;}
+.field input{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;outline:none;font-family:inherit;}
+.field input:focus{border-color:var(--blue);}
+.code-input{letter-spacing:9px;text-align:center;font-size:20px!important;font-weight:700;font-variant-numeric:tabular-nums;}
+.btn{background:var(--blue);color:var(--white);border:none;border-radius:8px;padding:10px 16px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;}
+.btn:hover{background:var(--blue-light);}
+.btn.ghost{background:transparent;border:1px solid var(--border-strong);color:var(--muted);}
+.btn.ghost:hover{background:var(--panel-2);color:var(--text);}
+.btn.danger{background:transparent;border:1px solid rgba(226,72,61,.4);color:var(--red);}
+.btn.sm{padding:6px 11px;font-size:11px;}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.hint{font-size:11.5px;color:var(--muted-2);margin-top:10px;line-height:1.65;}
+.warn{font-size:11.5px;color:var(--amber);background:rgba(240,160,32,.08);border:1px solid rgba(240,160,32,.25);border-radius:8px;padding:10px 12px;margin-top:12px;line-height:1.6;}
+.sep{height:1px;background:var(--border);margin:18px 0;}
+.qr{width:150px;height:150px;background:var(--white);border-radius:8px;padding:8px;flex:0 0 auto;}
+.keybox{font-family:"Consolas",monospace;font-size:12.5px;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--teal);word-break:break-all;letter-spacing:.5px;}
+.reco{font-family:"Consolas",monospace;font-size:12px;display:grid;grid-template-columns:1fr 1fr;gap:6px 14px;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:12px;}
+.reco span{color:var(--text);}
+.reco span.used{color:var(--muted-2);text-decoration:line-through;}
+table{width:100%;border-collapse:collapse;font-size:12px;}
+th{text-align:left;font-size:10.5px;color:var(--muted-2);font-weight:700;letter-spacing:.6px;padding:0 8px 8px 0;}
+td{padding:9px 8px 9px 0;border-top:1px solid var(--border);vertical-align:middle;}
+.toggle{width:40px;height:22px;border-radius:20px;background:var(--panel-2);border:1px solid var(--border-strong);position:relative;cursor:pointer;flex:0 0 auto;}
+.toggle i{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--muted);transition:.15s;}
+.toggle.on{background:rgba(59,130,246,.3);border-color:var(--blue);}
+.toggle.on i{left:20px;background:var(--blue-light);}
+.steps{display:flex;gap:6px;margin-bottom:16px;}
+.step{flex:1;font-size:10.5px;font-weight:700;text-align:center;padding:7px 4px;border-radius:6px;background:var(--panel-2);color:var(--muted-2);border:1px solid var(--border);}
+.step.on{background:rgba(59,130,246,.14);color:var(--blue-light);border-color:rgba(59,130,246,.4);}
+.step.done{color:var(--teal);border-color:rgba(30,185,128,.3);}
+.note{max-width:1220px;margin-top:24px;background:var(--panel-2);border:1px solid var(--border);border-radius:12px;padding:18px 20px;font-size:12.5px;color:var(--muted);line-height:1.85;}
+.note b{color:var(--text);}
+.note code{font-family:Consolas,monospace;color:var(--teal);font-size:11.5px;}
+.note ul{margin:8px 0 0 18px;}
+.login-shell{background:var(--panel-2);border:1px solid var(--border);border-radius:12px;padding:26px 24px;max-width:340px;margin:0 auto;}
+.logo{font-size:16px;font-weight:800;text-align:center;margin-bottom:2px;letter-spacing:-.3px;}
+.logo-sub{font-size:11px;color:var(--muted-2);text-align:center;margin-bottom:20px;}
+.tabs{display:flex;gap:6px;margin-bottom:14px;}
+.tabs button{flex:1;background:var(--panel-2);border:1px solid var(--border);color:var(--muted);font-size:11px;font-weight:700;padding:7px;border-radius:6px;cursor:pointer;font-family:inherit;}
+.tabs button.on{background:rgba(59,130,246,.14);color:var(--blue-light);border-color:rgba(59,130,246,.4);}
+.hidden{display:none;}
+</style>
+</head>
+<body>
+
+<h1>2차 인증(OTP) — 추천 시안</h1>
+<p class="lead">
+  비밀번호 하나로 들어오던 로그인에 <b>휴대폰 인증앱의 6자리 숫자</b>를 한 단계 더 붙입니다.
+  인터넷이 끊긴 폐쇄망에서도 되는 유일한 방식입니다(문자·이메일은 망 밖으로 나가야 하므로 쓸 수 없습니다).
+</p>
+
+<div class="grid">
+
+  <!-- ① 로그인 2단계 -->
+  <div class="card">
+    <div class="card-tag">① 로그인 화면 — 2단계</div>
+    <div class="tabs">
+      <button class="on" onclick="showLogin('pw')">1단계 비밀번호</button>
+      <button onclick="showLogin('otp')">2단계 코드</button>
+      <button onclick="showLogin('reco')">코드를 못 볼 때</button>
+    </div>
+
+    <div class="login-shell">
+      <div class="logo">GIJO AS</div>
+      <div class="logo-sub">AI 보안관리 플랫폼</div>
+
+      <div id="lg-pw">
+        <div class="field"><label>아이디</label><input value="jyh" /></div>
+        <div class="field"><label>비밀번호</label><input type="password" value="••••••••••" /></div>
+        <button class="btn" style="width:100%">로그인</button>
+      </div>
+
+      <div id="lg-otp" class="hidden">
+        <div class="field">
+          <label>인증앱의 6자리 숫자</label>
+          <input class="code-input" value="418 902" maxlength="7" />
+        </div>
+        <button class="btn" style="width:100%">확인</button>
+        <div class="hint" style="text-align:center">
+          남은 시간 <b style="color:var(--teal)">17초</b> · 바뀌면 새 숫자를 넣으세요
+        </div>
+        <div class="sep" style="margin:14px 0"></div>
+        <button class="btn ghost sm" style="width:100%" onclick="showLogin('reco')">휴대폰을 못 쓰는 경우</button>
+      </div>
+
+      <div id="lg-reco" class="hidden">
+        <div class="field">
+          <label>복구 코드 한 개</label>
+          <input value="7K3F-QP92" style="letter-spacing:3px;text-align:center;font-weight:700" />
+        </div>
+        <button class="btn" style="width:100%">확인</button>
+        <div class="hint">
+          복구 코드는 <b>한 번 쓰면 사라집니다.</b> 다 썼거나 잃어버리면 관리자에게
+          2차 인증 해제를 요청하세요.
+        </div>
+      </div>
+    </div>
+    <div class="warn">
+      ⚠ 코드가 계속 틀리면 <b>휴대폰과 서버의 시각이 어긋난 것</b>입니다 — 이 방식은 시계로 숫자를 만듭니다.
+      화면에 서버 시각을 함께 띄워 바로 비교하게 합니다.
+    </div>
+  </div>
+
+  <!-- ② 내 계정 등록 -->
+  <div class="card">
+    <div class="card-tag">② 설정 &gt; 계정 — 내 2차 인증</div>
+    <div class="steps">
+      <span class="step on" onclick="showEnroll(0)">1 시작 전</span>
+      <span class="step" onclick="showEnroll(1)">2 앱에 등록</span>
+      <span class="step" onclick="showEnroll(2)">3 복구 코드</span>
+      <span class="step" onclick="showEnroll(3)">4 켜짐</span>
+    </div>
+
+    <div id="en-0">
+      <div class="panel-title">2차 인증 <span class="badge b-grey">꺼짐</span></div>
+      <div class="panel-sub">비밀번호가 새어도 휴대폰 없이는 못 들어옵니다.</div>
+      <button class="btn">2차 인증 켜기</button>
+      <div class="hint">준비물: 휴대폰 인증앱(Google Authenticator·Microsoft Authenticator 등). 인터넷 연결은 필요 없습니다.</div>
+    </div>
+
+    <div id="en-1" class="hidden">
+      <div class="panel-title">인증앱에 등록</div>
+      <div class="panel-sub">앱으로 아래 그림을 찍으세요. 카메라를 못 쓰면 아래 키를 직접 넣으면 됩니다.</div>
+      <div class="row" style="gap:16px;align-items:flex-start">
+        <svg class="qr" viewBox="0 0 25 25" shape-rendering="crispEdges" aria-label="등록용 QR(예시)">
+          <rect width="25" height="25" fill="#fff"/>
+          <g fill="#000">
+            <rect x="1" y="1" width="7" height="7"/><rect x="2" y="2" width="5" height="5" fill="#fff"/><rect x="3" y="3" width="3" height="3"/>
+            <rect x="17" y="1" width="7" height="7"/><rect x="18" y="2" width="5" height="5" fill="#fff"/><rect x="19" y="3" width="3" height="3"/>
+            <rect x="1" y="17" width="7" height="7"/><rect x="2" y="18" width="5" height="5" fill="#fff"/><rect x="3" y="19" width="3" height="3"/>
+            <rect x="10" y="1" width="1" height="1"/><rect x="12" y="1" width="1" height="1"/><rect x="14" y="2" width="1" height="1"/>
+            <rect x="11" y="3" width="1" height="1"/><rect x="13" y="4" width="1" height="1"/><rect x="10" y="5" width="1" height="1"/>
+            <rect x="12" y="6" width="1" height="1"/><rect x="9" y="8" width="1" height="1"/><rect x="11" y="8" width="1" height="1"/>
+            <rect x="14" y="8" width="1" height="1"/><rect x="1" y="10" width="1" height="1"/><rect x="3" y="10" width="1" height="1"/>
+            <rect x="6" y="11" width="1" height="1"/><rect x="8" y="10" width="1" height="1"/><rect x="10" y="10" width="1" height="1"/>
+            <rect x="12" y="11" width="1" height="1"/><rect x="14" y="10" width="1" height="1"/><rect x="16" y="11" width="1" height="1"/>
+            <rect x="18" y="10" width="1" height="1"/><rect x="20" y="11" width="1" height="1"/><rect x="22" y="10" width="1" height="1"/>
+            <rect x="2" y="13" width="1" height="1"/><rect x="5" y="13" width="1" height="1"/><rect x="7" y="14" width="1" height="1"/>
+            <rect x="9" y="13" width="1" height="1"/><rect x="11" y="14" width="1" height="1"/><rect x="13" y="13" width="1" height="1"/>
+            <rect x="15" y="14" width="1" height="1"/><rect x="17" y="13" width="1" height="1"/><rect x="19" y="14" width="1" height="1"/>
+            <rect x="21" y="13" width="1" height="1"/><rect x="23" y="14" width="1" height="1"/>
+            <rect x="10" y="16" width="1" height="1"/><rect x="12" y="17" width="1" height="1"/><rect x="14" y="16" width="1" height="1"/>
+            <rect x="16" y="17" width="1" height="1"/><rect x="18" y="16" width="1" height="1"/><rect x="20" y="17" width="1" height="1"/>
+            <rect x="22" y="16" width="1" height="1"/><rect x="10" y="19" width="1" height="1"/><rect x="13" y="19" width="1" height="1"/>
+            <rect x="15" y="20" width="1" height="1"/><rect x="17" y="19" width="1" height="1"/><rect x="20" y="20" width="1" height="1"/>
+            <rect x="22" y="19" width="1" height="1"/><rect x="11" y="22" width="1" height="1"/><rect x="14" y="22" width="1" height="1"/>
+            <rect x="16" y="23" width="1" height="1"/><rect x="19" y="22" width="1" height="1"/><rect x="21" y="23" width="1" height="1"/>
+            <rect x="23" y="22" width="1" height="1"/>
+          </g>
+        </svg>
+        <div style="flex:1;min-width:170px">
+          <div style="font-size:11px;color:var(--muted);font-weight:600;margin-bottom:6px">직접 넣을 키</div>
+          <div class="keybox">JBSWY3DP EHPK3PXP JBSWY3DP</div>
+          <div class="field" style="margin-top:14px">
+            <label>앱에 뜬 6자리를 넣어 확인</label>
+            <input class="code-input" placeholder="000000" maxlength="7" />
+          </div>
+          <button class="btn">확인하고 켜기</button>
+        </div>
+      </div>
+      <div class="warn">
+        ⚠ 이 그림·키는 <b>이 서버 안에서 만들어집니다.</b> 외부 사이트로 나가지 않습니다 — 폐쇄망에서 그대로 씁니다.
+      </div>
+    </div>
+
+    <div id="en-2" class="hidden">
+      <div class="panel-title">복구 코드 10개 <span class="badge b-amber">지금 저장하세요</span></div>
+      <div class="panel-sub">휴대폰을 잃어버렸을 때 들어올 유일한 길입니다. 다시 볼 수 없습니다.</div>
+      <div class="reco">
+        <span>7K3F-QP92</span><span>M4XD-8R1T</span><span>QW9P-2LKS</span><span>ZC5V-7NHB</span>
+        <span>T8YR-3MQD</span><span>P2LW-9XKF</span><span>B6HN-4TSV</span><span>K9DM-1PQZ</span>
+        <span>R3FT-8WCL</span><span>N7XB-5VJH</span>
+      </div>
+      <div class="row" style="margin-top:14px">
+        <button class="btn ghost sm">복사</button>
+        <button class="btn ghost sm">파일로 내리기</button>
+        <button class="btn ghost sm">인쇄</button>
+        <button class="btn sm">저장했습니다</button>
+      </div>
+      <div class="hint">인쇄해 잠긴 곳에 두는 편이 폐쇄망 환경에 맞습니다. 화면 캡처는 남기지 마세요.</div>
+    </div>
+
+    <div id="en-3" class="hidden">
+      <div class="panel-title">2차 인증 <span class="badge b-teal">켜짐</span></div>
+      <div class="panel-sub">2026-07-30 등록 · 마지막 사용 방금 · 남은 복구 코드 <b>9</b>개</div>
+      <div class="row">
+        <button class="btn ghost sm">복구 코드 다시 만들기</button>
+        <button class="btn danger sm">2차 인증 끄기</button>
+      </div>
+      <div class="hint">끄려면 지금 쓰는 비밀번호를 다시 넣게 합니다 — 남의 자리에서 몰래 꺼지지 않게.</div>
+    </div>
+  </div>
+
+  <!-- ③ 관리자 -->
+  <div class="card">
+    <div class="card-tag">③ 설정 &gt; 계정 관리 — 관리자</div>
+    <div class="panel-title">계정별 2차 인증 <span class="badge b-teal">admin 전용</span></div>
+    <div class="panel-sub">기기를 잃은 담당자를 여기서 풀어 줍니다. 해제는 감사 기록에 남습니다.</div>
+    <table>
+      <tr><th>계정</th><th>역할</th><th>2차 인증</th><th></th></tr>
+      <tr><td>jyh</td><td>admin</td><td><span class="badge b-teal">켜짐</span></td><td style="text-align:right"><button class="btn danger sm">해제</button></td></tr>
+      <tr><td>kimdohee</td><td>담당자</td><td><span class="badge b-teal">켜짐</span></td><td style="text-align:right"><button class="btn danger sm">해제</button></td></tr>
+      <tr><td>parkjs</td><td>담당자</td><td><span class="badge b-grey">꺼짐</span></td><td style="text-align:right"><button class="btn ghost sm" disabled style="opacity:.4">해제</button></td></tr>
+      <tr><td>claude-deploy</td><td>admin</td><td><span class="badge b-grey">꺼짐</span></td><td style="text-align:right"><button class="btn ghost sm" disabled style="opacity:.4">해제</button></td></tr>
+    </table>
+
+    <div class="sep"></div>
+    <div class="row" style="justify-content:space-between">
+      <div style="flex:1;min-width:180px">
+        <div style="font-size:12.5px;font-weight:700">관리자 계정은 2차 인증 필수</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px">국가 사이버보안 기본지침 — 관리자 권한 인증에 다중인증 원칙</div>
+      </div>
+      <div class="toggle" id="pol" onclick="this.classList.toggle('on');document.getElementById('polwarn').style.display=this.classList.contains('on')?'block':'none'"><i></i></div>
+    </div>
+    <div class="warn" id="polwarn" style="display:none">
+      ⚠ 이걸 켜면 <b>2차 인증을 아직 안 켠 admin 2개(jyh 제외: claude-deploy)</b>가 다음 로그인부터 막힙니다.
+      <b>자동화 스크립트(게시·QA·평가 게이트)도 같이 막힙니다</b> — 그것들은 사람이 없어 6자리를 넣을 수 없습니다.
+      켜기 전에 영향받는 계정을 여기 그대로 보여주고, 한 번 더 확인을 받습니다.
+    </div>
+    <div class="hint">
+      기본값은 <b>꺼짐</b>입니다. 조달 심사에서 요구할 때 켜는 스위치로 두고, 그 전에 막히는 계정을 먼저 정리합니다.
+    </div>
+  </div>
+</div>
+
+<div class="note">
+  <b>왜 이렇게 만드나 — 근거</b>
+  <ul>
+    <li><b>TOTP(시간 기반 6자리)만 쓴다</b> — 문자·이메일 인증은 망 밖으로 나가야 해서 폐쇄망에서 불가능합니다.
+      TOTP는 서버와 휴대폰이 <b>같은 시계</b>만 보면 되고 통신이 필요 없습니다(RFC 6238). 표준 인증앱을 그대로 씁니다.</li>
+    <li><b>비밀 길이 160비트 · 시계 오차 ±30초 1칸만 허용 · 쓴 숫자는 재사용 금지</b> — RFC 4226/6238 권고.
+      오차를 넓게 잡으면 훔쳐본 숫자를 오래 쓸 수 있게 됩니다.</li>
+    <li><b>틀린 횟수 제한은 이미 있는 것을 그대로 씁니다</b>(15분에 10회 → 잠금).
+      NIST SP 800-63B는 6자리처럼 짧은 값에는 횟수 제한을 <b>필수</b>로 요구하고, 연속 실패 100회를 상한으로 봅니다 —
+      현재 값(10회)이 그보다 엄격합니다.</li>
+    <li><b>복구 코드 10개(1회용)</b> — 폐쇄망에는 "이메일로 재설정" 같은 길이 없습니다.
+      코드가 다 없어지면 관리자 해제만 남습니다.</li>
+    <li><b>기존 계정은 안 끊깁니다</b> — 2차 인증을 안 켠 계정은 지금처럼 비밀번호만으로 들어옵니다(계정별 선택).</li>
+    <li><b>법적 근거</b> — 「국가 사이버보안 기본지침」(2026-05-01 시행)이 <b>원격근무자와 정보시스템 관리자</b>에게
+      다중인증 적용을 의무화했습니다(제52조의2 통합인증·제59조 원격근무 계열).
+      이 제품은 담당자가 WireGuard VPN으로 원격 접속하므로 그 대상에 바로 들어갑니다.
+      ※ 관리자 권한 조문 번호는 언론 요약에만 있어 <b>원문 대조가 필요</b>합니다 — 문서에는 확인된 것만 씁니다.</li>
+  </ul>
+  <div style="margin-top:12px"><b>화면 설명은 챗봇으로</b> — 위 화면에는 정체성 한 줄과 ⚠경고만 두고,
+    준비물·복구 절차·시각 어긋남 대처는 서버 screenguide에 적어 대시보드 대화로 안내합니다(프로젝트 규칙).</div>
+</div>
+
+<script>
+function showLogin(k){
+  for (const id of ["pw","otp","reco"]) document.getElementById("lg-"+id).classList.add("hidden");
+  document.getElementById("lg-"+k).classList.remove("hidden");
+  const map={pw:0,otp:1,reco:2};
+  document.querySelectorAll(".tabs button").forEach((b,i)=>b.classList.toggle("on", i===map[k]));
+}
+function showEnroll(n){
+  for (let i=0;i<4;i++) document.getElementById("en-"+i).classList.add("hidden");
+  document.getElementById("en-"+n).classList.remove("hidden");
+  document.querySelectorAll(".step").forEach((s,i)=>{
+    s.classList.toggle("on", i===n);
+    s.classList.toggle("done", i<n);
+  });
+}
+</script>
+</body>
+</html>
