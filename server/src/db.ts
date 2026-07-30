@@ -10,9 +10,12 @@
 // "지금 누가 뭘 하고 있는지"를 나타내는 휘발성 라이브 신호라, 재시작 후에도 "working"이
 // 남아있으면 오히려 죽은 작업을 살아있는 것처럼 보이게 하는 오해를 만든다.
 
-import Database from "better-sqlite3";
+// better-sqlite3 → better-sqlite3-multiple-ciphers (2026-07-30, 저장 암호화).
+// 같은 12.11.1이라 API가 동일한 드롭인 교체다. 암호화를 안 켠 DB에서는 기존과 완전히 같게 동작한다.
+import Database from "better-sqlite3-multiple-ciphers";
 import * as fs from "fs";
 import * as path from "path";
+import { hasKeyFile, unsealWithMachine, toSqlcipherKey } from "./dbkey";
 
 const DB_PATH = process.env.GIJO_DB_PATH ?? path.join("data", "gijo-as.sqlite");
 
@@ -21,6 +24,33 @@ if (DB_PATH !== ":memory:") {
 }
 
 export const db = new Database(DB_PATH);
+
+// ── 저장 암호화(at-rest) ─────────────────────────────────────────────────────
+// 열쇠 파일이 있으면 이 DB는 암호화된 것이다 — 기계 봉인을 풀어 연다(무인 재시작 가능).
+// 켜는 방법: 서버를 멈추고 `node scripts/encrypt-db.mjs` (백업→열쇠 생성→전환→검증을 한 번에).
+// ⚠ key pragma는 **다른 어떤 SQL보다 먼저** 실행해야 한다 — journal_mode보다도 먼저.
+let dbEncrypted = false;
+if (DB_PATH !== ":memory:" && hasKeyFile(DB_PATH)) {
+  const dek = unsealWithMachine(DB_PATH);
+  if (!dek) {
+    // 여기서 멈추는 것이 맞다. 열쇠를 못 풀었는데 계속 가면 "file is not a database"로
+    // 온갖 곳에서 알 수 없게 터지거나, 최악엔 새 평문 DB를 만들어 "데이터가 다 사라진" 것처럼 보인다.
+    throw new Error(
+      "DB 암호화 열쇠의 기계 봉인을 풀지 못했습니다. 서버 기계가 바뀌었거나 열쇠 파일이 손상됐습니다.\n" +
+        "  복구: 서버를 멈추고  node scripts/recover-db-key.mjs  를 실행해 종이에 보관한 복구 열쇠를 입력하세요.\n" +
+        "  (복구 열쇠까지 잃었다면 이 DB는 열 수 없습니다 — 백업에서 복원하세요.)"
+    );
+  }
+  db.pragma("cipher='sqlcipher'");
+  db.pragma(`key="x'${toSqlcipherKey(dek)}'"`);
+  dek.fill(0); // 쓰고 바로 지운다 — 메모리 덤프에 남는 시간을 줄인다
+  dbEncrypted = true;
+}
+/** 지금 DB가 암호화 상태인가 — 자가 진단·설정 화면이 정직하게 표시하는 데 쓴다. */
+export function isDbEncrypted(): boolean {
+  return dbEncrypted;
+}
+
 db.pragma("journal_mode = WAL"); // :memory: DB는 이 pragma를 조용히 무시하고 memory 저널을 유지한다.
 
 // 테스트 전용 리셋(reset*ForTests) 가드 — 스크래치 스크립트가 GIJO_DB_PATH 없이 실행되면

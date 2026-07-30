@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>시안 — 설정 &gt; 관리자: 저장 암호화 카드</title>
+<style>
+  :root{--bg:#0b1020;--panel:#121a2e;--panel2:#0e1526;--border:rgba(255,255,255,.09);--border-s:rgba(255,255,255,.16);
+        --text:#e7eaf3;--muted:#8b93ab;--teal:#1eb980;--amber:#e8a13c;--red:#e2483d;}
+  body{margin:0;background:var(--bg);color:var(--text);font:13px/1.6 "Segoe UI","Malgun Gothic",sans-serif;padding:32px;}
+  .note{max-width:720px;margin:0 auto 18px;color:var(--muted);font-size:12px;border:1px dashed var(--border-s);border-radius:10px;padding:10px 14px;}
+  .card{max-width:720px;margin:0 auto;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px 22px;}
+  h2{font-size:15px;margin:0 0 4px;display:flex;align-items:center;gap:8px;}
+  .one-liner{color:var(--muted);font-size:12px;margin:0 0 14px;}
+  .status{display:flex;gap:10px;align-items:center;background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;margin-bottom:12px;}
+  .dot{width:10px;height:10px;border-radius:50%;}
+  .on .dot{background:var(--teal);box-shadow:0 0 8px rgba(30,185,128,.6);}
+  .off .dot{background:var(--muted);}
+  .status b{font-size:13.5px;}
+  .status .sub{color:var(--muted);font-size:11.5px;}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+  .cell{background:var(--panel2);border:1px solid var(--border);border-radius:10px;padding:10px 12px;}
+  .cell .l{color:var(--muted);font-size:11px;margin-bottom:3px;}
+  .cell .v{font-weight:700;font-size:12.5px;}
+  .honest{border-left:3px solid var(--amber);background:rgba(232,161,60,.07);border-radius:8px;padding:10px 12px;font-size:12px;margin-bottom:14px;}
+  .honest b{color:var(--amber);}
+  .honest ul{margin:6px 0 0;padding-left:18px;color:var(--muted);}
+  .actions{display:flex;gap:8px;}
+  button{border-radius:8px;padding:8px 14px;font-size:12.5px;font-weight:700;cursor:pointer;
+         border:1px solid var(--border-s);background:var(--panel2);color:var(--text);}
+  button.warn{border-color:var(--amber);color:var(--amber);background:rgba(232,161,60,.08);}
+  .modal{max-width:720px;margin:26px auto 0;background:var(--panel);border:1px solid var(--amber);border-radius:14px;padding:20px 22px;}
+  .keybox{background:#000;border:1px solid var(--border-s);border-radius:10px;padding:16px;text-align:center;
+          font:700 17px/1.4 Consolas,monospace;letter-spacing:2px;color:var(--teal);margin:12px 0;}
+  .modal .warn-line{color:var(--amber);font-size:12px;font-weight:700;}
+  .modal .muted{color:var(--muted);font-size:12px;}
+</style>
+</head>
+<body>
+
+<div class="note">
+  <b>시안(1안 추천)</b> — 설정 &gt; 관리자 탭, '계정 관리' 아래에 붙는 카드입니다.
+  화면에는 정체성 한 줄 + ⚠경고만 두고, 사용법·풀이는 챗봇 안내(이미 반영됨)로 엽니다.
+  아래 재발급 확인창은 버튼을 눌렀을 때의 모습입니다.
+</div>
+
+<!-- ── 카드 본체 ─────────────────────────────────────────── -->
+<div class="card">
+  <h2>🔐 저장 암호화 <span style="font-size:11px;color:var(--muted);font-weight:400;">admin 전용</span></h2>
+  <p class="one-liner">DB 파일이 밖으로 나가도 열 수 없게 잠급니다 — 열쇠는 이 서버 기계에만 있습니다.</p>
+
+  <!-- 켜짐 상태 -->
+  <div class="status on">
+    <div class="dot"></div>
+    <div>
+      <b>켜져 있습니다</b> <span class="sub">— AES-256 (SQLCipher 방식) · 2026-07-30부터</span><br>
+      <span class="sub">자동 백업본도 암호화된 채로 만들어집니다.</span>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="cell"><div class="l">열쇠 위치</div><div class="v">이 서버 기계에 봉인 (공급사 미보유)</div></div>
+    <div class="cell"><div class="l">기계 묶임</div><div class="v">강함 (고유 식별자 4종)</div></div>
+  </div>
+
+  <div class="honest">
+    <b>⚠ 이 암호화가 못 막는 것</b> — 과장하지 않습니다
+    <ul>
+      <li>서버가 살아 있는 동안의 침해 (이 기계의 관리자 권한을 얻으면 열 수 있습니다)</li>
+      <li>지식베이스(문서 원문)는 별도 저장소라 대상이 아닙니다</li>
+    </ul>
+  </div>
+
+  <div class="actions">
+    <button class="warn">복구 열쇠 재발급</button>
+  </div>
+</div>
+
+<!-- ── 재발급 확인창 (버튼 클릭 시) ───────────────────────── -->
+<div class="modal">
+  <h2>복구 열쇠 재발급</h2>
+  <p class="muted">종이를 잃어버렸거나 유출이 의심될 때 씁니다. <b style="color:var(--text)">이전 복구 열쇠는 즉시 쓸 수 없게 됩니다.</b>
+     DB 재암호화는 없어 서비스는 그대로 돕니다. 이 작업은 감사 기록에 남습니다.</p>
+  <div class="keybox">6W4KZ-37DFZ-ZFW2P-Y7NBJ-UYAU6-CKJC5</div>
+  <p class="warn-line">⚠ 지금 한 번만 보입니다 — 종이에 적어 금고에 보관하세요. 화면 캡처는 남기지 마세요.</p>
+  <p class="muted">서버 기계를 교체·재설치하면 이 열쇠로만 DB를 열 수 있습니다.</p>
+  <div class="actions">
+    <button>종이에 적었습니다 — 닫기</button>
+  </div>
+</div>
+
+<!-- 꺼짐 상태 참고 -->
+<div class="card" style="margin-top:26px;opacity:.75;">
+  <h2>🔐 저장 암호화 <span style="font-size:11px;color:var(--muted);font-weight:400;">(꺼짐 상태의 모습)</span></h2>
+  <div class="status off">
+    <div class="dot"></div>
+    <div>
+      <b>꺼져 있습니다</b> <span class="sub">— DB 파일을 가져가면 내용이 그대로 보입니다</span><br>
+      <span class="sub">켜기: 서버 정지 → <code>node scripts/encrypt-db.mjs</code> → 복구 열쇠 종이 보관 → 재시작 (화면에서는 켤 수 없습니다 — 서버 정지가 필요해서입니다)</span>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>

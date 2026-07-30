@@ -15,7 +15,7 @@
 import type { Express } from "express";
 import fs from "fs";
 import path from "path";
-import { db } from "../db";
+import { db, isDbEncrypted } from "../db";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { verifyBackupSnapshot } from "./backup";
@@ -140,9 +140,11 @@ function checkDatabase(): HealthCheck {
     /* 표가 없으면 넘어간다 */
   }
   const level: CheckLevel = mig > 0 ? auditLevel : "warn";
+  // 저장 암호화 상태 — 켰다고 믿는데 꺼져 있는 것이 최악이라 자가 진단에 상시 표시한다.
+  const enc = isDbEncrypted() ? "저장 암호화 켬" : "저장 암호화 끔";
   return {
     id: "database", label: "데이터베이스", level,
-    detail: `${mb(size)} · 스키마 이력 ${mig}건${auditNote}`,
+    detail: `${mb(size)} · 스키마 이력 ${mig}건 · ${enc}${auditNote}`,
     ...(auditLevel === "warn"
       ? { action: "작업 기록이 많이 쌓였습니다 — 보관 기간(GIJO_AUDIT_RETENTION_DAYS, 기본 1095일)을 줄이면 오래된 것부터 자동 정리됩니다." }
       : {}),

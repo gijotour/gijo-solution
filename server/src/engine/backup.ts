@@ -12,7 +12,8 @@ import type { Express } from "express";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
-import { db } from "../db";
+import { db, isDbEncrypted } from "../db";
+import { unsealWithMachine, toSqlcipherKey } from "../dbkey";
 import { authMiddleware, adminMiddleware } from "../auth/auth";
 
 function backupDir(): string {
@@ -47,7 +48,10 @@ export async function performBackup(): Promise<{ file: string; sizeBytes: number
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
   const file = `gijo-as-${stamp}.sqlite`;
   const dest = path.join(dir, file);
-  await db.backup(dest);
+  // db.backup() → VACUUM INTO 교체(2026-07-30). 이유: 저장 암호화를 켠 DB에서 backup() API는
+  // "incompatible source and target" 오류로 실패한다(실측). VACUUM INTO는 평문·암호화 양쪽에서
+  // 동작하고, **암호화 DB의 백업본은 암호화된 채로** 나온다 — 백업이 평문 구멍이 되지 않는다.
+  db.exec(`VACUUM INTO '${dest.replace(/'/g, "''")}'`);
 
   const lanceSrc = lanceDbDir();
   let lanceIncluded = false;
@@ -164,14 +168,25 @@ export function verifyBackupSnapshot(fileName?: string): BackupVerifyResult {
   let integrity: string | null = null;
   const tables: Record<string, number | null> = {};
   let schemaLatest: string | null = null;
-  let snap: import("better-sqlite3").Database | null = null;
+  let snap: import("better-sqlite3-multiple-ciphers").Database | null = null;
   const workDir = fs.mkdtempSync(path.join(os.tmpdir(), "gijo-verify-"));
   const workFile = path.join(workDir, "snapshot.sqlite");
   try {
     fs.copyFileSync(full, workFile);
     // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const Database = require("better-sqlite3") as typeof import("better-sqlite3");
+    const Database = require("better-sqlite3-multiple-ciphers") as typeof import("better-sqlite3-multiple-ciphers");
     snap = new Database(workFile, { readonly: true, fileMustExist: true });
+    // 저장 암호화가 켜져 있으면 백업본도 암호화돼 있다 — 같은 열쇠로 열어 검사한다.
+    // (열쇠 봉인이 안 풀리면 아래 integrity_check가 "file is not a database"로 실패해
+    //  problems에 그대로 드러난다 — 조용히 통과시키지 않는다.)
+    if (isDbEncrypted()) {
+      const dek = unsealWithMachine(process.env.GIJO_DB_PATH ?? path.join("data", "gijo-as.sqlite"));
+      if (dek) {
+        snap.pragma("cipher='sqlcipher'");
+        snap.pragma(`key="x'${toSqlcipherKey(dek)}'"`);
+        dek.fill(0);
+      }
+    }
     integrity = (snap.pragma("integrity_check", { simple: true }) as string) ?? null;
     if (integrity !== "ok") problems.push(`스냅샷이 손상됐습니다(integrity_check: ${integrity}) — 이 백업으로는 복구할 수 없습니다.`);
     for (const t of ESSENTIAL_TABLES) {
