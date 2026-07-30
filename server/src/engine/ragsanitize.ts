@@ -51,7 +51,14 @@ const INSTRUCTION_SIGNALS: { re: RegExp; label: string }[] = [
   { re: /(가드레일|안전장치|필터|검사)[^.\n]{0,20}(끄|해제|무시|우회|비활성)/, label: "안전장치 해제" },
 ];
 
-/** 문장 단위로 자른다. 한국어 종결(다./요.)과 줄바꿈·마침표를 모두 경계로 본다. */
+/**
+ * 문장 단위로 자른다 — **검사용으로만** 쓴다.
+ *
+ * ⚠ 실사고(2026-07-31): 잘라 놓고 `\n`으로 다시 붙이는 방식이었는데, 번호 목록의 "1."이
+ *   마침표로 끝나 **번호와 내용이 서로 다른 줄로 갈라졌다.** 지울 문장이 0개여도 문서가 망가진다.
+ *   그 결과 "월간 정기점검 절차" 답에서 시그니처·백업 항목이 사라졌다(QA-M04, 5/5 재현).
+ *   지금은 **원문을 그대로 두고 지울 문장만 잘라낸다**(sanitizeChunk 참고).
+ */
 function splitSentences(text: string): string[] {
   return text
     .split(/(?<=[.!?。])\s+|\n+/)
@@ -65,22 +72,30 @@ export interface SanitizeResult {
   labels: string[]; // 어떤 신호에 걸렸는지
 }
 
-/** 한 조각을 살균한다. 지시문 문장만 빼고 나머지는 그대로 둔다. */
+/**
+ * 한 조각을 살균한다. 지시문 문장만 빼고 **나머지는 글자 그대로** 둔다.
+ *
+ * ⚠ 예전에는 문장으로 잘라 `\n`으로 다시 붙였는데, 그게 번호 목록·표를 망가뜨렸다
+ *   (2026-07-31 QA-M04: "1."과 내용이 다른 줄로 갈라져 점검 7항목이 흩어졌다).
+ *   지금은 **원문에서 걸린 문장만 도려낸다** — 지울 게 없으면 원문이 한 글자도 안 바뀐다.
+ *   이건 시험으로 못 박아 뒀다("지울 게 없으면 원문 그대로").
+ */
 export function sanitizeChunk(chunk: string): SanitizeResult {
   const removed: string[] = [];
   const labels = new Set<string>();
-  const kept: string[] = [];
+  let text = chunk;
 
   for (const sentence of splitSentences(chunk)) {
     const hit = INSTRUCTION_SIGNALS.find((s) => s.re.test(sentence));
-    if (hit) {
-      removed.push(sentence.slice(0, 160));
-      labels.add(hit.label);
-      continue; // 이 문장은 모델에 닿지 않는다
-    }
-    kept.push(sentence);
+    if (!hit) continue;
+    removed.push(sentence.slice(0, 160));
+    labels.add(hit.label);
+    // 원문에서 그 문장만 들어낸다. 같은 문장이 여러 번 있으면 전부 들어낸다.
+    text = text.split(sentence).join("");
   }
-  return { text: kept.join("\n"), removed, labels: [...labels] };
+  // 문장을 들어낸 자리에 생긴 빈 줄·연속 공백만 정리한다(구조는 건드리지 않는다).
+  if (removed.length) text = text.replace(/[ \t]{2,}/g, " ").replace(/\n{3,}/g, "\n\n").trim();
+  return { text, removed, labels: [...labels] };
 }
 
 /**

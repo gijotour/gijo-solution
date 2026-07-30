@@ -39,7 +39,10 @@ const pages = await p.evaluate(() => {
     var label = lab.textContent.trim();
     if (seen.has(label)) return;
     seen.add(label);
-    if (label.indexOf("사무실") >= 0) return; // 별도 창 — 탭으로 안 연다
+    // 별도 창으로 여는 항목은 탭으로 안 열린다 — 훑으면 빈 화면(body=0)이 나와 거짓 실패가 된다.
+    // ⚠ 이름을 하나씩 빼지 않는다("사무실"만 빼 뒀다가 문서함을 더하니 바로 깨졌다, 2026-07-31).
+    //   창으로 여는 항목은 이름 끝에 "(창)"을 붙이는 것이 nav의 규약이므로 그걸로 판별한다.
+    if (/\(창\)/.test(label)) return;
     out.push({ label: label });
   });
   return out;

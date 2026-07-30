@@ -346,7 +346,11 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }
     // ⚠ 좁게 잡는다(검토 지적 2026-07-29). 앞의 '원격/정기'를 선택으로 두면 맨 "점검 일정"만으로
     // 걸려 **유지보수 점검**(maintenance_items — 다른 기능이다) 질문까지 삼켰다. 또 "정기점검
     // 돌려줘"는 실행 명령인데 조회로 갔다 — 명령형 어미는 여기서 제외하고 run_hardening_scan에 맡긴다.
-    re: /(원격|하드닝|정기)\s*점검\s*(스케줄|일정|주기)|정기점검.{0,6}(언제|어떻게|확인|알려|보여)|(원격|하드닝)\s*점검.{0,4}자동.{0,6}(돌|실행|되)/,
+    // ⚠ 또 넓었다(2026-07-31 QA-M04 재발). `정기점검.{0,6}알려`가 **"정기점검 절차를 알려줘"**까지
+    //   삼켰다 — 그건 스케줄 조회가 아니라 **점검을 어떻게 하는지** 묻는 지식 질문이다.
+    //   담당자는 점검일 아침에 그렇게 묻는데, 돌아온 답이 "등록된 스케줄이 없습니다"였다.
+    //   `절차·방법·항목·순서·단계·체크리스트`가 함께 있으면 이 도구가 아니다.
+    re: /^(?!.*(절차|방법|항목|순서|단계|체크\s*리스트|어떻게\s*하))(?:.*(?:(원격|하드닝|정기)\s*점검\s*(스케줄|일정|주기)|정기점검.{0,6}(언제|어떻게|확인|알려|보여)|(원격|하드닝)\s*점검.{0,4}자동.{0,6}(돌|실행|되)))/,
     tool: "hardening_schedule_list",
     args: {},
   },
@@ -370,6 +374,25 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }
 // 안 쓰고 "이 자산 취약점 1건" 같은 엉뚱한 답이 나왔다 — 매뉴얼이 들어 있는데도 찾아보지 않았다.
 // 어느 도구로 갈지 정해두지 않으면 LLM이 그냥 지어낸다.
 const EXPLAIN_VERB_RE = /설명|주요\s*기능|무슨\s*(제품|기능)|뭐(야|하는)|어떤\s*(제품|기능|역할)|알려줘|소개/;
+
+// 점검 절차·방법·항목을 묻는 말 — 스케줄 조회(hardening_schedule_list)와 갈라야 한다.
+// 저쪽은 "언제/일정"을 묻고 이쪽은 "어떻게/무엇을"을 묻는다. 답이 나오는 곳도 다르다
+// (저쪽=등록된 스케줄, 이쪽=지식베이스의 유지보수 절차 문서).
+// ⚠ 넓게 잡았다가 바로 다른 것을 깨뜨렸다(2026-07-31, 회귀 하네스가 잡음):
+//   "리눅스 SSH root 로그인 차단은 KISA 어떤 **점검항목**이야?"가 걸려 U-01 답이 사라졌다.
+//   그건 하드닝 **기준 코드**를 묻는 질문이지 유지보수 절차가 아니다. 그래서:
+//     · "점검항목"처럼 붙여 쓴 말은 제외한다(사이에 공백·수식어가 있어야 절차 질문이다)
+//     · 정기·월간·주간처럼 **주기어**가 함께 있거나 "유지보수"가 명시될 때만 잡는다
+//   좁히다 놓치면 답이 조금 헤맬 뿐이지만, 넓혀서 남의 답을 삼키면 그 기능이 죽는다.
+const MAINT_PROCEDURE_RE =
+  /((정기|월간|주간|분기|연간)\s*점검|유지보수(\s*점검)?)\s*.{0,8}(절차|방법|순서|단계|항목|체크\s*리스트)|(점검|유지보수)\s+(절차|방법|순서|단계|체크\s*리스트)/;
+
+// explain에 넘길 주제 — 장비 종류가 적혀 있으면 살려야 문서가 정확히 걸린다.
+const MAINT_DEVICE_RE = /(방화벽|IPS|IDS|WAF|VPN|백신|안티바이러스|스위치|라우터|웹서버|서버)/i;
+function maintenanceTopicOf(instruction: string): string {
+  const dev = instruction.match(MAINT_DEVICE_RE);
+  return (dev ? `${dev[1]} ` : "") + "정기점검 절차";
+}
 function namedProductIn(instruction: string): string | null {
   const q = instruction.replace(/\s+/g, "").toLowerCase();
   // 긴 이름부터 본다 — "Tenable Security Center"가 "Tenable"보다 먼저 걸리게.
@@ -402,6 +425,16 @@ function forcedToolFor(instruction: string, scope?: ToolScope): { tool: string; 
   if (available.has("explain") && EXPLAIN_VERB_RE.test(instruction)) {
     const product = namedProductIn(instruction);
     if (product) return { tool: "explain", args: { topic: product } };
+  }
+
+  // 점검 "절차·방법·항목"을 묻는 말은 **사내 문서 근거**로 결정적으로 잇는다.
+  // [2026-07-31 QA-M04 재발] "방화벽 월간 정기점검 절차를 알려줘"에 처음엔 스케줄 조회가
+  // (빈 스케줄), 그걸 고치자 이번엔 LLM이 분석 허브를 골라 취약점 목록이 돌아왔다.
+  // 담당자가 점검일 아침에 던지는 질문인데 두 번 다 엉뚱한 답이었다.
+  // 7B에 프롬프트로 타이르지 않고(확립 원칙) 경로를 코드로 못박는다 —
+  // 유지보수 절차는 지식베이스에 있고, explain이 그 문서를 근거로 모은다.
+  if (available.has("explain") && MAINT_PROCEDURE_RE.test(instruction)) {
+    return { tool: "explain", args: { topic: maintenanceTopicOf(instruction) } };
   }
 
   // "가장 급한 취약점 담당자·기한 배정해줘"처럼 배정/지정 지시면 우선순위 조회(today)로 못박지 않는다
