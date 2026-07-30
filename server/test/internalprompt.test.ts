@@ -125,6 +125,37 @@ describe("내부 프롬프트는 게이트를 다시 지나지 않는다", () =>
     resetGuardrailForTests();
   });
 
+  // ── LLM에 닿는 경로 전수 ──────────────────────────────────────────────────
+  // chat()을 거치지 않고 LLM에 **직접** 붙는 fetch가 진짜 우회 위험이다(gateway.ts가 생긴
+  // 이유이기도 하다 — 예전에 /api/llm/chat과 /api/memory/query가 그대로 통과했다).
+  // 새 직접 호출이 생기면 여기서 실패한다. 실패하면 지우지 말고 **판단해서 목록에 올릴 것**:
+  // 관문 뒤인가(정상), 의도적 raw인가(레드팀), 사용자 입력이 아닌가(헬스 프로브).
+  it("LLM에 직접 붙는 fetch는 검토된 곳만 있다", () => {
+    const 검토됨: Record<string, string> = {
+      "llm.ts": "chat() 내부 — 관문(gateUserInput)을 이미 지난 뒤다",
+      "redteam.ts": "의도적 raw 호출 — 공격 페이로드를 보내야 하므로 관문을 지나면 안 된다",
+      "localengine.ts": "hang 감시 프로브('ping') — 사용자 입력이 아니다",
+      "cloudllm.ts": "외부 클라우드 — askCloud가 gateUserInput(…, \"cloud\")를 먼저 지난다",
+    };
+    const 발견: string[] = [];
+    for (const f of fs.readdirSync(engineDir).filter((x) => x.endsWith(".ts"))) {
+      const src = fs.readFileSync(path.join(engineDir, f), "utf8");
+      if (/fetch\(\s*`?[^`)]*\/(v1\/)?chat\/completions/.test(src) && !(f in 검토됨)) 발견.push(f);
+    }
+    expect(발견, "LLM에 직접 붙는 새 경로다 — 관문을 지나는지 판단하고 이 목록에 근거와 함께 올릴 것").toEqual([]);
+  });
+
+  it("클라우드로 나가는 질문도 관문을 지난다 — 밖으로 나가는 경로일수록 엄격해야 한다", () => {
+    const src = fs.readFileSync(path.join(engineDir, "cloudllm.ts"), "utf8");
+    const fn = src.slice(src.indexOf("export async function askCloud"));
+    const body = fn.slice(0, fn.indexOf("\n}\n"));
+    expect(body).toMatch(/gateUserInput\([^)]*"cloud"\)/);
+    // 관문이 **실제로 막아야** 한다 — 부르기만 하고 결과를 안 보면 소용없다.
+    expect(body).toMatch(/!gate\.allowed/);
+    // 내부정보 유출 게이트(screenForCloud)와 둘 다 있어야 한다 — 서로 다른 검사다.
+    expect(body).toMatch(/screenForCloud/);
+  });
+
   it("dispatcher가 사용자 지시를 먼저 검사한다 — trusted의 전제", () => {
     const d = fs.readFileSync(path.join(__dirname, "..", "src", "engine", "dispatcher.ts"), "utf8");
     // 내부 재진입을 trusted로 넘기는 근거는 "사용자 입력은 이미 관문을 지났다"는 것이다.

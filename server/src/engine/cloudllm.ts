@@ -9,6 +9,7 @@
 // 키는 cryptopack.ts로 암호화 저장(cti.ts/email.ts와 동일 패턴).
 
 import type { Express, Request } from "express";
+import { gateUserInput } from "./gateway";
 import * as crypto from "crypto";
 import { authMiddleware, adminMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
@@ -298,6 +299,15 @@ export async function askCloud(question: string, user?: GijoUser): Promise<Cloud
   const provider = activeProvider();
   const apiKey = providerKey(provider);
   if (!apiKey) return { routedToCloud: false, blocked: false, reasons: [], error: `${PROVIDER_LABEL[provider]} API 키가 설정돼 있지 않습니다.` };
+
+  // 입력 관문 — 인젝션 시도는 밖으로 내보내지 않는다. 아래 screenForCloud(내부정보 유출 방지)와
+  // 다른 검사다: 이쪽은 "이 요청이 AI를 조종하려는 것인가", 저쪽은 "우리 자료가 섞였는가".
+  // 밖으로 나가는 경로일수록 관문을 먼저 지나야 한다(2026-07-30 — 여기만 관문 밖에 있었다).
+  const gate = gateUserInput(q, "cloud");
+  if (!gate.allowed) {
+    logEgress({ userId: user?.id, provider, decision: "blocked", reasons: gate.categories, question: q });
+    return { routedToCloud: false, blocked: true, reasons: gate.categories, error: gate.message };
+  }
 
   // 결정적 유출 방지 게이트 — 내부 식별자가 하나라도 걸리면 클라우드로 보내지 않는다.
   const decision = screenForCloud(q);

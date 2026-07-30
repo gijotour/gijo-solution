@@ -15,7 +15,10 @@
 import { guardInput } from "./guardrail";
 import type { AttackCategory } from "./redteam";
 
-export type GateSource = "chat" | "dispatch" | "memory-query" | "capability";
+// cloud — 외부 클라우드 LLM으로 나가는 질문. **밖으로 나가는 경로일수록 관문을 지나야 한다**.
+// 2026-07-30 전수 점검에서 이 입구만 관문 밖에 있었다(내부정보 유출 게이트 screenForCloud는
+// 지나지만 인젝션 검사는 아니었다). gateway가 선언한 "모든 입구" 원칙을 실제로 지킨다.
+export type GateSource = "chat" | "dispatch" | "memory-query" | "capability" | "cloud";
 
 export interface GateResult {
   allowed: boolean; // false면 호출자는 실행을 멈추고 거절 사유를 돌려줘야 한다
