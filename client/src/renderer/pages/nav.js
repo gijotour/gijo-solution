@@ -28,6 +28,8 @@
   var TOP = [
     { page: "dashboard.html", label: "대시보드", fixed: true },
     { office: true, label: "팀 사무실 (창)", ic: "🏢", fixed: true },
+    // 문서함 — 가이드·아키텍처를 읽는 별도 창(주소가 없어 별표 대상 아님, 팀 사무실과 같음)
+    { docbox: true, label: "문서함 (창)", ic: "📚", fixed: true },
     { page: "sessions.html", label: "작업 내역", fixed: true },
   ];
 

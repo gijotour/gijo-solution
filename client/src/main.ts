@@ -13,6 +13,7 @@ import { URL } from "url";
 import { isDangerous } from "./terminalPolicy";
 
 let mainWindow: BrowserWindow | null = null;
+let docboxWindow: BrowserWindow | null = null; // 문서함 별도 창 — 제품 화면 셸(탭) 밖에서 돈다(사용자 결정 2026-07-30)
 let officeWindow: BrowserWindow | null = null; // "우리 AI 팀 사무실" 별도 창(시안 B) — 관제 모니터 상시용
 let quitConfirmed = false; // 메인 창 닫기 확인을 통과했는가 — 재시작·업데이트는 true로 건너뛴다
 let bundledServerProcess: ChildProcess | null = null;
@@ -231,6 +232,35 @@ ipcMain.handle("office:open", async () => {
   bindZoom(officeWindow); // 사무실 창도 같은 화면 크기를 따른다
   officeWindow.on("closed", () => { officeWindow = null; });
   await officeWindow.loadFile(path.join(__dirname, "../src/renderer/pages/office.html"));
+});
+
+// 문서함 — 가이드·아키텍처를 읽는 별도 창. 제품 화면 탭 안에 넣지 않는다:
+// 문서를 옆에 띄워두고 제품을 조작할 수 있어야 한다(사용자 지시 2026-07-30
+// "클라이언트 실행시 별도로 사용 — 제품 안에서 동작하는 게 아니고").
+ipcMain.handle("docbox:open", async () => {
+  if (docboxWindow && !docboxWindow.isDestroyed()) {
+    docboxWindow.focus();
+    return;
+  }
+  docboxWindow = new BrowserWindow({
+    // 2단(목차 250 + 본문)이라 좁으면 표가 깨진다. 화면이 작으면 그 화면에 맞춘다.
+    width: Math.min(1180, Math.max(920, screen.getPrimaryDisplay().workAreaSize.width - 200)),
+    height: Math.min(860, Math.max(640, screen.getPrimaryDisplay().workAreaSize.height - 140)),
+    minWidth: 860,
+    minHeight: 560,
+    backgroundColor: "#0a0e1a",
+    title: "GIJO AS — 문서함",
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+  docboxWindow.removeMenu();
+  bindZoom(docboxWindow); // 문서함도 같은 화면 크기(배율)를 따른다
+  docboxWindow.on("closed", () => { docboxWindow = null; });
+  await docboxWindow.loadFile(path.join(__dirname, "../src/renderer/pages/docbox.html"));
 });
 
 // 관제 모니터 상시용 — 항상 위 고정 토글(office.html 헤더의 📌 버튼).

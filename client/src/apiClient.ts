@@ -1989,3 +1989,14 @@ export const dbCryptApi = {
   rotateRecovery: () =>
     request<{ recoveryKey: string; notice: string }>("/api/dbcrypt/rotate-recovery", { method: "POST" }),
 };
+
+// 문서함 — 출하 문서를 담당자가 직접 읽는 통로(2026-07-31).
+// id는 서버 목록이 준 것만 쓴다 — 클라이언트가 파일 경로를 정하지 않는다(서버가 화이트리스트).
+export const docboxApi = {
+  list: () => request<{ documents: { id: string; title: string; group: "guide" | "policy"; why?: string }[] }>("/api/docbox"),
+  read: (id: string) => request<{ id: string; title: string; markdown: string }>(`/api/docbox/${encodeURIComponent(id)}`),
+  search: (q: string) =>
+    request<{ results: { id: string; title: string; hits: number; snippet: string }[] }>(
+      `/api/docbox/search?q=${encodeURIComponent(q)}`
+    ),
+};

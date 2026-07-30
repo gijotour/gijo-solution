@@ -40,6 +40,7 @@ import { registerModelLicenseRoutes } from "./engine/modellicense";
 import { registerPreflightRoutes } from "./engine/preflight";
 import { registerBackupRoutes } from "./engine/backup";
 import { registerDbCryptRoutes } from "./engine/dbcrypt";
+import { registerDocboxRoutes } from "./engine/docbox";
 import { registerGitSyncRoutes } from "./engine/gitsync";
 import { registerHfModelsRoutes } from "./engine/hfmodels";
 import { registerIntentRoutes } from "./engine/intent";
@@ -164,6 +165,7 @@ export function createApp(): Express {
   registerPreflightRoutes(app);
   registerBackupRoutes(app);
   registerDbCryptRoutes(app); // 저장 암호화 상태·복구 열쇠 재발급
+  registerDocboxRoutes(app); // 문서함 — 출하 문서를 담당자가 직접 읽는 통로
   registerGitSyncRoutes(app);
   registerHfModelsRoutes(app);
   registerIntentRoutes(app);

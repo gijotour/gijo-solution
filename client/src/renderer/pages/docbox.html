@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 문서함</title>
+<style>
+/* 우리 제품 토큰 그대로(settings.html·audit.html과 동일) — 시안 mockups/docbox 승인본 */
+:root{
+  --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;
+  --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;
+  --teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+html,body{height:100%;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;display:flex;flex-direction:column;}
+
+.head{padding:14px 18px 10px;border-bottom:1px solid var(--border);flex:0 0 auto;}
+.ident{font-size:12.5px;color:var(--muted);}
+.search{margin-top:9px;width:100%;background:var(--panel-2);border:1px solid var(--border-strong);
+        border-radius:8px;padding:8px 12px;font-size:12.5px;color:var(--text);outline:none;}
+.search::placeholder{color:var(--muted-2);}
+.search:focus{border-color:var(--blue);}
+
+.body{display:grid;grid-template-columns:250px 1fr;flex:1 1 auto;min-height:0;}
+
+/* 왼쪽 목차 — 자산 화면 카테고리 트리와 같은 결 */
+.toc{border-right:1px solid var(--border);padding:12px 10px;display:flex;flex-direction:column;overflow-y:auto;}
+.grp{margin-bottom:6px;}
+.grp-h{display:flex;align-items:center;gap:7px;padding:7px 9px;font-size:11.5px;font-weight:800;
+       color:var(--muted);cursor:pointer;border-radius:7px;user-select:none;}
+.grp-h:hover{background:rgba(255,255,255,.03);}
+.grp-h .ar{font-size:9px;color:var(--muted-2);width:9px;}
+.badge{margin-left:auto;background:rgba(255,255,255,.07);color:var(--muted);font-size:10px;
+       font-weight:800;padding:1px 7px;border-radius:10px;}
+.grp.closed .doc{display:none;}
+.doc{padding:7px 9px 7px 26px;font-size:12.5px;color:var(--muted);cursor:pointer;border-radius:7px;line-height:1.45;}
+.doc:hover{background:rgba(255,255,255,.04);color:var(--text);}
+.doc.on{background:rgba(59,130,246,.12);color:#fff;box-shadow:inset 3px 0 0 var(--blue);}
+.doc .hit{color:var(--amber);font-size:10.5px;font-weight:800;margin-left:5px;}
+.toc-foot{margin-top:auto;padding-top:10px;border-top:1px solid var(--border);}
+.btn-req{width:100%;background:rgba(30,185,128,.10);border:1px solid var(--teal);color:#6ee7a0;
+         border-radius:8px;padding:9px;font-size:12.5px;font-weight:800;cursor:pointer;}
+.btn-req:hover{background:rgba(30,185,128,.18);}
+
+/* 오른쪽 본문 — 내부 스크롤 */
+.view{padding:20px 26px 40px;overflow-y:auto;min-height:0;}
+.view .empty{color:var(--muted-2);font-size:13px;padding:40px 0;text-align:center;}
+.md h1{font-size:19px;margin:0 0 14px;color:#fff;line-height:1.4;}
+.md h2{font-size:15px;margin:22px 0 9px;color:#fff;padding-bottom:5px;border-bottom:1px solid var(--border);line-height:1.4;}
+.md h3{font-size:13.5px;margin:16px 0 7px;color:var(--blue-light);}
+.md p{color:var(--text);line-height:1.85;margin-bottom:10px;font-size:12.5px;}
+.md ul,.md ol{margin:0 0 12px 20px;color:var(--text);line-height:1.85;font-size:12.5px;}
+.md li{margin-bottom:3px;}
+.md table{border-collapse:collapse;width:100%;margin:10px 0 16px;font-size:12px;display:block;overflow-x:auto;}
+.md th{background:var(--panel-2);color:var(--muted);text-align:left;padding:7px 10px;border:1px solid var(--border);font-weight:700;white-space:nowrap;}
+.md td{padding:7px 10px;border:1px solid var(--border);color:var(--text);}
+.md pre{background:#05070d;border:1px solid var(--border-strong);border-radius:8px;padding:12px;
+        overflow-x:auto;font:11.5px/1.6 Consolas,"Cascadia Mono",monospace;color:var(--muted);margin-bottom:12px;}
+.md code{background:rgba(255,255,255,.06);border-radius:4px;padding:1px 5px;font:11.5px Consolas,monospace;color:#a7d3ff;}
+.md pre code{background:none;padding:0;color:inherit;}
+.md blockquote{border-left:3px solid var(--border-strong);padding:2px 0 2px 12px;margin:0 0 12px;color:var(--muted);}
+.md hr{border:none;border-top:1px solid var(--border);margin:18px 0;}
+.md a{color:var(--blue-light);}
+.md strong{color:#fff;}
+.md img{max-width:100%;border-radius:8px;border:1px solid var(--border);}
+.md mark{background:rgba(240,160,32,.28);color:#fff;border-radius:3px;padding:0 2px;}
+
+.status{padding:8px 18px;border-top:1px solid var(--border);font-size:11px;color:var(--muted-2);flex:0 0 auto;}
+</style>
+</head>
+<body>
+
+<!-- 화면엔 정체성 한 줄만 — 사용법·주의사항은 챗봇(screenguide)에 있다(우리 규약) -->
+<div class="head">
+  <div class="ident">가이드를 읽고, 개발팀에 보낼 요청을 만듭니다.</div>
+  <input class="search" id="q" placeholder="🔍 문서 검색 — 제목·본문에서 찾습니다" autocomplete="off">
+</div>
+
+<div class="body">
+  <div class="toc" id="toc"><div style="color:var(--muted-2);font-size:12px;padding:8px">불러오는 중…</div></div>
+  <div class="view" id="view"><div class="empty">왼쪽에서 문서를 고르면 여기에 열립니다.</div></div>
+</div>
+
+<div class="status" id="status"></div>
+
+<script>
+(function () {
+  var api = window.gijo;
+  var docs = [];
+  var current = null;
+  var searchTerm = "";
+  var searchHits = null;   // 검색 결과 히트 수 — open()이 목차를 다시 그려도 유지되게 보관한다
+
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+
+  // ── 마크다운 렌더러 ──────────────────────────────────────────────────────
+  // 외부 라이브러리를 쓰지 않는다: 폐쇄망이라 CDN이 없고, 우리 문서는 우리가 쓴 것이라
+  // 문법 범위가 좁다(제목·표·목록·코드·인용·강조·링크). 필요한 만큼만 직접 그린다.
+  // ⚠ 모든 텍스트는 esc()를 먼저 지난다 — 문서에 <script>가 들어 있어도 실행되지 않는다.
+  function inline(t) {
+    return esc(t)
+      .replace(/`([^`]+)`/g, "<code>$1</code>")
+      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
+      .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>")
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, function (_m, txt, href) {
+        return /^https?:/i.test(href) ? '<a href="' + href + '" target="_blank" rel="noreferrer">' + txt + "</a>" : txt;
+      });
+  }
+
+  function renderMd(src) {
+    var lines = String(src || "").split(/\r?\n/);
+    var out = [];
+    var i = 0;
+    while (i < lines.length) {
+      var L = lines[i];
+
+      // 코드 블록
+      if (/^```/.test(L)) {
+        var buf = [];
+        i++;
+        while (i < lines.length && !/^```/.test(lines[i])) { buf.push(lines[i]); i++; }
+        i++;
+        out.push("<pre><code>" + esc(buf.join("\n")) + "</code></pre>");
+        continue;
+      }
+      // 표 — 다음 줄이 구분선이면 표로 본다
+      if (/\|/.test(L) && i + 1 < lines.length && /^\s*\|?[\s:|-]+\|[\s:|-]*$/.test(lines[i + 1])) {
+        var cells = function (row) {
+          return row.replace(/^\s*\|/, "").replace(/\|\s*$/, "").split("|").map(function (c) { return c.trim(); });
+        };
+        var head = cells(L);
+        i += 2;
+        var rows = [];
+        while (i < lines.length && /\|/.test(lines[i]) && lines[i].trim()) { rows.push(cells(lines[i])); i++; }
+        out.push(
+          "<table><thead><tr>" + head.map(function (h) { return "<th>" + inline(h) + "</th>"; }).join("") +
+          "</tr></thead><tbody>" +
+          rows.map(function (r) { return "<tr>" + r.map(function (c) { return "<td>" + inline(c) + "</td>"; }).join("") + "</tr>"; }).join("") +
+          "</tbody></table>"
+        );
+        continue;
+      }
+      // 제목
+      var h = L.match(/^(#{1,4})\s+(.*)$/);
+      if (h) { var lv = Math.min(h[1].length, 3); out.push("<h" + lv + ">" + inline(h[2]) + "</h" + lv + ">"); i++; continue; }
+      // 구분선
+      if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(L)) { out.push("<hr>"); i++; continue; }
+      // 인용
+      if (/^\s*>/.test(L)) {
+        var q = [];
+        while (i < lines.length && /^\s*>/.test(lines[i])) { q.push(lines[i].replace(/^\s*>\s?/, "")); i++; }
+        out.push("<blockquote>" + q.map(inline).join("<br>") + "</blockquote>");
+        continue;
+      }
+      // 목록
+      if (/^\s*([-*·]|\d+\.)\s+/.test(L)) {
+        var ordered = /^\s*\d+\./.test(L);
+        var items = [];
+        while (i < lines.length && /^\s*([-*·]|\d+\.)\s+/.test(lines[i])) {
+          items.push(lines[i].replace(/^\s*([-*·]|\d+\.)\s+/, ""));
+          i++;
+        }
+        var tag = ordered ? "ol" : "ul";
+        out.push("<" + tag + ">" + items.map(function (t) { return "<li>" + inline(t) + "</li>"; }).join("") + "</" + tag + ">");
+        continue;
+      }
+      // 빈 줄
+      if (!L.trim()) { i++; continue; }
+      // 문단 — 이어지는 줄을 묶는다
+      var para = [L];
+      i++;
+      while (i < lines.length && lines[i].trim() && !/^(#{1,4}\s|```|\s*>|\s*([-*·]|\d+\.)\s|\s*(-{3,}|\*{3,}))/.test(lines[i]) && !/\|/.test(lines[i])) {
+        para.push(lines[i]); i++;
+      }
+      out.push("<p>" + para.map(inline).join(" ") + "</p>");
+    }
+    return out.join("\n");
+  }
+
+  // 검색어를 본문에서 눈에 띄게 — 렌더된 HTML의 **텍스트 노드만** 건드린다(태그가 깨지지 않게).
+  function highlight(container, term) {
+    if (!term || term.length < 2) return;
+    var re = new RegExp(term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+    var walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null);
+    var targets = [];
+    var n;
+    while ((n = walker.nextNode())) if (re.test(n.nodeValue)) targets.push(n);
+    targets.forEach(function (node) {
+      var span = document.createElement("span");
+      span.innerHTML = esc(node.nodeValue).replace(re, function (m) { return "<mark>" + m + "</mark>"; });
+      node.parentNode.replaceChild(span, node);
+    });
+  }
+
+  // ── 목차 ────────────────────────────────────────────────────────────────
+  var GROUP = { guide: { icon: "📚", label: "사용 안내" }, policy: { icon: "📐", label: "업무 지침" } };
+
+  function renderToc(hits) {
+    if (hits !== undefined) searchHits = hits;   // 인자를 안 주면 지금 것을 유지한다
+    var el = document.getElementById("toc");
+    var byGroup = { guide: [], policy: [] };
+    docs.forEach(function (d) { (byGroup[d.group] || byGroup.policy).push(d); });
+
+    var html = "";
+    ["guide", "policy"].forEach(function (g) {
+      var list = byGroup[g];
+      var hitsNow = searchHits;
+      if (!list.length) return;
+      html +=
+        '<div class="grp" data-grp="' + g + '">' +
+        '<div class="grp-h"><span class="ar">▼</span>' + GROUP[g].icon + " " + GROUP[g].label +
+        '<span class="badge">' + list.length + "</span></div>" +
+        list.map(function (d) {
+          var h = hitsNow && hitsNow[d.id];
+          return '<div class="doc' + (current === d.id ? " on" : "") + '" data-id="' + esc(d.id) + '">' +
+            esc(d.title) + (h ? '<span class="hit">' + h + "</span>" : "") + "</div>";
+        }).join("") +
+        "</div>";
+    });
+    // 접기는 배지가 필수(우리 규약) — 위에서 배지를 항상 붙였다
+    html += ""; // 요청 버튼은 아래 고정 영역에
+    el.innerHTML = html +
+      '<div class="toc-foot"><button class="btn-req" id="btnReq">✏ 요청 만들기</button></div>';
+
+    el.querySelectorAll(".grp-h").forEach(function (h) {
+      h.addEventListener("click", function () {
+        var g = h.parentNode;
+        g.classList.toggle("closed");
+        h.querySelector(".ar").textContent = g.classList.contains("closed") ? "▶" : "▼";
+      });
+    });
+    el.querySelectorAll(".doc").forEach(function (d) {
+      d.addEventListener("click", function () { open(d.getAttribute("data-id")); });
+    });
+    document.getElementById("btnReq").addEventListener("click", function () {
+      // 쓰기 모드는 다음 단계에서 붙인다 — 없는 기능을 있는 척하지 않는다.
+      document.getElementById("status").textContent =
+        "요청 만들기는 준비 중입니다 — 다음 업데이트에서 열립니다.";
+    });
+  }
+
+  async function open(id) {
+    current = id;
+    renderToc(undefined);  // 배지 유지 — 검색 중에 문서를 열어도 히트 수가 남아야 한다
+    var view = document.getElementById("view");
+    view.innerHTML = '<div class="empty">여는 중…</div>';
+    try {
+      var doc = await api.docboxRead(id);
+      view.innerHTML = '<div class="md">' + renderMd(doc.markdown) + "</div>";
+      view.scrollTop = 0;
+      highlight(view, searchTerm);
+      document.getElementById("status").textContent = doc.title + " · " + doc.markdown.length.toLocaleString() + "자";
+    } catch (e) {
+      view.innerHTML = '<div class="empty">문서를 열지 못했습니다 — ' + esc((e && e.message) || e) + "</div>";
+    }
+  }
+
+  async function load() {
+    try {
+      var r = await api.docboxList();
+      docs = r.documents || [];
+      renderToc(null);
+      document.getElementById("status").textContent = "문서 " + docs.length + "건";
+      if (docs.length) open(docs[0].id);
+    } catch (e) {
+      document.getElementById("toc").innerHTML =
+        '<div style="color:var(--muted-2);font-size:12px;padding:8px">목록을 불러오지 못했습니다.</div>';
+      document.getElementById("status").textContent = (e && e.message) || String(e);
+    }
+  }
+
+  // ── 검색 ────────────────────────────────────────────────────────────────
+  var timer = null;
+  document.getElementById("q").addEventListener("input", function (e) {
+    clearTimeout(timer);
+    var v = e.target.value.trim();
+    timer = setTimeout(async function () {
+      searchTerm = v;
+      if (v.length < 2) { renderToc(null); document.getElementById("status").textContent = "문서 " + docs.length + "건"; return; }
+      try {
+        var r = await api.docboxSearch(v);
+        var hits = {};
+        (r.results || []).forEach(function (x) { hits[x.id] = x.hits; });
+        renderToc(hits);
+        var n = (r.results || []).length;
+        document.getElementById("status").textContent =
+          n ? '"' + v + '" — 문서 ' + n + "건에서 발견" : '"' + v + '" — 찾지 못했습니다';
+        if (n) { await open(r.results[0].id); document.getElementById("status").textContent = '"' + v + '" — 문서 ' + n + "건에서 발견"; }
+      } catch (e2) { /* 검색 실패는 조용히 — 목록은 그대로 */ }
+    }, 250);
+  });
+
+  load();
+})();
+</script>
+</body>
+</html>

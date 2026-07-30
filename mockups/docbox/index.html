@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>시안 — 문서함 (별도 창)</title>
+<style>
+  /* 우리 제품 토큰 그대로 (settings.html·audit.html과 동일) */
+  :root{
+    --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+    --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;
+    --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;
+    --teal:#1eb980;--purple:#8b7cf0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;}
+  .note{max-width:1180px;margin:16px auto;color:var(--muted);font-size:12px;border:1px dashed var(--border-strong);border-radius:10px;padding:10px 14px;line-height:1.7;}
+  .note b{color:var(--text);}
+
+  /* ── 창 ── */
+  .win{max-width:1180px;margin:0 auto 26px;border:1px solid var(--border-strong);border-radius:12px;overflow:hidden;background:var(--bg);}
+  .titlebar{background:var(--panel-2);border-bottom:1px solid var(--border);padding:9px 14px;display:flex;align-items:center;gap:10px;font-size:12px;color:var(--muted);}
+  .titlebar .dot{width:10px;height:10px;border-radius:50%;background:#3a4155;}
+  .titlebar .t{font-weight:700;color:var(--text);}
+
+  .head{padding:14px 18px 10px;border-bottom:1px solid var(--border);}
+  .ident{font-size:12.5px;color:var(--muted);}      /* 정체성 한 줄 — 큰 제목 없음(3.5.0) */
+  .search{margin-top:9px;width:100%;background:var(--panel-2);border:1px solid var(--border-strong);
+          border-radius:8px;padding:8px 12px;font-size:12.5px;color:var(--text);outline:none;}
+  .search::placeholder{color:var(--muted-2);}
+
+  .body{display:grid;grid-template-columns:250px 1fr;min-height:520px;}
+  /* 왼쪽 목차 — 자산 화면 카테고리 트리와 같은 결 */
+  .toc{border-right:1px solid var(--border);padding:12px 10px;display:flex;flex-direction:column;}
+  .grp{margin-bottom:6px;}
+  .grp-h{display:flex;align-items:center;gap:7px;padding:7px 9px;font-size:11.5px;font-weight:800;
+         color:var(--muted);cursor:pointer;border-radius:7px;}
+  .grp-h:hover{background:rgba(255,255,255,.03);}
+  .grp-h .ar{font-size:9px;color:var(--muted-2);}
+  .badge{margin-left:auto;background:rgba(255,255,255,.07);color:var(--muted);font-size:10px;
+         font-weight:800;padding:1px 7px;border-radius:10px;}
+  .doc{padding:7px 9px 7px 26px;font-size:12.5px;color:var(--muted);cursor:pointer;border-radius:7px;line-height:1.45;}
+  .doc:hover{background:rgba(255,255,255,.04);color:var(--text);}
+  .doc.on{background:rgba(59,130,246,.12);color:#fff;box-shadow:inset 3px 0 0 var(--blue);}
+  .toc-foot{margin-top:auto;padding-top:10px;border-top:1px solid var(--border);}
+  .btn-req{width:100%;background:rgba(30,185,128,.10);border:1px solid var(--teal);color:#6ee7a0;
+           border-radius:8px;padding:9px;font-size:12.5px;font-weight:800;cursor:pointer;}
+
+  /* 오른쪽 본문 — 내부 스크롤(허브 규약) */
+  .view{padding:20px 26px;overflow-y:auto;max-height:520px;}
+  .view h1{font-size:19px;margin:0 0 4px;color:#fff;}
+  .view .meta{font-size:11px;color:var(--muted-2);margin-bottom:16px;}
+  .view h2{font-size:14.5px;margin:20px 0 8px;color:#fff;padding-bottom:5px;border-bottom:1px solid var(--border);}
+  .view p{color:var(--text);line-height:1.85;margin-bottom:10px;font-size:12.5px;}
+  .view table{border-collapse:collapse;width:100%;margin:10px 0 14px;font-size:12px;}
+  .view th{background:var(--panel-2);color:var(--muted);text-align:left;padding:7px 10px;border:1px solid var(--border);font-weight:700;}
+  .view td{padding:7px 10px;border:1px solid var(--border);color:var(--text);}
+  .view pre{background:#05070d;border:1px solid var(--border-strong);border-radius:8px;padding:12px;
+            overflow-x:auto;font:11.5px/1.6 Consolas,monospace;color:var(--muted);margin-bottom:12px;}
+  .warn{border-left:3px solid var(--amber);background:rgba(240,160,32,.07);border-radius:8px;
+        padding:10px 12px;font-size:12px;line-height:1.75;margin:12px 0;}
+  .warn b{color:var(--amber);}
+
+  /* ── 작성 모드 ── */
+  .chips{display:flex;gap:7px;margin-bottom:14px;flex-wrap:wrap;}
+  .chip{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);
+        padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;}
+  .chip.on{background:rgba(59,130,246,.15);border-color:var(--blue);color:var(--blue-light);}
+  .fld{margin-bottom:12px;}
+  .fld label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:5px;font-weight:700;}
+  .fld input,.fld textarea{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);
+        border-radius:8px;padding:9px 11px;color:var(--text);font-size:12.5px;font-family:inherit;outline:none;}
+  .fld textarea{min-height:110px;resize:vertical;line-height:1.7;}
+  .shots{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 4px;}
+  .shot{width:104px;height:68px;border:1px solid var(--border-strong);border-radius:7px;
+        background:linear-gradient(135deg,#1b2436,#0e1526);position:relative;overflow:hidden;}
+  .shot .x{position:absolute;top:3px;right:5px;color:var(--muted);font-size:11px;cursor:pointer;}
+  .shot .cap{position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.55);
+             font-size:9.5px;color:var(--muted);padding:2px 5px;}
+  .drop{border:1px dashed var(--border-strong);border-radius:8px;padding:14px;text-align:center;
+        font-size:11.5px;color:var(--muted-2);}
+  .auto{background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:11px 13px;font-size:11.5px;color:var(--muted);line-height:1.8;}
+  .auto b{color:var(--text);}
+  .acts{display:flex;gap:8px;margin-top:14px;align-items:center;}
+  button.g{background:rgba(30,185,128,.16);border:1px solid var(--teal);color:#6ee7a0;
+        border-radius:8px;padding:9px 16px;font-size:12.5px;font-weight:800;cursor:pointer;}
+  button.n{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);
+        border-radius:8px;padding:9px 16px;font-size:12.5px;font-weight:700;cursor:pointer;}
+  .sz{margin-left:auto;font-size:11px;color:var(--muted-2);}
+  .mask{display:inline-block;background:rgba(240,160,32,.14);color:var(--amber);font-size:10.5px;
+        font-weight:800;padding:1px 8px;border-radius:10px;}
+  .sec-title{font-size:12px;font-weight:800;color:var(--muted);margin:16px 0 7px;}
+</style>
+</head>
+<body>
+
+<div class="note">
+  <b>시안 — 문서함(별도 창).</b> 사이드바 <b>📚 문서함 (창)</b>으로 띄웁니다(팀 사무실 창과 같은 방식 — 제품 화면 탭 안이 아닙니다).
+  왼쪽 목차에서 문서를 읽고, 맨 아래 <b>[✏ 요청 만들기]</b>를 누르면 <b>오른쪽만</b> 작성 모드로 바뀝니다(창을 또 띄우지 않습니다).
+  전달은 <b>파일 저장</b>만 — 메일 발송 기능은 만들지 않습니다.<br>
+  우리 토큰(<code>--bg:#0a0e1a · --teal:#1eb980</code> · Pretendard)과 규약(큰 제목 없음 · 접기+배지 · 사용법은 챗봇)을 그대로 씁니다.
+</div>
+
+<!-- ════════ ① 읽기 모드 ════════ -->
+<div class="note" style="border-style:solid;border-color:var(--border);"><b>① 읽기 모드</b> — 출하 문서 8건</div>
+<div class="win">
+  <div class="titlebar"><span class="dot"></span><span class="t">GIJO AS — 문서함</span></div>
+  <div class="head">
+    <div class="ident">가이드를 읽고, 개발팀에 보낼 요청을 만듭니다.</div>
+    <input class="search" placeholder="🔍 문서 검색 — 제목·본문에서 찾습니다">
+  </div>
+  <div class="body">
+    <div class="toc">
+      <div class="grp">
+        <div class="grp-h"><span class="ar">▼</span>📚 사용 안내<span class="badge">4</span></div>
+        <div class="doc">사용자 매뉴얼</div>
+        <div class="doc">보안담당자 실무매뉴얼</div>
+        <div class="doc">보안담당자 활용가이드</div>
+        <div class="doc">제품 소개</div>
+      </div>
+      <div class="grp">
+        <div class="grp-h"><span class="ar">▼</span>📐 업무 지침<span class="badge">4</span></div>
+        <div class="doc on">아키텍처 개요</div>
+        <div class="doc">AI-BOM 검토 가이드</div>
+        <div class="doc">취약점관리 지침</div>
+        <div class="doc">보안제품관리 지침</div>
+      </div>
+      <div class="toc-foot"><button class="btn-req">✏ 요청 만들기</button></div>
+    </div>
+
+    <div class="view">
+      <h1>아키텍처 개요</h1>
+      <div class="meta">보안담당자·보안성 검토 담당자용 · 최근 갱신 2026-07-30</div>
+
+      <h2>1. 한 장 요약</h2>
+      <pre>          ┌───────────────────────────────┐
+          │      담당자 PC (Windows)      │
+          │   GIJO AS 클라이언트          │
+          └───────────────┬───────────────┘
+                          │ 사내망
+          ┌───────────────▼───────────────┐
+          │   사내 GPU 서버 (온프레미스)  │
+          │  DB(암호화) · 지식베이스 · LLM│
+          └───────────────────────────────┘
+              ⛔ 인터넷 연결 불필요</pre>
+      <p><b>핵심 한 줄</b>: 화면·데이터·AI가 <b>전부 사내 서버 안</b>에 있습니다. 질문도 답도 회사 밖으로 나가지 않습니다.</p>
+
+      <h2>3. 우리 데이터는 어디에 있나</h2>
+      <table>
+        <tr><th>저장소</th><th>무엇이 들어가나</th><th>보호</th></tr>
+        <tr><td>데이터베이스</td><td>자산·취약점·계정·작업 기록</td><td>저장 암호화(AES-256) 선택</td></tr>
+        <tr><td>지식베이스</td><td>올린 문서와 검색 색인</td><td>서버 안</td></tr>
+      </table>
+      <div class="warn"><b>⚠ 정직하게</b> — 저장 암호화를 켜면 데이터베이스는 잠기지만,
+        <b>지식베이스(문서 원문)는 이 암호화 대상이 아닙니다.</b> 저장소 방식이 달라서입니다.</div>
+
+      <h2>9. 지키는 것과 못 지키는 것</h2>
+      <table>
+        <tr><th>지킵니다</th><th>못 지킵니다</th></tr>
+        <tr><td>질문·답변이 회사 밖으로 안 나감</td><td>서버가 살아 있는 동안 장악당하면 볼 수 있음</td></tr>
+        <tr><td>변경은 사람 승인 없이 실행 안 됨</td><td>AI 답변이 항상 옳다는 보장은 없음</td></tr>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ════════ ② 작성 모드 ════════ -->
+<div class="note" style="border-style:solid;border-color:var(--border);"><b>② 작성 모드</b> — [✏ 요청 만들기]를 누르면 오른쪽만 바뀝니다</div>
+<div class="win">
+  <div class="titlebar"><span class="dot"></span><span class="t">GIJO AS — 문서함</span></div>
+  <div class="head">
+    <div class="ident">가이드를 읽고, 개발팀에 보낼 요청을 만듭니다.</div>
+    <input class="search" placeholder="🔍 문서 검색 — 제목·본문에서 찾습니다">
+  </div>
+  <div class="body">
+    <div class="toc">
+      <div class="grp">
+        <div class="grp-h"><span class="ar">▶</span>📚 사용 안내<span class="badge">4</span></div>
+      </div>
+      <div class="grp">
+        <div class="grp-h"><span class="ar">▶</span>📐 업무 지침<span class="badge">4</span></div>
+      </div>
+      <div class="toc-foot"><button class="btn-req" style="background:rgba(30,185,128,.22)">✏ 요청 만들기</button></div>
+    </div>
+
+    <div class="view">
+      <div class="chips">
+        <span class="chip on">🐞 버그</span>
+        <span class="chip">✨ 기능 요청</span>
+        <span class="chip">🎨 화면·사용성</span>
+        <span class="chip">💬 기타</span>
+      </div>
+
+      <div class="fld">
+        <label>제목</label>
+        <input value="설정 화면에서 저장이 안 됨">
+      </div>
+      <div class="fld">
+        <label>무엇을 하려 했나</label>
+        <textarea>설정 &gt; 관리자에서 백업 주기를 바꾸고 저장을 눌렀습니다.</textarea>
+      </div>
+      <div class="fld">
+        <label>무슨 일이 일어났나 &nbsp;<span style="color:var(--muted-2);font-weight:400">— 화면을 캡처하고 Ctrl+V로 붙여넣으세요</span></label>
+        <textarea>저장 버튼을 눌러도 아무 반응이 없고, 화면을 새로 열면 예전 값으로 돌아옵니다.</textarea>
+        <div class="shots">
+          <div class="shot"><span class="x">✕</span><span class="cap">캡처_231045.png</span></div>
+          <div class="shot"><span class="x">✕</span><span class="cap">캡처_231102.png</span></div>
+        </div>
+        <div class="drop">여기에 이미지를 끌어다 놓거나 <b>Ctrl + V</b>로 붙여넣기</div>
+      </div>
+
+      <div class="sec-title">자동으로 함께 담기는 정보 <span style="color:var(--muted-2);font-weight:400">— 적지 않으셔도 됩니다</span></div>
+      <div class="auto">
+        <b>클라 버전</b> 4.7.0 &nbsp;·&nbsp; <b>서버</b> f1c0334 &nbsp;·&nbsp; <b>직전 화면</b> 설정 &gt; 관리자<br>
+        <b>발생 시각</b> 2026-07-30 23:40 &nbsp;·&nbsp; <b>OS</b> Windows 11 / Electron 31<br>
+        <b>최근 오류</b> 5줄 &nbsp;·&nbsp; <b>자가 진단</b> 저장 암호화 켬 · 백업 정상 · 모델 정상
+      </div>
+
+      <div class="warn" style="margin-top:14px">
+        <b>⚠ 보내기 전에 확인하세요</b><br>
+        글에서 <span class="mask">가려짐 2곳</span> — 비밀번호·API 키를 자동으로 가렸습니다.<br>
+        <b>그림 속 내용은 자동으로 가릴 수 없습니다.</b> 자산명·IP·담당자 이름이 찍혔는지 직접 확인해 주세요.
+      </div>
+
+      <div class="acts">
+        <button class="g">📄 파일로 저장</button>
+        <button class="n">미리보기</button>
+        <button class="n">취소</button>
+        <span class="sz">예상 크기 2.4MB · GIJO요청_버그_20260730-2340.md</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="note">
+  <b>정리</b> — ① 별도 창(팀 사무실 창 방식) ② 문서 8건만(<code>knowledge/*</code> 6건은 AI 답변 재료라 제외)
+  ③ 전달은 <b>파일 저장만</b> — 담당자가 직접 전달 ④ 자동 기술 정보가 이 기능의 값어치
+  ⑤ 그림 속은 못 가린다고 <b>정직하게 경고</b> ⑥ 요청 이력은 서버에 남겨 "지난달에 뭘 요청했지"를 볼 수 있게.
+</div>
+
+</body>
+</html>
