@@ -347,11 +347,25 @@ export const dispatchApi = {
   // screen: 지시가 들어온 화면(예: "vulnscan.html"). 서버가 모호한 지시를 해석하는 힌트로 쓴다
   // — 취약점 화면에서 "정리해줘"는 우선순위 정리로 본다(server/engine/screencontext.ts).
   // 호출자가 안 주면 현재 문서 경로에서 자동으로 채운다.
-  send: (text: string, sessionId?: string, screen?: string) =>
+  // progressId: 클라가 만든 UUID. 주면 서버가 처리 단계를 기록하고, progress()로 0.7초마다
+  // 조회해 진행 카드를 그린다(2026-07-30 — "처리 중…" 침묵 구간 해소).
+  send: (text: string, sessionId?: string, screen?: string, progressId?: string) =>
     request<DispatchResult>("/api/dispatch", {
       method: "POST",
-      body: { text, ...(sessionId ? { sessionId } : {}), screen: screen ?? currentScreen() },
+      body: {
+        text,
+        ...(sessionId ? { sessionId } : {}),
+        ...(progressId ? { progressId } : {}),
+        screen: screen ?? currentScreen(),
+      },
     }),
+  progress: (progressId: string) =>
+    request<{
+      running: boolean; stage?: "understand" | "tools" | "write" | "review"; detail?: string;
+      count?: { done: number; total: number; unit: string };
+      bigStep?: { index: number; total: number; label: string };
+      startedAt?: number;
+    }>(`/api/dispatch/progress?id=${encodeURIComponent(progressId)}`),
   plan: (text: string) =>
     request<{ steps: OrchestrationStepResult[]; multi: boolean }>("/api/dispatch/plan", { method: "POST", body: { text } }),
   // 결재판 승인 — 사람이 값을 확인·수정하고 누른 뒤에만 호출된다.

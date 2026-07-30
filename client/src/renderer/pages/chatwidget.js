@@ -229,10 +229,18 @@
       if (!text) return;
       input.value = "";
       appendRow("user", esc(text));
+      // 진행 카드 — "처리 중…" 한 줄 대신 서버가 실제로 지나는 단계를 보여준다(2026-07-30 시안 승인).
+      // progresscard.js가 없으면(로드 순서·구버전) 기존 문구로 그대로 동작한다.
       var typing = appendRow("bot", '처리 중… <span style="color:var(--muted-2,#5f6785);font-size:10.5px">첫 응답은 모델 준비로 다소 걸릴 수 있어요</span>');
+      var pc = null, pid;
+      if (window.gijoProgressCard) {
+        pid = window.gijoProgressCard.newId();
+        pc = window.gijoProgressCard.start(typing, pid);
+      }
       try {
         if (!sessionId) { try { var s = await window.gijo.createWorkSession(text.slice(0, 30), "screen:" + here); sessionId = s && s.id; } catch (e) {} }
-        var r = await window.gijo.sendInstruction(text, sessionId || undefined);
+        var r = await window.gijo.sendInstruction(text, sessionId || undefined, undefined, pid);
+        if (pc) pc.stop();
         typing.innerHTML = readBadge(r) + fmt(r.output || "(응답 없음)");
         // 근거(출처) 배지 — 답변 그라운딩에 쓰인 사내 문서명(서버 sources). 인수인계 검증에도 쓰인다.
         if (Array.isArray(r.sources) && r.sources.length) {
@@ -264,6 +272,7 @@
         }
         msgs.scrollTop = msgs.scrollHeight;
       } catch (e) {
+        if (pc) pc.stop();
         typing.className = "gcw-row error";
         typing.innerHTML = "실패: " + esc((e && e.message) || e);
       }

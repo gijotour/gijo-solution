@@ -284,10 +284,20 @@
     document.getElementById("dockSend").disabled = true;
     append("instr", { icon: "나", name: "나 → AI 팀", message: text });
     var typing = append("typing", { icon: "🧭", name: "오케스트레이터" });
+    // 진행 카드 — 점 세 개 대신 서버가 실제로 지나는 단계를 보여준다(2026-07-30 시안 승인).
+    // 카드는 typing 행의 .cm 자리에 그린다. progresscard.js가 없으면 기존 점 애니메이션 그대로.
+    var pc = null, pid;
+    var cmEl = typing.querySelector(".cm");
+    if (window.gijoProgressCard && cmEl) {
+      pid = window.gijoProgressCard.newId();
+      cmEl.classList.remove("cs-typing");
+      pc = window.gijoProgressCard.start(cmEl, pid);
+    }
     try {
       // 맥락(screen)을 함께 보낸다 — "정리해줘"가 취약점 화면 앞에서는 취약점 정리로 해석된다
       // (server/engine/screencontext.ts). 보고 있는 탭이 곧 그 맥락이다.
-      var r = await window.gijo.sendInstruction(text, session ? session.id : undefined, ctx.screen || undefined);
+      var r = await window.gijo.sendInstruction(text, session ? session.id : undefined, ctx.screen || undefined, pid);
+      if (pc) pc.stop();
       if (r && r.sessionId) {
         session = { id: r.sessionId };
         try { localStorage.setItem(SESS_KEY, JSON.stringify(session)); } catch (e) {}
@@ -296,6 +306,7 @@
       // 지적 버튼 — 방금 보낸 질문과 이 답을 짝지어 둔다(중-1 피드백 루프).
       attachFlag(replyEl, text, (r && r.output) || "");
     } catch (e) {
+      if (pc) pc.stop();
       replaceTyping(typing, "error", { icon: "⚠", name: "오류", message: (e && e.message) || String(e) });
     } finally {
       sending = false;

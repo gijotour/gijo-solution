@@ -11,6 +11,7 @@
 // 채팅 경로로 폴백한다. 즉 루프 도입으로 기존 동작이 나빠지는 회귀가 없다.
 
 import { chat } from "./llm";
+import { reportProgress } from "./progress";
 import { listAgentTools, listToolsFor, findAgentTool, toolCatalogText, validateToolArgs, buildApproval, PendingApproval, NO_HIT_PREFIX } from "./agenttools";
 import { emitCollaboration } from "./collaboration";
 import { listProducts } from "./securityproducts";
@@ -471,11 +472,15 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
     const tool = findAgentTool(forced.tool);
     if (tool && !tool.write) {
       try {
+        reportProgress("tools", `${tool.label} 실행 중`);
         const result = String(await tool.run(forced.args));
         recordToolWork(forced.tool, scope);
         const calls: AgentToolCall[] = [{ tool: forced.tool, args: forced.args, result }];
         const direct = directAnswerFor(calls);
-        return { output: guardAgainstDenial(direct ?? (await composeFinalAnswer(instruction, calls, context)), calls), toolCalls: calls };
+        if (!direct) reportProgress("write", "조회 결과로 답을 쓰고 있습니다");
+        const composed = direct ?? (await composeFinalAnswer(instruction, calls, context));
+        reportProgress("review", "답변을 검수하고 있습니다");
+        return { output: guardAgainstDenial(composed, calls), toolCalls: calls };
       } catch {
         /* 강제 실행 실패 시 아래 일반 루프로 폴백 */
       }
@@ -493,6 +498,8 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
 
   const calls: AgentToolCall[] = [];
   for (let step = 0; step < MAX_STEPS; step++) {
+    // 결정 프롬프트도 느리다(실측 5.8초) — 침묵 구간이 되지 않게 지금 뭘 하는지 알린다.
+    reportProgress("understand", calls.length === 0 ? "무엇을 할지 정하고 있습니다" : "다음 단계를 정하고 있습니다");
     const raw = await chat({
       agentId: "orchestrator",
       message: decisionPrompt(instruction, calls, context, scope, calls.length === 0 ? fewshot : ""),
@@ -510,7 +517,10 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
     if (decision.action === "final") {
       if (calls.length === 0) return null; // 도구가 필요 없는 일반 대화 → 기존 채팅(RAG·이력)이 더 낫다
       const direct = directAnswerFor(calls);
-      const output = guardAgainstDenial(direct ?? (await composeFinalAnswer(instruction, calls, context)), calls);
+      if (!direct) reportProgress("write", `조회 결과 ${calls.length}건으로 답을 쓰고 있습니다`);
+      const composed = direct ?? (await composeFinalAnswer(instruction, calls, context));
+      reportProgress("review", "답변을 검수하고 있습니다");
+      const output = guardAgainstDenial(composed, calls);
       return { output, toolCalls: calls };
     }
 
@@ -554,6 +564,8 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
         result = `인자 오류: ${invalid}`;
       } else {
         emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `도구 실행: ${tool.name}(${JSON.stringify(args)})` });
+        // 진행 카드: 도구를 **실명으로** 알린다. 전체 개수는 미리 모르므로 %는 붙이지 않는다(정직 원칙).
+        reportProgress("tools", `${tool.label} 실행 중${calls.length > 0 ? ` — ${calls.length + 1}번째 도구` : ""}`);
         try {
           result = String(await tool.run(args));
           recordToolWork(tool.name, scope);

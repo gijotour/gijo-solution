@@ -31,6 +31,7 @@ import { listMaintenanceItems } from "./maintenance";
 import { ACTION_CHECK_RE, runActionCheck } from "./actioncheck";
 import { appendTurn, recentTurnsText, getSession, createSession } from "./worksessions";
 import { LONG_ANSWER_MS, startLongAnswer, finishLongAnswer, failLongAnswer } from "./longanswer";
+import { runWithProgress, isValidProgressId, reportProgress, reportBigStep, registerProgressRoutes } from "./progress";
 
 // 협업 로그는 "무슨 일이 있었나"를 남기는 활동 기록이다 — 답변 전문을 그대로 실으면 화면에
 // 같은 글이 두 번 보인다(2026-07-26 사용자 지적: 같은 답이 연달아 두 번 나옴). 앞부분만 남긴다.
@@ -255,6 +256,7 @@ async function executeRoutedAction(route: RoutedIntent, instructionText: string,
       const message = contextText ? `${contextText}\n\n[현재 지시] ${instructionText}` : instructionText;
       // trusted: 지시문은 dispatchInstructionCore에서 이미 관문을 지났다(이중 집계 방지).
       // explain: 지휘 콘솔에 그대로 표시되는 답변이다.
+      reportProgress("write", "사내 근거를 찾아 답을 쓰고 있습니다"); // chat 내부에서 RAG 검색+작성이 함께 돈다
       return { output: await chat({ agentId: route.agentId, message, remember: true, trusted: true, explain: true, screen, qa }) };
     }
   }
@@ -313,6 +315,7 @@ async function runOrchestration(instructionText: string, steps: OrchestrationSte
     const step = steps[i];
     const agentId = AGENT_FOR_ACTION[step.action];
     setAgentStatus(agentId, "working");
+    reportBigStep(i + 1, steps.length, step.label); // 진행 카드의 "큰 단계 n/m" — 실제 단계 수 그대로
     collab(qa, { from: "orchestrator", to: agentId, message: `단계 ${i + 1}/${steps.length} — ${step.label}` });
 
     let output = "";
@@ -719,6 +722,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
 }
 
 export function registerDispatcherRoutes(app: Express): void {
+  registerProgressRoutes(app); // 진행 조회(GET /api/dispatch/progress) — 지시 처리 중 0.7초 폴링
   app.post(
     "/api/dispatch",
     authMiddleware,
@@ -731,10 +735,15 @@ export function registerDispatcherRoutes(app: Express): void {
       // qa=true — 평가 게이트/QA 호출 표시(중-3). 세션·학습 수집을 건너뛴다(오염 방지).
       // 판단 경로는 동일하므로 이 플래그로 점수가 후해지는 일은 없다.
       const qa = req.body?.qa === true;
+      // progressId — 클라가 만든 UUID. 있으면 처리 중 단계를 기록해 두고 클라가 폴링으로 본다
+      // (2026-07-30 사용자 요청 "진행사항을 %나 진행 바로"). 없으면(구버전·QA) 완전 무동작.
+      const progressId = isValidProgressId(req.body?.progressId) ? (req.body.progressId as string) : null;
 
       // 30초 안에 안 끝나면 "리포트로 작성해 드리겠다"고 답하고 물러난다(사용자 결정 2026-07-26, 10초→30초).
       // 작업은 뒤에서 계속 돌고, 끝나면 리포트로 저장한 뒤 화면에 팝업으로 알린다.
-      const work = dispatchInstruction(text, sessionId, screen, user?.displayName, qa);
+      const work = runWithProgress(progressId, user?.id ?? null, () =>
+        dispatchInstruction(text, sessionId, screen, user?.displayName, qa)
+      );
       let handedOff = false;
       const timer = new Promise<null>((resolve) => setTimeout(() => resolve(null), LONG_ANSWER_MS));
       const first = await Promise.race([work, timer]);

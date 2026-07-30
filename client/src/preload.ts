@@ -117,7 +117,9 @@ const gijoApi = {
   getAgentRecommendations: () => api.modelDexApi.agentRecommendations(),
   listModels: () => api.localEngineApi.models(),
   // screen: 지시가 들어온 화면 맥락 — 팝업 셸에서는 "지금 보고 있는 팝업"이 맥락이 된다(없으면 현재 문서).
-  sendInstruction: (text: string, sessionId?: string, screen?: string) => api.dispatchApi.send(text, sessionId, screen),
+  sendInstruction: (text: string, sessionId?: string, screen?: string, progressId?: string) =>
+    api.dispatchApi.send(text, sessionId, screen, progressId),
+  dispatchProgress: (progressId: string) => api.dispatchApi.progress(progressId),
   // 결재판 승인 실행 — 쓰기 도구는 이 경로로만 실행된다(지시만으로는 실행 안 됨).
   approveAgentTool: (tool: string, args: Record<string, string>, instruction = "") => api.dispatchApi.approve(tool, args, instruction),
   undoAgentTool: (id?: string) => api.dispatchApi.undo(id),
