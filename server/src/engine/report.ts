@@ -17,6 +17,7 @@ import { listTasks, TaskItem } from "./tasks";
 import { prioritizedReviews, buildTriageDraft, type PrioritizedFinding } from "./approvals";
 import { aibomThreatMatches, type AiBomThreatReport } from "./compliance";
 import { recordAudit } from "./audit";
+import { maskSecrets } from "./secretscan";
 import { recordWork } from "./worklog";
 import { timeSavedReport, fmtDuration } from "./timesaved";
 import type { GijoUser } from "../auth/users";
@@ -532,7 +533,7 @@ export async function generateReport(req: ReportRequest): Promise<ReportResult> 
   const caseHint = cases.length
     ? ` 취약점 사례(우선순위): ${cases.slice(0, 3).map((c) => `[${c.priority.code}] ${c.finding.finding_type}`).join(", ")}. 각 사례는 ISMS-P·ISO27001 등 거버넌스 통제에 매핑됨.`
     : "";
-  const executiveSummary = stripDialogueArtifacts(await chat({
+  let executiveSummary = stripDialogueArtifacts(await chat({
     agentId: "report",
     message:
       `다음 보안 현황 데이터를 바탕으로 1페이지 요약을 작성해줘. 출력은 보고서 본문 문단만 — 대화록·화자 표시([나]·[주인이] 등)·질문/답변 형식·영어 문장을 절대 쓰지 마세요. ${PLAIN_LANGUAGE_RULE} ${audienceGuide} 자산 ${assets.length}건, ` +
@@ -557,6 +558,22 @@ export async function generateReport(req: ReportRequest): Promise<ReportResult> 
     } catch {
       /* LLM 미가동 등 — 브리핑 없이 진행 */
     }
+  }
+
+  // ⚠ 자격증명 마스킹 — 리포트는 **이 시스템 밖으로 나가는 산출물**이다(경영진·감사·협력사).
+  //   요약은 LLM이 사내 문서를 근거로 쓰는데, 그 문서에는 벤더 매뉴얼의 초기 비밀번호나
+  //   설정 파일의 API 키가 실제로 들어 있다(2026-07-30 실측: 질문 한 번에 그대로 답변에 나왔다).
+  //   화면에서 담당자가 보는 것은 막지 않지만, 파일로 나가는 것은 가린다 — 되돌릴 수 없으니까.
+  const masked = maskSecrets(executiveSummary);
+  if (masked.hits.length > 0) {
+    executiveSummary = masked.text;
+    recordAudit({
+      kind: "block", actor: req.createdBy ?? "system",
+      action: `리포트에서 자격증명 ${masked.hits.length}건 가림(외부 반출 방지)`,
+      target: `${req.type}/${audience}`,
+      detail: masked.hits.map((h) => `${h.kind}: ${h.masked}`).join(", "), // 원본 값은 담기지 않는다
+      result: "blocked",
+    });
   }
 
   const aiThreats = collectAiThreatReports(assets);

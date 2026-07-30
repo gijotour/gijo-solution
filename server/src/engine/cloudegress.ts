@@ -9,6 +9,7 @@
 // 보냄) — 이 게이트는 사용자 질문 자체에 내부 식별자가 들어간 경우를 잡는 2차 방어선이다.
 
 import { listAssets } from "./assets";
+import { findSecrets } from "./secretscan";
 import { listUsers } from "../auth/users";
 
 export interface EgressDecision {
@@ -120,6 +121,18 @@ export function screenForCloud(question: string): EgressDecision {
       reasons.push(`내부 대상을 지시하는 표현("${term}")이 포함됨`);
       break;
     }
+  }
+
+  // 자격증명 — 여기까지는 IP·자산·사람 이름만 봤다. 그런데 담당자가 매뉴얼 한 대목을 붙여넣으면
+  // 그 안에 초기 비밀번호·API 키가 딸려 온다(2026-07-30 실측: 문서의 자격증명이 답변에 그대로 나옴).
+  // 자산명이 없어도 **비밀 그 자체는 절대 외부로 나가면 안 된다** — 종류만 밝히고 값은 안 적는다.
+  // ⚠ 정적 import로 부른다. 처음에 require()로 썼더니 ESM에서 조용히 던지고 catch가 삼켜
+  //   **검사가 아예 안 돌았다**(시험이 잡았다, 2026-07-30). 보안 검사는 실패하면 안 걸린
+  //   것과 구분되지 않으므로, 실패할 수 있는 방식으로 부르지 않는다.
+  const secrets = findSecrets(q);
+  if (secrets.length > 0) {
+    const kinds = [...new Set(secrets.map((s) => s.kind))].join("·");
+    reasons.push(`자격증명(${kinds})이 포함됨 — 값은 기록하지 않습니다`);
   }
 
   return { allowed: reasons.length === 0, reasons };
