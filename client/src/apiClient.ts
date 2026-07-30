@@ -1970,3 +1970,22 @@ export const complianceApi = {
   // AI 초안 — 위협별 대응 상태 제안(저장 아님). 담당자 검토용.
   draft: (code: string) => request<{ status: string; note: string }>(`/api/compliance/${code}/draft`, { method: "POST" }),
 };
+
+// 저장 암호화(at-rest) — 상태 조회와 복구 열쇠 재발급(2026-07-30).
+// 켜는 것은 화면에서 못 한다(서버 정지가 필요) — 상태를 정직하게 보여주는 것이 이 API의 일이다.
+export const dbCryptApi = {
+  status: () =>
+    request<{
+      encrypted: boolean;
+      keyFilePresent: boolean;
+      keyCreatedAt: number | null;
+      machineBinding: { sources: number; strong: boolean };
+      covers: string[];
+      notCovered: string[];
+      howToEnable: string | null;
+      plaintextCopies: { count: number; files: string[]; totalMb: number };
+    }>("/api/dbcrypt/status"),
+  // 응답의 recoveryKey는 **한 번만** 내려온다. 어디에도 저장하지 않는다.
+  rotateRecovery: () =>
+    request<{ recoveryKey: string; notice: string }>("/api/dbcrypt/rotate-recovery", { method: "POST" }),
+};
