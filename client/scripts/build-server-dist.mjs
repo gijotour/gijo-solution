@@ -74,7 +74,9 @@ run("npm", ["ci", "--omit=dev"], outDir);
 
 console.log("[build-server-dist] 4/4 네이티브 모듈을 Electron ABI로 재빌드...");
 const electronVersion = require("electron/package.json").version;
-await rebuild({ buildPath: outDir, electronVersion, onlyModules: ["better-sqlite3"], force: true });
+// better-sqlite3-multiple-ciphers 추가(2026-07-30, 저장 암호화 드라이버 교체) — 여기 빠지면
+// 프리빌드가 Node ABI로 남아 **단일 데스크톱 모드의 내장 서버가 기동을 못 한다**(ABI 불일치).
+await rebuild({ buildPath: outDir, electronVersion, onlyModules: ["better-sqlite3", "better-sqlite3-multiple-ciphers"], force: true });
 
 console.log("[build-server-dist] 5/5 불필요한 파일 정리 (용량 최적화)...");
 // onnxruntime-node는 플랫폼별 바이너리(darwin/linux/win32)를 모두 담고 온다. 빌드하는 플랫폼의
