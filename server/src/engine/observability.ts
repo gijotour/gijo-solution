@@ -21,6 +21,7 @@ import { asyncRoute } from "../util/asyncRoute";
 import { verifyBackupSnapshot } from "./backup";
 import { auditRetentionDays } from "./audit";
 import { dbCryptStatus } from "./dbcrypt";
+import { getSiemConfig, getSiemStats } from "./siem";
 
 export type CheckLevel = "ok" | "warn" | "fail" | "unknown";
 
@@ -175,6 +176,46 @@ function checkDatabase(): HealthCheck {
   };
 }
 
+/**
+ * SIEM 전달 — 켜 놓고 안 나가는 것이 최악이다.
+ * 예전에는 UDP뿐이라 실패를 알 방법 자체가 없었다(2026-07-31 확장). 이제 세어서 보여준다.
+ * ⚠ 꺼져 있으면 항목을 만들지 않는다 — 안 쓰는 기능이 늘 회색으로 떠 있으면 아무도 안 본다.
+ */
+function checkSiem(): HealthCheck | null {
+  let cfg: ReturnType<typeof getSiemConfig>;
+  try {
+    cfg = getSiemConfig();
+  } catch {
+    return null;
+  }
+  if (!cfg.enabled) return null;
+  const s = getSiemStats();
+  const 수단 = { udp: "UDP", tcp: "TCP", tls: "TLS", hec: "Splunk HEC" }[cfg.transport] ?? cfg.transport;
+  const base = `${cfg.host}:${cfg.port} (${수단}·${cfg.format}) · 보냄 ${s.sent.toLocaleString("ko-KR")}건`;
+
+  // 유실은 가장 나쁘다 — 큐가 넘쳐 버린 이벤트는 영영 SIEM에 안 간다.
+  if (s.dropped > 0) {
+    return {
+      id: "siem", label: "SIEM 전달", level: "fail",
+      detail: `${base} · ⚠ 유실 ${s.dropped.toLocaleString("ko-KR")}건 · 대기 ${s.queued}건${s.lastError ? ` · ${s.lastError}` : ""}`,
+      action: "SIEM이 오래 받지 못해 이벤트가 버려졌습니다 — 수집 서버 상태와 주소·포트를 확인하세요. 연결이 되살아나면 대기 중인 것부터 다시 나갑니다.",
+    };
+  }
+  if (s.queued > 0 || (s.failed > 0 && (!s.lastSuccessAt || (s.lastFailureAt ?? 0) > s.lastSuccessAt))) {
+    return {
+      id: "siem", label: "SIEM 전달", level: "warn",
+      detail: `${base} · 실패 ${s.failed}건 · 대기 ${s.queued}건${s.lastError ? ` · ${s.lastError}` : ""}`,
+      action: "지금 SIEM에 닿지 못하고 있습니다 — 수집 서버가 살아 있는지, 방화벽이 그 포트를 여는지 확인하세요.",
+    };
+  }
+  return {
+    id: "siem", label: "SIEM 전달", level: "ok",
+    // ⚠ UDP는 "보냈다"가 "도착했다"가 아니다 — 정직하게 적는다.
+    detail: base + (s.deliveryConfirmed ? " · 전달 확인됨" : " · ⚠ UDP는 도착 여부를 확인할 수 없습니다"),
+    ...(s.deliveryConfirmed ? {} : { action: "도착까지 확인하려면 TCP·TLS·Splunk HEC로 바꾸세요(설정 > 연동 > SIEM)." }),
+  };
+}
+
 /** ④ 최근 오류 — 감사 로그의 error/blocked. 조용한 고장을 드러낸다. */
 function checkRecentErrors(): HealthCheck {
   const since = Date.now() - 24 * 3600000;
@@ -224,7 +265,7 @@ export interface SystemHealth {
 const WORST: CheckLevel[] = ["fail", "warn", "unknown", "ok"];
 
 export function systemHealth(): SystemHealth {
-  const checks = [checkBackup(), checkKnowledge(), checkDatabase(), checkRecentErrors(), checkDisk()];
+  const checks = [checkBackup(), checkKnowledge(), checkDatabase(), checkRecentErrors(), checkDisk(), checkSiem()].filter((c): c is HealthCheck => c !== null);
   // 전체 판정은 가장 나쁜 항목을 따른다 — 평균을 내면 문제 하나가 정상 넷에 묻힌다.
   const level = WORST.find((l) => checks.some((c) => c.level === l)) ?? "ok";
   const bad = checks.filter((c) => c.level === "fail" || c.level === "warn");
