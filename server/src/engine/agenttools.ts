@@ -231,7 +231,7 @@ async function runExplain(args: Record<string, string>): Promise<string> {
   if (out.length === 0) {
     return `"${topic}"에 대해 사내 온톨로지·문서·보안제품 등록부에서 찾은 근거가 없습니다. 일반 지식으로만 답하거나, 관련 문서를 업로드하면 근거가 쌓입니다.`;
   }
-  return orderForSmallModel(out).join("\n").slice(0, 3500); // 본문 발췌가 들어가 상한을 늘렸다(2500이면 근거가 잘렸다)
+  return out.join("\n").slice(0, 3500); // 본문 발췌가 들어가 상한을 늘렸다(2500이면 근거가 잘렸다)
 }
 
 /**
@@ -390,7 +390,8 @@ async function searchOne(q: string): Promise<string[]> {
   const triples = ontologyLinesFor(q, 6);
   if (triples.length) out.push("온톨로지 관계:", ...triples);
 
-  return out;
+  // 자산 DB가 비었는데 문서 발췌에 답이 있으면 발췌를 앞으로 — 7B는 앞부분을 답으로 삼는다.
+  return orderForSmallModel(out);
 }
 
 // search — 메뉴를 가로지르는 단일 검색. LLM이 "어느 메뉴를 봐야 하나"를 풀지 않아도 되게 한다.
