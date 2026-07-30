@@ -37,11 +37,30 @@ describe("local engine auto-start candidate selection", () => {
     expect(pickAutoStartModelId()).toBe("lily-cybersecurity-7b-v0.2");
   });
 
-  it("prefers the last-used model over the default", () => {
+  // [2026-07-30 실사고로 우선순위 뒤집음] 예전엔 "마지막 로드 모델"이 최우선이었다. 그런데
+  // 그 값은 채택 검토(adopt.mjs)가 후보를 시험 삼아 올려도 갱신돼서, 게이트가 **탈락시킨**
+  // 합성 모델이 부팅 기본값으로 굳었다 — 재시작마다 운영이 탈락 모델로 조용히 돌아갔다.
+  // 이제 기본값은 **사람이 고른 것(defaultModelId)** 만이고, 마지막 로드는 최후의 폴백이다.
+  it("운영자가 고른 모델이 최우선 — 시험용으로 올린 모델에 밀리지 않는다", () => {
     placeModel("lily-cybersecurity-7b-v0.2");
     placeModel("qwythos-9b");
-    db.prepare("INSERT INTO app_state (key, value) VALUES ('lastModelId', 'qwythos-9b')").run();
+    placeModel("merged-candidate");
+    db.prepare("INSERT INTO app_state (key, value) VALUES ('defaultModelId', 'qwythos-9b')").run();
+    db.prepare("INSERT INTO app_state (key, value) VALUES ('lastModelId', 'merged-candidate')").run();
     expect(pickAutoStartModelId()).toBe("qwythos-9b");
+  });
+
+  it("고른 것이 없으면 제품 기본 모델 — 마지막 로드 모델보다 앞선다", () => {
+    placeModel("lily-cybersecurity-7b-v0.2");
+    placeModel("merged-candidate");
+    db.prepare("INSERT INTO app_state (key, value) VALUES ('lastModelId', 'merged-candidate')").run();
+    expect(pickAutoStartModelId()).toBe("lily-cybersecurity-7b-v0.2");
+  });
+
+  it("제품 기본 모델 파일이 없으면 그때만 마지막 로드 모델로 폴백한다", () => {
+    placeModel("merged-candidate"); // 제품 기본(lily) 파일 없음
+    db.prepare("INSERT INTO app_state (key, value) VALUES ('lastModelId', 'merged-candidate')").run();
+    expect(pickAutoStartModelId()).toBe("merged-candidate");
   });
 
   it("ignores a last-used model whose file is gone and falls back to the default", () => {

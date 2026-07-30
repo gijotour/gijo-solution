@@ -18,6 +18,12 @@ import { recordWork, TOOL_WORK_KIND } from "./worklog";
 
 const MAX_STEPS = 5;
 
+// 조회에 그치지 않고 **무언가 하라는** 지시. 이런 말투면 조회 결과가 다음 행동의 재료일 수 있어
+// 루프를 한 걸음 더 진행한다(directAnswer 조기 종료를 건너뛴다). 넓게 잡아 두는 편이 안전하다 —
+// 잘못 잡히면 응답이 몇 초 느려질 뿐이지만, 놓치면 "배정해줘"가 조회로 끝나 버린다.
+const ACTION_INTENT_RE =
+  /배정|지정|맡겨|넘겨|바꿔|변경|수정|등록|추가|삭제|지워|해제|승인|반려|실행|시작|돌려|생성|만들|작성|보내|올려|내려|설정/;
+
 // #8 대화 맥락 — 직전에 다룬 취약점을 기억해 "아까 그거 이영희로 바꿔" 같은 후속을 해석한다.
 // 1인 운영 전제라 전역 1건으로 충분(TTL 10분 지나면 무시). 쓰기 대상이 잡힐 때 갱신한다.
 interface LastTarget { assetId: string; finding: string; label: string; at: number }
@@ -526,6 +532,20 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
       }
     }
     calls.push({ tool: decision.tool ?? "(없음)", args, result });
+
+    // directAnswer 도구가 성공했고 **조회만 요구한 지시**면 다시 물어보지 않는다 — 그 결과가 곧 답이다.
+    // 예전엔 여기서 루프를 한 바퀴 더 돌며 "더 할 일 있나?"를 LLM에 물었는데, 그 한 번이 프롬프트
+    // 2,800~4,700토큰을 다시 읽느라 5초 넘게 걸렸다(2026-07-30 실측: 12토큰 생성에 5.8초).
+    // 질문 하나가 LLM 호출 3번·14초였고 그중 한 번은 결과를 바꾸지 않는 순수 낭비였다.
+    //
+    // ⚠ 단, 조회 결과가 **쓰기의 재료**인 흐름은 끊으면 안 된다("오늘 제일 급한 거 김보안한테
+    //   배정해줘" → today로 찾고 assign_finding으로 이어간다 — 시험이 이걸 잡았다).
+    //   그래서 행동을 요구하는 말투면 종전대로 루프를 계속한다. 못 알아보면 느려질 뿐 틀리지는
+    //   않는다 — 안전한 실패 방향으로 기울여 둔다.
+    const early = directAnswerFor(calls);
+    if (early && !ACTION_INTENT_RE.test(instruction)) {
+      return { output: guardAgainstDenial(early, calls), toolCalls: calls };
+    }
   }
 
   // 반복 상한 도달 — 지금까지 모은 결과로라도 답을 만든다(도구를 썼을 때만).

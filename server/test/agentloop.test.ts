@@ -148,9 +148,12 @@ describe("runAgentLoop — 결정→실행→최종답변", () => {
     const r = await runAgentLoop("위험 순위 목록 보여줘");
     expect(r).not.toBeNull();
     expect(r!.toolCalls[0].tool).toBe("today");
-    // 최종 답 = today 결과 그대로. LLM은 '결정'만 부르고 최종 재작성(3번째 호출)은 없다 = 멈춤 원천 차단.
+    // 최종 답 = today 결과 그대로. LLM 재작성이 없다 = 멈춤 원천 차단.
     expect(r!.output).toBe(r!.toolCalls[0].result);
-    expect(mockChat).toHaveBeenCalledTimes(2);
+    // 호출 1회(결정) — 2026-07-30부터 directAnswer 도구가 성공하고 조회만 요구한 지시면
+    // "더 할 일 있나?"를 다시 묻지 않는다. 그 한 번이 프롬프트 3천 토큰을 다시 읽느라 5초 넘게
+    // 걸렸고 결과는 바뀌지 않았다(실측). 예전엔 2회였다 — 줄어든 것이 이 시험의 취지에 맞다.
+    expect(mockChat).toHaveBeenCalledTimes(1);
   });
 
   it("같은 도구를 같은 인자로 되풀이하면 재실행 없이 종료해 최종 답을 만든다(루프 낭비 차단)", async () => {

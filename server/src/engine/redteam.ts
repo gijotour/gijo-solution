@@ -71,17 +71,51 @@ export function guardedSystemPrompt(canary: string): string {
 }
 
 // 재사용 가능한 입력 인젝션 탐지(향후 런타임 가드레일용) — 룰 기반 패턴.
-const INJECTION_PATTERNS: { re: RegExp; category: AttackCategory }[] = [
-  { re: /이전\s*지시.*무시|무시.*이전\s*지시|ignore\s+(previous|above|prior)\s+instructions?/i, category: "instruction-override" },
-  { re: /시스템\s*프롬프트|system\s*prompt|위쪽?\s*지시문|출력해.*지시문/i, category: "system-prompt-leak" },
-  { re: /\bDAN\b|제약\s*(이|가)?\s*없는|개발자\s*모드|developer\s*mode|jailbreak|탈옥/i, category: "jailbreak" },
-  { re: /\[?\s*(system|시스템)\s*(override|overwrite|재정의)\s*\]?|new\s+rules?:|새\s*규칙/i, category: "instruction-override" },
-  { re: /관리자(야|입니다|이다)|administrator|감사를?\s*위해|디버깅을?\s*위해/i, category: "jailbreak" },
+/**
+ * 입력 인젝션 탐지 룰.
+ *
+ * ⚠ [2026-07-30 실측] 이 제품의 사용자는 **보안 담당자**다. "감사를 위해", "새 규칙 추가",
+ *   "제약", "관리자"는 그들의 일상 업무 어휘다. 예전 룰은 그것들을 공격으로 잡아
+ *   정상 업무 6개 중 4개가 오탐이었다 — 기록만 하는 flag 모드라 눈에 안 띄었을 뿐,
+ *   차단(block)을 켜면 제품이 제 사용자의 업무를 막는다.
+ *   그래서 **"AI에게 규칙을 바꾸라고 시키는 말"에만** 걸리도록 좁혔다:
+ *     · "새 규칙" 단독 ✗ → "[SYSTEM] 새 규칙:"처럼 지시문 사칭과 함께일 때만 ○
+ *     · "감사를 위해" 단독 ✗ → 비밀·프롬프트를 내놓으라는 요구와 함께일 때만 ○
+ *   놓치는 쪽(오탐 없음)으로 기울였다 — 런타임 차단은 마지막 방어선이 아니고,
+ *   카나리 시스템 프롬프트·근거 강제·결재판이 그 앞에 있다.
+ */
+const SECRET_DEMAND = /비밀|시크릿|secret|프롬프트|지시문|설정값|덤프|dump|토큰|키를?\s*(알려|보여|출력)/i;
+
+const INJECTION_PATTERNS: { re: RegExp; category: AttackCategory; needsSecretDemand?: boolean }[] = [
+  // 지시 무시 요구 — 이 표현은 정상 업무에 쓸 이유가 없다.
+  // ⚠ 영어는 수식어가 겹쳐 붙는다("ignore **all previous** instructions") — 하나만 허용하면 놓친다.
+  {
+    re: /(이전|앞의|위의|기존)\s*지시[^\n]{0,10}무시|무시[^\n]{0,10}(이전|앞의|위의)\s*지시|(ignore|disregard|forget)\s+((all|any|the)\s+)*(previous|above|prior|earlier|preceding|prior)?\s*instructions?/i,
+    category: "instruction-override",
+  },
+  // 시스템 프롬프트·지시문 요구. "시스템 프롬프트가 뭐야?"(용어 질문)와 가르기 위해 요구 동사를 함께 본다.
+  { re: /(시스템\s*프롬프트|system\s*prompt|지시문)[^\n]{0,20}(알려|보여|출력|말해|공개|덤프|dump|그대로)/i, category: "system-prompt-leak" },
+  { re: /(출력|공개|알려)[^\n]{0,12}(시스템\s*프롬프트|지시문\s*전체)/i, category: "system-prompt-leak" },
+  // 영어 요구형 — 동사가 앞에 온다. 'instructions' 단독은 위험(업무 문장에 흔함)이라
+  // system prompt · your instructions · 지시문으로만 한정한다.
+  { re: /(reveal|show|print|dump|output|repeat|tell\s+me)[^\n]{0,25}(system\s*prompt|your\s+(system\s+)?instructions?|지시문)/i, category: "system-prompt-leak" },
+  // 탈옥 역할극 — DAN·개발자 모드는 고유 표현이라 단독으로도 안전하게 잡는다("제약이 없는"은 제외: 정상 업무 표현).
+  { re: /\bDAN\b|개발자\s*모드|developer\s*mode|jailbreak|탈옥|제한\s*없는\s*(모드|너|AI)/i, category: "jailbreak" },
+  // 지시문 사칭 — 대괄호·SYSTEM 표기와 함께일 때만. "새 규칙" 단독은 방화벽 업무 표현이라 제외.
+  { re: /\[\s*(system|시스템)[^\]]{0,20}\]|(system|시스템)\s*(override|overwrite|재정의)|new\s+rules?\s*:\s*(you|ignore|reveal)/i, category: "instruction-override" },
+  // 권위 사칭 — **비밀 요구와 함께일 때만** 잡는다(감사·디버깅은 정상 업무다).
+  { re: /(관리자(야|입니다|이다)|administrator|감사를?\s*위해|디버깅을?\s*위해)[^\n]{0,40}/i, category: "jailbreak", needsSecretDemand: true },
 ];
 
 export function detectInjectionAttempt(input: string): { flagged: boolean; categories: AttackCategory[] } {
   const cats = new Set<AttackCategory>();
-  for (const p of INJECTION_PATTERNS) if (p.re.test(input)) cats.add(p.category);
+  for (const p of INJECTION_PATTERNS) {
+    if (!p.re.test(input)) continue;
+    // needsSecretDemand 룰은 권위 사칭 어휘만으로는 잡지 않는다 — 비밀·프롬프트를 내놓으라는
+    // 요구가 같은 문장에 함께 있어야 공격으로 본다("감사를 위해 로그 보관 기간"은 업무다).
+    if (p.needsSecretDemand && !SECRET_DEMAND.test(input)) continue;
+    cats.add(p.category);
+  }
   return { flagged: cats.size > 0, categories: [...cats] };
 }
 

@@ -153,10 +153,20 @@ export function isModelAvailable(modelId: string): boolean {
   return fs.existsSync(modelFilePath(modelId));
 }
 
-// 부팅 자동 시작 후보: 마지막 사용 모델 → 제품 기본 모델 순으로, 실제 .gguf가 있는 첫 번째.
+/**
+ * 부팅 자동 시작 후보: **운영자가 고른 모델 → 제품 기본 모델 → (마지막 수단)마지막 로드 모델**.
+ *
+ * ⚠ [2026-07-30 실사고] 예전엔 "마지막 로드 모델"(lastModelId)을 최우선으로 썼다. 그런데
+ *   lastModelId는 **어떤 이유로든 모델이 올라갈 때마다** 갱신된다 — 채택 검토(adopt.mjs)가
+ *   후보 모델을 시험 삼아 올린 것도 포함이다. 그래서 게이트가 탈락시킨 합성 모델이
+ *   부팅 기본값으로 굳어, 재시작마다 **운영이 탈락한 모델로 조용히 돌아갔다**(오늘 3회 발생,
+ *   그 중 한 번은 게이트가 엉뚱한 모델을 재느라 판정까지 무효가 됐다).
+ *   시험용으로 잠깐 올린 것이 운영 기본이 되어서는 안 된다 — 기본값은 사람이 고른 것만이다.
+ */
 export function pickAutoStartModelId(): string | null {
+  const chosen = (getStateStmt.get("defaultModelId") as { value: string } | undefined)?.value;
   const last = (getStateStmt.get("lastModelId") as { value: string } | undefined)?.value;
-  for (const candidate of [last, DEFAULT_MODEL_ID]) {
+  for (const candidate of [chosen, DEFAULT_MODEL_ID, last]) {
     if (candidate && fs.existsSync(modelFilePath(candidate))) return candidate;
   }
   return null;
@@ -390,8 +400,15 @@ async function unloadModel(modelId: string): Promise<void> {
 }
 
 // 명시적 모델 로드 (수동 /start 라우트·부팅 자동 시작). 이미 있으면 재사용.
+/**
+ * 운영자가 **명시적으로 고른** 모델을 올린다(화면 · 관리 API 경로).
+ * 이 선택만이 부팅 기본값(defaultModelId)이 된다 — 아래 pickAutoStartModelId 주석 참조.
+ */
 export async function startLocalEngine(modelId: string): Promise<LocalEngineStatus> {
-  if (isModelAvailable(modelId)) await ensureModelLoaded(modelId);
+  if (isModelAvailable(modelId)) {
+    setStateStmt.run("defaultModelId", modelId); // 사람이 고른 것 = 재시작 후에도 이것
+    await ensureModelLoaded(modelId);
+  }
   return getLocalEngineStatus();
 }
 
