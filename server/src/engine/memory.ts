@@ -733,6 +733,7 @@ export interface MemoryDocument {
   docClass: string | null; // Scan·Analyze Agent 분류(매뉴얼/보고서/정책/기타) — 분류 전 문서는 null
   uploadedBy: string | null; // 작업 귀속 — 누가 올렸는지(2026-07-25)
   category: string | null; // 업무영역 5종(취약점·장비운영·사내규정·위협대응·일반) — 마이그레이션 전 문서는 null
+  grade: string | null;    // 기밀 C·민감 S·공개 O (engine/grades.ts). 마이그레이션에서 기존 문서는 O로 넣었다.
 }
 
 // 장기기억에 저장된 문서 목록. 조각 수·scope의 진실 원천은 LanceDB(실제 임베딩),
@@ -756,7 +757,7 @@ export async function listDocuments(): Promise<MemoryDocument[]> {
     }
   }
   const metaRows = db.prepare("SELECT * FROM memory_documents").all() as {
-    documentId: string; embeddingModel: string | null; sourcePath: string | null; ingestedAt: string; docClass: string | null; uploadedBy: string | null; category: string | null;
+    documentId: string; embeddingModel: string | null; sourcePath: string | null; ingestedAt: string; docClass: string | null; uploadedBy: string | null; category: string | null; grade: string | null;
   }[];
   const metaById = new Map(metaRows.map((m) => [m.documentId, m]));
   const out: MemoryDocument[] = [];
@@ -772,6 +773,7 @@ export async function listDocuments(): Promise<MemoryDocument[]> {
       docClass: meta?.docClass ?? null,
       uploadedBy: meta?.uploadedBy ?? null,
       category: meta?.category ?? null,
+      grade: meta?.grade ?? null,
     });
   }
   out.sort((a, b) => (b.ingestedAt ?? "").localeCompare(a.ingestedAt ?? "") || b.chunks - a.chunks);
@@ -832,6 +834,37 @@ export async function deleteDocument(documentId: string, withFile = false): Prom
 }
 
 export function registerMemoryRoutes(app: Express): void {
+  // 문서 등급 바꾸기(기밀 C·민감 S·공개 O) — N2SF. engine/grades.ts 참고.
+  //
+  // ⚠ 등급을 **낮추는 것**(기밀→공개)은 자료를 더 많은 사람에게 여는 일이다.
+  //   그래서 올리든 낮추든 감사에 남긴다 — 어느 쪽이든 나중에 "왜 이렇게 됐나"를 묻는다.
+  // ⚠ 주소가 아니라 **본문**으로 받는다 — documentId는 파일 이름이라 한글·공백·＃이 섞인다.
+  //   주소에 넣으면 인코딩에서 깨진다(옆의 category 라우트도 같은 이유로 본문을 쓴다).
+  app.post(
+    "/api/memory/document/grade",
+    authMiddleware,
+    asyncRoute(async (req, res) => {
+      const id = String((req.body as { documentId?: string })?.documentId ?? "");
+      const 값 = String((req.body as { grade?: string })?.grade ?? "").toUpperCase();
+      if (!["O", "S", "C"].includes(값)) {
+        res.status(400).json({ error: "등급은 O(공개)·S(민감)·C(기밀) 중 하나여야 합니다." });
+        return;
+      }
+      const before = (getDocMetaStmt.get(id) as { grade?: string } | undefined)?.grade ?? null;
+      const r = db.prepare("UPDATE memory_documents SET grade = ? WHERE documentId = ?").run(값, id);
+      if (r.changes === 0) { res.status(404).json({ error: "그런 문서가 없습니다." }); return; }
+      const { recordAudit } = await import("./audit.js");
+      recordAudit({
+        kind: "config",
+        actor: (req as unknown as { user?: { displayName?: string } }).user?.displayName ?? null,
+        action: `문서 등급 변경 → ${값}`,
+        target: id,
+        detail: `이전 ${before ?? "미지정"} → ${값}`,
+      });
+      res.json({ documentId: id, grade: 값 });
+    })
+  );
+
   app.post(
     "/api/memory/ingest",
     authMiddleware,

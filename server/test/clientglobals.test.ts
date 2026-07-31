@@ -80,6 +80,42 @@ describe("Electron에서 네이티브 모달을 쓰지 않는다", () => {
   });
 });
 
+describe("★ 없는 화면으로 보내지 않는다", () => {
+  // 같은 계열의 사고다: 부르는 이름이 실제로 있는지 아무도 대조하지 않는다.
+  //   · howto.ts — 8개 안내 중 **5개가 없는 화면**을 가리켰다(2026-07-31)
+  //   · kpi.html 「지금 손댈 일」 — 첫 구현에서 6개 중 5개가 틀렸다(2026-08-01)
+  // 버튼은 멀쩡히 눌리고 아무 일도 안 일어난다. 파일 목록과 맞춰 보면 누르지 않고 잡힌다.
+  const 있는화면 = new Set(pageFiles.filter((f) => f.endsWith(".html")));
+
+  it("data-page가 가리키는 화면이 전부 실재한다", () => {
+    const 없음: string[] = [];
+    for (const [file, src] of pageSrc) {
+      for (const m of src.matchAll(/data-page=["']([a-z0-9_-]+\.html)["']/gi)) {
+        if (!있는화면.has(m[1])) 없음.push(`${file} → ${m[1]}`);
+      }
+      // '문자열 조립' 형태(page: "x.html")도 본다 — 표에 적어 두고 배선하는 방식이 흔하다.
+      for (const m of src.matchAll(/\bpage:\s*["']([a-z0-9_-]+\.html)["']/gi)) {
+        if (!있는화면.has(m[1])) 없음.push(`${file} → ${m[1]}`);
+      }
+    }
+    expect([...new Set(없음)], "눌러도 아무 일이 없는 버튼이다").toEqual([]);
+  });
+
+  it("서버가 안내하는 화면(howto·screenguide)도 실재한다", () => {
+    const 서버 = ["../src/engine/howto.ts", "../src/engine/screenguide.ts"]
+      .map((p) => new URL(p, import.meta.url))
+      .filter((u) => fs.existsSync(u));
+    const 없음: string[] = [];
+    for (const u of 서버) {
+      const src = fs.readFileSync(u, "utf8");
+      for (const m of src.matchAll(/["']([a-z0-9_-]+\.html)["']/gi)) {
+        if (!있는화면.has(m[1])) 없음.push(`${u.pathname.split("/").pop()} → ${m[1]}`);
+      }
+    }
+    expect([...new Set(없음)], "AI가 없는 화면으로 안내한다").toEqual([]);
+  });
+});
+
 // 「내 업무로 돌아가기」 띠(worknow.js)는 **삭제됐다**(2026-07-31).
 // 사용자 신고로 세 개가 겹쳐 뜨는 것을 고쳤지만, 근본은 "화면을 떠나면 길을 잃는다"에
 // 버튼을 붙인 증상 치료였다. 대화창(지휘소)이 늘 옆에 있으면 돌아갈 일 자체가 없어

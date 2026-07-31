@@ -292,6 +292,32 @@ export function registerUsersRoutes(app: Express): void {
     }
   });
 
+  // 계정별 열람 등급(기밀 C·민감 S·공개 O) — N2SF. engine/grades.ts 참고.
+  //
+  // ⚠ **관리자만** 바꿀 수 있다. 자기 등급을 스스로 올릴 수 있으면 통제가 아니다.
+  // ⚠ 바꾼 사실은 반드시 감사에 남긴다 — "누가 언제 누구를 어디까지 열어 줬나"는
+  //   나중에 반드시 묻는 질문이다(보안 사고 조사의 첫 질문이 대개 이것이다).
+  app.post("/api/users/:id/clearance", authMiddleware, adminMiddleware, (req, res) => {
+    const targetId = String(req.params.id);
+    const requester = (req as Request & { user?: GijoUser }).user;
+    const 값 = String((req.body as { clearance?: string })?.clearance ?? "").toUpperCase();
+    if (!["O", "S", "C"].includes(값)) {
+      res.status(400).json({ error: "열람 등급은 O(공개)·S(민감)·C(기밀) 중 하나여야 합니다." });
+      return;
+    }
+    const row = getByIdStmt.get(targetId) as UserRow | undefined;
+    if (!row) { res.status(404).json({ error: "그런 계정이 없습니다." }); return; }
+    db.prepare("UPDATE users SET clearance = ? WHERE id = ?").run(값, targetId);
+    recordAudit({
+      kind: "config",
+      actor: requester?.displayName ?? null,
+      action: `열람 등급 변경 → ${값}`,
+      target: `${row.username}(${targetId})`,
+      detail: `이전 ${row.clearance ?? "미지정(공개만)"} → ${값}`,
+    });
+    res.json({ ...toPublic({ ...row, clearance: 값 }) });
+  });
+
   // 관리자용 접속 세션 목록 — 누가·어디서(IP)·언제부터 접속 중인지. (팀 사무실 presence와 같은 데이터)
   app.get("/api/users/sessions", authMiddleware, adminMiddleware, (_req, res) => {
     res.json(listActiveSessions());

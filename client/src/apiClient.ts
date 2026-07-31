@@ -763,6 +763,9 @@ export const memoryApi = {
   // 업무영역(취약점·장비운영·사내규정·위협대응·일반) 수정 — 승인카드의 [영역 수정]용.
   setDocumentCategory: (documentId: string, category: string) =>
     request<{ ok: boolean; documentId: string; category: string }>("/api/memory/document/category", { method: "POST", body: { documentId, category } }),
+  // 열람 등급(기밀 C·민감 S·공개 O) — N2SF. 서버가 감사에 남긴다.
+  setDocumentGrade: (documentId: string, grade: string) =>
+    request<{ documentId: string; grade: string }>("/api/memory/document/grade", { method: "POST", body: { documentId, grade } }),
   deleteDocument: (documentId: string, withFile?: boolean) =>
     request<{ documentId: string; deletedChunks: number; deletedFile: boolean }>("/api/memory/document/delete", { method: "POST", body: { documentId, withFile } }),
   // 서버에 보관된 업로드 원본(base64) — "원본 열기"용.
@@ -1575,6 +1578,9 @@ export const usersApi = {
   remove: (id: string) => request(`/api/users/${id}`, { method: "DELETE" }),
   changePassword: (id: string, password: string) =>
     request(`/api/users/${id}/password`, { method: "POST", body: { password } }),
+  // 열람 등급(기밀 C·민감 S·공개 O) — 관리자만. 서버가 감사에 남긴다.
+  setClearance: (id: string, clearance: string) =>
+    request<GijoUserPublic>(`/api/users/${id}/clearance`, { method: "POST", body: { clearance } }),
   setRole: (id: string, role: "security_officer" | "admin") =>
     request<GijoUserPublic>(`/api/users/${id}/role`, { method: "POST", body: { role } }),
   sessions: () => request<ActiveSessionInfo[]>("/api/users/sessions"),

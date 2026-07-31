@@ -1159,12 +1159,22 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
                <option value=""${!u.team ? " selected" : ""}>— 소속 팀 없음</option>
                ${teams.map((t) => `<option value="${t}"${u.team === t ? " selected" : ""}>${t}</option>`).join("")}
              </select>`;
+          // 열람 등급(기밀 C·민감 S·공개 O) — 이 사람이 어디까지 볼 수 있나(N2SF).
+          // ⚠ 비워 두면 **공개만** 본다. 새 계정이 만들자마자 기밀을 보면 그게 사고다.
+          //   그래서 기본값을 '공개만'으로 두고, 관리자가 명시적으로 올린다.
+          const clearSel =
+            `<select class="inp" data-clear="${u.id}" data-prev="${u.clearance || "O"}" title="이 계정이 볼 수 있는 최고 등급 — 더 높은 등급 문서는 검색에도 안 걸립니다"
+               style="min-width:104px;padding:3px 6px;font-size:11px">
+               <option value="O"${!u.clearance || u.clearance === "O" ? " selected" : ""}>🔓 공개만</option>
+               <option value="S"${u.clearance === "S" ? " selected" : ""}>🔸 민감까지</option>
+               <option value="C"${u.clearance === "C" ? " selected" : ""}>🔴 기밀까지</option>
+             </select>`;
           return `<div class="user-row">
             <div style="display:flex;align-items:center;gap:8px">${dot}
               <div><div class="user-row-name">${u.displayName} <span class="badge ${u.role === "admin" ? "b-purple" : "b-teal"}" style="margin-left:4px">${ROLE_LABEL[u.role] || u.role}</span></div>
               <div class="user-row-sub">${sub}</div></div>
             </div>
-            <div style="display:flex;gap:5px;align-items:center">${teamSel}${roleBtn}${pwBtn}${termBtn}${delBtn}</div>
+            <div style="display:flex;gap:5px;align-items:center">${clearSel}${teamSel}${roleBtn}${pwBtn}${termBtn}${delBtn}</div>
           </div>`;
         })
         .join("");
@@ -2174,6 +2184,36 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       else if (t.dataset.role) setUserRoleRow(t.dataset.role, t.dataset.cur);
       else if (t.dataset.pw) resetUserPw(t.dataset.pw);
       else if (t.dataset.term) terminateSessionRow(t.dataset.term);
+    });
+    // 열람 등급 변경 — **올리는 쪽만 묻는다.** 올리는 것은 그 사람에게 자료를 더 여는 일이라
+    // 되돌려도 이미 본 것은 되돌릴 수 없다. 내리는 것은 안전하므로 바로 간다.
+    document.getElementById("userListBox").addEventListener("change", async (e) => {
+      const id = e.target.dataset && e.target.dataset.clear;
+      if (!id) return;
+      const line = document.getElementById("userManagementStatusLine");
+      const 값 = e.target.value;
+      const 이름 = { O: "공개만", S: "민감까지", C: "기밀까지" };
+      const 순서 = { O: 0, S: 1, C: 2 };
+      const 이전 = e.target.dataset.prev || "O";
+      if (순서[값] > 순서[이전]) {
+        const ok = await gijoAsk(
+          `이 계정이 볼 수 있는 범위를 ${이름[이전]}에서 ${이름[값]}(으)로 넓힐까요?\n\n` +
+          `넓히면 그 등급 자료가 검색·답변에 쓰입니다. 되돌려도 **이미 본 것은 되돌릴 수 없습니다.**\n` +
+          `바꾼 기록은 감사에 남습니다.`,
+          { ok: "넓히기", danger: true }
+        );
+        if (!ok) { await loadUserList(); return; }
+      }
+      try {
+        const u = await window.gijo.setUserClearance(id, 값);
+        line.textContent = `✓ ${u.displayName}의 열람 등급: ${이름[u.clearance] || "공개만"}`;
+        line.className = "status-line status-ok";
+        await loadUserList();
+      } catch (err) {
+        line.textContent = "✗ 열람 등급 변경 실패: " + ((err && err.message) || err);
+        line.className = "status-line status-err";
+        await loadUserList();
+      }
     });
     // 소속 팀 변경 — 선택 즉시 저장(자산 접근 권한의 근거라 감사에도 남는다).
     document.getElementById("userListBox").addEventListener("change", async (e) => {

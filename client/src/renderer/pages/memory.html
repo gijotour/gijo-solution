@@ -49,6 +49,21 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .dm-gh .cnt{color:var(--muted-2);font-weight:600;margin-left:auto;font-size:10.5px;}
 .dm-catb{border:1px solid rgba(45,212,191,.4);color:var(--teal);border-radius:20px;padding:0 7px;font-size:10px;white-space:nowrap;}
 .dm-catb.c일반{border-color:var(--border-strong);color:var(--muted);}
+/* 업무정보 등급 배지 — 색이 먼저 읽히게. 기밀은 눈에 띄어야 하고 공개는 조용해야 한다. */
+.dm-grade{border-radius:5px;padding:0 6px;font-size:10px;font-weight:800;white-space:nowrap;letter-spacing:.2px;}
+.dm-grade.gg-C{background:rgba(226,72,61,.18);color:#ff8a80;border:1px solid rgba(226,72,61,.5);}
+.dm-grade.gg-S{background:rgba(240,160,32,.16);color:var(--amber);border:1px solid rgba(240,160,32,.42);}
+.dm-grade.gg-O{background:rgba(255,255,255,.06);color:var(--muted);border:1px solid rgba(255,255,255,.14);}
+/* 미지정은 "공개처럼 보이면 안 된다" — 물음표로 눈에 띄게 남긴다. */
+.dm-grade.gg-\?{background:rgba(139,124,240,.14);color:var(--purple);border:1px dashed rgba(139,124,240,.5);}
+/* 상세에서 등급 고르기 */
+.dm-gradeset{display:flex;gap:7px;}
+.dm-gbtn{flex:1;border-radius:8px;padding:7px 10px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;
+  background:transparent;border:1px solid var(--border-strong);color:var(--muted);}
+.dm-gbtn:hover{color:var(--text);border-color:rgba(255,255,255,.32);}
+.dm-gbtn.on.gg-C{background:rgba(226,72,61,.18);color:#ff8a80;border-color:rgba(226,72,61,.55);}
+.dm-gbtn.on.gg-S{background:rgba(240,160,32,.16);color:var(--amber);border-color:rgba(240,160,32,.5);}
+.dm-gbtn.on.gg-O{background:rgba(255,255,255,.08);color:var(--text);border-color:rgba(255,255,255,.28);}
 .dm-catb.c위협대응{border-color:rgba(248,81,73,.45);color:#ff9d97;}
 .dm-catb.c사내규정{border-color:rgba(188,140,255,.45);color:#bc8cff;}
 .dm-catb.c취약점{border-color:rgba(251,191,36,.45);color:var(--amber);}
@@ -561,6 +576,17 @@ tr:last-child td{border-bottom:none;}
     }));
   }
 
+  // ── 업무정보 등급(기밀 C·민감 S·공개 O) — N2SF. server/src/engine/grades.ts와 같은 뜻. ──
+  // 색과 한 글자로 **먼저 읽히게** 한다. 목록에서 눈으로 훑을 때 등급이 안 보이면
+  // 기밀 자료가 섞여 있어도 모른 채 지나간다.
+  const GRADE_LABEL = { O: "공개", S: "민감", C: "기밀" };
+  function gradeBadge(g) {
+    // 등급이 안 적힌 문서는 **비워 두지 않는다** — 빈 자리는 "공개"처럼 보인다.
+    const k = GRADE_LABEL[g] ? g : "?";
+    const 이름 = GRADE_LABEL[g] || "미지정";
+    return `<span class="dm-grade gg-${k}" title="열람 등급: ${이름}${k === "?" ? " — 아직 정하지 않았습니다" : ""}">${k === "?" ? "?" : k} ${이름}</span>`;
+  }
+
   function renderDmList(keepSel) {
     renderDmSeg();
     const list = document.getElementById("dmList");
@@ -578,7 +604,7 @@ tr:last-child td{border-bottom:none;}
       const rows = folded ? "" : g.docs.map((d) =>
         `<div class="dm-li" data-id="${dmEsc(d.documentId)}"><span class="ic">${DM_ICON(d.documentId)}</span>` +
         `<span class="nm" title="${dmEsc(d.documentId)}">${dmEsc(d.documentId)}</span>` +
-        `<span class="dm-catb c${dmEsc(dmCatOf(d))}">${dmEsc(dmCatOf(d))}</span><span class="ck">${d.chunks}</span></div>`
+        `${gradeBadge(d.grade)}<span class="dm-catb c${dmEsc(dmCatOf(d))}">${dmEsc(dmCatOf(d))}</span><span class="ck">${d.chunks}</span></div>`
       ).join("");
       return `<div class="dm-gh" data-g="${g.c}"><span class="tri">${folded ? "▸" : "▾"}</span>${g.icon} ${g.c}<span class="cnt">${g.docs.length}개</span></div>${rows}`;
     }).join("");
@@ -643,12 +669,51 @@ tr:last-child td{border-bottom:none;}
       `<div class="dm-m"><b>bge-m3</b><span>임베딩 모델</span></div>` +
       `<div class="dm-m"><b>${scopeShort}</b><span>검색 범위</span></div>` +
       `<div class="dm-m"><b>임베딩됨 ✓</b><span>상태</span></div></div>` +
+      // 열람 등급 — 누가 이 문서를 볼 수 있는지. 낮추는 것은 **자료를 더 많은 사람에게 여는 일**이다.
+      `<div class="dm-sec" id="dmGradeSec"><div class="h">🔒 열람 등급 ${gradeBadge(d.grade)}</div>` +
+      `<div style="font-size:11.5px;color:var(--muted);line-height:1.6;margin-bottom:8px">` +
+      `내 열람 등급보다 높은 문서는 <b>검색에도 걸리지 않습니다</b> — AI가 답에 쓰지 못합니다.` +
+      `</div><div class="dm-gradeset">` +
+      ["O", "S", "C"].map((g) =>
+        `<button class="dm-gbtn gg-${g}${(d.grade || "") === g ? " on" : ""}" data-grade="${g}">${g} ${GRADE_LABEL[g]}</button>`
+      ).join("") +
+      `</div><div class="status-line" id="dmGradeMsg" style="margin-top:6px"></div></div>` +
       `<div class="dm-how">🧠 <b>어떻게 학습됐나:</b> 800자 단위 ${d.chunks}개 조각으로 나뉘어 bge-m3로 벡터화돼 장기기억에 저장됐습니다. 질문하면 관련 조각이 검색돼 답변에 자동 주입됩니다. <b>모델 가중치에 각인되는 파인튜닝이 아니라</b> 검색 참고자료이므로, 삭제하면 즉시 답변에서 빠집니다.</div>` +
       `<div class="dm-del"><div class="dm-delbox"><div class="h">🗑 이 문서 삭제</div>` +
       `<label class="dm-opt"><input type="radio" name="dmDel" value="mem" checked><span><b>장기기억에서만 제거</b><span class="t">임베딩 ${d.chunks}조각 삭제 · 답변에서 즉시 빠짐 · 재업로드로 복구</span></span></label>` +
       `<label class="dm-opt${d.hasSource ? "" : " dis"}"><input type="radio" name="dmDel" value="file"${d.hasSource ? "" : " disabled"}><span><b>원본 파일까지 삭제</b><span class="t">${d.hasSource ? "임베딩 + 서버 원본 파일 완전 제거 · 복구 불가" : "서버에 저장된 원본이 없어 임베딩 제거로 완전 삭제됩니다"}</span></span></label>` +
       `</div><button class="dm-delbtn" id="dmDelBtn">삭제</button></div>`;
     document.getElementById("dmDelBtn").addEventListener("click", () => deleteDoc(documentId));
+    // 등급 바꾸기 — 낮추는 쪽(더 여는 쪽)은 한 번 더 묻는다. 올리는 쪽은 안전하므로 바로 간다.
+    detail.querySelectorAll(".dm-gbtn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const 새등급 = btn.dataset.grade;
+        const msg = document.getElementById("dmGradeMsg");
+        const 순서 = { O: 0, S: 1, C: 2 };
+        const 지금 = d.grade || "";
+        if (지금 && 순서[새등급] < 순서[지금] && window.gijoAsk) {
+          const ok = await window.gijoAsk(
+            `「${documentId}」의 등급을 ${GRADE_LABEL[지금]}에서 ${GRADE_LABEL[새등급]}(으)로 낮출까요?\n\n` +
+            `더 많은 사람이 이 문서를 검색·열람하게 됩니다. 바꾼 기록은 감사에 남습니다.`,
+            { ok: "낮추기", danger: true }
+          );
+          if (!ok) return;
+        }
+        msg.textContent = "바꾸는 중…";
+        try {
+          await window.gijo.setMemoryDocumentGrade(documentId, 새등급);
+          const doc = dmDocs.find((x) => x.documentId === documentId);
+          if (doc) doc.grade = 새등급;
+          msg.className = "status-line status-ok";
+          msg.textContent = `✓ 열람 등급을 ${GRADE_LABEL[새등급]}(으)로 바꿨습니다.`;
+          renderDmList(true);
+          selectDoc(documentId);
+        } catch (e) {
+          msg.className = "status-line status-err";
+          msg.textContent = "바꾸지 못했습니다: " + ((e && e.message) || e);
+        }
+      });
+    });
     // 영역 수정 — 승인카드와 같은 API·같은 UX(재임베딩 없이 즉시, 감사 기록).
     document.getElementById("dmCatFix")?.addEventListener("click", function () {
       const ex = this.parentElement.querySelector(".mem-cat-opts");

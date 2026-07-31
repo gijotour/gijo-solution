@@ -50,6 +50,20 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .footer{margin-top:20px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted-2);max-width:1040px;}
 .footer img{height:16px;opacity:0.6;}
 
+/* 숫자 다음에 올 것 — "그래서 뭘 하지". 숫자만 있고 손이 갈 곳이 없던 화면을 고친다(2026-08-01 사용점검). */
+.todo-strip{max-width:1040px;margin:-8px 0 22px;background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;}
+.todo-strip .ts-t{font-size:12px;font-weight:800;color:var(--muted);margin-bottom:10px;}
+.todo-row{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--border);}
+.todo-row:first-of-type{border-top:0;}
+.todo-row .tw{flex:1;min-width:0;font-size:12.5px;}
+.todo-row .tw b{font-weight:800;}
+.todo-row .tsub{display:block;font-size:10.5px;color:var(--muted-2);margin-top:2px;}
+.todo-row .tbtn{flex:none;font-size:11px;font-weight:700;padding:5px 11px;border-radius:7px;border:1px solid var(--border-strong);background:transparent;color:var(--text);cursor:pointer;}
+.todo-row .tbtn:hover{background:rgba(255,255,255,.06);}
+.todo-row .tbtn.prim{border-color:rgba(59,130,246,.5);color:var(--blue-light);}
+.todo-row .tbtn[disabled]{opacity:.55;cursor:default;}
+.todo-none{font-size:12px;color:var(--muted-2);}
+
 /* 종합 태세 히어로 + 임원 헤드라인 (인터넷 모범사례: 한 줄 대표 점수 + 7~8 핵심 지표) */
 .hero{display:grid;grid-template-columns:300px 1fr;gap:14px;max-width:1040px;margin-bottom:22px;}
 .posture{background:linear-gradient(180deg,rgba(59,130,246,.1),transparent);border:1px solid var(--border-strong);border-radius:14px;padding:18px;display:flex;flex-direction:column;}
@@ -280,6 +294,47 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     );
   }
 
+  // "그래서 뭘 하지" — 숫자에서 곧장 할 일로. 나쁜 지표만 골라 줄로 세운다.
+  //
+  // 왜 이게 필요한가: 이 화면은 지표가 30개가 넘는데 **누를 곳이 하나도 없었다**(2026-08-01 사용점검).
+  // 담당자가 "열린 취약점 214건"을 보고도 손이 갈 데가 없어 화면을 닫아 버린다.
+  // 그래서 0이 아닌 것만 뽑아 ① 할 일로 담기 ② 그 화면 열기 두 개를 붙인다.
+  //
+  // 원칙: **숫자가 0이면 줄을 만들지 않는다.** 할 일이 없는데 있는 척하면 담당자가 목록을 안 믿게 된다.
+  function todoStrip(c, v, rem) {
+    var a = c.aiSecurity;
+    // [지표, 조건, 문구, 할 일 문장, 급함, 갈 화면]
+    // ⚠ page는 **실제 있는 화면**만 쓴다. 없는 화면을 적으면 눌렀을 때 아무 일도 안 일어난다
+    //   (howto.ts에서 8개 중 5개가 틀렸던 실사고 — nav.js 기준으로 대조할 것).
+    //   유지보수 점검(c.inspections)은 전용 화면이 없어 여기서 뺐다 — 갈 곳 없는 버튼은 만들지 않는다.
+    var cands = [
+      { n: v.kev, t: "실제 악용(KEV) <b>" + v.kev + "건</b>", sub: "공격이 실제로 쓰이는 취약점 — 이번 주 안에 막아야 합니다",
+        task: "KEV 등재 취약점 " + v.kev + "건 우선 조치", p: "P0", page: "vulnscan.html" },
+      { n: rem.overdue, t: "기한 지난 조치 <b>" + rem.overdue + "건</b>", sub: "약속한 날짜를 넘긴 일 — SLA 준수율을 깎고 있습니다",
+        task: "기한 초과 조치 " + rem.overdue + "건 마무리", p: "P0", page: "approvals.html" },
+      { n: c.findings.pending, t: "미검토 취약점 <b>" + c.findings.pending + "건</b>", sub: "맞는지 오탐인지 아직 아무도 안 본 것",
+        task: "미검토 finding " + c.findings.pending + "건 검토", p: "P1", page: "approvals.html" },
+      { n: c.assets.highRisk, t: "고위험 자산 <b>" + c.assets.highRisk + "대</b>", sub: "위험이 몰린 장비 — 여기부터 손대면 점수가 가장 많이 오릅니다",
+        task: "고위험 자산 " + c.assets.highRisk + "대 점검", p: "P1", page: "assethub.html" },
+      { n: a && a.aiAssets && a.avgRobustness == null ? a.aiAssets : 0, t: "AI 자산 견고성 <b>미점검</b>",
+        sub: "AI 자산은 있는데 공격 저항력을 한 번도 안 재봤습니다",
+        task: "AI 자산 견고성 점검(레드팀) 실행", p: "P2", page: "redteam.html" },
+    ].filter(function (x) { return x.n > 0; });
+
+    if (!cands.length) {
+      return '<div class="todo-strip"><div class="ts-t">🎯 지금 손댈 일</div>' +
+        '<div class="todo-none">급한 건이 없습니다 — 위 지표에 나쁜 값이 잡히면 여기에 줄이 생깁니다.</div></div>';
+    }
+    var rows = cands.map(function (x, i) {
+      return '<div class="todo-row"><div class="tw">' + x.t + '<span class="tsub">' + x.sub + "</span></div>" +
+        '<button class="tbtn prim" data-todo="' + i + '">＋ 할 일로 담기</button>' +
+        '<button class="tbtn" data-page="' + x.page + '">화면 열기</button></div>';
+    }).join("");
+    todoStrip.items = cands; // 버튼 배선에서 쓴다
+    return '<div class="todo-strip"><div class="ts-t">🎯 지금 손댈 일 <span style="font-weight:600;color:var(--muted-2)">' +
+      "· 나쁜 지표만 골랐습니다(" + cands.length + "건)</span></div>" + rows + "</div>";
+  }
+
   // 🤖 AI 보안 (OWASP LLM) — 제품 차별점. 자산 허브 도출을 KPI로 요약, 보라 강조.
   function aiSecurityBlock(c) {
     var a = c.aiSecurity;
@@ -471,6 +526,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
       root.innerHTML =
         heroBlock(c, v, rem, series) +
+        todoStrip(c, v, rem) +
         aiSecurityBlock(c) +
         timeSavedBlock(timeSaved) +
         `<div class="detail-panel closed" id="detailPanel">` +
@@ -488,6 +544,28 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   // ③ AI 보안 타일 → 관련 화면 이동. (data-page 배선은 kpiRoot가 async로 채워지므로 여기서 다시 건다.)
   function wireKpi() {
     const root = document.getElementById("kpiRoot");
+    // 🎯 지금 손댈 일 — 담기 버튼. 담긴 뒤엔 버튼이 "✓ 담김"으로 바뀌어 두 번 담기지 않는다.
+    root && root.querySelectorAll("[data-todo]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const it = (todoStrip.items || [])[Number(btn.dataset.todo)];
+        if (!it || btn.disabled) return;
+        btn.disabled = true;
+        const 원래 = btn.textContent;
+        btn.textContent = "담는 중…";
+        try {
+          // ref에 화면을 적어 두면 할 일 목록에서 곧장 그 화면으로 돌아온다.
+          await window.gijo.addTask(it.task, { priority: it.p, ref: "kpi:" + it.page });
+          btn.textContent = "✓ 담김";
+          btn.classList.remove("prim");
+        } catch (e) {
+          // 실패를 조용히 삼키면 담긴 줄 알고 넘어간다 — 버튼에 그대로 적는다.
+          btn.disabled = false;
+          btn.textContent = "✕ 실패 · 다시";
+          btn.title = "할 일로 담지 못했습니다 — " + (e && e.message ? e.message : "서버 오류");
+          setTimeout(() => { btn.textContent = 원래; }, 4000);
+        }
+      });
+    });
     const panel = document.getElementById("detailPanel");
     const toggle = document.getElementById("detailToggle");
     if (panel && toggle) {

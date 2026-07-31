@@ -70,6 +70,7 @@ const gijoApi = {
   deleteUser: (id: string) => api.usersApi.remove(id),
   changeUserPassword: (id: string, password: string) => api.usersApi.changePassword(id, password),
   setUserRole: (id: string, role: "security_officer" | "admin") => api.usersApi.setRole(id, role),
+  setUserClearance: (id: string, clearance: string) => api.usersApi.setClearance(id, clearance),
   listSessions: () => api.usersApi.sessions(),
   terminateUserSession: (id: string) => api.usersApi.terminateSession(id),
 
@@ -317,6 +318,7 @@ const gijoApi = {
   queryMemory: (question: string, topK?: number, agentId?: string) => api.memoryApi.query(question, topK, agentId),
   listMemoryDocuments: () => api.memoryApi.listDocuments(),
   memoryDocumentChunks: (documentId: string, limit?: number) => api.memoryApi.documentChunks(documentId, limit),
+  setMemoryDocumentGrade: (documentId: string, grade: string) => api.memoryApi.setDocumentGrade(documentId, grade),
   deleteMemoryDocument: (documentId: string, withFile?: boolean) => api.memoryApi.deleteDocument(documentId, withFile),
   kbHygiene: () => api.memoryApi.hygiene(),
   kbHygieneScan: () => api.memoryApi.hygieneScan(),

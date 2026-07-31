@@ -447,7 +447,9 @@ export function registerAuthRoutes(app: Express): void {
     //   목록(listUsers)과 로그인 응답은 이미 필요한 것만 골라 보내고 있었다 — 여기만 빠져 있었다.
     const u = (req as Request & { user?: GijoUser }).user;
     if (!u) { res.status(401).json({ error: "unauthorized" }); return; }
-    res.json({ id: u.id, username: u.username, displayName: u.displayName, role: u.role, team: u.team ?? null });
+    // clearance(열람 등급)는 화면이 "내가 어디까지 볼 수 있나"를 보여주는 데 쓴다.
+    //   ⚠ 이 값을 화면이 바꿔 보내도 서버는 안 믿는다 — 검색 차단은 서버가 DB에서 직접 읽는다.
+    res.json({ id: u.id, username: u.username, displayName: u.displayName, role: u.role, team: u.team ?? null, clearance: u.clearance ?? null });
   });
 
   // 접속 중 클라이언트(외부 콘솔) 목록 — 팀 사무실 창의 presence 표시용.

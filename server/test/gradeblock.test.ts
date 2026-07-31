@@ -99,6 +99,31 @@ describe("★ 사람이 묻는 입구에서는 반드시 열람 등급을 싣는
     expect(llmSrc, "검색 함수까지 안 가면 아무 소용 없다").toContain("queryMemoryRelevant(message, 4, agentId, screen, viewer)");
   });
 
+  it("등급을 바꾸는 길이 있고, 바꾼 것이 감사에 남는다", () => {
+    // 라벨을 붙일 수 없으면 기능이 아니다. 그리고 "누가 언제 누구를 어디까지 열어 줬나"는
+    // 보안 사고 조사의 첫 질문이라 반드시 남아야 한다.
+    const memSrc2 = fs.readFileSync(new URL("../src/engine/memory.ts", import.meta.url), "utf8");
+    const usersSrc = fs.readFileSync(new URL("../src/auth/users.ts", import.meta.url), "utf8");
+    expect(memSrc2, "문서 등급을 바꾸는 라우트가 없다").toContain("/api/memory/document/grade");
+    expect(memSrc2.slice(memSrc2.indexOf("/api/memory/document/grade")), "문서 등급 변경이 감사에 안 남는다")
+      .toContain("문서 등급 변경");
+    expect(usersSrc, "계정 열람 등급을 바꾸는 라우트가 없다").toContain("/api/users/:id/clearance");
+    expect(usersSrc.slice(usersSrc.indexOf("/api/users/:id/clearance")), "열람 등급 변경이 감사에 안 남는다")
+      .toContain("열람 등급 변경");
+  });
+
+  it("★ 열람 등급은 관리자만 바꾼다 — 자기 등급을 스스로 올릴 수 없다", () => {
+    const usersSrc = fs.readFileSync(new URL("../src/auth/users.ts", import.meta.url), "utf8");
+    const i = usersSrc.indexOf('"/api/users/:id/clearance"');
+    const 줄 = usersSrc.slice(i, i + 120);
+    expect(줄, "adminMiddleware가 없으면 아무나 자기 등급을 올린다").toContain("adminMiddleware");
+  });
+
+  it("문서 목록이 등급을 함께 준다 — 화면이 배지를 그리려면 필요하다", () => {
+    const memSrc3 = fs.readFileSync(new URL("../src/engine/memory.ts", import.meta.url), "utf8");
+    expect(memSrc3).toContain("grade: meta?.grade ?? null");
+  });
+
   it("★ 등급은 서버가 읽는다 — 요청이 주장할 수 없다", () => {
     // 클라이언트가 clearance를 보내 올릴 수 있으면 통제 전체가 무의미하다.
     // 두 입구 모두 req.body가 아니라 **로그인 사용자**에서 읽어야 한다.
