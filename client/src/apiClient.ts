@@ -912,7 +912,22 @@ export const redteamApi = {
   last: (target?: string) => request<RedTeamReport>(`/api/redteam/last${target ? `?target=${encodeURIComponent(target)}` : ""}`),
   targets: () => request<RedTeamTargets>("/api/redteam/targets"),
   payloads: () => request<{ id: string; category: string; severity: string; desc: string }[]>("/api/redteam/payloads"),
+  // 제품 경로 실효 견고성 — 담당자가 실제로 쓰는 경로(가드레일 뒤)로 같은 공격을 보낸 결과.
+  // 위 run/last의 "맨몸 점수"와는 다른 것을 잰다(섞으면 안 된다 — 화면에서도 구분해 보여준다).
+  effectiveLast: () => request<EffectiveReport | null>("/api/redteam/effective/last"),
+  runEffective: () => request<EffectiveReport>("/api/redteam/effective", { method: "POST", body: {} }),
 };
+
+export interface EffectiveReport {
+  ranAt: number;
+  total: number;
+  blockedAtGate: number; // 입구에서 막힘(모델에 닿지 않음)
+  modelHeld: number; // 모델이 버팀
+  leaked: number; // 실제로 뚫림
+  effectiveScore: number;
+  leakedIds: string[];
+  results: { id: string; severity: string; outcome: "blocked" | "held" | "leaked"; excerpt: string }[];
+}
 
 export type GuardMode = "off" | "flag" | "block";
 export interface GuardEvent {

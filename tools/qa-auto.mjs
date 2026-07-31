@@ -283,7 +283,11 @@ async function runKnowledge() {
   });
 
   const ask = async (q) => {
-    const j = await post("/api/llm/chat", { agentId: "normaltic", message: q });
+    // ⚠ qa:true — 대화 이력을 읽지도 쓰지도 않는다(chat()이 args.qa로 격리).
+    //   없으면 직전 문항의 답이 다음 문항에 맥락으로 섞인다: QA-M04(정기점검 절차)가
+    //   재시도될 때 M03/M05 대화가 끼어들어 답이 흔들렸다(2026-07-31, 격리하면 13항목 적중).
+    //   판단 경로(RAG·가드레일·라우팅)는 그대로다 — 단기 기억만 끈다.
+    const j = await post("/api/llm/chat", { agentId: "normaltic", message: q, qa: true });
     const reply = String(j.reply ?? "");
     console.log(`\n──── 💬 실제 LLM 답변 (${q}) ────\n${reply}\n────────────────────────\n`);
     if (/등록된 사내 자료에는 관련 내용이 없습니다/.test(reply)) throw new Error("그라운딩 실패 — 자료 못 찾음 답변");
@@ -337,7 +341,11 @@ async function runMaintenance() {
     return res.json();
   };
   const ask = async (q) => {
-    const j = await post("/api/llm/chat", { agentId: "normaltic", message: q });
+    // ⚠ qa:true — 대화 이력을 읽지도 쓰지도 않는다(chat()이 args.qa로 격리).
+    //   없으면 직전 문항의 답이 다음 문항에 맥락으로 섞인다: QA-M04(정기점검 절차)가
+    //   재시도될 때 M03/M05 대화가 끼어들어 답이 흔들렸다(2026-07-31, 격리하면 13항목 적중).
+    //   판단 경로(RAG·가드레일·라우팅)는 그대로다 — 단기 기억만 끈다.
+    const j = await post("/api/llm/chat", { agentId: "normaltic", message: q, qa: true });
     const reply = String(j.reply ?? "");
     console.log(`\n──── 💬 실제 LLM 답변 (${q}) ────\n${reply}\n────────────────────────\n`);
     if (/등록된 사내 자료에는 관련 내용이 없습니다/.test(reply)) throw new Error("그라운딩 실패 — 자료 못 찾음 답변");

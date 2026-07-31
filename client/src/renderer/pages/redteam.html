@@ -42,6 +42,30 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .panel-sub{font-size:11.5px;color:var(--muted);margin-bottom:14px;line-height:1.6;}
 .muted{color:var(--muted);}
 
+/* 제품 경로 실효 견고성 — "우리 위험한가?"의 답 카드 (2026-07-31 신설) */
+.hero{background:linear-gradient(135deg,rgba(30,185,128,.10),rgba(18,26,46,.6));border:1px solid rgba(30,185,128,.35);}
+.hero.leak{background:linear-gradient(135deg,rgba(226,72,61,.12),rgba(18,26,46,.6));border-color:rgba(226,72,61,.4);}
+.hero-top{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;}
+.hero-q{font-size:16px;font-weight:800;color:#fff;}
+.hero-q small{display:block;font-size:11.5px;font-weight:600;color:var(--muted);margin-top:3px;}
+.hero-score{text-align:right;white-space:nowrap;}
+.hero-score b{font-size:38px;font-weight:800;color:var(--teal);letter-spacing:-1px;}
+.hero.leak .hero-score b{color:var(--red);}
+.hero-score span{font-size:13px;color:var(--muted);margin-left:3px;}
+.hero-score em{display:block;font-style:normal;font-size:11.5px;color:var(--teal);font-weight:700;}
+.hero.leak .hero-score em{color:var(--red);}
+.bar{display:flex;gap:3px;margin:16px 0 10px;}
+.bar .eseg{height:26px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#04140d;min-width:22px;}
+.eseg.e-block{background:var(--teal);}
+.eseg.e-held{background:rgba(30,185,128,.35);color:var(--teal);}
+.eseg.e-leak{background:var(--red);color:#fff;}
+.legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--text);}
+.legend b{color:var(--text);}
+.legend .dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:-1px;}
+.hero-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);font-size:11.5px;flex-wrap:wrap;}
+.eff-why{background:rgba(240,160,32,.07);border:1px solid rgba(240,160,32,.28);border-radius:10px;padding:11px 14px;font-size:12px;color:var(--text);line-height:1.6;margin-bottom:14px;}
+.eff-why b{color:var(--amber);}
+
 /* 가드레일 패널 */
 .guard-row{display:flex;align-items:center;gap:18px;flex-wrap:wrap;}
 .guard-state{display:flex;align-items:center;gap:10px;font-weight:800;font-size:15px;}
@@ -144,17 +168,39 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     <div id="gijoChatWidget" data-prompts='["이 자산 레드팀 점검해줘"]' style="max-width:640px;margin-bottom:16px;"></div>
     <div id="targetNote" style="font-size:11.5px;color:var(--teal);margin:-6px 0 14px;display:none">📦 AI-BOM 자산을 선택했습니다 — 점검 결과(견고성 점수)가 그 자산의 AI-BOM에 자동 기록됩니다.</div>
 
-    <!-- 레드팀 요약 — 이 화면 전체를 대표하는 숫자다. 팝업은 여기까지만 열린다(2026-07-27).
-         가드레일 패널보다 위에 둔다: 담당자가 먼저 알고 싶은 건 "지금 얼마나 튼튼한가"다. -->
-    <div class="kpis" id="kpis" data-gijo-summary>
+    <!-- ① 제품 경로 실효 견고성 — "우리 위험한가?"에 여기서 답한다. 담당자가 실제로 쓰는
+         경로(대화창)로 공격 14종을 그대로 보낸 결과다. 팝업은 여기까지만 열린다.
+         맨몸 점수(아래)보다 위에 둔다: 조달·보안성 검토에서 먼저 봐야 할 숫자다. -->
+    <div class="panel hero" id="effPanel" data-gijo-summary>
+      <div class="hero-top">
+        <div class="hero-q">🛡 우리 제품은 이 공격들을 막습니다
+          <small>담당자가 실제로 쓰는 경로(대화창)로 공격을 그대로 보낸 결과입니다.</small>
+        </div>
+        <div class="hero-score"><b id="effScore">-</b><span>/ 100</span><em id="effLeakWord">-</em></div>
+      </div>
+      <div class="bar" id="effBar"><div class="muted" style="font-size:12px;padding:6px 0">아직 측정 기록이 없습니다 — [지금 점검]을 눌러 주세요.</div></div>
+      <div class="legend" id="effLegend" style="display:none">
+        <span><i class="dot" style="background:var(--teal)"></i>입구에서 차단 <b id="effBlocked">-</b> <span class="muted">— 울타리가 막아 AI에 닿지도 못함</span></span>
+        <span><i class="dot" style="background:rgba(30,185,128,.35)"></i>AI가 버팀 <b id="effHeld">-</b> <span class="muted">— 닿았지만 넘어가지 않음</span></span>
+        <span><i class="dot" style="background:var(--red)"></i>뚫림 <b id="effLeaked">-</b> <span class="muted">— 감춰야 할 내용이 새어 나감</span></span>
+      </div>
+      <div class="hero-foot">
+        <span id="effRanAt" class="muted">-</span>
+        <button class="btn-primary" id="runEffBtn" style="white-space:nowrap">▶ 지금 점검</button>
+      </div>
+    </div>
+
+    <!-- ② 맨몸 견고성 — 울타리를 걷어내고 모델만 시험한 값. 참고치로 내린다(2026-07-31). -->
+    <div class="kpis" id="kpis">
       <div class="kpi donut">
         <svg width="66" height="66" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="#0e1526" stroke-width="4"/><circle id="scoreArc" cx="18" cy="18" r="15.9" fill="none" stroke="#e2483d" stroke-width="4" stroke-dasharray="0 100" stroke-linecap="round" transform="rotate(-90 18 18)"/><text id="scoreText" x="18" y="21" text-anchor="middle" font-size="9" fill="#e7eaf3" font-weight="700">-</text></svg>
-        <div><div class="v" id="verdictWord" style="font-size:16px">-</div><div class="k">견고성 점수 / 100</div></div>
+        <div><div class="v" id="verdictWord" style="font-size:16px">-</div><div class="k">맨몸 점수 / 100</div></div>
       </div>
       <div class="kpi"><div class="v" id="kVuln" style="color:var(--red)">-</div><div class="k">뚫린 공격</div></div>
       <div class="kpi"><div class="v" id="kSafe" style="color:var(--teal)">-</div><div class="k">방어한 공격</div></div>
       <div class="kpi"><div class="v" id="kTotal">-</div><div class="k">총 페이로드</div></div>
     </div>
+    <div class="eff-why">⚠ <b>이 맨몸 점수가 낮다고 제품이 위험한 것이 아닙니다.</b> 울타리(가드레일)·역할·참고자료를 <b>모두 걷어내고</b> AI 모델만 발가벗겨 시험한 값이라, 모델을 바꿀 때 비교용으로 씁니다. 담당자가 쓰는 실제 경로의 안전은 <b>맨 위 카드</b>가 답합니다. 이 값은 제품을 고쳐도 움직이지 않고, 잴 때마다 흔들립니다.</div>
 
     <!-- 가드레일: 실시간 방어 -->
     <div class="panel">
@@ -311,6 +357,47 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.querySelectorAll("#results .item-head").forEach(h => h.addEventListener("click", ()=> h.parentElement.classList.toggle("open")));
   }
 
+  // ── 제품 경로 실효 견고성 ──
+  // 맨몸 점수(renderReport)와 다른 것을 그린다. 14칸 막대로 공격 하나하나가 어디서 걸렸는지 보여준다.
+  function renderEffective(rep){
+    const panel = document.getElementById("effPanel");
+    if(!rep || rep.total == null){
+      document.getElementById("effScore").textContent = "-";
+      document.getElementById("effLeakWord").textContent = "미측정";
+      document.getElementById("effRanAt").textContent = "아직 실효 점검 기록이 없습니다.";
+      return;
+    }
+    const leaked = rep.leaked || 0;
+    panel.classList.toggle("leak", leaked > 0);
+    document.getElementById("effScore").textContent = rep.effectiveScore;
+    document.getElementById("effLeakWord").textContent = leaked > 0 ? ("뚫림 " + leaked + "건") : "뚫림 0건";
+
+    // 막대 — 입구차단(진초록) · 버팀(연초록) · 뚫림(빨강). flex 비율로 폭을 나눈다.
+    const parts = [];
+    if(rep.blockedAtGate > 0) parts.push('<div class="eseg e-block" style="flex:'+rep.blockedAtGate+'">입구 차단 '+rep.blockedAtGate+'</div>');
+    if(rep.modelHeld > 0) parts.push('<div class="eseg e-held" style="flex:'+rep.modelHeld+'">'+rep.modelHeld+'</div>');
+    if(leaked > 0) parts.push('<div class="eseg e-leak" style="flex:'+leaked+'">뚫림 '+leaked+'</div>');
+    document.getElementById("effBar").innerHTML = parts.join("");
+
+    document.getElementById("effBlocked").textContent = rep.blockedAtGate;
+    document.getElementById("effHeld").textContent = rep.modelHeld;
+    document.getElementById("effLeaked").textContent = leaked;
+    document.getElementById("effLegend").style.display = "flex";
+    document.getElementById("effRanAt").textContent =
+      "마지막 점검 " + new Date(rep.ranAt).toLocaleString("ko-KR") + " · 공격 " + rep.total + "종";
+  }
+  async function loadEffective(){
+    try{ renderEffective(await window.gijo.redteamEffectiveLast()); }catch(e){}
+  }
+  const runEffBtn = document.getElementById("runEffBtn");
+  runEffBtn.addEventListener("click", async () => {
+    runEffBtn.disabled = true; const old = runEffBtn.textContent;
+    runEffBtn.textContent = "점검 중… (약 10초)";
+    try{ renderEffective(await window.gijo.runRedteamEffective()); }
+    catch(e){ document.getElementById("effRanAt").textContent = "점검 실패 — " + (e && e.message ? e.message : "서버 확인 필요"); }
+    finally{ runEffBtn.disabled = false; runEffBtn.textContent = old; }
+  });
+
   // ── 점검 대상 ──
   const targetSelect = document.getElementById("targetSelect");
   async function loadTargets(){
@@ -373,7 +460,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   if(!window.gijo.isAuthenticated()){ window.gijo.navigateTo("login.html"); }
   else {
     tick(); setInterval(tick, 30000);
-    loadHealth(); loadUser(); loadGuard();
+    loadHealth(); loadUser(); loadGuard(); loadEffective();
     loadTargets().then(loadLast);
     if(window.gijoRealtime) window.gijoRealtime.connect();
   }
