@@ -517,11 +517,30 @@ if (flag("--accept-baseline")) {
     console.error("서버가 살아 있는지 확인하고 다시 실행하세요. 이 값 없이 박은 기준선은 가드레일 해제를 못 잡습니다.");
     process.exit(2);
   }
+  // ★ 실패한 결과를 기준선으로 삼지 않는다(2026-07-31 신설).
+  //   기준선은 "여기까지는 된다"는 약속인데, 실패가 섞인 채로 박으면 그 실패가 **정상**이 된다.
+  //   다음부터는 같은 실패가 나도 게이트가 통과시킨다 — 게이트를 만든 이유가 사라진다.
+  const 실패축 = AXES.filter((a) => axes[a].pass < axes[a].total || axes[a].canaryFail > 0);
+  if (실패축.length) {
+    console.error(`\n기준선 확정 불가 — 실패가 있는 결과입니다: ${실패축.map((a) => `${a} ${axes[a].pass}/${axes[a].total}${axes[a].canaryFail ? ` (카나리 ${axes[a].canaryFail})` : ""}`).join(", ")}`);
+    console.error("먼저 고치고 통과한 실행에서 확정하세요. 실패를 기준선으로 박으면 그 실패가 정상이 됩니다.");
+    process.exit(2);
+  }
+  // ★ 맨몸 견고성은 **명시할 때만** 갱신한다(2026-07-31 신설).
+  //   맨몸 점수는 우리 코드로 못 움직이는 확률적 값이다(오늘만 해도 관측 21~64).
+  //   우연히 높게 나온 날의 값을 박으면 다음 실행이 거짓 실패한다. 사용자가 "29를 유지한다"고
+  //   결정한 값이라, 문항셋을 고쳐 기준선을 다시 박는 김에 그 결정을 조용히 뒤집으면 안 된다.
+  const 맨몸기준 = flag("--accept-robustness") ? robustness : (baseline?.robustness ?? robustness);
   fs.writeFileSync(baselinePath, JSON.stringify({
-    acceptedAt: meta.ranAt, gitRev, caseSetHash, axes, robustness, effective,
+    acceptedAt: meta.ranAt, gitRev, caseSetHash, axes, robustness: 맨몸기준, effective,
     note: "사람이 결과를 읽고 확정한 기준선 — 갱신은 --accept-baseline 명시 실행으로만",
   }, null, 2));
   console.log(`\n기준선 확정: ${baselinePath}`);
+  console.log(
+    flag("--accept-robustness")
+      ? `  맨몸 견고성도 갱신: ${baseline?.robustness?.score ?? "-"} → ${robustness?.score ?? "-"} (명시 요청)`
+      : `  맨몸 견고성은 유지: ${맨몸기준?.score ?? "-"}점 (오늘 측정 ${robustness?.score ?? "-"}점 — 바꾸려면 --accept-robustness)`
+  );
 }
 
 console.log(`\n━━ 판정: ${verdict} ━━`);
