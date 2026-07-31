@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>레드팀 화면 시안 — 제품 경로 실효 견고성</title>
+<style>
+:root{
+  --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;
+  --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);padding:28px;line-height:1.5}
+.wrap{max-width:1000px;margin:0 auto}
+.note{background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.3);border-radius:10px;padding:12px 15px;font-size:12.5px;color:var(--blue-light);margin-bottom:22px}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:14px}
+.panel-title{font-size:14.5px;font-weight:800;color:#fff;margin-bottom:4px}
+.panel-sub{font-size:11.5px;color:var(--muted);margin-bottom:14px}
+
+/* ── 1) 답이 되는 카드 — "우리 위험한가?"에 여기서 답한다 ── */
+.hero{background:linear-gradient(135deg,rgba(30,185,128,.10),rgba(18,26,46,.6));border:1px solid rgba(30,185,128,.35)}
+.hero-top{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap}
+.hero-q{font-size:16px;font-weight:800;color:#fff}
+.hero-q small{display:block;font-size:11.5px;font-weight:600;color:var(--muted);margin-top:3px}
+.hero-score{text-align:right;white-space:nowrap}
+.hero-score b{font-size:38px;font-weight:800;color:var(--teal);letter-spacing:-1px}
+.hero-score span{font-size:13px;color:var(--muted);margin-left:3px}
+.hero-score em{display:block;font-style:normal;font-size:11.5px;color:var(--teal);font-weight:700}
+
+/* 14칸 막대 — 공격 하나하나가 어디서 걸렸는지 눈으로 */
+.bar{display:flex;gap:3px;margin:16px 0 10px}
+.seg{height:26px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#04140d}
+.s-block{background:var(--teal)}
+.s-held{background:rgba(30,185,128,.35);color:var(--teal)}
+.s-leak{background:var(--red);color:#fff}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:12px;color:var(--muted)}
+.legend b{color:var(--text)}
+.dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.hero-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);font-size:11.5px;color:var(--muted);flex-wrap:wrap}
+.btn{background:var(--blue);border:none;border-radius:8px;padding:8px 14px;color:#fff;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit}
+.btn-ghost{background:transparent;border:1px solid var(--border-strong);color:var(--muted)}
+
+/* ── 2) 맨몸 점수 — 참고치로 내린다 ── */
+.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:12px}
+.kpi{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:13px 15px}
+.kpi .v{font-size:22px;font-weight:800}
+.kpi .k{font-size:11px;color:var(--muted);margin-top:2px}
+.why{background:rgba(240,160,32,.07);border:1px solid rgba(240,160,32,.28);border-radius:10px;padding:12px 15px;font-size:12.5px;color:var(--text)}
+.why b{color:var(--amber)}
+.why ul{margin:8px 0 0 18px;color:var(--muted);font-size:12px}
+.why li{margin:3px 0}
+.muted{color:var(--muted)}
+h4{font-size:12px;color:var(--muted-2);text-transform:none;letter-spacing:.3px;margin:26px 0 10px;font-weight:800}
+</style></head><body><div class="wrap">
+
+<div class="note"><b>시안</b> — 레드팀 화면 위쪽에 <b>제품 경로 실효 견고성</b>을 새로 얹고, 기존 점수를 "모델 맨몸" 참고치로 내립니다. 아래는 실제 측정값(2026-07-31 운영 실측)으로 그렸습니다.</div>
+
+<!-- ①  담당자가 가장 먼저 보는 것 -->
+<div class="panel hero">
+  <div class="hero-top">
+    <div class="hero-q">🛡 우리 제품은 이 공격들을 막습니다
+      <small>담당자가 실제로 쓰는 경로(대화창)로 공격 14종을 그대로 보낸 결과입니다.</small>
+    </div>
+    <div class="hero-score"><b>100</b><span>/ 100</span><em>뚫림 0건</em></div>
+  </div>
+
+  <div class="bar">
+    <div class="seg s-block" style="flex:13">입구에서 차단 13</div>
+    <div class="seg s-held" style="flex:1">1</div>
+  </div>
+  <div class="legend">
+    <span><i class="dot" style="background:var(--teal)"></i>입구에서 차단 <b>13</b> — 울타리가 막아 AI에 닿지도 못함</span>
+    <span><i class="dot" style="background:rgba(30,185,128,.35)"></i>AI가 버팀 <b>1</b> — 닿았지만 넘어가지 않음</span>
+    <span><i class="dot" style="background:var(--red)"></i>뚫림 <b>0</b> — 감춰야 할 내용이 새어 나감</span>
+  </div>
+
+  <div class="hero-foot">
+    <span>마지막 점검 2026-07-31 10:15 · 공격 14종 · 9초 소요</span>
+    <span><button class="btn">지금 다시 점검</button></span>
+  </div>
+</div>
+
+<!-- ②  기존 점수 — 뜻을 붙여 참고치로 -->
+<h4>참고 — 모델을 맨몸으로 시험한 값</h4>
+<div class="panel">
+  <div class="panel-title">모델 맨몸 견고성 <span class="muted" style="font-size:11px;font-weight:600">— 울타리를 걷어내고 AI만 직접 시험</span></div>
+  <div class="panel-sub">이 값은 <b>모델을 바꿀 때</b> 비교용으로 씁니다. 실제 사용 경로의 안전과는 다릅니다.</div>
+  <div class="kpis">
+    <div class="kpi"><div class="v" style="color:var(--amber)">36</div><div class="k">맨몸 점수 / 100</div></div>
+    <div class="kpi"><div class="v" style="color:var(--red)">9</div><div class="k">뚫린 공격</div></div>
+    <div class="kpi"><div class="v" style="color:var(--teal)">5</div><div class="k">방어한 공격</div></div>
+    <div class="kpi"><div class="v">14</div><div class="k">총 페이로드</div></div>
+  </div>
+  <div class="why">
+    <b>⚠ 이 숫자가 낮다고 제품이 위험한 것이 아닙니다.</b>
+    <ul>
+      <li>울타리(가드레일)·역할·참고자료를 <b>모두 걷어내고</b> AI 모델만 발가벗겨 시험한 값입니다.</li>
+      <li>담당자가 쓰는 실제 경로에는 그 울타리가 있고, 거기서는 <b>14건 중 0건</b>만 뚫립니다(위 카드).</li>
+      <li>이 값은 <b>제품을 고쳐도 움직이지 않습니다</b> — 울타리 밖을 재는 값이라서요.</li>
+      <li>잴 때마다 21~50점으로 흔들립니다. 한 번 값으로 판단하지 말고 추세로 보세요.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="panel" style="background:transparent;border-style:dashed">
+  <div class="panel-title" style="font-size:13px">이 아래는 기존 화면 그대로</div>
+  <div class="panel-sub">런타임 가드레일 · 카테고리별 취약률 · 페이로드별 결과 — 바꾸지 않습니다.</div>
+</div>
+
+</div></body></html>

@@ -27,9 +27,14 @@
   // fixed:true — 이 셋은 늘 맨 위에 있으므로 즐겨찾기 별표를 달지 않는다.
   var TOP = [
     { page: "dashboard.html", label: "대시보드", fixed: true },
-    { office: true, label: "팀 사무실 (창)", ic: "🏢", fixed: true },
+    // ⚠ 별도 창으로 여는 항목은 **win에 여는 함수 이름을 적는다**(preload의 window.gijo.*).
+    //   예전엔 `office: true` 같은 항목별 표시를 두고 클릭 처리에서 이름을 하나씩 봤는데,
+    //   문서함을 더할 때 그 분기를 안 더해서 **메뉴를 눌러도 아무 일도 안 났다**(4.9.0 실사고).
+    //   page가 없는 항목이 탭 열기로 떨어져 undefined 탭을 여니 조용히 실패한다.
+    //   win을 보고 처리하면 새 창 항목을 더해도 클릭 처리를 고칠 일이 없다.
+    { win: "openTeamOffice", label: "팀 사무실 (창)", ic: "🏢", fixed: true },
     // 문서함 — 가이드·아키텍처를 읽는 별도 창(주소가 없어 별표 대상 아님, 팀 사무실과 같음)
-    { docbox: true, label: "문서함 (창)", ic: "📚", fixed: true },
+    { win: "openDocbox", label: "문서함 (창)", ic: "📚", fixed: true },
     { page: "sessions.html", label: "작업 내역", fixed: true },
   ];
 
@@ -317,8 +322,14 @@
       el.appendChild(sBadge);
     }
 
-    if (it.office) {
-      el.addEventListener("click", function () { if (window.gijo && window.gijo.openTeamOffice) window.gijo.openTeamOffice(); });
+    if (it.win) {
+      // 별도 창 항목 — preload가 노출한 window.gijo.<win>()을 부른다.
+      // 없으면 조용히 넘기지 않고 알린다: 예전엔 아무 일도 안 나서 "눌러도 안 열린다"는
+      // 증상만 남고 원인을 찾을 단서가 하나도 없었다(4.9.0 문서함).
+      el.addEventListener("click", function () {
+        if (window.gijo && typeof window.gijo[it.win] === "function") window.gijo[it.win]();
+        else alert(it.label + "을(를) 열 수 없습니다 — 앱을 다시 시작해 보시고, 계속되면 알려주세요.");
+      });
     } else if (window.gijoTabs) {
       // 탭 셸(app.html) 안 — 화면을 옮기지 않고 탭으로 연다. 셸이 리로드되지 않으므로
       // 대화·입력 중 초안·진행 중 작업이 그대로 유지된다(4.0.0 탭 구조).

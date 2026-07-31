@@ -20,7 +20,9 @@ import { OWASP_SOURCE } from "./owasp-llm-seed";
 import { NIST_SOURCE } from "./nist-airmf-seed";
 import { CWE_SOURCE } from "./cwe-seed";
 import { ATTACK_SOURCE } from "./attack-seed";
-import { listTriples } from "./ontology";
+import { listTriples, addTriples, countTriples, deleteTriplesBySource } from "./ontology";
+import { verifyBundle, type BundleManifest, type BundlePayload } from "./bundleverify";
+import { raw as expressRaw } from "express";
 import { bootstrapDocsBundle } from "./docsbundle";
 import { recordAudit } from "./audit";
 import type { GijoUser } from "../auth/users";
@@ -154,7 +156,113 @@ export async function ensureKnowledgeBundle(): Promise<void> {
   }
 }
 
+/**
+ * 서명이 검증된 번들을 반입한다. (계획서 후-3 2단계)
+ *
+ * ⚠ **검증은 호출 전에 끝나 있어야 한다** — 이 함수는 verifyBundle이 통과시킨 payload만 받는다.
+ *   검증과 적용을 한 함수에 섞으면 "검증을 건너뛰는 호출 경로"가 언젠가 생긴다.
+ *
+ * ⚠ **addTriples는 중복을 걸러 주지 않는다** — 매번 새 UUID로 그냥 INSERT한다.
+ *   나는 이걸 "멱등하다"고 잘못 알고 그대로 썼다가 운영에 2000행을 복제했다(아래 참고).
+ *   멱등은 **출처별로 지우고 다시 넣어** 우리가 만든다(시드가 쓰는 것과 같은 전략).
+ * 문서는 파일로 떨궈 기존 인입기가 읽게 한다 — 새 인입 기계를 만들면 어긋날 자리만 는다.
+ */
+export async function importVerifiedBundle(
+  manifest: BundleManifest,
+  payload: BundlePayload,
+  actor: string
+): Promise<{ version: string; triplesAdded: number; triplesReplaced: number; docsWritten: number; at: number }> {
+  // 온톨로지 — **출처별로 지우고 다시 넣는다**(seedOntologyFromCatalog와 같은 멱등 전략).
+  //
+  // ⚠ 실사고(2026-07-31): 처음엔 addTriples로 그냥 넣었는데, addTriple은 매번 새 UUID로
+  //   INSERT할 뿐 중복을 보지 않는다. 서버에서 뽑은 번들을 도로 넣자 **운영 온톨로지에
+  //   2000행이 그대로 복제됐다**(4185행 중 고유 2185). 같은 지식이 두 벌 있으면 검색 결과가
+  //   중복으로 차 근거 표시가 망가지고, 번들을 받을 때마다 배로 는다.
+  //   시드가 멱등이라 "기존 멱등 경로를 재사용한다"고 적어 놓고 정작 그 경로를 우회했다.
+  //
+  // 출처 태그로 지우므로 **고객이 손으로 넣은 지식은 보존된다**(출처가 다르다).
+  const sources = [...new Set(payload.ontology.map((t) => t.source).filter((s): s is string => !!s))];
+  let removed = 0;
+  for (const s of sources) removed += deleteTriplesBySource(s);
+  const before = countTriples();
+  addTriples(payload.ontology.map((t) => ({
+    subject: t.subject, predicate: t.predicate, object: t.object, scope: t.scope, source: t.source,
+  })));
+  const triplesAdded = countTriples() - before;
+
+  // 문서 — 지식 문서 디렉터리에 쓴다. 이름은 verifyBundle이 이미 안전성을 확인했지만,
+  // **여기서 한 번 더 basename을 취한다**: 이 함수만 따로 부르는 경로가 나중에 생겨도
+  // 파일이 엉뚱한 데 써지지 않게. 방어는 겹쳐 두는 편이 싸다.
+  const docsDir = process.env.GIJO_DOCS_DIR ?? "docs";
+  const knowledgeDir = path.join(docsDir, "knowledge");
+  let docsWritten = 0;
+  if (payload.docs.length) {
+    fs.mkdirSync(knowledgeDir, { recursive: true });
+    for (const d of payload.docs) {
+      const safe = path.basename(d.file);
+      if (!safe || safe.startsWith(".")) continue;
+      fs.writeFileSync(path.join(knowledgeDir, safe), Buffer.from(d.contentBase64, "base64"));
+      docsWritten++;
+    }
+  }
+  // 문서를 새로 깔았으니 코퍼스를 다시 태운다(멱등 — 내용이 같으면 건너뛴다).
+  const docsResult = await bootstrapDocsBundle();
+
+  const state: AppliedState = {
+    version: manifest.version,
+    at: Date.now(),
+    triples: triplesAdded,
+    docsIngested: docsResult.ingested.length,
+    docsSkipped: docsResult.skipped.length,
+  };
+  setStateStmt.run(STATE_KEY, JSON.stringify(state));
+
+  recordAudit({
+    kind: "config",
+    actor,
+    action: "지식 번들 반입(서명 검증 통과)",
+    target: manifest.version,
+    detail: [
+      `발행 ${manifest.issuedAt} · 서명 확인됨`,
+      `지식 ${payload.ontology.length}건 적재(출처 ${sources.length}종 교체 — 이전 ${removed}건 정리)`,
+      `문서 ${docsWritten}건 기록 · 인입 신규 ${docsResult.ingested.length}/유지 ${docsResult.skipped.length}`,
+    ].join("\n"),
+    result: "ok",
+  });
+
+  return { version: manifest.version, triplesAdded, triplesReplaced: removed, docsWritten, at: state.at };
+}
+
 export function registerKnowledgeBundleRoutes(app: Express): void {
+  // 번들 반입 — **admin만**, 그리고 서명이 맞을 때만.
+  // 본문은 gzip 바이너리라 express.raw로 받는다(JSON 파서를 태우면 깨진다).
+  app.post(
+    "/api/knowledge-bundle/import",
+    authMiddleware,
+    adminMiddleware,
+    expressRaw({ type: "application/octet-stream", limit: "64mb" }),
+    asyncRoute(async (req, res) => {
+      const actor = (req as Request & { user?: GijoUser }).user?.displayName ?? "admin";
+      const raw = req.body as Buffer;
+      const v = verifyBundle(Buffer.isBuffer(raw) ? raw : Buffer.alloc(0));
+      if (!v.ok || !v.manifest || !v.payload) {
+        // ⚠ 거부는 **기록에 남긴다**. 가짜 번들 반입 시도는 그 자체가 보안 사건이다.
+        recordAudit({
+          kind: "block",
+          actor,
+          action: "지식 번들 반입 거부",
+          target: `${Buffer.isBuffer(raw) ? raw.length : 0}바이트`,
+          detail: v.reason ?? "검증 실패",
+          result: "blocked",
+        });
+        res.status(400).json({ ok: false, reason: v.reason });
+        return;
+      }
+      res.json({ ok: true, ...(await importVerifiedBundle(v.manifest, v.payload, actor)) });
+    })
+  );
+
+
   app.get("/api/knowledge-bundle/status", authMiddleware, (_req, res) => {
     res.json(getBundleStatus());
   });
