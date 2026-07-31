@@ -148,14 +148,33 @@ async function 로그인() {
   return t;
 }
 
+/**
+ * ⚠ **응답 상태를 반드시 본다.**
+ *   첫 실행(2026-08-01)에서 115상황 중 35건이 "빈 답"으로 나왔다. 제품 결함인 줄 알았는데
+ *   실제로는 **접속표(access token)가 15분 만에 만료**된 것이었고, 내 하네스가 401을 그냥
+ *   삼켜 `j.output`이 undefined → 빈 문자열이 됐다. 4ms 만에 돌아온 "답"을 답으로 세고 있었다.
+ *   시험이 제품을 모함한 셈 — 상태 코드를 안 보면 이런 착각이 조용히 쌓인다.
+ *   그래서 ① 상태를 기록하고 ② 401이면 다시 로그인해 그 문항을 재시도한다.
+ */
 async function 물어보기(H, text, screen, sessionId) {
   const t0 = Date.now();
-  try {
+  const 한번 = async () => {
     const r = await fetch(BASE + "/api/dispatch", {
       method: "POST", headers: H,
       body: JSON.stringify({ text, screen, qa: true, ...(sessionId ? { sessionId } : {}) }),
     });
-    const j = await r.json();
+    const j = await r.json().catch(() => ({}));
+    return { status: r.status, j };
+  };
+  try {
+    let { status, j } = await 한번();
+    if (status === 401) {
+      H.authorization = "Bearer " + (await 로그인()); // 15분 만료 — 다시 받아 이어 간다
+      ({ status, j } = await 한번());
+    }
+    if (status !== 200) {
+      return { out: "", action: "HTTP" + status, ms: Date.now() - t0, err: "HTTP " + status };
+    }
     return { out: String(j.output ?? ""), action: j.route?.action ?? "?", ms: Date.now() - t0, sources: j.sources };
   } catch (e) {
     return { out: "", action: "ERROR", ms: Date.now() - t0, err: String(e).slice(0, 120) };
