@@ -578,3 +578,22 @@ migrate(
    );
    CREATE INDEX IF NOT EXISTS idx_personal_docs_user ON personal_docs(userId, updatedAt DESC);`
 );
+
+// 업무정보 등급(기밀 C · 민감 S · 공개 O)과 계정별 열람 등급 — N2SF 대응(engine/grades.ts).
+//
+//  · memory_documents.grade  — 지식 문서의 등급
+//  · users.clearance         — 그 사람이 볼 수 있는 최고 등급
+//
+// ⚠ **기존 자료에는 '공개(O)'를 명시적으로 넣는다.** 코드의 기본값은 "모르면 기밀"인데,
+//   그 기본값을 이미 쌓인 문서에 그대로 적용하면 어제까지 되던 검색이 오늘 전부 막힌다
+//   (담당자는 제품이 고장 났다고 생각하고 등급 기능을 꺼 버린다).
+//   지금 있는 자료는 등급 개념이 없던 시절의 것이라 **공개로 쓰이고 있었다** — 그 사실을
+//   기록으로 남기는 것이지 등급을 낮추는 게 아니다. 새로 들어오는 자료의 기본은 민감(S)이다.
+// ⚠ 기존 계정에는 열람 등급을 넣지 않는다(NULL → 코드가 '공개만'으로 읽는다).
+//   관리자가 설정에서 올려 주기 전까지는 닫혀 있는 쪽이 맞다.
+migrate(
+  "info-grades-2026-07-31",
+  `ALTER TABLE memory_documents ADD COLUMN grade TEXT;
+   UPDATE memory_documents SET grade = 'O' WHERE grade IS NULL;
+   ALTER TABLE users ADD COLUMN clearance TEXT;`
+);

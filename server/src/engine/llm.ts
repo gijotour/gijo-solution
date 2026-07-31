@@ -14,6 +14,7 @@ import type { GijoUser } from "../auth/users";
 //   깨졌다 — 이 파일을 vi.mock으로 통째로 바꿔치기하는 시험이 많아, export를 더할 때마다
 //   목까지 같이 고쳐야 했다. 정책은 정책 자리(learnpolicy.ts)에 둔다.
 import { isNonLearningAccount } from "./learnpolicy";
+import type { Viewer } from "./memory";
 import { explainHardTerms, glossaryGroundingFor } from "./glossary";
 import { gateUserInput } from "./gateway";
 
@@ -64,6 +65,13 @@ export interface ChatArgs {
    * 담당자가 아닌 계정의 문답으로 모델을 가르치면 제품이 아니라 시험을 배운다.
    */
   noLearn?: boolean;
+  /**
+   * 묻는 사람의 열람 등급 — RAG 검색에서 **못 보는 등급의 문서를 아예 안 가져오게** 한다.
+   *
+   * 없으면 가리지 않는다(지금까지와 동일). 사람이 묻는 입구(대화·디스패치)에서는 반드시 넘긴다 —
+   * 그게 사람에게 자료가 닿는 길이고, 시험이 그 배관을 지킨다(gradeblock.test.ts).
+   */
+  viewer?: Viewer;
   // true면 답변 끝에 어려운 용어 쉬운 풀이(glossary)를 붙인다 — 사람이 읽는 답변 전용.
   //
   // 기본값이 false인 이유: 이 후처리를 chat() 전체에 무조건 걸었더니(2026-07-20), 사람이 읽지 않는
@@ -95,14 +103,14 @@ export function resetChatHistoryForTests(): void {
 // 임베딩 서버가 없거나 지식 베이스가 비어 있으면 조용히 생략한다 — RAG가 안 된다고
 // 채팅 자체가 죽으면 안 된다. (memory.ts가 llm.ts의 embed를 쓰므로 순환 참조를 피해
 // 호출 시점에 동적 import.)
-async function ragContextFor(message: string, agentId: string, screen?: string): Promise<string | null> {
+async function ragContextFor(message: string, agentId: string, screen?: string, viewer?: Viewer): Promise<string | null> {
   try {
     const { queryMemoryRelevant } = await import("./memory.js");
     // 에이전트 전용 지식 + 전역 지식만 검색 (다른 에이전트 전용 문서는 제외).
     // 거리 임계값을 넘는 청크는 버린다 — 무관한 조각을 "참고 자료"로 붙이면 모델이 그걸
     // 근거인 양 답한다(memory.ts의 RAG_RELEVANCE_MAX_DISTANCE 주석 참고).
     // screen이 있으면 그 화면의 업무영역 문서를 우선한다(soft boost — 다른 영역도 배제 안 함).
-    const raw = await queryMemoryRelevant(message, 4, agentId, screen);
+    const raw = await queryMemoryRelevant(message, 4, agentId, screen, viewer);
     // ⚠ 살균 — 검색된 문서 조각은 **검사를 한 번도 안 거치고** 프롬프트에 실린다.
     //   가드레일은 사용자가 타이핑한 입력만 본다. 그래서 문서에 심어둔 지시문이 그대로
     //   실행됐다(2026-07-30 실측: 카나리가 답변 맨 앞에 출력됨 — chat·dispatch 양쪽).
@@ -448,7 +456,7 @@ export async function chat(args: ChatArgs): Promise<string> {
   // 없는 사실을 단정했다). 관련 자료가 없으면 애초에 LLM에 묻지 않는 것이 유일한 보장이다.
   if (args.agentId === "normaltic" && !args.responseSchema) {
     const { queryMemoryRelevant } = await import("./memory.js");
-    const relevant = await queryMemoryRelevant(args.message, 4, args.agentId).catch(() => null);
+    const relevant = await queryMemoryRelevant(args.message, 4, args.agentId, undefined, args.viewer).catch(() => null);
     // null = 검색 자체가 실패(임베딩 서버 다운 등) — 이때는 막지 않고 평소대로 진행한다.
     if (relevant && relevant.length === 0) {
       return "등록된 사내 자료에는 관련 내용이 없습니다. 사내 문서를 먼저 등록하시거나, 다른 에이전트에게 물어보세요.";
@@ -456,7 +464,7 @@ export async function chat(args: ChatArgs): Promise<string> {
   }
 
   const history = args.remember && !args.qa ? (histories.get(args.agentId) ?? []) : [];
-  const rag = args.remember ? await ragContextFor(args.message, args.agentId, args.screen) : null;
+  const rag = args.remember ? await ragContextFor(args.message, args.agentId, args.screen, args.viewer) : null;
 
   // RAG 참고자료는 별도 system 메시지가 아니라 시스템 프롬프트에 합친다 — Mistral 계열
   // (Lily 포함) 채팅 템플릿은 system 메시지 2개를 "roles must alternate" 에러로 거부한다.
@@ -704,7 +712,7 @@ export function registerLlmRoutes(app: Express): void {
       // noLearn도 **서버가 정한다**(trusted와 같은 이유) — 요청이 주장할 값이 아니다.
       const who = (req as Request & { user?: GijoUser }).user;
       res.json({
-        reply: await chat({ ...req.body, remember: true, explain: true, trusted: false, noLearn: isNonLearningAccount(who?.username) }),
+        reply: await chat({ ...req.body, remember: true, explain: true, trusted: false, noLearn: isNonLearningAccount(who?.username), viewer: { userId: who?.id, clearance: who?.clearance } }),
       });
     })
   );

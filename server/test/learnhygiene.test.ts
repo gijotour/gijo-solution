@@ -66,7 +66,14 @@ describe("★ 배포·시험 계정의 문답은 학습에 안 들어간다", ()
 
   it("디스패치 경로에도 이어져 있다", () => {
     expect(dispSrc).toContain("isNonLearningAccount(user?.username)");
-    expect(dispSrc, "chat 호출까지 안 닿으면 절반만 막힌다").toContain("noLearn, logQuestion: instructionText");
+    // ⚠ 인접 문자열로 검사하지 않는다 — 사이에 인자가 하나 끼면(실제로 viewer가 끼었다)
+    //   동작은 멀쩡한데 시험만 깨진다. **chat 호출에 둘 다 실렸는가**를 본다.
+    const calls = dispSrc.match(/await chat\(\{[^}]*\}\)/g) ?? [];
+    const 사람에게가는답 = calls.filter((c) => c.includes("logQuestion: instructionText"));
+    expect(사람에게가는답.length, "logQuestion을 넘기는 chat 호출을 못 찾았다").toBeGreaterThan(0);
+    for (const c of 사람에게가는답) {
+      expect(c, "chat 호출까지 안 닿으면 절반만 막힌다").toContain("noLearn");
+    }
   });
 });
 

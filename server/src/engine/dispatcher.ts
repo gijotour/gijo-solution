@@ -15,6 +15,7 @@ import { emitCollaboration } from "./collaboration";
 import { runAdapter, StandardFinding } from "./bridge";
 import { chat } from "./llm";
 import { isNonLearningAccount } from "./learnpolicy";
+import type { Viewer } from "./memory";
 import { runAgentLoop, AgentToolCall } from "./agentloop";
 import { executeApprovedTool, findAgentTool, buildApproval, PendingApproval } from "./agenttools";
 import { appendApprovedDecision } from "./orchestrator-dataset";
@@ -236,7 +237,7 @@ export function formatRejectHistory(instructionText: string): string {
   return lines.join("\n");
 }
 
-async function executeRoutedAction(route: RoutedIntent, instructionText: string, contextText = "", screen?: string, qa?: boolean, noLearn?: boolean): Promise<ActionResult> {
+async function executeRoutedAction(route: RoutedIntent, instructionText: string, contextText = "", screen?: string, qa?: boolean, noLearn?: boolean, viewer?: Viewer): Promise<ActionResult> {
   switch (route.action) {
     case "scan": {
       const assetId = route.targetAssetId ?? "unknown-asset";
@@ -257,7 +258,7 @@ async function executeRoutedAction(route: RoutedIntent, instructionText: string,
       const message = contextText ? `${contextText}
 
 [현재 지시] ${instructionText}` : instructionText;
-      return { output: await chat({ agentId: route.agentId, message, remember: true, trusted: true, explain: true, screen, qa, noLearn, logQuestion: instructionText }) };
+      return { output: await chat({ agentId: route.agentId, message, remember: true, trusted: true, explain: true, screen, qa, noLearn, viewer, logQuestion: instructionText }) };
     }
     case "analyze":
     case "chat":
@@ -268,7 +269,7 @@ async function executeRoutedAction(route: RoutedIntent, instructionText: string,
       // trusted: 지시문은 dispatchInstructionCore에서 이미 관문을 지났다(이중 집계 방지).
       // explain: 지휘 콘솔에 그대로 표시되는 답변이다.
       reportProgress("write", "사내 근거를 찾아 답을 쓰고 있습니다"); // chat 내부에서 RAG 검색+작성이 함께 돈다
-      return { output: await chat({ agentId: route.agentId, message, remember: true, trusted: true, explain: true, screen, qa, noLearn, logQuestion: instructionText }) };
+      return { output: await chat({ agentId: route.agentId, message, remember: true, trusted: true, explain: true, screen, qa, noLearn, viewer, logQuestion: instructionText }) };
     }
   }
 }
@@ -421,12 +422,12 @@ async function learnloopConfirmResult(instructionText: string, qa?: boolean): Pr
 // sessionId가 없으면 자동으로 새 세션을 만들어 기록한다(사용자 요청 2026-07-20 — "모든 행위를
 // 작업 세션에": 팀 사무실 CTA·에이전트 페이지 등 세션 없이 오던 지시도 이력에 남게).
 // 응답의 sessionId를 클라이언트가 저장하면 그 세션으로 "이어서" 지시가 된다.
-export async function dispatchInstruction(instructionText: string, sessionId?: string, screen?: string, actor?: string, qa?: boolean, noLearn?: boolean): Promise<DispatchResult> {
+export async function dispatchInstruction(instructionText: string, sessionId?: string, screen?: string, actor?: string, qa?: boolean, noLearn?: boolean, viewer?: Viewer): Promise<DispatchResult> {
   // 평가 게이트/QA 실행(중-3): 작업 세션·협업 피드에 기록하지 않는다 — 게이트 문답 수백 건이
   // 작업내역에 쌓이면 학습 후보함(출처 B)과 담당자의 작업 이력을 오염시킨다. 맥락도 싣지 않아
   // 문항 간 독립(재현성)을 보장한다. 라우팅·RAG·가드레일 등 제품 판단 경로는 전부 동일하다.
   if (qa) {
-    const core = await dispatchInstructionCore(instructionText, "", screen, actor, true, noLearn);
+    const core = await dispatchInstructionCore(instructionText, "", screen, actor, true, noLearn, viewer);
     // ⚠ 신호(dataHits·internalMiss·sources)는 **답의 일부**다 — 기록이 아니라 계산이라서
     //   qa에서도 그대로 내야 한다. 여기서 건너뛰었더니 회귀 하네스가 internalMiss=undefined로
     //   깨졌다(2026-07-30 실측). 게이트 문항은 이 신호를 안 써서 게이트 결과는 무사했지만,
@@ -450,7 +451,7 @@ export async function dispatchInstruction(instructionText: string, sessionId?: s
     // "어느 세션에서 온 작업인지"가 로그에 드러나게 한다(대시보드 📡 실시간 협업 피드에 표시).
     collab(qa, { from: "세션", to: "orchestrator", message: `💬 [${title}] ${기록문}` });
   }
-  const core = await dispatchInstructionCore(instructionText, contextText, screen, actor, undefined, noLearn);
+  const core = await dispatchInstructionCore(instructionText, contextText, screen, actor, undefined, noLearn, viewer);
   const result: DispatchResult = { ...core, ...(await computeOfferSignals(core, instructionText, screen)) };
   if (session) {
     appendTurn(session.id, "assistant", result.output, turnToolTag(result));
@@ -525,7 +526,7 @@ function turnToolTag(r: DispatchResult): string | undefined {
   return undefined;
 }
 
-async function dispatchInstructionCore(instructionText: string, contextText = "", screen?: string, actor?: string, qa?: boolean, noLearn?: boolean): Promise<DispatchResult> {
+async function dispatchInstructionCore(instructionText: string, contextText = "", screen?: string, actor?: string, qa?: boolean, noLearn?: boolean, viewer?: Viewer): Promise<DispatchResult> {
   // 런타임 가드레일 — 입력의 프롬프트 인젝션 시도를 실시간 검사. block 모드면 거절, flag면 기록·경고 후 진행.
   // guardInput을 직접 부르지 않고 게이트웨이를 거친다 — 검사 지점을 한 곳으로 모아, 앞으로
   // 검사가 늘어도(PII·출력 필터 등) 모든 입구에 자동으로 적용되게 하기 위함이다.
@@ -806,7 +807,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   let toolCalls: AgentToolCall[] | undefined;
   let approval: PendingApproval | undefined;
   try {
-    const result = await executeRoutedAction(route, instructionText, contextText, screen, qa, noLearn);
+    const result = await executeRoutedAction(route, instructionText, contextText, screen, qa, noLearn, viewer);
     output = result.output;
     toolCalls = result.toolCalls;
     approval = result.approval;
@@ -873,7 +874,7 @@ export function registerDispatcherRoutes(app: Express): void {
       //   무한정은 아니다. 매달린 요청이 게이트를 영영 멈추게 하면 안 되므로 상한을 둔다.
       const limitMs = qa ? QA_LONG_ANSWER_MS : LONG_ANSWER_MS;
       const work = runWithProgress(progressId, user?.id ?? null, () =>
-        dispatchInstruction(text, sessionId, screen, user?.displayName, qa, isNonLearningAccount(user?.username))
+        dispatchInstruction(text, sessionId, screen, user?.displayName, qa, isNonLearningAccount(user?.username), { userId: user?.id, clearance: user?.clearance })
       );
       let handedOff = false;
       const timer = new Promise<null>((resolve) => setTimeout(() => resolve(null), limitMs));

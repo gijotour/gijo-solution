@@ -11,6 +11,7 @@ import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { embed, chat } from "./llm";
 import { db, migrate } from "../db";
+import { clearanceOf, gradeOf, blockedGrades } from "./grades";
 import { emitCollaboration } from "./collaboration";
 import { gateUserInput } from "./gateway";
 import {
@@ -41,6 +42,31 @@ const upsertDocMetaStmt = db.prepare(
 const getDocMetaStmt = db.prepare("SELECT * FROM memory_documents WHERE documentId = ?");
 const deleteDocMetaStmt = db.prepare("DELETE FROM memory_documents WHERE documentId = ?");
 const setDocClassStmt = db.prepare("UPDATE memory_documents SET docClass = ? WHERE documentId = ?");
+
+// ── 등급 차단 (N2SF) ──────────────────────────────────────────────────────
+// 누가 묻는지에 따라 **검색에서 아예 빠지는** 문서를 정한다. engine/grades.ts 참고.
+//
+// ⚠ viewer를 안 넘긴 호출은 어떻게 되나: **아무것도 안 가린다**(지금까지와 동일).
+//   여기서 "모르면 전부 막기"로 하면, viewer를 아직 안 흘리는 내부 호출(도구·브리핑 등)이
+//   한꺼번에 답을 못 하게 된다 — 기능이 통째로 죽는 것을 '보안'이라 부를 수는 없다.
+//   대신 **사람이 묻는 입구(대화·디스패치)에서는 viewer를 반드시 넘긴다**. 그게 사람에게
+//   자료가 닿는 길이고, 시험이 그 배관을 지킨다(gradeblock.test.ts).
+export interface Viewer {
+  userId?: string | null;
+  clearance?: string | null;
+}
+
+const gradedDocsStmt = db.prepare("SELECT documentId, grade FROM memory_documents");
+
+/** 이 사람이 못 보는 문서 id들. viewer가 없으면 빈 배열(가리지 않음). */
+export function hiddenDocIds(viewer?: Viewer): string[] {
+  if (!viewer) return [];
+  const 열람 = clearanceOf(viewer.clearance);
+  const 막힌등급 = new Set(blockedGrades(열람));
+  if (막힌등급.size === 0) return [];
+  const rows = gradedDocsStmt.all() as { documentId: string; grade: string | null }[];
+  return rows.filter((r) => 막힌등급.has(gradeOf(r.grade))).map((r) => r.documentId);
+}
 
 // LanceDB where/delete 절에 문자열 리터럴로 들어가는 documentId(파일명)의 작은따옴표를 이스케이프.
 function escapeLiteral(s: string): string {
@@ -606,7 +632,7 @@ async function refreshFtsIndex(table: lancedb.Table): Promise<void> {
  * 관련성 게이트(0.95 임계값)를 그대로 유지할 수 있기 때문이다. 순위 점수만 남으면
  * "무관한 질문에 잡음 조각 주입" 사고가 다시 열린다.
  */
-async function hybridSearch(question: string, topK: number, agentId?: string, screen?: string): Promise<FusedChunk[]> {
+async function hybridSearch(question: string, topK: number, agentId?: string, screen?: string, viewer?: Viewer): Promise<FusedChunk[]> {
   const db = await lancedb.connect(DB_PATH);
   const names = await db.tableNames();
   if (!names.includes(TABLE_NAME)) return [];
@@ -614,7 +640,15 @@ async function hybridSearch(question: string, topK: number, agentId?: string, sc
   const table = await db.openTable(TABLE_NAME);
   const [queryVector] = await embed([question]);
   const scopes = agentId && agentId !== GLOBAL_SCOPE ? [GLOBAL_SCOPE, safeScope(agentId)] : [GLOBAL_SCOPE];
-  const whereClause = `scope IN (${scopes.map((s) => `'${s}'`).join(", ")})`;
+  // ★ 등급 차단은 **검색 조건에 넣는다**(가져온 뒤 거르지 않는다).
+  //   표준(OWASP RAG 등)이 한목소리로 권하는 방식이다 — 가져온 뒤 지우면 AI가 이미 본
+  //   상태라 흔적이 답에 남을 수 있다. 애초에 문맥에 안 들어가야 한다.
+  //   구현은 documentId 제외 목록으로 한다: 등급은 SQLite(memory_documents)에 있고,
+  //   LanceDB 스키마는 건드리지 않는다(컬럼 추가는 지식 소실 위험이 있다).
+  const 가림 = hiddenDocIds(viewer);
+  const whereClause =
+    `scope IN (${scopes.map((s) => `'${s}'`).join(", ")})` +
+    (가림.length ? ` AND documentId NOT IN (${가림.map((d) => `'${escapeLiteral(d)}'`).join(", ")})` : "");
   // 융합 전에는 각 검색이 넉넉히 후보를 내야 한다 — 한쪽에서 밀린 정답을 다른 쪽이 살린다.
   const candidates = Math.max(topK * 2, 10);
 
@@ -658,8 +692,8 @@ async function hybridSearch(question: string, topK: number, agentId?: string, sc
 }
 
 /** 거리까지 함께 돌려주는 검색. 그라운딩 판단(관련 자료가 있는가)에 쓴다. screen을 주면 그 화면의 업무영역 문서를 우선한다. */
-export async function queryMemoryScored(question: string, topK = 5, agentId?: string, screen?: string): Promise<ScoredChunk[]> {
-  const fused = await hybridSearch(question, topK, agentId, screen);
+export async function queryMemoryScored(question: string, topK = 5, agentId?: string, screen?: string, viewer?: Viewer): Promise<ScoredChunk[]> {
+  const fused = await hybridSearch(question, topK, agentId, screen, viewer);
   return fused.map((c) => ({
     text: c.text,
     distance: c.distance,
@@ -669,8 +703,8 @@ export async function queryMemoryScored(question: string, topK = 5, agentId?: st
 }
 
 /** 관련 있는 청크만 남긴다(벡터 거리 임계값 또는 코드 정확 일치). 관련 자료가 없으면 빈 배열. */
-export async function queryMemoryRelevant(question: string, topK = 5, agentId?: string, screen?: string): Promise<string[]> {
-  const fused = await hybridSearch(question, topK, agentId, screen);
+export async function queryMemoryRelevant(question: string, topK = 5, agentId?: string, screen?: string, viewer?: Viewer): Promise<string[]> {
+  const fused = await hybridSearch(question, topK, agentId, screen, viewer);
   return fused.filter((c) => isRelevant(c, RAG_RELEVANCE_MAX_DISTANCE)).map((c) => c.text);
 }
 
@@ -684,8 +718,8 @@ export async function getDocumentSample(documentId: string): Promise<string | nu
 }
 
 /** 임계값 없이 상위 topK를 그대로 돌려주는 검색(문서 검색 화면·도구용). 순위는 하이브리드로 낸다. */
-export async function queryMemory(question: string, topK = 5, agentId?: string, screen?: string): Promise<string[]> {
-  const fused = await hybridSearch(question, topK, agentId, screen);
+export async function queryMemory(question: string, topK = 5, agentId?: string, screen?: string, viewer?: Viewer): Promise<string[]> {
+  const fused = await hybridSearch(question, topK, agentId, screen, viewer);
   return fused.map((c) => c.text);
 }
 

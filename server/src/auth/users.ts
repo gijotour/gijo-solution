@@ -17,6 +17,9 @@ export interface GijoUser {
   displayName: string;
   role: "security_officer" | "admin";
   team?: string | null; // 소속 팀 — assets.owner와 매칭해 자산 접근 권한을 판정한다(조치 검증)
+  // 볼 수 있는 최고 등급(기밀 C·민감 S·공개 O) — engine/grades.ts. NULL이면 '공개만'으로 읽는다.
+  // 기존 계정은 NULL이라 닫혀 있다: 관리자가 설정에서 올려 주기 전까지는 그게 맞다.
+  clearance?: string | null;
 }
 
 // 클라이언트에는 해시를 절대 내려주지 않는다.
@@ -26,6 +29,7 @@ export interface GijoUserPublic {
   displayName: string;
   role: GijoUser["role"];
   team: string | null;
+  clearance: string | null;
   createdAt: number;
 }
 
@@ -36,6 +40,7 @@ interface UserRow {
   displayName: string;
   role: GijoUser["role"];
   team: string | null;
+  clearance: string | null;
   createdAt: number;
 }
 
@@ -56,7 +61,7 @@ const updatePasswordStmt = db.prepare("UPDATE users SET passwordHash = ? WHERE i
 const countAdminsStmt = db.prepare("SELECT COUNT(*) as n FROM users WHERE role = 'admin'");
 
 function toPublic(row: UserRow): GijoUserPublic {
-  return { id: row.id, username: row.username, displayName: row.displayName, role: row.role, team: row.team ?? null, createdAt: row.createdAt };
+  return { id: row.id, username: row.username, displayName: row.displayName, role: row.role, team: row.team ?? null, clearance: row.clearance ?? null, createdAt: row.createdAt };
 }
 
 function newId(): string {
@@ -88,9 +93,13 @@ export function createUser(args: {
     displayName: args.displayName,
     role: args.role,
     team: null, // 소속 팀은 생성 후 관리자가 지정한다(기본 null = 어떤 자산도 안 열림)
+    // 열람 등급도 생성 후 관리자가 올린다(기본 null = 코드가 '공개만'으로 읽는다).
+    // 새 계정이 만들자마자 기밀 자료를 보게 되면 그게 사고다 — 닫힌 채로 시작한다.
+    clearance: null,
     createdAt: Date.now(),
   };
-  insertStmt.run({ ...row, team: undefined } as unknown as UserRow); // INSERT 문에 team 컬럼은 없다(ALTER로 추가된 기본 null)
+  // INSERT 문에 team·clearance 컬럼은 없다(둘 다 ALTER로 추가돼 기본 null).
+  insertStmt.run({ ...row, team: undefined, clearance: undefined } as unknown as UserRow);
   return toPublic(row);
 }
 
