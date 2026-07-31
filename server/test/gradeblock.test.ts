@@ -8,13 +8,24 @@ import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
 import { gradeOf, clearanceOf, canRead, blockedGrades, GRADES, DEFAULT_DOC_GRADE } from "../src/engine/grades";
 
-describe("★ 모르면 닫힌다", () => {
-  it("자료의 등급을 못 읽으면 기밀로 본다", () => {
-    // 모르는 자료를 공개로 두면 그 순간 새어 나간다.
-    expect(gradeOf(undefined)).toBe("C");
-    expect(gradeOf(null)).toBe("C");
-    expect(gradeOf("")).toBe("C");
+describe("★ 모르면 닫힌다 — 단, '안 매겼다'와 '깨졌다'는 다르다", () => {
+  it("★ 등급을 아직 안 매긴 자료는 공개로 본다 — 통제 대상이 아니다", () => {
+    // ⚠ 이 기대값은 원래 기밀(C)이었다. 되돌린 이유(2026-08-01 실사고):
+    //   등급 칸은 새 문서에 비어 있고 사람의 열람 등급 기본값은 공개만(O)이다.
+    //   둘을 곱하면 **새로 올린 문서를 올린 사람조차 못 본다** — 파일을 넣고(200 OK)
+    //   바로 물었더니 "못 찾음"이었다. 오류도 안 나서 조용히 죽어 있었다.
+    //   등급 라벨은 켜는 기능이라, 켜기 전에는 아무것도 막히면 안 된다.
+    expect(gradeOf(undefined)).toBe("O");
+    expect(gradeOf(null)).toBe("O");
+    expect(gradeOf("")).toBe("O");
+    expect(gradeOf("   ")).toBe("O");
+  });
+
+  it("값이 깨진 자료는 기밀로 본다 — 여기선 닫는다", () => {
+    // 비어 있는 것과 다르다. 값이 있는데 못 알아보면 뭔가 잘못된 것이다.
     expect(gradeOf("아무거나")).toBe("C");
+    expect(gradeOf("PUBLIC")).toBe("C");
+    expect(gradeOf("1")).toBe("C");
   });
 
   it("사람의 열람 등급을 못 읽으면 공개만 본다", () => {
@@ -51,9 +62,12 @@ describe("누가 무엇을 볼 수 있나", () => {
     expect(GRADES).toEqual(["O", "S", "C"]);
   });
 
-  it("새 자료 기본은 민감 — 공개도 기밀도 아니다", () => {
-    // 공개면 모르는 사이에 다 열리고, 기밀이면 아무도 못 봐서 담당자가 기능을 꺼 버린다.
-    expect(DEFAULT_DOC_GRADE).toBe("S");
+  it("★ 등급 미지정 기본은 공개 — 짝이 되는 기본값과 곱해서 판단한다", () => {
+    // 처음엔 민감(S)으로 뒀다. "가운데라 안전하면서 일이 돌아간다"고 적었는데,
+    // 사람의 열람 등급 기본값이 공개만(O)이라 실제로는 기밀과 똑같이 동작했다.
+    // 기본값은 하나만 보고 정하면 안 된다 — 읽는 쪽 기본값과 함께 봐야 한다.
+    expect(DEFAULT_DOC_GRADE).toBe("O");
+    expect(canRead(clearanceOf(null), gradeOf(null)), "새 문서를 올린 사람이 못 보면 안 된다").toBe(true);
   });
 });
 

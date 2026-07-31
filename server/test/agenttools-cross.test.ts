@@ -17,6 +17,7 @@ vi.mock("../src/engine/memory", async (importOriginal) => ({
 }));
 
 import { findAgentTool, toolCatalogText } from "../src/engine/agenttools";
+import fs from "node:fs";
 import { resetAssetsForTests, registerAsset, recordFindings } from "../src/engine/assets";
 import { addTriple, deleteTriplesBySource } from "../src/engine/ontology";
 import { resetSecurityProductsForTests, createProduct } from "../src/engine/securityproducts";
@@ -262,5 +263,31 @@ describe("work_session_status — 작업 세션 현황", () => {
     const activeOnly = await run("work_session_status", { status: "active" });
     expect(activeOnly).toContain("취약점 우선순위 정리");
     expect(activeOnly).not.toContain("리포트 스케줄 확인");
+  });
+});
+
+describe("★ 목록 끝에 다음 걸음 한 줄 (2026-08-01 하루 실전)", () => {
+  // 숫자와 목록은 잘 나오는데 담당자에게 "그래서 뭘 하지"가 남았다.
+  // 특히 "오늘 뭐부터 볼까?"는 제품에서 가장 많이 쓰는 답인데 조치하러 갈 길이 없었다.
+  const src = fs.readFileSync(new URL("../src/engine/agenttools.ts", import.meta.url), "utf8");
+
+  it("today 답이 다음 행동을 알려 준다", () => {
+    const i = src.indexOf("function runToday");
+    const 본문 = src.slice(i, i + 1400);
+    expect(본문, "우선순위만 보여 주고 끝나면 담당자가 화면을 헤맨다").toContain("다음걸음(");
+  });
+
+  it("★ 한 줄이다 — 안내를 세 줄씩 붙이면 그게 새 잡음이 된다", () => {
+    const i = src.indexOf("function 다음걸음");
+    const 본문 = src.slice(i, i + 200);
+    expect(본문).toContain("▸ 다음:");
+    // 줄바꿈이 앞에 하나(빈 줄 띄우기) + 내용 한 줄 = \n 하나. 더 늘어나면 문단이 된다.
+    const 줄 = (본문.match(/return `[^`]*`/) || [""])[0];
+    expect((줄.match(/\n/g) || []).length, "다음 걸음은 한 줄로 유지한다").toBeLessThanOrEqual(1);
+  });
+
+  it("아무 답에나 붙이지 않는다 — 다음 행동이 분명한 목록에만", () => {
+    const 붙은곳 = (src.match(/다음걸음\(/g) || []).length;
+    expect(붙은곳, "전 도구에 붙이면 안내가 잡음이 된다").toBeLessThanOrEqual(4);
   });
 });

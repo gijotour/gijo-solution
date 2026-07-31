@@ -26,7 +26,7 @@ import { toolDomainsForScreen } from "./screencontext";
 import { isHelpIntent, formatScreenGuide } from "./screenguide";
 import { findHowTo, howToMarkdown } from "./howto";
 import { buildFindingPicks, parsePickCommand, pickToolArgs, isFindingListAsk, findingListAnswer, isMyWorkAsk, myWorkAnswer, stripPickMarks, PickList } from "./picklist";
-import { isOutOfScope, outOfScopeAnswer, isTooVague, vagueAnswer } from "./scopeguard";
+import { isOutOfScope, outOfScopeAnswer, isTooVague, vagueAnswer, 한낱말되묻기 } from "./scopeguard";
 import { analyzeFindings } from "./analysis";
 import { recordFindings, getAsset, listAssets } from "./assets";
 import { listFindings } from "./cti";
@@ -560,6 +560,15 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
     completeTask(task.id);
     return { task, route: { agentId: "orchestrator", action: "chat" }, output: vagueAnswer() };
+  }
+
+  // 한 낱말만 던진 경우("취약점", "급한거") — 뜻은 분명한데 무엇을 원하는지가 없다.
+  // LLM에 보내면 34초를 헤매다 엉뚱한 답을 낸다(2026-08-01 실측). 그 낱말에 맞는 예시로 되묻는다.
+  const 낱말 = 한낱말되묻기(instructionText);
+  if (낱말) {
+    const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
+    completeTask(task.id);
+    return { task, route: { agentId: "orchestrator", action: "chat" }, output: 낱말 };
   }
 
   // 대화창 목록에서 **체크해서 고른 건**에 대한 조치 — LLM을 아예 태우지 않는다(2026-07-31).
