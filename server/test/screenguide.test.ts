@@ -321,3 +321,17 @@ describe("★ 화면 설명을 물으면 화면 설명이 나온다 — 자료�
     expect(isMyWorkAsk("오늘 할 일 알려줘")).toBe(true);
   });
 });
+
+describe("★ 있는 기능을 없다고 하지 않는다 (챗봇 전수 2026-08-01)", () => {
+  it("「할 수 있는 게 뭐야」를 화면 안내로 받는다", () => {
+    // `뭐 할 수`는 잡는데 `할 수 있는 게 뭐`는 어순이 반대라 어느 가지에도 안 걸렸다.
+    expect(isHelpIntent("작업 내역에서 내가 할 수 있는 게 뭐야?", "sessions.html")).toBe(true);
+    expect(isHelpIntent("여기서 할 수 있는 일이 뭐야?", "kpi.html")).toBe(true);
+  });
+
+  it("★ 특정 제품을 콕 집으면 여전히 비켜선다 — 약한 가지에 둔 이유", () => {
+    // 강한 가지에 넣었으면 "Tenable로 할 수 있는 게 뭐야?"가 화면 안내로 샜을 것이다.
+    expect(isHelpIntent("Tenable로 할 수 있는 게 뭐야?", "dashboard.html")).toBe(false);
+    expect(isHelpIntent("CVE-2021-44228로 할 수 있는 게 뭐야?", "vulnscan.html")).toBe(false);
+  });
+});

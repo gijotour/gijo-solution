@@ -1293,10 +1293,12 @@ function runWorkSessionStatus(args: Record<string, string>): string {
   if (!sessions.length) return "작업 내역이 없습니다.";
   const status = (args.status ?? "").trim();
   const filtered = status === "active" || status === "done" ? sessions.filter((s) => s.status === status) : sessions;
-  if (!filtered.length) return `"${status}" 상태의 작업 내역이 없습니다.`;
+  const STATUS_LABEL: Record<string, string> = { active: "진행중", done: "완료", ignored: "무시" };
+  // ⚠ 내부 영문 상태값을 그대로 내보내면 담당자는 못 읽는다 — 바로 아래 한글 이름표가
+  //   이미 있는데 여기서만 안 썼다(2026-08-01 챗봇 전수에서 발견).
+  if (!filtered.length) return `${STATUS_LABEL[status] ?? status} 상태의 작업 내역이 없습니다.`;
   const active = sessions.filter((s) => s.status === "active").length;
   const done = sessions.filter((s) => s.status === "done").length;
-  const STATUS_LABEL: Record<string, string> = { active: "진행중", done: "완료", ignored: "무시" };
   const top = filtered.slice(0, 8).map(
     (s) => `- [${STATUS_LABEL[s.status] ?? s.status}] ${s.title}${s.turnCount ? ` (턴 ${s.turnCount}건)` : ""}${s.lastPreview ? ` · 최근 "${s.lastPreview.slice(0, 30)}"` : ""}`
   );
