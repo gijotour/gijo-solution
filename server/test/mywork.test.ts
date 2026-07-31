@@ -217,3 +217,76 @@ describe("질문은 일과로 배우지 않는다", () => {
     expect(isRoutineWorthy("가".repeat(80))).toBe(false);
   });
 });
+
+// ── 2차 업무 플로우(2026-07-31) — 화면 커버리지 공백을 메운 9종 ──────────────
+describe("추가 업무 플로우", () => {
+  it.each([
+    ["점검보고서 올려서 분석하기", "scan-report"],
+    ["스캐너 결과 분석", "scan-report"],
+    ["AI-BOM 점검", "aibom-manage"],
+    ["AI 견고성 점검", "ai-robustness"],
+    ["레드팀 점검 실행", "ai-robustness"],
+    ["위협 인텔 확인", "threat-intel"],
+    ["신규 서버 등록", "asset-onboard"],
+    ["자산 등록하기", "asset-onboard"],
+    ["승인 대기 처리", "approval-queue"],
+    ["월간 KPI 보고", "monthly-kpi"],
+    ["침해사고 대응", "incident-response"],
+    ["랜섬웨어 사고 조사", "incident-response"],
+    ["감사 기록 점검", "audit-review"],
+  ])("문장으로 고른다: %s", (text, expected) => {
+    expect(guessGuideKey(text)).toBe(expected);
+  });
+
+  it("★ 제품 1차 목표(스캐너 리포트 분석)와 차별점(AI-BOM)에 가이드가 있다", () => {
+    // 처음 9종은 '매일 도는 일' 위주라 정작 제품이 제일 잘하는 일에 가이드가 없었다.
+    // 담당자가 그 화면 앞에서 무엇부터 할지 모르면 기능이 있어도 안 쓴다.
+    for (const key of ["scan-report", "aibom-manage"]) {
+      expect(getGuide(key), `${key} 가이드가 없다`).toBeTruthy();
+    }
+  });
+
+  it("새 규칙이 기존 분류를 빼앗지 않는다", () => {
+    // 규칙을 더할 때마다 위쪽 규칙이 먼저 잡으므로 기존 것이 흔들릴 수 있다.
+    expect(guessGuideKey("방화벽 월간 정기점검")).toBe("product-maint");
+    expect(guessGuideKey("차단 로그 검토")).toBe("log-review");
+    expect(guessGuideKey("주간 현황 보고서 만들기")).toBe("weekly-report");
+    expect(guessGuideKey("취약점 조치하기")).toBe("vuln-remediate");
+    expect(guessGuideKey("정책 백업 점검")).toBe("policy-backup");
+  });
+
+  it("여전히 확신 없으면 안 붙인다", () => {
+    expect(guessGuideKey("점심 뭐 먹지")).toBeNull();
+    expect(guessGuideKey("김대리한테 전화")).toBeNull();
+  });
+
+  it("침해사고 대응은 확인 → 기록 → 조치 → 정리 순이다", () => {
+    // 급할수록 기록을 건너뛰기 쉬운데, 나중에 "언제 무엇을 했나"를 못 대면
+    // 보고도 재발방지도 못 한다.
+    const steps = getGuide("incident-response")!.steps;
+    expect(steps.length).toBeGreaterThanOrEqual(4);
+    expect(steps[0].page).toBe("analysis.html"); // 먼저 무슨 일인지 본다
+    expect(steps[steps.length - 1].page).toBe("report.html"); // 마지막은 기록
+  });
+});
+
+describe("★ 추천한 업무는 반드시 안내할 수 있어야 한다", () => {
+  // ⚠ 실사고(2026-07-31): 기본 추천 4개 중 2개가 어느 가이드에도 안 걸렸다.
+  //   담당자가 눌러 담으면 "이 업무에는 정해진 순서가 없습니다"가 뜬다 —
+  //   **추천해 놓고 안내를 못 하는 것**이라 이 화면의 약속이 거기서 깨진다.
+  it("기본 추천은 전부 가이드가 붙는다", async () => {
+    const { defaultRoutines } = await import("../src/engine/workguide");
+    const 안붙는것 = defaultRoutines().filter((r) => !guessGuideKey(r.text));
+    expect(안붙는것.map((r) => r.text), "추천했는데 안내할 순서가 없다").toEqual([]);
+  });
+
+  it("담으면 실제로 단계가 나온다 — 문장→가이드→단계까지 이어지는지", async () => {
+    const { defaultRoutines } = await import("../src/engine/workguide");
+    for (const r of defaultRoutines()) {
+      const t = createTask({ text: r.text, origin: "routine" });
+      const g = getGuide(t.guideKey);
+      expect(g, `${r.text}에 가이드가 없다`).toBeTruthy();
+      expect(g!.steps.length, `${r.text}의 가이드에 단계가 없다`).toBeGreaterThan(0);
+    }
+  });
+});

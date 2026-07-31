@@ -6,7 +6,7 @@ import type { GijoUser } from "../auth/users";
 import { asyncRoute } from "../util/asyncRoute";
 import { recordAudit } from "./audit";
 import { db, assertTestDb } from "../db";
-import { guessGuideKey } from "./workguide";
+import { guessGuideKey, defaultRoutines } from "./workguide";
 
 export interface TaskItem {
   id: string;
@@ -319,17 +319,15 @@ export async function routineSuggestions(): Promise<RoutineSuggestion[]> {
   }
   // 직접 추가 이력은 항상 상단에 재제안(학습 반영을 눈에 보이게).
   for (const t of fb.slice(0, 3).reverse()) out.unshift({ cadence: "daily", text: t.slice(0, 60), source: "직접 추가 이력 · 학습 반영" });
+  // ⚠ 기본 추천은 **가이드가 붙는 문장만** 쓴다(workguide.defaultRoutines).
+  //   예전엔 "방화벽·EDR 이상 알림 확인" 같은 문장이라 눌러 담으면 "정해진 순서가 없습니다"가
+  //   떴다 — 추천해 놓고 안내를 못 하는 것이라 이 화면의 약속이 거기서 깨진다(2026-07-31).
+  const defaults = defaultRoutines();
   if (!out.some((s) => s.cadence === "daily" && !s.source.startsWith("직접"))) {
-    out.push(
-      { cadence: "daily", text: "방화벽·EDR 이상 알림 확인", source: "기본 가이드" },
-      { cadence: "daily", text: "전일 스캔 결과·신규 취약점 확인", source: "기본 가이드" }
-    );
+    for (const d of defaults.filter((x) => x.cadence === "daily")) out.push({ ...d, source: "기본 가이드" });
   }
   if (!out.some((s) => s.cadence === "weekly")) {
-    out.push(
-      { cadence: "weekly", text: "전체 자산 재스캔·우선순위 갱신", source: "기본 가이드" },
-      { cadence: "weekly", text: "보안제품 정책 백업 상태 점검", source: "기본 가이드" }
-    );
+    for (const d of defaults.filter((x) => x.cadence === "weekly")) out.push({ ...d, source: "기본 가이드" });
   }
   // 중복 텍스트 제거 후 상한.
   const seen = new Set<string>();

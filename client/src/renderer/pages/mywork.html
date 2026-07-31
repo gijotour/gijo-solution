@@ -149,6 +149,14 @@
           <div id="listWeek"><div class="empty">불러오는 중…</div></div>
         </div>
 
+        <!-- ⚠ '나중에'가 없으면 담당자가 '기한 없음'으로 적은 일이 **어디에도 안 보인다**
+             (2026-07-31 게시 직전 발견). 서버는 later로 주고 있었는데 그릴 자리가 없었다 —
+             적었는데 사라지는 것만큼 신뢰를 깎는 일이 없다. -->
+        <div class="box">
+          <div class="bh"><h3>나중에</h3><span class="n" id="cntLater">-</span><span class="r">기한 없는 일</span></div>
+          <div id="listLater"><div class="empty">불러오는 중…</div></div>
+        </div>
+
         <div class="box">
           <div class="bh"><h3>자주 하는 업무</h3><span class="n">눌러서 담기</span></div>
           <div id="routines"><div class="empty">불러오는 중…</div></div>
@@ -244,10 +252,12 @@
     $("cntToday").textContent = data.counts.today + "건";
     $("cntOver").textContent = data.counts.overdue ? "기한 초과 " + data.counts.overdue : "";
     $("cntWeek").textContent = (data.week || []).length + "건";
+    $("cntLater").textContent = (data.later || []).length + "건";
     $("cntDone").textContent = "오늘 " + data.counts.doneToday + "건";
 
     renderList("listToday", data.today, "오늘 할 일이 없습니다. 아래에 적거나 아래 <b>자주 하는 업무</b>에서 담으세요.");
     renderList("listWeek", data.week, "이번 주에 잡힌 일이 없습니다.");
+    renderList("listLater", data.later, "기한 없이 적어 둔 일이 없습니다.");
     renderList("listDone", data.done, "오늘 끝낸 일이 아직 없습니다.");
 
     markSelected();
@@ -405,7 +415,7 @@
   }
 
   // ── 목록 클릭 ────────────────────────────────────────────────────────
-  ["listToday","listWeek","listDone"].forEach(function (id) {
+  ["listToday","listWeek","listLater","listDone"].forEach(function (id) {
     $(id).addEventListener("click", async function (e) {
       var row = e.target.closest(".it");
       if (!row) return;
