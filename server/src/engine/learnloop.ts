@@ -285,7 +285,7 @@ export function deleteChatLog(id: string): void {
 // ── ② 정제 → 데이터셋 ────────────────────────────────────────────────
 // 긍정 평가(옵션: +미평가) 미사용 로그를 {question,answer}[]로 변환해 저장한다 — 이미 Q&A 쌍이라
 // LLM 재변환이 필요 없다. 저장 성공 후 같은 트랜잭션에서 usedInDataset=1 마킹.
-export async function buildDatasetFromLogs(opts: { includeUnrated?: boolean; minExamples?: number } = {}): Promise<{ datasetId: string; examples: number }> {
+export async function buildDatasetFromLogs(opts: { includeUnrated?: boolean; minExamples?: number } = {}): Promise<{ datasetId: string; examples: number; fingerprint: string; dropped: Record<string, number> }> {
   const minExamples = opts.minExamples ?? 5;
   const rows = (opts.includeUnrated ? pickLogsWithUnratedStmt.all() : pickLogsStmt.all()) as ChatLogRow[];
   if (rows.length < minExamples) {
@@ -297,15 +297,30 @@ export async function buildDatasetFromLogs(opts: { includeUnrated?: boolean; min
   const pad = (n: number) => String(n).padStart(2, "0");
   const datasetId = `loop-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}${pad(now.getSeconds())}`;
 
+  // ★ 위생을 통과한 것만 학습에 넣는다(계획서 중-4 · 학습환경_분리_설계 §5).
+  //   중복·시험 문항·기계 생성·주입 표식을 여기서 거른다. 게이트(중-3)만 믿으면 늦다 —
+  //   며칠 학습한 뒤 보류가 뜨고, 왜 나빠졌는지는 되짚을 수 없다.
+  const { cleanForTraining } = await import("./datasethygiene.js");
+  const 위생 = cleanForTraining(rows.map((r) => ({ question: r.question, answer: r.answer })));
+  if (위생.kept.length < minExamples) {
+    const 사유 = Object.entries(위생.dropped).map(([k, v]) => `${k} ${v}건`).join(" · ") || "없음";
+    throw new Error(
+      `위생 검사를 통과한 문답이 부족합니다 (${rows.length}건 중 ${위생.kept.length}건, 최소 ${minExamples}건).\n` +
+        `걸러진 것: ${사유}\n` +
+        `같은 질문이 여러 번이면 하나만 남습니다 — 서로 다른 질문을 더 모아 주세요.`
+    );
+  }
+
   // dataset.ts는 llm.ts를 import하므로 정적 import 시 순환(llm→learnloop→dataset→llm) — 동적 import.
   const { saveDataset } = await import("./dataset.js");
-  const result = saveDataset(datasetId, rows.map((r) => ({ question: r.question, answer: r.answer })));
+  const result = saveDataset(datasetId, 위생.kept);
 
   const markAll = db.transaction((ids: string[]) => {
     for (const id of ids) markUsedStmt.run(id);
   });
   markAll(rows.map((r) => r.id));
-  return { datasetId: result.id, examples: result.examples };
+  // 지문·걸러진 내역을 함께 돌려준다 — 채택 원장에 남겨 "무엇으로 학습됐나"를 되짚는다.
+  return { datasetId: result.id, examples: result.examples, fingerprint: 위생.fingerprint, dropped: 위생.dropped };
 }
 
 // ── ③+④ 학습→배포 파이프라인 ─────────────────────────────────────────

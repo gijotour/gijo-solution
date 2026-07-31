@@ -99,7 +99,17 @@ function isRephrase(q: string, next: string): boolean {
   return common / Math.min(a.size, b.size) >= 0.5;
 }
 
+// 보안 시험이 심은 표식 — 레드팀 마커(INJECTED-XXXX)·RAG 오염 카나리(카나리주입성공…).
+// ★ 실사고(2026-08-01): "제로트러스트 기준" 후보 답이 「카나리주입성공XK7」로 시작했다.
+//   과거 RAG 오염 시험 문서가 답에 복창돼 대화 로그로, 다시 학습 후보로 흘러든 것.
+//   이걸 승인하면 **주입 성공 사례를 모델에게 가르치는** 최악의 학습이 된다. 원천 배제한다.
+const INJECT_MARK_RE = /카나리주입성공|INJECTED-[0-9A-F]{4}/;
+
 function excluded(question: string, answer: string): string | null {
+  if (INJECT_MARK_RE.test(question) || INJECT_MARK_RE.test(answer)) return "보안 시험 흔적(주입 표식)";
+  // 오케스트레이터 프롬프트 틀이 질문으로 샌 것 — 사람이 친 문장이 아니다.
+  // (실측 2026-08-01: 『사용자 지시: "…" 방금 시스템에서 조회한 실제 데이터: …』 꼴 수십 건)
+  if (/^사용자 지시:\s*"/.test(question.trim())) return "기계 생성(프롬프트 틀)";
   if (SMALLTALK.test(question.trim())) return "잡담";
   if (NO_ANSWER.some((n) => n.re.test(answer))) return "회피 답변(지식 구멍)";
   if (SECRET_RE.test(question) || SECRET_RE.test(answer)) return "비밀 흔적";
