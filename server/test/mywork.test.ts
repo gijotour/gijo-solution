@@ -317,9 +317,16 @@ describe("가이드 질문이 헛돌지 않는다", () => {
     const src = fs.readFileSync(new URL("../../client/src/renderer/pages/mywork.html", import.meta.url), "utf8");
     const 치환필요 = listGuides().some((g) => g.steps.some((s) => s.question?.includes("{업무}")));
     if (!치환필요) return;
+    // ⚠ 변수 이름을 고정하지 않는다 — 화면을 재설계하면 이름이 바뀌는데 동작은 멀쩡하다
+    //   (2026-07-31 재설계에서 실제로 이 시험이 헛되이 실패했다). **뜻**을 본다:
+    //   보낼 때도 보여줄 때도 치환을 거치는가.
     expect(src, "{업무}를 그대로 보내면 AI가 못 알아듣는다").toContain("function fillQuestion");
-    expect(src, "보낼 때 치환해야 한다").toContain("fillQuestion(s.question, task)");
-    expect(src, "화면에 보이는 것도 같아야 한다 — 다르면 담당자가 헷갈린다").toContain("fillQuestion(s.question, t)");
+    // 정규식 대신 문자열 포함으로 본다 — 괄호 이스케이프가 한 겹만 어긋나도
+    // 시험 자체가 못 돌아 "no tests"가 된다(2026-07-31에 실제로 겪었다).
+    const 쓰임 = src.split("fillQuestion(").length - 1;
+    expect(쓰임, "정의만 하고 안 쓰거나, 한 군데서만 쓰면 보이는 것과 보내는 것이 어긋난다").toBeGreaterThanOrEqual(3);
+    expect(src, "화면에 보이는 문장도 치환해야 한다 — 다르면 담당자가 헷갈린다").toContain("esc(fillQuestion(");
+    expect(src, "AI에게 보낼 때 치환해야 한다").toContain("askAI(fillQuestion(");
   });
 
   it("우리 제품 용어를 쓰는 질문은 그 용어를 정확히 쓴다", () => {

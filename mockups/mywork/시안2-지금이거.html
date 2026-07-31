@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>시안2 — 내 업무 "지금 이거 하세요"</title>
+<style>
+:root{
+  --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-l:#5fa1ff;
+  --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);line-height:1.5;font-size:13px}
+.note{background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.3);border-radius:10px;padding:12px 15px;font-size:12.5px;color:var(--blue-l);margin:18px 20px}
+.note b{color:#fff}
+.layout{display:flex;min-height:700px}
+.side{width:180px;flex:0 0 180px;background:#0b1020;border-right:1px solid var(--border);padding:10px 0}
+.gn{display:flex;align-items:center;gap:8px;padding:8px 13px;font-size:12.5px;color:var(--muted);cursor:pointer;position:relative}
+.gn.on{background:rgba(59,130,246,.16);color:#fff;font-weight:700}
+.gn .b{margin-left:auto;font-size:9px;font-weight:800;background:var(--red);color:#fff;border-radius:9px;padding:1px 6px}
+.gsec{font-size:11px;color:var(--muted-2);padding:9px 13px 3px;font-weight:700}
+.main{flex:1;padding:14px 18px 26px;min-width:0}
+
+.scr-id{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);margin-bottom:12px;flex-wrap:wrap}
+.scr-id b{color:var(--text);font-weight:800}
+.scr-id .ask{color:var(--blue-l);cursor:pointer;font-weight:700}
+
+/* ① 지금 이거 — 들어오자마자 가장 급한 일이 펼쳐져 있다(고를 필요 없음) */
+.now{background:linear-gradient(135deg,rgba(226,72,61,.10),rgba(18,26,46,.7));border:1px solid rgba(226,72,61,.4);
+  border-radius:14px;overflow:hidden;margin-bottom:14px}
+.now.ok{background:linear-gradient(135deg,rgba(30,185,128,.09),rgba(18,26,46,.7));border-color:rgba(30,185,128,.35)}
+.now-h{padding:14px 18px 12px}
+.now-k{font-size:10.5px;font-weight:800;letter-spacing:.4px;color:var(--red);margin-bottom:6px}
+.now-t{font-size:19px;font-weight:800;color:#fff;letter-spacing:-.3px}
+.now-w{font-size:12px;color:var(--muted);margin-top:6px}
+.now-w b{color:var(--amber);font-weight:700}
+.now-bar{display:flex;align-items:center;gap:9px;margin-top:12px}
+.trk{flex:1;height:5px;background:rgba(0,0,0,.35);border-radius:3px;overflow:hidden}
+.trk i{display:block;height:100%;background:var(--teal);width:25%}
+.now-cnt{font-size:11px;color:var(--teal);font-weight:800;white-space:nowrap}
+
+/* 다음 한 걸음만 크게 — 나머지는 접어 둔다(점진적 공개) */
+.step-now{margin:0 18px 14px;background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.4);
+  border-radius:11px;padding:13px 15px;display:flex;align-items:center;gap:13px;flex-wrap:wrap}
+.step-n{flex:0 0 auto;width:26px;height:26px;border-radius:50%;background:var(--blue);color:#fff;
+  font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center}
+.step-b{flex:1;min-width:150px}
+.step-t{font-size:14px;font-weight:800;color:#fff}
+.step-d{font-size:11.5px;color:var(--muted);margin-top:3px}
+.big{background:var(--blue);border:none;border-radius:9px;color:#fff;font-size:13px;font-weight:800;
+  padding:10px 20px;cursor:pointer;font-family:inherit;white-space:nowrap}
+.rest{margin:0 18px 14px;font-size:11.5px;color:var(--muted-2);cursor:pointer;user-select:none}
+.rest:hover{color:var(--blue-l)}
+.now-f{padding:10px 18px;background:rgba(0,0,0,.2);border-top:1px solid var(--border);
+  display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:11.5px;color:var(--muted)}
+.mini{background:transparent;border:1px solid var(--border-strong);border-radius:7px;color:var(--muted);
+  font-size:11px;padding:5px 11px;cursor:pointer;font-family:inherit}
+
+/* ② 나머지 — 가로로 넓게. 빈 구역은 아예 안 그린다 */
+.rows{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:12px}
+.rh{display:flex;align-items:center;gap:8px;padding:9px 14px;border-bottom:1px solid var(--border)}
+.rh h3{font-size:12.5px;font-weight:800;color:#fff}
+.rh .n{font-size:10.5px;color:var(--muted-2);font-weight:700}
+.rh .r{margin-left:auto;font-size:10.5px;color:var(--muted-2)}
+.it{display:flex;align-items:center;gap:11px;padding:10px 14px;border-bottom:1px solid rgba(255,255,255,.04);
+  cursor:pointer;position:relative}
+.it:last-child{border-bottom:none}
+.it:hover{background:rgba(59,130,246,.06)}
+.it::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:transparent}
+.it.ai::before{background:var(--purple)}
+.it.rep::before{background:var(--blue)}
+.it.over::before{background:var(--red)}
+.ck{width:15px;height:15px;flex:0 0 auto;accent-color:var(--teal);cursor:pointer}
+.it-t{flex:1;min-width:0;font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tag{font-size:9px;font-weight:800;border-radius:4px;padding:1px 5px;flex:0 0 auto}
+.t-ai{color:var(--purple);background:rgba(139,124,240,.16)}
+.t-me{color:var(--muted);background:rgba(255,255,255,.07)}
+.t-rep{color:var(--blue-l);background:rgba(59,130,246,.16)}
+.due{font-size:10.5px;flex:0 0 auto;white-space:nowrap;color:var(--muted-2)}
+.due.over{color:var(--red);font-weight:700}
+.due.today{color:var(--amber);font-weight:700}
+.prog{font-size:10px;color:var(--teal);font-weight:800;flex:0 0 auto;width:30px;text-align:right}
+.go{background:transparent;border:1px solid var(--border-strong);border-radius:7px;color:var(--blue-l);
+  font-size:11px;font-weight:700;padding:5px 11px;cursor:pointer;font-family:inherit;flex:0 0 auto}
+
+.add{display:flex;gap:7px;padding:11px 14px;background:var(--panel-2);border-top:1px solid var(--border);flex-wrap:wrap}
+.add input{flex:1;min-width:150px;background:var(--bg);border:1px solid var(--border-strong);border-radius:8px;
+  padding:8px 11px;color:var(--text);font-size:12.5px;outline:none;font-family:inherit}
+.add select{background:var(--bg);border:1px solid var(--border-strong);border-radius:8px;padding:8px 8px;
+  color:var(--text);font-size:12px;outline:none;font-family:inherit}
+.add button{background:var(--blue);border:none;border-radius:8px;color:#fff;font-size:12.5px;font-weight:700;
+  padding:8px 16px;cursor:pointer;font-family:inherit}
+
+/* 접힌 구역 */
+.fold{background:var(--panel);border:1px solid var(--border);border-radius:12px;margin-bottom:10px;
+  padding:11px 14px;display:flex;align-items:center;gap:9px;cursor:pointer;font-size:12.5px}
+.fold .car{color:var(--muted-2);font-size:10px}
+.fold b{font-weight:800;color:#fff}
+.fold .n{margin-left:auto;font-size:10.5px;color:var(--muted-2)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;padding:11px 14px;border-top:1px solid var(--border)}
+.chip{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:16px;padding:5px 11px;
+  font-size:11px;color:var(--text);cursor:pointer}
+.chip:hover{border-color:var(--blue);color:var(--blue-l)}
+.legend{display:flex;gap:13px;flex-wrap:wrap;font-size:10.5px;color:var(--muted);margin-bottom:11px}
+.legend i{display:inline-block;width:3px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+
+/* ③ 다른 화면에 가 있어도 돌아올 수 있는 띠 */
+.retbar{position:relative;margin:16px 0 0;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);
+  border-radius:10px;padding:10px 14px;display:flex;align-items:center;gap:11px;font-size:12px;flex-wrap:wrap}
+.retbar b{color:#fff}
+.retbar .sp{margin-left:auto;display:flex;gap:7px}
+.demo-label{font-size:10.5px;color:var(--muted-2);margin:22px 0 7px}
+</style></head><body>
+
+<div class="note"><b>시안2 — 내 업무 "지금 이거 하세요"</b> · 지금은 화면의 60%가 <b>“왼쪽에서 골라 주세요”</b>라는 빈 안내입니다. 들어오자마자 <b>가장 급한 일 하나가 이미 펼쳐져 있고, 다음 한 걸음만 크게</b> 보이게 바꿉니다. 빈 구역은 그리지 않고, 자주 하는 업무는 접어 둡니다.<br>근거: 판단 피로 감소(Linear) · 점진적 공개로 인지 부하 30~50% 감소(UXPin) · 긴장 상황일수록 순서를 강제하는 런북(Rootly).</div>
+
+<div class="layout">
+  <div class="side">
+    <div class="gn">🏠 대시보드</div>
+    <div class="gn">🏢 팀 사무실 (창)</div>
+    <div class="gn on">☑ 내 업무 <span class="b">3</span></div>
+    <div class="gn">📚 문서함 (창)</div>
+    <div class="gn">💬 작업 내역</div>
+    <div class="gsec">▶ ⭐ 즐겨찾기</div>
+    <div class="gsec">▶ 관제</div>
+    <div class="gsec">▶ 자산·조치</div>
+    <div class="gsec">▶ AI</div>
+    <div class="gsec">▶ 설정</div>
+  </div>
+
+  <div class="main">
+    <div class="scr-id">☑ <b>내 업무</b> — 지금 할 일과 그 순서를 알려 드립니다. <span class="ask">· 이 화면 설명 듣기</span></div>
+    <div class="legend">
+      <span><i style="background:var(--purple)"></i>AI가 찾음</span>
+      <span><i style="background:rgba(255,255,255,.15)"></i>내가 적음</span>
+      <span><i style="background:var(--blue)"></i>반복</span>
+      <span><i style="background:var(--red)"></i>기한 지남</span>
+    </div>
+
+    <!-- ① 지금 이거 — 고르지 않아도 이미 열려 있다 -->
+    <div class="now">
+      <div class="now-h">
+        <div class="now-k">🔴 지금 이것부터 — 기한 1일 초과</div>
+        <div class="now-t">경계 방화벽(FW-01) — 보안제품 관리</div>
+        <div class="now-w"><b>왜 지금:</b> 방화벽 정책 정기 점검 · 점검 예정일이 1일 지났습니다</div>
+        <div class="now-bar"><div class="trk"><i></i></div><span class="now-cnt">1 / 4 단계</span></div>
+      </div>
+
+      <div class="step-now">
+        <span class="step-n">2</span>
+        <div class="step-b">
+          <div class="step-t">점검 항목 물어보기</div>
+          <div class="step-d">무엇을 봐야 하는지 AI가 사내 자료로 알려 줍니다 — <span style="color:var(--blue-l)">"방화벽 월간 정기점검 절차를 알려줘"</span></div>
+        </div>
+        <button class="big">물어보기 →</button>
+      </div>
+
+      <div class="rest">▸ 남은 단계 2개 보기 (원격 점검 실행 · 결과 보고서)　·　✓ 1단계 완료함</div>
+
+      <div class="now-f">
+        <span>순서를 건너뛰어도 됩니다.</span>
+        <span style="margin-left:auto;display:flex;gap:7px">
+          <button class="mini">이 업무 완료</button>
+          <button class="mini">다른 일 먼저</button>
+        </span>
+      </div>
+    </div>
+
+    <!-- ② 나머지 — 가로로 넓게, 한 줄에 다 보인다 -->
+    <div class="rows">
+      <div class="rh"><h3>오늘 남은 일</h3><span class="n">5건</span><span class="r">기한 초과 2</span></div>
+      <div class="it over ai"><input type="checkbox" class="ck"><span class="it-t">침해사고 대응</span>
+        <span class="tag t-me">내가</span><span class="due over">1일 초과</span><span class="prog">1/5</span><button class="go">이어서</button></div>
+      <div class="it over ai"><input type="checkbox" class="ck"><span class="it-t">FOCS 메뉴얼 ver1 2 — 보안제품 관리</span>
+        <span class="tag t-ai">AI</span><span class="due over">1일 초과</span><span class="prog">1/4</span><button class="go">이어서</button></div>
+      <div class="it ai"><input type="checkbox" class="ck"><span class="it-t">보안 상담 챗봇 — 보안제품 관리</span>
+        <span class="tag t-ai">AI</span><span class="due today">오늘</span><span class="prog">0/4</span><button class="go">시작</button></div>
+      <div class="it ai"><input type="checkbox" class="ck"><span class="it-t">원격접속 VPN (SonicWall SMA) — 보안제품 관리</span>
+        <span class="tag t-ai">AI</span><span class="due today">오늘</span><span class="prog">0/4</span><button class="go">시작</button></div>
+      <div class="it ai"><input type="checkbox" class="ck"><span class="it-t">VPN 게이트웨이(VPN-03) — 보안제품 관리</span>
+        <span class="tag t-ai">AI</span><span class="due today">오늘</span><span class="prog">0/4</span><button class="go">시작</button></div>
+      <div class="add">
+        <input placeholder="할 일 적기 — 적으면 그 일의 순서도 함께 알려 드립니다">
+        <select><option>오늘</option><option>이번 주</option><option>기한 없음</option></select>
+        <select><option>한 번만</option><option>매주</option><option>매월</option></select>
+        <button>추가</button>
+      </div>
+    </div>
+
+    <!-- 빈 구역(이번 주 0건·나중에 0건)은 **아예 안 그린다** — 지금은 "없습니다"만 말하며 자리를 먹는다 -->
+
+    <div class="fold"><span class="car">▶</span><b>자주 하는 업무</b><span style="color:var(--muted)">눌러서 담기</span><span class="n">8가지</span></div>
+    <div class="fold"><span class="car">▶</span><b>다 한 일</b><span class="n">오늘 0건</span></div>
+
+    <div class="demo-label">↓ 가이드 단계로 다른 화면에 가 있을 때 (모든 화면 위에 뜨는 띠)</div>
+    <div class="retbar">
+      <span>☑ 진행 중 — <b>경계 방화벽(FW-01) 점검</b> 2/4단계</span>
+      <span class="sp"><button class="mini" style="border-color:var(--blue);color:var(--blue-l)">이 단계 완료</button><button class="mini">내 업무로 돌아가기</button></span>
+    </div>
+  </div>
+</div>
+
+</body></html>

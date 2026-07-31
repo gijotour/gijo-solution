@@ -325,6 +325,17 @@
       sBadge.title = "진행중인 작업";
       el.appendChild(sBadge);
     }
+    // 내 업무 — **기한이 지난 건수**를 띄운다. "몇 건 남았나"보다 "몇 건이 늦었나"가
+    // 담당자를 움직이는 숫자다(남은 건수는 늘 많아서 보고도 안 움직인다).
+    if (it.page === "mywork.html") {
+      var wBadge = document.createElement("span");
+      wBadge.className = "gn-upbadge gn-workbadge";
+      wBadge.style.display = "none";
+      wBadge.style.background = "var(--red,#e2483d)";
+      wBadge.style.color = "#fff";
+      wBadge.title = "기한이 지난 업무";
+      el.appendChild(wBadge);
+    }
 
     if (it.win) {
       // 별도 창 항목 — preload가 노출한 window.gijo.<win>()을 부른다.
@@ -697,6 +708,19 @@
     }).catch(function () {});
   }
 
+  // 내 업무 배지 — 기한 초과 건수. 0이면 감춘다(늦은 게 없으면 알릴 일이 아니다).
+  function refreshWorkBadge() {
+    if (!window.gijo || !window.gijo.myWork) return;
+    window.gijo.myWork().then(function (w) {
+      var n = (w && w.counts && w.counts.overdue) || 0;
+      document.querySelectorAll(".gn-workbadge").forEach(function (b) {
+        b.textContent = n > 99 ? "99+" : String(n);
+        b.setAttribute("aria-label", "기한이 지난 업무 " + n + "건");
+        b.style.display = n > 0 ? "" : "none";
+      });
+    }).catch(function () {});
+  }
+
   // 분리창 — 왼쪽 메뉴를 지우고 내용이 창 폭을 다 쓰게 한다. 가장자리 토글도 두지 않는다:
   // 이 창에서 메뉴를 열 일이 없고(이동은 대시보드에서), 토글만 남으면 그게 또 하나의 조작이 된다.
   function applyPopout() {
@@ -773,6 +797,7 @@
     // 됐다(관제 > 작업 세션 / 🏢 팀 사무실 창). 남은 건 아무도 못 여는 숨은 DOM과 iframe이
     // 전 화면에 실리는 것뿐이라, "메뉴에 있는 내부팝업 전체 삭제" 지시에 따라 걷어냈다.
     refreshSessionBadge();
+    refreshWorkBadge();
 
     loadLongNotice();
     checkUpdateBadge();
