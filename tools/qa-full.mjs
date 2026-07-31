@@ -20,6 +20,7 @@
 //   shell       대시보드 팝업 셸 (tools/qa-shell.mjs — CDP 9223 필요)
 //   download    파일 받기가 실제로 저장되는가 (tools/qa-download.mjs — ⚠ Playwright 금지·순수 CDP)
 //   sweep       Electron 전 화면 스윕 (menu-sweep — CDP 9223 필요, 없으면 안내 후 스킵)
+//   drawer      대화창 서랍이 약속한 질문이 실제로 되는가 (tools/drawer-audit.mjs)
 
 import fs from "node:fs";
 import path from "node:path";
@@ -60,6 +61,8 @@ const VERIFY_RE = /^server\/src\/engine\/(verify|vexexport|autoassign|versioncmp
 // ⚠ 이름 뒤에 점(.)을 요구한다 — 안 그러면 app이 approvals.html까지 잡는다(2026-07-29 실측).
 const SHELL_RE = /^client\/src\/renderer\/pages\/(app|console|dialog|dashboard|nav)\./;
 // 파일 받기는 메인 프로세스(will-download)·preload·받기 버튼이 걸린 화면이 바뀌면 다시 본다.
+// 서랍 목록(console.js)과 서랍이 기대는 결정적 경로(howto·picklist)가 바뀌면 다시 묻는다.
+const DRAWER_RE = /^client\/src\/renderer\/pages\/console\.js$|^server\/src\/engine\/(howto|picklist|screenguide|workguide)\.ts$|^tools\/drawer-audit\.mjs$/;
 const DOWNLOAD_RE = /^client\/src\/(main|preload)\.ts$|^client\/src\/renderer\/pages\/(approvals|report)\.html$/;
 for (const f of changed) {
   if (VERIFY_RE.test(f)) { picks.add("verify"); picks.add("vitest"); reasons.push(`${f} → 조치검증·VEX 계층`); }
@@ -68,13 +71,14 @@ for (const f of changed) {
   if (QUALITY_RE.test(f)) { picks.add("knowledge"); picks.add("maintenance"); picks.add("regress"); picks.add("vitest"); reasons.push(`${f} → 지식·시나리오·회귀`); }
   else if (f.startsWith("server/")) { picks.add("vitest"); reasons.push(`${f} → 서버 단위테스트`); }
   else if (f.startsWith("client/src/")) { picks.add("client"); picks.add("sweep"); reasons.push(`${f} → 클라 실페이지·스윕`); }
+  if (DRAWER_RE.test(f)) { picks.add("drawer"); reasons.push(`${f} → 서랍 약속 점검`); }
   else if (f.startsWith("tools/regress/") || f.startsWith("rag-seed/")) { picks.add("regress"); reasons.push(`${f} → 회귀 하네스`); }
 }
-if (ALL) for (const l of ["vitest", "client", "knowledge", "maintenance", "regress", "verify", "shell", "download", "sweep"]) picks.add(l);
+if (ALL) for (const l of ["vitest", "client", "knowledge", "maintenance", "regress", "verify", "shell", "download", "sweep", "drawer"]) picks.add(l);
 if (FAST) { picks.delete("vitest"); picks.delete("maintenance"); }
 
 console.log(`■ QA 전수조사 — 기준: ${since ? since.slice(0, 8) + "..HEAD" : "(첫 실행 — 마커 없음, 전 계층)"}`);
-if (!since) for (const l of ["vitest", "client", "knowledge", "maintenance", "regress", "verify", "shell", "download", "sweep"]) { if (!FAST || (l !== "vitest" && l !== "maintenance")) picks.add(l); }
+if (!since) for (const l of ["vitest", "client", "knowledge", "maintenance", "regress", "verify", "shell", "download", "sweep", "drawer"]) { if (!FAST || (l !== "vitest" && l !== "maintenance")) picks.add(l); }
 console.log(`  변경 파일 ${changed.length}개 → 계층 [${[...picks].join(", ")}]${ALL ? " (--all)" : ""}${FAST ? " (--fast)" : ""}`);
 for (const r of reasons.slice(0, 8)) console.log(`   · ${r}`);
 if (reasons.length > 8) console.log(`   · … 외 ${reasons.length - 8}건`);
@@ -111,6 +115,8 @@ run("verify", "node", ["tools/qa-verify.mjs"]);
 run("shell", "node", ["tools/qa-shell.mjs"]);
 run("download", "node", ["tools/qa-download.mjs"]);
 run("sweep", "node", ["tools/menu-sweep.mjs"]);
+// 서랍은 "이건 된다"고 약속하는 자리다 — 한 번 확인하고 두면 데이터가 바뀌며 늙는다.
+run("drawer", "node", ["tools/drawer-audit.mjs"]);
 
 // ── ④ 요약·마커·리포트 ──────────────────────────────────────────────────────────
 // 알려진 이슈 — 원인이 규명됐고 사용자가 "지금은 이대로 둔다"고 결정한 것만(tools/qa-known-issues.json).

@@ -39,6 +39,14 @@ export interface ChatArgs {
   // 현재 화면(예: "opsguide.html") — RAG 검색에서 그 화면의 업무영역 문서를 우선하는 soft boost용.
   // 없어도 동작한다(부스트 없이 기존과 동일).
   screen?: string;
+  // 학습 기록에 남길 **사람이 실제로 한 질문**. 없으면 message를 쓴다.
+  //
+  // ⚠ 왜 따로 받나(2026-07-31 실측 사고): dispatcher는 직전 대화를 앞에 붙여
+  //   "이전 대화 맥락(같은 세션): …\n\n[현재 지시] 실제질문" 을 message로 넘긴다.
+  //   그걸 그대로 질문으로 기록해서 **학습 후보함의 질문이 맥락 덩어리**가 돼 있었다
+  //   — 그대로 학습하면 모델이 그 이상한 입력 형식을 배우고, 담당자는 대화 로그에서
+  //   자기 질문을 못 알아본다. 직전 대화가 로그에 통째로 복제되는 문제도 있다.
+  logQuestion?: string;
   // true면 답변 끝에 어려운 용어 쉬운 풀이(glossary)를 붙인다 — 사람이 읽는 답변 전용.
   //
   // 기본값이 false인 이유: 이 후처리를 chat() 전체에 무조건 걸었더니(2026-07-20), 사람이 읽지 않는
@@ -593,7 +601,8 @@ export async function chat(args: ChatArgs): Promise<string> {
     histories.set(args.agentId, updated.slice(-HISTORY_LIMIT));
     // 헤르메스 학습 루프 ① 수집: 실제 대화만 영속 저장한다(연결 실패 문자열은 위에서 조기 반환돼
     // 여기 못 온다). recordChatLog는 내부 try/catch — 수집 실패가 채팅을 죽이지 않는다.
-    recordChatLog(args.agentId, args.message, reply);
+    // 기록에는 맥락을 뺀 **사람이 한 질문**만 남긴다(logQuestion). 위 ChatArgs 주석 참고.
+    recordChatLog(args.agentId, args.logQuestion?.trim() || args.message, reply);
   }
   // 사람이 읽는 답변(explain)에만 어려운 용어 쉬운 풀이를 붙인다. 히스토리·학습로그는 위에서 이미
   // 원문으로 저장됐다 — 맥락 오염·중복 방지.

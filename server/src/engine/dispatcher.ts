@@ -256,7 +256,7 @@ async function executeRoutedAction(route: RoutedIntent, instructionText: string,
       const message = contextText ? `${contextText}
 
 [현재 지시] ${instructionText}` : instructionText;
-      return { output: await chat({ agentId: route.agentId, message, remember: true, trusted: true, explain: true, screen, qa }) };
+      return { output: await chat({ agentId: route.agentId, message, remember: true, trusted: true, explain: true, screen, qa, logQuestion: instructionText }) };
     }
     case "analyze":
     case "chat":
@@ -267,7 +267,7 @@ async function executeRoutedAction(route: RoutedIntent, instructionText: string,
       // trusted: 지시문은 dispatchInstructionCore에서 이미 관문을 지났다(이중 집계 방지).
       // explain: 지휘 콘솔에 그대로 표시되는 답변이다.
       reportProgress("write", "사내 근거를 찾아 답을 쓰고 있습니다"); // chat 내부에서 RAG 검색+작성이 함께 돈다
-      return { output: await chat({ agentId: route.agentId, message, remember: true, trusted: true, explain: true, screen, qa }) };
+      return { output: await chat({ agentId: route.agentId, message, remember: true, trusted: true, explain: true, screen, qa, logQuestion: instructionText }) };
     }
   }
 }
