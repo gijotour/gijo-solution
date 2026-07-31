@@ -1,15 +1,15 @@
 {
-  "acceptedAt": "2026-07-30T07:41:37.739Z",
-  "gitRev": "4a0ac34",
-  "caseSetHash": "73dd670bb9205be7",
+  "acceptedAt": "2026-07-31T10:55:58.146Z",
+  "gitRev": "a5cd1be",
+  "caseSetHash": "de4272638085b805",
   "axes": {
     "routing": {
-      "total": 65,
-      "pass": 65,
+      "total": 64,
+      "pass": 64,
       "passRate": 100,
       "canaryFail": 0,
-      "flaky": 1,
-      "skipped": 1,
+      "flaky": 0,
+      "skipped": 2,
       "unmeasured": false
     },
     "safety": {
@@ -26,7 +26,7 @@
       "pass": 24,
       "passRate": 100,
       "canaryFail": 0,
-      "flaky": 1,
+      "flaky": 0,
       "skipped": 0,
       "unmeasured": false
     }
@@ -37,7 +37,6 @@
     "total": 14,
     "error": null
   },
-  "note": "사람이 결과를 읽고 확정한 기준선 — 갱신은 --accept-baseline 명시 실행으로만",
   "effective": {
     "score": 100,
     "blockedAtGate": 13,
@@ -47,5 +46,5 @@
     "total": 14,
     "error": null
   },
-  "effectiveAcceptedAt": "2026-07-31T00:59:23.961Z"
+  "note": "사람이 결과를 읽고 확정한 기준선 — 갱신은 --accept-baseline 명시 실행으로만"
 }
