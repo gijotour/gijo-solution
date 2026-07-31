@@ -27,6 +27,17 @@ const REPORT_DIR = process.env.GIJO_REPORT_DIR ?? path.join("data", "reports");
 /** 이 시간을 넘기면 리포트로 돌린다. 사용자 결정 30초(환경변수로 조절 가능). */
 export const LONG_ANSWER_MS = Number(process.env.GIJO_LONG_ANSWER_MS ?? 30_000);
 
+/**
+ * 평가 게이트(qa=true)가 기다리는 시간 — 사람이 아니라 **자를 대는 쪽**이다.
+ *
+ * 리포트 전환은 사람을 기다리게 하지 않으려는 배려다. 게이트에는 그 배려가 해롭다 —
+ * 30초를 넘기면 안내 문구만 돌아와 문항이 재려던 것을 아예 못 재고, '측정 못 함'으로
+ * 분모에서 빠진다. 그 자리에 결함이 숨어도 점수에 안 나타난다(2026-07-31 실측: 2문항).
+ *
+ * 무한정 기다리지는 않는다 — 매달린 요청 하나가 게이트를 영영 멈추게 하면 안 된다.
+ */
+export const QA_LONG_ANSWER_MS = Number(process.env.GIJO_QA_LONG_ANSWER_MS ?? 180_000);
+
 migrate(
   "long-answers-2026-07-26",
   `CREATE TABLE IF NOT EXISTS long_answers (

@@ -643,7 +643,7 @@
       whyCell: rk && rk.why ? rk.why : "",
       sbomCell: a.sbomGeneratedAt ? '<span class="sbom-ok">완료</span>' : `<span class="sbom-pending" style="cursor:pointer" data-gen-sbom="${a.id}">생성하기</span>`,
       maintBadge: maintByAsset[a.id]
-        ? ` <span data-open-ops="1" title="이 자산의 유지보수 점검 — 운영 가이드로 이동" style="cursor:pointer;font-size:10.5px;font-weight:700;color:${maintByAsset[a.id].overdue ? "#f5928a" : "var(--blue-light)"};background:rgba(59,130,246,0.14);padding:1px 7px;border-radius:6px;">🔧 점검 ${maintByAsset[a.id].total}${maintByAsset[a.id].overdue ? ` · 지연 ${maintByAsset[a.id].overdue}` : ""}</span>`
+        ? ` <span data-open-ops="${esc(a.name)}" title="이 자산의 유지보수 점검 — 운영 가이드로 이동" style="cursor:pointer;font-size:10.5px;font-weight:700;color:${maintByAsset[a.id].overdue ? "#f5928a" : "var(--blue-light)"};background:rgba(59,130,246,0.14);padding:1px 7px;border-radius:6px;">🔧 점검 ${maintByAsset[a.id].total}${maintByAsset[a.id].overdue ? ` · 지연 ${maintByAsset[a.id].overdue}` : ""}</span>`
         : "",
       kevBadge: risk.kev ? ` <span title="실제 악용이 확인된 취약점(CISA KEV) 포함 — 최우선" style="font-size:10.5px;font-weight:800;color:#ff8a80;background:rgba(226,72,61,0.2);border:1px solid rgba(226,72,61,0.5);padding:1px 7px;border-radius:6px;">🔴 KEV</span>` : "",
       os: a.components && a.components.length ? a.components[0].name : (isHost ? "—" : a.path),
@@ -1312,7 +1312,9 @@
         return;
       }
       if (e.target.dataset.openOps) {
-        window.gijo.navigateTo("opsguide.html");
+        // 툴팁이 "이 자산의 유지보수 점검"이라 약속하므로 그 이름을 실어 보낸다.
+        const nm = e.target.dataset.openOps;
+        window.gijo.navigateTo("opsguide.html" + (nm && nm !== "1" ? `?product=${encodeURIComponent(nm)}` : ""));
         return;
       }
       if (e.target.dataset.vulns) {

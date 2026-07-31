@@ -70,4 +70,32 @@ describe("★ 특정 항목을 누르면 그 항목으로 좁혀 간다", () => 
     const src = read("assethub.html");
     expect(src).toContain('vulnscan.html?host=${encodeURIComponent(r.id)}');
   });
+
+  it("보안제품의 '이 제품 점검'이 제품명을 실어 보낸다", () => {
+    const src = read("products.html");
+    expect(src, "제품명을 안 실으면 전체 점검 목록이 열린다").toContain('data-open-ops="${esc(p.name)}"');
+    expect(src).toContain("opsguide.html\" + (name ? `?product=");
+  });
+
+  it("운영 가이드가 ?product= 를 읽어 그 제품 점검만 보여준다", () => {
+    const src = read("opsguide.html");
+    expect(src).toContain('.get("product")');
+    expect(src, "목록만 걸러도 위 KPI가 전체면 무엇을 믿을지 알 수 없다").toContain("renderMaintKpis(items)");
+    expect(src, "좁혀진 줄 모르면 '왜 몇 건밖에 없지?'가 된다").toContain("의 점검만 보는 중");
+    expect(src, "빠져나올 길이 없으면 그 제품 안에 갇힌다").toContain("opsScopeAll");
+  });
+
+  it("★ 자산 목록의 '이 자산의 유지보수 점검'도 실어 보낸다", () => {
+    // 여기도 툴팁이 "이 자산의"라고 약속하던 자리다.
+    const src = read("inventory.html");
+    const i = src.indexOf("이 자산의 유지보수 점검");
+    expect(i, "그 툴팁을 못 찾았다").toBeGreaterThan(0);
+    const 줄 = src.slice(src.lastIndexOf("\n", i), src.indexOf("\n", i));
+    expect(줄).toContain('data-open-ops="${esc(a.name)}"');
+  });
+
+  it("AI-BOM의 '견고성 자세히'가 그 자산을 골라 둔 채로 연다", () => {
+    expect(read("sbom.html")).toContain('redteam.html?asset=" + encodeURIComponent(asset.id)');
+    expect(read("redteam.html"), "레드팀이 ?asset= 을 안 읽으면 실어 보내도 소용없다").toContain('.get("asset")');
+  });
 });

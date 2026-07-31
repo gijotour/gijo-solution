@@ -299,7 +299,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   function maintLineHtml(p) {
     const mine = allMaints.filter((m) => m.productId === p.id || squashName(m.productName) === squashName(p.name));
     if (!mine.length)
-      return `<div class="prod-maint" data-open-ops title="운영 가이드에서 점검 일정 등록">🔧 점검 이력 없음 — <span style="color:var(--blue-light)">점검 등록 →</span></div>`;
+      // 어느 제품의 점검인지 실어 보낸다 — 안 실으면 전체 점검 목록이 열려
+      // 방금 본 제품을 다시 찾아야 한다(2026-07-31, 취약점 이음매와 같은 결함).
+      return `<div class="prod-maint" data-open-ops="${esc(p.name)}" title="운영 가이드에서 점검 일정 등록">🔧 점검 이력 없음 — <span style="color:var(--blue-light)">점검 등록 →</span></div>`;
     const today = new Date().toISOString().slice(0, 10);
     const overdue = mine.filter((m) => m.status === "scheduled" && m.scheduleDate <= today).length;
     const pending = mine.filter((m) => m.status === "reported").length;
@@ -310,7 +312,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       next ? `다음 점검 ${esc(next.scheduleDate)}` : "",
       !overdue && !pending && !next ? `<span style="color:var(--teal)">점검 완료</span>` : "",
     ].filter(Boolean).join(" · ");
-    return `<div class="prod-maint" data-open-ops title="운영 가이드에서 점검 보고/승인">🔧 점검 ${mine.length}건 · ${parts} <span style="color:var(--blue-light)">→</span></div>`;
+    return `<div class="prod-maint" data-open-ops="${esc(p.name)}" title="운영 가이드에서 점검 보고/승인">🔧 점검 ${mine.length}건 · ${parts} <span style="color:var(--blue-light)">→</span></div>`;
   }
 
   function prodHtml(p) {
@@ -559,7 +561,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
   async function onGroupsClick(e) {
     const ops = e.target.closest("[data-open-ops]");
-    if (ops) { window.gijo.navigateTo("opsguide.html"); return; }
+    if (ops) {
+      const name = ops.dataset.openOps;
+      window.gijo.navigateTo("opsguide.html" + (name ? `?product=${encodeURIComponent(name)}` : ""));
+      return;
+    }
     const toggle = e.target.closest("[data-toggle]");
     if (toggle) {
       const cat = toggle.dataset.toggle;

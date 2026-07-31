@@ -7,7 +7,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { findAgentTool, matchFindingsByIds } from "../src/engine/agenttools";
 import { registerAsset, recordFindings, resetAssetsForTests } from "../src/engine/assets";
 import { prioritizedReviews, listFindingReviews } from "../src/engine/approvals";
-import { buildFindingPicks, parsePickCommand, pickToolArgs, isFindingListAsk, findingListAnswer, stripPickMarks } from "../src/engine/picklist";
+import { buildFindingPicks, parsePickCommand, pickToolArgs, isFindingListAsk, findingListAnswer, isMyWorkAsk, myWorkAnswer, stripPickMarks } from "../src/engine/picklist";
 
 function 아이디들(): string[] {
   return prioritizedReviews(50)
@@ -200,6 +200,76 @@ describe("규칙으로 만든 목록 답", () => {
     const { output, picklist } = findingListAnswer();
     expect(picklist).toBeNull();
     expect(output).toContain("없습니다");
+  });
+});
+
+describe("★ 내 업무를 대화창에서 보고 끝낸다", () => {
+  // 실측(2026-07-31): "내 업무 보여줘"가 **화면 설명**으로 떨어졌다
+  // ("항목을 클릭하면 해당 작업 화면으로 이동합니다…"). 자기 할 일을 물었는데 사용법을 들었다.
+  const 걸려야함 = ["내 업무 보여줘", "오늘 남은 일 알려줘", "내 할 일 뭐야", "오늘 할 일 보여줘", "해야 할 거 뭐 있어"];
+  for (const q of 걸려야함) {
+    it(`목록으로 답한다: ${q}`, () => expect(isMyWorkAsk(q)).toBe(true));
+  }
+
+  const 건드리면안됨 = [
+    "미조치 취약점 뭐 있어?",        // 취약점 목록이 맡는다
+    "우리 자산 현황 알려줘",
+    "2차 인증 켜려면 어떻게 해?",     // 가서 하기가 맡는다
+    "이번 주 보안 현황을 요약해줘",   // 리포트
+    "백업 어떻게 하나요?",
+  ];
+  for (const q of 건드리면안됨) {
+    it(`그냥 지나간다: ${q}`, () => expect(isMyWorkAsk(q), "다른 경로가 맡은 말을 가로채면 그 기능이 죽는다").toBe(false));
+  }
+
+  const 할일 = (o: Partial<{ id: string; text: string; done: boolean; overdue: boolean; dueAt: number }>) =>
+    ({ id: "t1", text: "방화벽 점검", done: false, overdue: false, ...o }) as never;
+
+  it("건수·기한 지남을 먼저 말하고 목록을 준다", () => {
+    const { output, picklist } = myWorkAnswer({
+      today: [할일({ id: "a", text: "오늘 것", overdue: true })],
+      week: [할일({ id: "b", text: "이번 주 것" })],
+      later: [],
+      counts: { doneToday: 2 },
+    });
+    expect(output).toContain("남은 일 **2건**");
+    expect(output).toContain("기한 지남 1건");
+    expect(output).toContain("오늘 끝낸 일 2건");
+    expect(picklist!.kind).toBe("task");
+    expect(picklist!.items.map((i) => i.id)).toEqual(["a", "b"]);
+  });
+
+  it("★ 할 일에는 '오탐'·'담당자 배정'을 내걸지 않는다", () => {
+    // 취약점 조치를 그대로 베끼면 뜻이 안 통하는 버튼이 생긴다.
+    const { picklist } = myWorkAnswer({ today: [할일({})], week: [], later: [] });
+    expect(picklist!.actions.map((a) => a.key)).toEqual(["done"]);
+  });
+
+  it("끝낸 일은 목록에 안 넣는다", () => {
+    const { picklist } = myWorkAnswer({ today: [할일({ id: "x", done: true })], week: [], later: [] });
+    expect(picklist).toBeNull();
+  });
+
+  it("남은 일이 없으면 체크칸도 없다", () => {
+    const { output, picklist } = myWorkAnswer({ today: [], week: [], later: [] });
+    expect(picklist).toBeNull();
+    expect(output).toContain("남은 일이 없습니다");
+  });
+
+  it("★ 할 일 표식에는 '끝냄'만 통한다", () => {
+    // 표식은 밖에서 오는 값이라 화면이 안 보내도 서버가 막아야 한다.
+    const 기본 = "고른 1건\n#고른건 t1\n#종류 task\n";
+    expect(parsePickCommand(기본 + "#조치 done")?.kind).toBe("task");
+    expect(parsePickCommand(기본 + "#조치 false"), "할 일에 오탐은 뜻이 없다").toBeNull();
+    expect(parsePickCommand(기본 + "#조치 assign\n#값 정요한"), "할 일에 담당자 배정은 없다").toBeNull();
+  });
+
+  it("종류를 안 보내면 예전처럼 취약점으로 본다", () => {
+    expect(parsePickCommand("고른 1건\n#고른건 a::1\n#조치 done")?.kind).toBe("finding");
+  });
+
+  it("기록에서 종류 표식도 지운다", () => {
+    expect(stripPickMarks("고른 1건을 끝냄으로\n#고른건 t1\n#조치 done\n#종류 task")).toBe("고른 1건을 끝냄으로");
   });
 });
 

@@ -416,6 +416,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         html += '</optgroup>';
       }
       targetSelect.innerHTML = html;
+      // AI-BOM 화면에서 "이 자산의 견고성 자세히"로 들어왔으면 그 자산을 골라 둔다(?asset=).
+      // 안 그러면 방금 보던 자산을 목록에서 다시 찾아야 한다(2026-07-31 이음매 정리).
+      try{
+        const want = new URLSearchParams(location.search).get("asset");
+        if(want && targetSelect.querySelector('option[value="asset:'+CSS.escape(want)+'"]')){
+          targetSelect.value = "asset:"+want;
+          targetSelect.dispatchEvent(new Event("change"));
+        }
+      }catch(e){}
     }catch(e){}
   }
   // 선택값 → 실행 인자 + 캐시 키.

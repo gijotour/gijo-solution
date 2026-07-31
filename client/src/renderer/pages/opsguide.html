@@ -188,6 +188,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         <button type="submit">+ 일정 추가</button>
       </form>
 
+      <!-- 제품 좁히기 띠 — 보안제품 등록부에서 "이 제품의 점검"을 눌러 들어왔을 때만 나타난다.
+           좁혀진 줄 모르면 "왜 몇 건밖에 없지?"가 된다(2026-07-31). -->
+      <div id="opsScope" style="display:none;align-items:center;gap:8px;background:rgba(59,130,246,.10);
+        border:1px solid rgba(59,130,246,.32);border-radius:9px;padding:7px 11px;margin-bottom:10px;
+        font-size:12px;color:var(--blue-light)">
+        <span id="opsScopeText"></span>
+        <span id="opsScopeAll" style="margin-left:auto;font-size:11px;font-weight:700;color:var(--muted);
+          cursor:pointer;border:1px solid rgba(255,255,255,.16);border-radius:7px;padding:3px 9px">전체 보기 ✕</span>
+      </div>
       <div id="maintList" class="maint-list"><div style="color:var(--muted);font-size:12px">불러오는 중...</div></div>
     </div>
 
@@ -401,14 +410,36 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.getElementById("kpiByProduct").innerHTML = chips ? "제품별 미완료 — " + chips : "";
   }
 
+  // 보안제품 등록부에서 "이 제품의 점검"을 눌러 들어왔는가 — ?product=<제품명>
+  // (2026-07-31: 특정 제품을 눌렀는데 전체 점검 목록이 열리던 것을 고침)
+  // 이름은 표기가 조금씩 달라(공백·대소문자) 느슨하게 맞춘다 — products.html과 같은 방식.
+  const squash = (s) => (String(s || "").toLowerCase().match(/[a-z0-9가-힣]+/g) || []).join("");
+  let scopeProduct = null;
+  try { scopeProduct = new URLSearchParams(location.search).get("product") || null; } catch (e) {}
+
+  function renderOpsScope(all, items) {
+    const bar = document.getElementById("opsScope");
+    if (!bar) return;
+    if (!scopeProduct) { bar.style.display = "none"; return; }
+    document.getElementById("opsScopeText").innerHTML =
+      `🎯 <b>${esc(scopeProduct)}</b> 의 점검만 보는 중 — ${items.length}건 (전체 ${all.length}건)`;
+    bar.style.display = "flex";
+  }
+
   async function loadMaintenance() {
     const list = document.getElementById("maintList");
     try {
-      const items = await window.gijo.listMaintenance();
+      const all = await window.gijo.listMaintenance();
+      // 좁혀 보는 중이면 **위 KPI도 그 제품 것**이어야 한다. 목록 2건인데 위에 10이면
+      // 무엇을 믿을지 알 수 없다(취약점 화면에서 겪은 것과 같은 함정).
+      const items = scopeProduct ? all.filter((m) => squash(m.productName) === squash(scopeProduct)) : all;
       renderMaintKpis(items);
+      renderOpsScope(all, items);
       list.innerHTML = items.length
         ? items.map(maintRowHtml).join("")
-        : '<div style="color:var(--muted-2);font-size:12px">등록된 점검 일정이 없습니다.</div>';
+        : scopeProduct
+          ? `<div style="color:var(--muted-2);font-size:12px">「${esc(scopeProduct)}」에 등록된 점검 일정이 없습니다 — 위에서 추가하세요.</div>`
+          : '<div style="color:var(--muted-2);font-size:12px">등록된 점검 일정이 없습니다.</div>';
     } catch (e) {
       list.innerHTML = '<div style="color:#f5928a;font-size:12px">불러오지 못했습니다: ' + e.message + "</div>";
     }
@@ -552,6 +583,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     loadHealth();
     document.getElementById("mDate").value = todayStr();
     loadMaintenance();
+    // 좁힌 상태에서 빠져나올 길 — 없으면 그 제품 안에 갇힌다.
+    document.getElementById("opsScopeAll").addEventListener("click", () => {
+      scopeProduct = null;
+      loadMaintenance();
+    });
     loadAssetOptions();
     loadProductOptions();
     loadNotify();

@@ -23,7 +23,8 @@ export interface PickItem {
 }
 
 export interface PickList {
-  kind: "finding";
+  /** finding=취약점 · task=내 업무(할 일). 고른 뒤 할 수 있는 일이 서로 다르다. */
+  kind: "finding" | "task";
   items: PickItem[];
   /** 고른 뒤 누를 수 있는 조치들. 화면이 이 목록으로 버튼을 그린다. */
   actions: { key: string; label: string; needs?: "assignee" | "dueDate" }[];
@@ -120,6 +121,80 @@ export function findingListAnswer(): { output: string; picklist: PickList | null
   return { output, picklist: { kind: "finding", items: 보여줄.map(toPickItem), actions: PICK_ACTIONS } };
 }
 
+// ── "내 업무 / 오늘 남은 일" — 규칙으로 목록 + 골라서 처리 ────────────────
+// (2026-07-31 사용자 지시: "내업무와 대시보드 오늘 남은 일이 챗봇에서 잘 뜨고 내용이 나오는지,
+//  챗봇에서 선택하고 일할 수 있는지 확인하고 수정")
+//
+// 왜 규칙인가: 실측해 보니 "내 업무 보여줘"가 **화면 설명**으로 떨어졌다("항목을 클릭하면
+// 해당 작업 화면으로 이동합니다…"). 담당자는 자기 할 일을 물었는데 사용법을 들었다.
+// 내 업무는 tasks 테이블에 그대로 있는 데이터다 — 모델에게 물을 이유가 없다.
+
+const WORK_ASK_RE = /(내\s*업무|내\s*할\s*일|오늘\s*할\s*일|오늘\s*남은|남은\s*일|할\s*일|업무\s*목록|해야\s*할)/;
+// 이미 다른 결정적 경로가 맡은 말은 비켜 준다(취약점 목록·설정 안내).
+const WORK_BLOCK_RE = /(취약점|자산|보고서|리포트|설정|계정|인증|열쇠|백업|어떻게|방법)/;
+
+export function isMyWorkAsk(text: string): boolean {
+  const t = String(text ?? "");
+  if (WORK_BLOCK_RE.test(t)) return false;
+  return WORK_ASK_RE.test(t);
+}
+
+/** 내 업무 한 줄 — 화면(mywork.html)과 같은 말로 적는다. */
+interface WorkLike {
+  id: string;
+  text: string;
+  done: boolean;
+  overdue: boolean;
+  dueAt?: number;
+  priority?: string;
+  why?: string;
+  guideTotal?: number;
+  guideDoneCount?: number;
+}
+
+const 날짜 = (ms?: number) => (ms ? new Date(ms).toLocaleDateString("ko-KR", { month: "numeric", day: "numeric" }) : null);
+
+export function myWorkAnswer(p: { today: WorkLike[]; week: WorkLike[]; later: WorkLike[]; counts?: { overdue?: number; doneToday?: number } }): {
+  output: string;
+  picklist: PickList | null;
+} {
+  const 오늘 = (p.today ?? []).filter((t) => !t.done);
+  const 이번주 = (p.week ?? []).filter((t) => !t.done);
+  const 나중 = (p.later ?? []).filter((t) => !t.done);
+  const 전부 = [...오늘, ...이번주, ...나중];
+  if (전부.length === 0) {
+    return { output: "지금 남은 일이 없습니다. 새로 할 일이 생기면 여기에 뜹니다.", picklist: null };
+  }
+  const 지남 = 전부.filter((t) => t.overdue).length;
+  const 줄 = (t: WorkLike) => {
+    const 기한 = t.overdue ? "⚠ 기한 지남" : 날짜(t.dueAt) ? `~${날짜(t.dueAt)}` : "기한 없음";
+    const 가이드 = t.guideTotal ? ` · 순서 ${t.guideDoneCount ?? 0}/${t.guideTotal}` : "";
+    return `- **${t.text}** — ${기한}${가이드}${t.why ? ` · ${t.why}` : ""}`;
+  };
+  const 절 = (제목: string, xs: WorkLike[]) => (xs.length ? `\n\n**${제목}** (${xs.length})\n${xs.map(줄).join("\n")}` : "");
+  const 머리 = `남은 일 **${전부.length}건**${지남 ? ` — 그중 기한 지남 ${지남}건` : ""}${p.counts?.doneToday ? ` · 오늘 끝낸 일 ${p.counts.doneToday}건` : ""}`;
+  const output = 머리 + 절("오늘", 오늘) + 절("이번 주", 이번주) + 절("나중에", 나중);
+
+  // 체크칸은 방금 그린 그 줄들에서 직접 만든다(글자 대조로 되찾지 않는다).
+  const items: PickItem[] = 전부.slice(0, MAX_PICK).map((t) => ({
+    id: t.id,
+    label: t.text,
+    severity: t.overdue ? "overdue" : String(t.priority ?? "P3"),
+    ...(t.dueAt ? { dueDate: new Date(t.dueAt).toISOString().slice(0, 10) } : {}),
+  }));
+  return {
+    output,
+    picklist: {
+      kind: "task",
+      items,
+      // ⚠ 할 일에 "오탐 처리"는 뜻이 없다 — 취약점 조치를 그대로 베끼지 않는다.
+      //   기한 바꾸기도 넣으려다 뺐다: 지금 tasks에 기한을 고치는 길이 없다.
+      //   **안 되는 버튼을 내걸면 그게 더 나쁘다** — 누르면 "화면에서 하세요"라는 답만 돌아온다.
+      actions: [{ key: "done", label: "끝냄으로" }],
+    },
+  };
+}
+
 // ── 고른 것을 조치로 잇기 ───────────────────────────────────────────────
 // 대화창이 체크한 건들을 **표식**으로 실어 보낸다. 서버는 그 표식을 규칙으로 읽는다 —
 // LLM에게 "이 중 3번, 5번을 처리해"라고 시키지 않는다. 7B가 번호를 하나 잘못 읽으면
@@ -127,11 +202,14 @@ export function findingListAnswer(): { output: string; picklist: PickList | null
 export const PICK_MARK = "#고른건";
 const ACTION_MARK = "#조치";
 const VALUE_MARK = "#값";
+const KIND_MARK = "#종류";
 
 export interface PickCommand {
   ids: string[];
   action: "assign" | "due" | "done" | "false";
   value: string;
+  /** 무엇을 고른 것인가 — 취약점과 할 일은 "끝냄"의 뜻이 다르다. 없으면 취약점(기존 동작). */
+  kind: "finding" | "task";
 }
 
 function markLine(text: string, mark: string): string {
@@ -154,7 +232,11 @@ export function parsePickCommand(text: string): PickCommand | null {
   // 담당자·기한은 값이 있어야 뜻이 통한다. 값 없이 넘어오면 처리하지 않는다 —
   // 빈 값으로 결재판을 만들면 "담당 (없음)으로 배정"이라는 뜻 모를 승인이 뜬다.
   if ((action === "assign" || action === "due") && !value) return null;
-  return { ids, action, value };
+  const kind = markLine(text, KIND_MARK) === "task" ? "task" : "finding";
+  // 할 일에 할 수 있는 건 "끝냄" 하나다(담당자 배정·오탐·기한은 뜻이 없거나 길이 없다).
+  // 화면은 그것만 보내지만, 표식은 밖에서 오는 값이라 여기서도 막는다.
+  if (kind === "task" && action !== "done") return null;
+  return { ids, action, value, kind };
 }
 
 /**
@@ -163,11 +245,12 @@ export function parsePickCommand(text: string): PickCommand | null {
  *   담당자가 자기 대화를 못 알아본다(2026-07-31 실화면에서 발견).
  */
 export function stripPickMarks(text: string): string {
+  const marks = [PICK_MARK, ACTION_MARK, VALUE_MARK, KIND_MARK];
   const kept = String(text ?? "")
     .split("\n")
     .filter((raw) => {
       const line = raw.trim();
-      return !(line.startsWith(PICK_MARK + " ") || line.startsWith(ACTION_MARK + " ") || line.startsWith(VALUE_MARK + " "));
+      return !marks.some((m) => line.startsWith(m + " "));
     });
   return kept.join("\n").trim();
 }

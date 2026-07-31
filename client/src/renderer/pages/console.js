@@ -410,7 +410,9 @@
 
     var head = document.createElement("div");
     head.className = "cs-ph";
-    head.textContent = "고쳐야 할 것을 골라 바로 처리할 수 있습니다";
+    head.textContent = pl.kind === "task"
+      ? "끝낸 일을 골라 바로 체크할 수 있습니다"
+      : "고쳐야 할 것을 골라 바로 처리할 수 있습니다";
     wrap.appendChild(head);
 
     pl.items.forEach(function (it) {
@@ -463,7 +465,8 @@
     function send(a, value) {
       // 사람에겐 뜻만, 서버에는 고른 건의 신원(sha1)까지 — 번호를 모델이 다시 읽는 일이 없다.
       var 뜻 = "고른 " + chosen.length + "건을 " + a.label + (value ? " (" + value + ")" : "");
-      var lines = [뜻, "#고른건 " + chosen.join(","), "#조치 " + a.key];
+      // 무엇을 고른 것인지도 실어 보낸다 — 취약점의 "조치완료"와 할 일의 "끝냄"은 뜻이 다르다.
+      var lines = [뜻, "#고른건 " + chosen.join(","), "#조치 " + a.key, "#종류 " + (pl.kind || "finding")];
       if (value) lines.push("#값 " + value);
       wrap.classList.add("done");
       acts.forEach(function (b) { b.disabled = true; });

@@ -423,7 +423,9 @@ tr:last-child td{border-bottom:none;}
           (t.models || []).map((m) => '<option value="' + esc(m.id) + '"' + (m.id === modelRef ? " selected" : "") + '>' + esc(m.id) + '</option>').join("");
       }
     } catch (e) {}
-    document.getElementById("robDetailLink").addEventListener("click", () => window.gijo.navigateTo("redteam.html"));
+    // 어느 자산의 견고성인지 실어 보낸다 — 안 실으면 레드팀 화면에서 다시 골라야 한다.
+    document.getElementById("robDetailLink").addEventListener("click", () =>
+      window.gijo.navigateTo("redteam.html?asset=" + encodeURIComponent(asset.id)));
     document.getElementById("robRunBtn").addEventListener("click", () => runRobustness(asset.id));
   }
   async function runRobustness(assetId) {

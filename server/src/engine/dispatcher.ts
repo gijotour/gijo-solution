@@ -22,7 +22,7 @@ import { gateUserInput } from "./gateway";
 import { toolDomainsForScreen } from "./screencontext";
 import { isHelpIntent, formatScreenGuide } from "./screenguide";
 import { findHowTo, howToMarkdown } from "./howto";
-import { buildFindingPicks, parsePickCommand, pickToolArgs, isFindingListAsk, findingListAnswer, stripPickMarks, PickList } from "./picklist";
+import { buildFindingPicks, parsePickCommand, pickToolArgs, isFindingListAsk, findingListAnswer, isMyWorkAsk, myWorkAnswer, stripPickMarks, PickList } from "./picklist";
 import { isOutOfScope, outOfScopeAnswer, isTooVague, vagueAnswer } from "./scopeguard";
 import { analyzeFindings } from "./analysis";
 import { recordFindings, getAsset, listAssets } from "./assets";
@@ -33,7 +33,7 @@ import { listFindingReviews } from "./approvals";
 import { listMaintenanceItems } from "./maintenance";
 import { ACTION_CHECK_RE, runActionCheck } from "./actioncheck";
 import { appendTurn, recentTurnsText, getSession, createSession } from "./worksessions";
-import { LONG_ANSWER_MS, startLongAnswer, finishLongAnswer, failLongAnswer } from "./longanswer";
+import { LONG_ANSWER_MS, QA_LONG_ANSWER_MS, startLongAnswer, finishLongAnswer, failLongAnswer } from "./longanswer";
 import { runWithProgress, isValidProgressId, reportProgress, reportBigStep, registerProgressRoutes } from "./progress";
 
 // 협업 로그는 "무슨 일이 있었나"를 남기는 활동 기록이다 — 답변 전문을 그대로 실으면 화면에
@@ -557,6 +557,24 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   // 오탐 처리되므로, 표식을 규칙으로 읽어 결재판까지 곧장 만든다.
   // ⚠ 그래도 **바로 실행하지는 않는다** — 쓰기는 전부 사람 승인을 거친다는 원칙은 그대로다.
   const pick = parsePickCommand(instructionText);
+  // 할 일(내 업무)은 결재판을 거치지 않는다 — 자기 할 일에 체크하는 일이라 되돌리기도 쉽다
+  // (내 업무 화면에서 다시 누르면 그만이다). 취약점 조치와 무게가 다르다.
+  if (pick && pick.kind === "task") {
+    const { setTaskDone, getTask } = await import("./tasks.js");
+    const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
+    completeTask(task.id);
+    const 있음 = pick.ids.filter((id) => getTask(id));
+    const 없음 = pick.ids.length - 있음.length;
+    let 문장: string;
+    if (있음.length === 0) {
+      문장 = `고르신 ${pick.ids.length}건을 지금 할 일 목록에서 찾지 못했습니다 — 그 사이에 처리됐거나 목록이 바뀌었을 수 있습니다.`;
+    } else {
+      for (const id of 있음) setTaskDone(id, true);
+      문장 = `${있음.length}건을 끝냄으로 표시했습니다. 되돌리려면 「내 업무」에서 다시 누르시면 됩니다.`;
+    }
+    if (없음 > 0) 문장 += ` ⚠ ${없음}건은 찾지 못해 건너뛰었습니다.`;
+    return { task, route: { agentId: "orchestrator", action: "chat" }, output: 문장 };
+  }
   if (pick) {
     const tool = findAgentTool("bulk_update");
     if (tool) {
@@ -594,6 +612,23 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
       route: { agentId: "orchestrator", action: "chat" },
       output: howToMarkdown(howTo),
       ...(howTo.page ? { openScreen: { page: howTo.page, label: howTo.where } } : {}),
+    };
+  }
+
+  // "내 업무 보여줘 / 오늘 남은 일" — 규칙으로 내 할 일을 내고 그 자리에서 끝낼 수 있게 한다.
+  // ⚠ 실측(2026-07-31): 이 질문이 **화면 설명**으로 떨어졌다("항목을 클릭하면 해당 작업
+  //   화면으로 이동합니다…"). 담당자는 자기 할 일을 물었는데 사용법을 들었다.
+  //   내 업무는 tasks에 그대로 있는 데이터다 — 모델에게 물을 이유가 없다.
+  if (isMyWorkAsk(instructionText)) {
+    const { buildMyWork } = await import("./mywork.js");
+    const { output, picklist } = myWorkAnswer(await buildMyWork());
+    const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P2" });
+    completeTask(task.id);
+    return {
+      task,
+      route: { agentId: "orchestrator", action: "chat" },
+      output,
+      ...(picklist ? { picklist } : {}),
     };
   }
 
@@ -828,11 +863,19 @@ export function registerDispatcherRoutes(app: Express): void {
 
       // 30초 안에 안 끝나면 "리포트로 작성해 드리겠다"고 답하고 물러난다(사용자 결정 2026-07-26, 10초→30초).
       // 작업은 뒤에서 계속 돌고, 끝나면 리포트로 저장한 뒤 화면에 팝업으로 알린다.
+      //
+      // ★ 단, 평가 게이트(qa=true)는 더 기다린다(2026-07-31).
+      //   리포트 전환은 **사람을 기다리게 하지 않으려는 배려**지 측정에 필요한 것이 아니다.
+      //   30초를 넘기면 돌아오는 건 안내 문구뿐이라 게이트가 재려던 것을 아예 못 쟀고,
+      //   그 문항은 '측정 못 함'으로 분모에서 빠졌다 — **그 자리에 결함이 숨어도 안 보인다**
+      //   (실측 2026-07-31: 라우팅 축에서 2문항이 그렇게 빠졌다).
+      //   무한정은 아니다. 매달린 요청이 게이트를 영영 멈추게 하면 안 되므로 상한을 둔다.
+      const limitMs = qa ? QA_LONG_ANSWER_MS : LONG_ANSWER_MS;
       const work = runWithProgress(progressId, user?.id ?? null, () =>
         dispatchInstruction(text, sessionId, screen, user?.displayName, qa)
       );
       let handedOff = false;
-      const timer = new Promise<null>((resolve) => setTimeout(() => resolve(null), LONG_ANSWER_MS));
+      const timer = new Promise<null>((resolve) => setTimeout(() => resolve(null), limitMs));
       const first = await Promise.race([work, timer]);
 
       if (first !== null) {
