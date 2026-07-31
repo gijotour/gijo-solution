@@ -35,12 +35,23 @@ export const KNOWLEDGE_BUNDLE_VERSION = "2026.07-1";
 // 재배포 고지 의무(조사 2026-07-29) — MITRE 계열(ATT&CK·ATLAS·CWE)은 저작권 고지+라이선스
 // 문구 재현이 재배포 조건이고, NIST는 퍼블릭 도메인(출처 표시 권장), KISA는 문서별 공공누리
 // 유형 확인이 필요하다. 번들 상태·반입 매니페스트에 항상 함께 내보낸다.
-// ⚠ MITRE 축자 문구는 원문 페이지 재대조 후 확정할 것(법무 확인 항목) — 아래는 요지 표기.
+// ⚠ MITRE 문구는 **축자로 요구된다** — 2026-07-31 원문 재대조로 확정했다.
+//   attack.mitre.org/resources/legal-and-branding/terms-of-use — 상업 재배포는 명시적으로
+//   허용되지만(“research, development, and commercial purposes”), 조건이 둘이다:
+//     ① 아래 영문 고지를 **그대로** 재현할 것
+//     ② **라이선스 본문 자체도 함께** 재현할 것(고지만으로는 부족)
+//   그래서 영문 원문을 손대지 않고 싣고, 한국어 설명은 뒤에 덧붙인다.
+//   ②는 번들의 ATTRIBUTIONS 파일에서 전문을 싣는다(요약하지 말 것 — 요약은 재현이 아니다).
 export const BUNDLE_ATTRIBUTIONS = [
-  "MITRE ATT&CK® / ATLAS™ / CWE™ — © The MITRE Corporation. MITRE의 허가 조건(저작권 고지·라이선스 재현)에 따라 수록. 상세: attack.mitre.org/resources/legal-and-branding",
-  "OWASP Top 10 for LLM Applications — OWASP Foundation, CC 라이선스 조건에 따름",
-  "NIST AI RMF 1.0 · GenAI Profile(AI 600-1) — 미 연방정부 저작물(퍼블릭 도메인), 출처 표시",
-  "KISA AI 보안 위협 대응 매뉴얼(2026.7) — 공공누리 유형 문서별 확인 필요(반영 전 판권면 대조)",
+  "© 2026 The MITRE Corporation. This work is reproduced and distributed with the permission of The MITRE Corporation. — MITRE ATT&CK® · ATLAS™ · CWE™ 수록분에 적용. 라이선스 전문은 attack.mitre.org/resources/legal-and-branding/terms-of-use 참조.",
+  // ⚠ CC BY-SA 4.0은 **동일조건 변경허락(ShareAlike)** 이 붙는다 — 2차적 저작물로 판단되면
+  //   그 부분을 같은 라이선스로 공개해야 한다. 상업 번들에서 가장 큰 쟁점이라 법무 확인 대상.
+  //   (GIJO_AS_지식번들_법무검토요청.md 참조)
+  "OWASP Top 10 for LLM Applications (2025) — © OWASP Foundation. CC BY-SA 4.0에 따라 수록(출처 표시·동일조건 변경허락).",
+  "NIST AI RMF 1.0 · GenAI Profile(NIST AI 600-1) — 미 연방정부 저작물(17 U.S.C. §105, 퍼블릭 도메인). 출처 표시.",
+  // ⚠ 공공누리 유형이 미확인이다. 유형2·4는 **상업적 이용을 금지**하므로, 확인 전까지
+  //   유상 배포 번들에 싣지 않는 것이 안전하다(법무 검토 대상 1순위).
+  "KISA 「AI 보안 위협 대응 매뉴얼」(2026.7) — 한국인터넷진흥원. 공공누리 유형 확인 중(판권면 대조 필요).",
 ] as const;
 
 const STATE_KEY = "knowledgeBundle:applied"; // JSON {version, at, triples, docs}

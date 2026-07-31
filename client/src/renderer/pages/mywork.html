@@ -202,6 +202,14 @@
     if (window.gijoOpenScreen) window.gijoOpenScreen(page);
     else if (window.gijo && window.gijo.navigateTo) window.gijo.navigateTo(page);
   }
+  // 질문 속 {업무}를 실제 업무 이름으로 바꾼다.
+  // ⚠ 안 바꾸면 AI가 "무엇을 확인해야 할까요?"라고 **되묻기만** 한다(2026-07-31 실측:
+  //   "이 작업이 사내 규정에 맞는지 확인해줘" → 65자 되묻기). 담당자는 단계를 눌렀는데
+  //   답 대신 질문을 받는다 — 안내가 안 되는 것이다.
+  function fillQuestion(q, t){
+    return String(q || "").replace(/{업무}/g, (t && t.text) ? t.text : "");
+  }
+
   function askAI(q){
     try { window.parent.postMessage({ type: "gijo:ask", text: q }, "*"); }
     catch (e) { /* 셸이 없으면 조용히 넘어간다 — 단계 완료 표시는 그대로 남는다 */ }
@@ -345,7 +353,7 @@
         : s.kind === "ask" ? (isDone ? "다시 묻기" : "물어보기")
         : (isDone ? "다시 보기" : "확인함");
       var desc = s.kind === "ask" && s.question
-        ? '<span class="st-q">"' + esc(s.question) + '"</span>' + (s.desc ? " — " + esc(s.desc) : "")
+        ? '<span class="st-q">"' + esc(fillQuestion(s.question, t)) + '"</span>' + (s.desc ? " — " + esc(s.desc) : "")
         : esc(s.desc || "");
       return '<div class="' + cls + '" data-step="' + i + '">' +
         '<span class="st-n" title="눌러서 완료 표시 바꾸기">' + (isDone ? "✓" : (i + 1)) + "</span>" +
@@ -392,7 +400,7 @@
         // 아직 안 담긴 AI 제안이면 여기서 담는다 — 진행이 저장될 곳이 생긴다.
         if (!task.saved) { task = await adoptItem(t, true); if (!task) return; }
         if (s.kind === "open" && s.page) openScreen(s.page);
-        else if (s.kind === "ask" && s.question) askAI(s.question);
+        else if (s.kind === "ask" && s.question) askAI(fillQuestion(s.question, task));
         try { await window.gijo.myWorkStep(task.id, i, true); } catch (e) {}
         await load();
         selId = task.id;

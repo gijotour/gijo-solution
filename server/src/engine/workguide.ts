@@ -51,7 +51,7 @@ const GUIDES: WorkGuide[] = [
     label: "취약점 조치",
     steps: [
       { kind: "open", title: "취약점 내용 확인하기", desc: "어떤 자산의 무슨 취약점인지, 얼마나 급한지 봅니다", page: "vulnscan.html" },
-      { kind: "ask", title: "조치 방법 물어보기", desc: "어떻게 막는지 AI가 표준·사내 자료로 알려 줍니다", question: "이 취약점 조치 방법을 알려줘" },
+      { kind: "ask", title: "조치 방법 물어보기", desc: "어떻게 막는지 AI가 표준·사내 자료로 알려 줍니다", question: "{업무} — 이 취약점을 어떻게 조치하는지 절차를 알려줘" },
       { kind: "open", title: "조치 승인 올리기", desc: "실제 변경은 승인을 거칩니다 — 조치·승인 화면에서 올립니다", page: "approvals.html" },
       { kind: "open", title: "조치됐는지 확인하기", desc: "다시 점검해 정말 닫혔는지 확인합니다", page: "vulnscan.html" },
     ],
@@ -87,7 +87,7 @@ const GUIDES: WorkGuide[] = [
     key: "compliance-check",
     label: "규정 확인",
     steps: [
-      { kind: "ask", title: "규정에 맞는지 물어보기", desc: "하려는 일이 사내 규정·법령에 맞는지 AI가 근거와 함께 답합니다", question: "이 작업이 사내 규정에 맞는지 확인해줘" },
+      { kind: "ask", title: "규정에 맞는지 물어보기", desc: "하려는 일이 사내 규정·법령에 맞는지 AI가 근거와 함께 답합니다", question: "{업무} — 이 작업이 사내 규정·법령에 맞는지 근거와 함께 알려줘" },
       { kind: "open", title: "컴플라이언스 현황 보기", desc: "지금 우리가 어느 항목을 지키고 있는지 봅니다", page: "compliance.html" },
     ],
   },
@@ -146,7 +146,7 @@ const GUIDES: WorkGuide[] = [
     label: "AI 견고성 점검",
     steps: [
       { kind: "open", title: "제품 경로로 점검하기", desc: "담당자가 실제로 쓰는 경로에 공격 14종을 보내 봅니다 — 뚫림 0건이어야 합니다", page: "redteam.html" },
-      { kind: "ask", title: "결과 뜻 물어보기", desc: "맨몸 점수와 제품 경로 점수가 왜 다른지 확인합니다", question: "레드팀 견고성 점수 두 개가 왜 달라?" },
+      { kind: "ask", title: "결과 뜻 물어보기", desc: "맨몸 점수와 제품 경로 점수가 왜 다른지 확인합니다", question: "맨몸 견고성과 제품 경로 실효 견고성이 무엇이 다른지 알려줘" },
       { kind: "note", title: "가드레일 설정 확인하기", desc: "같은 화면 아래에서 가드레일이 '차단'으로 켜져 있는지 봅니다" },
     ],
   },

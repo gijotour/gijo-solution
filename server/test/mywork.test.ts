@@ -290,3 +290,71 @@ describe("★ 추천한 업무는 반드시 안내할 수 있어야 한다", () 
     }
   });
 });
+
+describe("가이드 질문이 헛돌지 않는다", () => {
+  // ⚠ 실사고(2026-07-31, 19개 질문을 실 LLM에 보내 본 결과):
+  //   ① "이 작업이 사내 규정에 맞는지 확인해줘" → AI가 "무엇을 확인해야 할까요?"라고
+  //      **되묻기만** 했다(65자). 담당자는 단계를 눌렀는데 답 대신 질문을 받는다.
+  //      → 질문에 {업무}를 넣어 실제 업무 이름을 채워 보낸다.
+  //   ② "레드팀 견고성 점수 두 개가 왜 달라?" → "다른 팀원이 매겼거나…"라는 **엉뚱한 답**.
+  //      우리 용어(맨몸/제품 경로 실효)로 물어야 우리 자료를 찾는다.
+  //      ⚠ 이건 **길이만 보고 통과시킬 뻔했다** — 세는 것과 확인하는 것은 다르다.
+  it("지시대명사로 시작하는 질문에는 {업무}가 들어 있다", () => {
+    for (const g of listGuides()) {
+      for (const s of g.steps) {
+        if (s.kind !== "ask" || !s.question) continue;
+        // "이 취약점", "이 작업"처럼 무엇을 가리키는지 문장만으로 알 수 없는 질문은
+        // 업무 이름을 채워 보내야 한다.
+        if (/(^|\s)이\s*(작업|취약점|자산|제품|항목)/.test(s.question)) {
+          expect(s.question, `${g.key}: 무엇을 가리키는지 모르는 질문 — {업무} 필요`).toContain("{업무}");
+        }
+      }
+    }
+  });
+
+  it("{업무}를 쓴 질문은 화면이 실제로 치환한다", async () => {
+    const fs = await import("node:fs");
+    const src = fs.readFileSync(new URL("../../client/src/renderer/pages/mywork.html", import.meta.url), "utf8");
+    const 치환필요 = listGuides().some((g) => g.steps.some((s) => s.question?.includes("{업무}")));
+    if (!치환필요) return;
+    expect(src, "{업무}를 그대로 보내면 AI가 못 알아듣는다").toContain("function fillQuestion");
+    expect(src, "보낼 때 치환해야 한다").toContain("fillQuestion(s.question, task)");
+    expect(src, "화면에 보이는 것도 같아야 한다 — 다르면 담당자가 헷갈린다").toContain("fillQuestion(s.question, t)");
+  });
+
+  it("우리 제품 용어를 쓰는 질문은 그 용어를 정확히 쓴다", () => {
+    // 일반 용어로 물으면 AI가 일반 지식으로 답한다("다른 팀원이 매겼거나…").
+    const q = getGuide("ai-robustness")!.steps.find((s) => s.kind === "ask")!.question!;
+    expect(q).toContain("맨몸");
+    expect(q).toContain("실효");
+  });
+});
+
+describe("★ 용어사전이 AI의 지식에 들어 있다", () => {
+  // ⚠ 실사고(2026-07-31): 용어사전에 하루 종일 용어를 적어 넣었는데 **AI는 한 번도 못 봤다.**
+  //   파일이 docs-manifest.json에 없어서 RAG에 인입되지 않았기 때문이다.
+  //   그래서 "맨몸 견고성이 뭐야?"에 **Man-in-the-Middle(MitM)이라고 지어냈다.**
+  //   우리가 만든 말은 우리 자료에만 있으므로, 자료에 없으면 모델은 반드시 지어낸다.
+  it("용어사전이 문서 매니페스트에 있다", async () => {
+    const fs = await import("node:fs");
+    const m = JSON.parse(fs.readFileSync(new URL("../docs-manifest.json", import.meta.url), "utf8")) as { files: { file: string }[] };
+    expect(m.files.some((f) => f.file.includes("용어사전")), "용어를 적어도 AI가 못 본다").toBe(true);
+  });
+
+  it("매니페스트의 파일은 실제로 있어야 한다 — 없으면 조용히 안 실린다", async () => {
+    // ⚠ 경로는 URL로 푼다. pathname을 문자열로 만지면 윈도우 드라이브 문자(/D:/…)에서
+    //   틀린다 — 실제로 이 시험이 처음엔 15개 파일을 전부 "없다"고 했다(파일은 다 있었다).
+    const fs = await import("node:fs");
+    const 없는것: string[] = [];
+    const m = JSON.parse(fs.readFileSync(new URL("../docs-manifest.json", import.meta.url), "utf8")) as { files: { file: string }[] };
+    for (const f of m.files) {
+      const 후보 = [
+        new URL("../../" + f.file, import.meta.url),
+        new URL("../docs/" + f.file, import.meta.url),
+        new URL("../../docs/" + f.file, import.meta.url),
+      ];
+      if (!후보.some((c) => fs.existsSync(c))) 없는것.push(f.file);
+    }
+    expect(없는것, "매니페스트에 적혔지만 파일이 없다 — 인입에서 조용히 빠진다").toEqual([]);
+  });
+});
