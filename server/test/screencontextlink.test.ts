@@ -94,6 +94,18 @@ describe("★ 특정 항목을 누르면 그 항목으로 좁혀 간다", () => 
     expect(줄).toContain('data-open-ops="${esc(a.name)}"');
   });
 
+  it("★ 별도 창(사무실)도 본창 탭을 죽이지 않는다", () => {
+    // preload의 탭 안 보정은 embed 프레임에만 닿는다 — 별도 창은 embed가 아니라서
+    // navigateTo를 그대로 쓰면 **본창을 통째로 갈아치운다**(열어 둔 탭 전부 소실).
+    const src = read("office.html");
+    const i = src.indexOf('getElementById("todoOpenBtn")');
+    expect(i, "적어 넣기 버튼을 못 찾았다").toBeGreaterThan(0);
+    const 블록 = src.slice(i, i + 420);
+    expect(블록, "별도 창은 openTabInShell로 열어야 한다").toContain("openTabInShell");
+    // navigateTo가 남아 있어도 되지만 **폴백이어야 한다**(먼저 오면 안 된다).
+    expect(블록.indexOf("openTabInShell")).toBeLessThan(블록.indexOf("navigateTo"));
+  });
+
   it("AI-BOM의 '견고성 자세히'가 그 자산을 골라 둔 채로 연다", () => {
     expect(read("sbom.html")).toContain('redteam.html?asset=" + encodeURIComponent(asset.id)');
     expect(read("redteam.html"), "레드팀이 ?asset= 을 안 읽으면 실어 보내도 소용없다").toContain('.get("asset")');
