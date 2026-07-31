@@ -47,7 +47,26 @@
       ".cs-row .cb{flex:1;min-width:0;}",
       ".cs-row .cn{font-size:10.5px;font-weight:800;color:var(--muted,#8b93ab);margin-bottom:2px;}",
       ".cs-row .cn .ct{font-weight:500;color:var(--muted-2,#5f6785);margin-left:6px;}",
-      ".cs-row .cm{font-size:12.5px;color:var(--text,#e7eaf3);white-space:pre-wrap;word-break:break-word;line-height:1.62;}",
+      ".cs-row .cm{font-size:12.5px;color:var(--text,#e7eaf3);word-break:break-word;line-height:1.62;}",
+      // 마크다운으로 그린 답 — **표·목록·굵은 글씨**가 좁은 창에서도 읽히게(2026-07-31).
+      // ⚠ 표는 폭이 좁으면 글자가 겹친다 → 표만 가로 스크롤을 준다(창은 안 밀린다).
+      ".cs-row.instr .cm{white-space:pre-wrap;}",
+      ".cs-row .cm p{margin:0 0 6px;}",
+      ".cs-row .cm p:last-child{margin-bottom:0;}",
+      ".cs-row .cm strong{color:#fff;font-weight:800;}",
+      ".cs-row .cm h1,.cs-row .cm h2,.cs-row .cm h3{font-size:12.5px;font-weight:800;color:#fff;margin:9px 0 5px;}",
+      ".cs-row .cm ul,.cs-row .cm ol{margin:4px 0 7px 17px;}",
+      ".cs-row .cm li{margin:2px 0;}",
+      ".cs-row .cm code{background:var(--panel-2,#0e1526);border:1px solid var(--border,rgba(255,255,255,.08));" +
+        "border-radius:4px;padding:0 4px;font-size:11.5px;color:var(--blue-light,#5fa1ff);}",
+      ".cs-row .cm pre{background:var(--panel-2,#0e1526);border:1px solid var(--border,rgba(255,255,255,.08));" +
+        "border-radius:7px;padding:8px 10px;overflow-x:auto;margin:6px 0;}",
+      ".cs-row .cm pre code{background:none;border:none;padding:0;color:var(--text,#e7eaf3);}",
+      ".cs-row .cm table{border-collapse:collapse;width:100%;margin:6px 0;font-size:11.5px;display:block;overflow-x:auto;}",
+      ".cs-row .cm th{background:var(--panel-2,#0e1526);color:var(--muted,#8b93ab);text-align:left;font-weight:700;}",
+      ".cs-row .cm th,.cs-row .cm td{border:1px solid var(--border,rgba(255,255,255,.08));padding:5px 8px;white-space:nowrap;}",
+      ".cs-row .cm blockquote{border-left:3px solid var(--border-strong,rgba(255,255,255,.16));margin:6px 0;padding:2px 0 2px 10px;color:var(--muted,#8b93ab);}",
+      ".cs-row .cm hr{border:none;border-top:1px solid var(--border,rgba(255,255,255,.08));margin:9px 0;}",
       ".cs-row .cm.clamp{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer;}",
       ".cs-row .cl-more{font-size:10.5px;font-weight:700;color:var(--blue-light,#5fa1ff);cursor:pointer;}",
       // 「이 답 이상해요」 지적(중-1) — 평소엔 숨고 마우스를 올리거나 키보드로 짚으면 드러난다.
@@ -225,6 +244,15 @@
 
   // ── 대화 줄 ───────────────────────────────────────────────────────────
   function rows() { return document.getElementById("csBody"); }
+  // 답은 **마크다운으로 그린다**(2026-07-31 사용자 지시 "지금 너하고 하는 대화처럼").
+  // 예전엔 글자 그대로만 그려서 모델이 보낸 **굵게**·표·목록이 별표와 파이프로 보였다.
+  // 표·굵은 글씨가 그려져야 숫자와 이름이 눈에 들어온다 — 그래픽이 아니라 데이터다.
+  // ⚠ 내가 친 말(instr)은 그리지 않는다 — 담당자가 적은 그대로 보여야 한다.
+  function fmt(kind, msg) {
+    if (kind === "instr" || !window.gijoMd) return esc(msg);
+    return window.gijoMd.render(msg);
+  }
+
   function append(kind, o) {
     var body = rows();
     var empty = body.querySelector(".cs-empty");
@@ -236,7 +264,7 @@
     var long = (kind === "reply" || kind === "event") && msg.length > CLAMP_LEN;
     var bodyHtml = kind === "typing"
       ? '<span class="cm cs-typing"><span></span><span></span><span></span></span>'
-      : '<div class="cm' + (long ? " clamp" : "") + '">' + esc(msg) + "</div>" + (long ? '<span class="cl-more">더보기 ▾</span>' : "");
+      : '<div class="cm' + (long ? " clamp" : "") + '">' + fmt(kind, msg) + "</div>" + (long ? '<span class="cl-more">더보기 ▾</span>' : "");
     el.innerHTML = '<div class="ci">' + (o.icon || "◆") + "</div>" +
       '<div class="cb"><div class="cn">' + esc(o.name) + '<span class="ct">' + time + "</span></div>" + bodyHtml + "</div>";
     if (long) {

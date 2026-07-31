@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>시안 A — 상황판 (오늘 무엇이 급한가)</title>
+<style>
+  :root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.08);--border-s:rgba(255,255,255,.16);
+    --blue:#3b82f6;--blue-l:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--teal:#1eb980;--red:#e2483d;--amber:#f0a020;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;}
+  .note{background:#111a2e;border-bottom:1px solid var(--border);padding:10px 18px;font-size:12px;color:var(--muted);}
+  .note b{color:var(--blue-l);}
+  .wrap{padding:18px 22px;max-width:1180px;}
+  h2{font-size:15px;font-weight:800;margin:0 0 3px;}
+  .sub{font-size:11.5px;color:var(--muted-2);margin-bottom:14px;}
+
+  /* 급한 것 — 화면 맨 위, 가장 큰 자리 */
+  .urgent{background:linear-gradient(180deg,rgba(226,72,61,.10),transparent);border:1px solid rgba(226,72,61,.32);
+    border-radius:13px;padding:14px 16px;margin-bottom:14px;}
+  .urgent .hd{display:flex;align-items:center;gap:9px;margin-bottom:10px;}
+  .urgent .hd .t{font-size:13.5px;font-weight:800;}
+  .urgent .hd .why{font-size:11px;color:var(--muted);margin-left:auto;}
+  .row{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:9px;cursor:pointer;}
+  .row:hover{background:rgba(255,255,255,.05);}
+  .row+.row{border-top:1px solid rgba(255,255,255,.05);}
+  .tag{flex:0 0 auto;font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:5px;}
+  .t-kev{background:rgba(226,72,61,.2);color:#f5928a;border:1px solid rgba(226,72,61,.45);}
+  .t-due{background:rgba(240,160,32,.16);color:var(--amber);border:1px solid rgba(240,160,32,.4);}
+  .t-appr{background:rgba(59,130,246,.16);color:var(--blue-l);border:1px solid rgba(59,130,246,.4);}
+  .row .nm{flex:1;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .row .meta{font-size:11px;color:var(--muted-2);white-space:nowrap;}
+  .row .go{font-size:11px;color:var(--blue-l);font-weight:700;opacity:0;white-space:nowrap;}
+  .row:hover .go{opacity:1;}
+
+  /* 요약 타일 */
+  .tiles{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:14px;}
+  .tile{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:12px 13px;cursor:pointer;}
+  .tile:hover{border-color:var(--blue);}
+  .tile .k{font-size:10.5px;color:var(--muted);margin-bottom:5px;}
+  .tile .v{font-size:23px;font-weight:800;line-height:1;}
+  .tile .d{font-size:10px;color:var(--muted-2);margin-top:5px;}
+  .v.red{color:#f5928a;} .v.amber{color:var(--amber);} .v.teal{color:var(--teal);}
+
+  /* 오늘 할 일 */
+  .cols{display:grid;grid-template-columns:1.25fr 1fr;gap:14px;}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:13px 15px;}
+  .card h3{font-size:12.5px;font-weight:800;margin-bottom:4px;display:flex;align-items:center;gap:7px;}
+  .card h3 .cnt{margin-left:auto;font-size:10.5px;color:var(--muted-2);font-weight:700;}
+  .card .hint{font-size:10.5px;color:var(--muted-2);margin-bottom:9px;}
+  .todo{display:flex;align-items:center;gap:9px;padding:7px 2px;border-top:1px solid rgba(255,255,255,.05);}
+  .todo input{accent-color:var(--blue);}
+  .todo .tx{flex:1;font-size:12.5px;}
+  .todo .who{font-size:10.5px;color:var(--muted-2);}
+  .bar{height:5px;border-radius:3px;background:#0a1120;overflow:hidden;margin:9px 0 3px;}
+  .bar i{display:block;height:100%;background:var(--teal);}
+</style>
+</head>
+<body>
+<div class="note">
+  <b>시안 A — 상황판.</b> 대화(콘솔)는 셸 아래에 있으므로 대시보드에서 뺐습니다. 중앙 구체 그래픽·바로가기 타일도 뺐습니다.
+  대시보드는 <b>“오늘 무엇이 급한가”를 보여주고 누르면 그 화면이 탭으로 열리는 자리</b>로 좁혔습니다.
+</div>
+<div class="wrap">
+  <h2>오늘 상황</h2>
+  <div class="sub">2026. 07. 28. 화요일 · 마지막 갱신 방금 전</div>
+
+  <div class="urgent">
+    <div class="hd">
+      <span class="t">🔥 지금 손대야 할 것</span>
+      <span class="why">실제 악용 확인(KEV) · 기한 임박 · 승인 대기 순</span>
+    </div>
+    <div class="row"><span class="tag t-kev">KEV</span><span class="nm">Oracle Database Server 다중 취약점 (CVE-2020-36843)</span><span class="meta">oracle.local · 미배정</span><span class="go">취약점 열기 →</span></div>
+    <div class="row"><span class="tag t-kev">KEV</span><span class="nm">OpenSSH regreSSHion (CVE-2024-6387)</span><span class="meta">192.168.219.98 · 미배정</span><span class="go">취약점 열기 →</span></div>
+    <div class="row"><span class="tag t-due">기한 초과</span><span class="nm">방화벽 월간 정기점검 정검서 미제출</span><span class="meta">7.26 마감 · brian</span><span class="go">제품 유지보수 →</span></div>
+    <div class="row"><span class="tag t-appr">승인 대기</span><span class="nm">조치 검증 완료 3건 — 최종 승인 필요</span><span class="meta">2일째 대기</span><span class="go">조치·승인 →</span></div>
+  </div>
+
+  <div class="tiles">
+    <div class="tile"><div class="k">미조치 취약점</div><div class="v red">4,811</div><div class="d">KEV 12건 포함</div></div>
+    <div class="tile"><div class="k">미배정</div><div class="v amber">42</div><div class="d">배정해야 검증 가능</div></div>
+    <div class="tile"><div class="k">승인 대기</div><div class="v">3</div><div class="d">최대 2일 경과</div></div>
+    <div class="tile"><div class="k">점검 지연</div><div class="v amber">1</div><div class="d">방화벽 월간</div></div>
+    <div class="tile"><div class="k">보안 태세</div><div class="v teal">50</div><div class="d">보통 · 어제 대비 +2</div></div>
+  </div>
+
+  <div class="cols">
+    <div class="card">
+      <h3>☑ 오늘 할 일 <span class="cnt">2 / 6 완료</span></h3>
+      <div class="hint">AI가 채운 것과 내가 적은 것이 함께 쌓입니다. 누르면 그 화면이 탭으로 열립니다.</div>
+      <div class="bar"><i style="width:33%"></i></div>
+      <div class="todo"><input type="checkbox"><span class="tx">[조치] OpenSSH 업데이트 — 샘플-웹서버</span><span class="who">P1 · 기한 초과</span></div>
+      <div class="todo"><input type="checkbox"><span class="tx">[조치] Apache Log4j RCE — 샘플-웹서버</span><span class="who">P0 · ~8.2</span></div>
+      <div class="todo"><input type="checkbox"><span class="tx">[조치] Oracle CPU 적용 — 샘플-웹서버</span><span class="who">P2 · ~7.30</span></div>
+      <div class="todo"><input type="checkbox" checked><span class="tx" style="color:var(--muted-2);text-decoration:line-through">주간 리포트 발송</span><span class="who">완료</span></div>
+    </div>
+    <div class="card">
+      <h3>🧭 오늘 브리핑</h3>
+      <div class="hint">AI가 어젯밤 상황을 요약했습니다.</div>
+      <div style="font-size:12.5px;line-height:1.7;color:#cfd6e8;padding-top:8px">
+        오늘 급한 건 <b style="color:#f5928a">1건</b>이고, 모두 실제 악용이 확인된 취약점(KEV)입니다.
+        먼저 <b>샘플-웹서버(10.0.0.100)</b>의 취약점 점검부터 처리하시길 권합니다(악용예측 94%).
+        그 외 점검 주기가 도래한 항목이 <b>2건</b> 있습니다.
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

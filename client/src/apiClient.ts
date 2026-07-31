@@ -978,6 +978,20 @@ export const myWorkApi = {
     request<unknown>(`/api/mywork/${encodeURIComponent(id)}/step`, { method: "POST", body: { step, done } }),
 };
 
+// ── 개인 문서함(2026-07-31) — 담당자가 자기 메모를 넣는 자리. 서버가 userId로 격리한다.
+export interface PersonalDocMeta { id: string; title: string; ragOptIn: boolean; createdAt: number; updatedAt: number }
+export interface PersonalDoc extends PersonalDocMeta { body: string; warnings?: { kind: string; masked: string; hint: string }[] }
+export const personalDocsApi = {
+  list: () => request<{ documents: PersonalDocMeta[] }>("/api/personaldocs"),
+  read: (id: string) => request<PersonalDoc>(`/api/personaldocs/${encodeURIComponent(id)}`),
+  create: (b: { title: string; body: string }) => request<PersonalDoc>("/api/personaldocs", { method: "POST", body: b }),
+  update: (id: string, b: { title: string; body: string }) =>
+    request<PersonalDoc>(`/api/personaldocs/${encodeURIComponent(id)}`, { method: "PUT", body: b }),
+  setRag: (id: string, on: boolean) =>
+    request<PersonalDoc>(`/api/personaldocs/${encodeURIComponent(id)}/rag`, { method: "POST", body: { on } }),
+  remove: (id: string) => request<{ ok: boolean }>(`/api/personaldocs/${encodeURIComponent(id)}`, { method: "DELETE" }),
+};
+
 export type GuardMode = "off" | "flag" | "block";
 export interface GuardEvent {
   at: number;

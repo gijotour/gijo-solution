@@ -460,6 +460,19 @@ ipcMain.handle("console:context", async (_e, screenPage: string | null, label: s
   return { ok: true };
 });
 
+// 지휘소(별도 대화 창) → 본창에 탭 열기.
+// ⚠ navigate:to를 쓰면 안 된다 — 그건 본창을 loadFile로 **통째로 갈아치워** 열려 있던
+//   탭이 전부 사라진다(2026-07-31 확인). 대화창에서 화면을 여는 것은 "탭 하나 추가"지
+//   "앱을 그 화면으로 바꾸기"가 아니다. 그래서 셸에게 부탁하는 통로를 따로 둔다.
+ipcMain.handle("shell:openTab", async (_e, page: string, label?: string) => {
+  if (!mainWindow || mainWindow.isDestroyed()) return { ok: false, why: "본창이 없습니다" };
+  mainWindow.webContents.send("shell:openTab", { page: String(page), label: label ? String(label) : null });
+  // 화면을 열었으면 그 창을 앞으로 — 안 그러면 "열었다는데 안 보인다"가 된다.
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.focus();
+  return { ok: true };
+});
+
 // 분리창 안에서 가로/세로 전환(2026-07-26 사용자 결정 — 모니터 배치는 그 창에서 바꾼다).
 ipcMain.handle("shell:popoutOrient", async (e, orient: string) => {
   const win = BrowserWindow.fromWebContents(e.sender);

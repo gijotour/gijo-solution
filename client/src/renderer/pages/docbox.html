@@ -139,92 +139,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   // 외부 라이브러리를 쓰지 않는다: 폐쇄망이라 CDN이 없고, 우리 문서는 우리가 쓴 것이라
   // 문법 범위가 좁다(제목·표·목록·코드·인용·강조·링크). 필요한 만큼만 직접 그린다.
   // ⚠ 모든 텍스트는 esc()를 먼저 지난다 — 문서에 <script>가 들어 있어도 실행되지 않는다.
-  function inline(t) {
-    return esc(t)
-      .replace(/`([^`]+)`/g, "<code>$1</code>")
-      .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
-      .replace(/(^|[^*])\*([^*\n]+)\*/g, "$1<em>$2</em>")
-      // 이미지 — 링크보다 **먼저** 처리해야 한다(![]()가 []()에 먼저 잡히면 그림이 사라진다).
-      // 실측(2026-07-31): 미리보기에 붙여넣은 캡처가 안 보였다 — 파일에는 들어 있는데 화면에만
-      // 없어서, "저장될 모습 그대로"라는 미리보기의 약속이 깨졌다.
-      // ⚠ data: 와 http(s): 만 허용한다. javascript: 같은 것이 src로 들어가면 안 된다.
-      .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, function (_m, alt, src) {
-        return /^(data:image\/|https?:)/i.test(src) ? '<img src="' + src + '" alt="' + alt + '">' : "";
-      })
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, function (_m, txt, href) {
-        return /^https?:/i.test(href) ? '<a href="' + href + '" target="_blank" rel="noreferrer">' + txt + "</a>" : txt;
-      });
-  }
-
-  function renderMd(src) {
-    var lines = String(src || "").split(/\r?\n/);
-    var out = [];
-    var i = 0;
-    while (i < lines.length) {
-      var L = lines[i];
-
-      // 코드 블록
-      if (/^```/.test(L)) {
-        var buf = [];
-        i++;
-        while (i < lines.length && !/^```/.test(lines[i])) { buf.push(lines[i]); i++; }
-        i++;
-        out.push("<pre><code>" + esc(buf.join("\n")) + "</code></pre>");
-        continue;
-      }
-      // 표 — 다음 줄이 구분선이면 표로 본다
-      if (/\|/.test(L) && i + 1 < lines.length && /^\s*\|?[\s:|-]+\|[\s:|-]*$/.test(lines[i + 1])) {
-        var cells = function (row) {
-          return row.replace(/^\s*\|/, "").replace(/\|\s*$/, "").split("|").map(function (c) { return c.trim(); });
-        };
-        var head = cells(L);
-        i += 2;
-        var rows = [];
-        while (i < lines.length && /\|/.test(lines[i]) && lines[i].trim()) { rows.push(cells(lines[i])); i++; }
-        out.push(
-          "<table><thead><tr>" + head.map(function (h) { return "<th>" + inline(h) + "</th>"; }).join("") +
-          "</tr></thead><tbody>" +
-          rows.map(function (r) { return "<tr>" + r.map(function (c) { return "<td>" + inline(c) + "</td>"; }).join("") + "</tr>"; }).join("") +
-          "</tbody></table>"
-        );
-        continue;
-      }
-      // 제목
-      var h = L.match(/^(#{1,4})\s+(.*)$/);
-      if (h) { var lv = Math.min(h[1].length, 3); out.push("<h" + lv + ">" + inline(h[2]) + "</h" + lv + ">"); i++; continue; }
-      // 구분선
-      if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(L)) { out.push("<hr>"); i++; continue; }
-      // 인용
-      if (/^\s*>/.test(L)) {
-        var q = [];
-        while (i < lines.length && /^\s*>/.test(lines[i])) { q.push(lines[i].replace(/^\s*>\s?/, "")); i++; }
-        out.push("<blockquote>" + q.map(inline).join("<br>") + "</blockquote>");
-        continue;
-      }
-      // 목록
-      if (/^\s*([-*·]|\d+\.)\s+/.test(L)) {
-        var ordered = /^\s*\d+\./.test(L);
-        var items = [];
-        while (i < lines.length && /^\s*([-*·]|\d+\.)\s+/.test(lines[i])) {
-          items.push(lines[i].replace(/^\s*([-*·]|\d+\.)\s+/, ""));
-          i++;
-        }
-        var tag = ordered ? "ol" : "ul";
-        out.push("<" + tag + ">" + items.map(function (t) { return "<li>" + inline(t) + "</li>"; }).join("") + "</" + tag + ">");
-        continue;
-      }
-      // 빈 줄
-      if (!L.trim()) { i++; continue; }
-      // 문단 — 이어지는 줄을 묶는다
-      var para = [L];
-      i++;
-      while (i < lines.length && lines[i].trim() && !/^(#{1,4}\s|```|\s*>|\s*([-*·]|\d+\.)\s|\s*(-{3,}|\*{3,}))/.test(lines[i]) && !/\|/.test(lines[i])) {
-        para.push(lines[i]); i++;
-      }
-      out.push("<p>" + para.map(inline).join(" ") + "</p>");
-    }
-    return out.join("\n");
-  }
+  // 마크다운 렌더는 **공용**(gijomd.js) — 문서함과 대화창이 같은 것을 쓴다.
+  var renderMd = function (s) { return window.gijoMd.render(s); };
+  var inline = function (s) { return window.gijoMd.inline(s); };
 
   // 검색어를 본문에서 눈에 띄게 — 렌더된 HTML의 **텍스트 노드만** 건드린다(태그가 깨지지 않게).
   function highlight(container, term) {
@@ -242,16 +159,21 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   }
 
   // ── 목차 ────────────────────────────────────────────────────────────────
-  var GROUP = { guide: { icon: "📚", label: "사용 안내" }, policy: { icon: "📐", label: "업무 지침" } };
+  var GROUP = {
+    mine: { icon: "📝", label: "내 문서" },        // 담당자가 만든 것 — 자기만 본다
+    guide: { icon: "📚", label: "사용 안내" },
+    policy: { icon: "📐", label: "업무 지침" },
+  };
+  var GROUP_ORDER = ["mine", "guide", "policy"];   // 내 것이 먼저 — 매일 여는 것이 위에 있어야 한다
 
   function renderToc(hits) {
     if (hits !== undefined) searchHits = hits;   // 인자를 안 주면 지금 것을 유지한다
     var el = document.getElementById("toc");
-    var byGroup = { guide: [], policy: [] };
+    var byGroup = { mine: [], guide: [], policy: [] };
     docs.forEach(function (d) { (byGroup[d.group] || byGroup.policy).push(d); });
 
     var html = "";
-    ["guide", "policy"].forEach(function (g) {
+    GROUP_ORDER.forEach(function (g) {
       var list = byGroup[g];
       var hitsNow = searchHits;
       if (!list.length) return;
@@ -290,6 +212,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     var view = document.getElementById("view");
     view.innerHTML = '<div class="empty">여는 중…</div>';
     try {
+      // 개인 문서(mine:…)는 다른 곳에서 온다 — 제품 문서 읽기 경로를 타면 404가 난다.
+      if (id.indexOf("mine:") === 0) { await openMine(id.slice(5)); return; }
       var doc = await api.docboxRead(id);
       view.innerHTML = '<div class="md">' + renderMd(doc.markdown) + "</div>";
       view.scrollTop = 0;
@@ -302,8 +226,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
   async function load() {
     try {
+      // 제품 문서와 개인 문서를 **함께** 부른다. 개인 것이 없어도 제품 문서는 보여야 하므로
+      // 개인 쪽 실패는 삼킨다(둘을 한 덩어리로 묶으면 하나가 죽을 때 화면이 통째로 빈다).
       var r = await api.docboxList();
-      docs = r.documents || [];
+      var mine = { documents: [] };
+      try { mine = await window.gijo.personalDocsList(); } catch (e) {}
+      docs = (mine.documents || []).map(function (d) {
+        return { id: "mine:" + d.id, title: d.title, group: "mine", mine: true,
+                 ragOptIn: d.ragOptIn, updatedAt: d.updatedAt };
+      }).concat(r.documents || []);
       renderToc(null);
       document.getElementById("status").textContent = "문서 " + docs.length + "건";
       if (docs.length) open(docs[0].id);
@@ -363,6 +294,122 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     if (t) t.value = compose.title || "";
     if (a) a.value = compose.tried || "";
     if (b) b.value = compose.happened || "";
+  }
+
+
+  // ── 개인 문서 ─────────────────────────────────────────────────────────
+  // 담당자가 만든 것. **자기만 본다**(서버가 userId로 거른다 — 화면은 거르지 않는다).
+  var mineEditing = null; // 지금 고치는 중인 개인 문서 id(새 문서면 "")
+
+  async function openMine(id) {
+    var view = document.getElementById("view");
+    try {
+      var d = await window.gijo.personalDocsRead(id);
+      mineEditing = null;
+      view.innerHTML =
+        '<div class="mine-head"><h2>' + esc(d.title) + '</h2><span class="mine-tag">내 것</span>' +
+        '<span class="mine-acts">' +
+        '<button class="n" id="mEdit">✏ 고치기</button>' +
+        '<button class="n" id="mRag">' + (d.ragOptIn ? "AI 참고 끄기" : "AI도 참고하게") + "</button>" +
+        '<button class="n mdel" id="mDel">지우기</button></span></div>' +
+        '<div class="mine-meta">' + new Date(d.updatedAt).toLocaleString("ko-KR") + " 고침 · 나만 볼 수 있습니다" +
+        (d.ragOptIn ? ' · <b style="color:var(--amber)">AI가 이 문서를 답변 근거로 씁니다</b>' : "") + "</div>" +
+        '<div class="md">' + renderMd(d.body) + "</div>";
+      view.scrollTop = 0;
+      document.getElementById("mEdit").addEventListener("click", function () { editMine(d); });
+      document.getElementById("mDel").addEventListener("click", function () { askDeleteMine(d); });
+      document.getElementById("mRag").addEventListener("click", function () { toggleRag(d); });
+    } catch (e) {
+      view.innerHTML = '<div class="empty">문서를 열지 못했습니다. ' + esc((e && e.message) || "") + "</div>";
+    }
+  }
+
+  // AI 연결 — **켜면 개인용이 아니게 된다.** 그 사실을 켜기 전에 분명히 말한다.
+  function toggleRag(d) {
+    if (d.ragOptIn) { doRag(d, false); return; }
+    var view = document.getElementById("view");
+    var box = document.createElement("div");
+    box.className = "warn";
+    box.innerHTML =
+      "<b>이 문서를 AI가 참고하게 할까요?</b><br>" +
+      "내가 적은 절차로 답하게 되어 편해집니다. 다만 <b>더 이상 개인용이 아닙니다</b> — " +
+      "다른 담당자가 물어도 이 내용이 근거로 나올 수 있습니다.<br>" +
+      '<div class="acts" style="margin-top:9px"><button class="n" id="ragYes">그래도 켜기</button>' +
+      '<button class="n" id="ragNo">취소</button></div>';
+    view.insertBefore(box, view.firstChild);
+    document.getElementById("ragYes").addEventListener("click", function () { doRag(d, true); });
+    document.getElementById("ragNo").addEventListener("click", function () { box.remove(); });
+  }
+  async function doRag(d, on) {
+    try { await window.gijo.personalDocsRag(d.id, on); } catch (e) {}
+    await load();
+    open("mine:" + d.id);
+  }
+
+  function askDeleteMine(d) {
+    // 확인은 화면 안에서 묻는다 — Electron에서 window.confirm은 앱을 통째로 멈춘다.
+    var view = document.getElementById("view");
+    var box = document.createElement("div");
+    box.className = "warn";
+    box.innerHTML = "<b>이 문서를 지울까요?</b> 되돌릴 수 없습니다." +
+      (d.ragOptIn ? "<br>AI 지식에서도 함께 지웁니다." : "") +
+      '<div class="acts" style="margin-top:9px"><button class="n mdel" id="delYes">지우기</button>' +
+      '<button class="n" id="delNo">취소</button></div>';
+    view.insertBefore(box, view.firstChild);
+    document.getElementById("delYes").addEventListener("click", async function () {
+      try { await window.gijo.personalDocsDelete(d.id); } catch (e) {}
+      await load();
+    });
+    document.getElementById("delNo").addEventListener("click", function () { box.remove(); });
+  }
+
+  function editMine(d) {
+    mineEditing = d ? d.id : "";
+    var view = document.getElementById("view");
+    view.innerHTML =
+      '<div class="mine-head"><h2>' + (d ? "문서 고치기" : "새 문서") + "</h2>" +
+      '<span class="mine-acts"><button class="n" id="mCancel">취소</button>' +
+      '<button class="n pri" id="mSave">저장</button></span></div>' +
+      '<div class="warn"><b>⚠ 비밀번호·계정 정보는 넣지 마세요.</b><br>' +
+      "저장할 때 자동으로 살펴보고 그런 것이 보이면 알려 드립니다. 장비 접속 정보가 필요하면 " +
+      "<b>보안제품 등록부</b>에 두세요 — 거기는 암호화되어 보관됩니다.</div>" +
+      '<div class="fld"><label>제목</label><input id="mTitle" maxlength="120" value="' + esc(d ? d.title : "") + '"></div>' +
+      '<div class="fld"><label>내용</label><textarea id="mBody">' + esc(d ? d.body : "") + "</textarea>" +
+      '<div class="tips">제목에 <code>###</code>, 목록에 <code>-</code> 를 쓰면 보기 좋게 정리됩니다.</div></div>';
+    view.scrollTop = 0;
+    document.getElementById("mCancel").addEventListener("click", function () {
+      if (d) open("mine:" + d.id); else load();
+    });
+    document.getElementById("mSave").addEventListener("click", saveMine);
+  }
+
+  async function saveMine() {
+    var title = document.getElementById("mTitle").value.trim();
+    var body = document.getElementById("mBody").value;
+    if (!title) { document.getElementById("mTitle").focus(); return; }
+    var btn = document.getElementById("mSave");
+    btn.disabled = true; btn.textContent = "저장 중…";
+    try {
+      var saved = mineEditing
+        ? await window.gijo.personalDocsUpdate(mineEditing, { title: title, body: body })
+        : await window.gijo.personalDocsCreate({ title: title, body: body });
+      await load();
+      await open("mine:" + saved.id);
+      // 비밀번호로 보이는 것이 있으면 저장 뒤에 알린다(막지는 않는다 — 오탐도 있고,
+      // 막으면 담당자는 포스트잇에 적는다).
+      if (saved.warnings && saved.warnings.length) {
+        var view = document.getElementById("view");
+        var box = document.createElement("div");
+        box.className = "warn";
+        box.innerHTML = "<b>⚠ 비밀번호로 보이는 것이 " + saved.warnings.length + "곳 있습니다</b><br>" +
+          saved.warnings.map(function (w) { return esc(w.kind) + " — " + esc(w.masked); }).join("<br>") +
+          "<br>장비 접속 정보는 <b>보안제품 등록부</b>에 두세요.";
+        view.insertBefore(box, view.firstChild);
+      }
+    } catch (e) {
+      btn.disabled = false; btn.textContent = "저장";
+      alert("저장하지 못했습니다: " + ((e && e.message) || e));
+    }
   }
 
   function openCompose() {

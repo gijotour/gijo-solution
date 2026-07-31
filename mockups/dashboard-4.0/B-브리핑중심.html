@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>시안 B — 브리핑 중심 (AI가 먼저 말한다)</title>
+<style>
+  :root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.08);
+    --blue:#3b82f6;--blue-l:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--teal:#1eb980;--red:#e2483d;--amber:#f0a020;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;}
+  .note{background:#111a2e;border-bottom:1px solid var(--border);padding:10px 18px;font-size:12px;color:var(--muted);}
+  .note b{color:var(--blue-l);}
+  .wrap{padding:20px 22px;max-width:1180px;}
+
+  /* 브리핑 — 사람이 읽는 문장이 주인공 */
+  .brief{background:linear-gradient(180deg,rgba(59,130,246,.10),transparent);border:1px solid rgba(59,130,246,.30);
+    border-radius:14px;padding:18px 20px;margin-bottom:16px;}
+  .brief .who{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--blue-l);font-weight:800;margin-bottom:9px;}
+  .brief .who .dot{width:6px;height:6px;border-radius:50%;background:var(--teal);}
+  .brief p{font-size:14.5px;line-height:1.85;color:#dfe6f7;}
+  .brief b{color:#fff;}
+  .brief .k{color:#f5928a;font-weight:800;}
+  .acts{display:flex;gap:8px;margin-top:14px;flex-wrap:wrap;}
+  .act{background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.42);color:#cfe0ff;border-radius:9px;
+    padding:8px 13px;font-size:12px;font-weight:700;cursor:pointer;}
+  .act:hover{background:var(--blue);color:#fff;}
+  .act.ghost{background:transparent;border-color:rgba(255,255,255,.14);color:var(--muted);}
+  .act.ghost:hover{color:#fff;border-color:var(--blue);background:rgba(59,130,246,.1);}
+
+  .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:13px 15px;}
+  .card h3{font-size:12px;font-weight:800;margin-bottom:9px;color:var(--muted);display:flex;align-items:center;gap:6px;}
+  .card h3 .cnt{margin-left:auto;color:var(--muted-2);font-weight:700;}
+  .li{display:flex;align-items:center;gap:8px;padding:7px 0;border-top:1px solid rgba(255,255,255,.05);cursor:pointer;font-size:12.5px;}
+  .li:hover{color:#fff;}
+  .li .b{flex:0 0 auto;width:5px;height:5px;border-radius:50%;}
+  .b.red{background:#f5928a} .b.amber{background:var(--amber)} .b.blue{background:var(--blue-l)} .b.gray{background:var(--muted-2)}
+  .li .tx{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .li .m{font-size:10.5px;color:var(--muted-2);white-space:nowrap;}
+  .big{font-size:21px;font-weight:800;}
+  .kv{display:flex;justify-content:space-between;align-items:baseline;padding:6px 0;border-top:1px solid rgba(255,255,255,.05);}
+  .kv span:first-child{font-size:11.5px;color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="note">
+  <b>시안 B — 브리핑 중심.</b> 숫자판보다 <b>AI가 먼저 말을 거는</b> 형태입니다. "무엇이 급한지"를 문장으로 읽고,
+  버튼으로 바로 그 화면·조치로 갑니다. 목록은 아래에 작게 둡니다.
+</div>
+<div class="wrap">
+  <div class="brief">
+    <div class="who"><span class="dot"></span>AI 팀 브리핑 · 오늘 07:00 기준</div>
+    <p>
+      정요한님, 오늘 급한 건 <span class="k">1건</span>입니다 — 모두 <b>실제 악용이 확인된 취약점(KEV)</b>입니다.<br>
+      먼저 <b>샘플-웹서버(10.0.0.100)</b>의 OpenSSH 취약점부터 처리하시길 권합니다. 악용예측이 <b>94%</b>로 가장 높고,
+      이 자산은 인터넷에 노출돼 있습니다.<br>
+      그 밖에 <b>점검 기한이 지난 항목 1건</b>(방화벽 월간)과 <b>승인 대기 3건</b>이 있습니다.
+      미배정 취약점이 <b>42건</b>이라 담당자를 정해야 검증이 시작됩니다.
+    </p>
+    <div class="acts">
+      <button class="act">🔧 이것부터 조치하기 — OpenSSH</button>
+      <button class="act ghost">42건 담당자 한번에 배정</button>
+      <button class="act ghost">승인 3건 검토</button>
+      <button class="act ghost">브리핑 다시 만들기</button>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card">
+      <h3>🔥 급한 것 <span class="cnt">4</span></h3>
+      <div class="li"><span class="b red"></span><span class="tx">Oracle DB 다중 취약점 (KEV)</span><span class="m">미배정</span></div>
+      <div class="li"><span class="b red"></span><span class="tx">OpenSSH regreSSHion (KEV)</span><span class="m">미배정</span></div>
+      <div class="li"><span class="b amber"></span><span class="tx">방화벽 월간 점검 미제출</span><span class="m">7.26</span></div>
+      <div class="li"><span class="b blue"></span><span class="tx">조치 검증 승인 대기</span><span class="m">3건</span></div>
+    </div>
+    <div class="card">
+      <h3>☑ 오늘 할 일 <span class="cnt">2/6</span></h3>
+      <div class="li"><span class="b gray"></span><span class="tx">OpenSSH 업데이트 — 샘플-웹서버</span><span class="m">P1</span></div>
+      <div class="li"><span class="b gray"></span><span class="tx">Apache Log4j RCE</span><span class="m">P0</span></div>
+      <div class="li"><span class="b gray"></span><span class="tx">Oracle CPU 적용</span><span class="m">P2</span></div>
+      <div class="li"><span class="b gray"></span><span class="tx" style="color:var(--muted-2);text-decoration:line-through">주간 리포트 발송</span><span class="m">완료</span></div>
+    </div>
+    <div class="card">
+      <h3>📊 한눈에</h3>
+      <div style="padding:4px 0 8px"><span class="big" style="color:var(--teal)">50</span> <span style="font-size:11px;color:var(--muted)">/100 보안 태세 · 보통</span></div>
+      <div class="kv"><span>미조치 취약점</span><b style="color:#f5928a">4,811</b></div>
+      <div class="kv"><span>미배정</span><b style="color:var(--amber)">42</b></div>
+      <div class="kv"><span>자산</span><b>49</b></div>
+      <div class="kv"><span>컴플라이언스</span><b>68%</b></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

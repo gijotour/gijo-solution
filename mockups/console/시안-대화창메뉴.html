@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8"><title>시안 — 대화창이 전체 메뉴를 들고 있기</title>
+<style>
+:root{
+  --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-l:#5fa1ff;
+  --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:#05070d;color:var(--text);line-height:1.6;font-size:13px}
+.note{background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.3);border-radius:10px;padding:12px 15px;font-size:12.5px;color:var(--blue-l);margin:18px 20px}
+.note b{color:#fff}
+.row{display:flex;gap:18px;margin:0 20px 24px;align-items:flex-start;flex-wrap:wrap}
+.cap{font-size:11px;color:var(--muted-2);margin:0 0 7px 2px}
+
+/* 대화 창 — 세로로 길쭉한 별도 창 */
+.win{width:390px;flex:0 0 390px;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--bg);display:flex;flex-direction:column;height:640px}
+.wh{background:var(--panel);padding:9px 13px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;font-size:12px}
+.wh b{color:#fff;font-weight:800}
+.wh .ctx{background:rgba(59,130,246,.16);color:var(--blue-l);border-radius:6px;padding:2px 8px;font-size:10.5px;font-weight:700}
+.wh .dock{margin-left:auto;font-size:10.5px;color:var(--muted-2);cursor:pointer}
+
+/* ★ 메뉴 서랍 — 접혀 있다가 펼쳐진다 */
+.drawer{border-bottom:1px solid var(--border);background:var(--panel-2)}
+.dh{padding:9px 13px;display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px}
+.dh .car{color:var(--muted-2);font-size:10px;transition:transform .15s}
+.drawer.open .dh .car{transform:rotate(90deg)}
+.dh b{color:#fff;font-weight:800}
+.dh .n{margin-left:auto;color:var(--muted-2);font-size:10.5px}
+.db{display:none;max-height:270px;overflow:auto;padding:4px 0 8px}
+.drawer.open .db{display:block}
+.mfind{margin:2px 11px 8px;width:calc(100% - 22px);background:var(--bg);border:1px solid var(--border-strong);
+  border-radius:7px;padding:6px 9px;color:var(--text);font-size:11.5px;outline:none;font-family:inherit}
+.mg{font-size:10px;font-weight:800;color:var(--muted-2);padding:7px 13px 3px;letter-spacing:.3px}
+.mi{padding:6px 13px 6px 22px;font-size:12px;color:var(--muted);cursor:pointer;display:flex;align-items:center;gap:7px}
+.mi:hover{background:rgba(59,130,246,.1);color:#fff}
+.mi .b{margin-left:auto;font-size:9px;font-weight:800;background:var(--red);color:#fff;border-radius:9px;padding:0 5px}
+.mi.fix{padding-left:13px;color:var(--text);font-weight:600}
+
+.feed{flex:1;overflow:auto;padding:12px 13px}
+.msg{margin-bottom:13px}
+.who{font-size:10.5px;font-weight:800;color:var(--muted-2);margin-bottom:3px}
+.msg.me .who{color:var(--blue-l)}
+.tx{font-size:12.5px;line-height:1.8;color:var(--text)}
+.tx.ai{color:#dfe6f7}
+.opened{background:rgba(30,185,128,.1);border:1px solid rgba(30,185,128,.3);border-radius:8px;
+  padding:8px 11px;font-size:11.5px;color:var(--teal);margin-top:6px;display:flex;align-items:center;gap:7px}
+.compose{border-top:1px solid var(--border);padding:10px 12px;display:flex;gap:8px;align-items:center;background:var(--panel-2)}
+.compose .plus{width:30px;height:30px;flex:0 0 auto;border:1px solid var(--border-strong);border-radius:8px;
+  color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:16px}
+.compose input{flex:1;background:var(--bg);border:1px solid var(--border-strong);border-radius:9px;
+  padding:9px 11px;color:var(--text);font-size:12.5px;outline:none;font-family:inherit}
+.compose .send{background:var(--blue);border:none;border-radius:9px;color:#fff;font-size:12.5px;font-weight:800;padding:9px 16px;cursor:pointer;font-family:inherit}
+
+.expl{flex:1;min-width:280px;font-size:12.5px;color:var(--muted);line-height:1.9}
+.expl h3{font-size:13.5px;color:#fff;margin:0 0 8px}
+.expl ul{margin:6px 0 12px 18px}
+.expl b{color:var(--text)}
+.expl .k{color:var(--teal);font-weight:700}
+</style></head><body>
+
+<div class="note"><b>시안 — 대화창이 전체 메뉴를 들고 있기</b> (2단계) · 별도 대화 창 위에 <b>메뉴 서랍</b>을 답니다. 접혀 있다가 누르면 30개 화면이 다 나오고, 고르면 <b>본창에 탭으로 열립니다</b>. AI 판단이 아니라 <b>목록에서 직접 고르는 것</b>이라 틀릴 일이 없습니다.</div>
+
+<div class="row">
+  <div>
+    <div class="cap">닫혀 있을 때 — 대화가 주인공</div>
+    <div class="win">
+      <div class="wh">💬 <b>GIJO AS — 대화</b><span class="ctx">보안제품 등록부</span><span class="dock">⇤ 앱에 붙이기</span></div>
+      <div class="drawer">
+        <div class="dh"><span class="car">▶</span><b>화면 열기</b><span class="n">30곳 · Ctrl+K</span></div>
+      </div>
+      <div class="feed">
+        <div class="msg me"><div class="who">나</div><div class="tx">방화벽 월간 정기점검 절차를 알려줘</div></div>
+        <div class="msg"><div class="who">AI 팀</div><div class="tx ai">방화벽 월간 정기점검 절차는 다음과 같습니다:<br>1. <b>자원 상태</b> — CPU·메모리, 동시 세션 수…<br>2. <b>이중화 상태</b> — Active/Standby 확인…</div></div>
+      </div>
+      <div class="compose"><span class="plus">＋</span><input placeholder="「보안제품 등록부」 화면에 대해 지시…"><button class="send">전송</button></div>
+    </div>
+  </div>
+
+  <div>
+    <div class="cap">펼쳤을 때 — 30개 화면을 여기서 고른다</div>
+    <div class="win">
+      <div class="wh">💬 <b>GIJO AS — 대화</b><span class="ctx">보안제품 등록부</span><span class="dock">⇤ 앱에 붙이기</span></div>
+      <div class="drawer open">
+        <div class="dh"><span class="car">▶</span><b>화면 열기</b><span class="n">30곳 · Ctrl+K</span></div>
+        <div class="db">
+          <input class="mfind" placeholder="이름으로 찾기… (취약점, 리포트)">
+          <div class="mi fix">🏠 대시보드</div>
+          <div class="mi fix">🏢 팀 사무실 (창)</div>
+          <div class="mi fix">☑ 내 업무 <span class="b">3</span></div>
+          <div class="mi fix">📚 문서함 (창)</div>
+          <div class="mi fix">💬 작업 내역</div>
+          <div class="mg">관제</div>
+          <div class="mi">통합 관제</div><div class="mi">위협 인텔</div><div class="mi">리포트</div>
+          <div class="mi">보안 KPI</div><div class="mi">컴플라이언스</div>
+          <div class="mg">자산·조치</div>
+          <div class="mi">자산 통합 뷰</div><div class="mi">자산 목록</div><div class="mi">AI-BOM</div>
+          <div class="mi">취약점</div><div class="mi">조치·승인</div><div class="mi">보안제품 등록부</div>
+          <div class="mi">제품 유지보수</div><div class="mi">원격 정기점검</div><div class="mi">터미널 (CLI)</div>
+          <div class="mg">AI</div>
+          <div class="mi">에이전트 AI</div><div class="mi">기억·학습 (RAG)</div><div class="mi">인수인계</div>
+        </div>
+      </div>
+      <div class="feed">
+        <div class="msg me"><div class="who">나</div><div class="tx">취약점 화면 열어줘</div></div>
+        <div class="msg"><div class="who">AI 팀</div><div class="tx ai">취약점 화면을 열었습니다. 지금 미조치 46건이 있습니다.
+          <div class="opened">🗔 본창에 <b>취약점</b> 탭을 열었습니다</div></div></div>
+      </div>
+      <div class="compose"><span class="plus">＋</span><input placeholder="「취약점」 화면에 대해 지시…"><button class="send">전송</button></div>
+    </div>
+  </div>
+
+  <div class="expl">
+    <h3>이렇게 만듭니다</h3>
+    <ul>
+      <li><b>메뉴 서랍</b> — 대화 위에 접힌 한 줄. 누르면 30개가 나오고, 이름으로 찾을 수 있습니다(<span class="k">Ctrl+K</span>).</li>
+      <li><b>고르면 본창에 탭으로</b> 열립니다. 대화 창은 그대로 있어 흐름이 안 끊깁니다.</li>
+      <li><b>메뉴 목록은 nav.js 하나에서</b> 가져옵니다 — 사이드바와 대화창이 어긋날 수 없습니다.</li>
+      <li><b>도킹 상태에서도 같은 서랍</b>이 붙습니다(모니터 하나인 분도 동일).</li>
+    </ul>
+
+    <h3>왜 이게 안전한가</h3>
+    <ul>
+      <li><b>AI가 화면을 고르지 않습니다.</b> 담당자가 목록에서 직접 누릅니다 — 7B 라우팅이 흔들릴 여지가 없습니다.</li>
+      <li>말로 여는 것(1단계)은 이 위에 얹으면 됩니다. 서랍이 <b>안전망</b>이 되어, AI가 틀려도 담당자가 바로 고를 수 있습니다.</li>
+    </ul>
+
+    <h3>새로 만들어야 하는 것</h3>
+    <ul>
+      <li><b>별도 창 → 본창 탭 열기 통로</b>가 지금 없습니다. <code>navigate:to</code>는 셸을 통째로 갈아치워 탭이 다 사라집니다 — 새 통로를 만듭니다.</li>
+      <li>nav.js가 메뉴를 <b>밖으로 내주는</b> 창구(지금은 파일 안에만 있습니다).</li>
+    </ul>
+
+    <h3>같이 없애는 것</h3>
+    <ul>
+      <li><b>「내 업무로 돌아가기」 띠를 지웁니다.</b> 서랍에서 언제든 내 업무를 열 수 있으니 띠가 할 일이 없습니다 — 조작 개념이 하나 줄어듭니다.</li>
+    </ul>
+  </div>
+</div>
+
+</body></html>

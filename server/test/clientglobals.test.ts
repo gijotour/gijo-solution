@@ -80,37 +80,7 @@ describe("Electron에서 네이티브 모달을 쓰지 않는다", () => {
   });
 });
 
-describe("진행 중 띠(worknow.js) — 보고 있는 화면에만 뜬다", () => {
-  // ⚠ 실사고(2026-07-31): 자기 주소(location)만 보고 판단했더니
-  //   ① 탭 셸(app.html)은 자기 주소가 app.html이라 **내 업무 탭을 보고 있어도 띠를 띄웠다**
-  //      — "내 업무로 돌아가기"가 내 업무 화면 위에 떠서 대화창을 가렸다.
-  //   ② 숨은 탭(display:none)도 자기 주소만 보고 그렸다 — 안 보이는 곳에 DOM만 쌓인다.
-  //   보고 있는 화면은 **활성 탭(.on)**으로 판단해야 한다.
-  const src = fs.readFileSync(new URL("../../client/src/renderer/pages/worknow.js", import.meta.url), "utf8");
-
-  it("셸에서는 활성 탭을 보고 판단한다", () => {
-    expect(src, "location만 보면 셸에서 항상 뜬다").toContain("#screens iframe.on");
-  });
-
-  it("숨은 탭에서는 그리지 않는다", () => {
-    expect(src).toMatch(/frameElement[\s\S]{0,80}classList\.contains\("on"\)/);
-  });
-
-  it("탭이 바뀌면 다시 판단한다", () => {
-    // 한 번만 판단하면 탭을 바꿔도 띠가 그대로 남는다.
-    expect(src).toContain("MutationObserver");
-    expect(src).toContain('attributeFilter: ["class"]');
-  });
-
-  it("오래된 기록은 스스로 지운다 — 강제 종료로 남을 수 있다", () => {
-    expect(src).toContain("STALE_MS");
-  });
-
-  it("모든 화면에 실려 있다", () => {
-    // ⚠ .html만 센다. 스크립트 파일(progresscard.js 자신·chatwidget.js 등)도 그 이름을
-    //   본문에 갖고 있어 함께 세면 헛되이 실패한다.
-    const pagesWithCard = [...pageSrc].filter(([f, s]) => f.endsWith(".html") && s.includes("progresscard.js"));
-    const 빠진것 = pagesWithCard.filter(([, s]) => !s.includes("worknow.js")).map(([f]) => f);
-    expect(빠진것, "이 화면들에서는 돌아갈 길이 없다").toEqual([]);
-  });
-});
+// 「내 업무로 돌아가기」 띠(worknow.js)는 **삭제됐다**(2026-07-31).
+// 사용자 신고로 세 개가 겹쳐 뜨는 것을 고쳤지만, 근본은 "화면을 떠나면 길을 잃는다"에
+// 버튼을 붙인 증상 치료였다. 대화창(지휘소)이 늘 옆에 있으면 돌아갈 일 자체가 없어
+// 개념을 하나 없앴다 — 고치는 것보다 없애는 편이 나은 자리였다.

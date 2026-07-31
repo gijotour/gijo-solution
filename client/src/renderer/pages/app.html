@@ -279,6 +279,12 @@
   // 콘솔이 도킹이면 그 자리에서 바로 읽고, 창으로 빠져 있으면 메인 프로세스를 거쳐 알린다.
   function setCtx(label) {
     if (window.gijoConsoleSyncCtx) window.gijoConsoleSyncCtx();
+    if (window.gijo && window.gijo.onShellOpenTab) {
+      // 지휘소가 "이 화면 열어 주세요" 하면 탭으로 연다(셸을 갈아치우지 않는다).
+      window.gijo.onShellOpenTab(function (i) {
+        if (i && i.page && window.gijoTabs) window.gijoTabs.open(i.page, i.label || undefined);
+      });
+    }
     if (popped && window.gijo && window.gijo.sendConsoleContext) {
       window.gijo.sendConsoleContext(active ? active.page : null, label || null);
     }
@@ -445,7 +451,7 @@
 })();
 </script>
 <script src="progresscard.js"></script>
-<script src="worknow.js"></script>
+<script src="gijomd.js"></script>
 <script src="console.js"></script>
 <script src="nav.js"></script>
 <script src="titlebar.js"></script>

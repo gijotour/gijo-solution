@@ -33,6 +33,12 @@ const gijoApi = {
   docboxList: () => api.docboxApi.list(),
   docboxRead: (id: string) => api.docboxApi.read(id),
   docboxSearch: (q: string) => api.docboxApi.search(q),
+  personalDocsList: () => api.personalDocsApi.list(),
+  personalDocsRead: (id: string) => api.personalDocsApi.read(id),
+  personalDocsCreate: (b: { title: string; body: string }) => api.personalDocsApi.create(b),
+  personalDocsUpdate: (id: string, b: { title: string; body: string }) => api.personalDocsApi.update(id, b),
+  personalDocsRag: (id: string, on: boolean) => api.personalDocsApi.setRag(id, on),
+  personalDocsDelete: (id: string) => api.personalDocsApi.remove(id),
   docRequestBuild: (input: Parameters<typeof api.docRequestApi.build>[0]) => api.docRequestApi.build(input),
   docRequestList: () => api.docRequestApi.list(),
   openDocbox: () => ipcRenderer.invoke("docbox:open"),
@@ -81,6 +87,13 @@ const gijoApi = {
   reportPopoutTab: (page: string, label: string) => ipcRenderer.invoke("shell:popoutTab", page, label),
   // ── 대화 콘솔 창(4.0.0) — 기본은 셸 아래 도킹, 모니터가 여럿이면 창으로 빼낸다.
   openConsoleWindow: () => ipcRenderer.invoke("console:popout"),
+  // 지휘소(별도 대화 창)에서 본창에 탭을 연다. navigateTo와 다르다 — 그건 본창을 통째로
+  // 갈아치워 열려 있던 탭이 다 사라진다. 이건 **탭 하나 추가**다.
+  openTabInShell: (page: string, label?: string) => ipcRenderer.invoke("shell:openTab", page, label),
+  onShellOpenTab: (cb: (i: { page: string; label: string | null }) => void) => {
+    ipcRenderer.removeAllListeners("shell:openTab");
+    ipcRenderer.on("shell:openTab", (_e, i) => cb(i));
+  },
   dockConsoleWindow: () => ipcRenderer.invoke("console:dock"),
   // 셸이 "지금 보고 있는 탭"을 콘솔 창에 알린다(별도 창은 활성 탭을 직접 못 본다).
   sendConsoleContext: (screen: string | null, label: string | null) => ipcRenderer.invoke("console:context", screen, label),

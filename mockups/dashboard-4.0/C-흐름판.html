@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>시안 C — 흐름판 (막힌 곳이 보인다)</title>
+<style>
+  :root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.08);
+    --blue:#3b82f6;--blue-l:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--teal:#1eb980;--red:#e2483d;--amber:#f0a020;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;}
+  .note{background:#111a2e;border-bottom:1px solid var(--border);padding:10px 18px;font-size:12px;color:var(--muted);}
+  .note b{color:var(--blue-l);}
+  .wrap{padding:20px 22px;max-width:1180px;}
+  h2{font-size:15px;font-weight:800;}
+  .sub{font-size:11.5px;color:var(--muted-2);margin:3px 0 16px;}
+
+  /* 파이프라인 — 발견에서 종결까지 어디에 얼마나 쌓여 있나 */
+  .flow{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-bottom:8px;}
+  .st{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:13px 12px;position:relative;cursor:pointer;}
+  .st:hover{border-color:var(--blue);}
+  .st.jam{border-color:rgba(240,160,32,.55);background:linear-gradient(180deg,rgba(240,160,32,.10),var(--panel));}
+  .st .k{font-size:11px;color:var(--muted);margin-bottom:6px;display:flex;align-items:center;gap:5px;}
+  .st .v{font-size:26px;font-weight:800;line-height:1;}
+  .st .d{font-size:10.5px;color:var(--muted-2);margin-top:6px;}
+  .st .jamtag{position:absolute;top:-9px;right:10px;background:var(--amber);color:#3a2a00;font-size:9.5px;font-weight:800;
+    border-radius:20px;padding:2px 8px;}
+  .arrow{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;margin-bottom:16px;}
+  .arrow div{text-align:center;color:var(--muted-2);font-size:11px;}
+
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;}
+  .card h3{font-size:12.5px;font-weight:800;margin-bottom:3px;display:flex;align-items:center;gap:7px;}
+  .card h3 .cnt{margin-left:auto;font-size:10.5px;color:var(--muted-2);font-weight:700;}
+  .card .hint{font-size:10.5px;color:var(--muted-2);margin-bottom:10px;}
+  .li{display:flex;align-items:center;gap:9px;padding:8px 0;border-top:1px solid rgba(255,255,255,.05);cursor:pointer;}
+  .li:hover .tx{color:#fff;}
+  .li .tag{flex:0 0 auto;font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:5px;}
+  .t-kev{background:rgba(226,72,61,.2);color:#f5928a;border:1px solid rgba(226,72,61,.45);}
+  .t-jam{background:rgba(240,160,32,.16);color:var(--amber);border:1px solid rgba(240,160,32,.4);}
+  .li .tx{flex:1;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .li .m{font-size:10.5px;color:var(--muted-2);white-space:nowrap;}
+  .fix{background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.42);color:#cfe0ff;border-radius:8px;
+    padding:6px 11px;font-size:11.5px;font-weight:700;cursor:pointer;margin-top:11px;}
+  .fix:hover{background:var(--blue);color:#fff;}
+</style>
+</head>
+<body>
+<div class="note">
+  <b>시안 C — 흐름판.</b> 취약점이 <b>발견 → 배정 → 조치 → 검증 → 완료</b>로 흐르는데, 어디에 얼마나 쌓여 있고
+  <b>어디가 막혔는지</b>를 먼저 보여줍니다. 숫자가 아니라 “병목”이 주인공입니다.
+</div>
+<div class="wrap">
+  <h2>조치 흐름</h2>
+  <div class="sub">발견된 것이 종결까지 가는 길 · 막힌 칸을 누르면 그 화면이 탭으로 열립니다</div>
+
+  <div class="flow">
+    <div class="st"><div class="k">발견</div><div class="v">4,811</div><div class="d">미조치 · KEV 12</div></div>
+    <div class="st jam"><span class="jamtag">여기서 막힘</span><div class="k">배정</div><div class="v" style="color:var(--amber)">42</div><div class="d">담당자 없음</div></div>
+    <div class="st"><div class="k">조치 중</div><div class="v">0</div><div class="d">진행 중 없음</div></div>
+    <div class="st"><div class="k">검증</div><div class="v">3</div><div class="d">승인 대기</div></div>
+    <div class="st"><div class="k">완료</div><div class="v" style="color:var(--teal)">3</div><div class="d">이번 주</div></div>
+  </div>
+  <div class="arrow"><div>↓</div><div>↓</div><div>↓</div><div>↓</div><div></div></div>
+
+  <div class="cols">
+    <div class="card">
+      <h3>⚠ 막힌 곳 <span class="cnt">가장 먼저 풀 것</span></h3>
+      <div class="hint">담당자가 없으면 조치 검증을 아예 시작할 수 없습니다.</div>
+      <div class="li"><span class="tag t-jam">미배정 42</span><span class="tx">배정만 하면 검증이 도는 건들</span><span class="m">최장 6일 정체</span></div>
+      <div class="li"><span class="tag t-jam">승인 3</span><span class="tx">검증 끝나고 최종 승인만 남음</span><span class="m">2일 대기</span></div>
+      <button class="fix">▶ 42건 담당자 한번에 배정하기</button>
+    </div>
+    <div class="card">
+      <h3>🔥 흐름과 별개로 급한 것 <span class="cnt">4</span></h3>
+      <div class="hint">실제 악용이 확인됐거나 기한이 지난 것.</div>
+      <div class="li"><span class="tag t-kev">KEV</span><span class="tx">Oracle DB 다중 취약점</span><span class="m">oracle.local</span></div>
+      <div class="li"><span class="tag t-kev">KEV</span><span class="tx">OpenSSH regreSSHion</span><span class="m">192.168.219.98</span></div>
+      <div class="li"><span class="tag t-jam">기한초과</span><span class="tx">방화벽 월간 점검 미제출</span><span class="m">7.26</span></div>
+      <div class="li"><span class="tag t-jam">지연</span><span class="tx">Oracle CPU 적용</span><span class="m">~7.30</span></div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

@@ -510,6 +510,18 @@
   }
   // 대시보드가 '전체메뉴' 모드에서 같은 메뉴를 렌더하도록 공개(단일 소스).
   window.gijoRenderMenu = buildMenu;
+  // 메뉴 **자료**를 그대로 내준다 — 지휘소(대화창)가 자기 방식으로 그릴 수 있게.
+  // ⚠ 목록을 저쪽에 베껴 적으면 반드시 어긋난다(오늘만 "같은 것이 여러 군데"를 세 번 겪었다).
+  //   그리는 방법은 각자 달라도 **자료는 여기 하나**다.
+  window.gijoMenuData = function () {
+    return {
+      top: TOP.map(function (t) { return { page: t.page, win: t.win, label: t.label, ic: t.ic }; }),
+      groups: GROUPS.map(function (g) {
+        return { id: g.id, ic: g.ic, label: g.label,
+                 items: g.items.map(function (i) { return { page: i.page, label: i.label }; }) };
+      }),
+    };
+  };
   // 화면 주소 → 메뉴에 적힌 이름. 셸이 탭 이름을 붙일 때 쓴다(이름을 두 곳에 적지 않으려고).
   window.gijoMenuLabel = function (page) {
     for (var k = 0; k < TOP.length; k++) if (TOP[k].page === page) return TOP[k].label;
