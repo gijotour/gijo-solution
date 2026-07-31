@@ -669,6 +669,11 @@
   // embed 모드 — 셸 탭(app.html)의 iframe으로 품길 때(?embed=1). 사이드바·헤더를 숨기고 본문만
   // 보인다(셸이 바깥에서 메뉴·탭줄·콘솔을 제공).
   var IS_EMBED = /(^|[?&])embed=1(&|$)/.test(location.search);
+
+  // ⚠ "탭 안에서의 navigateTo를 탭 열기로 바꾸는 일"을 여기서 하려다 실패했다(2026-07-31).
+  //   window.gijo는 contextBridge로 노출된 객체라 **렌더러에서 덮어쓸 수 없다** — 조용히
+  //   무시되어 아무 일도 안 일어났다. 그래서 그 판단은 다리인 preload.ts의 navigateTo가 한다.
+  //   여기 다시 만들지 말 것.
   // 탭 안 화면이 다른 화면을 열 때 쓰는 다리 — 자기 자리를 갈아치우지 않고 **셸에 새 탭을 부탁**한다.
   // (대시보드 바로가기 타일처럼 "여기서 저기로" 보내는 자리들이 이걸 쓴다.)
   window.gijoOpenScreen = function (page, label) {

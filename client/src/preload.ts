@@ -74,7 +74,26 @@ const gijoApi = {
   terminateUserSession: (id: string) => api.usersApi.terminateSession(id),
 
   // 네비게이션(렌더러 내 페이지 전환은 메인 프로세스에 위임)
-  navigateTo: (page: string) => ipcRenderer.invoke("navigate:to", page),
+  //
+  // ★ 탭 안(embed)에서 부르면 **탭 하나 더 열기**로 바꾼다(2026-07-31).
+  //   그전에는 앱을 통째로 갈아치워, 취약점 화면에서 한 건을 누르는 순간 옆 탭에 걸어 둔
+  //   조건과 스크롤이 전부 사라졌다(실측). 담당자는 "그냥 눌렀을 뿐"인데 작업이 날아간다.
+  //
+  //   호출부가 60곳이 넘어 하나씩 고치면 반드시 빠뜨린다. 그렇다고 nav.js에서 이 함수를
+  //   갈아끼울 수도 없다 — contextBridge로 노출한 객체는 **렌더러에서 못 고친다**(조용히 무시된다.
+  //   실제로 그렇게 시도했다가 아무 일도 안 일어났다). 그래서 다리인 여기서 판단한다.
+  //   ⚠ login.html은 예외 — 로그아웃·인증 만료는 앱을 통째로 되돌리는 게 맞다.
+  navigateTo: (page: string) => {
+    const p = String(page ?? "");
+    const 탭안 =
+      window.parent !== window &&
+      /(^|[?&])embed=1(&|$)/.test(window.location.search);
+    if (탭안 && p && !p.startsWith("login.html")) {
+      window.parent.postMessage({ type: "gijo:openTab", page: p, label: null }, "*");
+      return Promise.resolve();
+    }
+    return ipcRenderer.invoke("navigate:to", p);
+  },
   // "우리 AI 팀 사무실" 별도 창(시안 B) — 열기 + 항상 위 고정 토글
   openTeamOffice: () => ipcRenderer.invoke("office:open"),
   setOfficeAlwaysOnTop: (on: boolean) => ipcRenderer.invoke("office:setAlwaysOnTop", on),

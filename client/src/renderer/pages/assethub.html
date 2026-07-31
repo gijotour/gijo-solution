@@ -290,7 +290,9 @@
       // 5영역 상세는 AI-BOM 화면으로 일원화(2026-07-26) — 여기선 안내만.
       body=`<div class="block"><div class="bh">🧠 AI 구성(AI-BOM)</div><div class="note">파운데이션 모델·파인튜닝 이력·데이터 출처·벡터DB·가드레일 명세는 <span class="link" data-page="sbom.html" style="cursor:pointer;color:var(--blue-light)">AI-BOM 화면</span>에서 관리합니다.</div></div>`;
     } else if(curTab==="vuln"){
-      body=`<div class="block"><div class="bh">🩹 취약점 ${r.host?`<span style="font-size:10px;color:var(--muted-2);font-weight:600">(${esc(r.host)} 연결)</span>`:""}</div>${vulnTable(d.findings)}<div class="note">취약점 반입·재스캔은 <span class="link" data-page="vulnscan.html" style="cursor:pointer;color:var(--blue-light)">취약점 화면</span>에서.</div></div>`;
+      // 취약점 화면으로 갈 때 **이 자산을 지목해서** 보낸다 — 안 그러면 전체 호스트 목록이
+      // 열려 방금 보던 자산을 46개 중에서 다시 찾아야 한다(2026-07-31 사용자 지적).
+      body=`<div class="block"><div class="bh">🩹 취약점 ${r.host?`<span style="font-size:10px;color:var(--muted-2);font-weight:600">(${esc(r.host)} 연결)</span>`:""}</div>${vulnTable(d.findings)}<div class="note">취약점 반입·재스캔은 <span class="link" data-page="vulnscan.html?host=${encodeURIComponent(r.id)}" style="cursor:pointer;color:var(--blue-light)">취약점 화면</span>에서.</div></div>`;
     } else if(curTab==="ai"){
       body=`<div class="block"><div class="bh">⚠ AI 위험 — OWASP LLM Top 10 (2025)</div>${owaspRows(d.owasp,false)}<div class="note">${OW_MITI}</div></div>`;
     }

@@ -93,6 +93,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     <div class="rv-wrap">
       <div class="rv-list-pane">
+        <!-- 자산 좁히기 띠 — 다른 화면에서 "이 건" 을 눌러 들어왔을 때만 나타난다.
+             무엇으로 좁혀져 있는지 안 보이면 "왜 몇 건밖에 없지?"가 된다(2026-07-31). -->
+        <div class="rv-scope" id="rvScope" style="display:none">
+          <span id="rvScopeText"></span>
+          <span class="rv-scope-all" id="rvScopeAll">전체 보기 ✕</span>
+        </div>
         <div class="rv-filt" id="rvFilt">
           <span class="fchip on" data-f="active">조치대상 <b id="fcActive">0</b></span>
           <span class="fchip" data-f="in_progress">진행중 <b id="fcProg">0</b></span>
@@ -127,6 +133,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   .rv-wrap{display:grid;grid-template-columns:360px 1fr;gap:14px;}
   .rv-list-pane{background:var(--panel-2);border:1px solid var(--border);border-radius:12px;padding:10px;min-height:520px;}
   .rv-filt{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:9px;}
+  /* 자산 좁히기 띠 — 눈에 띄어야 한다. 좁혀진 줄 모르면 "왜 이것밖에 없지?"가 된다. */
+  .rv-scope{display:flex;align-items:center;gap:8px;background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.32);
+    border-radius:9px;padding:7px 11px;margin-bottom:9px;font-size:12px;color:var(--blue-light,#8fb8ff);}
+  .rv-scope-all{margin-left:auto;font-size:11px;font-weight:700;color:var(--muted);cursor:pointer;
+    border:1px solid rgba(255,255,255,.16);border-radius:7px;padding:3px 9px;}
+  .rv-scope-all:hover{color:var(--text);border-color:rgba(255,255,255,.3);}
   /* VEX 내보내기 줄 — 상태 미리보기 + 파일 받기. */
   .vex-bar{display:flex;align-items:center;gap:10px;background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:9px 13px;margin-bottom:14px;max-width:1100px;flex-wrap:wrap;}
   .vex-lb{font-size:12px;font-weight:800;color:var(--text);display:flex;align-items:center;gap:5px;}
@@ -260,7 +272,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   function isUnassigned(r) {
     return !r.assignee && ["pending", "in_progress", "verifying"].includes(r.status);
   }
+  // 다른 화면에서 "이 건"을 눌러 들어왔을 때 좁혀 보는 자산(2026-07-31 사용자 지적:
+  // "해당 IP나 호스트를 눌렀을 때 해당 취약점만 나와야 하는데 전체가 보인다").
+  // ⚠ 상태 필터(rvFilter)와 **곱해서** 건다 — 자산으로 좁힌 뒤 상태 칩도 그대로 쓸 수 있어야 한다.
+  let scopeAsset = null;
   function matchFilter(r) {
+    if (scopeAsset && r.assetId !== scopeAsset) return false;
     switch (rvFilter) {
       case "active": return r.status === "pending" || r.status === "in_progress" || r.status === "verifying";
       case "in_progress": return r.status === "in_progress";
@@ -278,21 +295,33 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     try {
       const { reviews, summary } = await window.gijo.listApprovals();
       allReviews = reviews;
+      // 자산으로 좁혀 보는 중이면 **위 요약 카드와 칩 숫자도 그 자산 것**이어야 한다.
+      // 목록은 3건인데 위에 46이라고 적혀 있으면 담당자는 무엇을 믿어야 할지 모른다.
+      const scoped = scopeAsset ? reviews.filter((r) => r.assetId === scopeAsset) : reviews;
+      const cnt = (fn) => scoped.filter(fn).length;
+      const 요약 = scopeAsset
+        ? {
+            pending: cnt((r) => r.status === "pending"),
+            in_progress: cnt((r) => r.status === "in_progress"),
+            verifying: cnt((r) => r.status === "verifying"),
+            approved: cnt((r) => r.status === "approved"),
+            rejected: cnt((r) => r.status === "rejected"),
+            overdue: cnt((r) => r.overdue),
+          }
+        : summary;
       // 요약 카드
-      document.getElementById("kPending").textContent = summary.pending;
-      document.getElementById("kProg").textContent = summary.in_progress ?? 0;
-      document.getElementById("kVerify").textContent = summary.verifying ?? 0;
-      document.getElementById("kApproved").textContent = summary.approved;
-      document.getElementById("kRejected").textContent = summary.rejected;
-      document.getElementById("kOverdue").textContent = summary.overdue ?? 0;
-      // 필터 칩 카운트
-      const cnt = (fn) => reviews.filter(fn).length;
+      document.getElementById("kPending").textContent = 요약.pending;
+      document.getElementById("kProg").textContent = 요약.in_progress ?? 0;
+      document.getElementById("kVerify").textContent = 요약.verifying ?? 0;
+      document.getElementById("kApproved").textContent = 요약.approved;
+      document.getElementById("kRejected").textContent = 요약.rejected;
+      document.getElementById("kOverdue").textContent = 요약.overdue ?? 0;
       document.getElementById("fcActive").textContent = cnt((r) => ["pending", "in_progress", "verifying"].includes(r.status));
-      document.getElementById("fcProg").textContent = summary.in_progress ?? 0;
-      document.getElementById("fcVerify").textContent = summary.verifying ?? 0;
-      document.getElementById("fcRejected").textContent = summary.rejected;
-      document.getElementById("fcApproved").textContent = summary.approved;
-      document.getElementById("fcPending").textContent = summary.pending;
+      document.getElementById("fcProg").textContent = 요약.in_progress ?? 0;
+      document.getElementById("fcVerify").textContent = 요약.verifying ?? 0;
+      document.getElementById("fcRejected").textContent = 요약.rejected;
+      document.getElementById("fcApproved").textContent = 요약.approved;
+      document.getElementById("fcPending").textContent = 요약.pending;
       const unassigned = cnt(isUnassigned);
       document.getElementById("kUnassigned").textContent = unassigned;
       document.getElementById("fcUnassigned").textContent = unassigned;
@@ -540,7 +569,33 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     } catch (e) {}
   }
 
+  // 좁히기 띠를 다시 그린다. 좁혀진 줄 모르면 "왜 몇 건밖에 없지?"가 된다.
+  function renderScope() {
+    const bar = document.getElementById("rvScope");
+    if (!bar) return;
+    if (!scopeAsset) { bar.style.display = "none"; return; }
+    const one = allReviews.find((r) => r.assetId === scopeAsset);
+    const 이름 = one ? one.assetName : scopeAsset;
+    const n = allReviews.filter((r) => r.assetId === scopeAsset).length;
+    document.getElementById("rvScopeText").innerHTML =
+      `🎯 <b>${esc(이름)}</b> 의 취약점만 보는 중 — ${n}건`;
+    bar.style.display = "flex";
+  }
+  function clearScope() {
+    scopeAsset = null;
+    renderScope();
+    loadReviews(false);
+  }
+
   async function init() {
+    // 다른 화면에서 "이 건"을 눌러 들어왔는가 — ?asset=<자산id>&finding=<키>
+    // (2026-07-31: 취약점 화면에서 한 건을 눌렀는데 전체 목록이 열리던 것을 고침)
+    try {
+      const q = new URLSearchParams(location.search);
+      scopeAsset = q.get("asset") || null;
+      const wantKey = q.get("finding");
+      if (wantKey && scopeAsset) currentKey = `${scopeAsset}\0${wantKey}`;
+    } catch (e) { /* 주소가 이상해도 화면은 떠야 한다 */ }
     tick();
     setInterval(tick, 30000);
     try {
@@ -553,7 +608,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       const user = await window.gijo.me();
       avatarBtn.textContent = (user.displayName || user.username || "-").charAt(0);
     } catch (e) {}
-    loadReviews();
+    // 자산으로 좁혀 들어왔으면 상태 칩은 '전체'로 둔다 — 그 자산의 조치완료·반려까지 다 보여야
+    // "이 호스트 상황"이 한눈에 들어온다(조치대상만 보이면 왜 몇 건뿐인지 또 헷갈린다).
+    if (scopeAsset) {
+      rvFilter = "all";
+      document.querySelectorAll("#rvFilt .fchip").forEach((c) => c.classList.remove("on"));
+    }
+    loadReviews().then(renderScope);
+    document.getElementById("rvScopeAll").addEventListener("click", clearScope);
     loadUserSuggestions();
     // 상태 필터 — 클릭하면 그 상태만 목록에 보여준다(선택된 상세는 유지).
     document.getElementById("rvFilt").addEventListener("click", (e) => {
