@@ -312,8 +312,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         task: "KEV 등재 취약점 " + v.kev + "건 우선 조치", p: "P0", page: "vulnscan.html" },
       { n: rem.overdue, t: "기한 지난 조치 <b>" + rem.overdue + "건</b>", sub: "약속한 날짜를 넘긴 일 — SLA 준수율을 깎고 있습니다",
         task: "기한 초과 조치 " + rem.overdue + "건 마무리", p: "P0", page: "approvals.html" },
-      { n: c.findings.pending, t: "미검토 취약점 <b>" + c.findings.pending + "건</b>", sub: "맞는지 오탐인지 아직 아무도 안 본 것",
-        task: "미검토 finding " + c.findings.pending + "건 검토", p: "P1", page: "approvals.html" },
+      // ⚠ 여기는 finding(스캐너가 올린 낱개 항목) 단위라 히어로의 "열린 취약점"과 숫자가 다르다.
+      //   실화면에서 46건 옆에 602건이 나란히 떠 헷갈렸다(2026-08-01) — 단위를 적어 준다.
+      { n: c.findings.pending, t: "검토 대기 항목 <b>" + c.findings.pending + "건</b>",
+        sub: "맞는지 오탐인지 아직 아무도 안 본 것 · 스캐너가 올린 낱개(finding) 기준이라 위 「열린 취약점」과 세는 단위가 다릅니다",
+        task: "검토 대기 항목(finding) " + c.findings.pending + "건 검토", p: "P1", page: "approvals.html" },
       { n: c.assets.highRisk, t: "고위험 자산 <b>" + c.assets.highRisk + "대</b>", sub: "위험이 몰린 장비 — 여기부터 손대면 점수가 가장 많이 오릅니다",
         task: "고위험 자산 " + c.assets.highRisk + "대 점검", p: "P1", page: "assethub.html" },
       { n: a && a.aiAssets && a.avgRobustness == null ? a.aiAssets : 0, t: "AI 자산 견고성 <b>미점검</b>",
