@@ -319,6 +319,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         task: "검토 대기 항목(finding) " + c.findings.pending + "건 검토", p: "P1", page: "approvals.html" },
       { n: c.assets.highRisk, t: "고위험 자산 <b>" + c.assets.highRisk + "대</b>", sub: "위험이 몰린 장비 — 여기부터 손대면 점수가 가장 많이 오릅니다",
         task: "고위험 자산 " + c.assets.highRisk + "대 점검", p: "P1", page: "assethub.html" },
+      // 스캔이 안 된 자산은 **취약점이 아니라 스캐너 문제**다. 취약점 줄과 섞지 않고 따로 세운다
+      //   (2026-08-01: 605건 중 602건이 스캔 오류라 "검토 대기 602건"으로 보였다 — 실제 일감은 3건).
+      { n: (c.findings.scanFailed || 0), t: "스캔이 안 된 자산 <b>" + (c.findings.scanFailed || 0) + "건</b>",
+        sub: "스캐너가 결과를 못 받았습니다 — 접속 정보·권한 문제이지 취약점이 아닙니다",
+        task: "스캔 실패 " + (c.findings.scanFailed || 0) + "건 원인 확인", p: "P2", page: "assethub.html" },
       { n: c.inspections.overdue, t: "지연된 정기점검 <b>" + c.inspections.overdue + "건</b>",
         sub: "기한이 지난 유지보수 점검 — 점검서를 올리면 관리자 승인으로 닫힙니다",
         task: "지연 점검 " + c.inspections.overdue + "건 수행", p: "P2", page: "maintenance.html" },

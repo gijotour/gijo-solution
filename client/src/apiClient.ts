@@ -2005,6 +2005,9 @@ export interface ReviewPatch {
 
 export interface ApprovalSummary {
   total: number; pending: number; in_progress: number; verifying: number; approved: number; rejected: number; overdue: number;
+  // 스캔이 실패해 결과를 못 받은 건수 — 취약점이 아니라 **스캐너를 고칠 일**이라 따로 센다.
+  // (2026-08-01: 605건 중 602건이 스캔 오류였는데 "미검토 602건"으로 보였다.)
+  scanFailed?: number;
 }
 
 export const approvalsApi = {

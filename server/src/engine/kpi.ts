@@ -25,7 +25,9 @@ export interface KpiSnapshot {
   date: string; // YYYY-MM-DD
   at: number;
   assets: { total: number; highRisk: number; midRisk: number; lowRisk: number };
-  findings: { total: number; pending: number; approved: number; rejected: number };
+  // scanFailed = 스캔이 실패해 결과를 못 받은 건수. 취약점이 아니라 **스캐너를 고칠 일**이라
+  //   pending에 섞지 않는다(2026-08-01: 605건 중 602건이 스캔 오류였다).
+  findings: { total: number; pending: number; approved: number; rejected: number; scanFailed: number };
   inspections: { total: number; overdue: number; pendingApproval: number; approved: number; rejected: number };
   cti: { totalFindings: number; matchedFindings: number; affectedAssets: number; criticalMatches: number };
   compliance: { total: number; covered: number; coverageRate: number };
@@ -255,7 +257,7 @@ export async function computeKpiSnapshot(): Promise<KpiSnapshot> {
     date: todayStr(),
     at: Date.now(),
     assets: assetRisk,
-    findings: { total: fa.total, pending: fa.pending, approved: fa.approved, rejected: fa.rejected },
+    findings: { total: fa.total, pending: fa.pending, approved: fa.approved, rejected: fa.rejected, scanFailed: fa.scanFailed ?? 0 },
     inspections: {
       total: ms.total,
       overdue: ms.overdue,

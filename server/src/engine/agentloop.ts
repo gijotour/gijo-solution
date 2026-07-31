@@ -168,14 +168,29 @@ const INTERNAL_TOOL_ERROR_RE = /^(존재하지 않는 도구|인자 오류|도�
 
 // 도구 결과가 이미 사람이 읽기 좋은 결정적 요약이면(directAnswer) LLM 재작성 없이 그대로 답한다.
 // 단일 도구 호출일 때만 — 여러 도구를 조합한 답은 종합이 필요하므로 재작성 경로로 보낸다.
+/**
+ * 도구 결과에 박아 둔 **내부 식별자**를 사람에게 보이기 전에 지운다.
+ *
+ * 도구는 `자산이름(id=vuln:sample-web01)` 꼴로 id를 함께 낸다 — 일부러 그런 것이다.
+ * LLM이 "1번 자산 자세히 봐줘" 같은 후속 지시에서 그 id로 다음 도구를 부르기 때문이다.
+ * 문제는 **직답 경로**(도구 결과가 그대로 답이 되는 길)에서 그 id가 담당자 화면까지 간다는 것.
+ * 실측(2026-08-01 하루 실전): "오늘 뭐부터 볼까?"의 답에 `(id=vuln:sample-web01)`이 그대로 떴다.
+ *
+ * ⚠ 지우는 자리는 **사람에게 나가는 마지막 지점 한 곳**이어야 한다.
+ *   도구 결과(calls[].result) 자체를 지우면 LLM이 id를 잃어 후속 지시가 끊긴다.
+ */
+export function 사람용으로다듬기(text: string): string {
+  return String(text ?? "").replace(/\s*\(id=[\w:.\-]+\)/g, "");
+}
+
 function directAnswerFor(calls: AgentToolCall[]): string | null {
   if (calls.length !== 1) return null;
   const only = calls[0];
   if (INTERNAL_TOOL_ERROR_RE.test(only.result)) return null; // 실패 결과는 재작성 경로에서 안내
   // "못 찾았다"는 답은 그대로 내보낸다 — 재작성을 거치면 "존재하지 않습니다"로 부풀려
   // 담당자가 "우리 회사엔 없구나"로 오해하는 사고가 있었다(2026-07-26 실사용).
-  if (only.result.startsWith(NO_HIT_PREFIX)) return only.result;
-  return findAgentTool(only.tool)?.directAnswer ? only.result : null;
+  if (only.result.startsWith(NO_HIT_PREFIX)) return 사람용으로다듬기(only.result);
+  return findAgentTool(only.tool)?.directAnswer ? 사람용으로다듬기(only.result) : null;
 }
 
 // 최종 답 길이 상한 — 도구 결과를 프롬프트에 다시 실을 때 과도하게 커지지 않게 자른다(멈춤 방지).
@@ -197,9 +212,11 @@ export function guardAgainstDenial(answer: string, calls: AgentToolCall[]): stri
   const hasData = calls.some(
     (c) => !INTERNAL_TOOL_ERROR_RE.test(c.result) && c.result.trim().length > 40 && !EMPTY_RESULT_RE.test(c.result)
   );
-  if (!hasData) return answer; // 도구가 실제로 0건이면 "없다"가 정답
+  // ★ 이 함수가 루프의 **마지막 관문**이다 — 두 출구(538·645) 모두 여기를 지난다.
+  //   LLM이 도구 결과에서 id를 그대로 베껴 오는 일이 잦아, 되돌리지 않는 길에서도 지운다.
+  if (!hasData) return 사람용으로다듬기(answer); // 도구가 실제로 0건이면 "없다"가 정답
   const short = answer.trim().length < 400; // 긴 답변은 데이터를 다뤘을 가능성이 높다
-  if (!(DENIAL_RE.test(answer) && short)) return answer;
+  if (!(DENIAL_RE.test(answer) && short)) return 사람용으로다듬기(answer);
   const facts = calls
     .filter((c) => !INTERNAL_TOOL_ERROR_RE.test(c.result))
     .map((c) => c.result.trim())
@@ -209,8 +226,9 @@ export function guardAgainstDenial(answer: string, calls: AgentToolCall[]): stri
   // 포함)"을 그대로 내보냈다. 담당자에게 내부 id 덤프는 답이 아니고, 없다는 답보다 조금 나을
   // 뿐이다. 도구가 이미 사람이 읽는 문장(문서 발췌)을 담고 있으면 그쪽을 쓴다.
   const 발췌 = extractQuotedEvidence(facts);
-  if (발췌) return `찾은 근거입니다.\n\n${발췌}`.slice(0, 3000);
-  return `조회 결과입니다.\n\n${facts}`.slice(0, 3000);
+  // 여기도 도구 원문이 그대로 사람에게 간다 — 내부 식별자를 지운다(위 사람용으로다듬기 참고).
+  if (발췌) return 사람용으로다듬기(`찾은 근거입니다.\n\n${발췌}`).slice(0, 3000);
+  return 사람용으로다듬기(`조회 결과입니다.\n\n${facts}`).slice(0, 3000);
 }
 
 /** 도구 결과에서 사람이 읽는 근거(사내 문서 발췌)만 골라낸다. 없으면 null. */

@@ -17,7 +17,8 @@ vi.mock("../src/engine/llm", () => ({
 
 import { createApp } from "../src/app";
 import { resetAssetsForTests, recordFindings } from "../src/engine/assets";
-import { resetApprovalsForTests, findingKey, buildTriagePrompt, prioritizedReviews } from "../src/engine/approvals";
+import { resetApprovalsForTests, findingKey, buildTriagePrompt, prioritizedReviews, approvalSummary } from "../src/engine/approvals";
+import { isRealVulnerability } from "../src/engine/agenttools";
 import type { StandardFinding } from "../src/engine/bridge";
 
 async function login(app: ReturnType<typeof createApp>) {
@@ -55,7 +56,8 @@ describe("approvals (finding 검토 워크플로우)", () => {
     expect(res.body.reviews).toHaveLength(1);
     expect(res.body.reviews[0].status).toBe("pending");
     expect(res.body.reviews[0].assetName).toBe("모델1");
-    expect(res.body.summary).toEqual({ total: 1, pending: 1, in_progress: 0, verifying: 0, approved: 0, rejected: 0, overdue: 0 });
+    // scanFailed 추가(2026-08-01) — 스캐너 오류를 취약점과 분리해 세면서 생긴 칸.
+    expect(res.body.summary).toEqual({ total: 1, pending: 1, in_progress: 0, verifying: 0, approved: 0, rejected: 0, overdue: 0, scanFailed: 0 });
   });
 
   it("조치 관리: 담당자·기한(SLA) 배정 — status 없이 배정만 가능", async () => {
@@ -250,5 +252,38 @@ describe("approvals (finding 검토 워크플로우)", () => {
     const noSmtp = await request(app).post(`/api/approvals/m1/${key}/notify`).set(auth()).send({ to: "owner@corp.example" });
     expect(noSmtp.status).toBe(400);
     expect(noSmtp.body.error).toContain("SMTP");
+  });
+});
+
+describe("★ 스캐너 오류는 취약점이 아니다 (2026-08-01 하루 실전에서 발견)", () => {
+  // 실측: 운영 서버 finding 605건 중 **602건이 scan_error**였다.
+  // 그래서 제품에서 가장 중요한 답인 "오늘 뭐부터 볼까?"의 상위 5건 중 4건이 스캔 오류였고,
+  // 화면에는 "검토 대기 602건"이 떴다. **실제 일감은 3건**이다.
+  // 담당자는 밀린 일이 602건인 줄 알고 손도 못 댄다 — 숫자가 틀리면 없느니만 못하다.
+  //
+  // 이 결함은 조용하다: 오류도 안 나고 화면도 멀쩡하며 숫자도 "그럴듯"하다.
+  // 그래서 못으로 박는다.
+  const 진짜 = { finding_type: "OpenSSH < 9.6 사용자 열거 (CVE-2024-6387)", severity: "high" };
+  const 오류 = { finding_type: "scan_error", severity: "low" };
+  const 미지원 = { finding_type: "scan_not_supported", severity: "low" };
+
+  it("scan_error·scan_not_supported를 일감으로 세지 않는다", () => {
+    expect(isRealVulnerability(진짜)).toBe(true);
+    expect(isRealVulnerability(오류), "스캔 실패는 취약점이 아니다").toBe(false);
+    expect(isRealVulnerability(미지원), "스캐너가 지원 안 하는 것도 취약점이 아니다").toBe(false);
+  });
+
+  it("★ 세는 자리를 나눈다 — 감추는 게 아니다", () => {
+    // 스캔이 안 된 자산은 그 자체로 조치할 일이다(스캐너 설정·권한). 다만 취약점과 섞지 않는다.
+    const 리뷰 = [
+      { finding: 진짜, status: "pending", overdue: false },
+      { finding: 오류, status: "pending", overdue: false },
+      { finding: 오류, status: "pending", overdue: false },
+      { finding: 미지원, status: "pending", overdue: false },
+    ] as unknown as Parameters<typeof approvalSummary>[0];
+    const s = approvalSummary(리뷰);
+    expect(s.total, "일감은 1건이다").toBe(1);
+    expect(s.pending).toBe(1);
+    expect(s.scanFailed, "스캔 실패는 사라지지 않고 따로 세어진다").toBe(3);
   });
 });

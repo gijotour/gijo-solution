@@ -111,8 +111,21 @@ const SEVERITY_ORDER = ["critical", "high", "medium", "low"] as const;
  * (숫자가 틀린 답은 없느니만 못하다. 담당자가 그 숫자로 보고를 쓴다.)
  */
 export function isRealVulnerability(f: { finding_type?: string }): boolean {
-  return f.finding_type !== "scan_error";
+  return !SCAN_NOISE.has(String(f.finding_type ?? ""));
 }
+
+/**
+ * 스캐너가 낸 것이지만 **취약점이 아닌 것**.
+ *
+ * ★ 실측(2026-08-01 하루 실전 115상황): 전체 finding 605건 중 **602건이 이것**이었다.
+ *   그래서 "오늘 뭐부터 볼까?"의 상위 5건 중 4건이 스캔 오류였고, 화면에는
+ *   "검토 대기 602건"이 떴다. 담당자는 밀린 일이 602건인 줄 알고 절망하는데
+ *   **실제 일감은 3건**이다. 제품에서 가장 중요한 답이 8할 잡음이었다.
+ *
+ * 감추는 것이 아니다 — 스캔이 안 된 자산은 그 자체로 조치할 일이다(스캐너 설정·권한 문제).
+ * 다만 **취약점 일감과 섞지 않는다.** 세는 자리를 나눈다.
+ */
+const SCAN_NOISE = new Set(["scan_error", "scan_not_supported"]);
 
 function findingSummary(asset: Asset): string {
   const real = asset.findings.filter(isRealVulnerability);

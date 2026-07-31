@@ -80,6 +80,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <button class="btn vex-btn" id="btnVexExport">⬇ 파일 받기</button>
     </div>
 
+    <div id="scanFailNote" style="display:none;max-width:1100px;margin-bottom:12px;padding:10px 14px;border:1px solid rgba(240,160,32,.35);background:rgba(240,160,32,.08);border-radius:10px;font-size:12.5px;color:var(--text)"></div>
+
     <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:16px;max-width:1100px;">
       <div class="panel" style="margin:0"><div class="panel-sub" style="margin:0 0 6px">미검토</div><div style="font-size:20px;font-weight:800;color:var(--amber)" id="kPending">-</div></div>
       <div class="panel" style="margin:0"><div class="panel-sub" style="margin:0 0 6px">진행중</div><div style="font-size:20px;font-weight:800;color:var(--blue-light)" id="kProg">-</div></div>
@@ -309,6 +311,17 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
             overdue: cnt((r) => r.overdue),
           }
         : summary;
+      // 스캔이 안 된 자산 — 취약점이 아니라 **스캐너를 고칠 일**이다. 취약점 숫자에서 빼고
+      // 여기서 따로 알린다(2026-08-01: 605건 중 602건이 스캔 오류라 "미검토 602건"으로 보였다).
+      var 실패 = (summary && summary.scanFailed) || 0;
+      var 알림 = document.getElementById("scanFailNote");
+      if (실패 > 0 && 알림) {
+        알림.style.display = "";
+        알림.innerHTML = "🔧 <b>스캔이 안 된 자산 " + 실패 + "건</b> — 스캐너가 결과를 못 받은 것이라 " +
+          "취약점 숫자에는 넣지 않았습니다. 접속 정보·권한을 확인해 주세요.";
+      } else if (알림) {
+        알림.style.display = "none";
+      }
       // 요약 카드
       document.getElementById("kPending").textContent = 요약.pending;
       document.getElementById("kProg").textContent = 요약.in_progress ?? 0;

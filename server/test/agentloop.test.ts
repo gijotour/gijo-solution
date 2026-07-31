@@ -8,7 +8,8 @@ vi.mock("../src/engine/llm", () => ({
   registerLlmRoutes: vi.fn(),
 }));
 
-import { runAgentLoop, setLastTarget, resetContextForTests } from "../src/engine/agentloop";
+import { runAgentLoop, setLastTarget, resetContextForTests, 사람용으로다듬기 } from "../src/engine/agentloop";
+import fs from "node:fs";
 import { listAgentTools, findAgentTool, validateToolArgs } from "../src/engine/agenttools";
 import { resetAssetsForTests, registerAsset, recordFindings } from "../src/engine/assets";
 
@@ -244,5 +245,36 @@ describe("runAgentLoop — 결정→실행→최종답변", () => {
     const r = await runAgentLoop("자산 계속 봐줘");
     expect(r!.toolCalls).toHaveLength(5);
     expect(r!.output).toBe("상한 도달 답변");
+  });
+});
+
+describe("★ 내부 식별자는 사람에게 안 보인다", () => {
+  // 도구는 `자산이름(id=vuln:sample-web01)` 꼴로 id를 함께 낸다 — LLM이 후속 지시에서
+  // 그 id로 다음 도구를 부르기 때문에 **일부러** 그렇게 만든 것이다.
+  // 문제는 그 문자열이 그대로 담당자 화면까지 간다는 것.
+  // 실측(2026-08-01 하루 실전 115상황): "오늘 뭐부터 볼까?"의 답 첫 줄에 그대로 떴다.
+  it("(id=…)를 지운다", () => {
+    expect(사람용으로다듬기("1. [high] OpenSSH 취약점 @ 샘플-웹서버(id=vuln:sample-web01) — KEV"))
+      .toBe("1. [high] OpenSSH 취약점 @ 샘플-웹서버 — KEV");
+  });
+
+  it("여러 개도 전부 지운다", () => {
+    expect(사람용으로다듬기("A(id=asset:a1), B(id=asset:b2)")).toBe("A, B");
+  });
+
+  it("★ 사람이 읽는 괄호는 건드리지 않는다 — 넓히다 본문을 깎으면 안 된다", () => {
+    expect(사람용으로다듬기("경계 방화벽(FW-01)에서 발견")).toBe("경계 방화벽(FW-01)에서 발견");
+    expect(사람용으로다듬기("CVE-2021-44228 (Log4Shell)")).toBe("CVE-2021-44228 (Log4Shell)");
+  });
+
+  it("빈 값·null에도 죽지 않는다", () => {
+    expect(사람용으로다듬기("")).toBe("");
+    expect(사람용으로다듬기(undefined as unknown as string)).toBe("");
+  });
+
+  it("★ 도구 결과 원본은 그대로다 — LLM이 id를 잃으면 후속 지시가 끊긴다", () => {
+    // 지우는 자리는 사람에게 나가는 마지막 지점 한 곳이어야 한다.
+    const src = fs.readFileSync(new URL("../src/engine/agenttools.ts", import.meta.url), "utf8");
+    expect(src, "도구가 id를 안 내면 '1번 자산 자세히 봐줘'가 동작하지 않는다").toContain("(id=${r.assetId})");
   });
 });

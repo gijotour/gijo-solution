@@ -13,6 +13,7 @@ import { todayLocal } from "../util/date";
 import { db } from "../db";
 import { listAssets, getAsset } from "./assets";
 import type { StandardFinding } from "./bridge";
+import { isRealVulnerability } from "./agenttools";
 import type { GijoUser } from "../auth/users";
 import { PLAIN_LANGUAGE_RULE } from "./promptstyle";
 import { sendMail, getSmtpConfig } from "./email";
@@ -202,6 +203,10 @@ export interface PrioritizedFinding extends FindingReview {
 export function prioritizedReviews(limit = 10, assetIds?: string[]): PrioritizedFinding[] {
   const scope = assetIds && assetIds.length ? new Set(assetIds) : null;
   return listFindingReviews()
+    // ★ 스캐너 오류는 취약점이 아니다 — 일감 목록에서 뺀다(2026-08-01 실측: 605건 중 602건).
+    //   이 함수가 "오늘 뭐부터"·조치·승인 화면·KPI의 **공통 원천**이라 여기 한 곳에서 거른다.
+    //   감추는 게 아니라 세는 자리를 나누는 것이다 — 스캔 실패 건수는 scanFailureCount()로 따로 낸다.
+    .filter((r) => isRealVulnerability(r.finding))
     // 오탐(rejected)과 조치완료(fixed)는 "오늘의 조치" 대상이 아니므로 제외한다.
     .filter((r) => r.status !== "rejected" && r.finding.state !== "fixed")
     .filter((r) => !scope || scope.has(r.assetId))
@@ -257,11 +262,18 @@ export interface ApprovalSummary {
   approved: number; // 완료(해결·확정)
   rejected: number;
   overdue: number; // 기한 지난 미조치 건
+  // 스캔이 실패해 결과를 못 받은 건수 — **취약점이 아니라 스캐너 문제**다.
+  // 위 숫자들과 섞지 않고 따로 낸다. 0이 아니면 화면이 "스캔이 안 된 자산 N건"으로 안내한다.
+  scanFailed: number;
 }
 
 export function approvalSummary(reviews: FindingReview[]): ApprovalSummary {
-  const s: ApprovalSummary = { total: reviews.length, pending: 0, in_progress: 0, verifying: 0, approved: 0, rejected: 0, overdue: 0 };
-  for (const r of reviews) {
+  // ★ 스캐너 오류를 취약점으로 세지 않는다(2026-08-01 실측: 605건 중 602건이 스캔 오류였고,
+  //   화면에는 "검토 대기 602건"이 떴다. 실제 일감은 3건 — 담당자는 밀린 일이 602건인 줄 안다).
+  //   감추지 않는다: scanFailed로 따로 세어 "스캔이 안 된 자산"이라는 다른 일감으로 보여준다.
+  const 일감 = reviews.filter((r) => isRealVulnerability(r.finding));
+  const s: ApprovalSummary = { total: 일감.length, pending: 0, in_progress: 0, verifying: 0, approved: 0, rejected: 0, overdue: 0, scanFailed: reviews.length - 일감.length };
+  for (const r of 일감) {
     s[r.status]++;
     if (r.overdue) s.overdue++;
   }
@@ -348,8 +360,13 @@ export function resetApprovalsForTests(): void {
 
 export function registerApprovalsRoutes(app: Express): void {
   app.get("/api/approvals", authMiddleware, (_req, res) => {
-    const reviews = listFindingReviews();
-    res.json({ reviews, summary: approvalSummary(reviews) });
+    const 전부 = listFindingReviews();
+    // ★ 목록과 요약이 같은 것을 세야 한다(2026-08-01). 요약만 걸러 놓고 목록에 605줄을 내리면
+    //   "위에는 3이라는데 아래는 605줄"이 되어 담당자가 무엇을 믿어야 할지 모른다.
+    //   스캔 실패는 감추지 않고 scanFailed 숫자로 따로 알린다 — 그건 스캐너를 고칠 일이지
+    //   취약점을 검토할 일이 아니다.
+    const reviews = 전부.filter((r) => isRealVulnerability(r.finding));
+    res.json({ reviews, summary: approvalSummary(전부) });
   });
 
   // 오늘의 조치 — 전 자산 finding을 KEV·EPSS·VPR·심각도로 정렬한 우선순위 목록.
