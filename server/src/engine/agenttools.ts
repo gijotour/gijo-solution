@@ -912,9 +912,68 @@ function matchFindingsByFilter(filter: string): BulkMatch[] {
   return sel.map((r) => ({ assetId: r.assetId, key: r.findingKey, label: `[${r.finding.severity}] ${r.finding.finding_type} @ ${r.assetName}` }));
 }
 
+// 화면(대화창)에서 **체크박스로 직접 고른** 건들을 받는다 — "assetId::findingKey" 목록.
+// (2026-07-31 사용자 질문 "미조치 취약점에 리스트를 보고 선택도 가능한거지?")
+//
+// 왜 조건(filter)만으로는 부족한가: 조건은 담당자가 머릿속으로 세운 범위를 **말로 옮긴 것**이라
+// 실제 대상과 어긋날 수 있다("Oracle 취약점 다"에 무엇이 걸리는지는 눌러 보기 전엔 모른다).
+// 눈으로 보고 고른 것은 어긋날 수가 없다.
+//
+// findingKey는 (assetId+내용) sha1 16자라 LLM이 지어낼 수 없다 — 실제로 있는 건만 통과시키고,
+// 없는 id는 **조용히 버리지 않고 세어서 알린다**(골랐는데 안 된 걸 모르면 그게 제일 나쁘다).
+export function matchFindingsByIds(ids: string): { matched: BulkMatch[]; unknown: string[] } {
+  const want = String(ids ?? "")
+    .split(/[,\s]+/)
+    .map((s) => s.trim())
+    .filter(Boolean);
+  if (want.length === 0) return { matched: [], unknown: [] };
+  const all = prioritizedReviews(2000);
+  const byId = new Map<string, BulkMatch>();
+  for (const r of all) {
+    byId.set(`${r.assetId}::${r.findingKey}`, {
+      assetId: r.assetId,
+      key: r.findingKey,
+      label: `[${r.finding.severity}] ${r.finding.finding_type} @ ${r.assetName}`,
+    });
+  }
+  const matched: BulkMatch[] = [];
+  const unknown: string[] = [];
+  const seen = new Set<string>();
+  for (const id of want) {
+    if (seen.has(id)) continue; // 같은 것을 두 번 고쳐 쓰지 않는다
+    seen.add(id);
+    const hit = byId.get(id);
+    if (hit) matched.push(hit);
+    else unknown.push(id);
+  }
+  return { matched, unknown };
+}
+
 function runBulkUpdate(args: Record<string, string>): string {
-  const matched = matchFindingsByFilter(args.filter);
-  if (matched.length === 0) throw new Error(`"${args.filter}"에 맞는 취약점이 없습니다.`);
+  // ids(직접 고른 것)가 있으면 그것이 우선이다 — 조건보다 사람이 눈으로 고른 것이 정확하다.
+  let matched: BulkMatch[];
+  let 대상설명: string;
+  let 못찾음: string[] = [];
+  if (args.ids?.trim()) {
+    const r = matchFindingsByIds(args.ids);
+    matched = r.matched;
+    못찾음 = r.unknown;
+    대상설명 = "선택한 건";
+    if (matched.length === 0) {
+      throw new Error(
+        `고르신 ${못찾음.length}건을 지금 목록에서 찾지 못했습니다 — 그 사이에 처리됐거나 목록이 바뀌었을 수 있습니다. 목록을 다시 불러 주세요.`
+      );
+    }
+  } else {
+    // ★ 둘 다 비면 **전건**이 걸린다(matchFindingsByFilter("")는 필터를 하나도 안 건다).
+    //   filter를 선택값으로 바꾸면서 생긴 구멍이라 여기서 막는다 — 조건 없는 일괄 쓰기는 금지다.
+    if (!args.filter?.trim()) {
+      throw new Error("무엇에 적용할지 정하지 않았습니다 — 조건을 말씀하시거나 목록에서 직접 고르세요.");
+    }
+    matched = matchFindingsByFilter(args.filter);
+    대상설명 = `"${args.filter}"`;
+    if (matched.length === 0) throw new Error(`"${args.filter}"에 맞는 취약점이 없습니다.`);
+  }
   const patch: ReviewPatch = {};
   if (args.assignee?.trim()) patch.assignee = args.assignee.trim();
   if (args.dueDate?.trim()) {
@@ -929,7 +988,9 @@ function runBulkUpdate(args: Record<string, string>): string {
   if (!patch.assignee && !patch.dueDate && !patch.status) throw new Error("담당자·기한·판정 중 하나는 지정해야 합니다.");
   for (const m of matched) updateFindingReview(m.assetId, m.key, patch, "orchestrator");
   const acts = [patch.assignee && `담당 ${patch.assignee}`, patch.dueDate && `기한 ${patch.dueDate}`, patch.status && `판정 ${args.status.trim()}`].filter(Boolean).join(", ");
-  return `${matched.length}건에 일괄 적용했습니다: ${acts}.`;
+  // 못 찾은 건은 반드시 말한다 — 5건 골랐는데 3건만 됐다는 걸 모르면 안 한 일을 했다고 믿는다.
+  const 빠짐 = 못찾음.length ? ` ⚠ ${못찾음.length}건은 목록에서 찾지 못해 건너뛰었습니다(이미 처리됐거나 목록이 바뀐 건).` : "";
+  return `${대상설명} ${matched.length}건에 일괄 적용했습니다: ${acts}.${빠짐}`;
 }
 
 // ── 「취약점」 도메인 도구 ───────────────────────────────────────────────
@@ -1968,13 +2029,23 @@ const TOOLS: AgentTool[] = [
     description:
       '여러 취약점을 조건으로 한 번에 처리한다 — "Critical KEV 전부 정요한한테 배정", "Oracle 취약점 다 오탐 처리", "높은 취약점 기한 2026-07-24로". filter(조건: 심각도·KEV·상태·키워드) + 담당자/기한/판정 중 하나 이상. 예: {"filter":"critical kev","assignee":"정요한","dueDate":"2026-07-24"}',
     params: [
-      { name: "filter", label: "대상 조건", description: "심각도(critical/high…)·KEV·상태·키워드 (예: critical kev, Oracle)", required: true },
+      // ⚠ filter를 필수로 두지 않는다 — 대화창에서 체크박스로 고른 경우 조건이 없다.
+      //   대신 run에서 "ids든 filter든 하나는 있어야 한다"를 강제한다(둘 다 비면 전건이 걸릴 뻔했다).
+      { name: "filter", label: "대상 조건", description: "심각도(critical/high…)·KEV·상태·키워드 (예: critical kev, Oracle) — 목록에서 직접 고른 경우 비움", required: false },
+      { name: "ids", label: "고른 대상", description: "대화창 목록에서 체크한 건들(자동으로 채워짐). 사람이 손으로 적는 값이 아니다", required: false },
       { name: "assignee", label: "담당자", description: "일괄 배정할 담당자 (선택)", required: false },
       { name: "dueDate", label: "기한", description: "일괄 기한 YYYY-MM-DD (선택)", required: false },
       { name: "status", label: "판정", description: "조치완료 / 오탐 (선택)", required: false },
     ],
     // 결재판에 영향받는 건수·목록을 보여준다 — 사람이 범위를 확인하고 승인한다(대량 쓰기 안전).
     effect: (args) => {
+      if (args.ids?.trim()) {
+        const { matched, unknown } = matchFindingsByIds(args.ids);
+        if (matched.length === 0) return `고른 ${unknown.length}건을 목록에서 찾지 못함 — 목록을 다시 불러 주세요`;
+        const sample = matched.slice(0, 5).map((x) => x.label).join(" · ");
+        const 빠짐 = unknown.length ? ` (⚠ ${unknown.length}건은 못 찾아 건너뜀)` : "";
+        return `고른 ${matched.length}건에 적용 — ${sample}${matched.length > 5 ? ` 외 ${matched.length - 5}건` : ""}${빠짐}`;
+      }
       const m = matchFindingsByFilter(args.filter ?? "");
       if (m.length === 0) return `"${args.filter}"에 맞는 취약점 없음`;
       const sample = m.slice(0, 5).map((x) => x.label).join(" · ");

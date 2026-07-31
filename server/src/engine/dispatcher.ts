@@ -15,12 +15,14 @@ import { emitCollaboration } from "./collaboration";
 import { runAdapter, StandardFinding } from "./bridge";
 import { chat } from "./llm";
 import { runAgentLoop, AgentToolCall } from "./agentloop";
-import { executeApprovedTool, PendingApproval } from "./agenttools";
+import { executeApprovedTool, findAgentTool, buildApproval, PendingApproval } from "./agenttools";
 import { appendApprovedDecision } from "./orchestrator-dataset";
 import { undoSnapshot, undoCommit } from "./undo";
 import { gateUserInput } from "./gateway";
 import { toolDomainsForScreen } from "./screencontext";
 import { isHelpIntent, formatScreenGuide } from "./screenguide";
+import { findHowTo, howToMarkdown } from "./howto";
+import { buildFindingPicks, parsePickCommand, pickToolArgs, isFindingListAsk, findingListAnswer, stripPickMarks, PickList } from "./picklist";
 import { isOutOfScope, outOfScopeAnswer, isTooVague, vagueAnswer } from "./scopeguard";
 import { analyzeFindings } from "./analysis";
 import { recordFindings, getAsset, listAssets } from "./assets";
@@ -78,6 +80,13 @@ export interface DispatchResult {
   // 답변 그라운딩에 쓰인(검색된) 사내 문서 ID — 화면이 "근거: 문서명" 배지로 표시한다.
   // 인수인계 자동 검증도 이 필드로 "올린 문서가 실제로 인용되는가"를 판정한다.
   sources?: string[];
+  // "가서 하기" — AI가 대신 하면 안 되는 일(계정·인증·열쇠)에 순서를 안내하면서 그 화면을
+  // 같이 돌려준다. 대화창이 [그 화면 열어주기] 버튼으로 그린다(2026-07-31).
+  // 갈 화면이 없는 안내(백업처럼)에서는 아예 넣지 않는다 — 있는 척하면 없는 버튼을 찾게 된다.
+  openScreen?: { page: string; label: string };
+  // 답에 취약점 목록이 나왔으면 **그 목록을 체크해서 바로 조치**할 수 있게 같이 준다(2026-07-31).
+  // 조건("critical 전부")은 말로 옮긴 범위라 어긋날 수 있지만, 눈으로 고른 것은 어긋나지 않는다.
+  picklist?: PickList;
 }
 
 // ── 복합 지시(오케스트레이션) ─────────────────────────────────────────
@@ -429,13 +438,16 @@ export async function dispatchInstruction(instructionText: string, sessionId?: s
   // 맥락은 이번 지시를 기록하기 "전" 시점의 대화로 계산한다(방금 넣은 user 턴이 맥락에 중복되지 않게).
   const contextText = session ? recentTurnsText(session.id) : "";
   let title = session?.title;
+  // 기록에는 사람 말만 남긴다 — 목록에서 고를 때 붙는 기계용 표식(sha1 해시)이 그대로 저장되면
+  // 작업 내역과 이어보기가 해시 범벅이 되어 담당자가 자기 대화를 못 알아본다(2026-07-31 실화면).
+  const 기록문 = stripPickMarks(instructionText);
   if (session) {
-    appendTurn(session.id, "user", instructionText);
+    appendTurn(session.id, "user", 기록문);
     // 첫 지시면 방금 자동 지정된 제목을 로그에 쓰기 위해 다시 읽는다("새 세션" 대신 실제 제목).
     title = getSession(session.id)?.title ?? title;
     // 작업 세션의 지시를 실시간 에이전트 협업 로그에도 흘린다 — 세션 제목으로 꼬리표를 달아
     // "어느 세션에서 온 작업인지"가 로그에 드러나게 한다(대시보드 📡 실시간 협업 피드에 표시).
-    collab(qa, { from: "세션", to: "orchestrator", message: `💬 [${title}] ${instructionText}` });
+    collab(qa, { from: "세션", to: "orchestrator", message: `💬 [${title}] ${기록문}` });
   }
   const core = await dispatchInstructionCore(instructionText, contextText, screen, actor);
   const result: DispatchResult = { ...core, ...(await computeOfferSignals(core, instructionText, screen)) };
@@ -540,12 +552,64 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     return { task, route: { agentId: "orchestrator", action: "chat" }, output: vagueAnswer() };
   }
 
+  // 대화창 목록에서 **체크해서 고른 건**에 대한 조치 — LLM을 아예 태우지 않는다(2026-07-31).
+  // 사람이 눈으로 고른 대상이라 해석할 것이 없다. 7B가 번호를 하나 잘못 읽으면 엉뚱한 취약점이
+  // 오탐 처리되므로, 표식을 규칙으로 읽어 결재판까지 곧장 만든다.
+  // ⚠ 그래도 **바로 실행하지는 않는다** — 쓰기는 전부 사람 승인을 거친다는 원칙은 그대로다.
+  const pick = parsePickCommand(instructionText);
+  if (pick) {
+    const tool = findAgentTool("bulk_update");
+    if (tool) {
+      const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P2" });
+      completeTask(task.id);
+      const approval = buildApproval(tool, pickToolArgs(pick), instructionText);
+      return {
+        task,
+        route: { agentId: "orchestrator", action: "chat" },
+        output: `고르신 ${pick.ids.length}건에 적용할 내용을 확인해 주세요. 승인하면 그때 반영됩니다.`,
+        approval,
+      };
+    }
+  }
+
   // 보안 업무 밖 질문은 일관되게 거절하고 할 수 있는 것으로 되돌린다(2026-07-26 사용자 결정 ②).
   // 도구·RAG를 타기 전에 걸러야 한다 — 안 그러면 사내 문서에서 아무거나 끌어와 그럴듯하게 답한다.
   if (isOutOfScope(instructionText)) {
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
     completeTask(task.id);
     return { task, route: { agentId: "orchestrator", action: "chat" }, output: outOfScopeAnswer() };
+  }
+
+  // "2차 인증 켜줘" 같은 지시 — AI가 대신 하면 안 되는 일이다. 계정·인증·열쇠를 AI가 켜고 끄면
+  // 그 AI를 속인 사람도 켜고 끌 수 있다. 대신 **그 화면의 실제 순서**를 결정적으로 안내하고
+  // 화면을 같이 열어 준다(2026-07-31 사용자 지시 "설정등은 해당메뉴가서 어떻게 하라고 가이드").
+  // ⚠ 화면 안내(isHelpIntent)보다 **먼저** 봐야 한다 — 뒤에 두면 "2차 인증 어떻게 해?"가
+  //   지금 보고 있는 화면의 일반 안내로 떨어져 정작 켜는 법을 못 듣는다.
+  const howTo = findHowTo(instructionText);
+  if (howTo) {
+    const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
+    completeTask(task.id);
+    return {
+      task,
+      route: { agentId: "orchestrator", action: "chat" },
+      output: howToMarkdown(howTo),
+      ...(howTo.page ? { openScreen: { page: howTo.page, label: howTo.where } } : {}),
+    };
+  }
+
+  // "미조치 취약점 뭐 있어?" — 규칙으로 목록을 내고 그 자리에서 고를 수 있게 한다(2026-07-31).
+  // LLM 루프에 맡기면 모델이 목록 도구를 고른 날에만 체크칸이 생긴다 — 사용자가 콕 집어 물은
+  // 기능이 어떤 날은 되고 어떤 날은 안 되면 없는 것만 못하다.
+  if (isFindingListAsk(instructionText)) {
+    const { output, picklist } = findingListAnswer();
+    const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P2" });
+    completeTask(task.id);
+    return {
+      task,
+      route: { agentId: "orchestrator", action: "chat" },
+      output,
+      ...(picklist ? { picklist } : {}),
+    };
   }
 
   // 도움말/사용법 의도는 화면별 가이드로 결정적으로 답한다(LLM·도구 없이). "이 화면 뭐 할 수 있어?"
@@ -689,6 +753,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
       output: loop.output,
       toolCalls: loop.toolCalls,
       ...(loop.approval ? { approval: loop.approval } : {}),
+      ...picksFor(loop.output, loop.toolCalls, loop.approval),
     };
   }
 
@@ -721,7 +786,26 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   const updatedTasks = completeTask(task.id);
   const completedTask = updatedTasks.find((t) => t.id === task.id) ?? task;
 
-  return { task: completedTask, route, output, ...(toolCalls ? { toolCalls } : {}), ...(approval ? { approval } : {}) };
+  return {
+    task: completedTask,
+    route,
+    output,
+    ...(toolCalls ? { toolCalls } : {}),
+    ...(approval ? { approval } : {}),
+    ...picksFor(output, toolCalls, approval),
+  };
+}
+
+/**
+ * 답에 나온 취약점 목록에 체크칸을 붙인다(2026-07-31).
+ * 결재판이 이미 떠 있으면 붙이지 않는다 — 승인할 게 있는데 그 위에 또 고르라고 하면 무엇을
+ * 누르는지 알 수 없다. 한 답에 결정 하나가 원칙이다.
+ */
+function picksFor(output: string, toolCalls?: AgentToolCall[], approval?: PendingApproval): { picklist?: PickList } {
+  if (approval) return {}; // 승인할 게 떠 있는데 그 위에 또 고르라고 하면 무엇을 누르는지 알 수 없다
+  if (!toolCalls || toolCalls.length === 0) return {};
+  const picks = buildFindingPicks(output, toolCalls.map((t) => t.tool));
+  return picks ? { picklist: picks } : {};
 }
 
 export function registerDispatcherRoutes(app: Express): void {

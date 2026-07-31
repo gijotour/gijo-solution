@@ -1,0 +1,186 @@
+// "가서 하기" 안내 — **실제 화면과 한 글자라도 다르면 실패한다**.
+// (2026-07-31 사용자 지시 "설정등은 해당메뉴가서 어떻게 하라고 가이드 주고")
+//
+// 이 시험이 있는 이유:
+//   안내표를 처음 쓸 때 8건 중 5건이 화면과 달랐다 — 2차 인증을 관리자 구역이라 했지만 내 설정이고,
+//   SMTP를 연동이라 했지만 서버·AI고, 계정 추가 버튼은 "계정 만들기"가 아니라 "추가"고,
+//   백업은 화면이 아예 없는데 "[복원]을 누르세요"라고 썼다.
+//   **틀린 안내는 안내가 없는 것보다 나쁘다** — 담당자가 없는 버튼을 찾아 헤매고 제품을 안 믿게 된다.
+//   화면에서 버튼 이름이 바뀌면 담당자보다 이 시험이 먼저 알아야 한다.
+import { describe, it, expect } from "vitest";
+import * as fs from "node:fs";
+import { HOWTOS, findHowTo, howToMarkdown } from "../src/engine/howto";
+
+const PAGES = new URL("../../client/src/renderer/pages/", import.meta.url);
+const read = (f: string) => fs.readFileSync(new URL(f, PAGES), "utf8");
+const navSrc = read("nav.js");
+
+/** "settings.html?s=my" → 파일명과 구역을 나눈다. */
+function split(page: string): { file: string; sec: string | null } {
+  const [file, q] = page.split("?");
+  const sec = q ? (new URLSearchParams(q).get("s") ?? null) : null;
+  return { file, sec };
+}
+
+/** 안내문에서 **[버튼]** 으로 적은 것들 — 화면에 그 글자가 실제로 있어야 한다. */
+function buttonsIn(steps: string[]): string[] {
+  const out: string[] = [];
+  for (const s of steps) {
+    // 정규식 이스케이프가 어긋나면 시험이 조용히 0건이 된다(전에 겪음) → 손으로 훑는다.
+    let i = 0;
+    while (true) {
+      const a = s.indexOf("[", i);
+      if (a < 0) break;
+      const b = s.indexOf("]", a);
+      if (b < 0) break;
+      out.push(s.slice(a + 1, b));
+      i = b + 1;
+    }
+  }
+  return out;
+}
+
+/** 1단계의 첫 굵은 글씨 = 그 화면의 칸(패널) 이름. 없으면 null. */
+function panelOf(steps: string[]): string | null {
+  const s = steps[0] ?? "";
+  const a = s.indexOf("**");
+  if (a < 0) return null;
+  const b = s.indexOf("**", a + 2);
+  if (b < 0) return null;
+  const t = s.slice(a + 2, b);
+  return t.startsWith("[") ? t.slice(1, -1) : t;
+}
+
+describe("★ 안내가 실제 화면을 가리킨다", () => {
+  for (const h of HOWTOS) {
+    if (!h.page) continue; // 갈 화면이 없는 안내(백업)는 아래에서 따로 본다
+    const { file, sec } = split(h.page);
+
+    it(`${h.key}: ${file} 이 실제로 있다`, () => {
+      expect(fs.existsSync(new URL(file, PAGES)), `${h.page} — 없는 화면으로 보낸다`).toBe(true);
+    });
+
+    it(`${h.key}: 구역·버튼·칸 이름이 화면과 같다`, () => {
+      const html = read(file);
+      if (sec) {
+        expect(html.includes(`data-sec="${sec}"`), `설정에 '${sec}' 구역이 없다`).toBe(true);
+      }
+      for (const b of buttonsIn(h.steps)) {
+        expect(html.includes(b), `화면에 [${b}] 라는 버튼 글자가 없다 — 담당자가 못 찾는다`).toBe(true);
+      }
+      const panel = panelOf(h.steps);
+      if (panel) {
+        expect(html.includes(panel), `화면에 '${panel}' 칸이 없다`).toBe(true);
+      }
+    });
+
+    it(`${h.key}: 사이드바에 적힌 이름과 같은 자리를 말한다`, () => {
+      // where("설정 > 내 설정")의 끝 이름이 nav.js에서 그 page에 붙은 label과 같아야 한다.
+      // 다르면 "설정 > 관리자로 가세요"라고 해 놓고 정작 다른 구역을 여는 꼴이 된다.
+      const leaf = h.where.split(">").pop()!.trim();
+      expect(navSrc.includes(`page: "${h.page}", label: "${leaf}"`), `nav.js에서 ${h.page}의 이름은 '${leaf}'가 아니다`).toBe(true);
+    });
+  }
+
+  it("이 대조가 헛돌고 있지 않다", () => {
+    // ⚠ buttonsIn/panelOf가 아무것도 못 뽑으면 위 시험들은 **전부 통과하면서 아무것도 안 본다**.
+    //   "세는 것은 확인이 아니다"로 이미 당한 적이 있어(낡은 가이드가 단계 수만 맞아 통과) 못 박는다.
+    const 버튼 = HOWTOS.filter((h) => h.page).flatMap((h) => buttonsIn(h.steps));
+    const 칸 = HOWTOS.filter((h) => h.page).map((h) => panelOf(h.steps)).filter(Boolean);
+    expect(버튼.length, "버튼을 하나도 안 뽑았다 — 위 대조는 빈 검사다").toBeGreaterThanOrEqual(5);
+    expect(칸.length, "칸 이름을 하나도 안 뽑았다").toBeGreaterThanOrEqual(5);
+    expect(버튼).toContain("2차 인증 켜기");
+    expect(칸).toContain("저장 암호화");
+    // 없는 글자는 정말로 못 찾아야 한다(찾기 자체가 고장 나면 뭘 적어도 통과한다).
+    expect(read("settings.html").includes("[없는버튼XYZ]")).toBe(false);
+  });
+
+  it("갈 화면이 없는 안내는 화면을 지어내지 않는다", () => {
+    const 백업 = HOWTOS.find((h) => h.key === "backup")!;
+    expect(백업.page, "복원 화면은 없다 — 아무 설정 화면이나 열어 주면 없는 버튼을 찾게 된다").toBeNull();
+    expect(백업.steps.join(" ")).toContain("복원은 화면에 없습니다");
+  });
+});
+
+describe("걸려야 할 말에 걸린다", () => {
+  // 대화창 서랍의 '설정·관리' 칸은 이 질문들에 **가서 하기** 배지를 달아 놓았다.
+  // 하나라도 안 걸리면 배지가 거짓말이 된다.
+  const 서랍질문 = [
+    "2차 인증 켜려면 어떻게 해?",
+    "복구 열쇠 재발급하려면 어떻게 해?",
+    "담당자 계정 추가하려면 어떻게 해?",
+  ];
+  for (const q of 서랍질문) {
+    it(`서랍 질문: ${q}`, () => {
+      expect(findHowTo(q), "서랍이 '가서 하기'라고 적어 둔 질문이다").not.toBeNull();
+    });
+  }
+
+  const 지시형 = [
+    ["2차 인증 켜줘", "mfa-on"],
+    ["OTP 등록하고 싶어", "mfa-on"],
+    ["비밀번호 바꾸고 싶어", "password"],
+    ["SMTP 설정 방법 알려줘", "smtp"],
+    ["에이전트 모델 배정 어떻게 해?", "model-assign"],
+    ["백업 어떻게 하나요?", "backup"],
+  ] as const;
+  for (const [q, key] of 지시형) {
+    it(`${q} → ${key}`, () => {
+      // ⚠ "켜줘"처럼 시키는 말도 걸려야 한다. 이걸 AI가 실행하면 AI를 속인 사람도 끌 수 있다.
+      expect(findHowTo(q)?.key).toBe(key);
+    });
+  }
+});
+
+describe("★ 엉뚱한 질문을 가로채지 않는다", () => {
+  // 가로채면 잘 되던 기능이 죽는다 — 안내만 나오고 아무 일도 안 일어난다.
+  const 건드리면안됨 = [
+    "오늘 뭐부터 해야 해?",
+    "기한 지난 일 보여줘",
+    "미조치 취약점 뭐 있어?",
+    "우리 자산 현황 알려줘",
+    "새 자산 등록할게",
+    "가장 급한 취약점에 담당자 배정해줘",
+    "경계 방화벽(FW-01) 정기점검 잡아줘",
+    "이번 주 보안 현황을 요약해줘",
+    "보안제품 등록해줘",
+    "최근 작업 기록에서 이상한 게 있어?",
+  ];
+  for (const q of 건드리면안됨) {
+    it(`그냥 지나간다: ${q}`, () => {
+      expect(findHowTo(q), `이 지시는 도구가 처리하는 일이다 — 안내로 가로채면 기능이 죽는다`).toBeNull();
+    });
+  }
+});
+
+describe("안내문 자체", () => {
+  it("왜 대신 못 하는지를 반드시 적는다", () => {
+    // 이유 없이 "가서 하세요"만 하면 "왜 안 해주지"가 된다.
+    for (const h of HOWTOS) expect(h.why.length, `${h.key}에 이유가 없다`).toBeGreaterThan(15);
+  });
+
+  it("순서와 이유가 한 덩이로 나온다", () => {
+    const md = howToMarkdown(HOWTOS.find((h) => h.key === "mfa-on")!);
+    expect(md).toContain("설정 > 내 설정");
+    expect(md).toContain("1. ");
+    expect(md).toContain("[2차 인증 켜기]");
+  });
+
+  it("키가 겹치지 않는다", () => {
+    const keys = HOWTOS.map((h) => h.key);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+});
+
+describe("★ 화면 안내보다 먼저 본다", () => {
+  it("dispatcher에서 howTo가 isHelpIntent 앞에 있다", () => {
+    // 뒤에 두면 "2차 인증 어떻게 해?"가 지금 보고 있는 화면의 일반 안내로 떨어져,
+    // 정작 켜는 법을 못 듣는다. 순서가 곧 동작이라 소스로 못 박는다.
+    const src = fs.readFileSync(new URL("../src/engine/dispatcher.ts", import.meta.url), "utf8");
+    const a = src.indexOf("findHowTo(instructionText)");
+    const b = src.indexOf("isHelpIntent(instructionText");
+    expect(a, "dispatcher가 howto를 아예 안 쓴다").toBeGreaterThan(0);
+    expect(b).toBeGreaterThan(0);
+    expect(a, "화면 안내가 먼저 가로채면 설정 질문이 엉뚱한 답을 받는다").toBeLessThan(b);
+  });
+});

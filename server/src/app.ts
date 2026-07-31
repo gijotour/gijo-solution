@@ -60,6 +60,7 @@ import { registerAlertScheduleRoutes } from "./engine/alertschedule";
 import { registerToolsRoutes } from "./engine/tools";
 import { registerTasksRoutes } from "./engine/tasks";
 import { registerMyWorkRoutes } from "./engine/mywork";
+import { registerPersonalDocsRoutes } from "./engine/personaldocs";
 import { registerMaintenanceRoutes } from "./engine/maintenance";
 import { registerTodayRoutes } from "./engine/today";
 import { registerSecurityProductRoutes } from "./engine/securityproducts";
@@ -187,6 +188,7 @@ export function createApp(): Express {
   registerToolsRoutes(app);
   registerTasksRoutes(app);
   registerMyWorkRoutes(app);
+  registerPersonalDocsRoutes(app);
   registerMaintenanceRoutes(app);
   registerTodayRoutes(app);
   registerSecurityProductRoutes(app);

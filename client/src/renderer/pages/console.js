@@ -50,6 +50,24 @@
       ".cs-row .cm{font-size:12.5px;color:var(--text,#e7eaf3);word-break:break-word;line-height:1.62;}",
       // 마크다운으로 그린 답 — **표·목록·굵은 글씨**가 좁은 창에서도 읽히게(2026-07-31).
       // ⚠ 표는 폭이 좁으면 글자가 겹친다 → 표만 가로 스크롤을 준다(창은 안 밀린다).
+      // 서랍 — 무엇을 할 수 있나. 접혀 있는 게 기본(대화가 주인공이다).
+      ".cs-drawer{flex:0 0 auto;border-bottom:1px solid var(--border,rgba(255,255,255,.08));background:var(--panel-2,#0e1526);}",
+      ".cs-dh{display:flex;align-items:center;gap:7px;padding:7px 11px;cursor:pointer;font-size:11.5px;user-select:none;}",
+      ".cs-dh .car{color:var(--muted-2,#5f6785);font-size:9px;}",
+      ".cs-dh b{color:#fff;font-weight:800;}",
+      ".cs-dh .n{margin-left:auto;color:var(--muted-2,#5f6785);font-size:10px;}",
+      // 펼쳤을 때 대화를 다 밀어내면 안 된다 — 최대 높이를 주고 그 안에서 스크롤한다.
+      ".cs-db{max-height:240px;overflow-y:auto;padding:2px 0 7px;}",
+      ".cs-cat{display:flex;align-items:center;gap:6px;padding:7px 11px 3px;font-size:10px;font-weight:800;color:var(--muted-2,#5f6785);}",
+      ".cs-bd{font-size:8.5px;font-weight:800;border-radius:4px;padding:1px 5px;}",
+      ".b-here{color:var(--teal,#1eb980);background:rgba(30,185,128,.16);}",
+      ".b-ok{color:#f0a020;background:rgba(240,160,32,.16);}",
+      ".b-go{color:var(--muted,#8b93ab);background:rgba(255,255,255,.07);}",
+      ".cs-q{display:flex;align-items:center;gap:7px;margin:3px 11px;padding:6px 10px;border-radius:7px;",
+      "  background:var(--bg,#0a0e1a);border:1px solid var(--border-strong,rgba(255,255,255,.16));",
+      "  font-size:11.5px;color:var(--text,#e7eaf3);cursor:pointer;}",
+      ".cs-q:hover{border-color:var(--blue,#3b82f6);color:var(--blue-light,#5fa1ff);}",
+      ".cs-q .ic{flex:0 0 auto;opacity:.85;}",
       ".cs-row.instr .cm{white-space:pre-wrap;}",
       ".cs-row .cm p{margin:0 0 6px;}",
       ".cs-row .cm p:last-child{margin-bottom:0;}",
@@ -75,6 +93,41 @@
       ".cs-row:hover .cs-flag,.cs-row .cs-flag:focus-visible{display:inline-block;}",
       ".cs-row .cs-flag:hover,.cs-row .cs-flag:focus-visible{color:var(--amber,#f59e0b);border-color:rgba(245,158,11,.45);}",
       ".cs-row .cs-flag.done{display:inline-block;color:var(--teal,#1eb980);border-color:rgba(30,185,128,.4);cursor:default;}",
+      // "가서 하기" 화면 열기 — 지적(cs-flag)과 달리 **늘 보인다**. 순서를 읽은 다음 바로 누를
+      // 것이라 hover로 숨기면 있는 줄도 모른다.
+      ".cs-row .cs-open{display:block;margin-top:8px;font-size:11.5px;font-weight:700;color:var(--blue-l,#5fa1ff);background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.35);border-radius:8px;padding:6px 12px;cursor:pointer;min-height:28px;font-family:inherit;}",
+      ".cs-row .cs-open:hover{background:rgba(59,130,246,.18);}",
+      ".cs-row .cs-open:disabled{color:var(--teal,#1eb980);background:rgba(30,185,128,.10);border-color:rgba(30,185,128,.35);cursor:default;}",
+      // 목록 골라 조치 — 글자 위주로. 그래픽보다 데이터가 보이는 게 핵심(2026-07-31 사용자 지시).
+      ".cs-row .cs-pick{margin-top:8px;border:1px solid rgba(255,255,255,.10);border-radius:9px;padding:8px 10px;}",
+      ".cs-row .cs-pick.done{opacity:.55;}",
+      ".cs-row .cs-ph{font-size:11px;color:var(--muted-2,#5f6785);margin-bottom:6px;}",
+      ".cs-row .cs-pi{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12px;cursor:pointer;}",
+      ".cs-row .cs-pi:hover{background:rgba(255,255,255,.03);}",
+      ".cs-row .cs-pi input{width:auto;margin:0;flex:0 0 auto;}",
+      ".cs-row .cs-pl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}",
+      ".cs-row .cs-ps{flex:0 0 auto;font-size:10.5px;color:var(--muted-2,#5f6785);}",
+      ".cs-row .cs-pb{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.08);}",
+      ".cs-row .cs-pc{font-size:11px;color:var(--muted,#8b93ab);margin-right:auto;}",
+      ".cs-row .cs-pact{font-size:11px;font-weight:700;color:var(--blue-l,#5fa1ff);background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.30);border-radius:7px;padding:4px 9px;cursor:pointer;font-family:inherit;min-height:26px;}",
+      ".cs-row .cs-pact:hover:not(:disabled){background:rgba(59,130,246,.20);}",
+      ".cs-row .cs-pact:disabled{color:var(--muted-2,#5f6785);background:none;border-color:rgba(255,255,255,.08);cursor:default;}",
+      ".cs-row .cs-pv{display:flex;gap:6px;margin-top:7px;}",
+      ".cs-row .cs-pvi{flex:1;background:var(--panel-2,#0e1526);border:1px solid rgba(255,255,255,.16);border-radius:7px;padding:5px 9px;color:var(--text,#e7eaf3);font-size:12px;font-family:inherit;outline:none;}",
+      // 실행 승인(결재판) — 대화 안에서 값을 보고 고치고 승인한다.
+      ".cs-row .cs-ap{margin-top:8px;border:1px solid rgba(240,160,32,.35);background:rgba(240,160,32,.06);border-radius:9px;padding:9px 11px;}",
+      ".cs-row .cs-aph{font-size:12px;font-weight:800;color:var(--amber,#f0a020);margin-bottom:3px;}",
+      ".cs-row .cs-apsub{font-size:11px;color:var(--muted,#8b93ab);margin-bottom:8px;}",
+      ".cs-row .cs-apf{display:flex;align-items:center;gap:8px;margin-bottom:5px;}",
+      ".cs-row .cs-apk{flex:0 0 72px;font-size:11px;color:var(--muted-2,#5f6785);}",
+      ".cs-row .cs-apin{flex:1;min-width:0;background:var(--panel-2,#0e1526);border:1px solid rgba(255,255,255,.16);border-radius:7px;padding:5px 9px;color:var(--text,#e7eaf3);font-size:12px;font-family:inherit;outline:none;}",
+      ".cs-row .cs-apin.need{border-color:rgba(226,72,61,.55);}",
+      ".cs-row .cs-ape{font-size:11px;color:var(--muted,#8b93ab);margin-top:7px;line-height:1.6;}",
+      ".cs-row .cs-apb{display:flex;gap:6px;margin-top:9px;}",
+      ".cs-row .cs-apgo{font-size:11.5px;font-weight:800;color:#fff;background:var(--teal,#1eb980);border:none;border-radius:7px;padding:6px 12px;cursor:pointer;font-family:inherit;}",
+      ".cs-row .cs-apgo:disabled{background:rgba(255,255,255,.10);color:var(--muted-2,#5f6785);cursor:default;}",
+      ".cs-row .cs-apno{font-size:11.5px;font-weight:700;color:var(--muted,#8b93ab);background:none;border:1px solid rgba(255,255,255,.14);border-radius:7px;padding:6px 12px;cursor:pointer;font-family:inherit;}",
+      ".cs-row .cs-apd{font-size:12px;color:var(--muted,#8b93ab);}",
       ".cs-row.error .cm{color:#f5928a;}",
       ".cs-typing span{display:inline-block;width:5px;height:5px;margin-right:3px;border-radius:50%;background:var(--muted,#8b93ab);animation:csb 1s infinite;}",
       ".cs-typing span:nth-child(2){animation-delay:.15s}.cs-typing span:nth-child(3){animation-delay:.3s}",
@@ -113,7 +166,8 @@
           (IS_WINDOW ? "이 창을 닫고 앱 아래에 다시 붙입니다" : "대화를 별도 창으로 빼냅니다 — 화면을 100%로 쓸 때") + '">' +
           (IS_WINDOW ? "⇤ 앱에 붙이기" : "⧉ 창으로") + "</button>" +
       "</div>" +
-      '<div class="cs-body" id="csBody"><div class="cs-empty">지시하면 여기서 실시간으로 흐릅니다.</div></div>' +
+      '<div class="cs-drawer" id="csDrawer"></div>' +
+      '<div class="cs-body" id="csBody"><div class="cs-empty">지시하면 여기서 실시간으로 흐릅니다. 위 <b>무엇을 할 수 있나</b>에서 골라도 됩니다.</div></div>' +
       '<div class="cs-dock">' +
         '<button class="cs-plus" id="dockUpload" title="파일 올리기 — 자동 분류(취약점·매뉴얼·문서). 애매하면 유형을 물어봅니다">＋</button>' +
         '<input id="chatInput" placeholder="지시를 입력하세요…" aria-label="지시를 입력하세요">' +
@@ -122,13 +176,15 @@
       '<input type="file" id="csUploadInput" multiple style="display:none">';
 
     var input = document.getElementById("chatInput");
-    document.getElementById("dockSend").addEventListener("click", submit);
+    // ⚠ submit을 그대로 붙이면 클릭 이벤트가 첫 인자로 들어가 "[object MouseEvent]"를 보낸다.
+    document.getElementById("dockSend").addEventListener("click", function () { submit(); });
     input.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } });
     // 초안은 저장한다 — 콘솔을 창으로 빼거나 붙일 때 쓰던 글이 날아가면 안 된다.
     try { var d = localStorage.getItem(DRAFT_KEY); if (d) input.value = d; } catch (e) {}
     input.addEventListener("input", function () { try { localStorage.setItem(DRAFT_KEY, input.value); } catch (e) {} });
 
     wireUpload();
+    renderDrawer();
 
     document.getElementById("csToggleHost").addEventListener("click", function () {
       if (!window.gijo) return;
@@ -231,6 +287,216 @@
   }
 
   // 답변 줄에 지적 버튼을 단다. 질문(직전 지시)과 답을 짝지어 보내야 문항이 될 수 있다.
+  // ── "가서 하기" 답에 붙는 화면 열기 ─────────────────────────────────────
+  // 서버가 순서를 안내하면서 openScreen(화면·자리)을 같이 준다(server/engine/howto.ts).
+  // ⚠ 갈 화면이 없는 안내(백업 복원처럼)에는 openScreen이 아예 안 온다 — 버튼도 안 생긴다.
+  //   있는 척 아무 화면이나 열면 담당자는 없는 버튼을 찾아 헤맨다.
+  function attachOpen(el, open) {
+    if (!el || !open || !open.page) return;
+    var leaf = String(open.label || "").split(">").pop().trim() || "화면";
+    var b = document.createElement("button");
+    b.className = "cs-open";
+    b.textContent = "🗔 " + leaf + " 열기";
+    b.addEventListener("click", function () {
+      b.disabled = true;
+      // 창 모드면 본창에 탭으로 열어 달라고 부탁한다(별도 창은 탭을 직접 못 연다).
+      // 셸 안에 붙어 있으면 바로 연다. 어느 쪽이든 **대화는 그대로 남는다**.
+      var done = function (ok, why) {
+        b.textContent = ok ? "🗔 " + leaf + " 열었습니다" : "⚠ " + (why || "열지 못했습니다");
+        if (!ok) b.disabled = false;
+      };
+      try {
+        if (IS_WINDOW && window.gijo && window.gijo.openTabInShell) {
+          window.gijo.openTabInShell(open.page, leaf).then(function (r) {
+            done(!!(r && r.ok), r && r.why);
+          }, function (e) { done(false, (e && e.message) || String(e)); });
+        } else if (window.gijoTabs) {
+          window.gijoTabs.open(open.page, leaf);
+          done(true);
+        } else {
+          done(false, "이 창에서는 화면을 열 수 없습니다 — 사이드바에서 " + leaf + "으로 가세요");
+        }
+      } catch (e) { done(false, (e && e.message) || String(e)); }
+    });
+    var cb = el.querySelector(".cb");
+    if (cb) cb.appendChild(b);
+  }
+
+  // ── 실행 승인(결재판) ──────────────────────────────────────────────────
+  // ⚠ 이게 없어서 **대화창에서는 쓰기 지시가 막다른 길이었다**(2026-07-31 발견).
+  //   "정기점검 잡아줘" 같은 지시에 서버는 결재판을 돌려주는데 대화창이 그리질 않아,
+  //   "확인해 주세요"라고 해 놓고 확인할 자리가 없었다. 챗봇 위젯(chatwidget.js)에만 있었다.
+  //   값을 고칠 수 있게 두는 이유: 모델이 채운 값이 틀렸을 때 다시 말하는 것보다 고치는 게 빠르다.
+  function attachApproval(el, ap) {
+    if (!el || !ap || !ap.tool) return;
+    var fields = ap.fields || [];
+    var box = document.createElement("div");
+    box.className = "cs-ap";
+    box.innerHTML =
+      '<div class="cs-aph">🗂 실행 승인 — ' + esc(ap.label || ap.tool) + "</div>" +
+      '<div class="cs-apsub">아래 내용대로 실행합니다. 값을 확인·수정한 뒤 승인하세요.</div>' +
+      fields.map(function (f) {
+        return '<div class="cs-apf"><span class="cs-apk">' + esc(f.label || f.key) + (f.required ? "*" : "") + "</span>" +
+          '<input class="cs-apin' + (f.source === "empty" && f.required ? " need" : "") + '" data-k="' + esc(f.key) +
+          '" value="' + esc(f.value || "") + '" placeholder="' + esc(f.hint || "") + '"></div>';
+      }).join("") +
+      (ap.effect ? '<div class="cs-ape"><b>실행되면:</b> ' + esc(ap.effect) + "</div>" : "") +
+      (ap.undo ? '<div class="cs-ape"><b>되돌리기:</b> ' + esc(ap.undo) + "</div>" : "") +
+      '<div class="cs-apb"><button class="cs-apgo">✓ 승인하고 실행</button><button class="cs-apno">취소</button></div>';
+
+    var go = box.querySelector(".cs-apgo");
+    var inputs = Array.prototype.slice.call(box.querySelectorAll(".cs-apin"));
+    var collect = function () {
+      var o = {};
+      inputs.forEach(function (i) { o[i.dataset.k] = (i.value || "").trim(); });
+      return o;
+    };
+    var required = fields.filter(function (f) { return f.required; }).map(function (f) { return f.key; });
+    var sync = function () {
+      var args = collect();
+      var miss = required.filter(function (k) { return !args[k]; });
+      go.disabled = miss.length > 0;
+      go.textContent = miss.length ? "✓ 승인 (" + miss.length + "개 입력 필요)" : "✓ 승인하고 실행";
+    };
+    inputs.forEach(function (i) { i.addEventListener("input", sync); });
+    sync();
+
+    box.querySelector(".cs-apno").addEventListener("click", function () {
+      box.innerHTML = '<div class="cs-apd">✕ 실행하지 않았습니다 — ' + esc(ap.label || ap.tool) + "</div>";
+    });
+    go.addEventListener("click", async function () {
+      go.disabled = true;
+      go.textContent = "실행 중…";
+      try {
+        var r = await window.gijo.approveAgentTool(ap.tool, collect(), ap.instruction || "");
+        box.innerHTML = '<div class="cs-apd">✅ 실행 완료 — ' + esc(ap.label || ap.tool) + "</div>";
+        append("reply", { icon: "🧭", name: "AI 팀", message: (r && r.output) || "완료했습니다." });
+        if (r && r.undoId && window.gijo.undoAgentTool) {
+          var ub = document.createElement("button");
+          ub.className = "cs-pact";
+          ub.textContent = "↩ 방금 실행 취소";
+          ub.addEventListener("click", async function () {
+            ub.disabled = true;
+            try {
+              var u = await window.gijo.undoAgentTool(r.undoId);
+              ub.remove();
+              append("event", { icon: "↩", name: "되돌림", message: (u && u.message) || "되돌렸습니다." });
+            } catch (e) {
+              ub.disabled = false;
+              append("error", { icon: "⚠", name: "오류", message: "되돌리기 실패: " + ((e && e.message) || e) });
+            }
+          });
+          box.appendChild(ub);
+        }
+      } catch (e) {
+        go.disabled = false;
+        go.textContent = "✓ 승인하고 실행";
+        append("error", { icon: "⚠", name: "오류", message: "실행 실패: " + ((e && e.message) || e) });
+      }
+    });
+    var cb = el.querySelector(".cb");
+    if (cb) cb.appendChild(box);
+  }
+
+  // ── 목록에서 골라 조치하기 ─────────────────────────────────────────────
+  // 서버가 답에 나온 취약점 목록을 picklist로 같이 준다(server/engine/picklist.ts).
+  // 조건("critical 전부")은 말로 옮긴 범위라 어긋날 수 있지만, 눈으로 고른 것은 어긋나지 않는다.
+  // ⚠ 값 입력에 window.prompt를 쓰지 않는다 — Electron에서는 OS 창이라 렌더러가 통째로 멈춘다.
+  function attachPicks(el, pl) {
+    if (!el || !pl || !pl.items || !pl.items.length) return;
+    var chosen = [];
+    var wrap = document.createElement("div");
+    wrap.className = "cs-pick";
+
+    var head = document.createElement("div");
+    head.className = "cs-ph";
+    head.textContent = "고쳐야 할 것을 골라 바로 처리할 수 있습니다";
+    wrap.appendChild(head);
+
+    pl.items.forEach(function (it) {
+      var row = document.createElement("label");
+      row.className = "cs-pi";
+      var cb = document.createElement("input");
+      cb.type = "checkbox";
+      cb.addEventListener("change", function () {
+        var at = chosen.indexOf(it.id);
+        if (cb.checked) { if (at < 0) chosen.push(it.id); }
+        else if (at >= 0) chosen.splice(at, 1);
+        sync();
+      });
+      var name = document.createElement("span");
+      name.className = "cs-pl";
+      name.textContent = it.label;
+      var sub = document.createElement("span");
+      sub.className = "cs-ps";
+      sub.textContent = (it.assignee ? "담당 " + it.assignee : "담당 미배정") + " · " + (it.dueDate ? "기한 " + it.dueDate : "기한 없음");
+      row.appendChild(cb); row.appendChild(name); row.appendChild(sub);
+      wrap.appendChild(row);
+    });
+
+    var bar = document.createElement("div");
+    bar.className = "cs-pb";
+    var cnt = document.createElement("span");
+    cnt.className = "cs-pc";
+    bar.appendChild(cnt);
+    var acts = [];
+    (pl.actions || []).forEach(function (a) {
+      var b = document.createElement("button");
+      b.className = "cs-pact";
+      b.textContent = a.label;
+      b.addEventListener("click", function () { onAct(a); });
+      acts.push(b);
+      bar.appendChild(b);
+    });
+    wrap.appendChild(bar);
+
+    // 담당자·기한처럼 값이 필요한 조치는 이 줄이 열린다(창을 띄우지 않는다).
+    var ask = document.createElement("div");
+    ask.className = "cs-pv";
+    ask.style.display = "none";
+    wrap.appendChild(ask);
+
+    function sync() {
+      cnt.textContent = chosen.length ? chosen.length + "건 선택" : "고르면 아래 조치를 쓸 수 있습니다";
+      acts.forEach(function (b) { b.disabled = chosen.length === 0; });
+    }
+    function send(a, value) {
+      // 사람에겐 뜻만, 서버에는 고른 건의 신원(sha1)까지 — 번호를 모델이 다시 읽는 일이 없다.
+      var 뜻 = "고른 " + chosen.length + "건을 " + a.label + (value ? " (" + value + ")" : "");
+      var lines = [뜻, "#고른건 " + chosen.join(","), "#조치 " + a.key];
+      if (value) lines.push("#값 " + value);
+      wrap.classList.add("done");
+      acts.forEach(function (b) { b.disabled = true; });
+      ask.style.display = "none";
+      submit(lines.join("\n"), 뜻);
+    }
+    function onAct(a) {
+      if (!chosen.length) return;
+      if (!a.needs) return send(a, "");
+      ask.innerHTML = "";
+      ask.style.display = "flex";
+      var inp = document.createElement("input");
+      inp.className = "cs-pvi";
+      if (a.needs === "dueDate") { inp.type = "date"; }
+      else { inp.type = "text"; inp.placeholder = "담당자 이름"; }
+      var ok = document.createElement("button");
+      ok.className = "cs-pact";
+      ok.textContent = "적용";
+      var go = function () {
+        var v = (inp.value || "").trim();
+        if (!v) { inp.focus(); return; } // 빈 값으로 보내면 "담당 (없음)"이라는 뜻 모를 승인이 뜬다
+        send(a, v);
+      };
+      ok.addEventListener("click", go);
+      inp.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); go(); } });
+      ask.appendChild(inp); ask.appendChild(ok);
+      inp.focus();
+    }
+    sync();
+    var cb2 = el.querySelector(".cb");
+    if (cb2) cb2.appendChild(wrap);
+  }
+
   function attachFlag(el, question, answer) {
     if (!question) return; // 무엇에 대한 지적인지 모르면 남길 수 없다
     var b = document.createElement("button");
@@ -253,6 +519,76 @@
     return window.gijoMd.render(msg);
   }
 
+
+  // ── 서랍: 무엇을 할 수 있나 ────────────────────────────────────────────
+  // ⚠ **화면 이름이 아니라 하는 일**로 묶는다(2026-07-31 사용자 결정).
+  //   담당자가 원하는 건 '취약점 화면'이 아니라 '미조치가 뭔지 아는 것'이다.
+  //   누르면 그 말이 그대로 대화로 들어간다 — 뭘 물어야 할지 몰라도 되게.
+  //
+  // 세 갈래로 나눈다(시안 승인):
+  //   here — 대화창 안에서 답이 끝난다(도구가 조회해 온다)
+  //   ok   — 상태를 바꾸므로 결재판을 거쳐 실행된다
+  //   go   — 대화로 하면 안 되는 것(설정·계정·열쇠). 순서를 알려 주고 화면을 열어 준다.
+  var CAN = [
+    { cat: "지금 급한 것", kind: "here", qs: [
+      { ic: "🔥", q: "오늘 뭐부터 해야 해?" },
+      { ic: "⏰", q: "기한 지난 일 보여줘" },
+      { ic: "✅", q: "승인 기다리는 것 있어?" },
+    ]},
+    { cat: "살펴보기", kind: "here", qs: [
+      { ic: "🛡", q: "미조치 취약점 뭐 있어?" },
+      { ic: "📦", q: "우리 자산 현황 알려줘" },
+      { ic: "🌐", q: "새로 올라온 위협 중에 우리 자산에 해당하는 게 있어?" },
+      { ic: "📋", q: "오늘 로그에서 이상 징후가 있어?" },
+      { ic: "🧩", q: "AI-BOM에서 빠뜨린 항목이 뭐야?" },
+    ]},
+    { cat: "처리하기", kind: "ok", qs: [
+      { ic: "🔧", q: "경계 방화벽(FW-01) 정기점검 잡아줘" },
+      { ic: "📝", q: "새 자산 등록할게" },
+      { ic: "🚦", q: "가장 급한 취약점에 담당자 배정해줘" },
+    ]},
+    { cat: "정리하기", kind: "here", qs: [
+      { ic: "📄", q: "이번 주 보안 현황을 요약해줘" },
+      { ic: "📊", q: "이번 달 보안 지표를 지난달과 비교해줘" },
+      { ic: "🧾", q: "최근 작업 기록에서 이상한 게 있어?" },
+    ]},
+    { cat: "설정·관리", kind: "go", qs: [
+      { ic: "🔐", q: "2차 인증 켜려면 어떻게 해?" },
+      { ic: "🔑", q: "복구 열쇠 재발급하려면 어떻게 해?" },
+      { ic: "👤", q: "담당자 계정 추가하려면 어떻게 해?" },
+    ]},
+  ];
+  var KIND_BADGE = { here: ["여기서 끝", "b-here"], ok: ["승인 후 실행", "b-ok"], go: ["가서 하기", "b-go"] };
+  var drawerOpen = false;
+
+  function renderDrawer() {
+    var el = document.getElementById("csDrawer");
+    if (!el) return;
+    var n = CAN.reduce(function (a, c) { return a + c.qs.length; }, 0);
+    var head =
+      '<div class="cs-dh" id="csDrawerH"><span class="car">' + (drawerOpen ? "▼" : "▶") + "</span>" +
+      "<b>무엇을 할 수 있나</b><span class=\"n\">" + n + "가지</span></div>";
+    var body = !drawerOpen ? "" :
+      '<div class="cs-db">' + CAN.map(function (c) {
+        var bd = KIND_BADGE[c.kind];
+        return '<div class="cs-cat">' + esc(c.cat) + '<span class="cs-bd ' + bd[1] + '">' + bd[0] + "</span></div>" +
+          c.qs.map(function (x) {
+            return '<div class="cs-q" data-q="' + esc(x.q) + '"><span class="ic">' + x.ic + "</span>" + esc(x.q) + "</div>";
+          }).join("");
+      }).join("") + "</div>";
+    el.className = "cs-drawer" + (drawerOpen ? " open" : "");
+    el.innerHTML = head + body;
+    document.getElementById("csDrawerH").addEventListener("click", function () { drawerOpen = !drawerOpen; renderDrawer(); });
+    el.querySelectorAll(".cs-q").forEach(function (q) {
+      q.addEventListener("click", function () {
+        var input = document.getElementById("chatInput");
+        input.value = q.getAttribute("data-q");
+        drawerOpen = false; renderDrawer();
+        submit();
+      });
+    });
+  }
+
   function append(kind, o) {
     var body = rows();
     var empty = body.querySelector(".cs-empty");
@@ -261,7 +597,9 @@
     el.className = "cs-row " + kind;
     var time = new Date().toLocaleTimeString("ko-KR", { hour12: false });
     var msg = String(o.message == null ? "" : o.message);
-    var long = (kind === "reply" || kind === "event") && msg.length > CLAMP_LEN;
+    // o.full — 접으면 안 되는 답. 순서 안내는 2번째 단계부터 가려지면 안내가 아니다
+    // (2026-07-31 실화면: "가서 하기" 답이 1단계만 보이고 접혀 있었다).
+    var long = !o.full && (kind === "reply" || kind === "event") && msg.length > CLAMP_LEN;
     var bodyHtml = kind === "typing"
       ? '<span class="cm cs-typing"><span></span><span></span><span></span></span>'
       : '<div class="cm' + (long ? " clamp" : "") + '">' + fmt(kind, msg) + "</div>" + (long ? '<span class="cl-more">더보기 ▾</span>' : "");
@@ -302,15 +640,24 @@
 
   // ── 전송 ──────────────────────────────────────────────────────────────
   var sending = false;
-  async function submit() {
+  /**
+   * @param sendText 입력칸 대신 보낼 지시(목록에서 고르고 누른 조치 등). 없으면 입력칸을 읽는다.
+   * @param showText 대화에 보여 줄 문장. 고른 건 조치는 뒤에 기계용 표식이 붙는데,
+   *                 그걸 그대로 보여 주면 대화가 지저분해진다 — 사람에겐 뜻만 보인다.
+   */
+  async function submit(sendText, showText) {
     var input = document.getElementById("chatInput");
-    var text = (input.value || "").trim();
+    // 문자열이 아닌 것(이벤트 객체 등)은 지시가 아니다 — 실수로 붙어도 입력칸을 읽게 둔다.
+    var typed = typeof sendText !== "string";
+    var text = typed ? (input.value || "").trim() : sendText.trim();
     if (!text || sending) return;
-    input.value = "";
-    try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+    if (typed) {
+      input.value = "";
+      try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+    }
     sending = true;
     document.getElementById("dockSend").disabled = true;
-    append("instr", { icon: "나", name: "나 → AI 팀", message: text });
+    append("instr", { icon: "나", name: "나 → AI 팀", message: showText == null ? text : showText });
     var typing = append("typing", { icon: "🧭", name: "오케스트레이터" });
     // 진행 카드 — 점 세 개 대신 서버가 실제로 지나는 단계를 보여준다(2026-07-30 시안 승인).
     // 카드는 typing 행의 .cm 자리에 그린다. progresscard.js가 없으면 기존 점 애니메이션 그대로.
@@ -330,9 +677,19 @@
         session = { id: r.sessionId };
         try { localStorage.setItem(SESS_KEY, JSON.stringify(session)); } catch (e) {}
       }
-      var replyEl = replaceTyping(typing, "reply", { icon: "🧭", name: "AI 팀", message: (r && r.output) || "(응답 없음)" });
+      var replyEl = replaceTyping(typing, "reply", {
+        icon: "🧭", name: "AI 팀", message: (r && r.output) || "(응답 없음)",
+        full: !!(r && r.openScreen), // 순서 안내는 접지 않는다 — 접으면 순서를 못 읽는다
+      });
       // 지적 버튼 — 방금 보낸 질문과 이 답을 짝지어 둔다(중-1 피드백 루프).
       attachFlag(replyEl, text, (r && r.output) || "");
+      // "가서 하기" — 계정·인증·열쇠처럼 AI가 대신 하면 안 되는 일은 순서만 안내하고,
+      // 그 화면을 찾아 들어가는 수고는 없앤다(2026-07-31 사용자 지시).
+      attachOpen(replyEl, r && r.openScreen);
+      // 목록이 나왔으면 체크해서 바로 조치할 수 있게 한다(2026-07-31 "리스트를 보고 선택도 가능한거지?").
+      attachPicks(replyEl, r && r.picklist);
+      // 쓰기 지시는 결재판으로 돌아온다 — 대화창에서 바로 확인·승인한다(없으면 막다른 길이다).
+      attachApproval(replyEl, r && r.approval);
     } catch (e) {
       if (pc) pc.stop();
       replaceTyping(typing, "error", { icon: "⚠", name: "오류", message: (e && e.message) || String(e) });

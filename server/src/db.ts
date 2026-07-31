@@ -558,3 +558,23 @@ migrate(
    ALTER TABLE tasks ADD COLUMN guideKey TEXT;
    ALTER TABLE tasks ADD COLUMN guideDone TEXT;`
 );
+
+// 개인 문서함(2026-07-31 사용자 지시 "개인용 문서함") — 담당자가 자기 메모·연락처·
+// 자주 쓰는 절차를 넣어 두는 자리.
+//  ⚠ **만든 사람만 본다.** userId로 격리하며, 남의 문서는 "없다"고 답한다(존재 여부도 안 알린다).
+//  ragOptIn — AI가 이 문서를 답변 근거로 쓸지. **기본 꺼짐**이다:
+//    켜면 유용하지만(내가 적은 절차로 답한다) 그 순간 **더 이상 개인용이 아니다** —
+//    다른 담당자 질문에도 내 메모가 근거로 나온다. 그래서 문서마다 담당자가 직접 켠다.
+migrate(
+  "personal-docs-2026-07-31",
+  `CREATE TABLE IF NOT EXISTS personal_docs (
+     id TEXT PRIMARY KEY,
+     userId TEXT NOT NULL,
+     title TEXT NOT NULL,
+     body TEXT NOT NULL,
+     ragOptIn INTEGER NOT NULL DEFAULT 0,
+     createdAt INTEGER NOT NULL,
+     updatedAt INTEGER NOT NULL
+   );
+   CREATE INDEX IF NOT EXISTS idx_personal_docs_user ON personal_docs(userId, updatedAt DESC);`
+);
