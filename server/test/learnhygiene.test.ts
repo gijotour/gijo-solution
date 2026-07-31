@@ -36,6 +36,40 @@ describe("★ 학습 기록에는 사람이 한 질문만 남는다", () => {
   });
 });
 
+describe("★ 배포·시험 계정의 문답은 학습에 안 들어간다", () => {
+  // 실측(2026-07-31): 학습 후보 385건 중 한 질문이 66회, 그중 62건이 대화로그였다.
+  // 하네스는 qa:true로 잘 격리돼 있었고 **범인은 내(배포 계정) 손 검증**이었다.
+  // 담당자가 아닌 계정으로 모델을 가르치면 제품이 아니라 시험을 배운다.
+  it("배포·게시 계정을 가려낸다", async () => {
+    const { isNonLearningAccount } = await import("../src/engine/learnpolicy");
+    expect(isNonLearningAccount("claude-deploy")).toBe(true);
+    expect(isNonLearningAccount("gijo-publish")).toBe(true);
+    expect(isNonLearningAccount("jyh"), "담당자 계정은 학습에 들어가야 한다").toBe(false);
+    expect(isNonLearningAccount(undefined), "누군지 모르면 막지 않는다(기존 동작 유지)").toBe(false);
+  });
+
+  it("noLearn은 **학습 수집만** 끈다 — 대화 이력은 그대로", () => {
+    // 이력까지 끊으면 배포 계정으로 검증할 때 사람이 쓰는 것과 다르게 동작한다
+    // (실제로 처음엔 바깥 if에 걸어 이력까지 껐다 — 주석과 코드가 어긋났다).
+    const cond = llmSrc.slice(llmSrc.indexOf("if (args.remember"), llmSrc.indexOf("if (args.remember") + 60);
+    expect(cond, "이력 갱신 조건에 noLearn이 끼면 안 된다").not.toContain("noLearn");
+    const rec = llmSrc.indexOf("recordChatLog(args.");
+    expect(llmSrc.slice(rec - 80, rec), "학습 수집에는 noLearn이 걸려야 한다").toContain("!args.noLearn");
+  });
+
+  it("★ noLearn은 서버가 정한다 — 요청이 주장할 수 없다", () => {
+    // trusted와 같은 이유다. req.body를 펼친 뒤에 서버 값으로 덮어써야 한다.
+    const i = llmSrc.indexOf("...req.body");
+    const 뒤 = llmSrc.slice(i, i + 200);
+    expect(뒤, "req.body 뒤에 서버가 정한 noLearn이 와야 한다").toContain("noLearn: isNonLearningAccount");
+  });
+
+  it("디스패치 경로에도 이어져 있다", () => {
+    expect(dispSrc).toContain("isNonLearningAccount(user?.username)");
+    expect(dispSrc, "chat 호출까지 안 닿으면 절반만 막힌다").toContain("noLearn, logQuestion: instructionText");
+  });
+});
+
 describe("QA·게이트 호출은 학습에 들어가지 않는다", () => {
   it("qa=true면 recordChatLog까지 가지 않는다", () => {
     // 게이트 문항 수백 건이 후보함에 흘러들면 "가르친 걸 채점"하게 된다.

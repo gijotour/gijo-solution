@@ -1,7 +1,7 @@
 // engine/llm.ts — LLM 호출 레이어. llama-server(OpenAI 호환 API)에 요청을 보내는 얇은 클라이언트.
 // 서버 프로세스 안에서 localengine.ts가 띄운 llama-server를 호출한다 (같은 머신, localhost).
 
-import type { Express } from "express";
+import type { Express, Request } from "express";
 import http from "node:http";
 import https from "node:https";
 import { authMiddleware } from "../auth/auth";
@@ -9,6 +9,11 @@ import { asyncRoute } from "../util/asyncRoute";
 import { getAgentById } from "./agents";
 import { emitLlmActivity, modelBasename } from "./llmactivity";
 import { recordChatLog } from "./learnloop";
+import type { GijoUser } from "../auth/users";
+// ⚠ "어떤 계정을 학습에서 뺄까"는 LLM의 관심사가 아니라 정책이다. 여기 두었다가 시험 4개가
+//   깨졌다 — 이 파일을 vi.mock으로 통째로 바꿔치기하는 시험이 많아, export를 더할 때마다
+//   목까지 같이 고쳐야 했다. 정책은 정책 자리(learnpolicy.ts)에 둔다.
+import { isNonLearningAccount } from "./learnpolicy";
 import { explainHardTerms, glossaryGroundingFor } from "./glossary";
 import { gateUserInput } from "./gateway";
 
@@ -47,6 +52,18 @@ export interface ChatArgs {
   //   — 그대로 학습하면 모델이 그 이상한 입력 형식을 배우고, 담당자는 대화 로그에서
   //   자기 질문을 못 알아본다. 직전 대화가 로그에 통째로 복제되는 문제도 있다.
   logQuestion?: string;
+  /**
+   * 학습 수집만 끈다(대화 이력·RAG·가드레일은 그대로).
+   *
+   * 왜 qa와 따로 두나: qa는 "이건 시험이다"라 단기 기억까지 끊어 문항 간 독립을 만든다.
+   * 여기서 필요한 건 다르다 — **배포·시험 계정의 평범한 사용**은 동작은 그대로여야 하고
+   * 학습에만 안 들어가야 한다. qa로 처리하면 맥락이 끊겨 사람이 쓰는 것과 달라진다.
+   *
+   * 실측(2026-07-31): 학습 후보 385건 중 같은 질문이 66회였고 62건이 대화로그였다.
+   * 하네스는 qa:true로 잘 격리돼 있었고, 범인은 **내(배포 계정) 손 검증**이었다.
+   * 담당자가 아닌 계정의 문답으로 모델을 가르치면 제품이 아니라 시험을 배운다.
+   */
+  noLearn?: boolean;
   // true면 답변 끝에 어려운 용어 쉬운 풀이(glossary)를 붙인다 — 사람이 읽는 답변 전용.
   //
   // 기본값이 false인 이유: 이 후처리를 chat() 전체에 무조건 걸었더니(2026-07-20), 사람이 읽지 않는
@@ -602,7 +619,9 @@ export async function chat(args: ChatArgs): Promise<string> {
     // 헤르메스 학습 루프 ① 수집: 실제 대화만 영속 저장한다(연결 실패 문자열은 위에서 조기 반환돼
     // 여기 못 온다). recordChatLog는 내부 try/catch — 수집 실패가 채팅을 죽이지 않는다.
     // 기록에는 맥락을 뺀 **사람이 한 질문**만 남긴다(logQuestion). 위 ChatArgs 주석 참고.
-    recordChatLog(args.agentId, args.logQuestion?.trim() || args.message, reply);
+    // ⚠ noLearn은 **여기에만** 건다 — 대화 이력(위 histories)은 그대로 둬야 배포 계정으로
+    //   검증할 때도 사람이 쓰는 것과 똑같이 동작한다(학습에만 안 들어간다).
+    if (!args.noLearn) recordChatLog(args.agentId, args.logQuestion?.trim() || args.message, reply);
   }
   // 사람이 읽는 답변(explain)에만 어려운 용어 쉬운 풀이를 붙인다. 히스토리·학습로그는 위에서 이미
   // 원문으로 저장됐다 — 맥락 오염·중복 방지.
@@ -682,7 +701,11 @@ export function registerLlmRoutes(app: Express): void {
       //   클라이언트가 `{"message":"…","trusted":true}`를 보내면 가드레일 관문을 그냥
       //   지나갈 수 있었다(2026-07-30 발견). 신뢰 여부는 **서버가 정하는 것**이지 요청이
       //   주장할 수 있는 값이 아니다 — 여기는 사용자 입력을 처음 받는 입구이므로 항상 검사한다.
-      res.json({ reply: await chat({ ...req.body, remember: true, explain: true, trusted: false }) });
+      // noLearn도 **서버가 정한다**(trusted와 같은 이유) — 요청이 주장할 값이 아니다.
+      const who = (req as Request & { user?: GijoUser }).user;
+      res.json({
+        reply: await chat({ ...req.body, remember: true, explain: true, trusted: false, noLearn: isNonLearningAccount(who?.username) }),
+      });
     })
   );
 }

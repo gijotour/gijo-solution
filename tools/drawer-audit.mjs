@@ -100,12 +100,18 @@ for (const it of items) {
     !!r.approval || !!r.picklist ||
     (out.match(/^\s*[-•]\s+\S/gm) || []).length >= 2 ||
     /\d+\s*(건|개|%)/.test(out);
-  const 판정 = out.trim().length < 20 ? "FAIL" : bad && !데이터있음 ? "FAIL" : "OK";
+  // ⚠ **"없습니다"는 정상적인 답이다.** 기한 지난 일이 정말 없으면 짧게 없다고 말하는 게 맞다.
+  //   길이만 보고 실패로 세면 제품이 옳게 답한 것을 결함이라 부르게 된다
+  //   (2026-07-31 실제로 그렇게 잡았다: "기한 지난 일정이 없습니다." 12자 → FAIL).
+  //   빈 결과를 **분명히 말한 답**은 통과시키고, 진짜로 빈 응답만 잡는다.
+  const 빈결과답 = /(없습니다|없음|0\s*건|아직\s*없)/.test(out);
+  const 너무짧다 = out.trim().length < 10 || (out.trim().length < 20 && !빈결과답);
+  const 판정 = 너무짧다 ? "FAIL" : bad && !데이터있음 ? "FAIL" : "OK";
   rows.push({
     ...it, q, 판정,
     사유: 판정 === "FAIL"
-      ? (out.trim().length < 20 ? "답이 너무 짧다" : `데이터 없이 폴백 문구만: "${bad}"`)
-      : bad ? `(단서 문구 "${bad}" 있으나 데이터 있음)` : "",
+      ? (너무짧다 ? "답이 비었거나 뜻을 알 수 없다" : `데이터 없이 폴백 문구만: "${bad}"`)
+      : bad ? `(단서 문구 "${bad}" 있으나 데이터 있음)` : 빈결과답 && !데이터있음 ? "(빈 결과를 분명히 말함 — 정상)" : "",
     초: (r.ms / 1000).toFixed(1),
     결재판: r.approval ? r.approval.tool : "",
     체크칸: r.picklist ? r.picklist.items.length : "",
