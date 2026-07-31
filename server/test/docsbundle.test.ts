@@ -76,7 +76,10 @@ describe("docsbundle — 제품 문서 기본 코퍼스 부트스트랩", () => 
   // [전중후 계획서 정렬: 전-4] 지식 번들이 knowledge/ 하위 경로 항목을 편입하면서 생긴 함정 —
   // 운영에는 같은 문서가 이미 **파일명 id**로 수동 인입돼 있다. 경로째 id를 쓰면 같은 내용이
   // 두 id로 이중 인입되어 검색 경합(QA-M04류)이 된다. id는 언제나 basename이어야 한다.
-  it("하위 폴더 항목은 파일명이 id — 같은 파일명이 이미 있으면 경로가 달라도 건너뛴다", async () => {
+  it("하위 폴더 항목도 파일명이 id — 경로가 달라도 문서는 하나뿐이다(중복 없음)", async () => {
+    // 원래 의도(중복 문서 금지)는 그대로다. 다만 내용이 다르면 **바꿔 넣는다** —
+    // 건너뛰기만 하면 문서를 고쳐 올려도 AI는 영원히 옛 내용을 안다(2026-07-31 실사고:
+    // 용어사전을 고쳤는데 운영 AI가 새 용어를 "물리적인 도구"라고 지어냈다).
     const sub = path.join(DOCS_DIR, "knowledge");
     fs.mkdirSync(sub, { recursive: true });
     fs.writeFileSync(path.join(sub, "지침.md"), "# 취약점 관리 지침\n(번들 사본)", "utf-8");
@@ -85,9 +88,41 @@ describe("docsbundle — 제품 문서 기본 코퍼스 부트스트랩", () => 
     const before = (await listDocuments()).length;
     const r = await bootstrapDocsBundle();
 
-    expect(r.skipped).toEqual(["knowledge/지침.md"]); // 기존 "지침.md"(파일명 id)와 일치 → 스킵
+    expect(r.updated).toEqual(["knowledge/지침.md"]); // 내용이 다르니 갱신
     expect(r.ingested).toEqual([]);
     expect((await listDocuments()).length).toBe(before); // 문서 수 불변 — 중복 없음
+    expect((await listDocuments()).filter((d) => d.documentId === "지침.md")).toHaveLength(1);
+  });
+
+  it("★ 내용이 그대로면 다시 넣지 않는다 — 재기동마다 통째로 갈아엎지 않게", async () => {
+    const sub = path.join(DOCS_DIR, "knowledge");
+    fs.mkdirSync(sub, { recursive: true });
+    fs.writeFileSync(path.join(sub, "고정.md"), "# 안 바뀌는 문서\n내용 그대로", "utf-8");
+    writeManifest([{ file: "knowledge/고정.md" }]);
+
+    const 첫번째 = await bootstrapDocsBundle();
+    expect(첫번째.ingested).toEqual(["knowledge/고정.md"]);
+
+    const 두번째 = await bootstrapDocsBundle();
+    expect(두번째.skipped, "안 바뀐 문서를 매번 지웠다 넣으면 기동이 느려지고 검색이 흔들린다")
+      .toEqual(["knowledge/고정.md"]);
+    expect(두번째.updated).toEqual([]);
+  });
+
+  it("★ 내용을 고치면 다시 들어간다 — 옛 조각은 남지 않는다", async () => {
+    const sub = path.join(DOCS_DIR, "knowledge");
+    fs.mkdirSync(sub, { recursive: true });
+    const 파일 = path.join(sub, "바뀌는.md");
+    fs.writeFileSync(파일, "# 용어\n서랍이란 아직 없는 말이다", "utf-8");
+    writeManifest([{ file: "knowledge/바뀌는.md" }]);
+    await bootstrapDocsBundle();
+
+    fs.writeFileSync(파일, "# 용어\n서랍은 대화창 위에 접힌 질문 보기다", "utf-8");
+    const r = await bootstrapDocsBundle();
+
+    expect(r.updated).toEqual(["knowledge/바뀌는.md"]);
+    const 문서 = (await listDocuments()).filter((d) => d.documentId === "바뀌는.md");
+    expect(문서, "옛 문서와 새 문서가 함께 남으면 서로 다른 답이 번갈아 나온다").toHaveLength(1);
   });
 
   it("하위 폴더의 새 문서는 파일명 id로 인입된다 (경로 접두가 id에 남지 않는다)", async () => {
@@ -107,7 +142,7 @@ describe("docsbundle — 제품 문서 기본 코퍼스 부트스트랩", () => 
     process.env.GIJO_DOCS_MANIFEST = path.join(tmp, "없는매니페스트.json");
     try {
       const r = await bootstrapDocsBundle();
-      expect(r).toEqual({ ingested: [], skipped: [], missing: [], failed: [] });
+      expect(r).toEqual({ ingested: [], skipped: [], updated: [], missing: [], failed: [] });
     } finally {
       process.env.GIJO_DOCS_MANIFEST = MANIFEST;
     }

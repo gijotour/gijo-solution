@@ -542,8 +542,12 @@
       { ic: "📋", q: "오늘 로그에서 이상 징후가 있어?" },
       { ic: "🧩", q: "AI-BOM에서 빠뜨린 항목이 뭐야?" },
     ]},
+    // ⚠ 자산·제품 이름을 **박아 두지 않는다**(2026-07-31 실측: 예시로 쓰던 "경계 방화벽(FW-01)"이
+    //   운영에 없어서 첫 클릭이 "그런 자산이 없습니다"로 끝났다. 서랍은 "이건 된다"고 약속하는
+    //   자리라 첫 클릭이 실패하면 없느니만 못하다).
+    //   {제품} 자리는 서랍을 펼칠 때 **실제 등록된 제품 이름**으로 채운다. 하나도 없으면 그 줄을 뺀다.
     { cat: "처리하기", kind: "ok", qs: [
-      { ic: "🔧", q: "경계 방화벽(FW-01) 정기점검 잡아줘" },
+      { ic: "🔧", q: "{제품} 정기점검 잡아줘", needs: "product" },
       { ic: "📝", q: "새 자산 등록할게" },
       { ic: "🚦", q: "가장 급한 취약점에 담당자 배정해줘" },
     ]},
@@ -561,15 +565,44 @@
   var KIND_BADGE = { here: ["여기서 끝", "b-here"], ok: ["승인 후 실행", "b-ok"], go: ["가서 하기", "b-go"] };
   var drawerOpen = false;
 
+  // 실제 등록된 제품 이름 하나. 서랍을 처음 펼칠 때 한 번만 물어 기억한다(없으면 null).
+  var realProduct;
+  async function loadRealNames() {
+    if (realProduct !== undefined) return;
+    realProduct = null;
+    try {
+      var r = await window.gijo.listSecurityProducts();
+      var rows2 = Array.isArray(r) ? r : (r && (r.items || r.products)) || [];
+      var hit = rows2.find(function (p) { return p && p.name; });
+      if (hit) realProduct = hit.name;
+    } catch (e) { /* 못 불러와도 서랍은 뜬다 — 그 줄만 빠진다 */ }
+  }
+
+  /** 실데이터가 필요한 줄을 채우거나(있으면) 뺀다(없으면). */
+  function fillQs(qs) {
+    var out = [];
+    qs.forEach(function (x) {
+      if (x.needs === "product") {
+        if (!realProduct) return; // 등록된 제품이 없으면 이 줄은 보여주지 않는다
+        out.push({ ic: x.ic, q: x.q.replace("{제품}", realProduct) });
+        return;
+      }
+      out.push(x);
+    });
+    return out;
+  }
+
   function renderDrawer() {
     var el = document.getElementById("csDrawer");
     if (!el) return;
-    var n = CAN.reduce(function (a, c) { return a + c.qs.length; }, 0);
+    var cats = CAN.map(function (c) { return { cat: c.cat, kind: c.kind, qs: fillQs(c.qs) }; })
+      .filter(function (c) { return c.qs.length > 0; });
+    var n = cats.reduce(function (a, c) { return a + c.qs.length; }, 0);
     var head =
       '<div class="cs-dh" id="csDrawerH"><span class="car">' + (drawerOpen ? "▼" : "▶") + "</span>" +
       "<b>무엇을 할 수 있나</b><span class=\"n\">" + n + "가지</span></div>";
     var body = !drawerOpen ? "" :
-      '<div class="cs-db">' + CAN.map(function (c) {
+      '<div class="cs-db">' + cats.map(function (c) {
         var bd = KIND_BADGE[c.kind];
         return '<div class="cs-cat">' + esc(c.cat) + '<span class="cs-bd ' + bd[1] + '">' + bd[0] + "</span></div>" +
           c.qs.map(function (x) {
@@ -578,7 +611,14 @@
       }).join("") + "</div>";
     el.className = "cs-drawer" + (drawerOpen ? " open" : "");
     el.innerHTML = head + body;
-    document.getElementById("csDrawerH").addEventListener("click", function () { drawerOpen = !drawerOpen; renderDrawer(); });
+    document.getElementById("csDrawerH").addEventListener("click", function () {
+      drawerOpen = !drawerOpen;
+      // 펼칠 때 실제 이름을 불러온다(닫힌 채로는 부르지 않는다 — 안 쓸 수도 있는 호출을 아낀다).
+      if (drawerOpen && realProduct === undefined) {
+        loadRealNames().then(renderDrawer);
+      }
+      renderDrawer();
+    });
     el.querySelectorAll(".cs-q").forEach(function (q) {
       q.addEventListener("click", function () {
         var input = document.getElementById("chatInput");

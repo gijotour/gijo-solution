@@ -13,8 +13,10 @@
 
 import * as fs from "fs/promises";
 import * as path from "path";
+import { createHash } from "crypto";
 
-import { GLOBAL_SCOPE, ingestText, listDocuments } from "./memory";
+import { db } from "../db";
+import { GLOBAL_SCOPE, ingestText, listDocuments, deleteDocument } from "./memory";
 
 // 프로젝트 관례(localengine의 MODELS_DIR, memory의 DB_PATH)대로 cwd 기준 상대경로 + 환경변수
 // 오버라이드. 다만 저 둘과 달리 모듈 로드 시점에 상수로 굳히지 않고 호출할 때마다 읽는다 —
@@ -44,7 +46,8 @@ interface Manifest {
 
 export interface DocsBundleResult {
   ingested: string[];
-  skipped: string[]; // 이미 지식베이스에 있어 건너뛴 문서
+  skipped: string[]; // 이미 지식베이스에 있고 내용도 그대로라 건너뛴 문서
+  updated: string[]; // 내용이 바뀌어 옛 조각을 지우고 다시 넣은 문서
   missing: string[]; // 매니페스트에 있지만 파일을 찾지 못한 문서
   failed: { file: string; reason: string }[];
 }
@@ -74,8 +77,18 @@ async function resolveDocPath(file: string): Promise<string | null> {
 // 이미 인입된 문서는 다시 넣지 않는다(재기동마다 중복 청크가 쌓이는 것을 막는다).
 // 사용자가 화면에서 지운 문서도 '없음'으로 보이므로 재기동 시 되살아나는데, 기본 코퍼스는
 // 제품이 스스로 설명하기 위한 최소 자료라 그 편이 맞다(원치 않으면 매니페스트에서 뺀다).
+//
+// ★ 단, **내용이 바뀌었으면 다시 넣는다**(2026-07-31 실측 사고).
+//   예전에는 문서 id만 보고 건너뛰어서, 용어사전을 고쳐 올려도 AI는 영원히 옛 내용을 알았다.
+//   "서랍이 뭐야?"에 운영 AI가 "물리적인 도구"라고 지어냈다 — 문서는 새것인데 지식은 헌것이었다.
+//   문서를 고치는 일은 앞으로도 계속 있으므로, 사람이 기억해서 지웠다 넣는 절차로 두지 않는다.
+const hashOf = (raw: string) => createHash("sha256").update(raw, "utf8").digest("hex").slice(0, 16);
+const HASH_KEY = (docId: string) => `docsbundle:hash:${docId}`;
+const getHashStmt = db.prepare("SELECT value FROM app_state WHERE key = ?");
+const setHashStmt = db.prepare("INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value");
+
 export async function bootstrapDocsBundle(): Promise<DocsBundleResult> {
-  const result: DocsBundleResult = { ingested: [], skipped: [], missing: [], failed: [] };
+  const result: DocsBundleResult = { ingested: [], skipped: [], updated: [], missing: [], failed: [] };
   const manifest = await readManifest();
   if (!manifest?.files?.length) return result;
 
@@ -87,22 +100,46 @@ export async function bootstrapDocsBundle(): Promise<DocsBundleResult> {
     // 접두를 남기면 안 된다(2026-07-29 실측 함정: 운영에 파일명 id로 이미 인입된 지식 문서가
     // 경로 id로 한 번 더 들어가 중복 문서 = 검색 경합이 될 뻔했다).
     const docId = path.basename(entry.file);
-    if (existing.has(docId)) {
-      result.skipped.push(entry.file);
-      continue;
-    }
     const docPath = await resolveDocPath(entry.file);
     if (!docPath) {
+      // 파일이 없으면 '없음'이다. 이미 인입돼 있다면 지우지 않는다 — 문서를 잠깐 못 찾은 것과
+      // 문서를 뺀 것은 다르다(경로 문제로 지식이 통째로 날아가면 복구가 어렵다).
       result.missing.push(entry.file);
       continue;
     }
+    let raw: string;
     try {
-      const raw = await fs.readFile(docPath, "utf-8");
+      raw = await fs.readFile(docPath, "utf-8");
+    } catch (err) {
+      result.failed.push({ file: entry.file, reason: err instanceof Error ? err.message : String(err) });
+      continue;
+    }
+    const hash = hashOf(raw);
+    if (existing.has(docId)) {
+      const known = (getHashStmt.get(HASH_KEY(docId)) as { value?: string } | undefined)?.value;
+      if (known === hash) {
+        result.skipped.push(entry.file);
+        continue;
+      }
+      // 바뀌었다 → 옛 조각을 지우고 다시 넣는다. 지우지 않으면 옛 내용과 새 내용이 함께 검색돼
+      // 서로 다른 답이 번갈아 나온다(중복 청크는 눈에 안 보여서 더 나쁘다).
+      try {
+        await deleteDocument(docId);
+      } catch (err) {
+        result.failed.push({ file: entry.file, reason: `옛 조각 정리 실패: ${err instanceof Error ? err.message : String(err)}` });
+        continue;
+      }
+      result.updated.push(entry.file);
+    }
+    try {
       // classify=false로 넣는다. ① 분류는 LLM을 호출하는데 부팅 직후엔 아직 안 떠 있을 수 있고,
       // ② '매뉴얼'로 분류되면 보안제품 등록부에 자동 연결되는데(memory.linkManualToProduct)
       // GIJO 자체 매뉴얼이 남의 벤더 제품 매뉴얼로 붙는 건 등록부 오염이다.
       await ingestText(docId, raw, scope, docPath, false);
-      result.ingested.push(entry.file);
+      // 해시는 **인입에 성공한 뒤에만** 남긴다 — 실패했는데 기록해 두면 다음 기동에서
+      // "그대로다"라고 판단해 영영 안 들어간다(조용한 지식 공백).
+      setHashStmt.run(HASH_KEY(docId), hash);
+      if (!result.updated.includes(entry.file)) result.ingested.push(entry.file);
     } catch (err) {
       result.failed.push({ file: entry.file, reason: err instanceof Error ? err.message : String(err) });
     }
@@ -116,10 +153,12 @@ export async function bootstrapDocsBundle(): Promise<DocsBundleResult> {
 export async function bootstrapDocsBundleWithRetry(attempts = 5, delayMs = 20_000): Promise<void> {
   for (let i = 1; i <= attempts; i += 1) {
     const r = await bootstrapDocsBundle();
-    const done = r.ingested.length + r.skipped.length;
+    const done = r.ingested.length + r.skipped.length + r.updated.length;
     if (r.failed.length === 0) {
+      // 갱신은 따로 말한다 — "몇 건 인입"에 묻히면 문서를 고친 사람이 반영됐는지 알 수 없다.
+      if (r.updated.length > 0) console.log(`[docsbundle] 바뀐 문서 ${r.updated.length}건 다시 인입: ${r.updated.join(", ")}`);
       if (r.ingested.length > 0) console.log(`[docsbundle] 제품 문서 ${r.ingested.length}건 인입 완료 (기존 ${r.skipped.length}건 유지)`);
-      else if (done > 0) console.log(`[docsbundle] 제품 문서 ${r.skipped.length}건 이미 인입됨 — 건너뜀`);
+      else if (r.updated.length === 0 && done > 0) console.log(`[docsbundle] 제품 문서 ${r.skipped.length}건 이미 인입됨 — 건너뜀`);
       if (r.missing.length) console.warn(`[docsbundle] 파일을 찾지 못함: ${r.missing.join(", ")}`);
       return;
     }
