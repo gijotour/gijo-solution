@@ -4,6 +4,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import { createApp } from "../src/app";
 import { isHelpIntent, getScreenGuide, formatScreenGuide } from "../src/engine/screenguide";
+import { isMyWorkAsk } from "../src/engine/picklist";
 
 describe("screenguide — 도움말 의도 감지", () => {
   it("도움말성 질문은 감지한다", () => {
@@ -289,5 +290,34 @@ describe("정기점검 — 스케줄 조회와 절차 질문을 가른다", () =
     const code = src.split("\n").filter((l) => !l.trim().startsWith("//")).join("\n");
     expect(code).toContain("정기|월간|주간|분기|연간");
     expect(code).toContain("hardening_schedule_list");
+  });
+});
+
+describe("★ 화면 설명을 물으면 화면 설명이 나온다 — 자료를 쏟지 않는다", () => {
+  // 챗봇 전수 점검(2026-08-01)에서 잡힌 두 자리.
+  //   · "여기 내 업무 화면은 뭐 하는 곳이야?" → 남은 일 4건이 쏟아졌다
+  //   · "여기 보안 KPI 화면은 뭐 하는 곳이야?" → KPI 숫자가 쏟아졌다
+  // 답 자체는 멀쩡해서 길이·폴백·누출 검사를 전부 통과한다. **물은 것과 다른 답**이라는 게
+  // 문제고, 담당자에겐 그게 곧 "안 직관적인 화면"이다.
+  it("영문 섞인 화면 이름도 화면 질문으로 잡는다", () => {
+    // 앞 가지가 [가-힣]{2,10}이라 KPI·AI-BOM·CLI를 못 받았다.
+    expect(isHelpIntent("여기 보안 KPI 화면은 뭐 하는 곳이야?", "kpi.html")).toBe(true);
+    expect(isHelpIntent("여기 AI-BOM 화면은 뭐 하는 곳이야?", "sbom.html")).toBe(true);
+    expect(isHelpIntent("여기 터미널 (CLI) 화면은 뭐 하는 곳이야?", "terminal.html")).toBe(true);
+  });
+
+  it("★ 화면을 안 물은 질문은 여전히 안 걸린다 — 넓히다 새면 안 된다", () => {
+    // 낱말 「화면」을 요구하므로 2026-07-26 사고(벤더 제품 질문이 화면 안내로 샘)는 재발하지 않는다.
+    expect(isHelpIntent("Tenable Web App Scanning 주요기능 설명해줘", "dashboard.html")).toBe(false);
+    expect(isHelpIntent("미조치 취약점 알려줘", "vulnscan.html")).toBe(false);
+    expect(isHelpIntent("오늘 뭐부터 볼까?", "dashboard.html")).toBe(false);
+    expect(isHelpIntent("우리 자산 몇 대야?", "inventory.html")).toBe(false);
+  });
+
+  it("할 일 목록 경로가 화면 질문에서 비켜선다", () => {
+    // isMyWorkAsk가 isHelpIntent보다 먼저 돌기 때문에, 여기서 안 비키면 화면 안내에 닿지 못한다.
+    expect(isMyWorkAsk("여기 내 업무 화면은 뭐 하는 곳이야?"), "화면을 물었는데 할 일을 쏟는다").toBe(false);
+    expect(isMyWorkAsk("내 업무 보여줘"), "진짜 할 일 질문까지 막으면 안 된다").toBe(true);
+    expect(isMyWorkAsk("오늘 할 일 알려줘")).toBe(true);
   });
 });

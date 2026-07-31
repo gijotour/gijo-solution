@@ -131,7 +131,10 @@ export function findingListAnswer(): { output: string; picklist: PickList | null
 
 const WORK_ASK_RE = /(내\s*업무|내\s*할\s*일|오늘\s*할\s*일|오늘\s*남은|남은\s*일|할\s*일|업무\s*목록|해야\s*할)/;
 // 이미 다른 결정적 경로가 맡은 말은 비켜 준다(취약점 목록·설정 안내).
-const WORK_BLOCK_RE = /(취약점|자산|보고서|리포트|설정|계정|인증|열쇠|백업|어떻게|방법)/;
+// ★ "화면·메뉴·하는 곳"도 비켜 준다 — 화면 **설명**을 물었는데 할 일 목록을 쏟던 것을 막는다.
+//   실측(2026-08-01 챗봇 전수): "여기 내 업무 화면은 뭐 하는 곳이야?"에 남은 일 4건이 나왔다.
+//   답 자체는 멀쩡해서 어떤 검사에도 안 걸린다 — 물은 것과 다른 답이라는 게 문제다.
+const WORK_BLOCK_RE = /(취약점|자산|보고서|리포트|설정|계정|인증|열쇠|백업|어떻게|방법|화면|메뉴|페이지|하는\s*곳)/;
 
 export function isMyWorkAsk(text: string): boolean {
   const t = String(text ?? "");
