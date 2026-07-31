@@ -317,8 +317,19 @@
 
     var guide = guideCache[t.guideKey];
     if (!guide) {
+      // ⚠ 가이드를 받아오는 동안 **직전 업무의 단계가 그대로 남아 있으면 안 된다**
+      //   (2026-07-31 게시본 실측에서 발견: "AI-BOM 점검"을 골랐는데 "보고서 파일 올리기"가
+      //   떠 있었다). 담당자가 그걸 보고 따라 하면 엉뚱한 일을 한다 — 안내 화면에서 이건
+      //   느린 것보다 나쁘다. 머리글은 지금 아는 값으로 **즉시** 바꾸고 단계 자리는 비운다.
+      box.innerHTML =
+        '<div class="g-h"><div class="g-t">' + esc(t.text) + "</div>" +
+        (t.why ? '<div class="g-why"><b>왜 지금:</b><span>' + esc(t.why) + "</span></div>" : "") + "</div>" +
+        '<div class="empty">순서를 불러오는 중…</div>';
       try { guide = await window.gijo.workGuide(t.guideKey); guideCache[t.guideKey] = guide; }
       catch (e) { box.innerHTML = '<div class="empty">가이드를 불러오지 못했습니다.</div>'; return; }
+      // 기다리는 사이 담당자가 다른 업무를 골랐으면 이 결과는 버린다 — 늦게 온 응답이
+      // 새로 고른 화면을 덮어쓰면 방금 그 버그가 반대 방향으로 다시 난다.
+      if (selId !== t.id) return;
     }
     // 아직 담기지 않은 AI 제안은 진행이 저장될 곳이 없다 — 담으면 그때부터 남는다.
     var done = t.saved ? (t.guideDoneList || []) : [];
