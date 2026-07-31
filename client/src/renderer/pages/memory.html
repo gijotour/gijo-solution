@@ -508,12 +508,22 @@ tr:last-child td{border-bottom:none;}
     catch (e) { body.innerHTML = '<span style="color:#f5928a">점검 실패: ' + dmEsc(e.message || e) + "</span>"; return; }
     document.getElementById("hygienePanel").style.borderColor = r.clean ? "var(--border)" : "rgba(240,160,32,0.35)";
     if (r.clean) { body.innerHTML = '<span style="color:var(--teal)">✓ 상충·중복 없음 — 문서 ' + r.totalDocs + '건 모두 깔끔합니다.</span>'; return; }
-    var label = { duplicate: "완전중복", version_conflict: "버전충돌", stale: "신선도검토" };
+    // ⚠ 서버가 내는 종류를 하나 빠뜨리면 화면에 **[undefined]** 가 그대로 나온다
+    //   (2026-08-01 실앱 점검에서 발견 — demo_overlap이 표에 없었다).
+    //   서버(engine/kbhygiene.ts)에 종류를 더하면 여기도 같이 더할 것. 모르는 종류가 와도
+    //   [undefined] 대신 종류 이름이라도 보이게 둔다 — 담당자가 우리에게 알려줄 수 있다.
+    var label = {
+      duplicate: "완전중복",
+      version_conflict: "버전충돌",
+      stale: "신선도검토",
+      demo_overlap: "데모문서 겹침",
+    };
+    var 종류이름 = function (t) { return label[t] || String(t || "확인필요"); };
     var color = { high: "#f5928a", medium: "#f7c777", low: "var(--muted)" };
     body.innerHTML = r.findings.map(function (f) {
       var docs = f.documents.map(function (id) { return '<span class="hy-doc" data-hy="' + dmEsc(id) + '" style="color:var(--blue-light);cursor:pointer;text-decoration:underline">' + dmEsc(id) + "</span>"; }).join(", ");
       return '<div style="padding:8px 0;border-bottom:1px solid var(--border)">' +
-        '<b style="color:' + color[f.severity] + '">[' + label[f.type] + "]</b> " + dmEsc(f.reason) +
+        '<b style="color:' + (color[f.severity] || "var(--muted)") + '">[' + dmEsc(종류이름(f.type)) + "]</b> " + dmEsc(f.reason) +
         '<div style="margin-top:3px">대상: ' + docs + "</div>" +
         '<div style="font-size:11px;color:var(--muted-2);margin-top:2px">→ ' + dmEsc(f.suggestion) + "</div></div>";
     }).join("") + '<div style="font-size:11px;color:var(--amber);margin-top:8px">※ 삭제는 자동으로 하지 않습니다. 문서명을 눌러 아래에서 확인 후 지우세요.</div>';
@@ -878,13 +888,15 @@ tr:last-child td{border-bottom:none;}
       document.getElementById("ftProgressFill").style.width = pct + "%";
       if (p.status === "done") {
         document.getElementById("ftProgressFill").style.width = "100%";
-        line.textContent = `✓ 학습 완료 — 최종 loss ${p.loss}`;
+        // 담당자는 머신러닝 용어를 모른다. loss는 "얼마나 틀리는가"이고 낮을수록 좋다 —
+        // 그 뜻을 화면에 그대로 적는다(2026-08-01 사용자 상황 점검에서 발견).
+        line.textContent = `✓ 학습 완료 — 마지막 오차 ${p.loss} (낮을수록 잘 배운 것)`;
         line.className = "status-line status-ok";
       } else if (p.status === "error") {
         line.textContent = `✗ 학습 실패${p.message ? ": " + p.message : ""}`;
         line.className = "status-line status-err";
       } else {
-        line.textContent = `학습 중 — step ${p.step}/${p.maxSteps}, loss ${p.loss}`;
+        line.textContent = `학습 중 — ${p.step}/${p.maxSteps}단계 · 오차 ${p.loss}`;
         line.className = "status-line status-ok";
       }
     });

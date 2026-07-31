@@ -207,7 +207,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         ${t.source ? `<span class="src-tag">${esc(t.source)}</span>` : ""}
         <button class="del-btn" data-id="${t.id}" title="삭제">🗑</button>
       </div>`).join("");
-    box.querySelectorAll(".del-btn").forEach((b) => b.addEventListener("click", () => removeTriple(b.dataset.id)));
+    // 무엇을 지우는지 확인 창에 그대로 보여준다 — "이 관계"라고만 하면 어느 것인지 모른다.
+    box.querySelectorAll(".del-btn").forEach((b) =>
+      b.addEventListener("click", () => removeTriple(b.dataset.id, (b.closest(".triple") || b.parentElement)?.innerText.replace(/\s+/g, " ").trim()))
+    );
   }
 
   // 노드-링크 그래프를 원형 배치로 그린다(결정적 레이아웃 — 새로고침해도 위치 안정).
@@ -304,8 +307,20 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     } catch (e) { status.textContent = "✗ 추가 실패: " + e.message; status.className = "status-line status-err"; }
   }
 
-  async function removeTriple(id) {
-    try { await window.gijo.removeOntologyTriple(id); await refresh(document.getElementById("filterSubject").value.trim() || undefined); } catch (e) {}
+  // 지식 관계 하나를 지운다. 두 가지를 지킨다(2026-07-31 사용자 상황 점검에서 발견):
+  //  ① **묻고 지운다.** 예전엔 🗑을 누르는 즉시 사라졌다. 되돌리기가 없는데 확인도 없으면,
+  //     손이 미끄러진 것과 결심한 것을 구별할 방법이 없다.
+  //  ② **실패하면 말한다.** 예전엔 catch가 비어 있어, 못 지웠는데도 아무 말이 없었다 —
+  //     담당자는 지워진 줄 알고 넘어간다(목록엔 그대로 남아 있으니 더 혼란스럽다).
+  async function removeTriple(id, 설명) {
+    const 물음 = `이 관계를 지울까요?\n\n${설명 || ""}\n\n지운 관계는 되돌릴 수 없습니다. AI가 이 관계를 근거로 하던 답이 달라질 수 있습니다.`;
+    if (window.gijoAsk && !(await window.gijoAsk(물음, { ok: "삭제", danger: true }))) return;
+    try {
+      await window.gijo.removeOntologyTriple(id);
+      await refresh(document.getElementById("filterSubject").value.trim() || undefined);
+    } catch (e) {
+      alert("지우지 못했습니다: " + ((e && e.message) || e) + "\n\n목록에 그대로 남아 있습니다.");
+    }
   }
 
   async function expand() {

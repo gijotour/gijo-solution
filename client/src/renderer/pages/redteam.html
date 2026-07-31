@@ -364,7 +364,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     if(!rep || rep.total == null){
       document.getElementById("effScore").textContent = "-";
       document.getElementById("effLeakWord").textContent = "미측정";
-      document.getElementById("effRanAt").textContent = "아직 실효 점검 기록이 없습니다.";
+      document.getElementById("effRanAt").textContent = "아직 실효 점검 기록이 없습니다 — [실효 점검 실행]을 누르면 지금 방어 상태를 잽니다.";
       return;
     }
     const leaked = rep.leaked || 0;
