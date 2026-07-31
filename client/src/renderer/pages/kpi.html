@@ -306,7 +306,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     // [지표, 조건, 문구, 할 일 문장, 급함, 갈 화면]
     // ⚠ page는 **실제 있는 화면**만 쓴다. 없는 화면을 적으면 눌렀을 때 아무 일도 안 일어난다
     //   (howto.ts에서 8개 중 5개가 틀렸던 실사고 — nav.js 기준으로 대조할 것).
-    //   유지보수 점검(c.inspections)은 전용 화면이 없어 여기서 뺐다 — 갈 곳 없는 버튼은 만들지 않는다.
+    //   유지보수 점검은 갈 곳이 없어 뺐다가, maintenance.html을 만든 뒤 되살렸다(2026-08-01).
     var cands = [
       { n: v.kev, t: "실제 악용(KEV) <b>" + v.kev + "건</b>", sub: "공격이 실제로 쓰이는 취약점 — 이번 주 안에 막아야 합니다",
         task: "KEV 등재 취약점 " + v.kev + "건 우선 조치", p: "P0", page: "vulnscan.html" },
@@ -319,6 +319,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         task: "검토 대기 항목(finding) " + c.findings.pending + "건 검토", p: "P1", page: "approvals.html" },
       { n: c.assets.highRisk, t: "고위험 자산 <b>" + c.assets.highRisk + "대</b>", sub: "위험이 몰린 장비 — 여기부터 손대면 점수가 가장 많이 오릅니다",
         task: "고위험 자산 " + c.assets.highRisk + "대 점검", p: "P1", page: "assethub.html" },
+      { n: c.inspections.overdue, t: "지연된 정기점검 <b>" + c.inspections.overdue + "건</b>",
+        sub: "기한이 지난 유지보수 점검 — 점검서를 올리면 관리자 승인으로 닫힙니다",
+        task: "지연 점검 " + c.inspections.overdue + "건 수행", p: "P2", page: "maintenance.html" },
+      { n: c.inspections.pendingApproval, t: "점검 보고서 검토 대기 <b>" + c.inspections.pendingApproval + "건</b>",
+        sub: "담당자가 점검서를 올렸는데 아직 승인·반려가 안 됐습니다",
+        task: "점검 보고서 " + c.inspections.pendingApproval + "건 검토", p: "P2", page: "maintenance.html" },
       { n: a && a.aiAssets && a.avgRobustness == null ? a.aiAssets : 0, t: "AI 자산 견고성 <b>미점검</b>",
         sub: "AI 자산은 있는데 공격 저항력을 한 번도 안 재봤습니다",
         task: "AI 자산 견고성 점검(레드팀) 실행", p: "P2", page: "redteam.html" },

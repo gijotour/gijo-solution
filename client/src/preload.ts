@@ -212,6 +212,7 @@ const gijoApi = {
     api.maintenanceApi.report(id, args),
   approveMaintenance: (id: string) => api.maintenanceApi.approve(id),
   rejectMaintenance: (id: string, reason: string) => api.maintenanceApi.reject(id, reason),
+  maintenanceHistory: (id: string) => api.maintenanceApi.history(id),
   getMaintenanceHistory: (id: string) => api.maintenanceApi.history(id),
   getMaintenanceNotify: () => api.maintenanceApi.getNotify(),
   sendMaintenanceNotify: (to: string[]) => api.maintenanceApi.notify(to),

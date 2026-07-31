@@ -60,6 +60,9 @@
       { page: "approvals.html", label: "조치·승인" },
       { page: "products.html", label: "보안제품 등록부" },
       { page: "opsguide.html", label: "제품 유지보수" },
+      // 「유지보수 점검」은 기한이 있는 **일감**(늦었나·검토 대기인가), 「제품 유지보수」는 읽는 **가이드**다.
+      // 이름이 비슷해 붙여 둔다 — 떨어뜨려 놓으면 둘 다 못 찾는다(2026-08-01 신설).
+      { page: "maintenance.html", label: "유지보수 점검" },
       { page: "hardening.html", label: "원격 정기점검" },
       { page: "terminal.html", label: "터미널 (CLI)" },
     ]},

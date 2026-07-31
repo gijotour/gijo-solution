@@ -5,6 +5,7 @@ import request from "supertest";
 import { createApp } from "../src/app";
 import { isHelpIntent, getScreenGuide, formatScreenGuide } from "../src/engine/screenguide";
 import { isMyWorkAsk } from "../src/engine/picklist";
+import fs from "node:fs";
 
 describe("screenguide — 도움말 의도 감지", () => {
   it("도움말성 질문은 감지한다", () => {
@@ -333,5 +334,22 @@ describe("★ 있는 기능을 없다고 하지 않는다 (챗봇 전수 2026-08
     // 강한 가지에 넣었으면 "Tenable로 할 수 있는 게 뭐야?"가 화면 안내로 샜을 것이다.
     expect(isHelpIntent("Tenable로 할 수 있는 게 뭐야?", "dashboard.html")).toBe(false);
     expect(isHelpIntent("CVE-2021-44228로 할 수 있는 게 뭐야?", "vulnscan.html")).toBe(false);
+  });
+});
+
+describe("★ 메뉴에 있는 화면은 챗봇 안내도 있어야 한다", () => {
+  // 제품 규칙: 화면 설명·사용법은 전부 챗봇(screenguide)이 맡는다. 화면엔 정체성 한 줄과 ⚠경고만.
+  // 그래서 안내가 빠진 화면은 **아무 데서도 설명되지 않는 화면**이 된다 —
+  // 담당자가 "여기 뭐 하는 곳이야?"라고 물으면 화면과 무관한 답이 나온다.
+  // 새 화면을 만들 때 이걸 잊기 쉬워(2026-08-01 maintenance.html 신설) 대조로 못 박는다.
+  it("nav.js 메뉴와 screenguide 목록이 어긋나지 않는다", () => {
+    const nav = fs.readFileSync(new URL("../../client/src/renderer/pages/nav.js", import.meta.url), "utf8");
+    const 메뉴: string[] = [];
+    for (const m of nav.matchAll(/\{\s*page:\s*"([a-z0-9_-]+\.html)(?:\?[^"]*)?",\s*label:/g)) {
+      if (!메뉴.includes(m[1])) 메뉴.push(m[1]);
+    }
+    expect(메뉴.length, "nav에서 화면을 못 찾았다 — 시험이 헛돌고 있다").toBeGreaterThan(20);
+    const 없음 = 메뉴.filter((p) => !getScreenGuide(p));
+    expect(없음, "이 화면들은 챗봇이 설명하지 못한다").toEqual([]);
   });
 });

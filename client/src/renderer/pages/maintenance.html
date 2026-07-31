@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 유지보수 점검</title>
+<!--
+  유지보수 점검(maintenance) 전용 화면 — 2026-08-01 신설.
+
+  왜 만들었나: /api/maintenance에 점검 10건(그중 기한 초과 6건)이 들어 있는데
+  **이걸 보여주는 화면이 하나도 없었다.** 보안 KPI는 "지연 5건"이라고 세어 주면서
+  누르면 갈 곳이 없었고, 챗봇으로만 물어볼 수 있었다. 지표가 있는데 손댈 자리가
+  없는 것이 이 제품에서 반복된 결함이라 그 마지막 구멍을 메운다.
+-->
+<style>
+:root{
+  --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
+.app{display:grid;grid-template-columns:220px 1fr;}
+.sidebar{padding:22px 14px;border-right:1px solid var(--border);min-height:100vh;}
+.main{padding:20px 26px 48px;}
+.page-title{font-size:16px;font-weight:800;}
+
+.ident{font-size:12.5px;color:var(--muted);margin-bottom:16px;max-width:1040px;}
+.ident b{color:var(--text);}
+.ident .warn{color:#f5928a;font-weight:700;}
+
+/* 요약 카드 = 필터. 다른 화면과 같은 방식이라 새로 배울 게 없다. */
+.sum{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;max-width:1040px;margin-bottom:18px;}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;cursor:pointer;transition:border-color .12s,background .12s;}
+.card:hover{border-color:var(--border-strong);}
+.card.on{border-color:var(--blue);background:rgba(59,130,246,.08);}
+.card .l{font-size:11.5px;color:var(--muted);font-weight:700;}
+.card .v{font-size:30px;font-weight:900;line-height:1.15;margin-top:2px;}
+.card .s{font-size:10px;color:var(--muted-2);margin-top:2px;}
+
+/* 지금 손댈 일 — 보안 KPI와 같은 결(숫자에서 곧장 할 일로) */
+.todo{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;max-width:1040px;margin-bottom:18px;}
+.todo .t{font-size:12px;font-weight:800;color:var(--muted);margin-bottom:10px;}
+.trow{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--border);}
+.trow:first-of-type{border-top:0;}
+.trow .w{flex:1;min-width:0;font-size:12.5px;}
+.trow .w .sub{display:block;font-size:10.5px;color:var(--muted-2);margin-top:2px;}
+.todo-none{font-size:12px;color:var(--muted-2);}
+
+.btn{flex:none;font-size:11px;font-weight:700;padding:5px 11px;border-radius:7px;border:1px solid var(--border-strong);background:transparent;color:var(--text);cursor:pointer;font-family:inherit;}
+.btn:hover{background:rgba(255,255,255,.06);}
+.btn.prim{border-color:rgba(59,130,246,.5);color:var(--blue-light);}
+.btn[disabled]{opacity:.55;cursor:default;}
+
+.tbl{width:100%;max-width:1040px;border-collapse:collapse;background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.tbl th{text-align:left;font-size:11px;color:var(--muted);font-weight:700;padding:10px 12px;background:var(--panel-2);border-bottom:1px solid var(--border);}
+.tbl td{font-size:12.5px;padding:11px 12px;border-top:1px solid var(--border);vertical-align:middle;}
+.tbl tr.late td{background:rgba(226,72,61,.06);}
+.pill{display:inline-block;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:20px;white-space:nowrap;}
+.p-late{background:rgba(226,72,61,.16);color:#f5928a;}
+.p-sched{background:rgba(139,147,171,.16);color:var(--muted);}
+.p-rep{background:rgba(240,160,32,.16);color:#f7c777;}
+.p-app{background:rgba(30,185,128,.16);color:#6fdcb5;}
+.p-rej{background:rgba(226,72,61,.16);color:#f5928a;}
+.soon{color:var(--amber);font-weight:700;font-size:11px;}
+.dim{color:var(--muted-2);font-size:11px;}
+.acts{display:flex;gap:6px;justify-content:flex-end;}
+.empty{padding:28px;text-align:center;color:var(--muted-2);font-size:12.5px;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="sidebar" id="gijoNav"></div>
+
+  <div class="main">
+    <div class="page-title">유지보수 점검</div>
+
+    <div class="ident" id="ident">
+      🔧 <b>유지보수 점검</b> — 보안장비·AI 자산의 정기 점검을 <b>기한 순으로</b> 챙기는 곳입니다.
+    </div>
+
+    <div id="gijoChatWidget" data-prompts='["기한 지난 점검 알려줘","이번 달 점검 일정 뭐야?"]' style="max-width:640px;margin-bottom:16px;"></div>
+
+    <div class="sum" id="sumCards" data-gijo-summary></div>
+    <div id="todoWrap"></div>
+
+    <table class="tbl">
+      <thead><tr>
+        <th style="width:104px">기한</th><th>점검 항목</th><th style="width:190px">대상</th>
+        <th style="width:96px">상태</th><th style="width:74px">주기</th><th style="width:180px"></th>
+      </tr></thead>
+      <tbody id="rows"><tr><td colspan="6" class="empty">불러오는 중…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+  var 항목 = [];
+  var 관리자 = false;
+  var 고른상태 = "all";
+  var 오늘 = new Date().toISOString().slice(0, 10);
+
+  // 지연 판정은 **한 곳에서만** 한다 — 카드·띠·표가 서로 다르게 세면 담당자가 숫자를 못 믿는다.
+  function 지연인가(m) { return m.scheduleDate < 오늘 && m.status !== "approved"; }
+  function 지난날수(d) { return Math.max(0, Math.round((new Date(오늘) - new Date(d)) / 86400000)); }
+  function 남은날수(d) { return Math.max(0, Math.round((new Date(d) - new Date(오늘)) / 86400000)); }
+
+  var 상태이름 = { scheduled: "예정", reported: "검토 대기", approved: "승인됨", rejected: "반려됨" };
+  var 상태색 = { scheduled: "p-sched", reported: "p-rep", approved: "p-app", rejected: "p-rej" };
+
+  function esc(s) { return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+
+  function 집계() {
+    var 지연 = 항목.filter(지연인가).length;
+    var 검토 = 항목.filter(function (m) { return m.status === "reported"; }).length;
+    var 이번달 = 항목.filter(function (m) { return m.scheduleDate.slice(0, 7) === 오늘.slice(0, 7) && !지연인가(m); }).length;
+    return { 전체: 항목.length, 지연: 지연, 검토: 검토, 이번달: 이번달 };
+  }
+
+  function 카드그리기() {
+    var c = 집계();
+    var 목 = [
+      { key: "all", l: "전체", v: c.전체, s: "등록된 점검", col: "" },
+      { key: "late", l: "⚠ 기한 지남", v: c.지연, s: "가장 먼저 볼 것", col: "#f5928a" },
+      { key: "reported", l: "보고서 검토 대기", v: c.검토, s: "관리자 승인 필요", col: "var(--amber)" },
+      { key: "month", l: "이번 달 예정", v: c.이번달, s: "아직 기한 전", col: "var(--blue-light)" },
+    ];
+    document.getElementById("sumCards").innerHTML = 목.map(function (t) {
+      return '<div class="card' + (고른상태 === t.key ? " on" : "") + '" data-filter="' + t.key + '">' +
+        '<div class="l">' + t.l + '</div><div class="v"' + (t.col ? ' style="color:' + t.col + '"' : "") + ">" + t.v + "</div>" +
+        '<div class="s">' + t.s + "</div></div>";
+    }).join("");
+    // 정체성 줄의 ⚠경고는 실제 숫자와 맞춘다 — 화면에 두는 유일한 안내다.
+    var id = document.getElementById("ident");
+    var 기존 = id.querySelector(".warn");
+    if (기존) 기존.remove();
+    if (c.지연 > 0) {
+      var w = document.createElement("span");
+      w.className = "warn";
+      w.textContent = " ⚠ 기한 지남 " + c.지연 + "건";
+      id.appendChild(w);
+    }
+  }
+
+  // 🎯 지금 손댈 일 — 0이면 줄을 만들지 않는다(없는 일을 있는 척하면 목록을 안 믿게 된다).
+  function 할일그리기() {
+    var c = 집계();
+    var 늦은것 = 항목.filter(지연인가).sort(function (a, b) { return a.scheduleDate < b.scheduleDate ? -1 : 1; })[0];
+    var 줄 = [];
+    if (c.지연 > 0) {
+      줄.push({
+        t: "기한 지난 점검 <b>" + c.지연 + "건</b>",
+        sub: "가장 오래된 것은 <b>" + 지난날수(늦은것.scheduleDate) + "일</b> 지났습니다 — " + esc(늦은것.title),
+        task: "기한 지난 유지보수 점검 " + c.지연 + "건 수행", p: "P1", filter: "late",
+      });
+    }
+    if (c.검토 > 0) {
+      줄.push({
+        t: "검토 대기 <b>" + c.검토 + "건</b>",
+        sub: "담당자가 점검서를 올렸는데 아직 승인·반려가 안 됐습니다",
+        task: "점검 보고서 " + c.검토 + "건 검토", p: "P2", filter: "reported",
+      });
+    }
+    할일그리기.items = 줄;
+    var w = document.getElementById("todoWrap");
+    if (!줄.length) {
+      w.innerHTML = '<div class="todo"><div class="t">🎯 지금 손댈 일</div>' +
+        '<div class="todo-none">늦은 점검이 없습니다 — 기한을 넘기거나 검토가 밀리면 여기에 줄이 생깁니다.</div></div>';
+      return;
+    }
+    w.innerHTML = '<div class="todo"><div class="t">🎯 지금 손댈 일 <span style="font-weight:600;color:var(--muted-2)">· 늦은 것만 골랐습니다(' + 줄.length + '건)</span></div>' +
+      줄.map(function (x, i) {
+        return '<div class="trow"><div class="w">' + x.t + '<span class="sub">' + x.sub + "</span></div>" +
+          '<button class="btn prim" data-todo="' + i + '">＋ 할 일로 담기</button>' +
+          '<button class="btn" data-filter="' + x.filter + '">아래 목록에서 보기</button></div>';
+      }).join("") + "</div>";
+  }
+
+  function 걸러진것() {
+    if (고른상태 === "late") return 항목.filter(지연인가);
+    if (고른상태 === "reported") return 항목.filter(function (m) { return m.status === "reported"; });
+    if (고른상태 === "month") return 항목.filter(function (m) { return m.scheduleDate.slice(0, 7) === 오늘.slice(0, 7) && !지연인가(m); });
+    return 항목;
+  }
+
+  function 표그리기() {
+    // 기한 순이 기본이다 — 점검은 "무엇이 늦었나"가 전부라 이름순·등록순은 쓸 일이 없다.
+    var 목 = 걸러진것().slice().sort(function (a, b) { return a.scheduleDate < b.scheduleDate ? -1 : a.scheduleDate > b.scheduleDate ? 1 : 0; });
+    var tb = document.getElementById("rows");
+    if (!목.length) {
+      tb.innerHTML = '<tr><td colspan="6" class="empty">이 조건에 맞는 점검이 없습니다.</td></tr>';
+      return;
+    }
+    tb.innerHTML = 목.map(function (m) {
+      var 늦음 = 지연인가(m);
+      var 날짜부 = 늦음 ? '<div class="dim">' + 지난날수(m.scheduleDate) + "일 지남</div>"
+        : m.status === "approved" ? '<div class="dim">끝남</div>'
+        : m.scheduleDate === 오늘 ? '<div class="soon">오늘</div>'
+        : '<div class="dim">' + 남은날수(m.scheduleDate) + "일 남음</div>";
+      // 줄마다 **지금 할 수 있는 것**만 둔다. 승인·반려는 서버가 admin으로 막으므로 화면도 같게 맞춘다.
+      var 버튼 = [];
+      if (m.status === "reported") {
+        if (관리자) {
+          버튼.push('<button class="btn prim" data-approve="' + esc(m.id) + '">승인</button>');
+          버튼.push('<button class="btn" data-reject="' + esc(m.id) + '">반려</button>');
+        } else {
+          버튼.push('<span class="dim">관리자 승인 대기</span>');
+        }
+      } else if (m.status === "approved") {
+        버튼.push('<button class="btn" data-history="' + esc(m.id) + '">기록 보기</button>');
+      } else {
+        버튼.push('<button class="btn' + (늦음 ? " prim" : "") + '" data-report="' + esc(m.id) + '">점검서 올리기</button>');
+      }
+      return '<tr class="' + (늦음 ? "late" : "") + '">' +
+        "<td>" + esc(m.scheduleDate) + 날짜부 + "</td>" +
+        "<td>" + esc(m.title) + "</td>" +
+        "<td>" + esc(m.productName || m.assetName || "-") + "</td>" +
+        '<td><span class="pill ' + (늦음 && m.status === "scheduled" ? "p-late" : 상태색[m.status] || "p-sched") + '">' +
+          (늦음 && m.status === "scheduled" ? "기한 지남" : 상태이름[m.status] || m.status) + "</span></td>" +
+        '<td class="dim">' + (m.intervalDays ? m.intervalDays + "일" : "1회성") + "</td>" +
+        '<td><div class="acts">' + 버튼.join("") + "</div></td></tr>";
+    }).join("");
+  }
+
+  function 다시그리기() { 카드그리기(); 할일그리기(); 표그리기(); 배선(); }
+
+  function 배선() {
+    document.querySelectorAll("[data-filter]").forEach(function (el) {
+      el.onclick = function () { 고른상태 = el.dataset.filter; 다시그리기(); };
+    });
+    document.querySelectorAll("[data-todo]").forEach(function (btn) {
+      btn.onclick = async function () {
+        var it = (할일그리기.items || [])[Number(btn.dataset.todo)];
+        if (!it || btn.disabled) return;
+        btn.disabled = true;
+        var 원래 = btn.textContent;
+        btn.textContent = "담는 중…";
+        try {
+          await window.gijo.addTask(it.task, { priority: it.p, ref: "maintenance.html" });
+          btn.textContent = "✓ 담김";
+          btn.classList.remove("prim");
+        } catch (e) {
+          // 실패를 삼키면 담긴 줄 알고 넘어간다 — 버튼에 그대로 적는다.
+          btn.disabled = false;
+          btn.textContent = "✕ 실패 · 다시";
+          btn.title = e && e.message ? e.message : "서버 오류";
+          setTimeout(function () { btn.textContent = 원래; }, 4000);
+        }
+      };
+    });
+    document.querySelectorAll("[data-approve]").forEach(function (b) {
+      b.onclick = function () { 결재(b.dataset.approve, true, b); };
+    });
+    document.querySelectorAll("[data-reject]").forEach(function (b) {
+      b.onclick = function () { 결재(b.dataset.reject, false, b); };
+    });
+    document.querySelectorAll("[data-report]").forEach(function (b) {
+      b.onclick = function () {
+        // 점검서 첨부는 대화창(지휘소)이 맡는다 — 파일을 다루는 자리를 화면마다 만들지 않는다.
+        var m = 항목.filter(function (x) { return x.id === b.dataset.report; })[0];
+        var 말 = "「" + (m ? m.title : "") + "」 점검서를 올릴게";
+        if (window.gijoConsole && window.gijoConsole.ask) window.gijoConsole.ask(말);
+        else if (window.gijoAsk) window.gijoAsk(말);
+        else window.gijo.navigateTo("console.html");
+      };
+    });
+    document.querySelectorAll("[data-history]").forEach(function (b) {
+      b.onclick = async function () {
+        b.disabled = true;
+        try {
+          var h = await window.gijo.maintenanceHistory(b.dataset.history);
+          var 글 = (h || []).map(function (r) { return "· " + (r.at ? new Date(r.at).toLocaleString("ko-KR") : "") + " " + (r.action || "") + (r.actor ? " (" + r.actor + ")" : ""); }).join("\n");
+          await window.gijoTell("점검 기록\n\n" + (글 || "기록이 없습니다."));
+        } catch (e) {
+          await window.gijoTell("기록을 못 불러왔습니다 — " + String(e && e.message ? e.message : e));
+        }
+        b.disabled = false;
+      };
+    });
+  }
+
+  async function 결재(id, 승인, btn) {
+    var m = 항목.filter(function (x) { return x.id === id; })[0] || {};
+    // ⚠ Electron에서 window.confirm은 렌더러를 멈춘다 — 화면 안에서 묻는다(dialog.js).
+    var 머리 = "「" + (m.title || "") + "」 (" + (m.productName || "") + ")\n\n";
+    if (승인) {
+      var 답 = await window.gijoAsk(머리 + "이 점검을 승인할까요?\n주기가 있는 점검은 다음 회차가 자동으로 만들어집니다.", { ok: "승인" });
+      if (!답) return;
+    }
+    var 사유 = "";
+    if (!승인) {
+      // 반려는 **사유가 곧 다음 담당자의 지시**다 — 비워 두면 왜 되돌아왔는지 아무도 모른다.
+      사유 = await window.gijoPrompt(머리 + "반려 사유를 적어 주세요.\n담당자가 이 글을 보고 다시 점검합니다.", { ok: "반려", danger: true });
+      if (사유 === null) return;
+      if (!String(사유).trim()) { await window.gijoTell("반려 사유를 적어야 합니다."); return; }
+    }
+    btn.disabled = true;
+    try {
+      if (승인) await window.gijo.approveMaintenance(id);
+      else await window.gijo.rejectMaintenance(id, String(사유).trim());
+      await 불러오기();
+    } catch (e) {
+      btn.disabled = false;
+      await window.gijoTell("처리하지 못했습니다 — " + String(e && e.message ? e.message : e));
+    }
+  }
+
+  async function 불러오기() {
+    try {
+      항목 = (await window.gijo.listMaintenance()) || [];
+    } catch (e) {
+      document.getElementById("rows").innerHTML =
+        '<tr><td colspan="6" class="empty">점검 목록을 불러오지 못했습니다 — ' + esc(e && e.message ? e.message : e) + "</td></tr>";
+      return;
+    }
+    다시그리기();
+  }
+
+  (async function init() {
+    try {
+      var me = await window.gijo.me();
+      관리자 = !!me && (me.role === "admin" || me.isAdmin === true);
+    } catch (e) {}
+    await 불러오기();
+  })();
+</script>
+
+<script src="dialog.js"></script>
+<script src="nav.js"></script>
+<script src="progresscard.js"></script>
+<script src="gijomd.js"></script>
+<script src="chatwidget.js"></script>
+<script src="titlebar.js"></script>
+</body>
+</html>
