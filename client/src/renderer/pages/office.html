@@ -201,10 +201,13 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
     <div class="olive"><div class="ol-h">사무실 LIVE 채팅<span class="lv">LIVE</span></div>
       <div class="ol-feed" id="oliveFeed"><div style="font-size:11px;color:var(--muted-2);padding:6px 0">팀이 움직이면 대화가 여기 실시간으로 흐릅니다.</div></div></div>
     <div class="todo">
+      <!-- ⚠ 읽기 전용이다(2026-07-31). 같은 목록을 대시보드·이 창·'내 업무' 세 군데서 각각
+           적어 넣고 있었다(전부 /api/tasks). 적어 넣는 창구는 '내 업무' 하나로 모았다 —
+           거기서는 적으면 그 일을 어떤 순서로 하는지까지 안내받는다. 여기는 팀이 뭘 하는지
+           보는 창이므로 "지금 뭐가 남았나"만 보여준다. -->
       <div class="t-head">☑ 오늘의 할일 <span class="t-cnt" id="todoCnt"></span></div>
       <div class="t-add">
-        <input id="todoInput" placeholder="할 일 추가… (Enter)" maxlength="200" aria-label="할 일 추가">
-        <button id="todoAddBtn" title="추가">＋</button>
+        <button id="todoOpenBtn" style="width:100%" title="내 업무 화면에서 적고 진행합니다">내 업무에서 열기 →</button>
       </div>
       <div class="t-list" id="todoList">
         <div id="myTasks"><div class="t-empty">불러오는 중…</div></div>
@@ -736,7 +739,6 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
 
   const todoList = document.getElementById("todoList");
   const todoCnt = document.getElementById("todoCnt");
-  const todoInput = document.getElementById("todoInput");
   const ctaBtn = document.getElementById("ctaBtn");
   const guideBox = document.getElementById("guideBox");
   const guideBrief = document.getElementById("guideBrief");
@@ -992,17 +994,11 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
     } catch (err) { feedLine("시스템", "할일 처리 실패: " + (err && err.message || err), "var(--red)"); }
   });
 
-  async function addTodo() {
-    const text = todoInput.value.trim();
-    if (!text) return;
-    todoInput.value = "";
-    try {
-      await window.gijo.addTask(text, { routineFeedback: true }); // 직접 입력 — 루틴 학습 신호
-      await loadTasks();
-    } catch (err) { feedLine("시스템", "할일 추가 실패: " + (err && err.message || err), "var(--red)"); }
-  }
-  document.getElementById("todoAddBtn").addEventListener("click", addTodo);
-  todoInput.addEventListener("keydown", (e) => { if (e.key === "Enter") addTodo(); });
+  // 적어 넣기는 '내 업무' 화면으로 보낸다(2026-07-31) — 거기서는 적으면 그 일을 어떤 순서로
+  // 하는지까지 안내받는다. 이 창은 별도 창이라 탭 셸이 없으므로 메인 창 이동으로 연다.
+  document.getElementById("todoOpenBtn").addEventListener("click", () => {
+    if (window.gijo && window.gijo.navigateTo) window.gijo.navigateTo("mywork.html");
+  });
 
   // ── 운영 시작 CTA ──
   // 비어 있으면: 루틴 추천으로 오늘의 할일을 채운다. 있으면: 최우선 할일을 오케스트레이터에게 지시.

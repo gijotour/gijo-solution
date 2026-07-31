@@ -619,11 +619,11 @@ async function runClient() {
       };
     });
     if (m.groups.length !== 4) throw new Error(`그룹 ${m.groups.length}개: ${m.groups.join(",")}`);
-    // 맨 위 고정 4자리 — 대시보드 · 팀 사무실(창) · 문서함(창) · 작업 내역.
-    // 2026-07-31 문서함(창)을 더해 3 → 4가 됐다(실화면 검증 완료: 설치본 4.8.0에서 8/8).
+    // 맨 위 고정 5자리 — 대시보드 · 팀 사무실(창) · 내 업무 · 문서함(창) · 작업 내역.
+    // 2026-07-31 문서함(창)으로 3→4, 같은 날 '내 업무'를 팀 사무실 아래 더해 4→5가 됐다.
     // 개수만 세면 "무엇이 늘었는지"를 못 잡으므로 이름까지 확인한다.
-    if (m.fixed.length !== 4) throw new Error(`맨 위 고정이 ${m.fixed.length}자리: ${m.fixed.join(",")}`);
-    for (const 있어야 of ["대시보드", "팀 사무실", "문서함", "작업 내역"]) {
+    if (m.fixed.length !== 5) throw new Error(`맨 위 고정이 ${m.fixed.length}자리: ${m.fixed.join(",")}`);
+    for (const 있어야 of ["대시보드", "팀 사무실", "내 업무", "문서함", "작업 내역"]) {
       if (!m.fixed.some((f) => f.includes(있어야))) throw new Error(`맨 위 고정에 '${있어야}'가 없다: ${m.fixed.join(",")}`);
     }
     if (!m.fav) throw new Error("⭐즐겨찾기 가지가 안 보인다 — 비어 있어도 보여야 한다");

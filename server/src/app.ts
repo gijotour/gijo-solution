@@ -59,6 +59,7 @@ import { registerObservabilityRoutes } from "./engine/observability";
 import { registerAlertScheduleRoutes } from "./engine/alertschedule";
 import { registerToolsRoutes } from "./engine/tools";
 import { registerTasksRoutes } from "./engine/tasks";
+import { registerMyWorkRoutes } from "./engine/mywork";
 import { registerMaintenanceRoutes } from "./engine/maintenance";
 import { registerTodayRoutes } from "./engine/today";
 import { registerSecurityProductRoutes } from "./engine/securityproducts";
@@ -185,6 +186,7 @@ export function createApp(): Express {
   registerAlertScheduleRoutes(app); // 정기 알림(후-1 알림 스케줄)
   registerToolsRoutes(app);
   registerTasksRoutes(app);
+  registerMyWorkRoutes(app);
   registerMaintenanceRoutes(app);
   registerTodayRoutes(app);
   registerSecurityProductRoutes(app);

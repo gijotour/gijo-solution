@@ -249,9 +249,13 @@
       <div class="card"><h3>🔥 급한 것 <span class="cnt" id="urgentCnt"></span></h3>
         <div id="urgentList"><div class="empty">불러오는 중…</div></div></div>
 
+      <!-- 오늘 할 일 — **읽기 전용 요약**이다(2026-07-31).
+           같은 목록을 대시보드·팀 사무실 창·내 업무 세 군데서 각각 적어 넣고 있었다(전부 /api/tasks).
+           적어 넣는 창구는 '내 업무' 하나로 모으고, 여기는 "지금 몇 건 남았나"만 보여준다.
+           대시보드는 훑는 자리지 일하는 자리가 아니다. -->
       <div class="card"><h3>☑ 오늘 할 일 <span class="cnt" id="taskCnt"></span></h3>
         <div id="taskList"><div class="empty">불러오는 중…</div></div>
-        <div class="addrow"><input id="taskNew" placeholder="할 일 적기" maxlength="200"><button id="taskAdd">추가</button></div></div>
+        <div class="addrow"><button id="taskOpen" style="width:100%">내 업무에서 열기 →</button></div></div>
 
       <div class="card"><h3>📊 한눈에</h3>
         <div id="kpiBox"><div class="empty">불러오는 중…</div></div></div>
@@ -521,15 +525,8 @@
     try { await window.gijo.toggleTask(row.dataset.id, e.target.checked); } catch (err) {}
     loadTasks();
   });
-  async function addTask() {
-    var el = $("taskNew"), text = el.value.trim();
-    if (!text) return;
-    el.value = "";
-    try { await window.gijo.addTask(text); } catch (e) {}
-    loadTasks();
-  }
-  $("taskAdd").addEventListener("click", addTask);
-  $("taskNew").addEventListener("keydown", function (e) { if (e.key === "Enter") addTask(); });
+  // 적어 넣기는 '내 업무'로 보낸다 — 거기서 적으면 그 일을 어떤 순서로 하는지까지 안내받는다.
+  $("taskOpen").addEventListener("click", function () { go("mywork.html"); });
 
   // ── 한눈에 ───────────────────────────────────────────────────────────
   // 서버 KPI에 실제로 있는 값만 쓴다. 없는 항목은 줄 자체를 안 만든다(빈칸에 0을 채우지 않는다).

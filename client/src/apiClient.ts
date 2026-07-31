@@ -929,6 +929,55 @@ export interface EffectiveReport {
   results: { id: string; severity: string; outcome: "blocked" | "held" | "leaked"; excerpt: string }[];
 }
 
+// ── 내 업무 (2026-07-31) ─────────────────────────────────────────────────
+// 담당자가 볼 것은 하나인데 출처는 셋(직접 적은 할 일·AI가 찾은 오늘 할 일·자주 하는 업무).
+// 섞는 규칙은 서버에만 두고 화면은 받은 대로 그린다 — 화면마다 다르게 섞이면 그때부터
+// "왜 여기만 다르지"가 시작된다.
+export interface MyWorkItem {
+  id: string;
+  text: string;
+  origin: "me" | "ai" | "routine";
+  saved: boolean; // false면 아직 안 담긴 AI 제안
+  done: boolean;
+  priority: string;
+  dueAt?: number;
+  overdue: boolean;
+  recur?: "weekly" | "monthly";
+  why?: string;
+  ref?: string;
+  guideKey?: string;
+  guideTotal: number;
+  guideDoneCount: number;
+  guideDoneList: number[];
+}
+export interface MyWorkPayload {
+  today: MyWorkItem[];
+  week: MyWorkItem[];
+  later: MyWorkItem[];
+  done: MyWorkItem[];
+  routines: { text: string; cadence: "daily" | "weekly"; source: string }[];
+  counts: { today: number; overdue: number; doneToday: number };
+}
+export interface WorkGuideStep {
+  kind: "open" | "ask" | "note";
+  title: string;
+  desc?: string;
+  page?: string;
+  question?: string;
+}
+export interface WorkGuide { key: string; label: string; steps: WorkGuideStep[] }
+
+export const myWorkApi = {
+  list: () => request<MyWorkPayload>("/api/mywork"),
+  // 자주 하는 업무 — RAG+LLM이라 몇 초 걸린다. 목록과 따로 부른다(목록을 기다리게 하지 않는다).
+  routines: () => request<{ text: string; cadence: "daily" | "weekly"; source: string }[]>("/api/mywork/routines"),
+  guide: (key: string) => request<WorkGuide>(`/api/mywork/guide/${encodeURIComponent(key)}`),
+  adopt: (body: { text: string; ref?: string; origin?: string; dueAt?: number; recur?: string }) =>
+    request<{ id: string }>("/api/mywork/adopt", { method: "POST", body }),
+  step: (id: string, step: number, done: boolean) =>
+    request<unknown>(`/api/mywork/${encodeURIComponent(id)}/step`, { method: "POST", body: { step, done } }),
+};
+
 export type GuardMode = "off" | "flag" | "block";
 export interface GuardEvent {
   at: number;

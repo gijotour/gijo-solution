@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 내 업무</title>
+<style>
+  :root{
+    --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+    --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+    --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:#05070d;color:var(--text);}
+  .header{display:flex;justify-content:space-between;align-items:center;padding:12px 22px;border-bottom:1px solid var(--border);background:var(--bg);}
+  .header-left,.header-right{display:flex;align-items:center;gap:14px;}
+  .header img{height:22px;}
+  .app-title{font-size:14px;font-weight:800;color:#fff;}
+  .clock{font-size:12px;color:var(--muted);}
+  .status-pill{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--teal);background:rgba(30,185,128,0.1);border:1px solid rgba(30,185,128,0.25);border-radius:20px;padding:5px 12px;}
+  .status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
+  .beta-tag{font-size:9px;font-weight:800;color:var(--muted-2);letter-spacing:.5px;}
+  .avatar-btn{width:30px;height:30px;border-radius:50%;background:var(--blue);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer;}
+  .icon-btn{width:30px;height:30px;border-radius:8px;border:1px solid var(--border-strong);display:flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer;}
+  .app{display:flex;min-height:calc(100vh - 55px);background:var(--bg);}
+  .sidebar{border-right:1px solid var(--border);background:#0b1020;}
+  .mw-main{flex:1;padding:16px 20px 34px;min-width:0;}
+
+  .scr-id{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);margin-bottom:11px;flex-wrap:wrap;}
+  .scr-id b{color:var(--text);font-weight:800;}
+  .scr-id .ask{color:var(--blue-light);cursor:pointer;font-weight:700;}
+  .scr-id .ask:hover{text-decoration:underline;}
+  .legend{display:flex;gap:13px;flex-wrap:wrap;font-size:10.5px;color:var(--muted);margin-bottom:11px;}
+  .legend i{display:inline-block;width:3px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px;}
+
+  /* 2단 — 왼쪽 고른다 / 오른쪽 그대로 따라 한다 */
+  .two{display:grid;grid-template-columns:minmax(300px,365px) 1fr;gap:12px;align-items:start;}
+  @media (max-width:900px){ .two{grid-template-columns:1fr;} }
+
+  .box{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:10px;}
+  .bh{display:flex;align-items:center;gap:8px;padding:10px 13px;border-bottom:1px solid var(--border);}
+  .bh h3{font-size:12.5px;font-weight:800;color:#fff;}
+  .bh .n{font-size:10.5px;color:var(--muted-2);font-weight:700;}
+  .bh .r{margin-left:auto;font-size:10.5px;color:var(--muted-2);}
+
+  .it{display:flex;align-items:flex-start;gap:9px;padding:9px 13px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;position:relative;}
+  .it:last-child{border-bottom:none;}
+  .it::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:transparent;}
+  .it.ai::before{background:var(--purple);}
+  .it.rep::before{background:var(--blue);}
+  .it.over::before{background:var(--red);}
+  .it.sel{background:rgba(59,130,246,.13);}
+  .it.sel::after{content:"";position:absolute;right:0;top:0;bottom:0;width:3px;background:var(--blue);}
+  .it .ck{width:14px;height:14px;flex:0 0 auto;margin-top:2px;accent-color:var(--teal);cursor:pointer;}
+  .ib{flex:1;min-width:0;}
+  .it-t{font-size:12.5px;color:var(--text);font-weight:600;overflow:hidden;text-overflow:ellipsis;}
+  .it.done .it-t{color:var(--muted-2);text-decoration:line-through;}
+  .it-m{font-size:10.5px;color:var(--muted-2);margin-top:2px;display:flex;gap:6px;align-items:center;flex-wrap:wrap;}
+  .tag{font-size:9px;font-weight:800;border-radius:4px;padding:1px 5px;}
+  .t-ai{color:var(--purple);background:rgba(139,124,240,.16);}
+  .t-me{color:var(--muted);background:rgba(255,255,255,.07);}
+  .t-rep{color:var(--blue-light);background:rgba(59,130,246,.16);}
+  .due.over{color:var(--red);font-weight:700;}
+  .due.today{color:var(--amber);font-weight:700;}
+  .prog{font-size:10px;color:var(--teal);font-weight:800;flex:0 0 auto;margin-top:2px;white-space:nowrap;}
+
+  .add{display:flex;gap:6px;padding:10px 13px;background:var(--panel-2);border-top:1px solid var(--border);flex-wrap:wrap;}
+  .add input{flex:1;min-width:110px;background:var(--bg);border:1px solid var(--border-strong);border-radius:7px;padding:7px 10px;color:var(--text);font-size:12px;outline:none;font-family:inherit;}
+  .add select{background:var(--bg);border:1px solid var(--border-strong);border-radius:7px;padding:7px 6px;color:var(--text);font-size:11.5px;outline:none;font-family:inherit;}
+  .add button{background:var(--blue);border:none;border-radius:7px;color:#fff;font-size:12px;font-weight:700;padding:7px 13px;cursor:pointer;font-family:inherit;}
+
+  .chips{display:flex;flex-wrap:wrap;gap:6px;padding:11px 13px;}
+  .chip{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:16px;padding:5px 11px;font-size:11px;color:var(--text);cursor:pointer;display:flex;align-items:center;gap:5px;}
+  .chip:hover{border-color:var(--blue);color:var(--blue-light);}
+  .chip .p{color:var(--teal);font-weight:800;}
+
+  /* 오른쪽 — 이 화면의 핵심 */
+  .guide{background:var(--panel);border:1px solid rgba(59,130,246,.32);border-radius:12px;overflow:hidden;}
+  .g-h{padding:13px 16px;background:linear-gradient(135deg,rgba(59,130,246,.13),transparent);border-bottom:1px solid var(--border);}
+  .g-t{font-size:15px;font-weight:800;color:#fff;}
+  .g-why{font-size:11.5px;color:var(--muted);margin-top:5px;display:flex;gap:6px;align-items:flex-start;}
+  .g-why b{color:var(--amber);font-weight:700;flex:0 0 auto;}
+  .g-bar{display:flex;align-items:center;gap:9px;margin-top:11px;}
+  .g-track{flex:1;height:6px;background:var(--panel-2);border-radius:3px;overflow:hidden;}
+  .g-track i{display:block;height:100%;background:var(--teal);width:0%;transition:width .2s;}
+  .g-cnt{font-size:11px;color:var(--teal);font-weight:800;white-space:nowrap;}
+
+  .st{display:flex;align-items:flex-start;gap:11px;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.04);}
+  .st-n{flex:0 0 auto;width:21px;height:21px;border-radius:50%;background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);font-size:10.5px;font-weight:800;display:flex;align-items:center;justify-content:center;margin-top:1px;cursor:pointer;}
+  .st.done .st-n{background:rgba(30,185,128,.2);border-color:transparent;color:var(--teal);}
+  .st.now .st-n{background:var(--blue);border-color:transparent;color:#fff;}
+  .st-b{flex:1;min-width:0;}
+  .st-t{font-size:12.5px;font-weight:700;color:var(--text);}
+  .st.done .st-t{color:var(--muted);}
+  .st-d{font-size:11px;color:var(--muted-2);margin-top:2px;line-height:1.6;}
+  .st-q{color:var(--blue-light);}
+  .st-go{flex:0 0 auto;background:var(--blue);border:none;border-radius:7px;color:#fff;font-size:11px;font-weight:700;padding:6px 12px;cursor:pointer;font-family:inherit;margin-top:1px;white-space:nowrap;}
+  .st.done .st-go{background:transparent;border:1px solid var(--border-strong);color:var(--muted);}
+  .g-f{padding:11px 16px;background:var(--panel-2);border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+  .g-f .msg{font-size:11px;color:var(--muted);flex:1;min-width:170px;}
+  .g-done{background:var(--teal);border:none;border-radius:8px;color:#04140d;font-size:12px;font-weight:800;padding:8px 15px;cursor:pointer;font-family:inherit;}
+  .empty{padding:16px 14px;font-size:12px;color:var(--muted-2);line-height:1.7;}
+  .footer{margin-top:22px;display:flex;align-items:center;gap:9px;font-size:11px;color:var(--muted-2);}
+  .footer img{height:15px;opacity:.65;}
+</style>
+</head>
+<body>
+<div class="header">
+  <div class="header-left">
+    <span id="homeLink" data-page="dashboard.html" title="대시보드로 이동" style="display:flex;align-items:center;gap:12px;cursor:pointer"><img src="gijo-wordmark.svg" alt="GIJO">
+    <div class="app-title">GIJO AS</div></span>
+    <div class="clock" id="clockEl">-</div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill" id="statusPill"><span class="dot"></span>연결 확인 중<span class="beta-tag">LIVE</span></div>
+    <div class="avatar-btn" id="avatarBtn">-</div>
+    <div class="icon-btn" id="settingsBtn" title="설정">⚙</div>
+  </div>
+</div>
+
+<div class="app">
+  <div class="sidebar" id="gijoNav"></div>
+  <div class="mw-main">
+    <!-- 정체성 한 줄 — 사용법·용어 풀이는 ⓘ로 챗봇에서(프로젝트 원칙) -->
+    <div class="scr-id">☑ <b>내 업무</b> — 할 일을 고르면 그 자리에서 순서대로 알려 드립니다.
+      <span class="ask" id="askScreen">· 이 화면 설명 듣기</span></div>
+    <div class="legend">
+      <span><i style="background:var(--purple)"></i>AI가 찾음</span>
+      <span><i style="background:rgba(255,255,255,.15)"></i>내가 적음</span>
+      <span><i style="background:var(--blue)"></i>반복</span>
+      <span><i style="background:var(--red)"></i>기한 지남</span>
+    </div>
+
+    <div class="two">
+      <div>
+        <div class="box">
+          <div class="bh"><h3>오늘</h3><span class="n" id="cntToday">-</span><span class="r" id="cntOver"></span></div>
+          <div id="listToday"><div class="empty">불러오는 중…</div></div>
+          <div class="add">
+            <input id="newText" placeholder="할 일 적기" maxlength="200">
+            <select id="newDue"><option value="today">오늘</option><option value="week">이번 주</option><option value="">기한 없음</option></select>
+            <select id="newRecur"><option value="">한 번만</option><option value="weekly">매주</option><option value="monthly">매월</option></select>
+            <button id="btnAdd">추가</button>
+          </div>
+        </div>
+
+        <div class="box">
+          <div class="bh"><h3>이번 주</h3><span class="n" id="cntWeek">-</span></div>
+          <div id="listWeek"><div class="empty">불러오는 중…</div></div>
+        </div>
+
+        <div class="box">
+          <div class="bh"><h3>자주 하는 업무</h3><span class="n">눌러서 담기</span></div>
+          <div id="routines"><div class="empty">불러오는 중…</div></div>
+        </div>
+
+        <div class="box">
+          <div class="bh"><h3>다 한 일</h3><span class="n" id="cntDone">-</span></div>
+          <div id="listDone"><div class="empty">-</div></div>
+        </div>
+      </div>
+
+      <div class="guide" id="guideBox">
+        <div class="empty" id="guideEmpty">왼쪽에서 할 일을 하나 고르면, 그 일을 <b>어떤 순서로 하면 되는지</b> 여기에 나옵니다.<br>각 단계 버튼은 실제로 화면을 열거나 AI에게 물어봅니다.</div>
+      </div>
+    </div>
+
+    <div class="footer"><img src="gijo-symbol.svg" alt="GIJO"><span>© 2026 GIJO Technology · GIJO AS Platform · Confidential</span></div>
+  </div>
+</div>
+
+<div id="gijoChatWidget"></div>
+
+<script>
+(function () {
+  "use strict";
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) {
+    return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+  var DAY = 24 * 3600000;
+  var data = null;       // /api/mywork 응답
+  var selId = null;      // 지금 고른 업무
+  var guideCache = {};   // key → 가이드(결정적이라 캐시해도 안전)
+
+  function tick(){ $("clockEl").textContent = new Date().toLocaleString("ko-KR",{hour:"2-digit",minute:"2-digit",hour12:true,year:"numeric",month:"2-digit",day:"2-digit"}); }
+  async function loadHealth(){ try{ await window.gijo.checkServerHealth(); $("statusPill").innerHTML='<span class="dot"></span>서버 연결상태 양호'; }catch(e){ $("statusPill").innerHTML='<span class="dot" style="background:#e2483d"></span>서버 연결상태 불량'; } }
+  async function loadUser(){ try{ var u=await window.gijo.me(); $("avatarBtn").textContent=(u.displayName||u.username||"-").charAt(0); }catch(e){} }
+
+  // 화면 열기·AI에게 묻기 — 셸이 탭과 대화창을 가지고 있다. 분리창이면 그 자리에서 이동한다.
+  function openScreen(page){
+    if (window.gijoOpenScreen) window.gijoOpenScreen(page);
+    else if (window.gijo && window.gijo.navigateTo) window.gijo.navigateTo(page);
+  }
+  function askAI(q){
+    try { window.parent.postMessage({ type: "gijo:ask", text: q }, "*"); }
+    catch (e) { /* 셸이 없으면 조용히 넘어간다 — 단계 완료 표시는 그대로 남는다 */ }
+  }
+
+  function dueLabel(t){
+    if (t.overdue) {
+      if (t.dueAt == null) return { cls:"over", tx:"지금" };
+      var d = Math.max(1, Math.round((Date.now() - t.dueAt) / DAY));
+      return { cls:"over", tx: d + "일 초과" };
+    }
+    if (t.dueAt == null) return null;
+    var left = t.dueAt - Date.now();
+    if (left <= DAY) return { cls:"today", tx:"오늘까지" };
+    return { cls:"", tx: new Date(t.dueAt).toLocaleDateString("ko-KR",{month:"2-digit",day:"2-digit"}) };
+  }
+
+  function rowHtml(t){
+    var cls = "it" + (t.origin === "ai" ? " ai" : "") + (t.recur ? " rep" : "") +
+      (t.overdue ? " over" : "") + (t.done ? " done" : "") + (t.id === selId ? " sel" : "");
+    var tag = t.origin === "ai" ? '<span class="tag t-ai">AI</span>'
+      : t.recur ? '<span class="tag t-rep">🔁 반복</span>'
+      : '<span class="tag t-me">내가</span>';
+    var due = dueLabel(t);
+    var meta = tag + (due ? '<span class="due ' + due.cls + '">' + esc(due.tx) + "</span>" : "") +
+      (t.recur ? '<span>' + (t.recur === "weekly" ? "매주" : "매월") + "</span>" : "");
+    var prog = t.guideTotal > 0 ? '<span class="prog">' + t.guideDoneCount + "/" + t.guideTotal + "</span>" : "";
+    // AI 제안은 아직 저장 전이라 체크박스를 주지 않는다 — 담기 전에 완료할 수는 없다.
+    var ck = t.saved ? '<input type="checkbox" class="ck"' + (t.done ? " checked" : "") + ' title="완료 표시">' : '<span style="width:14px;flex:0 0 auto"></span>';
+    return '<div class="' + cls + '" data-id="' + esc(t.id) + '">' + ck +
+      '<div class="ib"><div class="it-t" title="' + esc(t.text) + '">' + esc(t.text) + "</div>" +
+      '<div class="it-m">' + meta + "</div></div>" + prog + "</div>";
+  }
+
+  function renderList(boxId, items, emptyMsg){
+    var box = $(boxId);
+    if (!items || !items.length) { box.innerHTML = '<div class="empty">' + emptyMsg + "</div>"; return; }
+    box.innerHTML = items.map(rowHtml).join("");
+  }
+
+  async function load(){
+    try {
+      data = await window.gijo.myWork();
+    } catch (e) {
+      $("listToday").innerHTML = '<div class="empty">업무를 불러오지 못했습니다. 서버 상태를 확인해 주세요.</div>';
+      return;
+    }
+    $("cntToday").textContent = data.counts.today + "건";
+    $("cntOver").textContent = data.counts.overdue ? "기한 초과 " + data.counts.overdue : "";
+    $("cntWeek").textContent = (data.week || []).length + "건";
+    $("cntDone").textContent = "오늘 " + data.counts.doneToday + "건";
+
+    renderList("listToday", data.today, "오늘 할 일이 없습니다. 아래에 적거나 아래 <b>자주 하는 업무</b>에서 담으세요.");
+    renderList("listWeek", data.week, "이번 주에 잡힌 일이 없습니다.");
+    renderList("listDone", data.done, "오늘 끝낸 일이 아직 없습니다.");
+
+    markSelected();
+    // 고른 것이 목록에서 사라졌으면(완료 등) 가이드도 비운다.
+    if (selId && !findItem(selId)) { selId = null; renderGuide(); }
+  }
+
+  // '자주 하는 업무'는 따로 늦게 채운다 — RAG+LLM으로 만드는 값이라 몇 초가 걸린다.
+  // 목록·가이드를 이것 때문에 기다리게 하면 화면의 존재 이유가 사라진다.
+  async function loadRoutines(){
+    var box = $("routines");
+    try {
+      var rs = await window.gijo.myWorkRoutines();
+      box.innerHTML = (rs && rs.length)
+        ? '<div class="chips">' + rs.map(function (r) {
+            return '<span class="chip" data-text="' + esc(r.text) + '" data-cadence="' + esc(r.cadence) + '">' +
+              '<span class="p">+</span>' + esc(r.text) + "</span>";
+          }).join("") + "</div>"
+        : '<div class="empty">추천할 업무를 아직 만들지 못했습니다.</div>';
+    } catch (e) {
+      box.innerHTML = '<div class="empty">추천을 불러오지 못했습니다.</div>';
+    }
+  }
+
+  /** 고른 줄만 표시를 바꾼다 — 목록을 통째로 다시 그리면 스크롤이 튄다. */
+  function markSelected(){
+    document.querySelectorAll(".it").forEach(function (el) {
+      el.classList.toggle("sel", el.dataset.id === selId);
+    });
+  }
+
+  function findItem(id){
+    if (!data) return null;
+    var all = [].concat(data.today || [], data.week || [], data.later || [], data.done || []);
+    for (var i = 0; i < all.length; i++) if (all[i].id === id) return all[i];
+    return null;
+  }
+
+  // ── 오른쪽 가이드 ────────────────────────────────────────────────────
+  async function renderGuide(){
+    var box = $("guideBox");
+    var t = selId ? findItem(selId) : null;
+    if (!t) {
+      box.innerHTML = '<div class="empty">왼쪽에서 할 일을 하나 고르면, 그 일을 <b>어떤 순서로 하면 되는지</b> 여기에 나옵니다.<br>각 단계 버튼은 실제로 화면을 열거나 AI에게 물어봅니다.</div>';
+      return;
+    }
+    if (!t.guideKey) {
+      box.innerHTML = '<div class="g-h"><div class="g-t">' + esc(t.text) + "</div>" +
+        (t.why ? '<div class="g-why"><b>왜 지금:</b><span>' + esc(t.why) + "</span></div>" : "") + "</div>" +
+        '<div class="empty">이 업무에는 정해진 순서가 없습니다. 아래 대화창에 물어보시면 AI가 방법을 알려 드립니다.' +
+        (t.saved ? "" : '<br><br>이 일을 하시려면 먼저 <b>내 업무에 담기</b>를 눌러 주세요.') + "</div>" +
+        '<div class="g-f">' + (t.saved ? "" : '<button class="g-done" id="btnAdopt">내 업무에 담기</button>') +
+        '<button class="st-go" id="btnAsk">AI에게 물어보기</button></div>';
+      wireGuide(t, null, []);
+      return;
+    }
+
+    var guide = guideCache[t.guideKey];
+    if (!guide) {
+      try { guide = await window.gijo.workGuide(t.guideKey); guideCache[t.guideKey] = guide; }
+      catch (e) { box.innerHTML = '<div class="empty">가이드를 불러오지 못했습니다.</div>'; return; }
+    }
+    // 아직 담기지 않은 AI 제안은 진행이 저장될 곳이 없다 — 담으면 그때부터 남는다.
+    var done = t.saved ? (t.guideDoneList || []) : [];
+    var total = guide.steps.length;
+    var pct = total ? Math.round(done.length / total * 100) : 0;
+    var nowIdx = -1;
+    for (var i = 0; i < total; i++) { if (done.indexOf(i) < 0) { nowIdx = i; break; } }
+
+    var steps = guide.steps.map(function (s, i) {
+      var isDone = done.indexOf(i) >= 0;
+      var cls = "st" + (isDone ? " done" : (i === nowIdx ? " now" : ""));
+      var btn = s.kind === "open" ? (isDone ? "다시 열기" : "열기")
+        : s.kind === "ask" ? (isDone ? "다시 묻기" : "물어보기")
+        : (isDone ? "다시 보기" : "확인함");
+      var desc = s.kind === "ask" && s.question
+        ? '<span class="st-q">"' + esc(s.question) + '"</span>' + (s.desc ? " — " + esc(s.desc) : "")
+        : esc(s.desc || "");
+      return '<div class="' + cls + '" data-step="' + i + '">' +
+        '<span class="st-n" title="눌러서 완료 표시 바꾸기">' + (isDone ? "✓" : (i + 1)) + "</span>" +
+        '<div class="st-b"><div class="st-t">' + esc(s.title) + "</div>" +
+        (desc ? '<div class="st-d">' + desc + "</div>" : "") + "</div>" +
+        '<button class="st-go" data-go="' + i + '">' + btn + "</button></div>";
+    }).join("");
+
+    box.innerHTML =
+      '<div class="g-h"><div class="g-t">' + esc(t.text) + "</div>" +
+      (t.why ? '<div class="g-why"><b>왜 지금:</b><span>' + esc(t.why) + "</span></div>" : "") +
+      '<div class="g-bar"><div class="g-track"><i style="width:' + pct + '%"></i></div>' +
+      '<span class="g-cnt">' + done.length + " / " + total + " 단계</span></div></div>" +
+      steps +
+      '<div class="g-f"><span class="msg">' +
+      (t.saved
+        ? "각 단계를 누르면 <b>실제로 실행됩니다</b> — 읽기만 하는 안내가 아닙니다. 순서를 건너뛰어도 됩니다."
+        : "이 일을 시작하면 <b>내 업무에 담깁니다</b> — 그때부터 진행이 저장됩니다.") +
+      "</span>" +
+      (t.saved ? '<button class="g-done" id="btnComplete">이 업무 완료</button>'
+               : '<button class="g-done" id="btnAdopt">내 업무에 담기</button>') +
+      "</div>";
+    wireGuide(t, guide, done);
+  }
+
+  function wireGuide(t, guide, done){
+    var adopt = $("btnAdopt");
+    if (adopt) adopt.addEventListener("click", function(){ adoptItem(t); });
+    var ask = $("btnAsk");
+    if (ask) ask.addEventListener("click", function(){ askAI(t.text + " 어떻게 하면 돼?"); });
+    var comp = $("btnComplete");
+    if (comp) comp.addEventListener("click", async function(){
+      try { await window.gijo.toggleTask(t.id, true); } catch (e) {}
+      selId = null; await load(); renderGuide();
+    });
+    if (!guide) return;
+
+    // 단계 실행 — 실제로 화면을 열거나 AI에게 묻고, 그 단계를 완료로 표시한다.
+    $("guideBox").querySelectorAll("[data-go]").forEach(function (b) {
+      b.addEventListener("click", async function () {
+        var i = Number(b.dataset.go);
+        var s = guide.steps[i];
+        var task = t;
+        // 아직 안 담긴 AI 제안이면 여기서 담는다 — 진행이 저장될 곳이 생긴다.
+        if (!task.saved) { task = await adoptItem(t, true); if (!task) return; }
+        if (s.kind === "open" && s.page) openScreen(s.page);
+        else if (s.kind === "ask" && s.question) askAI(s.question);
+        try { await window.gijo.myWorkStep(task.id, i, true); } catch (e) {}
+        await load();
+        selId = task.id;
+        await renderGuide();
+      });
+    });
+    // 동그라미를 눌러 완료 표시만 바꾸기(실행 없이) — 이미 손으로 한 일에 쓴다.
+    $("guideBox").querySelectorAll(".st-n").forEach(function (n) {
+      n.addEventListener("click", async function () {
+        if (!t.saved) return;
+        var i = Number(n.closest(".st").dataset.step);
+        try { await window.gijo.myWorkStep(t.id, i, done.indexOf(i) < 0); } catch (e) {}
+        await load(); await renderGuide();
+      });
+    });
+  }
+
+  // AI 제안 → 내 업무로 담기
+  async function adoptItem(t, quiet){
+    try {
+      // ⚠ 기한을 반드시 넘긴다(2026-07-31 실측). 안 넘기면 기한 없음이 되어 **'나중에'로 떨어진다** —
+      //   AI가 "오늘 하세요"라고 올린 일을 담았는데 오늘 목록에서 사라지는 건 그냥 잃어버리는 것이다.
+      //   원래 기한이 있으면 그대로 두고, 없으면 오늘로 잡는다.
+      var due = t.dueAt || Date.now();
+      var created = await window.gijo.myWorkAdopt({ text: t.text, ref: t.ref, origin: t.origin || "ai", dueAt: due });
+      await load();
+      selId = created.id;
+      if (!quiet) await renderGuide();
+      return findItem(created.id) || created;
+    } catch (e) { return null; }
+  }
+
+  // ── 목록 클릭 ────────────────────────────────────────────────────────
+  ["listToday","listWeek","listDone"].forEach(function (id) {
+    $(id).addEventListener("click", async function (e) {
+      var row = e.target.closest(".it");
+      if (!row) return;
+      if (e.target.classList.contains("ck")) {
+        try { await window.gijo.toggleTask(row.dataset.id, e.target.checked); } catch (err) {}
+        await load(); await renderGuide();
+        return;
+      }
+      // ⚠ 고르기만 할 때는 **다시 부르지 않는다**(2026-07-31 실측). 예전엔 load()를 거쳤는데
+      //   그 안에 몇 초짜리 호출이 섞여 있어 가이드가 한참 뒤에야 떴다 —
+      //   "고르면 바로 알려 준다"가 이 화면의 전부인데 그게 무너졌다.
+      //   고르는 것은 화면 안 상태 변화라 서버에 물을 것이 없다.
+      selId = row.dataset.id;
+      markSelected();
+      await renderGuide();
+    });
+  });
+
+  $("routines").addEventListener("click", async function (e) {
+    var chip = e.target.closest(".chip");
+    if (!chip) return;
+    try {
+      // 자주 하는 업무는 주기가 있으면 반복으로 담는다 — 매주 하는 일을 매주 다시 적게 하지 않는다.
+      var cadence = chip.dataset.cadence === "weekly" ? "weekly" : "";
+      await window.gijo.myWorkAdopt({
+        text: chip.dataset.text, origin: "routine",
+        dueAt: Date.now(), recur: cadence || undefined,
+      });
+    } catch (err) {}
+    await load();
+  });
+
+  async function addTask(){
+    var el = $("newText"), text = el.value.trim();
+    if (!text) return;
+    el.value = "";
+    var dueSel = $("newDue").value;
+    var dueAt = dueSel === "today" ? Date.now() : dueSel === "week" ? Date.now() + 6 * DAY : undefined;
+    var recur = $("newRecur").value || undefined;
+    try { await window.gijo.myWorkAdopt({ text: text, origin: "me", dueAt: dueAt, recur: recur }); } catch (e) {}
+    await load();
+  }
+  $("btnAdd").addEventListener("click", addTask);
+  $("newText").addEventListener("keydown", function (e) { if (e.key === "Enter") addTask(); });
+
+  $("askScreen").addEventListener("click", function () {
+    if (window.gijoExplain) window.gijoExplain();
+    else askAI("내 업무 화면 설명해줘");
+  });
+  $("settingsBtn").addEventListener("click", function () { window.gijo.navigateTo("settings.html"); });
+  document.querySelectorAll("[data-page]").forEach(function (el) {
+    el.addEventListener("click", function () { window.gijo.navigateTo(el.dataset.page); });
+  });
+
+  if (!window.gijo.isAuthenticated()) { window.gijo.navigateTo("login.html"); }
+  else {
+    tick(); setInterval(tick, 30000);
+    loadHealth(); loadUser();
+    load();
+    loadRoutines(); // 느린 값이라 목록과 따로 — 늦게 채워진다
+  }
+})();
+</script>
+<script src="nav.js"></script>
+<script src="progresscard.js"></script>
+<script src="chatwidget.js"></script>
+<script src="titlebar.js"></script>
+</body>
+</html>

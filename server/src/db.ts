@@ -543,3 +543,18 @@ migrate(
    ALTER TABLE assets ADD COLUMN hostname TEXT;
    ALTER TABLE assets ADD COLUMN ip TEXT;`
 );
+
+// 내 업무 화면(2026-07-31 사용자 지시 "가이드 받고 진행한다가 핵심"):
+//  recur      — 반복 주기(weekly|monthly). 없으면 한 번만 하는 일.
+//               완료하면 다음 주기 항목이 새로 생긴다(원본은 완료로 남아 기록이 끊기지 않는다).
+//  origin     — 이 일이 어디서 왔나(me=직접 적음 · ai=AI가 찾음 · routine=자주 하는 업무에서 담음).
+//               섞어 놓되 출처는 감추지 않는다 — 화면에서 색·배지로 구분한다.
+//  guideKey   — 진행 가이드 템플릿 키(workguide.ts). 없으면 가이드 없는 단순 할 일.
+//  guideDone  — 끝낸 단계 번호 JSON 배열(예 "[0,1]"). 화면을 닫았다 열어도 진행이 남는다.
+migrate(
+  "tasks-mywork-2026-07-31",
+  `ALTER TABLE tasks ADD COLUMN recur TEXT;
+   ALTER TABLE tasks ADD COLUMN origin TEXT;
+   ALTER TABLE tasks ADD COLUMN guideKey TEXT;
+   ALTER TABLE tasks ADD COLUMN guideDone TEXT;`
+);

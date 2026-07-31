@@ -160,6 +160,13 @@ const gijoApi = {
   getRoutineSuggestions: () => api.tasksApi.routineSuggestions(),
   completeTask: (id: string) => api.tasksApi.complete(id),
   toggleTask: (id: string, done: boolean) => api.tasksApi.toggle(id, done),
+  // 내 업무 — 목록·가이드·담기·단계 완료(2026-07-31)
+  myWork: () => api.myWorkApi.list(),
+  workGuide: (key: string) => api.myWorkApi.guide(key),
+  myWorkRoutines: () => api.myWorkApi.routines(),
+  myWorkAdopt: (body: { text: string; ref?: string; origin?: string; dueAt?: number; recur?: string }) =>
+    api.myWorkApi.adopt(body),
+  myWorkStep: (id: string, step: number, done: boolean) => api.myWorkApi.step(id, step, done),
   deleteTask: (id: string) => api.tasksApi.remove(id),
 
   // 유지보수 일정 · 점검서 · 승인(거버넌스 검증)

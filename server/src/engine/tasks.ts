@@ -6,6 +6,7 @@ import type { GijoUser } from "../auth/users";
 import { asyncRoute } from "../util/asyncRoute";
 import { recordAudit } from "./audit";
 import { db, assertTestDb } from "../db";
+import { guessGuideKey } from "./workguide";
 
 export interface TaskItem {
   id: string;
@@ -18,6 +19,11 @@ export interface TaskItem {
   assignee?: string; // 담당자
   ref?: string; // 연결된 취약점/자산 참조 (예: "vuln:192.168.219.98")
   completedAt?: number; // 완료 처리 시각(ms) — MTTR 산출용. 미완료면 없음.
+  // ── 내 업무 화면(2026-07-31) ──
+  recur?: "weekly" | "monthly"; // 반복 주기. 완료하면 다음 주기 항목이 새로 생긴다.
+  origin?: "me" | "ai" | "routine"; // 어디서 온 일인가 — 화면에서 색·배지로 구분한다.
+  guideKey?: string; // 진행 가이드 템플릿(workguide.ts). 없으면 가이드 없는 단순 할 일.
+  guideDone?: number[]; // 끝낸 단계 번호. 화면을 닫았다 열어도 진행이 남는다.
 }
 
 interface TaskRow {
@@ -31,6 +37,21 @@ interface TaskRow {
   assignee: string | null;
   ref: string | null;
   completedAt: number | null;
+  recur: string | null;
+  origin: string | null;
+  guideKey: string | null;
+  guideDone: string | null;
+}
+
+/** 끝낸 단계 목록 읽기 — 저장이 깨져 있어도 화면이 죽지 않게 조용히 빈 목록으로 떨어진다. */
+function parseGuideDone(raw: string | null): number[] | undefined {
+  if (!raw) return undefined;
+  try {
+    const v = JSON.parse(raw) as unknown;
+    return Array.isArray(v) ? v.filter((n): n is number => typeof n === "number") : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 function fromRow(row: TaskRow): TaskItem {
@@ -45,11 +66,15 @@ function fromRow(row: TaskRow): TaskItem {
     assignee: row.assignee ?? undefined,
     ref: row.ref ?? undefined,
     completedAt: row.completedAt ?? undefined,
+    recur: row.recur === "weekly" || row.recur === "monthly" ? row.recur : undefined,
+    origin: row.origin === "me" || row.origin === "ai" || row.origin === "routine" ? row.origin : undefined,
+    guideKey: row.guideKey ?? undefined,
+    guideDone: parseGuideDone(row.guideDone),
   };
 }
 
 const insertStmt = db.prepare(
-  "INSERT INTO tasks (id, priority, text, agentId, done, createdAt, dueAt, assignee, ref) VALUES (@id, @priority, @text, @agentId, @done, @createdAt, @dueAt, @assignee, @ref)"
+  "INSERT INTO tasks (id, priority, text, agentId, done, createdAt, dueAt, assignee, ref, recur, origin, guideKey, guideDone) VALUES (@id, @priority, @text, @agentId, @done, @createdAt, @dueAt, @assignee, @ref, @recur, @origin, @guideKey, @guideDone)"
 );
 const completeStmt = db.prepare("UPDATE tasks SET done = 1, completedAt = COALESCE(completedAt, @now) WHERE id = @id");
 const setDoneStmt = db.prepare("UPDATE tasks SET done = @done, completedAt = @completedAt WHERE id = @id");
@@ -64,7 +89,13 @@ export function createTask(args: {
   dueAt?: number;
   assignee?: string;
   ref?: string;
+  recur?: TaskItem["recur"];
+  origin?: TaskItem["origin"];
+  guideKey?: string;
 }): TaskItem {
+  // 가이드는 명시하지 않으면 문장·참조로 고른다 — 담당자가 "무슨 유형인지" 고를 필요가 없게.
+  // 확신이 없으면 guessGuideKey가 null을 준다(엉뚱한 가이드보다 없는 편이 낫다).
+  const guideKey = args.guideKey ?? guessGuideKey(args.text, args.ref) ?? undefined;
   const item: TaskItem = {
     id: String(Date.now()) + Math.random().toString(36).slice(2, 6),
     priority: args.priority ?? "P2",
@@ -75,6 +106,10 @@ export function createTask(args: {
     dueAt: args.dueAt,
     assignee: args.assignee?.trim() || undefined,
     ref: args.ref,
+    recur: args.recur,
+    origin: args.origin,
+    guideKey,
+    guideDone: undefined,
   };
   insertStmt.run({
     id: item.id,
@@ -86,8 +121,61 @@ export function createTask(args: {
     dueAt: item.dueAt ?? null,
     assignee: item.assignee ?? null,
     ref: item.ref ?? null,
+    recur: item.recur ?? null,
+    origin: item.origin ?? null,
+    guideKey: item.guideKey ?? null,
+    guideDone: null,
   });
   return item;
+}
+
+const setGuideDoneStmt = db.prepare("UPDATE tasks SET guideDone = ? WHERE id = ?");
+const getTaskStmt = db.prepare("SELECT * FROM tasks WHERE id = ?");
+
+export function getTask(id: string): TaskItem | null {
+  const row = getTaskStmt.get(id) as TaskRow | undefined;
+  return row ? fromRow(row) : null;
+}
+
+/** 가이드 단계 하나를 끝냈다고 표시한다(되돌리기도 같은 함수로 — 담당자가 잘못 눌렀을 수 있다). */
+export function setGuideStepDone(id: string, step: number, done: boolean): TaskItem | null {
+  const t = getTask(id);
+  if (!t) return null;
+  const set = new Set(t.guideDone ?? []);
+  if (done) set.add(step); else set.delete(step);
+  setGuideDoneStmt.run(JSON.stringify([...set].sort((a, b) => a - b)), id);
+  return getTask(id);
+}
+
+/**
+ * 반복 업무의 다음 차례를 만든다.
+ *
+ * ⚠ 원본을 되살리지 않고 **새 항목을 만든다.** 같은 줄을 미완료로 되돌리면 "지난주에 했다"는
+ *   기록이 사라져 점검 이력이 끊긴다 — 보안 업무에서 그건 그냥 사고다.
+ *   기준일은 완료 시각이 아니라 **원래 기한**이다. 늦게 끝냈다고 다음 주기까지 밀리면
+ *   매주 조금씩 뒤로 밀려 결국 주기가 무너진다(월요일 점검이 목요일 점검이 된다).
+ */
+export function nextRecurrence(t: TaskItem, now = Date.now()): TaskItem | null {
+  if (!t.recur) return null;
+  const base = t.dueAt ?? now;
+  const d = new Date(base);
+  if (t.recur === "weekly") d.setDate(d.getDate() + 7);
+  else d.setMonth(d.getMonth() + 1);
+  // 한참 방치돼 다음 기한도 이미 지났으면 오늘 이후로 당겨 온다(밀린 것을 몇 개씩 만들지 않는다).
+  while (d.getTime() < now) {
+    if (t.recur === "weekly") d.setDate(d.getDate() + 7);
+    else d.setMonth(d.getMonth() + 1);
+  }
+  return createTask({
+    text: t.text,
+    priority: t.priority,
+    dueAt: d.getTime(),
+    assignee: t.assignee,
+    ref: t.ref,
+    recur: t.recur,
+    origin: t.origin,
+    guideKey: t.guideKey,
+  });
 }
 
 // ⚠ 돌려주는 목록에 실행 기록까지 포함한다. 디스패처가 방금 만든 자기 기록을 이 목록에서
@@ -100,8 +188,14 @@ export function completeTask(id: string): TaskItem[] {
 
 // 완료 ↔ 미완료 토글 (담당자가 체크박스로 진행 상태를 직접 바꾼다).
 // 완료로 바꾸면 완료시각을 남기고(MTTR용), 미완료로 되돌리면 비운다.
+//
+// 반복 업무를 완료하면 **다음 차례를 새로 만든다**(nextRecurrence 주석 참고).
+// ⚠ 되돌릴 때는 다음 차례를 지우지 않는다 — 이미 만들어진 다음 주기 항목을 손대면
+//   담당자가 거기에 적어 둔 진행이 날아간다. 잘못 만든 항목은 직접 지우면 된다.
 export function setTaskDone(id: string, done: boolean): TaskItem[] {
+  const before = done ? getTask(id) : null;
   setDoneStmt.run({ id, done: done ? 1 : 0, completedAt: done ? Date.now() : null });
+  if (done && before?.recur && !before.done) nextRecurrence(before);
   return listTasks();
 }
 
@@ -153,7 +247,28 @@ seedSampleRemediationTasksIfEmpty();
 const insertRoutineFbStmt = db.prepare("INSERT INTO routine_feedback (text, addedAt) VALUES (?, ?)");
 const listRoutineFbStmt = db.prepare("SELECT text FROM routine_feedback ORDER BY addedAt DESC LIMIT 8");
 
+/**
+ * 일과로 배울 만한 문장인가 — **질문은 업무가 아니다.**
+ *
+ * ⚠ 실사고(2026-07-31, '내 업무' 화면에서 눈으로 발견): 할일 칸에 챗봇처럼 물어본 문장들이
+ *   그대로 학습돼 "자주 하는 업무" 추천에 떴다 — `+ 머할까?`, `+ 오늘뭐부터볼까`,
+ *   `+ 내가 제일 먼저 처리해야될 일이 어떤게 있을까?`. 누르면 그런 이름의 업무가 생긴다.
+ *   담당자는 그걸 보고 "이 제품 뭐지"라고 생각한다.
+ *
+ * 읽을 때도 같은 잣대로 거른다 — 이미 쌓인 것을 지우는 마이그레이션 없이 화면에서 사라진다.
+ * (지우지 않는 이유: 남의 입력 기록을 조용히 삭제하는 것보다 안 쓰는 편이 안전하다.)
+ */
+export function isRoutineWorthy(text: string): boolean {
+  const t = String(text || "").trim();
+  if (t.length < 4 || t.length > 60) return false;
+  if (/[?？]\s*$/.test(t)) return false; // 물음표로 끝나면 질문이다
+  // 물음 어미·의문사 — 업무 문장에는 나올 이유가 없다.
+  if (/(뭐|무엇|머할|할까|뭘까|어떤게|어떤 게|어디|언제|누가|왜|알려줘|보여줘|해줘|일까)/.test(t)) return false;
+  return true;
+}
+
 export function recordRoutineFeedback(text: string): void {
+  if (!isRoutineWorthy(text)) return; // 질문은 일과로 배우지 않는다
   insertRoutineFbStmt.run(text, Date.now());
   // 파인튜닝 데이터셋에도 축적 — 실패해도 할일 추가는 성공 처리(부가 경로).
   import("./dataset.js")
@@ -168,7 +283,9 @@ export interface RoutineSuggestion {
 }
 
 export async function routineSuggestions(): Promise<RoutineSuggestion[]> {
-  const fb = (listRoutineFbStmt.all() as { text: string }[]).map((r) => r.text);
+  // ⚠ 읽을 때도 거른다 — 예전에 질문이 그대로 쌓였다(isRoutineWorthy 주석 참고).
+  //   이미 들어간 것을 지우는 대신 안 쓰는 쪽을 골랐다: 남의 입력 기록을 조용히 삭제하지 않는다.
+  const fb = (listRoutineFbStmt.all() as { text: string }[]).map((r) => r.text).filter(isRoutineWorthy);
   const out: RoutineSuggestion[] = [];
   try {
     const { queryMemory } = await import("./memory.js");
