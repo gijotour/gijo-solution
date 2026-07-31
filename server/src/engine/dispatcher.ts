@@ -4,6 +4,7 @@
 
 import type { Express, Request } from "express";
 import { authMiddleware } from "../auth/auth";
+import { runWithViewer } from "./viewerctx";
 import type { GijoUser } from "../auth/users";
 import { recordAudit } from "./audit";
 import { asyncRoute } from "../util/asyncRoute";
@@ -423,6 +424,13 @@ async function learnloopConfirmResult(instructionText: string, qa?: boolean): Pr
 // 작업 세션에": 팀 사무실 CTA·에이전트 페이지 등 세션 없이 오던 지시도 이력에 남게).
 // 응답의 sessionId를 클라이언트가 저장하면 그 세션으로 "이어서" 지시가 된다.
 export async function dispatchInstruction(instructionText: string, sessionId?: string, screen?: string, actor?: string, qa?: boolean, noLearn?: boolean, viewer?: Viewer): Promise<DispatchResult> {
+  // ★ 이 요청이 끝날 때까지 "누가 묻는지"를 달아 둔다. 아래에서 도는 AI 도구(search·explain)는
+  //   run(args) 한 모양이라 사람을 넘길 자리가 없다 — 꼬리표가 없으면 대화는 등급을 지키는데
+  //   도구로 물으면 기밀 문서가 그대로 나온다(2026-08-01 실검증에서 잡은 뚫린 문. viewerctx.ts).
+  return runWithViewer(viewer, () => dispatchInstructionScoped(instructionText, sessionId, screen, actor, qa, noLearn, viewer));
+}
+
+async function dispatchInstructionScoped(instructionText: string, sessionId?: string, screen?: string, actor?: string, qa?: boolean, noLearn?: boolean, viewer?: Viewer): Promise<DispatchResult> {
   // 평가 게이트/QA 실행(중-3): 작업 세션·협업 피드에 기록하지 않는다 — 게이트 문답 수백 건이
   // 작업내역에 쌓이면 학습 후보함(출처 B)과 담당자의 작업 이력을 오염시킨다. 맥락도 싣지 않아
   // 문항 간 독립(재현성)을 보장한다. 라우팅·RAG·가드레일 등 제품 판단 경로는 전부 동일하다.

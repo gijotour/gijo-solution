@@ -124,6 +124,32 @@ describe("★ 사람이 묻는 입구에서는 반드시 열람 등급을 싣는
     expect(memSrc3).toContain("grade: meta?.grade ?? null");
   });
 
+  it("★ 지식검색 화면(/api/memory/query)도 등급을 싣는다 — 뚫린 문이었다", () => {
+    // 2026-08-01 실검증에서 발견: 대화(chat)는 등급을 지키는데 검색 라우트는 안 실었다.
+    // 대화창은 잠그고 검색창은 열어 둔 셈 — 이런 우회로가 하나만 있어도 통제 전체가 무의미하다.
+    const memSrc4 = fs.readFileSync(new URL("../src/engine/memory.ts", import.meta.url), "utf8");
+    const i = memSrc4.indexOf('"/api/memory/query"');
+    const 라우트 = memSrc4.slice(i, i + 1600);
+    expect(라우트, "검색 라우트가 열람 등급을 안 넘긴다").toContain("clearance: who?.clearance");
+  });
+
+  it("★ AI 도구로 물어도 막힌다 — 요청에 사람 꼬리표가 달린다", () => {
+    // 도구(search·explain)는 run(args) 한 모양이라 사람을 넘길 자리가 없다.
+    // 꼬리표(AsyncLocalStorage)를 안 달면 "log4shell 찾아줘"로 기밀 문서가 그대로 나온다.
+    const dispSrc2 = fs.readFileSync(new URL("../src/engine/dispatcher.ts", import.meta.url), "utf8");
+    const memSrc5 = fs.readFileSync(new URL("../src/engine/memory.ts", import.meta.url), "utf8");
+    expect(dispSrc2, "디스패치가 꼬리표를 안 단다").toContain("runWithViewer(viewer");
+    expect(memSrc5, "검색이 꼬리표를 안 집는다").toContain("hiddenDocIds(viewer ?? currentViewer())");
+  });
+
+  it("★ 제목도 가린다 — 파일명만으로 새는 것이 있다", () => {
+    // "퇴사자명단_최종.xlsx"는 열어 보지 않아도 알려 준다.
+    const memSrc6 = fs.readFileSync(new URL("../src/engine/memory.ts", import.meta.url), "utf8");
+    const toolSrc = fs.readFileSync(new URL("../src/engine/agenttools.ts", import.meta.url), "utf8");
+    expect(memSrc6).toContain("export async function listVisibleDocuments");
+    expect(toolSrc, "AI 도구가 전체 목록을 그대로 보여 준다").not.toContain("await listDocuments()");
+  });
+
   it("★ 등급은 서버가 읽는다 — 요청이 주장할 수 없다", () => {
     // 클라이언트가 clearance를 보내 올릴 수 있으면 통제 전체가 무의미하다.
     // 두 입구 모두 req.body가 아니라 **로그인 사용자**에서 읽어야 한다.

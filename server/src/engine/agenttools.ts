@@ -25,7 +25,7 @@ import { listCompliance, setComplianceStatus } from "./compliance";
 import { generateSbom } from "./sbom";
 import type { ComplianceStatus } from "./compliance";
 import { countTriples } from "./ontology";
-import { listDocuments, queryMemory, queryMemoryRelevant } from "./memory";
+import { listVisibleDocuments, queryMemory, queryMemoryRelevant } from "./memory";
 import { listFindings as listCtiFindings } from "./cti";
 import { matchCtiToAssets } from "./ctimatch";
 import { dailyBriefingText } from "./briefing";
@@ -212,7 +212,7 @@ async function runExplain(args: Record<string, string>): Promise<string> {
 
   // 어느 문서에서 왔는지도 함께(담당자가 원문을 찾아갈 수 있게).
   try {
-    const docs = (await listDocuments()).filter((d) => matches(d.documentId, topic));
+    const docs = (await listVisibleDocuments()).filter((d) => matches(d.documentId, topic));
     if (docs.length) {
       out.push(
         `관련 사내 문서 ${docs.length}건:`,
@@ -365,7 +365,7 @@ async function searchOne(q: string): Promise<string[]> {
   //   적혀 있었다(평문 전송·디렉토리 인덱싱 등). 근거 문서를 찾아 놓고 제목만 읽은 셈이다.
   //   숫자가 틀린 답은 없느니만 못하다 — 담당자가 그 숫자로 보고를 쓴다.
   try {
-    const docs = (await listDocuments()).filter((d) => matches(d.documentId, q));
+    const docs = (await listVisibleDocuments()).filter((d) => matches(d.documentId, q));
     if (docs.length) {
       out.push(`사내 문서 ${docs.length}건:`, ...docs.slice(0, 5).map((d) => `  - ${d.documentId}${d.docClass ? ` [${d.docClass}]` : ""}`));
       try {
@@ -529,7 +529,7 @@ async function runRemediation(args: Record<string, string>): Promise<string> {
     out.push("대응에 쓸 수 있는 보유 보안제품:", ...products.slice(0, 5).map((p) => `  - ${p.name} (${p.category}${p.vendor ? `, ${p.vendor}` : ""})`));
   }
   try {
-    const docs = (await listDocuments()).filter((d) => matches(d.documentId, topic));
+    const docs = (await listVisibleDocuments()).filter((d) => matches(d.documentId, topic));
     if (docs.length) out.push("참고할 사내 매뉴얼·문서(조치 절차 근거):", ...docs.slice(0, 5).map((d) => `  - ${d.documentId}${d.docClass ? ` [${d.docClass}]` : ""}`));
   } catch {
     /* 임베딩 미기동 — 문서 근거 없이 계속 */
@@ -1343,7 +1343,7 @@ async function runAuditSearch(args: Record<string, string>): Promise<string> {
 // 인수인계는 4단계 마법사인데 "어디까지 됐나"를 물어볼 길이 없었다.
 // 담은 문서는 담당자 브라우저에만 있어 서버가 모른다 — 지식베이스 쪽 사실만 정직하게 답한다.
 async function runHandoverStatus(): Promise<string> {
-  const docs = await listDocuments();
+  const docs = await listVisibleDocuments();
   if (docs.length === 0) {
     return "아직 지식베이스에 올린 문서가 없습니다. 인수인계는 아래 대화 콘솔의 ＋로 문서를 올리는 것부터 시작합니다.";
   }
@@ -1404,7 +1404,7 @@ async function runOntologyQuery(args: Record<string, string>): Promise<string> {
 }
 
 async function runKnowledgeStatus(): Promise<string> {
-  const docs = await listDocuments(); // lancedb 조회라 비동기다
+  const docs = await listVisibleDocuments(); // lancedb 조회라 비동기다
   const triples = countTriples();
   if (docs.length === 0 && triples === 0) return "등록된 지식 자료가 없습니다. 문서를 먼저 인입하세요.";
 

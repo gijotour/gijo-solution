@@ -11,7 +11,8 @@ vi.mock("../src/engine/llm", () => ({
 const mockListDocuments = vi.fn(async () => [] as unknown[]);
 vi.mock("../src/engine/memory", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../src/engine/memory")>()),
-  listDocuments: () => mockListDocuments(),
+  // 도구는 등급을 지키는 listVisibleDocuments를 쓴다 — 이름이 어긋나면 시험이 제품을 안 본다.
+  listVisibleDocuments: () => mockListDocuments(),
 }));
 
 import { findAgentTool } from "../src/engine/agenttools";

@@ -12,6 +12,7 @@ import { asyncRoute } from "../util/asyncRoute";
 import { embed, chat } from "./llm";
 import { db, migrate } from "../db";
 import { clearanceOf, gradeOf, blockedGrades } from "./grades";
+import { currentViewer } from "./viewerctx";
 import { emitCollaboration } from "./collaboration";
 import { gateUserInput } from "./gateway";
 import {
@@ -645,7 +646,9 @@ async function hybridSearch(question: string, topK: number, agentId?: string, sc
   //   상태라 흔적이 답에 남을 수 있다. 애초에 문맥에 안 들어가야 한다.
   //   구현은 documentId 제외 목록으로 한다: 등급은 SQLite(memory_documents)에 있고,
   //   LanceDB 스키마는 건드리지 않는다(컬럼 추가는 지식 소실 위험이 있다).
-  const 가림 = hiddenDocIds(viewer);
+  //   viewer를 명시로 안 받았으면 **요청에 달린 꼬리표**를 집는다. AI 도구(search·explain)는
+  //   run(args) 한 모양으로 등록돼 사람을 넘길 자리가 없어, 이 덧문이 없으면 도구로 우회된다.
+  const 가림 = hiddenDocIds(viewer ?? currentViewer());
   const whereClause =
     `scope IN (${scopes.map((s) => `'${s}'`).join(", ")})` +
     (가림.length ? ` AND documentId NOT IN (${가림.map((d) => `'${escapeLiteral(d)}'`).join(", ")})` : "");
@@ -778,6 +781,19 @@ export async function listDocuments(): Promise<MemoryDocument[]> {
   }
   out.sort((a, b) => (b.ingestedAt ?? "").localeCompare(a.ingestedAt ?? "") || b.chunks - a.chunks);
   return out;
+}
+
+/**
+ * 지금 묻는 사람이 **볼 수 있는** 문서만.
+ *
+ * 제목도 정보다 — "2026_인수인계_퇴사자명단_최종.xlsx"는 열어 보지 않아도 새는 것이 있다.
+ * 본문(hybridSearch)만 막고 목록을 열어 두면 반쪽이라 여기서도 같은 기준으로 가린다.
+ * 관리·정비용(listDocuments)은 전부 봐야 하므로 그대로 둔다 — 쓰는 자리로 나눈다.
+ */
+export async function listVisibleDocuments(): Promise<MemoryDocument[]> {
+  const all = await listDocuments();
+  const 가림 = new Set(hiddenDocIds(currentViewer()));
+  return 가림.size ? all.filter((d) => !가림.has(d.documentId)) : all;
 }
 
 // 특정 문서의 조각(청크) 텍스트 미리보기 — "어떻게 학습됐는지" 확인용.
@@ -932,7 +948,16 @@ export function registerMemoryRoutes(app: Express): void {
         res.status(400).json({ error: gate.message });
         return;
       }
-      res.json(await queryMemory(req.body.question, req.body.topK, req.body.agentId));
+      // ★ 열람 등급을 싣는다. 안 실으면 이 경로로 기밀 문서가 그대로 나온다 —
+      //   대화창은 막아 놓고 검색창은 열어 두는, 뚫린 문(2026-08-01 실검증에서 발견).
+      //   등급은 요청이 아니라 **로그인 사용자**에서 읽는다.
+      const who = (req as unknown as { user?: { id?: string; clearance?: string } }).user;
+      res.json(
+        await queryMemory(req.body.question, req.body.topK, req.body.agentId, undefined, {
+          userId: who?.id,
+          clearance: who?.clearance,
+        })
+      );
     })
   );
   // 장기기억 문서 목록(올린 문서 확인) — documentId별 조각수·scope·업로드시각.
