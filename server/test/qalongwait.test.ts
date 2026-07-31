@@ -28,4 +28,14 @@ describe("★ 게이트는 사람보다 오래 기다린다", () => {
   it("사람 경로는 그대로 30초다 — 배려를 걷어내지 않았다", () => {
     expect(LONG_ANSWER_MS).toBe(30_000);
   });
+
+  it("★ 게이트가 서버보다 오래 기다린다 — 기다리는 쪽이 먼저 포기하면 안 된다", () => {
+    // 둘을 같게 두었더니 서버가 답을 막 돌려주는 순간 게이트가 끊어져
+    // "aborted due to timeout"이 났다(2026-07-31 실측: multi-scan-report).
+    // '측정 못 함'을 없애려고 서버 대기를 늘렸는데, 클라이언트가 그대로면 오류로 바뀔 뿐이다.
+    const gate = fs.readFileSync(new URL("../../tools/evalgate/run.mjs", import.meta.url), "utf8");
+    const m = gate.match(/GIJO_EVALGATE_TIMEOUT_MS \?\? (\d+)/);
+    expect(m, "게이트 타임아웃 상수를 못 찾았다 — 시험이 헛돌고 있다").not.toBeNull();
+    expect(Number(m![1]), "게이트가 서버 대기보다 짧으면 잰 것도 못 쓴다").toBeGreaterThan(QA_LONG_ANSWER_MS);
+  });
 });

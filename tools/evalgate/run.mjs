@@ -110,7 +110,12 @@ function hangulRatio(text) {
   return hangul + latin === 0 ? 1 : hangul / (hangul + latin);
 }
 
-async function postAuthed(pathname, body, timeoutMs = 180000, retried = false) {
+// ⚠ 서버가 qa 요청을 기다리는 시간(GIJO_QA_LONG_ANSWER_MS, 기본 180초)**보다 길어야 한다.**
+//   같게 두었더니 서버가 답을 막 돌려주는 순간 이쪽이 끊어져 "aborted due to timeout"이 났다
+//   (2026-07-31 실측: multi-scan-report). 기다리는 쪽이 먼저 포기하면 잰 것도 못 쓴다.
+const FETCH_TIMEOUT_MS = Number(process.env.GIJO_EVALGATE_TIMEOUT_MS ?? 240000);
+
+async function postAuthed(pathname, body, timeoutMs = FETCH_TIMEOUT_MS, retried = false) {
   const r = await fetch(base + pathname, {
     method: "POST",
     headers: AUTH,
