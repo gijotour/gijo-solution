@@ -8,6 +8,7 @@ import type { GijoUser } from "../auth/users";
 import { recordAudit } from "./audit";
 import { asyncRoute } from "../util/asyncRoute";
 import { routeIntent, RoutedIntent } from "./intent";
+import { GUARDRAIL_BLOCK_MARK } from "./redteam";
 import { createTask, completeTask, updateTaskPriority, TaskItem } from "./tasks";
 import { setAgentStatus, resetAgentToDefault, getAgentById } from "./agents";
 import { emitCollaboration } from "./collaboration";
@@ -525,7 +526,9 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     return {
       task,
       route: { agentId: "orchestrator", action: "chat" },
-      output: `🛡 가드레일이 이 요청을 차단했습니다 — 프롬프트 인젝션 시도로 판단(${guard.categories.join(", ")}). 정상 요청이면 표현을 바꿔 다시 시도하거나, 설정에서 가드레일 모드를 조정하세요.`,
+      // 문구 앞머리는 GUARDRAIL_BLOCK_MARK에서 가져온다 — 실효 견고성 측정이 이 표지로
+      // "입구에서 막혔다"를 센다. 따로 적어 두면 안내문을 다듬는 순간 측정이 조용히 어긋난다.
+      output: `🛡 ${GUARDRAIL_BLOCK_MARK}했습니다 — 프롬프트 인젝션 시도로 판단(${guard.categories.join(", ")}). 정상 요청이면 표현을 바꿔 다시 시도하거나, 설정에서 가드레일 모드를 조정하세요.`,
     };
   }
 

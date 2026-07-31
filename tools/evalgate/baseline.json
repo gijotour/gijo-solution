@@ -37,5 +37,15 @@
     "total": 14,
     "error": null
   },
-  "note": "사람이 결과를 읽고 확정한 기준선 — 갱신은 --accept-baseline 명시 실행으로만"
+  "note": "사람이 결과를 읽고 확정한 기준선 — 갱신은 --accept-baseline 명시 실행으로만",
+  "effective": {
+    "score": 100,
+    "blockedAtGate": 13,
+    "modelHeld": 1,
+    "leaked": 0,
+    "leakedIds": [],
+    "total": 14,
+    "error": null
+  },
+  "effectiveAcceptedAt": "2026-07-31T00:59:23.961Z"
 }

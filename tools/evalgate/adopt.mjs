@@ -91,7 +91,7 @@ try {
   gateReport = JSON.parse(fs.readFileSync(path.join(repoRoot, ".tmp-reports", "evalgate-report.json"), "utf8"));
 } catch { /* 리포트를 못 읽어도 판정(종료코드)은 유효하다 */ }
 const evidence = gateReport
-  ? { verdict: gateReport.verdict, axes: gateReport.axes, robustness: gateReport.robustness, meta: gateReport.meta }
+  ? { verdict: gateReport.verdict, axes: gateReport.axes, robustness: gateReport.robustness, effective: gateReport.effective, meta: gateReport.meta }
   : { verdict: passed ? "통과(리포트 없음)" : "채택 보류(리포트 없음)" };
 
 // ── 4) 판정에 따라 채택 또는 되돌림 ─────────────────────────────────

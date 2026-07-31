@@ -31,6 +31,7 @@ import path from "node:path";
 import crypto from "node:crypto";
 import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { judgeEffective } from "./judge-effective.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(here, "..", "..");
@@ -223,6 +224,7 @@ if (!process.env.GIJO_EVALGATE_SKIP_PREFLIGHT) {
 const startedAt = Date.now();
 const results = { routing: [], safety: [], korean: [] };
 let redteamReport = null;
+let effectiveReport = null; // 제품 경로(가드레일 뒤) 실효 견고성 — 위 맨몸 점수와 다른 것을 잰다
 
 for (const axis of runAxes) {
   const cases = casesByAxis[axis].slice(0, limit);
@@ -264,6 +266,36 @@ for (const axis of runAxes) {
         // 실행 자체가 죽으면 견고성을 잴 수 없다 — 조용히 넘기면 "측정했다"는 거짓이 된다.
         console.error(`\n✗ 레드팀 실행 실패: ${e.message}`);
         redteamReport = { robustnessScore: null, error: e.message };
+      }
+
+      // ── 제품 경로 실효 견고성 ────────────────────────────────────────────
+      // 위 점수는 모델을 **맨몸으로**(가드레일·페르소나·RAG 없이) 때린 값이다. 우리가 파는 건
+      // 그게 아니다. 담당자는 /api/dispatch로 들어오고 그 앞에 가드레일이 있다.
+      //
+      // ⚠ 이 구분을 놓쳐서 실제로 틀린 판단을 했다(2026-07-31): 방어 3종(가드레일·문서 살균·
+      //   자격증명 가리기)을 넣은 날 맨몸 점수가 29→36으로 올랐길래 "방어가 효과를 냈다"고
+      //   보고했는데, **원리적으로 닿을 수 없는 숫자였다.** 실제로는 14개 중 1개 차이(한 눈금)
+      //   였을 뿐이다. 우리 코드가 못 움직이는 숫자로는 우리 코드를 지킬 수 없다.
+      //
+      // 두 숫자는 **다른 것을 지킨다** — 둘 다 있어야 한다:
+      //   · 맨몸 점수  → **모델**을 바꿀 때 (합성 모델 0점을 잡아낸 이력이 있다)
+      //   · 실효 점수  → **코드**를 바꿀 때 (가드레일을 끄거나 살균기가 깨지면 여기가 무너진다)
+      //
+      // 창 크기: 3회 실측(2026-07-31) 100/100/100, 입구차단 13/13/13 — **폭 0**. 14개 중 13개를
+      // 규칙 기반 가드레일이 결정하므로 확률적 요동이 거의 없다. 그래서 1회면 충분하고(9초),
+      // 판정도 중앙값이 아니라 **값 그대로** 쓴다.
+      try {
+        const eff = await postAuthed("/api/redteam/effective", {}, 600000);
+        if (eff?.effectiveScore == null) throw new Error("실효 응답에 effectiveScore 없음");
+        effectiveReport = eff;
+        console.log(
+          `· 제품 경로 실효 견고성 ${eff.effectiveScore}점 — 입구차단 ${eff.blockedAtGate} · 모델버팀 ${eff.modelHeld} · ` +
+          `뚫림 ${eff.leaked}/${eff.total}${eff.leakedIds?.length ? ": " + eff.leakedIds.join(", ") : ""}`
+        );
+      } catch (e) {
+        // 못 재면 "괜찮다"가 아니라 "모른다"다 — 조용히 넘기면 방어가 무너진 채로 통과한다.
+        console.error(`✗ 실효 견고성 측정 실패: ${e.message}`);
+        effectiveReport = { effectiveScore: null, error: e.message };
       }
       continue;
     }
@@ -335,7 +367,19 @@ for (const a of runAxes) {
 // 견고성(레드팀)은 확률적 측정이라 축 통과율과 섞지 않되, **여러 번 재서 판정에는 쓴다**.
 // 창 크기와 임계의 근거는 위 레드팀 실행부 주석의 45회 실측 표에 있다.
 const robustness = redteamReport
-  ? { score: redteamReport.robustnessScore ?? null, vulnerable: redteamReport.vulnerable ?? null, total: redteamReport.total ?? null, error: redteamReport.error ?? null }
+  ? { score: redteamReport.robustnessScore ?? null, vulnerable: redteamReport.vulnerable ?? null, total: redteamReport.total ?? null, error: redteamReport.error ?? null, samples: redteamReport.samples ?? null }
+  : null;
+// 제품 경로 실효 견고성 — 맨몸 점수와 나란히 남긴다(무엇을 잰 값인지 리포트에서 구분되게).
+const effective = effectiveReport
+  ? {
+      score: effectiveReport.effectiveScore ?? null,
+      blockedAtGate: effectiveReport.blockedAtGate ?? null,
+      modelHeld: effectiveReport.modelHeld ?? null,
+      leaked: effectiveReport.leaked ?? null,
+      leakedIds: effectiveReport.leakedIds ?? null,
+      total: effectiveReport.total ?? null,
+      error: effectiveReport.error ?? null,
+    }
   : null;
 
 const baselinePath = path.join(here, "baseline.json");
@@ -365,6 +409,14 @@ if (robustness?.score != null) {
   }
 } else if (robustness?.error) {
   reasons.push(`⚠ 견고성 측정 실패: ${robustness.error} — 안전 축 절반을 못 쟀다는 뜻이니 채택 판단에 반영할 것`);
+}
+
+// 제품 경로 실효 견고성 — 규칙은 judge-effective.mjs에 있다(뚫림·약화는 일부러 만들 수 없어
+// 실행으로 검증이 안 되므로 순수 함수로 떼어 시험으로 못 박았다).
+const effVerdict = judgeEffective(effective, baseline?.effective);
+if (effVerdict) {
+  if (effVerdict.fail) verdict = "채택 보류";
+  reasons.push(effVerdict.reason);
 }
 if (!baseline) {
   verdict = "기준선 없음";
@@ -406,14 +458,17 @@ const meta = {
   robustnessScore: redteamReport?.robustnessScore ?? null,
 };
 
-const report = { meta, axes, robustness, verdict, reasons, baseline: baseline ? { acceptedAt: baseline.acceptedAt, caseSetHash: baseline.caseSetHash, axes: baseline.axes } : null, results };
+const report = { meta, axes, robustness, effective, verdict, reasons, baseline: baseline ? { acceptedAt: baseline.acceptedAt, caseSetHash: baseline.caseSetHash, axes: baseline.axes } : null, results };
 fs.mkdirSync(path.join(repoRoot, ".tmp-reports"), { recursive: true });
 fs.writeFileSync(path.join(repoRoot, ".tmp-reports", "evalgate-report.json"), JSON.stringify(report, null, 2));
 
 const md = [
   `# 평가 게이트 결과 — ${verdict}`,
   `실행: ${meta.ranAt} · 커밋 ${meta.gitRev} · 문항셋 ${caseSetHash} · ${meta.durationSec}초`,
-  robustness ? `레드팀 견고성: ${robustness.score ?? "측정 실패"}점${robustness.total ? ` (뚫림 ${robustness.vulnerable}/${robustness.total})` : ""}` : "",
+  // 두 숫자를 나란히, **무엇을 잰 값인지 명시해서** 쓴다. 이름만 "견고성"으로 같으면
+  // 읽는 사람이 섞는다(2026-07-31에 내가 실제로 섞어서 틀린 보고를 했다).
+  effective ? `제품 경로 실효 견고성(담당자가 쓰는 경로): **${effective.score ?? "측정 실패"}점** — 입구차단 ${effective.blockedAtGate ?? "?"} · 모델버팀 ${effective.modelHeld ?? "?"} · 뚫림 ${effective.leaked ?? "?"}/${effective.total ?? "?"}` : "",
+  robustness ? `맨몸 모델 견고성(가드레일 걷어낸 값 — 모델 고를 때 쓰는 참고치): ${robustness.score ?? "측정 실패"}점${robustness.total ? ` (뚫림 ${robustness.vulnerable}/${robustness.total})` : ""}` : "",
   "",
   "| 축 | 통과/문항 | 통과율 | 카나리 실패 | FLAKY | 기준선 |",
   "|---|---|---|---|---|---|",
@@ -426,13 +481,44 @@ const md = [
 ].join("\n");
 fs.writeFileSync(path.join(repoRoot, ".tmp-reports", "evalgate-report.md"), md);
 
+// 실효 견고성 블록만 확정한다 — 3축 전체를 다시 돌지 않고.
+//
+// 왜 따로 두나: 전체 --accept-baseline은 축 통과율과 **맨몸 견고성까지 함께** 덮어쓴다.
+// 맨몸 점수는 우리 코드로 못 움직이는 확률적 값이라(관측 29~43) 우연히 높게 나온 날의 값을
+// 기준선에 박으면 다음 실행이 거짓 실패한다. 실제로 2026-07-31에 사용자가 "29를 유지한다"고
+// 결정한 값이다 — 그 결정을 이 명령이 조용히 뒤집으면 안 된다.
+// 반면 실효 블록은 결정적이라(5회 실측 전부 입구차단 13 · 뚫림 0) 따로 확정해도 안전하다.
+if (flag("--accept-effective")) {
+  if (effective?.score == null) {
+    console.error(`\n실효 기준선 확정 불가 — 재지 못했습니다(${effective?.error ?? "미측정"}).`);
+    process.exit(2);
+  }
+  if (effective.leaked > 0) {
+    console.error(`\n실효 기준선 확정 불가 — 지금 ${effective.leaked}건이 뚫려 있습니다. 뚫린 상태를 기준선으로 삼을 수는 없습니다.`);
+    process.exit(2);
+  }
+  if (!baseline) {
+    console.error("\n기준선 파일이 없습니다 — 먼저 --accept-baseline으로 전체 기준선을 확정하세요.");
+    process.exit(2);
+  }
+  fs.writeFileSync(baselinePath, JSON.stringify({ ...baseline, effective, effectiveAcceptedAt: meta.ranAt }, null, 2));
+  console.log(`\n실효 견고성 기준선 확정: 입구차단 ${effective.blockedAtGate}건 · 뚫림 0건 (축·맨몸 견고성 기준선은 그대로 둡니다)`);
+}
+
 if (flag("--accept-baseline")) {
   if (runAxes.length !== AXES.length) {
     console.error("\n기준선 확정은 3축 전체 실행에서만 가능합니다(--axis 부분 실행 불가).");
     process.exit(2);
   }
+  // 실효 견고성을 못 잰 채로 기준선을 박으면, 그 뒤 모든 실행이 "입구차단 비교 없음"으로
+  // 돌아 방어가 풀려도 조용히 통과한다. 기준선은 빈칸이 있으면 안 된다.
+  if (effective?.score == null) {
+    console.error(`\n기준선 확정 불가 — 제품 경로 실효 견고성을 재지 못했습니다(${effective?.error ?? "미측정"}).`);
+    console.error("서버가 살아 있는지 확인하고 다시 실행하세요. 이 값 없이 박은 기준선은 가드레일 해제를 못 잡습니다.");
+    process.exit(2);
+  }
   fs.writeFileSync(baselinePath, JSON.stringify({
-    acceptedAt: meta.ranAt, gitRev, caseSetHash, axes, robustness,
+    acceptedAt: meta.ranAt, gitRev, caseSetHash, axes, robustness, effective,
     note: "사람이 결과를 읽고 확정한 기준선 — 갱신은 --accept-baseline 명시 실행으로만",
   }, null, 2));
   console.log(`\n기준선 확정: ${baselinePath}`);
@@ -440,6 +526,10 @@ if (flag("--accept-baseline")) {
 
 console.log(`\n━━ 판정: ${verdict} ━━`);
 for (const a of runAxes) console.log(`  ${a}: ${axes[a].pass}/${axes[a].total} (${axes[a].passRate == null ? "측정 불가" : axes[a].passRate + "%"})${axes[a].canaryFail ? ` · 카나리 실패 ${axes[a].canaryFail}` : ""}${axes[a].flaky ? ` · flaky ${axes[a].flaky}` : ""}${axes[a].skipped ? ` · 측정 못 함 ${axes[a].skipped}` : ""}`);
+if (effective) {
+  console.log(`  제품 경로(실효): ${effective.score ?? "측정 실패"}점 · 뚫림 ${effective.leaked ?? "?"}/${effective.total ?? "?"} · 입구차단 ${effective.blockedAtGate ?? "?"}  ← 우리가 파는 경로`);
+}
+if (robustness) console.log(`  맨몸 모델: ${robustness.score ?? "측정 실패"}점  ← 모델 고를 때만 보는 참고치(우리 코드로 못 움직인다)`);
 for (const r of reasons) console.log(`  ${r}`);
 console.log(`  리포트: .tmp-reports/evalgate-report.md (${meta.durationSec}초)`);
 if (flag("--json")) console.log(JSON.stringify(report.axes));
