@@ -14,9 +14,9 @@
 -->
 <style>
 :root{
-  --bg:#12161f;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
   --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
-  --text:#dfe3ec;--muted:#8b93ab;--muted-2:#78829a;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
@@ -34,9 +34,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;cursor:pointer;transition:border-color .12s,background .12s;}
 .card:hover{border-color:var(--border-strong);}
 .card.on{border-color:var(--blue);background:rgba(59,130,246,.08);}
-.card .l{font-size:11.5px;color:var(--muted);font-weight:700;}
+.card .l{font-size:12.5px;color:var(--muted);font-weight:700;}
 .card .v{font-size:30px;font-weight:900;line-height:1.15;margin-top:2px;}
-.card .s{font-size:10px;color:var(--muted-2);margin-top:2px;}
+.card .s{font-size:11.75px;color:var(--muted-2);margin-top:2px;}
 
 /* 지금 손댈 일 — 보안 KPI와 같은 결(숫자에서 곧장 할 일로) */
 .todo{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;max-width:1040px;margin-bottom:18px;}
@@ -44,26 +44,26 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .trow{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--border);}
 .trow:first-of-type{border-top:0;}
 .trow .w{flex:1;min-width:0;font-size:12.5px;}
-.trow .w .sub{display:block;font-size:10.5px;color:var(--muted-2);margin-top:2px;}
+.trow .w .sub{display:block;font-size:12px;color:var(--muted-2);margin-top:2px;}
 .todo-none{font-size:12px;color:var(--muted-2);}
 
-.btn{flex:none;font-size:11px;font-weight:700;padding:5px 11px;border-radius:7px;border:1px solid var(--border-strong);background:transparent;color:var(--text);cursor:pointer;font-family:inherit;}
+.btn{flex:none;font-size:12.25px;font-weight:700;padding:5px 11px;border-radius:7px;border:1px solid var(--border-strong);background:transparent;color:var(--text);cursor:pointer;font-family:inherit;}
 .btn:hover{background:rgba(255,255,255,.06);}
 .btn.prim{border-color:rgba(59,130,246,.5);color:var(--blue-light);}
 .btn[disabled]{opacity:.55;cursor:default;}
 
 .tbl{width:100%;max-width:1040px;border-collapse:collapse;background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
-.tbl th{text-align:left;font-size:11px;color:var(--muted);font-weight:700;padding:10px 12px;background:var(--panel-2);border-bottom:1px solid var(--border);}
+.tbl th{text-align:left;font-size:12.25px;color:var(--muted);font-weight:700;padding:10px 12px;background:var(--panel-2);border-bottom:1px solid var(--border);}
 .tbl td{font-size:12.5px;padding:11px 12px;border-top:1px solid var(--border);vertical-align:middle;}
 .tbl tr.late td{background:rgba(226,72,61,.06);}
-.pill{display:inline-block;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:20px;white-space:nowrap;}
+.pill{display:inline-block;font-size:12px;font-weight:800;padding:2px 8px;border-radius:20px;white-space:nowrap;}
 .p-late{background:rgba(226,72,61,.16);color:#f5928a;}
 .p-sched{background:rgba(139,147,171,.16);color:var(--muted);}
 .p-rep{background:rgba(240,160,32,.16);color:#f7c777;}
 .p-app{background:rgba(30,185,128,.16);color:#6fdcb5;}
 .p-rej{background:rgba(226,72,61,.16);color:#f5928a;}
-.soon{color:var(--amber);font-weight:700;font-size:11px;}
-.dim{color:var(--muted-2);font-size:11px;}
+.soon{color:var(--amber);font-weight:700;font-size:12.25px;}
+.dim{color:var(--muted-2);font-size:12.25px;}
 .acts{display:flex;gap:6px;justify-content:flex-end;}
 .empty{padding:28px;text-align:center;color:var(--muted-2);font-size:12.5px;}
 </style>

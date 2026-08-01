@@ -6,9 +6,9 @@
 <title>GIJO AS — AI 견고성 (레드팀·가드레일)</title>
 <style>
 :root{
-  --bg:#12161f;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
   --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
-  --text:#dfe3ec;--muted:#8b93ab;--muted-2:#78829a;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
@@ -18,14 +18,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .app-title{font-size:15px;font-weight:800;color:#fff;}
 .clock{font-size:12px;color:var(--muted);}
 .header-right{display:flex;align-items:center;gap:12px;}
-.status-pill{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--teal);background:rgba(30,185,128,0.1);border:1px solid rgba(30,185,128,0.25);border-radius:20px;padding:5px 12px;}
+.status-pill{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--teal);background:rgba(30,185,128,0.1);border:1px solid rgba(30,185,128,0.25);border-radius:20px;padding:5px 12px;}
 .status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
-.beta-tag{font-size:9px;font-weight:800;color:var(--muted-2);letter-spacing:.5px;}
+.beta-tag{font-size:11.25px;font-weight:800;color:var(--muted-2);letter-spacing:.5px;}
 .avatar-btn{width:30px;height:30px;border-radius:50%;background:var(--blue);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer;}
 .icon-btn{width:30px;height:30px;border-radius:8px;border:1px solid var(--border-strong);display:flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer;}
 .app{display:grid;grid-template-columns:220px 1fr;}
 .sidebar{padding:22px 14px;border-right:1px solid var(--border);min-height:900px;}
-.nav-section{font-size:10.5px;font-weight:700;color:var(--muted-2);letter-spacing:1.2px;margin:18px 10px 8px;}
+.nav-section{font-size:12px;font-weight:700;color:var(--muted-2);letter-spacing:1.2px;margin:18px 10px 8px;}
 .nav-section:first-child{margin-top:0;}
 .nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:2px;}
 .nav-item .ic{width:18px;text-align:center;font-size:14px;}
@@ -39,7 +39,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .btn-primary:disabled{opacity:0.5;cursor:not-allowed;}
 .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;max-width:1080px;}
 .panel-title{font-size:14.5px;font-weight:800;color:#fff;margin-bottom:4px;}
-.panel-sub{font-size:11.5px;color:var(--muted);margin-bottom:14px;line-height:1.6;}
+.panel-sub{font-size:12.5px;color:var(--muted);margin-bottom:14px;line-height:1.6;}
 .muted{color:var(--muted);}
 
 /* 제품 경로 실효 견고성 — "우리 위험한가?"의 답 카드 (2026-07-31 신설) */
@@ -47,29 +47,29 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .hero.leak{background:linear-gradient(135deg,rgba(226,72,61,.12),rgba(18,26,46,.6));border-color:rgba(226,72,61,.4);}
 .hero-top{display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;}
 .hero-q{font-size:16px;font-weight:800;color:#fff;}
-.hero-q small{display:block;font-size:11.5px;font-weight:600;color:var(--muted);margin-top:3px;}
+.hero-q small{display:block;font-size:12.5px;font-weight:600;color:var(--muted);margin-top:3px;}
 .hero-score{text-align:right;white-space:nowrap;}
 .hero-score b{font-size:38px;font-weight:800;color:var(--teal);letter-spacing:-1px;}
 .hero.leak .hero-score b{color:var(--red);}
 .hero-score span{font-size:13px;color:var(--muted);margin-left:3px;}
-.hero-score em{display:block;font-style:normal;font-size:11.5px;color:var(--teal);font-weight:700;}
+.hero-score em{display:block;font-style:normal;font-size:12.5px;color:var(--teal);font-weight:700;}
 .hero.leak .hero-score em{color:var(--red);}
 .bar{display:flex;gap:3px;margin:16px 0 10px;}
-.bar .eseg{height:26px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:#04140d;min-width:22px;}
+.bar .eseg{height:26px;border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:11.75px;font-weight:800;color:#04140d;min-width:22px;}
 .eseg.e-block{background:var(--teal);}
 .eseg.e-held{background:rgba(30,185,128,.35);color:var(--teal);}
 .eseg.e-leak{background:var(--red);color:#fff;}
 .legend{display:flex;gap:16px;flex-wrap:wrap;font-size:12px;color:var(--text);}
 .legend b{color:var(--text);}
 .legend .dot{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:5px;vertical-align:-1px;}
-.hero-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);font-size:11.5px;flex-wrap:wrap;}
+.hero-foot{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);font-size:12.5px;flex-wrap:wrap;}
 .eff-why{background:rgba(240,160,32,.07);border:1px solid rgba(240,160,32,.28);border-radius:10px;padding:11px 14px;font-size:12px;color:var(--text);line-height:1.6;margin-bottom:14px;}
 .eff-why b{color:var(--amber);}
 
 /* 가드레일 패널 */
 .guard-row{display:flex;align-items:center;gap:18px;flex-wrap:wrap;}
 .guard-state{display:flex;align-items:center;gap:10px;font-weight:800;font-size:15px;}
-.guard-badge{font-size:11px;font-weight:800;padding:3px 10px;border-radius:6px;}
+.guard-badge{font-size:12.25px;font-weight:800;padding:3px 10px;border-radius:6px;}
 .gb-off{color:var(--muted-2);background:rgba(255,255,255,.06);}
 .gb-flag{color:var(--amber);background:rgba(240,160,32,.14);}
 .gb-block{color:var(--teal);background:rgba(30,185,128,.14);}
@@ -83,7 +83,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .glog-row:last-child{border-bottom:none;}
 .glog-row .gcat{color:var(--red);font-weight:700;}
 .glog-row .gex{color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}
-.glog-row .gbk{font-size:10px;font-weight:800;padding:1px 6px;border-radius:4px;}
+.glog-row .gbk{font-size:11.75px;font-weight:800;padding:1px 6px;border-radius:4px;}
 .gbk.b{color:var(--red);background:rgba(226,72,61,.14);}
 .gbk.f{color:var(--amber);background:rgba(240,160,32,.14);}
 
@@ -113,19 +113,19 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .item.vuln.medium{border-left-color:#c9a227;}
 .item.safe{border-left:3px solid var(--teal);}
 .item-head{display:flex;align-items:center;gap:10px;padding:11px 14px;cursor:pointer;font-size:13.5px;}
-.sev{font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:4px;}
+.sev{font-size:12px;font-weight:800;padding:2px 8px;border-radius:4px;}
 .sev.critical{color:var(--red);background:rgba(226,72,61,.14);}
 .sev.high{color:var(--amber);background:rgba(240,160,32,.14);}
 .sev.medium{color:#c9a227;background:rgba(201,162,39,.12);}
 .res{margin-left:auto;font-size:12px;font-weight:800;}
 .res.v{color:var(--red);}.res.s{color:var(--teal);}
-.caret{color:var(--muted-2);transition:transform .15s;font-size:11px;width:12px;}
+.caret{color:var(--muted-2);transition:transform .15s;font-size:12.25px;width:12px;}
 .item.open .caret{transform:rotate(90deg);}
 .item-body{display:none;padding:2px 16px 16px 36px;font-size:12.5px;color:var(--muted);line-height:1.75;}
 .item.open .item-body{display:block;}
 .item-body .lbl{color:var(--text);font-weight:700;}
 .item-body pre{background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:10px;white-space:pre-wrap;color:#cdd7e0;font-size:12px;margin:6px 0;font-family:inherit;}
-.footer{display:flex;align-items:center;gap:10px;margin-top:32px;color:var(--muted-2);font-size:11px;}
+.footer{display:flex;align-items:center;gap:10px;margin-top:32px;color:var(--muted-2);font-size:12.25px;}
 .footer img{height:16px;opacity:.6;}
 .empty{color:var(--muted-2);font-size:13px;padding:30px;text-align:center;}
 </style>
@@ -157,7 +157,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     <!-- 점검 대상·실행 버튼을 제목 아래 줄로(2026-07-26) — 제목 옆에 두면 버튼 글자가 줄바꿈됐다. -->
     <div style="display:flex;align-items:flex-end;gap:10px;margin:10px 0 14px;flex-wrap:wrap">
       <div>
-        <label for="targetSelect" style="display:block;font-size:11px;color:var(--muted);margin-bottom:5px">점검 대상</label>
+        <label for="targetSelect" style="display:block;font-size:12.25px;color:var(--muted);margin-bottom:5px">점검 대상</label>
         <select id="targetSelect" style="min-width:280px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 11px;color:var(--text);font-size:13px;outline:none">
           <option value="orchestrator">오케스트레이터 (내 메인 LLM)</option>
         </select>
@@ -166,7 +166,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     </div>
 
     <div id="gijoChatWidget" data-prompts='["이 자산 레드팀 점검해줘"]' style="max-width:640px;margin-bottom:16px;"></div>
-    <div id="targetNote" style="font-size:11.5px;color:var(--teal);margin:-6px 0 14px;display:none">📦 AI-BOM 자산을 선택했습니다 — 점검 결과(견고성 점수)가 그 자산의 AI-BOM에 자동 기록됩니다.</div>
+    <div id="targetNote" style="font-size:12.5px;color:var(--teal);margin:-6px 0 14px;display:none">📦 AI-BOM 자산을 선택했습니다 — 점검 결과(견고성 점수)가 그 자산의 AI-BOM에 자동 기록됩니다.</div>
 
     <!-- ① 제품 경로 실효 견고성 — "우리 위험한가?"에 여기서 답한다. 담당자가 실제로 쓰는
          경로(대화창)로 공격 14종을 그대로 보낸 결과다. 팝업은 여기까지만 열린다.
@@ -193,7 +193,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     <!-- ② 맨몸 견고성 — 울타리를 걷어내고 모델만 시험한 값. 참고치로 내린다(2026-07-31). -->
     <div class="kpis" id="kpis">
       <div class="kpi donut">
-        <svg width="66" height="66" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="#0e1526" stroke-width="4"/><circle id="scoreArc" cx="18" cy="18" r="15.9" fill="none" stroke="#e2483d" stroke-width="4" stroke-dasharray="0 100" stroke-linecap="round" transform="rotate(-90 18 18)"/><text id="scoreText" x="18" y="21" text-anchor="middle" font-size="9" fill="#e7eaf3" font-weight="700">-</text></svg>
+        <svg width="66" height="66" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15.9" fill="none" stroke="#1f1e1d" stroke-width="4"/><circle id="scoreArc" cx="18" cy="18" r="15.9" fill="none" stroke="#e2483d" stroke-width="4" stroke-dasharray="0 100" stroke-linecap="round" transform="rotate(-90 18 18)"/><text id="scoreText" x="18" y="21" text-anchor="middle" font-size="9" fill="#e9e7e2" font-weight="700">-</text></svg>
         <div><div class="v" id="verdictWord" style="font-size:16px">-</div><div class="k">맨몸 점수 / 100</div></div>
       </div>
       <div class="kpi"><div class="v" id="kVuln" style="color:var(--red)">-</div><div class="k">뚫린 공격</div></div>
@@ -204,7 +204,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     <!-- 가드레일: 실시간 방어 -->
     <div class="panel">
-      <div class="panel-title">🛡 런타임 가드레일 <span class="muted" style="font-size:11px;font-weight:600">— 실시간 인젝션 방어</span></div><div class="guard-row">
+      <div class="panel-title">🛡 런타임 가드레일 <span class="muted" style="font-size:12.25px;font-weight:600">— 실시간 인젝션 방어</span></div><div class="guard-row">
         <div class="guard-state"><span id="guardBadge" class="guard-badge gb-flag">탐지</span></div>
         <div class="seg" id="guardSeg">
           <button data-mode="off">끔</button>
@@ -224,7 +224,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         <div class="advice" id="advice" style="display:none"></div>
       </div>
       <div class="panel" style="margin-bottom:0">
-        <div class="panel-title">공격 결과 <span class="muted" style="font-size:11px;font-weight:600">— 항목을 누르면 공격·응답·판정근거·권고</span></div>
+        <div class="panel-title">공격 결과 <span class="muted" style="font-size:12.25px;font-weight:600">— 항목을 누르면 공격·응답·판정근거·권고</span></div>
         <div id="results"><div class="empty">레드팀을 실행하면 14개 공격의 상세 결과가 여기 표시됩니다.</div></div>
       </div>
     </div>

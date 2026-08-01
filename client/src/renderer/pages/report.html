@@ -6,9 +6,9 @@
 <title>GIJO AS — 내부 리포트</title>
 <style>
 :root{
-  --bg:#12161f;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
   --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
-  --text:#dfe3ec;--muted:#8b93ab;--muted-2:#78829a;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
@@ -18,7 +18,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .brand-divider{width:1px;height:22px;background:var(--border-strong);}
 .product-name{font-size:17px;font-weight:800;letter-spacing:0.3px;}
 .product-name span{color:var(--blue-light);}
-.product-tag{font-size:10.5px;color:var(--muted-2);font-weight:700;letter-spacing:1.4px;margin-top:1px;}
+.product-tag{font-size:12px;color:var(--muted-2);font-weight:700;letter-spacing:1.4px;margin-top:1px;}
 .topnav{display:flex;gap:28px;}
 .topnav a{color:var(--muted);text-decoration:none;font-size:13.5px;font-weight:600;padding:6px 2px;border-bottom:2px solid transparent;}
 .topnav a.active{color:var(--white);border-bottom-color:var(--blue);}
@@ -26,13 +26,13 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .avatar{width:30px;height:30px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
 .app{display:grid;grid-template-columns:220px 1fr;}
 .sidebar{padding:22px 14px;border-right:1px solid var(--border);min-height:900px;}
-.nav-section{font-size:10.5px;font-weight:700;color:var(--muted-2);letter-spacing:1.2px;margin:18px 10px 8px;}
+.nav-section{font-size:12px;font-weight:700;color:var(--muted-2);letter-spacing:1.2px;margin:18px 10px 8px;}
 .nav-section:first-child{margin-top:0;}
 .nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:2px;}
 .nav-item .ic{width:18px;text-align:center;font-size:14px;}
 .nav-item.active{background:rgba(59,130,246,0.12);color:var(--white);box-shadow:inset 3px 0 0 var(--blue);}
 .nav-item:hover:not(.active){background:rgba(255,255,255,0.04);color:var(--white);}
-.nav-badge{margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:800;padding:1px 6px;border-radius:20px;}
+.nav-badge{margin-left:auto;background:var(--red);color:#fff;font-size:11.75px;font-weight:800;padding:1px 6px;border-radius:20px;}
 .main{padding:28px 32px 48px;}
 .topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;}
 .page-title{font-size:21px;font-weight:800;color:#fff;}
@@ -42,7 +42,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .kpi-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
 .kpi-strip.c5{grid-template-columns:repeat(5,1fr);}
 .kpi-mini{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
-.kpi-mini-label{font-size:11px;color:var(--muted);font-weight:600;margin-bottom:6px;}
+.kpi-mini-label{font-size:12.25px;color:var(--muted);font-weight:600;margin-bottom:6px;}
 .kpi-mini-value{font-size:19px;font-weight:800;color:#fff;}
 .toolbar{display:flex;justify-content:space-between;align-items:center;background:var(--panel);border:1px solid var(--border);border-radius:12px 12px 0 0;padding:14px 18px;border-bottom:none;}
 .search{display:flex;align-items:center;gap:10px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:8px 14px;width:280px;}
@@ -54,15 +54,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .table-panel{background:var(--panel);border:1px solid var(--border);border-radius:0 0 12px 12px;padding:0 18px 10px;margin-bottom:16px;}
 .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;}
 .panel-title{font-size:14.5px;font-weight:800;color:#fff;margin-bottom:4px;display:flex;justify-content:space-between;align-items:center;}
-.panel-sub{font-size:11.5px;color:var(--muted);margin-bottom:14px;}
+.panel-sub{font-size:12.5px;color:var(--muted);margin-bottom:14px;}
 .panel-link{font-size:12px;color:var(--blue-light);font-weight:700;cursor:pointer;}
 table{width:100%;border-collapse:collapse;font-size:13px;}
-th{text-align:left;font-size:10.5px;font-weight:700;padding:12px 10px;color:var(--muted-2);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);}
+th{text-align:left;font-size:12px;font-weight:700;padding:12px 10px;color:var(--muted-2);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);}
 td{padding:13px 10px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;}
 tr:last-child td{border-bottom:none;}
 .asset-name{font-weight:700;color:#fff;}
-.asset-sub{font-size:11px;color:var(--muted-2);margin-top:2px;}
-.badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;}
+.asset-sub{font-size:12.25px;color:var(--muted-2);margin-top:2px;}
+.badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:12.25px;font-weight:700;}
 .b-blue{background:rgba(59,130,246,0.15);color:var(--blue-light);}
 .b-teal{background:rgba(30,185,128,0.15);color:var(--teal);}
 .b-amber{background:rgba(240,160,32,0.15);color:var(--amber);}
@@ -73,17 +73,17 @@ tr:last-child td{border-bottom:none;}
 .page-btns{display:flex;gap:6px;}
 .page-btn{width:28px;height:28px;border-radius:6px;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--muted);display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;}
 .page-btn.active{background:var(--blue);border-color:var(--blue);color:#fff;}
-.footer{margin-top:8px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted-2);}
+.footer{margin-top:8px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--muted-2);}
 .footer img{height:16px;opacity:0.6;}
 .progress-track{height:7px;border-radius:20px;background:rgba(255,255,255,0.08);overflow:hidden;margin-top:8px;}
 .progress-fill{height:100%;border-radius:20px;}
 .content-grid{display:grid;grid-template-columns:1fr;gap:16px;}
 
-.titlebar{display:flex;align-items:center;justify-content:space-between;background:#0d1220;padding:6px 12px;border-bottom:1px solid var(--border);font-size:11.5px;color:var(--muted);}
+.titlebar{display:flex;align-items:center;justify-content:space-between;background:#1f1e1d;padding:6px 12px;border-bottom:1px solid var(--border);font-size:12.5px;color:var(--muted);}
 .titlebar-left{display:flex;align-items:center;gap:8px;}
 .titlebar-left img{height:14px;}
 .win-dots{display:flex;gap:14px;color:var(--muted-2);font-size:13px;}
-.menubar{display:flex;gap:18px;background:#0a0e1a;padding:6px 14px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);}
+.menubar{display:flex;gap:18px;background:#262624;padding:6px 14px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);}
 .header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2);}
 .header-left{display:flex;align-items:center;gap:12px;}
 .header-left img{height:22px;}
@@ -92,7 +92,7 @@ tr:last-child td{border-bottom:none;}
 .header-right{display:flex;align-items:center;gap:10px;}
 .status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
 .status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
-.beta-tag{background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
+.beta-tag{background:var(--teal);color:#06281c;font-size:11.25px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
 .icon-row{display:flex;gap:6px;}
 .icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
 .icon-btn.on{background:rgba(59,130,246,0.18);border-color:var(--blue);color:var(--blue-light);}
@@ -102,7 +102,7 @@ tr:last-child td{border-bottom:none;}
 .modal-overlay.open{display:flex;}
 .modal{width:420px;background:var(--panel);border:1px solid var(--border-strong);border-radius:14px;padding:24px;}
 .modal-title{font-size:16px;font-weight:800;color:#fff;margin-bottom:18px;}
-.modal label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:6px;font-weight:600;}
+.modal label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px;font-weight:600;}
 .modal select{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;margin-bottom:14px;outline:none;}
 .modal-checklist{max-height:160px;overflow-y:auto;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;margin-bottom:14px;}
 .modal-checklist label{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text);font-weight:400;margin-bottom:8px;}
@@ -112,17 +112,17 @@ tr:last-child td{border-bottom:none;}
 .sched-item{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:11px 13px;margin-bottom:8px;cursor:pointer;}
 .sched-item.active{border-color:var(--blue);background:rgba(59,130,246,0.08);}
 .sched-item .t{font-size:12.5px;font-weight:800;color:#fff;display:flex;justify-content:space-between;gap:6px;}
-.sched-item .m{font-size:10.5px;color:var(--muted);margin-top:4px;}
-.chip-sm{font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:5px;white-space:nowrap;border:none;cursor:pointer;font-family:inherit;}
+.sched-item .m{font-size:12px;color:var(--muted);margin-top:4px;}
+.chip-sm{font-size:11.5px;font-weight:800;padding:2px 7px;border-radius:5px;white-space:nowrap;border:none;cursor:pointer;font-family:inherit;}
 .chip-on{background:rgba(30,185,128,0.15);color:var(--teal);}
 .chip-off{background:rgba(139,147,171,0.15);color:var(--muted);}
 .chip-warn{background:rgba(226,72,61,0.15);color:#f5928a;}
-.sched-form label{display:block;font-size:10.5px;color:var(--muted-2);font-weight:700;margin:9px 0 4px;}
+.sched-form label{display:block;font-size:12px;color:var(--muted-2);font-weight:700;margin:9px 0 4px;}
 .sched-form select,.sched-form input[type=number]{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;padding:7px 9px;color:var(--text);font-size:12px;outline:none;}
 .sched-hist{width:100%;border-collapse:collapse;margin-top:6px;}
-.sched-hist td{padding:6px 4px;border-bottom:1px solid var(--border);font-size:11.5px;}
+.sched-hist td{padding:6px 4px;border-bottom:1px solid var(--border);font-size:12.5px;}
 .sched-checklist{max-height:110px;overflow-y:auto;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;padding:8px 10px;}
-.sched-checklist label{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--text);font-weight:400;margin-bottom:6px;}
+.sched-checklist label{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--text);font-weight:400;margin-bottom:6px;}
 </style>
 </head>
 <body>
@@ -198,15 +198,15 @@ tr:last-child td{border-bottom:none;}
         <div style="flex:1;">
           <div class="panel-title">리포트 이력</div></div>
         <div style="display:flex;align-items:center;gap:6px;white-space:nowrap;padding-top:2px;">
-          <span style="font-size:11.5px;color:var(--muted)">오래된 리포트 정리</span>
-          <select id="pruneDays" style="font-size:11.5px;background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);border-radius:6px;padding:4px 7px;outline:none;">
+          <span style="font-size:12.5px;color:var(--muted)">오래된 리포트 정리</span>
+          <select id="pruneDays" style="font-size:12.5px;background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);border-radius:6px;padding:4px 7px;outline:none;">
             <option value="7">7일 이전</option>
             <option value="30" selected>30일 이전</option>
             <option value="90">90일 이전</option>
             <option value="180">180일 이전</option>
           </select>
-          <button id="pruneBtn" style="font-size:11.5px;background:transparent;border:1px solid #e2483d;color:#f5928a;border-radius:6px;padding:5px 10px;cursor:pointer;font-weight:700;">일괄 삭제</button>
-          <button id="deleteAllBtn" style="font-size:11.5px;background:rgba(226,72,61,.14);border:1px solid #e2483d;color:#f5928a;border-radius:6px;padding:5px 10px;cursor:pointer;font-weight:800;">🗑 전체 삭제</button>
+          <button id="pruneBtn" style="font-size:12.5px;background:transparent;border:1px solid #e2483d;color:#f5928a;border-radius:6px;padding:5px 10px;cursor:pointer;font-weight:700;">일괄 삭제</button>
+          <button id="deleteAllBtn" style="font-size:12.5px;background:rgba(226,72,61,.14);border:1px solid #e2483d;color:#f5928a;border-radius:6px;padding:5px 10px;cursor:pointer;font-weight:800;">🗑 전체 삭제</button>
         </div>
       </div>
       <table>
@@ -254,11 +254,11 @@ tr:last-child td{border-bottom:none;}
     <div style="display:flex;gap:8px;margin-bottom:12px;">
       <label style="flex:1;display:flex;gap:7px;align-items:flex-start;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 11px;cursor:pointer;">
         <input type="radio" name="reportAudience" value="official" checked style="margin-top:2px;accent-color:var(--blue)">
-        <span><b style="color:#fff;font-size:12.5px">📄 보고용</b><br><span style="font-size:10.5px;color:var(--muted)">경영진·감사용. 격식 문어체·거버넌스 강조</span></span>
+        <span><b style="color:#fff;font-size:12.5px">📄 보고용</b><br><span style="font-size:12px;color:var(--muted)">경영진·감사용. 격식 문어체·거버넌스 강조</span></span>
       </label>
       <label style="flex:1;display:flex;gap:7px;align-items:flex-start;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 11px;cursor:pointer;">
         <input type="radio" name="reportAudience" value="internal" style="margin-top:2px;accent-color:var(--blue)">
-        <span><b style="color:#fff;font-size:12.5px">🔍 내가 볼 것</b><br><span style="font-size:10.5px;color:var(--muted)">내부 검토용. 격식 없이 액션 중심</span></span>
+        <span><b style="color:#fff;font-size:12.5px">🔍 내가 볼 것</b><br><span style="font-size:12px;color:var(--muted)">내부 검토용. 격식 없이 액션 중심</span></span>
       </label>
     </div>
     <label for="reportFormatInput">출력 형식</label>
@@ -281,11 +281,11 @@ tr:last-child td{border-bottom:none;}
   <div class="modal" style="max-width:920px;width:92vw;height:88vh;display:flex;flex-direction:column;">
     <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
       <div class="modal-title" id="viewTitle" style="margin:0;flex:1;">리포트 미리보기</div>
-      <button class="rep-dl" id="viewDownloadBtn" style="font-size:11px;background:var(--panel-2);border:1px solid var(--border-strong);color:var(--blue-light);border-radius:6px;padding:5px 10px;cursor:pointer;">📥 내려받기</button>
+      <button class="rep-dl" id="viewDownloadBtn" style="font-size:12.25px;background:var(--panel-2);border:1px solid var(--border-strong);color:var(--blue-light);border-radius:6px;padding:5px 10px;cursor:pointer;">📥 내려받기</button>
       <button class="btn-ghost" id="viewCloseBtn">닫기</button>
     </div>
     <div id="viewBody" style="flex:1;min-height:0;background:#fff;border:1px solid var(--border);border-radius:8px;overflow:auto;"></div>
-    <div id="viewNote" style="font-size:11px;color:var(--muted-2);margin-top:8px;"></div>
+    <div id="viewNote" style="font-size:12.25px;color:var(--muted-2);margin-top:8px;"></div>
   </div>
 </div>
 
@@ -465,11 +465,11 @@ tr:last-child td{border-bottom:none;}
       reportRows.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">아직 생성한 리포트가 없습니다 — "+ 리포트 생성"으로 만들어 보세요</td></tr>';
     } else {
       const dlBtn = (name) =>
-        `<button class="rep-dl" data-name="${name}" style="font-size:11px;background:var(--panel-2);border:1px solid var(--border-strong);color:var(--blue-light);border-radius:6px;padding:4px 9px;cursor:pointer;margin-right:5px;">${/\.pdf$/i.test(name) ? "📄 PDF" : "📥 DOCX"}</button>`;
+        `<button class="rep-dl" data-name="${name}" style="font-size:12.25px;background:var(--panel-2);border:1px solid var(--border-strong);color:var(--blue-light);border-radius:6px;padding:4px 9px;cursor:pointer;margin-right:5px;">${/\.pdf$/i.test(name) ? "📄 PDF" : "📥 DOCX"}</button>`;
       const viewBtn = (base) =>
-        `<button class="rep-view" data-base="${base}" style="font-size:11px;background:var(--teal);border:1px solid var(--teal);color:#04211d;border-radius:6px;padding:4px 9px;cursor:pointer;margin-right:5px;font-weight:700;">👁 보기</button>`;
+        `<button class="rep-view" data-base="${base}" style="font-size:12.25px;background:var(--teal);border:1px solid var(--teal);color:#04211d;border-radius:6px;padding:4px 9px;cursor:pointer;margin-right:5px;font-weight:700;">👁 보기</button>`;
       const delBtn = (base) =>
-        `<button class="rep-del" data-base="${base}" title="삭제" style="font-size:11px;background:transparent;border:1px solid #e2483d;color:#f5928a;border-radius:6px;padding:4px 9px;cursor:pointer;">🗑</button>`;
+        `<button class="rep-del" data-base="${base}" title="삭제" style="font-size:12.25px;background:transparent;border:1px solid #e2483d;color:#f5928a;border-radius:6px;padding:4px 9px;cursor:pointer;">🗑</button>`;
       reportRows.innerHTML = historyReports
         .map((r) => {
           const audLabel = r.audience === "internal" ? "🔍 내부용" : "📄 보고용";
@@ -477,10 +477,10 @@ tr:last-child td{border-bottom:none;}
             ? r.assetNames.join(", ")
             : (r.assetIds && r.assetIds.length ? r.assetIds.join(", ") : "전체 자산");
           const when = r.createdAt ? new Date(r.createdAt).toLocaleString("ko-KR") : "-";
-          const who = r.createdBy ? `<br><span style="font-size:10px;color:#6fdcb5" title="이 리포트를 만든 사람">👤 ${esc(r.createdBy)}</span>` : ""; // 작업 귀속(2026-07-25)
+          const who = r.createdBy ? `<br><span style="font-size:11.75px;color:#6fdcb5" title="이 리포트를 만든 사람">👤 ${esc(r.createdBy)}</span>` : ""; // 작업 귀속(2026-07-25)
           const files = (r.docx ? dlBtn(r.docx) : "") + (r.pdf ? dlBtn(r.pdf) : "");
           return `<tr>
-            <td><span class="badge b-blue">${TYPE_LABEL[r.type] || r.type}</span><br><span style="font-size:10px;color:var(--muted-2);white-space:nowrap">${audLabel}</span></td>
+            <td><span class="badge b-blue">${TYPE_LABEL[r.type] || r.type}</span><br><span style="font-size:11.75px;color:var(--muted-2);white-space:nowrap">${audLabel}</span></td>
             <td>${esc(target)}</td>
             <td>${when}${who}</td>
             <td class="row-actions" style="white-space:nowrap">${viewBtn(r.base)}${files}${delBtn(r.base)}</td>
@@ -665,7 +665,7 @@ tr:last-child td{border-bottom:none;}
             <span style="color:var(--muted)">:</span>
             <input type="number" id="schedMinute" min="0" max="59" value="${s ? s.minute : 0}" style="width:64px">
           </div></div>
-          <div id="schedOndemandNote" style="grid-column:1/-1;font-size:11px;color:var(--muted-2);display:none">자동 실행 없음 — 등록해 두면 "지금 실행"으로 필요할 때 바로 생성합니다.</div>
+          <div id="schedOndemandNote" style="grid-column:1/-1;font-size:12.25px;color:var(--muted-2);display:none">자동 실행 없음 — 등록해 두면 "지금 실행"으로 필요할 때 바로 생성합니다.</div>
           <div><label>형식</label><select id="schedFormat">
             <option value="both" ${!s || s.format === "both" ? "selected" : ""}>DOCX+PDF</option>
             <option value="docx" ${s && s.format === "docx" ? "selected" : ""}>DOCX만</option>

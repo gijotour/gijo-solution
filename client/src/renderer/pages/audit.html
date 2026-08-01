@@ -6,15 +6,15 @@
 <title>GIJO AS — 작업 기록</title>
 <style>
 :root{
-  --bg:#12161f;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
   --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
-  --text:#dfe3ec;--muted:#8b93ab;--muted-2:#78829a;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
 .app{display:grid;grid-template-columns:220px 1fr;}
 .sidebar{padding:22px 14px;border-right:1px solid var(--border);min-height:900px;}
-.nav-section{font-size:10.5px;font-weight:700;color:var(--muted-2);letter-spacing:1.2px;margin:18px 10px 8px;}
+.nav-section{font-size:12px;font-weight:700;color:var(--muted-2);letter-spacing:1.2px;margin:18px 10px 8px;}
 .nav-section:first-child{margin-top:0;}
 .nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:2px;}
 .nav-item .ic{width:18px;text-align:center;font-size:14px;}
@@ -32,7 +32,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .header-right{display:flex;align-items:center;gap:10px;}
 .status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
 .status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
-.beta-tag{background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
+.beta-tag{background:var(--teal);color:#06281c;font-size:11.25px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
 .avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
 .icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
 
@@ -47,8 +47,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:6px 0;}
 .aud{display:flex;gap:12px;align-items:flex-start;padding:11px 18px;border-bottom:1px solid var(--border);font-size:12.5px;}
 .aud:last-child{border-bottom:none;}
-.aud .tm{color:var(--muted-2);font-size:11px;white-space:nowrap;width:118px;flex:0 0 auto;}
-.aud .kind{font-size:9.5px;font-weight:800;padding:2px 8px;border-radius:5px;white-space:nowrap;flex:0 0 auto;}
+.aud .tm{color:var(--muted-2);font-size:12.25px;white-space:nowrap;width:118px;flex:0 0 auto;}
+.aud .kind{font-size:11.5px;font-weight:800;padding:2px 8px;border-radius:5px;white-space:nowrap;flex:0 0 auto;}
 .k-cli{background:rgba(30,185,128,.16);color:var(--teal);}
 .k-approval{background:rgba(240,160,32,.16);color:var(--amber);}
 .k-write{background:rgba(139,124,240,.16);color:var(--purple);}
@@ -57,10 +57,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .k-config{background:rgba(255,255,255,.08);color:var(--muted);}
 .aud .body{flex:1;min-width:0;}
 .aud .act{color:var(--text);font-weight:600;}
-.aud .tgt{color:var(--blue-light);font-size:11px;margin-left:6px;}
-.aud .det{color:var(--muted-2);font-size:11px;margin-top:2px;white-space:pre-wrap;word-break:break-word;}
-.aud .who{color:var(--muted-2);font-size:11px;white-space:nowrap;flex:0 0 auto;}
-.aud .rz{font-size:9.5px;font-weight:800;padding:1px 6px;border-radius:4px;flex:0 0 auto;}
+.aud .tgt{color:var(--blue-light);font-size:12.25px;margin-left:6px;}
+.aud .det{color:var(--muted-2);font-size:12.25px;margin-top:2px;white-space:pre-wrap;word-break:break-word;}
+.aud .who{color:var(--muted-2);font-size:12.25px;white-space:nowrap;flex:0 0 auto;}
+.aud .rz{font-size:11.5px;font-weight:800;padding:1px 6px;border-radius:4px;flex:0 0 auto;}
 .rz-ok{color:var(--teal);}
 .rz-blocked{background:rgba(226,72,61,.16);color:#f5928a;}
 .rz-error{background:rgba(226,72,61,.16);color:#f5928a;}
@@ -68,21 +68,21 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .empty{padding:30px;text-align:center;color:var(--muted-2);font-size:13px;}
 .kpi{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
 .kpi-mini{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px 16px;}
-.kpi-mini .l{font-size:10.5px;color:var(--muted);}
+.kpi-mini .l{font-size:12px;color:var(--muted);}
 .kpi-mini .v{font-size:18px;font-weight:800;color:#fff;}
-.footer{margin-top:14px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted-2);}
+.footer{margin-top:14px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--muted-2);}
 .footer img{height:16px;opacity:0.6;}
 /* 시스템 로그 — logs.html에서 이관(2026-07-28) */
 .topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;}
 .filters{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px;}
 .filter-chip{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:700;cursor:pointer;}
 .filter-chip.active{background:rgba(59,130,246,0.15);border-color:var(--blue);color:var(--blue-light);}
-.log-console{background:#05070d;border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;height:calc(100vh - 320px);min-height:360px;overflow-y:auto;font-family:"Consolas","Cascadia Mono",monospace;font-size:11.5px;line-height:1.65;}
+.log-console{background:#1a1a19;border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;height:calc(100vh - 320px);min-height:360px;overflow-y:auto;font-family:"Consolas","Cascadia Mono",monospace;font-size:12.5px;line-height:1.65;}
 .log-line{white-space:pre-wrap;word-break:break-all;}
 .log-line.log-warn{color:var(--amber);}
 .log-line.log-error{color:#f5928a;}
 .log-ts{color:var(--muted-2);margin-right:6px;}
-.log-src{display:inline-block;min-width:88px;margin-right:8px;padding:0 6px;border-radius:4px;font-size:10px;font-weight:800;text-align:center;background:rgba(255,255,255,0.06);color:var(--muted);}
+.log-src{display:inline-block;min-width:88px;margin-right:8px;padding:0 6px;border-radius:4px;font-size:11.75px;font-weight:800;text-align:center;background:rgba(255,255,255,0.06);color:var(--muted);}
 .log-src.s-console{color:var(--muted-2);}
 .log-src.s-modelscan{background:rgba(139,124,240,0.15);color:var(--purple);}
 .log-src.s-reposcan{background:rgba(59,130,246,0.15);color:var(--blue-light);}
@@ -91,7 +91,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .log-src.s-hf-download{background:rgba(30,185,128,0.15);color:var(--teal);}
 .usage-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px;}
 .usage-kpi{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;}
-.usage-kpi .l{font-size:10.5px;color:var(--muted-2);font-weight:700;}
+.usage-kpi .l{font-size:12px;color:var(--muted-2);font-weight:700;}
 .usage-kpi .v{font-size:16px;font-weight:800;color:#fff;margin-top:3px;}
   /* 「더 보기」 — 목록을 줄여 보여주되 있는 것을 숨기지 않는다는 표시(2026-08-01). */
   .more{display:block;width:100%;margin-top:10px;padding:10px;background:var(--panel-2);
@@ -99,7 +99,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;}
   .more:hover{border-style:solid;border-color:var(--blue-light);}
   .more .cnt{color:var(--muted-2);font-weight:600;margin-left:6px;}
-  .more-end{margin-top:10px;padding:8px;text-align:center;font-size:11.5px;color:var(--muted-2);}
+  .more-end{margin-top:10px;padding:8px;text-align:center;font-size:12.5px;color:var(--muted-2);}
 </style>
 </head>
 <body>
@@ -175,12 +175,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     <div class="usage-kpi"><div class="l">호출 수</div><div class="v" id="kpiCalls">-</div></div>
     </div>
     <div style="margin-top:14px;font-size:12px;font-weight:700;color:var(--muted);">외부 서비스별</div>
-    <table style="width:100%;font-size:11.5px;margin-top:6px;border-collapse:collapse">
+    <table style="width:100%;font-size:12.5px;margin-top:6px;border-collapse:collapse">
     <thead><tr style="color:var(--muted-2);text-align:left"><th style="padding:4px 6px;font-weight:600">서비스</th><th style="font-weight:600">호출</th><th style="font-weight:600">예상 비용</th></tr></thead>
     <tbody id="usageRows"><tr><td colspan="3" style="color:var(--muted);padding:4px 6px;">불러오는 중...</td></tr></tbody>
     </table>
     <div style="margin-top:18px;font-size:12px;font-weight:700;color:var(--muted);">📊 클라우드 API 사용량 <span style="color:var(--muted-2);font-weight:400;">— 제공자별 호출·토큰·예상 비용 (서버 기동 후 누적)</span></div>
-    <table style="width:100%;font-size:11.5px;margin-top:6px;border-collapse:collapse;">
+    <table style="width:100%;font-size:12.5px;margin-top:6px;border-collapse:collapse;">
     <thead><tr style="color:var(--muted-2);text-align:left;"><th style="padding:4px 6px;">제공자·모델</th><th>호출</th><th>토큰(입력/출력)</th><th>예상 비용</th></tr></thead>
     <tbody id="cloudUsageRows"><tr><td colspan="4" style="color:var(--muted);padding:4px 6px;">불러오는 중...</td></tr></tbody>
     </table>
@@ -392,7 +392,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         return;
       }
       rows.innerHTML = u.rows.map((r) =>
-        `<tr><td style="padding:4px 6px;">${r.providerLabel} <span style="color:var(--muted-2);font-size:10.5px;">${r.model}</span></td>` +
+        `<tr><td style="padding:4px 6px;">${r.providerLabel} <span style="color:var(--muted-2);font-size:12px;">${r.model}</span></td>` +
         `<td>${r.calls.toLocaleString()}건</td><td>${r.inTokens.toLocaleString()} / ${r.outTokens.toLocaleString()}</td>` +
         `<td>$${r.estimatedCost.toFixed(4)}</td></tr>`).join("");
     } catch (e) {

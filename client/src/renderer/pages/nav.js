@@ -179,7 +179,7 @@
       + "*::-webkit-scrollbar{width:8px;height:8px;}*::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:4px;}*::-webkit-scrollbar-track{background:transparent;}"
       // 긴 목록 패널 내부 스크롤(2026-07-26 사용자 결정) — 창 고정 원칙과 세트.
       + ".scroll-list{max-height:calc(100vh - 300px);min-height:260px;overflow-y:auto;}"
-      + ".scroll-list thead th{position:sticky;top:0;background:var(--panel,#121a2e);z-index:1;}"
+      + ".scroll-list thead th{position:sticky;top:0;background:var(--panel,#30302e);z-index:1;}"
       // 하단 로고·저작권 푸터 제거(2026-07-26 사용자 결정) — 정보 가치가 없고 화면마다
       // 잘려 보였다. 개별 HTML은 건드리지 않고 공용 CSS로 한 번에 숨긴다.
       + ".footer{display:none !important;}.main{padding-bottom:20px;}" +
@@ -192,18 +192,18 @@
       // 왼쪽 가장자리 토글 — 접힘=화면 왼쪽 끝, 열림=사이드바 경계에 반쯤 걸침.
       // ⚠ 예전엔 '◀ 접기'를 세로로 눕혀 썼다. 세로 글씨는 읽는 데만 시간이 걸려서
       //    화살표 하나로 줄였다(2026-07-27). 뜻은 툴팁이 말한다.
-      ".gn-edge{position:fixed;top:50%;transform:translateY(-50%);width:18px;height:44px;background:var(--panel-2,#0e1526);color:var(--muted,#8b93ab);border:1px solid var(--border,#1e2a44);border-radius:8px;font-size:11px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:900;box-shadow:2px 0 10px rgba(0,0,0,.35);}" +
+      ".gn-edge{position:fixed;top:50%;transform:translateY(-50%);width:18px;height:44px;background:var(--panel-2,#1f1e1d);color:var(--muted,#b3ada4);border:1px solid var(--border,#3d3c38);border-radius:8px;font-size:12.25px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:900;box-shadow:2px 0 10px rgba(0,0,0,.35);}" +
       ".gn-edge:hover{color:var(--blue-light,#7ab0ff);border-color:var(--blue,#3b82f6);}" +
       "body.gn-left-collapsed #gijoNav{display:none !important;}" +
       "body.gn-left-collapsed .app{grid-template-columns:minmax(0,1fr) 46px !important;}" +
       "body.gn-left-collapsed .explorer{display:none !important;}" +
       "body.gn-left-collapsed .body-grid{grid-template-columns:1fr 360px !important;}" +
       "body.gn-left-collapsed .body-grid.no-right{grid-template-columns:1fr !important;}" +
-      ".gn-seg{display:flex;background:#0a1120;border:1px solid var(--border-strong);border-radius:9px;padding:3px;gap:3px;}" +
-      ".gn-seg span{flex:1;text-align:center;padding:6px 4px;border-radius:7px;font-size:11px;font-weight:800;color:var(--muted);cursor:pointer;border:1px solid transparent;}" +
+      ".gn-seg{display:flex;background:#1f1e1d;border:1px solid var(--border-strong);border-radius:9px;padding:3px;gap:3px;}" +
+      ".gn-seg span{flex:1;text-align:center;padding:6px 4px;border-radius:7px;font-size:12.25px;font-weight:800;color:var(--muted);cursor:pointer;border:1px solid transparent;}" +
       ".gn-seg span.on{background:rgba(59,130,246,.22);color:#fff;border-color:rgba(59,130,246,.5);}" +
       ".gn-mid{flex:1 1 auto;min-height:0;overflow-y:auto;padding:8px 6px;}"
-      + "#gijoNav .gtb-userarea{flex:0 0 auto;position:sticky;bottom:0;background:var(--panel-2,#0e1526);}" +
+      + "#gijoNav .gtb-userarea{flex:0 0 auto;position:sticky;bottom:0;background:var(--panel-2,#1f1e1d);}" +
       ".gn-mid::-webkit-scrollbar{width:5px;} .gn-mid::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:3px;}" +
       // 그룹 헤더 = 트리의 가지. 눌러서 접었다 편다(4.0.0: 허브를 풀어 항목이 30개가 되면서
       // 한 번에 다 보이면 훑기 어렵다 — 안 쓰는 그룹은 접어 둘 수 있게).
@@ -212,9 +212,9 @@
       ".gn-g{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:800;color:var(--muted);" +
       "letter-spacing:.2px;margin:13px 6px 5px;padding:5px 5px;border-radius:6px;cursor:pointer;user-select:none;}" +
       ".gn-g:hover{color:var(--blue-light,#7ab0ff);background:rgba(255,255,255,.03);}" +
-      ".gn-g .car{font-size:9px;width:10px;flex:0 0 auto;transition:transform .13s;}" +
+      ".gn-g .car{font-size:11.25px;width:10px;flex:0 0 auto;transition:transform .13s;}" +
       ".gn-g.open .car{transform:rotate(90deg);}" +
-      ".gn-g .cnt{margin-left:auto;font-size:10px;font-weight:700;color:var(--muted-2);opacity:.75;}" +
+      ".gn-g .cnt{margin-left:auto;font-size:11.75px;font-weight:700;color:var(--muted-2);opacity:.75;}" +
       ".gn-g.open .cnt{opacity:0;}" + // 펼치면 개수는 군더더기 — 눈으로 보인다
       ".gn-g:first-child{margin-top:2px;}" +
       ".gn-kids{display:block;}" +
@@ -227,24 +227,24 @@
       // 이름만 알면 바로 닿는 길을 둔다. 상시 보이게 두는 게 중요하다 — 단축키만 있으면 모르는
       // 사람은 영영 못 쓴다(담당자가 다 개발자는 아니다).
       ".gn-find{position:relative;margin:2px 6px 6px;}" +
-      ".gn-find input{width:100%;background:#0a1120;border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:9px;" +
-      "color:var(--text,#e7eaf3);font-size:12px;padding:7px 26px 7px 28px;outline:none;font-family:inherit;}" +
+      ".gn-find input{width:100%;background:#1f1e1d;border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:9px;" +
+      "color:var(--text,#e9e7e2);font-size:12px;padding:7px 26px 7px 28px;outline:none;font-family:inherit;}" +
       ".gn-find input:focus{border-color:var(--blue,#3b82f6);}" +
-      ".gn-find input::placeholder{color:var(--muted-2,#5f6785);}" +
-      ".gn-find .ic{position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--muted-2,#5f6785);pointer-events:none;}" +
-      ".gn-find .clr{position:absolute;right:7px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--muted-2,#5f6785);cursor:pointer;display:none;padding:2px 4px;border-radius:5px;}" +
+      ".gn-find input::placeholder{color:var(--muted-2,#a49d95);}" +
+      ".gn-find .ic{position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:12.25px;color:var(--muted-2,#a49d95);pointer-events:none;}" +
+      ".gn-find .clr{position:absolute;right:7px;top:50%;transform:translateY(-50%);font-size:12.25px;color:var(--muted-2,#a49d95);cursor:pointer;display:none;padding:2px 4px;border-radius:5px;}" +
       ".gn-find .clr:hover{color:#fff;background:rgba(255,255,255,.08);}" +
       ".gn-find.has .clr{display:block;}" +
       ".gn-hitwrap{padding-top:2px;}" +
-      ".gn-hit-g{font-size:10px;color:var(--muted-2,#5f6785);margin-left:auto;font-weight:700;}" +
-      ".gn-none{font-size:11.5px;color:var(--muted-2,#5f6785);padding:10px 12px;}" +
+      ".gn-hit-g{font-size:11.75px;color:var(--muted-2,#a49d95);margin-left:auto;font-weight:700;}" +
+      ".gn-none{font-size:12.5px;color:var(--muted-2,#a49d95);padding:10px 12px;}" +
       ".gn-fav-g{color:var(--amber,#f0a020);}" +
       // ☆ 별표 — 평소엔 숨어 있다가 그 줄에 마우스를 올리면 나온다(30줄에 별이 다 떠 있으면
       // 시끄럽다). 이미 넣은 것(★)은 항상 보인다 — 무엇이 즐겨찾기인지 알아야 하니까.
       // ☆는 **늘 흐리게 보인다**(2026-07-28). opacity:0으로 숨겨 뒀더니 마우스를 올려야만
       // 보여서, 처음 쓰는 사람은 즐겨찾기라는 기능이 있는 줄도 몰랐다("즐겨찾기 안 보임" 신고).
       // 있다는 건 알리되 시끄럽지 않게 — 흐리게 두고 올리면 진해진다.
-      ".gn-item .gn-star{flex:0 0 auto;font-size:11px;color:var(--muted-2,#5f6785);opacity:.28;cursor:pointer;padding:0 3px;border-radius:5px;}" +
+      ".gn-item .gn-star{flex:0 0 auto;font-size:12.25px;color:var(--muted-2,#a49d95);opacity:.28;cursor:pointer;padding:0 3px;border-radius:5px;}" +
       ".gn-item:hover .gn-star{opacity:.7;}" +
       ".gn-item .gn-star:hover{opacity:1;color:var(--amber,#f0a020);background:rgba(240,160,32,.14);}" +
       ".gn-item .gn-star.on{opacity:1;color:var(--amber,#f0a020);}" +
@@ -257,7 +257,7 @@
       ".gn-item .gn-bot{flex:0 0 auto;font-size:12px;opacity:.7;cursor:pointer;border-radius:6px;padding:1px 5px;line-height:1.4;}" +
       ".gn-item .gn-bot:hover{opacity:1;background:rgba(59,130,246,.22);}" +
       // 업데이트 가능 배지(설정 항목).
-      ".gn-item .gn-upbadge{flex:0 0 auto;background:var(--amber,#f0a020);color:#3a2a00;font-size:9px;font-weight:900;border-radius:20px;padding:1px 6px;}" +
+      ".gn-item .gn-upbadge{flex:0 0 auto;background:var(--amber,#f0a020);color:#3a2a00;font-size:11.25px;font-weight:900;border-radius:20px;padding:1px 6px;}" +
       // 대시보드 — 다른 화면에서 돌아오는 '집' 자리다. 가장 자주 누르므로 한눈에 찾히게
       // 테두리를 준다(2026-07-27 사용자 요청). 지금 대시보드에 있으면 이미 .active가 있어
       // 테두리를 빼서, "돌아갈 곳"일 때만 눈에 띄게 한다.
@@ -296,15 +296,16 @@
     favSave(arr);
   }
 
-  // 그룹 펼침 상태 — **기본은 접힘**(2026-07-28 사용자 지시). 자주 가는 곳은 위 고정 세 자리와
-  // 즐겨찾기로 닿으므로, 나머지 30줄을 늘 펼쳐 둘 이유가 없다. 편 것만 기억한다.
-  // (예전엔 "접은 것"을 기억했다 — 기본이 뒤집혔으므로 키도 바꿔 옛 값이 섞이지 않게 한다.)
-  var OPEN_KEY = "gijo:menu:opened";
-  function openedSet() {
-    try { return new Set(JSON.parse(localStorage.getItem(OPEN_KEY) || "[]")); } catch (e) { return new Set(); }
+  // 그룹 펼침 상태 — **기본은 펼침**(2026-08-02 사용자 지시로 되돌림. "접기가 아니라 펼치기로
+  // 하자 — 못 보는 부분이 있는 것 같다"). 접어 두면 어느 가지에 무엇이 있는지 열어 봐야 알고,
+  // 새로 생긴 메뉴가 있어도 눈에 띄지 않는다. **접은 것만** 기억한다.
+  // (2026-07-28에는 반대였다 — 기본이 뒤집힐 때마다 키도 바꿔 옛 값이 반대로 읽히지 않게 한다.)
+  var CLOSED_KEY = "gijo:menu:closed";
+  function closedSet() {
+    try { return new Set(JSON.parse(localStorage.getItem(CLOSED_KEY) || "[]")); } catch (e) { return new Set(); }
   }
-  function saveOpened(set) {
-    try { localStorage.setItem(OPEN_KEY, JSON.stringify([...set])); } catch (e) {}
+  function saveClosed(set) {
+    try { localStorage.setItem(CLOSED_KEY, JSON.stringify([...set])); } catch (e) {}
   }
 
   // 메뉴 한 줄을 만든다 — 즐겨찾기 가지와 본 가지가 **같은 함수**를 쓴다(이름·배지·동작을
@@ -387,7 +388,7 @@
     injectCss(); // 대시보드('전체메뉴' 모드)에서 render()를 안 거쳐도 gn-* 스타일이 있게.
     container.innerHTML = "";
     var here = currentKey();
-    var opened = openedSet();
+    var closed = closedSet();
     var favs = favList();
 
     // ── 찾기 칸 — 이름만 알면 가지를 안 펴고 바로 닿는다(Ctrl/Cmd+K로 여기 포커스).
@@ -427,7 +428,7 @@
   function renderBody(container, find) {
     while (find.nextSibling) container.removeChild(find.nextSibling);
     var here = currentKey();
-    var opened = openedSet();
+    var closed = closedSet();
     var favs = favList();
 
     // 찾는 중에는 트리를 접고 **걸린 것만** 보여준다 — 접힌 가지 안까지 뒤진다.
@@ -475,9 +476,8 @@
       var fcnt = document.createElement("span"); fcnt.className = "cnt"; fcnt.textContent = favs.length;
       fh.appendChild(fcar); fh.appendChild(fnm); fh.appendChild(fcnt);
       container.appendChild(fh);
-      // 즐겨찾기는 **기본 펼침** — 내가 직접 꽂아 둔 것들이라 접어 두면 꽂은 뜻이 없어진다.
-      // (다른 가지와 반대로, 여기만 "접은 것"을 기억한다.)
-      var favClosed = opened.has("__favClosed");
+      // 즐겨찾기도 **기본 펼침** — 내가 직접 꽂아 둔 것들이라 접어 두면 꽂은 뜻이 없어진다.
+      var favClosed = closed.has("__favClosed");
       var fkids = document.createElement("div");
       fkids.className = "gn-kids" + (favClosed ? " closed" : "");
       if (favClosed) fh.classList.remove("open");
@@ -485,9 +485,9 @@
       fh.addEventListener("click", function () {
         var nowOpen = fkids.classList.toggle("closed") === false;
         fh.classList.toggle("open", nowOpen);
-        var s = openedSet();
+        var s = closedSet();
         if (nowOpen) s.delete("__favClosed"); else s.add("__favClosed");
-        saveOpened(s);
+        saveClosed(s);
       });
       // 메뉴 정의에서 그 화면을 찾아 같은 모양으로 그린다(이름·배지를 두 곳에 적지 않는다).
       favs.forEach(function (page) {
@@ -501,10 +501,8 @@
     }
 
     GROUPS.forEach(function (g) {
-      // 기본은 접힘 — 편 가지만 기억한다. (보고 있는 화면을 따라 자동으로 펴지 않는다:
-      // 그러면 화면을 열 때마다 가지가 벌어져 "기본 접힘"이 무의미해진다. 지금 무엇을 보는지는
-      // 위쪽 탭줄이 말해 준다.)
-      var open = opened.has(g.id);
+      // 기본은 펼침 — 담당자가 직접 접은 가지만 접힌 채로 기억한다.
+      var open = !closed.has(g.id);
 
       var gh = document.createElement("div");
       gh.className = "gn-g" + (open ? " open" : "");
@@ -524,9 +522,9 @@
         var nowOpen = kids.classList.toggle("closed") === false;
         gh.classList.toggle("open", nowOpen);
         gh.title = (nowOpen ? "접기" : "펼치기") + " — " + g.label;
-        var s = openedSet();
-        if (nowOpen) s.add(g.id); else s.delete(g.id);
-        saveOpened(s);
+        var s = closedSet();
+        if (nowOpen) s.delete(g.id); else s.add(g.id);
+        saveClosed(s);
       });
 
       g.items.forEach(function (it) { kids.appendChild(makeItem(it, here, favs, container)); });
@@ -718,7 +716,7 @@
     st.textContent = "html,body{overflow:auto !important;height:auto !important;}" +
       // 긴 목록 내부 스크롤은 임베드에서도 동일(허브 탭 안의 threat·audit 등)
       ".scroll-list{max-height:calc(100vh - 260px);min-height:260px;overflow-y:auto;}" +
-      ".scroll-list thead th{position:sticky;top:0;background:var(--panel,#121a2e);z-index:1;}" +
+      ".scroll-list thead th{position:sticky;top:0;background:var(--panel,#30302e);z-index:1;}" +
       ".footer{display:none !important;}" +
       "*::-webkit-scrollbar{width:8px;height:8px;}*::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:4px;}*::-webkit-scrollbar-track{background:transparent;}" +
       ".header{display:none !important;}#gijoNav{display:none !important;}" +
@@ -773,8 +771,8 @@
       ".main{padding-left:18px !important;padding-right:18px !important;}" +
       // 가로/세로 전환 — 예전엔 허브가 그렸는데 허브를 없애서(4.0.0) 여기로 옮겼다.
       // 세로(피벗) 모니터를 쓰는 관제실이 있어 남겨 둔다.
-      ".gijo-orient{position:fixed;top:10px;right:14px;z-index:950;background:var(--panel-2,#0e1526);color:var(--muted,#8b93ab);" +
-      "border:1px solid var(--border,#1e2a44);border-radius:8px;font-size:11px;font-weight:800;padding:5px 10px;cursor:pointer;}" +
+      ".gijo-orient{position:fixed;top:10px;right:14px;z-index:950;background:var(--panel-2,#1f1e1d);color:var(--muted,#b3ada4);" +
+      "border:1px solid var(--border,#3d3c38);border-radius:8px;font-size:12.25px;font-weight:800;padding:5px 10px;cursor:pointer;}" +
       ".gijo-orient:hover{color:#fff;border-color:var(--blue,#3b82f6);}";
     document.head.appendChild(st);
     if (!window.gijo || !window.gijo.setPopoutOrientation) return;

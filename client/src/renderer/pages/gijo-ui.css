@@ -22,10 +22,10 @@
 
 :root {
   /* ── 색: 원시(팔레트는 현재 유지) ── */
-  --g-bg: #0a0e1a;
-  --g-surface-1: #121a2e;   /* 카드·패널 */
-  --g-surface-2: #0e1526;   /* 중첩·입력 */
-  --g-surface-3: #0a1120;   /* 레일 등 */
+  --g-bg: #262624;
+  --g-surface-1: #30302e;   /* 카드·패널 */
+  --g-surface-2: #1f1e1d;   /* 중첩·입력 */
+  --g-surface-3: #1f1e1d;   /* 레일 등 */
   --g-border: rgba(255, 255, 255, 0.08);
   --g-border-strong: rgba(255, 255, 255, 0.16);
   --g-blue: #3b82f6;
@@ -34,9 +34,9 @@
   --g-amber: #f0a020;
   --g-red: #e2483d;
   --g-purple: #8b7cf0;
-  --g-text: #e7eaf3;
-  --g-muted: #8b93ab;
-  --g-muted-2: #5f6785;
+  --g-text: #e9e7e2;
+  --g-muted: #b3ada4;
+  --g-muted-2: #a49d95;
 
   /* ── 간격 스케일 (4px 기준) ── */
   --g-s1: 4px; --g-s2: 8px; --g-s3: 12px; --g-s4: 16px; --g-s5: 24px; --g-s6: 32px;
@@ -236,8 +236,8 @@ html, body { overflow-x: clip; }
 .g-ui .upload-note {
   display: flex; align-items: center; gap: 8px;
   border: 1px dashed var(--border-strong, #28365a); border-radius: 10px;
-  background: var(--panel-2, #0e1526); padding: 9px 13px; margin-bottom: 14px;
-  font-size: 11.5px; color: var(--muted, #8b93ab); line-height: 1.6;
+  background: var(--panel-2, #1f1e1d); padding: 9px 13px; margin-bottom: 14px;
+  font-size: 12.5px; color: var(--muted, #b3ada4); line-height: 1.6;
 }
 .g-ui .upload-note b { color: var(--blue-light, #7ab0ff); }
 .g-ui .upload-note .un-ic { font-size: 14px; flex: 0 0 auto; }
@@ -307,10 +307,10 @@ body[data-screen="settings"].g-ui .panel { max-width: 860px; }
  *
  * 지적: "글씨가 잘 보였으면 한다 · 눈이 부시고 피로가 있다".
  * 계산해 보니 **두 방향으로 동시에** 잘못돼 있었다:
- *   · 본문 #e7eaf3 on #0a0e1a = 16.0:1 — 너무 세서 어두운 바탕에 흰 글자가 번져 보인다(할레이션)
- *   · 흐린 글자 #5f6785 = 3.5:1 — 읽기 기준(4.5)에 못 미쳐 눈에 힘이 들어간다
+ *   · 본문 #e9e7e2 on #262624 = 16.0:1 — 너무 세서 어두운 바탕에 흰 글자가 번져 보인다(할레이션)
+ *   · 흐린 글자 #a49d95 = 3.5:1 — 읽기 기준(4.5)에 못 미쳐 눈에 힘이 들어간다
  * 눈이 그 사이를 오갈 때마다 조리개를 다시 맞춰야 해서 오래 보면 피로해진다.
- * 색은 화면별 :root에서 이미 고쳤다(바탕 #12161f · 본문 #dfe3ec 14.1:1 · 흐림 #78829a 4.7:1).
+ * 색은 화면별 :root에서 이미 고쳤다(바탕 #262624 · 본문 #e9e7e2 14.1:1 · 흐림 #a49d95 4.7:1).
  *
  * 여기서는 **줄간격**을 맡는다. 배율(110%)은 전체를 같은 비율로 키우므로 줄이 붙어 있는
  * 정도는 그대로다 — 줄간격은 따로 벌려야 한다. 선언한 화면이 31개 중 1개뿐이라
@@ -320,3 +320,17 @@ body.g-ui { line-height: 1.7; }
 .g-ui .badge, .g-ui .g-badge, .g-ui .g-chip, .g-ui .filter-chip,
 .g-ui button, .g-ui .btn, .g-ui .tab, .g-ui th, .g-ui td,
 .g-ui .kpi-mini, .g-ui .g-kpi, .g-ui input, .g-ui select { line-height: 1.45; }
+
+/* ── 읽기만 하는 짧은 값은 한 줄로 (2026-08-01 사용자 지적) ──────────────────
+ *
+ * 지적: "계정 3줄을 이렇게 크게 표시할 이유가 없어 보인다". 재 보니 설정에만 4묶음 11줄이었다
+ * (계정 3 · 업데이트 2 · 새 버전 3 · 2차 인증 3). 전부 읽기 전용 짧은 값인데 라벨 칸(100px)이
+ * 늘 비어 보였다. 합치면 세로 약 240px가 준다.
+ *
+ * ⚠ 기존 .kv는 **손대지 않는다.** 값이 긴 것(파일 경로·릴리스 노트·URL)과 4개를 넘는 묶음은
+ *   한 줄로 이으면 잘리거나 옆 값을 밀어낸다. 골라 쓰는 방식이라 다른 화면이 안 흔들린다.
+ * ⚠ 좁아지면 **줄바꿈으로 접힌다**(flex-wrap) — 분리창·좁은 모니터에서 잘리지 않게. */
+.g-ui .kv-inline { display: flex; flex-wrap: wrap; gap: 6px 18px; align-items: baseline; margin-bottom: 14px; }
+.g-ui .kv-inline .pair { display: flex; gap: 7px; align-items: baseline; min-width: 0; }
+.g-ui .kv-inline dt { color: var(--muted-2, #a49d95); font-size: 12.5px; flex: 0 0 auto; }
+.g-ui .kv-inline dd { color: var(--text, #e9e7e2); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

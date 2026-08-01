@@ -7,9 +7,9 @@
 <link rel="stylesheet" href="gijo-ui.css">
 <style>
 :root{
-  --bg:#12161f;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
   --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
-  --text:#dfe3ec;--muted:#8b93ab;--muted-2:#78829a;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
@@ -17,14 +17,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .header-left{display:flex;align-items:center;gap:16px;}.header img{height:22px;}
 .app-title{font-size:15px;font-weight:800;color:#fff;}.clock{font-size:12px;color:var(--muted);}
 .header-right{display:flex;align-items:center;gap:12px;}
-.status-pill{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--teal);background:rgba(30,185,128,0.1);border:1px solid rgba(30,185,128,0.25);border-radius:20px;padding:5px 12px;}
+.status-pill{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--teal);background:rgba(30,185,128,0.1);border:1px solid rgba(30,185,128,0.25);border-radius:20px;padding:5px 12px;}
 .status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
-.beta-tag{font-size:9px;font-weight:800;color:var(--muted-2);letter-spacing:.5px;}
+.beta-tag{font-size:11.25px;font-weight:800;color:var(--muted-2);letter-spacing:.5px;}
 .avatar-btn{width:30px;height:30px;border-radius:50%;background:var(--blue);color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer;}
 .icon-btn{width:30px;height:30px;border-radius:8px;border:1px solid var(--border-strong);display:flex;align-items:center;justify-content:center;color:var(--muted);cursor:pointer;}
 .app{display:grid;grid-template-columns:220px 1fr;}
 .sidebar{padding:22px 14px;border-right:1px solid var(--border);min-height:900px;}
-.nav-section{font-size:10.5px;font-weight:700;color:var(--muted-2);letter-spacing:1.2px;margin:18px 10px 8px;}
+.nav-section{font-size:12px;font-weight:700;color:var(--muted-2);letter-spacing:1.2px;margin:18px 10px 8px;}
 .nav-section:first-child{margin-top:0;}
 .nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:2px;}
 .nav-item .ic{width:18px;text-align:center;font-size:14px;}
@@ -42,31 +42,31 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
 .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px;}
 .tile{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:15px;}
-.tile .lab{font-size:11.5px;color:var(--muted);}
+.tile .lab{font-size:12.5px;color:var(--muted);}
 .tile .v{font-size:24px;font-weight:800;margin-top:3px;}
-.tile .d{font-size:10.5px;color:var(--muted-2);margin-top:3px;}
+.tile .d{font-size:12px;color:var(--muted-2);margin-top:3px;}
 .tile.risk{background:linear-gradient(180deg,rgba(226,72,61,.1),transparent);border-color:rgba(226,72,61,.3);}
 .riskbar{background:linear-gradient(90deg,rgba(226,72,61,.1),transparent);border:1px solid rgba(226,72,61,.28);border-radius:12px;padding:12px 16px;margin-bottom:16px;}
 .riskbar .rb-main{font-size:15px;font-weight:800;color:#fff;}
 .riskbar .rb-lv{font-size:17px;}
 .riskbar .rb-pri{font-size:12px;font-weight:600;color:var(--muted);margin-left:8px;}
-.riskbar .rb-src{font-size:11.5px;color:var(--muted-2);margin-top:5px;}
+.riskbar .rb-src{font-size:12.5px;color:var(--muted-2);margin-top:5px;}
 .riskbar .rb-src b{color:var(--text);font-weight:800;}
 
 .two{display:grid;grid-template-columns:1.5fr 1fr;gap:16px;align-items:start;}
 .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
 .ph{font-size:13.5px;font-weight:800;color:#fff;margin-bottom:4px;}
-.psub{font-size:11px;color:var(--muted-2);margin-bottom:10px;}
-.corr-line{font-size:11.5px;color:var(--muted);background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:7px 11px;margin:2px 0 10px;line-height:1.5;}
+.psub{font-size:12.25px;color:var(--muted-2);margin-bottom:10px;}
+.corr-line{font-size:12.5px;color:var(--muted);background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:7px 11px;margin:2px 0 10px;line-height:1.5;}
 .corr-line b{color:#f0a0c0;font-weight:800;}
 .corr-line .ask{color:var(--blue-light,#5fa1ff);cursor:pointer;text-decoration:underline;text-underline-offset:2px;}
-.path-scope{font-size:11px;font-weight:600;color:var(--blue-light);}
-.graph-toggle{font-size:10px;display:inline-flex;gap:0;border:1px solid var(--border);border-radius:7px;overflow:hidden;}
+.path-scope{font-size:12.25px;font-weight:600;color:var(--blue-light);}
+.graph-toggle{font-size:11.75px;display:inline-flex;gap:0;border:1px solid var(--border);border-radius:7px;overflow:hidden;}
 .graph-toggle .gt{padding:3px 9px;cursor:pointer;color:var(--muted);background:var(--panel-2);}
 .graph-toggle .gt.on{background:rgba(59,130,246,.18);color:#fff;}
 /* 상세 분석 / 공격경로 분석 탭 — 항목 선택 시에만 나타난다. */
 .ana-tabs{display:flex;gap:6px;margin:9px 0 11px;border-bottom:1px solid var(--border);padding-bottom:9px;}
-.atab{font-size:11.5px;font-weight:700;padding:5px 11px;border-radius:7px;background:var(--panel-2);border:1px solid var(--border);color:var(--muted);cursor:pointer;user-select:none;}
+.atab{font-size:12.5px;font-weight:700;padding:5px 11px;border-radius:7px;background:var(--panel-2);border:1px solid var(--border);color:var(--muted);cursor:pointer;user-select:none;}
 .atab:hover{color:#fff;border-color:var(--blue);}
 .atab.on{background:rgba(59,130,246,.16);border-color:rgba(59,130,246,.45);color:#fff;}
 .path-head{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;}
@@ -74,38 +74,38 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
    실제 상한(max-width)은 내용(노드 수)에 따라 그리는 쪽에서 인라인으로 지정한다. */
 #pathGraph{margin-top:10px;}
 #pathGraph svg{width:100%;height:auto;display:block;margin:0 auto;}
-.graph-legend{font-size:10px;color:var(--muted-2);margin-top:8px;line-height:1.6;}
+.graph-legend{font-size:11.75px;color:var(--muted-2);margin-top:8px;line-height:1.6;}
 .graph-legend .lg{display:inline-block;margin-right:10px;}
 .graph-legend .dot{display:inline-block;width:8px;height:8px;border-radius:50%;vertical-align:middle;margin-right:3px;}
 .task-done{background:rgba(30,185,128,.12);border:1px solid rgba(30,185,128,.4);border-radius:8px;padding:9px 12px;margin-bottom:10px;font-size:12px;color:#8fe3c0;line-height:1.5;}
 .filters{display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;}
-.fchip{font-size:11.5px;padding:5px 11px;border-radius:20px;background:var(--panel-2);border:1px solid var(--border);color:var(--muted);cursor:pointer;}
+.fchip{font-size:12.5px;padding:5px 11px;border-radius:20px;background:var(--panel-2);border:1px solid var(--border);color:var(--muted);cursor:pointer;}
 .fchip.active{background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.4);color:#fff;}
 .risk-list{max-height:560px;overflow-y:auto;}
 .risk-row{display:flex;align-items:center;gap:11px;padding:11px 6px;border-bottom:1px solid var(--border);cursor:pointer;}
 .risk-row:hover{background:var(--panel-2);}.risk-row.sel{background:rgba(59,130,246,.07);}
 .rank{font-size:14px;font-weight:800;color:var(--muted-2);width:22px;text-align:center;flex:none;}
-.src{font-size:10px;font-weight:800;padding:2px 8px;border-radius:var(--g-r-pill);flex:none;}
+.src{font-size:11.75px;font-weight:800;padding:2px 8px;border-radius:var(--g-r-pill);flex:none;}
 .src.vuln{color:var(--red);background:rgba(226,72,61,.12);}
 .src.log{color:var(--amber);background:rgba(240,160,32,.12);}
 .src.product{color:var(--purple);background:rgba(139,124,240,.12);}
 .src.hardening{color:var(--teal);background:rgba(30,185,128,.12);}
 .rr-main{flex:1;min-width:0;}
 .rr-name{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.rr-sub{font-size:11px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.pri{font-size:11px;font-weight:800;padding:3px 9px;border-radius:20px;flex:none;}
+.rr-sub{font-size:12.25px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.pri{font-size:12.25px;font-weight:800;padding:3px 9px;border-radius:20px;flex:none;}
 .p0{color:var(--red);background:rgba(226,72,61,.14);}
 .p1{color:var(--amber);background:rgba(240,160,32,.14);}
 .p2{color:var(--teal);background:rgba(30,185,128,.14);}
 .p3{color:var(--muted-2);background:rgba(255,255,255,.05);}
 
 .ana .arow{font-size:12.5px;color:var(--muted);line-height:1.8;}.ana .arow b{color:var(--text);}
-.ana pre{background:var(--panel-2);border:1px solid var(--border);border-radius:7px;padding:10px;font-size:11.5px;color:#cdd7e0;white-space:pre-wrap;font-family:inherit;margin:8px 0;}
+.ana pre{background:var(--panel-2);border:1px solid var(--border);border-radius:7px;padding:10px;font-size:12.5px;color:#cdd7e0;white-space:pre-wrap;font-family:inherit;margin:8px 0;}
 .sigs{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px;}
-.sig{font-size:10.5px;padding:2px 8px;border-radius:5px;background:rgba(226,72,61,.12);color:var(--red);}
-.corr{background:rgba(139,124,240,.08);border:1px solid rgba(139,124,240,.25);border-radius:8px;padding:10px;font-size:11.5px;color:#b9aef5;line-height:1.6;margin-bottom:8px;}
+.sig{font-size:12px;padding:2px 8px;border-radius:5px;background:rgba(226,72,61,.12);color:var(--red);}
+.corr{background:rgba(139,124,240,.08);border:1px solid rgba(139,124,240,.25);border-radius:8px;padding:10px;font-size:12.5px;color:#b9aef5;line-height:1.6;margin-bottom:8px;}
 .empty{color:var(--muted-2);font-size:12.5px;padding:24px;text-align:center;}
-.footer{display:flex;align-items:center;gap:10px;margin-top:28px;color:var(--muted-2);font-size:11px;}
+.footer{display:flex;align-items:center;gap:10px;margin-top:28px;color:var(--muted-2);font-size:12.25px;}
 .footer img{height:16px;opacity:.6;}
 .toast{position:fixed;bottom:20px;right:20px;background:var(--panel);border:1px solid var(--border-strong);border-radius:9px;padding:12px 16px;font-size:12.5px;color:var(--text);box-shadow:0 6px 24px rgba(0,0,0,.4);display:none;}
 </style>
@@ -149,7 +149,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     <div class="two">
       <div class="panel">
-        <div class="ph">통합 위험 우선순위 <span style="font-size:11px;color:var(--muted);font-weight:600">— 4소스 병합</span></div>
+        <div class="ph">통합 위험 우선순위 <span style="font-size:12.25px;color:var(--muted);font-weight:600">— 4소스 병합</span></div>
         <div class="corr-line" id="corrLine" style="display:none"></div>
         <div class="filters" id="filters">
           <span class="fchip active" data-src="all">전체</span>
@@ -229,7 +229,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       const sub = (e.signals && e.signals.length ? e.signals.join(" · ") + " · " : "") + esc(e.entity);
       const st = e.status || "open";
       const resolved = st==="done" || st==="ignored";
-      const stTag = st!=="open" ? ' <span style="font-size:10px;padding:1px 6px;border-radius:4px;background:rgba(255,255,255,.08);color:var(--muted)">'+STATUS_LABEL[st]+'</span>' : '';
+      const stTag = st!=="open" ? ' <span style="font-size:11.75px;padding:1px 6px;border-radius:4px;background:rgba(255,255,255,.08);color:var(--muted)">'+STATUS_LABEL[st]+'</span>' : '';
       return '<div class="risk-row'+(e.id===selectedId?' sel':'')+'" data-id="'+esc(e.id)+'"'+(resolved?' style="opacity:.5"':'')+'>'+
         '<div class="rank">'+(i+1)+'</div>'+
         '<span class="src '+e.source+'">'+esc(SRC_LABEL[e.source]||e.source)+'</span>'+
@@ -263,10 +263,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       '</div>'+
       '<button class="btn-primary" id="mkTask">▶ 조치 생성 · 작업 등록</button>'+
       '<div style="margin-top:10px;padding-top:9px;border-top:1px solid var(--border)">'+
-        '<div style="font-size:11px;color:var(--muted);margin-bottom:6px">처리 상태: <b style="color:var(--text)">'+STATUS_LABEL[e.status||"open"]+'</b>'+(e.statusNote?(' — '+esc(e.statusNote)):'')+'</div>'+
+        '<div style="font-size:12.25px;color:var(--muted);margin-bottom:6px">처리 상태: <b style="color:var(--text)">'+STATUS_LABEL[e.status||"open"]+'</b>'+(e.statusNote?(' — '+esc(e.statusNote)):'')+'</div>'+
         '<div style="display:flex;gap:5px;flex-wrap:wrap">'+
           [["ack","확인"],["inprogress","처리중"],["done","완료"],["ignored","무시"],["open","열림"]].map(([v,l])=>
-            '<button class="btn-ghost" data-st="'+v+'" style="font-size:11px;padding:5px 11px'+((e.status||"open")===v?';border-color:var(--blue);color:#fff':'')+'">'+l+'</button>').join("")+
+            '<button class="btn-ghost" data-st="'+v+'" style="font-size:12.25px;padding:5px 11px'+((e.status||"open")===v?';border-color:var(--blue);color:#fff':'')+'">'+l+'</button>').join("")+
         '</div>'+
       '</div>';
     const aiBtn = document.getElementById("aiBtn");
@@ -369,7 +369,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       (dashed?' stroke-dasharray="4 3"':'')+' marker-end="url(#gah)"/>';
   }
   var GDEFS='<defs><marker id="gah" markerWidth="7" markerHeight="7" refX="6" refY="3.2" orient="auto">'+
-            '<path d="M0,0 L7,3.2 L0,6.4 Z" fill="#8b93ab"/></marker></defs>';
+            '<path d="M0,0 L7,3.2 L0,6.4 Z" fill="#b3ada4"/></marker></defs>';
   function findStep(p,kind){ return (p.steps||[]).find(function(s){ return s.kind===kind; }); }
   // 소스별: 중심=거점 자산, 방사형으로 관측 신호(진입/거점취약점/인접이동)
   function graphSource(p){
@@ -410,7 +410,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         {x:xs[2],fill:"#f7c777",icon:"⚠",label:foot?foot.label:"취약점",sub:null},
         {x:xs[3],fill:"#5fa1ff",icon:"🖥",label:p.entity,sub:"도달성 "+p.reachability}
       ];
-      for(var i=0;i<nodes.length-1;i++){ svg+=svgEdge(nodes[i].x+16, y, nodes[i+1].x-16, y, "#8b93ab", false); }
+      for(var i=0;i<nodes.length-1;i++){ svg+=svgEdge(nodes[i].x+16, y, nodes[i+1].x-16, y, "#b3ada4", false); }
       nodes.forEach(function(nd){ svg+=svgNode(nd.x,y,{ r:15, fill:nd.fill, icon:nd.icon, label:nd.label, sub:nd.sub }); });
     });
     return svg+'</svg>';
@@ -429,7 +429,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       // 있는 자산은 경로가 없다 — 왜 비었는지 화면에서 바로 알 수 있게 이유를 적는다.
       box.innerHTML = '<div class="empty">'
         + (selectedPathEntity ? esc(selectedPathEntity)+'에 대해 ' : '')
-        + '관측된 공격 경로가 없습니다.<br><span style="font-size:11px;color:var(--muted-2)">'
+        + '관측된 공격 경로가 없습니다.<br><span style="font-size:12.25px;color:var(--muted-2)">'
         + '공격 경로는 <b>취약점이 확인된 자산</b>에만 만들어집니다. 이 자산은 아직 취약점 소스가 없어 경로를 그릴 근거가 없습니다.</span></div>';
       if(legend) legend.innerHTML='';
       return;

@@ -32,40 +32,40 @@
     var st = document.createElement("style");
     st.id = "gijoConsoleCss";
     st.textContent = [
-      "#consoleHost{display:flex;flex-direction:column;min-height:0;height:100%;background:var(--panel-2,#0e1526);}",
-      ".cs-head{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:7px 14px;font-size:11px;color:var(--muted,#8b93ab);border-bottom:1px solid rgba(255,255,255,.05);}",
+      "#consoleHost{display:flex;flex-direction:column;min-height:0;height:100%;background:var(--panel-2,#1f1e1d);}",
+      ".cs-head{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:7px 14px;font-size:12.25px;color:var(--muted,#b3ada4);border-bottom:1px solid rgba(255,255,255,.05);}",
       ".cs-ctx{background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);color:var(--blue-light,#5fa1ff);border-radius:14px;padding:2px 10px;font-weight:800;white-space:nowrap;}",
       ".cs-hint{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}",
-      ".cs-btn{flex:0 0 auto;font-size:11px;font-weight:700;color:var(--muted,#8b93ab);background:transparent;border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:3px 9px;cursor:pointer;white-space:nowrap;}",
+      ".cs-btn{flex:0 0 auto;font-size:12.25px;font-weight:700;color:var(--muted,#b3ada4);background:transparent;border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:3px 9px;cursor:pointer;white-space:nowrap;}",
       ".cs-btn:hover{color:#fff;border-color:var(--blue,#3b82f6);}",
       ".cs-body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:8px 14px;}",
-      ".cs-empty{color:var(--muted-2,#5f6785);font-size:12px;padding:10px 0;}",
+      ".cs-empty{color:var(--muted-2,#a49d95);font-size:12px;padding:10px 0;}",
       ".cs-row{display:flex;gap:9px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.03);}",
-      ".cs-row .ci{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:rgba(59,130,246,.16);display:flex;align-items:center;justify-content:center;font-size:11px;}",
+      ".cs-row .ci{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:rgba(59,130,246,.16);display:flex;align-items:center;justify-content:center;font-size:12.25px;}",
       ".cs-row.instr .ci{background:rgba(30,185,128,.16);}",
       ".cs-row.error .ci{background:rgba(226,72,61,.18);}",
       ".cs-row .cb{flex:1;min-width:0;}",
-      ".cs-row .cn{font-size:10.5px;font-weight:800;color:var(--muted,#8b93ab);margin-bottom:2px;}",
-      ".cs-row .cn .ct{font-weight:500;color:var(--muted-2,#5f6785);margin-left:6px;}",
-      ".cs-row .cm{font-size:12.5px;color:var(--text,#e7eaf3);word-break:break-word;line-height:1.62;}",
+      ".cs-row .cn{font-size:12px;font-weight:800;color:var(--muted,#b3ada4);margin-bottom:2px;}",
+      ".cs-row .cn .ct{font-weight:500;color:var(--muted-2,#a49d95);margin-left:6px;}",
+      ".cs-row .cm{font-size:12.5px;color:var(--text,#e9e7e2);word-break:break-word;line-height:1.62;}",
       // 마크다운으로 그린 답 — **표·목록·굵은 글씨**가 좁은 창에서도 읽히게(2026-07-31).
       // ⚠ 표는 폭이 좁으면 글자가 겹친다 → 표만 가로 스크롤을 준다(창은 안 밀린다).
       // 서랍 — 무엇을 할 수 있나. 접혀 있는 게 기본(대화가 주인공이다).
-      ".cs-drawer{flex:0 0 auto;border-bottom:1px solid var(--border,rgba(255,255,255,.08));background:var(--panel-2,#0e1526);}",
-      ".cs-dh{display:flex;align-items:center;gap:7px;padding:7px 11px;cursor:pointer;font-size:11.5px;user-select:none;}",
-      ".cs-dh .car{color:var(--muted-2,#5f6785);font-size:9px;}",
+      ".cs-drawer{flex:0 0 auto;border-bottom:1px solid var(--border,rgba(255,255,255,.08));background:var(--panel-2,#1f1e1d);}",
+      ".cs-dh{display:flex;align-items:center;gap:7px;padding:7px 11px;cursor:pointer;font-size:12.5px;user-select:none;}",
+      ".cs-dh .car{color:var(--muted-2,#a49d95);font-size:11.25px;}",
       ".cs-dh b{color:#fff;font-weight:800;}",
-      ".cs-dh .n{margin-left:auto;color:var(--muted-2,#5f6785);font-size:10px;}",
+      ".cs-dh .n{margin-left:auto;color:var(--muted-2,#a49d95);font-size:11.75px;}",
       // 펼쳤을 때 대화를 다 밀어내면 안 된다 — 최대 높이를 주고 그 안에서 스크롤한다.
       ".cs-db{max-height:240px;overflow-y:auto;padding:2px 0 7px;}",
-      ".cs-cat{display:flex;align-items:center;gap:6px;padding:7px 11px 3px;font-size:10px;font-weight:800;color:var(--muted-2,#5f6785);}",
-      ".cs-bd{font-size:8.5px;font-weight:800;border-radius:4px;padding:1px 5px;}",
+      ".cs-cat{display:flex;align-items:center;gap:6px;padding:7px 11px 3px;font-size:11.75px;font-weight:800;color:var(--muted-2,#a49d95);}",
+      ".cs-bd{font-size:11px;font-weight:800;border-radius:4px;padding:1px 5px;}",
       ".b-here{color:var(--teal,#1eb980);background:rgba(30,185,128,.16);}",
       ".b-ok{color:#f0a020;background:rgba(240,160,32,.16);}",
-      ".b-go{color:var(--muted,#8b93ab);background:rgba(255,255,255,.07);}",
+      ".b-go{color:var(--muted,#b3ada4);background:rgba(255,255,255,.07);}",
       ".cs-q{display:flex;align-items:center;gap:7px;margin:3px 11px;padding:6px 10px;border-radius:7px;",
-      "  background:var(--bg,#0a0e1a);border:1px solid var(--border-strong,rgba(255,255,255,.16));",
-      "  font-size:11.5px;color:var(--text,#e7eaf3);cursor:pointer;}",
+      "  background:var(--bg,#262624);border:1px solid var(--border-strong,rgba(255,255,255,.16));",
+      "  font-size:12.5px;color:var(--text,#e9e7e2);cursor:pointer;}",
       ".cs-q:hover{border-color:var(--blue,#3b82f6);color:var(--blue-light,#5fa1ff);}",
       ".cs-q .ic{flex:0 0 auto;opacity:.85;}",
       ".cs-row.instr .cm{white-space:pre-wrap;}",
@@ -75,80 +75,80 @@
       ".cs-row .cm h1,.cs-row .cm h2,.cs-row .cm h3{font-size:12.5px;font-weight:800;color:#fff;margin:9px 0 5px;}",
       ".cs-row .cm ul,.cs-row .cm ol{margin:4px 0 7px 17px;}",
       ".cs-row .cm li{margin:2px 0;}",
-      ".cs-row .cm code{background:var(--panel-2,#0e1526);border:1px solid var(--border,rgba(255,255,255,.08));" +
-        "border-radius:4px;padding:0 4px;font-size:11.5px;color:var(--blue-light,#5fa1ff);}",
-      ".cs-row .cm pre{background:var(--panel-2,#0e1526);border:1px solid var(--border,rgba(255,255,255,.08));" +
+      ".cs-row .cm code{background:var(--panel-2,#1f1e1d);border:1px solid var(--border,rgba(255,255,255,.08));" +
+        "border-radius:4px;padding:0 4px;font-size:12.5px;color:var(--blue-light,#5fa1ff);}",
+      ".cs-row .cm pre{background:var(--panel-2,#1f1e1d);border:1px solid var(--border,rgba(255,255,255,.08));" +
         "border-radius:7px;padding:8px 10px;overflow-x:auto;margin:6px 0;}",
-      ".cs-row .cm pre code{background:none;border:none;padding:0;color:var(--text,#e7eaf3);}",
-      ".cs-row .cm table{border-collapse:collapse;width:100%;margin:6px 0;font-size:11.5px;display:block;overflow-x:auto;}",
-      ".cs-row .cm th{background:var(--panel-2,#0e1526);color:var(--muted,#8b93ab);text-align:left;font-weight:700;}",
+      ".cs-row .cm pre code{background:none;border:none;padding:0;color:var(--text,#e9e7e2);}",
+      ".cs-row .cm table{border-collapse:collapse;width:100%;margin:6px 0;font-size:12.5px;display:block;overflow-x:auto;}",
+      ".cs-row .cm th{background:var(--panel-2,#1f1e1d);color:var(--muted,#b3ada4);text-align:left;font-weight:700;}",
       ".cs-row .cm th,.cs-row .cm td{border:1px solid var(--border,rgba(255,255,255,.08));padding:5px 8px;white-space:nowrap;}",
-      ".cs-row .cm blockquote{border-left:3px solid var(--border-strong,rgba(255,255,255,.16));margin:6px 0;padding:2px 0 2px 10px;color:var(--muted,#8b93ab);}",
+      ".cs-row .cm blockquote{border-left:3px solid var(--border-strong,rgba(255,255,255,.16));margin:6px 0;padding:2px 0 2px 10px;color:var(--muted,#b3ada4);}",
       ".cs-row .cm hr{border:none;border-top:1px solid var(--border,rgba(255,255,255,.08));margin:9px 0;}",
       ".cs-row .cm.clamp{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;cursor:pointer;}",
-      ".cs-row .cl-more{font-size:10.5px;font-weight:700;color:var(--blue-light,#5fa1ff);cursor:pointer;}",
+      ".cs-row .cl-more{font-size:12px;font-weight:700;color:var(--blue-light,#5fa1ff);cursor:pointer;}",
       // 「이 답 이상해요」 지적(중-1) — 평소엔 숨고 마우스를 올리거나 키보드로 짚으면 드러난다.
       // 호버만으로 드러내면 키보드 사용자가 못 쓴다(탭 닫기 ✕와 같은 방식).
-      ".cs-row .cs-flag{display:none;margin-top:4px;font-size:10px;font-weight:700;color:var(--muted-2,#5f6785);background:none;border:1px solid rgba(255,255,255,.10);border-radius:999px;padding:2px 8px;cursor:pointer;min-height:24px;}",
+      ".cs-row .cs-flag{display:none;margin-top:4px;font-size:11.75px;font-weight:700;color:var(--muted-2,#a49d95);background:none;border:1px solid rgba(255,255,255,.10);border-radius:999px;padding:2px 8px;cursor:pointer;min-height:24px;}",
       ".cs-row:hover .cs-flag,.cs-row .cs-flag:focus-visible{display:inline-block;}",
       ".cs-row .cs-flag:hover,.cs-row .cs-flag:focus-visible{color:var(--amber,#f59e0b);border-color:rgba(245,158,11,.45);}",
       ".cs-row .cs-flag.done{display:inline-block;color:var(--teal,#1eb980);border-color:rgba(30,185,128,.4);cursor:default;}",
       // "가서 하기" 화면 열기 — 지적(cs-flag)과 달리 **늘 보인다**. 순서를 읽은 다음 바로 누를
       // 것이라 hover로 숨기면 있는 줄도 모른다.
-      ".cs-row .cs-open{display:block;margin-top:8px;font-size:11.5px;font-weight:700;color:var(--blue-l,#5fa1ff);background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.35);border-radius:8px;padding:6px 12px;cursor:pointer;min-height:28px;font-family:inherit;}",
+      ".cs-row .cs-open{display:block;margin-top:8px;font-size:12.5px;font-weight:700;color:var(--blue-l,#5fa1ff);background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.35);border-radius:8px;padding:6px 12px;cursor:pointer;min-height:28px;font-family:inherit;}",
       ".cs-row .cs-open:hover{background:rgba(59,130,246,.18);}",
       ".cs-row .cs-open:disabled{color:var(--teal,#1eb980);background:rgba(30,185,128,.10);border-color:rgba(30,185,128,.35);cursor:default;}",
       // 목록 골라 조치 — 글자 위주로. 그래픽보다 데이터가 보이는 게 핵심(2026-07-31 사용자 지시).
       ".cs-row .cs-pick{margin-top:8px;border:1px solid rgba(255,255,255,.10);border-radius:9px;padding:8px 10px;}",
       ".cs-row .cs-pick.done{opacity:.55;}",
-      ".cs-row .cs-ph{font-size:11px;color:var(--muted-2,#5f6785);margin-bottom:6px;}",
+      ".cs-row .cs-ph{font-size:12.25px;color:var(--muted-2,#a49d95);margin-bottom:6px;}",
       ".cs-row .cs-pi{display:flex;align-items:center;gap:8px;padding:3px 0;font-size:12px;cursor:pointer;}",
       ".cs-row .cs-pi:hover{background:rgba(255,255,255,.03);}",
       ".cs-row .cs-pi input{width:auto;margin:0;flex:0 0 auto;}",
       ".cs-row .cs-pl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}",
-      ".cs-row .cs-ps{flex:0 0 auto;font-size:10.5px;color:var(--muted-2,#5f6785);}",
+      ".cs-row .cs-ps{flex:0 0 auto;font-size:12px;color:var(--muted-2,#a49d95);}",
       ".cs-row .cs-pb{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,.08);}",
-      ".cs-row .cs-pc{font-size:11px;color:var(--muted,#8b93ab);margin-right:auto;}",
-      ".cs-row .cs-pact{font-size:11px;font-weight:700;color:var(--blue-l,#5fa1ff);background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.30);border-radius:7px;padding:4px 9px;cursor:pointer;font-family:inherit;min-height:26px;}",
+      ".cs-row .cs-pc{font-size:12.25px;color:var(--muted,#b3ada4);margin-right:auto;}",
+      ".cs-row .cs-pact{font-size:12.25px;font-weight:700;color:var(--blue-l,#5fa1ff);background:rgba(59,130,246,.10);border:1px solid rgba(59,130,246,.30);border-radius:7px;padding:4px 9px;cursor:pointer;font-family:inherit;min-height:26px;}",
       ".cs-row .cs-pact:hover:not(:disabled){background:rgba(59,130,246,.20);}",
-      ".cs-row .cs-pact:disabled{color:var(--muted-2,#5f6785);background:none;border-color:rgba(255,255,255,.08);cursor:default;}",
+      ".cs-row .cs-pact:disabled{color:var(--muted-2,#a49d95);background:none;border-color:rgba(255,255,255,.08);cursor:default;}",
       ".cs-row .cs-pv{display:flex;gap:6px;margin-top:7px;}",
-      ".cs-row .cs-pvi{flex:1;background:var(--panel-2,#0e1526);border:1px solid rgba(255,255,255,.16);border-radius:7px;padding:5px 9px;color:var(--text,#e7eaf3);font-size:12px;font-family:inherit;outline:none;}",
+      ".cs-row .cs-pvi{flex:1;background:var(--panel-2,#1f1e1d);border:1px solid rgba(255,255,255,.16);border-radius:7px;padding:5px 9px;color:var(--text,#e9e7e2);font-size:12px;font-family:inherit;outline:none;}",
       // 실행 승인(결재판) — 대화 안에서 값을 보고 고치고 승인한다.
       ".cs-row .cs-ap{margin-top:8px;border:1px solid rgba(240,160,32,.35);background:rgba(240,160,32,.06);border-radius:9px;padding:9px 11px;}",
       ".cs-row .cs-aph{font-size:12px;font-weight:800;color:var(--amber,#f0a020);margin-bottom:3px;}",
-      ".cs-row .cs-apsub{font-size:11px;color:var(--muted,#8b93ab);margin-bottom:8px;}",
+      ".cs-row .cs-apsub{font-size:12.25px;color:var(--muted,#b3ada4);margin-bottom:8px;}",
       ".cs-row .cs-apf{display:flex;align-items:center;gap:8px;margin-bottom:5px;}",
-      ".cs-row .cs-apk{flex:0 0 72px;font-size:11px;color:var(--muted-2,#5f6785);}",
-      ".cs-row .cs-apin{flex:1;min-width:0;background:var(--panel-2,#0e1526);border:1px solid rgba(255,255,255,.16);border-radius:7px;padding:5px 9px;color:var(--text,#e7eaf3);font-size:12px;font-family:inherit;outline:none;}",
+      ".cs-row .cs-apk{flex:0 0 72px;font-size:12.25px;color:var(--muted-2,#a49d95);}",
+      ".cs-row .cs-apin{flex:1;min-width:0;background:var(--panel-2,#1f1e1d);border:1px solid rgba(255,255,255,.16);border-radius:7px;padding:5px 9px;color:var(--text,#e9e7e2);font-size:12px;font-family:inherit;outline:none;}",
       ".cs-row .cs-apin.need{border-color:rgba(226,72,61,.55);}",
-      ".cs-row .cs-ape{font-size:11px;color:var(--muted,#8b93ab);margin-top:7px;line-height:1.6;}",
+      ".cs-row .cs-ape{font-size:12.25px;color:var(--muted,#b3ada4);margin-top:7px;line-height:1.6;}",
       ".cs-row .cs-apb{display:flex;gap:6px;margin-top:9px;}",
-      ".cs-row .cs-apgo{font-size:11.5px;font-weight:800;color:#fff;background:var(--teal,#1eb980);border:none;border-radius:7px;padding:6px 12px;cursor:pointer;font-family:inherit;}",
-      ".cs-row .cs-apgo:disabled{background:rgba(255,255,255,.10);color:var(--muted-2,#5f6785);cursor:default;}",
-      ".cs-row .cs-apno{font-size:11.5px;font-weight:700;color:var(--muted,#8b93ab);background:none;border:1px solid rgba(255,255,255,.14);border-radius:7px;padding:6px 12px;cursor:pointer;font-family:inherit;}",
-      ".cs-row .cs-apd{font-size:12px;color:var(--muted,#8b93ab);}",
+      ".cs-row .cs-apgo{font-size:12.5px;font-weight:800;color:#fff;background:var(--teal,#1eb980);border:none;border-radius:7px;padding:6px 12px;cursor:pointer;font-family:inherit;}",
+      ".cs-row .cs-apgo:disabled{background:rgba(255,255,255,.10);color:var(--muted-2,#a49d95);cursor:default;}",
+      ".cs-row .cs-apno{font-size:12.5px;font-weight:700;color:var(--muted,#b3ada4);background:none;border:1px solid rgba(255,255,255,.14);border-radius:7px;padding:6px 12px;cursor:pointer;font-family:inherit;}",
+      ".cs-row .cs-apd{font-size:12px;color:var(--muted,#b3ada4);}",
       ".cs-row.error .cm{color:#f5928a;}",
-      ".cs-typing span{display:inline-block;width:5px;height:5px;margin-right:3px;border-radius:50%;background:var(--muted,#8b93ab);animation:csb 1s infinite;}",
+      ".cs-typing span{display:inline-block;width:5px;height:5px;margin-right:3px;border-radius:50%;background:var(--muted,#b3ada4);animation:csb 1s infinite;}",
       ".cs-typing span:nth-child(2){animation-delay:.15s}.cs-typing span:nth-child(3){animation-delay:.3s}",
       "@keyframes csb{0%,60%,100%{opacity:.25}30%{opacity:1}}",
       ".cs-dock{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:9px 14px 12px;}",
-      ".cs-dock input{flex:1;background:var(--panel,#121a2e);border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:11px;color:var(--text,#e7eaf3);font-size:13px;padding:11px 14px;outline:none;font-family:inherit;}",
+      ".cs-dock input{flex:1;background:var(--panel,#30302e);border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:11px;color:var(--text,#e9e7e2);font-size:13px;padding:11px 14px;outline:none;font-family:inherit;}",
       ".cs-dock input:focus{border-color:var(--blue,#3b82f6);}",
       // ＋ 파일 올리기 — 인입 창구는 여기 하나다(2026-07-27 결정: "파일은 ＋ 한 곳으로").
-      ".cs-plus{flex:0 0 auto;width:38px;height:38px;border-radius:11px;background:var(--panel,#121a2e);color:var(--muted,#8b93ab);",
+      ".cs-plus{flex:0 0 auto;width:38px;height:38px;border-radius:11px;background:var(--panel,#30302e);color:var(--muted,#b3ada4);",
       "border:1px solid var(--border-strong,rgba(255,255,255,.16));font-size:17px;line-height:1;cursor:pointer;}",
       ".cs-plus:hover{color:#fff;border-color:var(--blue,#3b82f6);background:rgba(59,130,246,.12);}",
       ".cs-updec{margin-top:6px;}",
       ".cs-updec .h{font-size:12px;font-weight:800;color:#fff;margin-bottom:3px;}",
-      ".cs-updec .f{font-size:11px;color:var(--muted-2,#5f6785);margin-bottom:7px;}",
+      ".cs-updec .f{font-size:12.25px;color:var(--muted-2,#a49d95);margin-bottom:7px;}",
       ".cs-updec .btns{display:flex;gap:5px;flex-wrap:wrap;}",
-      ".cs-updec button{background:var(--panel,#121a2e);border:1px solid var(--border-strong,rgba(255,255,255,.16));color:#dfe6ff;",
-      "border-radius:8px;padding:6px 10px;font-size:11.5px;font-weight:700;cursor:pointer;}",
+      ".cs-updec button{background:var(--panel,#30302e);border:1px solid var(--border-strong,rgba(255,255,255,.16));color:#dfe6ff;",
+      "border-radius:8px;padding:6px 10px;font-size:12.5px;font-weight:700;cursor:pointer;}",
       ".cs-updec button:hover{border-color:var(--blue,#3b82f6);background:rgba(59,130,246,.14);}",
       ".cs-updec button.reco{border-color:var(--teal,#1eb980);color:#bff3de;}",
-      ".cs-updec input.pn{width:100%;margin-bottom:7px;background:var(--panel,#121a2e);border:1px solid var(--border-strong,rgba(255,255,255,.16));",
-      "border-radius:8px;color:var(--text,#e7eaf3);font-size:12px;padding:7px 9px;outline:none;font-family:inherit;}",
+      ".cs-updec input.pn{width:100%;margin-bottom:7px;background:var(--panel,#30302e);border:1px solid var(--border-strong,rgba(255,255,255,.16));",
+      "border-radius:8px;color:var(--text,#e9e7e2);font-size:12px;padding:7px 9px;outline:none;font-family:inherit;}",
       ".cs-send{background:var(--blue,#3b82f6);color:#fff;border:none;border-radius:11px;font-size:12.5px;font-weight:800;padding:11px 18px;cursor:pointer;}",
       ".cs-send:hover{background:#2f6fd0;}",
       ".cs-send[disabled]{opacity:.5;cursor:default;}",
@@ -220,17 +220,17 @@
       "border:1px solid var(--border-strong,#2a3040);border-radius:10px;box-shadow:0 18px 44px rgba(0,0,0,.55);padding:12px 13px;";
     c.innerHTML =
       '<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:9px">' +
-      '<div style="flex:1;min-width:0;font-size:10.5px;color:var(--muted-2,#5f6785);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
+      '<div style="flex:1;min-width:0;font-size:12px;color:var(--muted-2,#a49d95);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
       esc(String(answer).slice(0, 40)) + "…</div>" +
-      '<span id="fbX" role="button" tabindex="0" style="cursor:pointer;color:var(--muted,#8b93ab);font-size:13px;line-height:1">✕</span></div>' +
+      '<span id="fbX" role="button" tabindex="0" style="cursor:pointer;color:var(--muted,#b3ada4);font-size:13px;line-height:1">✕</span></div>' +
       '<div id="fbKinds" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px"></div>' +
-      '<div id="fbHint" style="font-size:10px;color:var(--muted-2,#5f6785);margin-bottom:9px;min-height:13px"></div>' +
-      '<textarea id="fbNote" rows="2" placeholder="무엇이 틀렸나요? (선택)" style="width:100%;box-sizing:border-box;background:var(--panel-2,#11151d);border:1px solid var(--border,#222836);border-radius:7px;padding:7px 9px;color:var(--text,#e7eaf3);font-size:11.5px;resize:vertical;margin-bottom:7px"></textarea>' +
-      '<textarea id="fbExp" rows="2" placeholder="혹시 정답을 아신다면 (선택)" style="width:100%;box-sizing:border-box;background:var(--panel-2,#11151d);border:1px solid var(--border,#222836);border-radius:7px;padding:7px 9px;color:var(--text,#e7eaf3);font-size:11.5px;resize:vertical"></textarea>' +
-      '<div style="font-size:9.5px;color:var(--muted-2,#5f6785);margin:5px 0 10px">적어 주시면 앞으로 이 질문을 검사 문항으로 씁니다.</div>' +
+      '<div id="fbHint" style="font-size:11.75px;color:var(--muted-2,#a49d95);margin-bottom:9px;min-height:13px"></div>' +
+      '<textarea id="fbNote" rows="2" placeholder="무엇이 틀렸나요? (선택)" style="width:100%;box-sizing:border-box;background:var(--panel-2,#242322);border:1px solid var(--border,#3a3936);border-radius:7px;padding:7px 9px;color:var(--text,#e9e7e2);font-size:12.5px;resize:vertical;margin-bottom:7px"></textarea>' +
+      '<textarea id="fbExp" rows="2" placeholder="혹시 정답을 아신다면 (선택)" style="width:100%;box-sizing:border-box;background:var(--panel-2,#242322);border:1px solid var(--border,#3a3936);border-radius:7px;padding:7px 9px;color:var(--text,#e9e7e2);font-size:12.5px;resize:vertical"></textarea>' +
+      '<div style="font-size:11.5px;color:var(--muted-2,#a49d95);margin:5px 0 10px">적어 주시면 앞으로 이 질문을 검사 문항으로 씁니다.</div>' +
       '<div style="display:flex;justify-content:flex-end;gap:7px">' +
-      '<button id="fbCancel" style="background:none;border:1px solid var(--border,#222836);border-radius:7px;padding:5px 12px;color:var(--muted,#8b93ab);font-size:11.5px;cursor:pointer">취소</button>' +
-      '<button id="fbSend" style="background:var(--blue,#3b82f6);border:none;border-radius:7px;padding:5px 14px;color:#fff;font-size:11.5px;font-weight:700;cursor:pointer">전송</button></div>';
+      '<button id="fbCancel" style="background:none;border:1px solid var(--border,#3a3936);border-radius:7px;padding:5px 12px;color:var(--muted,#b3ada4);font-size:12.5px;cursor:pointer">취소</button>' +
+      '<button id="fbSend" style="background:var(--blue,#3b82f6);border:none;border-radius:7px;padding:5px 14px;color:#fff;font-size:12.5px;font-weight:700;cursor:pointer">전송</button></div>';
     document.body.appendChild(c);
     flagCard = c;
 
@@ -239,11 +239,11 @@
     FLAG_KINDS.forEach(function (k) {
       var b = document.createElement("button");
       b.textContent = k.label;
-      b.style.cssText = "background:none;border:1px solid var(--border,#222836);border-radius:999px;padding:4px 10px;color:var(--text,#e7eaf3);font-size:11px;cursor:pointer;min-height:24px;";
+      b.style.cssText = "background:none;border:1px solid var(--border,#3a3936);border-radius:999px;padding:4px 10px;color:var(--text,#e9e7e2);font-size:12.25px;cursor:pointer;min-height:24px;";
       b.onclick = function () {
         picked = k.k;
         hint.textContent = k.hint;
-        [].forEach.call(kinds.children, function (x) { x.style.borderColor = "var(--border,#222836)"; x.style.color = "var(--text,#e7eaf3)"; });
+        [].forEach.call(kinds.children, function (x) { x.style.borderColor = "var(--border,#3a3936)"; x.style.color = "var(--text,#e9e7e2)"; });
         b.style.borderColor = "var(--amber,#f59e0b)"; b.style.color = "var(--amber,#f59e0b)";
       };
       kinds.appendChild(b);
@@ -307,7 +307,7 @@
     //   담당자가 가장 많이 쓰는 자리에서 "무엇을 보고 답했는지"가 안 보이고 있었다.
     if (el && Array.isArray(sources) && sources.length) {
       var badge = document.createElement("div");
-      badge.style.cssText = "margin-top:6px;font-size:9.5px;font-weight:700;color:#6fdcb5";
+      badge.style.cssText = "margin-top:6px;font-size:11.5px;font-weight:700;color:#6fdcb5";
       badge.textContent = "📄 근거: " + sources.slice(0, 4).join(" · ");
       el.appendChild(badge);
     }
@@ -315,7 +315,7 @@
     var wrap = document.createElement("div");
     wrap.style.cssText = "margin-top:8px;border-top:1px solid rgba(255,255,255,.08);padding-top:8px";
     var head = document.createElement("div");
-    head.style.cssText = "font-size:10.5px;color:var(--muted,#8b93ab);cursor:pointer;user-select:none";
+    head.style.cssText = "font-size:12px;color:var(--muted,#b3ada4);cursor:pointer;user-select:none";
     var open = false;
     var draw = function () { head.textContent = (open ? "▾" : "▸") + " 📄 근거 원문 " + quotes.length + "대목 — 답이 맞는지 확인"; };
     draw();
@@ -339,8 +339,8 @@
         } catch (e) {}
       });
       box.innerHTML =
-        '<div style="font-size:9.5px;color:var(--muted-2,#5f6785);margin-bottom:3px">' + esc(q.documentId || "") + "</div>" +
-        '<div style="font-size:11px;line-height:1.75;color:#cdd4e6">' + txt + "</div>";
+        '<div style="font-size:11.5px;color:var(--muted-2,#a49d95);margin-bottom:3px">' + esc(q.documentId || "") + "</div>" +
+        '<div style="font-size:12.25px;line-height:1.75;color:#cdd4e6">' + txt + "</div>";
       body.appendChild(box);
     });
 

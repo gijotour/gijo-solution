@@ -29,24 +29,24 @@
     s.textContent =
       ".gijo-pc{font-size:12px;}" +
       ".gijo-pc .pc-steps{display:flex;align-items:center;gap:3px;margin-bottom:7px;flex-wrap:wrap;}" +
-      ".gijo-pc .pc-step{display:flex;align-items:center;gap:4px;font-size:10.5px;color:var(--muted-2,#5f6785);" +
+      ".gijo-pc .pc-step{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted-2,#a49d95);" +
       "padding:2px 7px;border-radius:20px;border:1px solid transparent;white-space:nowrap;}" +
-      ".gijo-pc .pc-step.done{color:var(--muted,#8b93ab);}" +
+      ".gijo-pc .pc-step.done{color:var(--muted,#b3ada4);}" +
       ".gijo-pc .pc-step.done .ic{color:var(--teal,#1eb980);}" +
-      ".gijo-pc .pc-step.now{color:var(--text,#e7eaf3);background:var(--panel-2,#0e1526);" +
+      ".gijo-pc .pc-step.now{color:var(--text,#e9e7e2);background:var(--panel-2,#1f1e1d);" +
       "border-color:var(--border-strong,rgba(255,255,255,.16));font-weight:700;}" +
       ".gijo-pc .pc-step.now .ic{display:inline-block;animation:gijoPcSpin 1.1s linear infinite;}" +
       "@keyframes gijoPcSpin{to{transform:rotate(360deg)}}" +
       ".gijo-pc .pc-conn{width:8px;height:1px;background:var(--border-strong,rgba(255,255,255,.16));}" +
-      ".gijo-pc .pc-big{font-size:11.5px;color:var(--muted,#8b93ab);margin-bottom:6px;}" +
-      ".gijo-pc .pc-big b{color:var(--text,#e7eaf3);}" +
-      ".gijo-pc .pc-bar{height:4px;border-radius:4px;background:var(--panel-2,#0e1526);overflow:hidden;margin-bottom:6px;}" +
+      ".gijo-pc .pc-big{font-size:12.5px;color:var(--muted,#b3ada4);margin-bottom:6px;}" +
+      ".gijo-pc .pc-big b{color:var(--text,#e9e7e2);}" +
+      ".gijo-pc .pc-bar{height:4px;border-radius:4px;background:var(--panel-2,#1f1e1d);overflow:hidden;margin-bottom:6px;}" +
       ".gijo-pc .pc-fill{height:100%;border-radius:4px;background:var(--teal,#1eb980);transition:width .5s ease;width:5%;}" +
       ".gijo-pc.wave .pc-fill{width:34%;transition:none;animation:gijoPcWave 1.6s ease-in-out infinite;}" +
       "@keyframes gijoPcWave{0%{margin-left:-34%}100%{margin-left:100%}}" +
-      ".gijo-pc .pc-detail{display:flex;gap:8px;align-items:baseline;font-size:11.5px;color:var(--muted,#8b93ab);}" +
+      ".gijo-pc .pc-detail{display:flex;gap:8px;align-items:baseline;font-size:12.5px;color:var(--muted,#b3ada4);}" +
       ".gijo-pc .pc-pct{margin-left:auto;color:var(--teal,#1eb980);font-weight:800;font-variant-numeric:tabular-nums;}" +
-      ".gijo-pc .pc-elapsed{color:var(--muted-2,#5f6785);font-size:10.5px;font-variant-numeric:tabular-nums;}";
+      ".gijo-pc .pc-elapsed{color:var(--muted-2,#a49d95);font-size:12px;font-variant-numeric:tabular-nums;}";
     (doc.head || doc.documentElement).appendChild(s);
   }
 

@@ -25,18 +25,18 @@
     s.id = "gijoLnStyle";
     s.textContent =
       "#gijoLnWrap{position:fixed;right:18px;bottom:18px;z-index:4000;display:flex;flex-direction:column;gap:10px;}" +
-      ".gijo-ln{width:330px;background:var(--panel,#121a2e);border:1px solid var(--border-strong,rgba(255,255,255,.16));" +
+      ".gijo-ln{width:330px;background:var(--panel,#30302e);border:1px solid var(--border-strong,rgba(255,255,255,.16));" +
       "border-left:3px solid var(--teal,#1eb980);border-radius:11px;padding:13px 14px;" +
-      "box-shadow:0 10px 30px rgba(0,0,0,.45);font-size:12.5px;color:var(--text,#e7eaf3);animation:gijoLnIn .22s ease-out;}" +
+      "box-shadow:0 10px 30px rgba(0,0,0,.45);font-size:12.5px;color:var(--text,#e9e7e2);animation:gijoLnIn .22s ease-out;}" +
       ".gijo-ln.fail{border-left-color:var(--red,#e2483d);}" +
       "@keyframes gijoLnIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}" +
       ".gijo-ln .h{display:flex;align-items:center;gap:7px;font-weight:800;margin-bottom:5px;}" +
-      ".gijo-ln .x{margin-left:auto;cursor:pointer;color:var(--muted,#8b93ab);font-weight:400;}" +
-      ".gijo-ln .q{color:var(--muted,#8b93ab);font-size:11.5px;line-height:1.55;margin-bottom:9px;" +
+      ".gijo-ln .x{margin-left:auto;cursor:pointer;color:var(--muted,#b3ada4);font-weight:400;}" +
+      ".gijo-ln .q{color:var(--muted,#b3ada4);font-size:12.5px;line-height:1.55;margin-bottom:9px;" +
       "display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}" +
       ".gijo-ln .a{display:flex;gap:6px;}" +
-      ".gijo-ln button{border-radius:7px;padding:6px 11px;font-size:11.5px;font-weight:700;cursor:pointer;" +
-      "border:1px solid var(--border-strong,rgba(255,255,255,.16));background:var(--panel-2,#0e1526);color:var(--text,#e7eaf3);}" +
+      ".gijo-ln button{border-radius:7px;padding:6px 11px;font-size:12.5px;font-weight:700;cursor:pointer;" +
+      "border:1px solid var(--border-strong,rgba(255,255,255,.16));background:var(--panel-2,#1f1e1d);color:var(--text,#e9e7e2);}" +
       ".gijo-ln button.go{background:rgba(30,185,128,.16);border-color:#1eb980;color:#6ee7a0;}";
     document.head.appendChild(s);
   }

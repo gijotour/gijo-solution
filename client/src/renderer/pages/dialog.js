@@ -27,19 +27,19 @@
   var CSS =
     "#gijoDlgBack{position:fixed;inset:0;z-index:99999;background:rgba(4,7,14,.62);" +
     "display:flex;align-items:center;justify-content:center;padding:24px;}" +
-    "#gijoDlg{max-width:440px;width:100%;background:var(--panel,#121a2e);color:var(--text,#e7eaf3);" +
+    "#gijoDlg{max-width:440px;width:100%;background:var(--panel,#30302e);color:var(--text,#e9e7e2);" +
     "border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:14px;padding:20px 22px;" +
     "box-shadow:0 24px 64px rgba(0,0,0,.6);font-family:'Pretendard','Malgun Gothic','Segoe UI',sans-serif;}" +
     "#gijoDlg .m{font-size:13.5px;line-height:1.8;white-space:pre-wrap;word-break:break-word;}" +
     "#gijoDlg .a{display:flex;gap:8px;justify-content:flex-end;margin-top:18px;}" +
     "#gijoDlg button{font-size:12.5px;font-weight:700;border-radius:9px;padding:8px 15px;cursor:pointer;" +
     "font-family:inherit;border:1px solid transparent;}" +
-    "#gijoDlg .no{background:transparent;color:var(--muted,#8b93ab);border-color:rgba(255,255,255,.16);}" +
+    "#gijoDlg .no{background:transparent;color:var(--muted,#b3ada4);border-color:rgba(255,255,255,.16);}" +
     "#gijoDlg .no:hover{color:#fff;}" +
     "#gijoDlg .ok{background:var(--blue,#3b82f6);color:#fff;}" +
     "#gijoDlg .ok:hover{filter:brightness(1.1);}" +
     "#gijoDlg .ok.danger{background:var(--red,#e2483d);}" +
-    "#gijoDlg .in{width:100%;margin-top:12px;background:var(--panel-2,#0e1526);color:var(--text,#e7eaf3);" +
+    "#gijoDlg .in{width:100%;margin-top:12px;background:var(--panel-2,#1f1e1d);color:var(--text,#e9e7e2);" +
     "border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:9px;padding:9px 11px;" +
     "font-size:13px;font-family:inherit;outline:none;}" +
     "#gijoDlg .in:focus{border-color:var(--blue,#3b82f6);}";

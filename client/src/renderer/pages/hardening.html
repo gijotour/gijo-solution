@@ -10,9 +10,9 @@
 /* 색 토큰(공용 팔레트 — gijo-ui와 동일). 레이아웃·이 화면 고유 요소만 여기서 정의하고,
    버튼·카드·KPI·배지·입력·토글·모달은 gijo-ui.css의 .g-* 컴포넌트를 쓴다. */
 :root{
-  --bg:#12161f;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
   --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;
-  --text:#dfe3ec;--muted:#8b93ab;--muted-2:#78829a;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
@@ -26,7 +26,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .header-right{display:flex;align-items:center;gap:10px;}
 .status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,.15);border:1px solid rgba(30,185,128,.4);color:var(--teal);padding:6px 14px;border-radius:var(--g-r-pill);font-size:12px;font-weight:800;}
 .status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
-.beta-tag{background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
+.beta-tag{background:var(--teal);color:#06281c;font-size:11.25px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
 .avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
 .icon-btn{width:32px;height:32px;border-radius:var(--g-r-sm);background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
 /* 페이지 고유 */
@@ -52,9 +52,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .probe-res{font-size:var(--g-t-sm);margin-top:var(--g-s2);padding:8px 11px;border-radius:var(--g-r-sm);}
 .toast{position:fixed;bottom:22px;right:22px;background:var(--panel);border:1px solid var(--border-strong);border-radius:var(--g-r);padding:11px 16px;font-size:var(--g-t-sm);color:#fff;z-index:60;max-width:420px;box-shadow:var(--g-shadow-2);display:none;}
 .toast.show{display:block;}
-.reg-guide{background:var(--panel-2,#0e1526);border:1px solid rgba(95,161,255,.25);border-radius:var(--g-r-sm);padding:11px 13px;font-size:var(--g-t-xs);color:var(--muted);line-height:1.75;margin-bottom:var(--g-s3);}
+.reg-guide{background:var(--panel-2,#1f1e1d);border:1px solid rgba(95,161,255,.25);border-radius:var(--g-r-sm);padding:11px 13px;font-size:var(--g-t-xs);color:var(--muted);line-height:1.75;margin-bottom:var(--g-s3);}
 .reg-guide b{color:var(--blue-light,#5fa1ff);font-weight:700;}
-.page-guide{background:var(--panel-2,#0e1526);border:1px solid var(--border);border-left:3px solid var(--blue,#3b82f6);border-radius:var(--g-r-sm);padding:10px 14px;font-size:var(--g-t-xs);color:var(--muted);line-height:1.7;margin:12px 0 16px;}
+.page-guide{background:var(--panel-2,#1f1e1d);border:1px solid var(--border);border-left:3px solid var(--blue,#3b82f6);border-radius:var(--g-r-sm);padding:10px 14px;font-size:var(--g-t-xs);color:var(--muted);line-height:1.7;margin:12px 0 16px;}
 .page-guide b{color:#fff;font-weight:700;}
 .page-guide .std{color:var(--blue-light,#5fa1ff);font-weight:700;}
 </style>
@@ -145,7 +145,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 <script>
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s == null ? "" : s).replace(/</g, "&lt;");
-  const rc = (r) => (r == null ? "#8b93ab" : r >= 80 ? "#1eb980" : r >= 60 ? "#f0a020" : "#e2483d");
+  const rc = (r) => (r == null ? "#b3ada4" : r >= 80 ? "#1eb980" : r >= 60 ? "#f0a020" : "#e2483d");
   const authBadge = (a) => ({ key: "🔑 SSH 키", password: "🔒 비밀번호", local: "🖥 로컬" }[a] || a);
   let TARGETS = [], SCHEDULES = [], RUNS = [];
 
@@ -155,7 +155,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 3500); }
 
   function spark(vals, w = 90, h = 26, color = "#5fa1ff") {
-    if (!vals.length) return '<span style="color:var(--muted-2);font-size:10px">이력 없음</span>';
+    if (!vals.length) return '<span style="color:var(--muted-2);font-size:11.75px">이력 없음</span>';
     if (vals.length === 1) vals = [vals[0], vals[0]];
     const min = Math.min(...vals, 0), max = Math.max(...vals, 100);
     const pts = vals.map((v, i) => `${(i / (vals.length - 1)) * w},${h - ((v - min) / (max - min || 1)) * h}`).join(" ");
@@ -183,7 +183,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       `<div class="g-kpi"><div class="kv" style="color:#fff">${TARGETS.length}</div><div class="kl">등록 장비</div></div>` +
       `<div class="g-kpi"><div class="kv" style="color:#1eb980">${active}</div><div class="kl">활성 스케줄</div></div>` +
       `<div class="g-kpi"><div class="kv" style="color:${rc(withRate.length ? avg : null)}">${withRate.length ? avg + "%" : "—"}</div><div class="kl">평균 준수율</div></div>` +
-      `<div class="g-kpi" ${worse ? 'style="border-color:rgba(226,72,61,.4)"' : ""}><div class="kv" style="color:${worse ? "#e2483d" : "#8b93ab"}">${worse}</div><div class="kl">악화 경고</div></div>`;
+      `<div class="g-kpi" ${worse ? 'style="border-color:rgba(226,72,61,.4)"' : ""}><div class="kv" style="color:${worse ? "#e2483d" : "#b3ada4"}">${worse}</div><div class="kl">악화 경고</div></div>`;
   }
 
   function renderCards() {
@@ -197,7 +197,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       const nextTxt = d.sched && d.sched.enabled ? `⏱ ${d.sched.intervalHours}시간 · ${new Date(d.sched.nextRunAt).toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" })}` : "정기점검 미설정";
       const hostTxt = t.host === "local" ? "🖥 로컬" : `${t.host}:${t.port}`;
       return `<div class="tcard ${d.worsening ? "warn" : ""}">
-        <div class="tc-top"><span class="dot" style="background:${d.sched && d.sched.enabled ? rc(rate) : "#5f6785"}"></span>
+        <div class="tc-top"><span class="dot" style="background:${d.sched && d.sched.enabled ? rc(rate) : "#a49d95"}"></span>
           <span class="tc-name" title="${esc(t.label)}">${esc(t.label)}</span><span class="g-badge g-b-med">${stdLabel}</span></div>
         <div class="tc-mid"><div class="tc-rate" style="color:${rc(rate)}">${rate == null ? "—" : rate + "%"}</div>
           <div style="flex:1;text-align:right">${spark(d.trend, 90, 26, rc(rate))}</div></div>

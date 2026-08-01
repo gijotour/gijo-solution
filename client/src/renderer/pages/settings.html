@@ -6,21 +6,21 @@
 <title>GIJO AS — 설정</title>
 <style>
 :root{
-  --bg:#12161f;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
   --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
-  --text:#dfe3ec;--muted:#8b93ab;--muted-2:#78829a;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
 .app{display:grid;grid-template-columns:220px 1fr;}
 .sidebar{padding:22px 14px;border-right:1px solid var(--border);min-height:900px;}
-.nav-section{font-size:10.5px;font-weight:700;color:var(--muted-2);letter-spacing:1.2px;margin:18px 10px 8px;}
+.nav-section{font-size:12px;font-weight:700;color:var(--muted-2);letter-spacing:1.2px;margin:18px 10px 8px;}
 .nav-section:first-child{margin-top:0;}
 .nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:2px;}
 .nav-item .ic{width:18px;text-align:center;font-size:14px;}
 .nav-item.active{background:rgba(59,130,246,0.12);color:var(--white);box-shadow:inset 3px 0 0 var(--blue);cursor:default;}
 .nav-item:hover:not(.active){background:rgba(255,255,255,0.04);color:var(--white);}
-.nav-badge{margin-left:auto;background:var(--red);color:#fff;font-size:10px;font-weight:800;padding:1px 6px;border-radius:20px;}
+.nav-badge{margin-left:auto;background:var(--red);color:#fff;font-size:11.75px;font-weight:800;padding:1px 6px;border-radius:20px;}
 .main{padding:28px 32px 48px;}
 .topbar-row{display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:20px;}
 .page-title{font-size:21px;font-weight:800;color:#fff;}
@@ -31,14 +31,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .btn-danger{background:transparent;border:1px solid rgba(226,72,61,0.5);color:#f5928a;padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;}
 .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;max-width:640px;}
 .panel-title{font-size:14.5px;font-weight:800;color:#fff;margin-bottom:4px;}
-.panel-sub{font-size:11.5px;color:var(--muted);margin-bottom:16px;}
+.panel-sub{font-size:12.5px;color:var(--muted);margin-bottom:16px;}
 .field{margin-bottom:14px;}
-.field label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:6px;font-weight:600;}
+.field label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px;font-weight:600;}
 .field input{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;outline:none;}
 .field input:disabled{color:var(--muted);}
 .field-row{display:flex;gap:8px;align-items:center;}
 .field-row input{flex:1;}
-.hint{font-size:11.5px;color:var(--muted-2);margin-top:8px;line-height:1.6;}
+.hint{font-size:12.5px;color:var(--muted-2);margin-top:8px;line-height:1.6;}
 .status-line{font-size:12.5px;margin-top:10px;}
 /* 화면 크기 선택 — 칸 수를 고정하지 않고 폭에 맞춰 접히게 한다(이 화면 자체가 반응형 예시). */
 .zoom-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px;}
@@ -46,11 +46,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .zoom-opt:hover{border-color:var(--blue);color:#fff;}
 .zoom-opt.on{background:rgba(59,130,246,.16);border-color:rgba(59,130,246,.55);}
 .zoom-opt .zo-pct{font-size:14px;font-weight:800;color:#fff;}
-.zoom-opt .zo-name{font-size:10.5px;color:var(--muted);margin-top:3px;}
+.zoom-opt .zo-name{font-size:12px;color:var(--muted);margin-top:3px;}
 .zoom-opt.on .zo-name{color:var(--blue-light,#5fa1ff);}
 .status-ok{color:var(--teal);}
 .status-err{color:#f5928a;}
-.log-console{background:#05070d;border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;height:260px;overflow-y:auto;font-family:"Consolas","Cascadia Mono",monospace;font-size:11.5px;line-height:1.6;}
+.log-console{background:#1a1a19;border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;height:260px;overflow-y:auto;font-family:"Consolas","Cascadia Mono",monospace;font-size:12.5px;line-height:1.6;}
 .log-line{white-space:pre-wrap;word-break:break-all;}
 .log-line.log-warn{color:var(--amber);}
 .log-line.log-error{color:#f5928a;}
@@ -58,7 +58,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .kv{display:grid;grid-template-columns:100px 1fr;gap:8px 12px;font-size:13px;margin-bottom:16px;}
 .kv dt{color:var(--muted);}
 .kv dd{color:var(--text);font-weight:600;}
-.badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:11px;font-weight:700;}
+.badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:12.25px;font-weight:700;}
 .b-teal{background:rgba(30,185,128,0.15);color:var(--teal);}
 .b-amber{background:rgba(240,160,32,0.15);color:var(--amber);}
 /* 2차 인증 상태 배지 — 꺼짐(회색)·확인 실패(빨강). 없으면 배지가 글자만 남아 상태가 안 읽힌다. */
@@ -68,15 +68,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .user-row{display:flex;align-items:center;justify-content:space-between;padding:9px 0;border-bottom:1px solid var(--border);font-size:12.5px;}
 .user-row:last-child{border-bottom:none;}
 .user-row-name{font-weight:700;color:#fff;}
-.user-row-sub{font-size:11px;color:var(--muted-2);margin-top:2px;}
+.user-row-sub{font-size:12.25px;color:var(--muted-2);margin-top:2px;}
 .user-row-del{color:#f5928a;font-size:12px;font-weight:700;cursor:pointer;}
 .user-row-del.disabled{color:var(--muted-2);cursor:default;}
-.ua-btn{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid var(--border-strong);color:var(--muted);cursor:pointer;white-space:nowrap;}
+.ua-btn{font-size:12px;font-weight:700;padding:3px 9px;border-radius:6px;border:1px solid var(--border-strong);color:var(--muted);cursor:pointer;white-space:nowrap;}
 .ua-btn:hover{color:#fff;border-color:var(--blue);}
 .ua-btn.danger{border-color:rgba(226,72,61,.5);color:#f5928a;}
 .ua-btn.danger:hover{border-color:var(--red);}
 .ua-btn.dis{color:var(--muted-2);border-color:var(--border);cursor:default;}
-.footer{margin-top:8px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted-2);}
+.footer{margin-top:8px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--muted-2);}
 .footer img{height:16px;opacity:0.6;}
 .header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2);}
 .header-left{display:flex;align-items:center;gap:12px;}
@@ -86,7 +86,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .header-right{display:flex;align-items:center;gap:10px;}
 .status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
 .status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
-.beta-tag{background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
+.beta-tag{background:var(--teal);color:#06281c;font-size:11.25px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
 .avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
 .icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
 
@@ -96,8 +96,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .model-search button{background:var(--blue);color:#fff;border:none;border-radius:8px;padding:0 16px;font-size:12px;font-weight:700;cursor:pointer;}
 .hf-result{display:flex;justify-content:space-between;align-items:center;padding:9px 0;border-bottom:1px solid var(--border);font-size:12px;}
 .hf-result:last-child{border-bottom:none;}
-.hf-load{background:transparent;border:1px solid var(--border-strong);color:var(--blue-light);padding:4px 10px;border-radius:6px;font-size:11px;font-weight:700;cursor:pointer;}
-.hf-sub{font-size:11px;color:var(--muted-2);margin-top:2px;}
+.hf-load{background:transparent;border:1px solid var(--border-strong);color:var(--blue-light);padding:4px 10px;border-radius:6px;font-size:12.25px;font-weight:700;cursor:pointer;}
+.hf-sub{font-size:12.25px;color:var(--muted-2);margin-top:2px;}
 /* 추천 모델 목록 — llmguide.html에서 이관(2026-07-28) */
 .cat{margin-bottom:22px;}
 .cat-head{display:flex;align-items:baseline;gap:10px;margin-bottom:4px;}
@@ -107,29 +107,29 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .model-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:8px;}
 .mc-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
 .mc-name{font-size:13.5px;font-weight:800;color:#fff;}
-.mc-size{font-size:10.5px;font-weight:800;color:var(--blue-light);background:rgba(59,130,246,0.14);padding:2px 8px;border-radius:6px;}
-.mc-tag{font-size:10px;font-weight:800;color:var(--teal);background:rgba(30,185,128,0.14);padding:2px 7px;border-radius:6px;}
+.mc-size{font-size:12px;font-weight:800;color:var(--blue-light);background:rgba(59,130,246,0.14);padding:2px 8px;border-radius:6px;}
+.mc-tag{font-size:11.75px;font-weight:800;color:var(--teal);background:rgba(30,185,128,0.14);padding:2px 7px;border-radius:6px;}
 .mc-desc{font-size:12px;color:var(--text);line-height:1.65;flex:1;}
-.mc-id{font-size:10.5px;color:var(--muted-2);font-family:'Consolas','Menlo',monospace;word-break:break-all;}
+.mc-id{font-size:12px;color:var(--muted-2);font-family:'Consolas','Menlo',monospace;word-break:break-all;}
 .mc-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:2px;}
-.mc-gb{font-size:11px;color:var(--muted);}
+.mc-gb{font-size:12.25px;color:var(--muted);}
 .mc-dl{background:var(--blue);color:#fff;border:none;border-radius:7px;padding:7px 14px;font-size:12px;font-weight:800;cursor:pointer;}
 .mc-dl:disabled{opacity:.55;cursor:default;}
-.mc-installed{font-size:11.5px;font-weight:800;color:var(--teal);}
+.mc-installed{font-size:12.5px;font-weight:800;color:var(--teal);}
 .mc-agents{display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-top:2px;}
-.mc-agents-label{font-size:10px;color:var(--muted-2);font-weight:700;}
-.mc-agent{font-size:10px;font-weight:700;color:var(--blue-light);background:rgba(59,130,246,0.14);padding:2px 8px;border-radius:6px;}
-.mc-status{font-size:11px;min-height:14px;color:var(--muted);}
+.mc-agents-label{font-size:11.75px;color:var(--muted-2);font-weight:700;}
+.mc-agent{font-size:11.75px;font-weight:700;color:var(--blue-light);background:rgba(59,130,246,0.14);padding:2px 8px;border-radius:6px;}
+.mc-status{font-size:12.25px;min-height:14px;color:var(--muted);}
 .mc-status.err{color:#f5928a;}
 .mc-status.ok{color:var(--teal);}
 .am-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);}
 .am-row:last-child{border-bottom:none;}
 .am-name{flex:0 0 150px;font-size:12px;font-weight:700;color:var(--text);}
-.am-select{flex:1;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:6px;padding:6px 8px;color:var(--text);font-size:11.5px;outline:none;cursor:pointer;}
+.am-select{flex:1;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:6px;padding:6px 8px;color:var(--text);font-size:12.5px;outline:none;cursor:pointer;}
 .am-select:disabled{opacity:.6;cursor:default;}
 .usage-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px;}
 .usage-kpi{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;}
-.usage-kpi .l{font-size:10.5px;color:var(--muted-2);font-weight:700;}
+.usage-kpi .l{font-size:12px;color:var(--muted-2);font-weight:700;}
 .usage-kpi .v{font-size:16px;font-weight:800;color:#fff;margin-top:3px;}
 /* 업데이트 — update.html에서 이관(2026-07-28) */
 .kv{display:grid;grid-template-columns:120px 1fr;gap:10px 12px;font-size:13px;margin-bottom:16px;}
@@ -138,7 +138,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .notes{font-size:12.5px;color:var(--text);line-height:1.7;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:12px 14px;margin-bottom:14px;white-space:pre-wrap;}
 .progress-track{height:8px;border-radius:20px;background:rgba(255,255,255,0.08);overflow:hidden;margin:12px 0 4px;display:none;}
 .progress-fill{height:100%;border-radius:20px;background:var(--blue);width:0%;transition:width .2s;}
-.progress-label{font-size:11.5px;color:var(--muted);display:none;}
+.progress-label{font-size:12.5px;color:var(--muted);display:none;}
 /* MCP 연동 — mcp.html에서 이관(2026-07-28) */
 .note{margin:14px 0 0;background:rgba(240,160,32,.08);border:1px solid rgba(240,160,32,.35);border-radius:10px;padding:10px 13px;font-size:12px;color:var(--amber);line-height:1.5;}
 .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:var(--g-s3);margin:18px 0 8px;}
@@ -152,43 +152,43 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .dot.on{background:var(--teal);box-shadow:0 0 6px var(--teal);}
 .dot.off{background:var(--muted-2);}
 .dot.pend{background:var(--amber);box-shadow:0 0 6px var(--amber);}
-.tbadge{font-size:10px;font-weight:800;border-radius:6px;padding:2px 8px;}
+.tbadge{font-size:11.75px;font-weight:800;border-radius:6px;padding:2px 8px;}
 .b-local{color:var(--teal);background:rgba(30,185,128,.14);border:1px solid rgba(30,185,128,.35);}
 .b-remote{color:var(--amber);background:rgba(240,160,32,.14);border:1px solid rgba(240,160,32,.35);}
 .srv-acts{margin-left:auto;display:flex;align-items:center;gap:10px;}
-.gate{font-size:10.5px;font-weight:800;color:var(--amber);background:rgba(240,160,32,.12);border:1px solid rgba(240,160,32,.45);border-radius:7px;padding:5px 10px;cursor:pointer;}
+.gate{font-size:12px;font-weight:800;color:var(--amber);background:rgba(240,160,32,.12);border:1px solid rgba(240,160,32,.45);border-radius:7px;padding:5px 10px;cursor:pointer;}
 .gate.approved{color:var(--teal);background:rgba(30,185,128,.12);border-color:rgba(30,185,128,.4);cursor:default;}
 .toggle{width:38px;height:21px;border-radius:999px;background:var(--panel-2);border:1px solid var(--border-strong);position:relative;cursor:pointer;flex:0 0 auto;transition:.15s;}
 .toggle.on{background:rgba(59,130,246,.45);border-color:var(--blue);}
 .toggle.dis{opacity:.4;cursor:not-allowed;}
 .toggle i{position:absolute;top:2px;left:2px;width:15px;height:15px;border-radius:50%;background:var(--muted);transition:.15s;}
 .toggle.on i{left:19px;background:#fff;}
-.srv-meta{font-size:11px;color:var(--muted-2);margin-top:8px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
+.srv-meta{font-size:12.25px;color:var(--muted-2);margin-top:8px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
 .srv-meta .k{color:var(--muted);}.srv-meta code{font-family:Consolas,monospace;color:var(--blue-light);}
 .expand{margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:none;}
 .srv.open .expand{display:block;}
-.caret{color:var(--muted-2);font-size:11px;cursor:pointer;user-select:none;margin-left:2px;}
-.tool{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--blue-light);background:var(--panel-2);border:1px solid var(--border);border-radius:7px;padding:3px 9px;margin:4px 5px 0 0;}
+.caret{color:var(--muted-2);font-size:12.25px;cursor:pointer;user-select:none;margin-left:2px;}
+.tool{display:inline-flex;align-items:center;gap:5px;font-size:12.25px;color:var(--blue-light);background:var(--panel-2);border:1px solid var(--border);border-radius:7px;padding:3px 9px;margin:4px 5px 0 0;}
 .tool .x{color:var(--teal);}
-.perm-row{font-size:11.5px;color:var(--muted);margin-top:8px;}
+.perm-row{font-size:12.5px;color:var(--muted);margin-top:8px;}
 .perm-row .ag{display:inline-flex;align-items:center;gap:4px;margin:3px 8px 0 0;cursor:pointer;padding:2px 8px;border-radius:6px;border:1px solid var(--border);background:var(--panel-2);}
 .perm-row .ag.on{color:var(--teal);border-color:rgba(30,185,128,.4);background:rgba(30,185,128,.1);}
-.del{font-size:11px;color:var(--red);cursor:pointer;background:none;border:1px solid rgba(226,72,61,.35);border-radius:7px;padding:5px 9px;}
+.del{font-size:12.25px;color:var(--red);cursor:pointer;background:none;border:1px solid rgba(226,72,61,.35);border-radius:7px;padding:5px 9px;}
 .mtx-wrap{overflow-x:auto;}
-.mtx{border-collapse:collapse;font-size:11.5px;min-width:520px;}
+.mtx{border-collapse:collapse;font-size:12.5px;min-width:520px;}
 .mtx th,.mtx td{border:1px solid var(--border);padding:6px 10px;text-align:center;color:var(--muted);}
 .mtx th{color:#dfe8f7;font-weight:700;background:var(--panel-2);}
 .mtx td.tool-c{text-align:left;color:#dfe8f7;font-family:Consolas,monospace;}
 .mtx .y{color:var(--teal);font-weight:800;}.mtx .n{color:var(--muted-2);}
 .audit{background:var(--g-surface-1);border:1px solid var(--border);border-radius:12px;padding:8px 6px;}
-.au-row{font-size:11.5px;color:var(--muted);padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.03);display:flex;gap:10px;}
+.au-row{font-size:12.5px;color:var(--muted);padding:6px 10px;border-bottom:1px solid rgba(255,255,255,.03);display:flex;gap:10px;}
 .au-row:last-child{border-bottom:0;}.au-row .t{color:var(--muted-2);font-family:Consolas,monospace;flex:0 0 auto;}
 .empty{color:var(--muted);font-size:12px;padding:28px;text-align:center;border:1px dashed var(--border-strong);border-radius:12px;}
 .mbg{position:fixed;inset:0;background:rgba(4,8,16,.62);display:none;align-items:center;justify-content:center;z-index:60;}
 .mbg.on{display:flex;}
 .modal{background:var(--panel);border:1px solid var(--border-strong);border-radius:14px;padding:20px;width:460px;max-width:94vw;}
 .modal h3{font-size:15px;color:#fff;margin-bottom:14px;}
-.fld{margin-bottom:11px;}.fld label{display:block;font-size:11.5px;color:var(--muted);margin-bottom:4px;}
+.fld{margin-bottom:11px;}.fld label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:4px;}
 .fld input,.fld select{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 11px;color:var(--text);font-size:12.5px;outline:none;}
 .fld input:focus,.fld select:focus{border-color:var(--blue);}
 .seg{display:flex;gap:6px;}.seg label{flex:1;text-align:center;padding:8px;border:1px solid var(--border-strong);border-radius:8px;cursor:pointer;font-size:12px;color:var(--muted);}
@@ -197,7 +197,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .m-acts{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;}
 .btn{font-size:12.5px;font-weight:800;border-radius:9px;padding:9px 16px;cursor:pointer;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--text);}
 .btn.pri{background:var(--blue);border-color:var(--blue);color:#fff;}
-.err{color:var(--red);font-size:11.5px;min-height:14px;margin-top:2px;}
+.err{color:var(--red);font-size:12.5px;min-height:14px;margin-top:2px;}
 </style>
 </head>
 <!-- data-screen: 공용 CSS가 "이 화면은 폼이다"를 알아보는 표식(2026-08-01). 없으면 폭 규칙이 안 걸린다. -->
@@ -253,10 +253,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     <div data-sec="my" class="panel" data-gijo-fold="계정">
       <div class="panel-title">계정</div>
-      <dl class="kv" id="accountKv">
-        <dt>아이디</dt><dd id="accountUsername">-</dd>
-        <dt>이름</dt><dd id="accountDisplayName">-</dd>
-        <dt>역할</dt><dd id="accountRole">-</dd>
+      <!-- 읽기 전용 짧은 값 3개 — 세로 3줄을 쓸 이유가 없어 한 줄로 잇는다(2026-08-01 지적). -->
+      <dl class="kv-inline" id="accountKv">
+        <span class="pair"><dt>아이디</dt><dd id="accountUsername">-</dd></span>
+        <span class="pair"><dt>이름</dt><dd id="accountDisplayName">-</dd></span>
+        <span class="pair"><dt>역할</dt><dd id="accountRole">-</dd></span>
       </dl>
       <div class="field">
         <label for="myPasswordInput">비밀번호 변경</label>
@@ -317,7 +318,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div class="field-row" style="align-items:flex-start;gap:12px">
         <div style="flex:1">
           <div style="font-size:12.5px;font-weight:700">관리자 계정은 2차 인증 필수</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:3px">국가 사이버보안 기본지침 — 관리자·원격근무 인증에 다중인증 적용</div>
+          <div style="font-size:12.25px;color:var(--muted);margin-top:3px">국가 사이버보안 기본지침 — 관리자·원격근무 인증에 다중인증 적용</div>
         </div>
         <button class="btn-ghost" id="mfaPolicyBtn">확인 중</button>
       </div>
@@ -328,7 +329,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
          화면에는 정체성 한 줄과 ⚠경고만 두고, 사용법·풀이는 대화창 안내(screenguide)에 있다. -->
     <div data-sec="admin" class="panel" id="dbcryptPanel" style="display:none" data-gijo-fold="저장 암호화" data-gijo-fold-badges="dbcryptBadge">
       <div class="panel-title">저장 암호화<span class="badge b-teal" style="margin-left:8px">admin 전용</span><span id="dbcryptBadge" style="display:none"></span></div>
-      <div style="font-size:11.5px;color:var(--muted);margin-bottom:10px">DB 파일이 밖으로 나가도 열 수 없게 잠급니다 — 열쇠는 이 서버 기계에만 있습니다.</div>
+      <div style="font-size:12.5px;color:var(--muted);margin-bottom:10px">DB 파일이 밖으로 나가도 열 수 없게 잠급니다 — 열쇠는 이 서버 기계에만 있습니다.</div>
       <div id="dbcryptBody"></div>
       <div class="status-line" id="dbcryptStatusLine"></div>
     </div>
@@ -338,17 +339,17 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     <!-- 기본 펼침 — 업데이트 알림을 눌러 도착하는 자리다. 접혀 있으면 "업데이트 화면이 없다"가 된다. -->
     <div data-sec="admin" class="panel" data-gijo-fold="업데이트" data-gijo-fold-open>
       <div class="panel-title">업데이트</div>
-      <dl class="kv">
-        <dt>설치된 버전</dt><dd id="currentVersion">-</dd>
-        <dt>상태</dt><dd id="statusBadge"><span class="badge b-muted">확인 중…</span></dd>
+      <dl class="kv-inline">
+        <span class="pair"><dt>설치된 버전</dt><dd id="currentVersion">-</dd></span>
+        <span class="pair"><dt>상태</dt><dd id="statusBadge"><span class="badge b-muted">확인 중…</span></dd></span>
       </dl>
       <button class="btn-ghost" id="checkBtn">지금 확인</button>
       <div id="updatePanel" style="display:none;margin-top:16px">
         <div style="font-size:12.5px;font-weight:800;color:#fff;margin-bottom:8px">새 버전 사용 가능</div>
-        <dl class="kv">
-          <dt>버전</dt><dd id="latestVersion">-</dd>
-          <dt>게시일</dt><dd id="latestPublished">-</dd>
-          <dt>크기</dt><dd id="latestSize">-</dd>
+        <dl class="kv-inline">
+          <span class="pair"><dt>버전</dt><dd id="latestVersion">-</dd></span>
+          <span class="pair"><dt>게시일</dt><dd id="latestPublished">-</dd></span>
+          <span class="pair"><dt>크기</dt><dd id="latestSize">-</dd></span>
         </dl>
         <div class="notes" id="latestNotes"></div>
         <button class="btn-primary" id="installBtn">지금 업데이트</button>
@@ -361,7 +362,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     <div data-sec="admin" class="panel" id="adminPanel" style="display:none" data-gijo-fold="게시된 배포판">
       <div class="panel-title">게시된 배포판<span class="badge b-teal" style="margin-left:8px">admin 전용</span></div>
       <div class="panel-sub">서버에 게시된 전체 버전 이력입니다.</div>
-      <table style="width:100%;font-size:11.5px;border-collapse:collapse">
+      <table style="width:100%;font-size:12.5px;border-collapse:collapse">
         <thead><tr style="color:var(--muted-2);text-align:left"><th style="padding:4px 6px;font-weight:600">버전</th><th style="font-weight:600">메모</th><th style="font-weight:600">크기</th><th style="font-weight:600">게시일시</th></tr></thead>
         <tbody id="releaseRows"><tr><td colspan="4" style="color:var(--muted);padding:4px 6px;">불러오는 중…</td></tr></tbody>
       </table>
@@ -372,7 +373,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     <div data-sec="admin" class="panel" id="downloadLogPanel" style="display:none" data-gijo-fold="누가 받았나">
       <div class="panel-title">누가 받았나<span class="badge b-teal" style="margin-left:8px">admin 전용</span></div>
       <div class="panel-sub">담당자가 업데이트를 내려받은 기록입니다. 어느 PC가 아직 옛 버전인지 가늠할 때 씁니다.</div>
-      <table style="width:100%;font-size:11.5px;border-collapse:collapse">
+      <table style="width:100%;font-size:12.5px;border-collapse:collapse">
         <thead><tr style="color:var(--muted-2);text-align:left"><th style="padding:4px 6px;font-weight:600">받은 사람</th><th style="font-weight:600">버전</th><th style="font-weight:600">받은 일시</th></tr></thead>
         <tbody id="downloadRows"><tr><td colspan="3" style="color:var(--muted);padding:4px 6px;">불러오는 중…</td></tr></tbody>
       </table>
@@ -381,13 +382,13 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     <div data-sec="ai" class="panel" data-gijo-fold="구동 티어">
       <div class="panel-title">🧠 GIJO 구동 티어</div>
       <div id="tierGpuBox" style="background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:10px">
-        <div style="font-size:11px;color:var(--muted);display:flex;justify-content:space-between;margin-bottom:6px"><span id="tierGpuLabel">GPU 실측 중…</span><span id="tierGpuFree"></span></div>
+        <div style="font-size:12.25px;color:var(--muted);display:flex;justify-content:space-between;margin-bottom:6px"><span id="tierGpuLabel">GPU 실측 중…</span><span id="tierGpuFree"></span></div>
         <div style="height:8px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden"><div id="tierGpuBar" style="height:100%;width:0;background:linear-gradient(90deg,var(--teal,#1eb980),var(--blue,#3b82f6))"></div></div>
       </div>
       <div id="tierDiagBox" style="background:var(--panel-2);border:1px solid rgba(30,185,128,.4);border-radius:9px;padding:14px;text-align:center;margin-bottom:10px">
-        <div style="font-size:10px;font-weight:800;color:#6fdcb5">자동 판정</div>
+        <div style="font-size:11.75px;font-weight:800;color:#6fdcb5">자동 판정</div>
         <div id="tierDiagBig" style="font-size:16px;font-weight:800;color:#6fdcb5;margin:6px 0 4px">판정 중…</div>
-        <div id="tierDiagWhy" style="font-size:11px;color:var(--muted);line-height:1.6"></div>
+        <div id="tierDiagWhy" style="font-size:12.25px;color:var(--muted);line-height:1.6"></div>
       </div>
       <div class="field-row">
         <button class="btn-primary" id="tierApplyBtn" disabled>권장 티어 적용</button>
@@ -418,7 +419,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
           <button class="btn-ghost" id="saveHfTokenBtn">등록</button>
           <button class="btn-ghost" id="clearHfTokenBtn" title="등록된 토큰 삭제">삭제</button>
         </div>
-        <div id="hfTokenState" style="font-size:11.5px;color:var(--muted);margin-top:5px">불러오는 중…</div>
+        <div id="hfTokenState" style="font-size:12.5px;color:var(--muted);margin-top:5px">불러오는 중…</div>
       </div>
       <div class="field">
         <label for="hfProxyInput">프록시 주소 (선택)</label>
@@ -608,7 +609,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
           <input id="lawKeyInput" placeholder="법제처에서 발급받은 인증값 — 비우고 저장하면 꺼집니다" autocomplete="off">
         </div>
       </div>
-      <div style="font-size:11.5px;color:var(--muted-2);line-height:1.7;margin:-4px 0 12px">
+      <div style="font-size:12.5px;color:var(--muted-2);line-height:1.7;margin:-4px 0 12px">
         키가 없으면 <b style="color:var(--blue-light)">open.law.go.kr</b> → OPEN API 신청에서 무료로 받습니다(가입 후 신청, 인증값은 가입 이메일의 아이디 부분).
         조회는 원문과 링크를 찾아주는 데까지이며 법률 자문이 아닙니다.
       </div>
@@ -662,7 +663,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div class="status-line" id="cloudStatusLine"></div>
 
       <div style="margin-top:18px;font-size:12px;font-weight:700;color:var(--muted);">🛡 유출 방지 감사 로그 <span style="color:var(--muted-2);font-weight:400;">— 클라우드로 나간·차단된 질문(최근 50)</span></div>
-      <div id="cloudEgressLog" style="font-size:11px;margin-top:6px;"></div>
+      <div id="cloudEgressLog" style="font-size:12.25px;margin-top:6px;"></div>
 
       <!-- 사용량·예상 비용 — 사용량·요금 화면 제거(메뉴 정리 2026-07-25)로 여기로 이관.
            서버 살아있는 동안의 인메모리 누적(재시작 시 초기화). -->
@@ -784,10 +785,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         badge.className = "badge b-teal";
         const low = s.recoveryRemaining <= 2;
         body.innerHTML = `
-          <dl class="kv">
-            <dt>등록</dt><dd>${s.enabledAt ? new Date(s.enabledAt).toLocaleString("ko-KR") : "-"}</dd>
-            <dt>마지막 사용</dt><dd>${s.lastUsedAt ? new Date(s.lastUsedAt).toLocaleString("ko-KR") : "-"}</dd>
-            <dt>남은 복구 코드</dt><dd${low ? ' style="color:var(--amber);font-weight:700"' : ""}>${s.recoveryRemaining}개${low ? " — 다시 만들어 두세요" : ""}</dd>
+          <dl class="kv-inline">
+            <span class="pair"><dt>등록</dt><dd>${s.enabledAt ? new Date(s.enabledAt).toLocaleString("ko-KR") : "-"}</dd></span>
+            <span class="pair"><dt>마지막 사용</dt><dd>${s.lastUsedAt ? new Date(s.lastUsedAt).toLocaleString("ko-KR") : "-"}</dd></span>
+            <span class="pair"><dt>남은 복구 코드</dt><dd${low ? ' style="color:var(--amber);font-weight:700"' : ""}>${s.recoveryRemaining}개${low ? " — 다시 만들어 두세요" : ""}</dd></span>
           </dl>
           <div class="field">
             <label for="mfaPwInput">아래 작업에는 지금 쓰는 비밀번호가 필요합니다</label>
@@ -831,10 +832,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       document.getElementById("mfaBody").innerHTML = `
         <div style="display:flex;gap:16px;flex-wrap:wrap;align-items:flex-start">
           <div style="background:#fff;padding:8px;border-radius:8px;width:192px;height:192px;flex:0 0 auto">
-            ${r.qrSvg || '<div style="color:#333;font-size:11px;padding:8px">QR을 그리지 못했습니다 — 옆의 키를 직접 넣으세요</div>'}
+            ${r.qrSvg || '<div style="color:#333;font-size:12.25px;padding:8px">QR을 그리지 못했습니다 — 옆의 키를 직접 넣으세요</div>'}
           </div>
           <div style="flex:1;min-width:200px">
-            <div style="font-size:11.5px;color:var(--muted);font-weight:600;margin-bottom:6px">앱으로 왼쪽 그림을 찍으세요. 카메라를 못 쓰면 이 키를 직접 넣습니다.</div>
+            <div style="font-size:12.5px;color:var(--muted);font-weight:600;margin-bottom:6px">앱으로 왼쪽 그림을 찍으세요. 카메라를 못 쓰면 이 키를 직접 넣습니다.</div>
             <div style="font-family:Consolas,monospace;font-size:12.5px;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:9px 11px;color:var(--teal);word-break:break-all">${mfaEsc(r.secretDisplay)}</div>
             <div class="field" style="margin-top:14px">
               <label for="mfaConfirmInput">앱에 뜬 6자리를 넣어 확인</label>
@@ -952,7 +953,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         body.innerHTML =
           '<div class="user-row"><div><b>꺼져 있습니다</b>' +
           '<div class="user-row-sub">DB 파일을 가져가면 내용이 그대로 보입니다.</div></div></div>' +
-          '<div style="margin-top:10px;font-size:11.5px;color:var(--muted);line-height:1.7">' +
+          '<div style="margin-top:10px;font-size:12.5px;color:var(--muted);line-height:1.7">' +
           "켜는 방법: 서버를 멈추고 <code>node scripts/encrypt-db.mjs</code> 실행 → " +
           "<b>복구 열쇠를 종이에 적어 금고 보관</b> → 서버 재시작<br>" +
           "(화면에서는 켤 수 없습니다 — 전환에 서버 정지가 필요해서입니다)</div>";
@@ -969,14 +970,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         // 평문 사본 경고 — 암호화를 켠 의미를 지우는 가장 흔한 함정이라 눈에 띄게 둔다.
         (평문.count > 0
           ? '<div style="margin-top:10px;padding:10px 12px;border-left:3px solid var(--amber,#f0a020);' +
-            'background:rgba(240,160,32,.07);border-radius:8px;font-size:11.5px;line-height:1.7">' +
+            'background:rgba(240,160,32,.07);border-radius:8px;font-size:12.5px;line-height:1.7">' +
             '<b style="color:var(--amber,#f0a020)">⚠ 평문 사본 ' + 평문.count + "개(" + 평문.totalMb + "MB)가 남아 있습니다</b><br>" +
             "가져가려는 쪽은 잠긴 DB 대신 이 사본을 가져갑니다. 내용을 확인한 뒤 지우세요.<br>" +
-            '<span style="color:var(--muted-2,#5f6785)">' + 평문.files.slice(0, 3).map(esc).join(" · ") +
+            '<span style="color:var(--muted-2,#a49d95)">' + 평문.files.slice(0, 3).map(esc).join(" · ") +
             (평문.count > 3 ? " 외 " + (평문.count - 3) + "개" : "") + "</span></div>"
           : "") +
         '<div style="margin-top:10px;padding:10px 12px;border-left:3px solid var(--amber,#f0a020);' +
-        'background:rgba(240,160,32,.05);border-radius:8px;font-size:11.5px;line-height:1.7">' +
+        'background:rgba(240,160,32,.05);border-radius:8px;font-size:12.5px;line-height:1.7">' +
         '<b style="color:var(--amber,#f0a020)">⚠ 이 암호화가 못 막는 것</b><ul style="margin:5px 0 0;padding-left:18px;color:var(--muted)">' +
         못막는것 + "</ul></div>" +
         // ⚠ 확인은 **화면 안에서** 묻는다(2026-07-31 수리).
@@ -990,7 +991,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         'border:1px solid var(--amber,#f0a020);border-radius:10px;background:rgba(240,160,32,.06);font-size:12px;line-height:1.7">' +
         '<b style="color:var(--amber,#f0a020)">복구 열쇠를 새로 발급할까요?</b><br>' +
         "이전 복구 열쇠는 즉시 쓸 수 없게 됩니다. 새 열쇠는 <b>지금 한 번만</b> 보이니 종이에 적을 준비를 하고 진행하세요.<br>" +
-        '<span style="color:var(--muted-2,#5f6785)">DB를 다시 암호화하지 않으므로 서비스는 그대로 돕니다.</span>' +
+        '<span style="color:var(--muted-2,#a49d95)">DB를 다시 암호화하지 않으므로 서비스는 그대로 돕니다.</span>' +
         '<div class="field-row" style="margin-top:10px;gap:8px">' +
         '<button class="btn-ghost" id="dbcryptRotateGo" style="border-color:var(--amber,#f0a020);color:var(--amber,#f0a020)">재발급</button>' +
         '<button class="btn-ghost" id="dbcryptRotateNo">취소</button></div></div>';
@@ -1014,10 +1015,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
           body.insertAdjacentHTML(
             "afterbegin",
             '<div style="margin-bottom:12px;padding:14px;border:1px solid var(--teal,#1eb980);border-radius:10px;background:#000">' +
-              '<div style="font-size:11.5px;color:var(--amber,#f0a020);font-weight:700;margin-bottom:8px">⚠ 지금 한 번만 보입니다 — 종이에 적어 금고에 보관하세요</div>' +
+              '<div style="font-size:12.5px;color:var(--amber,#f0a020);font-weight:700;margin-bottom:8px">⚠ 지금 한 번만 보입니다 — 종이에 적어 금고에 보관하세요</div>' +
               '<div style="font:700 16px/1.5 Consolas,monospace;letter-spacing:2px;color:var(--teal,#1eb980);text-align:center;user-select:all">' +
               esc(r.recoveryKey) + "</div>" +
-              '<div style="font-size:11px;color:var(--muted);margin-top:8px">서버 기계를 교체·재설치하면 이 열쇠로만 DB를 엽니다. 이전 열쇠는 이제 쓸 수 없습니다.</div></div>'
+              '<div style="font-size:12.25px;color:var(--muted);margin-top:8px">서버 기계를 교체·재설치하면 이 열쇠로만 DB를 엽니다. 이전 열쇠는 이제 쓸 수 없습니다.</div></div>'
           );
           btn.remove();
           line.textContent = "재발급 완료 — 이전 복구 열쇠는 무효가 되었습니다(감사 기록에 남았습니다).";
@@ -1156,7 +1157,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
           const delBtn = isSelf ? '<span class="ua-btn dis">본인</span>' : `<span class="ua-btn danger" data-del-user="${u.id}">삭제</span>`;
           // 소속 팀 — 자산 소유팀과 매칭해 조치 검증 실행 권한을 정한다(관리자는 팀과 무관하게 전체).
           const teamSel = u.role === "admin" ? '<span class="user-row-sub" style="min-width:132px">전체 자산(관리자)</span>' :
-            `<select class="inp" data-team="${u.id}" style="min-width:132px;padding:3px 6px;font-size:11px">
+            `<select class="inp" data-team="${u.id}" style="min-width:132px;padding:3px 6px;font-size:12.25px">
                <option value=""${!u.team ? " selected" : ""}>— 소속 팀 없음</option>
                ${teams.map((t) => `<option value="${t}"${u.team === t ? " selected" : ""}>${t}</option>`).join("")}
              </select>`;
@@ -1165,7 +1166,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
           //   그래서 기본값을 '공개만'으로 두고, 관리자가 명시적으로 올린다.
           const clearSel =
             `<select class="inp" data-clear="${u.id}" data-prev="${u.clearance || "O"}" title="이 계정이 볼 수 있는 최고 등급 — 더 높은 등급 문서는 검색에도 안 걸립니다"
-               style="min-width:104px;padding:3px 6px;font-size:11px">
+               style="min-width:104px;padding:3px 6px;font-size:12.25px">
                <option value="O"${!u.clearance || u.clearance === "O" ? " selected" : ""}>🔓 공개만</option>
                <option value="S"${u.clearance === "S" ? " selected" : ""}>🔸 민감까지</option>
                <option value="C"${u.clearance === "C" ? " selected" : ""}>🔴 기밀까지</option>
@@ -1442,7 +1443,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     var 문제 = st.dropped > 0 || st.queued > 0 || (st.failed > 0 && (!st.lastSuccessAt || (st.lastFailureAt || 0) > st.lastSuccessAt));
     box.innerHTML =
       '<div style="background:var(--panel-2);border:1px solid ' + (문제 ? "var(--amber)" : "var(--border)") +
-      ';border-radius:9px;padding:11px 13px;font-size:11.5px;line-height:1.9;color:var(--muted)">' +
+      ';border-radius:9px;padding:11px 13px;font-size:12.5px;line-height:1.9;color:var(--muted)">' +
       '<b style="color:var(--text)">전달 상태</b> &nbsp; 보냄 <b style="color:var(--teal)">' + st.sent.toLocaleString() + '</b>건' +
       ' · 실패 <b style="color:' + (st.failed ? "var(--amber)" : "var(--muted)") + '">' + st.failed + '</b>건' +
       ' · 대기 <b>' + st.queued + '</b>건' +
@@ -1911,9 +1912,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         </div>
         <div class="srv-meta"><span><span class="k">상태</span> ${s.enabled ? "활성" : "정의됨 · 연동 대기"}</span><span><span class="k">엔드포인트</span> <code>${esc(s.endpoint || "-")}</code></span><span><span class="k">도구</span> ${s.tools.length}</span></div>
         <div class="expand">
-          <div style="font-size:11.5px;color:var(--muted);margin-bottom:2px">노출 도구</div>
-          <div>${tools || '<span style="color:var(--muted-2);font-size:11px">정의된 도구 없음</span>'}</div>
-          <div style="font-size:11.5px;color:var(--muted);margin:10px 0 2px">에이전트 권한 (도구별 허용)</div>
+          <div style="font-size:12.5px;color:var(--muted);margin-bottom:2px">노출 도구</div>
+          <div>${tools || '<span style="color:var(--muted-2);font-size:12.25px">정의된 도구 없음</span>'}</div>
+          <div style="font-size:12.5px;color:var(--muted);margin:10px 0 2px">에이전트 권한 (도구별 허용)</div>
           ${perms}
           <div style="margin-top:12px"><button class="del" data-del="${s.id}">서버 삭제</button></div>
         </div>
@@ -1953,7 +1954,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const head = `<tr><th style="text-align:left">도구 (서버)</th>${AGENTS.map((a) => `<th>${a[1]}</th>`).join("")}</tr>`;
     const body = rows.map(({ s, t }) => {
       const live = s.enabled && canEnable(s);
-      return `<tr><td class="tool-c">${esc(t.name)} <span style="color:var(--muted-2)">· ${esc(s.name)}</span>${live ? "" : ' <span style="color:var(--amber);font-size:9.5px">(대기)</span>'}</td>` +
+      return `<tr><td class="tool-c">${esc(t.name)} <span style="color:var(--muted-2)">· ${esc(s.name)}</span>${live ? "" : ' <span style="color:var(--amber);font-size:11.5px">(대기)</span>'}</td>` +
         AGENTS.map((a) => `<td class="${t.agents.includes(a[0]) ? "y" : "n"}">${t.agents.includes(a[0]) ? "✓" : "–"}</td>`).join("") + "</tr>";
     }).join("");
     $("mtx").innerHTML = head + body;
@@ -2084,7 +2085,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         return '<div style="display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px solid var(--border)">'
           + '<span style="width:7px;height:7px;border-radius:50%;flex-shrink:0;' + dot + '"></span>'
           + '<span style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(e.questionPreview || "") + '</span>'
-          + '<span style="color:var(--muted-2);font-size:10px;flex-shrink:0">' + meta + ' · ' + t + '</span></div>';
+          + '<span style="color:var(--muted-2);font-size:11.75px;flex-shrink:0">' + meta + ' · ' + t + '</span></div>';
       }).join("");
     } catch (e) { box.innerHTML = ""; }
   }
@@ -2250,7 +2251,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   }
 
   // 화면 크기 — 프리셋은 메인 프로세스가 갖고 있다(단축키와 같은 값을 써야 하므로 화면이 따로 정의하지 않는다).
-  const ZOOM_NAME = { 0.8: "아주 작게", 0.9: "작게", 1: "기본", 1.1: "크게", 1.25: "더 크게", 1.5: "아주 크게" };
+  // ⚠ 「기본」 표시는 **실제 기본값과 같아야 한다**(2026-08-01). 기본을 110%로 올렸는데
+  //   라벨은 100%를 기본이라 부르고 있었다 — 말과 코드가 어긋나면 담당자가 헷갈린다.
+  //   그래서 이름표에는 크기만 적고, 「기본」 딱지는 메인 프로세스가 알려 준 값에 붙인다(다시 어긋날 수 없게).
+  const ZOOM_NAME = { 0.8: "아주 작게", 0.9: "많이 작게", 1: "작게", 1.1: "조금 작게", 1.25: "보통", 1.5: "크게" };
   async function initZoom() {
     const grid = document.getElementById("zoomGrid");
     const line = document.getElementById("zoomStatusLine");
@@ -2264,15 +2268,17 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     }
     const steps = (state && state.steps) || [0.8, 0.9, 1, 1.1, 1.25, 1.5];
     let current = (state && state.zoom) || 1;
+    const 기본배율 = Number(state && state.default) || 1.25;
 
     function paint() {
       grid.innerHTML = steps
         .map((s) => {
           const on = Math.abs(s - current) < 0.001;
+          const 기본 = Math.abs(s - 기본배율) < 0.001 ? " · 기본" : "";
           return (
             '<div class="zoom-opt' + (on ? " on" : "") + '" data-z="' + s + '">' +
             '<div class="zo-pct">' + Math.round(s * 100) + "%</div>" +
-            '<div class="zo-name">' + (ZOOM_NAME[s] || "") + "</div></div>"
+            '<div class="zo-name">' + (ZOOM_NAME[s] || "") + 기본 + "</div></div>"
           );
         })
         .join("");

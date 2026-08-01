@@ -8,21 +8,21 @@
   /* 별도 창(시안 B) — 사이드바 없음. 사무실 뷰 + 오늘의 할일 + 팀 대화 피드 + 운영 시작 CTA.
      전부 실데이터: /api/agents 상태, /api/tasks, 협업 이벤트 WebSocket. 가짜 연출 없음. */
   :root {
-    --bg: #0a0e1a; --panel: #121a2e; --panel-2: #0e1526;
+    --bg: #262624; --panel: #30302e; --panel-2: #1f1e1d;
     --border: rgba(255,255,255,.08); --border-strong: rgba(255,255,255,.16);
     --blue: #3b82f6; --blue-light: #5fa1ff; --teal: #1eb980; --amber: #f0a020; --red: #e2483d;
-    --text: #e7eaf3; --muted: #8b93ab; --muted-2: #5f6785;
+    --text: #e9e7e2; --muted: #b3ada4; --muted-2: #a49d95;
   }
   * { margin: 0; box-sizing: border-box; font-family: "Pretendard", "Malgun Gothic", "Segoe UI", sans-serif; }
   body { background: var(--bg); color: var(--text); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 
   .head { display: flex; align-items: center; justify-content: space-between; padding: 12px 18px 8px; flex: 0 0 auto; }
   .h-title { font-size: 16px; font-weight: 800; display: flex; align-items: center; gap: 10px; }
-  .live { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--teal); font-weight: 700; }
+  .live { display: inline-flex; align-items: center; gap: 6px; font-size: 12.25px; color: var(--teal); font-weight: 700; }
   .live::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--teal); animation: pulse 1.4s infinite; }
   .live.off { color: var(--red); } .live.off::before { background: var(--red); animation: none; }
   @keyframes pulse { 50% { opacity: .3; } }
-  .h-right { display: flex; align-items: center; gap: 10px; font-size: 11.5px; color: var(--muted); }
+  .h-right { display: flex; align-items: center; gap: 10px; font-size: 12.5px; color: var(--muted); }
   .h-right b { color: var(--blue-light); }
   .pin { width: 30px; height: 30px; border-radius: 8px; border: 1px solid var(--border); background: var(--panel-2);
     color: var(--muted); cursor: pointer; font-size: 14px; }
@@ -35,7 +35,7 @@
 
   /* A안: 방(캔버스)을 아래까지 꽉 채운다(피드 삭제). 오른쪽 할일은 슬림하게. */
   /* LIVE 로그 — 관제 로그답게 고정폭 글꼴, 한 줄 말줄임(2026-07-26). 전에는 글이 잘려 보였다. */
-  .ol-feed .ol-line{display:flex;gap:8px;white-space:nowrap;font-family:"Consolas","D2Coding",monospace;font-size:11px;line-height:1.85;}
+  .ol-feed .ol-line{display:flex;gap:8px;white-space:nowrap;font-family:"Consolas","D2Coding",monospace;font-size:12.25px;line-height:1.85;}
   .ol-line .ol-ts{color:#4a5570;flex:none;}
   .ol-line .ol-tag{flex:none;font-weight:700;}
   .ol-line .ol-tag.ok{color:#4fd39a}.ol-line .ol-tag.warn{color:var(--amber)}
@@ -44,9 +44,9 @@
   .socbar{display:grid;grid-template-columns:repeat(5,1fr);gap:1px;background:var(--border);
     border-top:1px solid var(--border);border-bottom:1px solid var(--border);flex:0 0 auto;}
   .socbar .st{background:var(--panel-2);padding:7px 12px;}
-  .socbar .l{font-size:10px;color:var(--muted-2);}
+  .socbar .l{font-size:11.75px;color:var(--muted-2);}
   .socbar .v{font-size:16px;font-weight:800;margin-top:1px;font-variant-numeric:tabular-nums;}
-  .socbar .v small{font-size:10px;font-weight:600;color:var(--muted);margin-left:3px;}
+  .socbar .v small{font-size:11.75px;font-weight:600;color:var(--muted);margin-left:3px;}
   .socbar .v.red{color:#ff7a6e}.socbar .v.amber{color:var(--amber)}
   .socbar .v.teal{color:#4fd39a}.socbar .v.blue{color:var(--blue-light)}
   .body { display: grid; grid-template-columns: 236px minmax(0,1fr) 250px; grid-template-rows: minmax(0,1fr) 170px; gap: 10px; padding: 0 10px 10px; flex: 1 1 auto; min-height: 0; }
@@ -60,11 +60,11 @@
   .office-col { order: 1; grid-column: 2; grid-row: 1; } /* 위 화면 꽉 차게 */
   .olive { order: 2; grid-column: 1 / -1; grid-row: 2; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; min-height: 0; }
   .ol-h { padding: 10px 12px 6px; font-size: 12px; font-weight: 800; color: #fff; flex: 0 0 auto; }
-  .ol-h .lv { font-size: 8.5px; font-weight: 800; color: #fff; background: #e2483d; border-radius: 8px; padding: 1px 6px; margin-left: 6px; letter-spacing: 1px; }
+  .ol-h .lv { font-size: 11px; font-weight: 800; color: #fff; background: #e2483d; border-radius: 8px; padding: 1px 6px; margin-left: 6px; letter-spacing: 1px; }
   .ol-feed { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 2px 12px 10px; }
   .ol-line { padding: 5px 0; border-bottom: 1px solid var(--border); }
-  .ol-who { font-size: 10px; font-weight: 800; color: var(--blue-light, #7ab0ff); }
-  .ol-msg { display: block; font-size: 11px; color: var(--muted); margin-top: 1px; line-height: 1.45; word-break: break-word; }
+  .ol-who { font-size: 11.75px; font-weight: 800; color: var(--blue-light, #7ab0ff); }
+  .ol-msg { display: block; font-size: 12.25px; color: var(--muted); margin-top: 1px; line-height: 1.45; word-break: break-word; }
   .office-col { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
   /* 사무실 그림은 창을 꽉 채운다(2026-07-26 사용자 지시: "여백없게").
      contain은 비율이 안 맞는 만큼 위아래·좌우에 검은 띠를 남겼다 — cover로 채우고 넘치는 만큼만 자른다
@@ -74,7 +74,7 @@
   /* 오른쪽: 오늘의 할일 (실 작업 큐 — /api/tasks) */
   .todo { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; min-height: 0; }
   .t-head { padding: 12px 14px 8px; font-weight: 800; font-size: 14px; display: flex; justify-content: space-between; align-items: baseline; }
-  .t-cnt { color: var(--muted); font-weight: 400; font-size: 11.5px; }
+  .t-cnt { color: var(--muted); font-weight: 400; font-size: 12.5px; }
   .t-add { display: flex; gap: 6px; padding: 0 12px 10px; }
   .t-add input { flex: 1; background: var(--bg); border: 1px solid var(--border-strong); border-radius: 8px; height: 34px;
     padding: 0 10px; color: var(--text); font-size: 12.5px; outline: none; min-width: 0; }
@@ -86,8 +86,8 @@
   .guide { margin: 8px 0 10px; }
   .g-brief { background: linear-gradient(180deg, rgba(59,130,246,.1), transparent);
              border: 1px solid var(--border-strong); border-radius: 9px; padding: 8px 10px;
-             font-size: 11px; line-height: 1.6; margin-bottom: 7px; cursor: pointer; }
-  .g-brief .g-by { display: block; font-size: 9.5px; font-weight: 800; color: var(--blue-light); margin-bottom: 3px; }
+             font-size: 12.25px; line-height: 1.6; margin-bottom: 7px; cursor: pointer; }
+  .g-brief .g-by { display: block; font-size: 11.5px; font-weight: 800; color: var(--blue-light); margin-bottom: 3px; }
   /* 브리핑은 하단 접이식 참고 섹션 — 펼치면 전문을 줄임 없이 그대로 보여준다(글자 안 짤림). */
   .g-brief .g-txt { display: block; }
   /* 접이식: 기본은 한 줄(제목+배지)만. 펼쳐야 근거·대상·조치가 나온다.
@@ -99,41 +99,41 @@
   .g-head { display: flex; gap: 6px; align-items: center; padding: 6px 8px; cursor: pointer; }
   .g-head:hover { background: rgba(59,130,246,.07); }
   .g-num { width: 16px; height: 16px; border-radius: 5px; background: var(--blue); color: #fff;
-           font-size: 9px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
-  .g-t { font-size: 11px; font-weight: 700; line-height: 1.3; flex: 1; min-width: 0;
+           font-size: 11.25px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
+  .g-t { font-size: 12.25px; font-weight: 700; line-height: 1.3; flex: 1; min-width: 0;
          overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .g-caret { font-size: 9px; color: var(--muted-2); flex: 0 0 auto; transition: transform .15s; }
+  .g-caret { font-size: 11.25px; color: var(--muted-2); flex: 0 0 auto; transition: transform .15s; }
   .g-item.open .g-caret { transform: rotate(90deg); }
   .g-item.open .g-t { white-space: normal; }
   .g-detail { display: none; padding: 0 8px 8px 30px; }
   .g-item.open .g-detail { display: block; }
-  .g-s { font-size: 9.5px; color: var(--muted); word-break: break-all; }
-  .g-w { font-size: 10px; color: var(--blue-light); margin-top: 3px; line-height: 1.45; }
-  .g-a { font-size: 10px; color: var(--text); margin-top: 5px; line-height: 1.45; }
+  .g-s { font-size: 11.5px; color: var(--muted); word-break: break-all; }
+  .g-w { font-size: 11.75px; color: var(--blue-light); margin-top: 3px; line-height: 1.45; }
+  .g-a { font-size: 11.75px; color: var(--text); margin-top: 5px; line-height: 1.45; }
   .g-go { margin-top: 7px; width: 100%; background: var(--blue); color: #fff; border: none;
-          border-radius: 6px; padding: 6px 10px; font-size: 10.5px; font-weight: 800; cursor: pointer; font-family: inherit; }
+          border-radius: 6px; padding: 6px 10px; font-size: 12px; font-weight: 800; cursor: pointer; font-family: inherit; }
   .g-go:hover { filter: brightness(1.12); }
   .g-go:disabled { opacity: .5; cursor: default; }
-  .g-bd { font-size: 8.5px; font-weight: 800; padding: 1px 5px; border-radius: 20px; flex: 0 0 auto;
+  .g-bd { font-size: 11px; font-weight: 800; padding: 1px 5px; border-radius: 20px; flex: 0 0 auto;
           border: 1px solid var(--border-strong); color: var(--muted); }
   .g-bd.kev { color: #f5928a; border-color: rgba(226,72,61,.45); background: rgba(226,72,61,.12); }
-  .g-more { font-size: 10px; color: var(--muted-2); text-align: center; padding: 5px;
+  .g-more { font-size: 11.75px; color: var(--muted-2); text-align: center; padding: 5px;
             border: 1px dashed var(--border); border-radius: 7px; }
   /* 하단 접이식 "오늘 브리핑" — 참고용. 기본 접힘, 헤더를 누르면 전문이 펼쳐진다. */
   .brief-sec { border-top: 1px solid var(--border); margin-top: 8px; }
   .brief-toggle { display: flex; align-items: center; gap: 6px; padding: 9px 4px 8px; cursor: pointer;
-                  font-size: 11.5px; font-weight: 800; color: var(--blue-light); }
-  .brief-toggle .bt-hint { font-size: 9px; font-weight: 600; color: var(--muted-2); }
-  .brief-toggle .bt-caret { margin-left: auto; font-size: 9px; color: var(--muted-2); transition: transform .15s; }
+                  font-size: 12.5px; font-weight: 800; color: var(--blue-light); }
+  .brief-toggle .bt-hint { font-size: 11.25px; font-weight: 600; color: var(--muted-2); }
+  .brief-toggle .bt-caret { margin-left: auto; font-size: 11.25px; color: var(--muted-2); transition: transform .15s; }
   .brief-sec.open .brief-toggle .bt-caret { transform: rotate(90deg); }
   .brief-body { display: none; padding-bottom: 8px; }
   .brief-sec.open .brief-body { display: block; }
-  .my-h { font-size: 9.5px; font-weight: 800; color: var(--muted-2); padding: 6px 2px 2px; letter-spacing: .3px; }
+  .my-h { font-size: 11.5px; font-weight: 800; color: var(--muted-2); padding: 6px 2px 2px; letter-spacing: .3px; }
   .t-item { display: flex; gap: 7px; align-items: flex-start; padding: 6px 2px; border-bottom: 1px solid var(--border); font-size: 12px; }
   .t-item input { margin-top: 2px; accent-color: var(--teal); cursor: pointer; }
   .t-item.done .t-text { opacity: .45; text-decoration: line-through; }
   .t-text { flex: 1; min-width: 0; cursor: default; word-break: break-all; }
-  .t-meta { font-size: 10.5px; color: var(--muted-2); margin-top: 2px; display: flex; gap: 6px; flex-wrap: wrap; }
+  .t-meta { font-size: 12px; color: var(--muted-2); margin-top: 2px; display: flex; gap: 6px; flex-wrap: wrap; }
   .t-pri { font-weight: 800; }
   .t-pri.P0 { color: var(--red); } .t-pri.P1 { color: var(--amber); } .t-pri.P2 { color: var(--blue-light); } .t-pri.P3 { color: var(--muted-2); }
   .t-due-over { color: var(--red); font-weight: 700; }
@@ -141,14 +141,14 @@
   .t-del { color: var(--muted-2); cursor: pointer; font-size: 12px; padding: 0 2px; flex: 0 0 auto; }
   .t-del:hover { color: var(--red); }
   .t-empty { color: var(--muted); font-size: 12px; padding: 12px 4px; line-height: 1.6; }
-  .t-more { text-align: center; color: var(--muted-2); font-size: 11px; padding: 8px 0; }
+  .t-more { text-align: center; color: var(--muted-2); font-size: 12.25px; padding: 8px 0; }
 
   .cta-row { padding: 10px 18px 16px; flex: 0 0 auto; }
   .cta { width: 100%; background: linear-gradient(135deg, #1eb980, #0f8f60); border: none; border-radius: 12px;
     height: 46px; color: #04110b; font-weight: 800; font-size: 14.5px; cursor: pointer;
     box-shadow: 0 4px 20px rgba(30,185,128,.3); }
   .cta:disabled { opacity: .5; cursor: wait; }
-  .cta-hint { text-align: center; color: var(--muted-2); font-size: 10.5px; padding-top: 6px; }
+  .cta-hint { text-align: center; color: var(--muted-2); font-size: 12px; padding-top: 6px; }
 
   /* 서버 연결 실패 오버레이 */
   .dead { position: fixed; inset: 0; background: rgba(4,7,14,.85); display: none; align-items: center;
@@ -195,11 +195,11 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
         <div id="guideList"></div>
         <div class="g-more" id="guideMore" style="display:none"></div>
       </div>
-      <div class="bc-b" id="guideEmpty" style="font-size:11.5px;color:var(--muted-2)">브리핑을 불러오는 중…</div>
+      <div class="bc-b" id="guideEmpty" style="font-size:12.5px;color:var(--muted-2)">브리핑을 불러오는 중…</div>
     </div>
     <!-- 사무실 LIVE 채팅 — 작업 세션 팝업에서 이관(2026-07-26 사용자 결정) -->
     <div class="olive"><div class="ol-h">사무실 LIVE 채팅<span class="lv">LIVE</span></div>
-      <div class="ol-feed" id="oliveFeed"><div style="font-size:11px;color:var(--muted-2);padding:6px 0">팀이 움직이면 대화가 여기 실시간으로 흐릅니다.</div></div></div>
+      <div class="ol-feed" id="oliveFeed"><div style="font-size:12.25px;color:var(--muted-2);padding:6px 0">팀이 움직이면 대화가 여기 실시간으로 흐릅니다.</div></div></div>
     <div class="todo">
       <!-- ⚠ 읽기 전용이다(2026-07-31). 같은 목록을 대시보드·이 창·'내 업무' 세 군데서 각각
            적어 넣고 있었다(전부 /api/tasks). 적어 넣는 창구는 '내 업무' 하나로 모았다 —
@@ -333,10 +333,10 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
     const LOOKS = [
       { hair: "short", col: "#2b2f45", skin: "#e8c39e" },
       { hair: "long",  col: "#4a3020", skin: "#f0d6b4" },
-      { hair: "bun",   col: "#1e2230", skin: "#e8c39e" },
+      { hair: "bun",   col: "#33322f", skin: "#e8c39e" },
       { hair: "curly", col: "#4a3020", skin: "#d9ab7e" },
       { hair: "short", col: "#5a5a62", skin: "#e8c39e" },
-      { hair: "long",  col: "#1e2230", skin: "#d9ab7e" },
+      { hair: "long",  col: "#33322f", skin: "#d9ab7e" },
     ];
 
     // 아트 무드 3종 — 사용자 전환(☀🌃🌊), 선택은 localStorage 저장. 레이아웃·동작은 동일.
@@ -344,10 +344,10 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
       cozy: { wallTop: "#2a2320", base: "#241d18", floorA: "#5a4632", floorB: "#514029", plank: "rgba(0,0,0,.18)", grid: null,
         rug: ["#1eb980", "#17a06e"], deskTop: "#7a5a3a", deskFace: "#5f4530", deskEdge: "#8f6c48",
         skyTop: "#7fb2e8", skyBottom: "#cfe3f5", sun: "#ffe9a8", sign: null, accent: "#f0a020", shaft: "rgba(255,236,180,.05)" },
-      neon: { wallTop: "#0a0f1e", base: "#060a14", floorA: "#101828", floorB: "#0c1220", plank: null, grid: "rgba(64,220,255,.10)",
+      neon: { wallTop: "#0a0f1e", base: "#060a14", floorA: "#101828", floorB: "#1f1e1d", plank: null, grid: "rgba(64,220,255,.10)",
         rug: ["#12335a", "#0e2846"], deskTop: "#2a3a55", deskFace: "#1d2a40", deskEdge: "#3b5378",
         skyTop: "#0b1030", skyBottom: "#25164a", sun: "#cfd8ff", sign: "GIJO SOC", accent: "#40dcff", shaft: "rgba(64,220,255,.045)" },
-      deep: { wallTop: "#0e1526", base: "#0a1120", floorA: "#1c2440", floorB: "#171e35", plank: null, grid: "rgba(255,255,255,.03)",
+      deep: { wallTop: "#1f1e1d", base: "#1f1e1d", floorA: "#1c2440", floorB: "#171e35", plank: null, grid: "rgba(255,255,255,.03)",
         rug: ["#31406e", "#283457"], deskTop: "#5a4632", deskFace: "#463626", deskEdge: "#6d563e",
         skyTop: "#1c2c55", skyBottom: "#3a2c66", sun: "#ffe9a8", sign: null, accent: "#5fa1ff", shaft: "rgba(160,190,255,.05)" },
     };
@@ -458,18 +458,18 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
       }
       // 벽 장식: 방패 로고·시계·(네온 테마) 사인
       px(4, 3, 8, 8, T.base); px(5, 4, 6, 5, T.accent); px(7, 5, 2, 4, "#fff");
-      px(100, 3, 7, 7, "#e7eaf3"); px(102, 4, 1, 3, "#333"); px(103, 6, 2, 1, "#333"); px(100, 3, 7, 1, T.base);
+      px(100, 3, 7, 7, "#e9e7e2"); px(102, 4, 1, 3, "#333"); px(103, 6, 2, 1, "#333"); px(100, 3, 7, 1, T.base);
       if (T.sign) { ctx.font = `bold ${4 * S}px monospace`; ctx.fillStyle = T.accent; ctx.shadowColor = T.accent; ctx.shadowBlur = 6; ctx.fillText(T.sign, 148 * S, 8 * S); ctx.shadowBlur = 0; }
       // 러그 + 회의 테이블(3톤 음영 + 서류)
       px(TABLE.x - 12, TABLE.y - 12, 52, 24, T.rug[0]); px(TABLE.x - 10, TABLE.y - 10, 48, 20, T.rug[1]);
       px(TABLE.x, TABLE.y - 2, 28, 4, T.deskEdge); px(TABLE.x, TABLE.y + 2, 28, 8, T.deskTop); px(TABLE.x, TABLE.y + 10, 28, 3, T.deskFace);
-      px(TABLE.x + 4, TABLE.y + 3, 5, 3, "#e7eaf3"); px(TABLE.x + 18, TABLE.y + 4, 5, 3, "#cfd8ff");
+      px(TABLE.x + 4, TABLE.y + 3, 5, 3, "#e9e7e2"); px(TABLE.x + 18, TABLE.y + 4, 5, 3, "#cfd8ff");
       // 작업존 러그(위쪽 데스크 뱅크를 시각적으로 묶는다) — 존 분리(gather.town식 배치 참고)
       px(2, 22, 68, 30, "rgba(59,130,246,.05)"); px(2, 22, 68, 0.5, "rgba(95,161,255,.2)");
       // 서버랙(SOC 정체성) — 오른쪽 벽, 깜빡이는 LED 랙 2기
       for (let k = 0; k < 2; k++) {
         const rx = 150 + k * 12, ry = 22;
-        px(rx, ry, 10, 30, "#0c1220"); px(rx, ry, 10, 1, "#2a3a55"); px(rx, ry, 1, 30, "#2a3a55"); px(rx + 9, ry, 1, 30, "#1a2740");
+        px(rx, ry, 10, 30, "#1f1e1d"); px(rx, ry, 10, 1, "#2a3a55"); px(rx, ry, 1, 30, "#2a3a55"); px(rx + 9, ry, 1, 30, "#1a2740");
         for (let u = 0; u < 6; u++) {
           px(rx + 1, ry + 3 + u * 4, 8, 2, "#141c2e");
           const led = (t + k * 7 + u * 3) % 40 < 20 ? (u % 2 ? "#1eb980" : "#40dcff") : "#20304e";
@@ -482,7 +482,7 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
       for (let i = 0; i < 3; i++) px(W - 25, 18 + i * 5, 12, 3, ["#e2483d", "#5fa1ff", "#f0a020"][i]);
       px(COFFEE.x - 2, COFFEE.y - 12, 14, 16, T.deskFace);
       px(COFFEE.x, COFFEE.y - 10, 10, 12, "#3a4258");
-      px(COFFEE.x + 2, COFFEE.y - 8, 6, 3, "#e2483d"); px(COFFEE.x + 3, COFFEE.y - 2, 3, 2, "#e7eaf3");
+      px(COFFEE.x + 2, COFFEE.y - 8, 6, 3, "#e2483d"); px(COFFEE.x + 3, COFFEE.y - 2, 3, 2, "#e9e7e2");
       // 미팅룸 — 유리 파티션 바닥 + 상판 유리벽 + 미팅 테이블 + 의자 + 라벨.
       const m = MEETING;
       ctx.fillStyle = "rgba(64,160,255,.06)"; ctx.fillRect(m.x0 * S, m.y0 * S, (m.x1 - m.x0) * S, (m.y1 - m.y0) * S);
@@ -494,7 +494,7 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
       px(MTABLE.x - 1, MTABLE.y - 1, MTABLE.w + 2, 2, T.deskEdge);
       px(MTABLE.x, MTABLE.y + 1, MTABLE.w, MTABLE.h, T.deskTop);
       px(MTABLE.x, MTABLE.y + MTABLE.h + 1, MTABLE.w, 2, T.deskFace);
-      px(MTABLE.x + 4, MTABLE.y + 2, 5, 3, "#e7eaf3"); px(MTABLE.x + 15, MTABLE.y + 2, 5, 3, "#cfd8ff");
+      px(MTABLE.x + 4, MTABLE.y + 2, 5, 3, "#e9e7e2"); px(MTABLE.x + 15, MTABLE.y + 2, 5, 3, "#cfd8ff");
       // 의자(상단 헤드=보안총괄, 하단=방문자)
       px(MTABLE.x + 5, MTABLE.y - 5, 4, 3, "#33405e");
       px(MTABLE.x + 4, MTABLE.y + MTABLE.h + 3, 4, 3, "#33405e"); px(MTABLE.x + 14, MTABLE.y + MTABLE.h + 3, 4, 3, "#33405e");
@@ -515,12 +515,12 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
         px(dx + 1, dy + 16, 3, 4, T.deskFace); px(dx + 20, dy + 16, 3, 4, T.deskFace);
         px(dx + 8, dy + 11, 7, 2, "#141a2b");
         px(dx + 18, dy + 9, 3, 3, "#e2483d");
-        px(dx + 2, dy + 9, 4, 2, "#e7eaf3");
+        px(dx + 2, dy + 9, 4, 2, "#e9e7e2");
         const st = a ? a.state : "idle";
         const on = st !== "idle";
         const glow = st === "working" ? (Math.floor(t / 20) % 2 ? "#2ee6a0" : "#1eb980") : st === "watching" ? "#f0a020" : "#232c44";
         if (on) { ctx.fillStyle = st === "working" ? "rgba(46,230,160,.10)" : "rgba(240,160,32,.10)"; ctx.fillRect((dx + 5) * S, (dy - 4) * S, 14 * S, 12 * S); }
-        px(dx + 7, dy - 2, 10, 8, "#05070d");
+        px(dx + 7, dy - 2, 10, 8, "#1a1a19");
         px(dx + 8, dy - 1, 8, 6, glow);
         if (on && Math.floor(t / 30) % 3 === 0) px(dx + 9, dy, 4, 1, "rgba(255,255,255,.5)");
         px(dx + 11, dy + 6, 2, 2, "#39445f");
@@ -531,10 +531,10 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
     function drawLegs(wx, wy, moving) {
       if (moving) {
         const ph = Math.floor(t / 6) % 2;
-        px(wx + 1, wy + (ph ? 0 : 1), 2, ph ? 2 : 1, "#22263a");
-        px(wx + 3, wy + (ph ? 1 : 0), 2, ph ? 1 : 2, "#22263a");
+        px(wx + 1, wy + (ph ? 0 : 1), 2, ph ? 2 : 1, "#3a3936");
+        px(wx + 3, wy + (ph ? 1 : 0), 2, ph ? 1 : 2, "#3a3936");
       } else {
-        px(wx + 1, wy, 2, 1, "#22263a"); px(wx + 3, wy, 2, 1, "#22263a");
+        px(wx + 1, wy, 2, 1, "#3a3936"); px(wx + 3, wy, 2, 1, "#3a3936");
       }
     }
     function nameTag(text, cx, cy, color) {
@@ -553,7 +553,7 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
       if (o.typing && !o.moving) px(x - 1 + (bob ? 1 : 0), y - 4, 2, 2, "#e8c39e");
       const skin = o.skin || "#e8c39e";
       px(x + 1, y - 13 + bob, 5, 5, skin); // 얼굴
-      px(x + 2, y - 11 + bob, 1, 1, "#1c1f2b"); px(x + 4, y - 11 + bob, 1, 1, "#1c1f2b"); // 눈
+      px(x + 2, y - 11 + bob, 1, 1, "#2f2e2b"); px(x + 4, y - 11 + bob, 1, 1, "#2f2e2b"); // 눈
       // 머리 모양 — short(짧은) · long(긴) · bun(묶은) · curly(곱슬)
       const hs = o.hairStyle || "short";
       px(x, y - 15 + bob, 7, 3, hair);
@@ -577,7 +577,7 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
     }
     function drawAgent(a) {
       const wy = a.y + (a.state === "idle" && !a.moving ? Math.sin(t / 30 + a.desk) * 1.5 : 0);
-      const dot = a.state === "working" ? "#2ee6a0" : a.state === "watching" ? "#f0a020" : "#5f6785";
+      const dot = a.state === "working" ? "#2ee6a0" : a.state === "watching" ? "#f0a020" : "#a49d95";
       const look = LOOKS[a.desk % LOOKS.length];
       drawChar(a.x, wy, a.color, look.col, {
         typing: a.state === "working", moving: a.moving, dot, tag: a.shortName,
@@ -631,7 +631,7 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
       ctx.fillStyle = "#f4f6fb";
       ctx.fillRect(bx, by, w, 6 * S);
       ctx.fillRect((a.x + 3) * S, by + 6 * S, 2 * S, 2 * S);
-      ctx.fillStyle = "#0a0e1a";
+      ctx.fillStyle = "#262624";
       ctx.fillText(bubble.msg, bx + 2 * S, by + 4.4 * S);
     }
 
@@ -795,7 +795,7 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
     if (!줄) {
       줄 = document.createElement("span");
       줄.className = "gijo-notice";
-      줄.style.cssText = "margin-left:8px;font-weight:600;color:var(--amber);font-size:11.5px;";
+      줄.style.cssText = "margin-left:8px;font-weight:600;color:var(--amber);font-size:12.5px;";
       자리.appendChild(줄);
     }
     줄.textContent = 말;

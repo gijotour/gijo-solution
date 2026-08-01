@@ -6,15 +6,15 @@
 <title>GIJO AS — 헤르메스 학습 루프</title>
 <style>
 :root{
-  --bg:#12161f;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
   --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
-  --text:#dfe3ec;--muted:#8b93ab;--muted-2:#78829a;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
 .app{display:grid;grid-template-columns:220px 1fr;}
 .sidebar{padding:22px 14px;border-right:1px solid var(--border);min-height:900px;}
-.nav-section{font-size:10.5px;font-weight:700;color:var(--muted-2);letter-spacing:1.2px;margin:18px 10px 8px;}
+.nav-section{font-size:12px;font-weight:700;color:var(--muted-2);letter-spacing:1.2px;margin:18px 10px 8px;}
 .nav-section:first-child{margin-top:0;}
 .nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;font-size:13.5px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:2px;}
 .nav-item .ic{width:18px;text-align:center;font-size:14px;}
@@ -32,7 +32,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .header-right{display:flex;align-items:center;gap:10px;}
 .status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
 .status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
-.beta-tag{background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
+.beta-tag{background:var(--teal);color:#06281c;font-size:11.25px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
 .avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
 .icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
 
@@ -42,20 +42,20 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .cat-head{display:flex;align-items:baseline;gap:10px;margin-bottom:4px;}
 .cat-title{font-size:16px;font-weight:800;color:#fff;}
 .cat-intro{font-size:12.5px;color:var(--muted);margin-bottom:14px;line-height:1.6;max-width:860px;}
-.footer{margin-top:20px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:11.5px;color:var(--muted-2);max-width:1000px;}
+.footer{margin-top:20px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--muted-2);max-width:1000px;}
 .footer img{height:16px;opacity:0.6;}
 
 /* 루프 개념 스트립(수집→정제→학습→배포) */
 .loop-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;}
 .loop-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;position:relative;}
-.loop-card .lc-step{font-size:10px;font-weight:800;color:var(--muted-2);letter-spacing:1px;}
+.loop-card .lc-step{font-size:11.75px;font-weight:800;color:var(--muted-2);letter-spacing:1px;}
 .loop-card .lc-name{font-size:14px;font-weight:800;color:#fff;margin:3px 0 5px;}
-.loop-card .lc-desc{font-size:11px;color:var(--muted);line-height:1.55;}
+.loop-card .lc-desc{font-size:12.25px;color:var(--muted);line-height:1.55;}
 .loop-card:not(:last-child)::after{content:"→";position:absolute;right:-11px;top:50%;transform:translateY(-50%);color:var(--muted-2);font-size:14px;z-index:1;}
 
 /* 실행 단계 진행바 */
 .run-stages{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0 6px;}
-.stage-chip{font-size:11px;font-weight:700;padding:5px 11px;border-radius:16px;background:var(--panel-2);border:1px solid var(--border);color:var(--muted-2);}
+.stage-chip{font-size:12.25px;font-weight:700;padding:5px 11px;border-radius:16px;background:var(--panel-2);border:1px solid var(--border);color:var(--muted-2);}
 .stage-chip.active{background:rgba(59,130,246,0.16);border-color:var(--blue);color:var(--blue-light);animation:pulse 1.2s ease-in-out infinite;}
 .stage-chip.passed{background:rgba(30,185,128,0.12);border-color:rgba(30,185,128,0.4);color:var(--teal);}
 .stage-chip.failed{background:rgba(226,72,61,0.12);border-color:#e2483d;color:#f5928a;}
@@ -67,7 +67,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 /* KPI */
 .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px;}
 .kpi{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
-.kpi .k-label{font-size:11px;color:var(--muted);margin-bottom:6px;}
+.kpi .k-label{font-size:12.25px;color:var(--muted);margin-bottom:6px;}
 .kpi .k-value{font-size:19px;font-weight:800;color:#fff;word-break:break-all;}
 
 /* 버튼 */
@@ -90,13 +90,13 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .pf-ic.warn{color:var(--amber);}
 .pf-body{flex:1;min-width:0;}
 .pf-label{color:var(--text);font-weight:600;}
-.pf-detail{color:var(--muted-2);font-size:11px;margin-left:6px;}
-.pf-hint{color:var(--amber);font-size:11px;margin-top:2px;font-family:'Consolas','Menlo',monospace;}
+.pf-detail{color:var(--muted-2);font-size:12.25px;margin-left:6px;}
+.pf-hint{color:var(--amber);font-size:12.25px;margin-top:2px;font-family:'Consolas','Menlo',monospace;}
 
 /* 설정 */
 .cfg-panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;}
 .cfg-field{display:flex;flex-direction:column;gap:5px;}
-.cfg-field label{font-size:11px;color:var(--muted);font-weight:700;}
+.cfg-field label{font-size:12.25px;color:var(--muted);font-weight:700;}
 .cfg-field input,.cfg-field select{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 12px;color:var(--text);font-size:12.5px;outline:none;min-width:160px;}
 .cfg-field input.wide{min-width:280px;}
 .cfg-toggle{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--text);font-weight:600;padding-bottom:9px;}
@@ -109,24 +109,24 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .lc-card{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:12px 14px;margin-bottom:8px;}
 .lc-card.lc-dim{opacity:.75;}
 .lc-top{display:flex;gap:6px;align-items:center;margin-bottom:7px;flex-wrap:wrap;}
-.lc-sig{font-size:9.5px;font-weight:800;padding:2px 7px;border-radius:5px;}
+.lc-sig{font-size:11.5px;font-weight:800;padding:2px 7px;border-radius:5px;}
 .lc-doc{color:var(--teal);background:rgba(30,185,128,.13);}
 .lc-tool{color:var(--blue-light);background:rgba(59,130,246,.13);}
 .lc-ok{color:var(--teal);background:rgba(30,185,128,.08);}
 .lc-src{color:var(--muted);background:rgba(255,255,255,.06);}
 .lc-weak{color:#f5928a;background:rgba(226,72,61,.12);}
 .lc-q{font-size:12.5px;font-weight:700;color:#fff;margin-bottom:4px;word-break:break-all;}
-.lc-a{font-size:11.5px;color:var(--muted);line-height:1.65;word-break:break-all;}
+.lc-a{font-size:12.5px;color:var(--muted);line-height:1.65;word-break:break-all;}
 .lc-act{display:flex;gap:6px;margin-top:9px;}
-.lc-yes{background:var(--teal);color:#06281c;border:none;border-radius:7px;padding:6px 14px;font-size:11.5px;font-weight:800;cursor:pointer;}
-.lc-no{background:transparent;color:var(--muted);border:1px solid var(--border-strong);border-radius:7px;padding:6px 12px;font-size:11.5px;cursor:pointer;}
+.lc-yes{background:var(--teal);color:#06281c;border:none;border-radius:7px;padding:6px 14px;font-size:12.5px;font-weight:800;cursor:pointer;}
+.lc-no{background:transparent;color:var(--muted);border:1px solid var(--border-strong);border-radius:7px;padding:6px 12px;font-size:12.5px;cursor:pointer;}
 .lc-yes:disabled,.lc-no:disabled{opacity:.5;cursor:default;}
 .log-q{font-size:12.5px;font-weight:700;color:#fff;line-height:1.5;}
 .log-a{font-size:12px;color:var(--muted);line-height:1.6;margin-top:4px;max-height:60px;overflow:hidden;}
 .log-foot{display:flex;align-items:center;gap:8px;margin-top:8px;}
-.log-agent{font-size:10.5px;font-weight:700;color:var(--purple);background:rgba(139,124,240,0.14);padding:2px 8px;border-radius:6px;}
-.log-when{font-size:10.5px;color:var(--muted-2);}
-.log-used{font-size:10.5px;font-weight:700;color:var(--teal);}
+.log-agent{font-size:12px;font-weight:700;color:var(--purple);background:rgba(139,124,240,0.14);padding:2px 8px;border-radius:6px;}
+.log-when{font-size:12px;color:var(--muted-2);}
+.log-used{font-size:12px;font-weight:700;color:var(--teal);}
 .rate-btn{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;padding:4px 10px;font-size:12px;cursor:pointer;color:var(--muted);margin-left:auto;}
 .rate-btn+.rate-btn{margin-left:0;}
 .rate-btn.on-up{background:rgba(30,185,128,0.18);border-color:var(--teal);color:var(--teal);}
@@ -136,13 +136,13 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 /* 실행 이력 */
 .runs-list{display:flex;flex-direction:column;gap:8px;}
 .run-item{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:11px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12px;}
-.run-badge{font-size:10px;font-weight:800;padding:3px 8px;border-radius:6px;}
+.run-badge{font-size:11.75px;font-weight:800;padding:3px 8px;border-radius:6px;}
 .run-badge.done{color:var(--teal);background:rgba(30,185,128,0.14);}
 .run-badge.error{color:#f5928a;background:rgba(226,72,61,0.14);}
 .run-badge.progress{color:var(--blue-light);background:rgba(59,130,246,0.14);}
 .run-model{font-weight:800;color:#fff;}
-.run-meta{color:var(--muted-2);font-size:11px;margin-left:auto;}
-.run-err{width:100%;color:#f5928a;font-size:11px;}
+.run-meta{color:var(--muted-2);font-size:12.25px;margin-left:auto;}
+.run-err{width:100%;color:#f5928a;font-size:12.25px;}
 </style>
 </head>
 <body>
@@ -522,7 +522,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       `<span class="run-badge ${badge}">${label}</span>` +
       `<span class="run-model">${esc(r.outputModelId)}</span>` +
       `<span style="color:var(--muted)">데이터셋 ${esc(r.datasetId)}</span>` +
-      `<span style="color:var(--muted-2);font-size:11px">${esc(r.baseModel)}</span>` +
+      `<span style="color:var(--muted-2);font-size:12.25px">${esc(r.baseModel)}</span>` +
       `<span class="run-meta">${fmtTime(r.startedAt)}${r.finishedAt ? " ~ " + fmtTime(r.finishedAt) : ""}</span>` +
       (r.error ? `<div class="run-err">${esc(r.error)}</div>` : "") +
       `</div>`

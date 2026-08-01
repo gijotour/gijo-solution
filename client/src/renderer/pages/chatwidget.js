@@ -51,48 +51,48 @@
     st.id = "gijoChatWidgetCss";
     st.textContent =
       ".gcw{position:fixed;right:24px;top:70px;bottom:auto;width:460px;max-width:92vw;height:620px;max-height:82vh;" +
-      "background:var(--panel,#121a2e);border:1px solid rgba(139,124,240,.4);border-radius:14px;" +
+      "background:var(--panel,#30302e);border:1px solid rgba(139,124,240,.4);border-radius:14px;" +
       "box-shadow:0 12px 40px rgba(0,0,0,.5);padding:16px;display:flex;flex-direction:column;box-sizing:border-box;z-index:700;transition:height .15s,width .15s;}" +
       // 닫힌 상태는 완전히 숨긴다 — 예전엔 우하단 "🤖 챗봇" 알약이 떠 있었으나,
       // 여는 입구를 좌측 메뉴의 🤖 아이콘 하나로 일원화했다(2026-07-24).
       ".gcw.collapsed{display:none;}" +
       ".gcw-head{font-size:13.5px;font-weight:800;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:4px;}" +
       ".gcw-head .gcw-title{display:flex;align-items:center;gap:6px;}" +
-      ".gcw-toggle{cursor:pointer;font-size:11px;color:var(--muted,#8b93ab);border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:20px;padding:3px 10px;flex-shrink:0;}" +
+      ".gcw-toggle{cursor:pointer;font-size:12.25px;color:var(--muted,#b3ada4);border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:20px;padding:3px 10px;flex-shrink:0;}" +
       ".gcw-toggle:hover{color:#fff;border-color:var(--blue,#3b82f6);}" +
       ".gcw-body{display:flex;flex-direction:column;flex:1;min-height:0;}" +
-      ".gcw-sub{font-size:10.5px;color:var(--muted-2,#5f6785);margin-bottom:10px;}" +
-      ".gcw-guide{background:var(--panel-2,#0e1526);border:1px solid var(--border,rgba(255,255,255,.08));border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:11px;color:var(--muted,#8b93ab);line-height:1.7;flex-shrink:0;}" +
-      ".gcw-chip{display:inline-block;background:var(--panel-2,#0e1526);border:1px solid var(--border-strong,rgba(255,255,255,.16));color:var(--blue-light,#5fa1ff);font-size:10.5px;padding:4px 10px;border-radius:20px;margin:3px 4px 0 0;cursor:pointer;}" +
+      ".gcw-sub{font-size:12px;color:var(--muted-2,#a49d95);margin-bottom:10px;}" +
+      ".gcw-guide{background:var(--panel-2,#1f1e1d);border:1px solid var(--border,rgba(255,255,255,.08));border-radius:8px;padding:10px 12px;margin-bottom:10px;font-size:12.25px;color:var(--muted,#b3ada4);line-height:1.7;flex-shrink:0;}" +
+      ".gcw-chip{display:inline-block;background:var(--panel-2,#1f1e1d);border:1px solid var(--border-strong,rgba(255,255,255,.16));color:var(--blue-light,#5fa1ff);font-size:12px;padding:4px 10px;border-radius:20px;margin:3px 4px 0 0;cursor:pointer;}" +
       ".gcw-chip:hover{background:var(--blue,#3b82f6);color:#fff;border-color:var(--blue,#3b82f6);}" +
       ".gcw-msgs{flex:1;overflow-y:auto;margin-top:8px;display:flex;flex-direction:column;gap:9px;min-height:0;}" +
-      ".gcw-empty{font-size:11px;color:var(--muted-2,#5f6785);}" +
-      ".gcw-row{border-radius:9px;padding:9px 11px;font-size:11.5px;line-height:1.6;max-width:92%;word-break:break-word;}" +
+      ".gcw-empty{font-size:12.25px;color:var(--muted-2,#a49d95);}" +
+      ".gcw-row{border-radius:9px;padding:9px 11px;font-size:12.5px;line-height:1.6;max-width:92%;word-break:break-word;}" +
       ".gcw-row.user{background:var(--blue,#3b82f6);color:#fff;margin-left:auto;}" +
-      ".gcw-row.bot{background:var(--panel-2,#0e1526);border:1px solid var(--border-strong,rgba(255,255,255,.16));}" +
+      ".gcw-row.bot{background:var(--panel-2,#1f1e1d);border:1px solid var(--border-strong,rgba(255,255,255,.16));}" +
       ".gcw-row.error{background:rgba(226,72,61,.12);border:1px solid rgba(226,72,61,.4);color:#f5928a;}" +
       ".gcw-dock{display:flex;gap:6px;margin-top:8px;flex-shrink:0;}" +
-      ".gcw-dock input{flex:1;background:var(--panel-2,#0e1526);border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:8px;padding:9px 11px;color:var(--text,#e7eaf3);font-size:11.5px;outline:none;}" +
-      ".gcw-dock button{background:var(--blue,#3b82f6);color:#fff;border:0;border-radius:8px;padding:0 14px;font-size:11.5px;font-weight:700;cursor:pointer;}" +
+      ".gcw-dock input{flex:1;background:var(--panel-2,#1f1e1d);border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:8px;padding:9px 11px;color:var(--text,#e9e7e2);font-size:12.5px;outline:none;}" +
+      ".gcw-dock button{background:var(--blue,#3b82f6);color:#fff;border:0;border-radius:8px;padding:0 14px;font-size:12.5px;font-weight:700;cursor:pointer;}" +
       // 확인 후 실행 — 쓰기 작업은 답만 하고 끝내지 않고, 무엇을 어떤 값으로 실행할지 카드로
       // 보여 준 뒤 승인해야 실행한다(대시보드 지휘 콘솔의 결재판과 같은 규약).
-      ".gcw-ap{background:rgba(240,160,32,.07);border:1px solid rgba(240,160,32,.42);border-radius:10px;padding:10px 12px;font-size:11.5px;}" +
+      ".gcw-ap{background:rgba(240,160,32,.07);border:1px solid rgba(240,160,32,.42);border-radius:10px;padding:10px 12px;font-size:12.5px;}" +
       ".gcw-ap-head{font-weight:800;color:#f3c06a;margin-bottom:3px;}" +
-      ".gcw-ap-intro{color:var(--muted,#8b93ab);font-size:10.5px;margin-bottom:8px;line-height:1.6;}" +
+      ".gcw-ap-intro{color:var(--muted,#b3ada4);font-size:12px;margin-bottom:8px;line-height:1.6;}" +
       ".gcw-ap-f{display:flex;align-items:center;gap:6px;margin-bottom:5px;}" +
-      ".gcw-ap-k{font-size:10.5px;color:var(--muted,#8b93ab);width:78px;flex:0 0 auto;}" +
+      ".gcw-ap-k{font-size:12px;color:var(--muted,#b3ada4);width:78px;flex:0 0 auto;}" +
       ".gcw-ap-k .req{color:var(--red,#e2483d);margin-left:2px;}" +
-      ".gcw-ap-in{flex:1;min-width:0;background:var(--panel-2,#0e1526);border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:6px;padding:5px 8px;color:var(--text,#e7eaf3);font-size:11px;outline:none;}" +
+      ".gcw-ap-in{flex:1;min-width:0;background:var(--panel-2,#1f1e1d);border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:6px;padding:5px 8px;color:var(--text,#e9e7e2);font-size:12.25px;outline:none;}" +
       ".gcw-ap-in.need{border-color:rgba(226,72,61,.55);}" +
-      ".gcw-ap-effect{background:var(--panel-2,#0e1526);border-radius:7px;padding:7px 9px;margin-top:7px;font-size:10.5px;color:var(--muted,#8b93ab);line-height:1.6;}" +
+      ".gcw-ap-effect{background:var(--panel-2,#1f1e1d);border-radius:7px;padding:7px 9px;margin-top:7px;font-size:12px;color:var(--muted,#b3ada4);line-height:1.6;}" +
       ".gcw-ap-actions{display:flex;gap:6px;margin-top:9px;}" +
-      ".gcw-ap-actions button{border:0;border-radius:7px;padding:6px 12px;font-size:11px;font-weight:700;cursor:pointer;}" +
+      ".gcw-ap-actions button{border:0;border-radius:7px;padding:6px 12px;font-size:12.25px;font-weight:700;cursor:pointer;}" +
       ".gcw-ap-go{background:var(--teal,#1eb980);color:#04150f;}" +
       ".gcw-ap-go:disabled{opacity:.5;cursor:not-allowed;}" +
-      ".gcw-ap-no{background:transparent;color:var(--muted,#8b93ab);border:1px solid var(--border-strong,rgba(255,255,255,.16)) !important;}" +
-      ".gcw-undo{margin-top:7px;background:transparent;border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:7px;color:var(--muted,#8b93ab);font-size:10.5px;padding:4px 10px;cursor:pointer;}" +
+      ".gcw-ap-no{background:transparent;color:var(--muted,#b3ada4);border:1px solid var(--border-strong,rgba(255,255,255,.16)) !important;}" +
+      ".gcw-undo{margin-top:7px;background:transparent;border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:7px;color:var(--muted,#b3ada4);font-size:12px;padding:4px 10px;cursor:pointer;}" +
       // 해석 배지 — "무엇으로 이해했는지"를 답 위에 한 줄로 보여 준다.
-      ".gcw-read{font-size:10px;color:var(--muted-2,#5f6785);margin-bottom:4px;}" +
+      ".gcw-read{font-size:11.75px;color:var(--muted-2,#a49d95);margin-bottom:4px;}" +
       ".gcw-read b{color:var(--blue-light,#5fa1ff);font-weight:700;}";
     document.head.appendChild(st);
   }
@@ -237,7 +237,7 @@
       appendRow("user", esc(text));
       // 진행 카드 — "처리 중…" 한 줄 대신 서버가 실제로 지나는 단계를 보여준다(2026-07-30 시안 승인).
       // progresscard.js가 없으면(로드 순서·구버전) 기존 문구로 그대로 동작한다.
-      var typing = appendRow("bot", '처리 중… <span style="color:var(--muted-2,#5f6785);font-size:10.5px">첫 응답은 모델 준비로 다소 걸릴 수 있어요</span>');
+      var typing = appendRow("bot", '처리 중… <span style="color:var(--muted-2,#a49d95);font-size:12px">첫 응답은 모델 준비로 다소 걸릴 수 있어요</span>');
       var pc = null, pid;
       if (window.gijoProgressCard) {
         pid = window.gijoProgressCard.newId();
@@ -251,7 +251,7 @@
         // 근거(출처) 배지 — 답변 그라운딩에 쓰인 사내 문서명(서버 sources). 인수인계 검증에도 쓰인다.
         if (Array.isArray(r.sources) && r.sources.length) {
           typing.innerHTML +=
-            '<div style="margin-top:6px;font-size:9.5px;font-weight:700;color:#6fdcb5">📄 근거: ' +
+            '<div style="margin-top:6px;font-size:11.5px;font-weight:700;color:#6fdcb5">📄 근거: ' +
             r.sources.slice(0, 4).map(esc).join(" · ") + "</div>";
         }
         // ★ 아래 셋은 **지휘소와 같은 부품**을 쓴다(chatparts.js).

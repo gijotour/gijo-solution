@@ -543,20 +543,26 @@ ipcMain.handle("shell:popoutOrient", async (e, orient: string) => {
 // 렌더러의 webFrame이 아니라 webContents에 건다 — 허브(hub.html)가 화면을 iframe으로 품기 때문에
 // 프레임별로 걸면 탭 안쪽이 따로 놀지만, webContents 단위는 하위 프레임까지 한 번에 적용된다.
 // 값은 userData 파일에 남겨 다음 실행에도 유지한다(explorer-root.txt와 같은 방식).
+const ZOOM_DEFAULT = 1.25; // ⚠ 반드시 ZOOM_STEPS 안의 값이어야 한다(설정 화면이 프리셋만 그린다). 기본 배율 — 라벨(설정 › 화면 크기)의 「기본」과 반드시 같아야 한다
 const ZOOM_MIN = 0.8;
 const ZOOM_MAX = 1.5;
 const ZOOM_STEPS = [0.8, 0.9, 1.0, 1.1, 1.25, 1.5];
-// ★ 기본을 110%로 올린다(2026-08-01 사용자 지적: "눈이 부시고 눈에 피로가 있다").
+// ★ 기본을 125%로 올린다(2026-08-02 사용자 지적: "글씨가 너무 작고 특히 안내 글씨는 거의 안 보임").
+//   같은 날 화면 안 글자의 **바닥**도 올렸다(8.5~11.5px → 11~12.5px). 배율만 올리면 작은 글씨는
+//   여전히 본문보다 한참 작아 보이고, 크기만 올리면 배치가 흔들린다 — 둘을 같이 해야 한다.
 //   본문 글자가 화면마다 9.5~13px이라 100%에서는 작다. 31화면의 크기를 일일이 고치면
 //   표가 밀리고 칩이 줄바꿈되는 등 어디가 깨졌는지 못 찾는다 — 배율은 **전체를 같은 비율로**
 //   키워서 배치가 안 흔들린다. 담당자가 고른 값이 있으면 그대로 따른다(아래 loadSavedZoom).
-let uiZoom = 1.1;
+let uiZoom = ZOOM_DEFAULT;
 
 function zoomStateFile(): string {
-  return path.join(app.getPath("userData"), "ui-zoom.txt");
+  // ⚠ 파일 이름에 2가 붙은 이유: 기본 배율이 바뀔 때마다 **옛 저장값이 새 기본을 덮어쓴다**.
+  //   (2026-08-02 실측 — 기본을 올렸는데 예전에 고른 80%가 남아 있어 그대로 작게 떴다.)
+  //   기본을 바꾸는 날엔 이름도 바꿔 한 번은 새 기본으로 시작하게 한다.
+  return path.join(app.getPath("userData"), "ui-zoom2.txt");
 }
 function clampZoom(v: number): number {
-  return Number.isFinite(v) ? Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, v)) : 1;
+  return Number.isFinite(v) ? Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, v)) : ZOOM_DEFAULT;
 }
 function loadSavedZoom(): void {
   try {
@@ -573,10 +579,28 @@ function applyZoom(win: BrowserWindow | null): void {
 function bindZoom(win: BrowserWindow): void {
   win.webContents.on("did-finish-load", () => applyZoom(win));
   applyZoom(win);
+  // ⚠ 설정 화면이 "⌘/Ctrl + · − · 0(기본값)으로도 바꿀 수 있다"고 **안내만 하고 있었다**
+  //   (2026-08-02 실측 — preload에 stepUiZoom은 있는데 그걸 부르는 자리가 어디에도 없었다).
+  //   말과 코드가 어긋난 자리라 여기서 실제로 건다. bindZoom은 모든 창이 거치므로
+  //   대시보드·사무실·문서함·분리 창 어디서 눌러도 같게 동작한다.
+  win.webContents.on("before-input-event", (e, input) => {
+    if (input.type !== "keyDown" || input.alt || !(input.control || input.meta)) return;
+    const k = String(input.key);
+    if (k === "+" || k === "=") {
+      e.preventDefault();
+      화면크기한칸(1);
+    } else if (k === "-" || k === "_") {
+      e.preventDefault();
+      화면크기한칸(-1);
+    } else if (k === "0") {
+      e.preventDefault();
+      화면크기적용(ZOOM_DEFAULT);
+    }
+  });
 }
 
-ipcMain.handle("ui:getZoom", () => ({ zoom: uiZoom, steps: ZOOM_STEPS, min: ZOOM_MIN, max: ZOOM_MAX }));
-ipcMain.handle("ui:setZoom", (_e, factor: number) => {
+/** 배율을 정하고 저장하고 모든 창에 반영한다 — 단축키와 설정 화면이 **같은 한 길**을 쓴다. */
+function 화면크기적용(factor: number): number {
   uiZoom = clampZoom(Number(factor));
   try {
     fs.writeFileSync(zoomStateFile(), String(uiZoom), "utf-8");
@@ -585,22 +609,19 @@ ipcMain.handle("ui:setZoom", (_e, factor: number) => {
   }
   for (const w of BrowserWindow.getAllWindows()) applyZoom(w);
   return uiZoom;
-});
-// 단축키(+/-)용 — 현재 값에서 프리셋 한 칸 이동. 화면이 직접 계산하지 않게 여기서 처리한다.
-ipcMain.handle("ui:stepZoom", (_e, dir: number) => {
+}
+/** 현재 값에서 프리셋 한 칸 이동. 화면이 직접 계산하지 않게 여기서 처리한다. */
+function 화면크기한칸(dir: number): number {
   const d = Number(dir) > 0 ? 1 : -1;
   let i = ZOOM_STEPS.findIndex((s) => Math.abs(s - uiZoom) < 0.001);
   if (i === -1) i = ZOOM_STEPS.findIndex((s) => s >= uiZoom); // 프리셋 밖의 값이면 가까운 칸부터
   if (i === -1) i = ZOOM_STEPS.length - 1;
-  uiZoom = ZOOM_STEPS[Math.min(ZOOM_STEPS.length - 1, Math.max(0, i + d))];
-  try {
-    fs.writeFileSync(zoomStateFile(), String(uiZoom), "utf-8");
-  } catch {
-    /* 저장 실패는 무시 */
-  }
-  for (const w of BrowserWindow.getAllWindows()) applyZoom(w);
-  return uiZoom;
-});
+  return 화면크기적용(ZOOM_STEPS[Math.min(ZOOM_STEPS.length - 1, Math.max(0, i + d))]);
+}
+
+ipcMain.handle("ui:getZoom", () => ({ zoom: uiZoom, steps: ZOOM_STEPS, min: ZOOM_MIN, max: ZOOM_MAX, default: ZOOM_DEFAULT }));
+ipcMain.handle("ui:setZoom", (_e, factor: number) => 화면크기적용(factor));
+ipcMain.handle("ui:stepZoom", (_e, dir: number) => 화면크기한칸(dir));
 
 // ── 타이틀바 ⚙ 메뉴용 IPC (C안, 2026-07-25) ─────────────────────────────────
 // 전체 화면(관제 모드) 토글 — 대형 모니터 상시 표시용. 현재 상태를 돌려줘 UI가 표시를 맞춘다.

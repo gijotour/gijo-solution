@@ -6,9 +6,9 @@
 <title>GIJO AS — 인수인계</title>
 <style>
 :root{
-  --bg:#12161f;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
   --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
-  --text:#dfe3ec;--muted:#8b93ab;--muted-2:#78829a;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
@@ -19,9 +19,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .header-left{display:flex;align-items:center;gap:12px;}
 .header-left img{height:22px;}
 .app-title{font-size:15px;font-weight:800;color:#fff;}
-.clock{font-size:11.5px;color:var(--muted-2);}
+.clock{font-size:12.5px;color:var(--muted-2);}
 .header-right{display:flex;align-items:center;gap:10px;}
-.status-pill{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--teal);background:rgba(30,185,128,0.1);border:1px solid rgba(30,185,128,0.35);padding:3px 10px;border-radius:14px;}
+.status-pill{display:flex;align-items:center;gap:6px;font-size:12.25px;font-weight:700;color:var(--teal);background:rgba(30,185,128,0.1);border:1px solid rgba(30,185,128,0.35);padding:3px 10px;border-radius:14px;}
 .status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
 .status-pill.err{color:#f5928a;background:rgba(226,72,61,0.1);border-color:rgba(226,72,61,0.4);}
 .status-pill.err .dot{background:var(--red);}
@@ -31,41 +31,41 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .page-sub{font-size:12px;color:var(--muted);margin:4px 0 16px;line-height:1.65;max-width:860px;}
 /* 스테퍼 */
 .steps{display:flex;gap:8px;margin-bottom:16px;}
-.step{flex:1;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:9px 12px;font-size:11.5px;font-weight:700;color:var(--muted-2);display:flex;gap:8px;align-items:center;}
-.step .n{width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;font-size:10.5px;flex:0 0 auto;}
+.step{flex:1;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:9px 12px;font-size:12.5px;font-weight:700;color:var(--muted-2);display:flex;gap:8px;align-items:center;}
+.step .n{width:20px;height:20px;border-radius:50%;background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;font-size:12px;flex:0 0 auto;}
 .step.done{color:#6fdcb5;border-color:rgba(30,185,128,.4);} .step.done .n{background:rgba(30,185,128,.18);color:#6fdcb5;}
 .step.on{color:#fff;border-color:rgba(59,130,246,.55);} .step.on .n{background:var(--blue);color:#fff;}
 /* 패널 */
 .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 18px;margin-bottom:14px;}
 .p-title{font-size:13.5px;font-weight:800;color:#fff;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
-.p-badge{font-size:9px;font-weight:800;padding:1px 8px;border-radius:20px;background:rgba(30,185,128,.14);border:1px solid rgba(30,185,128,.4);color:#6fdcb5;}
-.hint{font-size:10.5px;color:var(--muted-2);margin-top:8px;line-height:1.6;}
+.p-badge{font-size:11.25px;font-weight:800;padding:1px 8px;border-radius:20px;background:rgba(30,185,128,.14);border:1px solid rgba(30,185,128,.4);color:#6fdcb5;}
+.hint{font-size:12px;color:var(--muted-2);margin-top:8px;line-height:1.6;}
 /* 체크리스트 */
 .chk{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
-.chk label{display:flex;gap:8px;align-items:flex-start;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:9px 11px;font-size:11.5px;color:var(--muted);line-height:1.5;cursor:pointer;}
+.chk label{display:flex;gap:8px;align-items:flex-start;background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:9px 11px;font-size:12.5px;color:var(--muted);line-height:1.5;cursor:pointer;}
 .chk input{margin-top:2px;accent-color:var(--blue);}
 .chk b{color:#dfe6ff;}
 /* 업로드/문서 */
 .upl b{color:var(--blue-light);}
 .doclist{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px;}
-.docchip{font-size:10.5px;color:#cfd6ea;background:var(--panel-2);border:1px solid var(--border);border-radius:6px;padding:3px 8px;display:inline-flex;align-items:center;gap:6px;}
+.docchip{font-size:12px;color:#cfd6ea;background:var(--panel-2);border:1px solid var(--border);border-radius:6px;padding:3px 8px;display:inline-flex;align-items:center;gap:6px;}
 .docchip .x{cursor:pointer;color:var(--muted-2);} .docchip .x:hover{color:#f5928a;}
 /* 검증 테이블 */
-table{width:100%;border-collapse:collapse;font-size:11.5px;}
-th{color:var(--muted-2);font-weight:800;text-align:left;padding:7px 9px;border-bottom:1px solid var(--border-strong);font-size:10px;}
+table{width:100%;border-collapse:collapse;font-size:12.5px;}
+th{color:var(--muted-2);font-weight:800;text-align:left;padding:7px 9px;border-bottom:1px solid var(--border-strong);font-size:11.75px;}
 td{padding:9px;border-bottom:1px solid var(--border);vertical-align:top;color:var(--muted);line-height:1.55;}
 td.doc{color:#dfe6ff;font-weight:700;max-width:220px;word-break:break-all;}
-.src{font-size:10px;color:#6fdcb5;} .ok{font-weight:800;color:#6fdcb5;font-size:11px;} .no{font-weight:800;color:#f5928a;font-size:11px;}
+.src{font-size:11.75px;color:#6fdcb5;} .ok{font-weight:800;color:#6fdcb5;font-size:12.25px;} .no{font-weight:800;color:#f5928a;font-size:12.25px;}
 /* 요약 */
 .sum{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px;}
 .sum .c{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:11px 13px;}
-.sum .k{font-size:10px;color:var(--muted-2);font-weight:800;margin-bottom:3px;}
+.sum .k{font-size:11.75px;color:var(--muted-2);font-weight:800;margin-bottom:3px;}
 .sum .v{font-size:19px;font-weight:900;color:#fff;} .sum .v.t{color:#6fdcb5;}
 .bar{height:8px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden;margin-top:6px;}
 .bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--teal),var(--blue));transition:width .4s;}
 /* 버튼 */
 .acts{display:flex;gap:8px;flex-wrap:wrap;}
-.btn{font-size:11.5px;font-weight:700;padding:8px 14px;border-radius:8px;cursor:pointer;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--text);}
+.btn{font-size:12.5px;font-weight:700;padding:8px 14px;border-radius:8px;cursor:pointer;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--text);}
 .btn.primary{background:rgba(59,130,246,.16);border-color:rgba(59,130,246,.5);color:#cfe0ff;}
 .btn.go{background:var(--teal);border-color:var(--teal);color:#04281c;font-weight:800;}
 .btn:disabled{opacity:.5;cursor:default;}
@@ -230,15 +230,15 @@ td.doc{color:#dfe6ff;font-weight:700;max-width:220px;word-break:break-all;}
     const box = document.getElementById("existingBox");
     if (box.style.display !== "none") { box.style.display = "none"; return; }
     box.style.display = "block";
-    box.innerHTML = '<span style="font-size:11px;color:var(--muted)">불러오는 중…</span>';
+    box.innerHTML = '<span style="font-size:12.25px;color:var(--muted)">불러오는 중…</span>';
     try {
       const list = await window.gijo.listMemoryDocuments();
       box.innerHTML = (list || []).slice(0, 60).map((d) =>
-        `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 2px;font-size:11px;border-bottom:1px solid var(--border)">
+        `<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 2px;font-size:12.25px;border-bottom:1px solid var(--border)">
           <span style="color:#cfd6ea;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:70%">📄 ${esc(d.documentId)}</span>
-          <button class="btn" style="padding:2px 9px;font-size:10px" data-add="${esc(d.documentId)}">담기</button></div>`).join("") || '<span style="font-size:11px;color:var(--muted-2)">올린 문서가 없습니다</span>';
+          <button class="btn" style="padding:2px 9px;font-size:11.75px" data-add="${esc(d.documentId)}">담기</button></div>`).join("") || '<span style="font-size:12.25px;color:var(--muted-2)">올린 문서가 없습니다</span>';
       box.querySelectorAll("[data-add]").forEach((b) => b.addEventListener("click", () => addDoc(b.dataset.add)));
-    } catch (e) { box.innerHTML = `<span style="font-size:11px;color:#f5928a">목록 실패: ${esc(e.message)}</span>`; }
+    } catch (e) { box.innerHTML = `<span style="font-size:12.25px;color:#f5928a">목록 실패: ${esc(e.message)}</span>`; }
   }
 
   // ── 3단계: 자동 검증 ──
@@ -266,7 +266,7 @@ td.doc{color:#dfe6ff;font-weight:700;max-width:220px;word-break:break-all;}
     document.getElementById("sumCited").textContent = lastReport.cited;
     document.getElementById("sumRate").textContent = lastReport.passRate + "%";
     document.getElementById("sumBar").style.width = lastReport.passRate + "%";
-    document.getElementById("sumWho").innerHTML = `${esc(meName || "-")}<br><span style="color:var(--muted-2);font-weight:600;font-size:10.5px">${new Date().toLocaleString("ko-KR")}</span>`;
+    document.getElementById("sumWho").innerHTML = `${esc(meName || "-")}<br><span style="color:var(--muted-2);font-weight:600;font-size:12px">${new Date().toLocaleString("ko-KR")}</span>`;
     document.getElementById("completeBtn").disabled = false;
     document.getElementById("downloadBtn").disabled = false;
     refreshSteps();

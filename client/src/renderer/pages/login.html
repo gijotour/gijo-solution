@@ -5,13 +5,13 @@
 <title>GIJO AS — 로그인</title>
 <style>
   :root {
-    --navy: #0a0e1a;
+    --navy: #262624;
     --navy2: #0c2c6b;
     --orange: #dd5a1c;
     --blue: #5fa1ff;
-    --text: #e6ecf5;
-    --muted: #8a97ad;
-    --border: #1c2740;
+    --text: #e9e7e2;
+    --muted: #b3ada4;
+    --border: #3d3c38;
   }
   * { box-sizing: border-box; }
   body {
@@ -20,7 +20,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: radial-gradient(circle at 30% 20%, #101a33 0%, var(--navy) 60%);
+    background: radial-gradient(circle at 30% 20%, #35342f 0%, var(--navy) 60%);
     font-family: "Pretendard", "Segoe UI", -apple-system, sans-serif;
     color: var(--text);
   }
@@ -40,7 +40,7 @@
   label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
   input {
     width: 100%;
-    background: #0d1526;
+    background: #1f1e1d;
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 10px 12px;
@@ -74,7 +74,7 @@
   .dup { margin-top: 12px; padding: 12px 14px; border: 1px solid rgba(240,160,32,.45);
     background: rgba(240,160,32,.10); border-radius: 10px; }
   .dup-t { font-size: 12.5px; font-weight: 800; color: #f0a020; }
-  .dup-d { margin-top: 5px; font-size: 11.5px; color: var(--muted); line-height: 1.6; }
+  .dup-d { margin-top: 5px; font-size: 12.5px; color: var(--muted); line-height: 1.6; }
   .dup-a { display: flex; gap: 8px; margin-top: 10px; }
   .dup-ok, .dup-no { font-size: 12px; font-weight: 700; border-radius: 8px; padding: 7px 13px; cursor: pointer; }
   .dup-ok { background: #f0a020; color: #21160a; border: 0; }
@@ -83,36 +83,36 @@
   /* 로그인 2단계(2차 인증) */
   .mfa { margin-top: 12px; padding: 14px; border: 1px solid rgba(59,130,246,.4);
     background: rgba(59,130,246,.08); border-radius: 10px; }
-  .mfa-t { font-size: 11.5px; font-weight: 700; color: var(--muted); margin-bottom: 7px; }
+  .mfa-t { font-size: 12.5px; font-weight: 700; color: var(--muted); margin-bottom: 7px; }
   .mfa-code { letter-spacing: 9px; text-align: center; font-size: 20px; font-weight: 700;
     font-variant-numeric: tabular-nums; }
   .mfa-reco { letter-spacing: 3px; text-align: center; font-weight: 700; }
-  .mfa-d { margin-top: 8px; font-size: 11px; color: var(--muted); line-height: 1.6; }
+  .mfa-d { margin-top: 8px; font-size: 12.25px; color: var(--muted); line-height: 1.6; }
   .mfa-alt { margin-top: 10px; background: transparent; border: 1px solid rgba(255,255,255,.16);
-    color: var(--muted); font-size: 11.5px; font-weight: 700; }
+    color: var(--muted); font-size: 12.5px; font-weight: 700; }
   .mfa-alt:hover { color: #fff; }
   /* 2단계에 들어가면 1단계 입력을 치운다 — 안 치우면 담당자가 위 '로그인'을 다시 눌러
      방금 받은 인증 대기를 스스로 무효로 만든다(2026-07-30 실화면 확인). */
   body.mfa-step #recentBox, body.mfa-step .server-row, body.mfa-step #username,
   body.mfa-step #password, body.mfa-step #savePwRow, body.mfa-step #loginBtn,
   body.mfa-step label[for="username"], body.mfa-step label[for="password"] { display: none !important; }
-  .mfa-who { font-size: 11.5px; color: var(--muted); margin-bottom: 10px; }
+  .mfa-who { font-size: 12.5px; color: var(--muted); margin-bottom: 10px; }
   .mfa-who b { color: var(--text); }
-  .hint { margin-top: 18px; font-size: 11.5px; color: var(--muted); line-height: 1.5; }
-  .ver { margin-top: 14px; font-size: 10.5px; color: var(--muted); text-align: center; opacity: .8; }
+  .hint { margin-top: 18px; font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+  .ver { margin-top: 14px; font-size: 12px; color: var(--muted); text-align: center; opacity: .8; }
   /* 최근 로그인 빠른 선택 */
   .recent { margin-bottom: 16px; }
-  .recent-t { font-size: 11px; color: var(--muted); margin-bottom: 7px; }
-  .rc { display: flex; align-items: center; gap: 8px; background: #0d1526; border: 1px solid var(--border); border-radius: 8px;
+  .recent-t { font-size: 12.25px; color: var(--muted); margin-bottom: 7px; }
+  .rc { display: flex; align-items: center; gap: 8px; background: #1f1e1d; border: 1px solid var(--border); border-radius: 8px;
         padding: 8px 10px; margin-bottom: 6px; cursor: pointer; }
   .rc:hover { border-color: var(--blue); }
   .rc-main { min-width: 0; flex: 1; }
   .rc-id { font-size: 13px; color: var(--text); font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .rc-srv { font-size: 10.5px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .rc-key { font-size: 9.5px; color: var(--blue); flex: 0 0 auto; }
+  .rc-srv { font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rc-key { font-size: 11.5px; color: var(--blue); flex: 0 0 auto; }
   .rc-x { flex: 0 0 auto; color: var(--muted); font-size: 13px; padding: 0 3px; }
   .rc-x:hover { color: #ff8080; }
-  .savepw { display: flex; align-items: center; gap: 7px; font-size: 11.5px; color: var(--muted); margin: -4px 0 16px; cursor: pointer; }
+  .savepw { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--muted); margin: -4px 0 16px; cursor: pointer; }
   .savepw input { width: auto; margin: 0; cursor: pointer; }
   .savepw.dim { opacity: .5; }
 </style>
