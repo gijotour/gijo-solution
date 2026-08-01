@@ -135,12 +135,16 @@ function mainWindowBounds(): { width: number; height: number; minWidth: number; 
 function createMainWindow(): void {
   mainWindow = new BrowserWindow({
     ...mainWindowBounds(),
-    backgroundColor: "#0a0e1a",
+    backgroundColor: "#262624",
     title: "GIJO AS — AI Security Manager OS",
     // C안(2026-07-25): OS 타이틀바 제거 — 각 페이지의 .header가 타이틀바 역할(드래그 영역, titlebar.js).
     // 창 컨트롤(─ ▢ ✕)은 OS가 오버레이로 그린다(직접 구현 안 함). mac은 신호등이 좌측 인셋.
+    // ⚠ 최대화(▢)는 끈다(2026-08-02 사용자 지시 "네모는 없어도 될 것 같은데").
+    //   Windows 오버레이는 버튼을 지우진 않고 **눌리지 않게** 그린다. 제목 줄 더블클릭으로도
+    //   최대화되지 않는다. 창 크기는 「이 창을 가로/세로 절반으로」(설정 메뉴)로 맞춘다.
+    maximizable: false,
     titleBarStyle: "hidden",
-    titleBarOverlay: { color: "#0e1526", symbolColor: "#8b93ab", height: 46 },
+    titleBarOverlay: { color: "#1f1e1d", symbolColor: "#b3ada4", height: 46 }, // 상단 바(.header)와 같은 색이어야 한 줄로 보인다
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -220,7 +224,7 @@ ipcMain.handle("office:open", async () => {
     height: Math.min(840, Math.max(700, screen.getPrimaryDisplay().workAreaSize.height - 120)),
     minWidth: 1080,
     minHeight: 620,
-    backgroundColor: "#0a0e1a",
+    backgroundColor: "#262624",
     title: "GIJO AS — 우리 AI 팀 사무실",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -249,7 +253,7 @@ ipcMain.handle("docbox:open", async () => {
     height: Math.min(860, Math.max(640, screen.getPrimaryDisplay().workAreaSize.height - 140)),
     minWidth: 860,
     minHeight: 560,
-    backgroundColor: "#0a0e1a",
+    backgroundColor: "#262624",
     title: "GIJO AS — 문서함",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -313,7 +317,7 @@ ipcMain.handle("shell:popout", async (_e, page: string, title?: string, orient?:
     height: pb.height,
     minWidth: 700,
     minHeight: 420,
-    backgroundColor: "#0a0e1a",
+    backgroundColor: "#262624",
     title: title ? `GIJO AS — ${title}` : "GIJO AS",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -457,7 +461,7 @@ ipcMain.handle("console:popout", async () => {
   consoleWindow = new BrowserWindow({
     x: wa.x + wa.width - w, y: wa.y, width: w, height: wa.height,
     minWidth: 360, minHeight: 320,
-    backgroundColor: "#0e1526",
+    backgroundColor: "#1f1e1d",
     title: "GIJO AS — 대화",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),

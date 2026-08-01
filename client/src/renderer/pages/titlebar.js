@@ -61,6 +61,32 @@
     ".gtb-menu .z{flex:1;text-align:center;font-size:12px;font-weight:700;padding:6px 0;border-radius:7px;background:#1f1e1d;border:1px solid rgba(255,255,255,.08);color:#b3ada4;cursor:pointer;}",
     ".gtb-menu .z.on{background:rgba(59,130,246,.18);border-color:rgba(59,130,246,.6);color:#fff;}",
     ".gtb-menu .foot{padding:8px 10px 4px;font-size:12px;color:#a49d95;}",
+
+    // ── 상단 조작 줄 (2026-08-02) ────────────────────────────────────────
+    // 흩어져 있던 조작 셋(설정=사이드바 맨 아래 / 접기=화면 한가운데 딱지 / 찾기=사이드바 맨 위)을
+    // 한 줄로 모으고 뒤로·앞으로를 더한다. 상단은 **메뉴를 접어도 남는 유일한 자리**다.
+    ".gtb-acts{display:flex;align-items:center;gap:2px;flex:0 0 auto;-webkit-app-region:no-drag;margin-right:4px;}",
+    ".gtb-ib{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--muted,#b3ada4);cursor:pointer;flex:0 0 auto;border:1px solid transparent;background:none;padding:0;position:relative;}",
+    ".gtb-ib:hover{background:rgba(255,255,255,.07);color:var(--text,#e9e7e2);}",
+    ".gtb-ib svg{width:17px;height:17px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round;}",
+    // 갈 곳이 없으면 흐리게 + 클릭 무시 — '눌러도 아무 일 없는 자리'를 만들지 않는다.
+    ".gtb-ib[disabled]{opacity:.32;cursor:default;pointer-events:none;}",
+    ".gtb-vr{width:1px;height:20px;background:var(--border,rgba(255,255,255,.10));margin:0 6px;flex:0 0 auto;}",
+    // 지금 보는 곳 — 메뉴를 접어도 여기가 어디인지 알 수 있어야 한다.
+    ".gtb-where{display:flex;align-items:center;gap:8px;min-width:0;flex:0 1 auto;padding-right:10px;}",
+    ".gtb-where .wg{font-size:12.5px;color:var(--muted-2,#a49d95);flex:0 0 auto;}",
+    ".gtb-where .wn{font-size:13.5px;font-weight:800;color:var(--text,#e9e7e2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}",
+
+    // ── 화면 찾기 겹판 (Ctrl+K) ─────────────────────────────────────────
+    ".gtb-fmask{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:995;display:flex;align-items:flex-start;justify-content:center;padding-top:11vh;-webkit-app-region:no-drag;}",
+    ".gtb-fpal{width:min(520px,88vw);max-height:70vh;display:flex;flex-direction:column;background:var(--panel,#30302e);border:1px solid var(--border-strong,rgba(255,255,255,.18));border-radius:12px;box-shadow:0 24px 70px rgba(0,0,0,.55);overflow:hidden;}",
+    ".gtb-fpal input{width:100%;background:none;border:none;border-bottom:1px solid var(--border,rgba(255,255,255,.10));padding:13px 15px;color:var(--text,#e9e7e2);font-size:14.5px;outline:none;font-family:inherit;}",
+    ".gtb-fpal .fl{overflow-y:auto;padding:5px;}",
+    ".gtb-fr{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:8px;font-size:13.5px;color:var(--muted,#b3ada4);cursor:pointer;}",
+    ".gtb-fr.on{background:rgba(59,130,246,.18);color:#fff;}",
+    ".gtb-fr .fg{margin-left:auto;font-size:12px;color:var(--muted-2,#a49d95);flex:0 0 auto;}",
+    ".gtb-fnone{padding:16px;font-size:13px;color:var(--muted-2,#a49d95);text-align:center;}",
+    ".gtb-fhint{padding:7px 12px;border-top:1px solid var(--border,rgba(255,255,255,.10));font-size:12px;color:var(--muted-2,#a49d95);display:flex;gap:14px;}",
   ].join("");
   var st = document.createElement("style");
   st.textContent = css;
@@ -118,6 +144,11 @@
     if (dir === "up") {
       menuEl.style.left = Math.max(8, r.left) + "px";
       menuEl.style.bottom = (window.innerHeight - r.top + 6) + "px";
+    } else if (dir === "downright") {
+      // 왼쪽 끝 단추용 — 단추 왼쪽 모서리에 맞춰 **오른쪽으로** 편다(2026-08-02 사용자 지시).
+      // 오른쪽 정렬로 펴면 창 밖으로 나가 잘린다.
+      menuEl.style.left = Math.max(8, r.left) + "px";
+      menuEl.style.top = (r.bottom + 6) + "px";
     } else {
       menuEl.style.right = Math.max(8, window.innerWidth - r.right) + "px";
       menuEl.style.top = (r.bottom + 6) + "px";
@@ -276,11 +307,27 @@
     row.className = "ua-row";
     var av = document.createElement("span"); av.className = "ua-avatar"; av.textContent = "-";
     var nm = document.createElement("span"); nm.className = "ua-name"; nm.textContent = "";
-    var gear = document.createElement("span"); gear.className = "gtb-gear"; gear.textContent = "⚙";
-    gear.title = "클라이언트 메뉴 — 배율·전체화면·서버·업데이트";
+    // ⚙는 **상단 ☰로 이사했다**(2026-08-02). 비는 줄 끝에는 문서함을 넣는다 —
+    // 늘 쓰는 곳이라 메뉴 목록을 훑지 않고 바로 닿는다(사용자 지시).
+    var gear = document.createElement("span"); gear.className = "gtb-gear"; gear.textContent = "📚";
+    gear.title = "문서함 열기 — 가이드·아키텍처를 읽는 별도 창";
     row.appendChild(av); row.appendChild(nm); row.appendChild(gear);
     area.appendChild(row);
-    row.addEventListener("click", function (e) { e.stopPropagation(); if (menuEl) closeMenu(); else openMenu(gear, "up"); });
+    gear.addEventListener("click", function (e) {
+      e.stopPropagation();
+      if (window.gijo && typeof window.gijo.openDocbox === "function") window.gijo.openDocbox();
+      else alert("문서함을 열 수 없습니다 — 앱을 다시 시작해 보시고, 계속되면 알려주세요.");
+    });
+    // 이름·아바타를 누르면 **설정 › 내 설정**으로. 예전엔 이 줄이 ⚙ 메뉴를 열었는데 그 메뉴는 상단으로 갔다.
+    // ⚠ 두 번 데었다. ① 구역 키는 s=my다(s=me로 적으면 아무 구역도 안 걸려 빈 화면이 뜬다).
+    //   ② navigateTo로 가면 **셸 문서가 통째로 바뀌어** 열어 둔 탭과 대화가 날아간다 —
+    //   메뉴와 같은 길(gijoOpenScreen)로 열어 탭으로 뜨게 한다.
+    row.addEventListener("click", function (e) {
+      e.stopPropagation();
+      var 갈곳 = { page: "settings.html?s=my", label: "내 설정" };
+      if (typeof window.gijoOpenScreen === "function") window.gijoOpenScreen(갈곳);
+      else window.gijo.navigateTo(갈곳.page);
+    });
     // 풀네임 — 로그인 사용자 표시 이름
     if (authed) {
       (async function () {
@@ -396,6 +443,272 @@
     setInterval(renderSessChip, 1000);
   }
 
+  // ══ 상단 조작 줄 (2026-08-02 사용자 지시: "상단 너처럼 변경") ══════════════
+  //
+  // 왜 옮겼나 — 자주 쓰는 조작 셋이 세 군데에 흩어져 있었다.
+  //   설정 ⚙ = 사이드바 맨 아래 · 접기 = 화면 한가운데 ◀ 딱지 · 찾기 = 사이드바 맨 위 입력칸.
+  //   셋 다 **사이드바를 접으면 같이 사라진다**. 상단은 접어도 남는 유일한 자리다.
+  // 뒤로·앞으로는 새로 만든다 — 눌러 들어간 화면에서 되돌아올 길이 아예 없었다.
+
+  // ── 화면 이력 ──────────────────────────────────────────────────────────
+  // ⚠ 브라우저 이력을 쓸 수 없다. 화면마다 **문서가 통째로 바뀌므로**(file://…html) 창 안에서만
+  //   사는 값으로 들고 다녀야 한다 — sessionStorage(창 단위, 앱 끄면 사라짐)를 쓴다.
+  //   되돌아가며 navigate하면 새 문서가 또 "새 화면"으로 보고 밀어 넣는다 → 무한 왕복.
+  //   그래서 이동 직전에 표식(MOVE_KEY)을 남겨, 새 문서는 밀지 않고 자리만 옮긴다.
+  var HIST_KEY = "gijo:navhist", MOVE_KEY = "gijo:navmove";
+  // 셸(app.html)에서는 화면이 **탭(iframe)**이라 문서가 안 바뀐다 — 주소로는 이력을 못 센다.
+  // 셸이 gijoNoteScreen으로 "지금 이 화면을 본다"고 알려 주면 그것을 한 걸음으로 센다.
+  var 셸인가 = !!document.getElementById("screens");
+  var 셸화면 = null;
+  function 지금화면() {
+    if (셸인가) return 셸화면 || "";
+    return (location.pathname.split("/").pop() || "") + (location.search || "");
+  }
+  function 이력읽기() {
+    try {
+      var h = JSON.parse(sessionStorage.getItem(HIST_KEY) || "null");
+      if (h && Array.isArray(h.stack) && typeof h.idx === "number") return h;
+    } catch (e) {}
+    return { stack: [], idx: -1 };
+  }
+  function 이력쓰기(h) { try { sessionStorage.setItem(HIST_KEY, JSON.stringify(h)); } catch (e) {} }
+  var hist = 이력읽기();
+  if (셸인가) hist = { stack: [], idx: -1 }; // 셸은 새로 뜰 때마다 처음부터 — 탭도 함께 복원되기 때문
+  (function 이력에지금화면반영() {
+    if (셸인가) return; // 셸은 아래 gijoNoteScreen이 채운다(아직 화면이 안 떴다)
+    var 이동 = null;
+    try { 이동 = sessionStorage.getItem(MOVE_KEY); sessionStorage.removeItem(MOVE_KEY); } catch (e) {}
+    var 여기 = 지금화면();
+    if (이동 === "back" || 이동 === "fwd") {
+      // 뒤로/앞으로로 온 것 — 자리만 옮긴다(밀어 넣지 않는다).
+      hist.idx = Math.min(hist.stack.length - 1, Math.max(0, hist.idx + (이동 === "fwd" ? 1 : -1)));
+      이력쓰기(hist);
+      return;
+    }
+    if (hist.stack[hist.idx] === 여기) return;      // 같은 화면 새로고침 — 이력이 늘 이유가 없다
+    hist.stack = hist.stack.slice(0, hist.idx + 1); // 되돌아간 뒤 새 길로 가면 앞쪽은 버린다
+    hist.stack.push(여기);
+    if (hist.stack.length > 60) hist.stack.shift();  // 무한정 쌓지 않는다
+    hist.idx = hist.stack.length - 1;
+    이력쓰기(hist);
+  })();
+  function 이력이동(d) {
+    var 갈곳 = hist.stack[hist.idx + d];
+    if (!갈곳) return;
+    if (셸인가) {
+      // 탭을 되짚는다. 이미 닫힌 탭이면 다시 열린다(open이 알아서 판단).
+      hist.idx += d;
+      이력쓰기(hist);
+      되짚는중 = true;
+      try { window.gijoTabs.open(갈곳.page || 갈곳, 갈곳.label); } finally { 되짚는중 = false; }
+      window.gijoSyncTopbar();
+      return;
+    }
+    try { sessionStorage.setItem(MOVE_KEY, d > 0 ? "fwd" : "back"); } catch (e) {}
+    window.gijo.navigateTo(갈곳);
+  }
+
+  /**
+   * 셸이 부른다 — "지금 이 화면을 본다". 되짚는 중(뒤로/앞으로)에는 밀어 넣지 않는다.
+   * ⚠ 안 그러면 뒤로 갈 때마다 그 화면이 다시 이력 끝에 쌓여 영원히 앞으로만 간다.
+   */
+  var 되짚는중 = false;
+  window.gijoNoteScreen = function (page, label) {
+    셸화면 = { page: page, label: label || page };
+    if (되짚는중) { window.gijoSyncTopbar(); return; }
+    var 지금 = hist.stack[hist.idx];
+    if (지금 && (지금.page || 지금) === page) { window.gijoSyncTopbar(); return; } // 같은 화면 다시 누름
+    hist.stack = hist.stack.slice(0, hist.idx + 1);
+    hist.stack.push(셸화면);
+    if (hist.stack.length > 60) hist.stack.shift();
+    hist.idx = hist.stack.length - 1;
+    이력쓰기(hist);
+    window.gijoSyncTopbar();
+  };
+
+  // ── 화면 찾기 겹판 ──────────────────────────────────────────────────────
+  var finderEl = null;
+  function closeFinder() { if (finderEl) { finderEl.remove(); finderEl = null; } }
+  window.gijoOpenFinder = function () {
+    if (finderEl) { closeFinder(); return; }
+    var 목록 = (typeof window.gijoScreenList === "function") ? window.gijoScreenList() : [];
+    if (!목록.length) return; // 메뉴 자료가 아직 없으면 조용히(빈 겹판을 띄우면 고장으로 보인다)
+    finderEl = document.createElement("div");
+    finderEl.className = "gtb-fmask";
+    var pal = document.createElement("div");
+    pal.className = "gtb-fpal";
+    var inp = document.createElement("input");
+    inp.type = "text";
+    inp.placeholder = "화면 이름을 적으세요 — 예: 취약점, 자산, 기록";
+    inp.setAttribute("aria-label", "화면 찾기");
+    inp.autocomplete = "off"; inp.spellcheck = false;
+    var list = document.createElement("div"); list.className = "fl";
+    var hint = document.createElement("div");
+    hint.className = "gtb-fhint";
+    hint.innerHTML = "<span>↑↓ 고르기</span><span>Enter 열기</span><span>Esc 닫기</span>";
+    pal.appendChild(inp); pal.appendChild(list); pal.appendChild(hint);
+    finderEl.appendChild(pal);
+    document.body.appendChild(finderEl);
+
+    var 걸린것 = [], 고른것 = 0;
+    function 그리기() {
+      var q = inp.value.trim().toLowerCase();
+      걸린것 = q ? 목록.filter(function (i) { return (i.label || "").toLowerCase().indexOf(q) >= 0 || (i.group || "").toLowerCase().indexOf(q) >= 0; })
+                 : 목록.slice(0, 12);
+      고른것 = 0;
+      list.innerHTML = "";
+      if (!걸린것.length) {
+        var none = document.createElement("div");
+        none.className = "gtb-fnone";
+        none.textContent = "'" + inp.value.trim() + "'에 맞는 화면이 없습니다.";
+        list.appendChild(none);
+        return;
+      }
+      걸린것.forEach(function (it, n) {
+        var r = document.createElement("div");
+        r.className = "gtb-fr" + (n === 0 ? " on" : "");
+        r.innerHTML = "<span>" + (it.ic || "▪") + "</span><span>" + it.label + "</span>" +
+                      (it.group ? '<span class="fg">' + it.group + "</span>" : "");
+        r.addEventListener("click", function () { closeFinder(); window.gijoOpenScreen(it); });
+        list.appendChild(r);
+      });
+    }
+    function 고르기(d) {
+      if (!걸린것.length) return;
+      고른것 = Math.min(걸린것.length - 1, Math.max(0, 고른것 + d));
+      [].forEach.call(list.children, function (el, n) { el.classList.toggle("on", n === 고른것); });
+      var on = list.children[고른것];
+      if (on && on.scrollIntoView) on.scrollIntoView({ block: "nearest" });
+    }
+    // ⚠ 한글은 ㅎ→하→한처럼 **조합 중**에도 input이 뜬다. 목록만 다시 그리고 입력칸은
+    //   건드리지 않는다 — 입력칸을 새로 만들면 조합이 끊겨 한글을 못 친다(옛 사이드바 찾기 사고).
+    inp.addEventListener("input", 그리기);
+    inp.addEventListener("keydown", function (e) {
+      if (e.key === "ArrowDown") { e.preventDefault(); 고르기(1); }
+      else if (e.key === "ArrowUp") { e.preventDefault(); 고르기(-1); }
+      else if (e.key === "Enter") {
+        if (e.isComposing) return; // 한글 조합 확정용 Enter를 '열기'로 삼으면 엉뚱한 화면이 열린다
+        e.preventDefault();
+        var it = 걸린것[고른것];
+        if (it) { closeFinder(); window.gijoOpenScreen(it); }
+      } else if (e.key === "Escape") { e.preventDefault(); closeFinder(); }
+    });
+    finderEl.addEventListener("click", function (e) { if (e.target === finderEl) closeFinder(); });
+    그리기();
+    inp.focus();
+  };
+
+  // ── 조작 줄 만들기 ──────────────────────────────────────────────────────
+  function 아이콘단추(title, svgPath, onClick) {
+    var b = document.createElement("button");
+    b.className = "gtb-ib";
+    b.type = "button";
+    b.title = title;
+    b.setAttribute("aria-label", title);
+    b.innerHTML = '<svg viewBox="0 0 24 24">' + svgPath + "</svg>";
+    b.addEventListener("click", function (e) { e.stopPropagation(); onClick(b); });
+    return b;
+  }
+  var topSideBtn = null, topBackBtn = null, topFwdBtn = null, topWhereEl = null;
+
+  /** 상단 바 모양을 현재 상태에 맞춘다 — 접힘 여부·이력 유무·지금 보는 곳. */
+  window.gijoSyncTopbar = function () {
+    if (topSideBtn) {
+      var 접힘 = typeof window.gijoLeftCollapsed === "function" && window.gijoLeftCollapsed();
+      topSideBtn.title = 접힘 ? "왼쪽 메뉴 펼치기 (Ctrl+B)" : "왼쪽 메뉴 접기 (Ctrl+B)";
+      topSideBtn.style.color = 접힘 ? "var(--blue-light,#7ab0ff)" : "";
+    }
+    if (topBackBtn) topBackBtn.disabled = !(hist.stack[hist.idx - 1]);
+    if (topFwdBtn) topFwdBtn.disabled = !(hist.stack[hist.idx + 1]);
+    if (topWhereEl) 지금보는곳채우기();
+  };
+
+  function 지금보는곳채우기() {
+    if (!topWhereEl) return;
+    var 여기 = 셸인가 ? (셸화면 && 셸화면.page) || "" : 지금화면();
+    var 이름 = "", 구역 = "";
+    var 목록 = (typeof window.gijoScreenList === "function") ? window.gijoScreenList() : [];
+    var 맞는것 = 목록.filter(function (i) { return i.page === 여기; })[0]
+              || 목록.filter(function (i) { return i.page && i.page.split("?")[0] === 여기.split("?")[0]; })[0];
+    if (맞는것) { 이름 = 맞는것.label; 구역 = 맞는것.group || ""; }
+    else if (셸인가 && 셸화면) { 이름 = 셸화면.label; }
+    else if (셸인가) { 이름 = "열린 화면 없음"; }
+    else { 이름 = (document.title || "").replace(/^GIJO AS\s*[—·-]\s*/, "") || 여기.split("?")[0]; }
+    topWhereEl.innerHTML = (구역 ? '<span class="wg">' + 구역 + " ›</span>" : "") +
+                           '<span class="wn"></span>';
+    topWhereEl.querySelector(".wn").textContent = 이름;
+  }
+
+  /**
+   * .header 맨 앞에 조작 줄을 끼운다.
+   * ⚠ 별도 창(팀 사무실·문서함·대화창)에는 사이드바가 없다 — 거기서는 ▣를 아예 만들지 않는다.
+   *   만들어 두고 아무 일도 안 하게 두면 "눌러도 반응 없는 자리"가 된다(전수 점검에서 잡던 결함).
+   */
+  function mountTopbar() {
+    // 화면은 .header, 별도 창(팀 사무실·문서함)은 .head를 쓴다 — 둘 다 받는다.
+    var hdr = document.querySelector(".header, .head");
+    if (!hdr || hdr.querySelector(".gtb-acts")) return false;
+    var 사이드있음 = !!(document.getElementById("gijoNav") || document.querySelector(".explorer"));
+
+    var acts = document.createElement("div");
+    acts.className = "gtb-acts";
+
+    // 톱니 모양 그대로 쓴다 — 담당자가 이미 「설정은 톱니」로 익힌 자리다(줄 세 개는 목록처럼 읽힌다).
+    var gear = 아이콘단추("설정 — 배율·전체화면·서버·업데이트",
+      '<circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/>',
+      function (b) { if (menuEl) closeMenu(); else openMenu(b, "downright"); });
+    acts.appendChild(gear);
+
+    if (사이드있음) {
+      topSideBtn = 아이콘단추("왼쪽 메뉴 접기 (Ctrl+B)", '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/>', function () {
+        if (typeof window.gijoLeftCollapse === "function") {
+          window.gijoLeftCollapse(!window.gijoLeftCollapsed());
+        }
+      });
+      acts.appendChild(topSideBtn);
+    }
+
+    acts.appendChild(아이콘단추("화면 찾기 (Ctrl+K)", '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>', function () {
+      window.gijoOpenFinder();
+    }));
+
+    var vr = document.createElement("div"); vr.className = "gtb-vr"; acts.appendChild(vr);
+    topBackBtn = 아이콘단추("뒤로 (Alt+←)", '<path d="M19 12H5M11 6l-6 6 6 6"/>', function () { 이력이동(-1); });
+    topFwdBtn = 아이콘단추("앞으로 (Alt+→)", '<path d="M5 12h14M13 6l6 6-6 6"/>', function () { 이력이동(1); });
+    acts.appendChild(topBackBtn); acts.appendChild(topFwdBtn);
+
+    topWhereEl = document.createElement("div");
+    topWhereEl.className = "gtb-where";
+    acts.appendChild(topWhereEl);
+
+    hdr.insertBefore(acts, hdr.firstChild);
+
+    // 로고는 뺀다 — 왼쪽 메뉴 위에 이미 있고, 상단은 조작이 쓸 자리다(2026-08-02 결정).
+    var logo = hdr.querySelector("#homeLink");
+    if (logo) logo.style.display = "none";
+    // 시계는 오른쪽 세션 칩 옆으로 — 「남은 시간」과 「지금 시각」은 같이 봐야 뜻이 산다.
+    var clock = hdr.querySelector(".clock, #clockEl");
+    var right = hdr.querySelector(".header-right");
+    if (clock && right && clock.parentNode !== right) right.insertBefore(clock, right.firstChild);
+
+    window.gijoSyncTopbar();
+    return true;
+  }
+
+  // 단축키 — 안내한 것은 반드시 걸려 있어야 한다(안내만 하고 안 걸어 둔 전례가 있다).
+  document.addEventListener("keydown", function (e) {
+    if (e.altKey && !e.ctrlKey && !e.metaKey) {
+      if (e.key === "ArrowLeft") { e.preventDefault(); 이력이동(-1); return; }
+      if (e.key === "ArrowRight") { e.preventDefault(); 이력이동(1); return; }
+    }
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === "b" || e.key === "B")) {
+      if (typeof window.gijoLeftCollapse === "function") {
+        e.preventDefault();
+        window.gijoLeftCollapse(!window.gijoLeftCollapsed());
+      }
+    }
+  });
+
   // ── 마운트 — 화면 유형별 왼쪽 패널 ─────────────────────────────────────
   function mountUserArea() {
     if (document.querySelector(".gtb-userarea")) return true;
@@ -424,10 +737,15 @@
 
   function afterMount() {
     mountSessChip(); // 세션 칩(전 화면 공용)
-    // 타이틀바의 기존 ⚙(진짜 기어만) 숨김 — 사용자 영역으로 이사 완료
+    mountTopbar();   // 상단 조작 줄(☰ ▣ 🔍 ← →)
+    // 화면 안에 남아 있던 ⚙ — 설정은 상단 ☰ 하나로 모았다(입구가 둘이면 하나만 고쳐진다).
     var oldGear = document.getElementById("settingsBtn");
     if (oldGear && oldGear.textContent.trim() === "⚙") oldGear.style.display = "none";
   }
+
+  // 별도 창(팀 사무실·문서함·대화창)에는 왼쪽 패널이 없다 — 그래도 상단 조작 줄은 붙인다
+  // (▣만 빠지고 ☰·🔍·←·→는 그대로 쓴다). 붙일 .header가 있으면 언제든 마운트.
+  if (document.querySelector(".header")) mountTopbar();
 
   var navRoot = document.getElementById("gijoNav");
   if (navRoot || document.querySelector(".explorer")) {

@@ -100,6 +100,37 @@ describe("바탕·글자 색 — 눈부심과 대비", () => {
     expect(대비(색(t, "bg")!, 색(t, "muted-2")!)).toBeGreaterThan(4.5);
   });
 
+  it("창 껍데기(OS 창 버튼 자리) 색이 상단 바와 같다", () => {
+    // ⚠ 이 색은 CSS가 아니라 main.ts가 정한다 — 화면 팔레트를 바꿔도 여기가 남으면
+    //   오른쪽 창 버튼 자리만 딴 색으로 떠서 "상단 바가 창 밖으로 삐져나온" 것처럼 보인다
+    //   (2026-08-02 사용자 지적). 팔레트를 바꾸는 사람이 여기를 잊지 않도록 시험으로 묶는다.
+    const overlay = main.match(/titleBarOverlay:\s*\{\s*color:\s*"(#[0-9a-fA-F]{6})"/)?.[1];
+    const 상단바색 = 색(fs.readFileSync(path.join(화면들, "app.html"), "utf-8"), "panel-2");
+    expect(overlay?.toLowerCase()).toBe(상단바색?.toLowerCase());
+    // 창 바탕색도 화면 바탕과 같아야 한다 — 뜨는 순간 잠깐 다른 색이 번쩍인다.
+    const 창바탕 = main.match(/backgroundColor:\s*"(#[0-9a-fA-F]{6})"/)?.[1];
+    expect(창바탕?.toLowerCase()).toBe(색(fs.readFileSync(path.join(화면들, "app.html"), "utf-8"), "bg")?.toLowerCase());
+  });
+
+  it("확대·축소 단축키는 메인 프로세스 한 곳에서만 건다", () => {
+    // ⚠ 화면(nav.js)에도 같은 단축키가 걸려 있었다. 두 곳이 같은 일을 하면 반드시 어긋난다 —
+    //   실제로 화면 쪽 코드가 `setUiZoom(0)`을 불러 **기본으로 되돌리는 대신 최소값(80%)으로**
+    //   떨어뜨렸다(2026-08-02). 거는 자리는 main.ts 하나뿐이어야 한다.
+    // 주석은 뺀다 — "왜 없앴는지" 설명하는 글에 함수 이름이 들어 있어 잡히면 안 된다.
+    const nav = fs
+      .readFileSync(path.join(화면들, "nav.js"), "utf-8")
+      .split("\n")
+      .filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l))
+      .join("\n");
+    expect(nav, "화면에서 배율을 직접 건드리면 안 된다").not.toMatch(/stepUiZoom\(/);
+    expect(nav, "화면에서 배율을 직접 건드리면 안 된다").not.toMatch(/setUiZoom\(/);
+  });
+
+  it("최대화(▢)를 끈 설정이 남아 있다", () => {
+    // 2026-08-02 사용자 지시 "네모는 없어도 될 것 같은데". 창 옵션이라 눈으로만 확인하면 놓친다.
+    expect(main).toMatch(/maximizable:\s*false/);
+  });
+
   it("모든 화면이 같은 바탕색을 쓴다", () => {
     const 바탕 = new Set<string>();
     for (const f of fs.readdirSync(화면들).filter((x) => x.endsWith(".html"))) {

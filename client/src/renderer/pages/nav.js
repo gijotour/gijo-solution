@@ -37,8 +37,11 @@
     //   있는 모든 내용은 대화창에서"). 목록·담기·완료·절차 밟기는 전부 대화창 도구로 옮겼다:
     //   picklist 결정적 목록 + add_task·complete_task·work_steps·step_done·step_undo·routine_tasks.
     //   화면을 되살릴 일이 있으면 그 도구들과 겹치지 않게 먼저 정리할 것.
-    // 문서함 — 가이드·아키텍처를 읽는 별도 창(주소가 없어 별표 대상 아님, 팀 사무실과 같음)
-    { win: "openDocbox", label: "문서함 (창)", ic: "📚", fixed: true },
+    // 문서함 — 가이드·아키텍처를 읽는 별도 창(주소가 없어 별표 대상 아님, 팀 사무실과 같음).
+    // ⚠ hidden: 메뉴 목록에는 **안 그린다**(2026-08-02 사용자 지시 — 왼쪽 아래 사용자 줄 끝
+    //   📚로 옮겼으니 같은 것이 두 번 보일 이유가 없다). 자료는 지우지 않는다:
+    //   상단 🔍 화면 찾기는 이 목록을 쓰므로, 지우면 이름으로도 못 찾게 된다.
+    { win: "openDocbox", label: "문서함 (창)", ic: "📚", fixed: true, hidden: true },
     { page: "sessions.html", label: "작업 내역", fixed: true },
   ];
 
@@ -187,13 +190,9 @@
       ".gn-top{padding:8px;border-bottom:1px solid var(--border);flex:0 0 auto;display:flex;align-items:center;gap:6px;}" +
       ".gn-top .gn-seg{flex:1;}" +
       // 패널 접기 버튼(좌우 공통 디자인, 2026-07-25 대칭 통일)
-      ".gn-pcol{flex:0 0 auto;width:26px;height:26px;border-radius:7px;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);color:var(--blue-light);display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;}" +
-      ".gn-pcol:hover{background:var(--blue);color:#fff;}" +
       // 왼쪽 가장자리 토글 — 접힘=화면 왼쪽 끝, 열림=사이드바 경계에 반쯤 걸침.
       // ⚠ 예전엔 '◀ 접기'를 세로로 눕혀 썼다. 세로 글씨는 읽는 데만 시간이 걸려서
       //    화살표 하나로 줄였다(2026-07-27). 뜻은 툴팁이 말한다.
-      ".gn-edge{position:fixed;top:50%;transform:translateY(-50%);width:18px;height:44px;background:var(--panel-2,#1f1e1d);color:var(--muted,#b3ada4);border:1px solid var(--border,#3d3c38);border-radius:8px;font-size:12.25px;font-weight:800;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:900;box-shadow:2px 0 10px rgba(0,0,0,.35);}" +
-      ".gn-edge:hover{color:var(--blue-light,#7ab0ff);border-color:var(--blue,#3b82f6);}" +
       "body.gn-left-collapsed #gijoNav{display:none !important;}" +
       "body.gn-left-collapsed .app{grid-template-columns:minmax(0,1fr) 46px !important;}" +
       "body.gn-left-collapsed .explorer{display:none !important;}" +
@@ -226,17 +225,7 @@
       // 찾기 — 가지를 기본으로 접어 두니(4.0.0) "어느 가지에 있더라"를 모르면 하나씩 열어봐야 한다.
       // 이름만 알면 바로 닿는 길을 둔다. 상시 보이게 두는 게 중요하다 — 단축키만 있으면 모르는
       // 사람은 영영 못 쓴다(담당자가 다 개발자는 아니다).
-      ".gn-find{position:relative;margin:2px 6px 6px;}" +
-      ".gn-find input{width:100%;background:#1f1e1d;border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:9px;" +
       "color:var(--text,#e9e7e2);font-size:12px;padding:7px 26px 7px 28px;outline:none;font-family:inherit;}" +
-      ".gn-find input:focus{border-color:var(--blue,#3b82f6);}" +
-      ".gn-find input::placeholder{color:var(--muted-2,#a49d95);}" +
-      ".gn-find .ic{position:absolute;left:9px;top:50%;transform:translateY(-50%);font-size:12.25px;color:var(--muted-2,#a49d95);pointer-events:none;}" +
-      ".gn-find .clr{position:absolute;right:7px;top:50%;transform:translateY(-50%);font-size:12.25px;color:var(--muted-2,#a49d95);cursor:pointer;display:none;padding:2px 4px;border-radius:5px;}" +
-      ".gn-find .clr:hover{color:#fff;background:rgba(255,255,255,.08);}" +
-      ".gn-find.has .clr{display:block;}" +
-      ".gn-hitwrap{padding-top:2px;}" +
-      ".gn-hit-g{font-size:11.75px;color:var(--muted-2,#a49d95);margin-left:auto;font-weight:700;}" +
       ".gn-none{font-size:12.5px;color:var(--muted-2,#a49d95);padding:10px 12px;}" +
       ".gn-fav-g{color:var(--amber,#f0a020);}" +
       // ☆ 별표 — 평소엔 숨어 있다가 그 줄에 마우스를 올리면 나온다(30줄에 별이 다 떠 있으면
@@ -276,7 +265,6 @@
   }
 
   var updateAvailable = false; // 클라이언트 새 버전 존재 여부(checkUpdateBadge가 채움)
-  var findQuery = "";          // 메뉴 찾기 입력값(메뉴를 다시 그려도 유지된다)
 
   // ── 즐겨찾기 ───────────────────────────────────────────────────────────
   // 화면이 30개라 자주 가는 곳까지 매번 훑어 내려가야 한다. 별표한 화면을 맨 위 가지에 모은다.
@@ -391,75 +379,23 @@
     var closed = closedSet();
     var favs = favList();
 
-    // ── 찾기 칸 — 이름만 알면 가지를 안 펴고 바로 닿는다(Ctrl/Cmd+K로 여기 포커스).
-    var find = document.createElement("div");
-    find.className = "gn-find";
-    find.innerHTML = '<span class="ic">🔍</span><input id="gnFind" type="text" placeholder="화면 찾기  (Ctrl+K)" ' +
-      'aria-label="화면 찾기" autocomplete="off" spellcheck="false"><span class="clr" title="지우기">✕</span>';
-    container.appendChild(find);
-    var findInput = find.querySelector("input");
-    findInput.value = findQuery;
-    if (findQuery) find.classList.add("has");
-    // ⚠ 여기서 buildMenu(전체 재생성)를 부르면 **한글을 못 친다**(2026-07-28 사용자 신고).
-    //   한글은 ㅎ→하→한처럼 조합 중인 상태로 입력칸에 머무는데, 글자마다 입력칸을 새로 만들면
-    //   그 조합이 매번 끊긴다. 영문은 한 글자가 곧 완성이라 증상이 안 보였다.
-    //   그래서 **입력칸은 그대로 두고 아래 결과만** 다시 그린다.
-    findInput.addEventListener("input", function () {
-      findQuery = findInput.value;
-      find.classList.toggle("has", !!findQuery);
-      renderBody(container, find);
-    });
-    findInput.addEventListener("keydown", function (e) {
-      if (e.key === "Escape") { e.preventDefault(); findQuery = ""; findInput.value = ""; find.classList.remove("has"); renderBody(container, find); return; }
-      if (e.key === "Enter") {   // 첫 결과를 연다 — 타이핑하다 바로 Enter가 가장 빠른 길이다
-        var first = container.querySelector(".gn-hitwrap .gn-item .gn-label");
-        if (first) first.click();
-      }
-    });
-    find.querySelector(".clr").addEventListener("click", function () {
-      findQuery = ""; findInput.value = ""; find.classList.remove("has");
-      renderBody(container, find); findInput.focus();
-    });
-
-    renderBody(container, find);
+    // ── 찾기 칸은 **상단 바 🔍로 이사했다**(2026-08-02 사용자 지시).
+    //   여기 입력칸이 있으면 메뉴를 접을 때 같이 사라져 못 쓴다 — 상단은 늘 남는다.
+    //   ⚠ 한글 조합 보호를 위해 입력 중 메뉴를 다시 그리지 않던 규칙은 겹판이 이어받았다.
+    renderBody(container);
   }
 
   // 찾기 칸 **아래쪽만** 다시 그린다 — 입력칸을 건드리지 않는 것이 핵심이다(한글 조합 보호).
-  function renderBody(container, find) {
-    while (find.nextSibling) container.removeChild(find.nextSibling);
+  function renderBody(container) {
+    container.innerHTML = "";
     var here = currentKey();
     var closed = closedSet();
     var favs = favList();
 
-    // 찾는 중에는 트리를 접고 **걸린 것만** 보여준다 — 접힌 가지 안까지 뒤진다.
-    if (findQuery.trim()) {
-      var q = findQuery.trim().toLowerCase();
-      var wrap = document.createElement("div");
-      wrap.className = "gn-kids gn-hitwrap";
-      container.appendChild(wrap);
-      var hits = 0;
-      var add = function (it, gLabel) {
-        if ((it.label || "").toLowerCase().indexOf(q) < 0) return;
-        var row = makeItem(it, here, favs, container);
-        if (gLabel) { var g = document.createElement("span"); g.className = "gn-hit-g"; g.textContent = gLabel; row.insertBefore(g, row.querySelector(".gn-star") || null); }
-        wrap.appendChild(row);
-        hits++;
-      };
-      TOP.forEach(function (it) { add(it, null); });
-      GROUPS.forEach(function (g) { g.items.forEach(function (it) { add(it, g.label); }); });
-      if (!hits) {
-        var none = document.createElement("div");
-        none.className = "gn-none";
-        none.textContent = "'" + findQuery.trim() + "'에 맞는 화면이 없습니다.";
-        wrap.appendChild(none);
-      }
-      return; // 찾는 동안에는 고정·즐겨찾기·가지를 그리지 않는다(결과에만 집중)
-    }
-
     // ── 맨 위 고정 세 자리 — 가지에 넣지 않는다(접혀 있으면 매번 펴야 한다).
     var top = document.createElement("div");
     top.className = "gn-kids gn-top-fixed";
-    TOP.forEach(function (it) { top.appendChild(makeItem(it, here, favs, container)); });
+    TOP.forEach(function (it) { if (!it.hidden) top.appendChild(makeItem(it, here, favs, container)); });
     container.appendChild(top);
 
     // ⭐ 즐겨찾기 가지 — **비어 있어도 보여준다**(2026-07-28 사용자 신고: "즐겨찾기 안 보임").
@@ -532,6 +468,16 @@
   }
   // 대시보드가 '전체메뉴' 모드에서 같은 메뉴를 렌더하도록 공개(단일 소스).
   window.gijoRenderMenu = buildMenu;
+
+  /** 찾기용 납작한 목록 — {page|win, label, group}. 자료는 위 TOP/GROUPS 하나에서만 온다. */
+  window.gijoScreenList = function () {
+    var out = [];
+    TOP.forEach(function (t) { out.push({ page: t.page, win: t.win, label: t.label, ic: t.ic, group: "" }); });
+    GROUPS.forEach(function (g) {
+      g.items.forEach(function (i) { out.push({ page: i.page, win: i.win, label: i.label, ic: g.ic, group: g.label }); });
+    });
+    return out;
+  };
   // 메뉴 **자료**를 그대로 내준다 — 지휘소(대화창)가 자기 방식으로 그릴 수 있게.
   // ⚠ 목록을 저쪽에 베껴 적으면 반드시 어긋난다(오늘만 "같은 것이 여러 군데"를 세 번 겪었다).
   //   그리는 방법은 각자 달라도 **자료는 여기 하나**다.
@@ -558,49 +504,24 @@
   // ── 왼쪽 패널 접기/열기(전 화면 공통, 오른쪽 rightReopen과 대칭) ────────────
   // 접힘=body 클래스(레이아웃은 위 CSS가 처리) + 가장자리 '메뉴 열기' 탭. 상태는 기억.
   var LEFT_KEY = "gijo:leftPanel:collapsed";
-  function ensureLeftEdge() {
-    var edge = document.getElementById("gnLeftEdge");
-    if (edge) return edge;
-    edge = document.createElement("div");
-    edge.id = "gnLeftEdge";
-    edge.className = "gn-edge";
-    edge.addEventListener("click", function () {
-      window.gijoLeftCollapse(!document.body.classList.contains("gn-left-collapsed"));
-    });
-    document.body.appendChild(edge);
-    return edge;
-  }
-  // 탭 위치·라벨 갱신 — 열림: 사이드바 오른쪽 경계에 반쯤(12px) 걸침 / 접힘: 화면 왼쪽 끝.
-  function updateLeftEdge() {
-    var edge = ensureLeftEdge();
-    var collapsed = document.body.classList.contains("gn-left-collapsed");
-    if (collapsed) {
-      edge.style.left = "0px";
-      edge.textContent = "▶";
-      edge.title = "왼쪽 메뉴 열기";
-    } else {
-      var panel = document.getElementById("gijoNav") || document.querySelector(".explorer");
-      if (!panel) { edge.style.display = "none"; return; }
-      edge.style.display = "";
-      edge.style.left = Math.max(0, Math.round(panel.getBoundingClientRect().right) - 9) + "px";
-      edge.textContent = "◀";
-      edge.title = "왼쪽 메뉴 접기";
-    }
-  }
+  // ⚠ 예전엔 화면 가장자리에 ◀ 딱지를 띄워 접었다. 본문 위에 떠서 글자를 가렸고,
+  //   접으면 사이드바와 함께 설정·계정까지 사라져 되돌릴 자리가 마땅치 않았다.
+  //   2026-08-02부터 접기는 **상단 바 ▣** 하나로 한다(늘 남아 있는 자리).
   window.gijoLeftCollapse = function (on) {
     injectCss();
     document.body.classList.toggle("gn-left-collapsed", !!on);
     try { localStorage.setItem(LEFT_KEY, on ? "1" : "0"); } catch (e) {}
-    updateLeftEdge();
+    if (typeof window.gijoSyncTopbar === "function") window.gijoSyncTopbar(); // 상단 ▣ 모양 맞추기
   };
+  /** 지금 접혀 있나 — 상단 바가 버튼 모양을 정할 때 묻는다. */
+  window.gijoLeftCollapsed = function () { return document.body.classList.contains("gn-left-collapsed"); };
   function setupLeftCollapse() {
     // 왼쪽 패널이 있는 화면에서만(login 제외). 저장 상태 복원 + 탭 초기 배치.
     if (!document.getElementById("gijoNav") && !document.querySelector(".explorer")) return;
     injectCss();
     var saved = null; try { saved = localStorage.getItem(LEFT_KEY); } catch (e) {}
     if (saved === "1") document.body.classList.add("gn-left-collapsed");
-    updateLeftEdge();
-    window.addEventListener("resize", updateLeftEdge); // 창 크기·배율 변경 시 경계 재계산
+    if (typeof window.gijoSyncTopbar === "function") window.gijoSyncTopbar();
   }
 
   function render() {
@@ -616,8 +537,8 @@
     var mid = document.createElement("div"); mid.className = "gn-mid";
     buildMenu(mid); root.appendChild(mid);
     // 하단 사용자 영역은 titlebar.js가 #gijoNav 마지막 자식으로 마운트(관찰자).
-    // 접기/열기는 가장자리 세로 탭 하나로(헤더 버튼 없음 — 2026-07-25 통일). 위치 재계산.
-    updateLeftEdge();
+    // 접기/열기는 **상단 바 ▣** 하나로(2026-08-02 이관) — 여기서는 모양만 맞춘다.
+    if (typeof window.gijoSyncTopbar === "function") window.gijoSyncTopbar();
   }
 
   // 공용 디자인 시스템(gijo-ui.css)을 모든 페이지에 주입한다 — .g-* 컴포넌트 사용 가능 + body.g-ui로
@@ -698,7 +619,20 @@
   //   여기 다시 만들지 말 것.
   // 탭 안 화면이 다른 화면을 열 때 쓰는 다리 — 자기 자리를 갈아치우지 않고 **셸에 새 탭을 부탁**한다.
   // (대시보드 바로가기 타일처럼 "여기서 저기로" 보내는 자리들이 이걸 쓴다.)
+  /**
+   * 화면 하나를 연다 — 메뉴·상단 바 찾기·대시보드가 **같은 길**을 쓴다.
+   * ⚠ 2026-08-02에 같은 이름의 함수를 하나 더 만들었다가 뒤엣것만 살아남아, 앞엣것을 믿고 짠
+   *   쪽(대시보드 이동·상단 찾기)이 조용히 깨졌다. 정의는 여기 **하나뿐**이어야 한다.
+   * @param page 화면 주소 문자열, 또는 항목 객체 {page|win, label}
+   */
   window.gijoOpenScreen = function (page, label) {
+    if (page && typeof page === "object") { label = page.label || label; page = page.win ? { win: page.win } : page.page; }
+    if (page && page.win) {                                                    // 별도 창(팀 사무실·문서함)
+      if (window.gijo && typeof window.gijo[page.win] === "function") { window.gijo[page.win](); return true; }
+      alert((label || "이 화면") + "을(를) 열 수 없습니다 — 앱을 다시 시작해 보시고, 계속되면 알려주세요.");
+      return false;
+    }
+    if (!page) return false;
     if (window.gijoTabs) { window.gijoTabs.open(page, label); return true; }   // 셸 자신
     if (window.parent !== window) {                                            // 탭 안
       try { window.parent.postMessage({ type: "gijo:openTab", page: page, label: label || null }, "*"); return true; } catch (e) {}
@@ -798,17 +732,14 @@
     if (window.__gijoZoomKeys) return;
     window.__gijoZoomKeys = true;
     window.addEventListener("keydown", function (e) {
-      // Ctrl/Cmd+K — 화면 찾기로 바로 커서를 옮긴다(익숙한 관례). 칸은 늘 보이므로
-      // 단축키를 몰라도 쓸 수 있고, 아는 사람은 손을 마우스로 안 옮겨도 된다.
+      // Ctrl/Cmd+K — 상단 바의 화면 찾기 겹판을 연다(2026-08-02 이관).
       if ((e.metaKey || e.ctrlKey) && !e.altKey && (e.key === "k" || e.key === "K")) {
-        var box = document.getElementById("gnFind");
-        if (box) { e.preventDefault(); box.focus(); box.select(); return; }
+        if (typeof window.gijoOpenFinder === "function") { e.preventDefault(); window.gijoOpenFinder(); return; }
       }
-      if (!(e.metaKey || e.ctrlKey) || e.altKey || !window.gijo) return;
-      var k = e.key;
-      if (k === "+" || k === "=" || k === "Add") { e.preventDefault(); window.gijo.stepUiZoom(1); }
-      else if (k === "-" || k === "_" || k === "Subtract") { e.preventDefault(); window.gijo.stepUiZoom(-1); }
-      else if (k === "0") { e.preventDefault(); window.gijo.setUiZoom(1); }
+      // ⚠ 확대·축소(Ctrl + · − · 0)는 **여기서 처리하지 않는다**(2026-08-02).
+      //   메인 프로세스가 모든 창에 직접 걸었다(main.ts bindZoom → before-input-event).
+      //   같은 일을 두 군데서 하면 반드시 어긋난다 — 실제로 여기 있던 `setUiZoom(0)`은
+      //   0을 배율로 넘겨 **최소값 80%로 떨어뜨렸다**(기본으로 되돌릴 셈이었는데 정반대).
     });
   }
 

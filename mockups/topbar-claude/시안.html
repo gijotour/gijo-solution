@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>GIJO AS — 상단 바 개편 (시안)</title>
+<style>
+  :root{
+    --bg:#262624; --panel:#30302e; --panel2:#1f1e1d; --bd:rgba(255,255,255,.10); --bds:rgba(255,255,255,.18);
+    --tx:#e9e7e2; --mut:#b3ada4; --mut2:#a49d95; --blue:#3b82f6; --bluel:#7ab0ff; --teal:#1eb980; --amber:#f0a020; --red:#e2483d;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--tx);font-size:14px;line-height:1.75;padding:26px 30px 70px}
+  h1{font-size:22px;font-weight:800;letter-spacing:-.3px;margin-bottom:5px}
+  h2{font-size:16px;font-weight:800;margin:30px 0 12px;padding-top:18px;border-top:1px solid var(--bd)}
+  h3{font-size:14px;font-weight:800;margin:18px 0 8px;color:var(--bluel)}
+  p{color:var(--mut);margin-bottom:10px}
+  .sub{color:var(--mut2);font-size:13px;margin-bottom:22px}
+  .tag{font-size:11.5px;font-weight:800;border-radius:6px;padding:3px 9px;margin-left:8px;vertical-align:2px}
+  .tag.now{background:rgba(226,72,61,.16);color:#f5928a}
+  .tag.new{background:rgba(30,185,128,.16);color:var(--teal)}
+
+  /* ── 창 미리보기 ─────────────────────────────────────── */
+  .win{border:1px solid var(--bds);border-radius:11px;overflow:hidden;background:var(--bg);box-shadow:0 18px 50px rgba(0,0,0,.42);margin-bottom:8px}
+
+  /* 지금 — 로고·시계가 자리를 먹고, 접기·찾기는 화면 안쪽에 흩어져 있다 */
+  .bar-now{height:46px;display:flex;align-items:center;gap:12px;padding:0 14px;background:var(--panel2);border-bottom:1px solid var(--bd)}
+  .logo{display:flex;align-items:center;gap:8px;font-weight:800;font-size:14px}
+  .logo .mk{width:24px;height:24px;border-radius:6px;background:linear-gradient(135deg,#3b82f6,#1eb980);display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff}
+  .clock{color:var(--bluel);font-weight:800;font-size:13px}
+
+  /* 시안 — 왼쪽에 조작 5개, 가운데는 지금 보는 곳, 오른쪽은 OS 버튼 자리 */
+  .bar-new{height:46px;display:flex;align-items:center;gap:3px;padding:0 8px 0 10px;background:var(--panel2);border-bottom:1px solid var(--bd)}
+  .ib{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--mut);cursor:pointer;flex:0 0 auto;border:1px solid transparent;background:none;font-family:inherit}
+  .ib:hover{background:rgba(255,255,255,.07);color:var(--tx)}
+  .ib.off{opacity:.35;cursor:default}
+  .ib.off:hover{background:none;color:var(--mut)}
+  .ib svg{width:17px;height:17px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round}
+  .sep{width:1px;height:20px;background:var(--bd);margin:0 6px;flex:0 0 auto}
+  .where{flex:1;display:flex;align-items:center;gap:9px;min-width:0;padding-left:6px}
+  .where .nm{font-size:13.5px;font-weight:800;color:var(--tx);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .where .crumb{font-size:12.5px;color:var(--mut2);flex:0 0 auto}
+  .osbtns{display:flex;gap:2px;flex:0 0 auto;margin-left:8px}
+  .osbtns span{width:34px;height:30px;display:flex;align-items:center;justify-content:center;color:var(--mut2);font-size:12px;border-radius:6px}
+  .osbtns span:last-child:hover{background:var(--red);color:#fff}
+  .osbtns span:hover{background:rgba(255,255,255,.08)}
+
+  /* 창 내용 */
+  .body{display:grid;grid-template-columns:212px 1fr;height:236px}
+  .body.collapsed{grid-template-columns:0 1fr}
+  .side{background:var(--panel2);border-right:1px solid var(--bd);padding:9px 7px;overflow:hidden;font-size:13px;transition:padding .15s}
+  .body.collapsed .side{padding:0;border-right:none}
+  .side .find{display:flex;align-items:center;gap:7px;background:var(--bg);border:1px solid var(--bds);border-radius:9px;padding:7px 10px;color:var(--mut2);font-size:12.5px;margin-bottom:9px}
+  .side .g{font-size:12px;font-weight:800;color:var(--mut);margin:11px 5px 5px}
+  .side .it{padding:6px 10px;border-radius:7px;color:var(--mut);font-size:13px}
+  .side .it.on{background:rgba(59,130,246,.18);color:#fff;font-weight:700}
+  /* 사이드바 맨 아래 사용자 영역 — 톱니가 상단으로 떠난 자리 */
+  .side{display:flex;flex-direction:column}
+  .side .fill{flex:1;min-height:0}
+  .ua{border-top:1px solid var(--bd);background:rgba(59,130,246,.05);margin:0 -7px -9px;padding:8px 10px;display:flex;align-items:center;gap:8px}
+  .ua .av{width:26px;height:26px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex:0 0 auto}
+  .ua .nm2{flex:1;font-size:12.5px;font-weight:700;color:#dfe6ff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ua .slot{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:13px;cursor:pointer;flex:0 0 auto;border:1px solid rgba(59,130,246,.4);background:rgba(59,130,246,.14)}
+  .ua .slot.gone{border-style:dashed;border-color:rgba(226,72,61,.5);background:rgba(226,72,61,.08);color:#f5928a}
+  .stage{padding:16px 18px;overflow:hidden;position:relative}
+  .card{background:var(--panel);border:1px solid var(--bd);border-radius:10px;padding:13px 15px;margin-bottom:11px}
+  .card .t{font-size:13.5px;font-weight:800;margin-bottom:5px}
+  .card .d{font-size:12.5px;color:var(--mut2)}
+  .edge{position:absolute;left:-9px;top:50%;transform:translateY(-50%);width:18px;height:44px;background:var(--panel2);border:1px solid var(--bd);border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--mut);font-size:12px;font-weight:800;box-shadow:2px 0 10px rgba(0,0,0,.35)}
+
+  .cap{font-size:12.5px;color:var(--mut2);margin:8px 2px 22px}
+  .cap b{color:var(--amber)}
+
+  /* 찾기 겹판 */
+  .ovl{position:absolute;inset:0;background:rgba(0,0,0,.5);display:none;align-items:flex-start;justify-content:center;padding-top:26px;z-index:5}
+  .ovl.on{display:flex}
+  .pal{width:min(420px,86%);background:var(--panel);border:1px solid var(--bds);border-radius:12px;box-shadow:0 20px 60px rgba(0,0,0,.55);overflow:hidden}
+  .pal input{width:100%;background:none;border:none;border-bottom:1px solid var(--bd);padding:12px 14px;color:var(--tx);font-size:14px;outline:none;font-family:inherit}
+  .pal .r{padding:9px 14px;font-size:13px;color:var(--mut);display:flex;gap:9px;align-items:center}
+  .pal .r.on{background:rgba(59,130,246,.16);color:#fff}
+  .pal .r .grp{margin-left:auto;font-size:11.5px;color:var(--mut2)}
+
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0 6px}
+  th,td{border:1px solid var(--bd);padding:9px 11px;text-align:left;vertical-align:top}
+  th{background:rgba(255,255,255,.03);color:var(--mut2);font-size:12.5px;font-weight:800}
+  code{background:rgba(255,255,255,.07);padding:1.5px 6px;border-radius:5px;font-size:12.5px}
+  .warn{background:rgba(240,160,32,.09);border:1px solid rgba(240,160,32,.34);border-radius:10px;padding:13px 15px;margin:14px 0;color:#f3d9a8}
+  .warn b{color:var(--amber)}
+  ul{margin:8px 0 8px 20px;color:var(--mut)} li{margin-bottom:6px}
+  .rec{background:rgba(30,185,128,.09);border:1px solid rgba(30,185,128,.34);border-radius:10px;padding:13px 15px;margin:14px 0;color:#bfe8d5}
+  .rec b{color:var(--teal)}
+</style>
+</head>
+<body>
+
+<h1>상단 바 — 조작을 한 줄로 모은다</h1>
+<div class="sub">2026-08-02 지시: “상단 너처럼 변경 = 설정 아이콘, 화면에 있는 접기 기능 이동, 메뉴에 화면 찾기 이동, 뒤로/앞으로 추가”</div>
+
+<h2>지금 <span class="tag now">조작이 세 군데에 흩어져 있다</span></h2>
+<div class="win">
+  <div class="bar-now">
+    <div class="logo"><span class="mk">G</span> GIJO AS</div>
+    <div class="clock">2026. 08. 02. 오전 12:29</div>
+  </div>
+  <div class="body">
+    <div class="side">
+      <div class="find">🔍 화면 찾기 (Ctrl+K)</div>
+      <div class="it on">🏠 대시보드</div>
+      <div class="it">📕 팀 사무실 (창)</div>
+      <div class="it">📗 문서함 (창)</div>
+      <div class="g">▼ 관제</div>
+      <div class="fill"></div>
+      <div class="ua">
+        <span class="av">배</span>
+        <span class="nm2">배포 자동화 전용</span>
+        <span class="slot">⚙</span>
+      </div>
+    </div>
+    <div class="stage">
+      <div class="edge">◀</div>
+      <div class="card"><div class="t">서버 연결</div><div class="d">http://localhost:4000</div></div>
+      <div class="card"><div class="t">구동 티어</div><div class="d">GPU 총 24.0GB · 사용 9.1GB</div></div>
+    </div>
+  </div>
+</div>
+<div class="cap">
+  상단 바에는 <b>누를 것이 하나도 없다</b> — 로고와 시계뿐입니다. 정작 자주 쓰는 조작은
+  ① 찾기 = 사이드바 맨 위 ② 접기 = 화면 한가운데 붙은 <code>◀</code> 딱지 ③ 설정 = 사이드바 맨 아래 ⚙,
+  이렇게 <b>세 군데</b>에 흩어져 있습니다. 뒤로 가기는 아예 없어서, 눌러 들어간 화면에서 되돌아오려면 메뉴를 다시 찾아야 합니다.
+</div>
+
+<h2>시안 <span class="tag new">조작 5개를 왼쪽 한 줄에</span></h2>
+<div class="win">
+  <div class="bar-new">
+    <button class="ib" id="btnSet" title="설정 (☰)">
+      <svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg>
+    </button>
+    <button class="ib" id="btnSide" title="왼쪽 메뉴 접기·펼치기 (Ctrl+B)">
+      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg>
+    </button>
+    <button class="ib" id="btnFind" title="화면 찾기 (Ctrl+K)">
+      <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+    </button>
+    <div class="sep"></div>
+    <button class="ib off" id="btnBack" title="뒤로 (Alt+←)">
+      <svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg>
+    </button>
+    <button class="ib off" id="btnFwd" title="앞으로 (Alt+→)">
+      <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+    </button>
+    <div class="where">
+      <span class="crumb" id="crumb">관제 ›</span>
+      <span class="nm" id="nm">대시보드</span>
+    </div>
+    <div class="osbtns"><span>─</span><span>▢</span><span>✕</span></div>
+  </div>
+  <div class="body" id="demoBody">
+    <div class="side">
+      <div class="it on">🏠 대시보드</div>
+      <div class="it">📕 팀 사무실 (창)</div>
+      <div class="g">▼ 관제</div>
+      <div class="it">통합 관제</div>
+      <div class="it">위협 인텔</div>
+      <div class="fill"></div>
+      <div class="ua">
+        <span class="av">배</span>
+        <span class="nm2">배포 자동화 전용</span>
+        <span class="slot" title="문서함 열기 (별도 창)">📗</span>
+      </div>
+    </div>
+    <div class="stage">
+      <div class="card"><div class="t">서버 연결</div><div class="d">http://localhost:4000</div></div>
+      <div class="card"><div class="t">구동 티어</div><div class="d">GPU 총 24.0GB · 사용 9.1GB</div></div>
+      <div class="ovl" id="ovl">
+        <div class="pal">
+          <input placeholder="화면 이름을 적으세요 — 예: 취약점, 자산, 기록" value="취" readonly>
+          <div class="r on">🛡 취약점 관리 <span class="grp">자산·조치</span></div>
+          <div class="r">📋 취약점 스캔 <span class="grp">자산·조치</span></div>
+          <div class="r">📊 보안 KPI <span class="grp">관제</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="cap">눌러 보세요 — <b>☰ 설정 · ▣ 접기 · 🔍 찾기</b>가 실제로 움직입니다. 뒤로/앞으로는 갈 곳이 없을 때 <b>흐리게</b> 둡니다(눌러도 아무 일 없는 자리를 만들지 않기 위해).</div>
+
+<h2>무엇이 어디로 가나</h2>
+<table>
+  <tr><th>조작</th><th>지금 자리</th><th>시안 자리</th><th>왜</th></tr>
+  <tr><td>⚙ 설정</td><td>사이드바 <b>맨 아래</b> 작은 톱니</td><td>상단 <b>☰</b></td><td>메뉴를 접으면 톱니까지 같이 사라졌습니다</td></tr>
+  <tr><td>메뉴 접기</td><td>화면 한가운데 <code>◀</code> 딱지</td><td>상단 <b>▣</b></td><td>본문 위에 떠 있어 글자를 가렸습니다</td></tr>
+  <tr><td>화면 찾기</td><td>사이드바 맨 위 입력칸</td><td>상단 <b>🔍</b> + Ctrl+K 겹판</td><td>메뉴 세로 공간을 40px 돌려받습니다</td></tr>
+  <tr><td>뒤로 · 앞으로</td><td style="color:#f5928a">없음</td><td>상단 <b>← →</b></td><td>탭을 옮겨 다닌 순서를 되짚습니다</td></tr>
+  <tr><td>지금 보는 곳</td><td>사이드바 파란 줄로만</td><td>상단 <b>관제 › 통합 관제</b></td><td>메뉴를 접어도 어디인지 압니다</td></tr>
+  <tr><td>📗 문서함</td><td>메뉴 목록의 한 줄</td><td>사용자 이름 옆 <b>(톱니가 비운 자리)</b></td><td>2026-08-02 지시. 늘 쓰는 곳이라 목록을 훑지 않고 바로 닿습니다</td></tr>
+</table>
+<p>톱니가 상단으로 떠나면 사용자 줄 끝이 빕니다. 그 자리에 <b>문서함(별도 창)</b>을 넣습니다 —
+같은 크기·같은 모양이라 줄이 흔들리지 않고, 메뉴 목록에서는 한 줄이 줄어듭니다.</p>
+<div class="win" style="max-width:430px">
+  <div class="bar-new" style="height:40px">
+    <button class="ib" title="설정"><svg viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+    <div class="where"><span class="crumb" style="font-size:12px">톱니는 여기로 ↑</span></div>
+  </div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:0">
+    <div style="padding:9px 10px;border-right:1px solid var(--bd)">
+      <div style="font-size:11.5px;color:#f5928a;font-weight:800;margin-bottom:7px">지금</div>
+      <div class="ua" style="margin:0;border-radius:8px;border:1px solid var(--bd)">
+        <span class="av">배</span><span class="nm2">배포 자동화 전용</span><span class="slot">⚙</span>
+      </div>
+    </div>
+    <div style="padding:9px 10px">
+      <div style="font-size:11.5px;color:var(--teal);font-weight:800;margin-bottom:7px">시안</div>
+      <div class="ua" style="margin:0;border-radius:8px;border:1px solid var(--bd)">
+        <span class="av">배</span><span class="nm2">배포 자동화 전용</span><span class="slot">📗</span>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="cap">📗를 누르면 <b>문서함이 별도 창</b>으로 열립니다(지금 메뉴에서 누르는 것과 같은 동작).
+이름을 누르면 여전히 내 설정으로 갑니다 — 바뀌는 것은 <b>줄 끝 아이콘 하나</b>뿐입니다.</div>
+
+<h2>정하고 갈 것 세 가지</h2>
+
+<h3>① 로고와 시계는 어떻게 하나</h3>
+<p>클로드 화면에는 로고도 시계도 없습니다. 다만 우리는 <b>여러 서버에 붙는 제품</b>이라, 지금 어느 서버에 붙어 있는지와 세션이 언제 끊기는지가 상단에 있어야 합니다.
+그래서 <b>로고는 빼고</b>(왼쪽 메뉴 위에 이미 있음), 시계는 <b>세션 칩에 합쳐</b> 오른쪽 OS 버튼 왼쪽에 둡니다.</p>
+
+<h3>② 뒤로 가기는 무엇을 되짚나</h3>
+<p>브라우저 이력이 아니라 <b>내가 열어 본 화면 순서</b>입니다. 대시보드 → 취약점 → 자산 순으로 봤다면 ←는 취약점으로 갑니다.
+같은 화면 안의 탭 이동(설정의 내 설정 ↔ 관리자)도 한 걸음으로 셉니다. <b>대화창에 지시한 것은 이력에 넣지 않습니다</b> — 되돌리기와 헷갈립니다.</p>
+
+<h3>③ 접으면 무엇이 사라지나</h3>
+<p>지금은 접으면 사이드바와 함께 <b>설정 톱니·계정·업데이트 알림</b>까지 사라집니다. 상단으로 옮기면 접어도 남습니다.
+바로 이것이 접기를 상단으로 올리는 진짜 이유입니다.</p>
+
+<div class="warn">
+  <b>⚠ 미리 말씀드릴 위험 3가지</b>
+  <ul style="color:#f3d9a8">
+    <li><b>오른쪽 끝은 우리 자리가 아닙니다.</b> 창 최소화·최대화·닫기는 Windows가 그립니다. 그 폭(약 138px)을 비워 두지 않으면 버튼이 겹칩니다 — 실제로 겪은 적이 있어 <code>env(titlebar-area-width)</code>로 계산해 둡니다.</li>
+    <li><b>드래그 영역이 줄어듭니다.</b> 상단 바는 창을 끄는 손잡이이기도 합니다. 버튼을 늘릴수록 끌 곳이 줄어드니, 가운데 「지금 보는 곳」 부분은 <b>끌 수 있게</b> 남겨 둡니다.</li>
+    <li><b>별도 창(팀 사무실·문서함·대화창)에도 같은 바가 붙습니다.</b> 그 창들엔 사이드바가 없으니 ▣는 감추고 ← →만 둡니다. 안 그러면 눌러도 아무 일 없는 버튼이 됩니다.</li>
+  </ul>
+</div>
+
+<div class="rec">
+  <b>추천 — 위 시안 그대로 갑니다.</b> 조작이 세 군데에서 한 줄로 모이고, 메뉴를 접어도 설정·찾기·현재 위치가 남습니다.
+  세로 공간도 사이드바에서 40px 돌려받습니다. 다만 <b>로고·시계 처리(①)</b>는 취향이 갈릴 수 있어 정해 주시면 그대로 하겠습니다.
+</div>
+
+<h2>어떻게 진행할지</h2>
+<table>
+  <tr><th>단계</th><th>내용</th><th>예상</th></tr>
+  <tr><td>1</td><td>상단 바 뼈대 — 버튼 5개 + 「지금 보는 곳」 + OS 버튼 자리 비우기</td><td>40분</td></tr>
+  <tr><td>2</td><td>찾기 겹판(Ctrl+K) — 사이드바 입력칸을 걷어내고 옮김</td><td>40분</td></tr>
+  <tr><td>3</td><td>화면 이력(뒤로·앞으로) + Alt+← / Alt+→</td><td>50분</td></tr>
+  <tr><td>4</td><td>접기·설정을 상단으로 이관, 화면 안 <code>◀</code> 딱지 제거</td><td>30분</td></tr>
+  <tr><td>5</td><td>별도 창 3종 대응 + 전 메뉴 스윕 + 실앱 검증</td><td>50분</td></tr>
+</table>
+<p style="color:var(--mut2)">합계 약 <b>3시간 30분</b>. 상단 바는 <b>모든 화면이 거치는 자리</b>라, 손대면 30개 화면이 한꺼번에 영향을 받습니다 — 스윕(5단계)을 반드시 붙입니다.</p>
+
+<script>
+  var body = document.getElementById("demoBody");
+  var ovl = document.getElementById("ovl");
+  document.getElementById("btnSide").onclick = function () { body.classList.toggle("collapsed"); };
+  document.getElementById("btnFind").onclick = function () { ovl.classList.add("on"); };
+  ovl.onclick = function () { ovl.classList.remove("on"); };
+  document.getElementById("btnSet").onclick = function () {
+    alert("설정 메뉴 — 화면 크기(배율) · 내 설정 · 서버 연결 · 로그아웃\n\n(시안이라 여기까지만 보여 드립니다)");
+  };
+</script>
+</body>
+</html>

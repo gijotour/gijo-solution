@@ -13,8 +13,16 @@
   html,body{height:100%;overflow:hidden;}
   body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
 
-  /* 셸 뼈대 — 왼쪽 메뉴 고정, 오른쪽은 [탭줄 / 화면 / 콘솔] 세로 3단 */
-  .app{display:grid;grid-template-columns:232px minmax(0,1fr);height:100vh;}
+  /* 셸 뼈대 — [상단 조작 줄] 아래 왼쪽 메뉴 고정, 오른쪽은 [탭줄 / 화면 / 콘솔] 세로 3단
+     ⚠ 상단 줄은 창 전체 폭을 쓴다(사이드바 위까지). 메뉴를 접어도 조작이 남으려면 이 자리여야 한다. */
+  body{display:flex;flex-direction:column;height:100vh;overflow:hidden;}
+  /* 상단 조작 줄 — 높이는 OS 창 버튼(titleBarOverlay 46px)과 맞춘다.
+     낮으면 버튼이 줄 밖으로 삐져나오고, 높으면 화면이 그만큼 줄어든다. */
+  #shellHeader{display:flex;align-items:center;justify-content:space-between;min-height:46px;
+    border-bottom:1px solid var(--border);flex:0 0 auto;}
+  #shellHeader .header-left{display:flex;align-items:center;gap:10px;min-width:0;flex:1;}
+  #shellHeader .header-right{display:flex;align-items:center;gap:10px;flex:0 0 auto;}
+  .app{display:grid;grid-template-columns:232px minmax(0,1fr);flex:1;min-height:0;}
   #gijoNav{border-right:1px solid var(--border);background:var(--panel-2);min-height:0;display:flex;flex-direction:column;}
   .work{display:flex;flex-direction:column;min-width:0;min-height:0;}
 
@@ -117,6 +125,13 @@
 </style>
 </head>
 <body class="g-ui">
+
+<!-- 상단 조작 줄 — 내용은 titlebar.js가 채운다(☰ 설정 · ▣ 메뉴 접기 · 🔍 화면 찾기 · ← → 이력).
+     ⚠ 여기에 직접 버튼을 적지 말 것: 화면마다 베껴 적으면 반드시 한쪽만 고쳐진다(단일 소스 원칙). -->
+<div class="header" id="shellHeader">
+  <div class="header-left"></div>
+  <div class="header-right"></div>
+</div>
 
 <div class="app">
   <div id="gijoNav"></div>
@@ -286,6 +301,11 @@
     redraw();
     setCtx(t.label);
     save();
+    // 상단 바 ← →에게 "지금 이 화면을 본다"고 알린다.
+    // ⚠ 셸 안에서는 **문서가 안 바뀐다**(화면은 iframe 탭이다) — 주소 이력에 기대면 뒤로 가기가
+    //   영원히 흐린 채로 남는다(2026-08-02 실측에서 login→app 두 칸만 쌓였다).
+    //   그래서 "본 화면 순서"는 여기서 직접 알려 준다.
+    if (typeof window.gijoNoteScreen === "function") window.gijoNoteScreen(t.page, t.label);
   }
 
   function close(page, quiet) {
