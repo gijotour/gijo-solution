@@ -56,16 +56,23 @@ console.log("\n[① 조작 줄]");
 확인(!!줄, "상단에 조작 줄이 있다");
 if (줄) {
   확인(줄.단추.length === 5, `단추 5개 (실제 ${줄.단추.length}개)`);
-  for (const 말 of ["설정", "접기", "찾기", "뒤로", "앞으로"]) {
+  // ⚠ 사이드바 단추 이름은 **상태에 따라 바뀐다**(접혀 있으면 "펼치기"). 시작 상태를 단정하면
+  //   제품이 멀쩡한데 시험만 빨개진다(2026-08-02 설치본 검증에서 실제로 겪음).
+  for (const 말 of ["설정", "찾기", "뒤로", "앞으로"]) {
     확인(줄.단추.some((b) => b.title.includes(말)), `「${말}」 단추가 있다`);
   }
+  확인(줄.단추.some((b) => /접기|펼치기/.test(b.title)), "「메뉴 접기·펼치기」 단추가 있다");
 }
 
 // ── ② ▣ 접기 ────────────────────────────────────────────────────────────
 console.log("\n[② ▣ 메뉴 접기]");
 const 접기단추 = (await page.$$(".gtb-acts .gtb-ib"))[1];
-await 접기단추.click(); await page.waitForTimeout(600);
-확인(await page.evaluate(() => document.body.classList.contains("gn-left-collapsed")), "누르면 접힌다");
+const 접힘 = () => page.evaluate(() => document.body.classList.contains("gn-left-collapsed"));
+// 어느 상태로 시작하든 **펼친 상태로 맞춰 놓고** 시험한다(설치본은 접힌 채 시작할 수 있다).
+if (await 접힘()) { await 접기단추.click(); await page.waitForTimeout(700); }
+확인(!(await 접힘()), "시작 상태를 펼침으로 맞춤");
+await 접기단추.click(); await page.waitForTimeout(700);
+확인(await 접힘(), "누르면 접힌다");
 확인(await page.evaluate(() => {
   const n = document.getElementById("gijoNav");
   return !n || getComputedStyle(n).display === "none";
