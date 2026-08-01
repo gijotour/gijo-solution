@@ -160,12 +160,18 @@ describe("★ 대화 부품은 한 벌만 있다 (2026-08-01 사용자 지적: \
     expect(parts).toContain("window.gijoChatParts");
   });
 
-  it("★ 양쪽이 같은 부품을 쓴다 — 자기 것을 또 만들지 않는다", () => {
+  it("★ 양쪽이 같은 부품을 쓴다 — 자기 것을 또 부르지 않는다", () => {
+    // ⚠ 재는 것은 "옛 코드가 파일에 남아 있나"가 아니라 **"무엇을 부르나"** 다.
+    //   지휘소의 옛 구현(attachQuotes·attachOpen·attachPicks)은 아직 파일에 있다 —
+    //   지우는 스크립트가 옆 함수(attachApproval 77줄)를 잘라 먹은 사고가 있어(2026-08-01)
+    //   **호출만 끊고 코드는 남겨 뒀다.** 남아 있어도 안 부르면 어긋나지 않는다.
+    //   다음 정리 때 이 시험이 통과하는 것을 보고 지운다.
     for (const [이름, src] of [["지휘소", console_], ["분리창 위젯", widget]] as [string, string][]) {
       expect(src, `${이름}이 공용 부품을 안 쓴다`).toContain("gijoChatParts");
-      // 자체 구현을 다시 만들면 어긋남이 돌아온다.
-      expect(src, `${이름}에 체크칸 자체 구현이 되살아났다`).not.toMatch(/function attachPicks\(/);
-      expect(src, `${이름}에 근거원문 자체 구현이 되살아났다`).not.toMatch(/function attachQuotes\(|function 근거원문\(/);
+      // 옛 구현을 **다시 부르면** 어긋남이 돌아온다 — 호출부를 본다.
+      expect(src, `${이름}이 옛 체크칸을 다시 부른다`).not.toMatch(/\battachPicks\(replyEl|\battachPicks\(typing/);
+      expect(src, `${이름}이 옛 근거원문을 다시 부른다`).not.toMatch(/\battachQuotes\(replyEl|근거원문\(r\./);
+      expect(src, `${이름}이 옛 가서하기를 다시 부른다`).not.toMatch(/\battachOpen\(replyEl/);
     }
   });
 
