@@ -44,6 +44,17 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .cat.collapsed > :not(.cat-title){display:none;}
 .kcar{color:var(--blue-light);font-size:12.25px;font-weight:900;width:16px;height:16px;display:inline-flex;align-items:center;justify-content:center;border-radius:5px;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.35);flex:0 0 auto;}
 .tiles{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;}
+/* 상세 지표 한 줄(2026-08-02) — 큰 타일 31장(약 1,900px)을 구역당 한 줄로 줄인다.
+   ⚠ 색은 그대로 살린다. 훑어서 알던 것을 하나씩 읽게 만들면 줄인 뜻이 없다. */
+.krow{display:flex;align-items:baseline;gap:12px;margin-bottom:0;padding:7px 2px;
+  border-bottom:1px solid rgba(255,255,255,.05);max-width:1040px;}
+.krow:last-of-type{border-bottom:0;}
+.krow .cat-title{margin-bottom:0;flex:0 0 auto;min-width:150px;font-size:13px;gap:6px;}
+.krow .kvals{display:flex;flex-wrap:wrap;gap:2px 13px;font-size:12.5px;color:var(--muted);min-width:0;flex:1;}
+.krow .kv{white-space:nowrap;}
+.krow .kv b{color:#fff;font-weight:800;font-size:13.5px;margin-left:2px;}
+.krow .cat-link{flex:0 0 auto;}
+.krow:hover{background:rgba(59,130,246,.05);}
 .tile{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
 .tile .t-label{font-size:12.25px;color:var(--muted);margin-bottom:6px;}
 .tile .t-value{font-size:22px;font-weight:800;color:#fff;}
@@ -184,6 +195,19 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       const user = await window.gijo.me();
       avatarBtn.textContent = (user.displayName || user.username || "-").charAt(0);
     } catch (e) {}
+  }
+
+  /**
+   * 지표 한 칸 — 큰 타일 대신 **한 줄 안의 작은 짝**으로 그린다(2026-08-02 사용자 지시
+   * "상세 지표는 간단하게 엑셀 표처럼 작게 정리해 주고").
+   * ⚠ 색은 그대로 살린다 — 고위험 빨강·양호 초록이 사라지면 훑어서 알던 것을 하나씩 읽어야 한다.
+   */
+  function kv(label, value, color) {
+    return `<span class="kv">${label} <b${color ? ` style="color:${color}"` : ""}>${value}</b></span>`;
+  }
+  /** 구역 한 줄 — [이름][값들][→ 열기]. 이름·구조는 그대로 둔다(화면 연결이 .cat-title로 찾는다). */
+  function krow(title, vals) {
+    return `<div class="cat krow"><div class="cat-title">${title}</div><div class="kvals">${vals}</div></div>`;
   }
 
   function tile(label, value, color) {
@@ -401,60 +425,45 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
       // 세부 지표는 임원 요약(히어로·AI 보안) 아래 '📂 상세 지표' 한 판으로 묶는다(기본 펼침).
       const detailSections =
-        `<div class="cat"><div class="cat-title">🖥 자산 위험도</div><div class="tiles">` +
-        tile("전체 자산", c.assets.total) +
-        tile("고위험", c.assets.highRisk, "#f5928a") +
-        tile("중위험", c.assets.midRisk, "var(--amber)") +
-        tile("저위험", c.assets.lowRisk, "var(--teal)") +
-        `</div></div>` +
+        krow("🖥 자산 위험도",
+          kv("전체", c.assets.total) + kv("고위험", c.assets.highRisk, "#f5928a") +
+          kv("중위험", c.assets.midRisk, "var(--amber)") + kv("저위험", c.assets.lowRisk, "var(--teal)")) +
 
-        `<div class="cat"><div class="cat-title">🔎 취약점 승인 (finding)</div><div class="tiles">` +
-        tile("전체 finding", c.findings.total) +
-        tile("미검토", c.findings.pending, "var(--amber)") +
-        tile("승인(확정)", c.findings.approved, "var(--teal)") +
-        tile("반려(오탐)", c.findings.rejected, "#f5928a") +
-        `</div></div>` +
+        krow("🔎 취약점 승인 (finding)",
+          kv("전체", c.findings.total) + kv("미검토", c.findings.pending, "var(--amber)") +
+          kv("승인", c.findings.approved, "var(--teal)") + kv("반려(오탐)", c.findings.rejected, "#f5928a")) +
 
-        `<div class="cat"><div class="cat-title">🔧 유지보수 점검 거버넌스</div><div class="tiles">` +
-        tile("전체 점검", c.inspections.total) +
-        tile("지연", c.inspections.overdue, "#f5928a") +
-        tile("승인 대기", c.inspections.pendingApproval, "var(--amber)") +
-        tile("승인됨", c.inspections.approved, "var(--teal)") +
-        `</div></div>` +
+        krow("🔧 유지보수 점검 거버넌스",
+          kv("전체", c.inspections.total) + kv("지연", c.inspections.overdue, "#f5928a") +
+          kv("승인 대기", c.inspections.pendingApproval, "var(--amber)") + kv("승인됨", c.inspections.approved, "var(--teal)")) +
 
-        `<div class="cat"><div class="cat-title">🎯 CTI 위협 · 자산 영향</div><div class="tiles">` +
-        tile("수집 위협", c.cti.totalFindings) +
-        tile("자산 매칭 위협", c.cti.matchedFindings, "var(--amber)") +
-        tile("영향받는 자산", c.cti.affectedAssets, "#f5928a") +
-        tile("긴급 매칭", c.cti.criticalMatches, "#f5928a") +
-        `</div></div>` +
+        krow("🎯 CTI 위협 · 자산 영향",
+          kv("수집", c.cti.totalFindings) + kv("자산 매칭", c.cti.matchedFindings, "var(--amber)") +
+          kv("영향 자산", c.cti.affectedAssets, "#f5928a") + kv("긴급", c.cti.criticalMatches, "#f5928a")) +
 
-        `<div class="cat"><div class="cat-title">🛡 취약점 조치 현황 (번다운)</div><div class="tiles">` +
-        tile("열린 취약점", v.active, v.active ? "#f5928a" : "var(--teal)") +
-        tile("🔴 실제 악용(KEV)", v.kev, v.kev ? "#ff8a80" : "var(--muted)") +
-        tile("이번 조치율", v.remediationRate + "%", "var(--teal)") +
-        tile("스캔 호스트", v.hosts, "var(--blue-light)") +
-        `</div><div class="tiles" style="margin-top:12px">` +
-        tile("Critical", v.critical, "#f5928a") +
-        tile("High", v.high, "#f7a86a") +
-        tile("🆕 신규", v.newCount, "var(--blue-light)") +
-        tile("✓ 고쳐짐", v.newlyFixed, "var(--teal)") +
-        `</div></div>` +
+        krow("🛡 취약점 조치 현황",
+          kv("열림", v.active, v.active ? "#f5928a" : "var(--teal)") +
+          kv("🔴 KEV", v.kev, v.kev ? "#ff8a80" : "var(--muted)") +
+          kv("조치율", v.remediationRate + "%", "var(--teal)") +
+          kv("스캔 호스트", v.hosts, "var(--blue-light)") +
+          kv("Critical", v.critical, "#f5928a") + kv("High", v.high, "#f7a86a") +
+          kv("🆕 신규", v.newCount, "var(--blue-light)") + kv("✓ 고쳐짐", v.newlyFixed, "var(--teal)")) +
 
-        `<div class="cat"><div class="cat-title">📋 조치 항목 · SLA</div><div class="tiles">` +
-        tile("조치 항목", rem.tasks) +
-        tile("기한 초과", rem.overdue, rem.overdue ? "#f5928a" : "var(--teal)") +
-        tile("임박(3일↓)", rem.dueSoon, rem.dueSoon ? "var(--amber)" : "var(--muted)") +
-        tile("SLA 준수율", rem.slaCompliance + "%", rem.slaCompliance >= 90 ? "var(--teal)" : rem.slaCompliance >= 70 ? "var(--amber)" : "#f5928a") +
-        `</div></div>` +
+        krow("📋 조치 항목 · SLA",
+          kv("항목", rem.tasks) + kv("기한 초과", rem.overdue, rem.overdue ? "#f5928a" : "var(--teal)") +
+          kv("임박(3일↓)", rem.dueSoon, rem.dueSoon ? "var(--amber)" : "var(--muted)") +
+          kv("SLA 준수율", rem.slaCompliance + "%", rem.slaCompliance >= 90 ? "var(--teal)" : rem.slaCompliance >= 70 ? "var(--amber)" : "#f5928a")) +
 
-        `<div class="cat"><div class="cat-title">✓ 컴플라이언스 · 🔄 AI 학습</div><div class="tiles">` +
-        tile("KISA 위협 항목", c.compliance.total) +
-        tile("대응 완료", c.compliance.covered, "var(--teal)") +
-        tile("대응률", c.compliance.coverageRate + "%", "var(--blue-light)") +
-        tile("배포된 학습 모델", c.learning.deployedModels, "var(--purple)") +
-        `</div></div>` +
+        krow("✓ 컴플라이언스 · 🔄 AI 학습",
+          kv("KISA 위협", c.compliance.total) + kv("대응 완료", c.compliance.covered, "var(--teal)") +
+          kv("대응률", c.compliance.coverageRate + "%", "var(--blue-light)") +
+          kv("배포 학습 모델", c.learning.deployedModels, "var(--purple)")) ;
 
+
+      // "AI가 아낀 시간"은 서버가 아직 없는 구버전에서도 화면이 죽지 않아야 한다 — 실패하면 빈 값.
+      // 그래프는 **손대지 않고 자리만** 올린다(2026-08-02 사용자 지시 "그래프는 변경 안 해도
+      // 되는데 위치 잘 잡아줘"). 추세가 낱개 숫자보다 앞선다 — "늘고 있나 줄고 있나"가 먼저다.
+      const 그래프묶음 =
         (() => {
           const bd = burndown || [];
           const n = bd.length;
@@ -476,13 +485,13 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         trendCard("조치 기한 초과", series("remediation.overdue"), "#f5928a", "건") +
         `</div></div>`;
 
-      // "AI가 아낀 시간"은 서버가 아직 없는 구버전에서도 화면이 죽지 않아야 한다 — 실패하면 빈 값.
       const timeSaved = await window.gijo.timeSaved(30).catch(() => null);
 
       root.innerHTML =
         heroBlock(c, v, rem, series) +
         aiSecurityBlock(c) +
         timeSavedBlock(timeSaved) +
+        그래프묶음 +
         `<div class="detail-panel" id="detailPanel">` +
         `<div class="detail-title" id="detailToggle"><span class="dcar">▸</span>📂 상세 지표` +
         `<span class="dsub">자산·취약점·점검·CTI·컴플라이언스·추세 전체 지표</span></div>` +
@@ -540,7 +549,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       if (!title) return;
       const m = SECTION_PAGE.find((s) => title.textContent.indexOf(s.key) >= 0);
       if (!m) return;
-      cat.querySelectorAll(".tile, .trend-card").forEach((el) => {
+      cat.querySelectorAll(".tile, .trend-card, .kv").forEach((el) => {
         el.classList.add("clk");
         el.addEventListener("click", () => window.gijo.navigateTo(m.page));
       });
