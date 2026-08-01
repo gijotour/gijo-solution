@@ -286,7 +286,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   async function kbQuery() {
     const question = document.getElementById("kbQueryInput").value.trim();
     const box = document.getElementById("kbQueryResults");
-    if (!question) return;
+    if (!question) { box.style.display = "block"; box.innerHTML = '<div style="color:var(--muted);font-size:12px">먼저 찾을 내용을 적어 주세요.</div>'; document.getElementById("kbQueryInput").focus(); return; }
     box.style.display = "block";
     box.innerHTML = '<div style="color:var(--muted);font-size:12px">검색 중...</div>';
     try {

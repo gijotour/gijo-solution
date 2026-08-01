@@ -532,7 +532,7 @@
 
   async function addTask(){
     var el = $("newText"), text = el.value.trim();
-    if (!text) return;
+    if (!text) { el.placeholder = "할 일을 적어 주세요 — 예: 방화벽 정책 점검"; el.focus(); return; }
     el.value = "";
     var dueSel = $("newDue").value;
     var dueAt = dueSel === "today" ? Date.now() : dueSel === "week" ? Date.now() + 6 * DAY : undefined;
