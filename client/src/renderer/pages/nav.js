@@ -166,6 +166,85 @@
     return GROUPS[0];
   }
 
+  // ══ GIJO 공용 목록 양식 (2026-08-02, 시안 mockups/list-unified) ══════════════════
+  // ⚠ **양쪽 경로에서 다 불러야 한다.** 탭(임베드) 안에서는 injectCss가 돌지 않아,
+  //   여기에만 넣으면 화면을 탭으로 열었을 때 양식이 통째로 빠진다(2026-08-02 실측 —
+  //   요약막대 때 똑같이 겪고도 또 밟았다). 그래서 문자열을 함수로 빼 두 곳에서 부른다.
+  function 목록양식CSS() {
+    // ⚠ 괄호 필수. `return ""` 다음 줄에서 자바스크립트가 문장을 **자동으로 끝내(ASI)**
+    //   아래 + "…" 줄들이 통째로 죽은 코드가 된다. 빈 문자열만 돌아와 양식이 사라졌었다
+    //   (2026-08-02 실측 — 화면에서 td 여백이 그대로여서 알았다. 빌드·문법 검사로는 안 잡힌다).
+    return (""
+      // 기준 화면은 **시스템 로그**다 — 사용자가 "내가 좋아하는 스타일"로 지목했고,
+      // 첫째 기준은 **칸 낭비 최소화**다("시안은 낭비 최소화가 메인이야 앞으로도 그렇게").
+      // 화면마다 카드·표가 제각각이던 것을 [상자 하나 + 줄]로 통일한다.
+      //
+      // 왜 공용 파일 한 곳인가: 화면 30개를 각자 고치면 통일은 반년이면 다시 흐트러진다.
+      //   여기만 고치면 표식(.gj-list 등)을 단 화면이 전부 같이 바뀐다.
+      //
+      // 쓰는 법 — 화면에서는 표식만 단다.
+      //   <div class="gj-chips">…<span class="gj-chip on">전체</span>…</div>
+      //   <div class="gj-list" data-gijo-fit>
+      //     <div class="gj-row"><span class="k">08-01</span><span class="gj-tag t-blue">방화벽</span>
+      //       <span class="bd"><b class="t">이름</b><span class="s">· 부제</span></span>
+      //       <span class="rt">만료 <b>2026-11-30</b></span></div>
+      //   </div>
+      //
+      // ⚠ 부제(.s)는 **아랫줄로 내리지 않는다** — 내리는 순간 줄 높이가 두 배가 된다.
+      //   이름 옆에 잇고 칸을 넘으면 …으로 줄이되 title 속성으로 전문을 남긴다.
+      // ⚠ 색(t-*)은 **상태에만** 쓴다. 장식으로 흔해지면 위험 신호가 안 보인다.
+      + ".gj-list{background:var(--panel,#30302e);border:1px solid var(--border,rgba(255,255,255,.08));" +
+        "border-radius:10px;padding:2px 0;overflow-y:auto;min-height:120px;}"
+      // 「네모칸 안에서만 움직인다」(2026-08-02 사용자 지시) — 화면 전체가 구르면 제목·칩이
+      // 위로 밀려 사라져, 지금 무엇을 보고 무엇으로 걸렀는지를 잊는다. 높이는 gijoFitList가 잰다.
+      + ".gj-row{display:flex;gap:10px;align-items:baseline;padding:6px 14px;" +
+        "border-bottom:1px solid rgba(255,255,255,.045);font-size:12.5px;line-height:1.35;}"
+      + ".gj-row:last-child{border-bottom:none;}"
+      + ".gj-row:hover{background:rgba(59,130,246,.05);}"
+      + ".gj-row.on{background:rgba(59,130,246,.12);}"
+      + ".gj-row>.k{color:var(--muted-2,#a49d95);font-size:12px;white-space:nowrap;width:96px;flex:0 0 auto;}"
+      + ".gj-row>.bd{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}"
+      + ".gj-row>.bd .t{color:var(--text,#e9e7e2);font-weight:600;}"
+      + ".gj-row>.bd .s{color:var(--muted-2,#a49d95);font-size:12px;margin-left:7px;}"
+      + ".gj-row>.rt{color:var(--muted-2,#a49d95);font-size:12px;white-space:nowrap;flex:0 0 auto;}"
+      + ".gj-row>.rt b{color:#fff;font-weight:800;font-size:12.5px;}"
+      + ".gj-tag{font-size:11.25px;font-weight:800;padding:1px 6px;border-radius:4px;white-space:nowrap;flex:0 0 auto;}"
+      + ".gj-tag.t-red{background:rgba(226,72,61,.16);color:#f5928a;}"
+      + ".gj-tag.t-amber{background:rgba(240,160,32,.16);color:var(--amber,#f0a020);}"
+      + ".gj-tag.t-teal{background:rgba(30,185,128,.16);color:var(--teal,#1eb980);}"
+      + ".gj-tag.t-blue{background:rgba(59,130,246,.16);color:var(--blue-light,#5fa1ff);}"
+      + ".gj-tag.t-purple{background:rgba(139,124,240,.16);color:var(--purple,#8b7cf0);}"
+      + ".gj-tag.t-gray{background:rgba(255,255,255,.08);color:var(--muted,#b3ada4);}"
+      + ".gj-chips{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:7px;}"
+      + ".gj-chip{background:var(--panel-2,#1f1e1d);border:1px solid var(--border-strong,rgba(255,255,255,.16));" +
+        "color:var(--muted,#b3ada4);padding:3px 10px;border-radius:20px;font-size:11.75px;font-weight:700;cursor:pointer;}"
+      + ".gj-chip.on{background:rgba(59,130,246,.15);border-color:var(--blue,#3b82f6);color:var(--blue-light,#5fa1ff);}"
+      + ".gj-search{margin-left:auto;background:var(--panel-2,#1f1e1d);border:1px solid var(--border-strong,rgba(255,255,255,.16));" +
+        "border-radius:8px;padding:4px 10px;font-size:11.75px;color:var(--text,#e9e7e2);outline:none;width:200px;}"
+      + ".gj-id{font-size:12.25px;color:var(--muted,#b3ada4);margin:0 0 7px;}"
+      + ".gj-empty{padding:22px;text-align:center;color:var(--muted-2,#a49d95);font-size:12.5px;}"
+      // 줄 바로 아래 자세히(gijoRowDetail) — 오른쪽 별도 패널을 대신한다.
+      // 왼쪽 파란 선으로 "위 줄에 딸린 것"임을 보인다. 상자 밖으로 튀어나가지 않는다.
+      + ".gj-detail{padding:9px 14px 11px 18px;font-size:12.25px;line-height:1.6;color:var(--muted,#b3ada4);" +
+        "background:rgba(59,130,246,.05);border-bottom:1px solid rgba(255,255,255,.045);" +
+        "box-shadow:inset 3px 0 0 var(--blue,#3b82f6);}"
+      + ".gj-detail b{color:var(--text,#e9e7e2);}"
+      + ".gj-detail .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px;}"
+      + ".gj-detail .acts button,.gj-detail .acts a{background:var(--panel-2,#1f1e1d);border:1px solid var(--border-strong,rgba(255,255,255,.16));" +
+        "color:var(--blue-light,#5fa1ff);border-radius:7px;padding:4px 11px;font-size:11.75px;font-weight:700;" +
+        "cursor:pointer;text-decoration:none;font-family:inherit;}"
+      + ".gj-detail .acts button:hover,.gj-detail .acts a:hover{border-color:var(--blue,#3b82f6);}"
+      + ".gj-list::-webkit-scrollbar{width:5px;} .gj-list::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:3px;}"
+
+      // 표도 같은 밀도로 — 화면 14곳이 <table>을 쓰는데 여백이 제각각(줄 34~48px)이었다.
+      // 여기 한 곳을 고치면 그 화면들이 전부 같이 줄어든다(줄 약 28px).
+      // ⚠ !important를 쓰지 않는다. 이 CSS는 화면 <style> **뒤에** 붙고 `.main table td`가
+      //   화면의 `.tbl td`보다 선택자가 세서 그대로 이긴다 — 억지로 덮으면 나중에 못 되돌린다.
+      + ".main table{border-collapse:collapse;width:100%;font-size:12.5px;}"
+      + ".main table th{padding:5px 10px;font-size:11.75px;line-height:1.35;}"
+      + ".main table td{padding:5px 10px;line-height:1.35;vertical-align:middle;}");
+  }
+
   function injectCss() {
     if (document.getElementById("gijoNavCss")) return;
     var st = document.createElement("style");
@@ -187,6 +266,8 @@
       + ".scroll-list{min-height:260px;overflow-y:auto;}"   // 높이는 gijoFitList가 재서 준다
 
       + ".scroll-list thead th{position:sticky;top:0;background:var(--panel,#30302e);z-index:1;}"
+
+      + 목록양식CSS()
 
       // 하단 로고·저작권 푸터 제거(2026-07-26 사용자 결정) — 정보 가치가 없고 화면마다
       // 잘려 보였다. 개별 HTML은 건드리지 않고 공용 CSS로 한 번에 숨긴다.
@@ -566,11 +647,54 @@
    *       필터 칩이 있다 없다 한다) 검색줄이 줄바꿈되면 그 상수가 또 틀어진다.
    *   그래서 **재서** 정한다. 규칙은 여기 하나뿐이다.
    *
-   * 대상: .scroll-list, [data-gijo-fit]  (화면에서 표시만 달면 된다)
+   * 대상: .scroll-list, .gj-list, [data-gijo-fit]  (화면에서 표시만 달면 된다)
    * @param el 특정 요소만 다시 재고 싶을 때(목록을 다시 그린 뒤). 없으면 이 문서 전체.
    */
+  /**
+   * 줄 바로 아래에 자세히 펼치기 — 오른쪽 별도 패널 대신(2026-08-02 사용자 지시
+   * "세부 항목 클릭 시 하단이나 링크가 바로 아래에 나오게, 오른쪽에 별도로 뜨는 것보다").
+   *
+   * 왜 아래인가: 오른쪽 패널은 **누른 줄과 내용이 멀다.** 목록 20번째 줄을 눌러도 설명은
+   *   화면 오른쪽 위에 뜨니 눈이 대각선으로 건너뛰고, "내가 뭘 눌렀더라"를 다시 확인하게 된다.
+   *   바로 아래에 펴면 누른 줄과 붙어 있어 그 일이 없다. 폭도 목록 폭을 그대로 쓴다.
+   *
+   * 규칙
+   *   · 한 번에 하나만 펴 둔다 — 여러 개가 펴져 있으면 목록이 아니라 문서가 된다.
+   *   · 다시 누르면 접는다. 접으면 자리도 사라진다(빈 칸을 남기지 않는다).
+   *   · 내용은 화면이 만든다. 여기서는 **자리와 여닫기만** 맡는다.
+   *
+   * @param row  누른 줄 요소(.gj-row 등)
+   * @param html 펼쳐 보일 내용(문자열) 또는 요소. 함수를 주면 펼 때 불러서 받는다(늦게 불러오기).
+   */
+  window.gijoRowDetail = function (row, html) {
+    if (!row) return null;
+    var 목록 = row.parentNode;
+    var 이미 = row.nextElementSibling;
+    var 열려있음 = 이미 && 이미.classList && 이미.classList.contains("gj-detail");
+    // 같은 목록에 펴 둔 다른 것은 접는다.
+    목록.querySelectorAll(":scope > .gj-detail").forEach(function (d) { d.remove(); });
+    목록.querySelectorAll(":scope > .on").forEach(function (r) { r.classList.remove("on"); });
+    if (열려있음) return null;   // 같은 줄을 다시 눌렀으면 접는 것으로 끝
+
+    var box = document.createElement("div");
+    box.className = "gj-detail";
+    var 내용 = typeof html === "function" ? html() : html;
+    if (내용 == null) 내용 = "";
+    if (내용 && 내용.nodeType) box.appendChild(내용);
+    else box.innerHTML = String(내용);
+    row.classList.add("on");
+    목록.insertBefore(box, row.nextSibling);
+    // 펴 놓고 화면 밖으로 나가 버리면 편 뜻이 없다 — 상자 안에서만 살짝 굴린다.
+    try {
+      var 상자 = 목록.closest(".gj-list") || 목록;
+      var b = box.getBoundingClientRect(), c = 상자.getBoundingClientRect();
+      if (b.bottom > c.bottom) 상자.scrollTop += b.bottom - c.bottom + 8;
+    } catch (e) { /* 못 굴려도 펼치기 자체는 됐다 */ }
+    return box;
+  };
+
   window.gijoFitList = function (el) {
-    var 목록 = el ? [el] : [].slice.call(document.querySelectorAll(".scroll-list, [data-gijo-fit]"));
+    var 목록 = el ? [el] : [].slice.call(document.querySelectorAll(".scroll-list, .gj-list, [data-gijo-fit]"));
     목록.forEach(function (x) {
       if (!x || !x.getBoundingClientRect || !x.offsetParent) return;   // 안 보이는 건 재지 않는다
       var 위 = x.getBoundingClientRect().top;
@@ -826,7 +950,8 @@
       // 하기로 했는데, 이 위젯이 화면 맨 위를 차지해 정작 봐야 할 요약 카드를 아래로 밀어냈다.
       // ⚠ 분리창(별도 창)에서는 대시보드가 없으므로 지우지 않는다 — embed(팝업 안)에서만.
       "#gijoChatWidget{display:none !important;}" +
-      ".main{padding-top:16px !important;}";
+      ".main{padding-top:16px !important;}" +
+      목록양식CSS();
     document.head.appendChild(st);
   }
 

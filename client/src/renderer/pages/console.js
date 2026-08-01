@@ -38,7 +38,12 @@
       ".cs-hint{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}",
       ".cs-btn{flex:0 0 auto;font-size:12.25px;font-weight:700;color:var(--muted,#b3ada4);background:transparent;border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:3px 9px;cursor:pointer;white-space:nowrap;}",
       ".cs-btn:hover{color:#fff;border-color:var(--blue,#3b82f6);}",
-      ".cs-body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:8px 14px;}",
+      // 대화는 **아래에 붙인다**(2026-08-02 사용자 지적 "대화창 아래 빈칸?").
+      // 대화가 짧으면 아래가 238px 비어 있었고, 새 답변이 입력칸에서 멀리 떨어져 나왔다.
+      // ⚠ justify-content:flex-end로 밀면 대화가 길어졌을 때 **위가 잘려 못 올라간다**(크롬 알려진 문제).
+      //   첫 자식에 margin-top:auto를 주면 짧을 땐 아래로 붙고, 길어지면 자동으로 0이 돼 정상 스크롤된다.
+      ".cs-body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:8px 14px;display:flex;flex-direction:column;}",
+      ".cs-body > *:first-child{margin-top:auto;}",
       ".cs-empty{color:var(--muted-2,#a49d95);font-size:12px;padding:10px 0;}",
       ".cs-row{display:flex;gap:9px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.03);}",
       ".cs-row .ci{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:rgba(59,130,246,.16);display:flex;align-items:center;justify-content:center;font-size:12.25px;}",
