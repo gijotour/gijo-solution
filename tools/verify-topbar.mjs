@@ -169,6 +169,11 @@ const 메뉴 = await page.evaluate(() => {
 확인(!!메뉴, "⚙를 누르면 메뉴가 열린다");
 확인(메뉴 && Math.abs(메뉴.왼쪽 - 메뉴.단추왼쪽) < 12, `메뉴가 단추에서 **오른쪽으로** 펴진다 (단추 ${메뉴 && 메뉴.단추왼쪽}px → 메뉴 ${메뉴 && 메뉴.왼쪽}px)`);
 확인(메뉴 && 메뉴.왼쪽 >= 0 && 메뉴.오른쪽 <= 메뉴.창폭, "메뉴가 창 밖으로 잘리지 않는다");
+// 보이는 닫기 — 바깥을 눌러야만 닫히면 "닫는 법을 모르겠다"가 된다.
+확인(await page.evaluate(() => !!document.querySelector(".gtb-menu .gtb-mx")), "메뉴에 닫기(✕)가 있다");
+await page.evaluate(() => document.querySelector(".gtb-menu .gtb-mx").click());
+await page.waitForTimeout(400);
+확인(!(await page.evaluate(() => !!document.querySelector(".gtb-menu"))), "✕를 누르면 닫힌다");
 await page.keyboard.press("Escape");
 await page.waitForTimeout(300);
 

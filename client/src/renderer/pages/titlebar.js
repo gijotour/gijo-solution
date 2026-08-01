@@ -61,6 +61,10 @@
     ".gtb-menu .z{flex:1;text-align:center;font-size:12px;font-weight:700;padding:6px 0;border-radius:7px;background:#1f1e1d;border:1px solid rgba(255,255,255,.08);color:#b3ada4;cursor:pointer;}",
     ".gtb-menu .z.on{background:rgba(59,130,246,.18);border-color:rgba(59,130,246,.6);color:#fff;}",
     ".gtb-menu .foot{padding:8px 10px 4px;font-size:12px;color:#a49d95;}",
+    ".gtb-mhead{display:flex;align-items:center;gap:8px;padding:4px 4px 8px 10px;border-bottom:1px solid rgba(255,255,255,.08);margin-bottom:6px;}",
+    ".gtb-mhead .t{font-size:13.5px;font-weight:800;color:#e9e7e2;flex:1;}",
+    ".gtb-mx{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:#a49d95;font-size:12.5px;cursor:pointer;flex:0 0 auto;}",
+    ".gtb-mx:hover{background:rgba(226,72,61,.16);color:#f5928a;}",
 
     // ── 상단 조작 줄 (2026-08-02) ────────────────────────────────────────
     // 흩어져 있던 조작 셋(설정=사이드바 맨 아래 / 접기=화면 한가운데 딱지 / 찾기=사이드바 맨 위)을
@@ -153,6 +157,20 @@
       menuEl.style.right = Math.max(8, window.innerWidth - r.right) + "px";
       menuEl.style.top = (r.bottom + 6) + "px";
     }
+
+    // 머리줄 — 무엇의 메뉴인지 + 닫기. Esc·바깥 클릭도 그대로 되지만, **보이는 닫기**가 있어야
+    // 처음 여는 사람도 빠져나올 길을 안다(2026-08-02 사용자 지시).
+    var head = document.createElement("div");
+    head.className = "gtb-mhead";
+    head.innerHTML = '<span class="t">설정</span>';
+    var x = document.createElement("span");
+    x.className = "gtb-mx";
+    x.textContent = "✕";
+    x.title = "닫기 (Esc)";
+    x.setAttribute("role", "button");
+    x.addEventListener("click", function (e) { e.stopPropagation(); closeMenu(); });
+    head.appendChild(x);
+    menuEl.appendChild(head);
 
     menuEl.appendChild(sec("화면"));
     var zrow = document.createElement("div");
@@ -646,9 +664,13 @@
    */
   function mountTopbar() {
     // 화면은 .header, 별도 창(팀 사무실·문서함)은 .head를 쓴다 — 둘 다 받는다.
-    var hdr = document.querySelector(".header, .head");
+    var hdr = document.querySelector(".header");
     if (!hdr || hdr.querySelector(".gtb-acts")) return false;
-    var 사이드있음 = !!(document.getElementById("gijoNav") || document.querySelector(".explorer"));
+    // ⚠ 분리창(popout=1)은 **왼쪽 메뉴를 강제로 숨긴다**(nav.js applyPopout). 요소는 남아 있으므로
+    //   "있으니 만들자"로 판단하면 ▣가 붙고, 눌러도 아무 일이 없다 — 딱 우리가 없애려던 자리다.
+    //   그래서 창 종류까지 본다(2026-08-02 사후 검토에서 발견).
+    var 분리창 = /(^|[?&])popout=1(&|$)/.test(location.search);
+    var 사이드있음 = !분리창 && !!(document.getElementById("gijoNav") || document.querySelector(".explorer"));
 
     var acts = document.createElement("div");
     acts.className = "gtb-acts";
