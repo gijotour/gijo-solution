@@ -725,6 +725,15 @@
   // 화면 안 대화상자(gijoAsk/gijoTell) — **모든 화면·모든 겹에 실어야 한다.**
   // window.confirm/alert은 Electron에서 OS 네이티브 모달이라 뜨는 순간 렌더러가 통째로 멈춘다
   // (탭 안이든 셸이든 같은 렌더러를 쓴다). 그래서 embed·분리창에서도 빠뜨리지 않는다.
+  /** 하단 고정바 — 조각이 스스로 판단해 붙는다(셸·탭 안에서는 스스로 빠진다). */
+  function loadFootbar() {
+    if (document.getElementById("gijoFootbarScript")) return;
+    var s = document.createElement("script");
+    s.id = "gijoFootbarScript";
+    s.src = "footbar.js";
+    document.head.appendChild(s);
+  }
+
   function loadDialog() {
     if (window.gijoAsk || document.getElementById("gijoDlgScript")) return;
     var s = document.createElement("script");
@@ -900,6 +909,7 @@
     bindZoomKeys();
     loadDialog(); // 어느 겹에서든 먼저 — 네이티브 모달이 뜨면 그 순간 모두 멈춘다
     loadFold(); // embed에서도 실어야 한다 — 팝업 안이 접기가 가장 필요한 곳이다
+    loadFootbar(); // 하단 고정바 — 어느 창에서 열든 같은 자리에 같은 모양으로(2026-08-02)
     // 요약 카드 줄 → 한 줄 막대. 숫자는 나중에 채워지므로 **모양만** 미리 바꿔 두면 된다.
     // ⚠ 화면이 요약 줄을 나중에 그리는 경우가 있어(목록을 받아야 카드가 생긴다) 잠깐 더 지켜본다.
     //   embed(탭 안)에서도 돌아야 한다 — 담당자가 실제로 보는 자리가 거기다.
