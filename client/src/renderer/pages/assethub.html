@@ -100,6 +100,8 @@
   .kev-b{font-size:11px;font-weight:800;color:#f5928a;background:rgba(226,72,61,.14);padding:1px 5px;border-radius:4px;margin-left:5px;}
   .note{font-size:11.75px;color:var(--muted-2);margin-top:8px;line-height:1.5;}
   .empty-line{color:var(--muted);font-size:12.5px;padding:10px 2px;}
+  .btn-s.danger{border-color:rgba(226,72,61,.55);color:#f5928a;}
+  .btn-s.danger:hover{background:rgba(226,72,61,.14);}
 </style></head>
 <body class="g-ui">
 <div class="header">
@@ -252,7 +254,8 @@
     const head=`<div class="d-head"><span style="font-size:24px">${assetIcon(r)}</span><div class="d-nm">${esc(shownName(r))}${r.displayName?' <span class="alias">별칭</span>':""}</div>
       <span class="risk r-${r.riskBand}" style="font-size:12px">위험 ${r.exposureScore} · ${bandLabel[r.riskBand]}</span>
       ${r.isAi?'<span class="ai-badge">AI 자산</span>':""}
-      <button class="btn-s p" id="renameBtn" style="margin-left:auto">✎ 이름 변경</button></div>
+      <button class="btn-s p" id="renameBtn" style="margin-left:auto">✎ 이름 변경</button>
+      <button class="btn-s danger" id="delBtn" title="이 자산을 목록에서 지웁니다">🗑 삭제</button></div>
       <div class="d-sub">${esc(r.assetType)}${r.owner?" · 소유: "+esc(r.owner):""}${r.host?" · "+esc(r.host):""}${r.service?" · 서비스: "+esc(r.service):""}</div>
       ${r.displayName?`<div class="src-line">원래 이름 ${esc(r.name)} · ID ${esc(r.id)}</div>`:`<div class="src-line">ID ${esc(r.id)}</div>`}
       ${r.sourceFile?`<div class="src-line">출처 파일 <b>${esc(r.sourceFile)}</b></div>`:""}
@@ -384,6 +387,7 @@
   if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",boot); else boot();
 })();
 </script>
+<script src="dialog.js"></script>
 <script src="nav.js"></script>
 <script src="progresscard.js"></script>
 <script src="gijomd.js"></script>

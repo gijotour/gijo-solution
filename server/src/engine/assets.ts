@@ -596,8 +596,24 @@ export function registerAssetsRoutes(app: Express): void {
     res.json(updated);
   });
   app.delete("/api/assets/:id", authMiddleware, (req, res) => {
-    const ok = deleteAsset(String(req.params.id));
+    const id = String(req.params.id);
+    // ⚠ 지우기 **전에** 무엇이었는지 붙잡는다 — 지운 뒤엔 이름도 finding 수도 알 수 없다.
+    //   2026-08-02 발견: 이름 변경은 기록을 남기는데 **삭제는 아무것도 안 남기고 있었다.**
+    //   훨씬 큰 일인데 흔적이 없으면 "누가 왜 지웠지"를 영영 못 찾는다.
+    const before = getAsset(id);
+    const ok = deleteAsset(id);
     if (!ok) return res.status(404).json({ error: "asset not found" });
+    const actor = (req as import("express").Request & { user?: { displayName?: string } }).user?.displayName ?? null;
+    recordAudit({
+      kind: "write",
+      actor,
+      action: "자산 삭제",
+      target: id,
+      detail: before
+        ? `${before.displayName ?? before.name} · 유형=${before.assetType} · finding ${before.findings.length}건 함께 삭제`
+        : "삭제 전 정보 없음",
+      result: "ok",
+    });
     res.json({ ok: true });
   });
 }

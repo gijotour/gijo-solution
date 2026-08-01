@@ -185,6 +185,15 @@
       + "*::-webkit-scrollbar{width:8px;height:8px;}*::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:4px;}*::-webkit-scrollbar-track{background:transparent;}"
       // 긴 목록 패널 내부 스크롤(2026-07-26 사용자 결정) — 창 고정 원칙과 세트.
       + ".scroll-list{min-height:260px;overflow-y:auto;}"   // 높이는 gijoFitList가 재서 준다
+      // 요약 한 줄 막대 — 카드 5장이 먹던 세로 80px을 한 줄로.
+      + ".gsum-box{display:block !important;background:linear-gradient(90deg,rgba(59,130,246,.10),transparent);"
+      + "border:1px solid rgba(59,130,246,.28);border-radius:12px;padding:11px 16px;margin-bottom:16px;gap:0 !important;}"
+      + ".gsum{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 9px;font-size:13px;}"
+      + ".gsum-pair{display:inline-flex;align-items:baseline;gap:6px;}"
+      + ".gsum-l{color:var(--muted,#b3ada4);font-size:12.5px;font-weight:600;}"
+      + ".gsum-v{font-size:15px;font-weight:800;color:#fff;}"
+      + ".gsum-pair.first .gsum-v{font-size:17px;}"
+      + ".gsum-dot{color:var(--muted-2,#a49d95);}"
       + ".scroll-list thead th{position:sticky;top:0;background:var(--panel,#30302e);z-index:1;}"
 
       // 하단 로고·저작권 푸터 제거(2026-07-26 사용자 결정) — 정보 가치가 없고 화면마다
@@ -571,6 +580,61 @@
   };
   window.addEventListener("resize", function () { window.gijoFitList(); });
 
+  /**
+   * 요약 카드 줄 → **한 줄 막대**로 바꾼다 (2026-08-02 사용자 지시
+   * "이 양식을 쓰는 화면들 이렇게 변경 다 해달라고 했는데").
+   *
+   * 왜 화면마다 고치지 않고 여기서 하나로 하나:
+   *   같은 양식이 20개 화면에 있다. 하나씩 손대면 오늘만 세 번 겪은 "지우다 옆을 건드림"이
+   *   스무 번 반복된다. 그리고 다음에 화면이 하나 늘면 또 빠뜨린다.
+   *
+   * ⚠ 값 요소를 **새로 만들지 않고 옮긴다**(appendChild는 이동이다).
+   *   숫자를 채우는 코드는 document.getElementById("kpiTotal")처럼 id로 찾는다 —
+   *   새로 그리면 그 id가 사라져 화면이 "-"에서 멈춘다. 껍데기만 바꾸고 알맹이는 그대로 옮긴다.
+   *
+   * ⚠ 모양이 조금이라도 다르면 **손대지 않는다.** 요약 줄이 아닌 것을 억지로 바꾸면
+   *   버튼·막대그래프가 있는 판까지 망가진다. 확신이 없으면 그냥 두는 쪽이 낫다.
+   */
+  function 요약막대로() {
+    var 상자들 = document.querySelectorAll("[data-gijo-summary]");
+    [].forEach.call(상자들, function (box) {
+      if (box.dataset.gijoSum === "1") return;              // 이미 바꿨다
+      var 카드 = [].filter.call(box.children, function (e) { return e.nodeType === 1; });
+      if (카드.length < 2 || 카드.length > 8) return;        // 카드 줄이 아니다
+      var 조각 = [];
+      for (var i = 0; i < 카드.length; i++) {
+        var c = 카드[i];
+        // 누를 것·그림이 든 판은 요약 줄이 아니다.
+        if (c.querySelector("button, input, select, a, svg, canvas, table, progress")) return;
+        var 안 = [].filter.call(c.children, function (e) { return e.nodeType === 1; });
+        if (안.length !== 2) return;                         // [라벨][값] 두 칸이 아니면 포기
+        var 라벨 = (안[0].textContent || "").trim();
+        var 값el = 안[1];
+        if (!라벨 || 라벨.length > 14) return;                // 라벨이 길면 문장형 판이다
+        조각.push({ 라벨: 라벨, el: 값el });
+      }
+      if (!조각.length) return;
+
+      var 막대 = document.createElement("div");
+      막대.className = "gsum";
+      조각.forEach(function (x, i) {
+        if (i) { var 점 = document.createElement("span"); 점.className = "gsum-dot"; 점.textContent = "·"; 막대.appendChild(점); }
+        var 짝 = document.createElement("span");
+        짝.className = "gsum-pair" + (i === 0 ? " first" : "");
+        var l = document.createElement("span"); l.className = "gsum-l"; l.textContent = x.라벨;
+        짝.appendChild(l);
+        x.el.classList.add("gsum-v");                        // 색은 화면이 준 것을 그대로 둔다
+        짝.appendChild(x.el);                                // ★ 옮긴다 — id가 살아 있어야 한다
+        막대.appendChild(짝);
+      });
+      box.innerHTML = "";
+      box.appendChild(막대);
+      box.dataset.gijoSum = "1";
+      box.classList.add("gsum-box");
+    });
+  }
+  window.gijo요약막대 = 요약막대로;
+
   // 공용 디자인 시스템(gijo-ui.css)을 모든 페이지에 주입한다 — .g-* 컴포넌트 사용 가능 + body.g-ui로
   // 안전한 전역 베이스라인(스크롤바·포커스링·폰트 스무딩)만 통일(레이아웃은 안 건드림).
   function loadDesignSystem() {
@@ -778,6 +842,14 @@
     bindZoomKeys();
     loadDialog(); // 어느 겹에서든 먼저 — 네이티브 모달이 뜨면 그 순간 모두 멈춘다
     loadFold(); // embed에서도 실어야 한다 — 팝업 안이 접기가 가장 필요한 곳이다
+    // 요약 카드 줄 → 한 줄 막대. 숫자는 나중에 채워지므로 **모양만** 미리 바꿔 두면 된다.
+    // ⚠ 화면이 요약 줄을 나중에 그리는 경우가 있어(목록을 받아야 카드가 생긴다) 잠깐 더 지켜본다.
+    //   embed(탭 안)에서도 돌아야 한다 — 담당자가 실제로 보는 자리가 거기다.
+    요약막대로();
+    var 요약틱 = 0;
+    var 요약감시 = setInterval(function () { 요약막대로(); if (++요약틱 > 10) clearInterval(요약감시); }, 700);
+    // 목록 높이도 같은 이유로 첫 그림 뒤에 한 번 더 잰다.
+    setTimeout(function () { window.gijoFitList && window.gijoFitList(); }, 900);
     if (IS_EMBED) { applyEmbed(); return; }
     // 탭으로 흡수된 페이지에 직접 들어오면(대시보드 바로가기·챗봇 링크 등) 허브의 그 탭으로 보낸다.
     // ⚠ 설정처럼 한 파일이 여러 탭인 화면은 **쿼리까지 봐야** 한다(2026-07-28 실측):
