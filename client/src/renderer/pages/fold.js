@@ -91,9 +91,17 @@
   }
 
   function setOpen(e, on, remember) {
+    var 바뀜 = (e.target.style.display === "none") === !!on;   // 접힘→펼침(또는 그 반대)인가
     e.target.style.display = on ? "" : "none";
     e.head.classList.toggle("on", on);
     if (remember) writeOpen(e.name, on);
+    // 펼쳐질 때 알린다 — 무거운 자료는 **열 때** 불러오면 된다.
+    // (예전엔 <details>의 toggle 이벤트를 쓰던 화면이 있었다. 그것을 우리 접기로 바꾸면서 대체한다.)
+    if (바뀜) {
+      try {
+        e.target.dispatchEvent(new CustomEvent("gijo:fold", { bubbles: true, detail: { open: !!on, name: e.name } }));
+      } catch (err) { /* 알림을 못 보내도 접기 자체는 동작한다 */ }
+    }
   }
 
   function build(target) {

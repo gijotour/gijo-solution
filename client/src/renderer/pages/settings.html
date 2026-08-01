@@ -439,13 +439,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         <button class="btn-primary" id="tierApplyBtn" disabled>권장 티어 적용</button>
         <button class="btn-ghost" id="tierRefreshBtn">다시 진단</button>
       </div>
-      <details style="margin-top:10px;font-size:12px;color:var(--muted)">
-        <summary style="cursor:pointer;font-weight:700">고급 — 티어 직접 선택</summary>
+      <div data-gijo-fold="고급 — 티어 직접 선택" style="margin-top:10px;font-size:12px;color:var(--muted)">
         <div class="field-row" style="margin-top:8px">
           <select id="tierManualSelect" style="flex:1;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 10px;color:var(--text);font-size:12.5px"></select>
           <button class="btn-ghost" id="tierManualBtn">이 티어로 적용</button>
         </div>
-      </details>
+      </div>
       <div class="hint" style="color:var(--amber,#f0a020)">⚠ 티어를 변경하면 채팅 LLM이 새 설정으로 재기동됩니다(약 30초, 진행 중 대화가 끊길 수 있습니다). 지식 검색(임베딩)은 영향 없습니다.</div>
       <div class="status-line" id="tierStatusLine"></div>
     </div>

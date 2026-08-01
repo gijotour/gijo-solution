@@ -192,13 +192,9 @@
        ⚠ 여기 결과를 자동으로 어디에 먹이지 않는다. 대화를 그대로 지식으로 삼으면 잡담·오답이
          멀쩡한 문서를 밀어낸다(QA-M04에서 겪었다). 사람이 읽고 판단하는 자리다.
        기본은 접혀 있다 — 매일 볼 것은 아니다. -->
-  <details class="ws-pat" style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:0 15px;margin-bottom:14px;">
-    <summary style="cursor:pointer;padding:12px 0;font-size:12.5px;font-weight:800;color:var(--text);list-style:none;">
-      🔎 업무 패턴 <span id="patPeriod" style="font-weight:600;color:var(--muted-2);font-size:12.25px"></span>
-      <span style="float:right;color:var(--muted-2);font-weight:600;font-size:12.25px">펼치기</span>
-    </summary>
+      <div class="ws-pat" data-gijo-fold="업무 패턴" style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:0 15px;margin-bottom:14px;">
     <div id="patBody" style="padding:2px 0 14px;font-size:12px;color:var(--muted);">불러오는 중…</div>
-  </details>
+  </div>
   <div class="topbar-row">
     <div>
       <div class="page-title">💬 작업 내역</div>
@@ -598,8 +594,10 @@
   async function init() {
     tick(); setInterval(tick, 30000);
     await loadUser(); await loadHealth();
+    // 업무 패턴은 **펼칠 때** 불러온다(무거운 계산이라 접힌 채로는 부르지 않는다).
+    // ⚠ 예전엔 <details>의 toggle 이벤트를 썼다 — 우리 접기로 바꾸면서 gijo:fold 알림으로 옮겼다.
     const pat = document.querySelector(".ws-pat");
-    if (pat) pat.addEventListener("toggle", () => { if (pat.open && !patLoaded) { patLoaded = true; loadPatterns(); } });
+    if (pat) pat.addEventListener("gijo:fold", (e) => { if (e.detail && e.detail.open && !patLoaded) { patLoaded = true; loadPatterns(); } });
     await loadExplorerData();
     // 다른 화면에서 넘어온 딥링크(localStorage) — 특정 내역 열기.
     // 'gijo:sessions:new'(새 세션으로 시작) 갈래는 ＋ 새 세션과 함께 없앴다. 옛 앱이 남긴
