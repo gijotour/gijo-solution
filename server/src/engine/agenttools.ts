@@ -1614,11 +1614,19 @@ const TOOLS: AgentTool[] = [
       { name: "hour", label: "보낼 시각", description: "0~23 (서버 기준 시각). \"아침 9시\"는 9", required: true },
       { name: "to", label: "받는 사람", description: "메일 주소. 여러 명이면 쉼표로 구분", required: true },
     ],
-    // "아침 9시"·"오전 9시" 같은 말을 숫자로 고친다 — 사람은 24시간제로 말하지 않는다.
+    // "아침 9시"·"오전 9시" 같은 말을 숫자로 고치고, 종류를 코드로 바꾼다.
+    //
+    // ★ **값이 이미 맞아도 그대로 다시 돌려준다**(2026-08-01 실측에서 배움).
+    //   결재판은 "지시문에 없는 필수값 = LLM이 지어낸 것"으로 보고 비워 되묻는다(환각 방어).
+    //   그런데 kind는 **코드값**이라 정답(`sla_due`)이 사람 말("기한 임박")에 있을 리가 없다.
+    //   그래서 LLM이 정확히 맞혔는데도 빈 칸이 돼 승인이 막혔다 — 잘한 것을 벌준 셈이다.
+    //   autoFill이 돌려준 값은 source=auto가 되어 비워지지 않는다. 이 두 칸의 권위는 여기다.
     autoFill: (args, instruction): Record<string, string> => {
       const 고침: Record<string, string> = {};
       const raw = String(args.hour ?? "").trim();
-      if (!/^\d{1,2}$/.test(raw)) {
+      if (/^\d{1,2}$/.test(raw) && Number(raw) <= 23) {
+        고침.hour = String(Number(raw)); // "09" → "9" 로 다듬어 다시 낸다(auto 표시를 위해)
+      } else {
         const m = (raw || instruction).match(/(오전|아침|오후|저녁|밤)?\s*(\d{1,2})\s*시/);
         if (m) {
           let h = Number(m[2]);
@@ -1627,9 +1635,10 @@ const TOOLS: AgentTool[] = [
           고침.hour = String(h);
         }
       }
-      // 종류를 한국어로 말했으면 코드로 바꾼다("기한 임박 알림" → sla_due).
       const k = String(args.kind ?? "").trim();
-      if (!["daily_brief", "sla_due", "system_health"].includes(k)) {
+      if (["daily_brief", "sla_due", "system_health"].includes(k)) {
+        고침.kind = k; // 이미 코드값 — 그대로 다시 낸다(비워지지 않게)
+      } else {
         const 말 = k + " " + instruction;
         if (/기한|SLA|마감|임박/i.test(말)) 고침.kind = "sla_due";
         else if (/시스템|이상|백업|진단|장애/.test(말)) 고침.kind = "system_health";

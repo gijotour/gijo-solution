@@ -291,6 +291,65 @@
   // 서버가 순서를 안내하면서 openScreen(화면·자리)을 같이 준다(server/engine/howto.ts).
   // ⚠ 갈 화면이 없는 안내(백업 복원처럼)에는 openScreen이 아예 안 온다 — 버튼도 안 생긴다.
   //   있는 척 아무 화면이나 열면 담당자는 없는 버튼을 찾아 헤맨다.
+  /**
+   * 근거 원문 — 답 아래에 접힌 채로 붙인다. 펴면 답을 만든 문서의 그 대목이 나온다.
+   *
+   * ★ 왜(2026-08-01 실측): 문서엔 "미사용 룰 37개"라고 적혀 있는데 AI가 "27"이라고 답했다.
+   *   근거 배지에는 그 문서가 **맞게** 떴다 — 자료 찾기는 정상이고 모델이 표를 잘못 읽은 것이다.
+   *   담당자는 그 숫자로 보고를 쓴다. 원문을 함께 보여 주면 그 자리에서 눈으로 잡는다.
+   *   (모델에게 "숫자를 정확히 읽어라"라고 타이르지 않는다 — 반복 실패한 방식이다.)
+   *
+   * ⚠ 이 파일이 **실제 대화창**이다. 화면 안 위젯(chatwidget.js)에도 같은 것을 붙였다가
+   *   그쪽은 탭 안에서 비어 있다는 걸 뒤늦게 알았다 — 기능을 안 쓰는 곳에 넣을 뻔했다.
+   */
+  function attachQuotes(el, quotes, answer, sources) {
+    // 근거 배지(문서 이름) — 화면 안 위젯에는 있었는데 **주 대화창인 여기엔 없었다**(2026-08-01).
+    //   담당자가 가장 많이 쓰는 자리에서 "무엇을 보고 답했는지"가 안 보이고 있었다.
+    if (el && Array.isArray(sources) && sources.length) {
+      var badge = document.createElement("div");
+      badge.style.cssText = "margin-top:6px;font-size:9.5px;font-weight:700;color:#6fdcb5";
+      badge.textContent = "📄 근거: " + sources.slice(0, 4).join(" · ");
+      el.appendChild(badge);
+    }
+    if (!el || !Array.isArray(quotes) || !quotes.length) return;
+    var wrap = document.createElement("div");
+    wrap.style.cssText = "margin-top:8px;border-top:1px solid rgba(255,255,255,.08);padding-top:8px";
+    var head = document.createElement("div");
+    head.style.cssText = "font-size:10.5px;color:var(--muted,#8b93ab);cursor:pointer;user-select:none";
+    var open = false;
+    var draw = function () { head.textContent = (open ? "▾" : "▸") + " 📄 근거 원문 " + quotes.length + "대목 — 답이 맞는지 확인"; };
+    draw();
+    var body = document.createElement("div");
+    body.style.cssText = "display:none;margin-top:6px";
+
+    // 답에 나온 숫자·영문코드를 원문에서 강조한다 — 눈이 바로 그리로 간다.
+    var marks = (String(answer || "").match(/\d[\d,.\-]{0,12}|[A-Z][A-Za-z0-9\-]{3,}/g) || [])
+      .filter(function (t) { return t.length >= 2; }).slice(0, 12);
+    quotes.slice(0, 3).forEach(function (q) {
+      var box = document.createElement("div");
+      box.style.cssText =
+        "border-left:3px solid rgba(59,130,246,.45);background:rgba(59,130,246,.05);" +
+        "padding:7px 10px;border-radius:0 6px 6px 0;margin-bottom:6px";
+      var txt = esc(q.text || "");
+      marks.forEach(function (t) {
+        var safe = esc(t).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        try {
+          txt = txt.replace(new RegExp(safe, "g"),
+            '<mark style="background:rgba(240,160,32,.28);color:#ffd88a;padding:0 2px;border-radius:3px">$&</mark>');
+        } catch (e) {}
+      });
+      box.innerHTML =
+        '<div style="font-size:9.5px;color:var(--muted-2,#5f6785);margin-bottom:3px">' + esc(q.documentId || "") + "</div>" +
+        '<div style="font-size:11px;line-height:1.75;color:#cdd4e6">' + txt + "</div>";
+      body.appendChild(box);
+    });
+
+    head.addEventListener("click", function () { open = !open; body.style.display = open ? "block" : "none"; draw(); });
+    wrap.appendChild(head);
+    wrap.appendChild(body);
+    el.appendChild(wrap);
+  }
+
   function attachOpen(el, open) {
     if (!el || !open || !open.page) return;
     var leaf = String(open.label || "").split(">").pop().trim() || "화면";
@@ -726,6 +785,8 @@
       });
       // 지적 버튼 — 방금 보낸 질문과 이 답을 짝지어 둔다(중-1 피드백 루프).
       attachFlag(replyEl, text, (r && r.output) || "");
+      // 근거 원문 — 답의 숫자를 담당자가 눈으로 검증할 수 있게(2026-08-01).
+      attachQuotes(replyEl, r && r.quotes, (r && r.output) || "", r && r.sources);
       // "가서 하기" — 계정·인증·열쇠처럼 AI가 대신 하면 안 되는 일은 순서만 안내하고,
       // 그 화면을 찾아 들어가는 수고는 없앤다(2026-07-31 사용자 지시).
       attachOpen(replyEl, r && r.openScreen);

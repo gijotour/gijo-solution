@@ -39,8 +39,10 @@ const 열기 = async (라벨) => {
     return {
       화면: f.getAttribute("src"),
       본문: d.body.innerText.length,
-      띠: !!d.querySelector(".todo-strip"),
-      띠줄: d.querySelectorAll(".todo-row").length,
+      // ⚠ 화면마다 띠 클래스가 다르다 — KPI는 .todo-strip, 유지보수 점검은 .todo.
+      //   한쪽만 보면 멀쩡한 화면을 "렌더 실패"로 오판한다(2026-08-01, 두 번 속았다).
+      띠: !!d.querySelector(".todo-strip, .todo"),
+      띠줄: d.querySelectorAll(".todo-row, .trow").length,
       등급배지: d.querySelectorAll(".dm-grade").length,
       열람등급셀렉트: d.querySelectorAll("[data-clear]").length,
     };

@@ -120,3 +120,22 @@ describe("★ 없는 화면으로 보내지 않는다", () => {
 // 사용자 신고로 세 개가 겹쳐 뜨는 것을 고쳤지만, 근본은 "화면을 떠나면 길을 잃는다"에
 // 버튼을 붙인 증상 치료였다. 대화창(지휘소)이 늘 옆에 있으면 돌아갈 일 자체가 없어
 // 개념을 하나 없앴다 — 고치는 것보다 없애는 편이 나은 자리였다.
+
+describe("★ 주 대화창이 근거를 보여 준다 (2026-08-01)", () => {
+  // 대화 입구가 다섯 곳이다(console·chatwidget·sessions·office·agent).
+  // 그런데 **가장 많이 쓰는 지휘소(console.js)에 근거 배지가 없었다** — 담당자가 답만 보고
+  // 무엇을 근거로 했는지 알 수 없었다. 화면 안 위젯에는 있었는데 그쪽은 탭에서 비어 있다.
+  // 기능을 안 쓰는 곳에 넣는 실수를 다시 밟지 않도록 못 박는다.
+  it("지휘소가 근거 문서 이름과 원문 대목을 그린다", () => {
+    const src = pageSrc.get("console.js") ?? "";
+    expect(src, "지휘소가 근거 배지를 안 그린다").toContain("📄 근거:");
+    expect(src, "지휘소가 근거 원문을 안 그린다").toContain("근거 원문");
+    expect(src, "서버가 준 quotes를 안 받는다").toMatch(/attachQuotes\(replyEl[^)]*quotes/);
+  });
+
+  it("서버가 실제로 quotes를 준다 — 화면만 그려 봐야 소용없다", () => {
+    const disp = fs.readFileSync(new URL("../src/engine/dispatcher.ts", import.meta.url), "utf8");
+    expect(disp).toContain("quotes?: SourceQuote[]");
+    expect(disp, "검색 결과에서 원문을 안 뽑는다").toMatch(/quotes = relevant/);
+  });
+});

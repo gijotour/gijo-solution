@@ -16,7 +16,7 @@ vi.mock("../src/engine/memory", async (importOriginal) => ({
   listVisibleDocuments: () => mockListDocuments(),
 }));
 
-import { findAgentTool, toolCatalogText } from "../src/engine/agenttools";
+import { findAgentTool, toolCatalogText, buildApproval } from "../src/engine/agenttools";
 import fs from "node:fs";
 import { resetAssetsForTests, registerAsset, recordFindings } from "../src/engine/assets";
 import { addTriple, deleteTriplesBySource } from "../src/engine/ontology";
@@ -296,5 +296,38 @@ describe("★ 목록 끝에 다음 걸음 한 줄 (2026-08-01 하루 실전)", (
     const 전체 = (src.match(/다음걸음\(/g) || []).length;
     expect(정의, "다음걸음은 한 곳에만 정의한다").toBe(1);
     expect(전체 - 정의, "붙인 자리가 늘면 안내가 잡음이 된다").toBe(3);
+  });
+});
+
+describe("★ 코드값 인자는 LLM이 맞혀도 비워지지 않는다 (2026-08-01 실측)", () => {
+  // 결재판은 "지시문에 없는 필수값 = 지어낸 것"으로 보고 비워 되묻는다(환각 방어).
+  // 그런데 kind는 **코드값**이라 정답(sla_due)이 사람 말("기한 임박")에 있을 리가 없다.
+  // 실제로 LLM이 정확히 맞혔는데 빈 칸이 돼 승인이 400으로 막혔다 — 잘한 것을 벌준 셈이다.
+  const 지시 = "매일 아침 9시에 기한 임박 알림을 hong@example.com 으로 보내줘";
+
+  it("한국어로 말해도 코드값으로 채워진다", () => {
+    const t = findAgentTool("alert_schedule_add")!;
+    const a = buildApproval(t, {}, 지시);
+    const 값 = Object.fromEntries(a.fields.map((f) => [f.key, f.value]));
+    expect(값.kind, "「기한 임박」을 못 알아들었다").toBe("sla_due");
+    expect(값.hour, "「아침 9시」를 못 알아들었다").toBe("9");
+  });
+
+  it("★ LLM이 이미 코드값을 넣어도 비워지지 않는다 — 이게 막혀 있었다", () => {
+    const t = findAgentTool("alert_schedule_add")!;
+    const a = buildApproval(t, { kind: "sla_due", hour: "09", to: "hong@example.com" }, 지시);
+    const f = Object.fromEntries(a.fields.map((x) => [x.key, x]));
+    expect(f.kind.value, "정답을 넣었는데 비워졌다").toBe("sla_due");
+    expect(f.kind.source, "auto여야 비워지지 않는다").toBe("auto");
+    expect(f.hour.value, "\"09\"도 받아 9로 다듬어야 한다").toBe("9");
+    expect(a.missing, "빠진 값이 있으면 승인이 400으로 막힌다").toEqual([]);
+  });
+
+  it("오후를 24시간제로 고친다", () => {
+    const t = findAgentTool("alert_schedule_add")!;
+    const a = buildApproval(t, {}, "오후 6시에 시스템 이상 알림 보내줘");
+    const 값 = Object.fromEntries(a.fields.map((f) => [f.key, f.value]));
+    expect(값.hour).toBe("18");
+    expect(값.kind).toBe("system_health");
   });
 });
