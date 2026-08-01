@@ -2,11 +2,15 @@
 // [전중후 계획서 정렬] 지키는 것: 보낼 게 없으면 안 보낸다(늑대 소년 방지) ·
 // 같은 시각에 두 번 보내지 않는다 · 발송 실패를 조용히 삼키지 않는다.
 import { describe, it, expect, beforeEach, vi } from "vitest";
+import fs from "node:fs";
 
 const sent: { to: string[]; subject: string }[] = [];
 vi.mock("../src/engine/email", () => ({
   sendMail: vi.fn(async (a: { to: string[]; subject: string }) => { sent.push(a); }),
   registerEmailRoutes: vi.fn(),
+  // 등록 0건 안내가 "메일부터 켜세요"를 말해야 해서 설정 조회를 쓴다(2026-08-01).
+  // 기본은 **안 켜진 상태**로 둔다 — 실제 새 설치가 그렇고, 그때 안내가 맞는지가 중요하다.
+  getSmtpConfig: vi.fn(() => undefined),
 }));
 
 import { db } from "../src/db";
@@ -115,5 +119,29 @@ describe("현황 요약", () => {
     const t = alertScheduleText();
     expect(t).toContain("시스템 이상");
     expect(t).toMatch(/발송|보낼 것 없어 건너뜀|실패/);
+  });
+});
+
+describe("★ 등록 0건 안내가 실제로 되는 길만 말한다 (2026-08-01)", () => {
+  // 전엔 "설정 > 서버·AI에서 … 알림을 등록하면"이라고 했는데 그 화면에 **등록하는 자리가 없었다.**
+  // 담당자는 가서 찾다가 못 찾는다 — 없는 길을 안내하는 것은 침묵보다 나쁘다.
+  it("메일이 꺼져 있으면 그것부터 말한다", () => {
+    // 알림을 걸어도 메일이 꺼져 있으면 안 나간다. 순서를 안 알려 주면 "걸었는데 왜 안 와?"가 된다.
+    const t = alertScheduleText();
+    expect(t).toContain("메일 발송");
+    expect(t, "켜야 한다는 사실이 빠지면 안 된다").toMatch(/켜|SMTP/);
+  });
+
+  it("★ 등록하는 길을 알려 준다 — 그리고 그 길은 실재한다", () => {
+    const t = alertScheduleText();
+    expect(t, "어떻게 거는지가 없으면 안내가 아니다").toMatch(/말로|말하|예:/);
+    // 그 길이 진짜 있는지 도구 목록에서 확인한다 — 안내와 기능이 어긋나면 안 된다.
+    const src = fs.readFileSync(new URL("../src/engine/agenttools.ts", import.meta.url), "utf8");
+    expect(src, "안내는 대화창에서 걸라고 하는데 그 도구가 없다").toContain('name: "alert_schedule_add"');
+  });
+
+  it("세 가지 알림 종류를 다 알려 준다", () => {
+    const t = alertScheduleText();
+    for (const k of ["오늘 할 일", "기한 임박", "시스템 이상"]) expect(t).toContain(k);
   });
 });

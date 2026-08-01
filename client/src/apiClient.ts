@@ -313,6 +313,10 @@ export interface DispatchResult {
   steps?: OrchestrationStepResult[]; // 복합(멀티스텝) 지시일 때만
   toolCalls?: { tool: string; args: Record<string, string>; result: string }[]; // 에이전트 루프가 실행한 조회 도구
   approval?: PendingApproval; // 쓰기 지시일 때 — 승인해야 실행된다
+  sources?: string[]; // 답을 만든 사내 문서 이름 — 대화창이 "📄 근거" 배지로 그린다
+  // 근거 **원문 대목**. 이름만으로는 담당자가 답을 검증할 수 없다(2026-08-01 실측:
+  // 문서엔 "미사용 룰 37개"인데 AI가 "27"이라고 답했고 근거 배지는 맞게 떴다).
+  quotes?: { documentId: string; text: string }[];
 }
 
 // 결재판 — 쓰기 도구는 지시만으로 실행되지 않고 이 구조가 화면에 떠서 사람의 승인을 받는다.

@@ -37,7 +37,9 @@ import { timeSavedText } from "./timesaved";
 import { feedbackSummaryText } from "./answerfeedback";
 import { adoptionSummaryText } from "./modeladoption";
 import { systemHealthText } from "./observability";
-import { alertScheduleText } from "./alertschedule";
+import { alertScheduleText, createAlertSchedule, ALERT_KIND_LABEL } from "./alertschedule";
+import type { AlertKind } from "./alertschedule";
+import { getSmtpConfig } from "./email";
 import { listAnalysisEvents, analysisSummary, computeCorrelations } from "./analysishub";
 import { computeKpiSnapshot } from "./kpi";
 import { listSessions as listWorkSessions } from "./worksessions";
@@ -737,6 +739,35 @@ function runSetComplianceStatus(args: Record<string, string>): string {
 }
 
 // 상대 기한("다음주 월요일")·절대일자를 YYYY-MM-DD로. 파싱 실패면 그대로 둬 검증에서 되묻게 한다.
+/**
+ * 정기 알림 걸기. 결재판을 통과한 뒤에만 여기 온다.
+ *
+ * ⚠ 메일이 안 켜져 있으면 **등록은 하되 그 사실을 말한다.** 막지 않는 이유는,
+ *   담당자가 알림부터 걸어 두고 메일을 나중에 켜는 순서도 흔하기 때문이다.
+ *   다만 "걸었습니다"로 끝내면 안 오는 이유를 영영 모른다 — 그게 이 기능이 죽어 있던 방식이다.
+ */
+function runAlertScheduleAdd(args: Record<string, string>): string {
+  const kind = String(args.kind ?? "").trim();
+  const hour = Number(String(args.hour ?? "").trim());
+  const to = String(args.to ?? "").split(",").map((s) => s.trim()).filter(Boolean);
+  if (!["daily_brief", "sla_due", "system_health"].includes(kind)) {
+    return "알림 종류를 골라 주세요 — 오늘 할 일 브리핑 / 조치 기한 임박 / 시스템 이상 중 하나입니다.";
+  }
+  if (!Number.isInteger(hour) || hour < 0 || hour > 23) return "보낼 시각을 0~23 사이 숫자로 알려 주세요(예: 아침 9시 → 9).";
+  if (!to.length) return "알림을 받을 메일 주소가 필요합니다.";
+  try {
+    const s = createAlertSchedule(kind as AlertKind, hour, to);
+    const 메일 = getSmtpConfig();
+    return [
+      `정기 알림을 걸었습니다 — ${ALERT_KIND_LABEL[s.kind]} · 매일 ${s.hourLocal}시 · ${s.recipients}`,
+      메일 ? "" : "⚠ 다만 **메일 발송(SMTP)이 아직 꺼져 있어** 지금은 나가지 않습니다 — 설정 > 서버·AI에서 켜 주세요.",
+      "보낼 것이 없는 날에는 보내지 않습니다.",
+    ].filter(Boolean).join("\n");
+  } catch (e) {
+    return `알림을 걸지 못했습니다 — ${e instanceof Error ? e.message : String(e)}`;
+  }
+}
+
 function runScheduleMaintenance(args: Record<string, string>): string {
   const productName = (args.productName ?? "").trim();
   const scheduleDate = parseRelativeDueDate(args.scheduleDate ?? "") ?? (args.scheduleDate ?? "").trim();
@@ -1058,7 +1089,11 @@ function runFindingStatusOverview(args: Record<string, string>): string {
     return `- [${r.finding.severity}] ${r.assetId} · ${r.finding.finding_type} (${r.status}, ${who}, ${due})`;
   });
   const more = matched.length > 10 ? `\n… 외 ${matched.length - 10}건` : "";
-  return `${head}\n${lines.join("\n")}${more}`;
+  // 담당자가 없는 건이 있으면 그게 **다음에 할 일**이다 — 배정 안 된 건은 아무도 안 한다.
+  const 할말 = unassigned
+    ? `담당자 미배정 ${unassigned}건이 병목입니다 — "1번 담당자 배정해줘"라고 하시거나 조치·승인 화면에서 배정하세요.`
+    : '조치·승인 화면에서 상태를 옮기거나, 여기서 "○○ 조치완료로 바꿔줘"라고 말해도 됩니다.';
+  return `${head}\n${lines.join("\n")}${more}${다음걸음(할말)}`;
 }
 
 // 승인/반려 — 조치·승인 화면(approvals.html)의 setFindingReview에 해당하는 역량.
@@ -1564,6 +1599,53 @@ const TOOLS: AgentTool[] = [
     run: () => alertScheduleText(),
   },
   {
+    // ★ 등록하는 길이 아예 없었다(2026-08-01 실측). 서버·챗봇 조회·발송은 다 만들어 뒀는데
+    //   **거는 자리**가 화면에도 챗봇에도 없어서, 운영 서버의 등록 알림이 0건이었다.
+    //   담당자는 앱을 열지 않으면 SLA 초과를 영영 모른다 — 있는 기능이 꺼져 있는 것과 같다.
+    //   새 화면을 만드는 대신 결재판(쓰기 도구)을 쓴다. 이 제품에서 쓰기는 원래 그 길이다.
+    name: "alert_schedule_add",
+    label: "정기 알림 걸기",
+    domain: "report",
+    write: true,
+    description:
+      '메일로 오는 정기 알림을 새로 건다. kind는 daily_brief(오늘 할 일)·sla_due(조치 기한 임박)·system_health(시스템 이상) 중 하나, hour는 보낼 시각(0~23), to는 받는 메일 주소(쉼표로 여러 명). "매일 9시에 기한 임박 알림 보내줘" 같은 지시에 쓴다. 예: {"kind":"sla_due","hour":"9","to":"hong@example.com"}',
+    params: [
+      { name: "kind", label: "알림 종류", description: "daily_brief(오늘 할 일) · sla_due(조치 기한 임박) · system_health(시스템 이상)", required: true },
+      { name: "hour", label: "보낼 시각", description: "0~23 (서버 기준 시각). \"아침 9시\"는 9", required: true },
+      { name: "to", label: "받는 사람", description: "메일 주소. 여러 명이면 쉼표로 구분", required: true },
+    ],
+    // "아침 9시"·"오전 9시" 같은 말을 숫자로 고친다 — 사람은 24시간제로 말하지 않는다.
+    autoFill: (args, instruction): Record<string, string> => {
+      const 고침: Record<string, string> = {};
+      const raw = String(args.hour ?? "").trim();
+      if (!/^\d{1,2}$/.test(raw)) {
+        const m = (raw || instruction).match(/(오전|아침|오후|저녁|밤)?\s*(\d{1,2})\s*시/);
+        if (m) {
+          let h = Number(m[2]);
+          if (/오후|저녁|밤/.test(m[1] ?? "") && h < 12) h += 12;
+          if (/오전|아침/.test(m[1] ?? "") && h === 12) h = 0;
+          고침.hour = String(h);
+        }
+      }
+      // 종류를 한국어로 말했으면 코드로 바꾼다("기한 임박 알림" → sla_due).
+      const k = String(args.kind ?? "").trim();
+      if (!["daily_brief", "sla_due", "system_health"].includes(k)) {
+        const 말 = k + " " + instruction;
+        if (/기한|SLA|마감|임박/i.test(말)) 고침.kind = "sla_due";
+        else if (/시스템|이상|백업|진단|장애/.test(말)) 고침.kind = "system_health";
+        else if (/오늘|할\s*일|브리핑|아침/.test(말)) 고침.kind = "daily_brief";
+      }
+      return 고침;
+    },
+    effect: (args) => {
+      const 이름: Record<string, string> = { daily_brief: "오늘 할 일 브리핑", sla_due: "조치 기한 임박", system_health: "시스템 이상" };
+      const k = String(args.kind ?? "");
+      return `정기 알림 등록 — ${이름[k] ?? k} · 매일 ${String(args.hour ?? "?")}시 · ${String(args.to ?? "")} 앞으로`;
+    },
+    undo: '대화창에서 "정기 알림 뭐 걸려 있어?"로 확인한 뒤 삭제할 수 있습니다.',
+    run: runAlertScheduleAdd,
+  },
+  {
     name: "analysis_status",
     label: "통합 보안 분석(관제) 현황",
     domain: "cross", // 취약점·보안로그·운영리포트·하드닝 4소스를 가로지르는 관제 허브
@@ -1932,7 +2014,8 @@ const TOOLS: AgentTool[] = [
     description:
       '오늘의 보안 브리핑을 한 번에 화면에 **즉석 요약**해 준다 — 오늘의 조치 상위·지난 이후 신규 취약점·기한 초과/임박(SLA)·우리 관련 위협·추천 3. "오늘 브리핑(해줘)", "아침에 뭐 챙겨야 돼?", "지금/오늘 상황 요약해줘"에 쓴다. **단 "리포트/보고서 작성·뽑아줘"처럼 문서를 만드는 지시는 브리핑이 아니라 리포트(report)로 간다.** 예: {}',
     params: [],
-    run: () => dailyBriefingText({ save: true }),
+    // 아침에 가장 먼저 보는 답이다 — 읽고 나서 어디로 갈지가 없으면 화면을 헤맨다.
+    run: async () => (await dailyBriefingText({ save: true })) + 다음걸음('급한 것부터 하시려면 "1번 담당자 배정해줘" 또는 조치·승인 화면으로 가세요.'),
   },
   {
     name: "run_redteam",

@@ -15,7 +15,7 @@ import type { Express, Request } from "express";
 import { db, migrate } from "../db";
 import { authMiddleware, adminMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
-import { sendMail } from "./email";
+import { sendMail, getSmtpConfig } from "./email";
 import { recordAudit } from "./audit";
 import { systemHealth } from "./observability";
 import type { GijoUser } from "../auth/users";
@@ -163,9 +163,21 @@ export async function runDueAlerts(now = new Date()): Promise<{ ran: number; sen
 export function alertScheduleText(): string {
   const rows = listAlertSchedules();
   if (rows.length === 0) {
+    // ★ 안내는 **실제로 되는 길**만 적는다(2026-08-01 실측에서 고침).
+    //   전엔 "설정 > 서버·AI에서 … 알림을 등록하면"이라고 했는데, 그 화면에 등록하는 자리가
+    //   **없었다.** 담당자가 가서 찾다가 못 찾는다 — 없는 길을 안내하는 것은 침묵보다 나쁘다.
+    //   등록은 대화창에서 한다(alert_schedule_add 도구 → 결재판).
+    //   그리고 **메일이 안 켜져 있으면 그것부터** 말한다. 알림을 등록해도 안 가기 때문이다.
+    const 메일 = getSmtpConfig();
+    const 준비 = 메일
+      ? "메일 발송은 켜져 있습니다."
+      : "⚠ 먼저 **메일 발송(SMTP)** 을 켜야 합니다 — 설정 > 서버·AI. 안 켜면 알림을 걸어도 나가지 않습니다.";
     return [
       "등록된 정기 알림이 없습니다.",
-      "설정 > 서버·AI에서 메일 발송을 켜고 알림을 등록하면, 화면을 열지 않아도 기한 임박·시스템 이상을 메일로 받습니다.",
+      준비,
+      "",
+      '등록은 여기서 말로 하시면 됩니다 — 예: "매일 아침 9시에 기한 임박 알림을 hong@example.com 으로 보내줘"',
+      "받을 수 있는 것: ① 오늘 할 일 브리핑 ② 조치 기한 임박(사흘 안) ③ 시스템 이상(백업 누락 등)",
       "보낼 것이 없는 날에는 보내지 않습니다 — 매일 오는 '이상 없음' 메일은 결국 아무도 읽지 않기 때문입니다.",
     ].join("\n");
   }

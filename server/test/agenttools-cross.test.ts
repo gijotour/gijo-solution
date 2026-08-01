@@ -286,8 +286,15 @@ describe("★ 목록 끝에 다음 걸음 한 줄 (2026-08-01 하루 실전)", (
     expect((줄.match(/\n/g) || []).length, "다음 걸음은 한 줄로 유지한다").toBeLessThanOrEqual(1);
   });
 
-  it("아무 답에나 붙이지 않는다 — 다음 행동이 분명한 목록에만", () => {
-    const 붙은곳 = (src.match(/다음걸음\(/g) || []).length;
-    expect(붙은곳, "전 도구에 붙이면 안내가 잡음이 된다").toBeLessThanOrEqual(4);
+  it("★ 아무 답에나 붙이지 않는다 — 세 곳뿐이다", () => {
+    // 붙인 곳: today(오늘 뭐부터) · briefing(아침 브리핑) · finding_status(조치할 취약점).
+    //   셋 다 **일감 목록**이라 다음 행동이 정해져 있다.
+    // 안 붙인 곳: kpi_status·list_assets·attack_paths·threats·knowledge_status —
+    //   현황 조회라 다음 행동이 사람마다 다르다. 붙이면 안내가 아니라 추측이 된다.
+    // 「내 업무」도 안 붙였다 — 체크칸(picklist)이 이미 그 자리에서 처리하게 해 준다.
+    const 정의 = (src.match(/function 다음걸음\(/g) || []).length;
+    const 전체 = (src.match(/다음걸음\(/g) || []).length;
+    expect(정의, "다음걸음은 한 곳에만 정의한다").toBe(1);
+    expect(전체 - 정의, "붙인 자리가 늘면 안내가 잡음이 된다").toBe(3);
   });
 });

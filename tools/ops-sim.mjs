@@ -131,7 +131,9 @@ function 불편찾기(q, r) {
   if (o.length > 2000) 목.push({ 종류: "너무 긺", 상세: o.length + "자 — 읽지 않는다" });
   if (o.replace(/\s/g, "").length < 25 && !없음답.test(o)) 목.push({ 종류: "너무 짧음", 상세: o.length + "자" });
   // 숫자를 세어 주면서 갈 곳을 안 알려 주는 것 — 이 제품에서 반복된 결함
-  if (/\d+\s*건/.test(o) && !갈곳.test(o) && o.length > 60) {
+  // ⚠ **체크칸(picklist)이 붙어 오면 갈 곳이 있는 것**이다 — 그 자리에서 골라 처리한다.
+  //   본문 글자만 보고 "갈 곳 없음"이라 세면 「내 업무」처럼 이미 손댈 수 있는 답을 벌준다(실측).
+  if (/\d+\s*건/.test(o) && !갈곳.test(o) && !r.picklist && o.length > 60) {
     목.push({ 종류: "숫자만 주고 갈 곳 없음", 상세: "화면·다음 행동 안내 없음" });
   }
   return 목;
@@ -175,7 +177,7 @@ async function 물어보기(H, text, screen, sessionId) {
     if (status !== 200) {
       return { out: "", action: "HTTP" + status, ms: Date.now() - t0, err: "HTTP " + status };
     }
-    return { out: String(j.output ?? ""), action: j.route?.action ?? "?", ms: Date.now() - t0, sources: j.sources };
+    return { out: String(j.output ?? ""), action: j.route?.action ?? "?", ms: Date.now() - t0, sources: j.sources, picklist: !!j.picklist };
   } catch (e) {
     return { out: "", action: "ERROR", ms: Date.now() - t0, err: String(e).slice(0, 120) };
   }

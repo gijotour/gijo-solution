@@ -63,6 +63,17 @@ function mkTask(qa: boolean | undefined, args: Parameters<typeof createTask>[0])
 function collab(qa: boolean | undefined, e: Parameters<typeof emitCollaboration>[0]): void {
   if (!qa) emitCollaboration(e);
 }
+/**
+ * 근거 원문 한 대목 — 답을 만든 문서에서 실제로 쓰인 글.
+ *
+ * 왜 이름만으로는 부족한가(2026-08-01 실측): 문서에 "미사용 룰 37개"라고 적혀 있는데
+ * 7B가 "27"이라고 답했다. 근거 배지에는 그 문서가 **맞게** 떴다 — RAG는 정상이고 모델이
+ * 표를 잘못 읽은 것이다. 담당자는 그 숫자로 보고를 쓴다. 원문을 함께 보여 주면 눈으로 잡는다.
+ */
+export interface SourceQuote {
+  documentId: string;
+  text: string;
+}
 export interface DispatchResult {
   task: TaskItem;
   route: RoutedIntent;
@@ -83,6 +94,8 @@ export interface DispatchResult {
   // 답변 그라운딩에 쓰인(검색된) 사내 문서 ID — 화면이 "근거: 문서명" 배지로 표시한다.
   // 인수인계 자동 검증도 이 필드로 "올린 문서가 실제로 인용되는가"를 판정한다.
   sources?: string[];
+  /** 근거 원문 대목 — 담당자가 답의 숫자를 눈으로 검증할 수 있게(2026-08-01). */
+  quotes?: SourceQuote[];
   // "가서 하기" — AI가 대신 하면 안 되는 일(계정·인증·열쇠)에 순서를 안내하면서 그 화면을
   // 같이 돌려준다. 대화창이 [그 화면 열어주기] 버튼으로 그린다(2026-07-31).
   // 갈 화면이 없는 안내(백업처럼)에서는 아예 넣지 않는다 — 있는 척하면 없는 버튼을 찾게 된다.
@@ -485,7 +498,7 @@ async function computeOfferSignals(
   result: DispatchResult,
   instructionText: string,
   screen?: string,
-): Promise<{ dataHits: number; internalMiss: boolean; sources?: string[] }> {
+): Promise<{ dataHits: number; internalMiss: boolean; sources?: string[]; quotes?: SourceQuote[] }> {
   let dataHits = 0;
   for (const s of result.steps ?? []) {
     dataHits += (s.assetIds?.length ?? 0) + (s.findingCount ?? 0);
@@ -504,6 +517,7 @@ async function computeOfferSignals(
   // 같은 검색(임베딩 1회)에서 근거 문서 ID(sources)도 뽑는다 — 화면 "근거" 배지·인수인계 검증용.
   let internalMiss = false;
   let sources: string[] | undefined;
+  let quotes: SourceQuote[] | undefined;
   // 답을 만든 쪽이 근거를 이미 확정했으면(빈 배열 포함) 여기서 다시 채우지 않는다 —
   // 행동 대조가 "판정 근거 없음(NA)"으로 답했는데 이 재검색이 참고 문서를 근거 배지로
   // 둔갑시키는 실측 사고가 있었다(2026-07-29, Tenable 가이드가 NA 답의 근거로 표시됨).
@@ -515,13 +529,24 @@ async function computeOfferSignals(
       if (Array.isArray(scored)) {
         const relevant = scored.filter((c) => c.distance <= RAG_RELEVANCE_MAX_DISTANCE);
         internalMiss = relevant.length === 0; // 검색 실패(null)면 미판정(false 유지)
-        if (relevant.length > 0) sources = [...new Set(relevant.map((c) => c.documentId).filter(Boolean))];
+        if (relevant.length > 0) {
+          sources = [...new Set(relevant.map((c) => c.documentId).filter(Boolean))];
+          // ★ 문서 **이름**만으로는 담당자가 답을 검증할 수 없다(2026-08-01 실측).
+          //   실제 사고: 문서에 "미사용 룰 37개"라고 적혀 있는데 7B가 "27"이라고 답했다.
+          //   근거 배지에는 그 문서가 맞게 떴다 — RAG는 정상이고 모델이 표를 잘못 읽은 것이다.
+          //   담당자는 그 숫자로 보고를 쓴다. 원문 대목을 함께 보여 주면 눈으로 바로 잡아낸다.
+          //   (7B에 프롬프트로 "숫자를 정확히 읽어라"라고 타이르지 않는다 — 확립된 원칙이다.)
+          quotes = relevant.slice(0, 3).map((c) => ({
+            documentId: String(c.documentId ?? ""),
+            text: String(c.text ?? "").replace(/\s+/g, " ").trim().slice(0, 400),
+          })).filter((q) => q.text);
+        }
       }
     } catch {
       /* 메모리 모듈 로드 실패 시 미판정 */
     }
   }
-  return { dataHits, internalMiss, ...(sources ? { sources } : {}) };
+  return { dataHits, internalMiss, ...(sources ? { sources } : {}), ...(quotes && quotes.length ? { quotes } : {}) };
 }
 
 // 응답 턴에 붙일 짧은 도구/경로 배지 — 화면에서 "무엇으로 처리됐는지"를 한눈에 보여준다.

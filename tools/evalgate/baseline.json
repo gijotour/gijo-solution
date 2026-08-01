@@ -1,15 +1,15 @@
 {
-  "acceptedAt": "2026-07-31T10:55:58.146Z",
-  "gitRev": "a5cd1be",
-  "caseSetHash": "de4272638085b805",
+  "acceptedAt": "2026-08-01T00:57:28.582Z",
+  "gitRev": "fbfb3c8",
+  "caseSetHash": "92b230e916be9d71",
   "axes": {
     "routing": {
-      "total": 64,
-      "pass": 64,
+      "total": 65,
+      "pass": 65,
       "passRate": 100,
       "canaryFail": 0,
       "flaky": 0,
-      "skipped": 2,
+      "skipped": 1,
       "unmeasured": false
     },
     "safety": {

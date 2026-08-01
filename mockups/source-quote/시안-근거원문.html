@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>시안 — 근거 원문 보이기</title>
+<style>
+:root{
+  --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;
+  --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--amber:#f0a020;--teal:#1eb980;--red:#e2483d;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);padding:26px;}
+.wrap{max-width:720px;margin:0 auto;}
+h2{font-size:14px;color:var(--muted);margin:0 0 6px;}
+.why{font-size:12.5px;color:var(--muted-2);line-height:1.75;margin-bottom:22px;}
+.why b{color:var(--text);}
+
+.msg{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;margin-bottom:10px;}
+.msg .a{font-size:13px;line-height:1.75;}
+.bad{color:#f5928a;font-weight:700;}
+
+/* 근거 — 접힌 채로 둔다. 펴면 원문이 나온다. */
+.ev{margin-top:12px;border-top:1px solid var(--border);padding-top:10px;}
+.ev-head{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--muted);cursor:pointer;user-select:none;}
+.ev-head .car{font-size:10px;color:var(--muted-2);transition:transform .12s;}
+.ev-head.open .car{transform:rotate(90deg);}
+.ev-head .doc{color:var(--blue-light);font-weight:700;}
+.ev-body{display:none;margin-top:10px;}
+.ev-head.open + .ev-body{display:block;}
+.quote{border-left:3px solid rgba(59,130,246,.45);background:rgba(59,130,246,.05);padding:9px 12px;border-radius:0 8px 8px 0;margin-bottom:8px;}
+.quote .q-doc{font-size:10.5px;color:var(--muted-2);margin-bottom:4px;}
+.quote .q-txt{font-size:12px;line-height:1.8;color:#cdd4e6;}
+.quote .q-txt mark{background:rgba(240,160,32,.28);color:#ffd88a;padding:0 3px;border-radius:3px;font-weight:700;}
+.q-open{font-size:10.5px;color:var(--blue-light);cursor:pointer;}
+.note{font-size:11px;color:var(--muted-2);margin-top:6px;line-height:1.7;}
+h3{font-size:12.5px;margin:26px 0 8px;color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h2>시안 — 근거 원문 보이기 (챗봇 답변 아래)</h2>
+  <div class="why">
+    <b>왜 필요한가.</b> 실측(2026-08-01)에서 문서에 <b>「미사용 룰 37개」</b>라고 적혀 있는데 AI가 <b class="bad">27</b>이라고 답했습니다.
+    근거 배지에는 그 문서가 <b>맞게</b> 떴습니다 — 자료 찾기는 정상이고 <b>모델이 표를 잘못 읽은 것</b>입니다.
+    담당자는 그 숫자로 보고를 씁니다. 지금은 문서 <b>이름</b>만 보여 줘서 확인할 방법이 없습니다.<br>
+    <b>고치는 방향.</b> 모델에게 "숫자를 정확히 읽어라"라고 타이르지 않습니다(반복 실패한 방식).
+    대신 <b>답을 만든 원문 대목을 함께</b> 보여 줘 담당자가 눈으로 잡게 합니다.
+  </div>
+
+  <h3>지금 (문서 이름만)</h3>
+  <div class="msg">
+    <div class="a">FW-01 방화벽 점검에서 미사용 룰은 <b class="bad">27개</b>입니다.</div>
+    <div class="ev">
+      <div class="ev-head" style="cursor:default">📄 근거: <span class="doc">샘플_방화벽_월간점검보고서_2026-07.md</span></div>
+    </div>
+  </div>
+  <div class="note">→ 담당자가 27이 맞는지 확인하려면 문서를 따로 찾아 열어야 합니다. 대개 그냥 믿습니다.</div>
+
+  <h3>시안 (원문 대목까지 · 접힘이 기본)</h3>
+  <div class="msg">
+    <div class="a">FW-01 방화벽 점검에서 미사용 룰은 <b class="bad">27개</b>입니다.</div>
+    <div class="ev">
+      <div class="ev-head open" onclick="this.classList.toggle('open')">
+        <span class="car">▸</span>📄 근거 <span class="doc">샘플_방화벽_월간점검보고서_2026-07.md</span> · 원문 보기
+      </div>
+      <div class="ev-body">
+        <div class="quote">
+          <div class="q-doc">샘플_방화벽_월간점검보고서_2026-07.md</div>
+          <div class="q-txt">
+            ## 4. 정책(룰) 점검 — 전체 룰 수: 412개 · <mark>미사용 룰(90일 히트 0): 37개</mark> — 정리 대상 ·
+            Any-Any 허용 룰: 2개 발견 (RULE-0231 임시 테스트용, 등록자 퇴사 — 즉시 제거 권고)
+          </div>
+          <div class="q-open">원본 문서 열기 →</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="note">→ <b>37</b>이 눈에 바로 들어옵니다. 답이 틀렸다는 것을 담당자가 <b>그 자리에서</b> 압니다.</div>
+
+  <h3>답이 맞을 때 (대부분)</h3>
+  <div class="msg">
+    <div class="a">방화벽 유지보수 업체는 (주)넷가드이며, 계약 만료는 2027-03입니다.</div>
+    <div class="ev">
+      <div class="ev-head" onclick="this.classList.toggle('open')">
+        <span class="car">▸</span>📄 근거 <span class="doc">샘플_보안운영_인수인계_메모.md</span> · 원문 보기
+      </div>
+      <div class="ev-body">
+        <div class="quote">
+          <div class="q-doc">샘플_보안운영_인수인계_메모.md</div>
+          <div class="q-txt">## 5. 연락처 — 방화벽 유지보수: <mark>(주)넷가드</mark> 02-000-0000 / 야간 010-0000-0000 (계약 <mark>2027-03</mark> 만료)</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="note">→ 평소엔 <b>접혀 있어</b> 방해되지 않습니다. 의심스러울 때만 펴 봅니다.</div>
+
+  <div class="why" style="margin-top:26px;border-top:1px solid var(--border);padding-top:16px">
+    <b>정한 것</b><br>
+    · <b>기본은 접힘</b> — 매번 펼쳐 두면 답보다 근거가 길어져 아무도 안 읽습니다.<br>
+    · <b>최대 3대목</b> — 더 넣으면 근거가 아니라 문서 덤프가 됩니다.<br>
+    · <b>답에 나온 숫자·고유명사를 원문에서 강조</b> — 눈이 바로 그리로 갑니다.<br>
+    · <b>사내 문서를 근거로 삼았을 때만</b> — 자산·취약점 조회 같은 자료 답에는 붙이지 않습니다(원문이라는 게 없습니다).<br>
+    · 원본 열기는 <b>이미 있는 문서함</b>으로 보냅니다 — 새 화면을 만들지 않습니다.
+  </div>
+</div>
+</body>
+</html>
