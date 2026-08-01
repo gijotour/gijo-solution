@@ -173,16 +173,29 @@ const s2 = await snap();
 ok("탭을 닫으면 프레임도 함께 사라진다", s2.탭.length === 2 && s2.프레임 === 2, s2.탭.join(" | "));
 
 // 12) 콘솔을 창으로 빼기 → 화면이 넓어짐 → 되붙이기
-const hBefore = await page.evaluate(() => Math.round(document.getElementById("screens").getBoundingClientRect().height));
+// ⚠ **어느 축이 넓어지는지는 배치에 달렸다**(2026-08-01 시안 3 가로 배치 도입).
+//   예전엔 콘솔이 항상 화면 **아래**에 있어서 빼면 높이가 늘었다. 지금은 창이 넓으면
+//   콘솔이 **옆**에 서므로 빼면 **너비**가 는다. 높이만 재던 옛 검사는 정상 동작을
+//   실패로 보고했다(실측 1082→1036: 셸 창이 콘솔 창 자리를 내주며 줄어든 것).
+//   그래서 숫자가 아니라 **규칙**을 본다 — 콘솔이 차지하던 축이 넓어졌는가.
+const 전 = await page.evaluate(() => {
+  const r = document.getElementById("screens").getBoundingClientRect();
+  return { 너비: Math.round(r.width), 높이: Math.round(r.height), 가로: document.querySelector(".work")?.classList.contains("console-side") ?? false };
+});
 await page.evaluate(() => document.getElementById("csToggleHost").click());
 await page.waitForTimeout(4500);
 const cw = ctx.pages().find((p) => p.url().includes("console.html"));
 ok("콘솔을 별도 창으로 빼낼 수 있다", !!cw, cw ? "console.html" : "창 없음");
-const hAfter = await page.evaluate(() => ({
-  높이: Math.round(document.getElementById("screens").getBoundingClientRect().height),
-  접힘: document.body.classList.contains("console-popped"),
-}));
-ok("콘솔을 빼면 화면이 넓어진다", hAfter.접힘 && hAfter.높이 > hBefore, `${hBefore} → ${hAfter.높이}`);
+const 후 = await page.evaluate(() => {
+  const r = document.getElementById("screens").getBoundingClientRect();
+  return { 너비: Math.round(r.width), 높이: Math.round(r.height), 접힘: document.body.classList.contains("console-popped") };
+});
+const 늘었나 = 전.가로 ? 후.너비 > 전.너비 : 후.높이 > 전.높이;
+ok(
+  `콘솔을 빼면 화면이 넓어진다(${전.가로 ? "가로 배치 → 너비" : "세로 배치 → 높이"})`,
+  후.접힘 && 늘었나,
+  `너비 ${전.너비}→${후.너비} · 높이 ${전.높이}→${후.높이}`
+);
 if (cw) {
   await cw.waitForTimeout(2500);
   const wctx = await cw.evaluate(() => document.getElementById("csCtx")?.textContent || null);
