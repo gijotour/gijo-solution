@@ -221,7 +221,8 @@ html, body { overflow-x: clip; }
  *    실측 덮음률 66%의 원인이 여기였다 — 창이 커져도 목록이 900px에서 멈추고 그 아래가
  *    통째로 비었다. 상한 없이 창 높이를 따르게 하면 큰 모니터에서 한 번에 더 많이 보인다.
  *    ⚠ 아래 하한(240px)은 남긴다 — 작은 창에서 목록이 사라지면 안 된다. */
-#riskList.risk-list { max-height: max(240px, calc(100vh - 565px)); }
+/* ⚠ 통합 관제 목록 높이는 analysis.html이 **재서** 정한다(목록높이맞추기). 여기서 또 정하면
+   두 규칙이 싸우고, 이긴 쪽이 상황에 안 맞아 목록이 창 밖으로 넘친다(2026-08-02). 규칙은 한 곳. */
 .two.two > * { min-width: 0; }
 @container (max-width: 920px) { .two.two { grid-template-columns: minmax(0, 1fr); } }
 

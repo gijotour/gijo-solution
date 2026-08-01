@@ -243,8 +243,7 @@ tr:last-child td{border-bottom:none;}
 </style>
 <div class="panel" id="modelGuidePanel" data-gijo-fold="환경별 모델 선택 가이드">
   <div class="panel-title">🖥 환경별 모델 선택 가이드</div>
-  <div class="panel-sub">고객사 GPU(VRAM)에 맞춰 AI 팀을 어떻게 구성할지 고르세요. 온프렘 제품이라 <b>이 PC/서버의 자원 안에서</b> 동작합니다.</div>
-  <div class="mg-gpu" id="mgGpu"><div class="mg-verdict">GPU 실측 중…</div></div>
+    <div class="mg-gpu" id="mgGpu"><div class="mg-verdict">GPU 실측 중…</div></div>
   <div class="mg-cards" id="mgCards">
     <div class="mg-card" data-tier="lite">
       <span class="mg-rec-badge">✓ 내 환경 추천</span>
@@ -289,7 +288,7 @@ tr:last-child td{border-bottom:none;}
       <div class="panel-title">에이전트별 브레인 모델</div>
       <!-- 바꾸는 곳은 설정으로 옮겼다(2026-07-28). 여기는 지금 무엇을 쓰는지 보는 자리로 남긴다 —
            로스터 카드 옆에서 한눈에 대조하려면 이 목록이 있어야 한다. -->
-      <div class="panel-sub">지금 어떤 모델을 쓰는지 보여줍니다. 바꾸려면 <b style="color:var(--blue-light);cursor:pointer" id="goAssignSettings">설정 &gt; 서버·AI &gt; 에이전트 모델 배정</b>에서 하세요.</div>
+      <div class="panel-sub">지금 어떤 모델을 쓰는지 보여줍니다.</div>
       <div id="brainList" style="font-size:12px;color:var(--muted)">불러오는 중...</div>
     </div>
     <div class="panel" data-gijo-fold="AI 엔진 상태">
@@ -311,8 +310,7 @@ tr:last-child td{border-bottom:none;}
          "왜 토큰이 필요한지"가 드러납니다. 여기엔 가는 길만 남깁니다. -->
     <div class="panel">
       <div class="panel-title">모델 받기</div>
-      <div class="panel-sub">모델 검색·받기와 추천 목록은 <b style="color:var(--blue-light);cursor:pointer" id="goModelSettings">설정 &gt; 서버·AI</b>로 옮겼습니다. 라이선스 동의가 필요한 모델을 위한 토큰 등록도 그곳에 함께 있습니다.</div>
-    </div>
+          </div>
   </div>
 </div>
 
@@ -828,8 +826,6 @@ tr:last-child td{border-bottom:none;}
     // 지시바 배선도 걷었다(2026-08-01) — 부를 함수가 없어졌고, 애초에 붙일 요소도 없었다.
 
     const goGuide = () => window.gijo.navigateTo("settings.html");
-    document.getElementById("goModelSettings").addEventListener("click", goGuide);
-    document.getElementById("goAssignSettings").addEventListener("click", goGuide);
     // 환경별 모델 선택 가이드 — 액션 배선
     document.getElementById("mgTierBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.getElementById("mgGuideBtn").addEventListener("click", goGuide);

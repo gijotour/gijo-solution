@@ -172,7 +172,7 @@ tr:last-child td{border-bottom:none;}
 <!-- 코드 저장소 스캔 — 자산 목록에서 이동(2026-07-26). AI 라이브러리 의존성 repo를 개발형 AI 자산으로 자동 등록. -->
 <div class="panel" id="repoScanPanel" style="margin-bottom:16px">
   <div class="panel-title">코드 저장소 스캔 <span style="font-size:12px;font-weight:700;color:var(--teal);background:rgba(30,185,128,0.15);padding:2px 8px;border-radius:10px;">온프레미스 · 자체 탐지</span></div>
-  <div class="panel-sub">GitHub 조직/사용자의 저장소를 훑어 AI 라이브러리(openai·langchain·transformers 등) 의존성이 있는 repo를 개발형 AI 자산으로 자동 등록합니다. 토큰은 저장하지 않고 이 스캔에만 사용합니다. 온프레미스 GitHub Enterprise는 Base URL로 지정하세요.</div>
+  <div class="panel-sub">GitHub 저장소를 훑어 AI 라이브러리 의존성이 있는 repo를 개발형 AI 자산으로 등록합니다. <b style="color:var(--amber)">토큰은 저장하지 않고 이 스캔에만 씁니다.</b></div>
   <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
     <input id="repoOwnerInput" placeholder="조직 또는 사용자명 (예: my-company)" style="flex:1;min-width:200px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;" aria-label="조직 또는 사용자명">
     <input id="repoTokenInput" type="password" placeholder="액세스 토큰 (선택 — 없으면 rate limit 낮음)" style="flex:1;min-width:200px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:9px 12px;color:var(--text);font-size:13px;outline:none;" aria-label="액세스 토큰">
@@ -185,7 +185,7 @@ tr:last-child td{border-bottom:none;}
 <!-- AI 자산 목록 — 이 화면의 주인공(스캔·등록으로 확인된 AI 자산만). 클릭하면 아래 5영역 명세가 열린다. -->
 <div class="panel" id="aiAssetsPanel" style="margin-bottom:16px">
   <div class="panel-title">AI 자산 <span id="aiAssetCount" style="color:var(--muted-2);font-weight:600;font-size:12px"></span></div>
-  <div class="panel-sub">파운데이션 모델·파인튜닝 이력·데이터 출처·벡터DB·가드레일을 자산별로 관리합니다. 일반 IT 자산은 자산 허브 › 통합 뷰·자산 목록에서.</div>
+  <div class="panel-sub">파운데이션 모델·파인튜닝 이력·데이터 출처·벡터DB·가드레일을 자산별로 관리합니다.</div>
   <div id="aiAssetList"><div style="font-size:12px;color:var(--muted)">불러오는 중…</div></div>
 </div>
 
@@ -227,7 +227,7 @@ tr:last-child td{border-bottom:none;}
 <div class="content-grid">
   <div class="panel" data-gijo-fold="컴포넌트 상세">
     <div class="panel-title" id="detailTitle">컴포넌트 상세 (코드 의존성 SBOM)</div>
-    <div class="panel-sub" id="detailSub">테이블에서 자산명을 클릭하면 컴포넌트 목록을 확인할 수 있습니다.</div>
+    <div class="panel-sub" id="detailSub"></div>
     <table>
       <tr><th>컴포넌트</th><th>버전</th><th>라이선스</th><th>알려진 취약점</th></tr>
       <tbody id="componentRows"></tbody>
