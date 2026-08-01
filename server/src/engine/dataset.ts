@@ -10,6 +10,8 @@ import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { chat } from "./llm";
 import { recordProcessOutput } from "./logs";
+// 학습 데이터가 디스크에 닿는 유일한 자리라, 위생을 여기서 건다(호출부마다 붙이면 또 빠뜨린다).
+import { cleanForTraining, type 데이터종류 } from "./datasethygiene";
 
 // 테스트가 실제 데이터셋(data/datasets/*.json)을 덮어쓰거나 지우지 않도록 경로를 env로 격리 가능하게 한다
 // (vitest.config.ts가 임시 디렉터리로 지정). 미설정 시 운영 경로.
@@ -155,15 +157,30 @@ export async function amplifyDataset(examples: ConversationExample[], factor = 3
 // 파일명으로 그대로 쓰이므로 경로 조작이 불가능한 id만 허용한다.
 const DATASET_ID_RE = /^[a-z0-9][a-z0-9-]{0,63}$/;
 
-export function saveDataset(id: string, examples: ConversationExample[]): { id: string; examples: number } {
+export function saveDataset(id: string, examples: ConversationExample[], 종류: 데이터종류 = "지식"): { id: string; examples: number } {
   if (!DATASET_ID_RE.test(id)) {
     throw new Error("데이터셋 ID는 영문 소문자/숫자/하이픈만 가능합니다 (예: incident-qa-v1)");
   }
   const valid = examples.filter((e) => e && typeof e.question === "string" && typeof e.answer === "string" && e.question && e.answer);
   if (valid.length === 0) throw new Error("유효한 question/answer 쌍이 없습니다");
+
+  // ★ 위생은 **여기서** 건다 — 학습 데이터가 디스크에 닿는 곳이 이 함수뿐이기 때문이다.
+  //
+  // ⚠ 2026-08-01 검토에서 잡힌 것: 위생 주석은 "어느 길로 들어오든 거치는 마지막 관문"이라
+  //   적어 놨는데 실제 호출은 learnloop 한 곳뿐이었다. `POST /api/dataset/save`,
+  //   orchestrator-dataset, 그리고 학습 시작에 datasetId를 직접 넘기는 길이 **그냥 지나갔다.**
+  //   담당자가 화면에서 「Q&A 변환」→「저장」 하고 그 ID로 파인튜닝을 걸면 시점 데이터·
+  //   시험 문항·프롬프트 누출이 한 번도 안 걸러지고 학습된다.
+  //   호출부마다 붙이면 또 빠뜨린다 — **저장 자체를 관문으로 만든다.**
+  //   cleanForTraining은 멱등이라 learnloop가 이미 건 것을 다시 걸어도 결과가 같다.
+  const 위생 = cleanForTraining(valid, 종류);
+  if (위생.kept.length === 0) {
+    const 사유 = Object.entries(위생.dropped).map(([k, v]) => `${k} ${v}건`).join(" · ") || "없음";
+    throw new Error(`위생 검사를 통과한 문답이 없습니다 (${valid.length}건 전부 걸러짐).\n걸러진 것: ${사유}`);
+  }
   fs.mkdirSync(DATASETS_DIR, { recursive: true });
-  fs.writeFileSync(path.join(DATASETS_DIR, `${id}.json`), JSON.stringify(valid, null, 2), "utf-8");
-  return { id, examples: valid.length };
+  fs.writeFileSync(path.join(DATASETS_DIR, `${id}.json`), JSON.stringify(위생.kept, null, 2), "utf-8");
+  return { id, examples: 위생.kept.length };
 }
 
 // 팀장이 "오늘 확인할 항목"에 직접 추가한 일과를 학습 데이터셋으로 축적한다(파인튜닝 반영 경로).

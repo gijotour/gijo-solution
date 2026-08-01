@@ -13,6 +13,7 @@
 //      승인 = 사람이 검증한 정답이라, 모델 자기오류를 재강화하지 않는 안전한 자가강화 신호다.
 
 import type { Express } from "express";
+import { 시험문항인가 } from "./datasethygiene";
 import * as fs from "fs";
 import * as path from "path";
 import { authMiddleware } from "../auth/auth";
@@ -142,7 +143,12 @@ export function collectDecisionPairs(): DecisionPair[] {
   const gold = readGold();
   const goldKeys = new Set(gold.map((g) => g.instruction.trim()));
   const seedOnly = SEED_DECISIONS.filter((s) => !goldKeys.has(s.instruction.trim()));
-  return [...seedOnly, ...gold];
+  // ★ 시험지에 있는 지시는 학습에서 뺀다 — **여기서만 걸러진다.**
+  //   question이 긴 프롬프트라 위생의 시험 문항 대조(질문 전체를 본다)로는 안 걸린다.
+  //   2026-08-01 실측: 시드 37개 중 2개("안전대부 웹서버 취약점 알려줘"·"지금 제일 급한
+  //   취약점 알려줘")가 평가 게이트 문항 그대로였다 — 시험지를 오케스트레이터에게
+  //   가르치고 있었고, 그러면 게이트 점수가 실력을 못 잰다(위생 규칙 ②가 "가장 위험"이라 적은 것).
+  return [...seedOnly, ...gold].filter((d) => !시험문항인가(d.instruction));
 }
 
 // ── 골드 few-shot 동적 주입 (파인튜닝 대체) ────────────────────────────────
@@ -287,7 +293,7 @@ export async function buildOrchestratorDataset(
   if (opts.amplify) pairs = await amplifyDecisionPairs(pairs);
   const examples = pairs.map(toTrainingExample);
   const { saveDataset } = await import("./dataset.js");
-  const saved = saveDataset(ORCHESTRATOR_DATASET_ID, examples);
+  const saved = saveDataset(ORCHESTRATOR_DATASET_ID, examples, "라우팅") // 도구 호출 예시라 식별자가 있어야 한다;
   return { datasetId: saved.id, examples: saved.examples, seed: SEED_DECISIONS.length, gold: goldCount(), amplified: !!opts.amplify };
 }
 

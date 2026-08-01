@@ -114,12 +114,23 @@ describe("appendApprovedDecision — 승인 누적(골드)", () => {
 });
 
 describe("buildOrchestratorDataset — 시드+골드 → 학습 데이터셋", () => {
-  it("시드만으로도 유효한 데이터셋 파일을 만든다", async () => {
+  // ★ 2026-08-01: saveDataset이 위생을 거치게 되면서 **시드 2개가 걸러진다.**
+  //   "안전대부 웹서버 취약점 알려줘" · "지금 제일 급한 취약점 알려줘" — 둘 다
+  //   **평가 게이트에 실제로 있는 문항**이다. 시험지를 오케스트레이터에게 가르치고 있었고,
+  //   그게 바로 위생 규칙 ②가 "가장 위험"이라고 적어 둔 오염이다. 걸러지는 게 맞다.
+  //   그래서 기대값을 시드 개수가 아니라 **위생 통과분**으로 잡는다.
+  const 시험문항인시드 = ["안전대부 웹서버 취약점 알려줘", "지금 제일 급한 취약점 알려줘"];
+  const 위생통과시드 = SEED_DECISIONS.filter((s) => !시험문항인시드.includes(s.instruction.trim())).length;
+
+  it("시드만으로도 유효한 데이터셋 파일을 만든다 (시험 문항은 빠진다)", async () => {
     const r = await buildOrchestratorDataset();
     expect(r.datasetId).toBe(ORCHESTRATOR_DATASET_ID);
-    expect(r.examples).toBe(SEED_DECISIONS.length);
+    expect(r.examples, "위생이 시험 문항을 안 걸렀거나, 멀쩡한 시드를 잘랐다").toBe(위생통과시드);
     const rows = JSON.parse(fs.readFileSync(DATASET_PATH, "utf-8"));
-    expect(rows).toHaveLength(SEED_DECISIONS.length);
+    expect(rows).toHaveLength(위생통과시드);
+    // 게이트 문항이 학습 파일에 실제로 안 들어갔는지 눈으로 확인한다.
+    const 질문들 = rows.map((x: { question: string }) => x.question).join("\n");
+    for (const q of 시험문항인시드) expect(질문들, `게이트 문항이 학습에 들어갔다: ${q}`).not.toContain(q);
     expect(rows[0]).toHaveProperty("question");
     expect(rows[0]).toHaveProperty("answer");
   });

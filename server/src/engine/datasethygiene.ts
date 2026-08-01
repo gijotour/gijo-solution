@@ -130,7 +130,23 @@ const 운영확인용테스트 = (q: string): boolean => 운영확인용.some((r
 function 시험문항(): Set<string> {
   const 정규화 = (s: string) => String(s ?? "").replace(/\s+/g, "").replace(/[?!.,·…]/g, "");
   const out = new Set<string>();
-  // 실행 위치는 dist/engine/ 또는 src/engine/ — 저장소 뿌리를 위로 올라가며 찾는다.
+
+  // ① 서버 안에 구워 둔 목록을 먼저 읽는다 — **운영에는 tools/가 없기 때문이다.**
+  //    (2026-08-01 검토에서 잡힘: 운영에서 이 필터가 늘 꺼져 있었다. 그 사실이 어디에도
+  //     안 남아서 "시험 문항은 걸렀다"고 믿고 있었다.)
+  //    갱신: node server/scripts/gen-exam-questions.mjs · 최신 여부는 examquestions.test.ts가 본다.
+  for (const 후보 of [path.join(__dirname, "examquestions.json"), path.join(__dirname, "..", "..", "src", "engine", "examquestions.json")]) {
+    try {
+      if (!fs.existsSync(후보)) continue;
+      const j = JSON.parse(fs.readFileSync(후보, "utf8")) as { 문항?: string[] };
+      for (const q of j.문항 ?? []) out.add(q);
+      break;
+    } catch {
+      /* 아래 tools/ 경로로 넘어간다 */
+    }
+  }
+
+  // ② 개발기에서는 tools/ 원본도 함께 읽는다 — 시험지를 늘리고 아직 안 구운 상태를 덮는다.
   const 뿌리 = (() => {
     let d = __dirname;
     for (let i = 0; i < 6; i++) {
@@ -139,7 +155,7 @@ function 시험문항(): Set<string> {
     }
     return null;
   })();
-  if (!뿌리) return out; // 운영 배포엔 tools/가 없다 — 그땐 중복 제거만으로 간다
+  if (!뿌리) return out;
   const 파일 = [
     "tools/regress/cases.json",
     "tools/evalgate/cases/routing.json",
@@ -169,8 +185,46 @@ function 시험문항(): Set<string> {
  * ⚠ 여기서 거르는 것은 "나쁜 답"이 아니라 "가르치면 안 되는 것"이다.
  *   답의 옳고 그름은 사람이 후보함에서 판단했다(승인 👍). 이 함수는 그 뒤 단계다.
  */
-export function cleanForTraining(rows: Example[]): HygieneResult {
+/**
+ * 데이터 종류 — 규칙을 다 걸면 안 되는 것이 있다.
+ *
+ * ⚠ 2026-08-01 실측: 위생을 saveDataset에 넣었더니 **오케스트레이터 시드 2개가 잘렸다.**
+ *   그 답은 `{"tool":"update_finding_status","args":{"assetId":"vuln:sample-web01"}}` 꼴이라
+ *   시점데이터 규칙(우리 DB 식별자)에 걸린 것이다. 그런데 라우팅 데이터는 **식별자가 있어야**
+ *   도구 호출을 가르칠 수 있다. 지식 답에 맞춘 규칙을 라우팅에 그대로 걸면 가르칠 것이 사라진다.
+ *
+ * · "지식" — 담당자 문답. 아홉 규칙 전부.
+ * · "라우팅" — 지시 → 도구 선택. **시험 문항과 주입 표식만** 막는다(그 둘은 종류와 무관하게
+ *   게이트·안전을 무너뜨린다). 나머지는 이 데이터의 성질과 안 맞는다.
+ */
+export type 데이터종류 = "지식" | "라우팅";
+
+/**
+ * 이 지시가 시험지(회귀·게이트)에 있는가 — **지시만 따로** 볼 때 쓴다.
+ *
+ * ⚠ 2026-08-01: 오케스트레이터 시드는 question이 긴 프롬프트고 지시는 그 안에 박혀 있다.
+ *   그래서 cleanForTraining의 시험 문항 대조(질문 전체를 본다)로는 못 걸러, 게이트 문항
+ *   2개("안전대부 웹서버 취약점 알려줘"·"지금 제일 급한 취약점 알려줘")가 그대로 학습되고
+ *   있었다. 지시가 따로 있는 자리에서는 이 함수로 본다.
+ */
+export function 시험문항인가(지시: string): boolean {
+  const 정규화 = (x: string) => String(x ?? "").replace(/\s+/g, "").replace(/[?!.,·…]/g, "");
+  return 시험문항().has(정규화(지시));
+}
+
+export function cleanForTraining(rows: Example[], 종류: 데이터종류 = "지식"): HygieneResult {
+  const 지식 = 종류 === "지식";
   const 시험 = 시험문항();
+  // ⚠ 시험지 목록이 비면 **막지 못한 채 지나간다.** 예전엔 그냥 넘어가서, 운영에서 이 필터가
+  //   내내 꺼져 있었는데도 아무도 몰랐다(2026-08-01 검토). 이제는 멈춘다 —
+  //   게이트 문항이 섞인 데이터로 학습하면 그 뒤 모든 점수가 거짓이 되기 때문이다.
+  if (시험.size === 0) {
+    throw new Error(
+      "시험 문항 목록을 읽지 못했습니다 — 학습 데이터를 만들 수 없습니다.\n" +
+        "평가 게이트 질문이 섞이면 모델이 시험지를 외운 채 시험을 보게 되어, 그 뒤 점수가 실력을 못 잽니다.\n" +
+        "server/src/engine/examquestions.json이 배포됐는지 확인하세요(만들기: node server/scripts/gen-exam-questions.mjs).",
+    );
+  }
   const 정규화 = (s: string) => String(s ?? "").replace(/\s+/g, "").replace(/[?!.,·…]/g, "");
   const dropped: Record<string, number> = {};
   const drop = (why: string) => { dropped[why] = (dropped[why] ?? 0) + 1; };
@@ -181,12 +235,12 @@ export function cleanForTraining(rows: Example[]): HygieneResult {
     const a = String(r?.answer ?? "").trim();
     if (!q || !a) { drop("빈 문답"); continue; }
     if (INJECT_MARK_RE.test(q) || INJECT_MARK_RE.test(a)) { drop("보안 시험 표식"); continue; }
-    if (MACHINE_RE.test(q)) { drop("기계 생성(프롬프트 틀·맥락 덩어리)"); continue; }
-    if (시점데이터(a)) { drop("시점 데이터(그날의 숫자·날짜·자산)"); continue; }
-    if (짧은질문(q)) { drop("질문이 너무 짧음"); continue; }
-    if (프롬프트누출.test(a)) { drop("내부 프롬프트 누출"); continue; }
-    if (회피답변.test(a)) { drop("회피 답변(지식 구멍)"); continue; }
-    if (운영확인용테스트(q)) { drop("운영 확인용 질문(내 시험 흔적)"); continue; }
+    if (지식 && MACHINE_RE.test(q)) { drop("기계 생성(프롬프트 틀·맥락 덩어리)"); continue; }
+    if (지식 && 시점데이터(a)) { drop("시점 데이터(그날의 숫자·날짜·자산)"); continue; }
+    if (지식 && 짧은질문(q)) { drop("질문이 너무 짧음"); continue; }
+    if (지식 && 프롬프트누출.test(a)) { drop("내부 프롬프트 누출"); continue; }
+    if (지식 && 회피답변.test(a)) { drop("회피 답변(지식 구멍)"); continue; }
+    if (지식 && 운영확인용테스트(q)) { drop("운영 확인용 질문(내 시험 흔적)"); continue; }
     const key = 정규화(q);
     if (시험.has(key)) { drop("시험 문항(회귀·게이트)"); continue; }
     // 같은 질문이 또 오면 **긴 답**을 남긴다 — 짧은 답은 대개 얼버무린 것이다.

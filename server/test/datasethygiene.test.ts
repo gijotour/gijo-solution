@@ -191,3 +191,21 @@ describe("운영 확인용 질문 — 내 시험 흔적", () => {
     expect(r.kept, "업무 질문이 잘못 걸렸다").toHaveLength(5);
   });
 });
+
+describe("★ 저장 자체가 관문 — 어느 길로 들어와도 위생을 거친다", () => {
+  // ⚠ 2026-08-01 검토 지적: 위생 주석은 "어느 길로 들어오든 거치는 마지막 관문"이라 적어
+  //   놨는데 실제 호출은 learnloop 한 곳뿐이었다. POST /api/dataset/save ·
+  //   orchestrator-dataset · datasetId를 직접 넘기는 학습 시작이 **그냥 지나갔다.**
+  //   호출부마다 붙이면 또 빠뜨리므로 saveDataset 안으로 넣었다.
+  it("saveDataset이 cleanForTraining을 부른다", async () => {
+    const fs = await import("node:fs");
+    const src = fs.readFileSync(new URL("../src/engine/dataset.ts", import.meta.url), "utf8");
+    const i = src.indexOf("export function saveDataset(");
+    expect(i, "saveDataset을 못 찾았다").toBeGreaterThan(-1);
+    const 본문 = src.slice(i, i + 1600);
+    expect(/cleanForTraining\(/.test(본문), "saveDataset이 위생을 안 거친다 — 우회로가 다시 열렸다").toBe(true);
+    // 걸러진 것을 저장하면 안 된다 — kept를 써야 한다.
+    // ⚠ `[^)]*`로 쓰면 path.join(...)의 괄호를 못 넘어 멀쩡한 코드를 틀렸다고 잡는다(실제로 당함).
+    expect(/writeFileSync\([\s\S]{0,120}JSON\.stringify\(위생\.kept/.test(본문), "위생 통과분이 아니라 원본을 저장한다").toBe(true);
+  });
+});

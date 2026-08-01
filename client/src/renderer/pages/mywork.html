@@ -207,7 +207,10 @@
     else if (window.gijo && window.gijo.navigateTo) window.gijo.navigateTo(page);
   }
   function askAI(q){
-    try { window.parent.postMessage({ type: "gijo:ask", text: q }, "*"); } catch (e) {}
+    // ⚠ 옛 길(`gijo:ask`)은 셸에게 보냈다 — 대화창을 창으로 빼 두면 접힌 자리에 답이 쌓여
+    //   **눌러도 아무 일이 없어 보인다**(2026-08-01 검토). 지금 보이는 대화창으로 보낸다.
+    if (window.gijo && window.gijo.askConsole) { window.gijo.askConsole(q); return; }
+    try { window.parent.postMessage({ type: "gijo:ask", text: q }, "*"); } catch (e) {} // 구버전 대비
   }
   // 질문 속 {업무}를 실제 업무 이름으로 바꾼다.
   // ⚠ 안 바꾸면 AI가 "무엇을 확인해야 할까요?"라고 되묻기만 한다(2026-07-31 실측).

@@ -626,10 +626,17 @@
     var sc = SCENARIOS[si], st = sc.steps[i];
     if (!stepDone(sc, i)) { guideDone.push(stepKey(sc, i)); saveGuideDone(); }
     renderGuide();
-    // 셸에 부탁한다 — 콘솔도 탭도 셸이 가지고 있다.
+    // 지시는 대화창으로, 화면 열기는 셸로. 둘은 주인이 다르다.
+    // ⚠ 옛 길(`gijo:ask` postMessage)은 셸에게 보냈는데, 대화창을 창으로 빼 두면 셸의
+    //   대화창은 접혀 있어 **눌러도 아무 일이 없어 보였다**(2026-08-01 검토). askConsole은
+    //   도킹이든 분리창이든 지금 보이는 쪽으로 간다.
     try {
-      if (st.k === "ask") window.parent.postMessage({ type: "gijo:ask", text: st.q }, "*");
-      else window.parent.postMessage({ type: "gijo:openTab", page: st.page }, "*");
+      if (st.k === "ask") {
+        if (window.gijo && window.gijo.askConsole) window.gijo.askConsole(st.q);
+        else window.parent.postMessage({ type: "gijo:ask", text: st.q }, "*"); // 구버전 대비
+      } else {
+        window.parent.postMessage({ type: "gijo:openTab", page: st.page }, "*");
+      }
     } catch (e) {}
   }
   function toggleSc(id) { guideOpenSc[id] = !guideOpenSc[id]; renderGuide(); }

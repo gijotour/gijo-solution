@@ -104,10 +104,13 @@ describe("dataset", () => {
       .post("/api/dataset/save")
       .set("Authorization", `Bearer ${token}`)
       .send({
+        // ⚠ 2026-08-01: 저장 자체가 위생 관문이 되면서 "q1"·"q2" 같은 **장난감 질문이 걸러진다**
+        //   (두 글자는 무엇을 묻는지 알 수 없어 학습에 넣으면 아무 데나 그 답을 붙인다).
+        //   fixture를 현실적인 질문으로 바꾼다 — 옛 fixture로는 이 시험이 제품을 잘못 판정했다.
         examples: [
-          { question: "q1", answer: "a1" },
+          { question: "KEV가 무엇인가요", answer: "실제 악용이 확인된 취약점 목록입니다" },
           { question: "", answer: "무시돼야 함" }, // 빈 question은 걸러진다
-          { question: "q2", answer: "a2" },
+          { question: "EPSS는 어떻게 보나요", answer: "악용 가능성 점수로 우선순위를 정합니다" },
         ],
         id,
       });

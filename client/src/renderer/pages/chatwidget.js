@@ -21,11 +21,17 @@
   // 분리창(popout)에는 콘솔이 없으므로 위젯을 남긴다 — 거기선 이게 유일한 답변 창구다.
   if (/(^|[?&])embed=1(&|$)/.test(location.search || "")) {
     host.style.display = "none";
-    // 화면 안에서 프로그램적으로 설명을 부르는 호출부(gijoExplain)는 셸 콘솔로 넘긴다.
+    // 화면 안에서 프로그램적으로 설명을 부르는 호출부(gijoExplain)는 대화창으로 넘긴다.
+    //
+    // ⚠ 옛 길(`gijo:explain` postMessage)은 **셸에게** 보냈다. 그런데 대화창을 「⧉ 창으로」
+    //   빼 두면 셸의 대화창은 접혀 있어서, 담당자 눈엔 **ⓘ를 눌러도 아무 일이 없고** 답은
+    //   안 보이는 자리에 쌓인다(2026-08-01 검토에서 잡힘 — ⓘ는 26개 화면 전부의 표준 경로다).
+    //   askConsole은 도킹이든 분리창이든 **지금 보이는 쪽**으로 간다.
+    //   문구를 여기서 만드는 이유: 셸이 만들던 것을 그대로 옮겨 왔다(app.html 옛 337~339행).
     window.gijoExplain = function (topic) {
-      try {
-        window.parent.postMessage({ type: "gijo:explain", screen: decodeURIComponent((location.pathname || "").split("/").pop() || ""), topic: topic || null }, "*");
-      } catch (e) {}
+      var 물음 = topic ? '"' + topic + '" 사용법 알려줘' : "이 화면에서 뭐 할 수 있어?";
+      if (window.gijo && window.gijo.askConsole) { window.gijo.askConsole(물음); return; }
+      try { window.parent.postMessage({ type: "gijo:ask", text: 물음 }, "*"); } catch (e) {} // 구버전 대비
     };
     return;
   }
