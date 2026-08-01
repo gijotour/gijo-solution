@@ -1,7 +1,7 @@
 {
   "name": "gijo-as-client",
   "productName": "GIJO AS",
-  "version": "4.16.0",
+  "version": "4.16.1",
   "description": "GIJO AS — AI Security Manager Platform (Electron client, connects to gijo-as-server)",
   "main": "dist/main.js",
   "scripts": {
