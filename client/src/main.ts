@@ -6,6 +6,7 @@ import { app, BrowserWindow, ipcMain, dialog, safeStorage, shell, screen, sessio
 import * as path from "path";
 import { spawn, ChildProcess } from "child_process";
 import * as os from "os";
+import { 셸옮길자리 } from "./util/layout";
 import * as fs from "fs";
 import * as http from "http";
 import * as https from "https";
@@ -417,10 +418,42 @@ let consoleWindow: BrowserWindow | null = null;
 // 없어 그대로 유실된다(2026-07-28 실측: 창을 빼면 맥락이 '대시보드'로 남았다).
 let lastConsoleContext: { screen: string | null; label: string | null } = { screen: null, label: null };
 
+// 도킹으로 돌아갈 때 되돌릴 셸 자리. 창을 옆으로 밀었을 때만 채워진다.
+let 셸복귀: { x: number; y: number; width: number; height: number; wasMaximized: boolean } | null = null;
+
+// 대화창을 창으로 뺄 때, 셸이 있던 자리를 **비켜 준다.**
+//
+// ⚠ 예전엔 안 비켜 줬다(2026-08-01 확인). 대화 창이 화면 오른쪽 끝에 뜨는데 셸은 그대로라
+//   모니터 한 대에서 앱을 최대화해 두면 **오른쪽 4분의 1이 가려졌다.** 담당자 눈에는
+//   "창으로 뺐더니 화면이 잘렸다"가 된다 — 도킹보다 나쁘다.
+//   같은 모니터에 겹칠 때만 비켜 준다. 대화 창을 다른 모니터로 옮겨 두었다면 건드리지 않는다.
+function 셸을옆으로(consoleBounds: { x: number; y: number; width: number; height: number }): void {
+  if (!mainWindow || mainWindow.isDestroyed()) return;
+  const 셸 = mainWindow.getBounds();
+  // 계산은 util/layout.ts에 있다 — 여기 두면 시험할 방법이 없다(이 개발 머신은 세로 모니터라
+  // 실앱에서 "비켜 주는 쪽"을 못 본다).
+  const 옮길자리 = 셸옮길자리(셸, consoleBounds);
+  if (!옮길자리) return;
+  // ⚠ 최대화 상태를 **먼저 적어 두고** 푼다 — 풀고 나서 물으면 언제나 false다.
+  const 최대화였나 = mainWindow.isMaximized();
+  if (최대화였나) mainWindow.unmaximize(); // 최대화 상태에선 크기를 못 바꾼다
+  셸복귀 = { x: 셸.x, y: 셸.y, width: 셸.width, height: 셸.height, wasMaximized: 최대화였나 };
+  mainWindow.setBounds(옮길자리);
+}
+
+function 셸자리복구(): void {
+  if (!셸복귀 || !mainWindow || mainWindow.isDestroyed()) return;
+  const b = 셸복귀;
+  셸복귀 = null;
+  mainWindow.setBounds({ x: b.x, y: b.y, width: b.width, height: b.height });
+  if (b.wasMaximized) mainWindow.maximize();
+}
+
 ipcMain.handle("console:popout", async () => {
   if (consoleWindow && !consoleWindow.isDestroyed()) { consoleWindow.focus(); return { ok: true }; }
   const wa = screen.getPrimaryDisplay().workArea;
   const w = Math.max(420, Math.round(wa.width * 0.28));
+  셸을옆으로({ x: wa.x + wa.width - w, y: wa.y, width: w, height: wa.height });
   consoleWindow = new BrowserWindow({
     x: wa.x + wa.width - w, y: wa.y, width: w, height: wa.height,
     minWidth: 360, minHeight: 320,
@@ -437,6 +470,7 @@ ipcMain.handle("console:popout", async () => {
   bindZoom(consoleWindow);
   consoleWindow.on("closed", () => {
     consoleWindow = null;
+    셸자리복구(); // 비켜 줬던 셸을 원래 자리로 — 안 돌리면 앱이 좁아진 채로 남는다
     // 창이 닫히면 셸이 콘솔을 다시 아래에 붙여야 한다 — 안 알리면 대화할 곳이 사라진다.
     if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("console:closed", {});
   });
