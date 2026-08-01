@@ -256,12 +256,24 @@
       <div class="conv" id="conv">
         <div class="conv-empty" id="convEmpty">
           <div class="big">💬</div>
-          <div>왼쪽에서 지난 작업을 고르면 그때 오간 대화가 여기 나옵니다.<br>새 일은 아래 콘솔에 지시하면 그 순간 새 내역으로 남습니다.</div>
+          <div>왼쪽에서 지난 작업을 고르면 그때 오간 대화가 여기 나옵니다.<br>새 일은 대화창에 지시하면 그 순간 새 내역으로 남습니다.</div>
         </div>
       </div>
+      <!--
+        여기 있던 입력칸을 **대화창(지휘소)으로 잇는 버튼**으로 바꿨다(2026-08-01 사용자 결정 ①안).
+
+        왜: 지시를 넣는 자리가 다섯 곳이었고, 이 자리에는 근거·결재판·체크칸·가서 하기가
+        **하나도 없었다.** 담당자는 자리가 다른 걸 모르므로 "같은 말을 했는데 어떤 때는
+        근거가 나오고 어떤 때는 안 나온다"가 되고, 그러면 근거 기능 자체를 안 믿게 된다.
+
+        ★ 실사용을 세어 보고 정했다: 오늘 이전 작업 세션 47건 중 **3턴 이상이 0건** —
+          「이어서 지시」가 한 번도 쓰이지 않았다. 부품을 여기 또 붙이는 것보다
+          대화를 한 줄로 모으는 편이 낫다("아까 그거 담당자 바꿔줘"가 통하는 이유).
+
+        ⚠ 빈 채로 두지 않는다 — 그냥 지우면 담당자는 기능이 사라진 줄 안다.
+      -->
       <div class="cin">
-        <input id="chatInput" placeholder="이 작업에 이어서 지시… (예: 오늘 제일 급한 취약점 뭐야?)" disabled aria-label="이 작업에 이어서 지시">
-        <button id="sendBtn" disabled>전송</button>
+        <button id="goConsoleBtn" disabled style="flex:1;justify-content:center">💬 대화창에서 이어서 지시하기</button>
       </div>
     </div>
   </div>
@@ -277,9 +289,27 @@
   const convEl = document.getElementById("conv");
   const convHead = document.getElementById("convHead");
   const convEmpty = document.getElementById("convEmpty");
-  const chatInput = document.getElementById("chatInput");
-  const sendBtn = document.getElementById("sendBtn");
+  const goConsoleBtn = document.getElementById("goConsoleBtn");
   const searchInput = document.getElementById("sessionSearch");
+
+  /**
+   * 이 작업을 이어서 하려면 **대화창(지휘소)으로 간다.**
+   *
+   * 여기서 바로 보내면 근거·결재판·체크칸이 없는 반쪽 답이 돌아온다(2026-08-01).
+   * 셸 안이면 대화창은 이미 아래에 있으므로 지시만 채워 주고, 분리창이면 본창에 부탁한다.
+   */
+  function 지휘소로(지시) {
+    var 글 = String(지시 || "").trim();
+    // askConsole을 먼저 쓴다 — 대화창이 셸 아래에 있든 창으로 빠져 있든 **지금 보이는 쪽**으로
+    // 간다. 셸에 postMessage하는 옛 `gijo:ask` 길은 대화창을 창으로 빼 두면 안 보이는
+    // 도킹 자리에 답을 찍는다(2026-08-01 확인). 그 길은 구버전 대비 폴백으로만 남긴다.
+    if (window.gijo && window.gijo.askConsole) { window.gijo.askConsole(글); return; }
+    try {
+      if (window.parent !== window) { window.parent.postMessage({ type: "gijo:ask", text: 글 }, "*"); return; }
+    } catch (e) {}
+    if (window.gijo && window.gijo.openConsoleWindow) { window.gijo.openConsoleWindow(); return; }
+    if (window.gijo && window.gijo.navigateTo) window.gijo.navigateTo("app.html");
+  }
 
   const STATUS_LABEL = { active: "진행중", done: "완료", ignored: "무시" };
   const esc = (s) => String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
@@ -421,11 +451,12 @@
     return `<div class="suggest"><div class="ask">무엇을 도와드릴까요? 이런 작업을 할 수 있어요 —</div>${steps}</div>`;
   }
   function bindSuggestions() {
-    convEl.querySelectorAll(".step[data-instr]").forEach((el) => el.addEventListener("click", () => { chatInput.value = el.dataset.instr; send(); }));
+    // 추천 단계도 **지휘소로 들고 간다** — 여기서 실행하면 근거·결재판 없는 답이 나온다.
+    convEl.querySelectorAll(".step[data-instr]").forEach((el) => el.addEventListener("click", () => 지휘소로(el.dataset.instr)));
   }
   function renderConversation(turns) {
     if (!turns.length && !(currentSession && currentSession.contextRef)) {
-      convEl.innerHTML = `<div class="conv-empty"><div class="big">🧭</div><div>아직 오간 대화가 없습니다. 아래에 지시를 입력하세요.</div></div>`;
+      convEl.innerHTML = `<div class="conv-empty"><div class="big">🧭</div><div>아직 오간 대화가 없습니다. 아래 [대화창에서 이어서 지시하기]를 누르세요.</div></div>`;
       return;
     }
     convEl.innerHTML = turns.map(turnHtml).join("") + suggestionsHtml();
@@ -437,7 +468,7 @@
     renderSessionList();
     convHead.style.display = "flex";
     convEmpty.style.display = "none";
-    chatInput.disabled = false; sendBtn.disabled = false;
+    goConsoleBtn.disabled = false;
     convEl.innerHTML = `<div class="conv-empty"><div>불러오는 중…</div></div>`;
     try {
       const { session, turns } = await window.gijo.getWorkSession(id);
@@ -446,7 +477,6 @@
       document.getElementById("convMeta").textContent = `👤 ${session.createdBy || "담당자 미기록"} · ${new Date(session.createdAt).toLocaleDateString("ko-KR")} 시작 · ${turns.length}턴`;
       document.getElementById("convStatus").value = session.status;
       renderConversation(turns);
-      chatInput.focus();
     } catch (e) {
       convEl.innerHTML = `<div class="conv-empty"><div>대화를 불러오지 못했습니다.</div></div>`;
     }
@@ -455,32 +485,9 @@
   // newSession()은 4.0.0에서 없앴다 — 빈 내역을 손으로 만드는 길이었다.
   // 새 작업은 셸 콘솔에 지시하면 서버가 그 자리에서 내역을 만든다(console.js → sendInstruction).
 
-  async function send() {
-    const text = chatInput.value.trim();
-    if (!text || !currentId) return;
-    chatInput.value = "";
-    chatInput.disabled = true; sendBtn.disabled = true;
-    // 낙관적 표시: 내 지시 + 처리중 인디케이터
-    if (convEl.querySelector(".conv-empty")) convEl.innerHTML = "";
-    convEl.insertAdjacentHTML("beforeend", `<div class="turn"><div class="you"><b>나</b> — ${esc(text)}</div></div>`);
-    convEl.insertAdjacentHTML("beforeend", `<div class="turn" id="pendingTurn"><div class="ai pending">처리 중… 오케스트레이터가 작업하고 있습니다.</div></div>`);
-    convEl.scrollTop = convEl.scrollHeight;
-    try {
-      await window.gijo.sendInstruction(text, currentId);
-      // 서버에 기록된 실제 턴으로 대화·목록을 재동기화(도구 배지·자동 제목 반영).
-      const { session, turns } = await window.gijo.getWorkSession(currentId);
-      currentSession = session;
-      document.getElementById("convTitle").textContent = session.title;
-      document.getElementById("convMeta").textContent = `👤 ${session.createdBy || "담당자 미기록"} · ${new Date(session.createdAt).toLocaleDateString("ko-KR")} 시작 · ${turns.length}턴`;
-      renderConversation(turns);
-      await loadSessions(false);
-    } catch (e) {
-      const p = document.getElementById("pendingTurn");
-      if (p) p.querySelector(".ai").innerHTML = `<span style="color:#f5928a">지시 처리 실패: ${esc(e && e.message || e)}</span>`;
-    } finally {
-      chatInput.disabled = false; sendBtn.disabled = false; chatInput.focus();
-    }
-  }
+  // 옛 send()는 지웠다(2026-08-01). 이 자리에서 직접 지시를 보내면 근거·결재판·체크칸이 없어
+  // 쓰기 지시가 막다른 길이 됐다. 게다가 오늘 이전에 만들어진 작업 세션 47건 중 **3턴 이상인
+  // 것이 0건** — 여기서 이어서 지시한 사람이 실제로 없었다. 지시는 대화창으로 모은다.
 
   // ── 세션 편집(이름·상태·삭제) ────────────────────────────────────────
   function startRename() {
@@ -518,7 +525,7 @@
         currentId = null; currentSession = null;
         convHead.style.display = "none";
         convEl.innerHTML = ""; convEl.appendChild(convEmpty); convEmpty.style.display = "flex";
-        chatInput.disabled = true; sendBtn.disabled = true;
+        goConsoleBtn.disabled = true;
       }
       await loadSessions(false);
     } catch (e) { gijoTell("삭제 실패: " + (e && e.message || e)); }
@@ -531,7 +538,7 @@
       currentId = null; currentSession = null;
       convHead.style.display = "none";
       convEl.innerHTML = ""; convEl.appendChild(convEmpty); convEmpty.style.display = "flex";
-      chatInput.disabled = true; sendBtn.disabled = true;
+      goConsoleBtn.disabled = true;
     }
   }
   // 기간 이전(마지막 활동 기준) 세션 일괄 삭제. (리포트 화면과 동일한 패턴: 드롭다운 선택 + 일괄 삭제 버튼)
@@ -633,8 +640,10 @@
     document.getElementById("convTitle").addEventListener("click", startRename);
     document.getElementById("deleteBtn").addEventListener("click", deleteSession);
     document.getElementById("convStatus").addEventListener("change", changeStatus);
-    sendBtn.addEventListener("click", send);
-    chatInput.addEventListener("keydown", (e) => { if (e.key === "Enter") send(); });
+    // 이어서 지시하기 → 대화창(지휘소)으로. 여기서 직접 보내지 않는다(2026-08-01 ①안).
+    // ⚠ 옛 send()는 아래에 남아 있지만 **아무도 안 부른다.** 지우다 옆 함수를 잘라 먹은
+    //   사고가 오늘 있어서(console.js attachApproval) 호출만 끊고 코드는 둔다.
+    goConsoleBtn.addEventListener("click", () => 지휘소로(""));
     searchInput.addEventListener("input", (e) => { searchQuery = e.target.value.trim().toLowerCase(); renderSessionList(); });
   }
 

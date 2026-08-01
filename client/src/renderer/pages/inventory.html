@@ -1330,9 +1330,21 @@
       if (genId) {
         await generateSbomFor(genId, e.target);
       } else if (scanId) {
-        e.target.textContent = "스캔 중...";
-        await window.gijo.sendInstruction(`${scanId} 스캔해줘`);
-        await refresh();
+        // ⚠ 원래 `"<id> 스캔해줘"`를 오케스트레이터에 자연어로 보냈다(2026-08-01 발견).
+        //    바로 옆 [SBOM 생성]은 직접 API를 부르는데 이것만 LLM을 거쳤다 — 버튼이 무엇을 할지
+        //    정해져 있는데 굳이 말로 옮겨 다시 알아듣게 한 것이다. 느리고, 모델이 다른 도구를
+        //    고르면 엉뚱한 일이 벌어지고, 결재판이 뜨면 이 화면은 그리지 못해 막다른 길이 된다.
+        //    스캔은 대상이 명확하니 옆 버튼과 같은 모양으로 직접 부른다.
+        const btn = e.target;
+        btn.textContent = "스캔 중...";
+        try {
+          const r = await window.gijo.scanAsset(scanId);
+          await refresh();
+          // refresh()가 줄을 다시 그리면 이 버튼은 사라진다 — 남아 있을 때만 결과를 적는다.
+          if (btn.isConnected) btn.textContent = `취약점 ${r && r.findings != null ? r.findings : 0}건`;
+        } catch (err) {
+          btn.textContent = "스캔 실패";
+        }
       }
     });
 

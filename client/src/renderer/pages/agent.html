@@ -347,7 +347,7 @@ tr:last-child td{border-bottom:none;}
   const agentGrid = document.getElementById("agentGrid");
   const chatFeed = document.getElementById("chatFeed") || document.createElement("div"); // 패널 제거(2026-07-26) — 참조 안전용 더미
   const terminalLog = document.getElementById("terminalLog");
-  const taskBarInput = document.getElementById("taskBarInput") || document.createElement("input"); // 지시바 제거 — 참조 안전용 더미
+  // taskBarInput 더미도 없앴다 — 지시바가 사라진 뒤 이 자리를 쓰는 코드가 하나도 남지 않았다.
 
   const AGENT_STYLE = {
     orchestrator: { icon: "◆", color: "var(--blue-light)", bg: "rgba(59,130,246,0.18)" },
@@ -766,24 +766,10 @@ tr:last-child td{border-bottom:none;}
     }
   }
 
-  async function sendInstruction() {
-    const text = taskBarInput.value.trim();
-    if (!text) return;
-    taskBarInput.value = "";
-    try {
-      const result = await window.gijo.sendInstruction(text);
-      // 복합(멀티스텝) 지시면 실행된 단계 요약을 피드 상단에 명확히 남긴다(단계별 진행은 협업 로그로 실시간 표시됨).
-      if (result && result.steps && result.steps.length) {
-        const summary = result.steps.map((s, i) => `${i + 1}. ${s.label}`).join(" → ");
-        if (chatFeed.textContent.includes("없습니다") || chatFeed.textContent.includes("불러오는 중")) chatFeed.innerHTML = "";
-        chatFeed.insertAdjacentHTML("afterbegin",
-          `<div class="chat-row" style="background:rgba(59,130,246,0.1)"><span style="color:var(--blue-light);font-weight:800">🧭 복합 지시 ${result.steps.length}단계</span><span class="chat-msg">${String(summary).replace(/</g, "&lt;")}</span></div>`);
-      }
-      await Promise.all([loadAgents(), loadTaskKpis()]);
-    } catch (e) {
-      gijoTell("지시 처리 중 오류가 발생했습니다: " + e.message);
-    }
-  }
+  // 옛 sendInstruction()은 지웠다(2026-08-01). 지시바는 2026-07-26에 이미 없앴고, 그 뒤로 이
+  // 함수는 **아무도 부르지 않았다** — taskBarBtn은 없고 taskBarInput은 문서에 붙지 않은 더미라
+  // keydown이 영영 안 뜬다. 지시는 대화창(지휘소) 한 곳으로 모은다 — 근거·결재판을 그리는 곳이
+  // 거기뿐이라, 다른 자리에서 보내면 쓰기 지시가 막다른 길이 된다.
 
   // 에이전트 구성(이름·모델)은 관리자만 — 담당자(security_officer)는 정의된 팀을 그대로 쓴다.
   // 로스터 카드(이름변경 클릭)와 설정 모달이 둘 다 여기 안에 있어서, 패널+버튼을 감추면
@@ -844,8 +830,7 @@ tr:last-child td{border-bottom:none;}
     document.querySelectorAll("[data-page]").forEach((el) => {
       el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
     });
-    document.getElementById("taskBarBtn")?.addEventListener("click", sendInstruction); // 지시바 제거(2026-07-26) — 가드
-    taskBarInput.addEventListener("keydown", (e) => { if (e.key === "Enter") sendInstruction(); });
+    // 지시바 배선도 걷었다(2026-08-01) — 부를 함수가 없어졌고, 애초에 붙일 요소도 없었다.
 
     const goGuide = () => window.gijo.navigateTo("settings.html");
     document.getElementById("goModelSettings").addEventListener("click", goGuide);

@@ -782,6 +782,26 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
     renderStat();
   }
 
+  // 버튼 글자로 잠깐 알린다. 이 화면엔 알림 자리가 따로 없고 feedLine은 그리는 곳이 없어졌다
+  // (아래 785행 주석) — 눌렀는데 아무 반응이 없으면 담당자는 고장으로 읽는다.
+  function 알림(btn, 말, 되돌릴말) {
+    if (!btn) return;
+    btn.dataset.hold = "1";
+    btn.textContent = 말;
+    setTimeout(function () { delete btn.dataset.hold; btn.textContent = 되돌릴말; }, 2600);
+  }
+
+  // 지시는 전부 대화창(지휘소)으로 보낸다.
+  // ⚠ 이 화면이 직접 sendInstruction을 부르면 **쓰기 지시가 막다른 길이 된다** — 쓰기 도구는
+  //   결재판(approval)으로만 실행되는데 이 화면은 그걸 그릴 줄 모른다. 근거·결재판·체크칸을
+  //   아는 곳은 대화창뿐이라 거기로 넘기고, 담당자가 거기서 승인한다(2026-08-01).
+  function 지휘소로(지시) {
+    var 글 = String(지시 || "").trim();
+    if (window.gijo && window.gijo.askConsole) { window.gijo.askConsole(글); return; }
+    // 구버전 대비 — 대화창을 띄우기만 한다(글은 못 싣는다).
+    if (window.gijo && window.gijo.openConsoleWindow) window.gijo.openConsoleWindow();
+  }
+
   function feedLine(from, msg, color) {
     // A안: 팀 대화 피드 패널을 없앴다 — 대화는 캐릭터 말풍선(office.collabMove)과
     // 대시보드 "실시간 세션"에서 확인한다. 피드 요소가 없으면 조용히 무시(호출부는 그대로 둠).
@@ -962,17 +982,25 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
       : `${it.subtitle} 자산의 ${it.title} 조치를 진행해줘. 근거: ${it.why}`;
     feedLine("나", instruction, "var(--blue-light)");
     goBtn.disabled = true;
-    goBtn.textContent = "AI 팀에 전달 중…";
+    goBtn.textContent = "대화창으로 넘기는 중…";
     try {
       // 맡긴 항목은 체크리스트에도 남아야 한다 — 안 그러면 지시만 나가고 "맡겼는데 어디 갔지?"가
       // 된다(사용자 지적, 2026-07-22). 미완료로 등록해 두고, 처리 여부는 담당자가 체크리스트에서
       // 직접 완료 처리한다(자동완료는 결재 대기 등 실제 완료가 아닐 수 있어 안 함).
       await window.gijo.addTask(instruction, { ref: "brief:" + it.id });
-      await window.gijo.sendInstruction(instruction);
+      // ⚠ 여기서 직접 sendInstruction을 부르던 것을 대화창으로 돌린다(2026-08-01).
+      //   이 지시는 "조치를 진행해줘"라 **쓰기**다. 쓰기 도구는 결재판(approval)으로만 실행되는데
+      //   이 화면은 결재판을 그릴 줄 몰라 응답의 approval을 버렸다 — 담당자는 맡겼다고 믿지만
+      //   아무것도 실행되지 않았다. 결재판·근거를 아는 곳은 대화창뿐이므로 거기로 보낸다.
+      지휘소로(instruction);
       await loadGuide();
       await loadTasks();
+      // ⚠ 확인 문구를 **버튼에 쓰면 안 된다** — 바로 위 loadGuide()가 목록을 다시 그려 그 버튼이
+      //   통째로 갈린다(실앱에서 확인: 눌러도 옛 글자 그대로였다). 다시 그려도 남는 자리인
+      //   브리핑 머리글에 적는다. feedLine은 피드 패널이 없어져 아무것도 안 그린다(아래 주석).
+      알림(document.querySelector(".brief-col .bc-h"), "💬 대화창으로 넘겼습니다 — 거기서 승인하세요", "🧭 오늘 브리핑");
     } catch (err) {
-      feedLine("시스템", "지시 실패: " + (err && err.message || err), "var(--red)");
+      알림(document.querySelector(".brief-col .bc-h"), "⚠ 넘기지 못했습니다 — 다시 눌러 주세요", "🧭 오늘 브리핑");
       goBtn.disabled = false;
       goBtn.textContent = "▶ AI 팀에 맡기기";
     }
@@ -1015,23 +1043,25 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
         ctaBtn.textContent = "루틴 추천 불러오는 중…";
         const sugg = await window.gijo.getRoutineSuggestions();
         const daily = (sugg || []).filter((s) => s.cadence === "daily").slice(0, 5);
-        if (!daily.length) { feedLine("시스템", "추천할 루틴이 아직 없어요 — 할 일을 직접 추가해 보세요"); return; }
+        if (!daily.length) { 알림(ctaBtn, "추천할 루틴이 없어요 — 할 일을 직접 추가하세요", orig); return; }
         for (const s of daily) await window.gijo.addTask(s.text, { ref: "routine:" + s.source });
         await loadTasks();
-        feedLine("AI 팀", `오늘의 루틴 ${daily.length}건을 할일에 채웠어요`);
+        알림(ctaBtn, `오늘의 루틴 ${daily.length}건을 담았어요`, orig);
       } else {
         const top = open[0];
-        ctaBtn.textContent = "오케스트레이터에게 지시 중…";
-        feedLine("나 → Orchestrator", top.text, "var(--text)");
-        const result = await window.gijo.sendInstruction(top.text);
-        const summary = result && (result.summary || result.reply || result.message);
-        if (summary) feedLine("Orchestrator", String(summary).slice(0, 300), AGENT_COLOR["Security Orchestrator"]);
+        feedLine("나 → 대화창", top.text, "var(--text)");
+        // ⚠ 여기는 두 겹으로 고장나 있었다(2026-08-01). ① 응답의 summary·reply·message를 읽었는데
+        //    dispatch 응답에 그런 필드가 없다(있는 건 output) — 그래서 **아무것도 안 찍혔다.**
+        //    ② 필드를 고쳐도 결재판을 못 그려 쓰기 지시는 실행되지 않는다. 대화창으로 보낸다.
+        지휘소로(top.text);
+        알림(ctaBtn, "→ 대화창에서 승인하세요", orig);
       }
     } catch (err) {
-      feedLine("시스템", "운영 시작 실패: " + (err && err.message || err), "var(--red)");
+      알림(ctaBtn, "운영 시작 실패 — 다시 눌러 주세요", orig);
     } finally {
       ctaBtn.disabled = false;
-      ctaBtn.textContent = orig;
+      // 알림()이 잡고 있는 동안은 글자를 되돌리지 않는다 — 안 그러면 알림이 뜨자마자 지워진다.
+      if (!ctaBtn.dataset.hold) ctaBtn.textContent = orig;
     }
   });
 

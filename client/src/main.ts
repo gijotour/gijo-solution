@@ -448,6 +448,22 @@ ipcMain.handle("console:popout", async () => {
   return { ok: true };
 });
 
+// 아무 창에서나 → 지휘소(대화창)에 지시를 건넨다.
+// ⚠ 화면이 자기 자리에서 직접 /api/dispatch를 부르면 **쓰기 지시가 막다른 길이 된다** —
+//   쓰기 도구는 결재판(approval)으로만 나가는데, 그걸 그릴 줄 아는 곳은 대화창뿐이다.
+//   실제로 팀 사무실이 그렇게 부르고 있었고, 없는 필드(summary)를 읽어 응답조차 안 보였다
+//   (2026-08-01 확인). 그래서 지시는 전부 대화창으로 모은다.
+ipcMain.handle("console:ask", async (_e, text: string) => {
+  const 글 = String(text ?? "").trim();
+  // 분리돼 있으면 그 창이 대화창이고, 아니면 셸 아래에 도킹돼 있다. 둘 다 console.js가 받는다.
+  const target = consoleWindow && !consoleWindow.isDestroyed() ? consoleWindow : mainWindow;
+  if (!target || target.isDestroyed()) return { ok: false, why: "대화창이 없습니다" };
+  if (target.isMinimized()) target.restore();
+  target.focus();
+  target.webContents.send("console:ask", { text: 글 });
+  return { ok: true };
+});
+
 ipcMain.handle("console:dock", async () => {
   if (consoleWindow && !consoleWindow.isDestroyed()) consoleWindow.close(); // closed 이벤트가 셸에 알린다
   return { ok: true };

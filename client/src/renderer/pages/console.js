@@ -942,6 +942,18 @@
     submit();
   }
   window.gijoConsole = { append: append, syncCtx: readCtxFromShell, submit: submit, ask: ask };
+
+  // 다른 화면·다른 창에서 "이 지시를 대화창에서 이어서" 하고 넘겨 준 것을 받는다.
+  // ⚠ 빈 글이면 **보내지 않는다** — 「이어서 지시하기」만 누른 사람은 아직 할 말을 안 정했다.
+  //   커서만 놓아 주는 것이 맞고, 빈 지시를 던지면 AI가 엉뚱한 답을 만든다.
+  if (window.gijo && window.gijo.onConsoleAsk) {
+    window.gijo.onConsoleAsk(function (text) {
+      var 글 = String(text || "").trim();
+      if (글) { ask(글); return; }
+      var input = document.getElementById("chatInput");
+      if (input) input.focus();
+    });
+  }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
   else boot();
 })();
