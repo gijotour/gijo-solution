@@ -96,7 +96,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .log-src.s-extract-doc{background:rgba(30,185,128,0.13);color:var(--teal);}
 .log-src.s-finetune{background:rgba(240,160,32,0.15);color:var(--amber);}
 .log-src.s-hf-download{background:rgba(30,185,128,0.15);color:var(--teal);}
-  </style>
+    .kpi{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;}
+  .kpi-mini{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px 16px;}
+  .kpi-mini .l{font-size:12px;color:var(--muted);}
+  .kpi-mini .v{font-size:18px;font-weight:800;color:#fff;}
+</style>
 </head>
 <body>
 
@@ -120,6 +124,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     <div class="topbar-row">
       <div><div class="page-title">🖥 시스템 로그</div></div>
     </div>
+
+    <!-- 요약 한 줄 — 표식만 달면 공용 변환기(nav.js)가 막대로 바꾼다. 화면마다 새로 짜지 않는다. -->
+    <div class="kpi" id="logKpi" data-gijo-summary></div>
 
     <!-- 화면엔 정체성 한 줄만 — 사용법·주의사항은 챗봇(screenguide)에 있다(우리 규약). -->
     <!-- 시스템 로그 — logs.html 화면에서 이관(2026-07-28). 작업 기록이 '누가 무엇을 했나'라면
@@ -173,6 +180,37 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const 셈 = document.getElementById("logErrCount");
     if (셈) 셈.textContent = String(오류);
     if (window.gijoFold) window.gijoFold.refresh();
+  }
+
+  /**
+   * 요약 한 줄 — 「지금 로그가 어떤 상태인가」를 숫자로.
+   * ⚠ 카드를 **매번 새로 만들지 않는다**(첫 번만 만든다). 공용 변환기가 이미 막대로 바꿔 놨는데
+   *   다시 그리면 그 막대를 부수고, 변환기가 또 바꾸는 일이 무한히 반복된다.
+   */
+  function 요약채우기(오류) {
+    const box = document.getElementById("logKpi");
+    if (!box) return;
+    const 갈래 = new Set(logEntries.map((e) => e.source || "console")).size;
+    const 마지막 = logEntries.length ? logEntries[logEntries.length - 1] : null;
+    const 시각 = 마지막 && 마지막.at ? new Date(마지막.at).toLocaleTimeString("ko-KR", { hour12: false }) : "-";
+    const 값 = [
+      ["로그 줄", String(logEntries.length), ""],
+      ["오류", String(오류), 오류 ? "#f5928a" : ""],
+      ["갈래", String(갈래), ""],
+      ["마지막", 시각, ""],
+      ["보관", "최근 500줄", ""],
+    ];
+    if (!box.querySelector(".kpi-mini") && box.dataset.gijoSum !== "1") {
+      box.innerHTML = 값.map(([l, v, c]) =>
+        '<div class="kpi-mini"><div class="l">' + l + '</div><div class="v"' +
+        (c ? ' style="color:' + c + '"' : "") + ' data-k="' + l + '">' + v + "</div></div>").join("");
+      return;   // 처음 그렸다 — 변환기가 곧 막대로 바꾼다
+    }
+    // 이미 있으면 **값만** 갈아 끼운다(막대가 되어 있어도 같은 요소를 그대로 쓴다).
+    값.forEach(([l, v, c]) => {
+      const el = box.querySelector('[data-k="' + l + '"]');
+      if (el) { el.textContent = v; if (c) el.style.color = c; }
+    });
   }
 
   function appendLogEntry(entry) {
