@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>취약점 화면 — 취약점 중심으로 뒤집기 시안</title>
+<style>
+:root{
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);
+  padding:24px 28px 60px;font-size:13px;line-height:1.5;}
+h1{font-size:18px;font-weight:800;color:#fff;margin-bottom:5px;}
+.lead{font-size:12.5px;color:var(--muted);max-width:1000px;line-height:1.7;margin-bottom:20px;}
+h2{font-size:14px;font-weight:800;color:#fff;margin:26px 0 4px;}
+h2 .n{color:var(--blue-light);margin-right:6px;}
+.note{font-size:12.25px;color:var(--muted-2);margin-bottom:9px;max-width:1000px;line-height:1.65;}
+.meas{font-size:12.25px;color:var(--muted-2);margin-top:8px;}
+.meas b{color:var(--teal);}
+
+/* 공용 목록 양식 그대로 쓴다(mockups/list-unified) */
+.gf{display:flex;align-items:center;gap:8px;padding:6px 11px;margin-bottom:5px;cursor:pointer;
+  border:1px solid var(--border);border-radius:8px;background:var(--panel-2);user-select:none;}
+.gf .car{color:var(--muted-2);font-size:11.75px;width:11px;}
+.gf .nm{font-size:12.5px;font-weight:700;color:#dfe6ff;flex:1;}
+.gf .b{font-size:11.75px;font-weight:800;padding:2px 8px;border-radius:20px;background:rgba(255,255,255,.06);color:var(--muted);}
+.gf .b.hot{background:rgba(226,72,61,.16);color:#f5928a;}
+.gchips{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:7px;}
+.gchip{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);
+  padding:3px 10px;border-radius:20px;font-size:11.75px;font-weight:700;cursor:pointer;}
+.gchip.on{background:rgba(59,130,246,.15);border-color:var(--blue);color:var(--blue-light);}
+.gsearch{margin-left:auto;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;
+  padding:4px 10px;font-size:11.75px;color:var(--text);outline:none;width:200px;}
+.glist{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:2px 0;
+  max-height:330px;overflow-y:auto;}
+.grow{display:flex;gap:10px;align-items:baseline;padding:6px 14px;
+  border-bottom:1px solid rgba(255,255,255,.045);font-size:12.5px;line-height:1.35;cursor:pointer;}
+.grow:last-child{border-bottom:none;}
+.grow:hover{background:rgba(59,130,246,.05);}
+.grow.on{background:rgba(59,130,246,.12);}
+.grow .k{color:var(--muted-2);font-size:12px;white-space:nowrap;width:52px;flex:0 0 auto;text-align:right;}
+.grow .bd{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.grow .bd .t{color:var(--text);font-weight:600;}
+.grow .bd .s{color:var(--muted-2);font-size:12px;margin-left:7px;}
+.grow .rt{color:var(--muted-2);font-size:12px;white-space:nowrap;flex:0 0 auto;}
+.grow .rt b{color:#fff;font-weight:800;font-size:12.5px;}
+.tag{font-size:11.25px;font-weight:800;padding:1px 6px;border-radius:4px;white-space:nowrap;flex:0 0 auto;}
+.t-red{background:rgba(226,72,61,.16);color:#f5928a;}
+.t-amber{background:rgba(240,160,32,.16);color:var(--amber);}
+.t-blue{background:rgba(59,130,246,.16);color:var(--blue-light);}
+.t-gray{background:rgba(255,255,255,.08);color:var(--muted);}
+.t-kev{background:rgba(226,72,61,.28);color:#ffb4ad;}
+/* 줄 바로 아래 자세히 — 영향받는 호스트가 여기 온다 */
+.det{padding:8px 14px 10px 18px;background:rgba(59,130,246,.05);
+  border-bottom:1px solid rgba(255,255,255,.045);box-shadow:inset 3px 0 0 var(--blue);}
+.det .hh{font-size:11.75px;font-weight:800;color:var(--muted-2);margin-bottom:5px;}
+.hrow{display:flex;gap:10px;align-items:baseline;padding:3px 0;font-size:12.25px;}
+.hrow .hn{color:var(--blue-light);min-width:230px;}
+.hrow .hs{color:var(--muted-2);flex:1;}
+.acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;}
+.acts button{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--blue-light);
+  border-radius:7px;padding:4px 11px;font-size:11.75px;font-weight:700;cursor:pointer;font-family:inherit;}
+.old{opacity:.72;}
+.old .orow{display:flex;gap:10px;align-items:baseline;padding:7px 14px;border-bottom:1px solid rgba(255,255,255,.045);font-size:12.5px;}
+.old .orow .on2{flex:1;color:var(--text);font-weight:600;}
+.tagline{font-size:11.75px;font-weight:800;letter-spacing:.4px;color:var(--muted-2);margin-bottom:6px;}
+.tagline.after{color:var(--teal);}
+table.spec{width:100%;border-collapse:collapse;font-size:12.25px;margin-top:8px;max-width:1000px;}
+table.spec th{text-align:left;color:var(--muted-2);font-weight:700;padding:6px 10px;border-bottom:1px solid var(--border);}
+table.spec td{padding:7px 10px;border-bottom:1px solid var(--border);vertical-align:top;}
+table.spec tr:last-child td{border-bottom:none;}
+</style>
+</head>
+<body>
+
+<h1>취약점 화면 — 주인공을 호스트에서 <b style="color:var(--blue-light)">취약점</b>으로</h1>
+<p class="lead">
+  지금은 한 줄 = <b>호스트 1대</b>이고 취약점은 줄을 펴야 나옵니다. 그런데 담당자가 하는 일은
+  「이 호스트에 뭐가 있나」가 아니라 <b>「지금 어느 취약점부터 잡나」</b>입니다.
+  화면 위쪽 <b>「오늘의 조치 우선순위」는 이미 취약점 중심</b>인데 아래 큰 목록만 호스트 중심이라
+  두 개가 따로 놀고 있습니다. 아래를 위와 같은 기준으로 맞춥니다.
+</p>
+
+<h2><span class="n">지금</span>한 줄 = 호스트 1대 · 53줄</h2>
+<div class="old">
+  <div class="glist" style="max-height:150px">
+    <div class="orow"><span class="on2">샘플-웹서버 (10.0.0.100)</span><span class="tag t-gray">L 1</span><span style="color:var(--muted-2)">26. 08. 01.</span></div>
+    <div class="orow"><span class="on2">SafeKey 발급 웹 서버 (cert.aj-safe.co.kr)</span><span class="tag t-gray">L 1</span><span style="color:var(--muted-2)">26. 08. 01.</span></div>
+    <div class="orow"><span class="on2">192.168.219.111</span><span class="tag t-gray">L 1</span><span style="color:var(--muted-2)">26. 08. 01.</span></div>
+    <div class="orow"><span class="on2">172.168.50.104</span><span class="tag t-gray">L 1</span><span style="color:var(--muted-2)">26. 08. 01.</span></div>
+  </div>
+</div>
+<div class="meas">같은 CVE가 53대에 걸려 있으면 <b>53줄로 흩어집니다.</b> 「무엇부터」를 알려면 53줄을 다 펴 봐야 합니다.</div>
+
+<h2><span class="n">바꾼 뒤</span>한 줄 = 취약점 하나 · 누르면 아래에 영향받는 호스트</h2>
+<div class="gf"><span class="car">▼</span><span class="nm">🔎 취약점 목록</span><span class="b hot">KEV 1</span><span class="b">18</span></div>
+<div class="gchips">
+  <span class="gchip on">전체</span><span class="gchip">🔴 실제 악용(KEV)</span><span class="gchip">Critical·High</span>
+  <span class="gchip">미조치</span><span class="gchip">기한 초과</span>
+  <span class="gchip" title="지금 방식대로 호스트가 주인공인 목록으로 바꿔 봅니다">🖥 호스트별로 보기</span>
+  <input class="gsearch" placeholder="CVE·이름·호스트 찾기">
+</div>
+<div class="glist">
+  <div class="grow on"><span class="k">P1</span><span class="tag t-red">HIGH</span><span class="tag t-kev">🔴 KEV</span>
+    <span class="bd"><span class="t">OpenSSH &lt; 9.6 사용자 열거 (CVE-2024-6387)</span><span class="s">· EPSS 0.42 · 김도희</span></span>
+    <span class="rt">영향 <b>3</b>대 · 기한 <b style="color:#f5928a">08-03</b></span></div>
+  <div class="det">
+    <div class="hh">영향받는 호스트 3대</div>
+    <div class="hrow"><span class="hn">샘플-웹서버 (10.0.0.100)</span><span class="hs">tcp/22 · 최근 스캔 08-01</span><span style="color:var(--muted-2)">미조치</span></div>
+    <div class="hrow"><span class="hn">172.168.50.48</span><span class="hs">tcp/22 · 최근 스캔 08-01</span><span style="color:var(--muted-2)">미조치</span></div>
+    <div class="hrow"><span class="hn">192.168.219.111</span><span class="hs">tcp/22 · 최근 스캔 08-01</span><span style="color:var(--teal)">조치됨</span></div>
+    <div class="acts">
+      <button>조치 만들기 · 작업 등록</button><button>담당 배정</button>
+      <button>오탐으로 반려</button><button>AI 조치 절차</button>
+    </div>
+  </div>
+  <div class="grow"><span class="k">P2</span><span class="tag t-amber">LOW</span>
+    <span class="bd"><span class="t">[IW-20] 디렉터리 인덱싱</span><span class="s">· SafeKey 발급 웹 서버 · dohee</span></span>
+    <span class="rt">영향 <b>1</b>대 · 기한 <b>07-26</b></span></div>
+  <div class="grow"><span class="k">P2</span><span class="tag t-amber">LOW</span>
+    <span class="bd"><span class="t">SSL 인증서 만료 임박</span><span class="s">· 샘플-웹서버 (10.0.0.100)</span></span>
+    <span class="rt">영향 <b>1</b>대 · 기한 <b>07-28</b></span></div>
+  <div class="grow"><span class="k">P3</span><span class="tag t-gray">INFO</span>
+    <span class="bd"><span class="t">TLS 1.0/1.1 허용</span><span class="s">· 담당 미배정</span></span>
+    <span class="rt">영향 <b>53</b>대 · 기한 —</span></div>
+  <div class="grow"><span class="k">P3</span><span class="tag t-gray">INFO</span>
+    <span class="bd"><span class="t">SMB 서명 미적용</span><span class="s">· 담당 미배정</span></span>
+    <span class="rt">영향 <b>12</b>대 · 기한 —</span></div>
+</div>
+<div class="meas">
+  한 줄 <b>30px</b> · 「TLS 1.0/1.1 허용」이 53대에 걸려도 <b>1줄 + 영향 53대</b>입니다(지금은 53줄).<br>
+  누른 줄 바로 아래에 호스트가 나오니 <b>「무엇을 · 어디에」가 한자리</b>에서 끝납니다.
+</div>
+
+<h2><span class="n">지키는 것</span>없애지 않습니다</h2>
+<table class="spec">
+  <tr><th style="width:210px">지금 있는 것</th><th>바꾼 뒤</th></tr>
+  <tr><td>호스트별 목록</td><td>칩 <b>「🖥 호스트별로 보기」</b>로 그대로 전환합니다. 자산 담당자는 이 보기가 편합니다.</td></tr>
+  <tr><td>호스트를 펴서 보던 취약점</td><td>반대로 <b>취약점을 펴면 호스트</b>가 나옵니다. 정보량은 같고 순서만 뒤집습니다.</td></tr>
+  <tr><td>「오늘의 조치 우선순위」 3줄</td><td>그대로 둡니다. 아래 목록이 같은 기준(KEV→EPSS→VPR)으로 정렬돼 <b>위아래가 어긋나지 않습니다.</b></td></tr>
+  <tr><td>자산 목록의 「취약점 보기 →」</td><td><b>그 호스트로 걸러진 취약점 목록</b>으로 엽니다 — 지금 전체가 나오던 결함이 함께 정리됩니다.</td></tr>
+</table>
+
+<h2><span class="n">함께 고치는 결함</span>「취약점 보기」가 전체를 보여주던 것</h2>
+<p class="note">
+  자산 목록은 <code>?host=&lt;자산id&gt;</code>로 넘기는데 취약점 화면은 <b>자기 목록에 같은 id가 있을 때만</b>
+  걸러냅니다. 두 화면이 자산을 다르게 불러서 못 찾고, <b>아무 말 없이 전체</b>를 보여줍니다.
+  → id로 못 찾으면 <b>이름·IP로도</b> 맞춰 보고, 그래도 없으면 <b>"그 자산의 스캔 기록이 아직 없습니다"</b>라고
+  화면에 적습니다. 조용히 전체를 보여주지 않습니다.
+</p>
+
+</body>
+</html>

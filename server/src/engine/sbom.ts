@@ -368,6 +368,9 @@ export async function exportAiBom(assetId: string): Promise<{ path: string; file
 
 export async function generateSbom(assetId: string): Promise<SbomDocument> {
   const asset = getAsset(assetId);
+  // ⚠ 없는 자산에 "생성됨" 기록을 남기지 않는다(2026-08-02 전수 점검에서 발견).
+  //   예전엔 asset이 없어도 markSbomGenerated가 먼저 불려, 목록에 없는 자산이 생성된 것처럼 남았다.
+  if (!asset) throw new Error(`자산을 찾을 수 없습니다: ${assetId}`);
   // 승인 워크플로우: 오탐(rejected)으로 처리된 finding은 SBOM 취약점 반영에서 제외한다
   // (미검토 pending은 아직 반영 — "확인 안 됨"을 "안전"으로 오해시키지 않기 위함).
   const activeFindings = (asset?.findings ?? []).filter((f) => !isFindingRejected(assetId, f));
