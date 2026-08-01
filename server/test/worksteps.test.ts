@@ -82,7 +82,12 @@ describe("절차 카드가 실제로 동작한다", () => {
     createTask({ text: "여기에맞는가이드는없는일xyz" });
     const out = await 실행("work_steps", { task: "여기에맞는가이드는없는일xyz" });
     expect(out).toContain("정해진 절차가 없습니다");
-    expect(out, "지어낸 단계 번호가 보인다").not.toMatch(/☐\s*1\./);
+    // ⚠ 부정 단언만 두면 글자표(☐)나 번호 서식을 바꾸는 순간 **무조건 통과**한다(거짓 통과,
+    //   검토 지적). 같은 도구가 절차 있는 일감에는 단계를 낸다는 **대조**를 함께 둔다.
+    const { g } = 가이드있는일감();
+    const 있는쪽 = await 실행("work_steps", { task: g.label });
+    expect(있는쪽, "대조군이 단계를 안 낸다 — 이 시험은 아무것도 못 지킨다").toContain(g.steps[0].title);
+    expect(out, "지어낸 단계 제목이 보인다").not.toContain(g.steps[0].title);
   });
 
   it("없는 일감이면 「없다」가 아니라 「못 찾았다」고 한다", async () => {

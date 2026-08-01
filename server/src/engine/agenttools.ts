@@ -44,14 +44,22 @@ import { listAnalysisEvents, analysisSummary, computeCorrelations } from "./anal
 import { computeKpiSnapshot } from "./kpi";
 import { listSessions as listWorkSessions } from "./worksessions";
 import { canonicalize, suggestionsFor } from "./terms";
-import { listAudit, type AuditEntry } from "./audit";
+import { listAudit, recordAudit, type AuditEntry } from "./audit";
 import { lawAnswer, getLawConfig, type LawTarget } from "./lawinfo";
 // 담당자가 "미조치"라고 하면 저장값 open·pending을 뜻한다 — 글자 그대로 대조하면 늘 0건이다.
 import { 필터에맞나 } from "./statuswords";
 // 내 업무(할 일) — 화면을 없애고 대화창에서 한다(2026-08-01 사용자 결정).
-import { listTasks, createTask, completeTask, setGuideStepDone, routineSuggestions } from "./tasks";
+import { listTasks, createTask, setTaskDone, setGuideStepDone, routineSuggestions, recordRoutineFeedback } from "./tasks";
 import { buildMyWork } from "./mywork";
 import { getGuide as 가이드가져오기 } from "./workguide";
+import { getScreenGuide } from "./screenguide";
+
+/** 화면 파일명 → 담당자가 메뉴에서 보는 한글 이름. 못 찾으면 파일명 대신 빈 값을 쓰지 않고
+ *  그대로 두되, screenguide에 제목이 있으면 그것을 쓴다(안내 문구와 메뉴 이름이 같아야 한다). */
+function 화면이름(page: string): string {
+  const g = getScreenGuide(page);
+  return g && g.title ? g.title : String(page).replace(/\.html.*$/, "");
+}
 import type { MyWorkItem } from "./mywork";
 
 export interface AgentToolParam {
@@ -1441,7 +1449,10 @@ function 절차카드(t: ReturnType<typeof listTasks>[number]): string {
   //   취약점을 …"을 그대로 복사해 물어 엉뚱한 답을 받는다(화면 시험이 이걸 지키고 있었다).
   const 물음 = 다음.question ? 다음.question.replace(/\{업무\}/g, t.text) : "";
   const 힌트 = 다음.kind === "ask" && 물음 ? `\n▸ 이렇게 물으시면 됩니다 — "${물음}"`
-    : 다음.kind === "open" && 다음.page ? `\n▸ ${다음.page} 화면을 보시면 됩니다` : "";
+    // ⚠ 화면 **파일명을 담당자에게 내보내지 않는다**(검토 지적: "vulnscan.html 화면을 보시면
+    //   됩니다"가 그대로 나갔다). 한글 메뉴 이름으로 바꿔 말한다 — 모든 사용자 대상 텍스트는
+    //   한글이라는 원칙이자, 파일명으로는 어느 메뉴인지 알 수 없다.
+    : 다음.kind === "open" && 다음.page ? `\n▸ 「${화면이름(다음.page)}」 메뉴를 보시면 됩니다` : "";
   return `${머리}\n${줄}${힌트}\n\n▸ ${다음번호 + 1}번을 끝내셨으면 "${다음번호 + 1}번 했어"`;
 }
 
@@ -1517,7 +1528,13 @@ async function runCompleteTask(args: Record<string, string>): Promise<string> {
   if (!hit) {
     return `전체 ${열린것.length}건 중 "${말}"에 맞는 할 일을 못 찾았습니다. "오늘 할 일"이라고 물어 목록부터 보세요.`;
   }
-  completeTask(hit.id);
+  // ★ completeTask가 아니라 **setTaskDone**이다(검토 지적 2026-08-01). completeTask는
+  //   nextRecurrence를 안 불러 **반복 업무의 다음 차례가 안 생긴다** — 주간 점검을 끝냈다고
+  //   말했는데 다음 주 것이 안 올라오면 점검 이력이 조용히 끊긴다. 옛 화면은 체크박스가
+  //   setTaskDone을 타서 멀쩡했다.
+  setTaskDone(hit.id, true);
+  const 반복 = hit.recur ? `
+▸ ${hit.recur === "weekly" ? "매주" : "매월"} 반복이라 다음 차례를 새로 만들었습니다.` : "";
   // 되돌릴 길을 함께 준다 — 결재판 없이 즉시 처리하는 대신 **되돌리기가 있어야** 안심된다.
   return `"${hit.text}" 완료로 옮겼습니다.\n▸ 되돌리려면 "${hit.text} 다시 열어줘"`;
 }
@@ -1531,8 +1548,36 @@ function runAddTask(args: Record<string, string>): string {
     /오늘|today/.test(기한말) ? Date.now() :
     /이번\s*주|주간|week/.test(기한말) ? Date.now() + 6 * DAY :
     undefined;
-  const t = createTask({ text: 글, ...(dueAt ? { dueAt } : {}) });
-  return `"${t.text}"를 오늘 할 일에 담았습니다.${dueAt ? "" : " (기한은 안 정했습니다)"}\n▸ 끝내면 "${t.text} 완료"`;
+  // ★ 반복 — 옛 화면에는 매주·매월로 담는 길이 있었는데 대화창에 없었다(검토 지적).
+  //   화면을 없애면서 **매주 담기 자체가 불가능**해졌다. 안내 패널은 여전히 반복을 말한다.
+  const 반복말 = (args.recur ?? "") + " " + 기한말 + " " + 글;
+  const recur = /매주|주간|weekly/.test(반복말) ? "weekly" as const
+    : /매월|월간|monthly|달마다/.test(반복말) ? "monthly" as const : undefined;
+  const t = createTask({ text: 글, ...(dueAt ? { dueAt } : {}), ...(recur ? { recur } : {}) });
+  // ★ 화면이 남기던 기록을 그대로 남긴다(검토 지적) — 누가 언제 무엇을 담았는지.
+  //   덤으로 '자주 하는 업무' 추천이 학습 신호를 받는다(안 남기면 추천이 갈수록 무뎌진다).
+  recordRoutineFeedback(글);
+  recordAudit({
+    kind: "config", actor: "담당자", action: "내 업무에 담기", target: t.id,
+    detail: `${글}${t.guideKey ? ` · 가이드 ${t.guideKey}` : " · 가이드 없음"}${recur ? ` · ${recur}` : ""} · 대화창`,
+    result: "ok",
+  });
+  const 반복표 = recur ? ` · ${recur === "weekly" ? "매주" : "매월"} 반복` : "";
+  return `"${t.text}"를 오늘 할 일에 담았습니다.${dueAt ? "" : " (기한은 안 정했습니다)"}${반복표}\n▸ 끝내면 "${t.text} 완료"`;
+}
+
+/** 잘못 끝낸 일을 다시 연다. 완료 답변이 "다시 열어줘"라고 **약속**하므로 반드시 있어야 한다. */
+function runReopenTask(args: Record<string, string>): string {
+  const 말 = (args.task ?? "").trim();
+  if (!말) return "어떤 일을 다시 열지 알려주세요 — 예: \"방화벽 점검 다시 열어줘\"";
+  const 납작 = (s: string) => s.replace(/\s/g, "");
+  const 끝난것 = listTasks().filter((t) => t.done);
+  const hit = 끝난것.find((t) => t.text === 말) ??
+    끝난것.find((t) => 납작(t.text).includes(납작(말))) ??
+    끝난것.find((t) => 납작(말).length >= 4 && 납작(말).includes(납작(t.text)));
+  if (!hit) return `끝낸 일 ${끝난것.length}건 중 "${말}"에 맞는 것을 못 찾았습니다.`;
+  setTaskDone(hit.id, false);
+  return `"${hit.text}"를 다시 열었습니다. 오늘 할 일에 돌아와 있습니다.`;
 }
 
 function runWorkSessionStatus(args: Record<string, string>): string {
@@ -1890,8 +1935,20 @@ const TOOLS: AgentTool[] = [
     params: [
       { name: "text", label: "할 일", description: "담을 일의 내용", required: true },
       { name: "due", label: "기한", description: "오늘 · 이번 주 (선택, 비우면 기한 없음)", required: false },
+      { name: "recur", label: "반복", description: "매주 · 매월 (선택, 비우면 한 번만)", required: false },
     ],
     run: runAddTask,
+  },
+  {
+    name: "reopen_task",
+    label: "할 일 다시 열기",
+    domain: "cross",
+    write: false, // ★ 나에게만 영향 — 되돌리는 동작 자체라 결재판이 붙으면 뜻이 없다
+    description:
+      '잘못 끝낸 할 일을 다시 연다. "○○ 다시 열어줘", "○○ 완료 취소"에 쓴다. 예: {"task":"방화벽 정책 점검"}',
+    directAnswer: true,
+    params: [{ name: "task", label: "할 일", description: "다시 열 할 일의 이름", required: true }],
+    run: runReopenTask,
   },
   // 「자주 하는 업무」 — 내 업무 화면의 접힌 구역에 있던 것. 화면을 없애면 이것도 같이
   // 사라지므로 대화창으로 옮긴다. ⚠ RAG+LLM이라 몇 초 걸린다(화면에서도 따로 늦게 채웠다).

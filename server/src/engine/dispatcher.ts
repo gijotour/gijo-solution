@@ -410,22 +410,62 @@ const LEARN_TOPIC_RE = /학습\s*루프|파인\s*튜닝|learn\s*loop|fine[-\s]?t
  *   (2026-08-01 실측: "10.10.20.41 — 취약점 점검 어떻게 해?"가 안 잡혔다). 대신 **할 일
  *   이름과 겹칠 때만** 통과시켜 좁힌다 — 그게 오검출을 막는 진짜 자물쇠다.
  */
+/**
+ * 말이 **열려 있는 내 할 일 하나를 가리키는가**. 절차 질문·완료 판정이 같은 자물쇠를 쓴다.
+ *
+ * ⚠ 두 번 데었다.
+ *   ① 끝을 `$`로 묶었더니 자산 맥락이 뒤에 붙는 경우에 조용히 깨졌다.
+ *   ② 부분일치에 길이 하한이 없어 **"점검"** 두 글자가 "웹서버-01 — 취약점 점검"에 걸렸다
+ *      (검토 지적). 업무 이름이 죄다 유형명(취약점 점검·하드닝 점검)이라 상시로 걸린다 —
+ *      그러면 일반 지식 질문에 특정 호스트 체크리스트가 답으로 나간다.
+ *   그래서 **이름 길이의 절반 이상**을 대야 통과시킨다. 딱 맞는 이름은 길이와 무관하게 통과.
+ */
+async function 내할일이름인가(말: string): Promise<boolean> {
+  const 납작 = (s: string) => s.replace(/\s/g, "");
+  const b = 납작(말);
+  if (!b) return false;
+  const 겹치나 = (이름: string) => {
+    const a = 납작(이름);
+    if (a === b) return true;
+    if (b.length < 4) return false; // 두세 글자 유형명이 걸리면 안 된다
+    if (a.includes(b)) return b.length >= Math.max(4, Math.ceil(a.length * 0.5));
+    return b.includes(a) && a.length >= 4;
+  };
+  if (listTasks().some((t) => !t.done && 겹치나(t.text))) return true;
+  // ⚠ tasks만 보면 **아직 안 담은 AI 제안**을 놓친다(2026-08-01 실측). 목록에 버젓이 보이고
+  //   「지금 이거」로 지목까지 한 것을 "못 찾았다"고 답하던 원인이다. 제안 이름까지 함께 본다.
+  try {
+    const p = await buildMyWork();
+    if ([...p.today, ...p.week, ...p.later].some((i) => !i.saved && 겹치나(i.text))) return true;
+  } catch { /* 목록을 못 만들면 그냥 다음 분기로 넘긴다 */ }
+  return false;
+}
+
 export async function 내할일절차질문(text: string): Promise<string | null> {
   const m = String(text ?? "").match(/(.{2,60}?)\s*(?:어떻게\s*(?:해|하지|하나요|합니까)|절차\s*(?:알려|보여)|뭐부터\s*(?:해|하지))/);
   if (!m) return null;
   const 말 = m[1].trim();
   if (!말 || /화면|메뉴|이거|이걸|여기|이곳/.test(말)) return null; // 화면 사용법은 screenguide의 몫
-  const 납작 = (s: string) => s.replace(/\s/g, "");
-  const 겹치나 = (이름: string) =>
-    납작(이름).includes(납작(말)) || (납작(말).length >= 4 && 납작(말).includes(납작(이름)));
-  // ⚠ tasks만 보면 **아직 안 담은 AI 제안**을 놓친다(2026-08-01 실측). 목록에 버젓이 보이고
-  //   「지금 이거」로 지목까지 한 것을 "못 찾았다"고 답하던 원인이다. 제안 이름까지 함께 본다.
-  if (listTasks().some((t) => !t.done && 겹치나(t.text))) return 말;
-  try {
-    const p = await buildMyWork();
-    if ([...p.today, ...p.week, ...p.later].some((i) => !i.saved && 겹치나(i.text))) return 말;
-  } catch { /* 목록을 못 만들면 그냥 다음 분기로 넘긴다 */ }
-  return null;
+  return (await 내할일이름인가(말)) ? 말 : null;
+}
+
+/**
+ * "○○ 완료" — 내 할 일을 끝냈다는 말인가(아니면 null).
+ *
+ * ★ 여기가 **낱말 제외어를 쓰면 안 되는 자리**다(검토 지적 2026-08-01). 처음엔
+ *   `취약점|점검|자산|CVE` 가 들어가면 비켜서게 했는데, 정작 **업무 이름 자체가 그 낱말로
+ *   만들어진다**("10.10.20.41 — 취약점 점검", "○○ 하드닝 점검"). 목록이 시킨 그대로
+ *   "취약점 점검 완료"라고 쳤을 때 도구가 안 불리는, 막으려던 바로 그 사고가 재현됐다.
+ *   제외는 **어형**으로만 한다 — 취약점 상태를 바꾸는 말(update_finding_status의 몫)은
+ *   "조치 완료 처리해줘"처럼 대상·동사를 따로 달고 온다.
+ */
+export async function 내할일완료말(text: string): Promise<string | null> {
+  const t = String(text ?? "");
+  if (/처리해|바꿔|변경|표시해|등록해|배정|담당자/.test(t)) return null; // 상태 변경 지시는 저쪽 몫
+  const m = t.match(/^(.{2,60}?)\s*(?:완료(?:했|됐|야|입니다|요)?|끝냈(?:어|다|습니다)|다\s*했(?:어|다|습니다))\s*[.!]?\s*$/);
+  if (!m) return null;
+  const 말 = m[1].trim().replace(/^(그|이|저)\s+/, "");
+  return (await 내할일이름인가(말)) ? 말 : null;
 }
 
 const REMEDIATION_INTENT_RE =/(조치|대응|remediat|패치|수정)\s*(방법|절차|어떻게|가이드|플레이북|playbook)|어떻게\s*(조치|대응|패치|고쳐|해결)|대응\s*방안/i;
@@ -626,7 +666,9 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   //   ⚠ 그냥 두면 모델이 **아직 있다고 답한다**(실측: "대시보드에서 항목을 클릭하면 해당
   //   작업 화면으로 이동합니다"). 사내 문서·학습에 옛 화면이 남아 있어 생기는 일이라,
   //   프롬프트로 못 고친다 — 옮겨 간 자리를 코드로 못 박아 답한다.
-  if (/(내\s*업무|할\s*일)\s*(화면|메뉴|탭)?\s*(어디|없어|사라|안\s*보|어떻게\s*가|못\s*찾)/.test(instructionText)) {
+  //   ⚠ 화면·메뉴·탭을 **반드시 대야** 잡는다(검토 지적). 선택으로 뒀더니 "오늘 할 일 없어?"
+  //   같은 흔한 물음까지 이 안내로 샜다 — 목록을 물었는데 메뉴 폐지 공지가 나오는 꼴이다.
+  if (/(내\s*업무|할\s*일)\s*(화면|메뉴|탭)\s*(어디|없어|사라|안\s*보|어떻게\s*가|못\s*찾)/.test(instructionText)) {
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
     completeTask(task.id);
     return {
@@ -647,6 +689,41 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   //   "10.10.20.41 — 취약점 점검 뭐부터 해?"는 today가 가져가 절차가 영영 안 열렸다.
   //   ⚠ 좁게 잡는다 — **열려 있는 내 할 일과 이름이 겹칠 때만**. 화면 사용법·개념 질문은
   //   그대로 screenguide·explain·플레이북의 몫이다.
+  // ★ "○○ 다시 열어줘" — 완료 답변이 **약속하는 말**이라 반드시 이어져야 한다(검토 지적:
+  //   도구가 아예 없어 빈말이었다). 결재판을 생략한 근거가 "되돌릴 길을 준다"였다.
+  const 되열기 = instructionText.match(/^(.{2,60}?)\s*(?:다시\s*열|완료\s*취소|되돌려|안\s*했)/);
+  if (되열기) {
+    const tool = findAgentTool("reopen_task");
+    if (tool) {
+      const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
+      const result = String(await tool.run({ task: 되열기[1].trim() }));
+      completeTask(task.id);
+      if (!result.includes("못 찾았습니다")) {
+        return {
+          task, route: { agentId: "orchestrator", action: "chat" }, output: result,
+          toolCalls: [{ tool: "reopen_task", args: { task: 되열기[1].trim() }, result }],
+        };
+      }
+      // 내 할 일이 아니면 조용히 다음 분기로 넘긴다("이 취약점 다시 열어줘" 등)
+    }
+  }
+
+  // ★ "○○ 완료" — 여기서 잡는다(2026-08-01, 검토 후 agentloop에서 옮겨 옴).
+  //   agentloop 쪽은 낱말 제외어를 쓰다 실제 업무 이름 대부분을 막았다. 자물쇠는 하나여야 한다.
+  const 완료말 = await 내할일완료말(instructionText);
+  if (완료말) {
+    const tool = findAgentTool("complete_task");
+    if (tool) {
+      const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
+      const result = String(await tool.run({ task: 완료말 }));
+      completeTask(task.id);
+      return {
+        task, route: { agentId: "orchestrator", action: "chat" }, output: result,
+        toolCalls: [{ tool: "complete_task", args: { task: 완료말 }, result }],
+      };
+    }
+  }
+
   const 절차질문 = await 내할일절차질문(instructionText);
   if (절차질문) {
     const tool = findAgentTool("work_steps");
@@ -672,6 +749,27 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     const { setTaskDone, getTask } = await import("./tasks.js");
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
     completeTask(task.id);
+    // ★ 체크한 것이 **아직 안 담은 AI 제안**일 수 있다(검토 지적 2026-08-01). 목록에는
+    //   `today:<원본id>`로 실리는데 tasks에는 없어서, 체크하고 「끝냄으로」를 누르면
+    //   "찾지 못했습니다"가 나왔다. 화면을 없앤 지금 체크칸이 유일한 클릭 경로라 그냥 두면
+    //   담당자가 끝낸 일을 못 닫는다. complete_task가 하는 것과 같게 — 담고 끝낸다.
+    for (const id of pick.ids) {
+      if (getTask(id)) continue;
+      try {
+        const p2 = await buildMyWork();
+        const 제안 = [...p2.today, ...p2.week, ...p2.later].find((i) => i.id === id && !i.saved);
+        if (제안) createTask({ text: 제안.text, ref: 제안.ref, origin: 제안.origin, dueAt: 제안.dueAt ?? Date.now() });
+      } catch { /* 목록을 못 만들면 아래에서 "못 찾음"으로 안내된다 */ }
+    }
+    const 담긴이름 = new Map(listTasks().filter((t) => !t.done).map((t) => [t.text, t.id]));
+    pick.ids = await Promise.all(pick.ids.map(async (id) => {
+      if (getTask(id)) return id;
+      try {
+        const p2 = await buildMyWork();
+        const 제안 = [...p2.today, ...p2.week, ...p2.later].find((i) => i.id === id);
+        return 제안 && 담긴이름.has(제안.text) ? 담긴이름.get(제안.text)! : id;
+      } catch { return id; }
+    }));
     const 있음 = pick.ids.filter((id) => getTask(id));
     const 없음 = pick.ids.length - 있음.length;
     let 문장: string;
@@ -679,7 +777,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
       문장 = `고르신 ${pick.ids.length}건을 지금 할 일 목록에서 찾지 못했습니다 — 그 사이에 처리됐거나 목록이 바뀌었을 수 있습니다.`;
     } else {
       for (const id of 있음) setTaskDone(id, true);
-      문장 = `${있음.length}건을 끝냄으로 표시했습니다. 되돌리려면 「내 업무」에서 다시 누르시면 됩니다.`;
+      문장 = `${있음.length}건을 끝냄으로 표시했습니다. 되돌리려면 "○○ 다시 열어줘"라고 말씀하세요.`;
     }
     if (없음 > 0) 문장 += ` ⚠ ${없음}건은 찾지 못해 건너뛰었습니다.`;
     return { task, route: { agentId: "orchestrator", action: "chat" }, output: 문장 };

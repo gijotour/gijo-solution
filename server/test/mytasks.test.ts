@@ -44,10 +44,35 @@ describe("할 일 도구가 있다", () => {
 describe("담기·완료가 실제로 동작한다", () => {
   beforeEach(() => resetTasksForTests());
 
-  it("담으면 목록에 생긴다", () => {
-    const out = 도구("add_task").run({ text: "방화벽 정책 점검", due: "오늘" }) as string;
+  it("담으면 목록에 생긴다", async () => {
+    const out = String(await 도구("add_task").run({ text: "방화벽 정책 점검", due: "오늘" }));
     expect(out).toContain("담았습니다");
     expect(listTasks().some((t) => t.text === "방화벽 정책 점검")).toBe(true);
+  });
+
+  it("★ 매주로 담으면 반복이 붙고, 끝내면 다음 차례가 생긴다", async () => {
+    // 옛 화면에는 매주·매월로 담는 길이 있었는데 대화창에는 없었다(검토 지적 2026-08-01).
+    // 안내 패널은 반복을 약속하는데 담을 길이 없으면 그 약속이 빈말이다.
+    await 도구("add_task").run({ text: "주간 방화벽 점검", due: "이번 주", recur: "매주" });
+    const t = listTasks().find((x) => x.text === "주간 방화벽 점검")!;
+    expect(t.recur, "매주로 담았는데 반복이 안 붙었다").toBe("weekly");
+    const 전 = listTasks().length;
+    await 도구("complete_task").run({ task: "주간 방화벽 점검" });
+    expect(listTasks().length, "반복 업무를 끝냈는데 다음 차례가 안 생겼다 — 점검 이력이 끊긴다")
+      .toBeGreaterThan(전 - 1);
+    expect(listTasks().some((x) => x.text === "주간 방화벽 점검" && !x.done), "다음 차례가 없다").toBe(true);
+  });
+
+  it("★ 완료가 알려주는 「다시 열어줘」가 실제로 동작한다", async () => {
+    // 결재판을 생략한 근거가 "대신 되돌릴 길을 준다"였다. 도구가 없으면 그 근거가 빈말이다.
+    createTask({ text: "방화벽 정책 점검" });
+    const 완료 = String(await 도구("complete_task").run({ task: "방화벽 정책 점검" }));
+    const 안내 = 완료.match(/"([^"]+?)\s*다시\s*열어줘"/);
+    expect(안내, "되돌리는 말을 안 알려 준다").toBeTruthy();
+    expect(도구("reopen_task"), "안내한 말을 받아 줄 도구가 없다").toBeTruthy();
+    const out = String(await 도구("reopen_task").run({ task: 안내![1] }));
+    expect(out).toContain("다시 열었습니다");
+    expect(listTasks().find((t) => t.text === "방화벽 정책 점검")?.done, "다시 안 열렸다").toBeFalsy();
   });
 
   it("완료하면 닫히고 **되돌리는 말**을 함께 준다", async () => {
