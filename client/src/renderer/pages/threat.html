@@ -179,7 +179,10 @@ tr:last-child td{border-bottom:none;}
       <!-- ⚠ 접기 배지가 읽는 자리(2026-08-01 검토 지적으로 신설) — 없으면 배지가 안 그려진다. -->
       <div class="panel-title">최근 탐지 내역<span id="feedCount" style="display:none">0</span></div>
       <div class="panel-sub">구독 중인 딥웹 · 다크웹 CTI 피드 기반 자동 탐지</div>
-      <div class="scroll-list"><!-- 긴 목록은 패널 안에서 스크롤(창 고정 원칙, 2026-07-26) -->
+      <div class="long-list"><!-- 긴 목록은 **화면째** 내려간다(2026-08-02 사용자 지시) — 안쪽 상자에
+           가두면 스크롤이 두 겹이 되고, 「더 보기」로 늘어난 만큼을 좁은 상자에서 훑게 된다.
+           ⚠ 오른쪽에 붙은 상세 칸이 있는 화면(조치·승인·통합 관제)은 그대로 가둔다 —
+             거기서 목록이 길어지면 상세가 화면 밖으로 밀려난다. -->
       <table>
         <thead><tr><th>탐지일</th><th>유형</th><th>대상 자산 · 도메인</th><th>출처</th><th>심각도</th></tr></thead>
         <tbody id="findingsBody">

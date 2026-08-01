@@ -198,6 +198,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .btn{font-size:12.5px;font-weight:800;border-radius:9px;padding:9px 16px;cursor:pointer;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--text);}
 .btn.pri{background:var(--blue);border-color:var(--blue);color:#fff;}
 .err{color:var(--red);font-size:12.5px;min-height:14px;margin-top:2px;}
+.usage-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-top:10px;}
+.usage-kpi{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;}
+.usage-kpi .l{font-size:12px;color:var(--muted-2);font-weight:700;}
+.usage-kpi .v{font-size:16px;font-weight:800;color:#fff;margin-top:3px;}
 </style>
 </head>
 <!-- data-screen: 공용 CSS가 "이 화면은 폼이다"를 알아보는 표식(2026-08-01). 없으면 폭 규칙이 안 걸린다. -->
@@ -274,6 +278,31 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
          두고, 준비물·복구·시각 어긋남 대처는 서버 screenguide에 적어 대화로 안내한다. -->
     <!-- 접힌 채로도 켜짐/꺼짐이 보여야 한다 — 접어서 상태를 가리면 "내가 켰던가?"가 된다.
          fold 배지는 #mfaBadge의 글자를 그대로 읽는다(loadMfa 뒤 gijoFold.refresh()로 갱신). -->
+    <!-- 사용량·비용 — 기록 보기에서 되옮김(2026-08-02 사용자 지시 "설정에 내 설정으로 이동").
+         ⚠ 2026-07-28에는 반대로 옮겼었다("바꾸는 곳이 아니라 보는 곳"). 담당자가 찾는 자리가
+           기준이므로 지시를 따른다 — 옮길 때는 화면·스크립트·CSS를 **한 벌로** 옮긴다
+           (마크업만 옮기면 숫자가 안 채워지고, 스크립트만 남으면 조용히 죽는다). -->
+    <div data-sec="my" class="panel" data-gijo-fold="사용량 · 비용" data-gijo-fold-badges="kpiCalls:호출">
+    <div class="panel-title">사용량 · 비용</div>
+    <div class="panel-sub">서버를 켠 뒤 누적된 호출량입니다.</div>
+    <div class="usage-kpis">
+    <div class="usage-kpi"><div class="l">예상 비용 합계</div><div class="v" id="kpiCost">-</div></div>
+    <div class="usage-kpi"><div class="l">외부 서비스</div><div class="v" id="kpiServices">-</div></div>
+    <div class="usage-kpi"><div class="l">호출 수</div><div class="v" id="kpiCalls">-</div></div>
+    </div>
+    <div style="margin-top:14px;font-size:12px;font-weight:700;color:var(--muted);">외부 서비스별</div>
+    <table style="width:100%;font-size:12.5px;margin-top:6px;border-collapse:collapse">
+    <thead><tr style="color:var(--muted-2);text-align:left"><th style="padding:4px 6px;font-weight:600">서비스</th><th style="font-weight:600">호출</th><th style="font-weight:600">예상 비용</th></tr></thead>
+    <tbody id="usageRows"><tr><td colspan="3" style="color:var(--muted);padding:4px 6px;">불러오는 중...</td></tr></tbody>
+    </table>
+    <div style="margin-top:18px;font-size:12px;font-weight:700;color:var(--muted);">📊 클라우드 API 사용량 <span style="color:var(--muted-2);font-weight:400;">— 제공자별 호출·토큰·예상 비용 (서버 기동 후 누적)</span></div>
+    <table style="width:100%;font-size:12.5px;margin-top:6px;border-collapse:collapse;">
+    <thead><tr style="color:var(--muted-2);text-align:left;"><th style="padding:4px 6px;">제공자·모델</th><th>호출</th><th>토큰(입력/출력)</th><th>예상 비용</th></tr></thead>
+    <tbody id="cloudUsageRows"><tr><td colspan="4" style="color:var(--muted);padding:4px 6px;">불러오는 중...</td></tr></tbody>
+    </table>
+    <button class="btn-ghost" id="csvExportBtn" style="margin-top:12px">사용량 CSV 내보내기</button>
+    <div class="status-line" id="usageStatusLine"></div>
+    </div>
     <div data-sec="my" class="panel" data-gijo-fold="2차 인증" data-gijo-fold-badges="mfaBadge">
       <div class="panel-title">2차 인증<span class="badge" id="mfaBadge" style="margin-left:8px">확인 중</span></div>
       <div class="panel-sub">비밀번호에 휴대폰 인증앱의 6자리 숫자를 한 단계 더 붙입니다.</div>
@@ -2327,6 +2356,75 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 <script src="progresscard.js"></script>
 <script src="gijomd.js"></script>
 <script src="chatparts.js"></script>
-<script src="chatwidget.js"></script>
+<script src="chatwidget.js">
+  // ── 사용량 · 비용 (2026-07-28 설정에서 이관) ────────────────────────
+  let lastUsage = [];
+  async function loadUsage() {
+    const rows = document.getElementById("usageRows");
+    if (!rows) return;
+    try {
+      lastUsage = (await window.gijo.getUsageSummary()) || [];
+      rows.innerHTML = lastUsage.length
+        ? lastUsage.map((u) =>
+            `<tr><td style="padding:4px 6px;">${esc(u.service)}</td><td>${u.callCount.toLocaleString()}건</td>` +
+            `<td>${u.estimatedCost.toFixed(4)}</td></tr>`).join("")
+        : '<tr><td colspan="3" style="color:var(--muted);padding:4px 6px;">아직 외부 서비스 호출이 없습니다 (온프레미스만 쓰는 중)</td></tr>';
+      document.getElementById("kpiCost").textContent = "$" + lastUsage.reduce((a, u) => a + u.estimatedCost, 0).toFixed(4);
+      document.getElementById("kpiServices").textContent = lastUsage.length;
+      document.getElementById("kpiCalls").textContent = lastUsage.reduce((a, u) => a + u.callCount, 0).toLocaleString();
+    } catch (e) {
+      rows.innerHTML = '<tr><td colspan="3" style="color:var(--muted);padding:4px 6px;">사용량을 불러오지 못했습니다</td></tr>';
+    }
+  }
+
+  function exportUsageCsv() {
+    const line = document.getElementById("usageStatusLine");
+    if (!lastUsage.length) {
+      line.className = "status-line status-err";
+      line.textContent = "내보낼 사용량이 없습니다";
+      return;
+    }
+    const rows = [["서비스", "호출 수", "예상 비용(USD)"]];
+    for (const u of lastUsage) rows.push([u.service, u.callCount, u.estimatedCost.toFixed(4)]);
+    const csv = rows.map((r) => r.map((c) => '"' + String(c).replace(/"/g, '""') + '"').join(",")).join("\n");
+    // BOM을 붙여야 엑셀에서 한글이 안 깨진다
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "gijo-as-usage-summary.csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    line.className = "status-line status-ok";
+    line.textContent = "gijo-as-usage-summary.csv 로 내보냈습니다";
+  }
+
+  async function loadCloudUsage() {
+    const rows = document.getElementById("cloudUsageRows");
+    if (!rows) return;
+    try {
+      const u = await window.gijo.cloudUsage();
+      if (!u.rows || !u.rows.length) {
+        rows.innerHTML = '<tr><td colspan="4" style="color:var(--muted);padding:4px 6px;">아직 클라우드 API 호출이 없습니다 (미사용 또는 호출 전)</td></tr>';
+        return;
+      }
+      rows.innerHTML = u.rows.map((r) =>
+        `<tr><td style="padding:4px 6px;">${r.providerLabel} <span style="color:var(--muted-2);font-size:12px;">${r.model}</span></td>` +
+        `<td>${r.calls.toLocaleString()}건</td><td>${r.inTokens.toLocaleString()} / ${r.outTokens.toLocaleString()}</td>` +
+        `<td>$${r.estimatedCost.toFixed(4)}</td></tr>`).join("");
+    } catch (e) {
+      rows.innerHTML = '<tr><td colspan="4" style="color:var(--muted);padding:4px 6px;">사용량을 불러오지 못했습니다</td></tr>';
+    }
+  }
+
+
+  // 내 설정 구역에서 자동으로 채운다 — 화면을 열면 바로 보여야 한다.
+  (function 사용량시작(){
+    if (!document.getElementById("usageRows")) return;   // 다른 구역만 보는 중이면 건너뛴다
+    var btn = document.getElementById("csvExportBtn");
+    if (btn) btn.addEventListener("click", exportUsageCsv);
+    loadUsage().catch(function(){});
+    loadCloudUsage().catch(function(){});
+  })();
+</script>
 </body>
 </html>
