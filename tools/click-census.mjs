@@ -61,17 +61,35 @@ for (const 라벨 of 화면들) {
   await p.waitForTimeout(6500);
 
   // 이 화면의 누를 만한 것 목록을 먼저 뽑는다(누르면 DOM이 바뀌므로 매번 다시 찾는다).
-  const 후보 = await p.evaluate(() => {
+  //
+  // ⚠ **글자가 같은 것은 하나만 누른다.** 온톨로지 화면에서 누를 수 있는 것이 6,566개였다 —
+  //   관계 칩이 전부 잡혀 한 화면에 2시간 반이 걸렸다(첫 판에 실제로 여기서 멈췄다).
+  //   같은 글자의 줄 1,000개를 누르는 건 같은 코드를 1,000번 확인하는 것이라 얻는 게 없다.
+  //   화면당 상한도 둔다 — 전수의 목적은 "무반응인 **종류**"를 찾는 것이다.
+  const 화면당상한 = 45;
+  const 후보 = await p.evaluate((상한) => {
     const f = document.querySelector("#screens iframe.on");
     const d = f && f.contentDocument;
     if (!d) return [];
     const els = [...d.querySelectorAll('button, [role="button"], .row-actions, .tb-mi, .chip, .g-go, [data-action]')];
-    return els.map((e, i) => ({ i, 글: (e.textContent || "").trim().slice(0, 30), 보임: !!(e.offsetParent || e.getClientRects().length) }))
-      .filter((x) => x.보임 && x.글);
-  });
-  if (!후보.length) { 건너뜀.push(라벨 + ": 누를 것이 없음(표·카드만)"); continue; }
+    const 본것 = new Set();
+    const out = [];
+    els.forEach((e, i) => {
+      if (!(e.offsetParent || e.getClientRects().length)) return;
+      const 글 = (e.textContent || "").trim().slice(0, 30);
+      if (!글 || 본것.has(글)) return;
+      본것.add(글);
+      out.push({ i, 글 });
+    });
+    return { 목록: out.slice(0, 상한), 전체: els.length, 서로다른글: out.length };
+  }, 화면당상한);
+  const 목록 = 후보.목록 || [];
+  if (!목록.length) { 건너뜀.push(라벨 + ": 누를 것이 없음(표·카드만)"); continue; }
+  if (후보.서로다른글 > 화면당상한) {
+    건너뜀.push(라벨 + ": 서로 다른 글 " + 후보.서로다른글 + "종 중 앞 " + 화면당상한 + "종만 (전체 요소 " + 후보.전체 + "개)");
+  }
 
-  for (const c of 후보) {
+  for (const c of 목록) {
     if (위험말.test(c.글)) { 건너뜀.push(`${라벨} / ${c.글}: 위험말`); continue; }
     const 요청 = [];
     const 오류 = [];
@@ -81,18 +99,19 @@ for (const 라벨 of 화면들) {
     p.on("request", onReq); p.on("pageerror", onErr); p.on("console", onCon);
     const 탭전 = ctx.pages().length;
 
-    const r = await p.evaluate(({ i }) => {
+    const r = await p.evaluate(({ i, 글 }) => {
       const f = document.querySelector("#screens iframe.on");
       const d = f && f.contentDocument;
       if (!d) return { 못봄: true };
       const els = [...d.querySelectorAll('button, [role="button"], .row-actions, .tb-mi, .chip, .g-go, [data-action]')]
         .filter((e) => (e.offsetParent || e.getClientRects().length) && (e.textContent || "").trim());
-      const el = els[i];
+      // 인덱스가 아니라 **글자로** 찾는다 — 앞선 클릭으로 목록이 바뀌면 인덱스는 엉뚱한 것을 가리킨다.
+      const el = els.find((e) => (e.textContent || "").trim().slice(0, 30) === 글) || els[i];
       if (!el) return { 사라짐: true };
       const 전 = d.body.innerHTML.length;
       el.click();
       return { 전, 글: (el.textContent || "").trim().slice(0, 30) };
-    }, { i: c.i });
+    }, { i: c.i, 글: c.글 });
 
     if (r.못봄 || r.사라짐) { p.off("request", onReq); p.off("pageerror", onErr); p.off("console", onCon); continue; }
     await p.waitForTimeout(1400);
