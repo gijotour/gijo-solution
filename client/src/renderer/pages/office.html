@@ -1031,14 +1031,12 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
     } catch (err) { 알림(document.querySelector(".todo .t-head"), "⚠ 할일 처리에 실패했습니다", "☑ 오늘의 할일", 15000); }
   });
 
-  // 적어 넣기는 '내 업무' 화면으로 보낸다(2026-07-31) — 거기서는 적으면 그 일을 어떤 순서로
-  // 하는지까지 안내받는다.
-  // ⚠ navigateTo를 쓰면 안 된다 — 이 창은 별도 창이지만 그 명령은 **본창을 통째로 갈아치워**
-  //   담당자가 본창에 열어 둔 탭이 전부 사라진다(preload의 탭 안 보정도 여기엔 안 닿는다,
-  //   이 창은 embed가 아니다). 대화창과 같은 통로로 **탭 하나만 더** 연다.
+  // 적어 넣기는 **본창 대화창**으로 보낸다(2026-08-01, 내 업무 메뉴 폐지).
+  // 이 창에는 대화창이 없으므로 askConsole 통로로 넘긴다 — 화면을 새로 열지 않는다.
+  // ⚠ navigateTo를 쓰면 안 된다 — 그 명령은 **본창을 통째로 갈아치워** 담당자가 열어 둔 탭이
+  //   전부 사라진다(이 창은 embed가 아니라 preload의 탭 안 보정이 안 닿는다).
   document.getElementById("todoOpenBtn").addEventListener("click", () => {
-    if (window.gijo && window.gijo.openTabInShell) window.gijo.openTabInShell("mywork.html", "내 업무");
-    else if (window.gijo && window.gijo.navigateTo) window.gijo.navigateTo("mywork.html");
+    if (window.gijo && window.gijo.askConsole) window.gijo.askConsole("오늘 할 일");
   });
 
   // ── 운영 시작 CTA ──

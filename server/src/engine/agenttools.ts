@@ -49,7 +49,7 @@ import { lawAnswer, getLawConfig, type LawTarget } from "./lawinfo";
 // 담당자가 "미조치"라고 하면 저장값 open·pending을 뜻한다 — 글자 그대로 대조하면 늘 0건이다.
 import { 필터에맞나 } from "./statuswords";
 // 내 업무(할 일) — 화면을 없애고 대화창에서 한다(2026-08-01 사용자 결정).
-import { listTasks, createTask, completeTask, setGuideStepDone } from "./tasks";
+import { listTasks, createTask, completeTask, setGuideStepDone, routineSuggestions } from "./tasks";
 import { buildMyWork } from "./mywork";
 import { getGuide as 가이드가져오기 } from "./workguide";
 import type { MyWorkItem } from "./mywork";
@@ -1437,9 +1437,25 @@ function 절차카드(t: ReturnType<typeof listTasks>[number]): string {
     return `${머리}\n${줄}\n\n▸ 절차를 다 밟으셨습니다 — 끝내려면 "${t.text} 완료"`;
   }
   const 다음 = g.steps[다음번호];
-  const 힌트 = 다음.kind === "ask" && 다음.question ? `\n▸ 이렇게 물으시면 됩니다 — "${다음.question}"`
+  // ⚠ {업무}는 **치환해서 내보낸다**. 화면이 하던 일인데, 안 하면 담당자가 "{업무} — 이
+  //   취약점을 …"을 그대로 복사해 물어 엉뚱한 답을 받는다(화면 시험이 이걸 지키고 있었다).
+  const 물음 = 다음.question ? 다음.question.replace(/\{업무\}/g, t.text) : "";
+  const 힌트 = 다음.kind === "ask" && 물음 ? `\n▸ 이렇게 물으시면 됩니다 — "${물음}"`
     : 다음.kind === "open" && 다음.page ? `\n▸ ${다음.page} 화면을 보시면 됩니다` : "";
   return `${머리}\n${줄}${힌트}\n\n▸ ${다음번호 + 1}번을 끝내셨으면 "${다음번호 + 1}번 했어"`;
+}
+
+async function runRoutineTasks(): Promise<string> {
+  let 목록: Awaited<ReturnType<typeof routineSuggestions>>;
+  try { 목록 = await routineSuggestions(); } catch { 목록 = []; }
+  if (!목록.length) {
+    return "아직 자주 하는 업무로 잡힌 것이 없습니다.\n" +
+      "▸ 몇 번 직접 담으시면 그 일이 여기 올라옵니다 — 예: \"할 일 추가: 방화벽 정책 점검\"";
+  }
+  const 줄 = 목록.map((r) => `· [${r.cadence === "daily" ? "매일" : "매주"}] ${r.text}` +
+    (r.source ? ` — ${r.source}` : "")).join("\n");
+  return `자주 하는 업무 **${목록.length}건**\n${줄}\n\n` +
+    `▸ 담으려면 "할 일 추가: ${목록[0].text}"`;
 }
 
 async function runWorkSteps(args: Record<string, string>): Promise<string> {
@@ -1876,6 +1892,19 @@ const TOOLS: AgentTool[] = [
       { name: "due", label: "기한", description: "오늘 · 이번 주 (선택, 비우면 기한 없음)", required: false },
     ],
     run: runAddTask,
+  },
+  // 「자주 하는 업무」 — 내 업무 화면의 접힌 구역에 있던 것. 화면을 없애면 이것도 같이
+  // 사라지므로 대화창으로 옮긴다. ⚠ RAG+LLM이라 몇 초 걸린다(화면에서도 따로 늦게 채웠다).
+  {
+    name: "routine_tasks",
+    label: "자주 하는 업무",
+    domain: "cross",
+    write: false,
+    description:
+      '주기적으로 반복되는 업무를 추천한다. "자주 하는 일 뭐 있어?", "정기 업무 추천해줘", "매일 뭐 해야 해?"에 쓴다. 예: {}',
+    directAnswer: true,
+    params: [],
+    run: runRoutineTasks,
   },
   // ★ 절차 카드 — 「내 업무」 화면에서 하던 단계 밟기를 대화창으로 옮긴 것(2026-08-01).
   //   목록 답변이 "○○ 어떻게 해?라고 물으면 순서를 알려드립니다"라고 **약속**하므로,

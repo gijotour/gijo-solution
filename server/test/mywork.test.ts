@@ -313,20 +313,24 @@ describe("가이드 질문이 헛돌지 않는다", () => {
   });
 
   it("{업무}를 쓴 질문은 화면이 실제로 치환한다", async () => {
-    const fs = await import("node:fs");
-    const src = fs.readFileSync(new URL("../../client/src/renderer/pages/mywork.html", import.meta.url), "utf8");
-    const 치환필요 = listGuides().some((g) => g.steps.some((s) => s.question?.includes("{업무}")));
-    if (!치환필요) return;
-    // ⚠ 변수 이름을 고정하지 않는다 — 화면을 재설계하면 이름이 바뀌는데 동작은 멀쩡하다
-    //   (2026-07-31 재설계에서 실제로 이 시험이 헛되이 실패했다). **뜻**을 본다:
-    //   보낼 때도 보여줄 때도 치환을 거치는가.
-    expect(src, "{업무}를 그대로 보내면 AI가 못 알아듣는다").toContain("function fillQuestion");
-    // 정규식 대신 문자열 포함으로 본다 — 괄호 이스케이프가 한 겹만 어긋나도
-    // 시험 자체가 못 돌아 "no tests"가 된다(2026-07-31에 실제로 겪었다).
-    const 쓰임 = src.split("fillQuestion(").length - 1;
-    expect(쓰임, "정의만 하고 안 쓰거나, 한 군데서만 쓰면 보이는 것과 보내는 것이 어긋난다").toBeGreaterThanOrEqual(3);
-    expect(src, "화면에 보이는 문장도 치환해야 한다 — 다르면 담당자가 헷갈린다").toContain("esc(fillQuestion(");
-    expect(src, "AI에게 보낼 때 치환해야 한다").toContain("askAI(fillQuestion(");
+    // 화면(mywork.html)이 하던 치환을 **대화창 절차 카드**가 이어받았다(2026-08-01).
+    // ⚠ 안 하면 담당자가 "{업무} — 이 취약점을 …"을 그대로 복사해 물어 엉뚱한 답을 받는다.
+    //   화면을 없앨 때 실제로 빠뜨렸다가 이 시험 덕에 잡았다.
+    const 치환필요 = listGuides().filter((g) => g.steps.some((s) => s.question?.includes("{업무}")));
+    if (!치환필요.length) return;
+    const g = 치환필요[0];
+    const { findAgentTool } = await import("../src/engine/agenttools");
+    const { createTask, resetTasksForTests } = await import("../src/engine/tasks");
+    resetTasksForTests();
+    createTask({ text: g.label });
+    // 치환이 걸린 단계까지 진행시킨 뒤 그 단계의 안내 문장을 본다.
+    const 물음단계 = g.steps.findIndex((s) => s.question?.includes("{업무}"));
+    for (let i = 0; i < 물음단계; i++) {
+      await findAgentTool("step_done")!.run({ step: String(i + 1), task: g.label });
+    }
+    const out = String(await findAgentTool("work_steps")!.run({ task: g.label }));
+    expect(out, "{업무}를 그대로 내보내면 담당자가 복사해 물었을 때 AI가 못 알아듣는다").not.toContain("{업무}");
+    expect(out, "치환한 자리에 실제 업무 이름이 들어가야 한다").toContain(g.label);
   });
 
   it("우리 제품 용어를 쓰는 질문은 그 용어를 정확히 쓴다", () => {

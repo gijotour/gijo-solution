@@ -525,8 +525,14 @@
     try { await window.gijo.toggleTask(row.dataset.id, e.target.checked); } catch (err) {}
     loadTasks();
   });
-  // 적어 넣기는 '내 업무'로 보낸다 — 거기서 적으면 그 일을 어떤 순서로 하는지까지 안내받는다.
-  $("taskOpen").addEventListener("click", function () { go("mywork.html"); });
+  // 적어 넣기는 **대화창**으로 보낸다(2026-08-01, 내 업무 메뉴 폐지). 거기서 담고·끝내고·
+  // 순서까지 안내받는다 — "메뉴는 보기 용도, 입력·설정은 대화창에서"라는 원칙 그대로다.
+  // ⚠ 화면 이동이 아니라 **명령창에 문장을 얹어 둔다** — 담당자가 무슨 말을 해야 하는지
+  //   모른 채 빈 칸을 마주하면 그 자리에서 멈춘다(2026-07-31 실측).
+  $("taskOpen").addEventListener("click", function () {
+    if (window.gijoConsole && window.gijoConsole.prefill) window.gijoConsole.prefill("할 일 추가: ");
+    else if (window.gijoConsole && window.gijoConsole.ask) window.gijoConsole.ask("오늘 할 일");
+  });
 
   // ── 한눈에 ───────────────────────────────────────────────────────────
   // 서버 KPI에 실제로 있는 값만 쓴다. 없는 항목은 줄 자체를 안 만든다(빈칸에 0을 채우지 않는다).

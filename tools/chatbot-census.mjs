@@ -44,7 +44,6 @@ function 화면들() {
 // ③ 화면의 본업을 묻는 질문. 상상해서 만들지 않고 **그 화면이 실제로 다루는 것**으로 적는다.
 const 본업질문 = {
   "dashboard.html": "오늘 뭐부터 볼까?",
-  "mywork.html": "내가 오늘 해야 할 일 알려줘",
   "sessions.html": "최근에 내가 한 작업 보여줘",
   "analysis.html": "지금 제일 급한 위험 뭐야?",
   "threat.html": "우리 자산에 걸리는 위협 있어?",

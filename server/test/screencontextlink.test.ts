@@ -101,9 +101,17 @@ describe("★ 특정 항목을 누르면 그 항목으로 좁혀 간다", () => 
     const i = src.indexOf('getElementById("todoOpenBtn")');
     expect(i, "적어 넣기 버튼을 못 찾았다").toBeGreaterThan(0);
     const 블록 = src.slice(i, i + 420);
-    expect(블록, "별도 창은 openTabInShell로 열어야 한다").toContain("openTabInShell");
+    // ⚠ **수단이 아니라 뜻을 본다**(2026-08-01). 예전엔 openTabInShell을 못 박았는데,
+    //   내 업무 화면을 없애면서 이 버튼이 대화창으로 넘기게 바뀌자(askConsole) 헛되이 실패했다.
+    //   지켜야 할 것은 하나다 — **navigateTo로 본창을 갈아치우지 않는다.**
+    expect(블록, "본창을 갈아치우지 않는 통로로 보내야 한다")
+      .toMatch(/openTabInShell|askConsole/);
     // navigateTo가 남아 있어도 되지만 **폴백이어야 한다**(먼저 오면 안 된다).
-    expect(블록.indexOf("openTabInShell")).toBeLessThan(블록.indexOf("navigateTo"));
+    if (블록.includes("navigateTo")) {
+      const 안전 = Math.min(...["openTabInShell", "askConsole"]
+        .map((n) => 블록.indexOf(n)).filter((n) => n >= 0));
+      expect(안전).toBeLessThan(블록.indexOf("navigateTo"));
+    }
   });
 
   it("AI-BOM의 '견고성 자세히'가 그 자산을 골라 둔 채로 연다", () => {

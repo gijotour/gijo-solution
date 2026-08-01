@@ -622,6 +622,25 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     return { task, route: { agentId: "orchestrator", action: "chat" }, output: 낱말 };
   }
 
+  // ★ "내 업무 화면 어디 갔어?" — 없앤 메뉴를 찾는 말(2026-08-01, 메뉴 폐지).
+  //   ⚠ 그냥 두면 모델이 **아직 있다고 답한다**(실측: "대시보드에서 항목을 클릭하면 해당
+  //   작업 화면으로 이동합니다"). 사내 문서·학습에 옛 화면이 남아 있어 생기는 일이라,
+  //   프롬프트로 못 고친다 — 옮겨 간 자리를 코드로 못 박아 답한다.
+  if (/(내\s*업무|할\s*일)\s*(화면|메뉴|탭)?\s*(어디|없어|사라|안\s*보|어떻게\s*가|못\s*찾)/.test(instructionText)) {
+    const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
+    completeTask(task.id);
+    return {
+      task, route: { agentId: "orchestrator", action: "chat" },
+      output: "「내 업무」 화면은 없앴습니다 — **여기 대화창에서 그대로 하시면 됩니다**.\n\n" +
+        "· 목록 — \"오늘 할 일\"\n" +
+        "· 담기 — \"할 일 추가: ○○\"\n" +
+        "· 끝내기 — \"○○ 완료\"\n" +
+        "· 순서 — \"○○ 어떻게 해?\" · 단계 체크는 \"1번 했어\"(되돌리기 \"1번 취소\")\n" +
+        "· 반복 업무 — \"자주 하는 일 뭐 있어?\"\n\n" +
+        "▸ 목록 맨 앞의 **▶ 지금 이거** 한 줄만 보고 시작하셔도 됩니다.",
+    };
+  }
+
   // ★ "○○ 어떻게 해?" — **내 할 일 이름을 댄 절차 질문**은 여기서 먼저 집는다(2026-08-01).
   //   목록 답변이 "○○ 어떻게 해?라고 물으면 순서를 알려드립니다"라고 약속하는데, 뒤쪽
   //   결정적 분기들이 이 말을 먼저 채 갔다(실측): "침해사고 대응 어떻게 해?"는 조치 플레이북이,

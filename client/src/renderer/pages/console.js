@@ -941,7 +941,17 @@
     input.value = text;
     submit();
   }
-  window.gijoConsole = { append: append, syncCtx: readCtxFromShell, submit: submit, ask: ask };
+  // prefill() — **보내지 않고** 문장 앞부분만 얹어 두고 커서를 뒤에 놓는다(2026-08-01).
+  // "할 일 적어 넣기"처럼 뒷말을 담당자가 채워야 하는 자리에 쓴다. 빈 칸만 보여 주면
+  // 무슨 말을 해야 할지 몰라 그 자리에서 멈춘다 — 첫 몇 글자가 그걸 막는다.
+  function prefill(text) {
+    var input = document.getElementById("chatInput");
+    if (!input) return;
+    input.value = text;
+    input.focus();
+    try { input.setSelectionRange(input.value.length, input.value.length); } catch (e) {}
+  }
+  window.gijoConsole = { append: append, syncCtx: readCtxFromShell, submit: submit, ask: ask, prefill: prefill };
 
   // 다른 화면·다른 창에서 "이 지시를 대화창에서 이어서" 하고 넘겨 준 것을 받는다.
   // ⚠ 빈 글이면 **보내지 않는다** — 「이어서 지시하기」만 누른 사람은 아직 할 말을 안 정했다.

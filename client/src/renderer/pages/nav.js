@@ -33,10 +33,10 @@
     //   page가 없는 항목이 탭 열기로 떨어져 undefined 탭을 여니 조용히 실패한다.
     //   win을 보고 처리하면 새 창 항목을 더해도 클릭 처리를 고칠 일이 없다.
     { win: "openTeamOffice", label: "팀 사무실 (창)", ic: "🏢", fixed: true },
-    // 내 업무 — 오늘 할 일을 고르고 **그 일을 어떤 순서로 하면 되는지 안내받아 진행하는** 자리.
-    // 팀 사무실 바로 아래에 둔다(2026-07-31 사용자 지시). 할 일을 적어 넣는 창구는 여기 하나다 —
-    // 대시보드 카드와 팀 사무실 창은 읽기 전용 요약으로 낮췄다(같은 목록이 세 군데였다).
-    { page: "mywork.html", label: "내 업무", ic: "☑", fixed: true },
+    // ⚠ 「내 업무」 메뉴는 없앴다(2026-08-01 사용자 지시 — "내업무 메뉴는 삭제하고 그 안에
+    //   있는 모든 내용은 대화창에서"). 목록·담기·완료·절차 밟기는 전부 대화창 도구로 옮겼다:
+    //   picklist 결정적 목록 + add_task·complete_task·work_steps·step_done·step_undo·routine_tasks.
+    //   화면을 되살릴 일이 있으면 그 도구들과 겹치지 않게 먼저 정리할 것.
     // 문서함 — 가이드·아키텍처를 읽는 별도 창(주소가 없어 별표 대상 아님, 팀 사무실과 같음)
     { win: "openDocbox", label: "문서함 (창)", ic: "📚", fixed: true },
     { page: "sessions.html", label: "작업 내역", fixed: true },
@@ -328,9 +328,12 @@
       sBadge.title = "진행중인 작업";
       el.appendChild(sBadge);
     }
-    // 내 업무 — **기한이 지난 건수**를 띄운다. "몇 건 남았나"보다 "몇 건이 늦었나"가
-    // 담당자를 움직이는 숫자다(남은 건수는 늘 많아서 보고도 안 움직인다).
-    if (it.page === "mywork.html") {
+    // **기한이 지난 건수**를 띄운다. "몇 건 남았나"보다 "몇 건이 늦었나"가 담당자를
+    // 움직이는 숫자다(남은 건수는 늘 많아서 보고도 안 움직인다).
+    // 내 업무 메뉴를 없애면서 **대시보드**로 옮겼다(2026-08-01) — 할 일을 실제로 처리하는
+    // 곳이 대화창이고, 대화창이 대시보드에 있기 때문이다. 붙일 자리가 사라지면 늦은 건수를
+    // 알릴 곳이 없어져 조용히 묻힌다.
+    if (it.page === "dashboard.html") {
       var wBadge = document.createElement("span");
       wBadge.className = "gn-upbadge gn-workbadge";
       wBadge.style.display = "none";
