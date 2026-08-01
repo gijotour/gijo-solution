@@ -330,7 +330,9 @@ function detectWebAttack(source: string, lines: string[], 대상: string[] = [])
 }
 
 function mkLog(source: string, id: string, title: string, entity: string, severity: Severity, signals: string[], detail: string, peers: string[] = []): AnalysisEvent {
-  return { id, source: "log", title, entity, peers, severity, priority: computePriority(severity, signals), detail, signals, aiSummary: "", ref: source, at: Date.now() };
+  // 공격자 자신은 대상이 아니다 — 로그 줄에서 첫 IP를 주워 온 경우를 여기서 걸러 낸다.
+  const 대상만 = [...new Set(peers)].filter((p) => p && p !== entity);
+  return { id, source: "log", title, entity, peers: 대상만, severity, priority: computePriority(severity, signals), detail, signals, aiSummary: "", ref: source, at: Date.now() };
 }
 
 /**
@@ -346,7 +348,11 @@ function syslogHosts(lines: string[]): string[] {
     // "<월> <일> <시:분:초> <호스트> <프로그램>" — 호스트는 4번째 토큰, IP가 아니어야 한다.
     const m = line.match(/^[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+(\S+)\s+\S+/);
     const h = m?.[1];
-    if (!h || /^\d+\.\d+\.\d+\.\d+$/.test(h)) continue; // IP면 우리 호스트로 못 본다
+    // ⚠ IP를 버리면 안 된다(2026-08-01 실측). 국내 현장 장비 상당수가 syslog 호스트 자리에
+    //   **IP를 넣어 보내고**, 우리 자산도 IP로 등록돼 있는 경우가 많다("10.10.20.41").
+    //   버리면 그 자산과 영영 안 묶인다. 대신 **공격자 IP와 같으면** 아래 mkLog에서 걸러 낸다
+    //   — 첫 IP를 주워 자기 자신을 대상으로 삼는 것만 막으면 된다.
+    if (!h) continue;
     셈.set(h, (셈.get(h) ?? 0) + 1);
   }
   // 가장 많이 나온 호스트만 — 여러 장비 로그가 섞이면 전부 묶어 오탐을 만들 수 있다.
