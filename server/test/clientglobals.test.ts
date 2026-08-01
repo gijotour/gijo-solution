@@ -127,15 +127,60 @@ describe("★ 주 대화창이 근거를 보여 준다 (2026-08-01)", () => {
   // 무엇을 근거로 했는지 알 수 없었다. 화면 안 위젯에는 있었는데 그쪽은 탭에서 비어 있다.
   // 기능을 안 쓰는 곳에 넣는 실수를 다시 밟지 않도록 못 박는다.
   it("지휘소가 근거 문서 이름과 원문 대목을 그린다", () => {
+    // ⚠ 그리는 코드는 공용 부품(chatparts.js)으로 옮겼다 — 지휘소는 그걸 부른다.
+    //   시험이 옛 자리를 계속 보면 **정상적인 이동을 실패로 읽는다**(2026-08-01 실제로 그랬다).
+    const parts = pageSrc.get("chatparts.js") ?? "";
     const src = pageSrc.get("console.js") ?? "";
-    expect(src, "지휘소가 근거 배지를 안 그린다").toContain("📄 근거:");
-    expect(src, "지휘소가 근거 원문을 안 그린다").toContain("근거 원문");
-    expect(src, "서버가 준 quotes를 안 받는다").toMatch(/attachQuotes\(replyEl[^)]*quotes/);
+    expect(parts, "근거 배지를 그리는 곳이 없다").toContain("📄 근거:");
+    expect(parts, "근거 원문을 그리는 곳이 없다").toContain("근거 원문");
+    expect(src, "지휘소가 서버의 quotes를 안 넘긴다").toMatch(/P\.quotes\(replyEl[^)]*quotes/);
   });
 
   it("서버가 실제로 quotes를 준다 — 화면만 그려 봐야 소용없다", () => {
     const disp = fs.readFileSync(new URL("../src/engine/dispatcher.ts", import.meta.url), "utf8");
     expect(disp).toContain("quotes?: SourceQuote[]");
     expect(disp, "검색 결과에서 원문을 안 뽑는다").toMatch(/quotes = relevant/);
+  });
+});
+
+describe("★ 대화 부품은 한 벌만 있다 (2026-08-01 사용자 지적: \"하나의 구조가 맞지?\")", () => {
+  // 지시를 넣는 자리가 둘이다 — 셸의 지휘소(console.js)와 분리창의 위젯(chatwidget.js).
+  // ⚠ 위젯은 죽은 코드가 **아니다**: 분리창(⧉ 창으로)에는 지휘소가 없어 거기선 유일한 창구다.
+  //   지우려다 확인해서 알았다(2026-08-01). 지웠으면 창으로 빼는 순간 물어볼 데가 사라졌다.
+  // 문제는 삭제가 아니라 **어긋남**이었다: 체크칸·가서 하기가 지휘소에만 있어,
+  // 같은 답인데 창으로 빼면 목록에서 고를 수가 없었다.
+  const parts = pageSrc.get("chatparts.js") ?? "";
+  const console_ = pageSrc.get("console.js") ?? "";
+  const widget = pageSrc.get("chatwidget.js") ?? "";
+
+  it("부품이 공용 파일에 있다", () => {
+    for (const fn of ["function quotes(", "function picks(", "function open("]) {
+      expect(parts, `${fn} 가 공용 파일에 없다`).toContain(fn);
+    }
+    expect(parts).toContain("window.gijoChatParts");
+  });
+
+  it("★ 양쪽이 같은 부품을 쓴다 — 자기 것을 또 만들지 않는다", () => {
+    for (const [이름, src] of [["지휘소", console_], ["분리창 위젯", widget]] as [string, string][]) {
+      expect(src, `${이름}이 공용 부품을 안 쓴다`).toContain("gijoChatParts");
+      // 자체 구현을 다시 만들면 어긋남이 돌아온다.
+      expect(src, `${이름}에 체크칸 자체 구현이 되살아났다`).not.toMatch(/function attachPicks\(/);
+      expect(src, `${이름}에 근거원문 자체 구현이 되살아났다`).not.toMatch(/function attachQuotes\(|function 근거원문\(/);
+    }
+  });
+
+  it("부품을 쓰는 화면은 공용 파일을 먼저 읽는다", () => {
+    const 없음: string[] = [];
+    for (const [file, src] of pageSrc) {
+      if (!file.endsWith(".html")) continue;
+      if (!/(chatwidget|console)\.js/.test(src)) continue;
+      if (!/chatparts\.js/.test(src)) { 없음.push(file); continue; }
+      // 순서도 본다 — 부품이 뒤에 오면 부를 때 아직 없다.
+      // ⚠ 주석에도 파일 이름이 적혀 있다 — **script 태그**만 센다(2026-08-01 거짓 실패).
+      const 태그 = (n: string) => src.indexOf(`<script src="${n}"></script>`);
+      const w = 태그("chatwidget.js");
+      if (w >= 0 && 태그("chatparts.js") > w) 없음.push(file + "(순서)");
+    }
+    expect(없음, "부품이 없거나 늦게 읽혀 대화창이 반쪽이 된다").toEqual([]);
   });
 });

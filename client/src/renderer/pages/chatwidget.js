@@ -91,52 +91,6 @@
     document.head.appendChild(st);
   }
 
-  /**
-   * 근거 원문 — 접힌 채로 붙인다. 펴면 답을 만든 문서의 그 대목이 나온다.
-   *
-   * ★ 왜(2026-08-01 실측): 문서엔 "미사용 룰 37개"라고 적혀 있는데 AI가 "27"이라고 답했다.
-   *   근거 배지에는 그 문서가 **맞게** 떴다 — 자료 찾기는 정상이고 모델이 표를 잘못 읽은 것이다.
-   *   담당자는 그 숫자로 보고를 쓴다. 원문을 함께 보여 주면 눈으로 그 자리에서 잡는다.
-   *   (모델에게 "숫자를 정확히 읽어라"라고 타이르지 않는다 — 반복 실패한 방식이다.)
-   */
-  function 근거원문(quotes, answer) {
-    var wrap = document.createElement("div");
-    wrap.style.cssText = "margin-top:8px;border-top:1px solid rgba(255,255,255,.08);padding-top:8px";
-    var head = document.createElement("div");
-    head.style.cssText = "font-size:10px;color:var(--muted,#8b93ab);cursor:pointer;user-select:none";
-    var 펴짐 = false;
-    var 그리기 = function () { head.textContent = (펴짐 ? "▾" : "▸") + " 📄 근거 원문 " + quotes.length + "대목 — 답이 맞는지 확인"; };
-    그리기();
-    var body = document.createElement("div");
-    body.style.display = "none";
-    body.style.marginTop = "6px";
-
-    // 답에 나온 숫자·영문코드를 원문에서 강조한다 — 눈이 바로 그리로 간다.
-    var 표시할것 = (String(answer).match(/\d[\d,.\-]{0,12}|[A-Z][A-Za-z0-9\-]{3,}/g) || [])
-      .filter(function (t) { return t.length >= 2; })
-      .slice(0, 12);
-    quotes.slice(0, 3).forEach(function (q) {
-      var box = document.createElement("div");
-      box.style.cssText =
-        "border-left:3px solid rgba(59,130,246,.45);background:rgba(59,130,246,.05);" +
-        "padding:7px 10px;border-radius:0 6px 6px 0;margin-bottom:6px";
-      var 글 = esc(q.text || "");
-      표시할것.forEach(function (t) {
-        var 안전 = esc(t).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-        try { 글 = 글.replace(new RegExp(안전, "g"), '<mark style="background:rgba(240,160,32,.28);color:#ffd88a;padding:0 2px;border-radius:3px">$&</mark>'); } catch (e) {}
-      });
-      box.innerHTML =
-        '<div style="font-size:9.5px;color:var(--muted-2,#5f6785);margin-bottom:3px">' + esc(q.documentId || "") + "</div>" +
-        '<div style="font-size:11px;line-height:1.75;color:#cdd4e6">' + 글 + "</div>";
-      body.appendChild(box);
-    });
-
-    head.onclick = function () { 펴짐 = !펴짐; body.style.display = 펴짐 ? "block" : "none"; 그리기(); };
-    wrap.appendChild(head);
-    wrap.appendChild(body);
-    return wrap;
-  }
-
   function build() {
     injectCss();
     host.removeAttribute("style");
@@ -294,11 +248,23 @@
             '<div style="margin-top:6px;font-size:9.5px;font-weight:700;color:#6fdcb5">📄 근거: ' +
             r.sources.slice(0, 4).map(esc).join(" · ") + "</div>";
         }
-        // ★ 근거 **원문 대목** — 이름만으로는 담당자가 답을 검증할 수 없다(2026-08-01 실측:
-        //   문서엔 "미사용 룰 37개"인데 AI가 "27"이라고 답했고, 근거 배지는 맞게 떴다).
-        //   기본은 접힘 — 매번 펼쳐 두면 답보다 근거가 길어져 아무도 안 읽는다.
-        //   답에 나온 숫자를 원문에서 강조해 눈이 바로 가게 한다.
-        if (Array.isArray(r.quotes) && r.quotes.length) typing.appendChild(근거원문(r.quotes, r.output || ""));
+        // ★ 아래 셋은 **지휘소와 같은 부품**을 쓴다(chatparts.js).
+        //   분리창(⧉ 창으로)에서는 여기가 유일한 창구인데, 전엔 체크칸·가서 하기가 없어
+        //   같은 답인데 창으로 빼면 목록에서 고를 수가 없었다(2026-08-01 실측).
+        //   한쪽에만 고쳐 놓고 고쳤다고 믿는 일을 없애려고 부품을 한 곳에 두었다.
+        var P = window.gijoChatParts;
+        if (P) {
+          P.quotes(typing, r.quotes, r.output || "", null); // 근거 배지는 위에서 이미 그렸다
+          P.picks(typing, r.picklist, function (보낼글) { send(보낼글); });
+          // 분리창은 탭을 직접 못 연다 — 본창에 부탁한다(지휘소와 다른 유일한 대목).
+          P.open(typing, r.openScreen, {
+            navigate: function (page, label) {
+              if (window.gijo && window.gijo.openTabInShell) return window.gijo.openTabInShell(page, label);
+              if (window.gijo && window.gijo.navigateTo) return window.gijo.navigateTo(page);
+              return false;
+            },
+          });
+        }
         // 실행이 필요한 지시면 여기서 끝내지 않고 확인 카드를 띄운다.
         if (r.approval) appendApproval(r.approval);
         else if (r.confirm && r.confirm.type === "learnloop") {

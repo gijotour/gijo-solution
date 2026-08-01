@@ -786,12 +786,31 @@
       // 지적 버튼 — 방금 보낸 질문과 이 답을 짝지어 둔다(중-1 피드백 루프).
       attachFlag(replyEl, text, (r && r.output) || "");
       // 근거 원문 — 답의 숫자를 담당자가 눈으로 검증할 수 있게(2026-08-01).
-      attachQuotes(replyEl, r && r.quotes, (r && r.output) || "", r && r.sources);
+      // ★ 아래 셋은 **분리창 위젯과 같은 부품**을 쓴다(chatparts.js) — 2026-08-01 사용자 지적
+      //   "대화창 하나의 구조로 되어 있는 게 맞지?"에 대한 답이다.
+      //   자리마다 다른 것은 **여는 방법**과 **붙일 자리**뿐이라 그것만 여기서 넘긴다.
+      //   ⚠ 자체 구현(attachQuotes·attachOpen·attachPicks)은 아래에 남아 있지만 이제 안 부른다.
+      //     지우다가 옆 함수를 잘라 먹은 적이 있어(같은 날) **호출만 끊고 코드는 둔다** —
+      //     다음 정리 때 시험이 통과하는 것을 보고 지운다.
+      var P = window.gijoChatParts;
+      P.quotes(replyEl, r && r.quotes, (r && r.output) || "", r && r.sources);
       // "가서 하기" — 계정·인증·열쇠처럼 AI가 대신 하면 안 되는 일은 순서만 안내하고,
       // 그 화면을 찾아 들어가는 수고는 없앤다(2026-07-31 사용자 지시).
-      attachOpen(replyEl, r && r.openScreen);
+      P.open(replyEl, r && r.openScreen, {
+        navigate: function (page, leaf) {
+          // 창 모드면 본창에 부탁한다(별도 창은 탭을 직접 못 연다). 셸 안이면 바로 연다.
+          if (IS_WINDOW && window.gijo && window.gijo.openTabInShell) {
+            return window.gijo.openTabInShell(page, leaf).then(function (x) { return !!(x && x.ok); });
+          }
+          if (window.gijoTabs) { window.gijoTabs.open(page, leaf); return true; }
+          if (window.gijo && window.gijo.navigateTo) { window.gijo.navigateTo(page); return true; }
+          return false;
+        },
+      });
       // 목록이 나왔으면 체크해서 바로 조치할 수 있게 한다(2026-07-31 "리스트를 보고 선택도 가능한거지?").
-      attachPicks(replyEl, r && r.picklist);
+      // 붙일 자리(.cb)는 지휘소 고유라 여기서 정한다 — 부품은 만들어만 주고 자리는 안 정한다.
+      var pickEl = P.picks(replyEl, r && r.picklist, function (보낼글, 보일글) { submit(보낼글, 보일글); });
+      if (pickEl) (replyEl.querySelector(".cb") || replyEl).appendChild(pickEl);
       // 쓰기 지시는 결재판으로 돌아온다 — 대화창에서 바로 확인·승인한다(없으면 막다른 길이다).
       attachApproval(replyEl, r && r.approval);
     } catch (e) {
