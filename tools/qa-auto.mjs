@@ -625,14 +625,25 @@ async function runClient() {
     for (const 있어야 of ["관제", "자산", "보안제품", "업무 관리", "AI", "데이터 플라이휠", "설정"]) {
       if (!m.groups.some((g) => g.includes(있어야))) throw new Error(`그룹에 '${있어야}'가 없다: ${m.groups.join(",")}`);
     }
-    // 맨 위 고정 4자리 — 대시보드 · 팀 사무실(창) · 문서함(창) · 작업 내역.
-    // 2026-07-31 문서함(창)으로 3→4, 같은 날 '내 업무'를 더해 5. 2026-08-01 '내 업무'
-    // 화면을 없애(그 일은 대화창이 받는다) 다시 4가 됐다.
-    // 개수만 세면 "무엇이 늘었는지"를 못 잡으므로 이름까지 확인한다.
-    if (m.fixed.length !== 4) throw new Error(`맨 위 고정이 ${m.fixed.length}자리: ${m.fixed.join(",")}`);
-    for (const 있어야 of ["대시보드", "팀 사무실", "문서함", "작업 내역"]) {
+    // 맨 위 고정 **3자리** — 대시보드 · 팀 사무실(창) · 작업 내역.
+    // 2026-07-31 문서함(창)으로 4가 됐다가, 2026-08-02 사용자 지시로 문서함을 **왼쪽 메뉴에서
+    //   감췄다**("문서함 메뉴는 아래 있으니 안 보이게 해 줘") — 사용자 이름 옆 📚로 옮겼기 때문이다.
+    //   데이터에는 남아 있어 상단 바 🔍 화면찾기로는 여전히 찾아진다. 그래서 화면이 준 게 아니라
+    //   **자리를 옮긴 것**이고, 기대값을 3으로 내린다.
+    if (m.fixed.length !== 3) throw new Error(`맨 위 고정이 ${m.fixed.length}자리: ${m.fixed.join(",")}`);
+    // ⚠ 문서함은 뺐다 — 없앤 게 아니라 사용자 이름 옆 📚로 **옮겼다**(2026-08-02).
+    //   그 자리는 아래 gtb-userarea 검사에서 따로 지킨다.
+    for (const 있어야 of ["대시보드", "팀 사무실", "작업 내역"]) {
       if (!m.fixed.some((f) => f.includes(있어야))) throw new Error(`맨 위 고정에 '${있어야}'가 없다: ${m.fixed.join(",")}`);
     }
+    // 문서함은 왼쪽 메뉴에서 뺐으니(2026-08-02) **옮겨간 자리에 있는지**를 여기서 지킨다.
+    //   기대값만 내리고 끝내면, 나중에 📚가 통째로 사라져도 아무도 못 잡는다.
+    const 문서함 = await page.evaluate(() => {
+      const el = document.querySelector("#gijoNav .gtb-userarea [title*='문서함'], #gijoNav .gtb-userarea .gtb-doc");
+      const 글 = document.querySelector("#gijoNav .gtb-userarea")?.innerText || "";
+      return { 있나: !!el || /📚/.test(글), 글: 글.replace(/s+/g, " ").slice(0, 40) };
+    });
+    if (!문서함.있나) throw new Error(`문서함(📚)이 사용자 이름 옆에도 없다: ${문서함.글}`);
     if (!m.fav) throw new Error("⭐즐겨찾기 가지가 안 보인다 — 비어 있어도 보여야 한다");
     if (!(m.starOpacity > 0.15)) throw new Error(`☆가 마우스 없이는 안 보인다(opacity ${m.starOpacity}) — 즐겨찾기를 발견할 수 없다`);
     if (m.total < 28) throw new Error(`항목 ${m.total}개 — 허브가 덜 풀렸다`);
