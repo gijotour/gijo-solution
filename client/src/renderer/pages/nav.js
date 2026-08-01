@@ -185,15 +185,7 @@
       + "*::-webkit-scrollbar{width:8px;height:8px;}*::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:4px;}*::-webkit-scrollbar-track{background:transparent;}"
       // 긴 목록 패널 내부 스크롤(2026-07-26 사용자 결정) — 창 고정 원칙과 세트.
       + ".scroll-list{min-height:260px;overflow-y:auto;}"   // 높이는 gijoFitList가 재서 준다
-      // 요약 한 줄 막대 — 카드 5장이 먹던 세로 80px을 한 줄로.
-      + ".gsum-box{display:block !important;background:linear-gradient(90deg,rgba(59,130,246,.10),transparent);"
-      + "border:1px solid rgba(59,130,246,.28);border-radius:12px;padding:11px 16px;margin-bottom:16px;gap:0 !important;}"
-      + ".gsum{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 9px;font-size:13px;}"
-      + ".gsum-pair{display:inline-flex;align-items:baseline;gap:6px;}"
-      + ".gsum-l{color:var(--muted,#b3ada4);font-size:12.5px;font-weight:600;}"
-      + ".gsum-v{font-size:15px;font-weight:800;color:#fff;}"
-      + ".gsum-pair.first .gsum-v{font-size:17px;}"
-      + ".gsum-dot{color:var(--muted-2,#a49d95);}"
+
       + ".scroll-list thead th{position:sticky;top:0;background:var(--panel,#30302e);z-index:1;}"
 
       // 하단 로고·저작권 푸터 제거(2026-07-26 사용자 결정) — 정보 가치가 없고 화면마다
@@ -595,7 +587,39 @@
    * ⚠ 모양이 조금이라도 다르면 **손대지 않는다.** 요약 줄이 아닌 것을 억지로 바꾸면
    *   버튼·막대그래프가 있는 판까지 망가진다. 확신이 없으면 그냥 두는 쪽이 낫다.
    */
+  /**
+   * 막대 모양은 **변환기가 직접** 넣는다.
+   * ⚠ 처음엔 메뉴 스타일(injectCss)에 얹었는데 그건 **탭 안(embed)에서는 안 돈다** —
+   *   변환만 되고 모양이 안 먹어 카드가 세로로 297px 그대로 남았다(2026-08-02 실측).
+   *   바꾸는 코드와 그 모양은 **같이 다녀야** 한다.
+   */
+  function 요약막대모양() {
+    if (document.getElementById("gijoSumCss")) return;
+    var st = document.createElement("style");
+    st.id = "gijoSumCss";
+    st.textContent =
+      ".gsum-box{display:block !important;grid-template-columns:none !important;gap:0 !important;" +
+      "background:linear-gradient(90deg,rgba(59,130,246,.10),transparent);border:1px solid rgba(59,130,246,.28);" +
+      "border-radius:12px;padding:11px 16px;margin-bottom:16px;}" +
+      ".gsum{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 9px;font-size:13px;}" +
+      ".gsum-pair{display:inline-flex;align-items:baseline;gap:6px;min-width:0;}" +
+      ".gsum .gsum-l{color:var(--muted,#b3ada4) !important;font-size:12.5px !important;font-weight:600 !important;" +
+      "white-space:nowrap;margin:0 !important;padding:0 !important;display:inline !important;line-height:1.4 !important;}" +
+      // 값 요소는 화면이 쓰던 클래스를 그대로 달고 온다(카드용 큰 글씨·여백) — 여기서 눌러 준다.
+      ".gsum .gsum-v{font-size:15px !important;font-weight:800;line-height:1.4 !important;margin:0 !important;" +
+      "padding:0 !important;display:inline !important;}" +
+      // 첫 짝은 **이름처럼 굵게** 읽혀야 한다 — 컴플라이언스 막대(「KISA 위협 21건 | …」)와
+      // 같은 맛(2026-08-02 사용자가 그 화면을 가리키며 "이렇게").
+      ".gsum-pair.first .gsum-l{font-size:14.5px;color:#fff;font-weight:800;}" +
+      ".gsum-pair.first .gsum-v{font-size:17px !important;color:#fff;}" +
+      // 이름 뒤에 얇은 칸막이 — 제목과 곁가지가 눈으로 갈린다.
+      ".gsum-pair.first{padding-right:11px;margin-right:2px;border-right:1px solid var(--border,rgba(255,255,255,.14));}" +
+      ".gsum-dot{color:var(--muted-2,#a49d95);}";
+    document.head.appendChild(st);
+  }
+
   function 요약막대로() {
+    요약막대모양();
     var 상자들 = document.querySelectorAll("[data-gijo-summary]");
     [].forEach.call(상자들, function (box) {
       if (box.dataset.gijoSum === "1") return;              // 이미 바꿨다
@@ -607,26 +631,38 @@
         // 누를 것·그림이 든 판은 요약 줄이 아니다.
         if (c.querySelector("button, input, select, a, svg, canvas, table, progress")) return;
         var 안 = [].filter.call(c.children, function (e) { return e.nodeType === 1; });
-        if (안.length !== 2) return;                         // [라벨][값] 두 칸이 아니면 포기
-        var 라벨 = (안[0].textContent || "").trim();
-        var 값el = 안[1];
+        if (안.length !== 2) return;                         // 두 칸이 아니면 포기
+        // ⚠ **순서가 화면마다 다르다.** 대부분 [라벨][값]인데 온톨로지는 [값][라벨]이다.
+        //   순서를 단정했다가 값 요소(#statCount)를 버려 화면이 통째로 터졌다(2026-08-02 실사고).
+        //   숫자를 채우는 코드는 **id로** 찾으므로, id가 붙은 쪽이 값이다. id가 없으면 글자로 가린다.
+        var a = 안[0], b = 안[1];
+        var 값el = a.id ? a : (b.id ? b : null);
+        if (!값el) {
+          var 짧은쪽 = (a.textContent || "").trim().length <= (b.textContent || "").trim().length ? a : b;
+          값el = 짧은쪽;
+        }
+        var 라벨el = 값el === a ? b : a;
+        var 라벨 = (라벨el.textContent || "").trim();
         if (!라벨 || 라벨.length > 14) return;                // 라벨이 길면 문장형 판이다
-        조각.push({ 라벨: 라벨, el: 값el });
+        조각.push({ 라벨el: 라벨el, el: 값el });
       }
       if (!조각.length) return;
 
       var 막대 = document.createElement("div");
       막대.className = "gsum";
       조각.forEach(function (x, i) {
-        if (i) { var 점 = document.createElement("span"); 점.className = "gsum-dot"; 점.textContent = "·"; 막대.appendChild(점); }
+        if (i > 1) { var 점 = document.createElement("span"); 점.className = "gsum-dot"; 점.textContent = "·"; 막대.appendChild(점); }  // 첫 칸막이 뒤엔 점을 안 찍는다
         var 짝 = document.createElement("span");
         짝.className = "gsum-pair" + (i === 0 ? " first" : "");
-        var l = document.createElement("span"); l.className = "gsum-l"; l.textContent = x.라벨;
-        짝.appendChild(l);
+        // ★ 라벨도 값도 **원래 요소를 옮긴다**(만들지 않는다). 어느 쪽에 id가 붙어 있을지
+        //   모르고, 새로 만들면 그 id를 찾는 코드가 null을 만나 화면이 통째로 멈춘다.
+        x.라벨el.classList.add("gsum-l");
         x.el.classList.add("gsum-v");                        // 색은 화면이 준 것을 그대로 둔다
-        짝.appendChild(x.el);                                // ★ 옮긴다 — id가 살아 있어야 한다
+        짝.appendChild(x.라벨el);
+        짝.appendChild(x.el);
         막대.appendChild(짝);
       });
+      // 이 시점에 남은 것은 빈 카드 껍데기뿐이다(라벨·값은 위에서 다 옮겼다).
       box.innerHTML = "";
       box.appendChild(막대);
       box.dataset.gijoSum = "1";
@@ -849,7 +885,7 @@
     var 요약틱 = 0;
     var 요약감시 = setInterval(function () { 요약막대로(); if (++요약틱 > 10) clearInterval(요약감시); }, 700);
     // 목록 높이도 같은 이유로 첫 그림 뒤에 한 번 더 잰다.
-    setTimeout(function () { window.gijoFitList && window.gijoFitList(); }, 900);
+    [300, 900, 2000, 4000].forEach(function (ms) { setTimeout(function () { window.gijoFitList && window.gijoFitList(); }, ms); });
     if (IS_EMBED) { applyEmbed(); return; }
     // 탭으로 흡수된 페이지에 직접 들어오면(대시보드 바로가기·챗봇 링크 등) 허브의 그 탭으로 보낸다.
     // ⚠ 설정처럼 한 파일이 여러 탭인 화면은 **쿼리까지 봐야** 한다(2026-07-28 실측):

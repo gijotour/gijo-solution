@@ -89,9 +89,9 @@ for (const t of pages) {
         // ⚠ 화면이 **글자를 채운 채로 고장 나는** 경우가 있다(2026-08-02 실사고:
         //   보안 KPI가 "불러오지 못했습니다: panel is not defined"만 남겼는데 body는 길어서
         //   스윕이 통과시켰다). 길이만 보지 말고 **실패 문구**를 직접 찾는다.
-        실패문구: (txt.match(/[^
-]*(?:불러오지 못했습니다|불러오지 못함|is not defined|is not a function|Cannot read propert|undefined is not)[^
-]*/) || [""])[0].trim().slice(0, 120),
+        실패문구: (txt.split(String.fromCharCode(10)).find(function (l) {
+          return /불러오지 못했습니다|불러오지 못함|is not defined|is not a function|Cannot read propert|undefined is not/.test(l);
+        }) || "").trim().slice(0, 120),
       };
     });
     t.page = info.page || t.label;
