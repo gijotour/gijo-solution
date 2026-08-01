@@ -563,10 +563,19 @@ export function computeCorrelations(events: AnalysisEvent[]): Correlation[] {
   //   entity만 보면 **로그는 어느 소스와도 구조적으로 절대 안 묶였다.** peers에 공격 대상
   //   호스트를 실어 두고 여기서 함께 본다. 묶음 이름은 **우리 쪽 개체**로 적는다 —
   //   담당자가 찾는 것은 "누가 때렸나"가 아니라 "우리 어느 장비가 걸렸나"이기 때문이다.
+  //   ⚠ 이름의 **대소문자**는 먼저 들어온 이벤트가 이겼다(2026-08-02 검토 지적). 같은 장비가
+  //   로그에선 web-01, 스캐너에선 WEB-01로 오면 담당자가 아는 표기와 다르게 뜬다.
+  //   등록부에 있는 이름이면 그 표기를 쓴다 — 담당자가 자산 목록에서 보던 그대로여야 찾는다.
+  const 등록표기 = (이름: string): string => {
+    const 납작 = (x: string) => String(x ?? "").replace(/\s/g, "").toLowerCase();
+    const k = 납작(이름);
+    const a = listAssets().find((x) => 납작(x.name) === k || 납작(x.id) === k);
+    return a ? a.name : 이름;
+  };
   const byKey = new Map<string, { evs: AnalysisEvent[]; 이름: string }>();
   const 담기 = (key: string, e: AnalysisEvent, 이름: string) => {
     const k = key.toLowerCase();
-    const cur = byKey.get(k) ?? { evs: [], 이름 };
+    const cur = byKey.get(k) ?? { evs: [], 이름: 등록표기(이름) };
     if (!cur.evs.includes(e)) cur.evs.push(e);
     byKey.set(k, cur);
   };

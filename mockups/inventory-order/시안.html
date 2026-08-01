@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>GIJO AS — 자산 목록 차례 바로잡기 (시안)</title>
+<style>
+  :root{--bg:#262624;--panel:#30302e;--panel2:#1f1e1d;--bd:rgba(255,255,255,.10);--bds:rgba(255,255,255,.18);
+        --tx:#e9e7e2;--mut:#b3ada4;--mut2:#a49d95;--blue:#3b82f6;--bluel:#7ab0ff;--teal:#1eb980;--red:#e2483d;--amber:#f0a020}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--tx);font-size:14px;line-height:1.75;padding:26px 30px 70px}
+  h1{font-size:22px;font-weight:800;letter-spacing:-.3px;margin-bottom:5px}
+  h2{font-size:16px;font-weight:800;margin:30px 0 12px;padding-top:18px;border-top:1px solid var(--bd)}
+  p{color:var(--mut);margin-bottom:10px}
+  .sub{color:var(--mut2);font-size:13px;margin-bottom:22px}
+  .tag{font-size:11.5px;font-weight:800;border-radius:6px;padding:3px 9px;margin-left:8px;vertical-align:2px}
+  .tag.now{background:rgba(226,72,61,.16);color:#f5928a}
+  .tag.new{background:rgba(30,185,128,.16);color:var(--teal)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(390px,1fr));gap:18px;align-items:start}
+  .win{border:1px solid var(--bds);border-radius:11px;overflow:hidden;background:var(--bg)}
+  .wh{height:34px;display:flex;align-items:center;padding:0 12px;background:var(--panel2);border-bottom:1px solid var(--bd);font-size:12.5px;color:var(--mut2)}
+  .stage{padding:13px;max-height:330px;overflow:hidden;position:relative}
+  .kpis{display:flex;gap:8px;margin-bottom:11px}
+  .kpi{flex:1;background:var(--panel);border:1px solid var(--bd);border-radius:9px;padding:8px 10px}
+  .kpi .l{font-size:11.5px;color:var(--mut2)} .kpi .v{font-size:17px;font-weight:800}
+  .fold{background:var(--panel);border:1px solid var(--bd);border-radius:9px;padding:10px 12px;margin-bottom:11px}
+  .fold .t{font-size:13px;font-weight:800;color:var(--bluel);margin-bottom:6px}
+  .fold .rows div{font-size:12px;color:var(--mut2);padding:4px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+  .list{background:var(--panel);border:1px solid var(--bd);border-radius:9px;overflow:hidden}
+  .list .lh{padding:8px 12px;font-size:12.5px;font-weight:800;border-bottom:1px solid var(--bd);display:flex;gap:9px;align-items:center}
+  .list .lh .cnt{background:rgba(59,130,246,.2);color:var(--bluel);border-radius:12px;padding:1px 8px;font-size:11.5px}
+  .list .r{display:flex;gap:10px;padding:7px 12px;font-size:12.5px;color:var(--mut);border-bottom:1px solid rgba(255,255,255,.05)}
+  .list .r b{color:var(--tx);font-weight:700;width:104px;flex:0 0 auto}
+  .cut{position:absolute;left:0;right:0;bottom:0;height:52px;background:linear-gradient(transparent,var(--bg));display:flex;align-items:flex-end;justify-content:center;font-size:11.5px;color:var(--mut2);padding-bottom:5px}
+  .cap{font-size:12.5px;color:var(--mut2);margin:9px 2px 0}
+  .cap b{color:var(--amber)}
+  table{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+  th,td{border:1px solid var(--bd);padding:9px 11px;text-align:left;vertical-align:top}
+  th{background:rgba(255,255,255,.03);color:var(--mut2);font-size:12.5px;font-weight:800}
+  code{background:rgba(255,255,255,.07);padding:1.5px 6px;border-radius:5px;font-size:12.5px}
+  .rec{background:rgba(30,185,128,.09);border:1px solid rgba(30,185,128,.34);border-radius:10px;padding:13px 15px;margin:16px 0;color:#bfe8d5}
+  .rec b{color:var(--teal)}
+  .warn{background:rgba(240,160,32,.09);border:1px solid rgba(240,160,32,.34);border-radius:10px;padding:13px 15px;margin:14px 0;color:#f3d9a8}
+  .warn b{color:var(--amber)}
+  ul{margin:8px 0 8px 20px;color:var(--mut)} li{margin-bottom:6px}
+</style>
+</head>
+<body>
+
+<h1>자산 목록 — 주인공을 맨 위로</h1>
+<div class="sub">접기를 없애 「서비스 영향도」가 늘 펼쳐지면서, 정작 보러 온 <b>자산 목록이 화면 밖으로 밀렸습니다</b>(2026-08-02 제가 만든 문제).</div>
+
+<h2>지금 vs 시안</h2>
+<div class="grid">
+  <div>
+    <div class="win">
+      <div class="wh">지금 — 첫 화면에 목록이 한 줄도 안 보인다</div>
+      <div class="stage">
+        <div class="kpis">
+          <div class="kpi"><div class="l">전체 자산</div><div class="v">57</div></div>
+          <div class="kpi"><div class="l">고위험</div><div class="v" style="color:#f5928a">0</div></div>
+          <div class="kpi"><div class="l">SBOM 미생성</div><div class="v" style="color:var(--amber)">49</div></div>
+        </div>
+        <div class="fold">
+          <div class="t">🔗 서비스 영향도 — 자산 → 업무 서비스 의존성</div>
+          <div class="rows">
+            <div>영향도 높음 · 미지정 — 자산 53 · SafeKey 발급 웹 서버, 안전대부 본인인증 …</div>
+            <div>영향도 높음 · 보안 운영 자동화 — 자산 1 · 사내 보안 어시스턴트</div>
+            <div>영향도 높음 · 고객 상담 — 자산 1 · 고객상담 RAG 챗봇</div>
+            <div>영향도 낮음 · 이상거래탐지 — 자산 1 · 이상거래 탐지 AI(FDS)</div>
+            <div>영향도 낮음 · 임직원 보안 포털 — 자산 1 · 샘플-웹서버</div>
+          </div>
+        </div>
+        <div class="cut">↓ 자산 목록은 여기서 <b style="color:#f5928a">한참 아래</b></div>
+      </div>
+    </div>
+    <div class="cap">영향도 판은 세로로 <b>약 320px</b>을 씁니다. 자산을 보러 들어왔는데 스크롤을 내려야 목록이 나옵니다.</div>
+  </div>
+
+  <div>
+    <div class="win">
+      <div class="wh">시안 — 목록이 먼저, 영향도는 그 아래</div>
+      <div class="stage">
+        <div class="kpis">
+          <div class="kpi"><div class="l">전체 자산</div><div class="v">57</div></div>
+          <div class="kpi"><div class="l">고위험</div><div class="v" style="color:#f5928a">0</div></div>
+          <div class="kpi"><div class="l">SBOM 미생성</div><div class="v" style="color:var(--amber)">49</div></div>
+        </div>
+        <div class="list">
+          <div class="lh">자산 목록 <span class="cnt">57</span> <span style="margin-left:auto;color:var(--mut2);font-weight:500">담당부서 없음 52</span></div>
+          <div class="r"><b>10.0.0.100</b><span>서비스 · 낮음 1건 · SBOM 완료</span></div>
+          <div class="r"><b>10.10.20.11</b><span>서비스 · 낮음 1건 · 생성하기</span></div>
+          <div class="r"><b>10.10.20.12</b><span>서비스 · 낮음 1건 · 생성하기</span></div>
+          <div class="r"><b>10.10.20.21</b><span>서비스 · 낮음 1건 · 생성하기</span></div>
+          <div class="r"><b>10.10.20.22</b><span>서비스 · 낮음 1건 · 생성하기</span></div>
+        </div>
+        <div class="cut">↓ 스크롤하면 <b style="color:var(--teal)">서비스 영향도</b></div>
+      </div>
+    </div>
+    <div class="cap">차례만 바꿉니다 — <b>지우지도, 다시 접지도 않습니다</b>. 영향도는 목록 아래에 그대로 펼쳐져 있습니다.</div>
+  </div>
+</div>
+
+<h2>왜 「다시 접기」가 아니라 「자리 옮기기」인가</h2>
+<table>
+  <tr><th>안</th><th>결과</th><th>판단</th></tr>
+  <tr><td>다시 접는다</td><td>목록은 위로 오지만, 어제 정하신 <b>「펼치기가 기본」</b>을 이 화면만 어긴다</td><td style="color:#f5928a">되돌리기</td></tr>
+  <tr><td>영향도를 지운다</td><td>세로는 확보되지만 <b>기능이 사라진다</b></td><td style="color:#f5928a">과함</td></tr>
+  <tr><td><b>차례를 바꾼다</b></td><td>목록이 첫 화면에 오고, 영향도는 아래에 펼쳐진 채 남는다</td><td style="color:var(--teal)">추천</td></tr>
+</table>
+
+<div class="rec">
+  <b>추천 — 차례 바꾸기.</b> <code>extraPanels</code>(영향도)를 자산 목록 표 <b>아래로</b> 옮깁니다.
+  접기 기본을 어기지 않고, 기능도 그대로 남으며, 보러 온 것이 먼저 보입니다.
+</div>
+
+<div class="warn">
+  <b>⚠ 같이 처리할 것</b>
+  <ul style="color:#f3d9a8">
+    <li>영향도는 <b>화면에 들어오면 그때 불러옵니다</b>(지금은 열려 있으면 바로 부름). 목록 아래로 내려가면 안 보고 나가는 경우가 많아, 매번 부르면 서버에 헛일을 시킵니다.</li>
+    <li>같은 문제가 <b>다른 화면에도 있는지</b> 함께 봅니다 — 접기를 없앤 뒤 「주인공이 아래로 밀린」 화면이 더 있을 수 있습니다(통합 관제·위협 인텔 후보).</li>
+  </ul>
+</div>
+
+<p style="color:var(--mut2)">예상 <b>40분</b>(자리 옮기기 15분 · 늦게 불러오기 15분 · 실화면 확인 10분).</p>
+
+</body>
+</html>
