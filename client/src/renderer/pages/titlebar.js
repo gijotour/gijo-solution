@@ -33,9 +33,11 @@
     ".gtb-sess-mi{padding:8px 10px;border-radius:7px;font-size:12px;color:#e9e7e2;cursor:pointer;font-weight:700;}",
     ".gtb-sess-mi:hover{background:rgba(59,130,246,.12);}",
     ".gtb-sess-mi .sub{font-size:11.75px;color:#a49d95;font-weight:500;margin-top:2px;}",
-    ".gtb-gear{-webkit-app-region:no-drag;width:28px;height:28px;border-radius:8px;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);display:flex;align-items:center;justify-content:center;font-size:13px;color:#cfe0ff;cursor:pointer;position:relative;flex:0 0 auto;}",
+    ".gtb-gear{-webkit-app-region:no-drag;width:24px;height:24px;border-radius:8px;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);display:flex;align-items:center;justify-content:center;font-size:13px;color:#cfe0ff;cursor:pointer;position:relative;flex:0 0 auto;}",
     // ── 사용자 영역(왼쪽 패널 하단) ──
-    ".gtb-userarea{border-top:1px solid rgba(255,255,255,.08);background:rgba(59,130,246,.05);padding:8px 10px;display:flex;flex-direction:column;gap:6px;z-index:60;}",
+    // 높이는 셸 하단바(.shellfoot 34px)와 **같아야 한다**(2026-08-02 사용자 지시 "세로길이도 맞춰줘").
+    //   왼쪽 사용자 줄과 오른쪽 하단바가 한 띠로 이어져 보이는 자리다 — 어긋나면 계단처럼 보인다.
+    ".gtb-userarea{border-top:1px solid rgba(255,255,255,.08);background:rgba(59,130,246,.05);padding:0 10px;display:flex;flex-direction:column;justify-content:center;gap:4px;z-index:60;min-height:34px;}",
     // 세그먼트 [🏠 대시보드 | ☰ 전체메뉴] — Claude.ai 홈/Code 전환 패턴
     ".gtb-seg{display:flex;background:#1f1e1d;border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:9px;padding:3px;gap:3px;}",
     ".gtb-seg span{flex:1;text-align:center;padding:6px 4px;border-radius:7px;font-size:12.25px;font-weight:800;color:var(--muted,#b3ada4);cursor:pointer;border:1px solid transparent;}",
@@ -46,8 +48,8 @@
     ".gtb-menu-panel .mp-i{padding:8px 12px;font-size:12.5px;font-weight:600;color:#b3ada4;border-radius:8px;cursor:pointer;margin-bottom:1px;}",
     ".gtb-menu-panel .mp-i:hover{background:rgba(59,130,246,.12);color:#fff;}",
     ".gtb-userarea .ua-upd{display:none;align-items:center;gap:5px;background:rgba(240,160,32,.15);border:1px solid rgba(240,160,32,.45);color:#f0a020;padding:3px 9px;border-radius:14px;font-size:12px;font-weight:800;cursor:pointer;align-self:flex-start;}",
-    ".gtb-userarea .ua-row{display:flex;align-items:center;gap:8px;cursor:pointer;}",
-    ".gtb-userarea .ua-avatar{width:26px;height:26px;border-radius:50%;background:var(--blue,#3b82f6);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12.25px;font-weight:800;flex:0 0 auto;}",
+    ".gtb-userarea .ua-row{display:flex;align-items:center;gap:8px;cursor:pointer;min-width:0;}",
+    ".gtb-userarea .ua-avatar{width:22px;height:22px;border-radius:50%;background:var(--blue,#3b82f6);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12.25px;font-weight:800;flex:0 0 auto;}",
     ".gtb-userarea .ua-name{flex:1;font-size:12.5px;font-weight:700;color:#dfe6ff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}",
     // ⚙ 드롭다운(공통 — 위/아래 방향은 JS가 지정)
     ".gtb-menu{position:fixed;width:268px;background:#35342f;border:1px solid rgba(255,255,255,.16);border-radius:12px;box-shadow:0 18px 50px rgba(0,0,0,.5);padding:8px;z-index:990;font-size:12.5px;-webkit-app-region:no-drag;}",

@@ -781,7 +781,6 @@
       // 긴 목록 내부 스크롤은 임베드에서도 동일(허브 탭 안의 threat·audit 등)
       ".scroll-list{min-height:260px;overflow-y:auto;}" +   // 높이는 gijoFitList가 재서 준다
       ".scroll-list thead th{position:sticky;top:0;background:var(--panel,#30302e);z-index:1;}" +
- +
       ".footer{display:none !important;}" +
       "*::-webkit-scrollbar{width:8px;height:8px;}*::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:4px;}*::-webkit-scrollbar-track{background:transparent;}" +
       ".header{display:none !important;}#gijoNav{display:none !important;}" +
@@ -831,6 +830,10 @@
     var st = document.createElement("style");
     st.textContent =
       "#gijoNav{display:none !important;}" +
+      // ⚠ 분리창에는 푸터 숨김이 **빠져 있었다**(2026-08-02 발견). 탭 안에서는 감춰지는데
+      //   창으로 빼면 화면마다 다른 푸터(긴 문구/짧은 문구 두 가지)가 그대로 나왔다.
+      //   하단 표시는 셸의 고정바 하나뿐이다.
+      ".footer{display:none !important;}" +
       ".app{grid-template-columns:minmax(0,1fr) !important;display:block !important;}" +
       ".explorer{display:none !important;}" +
       ".main{padding-left:18px !important;padding-right:18px !important;}" +
