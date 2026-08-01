@@ -194,14 +194,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     <div class="cat-summary" id="catSummary" data-gijo-summary></div>
 
-    <form class="reg-form" id="regForm">
-      <input type="text" id="pName" class="grow" placeholder="제품명 (예: 경계 방화벽 FW-01)" required aria-label="제품명">
-      <select id="pCategory"></select>
-      <input type="text" id="pVendor" placeholder="제조사 (선택)" style="max-width:150px" aria-label="제조사">
-      <input type="text" id="pModel" placeholder="모델/버전 (선택)" style="max-width:140px" aria-label="모델/버전">
-      <select id="pAsset"><option value="">연결 자산 없음</option></select>
-      <button type="submit">＋ 제품 등록</button>
-    </form>
 
     <div id="groups"><div style="color:var(--muted);font-size:12px">불러오는 중...</div></div>
 
@@ -255,12 +247,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     DOC_KINDS = docKinds;
     CAT_META = {};
     for (const c of categories) CAT_META[c.id] = { label: c.label, icon: c.icon };
-    document.getElementById("pCategory").innerHTML = categories.map((c) => `<option value="${c.id}">${c.icon} ${esc(c.label)}</option>`).join("");
-    try {
-      const assets = await window.gijo.listAssets();
-      const sel = document.getElementById("pAsset");
-      for (const a of assets) sel.insertAdjacentHTML("beforeend", `<option value="${esc(a.id)}">${esc(a.name)}</option>`);
-    } catch (e) {}
+    // 등록 폼이 없어져(2026-08-02) 종류·연결 자산 선택칸을 채울 곳도 없다.
+    //   등록은 대화창의 register_product가 한다 — 종류·자산 해석도 서버가 맡는다.
   }
 
   function docColHtml(product, kind, kindLabel) {
@@ -537,23 +525,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     }
   }
 
-  async function onRegister(e) {
-    e.preventDefault();
-    const name = document.getElementById("pName").value.trim();
-    if (!name) return;
-    const args = {
-      name,
-      category: document.getElementById("pCategory").value,
-      vendor: document.getElementById("pVendor").value.trim() || undefined,
-      model: document.getElementById("pModel").value.trim() || undefined,
-      assetId: document.getElementById("pAsset").value || undefined,
-    };
-    try {
-      await window.gijo.createSecurityProduct(args);
-      e.target.reset();
-      await loadProducts();
-    } catch (err) { gijoTell("등록 실패: " + ((err && err.message) || err)); }
-  }
+  // 제품 등록은 **대화창**에서 한다(2026-08-02 사용자 지시). 화면 폼과 그 처리를 걷어냈다.
+  //   대화창 도구: register_product(제품명·종류·제조사·모델·연결 자산) — 결재판을 거쳐 실행된다.
+  //   ⚠ 화면에만 있던 「연결 자산」을 도구에 먼저 넣고 지웠다. 화면에서 없애면서 기능을
+  //     같이 없애면 담당자는 등록할 길을 잃는다.
 
   async function onGroupsClick(e) {
     const ops = e.target.closest("[data-open-ops]");
@@ -650,7 +625,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
-    document.getElementById("regForm").addEventListener("submit", onRegister);
     document.getElementById("groups").addEventListener("click", onGroupsClick);
     document.getElementById("groups").addEventListener("input", onGroupsInput);
     document.getElementById("groups").addEventListener("change", onGroupsChange);

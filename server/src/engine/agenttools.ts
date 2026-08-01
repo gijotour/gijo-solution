@@ -797,8 +797,29 @@ function runRegisterProduct(args: Record<string, string>): string {
   const name = (args.name ?? "").trim();
   if (!name) return "제품명(name)이 필요합니다.";
   const category = (args.category ?? "").trim(); // createProduct가 미지의 종류를 "기타"로 흡수한다
-  const p = createProduct({ name, category, vendor: args.vendor?.trim() || undefined, model: args.model?.trim() || undefined });
-  return `보안제품을 등록했습니다 — ${p.name} · 종류 ${p.category}${p.vendor ? ` · ${p.vendor}` : ""}${p.model ? ` ${p.model}` : ""}.`;
+  // 연결 자산 — 화면의 등록 폼을 걷어내면서 도구로 옮겼다(2026-08-02 사용자 지시
+  // "제품 등록 메뉴는 필요 없을 것 같아, 대화창에서 등록할 거니").
+  // ⚠ 화면에만 있던 항목을 빠뜨리면 **없앤 것이 된다** — 지우기 전에 도구가 대신할 수 있게 한다.
+  //   못 찾으면 조용히 넘기지 않고 무엇을 못 찾았는지 말한다(빈 연결로 등록되면 나중에 못 알아챈다).
+  const 자산요청 = (args.asset ?? args.assetId ?? "").trim();
+  let assetId: string | undefined;
+  if (자산요청) {
+    const hit = resolveAsset(자산요청);
+    if (!hit) {
+      const ids = listAssets().map((a) => a.name).slice(0, 8).join(", ") || "(없음)";
+      return `연결할 자산을 찾지 못했습니다: "${자산요청}". 등록된 자산 예: ${ids}`;
+    }
+    assetId = hit.id;
+  }
+  const p = createProduct({
+    name, category,
+    vendor: args.vendor?.trim() || undefined,
+    model: args.model?.trim() || undefined,
+    assetId,
+  });
+  return `보안제품을 등록했습니다 — ${p.name} · 종류 ${p.category}` +
+    `${p.vendor ? ` · ${p.vendor}` : ""}${p.model ? ` ${p.model}` : ""}` +
+    `${assetId ? ` · 연결 자산 ${assetId}` : ""}.`;
 }
 
 async function runGenerateSbom(args: Record<string, string>): Promise<string> {
@@ -2166,8 +2187,9 @@ const TOOLS: AgentTool[] = [
       { name: "category", label: "종류", description: "방화벽·EDR·DLP·WAF·VPN·IPS·SIEM·백신·NAC·기타 (선택)", required: false },
       { name: "vendor", label: "제조사", description: "제조사·벤더 (선택)", required: false },
       { name: "model", label: "모델", description: "모델·버전 (선택)", required: false },
+      { name: "asset", label: "연결 자산", description: "이 제품이 지키는 자산 이름·IP (선택)", required: false },
     ],
-    effect: (args) => `보안제품 "${(args.name ?? "").trim()}"을(를) 등록부에 추가${args.category?.trim() ? ` · 종류 ${args.category.trim()}` : ""} · 자산·취약점과는 별개`,
+    effect: (args) => `보안제품 "${(args.name ?? "").trim()}"을(를) 등록부에 추가${args.category?.trim() ? ` · 종류 ${args.category.trim()}` : ""}${args.asset?.trim() ? ` · 연결 자산 ${args.asset.trim()}` : ""}`,
     undo: "보안제품 화면에서 제품을 삭제하면 원복됩니다.",
     run: runRegisterProduct,
   },
