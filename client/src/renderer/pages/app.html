@@ -87,6 +87,28 @@
      더 넓게 보려면 「⧉ 창으로」로 빼면 된다. */
   .console{flex:0 0 auto;display:flex;flex-direction:column;height:190px;min-height:190px;
     background:var(--panel-2);border-top:1px solid var(--border);}
+
+  /* ★ 넓은 창에서는 대화창을 **오른쪽 세로 패널**로 세운다 (2026-08-01 사용자 결정 · 시안 ③).
+     왜: 아래 도킹은 화면마다 세로 190px를 먹는다 — 1920×1080에서 세로의 17.6%다.
+        우리 화면은 표·목록이 많아 세로가 귀하고 가로는 상대적으로 여유가 있다.
+        옆으로 세우면 세로를 100% 쓰고 가로만 내준다(VS Code Copilot·Cursor·JetBrains AI가
+        고른 방식이기도 하다).
+     ⚠ **한 가지로 고정하면 절반의 환경에서 나쁘다**(실측). 세로 모니터(1080×1920)에서는
+        가로가 귀해서 반대가 된다 — 아래 도킹은 세로의 9.9%뿐이고, 옆에 두면 본문이
+        660px만 남아 표가 깨진다. 그래서 **창 너비로 자동 전환**하고, 담당자가 언제든 바꾼다.
+     기준 1600px 근거: Material Design 3의 Extra-large 등급(1600~)이 다분할 배치를 권한다.
+        1600에서 패널 380을 빼도 본문이 1220 남아 우리 표가 들어간다. */
+  .work.console-side{display:grid;grid-template-columns:minmax(0,1fr) var(--console-w, 380px);
+    grid-template-rows:auto minmax(0,1fr);}
+  .work.console-side .tabbar{grid-column:1 / -1;}
+  .work.console-side .console{grid-column:2;grid-row:2;height:auto;min-height:0;
+    border-top:0;border-left:1px solid var(--border);}
+  .work.console-side .screens{grid-column:1;grid-row:2;}
+  .work.console-side .console-out{grid-column:1 / -1;}
+  /* ⚠ 대화창을 **창으로 빼 두면** 도킹 콘솔은 숨겨진다(.console{display:none}). 그때도 옆 자리를
+     비워 두면 **본문만 380px 줄고 그 자리가 텅 빈다**(실측: 1196 → 816). 없는 것을 위해
+     자리를 남기지 않는다 — 분리 상태에서는 한 칸으로 되돌린다. */
+  body.console-popped .work.console-side{display:flex;flex-direction:column;}
   /* 창으로 빼냈을 때 — 손잡이·콘솔을 접고 안내만 얇게 남긴다(화면이 100%가 된다) */
   .console-out{display:none;flex:0 0 auto;align-items:center;justify-content:center;gap:10px;padding:9px 14px;
     border-top:1px solid var(--border);background:var(--panel-2);font-size:11.5px;color:var(--muted);}
@@ -104,6 +126,8 @@
       <div class="tb-act">
         <button class="tb-btn" id="tbPopout" title="지금 탭을 별도 창으로 빼냅니다 — 두 화면을 나란히 볼 때">⧉ 창으로</button>
         <button class="tb-btn" id="tbCloseAll" title="고정하지 않은 탭을 모두 닫습니다">모두 닫기</button>
+        <!-- 대화창 자리 바꾸기 — 넓은 창이면 기본이 「옆」이고, 여기서 언제든 되돌린다. -->
+        <button class="tb-btn" id="tbConsoleSide" title="대화창 자리를 바꿉니다">▥ 옆으로</button>
         <!-- 열린 창 목록 — 빼낸 창이 본창 뒤에 숨어 못 찾는 일을 없앤다(4.0.1 사용자 요청).
              창 버튼(─ ▢ ✕) 바로 옆자리다. -->
         <div class="winmenu">
@@ -355,6 +379,43 @@
   });
 
   $("tbCloseAll").addEventListener("click", closeAll);
+
+  // ── 대화창 자리: 넓으면 옆(세로 패널), 좁으면 아래 ──────────────────────
+  // 사용자 결정(2026-08-01, 시안 ③): **창 너비**로 자동 전환하되 담당자가 언제든 바꾼다.
+  // 신호를 창 너비 하나로 둔 이유 — 모니터 방향을 따로 물으면 세로 모니터(1080 폭)가
+  // "세로니까 옆으로"라는 엉뚱한 판단을 받는다. 폭만 보면 그 경우 자연히 아래로 남는다.
+  var SIDE_KEY = "gijo:console:side"; // "auto" | "side" | "dock"
+  var SIDE_MIN = 1600;
+  function 자리모드() {
+    try { return localStorage.getItem(SIDE_KEY) || "auto"; } catch (e) { return "auto"; }
+  }
+  function 옆에둘까() {
+    var m = 자리모드();
+    if (m === "side") return true;
+    if (m === "dock") return false;
+    return window.innerWidth >= SIDE_MIN;
+  }
+  function 자리적용() {
+    var 옆 = 옆에둘까();
+    document.querySelector(".work").classList.toggle("console-side", 옆);
+    var b = $("tbConsoleSide");
+    if (b) {
+      b.textContent = 옆 ? "▤ 아래로" : "▥ 옆으로";
+      b.title = 옆
+        ? "대화창을 화면 아래로 옮깁니다"
+        : "대화창을 오른쪽에 세웁니다 — 세로 공간이 넓어집니다";
+    }
+    // 자리를 바꾸면 iframe 크기가 달라진다 — 안에서 크기를 재는 화면이 다시 재게 알린다.
+    try { window.dispatchEvent(new Event("resize")); } catch (e) {}
+  }
+  $("tbConsoleSide").addEventListener("click", function () {
+    // 지금과 반대쪽으로 **명시적으로** 고정한다(자동으로 되돌아가면 담당자가 진 것처럼 느낀다).
+    try { localStorage.setItem(SIDE_KEY, 옆에둘까() ? "dock" : "side"); } catch (e) {}
+    자리적용();
+  });
+  // 창 크기가 바뀌면 자동 모드에서만 따라간다.
+  window.addEventListener("resize", function () { if (자리모드() === "auto") 자리적용(); });
+  자리적용();
 
   // ── 열린 창 목록 ─────────────────────────────────────────────────────
   // 빼낸 창(화면·대화·팀 사무실)은 본창 뒤로 숨는다. 작업표시줄에도 뜨지만 아이콘이 다 같아
