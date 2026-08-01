@@ -28,7 +28,12 @@ describe("보안제품(products) 역량", () => {
     const p = createProduct({ name: "테스트방화벽", category: "방화벽" });
     made.push(p.id);
     expect(findAgentTool("product_status")!.run({ query: "방화벽" }) as string).toContain("테스트방화벽");
-    expect(findAgentTool("product_status")!.run({ query: "존재하지않는제품xyz" }) as string).toContain("맞는 보안제품이 없습니다");
+    // 2026-08-01: 문구를 "없습니다"→"못 찾았습니다"로 바꿨다. 조건에 안 맞는 것과 아예 없는 것은
+    // 담당자에게 뜻이 다르다 — "없다"로 말하면 할 일이 없다고 믿는다(실사고: 미대응 16건을
+    // "없습니다"로 답함). 전체 건수도 함께 말해 "내가 조건을 잘못 준 것"임이 드러나게 한다.
+    const 못찾음 = findAgentTool("product_status")!.run({ query: "존재하지않는제품xyz" }) as string;
+    expect(못찾음).toContain("못 찾았습니다");
+    expect(못찾음).toMatch(/전체 \d+건 중/);
   });
 });
 

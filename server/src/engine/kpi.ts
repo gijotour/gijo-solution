@@ -20,6 +20,8 @@ import { matchCtiToAssets } from "./ctimatch";
 import { listLearnloopRuns } from "./learnloop";
 import { listTasks } from "./tasks";
 import { buildHub } from "./assethub";
+// 점검 실패 기록(scan_error 등)을 취약점에서 걸러 내는 판정 — 승인함·KPI가 같은 것을 쓴다.
+import { isRealVulnerability } from "./agenttools";
 
 export interface KpiSnapshot {
   date: string; // YYYY-MM-DD
@@ -46,6 +48,10 @@ export interface KpiSnapshot {
     resurfaced: number; // 재발
     newlyFixed: number; // 최근 스캔에서 고쳐짐
     remediationRate: number; // 고쳐짐 / (열림 + 고쳐짐) %
+    // 점검이 **실패한** 기록(scan_error·scan_not_supported). 취약점이 아니다 — 그런데도
+    // active에 함께 세어 왔다(2026-08-01 발견: 602건 전부가 이것인데 "활성 46건"으로 보고).
+    // 취약점에서 빼되 **감추지는 않는다** — 601건이 점검 실패라는 건 그 자체로 큰일이다.
+    scanFailed: number;
   };
   // 조치 항목(SLA) 추적 — 취약점에서 등록된 조치 태스크(ref가 vuln:)의 기한 준수 현황.
   remediation: {
@@ -93,9 +99,17 @@ function riskCounts(): { total: number; highRisk: number; midRisk: number; lowRi
 // state 태깅(vulnscan.ts)에 기대 — active/new/resurfaced는 열린 것, fixed는 고쳐진 것.
 function vulnerabilityMetrics(): KpiSnapshot["vulnerabilities"] {
   const hosts = listAssets().filter((a) => a.assetType === "infra-host");
-  const v = { hosts: hosts.length, active: 0, critical: 0, high: 0, medium: 0, low: 0, kev: 0, newCount: 0, resurfaced: 0, newlyFixed: 0, remediationRate: 0 };
+  const v = { hosts: hosts.length, active: 0, critical: 0, high: 0, medium: 0, low: 0, kev: 0, newCount: 0, resurfaced: 0, newlyFixed: 0, remediationRate: 0, scanFailed: 0 };
   for (const a of hosts) {
     for (const f of a.findings) {
+      // ⚠ 점검 실패 기록은 취약점이 아니다. 안 걸러서 "활성 46건"이라 보고했는데 실제 취약점은
+      //   0건이고 602건 전부가 scan_error였다(2026-08-01). 임원 보고에 들어가는 숫자다.
+      //   isRegular…가 아니라 **이미 있던 판정 함수를 안 부른 것**이 원인 — 오늘 승인함에서
+      //   똑같은 일이 있었다(같은 함수, 다른 호출부).
+      if (!isRealVulnerability(f)) {
+        v.scanFailed++;
+        continue;
+      }
       if (f.state === "fixed") {
         v.newlyFixed++;
         continue;
@@ -144,6 +158,7 @@ export function vulnerabilityBurndown(): BurndownPoint[] {
       }
       if (!latest) continue;
       for (const f of latest.findings) {
+        if (!isRealVulnerability(f)) continue; // 점검 실패 기록은 번다운에도 넣지 않는다
         if (f.state === "fixed") {
           pt.fixed++;
           continue;

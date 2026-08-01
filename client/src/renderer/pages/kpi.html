@@ -284,7 +284,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       '<div style="font-size:10.5px;color:var(--muted-2)">100점 만점 · 실지표 가중 합성(악용·기한초과·고위험자산 감점)</div>' +
       '<div class="pf">' + p.factors.map(pfBar).join("") + "</div></div>" +
       '<div class="headline">' +
-      headlineCard("🔴 열린 취약점", v.active, "건", series("vulnerabilities.active"), true, "fixed 제외 현재 노출") +
+      // ⚠ 「열린 취약점 0건」이 안전을 뜻하지 않을 수 있다 — 점검 자체가 실패했으면 아직 안 본
+      //   것이다(2026-08-01: 602건이 전부 스캔 오류인데 "활성 46건"으로 보고했다). 그래서
+      //   실패 건수를 부제에 함께 적는다. 임원이 이 카드 하나만 보고 판단하기 때문이다.
+      headlineCard("🔴 열린 취약점", v.active, "건", series("vulnerabilities.active"), true,
+        v.scanFailed ? `⚠ 점검 실패 ${v.scanFailed}건은 아직 안 본 것` : "fixed 제외 현재 노출") +
       headlineCard("🚨 실제 악용(KEV)", v.kev, "건", series("vulnerabilities.kev"), true, "CISA KEV 등재 — 최우선") +
       headlineCard("⏱ MTTR", mttr, "", null, true, mttrSub) +
       headlineCard("📋 SLA 준수율", rem.slaCompliance, "%", series("remediation.slaCompliance"), false, "조치 기한 준수 비율") +

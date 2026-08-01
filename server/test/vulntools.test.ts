@@ -44,8 +44,16 @@ describe("취약점(vuln) 도메인 역량", () => {
     expect(critical).toContain("critical");
     expect(critical).not.toContain("미서명");
 
+    // 2026-08-01: "없습니다"→"못 찾았습니다"(전체 건수 포함)로 바꿨다 — 조건 불일치를
+    // "없다"로 말하면 담당자가 할 일이 없다고 믿는다(실사고: 활성 46건을 "없습니다"로 답함).
     const none = findAgentTool("finding_status")!.run({ filter: "존재하지않는조건xyz" }) as string;
-    expect(none).toContain("맞는 취약점이 없습니다");
+    expect(none).toContain("못 찾았습니다");
+    expect(none).toMatch(/전체 \d+건 중/);
+
+    // ★ 우리말 상태어로 물어도 걸려야 한다. 예전엔 저장값(pending)에 글자 그대로 대조해
+    //   "미조치"가 언제나 0건이었다 — 이 줄이 그 사고의 회귀 차단선이다.
+    const 미조치 = findAgentTool("finding_status")!.run({ filter: "미조치" }) as string;
+    expect(미조치).not.toContain("못 찾았습니다");
   });
 
   it("review_finding — 반려(오탐) 처리가 실제로 저장된다", () => {

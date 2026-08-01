@@ -46,6 +46,8 @@ import { listSessions as listWorkSessions } from "./worksessions";
 import { canonicalize, suggestionsFor } from "./terms";
 import { listAudit, type AuditEntry } from "./audit";
 import { lawAnswer, getLawConfig, type LawTarget } from "./lawinfo";
+// 담당자가 "미조치"라고 하면 저장값 open·pending을 뜻한다 — 글자 그대로 대조하면 늘 0건이다.
+import { 필터에맞나 } from "./statuswords";
 
 export interface AgentToolParam {
   name: string;
@@ -1061,13 +1063,18 @@ function runFindingStatusOverview(args: Record<string, string>): string {
   const filter = (args.filter ?? "").trim().toLowerCase();
   const rows = prioritizedReviews(200);
   const matched = filter
-    ? rows.filter((r) => {
-        const hay = `${r.assetId} ${r.finding.finding_type} ${r.finding.severity} ${r.finding.evidence ?? ""} ${r.assignee ?? ""} ${r.status}`.toLowerCase();
-        return filter.split(/\s+/).every((w) => hay.includes(w));
-      })
+    ? rows.filter((r) =>
+        필터에맞나(
+          `${r.assetId} ${r.finding.finding_type} ${r.finding.severity} ${r.finding.evidence ?? ""} ${r.assignee ?? ""}`,
+          filter,
+          r.status,
+        ))
     : rows;
 
-  if (matched.length === 0) return filter ? `조건("${args.filter}")에 맞는 취약점이 없습니다.` : "등록된 취약점이 없습니다.";
+  if (matched.length === 0)
+    return filter
+      ? `전체 ${rows.length}건 중 조건("${args.filter}")에 맞는 취약점을 못 찾았습니다. 조건 없이 다시 물어보세요.`
+      : "등록된 취약점이 없습니다.";
 
   const byStatus = { pending: 0, approved: 0, rejected: 0 } as Record<string, number>;
   let unassigned = 0;
@@ -1212,9 +1219,9 @@ function runProductStatus(args: Record<string, string>): string {
   if (all.length === 0) return "등록된 보안제품이 없습니다.";
 
   const matched = q
-    ? all.filter((p) => `${p.name} ${p.category} ${p.vendor ?? ""} ${p.model ?? ""} ${p.note ?? ""}`.toLowerCase().includes(q))
+    ? all.filter((p) => 필터에맞나(`${p.name} ${p.category} ${p.vendor ?? ""} ${p.model ?? ""} ${p.note ?? ""}`, q))
     : all;
-  if (matched.length === 0) return `"${args.query}"에 맞는 보안제품이 없습니다.`;
+  if (matched.length === 0) return `전체 ${all.length}건 중 "${args.query}"에 맞는 보안제품을 못 찾았습니다. 조건 없이 다시 물어보세요.`;
 
   const noDocs = matched.filter((p) => p.docs.length === 0);
   const byCat = new Map<string, number>();
@@ -1242,9 +1249,9 @@ function runMaintenanceStatus(args: Record<string, string>): string {
   const today = dateOnlyLocal(new Date());
   const q = (args.filter ?? "").trim().toLowerCase();
   const matched = q
-    ? items.filter((m) => `${m.title} ${m.productName} ${m.status} ${m.assetName ?? ""}`.toLowerCase().includes(q))
+    ? items.filter((m) => 필터에맞나(`${m.title} ${m.productName} ${m.assetName ?? ""}`, q, m.status))
     : items;
-  if (matched.length === 0) return `"${args.filter}"에 맞는 점검 일정이 없습니다.`;
+  if (matched.length === 0) return `전체 ${items.length}건 중 "${args.filter}"에 맞는 점검 일정을 못 찾았습니다. 조건 없이 다시 물어보세요.`;
 
   // approved(승인 완료)를 뺀 나머지가 아직 손이 필요한 것들이다.
   const open = matched.filter((m) => m.status !== "approved");
@@ -1268,9 +1275,9 @@ function runComplianceStatus(args: Record<string, string>): string {
 
   const q = (args.filter ?? "").trim().toLowerCase();
   const matched = q
-    ? rows.filter((r) => `${r.code} ${r.name} ${r.status} ${r.note ?? ""}`.toLowerCase().includes(q))
+    ? rows.filter((r) => 필터에맞나(`${r.code} ${r.name} ${r.note ?? ""}`, q, r.status))
     : rows;
-  if (matched.length === 0) return `"${args.filter}"에 맞는 항목이 없습니다.`;
+  if (matched.length === 0) return `전체 ${rows.length}건 중 "${args.filter}"에 맞는 항목을 못 찾았습니다. 조건 없이 다시 물어보세요.`;
 
   const counts = matched.reduce<Record<string, number>>((acc, r) => {
     acc[r.status] = (acc[r.status] ?? 0) + 1;
@@ -1342,7 +1349,12 @@ async function runKpiStatus(): Promise<string> {
   const s = await computeKpiSnapshot();
   const lines = [
     `자산 ${s.assets.total}건(고위험 ${s.assets.highRisk} · 중위험 ${s.assets.midRisk} · 저위험 ${s.assets.lowRisk})`,
-    `취약점 활성 ${s.vulnerabilities.active}건(Critical ${s.vulnerabilities.critical} · High ${s.vulnerabilities.high} · KEV ${s.vulnerabilities.kev}) · 조치율 ${s.vulnerabilities.remediationRate}%`,
+    `취약점 활성 ${s.vulnerabilities.active}건(Critical ${s.vulnerabilities.critical} · High ${s.vulnerabilities.high} · KEV ${s.vulnerabilities.kev}) · 조치율 ${s.vulnerabilities.remediationRate}%` +
+      // 점검 실패는 취약점이 아니지만 **감추면 안 된다** — 스캔이 안 돌고 있다는 뜻이라
+      // "취약점 0건"이 안전하다는 뜻이 아니게 된다(2026-08-01: 602건이 전부 스캔 오류였다).
+      (s.vulnerabilities.scanFailed
+        ? ` ⚠ 점검 실패 ${s.vulnerabilities.scanFailed}건 — 스캐너가 결과를 못 받았습니다. 이만큼은 아직 안 본 것입니다`
+        : ""),
     `조치 SLA 준수율 ${s.remediation.slaCompliance}%(기한초과 ${s.remediation.overdue}건 · 마감임박 ${s.remediation.dueSoon}건)`,
     `점검 ${s.inspections.total}건(지연 ${s.inspections.overdue} · 승인대기 ${s.inspections.pendingApproval})`,
     `컴플라이언스 이행률 ${s.compliance.coverageRate}%(${s.compliance.covered}/${s.compliance.total})`,

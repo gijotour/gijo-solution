@@ -104,6 +104,27 @@ describe("kpi (통합 보안 KPI 대시보드)", () => {
     expect(v.remediationRate).toBe(67); // 2 / (1 + 2) = 67%
   });
 
+  // ★ 실사고(2026-08-01): 운영 데이터의 findings 602건이 **전부 스캔 오류**(scan_error 601 +
+  //   scan_not_supported 1)였는데 KPI가 그걸 취약점으로 세어 "활성 46건"이라 보고했다.
+  //   실제 취약점은 0건. 임원이 보는 숫자이고, 챗봇도 이 값을 그대로 읽는다.
+  //   판정 함수(isRealVulnerability)는 이미 있었고 **KPI가 안 불렀을 뿐이다** — 같은 날
+  //   승인함에서도 같은 일이 있었다(있는 규칙을 호출부가 안 쓰는 것이 이 저장소의 단골).
+  it("스캔 실패는 취약점으로 세지 않되, 감추지도 않는다", async () => {
+    // 스캔이 통째로 실패한 호스트 — 결과는 scan_error 한 줄뿐이다.
+    importVulnScan(
+      "Plugin ID,CVE,Risk,Host,Name\n" +
+        "1,CVE-2021-44228,Critical,10.9.9.9,Log4Shell\n" +
+        "0,,Info,10.9.9.9,scan_error\n",
+      "csv",
+      "nessus",
+    );
+    const v = (await computeKpiSnapshot()).vulnerabilities;
+    // 진짜 취약점만 센다.
+    expect(v.active, "스캔 오류가 취약점으로 세어졌다").toBe(1);
+    // 그렇다고 없던 일이 되면 안 된다 — 점검이 실패했다는 건 "아직 안 본 것"이라는 뜻이다.
+    expect(v.scanFailed, "스캔 실패가 어디에도 안 남았다").toBeGreaterThanOrEqual(1);
+  });
+
   it("aggregates remediation SLA status from vuln-linked tasks", async () => {
     const day = 86400000;
     createTask({ text: "[조치] A", ref: "vuln:10.0.0.1", dueAt: Date.now() + 5 * day }); // 여유
