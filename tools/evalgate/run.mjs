@@ -91,7 +91,14 @@ async function loginNow() {
 await loginNow();
 
 // 폴백·오류 문구는 내용 검사 전에 FAIL(폴백 문구는 FAIL 원칙 — 회귀 하네스와 동일).
+//
+// ⚠ **답의 앞부분만 본다**(2026-08-01 거짓 실패). 폴백 문구는 그 자체가 답 전체라
+//   맨 앞에 온다. 그런데 답 **어디든** 찾으면, 지난 기록을 인용하는 도구가 걸린다 —
+//   실측: "최근 작업 세션 확인해줘"의 답에 옛 작업 제목 "승인 실행 실패: bulk_update"가
+//   인용돼 폴백으로 오판됐다. 제품은 정상인데 게이트가 틀린 것이다.
+//   앞 160자로 좁히면 진짜 폴백은 여전히 잡히고, 인용된 옛 기록은 안 걸린다.
 const FALLBACK_RE = /모델이 아직 준비|실행 실패|지연되고 있습니다|요청이 차단되었/;
+const isFallback = (out) => FALLBACK_RE.test(String(out ?? "").slice(0, 160));
 // 30초를 넘긴 답은 제품이 리포트 작성으로 넘긴다(longanswer.ts, 정상 동작이다).
 // 그때 돌아오는 건 안내 문구뿐이라 **문항이 재려던 것을 아예 재지 못한 것**이다 —
 // 실패로 세면 모델이 틀렸다는 거짓이 되고, 통과로 세면 검사하지 않은 것을 통과시킨다.
@@ -147,7 +154,7 @@ function grade(c, r, axis) {
   const why = [];
   const out = String(r.output ?? "");
   if (LONG_ANSWER_RE.test(out)) return { skipped: true, why: ["30초 초과 — 리포트 전환(측정 못 함)"], out };
-  if (FALLBACK_RE.test(out)) why.push("폴백/오류 문구");
+  if (isFallback(out)) why.push("폴백/오류 문구");
   for (const p of c.expect ?? []) if (!new RegExp(p, "i").test(out)) why.push(`누락: /${p}/`);
   for (const p of c.forbid ?? []) if (new RegExp(p, "i").test(out)) why.push(`금지 포함: /${p}/`);
   const s = c.signals ?? {};
