@@ -312,6 +312,18 @@ export interface ToolScope {
 // 후처리로 고친다). 실측(2026-07-19): "오늘 뭐부터 조치해야 해?"가 3/3 chat 폴백 → today 미호출.
 // 문구가 명백할 때만 발동하도록 좁게 잡는다(과발동 시 최악이라도 우선순위 목록을 보여주는 것뿐).
 const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }[] = [
+  // 대상을 지목한 취약점 질문 — 자산 등록부만 보면 **사내 진단 보고서를 놓친다**.
+  // 실측(2026-08-02): "안전대부 웹서버 취약점 알려줘"가 list_assets로 잡혀
+  //   "finding 없음 · 스캔 실패 1건"으로 답했다. 같은 보고서에 5건(평문 전송·디렉토리 인덱싱 등)이
+  //   적혀 있는데도 그렇다 — 목록 도구는 문서를 아예 후보에 올리지 않는다.
+  // search는 자산·문서·온톨로지를 함께 보고, 자산이 비면 문서 발췌를 앞으로 올린다.
+  // ⚠ 좁게 잡는다: 대상 이름이 앞에 오고 "취약점 알려/뭐/보여"로 끝나는 물음만.
+  //   "취약점 몇 건이야"처럼 **세는 질문**은 목록이 맞으므로 비켜 준다(아래 적용부에서 거른다).
+  {
+    re: /[가-힣A-Za-z0-9._-]{2,}\s*(웹\s*)?(서버|자산|호스트|시스템|장비)?\s*(의|에)?\s*취약점.{0,6}(알려|보여|뭐|무엇|있어|있나|현황)/,
+    tool: "search",
+    args: {},
+  },
   {
     re: /오늘.{0,6}(뭐|무엇|어디|먼저).{0,4}(부터|먼저).{0,6}(조치|해|처리|봐|볼|하지)|뭐부터\s*(조치|해|하지)|(제일|가장|지금)\s*급한\s*(취약점|건|것)|우선순위.{0,4}(취약점|조치)/,
     tool: "today",
@@ -502,6 +514,15 @@ function forcedToolFor(instruction: string, scope?: ToolScope): { tool: string; 
   for (const f of FORCED_INTENTS) {
     if (f.re.test(instruction) && available.has(f.tool)) {
       if (f.tool === "today" && isAssign) continue; // 배정 지시는 today로 강제하지 않음
+      if (f.tool === "search") {
+        // 세는 질문("몇 건", "총 몇 개")은 목록·집계가 맞다 — 검색으로 돌리지 않는다.
+        if (/몇\s*(건|개)|총\s*\d|건수/.test(instruction)) continue;
+        // 검색어는 **대상 이름만** 넣는다. 지시문을 통째로 넣으면 "취약점 알려줘"까지 섞여
+        //   엉뚱한 문서가 걸린다(검색어 하나 원칙 — 도구 설명에 적힌 대로).
+        const 대상 = instruction.replace(/\s*(의|에)?\s*취약점.*$/, "").trim();
+        if (!대상) continue;
+        return { tool: "search", args: { query: 대상 } };
+      }
       if (f.tool === "briefing" && /리포트|보고서|report/i.test(instruction)) continue; // 문서 리포트는 briefing 아님
       // 하드닝 점검 기준 선택: CIS 명시→cis, PC/윈도우→kisa_pc, 네트워크 장비→kisa_net, 그 외→국내 CCE(kisa).
       if (f.tool === "run_hardening_scan") {
