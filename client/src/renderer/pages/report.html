@@ -175,22 +175,6 @@ tr:last-child td{border-bottom:none;}
   <div class="kpi-mini"><div class="kpi-mini-label">최근 생성</div><div class="kpi-mini-value" id="kpiLastGen">-</div></div>
 </div>
 
-<!-- 경영진 요약 — 이력 위 전체 폭(2026-07-26 사용자 결정). 오른쪽 좁은 칸에 있을 땐 문장이
-     두세 글자씩 끊겨 읽기 어려웠다. 요약을 보다 바로 새로 만들 수 있게 생성 버튼도 여기 둔다. -->
-<div class="panel" data-gijo-fold="경영진 요약 미리보기">
-  <div style="display:flex;align-items:flex-start;gap:12px;">
-    <div style="flex:1;">
-      <div class="panel-title">🧾 경영진 요약 미리보기</div>
-      <div class="panel-sub" id="summarySub">아직 생성된 리포트가 없습니다</div>
-    </div>
-    <button class="btn-ghost" id="summaryGenBtn" title="새 리포트를 만듭니다"
-      style="background:rgba(74,125,255,.14);color:var(--blue-light);font-weight:800;white-space:nowrap;">＋ 리포트 생성</button>
-  </div>
-  <div style="font-size:12.5px;line-height:1.8;color:var(--text)" id="summaryText">
-    "+ 리포트 생성"으로 새 리포트를 만들면 LLM이 작성한 경영진 요약이 여기 표시됩니다.
-  </div>
-</div>
-
 <div class="content-grid">
   <div>
     <div class="panel">
@@ -502,15 +486,6 @@ tr:last-child td{border-bottom:none;}
       document.getElementById("kpiAvgTime").textContent = `${(avgMs / 1000).toFixed(1)}초`;
     }
 
-    // 요약 패널 — 이번 세션에서 방금 만든 게 있으면 전체 요약을, 없으면 최근 저장 리포트의 요약(미리보기)을.
-    const latest = sessionReports[0];
-    if (latest) {
-      document.getElementById("summarySub").textContent = `${TYPE_LABEL[latest.type]} · LLM 자동 생성`;
-      document.getElementById("summaryText").textContent = latest.executiveSummary;
-    } else if (historyReports.length && historyReports[0].summary) {
-      document.getElementById("summarySub").textContent = `${TYPE_LABEL[historyReports[0].type] || historyReports[0].type} · 최근 저장 리포트 요약`;
-      document.getElementById("summaryText").textContent = historyReports[0].summary;
-    }
   }
 
   function openModal() {
@@ -828,7 +803,6 @@ tr:last-child td{border-bottom:none;}
       el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
     });
     document.getElementById("genReportBtn").addEventListener("click", openModal);
-    document.getElementById("summaryGenBtn")?.addEventListener("click", openModal); // 요약 패널의 생성 버튼
     document.getElementById("modalCancelBtn").addEventListener("click", closeModal);
     modalSaveBtn.addEventListener("click", generate);
     modal.addEventListener("click", (e) => { if (e.target === modal) closeModal(); });
