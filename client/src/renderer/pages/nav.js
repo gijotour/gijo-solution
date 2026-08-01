@@ -206,7 +206,8 @@
       ".gn-seg{display:flex;background:#1f1e1d;border:1px solid var(--border-strong);border-radius:9px;padding:3px;gap:3px;}" +
       ".gn-seg span{flex:1;text-align:center;padding:6px 4px;border-radius:7px;font-size:12.25px;font-weight:800;color:var(--muted);cursor:pointer;border:1px solid transparent;}" +
       ".gn-seg span.on{background:rgba(59,130,246,.22);color:#fff;border-color:rgba(59,130,246,.5);}" +
-      ".gn-mid{flex:1 1 auto;min-height:0;overflow-y:auto;padding:8px 6px;}"
+      ".gn-pin{flex:0 0 auto;padding:8px 6px 0;}" +
+      ".gn-mid{flex:1 1 auto;min-height:0;overflow-y:auto;padding:4px 6px 8px;}"
       + "#gijoNav .gtb-userarea{flex:0 0 auto;position:sticky;bottom:0;background:var(--panel-2,#1f1e1d);}" +
       ".gn-mid::-webkit-scrollbar{width:5px;} .gn-mid::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:3px;}" +
       // 그룹 헤더 = 트리의 가지. 눌러서 접었다 편다(4.0.0: 허브를 풀어 항목이 30개가 되면서
@@ -398,10 +399,15 @@
     var favs = favList();
 
     // ── 맨 위 고정 세 자리 — 가지에 넣지 않는다(접혀 있으면 매번 펴야 한다).
+    //   스크롤 **밖**에 둔다(2026-08-02 사용자 신고: "하단 메뉴가 나오면 상단 메뉴가 안 나옴").
+    //   메뉴를 다 펼치면 목록이 창보다 길어져, 아래를 보려고 내리는 순간 이 세 자리가 밀려났다.
+    //   창이 좁을수록 먼저 필요한 자리라 위·아래 양 끝은 붙여 두고 가운데만 구른다.
+    var 고정자리 = container.__gnPin;
+    if (고정자리) 고정자리.innerHTML = "";
     var top = document.createElement("div");
     top.className = "gn-kids gn-top-fixed";
     TOP.forEach(function (it) { if (!it.hidden) top.appendChild(makeItem(it, here, favs, container)); });
-    container.appendChild(top);
+    (고정자리 || container).appendChild(top);
 
     // ⭐ 즐겨찾기 가지 — **비어 있어도 보여준다**(2026-07-28 사용자 신고: "즐겨찾기 안 보임").
     //   전에는 별표한 게 하나도 없으면 가지를 통째로 안 그렸다. 그런데 별표는 마우스를 올려야
@@ -538,8 +544,11 @@
     // 두 칸짜리 토글처럼 보였지만 실제로는 토글이 아니었다: '전체메뉴'는 언제나 켜진 채
     // 아무 동작도 하지 않았고(지금 보고 있는 게 이미 전체메뉴다), '대시보드'는 바로 아래
     // 메뉴 첫 항목과 같은 곳으로 갔다. 누르면 뭐가 달라지는지 알 수 없는 버튼은 조작만 늘린다.
+    // 위 고정 자리(대시보드·팀 사무실·작업 내역) — 스크롤과 함께 밀려나지 않게 목록 밖에 둔다.
+    var pin = document.createElement("div"); pin.className = "gn-pin"; root.appendChild(pin);
     // 중앙 메뉴(스크롤)
     var mid = document.createElement("div"); mid.className = "gn-mid";
+    mid.__gnPin = pin;
     buildMenu(mid); root.appendChild(mid);
     // 하단 사용자 영역은 titlebar.js가 #gijoNav 마지막 자식으로 마운트(관찰자).
     // 접기/열기는 **상단 바 ▣** 하나로(2026-08-02 이관) — 여기서는 모양만 맞춘다.
