@@ -37,7 +37,6 @@
   .hub-seg{display:flex;background:#1f1e1d;border:1px solid var(--border-strong);border-radius:9px;padding:3px;gap:3px;margin-bottom:10px;width:max-content;}
   .hub-seg span{padding:5px 13px;border-radius:7px;font-size:12.25px;font-weight:800;color:var(--muted);cursor:pointer;border:1px solid transparent;}
   .hub-seg span.on{background:rgba(59,130,246,.22);color:#fff;border-color:rgba(59,130,246,.5);}
-  .fgrp{margin-bottom:8px;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:var(--panel-2);}
   .fhd{display:flex;align-items:center;gap:8px;padding:9px 11px;cursor:pointer;}
   .fhd.on{background:rgba(59,130,246,.13);box-shadow:inset 3px 0 0 var(--blue);}
   .fhd .nm{flex:1;min-width:0;font-size:12.5px;font-weight:800;color:#dfe6ff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -64,12 +63,19 @@
   .master{width:330px;flex-shrink:0;}
   .sec-h{font-size:12.25px;font-weight:800;color:var(--muted-2);letter-spacing:.3px;margin:2px 4px 8px;display:flex;align-items:center;gap:6px;}
   .sec-h .cnt{margin-left:auto;color:var(--muted);}
-  .acard{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:11px;margin-bottom:8px;cursor:pointer;}
-  .acard.ai{border-color:rgba(139,124,240,.35);background:linear-gradient(180deg,rgba(139,124,240,.07),transparent);}
-  .acard.sel{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue);}
+  /* 한 줄 = 자산 하나(2026-08-02 통합). 카드 테두리·여백을 걷고 줄로 눕힌다 — 30px 안쪽. */
+  .acard{display:flex;align-items:baseline;gap:8px;background:transparent;border:0;
+    border-bottom:1px solid rgba(255,255,255,.05);border-radius:0;padding:6px 10px;margin:0;cursor:pointer;
+    white-space:nowrap;overflow:hidden;}
+  .acard:hover{background:rgba(59,130,246,.05);}
+  .acard.ai{box-shadow:inset 3px 0 0 rgba(139,124,240,.55);}
+  .acard.sel{background:rgba(59,130,246,.12);}
   .ac-top{display:flex;align-items:center;gap:7px;}
-  .ac-ic{width:26px;height:26px;border-radius:7px;background:var(--panel-2);display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;}
-  .ac-nm{font-size:12.5px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;} .ac-sub{font-size:11.75px;color:var(--muted);}
+  .ac-ic{font-size:13px;flex:0 0 auto;}
+  .ac-nm{font-size:12.5px;font-weight:700;color:#fff;flex:0 0 auto;max-width:280px;overflow:hidden;text-overflow:ellipsis;}
+  /* 부제(종류·호스트·출처 파일)는 **아랫줄로 내리지 않는다** — 내리면 줄 높이가 두 배가 된다. */
+  .ac-sub{font-size:11.75px;color:var(--muted);flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;}
+  .ac-tags{display:inline-flex;gap:4px;flex:0 0 auto;}
   .risk{margin-left:auto;font-size:11.5px;font-weight:800;padding:2px 8px;border-radius:20px;flex-shrink:0;}
   .r-critical{background:rgba(226,72,61,.16);color:#f5928a;} .r-high{background:rgba(240,160,32,.16);color:#f7c777;}
   .r-medium{background:rgba(59,130,246,.16);color:#8fb8ff;} .r-ok{background:rgba(30,185,128,.16);color:#6fdcb5;}
@@ -139,7 +145,9 @@
     <!-- Shadow AI 배너는 AI-BOM 화면으로 이관(2026-07-26) — 통합 뷰는 전체 자산 관제에 집중 -->
 
     <!-- 마스터·디테일 -->
-    <div class="hub-seg" id="hubSeg"><span data-mode="asset" class="on">🗂 자산별</span><span data-mode="file">📄 파일별</span></div>
+    <!-- 모드 전환(자산별/파일별)을 없앴다(2026-08-02) — 같은 화면인데 모양이 둘이라 두 번 배워야 했다.
+         한 줄 = 자산 하나이고, 어느 파일에서 나왔는지는 **그 줄에** 적는다. 파일로 보고 싶으면 걸러서 본다. -->
+    <div class="hub-seg" id="hubSeg"><span data-pick="all" class="on">전체</span><span data-pick="ai">🤖 AI 자산</span><span data-pick="file">📄 파일에서</span><span data-pick="direct">🖐 직접 등록</span><span data-pick="vuln">⚠ 취약점 있음</span></div>
     <div class="body">
       <div class="master" id="master"><div class="empty-line">불러오는 중…</div></div>
       <div class="detail" id="detail"><div class="d-empty">왼쪽에서 자산을 선택하면 구성·취약점·AI 위험을 한 자리에서 봅니다.</div></div>
@@ -155,7 +163,8 @@
   const bandLabel={critical:"🔴 매우높음",high:"🟠 높음",medium:"🔵 보통",ok:"🟢 양호"};
   let OVERVIEW=null, selId=null, curTab="overview";
   // 목록 보기 모드 — asset(자산별) | file(파일별). 설명은 ⓘ(screenguide '파일별 보기')에 있다.
-  let listMode=(()=>{ try{ return localStorage.getItem("gijo:assethub:mode")||"asset"; }catch(e){ return "asset"; } })();
+  // 걸러 보기 — all | ai | file | direct | vuln. ⚠ 예전 값("asset")은 뜻이 없어졌으니 전체로 읽는다.
+  let listMode=(()=>{ try{ const v=localStorage.getItem("gijo:assethub:mode"); return (v&&v!=="asset")?v:"all"; }catch(e){ return "all"; } })();
 
   function tick(){ $("clockEl").textContent=new Date().toLocaleString("ko-KR",{hour:"2-digit",minute:"2-digit",hour12:true,month:"2-digit",day:"2-digit"}); }
   async function loadHealth(){ try{ await window.gijo.checkServerHealth(); $("statusPill").innerHTML='<span class="dot"></span>운영중<span class="beta-tag">LIVE</span>'; }catch(e){ $("statusPill").innerHTML='<span class="dot" style="background:#e2483d"></span>연결 끊김'; } }
@@ -185,11 +194,16 @@
     if(r.vuln.open) tags.push(`<span class="tag">취약점 ${r.vuln.open}</span>`);
     if(r.vuln.kev) tags.push(`<span class="tag" style="color:#f5928a">KEV ${r.vuln.kev}</span>`);
     if(r.isAi && r.sbomGenerated) tags.push('<span class="tag">SBOM ✓</span>');
-    return `<div class="acard ${r.isAi?"ai":""} ${r.id===selId?"sel":""}" data-id="${esc(r.id)}">
-      <div class="ac-top"><div class="ac-ic">${assetIcon(r)}</div>
-        <div style="min-width:0"><div class="ac-nm">${esc(shownName(r))}${r.displayName?' <span class="alias">별칭</span>':""}</div><div class="ac-sub">${esc(r.assetType)}${r.host?" · "+esc(r.host):""}</div></div>
-        <span class="risk r-${r.riskBand}">위험 ${r.exposureScore}</span></div>
-      ${tags.length?`<div class="ac-tags">${tags.join("")}</div>`:""}
+    // 한 줄 = 자산 하나(2026-08-02). 출처 파일을 이 줄에 적어 「파일별」 모드를 없앴다.
+    //   ⚠ 파일 쪽에만 있던 정보를 버리지 않는다 — 파일 이름을 줄에 남기고, 파일 단위 요약은
+    //     자세히의 '출처 파일' 구역에서 그대로 본다.
+    const 출처 = r.sourceFile ? `📄 ${esc(r.sourceFile)}` : "🖐 직접 등록";
+    return `<div class="acard ${r.isAi?"ai":""} ${r.id===selId?"sel":""}" data-id="${esc(r.id)}" data-src="${esc(r.sourceFile||"")}">
+      <span class="ac-ic">${assetIcon(r)}</span>
+      <span class="ac-nm">${esc(shownName(r))}${r.displayName?' <span class="alias">별칭</span>':""}</span>
+      <span class="ac-sub">${esc(r.assetType)}${r.host?" · "+esc(r.host):""} · ${출처}</span>
+      ${tags.length?`<span class="ac-tags">${tags.join("")}</span>`:""}
+      <span class="risk r-${r.riskBand}">위험 ${r.exposureScore}</span>
     </div>`;
   }
   // 화면에 보여줄 이름 — 별칭(displayName)이 있으면 그것, 없으면 원래 이름.
@@ -203,39 +217,22 @@
     return out.join("");
   }
 
-  // 파일(출처) 기준 목록 — 파일 → 그 파일로 등록된 자산 → (클릭 시) 취약점.
-  function renderMasterByFile(){
-    const groups=OVERVIEW.sourceGroups||[];
-    const byId=new Map(OVERVIEW.rows.map(r=>[r.id,r]));
-    if(!groups.length){ $("master").innerHTML='<div class="empty-line">등록된 자산이 없습니다.</div>'; return; }
-    $("master").innerHTML=groups.map(g=>{
-      const rows=g.assetIds.map(id=>byId.get(id)).filter(Boolean);
-      const when=g.lastScannedAt? new Date(g.lastScannedAt).toLocaleDateString("ko-KR") : null;
-      const meta=[g.sourceFile? "파일 등록":"화면·대화창 직접 등록", when? `최근 점검 ${when}`:null, g.vuln.open? `취약점 ${g.vuln.open}건`:"취약점 없음"].filter(Boolean).join(" · ");
-      return `<div class="fgrp">
-        <div class="fhd" data-src="${esc(g.sourceFile||"")}"><span>${g.sourceFile?"📄":"🤖"}</span><span class="nm" title="${esc(g.label)}">${esc(g.label)}</span><span class="cnt2">자산 ${g.assetCount}</span></div>
-        <div class="fmeta">${esc(meta)}</div>
-        <div class="fchild">${rows.map(r=>`<div class="arow ${r.id===selId?"sel":""}" data-id="${esc(r.id)}">
-          <span class="an">${esc(shownName(r))}${r.displayName?' <span class="alias">별칭</span>':""}</span>${sevDots(r.vuln)}</div>`).join("")}</div>
-      </div>`;
-    }).join("");
-    $("master").querySelectorAll(".arow").forEach(el=>el.addEventListener("click",()=>selectAsset(el.dataset.id)));
-    $("master").querySelectorAll(".fhd").forEach(el=>el.addEventListener("click",()=>{
-      // 파일 헤더 클릭 = 그 파일의 첫 자산 선택(파일 요약은 상세의 '출처 파일' 구역에 있다)
-      const g=(OVERVIEW.sourceGroups||[]).find(x=>(x.sourceFile||"")===el.dataset.src);
-      if(g&&g.assetIds.length) selectAsset(g.assetIds[0]);
-    }));
-  }
-
   function renderMaster(){
-    if(listMode==="file") return renderMasterByFile();
     const rows=OVERVIEW.rows;
-    const ai=rows.filter(r=>r.isAi), it=rows.filter(r=>!r.isAi);
+    // 걸러 보기 — 모드 전환 대신 칩 하나로 좁힌다(2026-08-02 통합).
+    const 걸러진 = rows.filter(r =>
+      listMode==="ai"     ? r.isAi :
+      listMode==="file"   ? !!r.sourceFile :
+      listMode==="direct" ? !r.sourceFile :
+      listMode==="vuln"   ? (r.vuln && r.vuln.open>0) : true);
+    // AI 자산은 중점관리라 위로 올린다(구분 줄은 그대로 — 없애면 무엇이 AI인지 훑어서 못 안다).
+    const ai=걸러진.filter(r=>r.isAi), it=걸러진.filter(r=>!r.isAi);
     let html="";
-    html+=`<div class="sec-h">🤖 AI 자산 <span class="ai-badge">중점관리</span><span class="cnt">${ai.length}</span></div>`;
-    html+= ai.length? ai.map(cardHtml).join("") : '<div class="empty-line">AI 자산이 없습니다.</div>';
-    html+=`<div class="sec-h" style="margin-top:14px">🖥 일반 IT 자산 <span class="cnt">${it.length}</span></div>`;
-    html+= it.length? it.map(cardHtml).join("") : '<div class="empty-line">IT 자산이 없습니다.</div>';
+    if(!걸러진.length){ html='<div class="empty-line">이 조건에 맞는 자산이 없습니다.</div>'; }
+    else {
+      if(ai.length) html+=`<div class="sec-h">🤖 AI 자산 <span class="ai-badge">중점관리</span><span class="cnt">${ai.length}</span></div>`+ai.map(cardHtml).join("");
+      if(it.length) html+=`<div class="sec-h"${ai.length?' style="margin-top:10px"':""}>🖥 일반 IT 자산 <span class="cnt">${it.length}</span></div>`+it.map(cardHtml).join("");
+    }
     $("master").innerHTML=html;
     $("master").querySelectorAll(".acard").forEach(el=>el.addEventListener("click",()=>selectAsset(el.dataset.id)));
   }
@@ -352,12 +349,12 @@
     tick(); setInterval(tick,30000); loadHealth(); loadUser();
     // 목록 보기 전환(자산별 ↔ 파일별) — 선택은 기억한다.
     $("hubSeg").querySelectorAll("span").forEach(el=>el.addEventListener("click",()=>{
-      listMode=el.dataset.mode;
+      listMode=el.dataset.pick;
       try{ localStorage.setItem("gijo:assethub:mode",listMode); }catch(e){}
-      $("hubSeg").querySelectorAll("span").forEach(x=>x.classList.toggle("on",x.dataset.mode===listMode));
+      $("hubSeg").querySelectorAll("span").forEach(x=>x.classList.toggle("on",x.dataset.pick===listMode));
       if(OVERVIEW) renderMaster();
     }));
-    $("hubSeg").querySelectorAll("span").forEach(x=>x.classList.toggle("on",x.dataset.mode===listMode));
+    $("hubSeg").querySelectorAll("span").forEach(x=>x.classList.toggle("on",x.dataset.pick===listMode));
     try{
       OVERVIEW=await window.gijo.assetHub();
       renderSummary(OVERVIEW.summary);
@@ -393,7 +390,7 @@
     let 남은시도=20;
     const 걸기=()=>{
       if(typeof window.gijo자세히아래로!=="function") return void (남은시도-->0&&setTimeout(걸기,300));
-      const 됐나=window.gijo자세히아래로({칸:".body", 목록:"#master", 자세히:"#detail", 줄:".arow"});
+      const 됐나=window.gijo자세히아래로({칸:".body", 목록:"#master", 자세히:"#detail", 줄:".acard"});
       // 목록은 상자 안에서만 구른다 — 위의 자산별/파일별 고르는 줄이 밀려 사라지지 않게.
       const m=document.getElementById("master");
       if(m&&!m.hasAttribute("data-gijo-fit")) m.setAttribute("data-gijo-fit","");

@@ -46,8 +46,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .footer img{height:16px;opacity:0.6;}
 
 /* 루프 개념 스트립(수집→정제→학습→배포) */
-.loop-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px;}
-.loop-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;position:relative;}
+/* 창이 좁아지면 STEP 4가 밖으로 나갔다 — 4칸 고정 대신 폭에 맞춰 접히게(2026-08-02). */
+.loop-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;margin-bottom:14px;}
+.loop-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;position:relative;min-width:0;}
 .loop-card .lc-step{font-size:11.75px;font-weight:800;color:var(--muted-2);letter-spacing:1px;}
 .loop-card .lc-name{font-size:14px;font-weight:800;color:#fff;margin:3px 0 5px;}
 .loop-card .lc-desc{font-size:12.25px;color:var(--muted);line-height:1.55;}
