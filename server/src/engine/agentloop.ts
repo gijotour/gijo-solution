@@ -517,6 +517,12 @@ function forcedToolFor(instruction: string, scope?: ToolScope): { tool: string; 
       if (f.tool === "search") {
         // 세는 질문("몇 건", "총 몇 개")은 목록·집계가 맞다 — 검색으로 돌리지 않는다.
         if (/몇\s*(건|개)|총\s*\d|건수/.test(instruction)) continue;
+        // ⚠ "오늘 / 지금 가장 급한 / 우선순위 / 뭐부터"는 **today가 맡는 말**이다.
+        //   평가 게이트 실측(2026-08-02): 이 제외가 없어 today-urgent가 search로 새면서
+        //   routing이 100% → 96.9%로 떨어졌다. FORCED_INTENTS는 배열 순서대로 보는데
+        //   내가 넣은 규칙이 앞에 있어 좁은 규칙(today)을 가로챈 것이다.
+        //   여기서 continue하면 그다음 규칙으로 넘어가므로 today가 제자리를 찾는다.
+        if (/오늘|지금\s*(가장|제일)|가장\s*급한|제일\s*급한|우선순위|뭐부터/.test(instruction)) continue;
         // 검색어는 **대상 이름만** 넣는다. 지시문을 통째로 넣으면 "취약점 알려줘"까지 섞여
         //   엉뚱한 문서가 걸린다(검색어 하나 원칙 — 도구 설명에 적힌 대로).
         const 대상 = instruction.replace(/\s*(의|에)?\s*취약점.*$/, "").trim();
