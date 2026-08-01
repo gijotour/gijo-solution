@@ -1,0 +1,548 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<!--
+============================================================================
+ 대화창(콘솔) 자리 배치 — 시안
+ 경로: mockups/console-placement/placement.html
+ 작성: gijo-mockup 서브에이전트 (제품 코드는 읽기만 함, 이 파일 밖에는 아무것도 안 씀)
+============================================================================
+ 이 파일은 그림(정지 mockup)입니다. client/·server/ 등 제품 코드는 건드리지 않았습니다.
+
+ 【설계 전 조사 — 근거(출처·수치)】
+
+ 1) 내부 실측 — 우리 제품의 실제 코드(추측이 아니라 지금 이 순간 코드에 있는 값)
+    · client/src/renderer/pages/app.html
+      L17  .app{grid-template-columns:232px minmax(0,1fr)} → 사이드바 232px 고정
+      L76-81 도킹 콘솔 높이 = 190px 고정
+             (맥락줄 34 + 대화 4줄 22px×4=88 + 입력 52 + 여백 16 ≒ 190)
+             "끌어서 늘리는 손잡이는 없앴다 — 끄는 동안 아래 iframe이 매번 다시 그려져 버벅였다"
+    · client/src/main.ts
+      L452-483 ipcMain.handle("console:popout", …)
+             분리창 폭 = Math.max(420, Math.round(workArea.width * 0.28)), 화면 우측 도킹, 세로는 화면 전체
+             L459 분리창 최소 크기 = 360×320
+      L142-143 titleBarOverlay 높이 46px(창 컨트롤 오버레이)
+    · client/src/util/layout.ts (2026-08-01 신설 — Electron 밖 순수함수라 테스트 가능)
+      셸옮길자리(): 대화창을 옆으로 뺄 때 셸과 겹치면 셸을 옮기되,
+      옮긴 뒤 남는 폭이 최소폭(기본 900px) 미만이면 "옮기지 않는다"
+      → "표가 안 들어가는 폭으로 밀어 넣느니 겹치는 게 낫다"(코드 주석 원문)
+    · client/src/renderer/pages/console.js
+      L1-11  도킹과 분리창은 완전히 같은 파일(기능 차이 없음)
+      L20-21 CL_MAX=40(대화 40개 넘으면 오래된 것부터 삭제), CLAMP_LEN=140(140자 넘는 답은 자동 접힘)
+      L83    표가 좁아지면 이미 overflow-x:auto로 가로 스크롤을 준다(콘솔 안 markdown 표 렌더링)
+
+ 2) 외부 표준·업계 사례
+    · VS Code — GitHub Copilot Chat이 Secondary Side Bar(오른쪽 세로 패널)로 이전
+      github.com/microsoft/vscode-copilot-release issue #1434 / dev-solve.com 해설 기사
+    · Cursor — AI 채팅이 우측 세로 사이드바에 상주, 폭 드래그 조절(다수 실사용 후기)
+      forum.cursor.com 다수 스레드
+    · JetBrains AI Assistant — AI Chat이 우측 툴바의 도킹 가능한 tool window
+      jetbrains.com/help/ai-assistant 공식 문서
+      → 셋 다 "오른쪽 세로 패널"을 공통 자리로 쓴다. 단, 셋 다 개발자용 넓은 모니터를
+        전제로 한 도구라는 점은 그대로 베끼면 안 되는 이유이기도 하다(3번 결론 참고).
+    · Microsoft, Windows Apps 공식 반응형 레이아웃 가이드
+      "Screen sizes and breakpoints for responsive design"
+      learn.microsoft.com/windows/apps/design/layout/screen-sizes-and-breakpoints-for-responsive-design
+      Small<640px · Medium 641-1007px · Large 1008px+
+      원칙 원문: "물리적 화면 크기가 아니라 앱이 실제 쓸 수 있는 창 폭 기준으로 설계하라"
+    · Google Material Design 3, 창 크기 등급(Window size classes)
+      m3.material.io/foundations/layout/breakpoints , developer.android.com/develop/adaptive-apps
+      Compact<600 · Medium 600-839 · Expanded 840-1199 · Large 1200-1599 · Extra-large 1600+
+      "Extra-large(1600 이상)부터 다분할·사이드 패널 레이아웃을 권장" — 이 시안의 1600 임계값 근거
+
+ 3) 이 시안의 결론
+    "오른쪽 세로 패널"은 업계가 이미 검증한 자리이지만, 그건 화면이 넓다는 전제에서다.
+    이 제품의 개발 머신 자체가 세로 모니터(1080×1920)일 만큼, 실제로는 화면이 좁거나
+    세로로 긴 환경도 감당해야 한다. 그래서 폭 하나만 보고 자동으로 배치를 고르되(③),
+    되돌릴 수 있게 남겨 두는 절충안을 추천한다. 1600 임계값은 Material Design 3의
+    Extra-large 시작점과, 우리 제품의 실제 패널 폭 공식(max(420, 폭×28%))으로 계산한
+    "본문이 편안해지는 지점"이 같은 자리에서 만나 정했다(본문 표의 "왜 1600인가" 참고).
+============================================================================
+-->
+<title>대화창 자리 시안 — GIJO AS</title>
+<style>
+:root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.16);
+  --blue:#3b82f6;--blue-l:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--teal:#1eb980;--red:#e2483d;--amber:#f0a020;}
+*{box-sizing:border-box;}
+html,body{margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;font-size:13px;line-height:1.65;}
+.wrap{max-width:1320px;margin:0 auto;padding:26px 32px 90px;}
+h1{font-size:21px;margin:0 0 6px;color:#fff;}
+h2{font-size:16px;margin:0 0 4px;color:#fff;scroll-margin-top:58px;}
+h3{font-size:13.5px;margin:20px 0 9px;color:#fff;}
+.subtitle{color:var(--muted);font-size:12.5px;margin-bottom:4px;}
+.keyline{font-size:13.5px;color:var(--blue-l);font-weight:700;margin:10px 0 18px;}
+
+.disclaimer{background:rgba(240,160,32,.08);border:1px solid rgba(240,160,32,.35);border-radius:10px;padding:11px 15px;font-size:12px;color:#e8c98a;line-height:1.75;margin-bottom:20px;}
+.disclaimer b{color:var(--amber);}
+
+.pagenav{position:sticky;top:0;z-index:20;display:flex;flex-wrap:wrap;gap:3px;background:rgba(8,11,20,.94);backdrop-filter:blur(4px);border-bottom:1px solid var(--border);padding:9px 32px;margin:0 0 26px;}
+.pagenav a{font-size:11.2px;font-weight:700;color:var(--muted);text-decoration:none;padding:5px 10px;border-radius:7px;white-space:nowrap;}
+.pagenav a:hover{color:#fff;background:rgba(59,130,246,.14);}
+.pagenav a.star{color:var(--teal);}
+
+section{margin-bottom:42px;}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px 20px;}
+
+.now-grid{display:flex;gap:14px;flex-wrap:wrap;margin-top:10px;}
+.now-item{flex:1 1 250px;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;font-size:12px;color:var(--muted);}
+.now-item b{display:block;color:#fff;font-size:12.5px;margin-bottom:4px;}
+
+.reco-banner{border:1px solid rgba(30,185,128,.45);background:linear-gradient(160deg,rgba(30,185,128,.10),rgba(30,185,128,.02));border-radius:14px;padding:20px 22px;}
+.reco-banner .star{display:inline-flex;align-items:center;gap:6px;background:var(--teal);color:#06281c;font-weight:800;font-size:11.3px;padding:3px 11px;border-radius:999px;margin-bottom:10px;}
+.reco-banner h2{color:#fff;}
+.reco-banner .sum{font-size:12.5px;color:#cdeee0;line-height:1.8;margin-top:6px;}
+.reco-banner ol{margin:12px 0 0 18px;padding:0;font-size:12.5px;color:var(--text);}
+.reco-banner li{margin-bottom:6px;}
+
+.head-mock{display:flex;align-items:center;gap:9px;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:8px 13px;font-size:11px;color:var(--muted);margin:16px 0 5px;}
+.head-mock .chip{background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);color:var(--blue-l);border-radius:14px;padding:2px 10px;font-weight:800;white-space:nowrap;}
+.head-mock .hint{flex:1;}
+.head-mock .seg{display:flex;border:1px solid var(--border-strong);border-radius:8px;overflow:hidden;}
+.head-mock .seg span{padding:4px 10px;font-size:10.2px;font-weight:700;color:var(--muted);}
+.head-mock .seg .on{background:var(--blue);color:#fff;}
+.head-mock .btnmock{border:1px solid var(--border-strong);border-radius:7px;padding:4px 10px;font-size:10.2px;font-weight:700;color:var(--muted);white-space:nowrap;}
+.head-mock-note{font-size:10.6px;color:var(--muted-2);margin-bottom:4px;}
+
+.why{margin-top:16px;}
+.why ul{margin:8px 0 0 18px;padding:0;}
+.why li{margin-bottom:9px;font-size:12.3px;}
+.why b{color:#fff;}
+.legend{display:flex;gap:18px;flex-wrap:wrap;font-size:11px;color:var(--muted);margin:8px 0 22px;padding:10px 14px;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;}
+.legend span{display:inline-flex;align-items:center;gap:6px;}
+.sw{width:13px;height:13px;border-radius:3px;display:inline-block;}
+
+.opt-card{position:relative;background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:20px 22px;margin-bottom:22px;}
+.opt-card.reco{border-color:rgba(30,185,128,.5);box-shadow:0 0 0 1px rgba(30,185,128,.25);}
+.ribbon{position:absolute;top:-11px;right:22px;background:var(--teal);color:#06281c;font-weight:800;font-size:11px;padding:3px 12px;border-radius:999px;}
+.opt-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;}
+.opt-head .no{font-size:11px;font-weight:800;color:var(--muted-2);}
+.opt-head h2{margin:0;}
+.opt-sub{font-size:12.3px;color:var(--muted);margin:5px 0 16px;}
+
+.diagrow{display:flex;gap:34px;flex-wrap:wrap;margin-bottom:14px;}
+.diagcol{flex:0 0 auto;}
+.reslabel{font-size:11px;color:var(--muted);margin-top:9px;}
+.reslabel b{color:#fff;}
+.numline{font-size:11.8px;color:var(--text);margin-top:3px;font-weight:600;}
+.numline.bad{color:#f5928a;}
+.numline.good{color:var(--teal);}
+.whybadge{display:inline-block;font-size:10.2px;font-weight:700;color:var(--blue-l);background:rgba(59,130,246,.12);border:1px solid rgba(59,130,246,.35);border-radius:6px;padding:2px 8px;margin-bottom:8px;}
+.samebadge{display:inline-block;font-size:10.2px;font-weight:700;color:var(--teal);background:rgba(30,185,128,.12);border:1px solid rgba(30,185,128,.35);border-radius:6px;padding:2px 8px;margin-bottom:8px;margin-left:6px;}
+
+.mon,.screen{position:relative;border-radius:6px;background:#04060b;box-shadow:0 8px 22px rgba(0,0,0,.4);}
+.mon{border:3px solid #29334a;}
+.screen{border:2px dashed #333c52;}
+.side{position:absolute;left:0;top:0;bottom:0;width:39px;background:var(--panel-2);border-right:1px solid var(--border);}
+.dockbar{position:absolute;left:39px;right:0;bottom:0;background:rgba(59,130,246,.28);border-top:2px solid var(--blue);}
+.panelbar{position:absolute;top:0;bottom:0;right:0;background:rgba(59,130,246,.28);border-left:2px solid var(--blue);}
+.tagin{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;font-size:8.6px;font-weight:800;color:var(--blue-l);line-height:1.35;padding:2px;}
+
+.winbox{position:absolute;top:4px;bottom:4px;border-radius:5px;box-shadow:0 6px 16px rgba(0,0,0,.5);}
+.winbox.shell{background:#0c1120;border:1px solid #384360;}
+.winbox.consolewin{background:rgba(59,130,246,.30);border:1px solid var(--blue);}
+.winbox.consolewin.overlap{background:repeating-linear-gradient(45deg,rgba(226,72,61,.45) 0 5px,rgba(59,130,246,.30) 5px 10px);border-color:var(--red);}
+
+.prosconswrap{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:8px;}
+.pc h4{font-size:11px;color:var(--muted);margin:0 0 7px;text-transform:uppercase;letter-spacing:.3px;}
+.pc ul{list-style:none;margin:0;padding:0;}
+.pc li{position:relative;padding-left:17px;font-size:12.2px;margin-bottom:6px;line-height:1.6;}
+.pc.good li::before{content:"✓";position:absolute;left:0;color:var(--teal);font-weight:800;}
+.pc.bad li::before{content:"✕";position:absolute;left:0;color:#f5928a;font-weight:800;}
+
+.whenline{background:rgba(255,255,255,.035);border-left:3px solid var(--blue);border-radius:0 8px 8px 0;padding:8px 13px;font-size:12.2px;margin-top:14px;}
+.whenline b{color:var(--blue-l);}
+
+.realdemo{margin-top:16px;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+.realdemo .rdtitle{font-size:11.8px;color:#fff;font-weight:700;margin-bottom:10px;}
+.rd-box{overflow-x:auto;border:1px solid var(--border-strong);border-radius:8px;background:var(--panel);}
+table.rd-table{border-collapse:collapse;width:570px;}
+table.rd-table th,table.rd-table td{border:1px solid var(--border);padding:6px 10px;font-size:11.3px;white-space:nowrap;text-align:left;}
+table.rd-table th{background:var(--panel-2);color:var(--muted);font-weight:700;}
+.rd-cap{font-size:11px;margin:6px 0 16px;font-weight:700;}
+.rd-cap.bad{color:#f5928a;}
+.rd-cap.good{color:var(--teal);}
+
+table.cmp,table.res{border-collapse:collapse;width:100%;margin-top:10px;font-size:12px;}
+table.cmp th,table.cmp td,table.res th,table.res td{border:1px solid var(--border);padding:9px 12px;text-align:left;vertical-align:top;}
+table.cmp th,table.res th{background:var(--panel-2);color:var(--muted);font-weight:700;font-size:11.2px;}
+table.cmp td b,table.res td b{color:#fff;}
+.pass{color:var(--teal);font-weight:700;}
+.fail{color:var(--muted-2);}
+
+.barcmp{margin-top:10px;}
+.barrow{display:flex;align-items:center;gap:10px;margin-bottom:11px;}
+.barlabel{flex:0 0 250px;font-size:11.7px;color:var(--muted);}
+.bartrack{flex:1;height:11px;background:rgba(255,255,255,.06);border-radius:6px;overflow:hidden;}
+.barfill{height:100%;background:var(--blue);}
+.barfill.full{background:var(--teal);}
+.barval{flex:0 0 160px;font-size:11.4px;color:#fff;text-align:right;}
+
+.srclist{font-size:11.2px;color:var(--muted);line-height:2;}
+.srclist b{color:#fff;}
+footer{border-top:1px solid var(--border);padding-top:20px;margin-top:6px;font-size:11.5px;color:var(--muted-2);}
+footer a{color:var(--blue-l);}
+@media(max-width:900px){.prosconswrap{grid-template-columns:1fr;}}
+</style>
+</head>
+<body>
+<a id="top"></a>
+<div class="wrap">
+
+<h1>대화창(콘솔) 자리 배치 — 시안</h1>
+<div class="subtitle">지금은 「아래 도킹 190px 고정 + ⧉ 창으로(선택)」입니다. 오늘 실측한 근거로 배치 4안을 비교하고 1개를 추천합니다.</div>
+<div class="keyline">핵심: 모니터가 가로냐 세로냐에 따라 "정답"이 반대로 뒤집힙니다 — 그래서 하나로 고정하지 않는 안을 추천합니다.</div>
+
+<div class="disclaimer">
+  이 페이지는 결정을 위한 <b>정지 그림</b>입니다. 버튼·토글처럼 보이는 요소(예: 머리줄의 [자동][아래][옆] 조각, ⧉ 창으로)는
+  <b>자리를 보여주기 위한 그림일 뿐 클릭해도 동작하지 않습니다.</b> 표 안의 자산명·IP·담당자 이름은 예시이며 실제 데이터가 아닙니다.
+  실제 화면 배치·구조는 <code>client/src/renderer/pages/app.html</code>·<code>console.js</code>·<code>main.ts</code>를 그대로 옮겼습니다.
+</div>
+
+<div class="pagenav">
+  <a href="#now">① 지금 상태</a>
+  <a href="#reco" class="star">★ 추천</a>
+  <a href="#opt1">선택지1 아래고정</a>
+  <a href="#opt2">선택지2 옆패널</a>
+  <a href="#opt3" class="star">선택지3 자동★</a>
+  <a href="#opt4">선택지4 분리창기본</a>
+  <a href="#numbers">숫자 비교표</a>
+  <a href="#detail">접기·최소폭·긴대화</a>
+  <a href="#src">근거 출처</a>
+</div>
+
+<!-- ══════════════════════════ 지금 상태 ══════════════════════════ -->
+<section id="now">
+  <h2>지금 상태</h2>
+  <div class="card">
+    <div class="now-grid">
+      <div class="now-item"><b>도킹(기본)</b>셸 아래에 가로로 붙어 <b style="color:#fff">190px 고정</b> 높이. 화면마다 그만큼 세로를 잃습니다.</div>
+      <div class="now-item"><b>⧉ 창으로</b>별도 OS 창으로 뺄 수 있습니다. 뺀 상태는 기억되어 다음 실행에도 유지됩니다.</div>
+      <div class="now-item"><b>같은 코드</b>도킹과 분리창은 <code>console.js</code> 한 파일을 그대로 씁니다 — 기능 차이가 없습니다.</div>
+      <div class="now-item"><b>오늘 고친 것</b>창으로 뺄 때 셸이 왼쪽으로 줄어들어 겹치지 않게 했습니다(자리가 없으면 안 옮깁니다 — 아래에서 이 안전장치를 그대로 보여드립니다).</div>
+    </div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ 추천 배너 ══════════════════════════ -->
+<section id="reco">
+  <div class="reco-banner">
+    <div class="star">★ 추천</div>
+    <h2>선택지 ③ — 창 너비로 자동 전환(오른쪽 패널 ↔ 아래 도킹) + 담당자가 언제든 수동 전환</h2>
+    <div class="sum">
+      창 너비가 <b>1600px 이상</b>이면 대화를 오른쪽 세로 패널로, <b>그 미만</b>이면 지금처럼 아래에 도킹합니다.
+      신호는 "창 너비" 하나뿐입니다 — 세로 모니터는 폭이 좁으니 자연히 도킹 쪽으로 걸립니다. 담당자가 자동판단이
+      마음에 안 들면 콘솔 머리줄에서 언제든 [아래]/[옆]으로 직접 바꿀 수 있습니다.
+    </div>
+    <div class="head-mock-note">아래는 이 제안이 실제로 어디에 붙는지 보여주는 그림입니다 — 지금 콘솔 머리줄(맥락칩 · 안내문 · ⧉ 창으로)의 <b style="color:#fff">오른쪽에 새 조각 하나</b>가 늘어납니다.</div>
+    <div class="head-mock">
+      <span class="chip">대시보드</span>
+      <span class="hint">보고 있는 화면 기준으로 지시합니다</span>
+      <span class="seg" title="그림 — 실제로 동작하지 않습니다"><span class="on">자동</span><span>⬓ 아래</span><span>▤ 옆</span></span>
+      <span class="btnmock">⧉ 창으로</span>
+    </div>
+    <ol>
+      <li><b>한쪽으로 고정하면 절반의 환경에서 나쁩니다.</b> 아래 도킹은 가로 모니터에서 세로 18% 손해, 옆 패널은 세로 모니터에서 본문이 428px로 줄어 표가 깨집니다(아래 ②·③ 카드에서 실측치로 증명). 자동전환은 두 손해를 모두 피합니다.</li>
+      <li><b>업계 관행(오른쪽 패널)을 조건부로만 받아들입니다.</b> VS Code Copilot Chat·Cursor·JetBrains AI Assistant 모두 오른쪽 세로 패널을 씁니다 — 하지만 셋 다 넓은 개발자 모니터 전제입니다. 이 제품은 세로 모니터(개발 머신 실측 1080×1920)까지 감당해야 하므로, "넓을 때만" 그 관행을 따르고 좁으면 검증된 현재 방식(도킹)을 유지합니다.</li>
+      <li><b>새 숫자를 만들지 않았습니다.</b> 패널 폭은 이미 코드에 있는 공식(<code>max(420, 폭×28%)</code>, main.ts L455)을 그대로 재사용했고, 1600 임계값은 Material Design 3의 Extra-large 시작점(1600, 다분할 레이아웃 권장)과 우리 계산(1600에서 본문 920px 확보)이 같은 지점에서 만나 정했습니다.</li>
+    </ol>
+  </div>
+
+  <div class="why">
+    <h3>왜 이렇게 정했나 (설명 블록)</h3>
+    <ul>
+      <li><b>오늘 실측한 사실:</b> 가로 1920×1080에서 아래 190px 도킹 = 세로의 17.6%(체감상 "18%") 손실. 세로 1080×1920(개발 머신 실측값)에서는 같은 190px이 세로의 9.9%뿐이라 훨씬 쌉니다. 반대로 옆에 두면 가로 모니터에선 괜찮지만(폭 28% 손실, 본문 1150px 남음), 세로 모니터에서는 폭 420px을 잃어 본문이 428px로 줄어 표가 안 들어갑니다.</li>
+      <li><b>그래서 방향이 다르면 정답도 반대로 뒤집힙니다.</b> 아래 도킹은 "세로 모니터에서 싸고, 옆 패널은 가로 모니터에서 좋다" — 겹치는 구간이 없습니다. 하나만 기본값으로 고정하면 나머지 절반의 환경에서는 계속 나쁜 선택이 됩니다.</li>
+      <li><b>신호는 창 너비 하나로 충분합니다.</b> 세로 모니터인지 가로 모니터인지 따로 안 물어봐도, 세로 모니터는 폭 자체가 좁아서(1080&lt;1600) 규칙에 자연히 걸립니다. 좁은 노트북 화면(1366·1440, 국내 기업에 흔한 해상도)도 같은 이유로 도킹 쪽에 남습니다 — "가로 모니터인데 폭이 좁은" 경우까지 정직하게 처리됩니다.</li>
+      <li><b>분리창을 기본값으로 하지 않는 이유(옵션④를 추천하지 않는 이유):</b> 오늘 고친 "겹치지 않게" 안전장치도 세로 모니터에서는 결국 "옮기지 않기"를 택합니다(옮긴 뒤 남는 폭 660px이 최소 기준 900px에 못 미치기 때문). 그 결과 분리창을 기본값으로 하면 세로 모니터 담당자는 <b>첫 실행부터 창이 겹친 채로</b> 시작합니다. 지금처럼 선택 사항(도킹 기본 + 필요하면 개인이 창으로)으로 남겨 두는 편이 안전합니다.</li>
+      <li><b>정직한 한계:</b> 자동전환도 세로 모니터에서는 여전히 도킹(190px, 약 4줄 노출)을 씁니다 — 폭(표)은 지키지만 대화를 길게 훑어보는 문제는 그대로 남습니다. 세로 모니터에서 대화를 크게 보려면 여전히 「⧉ 창으로」가 필요합니다. 자동전환은 "표가 깨지는 사고"를 막을 뿐, 모든 걸 해결하지는 않습니다.</li>
+    </ul>
+  </div>
+</section>
+
+<!-- ══════════════════════════ 범례 ══════════════════════════ -->
+<div class="legend">
+  <span><span class="sw" style="background:var(--panel-2);border:1px solid var(--border)"></span>회색 띠 = 사이드바(232px, 항상 고정)</span>
+  <span><span class="sw" style="background:rgba(59,130,246,.5)"></span>파란 띠 = 대화(콘솔) 자리</span>
+  <span><span class="sw" style="background:#0c1120;border:1px solid #384360"></span>진한 사각 = 앱 셸 창(실선 테두리)</span>
+  <span><span class="sw" style="background:repeating-linear-gradient(45deg,#e2483d 0 3px,#3b82f6 3px 6px)"></span>빗금 = 창이 완전히 겹침</span>
+  <span>점선 테두리 = 물리 모니터 경계(창이 여러 개일 때만)</span>
+  <span>도식은 실제 비율 그대로 <b style="color:#fff">1/6 축척</b>입니다(1920px→320px, 232px→39px)</span>
+</div>
+
+<!-- ══════════════════════════ 선택지 1 ══════════════════════════ -->
+<div class="opt-card" id="opt1">
+  <div class="opt-head"><span class="no">선택지 ①</span><h2>지금대로 — 아래 도킹 기본, 「창으로」는 선택</h2></div>
+  <div class="opt-sub">변경 없음. 콘솔이 셸 하단에 190px 고정으로 붙어 있고, 필요하면 담당자가 직접 「⧉ 창으로」를 눌러 뺍니다.</div>
+
+  <div class="diagrow">
+    <div class="diagcol">
+      <div class="mon" style="width:320px;height:180px;">
+        <div class="side"></div>
+        <div class="dockbar" style="height:32px;"><span class="tagin">대화 190px</span></div>
+      </div>
+      <div class="reslabel">1920 × 1080 <b>가로형(FHD, 가장 흔한 데스크톱)</b></div>
+      <div class="numline bad">세로 −190px(−17.6%) · 본문폭은 그대로 1688px</div>
+    </div>
+    <div class="diagcol">
+      <div class="mon" style="width:180px;height:320px;">
+        <div class="side"></div>
+        <div class="dockbar" style="height:32px;"><span class="tagin">대화 190px</span></div>
+      </div>
+      <div class="reslabel">1080 × 1920 <b>세로형(개발 머신 실측값)</b></div>
+      <div class="numline good">세로 −190px(−9.9%) · 본문폭은 그대로 848px</div>
+    </div>
+  </div>
+
+  <div class="prosconswrap">
+    <div class="pc good"><h4>장점</h4><ul>
+      <li>이미 구현되어 있음 — 변경 위험 0</li>
+      <li>창이 하나뿐이라 알트탭·창 목록 관리 부담이 없음</li>
+      <li>가로 폭을 항상 100% 쓴다 — 표·목록이 절대 안 깨짐</li>
+      <li>세로 모니터에서는 손실이 9.9%로 작음</li>
+    </ul></div>
+    <div class="pc bad"><h4>단점</h4><ul>
+      <li>가로 모니터에서 세로 17.6%(체감 18%) 손해</li>
+      <li>대화 노출 영역이 88px(약 4줄)뿐 — 길어지면 스크롤이 잦음</li>
+      <li>접는 손잡이가 없어(의도적 제거) 안 쓸 때도 항상 190px을 차지함</li>
+    </ul></div>
+  </div>
+  <div class="whenline">언제 좋은가: <b>세로로 긴 모니터</b>, 또는 <b>폭이 좁은 노트북 화면(1366px 이하)</b>처럼 표를 지키는 게 더 중요할 때.</div>
+</div>
+
+<!-- ══════════════════════════ 선택지 2 ══════════════════════════ -->
+<div class="opt-card" id="opt2">
+  <div class="opt-head"><span class="no">선택지 ②</span><h2>오른쪽 세로 패널(같은 창 안)</h2></div>
+  <div class="opt-sub">아래 대신 오른쪽에 세로로 붙입니다. 창은 지금처럼 하나. VS Code Copilot Chat·Cursor·JetBrains AI Assistant가 고른 방식입니다. <b style="color:var(--amber)">신규 구현 필요</b>(지금 코드에는 없음).</div>
+
+  <div class="diagrow">
+    <div class="diagcol">
+      <div class="mon" style="width:320px;height:180px;">
+        <div class="side"></div>
+        <div class="panelbar" style="width:90px;"><span class="tagin">대화 538px</span></div>
+      </div>
+      <div class="reslabel">1920 × 1080 <b>가로형(FHD)</b></div>
+      <div class="numline good">가로 −538px(−28.0%) · 본문 1150px 남음 · 세로 손실 0</div>
+    </div>
+    <div class="diagcol">
+      <div class="mon" style="width:180px;height:320px;">
+        <div class="side"></div>
+        <div class="panelbar" style="width:70px;"><span class="tagin">대화 420px</span></div>
+      </div>
+      <div class="reslabel">1080 × 1920 <b>세로형(개발 머신 실측값)</b></div>
+      <div class="numline bad">가로 −420px(−38.9%) · 본문 428px로 감소 ⚠표 깨짐(아래 실제 표 참고)</div>
+    </div>
+  </div>
+
+  <div class="realdemo" id="realdemo">
+    <div class="rdtitle">실제 폭 그대로 비교 — 세로 모니터에서 "옆 패널"을 쓰면 본문(표)이 이렇게 됩니다</div>
+    <div class="rd-box" style="width:428px;">
+      <table class="rd-table">
+        <thead><tr><th>호스트</th><th>IP</th><th>OS</th><th>패치상태</th><th>담당자</th></tr></thead>
+        <tbody>
+          <tr><td>WEB-01</td><td>10.20.1.11</td><td>Ubuntu 22.04</td><td>준수</td><td>김보안</td></tr>
+          <tr><td>DB-02</td><td>10.20.1.22</td><td>CentOS 7</td><td>2건 미조치</td><td>이현우</td></tr>
+          <tr><td>WAS-03</td><td>10.20.1.31</td><td>Windows Server 2019</td><td>준수</td><td>박지민</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="rd-cap bad">⚠ 폭 428px(세로 모니터의 실제 본문 폭) — 표가 넓어 가로 스크롤을 해야 "담당자" 열이 보입니다. (예시 데이터입니다.)</div>
+    <div class="rd-box" style="width:min(1150px,100%);">
+      <table class="rd-table">
+        <thead><tr><th>호스트</th><th>IP</th><th>OS</th><th>패치상태</th><th>담당자</th></tr></thead>
+        <tbody>
+          <tr><td>WEB-01</td><td>10.20.1.11</td><td>Ubuntu 22.04</td><td>준수</td><td>김보안</td></tr>
+          <tr><td>DB-02</td><td>10.20.1.22</td><td>CentOS 7</td><td>2건 미조치</td><td>이현우</td></tr>
+          <tr><td>WAS-03</td><td>10.20.1.31</td><td>Windows Server 2019</td><td>준수</td><td>박지민</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="rd-cap good">✓ 폭 1150px(가로 모니터의 실제 본문 폭) — 스크롤 없이 다섯 열이 모두 여유 있게 보입니다.</div>
+    <div style="font-size:10.6px;color:var(--muted-2)">참고: 실제로 콘솔 안 markdown 표도 좁아지면 이렇게 가로 스크롤을 줍니다(<code>console.js</code> — <code>display:block;overflow-x:auto</code>) — 가상의 문제가 아니라 우리 제품 코드가 이미 그렇게 동작합니다.</div>
+  </div>
+
+  <div class="prosconswrap">
+    <div class="pc good"><h4>장점</h4><ul>
+      <li>대화가 창 전체 높이를 쓴다 — 표시 영역이 도킹의 88px 대비 훨씬 큼(아래 "긴 대화" 표 참고, 최대 10배 이상)</li>
+      <li>VS Code·Cursor·JetBrains 공통 관행 — 다른 도구에 이미 익숙한 담당자에게 낯설지 않음</li>
+      <li>창이 하나뿐이라 옵션④ 같은 창 겹침·분실 문제가 없음</li>
+    </ul></div>
+    <div class="pc bad"><h4>단점</h4><ul>
+      <li>세로 모니터에서 본문이 428px로 줄어 표가 깨짐(실측)</li>
+      <li>신규 구현 필요 — 셸 그리드 재구성, 드래그 리사이즈, 접기 로직 추가</li>
+      <li>항상 옆에 있으면 가로 모니터라도 노트북급 폭(1366 이하)에서는 본문이 714px까지 좁아짐</li>
+    </ul></div>
+  </div>
+  <div class="whenline">언제 좋은가: <b>가로로 넓은 모니터(FHD 이상)</b>를 쓰고, 대화를 자주 길게 이어가는 담당자.</div>
+</div>
+
+<!-- ══════════════════════════ 선택지 3 (추천) ══════════════════════════ -->
+<div class="opt-card reco" id="opt3">
+  <div class="ribbon">★ 추천</div>
+  <div class="opt-head"><span class="no">선택지 ③</span><h2>화면 비율에 따라 자동(+ 담당자가 언제든 수동 전환)</h2></div>
+  <div class="opt-sub">창 너비 ≥1600px이면 오른쪽 패널(②와 동일), 그 미만이면 아래 도킹(①과 동일). 콘솔 머리줄에 [자동]/[아래]/[옆] 전환을 추가합니다. <b style="color:var(--amber)">①+②를 모두 구현 + 자동판정 로직 필요</b>.</div>
+
+  <div class="diagrow">
+    <div class="diagcol">
+      <div class="whybadge">폭 1920 ≥ 1600 → 옆 패널 자동 선택</div><span class="samebadge">= 선택지②와 동일</span>
+      <div class="mon" style="width:320px;height:180px;">
+        <div class="side"></div>
+        <div class="panelbar" style="width:90px;"><span class="tagin">대화 538px</span></div>
+      </div>
+      <div class="reslabel">1920 × 1080 <b>가로형(FHD)</b></div>
+      <div class="numline good">가로 −538px(−28.0%) · 본문 1150px · 세로 손실 0</div>
+    </div>
+    <div class="diagcol">
+      <div class="whybadge">폭 1080 &lt; 1600 → 아래 도킹 자동 선택</div><span class="samebadge">= 선택지①과 동일</span>
+      <div class="mon" style="width:180px;height:320px;">
+        <div class="side"></div>
+        <div class="dockbar" style="height:32px;"><span class="tagin">대화 190px</span></div>
+      </div>
+      <div class="reslabel">1080 × 1920 <b>세로형(개발 머신 실측값)</b></div>
+      <div class="numline good">세로 −190px(−9.9%) · 본문폭 그대로 848px</div>
+    </div>
+  </div>
+
+  <div class="prosconswrap">
+    <div class="pc good"><h4>장점</h4><ul>
+      <li>두 손해(가로 18% / 세로 표깨짐)를 모두 피함 — "하나로 고정하면 절반이 나쁘다"는 문제의 근본 해결</li>
+      <li>신호가 창 너비 하나뿐 — 규칙이 단순(세로 모니터인지 따로 안 물어도 폭이 좁아 자연히 걸림)</li>
+      <li>수동 전환을 남겨 둬 자동판단이 안 맞다고 느끼면 담당자가 즉시 되돌릴 수 있음</li>
+    </ul></div>
+    <div class="pc bad"><h4>단점</h4><ul>
+      <li>①+②를 모두 구현해야 해서 코드가 가장 많음(자동판정 로직 + 양쪽 레이아웃 + 수동 상태 저장)</li>
+      <li>창 크기를 1600 경계 근처로 계속 오가면 배치가 왔다갔다 할 수 있음(디바운스 등 보완 필요)</li>
+      <li>세로 모니터에서는 여전히 4줄만 보임 — 긴 대화 문제는 해결 안 됨(정직한 한계, 위 "왜" 참고)</li>
+    </ul></div>
+  </div>
+  <div class="whenline">언제 좋은가: <b>담당자 PC 환경이 다양하거나</b>(노트북↔외장 모니터, 세로 모니터 등) 배포 초기라 <b>모니터를 특정할 수 없을 때</b> — 즉 지금 이 제품의 상황.</div>
+</div>
+
+<!-- ══════════════════════════ 선택지 4 ══════════════════════════ -->
+<div class="opt-card" id="opt4">
+  <div class="opt-head"><span class="no">선택지 ④</span><h2>별도 창을 기본으로 — 첫 실행부터 두 창 나란히</h2></div>
+  <div class="opt-sub">지금 있는 「⧉ 창으로」 기능을 <b>기본값</b>으로 바꾸는 안입니다(코드는 이미 있음 — 시작 시 자동으로 한 번 실행). 오늘 고친 "겹치지 않게" 안전장치가 그대로 적용됩니다.</div>
+
+  <div class="diagrow">
+    <div class="diagcol">
+      <div class="screen" style="width:320px;height:180px;">
+        <div class="winbox shell" style="left:0;width:228px;"><div class="side"></div></div>
+        <div class="winbox consolewin" style="left:232px;width:88px;"><span class="tagin">대화창<br>538px</span></div>
+      </div>
+      <div class="reslabel">1920 × 1080 <b>가로형(FHD)</b></div>
+      <div class="numline good">셸 1382px로 자동 축소(오늘 수정) · 안 겹침 · 본문 1150px</div>
+    </div>
+    <div class="diagcol">
+      <div class="screen" style="width:180px;height:320px;">
+        <div class="winbox shell" style="left:0;width:180px;"><div class="side"></div></div>
+        <div class="winbox consolewin overlap" style="left:110px;width:70px;"><span class="tagin" style="color:#fff">⚠ 완전 겹침<br>420px</span></div>
+      </div>
+      <div class="reslabel">1080 × 1920 <b>세로형(개발 머신 실측값)</b></div>
+      <div class="numline bad">셸을 안 옮김(옮기면 660px&lt;최소 900px) → 대화창이 셸 위에 그대로 덮임</div>
+    </div>
+  </div>
+
+  <div class="prosconswrap">
+    <div class="pc good"><h4>장점</h4><ul>
+      <li>모니터가 2대 이상이면 최고 — 대화창을 아예 다른 모니터로 보내고 양쪽 다 100%로 씀</li>
+      <li>창 관리(최소화·이동)가 OS 표준 방식이라 새로 배울 게 없음</li>
+      <li>가로 모니터 1대에서는 옵션②와 수치상 동일한 결과(본문 1150px, 안 겹침)</li>
+    </ul></div>
+    <div class="pc bad"><h4>단점</h4><ul>
+      <li>모니터 1대·세로형이면 <b>첫 실행부터 창이 겹친 채로 시작</b>(안전장치가 "옮기지 않기"를 택하기 때문)</li>
+      <li>창이 2개라 알트탭·작업표시줄이 붐빔(그래서 🗔 창 목록 기능이 이미 별도로 필요했음)</li>
+      <li>분리창 다루는 법(닫으면 다시 도킹, 열린 창 목록 등)을 담당자가 배워야 함</li>
+    </ul></div>
+  </div>
+  <div class="whenline">언제 좋은가: <b>이미 모니터 2대 이상</b>을 쓰는 담당자, 특히 대화창을 계속 띄워 두고 싶은 경우. (지금도 「⧉ 창으로」로 도달 가능 — ④는 이걸 <b>기본값</b>으로 바꾸는 것뿐입니다.)</div>
+</div>
+
+<!-- ══════════════════════════ 숫자 비교표 ══════════════════════════ -->
+<section id="numbers">
+  <h2>숫자로 보는 비교</h2>
+  <div class="card">
+    <table class="cmp">
+      <tr><th>배치</th><th>가로 1920×1080</th><th>세로 1080×1920(개발 머신)</th></tr>
+      <tr><td><b>① 아래 고정(지금 기본)</b></td><td>세로 <b>−190px(−17.6%)</b> · 본문폭 그대로 1688px</td><td>세로 <b>−190px(−9.9%)</b> · 본문폭 그대로 848px</td></tr>
+      <tr><td><b>② 오른쪽 세로 패널</b></td><td>가로 <b>−538px(−28.0%)</b> · 본문 1150px</td><td>가로 <b>−420px(−38.9%)</b> · 본문 <span style="color:#f5928a">428px ⚠표 깨짐</span></td></tr>
+      <tr style="background:rgba(30,185,128,.06)"><td><b>③ 자동전환(추천)</b></td><td>= ②(옆 패널, 폭≥1600)</td><td>= ①(아래 도킹, 폭&lt;1600)</td></tr>
+      <tr><td><b>④ 분리창을 기본으로</b></td><td>가로 <b>−538px(−28.0%)</b> · 안 겹침(셸 1382로 축소)</td><td>셸 안 옮김 · 대화창이 우측 <span style="color:#f5928a">420px 완전히 겹침</span>(최소폭 900 미달)</td></tr>
+    </table>
+    <div style="font-size:10.8px;color:var(--muted-2);margin-top:10px">기준: 사이드바 232px 고정, 팝업 폭 공식 <code>max(420, 창너비×28%)</code>(main.ts 실측), 셸 최소폭 900px 미만이면 옮기지 않음(layout.ts 실측). 작업표시줄·타이틀바(46px)는 제외한 근사치입니다.</div>
+
+    <h3>왜 1600인가 — 흔한 해상도로 확인</h3>
+    <table class="res">
+      <tr><th>해상도</th><th>폭</th><th>1600 기준</th><th>선택지③의 배치</th></tr>
+      <tr><td>3440×1440(울트라와이드)</td><td>3440</td><td class="pass">≥1600</td><td>옆 패널 · 본문 2245px</td></tr>
+      <tr><td>2560×1440(QHD)</td><td>2560</td><td class="pass">≥1600</td><td>옆 패널 · 본문 1611px</td></tr>
+      <tr><td>1920×1080(FHD, 가장 흔한 데스크톱)</td><td>1920</td><td class="pass">≥1600</td><td>옆 패널 · 본문 1150px</td></tr>
+      <tr><td>1600×900</td><td>1600</td><td class="pass">경계(=1600)</td><td>옆 패널 · 본문 920px</td></tr>
+      <tr><td>1440×900(구형 노트북)</td><td>1440</td><td class="fail">&lt;1600</td><td>아래 도킹 · 본문 1208px(사이드바만 뺀 값)</td></tr>
+      <tr><td>1366×768(국내 기업 흔한 노트북)</td><td>1366</td><td class="fail">&lt;1600</td><td>아래 도킹 · 본문 1134px</td></tr>
+      <tr><td>1080×1920(세로, 개발 머신 실측)</td><td>1080</td><td class="fail">&lt;1600</td><td>아래 도킹 · 본문 848px</td></tr>
+    </table>
+    <div style="font-size:10.8px;color:var(--muted-2);margin-top:8px">1600은 Google Material Design 3 창 크기 등급의 <b style="color:#cfd6e6">Extra-large 시작점</b>과 같습니다(그 아래 Large는 1200~1599) — "이 폭부터 다분할·사이드 패널 레이아웃을 권장"이라는 공인된 전환점이 우리 계산(1600에서 본문 920px 확보)과 같은 자리에서 만납니다.</div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ 접기/최소폭/긴대화 ══════════════════════════ -->
+<section id="detail">
+  <h2>접기·펼치기 / 최소 폭 / 대화가 길어지면</h2>
+  <div class="card">
+    <h3>접기·펼치기</h3>
+    <ul style="margin:0 0 0 18px;padding:0;font-size:12.3px;">
+      <li style="margin-bottom:7px"><b style="color:#fff">지금:</b> 도킹 콘솔에는 접는 손잡이가 없습니다 — 일부러 뺐습니다("끄는 동안 아래 iframe이 매번 다시 그려져 버벅였다", app.html 주석). 유일한 "치우기"는 「⧉ 창으로」뿐이라, "잠깐 안 보이게"와 "아예 다른 자리로 옮기기"가 지금은 같은 조작으로 묶여 있습니다.</li>
+      <li style="margin-bottom:7px"><b style="color:#fff">제안(②·③의 옆 패널에 한해):</b> 패널 왼쪽 가장자리에 접기 화살표(‹)를 두어, 접으면 44px 아이콘 레일(안읽음 표시만)로 줄고, 펼치면 원래 폭으로 돌아오는 방식을 추가로 제안합니다. "잠깐 안 보이게"와 "창으로 완전히 빼기"를 구분할 수 있게 됩니다.</li>
+    </ul>
+
+    <h3>최소 폭</h3>
+    <ul style="margin:0 0 0 18px;padding:0;font-size:12.3px;">
+      <li style="margin-bottom:7px"><b style="color:#fff">지금 분리창:</b> 가로 최소 360px · 세로 최소 320px(main.ts 실측, 이보다 못 줄임).</li>
+      <li style="margin-bottom:7px"><b style="color:#fff">옆 패널(제안):</b> 같은 최소치(360px)를 물려받는 걸 제안합니다 — 그 아래로는 입력칸+전송 버튼이 한 줄에 안 들어갑니다.</li>
+    </ul>
+
+    <h3>대화가 길어지면</h3>
+    <ul style="margin:0 0 0 18px;padding:0;font-size:12.3px;">
+      <li style="margin-bottom:7px"><b style="color:#fff">자리와 무관한 공통 규칙</b>(도킹·창 모두 <code>console.js</code> 한 코드): 최근 40개 말풍선만 유지하고 그 이상은 오래된 것부터 삭제합니다(<code>CL_MAX=40</code>). 답 하나가 140자를 넘으면 자동으로 접혀 "더보기"가 붙습니다(<code>CLAMP_LEN=140</code>). 이 두 규칙은 패널을 아무리 키워도 안 바뀝니다.</li>
+      <li style="margin-bottom:7px"><b style="color:#fff">자리에 따라 바뀌는 건 "한 번에 보이는 줄 수"뿐입니다.</b> 아래 막대는 실제 배분값 기준 비교입니다.</li>
+    </ul>
+    <div class="barcmp">
+      <div class="barrow"><span class="barlabel">① 아래 도킹 — 대화 표시 영역</span><div class="bartrack"><div class="barfill" style="width:9%"></div></div><span class="barval">88px · 약 4줄</span></div>
+      <div class="barrow"><span class="barlabel">② 옆 패널·④ 분리창(가로 1080 높이 기준)</span><div class="bartrack"><div class="barfill full" style="width:100%"></div></div><span class="barval">약 900px · 약 40줄</span></div>
+    </div>
+    <div style="font-size:12px;margin-top:4px">→ 옆 패널·분리창은 도킹보다 <b style="color:var(--teal)">약 10배</b> 더 많은 대화가 한 번에 보입니다(스크롤 횟수가 그만큼 줄어듭니다).</div>
+    <div class="whenline" style="margin-top:14px">정직한 한계: <b>③(자동전환)을 쓰는 세로 모니터 담당자</b>는 표는 지키지만 여전히 4줄만 보입니다 — 긴 대화를 훑어보려면 그래도 「⧉ 창으로」가 필요합니다. 이건 숨길 부분이 아니라 밝혀 둡니다.</div>
+  </div>
+</section>
+
+<!-- ══════════════════════════ 마무리 ══════════════════════════ -->
+<section id="src">
+  <h2>결정해 주시면</h2>
+  <div class="card">
+    <div style="font-size:12.5px;margin-bottom:14px">
+      이 중 하나(추천은 <b style="color:var(--teal)">③ 자동전환</b>)를 골라 주시면 구현은 별도로 진행합니다.
+      시안 단계에서는 <code>client/</code>·<code>server/</code> 등 제품 코드를 전혀 바꾸지 않았습니다.
+    </div>
+    <h3>근거 출처</h3>
+    <div class="srclist">
+      <b>내부(가장 우선)</b> — client/src/renderer/pages/app.html(도킹 190px·232px 사이드바 계산 주석) ·
+      client/src/main.ts(팝업 폭 공식·최소창크기·타이틀바 46px) ·
+      client/src/util/layout.ts(셸옮길자리, 최소폭 900) ·
+      client/src/renderer/pages/console.js(도킹/창 공용 코드, 40개 제한, 140자 클램프, 표 overflow-x)<br>
+      <b>외부</b> —
+      <a href="https://github.com/microsoft/vscode-copilot-release/issues/1434" target="_blank" rel="noopener">VS Code Copilot Chat — Secondary Side Bar 이전(GitHub Issue #1434)</a> ·
+      Cursor 커뮤니티 포럼(forum.cursor.com) 우측 채팅 패널 관련 스레드 다수 ·
+      <a href="https://www.jetbrains.com/help/ai-assistant/ai-chat.html" target="_blank" rel="noopener">JetBrains AI Assistant — AI Chat 공식 문서</a> ·
+      <a href="https://learn.microsoft.com/en-us/windows/apps/design/layout/screen-sizes-and-breakpoints-for-responsive-design" target="_blank" rel="noopener">Microsoft — Windows Apps 반응형 브레이크포인트</a> ·
+      <a href="https://m3.material.io/foundations/layout/breakpoints/overview" target="_blank" rel="noopener">Google Material Design 3 — 창 크기 등급(Window size classes)</a>
+    </div>
+  </div>
+  <footer>
+    쉬운 말 풀이 — <b>브레이크포인트</b>: 화면(창) 폭이 어느 지점을 넘으면 배치를 바꾸는 기준선. <b>워크에어리어(work area)</b>: 작업표시줄 등을 뺀, 앱이 실제로 쓸 수 있는 화면 영역. <b>도킹</b>: 창에 딸려 붙어 있는 상태(따로 안 뜸). &nbsp;·&nbsp; <a href="#top">↑ 맨 위로</a>
+  </footer>
+</section>
+
+</div>
+</body>
+</html>

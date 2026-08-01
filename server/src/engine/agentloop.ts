@@ -473,6 +473,16 @@ function forcedToolFor(instruction: string, scope?: ToolScope): { tool: string; 
   // "가장 급한 취약점 담당자·기한 배정해줘"처럼 배정/지정 지시면 우선순위 조회(today)로 못박지 않는다
   // — LLM이 assign_finding(쓰기)을 고르도록 둔다(실측: today 강제가 배정 명령까지 흡수했었음).
   const isAssign = /배정|담당자\s*(를|을|.{0,2})?(지정|정해|배치|맡|줘|넣)|기한\s*(을|를)?\s*(지정|정해|설정|잡)|맡겨|배치해줘/.test(instruction);
+  // ★ "○○ 완료" — 할 일을 끝냈다는 말은 **코드로 못 박는다**(2026-08-01, 콘솔 이관).
+  //   실측: 7B가 이 말을 도구로 안 잇고 RAG로 새어 "완료했습니다" + 엉뚱한 절차를 지어냈다.
+  //   담당자가 끝냈다고 말했는데 아무것도 안 닫히고 거짓 확인만 받는 것이라 그냥 두면 안 된다.
+  //   도구 설명을 늘리는 방식은 이 저장소에서 반복해 실패했다(CLAUDE.md — 7B는 코드로 잡는다).
+  //   ⚠ 취약점·점검 상태를 바꾸는 말과 섞이면 안 된다 — 그건 update_finding_status의 몫이다.
+  const 할일완료 = instruction.match(/^(.{2,60}?)\s*(?:완료(?:했|됐|야|입니다)?|끝냈(?:어|다|습니다)|다\s*했(?:어|다|습니다))\s*$/);
+  if (할일완료 && available.has("complete_task") && !/취약점|점검|자산|CVE|배정/i.test(instruction)) {
+    return { tool: "complete_task", args: { task: 할일완료[1].trim() } };
+  }
+
   for (const f of FORCED_INTENTS) {
     if (f.re.test(instruction) && available.has(f.tool)) {
       if (f.tool === "today" && isAssign) continue; // 배정 지시는 today로 강제하지 않음

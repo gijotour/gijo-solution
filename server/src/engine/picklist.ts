@@ -136,9 +136,16 @@ const WORK_ASK_RE = /(내\s*업무|내\s*할\s*일|오늘\s*할\s*일|오늘\s*�
 //   답 자체는 멀쩡해서 어떤 검사에도 안 걸린다 — 물은 것과 다른 답이라는 게 문제다.
 const WORK_BLOCK_RE = /(취약점|자산|보고서|리포트|설정|계정|인증|열쇠|백업|어떻게|방법|화면|메뉴|페이지|하는\s*곳)/;
 
+// ★ **하라는 말은 비켜 준다**(2026-08-01, 콘솔 이관). "할 일 추가: ○○" · "○○ 완료"는
+//   목록을 보여 달라는 게 아니라 **시키는 말**이다. 여기서 가로채면 담기·완료 도구가
+//   영영 안 불리고, 모델이 "완료했습니다"라고 지어낸다(실측으로 확인함).
+//   대화창에서 업무를 끝내는 것이 이 제품의 핵심이라 이 갈림이 중요하다.
+const WORK_DO_RE = /(추가|담아|적어|넣어|등록|완료|끝냈|끝났|다\s*했|처리했|지워|삭제|없애)/;
+
 export function isMyWorkAsk(text: string): boolean {
   const t = String(text ?? "");
   if (WORK_BLOCK_RE.test(t)) return false;
+  if (WORK_DO_RE.test(t)) return false; // 시키는 말 → 도구(add_task·complete_task)로
   return WORK_ASK_RE.test(t);
 }
 
@@ -176,7 +183,21 @@ export function myWorkAnswer(p: { today: WorkLike[]; week: WorkLike[]; later: Wo
   };
   const 절 = (제목: string, xs: WorkLike[]) => (xs.length ? `\n\n**${제목}** (${xs.length})\n${xs.map(줄).join("\n")}` : "");
   const 머리 = `남은 일 **${전부.length}건**${지남 ? ` — 그중 기한 지남 ${지남}건` : ""}${p.counts?.doneToday ? ` · 오늘 끝낸 일 ${p.counts.doneToday}건` : ""}`;
-  const output = 머리 + 절("오늘", 오늘) + 절("이번 주", 이번주) + 절("나중에", 나중);
+
+  // ★ 「지금 이거」 — 담당자가 **고르지 않아도 되게** 하나를 집어 맨 앞에 둔다
+  //   (2026-08-01 시안 승인 · 「내 업무」 화면을 없애고 대화창에서 하는 첫 조각).
+  //   손대던 것이 있으면 그것부터 — 하던 일을 잃지 않는 게 먼저다(옛 화면의 규칙 그대로).
+  //   ⚠ 순서는 여기서 **규칙으로** 정한다. 모델이 고르면 담당자가 근거를 못 되짚는다.
+  const 진행중 = 오늘.filter((t) => (t.guideDoneCount ?? 0) > 0 && (t.guideDoneCount ?? 0) < (t.guideTotal ?? 0));
+  const 지금 = 진행중[0] ?? 오늘[0] ?? 이번주[0] ?? null;
+  const 지금줄 = 지금
+    ? `\n\n**▶ 지금 이거** — ${지금.text}` +
+      (지금.overdue ? " ⚠ 기한 지남" : "") +
+      (지금.guideTotal ? ` · 순서 ${지금.guideDoneCount ?? 0}/${지금.guideTotal}` : "") +
+      `\n  "${지금.text} 어떻게 해?"라고 물으면 순서를 알려드립니다 · 끝냈으면 "${지금.text} 완료"`
+    : "";
+
+  const output = 머리 + 지금줄 + 절("오늘", 오늘) + 절("이번 주", 이번주) + 절("나중에", 나중);
 
   // 체크칸은 방금 그린 그 줄들에서 직접 만든다(글자 대조로 되찾지 않는다).
   const items: PickItem[] = 전부.slice(0, MAX_PICK).map((t) => ({

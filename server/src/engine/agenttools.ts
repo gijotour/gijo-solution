@@ -48,6 +48,9 @@ import { listAudit, type AuditEntry } from "./audit";
 import { lawAnswer, getLawConfig, type LawTarget } from "./lawinfo";
 // 담당자가 "미조치"라고 하면 저장값 open·pending을 뜻한다 — 글자 그대로 대조하면 늘 0건이다.
 import { 필터에맞나 } from "./statuswords";
+// 내 업무(할 일) — 화면을 없애고 대화창에서 한다(2026-08-01 사용자 결정).
+import { listTasks, createTask, completeTask } from "./tasks";
+import type { MyWorkItem } from "./mywork";
 
 export interface AgentToolParam {
   name: string;
@@ -1363,6 +1366,43 @@ async function runKpiStatus(): Promise<string> {
 }
 
 // 작업 세션(대화 세션형, sessions.html) 현황 — 최근 대화 이력을 챗봇이 그대로 알 수 있게 한다.
+// ── 내 업무(할 일) — 화면을 없애고 대화창에서 한다 ─────────────────────────
+//
+// 사용자 지시(2026-08-01): "내업무 메뉴는 삭제하고 그안에 있는 모든 내용은 대화창에서
+// 처음부터 나오고 선택하고 해당 대화창에서 모든 업무를 했으면 좋겠어" +
+// "메뉴는 보기용도, 대화창에서 입력 및 설정 다 한다가 핵심 기능".
+//
+// ⚠ 순서는 **서버가 정한다**(mywork.buildMyWork). AI가 우선순위를 지어내면 담당자가
+//   그 근거를 되짚을 수 없다 — 오늘 할 일은 규칙으로 계산하고 모델은 문장만 다듬는다.
+
+function runCompleteTask(args: Record<string, string>): string {
+  const 말 = (args.task ?? "").trim();
+  if (!말) return "어떤 일을 끝내셨는지 알려주세요 — 예: \"방화벽 점검 완료\"";
+  const 열린것 = listTasks().filter((t) => !t.done);
+  const hit =
+    열린것.find((t) => t.text === 말) ??
+    열린것.find((t) => t.text.replace(/\s/g, "").includes(말.replace(/\s/g, "")));
+  if (!hit) {
+    return `전체 ${열린것.length}건 중 "${말}"에 맞는 할 일을 못 찾았습니다. "오늘 할 일"이라고 물어 목록부터 보세요.`;
+  }
+  completeTask(hit.id);
+  // 되돌릴 길을 함께 준다 — 결재판 없이 즉시 처리하는 대신 **되돌리기가 있어야** 안심된다.
+  return `"${hit.text}" 완료로 옮겼습니다.\n▸ 되돌리려면 "${hit.text} 다시 열어줘"`;
+}
+
+function runAddTask(args: Record<string, string>): string {
+  const 글 = (args.text ?? "").trim();
+  if (!글) return "무엇을 담을지 알려주세요 — 예: \"할 일 추가: 방화벽 정책 점검\"";
+  const 기한말 = (args.due ?? "").trim();
+  const DAY = 86400000;
+  const dueAt =
+    /오늘|today/.test(기한말) ? Date.now() :
+    /이번\s*주|주간|week/.test(기한말) ? Date.now() + 6 * DAY :
+    undefined;
+  const t = createTask({ text: 글, ...(dueAt ? { dueAt } : {}) });
+  return `"${t.text}"를 오늘 할 일에 담았습니다.${dueAt ? "" : " (기한은 안 정했습니다)"}\n▸ 끝내면 "${t.text} 완료"`;
+}
+
 function runWorkSessionStatus(args: Record<string, string>): string {
   const sessions = listWorkSessions();
   if (!sessions.length) return "작업 내역이 없습니다.";
@@ -1687,6 +1727,39 @@ const TOOLS: AgentTool[] = [
     directAnswer: true,
     params: [],
     run: runKpiStatus,
+  },
+  // ── 내 업무(할 일) 3종 ────────────────────────────────────────────────
+  // 결재판 경계(2026-08-01 사용자 승인): **나에게만 영향**을 주는 것(완료·담기)은 결재판 없이
+  // 즉시 처리하고 되돌릴 길을 준다. 체크칸 하나에도 승인 팝업이 뜨면 아무도 안 쓴다.
+  // **남에게 영향**을 주는 것(담당자 재배정)만 결재판을 거친다 — 그건 assign_finding이 이미 한다.
+  // ⚠ my_tasks 도구는 넣었다가 **뺐다**(2026-08-01 실측). 조회는 picklist.ts의 결정적 경로가
+  //   이미 맡고 있어서(isMyWorkAsk) 도구가 영영 안 불렸다 — 두 길이 같은 일을 하면 반드시
+  //   어긋난다. 「지금 이거」는 그쪽 목록 맨 앞에 얹었다.
+  //   여기 남은 둘은 **시키는 말**(담기·완료)이라 도구가 맞다.
+  {
+    name: "complete_task",
+    label: "할 일 완료",
+    domain: "cross",
+    write: false, // ★ 나에게만 영향 — 결재판 없이 즉시, 대신 되돌리는 말을 함께 준다
+    description:
+      '내 할 일 하나를 완료로 옮긴다. "○○ 완료", "○○ 끝냈어", "○○ 다 했어"에 쓴다. 예: {"task":"방화벽 정책 점검"}',
+    directAnswer: true,
+    params: [{ name: "task", label: "할 일", description: "끝낸 할 일의 이름(일부만 적어도 된다)", required: true }],
+    run: runCompleteTask,
+  },
+  {
+    name: "add_task",
+    label: "할 일 담기",
+    domain: "cross",
+    write: false, // ★ 나에게만 영향 — 즉시 담고, 잘못 담았으면 완료로 지우면 된다
+    description:
+      '내 할 일에 하나 담는다. "할 일 추가: ○○", "○○ 담아줘", "○○ 잊지 않게 적어줘"에 쓴다. 예: {"text":"방화벽 정책 점검","due":"오늘"}',
+    directAnswer: true,
+    params: [
+      { name: "text", label: "할 일", description: "담을 일의 내용", required: true },
+      { name: "due", label: "기한", description: "오늘 · 이번 주 (선택, 비우면 기한 없음)", required: false },
+    ],
+    run: runAddTask,
   },
   {
     name: "work_session_status",
