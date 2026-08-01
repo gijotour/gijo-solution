@@ -49,7 +49,9 @@ import { lawAnswer, getLawConfig, type LawTarget } from "./lawinfo";
 // 담당자가 "미조치"라고 하면 저장값 open·pending을 뜻한다 — 글자 그대로 대조하면 늘 0건이다.
 import { 필터에맞나 } from "./statuswords";
 // 내 업무(할 일) — 화면을 없애고 대화창에서 한다(2026-08-01 사용자 결정).
-import { listTasks, createTask, completeTask } from "./tasks";
+import { listTasks, createTask, completeTask, setGuideStepDone } from "./tasks";
+import { buildMyWork } from "./mywork";
+import { getGuide as 가이드가져오기 } from "./workguide";
 import type { MyWorkItem } from "./mywork";
 
 export interface AgentToolParam {
@@ -1375,13 +1377,127 @@ async function runKpiStatus(): Promise<string> {
 // ⚠ 순서는 **서버가 정한다**(mywork.buildMyWork). AI가 우선순위를 지어내면 담당자가
 //   그 근거를 되짚을 수 없다 — 오늘 할 일은 규칙으로 계산하고 모델은 문장만 다듬는다.
 
-function runCompleteTask(args: Record<string, string>): string {
+/**
+ * 열린 할 일 중에서 담당자가 말한 것을 찾는다 — 완료·절차·단계가 같은 규칙을 쓴다.
+ *
+ * ⚠ 셋이 각자 찾으면 "완료는 되는데 절차는 못 찾는" 어긋남이 생긴다(이 저장소 반복 사례).
+ */
+function 열린할일찾기(말: string): { hit: ReturnType<typeof listTasks>[number] | undefined; 열린것: ReturnType<typeof listTasks> } {
+  const 열린것 = listTasks().filter((t) => !t.done);
+  const 납작 = (s: string) => s.replace(/\s/g, "");
+  const hit = 열린것.find((t) => t.text === 말) ??
+    열린것.find((t) => 납작(t.text).includes(납작(말))) ??
+    열린것.find((t) => 납작(말).includes(납작(t.text)));
+  return { hit, 열린것 };
+}
+
+/**
+ * 목록에는 보이는데 tasks에는 없는 것 — **아직 안 담은 AI 제안**을 찾아 담는다.
+ *
+ * ★ 2026-08-01 실측으로 드러난 구멍: 목록 맨 앞 「지금 이거」가 AI 제안일 때가 있는데,
+ *   목록은 "○○ 어떻게 해?"라고 물으라 안내한다. 그런데 tasks에만 있는 걸 찾으니 늘 못 찾았다
+ *   — 담당자 눈엔 "방금 보여준 걸 모른다"로 보인다. 화면에서는 「내 업무에 담기」 버튼이
+ *   이 일을 했다. 대화창에는 버튼이 없으니 **묻는 순간 담고, 담았다고 말한다**(조용히 하지 않는다).
+ */
+async function 제안담기(말: string): Promise<ReturnType<typeof listTasks>[number] | null> {
+  const 납작 = (s: string) => s.replace(/\s/g, "");
+  let p: Awaited<ReturnType<typeof buildMyWork>>;
+  try { p = await buildMyWork(); } catch { return null; }
+  const 후보 = [...p.today, ...p.week, ...p.later].filter((i) => !i.saved);
+  const 제안 = 후보.find((i) => i.text === 말) ??
+    후보.find((i) => 납작(i.text).includes(납작(말))) ??
+    후보.find((i) => 납작(말).length >= 4 && 납작(말).includes(납작(i.text)));
+  if (!제안) return null;
+  // 화면이 지키던 규칙 그대로 — AI 제안은 기한을 오늘로 잡는다(안 그러면 '나중에'로 밀려
+  // 담자마자 오늘 목록에서 사라진다).
+  createTask({ text: 제안.text, ref: 제안.ref, origin: 제안.origin, dueAt: 제안.dueAt ?? Date.now() });
+  return listTasks().find((t) => !t.done && t.text === 제안.text) ?? null;
+}
+
+/** 절차 카드 한 장 — 끝낸 단계·지금 할 단계·남은 단계를 한눈에. */
+function 절차카드(t: ReturnType<typeof listTasks>[number]): string {
+  const g = 가이드가져오기(t.guideKey);
+  // ★ 순서를 **지어내지 않는다**. 가이드가 없으면 없다고 말하고 물어볼 말을 준다
+  //   (mywork.html이 지키던 원칙 — 화면을 없애면서 같이 잃으면 안 된다).
+  if (!g) {
+    return `"${t.text}"에는 정해진 절차가 없습니다.\n` +
+      `▸ 이 일이 무엇인지 물어보시면 아는 만큼 답합니다 — 예: "${t.text} 뭐부터 봐야 해?"\n` +
+      `▸ 끝내셨으면 "${t.text} 완료"`;
+  }
+  const 끝난 = new Set(t.guideDone ?? []);
+  const 다음번호 = g.steps.findIndex((_, i) => !끝난.has(i));
+  const 줄 = g.steps.map((s, i) => {
+    const 표 = 끝난.has(i) ? "☑" : i === 다음번호 ? "▶" : "☐";
+    const 곁 = s.desc ? ` — ${s.desc}` : "";
+    return `${표} ${i + 1}. ${s.title}${곁}`;
+  }).join("\n");
+  const 기한지남 = typeof t.dueAt === "number" && t.dueAt < Date.now();
+  const 머리 = `**${t.text}** · 절차 ${끝난.size}/${g.steps.length}` + (기한지남 ? " ⚠ 기한 지남" : "");
+  if (다음번호 < 0) {
+    return `${머리}\n${줄}\n\n▸ 절차를 다 밟으셨습니다 — 끝내려면 "${t.text} 완료"`;
+  }
+  const 다음 = g.steps[다음번호];
+  const 힌트 = 다음.kind === "ask" && 다음.question ? `\n▸ 이렇게 물으시면 됩니다 — "${다음.question}"`
+    : 다음.kind === "open" && 다음.page ? `\n▸ ${다음.page} 화면을 보시면 됩니다` : "";
+  return `${머리}\n${줄}${힌트}\n\n▸ ${다음번호 + 1}번을 끝내셨으면 "${다음번호 + 1}번 했어"`;
+}
+
+async function runWorkSteps(args: Record<string, string>): Promise<string> {
+  const 말 = (args.task ?? "").trim();
+  if (!말) return "어떤 일의 절차인지 알려주세요 — 예: \"방화벽 점검 어떻게 해?\"";
+  const { hit, 열린것 } = 열린할일찾기(말);
+  if (hit) return 절차카드(hit);
+  const 담은것 = await 제안담기(말); // 아직 안 담은 AI 제안이면 담고 연다
+  if (담은것) return `AI가 제안한 일이라 **내 업무에 담고** 절차를 엽니다.\n\n` + 절차카드(담은것);
+  return `전체 ${열린것.length}건 중 "${말}"에 맞는 할 일을 못 찾았습니다. "오늘 할 일"이라고 물어 목록부터 보세요.`;
+}
+
+async function runStepDone(args: Record<string, string>): Promise<string> {
+  const 번호 = Number((args.step ?? "").replace(/[^0-9]/g, ""));
+  const 말 = (args.task ?? "").trim();
+  // 일감을 안 적었으면 **진행 중인 것**을 집는다 — 대화창에서는 "1번 했어"만 말하는 게 자연스럽다.
+  const 열린것 = listTasks().filter((t) => !t.done);
+  const hit = (말 ? 열린할일찾기(말).hit : undefined)
+    ?? (말 ? await 제안담기(말) ?? undefined : undefined)
+    ?? 열린것.find((t) => (t.guideDone?.length ?? 0) > 0 && 가이드가져오기(t.guideKey))
+    ?? 열린것.find((t) => 가이드가져오기(t.guideKey));
+  if (!hit) {
+    return 말 ? `전체 ${열린것.length}건 중 "${말}"에 맞는 할 일을 못 찾았습니다.`
+      : "어떤 일의 단계인지 모르겠습니다 — \"○○ 어떻게 해?\"로 절차를 먼저 여세요.";
+  }
+  const g = 가이드가져오기(hit.guideKey);
+  if (!g) return 절차카드(hit); // 절차가 없으면 없다고 말한다(카드가 그 말을 한다)
+  if (!Number.isInteger(번호) || 번호 < 1 || 번호 > g.steps.length) {
+    return `"${hit.text}"의 절차는 1~${g.steps.length}번입니다. 몇 번을 끝내셨는지 알려주세요.`;
+  }
+  const 뒤 = setGuideStepDone(hit.id, 번호 - 1, true);
+  if (!뒤) return `"${hit.text}" 단계를 기록하지 못했습니다.`;
+  return `${번호}번 「${g.steps[번호 - 1].title}」 끝낸 것으로 적었습니다.\n\n` + 절차카드(뒤) +
+    `\n▸ 잘못 눌렀으면 "${번호}번 취소"`;
+}
+
+async function runStepUndo(args: Record<string, string>): Promise<string> {
+  const 번호 = Number((args.step ?? "").replace(/[^0-9]/g, ""));
+  const 말 = (args.task ?? "").trim();
+  const 열린것 = listTasks().filter((t) => !t.done);
+  const hit = 말 ? 열린할일찾기(말).hit : 열린것.find((t) => (t.guideDone?.length ?? 0) > 0);
+  if (!hit) return "되돌릴 단계를 못 찾았습니다 — \"○○ 어떻게 해?\"로 절차를 먼저 여세요.";
+  const g = 가이드가져오기(hit.guideKey);
+  if (!g || !Number.isInteger(번호) || 번호 < 1 || 번호 > g.steps.length) {
+    return `"${hit.text}"의 절차 번호가 올바르지 않습니다.`;
+  }
+  const 뒤 = setGuideStepDone(hit.id, 번호 - 1, false);
+  if (!뒤) return `"${hit.text}" 단계를 되돌리지 못했습니다.`;
+  return `${번호}번을 다시 열었습니다.\n\n` + 절차카드(뒤);
+}
+
+async function runCompleteTask(args: Record<string, string>): Promise<string> {
   const 말 = (args.task ?? "").trim();
   if (!말) return "어떤 일을 끝내셨는지 알려주세요 — 예: \"방화벽 점검 완료\"";
-  const 열린것 = listTasks().filter((t) => !t.done);
-  const hit =
-    열린것.find((t) => t.text === 말) ??
-    열린것.find((t) => t.text.replace(/\s/g, "").includes(말.replace(/\s/g, "")));
+  const { hit: 찾음, 열린것 } = 열린할일찾기(말);
+  // 안 담은 AI 제안을 "끝냈다"고 하는 경우도 있다 — 담아 두고 곧장 완료로 넘긴다.
+  // (담지 않고 넘기면 끝낸 기록이 어디에도 안 남아 "했는데 또 올라온다"가 된다.)
+  const hit = 찾음 ?? (await 제안담기(말));
   if (!hit) {
     return `전체 ${열린것.length}건 중 "${말}"에 맞는 할 일을 못 찾았습니다. "오늘 할 일"이라고 물어 목록부터 보세요.`;
   }
@@ -1760,6 +1876,48 @@ const TOOLS: AgentTool[] = [
       { name: "due", label: "기한", description: "오늘 · 이번 주 (선택, 비우면 기한 없음)", required: false },
     ],
     run: runAddTask,
+  },
+  // ★ 절차 카드 — 「내 업무」 화면에서 하던 단계 밟기를 대화창으로 옮긴 것(2026-08-01).
+  //   목록 답변이 "○○ 어떻게 해?라고 물으면 순서를 알려드립니다"라고 **약속**하므로,
+  //   이 도구가 없으면 그 약속이 빈말이 된다(실측: 엉뚱한 CVSS 설명이 나왔다).
+  {
+    name: "work_steps",
+    label: "업무 절차",
+    domain: "cross",
+    write: false,
+    description:
+      '내 할 일 하나의 진행 절차를 단계별로 보여준다. "○○ 어떻게 해?", "○○ 절차 알려줘", "○○ 뭐부터 해?"에 쓴다. 예: {"task":"방화벽 정책 점검"}',
+    directAnswer: true,
+    params: [{ name: "task", label: "할 일", description: "절차를 볼 할 일의 이름(일부만 적어도 된다)", required: true }],
+    run: runWorkSteps,
+  },
+  {
+    name: "step_done",
+    label: "단계 완료",
+    domain: "cross",
+    write: false, // ★ 나에게만 영향 — 체크칸 하나에 결재판이 뜨면 아무도 안 쓴다
+    description:
+      '진행 중인 업무의 절차 한 단계를 끝낸 것으로 적는다. "1번 했어", "2단계 완료"에 쓴다. 일감 이름을 안 적으면 진행 중인 것을 집는다. 예: {"step":"1"}',
+    directAnswer: true,
+    params: [
+      { name: "step", label: "단계 번호", description: "끝낸 단계 번호", required: true },
+      { name: "task", label: "할 일", description: "어느 일감인지(선택)", required: false },
+    ],
+    run: runStepDone,
+  },
+  {
+    name: "step_undo",
+    label: "단계 되돌리기",
+    domain: "cross",
+    write: false,
+    description:
+      '잘못 적은 절차 단계를 다시 연다. "1번 취소", "2단계 되돌려"에 쓴다. 예: {"step":"1"}',
+    directAnswer: true,
+    params: [
+      { name: "step", label: "단계 번호", description: "되돌릴 단계 번호", required: true },
+      { name: "task", label: "할 일", description: "어느 일감인지(선택)", required: false },
+    ],
+    run: runStepUndo,
   },
   {
     name: "work_session_status",

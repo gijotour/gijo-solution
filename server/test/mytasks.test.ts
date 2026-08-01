@@ -50,23 +50,23 @@ describe("담기·완료가 실제로 동작한다", () => {
     expect(listTasks().some((t) => t.text === "방화벽 정책 점검")).toBe(true);
   });
 
-  it("완료하면 닫히고 **되돌리는 말**을 함께 준다", () => {
+  it("완료하면 닫히고 **되돌리는 말**을 함께 준다", async () => {
     createTask({ text: "방화벽 정책 점검" });
-    const out = 도구("complete_task").run({ task: "방화벽" }) as string; // 일부만 적어도 찾는다
+    const out = String(await 도구("complete_task").run({ task: "방화벽" })); // 일부만 적어도 찾는다
     expect(out).toContain("완료로 옮겼습니다");
     expect(out, "즉시 처리하면서 되돌릴 길을 안 알려 준다").toContain("되돌리려면");
     expect(listTasks().find((t) => t.text === "방화벽 정책 점검")?.done).toBe(true);
   });
 
-  it("없는 것을 완료하라면 **없다고 하지 않고 못 찾았다고 한다**", () => {
+  it("없는 것을 완료하라면 **없다고 하지 않고 못 찾았다고 한다**", async () => {
     createTask({ text: "방화벽 정책 점검" });
-    const out = 도구("complete_task").run({ task: "존재하지않는일xyz" }) as string;
+    const out = String(await 도구("complete_task").run({ task: "존재하지않는일xyz" }));
     expect(out).toContain("못 찾았습니다");
     expect(out).toMatch(/전체 \d+건 중/);
   });
 
-  it("빈 인자면 무엇이 필요한지 말한다(조용히 돌아가지 않는다)", () => {
-    expect(도구("complete_task").run({ task: "" })).toContain("알려주세요");
-    expect(도구("add_task").run({ text: "" })).toContain("알려주세요");
+  it("빈 인자면 무엇이 필요한지 말한다(조용히 돌아가지 않는다)", async () => {
+    expect(String(await 도구("complete_task").run({ task: "" }))).toContain("알려주세요");
+    expect(String(await 도구("add_task").run({ text: "" }))).toContain("알려주세요");
   });
 });

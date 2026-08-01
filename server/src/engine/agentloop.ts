@@ -16,6 +16,7 @@ import { listAgentTools, listToolsFor, findAgentTool, toolCatalogText, validateT
 import { emitCollaboration } from "./collaboration";
 import { listProducts } from "./securityproducts";
 import { recordWork, TOOL_WORK_KIND } from "./worklog";
+import { listTasks } from "./tasks";
 
 const MAX_STEPS = 5;
 
@@ -481,6 +482,26 @@ function forcedToolFor(instruction: string, scope?: ToolScope): { tool: string; 
   const 할일완료 = instruction.match(/^(.{2,60}?)\s*(?:완료(?:했|됐|야|입니다)?|끝냈(?:어|다|습니다)|다\s*했(?:어|다|습니다))\s*$/);
   if (할일완료 && available.has("complete_task") && !/취약점|점검|자산|CVE|배정/i.test(instruction)) {
     return { tool: "complete_task", args: { task: 할일완료[1].trim() } };
+  }
+
+  // ★ "n번 했어" / "n번 취소" — 절차 카드를 보고 답하는 말. 짧아서 7B가 늘 흘린다.
+  //   여기서 잡지 않으면 담당자가 단계를 밟아도 진행이 하나도 안 남는다.
+  const 단계말 = instruction.match(/^\s*(\d{1,2})\s*(?:번|단계)\s*(했|완료|끝|취소|되돌|다시)/);
+  if (단계말) {
+    const 되돌림 = /취소|되돌|다시/.test(단계말[2]);
+    const tool = 되돌림 ? "step_undo" : "step_done";
+    if (available.has(tool)) return { tool, args: { step: 단계말[1] } };
+  }
+
+  // ★ "○○ 어떻게 해?" — 목록 답변이 이렇게 물으라고 **약속한** 말이라 반드시 이어져야 한다.
+  //   ⚠ 화면 사용법·개념 질문("이 화면 어떻게 써", "CVSS가 뭐야")과 섞이면 안 된다 —
+  //   그건 screenguide·explain의 몫이므로, 열려 있는 내 할 일과 이름이 겹칠 때만 잡는다.
+  const 절차말 = instruction.match(/^(.{2,60}?)\s*(?:어떻게\s*(?:해|하지|하나요|합니까)|절차\s*(?:알려|보여)|뭐부터\s*(?:해|하지))\s*[?？]?\s*$/);
+  if (절차말 && available.has("work_steps") && !/화면|메뉴|이거|이걸|여기/.test(절차말[1])) {
+    const 납작 = (s: string) => s.replace(/\s/g, "");
+    const 겹침 = listTasks().some((t) => !t.done &&
+      (납작(t.text).includes(납작(절차말[1])) || 납작(절차말[1]).includes(납작(t.text))));
+    if (겹침) return { tool: "work_steps", args: { task: 절차말[1].trim() } };
   }
 
   for (const f of FORCED_INTENTS) {

@@ -10,7 +10,8 @@ import { recordAudit } from "./audit";
 import { asyncRoute } from "../util/asyncRoute";
 import { routeIntent, RoutedIntent } from "./intent";
 import { GUARDRAIL_BLOCK_MARK } from "./redteam";
-import { createTask, completeTask, updateTaskPriority, TaskItem } from "./tasks";
+import { createTask, completeTask, updateTaskPriority, listTasks, TaskItem } from "./tasks";
+import { buildMyWork } from "./mywork";
 import { setAgentStatus, resetAgentToDefault, getAgentById } from "./agents";
 import { emitCollaboration } from "./collaboration";
 import { runAdapter, StandardFinding } from "./bridge";
@@ -402,7 +403,32 @@ async function runOrchestration(instructionText: string, steps: OrchestrationSte
 // 안내하고 화면의 명시적 확인 버튼(대시보드 confirm 카드 / 학습 루프 화면)으로만 시작한다.
 const LEARN_TOPIC_RE = /학습\s*루프|파인\s*튜닝|learn\s*loop|fine[-\s]?tun/i;
 // "이 취약점 어떻게 조치해?/조치 방법/조치 절차/대응 방법" — 방법 문의(실행 지시 아님).
-const REMEDIATION_INTENT_RE = /(조치|대응|remediat|패치|수정)\s*(방법|절차|어떻게|가이드|플레이북|playbook)|어떻게\s*(조치|대응|패치|고쳐|해결)|대응\s*방안/i;
+/**
+ * "○○ 어떻게 해?"에서 ○○가 **열려 있는 내 할 일**이면 그 이름을 돌려준다(아니면 null).
+ *
+ * ⚠ 끝을 `$`로 묶지 않는다 — 자산·화면 맥락이 뒤에 붙는 경우가 있어 앵커가 조용히 깨졌다
+ *   (2026-08-01 실측: "10.10.20.41 — 취약점 점검 어떻게 해?"가 안 잡혔다). 대신 **할 일
+ *   이름과 겹칠 때만** 통과시켜 좁힌다 — 그게 오검출을 막는 진짜 자물쇠다.
+ */
+export async function 내할일절차질문(text: string): Promise<string | null> {
+  const m = String(text ?? "").match(/(.{2,60}?)\s*(?:어떻게\s*(?:해|하지|하나요|합니까)|절차\s*(?:알려|보여)|뭐부터\s*(?:해|하지))/);
+  if (!m) return null;
+  const 말 = m[1].trim();
+  if (!말 || /화면|메뉴|이거|이걸|여기|이곳/.test(말)) return null; // 화면 사용법은 screenguide의 몫
+  const 납작 = (s: string) => s.replace(/\s/g, "");
+  const 겹치나 = (이름: string) =>
+    납작(이름).includes(납작(말)) || (납작(말).length >= 4 && 납작(말).includes(납작(이름)));
+  // ⚠ tasks만 보면 **아직 안 담은 AI 제안**을 놓친다(2026-08-01 실측). 목록에 버젓이 보이고
+  //   「지금 이거」로 지목까지 한 것을 "못 찾았다"고 답하던 원인이다. 제안 이름까지 함께 본다.
+  if (listTasks().some((t) => !t.done && 겹치나(t.text))) return 말;
+  try {
+    const p = await buildMyWork();
+    if ([...p.today, ...p.week, ...p.later].some((i) => !i.saved && 겹치나(i.text))) return 말;
+  } catch { /* 목록을 못 만들면 그냥 다음 분기로 넘긴다 */ }
+  return null;
+}
+
+const REMEDIATION_INTENT_RE =/(조치|대응|remediat|패치|수정)\s*(방법|절차|어떻게|가이드|플레이북|playbook)|어떻게\s*(조치|대응|패치|고쳐|해결)|대응\s*방안/i;
 // "Shadow AI/미등록 AI/비인가 모델 점검·확인"
 const SHADOW_AI_INTENT_RE = /shadow\s*ai|미등록\s*(ai|모델|엘엘엠|llm)|비인가\s*(ai|모델)|섀도우|(등록\s*안\s*된|등록되지\s*않은)\s*(ai|모델)/i;
 // "공격 경로 / 도달성 / 측면 이동" 분석
@@ -594,6 +620,26 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
     completeTask(task.id);
     return { task, route: { agentId: "orchestrator", action: "chat" }, output: 낱말 };
+  }
+
+  // ★ "○○ 어떻게 해?" — **내 할 일 이름을 댄 절차 질문**은 여기서 먼저 집는다(2026-08-01).
+  //   목록 답변이 "○○ 어떻게 해?라고 물으면 순서를 알려드립니다"라고 약속하는데, 뒤쪽
+  //   결정적 분기들이 이 말을 먼저 채 갔다(실측): "침해사고 대응 어떻게 해?"는 조치 플레이북이,
+  //   "10.10.20.41 — 취약점 점검 뭐부터 해?"는 today가 가져가 절차가 영영 안 열렸다.
+  //   ⚠ 좁게 잡는다 — **열려 있는 내 할 일과 이름이 겹칠 때만**. 화면 사용법·개념 질문은
+  //   그대로 screenguide·explain·플레이북의 몫이다.
+  const 절차질문 = await 내할일절차질문(instructionText);
+  if (절차질문) {
+    const tool = findAgentTool("work_steps");
+    if (tool) {
+      const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
+      const result = String(await tool.run({ task: 절차질문 }));
+      completeTask(task.id);
+      return {
+        task, route: { agentId: "orchestrator", action: "chat" }, output: result,
+        toolCalls: [{ tool: "work_steps", args: { task: 절차질문 }, result }],
+      };
+    }
   }
 
   // 대화창 목록에서 **체크해서 고른 건**에 대한 조치 — LLM을 아예 태우지 않는다(2026-07-31).
