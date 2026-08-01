@@ -36,7 +36,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .field label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:6px;font-weight:600;}
 .field input{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;color:var(--text);font-size:13px;outline:none;}
 .field input:disabled{color:var(--muted);}
-.field-row{display:flex;gap:8px;align-items:center;}
+.field-row{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+/* 칸 낭비 줄이기(2026-08-02 사용자 지시 "좁힐 수 있으면 좁혀 주고 가로세로 칸 낭비 하지 않게").
+   ⚠ 서버 주소·토큰처럼 **긴 값**은 좁히면 끝이 안 보인다 — 짧은 값만 줄인다.
+     포트·시간·개수는 6~9자면 충분한데 지금은 한 줄을 통째로 먹고 있었다. */
+.field{flex:1 1 220px;min-width:0;margin-bottom:10px;}
+.field input[type=number]{max-width:130px;}
+.field select{max-width:280px;}
+.panel .field-row+.field-row{margin-top:2px;}
+.panel-sub{margin-bottom:8px;}
 .field-row input{flex:1;}
 .hint{font-size:12.5px;color:var(--muted-2);margin-top:8px;line-height:1.6;}
 .status-line{font-size:12.5px;margin-top:10px;}
@@ -311,7 +319,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     </div>
 
     <div data-sec="admin" class="panel" id="userManagementPanel" style="display:none">
-      <div class="panel-title">계정 관리<span class="badge b-teal" style="margin-left:8px">admin 전용</span></div>
+      <div class="panel-title">계정 관리<span class="badge b-teal" style="margin-left:8px">admin 전용</span>
+        <!-- 접기 배지가 읽는 자리 — 없으면 배지가 아예 안 그려진다(2026-08-01에 겪은 함정). -->
+        <span id="userCount" style="display:none">0</span></div>
+      <!-- ⚠ 접기는 판(.panel[data-sec])이 아니라 **안쪽 내용**에 건다(2026-08-02).
+           구역 숨김이 `[data-sec]:not(...){display:none !important}` 규칙이라 판에 걸면
+           접기의 인라인 display와 싸우고, 관리자 여부로 판을 켜고 끄는 코드와도 겹친다.
+           접힌 채로도 몇 명인지 알아야 하므로 배지(계정 수)를 함께 단다. -->
+      <div data-gijo-fold="계정 목록" data-gijo-fold-badges="userCount:계정">
       <div id="userListBox" style="margin-bottom:16px"></div>
       <div class="field-row">
         <div class="field">
@@ -338,6 +353,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         <button class="btn-primary" id="addUserBtn">추가</button>
       </div>
       <div class="status-line" id="userManagementStatusLine"></div>
+      </div><!-- /계정 목록 접기 -->
     </div>
 
     <!-- 계정별 2차 인증(관리자) — 기기를 잃은 담당자를 여기서 풀어 준다. 해제는 감사에 남는다. -->
@@ -543,6 +559,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     <div data-sec="link" class="panel" id="smtpInboundPanel" style="display:none">
       <div class="panel-title">인바운드 SMTP (알림 집수)<span class="badge b-purple" style="margin-left:8px">admin 전용</span></div>
+      <!-- ⚠ 접기는 판이 아니라 **안쪽**에 건다 — 구역 숨김이 !important 규칙이라
+           판에 걸면 접기의 인라인 display와 싸운다(2026-08-02). -->
+      <div data-gijo-fold="인바운드 SMTP">
       <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);margin-bottom:14px;cursor:pointer">
         <input type="checkbox" id="smtpInEnabledInput" style="width:auto">활성화
       </label>
@@ -559,10 +578,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <button class="btn-primary" id="saveSmtpInBtn">저장</button>
       <div class="status-line" id="smtpInStatusLine"></div>
       <div class="panel-sub" id="smtpInStatusInfo" style="margin-top:10px"></div>
+      </div><!-- /인바운드 SMTP 접기 -->
     </div>
 
     <div data-sec="link" class="panel" id="siemPanel" style="display:none">
       <div class="panel-title">📡 SIEM 연동 (아웃바운드)<span class="badge b-purple" style="margin-left:8px">admin 전용</span></div>
+      <!-- ⚠ 접기는 판이 아니라 **안쪽**에 건다 — 구역 숨김이 !important 규칙이라
+           판에 걸면 접기의 인라인 display와 싸운다(2026-08-02). -->
+      <div data-gijo-fold="SIEM 연동">
       <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);margin-bottom:14px;cursor:pointer">
         <input type="checkbox" id="siemEnabledInput" style="width:auto">GIJO 보안 이벤트를 SIEM으로 전달
       </label>
@@ -626,11 +649,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div class="status-line" id="siemStatusLine"></div>
       <!-- 전달 상태 — 이번 확장의 핵심. 보냈는지 못 보냈는지를 여기서 본다 -->
       <div id="siemStats" style="margin-top:12px"></div>
+      </div><!-- /SIEM 연동 접기 -->
     </div>
 
     <!-- 법령·판례 조회 — 인터넷이 필요해 기본 꺼짐. 키를 넣어야 켜진다(2026-07-26). -->
     <div data-sec="link" class="panel" id="lawPanel" style="display:none">
       <div class="panel-title">⚖ 법령·판례 조회 (선택)<span class="badge b-purple" style="margin-left:8px">admin 전용</span></div>
+      <!-- ⚠ 접기는 판이 아니라 **안쪽**에 건다 — 구역 숨김이 !important 규칙이라
+           판에 걸면 접기의 인라인 display와 싸운다(2026-08-02). -->
+      <div data-gijo-fold="법령·판례 조회">
       <div class="panel-sub">개인정보보호법·정보통신망법 같은 IT보안 법령과 고시·판례를 국가법령정보센터에서 찾아옵니다. <b>인터넷 연결이 필요합니다</b> — 폐쇄망이면 켜지 마세요.</div>
       <div class="field-row">
         <div class="field">
@@ -645,6 +672,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <button class="btn-primary" id="saveLawBtn">저장</button>
       <button class="btn-ghost" id="testLawBtn">연결 확인</button>
       <div class="status-line" id="lawStatusLine"></div>
+      </div><!-- /법령·판례 조회 접기 -->
     </div>
 
     <!-- MCP 연동 — mcp.html 화면에서 이관(2026-07-28, 설정 통합 ③단계).
@@ -666,6 +694,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     <div data-sec="link" class="panel" id="cloudLlmPanel" style="display:none">
       <div class="panel-title">☁ 클라우드 LLM (선택) <span class="badge b-purple" style="margin-left:8px">admin 전용</span></div>
+      <!-- ⚠ 접기는 판이 아니라 **안쪽**에 건다 — 구역 숨김이 !important 규칙이라
+           판에 걸면 접기의 인라인 display와 싸운다(2026-08-02). -->
+      <div data-gijo-fold="클라우드 LLM">
       <div class="panel-sub">온프레미스가 기본입니다 — 끄면 모든 답변이 로컬 LLM으로만 처리됩니다.</div>
       <label style="display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--muted);margin-bottom:14px;cursor:pointer">
         <input type="checkbox" id="cloudEnabledInput" style="width:auto">클라우드 사용 허용 (끄면 모든 답변이 로컬 LLM으로만 처리 — 완전 폐쇄)
@@ -697,6 +728,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <!-- 사용량·예상 비용 — 사용량·요금 화면 제거(메뉴 정리 2026-07-25)로 여기로 이관.
            서버 살아있는 동안의 인메모리 누적(재시작 시 초기화). -->
 
+      </div><!-- /클라우드 LLM 접기 -->
     </div>
 
     <div class="footer">
@@ -1163,6 +1195,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const box = document.getElementById("userListBox");
     try {
       const users = await window.gijo.listUsers();
+      // 접기 배지에 계정 수를 적는다 — 접어 둬도 몇 명인지 보여야 접기가 쓸모 있다.
+      const 셈 = document.getElementById("userCount");
+      if (셈) { 셈.textContent = String(users.length); if (window.gijoFold) window.gijoFold.refresh(); }
       let sessions = [];
       try { sessions = await window.gijo.listSessions(); } catch (e) {}
       const online = {};
