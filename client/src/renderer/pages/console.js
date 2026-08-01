@@ -58,6 +58,15 @@
       ".cs-dh .n{margin-left:auto;color:var(--muted-2,#a49d95);font-size:11.75px;}",
       // 펼쳤을 때 대화를 다 밀어내면 안 된다 — 최대 높이를 주고 그 안에서 스크롤한다.
       ".cs-db{max-height:240px;overflow-y:auto;padding:2px 0 7px;}",
+      // 갈래 한 줄 — 누르면 그 갈래 질문이 대화에 뜬다.
+      ".cs-catrow{display:flex;align-items:center;gap:7px;margin:3px 8px;padding:9px 11px;border-radius:8px;cursor:pointer;",
+      "border:1px solid var(--border,rgba(255,255,255,.10));background:var(--panel-2,#1f1e1d);}",
+      ".cs-catrow:hover{border-color:var(--blue,#3b82f6);background:rgba(59,130,246,.08);}",
+      ".cs-catrow .nm{font-size:13px;font-weight:800;color:var(--text,#e9e7e2);}",
+      ".cs-catrow .cs-n{margin-left:auto;font-size:11.75px;font-weight:800;color:var(--muted-2,#a49d95);}",
+      // 대화 안에 뜬 질문 묶음
+      ".cs-picks{margin-top:4px;}",
+      ".cs-picks .cs-q{margin:4px 0;}",
       ".cs-cat{display:flex;align-items:center;gap:6px;padding:7px 11px 3px;font-size:11.75px;font-weight:800;color:var(--muted-2,#a49d95);}",
       ".cs-bd{font-size:11px;font-weight:800;border-radius:4px;padding:1px 5px;}",
       ".b-here{color:var(--teal,#1eb980);background:rgba(30,185,128,.16);}",
@@ -666,13 +675,16 @@
     var head =
       '<div class="cs-dh" id="csDrawerH"><span class="car">' + (drawerOpen ? "▼" : "▶") + "</span>" +
       "<b>무엇을 할 수 있나</b><span class=\"n\">" + n + "가지</span></div>";
+    // ⚠ 예전엔 서랍이 **질문 18줄을 통째로** 폈다. 서랍만으로 대화창 절반을 먹고,
+    //   정작 오간 말이 밀려 올라갔다(2026-08-02 사용자 지시: 갈래만 보이고 누르면 대화에 뜨게).
+    //   갈래 다섯 줄이면 "무엇을 할 수 있나"가 한눈에 들어오고, 고른 뒤에야 질문이 나온다.
     var body = !drawerOpen ? "" :
       '<div class="cs-db">' + cats.map(function (c) {
         var bd = KIND_BADGE[c.kind];
-        return '<div class="cs-cat">' + esc(c.cat) + '<span class="cs-bd ' + bd[1] + '">' + bd[0] + "</span></div>" +
-          c.qs.map(function (x) {
-            return '<div class="cs-q" data-q="' + esc(x.q) + '"><span class="ic">' + x.ic + "</span>" + esc(x.q) + "</div>";
-          }).join("");
+        return '<div class="cs-catrow" data-cat="' + esc(c.cat) + '">' +
+          '<span class="nm">' + esc(c.cat) + "</span>" +
+          '<span class="cs-bd ' + bd[1] + '">' + bd[0] + "</span>" +
+          '<span class="cs-n">' + c.qs.length + "</span></div>";
       }).join("") + "</div>";
     el.className = "cs-drawer" + (drawerOpen ? " open" : "");
     el.innerHTML = head + body;
@@ -684,14 +696,46 @@
       }
       renderDrawer();
     });
+    el.querySelectorAll(".cs-catrow").forEach(function (row) {
+      row.addEventListener("click", function () {
+        var 이름 = row.getAttribute("data-cat");
+        var c = cats.filter(function (x) { return x.cat === 이름; })[0];
+        if (!c) return;
+        drawerOpen = false; renderDrawer();
+        갈래카드(c);
+      });
+    });
+  }
+
+  /**
+   * 고른 갈래의 질문들을 **대화 안에** 카드로 띄운다.
+   * ⚠ append()는 글만 받는다 — 여기서는 누를 수 있는 줄이 필요하므로 직접 만든다.
+   *   누르면 그 말이 그대로 지시로 들어간다(서랍에서 누르던 것과 같은 길).
+   */
+  function 갈래카드(c) {
+    var body = rows();
+    var empty = body.querySelector(".cs-empty");
+    if (empty) empty.remove();
+    var el = document.createElement("div");
+    el.className = "cs-row event cs-pick";
+    var bd = KIND_BADGE[c.kind];
+    el.innerHTML =
+      '<div class="ci">💡</div>' +
+      '<div class="cb"><div class="cn">' + esc(c.cat) +
+      '<span class="cs-bd ' + bd[1] + '" style="margin-left:6px">' + bd[0] + "</span></div>" +
+      '<div class="cs-picks">' + c.qs.map(function (x) {
+        return '<div class="cs-q" data-q="' + esc(x.q) + '"><span class="ic">' + x.ic + "</span>" + esc(x.q) + "</div>";
+      }).join("") + "</div></div>";
     el.querySelectorAll(".cs-q").forEach(function (q) {
       q.addEventListener("click", function () {
         var input = document.getElementById("chatInput");
         input.value = q.getAttribute("data-q");
-        drawerOpen = false; renderDrawer();
         submit();
       });
     });
+    body.appendChild(el);
+    while (body.childElementCount > CL_MAX) body.removeChild(body.firstChild);
+    body.scrollTop = body.scrollHeight;
   }
 
   function append(kind, o) {
