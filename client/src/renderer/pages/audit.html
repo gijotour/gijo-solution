@@ -122,7 +122,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <button class="dl" id="dlBtn">⬇ 내보내기 (.csv)</button>
     </div>
 
-    <div class="panel long-list" id="auditPanel"><div class="empty">불러오는 중…</div></div>
+    <div class="panel" id="auditPanel"><div class="empty">불러오는 중…</div></div>
 
 
 
@@ -138,6 +138,18 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   const statusPill = document.getElementById("statusPill");
   const avatarBtn = document.getElementById("avatarBtn");
   const panel = document.getElementById("auditPanel");
+  /**
+   * 목록 높이를 창에 맞춘다 — **위 카드(전체·CLI·승인…)와 필터가 늘 보여야 한다.**
+   * ⚠ 2026-08-02에 지시를 반대로 읽어 높이를 아예 풀었다가(화면째 내려가게) 되돌린 자리다.
+   *   원하는 그림은 「위는 고정, 목록만 안에서 스크롤, 더 필요하면 ＋더 보기로 늘림」이다.
+   *   고정 px도, calc(100vh - 상수)도 못 맞춘다 — 검색줄·필터가 줄바꿈되면 위 높이가 달라지고
+   *   배율까지 곱해진다. 그래서 **제 위치를 재서** 남는 만큼만 쓴다.
+   */
+  function 목록높이맞추기() {
+    if (!panel) return;
+    // 계산은 공용 도우미 한 곳에만 둔다(nav.js gijoFitList) — 화면마다 베끼면 반드시 어긋난다.
+    if (window.gijoFitList) window.gijoFitList(panel);
+  }
 
   let activeKind = "all";
   let entries = [];
@@ -186,7 +198,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     let rows = entries;
     if (activeKind !== "all") rows = rows.filter((e) => e.kind === activeKind);
     if (q) rows = rows.filter((e) => `${e.action} ${e.target || ""} ${e.detail || ""} ${e.actor || ""}`.toLowerCase().includes(q));
-    if (!rows.length) { panel.innerHTML = '<div class="empty">해당 조건의 작업 기록이 없습니다.</div>'; return; }
+    if (!rows.length) { panel.innerHTML = '<div class="empty">해당 조건의 작업 기록이 없습니다.</div>'; 목록높이맞추기(); return; }
     const 볼것 = rows.slice(0, 보이는수);
     const 남음 = rows.length - 볼것.length;
     panel.innerHTML = 볼것.map(rowHtml).join("") +

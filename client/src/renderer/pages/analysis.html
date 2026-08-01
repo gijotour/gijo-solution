@@ -227,11 +227,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   function 목록높이맞추기(){
     const box = document.getElementById("riskList");
     if(!box) return;
-    const 위 = box.getBoundingClientRect().top;
-    const 남은 = window.innerHeight - 위 - 20;   // 20 = 아래 여백
-    box.style.maxHeight = Math.max(220, Math.round(남은)) + "px";
+    // 계산은 공용 도우미 한 곳에만 둔다(nav.js gijoFitList) — 화면마다 베끼면 어긋난다.
+    if (window.gijoFitList) window.gijoFitList(box);
   }
-  window.addEventListener("resize", 목록높이맞추기);
 
   function renderList(){
     const box = document.getElementById("riskList");

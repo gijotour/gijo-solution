@@ -504,6 +504,24 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       card.title = "클릭하면 현재 지표로 종합 보안 리포트를 생성합니다";
       card.addEventListener("click", askReport);
     });
+    // 📂 상세 지표 아코디언(기본 펼침) — 접은 적이 있을 때만 접힌 채로 연다.
+    // ⚠ 이 블록은 2026-08-02에 「지금 손댈 일」 줄을 걷다가 **함께 잘렸다.** panel 선언이 사라져
+    //   아래 배선이 `panel is not defined`로 터졌고, 화면 전체가 "불러오지 못했습니다"가 됐다.
+    //   지울 때 **바로 아래 코드까지 딸려 가는지** 반드시 보고 지울 것(같은 실수 두 번째다).
+    const panel = document.getElementById("detailPanel");
+    const toggle = document.getElementById("detailToggle");
+    if (panel && toggle) {
+      let open = true;
+      try { open = localStorage.getItem("gijo.kpi.detailOpen") !== "0"; } catch (e) {}
+      const car = toggle.querySelector(".dcar");
+      const apply = () => { panel.classList.toggle("closed", !open); if (car) car.textContent = open ? "▾" : "▸"; };
+      apply();
+      toggle.addEventListener("click", () => {
+        open = !open; apply();
+        try { localStorage.setItem("gijo.kpi.detailOpen", open ? "1" : "0"); } catch (e) {}
+      });
+    }
+
     // 상세 지표 각 섹션 → 관련 화면 연결(타일·추세카드·제목 링크 모두 이동).
     // 제목의 고유 토큰으로 대상 화면을 판별한다(개별 tile 호출을 건드리지 않는 방식).
     const SECTION_PAGE = [

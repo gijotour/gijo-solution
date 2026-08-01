@@ -184,10 +184,9 @@
       + ".app > *:nth-child(2){overflow-y:auto;height:100vh;min-height:0;}")
       + "*::-webkit-scrollbar{width:8px;height:8px;}*::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:4px;}*::-webkit-scrollbar-track{background:transparent;}"
       // 긴 목록 패널 내부 스크롤(2026-07-26 사용자 결정) — 창 고정 원칙과 세트.
-      + ".scroll-list{max-height:calc(100vh - 300px);min-height:260px;overflow-y:auto;}"
+      + ".scroll-list{min-height:260px;overflow-y:auto;}"   // 높이는 gijoFitList가 재서 준다
       + ".scroll-list thead th{position:sticky;top:0;background:var(--panel,#30302e);z-index:1;}"
 
-      + ".long-list thead th{position:sticky;top:0;background:var(--panel,#30302e);z-index:1;}"
       // 하단 로고·저작권 푸터 제거(2026-07-26 사용자 결정) — 정보 가치가 없고 화면마다
       // 잘려 보였다. 개별 HTML은 건드리지 않고 공용 CSS로 한 번에 숨긴다.
       + ".footer{display:none !important;}.main{padding-bottom:20px;}" +
@@ -546,6 +545,32 @@
     if (typeof window.gijoSyncTopbar === "function") window.gijoSyncTopbar();
   }
 
+  /**
+   * 긴 목록 높이 맞추기 — **위 카드·필터가 늘 보이게** 목록에만 남는 높이를 준다.
+   *
+   * 왜 공용인가(2026-08-02 사용자 질문 "다른 메뉴들도 그렇게 반영되는 거지?"):
+   *   화면마다 제각각이었다. 어떤 곳은 고정 560px, 어떤 곳은 calc(100vh - 300px),
+   *   어떤 곳은 아무것도 없었다. 둘 다 못 맞춘다 —
+   *     · 고정 px: 창·배율이 바뀌면 넘치거나 남는다.
+   *     · calc(100vh - 상수): 목록 **위에 무엇이 있는지**가 화면마다 다르고(요약 막대·상관 줄·
+   *       필터 칩이 있다 없다 한다) 검색줄이 줄바꿈되면 그 상수가 또 틀어진다.
+   *   그래서 **재서** 정한다. 규칙은 여기 하나뿐이다.
+   *
+   * 대상: .scroll-list, [data-gijo-fit]  (화면에서 표시만 달면 된다)
+   * @param el 특정 요소만 다시 재고 싶을 때(목록을 다시 그린 뒤). 없으면 이 문서 전체.
+   */
+  window.gijoFitList = function (el) {
+    var 목록 = el ? [el] : [].slice.call(document.querySelectorAll(".scroll-list, [data-gijo-fit]"));
+    목록.forEach(function (x) {
+      if (!x || !x.getBoundingClientRect || !x.offsetParent) return;   // 안 보이는 건 재지 않는다
+      var 위 = x.getBoundingClientRect().top;
+      var 남은 = window.innerHeight - 위 - 24;                          // 24 = 아래 여백
+      x.style.maxHeight = Math.max(240, Math.round(남은)) + "px";       // 너무 납작해지지 않게 바닥
+      x.style.overflowY = "auto";
+    });
+  };
+  window.addEventListener("resize", function () { window.gijoFitList(); });
+
   // 공용 디자인 시스템(gijo-ui.css)을 모든 페이지에 주입한다 — .g-* 컴포넌트 사용 가능 + body.g-ui로
   // 안전한 전역 베이스라인(스크롤바·포커스링·폰트 스무딩)만 통일(레이아웃은 안 건드림).
   function loadDesignSystem() {
@@ -654,10 +679,9 @@
     var st = document.createElement("style");
     st.textContent = "html,body{overflow:auto !important;height:auto !important;}" +
       // 긴 목록 내부 스크롤은 임베드에서도 동일(허브 탭 안의 threat·audit 등)
-      ".scroll-list{max-height:calc(100vh - 260px);min-height:260px;overflow-y:auto;}" +
+      ".scroll-list{min-height:260px;overflow-y:auto;}" +   // 높이는 gijoFitList가 재서 준다
       ".scroll-list thead th{position:sticky;top:0;background:var(--panel,#30302e);z-index:1;}" +
  +
-      ".long-list thead th{position:sticky;top:0;background:var(--panel,#30302e);z-index:1;}" +
       ".footer{display:none !important;}" +
       "*::-webkit-scrollbar{width:8px;height:8px;}*::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:4px;}*::-webkit-scrollbar-track{background:transparent;}" +
       ".header{display:none !important;}#gijoNav{display:none !important;}" +
