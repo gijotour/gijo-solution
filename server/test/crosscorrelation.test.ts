@@ -119,3 +119,41 @@ describe("★ CEF·LEEF 형식에서도 우리 자산과 이어진다", () => {
     expect(묶임!.sources.sort()).toEqual(["log", "vuln"]);
   });
 });
+
+// ── 검토 지적 수정 확인 (2026-08-01 오후 검토) ──────────────────────────────
+describe("★ 검토가 짚은 사각지대", () => {
+  const 반복 = (f: (i: number) => string, n = 14) => Array.from({ length: n }, (_, i) => f(i)).join("\n");
+
+  it("★★ 여러 장비를 한 파일로 올려도 **엉뚱한 장비에 안 붙는다**", () => {
+    // 파일 전체의 top-1 호스트를 모든 이벤트에 붙이던 것이 결함이었다 —
+    // 파일럿에서 가장 흔한 형태(중앙 수집기 로그)에서 web01 공격이 fw01에 귀속됐다.
+    const 섞임 = [
+      반복((i) => `Aug  1 10:0${i % 6}:0${i % 6} fw01 sshd[${100 + i}]: Failed password for invalid user a from 203.0.113.1 port ${1000 + i} ssh2`, 20),
+      반복((i) => `Aug  1 10:0${i % 6}:0${i % 6} web01 sshd[${200 + i}]: Failed password for invalid user b from 198.51.100.2 port ${2000 + i} ssh2`, 14),
+    ].join("\n");
+    const evs = parseSecurityLog("수집기.log", 섞임).events;
+    const a = evs.find((e) => e.entity === "203.0.113.1");
+    const b2 = evs.find((e) => e.entity === "198.51.100.2");
+    expect(a?.peers, "fw01을 노린 공격의 대상이 틀렸다").toEqual(["fw01"]);
+    expect(b2?.peers, "web01을 노린 공격이 fw01에 귀속됐다 — 담당자가 엉뚱한 장비를 조사한다").toEqual(["web01"]);
+  });
+
+  it("★ 호스트 필드가 없으면 프로그램 이름을 자산으로 삼지 않는다", () => {
+    // "Aug  1 11:00:01 sshd[1234]: …" 처럼 호스트가 빠진 줄에서 sshd[1234]:를 우리 자산으로
+    // 둔갑시키면 안 된다. 용어사전에 "못 알아내면 지어내지 않는다"고 공표한 계약이다.
+    const 호스트없음 = 반복((i) => `Aug  1 11:0${i % 6}:0${i % 6} sshd[${300 + i}]: Failed password for invalid user c from 203.0.113.9 port ${3000 + i} ssh2`);
+    const evs = parseSecurityLog("호스트없음.log", 호스트없음).events;
+    expect(evs.length).toBeGreaterThan(0);
+    expect(evs[0].peers ?? [], "프로그램 이름을 우리 자산으로 지어냈다").toEqual([]);
+  });
+
+  it("★★ 공격 경로도 로그를 자산에 잇는다 (상관만 고치고 형제 함수를 빠뜨렸던 것)", async () => {
+    const { computeAttackPaths } = await import("../src/engine/analysishub");
+    const 로그ev = parseSecurityLog("경로.log", 로그).events; // fw01을 노린 브루트포스
+    const paths = computeAttackPaths([...로그ev, 취약점이벤트("fw01")]);
+    const p = paths.find((x) => x.entity === "fw01");
+    expect(p, "취약 자산 경로가 안 나온다").toBeTruthy();
+    expect(p!.steps.some((s) => s.kind === "entry"), "①진입(로그) 단계가 빠졌다 — 공격 신호가 있는데 없는 것처럼 보인다").toBe(true);
+    expect(p!.reachability, "실제 공격 신호가 있는데 도달성이 「확인됨」이 아니다").toBe("확인됨");
+  });
+});

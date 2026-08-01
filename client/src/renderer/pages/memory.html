@@ -253,6 +253,9 @@ tr:last-child td{border-bottom:none;}
         <button id="hygieneScanBtn" style="float:right;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;padding:5px 11px;color:var(--blue-light);font-size:11px;font-weight:700;cursor:pointer">다시 점검</button>
       </div>
       <div class="panel-sub">상충·중복·오래된 문서를 주기적으로 찾아 보여줍니다. <b style="color:var(--amber)">삭제는 자동으로 하지 않습니다</b> — 아래 목록에서 확인 후 지우세요.</div>
+      <!-- ⚠ 접기 배지가 읽는 자리(2026-08-01 검토 지적으로 신설). 이 요소가 없으면 배지가
+           **아예 안 그려져** "안에 뭐가 있는지 모르는 서랍"이 된다 — 접기의 뜻이 사라진다. -->
+      <span id="hygieneCount" style="display:none">0</span>
       <div id="hygieneBody" style="font-size:12.5px;color:var(--muted);line-height:1.7">점검 중…</div>
     </div>
 
@@ -533,6 +536,12 @@ tr:last-child td{border-bottom:none;}
     try { r = rescan ? await window.gijo.kbHygieneScan() : await window.gijo.kbHygiene(); }
     catch (e) { body.innerHTML = '<span style="color:#f5928a">점검 실패: ' + dmEsc(e.message || e) + "</span>"; return; }
     document.getElementById("hygienePanel").style.borderColor = r.clean ? "var(--border)" : "rgba(240,160,32,0.35)";
+    // 배지가 읽을 숫자를 먼저 적고 접기 도우미에 알린다(접힌 채로도 "열어야 하나"를 알 수 있게).
+    // ⚠ 필드 이름은 **짐작하지 않는다** — problems로 썼다가 늘 0이 나와 배지가 안 떴다
+    //   (2026-08-01). 실제 응답 키는 findings다(/api/kb-hygiene).
+    var 겹침수 = (r.findings || []).length;
+    var 셈 = document.getElementById("hygieneCount"); if (셈) 셈.textContent = String(겹침수);
+    if (window.gijoFold) window.gijoFold.refresh();
     if (r.clean) { body.innerHTML = '<span style="color:var(--teal)">✓ 상충·중복 없음 — 문서 ' + r.totalDocs + '건 모두 깔끔합니다.</span>'; return; }
     // ⚠ 서버가 내는 종류를 하나 빠뜨리면 화면에 **[undefined]** 가 그대로 나온다
     //   (2026-08-01 실앱 점검에서 발견 — demo_overlap이 표에 없었다).

@@ -243,11 +243,21 @@ export interface LogParseResult {
 function detectBruteForce(source: string, lines: string[], threshold: number, 대상: string[] = []): { events: AnalysisEvent[]; matched: number } {
   const fails = new Map<string, number>();
   const accepts = new Set<string>();
+  // ★ 대상 호스트는 **그 공격자가 나온 줄에서만** 모은다(2026-08-01 검토 지적).
+  //   파일 전체의 top-1 호스트를 모든 이벤트에 붙이면, 여러 장비를 한 파일로 모아 올렸을 때
+  //   web01을 노린 공격이 fw01에 귀속된다 — 담당자가 **엉뚱한 장비를 조사**하게 된다.
+  //   "틀린 자산에 묶는 것이 못 묶는 것보다 나쁘다"는 우리 계약을 정면으로 어기는 자리였다.
+  const 줄대상 = new Map<string, Set<string>>();
   let matched = 0;
   for (const line of lines) {
+    const h = syslogHostOf(line);
     for (const re of FAIL_RES) {
       const m = line.match(re);
-      if (m) { fails.set(m[1], (fails.get(m[1]) ?? 0) + 1); matched++; break; }
+      if (m) {
+        fails.set(m[1], (fails.get(m[1]) ?? 0) + 1);
+        if (h) { const set = 줄대상.get(m[1]) ?? new Set<string>(); set.add(h); 줄대상.set(m[1], set); }
+        matched++; break;
+      }
     }
     const acc = line.match(ACCEPT_RE);
     if (acc) accepts.add(acc[1]);
@@ -260,7 +270,8 @@ function detectBruteForce(source: string, lines: string[], threshold: number, �
     if (succeeded) signals.push("활성 악용");
     const severity: Severity = succeeded ? "critical" : "high";
     events.push(mkLog(source, `log:${source}:brute:${ip}`, `인증 브루트포스 의심 — ${ip}`, ip, severity, signals,
-      `${source}에서 ${ip}의 인증 실패 ${count}회${succeeded ? " 후 성공 로그 존재(계정 탈취 가능성)" : ""}. 임계치 ${threshold} 초과.`, 대상));
+      `${source}에서 ${ip}의 인증 실패 ${count}회${succeeded ? " 후 성공 로그 존재(계정 탈취 가능성)" : ""}. 임계치 ${threshold} 초과.`,
+      줄에서찾은것(줄대상.get(ip), 대상)));
   }
   return { events, matched };
 }
@@ -291,7 +302,9 @@ function detectFirewall(source: string, lines: string[], 대상: string[] = [], 
     const rec = perSrc.get(d.src) ?? { denies: 0, ports: new Set<string>(), dsts: new Set<string>() };
     rec.denies++;
     if (d.dpt) rec.ports.add(d.dpt);
-    if (d.dst) rec.dsts.add(d.dst); // 이 공격이 노린 **우리 자산**
+    if (d.dst) rec.dsts.add(d.dst);            // 이 공격이 노린 대상
+    const h = syslogHostOf(line);
+    if (h) rec.dsts.add(h);                    // 이 줄을 보낸 우리 장비(줄 단위 — 파일 top-1 아님)
     perSrc.set(d.src, rec);
   }
   const events: AnalysisEvent[] = [];
@@ -299,11 +312,11 @@ function detectFirewall(source: string, lines: string[], 대상: string[] = [], 
     if (rec.ports.size >= portScanPorts) {
       events.push(mkLog(source, `log:${source}:scan:${ip}`, `포트 스캔 의심 — ${ip}`, ip, "high", ["포트스캔"],
         `${source}에서 ${ip}가 서로 다른 목적지 포트 ${rec.ports.size}개를 차단당함(차단 ${rec.denies}건) — 스캐닝 정황.`,
-        [...new Set([...대상, ...rec.dsts])]));
+        줄에서찾은것(rec.dsts, 대상)));
     } else if (rec.denies >= floodThreshold) {
       events.push(mkLog(source, `log:${source}:flood:${ip}`, `방화벽 차단 폭주 — ${ip}`, ip, "medium", ["반복"],
         `${source}에서 ${ip}가 ${rec.denies}회 차단됨 — 반복 접근 시도.`,
-        [...new Set([...대상, ...rec.dsts])]));
+        줄에서찾은것(rec.dsts, 대상)));
     }
   }
   return { events, matched };
@@ -313,18 +326,22 @@ function detectFirewall(source: string, lines: string[], 대상: string[] = [], 
 const WEB_PATTERNS = [/union\s+select/i, /<script/i, /\.\.\/\.\.\//, /\/etc\/passwd/i, /\bor\b\s+['"]?1['"]?\s*=\s*['"]?1/i, /%27/i, /%3Cscript/i, /base64_decode/i, /\/bin\/(?:ba)?sh/i, /cmd\.exe/i, /\bexec\s*\(/i];
 function detectWebAttack(source: string, lines: string[], 대상: string[] = []): { events: AnalysisEvent[]; matched: number } {
   const perIp = new Map<string, number>();
+  const 줄대상 = new Map<string, Set<string>>();
   let matched = 0;
   for (const line of lines) {
     if (!WEB_PATTERNS.some((re) => re.test(line))) continue;
     matched++;
     const ip = (line.match(/^\s*(\d+\.\d+\.\d+\.\d+)/) || line.match(/(\d+\.\d+\.\d+\.\d+)/))?.[1] ?? "unknown";
     perIp.set(ip, (perIp.get(ip) ?? 0) + 1);
+    const h = syslogHostOf(line);            // 이 줄을 보낸 우리 장비(줄 단위)
+    if (h) { const set = 줄대상.get(ip) ?? new Set<string>(); set.add(h); 줄대상.set(ip, set); }
   }
   const events: AnalysisEvent[] = [];
   for (const [ip, hits] of perIp) {
     const severity: Severity = hits >= 5 ? "high" : "medium";
     events.push(mkLog(source, `log:${source}:web:${ip}`, `웹 공격 시그니처 — ${ip}`, ip, severity, ["웹공격"],
-      `${source}에서 ${ip}의 요청에 웹 공격 흔적(SQLi/XSS/경로순회/명령주입 등) ${hits}건 탐지.`, 대상));
+      `${source}에서 ${ip}의 요청에 웹 공격 흔적(SQLi/XSS/경로순회/명령주입 등) ${hits}건 탐지.`,
+      줄에서찾은것(줄대상.get(ip), 대상)));
   }
   return { events, matched };
 }
@@ -342,20 +359,42 @@ function mkLog(source: string, id: string, title: string, entity: string, severi
  *   이 값이 없으면 취약점·운영리포트·하드닝 어느 것과도 상관되지 않는다(2026-08-01 결함).
  *   못 뽑으면 **지어내지 않고 빈 값**을 준다 — 틀린 자산에 묶는 것이 못 묶는 것보다 나쁘다.
  */
+/**
+ * 줄에서 찾은 대상이 있으면 **그것만** 쓰고, 없을 때만 파일 전체 보조값을 쓴다.
+ *
+ * ⚠ 둘을 합치면 안 된다(2026-08-01 검토 후 실측). 여러 장비를 한 파일로 올렸을 때
+ *   web01을 노린 공격에 파일 top-1인 fw01이 **덧붙어** 결국 엉뚱한 장비까지 묶였다.
+ *   줄에서 알아냈으면 그게 정답이다 — 보조값은 모를 때의 마지막 수단이다.
+ */
+function 줄에서찾은것(줄것: Set<string> | undefined, 보조: string[]): string[] {
+  const a = [...(줄것 ?? [])];
+  return a.length ? a : [...보조];
+}
+
+/**
+ * 로그 **한 줄**에서 우리 쪽 호스트 이름을 뽑는다 — `Aug  1 10:00:01 fw01 sshd[…]` 의 fw01.
+ *
+ * ⚠ 줄 단위여야 한다(2026-08-01 검토 지적). 파일 전체의 top-1 호스트를 모든 이벤트에
+ *   붙이면 여러 장비를 한 파일로 모아 올렸을 때 **엉뚱한 장비에 귀속**된다.
+ * ⚠ 4번째 토큰이면 무엇이든 받지는 않는다 — 호스트 필드가 없는 줄에서는 `sshd[1234]:`나
+ *   `%ASA-4-106023:`가 "우리 자산"으로 둔갑한다. 호스트 이름 문법(영숫자·점·하이픈·밑줄)만 받고,
+ *   콜론·대괄호가 붙은 것은 프로그램 이름이므로 버린다. 못 뽑으면 **지어내지 않는다.**
+ */
+function syslogHostOf(line: string): string | null {
+  const m = line.match(/^[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+([^\s:\[]+)\s+\S/);
+  const h = m?.[1];
+  if (!h) return null;
+  return /^[A-Za-z0-9][A-Za-z0-9._-]*$/.test(h) ? h : null;
+}
+
 function syslogHosts(lines: string[]): string[] {
   const 셈 = new Map<string, number>();
   for (const line of lines) {
-    // "<월> <일> <시:분:초> <호스트> <프로그램>" — 호스트는 4번째 토큰, IP가 아니어야 한다.
-    const m = line.match(/^[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+(\S+)\s+\S+/);
-    const h = m?.[1];
-    // ⚠ IP를 버리면 안 된다(2026-08-01 실측). 국내 현장 장비 상당수가 syslog 호스트 자리에
-    //   **IP를 넣어 보내고**, 우리 자산도 IP로 등록돼 있는 경우가 많다("10.10.20.41").
-    //   버리면 그 자산과 영영 안 묶인다. 대신 **공격자 IP와 같으면** 아래 mkLog에서 걸러 낸다
-    //   — 첫 IP를 주워 자기 자신을 대상으로 삼는 것만 막으면 된다.
-    if (!h) continue;
-    셈.set(h, (셈.get(h) ?? 0) + 1);
+    const h = syslogHostOf(line);
+    if (h) 셈.set(h, (셈.get(h) ?? 0) + 1);
   }
-  // 가장 많이 나온 호스트만 — 여러 장비 로그가 섞이면 전부 묶어 오탐을 만들 수 있다.
+  // ⚠ 이 값은 **줄에서 호스트를 못 뽑은 이벤트의 보조**로만 쓴다(줄 단위가 우선).
+  //   여기서 여러 개를 돌려주면 한 파일에 섞인 장비를 전부 묶어 오탐을 만든다.
   return [...셈.entries()].sort((a, b) => b[1] - a[1]).slice(0, 1).map(([h]) => h);
 }
 
@@ -556,12 +595,22 @@ const hasSignal = (e: AnalysisEvent, re: RegExp) => e.signals.some((s) => re.tes
 
 export function computeAttackPaths(events: AnalysisEvent[]): AttackPath[] {
   const active = events.filter((e) => !RESOLVED.includes(e.status ?? "open"));
+  // ★ **peers도 함께 담는다**(2026-08-01 검토 지적). 상관분석은 고쳤는데 형제 함수인
+  //   여기는 entity만 보고 있었다 — 로그 이벤트의 entity는 공격자 IP라 취약 자산 버킷에
+  //   **절대** 안 들어갔고, 그래서 아래 `attacked`가 구조적으로 항상 false였다.
+  //   결과: 도달성 「확인됨」이 영원히 안 나오고 경로에서 ①진입(로그) 단계가 늘 빠졌다.
+  //   실제 공격 로그가 있는데도 "관측된 공격 신호 없음"처럼 읽힌다 — 차별점 기능이 반쪽이었다.
+  //   ⚠ 한 곳을 고치면 **같은 키를 쓰는 형제 함수**를 함께 봐야 한다.
   const byEntity = new Map<string, AnalysisEvent[]>();
+  const 담기 = (key: string, e: AnalysisEvent) => {
+    if (!key) return;
+    const arr = byEntity.get(key) ?? [];
+    if (!arr.includes(e)) arr.push(e);
+    byEntity.set(key, arr);
+  };
   for (const e of active) {
-    if (!e.entity) continue;
-    const arr = byEntity.get(e.entity) ?? [];
-    arr.push(e);
-    byEntity.set(e.entity, arr);
+    담기(e.entity, e);
+    for (const p of e.peers ?? []) 담기(p, e);
   }
   const paths: AttackPath[] = [];
   for (const [entity, evs] of byEntity) {

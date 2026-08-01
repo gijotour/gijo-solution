@@ -176,7 +176,8 @@ tr:last-child td{border-bottom:none;}
          최근 탐지 내역은 훑어보는 참고 목록이라 접어 두고, **건수를 배지로** 남긴다.
          ⚠ 숫자 없이 접으면 "안에 뭐가 있는지 모르는 서랍"이 된다. -->
     <div class="panel" data-gijo-fold="최근 탐지 내역" data-gijo-fold-badges="feedCount:건">
-      <div class="panel-title">최근 탐지 내역</div>
+      <!-- ⚠ 접기 배지가 읽는 자리(2026-08-01 검토 지적으로 신설) — 없으면 배지가 안 그려진다. -->
+      <div class="panel-title">최근 탐지 내역<span id="feedCount" style="display:none">0</span></div>
       <div class="panel-sub">구독 중인 딥웹 · 다크웹 CTI 피드 기반 자동 탐지</div>
       <div class="scroll-list"><!-- 긴 목록은 패널 안에서 스크롤(창 고정 원칙, 2026-07-26) -->
       <table>
@@ -256,6 +257,10 @@ tr:last-child td{border-bottom:none;}
   function renderFindings(findings) {
     findingCountEl.textContent = findings.length;
     criticalCountEl.textContent = findings.filter((f) => f.severity === "critical").length;
+    // 접기 배지가 읽을 숫자를 먼저 적고 도우미에 알린다 — 접힌 채로도 건수가 보여야 한다.
+    const 셈 = document.getElementById("feedCount");
+    if (셈) 셈.textContent = String(findings.length);
+    if (window.gijoFold) window.gijoFold.refresh();
     if (findings.length === 0) {
       findingsBodyEl.innerHTML =
         '<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:28px 10px">탐지 내역이 없습니다. 연동된 CTI 피드가 없거나 아직 탐지된 항목이 없습니다.</td></tr>';
