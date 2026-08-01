@@ -209,9 +209,18 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     cats.innerHTML = CATEGORY_ORDER.map((cat) => {
       const items = catalog.filter((t) => t.category === cat);
       if (items.length === 0) return "";
+      // 제목 줄을 눌러 갈래를 접었다 편다(2026-08-02 사용자 지시).
+      // ⚠ 접혀도 **미대응 건수**는 남긴다 — 숫자 없이 접으면 "안에 뭐가 있는지 모르는 서랍"이 된다.
+      const 접힘 = 접힌갈래.has(cat);
+      const 미대응 = items.filter((t) => t.status === "open").length;
       return `<div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:16px;">
-        <div style="font-size:13.5px;font-weight:800;color:#fff;margin-bottom:6px;">${items[0].categoryLabel} <span style="color:var(--muted-2);font-weight:600;font-size:12.25px;">(${items.length})</span></div>
-        ${items.map(threatRow).join("")}
+        <div class="cat-head" data-cat="${cat}" role="button" tabindex="0">
+          <span class="car">${접힘 ? "▶" : "▼"}</span>
+          <span class="nm">${items[0].categoryLabel}</span>
+          <span class="cnt">(${items.length})</span>
+          ${미대응 ? `<span class="hot">미대응 ${미대응}</span>` : ""}
+        </div>
+        ${접힘 ? "" : items.map(threatRow).join("")}
       </div>`;
     }).join("");
 

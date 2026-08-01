@@ -2328,35 +2328,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   } else {
     init();
   }
-</script>
-
-
-
-<!-- 서버 추가/편집 모달 -->
-<div class="mbg" id="mbg">
-  <div class="modal">
-    <h3 id="mTitle">＋ MCP 서버 추가</h3>
-    <div class="fld"><label>이름</label><input id="fName" placeholder="예: VirusTotal, Nessus 스캐너"></div>
-    <div class="fld"><label>아이콘(이모지)</label><input id="fIcon" placeholder="예: 🎯" maxlength="4"></div>
-    <div class="fld"><label>전송 방식</label>
-      <div class="seg">
-        <label><input type="radio" name="tr" value="stdio" checked><span>🖥 stdio (로컬·안전)</span></label>
-        <label><input type="radio" name="tr" value="http"><span>🌐 HTTP (원격·egress)</span></label>
-      </div>
-    </div>
-    <div class="fld"><label id="epLbl">명령/경로 (stdio)</label><input id="fEndpoint" placeholder="예: ./mcp/nessus  또는  https://mcp.vendor.com"></div>
-    <div class="fld"><label>도구 이름(쉼표로 구분 — 정의용)</label><input id="fTools" placeholder="예: scan_host, get_findings"></div>
-    <div class="err" id="mErr"></div>
-    <div class="m-acts"><button class="btn" id="mCancel">취소</button><button class="btn pri" id="mSave">저장</button></div>
-  </div>
-</div>
-
-<div id="gijoChatWidget" data-prompts='["구동 티어 사용법 알려줘","SMTP 설정 방법 알려줘"]'></div>
-<script src="nav.js"></script>
-<script src="progresscard.js"></script>
-<script src="gijomd.js"></script>
-<script src="chatparts.js"></script>
-<script src="chatwidget.js">
   // ── 사용량 · 비용 (2026-07-28 설정에서 이관) ────────────────────────
   let lastUsage = [];
   async function loadUsage() {
@@ -2417,14 +2388,53 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   }
 
 
-  // 내 설정 구역에서 자동으로 채운다 — 화면을 열면 바로 보여야 한다.
-  (function 사용량시작(){
-    if (!document.getElementById("usageRows")) return;   // 다른 구역만 보는 중이면 건너뛴다
+  // 내 설정 구역의 사용량을 채운다.
+  // ⚠ 실패를 삼키지 않는다(2026-08-02 실측: .catch(function(){})로 묻어 두었더니 표가
+  //   "불러오는 중..."에 멈춘 채 단서가 하나도 안 남았다). 안 되면 그 사실을 표에 적는다.
+  function 사용량시작(){
+    var rows = document.getElementById("usageRows");
+    if (!rows) return;                                   // 다른 구역만 보는 중이면 건너뛴다
     var btn = document.getElementById("csvExportBtn");
     if (btn) btn.addEventListener("click", exportUsageCsv);
-    loadUsage().catch(function(){});
-    loadCloudUsage().catch(function(){});
-  })();
+    loadUsage().catch(function(e){
+      rows.innerHTML = '<tr><td colspan="3" style="color:#f5928a;padding:4px 6px;">사용량을 불러오지 못했습니다 — ' + (e && e.message ? e.message : e) + '</td></tr>';
+    });
+    loadCloudUsage().catch(function(e){
+      var c = document.getElementById("cloudUsageRows");
+      if (c) c.innerHTML = '<tr><td colspan="4" style="color:#f5928a;padding:4px 6px;">불러오지 못했습니다 — ' + (e && e.message ? e.message : e) + '</td></tr>';
+    });
+  }
+  // 이 화면의 초기화가 어디서 끝나는지에 **기대지 않는다** — 문서가 준비되면 스스로 시작한다.
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", 사용량시작);
+  else 사용량시작();
 </script>
+
+
+
+<!-- 서버 추가/편집 모달 -->
+<div class="mbg" id="mbg">
+  <div class="modal">
+    <h3 id="mTitle">＋ MCP 서버 추가</h3>
+    <div class="fld"><label>이름</label><input id="fName" placeholder="예: VirusTotal, Nessus 스캐너"></div>
+    <div class="fld"><label>아이콘(이모지)</label><input id="fIcon" placeholder="예: 🎯" maxlength="4"></div>
+    <div class="fld"><label>전송 방식</label>
+      <div class="seg">
+        <label><input type="radio" name="tr" value="stdio" checked><span>🖥 stdio (로컬·안전)</span></label>
+        <label><input type="radio" name="tr" value="http"><span>🌐 HTTP (원격·egress)</span></label>
+      </div>
+    </div>
+    <div class="fld"><label id="epLbl">명령/경로 (stdio)</label><input id="fEndpoint" placeholder="예: ./mcp/nessus  또는  https://mcp.vendor.com"></div>
+    <div class="fld"><label>도구 이름(쉼표로 구분 — 정의용)</label><input id="fTools" placeholder="예: scan_host, get_findings"></div>
+    <div class="err" id="mErr"></div>
+    <div class="m-acts"><button class="btn" id="mCancel">취소</button><button class="btn pri" id="mSave">저장</button></div>
+  </div>
+</div>
+
+<div id="gijoChatWidget" data-prompts='["구동 티어 사용법 알려줘","SMTP 설정 방법 알려줘"]'></div>
+<script src="nav.js"></script>
+<script src="progresscard.js"></script>
+<script src="gijomd.js"></script>
+<script src="chatparts.js"></script>
+<script src="chatwidget.js"></script>
 </body>
 </html>

@@ -476,9 +476,7 @@ tr:last-child td{border-bottom:none;}
       reportRows.innerHTML = historyReports
         .map((r) => {
           const audLabel = r.audience === "internal" ? "🔍 내부용" : "📄 보고용";
-          const target = (r.assetNames && r.assetNames.length)
-            ? r.assetNames.join(", ")
-            : (r.assetIds && r.assetIds.length ? r.assetIds.join(", ") : "전체 자산");
+          const target = 대상요약(r);
           const when = r.createdAt ? new Date(r.createdAt).toLocaleString("ko-KR") : "-";
           const who = r.createdBy ? `<br><span style="font-size:11.75px;color:#6fdcb5" title="이 리포트를 만든 사람">👤 ${esc(r.createdBy)}</span>` : ""; // 작업 귀속(2026-07-25)
           const files = (r.docx ? dlBtn(r.docx) : "") + (r.pdf ? dlBtn(r.pdf) : "");
