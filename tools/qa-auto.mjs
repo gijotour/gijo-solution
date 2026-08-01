@@ -618,7 +618,13 @@ async function runClient() {
         })(),
       };
     });
-    if (m.groups.length !== 4) throw new Error(`그룹 ${m.groups.length}개: ${m.groups.join(",")}`);
+    // 그룹 7개(2026-08-01 사용자 지시로 재편) — 관제 · 자산·조치 · 보안제품 · 업무 관리 ·
+    // AI · 데이터 플라이휠 · 설정. 자산·조치에 10개가 몰려 있던 것을 갈랐다.
+    // 개수만 세면 "무엇이 바뀌었는지"를 못 잡으므로 이름까지 확인한다.
+    if (m.groups.length !== 7) throw new Error(`그룹 ${m.groups.length}개: ${m.groups.join(",")}`);
+    for (const 있어야 of ["관제", "자산", "보안제품", "업무 관리", "AI", "데이터 플라이휠", "설정"]) {
+      if (!m.groups.some((g) => g.includes(있어야))) throw new Error(`그룹에 '${있어야}'가 없다: ${m.groups.join(",")}`);
+    }
     // 맨 위 고정 4자리 — 대시보드 · 팀 사무실(창) · 문서함(창) · 작업 내역.
     // 2026-07-31 문서함(창)으로 3→4, 같은 날 '내 업무'를 더해 5. 2026-08-01 '내 업무'
     // 화면을 없애(그 일은 대화창이 받는다) 다시 4가 됐다.

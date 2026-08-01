@@ -58,22 +58,36 @@
       { page: "sbom.html", label: "AI-BOM" },
       { page: "vulnscan.html", label: "취약점" },
       { page: "approvals.html", label: "조치·승인" },
+      { page: "terminal.html", label: "터미널 (CLI)" },
+    ]},
+    // 보안제품(2026-08-01 사용자 지시로 신설) — 자산·조치에 10개가 몰려 훑기 어려웠다.
+    // 「우리가 산 장비를 등록하고·정비하고·점검하는」 한 갈래라 따로 세운다.
+    // ⚠ 「유지보수 점검」은 기한이 있는 **일감**(늦었나·검토 대기인가), 「제품 유지보수」는 읽는
+    //   **가이드**다. 이름이 비슷해 붙여 둔다 — 떨어뜨려 놓으면 둘 다 못 찾는다.
+    { id: "products", ic: "🧰", label: "보안제품", items: [
       { page: "products.html", label: "보안제품 등록부" },
       { page: "opsguide.html", label: "제품 유지보수" },
-      // 「유지보수 점검」은 기한이 있는 **일감**(늦었나·검토 대기인가), 「제품 유지보수」는 읽는 **가이드**다.
-      // 이름이 비슷해 붙여 둔다 — 떨어뜨려 놓으면 둘 다 못 찾는다(2026-08-01 신설).
       { page: "maintenance.html", label: "유지보수 점검" },
       { page: "hardening.html", label: "원격 정기점검" },
-      { page: "terminal.html", label: "터미널 (CLI)" },
+    ]},
+    // 업무 관리(2026-08-01 사용자 지시로 신설) — 지금은 인수인계 하나다.
+    // 항목이 하나여도 그룹을 세운 것은 「사람·업무를 넘기는 일」이 AI 기능과 성격이 다르기 때문이다.
+    { id: "work", ic: "📋", label: "업무 관리", items: [
+      { page: "handover.html", label: "인수인계" },
     ]},
     { id: "ai", ic: "🤖", label: "AI", items: [
       { page: "agent.html", label: "에이전트 AI" },
-      { page: "memory.html", label: "기억·학습 (RAG)" },
-      { page: "handover.html", label: "인수인계" },
-      { page: "ontology.html", label: "온톨로지" },
-      { page: "learnloop.html", label: "학습 루프" },
       { page: "merge.html", label: "LLM 합성" },
       { page: "redteam.html", label: "레드팀·가드레일" },
+    ]},
+    // 데이터 플라이휠(2026-08-01 사용자 지시로 신설, 원 지시는 "Data Flywheel").
+    // **쓸수록 똑똑해지는 고리** — 자료를 넣고(기억·학습) 뜻을 잇고(온톨로지) 되먹임으로
+    // 다듬는(학습 루프) 세 화면이 한 고리다. AI 기능(에이전트·합성·레드팀)과 성격이 다르다.
+    // ⚠ 이름을 한글로 적는다 — 사용자 대상 텍스트는 한글이 이 제품의 원칙이다(CLAUDE.md).
+    { id: "flywheel", ic: "🔄", label: "데이터 플라이휠", items: [
+      { page: "memory.html", label: "기억·학습 (RAG)" },
+      { page: "ontology.html", label: "온톨로지" },
+      { page: "learnloop.html", label: "학습 루프" },
     ]},
     // 설정 5구역(2026-07-28) — 기준은 기능이 아니라 **결정권자**다.
     // 내 것 / 모두의 것(서버·AI) / 바깥과 잇는 것 / 관리자만 / 보기만.
