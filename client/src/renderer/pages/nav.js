@@ -231,6 +231,9 @@
       + ".gj-underrow{box-shadow:inset 3px 0 0 var(--blue,#3b82f6);border-radius:0 8px 8px 0;" +
         "margin:0 0 6px 0;min-height:0 !important;}"
       + ".gj-picked{background:rgba(59,130,246,.12);}"
+      // 요약 줄 + 상단 버튼을 한 줄로 — 버튼은 오른쪽 끝에 붙는다.
+      + ".gsum-host{display:flex !important;align-items:center;gap:10px;flex-wrap:wrap;}"
+      + ".gsum-host > .gsum-acts{margin-left:auto;}"
       // 목록 줄을 **한 줄**로(2026-08-02 사용자 지시 "가능하면 한 줄로 나오게 하고").
       // 제목·부제가 위아래로 쌓이면 한 줄이 두세 줄이 된다 — 옆으로 잇고 넘치면 …으로 줄인다.
       // ⚠ 자세히 칸(.gj-underrow)은 여러 줄이 정상이라 건드리지 않는다.
@@ -899,6 +902,10 @@
       box.classList.add("gsum-box");
       상단버튼줄합치기(막대);
     });
+    // ⚠ 칸이 하나뿐인 요약 줄(작업 내역의 "작업 내역 100건 …")은 위에서 건너뛴다.
+    //   그래도 **버튼 합치기는 해야 한다** — 안 그러면 그 화면만 버튼이 한 줄을 더 먹는다.
+    var 남은 = document.querySelector("[data-gijo-summary]");
+    if (남은) 상단버튼줄합치기(남은);
   }
 
   /**
@@ -922,6 +929,7 @@
       });
       if (!묶음) return;
       묶음.classList.add("gsum-acts");
+      막대.classList.add("gsum-host");   // 한 줄로 눕힌다(요약 줄이 .gsum이 아닐 수도 있다)
       막대.appendChild(묶음);
       줄.dataset.gijoMerged = "1";
       줄.style.display = "none";   // 남은 껍데기가 자리를 먹지 않게

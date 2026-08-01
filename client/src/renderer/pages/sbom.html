@@ -188,6 +188,10 @@ tr:last-child td{border-bottom:none;}
   <div id="aiAssetList"><div style="font-size:12px;color:var(--muted)">불러오는 중…</div></div>
 </div>
 
+<!-- 검색줄 + 표는 한 덩어리다(2026-08-02 사용자 지시 "분리된 듯 — 합쳐 줘서 접히도록").
+     전에는 판 밖에 떠 있어 위 「AI 자산」과 따로 노는 것처럼 보였다.
+     접힌 채로도 **아직 안 만든 게 몇 건인지**는 보여야 한다 — 배지로 남긴다. -->
+<div class="panel" style="margin-bottom:16px" data-gijo-fold="자산별 SBOM 목록" data-gijo-fold-badges="kpiMissing:미생성:warn">
 <div class="toolbar">
   <div class="search"><span style="color:var(--muted-2)">⌕</span><input id="searchInput" placeholder="자산명으로 검색" aria-label="자산명으로 검색"></div>
   <div class="filters" id="filterChips">
@@ -208,6 +212,7 @@ tr:last-child td{border-bottom:none;}
     <span id="paginationLabel">-</span>
   </div>
 </div>
+</div><!-- /자산별 SBOM 목록 -->
 
 <div class="panel" id="aibomPanel" style="display:none;margin-bottom:16px">
   <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">

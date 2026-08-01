@@ -134,7 +134,23 @@
     // 구역(탭)으로 나뉜 화면에서는 제목 줄도 같은 구역에 속해야 한다(2026-07-28).
     // 안 물려주면 다른 탭 구역의 제목 줄만 남아 "여긴 왜 이게 있지"가 된다.
     if (target.dataset && target.dataset.sec) head.dataset.sec = target.dataset.sec;
-    target.parentNode.insertBefore(head, target);
+
+    // ⚠ 부모가 **격자(grid)·가로배치(flex)**면 제목 줄이 판과 **나란한 칸**으로 들어간다.
+    //   그러면 제목은 왼쪽, 내용은 오른쪽으로 갈라진다(2026-08-02 사용자 신고: 위협 인텔의
+    //   구독 피드·모니터링 대상). 그때만 둘을 한 칸에 담는 껍데기를 만든다.
+    //   ⚠ 평소에는 감싸지 않는다 — 표·고정 헤더를 깨뜨린 이력이 있다.
+    var 부모배치 = "";
+    try { 부모배치 = window.getComputedStyle(target.parentNode).display || ""; } catch (e) {}
+    if (부모배치 === "grid" || 부모배치 === "inline-grid" || 부모배치 === "flex" || 부모배치 === "inline-flex") {
+      var 칸 = document.createElement("div");
+      칸.className = "gjf-cell";
+      칸.style.minWidth = "0";
+      target.parentNode.insertBefore(칸, target);
+      칸.appendChild(head);
+      칸.appendChild(target);
+    } else {
+      target.parentNode.insertBefore(head, target);
+    }
     겹친제목지우기(target, name);
 
     var e = { target: target, head: head, name: name, badges: parseBadges(target.getAttribute("data-gijo-fold-badges")) };
