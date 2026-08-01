@@ -88,3 +88,27 @@ describe("0건일 때의 말", () => {
     expect(못찾음, "조건 불일치를 '없습니다'로 말하는 곳이 남았다").toBeGreaterThanOrEqual(4);
   });
 });
+
+describe("0건 문구를 바꾸면 안전망도 같이 봐야 한다", () => {
+  // ★ 실사고(2026-08-01 검토 지적): 도구 0건 문구를 "없습니다"→"전체 N건 중 못 찾았습니다"로
+  //   바꾸면서 agentloop.ts의 EMPTY_RESULT_RE를 안 고쳤다. 「못 찾았습니다」는 「찾지 못했습니다」와
+  //   어순이 달라 안 걸리고, 문장이 40자를 넘어 길이 조건도 통과한다 →
+  //   **0건인데 "데이터가 있다"로 판정**되어, LLM이 정직하게 못 찾았다고 답하면
+  //   도구 원문으로 덮어쓴다. 두 파일이 같은 문구를 두고 어긋난 것이다.
+  it("도구가 실제로 쓰는 0건 문구가 안전망 정규식에 걸린다", async () => {
+    const fs = await import("node:fs");
+    const loop = fs.readFileSync(new URL("../src/engine/agentloop.ts", import.meta.url), "utf8");
+    const m = loop.match(/const EMPTY_RESULT_RE = (\/[^/]+\/);/);
+    expect(m, "EMPTY_RESULT_RE를 못 찾았다 — 이름이 바뀌었으면 이 시험도 고칠 것").toBeTruthy();
+    const re = new RegExp(m![1].slice(1, -1));
+
+    // agenttools.ts가 실제로 내보내는 0건 문구 꼴 그대로.
+    for (const 문구 of [
+      '전체 3건 중 조건("미조치")에 맞는 취약점을 못 찾았습니다. 조건 없이 다시 물어보세요.',
+      '전체 21건 중 "미이행"에 맞는 항목을 못 찾았습니다. 조건 없이 다시 물어보세요.',
+      "등록된 취약점이 없습니다.",
+    ]) {
+      expect(re.test(문구), `0건 문구가 안전망에 안 걸린다: ${문구}`).toBe(true);
+    }
+  });
+});
