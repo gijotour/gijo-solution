@@ -422,7 +422,7 @@
   const avatarBtn = document.getElementById("avatarBtn");
   const assetRows = document.getElementById("assetRows");
   const searchInput = document.getElementById("searchInput");
-  const filterChips = document.getElementById("filterChips");
+  // (filterChips는 없앴다 — 그 요소는 툴바 개편 때 사라졌고 지금 필터는 #ddRiskMenu에 있다.)
   const paginationLabel = document.getElementById("paginationLabel");
   const modal = document.getElementById("addAssetModal");
   const modalErr = document.getElementById("modalErr");
@@ -1264,8 +1264,14 @@
     if (kind === "unscanned") {
       // 점검은 자산 성격에 따라 경로가 달라 일괄 실행하지 않는다 — 대상만 목록에서 보여준다.
       switchTab("list");
-      const chip = filterChips.querySelector('[data-filter="unscanned"]');
-      if (chip) chip.click();
+      // ⚠ 옛 코드는 filterChips(개편 때 사라진 요소)를 잡아 **null.querySelector로 죽었다**
+      //   — 「미점검 보기」가 눌러도 아무 일이 없었다(2026-08-01 발견). 지금 자리는 ddRiskMenu다.
+      //   목록이 다시 그려진 뒤에야 칩이 생기므로 한 박자 뒤에 누른다.
+      setTimeout(() => {
+        const menu = document.getElementById("ddRiskMenu");
+        const chip = menu && menu.querySelector('[data-filter="unscanned"]');
+        if (chip) chip.click();
+      }, 0);
     }
   }
 

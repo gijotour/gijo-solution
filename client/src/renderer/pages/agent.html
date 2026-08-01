@@ -345,7 +345,7 @@ tr:last-child td{border-bottom:none;}
   const statusPill = document.getElementById("statusPill");
   const avatarBtn = document.getElementById("avatarBtn");
   const agentGrid = document.getElementById("agentGrid");
-  const chatFeed = document.getElementById("chatFeed") || document.createElement("div"); // 패널 제거(2026-07-26) — 참조 안전용 더미
+  // (chatFeed 더미도 없앴다 — 이제 이 자리를 쓰는 코드가 없다. 협업 기록은 터미널 패널에 흐른다.)
   const terminalLog = document.getElementById("terminalLog");
   // taskBarInput 더미도 없앴다 — 지시바가 사라진 뒤 이 자리를 쓰는 코드가 하나도 남지 않았다.
 
@@ -704,8 +704,6 @@ tr:last-child td{border-bottom:none;}
   }
 
   function appendLlmEvent(evt) {
-    if (chatFeed.textContent.includes("없습니다") || chatFeed.textContent.includes("불러오는 중")) chatFeed.innerHTML = "";
-    chatFeed.insertAdjacentHTML("afterbegin", llmRowHtml(evt));
     if (terminalLog.textContent.includes("이벤트 없음") || terminalLog.textContent.includes("대기 중")) terminalLog.innerHTML = "";
     terminalLog.insertAdjacentHTML("beforeend", llmTerminalHtml(evt));
     terminalLog.scrollTop = terminalLog.scrollHeight;
@@ -717,10 +715,8 @@ tr:last-child td{border-bottom:none;}
         window.gijo.listCollaborationHistory(),
         window.gijo.listLlmActivity().catch(() => []),
       ]);
-      // 피드: 협업 이벤트 위주(최신이 위). LLM 실동작은 이후 라이브로 흘러든다.
-      chatFeed.innerHTML = collab.length
-        ? collab.slice(-20).reverse().map(collabRowHtml).join("")
-        : '<div style="color:var(--muted);font-size:12px">아직 협업 이벤트가 없습니다 — 지시를 내리면 여기에 실시간으로 표시됩니다</div>';
+      // 협업현황 패널은 2026-07-26에 없앴다 — 그 뒤로 chatFeed에 쓰던 줄들은 문서에 붙지 않은
+      // 더미에 쓰고 있었다(2026-08-01 정리). 살아 있는 자리는 아래 터미널 하나다.
       // 터미널: 협업 이벤트 + 로컬 LLM 실동작을 시간순으로 병합해 최근 40줄.
       const merged = [
         ...collab.map((e) => ({ t: e.timestamp, html: terminalRowHtml(e) })),
@@ -731,13 +727,12 @@ tr:last-child td{border-bottom:none;}
       terminalLog.innerHTML = merged.length ? merged.map((m) => m.html).join("") : '<div class="out">이벤트 없음</div>';
       terminalLog.scrollTop = terminalLog.scrollHeight;
     } catch (e) {
-      chatFeed.innerHTML = '<div style="color:var(--muted);font-size:12px">협업 로그를 불러오지 못했습니다</div>';
+      // ⚠ 이 오류는 옛 코드에서 **어디에도 안 떴다** — 사라진 패널에만 적었다. 터미널에 남긴다.
+      terminalLog.innerHTML = '<div class="out">협업 로그를 불러오지 못했습니다 — 서버 연결을 확인하세요</div>';
     }
   }
 
   function appendLiveEvent(evt) {
-    if (chatFeed.querySelector(".chat-row") === null && chatFeed.textContent.includes("없습니다")) chatFeed.innerHTML = "";
-    chatFeed.insertAdjacentHTML("afterbegin", collabRowHtml(evt));
     if (terminalLog.textContent.includes("이벤트 없음") || terminalLog.textContent.includes("대기 중")) terminalLog.innerHTML = "";
     terminalLog.insertAdjacentHTML("beforeend", terminalRowHtml(evt));
     terminalLog.scrollTop = terminalLog.scrollHeight;
@@ -846,9 +841,7 @@ tr:last-child td{border-bottom:none;}
     });
     loadModelGuide();
 
-    document.getElementById("clearFeedBtn")?.addEventListener("click", () => { // 협업현황 패널 제거 — 가드
-      chatFeed.innerHTML = '<div style="color:var(--muted);font-size:12px">지워졌습니다 (서버 이력은 유지됩니다)</div>';
-    });
+    // clearFeedBtn 배선도 걷었다 — 버튼도, 지울 피드도 없어진 지 오래다(협업현황 패널 제거).
     // 두 버튼 모두 팀 설정 모달을 연다. "추가"는 역할이 고정이라 실제 추가는 없고, 모달이
     // "역할 고정 · 이름/모델 커스터마이즈 가능"을 안내한다(가짜 추가 대신 정직한 안내).
     document.getElementById("agentSettingsBtn").addEventListener("click", openAgentSettings);
@@ -872,7 +865,7 @@ tr:last-child td{border-bottom:none;}
 
 
 
-<div id="gijoChatWidget" data-prompts='["팀 구성 알려줘","협업 피드 사용법 알려줘"]'></div>
+<div id="gijoChatWidget" data-prompts='["팀 구성 알려줘","에이전트에 모델은 어떻게 배정해"]'></div>
 <script src="nav.js"></script>
 <script src="progresscard.js"></script>
 <script src="gijomd.js"></script>

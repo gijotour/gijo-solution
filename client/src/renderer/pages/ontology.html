@@ -123,7 +123,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     </div>
 
     <div class="panel">
-      <div class="panel-title">🕸 관계 그래프</div><div class="field-row" style="margin-bottom:12px">
+      <div class="panel-title">🕸 관계 그래프 <span id="graphCap" style="font-size:11.5px;font-weight:600;color:var(--muted)"></span></div><div class="field-row" style="margin-bottom:12px">
         <div class="field"><label for="filterSubject">특정 엔티티만 보기 (주어)</label><input id="filterSubject" placeholder="비워두면 전체 · 예: 탈옥"></div>
         <button class="btn-ghost" id="filterBtn" style="align-self:flex-end">필터</button>
         <button class="btn-ghost" id="filterClearBtn" style="align-self:flex-end">전체</button>
@@ -218,8 +218,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const svg = document.getElementById("graph");
     const W = 900, H = 440, cx = W / 2, cy = H / 2, R = 165;
     const shown = triples.slice(0, GRAPH_CAP);
-    const capEl = document.getElementById("graphCap"); // 요소는 개편 때 제거됨 — 잔존 참조가 그래프 렌더를 죽였다(2026-07-25 스윕 발견)
-    if (capEl) capEl.textContent = GRAPH_CAP;
+    // ⚠ 표시 상한을 **말하지 않고 잘라 왔다**(2026-08-01 발견). 요소가 개편 때 사라진 뒤로
+    //   1년치 관계 중 60개만 그리면서 담당자에겐 그게 전부인 것처럼 보였다 — 자리를 되살렸다.
+    //   담당자는 화면에 보이는 수로 지식의 크기를 가늠한다. 잘랐으면 잘랐다고 적는다.
+    const capEl = document.getElementById("graphCap");
+    if (capEl) {
+      capEl.textContent = triples.length > GRAPH_CAP
+        ? `전체 ${triples.length.toLocaleString("ko-KR")}건 중 ${GRAPH_CAP}건만 그립니다 — 좁히려면 위에서 주어를 지정하세요`
+        : `${triples.length.toLocaleString("ko-KR")}건 전부`;
+    }
     const nodeNames = [];
     const seen = new Set();
     for (const t of shown) { for (const n of [t.subject, t.object]) if (!seen.has(n)) { seen.add(n); nodeNames.push(n); } }

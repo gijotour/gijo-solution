@@ -707,7 +707,7 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
   // ── 실데이터 연동 ──────────────────────────────────────────────────
   const liveBadge = document.getElementById("liveBadge");
   const statLine = document.getElementById("statLine");
-  const feedEl = document.getElementById("feed");
+  // (feedEl은 없앴다 — #feed 요소가 A안에서 사라진 뒤로 늘 null이었다.)
 
   // 사무실 LIVE 채팅(v5) — 캐릭터 말풍선과 같은 협업 이벤트를 오른쪽 열에도 흘린다.
   const OLIVE_MAX = 60;
@@ -772,10 +772,8 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
     const sessions = await window.gijo.listActiveSessions();
     const online = (sessions || []).filter((s) => Date.now() - s.lastSeenAt < ONLINE_WINDOW_MS);
     const names = new Set(online.map((s) => s.username));
-    if (knownVisitors) {
-      for (const n of names) if (!knownVisitors.has(n)) feedLine("🧑 지시", `${n} 님이 미팅룸에서 보안총괄에게 지시합니다`, "#ffe9a8");
-      for (const n of knownVisitors) if (!names.has(n)) feedLine("🚪 퇴장", `${n} 님의 접속이 종료되었습니다`, "var(--muted)");
-    }
+    // 입·퇴장은 사무실 그림의 방문자 캐릭터로 이미 보인다(office.setVisitors) —
+    // 옛 피드 줄은 그릴 자리가 없어져 허공에 쓰고 있었다(2026-08-01 정리).
     knownVisitors = names;
     visitorCount = online.length;
     office.setVisitors(online.map((s) => ({ username: s.username })));
@@ -784,11 +782,12 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
 
   // 버튼 글자로 잠깐 알린다. 이 화면엔 알림 자리가 따로 없고 feedLine은 그리는 곳이 없어졌다
   // (아래 785행 주석) — 눌렀는데 아무 반응이 없으면 담당자는 고장으로 읽는다.
-  function 알림(btn, 말, 되돌릴말) {
+  // 오류는 오래 둔다(기본 2.6초, 넷째 인자로 늘림) — 잠깐 스쳐 지나가면 못 본 것과 같다.
+  function 알림(btn, 말, 되돌릴말, 밀리초) {
     if (!btn) return;
     btn.dataset.hold = "1";
     btn.textContent = 말;
-    setTimeout(function () { delete btn.dataset.hold; btn.textContent = 되돌릴말; }, 2600);
+    setTimeout(function () { delete btn.dataset.hold; btn.textContent = 되돌릴말; }, 밀리초 || 2600);
   }
 
   // 지시는 전부 대화창(지휘소)으로 보낸다.
@@ -802,24 +801,15 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
     if (window.gijo && window.gijo.openConsoleWindow) window.gijo.openConsoleWindow();
   }
 
-  function feedLine(from, msg, color) {
-    // A안: 팀 대화 피드 패널을 없앴다 — 대화는 캐릭터 말풍선(office.collabMove)과
-    // 대시보드 "실시간 세션"에서 확인한다. 피드 요소가 없으면 조용히 무시(호출부는 그대로 둠).
-    if (!feedEl) return;
-    const div = document.createElement("div");
-    div.className = "f-line";
-    // 장문 LLM 응답이 피드를 도배하지 않게 잘라서 표시(전문은 에이전트 AI 페이지 협업 로그에서).
-    const short = String(msg).length > 180 ? String(msg).slice(0, 180) + "…" : String(msg);
-    div.innerHTML = `<span class="f-who" style="color:${color || "var(--blue-light)"}">${esc(from)}</span><span class="f-msg">${esc(short)}</span>`;
-    feedEl.appendChild(div);
-    while (feedEl.children.length > 40) feedEl.removeChild(feedEl.children[1]); // f-note 다음부터 정리
-    feedEl.scrollTop = feedEl.scrollHeight;
-  }
+  // feedLine()은 없앴다(2026-08-01). 팀 대화 피드 패널을 A안에서 걷어내면서 "그릴 자리가 없으면
+  // 조용히 무시, 호출부는 그대로 둠"으로 남겨 뒀는데, 그 뒤로 **9곳이 허공에 쓰고 있었다** —
+  // 그중 셋이 오류 알림이라 브리핑·할일·초기화가 실패해도 화면은 조용했다.
+  // 남길 통보는 살아 있는 자리(알림·말풍선·LIVE 채팅)로 옮겼다. 함수를 지운 이유는, 남겨 두면
+  // 다음 사람이 또 부르기 때문이다 — 이제 부르면 ReferenceError로 **시끄럽게** 터진다.
 
   function onCollabEvent(evt) {
     if (!evt || !evt.message) return;
     const from = evt.from || "팀";
-    feedLine(from + (evt.to ? " → " + evt.to : ""), evt.message, AGENT_COLOR[from]);
     // from 캐릭터가 to 책상까지 걸어가 말풍선 — to가 없으면 제자리 말풍선
     office.collabMove(from, evt.to, evt.message);
     appendOlive(from, evt.to, evt.message); // LIVE 채팅 열(v5)
@@ -952,7 +942,7 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
       guideFirstRender = false; // 초기 2단이 끝났다 — 이후 갱신은 스크롤을 건드리지 않는다
     } catch (err) {
       guideBox.style.display = "none"; // 실패해도 아래 "내 할일"은 그대로 뜬다
-      feedLine("시스템", "오늘 브리핑을 불러오지 못했습니다: " + (err && err.message || err), "var(--amber)");
+      알림(document.querySelector(".brief-col .bc-h"), "⚠ 브리핑을 불러오지 못했습니다", "🧭 오늘 브리핑", 15000);
     }
   }
 
@@ -980,7 +970,7 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
     const instruction = it.axis === "device"
       ? `${it.subtitle}의 ${it.title}을 진행해줘. (${it.why})`
       : `${it.subtitle} 자산의 ${it.title} 조치를 진행해줘. 근거: ${it.why}`;
-    feedLine("나", instruction, "var(--blue-light)");
+    // 보낸 지시를 여기 되뇌지 않는다 — 대화창이 그대로 보여 준다(옛 피드 줄은 그릴 자리가 없었다).
     goBtn.disabled = true;
     goBtn.textContent = "대화창으로 넘기는 중…";
     try {
@@ -1019,7 +1009,7 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
         await window.gijo.deleteTask(id);
         await loadTasks();
       }
-    } catch (err) { feedLine("시스템", "할일 처리 실패: " + (err && err.message || err), "var(--red)"); }
+    } catch (err) { 알림(document.querySelector(".todo .t-head"), "⚠ 할일 처리에 실패했습니다", "☑ 오늘의 할일", 15000); }
   });
 
   // 적어 넣기는 '내 업무' 화면으로 보낸다(2026-07-31) — 거기서는 적으면 그 일을 어떤 순서로
@@ -1049,7 +1039,6 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
         알림(ctaBtn, `오늘의 루틴 ${daily.length}건을 담았어요`, orig);
       } else {
         const top = open[0];
-        feedLine("나 → 대화창", top.text, "var(--text)");
         // ⚠ 여기는 두 겹으로 고장나 있었다(2026-08-01). ① 응답의 summary·reply·message를 읽었는데
         //    dispatch 응답에 그런 필드가 없다(있는 건 output) — 그래서 **아무것도 안 찍혔다.**
         //    ② 필드를 고쳐도 결재판을 못 그려 쓰기 지시는 실행되지 않는다. 대화창으로 보낸다.
@@ -1122,14 +1111,15 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
       setInterval(loadSocBar, 60000); // 관제 상태 띠 갱신(1분)
       const history = await window.gijo.listCollaborationHistory();
       (history || []).slice(-40).forEach((e) => appendOlive(e.from, e.to, e.message)); // LIVE 채팅 초기 채움(v5)
-      (history || []).slice(-8).forEach((evt) => feedLine(evt.from + (evt.to ? " → " + evt.to : ""), evt.message, AGENT_COLOR[evt.from]));
       if (window.gijoRealtime) window.gijoRealtime.connect();
       window.gijo.onCollaborationEvent(onCollabEvent);
       setInterval(loadAgents, 20000);  // 상태는 휘발성 라이브 신호 — 주기 폴링으로 갱신
       setInterval(loadSessions, 15000); // 외부 콘솔 접속자 presence
       setInterval(loadTasks, 60000);
     } catch (e) {
-      feedLine("시스템", "초기화 실패: " + (e && e.message || e), "var(--red)");
+      // ⚠ 여기가 조용하면 **화면이 통째로 비어 있는데 이유를 알 수 없다.** 옛 코드는 그릴 자리가
+      //   없어진 피드에 적어 아무도 못 봤다(2026-08-01). 할일 머리글에 남긴다(오래 둔다).
+      알림(document.querySelector(".todo .t-head"), "⚠ 사무실을 여는 데 실패했습니다 — 창을 닫았다 다시 열어 주세요", "☑ 오늘의 할일", 20000);
     }
   })();
 })();
