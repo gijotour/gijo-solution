@@ -177,24 +177,27 @@ ok("탭을 닫으면 프레임도 함께 사라진다", s2.탭.length === 2 && s
 //   예전엔 콘솔이 항상 화면 **아래**에 있어서 빼면 높이가 늘었다. 지금은 창이 넓으면
 //   콘솔이 **옆**에 서므로 빼면 **너비**가 는다. 높이만 재던 옛 검사는 정상 동작을
 //   실패로 보고했다(실측 1082→1036: 셸 창이 콘솔 창 자리를 내주며 줄어든 것).
-//   그래서 숫자가 아니라 **규칙**을 본다 — 콘솔이 차지하던 축이 넓어졌는가.
-const 전 = await page.evaluate(() => {
-  const r = document.getElementById("screens").getBoundingClientRect();
-  return { 너비: Math.round(r.width), 높이: Math.round(r.height), 가로: document.querySelector(".work")?.classList.contains("console-side") ?? false };
+//   ⚠ 그리고 **절대 픽셀로도 재면 안 된다**(같은 날 두 번째로 데임). 콘솔을 빼내면 셸 창
+//   자체가 콘솔 창 자리를 내주려 작아진다 — 안쪽에서는 넓어졌는데 절대값은 줄어든다
+//   (실측: 한 실행 1188→1196 늘고, 다른 실행 1788→1506 줄었다. 둘 다 정상 동작이다).
+//   그래서 창 크기와 무관한 것을 본다: **화면 영역이 작업 영역을 다 차지하는가.**
+const 차지비율 = () => page.evaluate(() => {
+  const s = document.getElementById("screens").getBoundingClientRect();
+  const w = document.querySelector(".work").getBoundingClientRect();
+  const 가로 = document.querySelector(".work")?.classList.contains("console-side") ?? false;
+  return { 비율: 가로 ? +(s.width / w.width).toFixed(3) : +(s.height / w.height).toFixed(3), 가로 };
 });
+const 전 = await 차지비율();
 await page.evaluate(() => document.getElementById("csToggleHost").click());
 await page.waitForTimeout(4500);
 const cw = ctx.pages().find((p) => p.url().includes("console.html"));
 ok("콘솔을 별도 창으로 빼낼 수 있다", !!cw, cw ? "console.html" : "창 없음");
-const 후 = await page.evaluate(() => {
-  const r = document.getElementById("screens").getBoundingClientRect();
-  return { 너비: Math.round(r.width), 높이: Math.round(r.height), 접힘: document.body.classList.contains("console-popped") };
-});
-const 늘었나 = 전.가로 ? 후.너비 > 전.너비 : 후.높이 > 전.높이;
+const 후 = await 차지비율();
+const 접힘 = await page.evaluate(() => document.body.classList.contains("console-popped"));
 ok(
-  `콘솔을 빼면 화면이 넓어진다(${전.가로 ? "가로 배치 → 너비" : "세로 배치 → 높이"})`,
-  후.접힘 && 늘었나,
-  `너비 ${전.너비}→${후.너비} · 높이 ${전.높이}→${후.높이}`
+  "콘솔을 빼면 화면이 그 자리를 가져간다",
+  접힘 && 후.비율 > 전.비율 && 후.비율 > 0.95,
+  `작업영역 차지 ${전.비율} → ${후.비율} (${전.가로 ? "가로" : "세로"} 배치 기준)`
 );
 if (cw) {
   await cw.waitForTimeout(2500);
@@ -247,7 +250,31 @@ const upd = await page.evaluate((visSrc) => {
     return { 활성: document.querySelector("#tabBar .tab.on .nm")?.textContent, 보임: isVis(p), 버전: p?.querySelector("#currentVersion")?.textContent?.trim() || null };
   } catch (e) { return { err: String(e).slice(0, 60) }; }
 }, VIS);
-ok("설정 관리자에 업데이트가 펼쳐져 보인다", upd.활성 === "관리자" && upd.보임 && !!upd.버전, JSON.stringify(upd));
+// ⚠ 이 구역은 **접기 도우미**(fold.js)가 관리한다 — 접으면 패널 전체에 인라인 display:none이
+//   붙고 그 상태가 localStorage에 남는다. 한 번 접어 두면 다음 실행에서도 접힌 채다.
+//   "항상 펼쳐져 있어야 한다"는 옛 기대는 **정상 상태를 실패로** 보고했다
+//   (2026-08-01 실측: 인라인 display:none, 원인은 접힘 저장값 — 제품 결함이 아니다).
+//   지켜야 할 것은 **접혀 있어도 눌러서 펼치면 보이고 버전이 나온다**는 것이다.
+let upd2 = upd;
+if (!upd2.보임) {
+  await page.evaluate(() => {
+    const f = document.querySelector("#screens iframe.on");
+    const d = f?.contentDocument;
+    const p = [...(d?.querySelectorAll(".panel") ?? [])].find((x) => (x.querySelector(".panel-title")?.textContent || "").trim().startsWith("업데이트"));
+    p?.previousElementSibling?.click?.(); // 접기 머리줄은 대상 **앞**에 끼워 넣는다(fold.js)
+  });
+  await page.waitForTimeout(800);
+  upd2 = await page.evaluate((visSrc) => {
+    const isVis = eval(visSrc);
+    const f = document.querySelector("#screens iframe.on");
+    try {
+      const d = f.contentDocument;
+      const p = [...d.querySelectorAll(".panel")].find((x) => (x.querySelector(".panel-title")?.textContent || "").trim().startsWith("업데이트"));
+      return { 활성: document.querySelector("#tabBar .tab.on .nm")?.textContent, 보임: isVis(p), 버전: p?.querySelector("#currentVersion")?.textContent?.trim() || null };
+    } catch (e) { return { err: String(e).slice(0, 60) }; }
+  }, VIS);
+}
+ok("설정 관리자에서 업데이트를 펼치면 버전이 보인다", upd2.활성 === "관리자" && upd2.보임 && !!upd2.버전, JSON.stringify(upd2));
 
 // 16) JS 오류 — preload 주입 플레이크의 1회성 오류(치유 전 프레임 소음)는 구분 집계
 const transient = jsErrors.filter((e) => e.includes("reading 'isAuthenticated'"));
