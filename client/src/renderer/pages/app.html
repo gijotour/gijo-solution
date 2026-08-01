@@ -43,6 +43,14 @@
   .tab .x:hover{opacity:1;color:#fff;background:rgba(226,72,61,.4);}
   .tab.pinned .x{display:none;}
   .tab .pin{flex:0 0 auto;font-size:9px;color:var(--blue-light);}
+  /* ★ 창을 마우스로 끌 수 있는 자리 (2026-08-01 사용자 지적 — "마우스 눌러서 창을 이동하는건데").
+     이 앱은 윈도우 제목표시줄을 숨기고(main.ts titleBarStyle:"hidden") 버튼 셋만 OS가 그린다.
+     그런데 셸에는 끌 수 있는 자리가 **하나도 없어서 본창을 아예 못 옮겼다** — 실앱에서
+     맨 위 가운데를 찍어 보니 잡히는 것이 DIV.spacer였고 drag 영역이 아니었다.
+     탭 띠 전체를 손잡이로 삼되, 그 안의 누르는 것들은 no-drag로 되돌린다
+     (안 되돌리면 탭·버튼이 안 눌리고 창만 끌린다). */
+  .tabbar{-webkit-app-region:drag;}
+  .tabbar .tab,.tabbar button,.tabbar .winmenu,.tabbar input,.tabbar select{-webkit-app-region:no-drag;}
   .tabbar .spacer{flex:1 1 auto;}
   .tb-act{flex:0 0 auto;display:flex;align-items:center;gap:4px;padding-bottom:6px;}
   .tb-btn{font-size:11px;font-weight:700;color:var(--muted);background:transparent;border:1px solid var(--border);border-radius:7px;padding:4px 9px;cursor:pointer;white-space:nowrap;}
@@ -102,9 +110,6 @@
           <button class="tb-btn" id="tbWins" title="열려 있는 창 목록 — 누르면 그 창이 앞으로">🗔 창 <span id="tbWinCnt"></span></button>
           <div class="winpop" id="winPop"></div>
         </div>
-        <!-- 창 자리 옮기기 — 창 버튼(─ ▢ ✕) 바로 왼쪽. 그 셋은 윈도우가 그리는 것이라
-             그 안엔 우리 아이콘을 못 넣는다(titleBarOverlay). 사용자 요청 2026-08-01. -->
-        <button class="tb-btn" id="tbSnapSide" title="창을 화면 왼쪽 끝으로 붙입니다 — 한 번 더 누르면 오른쪽으로">⇤</button>
       </div>
     </div>
     <div class="screens" id="screens"><div class="blank">왼쪽 메뉴에서 화면을 고르면 탭으로 열립니다.</div></div>    <!-- 콘솔은 console.js가 그린다 — 별도 창(console.html)과 같은 파일을 쓴다(자리만 다르다). -->
@@ -351,18 +356,7 @@
 
   $("tbCloseAll").addEventListener("click", closeAll);
 
-  // 창을 화면 한쪽 끝으로 붙인다. 누를 때마다 왼쪽 ↔ 오른쪽으로 오가고, 화살표도 따라 바뀐다
-  // — 다음에 어디로 갈지 아이콘이 말해 준다(2026-08-01 사용자 요청).
-  $("tbSnapSide").addEventListener("click", function () {
-    if (!window.gijo || !window.gijo.snapWindowSide) return;
-    window.gijo.snapWindowSide().then(function (r) {
-      if (!r || !r.ok) return;
-      var 왼쪽으로갈차례 = r.side === "right"; // 방금 오른쪽으로 갔으면 다음은 왼쪽
-      $("tbSnapSide").textContent = 왼쪽으로갈차례 ? "⇤" : "⇥";
-      $("tbSnapSide").title = 왼쪽으로갈차례
-        ? "창을 화면 왼쪽 끝으로 붙입니다"
-        : "창을 화면 오른쪽 끝으로 붙입니다";
-    });
+
   });
 
   // ── 열린 창 목록 ─────────────────────────────────────────────────────

@@ -498,25 +498,6 @@ ipcMain.handle("console:ask", async (_e, text: string) => {
   return { ok: true };
 });
 
-// 창을 화면 한쪽 끝으로 붙인다(사용자 요청 2026-08-01 — "여기 왼쪽으로 전체 창 이동").
-// 창 버튼(─ ▢ ✕)은 **윈도우가 그리는 것**이라 그 안엔 우리 아이콘을 못 넣는다
-// (titleBarOverlay). 그래서 바로 왼쪽 우리 영역에 둔다.
-//
-// 누를 때마다 왼쪽 → 오른쪽 → 왼쪽으로 오간다. 두 번째 모니터로 옮기려는 것이 아니라
-// **같은 화면 안에서 자리를 비키는** 용도다(대화 창이나 다른 앱을 옆에 두려고).
-ipcMain.handle("shell:snapSide", async (e) => {
-  const win = BrowserWindow.fromWebContents(e.sender);
-  if (!win || win.isDestroyed()) return { ok: false };
-  const wa = screen.getDisplayMatching(win.getBounds()).workArea; // 지금 있는 모니터 기준
-  if (win.isMaximized()) win.unmaximize(); // 최대화면 자리를 못 옮긴다
-  const b = win.getBounds();
-  // 지금 왼쪽에 붙어 있으면 오른쪽으로, 아니면 왼쪽으로.
-  const 왼쪽에있나 = Math.abs(b.x - wa.x) <= 8;
-  const x = 왼쪽에있나 ? wa.x + wa.width - b.width : wa.x;
-  win.setBounds({ x, y: b.y, width: b.width, height: b.height });
-  return { ok: true, side: 왼쪽에있나 ? "right" : "left" };
-});
-
 ipcMain.handle("console:dock", async () => {
   if (consoleWindow && !consoleWindow.isDestroyed()) consoleWindow.close(); // closed 이벤트가 셸에 알린다
   return { ok: true };
