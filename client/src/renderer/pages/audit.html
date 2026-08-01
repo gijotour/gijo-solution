@@ -6,9 +6,9 @@
 <title>GIJO AS — 작업 기록</title>
 <style>
 :root{
-  --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --bg:#12161f;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
   --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
-  --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+  --text:#dfe3ec;--muted:#8b93ab;--muted-2:#78829a;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
@@ -93,6 +93,13 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .usage-kpi{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;}
 .usage-kpi .l{font-size:10.5px;color:var(--muted-2);font-weight:700;}
 .usage-kpi .v{font-size:16px;font-weight:800;color:#fff;margin-top:3px;}
+  /* 「더 보기」 — 목록을 줄여 보여주되 있는 것을 숨기지 않는다는 표시(2026-08-01). */
+  .more{display:block;width:100%;margin-top:10px;padding:10px;background:var(--panel-2);
+    border:1px dashed var(--border-strong);border-radius:9px;color:var(--blue-light);
+    font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;}
+  .more:hover{border-style:solid;border-color:var(--blue-light);}
+  .more .cnt{color:var(--muted-2);font-weight:600;margin-left:6px;}
+  .more-end{margin-top:10px;padding:8px;text-align:center;font-size:11.5px;color:var(--muted-2);}
 </style>
 </head>
 <body>
@@ -140,8 +147,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     <!-- 시스템 로그 — logs.html 화면에서 이관(2026-07-28). 작업 기록이 '누가 무엇을 했나'라면
          이쪽은 '서버가 무엇을 했나'다. 같은 탭에서 위아래로 대조할 수 있어야 한다. -->
-    <div class="panel" data-gijo-fold="시스템 로그">
-      <div class="panel-title">시스템 로그</div>
+    <!-- ⚠ 접힌 구역에는 **배지가 필수**다. 오류가 있는데 숫자 없이 접혀 있으면 그냥 지나친다
+         (2026-08-01: 배지가 참조하는 요소를 안 만들어 두어 아예 안 뜬 사고를 겪었다 —
+         그래서 이번엔 요소를 함께 만든다). hot이면 저장값과 무관하게 펼쳐진다. -->
+    <div class="panel" data-gijo-fold="시스템 로그" data-gijo-fold-badges="logErrCount:오류:hot">
+      <div class="panel-title">시스템 로그<span id="logErrCount" style="display:none">0</span></div>
       <div class="panel-sub">서버와 도구가 실제로 무엇을 했는지 흐르는 그대로 보여줍니다.</div>
       <div class="filters" id="sourceFilters">
         <div class="filter-chip active" data-src="all">전체</div>
@@ -156,7 +166,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     </div>
 
     <!-- 사용량·비용 — 설정에서 이관(2026-07-28). 바꾸는 곳이 아니라 보는 곳이다. -->
-    <div class="panel" data-gijo-fold="사용량 · 비용">
+    <div class="panel" data-gijo-fold="사용량 · 비용" data-gijo-fold-badges="kpiCalls:호출">
     <div class="panel-title">사용량 · 비용</div>
     <div class="panel-sub">서버를 켠 뒤 누적된 호출량입니다. 온프레미스 로컬 LLM은 비용이 들지 않으며, 외부 서비스를 쓴 경우에만 예상 비용이 잡힙니다.</div>
     <div class="usage-kpis">
@@ -226,13 +236,31 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     );
   }
 
+  // 한 번에 그리는 줄 수. 500건을 다 그리면 화면이 글자 3,100조각이 되어 무엇이 중요한지
+  // 안 보인다(2026-08-01 실측). 기록은 **최근 것이 중요하고**, 옛것은 스크롤이 아니라
+  // 검색·필터로 찾는다. ⚠ 줄여서 보여주되 **있는 것을 숨기지는 않는다** — 전체 건수를 늘 적고,
+  // 눌러서 늘릴 수 있게 한다. 내보내기(.csv)는 화면에 그린 수와 무관하게 전건이다.
+  const 한번에 = 50;
+  let 보이는수 = 한번에;
+
   function render() {
     const q = (document.getElementById("searchBox").value || "").toLowerCase();
     let rows = entries;
     if (activeKind !== "all") rows = rows.filter((e) => e.kind === activeKind);
     if (q) rows = rows.filter((e) => `${e.action} ${e.target || ""} ${e.detail || ""} ${e.actor || ""}`.toLowerCase().includes(q));
-    panel.innerHTML = rows.length ? rows.map(rowHtml).join("") : '<div class="empty">해당 조건의 작업 기록이 없습니다.</div>';
+    if (!rows.length) { panel.innerHTML = '<div class="empty">해당 조건의 작업 기록이 없습니다.</div>'; return; }
+    const 볼것 = rows.slice(0, 보이는수);
+    const 남음 = rows.length - 볼것.length;
+    panel.innerHTML = 볼것.map(rowHtml).join("") +
+      (남음 > 0
+        ? `<button class="more" id="moreBtn">＋ ${Math.min(한번에, 남음)}건 더 보기 <span class="cnt">(${볼것.length} / 전체 ${rows.length}건)</span></button>`
+        : (rows.length > 한번에 ? `<div class="more-end">전체 ${rows.length}건을 다 보고 있습니다</div>` : ""));
+    const b = document.getElementById("moreBtn");
+    if (b) b.addEventListener("click", () => { 보이는수 += 한번에; render(); });
   }
+
+  // 조건이 바뀌면 처음 50건부터 다시 — 앞 조건에서 늘려 둔 상태가 남으면 갑자기 500줄이 쏟아진다.
+  function 다시처음부터() { 보이는수 = 한번에; render(); }
 
   function renderKpi(summary, retention) {
     const el = document.getElementById("kpiRow");
@@ -285,6 +313,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const shown = activeFilter === "all" ? logEntries : logEntries.filter((e) => (e.source || "console") === activeFilter);
     logConsole.innerHTML = shown.map(lineHtml).join("") || '<div style="color:var(--muted)">표시할 로그가 없습니다.</div>';
     logConsole.scrollTop = logConsole.scrollHeight;
+    // 접힌 채로도 "지금 열어야 하나"를 알 수 있게 오류 수를 배지에 적는다.
+    const 오류 = logEntries.filter((e) => /error|err|fail|실패|오류/i.test(String(e.level || "") + " " + String(e.message || ""))).length;
+    const 셈 = document.getElementById("logErrCount");
+    if (셈) 셈.textContent = String(오류);
+    if (window.gijoFold) window.gijoFold.refresh();
   }
 
   function appendLogEntry(entry) {
@@ -395,9 +428,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.getElementById("kindFilters").addEventListener("click", (e) => {
       const chip = e.target.closest("[data-kind]"); if (!chip) return;
       document.querySelectorAll("#kindFilters .filter-chip").forEach((c) => c.classList.remove("active"));
-      chip.classList.add("active"); activeKind = chip.dataset.kind; render();
+      chip.classList.add("active"); activeKind = chip.dataset.kind; 다시처음부터();
     });
-    document.getElementById("searchBox").addEventListener("input", render);
+    document.getElementById("searchBox").addEventListener("input", 다시처음부터);
     document.getElementById("dlBtn").addEventListener("click", exportCsv);
   }
 

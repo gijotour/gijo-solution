@@ -546,7 +546,11 @@ ipcMain.handle("shell:popoutOrient", async (e, orient: string) => {
 const ZOOM_MIN = 0.8;
 const ZOOM_MAX = 1.5;
 const ZOOM_STEPS = [0.8, 0.9, 1.0, 1.1, 1.25, 1.5];
-let uiZoom = 1;
+// ★ 기본을 110%로 올린다(2026-08-01 사용자 지적: "눈이 부시고 눈에 피로가 있다").
+//   본문 글자가 화면마다 9.5~13px이라 100%에서는 작다. 31화면의 크기를 일일이 고치면
+//   표가 밀리고 칩이 줄바꿈되는 등 어디가 깨졌는지 못 찾는다 — 배율은 **전체를 같은 비율로**
+//   키워서 배치가 안 흔들린다. 담당자가 고른 값이 있으면 그대로 따른다(아래 loadSavedZoom).
+let uiZoom = 1.1;
 
 function zoomStateFile(): string {
   return path.join(app.getPath("userData"), "ui-zoom.txt");
@@ -558,7 +562,7 @@ function loadSavedZoom(): void {
   try {
     uiZoom = clampZoom(Number(fs.readFileSync(zoomStateFile(), "utf-8").trim()));
   } catch {
-    /* 저장값 없음 — 100% 유지 */
+    /* 저장값 없음 — 위 기본값(110%) 유지 */
   }
 }
 // 창이 새 페이지를 띄울 때마다 다시 걸어 준다. Chromium의 배율은 origin 단위로 기억되는데,

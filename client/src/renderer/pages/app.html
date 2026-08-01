@@ -7,8 +7,8 @@
      기본 글꼴로 그려졌다가 바뀌어 깜빡인다(셸은 앱의 첫 화면이라 특히 눈에 띈다). -->
 <link rel="stylesheet" href="gijo-ui.css">
 <style>
-  :root{--bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);--border-strong:rgba(255,255,255,0.16);
-    --blue:#3b82f6;--blue-light:#5fa1ff;--text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--teal:#1eb980;--red:#e2483d;--amber:#f0a020;}
+  :root{--bg:#12161f;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);--border-strong:rgba(255,255,255,0.16);
+    --blue:#3b82f6;--blue-light:#5fa1ff;--text:#dfe3ec;--muted:#8b93ab;--muted-2:#78829a;--teal:#1eb980;--red:#e2483d;--amber:#f0a020;}
   *{box-sizing:border-box;margin:0;padding:0;}
   html,body{height:100%;overflow:hidden;}
   body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
@@ -136,7 +136,8 @@
         </div>
       </div>
     </div>
-    <div class="screens" id="screens"><div class="blank">왼쪽 메뉴에서 화면을 고르면 탭으로 열립니다.</div></div>    <!-- 콘솔은 console.js가 그린다 — 별도 창(console.html)과 같은 파일을 쓴다(자리만 다르다). -->
+    <div class="screens" id="screens"><div class="blank">왼쪽 메뉴에서 화면을 고르면 탭으로 열립니다.</div></div>
+    <!-- 콘솔은 console.js가 그린다 — 별도 창(console.html)과 같은 파일을 쓴다(자리만 다르다). -->
     <div class="console" id="console"><div id="consoleHost" data-mode="dock"></div></div>
     <!-- 콘솔을 창으로 빼냈을 때 자리에 남는 안내 -->
     <div class="console-out" id="consoleOut">
