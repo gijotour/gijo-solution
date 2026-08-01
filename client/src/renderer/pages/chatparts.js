@@ -53,7 +53,10 @@
       ".gcp-open:hover{background:rgba(59,130,246,.18);}",
       ".gcp-open:disabled{color:var(--teal,#1eb980);background:rgba(30,185,128,.10);border-color:rgba(30,185,128,.35);cursor:default;}",
       ".gcp-src{margin-top:6px;font-size:11.5px;font-weight:700;color:#6fdcb5;}",
-      ".gcp-ev{margin-top:8px;border-top:1px solid rgba(255,255,255,.08);padding-top:8px;}",
+      ".gcp-ev{margin-top:8px;border-top:1px solid rgba(255,255,255,.08);padding-top:8px;min-width:0;}",
+      // 안전망 — 어쩌다 줄(.cs-row)에 직접 붙어도 **아래로** 가지 옆으로 가지 않게 한다.
+      ".cs-row{flex-wrap:wrap;}",
+      ".cs-row > .gcp-ev, .cs-row > .gcp-src, .cs-row > .gcp-open, .cs-row > .gcp-picks{flex:1 1 100%;}",
       ".gcp-evh{font-size:12px;color:var(--muted,#b3ada4);cursor:pointer;user-select:none;}",
       ".gcp-q{border-left:3px solid rgba(59,130,246,.45);background:rgba(59,130,246,.05);padding:7px 10px;border-radius:0 6px 6px 0;margin-bottom:6px;}",
       ".gcp-qd{font-size:11.5px;color:var(--muted-2,#a49d95);margin-bottom:3px;}",
@@ -72,7 +75,25 @@
    *   원문을 함께 보여 주면 그 자리에서 눈으로 잡는다.
    *   (모델에게 "숫자를 정확히 읽어라"라고 타이르지 않는다 — 반복 실패한 방식이다.)
    */
+  /**
+   * 붙일 자리를 고른다 — **말풍선 안**이지 줄(row) 옆이 아니다.
+   *
+   * ⚠ 2026-08-02 실사고: 대화 한 줄(.cs-row)은 [아이콘][본문] 가로 배치다. 여기에 근거 블록을
+   *   그대로 붙이면 **세 번째 칸**이 되어 본문을 옆으로 밀어낸다. 넓은 별도 창에서는 자리가
+   *   남아 멀쩡해 보이고, 앱에 붙인 좁은 대화창(380px)에서만 본문이 한 글자 폭으로 찌부러져
+   *   "2/시/18/분"처럼 세로로 쪼개졌다 — 그래서 한쪽에서만 깨져 보였다.
+   *   줄을 받으면 그 안의 본문 칸(.cb)으로 바꿔 준다.
+   */
+  function 붙일자리(el) {
+    if (el && el.classList && el.classList.contains("cs-row")) {
+      var cb = el.querySelector(".cb");
+      if (cb) return cb;
+    }
+    return el;
+  }
+
   function quotes(el, list, answer, sources) {
+    el = 붙일자리(el);
     if (!el) return;
     ensureCss();
     if (Array.isArray(sources) && sources.length) {
@@ -121,6 +142,7 @@
    *   ⚠ 표식이 대화 기록에 남으면 안 되므로 서버가 걸러낸다(stripPickMarks) — 여기선 그냥 보낸다.
    */
   function picks(el, pl, submit) {
+    el = 붙일자리(el);
     if (!el || !pl || !pl.items || !pl.items.length || typeof submit !== "function") return;
     ensureCss();
     var chosen = [];
@@ -226,6 +248,7 @@
    *   셸이면 탭으로 열고, 분리창이면 본창에 부탁해야 한다 — 그 차이를 부르는 쪽이 넘긴다.
    */
   function open(el, screen, opts) {
+    el = 붙일자리(el);
     if (!el || !screen || !screen.page) return;
     var nav = opts && opts.navigate;
     if (typeof nav !== "function") return; // 여는 법을 모르면 **버튼을 만들지 않는다**(눌러도 안 되는 버튼 금지)

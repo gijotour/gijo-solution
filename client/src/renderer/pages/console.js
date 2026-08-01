@@ -56,6 +56,20 @@
       ".cs-dh .car{color:var(--muted-2,#a49d95);font-size:11.25px;}",
       ".cs-dh b{color:#fff;font-weight:800;}",
       ".cs-dh .n{margin-left:auto;color:var(--muted-2,#a49d95);font-size:11.75px;}",
+      // ＋ 등록 — 개수 오른쪽(2026-08-02 사용자 지시)
+      ".cs-add{font-size:11.75px;font-weight:800;color:var(--blue-light,#7ab0ff);border:1px solid rgba(59,130,246,.4);",
+      "border-radius:7px;padding:3px 9px;cursor:pointer;flex:0 0 auto;}",
+      ".cs-add:hover{background:rgba(59,130,246,.14);}",
+      ".cs-addbox{padding:9px 11px;border-top:1px solid var(--border,rgba(255,255,255,.08));display:flex;flex-wrap:wrap;gap:6px;align-items:center;}",
+      ".cs-addbox input{flex:1 1 200px;min-width:0;background:var(--bg,#262624);border:1px solid var(--border-strong,rgba(255,255,255,.18));",
+      "border-radius:8px;padding:7px 10px;color:var(--text,#e9e7e2);font-size:12.5px;outline:none;font-family:inherit;}",
+      ".cs-addbox button{font-size:12px;font-weight:800;border-radius:8px;padding:7px 12px;cursor:pointer;border:1px solid rgba(59,130,246,.5);",
+      "background:rgba(59,130,246,.18);color:#fff;font-family:inherit;flex:0 0 auto;}",
+      ".cs-addbox button.ghost{background:transparent;border-color:var(--border-strong,rgba(255,255,255,.18));color:var(--muted,#b3ada4);}",
+      ".cs-addbox .hint{flex:1 1 100%;font-size:11.75px;color:var(--muted-2,#a49d95);}",
+      ".cs-del{margin-left:auto;font-size:12px;opacity:.55;flex:0 0 auto;}",
+      ".cs-del:hover{opacity:1;}",
+      ".b-mine{background:rgba(240,160,32,.16);color:var(--amber,#f0a020);}",
       // 펼쳤을 때 대화를 다 밀어내면 안 된다 — 최대 높이를 주고 그 안에서 스크롤한다.
       ".cs-db{max-height:240px;overflow-y:auto;padding:2px 0 7px;}",
       // 갈래 한 줄 — 누르면 그 갈래 질문이 대화에 뜬다.
@@ -636,7 +650,34 @@
       { ic: "👤", q: "담당자 계정 추가하려면 어떻게 해?" },
     ]},
   ];
-  var KIND_BADGE = { here: ["여기서 끝", "b-here"], ok: ["승인 후 실행", "b-ok"], go: ["가서 하기", "b-go"] };
+  var KIND_BADGE = { here: ["여기서 끝", "b-here"], ok: ["승인 후 실행", "b-ok"], go: ["가서 하기", "b-go"], mine: ["내가 등록", "b-mine"] };
+
+  // ── 내가 등록한 지시(2026-08-02 사용자 지시 "무엇을 할 수 있나를 등록할 수 있는 메뉴") ──
+  // 서랍의 기본 목록은 우리가 정한 것이라 담당자의 현장 말버릇과는 다르다. 자주 쓰는 말을
+  // 그대로 등록해 두면 다음부터 한 번에 부른다.
+  // ⚠ 이 PC에만 저장한다 — 사람마다 자주 쓰는 말이 다르고, 서버에 넣으면 계정 하나로
+  //   두 대를 쓸 때 서로 덮어쓴다(왼쪽 메뉴 즐겨찾기와 같은 규칙).
+  var MY_KEY = "gijo:console:myasks";
+  function 내지시목록() {
+    try {
+      var v = JSON.parse(localStorage.getItem(MY_KEY) || "[]");
+      return Array.isArray(v) ? v.filter(function (x) { return x && typeof x.q === "string"; }) : [];
+    } catch (e) { return []; }
+  }
+  function 내지시저장(list) { try { localStorage.setItem(MY_KEY, JSON.stringify(list)); } catch (e) {} }
+  function 내지시추가(q) {
+    q = String(q || "").trim();
+    if (!q) return false;
+    var l = 내지시목록();
+    if (l.some(function (x) { return x.q === q; })) return false;   // 같은 말 두 번 넣지 않는다
+    l.push({ ic: "⭐", q: q });
+    내지시저장(l.slice(0, 30));                                      // 너무 많으면 고르기 어렵다
+    return true;
+  }
+  function 내지시삭제(q) {
+    내지시저장(내지시목록().filter(function (x) { return x.q !== q; }));
+  }
+  var 등록열림 = false;
   var drawerOpen = false;
 
   // 실제 등록된 제품 이름 하나. 서랍을 처음 펼칠 때 한 번만 물어 기억한다(없으면 null).
@@ -674,7 +715,9 @@
     var n = cats.reduce(function (a, c) { return a + c.qs.length; }, 0);
     var head =
       '<div class="cs-dh" id="csDrawerH"><span class="car">' + (drawerOpen ? "▼" : "▶") + "</span>" +
-      "<b>무엇을 할 수 있나</b><span class=\"n\">" + n + "가지</span></div>";
+      "<b>무엇을 할 수 있나</b>" +
+      '<span class="n">' + n + "가지</span>" +
+      '<span class="cs-add" id="csAdd" title="자주 쓰는 지시를 등록해 둡니다">＋ 등록</span></div>';
     // ⚠ 예전엔 서랍이 **질문 18줄을 통째로** 폈다. 서랍만으로 대화창 절반을 먹고,
     //   정작 오간 말이 밀려 올라갔다(2026-08-02 사용자 지시: 갈래만 보이고 누르면 대화에 뜨게).
     //   갈래 다섯 줄이면 "무엇을 할 수 있나"가 한눈에 들어오고, 고른 뒤에야 질문이 나온다.
@@ -696,6 +739,31 @@
       }
       renderDrawer();
     });
+    var add = document.getElementById("csAdd");
+    if (add) add.addEventListener("click", function (e) {
+      e.stopPropagation();                 // 머리줄 클릭(접기)과 겹치지 않게
+      등록열림 = !등록열림;
+      if (등록열림) drawerOpen = true;      // 등록하려면 서랍이 열려 있어야 목록이 보인다
+      renderDrawer();
+      var i = document.getElementById("csAddInput");
+      if (i) i.focus();
+    });
+    var 저장 = document.getElementById("csAddSave");
+    var 입력 = document.getElementById("csAddInput");
+    var 넣기 = function () {
+      if (!입력) return;
+      // ⚠ 한글은 조합 중에도 Enter가 온다 — 조합 확정용 Enter를 등록으로 삼으면 반 글자가 들어간다.
+      if (!내지시추가(입력.value)) { 입력.select(); return; }
+      등록열림 = false; renderDrawer();
+    };
+    if (저장) 저장.addEventListener("click", 넣기);
+    if (입력) 입력.addEventListener("keydown", function (e) {
+      if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); 넣기(); }
+      if (e.key === "Escape") { 등록열림 = false; renderDrawer(); }
+    });
+    var 취소 = document.getElementById("csAddCancel");
+    if (취소) 취소.addEventListener("click", function () { 등록열림 = false; renderDrawer(); });
+
     el.querySelectorAll(".cs-catrow").forEach(function (row) {
       row.addEventListener("click", function () {
         var 이름 = row.getAttribute("data-cat");
