@@ -191,8 +191,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
   // ④ 챗봇에게 명령 제안 받기 → 정책 판정 → 승인 카드 / 점검 요청이면 하드닝 점검 실행
   async function askChatbot() {
-    const q = document.getElementById("askInput").value.trim();
-    if (!q) return;
+    const 칸 = document.getElementById("askInput");
+    const q = 칸.value.trim();
+    // ⚠ 빈 칸이면 조용히 돌아가던 자리(2026-08-01 클릭 전수 점검에서 발견). 담당자는 눌렀는데
+    //   아무 말이 없으면 **고장으로 읽는다.** 무엇이 없어서 못 하는지 말하고 커서를 놓아 준다.
+    if (!q) { 칸.placeholder = "먼저 하고 싶은 일을 적어 주세요 — 예: 방화벽 정책 점검해줘"; 칸.focus(); return; }
     if (SCAN_INTENT.test(q)) {
       const std = /\bcis\b|국제/i.test(q) ? "cis" : /\bpc\b|피시|윈도우|windows/i.test(q) ? "kisa_pc" : /네트워크\s*장비|스위치|라우터|cisco/i.test(q) ? "kisa_net" : "kisa";
       runHardeningFromChat(std, q); return;

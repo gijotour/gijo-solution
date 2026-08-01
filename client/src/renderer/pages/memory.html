@@ -491,7 +491,14 @@ tr:last-child td{border-bottom:none;}
     const path = document.getElementById("ingestPathInput").value.trim();
     const scope = document.getElementById("ingestScopeSelect").value;
     const line = document.getElementById("ingestStatusLine");
-    if (!path) return;
+    // ⚠ 빈 칸이면 조용히 돌아가던 자리(2026-08-01 클릭 전수 점검). 눌렀는데 아무 말이 없으면
+    //   담당자는 고장으로 읽는다 — 무엇이 없어서 못 하는지 말한다.
+    if (!path) {
+      line.textContent = "먼저 가져올 폴더나 파일 경로를 적어 주세요.";
+      line.className = "status-line";
+      document.getElementById("ingestPathInput").focus();
+      return;
+    }
     line.textContent = "수집 중...";
     line.className = "status-line";
     try {
@@ -868,7 +875,13 @@ tr:last-child td{border-bottom:none;}
     const raw = document.getElementById("dsRawInput").value.trim();
     const line = document.getElementById("dsConvertStatusLine");
     const preview = document.getElementById("dsPreview");
-    if (!raw) return;
+    // ⚠ 빈 칸이면 조용히 돌아가던 자리(2026-08-01 클릭 전수 점검).
+    if (!raw) {
+      line.textContent = "먼저 변환할 원문을 넣어 주세요 — 위 [문서에서 불러오기]로 가져오거나 직접 붙여넣습니다.";
+      line.className = "status-line";
+      document.getElementById("dsRawInput").focus();
+      return;
+    }
     line.textContent = "로컬 LLM으로 변환 중... 긴 문서는 자동으로 나눠 처리하며 수 분 걸릴 수 있습니다.";
     line.className = "status-line";
     try {
