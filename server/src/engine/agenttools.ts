@@ -168,7 +168,7 @@ function runListAssets(): string {
 
 // 자산 상세 — AI-BOM까지 한 번에 준다(예전엔 get_aibom을 따로 뒀는데, LLM이 "AI-BOM도 봐야 하나"를
 // 매번 판단해야 해서 도구만 늘고 턴이 늘었다. 상세는 상세 하나로 충분하다).
-function runGetAsset(args: Record<string, string>): string {
+async function runGetAsset(args: Record<string, string>): Promise<string> {
   const asset = getAsset(args.assetId);
   if (!asset) {
     const ids = listAssets().map((a) => a.id).join(", ") || "(없음)";
@@ -187,14 +187,47 @@ function runGetAsset(args: Record<string, string>): string {
   ];
   // 온톨로지 연계: 이 자산의 유형·구성에 걸리는 위협·완화통제를 함께 준다(AI-BOM → 위협 흐름).
   const threats = ontologyLinesFor(`${asset.name} ${asset.assetType} ${b.model.foundationModel} ${b.model.architecture}`, 6);
-  return [
+  const 줄 = [
     `자산 ${asset.id} (${asset.name})`,
     `유형=${asset.assetType} | 담당=${asset.owner || "미지정"} | 서비스=${asset.service ?? "미지정"} | 경로=${asset.path}`,
     `마지막 스캔: ${asset.lastScannedAt ? koDateTimeString(asset.lastScannedAt) : "스캔 이력 없음"} | ${findingSummary(asset)}`,
     ...aibomLines,
     ...(top.length ? ["주요 finding(심각도순, 최대 5건):", ...top] : []),
     ...(threats.length ? ["사내 온톨로지가 아는 관련 위협·통제:", ...threats] : []),
-  ].join("\n").slice(0, 2500);
+  ];
+
+  // ★ 자산 등록부에 **실제 취약점이 0건**이면 올려 둔 진단 보고서를 대신 읽는다.
+  //
+  // 실사고(2026-07-28~30 규명, 2026-08-02 재발 확인): "안전대부 웹서버 취약점 알려줘"에
+  //   보고서에는 5건(평문 전송·디렉토리 인덱싱·임시/백업 파일 노출 등)이 적혀 있는데
+  //   자산 DB는 스캔 실패 1건뿐이라 **"취약점 정보는 없습니다"**로 답했다. 근거가 사내에 있는데
+  //   안 본 것이다. 2026-07-30 처방(발췌를 앞으로)은 **search 도구에만** 들어가 있었고,
+  //   담당자가 자산을 지목해 물으면 이 경로로 새어 나갔다 — 같은 병을 두 곳에서 고쳐야 했다.
+  //
+  // ⚠ 프롬프트로 "문서도 봐라"라고 시키지 않는다. 이 크기 모델에 규칙을 더해 행동을 고치려는
+  //   시도는 이 프로젝트에서 반복해 실패했다. **읽을 것을 앞에 둔다**(배치는 결정적이다).
+  // ⚠ 스캔 실패(scan_error)는 취약점이 아니다 — isRealVulnerability로 거른 뒤 센다.
+  const 진짜취약 = (asset.findings ?? []).filter(isRealVulnerability);
+  if (진짜취약.length === 0) {
+    try {
+      const rawChunks = await queryMemory(`${asset.name} 취약점`, 5);
+      const { sanitizeRagChunks } = await import("./ragsanitize.js");
+      const chunks = sanitizeRagChunks(rawChunks.map(String), { source: "tool:get_asset", question: asset.name }).chunks;
+      if (chunks.length) {
+        return [
+          "※ 자산 등록부에는 이 대상의 취약점이 아직 등록돼 있지 않습니다 — 아래 **사내 문서 근거**가 답입니다.",
+          `사내 문서 근거(발췌) ${chunks.length}건:`,
+          ...chunks.slice(0, 4).map((c) => `  · ${String(c).replace(/\s+/g, " ").slice(0, 600)}`),
+          "",
+          "(참고) 자산 등록부 정보:",
+          ...줄,
+        ].join("\n").slice(0, 3000);
+      }
+    } catch {
+      /* 임베딩 미기동 — 등록부 정보만이라도 돌려준다 */
+    }
+  }
+  return 줄.join("\n").slice(0, 2500);
 }
 
 // ── 온톨로지(지식 그래프)를 도구의 접착제로 ─────────────────────────────
