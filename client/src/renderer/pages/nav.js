@@ -671,6 +671,25 @@
   }
   window.gijo요약막대 = 요약막대로;
 
+  /**
+   * 요약 줄이 **늦게 그려지는 화면**을 위해 지켜본다.
+   *
+   * ⚠ 처음엔 "0.7초마다 10번 보기"로 했는데, 기록 보기(27,154건)처럼 자료가 많은 화면은
+   *   그보다 늦게 카드를 그린다 — 그러면 영영 안 바뀐 채로 남는다(2026-08-02 사용자 신고:
+   *   "기록 보기 메뉴에 한 줄로 변경"). **시간에 기대지 않는다** — 바뀌는 순간을 지켜본다.
+   */
+  function 요약감시걸기() {
+    if (typeof MutationObserver !== "function") return;
+    [].forEach.call(document.querySelectorAll("[data-gijo-summary]"), function (box) {
+      if (box.__gijoSumWatch) return;
+      box.__gijoSumWatch = true;
+      new MutationObserver(function () {
+        if (box.dataset.gijoSum === "1") return;   // 이미 바꿨다 — 우리가 만든 변화다
+        요약막대로();
+      }).observe(box, { childList: true });
+    });
+  }
+
   // 공용 디자인 시스템(gijo-ui.css)을 모든 페이지에 주입한다 — .g-* 컴포넌트 사용 가능 + body.g-ui로
   // 안전한 전역 베이스라인(스크롤바·포커스링·폰트 스무딩)만 통일(레이아웃은 안 건드림).
   function loadDesignSystem() {
