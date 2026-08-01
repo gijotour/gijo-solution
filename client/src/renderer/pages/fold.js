@@ -104,6 +104,22 @@
     }
   }
 
+  // 접기 제목 줄과 판 제목이 **같은 말을 두 번** 쓰던 자리를 지운다(2026-08-02 사용자 지시
+  // "가능한 데는 같이 칸 좁혀 줘"). 접기를 걸면 이름이 적힌 줄이 이미 생기므로 판 제목은
+  // 같은 글자를 한 줄 더 차지할 뿐이다 — 24곳 × 약 34px.
+  // ⚠ 누르는 것(버튼·입력·링크)이 들어 있는 제목은 건드리지 않는다. 안 보이면 못 누른다.
+  //   배지(span)만 든 제목은 지워도 된다 — 접힌 줄의 배지가 그 값을 그대로 읽어 보여준다.
+  function 겹친제목지우기(target, name) {
+    var t = target.querySelector(".panel-title, .card-title, .sec-title, h2, h3");
+    if (!t || t.closest("[data-gijo-fold]") !== target) return;
+    if (t.querySelector("button, input, select, textarea, a")) return;
+    var 제목글 = "";
+    t.childNodes.forEach(function (n) { if (n.nodeType === 3) 제목글 += n.textContent; });
+    if (제목글.trim() !== String(name).trim()) return;
+    t.style.display = "none";
+    t.setAttribute("data-gijo-dup-title", "1"); // 왜 안 보이는지 나중에 알아볼 수 있게
+  }
+
   function build(target) {
     var name = target.getAttribute("data-gijo-fold") || "구역";
     var head = document.createElement("div");
@@ -117,6 +133,7 @@
     // 안 물려주면 다른 탭 구역의 제목 줄만 남아 "여긴 왜 이게 있지"가 된다.
     if (target.dataset && target.dataset.sec) head.dataset.sec = target.dataset.sec;
     target.parentNode.insertBefore(head, target);
+    겹친제목지우기(target, name);
 
     var e = { target: target, head: head, name: name, badges: parseBadges(target.getAttribute("data-gijo-fold-badges")) };
     entries.push(e);
