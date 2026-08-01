@@ -268,32 +268,42 @@ function detectBruteForce(source: string, lines: string[], threshold: number, �
 // 탐지기 ②: 방화벽 차단 — iptables/UFW(SRC=/DPT=)·Cisco(dst .../port) 차단 로그를 소스 IP별로 집계.
 // 서로 다른 목적지 포트가 많으면 포트스캔, 차단 건수만 많으면 차단 폭주로 본다.
 const DENY_RE = /\b(DENY|DROP|BLOCK|Deny|denied|REJECT|blocked)\b/i;
-function extractDeny(line: string): { src: string; dpt?: string } | null {
+function extractDeny(line: string): { src: string; dpt?: string; dst?: string } | null {
   if (!DENY_RE.test(line)) return null;
   const src = (line.match(/SRC=(\d+\.\d+\.\d+\.\d+)/i) || line.match(/src\S*?\s?(\d+\.\d+\.\d+\.\d+)/i) || line.match(/(\d+\.\d+\.\d+\.\d+)/))?.[1];
   const dpt = (line.match(/DPT=(\d+)/i) || line.match(/dst \S*?\/(\d{1,5})/i) || line.match(/dpt\D{0,3}(\d{2,5})/i))?.[1];
-  return src ? { src, dpt } : null;
+  // ★ **목적지(우리 자산)**도 뽑는다(2026-08-01). 국내 보안장비는 대개 CEF/LEEF나 key=value로
+  //   보내는데(`CEF:0|AhnLab|TrusGuard|…|src=203.0.113.9 dst=10.0.0.5 dpt=445 act=deny`),
+  //   그 줄에는 syslog 호스트 이름이 없다 — 즉 syslogHosts()로는 우리 쪽을 못 찾는다.
+  //   dst가 상관을 잇는 유일한 끈이 된다. src와 같으면(둘 다 첫 IP를 주운 경우) 버린다.
+  const dstRaw = (line.match(/\bDST=(\d+\.\d+\.\d+\.\d+)/i) || line.match(/\bdst\s*=\s*(\d+\.\d+\.\d+\.\d+)/i) ||
+    line.match(/\bdst\s+(\d+\.\d+\.\d+\.\d+)/i))?.[1];
+  const dst = dstRaw && dstRaw !== src ? dstRaw : undefined;
+  return src ? { src, dpt, dst } : null;
 }
 function detectFirewall(source: string, lines: string[], 대상: string[] = [], portScanPorts = 15, floodThreshold = 30): { events: AnalysisEvent[]; matched: number } {
-  const perSrc = new Map<string, { denies: number; ports: Set<string> }>();
+  const perSrc = new Map<string, { denies: number; ports: Set<string>; dsts: Set<string> }>();
   let matched = 0;
   for (const line of lines) {
     const d = extractDeny(line);
     if (!d) continue;
     matched++;
-    const rec = perSrc.get(d.src) ?? { denies: 0, ports: new Set<string>() };
+    const rec = perSrc.get(d.src) ?? { denies: 0, ports: new Set<string>(), dsts: new Set<string>() };
     rec.denies++;
     if (d.dpt) rec.ports.add(d.dpt);
+    if (d.dst) rec.dsts.add(d.dst); // 이 공격이 노린 **우리 자산**
     perSrc.set(d.src, rec);
   }
   const events: AnalysisEvent[] = [];
   for (const [ip, rec] of perSrc) {
     if (rec.ports.size >= portScanPorts) {
       events.push(mkLog(source, `log:${source}:scan:${ip}`, `포트 스캔 의심 — ${ip}`, ip, "high", ["포트스캔"],
-        `${source}에서 ${ip}가 서로 다른 목적지 포트 ${rec.ports.size}개를 차단당함(차단 ${rec.denies}건) — 스캐닝 정황.`, 대상));
+        `${source}에서 ${ip}가 서로 다른 목적지 포트 ${rec.ports.size}개를 차단당함(차단 ${rec.denies}건) — 스캐닝 정황.`,
+        [...new Set([...대상, ...rec.dsts])]));
     } else if (rec.denies >= floodThreshold) {
       events.push(mkLog(source, `log:${source}:flood:${ip}`, `방화벽 차단 폭주 — ${ip}`, ip, "medium", ["반복"],
-        `${source}에서 ${ip}가 ${rec.denies}회 차단됨 — 반복 접근 시도.`, 대상));
+        `${source}에서 ${ip}가 ${rec.denies}회 차단됨 — 반복 접근 시도.`,
+        [...new Set([...대상, ...rec.dsts])]));
     }
   }
   return { events, matched };

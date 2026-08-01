@@ -68,3 +68,54 @@ describe("★ 로그가 우리 자산과 묶인다", () => {
     expect(new Set(지문).size, "같은 묶음이 중복으로 실렸다").toBe(지문.length);
   });
 });
+
+// ── 국내 보안장비 형식 (계획서 전 단계, 파일럿 대비) ─────────────────────────
+//
+// ⚠ **없는 형식을 지어내지 않았다.** 국내 보안장비(안랩·시큐아이·윈스 등)는 대개
+//   CEF(ArcSight) · LEEF(IBM) · key=value 로 syslog를 보낸다 — 공개된 표준 형식이다.
+//   그 줄에는 syslog 호스트 이름이 없어서, dst= 를 못 뽑으면 우리 자산과 이어지지 않는다.
+describe("★ CEF·LEEF 형식에서도 우리 자산과 이어진다", () => {
+  const 반복 = (line: (i: number) => string, n = 40) => Array.from({ length: n }, (_, i) => line(i)).join("\n");
+
+  it("CEF 차단 로그 — dst가 상관 키가 된다", () => {
+    const cef = 반복((i) =>
+      `CEF:0|AhnLab|TrusGuard|3.0|1001|Blocked|7|src=203.0.113.9 dst=10.0.0.5 dpt=${445 + i} act=deny`);
+    const evs = parseSecurityLog("trusguard.log", cef).events;
+    expect(evs.length, "CEF 차단 로그를 못 읽는다").toBeGreaterThan(0);
+    expect(evs[0].entity, "주인공은 공격자여야 한다").toBe("203.0.113.9");
+    expect(evs[0].peers, "dst(우리 자산)를 안 뽑으면 어느 소스와도 안 묶인다").toContain("10.0.0.5");
+  });
+
+  it("LEEF 차단 로그도 같다", () => {
+    const leef = 반복((i) =>
+      `LEEF:2.0|SECUI|MF2|4.0|3001|src=198.51.100.7|dst=10.0.0.9|dstPort=${1000 + i}|action=DENY`);
+    const evs = parseSecurityLog("secui.log", leef).events;
+    expect(evs.length).toBeGreaterThan(0);
+    expect(evs[0].peers).toContain("10.0.0.9");
+  });
+
+  it("iptables 형식(DST=)도 같다", () => {
+    const ipt = 반복((i) =>
+      `Aug  1 11:00:0${i % 10} gw01 kernel: [UFW BLOCK] IN=eth0 SRC=203.0.113.50 DST=10.0.0.12 PROTO=TCP DPT=${2000 + i}`);
+    const evs = parseSecurityLog("ufw.log", ipt).events;
+    expect(evs.length).toBeGreaterThan(0);
+    // syslog 호스트(gw01)와 DST(10.0.0.12) 둘 다 실린다 — 어느 쪽 이름으로 등록돼 있어도 이어진다.
+    expect(evs[0].peers).toEqual(expect.arrayContaining(["gw01", "10.0.0.12"]));
+  });
+
+  it("★ 목적지가 없으면 **지어내지 않는다**", () => {
+    const 목적지없음 = 반복((i) => `CEF:0|X|Y|1|1|Blocked|5|src=203.0.113.9 dpt=${500 + i} act=deny`);
+    const evs = parseSecurityLog("noDst.log", 목적지없음).events;
+    expect(evs.length).toBeGreaterThan(0);
+    expect(evs[0].peers ?? [], "목적지를 모르는데 만들어 냈다").toEqual([]);
+  });
+
+  it("★★ CEF 로그 + 그 자산의 취약점이 묶인다", () => {
+    const cef = 반복((i) =>
+      `CEF:0|AhnLab|TrusGuard|3.0|1001|Blocked|7|src=203.0.113.9 dst=10.0.0.5 dpt=${445 + i} act=deny`);
+    const 상관 = computeCorrelations([...parseSecurityLog("trusguard.log", cef).events, 취약점이벤트("10.0.0.5")]);
+    const 묶임 = 상관.find((c) => c.entity === "10.0.0.5");
+    expect(묶임, "국내 장비 로그가 취약점과 안 묶인다 — 파일럿에서 통합 분석이 안 보인다").toBeTruthy();
+    expect(묶임!.sources.sort()).toEqual(["log", "vuln"]);
+  });
+});
