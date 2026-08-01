@@ -105,7 +105,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .tsv-table th.num,.tsv-table td.num{text-align:right;}
 .tsv-table td{padding:9px 10px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:top;}
 .tsv-table tr:last-child td{border-bottom:none;}
-.tsv-src{display:block;font-size:11.75px;color:var(--muted-2);margin-top:3px;}
+/* 근거 설명을 아랫줄이 아니라 **이름 옆**에 잇는다 — 한 종류가 한 줄을 쓴다(2026-08-02).
+   길면 …으로 자르고 마우스를 올리면 전문이 뜬다(title). 지운 것이 아니라 접은 것이다. */
+.tsv-src{font-size:11.75px;color:var(--muted-2);min-width:0;flex:1;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+/* 이름 칸은 [이름][근거]가 한 줄에 나란히 — 이름이 길어도 줄이 늘지 않게 근거만 …으로 줄인다. */
+.tsv-table td:first-child{display:flex;align-items:baseline;gap:8px;}
+/* 숫자 칸은 절대 접지 않는다 — "85건"이 "85 / 건"으로 갈라져 두 줄이 됐다. */
+.tsv-table th.num,.tsv-table td.num{white-space:nowrap;}
 .tsv-own{display:inline-block;font-size:11.5px;font-weight:700;color:var(--blue-light);border:1px solid rgba(59,130,246,.35);border-radius:999px;padding:1px 6px;margin-left:6px;}
 .tsv-sum td{font-weight:800;color:#fff;border-top:1px solid var(--border-strong);}
 .tsv-note{margin-top:12px;font-size:12.25px;line-height:1.7;color:var(--muted);background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;}
@@ -119,13 +126,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
 /* 📂 상세 지표 — 임원 요약 아래 전체 세부 지표를 접이식 한 판으로 통합(기본 펼침, 2026-08-02) */
 .detail-panel{max-width:1040px;margin-bottom:24px;border:1px solid var(--border);border-radius:12px;background:var(--panel-2);overflow:hidden;}
-.detail-title{font-size:14px;font-weight:800;color:#fff;padding:14px 18px;display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none;}
-.detail-title:hover{color:var(--blue-light);}
-.detail-title .dcar{color:var(--blue-light);font-size:12.25px;font-weight:900;width:18px;height:18px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.35);flex:0 0 auto;}
-.detail-title .dsub{font-size:12.25px;font-weight:500;color:var(--muted-2);margin-left:auto;}
 .detail-body{padding:8px 18px 18px;}
-.detail-body .cat{max-width:none;margin-bottom:20px;}
-.detail-panel.closed .detail-body{display:none;}
+.detail-panel .cat{max-width:none;margin-bottom:20px;}
 
 /* 추세 */
 .trend-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;max-width:1040px;}
@@ -359,9 +361,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const warn = t.coversWholePeriod || !t.ledgerStart ? "" :
       '<div class="tsv-warn">⚠ 기록은 <b>' + new Date(t.ledgerStart).toLocaleDateString("ko-KR") +
       '</b>부터 쌓였습니다 — 그 이전 기간은 이번 집계에 들어 있지 않습니다.</div>';
+    // 한 종류가 두 줄(이름 + 근거 설명)을 쓰던 것을 **한 줄**로 합친다(2026-08-02 사용자 지시).
+    // 근거는 지우지 않고 이름 옆에 잇는다 — "자체 추정"이라는 사실을 감추면 숫자가 사실처럼 읽힌다.
     const rows = t.rows.map((r) =>
       "<tr><td>" + r.label + (r.custom ? '<span class="tsv-own">우리 조직 설정</span>' : "") +
-      '<span class="tsv-src">' + String(r.source).replace(/</g, "&lt;") + "</span></td>" +
+      '<span class="tsv-src" title="' + String(r.source).replace(/"/g, "&quot;").replace(/</g, "&lt;") + '">' +
+      String(r.source).replace(/</g, "&lt;") + "</span></td>" +
       '<td class="num">' + r.count + "건</td>" +
       '<td class="num">' + r.minutesEach + "분</td>" +
       '<td class="num" style="color:var(--teal)">' + tsvDur(r.minutes) + "</td></tr>"
@@ -492,10 +497,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         aiSecurityBlock(c) +
         timeSavedBlock(timeSaved) +
         그래프묶음 +
-        `<div class="detail-panel" id="detailPanel">` +
-        `<div class="detail-title" id="detailToggle"><span class="dcar">▸</span>📂 상세 지표` +
-        `<span class="dsub">자산·취약점·점검·CTI·컴플라이언스·추세 전체 지표</span></div>` +
-        `<div class="detail-body">` + detailSections + `</div></div>`;
+        // 이 화면만 쓰던 자체 접기를 **공용 접기**로 바꿨다(2026-08-02 사용자 지시 "공용 접기 해 줘").
+        // 화면마다 접는 모양이 다르면 담당자는 화면을 옮길 때마다 다시 배운다.
+        `<div class="detail-panel detail-body" id="detailPanel" data-gijo-fold="📂 상세 지표">` +
+        detailSections + `</div>`;
       wireKpi();
       wireTimeSaved(timeSaved);
     } catch (e) {
@@ -518,18 +523,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     //   아래 배선이 `panel is not defined`로 터졌고, 화면 전체가 "불러오지 못했습니다"가 됐다.
     //   지울 때 **바로 아래 코드까지 딸려 가는지** 반드시 보고 지울 것(같은 실수 두 번째다).
     const panel = document.getElementById("detailPanel");
-    const toggle = document.getElementById("detailToggle");
-    if (panel && toggle) {
-      let open = true;
-      try { open = localStorage.getItem("gijo.kpi.detailOpen") !== "0"; } catch (e) {}
-      const car = toggle.querySelector(".dcar");
-      const apply = () => { panel.classList.toggle("closed", !open); if (car) car.textContent = open ? "▾" : "▸"; };
-      apply();
-      toggle.addEventListener("click", () => {
-        open = !open; apply();
-        try { localStorage.setItem("gijo.kpi.detailOpen", open ? "1" : "0"); } catch (e) {}
-      });
-    }
+    // 접기 제목 줄은 공용 fold.js가 끼워 넣는다. 이 화면은 자료를 받은 뒤에 그리므로
+    // 첫 훑기(DOMContentLoaded)에는 이 구역이 없다 — 그려진 뒤에 한 번 더 훑게 한다.
+    if (panel && window.gijoFold) window.gijoFold.scan();
 
     // 상세 지표 각 섹션 → 관련 화면 연결(타일·추세카드·제목 링크 모두 이동).
     // 제목의 고유 토큰으로 대상 화면을 판별한다(개별 tile 호출을 건드리지 않는 방식).
@@ -544,7 +540,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       { key: "취약점 번다운", page: "vulnscan.html" },  // 📉 → 취약점
       { key: "추세", page: "vulnscan.html" },           // 📈 → 취약점
     ];
-    panel && panel.querySelectorAll(".detail-body .cat").forEach((cat) => {
+    panel && panel.querySelectorAll(".cat").forEach((cat) => {
       const title = cat.querySelector(".cat-title");
       if (!title) return;
       const m = SECTION_PAGE.find((s) => title.textContent.indexOf(s.key) >= 0);
@@ -617,6 +613,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
 
 
+<script src="fold.js"></script>
 <script src="nav.js"></script>
 <script src="progresscard.js"></script>
 <script src="gijomd.js"></script>
