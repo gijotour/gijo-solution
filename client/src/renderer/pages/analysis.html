@@ -330,7 +330,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const more = cs.length>1 ? ' <span style="color:var(--muted-2)">외 '+(cs.length-1)+'건</span>' : '';
     line.style.display="block";
     line.innerHTML = '🔗 <b>소스 간 상관</b> '+esc(cs[0].note)+more+
-      ' <span class="ask" data-topic="소스 간 상관분석">· 챗봇에 묻기</span>';
+      ' <span class="ask" data-topic="소스 간 상관분석">· 대화창에 묻기</span>';
     const ask = line.querySelector(".ask");
     if(ask) ask.addEventListener("click", ()=>{ if(window.gijoExplain) window.gijoExplain(ask.dataset.topic); });
   }

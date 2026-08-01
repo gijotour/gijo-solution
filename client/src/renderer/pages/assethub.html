@@ -206,7 +206,7 @@
     $("master").innerHTML=groups.map(g=>{
       const rows=g.assetIds.map(id=>byId.get(id)).filter(Boolean);
       const when=g.lastScannedAt? new Date(g.lastScannedAt).toLocaleDateString("ko-KR") : null;
-      const meta=[g.sourceFile? "파일 등록":"화면·챗봇 직접 등록", when? `최근 점검 ${when}`:null, g.vuln.open? `취약점 ${g.vuln.open}건`:"취약점 없음"].filter(Boolean).join(" · ");
+      const meta=[g.sourceFile? "파일 등록":"화면·대화창 직접 등록", when? `최근 점검 ${when}`:null, g.vuln.open? `취약점 ${g.vuln.open}건`:"취약점 없음"].filter(Boolean).join(" · ");
       return `<div class="fgrp">
         <div class="fhd" data-src="${esc(g.sourceFile||"")}"><span>${g.sourceFile?"📄":"🤖"}</span><span class="nm" title="${esc(g.label)}">${esc(g.label)}</span><span class="cnt2">자산 ${g.assetCount}</span></div>
         <div class="fmeta">${esc(meta)}</div>

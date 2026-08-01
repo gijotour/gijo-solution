@@ -79,7 +79,7 @@ describe("screenguide — 화면별 가이드", () => {
     expect(g.can.length).toBeGreaterThan(0);
     const txt = formatScreenGuide("vulnscan.html");
     expect(txt).toContain("취약점");
-    expect(txt).toContain("이 화면에서 챗봇으로 할 수 있는 것");
+    expect(txt).toContain("이 화면에서 대화창으로 할 수 있는 것");
   });
 
   it("경로째 와도(pages/hardening.html) 파일명으로 해석한다", () => {
@@ -107,7 +107,7 @@ describe("패널 단위 상세 안내", () => {
     const out = formatScreenGuide("settings.html", "SMTP 설정 방법 알려줘");
     expect(out).toContain("설정 › SMTP");
     expect(out).toContain("암호화 저장");
-    expect(out).not.toContain("이 화면에서 챗봇으로 할 수 있는 것");
+    expect(out).not.toContain("이 화면에서 대화창으로 할 수 있는 것");
   });
 
   it("패널 이름이 없으면 전체 안내 + 구역 목차를 준다", async () => {

@@ -94,7 +94,7 @@ describe("dispatcher + intent + assets integration", () => {
       .send({ text: "이 화면 뭐 할 수 있어?", screen: "hardening.html" });
     expect(res.status).toBe(200);
     expect(res.body.output).toContain("하드닝");
-    expect(res.body.output).toContain("이 화면에서 챗봇으로 할 수 있는 것");
+    expect(res.body.output).toContain("이 화면에서 대화창으로 할 수 있는 것");
     // 화면을 안 주면 전체 개요
     const res2 = await request(app)
       .post("/api/dispatch")

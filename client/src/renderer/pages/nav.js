@@ -90,7 +90,7 @@
   // 없어진 화면의 옛 주소 → 흡수처. 허브를 걷어낸 뒤로는 화면이 곧 주소라 딥링크가 필요 없고,
   // **사라진 화면만** 여기서 돌려보낸다(기존 바로가기·챗봇 링크가 죽지 않게).
   var TAB_REDIRECT = {
-    "reference.html": "settings.html?s=my",     // 기능 안내 → 챗봇이 대신(2026-07-25)
+    "reference.html": "settings.html?s=my",     // 기능 안내 → AI가 대신(2026-07-25)
     "billing.html": "audit.html",               // 사용량·요금 → 기록 보기
     "mcp.html": "settings.html?s=link",         // 2026-07-28 설정 5구역으로 흡수
     "update.html": "settings.html?s=admin",

@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>시안 — 남은 대화 입구 세 곳 정리</title>
+<style>
+:root{
+  --bg:#0a0e1a;--panel:#121a2e;--panel-2:#0e1526;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;
+  --text:#e7eaf3;--muted:#8b93ab;--muted-2:#5f6785;--amber:#f0a020;--teal:#1eb980;--red:#e2483d;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);padding:28px;line-height:1.7;}
+.wrap{max-width:900px;margin:0 auto;}
+h1{font-size:19px;margin-bottom:6px;}
+.lead{font-size:13px;color:var(--muted);margin-bottom:26px;}
+h2{font-size:15px;margin:30px 0 10px;padding-top:18px;border-top:1px solid var(--border);}
+h2:first-of-type{border-top:0;padding-top:0;}
+p{font-size:13px;color:var(--text);margin-bottom:10px;}
+.dim{color:var(--muted);}
+table{width:100%;border-collapse:collapse;margin:12px 0 16px;font-size:12.5px;}
+th{text-align:left;background:var(--panel-2);color:var(--muted);font-weight:700;padding:8px 10px;border:1px solid var(--border);}
+td{padding:8px 10px;border:1px solid var(--border);vertical-align:top;}
+.ok{color:#6fdcb5;} .no{color:#f5928a;} .warn{color:#f7c777;}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:16px 18px;margin-bottom:14px;}
+.card.rec{border-color:rgba(59,130,246,.45);background:rgba(59,130,246,.05);}
+.card h3{font-size:14px;margin-bottom:6px;}
+.card .why{font-size:12.5px;color:var(--muted);}
+.tag{display:inline-block;font-size:10px;font-weight:800;padding:2px 8px;border-radius:20px;margin-left:6px;}
+.t-rec{background:rgba(59,130,246,.18);color:var(--blue-light);}
+.t-keep{background:rgba(30,185,128,.16);color:#6fdcb5;}
+.t-drop{background:rgba(226,72,61,.16);color:#f5928a;}
+.q{background:var(--panel-2);border-left:3px solid var(--amber);padding:10px 14px;border-radius:0 8px 8px 0;font-size:12.5px;margin:14px 0;}
+ul{margin:6px 0 12px 20px;font-size:12.5px;}
+li{margin:3px 0;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>남은 대화 입구 세 곳 — 어떻게 할까요</h1>
+  <div class="lead">
+    대화창을 한 구조로 모으면서(<b>chatparts.js</b>) 지휘소와 분리창은 같은 부품을 쓰게 됐습니다.
+    그런데 <b>지시를 넣을 수 있는 자리가 세 곳 더</b> 있고, 셋 다 근거·결재판·체크칸이 <b>하나도 없습니다.</b>
+    없앨지 살릴지는 제품 판단이라 결정을 여쭙습니다.
+  </div>
+
+  <h2>지금 상태 — 실측</h2>
+  <table>
+    <tr><th>자리</th><th>근거</th><th>결재판</th><th>체크칸</th><th>가서 하기</th><th>무엇을 하는 자리인가</th></tr>
+    <tr><td><b>지휘소</b>(셸)</td><td class="ok">✅</td><td class="ok">✅</td><td class="ok">✅</td><td class="ok">✅</td><td>평소 쓰는 대화창</td></tr>
+    <tr><td><b>분리창 위젯</b></td><td class="ok">✅</td><td class="ok">✅</td><td class="ok">✅</td><td class="ok">✅</td><td>「⧉ 창으로」 뺐을 때 유일한 창구</td></tr>
+    <tr><td>작업 내역</td><td class="no">✕</td><td class="no">✕</td><td class="no">✕</td><td class="no">✕</td><td>"이 작업에 이어서 지시"</td></tr>
+    <tr><td>팀 사무실(창)</td><td class="no">✕</td><td class="no">✕</td><td class="no">✕</td><td class="no">✕</td><td>오늘 할 일 창에서 지시</td></tr>
+    <tr><td>에이전트 AI</td><td class="no">✕</td><td class="no">✕</td><td class="no">✕</td><td class="no">✕</td><td>에이전트에게 직접 지시</td></tr>
+  </table>
+
+  <div class="q">
+    <b>왜 이게 문제인가.</b> 담당자는 <b>자리가 다르다는 것을 모릅니다.</b>
+    같은 말을 했는데 어떤 자리에서는 근거가 보이고 체크해서 처리되는데,
+    다른 자리에서는 글만 돌아옵니다. 그러면 <b>근거 기능 자체를 안 믿게 됩니다</b> —
+    "가끔 나오는 것"은 없는 것보다 나쁩니다.
+  </div>
+
+  <h2>선택지</h2>
+
+  <div class="card rec">
+    <h3>① 세 곳 모두 지휘소로 보낸다 <span class="tag t-rec">추천</span></h3>
+    <p class="why">
+      입력칸을 없애고 그 자리에 <b>「대화창에서 이어서 지시하기」</b> 한 줄만 둡니다.
+      누르면 지휘소가 그 맥락(작업 세션·에이전트)을 물고 열립니다.
+    </p>
+    <ul>
+      <li><b>좋은 점</b> — 대화가 한 곳에 쌓입니다. 지금은 같은 일을 세 군데에 나눠 말하면 이력이 흩어집니다</li>
+      <li><b>좋은 점</b> — 부품을 세 번 더 붙일 필요가 없습니다(붙여도 어긋남은 또 생깁니다)</li>
+      <li><b>잃는 것</b> — 그 화면 안에서 바로 치던 흐름이 한 번 더 눌러야 합니다</li>
+      <li><b>품</b> — 반나절. 맥락 넘기기(세션 id)는 이미 있습니다</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>② 세 곳에도 공용 부품을 붙인다 <span class="tag t-keep">기능 동등</span></h3>
+    <p class="why">각 자리를 남기되 근거·결재판·체크칸·가서 하기를 <b>chatparts.js</b>로 채웁니다.</p>
+    <ul>
+      <li><b>좋은 점</b> — 지금 쓰던 방식이 안 바뀝니다</li>
+      <li><b>나쁜 점</b> — 대화 이력이 계속 다섯 갈래로 흩어집니다. <b>"아까 그거"가 자리를 건너면 안 통합니다</b></li>
+      <li><b>나쁜 점</b> — 자리가 늘 때마다 같은 일을 또 해야 합니다</li>
+      <li><b>품</b> — 하루. 각 자리의 전송 경로가 달라 붙이는 방식이 제각각입니다</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h3>③ 작업 내역만 살리고 둘은 없앤다 <span class="tag t-drop">절충</span></h3>
+    <p class="why">
+      「이 작업에 이어서 지시」는 <b>목적이 분명히 다릅니다</b> — 특정 작업 세션에 매인 대화라
+      지휘소의 "지금 보는 화면 기준"과 맥락이 다릅니다. 그것만 부품을 붙여 살리고,
+      팀 사무실·에이전트 화면의 입력칸은 지휘소로 보냅니다.
+    </p>
+    <ul>
+      <li><b>좋은 점</b> — 뜻이 다른 하나만 남기니 담당자가 "왜 여기 또 있지"를 안 묻습니다</li>
+      <li><b>확인 필요</b> — 작업 내역에서 이어 지시하는 일이 <b>실제로 있는지</b> 모릅니다(사용 기록을 안 봤습니다)</li>
+      <li><b>품</b> — 반나절</li>
+    </ul>
+  </div>
+
+  <h2>제 의견</h2>
+  <p>
+    <b>①을 권합니다.</b> 이 제품의 뼈대는 "대화창이 오케스트레이션"이고, 그 값어치는
+    <b>대화가 한 줄로 이어질 때</b> 나옵니다. "아까 그거 담당자 바꿔줘"가 통하는 이유가 그것입니다.
+    자리를 늘리면 그 맥락이 매번 끊깁니다.
+  </p>
+  <p class="dim">
+    다만 ③도 합리적입니다 — 작업 세션 대화는 정말 맥락이 다릅니다.
+    <b>결정에 필요한 사실 하나가 빠져 있습니다</b>: 담당자가 작업 내역 화면에서 실제로 이어 지시하는지.
+    원하시면 감사 기록으로 세어 보고 그 숫자를 근거로 다시 제안하겠습니다.
+  </p>
+
+  <h2>어느 쪽이든 함께 할 것</h2>
+  <ul>
+    <li>남기는 자리는 <b>반드시 chatparts.js를 쓴다</b> — 자체 구현을 다시 만들면 어긋남이 돌아옵니다(시험으로 막아 뒀습니다)</li>
+    <li>없애는 자리는 <b>빈 채로 두지 않는다</b> — 「대화창에서 이어서 지시하기」 버튼을 둡니다. 그냥 지우면 담당자는 기능이 사라진 줄 압니다</li>
+  </ul>
+</div>
+</body>
+</html>
