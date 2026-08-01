@@ -652,6 +652,23 @@ export function ingestMailAlert(from: string, subject: string, text: string): nu
 
 // 드롭존 자동 판별: 파일명·내용으로 보안 로그 vs 운영 리포트를 가른다(결정적 규칙).
 // 취약점 스캔(.nessus/스캔 CSV)은 취약점 업로드가 담당하고 rebuildVulnEvents로 자동 반영되므로 여기서 제외.
+/**
+ * 파일 하나를 분석 이벤트로 인입한다 — **드롭존 라우트와 대화창 첨부가 같은 길을 쓰게** 한다.
+ *
+ * ★ 2026-08-01 실측으로 드러난 구멍: 이 파이프라인은 멀쩡한데 **담당자가 넣을 길이 없었다.**
+ *   드롭존을 없애면서(파일 인입을 한 곳으로 모으는 정리) 화면 호출처가 전부 사라졌고,
+ *   preload의 analysisIngest는 부르는 곳이 0이 됐다. 제품 1차 목표가 3소스 통합 분석인데
+ *   그중 **보안로그·운영리포트 두 소스가 인입 불가** 상태였다.
+ *   ⚠ 길을 둘로 만들지 않는다 — 라우트도 대화창 첨부도 이 함수를 부른다(두 길은 반드시 어긋난다).
+ */
+export function ingestAnalysisFile(filename: string, content: string): { kind: "log" | "report"; created: number; events: AnalysisEvent[] } {
+  const kind = detectIngestKind(filename, content);
+  const label = filename || (kind === "log" ? "로그" : "보안제품");
+  const r = kind === "log" ? parseSecurityLog(label, content) : parseProductReport(label, content);
+  r.events.forEach(saveEvent);
+  return { kind, created: r.events.length, events: r.events };
+}
+
 export function detectIngestKind(filename: string, content: string): "log" | "report" {
   const f = (filename || "").toLowerCase();
   if (/\.(log|syslog)$/.test(f)) return "log";
@@ -734,11 +751,8 @@ export function registerAnalysisHubRoutes(app: Express): void {
       const filename = String(req.body?.filename || "");
       const content = String(req.body?.content ?? "");
       if (!content.trim()) return res.status(400).json({ error: "내용이 비었습니다." });
-      const kind = detectIngestKind(filename, content);
-      const label = filename || (kind === "log" ? "로그" : "보안제품");
-      const r = kind === "log" ? parseSecurityLog(label, content) : parseProductReport(label, content);
-      r.events.forEach(saveEvent);
-      res.json({ routedTo: kind, created: r.events.length, events: r.events });
+      const r = ingestAnalysisFile(filename, content);
+      res.json({ routedTo: r.kind, created: r.created, events: r.events });
     })
   );
 }

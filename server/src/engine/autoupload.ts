@@ -8,16 +8,26 @@ import { authMiddleware } from "../auth/auth";
 import { recordAudit } from "./audit";
 import { asyncRoute } from "../util/asyncRoute";
 import { emitCollaboration } from "./collaboration";
+import { ingestAnalysisFile, detectIngestKind } from "./analysishub";
 import { importVulnScan, parseNessusHtml } from "./vulnscan";
 import { importManual, classifyManual, listProducts, guessProductName } from "./securityproducts";
 import { ingestText, GLOBAL_SCOPE } from "./memory";
 
-// 사용자가 결정창에서 고를 수 있는 5유형(파일명으로 애매할 때).
-export type UploadType = "asset" | "log" | "document" | "guideline" | "vulnreport";
+// 사용자가 결정창에서 고를 수 있는 유형(파일명으로 애매할 때).
+//
+// ⚠ **"log"와 "securitylog"는 다른 것이다.** 헷갈리기 쉬워 여기 적어 둔다.
+//   · log         = 제품의 **로그 매뉴얼**("이 장비의 로그는 이렇게 읽는다" 설명서) → 보안제품 등록부
+//   · securitylog = 장비가 실제로 뱉은 **보안 로그 원본**(sshd 실패·차단 기록 등)   → 통합 분석 이벤트
+//   · opsreport   = 보안제품 **운영 리포트**(주간 차단 통계 등)                      → 통합 분석 이벤트
+//
+// ★ securitylog·opsreport는 2026-08-01에 **되살린** 것이다. 제품 1차 목표가
+//   "취약점·보안로그·운영리포트 3소스 통합 분석"인데, 드롭존을 없애면서 뒤 두 소스의
+//   인입 경로가 통째로 끊겨 있었다(엔진은 멀쩡한데 넣을 길이 없었다).
+export type UploadType = "asset" | "log" | "document" | "guideline" | "vulnreport" | "securitylog" | "opsreport";
 
 export interface AutoUploadResult {
   filename: string;
-  routedTo: "vulnscan" | "product-manual" | "memory" | "decision"; // decision = 사용자 결정 필요
+  routedTo: "vulnscan" | "product-manual" | "memory" | "analysis" | "decision"; // decision = 사용자 결정 필요
   reason: string; // 판별 근거(투명성)
   needsDecision?: boolean; // true면 프론트가 결정 카드(4유형)를 띄운다
   guess?: UploadType; // 결정 필요 시 추천 유형(미리 선택)
@@ -27,6 +37,8 @@ export interface AutoUploadResult {
    *  ＋로 모으면서(2026-07-27) 이 경고까지 사라지면 안 되므로 결과에 함께 싣는다. */
   vulnscan?: { hosts: number; findings: number; uncredentialedHosts?: string[] };
   manual?: { productName: string; kind: string; createdProduct: boolean };
+  /** 통합 분석 인입 결과 — 로그/리포트 판별과 만들어진 이벤트 수(0건도 정직하게 싣는다). */
+  analysis?: { kind: "log" | "report"; created: number };
   memory?: { chunks: number; docClass?: string; linkedProduct?: string; category?: string };
   /** 확정된 업무영역(취약점·장비운영·사내규정·위협대응·일반) — 승인카드에 "이렇게 분류했습니다" 표시용. */
   category?: string;
@@ -35,10 +47,32 @@ export interface AutoUploadResult {
 // 파일명으로 애매할 때의 추천 유형. 취약점 리포트·로그·가이드라인·매뉴얼 신호를 순서대로 본다.
 function guessType(filename: string): UploadType {
   if (/취약점|vuln(?:erabilit)?y?|스캔\s*리포트|scan\s*report/i.test(filename)) return "vulnreport";
-  if (/로그|(?:^|[^a-z])logs?(?:[^a-z]|$)/i.test(filename)) return "log";
+  // 운영 리포트(주간 차단 통계 등) — 「매뉴얼」이 아니라 **운영 실적**이다. 통합 분석의 소스 ③.
+  if (/(주간|월간|일일|운영|차단|탐지)\s*(리포트|report|보고)/i.test(filename)) return "opsreport";
+  // 로그 원본 vs 로그 매뉴얼 — 매뉴얼 신호(매뉴얼·가이드·설명서)가 함께 있으면 매뉴얼 쪽이다.
+  if (/로그|(?:^|[^a-z])logs?(?:[^a-z]|$)/i.test(filename)) {
+    return /매뉴얼|manual|가이드|guide|설명서|규격|포맷|format/i.test(filename) ? "log" : "securitylog";
+  }
   if (/가이드라인|guideline|지침/i.test(filename)) return "guideline";
   if (/매뉴얼|manual|guide/i.test(filename)) return "asset"; // 제품 매뉴얼(User Guide 등)
   return "document";
+}
+
+/**
+ * 보안 로그 **원본**인가 — 「로그 매뉴얼」과 가르는 자물쇠.
+ *
+ * ⚠ 보수적으로 잡는다. 로그 서명이 한두 줄 우연히 들어간 문서(장애처리 노트·매뉴얼 예시)를
+ *   끌고 오면, 담당자가 올린 매뉴얼이 분석 이벤트로 둔갑한다. 그래서
+ *   ① 확장자가 .log/.syslog이거나 ② 서명 줄이 **5줄 이상** 반복될 때만 원본으로 본다.
+ */
+function looksLikeRawSecurityLog(text: string, ext: string): boolean {
+  if (ext === ".log" || ext === ".syslog") return true;
+  const 서명 = /sshd\[|Failed password|authentication failure|Invalid user|kernel:|iptables|UFW |denied by|DENY|DROP\b/i;
+  let n = 0;
+  for (const line of text.slice(0, 200_000).split(/\r?\n/)) {
+    if (서명.test(line) && ++n >= 5) return true;
+  }
+  return false;
 }
 
 // Nessus CSV 헤더 감지 — host 열과 plugin/risk/cvss 계열 열이 함께 있으면 스캔 결과로 본다.
@@ -128,6 +162,30 @@ async function tryWebReport(filename: string, base64: string, uploadedBy?: strin
 // 라우팅 경로가 업무영역(category)을 이미 아는 경우 그 값을 인입에 그대로 전달한다 —
 // 제품 매뉴얼=장비운영, 취약점 리포트=취약점. LLM 분류보다 정확하고 결정적이다.
 async function routeByType(filename: string, base64: string, type: UploadType, productName?: string, uploadedBy?: string): Promise<AutoUploadResult> {
+  // 보안로그 원본·운영 리포트 → **통합 분석 이벤트**. 제품 1차 목표의 소스 ②③이다.
+  // ⚠ 파싱만 하고 끝내지 않는다 — 이벤트로 저장돼야 관제 목록·상관분석에 올라온다.
+  if (type === "securitylog" || type === "opsreport") {
+    const text = Buffer.from(base64, "base64").toString("utf-8");
+    const r = ingestAnalysisFile(filename, text);
+    // 원문도 지식베이스에 남긴다 — 취약점 리포트와 같은 대우(챗봇이 근거로 인용할 수 있게).
+    const ing = await tryIngest(filename, base64, false, "위협대응", uploadedBy);
+    const 종류 = r.kind === "log" ? "보안 로그" : "운영 리포트";
+    emitCollaboration({
+      from: "scan", to: "orchestrator",
+      message: `${filename} → ${종류}로 인입 — 분석 이벤트 ${r.created}건 생성${r.created === 0 ? " (탐지 규칙에 걸린 항목 없음)" : ""}${ing ? "" : " · 검색수집 보류(임베딩 미기동)"}`,
+    });
+    return {
+      filename,
+      routedTo: "analysis",
+      // 0건도 정직하게 말한다 — "올렸는데 아무 일도 없다"로 보이지 않게 이유를 붙인다.
+      reason: r.created > 0
+        ? `사용자 지정: ${종류} — 통합 분석에 ${r.created}건 등록`
+        : `사용자 지정: ${종류} — 읽었지만 탐지 규칙에 걸린 항목이 없어 이벤트는 만들지 않았습니다(원문은 저장)`,
+      category: "위협대응",
+      analysis: { kind: r.kind, created: r.created },
+      memory: ing ? { chunks: ing.chunks, docClass: 종류, category: ing.category } : undefined,
+    };
+  }
   if (type === "asset" || type === "log") {
     const ing = await tryIngest(filename, base64, false, "장비운영", uploadedBy);
     const m = importManual(filename, ing?.docName, undefined, type === "log" ? "logManual" : "manual", productName);
@@ -202,6 +260,25 @@ export async function autoRouteUpload(
     return { filename, routedTo: "vulnscan", reason: vulnReason, category: "취약점", vulnscan: { hosts: r.hosts, findings: r.findings, uncredentialedHosts: r.uncredentialedHosts } };
   }
 
+  // ①-c 보안 로그 **원본** — 장비가 뱉은 로그 파일. 구조가 뚜렷해 자동으로 통합 분석에 넣는다.
+  //   ⚠ 「로그 매뉴얼」(로그 읽는 법 설명서)과 헷갈리면 안 된다. 매뉴얼은 PDF/DOCX 산문이고
+  //   원본 로그는 확장자가 .log/.syslog이거나 로그 줄 서명이 여러 줄 반복된다. 그래서
+  //   **줄 수 기준**으로 보수적으로 잡는다 — 한두 줄 우연히 걸리는 문서를 끌고 오지 않게.
+  if (looksLikeRawSecurityLog(textish, ext)) {
+    const r = ingestAnalysisFile(filename, textish);
+    const ing = await tryIngest(filename, base64, false, "위협대응", uploadedBy);
+    emitCollaboration({ from: "scan", to: "orchestrator", message: `${filename} → 보안 로그 원본으로 자동 인입 — 분석 이벤트 ${r.created}건${ing ? "" : " · 검색수집 보류(임베딩 미기동)"}` });
+    return {
+      filename, routedTo: "analysis",
+      reason: r.created > 0
+        ? `보안 로그 원본 감지 — 통합 분석에 ${r.created}건 등록`
+        : "보안 로그 원본 감지 — 읽었지만 탐지 규칙에 걸린 항목이 없어 이벤트는 만들지 않았습니다(원문은 저장)",
+      category: "위협대응",
+      analysis: { kind: r.kind, created: r.created },
+      memory: ing ? { chunks: ing.chunks, docClass: "보안 로그", category: ing.category } : undefined,
+    };
+  }
+
   // ①-b 국내 웹취약점 점검 결과보고서(PDF/DOCX 서술형) — 제목·[IW-NN] 코드체계로 판별되고
   // 규칙 파서가 취약점을 실제로 뽑아낼 때만 취약점으로 반영한다(못 뽑으면 아래 경로로 계속).
   const webAuto = await tryWebReport(filename, base64, uploadedBy);
@@ -244,8 +321,11 @@ export function registerAutoUploadRoutes(app: Express): void {
         res.status(400).json({ error: "filename과 content(base64)가 필요합니다" });
         return;
       }
-      const valid =
-        forceType && ["asset", "log", "document", "guideline", "vulnreport"].includes(forceType) ? forceType : undefined;
+      // ⚠ 이 허용 목록은 **UploadType과 반드시 같이 늘려야 한다**(2026-08-01 실측 사고).
+      //   유형을 새로 만들고 여기를 안 고치면 forceType이 조용히 버려져 "결정 필요"로 되돌아온다
+      //   — 담당자는 골랐는데 아무 일도 안 일어나는 것으로 보인다. 타입에서 뽑아 어긋남을 막는다.
+      const ALLOWED: UploadType[] = ["asset", "log", "document", "guideline", "vulnreport", "securitylog", "opsreport"];
+      const valid = forceType && ALLOWED.includes(forceType) ? forceType : undefined;
       // 작업 귀속 — 인입되는 문서에 "누가 올렸는지"를 함께 기록한다(2026-07-25 RAG 전면 검토).
       const uploader = (req as Request & { user?: { displayName?: string; username?: string } }).user;
       const result = await autoRouteUpload(filename.trim(), content, valid, productName, uploader?.displayName ?? uploader?.username);
