@@ -245,7 +245,10 @@ tr:last-child td{border-bottom:none;}
       </details>
     </div>
 
-    <div class="panel" id="hygienePanel" style="border-color:rgba(240,160,32,0.35)">
+    <!-- 접기(2026-08-01) — 정리 점검은 매일 보는 것이 아니다. 다만 **겹친 문서 수를 배지로**
+         남긴다: 숫자 없이 접으면 "안에 뭐가 있는지 모르는 서랍"이 된다. -->
+    <div class="panel" id="hygienePanel" data-gijo-fold="지식베이스 정리 점검"
+         data-gijo-fold-badges="hygieneCount:겹침:warn" style="border-color:rgba(240,160,32,0.35)">
       <div class="panel-title">🧹 지식베이스 정리 점검
         <button id="hygieneScanBtn" style="float:right;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;padding:5px 11px;color:var(--blue-light);font-size:11px;font-weight:700;cursor:pointer">다시 점검</button>
       </div>
@@ -263,7 +266,7 @@ tr:last-child td{border-bottom:none;}
       </div>
     </div>
 
-    <div class="panel">
+    <div class="panel" data-gijo-fold="RAG로 쓸까 학습으로 쓸까 — 활용 가이드">
       <details style="margin-bottom:14px;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;">
         <summary style="cursor:pointer;font-size:12.5px;font-weight:800;color:var(--blue-light);">💡 이 문서들, RAG로 쓸까 학습(파인튜닝)으로 쓸까? — 활용 가이드</summary>
         <div style="font-size:12px;color:var(--text);line-height:1.8;margin-top:10px;">
@@ -302,7 +305,8 @@ tr:last-child td{border-bottom:none;}
       <div class="status-line" id="dsSaveStatusLine"></div>
     </div>
 
-    <div class="panel">
+    <!-- GPU가 필요한 고급 작업이라 평소엔 접어 둔다(2026-08-01). -->
+    <div class="panel" data-gijo-fold="학습 · 파인튜닝 (GPU 필요)">
       <div class="panel-title">🎓 학습 · ② 파인튜닝<span class="badge b-amber" style="margin-left:8px">GPU 필요 · Unsloth QLoRA</span></div><div class="field-row">
         <div class="field">
           <label for="ftAgentInput">에이전트 ID</label>
