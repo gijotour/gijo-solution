@@ -947,7 +947,14 @@
   // ⚠ 빈 글이면 **보내지 않는다** — 「이어서 지시하기」만 누른 사람은 아직 할 말을 안 정했다.
   //   커서만 놓아 주는 것이 맞고, 빈 지시를 던지면 AI가 엉뚱한 답을 만든다.
   if (window.gijo && window.gijo.onConsoleAsk) {
-    window.gijo.onConsoleAsk(function (text) {
+    window.gijo.onConsoleAsk(function (text, sessionId) {
+      // 세션을 함께 받으면 **그 작업으로 갈아탄다** — 「작업 내역에서 이어서 지시」가 그 작업에
+      // 붙어야 한다. 안 갈아타면 대화창이 기억하던 다른 세션에 기록돼 버튼 이름이 거짓이 된다
+      // (2026-08-01 검토 지적).
+      if (sessionId) {
+        session = { id: String(sessionId) };
+        try { localStorage.setItem(SESS_KEY, JSON.stringify(session)); } catch (e) {}
+      }
       var 글 = String(text || "").trim();
       if (글) { ask(글); return; }
       var input = document.getElementById("chatInput");

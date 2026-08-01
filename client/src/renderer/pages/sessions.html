@@ -303,7 +303,10 @@
     // askConsole을 먼저 쓴다 — 대화창이 셸 아래에 있든 창으로 빠져 있든 **지금 보이는 쪽**으로
     // 간다. 셸에 postMessage하는 옛 `gijo:ask` 길은 대화창을 창으로 빼 두면 안 보이는
     // 도킹 자리에 답을 찍는다(2026-08-01 확인). 그 길은 구버전 대비 폴백으로만 남긴다.
-    if (window.gijo && window.gijo.askConsole) { window.gijo.askConsole(글); return; }
+    // ⚠ **지금 열어 둔 작업(currentId)을 함께 넘긴다.** 안 넘기면 대화창이 자기가 기억하던
+    //   다른 세션에 붙여, 47번을 열고 「이어서 지시」를 눌러도 엉뚱한 곳에 기록된다 —
+    //   버튼 이름이 거짓말이 된다(2026-08-01 검토 지적).
+    if (window.gijo && window.gijo.askConsole) { window.gijo.askConsole(글, currentId || undefined); return; }
     try {
       if (window.parent !== window) { window.parent.postMessage({ type: "gijo:ask", text: 글 }, "*"); return; }
     } catch (e) {}

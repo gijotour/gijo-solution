@@ -909,7 +909,16 @@ tr:last-child td{border-bottom:none;}
   async function saveDataset() {
     const id = document.getElementById("dsIdInput").value.trim();
     const line = document.getElementById("dsSaveStatusLine");
-    if (!id || convertedExamples.length === 0) return;
+    // ⚠ 조용히 돌아가던 자리(2026-08-01 검토 지적). 오후에 같은 꼴 셋을 고쳤는데 이 둘을
+    //   놓쳤다 — 클릭 전수 점검이 글자 중복을 걸러 「저장」을 한 번만 눌러 본 탓이다.
+    if (!id || convertedExamples.length === 0) {
+      line.textContent = !id
+        ? "먼저 데이터셋 ID를 적어 주세요 (영문 소문자·숫자·하이픈, 예: incident-qa-v1)."
+        : "저장할 것이 없습니다 — 위에서 [Q&A 변환]을 먼저 하세요.";
+      line.className = "status-line";
+      if (!id) document.getElementById("dsIdInput").focus();
+      return;
+    }
     try {
       const result = await window.gijo.saveDataset(id, convertedExamples);
       line.textContent = `✓ 저장됨: ${result.id} (${result.examples}쌍) — 아래 파인튜닝 패널에서 이 ID를 사용하세요.`;
@@ -925,7 +934,15 @@ tr:last-child td{border-bottom:none;}
     const agentId = document.getElementById("ftAgentInput").value.trim();
     const datasetId = document.getElementById("ftDatasetInput").value.trim();
     const line = document.getElementById("ftStatusLine");
-    if (!agentId || !datasetId) return;
+    // ⚠ 조용히 돌아가던 자리(2026-08-01 검토 지적) — 위 saveDataset과 같은 부류다.
+    if (!agentId || !datasetId) {
+      line.textContent = !agentId
+        ? "먼저 학습시킬 에이전트를 적어 주세요."
+        : "먼저 데이터셋 ID를 적어 주세요 — 위 [저장]에서 만든 ID입니다.";
+      line.className = "status-line";
+      document.getElementById(!agentId ? "ftAgentInput" : "ftDatasetInput").focus();
+      return;
+    }
     try {
       await window.gijo.startFinetune(agentId, datasetId);
       line.textContent = "파인튜닝 시작됨 — 진행률 대기 중...";

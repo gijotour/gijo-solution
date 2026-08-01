@@ -36,3 +36,39 @@ describe("빈 입력에도 말은 한다", () => {
     });
   }
 });
+
+describe("검토관이 더 찾은 침묵 버튼 2개", () => {
+  // ⚠ 2026-08-01: 오후에 같은 꼴 셋을 고쳤는데 이 둘을 놓쳤다. 클릭 전수 점검이
+  //   **글자가 같은 것을 한 번만 누르도록** 걸러서 「저장」을 한 번밖에 안 눌러 본 탓이다
+  //   — 점검 도구의 절약이 사각지대를 만들었다. 사람 검토가 그걸 잡았다.
+  const 더 = [
+    { 함수: "saveDataset", 안내: /먼저 데이터셋 ID를 적어/ },
+    { 함수: "startFinetune", 안내: /먼저 학습시킬 에이전트를 적어/ },
+  ];
+  for (const { 함수, 안내 } of 더) {
+    it(`memory.html / ${함수} — 빈 칸이면 이유를 말한다`, async () => {
+      const fs = await import("node:fs");
+      const src = fs.readFileSync(new URL("../../client/src/renderer/pages/memory.html", import.meta.url), "utf8");
+      const i = src.indexOf(`function ${함수}(`);
+      expect(i, `${함수}를 못 찾았다`).toBeGreaterThan(-1);
+      expect(안내.test(src.slice(i, i + 1400)), `${함수}가 빈 입력에 아무 말도 안 한다`).toBe(true);
+    });
+  }
+});
+
+describe("「이어서 지시」가 그 작업에 붙는가", () => {
+  // ⚠ 2026-08-01 검토 지적: console:ask가 { text }만 넘겨 세션 id가 안 실렸다.
+  //   47번 작업을 열고 눌러도 대화창이 기억하던 **다른 세션**에 기록된다 — 버튼 이름이 거짓말.
+  it("세션이 사슬 끝까지 실린다", async () => {
+    const fs = await import("node:fs");
+    const 읽기 = (p: string) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
+    expect(/askConsole\(글, currentId/.test(읽기("../../client/src/renderer/pages/sessions.html")),
+      "작업 내역이 세션을 안 넘긴다").toBe(true);
+    expect(/askConsole: \(text: string, sessionId\?: string\)/.test(읽기("../../client/src/preload.ts")),
+      "preload가 세션을 안 받는다").toBe(true);
+    expect(/send\("console:ask", \{ text: 글, sessionId/.test(읽기("../../client/src/main.ts")),
+      "main이 세션을 안 보낸다").toBe(true);
+    expect(/onConsoleAsk\(function \(text, sessionId\)/.test(읽기("../../client/src/renderer/pages/console.js")),
+      "대화창이 세션을 안 받는다").toBe(true);
+  });
+});

@@ -116,10 +116,10 @@ const gijoApi = {
   },
   // 어느 화면·어느 창에서든 지휘소(대화창)에 지시를 건넨다. 화면이 스스로 dispatch를 부르면
   // 결재판을 못 그려 쓰기 지시가 막다른 길이 된다 — 지시는 대화창 한 곳으로 모은다.
-  askConsole: (text: string) => ipcRenderer.invoke("console:ask", text),
-  onConsoleAsk: (cb: (text: string) => void) => {
+  askConsole: (text: string, sessionId?: string) => ipcRenderer.invoke("console:ask", text, sessionId),
+  onConsoleAsk: (cb: (text: string, sessionId: string | null) => void) => {
     ipcRenderer.removeAllListeners("console:ask");
-    ipcRenderer.on("console:ask", (_e, i) => cb(String((i && i.text) || "")));
+    ipcRenderer.on("console:ask", (_e, i) => cb(String((i && i.text) || ""), (i && i.sessionId) || null));
   },
   dockConsoleWindow: () => ipcRenderer.invoke("console:dock"),
   // 셸이 "지금 보고 있는 탭"을 콘솔 창에 알린다(별도 창은 활성 탭을 직접 못 본다).

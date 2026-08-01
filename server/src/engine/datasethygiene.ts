@@ -256,8 +256,13 @@ export function cleanForTraining(rows: Example[], 종류: 데이터종류 = "지
   // 지문은 **내용**으로 만든다(순서·id 무관) — 같은 데이터면 언제 뽑아도 같은 지문이라야
   // "이 모델이 무엇으로 학습됐나"를 대조할 수 있다.
   const kept = [...최선.values()].sort((a, b) => a.question.localeCompare(b.question));
+  // ⚠ 구분자는 **이스케이프로 적는다**(2026-08-01 검토 지적). 예전엔 날 제어문자(NUL·SOH)를
+  //   소스에 박아 둬서 git이 이 파일을 **바이너리로 취급**했다 — diff·blame·머지가 안 되고,
+  //   사후 검토가 안전망인 이 저장소에서 하필 이 파일만 검토가 불가능했다(오늘 네 번 고쳤는데
+  //   검토관이 변경 내용을 못 봤다).
+  //   런타임 값은 같으므로 **지문은 바뀌지 않는다** — 아래 시험이 그걸 못 박는다.
   const fingerprint = createHash("sha256")
-    .update(kept.map((e) => `${e.question} ${e.answer}`).join(""), "utf8")
+    .update(kept.map((e) => `${e.question}\u0000${e.answer}`).join("\u0001"), "utf8")
     .digest("hex")
     .slice(0, 16);
 
