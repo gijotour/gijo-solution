@@ -44,6 +44,60 @@ const getDocMetaStmt = db.prepare("SELECT * FROM memory_documents WHERE document
 const deleteDocMetaStmt = db.prepare("DELETE FROM memory_documents WHERE documentId = ?");
 const setDocClassStmt = db.prepare("UPDATE memory_documents SET docClass = ? WHERE documentId = ?");
 
+// ── 문서 ↔ 자산 연결 ──────────────────────────────────────────────────────
+// "이 보고서는 어느 자산 것인가". 리포트를 올려 자산을 등록하는 **그 순간**에 적어 둔다 —
+// 그때는 문서와 자산을 둘 다 확실히 알고 있다(ingestreport가 assetIds를 들고 있다).
+// 나중에 자산 이름으로 물으면 이 연결로 그 보고서만 정확히 꺼낸다(느슨한 검색이 아니다).
+const setDocAssetsStmt = db.prepare("UPDATE memory_documents SET assetIds = ? WHERE documentId = ?");
+const docsByAssetStmt = db.prepare(
+  "SELECT documentId, sourcePath, assetIds FROM memory_documents WHERE assetIds IS NOT NULL AND assetIds <> ''"
+);
+
+/** 문서에 이 자산들이 담겼다고 적는다. 빈 목록이면 아무것도 하지 않는다(빈 값으로 덮지 않는다). */
+export function linkDocumentToAssets(documentId: string, assetIds: string[]): void {
+  const ids = (assetIds ?? []).map((s) => String(s).trim()).filter(Boolean);
+  if (!documentId || ids.length === 0) return;
+  try {
+    // 이미 이어 둔 것이 있으면 합친다 — 같은 문서를 두 번 올려도 앞의 연결을 잃지 않는다.
+    const 기존 = getDocumentAssetIds(documentId);
+    const 합 = Array.from(new Set([...기존, ...ids]));
+    setDocAssetsStmt.run(JSON.stringify(합), documentId);
+  } catch {
+    /* 연결을 못 적어도 문서 인입 자체는 성공으로 둔다 */
+  }
+}
+
+/** 그 문서에 담긴 자산 id들. */
+export function getDocumentAssetIds(documentId: string): string[] {
+  try {
+    const row = getDocMetaStmt.get(documentId) as { assetIds?: string | null } | undefined;
+    const raw = row?.assetIds;
+    if (!raw) return [];
+    const v = JSON.parse(raw);
+    return Array.isArray(v) ? v.map(String) : [];
+  } catch {
+    return [];
+  }
+}
+
+/** 이 자산이 담긴 문서들. 자산 이름으로 물었을 때 그 보고서만 정확히 꺼내는 용도. */
+export function documentsForAsset(assetId: string): { documentId: string; sourcePath: string | null }[] {
+  if (!assetId) return [];
+  try {
+    const rows = docsByAssetStmt.all() as { documentId: string; sourcePath: string | null; assetIds: string }[];
+    return rows
+      .filter((r) => {
+        try {
+          const ids = JSON.parse(r.assetIds);
+          return Array.isArray(ids) && ids.includes(assetId);
+        } catch { return false; }
+      })
+      .map((r) => ({ documentId: r.documentId, sourcePath: r.sourcePath }));
+  } catch {
+    return [];
+  }
+}
+
 // ── 등급 차단 (N2SF) ──────────────────────────────────────────────────────
 // 누가 묻는지에 따라 **검색에서 아예 빠지는** 문서를 정한다. engine/grades.ts 참고.
 //

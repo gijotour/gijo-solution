@@ -135,6 +135,18 @@ async function tryWebReport(filename: string, base64: string, uploadedBy?: strin
     const r = importVulnScan(text, "webreport", filename);
     // 원문은 지식베이스에도 남긴다 — 취약점 등록과 별개로 "보고서 내용"을 챗봇이 근거로 인용할 수 있게.
     const ing = await tryIngest(filename, base64, false, "취약점", uploadedBy);
+    // ★ 이 보고서가 **어느 자산 것인지** 지금 적어 둔다(2026-08-02).
+    //   실사고(2026-07-28~08-02 세 번 재발): "안전대부 웹서버 취약점 알려줘"에 보고서에는 5건이
+    //   적혀 있는데 "취약점 없습니다"라고 답했다. 보고서는 지식베이스에 잘 있었지만,
+    //   **자산 이름으로는 그 보고서를 찾을 길이 없었다**(검색은 문서 제목이 맞을 때만 발췌를 붙인다).
+    //   제목이 안 맞아도 붙이는 느슨한 검색은 무관한 문서를 섞는다 — 보안 답변에선 그게 더 나쁘다.
+    //   이 순간에는 문서와 자산을 **둘 다 확실히** 알고 있으니, 여기서 이어 둔다.
+    if (ing) {
+      try {
+        const { linkDocumentToAssets } = await import("./memory.js");
+        linkDocumentToAssets(filename, (r.assets ?? []).map((a) => a.id));
+      } catch { /* 연결을 못 적어도 등록·인입은 그대로 성공이다 */ }
+    }
     emitCollaboration({
       from: "scan",
       to: "orchestrator",

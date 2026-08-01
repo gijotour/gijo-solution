@@ -210,7 +210,15 @@ async function runGetAsset(args: Record<string, string>): Promise<string> {
   const 진짜취약 = (asset.findings ?? []).filter(isRealVulnerability);
   if (진짜취약.length === 0) {
     try {
-      const rawChunks = await queryMemory(`${asset.name} 취약점`, 5);
+      // ★ 먼저 **이 자산에 이어 둔 보고서**를 찾는다(2026-08-02 신설).
+      //   자산 이름으로 검색하면 문서 제목이 안 맞아 발췌가 안 붙는다 — 인입 때 적어 둔
+      //   연결로 그 보고서만 정확히 꺼낸다. 느슨한 검색이 아니라서 무관한 문서가 안 섞인다.
+      const { documentsForAsset } = await import("./memory.js");
+      const 이어둔문서 = documentsForAsset(asset.id);
+      const q = 이어둔문서.length
+        ? `${이어둔문서[0].documentId} ${asset.name} 취약점`
+        : `${asset.name} 취약점`;
+      const rawChunks = await queryMemory(q, 5);
       const { sanitizeRagChunks } = await import("./ragsanitize.js");
       const chunks = sanitizeRagChunks(rawChunks.map(String), { source: "tool:get_asset", question: asset.name }).chunks;
       if (chunks.length) {
