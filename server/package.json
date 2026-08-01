@@ -4,7 +4,7 @@
   "description": "GIJO AS — 보안 오케스트레이터 서버 (엔진 모듈 전부 호스팅)",
   "main": "dist/index.js",
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "tsc -p tsconfig.json && node scripts/copy-assets.mjs",
     "start": "npm run build && node dist/index.js",
     "watch": "tsc -p tsconfig.json --watch",
     "test": "vitest run",
