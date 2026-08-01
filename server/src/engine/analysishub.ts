@@ -348,7 +348,9 @@ function detectWebAttack(source: string, lines: string[], 대상: string[] = [])
 
 function mkLog(source: string, id: string, title: string, entity: string, severity: Severity, signals: string[], detail: string, peers: string[] = []): AnalysisEvent {
   // 공격자 자신은 대상이 아니다 — 로그 줄에서 첫 IP를 주워 온 경우를 여기서 걸러 낸다.
-  const 대상만 = [...new Set(peers)].filter((p) => p && p !== entity);
+  // 공격자 자신은 대상이 아니다 — 로그 줄에서 첫 IP를 주워 온 경우를 여기서 걸러 낸다.
+  // 그리고 **우리 자산인 것만** 남긴다(바깥 주소가 "우리 쪽"으로 앉는 것을 막는다).
+  const 대상만 = [...new Set(peers)].filter((p) => p && p !== entity && 우리자산인가(p));
   return { id, source: "log", title, entity, peers: 대상만, severity, priority: computePriority(severity, signals), detail, signals, aiSummary: "", ref: source, at: Date.now() };
 }
 
@@ -359,6 +361,24 @@ function mkLog(source: string, id: string, title: string, entity: string, severi
  *   이 값이 없으면 취약점·운영리포트·하드닝 어느 것과도 상관되지 않는다(2026-08-01 결함).
  *   못 뽑으면 **지어내지 않고 빈 값**을 준다 — 틀린 자산에 묶는 것이 못 묶는 것보다 나쁘다.
  */
+/**
+ * 이 이름이 **우리 자산**인가 — 등록부(assets)와 대조한다.
+ *
+ * ⚠ dst를 무조건 "우리 자산"으로 믿으면 안 된다(2026-08-01 검토 지적). 내부→외부 차단
+ *   로그(방화벽에서 매우 흔하다)에서는 SRC가 우리 PC이고 **DST가 바깥 주소**다. 그대로
+ *   실으면 남의 IP가 "우리 쪽 개체" 자리에 앉아, 상관 묶음 이름이 외부 IP가 된다.
+ * ⚠ 등록부가 비어 있으면(첫날) **막지 않는다** — 아직 자산을 안 넣은 것뿐인데 상관을
+ *   통째로 꺼 버리면 제품이 고장 난 것처럼 보인다. 자산이 있을 때만 대조한다.
+ */
+function 우리자산인가(이름: string): boolean {
+  const 목록 = listAssets();
+  if (목록.length === 0) return true; // 등록 전에는 판단하지 않는다
+  const 납작 = (x: string) => String(x ?? "").replace(/\s/g, "").toLowerCase();
+  const k = 납작(이름);
+  return 목록.some((a) => 납작(a.name) === k || 납작(a.id) === k ||
+    납작(a.name).includes(k) || k.includes(납작(a.id)));
+}
+
 /**
  * 줄에서 찾은 대상이 있으면 **그것만** 쓰고, 없을 때만 파일 전체 보조값을 쓴다.
  *
@@ -525,7 +545,8 @@ export function projectHardeningEvents(
 }
 
 // ── 상관분석 ───────────────────────────────────────────────────────────────
-// 같은 entity(호스트/IP/PC)가 2개 이상 서로 다른 소스에 나타나면 교차 위험으로 묶는다.
+// 같은 개체(호스트/IP/PC)가 2개 이상 서로 다른 소스에 나타나면 교차 위험으로 묶는다.
+// ⚠ 키는 entity **와 peers 둘 다**다 — 로그의 entity는 공격자 IP라 그것만 보면 안 묶인다.
 // 예: 백신 재발(product) + 비정상 아웃바운드(log)가 같은 PC → 감염+C2 연계 가능성.
 export interface Correlation {
   entity: string;

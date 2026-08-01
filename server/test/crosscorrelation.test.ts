@@ -11,6 +11,15 @@
 //   에러도 0건 표시도 없고 그냥 상관 목록이 조용히 짧다. 그래서 시험으로 못 박는다.
 import { describe, it, expect, beforeEach } from "vitest";
 import { parseSecurityLog, computeCorrelations, type AnalysisEvent } from "../src/engine/analysishub";
+import { registerAsset, resetAssetsForTests } from "../src/engine/assets";
+
+// ⚠ **자산을 등록해 두고 시작한다**(2026-08-01 검토 후 추가). peers는 이제 우리 자산인지
+//   대조하는데(바깥 주소가 "우리 쪽"으로 앉는 것을 막는다), 등록부가 비면 그 대조가
+//   무의미해진다. 시험 자료를 현실(자산이 등록된 상태)에 맞춘다.
+function 자산등록(...이름들: string[]) {
+  resetAssetsForTests();
+  for (const n of 이름들) registerAsset({ id: n, name: n, path: n });
+}
 
 /** 우리 장비(fw01)를 노린 공격 로그 — syslog 형식이라 4번째 토큰이 우리 호스트다. */
 const 로그 = Array.from({ length: 14 }, (_, i) =>
@@ -24,7 +33,7 @@ const 취약점이벤트 = (entity: string): AnalysisEvent => ({
 
 describe("★ 로그가 우리 자산과 묶인다", () => {
   let 로그이벤트: AnalysisEvent[];
-  beforeEach(() => { 로그이벤트 = parseSecurityLog("secure.log", 로그).events; });
+  beforeEach(() => { 자산등록("fw01", "10.0.0.5", "10.0.0.9", "10.0.0.12"); 로그이벤트 = parseSecurityLog("secure.log", 로그).events; });
 
   it("로그 이벤트가 만들어진다", () => {
     expect(로그이벤트.length, "로그를 못 읽으면 나머지 시험이 무의미하다").toBeGreaterThan(0);
@@ -75,6 +84,7 @@ describe("★ 로그가 우리 자산과 묶인다", () => {
 //   CEF(ArcSight) · LEEF(IBM) · key=value 로 syslog를 보낸다 — 공개된 표준 형식이다.
 //   그 줄에는 syslog 호스트 이름이 없어서, dst= 를 못 뽑으면 우리 자산과 이어지지 않는다.
 describe("★ CEF·LEEF 형식에서도 우리 자산과 이어진다", () => {
+  beforeEach(() => 자산등록("fw01", "gw01", "10.0.0.5", "10.0.0.9", "10.0.0.12"));
   const 반복 = (line: (i: number) => string, n = 40) => Array.from({ length: n }, (_, i) => line(i)).join("\n");
 
   it("CEF 차단 로그 — dst가 상관 키가 된다", () => {
@@ -122,6 +132,7 @@ describe("★ CEF·LEEF 형식에서도 우리 자산과 이어진다", () => {
 
 // ── 검토 지적 수정 확인 (2026-08-01 오후 검토) ──────────────────────────────
 describe("★ 검토가 짚은 사각지대", () => {
+  beforeEach(() => 자산등록("fw01", "web01"));
   const 반복 = (f: (i: number) => string, n = 14) => Array.from({ length: n }, (_, i) => f(i)).join("\n");
 
   it("★★ 여러 장비를 한 파일로 올려도 **엉뚱한 장비에 안 붙는다**", () => {

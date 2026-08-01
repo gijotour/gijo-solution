@@ -21,12 +21,18 @@ const 로그원본 = Array.from({ length: 12 }, (_, i) =>
 ).join("\n");
 
 describe("★ 3소스 인입 — 담당자가 넣을 길이 있는가", () => {
-  it("업로드 유형에 보안로그·운영리포트가 있다", () => {
-    // 유형이 없으면 결정 카드에서 고를 수가 없다 — 넣을 길 자체가 없는 것이다.
-    const 유형: UploadType[] = ["vulnreport", "securitylog", "opsreport"];
-    for (const t of 유형) {
-      // 타입 수준 확인 + 실제 라우팅이 되는지는 아래 시험이 본다.
-      expect(typeof t).toBe("string");
+  it("★ 업로드 유형 3소스가 **실제로 라우팅된다**", async () => {
+    // ⚠ 예전엔 `expect(typeof t).toBe("string")`이었다 — 문자열 리터럴이 문자열인지 보는
+    //   것이라 **제품을 전혀 검증하지 않았다**(2026-08-01 검토 지적). 유형을 지정해 올려
+    //   각각 제 갈 길로 가는지 본다. 라우트의 허용 목록이 유형과 어긋나면 여기서 걸린다.
+    const 갈곳: [UploadType, string][] = [
+      ["securitylog", "analysis"],
+      ["opsreport", "analysis"],
+      ["guideline", "memory"],
+    ];
+    for (const [t, 기대] of 갈곳) {
+      const r = await autoRouteUpload(`유형시험-${t}.txt`, b64("구분,건수\n차단,3\n"), t);
+      expect(r.routedTo, `${t} 유형이 ${r.routedTo}로 갔다`).toBe(기대);
     }
   });
 
