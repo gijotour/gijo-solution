@@ -1357,6 +1357,53 @@ function runAnalysisStatus(): string {
   return [head, pri, top.length ? `최우선 항목:\n${top.join("\n")}` : "", corr.length ? `상관관계:\n${corr.join("\n")}` : ""].filter(Boolean).join("\n");
 }
 
+
+/**
+ * 지금 손댈 일 — 보안 KPI의 나쁜 값만 골라 **할 일 줄**로 낸다.
+ *
+ * 왜 서버로 옮겼나(2026-08-02 사용자 지시 "화면에서는 숨기거나 삭제, 대화창에서 가이드"):
+ *   같은 목록을 보안 KPI 화면이 자기 자바스크립트로 따로 만들고 있었다. 규칙이 두 벌이면
+ *   한쪽만 고쳐진다 — 실제로 화면 쪽에는 "0이면 줄을 만들지 않는다"는 규칙이 있는데
+ *   대화창에는 그런 개념 자체가 없었다. 규칙은 여기 하나로 둔다.
+ *
+ * 원칙 — **숫자가 0이면 줄을 만들지 않는다.** 할 일이 없는데 있는 척하면 목록을 안 믿게 된다.
+ * ⚠ 스캔 실패는 취약점 줄과 **섞지 않는다**. 스캐너를 고칠 일이지 취약점이 아니다.
+ */
+async function runUrgentTodo(): Promise<string> {
+  const s = await computeKpiSnapshot();
+  const a = s.aiSecurity;
+  const 후보 = [
+    { n: s.vulnerabilities.kev, p: "P0", 무엇: `실제 악용(KEV) ${s.vulnerabilities.kev}건`,
+      왜: "공격이 실제로 쓰이는 취약점 — 이번 주 안에 막아야 합니다", 어디: "취약점" },
+    { n: s.remediation.overdue, p: "P0", 무엇: `기한 지난 조치 ${s.remediation.overdue}건`,
+      왜: "약속한 날짜를 넘긴 일 — SLA 준수율을 깎고 있습니다", 어디: "조치·승인" },
+    { n: s.findings.pending, p: "P1", 무엇: `검토 대기 항목 ${s.findings.pending}건`,
+      왜: "맞는지 오탐인지 아직 아무도 안 본 것(스캐너가 올린 낱개 기준)", 어디: "조치·승인" },
+    { n: s.assets.highRisk, p: "P1", 무엇: `고위험 자산 ${s.assets.highRisk}대`,
+      왜: "위험이 몰린 장비 — 여기부터 손대면 점수가 가장 많이 오릅니다", 어디: "자산 통합 뷰" },
+    { n: s.findings.scanFailed, p: "P2", 무엇: `스캔이 안 된 자산 ${s.findings.scanFailed}건`,
+      왜: "스캐너가 결과를 못 받았습니다 — 접속 정보·권한 문제이지 취약점이 아닙니다", 어디: "자산 통합 뷰" },
+    { n: s.inspections.overdue, p: "P2", 무엇: `지연된 정기점검 ${s.inspections.overdue}건`,
+      왜: "기한이 지난 유지보수 점검 — 점검서를 올리면 관리자 승인으로 닫힙니다", 어디: "유지보수 점검" },
+    { n: s.inspections.pendingApproval, p: "P2", 무엇: `점검 보고서 검토 대기 ${s.inspections.pendingApproval}건`,
+      왜: "담당자가 점검서를 올렸는데 아직 승인·반려가 안 됐습니다", 어디: "유지보수 점검" },
+    { n: a && a.aiAssets && a.avgRobustness == null ? a.aiAssets : 0, p: "P2", 무엇: "AI 자산 견고성 미점검",
+      왜: "AI 자산은 있는데 공격 저항력을 한 번도 안 재봤습니다", 어디: "레드팀·가드레일" },
+  ].filter((x) => x.n > 0);
+
+  if (!후보.length) {
+    return "지금 손댈 일: 급한 건이 없습니다 — 보안 KPI에 나쁜 값이 잡히면 여기에 줄이 생깁니다.";
+  }
+  const 줄 = 후보.map((x, i) => `${i + 1}. [${x.p}] ${x.무엇}
+   ${x.왜} · 화면: ${x.어디}`);
+  return [
+    `지금 손댈 일 ${후보.length}건 (보안 KPI에서 나쁜 값만 골랐습니다):`,
+    ...줄,
+    "",
+    "할 일로 담으려면 그대로 말씀하세요 — 예: \"기한 지난 조치 마무리를 할 일로 담아줘\"",
+  ].join("\n");
+}
+
 // 통합 보안 KPI 현황(kpi.html) — 자산 위험도·취약점·조치 SLA·점검·컴플라이언스를 한 스냅샷으로.
 async function runKpiStatus(): Promise<string> {
   const s = await computeKpiSnapshot();
@@ -2300,6 +2347,18 @@ const TOOLS: AgentTool[] = [
       '보안 주제·위협·용어의 사내 근거를 모은다 — 온톨로지 관계(위협→완화통제→제품)·사내 문서·보유 보안제품. "이게 뭐야", "무슨 위협이 걸려", "우리 통제는?"에 쓴다. 예: {"topic":"프롬프트 인젝션"}',
     params: [{ name: "topic", label: "주제", description: "설명이 필요한 위협·용어·주제", required: true }],
     run: runExplain,
+  },
+  {
+    name: "urgent_todo",
+    label: "지금 손댈 일",
+    domain: "cross",
+    write: false,
+    description:
+      '보안 KPI의 **나쁜 값만** 골라 지금 손댈 일을 우선순위(P0~P2)로 낸다. "지금 손댈 일", "뭐가 급해", "손댈 일 뭐야", "급한 일 알려줘"에 쓴다. **취약점만의 우선순위는 today, 지표 숫자 나열은 kpi_status로 간다.**',
+    params: [],
+    // 규칙으로 만든 목록이라 LLM이 다시 쓸 이유가 없다 — 숫자가 바뀌면 안 된다.
+    directAnswer: true,
+    run: runUrgentTodo,
   },
   {
     name: "today",
