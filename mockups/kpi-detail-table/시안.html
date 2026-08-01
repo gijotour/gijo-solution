@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>GIJO AS — 보안 KPI 상세 지표를 표로 (시안)</title>
+<style>
+  :root{--bg:#262624;--panel:#30302e;--panel2:#1f1e1d;--bd:rgba(255,255,255,.10);--bds:rgba(255,255,255,.18);
+        --tx:#e9e7e2;--mut:#b3ada4;--mut2:#a49d95;--blue:#3b82f6;--bluel:#7ab0ff;--teal:#1eb980;--red:#e2483d;--amber:#f0a020}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--tx);font-size:14px;line-height:1.75;padding:26px 30px 70px}
+  h1{font-size:22px;font-weight:800;letter-spacing:-.3px;margin-bottom:5px}
+  h2{font-size:16px;font-weight:800;margin:30px 0 12px;padding-top:18px;border-top:1px solid var(--bd)}
+  p{color:var(--mut);margin-bottom:10px}
+  .sub{color:var(--mut2);font-size:13px;margin-bottom:22px}
+  .tag{font-size:11.5px;font-weight:800;border-radius:6px;padding:3px 9px;margin-left:8px;vertical-align:2px}
+  .tag.now{background:rgba(226,72,61,.16);color:#f5928a}
+  .tag.new{background:rgba(30,185,128,.16);color:var(--teal)}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(410px,1fr));gap:18px;align-items:start}
+  .win{border:1px solid var(--bds);border-radius:11px;overflow:hidden;background:var(--bg)}
+  .wh{height:32px;display:flex;align-items:center;padding:0 12px;background:var(--panel2);border-bottom:1px solid var(--bd);font-size:12.5px;color:var(--mut2)}
+  .stage{padding:14px;max-height:400px;overflow:hidden;position:relative}
+
+  /* 지금 — 큰 타일 */
+  .cat-t{font-size:14px;font-weight:800;color:#fff;margin:0 0 9px;display:flex;gap:8px;align-items:center}
+  .cat-t .go{margin-left:auto;font-size:12px;font-weight:700;color:var(--bluel)}
+  .tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+  .tile{background:var(--panel);border:1px solid var(--bd);border-radius:10px;padding:12px 14px}
+  .tile .l{font-size:12px;color:var(--mut)}
+  .tile .v{font-size:20px;font-weight:800;margin-top:3px}
+
+  /* 시안 — 엑셀처럼 좁은 표 */
+  .ktab{width:100%;border-collapse:collapse;font-size:13px;margin-bottom:6px}
+  .ktab tr{border-bottom:1px solid rgba(255,255,255,.05)}
+  .ktab tr:last-child{border-bottom:0}
+  .ktab td{padding:5px 8px;vertical-align:middle}
+  .ktab td.nm{color:#fff;font-weight:800;width:150px;white-space:nowrap}
+  .ktab td.vals{color:var(--mut)}
+  .ktab .kv{display:inline-flex;align-items:baseline;gap:5px;margin-right:14px;white-space:nowrap}
+  .ktab .kv b{font-size:14.5px;font-weight:800;color:#fff}
+  .ktab td.go{width:74px;text-align:right;color:var(--bluel);font-size:12px;font-weight:700;white-space:nowrap}
+  .ktab tr:hover{background:rgba(59,130,246,.06)}
+  .r{color:#f5928a} .a{color:var(--amber)} .t{color:var(--teal)} .b{color:var(--bluel)}
+
+  .cut{position:absolute;left:0;right:0;bottom:0;height:52px;background:linear-gradient(transparent,var(--bg));display:flex;align-items:flex-end;justify-content:center;font-size:11.5px;color:var(--mut2);padding-bottom:5px}
+  .cap{font-size:12.5px;color:var(--mut2);margin:9px 2px 0}
+  .cap b{color:var(--amber)}
+  table.cmp{width:100%;border-collapse:collapse;font-size:13px;margin:10px 0}
+  table.cmp th,table.cmp td{border:1px solid var(--bd);padding:9px 11px;text-align:left;vertical-align:top}
+  table.cmp th{background:rgba(255,255,255,.03);color:var(--mut2);font-size:12.5px;font-weight:800}
+  code{background:rgba(255,255,255,.07);padding:1.5px 6px;border-radius:5px;font-size:12.5px}
+  .rec{background:rgba(30,185,128,.09);border:1px solid rgba(30,185,128,.34);border-radius:10px;padding:13px 15px;margin:16px 0;color:#bfe8d5}
+  .rec b{color:var(--teal)}
+  .warn{background:rgba(240,160,32,.09);border:1px solid rgba(240,160,32,.34);border-radius:10px;padding:13px 15px;margin:14px 0;color:#f3d9a8}
+  .warn b{color:var(--amber)}
+  ul{margin:8px 0 8px 20px;color:var(--mut)} li{margin-bottom:6px}
+</style>
+</head>
+<body>
+
+<h1>보안 KPI 상세 지표 — 엑셀처럼 한 줄씩</h1>
+<div class="sub">2026-08-02 지시: “상세 지표는 간단하게 엑셀 표처럼 작게 정리해 주고, 그래프는 그대로 두되 위치를 잘 잡아 달라”.</div>
+
+<h2>지금 vs 시안</h2>
+<div class="grid">
+  <div>
+    <div class="win">
+      <div class="wh">지금 — 큰 타일 31장</div>
+      <div class="stage">
+        <div class="cat-t">🖥 자산 위험도 <span class="go">→ 화면 열기</span></div>
+        <div class="tiles">
+          <div class="tile"><div class="l">전체 자산</div><div class="v">57</div></div>
+          <div class="tile"><div class="l">고위험</div><div class="v r">0</div></div>
+          <div class="tile"><div class="l">중위험</div><div class="v a">0</div></div>
+          <div class="tile"><div class="l">저위험</div><div class="v t">57</div></div>
+        </div>
+        <div class="cat-t">🔎 취약점 승인 (finding) <span class="go">→ 화면 열기</span></div>
+        <div class="tiles">
+          <div class="tile"><div class="l">전체 finding</div><div class="v">3</div></div>
+          <div class="tile"><div class="l">미검토</div><div class="v a">0</div></div>
+          <div class="tile"><div class="l">승인(확정)</div><div class="v t">3</div></div>
+        </div>
+        <div class="cut">↓ 아직 <b>4구역</b> 더 · 그래프는 그 아래</div>
+      </div>
+    </div>
+    <div class="cap">한 지표가 세로 <b>76px</b>. 6구역 31장이면 <b>약 1,900px</b> — 화면 세 개 분량입니다. 그래프는 맨 아래라 스크롤 끝까지 가야 나옵니다.</div>
+  </div>
+
+  <div>
+    <div class="win">
+      <div class="wh">시안 — 구역당 한 줄</div>
+      <div class="stage">
+        <table class="ktab">
+          <tr><td class="nm">🖥 자산 위험도</td>
+              <td class="vals"><span class="kv">전체 <b>57</b></span><span class="kv">고위험 <b class="r">0</b></span><span class="kv">중위험 <b class="a">0</b></span><span class="kv">저위험 <b class="t">57</b></span></td>
+              <td class="go">→ 열기</td></tr>
+          <tr><td class="nm">🔎 취약점 승인</td>
+              <td class="vals"><span class="kv">finding <b>3</b></span><span class="kv">미검토 <b class="a">0</b></span><span class="kv">승인 <b class="t">3</b></span><span class="kv">반려 <b>0</b></span></td>
+              <td class="go">→ 열기</td></tr>
+          <tr><td class="nm">🔧 유지보수 점검</td>
+              <td class="vals"><span class="kv">전체 <b>10</b></span><span class="kv">지연 <b class="r">5</b></span><span class="kv">승인 대기 <b class="a">1</b></span><span class="kv">승인됨 <b class="t">2</b></span></td>
+              <td class="go">→ 열기</td></tr>
+          <tr><td class="nm">🎯 CTI 위협</td>
+              <td class="vals"><span class="kv">수집 <b>55</b></span><span class="kv">자산 매칭 <b class="a">13</b></span><span class="kv">영향 자산 <b class="r">15</b></span><span class="kv">긴급 <b class="r">2</b></span></td>
+              <td class="go">→ 열기</td></tr>
+          <tr><td class="nm">🛡 취약점 조치</td>
+              <td class="vals"><span class="kv">열림 <b>0</b></span><span class="kv">KEV <b class="r">0</b></span><span class="kv">조치율 <b class="b">0%</b></span><span class="kv">스캔 호스트 <b>53</b></span></td>
+              <td class="go">→ 열기</td></tr>
+          <tr><td class="nm">📋 조치 항목 · SLA</td>
+              <td class="vals"><span class="kv">항목 <b>1</b></span><span class="kv">기한 초과 <b class="r">0</b></span><span class="kv">임박 <b class="a">0</b></span><span class="kv">준수율 <b class="t">100%</b></span></td>
+              <td class="go">→ 열기</td></tr>
+          <tr><td class="nm">✔ 컴플라이언스</td>
+              <td class="vals"><span class="kv">위협 <b>21</b></span><span class="kv">대응 완료 <b class="t">10</b></span><span class="kv">대응률 <b class="b">48%</b></span></td>
+              <td class="go">→ 열기</td></tr>
+        </table>
+        <div class="cap" style="margin-top:2px">↑ 여기까지 <b style="color:#1eb980">약 250px</b> — 그래프가 바로 이어집니다</div>
+      </div>
+    </div>
+    <div class="cap">한 구역이 <b>34px</b> 한 줄. 7구역 합쳐 <b>약 250px</b>. 숫자·색·「→ 열기」는 그대로 살립니다.</div>
+  </div>
+</div>
+
+<h2>그래프는 어디로 <span class="tag new">손대지 않고 자리만</span></h2>
+<table class="cmp">
+  <tr><th>순서</th><th>지금</th><th>시안</th><th>왜</th></tr>
+  <tr><td>1</td><td>임원 요약(히어로)</td><td>임원 요약(히어로)</td><td>그대로</td></tr>
+  <tr><td>2</td><td>🎯 지금 손댈 일</td><td style="color:var(--mut2)">(대화창으로 옮김)</td><td>2026-08-02 완료</td></tr>
+  <tr><td>3</td><td>📂 상세 지표 <b>31장</b></td><td><b>📉 번다운·추세 그래프 4종</b></td><td>추세가 먼저다 — “늘고 있나 줄고 있나”가 낱개 숫자보다 앞선다</td></tr>
+  <tr><td>4</td><td>그래프 4종</td><td>📂 상세 지표 <b>표 7줄</b></td><td>낱개 숫자는 확인용이라 뒤가 맞다</td></tr>
+</table>
+<p><b>그래프 자체는 한 줄도 안 고칩니다.</b> 자리만 상세 지표 <b>위</b>로 올립니다.</p>
+
+<div class="rec">
+  <b>추천 — 표 + 그래프 자리 바꾸기.</b> 상세 지표 <b>1,900px → 약 250px</b>, 그래프가 스크롤 없이 보입니다.
+  숫자를 채우는 코드는 <code>tile()</code> 하나만 고치면 되고(31곳을 각각 안 건드립니다), 색과 「→ 열기」는 그대로 삽니다.
+</div>
+
+<div class="warn">
+  <b>⚠ 미리 말씀드릴 것</b>
+  <ul style="color:#f3d9a8">
+    <li><b>좁은 창에서는 표가 접힙니다.</b> 값이 많은 구역(자산 위험도 4개)은 두 줄이 될 수 있어, 폭이 좁으면 값 묶음만 줄바꿈되게 합니다 — 이름과 「→ 열기」는 한 줄에 붙어 있습니다.</li>
+    <li><b>「AI 보안(OWASP)」과 「AI가 아낀 시간」은 표로 안 바꿉니다.</b> 그 두 구역은 값이 아니라 문장·막대가 섞여 있어, 억지로 줄에 넣으면 오히려 못 읽습니다.</li>
+    <li>상세 지표는 <b>기본 펼침</b>을 그대로 둡니다(2026-08-02 원칙). 250px이면 접을 이유가 없습니다.</li>
+  </ul>
+</div>
+
+<h2>어떻게 진행할지</h2>
+<table class="cmp">
+  <tr><th>단계</th><th>내용</th><th>예상</th></tr>
+  <tr><td>1</td><td><code>tile()</code>을 표 한 줄(<code>kpiRow()</code>)로 바꾸고 6구역 조립부 수정</td><td>40분</td></tr>
+  <tr><td>2</td><td>그래프 묶음을 상세 지표 <b>위</b>로 이동</td><td>15분</td></tr>
+  <tr><td>3</td><td>실앱 확인(값·색·→ 열기·좁은 창) + 스윕</td><td>25분</td></tr>
+</table>
+<p style="color:var(--mut2)">합계 약 <b>1시간 20분</b>.</p>
+
+</body>
+</html>
