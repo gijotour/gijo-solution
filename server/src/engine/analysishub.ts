@@ -31,7 +31,11 @@ export interface AnalysisEvent {
   id: string;
   source: AnalysisSource;
   title: string;
-  entity: string; // 호스트/IP/PC/사용자 — 소스 간 상관분석 키
+  entity: string; // 호스트/IP/PC/사용자 — 소스 간 상관분석 키(이 이벤트의 주인공)
+  /** 이 이벤트가 **함께 가리키는 우리 쪽 개체**(공격 대상 호스트 등) — 두 번째 상관 키.
+   *  ⚠ 로그 이벤트의 entity는 공격자 IP다. 이 값이 없으면 로그는 취약점·운영리포트와
+   *  구조적으로 절대 안 묶인다(2026-08-01 실측 결함). db.ts의 analysis-peers 주석 참고. */
+  peers?: string[];
   severity: Severity;
   priority: Priority;
   detail: string;
@@ -57,11 +61,26 @@ db.exec(`CREATE TABLE IF NOT EXISTS analysis_events (
   at INTEGER NOT NULL
 )`);
 
-const upsertStmt = db.prepare(`INSERT INTO analysis_events (id, source, title, entity, severity, priority, detail, signals, aiSummary, ref, at)
-  VALUES (@id, @source, @title, @entity, @severity, @priority, @detail, @signals, @aiSummary, @ref, @at)
+// 분석 이벤트의 **두 번째 상관 키** — 이 이벤트가 함께 가리키는 우리 쪽 개체(공격 대상 호스트).
+//
+// ⚠ 실측으로 드러난 설계 결함(2026-08-01): 보안로그 이벤트 3종(브루트포스·방화벽·웹)이
+//   전부 entity에 **공격자 출발지 IP**를 넣고 있었다. 상관은 "같은 entity가 2개 이상 소스에
+//   나타나면 묶는다"인데, 남의 IP가 우리 자산 이름과 같을 리 없다 — 즉 **로그는 취약점·
+//   운영리포트·하드닝 어느 것과도 구조적으로 절대 안 묶였다.** 상관분석 주석이 예로 든
+//   "백신 재발(product) + 비정상 아웃바운드(log)가 같은 PC"조차 성립할 수 없었다.
+//   제품 1차 목표가 '3소스 통합 분석'이므로 이건 핵심 주장에 직접 걸린다.
+//
+//   entity를 대상으로 바꾸지 않고 **키를 하나 더 둔다** — 로그 이벤트의 주인공은 여전히
+//   공격자이고(화면 묶음·제목이 그렇게 읽힌다), 대상은 상관을 위해 함께 지니는 값이다.
+// ⚠ 이 migrate는 **표를 만드는 이 파일 안**에 있어야 한다. db.ts에 두면 표가 생기기 전에
+//   ALTER가 돌아 "no such table"로 죽는다(2026-08-01에 실제로 그렇게 한 번 깨뜨렸다).
+migrate("analysis-peers-2026-08-01", "ALTER TABLE analysis_events ADD COLUMN peers TEXT");
+
+const upsertStmt = db.prepare(`INSERT INTO analysis_events (id, source, title, entity, severity, priority, detail, signals, peers, aiSummary, ref, at)
+  VALUES (@id, @source, @title, @entity, @severity, @priority, @detail, @signals, @peers, @aiSummary, @ref, @at)
   ON CONFLICT(id) DO UPDATE SET source=excluded.source, title=excluded.title, entity=excluded.entity,
     severity=excluded.severity, priority=excluded.priority, detail=excluded.detail, signals=excluded.signals,
-    aiSummary=excluded.aiSummary, ref=excluded.ref, at=excluded.at`);
+    peers=excluded.peers, aiSummary=excluded.aiSummary, ref=excluded.ref, at=excluded.at`);
 const listStmt = db.prepare("SELECT * FROM analysis_events ORDER BY at DESC");
 const getEventStmt = db.prepare("SELECT * FROM analysis_events WHERE id = ?");
 const deleteBySourceStmt = db.prepare("DELETE FROM analysis_events WHERE source = ?");
@@ -131,7 +150,7 @@ interface EventRow extends Omit<AnalysisEvent, "signals" | "status" | "statusNot
 }
 function rowToEvent(r: EventRow): AnalysisEvent {
   const st = getStatus(r.id);
-  return { ...r, signals: JSON.parse(r.signals || "[]"), status: st.status, statusNote: st.note };
+  return { ...r, signals: JSON.parse(r.signals || "[]"), peers: JSON.parse((r as { peers?: string }).peers || "[]"), status: st.status, statusNote: st.note };
 }
 function saveEvent(e: AnalysisEvent): void {
   // status/statusNote는 별도 테이블 소관이라 여기 컬럼에 넣지 않는다(명시 컬럼만 바인딩).
@@ -144,6 +163,7 @@ function saveEvent(e: AnalysisEvent): void {
     priority: e.priority,
     detail: e.detail,
     signals: JSON.stringify(e.signals),
+    peers: JSON.stringify(e.peers ?? []),
     aiSummary: e.aiSummary,
     ref: e.ref,
     at: e.at,
@@ -220,7 +240,7 @@ export interface LogParseResult {
 }
 
 // 탐지기 ①: 인증 브루트포스 — 소스 IP별 인증 실패 집계, 성공 로그 있으면 활성악용.
-function detectBruteForce(source: string, lines: string[], threshold: number): { events: AnalysisEvent[]; matched: number } {
+function detectBruteForce(source: string, lines: string[], threshold: number, 대상: string[] = []): { events: AnalysisEvent[]; matched: number } {
   const fails = new Map<string, number>();
   const accepts = new Set<string>();
   let matched = 0;
@@ -240,7 +260,7 @@ function detectBruteForce(source: string, lines: string[], threshold: number): {
     if (succeeded) signals.push("활성 악용");
     const severity: Severity = succeeded ? "critical" : "high";
     events.push(mkLog(source, `log:${source}:brute:${ip}`, `인증 브루트포스 의심 — ${ip}`, ip, severity, signals,
-      `${source}에서 ${ip}의 인증 실패 ${count}회${succeeded ? " 후 성공 로그 존재(계정 탈취 가능성)" : ""}. 임계치 ${threshold} 초과.`));
+      `${source}에서 ${ip}의 인증 실패 ${count}회${succeeded ? " 후 성공 로그 존재(계정 탈취 가능성)" : ""}. 임계치 ${threshold} 초과.`, 대상));
   }
   return { events, matched };
 }
@@ -254,7 +274,7 @@ function extractDeny(line: string): { src: string; dpt?: string } | null {
   const dpt = (line.match(/DPT=(\d+)/i) || line.match(/dst \S*?\/(\d{1,5})/i) || line.match(/dpt\D{0,3}(\d{2,5})/i))?.[1];
   return src ? { src, dpt } : null;
 }
-function detectFirewall(source: string, lines: string[], portScanPorts = 15, floodThreshold = 30): { events: AnalysisEvent[]; matched: number } {
+function detectFirewall(source: string, lines: string[], 대상: string[] = [], portScanPorts = 15, floodThreshold = 30): { events: AnalysisEvent[]; matched: number } {
   const perSrc = new Map<string, { denies: number; ports: Set<string> }>();
   let matched = 0;
   for (const line of lines) {
@@ -270,10 +290,10 @@ function detectFirewall(source: string, lines: string[], portScanPorts = 15, flo
   for (const [ip, rec] of perSrc) {
     if (rec.ports.size >= portScanPorts) {
       events.push(mkLog(source, `log:${source}:scan:${ip}`, `포트 스캔 의심 — ${ip}`, ip, "high", ["포트스캔"],
-        `${source}에서 ${ip}가 서로 다른 목적지 포트 ${rec.ports.size}개를 차단당함(차단 ${rec.denies}건) — 스캐닝 정황.`));
+        `${source}에서 ${ip}가 서로 다른 목적지 포트 ${rec.ports.size}개를 차단당함(차단 ${rec.denies}건) — 스캐닝 정황.`, 대상));
     } else if (rec.denies >= floodThreshold) {
       events.push(mkLog(source, `log:${source}:flood:${ip}`, `방화벽 차단 폭주 — ${ip}`, ip, "medium", ["반복"],
-        `${source}에서 ${ip}가 ${rec.denies}회 차단됨 — 반복 접근 시도.`));
+        `${source}에서 ${ip}가 ${rec.denies}회 차단됨 — 반복 접근 시도.`, 대상));
     }
   }
   return { events, matched };
@@ -281,7 +301,7 @@ function detectFirewall(source: string, lines: string[], portScanPorts = 15, flo
 
 // 탐지기 ③: 웹 공격 시그니처 — 접근 로그에서 SQLi/XSS/경로순회/명령주입 흔적을 소스 IP별로 집계.
 const WEB_PATTERNS = [/union\s+select/i, /<script/i, /\.\.\/\.\.\//, /\/etc\/passwd/i, /\bor\b\s+['"]?1['"]?\s*=\s*['"]?1/i, /%27/i, /%3Cscript/i, /base64_decode/i, /\/bin\/(?:ba)?sh/i, /cmd\.exe/i, /\bexec\s*\(/i];
-function detectWebAttack(source: string, lines: string[]): { events: AnalysisEvent[]; matched: number } {
+function detectWebAttack(source: string, lines: string[], 대상: string[] = []): { events: AnalysisEvent[]; matched: number } {
   const perIp = new Map<string, number>();
   let matched = 0;
   for (const line of lines) {
@@ -294,21 +314,44 @@ function detectWebAttack(source: string, lines: string[]): { events: AnalysisEve
   for (const [ip, hits] of perIp) {
     const severity: Severity = hits >= 5 ? "high" : "medium";
     events.push(mkLog(source, `log:${source}:web:${ip}`, `웹 공격 시그니처 — ${ip}`, ip, severity, ["웹공격"],
-      `${source}에서 ${ip}의 요청에 웹 공격 흔적(SQLi/XSS/경로순회/명령주입 등) ${hits}건 탐지.`));
+      `${source}에서 ${ip}의 요청에 웹 공격 흔적(SQLi/XSS/경로순회/명령주입 등) ${hits}건 탐지.`, 대상));
   }
   return { events, matched };
 }
 
-function mkLog(source: string, id: string, title: string, entity: string, severity: Severity, signals: string[], detail: string): AnalysisEvent {
-  return { id, source: "log", title, entity, severity, priority: computePriority(severity, signals), detail, signals, aiSummary: "", ref: source, at: Date.now() };
+function mkLog(source: string, id: string, title: string, entity: string, severity: Severity, signals: string[], detail: string, peers: string[] = []): AnalysisEvent {
+  return { id, source: "log", title, entity, peers, severity, priority: computePriority(severity, signals), detail, signals, aiSummary: "", ref: source, at: Date.now() };
+}
+
+/**
+ * syslog 줄에서 **우리 쪽 호스트 이름**을 뽑는다 — `Aug  1 10:00:01 fw01 sshd[…]` 의 fw01.
+ *
+ * ⚠ 이게 로그를 우리 자산과 잇는 유일한 끈이다. 로그 이벤트의 entity는 공격자 IP라서,
+ *   이 값이 없으면 취약점·운영리포트·하드닝 어느 것과도 상관되지 않는다(2026-08-01 결함).
+ *   못 뽑으면 **지어내지 않고 빈 값**을 준다 — 틀린 자산에 묶는 것이 못 묶는 것보다 나쁘다.
+ */
+function syslogHosts(lines: string[]): string[] {
+  const 셈 = new Map<string, number>();
+  for (const line of lines) {
+    // "<월> <일> <시:분:초> <호스트> <프로그램>" — 호스트는 4번째 토큰, IP가 아니어야 한다.
+    const m = line.match(/^[A-Z][a-z]{2}\s+\d{1,2}\s+\d{2}:\d{2}:\d{2}\s+(\S+)\s+\S+/);
+    const h = m?.[1];
+    if (!h || /^\d+\.\d+\.\d+\.\d+$/.test(h)) continue; // IP면 우리 호스트로 못 본다
+    셈.set(h, (셈.get(h) ?? 0) + 1);
+  }
+  // 가장 많이 나온 호스트만 — 여러 장비 로그가 섞이면 전부 묶어 오탐을 만들 수 있다.
+  return [...셈.entries()].sort((a, b) => b[1] - a[1]).slice(0, 1).map(([h]) => h);
 }
 
 // 여러 결정적 탐지기를 돌려 보안 로그를 이벤트로 정규화한다.
 export function parseSecurityLog(source: string, content: string, threshold = 10): LogParseResult {
   const lines = content.split(/\r?\n/);
-  const brute = detectBruteForce(source, lines, threshold);
-  const fw = detectFirewall(source, lines);
-  const web = detectWebAttack(source, lines);
+  // 우리 쪽 호스트를 먼저 뽑아 **모든 로그 이벤트에 실어 준다** — 상관의 유일한 끈이다.
+  // 이게 없으면 로그 이벤트의 키가 공격자 IP뿐이라 어느 소스와도 안 묶인다(2026-08-01 결함).
+  const 대상 = syslogHosts(lines);
+  const brute = detectBruteForce(source, lines, threshold, 대상);
+  const fw = detectFirewall(source, lines, 대상);
+  const web = detectWebAttack(source, lines, 대상);
   return {
     events: [...brute.events, ...fw.events, ...web.events],
     matchedLines: brute.matched + fw.matched + web.matched,
@@ -439,23 +482,36 @@ function sourceLabel(s: AnalysisSource): string {
   return s === "vuln" ? "취약점" : s === "log" ? "보안로그" : s === "hardening" ? "하드닝점검" : "운영리포트";
 }
 export function computeCorrelations(events: AnalysisEvent[]): Correlation[] {
-  const byEntity = new Map<string, AnalysisEvent[]>();
+  // ★ entity **와 peers 둘 다**를 키로 본다(2026-08-01 결함 수정).
+  //   로그 이벤트의 entity는 공격자 출발지 IP다 — 남의 IP가 우리 자산 이름과 같을 리 없어서,
+  //   entity만 보면 **로그는 어느 소스와도 구조적으로 절대 안 묶였다.** peers에 공격 대상
+  //   호스트를 실어 두고 여기서 함께 본다. 묶음 이름은 **우리 쪽 개체**로 적는다 —
+  //   담당자가 찾는 것은 "누가 때렸나"가 아니라 "우리 어느 장비가 걸렸나"이기 때문이다.
+  const byKey = new Map<string, { evs: AnalysisEvent[]; 이름: string }>();
+  const 담기 = (key: string, e: AnalysisEvent, 이름: string) => {
+    const k = key.toLowerCase();
+    const cur = byKey.get(k) ?? { evs: [], 이름 };
+    if (!cur.evs.includes(e)) cur.evs.push(e);
+    byKey.set(k, cur);
+  };
   for (const e of events) {
-    if (!e.entity) continue;
-    const k = e.entity.toLowerCase();
-    const arr = byEntity.get(k) ?? [];
-    arr.push(e);
-    byEntity.set(k, arr);
+    if (e.entity) 담기(e.entity, e, e.entity);
+    for (const p of e.peers ?? []) if (p) 담기(p, e, p);
   }
   const out: Correlation[] = [];
-  for (const evs of byEntity.values()) {
+  const 본것 = new Set<string>();
+  for (const { evs, 이름 } of byKey.values()) {
     const sources = [...new Set(evs.map((e) => e.source))];
     if (sources.length < 2) continue;
+    // 같은 이벤트 묶음이 entity·peers 양쪽에서 두 번 잡히지 않게 한다.
+    const 지문 = evs.map((e) => e.id).sort().join("|");
+    if (본것.has(지문)) continue;
+    본것.add(지문);
     out.push({
-      entity: evs[0].entity,
+      entity: 이름,
       sources,
       eventIds: evs.map((e) => e.id),
-      note: `${evs[0].entity}이(가) ${sources.map(sourceLabel).join(" + ")}에 동시 출현 — 교차 위험 가능성. 함께 조사 권고.`,
+      note: `${이름}이(가) ${sources.map(sourceLabel).join(" + ")}에 동시 출현 — 교차 위험 가능성. 함께 조사 권고.`,
     });
   }
   return out;

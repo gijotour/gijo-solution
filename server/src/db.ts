@@ -597,3 +597,4 @@ migrate(
    UPDATE memory_documents SET grade = 'O' WHERE grade IS NULL;
    ALTER TABLE users ADD COLUMN clearance TEXT;`
 );
+
