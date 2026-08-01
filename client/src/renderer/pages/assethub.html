@@ -386,6 +386,22 @@
   }
   if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",boot); else boot();
 })();
+
+  // 오른쪽 자세히를 **누른 줄 바로 아래**로 + 목록은 네모칸 안에서만 구르게
+  //   (2026-08-02 사용자 지시 "자산별·파일별 항목도 하단 고정" → 목록만 상자 안 스크롤).
+  (function 줄아래자세히(){
+    let 남은시도=20;
+    const 걸기=()=>{
+      if(typeof window.gijo자세히아래로!=="function") return void (남은시도-->0&&setTimeout(걸기,300));
+      const 됐나=window.gijo자세히아래로({칸:".body", 목록:"#master", 자세히:"#detail", 줄:".arow"});
+      // 목록은 상자 안에서만 구른다 — 위의 자산별/파일별 고르는 줄이 밀려 사라지지 않게.
+      const m=document.getElementById("master");
+      if(m&&!m.hasAttribute("data-gijo-fit")) m.setAttribute("data-gijo-fit","");
+      if(window.gijoFitList) window.gijoFitList(m);
+      if(!됐나&&남은시도-->0) setTimeout(걸기,300);
+    };
+    걸기();
+  })();
 </script>
 <script src="dialog.js"></script>
 <script src="nav.js"></script>

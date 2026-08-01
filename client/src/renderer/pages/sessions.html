@@ -375,7 +375,7 @@
       return `<div class="srow ${s.id === currentId ? "on" : ""}" data-id="${s.id}">
         <span class="sdot ${st}"></span>
         <div class="sr-main"><div class="sr-title">${esc(s.title)}</div><div class="sr-sub">${preview}</div></div>
-        <div class="sr-meta"><span class="badge ${STATUS_BADGE[st] || "b-active"}">${label}</span><br>${s.createdBy ? "👤 " + esc(s.createdBy) + "<br>" : ""}${fmtTime(s.updatedAt)} · ${s.turnCount || 0}턴</div>
+        <div class="sr-meta"><span class="badge ${STATUS_BADGE[st] || "b-active"}">${label}</span> ${s.createdBy ? "· 👤 " + esc(s.createdBy) + " " : ""}· ${fmtTime(s.updatedAt)} · ${s.turnCount || 0}턴</div>
         <span class="sdel" data-del="${s.id}" title="이 내역 삭제">🗑</span>
       </div>`;
     }).join("");
@@ -638,6 +638,21 @@
 
   if (!window.gijo.isAuthenticated()) window.gijo.navigateTo("login.html");
   else init();
+
+  // 오른쪽 자세히를 **누른 줄 바로 아래**로 (2026-08-02 사용자 지시, 본은 컴플라이언스 화면).
+  // 목록이 가로를 다 쓰게 되어 이름이 잘리지 않고, 누른 줄과 내용이 붙어 있다.
+  // ⚠ 목록을 다시 그리는 화면이라 **늦게** 건다 — 요소가 없으면 조용히 넘어간다.
+  (function 줄아래자세히() {
+    let 남은시도 = 20;
+    const 걸기 = () => {
+      if (typeof window.gijo자세히아래로 !== "function") return void (남은시도-- > 0 && setTimeout(걸기, 300));
+      const 됐나 = window.gijo자세히아래로({
+        칸: ".two", 목록: "#sessionList", 자세히: ".panel.v3-detail",
+      });
+      if (!됐나 && 남은시도-- > 0) setTimeout(걸기, 300);
+    };
+    걸기();
+  })();
 </script>
 <script src="nav.js"></script>
 <script src="progresscard.js"></script>

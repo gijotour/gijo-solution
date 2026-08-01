@@ -223,6 +223,24 @@
         "border-radius:8px;padding:4px 10px;font-size:11.75px;color:var(--text,#e9e7e2);outline:none;width:200px;}"
       + ".gj-id{font-size:12.25px;color:var(--muted,#b3ada4);margin:0 0 7px;}"
       + ".gj-empty{padding:22px;text-align:center;color:var(--muted-2,#a49d95);font-size:12.5px;}"
+      // 두 칸을 한 칸으로 — 목록이 가로를 다 쓰면 이름이 안 잘린다.
+      + ".gj-onecol{display:block !important;}"
+      // 화면이 목록에 준 고정 폭(예: 330px)을 푼다 — 한 칸으로 폈으면 가로를 다 써야 이름이 안 잘린다.
+      + ".gj-onecol > *{max-width:none;width:100% !important;min-width:0;flex:none;}"
+      // 누른 줄 바로 아래 자세히 — 왼쪽 파란 선으로 "위 줄에 딸린 것"임을 보인다.
+      + ".gj-underrow{box-shadow:inset 3px 0 0 var(--blue,#3b82f6);border-radius:0 8px 8px 0;" +
+        "margin:0 0 6px 0;min-height:0 !important;}"
+      + ".gj-picked{background:rgba(59,130,246,.12);}"
+      // 목록 줄을 **한 줄**로(2026-08-02 사용자 지시 "가능하면 한 줄로 나오게 하고").
+      // 제목·부제가 위아래로 쌓이면 한 줄이 두세 줄이 된다 — 옆으로 잇고 넘치면 …으로 줄인다.
+      // ⚠ 자세히 칸(.gj-underrow)은 여러 줄이 정상이라 건드리지 않는다.
+      + ".gj-rows1 > *:not(.gj-underrow){display:flex !important;align-items:baseline;gap:8px;" +
+        "white-space:nowrap;overflow:hidden;padding-top:5px;padding-bottom:5px;min-height:0;}"
+      + ".gj-rows1 > *:not(.gj-underrow) > *{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;margin:0;}"
+      + ".gj-rows1 > *:not(.gj-underrow) > *:nth-child(2){flex:1;}"
+      // 줄 안에서 제목·부제를 **세로로 쌓아 둔 판**도 눕힌다(통합 관제·작업 내역이 그렇다).
+      + ".gj-rows1 > *:not(.gj-underrow) > div{display:flex;align-items:baseline;gap:7px;min-width:0;}"
+      + ".gj-rows1 > *:not(.gj-underrow) > div > *{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}"
       // 줄 바로 아래 자세히(gijoRowDetail) — 오른쪽 별도 패널을 대신한다.
       // 왼쪽 파란 선으로 "위 줄에 딸린 것"임을 보인다. 상자 밖으로 튀어나가지 않는다.
       + ".gj-detail{padding:9px 14px 11px 18px;font-size:12.25px;line-height:1.6;color:var(--muted,#b3ada4);" +
@@ -691,6 +709,82 @@
       if (b.bottom > c.bottom) 상자.scrollTop += b.bottom - c.bottom + 8;
     } catch (e) { /* 못 굴려도 펼치기 자체는 됐다 */ }
     return box;
+  };
+
+  /**
+   * 두 칸(목록 | 오른쪽 자세히)을 **한 칸으로 펴고, 자세히를 누른 줄 바로 아래**로 옮긴다.
+   * (2026-08-02 사용자 지시 — 작업 내역·통합 관제·자산 통합 뷰·조치 승인·기억 학습 5화면.
+   *  본은 컴플라이언스 화면: "1번 작업에 샘플이 컴플라이언스 화면에 있네")
+   *
+   * 왜: 오른쪽 패널은 **누른 줄과 내용이 멀다.** 20번째 줄을 눌러도 설명은 오른쪽 위에 떠서
+   *   눈이 대각선으로 건너뛰고 "내가 뭘 눌렀더라"를 다시 확인하게 된다. 게다가 목록이 좁아져
+   *   이름이 잘린다(문서명·자산명이 …으로 끊기던 자리).
+   *
+   * 방식: 화면이 이미 그리고 있는 자세히 요소를 **그대로 옮긴다**. 다시 그리지 않으므로
+   *   그 안의 버튼·입력에 걸린 동작이 살아 있다. 화면 코드는 한 줄만 부르면 된다.
+   *
+   * @param opt.칸    두 칸을 만드는 바깥 요소(선택자) — 한 칸으로 편다
+   * @param opt.목록  줄들이 들어 있는 요소(선택자)
+   * @param opt.자세히 오른쪽에 있던 자세히 요소(선택자)
+   * @param opt.줄    줄 하나를 고르는 선택자(생략하면 목록의 바로 아래 자식)
+   */
+  /** 목록의 "줄"만 고른다 — 우리가 끼워 넣은 자세히 칸은 줄이 아니다. */
+  function 줄들만(목록) {
+    return [].filter.call(목록.children, function (c) {
+      return c.nodeType === 1 && !c.classList.contains("gj-underrow");
+    });
+  }
+
+  window.gijo자세히아래로 = function (opt) {
+    try {
+      var 칸 = document.querySelector(opt.칸);
+      var 목록 = document.querySelector(opt.목록);
+      var 자세히 = document.querySelector(opt.자세히);
+      if (!칸 || !목록 || !자세히) return false;
+      if (칸.dataset.gijoUnrow === "1") return true;
+      칸.dataset.gijoUnrow = "1";
+      칸.classList.add("gj-onecol");
+      자세히.classList.add("gj-underrow");
+      목록.classList.add("gj-rows1");   // 줄을 한 줄로 (아래 CSS)
+      자세히.style.display = "none";   // 고르기 전에는 자리도 차지하지 않는다
+
+      // ⚠ **잡는 단계(capture)**로 받는다. 줄이 자기 처리에서 위로 못 올라가게 막으면
+      //   보통 방식(bubble)으로는 아예 안 들어온다(2026-08-02 실측 — 통합 관제·작업 내역).
+      목록.addEventListener("click", function (e) {
+        var 줄 = opt.줄 ? e.target.closest(opt.줄) : null;
+        if (!줄) {
+          // 줄 선택자를 안 준 화면 — 목록의 **바로 아래 자식**까지 거슬러 올라간다.
+          줄 = e.target;
+          while (줄 && 줄.parentNode !== 목록) 줄 = 줄.parentNode;
+        }
+        if (!줄 || 줄 === 자세히 || !목록.contains(줄)) return;
+        var 색인 = 줄들만(줄.parentNode || 목록).indexOf(줄);
+
+        // 화면이 자세히를 다시 그린 **뒤에** 옮긴다(먼저 옮기면 그리면서 제자리로 돌아간다).
+        // ⚠ 여러 화면이 줄을 누르면 **목록을 통째로 다시 그린다**(고른 표시를 칠하려고).
+        //   그러면 방금 누른 줄 요소는 사라진다 — 그때는 고른 표시가 붙은 줄이나 같은 자리를 쓴다.
+        //   (2026-08-02 실측: 통합 관제·작업 내역이 이 경우라 자세히가 아예 안 나타났다.)
+        function 옮기기() {
+          var 대상 = 줄;
+          var 판 = 줄.parentNode;                          // 줄이 들어 있는 판(묶음일 수도 있다)
+          if (!판 || !목록.contains(판)) 판 = 목록;
+          if (대상.parentNode !== 판) {
+            // 화면이 다시 그려 그 줄 요소가 사라졌다 — 고른 표시가 붙은 줄이나 같은 자리를 쓴다.
+            var 줄들 = 줄들만(판);
+            대상 = 판.querySelector(":scope > .on, :scope > .active, :scope > .sel, :scope > .selected") ||
+                   줄들[색인] || null;
+          }
+          if (!대상) return false;
+          자세히.style.display = "";
+          if (대상.nextSibling !== 자세히) 판.insertBefore(자세히, 대상.nextSibling);
+          목록.querySelectorAll(".gj-picked").forEach(function (r) { r.classList.remove("gj-picked"); });
+          대상.classList.add("gj-picked");
+          return true;
+        }
+        setTimeout(function () { if (!옮기기()) setTimeout(옮기기, 450); }, 0);
+      }, true);
+      return true;
+    } catch (e) { return false; }
   };
 
   window.gijoFitList = function (el) {
