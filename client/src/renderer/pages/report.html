@@ -179,6 +179,22 @@ tr:last-child td{border-bottom:none;}
   <div class="kpi-mini"><div class="kpi-mini-label">최근 생성</div><div class="kpi-mini-value" id="kpiLastGen">-</div></div>
 </div>
 
+<!-- 정기 리포트 스케줄 — 리포트 이력 **위**로 올렸다(2026-08-02 사용자 지시).
+     "언제 자동으로 만들어지나"를 먼저 정하고, 그 결과인 이력을 아래에서 본다. -->
+<div class="panel" data-gijo-fold="정기 리포트 스케줄">
+  <div class="panel-title">정기 리포트 스케줄</div>
+  <div class="panel-sub">주간·분기 리포트를 지정한 요일·시각에 자동 생성합니다.</div>
+  <div style="display:grid;grid-template-columns:280px 1fr;gap:16px;margin-top:8px;">
+    <div>
+      <div id="schedList"><div style="color:var(--muted);font-size:12px">불러오는 중…</div></div>
+      <button class="btn-ghost" id="schedAddBtn" style="width:100%;margin-top:4px">+ 새 스케줄</button>
+    </div>
+    <div id="schedDetail">
+      <div style="color:var(--muted);font-size:12.5px">왼쪽에서 스케줄을 선택하거나 "+ 새 스케줄"로 추가하세요.</div>
+    </div>
+  </div>
+</div>
+
 <div class="content-grid">
   <div>
     <div class="panel">
@@ -207,19 +223,6 @@ tr:last-child td{border-bottom:none;}
   </div>
 </div>
 
-<div class="panel" data-gijo-fold="정기 리포트 스케줄">
-  <div class="panel-title">정기 리포트 스케줄</div>
-  <div class="panel-sub">주간·분기 리포트를 지정한 요일·시각에 자동 생성합니다.</div>
-  <div style="display:grid;grid-template-columns:280px 1fr;gap:16px;margin-top:8px;">
-    <div>
-      <div id="schedList"><div style="color:var(--muted);font-size:12px">불러오는 중…</div></div>
-      <button class="btn-ghost" id="schedAddBtn" style="width:100%;margin-top:4px">+ 새 스케줄</button>
-    </div>
-    <div id="schedDetail">
-      <div style="color:var(--muted);font-size:12.5px">왼쪽에서 스케줄을 선택하거나 "+ 새 스케줄"로 추가하세요.</div>
-    </div>
-  </div>
-</div>
 
 
     <div class="footer">
