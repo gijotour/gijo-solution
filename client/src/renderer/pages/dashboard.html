@@ -530,8 +530,10 @@
   // ⚠ 화면 이동이 아니라 **명령창에 문장을 얹어 둔다** — 담당자가 무슨 말을 해야 하는지
   //   모른 채 빈 칸을 마주하면 그 자리에서 멈춘다(2026-07-31 실측).
   $("taskOpen").addEventListener("click", function () {
-    if (window.gijoConsole && window.gijoConsole.prefill) window.gijoConsole.prefill("할 일 추가: ");
-    else if (window.gijoConsole && window.gijoConsole.ask) window.gijoConsole.ask("오늘 할 일");
+    // ⚠ window.gijoConsole은 **셸(app.html)에 있고 이 화면은 iframe 안**이라 여기서는 없다
+    //   (2026-08-01 실앱에서 확인 — 그냥 뒀으면 눌러도 아무 일이 없는 버튼이 됐다).
+    //   같은 화면의 검증된 통로(gijo.askConsole → 없으면 postMessage)를 그대로 쓴다.
+    window.parent.postMessage({ type: "gijo:prefill", text: "할 일 추가: " }, "*");
   });
 
   // ── 한눈에 ───────────────────────────────────────────────────────────

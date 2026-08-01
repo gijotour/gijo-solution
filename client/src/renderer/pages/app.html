@@ -376,6 +376,11 @@
     if (d.type === "gijo:ask" && d.text && window.gijoConsole) {
       window.gijoConsole.ask(String(d.text));
     }
+    // ④ "문장만 얹어 줘" — ③과 달리 **보내지 않는다**. 뒷말을 담당자가 채워야 하는 자리에 쓴다
+    //    (대시보드 「적어 넣기」 → "할 일 추가: "). 빈 칸만 보면 무슨 말을 할지 몰라 멈춘다.
+    if (d.type === "gijo:prefill" && d.text && window.gijoConsole && window.gijoConsole.prefill) {
+      window.gijoConsole.prefill(String(d.text));
+    }
   });
 
   $("tbCloseAll").addEventListener("click", closeAll);
