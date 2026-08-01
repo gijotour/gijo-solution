@@ -186,7 +186,6 @@
     <div class="wb-main">작업 내역 <b id="kTotal">-</b>건
       <span class="wb-sub">🟢 진행중 <b id="kActive">-</b> · 완료 <b id="kDone">-</b> · 오늘 생성 <b id="kToday">-</b></span>
     </div>
-    <div id="wsArchiveNote" class="wb-note" style="display:none"></div>
   </div>
 
   <!-- 쌓인 내역에서 뽑은 업무 패턴(2026-07-28 사용자 요청) — 나중에 참고할 자료로 둔다.
@@ -405,16 +404,10 @@
     set("kDone", sessions.filter((s) => s.status === "done").length);
     set("kToday", sessions.filter((s) => new Date(s.createdAt || s.updatedAt) >= 오늘0시).length);
 
-    // 목록이 상한(100)에 닿았으면 "더 있는데 안 보이는" 상태다 — 어디로 갔는지 말해 준다.
-    // 말 안 하면 담당자는 예전 세션이 지워진 줄 안다(실제로는 파일로 옮겨져 있다).
-    const note = document.getElementById("wsArchiveNote");
-    if (note) {
-      const capped = sessions.length >= 100;
-      note.textContent = capped
-        ? "최근 100건만 보입니다 — 그보다 오래된 내역은 서버의 data/session-archive/ 폴더에 파일로 보관돼 있습니다."
-        : "";
-      note.style.display = capped ? "block" : "none";
-    }
+    // ⚠ "최근 100건만 보입니다 …" 안내 줄은 **화면에서 걷었다**(2026-08-02 사용자 지시
+    //   "이 글은 대화창에서 알려줄 수 있게"). 같은 설명이 챗봇 안내(screenguide의
+    //   sessions.html › 「오래된 내역 정리」)에 이미 있어 화면에 또 적을 이유가 없다.
+    //   화면엔 정체성 한 줄과 ⚠경고만 둔다(우리 규약).
   }
 
   // ── 대화(선택된 세션) ────────────────────────────────────────────────
