@@ -9,6 +9,7 @@
 // --force: 그 계정이 이미 다른 곳(앱 등)에 로그인 중이면 강제 전환(그 세션은 끊긴다).
 
 import * as fs from "node:fs";
+import * as crypto from "node:crypto"; // 같은 번호로 다른 내용을 올리는 것을 막기 위한 대조용
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -55,6 +56,37 @@ async function main() {
   }
 
   const buf = fs.readFileSync(installerPath);
+
+  // ★ 같은 번호로 **다른 내용**을 게시하지 못하게 막는다.
+  //
+  // ⚠ 2026-08-01 실사고: 4.16.1을 게시한 뒤 버튼 3곳을 더 고치고 **번호를 안 올린 채**
+  //   다시 빌드했다. 번호 하나가 두 벌을 가리키게 됐고, 게시본에는 그 수정이 없었다.
+  //   "4.16.1"이라는 말이 무엇을 뜻하는지 아무도 확신할 수 없게 된다 — 담당자가 버전을
+  //   대며 문의해도 어느 쪽인지 모른다.
+  //
+  // ⚠ **sha256으로 "같은 코드인지"를 판정할 수는 없다**(2026-08-01 실측). 같은 코드를 다시
+  //   빌드해도 NSIS가 시각 등을 심어 바이트가 달라진다(b1c34e… → 34d1fd…). 그러니
+  //   "내용이 같으면 통과"라는 판정은 성립하지 않는다 — **이미 게시된 번호는 그냥 막는다.**
+  //   정말 같은 번호로 다시 올려야 하면 --republish를 명시한다(사람이 뜻을 밝히는 것).
+  const 이번sha = crypto.createHash("sha256").update(buf).digest("hex");
+  const 목록 = await fetch(`${serverUrl}/api/client/releases`, {
+    headers: { Authorization: `Bearer ${login.accessToken}` },
+  })
+    .then((r) => r.json())
+    .catch(() => null);
+  const 이미 = (목록?.releases ?? []).find((r) => r.version === version);
+  if (이미 && !process.argv.includes("--republish")) {
+    throw new Error(
+      `${version}은 **이미 게시돼 있습니다.**\n` +
+        `  게시된 것: sha256=${String(이미.sha256 ?? "?").slice(0, 12)}…\n` +
+        `  지금 것  : sha256=${이번sha.slice(0, 12)}…\n` +
+        `한 번호는 한 벌만 가리켜야 합니다 — client/package.json의 version을 올리고 다시 빌드하세요.\n` +
+        `(빌드는 매번 바이트가 달라지므로 sha가 다르다고 코드가 다른 것은 아닙니다.\n` +
+        ` 정말 같은 번호로 덮어야 하면 --republish를 붙이세요.)`,
+    );
+  }
+  if (이미) console.log(`[publish-release] ⚠ ${version}을 --republish로 덮어씁니다 — 받은 사람마다 다른 벌을 쓸 수 있습니다.`);
+
   console.log(`[publish-release] 게시: ${version} (${(buf.length / 1024 / 1024).toFixed(1)}MB) ← ${installerPath}`);
   const publish = await fetch(
     `${serverUrl}/api/client/releases?version=${encodeURIComponent(version)}&notes=${encodeURIComponent(notes)}`,
