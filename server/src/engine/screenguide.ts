@@ -666,7 +666,14 @@ export function formatScreenGuide(screen?: string, question?: string): string {
   if (g.panels && q) {
     // 화면에 적힌 이름으로 물어도 찾도록 별명표까지 본다(PANEL_ALIASES).
     const hit = resolvePanel(screen, q);
-    if (hit) return `🤖 ${g.title} › ${hit}\n${g.panels[hit]}`;
+    // ⚠ 화면 이름과 구역 이름이 같으면 **같은 말이 두 번** 나온다 — 실측(2026-08-01 챗봇 전수):
+    //   "🤖 AI-BOM 구성 › AI-BOM 코드 의존성(SBOM)을 넘어…". 담당자에겐 앞머리가 군더더기고,
+    //   점검에서는 "내부 규칙 누출"로 잡혔다. 겹치면 한 번만 적는다.
+    if (hit) {
+      const 같은말 = g.title.replace(/\s/g, "").includes(hit.replace(/\s/g, ""));
+      const 머리 = 같은말 ? `🤖 ${hit}` : `🤖 ${g.title} › ${hit}`;
+      return `${머리}\n${g.panels[hit]}`;
+    }
   }
   const L: string[] = [];
   L.push(`🤖 ${g.title} — 이 화면 사용 안내`);

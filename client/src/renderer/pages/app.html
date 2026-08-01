@@ -406,7 +406,15 @@
         : "대화창을 오른쪽에 세웁니다 — 세로 공간이 넓어집니다";
     }
     // 자리를 바꾸면 iframe 크기가 달라진다 — 안에서 크기를 재는 화면이 다시 재게 알린다.
-    try { window.dispatchEvent(new Event("resize")); } catch (e) {}
+    //
+    // ⚠ **셸 자신에게 쏘면 무한 되풀이가 된다**(2026-08-01 실측: RangeError Maximum call stack).
+    //   아래 resize 리스너가 다시 자리적용()을 부르고, 그게 또 resize를 쏜다.
+    //   알려야 할 대상은 셸이 아니라 **탭 안의 화면들**이므로 iframe에만 쏜다.
+    try {
+      document.querySelectorAll("#screens iframe").forEach(function (f) {
+        try { f.contentWindow.dispatchEvent(new Event("resize")); } catch (e) {}
+      });
+    } catch (e) {}
   }
   $("tbConsoleSide").addEventListener("click", function () {
     // 지금과 반대쪽으로 **명시적으로** 고정한다(자동으로 되돌아가면 담당자가 진 것처럼 느낀다).

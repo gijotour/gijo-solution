@@ -79,6 +79,15 @@ for (const 라벨 of 화면들) {
       // ⚠ **비활성 버튼은 빼야 한다**(2026-08-01 오탐). 눌러도 반응 없는 게 맞는 동작인데
       //   "무반응"으로 잡혀 인수인계 완료 처리 등이 결함처럼 보고됐다.
       if (e.disabled || e.getAttribute("aria-disabled") === "true") return;
+      // ⚠ **눌릴 것처럼 안 보이는 것은 빼야 한다**(2026-08-01 두 판 연속 오탐).
+      //   온톨로지의 MITRE 완화통제 칩 35개가 매번 "무반응"으로 올라왔는데,
+      //   `cursor:pointer`가 없어 담당자 눈에도 눌리는 것으로 안 보인다 — 장식이다.
+      //   보고서가 오탐으로 도배되면 진짜 결함이 그 속에 묻힌다.
+      const st = getComputedStyle(e);
+      const 눌릴것처럼 =
+        e.tagName === "BUTTON" || e.getAttribute("role") === "button" ||
+        st.cursor === "pointer" || e.hasAttribute("data-action");
+      if (!눌릴것처럼) return;
       const 글 = (e.textContent || "").trim().slice(0, 30);
       if (!글 || 본것.has(글)) return;
       본것.add(글);
