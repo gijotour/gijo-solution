@@ -139,10 +139,13 @@ function createMainWindow(): void {
     title: "GIJO AS — AI Security Manager OS",
     // C안(2026-07-25): OS 타이틀바 제거 — 각 페이지의 .header가 타이틀바 역할(드래그 영역, titlebar.js).
     // 창 컨트롤(─ ▢ ✕)은 OS가 오버레이로 그린다(직접 구현 안 함). mac은 신호등이 좌측 인셋.
-    // ⚠ 최대화(▢)는 끈다(2026-08-02 사용자 지시 "네모는 없어도 될 것 같은데").
-    //   Windows 오버레이는 버튼을 지우진 않고 **눌리지 않게** 그린다. 제목 줄 더블클릭으로도
-    //   최대화되지 않는다. 창 크기는 「이 창을 가로/세로 절반으로」(설정 메뉴)로 맞춘다.
-    maximizable: false,
+    // ⚠ 최대화(▢)는 **켜 둔다**. 하루 안에 두 번 뒤집힌 자리라 사연을 남긴다(2026-08-02):
+    //   ① "네모는 없어도 될 것 같다" → maximizable:false로 껐다.
+    //   ② "전체화면이 없으니 불편, 상단 두 번 누르면 전체화면" → 최대화가 도로 필요해졌다.
+    //   Windows의 titleBarOverlay는 세 버튼(─ ▢ ✕)을 **통째로** 그려 ▢만 골라 숨길 수 없다.
+    //   숨기려면 오버레이를 걷고 ─·✕까지 직접 그려야 한다(닫기까지 우리 책임이 된다).
+    //   "그냥 네모칸 넣자"는 결정으로 OS에 맡긴다 — 제목 줄 더블클릭 최대화도 이때 같이 살아난다.
+    maximizable: true,
     titleBarStyle: "hidden",
     titleBarOverlay: { color: "#1f1e1d", symbolColor: "#b3ada4", height: 46 }, // 상단 바(.header)와 같은 색이어야 한 줄로 보인다
     webPreferences: {
