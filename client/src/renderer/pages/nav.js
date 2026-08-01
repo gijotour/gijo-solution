@@ -101,6 +101,9 @@
       { page: "settings.html?s=link", label: "연동" },
       { page: "settings.html?s=admin", label: "관리자" },
       { page: "audit.html", label: "기록 보기" },
+      // 시스템 로그 — 기록 보기 안에 접어 두던 것을 **별도 화면**으로 뺐다(2026-08-02 사용자 지시).
+      // 「기록 보기」가 누가 무엇을 했나(감사)라면 이쪽은 서버가 무엇을 했나(진단)다.
+      { page: "syslog.html", label: "시스템 로그" },
     ]},
   ];
 
@@ -111,7 +114,7 @@
     "billing.html": "audit.html",               // 사용량·요금 → 기록 보기
     "mcp.html": "settings.html?s=link",         // 2026-07-28 설정 5구역으로 흡수
     "update.html": "settings.html?s=admin",
-    "logs.html": "audit.html",
+    "logs.html": "syslog.html",   // 2026-08-02 시스템 로그를 다시 떼어냈다
     "llmguide.html": "settings.html?s=ai",      // 추천 모델 목록 → 설정 서버·AI
     "docenrich.html": "memory.html",            // 문서 보강 → 기억·학습에 병합
     // 내 업무 → 대시보드(2026-08-01 화면 폐지, 그 일은 대화창이 받는다). ⚠ 이걸 빼면
