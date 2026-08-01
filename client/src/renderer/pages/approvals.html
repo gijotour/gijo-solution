@@ -82,7 +82,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     <div id="scanFailNote" style="display:none;max-width:1100px;margin-bottom:12px;padding:10px 14px;border:1px solid rgba(240,160,32,.35);background:rgba(240,160,32,.08);border-radius:10px;font-size:12.5px;color:var(--text)"></div>
 
-    <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:16px;max-width:1100px;">
+    <!-- 카드 7장 → **한 줄**(2026-08-02 사용자 지시 "상단칸 작게 우리 룰에 맞춰서").
+         공용 변환기가 [라벨][값]을 그대로 옮겨 한 줄로 만든다 — 여기선 표식만 단다. -->
+    <div data-gijo-summary style="display:grid;grid-template-columns:repeat(7,1fr);gap:10px;margin-bottom:16px;max-width:1100px;">
       <div class="panel" style="margin:0"><div class="panel-sub" style="margin:0 0 6px">미검토</div><div style="font-size:20px;font-weight:800;color:var(--amber)" id="kPending">-</div></div>
       <div class="panel" style="margin:0"><div class="panel-sub" style="margin:0 0 6px">진행중</div><div style="font-size:20px;font-weight:800;color:var(--blue-light)" id="kProg">-</div></div>
       <div class="panel" style="margin:0"><div class="panel-sub" style="margin:0 0 6px">검증</div><div style="font-size:20px;font-weight:800;color:var(--purple)" id="kVerify">-</div></div>
@@ -691,10 +693,20 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     });
 
     // 미배정 카드 클릭 = 미배정만 보기(병목을 바로 열어본다)
-    document.getElementById("kUnassignedCard").addEventListener("click", () => {
+    // 미배정 = 병목(검증은 배정된 건에만 가능) — 누르면 미배정만 걸러 본다.
+    // ⚠ 카드 껍데기(#kUnassignedCard)는 요약 막대로 바뀌면서 사라진다. 그래서 **옮겨지는
+    //   값 요소(#kUnassigned)에도 같이 건다** — 안 그러면 눌러도 아무 일 없는 자리가 된다.
+    const 미배정보기 = () => {
       rvFilter = "unassigned";
       document.querySelectorAll("#rvFilt .fchip").forEach((c) => c.classList.toggle("on", c.dataset.f === "unassigned"));
       renderList();
+    };
+    ["kUnassignedCard", "kUnassigned"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (!el) return;
+      el.style.cursor = "pointer";
+      el.title = "담당자가 없는 건 — 누르면 미배정만 봅니다";
+      el.addEventListener("click", 미배정보기);
     });
     // 일괄 배정 — 한 건씩 배정은 건수가 늘면 현실적이지 않다.
     document.getElementById("btnBulkClear").addEventListener("click", () => { selected.clear(); renderList(); });

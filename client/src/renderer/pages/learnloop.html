@@ -186,8 +186,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div class="kpi"><div class="k-label">최근 배포 모델</div><div class="k-value" id="kpiModel" style="font-size:14px">-</div></div>
     </div>
 
-    <div class="cat">
-      <div class="cat-head"><span style="font-size:18px">🩺</span><span class="cat-title">사전 점검</span></div>
+    <div class="cat" data-gijo-fold="🩺 사전 점검">
       <div class="cat-intro">실행 전에 준비물(Python·unsloth·gguf·llama.cpp·베이스 모델 캐시)을 확인합니다. 하나라도 빠지면 실행 도중에 실패하니, <b style="color:var(--amber)">모두 초록불</b>인지 먼저 확인하세요.</div>
       <div class="pf-panel">
         <div class="pf-summary" id="pfSummary">점검 중...</div>
@@ -196,8 +195,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       </div>
     </div>
 
-    <div class="cat">
-      <div class="cat-head"><span style="font-size:18px">▶</span><span class="cat-title">루프 실행</span></div>
+    <div class="cat" data-gijo-fold="▶ 루프 실행">
       <div class="cat-intro">원클릭 실행 시 [👍 로그 → 데이터셋 → 학습 → GGUF 변환 → 에이전트 배포]가 순서대로 진행됩니다. 각 단계는 아래에 실시간 표시됩니다.</div>
       <div class="actions-row">
         <button class="btn-primary" id="runBtn">🔄 루프 실행 (원클릭)</button>
@@ -245,8 +243,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div id="lcList"><div style="color:var(--muted);font-size:12px">불러오는 중...</div></div>
     </div>
 
-    <div class="cat">
-      <div class="cat-head"><span style="font-size:18px">📥</span><span class="cat-title">수집된 대화</span></div>
+    <div class="cat" data-gijo-fold="📥 수집된 대화">
       <div class="cat-intro">좋은 답변에 👍를 남기면 다음 학습에 채택됩니다. 👎/삭제한 대화는 학습에서 제외됩니다. 이미 학습에 쓰인 대화는 ✓ 표시.</div>
       <div class="log-list" id="logList"><div style="color:var(--muted);font-size:12px">불러오는 중...</div></div>
     </div>

@@ -78,6 +78,10 @@ tr:last-child td{border-bottom:none;}
 .progress-track{height:7px;border-radius:20px;background:rgba(255,255,255,0.08);overflow:hidden;margin-top:8px;}
 .progress-fill{height:100%;border-radius:20px;}
 .content-grid{display:grid;grid-template-columns:1.7fr 1fr;gap:16px;}
+/* 구독 피드·모니터링 대상 — 둘 다 짧아 나란히 둔다. 좁아지면 자동으로 아래로 내려간다. */
+.feed-top{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;align-items:start;margin-bottom:16px;}
+/* 심각도 칸이 좁아 "정보"가 "정 / 보"로 갈라졌다 — 접지 않는다. */
+table th:last-child,table td:last-child{white-space:nowrap;}
 
 .titlebar{display:flex;align-items:center;justify-content:space-between;background:#1f1e1d;padding:6px 12px;border-bottom:1px solid var(--border);font-size:12.5px;color:var(--muted);}
 .titlebar-left{display:flex;align-items:center;gap:8px;}
@@ -165,40 +169,40 @@ tr:last-child td{border-bottom:none;}
   <div class="kpi-mini"><div class="kpi-mini-label">영향받는 내부 자산</div><div class="kpi-mini-value" style="color:var(--amber)" id="affectedAssetCount">-</div></div>
 </div>
 
+<!-- 순서(2026-08-02 사용자 지시): 무엇을 구독·감시 중인가 → 그래서 우리에게 오는 위협 →
+     참고로 훑는 탐지 내역. 탐지 내역은 표가 넓어 **가로를 다 쓴다**(오른쪽 열에 두면 칸이 좁아
+     심각도가 "정 / 보"로 갈라졌다). -->
+<div class="feed-top">
+  <div class="panel" data-gijo-fold="구독 중인 CTI 피드">
+    <div class="panel-title">구독 중인 CTI 피드</div><div id="feedList"><div style="font-size:12px;color:var(--muted)">불러오는 중...</div></div>
+    <div style="margin-top:14px"><button class="btn-ghost" style="width:100%" id="addFeedBtn2">+ 피드 구독 추가</button></div>
+  </div>
+  <div class="panel" data-gijo-fold="모니터링 대상">
+    <div class="panel-title">모니터링 대상</div>
+    <div style="font-size:12.5px;color:var(--muted);line-height:1.7">
+      모니터링 대상 관리 기능은 아직 제공되지 않습니다. CTI 벤더 연동 시 벤더 측 콘솔에서 설정한 대상이 적용됩니다.
+    </div>
+  </div>
+</div>
+
 <!-- CTI ↔ 내부 자산 자동 매칭: "지금 우리에게 영향 있는 위협"을 자동 산출해 수작업 대조를 없앤다. -->
-<div class="panel" style="border-color:rgba(240,160,32,0.35)">
+<div class="panel" style="border-color:rgba(240,160,32,0.35)" data-gijo-fold="🎯 내부 자산에 영향을 주는 위협">
   <div class="panel-title">🎯 내부 자산에 영향을 주는 위협 <span style="font-size:12.25px;font-weight:600;color:var(--muted)">CTI ↔ 자산 자동 매칭</span></div><div id="ctiMatchBody" style="margin-top:10px;display:flex;flex-direction:column;gap:9px;">불러오는 중...</div>
 </div>
 
-<div class="content-grid">
-  <div>
-    <!-- 접기(2026-08-01) — 이 화면의 본업은 위 「내부 자산에 영향을 주는 위협」이다.
-         최근 탐지 내역은 훑어보는 참고 목록이라 접어 두고, **건수를 배지로** 남긴다.
-         ⚠ 숫자 없이 접으면 "안에 뭐가 있는지 모르는 서랍"이 된다. -->
-    <div class="panel" data-gijo-fold="최근 탐지 내역" data-gijo-fold-badges="feedCount:건">
-      <!-- ⚠ 접기 배지가 읽는 자리(2026-08-01 검토 지적으로 신설) — 없으면 배지가 안 그려진다. -->
-      <div class="panel-title">최근 탐지 내역<span id="feedCount" style="display:none">0</span></div>
-      <div class="scroll-list"><!-- 긴 목록은 패널 안에서 스크롤 — 위 요약이 늘 보여야 한다(2026-08-02 되돌림) -->
-      <table>
-        <thead><tr><th>탐지일</th><th>유형</th><th>대상 자산 · 도메인</th><th>출처</th><th>심각도</th></tr></thead>
-        <tbody id="findingsBody">
-          <tr><td colspan="5" style="color:var(--muted);text-align:center;padding:28px 10px">불러오는 중...</td></tr>
-        </tbody>
-      </table>
-      </div>
-    </div>
-  </div>
-  <div>
-    <div class="panel" data-gijo-fold="구독 중인 CTI 피드">
-      <div class="panel-title">구독 중인 CTI 피드</div><div id="feedList"><div style="font-size:12px;color:var(--muted)">불러오는 중...</div></div>
-      <div style="margin-top:14px"><button class="btn-ghost" style="width:100%" id="addFeedBtn2">+ 피드 구독 추가</button></div>
-    </div>
-    <div class="panel" data-gijo-fold="모니터링 대상">
-      <div class="panel-title">모니터링 대상</div>
-      <div style="font-size:12.5px;color:var(--muted);line-height:1.7">
-        모니터링 대상 관리 기능은 아직 제공되지 않습니다. CTI 벤더 연동 시 벤더 측 콘솔에서 설정한 대상이 적용됩니다.
-      </div>
-    </div>
+<!-- 접기(2026-08-01) — 이 화면의 본업은 위 「내부 자산에 영향을 주는 위협」이다.
+     최근 탐지 내역은 훑어보는 참고 목록이라 접어 두고, **건수를 배지로** 남긴다.
+     ⚠ 숫자 없이 접으면 "안에 뭐가 있는지 모르는 서랍"이 된다. -->
+<div class="panel" data-gijo-fold="최근 탐지 내역" data-gijo-fold-badges="feedCount:건">
+  <!-- ⚠ 접기 배지가 읽는 자리(2026-08-01 검토 지적으로 신설) — 없으면 배지가 안 그려진다. -->
+  <div class="panel-title">최근 탐지 내역<span id="feedCount" style="display:none">0</span></div>
+  <div class="scroll-list"><!-- 긴 목록은 패널 안에서 스크롤 — 위 요약이 늘 보여야 한다(2026-08-02 되돌림) -->
+  <table>
+    <thead><tr><th>탐지일</th><th>유형</th><th>대상 자산 · 도메인</th><th>출처</th><th>심각도</th></tr></thead>
+    <tbody id="findingsBody">
+      <tr><td colspan="5" style="color:var(--muted);text-align:center;padding:28px 10px">불러오는 중...</td></tr>
+    </tbody>
+  </table>
   </div>
 </div>
 

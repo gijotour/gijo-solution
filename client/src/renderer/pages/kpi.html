@@ -94,6 +94,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 /* ⏱ AI가 아낀 시간(중-2) — 승인된 시안(mockups/kpi-time-saved) 그대로.
    배치 근거: 위험도 히어로에 섞으면 "클수록 좋다"로 읽히므로 AI 보안 아래·상세 지표 위 별도 카드.
    신뢰 장치: 단일 숫자 대신 범위(보수 하한 먼저) + '추정' 배지 + 근거 표 + 한계 문구 상시 노출. */
+/* 제목 줄을 접기 제목이 대신하므로, 기준시간 조정 링크는 본문 첫 줄 오른쪽으로 옮긴다. */
+.tsv-adminrow{display:flex;justify-content:flex-end;margin-bottom:6px;}
 .tsv-hero{display:flex;align-items:center;gap:18px;flex-wrap:wrap;background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px 18px;}
 .tsv-range{font-size:30px;font-weight:900;color:var(--teal);line-height:1.1;}
 .tsv-range small{font-size:14px;font-weight:700;color:var(--muted);}
@@ -372,8 +374,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       '<td class="num" style="color:var(--teal)">' + tsvDur(r.minutes) + "</td></tr>"
     ).join("");
     return (
-      '<div class="cat" data-gijo-summary><div class="cat-title">⏱ AI가 아낀 시간' +
-      '<span class="tsv-admin" id="tsvAdminBtn">⚙ 기준시간 조정 (관리자)</span></div>' +
+      '<div class="cat" data-gijo-summary data-gijo-fold="⏱ AI가 아낀 시간">' +
+      '<div class="tsv-adminrow"><span class="tsv-admin" id="tsvAdminBtn">⚙ 기준시간 조정 (관리자)</span></div>' +
       '<div class="tsv-hero"><div>' +
       '<div class="tsv-range">약 ' + lo + " ~ " + hi + '<span class="tsv-badge">추정</span></div>' +
       '<div class="tsv-sub">최근 ' + t.days + "일 · AI가 대신 처리한 일 " + cases + "건 · 앞의 값은 보수 조정(20%↓) 적용값</div>" +
@@ -480,10 +482,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
           const body = n === 0
             ? `<div class="trend-note">아직 스캔 이력이 없습니다. 취약점 리포트를 업로드하면 재스캔마다 번다운이 그려집니다.</div>`
             : chart + `<div class="trend-note"><span style="color:#f5928a">●</span> 열린 취약점 &nbsp; <span style="color:#ff5a4d">●</span> 실제 악용(KEV) &nbsp;·&nbsp; ${n < 2 ? "재스캔이 쌓이면 감소 궤적이 나타납니다" : `${n}개 스캔 시점 기준 — 실제 저장된 스캔 이력에서 재구성`}</div>`;
-          return `<div class="cat"><div class="cat-title">📉 취약점 번다운 (실제 스캔 이력)</div><div class="trend-card" style="max-width:680px"><div class="trend-head"><span class="trend-name">열린 취약점 — 재스캔마다 재구성 (줄수록 좋음)</span><span class="trend-now">${net}</span></div>${body}</div></div>`;
+          return `<div class="cat" data-gijo-fold="📉 취약점 번다운 (실제 스캔 이력)"><div class="trend-card" style="max-width:680px"><div class="trend-head"><span class="trend-name">열린 취약점 — 재스캔마다 재구성 (줄수록 좋음)</span><span class="trend-now">${net}</span></div>${body}</div></div>`;
         })() +
 
-        `<div class="cat"><div class="cat-title">📈 추세 · 조치 번다운 (일일 스냅샷)</div><div class="trend-grid">` +
+        `<div class="cat" data-gijo-fold="📈 추세 · 조치 번다운 (일일 스냅샷)"><div class="trend-grid">` +
         trendCard("열린 취약점 (번다운 — 줄수록 좋음)", series("vulnerabilities.active"), "#f5928a", "건") +
         trendCard("실제 악용(KEV)", series("vulnerabilities.kev"), "#ff8a80", "건") +
         trendCard("SLA 준수율", series("remediation.slaCompliance"), "var(--teal)", "%") +

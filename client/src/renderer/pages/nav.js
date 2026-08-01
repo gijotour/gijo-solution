@@ -735,6 +735,9 @@
       "background:linear-gradient(90deg,rgba(59,130,246,.10),transparent);border:1px solid rgba(59,130,246,.28);" +
       "border-radius:12px;padding:11px 16px;margin-bottom:16px;}" +
       ".gsum{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 9px;font-size:13px;}" +
+      // 상단 버튼 묶음을 요약 막대 오른쪽 끝에 붙인다 — 같은 줄에서 끝난다.
+      ".gsum .gsum-acts{margin-left:auto;display:flex;gap:6px;flex:0 0 auto;}" +
+      ".gsum .gsum-acts button{padding:4px 11px !important;font-size:11.75px !important;}" +
       ".gsum-pair{display:inline-flex;align-items:baseline;gap:6px;min-width:0;}" +
       ".gsum .gsum-l{color:var(--muted,#b3ada4) !important;font-size:12.5px !important;font-weight:600 !important;" +
       "white-space:nowrap;margin:0 !important;padding:0 !important;display:inline !important;line-height:1.4 !important;}" +
@@ -800,7 +803,35 @@
       box.appendChild(막대);
       box.dataset.gijoSum = "1";
       box.classList.add("gsum-box");
+      상단버튼줄합치기(막대);
     });
+  }
+
+  /**
+   * 상단 버튼 줄을 요약 막대 **같은 줄**로 옮긴다
+   * (2026-08-02 사용자 지시 "위협 인텔 상단 메뉴 한 줄로 통합" → "리포트도").
+   *
+   * 화면 제목은 이미 감춰서, 버튼 줄에는 버튼 두어 개만 남아 한 줄을 통째로 먹고 있었다.
+   * 요약 막대와 버튼은 둘 다 "이 화면 맨 위에서 한 번 보는 것"이라 같은 줄에 있어도 된다.
+   *
+   * ⚠ 버튼을 **옮긴다**(다시 만들지 않는다). 새로 만들면 화면이 걸어 둔 클릭이 사라진다.
+   * ⚠ 화면마다 따로 고치지 않는다 — 여기 하나로 같은 구조를 쓰는 화면이 전부 정리된다.
+   */
+  function 상단버튼줄합치기(막대) {
+    try {
+      var 줄 = document.querySelector(".topbar-row");
+      if (!줄 || 줄.dataset.gijoMerged === "1") return;
+      // 버튼이 든 묶음만 가져온다(제목 쪽은 이미 안 보인다).
+      var 묶음 = null;
+      [].forEach.call(줄.children, function (c) {
+        if (!묶음 && c.querySelector && c.querySelector("button, a, select")) 묶음 = c;
+      });
+      if (!묶음) return;
+      묶음.classList.add("gsum-acts");
+      막대.appendChild(묶음);
+      줄.dataset.gijoMerged = "1";
+      줄.style.display = "none";   // 남은 껍데기가 자리를 먹지 않게
+    } catch (e) { /* 못 합쳐도 화면은 그대로 돈다 */ }
   }
   window.gijo요약막대 = 요약막대로;
 

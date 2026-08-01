@@ -110,9 +110,11 @@
   // ⚠ 누르는 것(버튼·입력·링크)이 들어 있는 제목은 건드리지 않는다. 안 보이면 못 누른다.
   //   배지(span)만 든 제목은 지워도 된다 — 접힌 줄의 배지가 그 값을 그대로 읽어 보여준다.
   function 겹친제목지우기(target, name) {
-    var t = target.querySelector(".panel-title, .card-title, .sec-title, h2, h3");
+    var t = target.querySelector(".panel-title, .card-title, .sec-title, .cat-title, h2, h3");
     if (!t || t.closest("[data-gijo-fold]") !== target) return;
-    if (t.querySelector("button, input, select, textarea, a")) return;
+    // 누르는 것이 들어 있으면 건드리지 않는다 — 안 보이면 못 누른다.
+    // 버튼 태그가 아니어도 **누르게 만든 span**이 있다(id가 …Btn, class에 btn, onclick).
+    if (t.querySelector("button, input, select, textarea, a, [id$='Btn'], [class*='btn'], [onclick]")) return;
     var 제목글 = "";
     t.childNodes.forEach(function (n) { if (n.nodeType === 3) 제목글 += n.textContent; });
     if (제목글.trim() !== String(name).trim()) return;
