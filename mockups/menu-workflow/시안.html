@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>GIJO AS — 업무 절차 중심 메뉴 재구성 시안</title>
+<style>
+:root{
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;--red:#e2483d;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);
+  padding:22px 26px 60px;font-size:13px;line-height:1.5;}
+h1{font-size:19px;font-weight:800;color:#fff;margin-bottom:5px;}
+.lead{font-size:12.5px;color:var(--muted);max-width:1060px;line-height:1.7;margin-bottom:18px;}
+h2{font-size:14px;font-weight:800;color:#fff;margin:26px 0 5px;}
+h2 .n{color:var(--blue-light);margin-right:6px;}
+.note{font-size:12.25px;color:var(--muted-2);margin-bottom:9px;max-width:1060px;line-height:1.65;}
+b.hi{color:var(--text);}
+.warn{color:var(--amber);}
+.bad{color:#f5928a;}
+.ok{color:var(--teal);}
+
+/* 좌우 비교 */
+.pair{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start;}
+.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 14px;}
+.card.after{border-color:rgba(30,185,128,.35);}
+.tagline{font-size:11.5px;font-weight:800;letter-spacing:.4px;color:var(--muted-2);margin-bottom:8px;}
+.tagline.after{color:var(--teal);}
+
+/* 메뉴 모형 */
+.menu{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:6px;font-size:12.25px;}
+.mg{display:flex;align-items:center;gap:7px;padding:5px 8px;font-weight:800;color:#dfe6ff;}
+.mg .cnt{margin-left:auto;font-size:11.25px;font-weight:700;color:var(--muted-2);}
+.mi{display:flex;align-items:center;gap:7px;padding:3px 8px 3px 26px;color:var(--muted);}
+.mi.new{color:var(--blue-light);}
+.sep{height:1px;background:var(--border);margin:5px 4px;}
+.stage{display:flex;align-items:center;gap:7px;padding:5px 8px;font-weight:800;border-radius:6px;margin-top:2px;}
+.stage .num{width:17px;height:17px;border-radius:5px;background:rgba(59,130,246,.2);color:var(--blue-light);
+  font-size:10.5px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;}
+.stage .cnt{margin-left:auto;font-size:11.25px;font-weight:700;color:var(--muted-2);}
+.stage.s1{background:rgba(59,130,246,.08);} .stage.s2{background:rgba(240,160,32,.08);}
+.stage.s3{background:rgba(226,72,61,.08);}  .stage.s4{background:rgba(30,185,128,.08);}
+.stage.s5{background:rgba(139,124,240,.08);}
+
+/* 절차 띠 */
+.rail{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 4px;}
+.rstep{flex:1;min-width:150px;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:8px 10px;}
+.rstep.on{border-color:var(--blue);background:rgba(59,130,246,.1);}
+.rstep .rt{font-size:12.25px;font-weight:800;color:#fff;display:flex;align-items:center;gap:6px;}
+.rstep .rv{font-size:11.75px;color:var(--muted-2);margin-top:3px;}
+.rstep .rn{font-size:16px;font-weight:900;color:var(--blue-light);}
+
+/* 대화창 모형 */
+.chat{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:12.25px;}
+.crow{padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05);}
+.crow:last-child{border-bottom:none;}
+.who{font-size:11.25px;font-weight:800;color:var(--muted-2);}
+.who.ai{color:var(--blue-light);}
+.bubble{margin-top:3px;line-height:1.6;}
+.acts{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px;}
+.acts span{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--blue-light);
+  border-radius:7px;padding:3px 9px;font-size:11.5px;font-weight:700;}
+.acts span.go{background:rgba(59,130,246,.18);border-color:var(--blue);}
+
+table.t{width:100%;border-collapse:collapse;font-size:12.25px;margin-top:6px;}
+table.t th{text-align:left;color:var(--muted-2);font-weight:700;padding:5px 8px;border-bottom:1px solid var(--border);white-space:nowrap;}
+table.t td{padding:5px 8px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:top;}
+table.t tr:last-child td{border-bottom:none;}
+.meas{font-size:12.25px;color:var(--muted-2);margin-top:7px;}
+.meas b{color:var(--teal);}
+code{background:var(--panel-2);border-radius:4px;padding:1px 5px;font-size:11.75px;}
+</style>
+</head>
+<body>
+
+<h1>업무 절차 중심 메뉴 재구성</h1>
+<p class="lead">
+  지금 메뉴는 <b class="hi">데이터 종류</b>로 묶여 있습니다(관제 / 자산·조치 / 보안제품 / AI / 데이터 플라이휠).
+  담당자가 하는 일은 <b class="hi">절차</b>인데 메뉴는 <b class="hi">창고</b>라, "취약점을 발견해서 리포트까지" 한 바퀴 도는 동안
+  <b class="bad">5개 그룹을 넘나들어야</b> 합니다. 그래서 연관성이 안 보이고, 지금 어디까지 했는지도 모릅니다.
+  <br>
+  <b class="hi">근거는 우리 문서에 이미 있습니다</b> — <code>GIJO_AS_취약점관리_지침.md</code> 1절:
+  <i>"GIJO AS의 메뉴도 이 4단계에 맵핑되어야 한다. 정적 목록만 보여주면 실패다."</i>
+  적어 두고 지키지 않은 것을 이번에 지킵니다.
+</p>
+
+<h2><span class="n">진단</span>한 업무가 다섯 그룹에 흩어져 있다</h2>
+<p class="note">
+  취약점 업무 한 바퀴(발견 → 우선순위 → 조치 → 검증 → 보고)를 실제 화면으로 따라가 본 결과입니다.
+</p>
+<table class="t">
+  <tr><th style="width:110px">절차</th><th style="width:230px">지금 어디로 가야 하나</th><th style="width:110px">지금 속한 그룹</th><th>문제</th></tr>
+  <tr><td>① 발견</td><td>통합 관제 · 자산 목록</td><td>관제 / 자산·조치</td><td>두 그룹</td></tr>
+  <tr><td>② 우선순위</td><td>취약점</td><td>자산·조치</td><td>—</td></tr>
+  <tr><td>③ 조치</td><td>조치·승인 · 터미널</td><td>자산·조치</td><td>—</td></tr>
+  <tr><td>④ 검증</td><td>취약점(재스캔) · 원격 정기점검</td><td>자산·조치 / <b class="bad">보안제품</b></td><td>엉뚱한 그룹</td></tr>
+  <tr><td>⑤ 보고</td><td>리포트 · 보안 KPI · 컴플라이언스</td><td>관제</td><td>맨 위로 되돌아감</td></tr>
+</table>
+<div class="meas">
+  한 바퀴에 <b>그룹 5개 중 3개</b>를 오가고, <b class="bad">방향이 위→아래→위로 꺾입니다</b>.
+  담당자는 "다음에 뭘 눌러야 하나"를 매번 기억해서 찾아야 합니다.
+</div>
+
+<h2><span class="n">근거</span>바깥 표준도 같은 말을 한다</h2>
+<table class="t">
+  <tr><th style="width:180px">출처</th><th>말하는 것</th></tr>
+  <tr><td>우리 <code>취약점관리_지침</code> 1절</td><td>발견·평가 → 우선순위 → 조치 → 측정 <b class="hi">4단계 루프</b>. "메뉴도 이 4단계에 맵핑되어야 한다"</td></tr>
+  <tr><td>업계 공통 생애주기</td><td>식별 → 우선순위 → 조치 → <b class="hi">검증</b> → <b class="hi">보고</b> → 지속 감시 (검증·보고가 별도 단계로 승격)</td></tr>
+  <tr><td>Tenable Exposure Response</td><td>원시 목록을 <b class="hi">기한·담당자 있는 프로젝트</b>로. 번다운으로 추적, 대시보드로 보고</td></tr>
+  <tr><td>내비게이션 설계 3방식</td><td>객체(데이터)형 · 과업형 · <b class="hi">워크플로형</b>. 반복 업무를 하는 사용자에겐 워크플로형이 맞음</td></tr>
+</table>
+<p class="note">
+  ⚠ 표준을 그대로 베끼지 않았습니다. 6단계 중 <b class="hi">"지속 감시"는 별도 메뉴로 만들지 않습니다</b> —
+  그건 화면이 아니라 <b class="hi">스케줄러가 늘 도는 일</b>이고, 결과는 ①발견으로 들어옵니다.
+  메뉴를 늘리는 대신 루프가 ①로 되돌아오게 그립니다.
+</p>
+
+<h2><span class="n">시안</span>지금 → 바꾼 뒤</h2>
+<div class="pair">
+  <div class="card">
+    <div class="tagline">지금 — 데이터 종류로 묶음 (7그룹 26화면)</div>
+    <div class="menu">
+      <div class="mg">🏠 대시보드</div>
+      <div class="mg">💬 작업 내역</div>
+      <div class="sep"></div>
+      <div class="mg">🖥 관제 <span class="cnt">5</span></div>
+      <div class="mi">통합 관제 · 위협 인텔 · 리포트 · 보안 KPI · 컴플라이언스</div>
+      <div class="mg">🛡 자산·조치 <span class="cnt">6</span></div>
+      <div class="mi">자산 통합 뷰 · 자산 목록 · AI-BOM · 취약점 · 조치·승인 · 터미널</div>
+      <div class="mg">🧰 보안제품 <span class="cnt">4</span></div>
+      <div class="mi">등록부 · 제품 유지보수 · 유지보수 점검 · 원격 정기점검</div>
+      <div class="mg">📋 업무 관리 <span class="cnt">1</span></div>
+      <div class="mi">인수인계</div>
+      <div class="mg">🤖 AI <span class="cnt">3</span></div>
+      <div class="mi">에이전트 AI · LLM 합성 · 레드팀·가드레일</div>
+      <div class="mg">🔄 데이터 플라이휠 <span class="cnt">3</span></div>
+      <div class="mi">기억·학습 · 온톨로지 · 학습 루프</div>
+      <div class="mg">⚙ 설정 <span class="cnt">6</span></div>
+    </div>
+    <div class="meas">한 업무를 하려면 <span class="bad">그룹을 넘나든다</span>. 그룹 이름이 "무엇이 들었나"만 말하고 "언제 쓰나"를 안 말한다.</div>
+  </div>
+
+  <div class="card after">
+    <div class="tagline after">바꾼 뒤 — 업무 절차로 묶음 (5단계 + 기반 3그룹)</div>
+    <div class="menu">
+      <div class="mg">🏠 오늘 할 일</div>
+      <div class="mg">💬 작업 내역</div>
+      <div class="sep"></div>
+      <div class="stage s1"><span class="num">1</span>발견·수집 <span class="cnt">3</span></div>
+      <div class="mi">통합 관제 · 위협 인텔 · 자산 목록</div>
+      <div class="stage s2"><span class="num">2</span>우선순위 <span class="cnt">2</span></div>
+      <div class="mi">취약점 <span class="new">(취약점 중심으로 뒤집기)</span> · AI 위험(AI-BOM)</div>
+      <div class="stage s3"><span class="num">3</span>조치 <span class="cnt">3</span></div>
+      <div class="mi">조치·승인 · 유지보수 점검 · 터미널</div>
+      <div class="stage s4"><span class="num">4</span>검증 <span class="cnt">2</span></div>
+      <div class="mi new">조치 검증(재스캔 대조) · 원격 정기점검</div>
+      <div class="stage s5"><span class="num">5</span>보고 <span class="cnt">3</span></div>
+      <div class="mi">리포트 · 보안 KPI · 컴플라이언스</div>
+      <div class="sep"></div>
+      <div class="mg">🗂 등록부 <span class="cnt">3</span></div>
+      <div class="mi">자산 통합 뷰 · 보안제품 · 제품 유지보수</div>
+      <div class="mg">🤖 AI 운영 <span class="cnt">6</span></div>
+      <div class="mi">에이전트 · 레드팀·가드레일 · LLM 합성 · 기억·학습 · 온톨로지 · 학습 루프</div>
+      <div class="mg">⚙ 설정 <span class="cnt">6</span> <span style="font-size:11px;color:var(--muted-2)">+ 인수인계</span></div>
+    </div>
+    <div class="meas">
+      위에서 아래로 <b>한 방향</b>. 번호가 "지금 몇 번째인지"를 말한다.
+      화면 수는 <b>26개 그대로</b> — <b class="hi">없애지 않고 자리만 옮긴다</b>.
+    </div>
+  </div>
+</div>
+
+<h2><span class="n">핵심</span>절차 띠 — "지금 어디까지 왔나"를 늘 보이게</h2>
+<p class="note">
+  메뉴만 바꾸면 절반입니다. 각 단계 화면 맨 위에 <b class="hi">같은 띠</b>를 둡니다 —
+  숫자는 실데이터이고, 누르면 그 단계로 갑니다. 이게 "전 과정을 볼 수 있어야 한다"의 답입니다.
+</p>
+<div class="rail">
+  <div class="rstep"><div class="rt">① 발견</div><div class="rv"><span class="rn">57</span> 자산 · 오늘 신규 <b>3</b></div></div>
+  <div class="rstep on"><div class="rt">② 우선순위 ◀ 지금</div><div class="rv"><span class="rn">18</span> 미분류 · KEV <b class="bad">1</b></div></div>
+  <div class="rstep"><div class="rt">③ 조치</div><div class="rv"><span class="rn">3</span> 진행 · 미배정 <b class="warn">2</b></div></div>
+  <div class="rstep"><div class="rt">④ 검증</div><div class="rv"><span class="rn">5</span> 대기 · 재발 <b>0</b></div></div>
+  <div class="rstep"><div class="rt">⑤ 보고</div><div class="rv">이번 주 <b>미작성</b></div></div>
+</div>
+<div class="meas">
+  ⚠ 숫자는 <b>규칙으로 계산</b>합니다(LLM 아님). 틀린 숫자를 보여 주면 담당자가 그 숫자로 보고를 씁니다.
+  ⚠ 0건이면 회색으로 죽입니다 — "미배정 0"을 빨갛게 두면 위험 신호가 흔해져 안 보입니다.
+</div>
+
+<h2><span class="n">대화창</span>단계마다 "다음에 뭘 하면 되는지"를 말해 준다</h2>
+<p class="note">
+  우리 제품 원칙은 <b class="hi">"메뉴는 보기 용도, 지시는 대화창"</b>입니다. 절차를 메뉴에 그렸으니,
+  대화창은 <b class="hi">그 절차를 밟게 하는 안내자</b>가 되어야 합니다 — 화면을 열면 그 단계의 할 일을 먼저 말합니다.
+</p>
+<div class="chat">
+  <div class="crow"><div class="who ai">AI 팀 — ② 우선순위 단계</div>
+    <div class="bubble">
+      새로 들어온 취약점 <b>18건</b> 중 <b class="bad">지금 손대야 할 것 3건</b>입니다 (CISA KEV → EPSS → VPR 순).<br>
+      1. [high] OpenSSH &lt; 9.6 사용자 열거 (CVE-2024-6387) — 영향 3대 · <b class="bad">실제 악용 중</b><br>
+      2. [low] 디렉터리 인덱싱 [IW-20] — 영향 1대<br>
+      3. [low] SSL 인증서 만료 임박 — 영향 1대 · 기한 <b class="warn">08-28</b>
+      <div class="acts"><span class="go">1번 담당자 배정하기</span><span>3건 모두 조치 항목으로</span><span>왜 이 순서인지</span><span>오탐으로 반려</span></div>
+    </div>
+  </div>
+  <div class="crow"><div class="who">나</div><div class="bubble">1번 담당자 배정하기</div></div>
+  <div class="crow"><div class="who ai">AI 팀 — ③ 조치로 넘어갑니다</div>
+    <div class="bubble">
+      김도희 님에게 배정하고 기한을 <b>08-05</b>(KEV라 3일)로 잡았습니다. <span style="color:var(--muted-2)">— 결재판 승인 후 반영됨</span><br>
+      조치 절차 4단계를 만들어 뒀습니다. <b>다음은 ④ 검증</b>입니다 — 패치 후 재스캔하면 자동으로 대조합니다.
+      <div class="acts"><span class="go">조치 절차 보기</span><span>재스캔 예약</span><span>⑤ 보고에 담기</span></div>
+    </div>
+  </div>
+</div>
+<div class="meas">
+  핵심은 <b>마지막 줄</b>입니다 — 매 답변이 <b class="hi">"다음 단계는 ○○"</b>로 끝납니다.
+  담당자가 절차를 외우지 않아도 대화창이 데려갑니다. (이미 있는 <code>workguide</code>·절차 카드를 절차 축에 맞춰 붙입니다.)
+</div>
+
+<h2><span class="n">다른 업무</span>같은 틀이 그대로 맞는다</h2>
+<table class="t">
+  <tr><th style="width:120px">업무</th><th>① 발견</th><th>② 우선순위</th><th>③ 조치</th><th>④ 검증</th><th>⑤ 보고</th></tr>
+  <tr>
+    <td><b class="hi">취약점</b></td>
+    <td>스캔 결과 인입</td><td>KEV·EPSS·VPR</td><td>담당·기한 배정</td><td>재스캔 대조</td><td>리포트·KPI</td>
+  </tr>
+  <tr>
+    <td><b class="hi">보안제품 운영</b></td>
+    <td>제품·매뉴얼 등록</td><td>점검 주기·EoS 임박</td><td>정기점검 수행</td><td>하드닝 재점검</td><td>점검 결과 리포트</td>
+  </tr>
+  <tr>
+    <td><b class="hi">AI 보안</b><br><span style="color:var(--muted-2);font-size:11.5px">(우리 차별점)</span></td>
+    <td>AI 자산·Shadow AI 발견</td><td>AI-BOM 결손·OWASP LLM</td><td>가드레일·명세 보완</td><td>레드팀 재측정</td><td>AI 보안 리포트</td>
+  </tr>
+  <tr>
+    <td><b class="hi">보안로그·운영</b></td>
+    <td>로그·운영리포트 인입</td><td>상관분석 우선순위</td><td>조치 항목 전환</td><td>재발 확인</td><td>주간 보고</td>
+  </tr>
+</table>
+<p class="note">
+  네 업무가 <b class="hi">같은 5단계</b>를 돕니다 — 그래서 한 번 배우면 나머지가 공짜입니다.
+  이것이 업무별로 메뉴를 따로 만들지 않는 이유입니다(메뉴 4배가 되면 원점).
+</p>
+
+<h2><span class="n">이동표</span>어느 화면이 어디로 — 없애는 것은 없다</h2>
+<table class="t">
+  <tr><th style="width:190px">화면</th><th style="width:150px">지금</th><th style="width:150px">바꾼 뒤</th><th>왜</th></tr>
+  <tr><td>통합 관제 · 위협 인텔</td><td>관제</td><td>① 발견</td><td>바깥에서 들어오는 것을 받는 자리</td></tr>
+  <tr><td>자산 목록</td><td>자산·조치</td><td>① 발견</td><td>"무엇이 있나"를 아는 것이 시작</td></tr>
+  <tr><td>취약점</td><td>자산·조치</td><td>② 우선순위</td><td>이 화면의 본업이 "무엇부터"다</td></tr>
+  <tr><td>AI-BOM</td><td>자산·조치</td><td>② 우선순위</td><td>AI 위험도 우선순위 판단 자리</td></tr>
+  <tr><td>조치·승인 · 터미널</td><td>자산·조치</td><td>③ 조치</td><td>실제로 손대는 자리</td></tr>
+  <tr><td>유지보수 점검</td><td>보안제품</td><td>③ 조치</td><td>점검 수행은 조치다</td></tr>
+  <tr><td>원격 정기점검</td><td>보안제품</td><td>④ 검증</td><td>고친 뒤 다시 확인하는 자리</td></tr>
+  <tr><td><b class="ok">조치 검증</b> <span style="color:var(--blue-light)">(승격)</span></td><td>취약점 안 기능</td><td>④ 검증</td><td>이미 있는 기능인데 <b>메뉴에 없어 안 보였다</b></td></tr>
+  <tr><td>리포트 · 보안 KPI · 컴플라이언스</td><td>관제</td><td>⑤ 보고</td><td>결과를 밖에 알리는 자리</td></tr>
+  <tr><td>자산 통합 뷰 · 보안제품 · 제품 유지보수</td><td>여기저기</td><td>🗂 등록부</td><td>절차가 아니라 <b>참조하는 대장</b>이다</td></tr>
+  <tr><td>AI 6화면</td><td>AI + 데이터 플라이휠</td><td>🤖 AI 운영</td><td>두 그룹으로 나눌 이유가 없었다(6개면 한 그룹)</td></tr>
+  <tr><td>인수인계</td><td>업무 관리(1개짜리 그룹)</td><td>⚙ 설정</td><td>1개짜리 그룹은 그룹이 아니다</td></tr>
+</table>
+<div class="meas">
+  그룹 <b>7 → 5+3</b>, 그중 <b>절차 5단계가 주인공</b>. <b class="hi">화면 26개는 그대로</b>입니다 —
+  ④ 검증만 이미 있던 기능을 메뉴로 올렸습니다.
+</div>
+
+<h2><span class="n">위험</span>정직하게 — 이 변경이 깨뜨릴 수 있는 것</h2>
+<table class="t">
+  <tr><th style="width:200px">위험</th><th>대비</th></tr>
+  <tr><td>익숙한 자리가 바뀐다</td><td>상단 바 <b>🔍 화면 찾기</b>가 이미 있다(이름으로 검색). 첫 실행 때 대화창이 "메뉴가 업무 순서로 바뀌었다"고 한 번 알린다.</td></tr>
+  <tr><td>챗봇 안내가 옛 구조를 말한다</td><td>오늘 겪은 일이다 — <b>메뉴를 바꾸면 screenguide도 같은 커밋에서</b> 바꾼다.</td></tr>
+  <tr><td>QA 기대값(그룹 7개·이름)이 깨진다</td><td>QA-C05가 그룹 수와 이름을 검사한다. <b>근거를 달아 같이 갱신</b>한다(오늘 문서함 때와 같은 방식).</td></tr>
+  <tr><td>절차 띠 숫자가 틀린다</td><td>규칙 계산 + 화면별 실측 검증. 숫자를 못 구하면 <b>그 칸을 비운다</b> — 지어내지 않는다.</td></tr>
+  <tr><td>구조 개편이라 <b>major 올림</b>(5.0.0)</td><td>버전 기준상 major는 <b>사용자 결정</b>이다. 승인 때 함께 정한다.</td></tr>
+</table>
+
+<h2><span class="n">단계</span>한 번에 다 바꾸지 않는다</h2>
+<table class="t">
+  <tr><th style="width:60px">순서</th><th style="width:230px">할 일</th><th style="width:80px">예상</th><th>왜 이 순서</th></tr>
+  <tr><td><b>1</b></td><td>메뉴 그룹 재배치 (5단계 + 기반 3)</td><td>1시간</td><td>가장 눈에 띄고, 되돌리기도 쉽다</td></tr>
+  <tr><td><b>2</b></td><td>screenguide를 절차 축으로 고쳐 쓰기</td><td>1시간</td><td>안 하면 챗봇이 옛 구조를 말한다</td></tr>
+  <tr><td><b>3</b></td><td>절차 띠(5단계) 공용 부품 + 5화면 적용</td><td>2시간</td><td>"전 과정이 보인다"의 핵심</td></tr>
+  <tr><td><b>4</b></td><td>대화창 답변 끝에 "다음 단계" 붙이기</td><td>2시간</td><td>절차를 실제로 밟게 하는 부분</td></tr>
+  <tr><td><b>5</b></td><td>④ 검증 화면 승격 + 취약점 화면 뒤집기</td><td>3시간</td><td>이미 시안이 있다(vulnscan-flip)</td></tr>
+</table>
+<p class="note">
+  1~2만 해도 <b class="hi">"어디로 가야 하나"</b>는 풀립니다. 3~4가 <b class="hi">"전 과정이 보인다"</b>를 만듭니다.
+  5는 화면 구조가 바뀌므로 따로 확인받는 편이 좋습니다.
+</p>
+
+</body>
+</html>
