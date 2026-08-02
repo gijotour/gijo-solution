@@ -534,7 +534,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const ops = e.target.closest("[data-open-ops]");
     if (ops) {
       const name = ops.dataset.openOps;
-      window.gijo.navigateTo("opsguide.html" + (name ? `?product=${encodeURIComponent(name)}` : ""));
+      window.gijo.navigateTo("maintenance.html" + (name ? `?product=${encodeURIComponent(name)}` : ""));
       return;
     }
     const toggle = e.target.closest("[data-toggle]");

@@ -77,11 +77,12 @@ describe("★ 특정 항목을 누르면 그 항목으로 좁혀 간다", () => 
   it("보안제품의 '이 제품 점검'이 제품명을 실어 보낸다", () => {
     const src = read("products.html");
     expect(src, "제품명을 안 실으면 전체 점검 목록이 열린다").toContain('data-open-ops="${esc(p.name)}"');
-    expect(src).toContain("opsguide.html\" + (name ? `?product=");
+    expect(src).toContain("maintenance.html\" + (name ? `?product=");
   });
 
-  it("운영 가이드가 ?product= 를 읽어 그 제품 점검만 보여준다", () => {
-    const src = read("opsguide.html");
+  // 「제품 유지보수」는 2026-08-02에 「정기 점검」으로 합쳤다 — 코드가 옮겨 왔으니 시험도 옮긴다.
+  it("정기 점검이 ?product= 를 읽어 그 제품 점검만 보여준다", () => {
+    const src = read("maintenance.html");
     expect(src).toContain('.get("product")');
     expect(src, "목록만 걸러도 위 KPI가 전체면 무엇을 믿을지 알 수 없다").toContain("renderMaintKpis(items)");
     expect(src, "좁혀진 줄 모르면 '왜 몇 건밖에 없지?'가 된다").toContain("의 점검만 보는 중");

@@ -1483,7 +1483,7 @@
       if (e.target.dataset.openOps) {
         // 툴팁이 "이 자산의 유지보수 점검"이라 약속하므로 그 이름을 실어 보낸다.
         const nm = e.target.dataset.openOps;
-        window.gijo.navigateTo("opsguide.html" + (nm && nm !== "1" ? `?product=${encodeURIComponent(nm)}` : ""));
+        window.gijo.navigateTo("maintenance.html" + (nm && nm !== "1" ? `?product=${encodeURIComponent(nm)}` : ""));
         return;
       }
       if (e.target.dataset.vulns) {
