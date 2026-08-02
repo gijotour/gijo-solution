@@ -641,6 +641,10 @@ function turnToolTag(r: DispatchResult): string | undefined {
 }
 
 async function dispatchInstructionCore(instructionText: string, contextText = "", screen?: string, actor?: string, qa?: boolean, noLearn?: boolean, viewer?: Viewer): Promise<DispatchResult> {
+  // 대화 열쇠 — "아까 그거"가 **이 사람의** 직전 대상만 가리키게 한다.
+  //   예전에는 전역 1건이라 담당자 A가 방금 다룬 취약점을 담당자 B의 "아까 그거"가 가리켰다.
+  //   ⚠ 사람을 못 알아내면 기본 대화를 쓴다 — 예전 동작 그대로다(더 나빠지지 않는다).
+  const 대화열쇠 = viewer?.userId != null ? `u:${viewer.userId}` : actor ? `a:${actor}` : undefined;
   // 런타임 가드레일 — 입력의 프롬프트 인젝션 시도를 실시간 검사. block 모드면 거절, flag면 기록·경고 후 진행.
   // guardInput을 직접 부르지 않고 게이트웨이를 거친다 — 검사 지점을 한 곳으로 모아, 앞으로
   // 검사가 늘어도(PII·출력 필터 등) 모든 입구에 자동으로 적용되게 하기 위함이다.
@@ -961,7 +965,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   //   (2026-08-03 실전 147상황). 되묻는 것은 맞는 답이고, 틀린 것은 27초다.
   //   맥락이 없는데 아무거나 골라 답하면 엉뚱한 자산을 손대게 되므로 되묻는 것이 옳다 —
   //   다만 되묻는 데 모델이 필요할 리 없다. ⚠ 직전 대상이 있으면 여기 안 걸린다(#8 맥락이 이어받음).
-  if (가리킬것없는대명사(instructionText)) {
+  if (가리킬것없는대명사(instructionText, 대화열쇠)) {
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
     completeTask(task.id);
     return { task, route: { agentId: "orchestrator", action: "chat" }, output: 되물음() };
@@ -1011,6 +1015,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     domains: toolDomainsForScreen(screen),
     qa,
     actor,
+    대화: 대화열쇠,
   }).catch(() => null);
   if (loop) {
     const loopTask = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P2" });

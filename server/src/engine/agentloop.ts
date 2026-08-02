@@ -28,20 +28,38 @@ const ACTION_INTENT_RE =
   /배정|지정|맡겨|넘겨|바꿔|변경|수정|등록|추가|삭제|지워|해제|승인|반려|실행|시작|돌려|생성|만들|작성|보내|올려|내려|설정/;
 
 // #8 대화 맥락 — 직전에 다룬 취약점을 기억해 "아까 그거 이영희로 바꿔" 같은 후속을 해석한다.
-// 1인 운영 전제라 전역 1건으로 충분(TTL 10분 지나면 무시). 쓰기 대상이 잡힐 때 갱신한다.
+//
+// ⚠ **대화마다 따로 기억한다.** 예전에는 전역 1건이었고 주석에 "1인 운영 전제"라고 적혀 있었다.
+//   그 전제는 낡았다 — 지금은 보안담당자 여럿이 각자 대화창을 쓴다.
+//   전역 1건이면 담당자 A가 방금 다룬 취약점을 **담당자 B의 "아까 그거"가 가리킨다.**
+//   남의 맥락으로 남의 자산에 쓰기 지시가 나갈 수 있다(2026-08-03 발견).
+// ⚠ 전역이던 시절의 부작용이 하나 더 있었다: 오래 도는 작업(147상황 시뮬레이션) 중
+//   앞 질문이 남긴 대상이 10분간 살아 있어, 맥락 없는 "그거 어떻게 해"까지
+//   "맥락이 있다"고 판단해 되묻기가 안 걸렸다.
 interface LastTarget { assetId: string; finding: string; label: string; at: number }
-let lastTarget: LastTarget | null = null;
+const 대화별대상 = new Map<string, LastTarget>();
+const 기본대화 = "기본";
 const TARGET_TTL_MS = 10 * 60 * 1000;
+const 대화상한 = 200;   // 대화가 계속 생겨도 메모리를 무한히 먹지 않게
 const ANAPHORA_RE = /아까|방금|그거|그것|이거|이것|저거|그\s*취약점|위\s*취약점|같은\s*(거|취약점)|그\s*건|이\s*건/;
 
-export function setLastTarget(assetId: string, finding: string, label: string): void {
-  if (assetId && finding) lastTarget = { assetId, finding, label, at: Date.now() };
+export function setLastTarget(assetId: string, finding: string, label: string, 대화 = 기본대화): void {
+  if (!assetId || !finding) return;
+  대화별대상.set(대화, { assetId, finding, label, at: Date.now() });
+  // 오래된 것부터 정리 — 대화가 계속 생겨도 메모리가 안 는다.
+  if (대화별대상.size > 대화상한) {
+    const 오래된순 = [...대화별대상.entries()].sort((a, b) => a[1].at - b[1].at);
+    for (const [k] of 오래된순.slice(0, 대화별대상.size - 대화상한)) 대화별대상.delete(k);
+  }
 }
-function recentTarget(): LastTarget | null {
-  return lastTarget && Date.now() - lastTarget.at < TARGET_TTL_MS ? lastTarget : null;
+function recentTarget(대화 = 기본대화): LastTarget | null {
+  const t = 대화별대상.get(대화);
+  if (!t) return null;
+  if (Date.now() - t.at >= TARGET_TTL_MS) { 대화별대상.delete(대화); return null; }
+  return t;
 }
 export function resetContextForTests(): void {
-  lastTarget = null;
+  대화별대상.clear();
 }
 
 // 벤치(tools/orchestrator-bench.mjs)와 동일한 결정 스키마 — 벤치 결과가 곧 이 루프의 실측 근거다.
@@ -128,7 +146,7 @@ function decisionPrompt(instruction: string, calls: AgentToolCall[], context = "
     ...(fewshot ? [fewshot] : []),
     ...ctx,
     ...history,
-    ...anaphoraHint(instruction),
+    ...anaphoraHint(instruction, scope?.대화),
     "",
     `사용자 지시: "${instruction}"`,
   ].join("\n");
@@ -146,10 +164,10 @@ function decisionPrompt(instruction: string, calls: AgentToolCall[], context = "
  *   · 직전 대상이 **있으면** 잡지 않는다 — 그건 #8 맥락 기능이 이어받아야 한다
  *   · 대명사 말고 **다른 내용이 있으면** 잡지 않는다("그 취약점 담당자 배정해줘"는 진짜 지시다)
  */
-export function 가리킬것없는대명사(instruction: string): boolean {
+export function 가리킬것없는대명사(instruction: string, 대화 = 기본대화): boolean {
   const t = String(instruction ?? "").trim();
   if (!t || !ANAPHORA_RE.test(t)) return false;
-  if (recentTarget()) return false;   // 직전 대상이 있으면 맥락으로 푼다
+  if (recentTarget(대화)) return false;   // **이 대화의** 직전 대상이 있으면 맥락으로 푼다
   // 대명사·기능어를 걷어내고 **남는 내용이 거의 없을 때만** 되묻는다.
   const 남은 = t
     .replace(ANAPHORA_RE, " ")
@@ -171,8 +189,8 @@ export function 되물음(): string {
 }
 
 // #8: 지시가 "아까 그거" 류이고 최근 다룬 대상이 있으면, 그 대상을 프롬프트에 실어 해석을 돕는다.
-function anaphoraHint(instruction: string): string[] {
-  const t = recentTarget();
+function anaphoraHint(instruction: string, 대화 = 기본대화): string[] {
+  const t = recentTarget(대화);
   if (!t || !ANAPHORA_RE.test(instruction)) return [];
   return [
     "",
@@ -434,6 +452,9 @@ export interface ToolScope {
   role?: string;
   qa?: boolean;
   actor?: string; // 지시한 사람 — 작업 원장(중-2)에 누가 시킨 일인지 남긴다
+  // ⚠ 대화 열쇠 — "아까 그거"가 **이 대화의** 직전 대상만 가리키게 한다.
+  //   없으면 기본 대화를 쓴다(단일 대화 시절 동작 그대로).
+  대화?: string;
 }
 
 // 제품 핵심 문구인데 LLM이 "일반 질문"으로 오인해 도구를 건너뛰고 잡담으로 답하던 의도를
@@ -608,7 +629,14 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }
   //   today가 이미 KEV→EPSS→VPR 순으로 전 자산을 가로질러 정렬한다.
   // ⚠ "EPSS가 뭐야?"(개념 질문)는 잡지 않는다 — 그건 explain 몫이다.
   {
-    re: /(epss|vpr|cvss|위험도|심각도|우선순위)\s*(점수\s*)?(높은|낮은)\s*순|(높은|위험한)\s*순(으로|서)?\s*(보여|정렬|알려)|정렬해\s*(줘|주세요)/i,
+    // ⚠ 셋 다 today가 이미 하는 일이다(KEV 우선 정렬 · 상위 N건):
+    //   · "EPSS 높은 순으로 보여줘"        — 정렬
+    //   · "실제로 악용되는 것만 골라줘"     — KEV가 맨 위에 온다
+    //   · "그중에 제일 위험한 거 하나만"    — 상위 1건
+    //   실측(2026-08-03): 셋 다 LLM에게 갔고 각각 39초 강의 / 복창 방어에 걸려 답 못 만듦 /
+    //   "밝혀내어 주세요."라는 말이 안 되는 답이 나왔다.
+    // ⚠ "EPSS가 뭐야?"(개념)는 안 잡는다 — explain 몫이다.
+    re: /(epss|vpr|cvss|위험도|심각도|우선순위)\s*(점수\s*)?(높은|낮은)\s*순|(높은|위험한)\s*순(으로|서)?\s*(보여|정렬|알려)|정렬해\s*(줘|주세요)|실제로\s*악용|악용\s*(되는|중인|확인된)\s*(것|거|취약점)|(제일|가장)\s*위험한\s*(거|것|취약점|자산)?\s*(하나|한\s*건|1건)?/i,
     tool: "today",
     args: {},
   },
@@ -656,6 +684,15 @@ const EXPLAIN_VERB_RE = /설명|주요\s*기능|무슨\s*(제품|기능)|뭐(야
 //     · "점검항목"처럼 붙여 쓴 말은 제외한다(사이에 공백·수식어가 있어야 절차 질문이다)
 //     · 정기·월간·주간처럼 **주기어**가 함께 있거나 "유지보수"가 명시될 때만 잡는다
 //   좁히다 놓치면 답이 조금 헤맬 뿐이지만, 넓혀서 남의 답을 삼키면 그 기능이 죽는다.
+/** 보안장비 운영 설정을 어떻게 보나 — 장비 낱말 · 설정 대상 · 확인 동사가 **셋 다** 있어야 한다. */
+const 제품낱말 = /방화벽|waf|ips|ids|vpn|edr|백신|안티바이러스|스위치|라우터|프록시|siem|dlp|ahnlab|안랩|fortinet|palo\s*alto|checkpoint|cisco/i;
+const 설정낱말 = /룰셋|룰|정책|규칙|시그니처|화이트리스트|블랙리스트|예외|설정|구성/;
+const 확인낱말 = /어떻게|어케|방법|보나|보려면|확인|조회|어디서/;
+function 제품설정질문(s: string): boolean {
+  const t = String(s ?? "");
+  return 제품낱말.test(t) && 설정낱말.test(t) && 확인낱말.test(t);
+}
+
 const MAINT_PROCEDURE_RE =
   /((정기|월간|주간|분기|연간)\s*점검|유지보수(\s*점검)?)\s*.{0,8}(절차|방법|순서|단계|항목|체크\s*리스트)|(점검|유지보수)\s+(절차|방법|순서|단계|체크\s*리스트)/;
 
@@ -707,6 +744,16 @@ function forcedToolFor(instruction: string, scope?: ToolScope): { tool: string; 
   // 유지보수 절차는 지식베이스에 있고, explain이 그 문서를 근거로 모은다.
   if (available.has("explain") && MAINT_PROCEDURE_RE.test(instruction)) {
     return { tool: "explain", args: { topic: maintenanceTopicOf(instruction) } };
+  }
+
+  // 보안장비 **운영 설정을 어떻게 보나** — 답은 그 제품의 사내 매뉴얼에 있다.
+  //   실측(2026-08-03): "WAF 룰셋 어떻게 확인해?"에 LLM이
+  //   "당신이 주어진 질문에 대해서, 우선순위 판단에 관심이 있는 것으로 보입니다"로 시작하는
+  //   엉뚱한 답을 길게 늘어놓았다. 매뉴얼이 들어 있는데도 찾아보지 않은 것이다.
+  // ⚠ 좁게 잡는다: **장비·제품 낱말 + 설정 대상 + 확인/설정 동사**가 다 있어야 한다.
+  //   "어떻게 해"만으로 잡으면 내 할 일 절차(work_steps)를 가로챈다.
+  if (available.has("explain") && 제품설정질문(instruction)) {
+    return { tool: "explain", args: { topic: instruction.replace(/\s*(어떻게|어케)\s*.*$/, "").trim() || instruction } };
   }
 
   // "가장 급한 취약점 담당자·기한 배정해줘"처럼 배정/지정 지시면 우선순위 조회(today)로 못박지 않는다
@@ -900,7 +947,7 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
       const toolResults = [calls.map((c) => c.result).join("\n"), ctx ? `직전 대상 자산 ${ctx.assetId} 취약점 ${ctx.finding}` : ""].filter(Boolean).join("\n");
       const approval = buildApproval(tool, args, instruction, toolResults);
       // 방금 다룬 취약점을 기억(후속 "아까 그거"용) — assetId·finding 인자가 있는 도구만.
-      if (args.assetId && args.finding) setLastTarget(args.assetId, args.finding, tool.label);
+      if (args.assetId && args.finding) setLastTarget(args.assetId, args.finding, tool.label, scope?.대화);
       emitCollaboration({ from: "orchestrator", to: "orchestrator", message: `승인 대기: ${tool.label} — 값 검토 요청` });
       return { output: approvalMessage(approval), toolCalls: calls, approval };
     } else {
