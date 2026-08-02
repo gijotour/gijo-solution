@@ -335,8 +335,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     return (
       '<div class="cat"><div class="cat-title">🤖 AI 보안 (OWASP LLM Top 10)</div>' +
       '<div class="tiles">' +
-      aiTile("AI 자산", a.aiAssets, "#c9b8ff", "LLM·모델 자산", "assethub.html") +
-      aiTile("OWASP LLM 미대응", a.owaspOpen, a.owaspOpen ? "#f5928a" : "var(--teal)", top, "assethub.html") +
+      aiTile("AI 자산", a.aiAssets, "#c9b8ff", "LLM·모델 자산", "inventory.html") +
+      aiTile("OWASP LLM 미대응", a.owaspOpen, a.owaspOpen ? "#f5928a" : "var(--teal)", top, "inventory.html") +
       aiTile("AI-BOM 생성률", bomRate + "%", bomRate >= 80 ? "var(--teal)" : bomRate >= 40 ? "var(--amber)" : "#f5928a", a.aibomComplete + "/" + a.aiAssets + " 자산", "sbom.html") +
       aiTile("레드팀 견고성", robust, robustCol, a.redteamTested + "/" + a.aiAssets + " 점검됨", "redteam.html") +
       "</div></div>"
@@ -532,7 +532,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     // 상세 지표 각 섹션 → 관련 화면 연결(타일·추세카드·제목 링크 모두 이동).
     // 제목의 고유 토큰으로 대상 화면을 판별한다(개별 tile 호출을 건드리지 않는 방식).
     const SECTION_PAGE = [
-      { key: "자산 위험도", page: "assethub.html" },   // 🖥 → 자산 허브
+      { key: "자산 위험도", page: "inventory.html" },   // 🖥 → 자산 허브
       { key: "취약점 승인", page: "approvals.html" },   // 🔎 → 조치·승인
       { key: "유지보수", page: "products.html" },       // 🔧 → 보안제품 등록부
       { key: "CTI", page: "threat.html" },              // 🎯 → 위협 인텔

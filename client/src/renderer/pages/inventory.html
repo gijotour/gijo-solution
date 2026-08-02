@@ -208,6 +208,30 @@
   .group-label{font-size:12.5px;font-weight:800;color:var(--text);}
   .group-count{font-size:12px;font-weight:800;color:var(--blue-light);background:rgba(59,130,246,0.16);padding:1px 7px;border-radius:20px;margin-left:8px;}
   .group-hint{font-size:12.25px;color:var(--muted-2);margin-left:10px;}
+  /* 줄 바로 아래 자세히 — 오른쪽 패널이 아니라 **누른 자리 밑**에 가로로 꽉 차게.
+     오른쪽에 띄우면 눈이 좌우로 왔다 갔다 하고, 좁은 창에서는 글자가 눌린다. */
+  tr.asset-open > td{background:rgba(59,130,246,.10);}
+  tr.asset-detail > td{background:var(--panel-2);padding:12px 14px;border-bottom:1px solid var(--border);}
+  .ad-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:9px;}
+  .ad-cell{background:var(--panel);border:1px solid var(--border);border-radius:7px;padding:6px 9px;}
+  .ad-cell .l{font-size:11.5px;color:var(--muted-2);} .ad-cell .v{font-size:12.75px;font-weight:700;margin-top:1px;}
+  .ad-sec{margin-top:7px;} .ad-sec .h{font-size:11.75px;color:var(--muted);font-weight:700;margin-bottom:4px;}
+  .ad-row{display:flex;gap:8px;align-items:center;padding:3px 0;font-size:12.25px;border-bottom:1px solid rgba(255,255,255,.04);}
+  .ad-row .code{font-size:11.25px;font-weight:800;color:#c9b8ff;background:rgba(139,124,240,.14);padding:1px 6px;border-radius:5px;flex:0 0 auto;}
+  .ad-tag{font-size:11px;font-weight:800;padding:1px 6px;border-radius:5px;flex:0 0 auto;}
+  .ad-tag.critical{background:rgba(226,72,61,.16);color:#f5928a;}
+  .ad-tag.high{background:rgba(247,199,119,.14);color:#f7c777;}
+  .ad-tag.medium{background:rgba(143,184,255,.14);color:#8fb8ff;}
+  .ad-tag.low{background:var(--panel);color:var(--muted-2);}
+  .ad-tag.open{background:rgba(226,72,61,.16);color:#f5928a;}
+  .ad-tag.covered{background:rgba(30,185,128,.14);color:#6fdcb5;}
+  .ad-tag.na{background:var(--panel);color:var(--muted-2);}
+  .ad-act{display:flex;gap:6px;margin-top:9px;padding-top:8px;border-top:1px solid var(--border);flex-wrap:wrap;}
+  .ad-act button{background:var(--panel);border:1px solid var(--border);color:var(--text);border-radius:7px;padding:4px 10px;font-size:12.25px;cursor:pointer;}
+  .ad-act button.pri{background:rgba(59,130,246,.16);border-color:rgba(59,130,246,.45);color:var(--blue-light);}
+  .ad-ask{font-size:11.75px;color:var(--muted-2);margin-top:7px;}
+  .ad-ask code{background:var(--panel);border:1px solid var(--border);border-radius:5px;padding:1px 6px;color:var(--blue-light);}
+  .ad-empty{font-size:12.25px;color:var(--muted-2);padding:4px 0;}
 </style>
 </head>
 <body>
@@ -261,6 +285,11 @@
       <div class="kpi-mini"><div class="kpi-mini-label">중위험</div><div class="kpi-mini-value" id="kpiMid" style="color:#f7c777">-</div></div>
       <div class="kpi-mini"><div class="kpi-mini-label">저위험</div><div class="kpi-mini-value" id="kpiLow" style="color:#6fdcb5">-</div></div>
       <div class="kpi-mini"><div class="kpi-mini-label">SBOM 미생성</div><div class="kpi-mini-value" id="kpiNoSbom" style="color:var(--amber)">-</div></div>
+      <!-- 「자산 통합 뷰」에서 옮겨 온 3지표(2026-08-02 화면 통합). 같은 자산을 두 화면에서
+           보던 것을 하나로 합쳤다 — 두 화면의 숫자가 다르면 담당자는 둘 다 못 믿는다. -->
+      <div class="kpi-mini"><div class="kpi-mini-label">종합 노출도</div><div class="kpi-mini-value" id="kpiExposure">-</div></div>
+      <div class="kpi-mini"><div class="kpi-mini-label">AI 위험(미대응)</div><div class="kpi-mini-value" id="kpiOwasp" style="color:#c9b8ff">-</div></div>
+      <div class="kpi-mini"><div class="kpi-mini-label">미조치 취약점</div><div class="kpi-mini-value" id="kpiOpenVuln">-</div></div>
     </div>
 
     <!-- 부가 패널도 기본 펼침(2026-08-02 사용자 지시 — 접어 두면 있는 것을 못 본다).
@@ -701,6 +730,118 @@
       visibleCols.map((id) => `<th>${esc(COL_LABEL[id] || id)}</th>`).join("") +
       `<th></th>`;
   }
+
+  // ── 자산 상세 — 「자산 통합 뷰」에서 옮겨 왔다 (2026-08-02 화면 통합) ──────────
+  //
+  // 왜 합쳤나: 같은 자산을 「자산 목록」(표)과 「자산 통합 뷰」(점수+오른쪽 상세) 두 화면에서
+  //   봤다. 담당자는 어느 쪽이 진짜인지 매번 판단해야 했고, 두 화면의 숫자가 다르면 둘 다
+  //   못 믿는다. 바탕은 표(직접 설계한 것)로 두고 상세만 흡수한다.
+  //
+  // ⚠ 상세는 **오른쪽 패널이 아니라 누른 줄 바로 아래**에 가로로 꽉 차게 편다
+  //   (사용자 지시: "세부항목클릭시 하단이나 링크가 바로 아래에 나오게").
+  // ⚠ 바꾸는 일(담당자 지정 등)은 **대화창에서** 한다 — 이 제품의 핵심 원칙이다.
+  //   여기 버튼은 **가서 보기**만 한다.
+  let 펼친자산 = null;
+
+  function 자산상세닫기() {
+    펼친자산 = null;
+    document.querySelectorAll("tr.asset-detail").forEach((el) => el.remove());
+    document.querySelectorAll("tr.asset-open").forEach((el) => el.classList.remove("asset-open"));
+  }
+
+  async function 자산상세펼치기(tr, id) {
+    const 이미 = 펼친자산 === id;
+    자산상세닫기();
+    if (이미) return;                       // 같은 줄을 다시 누르면 접는다
+    펼친자산 = id;
+    tr.classList.add("asset-open");
+    const colspan = visibleCols.length + 2;
+    const row = document.createElement("tr");
+    row.className = "asset-detail";
+    row.innerHTML = `<td colspan="${colspan}"><div class="ad-empty">불러오는 중…</div></td>`;
+    tr.after(row);
+    try {
+      const d = await window.gijo.assetHubDetail(id);
+      // 화면을 그리는 사이에 다른 줄을 눌렀으면 버린다(늦게 온 응답이 새 상세를 덮지 않게).
+      if (펼친자산 !== id || !row.isConnected) return;
+      row.firstChild.innerHTML = 자산상세HTML(d);
+      묶기(row, d);
+    } catch (e) {
+      // 조용히 사라지지 않게 — 왜 안 나오는지 그 자리에 적는다.
+      if (row.isConnected) row.firstChild.innerHTML = `<div class="ad-empty">상세를 불러오지 못했습니다 — ${esc(e && e.message ? e.message : String(e))}</div>`;
+    }
+  }
+
+  function 자산상세HTML(d) {
+    const r = d.row || {};
+    const 미대응 = (d.owasp || []).filter((o) => o.status === "open");
+    const 칸 = (l, v) => `<div class="ad-cell"><div class="l">${esc(l)}</div><div class="v">${v}</div></div>`;
+    const 없으면 = (v) => (v && String(v).trim() ? esc(v) : '<span style="color:var(--muted-2)">—</span>');
+    let h = `<div class="ad-grid">` +
+      칸("유형 / ID", esc(r.assetType || "-") + " · " + esc(r.id || "")) +
+      칸("소유부서", 없으면(r.owner)) +
+      칸("등록 출처", r.sourceFile ? "📄 " + esc(r.sourceFile) : "🖐 직접 등록") +
+      칸("지원 서비스", 없으면(r.service)) +
+      `</div>`;
+
+    // 취약점 — 없으면 없다고 쓴다(빈칸으로 두면 못 본 것인지 없는 것인지 모른다).
+    const fs2 = d.findings || [];
+    h += `<div class="ad-sec"><div class="h">🩹 취약점 ${fs2.length}건</div>` +
+      (fs2.length
+        ? fs2.slice(0, 8).map((f) => `<div class="ad-row"><span class="ad-tag ${esc(f.severity)}">${esc(f.severity)}</span>` +
+            `<span>${esc(f.title)}</span>${f.kev ? '<span class="ad-tag critical">KEV</span>' : ""}` +
+            `<span style="margin-left:auto;color:var(--muted-2)">${esc(f.state)}</span></div>`).join("")
+        : '<div class="ad-empty">미조치 취약점이 없습니다 👍</div>') + `</div>`;
+
+    // AI 위험 — AI 자산일 때만. 아닌 자산에 빈 칸을 두면 있어야 하는데 없는 것처럼 보인다.
+    if (r.isAi) {
+      h += `<div class="ad-sec"><div class="h">🤖 AI 위험 (OWASP LLM) — 미대응 ${미대응.length}건</div>` +
+        ((d.owasp || []).length
+          ? (d.owasp || []).slice(0, 6).map((o) => `<div class="ad-row"><span class="code">${esc(o.code)}</span>` +
+              `<span>${esc(o.title)}</span><span class="ad-tag ${esc(o.status)}" style="margin-left:auto">` +
+              `${o.status === "open" ? "미대응" : o.status === "covered" ? "대응" : "해당없음"}</span></div>`).join("")
+          : '<div class="ad-empty">평가된 항목이 없습니다</div>') + `</div>`;
+    }
+
+    h += `<div class="ad-act">` +
+      `<button class="pri" data-go="vulnscan.html?host=${encodeURIComponent(r.id || "")}">이 자산 취약점 보기</button>` +
+      (r.isAi ? `<button data-go="sbom.html">AI-BOM 보기</button>` : "") +
+      (r.host ? `<button data-go="terminal.html?host=${encodeURIComponent(r.host)}">명령창으로 접속</button>` : "") +
+      `<button data-close="1">닫기</button></div>`;
+    h += `<div class="ad-ask">바꾸는 일은 대화창에서 합니다 — ` +
+      `<code>${esc(r.name || r.id || "이 자산")} 담당부서 지정해줘</code> · ` +
+      `<code>이 자산 취약점 담당자 배정해줘</code></div>`;
+    return h;
+  }
+
+  function 묶기(row, d) {
+    row.querySelectorAll("[data-go]").forEach((b) =>
+      b.addEventListener("click", (e) => { e.stopPropagation(); window.gijo.navigateTo(b.dataset.go); }));
+    row.querySelectorAll("[data-close]").forEach((b) =>
+      b.addEventListener("click", (e) => { e.stopPropagation(); 자산상세닫기(); }));
+  }
+
+  // 「자산 통합 뷰」의 요약 3지표. 못 받으면 **비운다**(0으로 채우면 "없다"가 되어 거짓이다).
+  async function 통합요약불러오기() {
+    try {
+      const o = await window.gijo.assetHub();
+      const s2 = o && o.summary;
+      if (!s2) return;
+      const ex = document.getElementById("kpiExposure");
+      if (ex) {
+        ex.textContent = s2.overallExposure;
+        ex.style.color = s2.overallExposure >= 45 ? "#f5928a" : s2.overallExposure >= 18 ? "#8fb8ff" : "#6fdcb5";
+      }
+      const ow = document.getElementById("kpiOwasp");
+      if (ow) ow.textContent = (s2.owaspOpenByCode || []).reduce((a, x) => a + (x.count || 0), 0);
+      const ov = document.getElementById("kpiOpenVuln");
+      if (ov) {
+        ov.textContent = s2.vuln.open;
+        ov.style.color = s2.vuln.critical > 0 ? "#f5928a" : s2.vuln.open > 0 ? "#f7c777" : "#6fdcb5";
+      }
+    } catch (e) { /* 못 받으면 "-" 그대로 둔다 */ }
+  }
+
   function render() {
     const filtered = sortByPriority(applyFilters(allAssets));
     const rankedById = new Map(coverage.ranked.map((r) => [r.id, r]));
@@ -734,6 +875,7 @@
         }).join("");
       }
     }
+    자산상세닫기();   // 다시 그리면 펼친 상세는 사라진다 — 상태도 같이 지운다
     renderToolbar(); // 카테고리 트리 → 툴바 드롭다운·칩(2026-07-26)
     const originNote = { real: "전체 자산", scanner: "스캐너 탐지분", registered: "연동자산" }[activeOrigin] || "전체 자산";
     paginationLabel.textContent = `${originNote} 기준 ${filtered.length}건 표시 · 등록된 자산 전체 ${allAssets.filter((a) => a.origin !== "sample").length}건`;
@@ -1102,6 +1244,7 @@
     render();
     // 부가 패널이 접혀 있으면 서비스 영향도를 부르지 않는다 — 안 보이는 걸 계산할 이유가 없다.
     if (document.getElementById("extraPanels").style.display !== "none") loadServiceImpact();
+    통합요약불러오기();   // 「자산 통합 뷰」에서 옮겨 온 3지표(2026-08-02 화면 통합)
   }
 
   // 서버가 스캔 완료 · SBOM 생성 · 자산 등록 시점마다 WebSocket으로 밀어주는 asset:updated를
@@ -1276,7 +1419,26 @@
     }
   }
 
+  // 줄을 누르면 그 아래에 상세를 편다. **위임**으로 단다 — 표는 매번 다시 그려지므로
+  // 줄마다 달면 다시 그릴 때 리스너가 사라진다(눌러도 아무 일 없는 자리가 된다).
+  function 줄클릭묶기() {
+    const tb = document.getElementById("assetRows");
+    if (!tb || tb.dataset.rowClickBound) return;
+    tb.dataset.rowClickBound = "1";
+    tb.addEventListener("click", (e) => {
+      const t = e.target;
+      // 고르거나 누르러 온 것이면 상세를 열지 않는다.
+      if (t.closest("input, button, a, select, .asset-detail")) return;
+      const tr = t.closest("tr");
+      if (!tr || tr.classList.contains("group-head") || tr.classList.contains("asset-detail")) return;
+      const cb = tr.querySelector(".asset-cb");
+      if (!cb) return;                       // 자산 줄이 아니다(안내 줄 등)
+      자산상세펼치기(tr, cb.dataset.id);
+    });
+  }
+
   async function init() {
+    줄클릭묶기();
     tick();
     setInterval(tick, 30000);
     await loadUser();

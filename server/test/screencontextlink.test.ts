@@ -66,9 +66,12 @@ describe("★ 특정 항목을 누르면 그 항목으로 좁혀 간다", () => 
     expect(src).toContain("vulnscan.html\" + (id && id !== \"1\" ? `?host=");
   });
 
-  it("자산 통합 뷰의 '취약점 화면' 링크도 그 자산을 지목한다", () => {
-    const src = read("assethub.html");
-    expect(src).toContain('vulnscan.html?host=${encodeURIComponent(r.id)}');
+  // 「자산 통합 뷰」는 2026-08-02에 자산 목록으로 합쳤다 — 코드가 옮겨 왔으니 시험도 옮긴다.
+  // ⚠ 지목해서 보내지 않으면 전체 호스트 목록이 열려, 방금 보던 자산을 수십 개 중에서
+  //   다시 찾아야 한다(2026-07-31 사용자 지적).
+  it("자산 목록의 '이 자산 취약점 보기'가 그 자산을 지목한다", () => {
+    const src = read("inventory.html");
+    expect(src).toContain('vulnscan.html?host=' + '$' + '{encodeURIComponent(r.id');
   });
 
   it("보안제품의 '이 제품 점검'이 제품명을 실어 보낸다", () => {

@@ -164,7 +164,7 @@ const GUIDES: WorkGuide[] = [
     label: "새 자산 등록",
     steps: [
       { kind: "open", title: "자산 등록하기", desc: "새로 들어온 서버·장비를 목록에 넣습니다(CSV로 한꺼번에도 됩니다)", page: "inventory.html" },
-      { kind: "open", title: "전체 그림에서 확인하기", desc: "등록한 자산이 분류·담당자와 함께 제대로 잡혔는지 봅니다", page: "assethub.html" },
+      { kind: "open", title: "전체 그림에서 확인하기", desc: "등록한 자산이 분류·담당자와 함께 제대로 잡혔는지 봅니다", page: "inventory.html" },
       { kind: "ask", title: "무엇을 점검해야 하는지 묻기", desc: "이 유형의 자산은 어떤 점검이 필요한지 확인합니다", question: "새로 등록한 자산은 뭘 점검해야 해?" },
     ],
   },
@@ -194,7 +194,7 @@ const GUIDES: WorkGuide[] = [
       //   했나"를 못 대면 보고도 재발방지도 못 한다. 그래서 확인 → 기록 → 조치 → 정리 순이다.
       { kind: "open", title: "무슨 일인지 확인하기", desc: "통합 관제에서 지금 올라온 이벤트와 로그를 봅니다", page: "analysis.html" },
       { kind: "ask", title: "대응 절차 물어보기", desc: "이 상황에서 무엇부터 해야 하는지 사내 절차로 답합니다", question: "침해사고가 의심될 때 대응 절차를 알려줘" },
-      { kind: "open", title: "영향받는 자산 좁히기", desc: "어느 자산이 걸렸는지 확인합니다", page: "assethub.html" },
+      { kind: "open", title: "영향받는 자산 좁히기", desc: "어느 자산이 걸렸는지 확인합니다", page: "inventory.html" },
       { kind: "open", title: "조치 올리고 승인받기", desc: "차단·격리 같은 조치는 승인을 거쳐 실행합니다", page: "approvals.html" },
       { kind: "open", title: "사고 보고서 만들기", desc: "경위·조치·재발방지를 문서로 남깁니다", page: "report.html" },
     ],

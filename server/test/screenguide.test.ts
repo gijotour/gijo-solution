@@ -136,9 +136,9 @@ describe("패널 단위 상세 안내", () => {
 // 실측 배경: "표시 이름은 어떻게 바꿔?"가 HELP_RE에 안 걸려 RAG로 새고 엉뚱한 벤더 매뉴얼로 답했다.
 describe("패널 이름 기반 도움말 의도", () => {
   it("패널명 + 설명 요구 말투면 도움말로 인정한다(현재 화면 기준)", () => {
-    expect(isHelpIntent("표시 이름은 어떻게 바꿔?", "assethub.html")).toBe(true);
-    expect(isHelpIntent("진행내역 리포트가 뭐야?", "assethub.html")).toBe(true);
-    expect(isHelpIntent("파일별 보기 사용법 알려줘", "assethub.html")).toBe(true);
+    expect(isHelpIntent("표시 이름은 어떻게 바꿔?", "inventory.html")).toBe(true);
+    expect(isHelpIntent("진행내역 리포트가 뭐야?", "inventory.html")).toBe(true);
+    expect(isHelpIntent("출처 파일 보기 사용법 알려줘", "inventory.html")).toBe(true);
   });
 
   it("해당 화면에 없는 패널명이면 인정하지 않는다", () => {
@@ -146,7 +146,7 @@ describe("패널 이름 기반 도움말 의도", () => {
   });
 
   it("패널명이 있어도 설명 요구가 아니면 도구가 처리하게 남긴다", () => {
-    expect(isHelpIntent("표시 이름 목록 CSV로 내려줘", "assethub.html")).toBe(false);
+    expect(isHelpIntent("표시 이름 목록 CSV로 내려줘", "inventory.html")).toBe(false);
   });
 
   // 곤란을 털어놓는 말투도 안내를 구하는 것이다 — "복구 코드 잃어버렸어"에 일반 LLM이
@@ -159,7 +159,7 @@ describe("패널 이름 기반 도움말 의도", () => {
   it("⚠ 구역 이름이 없는 하소연은 여전히 도구·LLM 몫이다(안내로 가로채지 않는다)", () => {
     expect(isHelpIntent("스캔 실패했어", "settings.html")).toBe(false);
     expect(isHelpIntent("서버가 안 보여", "kpi.html")).toBe(false);
-    expect(isHelpIntent("자산을 못 찾겠어", "assethub.html")).toBe(false);
+    expect(isHelpIntent("자산을 못 찾겠어", "inventory.html")).toBe(false);
   });
 
   it("화면을 모르면 기존 HELP_RE만 적용된다", () => {
@@ -168,7 +168,7 @@ describe("패널 이름 기반 도움말 의도", () => {
   });
 
   it("패널 상세를 물으면 그 패널 설명만 답한다", () => {
-    const out = formatScreenGuide("assethub.html", "표시 이름은 어떻게 바꿔?");
+    const out = formatScreenGuide("inventory.html", "표시 이름은 어떻게 바꿔?");
     expect(out).toContain("표시 이름");
     expect(out).toContain("원래대로");
     expect(out).not.toContain("파일별 보기 —"); // 다른 패널 설명이 섞이지 않는다
@@ -214,15 +214,15 @@ describe("screenguide — /api/screen-guide 라우트", () => {
   });
 
   it("화면 이름을 주면 그 화면 안내를 그대로 준다", async () => {
-    const res = await request(app).get("/api/screen-guide?screen=assethub.html").set("Authorization", `Bearer ${token}`);
+    const res = await request(app).get("/api/screen-guide?screen=inventory.html").set("Authorization", `Bearer ${token}`);
     expect(res.status).toBe(200);
-    expect(res.body.title).toBe(getScreenGuide("assethub.html").title);
-    expect(res.body.text).toBe(formatScreenGuide("assethub.html"));
+    expect(res.body.title).toBe(getScreenGuide("inventory.html").title);
+    expect(res.body.text).toBe(formatScreenGuide("inventory.html"));
   });
 
   it("구역 이름을 함께 주면 그 구역 설명만 준다", async () => {
     const res = await request(app)
-      .get("/api/screen-guide?screen=assethub.html&question=" + encodeURIComponent("표시 이름은 어떻게 바꿔?"))
+      .get("/api/screen-guide?screen=inventory.html&question=" + encodeURIComponent("표시 이름은 어떻게 바꿔?"))
       .set("Authorization", `Bearer ${token}`);
     expect(res.status).toBe(200);
     expect(res.body.text).toContain("표시 이름");
@@ -230,7 +230,7 @@ describe("screenguide — /api/screen-guide 라우트", () => {
   });
 
   it("인증 없이는 열리지 않는다", async () => {
-    const res = await request(app).get("/api/screen-guide?screen=assethub.html");
+    const res = await request(app).get("/api/screen-guide?screen=inventory.html");
     expect(res.status).toBe(401);
   });
 });

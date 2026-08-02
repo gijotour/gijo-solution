@@ -50,7 +50,6 @@ const 본업질문 = {
   "report.html": "이번 달 보안 리포트 만들어줘",
   "kpi.html": "우리 보안 점수 어때?",
   "compliance.html": "컴플라이언스 대응 안 된 항목 알려줘",
-  "assethub.html": "위험도 높은 자산 알려줘",
   "inventory.html": "우리 자산 몇 대야?",
   "sbom.html": "AI-BOM이 뭐야?",
   "vulnscan.html": "미조치 취약점 알려줘",
