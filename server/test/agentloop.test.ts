@@ -118,7 +118,11 @@ describe("runAgentLoop — 결정→실행→최종답변", () => {
       .mockResolvedValueOnce("등록된 자산은 1개입니다: fraud-detect-llm"); // 최종 재작성(chat)
     const r = await runAgentLoop("자산 몇 개야?");
     expect(r).not.toBeNull();
-    expect(r!.output).toBe("등록된 자산은 1개입니다: fraud-detect-llm");
+    // LLM이 다시 쓴 문장이 그대로 앞에 온다. 뒤에 붙는 「다음 단계」 한 줄은 규칙으로 만든
+    // 고정 문장이라 재작성이 아니다 — 이 시험이 지키는 것은 **재작성 경로를 탔는가**이고,
+    // 그건 아래 mockChat 호출 3회(결정2 + 재작성1)로 직접 못 박는다.
+    expect(r!.output.startsWith("등록된 자산은 1개입니다: fraud-detect-llm")).toBe(true);
+    expect(r!.output).toContain("▸ 다음 단계 ② 우선순위");
     expect(r!.toolCalls).toHaveLength(1);
     expect(r!.toolCalls[0].tool).toBe("list_assets");
     expect(r!.toolCalls[0].result).toContain("fraud-detect-llm");
@@ -136,7 +140,12 @@ describe("runAgentLoop — 결정→실행→최종답변", () => {
     const r = await runAgentLoop("오늘 뭐부터 조치해야 해?");
     expect(r).not.toBeNull();
     expect(r!.toolCalls[0].tool).toBe("today");
-    expect(r!.output).toBe(r!.toolCalls[0].result); // directAnswer라 그대로
+    // directAnswer라 도구 결과가 **그대로** 앞에 온다. 2026-08-02부터 뒤에 「다음 단계」
+    // 한 줄이 붙는다 — 이건 규칙으로 만든 고정 문장이라 LLM 재작성이 아니다.
+    // ⚠ 이 시험이 지키는 것은 "글자 수가 안 변한다"가 아니라 **"LLM이 다시 안 쓴다"**이고,
+    //   그건 아래 mockChat 미호출로 직접 못 박는다.
+    expect(r!.output.startsWith(r!.toolCalls[0].result)).toBe(true);
+    expect(r!.output).toContain("▸ 다음 단계 ③ 조치");
     expect(mockChat).not.toHaveBeenCalled(); // LLM 라우팅 흔들림 원천 차단
   });
 
@@ -149,8 +158,10 @@ describe("runAgentLoop — 결정→실행→최종답변", () => {
     const r = await runAgentLoop("위험 순위 목록 보여줘");
     expect(r).not.toBeNull();
     expect(r!.toolCalls[0].tool).toBe("today");
-    // 최종 답 = today 결과 그대로. LLM 재작성이 없다 = 멈춤 원천 차단.
-    expect(r!.output).toBe(r!.toolCalls[0].result);
+    // 최종 답 = today 결과 그대로(+규칙으로 붙인 「다음 단계」 한 줄). LLM 재작성이 없다 =
+    // 멈춤 원천 차단 — 그 성질은 아래 호출 1회로 못 박는다.
+    expect(r!.output.startsWith(r!.toolCalls[0].result)).toBe(true);
+    expect(r!.output).toContain("▸ 다음 단계");
     // 호출 1회(결정) — 2026-07-30부터 directAnswer 도구가 성공하고 조회만 요구한 지시면
     // "더 할 일 있나?"를 다시 묻지 않는다. 그 한 번이 프롬프트 3천 토큰을 다시 읽느라 5초 넘게
     // 걸렸고 결과는 바뀌지 않았다(실측). 예전엔 2회였다 — 줄어든 것이 이 시험의 취지에 맞다.

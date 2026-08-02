@@ -35,6 +35,7 @@ import { registerBriefingRoutes } from "./engine/briefing";
 import { registerUndoRoutes } from "./engine/undo";
 import { registerRedteamRoutes } from "./engine/redteam";
 import { registerGuardrailRoutes } from "./engine/guardrail";
+import { registerWorkflowRoutes } from "./engine/workflow";
 import { registerAnalysisHubRoutes } from "./engine/analysishub";
 import { registerModelLicenseRoutes } from "./engine/modellicense";
 import { registerPreflightRoutes } from "./engine/preflight";
@@ -163,6 +164,7 @@ export function createApp(): Express {
   registerUndoRoutes(app);
   registerRedteamRoutes(app);
   registerGuardrailRoutes(app);
+  registerWorkflowRoutes(app);   // 업무 절차 5단계 현황(절차 띠가 읽는다)
   registerAnalysisHubRoutes(app);
   registerModelLicenseRoutes(app);
   registerPreflightRoutes(app);

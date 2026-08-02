@@ -210,6 +210,68 @@ const DENIAL_RE = /찾을 수 없|찾지 못|정보가 없|확인되지 않|해�
 const EMPTY_RESULT_RE = /찾지 못했습니다|못 찾았습니다|없습니다|0건|해당 없음/;
 
 /**
+ * 답 끝에 **「다음 단계」 한 줄**을 붙인다 (2026-08-02 업무 절차 개편).
+ *
+ * 왜: 메뉴를 절차로 바꾸고 화면에 절차 띠를 달아도, 담당자는 **이 답 다음에 뭘 하는지**를
+ *   여전히 스스로 알아야 한다. 대화창이 데려가야 절차가 실제로 돈다
+ *   (사용자 지시: "대화창 가이드라인으로 쉽게 업무 보고 리포트까지 전과정을 볼 수 있어야").
+ *
+ * ⚠ 무엇을 했는지 **모르면 안 붙인다**. 아무 데나 "다음은 조치입니다"를 붙이면 맞는 말 같지만
+ *   틀린 안내가 되고, 그런 안내는 한 번만 틀려도 담당자가 다시는 안 믿는다.
+ * ⚠ 쓰기 도구(결재판)는 그 자리에서 이미 다음 할 일을 말한다 — 여기서 두 번 말하지 않는다.
+ * ⚠ **관문(guardAgainstDenial) 안에 넣지 말 것.** 관문은 거짓 부정을 되돌리는 순수 함수다.
+ *   한 번 거기에 끼워 넣었다가 관문 시험이 깨졌다(2026-08-02) — 시험이 옳았다. 이 안내는
+ *   **사람에게 나가는 마지막 조립 자리**에서만 붙인다.
+ * ⚠ 여기 적는 도구 이름은 **실제로 있는 도구**여야 한다. 처음엔 hardening_status·asset_status를
+ *   적어 뒀는데 둘 다 없는 도구였다 — 없는 이름은 영원히 안 걸려 그 안내가 아무 데도 안 나오고,
+ *   기능 QA로는 절대 안 잡힌다. nextstep.test.ts가 도구 목록과 대조해 막는다.
+ */
+export const 도구단계: Record<string, { 다음: string; 말: string }> = {
+  // ① 발견·수집 → ② 우선순위 (뭐가 있는지 봤으면, 다음은 무엇부터냐)
+  search: { 다음: "② 우선순위", 말: '무엇부터 볼지 정하려면 "지금 가장 급한 취약점 알려줘"' },
+  list_assets: { 다음: "② 우선순위", 말: '이 자산들의 취약점을 보려면 "미조치 취약점 뭐 있어?"' },
+  get_asset: { 다음: "② 우선순위", 말: '이 자산에서 뭘 먼저 할지는 "이 자산 취약점 우선순위 알려줘"' },
+  analysis_status: { 다음: "② 우선순위", 말: '들어온 것 중 급한 것을 보려면 "지금 가장 급한 취약점 알려줘"' },
+  threats: { 다음: "② 우선순위", 말: '우리 자산에 걸리는 것만 보려면 "내부 자산에 영향 주는 위협 알려줘"' },
+  scan_status: { 다음: "② 우선순위", 말: '스캔 결과를 우선순위로 보려면 "오늘 뭐부터 조치해야 해?"' },
+  // ① 안에서 되돌아가는 경우 — 자산 정보가 비어 있으면 채우는 것이 먼저다
+  asset_coverage: { 다음: "① 발견", 말: '빠진 정보를 채우려면 "○○ 자산 담당부서 지정해줘"' },
+
+  // ② 우선순위 → ③ 조치 (무엇부터인지 정했으면, 다음은 누가 언제)
+  today: { 다음: "③ 조치", 말: '바로 시작하려면 "가장 급한 취약점에 담당자 배정해줘"' },
+  urgent_todo: { 다음: "③ 조치", 말: '맡길 사람을 정하려면 "이 건 담당자 ○○로 배정해줘"' },
+  finding_status: { 다음: "③ 조치", 말: '조치를 시작하려면 "이 취약점 조치 절차 알려줘"' },
+  aibom_status: { 다음: "③ 조치", 말: 'AI 자산에서 위험한 것부터 손보려면 "AI 자산 취약점 담당자 배정해줘"' },
+
+  // ③ 조치 → ④ 검증 (했다고 끝이 아니다 — 닫혔는지 확인해야 끝난다)
+  maintenance_status: { 다음: "④ 검증", 말: "끝난 점검은 점검서를 올려 승인받으면 닫힙니다" },
+  work_session_status: { 다음: "④ 검증", 말: '고친 것이 실제로 닫혔는지 "조치 검증 결과 알려줘"' },
+  remediation: { 다음: "④ 검증", 말: "조치를 마쳤으면 재스캔으로 닫혔는지 확인합니다" },
+
+  // ④ 검증 → ⑤ 보고 (확인까지 끝났으면 남는 일은 보고다)
+  hardening_schedule_list: { 다음: "⑤ 보고", 말: '결과를 보고로 만들려면 "이번 주 보안 현황 리포트 만들어줘"' },
+  compliance_status: { 다음: "⑤ 보고", 말: '근거를 붙여 보고하려면 "컴플라이언스 리포트 만들어줘"' },
+
+  // ⑤ 보고 — 여기서 한 바퀴가 끝난다. 다음 바퀴는 다시 ①이다.
+  kpi_status: { 다음: "⑤ 보고", 말: '보고 문서로 뽑으려면 "이번 달 보안 KPI 리포트 만들어줘"' },
+  time_saved: { 다음: "⑤ 보고", 말: '보고에 넣으려면 "이번 달 리포트 만들어줘"' },
+};
+
+function 다음단계붙이기(answer: string, calls: AgentToolCall[]): string {
+  try {
+    if (!answer || answer.length < 20) return answer;
+    if (answer.includes("다음 단계")) return answer;   // 이미 말했으면 두 번 말하지 않는다
+    for (const c of calls) {
+      const m = 도구단계[c.tool];
+      if (m) return answer + "\n\n▸ 다음 단계 " + m.다음 + " — " + m.말;
+    }
+    return answer;   // 아는 도구가 아니면 **안 붙인다**(틀린 안내보다 없는 편이 낫다)
+  } catch {
+    return answer;
+  }
+}
+
+/**
  * 도구가 데이터를 돌려줬는데 LLM 최종답이 그것을 부정하면, 조회 결과 원문으로 되돌린다.
  * 실측(2026-07-25): search가 자산 1건·취약점 3건을 반환했는데도 7B가 "취약점 정보를 찾을 수
  * 없습니다"로 답했다. 프롬프트 강화(위 지시문)로도 재발했다 — 7B 행동 교정은 프롬프트로 하지
@@ -609,7 +671,7 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
         if (!direct) reportProgress("write", "조회 결과로 답을 쓰고 있습니다");
         const composed = direct ?? (await composeFinalAnswer(instruction, calls, context));
         reportProgress("review", "답변을 검수하고 있습니다");
-        return { output: guardAgainstDenial(composed, calls), toolCalls: calls };
+        return { output: 다음단계붙이기(guardAgainstDenial(composed, calls), calls), toolCalls: calls };
       } catch {
         /* 강제 실행 실패 시 아래 일반 루프로 폴백 */
       }
@@ -649,7 +711,7 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
       if (!direct) reportProgress("write", `조회 결과 ${calls.length}건으로 답을 쓰고 있습니다`);
       const composed = direct ?? (await composeFinalAnswer(instruction, calls, context));
       reportProgress("review", "답변을 검수하고 있습니다");
-      const output = guardAgainstDenial(composed, calls);
+      const output = 다음단계붙이기(guardAgainstDenial(composed, calls), calls);
       return { output, toolCalls: calls };
     }
 
@@ -716,13 +778,13 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
     //   않는다 — 안전한 실패 방향으로 기울여 둔다.
     const early = directAnswerFor(calls);
     if (early && !ACTION_INTENT_RE.test(instruction)) {
-      return { output: guardAgainstDenial(early, calls), toolCalls: calls };
+      return { output: 다음단계붙이기(guardAgainstDenial(early, calls), calls), toolCalls: calls };
     }
   }
 
   // 반복 상한 도달 — 지금까지 모은 결과로라도 답을 만든다(도구를 썼을 때만).
   if (calls.length === 0) return null;
   const direct = directAnswerFor(calls);
-  const output = guardAgainstDenial(direct ?? (await composeFinalAnswer(instruction, calls, context)), calls);
+  const output = 다음단계붙이기(guardAgainstDenial(direct ?? (await composeFinalAnswer(instruction, calls, context)), calls), calls);
   return { output, toolCalls: calls };
 }

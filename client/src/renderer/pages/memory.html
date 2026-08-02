@@ -1218,17 +1218,6 @@ tr:last-child td{border-bottom:none;}
     renderGraph(allTriples);
   }
 
-  async function seed() {
-    const btn = document.getElementById("seedBtn");
-    btn.disabled = true; btn.textContent = "불러오는 중...";
-    try {
-      const r = await window.gijo.seedOntology();
-      btn.textContent = `✓ ${r.inserted}건 불러옴`;
-      document.getElementById("filterSubject").value = "";
-      await refresh();
-    } catch (e) { btn.textContent = "✗ 실패 — 다시 시도"; }
-    finally { setTimeout(() => { btn.disabled = false; btn.textContent = "＋ 샘플 지식 불러오기 (KISA 위협)"; }, 2200); }
-  }
 
   async function addTriple() {
     const subject = document.getElementById("addSubject").value.trim();

@@ -444,29 +444,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   //   화면이 통째로 죽은 적이 있다(2026-08-02 실측) — 감싸는 편이 안전하고 되돌리기도 쉽다.
   (function 제품유지보수구역() {
 
-  const clockEl = (document.getElementById("clockEl") || { style:{}, classList:{add(){},remove(){},toggle(){}}, addEventListener(){}, set textContent(v){}, set innerHTML(v){} });
-  const statusPill = (document.getElementById("statusPill") || { style:{}, classList:{add(){},remove(){},toggle(){}}, addEventListener(){}, set textContent(v){}, set innerHTML(v){} });
-  const avatarBtn = (document.getElementById("avatarBtn") || { style:{}, classList:{add(){},remove(){},toggle(){}}, addEventListener(){}, set textContent(v){}, set innerHTML(v){} });
+  // ⚠ 옛 화면의 머리말(시계·서버 상태·프로필 글자)은 **지웠다** — 통합된 이 화면엔 그 칸이
+  //   없다. 처음엔 "없으면 그냥 넘어가게" 감싸 두었는데, 그건 죽은 코드를 남겨 두는 것이라
+  //   나중에 이 자리에 통보를 적으면 **아무에게도 안 보인다**(deadelements 시험이 잡아냈다).
+  //   시계·서버 상태·프로필은 이제 상단 바가 화면 하나로 보여 준다.
   let currentUser = null;
 
-  function tick() {
-    clockEl.textContent = new Date().toLocaleString("ko-KR", {
-      hour: "2-digit", minute: "2-digit", hour12: true, year: "numeric", month: "2-digit", day: "2-digit",
-    });
-  }
-  async function loadHealth() {
-    try {
-      await window.gijo.checkServerHealth();
-      statusPill.innerHTML = '<span class="dot"></span>운영중<span class="beta-tag">LIVE</span>';
-    } catch (e) {
-      statusPill.innerHTML = '<span class="dot" style="background:#e2483d"></span>서버 연결 끊김';
-    }
-  }
   async function loadUser() {
-    try {
-      currentUser = await window.gijo.me();
-      avatarBtn.textContent = (currentUser.displayName || currentUser.username || "-").charAt(0);
-    } catch (e) {}
+    // 화면 그리기(maintRowHtml)가 role로 승인 버튼을 켜고 끄므로 이 값은 여전히 필요하다.
+    try { currentUser = await window.gijo.me(); } catch (e) {}
   }
 
   const esc = (s) => String(s == null ? "" : s).replace(/</g, "&lt;");
@@ -813,9 +799,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   }
 
   async function init() {
-    tick();  // (시계는 아래 정기 점검 화면 것이 돈다)
     await loadUser(); // maintRowHtml이 currentUser.role로 승인 버튼 노출 여부를 결정하므로 먼저 기다린다.
-    loadHealth();
     document.getElementById("mDate").value = todayStr();
     loadMaintenance();
     // 좁힌 상태에서 빠져나올 길 — 없으면 그 제품 안에 갇힌다.
@@ -827,7 +811,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     loadProductOptions();
     loadNotify();
 
-    (document.getElementById("settingsBtn") || { style:{}, classList:{add(){},remove(){},toggle(){}}, addEventListener(){}, set textContent(v){}, set innerHTML(v){} }).addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => {
       el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
     });
@@ -852,6 +835,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
 <script src="dialog.js"></script>
 <script src="nav.js"></script>
+<script src="workflowrail.js"></script>
 <script src="progresscard.js"></script>
 <script src="gijomd.js"></script>
 <script src="chatparts.js"></script>

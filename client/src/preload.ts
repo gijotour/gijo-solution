@@ -246,6 +246,7 @@ const gijoApi = {
   listAssets: () => api.assetsApi.list(),
   getAsset: (id: string) => api.assetsApi.get(id),
   // 자산 허브(자산 목록·AI-BOM·취약점 통합 뷰)
+  workflowStages: () => api.workflowApi.stages(),   // 업무 절차 5단계 현황(절차 띠)
   assetHub: () => api.assetHubApi.overview(),
   assetHubDetail: (id: string) => api.assetHubApi.detail(id),
   shadowAi: () => api.assetHubApi.shadowAi(),
