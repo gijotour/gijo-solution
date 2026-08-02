@@ -151,7 +151,11 @@ describe("행동 대조 — 판정과 조립", () => {
     chatMock.mockResolvedValueOnce(JSON.stringify({ verdict: "deny", reason: "The grounds prohibit this action." }));
     const r = await runActionCheck("접속기록 보관 주기 줄여도 돼?");
     expect(r.output).toContain("× 금지"); // 판정은 유지
-    expect(r.output).toContain("한국어로 받지 못했습니다"); // 영어 설명은 그대로 내보내지 않는다
+    // ⚠ 문구가 바뀌었다(2026-08-02): "한국어로 받지 못했습니다"는 **우리 사정**이라
+    //   담당자가 알 이유가 없다. 147상황 실전 시뮬레이션이 내부 사정 노출로 잡았다.
+    //   지키는 것은 문구가 아니라 **영어 설명을 그대로 내보내지 않는다**는 성질이다.
+    expect(r.output).toContain("우리말로 정리하지 못했습니다");
+    expect(r.output, "영어 설명이 그대로 나갔다").not.toMatch(/[A-Za-z]{12,}/);
   });
 
   it("관련성 문턱을 못 넘는 조각은 근거로 쓰지 않는다", async () => {

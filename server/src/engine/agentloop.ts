@@ -257,6 +257,31 @@ export const 도구단계: Record<string, { 다음: string; 말: string }> = {
   time_saved: { 다음: "⑤ 보고", 말: '보고에 넣으려면 "이번 달 리포트 만들어줘"' },
 };
 
+/**
+ * 절차 5단계에 **속하지 않는** 조회 도구의 다음 걸음.
+ *
+ * 왜 따로 두나: 작업 기록·지식베이스·보안제품·자가 진단은 절차의 한 단계가 아니다.
+ *   여기에 "③ 조치로 가세요"를 붙이면 맞는 말 같지만 틀린 안내가 된다.
+ *   그렇다고 아무 말도 안 하면 담당자에게 **숫자만 남고 갈 곳이 없다**
+ *   (147상황 실전 시뮬레이션에서 9건이 이 모양이었다 — 가장 많은 불편).
+ *   그래서 단계 대신 **구체적인 다음 행동**을 준다.
+ */
+export const 이어서: Record<string, string> = {
+  audit_search: '이 기록을 문서로 남기려면 "이번 주 보안 현황 리포트 만들어줘"',
+  knowledge_status: "문서를 더 올리려면 대화창 아래 ＋로 파일을 올리세요",
+  product_status: '이 제품 점검을 잡으려면 "○○ 정기 점검 잡아줘"',
+  handover_status: '넘길 내용을 정리하려면 "인수인계 문서 만들어줘"',
+  system_health: "문제가 있으면 각 항목의 조치 안내를 따라가면 됩니다",
+  system_log_status: '사람이 한 일은 "기록 보기"에서 봅니다',
+  ontology_query: "관계도 전체는 「AI 지식」 화면에서 봅니다",
+  law_lookup: '우리 사내 규정과 대조하려면 "이거 해도 돼?"라고 물어보세요',
+  model_adoption_status: "모델 배정은 설정 > 서버·AI에서 바꿉니다",
+  report_schedule_list: '지금 만들려면 "이번 주 보안 현황 리포트 만들어줘"',
+  alert_schedule_status: "알림 규칙은 설정 > 연동에서 바꿉니다",
+  routine_tasks: '내 목록에 담으려면 "할 일 추가: ○○"',
+  briefing: '바로 시작하려면 "가장 급한 취약점에 담당자 배정해줘"',
+};
+
 function 다음단계붙이기(answer: string, calls: AgentToolCall[]): string {
   try {
     if (!answer || answer.length < 20) return answer;
@@ -264,6 +289,11 @@ function 다음단계붙이기(answer: string, calls: AgentToolCall[]): string {
     for (const c of calls) {
       const m = 도구단계[c.tool];
       if (m) return answer + "\n\n▸ 다음 단계 " + m.다음 + " — " + m.말;
+    }
+    // 절차 단계가 아닌 조회 도구 — 단계 번호 대신 구체적인 다음 행동을 준다.
+    for (const c of calls) {
+      const t = 이어서[c.tool];
+      if (t) return answer + "\n\n▸ 이어서 — " + t;
     }
     return answer;   // 아는 도구가 아니면 **안 붙인다**(틀린 안내보다 없는 편이 낫다)
   } catch {

@@ -11,7 +11,7 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { 도구단계 } from "../src/engine/agentloop";
+import { 도구단계, 이어서 } from "../src/engine/agentloop";
 import { listAgentTools } from "../src/engine/agenttools";
 
 const navSrc = fs.readFileSync(
@@ -58,5 +58,30 @@ describe("대화창 「다음 단계」 안내", () => {
       if (!예시있음 && !서술있음) 빈말.push(도구);
     }
     expect(빈말, `무엇을 하라는지 없는 안내:\n  ${빈말.join(", ")}`).toEqual([]);
+  });
+});
+
+// 절차 밖 조회 도구의 「이어서」 — 147상황 실전 시뮬레이션에서 가장 많았던 불편이
+// **「숫자만 주고 갈 곳 없음」 9건**이었고, 원인은 그 도구가 지도에 없어서였다.
+describe("절차 밖 도구의 「이어서」", () => {
+  it("적힌 도구가 전부 실제로 있는 도구다", () => {
+    const 있는것 = new Set(listAgentTools().map((t) => t.name));
+    const 없는것 = Object.keys(이어서).filter((k) => !있는것.has(k));
+    expect(없는것, `없는 도구 이름은 영영 안 걸린다:\n  ${없는것.join(", ")}`).toEqual([]);
+  });
+
+  it("절차 지도와 겹치지 않는다 — 겹치면 어느 쪽이 나올지 알 수 없다", () => {
+    const 겹침 = Object.keys(이어서).filter((k) => k in 도구단계);
+    expect(겹침, `같은 도구가 두 지도에 있다:\n  ${겹침.join(", ")}`).toEqual([]);
+  });
+
+  it("안내에 무엇을 하라는지가 들어 있다", () => {
+    for (const [도구, 말] of Object.entries(이어서)) {
+      expect(말.length, `${도구} 안내가 너무 짧다`).toBeGreaterThanOrEqual(12);
+    }
+  });
+
+  it("이 대조가 헛돌고 있지 않다", () => {
+    expect(Object.keys(이어서).length).toBeGreaterThanOrEqual(8);
   });
 });

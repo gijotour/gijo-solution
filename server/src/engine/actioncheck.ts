@@ -158,9 +158,9 @@ export async function runActionCheck(question: string, qa?: boolean): Promise<Ac
     trusted: true,
   }).catch(() => "");
   // 모델이 형식을 못 지키면 판정을 지어내지 않고 보류로 — 근거는 그대로 보여준다(정직 폴백).
-  const v = parseVerdict(raw) ?? { verdict: "insufficient" as const, reason: "모델 판정이 형식을 지키지 못해 보류합니다 — 아래 근거를 직접 확인하세요." };
+  const v = parseVerdict(raw) ?? { verdict: "insufficient" as const, reason: "자동 판정을 하지 못했습니다 — 아래 사내 근거를 직접 보고 판단해 주세요." };
   // 이유가 영어로 나오면(7B 실측) 판정은 유지하되 이유는 정직하게 바꾼다 — 못 읽는 설명은 없느니만 못하다.
-  if (!/[가-힣]/.test(v.reason)) v.reason = "판정 이유를 한국어로 받지 못했습니다 — 아래 근거 원문을 직접 확인하세요.";
+  if (!/[가-힣]/.test(v.reason)) v.reason = "판정 이유를 우리말로 정리하지 못했습니다 — 아래 사내 근거를 직접 보고 판단해 주세요.";
 
   const lines = [
     `【행동 대조】 ${VERDICT_LABEL[v.verdict]}`,
