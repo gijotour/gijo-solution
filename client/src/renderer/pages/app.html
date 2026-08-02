@@ -27,7 +27,14 @@
     border-bottom:1px solid var(--border);flex:0 0 auto;}
   #shellHeader .header-left{display:flex;align-items:center;gap:10px;min-width:0;flex:1;}
   #shellHeader .header-right{display:flex;align-items:center;gap:10px;flex:0 0 auto;}
-  .app{display:grid;grid-template-columns:232px minmax(0,1fr);flex:1;min-height:0;}
+  /* ⚠ **줄 높이를 못 박는다**(2026-08-02 사용자 신고: "상단 하단 고정탭 아직도 문제있음 …
+       고정값이 필요할듯"). 격자 줄은 기본이 auto라 **내용이 요구하는 만큼 늘어난다** —
+       실측에서 안쪽 내용이 900px를 요구해 854px 칸을 넘겼고, 그만큼 하단 바가 창 밖으로
+       밀려났다(하단바 위치 912 / 창 높이 900 → 안 보임).
+       minmax(0,1fr)로 두면 줄이 남는 높이만 쓰고, 넘치는 내용은 안에서 스크롤한다. */
+  .app{display:grid;grid-template-columns:232px minmax(0,1fr);grid-template-rows:minmax(0,1fr);
+    flex:1;min-height:0;overflow:hidden;}
+  .app > *{min-height:0;}
   #gijoNav{border-right:1px solid var(--border);background:var(--panel-2);min-height:0;display:flex;flex-direction:column;}
   .work{display:flex;flex-direction:column;min-width:0;min-height:0;}
 
