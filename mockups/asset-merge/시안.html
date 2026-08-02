@@ -1,0 +1,200 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>자산 화면 통합 시안 — 자산 목록 + 자산 통합 뷰</title>
+<style>
+  :root{
+    --bg:#191817; --panel:#232120; --panel-2:#1f1e1d; --border:rgba(255,255,255,.08);
+    --text:#eae7e3; --muted:#a49d95; --muted-2:#857e76; --blue:#3b82f6; --blue-light:#5fa1ff;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;background:var(--bg);color:var(--text);font:13px/1.5 "Malgun Gothic","맑은 고딕",system-ui,sans-serif;}
+  .wrap{max-width:1180px;margin:0 auto;padding:16px 18px 40px;}
+  h1{font-size:16px;margin:0 0 4px;}
+  .sub{font-size:12.5px;color:var(--muted);margin-bottom:6px;}
+  .why{background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.25);border-radius:9px;
+       padding:10px 12px;font-size:12.5px;color:var(--muted);margin:12px 0 18px;line-height:1.7;}
+  .why b{color:#fff;}
+
+  /* ── 절차 띠(실제 제품에 이미 들어간 것 — 시안에서도 자리를 보여 준다) ── */
+  .gjr{display:flex;gap:6px;margin:0 0 12px;}
+  .gjr-s{flex:1;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:7px 10px;}
+  .gjr-s.on{border-color:var(--blue);background:rgba(59,130,246,.1);}
+  .gjr-s .t{font-size:12.25px;font-weight:800;display:flex;align-items:center;gap:5px;}
+  .gjr-s .t .no{width:16px;height:16px;border-radius:4px;background:rgba(59,130,246,.2);
+       color:var(--blue-light);font-size:11px;display:inline-flex;align-items:center;justify-content:center;}
+  .gjr-s .v{font-size:11.75px;color:var(--muted-2);margin-top:2px;}
+  .gjr-s .v b{font-size:15px;color:var(--blue-light);}
+
+  /* ── ① 요약 한 줄(자산 통합 뷰에서 가져온 3지표) ── */
+  .sumbar{display:flex;gap:8px;margin:0 0 10px;}
+  .sc{flex:1;background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:7px 11px;
+      display:flex;align-items:baseline;gap:8px;}
+  .sc .l{font-size:11.75px;color:var(--muted);} .sc .v{font-size:16px;font-weight:900;margin-left:auto;}
+  .sc .u{font-size:11.5px;color:var(--muted-2);}
+  .v.warn{color:#f5928a;} .v.ok{color:#6fdcb5;}
+
+  /* ── ② 툴바 한 줄 ── */
+  .bar{display:flex;gap:6px;align-items:center;margin:0 0 8px;flex-wrap:wrap;}
+  select,input[type=text]{background:var(--panel-2);border:1px solid var(--border);color:var(--text);
+      border-radius:7px;padding:4px 8px;font-size:12.25px;}
+  .btn{background:var(--panel-2);border:1px solid var(--border);color:var(--text);border-radius:7px;
+      padding:4px 10px;font-size:12.25px;cursor:pointer;}
+  .btn.pri{background:rgba(59,130,246,.16);border-color:rgba(59,130,246,.45);color:var(--blue-light);}
+  .spacer{margin-left:auto;}
+
+  /* ── ③ 목록(공용 목록 양식) ── */
+  .gj-list{background:var(--panel);border:1px solid var(--border);border-radius:10px;
+      max-height:380px;overflow:auto;}
+  .gj-head,.gj-row{display:grid;grid-template-columns:26px 1.6fr 1.1fr .9fr .8fr .7fr 76px;
+      gap:8px;align-items:center;padding:0 10px;font-size:12.25px;}
+  .gj-head{height:28px;color:var(--muted);font-size:11.75px;font-weight:700;
+      border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--panel);}
+  .gj-row{height:30px;border-bottom:1px solid rgba(255,255,255,.04);cursor:pointer;}
+  .gj-row:hover{background:rgba(255,255,255,.03);}
+  .gj-row.on{background:rgba(59,130,246,.1);}
+  .gj-tag{font-size:11px;font-weight:800;padding:1px 6px;border-radius:5px;justify-self:start;}
+  .t-crit{background:rgba(226,72,61,.16);color:#f5928a;}
+  .t-high{background:rgba(247,199,119,.14);color:#f7c777;}
+  .t-ok{background:rgba(30,185,128,.14);color:#6fdcb5;}
+  .t-none{background:var(--panel-2);color:var(--muted-2);}
+  .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .mut{color:var(--muted-2);}
+
+  /* ── ④ 줄 바로 아래 자세히(오른쪽 패널 아님) ── */
+  .gj-detail{grid-column:1/-1;background:var(--panel-2);border-top:1px solid var(--border);
+      border-bottom:1px solid var(--border);padding:10px 12px;font-size:12.25px;}
+  .dgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:8px;}
+  .dcell{background:var(--panel);border:1px solid var(--border);border-radius:7px;padding:6px 9px;}
+  .dcell .l{font-size:11.5px;color:var(--muted-2);} .dcell .v{font-size:12.75px;font-weight:700;margin-top:1px;}
+  .dsec{margin-top:6px;}
+  .dsec .h{font-size:11.75px;color:var(--muted);font-weight:700;margin-bottom:4px;}
+  .vrow{display:flex;gap:8px;align-items:center;padding:3px 0;font-size:12.25px;
+      border-bottom:1px solid rgba(255,255,255,.04);}
+  .vrow .code{font-size:11.25px;font-weight:800;color:#c9b8ff;background:rgba(139,124,240,.14);
+      padding:1px 6px;border-radius:5px;}
+  .dact{display:flex;gap:6px;margin-top:9px;padding-top:8px;border-top:1px solid var(--border);}
+  .askline{font-size:11.75px;color:var(--muted-2);margin-top:7px;}
+  .askline code{background:var(--panel);border:1px solid var(--border);border-radius:5px;
+      padding:1px 6px;color:var(--blue-light);}
+  .note{font-size:11.75px;color:var(--muted-2);margin-top:10px;line-height:1.6;}
+  .gone{text-decoration:line-through;color:var(--muted-2);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>자산 화면 통합 — 「자산 목록」 + 「자산 통합 뷰」를 하나로</h1>
+  <div class="sub">추천 시안 1개 · 구현 전 확인용 목업(진짜 데이터 아님)</div>
+
+  <div class="why">
+    <b>왜 합치나</b> — 지금은 같은 자산을 두 화면에서 봅니다. 「자산 목록」은 표로, 「자산 통합 뷰」는
+    점수와 오른쪽 상세로. 담당자는 <b>어느 쪽이 진짜인지</b>를 매번 판단해야 하고, 두 화면의 숫자가
+    다르면 둘 다 못 믿습니다.<br>
+    <b>어떻게</b> — 바탕은 <b>자산 목록</b>(표·컬럼 고르기·카테고리는 그대로 씁니다. 직접 설계하신 것입니다).
+    통합 뷰에서 가져오는 것은 ① 맨 위 <b>요약 3지표</b>와 ② 자산 하나의 <b>구성·취약점·AI 위험 상세</b>입니다.
+    상세는 오른쪽 패널이 아니라 <b>누른 줄 바로 아래</b>에 가로로 꽉 차게 펼칩니다.<br>
+    <b>메뉴</b> — 「등록부 &gt; 자산 통합 뷰」가 없어지고 「① 발견·수집 &gt; 자산 목록」 하나만 남습니다.
+    옛 이름으로 물어도 챗봇이 알아듣게 동의어를 남깁니다.
+  </div>
+
+  <!-- 절차 띠 -->
+  <div class="gjr">
+    <div class="gjr-s on"><div class="t"><span class="no">1</span>발견·수집 ◀</div><div class="v"><b>57</b> · 오늘 신규 0</div></div>
+    <div class="gjr-s"><div class="t"><span class="no">2</span>우선순위</div><div class="v"><b>0</b> · KEV 0</div></div>
+    <div class="gjr-s"><div class="t"><span class="no">3</span>조치</div><div class="v"><b>0</b> · 미배정 0</div></div>
+    <div class="gjr-s"><div class="t"><span class="no">4</span>검증</div><div class="v"><b>29</b> · 미점검 0</div></div>
+    <div class="gjr-s"><div class="t"><span class="no">5</span>보고</div><div class="v">—</div></div>
+  </div>
+
+  <!-- ① 요약 한 줄 (통합 뷰의 3패널 → 한 줄로 눌러 담음) -->
+  <div class="sumbar">
+    <div class="sc"><span class="l">📊 종합 노출도</span><span class="v warn">62</span><span class="u">보통</span></div>
+    <div class="sc"><span class="l">🤖 AI 위험(OWASP LLM)</span><span class="v">3</span><span class="u">미대응</span></div>
+    <div class="sc"><span class="l">🩹 취약점 처리</span><span class="v ok">100%</span><span class="u">KEV 0</span></div>
+    <div class="sc"><span class="l">🗂 자산</span><span class="v">57</span><span class="u">직접 4 · 파일 53</span></div>
+  </div>
+
+  <!-- ② 툴바 -->
+  <div class="bar">
+    <select><option>전체 카테고리</option><option>인프라</option><option>AI 서비스</option></select>
+    <select><option>전체 유형</option><option>infra-host</option><option>LLM 서비스</option></select>
+    <select><option>전체 출처</option><option>📄 파일에서</option><option>🖐 직접 등록</option></select>
+    <input type="text" placeholder="자산명·호스트·IP 찾기" style="width:190px">
+    <span class="spacer"></span>
+    <button class="btn">☰ 표시 항목</button>
+    <button class="btn">⬇ CSV</button>
+  </div>
+
+  <!-- ③ 목록 + ④ 줄 아래 자세히 -->
+  <div class="gj-list">
+    <div class="gj-head">
+      <span></span><span>자산명</span><span>호스트 / IP</span><span>유형</span>
+      <span>소유부서</span><span>위험</span><span>최근 스캔</span>
+    </div>
+
+    <div class="gj-row"><input type="checkbox"><span class="nm">web-portal-01</span>
+      <span class="nm mut">portal.example.kr · 10.0.1.21</span><span class="mut">infra-host</span>
+      <span class="mut">정보보안팀</span><span class="gj-tag t-ok">양호</span><span class="mut">08-01</span></div>
+
+    <div class="gj-row on"><input type="checkbox" checked><span class="nm">fraud-detect-llm</span>
+      <span class="nm mut">ai-01.example.kr · 10.0.4.7</span><span class="mut">LLM 서비스</span>
+      <span class="mut">AI팀</span><span class="gj-tag t-crit">긴급 2</span><span class="mut">08-02</span></div>
+
+    <!-- 누른 줄 바로 아래, 가로 꽉 차게 -->
+    <div class="gj-detail">
+      <div class="dgrid">
+        <div class="dcell"><div class="l">유형 / 경로</div><div class="v">LLM 서비스 · models/fraud/model.gguf</div></div>
+        <div class="dcell"><div class="l">기본 담당자</div><div class="v">김보안</div></div>
+        <div class="dcell"><div class="l">등록 출처</div><div class="v">📄 2026-07-30_웹점검.pdf</div></div>
+        <div class="dcell"><div class="l">지원 서비스</div><div class="v">대외 웹서비스</div></div>
+      </div>
+
+      <div class="dsec">
+        <div class="h">취약점 2건 (우선순위순)</div>
+        <div class="vrow"><span class="gj-tag t-crit">critical</span><span class="code">CVE-2025-1234</span>
+          <span>인증 우회 — 외부에서 바로 닿음</span><span class="mut" style="margin-left:auto">미조치</span></div>
+        <div class="vrow"><span class="gj-tag t-high">high</span><span class="code">IW-32</span>
+          <span>데이터 평문 전송</span><span class="mut" style="margin-left:auto">조치 중</span></div>
+      </div>
+
+      <div class="dsec">
+        <div class="h">AI 위험 (OWASP LLM)</div>
+        <div class="vrow"><span class="code">LLM01</span><span>프롬프트 주입 — 가드레일 미적용</span>
+          <span class="gj-tag t-crit" style="margin-left:auto">미대응</span></div>
+        <div class="vrow"><span class="code">LLM06</span><span>민감정보 노출 — 마스킹 적용됨</span>
+          <span class="gj-tag t-ok" style="margin-left:auto">대응</span></div>
+      </div>
+
+      <div class="dact">
+        <button class="btn pri">이 자산 취약점 보기</button>
+        <button class="btn">AI-BOM 보기</button>
+        <button class="btn">명령창으로 접속</button>
+      </div>
+      <div class="askline">
+        바꾸는 일은 대화창에서 합니다 —
+        <code>fraud-detect-llm 담당자 김보안으로 지정해줘</code> ·
+        <code>이 자산 취약점 담당자 배정해줘</code>
+      </div>
+    </div>
+
+    <div class="gj-row"><input type="checkbox"><span class="nm">db-main-01</span>
+      <span class="nm mut">db01.example.kr · 10.0.2.11</span><span class="mut">infra-host</span>
+      <span class="mut">인프라팀</span><span class="gj-tag t-high">주의 1</span><span class="mut">07-29</span></div>
+    <div class="gj-row"><input type="checkbox"><span class="nm">gijo-orchestrator</span>
+      <span class="nm mut">— · —</span><span class="mut">오케스트레이터</span>
+      <span class="mut">AI팀</span><span class="gj-tag t-none">스캔 안 됨</span><span class="mut">—</span></div>
+  </div>
+
+  <div class="note">
+    <b>없어지는 것</b>: <span class="gone">등록부 &gt; 자산 통합 뷰</span> ·
+    <span class="gone">통합 뷰의 오른쪽 상세 패널</span> · <span class="gone">자산별/파일별 모드 전환</span>
+    (출처는 툴바 「전체 출처」로 거릅니다).<br>
+    <b>그대로 남는 것</b>: 표시 항목 고르기 · 카테고리 지정 · 체크박스 일괄 삭제 · CSV 내려받기 ·
+    커버리지(무엇을 모르는가) 구역.<br>
+    <b>지어내지 않는 것</b>: 스캔이 안 된 자산의 위험도는 <b>「스캔 안 됨」</b>으로 둡니다 —
+    0이나 「양호」로 칠하면 확인한 것처럼 보여 거짓이 됩니다.
+  </div>
+</div>
+</body>
+</html>

@@ -379,6 +379,48 @@ function matchesLoose(haystack: string, q: string, tokens: string[]): boolean {
   return tokens.length > 0 && tokens.every((t) => matches(haystack, t));
 }
 
+/**
+ * 이 **자산을 다룬** 사내 문서에서 취약점 대목을 발췌한다.
+ *
+ * 왜(실사고 2026-07-28 → 원인 규명 2026-08-02):
+ *   "안전대부 웹서버 취약점 알려줘"에 "finding 없음 · 스캔 실패 1건"이라고 답했다. 그런데
+ *   같은 서버의 **웹 취약점 진단 보고서**가 지식에 31조각으로 들어 있었고 거기엔 평문 전송·
+ *   디렉토리 인덱싱 등 5건이 적혀 있었다. 담당자가 이 답으로 "취약점 없음"이라고 보고하면
+ *   그것이 사고다.
+ *   원인은 **같은 질문에 잣대가 둘**이었던 것 — 자산은 낱말 하나만 걸려도 찾는데(이름에
+ *   "웹 서버"가 있다) 문서는 질문 문자열이 제목에 들어 있어야 찾았다(제목은 "웹취약점"이라
+ *   낱말이 어긋난다). 그래서 질문이 아니라 **찾은 자산으로** 문서를 다시 찾는다.
+ *
+ * ⚠ 아무 발췌나 싣지 않는다. 가져온 조각이 **그 자산을 실제로 가리키는지**(호스트명이나 자산
+ *   이름의 고유 낱말이 그 안에 있는지) 확인한 것만 남긴다 — 확인 못 한 문장을 자산 취약점으로
+ *   보여 주는 것은 없느니만 못하다.
+ */
+async function 자산문서발췌(a: { id: string; name: string }): Promise<string[]> {
+  try {
+    // 이 자산을 가리키는 표식 — 호스트명(가장 확실)과 이름 속 고유 낱말.
+    const host = a.id.replace(/^[a-z]+:/, "").trim();
+    const 일반어 = /^(웹|서버|웹서버|시스템|서비스|운영|테스트|개발|본인|인증|사이트|호스트)$/;
+    const 고유낱말 = a.name
+      .replace(/\([^)]*\)/g, " ")
+      .split(/[\s·,()]+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length >= 3 && !일반어.test(s));
+    const 표식 = [host, ...고유낱말].filter((s) => s.length >= 3);
+    if (!표식.length) return [];
+
+    const raw = await queryMemory(`${a.name} ${host} 취약점 점검 결과`, 6);
+    const { sanitizeRagChunks } = await import("./ragsanitize.js");
+    const chunks = sanitizeRagChunks(raw.map(String), { source: "tool:search-asset-doc", question: a.name }).chunks;
+    // **그 자산이 실제로 나오는 조각만** 남긴다.
+    const 확인된 = chunks
+      .map((c) => String(c).replace(/\s+/g, " ").trim())
+      .filter((c) => 표식.some((m) => c.toLowerCase().includes(m.toLowerCase())));
+    return 확인된.slice(0, 3).map((c) => `      · ${c.slice(0, 600)}`);
+  } catch {
+    return [];   // 임베딩 미기동 등 — 없는 대로 둔다(지어내지 않는다)
+  }
+}
+
 async function searchOne(q: string): Promise<string[]> {
   const out: string[] = [];
   const tokens = queryTokens(q);
@@ -403,6 +445,14 @@ async function searchOne(q: string): Promise<string[]> {
         `  · ${a.name} 취약점 ${real.length}건:`,
         ...real.slice(0, 8).map((f) => `      - [${f.severity}] ${f.finding_type}`)
       );
+    }
+    // 자산은 찾았는데 **그 자산의 취약점이 하나도 없을 때**, 그 자산을 다룬 사내 문서를 찾아 붙인다.
+    for (const a of assets.slice(0, 2)) {
+      if (a.findings.some(isRealVulnerability)) continue;   // DB에 있으면 문서를 뒤질 이유가 없다
+      const 발췌 = await 자산문서발췌(a);
+      if (발췌.length) {
+        out.push(`  · ${a.name} — 자산 DB엔 취약점이 없지만 **사내 점검 보고서**에 적혀 있습니다:`, ...발췌);
+      }
     }
   }
 
