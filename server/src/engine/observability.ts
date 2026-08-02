@@ -13,6 +13,7 @@
 //
 // 정직 규칙: 못 재는 항목은 null로 두고 "확인 불가"라고 적는다 — 모르는 것을 정상으로 세지 않는다.
 import type { Express } from "express";
+import { 말투현황줄 } from "./tonewatch";
 import fs from "fs";
 import path from "path";
 import { db, isDbEncrypted } from "../db";
@@ -354,6 +355,10 @@ export function systemHealthText(): string {
     "",
     ...h.checks.map((c) => `  ${LEVEL_MARK[c.level]} ${c.label}: ${c.detail}${c.action ? `\n      → ${c.action}` : ""}`),
   ];
+  // 말투 규범 감시 — **막지 않는 감시**라 진단 항목(ok/fail)이 아니라 참고 줄로 붙인다.
+  //   판정에 넣으면 "이상 있음"으로 읽혀 진짜 장애와 섞인다.
+  const 말투 = 말투현황줄();
+  if (말투) lines.push("", `  · ${말투}`);
   return lines.join("\n");
 }
 

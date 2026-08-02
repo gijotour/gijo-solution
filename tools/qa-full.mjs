@@ -62,6 +62,7 @@ const VERIFY_RE = /^server\/src\/engine\/(verify|vexexport|autoassign|versioncmp
 const SHELL_RE = /^client\/src\/renderer\/pages\/(app|console|dialog|dashboard|nav)\./;
 // 파일 받기는 메인 프로세스(will-download)·preload·받기 버튼이 걸린 화면이 바뀌면 다시 본다.
 // 서랍 목록(console.js)과 서랍이 기대는 결정적 경로(howto·picklist)가 바뀌면 다시 묻는다.
+const ROUTING_RE = /^server/src/engine/(agentloop|dispatcher|routes).ts$|^tools/route-explain.mjs$/;
 const DRAWER_RE = /^client\/src\/renderer\/pages\/console\.js$|^server\/src\/engine\/(howto|picklist|screenguide|workguide)\.ts$|^tools\/drawer-audit\.mjs$/;
 const DOWNLOAD_RE = /^client\/src\/(main|preload)\.ts$|^client\/src\/renderer\/pages\/(approvals|report)\.html$/;
 for (const f of changed) {
@@ -72,13 +73,14 @@ for (const f of changed) {
   else if (f.startsWith("server/")) { picks.add("vitest"); reasons.push(`${f} → 서버 단위테스트`); }
   else if (f.startsWith("client/src/")) { picks.add("client"); picks.add("sweep"); reasons.push(`${f} → 클라 실페이지·스윕`); }
   if (DRAWER_RE.test(f)) { picks.add("drawer"); reasons.push(`${f} → 서랍 약속 점검`); }
+  if (ROUTING_RE.test(f)) { picks.add("routing"); picks.add("vitest"); reasons.push(`${f} → 라우팅 겹침·규칙표`); }
   else if (f.startsWith("tools/regress/") || f.startsWith("rag-seed/")) { picks.add("regress"); reasons.push(`${f} → 회귀 하네스`); }
 }
-if (ALL) for (const l of ["vitest", "client", "knowledge", "maintenance", "regress", "verify", "shell", "download", "sweep", "drawer"]) picks.add(l);
+if (ALL) for (const l of ["vitest", "client", "knowledge", "maintenance", "regress", "verify", "shell", "download", "sweep", "drawer", "routing"]) picks.add(l);
 if (FAST) { picks.delete("vitest"); picks.delete("maintenance"); }
 
 console.log(`■ QA 전수조사 — 기준: ${since ? since.slice(0, 8) + "..HEAD" : "(첫 실행 — 마커 없음, 전 계층)"}`);
-if (!since) for (const l of ["vitest", "client", "knowledge", "maintenance", "regress", "verify", "shell", "download", "sweep", "drawer"]) { if (!FAST || (l !== "vitest" && l !== "maintenance")) picks.add(l); }
+if (!since) for (const l of ["vitest", "client", "knowledge", "maintenance", "regress", "verify", "shell", "download", "sweep", "drawer", "routing"]) { if (!FAST || (l !== "vitest" && l !== "maintenance")) picks.add(l); }
 console.log(`  변경 파일 ${changed.length}개 → 계층 [${[...picks].join(", ")}]${ALL ? " (--all)" : ""}${FAST ? " (--fast)" : ""}`);
 for (const r of reasons.slice(0, 8)) console.log(`   · ${r}`);
 if (reasons.length > 8) console.log(`   · … 외 ${reasons.length - 8}건`);
@@ -117,6 +119,10 @@ run("download", "node", ["tools/qa-download.mjs"]);
 run("sweep", "node", ["tools/menu-sweep.mjs"]);
 // 서랍은 "이건 된다"고 약속하는 자리다 — 한 번 확인하고 두면 데이터가 바뀌며 늙는다.
 run("drawer", "node", ["tools/drawer-audit.mjs"]);
+// 라우팅 겹침 — 규칙을 넓힐 때마다 사람이 기억해서 돌리는 방식은 반드시 샌다.
+//   실측(2026-08-02): 넓은 규칙을 앞에 넣어 today를 가로챘고 라우팅이 100%→96.9%로 떨어졌는데,
+//   평가 게이트(20분)를 돌리고서야 알았다. 여기서는 1초에 알린다.
+run("routing", "node", ["tools/route-explain.mjs", "--겹침"]);
 
 // ── ④ 요약·마커·리포트 ──────────────────────────────────────────────────────────
 // 알려진 이슈 — 원인이 규명됐고 사용자가 "지금은 이대로 둔다"고 결정한 것만(tools/qa-known-issues.json).

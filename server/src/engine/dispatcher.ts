@@ -3,6 +3,7 @@
 // WebSocket으로 모든 접속 클라이언트에 브로드캐스트된다.
 
 import type { Express, Request } from "express";
+import { 말투재기 } from "./tonewatch";
 import { authMiddleware } from "../auth/auth";
 import { runWithViewer } from "./viewerctx";
 import type { GijoUser } from "../auth/users";
@@ -1117,6 +1118,10 @@ export function registerDispatcherRoutes(app: Express): void {
       const first = await Promise.race([work, timer]);
 
       if (first !== null) {
+        // 말투 규범 감시 — **여기가 답이 담당자에게 나가는 마지막 지점**이다.
+        // ⚠ 막지 않는다. 기록만 하고 답은 그대로 보낸다(tonewatch.ts 머리말 참고).
+        //   오탐 하나로 답이 통째로 막히면 놓치는 것보다 나쁘다.
+        말투재기(text, String((first as { output?: string }).output ?? ""));
         res.json(first);
         return;
       }
