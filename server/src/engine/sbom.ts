@@ -10,6 +10,8 @@ import { asyncRoute } from "../util/asyncRoute";
 import { getAsset, markSbomGenerated, type AiBom } from "./assets";
 import { isFindingRejected } from "./approvals";
 import { aibomThreatMatches, type AiBomThreatMatch } from "./compliance";
+// 스캔 실패 판정은 한 곳만 쓴다 — 두 벌 두면 하나는 반드시 낡는다.
+import { isRealVulnerability } from "./agenttools";
 
 export interface SbomComponent {
   name: string;
@@ -138,7 +140,9 @@ function addFindingVulns(bom: Models.Bom, rootRef: Models.BomRef, assetId: strin
   const asset = getAsset(assetId);
   for (const f of asset?.findings ?? []) {
     if (isFindingRejected(assetId, f)) continue; // 오탐 판정은 문서에 싣지 않는다
-    if (f.finding_type === "scan_error") continue; // 스캔 실패는 운영 오류지 취약점이 아니다
+    // ⚠ 예전엔 scan_error만 손으로 걸러 scan_not_supported를 놓쳤다 — 같은 판정을 두 벌 두면
+    //   하나는 반드시 낡는다. 판정은 isRealVulnerability 한 곳만 쓴다.
+    if (!isRealVulnerability(f)) continue; // 스캔 실패·미지원은 운영 오류지 취약점이 아니다
     const v = new Models.Vulnerability.Vulnerability({ id: vulnId(f) });
     v.source = new Models.Vulnerability.Source({ name: `GIJO AS 스캔(${f.source_tool ?? "unknown"})` });
     v.description = f.finding_type;
@@ -373,7 +377,7 @@ export async function generateSbom(assetId: string): Promise<SbomDocument> {
   if (!asset) throw new Error(`자산을 찾을 수 없습니다: ${assetId}`);
   // 승인 워크플로우: 오탐(rejected)으로 처리된 finding은 SBOM 취약점 반영에서 제외한다
   // (미검토 pending은 아직 반영 — "확인 안 됨"을 "안전"으로 오해시키지 않기 위함).
-  const activeFindings = (asset?.findings ?? []).filter((f) => !isFindingRejected(assetId, f));
+  const activeFindings = (asset?.findings ?? []).filter((f) => !isFindingRejected(assetId, f) && isRealVulnerability(f));
   const components: SbomComponent[] = (asset?.components ?? []).map((c) => ({
     name: c.name,
     version: c.version,

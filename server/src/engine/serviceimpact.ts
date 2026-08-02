@@ -13,6 +13,8 @@ import { listAssets, Asset } from "./assets";
 import { listMaintenanceItems } from "./maintenance";
 import { listFindings } from "./cti";
 import { matchCtiToAssets } from "./ctimatch";
+// 스캔 실패 판정은 한 곳만 쓴다 — 두 벌 두면 하나는 반드시 낡는다.
+import { isRealVulnerability } from "./agenttools";
 
 export type ImpactLevel = "high" | "mid" | "low" | "none";
 
@@ -35,10 +37,14 @@ export interface ServiceImpact {
 }
 
 function assetRisk(asset: Asset): ImpactLevel {
-  const sev = new Set(asset.findings.map((f) => f.severity));
+  // ⚠ 스캔 실패는 위험도가 아니다. scan_error의 severity가 "low"라서, 실패만 있는 자산이
+  //   「low 위험」으로 서비스 영향도에 올라갔다(2026-08-02 소스 감시가 잡음).
+  //   **모르는 것을 낮은 위험으로 보고하면 안 된다** — 점검이 안 됐다는 사실이 답이다.
+  const real = asset.findings.filter(isRealVulnerability);
+  const sev = new Set(real.map((f) => f.severity));
   if (sev.has("critical") || sev.has("high")) return "high";
   if (sev.has("medium")) return "mid";
-  if (asset.findings.length) return "low";
+  if (real.length) return "low";
   return "none";
 }
 

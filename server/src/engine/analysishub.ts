@@ -17,6 +17,8 @@ import { db, migrate } from "../db";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { listAssets } from "./assets";
+// 스캔 실패 판정은 한 곳만 쓴다 — 호출부마다 제 규칙을 두면 화면마다 숫자가 달라진다.
+import { isRealVulnerability } from "./agenttools";
 import { chat } from "./llm";
 import { PLAIN_LANGUAGE_RULE } from "./promptstyle";
 
@@ -197,6 +199,10 @@ export function rebuildVulnEvents(): number {
   for (const a of listAssets()) {
     for (const f of a.findings) {
       if (f.state === "fixed") continue; // 고쳐진 건 관제 대상 아님
+      // ⚠ 스캔 실패는 **위협 이벤트가 아니다**. 넣으면 상관분석·우선순위가 통째로 오염되고
+      //   관제 화면이 잡음으로 덮인다(실측 2026-08-02: 609건 중 608건이 스캔 실패였다).
+      //   스캔이 안 된 자산은 커버리지(무엇을 모르는가)에서 따로 챙긴다.
+      if (!isRealVulnerability(f)) continue;
       const signals: string[] = [];
       if (f.kev) signals.push("KEV");
       if (typeof f.epss === "number" && f.epss >= 0.5) signals.push(`EPSS ${f.epss.toFixed(2)}`);

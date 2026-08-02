@@ -12,6 +12,9 @@ import { todayLocal } from "../util/date";
 import { chat } from "./llm";
 import { PLAIN_LANGUAGE_RULE } from "./promptstyle";
 import { listAssets, getAsset, Asset } from "./assets";
+// ⚠ 스캔 실패(scan_error)는 취약점이 아니다. 판정은 이 함수 **한 곳**만 쓴다 —
+//   호출부마다 제 규칙을 두면 화면·리포트마다 숫자가 달라지고, 담당자는 그 숫자로 보고를 쓴다.
+import { isRealVulnerability } from "./agenttools";
 import { listMaintenanceItems, MaintenanceItem } from "./maintenance";
 import { listTasks, TaskItem } from "./tasks";
 import { prioritizedReviews, buildTriageDraft, type PrioritizedFinding } from "./approvals";
@@ -58,7 +61,11 @@ function severityCounts(assets: Asset[]): Record<string, number> {
   const counts: Record<string, number> = { low: 0, medium: 0, high: 0, critical: 0 };
   for (const asset of assets) {
     // 고쳐진(fixed) finding은 현재 위험이 아니므로 제외.
-    for (const finding of asset.findings) if (finding.state !== "fixed") counts[finding.severity] = (counts[finding.severity] ?? 0) + 1;
+    for (const finding of asset.findings) {
+      if (finding.state === "fixed") continue;
+      if (!isRealVulnerability(finding)) continue;   // 점검 실패는 심각도가 없다
+      counts[finding.severity] = (counts[finding.severity] ?? 0) + 1;
+    }
   }
   return counts;
 }
@@ -87,6 +94,7 @@ export function collectVulnReportData(scopeAssets?: Asset[]): VulnReportData {
   for (const a of hosts) {
     for (const f of a.findings) {
       if (f.state === "fixed") continue;
+      if (!isRealVulnerability(f)) continue;   // 스캔 실패를 활성 취약점으로 세지 않는다
       d.active++;
       if (f.severity === "critical") d.critical++;
       else if (f.severity === "high") d.high++;
@@ -205,6 +213,7 @@ export function vulnCases(assets: Asset[]): VulnCase[] {
     if (a.assetType !== "infra-host") continue;
     for (const f of a.findings) {
       if (f.state === "fixed") continue;
+      if (!isRealVulnerability(f)) continue;   // 사례 목록에도 넣지 않는다
       cases.push({ assetName: a.name, finding: f, priority: classifyVulnPriority(f), governance: matchGovernance(f) });
     }
   }
@@ -423,7 +432,13 @@ async function buildDocx(
               ? asset.findings.map(
                   (f) =>
                     new Paragraph({
-                      children: [new TextRun(`[${f.severity}] ${f.finding_type} — ${f.evidence} (${f.source_tool})`)],
+                      // ⚠ 스캔 실패는 감추지 않되 **취약점처럼 보이게 두지 않는다** —
+                      //   심각도 대괄호를 달면 읽는 사람이 취약점으로 센다.
+                      children: [new TextRun(
+                        isRealVulnerability(f)
+                          ? `[${f.severity}] ${f.finding_type} — ${f.evidence} (${f.source_tool})`
+                          : `[점검 실패 · 취약점 아님] ${f.evidence} (${f.source_tool}) — 재스캔 필요`
+                      )],
                     })
                 )
               : [new Paragraph({ children: [new TextRun("발견된 finding 없음")] })]),

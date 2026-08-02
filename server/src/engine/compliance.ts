@@ -117,8 +117,13 @@ export async function buildComplianceDraft(code: string): Promise<{ status: Comp
   const { listAssets } = await import("./assets.js");
   const assets = listAssets();
   const withAibom = assets.filter((a) => a.aibom && JSON.stringify(a.aibom).replace(/[{}":,\s]/g, "").length > 0).length;
-  const findings = assets.reduce((n, a) => n + (a.findings?.length ?? 0), 0);
-  const context = `등록 AI 자산 ${assets.length}개, AI-BOM 작성 ${withAibom}개, 스캔 취약점 ${findings}건`;
+  // ⚠ 스캔 실패는 취약점이 아니다. 이 숫자는 **LLM 프롬프트로 그대로 들어가** 평가 초안의
+  //   전제가 된다 — 623건이라 알려 주면 AI는 그 전제로 문서를 쓰고, 담당자는 그걸 제출한다.
+  const { isRealVulnerability } = await import("./agenttools.js");
+  let findings = 0, scanFailed = 0;
+  for (const a of assets) for (const f of (a.findings ?? [])) (isRealVulnerability(f) ? findings++ : scanFailed++);
+  const context = `등록 AI 자산 ${assets.length}개, AI-BOM 작성 ${withAibom}개, 스캔 취약점 ${findings}건` +
+    (scanFailed ? `, 스캔 실패 ${scanFailed}건(취약점 아님 — 재스캔 필요)` : "");
 
   const prompt = [
     `KISA AI 보안 위협 대응 현황 평가 초안을 작성하세요.`,

@@ -4,6 +4,8 @@
 // 두 곳에서 따로 세면 반드시 어긋나고, 어긋나면 담당자는 둘 다 믿지 않게 된다.
 // 값이 아니라 타입만 가져온다 — assets.ts가 이 파일을 쓰므로 값 임포트는 순환이 된다.
 import type { Asset } from "./assets";
+// 스캔 실패 판정은 한 곳만 쓴다 — 결손(무엇을 모르는가)과 취약점(무엇이 뚫렸나)은 다른 축이다.
+import { isRealVulnerability } from "./agenttools";
 
 export type GapKind = "owner" | "service" | "sbom" | "unscanned";
 
@@ -47,7 +49,8 @@ export function isOwnerMissing(owner: string | null | undefined): boolean {
 }
 
 function openFindingsOf(a: Asset) {
-  return (a.findings || []).filter((f) => f.state !== "fixed");
+  // ⚠ 스캔 실패는 취약점이 아니다 — 결손(무엇을 모르는가)은 커버리지의 다른 항목이 챙긴다.
+  return (a.findings || []).filter((f) => f.state !== "fixed" && isRealVulnerability(f));
 }
 
 // SBOM(구성요소 목록)·AI-BOM은 소프트웨어·AI 자산에만 의미가 있다. 취약점 스캐너로 들여온 IP
