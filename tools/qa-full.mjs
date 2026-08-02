@@ -62,7 +62,7 @@ const VERIFY_RE = /^server\/src\/engine\/(verify|vexexport|autoassign|versioncmp
 const SHELL_RE = /^client\/src\/renderer\/pages\/(app|console|dialog|dashboard|nav)\./;
 // 파일 받기는 메인 프로세스(will-download)·preload·받기 버튼이 걸린 화면이 바뀌면 다시 본다.
 // 서랍 목록(console.js)과 서랍이 기대는 결정적 경로(howto·picklist)가 바뀌면 다시 묻는다.
-const ROUTING_RE = /^server/src/engine/(agentloop|dispatcher|routes).ts$|^tools/route-explain.mjs$/;
+const ROUTING_RE = /^server\/src\/engine\/(agentloop|dispatcher|routes)\.ts$|^tools\/route-explain\.mjs$/;
 const DRAWER_RE = /^client\/src\/renderer\/pages\/console\.js$|^server\/src\/engine\/(howto|picklist|screenguide|workguide)\.ts$|^tools\/drawer-audit\.mjs$/;
 const DOWNLOAD_RE = /^client\/src\/(main|preload)\.ts$|^client\/src\/renderer\/pages\/(approvals|report)\.html$/;
 for (const f of changed) {
