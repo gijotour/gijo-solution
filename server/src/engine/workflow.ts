@@ -14,7 +14,35 @@ import { authMiddleware } from "../auth/auth";
 import { listAssets } from "./assets";
 import { isRealVulnerability } from "./agenttools";
 import { listFindingReviews } from "./approvals";
-import { listMaintenanceItems } from "./maintenance";
+import { listTargets, listRuns } from "./hardeningtargets";
+
+/**
+ * 화면 → 절차 단계. **여기가 단 하나의 출처다.**
+ *
+ * 처음엔 절차 띠(client/workflowrail.js)가 제 지도를 들고 있었다. 그러면 사이드바(nav.js)와
+ * 어긋나는 순간 담당자는 "메뉴에선 ③인데 띠에선 ②"를 보게 되고, 그 뒤로는 어느 쪽도 못 믿는다.
+ * 숫자를 서버에서 한 번만 세는 것과 같은 이유로 **자리도 서버에서 한 번만 정한다**.
+ * 띠도 화면 안내(screenguide)도 이 표를 받아 쓴다.
+ *
+ * ⚠ nav.js의 5개 절차 그룹과 **같아야 한다** — workflow.test.ts가 대조해 막는다.
+ */
+export const STAGE_SCREENS: Record<number, string[]> = {
+  1: ["analysis.html", "threat.html", "inventory.html"],
+  2: ["vulnscan.html", "sbom.html"],
+  3: ["approvals.html", "maintenance.html", "terminal.html"],
+  4: ["hardening.html"],
+  5: ["report.html", "kpi.html", "compliance.html"],
+};
+
+/** 이 화면이 몇 단계인가. 절차 화면이 아니면 null(띠도 안 그리고 안내도 안 붙인다). */
+export function stageOfScreen(screen?: string): number | null {
+  if (!screen) return null;
+  const key = screen.split(/[\\/]/).pop()?.split("?")[0] ?? "";
+  for (const [no, list] of Object.entries(STAGE_SCREENS)) {
+    if (list.includes(key)) return Number(no);
+  }
+  return null;
+}
 
 export interface WorkflowStage {
   no: number;
@@ -27,6 +55,8 @@ export interface WorkflowStage {
   alertLabel: string;
   /** 이 단계에서 먼저 열 화면 */
   page: string;
+  /** 이 단계에 속한 화면 전부. 띠가 "지금 여기"를 이걸로 판단한다(제 지도를 안 든다). */
+  screens: string[];
 }
 
 /** 5단계 현황. 세는 규칙은 여기 한 곳에만 둔다. */
@@ -63,25 +93,35 @@ export function workflowStages(): WorkflowStage[] {
     }
   } catch { /* 대장을 못 읽어도 나머지 단계는 보여준다 */ }
 
-  // ④ 검증 — 점검 중 승인 대기(=고쳤다고 보고했으나 아직 확인 안 됨)와 기한 지난 것.
-  let 검증대기: number | null = null, 지연: number | null = null;
+  // ④ 검증 — 고친 것이 실제로 닫혔는지 다시 확인한 결과.
+  //
+  // ⚠ 처음엔 여기에 **점검서 승인 대기(유지보수)** 숫자를 넣었다. 그런데 그 일을 하는 화면은
+  //   「정기 점검」이고 그 화면은 사이드바에서 **③ 조치**다. 그러면 띠에서 ④를 눌러 ③ 화면에
+  //   떨어지고, 도착하자마자 띠가 "지금 ③"이라고 말한다 — 담당자는 그 순간 띠를 못 믿는다.
+  //   단계의 숫자는 **그 단계의 화면에서 나온 것**이어야 한다. 그래서 보안설정 점검에서 센다.
+  let 미확인: number | null = null, 실패항목: number | null = null;
   try {
-    const items = listMaintenanceItems();
-    // ⚠ 상태 값은 scheduled | approved | rejected 뿐이다(타입이 잡아 줬다 — 처음엔 있지도
-    //   않은 "reported"·"pending"을 세려 했다). 「고쳤다고 했는데 아직 확인 안 됨」에 해당하는
-    //   것은 **반려**(다시 봐야 함)와 **예정인데 기한이 지난 것**이다.
-    검증대기 = items.filter((m) => m.status === "rejected").length;
-    지연 = items.filter((m) => m.scheduleDate < 오늘 && m.status !== "approved").length;
+    const targets = listTargets();
+    const runs = listRuns(undefined, 500);
+    const 점검한대상 = new Set(runs.map((r) => r.targetId));
+    // 「아직 확인 안 된 것」 = 등록해 놓고 한 번도 점검을 안 돌린 대상.
+    미확인 = targets.filter((t) => !점검한대상.has(t.id)).length;
+    // 대상마다 **가장 최근** 결과의 실패 수를 더한다(옛 결과까지 더하면 고친 것이 계속 세어진다).
+    const 최근: Record<string, number> = {};
+    for (const r of runs) if (!(r.targetId in 최근)) 최근[r.targetId] = r.fail;   // listRuns는 최신순
+    실패항목 = Object.values(최근).reduce((a, b) => a + b, 0);
   } catch { /* 못 구하면 비워 둔다 — 0으로 채우면 "없다"가 되어 거짓이다 */ }
 
+  // ⚠ page는 **STAGE_SCREENS의 그 단계 안에 있는 화면**이어야 한다 — 아니면 띠에서 눌러
+  //   도착한 순간 띠가 다른 단계를 가리킨다. workflow.test.ts가 대조해 막는다.
   return [
-    { no: 1, key: "find", label: "발견·수집", count: assets.length, alert: 오늘신규, alertLabel: "오늘 신규", page: "analysis.html" },
-    { no: 2, key: "triage", label: "우선순위", count: 취약, alert: kev, alertLabel: "실제 악용(KEV)", page: "vulnscan.html" },
-    { no: 3, key: "fix", label: "조치", count: 진행, alert: 미배정, alertLabel: "미배정", page: "approvals.html" },
-    { no: 4, key: "verify", label: "검증", count: 검증대기, alert: 지연, alertLabel: "기한 초과", page: "maintenance.html" },
+    { no: 1, key: "find", label: "발견·수집", count: assets.length, alert: 오늘신규, alertLabel: "오늘 신규", page: "analysis.html", screens: STAGE_SCREENS[1] },
+    { no: 2, key: "triage", label: "우선순위", count: 취약, alert: kev, alertLabel: "실제 악용(KEV)", page: "vulnscan.html", screens: STAGE_SCREENS[2] },
+    { no: 3, key: "fix", label: "조치", count: 진행, alert: 미배정, alertLabel: "미배정", page: "approvals.html", screens: STAGE_SCREENS[3] },
+    { no: 4, key: "verify", label: "검증", count: 실패항목, alert: 미확인, alertLabel: "미점검 대상", page: "hardening.html", screens: STAGE_SCREENS[4] },
     // ⑤ 보고 — "이번 주 리포트를 썼나"는 리포트 이력을 읽어야 하는데, 그 판정 규칙을 아직
     //    한 곳으로 모으지 않았다. **지어내지 않고 비워 둔다**(화면이 빈칸으로 그린다).
-    { no: 5, key: "report", label: "보고", count: null, alert: null, alertLabel: "", page: "report.html" },
+    { no: 5, key: "report", label: "보고", count: null, alert: null, alertLabel: "", page: "report.html", screens: STAGE_SCREENS[5] },
   ];
 }
 

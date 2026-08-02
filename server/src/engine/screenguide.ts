@@ -9,6 +9,8 @@
 
 import type { Express } from "express";
 import { authMiddleware } from "../auth/auth";
+// 단계 표는 서버 한 곳에서만 든다 — 사이드바·절차 띠·이 안내가 같은 것을 봐야 한다.
+import { stageOfScreen, workflowStages } from "./workflow";
 
 export interface ScreenGuide {
   title: string;
@@ -675,6 +677,47 @@ export function getScreenGuide(screen?: string): ScreenGuide {
   return GUIDES[key] ?? OVERVIEW;
 }
 
+/**
+ * 「이 화면은 절차 몇 단계인가」 한 줄 (2026-08-02 업무 절차 개편).
+ *
+ * 왜: 화면 안내가 그 화면 안의 일만 설명하면, 담당자는 **이 일이 전체 어디쯤인지** 모른 채
+ *   화면마다 새로 배운다. 사용자 지시("취약점 기준 업무절차… 보고 리포트까지 전과정을
+ *   볼수있어야해")는 화면 하나가 아니라 **흐름**을 보여 달라는 뜻이다.
+ *
+ * ⚠ 단계 표는 **서버 한 곳**(workflow.ts STAGE_SCREENS)만 본다. 여기서 따로 들면 사이드바·띠와
+ *   어긋나고, 어긋나는 순간 셋 다 못 믿게 된다.
+ * ⚠ 절차 화면이 아니면 **안 붙인다** — 설정 화면에 "③ 조치입니다"는 틀린 말이다.
+ */
+/**
+ * 「로 / 으로」를 받침에 따라 고른다.
+ * ⚠ 단계 이름을 그냥 이어 붙였더니 "**4 검증**로 갑니다"가 나왔다(실측 2026-08-02).
+ *   담당자에게 나가는 우리말이라 조사는 맞아야 한다 — 받침 없거나 ㄹ이면 「로」, 아니면 「으로」.
+ */
+function 로조사(말: string): string {
+  const 끝 = 말.trim().slice(-1);
+  const code = 끝.charCodeAt(0);
+  if (code < 0xac00 || code > 0xd7a3) return "로";   // 한글이 아니면 건드리지 않는다
+  const 받침 = (code - 0xac00) % 28;
+  return 받침 === 0 || 받침 === 8 ? "로" : "으로";   // 8 = ㄹ
+}
+
+function 절차줄(screen?: string): string | null {
+  const no = stageOfScreen(screen);
+  if (!no) return null;
+  const stages = workflowStages();
+  const 여기 = stages.find((s) => s.no === no);
+  if (!여기) return null;
+  const 앞 = stages.find((s) => s.no === no - 1);
+  const 뒤 = stages.find((s) => s.no === no + 1);
+  const 길 = [앞 && `앞: ${앞.no} ${앞.label}`, `**지금: ${no} ${여기.label}**`, 뒤 && `다음: ${뒤.no} ${뒤.label}`]
+    .filter(Boolean)
+    .join("  →  ");
+  const 끝말 = 뒤
+    ? `이 화면 일이 끝나면 **${뒤.no} ${뒤.label}**${로조사(뒤.label)} 갑니다.`
+    : "여기까지가 한 바퀴입니다 — 다음 주기는 다시 **1 발견·수집**부터입니다.";
+  return `📍 업무 절차 ${길}\n   ${끝말}`;
+}
+
 // 챗봇/지휘 콘솔이 그대로 최종 답으로 쓸 수 있는 안내 텍스트.
 // question에 패널 이름이 들어 있으면(예: "SMTP 설정 방법 알려줘" — ⓘ 버튼이 이런 질문을 주입)
 // 그 패널 상세만 답한다. 없으면 화면 전체 안내 + 패널 목차를 준다.
@@ -696,6 +739,8 @@ export function formatScreenGuide(screen?: string, question?: string): string {
   const L: string[] = [];
   L.push(`🤖 ${g.title} — 이 화면 사용 안내`);
   L.push(g.what);
+  const 절차 = 절차줄(screen);
+  if (절차) { L.push(""); L.push(절차); }
   L.push("");
   L.push("이 화면에서 대화창으로 할 수 있는 것:");
   for (const c of g.can) L.push(`  • ${c}`);

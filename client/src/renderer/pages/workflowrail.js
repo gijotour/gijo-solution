@@ -16,15 +16,10 @@
 (function () {
   if (window.gijoRail) return;
 
-  // 화면 → 단계. 메뉴(nav.js GROUPS)와 **같은 자리**여야 한다 — 어긋나면 담당자가
-  // "메뉴에선 ③인데 띠에선 ②"를 보게 된다.
-  var 화면단계 = {
-    "analysis.html": 1, "threat.html": 1, "inventory.html": 1,
-    "vulnscan.html": 2, "sbom.html": 2,
-    "approvals.html": 3, "maintenance.html": 3, "terminal.html": 3,
-    "hardening.html": 4,
-    "report.html": 5, "kpi.html": 5, "compliance.html": 5,
-  };
+  // ⚠ 화면→단계 표를 **여기 들지 않는다.** 처음엔 이 파일이 제 지도를 갖고 있었는데,
+  //   그러면 사이드바(nav.js)와 어긋나는 순간 담당자가 "메뉴에선 ③인데 띠에선 ②"를 보게 되고
+  //   그 뒤로는 어느 쪽도 못 믿는다. 자리도 숫자와 똑같이 **서버가 한 번만 정한다**
+  //   (workflow.ts STAGE_SCREENS → 응답의 stage.screens).
 
   function 지금화면() {
     try { return decodeURIComponent((location.pathname || "").split("/").pop() || ""); } catch (e) { return ""; }
@@ -86,12 +81,17 @@
   }
 
   async function 붙이기() {
-    var 여기 = 화면단계[지금화면()];
-    if (!여기) return;                       // 절차 화면이 아니면 띠를 안 그린다
     if (!window.gijo || !window.gijo.workflowStages) return;
     try {
       var r = await window.gijo.workflowStages();
-      if (r && Array.isArray(r.stages) && r.stages.length) 그리기(r.stages, 여기);
+      if (!r || !Array.isArray(r.stages) || !r.stages.length) return;
+      var 지금 = 지금화면();
+      var 여기 = 0;
+      r.stages.forEach(function (s) {
+        if (Array.isArray(s.screens) && s.screens.indexOf(지금) >= 0) 여기 = s.no;
+      });
+      if (!여기) return;                     // 절차 화면이 아니면 띠를 안 그린다
+      그리기(r.stages, 여기);
     } catch (e) {
       /* 서버가 안 되면 **아예 안 그린다** — 빈 띠가 자리만 먹는 것보다 없는 편이 낫다 */
     }
