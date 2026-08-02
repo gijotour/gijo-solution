@@ -11,6 +11,8 @@ import type { Express } from "express";
 import { authMiddleware } from "../auth/auth";
 import { listAssets, getAsset, isAiAsset, type Asset } from "./assets";
 import type { StandardFinding } from "./bridge";
+// 스캔 실패 판정은 한 곳에서만 — 규칙이 갈라지면 화면마다 숫자가 달라진다.
+import { isRealVulnerability } from "./agenttools";
 
 export type OwaspStatus = "open" | "covered" | "na";
 
@@ -119,10 +121,16 @@ export function deriveOwaspRisks(a: Asset): OwaspRiskState[] {
 }
 
 // 취약점(findings) 심각도 집계.
+//
+// ⚠ **스캔 실패는 취약점이 아니다.** 이걸 안 걸러 "미조치 취약점 616"이 떴는데 그중 602건이
+//   scan_error였다(실측 2026-08-02, 자산 화면 통합 검증에서 발견). 같은 화면의 절차 띠는
+//   14를 말하고 있었다 — **같은 화면에 두 숫자**가 나란히 있으면 담당자는 둘 다 못 믿는다.
+//   스캔이 안 된 자산은 감추지 않고 「미점검」으로 따로 센다(agenttools의 SCAN_NOISE와 같은 규칙).
 function vulnCounts(findings: StandardFinding[]): VulnCounts {
   const c = { critical: 0, high: 0, medium: 0, low: 0, kev: 0, open: 0 };
   for (const f of findings) {
     if (f.state === "fixed") continue; // 해소된 것은 현재 노출로 세지 않는다
+    if (!isRealVulnerability(f)) continue; // 스캔 실패·미지원은 취약점 일감이 아니다
     c.open++;
     c[f.severity]++;
     if (f.kev) c.kev++;

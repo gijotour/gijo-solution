@@ -12,6 +12,7 @@ import { createApp } from "../src/app";
 import { resetAssetsForTests, registerAsset, updateAiBom, recordFindings, markSbomGenerated, getAsset } from "../src/engine/assets";
 import { buildHub, buildHubRow, deriveOwaspRisks } from "../src/engine/assethub";
 import { emptyAiBom } from "../src/engine/assets";
+import type { StandardFinding } from "../src/engine/bridge";
 
 async function login(app: ReturnType<typeof createApp>) {
   const res = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" });
@@ -125,5 +126,41 @@ describe("assethub — 라우트", () => {
     expect(res.body.row.isAi).toBe(true);
     expect(res.body.owasp.length).toBeGreaterThan(0);
     expect((await request(app).get("/api/assethub/none").set("Authorization", `Bearer ${token}`)).status).toBe(404);
+  });
+});
+
+// ⚠ 스캔 실패를 취약점으로 세지 않는가 (2026-08-02 실측 사고).
+//   자산 화면을 통합한 뒤 요약이 "미조치 취약점 616"을 띄웠는데 그중 602건이 scan_error였다.
+//   같은 화면의 절차 띠는 14를 말하고 있었다 — **같은 화면에 두 숫자**가 나란히 놓이면
+//   담당자는 둘 다 못 믿는다. 규칙(SCAN_NOISE)은 한 곳에만 두고 모두가 그걸 본다.
+describe("assethub — 스캔 실패는 취약점이 아니다", () => {
+  beforeEach(() => resetAssetsForTests());
+
+  // 실제 등록 경로로 만든다 — 손으로 만든 가짜 자산은 AI-BOM 기본값이 없어 현실과 어긋난다.
+  const 자산만들기 = (findings: StandardFinding[]) => {
+    registerAsset({ id: "h1", name: "h1", path: "10.0.0.1", assetType: "infra-host" });
+    const a = getAsset("h1")!;
+    a.findings.push(...findings);
+    return a;
+  };
+
+  it("scan_error·scan_not_supported는 미조치 취약점에 안 들어간다", () => {
+    const a = 자산만들기([
+      { finding_type: "scan_error", severity: "low", evidence: "Command failed" } as StandardFinding,
+      { finding_type: "scan_not_supported", severity: "low", evidence: "미지원 형식" } as StandardFinding,
+      { finding_type: "CVE-2021-44228", severity: "critical", evidence: "Log4Shell", kev: true } as StandardFinding,
+    ]);
+    const row = buildHubRow(a);
+    expect(row.vuln.open, "스캔 실패 2건이 섞여 들어갔다").toBe(1);
+    expect(row.vuln.critical).toBe(1);
+    expect(row.vuln.kev).toBe(1);
+  });
+
+  it("스캔 실패만 있으면 0건이다 — 있는 것처럼 보이면 거짓이다", () => {
+    const a = 자산만들기([{ finding_type: "scan_error", severity: "low", evidence: "x" } as StandardFinding]);
+    const row = buildHubRow(a);
+    expect(row.vuln.open).toBe(0);
+    // 노출 점수도 따라 내려가야 한다 — 실패를 위험으로 세면 안 된다.
+    expect(row.exposureScore).toBe(0);
   });
 });
