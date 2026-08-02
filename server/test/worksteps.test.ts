@@ -8,6 +8,7 @@
 //   실제로는 엉뚱한 CVSS 설명이 나왔다(2026-08-01 운영 실측). 말만 하고 코드가
 //   안 지키는 종류의 결함은 동작 QA로는 안 잡힌다 — 여기서 못 박는다.
 import { describe, it, expect, beforeEach } from "vitest";
+import { 표식 } from "../src/engine/tone";
 import { findAgentTool } from "../src/engine/agenttools";
 import { createTask, listTasks, resetTasksForTests } from "../src/engine/tasks";
 import { listGuides } from "../src/engine/workguide";
@@ -47,7 +48,9 @@ describe("절차 카드가 실제로 동작한다", () => {
     const out = await 실행("work_steps", { task: g.label });
     expect(out).toContain(g.label);
     expect(out, "첫 단계 제목이 안 보인다").toContain(g.steps[0].title);
-    expect(out, "지금 할 단계 표시(▶)가 없다").toContain("▶");
+    // ⚠ 기호를 여기 박아 두지 않는다 — 표식 사전(tone.ts)이 단일 출처다.
+    //   사전을 고칠 때마다 시험을 따라 고치면, 시험이 사전을 지키는 게 아니라 뒤따라간다.
+    expect(out, `지금 할 단계 표시(${표식.다음})가 없다`).toContain(표식.다음);
     expect(out, `절차 0/${g.steps.length} 표기가 없다`).toContain(`/${g.steps.length}`);
   });
 
@@ -55,7 +58,7 @@ describe("절차 카드가 실제로 동작한다", () => {
     const { g } = 가이드있는일감();
     const out = await 실행("step_done", { step: "1", task: g.label });
     expect(out).toContain("끝낸 것으로 적었습니다");
-    expect(out, "☑ 표시가 안 붙었다").toContain("☑");
+    expect(out, `끝난 단계 표시(${표식.좋음})가 안 붙었다`).toContain(표식.좋음);
     expect(listTasks().find((t) => t.text === g.label)?.guideDone).toEqual([0]);
     expect(out, "잘못 눌렀을 때 되돌릴 말을 안 준다").toContain("취소");
   });

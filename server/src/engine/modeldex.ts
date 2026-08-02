@@ -60,7 +60,7 @@ export interface LlmGuideCategory {
 export const LLM_GUIDE: LlmGuideCategory[] = [
   {
     key: "security",
-    icon: "🛡️",
+    icon: "🛡",
     title: "보안 특화 LLM",
     intro: "침해사고 대응·취약점 분석·보안 개념을 이미 학습한 모델. 보안 담당 에이전트의 두뇌로 바로 쓰기 좋습니다.",
     models: [

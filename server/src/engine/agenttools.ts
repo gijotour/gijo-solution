@@ -1623,7 +1623,7 @@ function 절차카드(t: ReturnType<typeof listTasks>[number]): string {
   const 끝난 = new Set(t.guideDone ?? []);
   const 다음번호 = g.steps.findIndex((_, i) => !끝난.has(i));
   const 줄 = g.steps.map((s, i) => {
-    const 표 = 끝난.has(i) ? "☑" : i === 다음번호 ? "▶" : "☐";
+    const 표 = 끝난.has(i) ? "✓" : i === 다음번호 ? "▸" : "☐";
     const 곁 = s.desc ? ` — ${s.desc}` : "";
     return `${표} ${i + 1}. ${s.title}${곁}`;
   }).join("\n");

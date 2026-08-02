@@ -105,7 +105,7 @@ export function adoptionSummaryText(limit = 10): string {
   const fmt = (t: number) => new Date(t).toLocaleString("ko-KR");
   const label: Record<AdoptionVerdict, string> = {
     pass: "✓ 채택(게이트 통과)",
-    hold: "⛔ 보류(되돌림)",
+    hold: "⚠ 보류(되돌림)",
     none: "⚠ 근거 없이 변경",
   };
   const evidenceless = rows.filter((r) => r.verdict === "none").length;
