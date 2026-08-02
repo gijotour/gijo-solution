@@ -623,6 +623,9 @@ export async function generateReport(req: ReportRequest): Promise<ReportResult> 
       pdf: result.pdfPath ? path.basename(result.pdfPath) : undefined,
       summary: executiveSummary.slice(0, 400),
       createdBy: req.createdBy, // 작업 귀속
+      // ⚠ QA·시험이 만든 리포트 표식. 시간 KPI가 시험 흔적을 빼는 것과 같은 규칙 —
+      //   안 빼면 절차 띠 ⑤ 보고가 "이번 주 119건"이 되고 담당자는 그 칸을 안 믿는다.
+      qa: req.qa === true ? true : undefined,
     };
     await fs.writeFile(path.join(REPORT_DIR, `${base}.json`), JSON.stringify(meta, null, 2), "utf-8");
   } catch {
@@ -658,6 +661,15 @@ export interface ReportHistoryEntry {
  * ⚠ 같은 보고서가 docx·pdf·json으로 여러 벌 저장되므로 **파일명 접두(base)로 묶어** 센다.
  *   안 묶으면 한 번 쓴 보고서가 세 건으로 잡힌다.
  */
+/** 이 리포트가 QA·시험이 만든 것인가. 메타를 못 읽으면 **아니라고 본다**(지어내지 않는다). */
+function qa표식(nodeFs: typeof import("node:fs"), base: string): boolean {
+  try {
+    const f = require("node:path").join(REPORT_DIR, `${base}.json`);
+    if (!nodeFs.existsSync(f)) return false;
+    return JSON.parse(nodeFs.readFileSync(f, "utf-8")).qa === true;
+  } catch { return false; }
+}
+
 export function reportActivity(): { thisWeek: number; daysSinceLast: number | null } | null {
   try {
     const nodeFs = require("node:fs") as typeof import("node:fs");
@@ -669,6 +681,15 @@ export function reportActivity(): { thisWeek: number; daysSinceLast: number | nu
     for (const f of nodeFs.readdirSync(REPORT_DIR)) {
       const m = /^(.+)\.(docx|pdf|md)$/i.exec(f);
       if (!m) continue;
+      // ⚠ 이 폴더에는 **보고서가 아닌 것도** 쌓인다. 안 거르면 「이번 주 보고 369건」이 뜨고
+      //   (실측 2026-08-02), 담당자는 그 칸을 영영 안 믿는다.
+      //   · answer-  = 긴 답변이 리포트로 자동 전환된 것(longanswer.ts) — 사람이 쓴 보고가 아니다
+      //   · ingest-  = 파일 반입 진행내역(ingestreport.ts) — 반입 기록이지 보고가 아니다
+      //   진짜 보고서는 `${req.type}-<시각>` 꼴이다(주간/월간/온디맨드 등).
+      if (/^(answer|ingest)-/.test(m[1])) continue;
+      // QA·시험이 만든 것은 세지 않는다(메타의 qa 표식). 메타가 없으면 사람이 만든 것으로 본다 —
+      // **모르는 것을 시험으로 몰아 숫자를 낮추면** 반대 방향의 거짓이 된다.
+      if (qa표식(nodeFs, m[1])) continue;
       const t = nodeFs.statSync(require("node:path").join(REPORT_DIR, f)).mtimeMs;
       const 이전 = 묶음.get(m[1]);
       if (이전 == null || t < 이전) 묶음.set(m[1], t);
