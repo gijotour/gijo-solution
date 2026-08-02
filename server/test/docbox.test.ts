@@ -32,9 +32,12 @@ describe("문서함 목록 — 경계", () => {
 
   it("사람이 읽을 제목으로 나온다 — 파일명 그대로가 아니다", async () => {
     const docs = await listDocbox();
-    const aibom = docs.find((d) => d.title.includes("AI-BOM"));
-    expect(aibom, "AI-BOM 검토 가이드가 목록에 있어야 한다").toBeDefined();
-    expect(aibom!.title).toBe("AI-BOM 검토 가이드"); // "AIBOM_검토_가이드"가 아니다
+    // ⚠ 예시 문서가 바뀌었다(2026-08-02): 「AI-BOM 검토 가이드」는 개발 문서라 코퍼스에서
+    //   뺐다 — 문서함도 같은 매니페스트를 보므로 함께 사라진다. 시험의 뜻(파일명이 아니라
+    //   사람이 읽을 제목)은 그대로 두고 살아 있는 문서로 예시를 옮긴다.
+    const 밑줄이름 = docs.find((d) => d.id.includes("취약점관리"));
+    expect(밑줄이름, "취약점관리 지침이 목록에 있어야 한다").toBeDefined();
+    expect(밑줄이름!.title).toBe("취약점관리 지침"); // "GIJO_AS_취약점관리_지침"이 아니다
     for (const d of docs) {
       expect(d.title).not.toMatch(/\.md$/);
       expect(d.title).not.toMatch(/^GIJO_AS_/);
