@@ -36,12 +36,17 @@ describe("취약점(vuln) 도메인 역량", () => {
     const out = findAgentTool("finding_status")!.run({}) as string;
     expect(out).toContain("취약점");
     expect(out).toContain("담당자 미배정");
-    expect(out).toContain("test-llm");
+    // ⚠ 내부 id가 아니라 **이름**이 나온다(2026-08-03 말투 규범 — `vuln:10.10.20.41`이
+    //   담당자 화면에 그대로 나갔다). 등록된 이름은 "테스트 LLM"이다.
+    expect(out).toContain("테스트 LLM");
+    expect(out, "내부 id가 사람에게 나간다").not.toMatch(/(vuln|asset|finding):/);
   });
 
   it("finding_status — 조건으로 좁힌다", () => {
     const critical = findAgentTool("finding_status")!.run({ filter: "critical" }) as string;
-    expect(critical).toContain("critical");
+    // 조건은 영문으로 받아도 **답은 우리말로** 한다.
+    expect(critical).toContain("매우 심각");
+    expect(critical, "영문 심각도가 그대로 나간다").not.toMatch(/\[(critical|high|medium|low)\]/);
     expect(critical).not.toContain("미서명");
 
     // 2026-08-01: "없습니다"→"못 찾았습니다"(전체 건수 포함)로 바꿨다 — 조건 불일치를

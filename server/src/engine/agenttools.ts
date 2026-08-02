@@ -185,8 +185,11 @@ function runListAssets(args: Record<string, string> = {}): string {
   }
 
   const 자름 = assets.length > 보여줄자산;
+  // ⚠ 내부 id(`vuln:sample-web01`)를 앞세우지 않는다 — 사람이 읽는 글자가 아니다(2026-08-03 실측:
+  //   자산 목록 답이 `- vuln:sample-web01` 로 시작했다). 이름으로 보여 주고, **이름으로도 찾히게**
+  //   getAsset을 넓혔다 — 그러지 않으면 화면에서 본 이름으로 이어서 물을 수 없다.
   const lines = assets.slice(0, 보여줄자산).map(
-    (a) => `- ${a.id} | ${a.name} | 유형=${a.assetType} | 담당=${a.owner || "미지정"} | ${findingSummary(a)}`
+    (a) => `- ${자산표시이름(a.id)} | 유형=${a.assetType} | 담당=${a.owner || "미지정"} | ${findingSummary(a)}`
   );
   const 머리 = q
     ? `"${q}" 자산 ${assets.length}개` + (자름 ? ` · 아래는 ${보여줄자산}개입니다` : "") + ":"
@@ -199,8 +202,18 @@ function runListAssets(args: Record<string, string> = {}): string {
 async function runGetAsset(args: Record<string, string>): Promise<string> {
   const asset = getAsset(args.assetId);
   if (!asset) {
-    const ids = listAssets().map((a) => a.id).join(", ") || "(없음)";
-    return `자산 "${args.assetId}"을(를) 찾을 수 없습니다. 등록된 자산 id: ${ids}`;
+    // ⚠ 전부 늘어놓지 않는다(57개면 화면이 내부 id로 덮인다) — 몇 개만 보기로 주고 잘랐다고 밝힌다.
+    //   그리고 **이름으로** 보여 준다. 담당자가 화면에서 본 글자가 이름이기 때문이다.
+    const 전체 = listAssets();
+    const 보기 = 전체.slice(0, 8).map((a) => 자산표시이름(a.id)).join(", ") || "(없음)";
+    const 더 = 전체.length > 8 ? ` … 외 ${전체.length - 8}개` : "";
+    return (
+      `자산 "${args.assetId}"을(를) 찾지 못했습니다.
+` +
+      `등록된 자산 ${전체.length}개 중 몇 개: ${보기}${더}
+` +
+      `${표식.다음} 전체를 보시려면 "자산 목록 보여줘"`
+    );
   }
   const top = asset.findings
     .slice()
@@ -746,8 +759,18 @@ function runScanStatus(args: Record<string, string>): string {
 async function runRunRedteam(args: Record<string, string>): Promise<string> {
   const asset = resolveAsset(args.assetId ?? "");
   if (!asset) {
-    const ids = listAssets().map((a) => a.id).join(", ") || "(없음)";
-    return `자산 "${args.assetId}"을(를) 찾을 수 없습니다. 등록된 자산 id: ${ids}`;
+    // ⚠ 전부 늘어놓지 않는다(57개면 화면이 내부 id로 덮인다) — 몇 개만 보기로 주고 잘랐다고 밝힌다.
+    //   그리고 **이름으로** 보여 준다. 담당자가 화면에서 본 글자가 이름이기 때문이다.
+    const 전체 = listAssets();
+    const 보기 = 전체.slice(0, 8).map((a) => 자산표시이름(a.id)).join(", ") || "(없음)";
+    const 더 = 전체.length > 8 ? ` … 외 ${전체.length - 8}개` : "";
+    return (
+      `자산 "${args.assetId}"을(를) 찾지 못했습니다.
+` +
+      `등록된 자산 ${전체.length}개 중 몇 개: ${보기}${더}
+` +
+      `${표식.다음} 전체를 보시려면 "자산 목록 보여줘"`
+    );
   }
   const modelId = asset.aibom?.model?.modelRef;
   if (!modelId) {
@@ -841,7 +864,7 @@ function resolveAssetList(raw: string): { resolved: Asset[]; unresolved: string[
 function runAssignOwner(args: Record<string, string>): string {
   const { resolved, unresolved } = resolveAssetList(args.assetId ?? "");
   if (resolved.length === 0) {
-    const ids = listAssets().map((a) => a.id).slice(0, 12).join(", ") || "(없음)";
+    const ids = listAssets().map((a) => 자산표시이름(a.id)).slice(0, 12).join(", ") || "(없음)";
     return `대상 자산을 찾지 못했습니다: "${args.assetId}". 등록된 자산 id: ${ids}`;
   }
   const owner = (args.owner ?? "").trim();
@@ -849,7 +872,7 @@ function runAssignOwner(args: Record<string, string>): string {
   for (const a of resolved) {
     updateAssetOwnership(a.id, { owner, ...(service ? { service } : {}) });
   }
-  const names = resolved.map((a) => a.id).join(", ");
+  const names = resolved.map((a) => 자산표시이름(a.id)).join(", ");
   const tail = unresolved.length ? ` (찾지 못해 건너뜀: ${unresolved.join(", ")})` : "";
   return `자산 ${resolved.length}건에 담당부서를 "${owner}"로 지정했습니다${service ? ` · 서비스 "${service}"` : ""}: ${names}${tail}`;
 }
@@ -956,7 +979,7 @@ function runRegisterProduct(args: Record<string, string>): string {
 async function runGenerateSbom(args: Record<string, string>): Promise<string> {
   const asset = resolveAsset(args.assetId ?? "");
   if (!asset) {
-    const ids = listAssets().map((a) => a.id).slice(0, 12).join(", ") || "(없음)";
+    const ids = listAssets().map((a) => 자산표시이름(a.id)).slice(0, 12).join(", ") || "(없음)";
     return `대상 자산을 찾지 못했습니다: "${args.assetId}". 등록된 자산 id: ${ids}`;
   }
   const doc = await generateSbom(asset.id);
@@ -1018,7 +1041,7 @@ function resolveAsset(assetId: string): Asset | undefined {
 function resolveFinding(assetId: string, needle: string): { ok: true; hit: FindingHit } | { ok: false; error: string } {
   const asset = resolveAsset(assetId);
   if (!asset) {
-    const ids = listAssets().map((a) => a.id).join(", ") || "(없음)";
+    const ids = listAssets().map((a) => 자산표시이름(a.id)).join(", ") || "(없음)";
     return { ok: false, error: `자산 "${assetId}"을(를) 찾을 수 없습니다. 등록된 자산 id: ${ids}` };
   }
   if (asset.findings.length === 0) return { ok: false, error: `자산 ${asset.id}에는 조치할 취약점(finding)이 없습니다.` };
@@ -1224,6 +1247,20 @@ function runBulkUpdate(args: Record<string, string>): string {
 
 // 취약점 현황을 조건으로 훑는다. today(cross)가 "오늘 볼 상위 N건"이라면 이건 "조건에 맞는
 // 것들이 지금 어떤 상태인가"를 본다 — 배정·기한·판정 현황 파악이 목적이다.
+/**
+ * 자산 id를 **사람이 읽는 이름**으로. 이름이 없거나 id와 같으면 어쩔 수 없이 id를 쓴다 —
+ * 그럴 땐 앞의 `vuln:`·`asset:` 같은 내부 표식만 떼어 읽기라도 낫게 한다.
+ * ⚠ 지어내지 않는다: 이름을 모르면 모르는 대로 둔다(빈칸이 거짓말보다 낫다).
+ */
+function 자산표시이름(id: string): string {
+  const s = String(id ?? "");
+  try {
+    const a = listAssets().find((x) => x.id === s);
+    if (a?.name && a.name !== s) return a.name;
+  } catch { /* 등록부를 못 읽으면 아래로 */ }
+  return s.replace(/^(vuln|asset|finding|task):/, "");
+}
+
 function runFindingStatusOverview(args: Record<string, string>): string {
   const filter = (args.filter ?? "").trim().toLowerCase();
   const rows = prioritizedReviews(200);
@@ -1255,12 +1292,22 @@ function runFindingStatusOverview(args: Record<string, string>): string {
     `취약점 ${matched.length}건 — 미검토 ${byStatus.pending ?? 0}, 조치완료 ${byStatus.approved ?? 0}, 오탐 ${byStatus.rejected ?? 0}` +
     ` / 담당자 미배정 ${unassigned}건, 기한 초과 ${overdue}건`;
 
+  // ⚠ 예전에는 `[critical] vuln:10.10.20.41 … (pending, …)`을 그대로 냈다.
+  //   담당자가 읽는 글자에 **영문 상태값**과 **내부 식별자**가 섞여 있었다(2026-08-03 실측) —
+  //   말투 규범이 금지한 둘이다. 저장은 영문이어도 **사람에게는 우리말로** 말한다.
+  const 상태말: Record<string, string> = { pending: "미검토", approved: "조치완료", rejected: "오탐" };
+  const 심각도말: Record<string, string> = { critical: "매우 심각", high: "높음", medium: "보통", low: "낮음" };
+  const 표: Record<string, string> = { critical: 표식.위험, high: 표식.높음, medium: 표식.보통, low: 표식.안전 };
+  const 자산이름 = (id: string) => 자산표시이름(id);
   const lines = matched.slice(0, 10).map((r) => {
     const who = r.assignee ? `담당 ${r.assignee}` : "담당 미배정";
     const due = r.dueDate ? `기한 ${r.dueDate}` : "기한 없음";
-    return `- [${r.finding.severity}] ${r.assetId} · ${r.finding.finding_type} (${r.status}, ${who}, ${due})`;
+    const sev = r.finding.severity;
+    return `${표[sev] ?? "·"} [${심각도말[sev] ?? sev}] ${자산이름(r.assetId)} · ${r.finding.finding_type}` +
+      ` (${상태말[r.status] ?? r.status}, ${who}, ${due})`;
   });
-  const more = matched.length > 10 ? `\n… 외 ${matched.length - 10}건` : "";
+  // ⚠ 잘랐으면 잘랐다고 말한다 — 안 그러면 열 건이 전부인 줄 안다.
+  const more = matched.length > 10 ? `\n… 외 ${matched.length - 10}건 (전체 ${matched.length}건 중 위험한 순 10건)` : "";
   // 담당자가 없는 건이 있으면 그게 **다음에 할 일**이다 — 배정 안 된 건은 아무도 안 한다.
   const 할말 = unassigned
     ? `담당자 미배정 ${unassigned}건이 병목입니다 — "1번 담당자 배정해줘"라고 하시거나 조치·승인 화면에서 배정하세요.`

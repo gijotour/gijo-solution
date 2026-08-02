@@ -211,7 +211,10 @@ export const REPORT_CREATE_RE = /(리포트|보고서)[^\n]{0,12}(만들|생성|
 export const REPORT_QUERY_EXCLUDE_RE = /스케줄|일정|예약|언제|이력|목록/;
 
 // "반려 사유가 주로 뭐였어?" — 사내 이력 질문. 데이터는 취약점 검토·유지보수 점검 두 곳에 실재한다.
-export const REJECT_HISTORY_RE = /반려[^\n]{0,10}(사유|이유|왜|뭐|얼마나|몇|이력|내역)|(오탐|보상통제)[^\n]{0,8}(이력|내역|얼마나|몇\s*건)/;
+// ⚠ 오탐 쪽 사이 글자 여유를 8 → 14로 넓혔다(2026-08-03 실전 147상황):
+//   "오탐으로 표시된 거 몇 건이야?"가 **아홉 글자 차이로** 빗나가 LLM에게 갔고,
+//   모델은 "9건입니다" 뒤에 오탐 튜닝 일반론을 붙였다. 세는 일은 코드가 센다.
+export const REJECT_HISTORY_RE = /반려[^\n]{0,10}(사유|이유|왜|뭐|얼마나|몇|이력|내역)|(오탐|보상통제)[^\n]{0,14}(이력|내역|얼마나|몇\s*(건|개))/;
 
 const REJECT_REASON_LABEL: Record<string, string> = { false_positive: "오탐", compensating_control: "보상통제" };
 

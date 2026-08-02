@@ -430,7 +430,26 @@ export function deleteAsset(id: string): boolean {
 
 export function getAsset(assetId: string): Asset | undefined {
   const row = getAssetRowStmt.get(assetId) as AssetRow | undefined;
-  return row ? fromRow(row) : undefined;
+  if (row) return fromRow(row);
+  // ⚠ **이름으로도 찾는다.** 담당자에게 보여 주는 글자는 내부 id가 아니라 이름이라
+  //   (2026-08-03 말투 규범 — `vuln:sample-web01` 같은 내부 키는 사람이 읽는 글자가 아니다),
+  //   화면에서 본 이름 그대로 물었을 때 못 찾으면 이어서 파고들 길이 끊긴다.
+  //   내부 표식(`vuln:` 등)을 뗀 꼴도 받아 준다 — 사람이 그렇게 옮겨 적는다.
+  const 찾을말 = String(assetId ?? "").trim().toLowerCase();
+  if (!찾을말) return undefined;
+  const 벗김 = (s: string) => s.toLowerCase().replace(/^(vuln|asset|finding|task):/, "");
+  const 후보 = listAssets();
+  const 정확 =
+    후보.find((a) => a.name?.toLowerCase() === 찾을말) ??
+    후보.find((a) => 벗김(a.id) === 벗김(찾을말));
+  if (정확) return 정확;
+
+  // ⚠ **딱 하나일 때만** 이어 준다. 이름에 덧붙은 것이 있어 정확히 안 맞는 경우가 많다 —
+  //   실측(2026-08-03): 목록에 "샘플-웹서버"로 보이던 자산의 실제 이름이
+  //   "샘플-웹서버 (10.0.0.100)"이라 그대로 물었더니 못 찾았다.
+  //   여럿이 걸리면 **고르지 않는다** — 엉뚱한 자산을 집어 오는 것이 못 찾는 것보다 나쁘다.
+  const 부분 = 후보.filter((a) => (a.name ?? "").toLowerCase().includes(찾을말));
+  return 부분.length === 1 ? 부분[0] : undefined;
 }
 
 export function listAssets(): Asset[] {

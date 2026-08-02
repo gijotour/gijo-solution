@@ -188,7 +188,8 @@ describe("assign_owner — 자산 담당부서 채우기 (쓰기, 결재판 경�
     registerAsset({ id: "real-01", name: "실자산", path: "-" });
     const out = await executeApprovedTool("assign_owner", { assetId: "존재안함", owner: "x" });
     expect(out).toContain("찾지 못했습니다");
-    expect(out).toContain("real-01");
+    // ⚠ 안내에는 **이름**이 나온다 — 내부 id는 사람이 읽는 글자가 아니다(2026-08-03 말투 규범).
+    expect(out).toContain("실자산");
   });
 
   it("결재판: coverage 결과에서 온 자산 id는 found, 지시문 담당부서는 said", () => {

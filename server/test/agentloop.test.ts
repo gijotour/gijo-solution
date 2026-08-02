@@ -100,10 +100,10 @@ describe("agenttools — 「AI 자산」 조회 도구", () => {
     expect(out).toContain("critical 1");
   });
 
-  it("get_asset은 없는 자산이면 등록된 id 목록과 함께 안내한다", async () => {
+  it("get_asset은 없는 자산이면 등록된 자산 **이름**과 함께 안내한다", async () => {
     seedAsset();
     const out = String(await findAgentTool("get_asset")!.run({ assetId: "no-such" }));
-    expect(out).toContain("찾을 수 없습니다");
+    expect(out).toContain("찾지 못했습니다");   // 「없다」가 아니라 「못 찾았다」 — 말투 규범
     expect(out).toContain("fraud-detect-llm");
   });
 
@@ -114,6 +114,9 @@ describe("agenttools — 「AI 자산」 조회 도구", () => {
   });
 });
 
+// ⚠ 예시 질문으로 "자산 몇 개야?"를 쓰지 말 것 — 2026-08-03부터 **강제 라우팅**에 걸려
+//   LLM 결정 경로를 아예 안 탄다(FORCED_INTENTS 「자산 몇 개인가」). 이 묶음이 재는 것은
+//   **재작성 경로를 탔는가**이므로, 강제되지 않는 말을 써야 한다.
 describe("runAgentLoop — 결정→실행→최종답변", () => {
   it("도구 호출 후 최종 답변을 일반 chat 경로로 재작성한다", async () => {
     seedAsset();
@@ -121,7 +124,7 @@ describe("runAgentLoop — 결정→실행→최종답변", () => {
       .mockResolvedValueOnce('{"action":"tool","tool":"list_assets","args":{}}') // 결정 1
       .mockResolvedValueOnce('{"action":"final"}') // 결정 2 — 결과로 충분
       .mockResolvedValueOnce("등록된 자산은 1개입니다: fraud-detect-llm"); // 최종 재작성(chat)
-    const r = await runAgentLoop("자산 몇 개야?");
+    const r = await runAgentLoop("자산 목록 보여줘");
     expect(r).not.toBeNull();
     // LLM이 다시 쓴 문장이 그대로 앞에 온다. 뒤에 붙는 「다음 단계」 한 줄은 규칙으로 만든
     // 고정 문장이라 재작성이 아니다 — 이 시험이 지키는 것은 **재작성 경로를 탔는가**이고,
@@ -219,7 +222,7 @@ describe("runAgentLoop — 결정→실행→최종답변", () => {
 
   it("JSON이 아닌 응답(LLM 다운 안내 등)이면 null — 폴백", async () => {
     mockChat.mockResolvedValueOnce("⚠ 로컬 LLM 응답이 제한 시간을 초과했습니다");
-    expect(await runAgentLoop("자산 몇 개야?")).toBeNull();
+    expect(await runAgentLoop("자산 목록 보여줘")).toBeNull();
   });
 
   it("존재하지 않는 도구 이름이면 실행하지 않고 관찰로 알려 재결정시킨다", async () => {
