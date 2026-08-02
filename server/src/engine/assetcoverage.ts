@@ -176,7 +176,10 @@ export function coverageSummaryText(cov: AssetCoverage): string {
   const top = cov.ranked.filter((r) => r.why).slice(0, 3);
   if (top.length) {
     lines.push("", "먼저 볼 자산:");
-    for (const r of top) lines.push(`· ${r.id} — ${r.why}`);
+    // ⚠ 이름으로 부른다 — `vuln:10.10.20.11`은 담당자가 읽을 글자가 아니다(2026-08-03 말투 규범).
+    // ⚠ 이름으로 부른다 — `vuln:10.10.20.11`은 담당자가 읽을 글자가 아니다(2026-08-03 말투 규범).
+    //   여기 ranked에 이미 name이 있어 따로 조회할 필요가 없다(순환 참조도 안 만든다).
+    for (const r of top) lines.push(`· ${r.name || r.id.replace(/^(vuln|asset):/, "")} — ${r.why}`);
   }
   return lines.join("\n");
 }

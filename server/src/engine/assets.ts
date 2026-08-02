@@ -452,6 +452,22 @@ export function getAsset(assetId: string): Asset | undefined {
   return 부분.length === 1 ? 부분[0] : undefined;
 }
 
+/**
+ * 자산 id를 **사람이 읽는 이름**으로. 이름이 없거나 id와 같으면 id를 쓰되,
+ * 앞의 내부 표식(`vuln:` 등)만 떼어 읽기라도 낫게 한다.
+ *
+ * ⚠ 한 곳에만 둔다 — 화면에 나가는 글자를 두 벌로 만들면 반드시 어긋난다
+ *   (2026-08-03 예고 판정에서 이미 겪었다: llm과 report가 각자 목록을 들고 있어 누출이 났다).
+ * ⚠ 지어내지 않는다: 이름을 모르면 모르는 대로 둔다.
+ */
+export function 자산표시이름(id: string): string {
+  const s = String(id ?? "");
+  try {
+    const a = listAssets().find((x) => x.id === s);
+    if (a?.name && a.name !== s) return a.name;
+  } catch { /* 등록부를 못 읽으면 아래로 */ }
+  return s.replace(/^(vuln|asset|finding|task):/, "");
+}
 export function listAssets(): Asset[] {
   return (listAssetRowsStmt.all() as AssetRow[]).map(fromRow);
 }

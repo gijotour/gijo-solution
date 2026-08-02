@@ -15,7 +15,7 @@
 // 만들어 돌려주고, 사람이 승인한 뒤 /api/agent/approve로만 실행된다(시안 B, 2026-07-17 확정).
 
 import { dateOnlyLocal, addDaysLocal, koDateTimeString } from "../util/date";
-import { listAssets, getAsset, registerAsset, updateAssetOwnership, setAssetRobustness, isAiAsset, Asset } from "./assets";
+import { listAssets, getAsset, registerAsset, updateAssetOwnership, setAssetRobustness, isAiAsset, Asset, 자산표시이름 } from "./assets";
 import { computeAssetCoverage, coverageSummaryText, type GapKind } from "./assetcoverage";
 import { expandOntology } from "./ontology";
 import { prioritizedReviews, updateFindingReview, findingKey, ReviewPatch, ApprovalStatus } from "./approvals";
@@ -33,7 +33,7 @@ import { dailyBriefingText } from "./briefing";
 import { runRedTeam, makeServedCaller } from "./redteam";
 import { runHardeningScan, scanSummaryText, isStandard } from "./hardeningscan";
 import { listSchedules as listReportSchedules, scheduleSummaryText } from "./reportschedule";
-import { reportActivity } from "./report";
+import { reportActivity, listReportHistory } from "./report";
 import { listSchedules as listHardeningSchedules } from "./hardeningtargets";
 import { timeSavedText } from "./timesaved";
 import { feedbackSummaryText } from "./answerfeedback";
@@ -474,7 +474,8 @@ async function searchOne(q: string): Promise<string[]> {
       a.components.some((c) => matchesLoose(c.name, q, tokens))
   );
   if (assets.length) {
-    out.push(`AI 자산 ${assets.length}건:`, ...assets.slice(0, 6).map((a) => `  - ${a.id} | ${a.name} | ${a.assetType} | ${findingSummary(a)}`));
+    // ⚠ 내부 id를 앞세우지 않는다 — 사람이 읽는 글자가 아니다(2026-08-03 말투 규범).
+    out.push(`AI 자산 ${assets.length}건:`, ...assets.slice(0, 6).map((a) => `  - ${자산표시이름(a.id)} | ${a.assetType} | ${findingSummary(a)}`));
     // 대상이 좁혀졌으면 취약점 **이름**까지 준다(2026-07-28 실측).
     // 건수만 주면 LLM은 아는 만큼만 말해 "medium 1건, low 2건"으로 끝난다 — 담당자가 알고 싶은 건
     // "무엇이" 취약한가다. 아래 취약점 섹션은 우선순위 상위 100건만 보므로 낮은 위험은 거기서 샌다.
@@ -509,11 +510,16 @@ async function searchOne(q: string): Promise<string[]> {
         matchesLoose(r.assetName, q, tokens))
   );
   if (vulns.length) {
-    // assetId를 함께 준다 — LLM이 이어서 get_asset(assetId)을 부를 수 있어야 한다.
-    // (자산명만 주면 id를 몰라 다음 도구를 못 부르고 턴이 낭비된다.)
+    // ⚠ 예전에는 `@ 웹 서비스(id=web-01)`처럼 id를 함께 실었다 — "LLM이 이어서 get_asset을
+    //   부를 수 있게"가 이유였는데, 그 글자가 **담당자 화면에 그대로 나갔다**(2026-08-03 실측).
+    //   이제 getAsset이 **이름으로도 찾으므로**(assets.ts) id를 실을 이유가 없다.
+    //   영문 심각도도 우리말로 바꾼다 — 한글 제품에서 못 읽는다.
+    const 심각도말: Record<string, string> = { critical: "매우 심각", high: "높음", medium: "보통", low: "낮음" };
     out.push(
       `취약점 ${vulns.length}건(우선순위순):`,
-      ...vulns.slice(0, 6).map((r) => `  - [${r.finding.severity}] ${r.finding.finding_type} @ ${r.assetName}(id=${r.assetId}) — 점수 ${r.score}${r.assignee ? `, 담당 ${r.assignee}` : ""}${r.overdue ? " ⚠지연" : ""}`)
+      ...vulns.slice(0, 6).map((r) =>
+        `  - [${심각도말[r.finding.severity] ?? r.finding.severity}] ${r.finding.finding_type} @ ${r.assetName || 자산표시이름(r.assetId)}` +
+        ` — 점수 ${r.score}${r.assignee ? `, 담당 ${r.assignee}` : ""}${r.overdue ? " ⚠지연" : ""}`)
     );
   }
 
@@ -1247,20 +1253,6 @@ function runBulkUpdate(args: Record<string, string>): string {
 
 // 취약점 현황을 조건으로 훑는다. today(cross)가 "오늘 볼 상위 N건"이라면 이건 "조건에 맞는
 // 것들이 지금 어떤 상태인가"를 본다 — 배정·기한·판정 현황 파악이 목적이다.
-/**
- * 자산 id를 **사람이 읽는 이름**으로. 이름이 없거나 id와 같으면 어쩔 수 없이 id를 쓴다 —
- * 그럴 땐 앞의 `vuln:`·`asset:` 같은 내부 표식만 떼어 읽기라도 낫게 한다.
- * ⚠ 지어내지 않는다: 이름을 모르면 모르는 대로 둔다(빈칸이 거짓말보다 낫다).
- */
-function 자산표시이름(id: string): string {
-  const s = String(id ?? "");
-  try {
-    const a = listAssets().find((x) => x.id === s);
-    if (a?.name && a.name !== s) return a.name;
-  } catch { /* 등록부를 못 읽으면 아래로 */ }
-  return s.replace(/^(vuln|asset|finding|task):/, "");
-}
-
 function runFindingStatusOverview(args: Record<string, string>): string {
   const filter = (args.filter ?? "").trim().toLowerCase();
   const rows = prioritizedReviews(200);
@@ -1513,6 +1505,34 @@ function runComplianceStatus(args: Record<string, string>): string {
 // 그대로 알 수 있게 한다("다음 정기 리포트 언제야?", "이번 주 스케줄 뭐있어?" 등).
 function runReportScheduleList(): string {
   return scheduleSummaryText(listReportSchedules());
+}
+
+// "지난달 리포트 어디 있어?" — **어디 있는지** 묻는 말에 목록으로 답한다.
+//   실측(2026-08-03 실전 147상황): LLM에게 가서 사내 문서(스캐너 매니페스트)를 읽고
+//   `FindingsManifestFile (Type: MANIFEST_FINDING, MD5: ed32e90f…)` 를 늘어놓았다.
+//   담당자는 리포트를 찾고 있었는데 남의 파일 해시를 받았다.
+async function runReportList(args: Record<string, string>): Promise<string> {
+  let 목록: Awaited<ReturnType<typeof listReportHistory>>;
+  try { 목록 = await listReportHistory(50); } catch { return "리포트 보관함을 읽지 못했습니다 — 저장 위치를 확인해 주세요."; }
+  // ⚠ 보고서가 아닌 것을 세지 않는다(긴 답변 자동 전환·파일 반입 기록) — 세는 곳과 같은 규칙이다.
+  const 진짜 = 목록.filter((r) => !/^(answer|ingest)-/.test(r.base));
+  if (!진짜.length) {
+    return `아직 만든 보고서가 없습니다.\n${표식.다음} 지금 만들려면 "이번 주 취약점 보고서 만들어줘"`;
+  }
+  const 기간 = (args.filter ?? "").trim();
+  const 보여줄 = 8;
+  const 줄 = 진짜.slice(0, 보여줄).map((r) => {
+    const d = new Date(r.createdAt);
+    const 날 = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const 형식 = [r.docx && "DOCX", r.pdf && "PDF", r.md && "MD"].filter(Boolean).join("·") || "—";
+    return `· ${날} ${r.type}${r.audience === "internal" ? "(내부 검토용)" : ""} — ${형식}`;
+  });
+  const 자름 = 진짜.length > 보여줄 ? ` · 아래는 최근 ${보여줄}건입니다` : "";
+  return (
+    `보관된 보고서 ${진짜.length}건${자름}${기간 ? ` (물으신 조건: "${기간}")` : ""}\n` +
+    `${줄.join("\n")}\n` +
+    `${표식.다음} 열어 보시려면 사이드바 ⑤ 보고 › 「리포트」 화면에서 내려받으세요.`
+  );
 }
 
 // 보고서 작성 현황 — **세는 것은 코드가 센다.** 절차 띠 ⑤ 보고 칸과 **같은 함수**를 쓴다.
@@ -2061,6 +2081,17 @@ const TOOLS: AgentTool[] = [
     //   담당자는 이 답을 보고 "썼구나" 하고 넘어간다. 세는 일을 모델에 맡겨서 생긴 일이고,
     //   같은 숫자를 절차 띠 ⑤ 보고 칸은 이미 결정적으로 세고 있었다(reportActivity).
     //   **세는 것은 코드가 센다.**
+    name: "report_list",
+    label: "보고서 목록",
+    domain: "report",
+    write: false,
+    description:
+      '만들어 둔 보고서가 어디 있는지, 무엇이 있는지 보여준다. "지난달 리포트 어디 있어?", "보고서 목록 보여줘", "지난번에 만든 보고서 찾아줘"에 쓴다. 예: {}',
+    directAnswer: true,
+    params: [{ name: "filter", label: "조건", description: "기간 등 물어본 조건(그대로 되짚어 준다)", required: false }],
+    run: runReportList,
+  },
+  {
     name: "report_activity",
     label: "보고서 작성 현황",
     domain: "report",

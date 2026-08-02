@@ -46,7 +46,9 @@ describe("search — 메뉴를 가로지르는 단일 검색", () => {
 
     const out = await run("search", { query: "Log4Shell" });
     expect(out).toContain("취약점"); // 취약점 섹션
-    expect(out).toContain("web-01"); // 자산명으로도 걸림
+    expect(out).toContain("웹 서비스"); // 자산명으로도 걸림
+    // ⚠ 화면에 나가는 글자는 내부 id가 아니라 **이름**이다(2026-08-03 말투 규범).
+    expect(out, "내부 id가 사람에게 나간다").not.toContain("web-01");
     expect(out).toContain("Log4Shell");
   });
 
@@ -66,7 +68,7 @@ describe("search — 메뉴를 가로지르는 단일 검색", () => {
     mockListDocuments.mockRejectedValue(new Error("임베딩 서버 연결 실패"));
     registerAsset({ id: "web-01", name: "웹 서비스", path: "p" });
     const out = await run("search", { query: "웹 서비스" });
-    expect(out).toContain("web-01"); // 문서 검색 실패가 자산 검색을 죽이지 않는다
+    expect(out).toContain("웹 서비스"); // 문서 검색 실패가 자산 검색을 죽이지 않는다
   });
 
   // 실측(2026-07-19): "자산A와 자산B 비교해줘" 질문에서 7B 모델이 두 대상을 "A OR B" 한 문자열로
@@ -76,8 +78,8 @@ describe("search — 메뉴를 가로지르는 단일 검색", () => {
     registerAsset({ id: "web-01", name: "웹 서비스", path: "p" });
     registerAsset({ id: "db-02", name: "DB 서버", path: "p" });
     const out = await run("search", { query: "웹 서비스 OR DB 서버" });
-    expect(out).toContain("web-01");
-    expect(out).toContain("db-02");
+    expect(out).toContain("웹 서비스");
+    expect(out).toContain("DB 서버");
   });
 
   // 회귀 하네스가 잡음(2026-07-28): "안전대부 웹서버 취약점 알려줘"가 0건이 돼, 호스트명을
@@ -103,8 +105,8 @@ describe("search — 메뉴를 가로지르는 단일 검색", () => {
     registerAsset({ id: "web-01", name: "웹서비스", path: "p" });
     registerAsset({ id: "db-02", name: "DB서버", path: "p" });
     const out = await run("search", { query: "웹서비스와 DB서버" });
-    expect(out).toContain("web-01");
-    expect(out).toContain("db-02");
+    expect(out).toContain("웹서비스");
+    expect(out).toContain("DB서버");
   });
 });
 
