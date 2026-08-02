@@ -129,3 +129,27 @@ describe("★ 목록이 한 약속을 코드가 지킨다", () => {
     expect(out).toContain(g.steps[0].title);
   });
 });
+
+describe("★ 못 찾았을 때 막다른 길로 두지 않는다", () => {
+  beforeEach(() => resetTasksForTests());
+
+  it("할 일에 없으면 담을 길이라도 준다", async () => {
+    // 실측(2026-08-03 실전 147상황): "AhnLab V3 정책 점검 어떻게 해?"에
+    //   "할 일 22건 중 못 찾았습니다"로 끝났다 — 숫자만 주고 갈 곳이 없다.
+    const out = await 실행("work_steps", { task: "여기에없는일xyz" });
+    expect(out).toContain("못 찾았습니다");
+    expect(out, "다음 걸음이 없다 — 「그래서 뭘 하지」가 남는다").toContain("▸");
+    expect(out, "담는 방법을 안 알려 준다").toContain("할 일 추가");
+  });
+
+  it("등록된 보안제품 이름이면 그쪽 길을 알려 준다", async () => {
+    const { listProducts, createProduct } = await import("../src/engine/securityproducts");
+    const 이름 = "시험용백신제품ABC";
+    if (!listProducts().some((p) => p.name === 이름)) {
+      createProduct({ name: 이름, category: "기타" } as never);
+    }
+    const out = await 실행("work_steps", { task: `${이름} 정책 점검 어떻게 해` });
+    expect(out, "제품인 줄 모른다").toContain(이름);
+    expect(out, "매뉴얼로 가는 길을 안 준다").toContain("점검 절차 알려줘");
+  });
+});

@@ -57,6 +57,14 @@ function collectAssets(req: ReportRequest): Asset[] {
   return listAssets();
 }
 
+/** 심각도 건수를 **우리말 한 줄**로. LLM 프롬프트에 영문 키를 넣으면 답변에 그대로 나온다. */
+const 심각도이름: Record<string, string> = { critical: "매우 심각", high: "높음", medium: "보통", low: "낮음" };
+function 심각도한글(counts: Record<string, number>): string {
+  return ["critical", "high", "medium", "low"]
+    .map((k) => `${심각도이름[k]} ${counts[k] ?? 0}건`)
+    .join(" · ");
+}
+
 function severityCounts(assets: Asset[]): Record<string, number> {
   const counts: Record<string, number> = { low: 0, medium: 0, high: 0, critical: 0 };
   for (const asset of assets) {
@@ -552,7 +560,10 @@ export async function generateReport(req: ReportRequest): Promise<ReportResult> 
     agentId: "report",
     message:
       `다음 보안 현황 데이터를 바탕으로 1페이지 요약을 작성해줘. 출력은 보고서 본문 문단만 — 대화록·화자 표시([나]·[주인이] 등)·질문/답변 형식·영어 문장을 절대 쓰지 마세요. ${PLAIN_LANGUAGE_RULE} ${audienceGuide} 자산 ${assets.length}건, ` +
-      `심각도별 발견 건수: ${JSON.stringify(counts)}. ` +
+      // ⚠ 영문 키를 그대로 넣으면 모델이 그대로 복창한다 — 실측(2026-08-03 실전 147상황):
+      //   보고서 요약에 `"low" 2개, "medium" 3개, "high" 5개, "critical" 4개`가 그대로 나갔다.
+      //   한글 제품에서 영문 상태값은 담당자가 못 읽는다(말투 규범 금지 항목). **넣을 때부터 우리말로.**
+      `심각도별 발견 건수: ${심각도한글(counts)}. ` +
       `취약점 조치: 스캔 호스트 ${vuln.hosts}대, 열린 취약점 ${vuln.active}건(Critical ${vuln.critical}·High ${vuln.high}), ` +
       `실제 악용 확인(KEV) ${vuln.kev}건은 최우선 조치 대상. 조치 SLA 준수율 ${vuln.remediation.slaCompliance}%, 기한 초과 ${vuln.remediation.overdue}건. ` +
       `유지보수 점검: 전체 ${ms.total}건 중 지연 ${ms.overdue}건, 승인 대기 ${ms.reported}건, 반려 ${ms.rejected}건.${caseHint} ` +

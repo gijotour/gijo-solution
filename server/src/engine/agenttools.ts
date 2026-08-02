@@ -19,6 +19,7 @@ import { listAssets, getAsset, registerAsset, updateAssetOwnership, setAssetRobu
 import { computeAssetCoverage, coverageSummaryText, type GapKind } from "./assetcoverage";
 import { expandOntology } from "./ontology";
 import { prioritizedReviews, updateFindingReview, findingKey, ReviewPatch, ApprovalStatus } from "./approvals";
+import { 표식 } from "./tone";
 import { listProducts, createProduct, PRODUCT_CATEGORIES } from "./securityproducts";
 import { listMaintenanceItems, createMaintenanceItem } from "./maintenance";
 import { listCompliance, setComplianceStatus } from "./compliance";
@@ -32,6 +33,7 @@ import { dailyBriefingText } from "./briefing";
 import { runRedTeam, makeServedCaller } from "./redteam";
 import { runHardeningScan, scanSummaryText, isStandard } from "./hardeningscan";
 import { listSchedules as listReportSchedules, scheduleSummaryText } from "./reportschedule";
+import { reportActivity } from "./report";
 import { listSchedules as listHardeningSchedules } from "./hardeningtargets";
 import { timeSavedText } from "./timesaved";
 import { feedbackSummaryText } from "./answerfeedback";
@@ -671,14 +673,23 @@ async function runThreats(args: Record<string, string>): Promise<string> {
     .slice()
     .sort((a, b) => (CTI_SEV_ORDER[a.finding.severity] ?? 3) - (CTI_SEV_ORDER[b.finding.severity] ?? 3))
     .slice(0, limit);
-  // matchedAssets에 id=를 함께 준다 — LLM이 이어서 get_asset(assetId)으로 파고들 수 있게.
+  // ⚠ 예전에는 여기에 `이름(id=…)`과 `[critical]`을 그대로 실어 LLM이 파고들게 했다.
+  //   그 답이 **담당자 화면에 그대로 나갔다**(2026-08-03 실전 147상황 실측: 30.5초 + 영문 상태값).
+  //   내부 식별자와 영문 상태값은 사람이 읽는 글자가 아니다 — 말투 규범이 금지하는 둘이다.
+  //   **사람이 읽을 답으로 만들고 즉답으로 돌린다**(재작성 20~30초를 안 쓴다).
+  const 심각도말 = (s: string) => (s === "critical" ? "심각" : s === "warning" ? "경고" : "참고");
+  const 표 = (s: string) => (s === "critical" ? 표식.위험 : s === "warning" ? 표식.주의 : "·");
   const lines = top.map((m) => {
-    const hit = m.matchedAssets.map((a) => `${a.assetName}(id=${a.assetId})`).join(", ");
-    return `- [${m.finding.severity}] ${m.finding.type} — ${m.finding.target} (출처 ${m.finding.source}) → 우리 자산: ${hit}`;
+    const hit = m.matchedAssets.map((a) => a.assetName).join(", ");
+    return `${표(m.finding.severity)} [${심각도말(m.finding.severity)}] ${m.finding.type} — ${m.finding.target} → 우리 자산: ${hit} (출처 ${m.finding.source})`;
   });
+  const 잘림 =
+    matches.length > top.length ? ` · 아래는 심각한 순 ${top.length}건입니다` : "";
   return [
-    `최신 위협 ${summary.totalFindings}건 중 우리 자산에 걸리는 것 ${summary.matchedFindings}건 (영향 자산 ${summary.affectedAssets}개, 심각·경고 ${summary.criticalMatches}건):`,
+    `최신 위협 ${summary.totalFindings}건 중 우리 자산에 걸리는 것 ${summary.matchedFindings}건` +
+      ` (영향 자산 ${summary.affectedAssets}개 · 심각·경고 ${summary.criticalMatches}건)${잘림}`,
     ...lines,
+    `\n${표식.다음} 이어서 — 자산 하나를 파고들려면 "○○ 자산 취약점 알려줘"`,
   ].join("\n").slice(0, 2500);
 }
 
@@ -1457,6 +1468,22 @@ function runReportScheduleList(): string {
   return scheduleSummaryText(listReportSchedules());
 }
 
+// 보고서 작성 현황 — **세는 것은 코드가 센다.** 절차 띠 ⑤ 보고 칸과 **같은 함수**를 쓴다.
+// 따로 세면 반드시 어긋나고, 어긋난 두 숫자는 담당자가 둘 다 안 믿게 만든다.
+function runReportActivity(): string {
+  const a = reportActivity();
+  if (!a) return "보고서 보관함을 읽지 못했습니다 — 저장 위치를 확인해 주세요.";
+  const 지남 =
+    a.daysSinceLast == null
+      ? "아직 만든 보고서가 없습니다"
+      : a.daysSinceLast === 0
+        ? "마지막으로 만든 것이 오늘입니다"
+        : `마지막으로 만든 지 ${a.daysSinceLast}일 됐습니다`;
+  if (a.thisWeek > 0) return `이번 주에 보고서 ${a.thisWeek}건을 만들었습니다 — ${지남}.`;
+  // ⚠ 0건일 때 "없습니다"로 끝내면 "그래서 뭘 하지"가 남는다.
+  return `이번 주에 만든 보고서가 없습니다 — ${지남}.\n▸ 다음 단계 ⑤ 보고 — 바로 만들려면 "이번 주 취약점 보고서 만들어줘"`;
+}
+
 // 원격 정기점검(하드닝) 스케줄 조회 — [2026-07-29 평가 게이트(중-3) 첫 실행이 잡은 공백]
 // "원격 정기점검 스케줄 어떻게 되어 있어?"에 자산 취약점 이야기가 나왔다. 화면(hardening.html)과
 // 데이터(hardening_schedules)는 있는데 챗봇이 들여다볼 도구가 없었다 — 화면에만 있고 챗봇엔 없는
@@ -1664,7 +1691,39 @@ async function runWorkSteps(args: Record<string, string>): Promise<string> {
   if (hit) return 절차카드(hit);
   const 담은것 = await 제안담기(말); // 아직 안 담은 AI 제안이면 담고 연다
   if (담은것) return `AI가 제안한 일이라 **내 업무에 담고** 절차를 엽니다.\n\n` + 절차카드(담은것);
-  return `전체 ${열린것.length}건 중 "${말}"에 맞는 할 일을 못 찾았습니다. "오늘 할 일"이라고 물어 목록부터 보세요.`;
+  // 실측(2026-08-03 실전 147상황): "AhnLab V3 정책 점검 어떻게 해?"가 여기까지 와서
+  //   "할 일 22건 중 못 찾았습니다"로 끝났다. 담당자가 물은 것은 **보안제품 운영 절차**인데
+  //   내 할 일 목록을 뒤진 답을 받은 것이다 — 숫자만 주고 갈 곳이 없다.
+  // ⚠ 라우팅을 바꾸지 않는다(지금 잘 도는 것을 건드리는 위험을 안 진다).
+  //   **막다른 길을 이정표로** 바꾼다: 등록된 제품 이름이 섞여 있으면 그쪽 길을 알려 준다.
+  const 제품 = 말한제품찾기(말);
+  if (제품) {
+    return (
+      `"${말}"은 제 할 일 목록에 없습니다 — **${제품.name}**은 등록된 보안제품이라 운영 절차는 그 제품의 사내 자료에 있습니다.\n` +
+      `▸ "${제품.name} 점검 절차 알려줘"라고 물으시면 매뉴얼에서 찾아 드립니다.\n` +
+      `▸ 이 일을 계속 관리하시려면 "할 일 추가: ${말}"`
+    );
+  }
+  return (
+    `전체 ${열린것.length}건 중 "${말}"에 맞는 할 일을 못 찾았습니다.\n` +
+    `▸ 목록부터 보시려면 "오늘 할 일"\n` +
+    `▸ 새로 담으시려면 "할 일 추가: ${말}"`
+  );
+}
+
+/** 말 속에 등록된 보안제품 이름이 들어 있는가. 짧은 이름이 아무 데나 걸리지 않게 3글자 이상만 본다. */
+function 말한제품찾기(말: string): { name: string } | null {
+  const 눌러 = (s: string) => s.toLowerCase().replace(/\s+/g, "");
+  const t = 눌러(말);
+  let 최선: { name: string } | null = null;
+  try {
+    for (const p of listProducts()) {
+      const n = 눌러(p.name ?? "");
+      if (n.length < 3 || !t.includes(n)) continue;
+      if (!최선 || n.length > 눌러(최선.name).length) 최선 = { name: p.name };   // 긴 이름이 더 확실하다
+    }
+  } catch { return null; }
+  return 최선;
 }
 
 async function runStepDone(args: Record<string, string>): Promise<string> {
@@ -1948,6 +2007,22 @@ const TOOLS: AgentTool[] = [
     directAnswer: true,
     params: [],
     run: runReportScheduleList,
+  },
+  {
+    // 실측(2026-08-03 실전 147상황): "이번 주 보고서 썼어?"에 **"지난주 보고서는 7월 5일에
+    //   작성되었습니다"**라고 답했다. 이번 주를 물었는데 지난주를 답한 것이다 —
+    //   담당자는 이 답을 보고 "썼구나" 하고 넘어간다. 세는 일을 모델에 맡겨서 생긴 일이고,
+    //   같은 숫자를 절차 띠 ⑤ 보고 칸은 이미 결정적으로 세고 있었다(reportActivity).
+    //   **세는 것은 코드가 센다.**
+    name: "report_activity",
+    label: "보고서 작성 현황",
+    domain: "report",
+    write: false,
+    description:
+      '이번 주에 보고서를 만들었는지, 마지막으로 만든 지 며칠 됐는지 센다. "이번 주 보고서 썼어?", "보고서 언제 마지막으로 냈지?", "이번 달 보고 했나?"에 쓴다. 예: {}',
+    directAnswer: true,
+    params: [],
+    run: runReportActivity,
   },
   {
     name: "hardening_schedule_list",
@@ -2538,6 +2613,7 @@ const TOOLS: AgentTool[] = [
     write: false,
     description:
       '우리 자산에 걸리는 최신 위협을 보여준다 — "요즘 위협 있어?", "새로 뜬 거 우리랑 관련?", "우리 자산에 걸리는 위협", "위협 인텔"에 쓴다. CTI 피드 탐지 × 사내 자산 교집합. 예: {"limit":"5"}',
+    directAnswer: true,   // 이미 우리말 요약 — 재작성하면 20~30초만 더 들고 숫자가 흔들린다
     params: [{ name: "limit", label: "개수", description: "상위 몇 건 (기본 5)", required: false }],
     run: runThreats,
   },

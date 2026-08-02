@@ -77,11 +77,16 @@ describe("agenttools — 「AI 자산」 조회 도구", () => {
     expect(out).toMatch(/겹치는 것은 없습니다|새로 탐지된 위협이 없습니다/);
   });
 
-  it("threats는 자산 신호가 CTI 탐지와 겹치면 해당 위협·자산 id를 준다", async () => {
+  it("threats는 겹치는 위협과 **자산 이름**을 준다 (내부 id·영문 상태값은 안 낸다)", async () => {
+    // ⚠ 예전에는 `이름(id=…)`과 `[critical]`을 실어 LLM이 이어서 파고들게 했다.
+    //   그 답이 **담당자 화면에 그대로 나갔다**(2026-08-03 실전 147상황: 30.5초 + 영문 상태값).
+    //   지금은 즉답(directAnswer)이라 LLM 재작성을 안 거친다 — 그러니 **사람이 읽을 글자**여야 한다.
     registerAsset({ id: "ai-kobert-01", name: "KoBERT 분류기", path: "models/kobert.onnx" });
     const out = String(await findAgentTool("threats")!.run({ limit: "5" }));
-    expect(out).toContain("KoBERT"); // 시드 위협 target 텍스트
-    expect(out).toContain("ai-kobert-01"); // 이어서 get_asset 할 수 있게 id 노출
+    expect(out).toContain("KoBERT"); // 시드 위협 target 텍스트 + 자산 이름
+    expect(out, "내부 id가 사람에게 나간다").not.toContain("id=");
+    expect(out, "영문 심각도가 그대로 나간다").not.toMatch(/\[(critical|warning|info)\]/);
+    expect(out, "다음 걸음이 없다").toContain("▸");
   });
 
   it("list_assets는 자산 개수·이름·finding 요약을 담는다", async () => {
