@@ -649,6 +649,41 @@ export interface ReportHistoryEntry {
   createdBy?: string; // 작업 귀속 — 누가 생성했는지
 }
 
+/**
+ * 보고 현황을 **동기로** 센다 — 절차 띠(workflow.ts)가 동기 경로라 async를 못 쓴다.
+ *
+ * 돌려주는 것: 이번 주(월요일부터) 만든 보고서 수 · 마지막 보고 후 지난 날수.
+ * ⚠ 폴더를 못 읽으면 **null**이다. 0으로 채우면 "이번 주 하나도 안 썼다"가 되어 거짓이 된다 —
+ *   못 구한 것과 없는 것은 다르다.
+ * ⚠ 같은 보고서가 docx·pdf·json으로 여러 벌 저장되므로 **파일명 접두(base)로 묶어** 센다.
+ *   안 묶으면 한 번 쓴 보고서가 세 건으로 잡힌다.
+ */
+export function reportActivity(): { thisWeek: number; daysSinceLast: number | null } | null {
+  try {
+    const nodeFs = require("node:fs") as typeof import("node:fs");
+    if (!nodeFs.existsSync(REPORT_DIR)) return { thisWeek: 0, daysSinceLast: null };
+    const 주시작 = new Date();
+    주시작.setHours(0, 0, 0, 0);
+    주시작.setDate(주시작.getDate() - ((주시작.getDay() + 6) % 7)); // 월요일
+    const 묶음 = new Map<string, number>();   // base → 가장 이른 생성시각
+    for (const f of nodeFs.readdirSync(REPORT_DIR)) {
+      const m = /^(.+)\.(docx|pdf|md)$/i.exec(f);
+      if (!m) continue;
+      const t = nodeFs.statSync(require("node:path").join(REPORT_DIR, f)).mtimeMs;
+      const 이전 = 묶음.get(m[1]);
+      if (이전 == null || t < 이전) 묶음.set(m[1], t);
+    }
+    if (묶음.size === 0) return { thisWeek: 0, daysSinceLast: null };
+    const 시각들 = [...묶음.values()];
+    const thisWeek = 시각들.filter((t) => t >= 주시작.getTime()).length;
+    const 최근 = Math.max(...시각들);
+    const daysSinceLast = Math.floor((Date.now() - 최근) / 86400000);
+    return { thisWeek, daysSinceLast };
+  } catch {
+    return null;   // 못 읽으면 비운다 — 지어내지 않는다
+  }
+}
+
 export async function listReportHistory(limit = 100): Promise<ReportHistoryEntry[]> {
   await fs.mkdir(REPORT_DIR, { recursive: true });
   const files = await fs.readdir(REPORT_DIR);

@@ -15,6 +15,7 @@ import { listAssets } from "./assets";
 import { isRealVulnerability } from "./agenttools";
 import { listFindingReviews } from "./approvals";
 import { listTargets, listRuns } from "./hardeningtargets";
+import { reportActivity } from "./report";
 
 /**
  * 화면 → 절차 단계. **여기가 단 하나의 출처다.**
@@ -112,6 +113,9 @@ export function workflowStages(): WorkflowStage[] {
     실패항목 = Object.values(최근).reduce((a, b) => a + b, 0);
   } catch { /* 못 구하면 비워 둔다 — 0으로 채우면 "없다"가 되어 거짓이다 */ }
 
+  // ⑤ 보고 — 리포트 폴더를 읽는다. 못 읽으면 null이고, 그때는 칸을 비운다.
+  const 보고 = reportActivity();
+
   // ⚠ page는 **STAGE_SCREENS의 그 단계 안에 있는 화면**이어야 한다 — 아니면 띠에서 눌러
   //   도착한 순간 띠가 다른 단계를 가리킨다. workflow.test.ts가 대조해 막는다.
   return [
@@ -119,9 +123,10 @@ export function workflowStages(): WorkflowStage[] {
     { no: 2, key: "triage", label: "우선순위", count: 취약, alert: kev, alertLabel: "실제 악용(KEV)", page: "vulnscan.html", screens: STAGE_SCREENS[2] },
     { no: 3, key: "fix", label: "조치", count: 진행, alert: 미배정, alertLabel: "미배정", page: "approvals.html", screens: STAGE_SCREENS[3] },
     { no: 4, key: "verify", label: "검증", count: 실패항목, alert: 미확인, alertLabel: "미점검 대상", page: "hardening.html", screens: STAGE_SCREENS[4] },
-    // ⑤ 보고 — "이번 주 리포트를 썼나"는 리포트 이력을 읽어야 하는데, 그 판정 규칙을 아직
-    //    한 곳으로 모으지 않았다. **지어내지 않고 비워 둔다**(화면이 빈칸으로 그린다).
-    { no: 5, key: "report", label: "보고", count: null, alert: null, alertLabel: "", page: "report.html", screens: STAGE_SCREENS[5] },
+    // ⑤ 보고 — 이번 주 쓴 보고서 수와 마지막 보고 후 지난 날수(2026-08-02 규칙 확정).
+    //    ⚠ 한동안 비워 뒀던 칸이다. 다섯 칸 중 하나가 늘 비어 있으면 담당자는 고장으로 읽는다.
+    //    ⚠ 못 읽으면 여전히 **비운다** — 0으로 채우면 "안 썼다"가 되어 거짓이다.
+    { no: 5, key: "report", label: "보고", count: 보고?.thisWeek ?? null, alert: 보고?.daysSinceLast ?? null, alertLabel: 보고?.daysSinceLast == null ? "" : "마지막 보고 후(일)", page: "report.html", screens: STAGE_SCREENS[5] },
   ];
 }
 

@@ -211,6 +211,23 @@
   }
 
   function embedSrc(page) { return page + (page.indexOf("?") >= 0 ? "&" : "?") + "embed=1"; }
+  // 합쳐서 없어진 화면의 **옛 탭**을 새 이름·새 주소로 바로잡는다 (2026-08-02).
+  //
+  // ⚠ iframe 쪽 리다이렉트만으로는 부족하다. 리다이렉트는 화면 안에서 일어나고 **탭 이름은
+  //   셸이 따로 저장**하므로, 그냥 두면 「자산 통합 뷰」라는 이름 안에 자산 목록이 뜬다 —
+  //   이름과 내용이 다르면 담당자는 잘못 눌렀다고 생각한다(실측 2026-08-02).
+  // ⚠ 새 이름은 사이드바(nav.js GROUPS)에 적힌 것과 **같아야** 한다.
+  var 옛탭 = {
+    "assethub.html": { page: "inventory.html", label: "자산 목록" },
+    "opsguide.html": { page: "maintenance.html", label: "정기 점검" },
+    "ontology.html": { page: "memory.html", label: "AI 지식" },
+    "mywork.html": { page: "dashboard.html", label: "대시보드" },
+  };
+  function 옛탭바로잡기(o) {
+    var m = 옛탭[String(o && o.page || "").split("?")[0]];
+    return m ? { page: m.page, label: m.label, pinned: !!(o && o.pinned) } : o;
+  }
+
 
   function find(page) {
     for (var i = 0; i < tabs.length; i++) if (tabs[i].page === page) return tabs[i];
@@ -558,8 +575,12 @@
     var st = null;
     try { st = JSON.parse(localStorage.getItem(KEY_TABS) || "null"); } catch (e) {}
     if (st && st.open && st.open.length) {
-      st.open.forEach(function (o) { open(o.page, o.label); if (o.pinned) { var t = find(o.page); if (t) t.pinned = true; } });
-      if (st.active && find(st.active)) show(st.active);
+      // ⚠ 바로잡으면 두 옛 탭이 같은 화면을 가리킬 수 있다(자산 통합 뷰 + 자산 목록) —
+      //   그대로 열면 같은 탭이 두 번 생긴다. open()이 이미 있는 탭을 재사용하므로 안전하지만,
+      //   활성 탭 주소도 함께 바로잡아야 엉뚱한 탭이 선택된다.
+      st.open.map(옛탭바로잡기).forEach(function (o) { open(o.page, o.label); if (o.pinned) { var t = find(o.page); if (t) t.pinned = true; } });
+      var 활성 = (옛탭[String(st.active || "").split("?")[0]] || {}).page || st.active;
+      if (활성 && find(활성)) show(활성);
       redraw();
     } else {
       open("dashboard.html", "대시보드"); // 첫 실행 — 대시보드도 여러 탭 중 하나다

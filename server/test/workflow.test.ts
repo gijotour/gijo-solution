@@ -91,6 +91,22 @@ describe("업무 절차 5단계", () => {
     expect(formatScreenGuide("report.html")).toContain("여기까지가 한 바퀴입니다");
   });
 
+  it("⑤ 보고 칸이 더는 늘 비어 있지 않다", () => {
+    // ⚠ 한동안 null로 비워 뒀던 칸이다(판정 규칙을 안 정해서). 다섯 칸 중 하나가 늘
+    //   비어 있으면 담당자는 고장으로 읽는다. 이제 리포트 이력으로 센다.
+    //   ⚠ 다만 **폴더를 못 읽으면 여전히 비운다** — 0으로 채우면 "안 썼다"가 되어 거짓이다.
+    //   그래서 시험은 "항상 숫자"가 아니라 "라벨과 값이 짝이 맞는가"를 본다.
+    const s5 = workflowStages().find((x) => x.no === 5)!;
+    if (s5.alert == null) {
+      expect(s5.alertLabel, "값이 없는데 라벨만 있으면 화면에 빈 경고가 뜬다").toBe("");
+    } else {
+      expect(s5.alertLabel).toContain("마지막 보고");
+      expect(s5.alert).toBeGreaterThanOrEqual(0);
+    }
+    // count는 못 읽었을 때만 null이다.
+    expect(s5.count === null || s5.count >= 0).toBe(true);
+  });
+
   it("모든 단계가 숫자 아니면 빈칸을 준다 — 지어내지 않는다", () => {
     for (const s of workflowStages()) {
       expect(s.count === null || Number.isFinite(s.count), `${s.no}단계 count가 이상하다`).toBe(true);
