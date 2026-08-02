@@ -324,10 +324,40 @@ export function registerAsset(args: {
   return asset;
 }
 
+/**
+ * 스캔 결과를 자산에 기록한다.
+ *
+ * ⚠ **실패한 스캔은 알던 취약점을 지우지 않는다** (2026-08-02 실측 데이터 소실).
+ *   증상: 데모 취약점 14건을 반입해 화면에서 확인까지 했는데, 잠시 뒤 0건이 되어 있었다.
+ *   원인: 이 함수가 findings를 **통째로 교체**한다. 전체 자산 스캔이 돌면 IP 호스트에는
+ *   modelscan이 맞지 않아 실패하고, 그 `scan_error` 한 줄이 실제 취약점을 덮어썼다.
+ *   운영 데이터가 609건 전부 스캔 오류였던 이유도 이것이다 — 취약점이 없던 게 아니라
+ *   **지워진** 것이다.
+ *
+ *   스캔이 실패했다는 사실은 "그 취약점이 사라졌다"를 뜻하지 않는다. 모르는 것을 안다고
+ *   기록하는 셈이라, 담당자가 그 화면을 보고 "다 조치됐네"라고 판단하면 그게 사고다.
+ *   그래서 **들어온 결과가 전부 스캔 실패**이고 **알던 것에 진짜 취약점이 있으면**,
+ *   알던 것을 지키고 실패 기록을 함께 남긴다(감추지도 않는다).
+ *
+ * ⚠ 정상 재스캔이 0건을 돌려주는 경우(다 고쳤다)는 막지 않는다 — 그때는 들어온 목록이
+ *   비어 있지 스캔 실패가 아니다. 조건을 "전부 스캔 실패"로 좁게 잡은 이유다.
+ */
+function 실패로덮어쓰지않기(assetId: string, 들어온: StandardFinding[], 이전JSON: string): StandardFinding[] {
+  const 스캔실패 = (f: StandardFinding) => f.finding_type === "scan_error" || f.finding_type === "scan_not_supported";
+  if (들어온.length === 0 || !들어온.every(스캔실패)) return 들어온;
+  let 이전: StandardFinding[] = [];
+  try { 이전 = JSON.parse(이전JSON) as StandardFinding[]; } catch { return 들어온; }
+  const 진짜 = 이전.filter((f) => !스캔실패(f));
+  if (진짜.length === 0) return 들어온;   // 지킬 것이 없으면 그대로
+  // 알던 취약점 + 이번 실패 기록. 실패를 감추면 "왜 결과가 안 바뀌지?"가 된다.
+  return [...진짜, ...들어온];
+}
+
 export function recordFindings(assetId: string, findings: StandardFinding[]): Asset | undefined {
   const existing = getAssetRowStmt.get(assetId) as AssetRow | undefined;
   if (!existing) return undefined;
 
+  findings = 실패로덮어쓰지않기(assetId, findings, existing.findings);
   const scannedAt = Date.now();
   insertScanRunStmt.run({
     id: `${assetId}-${scanHistoryOf(assetId).length + 1}`,
