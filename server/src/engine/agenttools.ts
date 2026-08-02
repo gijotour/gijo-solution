@@ -19,7 +19,7 @@ import { listAssets, getAsset, registerAsset, updateAssetOwnership, setAssetRobu
 import { computeAssetCoverage, coverageSummaryText, type GapKind } from "./assetcoverage";
 import { expandOntology } from "./ontology";
 import { prioritizedReviews, updateFindingReview, findingKey, ReviewPatch, ApprovalStatus } from "./approvals";
-import { 표식 } from "./tone";
+import { 표식, 심각도한글, 심각도표식 } from "./tone";
 import { listProducts, createProduct, PRODUCT_CATEGORIES } from "./securityproducts";
 import { listMaintenanceItems, createMaintenanceItem } from "./maintenance";
 import { listCompliance, setComplianceStatus } from "./compliance";
@@ -219,7 +219,7 @@ async function runGetAsset(args: Record<string, string>): Promise<string> {
     .slice()
     .sort((a, b) => SEVERITY_ORDER.indexOf(a.severity) - SEVERITY_ORDER.indexOf(b.severity))
     .slice(0, 5)
-    .map((f) => `  - [${f.severity}] ${f.finding_type}: ${f.evidence.slice(0, 80)}`);
+    .map((f) => `  ${심각도표식(f.severity)} [${심각도한글(f.severity)}] ${f.finding_type}: ${f.evidence.slice(0, 80)}`);
   const b = asset.aibom;
   const v = (s: string) => (s.trim() === "" ? "미기재" : s);
   const aibomLines = [
@@ -485,7 +485,7 @@ async function searchOne(q: string): Promise<string[]> {
       if (!real.length) continue;
       out.push(
         `  · ${a.name} 취약점 ${real.length}건:`,
-        ...real.slice(0, 8).map((f) => `      - [${f.severity}] ${f.finding_type}`)
+        ...real.slice(0, 8).map((f) => `      ${심각도표식(f.severity)} [${심각도한글(f.severity)}] ${f.finding_type}`)
       );
     }
     // 자산은 찾았는데 **그 자산의 취약점이 하나도 없을 때**, 그 자산을 다룬 사내 문서를 찾아 붙인다.
@@ -514,11 +514,10 @@ async function searchOne(q: string): Promise<string[]> {
     //   부를 수 있게"가 이유였는데, 그 글자가 **담당자 화면에 그대로 나갔다**(2026-08-03 실측).
     //   이제 getAsset이 **이름으로도 찾으므로**(assets.ts) id를 실을 이유가 없다.
     //   영문 심각도도 우리말로 바꾼다 — 한글 제품에서 못 읽는다.
-    const 심각도말: Record<string, string> = { critical: "매우 심각", high: "높음", medium: "보통", low: "낮음" };
     out.push(
       `취약점 ${vulns.length}건(우선순위순):`,
       ...vulns.slice(0, 6).map((r) =>
-        `  - [${심각도말[r.finding.severity] ?? r.finding.severity}] ${r.finding.finding_type} @ ${r.assetName || 자산표시이름(r.assetId)}` +
+        `  ${심각도표식(r.finding.severity)} [${심각도한글(r.finding.severity)}] ${r.finding.finding_type} @ ${r.assetName || 자산표시이름(r.assetId)}` +
         ` — 점수 ${r.score}${r.assignee ? `, 담당 ${r.assignee}` : ""}${r.overdue ? " ⚠지연" : ""}`)
     );
   }
@@ -642,8 +641,12 @@ function runToday(args: Record<string, string>): string {
       f.epss != null ? `EPSS ${f.epss}` : null,
       f.vpr != null ? `VPR ${f.vpr}` : null,
     ].filter(Boolean).join(" · ");
-    // assetId 포함 — LLM이 "1번 자산 자세히 봐줘" 후속 지시에 get_asset을 바로 부를 수 있게.
-    return `${i + 1}. [${f.severity}] ${f.finding_type} @ ${r.assetName}(id=${r.assetId})${tags ? ` — ${tags}` : ""}${r.assignee ? ` | 담당 ${r.assignee}` : " | 담당 미지정"}${r.dueDate ? ` | 기한 ${r.dueDate}` : ""}${r.overdue ? " ⚠기한초과" : ""}`;
+    // ⚠ **제품에서 가장 많이 쓰는 답**이다 — 여기 글자가 곧 담당자가 매일 보는 글자다.
+    //   예전에는 `[critical] … @ 이름(id=vuln:10.10.20.41)`이었다: 영문 상태값과 내부 키 둘 다
+    //   말투 규범이 금지한 것이고, 실제로 담당자 화면에 그대로 나갔다(2026-08-03 실측).
+    //   id는 "LLM이 이어서 get_asset을 부를 수 있게" 실었는데, 이제 **이름으로도 찾으므로**
+    //   실을 이유가 없다(assets.ts getAsset).
+    return `${i + 1}. ${심각도표식(f.severity)} [${심각도한글(f.severity)}] ${f.finding_type} @ ${r.assetName || 자산표시이름(r.assetId)}${tags ? ` — ${tags}` : ""}${r.assignee ? ` | 담당 ${r.assignee}` : " | 담당 미지정"}${r.dueDate ? ` | 기한 ${r.dueDate}` : ""}${r.overdue ? ` ${표식.주의}기한초과` : ""}`;
   });
   const overdue = top.filter((r) => r.overdue).length;
   return [
@@ -745,7 +748,7 @@ function runScanStatus(args: Record<string, string>): string {
     for (const f of a.findings) {
       const st = f.state ?? "unknown";
       counts[st] = (counts[st] ?? 0) + 1;
-      if (st === "fixed") fixedList.push(`${a.id} [${f.severity}] ${f.finding_type}`);
+      if (st === "fixed") fixedList.push(`${자산표시이름(a.id)} [${심각도한글(f.severity)}] ${f.finding_type}`);
     }
   }
   const total = Object.values(counts).reduce((x, y) => x + y, 0);
@@ -787,7 +790,7 @@ async function runRunRedteam(args: Record<string, string>): Promise<string> {
   const worst = Object.entries(report.byCategory)
     .filter(([, c]) => c.vulnerable > 0)
     .sort((a, b) => b[1].vulnerable - a[1].vulnerable)[0];
-  const vulnList = report.results.filter((r) => r.vulnerable).slice(0, 5).map((r) => `  - [${r.severity}] ${r.desc} (${r.basis})`);
+  const vulnList = report.results.filter((r) => r.vulnerable).slice(0, 5).map((r) => `  ${심각도표식(r.severity)} [${심각도한글(r.severity)}] ${r.desc} (${r.basis})`);
   return [
     `${asset.name} 레드팀 점검 완료 — 견고성 ${report.robustnessScore}점 (${report.total - report.vulnerable}/${report.total} 방어 성공)`,
     worst ? `가장 취약한 유형: ${worst[0]} (${worst[1].vulnerable}/${worst[1].total}건 뚫림)` : "14개 공격 유형 전부 방어 성공",
@@ -1007,7 +1010,7 @@ interface FindingHit {
 }
 
 function findingLabel(f: Asset["findings"][number]): string {
-  return `[${f.severity}] ${f.finding_type}`;
+  return `[${심각도한글(f.severity)}] ${f.finding_type}`;
 }
 
 // finding 지목 매칭 — needle의 모든 토큰이 haystack에 있으면 매칭(연속 부분문자열 아님).
@@ -1164,7 +1167,7 @@ function matchFindingsByFilter(filter: string): BulkMatch[] {
   // 남은 키워드(심각도·KEV·집합어 제거 후)로 유형·근거 매칭
   const kw = f.replace(/critical|high|medium|low|크리티컬|심각|높은?|중간|낮은?|kev|실제\s*악용|악용|미배정|담당\s*없음?|미지정|기한\s*초과|지연|overdue|전부|모두|다|취약점|것들?|전체/g, "").trim();
   if (kw.length >= 2) sel = sel.filter((r) => matches(`${r.finding.finding_type} ${r.finding.evidence}`, kw));
-  return sel.map((r) => ({ assetId: r.assetId, key: r.findingKey, label: `[${r.finding.severity}] ${r.finding.finding_type} @ ${r.assetName}` }));
+  return sel.map((r) => ({ assetId: r.assetId, key: r.findingKey, label: `[${심각도한글(r.finding.severity)}] ${r.finding.finding_type} @ ${r.assetName}` }));
 }
 
 // 화면(대화창)에서 **체크박스로 직접 고른** 건들을 받는다 — "assetId::findingKey" 목록.
@@ -1188,7 +1191,7 @@ export function matchFindingsByIds(ids: string): { matched: BulkMatch[]; unknown
     byId.set(`${r.assetId}::${r.findingKey}`, {
       assetId: r.assetId,
       key: r.findingKey,
-      label: `[${r.finding.severity}] ${r.finding.finding_type} @ ${r.assetName}`,
+      label: `[${심각도한글(r.finding.severity)}] ${r.finding.finding_type} @ ${r.assetName}`,
     });
   }
   const matched: BulkMatch[] = [];
@@ -1288,14 +1291,12 @@ function runFindingStatusOverview(args: Record<string, string>): string {
   //   담당자가 읽는 글자에 **영문 상태값**과 **내부 식별자**가 섞여 있었다(2026-08-03 실측) —
   //   말투 규범이 금지한 둘이다. 저장은 영문이어도 **사람에게는 우리말로** 말한다.
   const 상태말: Record<string, string> = { pending: "미검토", approved: "조치완료", rejected: "오탐" };
-  const 심각도말: Record<string, string> = { critical: "매우 심각", high: "높음", medium: "보통", low: "낮음" };
-  const 표: Record<string, string> = { critical: 표식.위험, high: 표식.높음, medium: 표식.보통, low: 표식.안전 };
   const 자산이름 = (id: string) => 자산표시이름(id);
   const lines = matched.slice(0, 10).map((r) => {
     const who = r.assignee ? `담당 ${r.assignee}` : "담당 미배정";
     const due = r.dueDate ? `기한 ${r.dueDate}` : "기한 없음";
     const sev = r.finding.severity;
-    return `${표[sev] ?? "·"} [${심각도말[sev] ?? sev}] ${자산이름(r.assetId)} · ${r.finding.finding_type}` +
+    return `${심각도표식(sev)} [${심각도한글(sev)}] ${자산이름(r.assetId)} · ${r.finding.finding_type}` +
       ` (${상태말[r.status] ?? r.status}, ${who}, ${due})`;
   });
   // ⚠ 잘랐으면 잘랐다고 말한다 — 안 그러면 열 건이 전부인 줄 안다.
@@ -2626,6 +2627,11 @@ const TOOLS: AgentTool[] = [
     write: false,
     description:
       'AI·IT 자산 목록을 보여준다 (개수·이름·유형·담당자·finding 요약). 종류나 이름으로 좁힐 수 있다 — 예: {"query":"방화벽"}, {"query":"LLM 서비스"}. 비우면 전체.',
+    // ⚠ 즉답이다(2026-08-03). 예전에는 LLM이 다시 썼는데, "우리 자산 몇 대야?"에
+    //   머리줄(`등록된 AI 자산 57개 · 아래는 15개입니다`)과 「다음 걸음」을 날리고
+    //   `등록된 AI 자산 총 57개입니다.` 한 줄만 남겼다 — **개수를 물었는데 잘림 고지가 사라졌다.**
+    //   출력이 이미 우리말 요약이라 다시 쓸 이유가 없고, 재작성 시간(20~30초)도 아낀다.
+    directAnswer: true,
     params: [{ name: "query", label: "찾을 말", description: "유형·이름·카테고리·서비스 (선택, 비우면 전체)", required: false }],
     run: runListAssets,
   },
@@ -2970,6 +2976,21 @@ function textHas(haystack: string, value: string): boolean {
 
 // toolResults: 이 결재판이 뜨기까지 에이전트 루프가 실행한 읽기 도구들의 결과(합친 텍스트).
 // assign_finding의 assetId·finding처럼 "앞선 조회 결과에서 복사한" 값은 환각이 아니므로 유지한다.
+/**
+ * 앞선 조회 결과에 **이 자산이 보였는가** — id가 아니라 대상으로 판단한다.
+ *
+ * 화면에 나가는 글자는 이름이고 도구 인자는 id다. 둘이 다르다고 "근거 없음"으로 몰면
+ * 근거 배지가 거짓말을 한다(2026-08-03 실측: today에서 id를 뺀 순간 found → guess로 떨어졌다).
+ * ⚠ 이름이 없거나 너무 짧으면(2자 이하) 판단하지 않는다 — 흔한 글자가 아무 데나 걸린다.
+ */
+function 같은자산이보였나(toolResults: string, assetId: string): boolean {
+  const 결과 = String(toolResults ?? "");
+  if (!결과.trim() || !assetId) return false;
+  const 이름 = 자산표시이름(assetId);
+  if (!이름 || 이름.length <= 2) return false;
+  return textHas(결과, 이름);
+}
+
 export function buildApproval(
   tool: AgentTool,
   rawArgs: Record<string, string>,
@@ -2985,6 +3006,11 @@ export function buildApproval(
     else if (p.name in autoFilled) source = "auto";
     else if (textHas(instruction, value)) source = "said";
     else if (textHas(toolResults, value)) source = "found"; // 앞선 조회 결과에서 온 값 — 근거 있음
+    // ⚠ **글자가 아니라 대상이 같은지**를 본다. 2026-08-03에 도구 답에서 내부 id를 빼고
+    //   이름으로 보여주게 바꿨더니(말투 규범), 앞선 조회에서 분명히 본 자산인데도
+    //   `vuln:sample-web01`이라는 **글자**가 없다는 이유로 근거 배지가 「지어냄」으로 떨어졌다.
+    //   근거 배지는 "AI가 봤는가"를 알리는 장치라, 봤는데 못 봤다고 하면 그 배지를 못 믿게 된다.
+    else if (p.name === "assetId" && 같은자산이보였나(toolResults, value)) source = "found";
     else source = "guess";
     // 필수값은 LLM이 지어낸 값(guess)을 받지 않는다 — 빈 칸으로 되묻는다.
     // 실측(2026-07-17): 경로를 안 알려주고 "테스트봇 등록해줘"라고 하면 7B 모델이 그럴듯한

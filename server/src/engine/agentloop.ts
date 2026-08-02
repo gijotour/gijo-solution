@@ -11,6 +11,7 @@
 // 채팅 경로로 폴백한다. 즉 루프 도입으로 기존 동작이 나빠지는 회귀가 없다.
 
 import { chat } from "./llm";
+import { 표식 } from "./tone";
 import { reportProgress } from "./progress";
 import { listAgentTools, listToolsFor, findAgentTool, toolCatalogText, validateToolArgs, buildApproval, PendingApproval, NO_HIT_PREFIX } from "./agenttools";
 import { emitCollaboration } from "./collaboration";
@@ -130,6 +131,42 @@ function decisionPrompt(instruction: string, calls: AgentToolCall[], context = "
     ...anaphoraHint(instruction),
     "",
     `사용자 지시: "${instruction}"`,
+  ].join("\n");
+}
+
+/**
+ * **가리킬 것이 없는 대명사인가.** "그거 어떻게 해"처럼 대명사뿐이고 직전 대상도 없는 말.
+ *
+ * 실측(2026-08-03 실전 147상황): 이 말에 LLM이 **27초를 쓰고** "질문을 구체적으로
+ *   알려주시면 도와드리겠습니다"를 내놓았다. 되묻는 것은 **맞는 답**이다 —
+ *   맥락이 없는데 아무거나 골라 답하면 엉뚱한 자산을 손대게 된다.
+ *   틀린 것은 답이 아니라 **27초**다. 되묻는 데 모델이 필요할 리 없다.
+ *
+ * ⚠ 좁게 잡는다:
+ *   · 직전 대상이 **있으면** 잡지 않는다 — 그건 #8 맥락 기능이 이어받아야 한다
+ *   · 대명사 말고 **다른 내용이 있으면** 잡지 않는다("그 취약점 담당자 배정해줘"는 진짜 지시다)
+ */
+export function 가리킬것없는대명사(instruction: string): boolean {
+  const t = String(instruction ?? "").trim();
+  if (!t || !ANAPHORA_RE.test(t)) return false;
+  if (recentTarget()) return false;   // 직전 대상이 있으면 맥락으로 푼다
+  // 대명사·기능어를 걷어내고 **남는 내용이 거의 없을 때만** 되묻는다.
+  const 남은 = t
+    .replace(ANAPHORA_RE, " ")
+    .replace(/어떻게|어떡|뭐|무엇|해야|하지|하나요|해줘|해\s*줘|알려|보여|좀|요|는|은|을|를|이|가|\?|\.|,/g, " ")
+    .replace(/\s+/g, "");
+  return 남은.length <= 2;
+}
+
+/** 되묻는 말 — 무엇이 필요한지 **예시까지** 준다. 그냥 "구체적으로"라고 하면 또 막힌다. */
+export function 되물음(): string {
+  return [
+    "무엇을 말씀하시는지 몰라 되묻습니다 — 앞선 대화가 없어 「그거」가 가리킬 것을 못 찾았습니다.",
+    "",
+    `${표식.다음} 이렇게 물어보시면 됩니다`,
+    '  · "오늘 뭐부터 해야 해?" — 지금 급한 것부터 보여드립니다',
+    '  · "미조치 취약점 뭐 있어?" — 목록에서 고르시면 그다음을 이어갑니다',
+    '  · "○○ 자산 취약점 알려줘" — 대상을 지목하시면 그것만 봅니다',
   ].join("\n");
 }
 
@@ -555,6 +592,24 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }
   {
     re: /(최근|요즘|새로)\s*(에\s*)?(올린|등록한|추가한|들어온)\s*(문서|자료|파일)|문서\s*(목록|리스트)|올린\s*문서\s*(뭐|무엇|보여|알려)/,
     tool: "knowledge_status",
+    args: {},
+  },
+  // AI가 아낀 시간 — **도구가 있는데 안 불렸다**(2026-08-03 실전 147상황).
+  //   LLM이 "처리 건수를 입력해 주시면 정확한 시간을 알려드릴 수 있습니다"라고 답했다.
+  //   ⚠ 담당자에게 숫자를 받아 계산하는 기능이 아니다 — **우리가 처리한 기록을 우리가 센다.**
+  //   계획서 중-2의 대표 지표라 이 답이 시연에 나오면 기능이 없는 것처럼 보인다.
+  {
+    re: /(아낀|절감|줄인|save[d]?)\s*(시간|공수|시간이|근무)|시간\s*(을\s*)?(얼마나\s*)?(아꼈|절감|줄였)|자동화\s*(효과|성과)|(ai|에이아이)\s*가?\s*(대신|얼마나)\s*(한|해\s*준|처리)/i,
+    tool: "time_saved",
+    args: {},
+  },
+  // 위험한 순·EPSS 순으로 보여 달라 — **정렬은 코드가 하는 일**이다.
+  //   실측(2026-08-03): "EPSS 점수 높은 순으로 보여줘"에 LLM이 EPSS 개념 강의를 39초 했다.
+  //   today가 이미 KEV→EPSS→VPR 순으로 전 자산을 가로질러 정렬한다.
+  // ⚠ "EPSS가 뭐야?"(개념 질문)는 잡지 않는다 — 그건 explain 몫이다.
+  {
+    re: /(epss|vpr|cvss|위험도|심각도|우선순위)\s*(점수\s*)?(높은|낮은)\s*순|(높은|위험한)\s*순(으로|서)?\s*(보여|정렬|알려)|정렬해\s*(줘|주세요)/i,
+    tool: "today",
     args: {},
   },
   // 자산이 몇 개인가 — 등록부를 세면 되는 일인데 LLM에게 가서 25초가 걸렸다

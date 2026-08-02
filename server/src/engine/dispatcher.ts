@@ -18,7 +18,7 @@ import { runAdapter, StandardFinding } from "./bridge";
 import { chat } from "./llm";
 import { isNonLearningAccount } from "./learnpolicy";
 import type { Viewer } from "./memory";
-import { runAgentLoop, AgentToolCall } from "./agentloop";
+import { runAgentLoop, AgentToolCall, 가리킬것없는대명사, 되물음 } from "./agentloop";
 import { executeApprovedTool, findAgentTool, buildApproval, PendingApproval } from "./agenttools";
 import { appendApprovedDecision } from "./orchestrator-dataset";
 import { undoSnapshot, undoCommit } from "./undo";
@@ -954,6 +954,16 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
       sources: r.sources,
       dataHits: r.sources.length,
     };
+  }
+
+  // 가리킬 것이 없는 대명사 — "그거 어떻게 해"에 **모델이 27초를 쓰고** 되물었다
+  //   (2026-08-03 실전 147상황). 되묻는 것은 맞는 답이고, 틀린 것은 27초다.
+  //   맥락이 없는데 아무거나 골라 답하면 엉뚱한 자산을 손대게 되므로 되묻는 것이 옳다 —
+  //   다만 되묻는 데 모델이 필요할 리 없다. ⚠ 직전 대상이 있으면 여기 안 걸린다(#8 맥락이 이어받음).
+  if (가리킬것없는대명사(instructionText)) {
+    const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
+    completeTask(task.id);
+    return { task, route: { agentId: "orchestrator", action: "chat" }, output: 되물음() };
   }
 
   // ── 시연 실측이 잡은 라우팅 결함 2건의 결정적 분기 (2026-07-29, 계획서 전-1) ──────────

@@ -54,6 +54,25 @@ export const 겹치는기호: Record<string, string[]> = {
 /** 사전에 있는 표식만 쓴다. 새 기호가 필요하면 **여기 먼저** 추가한다. */
 export const 허용표식 = new Set<string>(Object.values(표식));
 
+/**
+ * 심각도를 **사람이 읽는 말**로. 저장은 영문이어도 담당자에게는 우리말로 말한다.
+ *
+ * ⚠ **한 곳에만 둔다.** 실측(2026-08-03): 영문 심각도가 담당자 화면에 나가는 자리가
+ *   여덟 곳이었다(오늘 할 일·자산 상세·검색·조치 검증·하드닝·체크목록 라벨 …).
+ *   자리마다 따로 만들면 어떤 화면은 "critical", 어떤 화면은 "매우 심각"이 되어
+ *   같은 것이 둘로 보인다.
+ * ⚠ 모르는 값은 **그대로 돌려준다** — 지어내지 않는다.
+ */
+const 심각도표: Record<string, string> = { critical: "매우 심각", high: "높음", medium: "보통", low: "낮음", info: "참고" };
+export function 심각도한글(severity: string): string {
+  return 심각도표[String(severity ?? "").toLowerCase()] ?? String(severity ?? "");
+}
+/** 심각도에 맞는 표식(🔴🟠🟡🟢). 모르는 값이면 가운뎃점. */
+export function 심각도표식(severity: string): string {
+  const s = String(severity ?? "").toLowerCase();
+  return s === "critical" ? 표식.위험 : s === "high" ? 표식.높음 : s === "medium" ? 표식.보통 : s === "low" ? 표식.안전 : "·";
+}
+
 /** 제품 판정 머리표 — 【 】는 이 이름들에만 쓴다(다른 【 】는 프롬프트 누출로 본다). */
 export const 판정머리표 = ["행동 대조", "근거", "판정"] as const;
 

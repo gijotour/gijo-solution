@@ -11,7 +11,21 @@ vi.mock("../src/engine/llm", () => ({
 import { runAgentLoop, setLastTarget, resetContextForTests, 사람용으로다듬기 } from "../src/engine/agentloop";
 import fs from "node:fs";
 import { listAgentTools, findAgentTool, validateToolArgs } from "../src/engine/agenttools";
-import { resetAssetsForTests, registerAsset, recordFindings } from "../src/engine/assets";
+import { resetAssetsForTests, registerAsset, recordFindings, getAsset } from "../src/engine/assets";
+
+
+/**
+ * **재작성 경로**를 재는 시험이 쓸 도구 하나. 즉답(directAnswer)이 아닌 것을 골라 온다.
+ *
+ * ⚠ 도구 이름을 박아 두지 말 것 — 2026-08-03에 list_assets가 즉답으로 바뀌면서 이 묶음이
+ *   두 번 깨졌다. 이 시험이 재는 것은 "특정 도구"가 아니라 **LLM이 다시 쓰는가**이므로,
+ *   즉답이 아닌 도구를 그때그때 골라 쓴다.
+ */
+function 재작성도구(): string {
+  const t = listAgentTools().find((x) => !x.write && !(x as { directAnswer?: boolean }).directAnswer && x.params.every((p) => !p.required));
+  expect(t, "즉답이 아닌 무인자 조회 도구가 하나도 없다 — 이 시험은 아무것도 못 잰다").toBeTruthy();
+  return t!.name;
+}
 
 function seedAsset(id = "fraud-detect-llm") {
   registerAsset({ id, name: id, path: `models/${id}.gguf` });
@@ -120,8 +134,9 @@ describe("agenttools — 「AI 자산」 조회 도구", () => {
 describe("runAgentLoop — 결정→실행→최종답변", () => {
   it("도구 호출 후 최종 답변을 일반 chat 경로로 재작성한다", async () => {
     seedAsset();
+    const 도구 = 재작성도구();
     mockChat
-      .mockResolvedValueOnce('{"action":"tool","tool":"list_assets","args":{}}') // 결정 1
+      .mockResolvedValueOnce(`{"action":"tool","tool":"${도구}","args":{}}`) // 결정 1
       .mockResolvedValueOnce('{"action":"final"}') // 결정 2 — 결과로 충분
       .mockResolvedValueOnce("등록된 자산은 1개입니다: fraud-detect-llm"); // 최종 재작성(chat)
     const r = await runAgentLoop("자산 목록 보여줘");
@@ -130,16 +145,20 @@ describe("runAgentLoop — 결정→실행→최종답변", () => {
     // 고정 문장이라 재작성이 아니다 — 이 시험이 지키는 것은 **재작성 경로를 탔는가**이고,
     // 그건 아래 mockChat 호출 3회(결정2 + 재작성1)로 직접 못 박는다.
     expect(r!.output.startsWith("등록된 자산은 1개입니다: fraud-detect-llm")).toBe(true);
-    expect(r!.output).toContain("▸ 다음 단계 ② 우선순위");
+    // ⚠ 단계 번호는 **어느 도구를 썼느냐**에 따라 달라진다 — 번호를 박으면 도구가 바뀔 때 깨진다.
+    //   이 시험이 지키는 것은 「다음 걸음」이 붙는가이다.
+    expect(r!.output, "다음 걸음이 안 붙었다").toContain("▸ 다음 단계");
     expect(r!.toolCalls).toHaveLength(1);
-    expect(r!.toolCalls[0].tool).toBe("list_assets");
-    expect(r!.toolCalls[0].result).toContain("fraud-detect-llm");
+    expect(r!.toolCalls[0].tool).toBe(도구);
+    // ⚠ 도구 결과의 **내용**은 어느 도구냐에 달렸다 — 여기서 지키는 것은
+    //   "도구 결과가 재작성 프롬프트에 실려 갔는가"이므로 그 대조만 한다.
+    expect(r!.toolCalls[0].result.length, "도구 결과가 비었다").toBeGreaterThan(5);
     // 결정 호출에는 스키마 강제, 최종 재작성에는 생성 길이 상한(maxTokens)이 걸린다. remember(임베딩
     // 재호출)은 최종답 경로에서 뺐다 — 단일 GPU에서 채팅 모델과 경합해 멈추던 원인이라(오늘 수정).
     expect(mockChat.mock.calls[0][0]).toMatchObject({ agentId: "orchestrator", responseSchema: expect.anything() });
     expect(mockChat.mock.calls[2][0]).toMatchObject({ maxTokens: 800 });
     expect(mockChat.mock.calls[2][0].remember).toBeFalsy();
-    expect(mockChat.mock.calls[2][0].message).toContain("fraud-detect-llm");
+    expect(mockChat.mock.calls[2][0].message, "도구 결과가 재작성 프롬프트에 안 실렸다").toContain(r!.toolCalls[0].result.slice(0, 12));
   });
 
   it("대표 문구 '오늘 뭐부터 조치해야 해?'는 LLM 결정을 건너뛰고 today를 강제 실행한다", async () => {
@@ -178,9 +197,10 @@ describe("runAgentLoop — 결정→실행→최종답변", () => {
 
   it("같은 도구를 같은 인자로 되풀이하면 재실행 없이 종료해 최종 답을 만든다(루프 낭비 차단)", async () => {
     seedAsset();
+    const 도구 = 재작성도구();
     mockChat
-      .mockResolvedValueOnce('{"action":"tool","tool":"list_assets","args":{}}') // 결정 1 — 실행됨
-      .mockResolvedValueOnce('{"action":"tool","tool":"list_assets","args":{}}') // 결정 2 — 동일 반복 → 재실행 안 함
+      .mockResolvedValueOnce(`{"action":"tool","tool":"${도구}","args":{}}`) // 결정 1 — 실행됨
+      .mockResolvedValueOnce(`{"action":"tool","tool":"${도구}","args":{}}`) // 결정 2 — 동일 반복 → 재실행 안 함
       .mockResolvedValueOnce("자산 1개 요약"); // 최종 재작성(composeFinalAnswer)
     const r = await runAgentLoop("자산 목록 계속 봐줘");
     expect(r).not.toBeNull();
@@ -194,13 +214,14 @@ describe("runAgentLoop — 결정→실행→최종답변", () => {
   // 뱉으면 maxTokens에서 잘려 JSON이 깨지고, parseDecision이 null을 줘 루프 전체가 폐기→환각 폴백됐다.
   it("최종 답이 잘려 JSON이 깨져도 도구 결과를 살린다(루프 폐기 안 함)", async () => {
     seedAsset();
+    const 도구 = 재작성도구();
     mockChat
-      .mockResolvedValueOnce('{"action":"tool","tool":"list_assets","args":{}}') // step0: 도구 선택
+      .mockResolvedValueOnce(`{"action":"tool","tool":"${도구}","args":{}}`) // step0: 도구 선택
       .mockResolvedValueOnce('{"action":"final","answer":"등록된 AI 자산 6개:\\n- fraud-detect-llm | 사내 | 유형=LLM | 담당=보안팀 | fin') // step1: 잘린 JSON
       .mockResolvedValueOnce("최종 답(재작성)"); // composeFinalAnswer
     const r = await runAgentLoop("자산 다 보여줘");
     expect(r).not.toBeNull(); // 폴백하지 않는다
-    expect(r!.toolCalls.map((c) => c.tool)).toContain("list_assets");
+    expect(r!.toolCalls.map((c) => c.tool)).toContain(도구);
     expect(r!.output).toBe("최종 답(재작성)");
   });
 
@@ -291,9 +312,16 @@ describe("★ 내부 식별자는 사람에게 안 보인다", () => {
     expect(사람용으로다듬기(undefined as unknown as string)).toBe("");
   });
 
-  it("★ 도구 결과 원본은 그대로다 — LLM이 id를 잃으면 후속 지시가 끊긴다", () => {
-    // 지우는 자리는 사람에게 나가는 마지막 지점 한 곳이어야 한다.
+  it("★ 이어서 파고들 수 있다 — 화면에 보인 글자로 그대로 물을 수 있어야 한다", () => {
+    // 예전 약속: "도구 답에 내부 id를 실어야 LLM이 후속 get_asset을 부른다".
+    //   그 id가 **담당자 화면에 그대로 나갔다**(2026-08-03: `@ 이름(id=vuln:10.10.20.41)`).
+    //   약속을 바꿨다 — id를 빼는 대신 **이름으로도 찾게** 했다(assets.ts getAsset).
+    //   ⚠ 여기서 지킬 것은 "id가 있다"가 아니라 **"보인 글자로 이어서 물을 수 있다"**이다.
+    registerAsset({ id: "vuln:sample-web01", name: "샘플-웹서버", path: "-" });
+    expect(getAsset("샘플-웹서버")?.id, "화면에 보인 이름으로 못 찾으면 후속 지시가 끊긴다").toBe("vuln:sample-web01");
+
+    // 그리고 그 id가 **화면에는 안 나가야** 한다.
     const src = fs.readFileSync(new URL("../src/engine/agenttools.ts", import.meta.url), "utf8");
-    expect(src, "도구가 id를 안 내면 '1번 자산 자세히 봐줘'가 동작하지 않는다").toContain("(id=${r.assetId})");
+    expect(src, "내부 id를 답에 다시 실었다 — 담당자가 읽을 글자가 아니다").not.toContain("(id=${r.assetId})");
   });
 });
