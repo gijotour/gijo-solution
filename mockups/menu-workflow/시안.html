@@ -167,7 +167,7 @@ code{background:var(--panel-2);border-radius:4px;padding:1px 5px;font-size:11.75
     </div>
     <div class="meas">
       위에서 아래로 <b>한 방향</b>. 번호가 "지금 몇 번째인지"를 말한다.
-      화면 수는 <b>26개 그대로</b> — <b class="hi">없애지 않고 자리만 옮긴다</b>.
+      화면 <b>26 → 23개</b>(아래 통합 절) — <b class="hi">기능은 하나도 안 없애고 입구만 합친다</b>.
     </div>
   </div>
 </div>
@@ -260,8 +260,82 @@ code{background:var(--panel-2);border-radius:4px;padding:1px 5px;font-size:11.75
   <tr><td>인수인계</td><td>업무 관리(1개짜리 그룹)</td><td>⚙ 설정</td><td>1개짜리 그룹은 그룹이 아니다</td></tr>
 </table>
 <div class="meas">
-  그룹 <b>7 → 5+3</b>, 그중 <b>절차 5단계가 주인공</b>. <b class="hi">화면 26개는 그대로</b>입니다 —
-  ④ 검증만 이미 있던 기능을 메뉴로 올렸습니다.
+  그룹 <b>7 → 5+3</b>, 그중 <b>절차 5단계가 주인공</b>. 화면은 <b class="hi">26 → 23개</b>입니다(겹치던 3쌍을 합침) — ④ 검증만 이미 있던 기능을 메뉴로 올렸습니다.
+</div>
+
+
+<h2><span class="n">통합</span>합칠 화면 — 같은 일을 두 곳에서 하고 있었다</h2>
+<p class="note">
+  처음 안은 "화면 26개 그대로"였는데, <b class="hi">그건 덜 본 것이었습니다.</b>
+  화면이 실제로 부르는 서버 기능을 대조하니 <b class="bad">같은 데이터를 같은 방식으로 다루는 화면</b>이 있었습니다.
+</p>
+<table class="t">
+  <tr><th style="width:210px">합칠 것</th><th style="width:250px">겹치는 근거(부르는 서버 기능)</th><th>어떻게</th></tr>
+  <tr>
+    <td><b class="bad">제품 유지보수</b> + <b class="bad">유지보수 점검</b><br>
+      <span style="color:var(--muted-2);font-size:11.5px">620줄 + 336줄</span></td>
+    <td><code>listMaintenance</code> · <code>approveMaintenance</code> · 점검 이력 —
+      <b class="hi">셋이 양쪽에 다 있다</b>. 뒤쪽은 앞쪽의 부분집합에 가깝다.</td>
+    <td><b>한 화면</b>으로. 이름이 「제품 <u>유지보수</u>」와 「<u>유지보수</u> 점검」이라
+      <b class="bad">어느 쪽인지 구분이 안 된다</b> — 이게 헷갈림의 큰 원인이다.</td>
+  </tr>
+  <tr>
+    <td><b class="warn">자산 통합 뷰</b> + <b class="warn">자산 목록</b><br>
+      <span style="color:var(--muted-2);font-size:11.5px">409줄 + 1,459줄</span></td>
+    <td>서버 기능은 갈린다(<code>assetHub</code> vs <code>listAssets</code>).
+      그런데 <b class="hi">오늘 통합 뷰를 「한 줄 목록 + 줄 아래 자세히」로 바꾸면서</b>
+      목록 화면과 하는 일이 겹치기 시작했다.</td>
+    <td><b>한 화면 + 두 보기</b>. 목록(등록·결손 찾기)과 파고들기(구성·취약점·AI 위험)를
+      같은 화면의 <b>줄 아래 펼치기</b>로 잇는다 — 이미 그렇게 만들어 뒀다.</td>
+  </tr>
+  <tr>
+    <td><b class="warn">기억·학습</b> + <b class="warn">온톨로지</b><br>
+      <span style="color:var(--muted-2);font-size:11.5px">1,034줄 + 373줄</span></td>
+    <td>서버 기능은 완전히 다르다(벡터 vs 트리플).
+      하지만 담당자에게 둘 다 <b class="hi">"AI가 근거로 쓰는 지식"</b> 한 가지다 —
+      벡터냐 트리플이냐는 <b class="bad">우리 구현 사정</b>이지 업무 구분이 아니다.</td>
+    <td><b>한 화면 두 탭</b>(문장으로 찾기 / 관계로 찾기). 기능은 그대로 두고 입구만 하나로.</td>
+  </tr>
+  <tr>
+    <td><b class="ok">통합 관제</b> + <b class="ok">위협 인텔</b></td>
+    <td>합치지 <b class="hi">않는다</b> — 안은 우리 것(스캐너·로그·운영리포트),
+      밖은 남의 것(CTI 피드)이다. 들어오는 문이 다르면 화면도 다른 게 맞다.</td>
+    <td><b>그대로</b>. ① 발견 그룹에 나란히 두는 것으로 충분하다.</td>
+  </tr>
+  <tr>
+    <td><b class="ok">리포트</b> + <b class="ok">보안 KPI</b> + <b class="ok">컴플라이언스</b></td>
+    <td>합치지 <b class="hi">않는다</b> — 보고 받는 사람이 다르다
+      (문서=경영진 / 숫자=팀장 / 규제 대응=감사).</td>
+    <td><b>그대로</b>. ⑤ 보고 그룹에 나란히.</td>
+  </tr>
+</table>
+<div class="meas">화면 <b>26 → 23개</b>(3개 줄임). 기능은 하나도 안 없앤다 — <b class="hi">입구만 합친다</b>.</div>
+
+<h2><span class="n">이름</span>담당자가 쓰는 말로 — 우리 사정이 담긴 이름을 고친다</h2>
+<p class="note">
+  제품 규칙이 <b class="hi">"모든 사용자 대상 텍스트는 한글로, 어려운 말엔 쉬운 풀이"</b>인데
+  메뉴 이름 자체가 안 지켜지고 있었습니다. 기준 둘: <b>① 담당자가 실제로 쓰는 말인가</b>
+  <b>② 이름만 보고 무슨 일을 하는지 아는가</b>.
+</p>
+<table class="t">
+  <tr><th style="width:190px">지금</th><th style="width:200px">바꾼 뒤</th><th>왜</th></tr>
+  <tr><td class="bad">제품 유지보수 / 유지보수 점검</td><td class="ok"><b>정기 점검</b> (한 화면)</td><td>두 이름이 서로 구분 안 됨 — 합치면서 하나로</td></tr>
+  <tr><td class="bad">원격 정기점검</td><td class="ok"><b>보안설정 점검</b></td><td>"원격"은 우리 구현(SSH) 얘기. 담당자에겐 <b>무엇을 보는지</b>(CCE 보안설정)가 중요</td></tr>
+  <tr><td class="bad">온톨로지</td><td class="ok"><b>지식 관계도</b></td><td>학술 용어. 화면이 하는 일은 "무엇이 무엇과 이어지나"</td></tr>
+  <tr><td class="bad">LLM 합성</td><td class="ok"><b>모델 합치기</b></td><td>SLERP·합성은 안쪽 얘기</td></tr>
+  <tr><td class="bad">레드팀·가드레일</td><td class="ok"><b>AI 공격 시험·차단</b></td><td>레드팀을 아는 담당자만 알아본다</td></tr>
+  <tr><td class="bad">터미널 (CLI)</td><td class="ok"><b>명령창</b></td><td>같은 말 두 번(터미널=CLI)</td></tr>
+  <tr><td class="bad">데이터 플라이휠</td><td class="ok">(그룹 없앰)</td><td>업계 유행어. 그룹 자체를 AI 운영으로 흡수</td></tr>
+  <tr><td class="bad">기억·학습 (RAG)</td><td class="ok"><b>AI 지식</b></td><td>RAG는 구현 이름. 온톨로지와 합치면서 하나로</td></tr>
+  <tr><td class="bad">인수인계</td><td class="ok"><b>업무 넘기기</b></td><td>한자말보다 쉬운 말</td></tr>
+  <tr><td>AI-BOM</td><td>AI-BOM <span style="color:var(--muted-2)">(그대로)</span></td><td>⚠ <b class="hi">바꾸지 않는다</b> — 우리 제품의 차별점이자 조달·보안성 검토에서 쓰는 <b>공식 용어</b>다.
+    대신 부제로 "AI 구성 명세"를 붙인다</td></tr>
+  <tr><td>통합 관제</td><td>통합 관제 <span style="color:var(--muted-2)">(그대로)</span></td><td>보안 담당자가 쓰는 말이다</td></tr>
+</table>
+<div class="meas">
+  ⚠ 이름을 바꾸면 <b class="hi">챗봇이 옛 이름으로 안내</b>하고, <b>담당자가 옛 이름으로 묻습니다</b>.
+  그래서 <b>동의어 표</b>(terms.ts)에 옛 이름을 남겨 둡니다 — "원격 정기점검"으로 물어도 찾아집니다.
+  이름 바꾸기의 진짜 비용은 화면이 아니라 <b>대화 경로</b>에 있습니다.
 </div>
 
 <h2><span class="n">위험</span>정직하게 — 이 변경이 깨뜨릴 수 있는 것</h2>
