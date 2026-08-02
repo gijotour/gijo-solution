@@ -641,7 +641,14 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
       route: { agentId: "orchestrator", action: "chat" },
       // 문구 앞머리는 GUARDRAIL_BLOCK_MARK에서 가져온다 — 실효 견고성 측정이 이 표지로
       // "입구에서 막혔다"를 센다. 따로 적어 두면 안내문을 다듬는 순간 측정이 조용히 어긋난다.
-      output: `🛡 ${GUARDRAIL_BLOCK_MARK}했습니다 — 프롬프트 인젝션 시도로 판단(${guard.categories.join(", ")}). 정상 요청이면 표현을 바꿔 다시 시도하거나, 설정에서 가드레일 모드를 조정하세요.`,
+      //
+      // ⚠ 관문이 **자기 문구를 준 경우엔 그것을 쓴다**(2026-08-02). 관문에 인젝션 말고
+      //   다른 판정(해로운 요청 차단)이 생겼는데 여기서 늘 "프롬프트 인젝션 시도로 판단()"을
+      //   찍는 바람에, 막힌 이유가 틀리게 표시되고 괄호까지 비어 나왔다(실측).
+      //   막는 것보다 **왜 막혔는지**가 담당자에게 중요하다.
+      output: guard.message
+        ? guard.message
+        : `🛡 ${GUARDRAIL_BLOCK_MARK}했습니다 — 프롬프트 인젝션 시도로 판단(${guard.categories.join(", ")}). 정상 요청이면 표현을 바꿔 다시 시도하거나, 설정에서 가드레일 모드를 조정하세요.`,
     };
   }
 
