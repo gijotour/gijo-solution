@@ -252,6 +252,14 @@ export function formatRejectHistory(instructionText: string): string {
   for (const m of recentM) {
     lines.push(`  - [점검] ${m.title} — ${m.reviewNote ? String(m.reviewNote).slice(0, 60) : "사유 미기재"} (${m.reviewedBy ?? "-"}, ${fmt(m.reviewedAt)})`);
   }
+  // ⚠ 숫자만 주고 끝내면 "그래서 뭘 하지"가 남는다(2026-08-03 실전 147상황이 이 답을 지적).
+  //   오탐으로 넘긴 것은 **다시 볼 값어치가 있는 기록**이다 — 어디서 되짚는지 알려 준다.
+  lines.push(
+    "",
+    vuln.length || maint.length
+      ? `▸ 이어서 — 판정을 되돌리시려면 "○○ 미검토로 되돌려줘", 전체를 보시려면 ③ 조치 › 「조치·승인」 화면`
+      : `▸ 이어서 — 아직 오탐으로 넘긴 것이 없습니다. 검토할 것은 "미조치 취약점 뭐 있어?"`
+  );
   return lines.join("\n");
 }
 
