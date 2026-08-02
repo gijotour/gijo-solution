@@ -22,6 +22,7 @@ import { verifyBackupSnapshot } from "./backup";
 import { auditRetentionDays } from "./audit";
 import { dbCryptStatus } from "./dbcrypt";
 import { getSiemConfig, getSiemStats } from "./siem";
+import { getLocalEngineStatus } from "./localengine";
 
 export type CheckLevel = "ok" | "warn" | "fail" | "unknown";
 
@@ -264,8 +265,64 @@ export interface SystemHealth {
 
 const WORST: CheckLevel[] = ["fail", "warn", "unknown", "ok"];
 
+/**
+ * 채팅 모델 — 이 제품에서 **가장 자주 죽는 것**이다.
+ *
+ * ⚠ 안 떠 있는 것 자체는 고장이 아니다. 필요할 때 올리는 구조(VRAM 예산·LRU 스왑)라
+ *   유휴 시간에는 비어 있는 것이 정상이다. 그래서 **안 떠 있음 = warn**이지 fail이 아니다.
+ *   진짜 고장은 **떠 있는데 준비가 안 된 것**(ready=false) — 실측된 WSL2 GPU 유휴 정지가
+ *   이 모양이었다. 프로세스는 살아 있는데 응답을 못 한다.
+ */
+function checkModel(): HealthCheck {
+  try {
+    const st = getLocalEngineStatus();
+    const 상주 = st.loaded ?? [];
+    const 멈춘것 = 상주.filter((m) => !m.ready);
+    if (멈춘것.length) {
+      return {
+        id: "model", label: "AI 모델", level: "fail",
+        detail: `떠 있으나 응답 준비가 안 된 모델 ${멈춘것.length}개 (${멈춘것.map((m) => m.modelId).join(", ")})`,
+        action: "설정 > 서버·AI에서 모델을 껐다 켜세요. 반복되면 GPU 유휴 정지일 수 있습니다(실측 사례).",
+      };
+    }
+    if (상주.length === 0) {
+      return {
+        id: "model", label: "AI 모델", level: "warn",
+        detail: "지금 상주 중인 채팅 모델이 없습니다(필요할 때 올라옵니다)",
+        action: "대화창에 무엇이든 물어보면 올라옵니다. 그래도 답이 없으면 설정 > 서버·AI에서 확인하세요.",
+      };
+    }
+    return { id: "model", label: "AI 모델", level: "ok", detail: `상주 ${상주.length}개 · ${상주.map((m) => m.modelId).join(", ")}` };
+  } catch {
+    // ⚠ 못 재면 **모른다**고 한다 — 정상으로 세면 죽어 있어도 초록으로 보인다.
+    return { id: "model", label: "AI 모델", level: "unknown", detail: "모델 상태를 확인하지 못했습니다" };
+  }
+}
+
+/**
+ * 임베딩 서버 — 죽으면 **문서 인입과 검색이 조용히 실패**한다.
+ * ⚠ 실사고(2026-07-24): 512토큰 넘는 한글 입력에 500을 내며 인입이 통째로 실패했는데
+ *   화면은 멀쩡했다. 채팅 모델과 달리 이건 **항상 떠 있어야** 하므로 없으면 fail이다.
+ */
+function checkEmbedding(): HealthCheck {
+  try {
+    const e = getLocalEngineStatus().embedding;
+    if (!e || !e.running) {
+      return {
+        id: "embedding", label: "문서 검색 엔진(임베딩)", level: "fail",
+        detail: "임베딩 서버가 떠 있지 않습니다 — 문서 올리기와 지식 검색이 동작하지 않습니다",
+        action: "서버를 재시작하세요. 계속 안 뜨면 models/ 아래 임베딩 모델 파일을 확인하세요.",
+      };
+    }
+    return { id: "embedding", label: "문서 검색 엔진(임베딩)", level: "ok", detail: `가동 중 · ${e.modelId ?? "모델 미상"} (포트 ${e.port})` };
+  } catch {
+    return { id: "embedding", label: "문서 검색 엔진(임베딩)", level: "unknown", detail: "확인하지 못했습니다" };
+  }
+}
+
 export function systemHealth(): SystemHealth {
-  const checks = [checkBackup(), checkKnowledge(), checkDatabase(), checkRecentErrors(), checkDisk(), checkSiem()].filter((c): c is HealthCheck => c !== null);
+  // 가장 자주 죽는 것부터 본다 — 모델·임베딩이 앞이다.
+  const checks = [checkModel(), checkEmbedding(), checkBackup(), checkKnowledge(), checkDatabase(), checkRecentErrors(), checkDisk(), checkSiem()].filter((c): c is HealthCheck => c !== null);
   // 전체 판정은 가장 나쁜 항목을 따른다 — 평균을 내면 문제 하나가 정상 넷에 묻힌다.
   const level = WORST.find((l) => checks.some((c) => c.level === l)) ?? "ok";
   const bad = checks.filter((c) => c.level === "fail" || c.level === "warn");
