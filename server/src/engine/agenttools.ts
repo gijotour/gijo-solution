@@ -2185,6 +2185,8 @@ const TOOLS: AgentTool[] = [
     write: false,
     description: "장기기억(RAG) 문서와 온톨로지 트리플이 얼마나 쌓였는지 본다. 답변 품질의 근거가 되는 자료 현황이다.",
     params: [],
+    // 출력이 이미 한국어 요약이라 LLM 재작성을 생략한다(2026-08-02: 재작성이 20~30초를 더 썼다).
+    directAnswer: true,
     run: runKnowledgeStatus,
   },
   {
@@ -2203,6 +2205,8 @@ const TOOLS: AgentTool[] = [
       { name: "query", label: "검색어", description: "작업·대상·사람 이름 일부(비우면 전체)", required: false },
       { name: "days", label: "기간(일)", description: "최근 며칠 — 기본 7, 최대 90", required: false },
     ],
+    // 출력이 이미 한국어 요약이라 LLM 재작성을 생략한다(2026-08-02: 재작성이 20~30초를 더 썼다).
+    directAnswer: true,
     run: runAuditSearch,
   },
   {
@@ -2212,6 +2216,8 @@ const TOOLS: AgentTool[] = [
     write: false,
     description: '인수인계에 쓸 문서가 얼마나 쌓였는지 본다. "인수인계 어디까지 됐어?", "인수인계 준비됐어?"에 쓴다.',
     params: [],
+    // 출력이 이미 한국어 요약이라 LLM 재작성을 생략한다(2026-08-02: 재작성이 20~30초를 더 썼다).
+    directAnswer: true,
     run: runHandoverStatus,
   },
   {
@@ -2266,6 +2272,8 @@ const TOOLS: AgentTool[] = [
     description:
       '등록된 보안제품과 운영문서(매뉴얼) 보유 현황을 본다. 문서 없는 제품은 장애 시 대응이 늦어지므로 따로 짚어준다. 예: {} 또는 {"query":"방화벽"}',
     params: [{ name: "query", label: "검색어", description: "제품명·분류·벤더 (선택, 비우면 전체)", required: false }],
+    // 출력이 이미 한국어 요약이라 LLM 재작성을 생략한다(2026-08-02: 재작성이 20~30초를 더 썼다).
+    directAnswer: true,
     run: runProductStatus,
   },
   {
@@ -2295,6 +2303,8 @@ const TOOLS: AgentTool[] = [
     description:
       '정기 점검 일정의 기한 초과·예정 현황을 본다. 기한이 지난 것부터 보여준다. 예: {} 또는 {"filter":"방화벽"}',
     params: [{ name: "filter", label: "조건", description: "점검명·제품명·상태 (선택, 비우면 전체)", required: false }],
+    // 출력이 이미 한국어 요약이라 LLM 재작성을 생략한다(2026-08-02: 재작성이 20~30초를 더 썼다).
+    directAnswer: true,
     run: runMaintenanceStatus,
   },
   {
@@ -2331,6 +2341,8 @@ const TOOLS: AgentTool[] = [
     params: [
       { name: "gap", label: "결손 종류", description: "owner(담당부서)·service(서비스)·sbom·unscanned(미점검) 중 하나 (선택, 비우면 전체)", required: false },
     ],
+    // 출력이 이미 한국어 요약이라 LLM 재작성을 생략한다(2026-08-02: 재작성이 20~30초를 더 썼다).
+    directAnswer: true,
     run: runAssetCoverage,
   },
   {
@@ -2393,6 +2405,8 @@ const TOOLS: AgentTool[] = [
     params: [
       { name: "assetId", label: "자산 id", description: "특정 자산만 (선택, 비우면 전체 현황)", required: false },
     ],
+    // 출력이 이미 한국어 요약이라 LLM 재작성을 생략한다(2026-08-02: 재작성이 20~30초를 더 썼다).
+    directAnswer: true,
     run: runAibomStatus,
   },
   {
@@ -2405,6 +2419,8 @@ const TOOLS: AgentTool[] = [
     params: [
       { name: "filter", label: "조건", description: "심각도·자산·담당자·상태 키워드 (선택, 비우면 전체)", required: false },
     ],
+    // 출력이 이미 한국어 요약이라 LLM 재작성을 생략한다(2026-08-02: 재작성이 20~30초를 더 썼다).
+    directAnswer: true,
     run: runFindingStatusOverview,
   },
   {

@@ -310,13 +310,54 @@ export function dropEchoSentences(text: string): string | null {
     if (!t) return false;
     if (INSTRUCTION_MENTION_RE.test(t) || PERSONA_ECHO_RE.test(t) || SYSTEM_ECHO_SENTENCE_RE.test(t)) return true;
     if (PROMPT_LEAK_MARKERS.some((m) => t.includes(m))) return true;
-    return RESPONSE_META_WORDS.filter((w) => t.includes(w)).length >= 2;
+    if (RESPONSE_META_WORDS.filter((w) => t.includes(w)).length >= 2) return true;
+    return promptOverlapCount(t) >= 2;   // 그 줄이 프롬프트 원문과 겹치면 복창이다
   };
   if (!lines.some(isEcho)) return null; // 줄 단위로 지울 게 없으면 살릴 방법이 없다
   const kept = lines.filter((s) => !isEcho(s)).join("\n").trim();
   // 걷어낸 뒤에도 여전히 복창이면 살린 것이 아니다. 너무 짧아도(껍데기만 남음) 마찬가지.
   if (kept.length < 20 || hasPromptLeak(kept)) return null;
   return kept;
+}
+
+// ④ **원문 대조** — 표현을 짐작하지 말고, 우리가 준 프롬프트와 실제로 겹치는지 잰다.
+//
+// 왜 이게 필요한가(2026-08-02 실전 시뮬레이션): 위 ①~③ 네 가지가 **전부 빗나간** 답이
+//   고객에게 나갔다. 표지는 축자라 '저는'을 못 잡고, 메타 어휘는 하나뿐이라 문턱에 못 미쳤다.
+//   패턴을 또 덧대는 길은 이미 세 번(07-20 · 07-30 · 08-02) 실패했다.
+//
+// ⚠ 짧은 조각은 쓰지 않는다 — '보안 담당자'처럼 정상 답변에도 나오는 말이 걸린다.
+//   길이 14자 이상, **서로 다른 조각 2개 이상**이 겹칠 때만 복창으로 본다.
+// ⚠ 제품 정체성 문구는 뺀다 — '무엇을 하는 제품이야?'에 정상 답변이 그대로 쓸 수 있다.
+const 정체성문구 = ["AI 자산 보안 관리 플랫폼", "보안 어시스턴트", "보안 AI입니다"];
+const 조각길이 = 14;
+
+let 조각캐시: Set<string> | null = null;
+function 프롬프트조각(): Set<string> {
+  if (조각캐시) return 조각캐시;
+  const out = new Set<string>();
+  // 에이전트별로 문구가 조금씩 다르므로 대표 프롬프트 몇 개를 모아 조각을 만든다.
+  for (const id of ["orchestrator", "normaltic", ""]) {
+    let raw = "";
+    try { raw = systemPromptFor(id); } catch { continue; }
+    let t = raw.replace(/\s+/g, " ");
+    for (const x of 정체성문구) t = t.split(x).join(" ");
+    for (let i = 0; i + 조각길이 <= t.length; i += 3) {
+      const g = t.slice(i, i + 조각길이).trim();
+      if (g.length === 조각길이 && /[가-힣]/.test(g)) out.add(g);
+    }
+  }
+  조각캐시 = out;
+  return out;
+}
+
+/** 답이 프롬프트 원문과 몇 조각이나 겹치나. 시험이 수치를 직접 보게 export 한다. */
+export function promptOverlapCount(text: string): number {
+  const t = (text ?? "").replace(/\s+/g, " ");
+  if (t.length < 조각길이) return 0;
+  let n = 0;
+  for (const g of 프롬프트조각()) if (t.includes(g)) { n++; if (n >= 2) break; }
+  return n;
 }
 
 export function hasPromptLeak(text: string): boolean {
@@ -332,7 +373,9 @@ export function hasPromptLeak(text: string): boolean {
   const firstSentence = (cut >= 0 ? t.slice(0, cut + 1) : t).trim();
   if (SYSTEM_ECHO_SENTENCE_RE.test(firstSentence)) return true;
   // ③ 풀어쓴 복창 — 응답-메타 어휘가 여럿 모이면 규칙을 옮긴 것이다.
-  return RESPONSE_META_WORDS.filter((w) => t.includes(w)).length >= META_THRESHOLD;
+  if (RESPONSE_META_WORDS.filter((w) => t.includes(w)).length >= META_THRESHOLD) return true;
+  // ④ 원문 대조 — 위 셋을 전부 빠져나간 복창을 잡는 마지막 그물.
+  return promptOverlapCount(t) >= 2;
 }
 
 // 주입 블록 머리말 에코 제거 — 재생성이 아니라 **결정적 절단**으로 처리한다.
