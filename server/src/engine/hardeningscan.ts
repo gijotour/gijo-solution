@@ -628,7 +628,7 @@ export async function runHardeningScan(opts: { standard: StandardId; target?: st
   };
 }
 
-const MARK: Record<ScanStatus, string> = { PASS: "✅ 양호", FAIL: "❌ 취약", WARN: "⚠️ 확인필요", NA: "➖ 해당없음" };
+const MARK: Record<ScanStatus, string> = { PASS: "✓ 양호", FAIL: "✗ 취약", WARN: "⚠ 확인필요", NA: "— 해당없음" };
 
 export function formatHardeningReport(r: ScanReport): string {
   const L: string[] = [];
@@ -642,7 +642,7 @@ export function formatHardeningReport(r: ScanReport): string {
   L.push(`## 요약`);
   L.push("");
   L.push(`- 준수율: **${r.summary.rate}%** (양호 ${r.summary.pass} / 채점대상 ${r.summary.scored})`);
-  L.push(`- 결과: ✅ 양호 ${r.summary.pass} · ❌ 취약 ${r.summary.fail} · ⚠️ 확인필요 ${r.summary.warn} · ➖ 해당없음 ${r.summary.na} (총 ${r.summary.total}항목)`);
+  L.push(`- 결과: ✓ 양호 ${r.summary.pass} · ✗ 취약 ${r.summary.fail} · ⚠ 확인필요 ${r.summary.warn} · — 해당없음 ${r.summary.na} (총 ${r.summary.total}항목)`);
   L.push(`- 종합 판정: ${r.summary.verdict}`);
   L.push("");
   L.push(`## 항목별 결과`);
@@ -668,7 +668,7 @@ export function scanSummaryText(r: ScanReport): string {
   const L: string[] = [];
   L.push(`${r.standardLabel.split(" —")[0]} 기준 하드닝 점검 완료 — 대상 ${r.target}`);
   L.push(`준수율 ${r.summary.rate}% (양호 ${r.summary.pass}/${r.summary.scored}) · ${r.summary.verdict}`);
-  L.push(`✅ 양호 ${r.summary.pass} · ❌ 취약 ${r.summary.fail} · ⚠️ 확인필요 ${r.summary.warn} · ➖ 해당없음 ${r.summary.na}`);
+  L.push(`✓ 양호 ${r.summary.pass} · ✗ 취약 ${r.summary.fail} · ⚠ 확인필요 ${r.summary.warn} · — 해당없음 ${r.summary.na}`);
   if (fails.length) {
     L.push("취약 항목:");
     for (const i of fails) L.push(`  - [${i.id}] ${i.title} — ${i.evidence}\n    → ${i.remediation}`);

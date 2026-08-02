@@ -342,7 +342,7 @@ export function systemHealth(): SystemHealth {
   };
 }
 
-const LEVEL_MARK: Record<CheckLevel, string> = { ok: "✅", warn: "⚠", fail: "❌", unknown: "❔" };
+const LEVEL_MARK: Record<CheckLevel, string> = { ok: "✓", warn: "⚠", fail: "✗", unknown: "❔" };
 
 /** 챗봇·보고용 한국어 요약. 문제일 때 무엇을 하면 되는지까지 함께 낸다. */
 export function systemHealthText(): string {
