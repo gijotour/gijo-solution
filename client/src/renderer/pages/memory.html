@@ -107,6 +107,49 @@ table{width:100%;border-collapse:collapse;font-size:13px;}
 th{text-align:left;font-size:12px;font-weight:700;padding:12px 10px;color:var(--muted-2);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border);}
 td{padding:13px 10px;border-bottom:1px solid var(--border);color:var(--text);vertical-align:middle;line-height:1.5;}
 tr:last-child td{border-bottom:none;}
+
+/* ── 지식 관계도(옛 온톨로지 화면) — 2026-08-02 통합 ─────────────────────────
+   담당자에게 둘 다 "AI가 근거로 쓰는 지식"이다. 벡터냐 트리플이냐는 우리 구현 사정이라
+   화면을 나눌 이유가 아니었다. 기능은 그대로 옮겼다. */
+.stat-row{display:flex;gap:12px;flex-wrap:wrap;margin-bottom:16px;max-width:960px;}
+.stat-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 20px;min-width:150px;}
+.stat-num{font-size:26px;font-weight:800;color:#fff;}
+.stat-label{font-size:12.5px;color:var(--muted);margin-top:2px;}
+.triple-row{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border);font-size:12.5px;}
+.triple-row:last-child{border-bottom:none;}
+.chip{display:inline-block;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:6px;padding:3px 9px;font-weight:700;color:var(--text);}
+.chip-s{color:var(--blue-light);}
+.chip-o{color:var(--teal);}
+.pred{color:var(--muted);font-size:12.5px;}
+.arrow{color:var(--muted-2);}
+.del-btn{margin-left:auto;background:none;border:none;color:var(--muted-2);cursor:pointer;font-size:14px;padding:2px 6px;border-radius:6px;}
+.del-btn:hover{color:var(--red);background:rgba(226,72,61,0.1);}
+.src-tag{font-size:11.75px;color:var(--muted-2);background:rgba(139,124,240,0.12);border-radius:5px;padding:2px 6px;margin-left:6px;}
+.list-box{max-height:360px;overflow-y:auto;}
+.graph-wrap{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.graph-wrap svg{display:block;width:100%;height:440px;}
+.node circle{fill:var(--panel);stroke:var(--blue);stroke-width:1.5;transition:.15s;}
+.node text{fill:var(--text);font-size:12px;font-weight:600;}
+.node.dim circle,.node.dim text{opacity:.2;}
+.edge{stroke:var(--border-strong);stroke-width:1;}
+.edge.hl{stroke:var(--blue-light);stroke-width:2;}
+.edge-label{fill:var(--muted-2);font-size:11px;}
+.footer{margin-top:8px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--muted-2);}
+.footer img{height:16px;opacity:0.6;}
+.header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2);}
+.header-left{display:flex;align-items:center;gap:12px;}
+.header-left img{height:22px;}
+.app-title{font-size:15px;font-weight:800;color:#fff;}
+.clock{font-size:12px;color:var(--blue-light);font-weight:600;}
+.header-right{display:flex;align-items:center;gap:10px;}
+.status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
+.status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
+.beta-tag{background:var(--teal);color:#06281c;font-size:11.25px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
+.avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+.icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
+.result-box{background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:12px;margin-top:12px;font-size:12.5px;color:var(--text);}
+.result-chunk{padding:7px 0;border-bottom:1px solid var(--border);line-height:1.6;}
+.result-chunk:last-child{border-bottom:none;}
 </style>
 </head>
 <body>
@@ -315,6 +358,52 @@ tr:last-child td{border-bottom:none;}
       <div class="status-line" id="ftStatusLine"></div>
       <div class="progress-track"><div class="progress-fill" id="ftProgressFill"></div></div>
       <div class="hint">학습은 GPU 머신에서 실행되고 진행률이 실시간 표시됩니다.</div>
+    </div>
+
+    <!-- 🔗 지식 관계도 — 옛 「온톨로지」 화면을 통째로 옮겼다(2026-08-02 통합).
+         문장으로 찾기(위 벡터 검색)와 관계로 찾기(여기)를 한 화면에서 오간다. -->
+    <div data-gijo-fold="🔗 지식 관계도" data-gijo-fold-badges="statCount:관계">
+    <div class="stat-row">
+      <div class="stat-card"><div class="stat-num" id="statCount">-</div><div class="stat-label">전체 관계(트리플)</div></div>
+      <div class="stat-card"><div class="stat-num" id="statEntities">-</div><div class="stat-label">엔티티(노드)</div></div>
+      <div class="stat-card"><div class="stat-num" id="statPreds">-</div><div class="stat-label">관계 종류</div></div>
+    </div>
+
+    <div class="panel" data-gijo-fold="규칙 주입 미리보기">
+      <div class="panel-title">🔎 규칙 주입 미리보기</div><div class="field-row">
+        <div class="field"><label for="expandInput">질문 / 텍스트</label><input id="expandInput" placeholder="예: 탈옥 위협에 어떻게 대응하나요?"></div>
+        <button class="btn-primary" id="expandBtn" style="align-self:flex-end">확장</button>
+      </div>
+      <div class="result-box" id="expandResult" style="display:none"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">🕸 관계 그래프 <span id="graphCap" style="font-size:12.5px;font-weight:600;color:var(--muted)"></span></div><div class="field-row" style="margin-bottom:12px">
+        <div class="field"><label for="filterSubject">특정 엔티티만 보기 (주어)</label><input id="filterSubject" placeholder="비워두면 전체 · 예: 탈옥"></div>
+        <button class="btn-ghost" id="filterBtn" style="align-self:flex-end">필터</button>
+        <button class="btn-ghost" id="filterClearBtn" style="align-self:flex-end">전체</button>
+      </div>
+      <div class="graph-wrap"><svg id="graph" viewBox="0 0 900 440" preserveAspectRatio="xMidYMid meet"></svg></div>
+    </div>
+
+    <div class="panel" data-gijo-fold="관계 추가">
+      <div class="panel-title">＋ 관계 추가</div><div class="field-row">
+        <div class="field"><label>주어 (Subject)</label><input id="addSubject" placeholder="관리자API"></div>
+        <div class="field"><label>관계 (Predicate)</label><input id="addPredicate" placeholder="접근권한"></div>
+        <div class="field"><label>대상 (Object)</label><input id="addObject" placeholder="보안운영팀"></div>
+      </div>
+      <div class="field-row" style="margin-top:12px">
+        <div class="field"><label>출처 (선택)</label><input id="addSource" placeholder="예: 접근제어지침 3.2"></div>
+        <div class="field"><label for="addScope">적용 범위</label><select id="addScope"><option value="global">전체 공유 (모든 에이전트)</option></select></div>
+        <button class="btn-primary" id="addBtn" style="align-self:flex-end">추가</button>
+      </div>
+      <div class="status-line" id="addStatus"></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">📋 등록된 관계 <span id="listCount" style="color:var(--muted);font-weight:600;font-size:12px"></span></div>
+      <div class="list-box" id="tripleList"></div>
+    </div>
     </div>
 
     <div class="footer">
@@ -1021,6 +1110,186 @@ tr:last-child td{border-bottom:none;}
     };
     걸기();
   })();
+
+  // ── 지식 관계도(옛 온톨로지) ─────────────────────────────────────────────
+  // ⚠ 공통 뼈대(tick·loadHealth·loadUser·init)는 위 memory 것을 쓴다 — 다시 선언하면 충돌한다.
+  //   대신 이 구역의 첫 그리기를 아래에서 직접 부른다.
+  const GRAPH_CAP = 60;
+  let allTriples = [];
+
+
+  const esc = (s) => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+  function renderStats() {
+    const nodes = new Set(), preds = new Set();
+    for (const t of allTriples) { nodes.add(t.subject); nodes.add(t.object); preds.add(t.predicate); }
+    document.getElementById("statCount").textContent = allTriples.length;
+    document.getElementById("statEntities").textContent = nodes.size;
+    document.getElementById("statPreds").textContent = preds.size;
+  }
+
+  function renderList(triples) {
+    const box = document.getElementById("tripleList");
+    document.getElementById("listCount").textContent = `· ${triples.length}건`;
+    if (triples.length === 0) { box.innerHTML = `<div style="color:var(--muted-2);font-size:12.5px;padding:14px 0">등록된 관계가 없습니다. 위 "샘플 지식 불러오기"로 시작하거나 직접 추가하세요.</div>`; return; }
+    box.innerHTML = triples.map((t) => `
+      <div class="triple-row">
+        <span class="chip chip-s">${esc(t.subject)}</span>
+        <span class="arrow">—</span><span class="pred">${esc(t.predicate)}</span><span class="arrow">→</span>
+        <span class="chip chip-o">${esc(t.object)}</span>
+        ${t.source ? `<span class="src-tag">${esc(t.source)}</span>` : ""}
+        <button class="del-btn" data-id="${t.id}" title="삭제">🗑</button>
+      </div>`).join("");
+    // 무엇을 지우는지 확인 창에 그대로 보여준다 — "이 관계"라고만 하면 어느 것인지 모른다.
+    box.querySelectorAll(".del-btn").forEach((b) =>
+      b.addEventListener("click", () => removeTriple(b.dataset.id, (b.closest(".triple") || b.parentElement)?.innerText.replace(/\s+/g, " ").trim()))
+    );
+  }
+
+  // 노드-링크 그래프를 원형 배치로 그린다(결정적 레이아웃 — 새로고침해도 위치 안정).
+  function renderGraph(triples) {
+    const svg = document.getElementById("graph");
+    const W = 900, H = 440, cx = W / 2, cy = H / 2, R = 165;
+    const shown = triples.slice(0, GRAPH_CAP);
+    // ⚠ 표시 상한을 **말하지 않고 잘라 왔다**(2026-08-01 발견). 요소가 개편 때 사라진 뒤로
+    //   1년치 관계 중 60개만 그리면서 담당자에겐 그게 전부인 것처럼 보였다 — 자리를 되살렸다.
+    //   담당자는 화면에 보이는 수로 지식의 크기를 가늠한다. 잘랐으면 잘랐다고 적는다.
+    const capEl = document.getElementById("graphCap");
+    if (capEl) {
+      capEl.textContent = triples.length > GRAPH_CAP
+        ? `전체 ${triples.length.toLocaleString("ko-KR")}건 중 ${GRAPH_CAP}건만 그립니다 — 좁히려면 위에서 주어를 지정하세요`
+        : `${triples.length.toLocaleString("ko-KR")}건 전부`;
+    }
+    const nodeNames = [];
+    const seen = new Set();
+    for (const t of shown) { for (const n of [t.subject, t.object]) if (!seen.has(n)) { seen.add(n); nodeNames.push(n); } }
+    if (nodeNames.length === 0) { svg.innerHTML = `<text x="${cx}" y="${cy}" text-anchor="middle" fill="#a49d95" font-size="13">표시할 관계가 없습니다</text>`; return; }
+    const pos = {};
+    nodeNames.forEach((n, i) => {
+      const a = (i / nodeNames.length) * Math.PI * 2 - Math.PI / 2;
+      pos[n] = { x: cx + R * Math.cos(a), y: cy + R * Math.sin(a), i };
+    });
+    const deg = {}; nodeNames.forEach((n) => (deg[n] = 0));
+    shown.forEach((t) => { deg[t.subject]++; deg[t.object]++; });
+
+    let edges = "", labels = "", nodes = "";
+    shown.forEach((t, i) => {
+      const a = pos[t.subject], b = pos[t.object];
+      edges += `<line class="edge" data-s="${esc(t.subject)}" data-o="${esc(t.object)}" x1="${a.x.toFixed(1)}" y1="${a.y.toFixed(1)}" x2="${b.x.toFixed(1)}" y2="${b.y.toFixed(1)}"></line>`;
+      const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+      labels += `<text class="edge-label" x="${mx.toFixed(1)}" y="${my.toFixed(1)}" text-anchor="middle">${esc(t.predicate)}</text>`;
+    });
+    nodeNames.forEach((n) => {
+      const p = pos[n];
+      const r = Math.min(9 + deg[n] * 1.6, 18);
+      const anchor = p.x < cx ? "end" : "start";
+      const dx = p.x < cx ? -(r + 4) : (r + 4);
+      const label = n.length > 12 ? n.slice(0, 11) + "…" : n;
+      nodes += `<g class="node" data-name="${esc(n)}"><circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${r.toFixed(1)}"></circle>`
+        + `<text x="${(p.x + dx).toFixed(1)}" y="${(p.y + 3.5).toFixed(1)}" text-anchor="${anchor}">${esc(label)}</text></g>`;
+    });
+    svg.innerHTML = edges + labels + nodes;
+
+    // 호버 강조: 노드에 올리면 그 노드에 붙은 엣지·이웃만 밝게.
+    svg.querySelectorAll(".node").forEach((g) => {
+      const name = g.dataset.name;
+      g.addEventListener("mouseenter", () => {
+        const neighbors = new Set([name]);
+        svg.querySelectorAll(".edge").forEach((e) => {
+          const hit = e.dataset.s === name || e.dataset.o === name;
+          e.classList.toggle("hl", hit);
+          if (hit) { neighbors.add(e.dataset.s); neighbors.add(e.dataset.o); }
+        });
+        svg.querySelectorAll(".node").forEach((nn) => nn.classList.toggle("dim", !neighbors.has(nn.dataset.name)));
+      });
+      g.addEventListener("mouseleave", () => {
+        svg.querySelectorAll(".edge").forEach((e) => e.classList.remove("hl"));
+        svg.querySelectorAll(".node").forEach((nn) => nn.classList.remove("dim"));
+      });
+    });
+  }
+
+  async function refresh(filterSubject) {
+    try {
+      allTriples = await window.gijo.listOntology(filterSubject ? { subject: filterSubject } : undefined);
+    } catch (e) { allTriples = []; }
+    renderStats();
+    renderList(allTriples);
+    renderGraph(allTriples);
+  }
+
+  async function seed() {
+    const btn = document.getElementById("seedBtn");
+    btn.disabled = true; btn.textContent = "불러오는 중...";
+    try {
+      const r = await window.gijo.seedOntology();
+      btn.textContent = `✓ ${r.inserted}건 불러옴`;
+      document.getElementById("filterSubject").value = "";
+      await refresh();
+    } catch (e) { btn.textContent = "✗ 실패 — 다시 시도"; }
+    finally { setTimeout(() => { btn.disabled = false; btn.textContent = "＋ 샘플 지식 불러오기 (KISA 위협)"; }, 2200); }
+  }
+
+  async function addTriple() {
+    const subject = document.getElementById("addSubject").value.trim();
+    const predicate = document.getElementById("addPredicate").value.trim();
+    const object = document.getElementById("addObject").value.trim();
+    const source = document.getElementById("addSource").value.trim();
+    const scope = document.getElementById("addScope").value;
+    const status = document.getElementById("addStatus");
+    if (!subject || !predicate || !object) { status.textContent = "주어·관계·대상을 모두 입력하세요."; status.className = "status-line status-err"; return; }
+    try {
+      await window.gijo.addOntologyTriple({ subject, predicate, object, scope, source: source || undefined });
+      status.textContent = `✓ 추가됨: ${subject} —[${predicate}]→ ${object}`;
+      status.className = "status-line status-ok";
+      ["addSubject", "addPredicate", "addObject", "addSource"].forEach((id) => (document.getElementById(id).value = ""));
+      await refresh(document.getElementById("filterSubject").value.trim() || undefined);
+    } catch (e) { status.textContent = "✗ 추가 실패: " + e.message; status.className = "status-line status-err"; }
+  }
+
+  // 지식 관계 하나를 지운다. 두 가지를 지킨다(2026-07-31 사용자 상황 점검에서 발견):
+  //  ① **묻고 지운다.** 예전엔 🗑을 누르는 즉시 사라졌다. 되돌리기가 없는데 확인도 없으면,
+  //     손이 미끄러진 것과 결심한 것을 구별할 방법이 없다.
+  //  ② **실패하면 말한다.** 예전엔 catch가 비어 있어, 못 지웠는데도 아무 말이 없었다 —
+  //     담당자는 지워진 줄 알고 넘어간다(목록엔 그대로 남아 있으니 더 혼란스럽다).
+  async function removeTriple(id, 설명) {
+    const 물음 = `이 관계를 지울까요?\n\n${설명 || ""}\n\n지운 관계는 되돌릴 수 없습니다. AI가 이 관계를 근거로 하던 답이 달라질 수 있습니다.`;
+    if (window.gijoAsk && !(await window.gijoAsk(물음, { ok: "삭제", danger: true }))) return;
+    try {
+      await window.gijo.removeOntologyTriple(id);
+      await refresh(document.getElementById("filterSubject").value.trim() || undefined);
+    } catch (e) {
+      alert("지우지 못했습니다: " + ((e && e.message) || e) + "\n\n목록에 그대로 남아 있습니다.");
+    }
+  }
+
+  async function expand() {
+    const text = document.getElementById("expandInput").value.trim();
+    const box = document.getElementById("expandResult");
+    if (!text) return;
+    box.style.display = "block";
+    box.innerHTML = `<span style="color:var(--muted)">확장 중...</span>`;
+    try {
+      const hits = await window.gijo.expandOntology(text);
+      if (!hits || hits.length === 0) { box.innerHTML = `<span style="color:var(--muted-2)">이 질문에 연결되는 규칙이 없습니다. (그래프에 관련 엔티티가 없거나 아직 등록 전)</span>`; return; }
+      box.innerHTML = `<div style="color:var(--teal);font-weight:700;margin-bottom:8px">이 질문에 함께 주입될 규칙 ${hits.length}건:</div>` +
+        hits.map((t) => `<div class="result-chunk"><span class="chip chip-s">${esc(t.subject)}</span> <span class="pred">${esc(t.predicate)}</span> <span class="arrow">→</span> <span class="chip chip-o">${esc(t.object)}</span>${t.source ? ` <span class="src-tag">${esc(t.source)}</span>` : ""}</div>`).join("");
+    } catch (e) { box.innerHTML = `<span class="status-err">확장 실패: ${esc(e.message)}</span>`; }
+  }
+
+
+  if (!window.gijo.isAuthenticated()) window.gijo.navigateTo("login.html");
+  else init();
+</script>
+
+
+<script src="nav.js"></script>
+<script src="progresscard.js"></script>
+<script src="gijomd.js"></script>
+<script src="chatparts.js"></script>
+<script src="chatwidget.js">
+  // 화면이 뜨면 관계도도 함께 불러온다(옛 화면의 init이 하던 일).
+  try { if (typeof loadTriples === "function") loadTriples(); } catch (e) { /* 관계도가 없어도 문서 검색은 돈다 */ }
 </script>
 
 

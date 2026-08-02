@@ -424,7 +424,7 @@ const GUIDES: Record<string, ScreenGuide> = {
     },
   },
   "handover.html": {
-    title: "인수인계",
+    title: "업무 넘기기",
     what: "담당자의 업무 지식·노하우를 GIJO AS에 남기고 떠나는 마법사입니다 — 문서를 올리면 즉시 AI 지식이 되고(재학습 불필요), AI가 스스로 검증해 이관 리포트를 증적으로 남깁니다.",
     can: ['"인수인계는 어떻게 해?" — 4단계 절차 안내', '"올린 문서가 잘 반영됐는지 확인해줘"'],
     panels: {
@@ -434,7 +434,7 @@ const GUIDES: Record<string, ScreenGuide> = {
     },
   },
   "memory.html": {
-    title: "기억·학습 (RAG)",
+    title: "AI 지식 (기억·학습·RAG)",
     what: "사내 문서를 아래 대화 콘솔의 ＋로 올리면 AI가 참고하고(장기 기억·RAG), 이 화면에서는 올린 문서를 확인·관리하거나 학습(파인튜닝)에 씁니다.",
     can: [
       "\"지식베이스에 뭐 들어있어?\"",
@@ -468,7 +468,7 @@ const GUIDES: Record<string, ScreenGuide> = {
     },
   },
   "redteam.html": {
-    title: "AI 견고성 (레드팀·가드레일)",
+    title: "AI 공격 시험·차단 (레드팀·가드레일)",
     what: "배포된 로컬 LLM이 프롬프트 인젝션·탈옥에 얼마나 견고한지 레드팀 페이로드로 실측하고, 실시간 입력을 검사해 인젝션 시도를 탐지·차단(가드레일)합니다. 온프레미스에서 도는 AI 보안 방어선입니다.",
     can: [
       "\"이 자산 레드팀 점검해줘\"",
@@ -530,7 +530,7 @@ const GUIDES: Record<string, ScreenGuide> = {
     },
   },
   "merge.html": {
-    title: "LLM 합성",
+    title: "모델 합치기",
     what: "보안 특화 LLM 도감에서 같은 구조(아키텍처·크기)의 두 모델을 골라 SLERP로 합성합니다(실 GPU 파이프라인). 서로 다른 보안 강점을 하나로 합칠 수 있습니다.",
     can: ["\"합성 가능한 모델 조합 알려줘\"", "\"합성 진행 상황 알려줘\""],
     tip: "같은 아키텍처(예: Qwen2.5 계열끼리)만 합성할 수 있습니다.",
@@ -554,7 +554,7 @@ const GUIDES: Record<string, ScreenGuide> = {
     },
   },
   "hardening.html": {
-    title: "원격 정기점검 (하드닝)",
+    title: "보안설정 점검 (하드닝)",
     what: "등록한 보안장비에 SSH로 접속해 CCE 하드닝(보안설정)을 주기적으로 자동 점검하고, 준수율 추세·악화를 관제합니다. 점검은 읽기 전용 진단 명령만 실행합니다.",
     can: [
       "\"하드닝 점검해줘\" — 리눅스 서버(KISA U-시리즈)",
@@ -573,7 +573,7 @@ const GUIDES: Record<string, ScreenGuide> = {
     },
   },
   "maintenance.html": {
-    title: "유지보수 점검",
+    title: "정기 점검",
     what: "보안장비·AI 자산의 정기 점검을 기한 순으로 챙기는 곳입니다. 늦은 것이 맨 위로 올라오고, 점검서를 올리면 관리자 승인으로 닫힙니다.",
     can: [
       '"기한 지난 점검 알려줘" — 늦은 것만',
@@ -619,7 +619,7 @@ const GUIDES: Record<string, ScreenGuide> = {
     tip: "무엇이 안 될 때 여기부터 봅니다. 「누가 했나」가 궁금하면 옆 메뉴 「기록 보기」입니다.",
   },
   "terminal.html": {
-    title: "터미널 (CLI)",
+    title: "명령창 (터미널·CLI)",
     what: "담당자 PC의 셸을 이 앱 안에서 직접 실행합니다. 서버가 아니라 이 PC에서 돕니다. 위험 명령(드라이브 삭제·포맷 등)은 실행 전 차단되며, 모든 실행·차단은 작업 기록에 남습니다.",
     can: [
       "🤖 명령 제안 받기 — 하려는 일을 말하면 명령을 만들어 줍니다(실행은 직접 확인 후).",

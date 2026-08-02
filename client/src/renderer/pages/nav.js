@@ -46,60 +46,66 @@
   ];
 
   var GROUPS = [
-    { id: "monitor", ic: "🖥", label: "관제", items: [
-      // '내 업무 바로가기'는 즐겨찾기로 대신한다(2026-07-28 사용자 결정) — 원래 대시보드 위
-      // 팝업으로 열리던 기능인데 팝업을 없앴고, "자주 가는 화면을 빨리"는 별표가 더 곧다.
+    // ══ 업무 절차 5단계 (2026-08-02 사용자 승인 — 시안 mockups/menu-workflow) ══════════
+    //
+    // 왜 바꿨나: 예전 그룹은 **데이터 종류**로 묶여 있었다(관제/자산·조치/보안제품/AI/플라이휠).
+    //   담당자가 하는 일은 **절차**인데 메뉴는 창고라, 취약점 한 바퀴(발견→우선순위→조치→검증→보고)를
+    //   도는 데 그룹 3개를 오가고 방향이 위→아래→위로 꺾였다(실측).
+    //   근거는 우리 문서에 이미 있었다 — GIJO_AS_취약점관리_지침.md 1절:
+    //   "GIJO AS의 메뉴도 이 4단계에 맵핑되어야 한다. 정적 목록만 보여주면 실패다."
+    //   바깥 표준(생애주기 6단계·Tenable Exposure Response·워크플로형 내비게이션)도 같은 방향이다.
+    //
+    // ⚠ 표준의 6단계 중 "지속 감시"는 **메뉴로 만들지 않는다** — 그건 화면이 아니라 스케줄러가
+    //   늘 하는 일이고, 결과는 ① 발견으로 들어온다. 메뉴를 늘리는 대신 루프가 ①로 돌아오게 둔다.
+    // ⚠ 네 업무(취약점·보안제품 운영·AI 보안·보안로그)가 **같은 5단계**를 돈다. 그래서 업무별로
+    //   메뉴를 따로 만들지 않는다 — 그러면 메뉴가 4배가 되어 원점이다.
+    { id: "s1-find", ic: "🔍", label: "① 발견·수집", items: [
       { page: "analysis.html", label: "통합 관제" },
       { page: "threat.html", label: "위협 인텔" },
+      { page: "inventory.html", label: "자산 목록" },
+    ]},
+    { id: "s2-triage", ic: "🎯", label: "② 우선순위", items: [
+      { page: "vulnscan.html", label: "취약점" },
+      { page: "sbom.html", label: "AI-BOM" },
+    ]},
+    { id: "s3-fix", ic: "🔧", label: "③ 조치", items: [
+      { page: "approvals.html", label: "조치·승인" },
+      { page: "maintenance.html", label: "정기 점검" },
+      { page: "terminal.html", label: "명령창" },
+    ]},
+    { id: "s4-verify", ic: "✅", label: "④ 검증", items: [
+      { page: "hardening.html", label: "보안설정 점검" },
+    ]},
+    { id: "s5-report", ic: "📊", label: "⑤ 보고", items: [
       { page: "report.html", label: "리포트" },
       { page: "kpi.html", label: "보안 KPI" },
       { page: "compliance.html", label: "컴플라이언스" },
     ]},
-    { id: "assets", ic: "🛡", label: "자산·조치", items: [
+
+    // ── 기반 — 절차가 아니라 **참조하는 대장**이다. 절차 아래에 둔다. ────────────────
+    { id: "registry", ic: "🗂", label: "등록부", items: [
       { page: "assethub.html", label: "자산 통합 뷰" },
-      { page: "inventory.html", label: "자산 목록" },
-      { page: "sbom.html", label: "AI-BOM" },
-      { page: "vulnscan.html", label: "취약점" },
-      { page: "approvals.html", label: "조치·승인" },
-      { page: "terminal.html", label: "터미널 (CLI)" },
+      { page: "products.html", label: "보안제품" },
     ]},
-    // 보안제품(2026-08-01 사용자 지시로 신설) — 자산·조치에 10개가 몰려 훑기 어려웠다.
-    // 「우리가 산 장비를 등록하고·정비하고·점검하는」 한 갈래라 따로 세운다.
-    // ⚠ 「유지보수 점검」은 기한이 있는 **일감**(늦었나·검토 대기인가), 「제품 유지보수」는 읽는
-    //   **가이드**다. 이름이 비슷해 붙여 둔다 — 떨어뜨려 놓으면 둘 다 못 찾는다.
-    { id: "products", ic: "🧰", label: "보안제품", items: [
-      { page: "products.html", label: "보안제품 등록부" },
-      { page: "opsguide.html", label: "제품 유지보수" },
-      { page: "maintenance.html", label: "유지보수 점검" },
-      { page: "hardening.html", label: "원격 정기점검" },
-    ]},
-    // 업무 관리(2026-08-01 사용자 지시로 신설) — 지금은 인수인계 하나다.
-    // 항목이 하나여도 그룹을 세운 것은 「사람·업무를 넘기는 일」이 AI 기능과 성격이 다르기 때문이다.
-    { id: "work", ic: "📋", label: "업무 관리", items: [
-      { page: "handover.html", label: "인수인계" },
-    ]},
-    { id: "ai", ic: "🤖", label: "AI", items: [
+    // AI 운영 — 예전 「AI」와 「데이터 플라이휠」 두 그룹을 합쳤다. 6개면 한 그룹으로 충분하고,
+    // 담당자에게 둘의 차이(기능 vs 되먹임 고리)는 우리 사정이지 업무 구분이 아니었다.
+    { id: "aiops", ic: "🤖", label: "AI 운영", items: [
       { page: "agent.html", label: "에이전트 AI" },
-      { page: "merge.html", label: "LLM 합성" },
-      { page: "redteam.html", label: "레드팀·가드레일" },
-    ]},
-    // 데이터 플라이휠(2026-08-01 사용자 지시로 신설, 원 지시는 "Data Flywheel").
-    // **쓸수록 똑똑해지는 고리** — 자료를 넣고(기억·학습) 뜻을 잇고(온톨로지) 되먹임으로
-    // 다듬는(학습 루프) 세 화면이 한 고리다. AI 기능(에이전트·합성·레드팀)과 성격이 다르다.
-    // ⚠ 이름을 한글로 적는다 — 사용자 대상 텍스트는 한글이 이 제품의 원칙이다(CLAUDE.md).
-    { id: "flywheel", ic: "🔄", label: "데이터 플라이휠", items: [
-      { page: "memory.html", label: "기억·학습 (RAG)" },
-      { page: "ontology.html", label: "온톨로지" },
+      { page: "redteam.html", label: "AI 공격 시험·차단" },
+      { page: "memory.html", label: "AI 지식" },
       { page: "learnloop.html", label: "학습 루프" },
+      { page: "merge.html", label: "모델 합치기" },
     ]},
     // 설정 5구역(2026-07-28) — 기준은 기능이 아니라 **결정권자**다.
     // 내 것 / 모두의 것(서버·AI) / 바깥과 잇는 것 / 관리자만 / 보기만.
     // 같은 settings.html을 ?s= 로 걸러 보여준다(파일을 쪼개면 공통 스크립트가 어긋난다).
+    // ⚠ 인수인계를 여기로 옮겼다 — 「업무 관리」 그룹에 항목이 하나뿐이었다. 하나짜리는 그룹이 아니다.
     { id: "settings", ic: "⚙", label: "설정", bottom: true, items: [
       { page: "settings.html?s=my", label: "내 설정" },
       { page: "settings.html?s=ai", label: "서버·AI" },
       { page: "settings.html?s=link", label: "연동" },
       { page: "settings.html?s=admin", label: "관리자" },
+      { page: "handover.html", label: "업무 넘기기" },
       { page: "audit.html", label: "기록 보기" },
       // 시스템 로그 — 기록 보기 안에 접어 두던 것을 **별도 화면**으로 뺐다(2026-08-02 사용자 지시).
       // 「기록 보기」가 누가 무엇을 했나(감사)라면 이쪽은 서버가 무엇을 했나(진단)다.
@@ -117,6 +123,11 @@
     "logs.html": "syslog.html",   // 2026-08-02 시스템 로그를 다시 떼어냈다
     "llmguide.html": "settings.html?s=ai",      // 추천 모델 목록 → 설정 서버·AI
     "docenrich.html": "memory.html",            // 문서 보강 → 기억·학습에 병합
+    // 2026-08-02 업무 절차 개편에서 합친 두 화면.
+    // ⚠ 흡수처를 안 적으면 **열어 둔 탭이 영구 빈 화면**이 된다(셸이 localStorage의 탭을
+    //   그대로 복원해 iframe에 물린다 — mywork 때 겪은 것과 같은 사고).
+    "opsguide.html": "maintenance.html",        // 제품 유지보수 → 정기 점검에 흡수
+    "ontology.html": "memory.html",             // 온톨로지 → AI 지식(관계 탭)에 흡수
     // 내 업무 → 대시보드(2026-08-01 화면 폐지, 그 일은 대화창이 받는다). ⚠ 이걸 빼면
     // **업데이트 전에 「내 업무」 탭을 열어 둔 담당자**의 그 탭이 영구 빈 화면이 된다
     // (셸이 localStorage의 탭을 그대로 복원해 iframe에 물린다). 검토 지적 2026-08-01.
