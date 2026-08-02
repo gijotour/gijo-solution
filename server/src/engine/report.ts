@@ -10,6 +10,7 @@ import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { todayLocal } from "../util/date";
 import { chat } from "./llm";
+import { 예고서두인가 } from "./tone";
 import { PLAIN_LANGUAGE_RULE } from "./promptstyle";
 import { listAssets, getAsset, Asset } from "./assets";
 // ⚠ 스캔 실패(scan_error)는 취약점이 아니다. 판정은 이 함수 **한 곳**만 쓴다 —
@@ -504,7 +505,10 @@ export function stripMetaPreamble(text: string): string {
           s = s.replace(LEAD, ""); // 데이터 문장 앞 리드 구절 제거
           started = true;
           kept.push(s);
-        } else if (META.test(s)) {
+        } else if (META.test(s) || 예고서두인가(s)) {
+          // ⚠ **예고 판정은 llm.ts와 한 벌을 쓴다.** 여기 따로 목록을 두었더니 어긋났다 —
+          //   채팅 쪽은 잡는 `우선, 1페이지 요약에 대해 알려드리겠습니다.`를 여기서는 놓쳐
+          //   담당자에게 그대로 나갔다(2026-08-03 실전 147상황).
           continue; // 순수 메타 서두 문장 폐기(숫자 없는 "…요약입니다/살펴볼 수 있는" 포함)
         } else {
           kept.push(s); // 메타도 데이터도 아닌 일반 문장(짧은 제목 등)은 보존
