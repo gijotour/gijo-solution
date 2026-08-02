@@ -696,14 +696,31 @@ export function computeAttackPaths(events: AnalysisEvent[]): AttackPath[] {
   return paths;
 }
 
+/** 화면·대화창에 한 번에 보여 주는 경로 수. 넘으면 **잘랐다고 밝힌다.** */
+const 보여줄경로 = 6;
+
 export function formatAttackPaths(): string {
   const paths = computeAttackPaths(listAnalysisEvents());
   if (paths.length === 0) return "🧭 공격 경로 분석 — 관측된 신호로 구성 가능한 공격 경로가 없습니다 ✓";
-  const L: string[] = [`🧭 공격 경로 분석 — 도달성 순 ${paths.length}건 (관측 신호 기반 추정)`];
-  for (const p of paths.slice(0, 6)) {
+  // ⚠ 머리말은 총 건수를 말하고 아래는 상위 몇 건만 보여 준다. **잘랐다는 말을 빼면**
+  //   담당자는 57개를 다 봤다고 생각한다(2026-08-03 실측: 57건이라 쓰고 6건만 보여 줬다).
+  const 자름 = paths.length > 보여줄경로;
+  const L: string[] = [
+    `🧭 공격 경로 분석 — 도달성 순 ${paths.length}건 (관측 신호 기반 추정)` +
+      (자름 ? ` · 아래는 위험한 순 ${보여줄경로}건입니다` : ""),
+  ];
+  for (const p of paths.slice(0, 보여줄경로)) {
     L.push(`\n[도달성 ${p.reachability}·${p.reachScore}점] ${p.entity}`);
     L.push("  " + p.steps.map((s) => `${s.kind === "entry" ? "진입" : s.kind === "foothold" ? "거점" : "인접"}:${s.label}`).join(" → "));
   }
+  // ▸ 다음 걸음 — 경로를 보여 주고 끝내면 담당자에게 '그래서 뭘 하지'가 남는다.
+  //   경로는 **거점을 끊으면 통째로 무너진다** — 그 지점을 짚어 준다.
+  L.push(
+    "",
+    '▸ 이어서 — 경로는 거점을 막으면 끊어집니다. "' +
+      (paths[0]?.entity ?? "가장 위험한 자산") +
+      ' 취약점 담당자 배정해줘"라고 말하면 바로 시작합니다.'
+  );
   return L.join("\n");
 }
 

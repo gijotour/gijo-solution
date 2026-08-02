@@ -157,13 +157,39 @@ function findingSummary(asset: Asset): string {
   return `finding ${real.length}건 (${counts})${errNote}`;
 }
 
-function runListAssets(): string {
-  const assets = listAssets();
-  if (assets.length === 0) return "등록된 AI 자산이 없습니다.";
-  const lines = assets.map(
+/** 한 번에 보여 주는 자산 수. 넘으면 **잘랐다고 밝힌다.** */
+const 보여줄자산 = 15;
+
+function runListAssets(args: Record<string, string> = {}): string {
+  const all = listAssets();
+  if (all.length === 0) return "등록된 AI 자산이 없습니다.";
+
+  // ⚠ 조건을 받고도 안 거르면 **방화벽을 물었는데 전체 57건**이 나온다(2026-08-02 실측).
+  const q = String(args.query ?? "").trim();
+  const tokens = q ? queryTokens(q) : [];
+  const assets = q
+    ? all.filter((a) =>
+        matchesLoose(a.name, q, tokens) ||
+        matchesLoose(a.assetType, q, tokens) ||
+        matchesLoose(a.id, q, tokens) ||
+        matchesLoose(a.category ?? "", q, tokens) ||
+        matchesLoose(a.service ?? "", q, tokens))
+    : all;
+
+  // ⚠ 못 찾았다고 **전체를 쏟지 않는다.** 조건을 흘려버리고 전부 주면 담당자는 그게 답인 줄 안다.
+  if (assets.length === 0) {
+    return `등록된 자산 ${all.length}개 중 "${q}"에 해당하는 것을 찾지 못했습니다. ` +
+      `유형·이름·카테고리로 찾습니다 — 다른 말로 물어보시거나 "자산 목록"으로 전체를 보세요.`;
+  }
+
+  const 자름 = assets.length > 보여줄자산;
+  const lines = assets.slice(0, 보여줄자산).map(
     (a) => `- ${a.id} | ${a.name} | 유형=${a.assetType} | 담당=${a.owner || "미지정"} | ${findingSummary(a)}`
   );
-  return [`등록된 AI 자산 ${assets.length}개:`, ...lines].join("\n").slice(0, 2000);
+  const 머리 = q
+    ? `"${q}" 자산 ${assets.length}개` + (자름 ? ` · 아래는 ${보여줄자산}개입니다` : "") + ":"
+    : `등록된 AI 자산 ${assets.length}개` + (자름 ? ` · 아래는 ${보여줄자산}개입니다` : "") + ":";
+  return [머리, ...lines].join("\n").slice(0, 2000);
 }
 
 // 자산 상세 — AI-BOM까지 한 번에 준다(예전엔 get_aibom을 따로 뒀는데, LLM이 "AI-BOM도 봐야 하나"를
@@ -2446,8 +2472,8 @@ const TOOLS: AgentTool[] = [
     domain: "assets",
     write: false,
     description:
-      'AI 자산 목록을 보여준다 — "자산 목록", "자산 다 보여줘", "우리 자산 뭐 있어", "등록된 자산 보여줘"에 쓴다 (개수·이름·유형·담당자·finding 요약 포함).',
-    params: [],
+      'AI·IT 자산 목록을 보여준다 (개수·이름·유형·담당자·finding 요약). 종류나 이름으로 좁힐 수 있다 — 예: {"query":"방화벽"}, {"query":"LLM 서비스"}. 비우면 전체.',
+    params: [{ name: "query", label: "찾을 말", description: "유형·이름·카테고리·서비스 (선택, 비우면 전체)", required: false }],
     run: runListAssets,
   },
   {

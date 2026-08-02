@@ -429,7 +429,10 @@ async function 내할일이름인가(말: string): Promise<boolean> {
     if (a === b) return true;
     if (b.length < 4) return false; // 두세 글자 유형명이 걸리면 안 된다
     if (a.includes(b)) return b.length >= Math.max(4, Math.ceil(a.length * 0.5));
-    return b.includes(a) && a.length >= 4;
+    // ⚠ 반대 방향에도 **같은 절반 규칙**을 건다(2026-08-03). 없으면 흔한 업무명
+    //   "정책 점검"(4자)이 "AhnLab V3 정책 점검"(13자) 질문에 걸려, 제품 점검 절차를
+    //   물었는데 내 할 일을 뒤진다. 질문에만 있는 고유한 말(제품명 등)이 붙으면 같은 일이 아니다.
+    return b.includes(a) && a.length >= Math.max(4, Math.ceil(b.length * 0.5));
   };
   if (listTasks().some((t) => !t.done && 겹치나(t.text))) return true;
   // ⚠ tasks만 보면 **아직 안 담은 AI 제안**을 놓친다(2026-08-01 실측). 목록에 버젓이 보이고
