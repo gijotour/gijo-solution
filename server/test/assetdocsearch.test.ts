@@ -68,6 +68,21 @@ describe("자산을 다룬 문서에서 취약점 발췌", () => {
     expect(out).not.toContain("사내 점검 보고서");
   });
 
+  it("넓은 질문(자산이 여럿 걸림)에는 붙이지 않는다", async () => {
+    // ⚠ "자산 목록 보여줘"에 앞의 두 자산만 보고서를 붙이면 **하필 그 둘만 자세한** 이상한
+    //   답이 된다. 지금 운영 데이터는 자산 대부분이 스캔 실패뿐이라 이 가지를 안 막으면
+    //   거의 항상 탄다.
+    const 여럿 = [1, 2, 3, 4].map((n) => ({
+      ...자산([{ finding_type: "scan_error", severity: "low", evidence: "x" }]),
+      id: `vuln:h${n}.aj-safe.co.kr`,
+      name: `안전대부 서버 ${n} (h${n}.aj-safe.co.kr)`,
+    }));
+    자산들.list = 여럿;
+    조각들.list = ["안전대부 h1.aj-safe.co.kr 디렉토리 인덱싱"];
+    const out = await 찾기("안전대부");
+    expect(out).not.toContain("사내 점검 보고서");
+  });
+
   it("DB에 진짜 취약점이 있으면 문서를 뒤지지 않는다", async () => {
     // 있는 것을 두고 문서를 또 뒤지면 같은 취약점이 두 번 나와 건수가 어긋난다.
     자산들.list = [자산([{ finding_type: "CVE-2025-1234", severity: "critical", evidence: "인증 우회" }])];

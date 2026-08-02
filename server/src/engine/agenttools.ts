@@ -447,7 +447,10 @@ async function searchOne(q: string): Promise<string[]> {
       );
     }
     // 자산은 찾았는데 **그 자산의 취약점이 하나도 없을 때**, 그 자산을 다룬 사내 문서를 찾아 붙인다.
-    for (const a of assets.slice(0, 2)) {
+    // ⚠ **대상이 좁혀졌을 때만** 한다. "자산 목록 보여줘"처럼 다 걸리는 질문에서 앞의 두 자산만
+    //   골라 보고서를 붙이면, 하필 그 둘만 자세한 이상한 답이 된다. 지금 운영 데이터는 자산의
+    //   대부분이 스캔 실패뿐이라(609건 중 608건) 이 가지를 안 막으면 거의 항상 탄다.
+    for (const a of (assets.length <= 3 ? assets : [])) {
       if (a.findings.some(isRealVulnerability)) continue;   // DB에 있으면 문서를 뒤질 이유가 없다
       const 발췌 = await 자산문서발췌(a);
       if (발췌.length) {
