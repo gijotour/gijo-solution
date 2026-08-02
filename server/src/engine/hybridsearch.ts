@@ -125,7 +125,7 @@ export const SCREEN_CATEGORY: Record<string, Category> = {
   "sbom.html": "취약점",
   "kpi.html": "취약점",
   "products.html": "장비운영",
-  "opsguide.html": "장비운영",
+  "maintenance.html": "장비운영",
   "hardening.html": "장비운영",
   "terminal.html": "장비운영",
   "compliance.html": "사내규정",

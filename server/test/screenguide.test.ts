@@ -185,9 +185,11 @@ describe("screenguide — 화면에 적힌 구역 이름으로 물어도 찾는�
     expect(out).toContain("벤더명");
   });
 
-  it("유지보수: '유지보수 일정 · 점검서 · 승인' → '점검 승인' 설명", () => {
-    const out = formatScreenGuide("opsguide.html", "유지보수 일정 · 점검서 · 승인 어떻게 써?");
-    expect(out).toContain("점검 승인");
+  // 「제품 유지보수」는 2026-08-02에 「정기 점검」으로 합쳤다 — 구역도 함께 옮겼다.
+  it("정기 점검: '점검 승인' 구역을 물으면 그 설명을 준다", () => {
+    const out = formatScreenGuide("maintenance.html", "점검 승인 어떻게 써?");
+    expect(out).toContain("관리자");
+    expect(out, "옮겨 온 지식이 사라지면 안 된다").toContain("점검서");
   });
 
   it("설정: '이메일(SMTP) 설정' → 'SMTP' 설명", () => {

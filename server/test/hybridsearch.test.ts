@@ -147,7 +147,7 @@ describe("화면 맥락 부스트(업무영역) — soft boost 원칙", () => {
   });
 
   it("화면→업무영역 매핑: 대표 화면들이 올바른 영역으로 간다", () => {
-    expect(categoryForScreen("opsguide.html")).toBe("장비운영");
+    expect(categoryForScreen("maintenance.html")).toBe("장비운영");
     expect(categoryForScreen("compliance.html")).toBe("사내규정");
     expect(categoryForScreen("vulnscan.html")).toBe("취약점");
     expect(categoryForScreen("threat.html")).toBe("위협대응");

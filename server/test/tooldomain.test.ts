@@ -67,7 +67,7 @@ describe("화면 → 도구 영역 연결", () => {
   it("업무 화면은 자기 영역을 준다", () => {
     expect(toolDomainsForScreen("vulnscan.html")).toEqual(["vuln", "assets"]);
     expect(toolDomainsForScreen("products.html")).toEqual(["products"]);
-    expect(toolDomainsForScreen("opsguide.html")).toEqual(["maintenance"]);
+    expect(toolDomainsForScreen("maintenance.html")).toEqual(["maintenance"]);
   });
 
   it("대시보드·설정처럼 영역이 없는 화면은 undefined — 좁히지 않는다", () => {
@@ -78,7 +78,7 @@ describe("화면 → 도구 영역 연결", () => {
 
   it("선언한 영역은 전부 실재하는 도메인이어야 한다(오타 방지)", async () => {
     const { TOOL_DOMAINS } = await import("../src/engine/agenttools");
-    const screens = ["vulnscan.html", "sbom.html", "products.html", "opsguide.html", "report.html", "memory.html", "threat.html", "inventory.html"];
+    const screens = ["vulnscan.html", "sbom.html", "products.html", "maintenance.html", "report.html", "memory.html", "threat.html", "inventory.html"];
     for (const s of screens) {
       for (const d of toolDomainsForScreen(s) ?? []) {
         expect(TOOL_DOMAINS as readonly string[], `${s}의 ${d}`).toContain(d);

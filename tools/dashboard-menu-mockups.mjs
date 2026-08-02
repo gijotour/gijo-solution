@@ -14,7 +14,7 @@ const WEEKLY = [
   ["자산 목록", "📦", "inventory.html"], ["보안제품", "🧰", "products.html"], ["원격 정기점검", "🛰️", "hardening.html"], ["작업 기록", "📜", "audit.html"], ["터미널", "💻", "terminal.html"],
 ];
 const MONTHLY = [
-  ["리포트", "📄", "report.html"], ["컴플라이언스", "📋", "compliance.html"], ["유지보수", "🔧", "opsguide.html"], ["레드팀·가드레일", "🚨", "redteam.html"],
+  ["리포트", "📄", "report.html"], ["컴플라이언스", "📋", "compliance.html"], ["정기 점검", "🔧", "maintenance.html"], ["레드팀·가드레일", "🚨", "redteam.html"],
 ];
 // "메뉴 담기" 후보 — 담당자가 추가로 담을 수 있는 나머지(관리자·고급 포함).
 const CATALOG = [

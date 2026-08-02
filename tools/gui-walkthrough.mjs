@@ -25,7 +25,6 @@ const PAGES = [
   ["compliance.html", "10-compliance"],
   ["agent.html", "11-agent"],
   ["memory.html", "12-memory"],
-  ["ontology.html", "13-ontology"],
   ["settings.html", "14-settings"],
 ];
 

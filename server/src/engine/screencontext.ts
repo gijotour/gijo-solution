@@ -46,14 +46,13 @@ const SCREENS: Record<string, ScreenContext> = {
 
   "threat.html": { label: "위협 인텔리전스", domain: "외부 위협 인텔·CTI 피드", toolDomains: ["threat"] },
   "products.html": { label: "보안제품", domain: "보안제품 등록부·매뉴얼", toolDomains: ["products"] },
-  "opsguide.html": { label: "유지보수", domain: "정기 점검 일정·이력", toolDomains: ["maintenance"] },
+  "maintenance.html": { label: "정기 점검", domain: "정기 점검 일정·이력", toolDomains: ["maintenance"] },
 
   "report.html": { label: "내부 리포트", domain: "보고서 작성·배포", defaultAction: "report", toolDomains: ["report"] },
   "compliance.html": { label: "컴플라이언스", domain: "규제·통제 항목 대응 현황", toolDomains: ["report"] },
 
   "agent.html": { label: "에이전트 AI", domain: "에이전트 설정·직접 지시" },
   "memory.html": { label: "기억·학습", domain: "장기기억(RAG) 문서", toolDomains: ["knowledge"] },
-  "ontology.html": { label: "온톨로지", domain: "지식 그래프·표준 매핑", toolDomains: ["knowledge"] },
   "redteam.html": { label: "AI 견고성", domain: "레드팀·가드레일", toolDomains: ["assets"] },
 
   // 오케스트레이션 대상이 아닌 화면들 — defaultAction 없음(추측하지 않는다).

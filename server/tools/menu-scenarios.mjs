@@ -41,7 +41,7 @@ export const CATALOG = [
     { desc: "제품 등록", expect: { tool: ["register_product"] },
       commands: ["보안제품 등록해줘. 이름 팔로알토, 종류 방화벽"] },
   ]},
-  { screen: "opsguide.html", menu: "유지보수", scenarios: [
+  { screen: "maintenance.html", menu: "정기 점검", scenarios: [
     { desc: "점검 일정 현황", expect: { tool: ["maintenance_status"] },
       commands: ["정기 점검 일정 보여줘", "이번 달 점검 뭐 있어?"] },
     { desc: "점검 예약", expect: { tool: ["schedule_maintenance"] },
