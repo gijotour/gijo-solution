@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>시안 — 첫 화면을 데이터부터 (전-7)</title>
+<style>
+  :root{ --bg:#141312; --panel:#1c1b19; --line:#332f2b; --text:#e9e7e2; --dim:#9a938a;
+         --red:#e5484d; --org:#f2811d; --grn:#46a758; --blu:#5b8dd6; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font:13px/1.45 "Malgun Gothic","맑은 고딕",system-ui,sans-serif}
+  .wrap{max-width:1180px;margin:0 auto;padding:14px 16px 40px}
+  h1{font-size:15px;margin:0 0 2px}
+  .sub{color:var(--dim);font-size:12px;margin:0 0 14px}
+  .note{border:1px dashed #4a423a;background:#1a1714;color:#d8cfc2;padding:9px 11px;
+        border-radius:5px;font-size:12px;margin:0 0 14px}
+  .note b{color:#f0e6d8}
+  table{border-collapse:collapse;width:100%;font-size:12px}
+  th,td{border-bottom:1px solid var(--line);padding:4px 7px;text-align:left;height:23px}
+  th{color:var(--dim);font-weight:500}
+  td.n{text-align:right;font-variant-numeric:tabular-nums}
+  .bad{color:var(--red)} .good{color:var(--grn)}
+  /* ── 화면 흉내 ───────────────────────────────────────── */
+  .screen{border:1px solid var(--line);border-radius:6px;overflow:hidden;background:var(--panel)}
+  .screen .ruler{position:relative;background:#0f0e0d;border-bottom:1px solid var(--line);
+                 color:var(--dim);font-size:11px;padding:3px 8px}
+  .band{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;padding:7px 8px;border-bottom:1px solid var(--line)}
+  .band div{background:#231f1c;border:1px solid var(--line);border-radius:4px;padding:5px 7px;font-size:11.5px}
+  .band b{display:block;font-size:13px;margin-top:1px}
+  .sum{padding:6px 9px;border-bottom:1px solid var(--line);font-size:12px;color:var(--dim)}
+  .sum b{color:var(--text)}
+  .fold{padding:5px 9px;border-bottom:1px solid var(--line);font-size:12px;color:var(--dim);cursor:default}
+  .rows td{font-size:12px}
+  .cut{background:repeating-linear-gradient(45deg,#3a2020,#3a2020 6px,#2a1818 6px,#2a1818 12px);
+       color:#ffb4b4;text-align:center;font-size:11.5px;padding:4px}
+  .blob{padding:8px 10px;border-bottom:1px solid var(--line);font-size:11.5px;color:#8b8279;
+        line-height:1.5;max-height:112px;overflow:hidden}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>시안 — 첫 화면을 <b>데이터부터</b> <span style="color:var(--dim);font-weight:400">(전-7 · 파트너 의견 3·6번)</span></h1>
+<p class="sub">2026-08-04 실앱(1440×776)에서 잰 값입니다. 추측이 아니라 그려진 화면을 재고 찍었습니다.</p>
+
+<div class="note">
+  <b>파트너가 말한 것</b><br>
+  “자산과 취약점 정보는 <b>한줄로 만들고 클릭시 창이 하나 더 뜨거나</b> 하는 형식으로 보여주는게 어떨가 생각 됩니다.
+  <b>한꺼번에 너무 많은 정보가 보이는 듯합니다.</b>” · “<b>모든 메뉴의 첫장은 너무 복잡해 보이지 않게</b>”
+</div>
+
+<div class="note">
+  <b>재 보니 그 말이 맞았습니다</b>
+  <table style="margin-top:6px">
+    <tr><th>화면</th><th class="n">첫 데이터 줄이 나오는 높이</th><th class="n">화면 높이</th><th class="n">위에 쌓인 요소</th><th>결과</th></tr>
+    <tr><td>자산 목록</td><td class="n bad">1,124px</td><td class="n">776px</td><td class="n">90개 · 1,483자</td><td class="bad">첫 줄이 화면 밖 (348px 아래)</td></tr>
+    <tr><td>취약점</td><td class="n bad">846px</td><td class="n">776px</td><td class="n">95개 · 947자</td><td class="bad">첫 줄이 화면 밖 (70px 아래)</td></tr>
+    <tr><td>대시보드</td><td class="n bad">1,015px</td><td class="n">776px</td><td class="n">50개</td><td class="bad">첫 줄이 화면 밖</td></tr>
+  </table>
+  <div style="margin-top:6px">담당자는 <b>스크롤을 내려야 자산 한 줄을 봅니다.</b> 화면을 열자마자 보이는 건 요약·설명뿐입니다.</div>
+</div>
+
+<!-- 지금 -->
+<h2 style="font-size:13.5px;margin:16px 0 6px">지금 — 자산 목록</h2>
+<div class="screen">
+  <div class="ruler">0px — 화면 시작</div>
+  <div class="band">
+    <div>1 발견·수집<b>57</b></div><div>2 우선순위<b>4,833</b></div><div>3 조치<b>0</b></div>
+    <div>4 검증<b>29</b></div><div>5 보고<b>1</b></div>
+  </div>
+  <div class="sum">전체 자산 <b>57</b> · 고위험 <b>27</b> · 중위험 <b>24</b> · 저위험 <b>6</b> · SBOM 미생성 <b>49</b> · 종합 노출도 <b>55</b> · AI 위험 <b>6</b> · 미조치 취약점 <b>4,828</b> &nbsp;&nbsp;[CSV 내보내기] [탐지 결과 가져오기] [＋ 자산 등록]</div>
+  <div class="fold">▾ 서비스 영향도 접기</div>
+  <div style="padding:7px 9px;border-bottom:1px solid var(--line);font-size:12px">🔗 <b>서비스 영향도</b> 자산 → 업무 서비스 의존성 <span style="color:var(--dim)">— 각 자산이 지원하는 서비스별로 위험을 모아 “지금 위험한 서비스”를 보여줍니다…</span></div>
+  <div class="blob">
+    <b style="color:#e0a0a0">영향도 높음 · 미지정</b> — 자산 53 · SafeKey 발급 웹 서버 (cert.aj-safe.co.kr), 안전대부 본인인증 웹 서버 (certify.aj-safe.co.kr), GIJO AS 서버(로컬),
+    192.168.219.111, 192.168.219.98, 172.168.50.104, 172.168.50.179, 172.168.50.178, 172.168.50.177, 172.168.50.142,
+    172.168.50.43, 172.168.50.49, 172.168.50.48, 172.168.50.200, 172.168.50.150, 172.168.50.211, tenable-qgaxau0a
+    (172.168.50.21), 172.168.50.87, 172.168.50.86, _gateway (172.168.50.1), 172.168.50.160, 172.168.50.62, 172.168.50.70 …
+  </div>
+  <div style="padding:6px 9px;border-bottom:1px solid var(--line);font-size:11.5px;color:var(--dim)">영향도 높음 · 보안 운영 자동화 / 고객 상담 / 임직원 보안 포털 … <span style="color:#8b8279">(카드가 이어집니다)</span></div>
+  <div class="cut">▼ 여기까지 1,124px — 화면(776px)을 넘었습니다. <b>자산 표는 스크롤해야 나옵니다.</b></div>
+</div>
+
+<!-- 시안 -->
+<h2 style="font-size:13.5px;margin:18px 0 6px">시안 — 같은 자리에서 자산이 <b>24줄</b> 보입니다</h2>
+<div class="screen">
+  <div class="ruler">0px — 화면 시작</div>
+  <div class="band">
+    <div>1 발견·수집<b>57</b></div><div>2 우선순위<b>4,833</b></div><div>3 조치<b>0</b></div>
+    <div>4 검증<b>29</b></div><div>5 보고<b>1</b></div>
+  </div>
+  <div class="sum">자산 <b>57</b> · 고위험 <b>27</b> · 미조치 취약점 <b>4,828</b> <span style="color:#8b8279">(조사 정보 약 1,289 포함)</span> &nbsp;&nbsp;[＋ 자산 등록] <span style="color:#8b8279">· 나머지 숫자·버튼은 ⋯로</span></div>
+  <div class="fold">▸ 서비스 영향도 <b style="color:var(--text)">— 위험한 서비스 4개</b> <span style="color:#8b8279">(눌러서 펼치기)</span></div>
+  <div class="ruler" style="border-top:1px solid var(--line);color:var(--grn)">▲ 여기까지 <b>178px</b> — 자산 표가 여기서 시작합니다</div>
+  <table class="rows">
+    <thead><tr><th>자산</th><th>호스트</th><th>담당</th><th class="n">취약점</th><th>SBOM</th></tr></thead>
+    <tbody>
+      <tr><td>192.168.219.98</td><td>—</td><td class="bad">미지정</td><td class="n bad">354</td><td>부품 2</td></tr>
+      <tr><td>172.168.50.142</td><td>—</td><td class="bad">미지정</td><td class="n bad">1,172</td><td>부품 2</td></tr>
+      <tr><td>샘플-웹서버</td><td>샘플-웹서버</td><td>brian</td><td class="n">2</td><td>부품 2</td></tr>
+      <tr><td>GIJO AS 서버(로컬)</td><td>—</td><td class="bad">미지정</td><td class="n">553</td><td class="good">부품 789</td></tr>
+      <tr><td colspan="5" style="color:var(--dim)">… 이렇게 <b>24줄</b>이 스크롤 없이 보입니다(줄 높이 23px · (776−178)÷23)</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="note" style="margin-top:14px">
+  <b>무엇을 바꿨나 — 셋뿐입니다</b>
+  <table style="margin-top:6px">
+    <tr><th style="width:180px">바꾼 것</th><th>왜</th><th class="n">아끼는 높이</th></tr>
+    <tr><td>서비스 영향도 <b>기본 접기</b></td><td>미지정 자산 53개의 <b>IP를 전부 나열</b>하고 있었습니다 — 자리를 가장 많이 먹으면서 읽을 수도 없습니다. 접고 <b>“위험한 서비스 4개”</b>만 남깁니다</td><td class="n">≈ 700px</td></tr>
+    <tr><td>요약 줄을 <b>3개 + ⋯</b>로</td><td>숫자 8개를 한 줄에 늘어놓으면 무엇이 중요한지 안 보입니다. 자주 쓰는 셋만 두고 나머지는 접습니다</td><td class="n">≈ 20px</td></tr>
+    <tr><td>버튼 3개 → <b>1개 + ⋯</b></td><td>「자산 등록」만 첫 화면에 남깁니다. 내보내기·가져오기는 자주 쓰지 않습니다</td><td class="n">≈ 0px(같은 줄)</td></tr>
+  </table>
+  <div style="margin-top:7px"><b>결과: 1,124px → 178px.</b> 자산 표가 첫 화면 안에 들어옵니다.</div>
+</div>
+
+<div class="note">
+  <b>일부러 안 바꾼 것</b><br>
+  ① <b>절차 띠(5단계)는 그대로</b> — 90px을 쓰지만 “지금 어느 단계인가”는 이 제품의 뼈대입니다. 이걸 접으면 길을 잃습니다.<br>
+  ② <b>한 줄 + 클릭 펼침은 이미 그렇게 돼 있습니다</b> — 파트너가 제안한 형태가 이미 구현돼 있어 손대지 않습니다(자산 한 줄을 누르면 구성·취약점·AI 위험이 그 아래 펼쳐집니다).<br>
+  ③ <b>접은 것은 지우는 게 아닙니다</b> — 「위험한 서비스 4개」처럼 <b>안에 무엇이 있는지 숫자로</b> 남깁니다. 배지 없이 접으면 담당자는 그게 있는 줄도 모릅니다.
+</div>
+
+<div class="note">
+  ⚠ <b>같은 처방을 취약점·대시보드에도 적용합니다.</b> 셋 다 첫 줄이 화면 밖이었습니다.
+  다만 화면마다 무엇을 접을지는 다르므로, 이 시안이 승인되면 화면별로 잰 뒤 같은 방식으로 줄입니다.
+</div>
+
+</div>
+</body>
+</html>
