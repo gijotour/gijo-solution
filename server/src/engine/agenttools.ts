@@ -22,6 +22,7 @@ import { prioritizedReviews, updateFindingReview, findingKey, ReviewPatch, Appro
 import { 표식, 심각도한글, 심각도표식 } from "./tone";
 import { buildHub, sourceFileOf } from "./assethub";
 import { workflowStages } from "./workflow";
+import { 한줄풀이글 } from "./findingplain";
 import { 패키지수집, 구성요소합치기, 덮는범위글 } from "./packagescan";
 import { targetRunner } from "./hardeningscan";
 import { listTargets } from "./hardeningtargets";
@@ -595,6 +596,7 @@ async function searchOne(q: string): Promise<string[]> {
       `취약점 ${vulns.length}건(우선순위순):`,
       ...vulns.slice(0, 6).map((r) =>
         `  ${심각도표식(r.finding.severity)} [${심각도한글(r.finding.severity)}] ${r.finding.finding_type} @ ${r.assetName || 자산표시이름(r.assetId)}` +
+        한줄풀이글(r.finding.finding_type) +
         ` — 점수 ${r.score}${r.assignee ? `, 담당 ${r.assignee}` : ""}${r.overdue ? " ⚠지연" : ""}`)
     );
   }
@@ -1403,7 +1405,10 @@ function runFindingStatusOverview(args: Record<string, string>): string {
     const who = r.assignee ? `담당 ${r.assignee}` : "담당 미배정";
     const due = r.dueDate ? `기한 ${r.dueDate}` : "기한 없음";
     const sev = r.finding.severity;
+    // ⚠ 이름은 **원문 그대로** 둔다(검색·벤더 대조의 열쇠다). 우리말 한 줄을 **옆에** 붙인다.
+    //   못 알아보는 이름에는 아무것도 안 붙는다 — 지어내지 않는다(2026-08-04 파트너 지적).
     return `${심각도표식(sev)} [${심각도한글(sev)}] ${자산이름(r.assetId)} · ${r.finding.finding_type}` +
+      한줄풀이글(r.finding.finding_type) +
       ` (${상태말[r.status] ?? r.status}, ${who}, ${due})`;
   });
   // ⚠ 잘랐으면 잘랐다고 말한다 — 안 그러면 열 건이 전부인 줄 안다.
