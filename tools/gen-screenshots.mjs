@@ -205,15 +205,26 @@ async function main() {
     { page: "redteam.html", name: "15-레드팀-가드레일" },
     { page: "memory.html", name: "17-기억학습-문서관리" },
     { page: "merge.html", name: "18-LLM합성-모델머지" },
-    { page: "logs.html", name: "20-시스템로그" },
+    // ★ 2026-08-04: logs.html은 **없어졌다**(2026-08-02에 syslog.html로 떼어냄).
+    //   nav.js는 옛 주소를 새 화면으로 보내 주지만, 이 도구는 파일을 직접 열어서 못 찾는다.
+    //   mcp.html도 2026-07-28에 설정으로 흡수돼 사라졌다 — 목록에서 뺀다.
+    //   ⚠ 이 목록은 **손으로 관리한다** — 화면이 생기거나 없어지면 여기도 고쳐야 한다.
+    //     아래 시험(shotlist)이 실제 파일과 대조해 낡으면 잡는다.
+    { page: "syslog.html", name: "20-시스템로그" },
     { page: "settings.html", name: "21-설정-사용자관리" },
     // 매뉴얼 v3.3.3 갱신분 — 이전엔 없던 화면.
     { page: "office.html", name: "22-팀사무실" },
     { page: "handover.html", name: "23-인수인계" },
     { page: "audit.html", name: "24-작업기록-감사" },
     { page: "hardening.html", name: "25-원격정기점검" },
-    { page: "mcp.html", name: "26-MCP연동" },
     { page: "terminal.html", name: "27-터미널CLI" },
+    // ★ 2026-08-04 파트너 지적 대응(전-1·전-7): 제안·시연 자료에 **실제 화면**을 넣기로 했다.
+    //   파트너 회사는 EDR이 설치를 막아 제품을 못 띄웠고, 그래서 글자로만 판단했다.
+    //   업무 절차 재편(2026-08-02) 뒤 생긴 화면들이 빠져 있어 자료가 지금 제품과 달라진다.
+    { page: "sessions.html", name: "28-작업세션" },
+    { page: "report.html", name: "29-리포트" },
+    { page: "reference.html", name: "30-참고자료" },
+    { page: "docenrich.html", name: "31-문서보강" },
   ];
 
   // GIJO_SHOT_ONLY="05,06" — 일부 화면만 다시 찍고 싶을 때(파일명 접두 번호로 필터). 없으면 전체.
