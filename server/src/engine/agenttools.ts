@@ -34,7 +34,7 @@ import { listCompliance, setComplianceStatus } from "./compliance";
 import { generateSbom } from "./sbom";
 import type { ComplianceStatus } from "./compliance";
 import { countTriples } from "./ontology";
-import { listVisibleDocuments, queryMemory, queryMemoryRelevant } from "./memory";
+import { listVisibleDocuments, queryMemory, queryMemoryRelevant, queryMemoryScored } from "./memory";
 import { listFindings as listCtiFindings } from "./cti";
 import { matchCtiToAssets } from "./ctimatch";
 import { dailyBriefingText } from "./briefing";
@@ -525,8 +525,13 @@ export function 자산이걸린이유(a: Asset, q: string, tokens: string[]): st
  *   이름의 고유 낱말이 그 안에 있는지) 확인한 것만 남긴다 — 확인 못 한 문장을 자산 취약점으로
  *   보여 주는 것은 없느니만 못하다.
  */
-async function 자산문서발췌(a: { id: string; name: string }): Promise<string[]> {
+async function 자산문서발췌(a: { id: string; name: string }): Promise<{ 문서: string; 줄: string[] } | null> {
   try {
+    // ★ 먼저 **인입 때 이어 둔 문서**를 본다(2026-08-04). get_asset은 이미 이 길을 쓰는데
+    //   여기만 낱말 검색이었다 — 같은 일을 두 잣대로 하면 한쪽이 반드시 샌다.
+    const { documentsForAsset } = await import("./memory.js");
+    const 이어둔 = documentsForAsset(a.id).map((d) => d.documentId);
+
     // 이 자산을 가리키는 표식 — 호스트명(가장 확실)과 이름 속 고유 낱말.
     const host = a.id.replace(/^[a-z]+:/, "").trim();
     const 일반어 = /^(웹|서버|웹서버|시스템|서비스|운영|테스트|개발|본인|인증|사이트|호스트)$/;
@@ -534,21 +539,60 @@ async function 자산문서발췌(a: { id: string; name: string }): Promise<stri
       .replace(/\([^)]*\)/g, " ")
       .split(/[\s·,()]+/)
       .map((s) => s.trim())
-      .filter((s) => s.length >= 3 && !일반어.test(s));
+      .filter((s) => s.length >= 3 && !일반어.test(s) && !제품이름인가(s));
     const 표식 = [host, ...고유낱말].filter((s) => s.length >= 3);
-    if (!표식.length) return [];
+    if (!표식.length && !이어둔.length) return null;
 
-    const raw = await queryMemory(`${a.name} ${host} 취약점 점검 결과`, 6);
+    const raw = await queryMemoryScored(`${a.name} ${host} 취약점 점검 결과`, 6);
     const { sanitizeRagChunks } = await import("./ragsanitize.js");
-    const chunks = sanitizeRagChunks(raw.map(String), { source: "tool:search-asset-doc", question: a.name }).chunks;
-    // **그 자산이 실제로 나오는 조각만** 남긴다.
-    const 확인된 = chunks
-      .map((c) => String(c).replace(/\s+/g, " ").trim())
-      .filter((c) => 표식.some((m) => c.toLowerCase().includes(m.toLowerCase())));
-    return 확인된.slice(0, 3).map((c) => `      · ${c.slice(0, 600)}`);
+    const 후보 = raw.filter((c) => 자산점검문서인가(c.documentId, 이어둔));
+    if (!후보.length) return null;
+
+    // ⚠ sanitizeRagChunks는 조각을 **버릴 수 있다**(지시문뿐인 조각). 한꺼번에 넣고 인덱스로
+    //   문서 이름을 되찾으면 어긋난다 — 한 조각씩 살균해 문서 이름을 붙여 다니게 한다.
+    const 확인된: { 문서: string; 글: string }[] = [];
+    for (const c of 후보) {
+      const 살균 = sanitizeRagChunks([c.text], { source: "tool:search-asset-doc", question: a.name }).chunks;
+      if (!살균.length) continue;
+      const 글 = String(살균[0]).replace(/\s+/g, " ").trim();
+      // 이어 둔 문서는 인입 때 확인된 연결이라 그대로 믿는다. 그 밖에는 자산이 실제로 나와야 한다.
+      const 믿을만 = 이어둔.includes(c.documentId ?? "") || 표식.some((m) => 글.toLowerCase().includes(m.toLowerCase()));
+      if (믿을만) 확인된.push({ 문서: c.documentId || "사내 문서", 글 });
+    }
+    if (!확인된.length) return null;
+    const 문서 = 확인된[0].문서;
+    // ⚠ 600자×3=1,800자를 그대로 실어 답이 2,561자가 된 적이 있다(2026-08-04 147상황).
+    //   담당자는 2,000자를 안 읽는다 — 발췌는 **어느 문서에 있다**를 알리는 몫까지만 한다.
+    return { 문서, 줄: 확인된.slice(0, 2).map(({ 글 }) => `      · ${글.slice(0, 300)}${글.length > 300 ? "…" : ""}`) };
   } catch {
-    return [];   // 임베딩 미기동 등 — 없는 대로 둔다(지어내지 않는다)
+    return null;   // 임베딩 미기동 등 — 없는 대로 둔다(지어내지 않는다)
   }
+}
+
+/**
+ * 우리 제품 이름은 **자산을 가리키는 표식이 될 수 없다**.
+ *
+ * 실사고(2026-08-04 147상황): 자산 "GIJO AS 서버(로컬)"의 이름에서 고유 낱말을 뽑으면
+ * "GIJO" 하나가 남는다. 그런데 우리 사내 문서는 전부 `GIJO_AS_…`라 **설계 문서·아키텍처
+ * 문서·취약점관리 지침이 전부 이 자산의 「점검 보고서」로 걸렸다.** 「SSH 취약점 찾아줘」
+ * 답이 2,561자가 되고 그중 1,800자가 우리 제품 소개였다.
+ */
+function 제품이름인가(낱말: string): boolean {
+  return /^(gijo|gijoas|기조|커넥트|connect)$/i.test(낱말.replace(/[_\-\s]/g, ""));
+}
+
+/**
+ * 이 문서가 **자산의 점검 결과**일 수 있는가.
+ *
+ * 우리가 쓴 제품 문서(GIJO_AS_*.md — 지침·가이드·아키텍처)는 어느 자산의 점검 보고서도
+ * 아니다. 낱말이 우연히 걸렸다고 "이 자산이 사내 점검 보고서에 적혀 있습니다"라고 말하면
+ * **없는 취약점을 있다고 보고하게 만든다.** 이어 둔 문서는 인입 때 확인된 연결이라 통과.
+ */
+function 자산점검문서인가(documentId: string | undefined, 이어둔: string[]): boolean {
+  const id = String(documentId ?? "");
+  if (!id) return false;
+  if (이어둔.includes(id)) return true;
+  return !/^GIJO[_\s-]?AS[_\s-]/i.test(id);
 }
 
 async function searchOne(q: string): Promise<string[]> {
@@ -589,8 +633,11 @@ async function searchOne(q: string): Promise<string[]> {
     for (const a of (assets.length <= 3 ? assets : [])) {
       if (a.findings.some(isRealVulnerability)) continue;   // DB에 있으면 문서를 뒤질 이유가 없다
       const 발췌 = await 자산문서발췌(a);
-      if (발췌.length) {
-        out.push(`  · ${a.name} — 자산 DB엔 취약점이 없지만 **사내 점검 보고서**에 적혀 있습니다:`, ...발췌);
+      if (발췌) {
+        // ⚠ "사내 점검 보고서"라고 **단정하지 않는다** — 어느 문서인지 밝힌다(2026-08-04).
+        //   문서 이름을 안 밝히면 담당자가 근거를 확인할 방법이 없고, 우리 제품 문서가
+        //   남의 점검 보고서로 둔갑해도 알아채지 못한다.
+        out.push(`  · ${a.name} — 자산 등록부엔 취약점이 없지만 「${발췌.문서}」에 이런 대목이 있습니다:`, ...발췌.줄);
       }
     }
   }
@@ -1528,7 +1575,8 @@ function runAibomStatus(args: Record<string, string>): string {
     const r = a.aibom.robustness;
     const rob = r.ranAt ? `견고성 ${r.score ?? "-"}점 (취약 ${r.vulnerable}/${r.total})` : "견고성 미점검";
     const sbom = a.sbomGeneratedAt ? `SBOM 생성됨` : "SBOM 미생성";
-    const head = `${a.id} — AI-BOM ${filled}/${total} 항목 기재, ${sbom}, ${rob}`;
+    // ⚠ 내부 id를 사람에게 보이지 않는다(2026-08-04) — `vuln:192.168.219.98`은 읽는 글자가 아니다.
+    const head = `${자산표시이름(a.id)} — AI-BOM ${filled}/${total} 항목 기재, ${sbom}, ${rob}`;
     return missing.length ? `${head}\n미기재: ${missing.join(", ")}` : `${head}\n5영역 모두 기재 완료.`;
   }
 
@@ -1546,9 +1594,17 @@ function runAibomStatus(args: Record<string, string>): string {
     `자산 ${rows.length}건 — AI-BOM 미완성 ${incomplete.length}건, SBOM 미생성 ${noSbom.length}건, 견고성 미점검 ${noRobustness.length}건`;
   const lines = rows
     .slice(0, 10)
-    .map((r) => `- ${r.a.id}: ${r.filled}/${r.total} 기재${r.missing.length ? ` (미기재 ${r.missing.length}개)` : " ✓"}`);
+    .map((r) => `- ${자산표시이름(r.a.id)}: ${r.filled}/${r.total} 기재${r.missing.length ? ` (미기재 ${r.missing.length}개)` : " ✓"}`);
   const more = rows.length > 10 ? `\n… 외 ${rows.length - 10}건` : "";
-  return `${head}\n${lines.join("\n")}${more}`;
+  // ⚠ 숫자만 주고 끝내면 "그래서 뭘 하지"가 남는다(2026-08-03 18건 실측 규범).
+  // ⚠⚠ **있는 명령만 적는다.** AI-BOM 항목을 채우는 대화창 도구는 아직 없다 —
+  //    없는 것을 안내하면 담당자가 그 말을 따라가다 막다른 길에 선다(2026-08-04 확인).
+  const 다음 = noSbom.length
+    ? `\n\n${표식.다음} SBOM이 없는 자산은 "○○ SBOM 만들어줘"라고 하면 만듭니다.`
+    : incomplete.length
+      ? `\n\n${표식.다음} 어느 항목이 비었는지 보려면 "○○ AI-BOM 보여줘"라고 하세요.`
+      : "";
+  return `${head}\n${lines.join("\n")}${more}${다음}`;
 }
 
 // ── 「보안제품」 도메인 도구 ─────────────────────────────────────────────
@@ -1730,7 +1786,55 @@ function runExposedAssets(): string {
  *   건수(count)가 큰 것은 그 단계를 지나간 양일 뿐 밀린 것이 아니다(①은 늘 자산 전체다).
  * ⚠ 못 구한 칸(null)은 **0으로 치지 않는다** — 비운 채 "모름"이라고 적는다.
  */
-function 절차현황글(): string {
+/**
+ * 단계마다 **거기서 실제로 하는 일**. 우리 제품 기준이다.
+ *
+ * ★ 왜 표로 박아 두는가(2026-08-04 147상황): 「발견 단계에서 뭘 해야 해?」에 **35초**를 쓰고
+ *   Tenable 사용자 가이드를 읽어 "기업의 네트워크·시스템을 파악하여 자산 목록을 작성합니다"
+ *   라고 답했다. 남의 제품 방법론 강의다 — 담당자는 **우리 화면에서 뭘 누르는지**를 물었다.
+ *   절차 5단계는 우리가 정한 것이라 지어낼 이유가 없다. 규칙으로 답한다.
+ */
+const 단계별할일: Record<number, { 일: string; 말: string }> = {
+  1: { 일: "장비·서비스를 찾아 등록하고, 스캐너 결과와 점검 보고서를 받아들입니다.", 말: '"자산 목록 보여줘" 또는 점검 보고서를 대화창에 올려 주세요.' },
+  2: { 일: "받아들인 취약점 중 **먼저 볼 것**을 고릅니다 — 실제 악용(KEV)·노출도·자산 중요도로 셉니다.", 말: '"오늘 뭐부터 해야 해?"라고 물어보세요.' },
+  3: { 일: "고른 건에 담당자와 기한을 붙이고, 실제로 고칩니다.", 말: '"미배정 취약점 담당자 배정해줘"라고 하시면 승인 창이 뜹니다.' },
+  4: { 일: "고쳤는지 **다시 재서 확인**합니다 — 재스캔·하드닝 점검으로 닫혔는지 봅니다.", 말: '"조치한 거 확인해줘"라고 물어보세요.' },
+  5: { 일: "결과를 위에 올릴 수 있는 형태로 정리합니다 — 리포트·KPI·규정 대응.", 말: '"이번 주 보고서 만들어줘"라고 하세요.' },
+};
+
+/** 질문에 단계 이름이 들어 있으면 그 번호. 없으면 null. */
+function 질문속단계(q: string): number | null {
+  const t = String(q ?? "");
+  if (/발견|수집|자산\s*등록/.test(t)) return 1;
+  if (/우선\s*순위|우선순위|분류|골라|고르/.test(t)) return 2;
+  if (/조치|패치|고치/.test(t)) return 3;
+  if (/검증|재스캔|확인/.test(t)) return 4;
+  if (/보고|리포트/.test(t)) return 5;
+  const m = t.match(/([1-5①-⑤])\s*단계/);
+  if (m) return "①②③④⑤".indexOf(m[1]) >= 0 ? "①②③④⑤".indexOf(m[1]) + 1 : Number(m[1]);
+  return null;
+}
+
+/** 「○○ 단계에서 뭘 해야 해?」 — 그 단계 하나만 짚어 준다(즉답). */
+function 단계안내글(단계: number): string {
+  const s = workflowStages().find((x) => x.no === 단계);
+  const 할일 = 단계별할일[단계];
+  if (!s || !할일) return 절차현황글();
+  const 건 = s.count == null ? "값을 못 구했습니다(0이 아니라 **모름**입니다)" : `지금 ${s.count}건`;
+  const 경고 = s.alert != null && s.alertLabel && s.alert > 0 ? ` · ${s.alertLabel} ${s.alert}건` : "";
+  return [
+    `${s.no} ${s.label} 단계 — ${건}${경고}`,
+    "",
+    `여기서 하는 일: ${할일.일}`,
+    `보는 화면: ${s.screens.join(", ")}`,
+    "",
+    `${표식.다음} 지금 할 일 — ${할일.말}`,
+  ].join("\n");
+}
+
+function 절차현황글(질문?: string): string {
+  const 지목 = 질문 ? 질문속단계(질문) : null;
+  if (지목) return 단계안내글(지목);
   const 단계들 = workflowStages();
   const 줄 = 단계들.map((s) => {
     const 건 = s.count == null ? "—" : `${s.count}건`;
@@ -2451,10 +2555,10 @@ const TOOLS: AgentTool[] = [
     domain: "report",
     write: false,
     description:
-      '업무 절차 5단계(①발견·수집 ②우선순위 ③조치 ④검증 ⑤보고)의 건수와 **어느 단계가 제일 밀렸는지**를 보여준다. "어느 단계가 제일 밀렸어?", "지금 절차 어디쯤이야?", "단계별 현황 알려줘"에 쓴다. 예: {}',
+      '업무 절차 5단계(①발견·수집 ②우선순위 ③조치 ④검증 ⑤보고)의 건수와 **어느 단계가 제일 밀렸는지**를 보여준다. 특정 단계를 물으면(“발견 단계에서 뭘 해야 해?”) 그 단계에서 하는 일과 다음 걸음만 짚어 준다. "어느 단계가 제일 밀렸어?", "지금 절차 어디쯤이야?", "단계별 현황 알려줘"에 쓴다. 예: {} 또는 {"stage":"발견"}',
     directAnswer: true,
-    params: [],
-    run: async () => 절차현황글(),
+    params: [{ name: "stage", label: "단계", description: "특정 단계만 볼 때 (발견·우선순위·조치·검증·보고, 비우면 전체)", required: false }],
+    run: async (args: Record<string, string>) => 절차현황글(args.stage ?? args.질문 ?? ""),
   },
   {
     // ★ 2026-08-03 — 담당자 지적을 따라가다 발견한 데이터 소실의 복구 창구.

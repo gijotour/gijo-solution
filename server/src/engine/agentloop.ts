@@ -18,6 +18,7 @@ import { emitCollaboration } from "./collaboration";
 import { listProducts } from "./securityproducts";
 import { recordWork, TOOL_WORK_KIND } from "./worklog";
 import { listTasks } from "./tasks";
+import { 자산표시이름 } from "./assets";
 
 const MAX_STEPS = 5;
 
@@ -165,15 +166,43 @@ function decisionPrompt(instruction: string, calls: AgentToolCall[], context = "
  *   · 대명사 말고 **다른 내용이 있으면** 잡지 않는다("그 취약점 담당자 배정해줘"는 진짜 지시다)
  */
 export function 가리킬것없는대명사(instruction: string, 대화 = 기본대화): boolean {
+  if (!대명사뿐인가(instruction)) return false;
+  return !recentTarget(대화);   // **이 대화의** 직전 대상이 있으면 맥락으로 푼다
+}
+
+/**
+ * 대명사 말고는 **내용이 없는 말인가.** 직전 대상이 있든 없든 판정은 같다.
+ *
+ * ★ 왜 갈랐나(2026-08-04 147상황 재측정): 「그거 어떻게 해」가 **25초**를 쓰고
+ *   "무엇을 해야 하는지 구체적으로 알려주세요"(23자)를 냈다. 직전 대상이 남아 있어
+ *   되묻기 경로를 비켜 갔고, 넘겨받은 모델은 결국 **똑같이 되물었다** — 25초 늦게, 더 불친절하게.
+ *   대명사뿐인 말은 어느 쪽이든 모델이 필요 없다. 대상이 있으면 그것을 짚어 확인받고,
+ *   없으면 되묻는다. 둘 다 즉답이다.
+ */
+export function 대명사뿐인가(instruction: string): boolean {
   const t = String(instruction ?? "").trim();
   if (!t || !ANAPHORA_RE.test(t)) return false;
-  if (recentTarget(대화)) return false;   // **이 대화의** 직전 대상이 있으면 맥락으로 푼다
-  // 대명사·기능어를 걷어내고 **남는 내용이 거의 없을 때만** 되묻는다.
+  // 대명사·기능어를 걷어내고 **남는 내용이 거의 없을 때만** 잡는다.
   const 남은 = t
     .replace(ANAPHORA_RE, " ")
     .replace(/어떻게|어떡|뭐|무엇|해야|하지|하나요|해줘|해\s*줘|알려|보여|좀|요|는|은|을|를|이|가|\?|\.|,/g, " ")
     .replace(/\s+/g, "");
   return 남은.length <= 2;
+}
+
+/** 직전 대상이 있을 때 — **무엇을 가리키는지 짚어 확인받고** 이어갈 길을 준다(즉답). */
+export function 대명사확인(대화 = 기본대화): string | null {
+  const t = recentTarget(대화);
+  if (!t) return null;
+  return [
+    // ⚠ 내부 id(`vuln:192.168.219.98`)를 그대로 보이지 않는다 — 사람이 읽는 글자가 아니다.
+    `「그거」를 **${t.finding}**(자산 ${자산표시이름(t.assetId)})로 봤습니다 — 맞나요?`,
+    "",
+    `${표식.다음} 이어서 하시려면`,
+    `  · "이 취약점 담당자 배정해줘" — 담당자와 기한을 붙입니다(승인 창이 뜹니다)`,
+    `  · "이 취약점 조치 절차 알려줘" — 무엇을 어떻게 고치는지 봅니다`,
+    `  · 다른 것을 말씀하신 거면 대상을 적어 주세요(예: "○○ 자산 취약점 알려줘")`,
+  ].join("\n");
 }
 
 /** 되묻는 말 — 무엇이 필요한지 **예시까지** 준다. 그냥 "구체적으로"라고 하면 또 막힌다. */
@@ -665,7 +694,17 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }
   //   「채워**졌어?**」(묻기)와 「채워**줘**」(시키기)를 가르지 못한 탓이고,
   //   순서로 한 번, 시킴꼴 조건으로 또 한 번 막는다.
   {
-    re: /sbom[^.\n]{0,12}(얼마나|현황|범위|채워졌|채워져|정확|비었|부족)|(구성요소|부품)[^.\n]{0,10}(현황|얼마나|몇\s*개|정확|비었)/i,
+    // ★ AI-BOM은 **SBOM보다 먼저** 본다(2026-08-04 147상황).
+    //   「자산 중에 AI-BOM 비어 있는 거 뭐야?」가 아무 규칙에도 안 걸려 엉뚱한 도구로 갔고
+    //   "이 자산은 취약점 스캐너에서 포함되지 않았습니다"라는 27자를 답했다 — 묻지도 않은 말이다.
+    //   ⚠ 'ai bom'을 요구하므로 'SBOM'은 여기 안 걸린다(S·B·O·M 안에 'ai'가 없다).
+    re: /ai[-\s_]?bom/i,
+    tool: "aibom_status",
+    args: {},
+  },
+  {
+    // 「비어 있는」은 「비었」과 다른 글자다 — 사람은 둘 다 쓴다(2026-08-04 실측).
+    re: /sbom[^.\n]{0,12}(얼마나|현황|범위|채워졌|채워져|정확|비었|비어\s?있|부족)|(구성요소|부품)[^.\n]{0,10}(현황|얼마나|몇\s*개|정확|비었|비어\s?있)/i,
     tool: "sbom_coverage",
     args: {},
   },
@@ -685,7 +724,11 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }
   // 업무 절차 단계 — 실측(2026-08-03): 「지금 우리 어느 단계가 제일 밀렸어?」에 28초를 쓰고
   //   "어떤 프로젝트를 진행 중인지 알려 달라"고 **되물었다.** 숫자는 workflow.ts가 다 세고 있다.
   {
-    re: /(단계|절차)[^.\n]{0,10}(제일|가장|어디|어느|밀렸|밀린|현황)|(어느|어떤)\s*단계|절차\s*(어디쯤|현황)/,
+    // ★ 「발견 단계에서 뭘 해야 해?」를 더한다(2026-08-04 147상황). 이 말이 규칙에 안 걸려
+    //   LLM+RAG로 새면서 **35초**를 쓰고 Tenable 사용자 가이드를 읽어 줬다 — 남의 제품
+    //   방법론 강의다. 절차 5단계는 우리가 정한 것이라 지어낼 이유가 없다.
+    // ★ 「이 취약점 다음 단계가 뭐야?」도 여기서 받는다(33초 → 즉답).
+    re: /(단계|절차)[^.\n]{0,10}(제일|가장|어디|어느|밀렸|밀린|현황)|(어느|어떤)\s*단계|절차\s*(어디쯤|현황)|(단계|절차)[^.\n]{0,8}(뭐|뭘|무엇|해야)|다음\s*단계/,
     tool: "workflow_status",
     args: {},
   },
@@ -910,6 +953,13 @@ function forcedToolFor(instruction: string, scope?: ToolScope): { tool: string; 
           .replace(/\s+/g, " ")
           .trim();
         return { tool: f.tool, args: 대상 ? { target: 대상 } : {} };
+      }
+      // ★ 지목한 단계를 넘긴다(2026-08-04). 안 넘기면 「발견 단계에서 뭘 해야 해?」에
+      //   5단계 전체 현황이 나와 **묻지 않은 것까지** 답하게 된다.
+      //   ⚠ 지시문을 통째로 넘긴다 — 단계 판별은 agenttools의 질문속단계 한 곳에서만 한다
+      //     (두 곳에서 가르면 반드시 어긋난다. 절차 숫자를 한 곳에서 세는 것과 같은 이유).
+      if (f.tool === "workflow_status") {
+        return { tool: f.tool, args: { stage: instruction } };
       }
       if (f.tool === "finding_status") {
         const 조건 = /(critical|긴급|매우\s*심각)/i.test(instruction) ? "critical"

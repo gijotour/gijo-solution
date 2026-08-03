@@ -29,7 +29,12 @@ describe("AI-BOM(sbom) 도메인 역량", () => {
     expect(out).toContain("자산 2건");
     expect(out).toContain("AI-BOM 미완성 1건"); // bare-llm만 비어 있다
     expect(out).toContain("SBOM 미생성 1건");
-    expect(out).toContain("bare-llm");
+    // ★ 2026-08-04: **사람이 읽는 이름**으로 말한다. 예전엔 내부 id("bare-llm")를 그대로 냈는데,
+    //   운영 데이터에서는 그게 `vuln:192.168.219.98` 같은 글자라 담당자가 못 읽는다.
+    expect(out).toContain("빈 자산");
+    expect(out, "내부 id는 사람에게 보이지 않는다").not.toContain("bare-llm");
+    // ★ 숫자만 주고 끝내지 않는다 — 다음 걸음이 붙어야 대화창에서 일이 끝난다.
+    expect(out).toContain("SBOM 만들어줘");
   });
 
   it("빈 자산 — 무엇이 빠졌는지 항목까지 알려준다", () => {
