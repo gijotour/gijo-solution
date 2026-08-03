@@ -33,6 +33,17 @@ export interface AssetComponent {
   name: string;
   version: string;
   license: string;
+  /**
+   * 이 부품을 **어디서 알았나**. 없으면 예전 데이터(출처 미상)다.
+   *
+   * ★ 왜 적나(2026-08-04 파트너 지적): SBOM에 부품이 있어도 그것이 **스캐너가 추정한
+   *   제품 이름**인지 **장비에서 실제로 읽은 패키지**인지에 따라 값이 다르다.
+   *   섞어 두면 "부품 1,500개"라는 숫자가 실제보다 정확해 보인다.
+   *   - `scanner` — 취약점 스캐너가 준 OS·제품(CPE 수준, 버전·라이선스가 없을 수 있다)
+   *   - `package` — 장비에서 패키지 목록을 직접 읽은 것(rpm·dpkg·Windows 설치 목록)
+   *   - `manual`  — 사람이 적어 넣은 것
+   */
+  from?: "scanner" | "package" | "manual";
 }
 
 // AI-BOM 5영역 — 코드 의존성(SBOM)을 넘어 모델·데이터·프롬프트·도구·인프라까지의 구성명세.

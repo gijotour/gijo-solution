@@ -1,0 +1,190 @@
+// engine/packagescan.ts — 장비에서 **설치된 패키지 목록을 직접 읽어** SBOM을 채운다.
+//
+// ★ 왜 만들었나 (2026-08-04 파트너 검토 의견 · 계획서 중-7)
+//   지적: "SBOM을 Tenable 기반으로 만든다면 개선이 필요하다. Tenable은 CPE만 기준이라
+//   정보가 제한된다. SBOM에는 Package나 Library가 들어가야 한다."
+//
+//   확인해 보니 **맞는 지적이었다.** 스캐너로 들어온 호스트의 구성요소를 만드는 코드
+//   (vulnscan.ts:424~431)는 `meta.os` 한 줄을 쪼개 **배포판 1개 + 커널 1개**를 넣을 뿐이고
+//   버전·라이선스는 `-`다. 호스트 한 대의 SBOM에 부품이 두 개인 셈이다.
+//
+//   고객이 제안한 방식(Audit 파일을 장비에서 돌려 패키지를 긁어 오기)에 필요한 것은
+//   **원격에서 읽기 전용 명령을 돌리는 길**인데, 우리는 이미 갖고 있다(hardeningscan.ts).
+//   그래서 이 파일은 **새 커넥터가 아니라 있는 길에 명령을 더 태우는 것**이다.
+//
+// ■ 지키는 것
+//   ① **읽기 전용 고정 명령만.** 사용자 입력을 셸에 넣지 않는다(하드닝 점검과 같은 계약).
+//   ② **파싱은 코드가 한다 — LLM에 맡기지 않는다.** 목록 파싱은 정확해야 하고 정확할 수 있다.
+//      7B에 1,500줄짜리 패키지 목록을 주면 반드시 몇 줄을 흘린다(반복 실측된 원칙).
+//      AI는 "이 부품에 어떤 위험이 있나"를 설명하는 자리에 쓴다.
+//   ③ **출처를 적는다**(from: "package"). 스캐너 추정치와 실제 수집을 섞지 않는다.
+//   ④ **못 읽으면 못 읽었다고 말한다.** 빈 목록을 "부품 없음"으로 기록하지 않는다.
+import type { RunFn } from "./hardeningscan";
+import type { AssetComponent } from "./assets";
+
+/** 장비 종류 — 어떤 명령으로 읽을지 가른다. */
+export type 장비종류 = "rpm" | "deb" | "windows";
+
+/**
+ * 패키지 목록을 읽는 **고정 명령**.
+ *
+ * ⚠ 전부 읽기(query)만 한다. 설치·삭제·변경 명령은 여기 들어올 수 없다 —
+ *   `안전한명령인가()`가 시험으로 막는다.
+ * ⚠ 구분자는 탭이다. 패키지 이름·라이선스에 공백이 흔해서 공백으로 나누면 깨진다.
+ */
+export const 수집명령: Record<장비종류, string> = {
+  // %{LICENSE}까지 한 번에 — 라이선스는 SBOM의 핵심 칸인데 스캐너는 안 준다.
+  rpm: "rpm -qa --qf '%{NAME}\\t%{VERSION}-%{RELEASE}\\t%{LICENSE}\\n'",
+  // dpkg-query는 라이선스를 안 준다(데비안은 copyright 파일에 있다) — 비워 두고 밝힌다.
+  deb: "dpkg-query -W -f='${Package}\\t${Version}\\t\\n'",
+  // 설치 목록은 레지스트리에 있다. wmic product는 **MSI 재구성을 유발**해 쓰지 않는다(느리고 위험).
+  windows:
+    'powershell -NoProfile -Command "Get-ItemProperty HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*, HKLM:\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\* | Where-Object DisplayName | ForEach-Object { $_.DisplayName + [char]9 + $_.DisplayVersion + [char]9 + $_.Publisher }"',
+};
+
+/** 어떤 장비인지 알아내는 **판별 명령**(이것도 읽기 전용). */
+const 판별명령 = "(command -v rpm >/dev/null && echo rpm) || (command -v dpkg-query >/dev/null && echo deb) || echo unknown";
+
+/**
+ * ★ 이 명령이 정말 **읽기만** 하는가. 시험이 이 함수로 수집명령 전부를 검사한다.
+ *
+ * ⚠ "우리가 짰으니 안전하다"는 근거가 아니다. 이 파일은 담당자 장비에 원격으로 명령을
+ *   보내는 자리다 — 실수로 쓰기 명령이 하나 섞이면 고객 장비가 바뀐다.
+ */
+export function 안전한명령인가(cmd: string): boolean {
+  const c = String(cmd ?? "");
+  // ① 무엇을 바꾸는 동사가 있으면 안 된다.
+  const 위험동사 = /\b(rm|mv|dd|mkfs|chmod|chown|kill|shutdown|reboot|systemctl|service|yum|dnf|apt|apt-get|pip|npm|nc|curl|wget|Remove-|Set-|New-|Stop-|Start-|Restart-|Install-|Uninstall-)\b/i;
+  if (위험동사.test(c)) return false;
+  // ② 명령 치환 — 다른 명령을 몰래 실행시키는 길.
+  if (/\$\(|`/.test(c)) return false;
+  // ③ 명령 이어붙이기·파일 덮어쓰기.
+  if (/;|&&|\|\||>/.test(c)) return false;
+  // ④ 파이프는 **PowerShell -Command 안에서만** 허용한다. 윈도우 설치 목록은 파이프가 본질이고
+  //    그 안은 PowerShell이 해석하지 셸이 해석하지 않는다. 리눅스 명령에 파이프가 생기면 막는다.
+  if (/\|/.test(c) && !/^powershell\s+-NoProfile\s+-Command\s+"/.test(c)) return false;
+  return true;
+}
+
+/**
+ * ⚠ **이 검사기가 진짜 방패는 아니다.** 진짜 방패는 `수집명령`이 **고정 상수**라는 것이다 —
+ *   사용자 입력이 명령에 들어갈 길이 아예 없다. 이 검사기는 나중에 누군가(나를 포함해)
+ *   명령을 손볼 때 실수를 잡는 **두 번째 그물**이다.
+ *   실제로 처음 짤 때 이 그물이 내 명령을 막았고(`%{NAME}`의 중괄호), 그때 규칙을
+ *   "punctuation 전부 금지"에서 "셸이 해석하는 것만 금지"로 정확하게 고쳤다.
+ */
+
+/** 판별 결과를 장비종류로. 못 가리면 null(윈도우는 이 명령이 아예 안 도므로 따로 본다). */
+export function 장비종류판별(out: string): 장비종류 | null {
+  const t = String(out ?? "").trim().toLowerCase();
+  if (t === "rpm") return "rpm";
+  if (t === "deb") return "deb";
+  return null;
+}
+
+/**
+ * 명령 출력을 구성요소 목록으로. **탭으로 나눈다.**
+ *
+ * ⚠ 이름에 공백이 흔하다("Microsoft Visual C++ 2015 Redistributable"). 공백으로 나누면
+ *   한 부품이 여러 개로 쪼개져 **부품 수가 부풀려진다** — SBOM에서 그건 거짓말이다.
+ */
+export function 패키지파싱(종류: 장비종류, out: string): AssetComponent[] {
+  const 결과: AssetComponent[] = [];
+  const 본이름 = new Set<string>();
+  for (const line of String(out ?? "").split(/\r?\n/)) {
+    if (!line.trim()) continue;
+    // ⚠ **줄 전체를 trim한 뒤 나누면 안 된다.** 앞칸이 비어 있을 때(`\t1.0\tMIT`) 앞 탭이
+    //   사라져 **버전이 이름 자리로 밀려든다**. 시험이 이걸 잡았다 — 이름 없는 줄이
+    //   "1.0"이라는 부품이 됐다. 나눈 **뒤에** 칸마다 다듬는다.
+    const [name = "", version = "", license = ""] = line.split("\t").map((s) => s.trim());
+    if (!name) continue;
+    // 같은 패키지가 아키텍처별로 두 번 나오는 일이 있다(i686/x86_64) — 이름+버전으로 한 번만.
+    const 열쇠 = `${name}@${version}`;
+    if (본이름.has(열쇠)) continue;
+    본이름.add(열쇠);
+    결과.push({
+      name,
+      version: version || "-",
+      // ⚠ 라이선스를 못 읽는 장비가 있다(데비안·윈도우). 모르는 것을 "-"로 두고
+      //   **아는 척하지 않는다**. SBOM 라이선스 칸은 법무가 보는 칸이다.
+      license: license || "-",
+      from: "package",
+    });
+    if (종류 === "windows" && 결과.length >= 3000) break; // 터무니없이 길면 자른다(아래에서 밝힌다)
+  }
+  return 결과;
+}
+
+export interface 수집결과 {
+  ok: boolean;
+  종류: 장비종류 | null;
+  부품: AssetComponent[];
+  /** 담당자에게 그대로 보여 줄 한 줄. 실패 이유도 여기에 적는다. */
+  말: string;
+}
+
+/**
+ * 한 장비에서 패키지를 읽는다. **실패를 성공처럼 만들지 않는다.**
+ *
+ * @param run  hardeningscan의 targetRunner(t) — 원격이면 SSH, local이면 호스트
+ * @param 윈도우  대상이 윈도우인지(판별 명령이 리눅스 전용이라 미리 알려 준다)
+ */
+export async function 패키지수집(run: RunFn, 윈도우 = false): Promise<수집결과> {
+  let 종류: 장비종류 | null = 윈도우 ? "windows" : null;
+  if (!종류) {
+    const 판별 = await run(판별명령);
+    종류 = 장비종류판별(판별.out);
+    if (!종류) {
+      return {
+        ok: false, 종류: null, 부품: [],
+        말: "패키지 관리자를 찾지 못했습니다(rpm·dpkg 둘 다 없음). 이 장비는 목록을 읽을 수 없습니다 — **부품이 없다는 뜻이 아닙니다.**",
+      };
+    }
+  }
+  const cmd = 수집명령[종류];
+  const r = await run(cmd);
+  if (r.code !== 0 && !r.out.trim()) {
+    return {
+      ok: false, 종류, 부품: [],
+      말: `패키지 목록을 읽지 못했습니다(${종류}). ${r.err ? `사유: ${r.err.slice(0, 120)}` : "접속·권한을 확인해 주세요."} — **부품이 없다는 뜻이 아닙니다.**`,
+    };
+  }
+  const 부품 = 패키지파싱(종류, r.out);
+  if (부품.length === 0) {
+    return { ok: false, 종류, 부품: [], 말: `명령은 돌았는데 읽은 부품이 0개입니다(${종류}). 출력 형식이 예상과 다를 수 있습니다 — 확인이 필요합니다.` };
+  }
+  const 라이선스없음 = 부품.filter((c) => c.license === "-").length;
+  return {
+    ok: true, 종류, 부품,
+    말:
+      `${종류} 패키지 **${부품.length}개**를 읽었습니다.` +
+      (라이선스없음 ? ` 그중 ${라이선스없음}개는 라이선스를 못 읽었습니다(그 장비가 안 알려 줍니다 — 비워 둡니다).` : ""),
+  };
+}
+
+/**
+ * 기존 구성요소와 합친다. **스캐너가 준 것을 지우지 않는다.**
+ *
+ * ⚠ 같은 이름이 양쪽에 있으면 **실제로 읽은 쪽(package)을 남긴다** — 스캐너 추정치보다
+ *   장비에서 직접 읽은 것이 정확하다. 다만 스캐너에만 있는 것(OS·배포판)은 그대로 둔다.
+ */
+export function 구성요소합치기(기존: AssetComponent[], 새것: AssetComponent[]): AssetComponent[] {
+  const 이름 = (c: AssetComponent) => c.name.trim().toLowerCase();
+  const 새것이름 = new Set(새것.map(이름));
+  const 남길기존 = (기존 ?? []).filter((c) => !새것이름.has(이름(c)));
+  return [...남길기존, ...새것];
+}
+
+/** SBOM·화면에 붙일 **덮는 범위** 한 줄. 이걸 안 적으면 부품 수가 실제보다 정확해 보인다. */
+export function 덮는범위글(components: AssetComponent[]): string {
+  const 총 = components.length;
+  if (총 === 0) return "구성요소가 아직 없습니다 — 패키지 수집을 돌리면 채워집니다.";
+  const 실제 = components.filter((c) => c.from === "package").length;
+  const 추정 = components.filter((c) => c.from !== "package").length;
+  const 라이선스 = components.filter((c) => c.license && c.license !== "-").length;
+  return (
+    `구성요소 ${총}개 — 장비에서 **직접 읽은 것 ${실제}개** · 스캐너가 준 것 ${추정}개. ` +
+    `라이선스를 아는 것은 ${라이선스}개입니다.` +
+    (실제 === 0 ? " ⚠ 아직 직접 읽은 부품이 없습니다 — SBOM이 제품(CPE) 수준입니다." : "")
+  );
+}

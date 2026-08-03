@@ -425,10 +425,14 @@ export function importVulnScan(content: string, format: VulnFormat, sourceLabel:
     if (meta.os) {
       const m = meta.os.match(/^(.*?)\s+on\s+(.*)$/i);
       if (m) {
-        components.push({ name: m[2].trim(), version: "-", license: "-" }); // 배포판
-        components.push({ name: m[1].trim().replace(/\s+\S+$/, "").trim() || "Kernel", version: (m[1].match(/\S+$/) ?? ["-"])[0], license: "-" });
+        // ⚠ from: "scanner" — **스캐너가 준 제품 이름**이지 장비에서 읽은 패키지가 아니다.
+        //   2026-08-04 파트너 지적("Tenable은 CPE만 기준이라 정보가 제한된다")이 맞았고,
+        //   실제로 여기서 만드는 부품은 배포판·커널 둘뿐이다. 출처를 적어야 SBOM에서
+        //   "부품 2개"가 실제보다 정확해 보이지 않는다(packagescan.ts가 진짜 패키지를 채운다).
+        components.push({ name: m[2].trim(), version: "-", license: "-", from: "scanner" }); // 배포판
+        components.push({ name: m[1].trim().replace(/\s+\S+$/, "").trim() || "Kernel", version: (m[1].match(/\S+$/) ?? ["-"])[0], license: "-", from: "scanner" });
       } else {
-        components.push({ name: meta.os, version: "-", license: "-" });
+        components.push({ name: meta.os, version: "-", license: "-", from: "scanner" });
       }
     }
     const name = meta.dnsName ? `${meta.dnsName} (${host})` : host;

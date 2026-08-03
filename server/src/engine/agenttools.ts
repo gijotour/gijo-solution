@@ -15,13 +15,16 @@
 // 만들어 돌려주고, 사람이 승인한 뒤 /api/agent/approve로만 실행된다(시안 B, 2026-07-17 확정).
 
 import { dateOnlyLocal, addDaysLocal, koDateTimeString } from "../util/date";
-import { listAssets, getAsset, registerAsset, updateAssetOwnership, setAssetRobustness, isAiAsset, Asset, 자산표시이름 } from "./assets";
+import { listAssets, getAsset, registerAsset, updateAssetOwnership, updateAssetMeta, setAssetRobustness, isAiAsset, Asset, 자산표시이름 } from "./assets";
 import { computeAssetCoverage, coverageSummaryText, type GapKind } from "./assetcoverage";
 import { expandOntology } from "./ontology";
 import { prioritizedReviews, updateFindingReview, findingKey, ReviewPatch, ApprovalStatus } from "./approvals";
 import { 표식, 심각도한글, 심각도표식 } from "./tone";
 import { buildHub, sourceFileOf } from "./assethub";
 import { workflowStages } from "./workflow";
+import { 패키지수집, 구성요소합치기, 덮는범위글 } from "./packagescan";
+import { targetRunner } from "./hardeningscan";
+import { listTargets } from "./hardeningtargets";
 import { 잃은취약점찾기, 잃은취약점현황글, 되살리기 } from "./findingsrestore";
 import { listProducts, createProduct, PRODUCT_CATEGORIES } from "./securityproducts";
 import { listMaintenanceItems, createMaintenanceItem } from "./maintenance";
@@ -1720,6 +1723,90 @@ function 절차현황글(): string {
   ].filter(Boolean).join("\n");
 }
 
+// ── SBOM 부품 수집 (2026-08-04 파트너 지적 · 계획서 중-7) ─────────────────────
+
+/** 점검 대상을 이름이나 id로 찾는다 — 담당자는 id를 외우지 않는다. */
+function 대상찾기(말: string) {
+  const t = String(말 ?? "").trim().toLowerCase();
+  if (!t) return undefined;
+  const 목록 = listTargets();
+  return (
+    목록.find((x) => x.id.toLowerCase() === t) ??
+    목록.find((x) => x.label.toLowerCase() === t) ??
+    목록.find((x) => x.label.toLowerCase().includes(t) || x.host.toLowerCase().includes(t))
+  );
+}
+
+/**
+ * SBOM이 얼마나 채워졌나 — **고치기 전에 얼마나 부족한지 보여 준다.**
+ *
+ * ⚠ 부품 수만 말하면 "많으니 괜찮다"로 읽힌다. **직접 읽은 것과 스캐너 추정치를 갈라** 센다.
+ */
+function runSbomCoverage(assetId?: string): string {
+  const 자산들 = assetId ? [getAsset(assetId)].filter(Boolean) : listAssets();
+  if (자산들.length === 0) return assetId ? `"${assetId}" 자산을 찾지 못했습니다.` : "등록된 자산이 없습니다.";
+  if (assetId) {
+    const a = 자산들[0]!;
+    return `${자산표시이름(a.id)}\n${덮는범위글(a.components ?? [])}`;
+  }
+  let 총 = 0, 실제 = 0;
+  const 비어있음: string[] = [];
+  for (const a of 자산들 as NonNullable<ReturnType<typeof getAsset>>[]) {
+    const c = a.components ?? [];
+    총 += c.length;
+    const 직접 = c.filter((x) => x.from === "package").length;
+    실제 += 직접;
+    if (직접 === 0) 비어있음.push(자산표시이름(a.id));
+  }
+  return [
+    `자산 ${자산들.length}개 · 구성요소 **${총}개** — 장비에서 직접 읽은 것 **${실제}개**`,
+    실제 === 0
+      ? `${표식.주의} 아직 **직접 읽은 부품이 하나도 없습니다.** 지금 SBOM은 스캐너가 준 제품 이름(CPE) 수준이라 패키지·라이브러리가 비어 있습니다.`
+      : `${표식.주의} 직접 읽지 않은 자산 ${비어있음.length}개는 아직 제품(CPE) 수준입니다.`,
+    비어있음.length ? `  · ${비어있음.slice(0, 8).join(", ")}${비어있음.length > 8 ? ` 외 ${비어있음.length - 8}개` : ""}` : "",
+    "",
+    `${표식.다음} 채우려면 "○○ 패키지 목록 읽어줘"라고 하세요 — 장비에 읽기 전용 명령만 보냅니다(승인 창이 뜹니다).`,
+  ].filter(Boolean).join("\n");
+}
+
+/** 실제 수집 — 승인 뒤에만 돈다. */
+async function runCollectPackages(말: string): Promise<string> {
+  const t = 대상찾기(말);
+  if (!t) return `"${말}"에 해당하는 점검 대상을 찾지 못했습니다 — 먼저 하드닝 점검 대상으로 등록해 주세요.`;
+  const 윈도우 = t.standard === "kisa_pc";
+  const r = await 패키지수집(targetRunner(t), 윈도우);
+  if (!r.ok) return `${표식.나쁨} ${t.label} — ${r.말}`;
+
+  // 이 대상에 맞는 자산을 찾는다. 못 찾으면 **읽은 것을 버리지 않고 그렇게 말한다.**
+  //
+  // ⚠ host만 보면 **local 대상은 영영 못 붙는다**(2026-08-04 실측: 789개를 읽어 놓고
+  //   "local에 해당하는 자산을 못 찾았다"로 끝났다). 담당자가 붙인 **이름으로도 찾는다** —
+  //   자산 검색에서 배운 것과 같다: 등록된 값 하나만 보면 사람이 쓰는 말을 못 찾는다.
+  const 라벨 = t.label.trim().toLowerCase();
+  const 자산 =
+    listAssets().find((a) => t.host !== "local" && (a.ip === t.host || a.name.includes(t.host) || a.id.includes(t.host))) ??
+    listAssets().find((a) => (a.displayName || a.name).trim().toLowerCase() === 라벨) ??
+    listAssets().find((a) => (a.displayName || a.name).toLowerCase().includes(라벨) || 라벨.includes((a.displayName || a.name).toLowerCase()));
+  if (!자산) {
+    return (
+      `${t.label}에서 ${r.말}\n` +
+      `${표식.주의} 그런데 **${t.host}에 해당하는 자산을 등록부에서 못 찾아** 붙이지 못했습니다. ` +
+      `자산을 먼저 등록한 뒤 다시 실행해 주세요.`
+    );
+  }
+  const 합친것 = 구성요소합치기(자산.components ?? [], r.부품);
+  updateAssetMeta(자산.id, 자산.name, 자산.owner ?? "", 합친것);
+  recordAudit({
+    kind: "write", actor: null, action: "패키지 목록 수집",
+    target: 자산표시이름(자산.id), detail: `${r.종류} · 부품 ${r.부품.length}개`, result: "ok",
+  });
+  return [
+    `${자산표시이름(자산.id)} — ${r.말}`,
+    덮는범위글(합친것),
+    `${표식.주의} 읽기만 했습니다 — 장비는 바뀌지 않았습니다.`,
+  ].join("\n");
+}
+
 // 보고서 작성 현황 — **세는 것은 코드가 센다.** 절차 띠 ⑤ 보고 칸과 **같은 함수**를 쓴다.
 // 따로 세면 반드시 어긋나고, 어긋난 두 숫자는 담당자가 둘 다 안 믿게 만든다.
 function runReportActivity(): string {
@@ -2248,6 +2335,47 @@ const TOOLS: AgentTool[] = [
     },
     undo: "컴플라이언스 화면에서 상태를 되돌릴 수 있습니다.",
     run: runSetComplianceStatus,
+  },
+  {
+    // ★ 2026-08-04 파트너 지적(계획서 중-7): "Tenable은 CPE만 기준이라 SBOM 정보가 제한된다."
+    //   맞는 지적이라 확인만 하는 창구를 먼저 낸다 — 고치기 전에 **얼마나 부족한지 보여 준다.**
+    name: "sbom_coverage",
+    label: "SBOM 덮는 범위",
+    domain: "assets",
+    write: false,
+    description:
+      '자산의 구성요소(SBOM 부품)가 얼마나 채워져 있는지, 그중 장비에서 직접 읽은 것과 스캐너가 준 것이 각각 몇 개인지 보여준다. "SBOM 얼마나 채워졌어?", "구성요소 현황", "부품 목록 정확해?"에 쓴다. 자산 하나만 보려면 assetId를 준다. 예: {} 또는 {"assetId":"vuln:192.168.219.98"}',
+    directAnswer: true,
+    params: [{ name: "assetId", label: "자산", description: "특정 자산만 볼 때 (비우면 전체)", required: false }],
+    run: async (args: Record<string, string>) => runSbomCoverage(args.assetId),
+  },
+  {
+    // ⚠ **쓰기다.** 고객 장비에 원격 접속해 명령을 돌린다 — 결재판을 반드시 거친다.
+    //   명령은 읽기 전용 고정 상수이고(packagescan.ts), 시험이 그것을 지킨다.
+    name: "collect_packages",
+    label: "장비에서 패키지 목록 읽기",
+    domain: "assets",
+    write: true,
+    description:
+      '점검 대상 장비에 접속해 설치된 패키지 목록을 읽어 SBOM을 채운다. "패키지 목록 읽어줘", "SBOM 채워줘", "구성요소 수집해줘"에 쓴다. 대상은 하드닝 점검 대상 이름이나 id. 예: {"target":"웹서버-01"}',
+    params: [{ name: "target", label: "대상 장비", description: "하드닝 점검에 등록된 대상 이름 또는 id", required: true }],
+    effect: (args) => {
+      // ⚠ 대상이 안 넘어왔을 때 `"undefined"`를 담당자에게 보이지 않는다 — 사람이 읽는 글자가 아니다.
+      const 말 = (args.target ?? "").trim();
+      if (!말) {
+        const 있는것 = listTargets().slice(0, 5).map((x) => x.label).join(", ");
+        return `어느 장비에서 읽을지 정해 주세요. 등록된 점검 대상: ${있는것 || "(아직 없습니다 — 하드닝 점검 대상으로 먼저 등록해 주세요)"}`;
+      }
+      const t = 대상찾기(말);
+      if (!t) return `"${말}"에 해당하는 점검 대상을 찾지 못했습니다 — 먼저 하드닝 점검 대상으로 등록해 주세요.`;
+      return (
+        `${t.label}(${t.host})에 접속해 **설치된 패키지 목록을 읽습니다.** ` +
+        `읽기 전용 명령만 보냅니다(rpm -qa · dpkg-query · Windows 설치 목록 조회) — 장비를 바꾸지 않습니다. ` +
+        `읽은 부품은 자산 구성요소에 더해지고, 스캐너가 준 기존 값은 지우지 않습니다.`
+      );
+    },
+    undo: "되돌리려면 자산 화면에서 구성요소를 지우면 됩니다(읽기만 했으므로 장비에는 아무 변화가 없습니다).",
+    run: async (args: Record<string, string>) => runCollectPackages(args.target ?? ""),
   },
   {
     // ★ 2026-08-03 실전 147상황: 「이 취약점 조치하면 점수 얼마나 올라?」에 33.5초를 쓰고

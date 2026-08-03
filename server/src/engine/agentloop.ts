@@ -648,6 +648,23 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }
     tool: "exposed_assets",
     args: {},
   },
+  // SBOM 부품 — 파트너 지적(2026-08-04): "Tenable은 CPE만 기준이라 정보가 제한된다."
+  //
+  // ⚠ **조회를 먼저 본다.** 처음엔 수집(쓰기)을 앞에 뒀다가 「SBOM 얼마나 채워졌어?」가
+  //   결재판으로 갔다 — **묻는 말인데 장비에 접속하겠다고 나선 것**이다.
+  //   「채워**졌어?**」(묻기)와 「채워**줘**」(시키기)를 가르지 못한 탓이고,
+  //   순서로 한 번, 시킴꼴 조건으로 또 한 번 막는다.
+  {
+    re: /sbom[^.\n]{0,12}(얼마나|현황|범위|채워졌|채워져|정확|비었|부족)|(구성요소|부품)[^.\n]{0,10}(현황|얼마나|몇\s*개|정확|비었)/i,
+    tool: "sbom_coverage",
+    args: {},
+  },
+  {
+    // 시킴꼴만 잡는다 — 「읽어 줘·수집해 줘·채워 줘·가져와」. 「채워졌어?」는 안 걸린다.
+    re: /(패키지|구성요소|부품|sbom)[^.\n]{0,12}(읽어|수집해?|가져와|채워)\s*(줘|주세요|줄래|주라|봐|보자)|(패키지|구성요소)\s*목록\s*(읽어|수집)/i,
+    tool: "collect_packages",
+    args: {},
+  },
   // 점수 영향 — 실측(2026-08-03): 「이 취약점 조치하면 점수 얼마나 올라?」에 33.5초를 쓰고
   //   벤더 문서의 진단 방법론을 읽어 줬다. 점수는 규칙으로 내는 값이라 지어낼 이유가 없다.
   {
@@ -872,6 +889,18 @@ function forcedToolFor(instruction: string, scope?: ToolScope): { tool: string; 
       //   담당자는 심각도로 좁혀 물었는데 4,827건을 그대로 받았다. 취약점이 17건일 때는
       //   전체나 critical이나 비슷해 보여 아무도 몰랐다 — 데이터가 커지고서야 드러났다.
       // ⚠ 조건은 **물음에 실제로 있는 말**만 넘긴다. 없는 조건을 지어내면 엉뚱하게 좁힌다.
+      // ★ 「GIJO AS 서버 패키지 목록 읽어줘」의 **대상**을 넘긴다(2026-08-04).
+      //   안 넘기면 결재판에 `"undefined"에 해당하는 점검 대상을 찾지 못했습니다`가 뜬다 —
+      //   어제 심각도 조건이 사라지던 것과 **같은 함정**이다(args를 비운 채 부르기).
+      if (f.tool === "collect_packages") {
+        const 대상 = instruction
+          .replace(/(패키지|구성요소|부품|sbom)/gi, " ")
+          .replace(/(목록|읽어|수집해?|가져와|채워)\s*(줘|주세요|줄래|주라|봐|보자)?/g, " ")
+          .replace(/[의를을에서]\s*$/g, " ")
+          .replace(/\s+/g, " ")
+          .trim();
+        return { tool: f.tool, args: 대상 ? { target: 대상 } : {} };
+      }
       if (f.tool === "finding_status") {
         const 조건 = /(critical|긴급|매우\s*심각)/i.test(instruction) ? "critical"
           : /(high|고위험|높음)/i.test(instruction) ? "high"
