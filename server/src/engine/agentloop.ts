@@ -854,6 +854,21 @@ function forcedToolFor(instruction: string, scope?: ToolScope): { tool: string; 
         if (!대상) continue;
         return { tool: "search", args: { query: 대상 } };
       }
+      // ★ 「critical 취약점 몇 건이야?」 — 조건을 안 넘겨 **전체 건수**를 답하던 것(2026-08-03).
+      //   담당자는 심각도로 좁혀 물었는데 4,827건을 그대로 받았다. 취약점이 17건일 때는
+      //   전체나 critical이나 비슷해 보여 아무도 몰랐다 — 데이터가 커지고서야 드러났다.
+      // ⚠ 조건은 **물음에 실제로 있는 말**만 넘긴다. 없는 조건을 지어내면 엉뚱하게 좁힌다.
+      if (f.tool === "finding_status") {
+        const 조건 = /(critical|긴급|매우\s*심각)/i.test(instruction) ? "critical"
+          : /(high|고위험|높음)/i.test(instruction) ? "high"
+          : /(medium|중간)/i.test(instruction) ? "medium"
+          : /(low|낮음)/i.test(instruction) ? "low"
+          : /kev|실제\s*악용/i.test(instruction) ? "kev"
+          : /미배정|배정\s*안|담당자?\s*없/.test(instruction) ? "미배정"
+          : /기한\s*(초과|지난)|지연/.test(instruction) ? "기한"
+          : "";
+        return { tool: f.tool, args: 조건 ? { filter: 조건 } : {} };
+      }
       if (f.tool === "briefing" && /리포트|보고서|report/i.test(instruction)) continue; // 문서 리포트는 briefing 아님
       // 하드닝 점검 기준 선택: CIS 명시→cis, PC/윈도우→kisa_pc, 네트워크 장비→kisa_net, 그 외→국내 CCE(kisa).
       if (f.tool === "run_hardening_scan") {

@@ -25,7 +25,7 @@ import { appendApprovedDecision } from "./orchestrator-dataset";
 import { undoSnapshot, undoCommit } from "./undo";
 import { gateUserInput } from "./gateway";
 import { toolDomainsForScreen } from "./screencontext";
-import { isHelpIntent, formatScreenGuide } from "./screenguide";
+import { isHelpIntent, formatScreenGuide, 이름으로화면찾기, 화면위치안내 } from "./screenguide";
 import { findHowTo, howToMarkdown } from "./howto";
 import { buildFindingPicks, parsePickCommand, pickToolArgs, isFindingListAsk, findingListAnswer, isMyWorkAsk, myWorkAnswer, stripPickMarks, PickList } from "./picklist";
 import { isOutOfScope, outOfScopeAnswer, isTooVague, vagueAnswer, 한낱말되묻기 } from "./scopeguard";
@@ -887,6 +887,23 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
       route: { agentId: "orchestrator", action: "chat" },
       output,
       ...(picklist ? { picklist } : {}),
+    };
+  }
+
+  // 「○○은 어디서 해?」 — **우리 화면 이름**으로 자리를 찾아 준다(2026-08-03 실전 147상황).
+  //   예전에는 이 말이 RAG로 새어 「설정은 Tenable Security Center의 인터페이스에서…」라고
+  //   **남의 제품 매뉴얼**을 32초 걸려 읽어 줬다. 우리 화면을 물었는데 남의 화면을 답한 것이다.
+  // ⚠ isHelpIntent보다 **먼저** 본다 — isHelpIntent는 "지금 보고 있는 화면"을 안내하므로,
+  //   다른 화면 이름을 대고 물으면 엉뚱한 화면 설명이 나간다.
+  const 찾는화면 = 이름으로화면찾기(instructionText);
+  if (찾는화면) {
+    const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
+    completeTask(task.id);
+    return {
+      task,
+      route: { agentId: "orchestrator", action: "chat" },
+      output: 화면위치안내(찾는화면.screen, 찾는화면.title),
+      openScreen: { page: 찾는화면.screen, label: 찾는화면.title },
     };
   }
 

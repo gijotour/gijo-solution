@@ -652,6 +652,73 @@ export function getScreenGuide(screen?: string): ScreenGuide {
   return GUIDES[key] ?? OVERVIEW;
 }
 
+/** 「어디서 해?」류 — **자리를 묻는 말**인지. 이 말이 없으면 화면 이름이 나와도 길찾기가 아니다. */
+const 자리질문_RE = /어디|어느\s*(메뉴|화면|자리)|무슨\s*메뉴|어떻게\s*가|가려면|보려면|찾으려면|찾을\s*수\s*있/;
+
+/**
+ * 물음에 든 **우리 화면 이름**으로 그 화면을 찾는다. 없으면 null.
+ *
+ * ★ 왜(2026-08-03 실전 147상황): 「설정은 어디서 해?」에 32초를 쓰고
+ *   **"설정은 Tenable Security Center의 인터페이스에서 이루어집니다"**라고 답했다.
+ *   우리 제품 설정을 물었는데 **남의 제품 매뉴얼**을 읽어 준 것이다. 화면 이름을 알아보는
+ *   길이 없어 RAG로 샜고, RAG에는 벤더 문서가 있으니 거기서 답을 지어냈다.
+ *
+ * ⚠ 이름표는 **GUIDES 하나**를 본다. 따로 적어 두면 화면 이름이 바뀔 때 여기만 낡는다.
+ * ⚠ 가장 **긴 이름**이 이긴다 — "보안 KPI"를 물었는데 "KPI"로 잘리면 엉뚱한 화면이 열린다.
+ */
+/**
+ * 담당자가 부르는 다른 말 → 화면. 화면에 적힌 이름과 사람이 쓰는 말은 자주 다르다.
+ *
+ * ⚠ 「보고서 보려면 어디로?」가 안 걸려서 이 표를 만들었다(2026-08-03) — 화면 이름은
+ *   「리포트」인데 담당자는 「보고서」라고 한다. 자산 검색에서 배운 것과 같다:
+ *   **등록된 이름 하나만 보면 사람이 쓰는 말을 영영 못 찾는다.**
+ */
+const 화면별칭: Record<string, string> = {
+  보고서: "report.html",
+  감사로그: "audit.html",
+  작업기록: "audit.html",
+  취약점목록: "vulnscan.html",
+  자산: "inventory.html",
+  자산목록: "inventory.html",
+  하드닝: "hardening.html",
+  보안설정점검: "hardening.html",
+  터미널: "terminal.html",
+  명령창: "terminal.html",
+  레드팀: "redteam.html",
+  지식: "memory.html",
+  문서함: "docbox.html",
+  대시보드: "dashboard.html",
+};
+
+export function 이름으로화면찾기(text: string): { screen: string; title: string } | null {
+  const t = String(text ?? "");
+  if (!자리질문_RE.test(t)) return null;
+  const 붙인질문 = t.replace(/\s/g, "");
+  type 후보 = { screen: string; title: string; 길이: number };
+  let 최선: 후보 | undefined;
+  const 담기 = (screen: string, 이름: string) => {
+    if (이름.length < 2 || !붙인질문.includes(이름)) return;
+    if (최선 && 이름.length <= 최선.길이) return;
+    최선 = { screen, title: GUIDES[screen]?.title ?? 이름, 길이: 이름.length };
+  };
+  for (const [screen, g] of Object.entries(GUIDES)) 담기(screen, g.title.replace(/\s/g, ""));
+  for (const [별명, screen] of Object.entries(화면별칭)) 담기(screen, 별명);
+  return 최선 ? { screen: 최선.screen, title: 최선.title } : null;
+}
+
+/** 「○○은 여기 있습니다」 — 화면 위치 + 그 화면이 절차 몇 단계인지 + 거기서 하는 일. */
+export function 화면위치안내(screen: string, title: string): string {
+  const g = getScreenGuide(screen);
+  const 단계 = stageOfScreen(screen);
+  const 단계말 = 단계 ? workflowStages().find((s) => s.no === 단계) : null;
+  return [
+    `🤖 **${title}** — ${단계말 ? `사이드바 ${단계말.no} ${단계말.label} 안에 있습니다.` : "사이드바 메뉴에서 찾을 수 있습니다."}`,
+    "",
+    g.what,
+    ...(g.can?.length ? ["", "여기서 하는 일:", ...g.can.slice(0, 5).map((c) => `- ${c}`)] : []),
+  ].join("\n");
+}
+
 /**
  * 「이 화면은 절차 몇 단계인가」 한 줄 (2026-08-02 업무 절차 개편).
  *
