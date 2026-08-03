@@ -134,6 +134,30 @@ export function isRealVulnerability(f: { finding_type?: string }): boolean {
 }
 
 /**
+ * **시연용 데이터가 섞여 있으면 밝힌다.**
+ *
+ * 왜 필요한가(2026-08-03 실측): 운영 서버의 취약점 14건이 **전부 `demo-scan.csv`**에서 왔는데
+ *   자산 출처는 `scanner`로 찍혀 있어 화면에서 실제 스캔 결과와 구분되지 않았다.
+ *   담당자가 "우리 망에 Log4Shell이 있다"고 읽으면 **없는 사고를 쫓게 된다.**
+ *
+ * ⚠ **지우지도, 숨기지도 않는다.** 지우면 시연·시험 기준선이 무너지고,
+ *   숨기면(origin=sample) 화면 기본 목록에서 사라져 지운 것과 같아진다.
+ *   남겨 두되 **숫자를 말할 때 함께 밝힌다** — 그게 정직한 쪽이다.
+ * ⚠ 섞여 있지 않으면 **아무 말도 안 붙인다** — 늘 붙는 단서는 아무도 안 읽는다.
+ */
+const 시연도구 = /^demo[-_]|샘플|sample[-_]scan/i;
+export function 시연데이터알림(findings: { source_tool?: string; finding_type?: string }[]): string {
+  const 진짜 = (findings ?? []).filter((f) => isRealVulnerability(f));
+  const 시연 = 진짜.filter((f) => 시연도구.test(String(f.source_tool ?? "")));
+  if (시연.length === 0) return "";
+  const 전부 = 시연.length === 진짜.length;
+  return (
+    `\n⚠ ${전부 ? "위 취약점은 전부" : `위 ${진짜.length}건 중 ${시연.length}건은`}` +
+    ` 시연용으로 넣은 자료입니다 — 실제 스캔 결과가 아닙니다.`
+  );
+}
+
+/**
  * 스캐너가 낸 것이지만 **취약점이 아닌 것**.
  *
  * ★ 실측(2026-08-01 하루 실전 115상황): 전체 finding 605건 중 **602건이 이것**이었다.
@@ -653,6 +677,7 @@ function runToday(args: Record<string, string>): string {
     `오늘 조치 우선순위 상위 ${top.length}건 (KEV→EPSS→VPR 순):`,
     ...lines,
     overdue ? `⚠ 기한 초과 ${overdue}건 포함` : "",
+    시연데이터알림(top.map((r) => r.finding)),
     다음걸음("조치·승인 화면에서 담당자·기한을 배정하거나, 여기서 \"1번 담당자 배정해줘\"라고 말해도 됩니다."),
   ].filter(Boolean).join("\n").slice(0, 2500);
 }
@@ -753,8 +778,28 @@ function runScanStatus(args: Record<string, string>): string {
   }
   const total = Object.values(counts).reduce((x, y) => x + y, 0);
   if (total === 0) return "스캔된 취약점이 없습니다. (취약점 관리에서 스캔 결과를 업로드하세요.)";
+  // **언제 들어온 것인가** — 실측(2026-08-03 실전 147상황): "스캔 결과 언제 들어온 거야?"에
+  //   30초를 쓰고 "이 자산에서 발견된 1개 취약점 중…"이라고 답했다. **언제를 물었는데 무엇을 답했다.**
+  //   숫자가 언제 것인지 모르면 그 숫자로 보고를 쓸 수 없다.
+  // ⚠ 못 구하면 비운다 — 0이나 오늘로 채우면 "방금 본 것"이라는 거짓이 된다.
+  const 시각들 = assets.map((a) => a.lastScannedAt).filter((t): t is number => typeof t === "number" && t > 0);
+  const 신선도 = (() => {
+    if (시각들.length === 0) return "· 반입 시각을 기록한 자산이 없습니다 — 언제 것인지 알 수 없습니다.";
+    const 최근 = Math.max(...시각들);
+    const 가장오래 = Math.min(...시각들);
+    const 며칠 = (t: number) => Math.floor((Date.now() - t) / 86400000);
+    const 날 = (t: number) => new Date(t).toLocaleDateString("ko-KR");
+    const 안본자산 = assets.length - 시각들.length;
+    return (
+      `· 가장 최근 반입 ${날(최근)} (${며칠(최근) === 0 ? "오늘" : `${며칠(최근)}일 전`})` +
+      ` · 가장 오래된 것 ${날(가장오래)} (${며칠(가장오래)}일 전)` +
+      (안본자산 > 0 ? ` · 반입 기록이 없는 자산 ${안본자산}건` : "")
+    );
+  })();
+
   const parts = [
     `재스캔 기준 상태 (총 ${total}건): 신규 ${counts.new} · 활성 ${counts.active} · 해결 ${counts.fixed} · 재발 ${counts.resurfaced}`,
+    신선도,
   ];
   if (fixedList.length) parts.push(`해결(fixed)로 판정된 ${fixedList.length}건 — 조치완료 확정 후보:`, ...fixedList.slice(0, 8).map((x) => `  - ${x}`));
   if (counts.resurfaced) parts.push(`⚠ 재발 ${counts.resurfaced}건 — 조치 후 다시 나타남, 재확인 필요`);
@@ -1305,7 +1350,7 @@ function runFindingStatusOverview(args: Record<string, string>): string {
   const 할말 = unassigned
     ? `담당자 미배정 ${unassigned}건이 병목입니다 — "1번 담당자 배정해줘"라고 하시거나 조치·승인 화면에서 배정하세요.`
     : '조치·승인 화면에서 상태를 옮기거나, 여기서 "○○ 조치완료로 바꿔줘"라고 말해도 됩니다.';
-  return `${head}\n${lines.join("\n")}${more}${다음걸음(할말)}`;
+  return `${head}\n${lines.join("\n")}${more}${시연데이터알림(matched.map((r) => r.finding))}${다음걸음(할말)}`;
 }
 
 // 승인/반려 — 조치·승인 화면(approvals.html)의 setFindingReview에 해당하는 역량.
@@ -2718,6 +2763,10 @@ const TOOLS: AgentTool[] = [
     write: false,
     description:
       '재스캔 기준 취약점 상태 변화를 요약한다 — 신규·활성·해결·재발 건수 + 해결(fixed) 후보. "지난 스캔 대비 뭐가 바뀌었어?", "새로 뜬 거 있어?", "해결된 거"에 쓴다. 예: {} 또는 {"assetId":"vuln:sample-web01"}',
+    // ⚠ 즉답이다 — LLM 재작성이 말을 망가뜨렸다(2026-08-03 실측:
+    //   "신규 14건"이 **"가장 최근의 신규 스피드는 14건입니다"**로 나갔다).
+    //   이미 우리말 요약이라 다시 쓸 이유가 없다.
+    directAnswer: true,
     params: [{ name: "assetId", label: "자산 id", description: "특정 자산만 (선택, 비우면 전체)", required: false }],
     run: runScanStatus,
   },
