@@ -640,6 +640,14 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }
     tool: "today",
     args: {},
   },
+  // 인터넷에 노출된 자산 — 실측(2026-08-03): 노출 여부를 물었는데
+  //   "이 자산에서 발견된 1개 취약점 중 즉시 조치 없음입니다"라고 특정 자산 취약점을 답했다.
+  //   노출 점수는 assethub가 이미 계산하는데 챗봇이 못 부르고 있었다.
+  {
+    re: /(인터넷|외부|공개|퍼블릭|public)(에|으로|에서)?\s*(노출|열려|접근|오픈|공개)|노출된?\s*(자산|장비|서버)|외부\s*공개\s*(자산|장비)/i,
+    tool: "exposed_assets",
+    args: {},
+  },
   // 자산을 등록하겠다 — 실측(2026-08-03 서랍 점검): `register_asset`이 있는데 안 불려
   //   **Tenable Security Center 로그인 → Explore > Assets…** 남의 제품 매뉴얼 절차를 답했다.
   //   우리 제품에서 등록하는 법을 물었는데 벤더 문서를 읽어 준 것이다.

@@ -20,6 +20,7 @@ import { computeAssetCoverage, coverageSummaryText, type GapKind } from "./asset
 import { expandOntology } from "./ontology";
 import { prioritizedReviews, updateFindingReview, findingKey, ReviewPatch, ApprovalStatus } from "./approvals";
 import { 표식, 심각도한글, 심각도표식 } from "./tone";
+import { buildHub } from "./assethub";
 import { listProducts, createProduct, PRODUCT_CATEGORIES } from "./securityproducts";
 import { listMaintenanceItems, createMaintenanceItem } from "./maintenance";
 import { listCompliance, setComplianceStatus } from "./compliance";
@@ -1581,6 +1582,56 @@ async function runReportList(args: Record<string, string>): Promise<string> {
   );
 }
 
+// 인터넷에 노출된 자산 — 실측(2026-08-03 실전 147상황): "인터넷에 노출된 자산 있어?"에
+//   **"이 자산에서 발견된 1개 취약점 중 즉시 조치 없음입니다."**라고 답했다.
+//   노출 여부를 물었는데 특정 자산 취약점을 말한 것이다. 노출 점수는 assethub가 이미 계산한다.
+//
+// ⚠ **어떻게 판정했는지 밝힌다.** 이 판정은 스캔이 아니라 **우리가 적어 둔 정보**에서 나온다
+//   (AI-BOM 인프라 칸의 호스팅 정보 + 자산의 서비스명). 적어 두지 않은 자산은 "모른다"이지
+//   "노출 안 됨"이 아니다 — 그 차이를 안 밝히면 담당자가 안전하다고 착각한다.
+// ⚠ **판별식을 밖으로 꺼내 둔다.** 함수 안에 두면 시험할 방법이 없고, 그러면 정규식이
+//   고장 나도 답은 언제나 그럴듯한 「0건」이라 아무도 모른다(2026-08-03 운영 실측이 0건이었다 —
+//   등록부 57건 중 4건만 채워져 있고 그 4건이 전부 온프레미스라 0건이 **맞는** 답이었지만,
+//   맞는지 틀린지 가릴 수단이 없다는 것이 문제였다).
+export function 인터넷노출로적혔나(호스팅: string, 서비스: string): boolean {
+  return /인터넷|external|public|외부|공인\s*ip|dmz/i.test(`${호스팅 || ""} ${서비스 || ""}`);
+}
+
+function runExposedAssets(): string {
+  let hub: ReturnType<typeof buildHub>;
+  try { hub = buildHub(); } catch { return "자산 노출도를 계산하지 못했습니다 — 자산 등록부를 확인해 주세요."; }
+  const 적힌것 = hub.rows.filter((r) => {
+    const a = getAsset(r.id);
+    return a ? 인터넷노출로적혔나(a.aibom.infrastructure.hostingProvider || "", a.service || "") : false;
+  });
+  const 모름 = hub.rows.filter((r) => {
+    const a = getAsset(r.id);
+    return !a || !`${a.aibom.infrastructure.hostingProvider || ""}${a.service || ""}`.trim();
+  }).length;
+
+  const 머리 = 적힌것.length
+    ? `인터넷 노출로 **적혀 있는** 자산 ${적힌것.length}건 (전체 ${hub.rows.length}건)`
+    : `인터넷 노출로 적혀 있는 자산이 없습니다 (전체 ${hub.rows.length}건)`;
+  const 줄 = 적힌것
+    .slice()
+    .sort((x, y) => y.exposureScore - x.exposureScore)
+    .slice(0, 8)
+    .map((r) => `${심각도표식(r.riskBand === "ok" ? "low" : r.riskBand)} ${자산표시이름(r.id)} — 노출점수 ${r.exposureScore}`);
+
+  return [
+    머리,
+    ...줄,
+    "",
+    // ⚠ 여기에 「다음 걸음」을 붙이지 않는다. 이건 **현황 조회**라 다음 행동이 사람마다 다르다
+    //   (일감 목록인 today·briefing·finding_status에만 붙인다 — agenttools-cross.test.ts가 지킨다).
+    //   등록부가 비었다는 사실은 아래 정직 문구에 함께 적어 「그래서 뭘 하지」를 남기지 않는다.
+    `${표식.주의} 이 판정은 스캔이 아니라 **등록부에 적힌 정보**(AI-BOM 인프라·서비스명)로 한 것입니다.` +
+      (모름
+        ? ` 적어 두지 않은 자산 ${모름}건은 **모릅니다** — 노출 안 됐다는 뜻이 아닙니다. 자산 화면에서 그 ${모름}건의 인프라·서비스 칸을 채우면 판정이 정확해집니다.`
+        : ""),
+  ].filter(Boolean).join("\n");
+}
+
 // 보고서 작성 현황 — **세는 것은 코드가 센다.** 절차 띠 ⑤ 보고 칸과 **같은 함수**를 쓴다.
 // 따로 세면 반드시 어긋나고, 어긋난 두 숫자는 담당자가 둘 다 안 믿게 만든다.
 function runReportActivity(): string {
@@ -2136,6 +2187,17 @@ const TOOLS: AgentTool[] = [
     directAnswer: true,
     params: [{ name: "filter", label: "조건", description: "기간 등 물어본 조건(그대로 되짚어 준다)", required: false }],
     run: runReportList,
+  },
+  {
+    name: "exposed_assets",
+    label: "인터넷 노출 자산",
+    domain: "assets",
+    write: false,
+    description:
+      '인터넷·외부에 노출된 것으로 등록부에 적혀 있는 자산을 노출점수 순으로 보여준다. "인터넷에 노출된 자산 있어?", "외부에서 접근되는 자산", "공개된 자산 뭐 있어?"에 쓴다. 예: {}',
+    directAnswer: true,
+    params: [],
+    run: runExposedAssets,
   },
   {
     name: "report_activity",
