@@ -146,6 +146,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <button class="btn-ghost rb-refresh" id="refreshBtn">↻ 새로고침</button>
     </div>
 
+    <!-- 소스 겹침 그림 (2026-08-04 파트너 의견 5번 — "상관/위험 분석을 그래프로")
+         ⚠ **겹치는 자산이 있을 때만** 나타난다. 겹침이 없는데 빈 그림을 띄우면 자리만 먹는다. -->
+    <div class="panel" id="overlapPanel" style="display:none;margin-bottom:16px">
+      <div class="ph">소스 겹침 <span style="font-size:12.25px;color:var(--muted);font-weight:600">— 같은 자산에서 몇 곳이 동시에 우는가</span></div>
+      <div style="padding:8px 12px 10px"><svg id="overlapSvg" viewBox="0 0 1000 150" style="display:block;width:100%;height:auto" role="img" aria-label="소스 겹침 그림"></svg>
+        <div id="overlapNote" style="font-size:12px;color:var(--muted);margin-top:4px"></div>
+      </div>
+    </div>
+
     <div class="two">
       <div class="panel">
         <div class="ph">통합 위험 우선순위 <span style="font-size:12.25px;color:var(--muted);font-weight:600">— 4소스 병합</span></div>
@@ -216,6 +225,83 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.getElementById("tLog").textContent = s.bySource.log;
     document.getElementById("tProduct").textContent = s.bySource.product;
     const tH = document.getElementById("tHardening"); if (tH) tH.textContent = s.bySource.hardening || 0;
+    renderOverlap();
+  }
+
+  /**
+   * 소스 겹침 그림 — **같은 자산에서 몇 곳이 동시에 우는가.**
+   * (2026-08-04 파트너 의견 5번 "상관·위험 분석을 그래프로")
+   *
+   * 왜 이게 값을 하나: 한 곳만 울면 오탐일 수 있지만 **여러 곳이 겹치면 실제일 가능성이 높다.**
+   * 취약점 4,800건을 다 볼 수 없는 담당자에게 **어디부터 보라**고 말해 주는 그림이다.
+   *
+   * ⚠ **있는 것만 그린다.** 겹치는 자산이 없으면 이 구역 자체를 숨긴다 —
+   *   빈 그림은 자리만 먹고, 없는 선을 그리면 그럴듯하게 틀린다.
+   * ⚠ 외부 차트 라이브러리를 쓰지 않는다(폐쇄망). 내장 SVG만.
+   */
+  function renderOverlap(){
+    const panel = document.getElementById("overlapPanel");
+    const svgEl = document.getElementById("overlapSvg");
+    const note  = document.getElementById("overlapNote");
+    if(!panel || !svgEl) return;
+
+    // 자산(entity)별로 어느 소스가 울었는지 모은다.
+    const 자산별 = new Map();
+    for(const e of (data.events||[])){
+      if(!e.entity) continue;
+      let v = 자산별.get(e.entity);
+      if(!v){ v = { 소스: new Set(), 건수: 0, 최고: "low" }; 자산별.set(e.entity, v); }
+      v.소스.add(e.source); v.건수++;
+      if(e.priority === "P0" || e.severity === "critical") v.최고 = "critical";
+      else if(v.최고 !== "critical" && (e.priority === "P1" || e.severity === "high")) v.최고 = "high";
+    }
+    const 겹친것 = [...자산별.entries()]
+      .filter(([,v]) => v.소스.size >= 2)
+      .sort((a,b) => b[1].소스.size - a[1].소스.size || b[1].건수 - a[1].건수)
+      .slice(0, 4);
+
+    if(겹친것.length === 0){ panel.style.display = "none"; return; }
+    panel.style.display = "";
+
+    const s = data.summary;
+    const 소스칸 = [
+      { k:"vuln",      icon:"🔍", 이름:"취약점",   n: s?.bySource?.vuln ?? 0 },
+      { k:"log",       icon:"📊", 이름:"보안로그", n: s?.bySource?.log ?? 0 },
+      { k:"product",   icon:"🧰", 이름:"운영리포트", n: s?.bySource?.product ?? 0 },
+      { k:"hardening", icon:"🛡", 이름:"하드닝",   n: s?.bySource?.hardening ?? 0 },
+    ];
+    const 색 = { critical:"#e2483d", high:"#e08c39", low:"#5b8dd6" };
+    let out = '<defs><marker id="oah" markerWidth="8" markerHeight="8" refX="7" refY="2.5" orient="auto">'
+            + '<path d="M0,0 L7,2.5 L0,5 Z" fill="#6f6a64"/></marker></defs>';
+
+    소스칸.forEach((c,i) => {
+      const y = 12 + i*34;
+      out += '<rect x="8" y="'+y+'" width="200" height="28" rx="4" fill="rgba(255,255,255,.04)" stroke="rgba(255,255,255,.12)"/>'
+           + '<text x="20" y="'+(y+19)+'" font-size="12.5" fill="#d3daec">'+c.icon+' '+c.이름
+           + ' <tspan fill="#8b93a7">'+c.n+'</tspan></text>';
+    });
+
+    const 칸높이 = Math.min(34, Math.floor(132 / 겹친것.length));
+    겹친것.forEach(([이름, v], i) => {
+      const y = 12 + i*(칸높이+4);
+      const h = 칸높이;
+      const c = 색[v.최고] || 색.low;
+      out += '<rect x="420" y="'+y+'" width="560" height="'+h+'" rx="4" fill="rgba(226,72,61,.07)" stroke="'+c+'"/>'
+           + '<text x="434" y="'+(y+h/2+4)+'" font-size="12.5" fill="#e9e7e2">'
+           + esc(이름.length>28?이름.slice(0,27)+"…":이름)
+           + ' <tspan fill="'+c+'" font-weight="700">' + v.소스.size + '개 소스</tspan>'
+           + ' <tspan fill="#8b93a7">· 신호 '+v.건수+'건</tspan></text>';
+      // 선은 **실제로 운 소스에서만** 긋는다.
+      [...v.소스].forEach((src) => {
+        const si = 소스칸.findIndex(x=>x.k===src); if(si<0) return;
+        out += '<line x1="208" y1="'+(12+si*34+14)+'" x2="414" y2="'+(y+h/2)+'" stroke="'+c+'" stroke-width="1.3" opacity=".75" marker-end="url(#oah)"/>';
+      });
+    });
+    svgEl.innerHTML = out;
+
+    const 한곳만 = [...자산별.values()].filter(v=>v.소스.size===1).length;
+    note.textContent = '여러 곳이 동시에 운 자산이 위로 옵니다 — 한 곳에서만 보이는 '
+      + 한곳만 + '개보다 먼저 봐야 할 것입니다. 선은 실제로 신호가 온 소스에서만 긋습니다.';
   }
   /**
    * 목록이 **늘 창 안에 들어오게** 높이를 맞춘다.

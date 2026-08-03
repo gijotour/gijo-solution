@@ -1509,7 +1509,10 @@ function runAssetCoverage(args: Record<string, string>): string {
 
   const gap = cov.gaps.find((g) => g.kind === kind);
   if (!gap) return `${only} 결손은 없습니다. 해당 항목은 전체 ${cov.total}건이 모두 채워져 있습니다.`;
-  const shown = gap.assetIds.slice(0, 15).map((id) => `- ${id}`).join("\n");
+  // ⚠ **내부 id를 그대로 내지 않는다**(2026-08-04 말투 감시가 잡음: `- vuln:cert.aj-safe.co.kr`).
+  //   담당자에게 `vuln:` 접두는 아무 뜻이 없고, 그 값으로는 화면에서 찾을 수도 없다.
+  //   오늘 오탐 이력에서 고친 것과 같은 종류다 — 사람이 읽는 글자로 낸다.
+  const shown = gap.assetIds.slice(0, 15).map((id) => `- ${자산표시이름(id)}`).join("\n");
   const more = gap.assetIds.length > 15 ? `\n… 외 ${gap.assetIds.length - 15}건` : "";
   return `${gap.title}\n${gap.why}\n\n${shown}${more}\n\n조치: ${gap.fixLabel} (자산 화면 > 커버리지 탭)`;
 }
@@ -1745,6 +1748,16 @@ function 절차현황글(): string {
       ? `${표식.주의} 제일 밀린 곳은 **${밀린것.no} ${밀린것.label}** — ${밀린것.alertLabel} ${밀린것.alert}건입니다.`
       : `${표식.좋음} 지금 밀린 단계가 없습니다.`,
     모름.length ? `${표식.주의} ${모름.join(", ")}는 값을 못 구했습니다 — 0이 아니라 **모름**입니다.` : "",
+    // ⚠ **숫자만 주고 끝내지 않는다**(2026-08-04 실전 147상황이 "숫자만 주고 갈 곳 없음"으로 잡음).
+    //   어느 단계가 밀렸는지 알려 줬으면 **거기서 뭘 하는지**까지 이어야 대화창에서 일이 끝난다.
+    밀린것
+      ? `${표식.다음} 지금 할 일 — ${밀린것.no} ${밀린것.label}부터 손대세요. ` +
+        (밀린것.no === 3
+          ? '"미배정 취약점 담당자 배정해줘"라고 하시면 승인 창이 뜹니다.'
+          : 밀린것.no === 2
+            ? '"오늘 뭐부터 해야 해?"로 우선순위를 받으세요.'
+            : `${밀린것.label} 화면으로 가시거나 "${밀린것.label} 어디서 해?"라고 물어보세요.`)
+      : `${표식.다음} 다음 걸음 — "오늘 뭐부터 해야 해?"로 오늘 할 일을 받으세요.`,
   ].filter(Boolean).join("\n");
 }
 

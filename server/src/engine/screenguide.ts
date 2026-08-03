@@ -712,7 +712,7 @@ export function 화면위치안내(screen: string, title: string): string {
   const 단계 = stageOfScreen(screen);
   const 단계말 = 단계 ? workflowStages().find((s) => s.no === 단계) : null;
   return [
-    `🤖 **${title}** — ${단계말 ? `사이드바 ${단계말.no} ${단계말.label} 안에 있습니다.` : "사이드바 메뉴에서 찾을 수 있습니다."}`,
+    `**${title}** — ${단계말 ? `사이드바 ${단계말.no} ${단계말.label} 안에 있습니다.` : "사이드바 메뉴에서 찾을 수 있습니다."}`,
     "",
     g.what,
     ...(g.can?.length ? ["", "여기서 하는 일:", ...g.can.slice(0, 5).map((c) => `- ${c}`)] : []),
@@ -774,12 +774,12 @@ export function formatScreenGuide(screen?: string, question?: string): string {
     //   점검에서는 "내부 규칙 누출"로 잡혔다. 겹치면 한 번만 적는다.
     if (hit) {
       const 같은말 = g.title.replace(/\s/g, "").includes(hit.replace(/\s/g, ""));
-      const 머리 = 같은말 ? `🤖 ${hit}` : `🤖 ${g.title} › ${hit}`;
+      const 머리 = 같은말 ? `${hit}` : `${g.title} › ${hit}`;
       return `${머리}\n${g.panels[hit]}`;
     }
   }
   const L: string[] = [];
-  L.push(`🤖 ${g.title} — 이 화면 사용 안내`);
+  L.push(`${g.title} — 이 화면 사용 안내`);
   L.push(g.what);
   const 절차 = 절차줄(screen);
   if (절차) { L.push(""); L.push(절차); }
