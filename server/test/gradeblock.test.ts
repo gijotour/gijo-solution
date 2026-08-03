@@ -110,7 +110,8 @@ describe("★ 사람이 묻는 입구에서는 반드시 열람 등급을 싣는
 
   it("chat()이 받은 등급을 RAG 검색까지 흘린다", () => {
     expect(llmSrc, "ragContextFor에 안 넘기면 거기서 끊긴다").toContain("args.screen, args.viewer");
-    expect(llmSrc, "검색 함수까지 안 가면 아무 소용 없다").toContain("queryMemoryRelevant(message, 4, agentId, screen, viewer)");
+    // 2026-08-03: 근거 세기를 함께 받도록 queryMemoryGraded로 바꿨다 — 등급은 그대로 흘러야 한다.
+    expect(llmSrc, "검색 함수까지 안 가면 아무 소용 없다").toContain("queryMemoryGraded(message, 4, agentId, screen, viewer)");
   });
 
   it("등급을 바꾸는 길이 있고, 바꾼 것이 감사에 남는다", () => {

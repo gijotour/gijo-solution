@@ -2,7 +2,7 @@
 // 서버 프로세스 안에서 localengine.ts가 띄운 llama-server를 호출한다 (같은 머신, localhost).
 
 import type { Express, Request } from "express";
-import { 예고서두, 인사서두, 소개서두 } from "./tone";
+import { 예고서두, 인사서두, 소개서두, 표식 } from "./tone";
 import http from "node:http";
 import https from "node:https";
 import { authMiddleware } from "../auth/auth";
@@ -104,14 +104,14 @@ export function resetChatHistoryForTests(): void {
 // 임베딩 서버가 없거나 지식 베이스가 비어 있으면 조용히 생략한다 — RAG가 안 된다고
 // 채팅 자체가 죽으면 안 된다. (memory.ts가 llm.ts의 embed를 쓰므로 순환 참조를 피해
 // 호출 시점에 동적 import.)
-async function ragContextFor(message: string, agentId: string, screen?: string, viewer?: Viewer): Promise<string | null> {
+async function ragContextFor(message: string, agentId: string, screen?: string, viewer?: Viewer): Promise<{ context: string | null; 약한근거만: boolean }> {
   try {
-    const { queryMemoryRelevant } = await import("./memory.js");
+    const { queryMemoryGraded } = await import("./memory.js");
     // 에이전트 전용 지식 + 전역 지식만 검색 (다른 에이전트 전용 문서는 제외).
     // 거리 임계값을 넘는 청크는 버린다 — 무관한 조각을 "참고 자료"로 붙이면 모델이 그걸
     // 근거인 양 답한다(memory.ts의 RAG_RELEVANCE_MAX_DISTANCE 주석 참고).
     // screen이 있으면 그 화면의 업무영역 문서를 우선한다(soft boost — 다른 영역도 배제 안 함).
-    const raw = await queryMemoryRelevant(message, 4, agentId, screen, viewer);
+    const { chunks: raw, 약한근거만 } = await queryMemoryGraded(message, 4, agentId, screen, viewer);
     // ⚠ 살균 — 검색된 문서 조각은 **검사를 한 번도 안 거치고** 프롬프트에 실린다.
     //   가드레일은 사용자가 타이핑한 입력만 본다. 그래서 문서에 심어둔 지시문이 그대로
     //   실행됐다(2026-07-30 실측: 카나리가 답변 맨 앞에 출력됨 — chat·dispatch 양쪽).
@@ -137,9 +137,9 @@ async function ragContextFor(message: string, agentId: string, screen?: string, 
       /* 온톨로지가 비어있거나 조회 실패해도 채팅은 계속된다 (RAG와 동일한 방어). */
     }
 
-    return parts.length > 0 ? parts.join("\n\n") : null;
+    return { context: parts.length > 0 ? parts.join("\n\n") : null, 약한근거만 };
   } catch {
-    return null;
+    return { context: null, 약한근거만: false };
   }
 }
 
@@ -535,8 +535,12 @@ export async function chat(args: ChatArgs): Promise<string> {
   // 지켜지지 않았다(2026-07-19 실측: "2026년 프로야구 우승팀"에 "롯데 지자체입니다"라고
   // 없는 사실을 단정했다). 관련 자료가 없으면 애초에 LLM에 묻지 않는 것이 유일한 보장이다.
   if (args.agentId === "normaltic" && !args.responseSchema) {
-    const { queryMemoryRelevant } = await import("./memory.js");
-    const relevant = await queryMemoryRelevant(args.message, 4, args.agentId, undefined, args.viewer).catch(() => null);
+    // ⚠ 위 ragContextFor와 **같은 함수**를 쓴다 — 두 벌로 두면 한쪽만 고쳐져 어긋난다
+    //   (2026-08-03 예고 판정에서 이미 겪었다).
+    const { queryMemoryGraded } = await import("./memory.js");
+    const relevant = await queryMemoryGraded(args.message, 4, args.agentId, undefined, args.viewer)
+      .then((r) => r.chunks)
+      .catch(() => null);
     // null = 검색 자체가 실패(임베딩 서버 다운 등) — 이때는 막지 않고 평소대로 진행한다.
     if (relevant && relevant.length === 0) {
       return "등록된 사내 자료에는 관련 내용이 없습니다. 사내 문서를 먼저 등록하시거나, 다른 에이전트에게 물어보세요.";
@@ -544,7 +548,8 @@ export async function chat(args: ChatArgs): Promise<string> {
   }
 
   const history = args.remember && !args.qa ? (histories.get(args.agentId) ?? []) : [];
-  const rag = args.remember ? await ragContextFor(args.message, args.agentId, args.screen, args.viewer) : null;
+  const ragResult = args.remember ? await ragContextFor(args.message, args.agentId, args.screen, args.viewer) : null;
+  const rag = ragResult?.context ?? null;
 
   // RAG 참고자료는 별도 system 메시지가 아니라 시스템 프롬프트에 합친다 — Mistral 계열
   // (Lily 포함) 채팅 템플릿은 system 메시지 2개를 "roles must alternate" 에러로 거부한다.
@@ -686,6 +691,21 @@ export async function chat(args: ChatArgs): Promise<string> {
         : "답변을 만들지 못했습니다(내부 지시문이 섞여 걷어냈습니다). 질문을 조금 더 구체적으로 적어 다시 시도해 주세요.";
       emitLlmActivity({ kind: "chat", phase: "start", agent: agentName, detail: salvaged ? "복창 문장 제거" : "복창 지속 — 답변 대체" });
     }
+  }
+
+  // 근거가 **멀 때는 멀다고 먼저 말한다.**
+  //
+  // 실측(2026-08-03): "우리 회사 2019년 정보보호 감사 결과 알려줘"에 **2024년 사이버 위협 동향
+  //   보고서** 내용을 답했다(그 조각의 거리 0.908). 3회 재현에 3회 다 다른 답이 나왔다.
+  // 거리 분포를 재 보니 **자를 수가 없었다** — 있는 자료(0.56~0.85)와 없는 자료(0.77~0.91)가
+  //   겹친다. 문턱을 0.85로 내리면 KISA 질문(0.849)이 아슬아슬해지고, 0.95로 두면 위 사고가 난다.
+  // 그래서 자르는 대신 **세기를 밝힌다**: 가까운 근거가 하나도 없으면 답 앞에 한 줄을 붙인다.
+  //
+  // ⚠ 모델에게 "약하면 밝혀라"라고 시키지 않는다 — 프롬프트로 행동을 교정하는 방식은
+  //   이 프로젝트에서 반복해 실패했다. **코드가 문장을 붙인다.**
+  // ⚠ 답을 버리지 않는다 — 먼 자료도 담당자에겐 실마리가 된다. 다만 **확실한 답인 척하지 않는다.**
+  if (ragResult?.약한근거만 && reply && !/찾지 못|없습니다|확인되지/.test(reply.slice(0, 60))) {
+    reply = `${표식.못찾음} 직접적인 사내 자료는 찾지 못했습니다 — 아래는 **관련이 있어 보이는 자료로 답한 것**이라 확인이 필요합니다.\n\n${reply}`;
   }
 
   // llama.cpp 실측치(usage·timings)를 그대로 실어 보낸다 — 값이 나오면 실제 추론이 일어난 것.

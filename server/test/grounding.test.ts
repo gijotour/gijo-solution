@@ -11,7 +11,7 @@ describe("GIJO Agent 엄격 그라운딩", () => {
 
   function mockMemory(relevant: string[]) {
     vi.doMock("../src/engine/memory.js", () => ({
-      queryMemoryRelevant: async () => relevant,
+      queryMemoryGraded: async () => ({ chunks: relevant, 약한근거만: false }),
       queryMemory: async () => relevant,
     }));
   }
@@ -59,7 +59,7 @@ describe("GIJO Agent 엄격 그라운딩", () => {
 
   it("검색 자체가 실패하면 막지 않는다 — 임베딩 서버 장애가 채팅을 죽이면 안 된다", async () => {
     vi.doMock("../src/engine/memory.js", () => ({
-      queryMemoryRelevant: async () => { throw new Error("임베딩 서버 없음"); },
+      queryMemoryGraded: async () => { throw new Error("임베딩 서버 없음"); },
       queryMemory: async () => { throw new Error("임베딩 서버 없음"); },
     }));
     const fetchMock = vi.fn().mockResolvedValue({

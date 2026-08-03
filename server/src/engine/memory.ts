@@ -765,6 +765,33 @@ export async function queryMemoryRelevant(question: string, topK = 5, agentId?: 
   return fused.filter((c) => isRelevant(c, RAG_RELEVANCE_MAX_DISTANCE)).map((c) => c.text);
 }
 
+/**
+ * **근거가 얼마나 가까운가**까지 함께 돌려준다 — 답이 근거의 세기를 밝힐 수 있게.
+ *
+ * 왜 필요한가(2026-08-03 거리 실측): 거리 하나로는 못 가린다.
+ *   · 있는 자료: 방화벽 절차 0.56 · 레드팀 0.77 · AI-BOM 0.80 · KISA 0.85
+ *   · 없는 자료: ISMS 지적사항 0.77 · 개인정보 유출 0.80 · **2019 감사 0.91**
+ *   **두 무리가 겹친다.** 문턱을 0.85로 내리면 KISA(0.849)가 아슬아슬해지고,
+ *   0.95로 두면 "2019년 감사 결과"에 2024년 위협 동향 보고서가 근거로 실린다(실사고).
+ *
+ * 그래서 자르는 대신 **세기를 나눈다**:
+ *   · 가까움(≤ 0.85) — 지금처럼 근거로 쓴다
+ *   · 멂(0.85~0.95) — 쓰되 **"직접적인 자료는 못 찾았다"고 먼저 밝힌다**
+ *   · 무관(> 0.95) — 안 쓴다
+ * ⚠ 밝히는 일은 **코드가 문장을 붙여서** 한다. 모델에게 "약하면 밝혀라"라고 시키지 않는다 —
+ *   프롬프트로 행동을 교정하는 방식은 이 프로젝트에서 반복해 실패했다.
+ */
+export const RAG_STRONG_MAX_DISTANCE = 0.85;
+export async function queryMemoryGraded(
+  question: string, topK = 5, agentId?: string, screen?: string, viewer?: Viewer
+): Promise<{ chunks: string[]; 약한근거만: boolean }> {
+  const fused = await hybridSearch(question, topK, agentId, screen, viewer);
+  const 쓸것 = fused.filter((c) => isRelevant(c, RAG_RELEVANCE_MAX_DISTANCE));
+  // 코드가 글자 그대로 걸린 것(CVE·U-01 등)은 거리와 무관하게 **가까운 근거**로 본다.
+  const 가까움 = 쓸것.some((c) => c.lexicalHit || c.distance <= RAG_STRONG_MAX_DISTANCE);
+  return { chunks: 쓸것.map((c) => c.text), 약한근거만: 쓸것.length > 0 && !가까움 };
+}
+
 /** 문서의 첫 조각 텍스트 — 인수인계 자동 검증의 질문 생성용. 없으면 null. */
 export async function getDocumentSample(documentId: string): Promise<string | null> {
   const db = await lancedb.connect(DB_PATH);
