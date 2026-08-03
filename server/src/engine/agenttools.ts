@@ -21,6 +21,7 @@ import { expandOntology } from "./ontology";
 import { prioritizedReviews, updateFindingReview, findingKey, ReviewPatch, ApprovalStatus } from "./approvals";
 import { 표식, 심각도한글, 심각도표식 } from "./tone";
 import { buildHub, sourceFileOf } from "./assethub";
+import { workflowStages } from "./workflow";
 import { 잃은취약점찾기, 잃은취약점현황글, 되살리기 } from "./findingsrestore";
 import { listProducts, createProduct, PRODUCT_CATEGORIES } from "./securityproducts";
 import { listMaintenanceItems, createMaintenanceItem } from "./maintenance";
@@ -1689,6 +1690,36 @@ function runExposedAssets(): string {
   ].filter(Boolean).join("\n");
 }
 
+/**
+ * 업무 절차 5단계 현황 — **절차 띠와 같은 함수(workflowStages)를 쓴다.**
+ * 따로 세면 띠의 숫자와 대화창의 숫자가 어긋나고, 어긋난 두 숫자는 둘 다 안 믿게 만든다.
+ *
+ * ⚠ 「제일 밀렸다」의 뜻을 정해 둔다 — **경고 칸(alert)이 가장 큰 단계**다.
+ *   건수(count)가 큰 것은 그 단계를 지나간 양일 뿐 밀린 것이 아니다(①은 늘 자산 전체다).
+ * ⚠ 못 구한 칸(null)은 **0으로 치지 않는다** — 비운 채 "모름"이라고 적는다.
+ */
+function 절차현황글(): string {
+  const 단계들 = workflowStages();
+  const 줄 = 단계들.map((s) => {
+    const 건 = s.count == null ? "—" : `${s.count}건`;
+    const 경고 = s.alert == null || !s.alertLabel ? "" : ` · ${s.alertLabel} ${s.alert}`;
+    return `${s.no} ${s.label} — ${건}${경고}`;
+  });
+  const 밀린것 = 단계들
+    .filter((s) => typeof s.alert === "number" && s.alert > 0 && s.alertLabel)
+    .sort((a, b) => (b.alert as number) - (a.alert as number))[0];
+  const 모름 = 단계들.filter((s) => s.count == null).map((s) => `${s.no} ${s.label}`);
+  return [
+    "업무 절차 5단계 현황",
+    ...줄,
+    "",
+    밀린것
+      ? `${표식.주의} 제일 밀린 곳은 **${밀린것.no} ${밀린것.label}** — ${밀린것.alertLabel} ${밀린것.alert}건입니다.`
+      : `${표식.좋음} 지금 밀린 단계가 없습니다.`,
+    모름.length ? `${표식.주의} ${모름.join(", ")}는 값을 못 구했습니다 — 0이 아니라 **모름**입니다.` : "",
+  ].filter(Boolean).join("\n");
+}
+
 // 보고서 작성 현황 — **세는 것은 코드가 센다.** 절차 띠 ⑤ 보고 칸과 **같은 함수**를 쓴다.
 // 따로 세면 반드시 어긋나고, 어긋난 두 숫자는 담당자가 둘 다 안 믿게 만든다.
 function runReportActivity(): string {
@@ -2217,6 +2248,21 @@ const TOOLS: AgentTool[] = [
     },
     undo: "컴플라이언스 화면에서 상태를 되돌릴 수 있습니다.",
     run: runSetComplianceStatus,
+  },
+  {
+    // ★ 2026-08-03 실전 147상황: 「지금 우리 어느 단계가 제일 밀렸어?」에 28초를 쓰고
+    //   "필요한 정보가 부족합니다. 어떤 프로젝트나 작업을 진행 중인지…"라고 **되물었다.**
+    //   절차 5단계 숫자는 workflow.ts가 이미 다 세고 있는데 챗봇이 부를 창구가 없었다.
+    //   되물음을 받으면 담당자는 그냥 화면으로 간다 — 대화창에서 끝낸다는 원칙이 깨진다.
+    name: "workflow_status",
+    label: "업무 절차 단계별 현황",
+    domain: "report",
+    write: false,
+    description:
+      '업무 절차 5단계(①발견·수집 ②우선순위 ③조치 ④검증 ⑤보고)의 건수와 **어느 단계가 제일 밀렸는지**를 보여준다. "어느 단계가 제일 밀렸어?", "지금 절차 어디쯤이야?", "단계별 현황 알려줘"에 쓴다. 예: {}',
+    directAnswer: true,
+    params: [],
+    run: async () => 절차현황글(),
   },
   {
     // ★ 2026-08-03 — 담당자 지적을 따라가다 발견한 데이터 소실의 복구 창구.
