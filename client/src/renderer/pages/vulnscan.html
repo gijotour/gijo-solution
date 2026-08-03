@@ -442,7 +442,12 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
   async function loadToday() {
     const box = document.getElementById("todayList");
     try {
-      const { items } = await window.gijo.listActionPriorities(8);
+      // ★ 2026-08-04 첫 화면 단순화(전-7). 실측: 이 화면의 **첫 표 줄이 846px**에 있었다
+      //   (창 높이 776px) — 8줄이 표를 화면 밖으로 밀어냈다. 5줄로 줄이면 표가 안으로 들어온다.
+      //   ⚠ 이 구역은 **접지 않는다** — 「오늘 뭐부터」가 이 화면의 존재 이유다.
+      //   ⚠ 줄인 것을 숨기지 않는다 — 나머지가 어디 있는지 한 줄로 말한다.
+      const 보일줄 = 5;
+      const { items } = await window.gijo.listActionPriorities(보일줄);
       if (!items || !items.length) {
         box.innerHTML = '<span style="color:var(--muted-2)">조치 대상 취약점이 없습니다 — 스캔 결과를 업로드하세요.</span>';
         return;
@@ -461,7 +466,12 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
           `<span class="tp-type">${esc(f.finding_type)}</span>` +
           `<span class="tp-asset">${esc(r.assetName)}</span>` +
           `<span class="tp-metaend">${who}${due}</span></div>`;
-      }).join("");
+      }).join("") +
+      // 줄인 것을 **숨기지 않는다** — 여기 5건뿐이라고 오해하면 나머지를 놓친다.
+      (items.length >= 보일줄
+        ? '<div style="padding:7px 6px 1px;font-size:12px;color:var(--muted-2)">상위 ' + 보일줄 +
+          '건입니다 — 나머지는 아래 표에서 호스트를 눌러 보시거나, 대화창에 "오늘 뭐부터 해야 해?"라고 물어보세요.</div>'
+        : "");
     } catch (e) {
       box.innerHTML = '<span style="color:#f5928a">불러오지 못했습니다: ' + e.message + "</span>";
     }

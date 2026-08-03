@@ -112,6 +112,35 @@ describe("③④ 절차 질문이 35초·33초 — 규칙에 없어 남의 제�
   });
 });
 
+describe("지적함 2건 — 규칙이 없어 모델이 매번 다르게 골랐다 (2026-08-04)", () => {
+  const loop = 읽기("engine/agentloop.ts");
+  const 규칙 = (tool: string): RegExp => {
+    const m = loop.match(new RegExp(`re:\\s*(/[^\\n]+/),\\s*\\n\\s*tool:\\s*"${tool}"`));
+    if (!m) throw new Error(`${tool} 규칙을 못 찾았다`);
+    return eval(m[1]) as RegExp;
+  };
+
+  it("★ 「오늘 로그에서 이상 징후 있어?」가 관제 허브로 간다 — 들쭉날쭉은 못 믿는 답이다", () => {
+    const re = 규칙("analysis_status");
+    expect(re.test("오늘 로그에서 이상 징후 있어?")).toBe(true);
+    expect(re.test("로그에 수상한 거 있나?")).toBe(true);
+    expect(re.test("통합 보안 분석 현황"), "기존 물음도 그대로").toBe(true);
+  });
+
+  it("★ 「○○ 취약점 정리해줘」가 우리 취약점을 답한다 — 남의 진단 방법론이 아니라", () => {
+    const re = 규칙("search");
+    expect(re.test("SSH 취약점 정리해줘")).toBe(true);
+    expect(re.test("OpenSSH 취약점 정리해줘")).toBe(true);
+    expect(re.test("안전대부 웹서버 취약점 알려줘"), "기존 물음도 그대로").toBe(true);
+  });
+
+  it("⚠ 감시가 헛돌지 않는가 — 대상 없는 「취약점 정리해줘」는 검색으로 끌고 가지 않는다", () => {
+    // 검색어가 빈 채로 search를 부르면 전건이 쏟아진다(적용부에서 `if (!대상) continue`).
+    const 대상 = "취약점 정리해줘".replace(/\s*(의|에)?\s*취약점.*$/, "").trim();
+    expect(대상, "대상이 비면 규칙이 비켜서야 한다").toBe("");
+  });
+});
+
 describe("⑤ 「그거 어떻게 해」가 25초 걸려 23자 — 모델이 결국 똑같이 되물었다", () => {
   const disp = 읽기("engine/dispatcher.ts");
 

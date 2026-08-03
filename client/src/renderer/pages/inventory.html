@@ -292,10 +292,14 @@
       <div class="kpi-mini"><div class="kpi-mini-label">미조치 취약점</div><div class="kpi-mini-value" id="kpiOpenVuln">-</div></div>
     </div>
 
-    <!-- 부가 패널도 기본 펼침(2026-08-02 사용자 지시 — 접어 두면 있는 것을 못 본다).
-         ⚠ 이 자리가 자산 목록 **위**라 펼치면 목록이 아래로 밀린다. 자리 옮기기는 시안 뒤로. -->
-    <div id="extraToggle" style="font-size:13px;font-weight:700;color:var(--blue-light);cursor:pointer;margin-bottom:12px;user-select:none;">▾ 서비스 영향도 접기</div>
-    <div id="extraPanels">
+    <!-- ★ 2026-08-04 기본 접기(시안 first-screen-v1 승인). 파트너 지적: "한꺼번에 너무 많은
+         정보가 보이는 듯합니다" · "모든 메뉴의 첫장은 너무 복잡해 보이지 않게".
+         실측: 이 패널 때문에 **첫 자산 줄이 1,124px**에 있었다(창 높이 776px) — 담당자는
+         스크롤을 내려야 자산 한 줄을 봤다. 접으면 178px에서 표가 시작한다.
+         ⚠ 접되 **배지로 안에 무엇이 있는지 숫자를 남긴다** — 배지 없이 접으면 담당자는
+           그런 것이 있는 줄도 모른다(2026-08-02 접기 규범). -->
+    <div id="extraToggle" style="font-size:13px;font-weight:700;color:var(--blue-light);cursor:pointer;margin-bottom:12px;user-select:none;">▸ 서비스 영향도 <span id="extraBadge" style="font-weight:600;color:var(--muted)">— 세는 중…</span></div>
+    <div id="extraPanels" style="display:none;">
     <!-- 코드 저장소 스캔은 AI-BOM 화면으로 이동(2026-07-26) — AI 자산을 찾아 등록하는 기능이라 Shadow AI와 한 흐름 -->
 
     <!-- 서비스 영향도: 자산에 문제가 생기면 어느 업무 서비스가 영향받는지 자동 집계(자산 위험·CTI 위협·지연 점검). -->
@@ -1194,6 +1198,24 @@
     low: { label: "낮음", color: "var(--blue-light)", bg: "rgba(59,130,246,0.14)" },
     none: { label: "정상", color: "var(--teal)", bg: "rgba(30,185,128,0.14)" },
   };
+  /**
+   * 접힌 채로도 **안에 무엇이 있는지 숫자로** 말한다.
+   * 배지 없이 접으면 담당자는 그런 것이 있는 줄도 모른다 — 그건 접기가 아니라 삭제다.
+   * ⚠ 못 세면 "0"이라고 하지 않는다 — 0은 "없다"는 뜻이라 거짓이 된다.
+   */
+  async function loadImpactBadge() {
+    const el = document.getElementById("extraBadge");
+    if (!el) return;
+    try {
+      const { services } = await window.gijo.getServiceImpact();
+      const 위험 = services.filter((s) => s.impactLevel && s.impactLevel !== "none").length;
+      el.textContent = 위험 ? `— 위험한 서비스 ${위험}개 (눌러서 펼치기)` : `— 위험한 서비스 없음 (눌러서 펼치기)`;
+      if (위험) el.style.color = "var(--amber)";
+    } catch {
+      el.textContent = "— 세지 못했습니다 (눌러서 펼치기)";
+    }
+  }
+
   async function loadServiceImpact() {
     const body = document.getElementById("serviceImpactBody");
     try {
@@ -1209,7 +1231,11 @@
         if (s.ctiAffectedAssets) factors.push(`<span style="color:#f5928a">CTI 위협 ${s.ctiAffectedAssets}</span>`);
         if (s.overdueInspections) factors.push(`<span style="color:var(--amber)">지연 점검 ${s.overdueInspections}</span>`);
         const factorsStr = factors.length ? factors.join(" · ") : "위험 요인 없음";
-        const assetNames = s.assets.map((a) => a.name.replace(/</g, "&lt;")).join(", ");
+        // ⚠ 자산 이름을 **전부 늘어놓지 않는다**(2026-08-04). 「미지정」 하나에 자산 53개가
+        //   걸려 IP가 줄줄이 나왔다 — 자리를 가장 많이 먹으면서 읽을 수도 없다.
+        //   펼쳐도 못 읽는 것은 접어도 못 읽는다. 앞의 몇 개만 보이고 나머지는 개수로 말한다.
+        const 이름들 = s.assets.map((a) => a.name.replace(/</g, "&lt;"));
+        const assetNames = 이름들.slice(0, 4).join(", ") + (이름들.length > 4 ? ` 외 ${이름들.length - 4}개` : "");
         return `<div style="display:flex;align-items:center;gap:10px;background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:10px 13px;flex-wrap:wrap;">
           <span style="font-size:11.75px;font-weight:800;padding:3px 9px;border-radius:6px;color:${im.color};background:${im.bg};white-space:nowrap;">영향도 ${im.label}</span>
           <span style="font-size:13px;font-weight:800;color:#fff;">${s.service.replace(/</g, "&lt;")}</span>
@@ -1242,8 +1268,9 @@
     [allAssets] = await Promise.all([window.gijo.listAssets(), loadMaintCounts()]);
     await loadCoverage();
     render();
-    // 부가 패널이 접혀 있으면 서비스 영향도를 부르지 않는다 — 안 보이는 걸 계산할 이유가 없다.
+    // 접혀 있으면 **패널은 그리지 않되 배지 숫자는 센다** — 접힌 것이 있는 줄도 모르면 안 된다.
     if (document.getElementById("extraPanels").style.display !== "none") loadServiceImpact();
+    else loadImpactBadge();
     통합요약불러오기();   // 「자산 통합 뷰」에서 옮겨 온 3지표(2026-08-02 화면 통합)
   }
 
@@ -1449,12 +1476,18 @@
     searchInput.addEventListener("input", () => { render(); renderActiveChips(); });
     initToolbarDropdowns();
 
-    document.getElementById("extraToggle").addEventListener("click", (e) => {
+    document.getElementById("extraToggle").addEventListener("click", () => {
       const pane = document.getElementById("extraPanels");
+      const badge = document.getElementById("extraBadge");
       const open = pane.style.display === "none";
       pane.style.display = open ? "" : "none";
-      e.target.textContent = (open ? "▾ " : "▸ ") + "위험 요약 · 서비스 영향도 " + (open ? "숨기기" : "보기");
-      if (open) loadServiceImpact(); // 접혀 있는 동안은 불러오지 않는다
+      // ⚠ 라벨을 통째로 갈아 끼우면 배지가 사라진다(예전 코드가 그랬다 — textContent로 덮었다).
+      //   화살표만 바꾸고 배지는 그대로 둔다. 접힘 문구도 HTML 초기값과 **같은 말**을 쓴다
+      //   (예전엔 HTML은 「서비스 영향도」, JS는 「위험 요약 · 서비스 영향도」로 어긋나 있었다).
+      document.getElementById("extraToggle").firstChild.textContent = (open ? "▾ " : "▸ ") + "서비스 영향도 ";
+      if (badge) badge.textContent = open ? "(눌러서 접기)" : "— 세는 중…";
+      if (open) loadServiceImpact();
+      else loadImpactBadge();
     });
 
     document.getElementById("covTabs").addEventListener("click", (e) => {
