@@ -23,6 +23,7 @@ import { 표식, 심각도한글, 심각도표식 } from "./tone";
 import { buildHub, sourceFileOf } from "./assethub";
 import { workflowStages } from "./workflow";
 import { 한줄풀이글, 섞임고지 } from "./findingplain";
+import { eol찾기, eol한줄 } from "./eol-seed";
 import { 패키지수집, 구성요소합치기, 덮는범위글 } from "./packagescan";
 import { targetRunner } from "./hardeningscan";
 import { listTargets } from "./hardeningtargets";
@@ -1785,7 +1786,18 @@ function runSbomCoverage(assetId?: string): string {
   if (자산들.length === 0) return assetId ? `"${assetId}" 자산을 찾지 못했습니다.` : "등록된 자산이 없습니다.";
   if (assetId) {
     const a = 자산들[0]!;
-    return `${자산표시이름(a.id)}\n${덮는범위글(a.components ?? [])}`;
+    // ★ 지원 종료(EOL)를 함께 본다(2026-08-04 파트너 지적 3번) — 지원이 끝난 부품은
+    //   취약점이 나와도 **고칠 패치가 없다.** 부품 목록만 주고 끝내면 그 사실을 놓친다.
+    const 끝난것: string[] = [];
+    for (const c of a.components ?? []) {
+      const row = eol찾기(c.name, c.version);
+      if (row) 끝난것.push(`  · ${c.name} ${c.version !== "-" ? c.version : ""} — ${eol한줄(row)}`);
+    }
+    return [
+      자산표시이름(a.id),
+      덮는범위글(a.components ?? []),
+      ...(끝난것.length ? ["", `${표식.주의} 지원 종료 확인이 필요한 부품 ${끝난것.length}건:`, ...끝난것.slice(0, 5)] : []),
+    ].join("\n");
   }
   let 총 = 0, 실제 = 0;
   const 비어있음: string[] = [];
