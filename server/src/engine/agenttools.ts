@@ -46,7 +46,7 @@ import { alertScheduleText, createAlertSchedule, ALERT_KIND_LABEL } from "./aler
 import type { AlertKind } from "./alertschedule";
 import { getSmtpConfig } from "./email";
 import { listAnalysisEvents, analysisSummary, computeCorrelations } from "./analysishub";
-import { computeKpiSnapshot } from "./kpi";
+import { computeKpiSnapshot, 점수영향글 } from "./kpi";
 import { listSessions as listWorkSessions } from "./worksessions";
 import { canonicalize, suggestionsFor } from "./terms";
 import { listAudit, recordAudit, type AuditEntry } from "./audit";
@@ -2248,6 +2248,20 @@ const TOOLS: AgentTool[] = [
     },
     undo: "컴플라이언스 화면에서 상태를 되돌릴 수 있습니다.",
     run: runSetComplianceStatus,
+  },
+  {
+    // ★ 2026-08-03 실전 147상황: 「이 취약점 조치하면 점수 얼마나 올라?」에 33.5초를 쓰고
+    //   벤더 문서의 **진단 방법론**을 읽어 줬다. 점수는 computePosture가 규칙으로 내는
+    //   값이라 지어낼 이유가 없다 — 감점 요인을 그대로 펼쳐 보여 준다.
+    name: "posture_impact",
+    label: "점수에 무엇이 영향을 주나",
+    domain: "report",
+    write: false,
+    description:
+      '종합 보안태세 점수를 무엇이 얼마나 깎고 있는지, 취약점을 조치하면 점수가 실제로 오르는지 보여준다. "이거 조치하면 점수 얼마나 올라?", "점수 어떻게 올려?", "뭐가 점수를 깎아?"에 쓴다. 예: {}',
+    directAnswer: true,
+    params: [],
+    run: async () => 점수영향글(await computeKpiSnapshot()),
   },
   {
     // ★ 2026-08-03 실전 147상황: 「지금 우리 어느 단계가 제일 밀렸어?」에 28초를 쓰고

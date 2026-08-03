@@ -17,6 +17,7 @@ import { listFindingReviews, approvalSummary } from "./approvals";
 import { listCompliance } from "./compliance";
 import { listFindings } from "./cti";
 import { matchCtiToAssets } from "./ctimatch";
+import { 표식 } from "./tone";
 import { listLearnloopRuns } from "./learnloop";
 import { listTasks } from "./tasks";
 import { buildHub } from "./assethub";
@@ -223,6 +224,45 @@ function computePosture(
       { label: "컴플라이언스 대응률", value: compRate },
     ],
   };
+}
+
+/**
+ * 「이 취약점 조치하면 점수 얼마나 올라?」 — **감점 요인을 그대로 펼쳐 보여 준다.**
+ *
+ * ★ 왜(2026-08-03 실전 147상황): 이 물음에 33.5초를 쓰고 벤더 문서의 진단 방법론을
+ *   읽어 줬다. 점수는 computePosture가 **규칙으로** 내는 값이라 지어낼 이유가 없다.
+ *
+ * ⚠ **한 건을 고쳐도 점수가 안 움직일 수 있다** — 각 감점에 상한이 있어서다.
+ *   지금 운영이 그렇다: KEV 21건×8 + 치명 419건×4 = 상한 25점에 이미 걸려 있다.
+ *   "고치면 오릅니다"라고 답하면 담당자는 한 건 고치고 점수를 확인하다 제품을 안 믿게 된다.
+ *   **몇 건을 닫아야 숫자가 움직이는지**를 함께 말한다.
+ */
+export function 점수영향글(snap: KpiSnapshot): string {
+  const v = snap.vulnerabilities;
+  const rem = snap.remediation;
+  const 감점 = [
+    { 이름: "실제 악용(KEV)·치명 취약점", 값: Math.min(25, v.kev * 8 + v.critical * 4), 상한: 25, 원값: v.kev * 8 + v.critical * 4 },
+    { 이름: "기한 초과", 값: Math.min(15, rem.overdue * 5), 상한: 15, 원값: rem.overdue * 5 },
+    { 이름: "SLA 미준수", 값: Math.min(15, Math.round((100 - rem.slaCompliance) * 0.15)), 상한: 15, 원값: Math.round((100 - rem.slaCompliance) * 0.15) },
+  ];
+  const 줄 = 감점.map((d) => {
+    const 걸림 = d.원값 > d.상한 ? ` — **상한 ${d.상한}점에 걸려 있습니다**(원래 ${d.원값}점어치)` : "";
+    return `- ${d.이름}: −${d.값}점${걸림}`;
+  });
+  // KEV/치명이 상한에 걸렸다면, 상한 아래로 내려오려면 몇 건을 닫아야 하는지 센다.
+  const kev치명 = 감점[0];
+  const 안내 =
+    kev치명.원값 > kev치명.상한
+      ? `${표식.주의} 지금은 **한 건을 고쳐도 점수가 안 움직입니다.** 실제 악용·치명 취약점 감점이 상한(25점)을 넘겨 있기 때문입니다 — ` +
+        `KEV ${v.kev}건과 치명 ${v.critical}건이 상한 아래(합산 25점 미만)로 내려와야 숫자가 바뀝니다. 지금은 점수보다 **KEV부터 줄이는 것**이 맞습니다.`
+      : `${표식.다음} 지금은 감점이 상한 아래라 **한 건 조치가 바로 점수에 반영됩니다** — KEV 1건 −8점, 치명 1건 −4점입니다.`;
+  return [
+    `종합 보안태세 **${snap.posture.score}점** (100점 만점) — 규칙으로 계산한 값입니다.`,
+    "무엇이 깎고 있나:",
+    ...줄,
+    "",
+    안내,
+  ].join("\n");
 }
 
 // AI 보안 지표 — 자산 허브(assethub) 집계를 재사용해 OWASP LLM·AI-BOM·견고성을 KPI로 요약한다.
