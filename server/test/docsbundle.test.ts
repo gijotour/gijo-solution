@@ -142,7 +142,9 @@ describe("docsbundle — 제품 문서 기본 코퍼스 부트스트랩", () => 
     process.env.GIJO_DOCS_MANIFEST = path.join(tmp, "없는매니페스트.json");
     try {
       const r = await bootstrapDocsBundle();
-      expect(r).toEqual({ ingested: [], skipped: [], updated: [], missing: [], failed: [] });
+      // removed = 제외 목록에 있어 저장소에서 지운 문서(2026-08-03 신설).
+      //   매니페스트가 없으면 지울 것도 없으므로 빈 배열이어야 한다.
+      expect(r).toEqual({ ingested: [], skipped: [], updated: [], missing: [], removed: [], failed: [] });
     } finally {
       process.env.GIJO_DOCS_MANIFEST = MANIFEST;
     }

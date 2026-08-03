@@ -42,6 +42,15 @@ interface ManifestEntry {
 interface Manifest {
   scope?: string;
   files: ManifestEntry[];
+  /**
+   * **다시 넣지 않을 뿐 아니라, 이미 들어간 것도 지운다.**
+   *
+   * 실측(2026-08-03): `GIJO_AS_AIBOM_검토_가이드.md`를 2026-08-02에 이 목록으로 옮겼는데
+   *   지식 검색에서 **여전히 1위로 나왔다**(조각 10개가 그대로 남아 있었다).
+   *   목록에서 빼는 것을 "다시 안 넣는다"로만 구현했고, **아무도 지우지 않았다.**
+   *   이 문서에는 소스 경로와 개발 사정이 들어 있어 언제든 담당자 답에 실릴 수 있었다.
+   */
+  _제외?: { file: string; removed?: string; why?: string }[];
 }
 
 export interface DocsBundleResult {
@@ -49,6 +58,7 @@ export interface DocsBundleResult {
   skipped: string[]; // 이미 지식베이스에 있고 내용도 그대로라 건너뛴 문서
   updated: string[]; // 내용이 바뀌어 옛 조각을 지우고 다시 넣은 문서
   missing: string[]; // 매니페스트에 있지만 파일을 찾지 못한 문서
+  removed: string[]; // _제외에 있어 저장소에서 지운 문서 (다시 안 넣는 것만으로는 안 지워진다)
   failed: { file: string; reason: string }[];
 }
 
@@ -88,12 +98,32 @@ const getHashStmt = db.prepare("SELECT value FROM app_state WHERE key = ?");
 const setHashStmt = db.prepare("INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value");
 
 export async function bootstrapDocsBundle(): Promise<DocsBundleResult> {
-  const result: DocsBundleResult = { ingested: [], skipped: [], updated: [], missing: [], failed: [] };
+  const result: DocsBundleResult = { ingested: [], skipped: [], updated: [], missing: [], removed: [], failed: [] };
   const manifest = await readManifest();
   if (!manifest?.files?.length) return result;
 
   const scope = manifest.scope ?? GLOBAL_SCOPE;
   const existing = new Set((await listDocuments()).map((d) => d.documentId));
+
+  // ── ① 제외 목록을 **실제로 지운다** ──────────────────────────────────────────
+  // 실측(2026-08-03): `GIJO_AS_AIBOM_검토_가이드.md`를 2026-08-02에 _제외로 옮겼는데
+  //   지식 검색에서 **여전히 1위로 나왔다**(조각 10개가 그대로 남아 있었다).
+  //   "목록에서 뺀다"를 **다시 안 넣는다**로만 구현했고 아무도 지우지 않았다 —
+  //   그 문서에는 소스 경로와 개발 사정이 들어 있어 언제든 담당자 답에 실릴 수 있었다.
+  // ⚠ **_제외에 적힌 것만** 지운다. 담당자가 올린 문서(목록에 없는 76건)는 손대지 않는다 —
+  //   "목록에 없으면 지운다"로 만들면 담당자 자료가 기동 때마다 사라진다.
+  for (const 뺀것 of manifest._제외 ?? []) {
+    const docId = path.basename(String(뺀것.file ?? ""));
+    if (!docId || !existing.has(docId)) continue;
+    try {
+      await deleteDocument(docId);
+      existing.delete(docId);
+      result.removed.push(docId);
+      console.log(`[docs-bundle] 제외 목록에 있어 지식베이스에서 지움 — ${docId}${뺀것.why ? ` (${String(뺀것.why).slice(0, 60)}…)` : ""}`);
+    } catch (e) {
+      result.failed.push({ file: docId, reason: `제외 삭제 실패: ${e instanceof Error ? e.message : String(e)}` });
+    }
+  }
 
   for (const entry of manifest.files) {
     // 문서 id는 **파일명**이다 — 매니페스트 항목이 하위 폴더 경로(knowledge/…)여도 id에
