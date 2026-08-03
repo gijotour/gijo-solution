@@ -255,7 +255,12 @@ export function formatRejectHistory(instructionText: string): string {
   if (byReason.size) lines.push(`사유 분포(취약점): ${[...byReason.entries()].map(([k, v]) => `${k} ${v}건`).join(" · ")}`);
   const recentV = [...vuln].sort((a, b) => (b.reviewedAt ?? 0) - (a.reviewedAt ?? 0)).slice(0, 5);
   for (const r of recentV) {
-    lines.push(`  - [취약점] ${r.findingKey} @ ${r.assetId} — ${REJECT_REASON_LABEL[r.rejectReason ?? ""] ?? "사유 미기재"}${r.note ? ` · ${String(r.note).slice(0, 60)}` : ""} (${r.reviewedBy ?? "-"}, ${fmt(r.reviewedAt)})`);
+    // ⚠ **사람이 읽는 글자만** 낸다. 예전에는 `2aa6def8dcc181ae @ vuln:sample-web01`처럼
+    //   내부 열쇠와 내부 id를 그대로 냈다(2026-08-03 말투 감시가 잡음). 담당자에게 그 글자는
+    //   아무 뜻이 없고, 되짚으려 해도 그 값으로는 화면에서 찾을 수 없다.
+    const 이름 = 자산표시이름(r.assetId);
+    const 무엇 = r.finding?.finding_type ?? "(취약점 이름 없음)";
+    lines.push(`  - [취약점] ${무엇} @ ${이름} — ${REJECT_REASON_LABEL[r.rejectReason ?? ""] ?? "사유 미기재"}${r.note ? ` · ${String(r.note).slice(0, 60)}` : ""} (${r.reviewedBy ?? "-"}, ${fmt(r.reviewedAt)})`);
   }
   const recentM = [...maint].sort((a, b) => (b.reviewedAt ?? 0) - (a.reviewedAt ?? 0)).slice(0, 5);
   for (const m of recentM) {
@@ -874,7 +879,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   // LLM 루프에 맡기면 모델이 목록 도구를 고른 날에만 체크칸이 생긴다 — 사용자가 콕 집어 물은
   // 기능이 어떤 날은 되고 어떤 날은 안 되면 없는 것만 못하다.
   if (isFindingListAsk(instructionText)) {
-    const { output, picklist } = findingListAnswer();
+    const { output, picklist } = findingListAnswer(instructionText);
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P2" });
     completeTask(task.id);
     return {

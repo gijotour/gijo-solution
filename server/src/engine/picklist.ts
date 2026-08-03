@@ -13,6 +13,7 @@
 //   ③ **골라도 바로 실행되지 않는다.** 고른 뒤에도 결재판(승인)을 거친다 — 쓰기는 전부 사람 승인.
 
 import { prioritizedReviews } from "./approvals";
+import { listAssets } from "./assets";
 
 export interface PickItem {
   id: string; // "assetId::findingKey" — 조치할 때 그대로 돌려보낸다
@@ -97,13 +98,69 @@ export function isFindingListAsk(text: string): boolean {
   return LIST_ASK_RE.test(t) && LIST_VERB_RE.test(t);
 }
 
+/**
+ * 물음에 **대상이 적혀 있으면** 그 자산으로 좁힌다.
+ *
+ * ★ 왜(2026-08-03 실측): 잃었던 취약점 4,833건을 되살리자 「웹서버 취약점만 보여줘」와
+ *   「sample-web01 취약점만 보여줘」가 **4,827건 전부**를 쏟았다. 이 함수가 대상을 아예
+ *   안 봤기 때문인데, 데이터가 17건일 때는 아무도 몰랐다 — 적은 데이터가 결함을 가렸다.
+ *
+ * ⚠ 대상을 못 찾으면 **전체를 쏟지 않는다.** 못 찾았다고 말한다(runListAssets와 같은 원칙).
+ */
+function 대상자산고르기(text: string): { ids: string[] | null; 이름: string | null; 못찾음: string | null } {
+  const t = String(text ?? "").trim();
+  // "…만 보여줘"처럼 **좁히겠다는 말**이 있을 때만 대상을 찾는다. 없으면 전체가 맞다.
+  const 좁힘 = /(만|의|에서|중에?)\s*(취약점|미조치|목록|리스트|보여|뭐\s*있)/.test(t) || /취약점만/.test(t);
+  if (!좁힘) return { ids: null, 이름: null, 못찾음: null };
+  // 물음에서 대상이 될 만한 낱말을 뽑는다. 조사·공용어는 뺀다.
+  //   ⚠ **양방향으로 본다.** 물음이 자산 이름을 통째로 담은 경우("sample-web01 취약점만")와,
+  //     자산 이름이 물음의 낱말을 담은 경우("웹서버" ⊂ "샘플-웹서버 (10.0.0.100)") 둘 다다.
+  //     한쪽만 보면 담당자가 줄여 부르는 이름을 영영 못 찾는다(2026-08-03 실측).
+  const 흔한말 = /^(취약점|미조치|목록|리스트|보여|보여줘|현황|뭐|있어|있나|알려|알려줘|전체|모든|우리|지금|좀|해줘|줘)$/;
+  const 낱말들 = t
+    .replace(/[?!.,]/g, " ")
+    .split(/\s+/)
+    .map((w) => w.replace(/(만|의|에서|중에?|은|는|이|가|을|를)$/, "").trim())
+    .filter((w) => w.length >= 2 && !흔한말.test(w));
+  const 자산들 = listAssets();
+  const 걸린것 = 자산들.filter((a) => {
+    const 후보 = [a.displayName || "", a.name, a.id.replace(/^vuln:/, ""), a.assetType, a.service ?? ""].filter(Boolean);
+    return 후보.some(
+      (s) =>
+        (s.length >= 3 && t.toLowerCase().includes(s.toLowerCase())) ||
+        낱말들.some((w) => s.toLowerCase().includes(w.toLowerCase()))
+    );
+  });
+  if (걸린것.length > 0) {
+    return { ids: 걸린것.map((a) => a.id), 이름: 걸린것.map((a) => a.displayName || a.name).join(", "), 못찾음: null };
+  }
+  // 좁히겠다고 했는데 등록부에 없는 이름이다 — 전체를 주면 담당자는 그게 답인 줄 안다.
+  const 낱말 = t.replace(/(취약점|미조치|목록|리스트|보여\s*줘?|뭐\s*있어?|만|의|에서|중에?|\?|줘)/g, "").trim();
+  return { ids: null, 이름: null, 못찾음: 낱말 || null };
+}
+
 /** 규칙으로 만든 취약점 목록 답 + 그 자리에서 고를 수 있는 체크칸. */
-export function findingListAnswer(): { output: string; picklist: PickList | null } {
+export function findingListAnswer(text = ""): { output: string; picklist: PickList | null } {
+  const 범위 = 대상자산고르기(text);
+  if (범위.못찾음) {
+    return {
+      output:
+        `등록된 자산 중 "${범위.못찾음}"에 해당하는 것을 찾지 못해 취약점을 좁히지 못했습니다.\n` +
+        `자산 이름으로 다시 말씀해 주시거나, "자산 목록"으로 어떤 이름이 있는지 보세요. ` +
+        `전체를 보시려면 "미조치 취약점 뭐 있어?"라고 하시면 됩니다.`,
+      picklist: null,
+    };
+  }
   // ⚠ 상한을 걸고 그 수를 "총 N건"이라 말하면 거짓이 된다(실측: 상한 200에 걸려 늘 "200건"이었다).
   //   담당자는 그 수를 보고 일의 크기를 가늠하므로, 총계는 상한 없이 센다.
-  const rows = prioritizedReviews(100000);
+  const rows = prioritizedReviews(100000, 범위.ids ?? undefined);
   if (rows.length === 0) {
-    return { output: "지금 조치할 취약점이 없습니다. 새 점검 결과가 들어오면 여기에 뜹니다.", picklist: null };
+    return {
+      output: 범위.이름
+        ? `${범위.이름}에는 지금 조치할 취약점이 없습니다. (오탐 판정·조치완료 제외)`
+        : "지금 조치할 취약점이 없습니다. 새 점검 결과가 들어오면 여기에 뜹니다.",
+      picklist: null,
+    };
   }
   const 미배정 = rows.filter((r) => !r.assignee).length;
   const 초과 = rows.filter((r) => r.overdue).length;
@@ -113,7 +170,10 @@ export function findingListAnswer(): { output: string; picklist: PickList | null
     const due = r.dueDate ? `기한 ${r.dueDate}` : "기한 없음";
     return `- **[${r.finding.severity}]** ${r.finding.finding_type} @ ${r.assetName} — ${who} · ${due}`;
   });
-  const 머리 = `조치할 취약점 **${rows.length}건** — 담당자 미배정 ${미배정}건 · 기한 초과 ${초과}건`;
+  // 좁혔으면 **무엇으로 좁혔는지 머리줄에 적는다** — 안 적으면 전체인 줄 안다.
+  const 머리 =
+    (범위.이름 ? `${범위.이름} — ` : "") +
+    `조치할 취약점 **${rows.length}건** — 담당자 미배정 ${미배정}건 · 기한 초과 ${초과}건`;
   const 꼬리 = rows.length > 보여줄.length ? `\n\n(급한 순으로 ${보여줄.length}건만 보여드립니다)` : "";
   const output = `${머리}\n\n${lines.join("\n")}${꼬리}`;
   // 체크칸은 **방금 그린 그 줄들**에서 직접 만든다. 글자 대조로 되찾으면 같은 자산에 같은 유형이

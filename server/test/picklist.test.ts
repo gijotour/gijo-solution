@@ -320,3 +320,70 @@ describe("고른 것 → 조치 표식 읽기", () => {
       .toEqual({ ids: "a::1", dueDate: "2026-08-10" });
   });
 });
+
+// ── 대상으로 좁히기 — [2026-08-03 실전 147상황 재측정에서 드러남] ──────────
+//
+// ★ 왜: 잃었던 취약점 4,833건을 되살리자 「웹서버 취약점만 보여줘」와
+//   「sample-web01 취약점만 보여줘」가 **4,827건 전부**를 쏟았다.
+//   findingListAnswer가 물음의 대상을 아예 안 봤기 때문인데, 데이터가 17건일 때는
+//   아무도 몰랐다 — **적은 데이터가 결함을 가리고 있었다.**
+describe("취약점 목록을 대상으로 좁힌다", () => {
+  beforeEach(() => {
+    resetAssetsForTests();
+    registerAsset({ id: "vuln:sample-web01", name: "sample-web01", path: "p", assetType: "infra-host", owner: "" });
+    registerAsset({ id: "vuln:db01", name: "db01", path: "p", assetType: "infra-host", owner: "" });
+    recordFindings("vuln:sample-web01", [
+      { finding_type: "웹 디렉토리 인덱싱", severity: "medium", evidence: "e", source_tool: "s.pdf", key: "w1", state: "active" },
+    ]);
+    recordFindings("vuln:db01", [
+      { finding_type: "Oracle CPU 미적용", severity: "high", evidence: "e", source_tool: "o.nessus", key: "d1", state: "active" },
+      { finding_type: "약한 암호 사용", severity: "high", evidence: "e", source_tool: "o.nessus", key: "d2", state: "active" },
+    ]);
+  });
+
+  it("★ 자산 이름이 적혀 있으면 그 자산만 센다", () => {
+    const { output } = findingListAnswer("sample-web01 취약점만 보여줘");
+    expect(output, "좁힌 대상을 머리줄에 적는다").toContain("sample-web01");
+    expect(output, "그 자산의 1건만이어야 한다").toContain("1건");
+    expect(output, "다른 자산 것이 섞이면 안 된다").not.toContain("Oracle CPU 미적용");
+  });
+
+  it("대상이 없으면 전체가 맞다 — 괜히 좁히지 않는다", () => {
+    const { output } = findingListAnswer("미조치 취약점 뭐 있어?");
+    expect(output).toContain("3건");
+  });
+
+  it("★ 못 찾은 대상에 전체를 쏟지 않는다 — 담당자가 그게 답인 줄 안다", () => {
+    const { output, picklist } = findingListAnswer("메일서버 취약점만 보여줘");
+    expect(output, "못 찾았다고 말한다").toContain("찾지 못해");
+    expect(output, "전체 건수를 답으로 주면 안 된다").not.toContain("3건");
+    expect(picklist, "고를 것이 없으면 체크칸도 없다").toBeNull();
+  });
+});
+
+describe("줄여 부르는 이름도 찾는다 — 양방향 대조", () => {
+  beforeEach(() => {
+    resetAssetsForTests();
+    registerAsset({ id: "vuln:sample-web01", name: "샘플-웹서버 (10.0.0.100)", path: "p", assetType: "infra-host", owner: "" });
+    recordFindings("vuln:sample-web01", [
+      { finding_type: "웹 디렉토리 인덱싱", severity: "medium", evidence: "e", source_tool: "s.pdf", key: "w1", state: "active" },
+    ]);
+    registerAsset({ id: "vuln:db01", name: "db01", path: "p", assetType: "infra-host", owner: "" });
+    recordFindings("vuln:db01", [
+      { finding_type: "Oracle CPU 미적용", severity: "high", evidence: "e", source_tool: "o.nessus", key: "d1", state: "active" },
+    ]);
+  });
+
+  it("★ 「웹서버 취약점만」이 「샘플-웹서버 (10.0.0.100)」을 찾는다", () => {
+    // 담당자는 등록부에 적힌 긴 이름을 그대로 치지 않는다. 줄여 부른다.
+    const { output } = findingListAnswer("웹서버 취약점만 보여줘");
+    expect(output).toContain("샘플-웹서버");
+    expect(output, "그 자산 1건만").toContain("1건");
+    expect(output).not.toContain("Oracle CPU 미적용");
+  });
+
+  it("없는 이름은 여전히 못 찾았다고 말한다 — 넓혔다고 아무거나 걸리면 안 된다", () => {
+    const { output } = findingListAnswer("메일서버 취약점만 보여줘");
+    expect(output).toContain("찾지 못해");
+  });
+});
