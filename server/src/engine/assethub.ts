@@ -130,7 +130,10 @@ function vulnCounts(findings: StandardFinding[]): VulnCounts {
   const c = { critical: 0, high: 0, medium: 0, low: 0, kev: 0, open: 0 };
   for (const f of findings) {
     if (f.state === "fixed") continue; // 해소된 것은 현재 노출로 세지 않는다
-    if (!isRealVulnerability(f)) continue; // 스캔 실패·미지원은 취약점 일감이 아니다
+    if (!isRealVulnerability(f)) continue; // 스캔 실패·미지원·조사 정보는 취약점 일감이 아니다
+    // ⚠ info는 위 판정에서 이미 빠진다(2026-08-04). 타입이 그걸 모르므로 한 번 더 갈라 둔다 —
+    //   나중에 판정이 느슨해져도 여기서 조사 정보가 취약점 칸에 섞이지 않는다.
+    if (f.severity === "info") continue;
     c.open++;
     c[f.severity]++;
     if (f.kev) c.kev++;

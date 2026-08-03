@@ -56,7 +56,14 @@ function toSeverity(risk: string): StandardFinding["severity"] {
   if (r.includes("critical")) return "critical";
   if (r.includes("high")) return "high";
   if (r.includes("medium") || r.includes("moderate")) return "medium";
-  return "low"; // low/none/info 등
+  // ★ **none/info를 low로 받으면 안 된다**(2026-08-04 실측). Nessus는 severity 0을 "None"으로
+  //   주는데 그건 **취약점이 아니라 조사 결과**다(Service Detection·OS Fingerprints 등).
+  //   여기서 low로 받는 바람에 운영 4,833건 중 **1,400여 건**이 취약점으로 세어졌고,
+  //   그 숫자가 KPI·오늘 할 일·임원 보고까지 갔다. 파트너가 "정보가 많다"고 한 것이 이것이다.
+  if (r.includes("none") || r.includes("info")) return "info";
+  if (r.includes("low")) return "low";
+  // 스캐너가 아무 말도 안 했으면 **모른다** — 취약점이라고 단정하지 않는다.
+  return r.trim() ? "low" : "info";
 }
 
 function pick(row: Record<string, string>, aliases: string[]): string {

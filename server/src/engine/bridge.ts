@@ -14,7 +14,13 @@ export interface ScanAdapter {
 
 export interface StandardFinding {
   finding_type: string;
-  severity: "low" | "medium" | "high" | "critical";
+  /**
+   * ⚠ **info는 취약점이 아니다.** 스캐너가 "무엇이 깔려 있는지" 알아낸 것이다
+   *   (Nessus severity 0 = None). 2026-08-04까지 이걸 `low`로 받아 **취약점으로 세고 있었다** —
+   *   운영 4,833건 중 1,400여 건이 그것이었고 그 숫자가 임원 보고까지 갔다.
+   *   지금은 갈라서 세되 **감추지는 않는다**(scan_error를 다루는 방식과 같다).
+   */
+  severity: "info" | "low" | "medium" | "high" | "critical";
   evidence: string;
   source_tool: string;
   // 취약점 스캐너가 주면 함께 보관하는 실제 위협 지표(없으면 undefined).

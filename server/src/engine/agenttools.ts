@@ -22,7 +22,7 @@ import { prioritizedReviews, updateFindingReview, findingKey, ReviewPatch, Appro
 import { 표식, 심각도한글, 심각도표식 } from "./tone";
 import { buildHub, sourceFileOf } from "./assethub";
 import { workflowStages } from "./workflow";
-import { 한줄풀이글 } from "./findingplain";
+import { 한줄풀이글, 섞임고지 } from "./findingplain";
 import { 패키지수집, 구성요소합치기, 덮는범위글 } from "./packagescan";
 import { targetRunner } from "./hardeningscan";
 import { listTargets } from "./hardeningtargets";
@@ -122,7 +122,8 @@ export interface AgentTool {
 
 // ── 「AI 자산」 도구 구현 ────────────────────────────────────────────────
 
-const SEVERITY_ORDER = ["critical", "high", "medium", "low"] as const;
+// ⚠ info는 **맨 뒤**다. 취약점이 아니라 조사 결과이므로 정렬에서도 마지막에 온다.
+const SEVERITY_ORDER = ["critical", "high", "medium", "low", "info"] as const;
 
 /**
  * scan_error는 **스캔이 실패했다는 운영 기록이지 취약점이 아니다.**
@@ -136,8 +137,16 @@ const SEVERITY_ORDER = ["critical", "high", "medium", "low"] as const;
  * 문서 발췌를 쓸 수밖에 없다 — **틀린 숫자를 먼저 보여주지 않는 것이 처방이다.**
  * (숫자가 틀린 답은 없느니만 못하다. 담당자가 그 숫자로 보고를 쓴다.)
  */
-export function isRealVulnerability(f: { finding_type?: string }): boolean {
-  return !SCAN_NOISE.has(String(f.finding_type ?? ""));
+export function isRealVulnerability(f: { finding_type?: string; severity?: string }): boolean {
+  if (SCAN_NOISE.has(String(f.finding_type ?? ""))) return false;
+  // ★ **조사 결과(info)는 취약점이 아니다**(2026-08-04). 스캐너가 severity 0(None)으로 준 것 —
+  //   "이 서버에 SSH가 깔려 있다" 같은 사실이다. 세는 자리를 나눌 뿐 **감추지 않는다**
+  //   (조사 정보 건수는 따로 낸다 — scan_error를 다루는 방식과 같다).
+  //
+  // ⚠ **이름으로는 거르지 않는다.** 이름 규칙(findingplain)은 45%만 덮고, 그것으로 집계를
+  //   깎으면 내 정규식이 넓어질 때 **진짜 취약점이 조용히 사라진다.** 스캐너가 준 심각도만 본다.
+  if (String(f.severity ?? "").toLowerCase() === "info") return false;
+  return true;
 }
 
 /**
@@ -179,9 +188,15 @@ const SCAN_NOISE = new Set(["scan_error", "scan_not_supported"]);
 
 function findingSummary(asset: Asset): string {
   const real = asset.findings.filter(isRealVulnerability);
-  const scanErrors = asset.findings.length - real.length;
+  // ⚠ 뺀 것을 **어디로 갔는지** 갈라 적는다. 뭉뚱그리면 담당자가 "왜 숫자가 줄었지?" 한다.
+  const scanErrors = asset.findings.filter((f) => SCAN_NOISE.has(String(f.finding_type ?? ""))).length;
+  const 조사 = asset.findings.filter(
+    (f) => !SCAN_NOISE.has(String(f.finding_type ?? "")) && String(f.severity ?? "").toLowerCase() === "info"
+  ).length;
   // 스캔 실패는 감추지 않는다 — 취약점이 아니라고 말할 뿐이다. 감추면 "왜 결과가 없지?"가 된다.
-  const errNote = scanErrors ? ` · 스캔 실패 ${scanErrors}건(취약점 아님 — 재스캔 필요)` : "";
+  const errNote =
+    (scanErrors ? ` · 스캔 실패 ${scanErrors}건(취약점 아님 — 재스캔 필요)` : "") +
+    (조사 ? ` · 조사 정보 ${조사}건(취약점 아님 — 스캐너가 알아낸 사실)` : "");
   if (real.length === 0) return `finding 없음${errNote}`;
   const counts = SEVERITY_ORDER.map((s) => [s, real.filter((f) => f.severity === s).length] as const)
     .filter(([, n]) => n > 0)
@@ -1390,6 +1405,8 @@ function runFindingStatusOverview(args: Record<string, string>): string {
     if (r.dueDate && r.dueDate < today && r.status === "pending") overdue++;
   }
 
+  // 2026-08-04 이전에 반입한 것은 조사 정보가 취약점으로 저장돼 있다 — **섞였다고 밝힌다.**
+  const 섞임 = 섞임고지(matched.map((r) => r.finding.finding_type));
   // 훑는 상한에 닿았으면 그 수는 총계가 아니다 — "이상"이라고 적는다.
   const 상한닿음 = rows.length >= 현황상한;
   const head =
@@ -1417,7 +1434,10 @@ function runFindingStatusOverview(args: Record<string, string>): string {
   const 할말 = unassigned
     ? `담당자 미배정 ${unassigned}건이 병목입니다 — "1번 담당자 배정해줘"라고 하시거나 조치·승인 화면에서 배정하세요.`
     : '조치·승인 화면에서 상태를 옮기거나, 여기서 "○○ 조치완료로 바꿔줘"라고 말해도 됩니다.';
-  return `${head}\n${lines.join("\n")}${more}${시연데이터알림(matched.map((r) => r.finding))}${다음걸음(할말)}`;
+  return (
+    `${head}${섞임 ? `\n${섞임}` : ""}\n${lines.join("\n")}${more}` +
+    `${시연데이터알림(matched.map((r) => r.finding))}${다음걸음(할말)}`
+  );
 }
 
 // 승인/반려 — 조치·승인 화면(approvals.html)의 setFindingReview에 해당하는 역량.

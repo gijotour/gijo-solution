@@ -190,11 +190,15 @@ describe("vulnscan (Tenable Nessus 등 취약점 스캔 결과 업로드)", () =
     expect(result.findings).toBe(2); // 이름이 같으면 한 건으로 합침
   });
 
-  it("maps risk strings to severities (critical/high/medium/low, none→low)", () => {
-    const csv = "Host,Name,Risk\nh,a,High\nh,b,None\nh,c,Moderate\n";
+  it("★ 심각도를 옮긴다 — **None은 low가 아니라 info**다", () => {
+    // 2026-08-04까지 None을 `low`로 받았다. 그래서 `Service Detection` 같은 **조사 결과**가
+    // 취약점으로 세어졌고, 운영 4,833건 중 **1,400여 건**이 그것이었다 —
+    // 그 숫자가 KPI·오늘 할 일·임원 보고까지 갔다(파트너가 "정보가 많다"고 한 것이 이것).
+    // 이 시험은 **예전 약속을 그대로 지키고 있었다.** 약속 자체가 결함이었다.
+    const csv = "Host,Name,Risk\nh,a,High\nh,b,None\nh,c,Moderate\nh,d,Low\n";
     importVulnScan(csv, "csv", "s");
     const sevs = getAsset("vuln:h")!.findings.map((f) => f.severity).sort();
-    expect(sevs).toEqual(["high", "low", "medium"]);
+    expect(sevs).toEqual(["high", "info", "low", "medium"]);
   });
 
   it("parses a Nessus HTML report: host meta (DNS/OS) enriches the asset, vulns become findings", () => {
@@ -228,7 +232,7 @@ describe("vulnscan (Tenable Nessus 등 취약점 스캔 결과 업로드)", () =
     expect(log4j.vpr).toBe(10);
 
     const netstat = asset.findings.find((f) => f.finding_type.includes("Netstat"))!;
-    expect(netstat.severity).toBe("low"); // None → low
+    expect(netstat.severity).toBe("info"); // ★ None은 취약점이 아니라 조사 결과다(2026-08-04)
     expect(netstat.evidence).toContain("포트: tcp/22, udp/53"); // 여러 포트가 한 건으로 합쳐짐
   });
 
@@ -271,7 +275,7 @@ describe("vulnscan (Tenable Nessus 등 취약점 스캔 결과 업로드)", () =
     expect(log4j.kev).toBe(true); // KEV 매칭도 CVE 기반으로 동작
 
     const netstat = asset.findings.find((f) => f.finding_type.includes("Netstat"))!;
-    expect(netstat.severity).toBe("low"); // severity="0" → low
+    expect(netstat.severity).toBe("info"); // ★ severity 0 = None = 조사 결과(2026-08-04)
     expect(netstat.evidence).toContain("포트: tcp/22, udp/53");
   });
 
