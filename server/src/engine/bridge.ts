@@ -64,6 +64,44 @@ export async function runAdapter(adapterId: string, assetPath: string): Promise<
   return adapter.run(assetPath);
 }
 
+/**
+ * ModelScan은 **AI 모델 파일**을 뜯어보는 도구다 — IP 호스트나 서비스에는 맞지 않는다.
+ *
+ * ★ 왜 가리는가(2026-08-03 실측): 전체 자산 스캔이 IP 호스트에도 modelscan을 돌렸고,
+ *   매번 `python modelscan_wrapper.py 192.168.219.98`이 실패해 `scan_error` 한 줄을 남겼다.
+ *   한 자산에서만 **76번** 그랬다. 2026-08-02 가드가 생기기 전에는 그 한 줄이 진짜 취약점을
+ *   덮어썼다 — 자산 46개에서 4,817건이 그렇게 사라졌다.
+ *
+ *   가드가 덮어쓰기는 막지만, **맞지도 않는 도구를 돌려 실패를 쌓는 것 자체가 잘못**이다.
+ *   실패 기록은 "스캐너에 문제가 있다"는 신호인데, 애초에 대상이 아닌 것을 돌려 놓고
+ *   실패라 부르면 그 신호가 못 쓰게 된다. 대상이 아니면 **돌리지 않고 그렇게 적는다.**
+ */
+export function 모델스캔대상인가(assetPath: string): boolean {
+  const p = String(assetPath || "").trim().toLowerCase();
+  if (!p) return false;
+  // IP·호스트명만 적힌 자산(취약점 스캐너가 만든 자산)은 파일이 아니다.
+  if (/^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(p)) return false;
+  return /\.(pkl|pickle|pt|pth|bin|safetensors|h5|onnx|pb|joblib|dill|gguf|ckpt|npz|keras|tflite|pmml)$/.test(p);
+}
+
+/**
+ * 자산 하나에 모델 스캔을 시도한다 — **부르는 곳은 여기만 본다.**
+ * 대상이 아니면 파이썬을 띄우지 않고 `scan_not_supported`로 적는다(실패가 아니라 해당 없음).
+ */
+export async function 모델스캔(assetPath: string): Promise<StandardFinding[]> {
+  if (!모델스캔대상인가(assetPath)) {
+    return [{
+      finding_type: "scan_not_supported",
+      severity: "low",
+      evidence: `모델 파일 스캐너(ModelScan)의 대상이 아닙니다 — ${assetPath}. 이 자산은 취약점 스캐너 보고서로 점검합니다.`,
+      source_tool: "modelscan",
+    }];
+  }
+  return runAdapter("modelscan", assetPath).catch((err) => [
+    { finding_type: "scan_error", severity: "low" as const, evidence: String(err), source_tool: "modelscan" },
+  ]);
+}
+
 export function listAdapters(): { id: string; name: string }[] {
   return Object.values(adapters).map(({ id, name }) => ({ id, name }));
 }

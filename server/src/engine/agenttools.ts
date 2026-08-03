@@ -20,7 +20,8 @@ import { computeAssetCoverage, coverageSummaryText, type GapKind } from "./asset
 import { expandOntology } from "./ontology";
 import { prioritizedReviews, updateFindingReview, findingKey, ReviewPatch, ApprovalStatus } from "./approvals";
 import { 표식, 심각도한글, 심각도표식 } from "./tone";
-import { buildHub } from "./assethub";
+import { buildHub, sourceFileOf } from "./assethub";
+import { 잃은취약점찾기, 잃은취약점현황글, 되살리기 } from "./findingsrestore";
 import { listProducts, createProduct, PRODUCT_CATEGORIES } from "./securityproducts";
 import { listMaintenanceItems, createMaintenanceItem } from "./maintenance";
 import { listCompliance, setComplianceStatus } from "./compliance";
@@ -194,28 +195,35 @@ function runListAssets(args: Record<string, string> = {}): string {
   // ⚠ 조건을 받고도 안 거르면 **방화벽을 물었는데 전체 57건**이 나온다(2026-08-02 실측).
   const q = String(args.query ?? "").trim();
   const tokens = q ? queryTokens(q) : [];
+  // 걸리는 조건은 자산이걸린이유() 하나가 정한다 — 통합 검색과 갈리면 같은 말에 다른 답이 나온다.
+  const 이유 = new Map<string, string>();
   const assets = q
-    ? all.filter((a) =>
-        matchesLoose(a.name, q, tokens) ||
-        matchesLoose(a.assetType, q, tokens) ||
-        matchesLoose(a.id, q, tokens) ||
-        matchesLoose(a.category ?? "", q, tokens) ||
-        matchesLoose(a.service ?? "", q, tokens))
+    ? all.filter((a) => {
+        const r = 자산이걸린이유(a, q, tokens);
+        if (r === null) return false;
+        if (r) 이유.set(a.id, r);
+        return true;
+      })
     : all;
 
   // ⚠ 못 찾았다고 **전체를 쏟지 않는다.** 조건을 흘려버리고 전부 주면 담당자는 그게 답인 줄 안다.
   if (assets.length === 0) {
     return `등록된 자산 ${all.length}개 중 "${q}"에 해당하는 것을 찾지 못했습니다. ` +
-      `유형·이름·카테고리로 찾습니다 — 다른 말로 물어보시거나 "자산 목록"으로 전체를 보세요.`;
+      `이름·유형·카테고리·서비스·구성요소와 **올린 점검 파일 이름**으로 찾습니다 — ` +
+      `다른 말로 물어보시거나 "자산 목록"으로 전체를 보세요.`;
   }
 
   const 자름 = assets.length > 보여줄자산;
   // ⚠ 내부 id(`vuln:sample-web01`)를 앞세우지 않는다 — 사람이 읽는 글자가 아니다(2026-08-03 실측:
   //   자산 목록 답이 `- vuln:sample-web01` 로 시작했다). 이름으로 보여 주고, **이름으로도 찾히게**
   //   getAsset을 넓혔다 — 그러지 않으면 화면에서 본 이름으로 이어서 물을 수 없다.
-  const lines = assets.slice(0, 보여줄자산).map(
-    (a) => `- ${자산표시이름(a.id)} | 유형=${a.assetType} | 담당=${a.owner || "미지정"} | ${findingSummary(a)}`
-  );
+  // 이름이 아닌 자리(호스트명·출처 파일)로 걸린 줄은 **왜 걸렸는지 적는다.**
+  //   적지 않으면 담당자는 이름에 없는 말로 나온 줄을 오답으로 본다(brian 지적의 절반이 이것이다).
+  const lines = assets.slice(0, 보여줄자산).map((a) => {
+    const 왜 = 이유.get(a.id);
+    return `- ${자산표시이름(a.id)} | 유형=${a.assetType} | 담당=${a.owner || "미지정"} | ${findingSummary(a)}` +
+      (왜 ? ` | 걸린 이유=${왜}` : "");
+  });
   const 머리 = q
     ? `"${q}" 자산 ${assets.length}개` + (자름 ? ` · 아래는 ${보여줄자산}개입니다` : "") + ":"
     : `등록된 AI 자산 ${assets.length}개` + (자름 ? ` · 아래는 ${보여줄자산}개입니다` : "") + ":";
@@ -446,6 +454,41 @@ function matchesLoose(haystack: string, q: string, tokens: string[]): boolean {
 }
 
 /**
+ * 자산 하나가 검색어에 걸리는가 — **한 곳에서만 정한다.**
+ *
+ * ★ 왜(실사용자 brian의 지적, 2026-07-31 → 2026-08-03 처리): "자산 목록에서 서버이름이
+ *   oracle 찾아줘"에 엉뚱한 자산 2건을 답했다. 오라클 서버는 **등록부에 있었다** —
+ *   `192.168.219.98`, 출처 `Oracle Server Scan.nessus`, Oracle Database 취약점이 가득하다.
+ *   못 찾은 이유는 그 자산의 **이름이 IP뿐이고 hostname이 비어 있어서**다. 스캐너가 이름을
+ *   안 준 자산은 담당자가 부르는 말("오라클 서버")과 등록부에 적힌 말(IP)이 영영 어긋난다.
+ *   그래서 **출처 파일명까지 본다** — 담당자가 그 파일을 올렸으니 그 말은 담당자의 말이다.
+ *
+ * ⚠ 취약점 본문(finding_type)은 **일부러 안 본다.** 넣으면 "Log4j 찾아줘"에 자산 수십 대가
+ *   쏟아져 목록이 뜻을 잃는다. 소프트웨어로 찾는 것은 취약점 검색이 할 일이다.
+ *
+ * 돌려주는 값: null=안 걸림 · ""=이름·유형처럼 **보면 아는 자리**에서 걸림 · 그 밖=걸린 이유.
+ *   이유가 있으면 **답에 적는다.** 왜 나왔는지 모르는 줄은 담당자가 못 믿는다.
+ */
+export function 자산이걸린이유(a: Asset, q: string, tokens: string[]): string | null {
+  if (
+    matchesLoose(a.name, q, tokens) ||
+    matchesLoose(a.assetType, q, tokens) ||
+    matchesLoose(a.id, q, tokens) ||
+    matchesLoose(a.category ?? "", q, tokens) ||
+    matchesLoose(a.service ?? "", q, tokens) ||
+    a.components.some((c) => matchesLoose(c.name, q, tokens))
+  ) {
+    return "";
+  }
+  // ⚠ hostname은 **따로 보지 않는다.** 저장하는 곳이 없고 `name`에서 유도만 하므로
+  //   (assets.ts deriveHostIp), hostname으로 걸리는 것은 이미 name으로 걸린다.
+  //   가지를 두면 "호스트명으로도 찾습니다"라고 말해 놓고 실제로는 안 타는 죽은 코드가 된다.
+  const 출처 = sourceFileOf(a);
+  if (출처 && matchesLoose(출처, q, tokens)) return `출처 ${출처}`;
+  return null;
+}
+
+/**
  * 이 **자산을 다룬** 사내 문서에서 취약점 대목을 발췌한다.
  *
  * 왜(실사고 2026-07-28 → 원인 규명 2026-08-02):
@@ -491,16 +534,21 @@ async function searchOne(q: string): Promise<string[]> {
   const out: string[] = [];
   const tokens = queryTokens(q);
 
-  const assets = listAssets().filter(
-    (a) =>
-      matchesLoose(a.id, q, tokens) ||
-      matchesLoose(a.name, q, tokens) ||
-      matchesLoose(a.assetType, q, tokens) ||
-      a.components.some((c) => matchesLoose(c.name, q, tokens))
-  );
+  // 걸리는 조건은 목록 조회와 **같은 함수**를 쓴다(자산이걸린이유). 갈리면 "자산 목록에서 찾아줘"와
+  // "oracle 찾아줘"가 서로 다른 답을 낸다 — 담당자는 둘 다 안 믿게 된다.
+  const 이유 = new Map<string, string>();
+  const assets = listAssets().filter((a) => {
+    const r = 자산이걸린이유(a, q, tokens);
+    if (r === null) return false;
+    if (r) 이유.set(a.id, r);
+    return true;
+  });
   if (assets.length) {
     // ⚠ 내부 id를 앞세우지 않는다 — 사람이 읽는 글자가 아니다(2026-08-03 말투 규범).
-    out.push(`AI 자산 ${assets.length}건:`, ...assets.slice(0, 6).map((a) => `  - ${자산표시이름(a.id)} | ${a.assetType} | ${findingSummary(a)}`));
+    out.push(`AI 자산 ${assets.length}건:`, ...assets.slice(0, 6).map(
+      (a) => `  - ${자산표시이름(a.id)} | ${a.assetType} | ${findingSummary(a)}` +
+        (이유.get(a.id) ? ` | 걸린 이유=${이유.get(a.id)}` : "")
+    ));
     // 대상이 좁혀졌으면 취약점 **이름**까지 준다(2026-07-28 실측).
     // 건수만 주면 LLM은 아는 만큼만 말해 "medium 1건, low 2건"으로 끝난다 — 담당자가 알고 싶은 건
     // "무엇이" 취약한가다. 아래 취약점 섹션은 우선순위 상위 100건만 보므로 낮은 위험은 거기서 샌다.
@@ -1302,9 +1350,16 @@ function runBulkUpdate(args: Record<string, string>): string {
 
 // 취약점 현황을 조건으로 훑는다. today(cross)가 "오늘 볼 상위 N건"이라면 이건 "조건에 맞는
 // 것들이 지금 어떤 상태인가"를 본다 — 배정·기한·판정 현황 파악이 목적이다.
+/** 현황을 셀 때 훑는 최대 건수. 여기에 닿으면 **닿았다고 말한다**(총계인 척하지 않는다). */
+const 현황상한 = 50000;
+
 function runFindingStatusOverview(args: Record<string, string>): string {
   const filter = (args.filter ?? "").trim().toLowerCase();
-  const rows = prioritizedReviews(200);
+  // ⚠ **세는 것은 전부 세고, 보여 주는 것만 자른다.**
+  //   예전에는 prioritizedReviews(200)으로 200건만 가져와 그 수를 "취약점 200건"이라고
+  //   총계처럼 말했다. 2026-08-03에 잃었던 취약점 4,833건을 되살리자 **총계가 200에 멈춰**
+  //   그 거짓말이 드러났다. 담당자는 이 숫자로 임원 보고를 쓴다.
+  const rows = prioritizedReviews(현황상한);
   const matched = filter
     ? rows.filter((r) =>
         필터에맞나(
@@ -1329,8 +1384,10 @@ function runFindingStatusOverview(args: Record<string, string>): string {
     if (r.dueDate && r.dueDate < today && r.status === "pending") overdue++;
   }
 
+  // 훑는 상한에 닿았으면 그 수는 총계가 아니다 — "이상"이라고 적는다.
+  const 상한닿음 = rows.length >= 현황상한;
   const head =
-    `취약점 ${matched.length}건 — 미검토 ${byStatus.pending ?? 0}, 조치완료 ${byStatus.approved ?? 0}, 오탐 ${byStatus.rejected ?? 0}` +
+    `취약점 ${matched.length}${상한닿음 ? "건 이상(너무 많아 일부만 셌습니다)" : "건"} — 미검토 ${byStatus.pending ?? 0}, 조치완료 ${byStatus.approved ?? 0}, 오탐 ${byStatus.rejected ?? 0}` +
     ` / 담당자 미배정 ${unassigned}건, 기한 초과 ${overdue}건`;
 
   // ⚠ 예전에는 `[critical] vuln:10.10.20.41 … (pending, …)`을 그대로 냈다.
@@ -2162,6 +2219,53 @@ const TOOLS: AgentTool[] = [
     run: runSetComplianceStatus,
   },
   {
+    // ★ 2026-08-03 — 담당자 지적을 따라가다 발견한 데이터 소실의 복구 창구.
+    //   실패한 modelscan이 자산 46개에서 취약점 4,817건을 덮어썼고, 원본은 스캔 이력에 남아 있다.
+    //   덮어쓰기는 가드로 막혔지만 **이미 잃은 것을 되돌리는 길**이 없어 이 두 도구를 만들었다.
+    name: "lost_findings_status",
+    label: "잃은 취약점 현황",
+    domain: "assets",
+    write: false,
+    description:
+      '실패한 스캔에 덮여 사라진 취약점이 얼마나 되는지, 어느 자산에서 몇 건을 되찾을 수 있는지 보여준다. "취약점이 왜 0건이야?", "잃은 취약점 있어?", "스캔 결과가 사라졌어"에 쓴다. 예: {}',
+    directAnswer: true,
+    params: [],
+    run: async () => 잃은취약점현황글(),
+  },
+  {
+    name: "restore_lost_findings",
+    label: "잃은 취약점 되살리기",
+    domain: "assets",
+    write: true,
+    description:
+      '실패한 스캔에 덮여 사라진 취약점을 스캔 이력에서 되살린다. "잃은 취약점 되살려줘", "사라진 스캔 결과 복구해줘"에 쓴다. 자산 하나만 하려면 assetId를 준다. 예: {} 또는 {"assetId":"vuln:192.168.219.98"}',
+    params: [{ name: "assetId", label: "자산", description: "특정 자산만 되살릴 때 (비우면 전체)", required: false }],
+    // 결재판에 뜨는 글 — **무엇이 얼마나 바뀌는지 숫자로** 보여 준다. "복구합니다"만으론 승인할 수 없다.
+    effect: (args) => {
+      const 후보 = 잃은취약점찾기().filter((c) => !args.assetId || c.assetId === args.assetId || c.이름 === args.assetId);
+      if (후보.length === 0) return "되살릴 것이 없습니다 — 잃은 취약점을 찾지 못했습니다.";
+      const 총건 = 후보.reduce((n, c) => n + c.되찾을건수, 0);
+      const 가장오래된 = new Date(Math.min(...후보.map((c) => c.스캔시각))).toISOString().slice(0, 10);
+      return `자산 ${후보.length}개에 취약점 ${총건}건을 되살립니다 — ${가장오래된} 이후 스캔 이력에 남아 있던 그대로입니다(지금 다시 스캔한 것이 아닙니다). 기존 스캔 실패 기록은 지우지 않고 함께 남깁니다.`;
+    },
+    undo: "되살리기 전 상태는 스캔 이력에 그대로 남아 있어 되짚을 수 있습니다.",
+    run: async (args: Record<string, string>) => {
+      const ids = args.assetId
+        ? 잃은취약점찾기().filter((c) => c.assetId === args.assetId || c.이름 === args.assetId).map((c) => c.assetId)
+        : undefined;
+      if (args.assetId && ids && ids.length === 0) {
+        return `"${args.assetId}"에서 되살릴 취약점을 찾지 못했습니다 — "잃은 취약점 있어?"로 먼저 확인해 주세요.`;
+      }
+      const r = 되살리기(ids);
+      if (r.되살린자산 === 0) return "되살릴 것이 없었습니다.";
+      return (
+        `취약점 ${r.되살린건수}건을 자산 ${r.되살린자산}개에 되살렸습니다.` +
+        (r.건너뛴자산 ? ` (${r.건너뛴자산}개는 이력을 읽지 못해 건너뛰었습니다)` : "") +
+        `\n${표식.주의} 되살린 것은 **그때 스캔한 결과**입니다 — 그 사이 조치했다면 재스캔으로 확인해 주세요.`
+      );
+    },
+  },
+  {
     name: "report_schedule_list",
     label: "정기 리포트 스케줄 조회",
     domain: "report",
@@ -2733,7 +2837,7 @@ const TOOLS: AgentTool[] = [
     domain: "assets",
     write: false,
     description:
-      'AI·IT 자산 목록을 보여준다 (개수·이름·유형·담당자·finding 요약). 종류나 이름으로 좁힐 수 있다 — 예: {"query":"방화벽"}, {"query":"LLM 서비스"}. 비우면 전체.',
+      'AI·IT 자산 목록을 보여준다 (개수·이름·유형·담당자·finding 요약). 이름·유형·서비스·구성요소, 그리고 그 자산이 들어온 점검 파일 이름으로 좁힐 수 있다 — 예: {"query":"방화벽"}, {"query":"LLM 서비스"}, {"query":"oracle"}. 비우면 전체.',
     // ⚠ 즉답이다(2026-08-03). 예전에는 LLM이 다시 썼는데, "우리 자산 몇 대야?"에
     //   머리줄(`등록된 AI 자산 57개 · 아래는 15개입니다`)과 「다음 걸음」을 날리고
     //   `등록된 AI 자산 총 57개입니다.` 한 줄만 남겼다 — **개수를 물었는데 잘림 고지가 사라졌다.**

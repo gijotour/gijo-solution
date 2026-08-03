@@ -12,6 +12,13 @@ vi.mock("../src/engine/llm", () => ({
 const mockRunAdapter = vi.fn();
 vi.mock("../src/engine/bridge", () => ({
   runAdapter: (...args: unknown[]) => mockRunAdapter(...args),
+  // 2026-08-03: dispatcher가 runAdapter를 직접 부르지 않고 모델스캔()을 거치게 바뀌었다
+  //   (안 맞는 자산에 파이썬을 띄우지 않으려고). 여기 모의가 그 함수를 안 가지고 있어
+  //   스캔이 통째로 조용히 죽었고 이 시험이 잡았다.
+  // ⚠ 여기서는 **대상 판정을 통과한 것으로 두고** 경로 전달만 본다. 판정 자체(IP 호스트는
+  //   제외, 모델 파일은 통과)는 findingsrestore.test.ts가 진짜 함수로 확인한다.
+  모델스캔대상인가: () => true,
+  모델스캔: (assetPath: string) => mockRunAdapter("modelscan", assetPath),
   listAdapters: () => [{ id: "modelscan", name: "ModelScan" }],
   registerBridgeRoutes: vi.fn(),
 }));

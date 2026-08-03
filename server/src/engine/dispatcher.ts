@@ -15,7 +15,7 @@ import { createTask, completeTask, updateTaskPriority, listTasks, TaskItem } fro
 import { buildMyWork } from "./mywork";
 import { setAgentStatus, resetAgentToDefault, getAgentById } from "./agents";
 import { emitCollaboration } from "./collaboration";
-import { runAdapter, StandardFinding } from "./bridge";
+import { 모델스캔, StandardFinding } from "./bridge";
 import { chat } from "./llm";
 import { isNonLearningAccount } from "./learnpolicy";
 import type { Viewer } from "./memory";
@@ -277,9 +277,7 @@ async function executeRoutedAction(route: RoutedIntent, instructionText: string,
     case "scan": {
       const assetId = route.targetAssetId ?? "unknown-asset";
       const scanPath = getAsset(assetId)?.path ?? assetId;
-      const findings = await runAdapter("modelscan", scanPath).catch((err) => [
-        { finding_type: "scan_error", severity: "low" as const, evidence: String(err), source_tool: "modelscan" },
-      ]);
+      const findings = await 모델스캔(scanPath);
       recordFindings(assetId, findings);
       const analysis = await analyzeFindings(findings);
       return { output: analysis.summary, findings };
@@ -374,9 +372,7 @@ async function runOrchestration(instructionText: string, steps: OrchestrationSte
         let count = 0;
         for (const assetId of assetIds) {
           const scanPath = getAsset(assetId)?.path ?? assetId;
-          const findings = await runAdapter("modelscan", scanPath).catch((err) => [
-            { finding_type: "scan_error", severity: "low" as const, evidence: String(err), source_tool: "modelscan" },
-          ]);
+          const findings = await 모델스캔(scanPath);
           recordFindings(assetId, findings);
           accumulated.push(...findings);
           scannedAssetIds.add(assetId);
