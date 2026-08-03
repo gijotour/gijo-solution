@@ -30,7 +30,7 @@ import { findHowTo, howToMarkdown } from "./howto";
 import { buildFindingPicks, parsePickCommand, pickToolArgs, isFindingListAsk, findingListAnswer, isMyWorkAsk, myWorkAnswer, stripPickMarks, PickList } from "./picklist";
 import { isOutOfScope, outOfScopeAnswer, isTooVague, vagueAnswer, 한낱말되묻기 } from "./scopeguard";
 import { analyzeFindings } from "./analysis";
-import { recordFindings, getAsset, listAssets } from "./assets";
+import { recordFindings, getAsset, listAssets, 자산표시이름 } from "./assets";
 import { listFindings } from "./cti";
 import { matchCtiToAssets } from "./ctimatch";
 import { generateReport } from "./report";
@@ -137,7 +137,15 @@ const ACTION_PATTERNS: { action: OrchestrationStep["action"]; re: RegExp }[] = [
 // 지시문에서 스캔 대상 범위를 해석한다.
 function resolveScopeFromText(text: string): StepScope {
   if (/cti/i.test(text) && /영향|관련|매칭|affected/i.test(text)) return { type: "cti-affected" };
-  const mentioned = listAssets().find((a) => text.includes(a.id) || text.includes(a.name));
+  // ⚠ **내부 표식을 뗀 꼴도 받는다.** 실측(2026-08-03 게이트): "sample-web01 스캔하고 리포트까지"가
+  //   대상을 못 찾아 **전체 자산(57개)**으로 번졌다 — 실제 id가 `vuln:sample-web01`이라
+  //   글자 그대로는 안 걸렸기 때문이다. 그래서 43초면 될 일이 **190초**가 됐고,
+  //   게이트는 이 문항을 **5판 연속 「측정 못 함」**으로 버렸다(30초 넘어 리포트로 전환).
+  //   담당자가 화면에서 보는 글자는 이름이고, 내부 키를 그대로 칠 이유가 없다.
+  const 벗김 = (s: string) => s.replace(/^(vuln|asset|finding|task):/, "");
+  const mentioned = listAssets().find(
+    (a) => text.includes(a.id) || text.includes(a.name) || (벗김(a.id).length >= 4 && text.includes(벗김(a.id)))
+  );
   if (mentioned) return { type: "asset", assetId: mentioned.id };
   return { type: "all-assets" };
 }
@@ -376,7 +384,8 @@ async function runOrchestration(instructionText: string, steps: OrchestrationSte
         }
         findingCount = count;
         output = assetIds.length
-          ? `${assetIds.length}개 자산 스캔 완료 — finding ${count}건 (${assetIds.join(", ")})`
+          // ⚠ 내부 id를 그대로 내지 않는다 — 사람이 읽는 글자가 아니다(말투 규범).
+          ? `${assetIds.length}개 자산 스캔 완료 — 발견 ${count}건 (${assetIds.map(자산표시이름).join(", ")})`
           : "스캔 대상 자산이 없습니다.";
       } else if (step.action === "analyze") {
         output = accumulated.length
