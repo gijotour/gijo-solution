@@ -640,6 +640,16 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }
     tool: "today",
     args: {},
   },
+  // 자산을 등록하겠다 — 실측(2026-08-03 서랍 점검): `register_asset`이 있는데 안 불려
+  //   **Tenable Security Center 로그인 → Explore > Assets…** 남의 제품 매뉴얼 절차를 답했다.
+  //   우리 제품에서 등록하는 법을 물었는데 벤더 문서를 읽어 준 것이다.
+  // ⚠ 쓰기 도구라 결재판이 뜬다 — 이름·경로가 없으면 결재판이 빈 칸을 되묻는다(그게 맞는 흐름).
+  // ⚠ "자산 목록"·"자산 몇 개"(조회)와 갈라야 한다 — **등록 의사**를 밝힌 말만 잡는다.
+  {
+    re: /(자산|장비|서버|모델)\s*(을|를)?\s*(새로\s*)?(등록|추가)(할게|하고\s*싶|해\s*줘|해줘|하려|할래|하자)|(새|신규)\s*(자산|장비|서버|모델)\s*(등록|추가)/,
+    tool: "register_asset",
+    args: {},
+  },
   // 스캔 결과가 **언제** 들어왔나 — 실측(2026-08-03): 30초를 쓰고
   //   "이 자산에서 발견된 1개 취약점 중…"이라고 답했다. **언제를 물었는데 무엇을 답했다.**
   //   숫자가 언제 것인지 모르면 그 숫자로 보고를 쓸 수 없다.
@@ -878,6 +888,19 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
   const forced = forcedToolFor(instruction, scope);
   if (forced) {
     const tool = findAgentTool(forced.tool);
+    // ⚠ **쓰기 도구는 강제로 실행하지 않는다** — 그건 사람 확인 없이 상태를 바꾸는 일이다.
+    //   대신 **결재판을 띄운다**: 무엇을 할지 보여주고 빈 칸을 되묻는 것까지가 결재판 몫이다.
+    //   실측(2026-08-03 서랍 점검): "새 자산 등록할게"가 여기서 조용히 빠져나가
+    //   LLM에게 갔고, **Tenable Security Center 로그인 → Explore > Assets** 남의 제품
+    //   매뉴얼 절차를 답했다. 도구도 규칙도 있는데 **실행 문턱에서 새고 있었다.**
+    if (tool?.write) {
+      reportProgress("review", `${tool.label} — 확인을 받습니다`);
+      return {
+        output: `${tool.label}을(를) 진행합니다 — 아래 내용을 확인하고 승인해 주세요.`,
+        toolCalls: [],
+        approval: buildApproval(tool, forced.args, instruction, ""),
+      };
+    }
     if (tool && !tool.write) {
       try {
         reportProgress("tools", `${tool.label} 실행 중`);
