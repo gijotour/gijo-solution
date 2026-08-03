@@ -188,3 +188,29 @@ describe("assets", () => {
     expect((await request(app).patch("/api/assets/c1/category").send({ category: "x" })).status).toBe(401);
   });
 });
+
+// ── 목록 응답 크기 — [2026-08-03 실측: 14.69MB 중 93%가 화면이 안 읽는 이력이었다] ──
+describe("자산 목록은 스캔 이력을 싣지 않는다", () => {
+  let app: ReturnType<typeof createApp>;
+  let token: string;
+  beforeEach(async () => {
+    resetAssetsForTests();
+    app = createApp();
+    token = await login(app);
+  });
+
+  it("★ 목록에는 scanHistory가 없고, 몇 번 점검했는지만 남는다", async () => {
+    await request(app).post("/api/assets").set("Authorization", `Bearer ${token}`).send({ id: "list-slim", name: "슬림", path: "p" });
+    const list = await request(app).get("/api/assets").set("Authorization", `Bearer ${token}`);
+    const row = (list.body as Record<string, unknown>[]).find((a) => a.id === "list-slim")!;
+    expect(row, "자산이 목록에 있어야 이 시험이 뜻이 있다").toBeTruthy();
+    expect(row.scanHistory, "이력을 목록에 실으면 담당자 PC가 13MB를 받아 버린다").toBeUndefined();
+    expect(typeof row.scanCount, "몇 번 점검했는지는 남긴다 — 없애면 이력이 없다로 읽힌다").toBe("number");
+  });
+
+  it("⚠ 상세 조회에서는 그대로 준다 — 거기서는 이력이 뜻이 있다", async () => {
+    await request(app).post("/api/assets").set("Authorization", `Bearer ${token}`).send({ id: "detail-full", name: "상세", path: "p" });
+    const one = await request(app).get("/api/assets/detail-full").set("Authorization", `Bearer ${token}`);
+    expect(Array.isArray(one.body.scanHistory), "상세는 이력을 그대로 준다").toBe(true);
+  });
+});

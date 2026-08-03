@@ -541,8 +541,25 @@ export function seedSampleVulnHostIfEmpty(): void {
 }
 seedSampleVulnHostIfEmpty();
 
+/**
+ * 목록에서 스캔 이력을 뺀다 — **화면이 읽지도 않는 13.65MB였다.**
+ *
+ * ★ 실측(2026-08-03): 잃었던 취약점 4,833건을 되살리자 `/api/assets` 응답이 **14.69MB**가 됐고,
+ *   그중 **93%가 scanHistory**였다. 클라이언트 코드 전체를 뒤져도 scanHistory를 읽는 곳은
+ *   한 군데도 없다(서버 안에서만 쓴다 — 되살리기·KPI 추이).
+ *   담당자 PC는 그 13MB를 받아 JSON으로 풀고 버린다.
+ *
+ * ⚠ **상세 조회(/api/assets/:id)에서는 빼지 않는다.** 거기서는 이력이 뜻이 있고,
+ *   assets.test.ts가 그 계약을 지킨다. 목록에는 **몇 번 점검했는지**만 남긴다 —
+ *   숫자를 통째로 없애면 "이력이 없다"로 읽힌다.
+ */
+function 목록용(a: Asset): Omit<Asset, "scanHistory"> & { scanCount: number } {
+  const { scanHistory, ...나머지 } = a;
+  return { ...나머지, scanCount: scanHistory.length };
+}
+
 export function registerAssetsRoutes(app: Express): void {
-  app.get("/api/assets", authMiddleware, (_req, res) => res.json(listAssets()));
+  app.get("/api/assets", authMiddleware, (_req, res) => res.json(listAssets().map(목록용)));
   // :id 라우트보다 먼저 — 뒤에 두면 "coverage"가 자산 id로 잡힌다.
   app.get("/api/assets/coverage", authMiddleware, (_req, res) => res.json(computeAssetCoverage(listAssets())));
   app.get("/api/assets/:id", authMiddleware, (req, res) => {
