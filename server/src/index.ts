@@ -30,9 +30,14 @@ import { bootstrapDocsBundleWithRetry } from "./engine/docsbundle";
 import { ensureKnowledgeBundle } from "./engine/knowledgebundle";
 import { bootSmtpInboundIfEnabled, stopSmtpInbound } from "./engine/smtpinbound";
 import { closeHttpServer } from "./util/gracefulClose";
+import { installAirgapGuard } from "./engine/airgap";
 
 // 가능한 한 이른 시점에 설치해야 이후의 console.log/warn/error가 전부 캡처된다.
 installConsoleCapture();
+
+// 에어갭 봉인(후-4) — **어떤 fetch보다 먼저** 관문을 설치한다. 이 아래로 도는 KEV 갱신·모델
+// 다운로드·클라우드 LLM 등 모든 외부 요청이 이 관문을 지난다(GIJO_AIRGAP=1일 때 전량 차단).
+installAirgapGuard();
 
 const PORT = Number(process.env.GIJO_SERVER_PORT ?? 4000);
 

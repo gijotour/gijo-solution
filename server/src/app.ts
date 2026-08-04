@@ -8,6 +8,7 @@ import { schemaVersion } from "./db";
 import { registerAuthRoutes } from "./auth/auth";
 import { registerMfaRoutes } from "./auth/mfaroutes";
 import { registerUsersRoutes } from "./auth/users";
+import { isAirgapOn, EGRESS_POINTS } from "./engine/airgap";
 import { registerAgentsRoutes } from "./engine/agents";
 import { registerAssetsRoutes } from "./engine/assets";
 import { registerAssetImportRoutes } from "./engine/assetimport";
@@ -229,7 +230,9 @@ export function createApp(): Express {
   // serverTime: 2차 인증 6자리는 **시계**로 만들어진다 — 휴대폰과 서버 시각이 어긋나면 아무도
   // 못 들어온다. 로그인 화면이 아직 인증 전이라 이 무인증 응답으로 서버 시각을 비교해 보여준다.
   app.get("/api/health", (_req, res) =>
-    res.json({ ok: true, service: "gijo-as-server", schema: schemaVersion(), serverTime: Date.now() })
+    // 에어갭 봉인 상태를 헬스에 실어 **보이게** 한다(후-4) — 기밀 배치 관리자가 "봉인됐나"를
+    //   설정을 믿지 않고 확인할 수 있게. 상세(대체 안내)는 대화창 「에어갭 상태」가 답한다.
+    res.json({ ok: true, service: "gijo-as-server", schema: schemaVersion(), serverTime: Date.now(), airgap: { on: isAirgapOn(), egressPoints: EGRESS_POINTS.length } })
   );
 
   return app;

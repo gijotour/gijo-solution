@@ -65,6 +65,7 @@ import { getGuide as 가이드가져오기 } from "./workguide";
 import { getScreenGuide } from "./screenguide";
 // 지식 번들(후-3 구독화) — 지금 실린 지식이 언제 기준인지 보기 + 대기 폴더 번들 반입.
 import { getBundleStatus, listInboxBundles, importBundleFromInbox, KNOWLEDGE_BUNDLE_VERSION } from "./knowledgebundle";
+import { airgapStatus } from "./airgap";
 import { currentViewer } from "./viewerctx";
 import { findUserById } from "../auth/users";
 
@@ -2579,6 +2580,28 @@ async function runKnowledgeBundleImport(args: Record<string, string>): Promise<s
   ].filter(Boolean).join("\n");
 }
 
+// ── 에어갭 봉인 상태 (후-4 v1) ─────────────────────────────────────────────
+// "인터넷으로 나가는 길이 전부 막혔나"를 담당자가 설정을 믿지 않고 대화창에서 확인한다.
+async function runAirgapStatus(): Promise<string> {
+  const s = airgapStatus();
+  const lines: string[] = [];
+  if (s.on) {
+    lines.push("에어갭 봉인: 🔒 ON — 인터넷으로 나가는 길이 전부 막혀 있습니다.");
+    lines.push(`· 봉인한 외부 통로 ${s.points.length}종 · 봉인 후 차단된 시도 ${s.blockedCount}건`);
+  } else {
+    lines.push("에어갭 봉인: 열림 — 외부 통로가 열려 있는 일반 배치입니다.");
+    lines.push("(기밀·방산 폐쇄망은 서버를 GIJO_AIRGAP=1로 띄워 봉인합니다.)");
+  }
+  lines.push("");
+  lines.push("외부로 나갈 수 있는 통로와 에어갭에서의 대체:");
+  for (const p of s.points) lines.push(`· ${p.label}(${p.host}) → ${p.대체}`);
+  if (s.allow.length) {
+    lines.push("");
+    lines.push(`명시 허용된 내부 호스트: ${s.allow.join(", ")}`);
+  }
+  return lines.join("\n");
+}
+
 // ── 레지스트리 ──────────────────────────────────────────────────────────
 
 const TOOLS: AgentTool[] = [
@@ -3093,6 +3116,19 @@ const TOOLS: AgentTool[] = [
     },
     undo: "이전 버전 번들을 다시 반입하면 되돌아갑니다(번들은 출처별 교체라 멱등합니다).",
     run: runKnowledgeBundleImport,
+  },
+  {
+    // 에어갭 봉인 현황(후-4) — 인터넷으로 나가는 길이 전부 막혔는지 대화창에서 확인.
+    name: "airgap_status",
+    label: "에어갭 봉인 현황",
+    domain: "cross",
+    write: false,
+    description:
+      '이 서버가 인터넷과 완전히 분리(에어갭) 봉인됐는지와, 외부로 나갈 수 있는 통로·에어갭에서의 대체를 본다. ' +
+      '"에어갭 상태", "인터넷 막혀 있어?", "외부로 나가는 거 있어?", "봉인 상태" 같은 물음에 쓴다.',
+    params: [],
+    directAnswer: true,
+    run: runAirgapStatus,
   },
   {
     // 도구가 하나도 없던 화면들을 메운다(2026-07-27 공백 점검) — 기록은 이미 쌓여 있는데
