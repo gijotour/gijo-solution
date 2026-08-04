@@ -104,6 +104,15 @@ async function main() {
     hardeningTargets: await g("/api/hardening/targets"),
     hardeningSchedules: await g("/api/hardening/schedules"),
     hardeningRuns: await g("/api/hardening/runs"),
+    // ★ 2026-08-04 새로 찍는 화면(작업 세션·리포트)의 백데이터.
+    //   ⚠ 데이터를 안 채우면 **빈 화면이 찍힌다.** 빈 화면을 제안 자료에 넣는 것은
+    //     없느니만 못하다 — 고객은 "이 기능은 아무것도 없나 보다"로 읽는다.
+    //   ⚠ 경로는 **apiClient.ts에서 확인한 것**을 쓴다. 처음엔 이름만 보고
+    //     `/api/work-sessions/patterns`·`/api/reports`로 적었는데 둘 다 없는 주소였다
+    //     (앞의 것은 `:id` 라우트에 걸려 "세션 없음"이 온다 — 조용히 빈 화면이 된다).
+    workSessions: await g("/api/work-sessions"),
+    sessionPatterns: await g("/api/session-patterns?days=30"),
+    reportHistory: await g("/api/report/history"),
   };
 
   // 브라우저에 주입할 window.gijo 스텁(읽기=주입 데이터 반환, 쓰기/구독=no-op). 페이지 스크립트보다 먼저 실행.
@@ -169,6 +178,12 @@ async function main() {
       hardeningTargets: { list: () => R(DATA.hardeningTargets) },
       hardeningSchedules: { list: () => R(DATA.hardeningSchedules) },
       hardeningRuns: () => R(DATA.hardeningRuns),
+      // ★ 2026-08-04 새로 찍는 화면(작업 세션·리포트).
+      //   ⚠ 아래 Proxy가 모르는 함수에 **빈 배열**을 돌려주므로, 안 적으면 화면이 깨지지 않고
+      //     **조용히 비어 보인다.** 빈 화면을 제안 자료에 넣으면 "이 기능은 아무것도 없나 보다"가 된다.
+      listWorkSessions: () => R(DATA.workSessions || []),
+      sessionPatterns: () => R(DATA.sessionPatterns || {}),
+      listReportHistory: () => R(DATA.reportHistory || []),
       onCollaborationEvent: noop,
       // 터미널 화면 — 실제 로컬 셸 스폰 없이 빈 상태(대기 화면)만 보여준다.
       terminal: {
