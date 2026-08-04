@@ -152,6 +152,23 @@ describe("⑥ 「위험도 높은 자산 알려줘」가 29자 — 목록을 물
   });
 });
 
+describe("⑦ 「KEV 걸린 거 있어?」 40초 — 「몇 건」이 없으면 세는 질문을 비켰다 (4차)", () => {
+  const loop = 읽기("engine/agentloop.ts");
+  it("★ KEV 걸린/잡힌/뜬 + 있어/없어 꼴이 세는 질문으로 간다", () => {
+    const m = loop.match(/re:\s*(\/\(미배정[^\n]+\/i),\s*\n\s*tool:\s*"finding_status"/);
+    expect(m, "finding_status 규칙을 못 찾았다").toBeTruthy();
+    const re = eval(m![1]) as RegExp;
+    expect(re.test("KEV 걸린 거 있어?")).toBe(true);
+    expect(re.test("kev 뜬 것 없어?")).toBe(true);
+    expect(re.test("미배정 몇 건이야?"), "기존 물음 그대로").toBe(true);
+  });
+  it("★★ 시연 대본을 가로채지 않는다 — 「KEV 등재 … 지침이 뭐야?」는 지식 질문이다", () => {
+    const m = loop.match(/re:\s*(\/\(미배정[^\n]+\/i),\s*\n\s*tool:\s*"finding_status"/);
+    const re = eval(m![1]) as RegExp;
+    expect(re.test("KEV 등재 취약점 조치 기한 근거 지침이 뭐야?"), "시연 ③ 대본 문항").toBe(false);
+  });
+});
+
 describe("「이 화면 설명해줘」 — 앱이 유도하는 말이 함수에 안 걸렸다 (게이트가 잡음)", () => {
   it("★★ 이 화면 설명해줘/안내해줘가 화면안내로 간다", async () => {
     const { isHelpIntent } = await import("../src/engine/screenguide");
