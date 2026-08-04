@@ -493,7 +493,10 @@ export async function 내할일완료말(text: string): Promise<string | null> {
   return (await 내할일이름인가(말)) ? 말 : null;
 }
 
-const REMEDIATION_INTENT_RE =/(조치|대응|remediat|패치|수정)\s*(방법|절차|어떻게|가이드|플레이북|playbook)|어떻게\s*(조치|대응|패치|고쳐|해결)|대응\s*방안/i;
+// ★ 2026-08-04: **제품이 「조치 검증 결과 알려줘」라고 안내해 놓고** 그 말이 여기 안 걸렸다
+//   (안내 문구 전수 점검에서 발견). 「검증」 갈래를 더한다 — 우리가 시킨 대로 친 말은
+//   회차마다 답이 달라지면 안 된다.
+const REMEDIATION_INTENT_RE =/(조치|대응|remediat|패치|수정)\s*(방법|절차|어떻게|가이드|플레이북|playbook)|어떻게\s*(조치|대응|패치|고쳐|해결)|대응\s*방안|조치\s*검증|(고친|조치한)\s*(거|것)\s*(확인|검증)|검증\s*결과/i;
 // "Shadow AI/미등록 AI/비인가 모델 점검·확인"
 const SHADOW_AI_INTENT_RE = /shadow\s*ai|미등록\s*(ai|모델|엘엘엠|llm)|비인가\s*(ai|모델)|섀도우|(등록\s*안\s*된|등록되지\s*않은)\s*(ai|모델)/i;
 // "공격 경로 / 도달성 / 측면 이동" 분석
