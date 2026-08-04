@@ -1211,10 +1211,17 @@ export function registerDispatcherRoutes(app: Express): void {
       const task = mkTask(undefined, { text: `[승인 실행] ${toolName}`, agentId: "orchestrator", priority: "P2" });
       setAgentStatus("orchestrator", "working");
       collab(undefined, { from: "orchestrator", to: "orchestrator", message: `승인됨 — ${toolName} 실행` });
-      const actor = (req as Request & { user?: GijoUser }).user?.displayName ?? null;
+      const user = (req as Request & { user?: GijoUser }).user;
+      const actor = user?.displayName ?? null;
       try {
         const undoBefore = undoSnapshot(); // #7: 실행 전 상태 스냅샷(원클릭 undo용)
-        const output = await executeApprovedTool(toolName, args);
+        // 승인 실행도 **누가 승인했는지**를 실어 나른다(viewerctx) — 도구 내부 감사·등급 필터가
+        //   실행자를 알게. 지식 번들 반입처럼 공급망에 닿는 쓰기는 사람 이름이 특히 중요하다
+        //   (2026-08-04 자체 검토: 없으면 도구 내부 감사가 '담당자(대화창)' 일반값으로 남았다).
+        const output = await runWithViewer(
+          { userId: user?.id, clearance: user?.clearance },
+          () => executeApprovedTool(toolName, args)
+        );
         const undoId = undoCommit(toolName, output.slice(0, 50), undoBefore); // 변화 있으면 되돌리기 항목 등록
         collab(undefined, { from: "orchestrator", to: "orchestrator", message: `실행 완료: ${collabNote(output)}` });
         // 작업 기록(감사 로그) — 승인된 쓰기 실행을 남긴다(챗봇 제안 → 사람 승인).
