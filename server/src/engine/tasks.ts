@@ -92,7 +92,21 @@ export function createTask(args: {
   recur?: TaskItem["recur"];
   origin?: TaskItem["origin"];
   guideKey?: string;
+  /** 같은 일이 이미 있어도 새로 만든다(되풀이 일정처럼 일부러 여러 건이 필요한 경우). */
+  중복허용?: boolean;
 }): TaskItem {
+  // ★ 2026-08-04 실화면에서 발견: 대시보드 「오늘 할 일」에 **같은 줄이 2~4개**씩 있었다.
+  //   「기한 지난 유지보수 점검 6건 수행」 ×3 · 「FOCS 메뉴얼 ver1 2 정기점검」 ×4 …
+  //   원인은 「＋ 할 일로 담기」를 누를 때마다 무조건 새로 만든 것. 담당자는 자기가
+  //   담았는지 기억하지 못해 다시 누르고, 목록은 같은 줄로 불어난다 — 그러면 목록 자체를
+  //   안 믿게 된다(파트너 지적 「한꺼번에 너무 많은 정보」와 같은 병이다).
+  // ⚠ **끝난 일과는 견주지 않는다.** 지난주에 끝낸 「주간 점검」을 이번 주에 다시 담는 것은
+  //   중복이 아니라 정상이다. 아직 안 끝난 같은 일이 있을 때만 그것을 돌려준다.
+  const 글 = args.text.trim();
+  if (!args.중복허용 && 글) {
+    const 이미 = listTasks({ includeAgentRuns: true }).find((t) => !t.done && t.text.trim() === 글);
+    if (이미) return 이미;
+  }
   // 가이드는 명시하지 않으면 문장·참조로 고른다 — 담당자가 "무슨 유형인지" 고를 필요가 없게.
   // 확신이 없으면 guessGuideKey가 null을 준다(엉뚱한 가이드보다 없는 편이 낫다).
   const guideKey = args.guideKey ?? guessGuideKey(args.text, args.ref) ?? undefined;
@@ -175,6 +189,9 @@ export function nextRecurrence(t: TaskItem, now = Date.now()): TaskItem | null {
     recur: t.recur,
     origin: t.origin,
     guideKey: t.guideKey,
+    // ⚠ 되풀이 일정은 **일부러 다음 회차를 만드는 것**이다 — 중복 막이에 걸리면
+    //   이번 주 것을 끝내도 다음 주 것이 안 생긴다(기능이 조용히 죽는다).
+    중복허용: true,
   });
 }
 
@@ -348,7 +365,12 @@ export function registerTasksRoutes(app: Express): void {
     // 대시보드에서 직접 입력한 일과는 학습 신호로 기록 — 다음 추천 가이드에 반영된다.
     if (b.routineFeedback) recordRoutineFeedback(String(b.text).trim());
     const priority = ["P0", "P1", "P2", "P3"].includes(b.priority as string) ? b.priority : undefined;
-    res.json(createTask({ text: String(b.text), priority, dueAt: typeof b.dueAt === "number" ? b.dueAt : undefined, assignee: b.assignee, ref: b.ref }));
+    // ★ 이미 있던 일을 돌려받았는지 알려 준다(2026-08-04). 화면이 그냥 "담았습니다"라고 하면
+    //   담당자는 아무 일도 안 일어난 줄 알고 또 누른다 — 같은 줄이 4개까지 불어난 원인이다.
+    const 전 = listTasks({ includeAgentRuns: true }).length;
+    const 일 = createTask({ text: String(b.text), priority, dueAt: typeof b.dueAt === "number" ? b.dueAt : undefined, assignee: b.assignee, ref: b.ref });
+    const 이미있었다 = listTasks({ includeAgentRuns: true }).length === 전;
+    res.json({ ...일, 이미있었다 });
   });
   // completeTask는 디스패처를 위해 실행 기록까지 돌려준다 — 화면에 줄 땐 거른다.
   app.post("/api/tasks/:id/complete", authMiddleware, (req, res) => {

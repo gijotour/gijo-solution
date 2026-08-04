@@ -147,7 +147,10 @@
           padding:4px 10px;font-size:12.25px;font-weight:700;cursor:pointer;font-family:inherit;flex:0 0 auto;}
   .gst-go:hover{border-color:var(--blue);color:#fff;}
   .gst.done .gst-go{opacity:.55;}
-  .g-foot{padding:10px 15px;border-top:1px solid var(--border);font-size:12.25px;color:var(--muted-2);display:flex;align-items:center;gap:10px;}
+  /* ⚠ 접혀 있으면 꼬리말도 같이 감춘다(2026-08-04). 단계가 안 보이는데 "각 단계를 누르면
+     실제로 실행됩니다"만 남으면 무슨 말인지 알 수 없고, 접은 보람도 45px 줄어든다. */
+  .g-foot{display:none;padding:10px 15px;border-top:1px solid var(--border);font-size:12.25px;color:var(--muted-2);align-items:center;gap:10px;}
+  .guide.open .g-foot{display:flex;}
   .g-foot button{margin-left:auto;background:transparent;border:1px solid rgba(255,255,255,.16);color:var(--muted);
           border-radius:7px;padding:4px 10px;font-size:12.25px;font-weight:700;cursor:pointer;font-family:inherit;}
   .g-done{display:flex;align-items:center;gap:8px;padding:11px 15px;font-size:12px;color:var(--teal);}
@@ -713,13 +716,16 @@
   // 첫 표시 여부 — 담당자가 손으로 접었으면 그 선택을 존중한다.
   // 예전 온보딩을 이미 다 끝낸 사람은 제품을 아는 사람이므로 접힌 채로 시작한다.
   (function initGuide() {
-    var folded = false;
+    // ★ 2026-08-04 기본 접기(시안 first-screen-v1 · 파트너 지적 「모든 메뉴의 첫장은 너무
+    //   복잡해 보이지 않게」). 실측: 이 카드가 펼쳐져 있어 **「급한 것」 첫 줄이 894px**에
+    //   있었다(창 776px) — 담당자가 매일 보는 일감이 화면 밖으로 밀려났다.
+    //   ⚠ 감추는 것이 아니다. 접혀도 제목·진행 막대·「0/4」가 그대로 보이고 한 번 누르면
+    //     펼쳐진다 — 배지 없이 접으면 그건 접기가 아니라 삭제다.
+    //   ⚠ 한 번이라도 펼치거나 접은 사람의 선택(GUIDE_FOLD)은 그대로 존중한다.
+    var folded = true;
     try {
-      folded = localStorage.getItem(GUIDE_FOLD) === "1";
-      if (localStorage.getItem(GUIDE_FOLD) === null) {
-        var old = JSON.parse(localStorage.getItem("gijo:onboarding:checked") || "[]");
-        if (Array.isArray(old) && old.length >= 10) folded = true; // 옛 온보딩을 거의 다 끝낸 사람
-      }
+      var 저장 = localStorage.getItem(GUIDE_FOLD);
+      if (저장 !== null) folded = 저장 === "1";
     } catch (e) {}
     if (!folded) document.getElementById("guideCard").classList.add("open");
     renderGuide();

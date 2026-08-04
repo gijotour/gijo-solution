@@ -105,6 +105,21 @@ describe("③④ 절차 질문이 35초·33초 — 규칙에 없어 남의 제�
     }
   });
 
+  it("★★ 2차: 「단계·절차」라는 말을 안 쓴 절차 질문도 잡는다 (1차가 절반만 덮었다)", () => {
+    const m = loop.match(/re:\s*(\/\(단계\|절차\)[^\n]+\/),\s*\n\s*tool:\s*"workflow_status"/);
+    const re = eval(m![1]) as RegExp;
+    expect(re.test("우선순위 정하려면 뭘 봐야 해?"), "36초 걸리던 물음").toBe(true);
+    expect(re.test("조치까지 갔는데 그다음은?"), "33초").toBe(true);
+    expect(re.test("보고까지 끝내려면 뭐가 남았어?"), "34초").toBe(true);
+  });
+
+  it("★★ 남의 답을 빼앗지 않는다 — 「이 취약점 조치하려면?」은 그 건의 조치 절차다", () => {
+    const m = loop.match(/re:\s*(\/\(단계\|절차\)[^\n]+\/),\s*\n\s*tool:\s*"workflow_status"/);
+    const re = eval(m![1]) as RegExp;
+    expect(re.test("이 취약점 조치하려면?"), "절차 현황이 아니라 그 취약점의 조치법을 물었다").toBe(false);
+    expect(loop, "「하려면」을 넣으면 위 물음을 빼앗는다").not.toContain("|하려면|");
+  });
+
   it("⚠ 감시가 헛돌지 않는가 — 단계 판별이 **한 곳**에만 있어야 한다", () => {
     // 두 곳에서 가르면 반드시 어긋난다(절차 숫자를 한 곳에서 세는 것과 같은 이유).
     expect(tools).toContain("function 질문속단계");

@@ -350,8 +350,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         var 원래 = btn.textContent;
         btn.textContent = "담는 중…";
         try {
-          await window.gijo.addTask(it.task, { priority: it.p, ref: "maintenance.html" });
-          btn.textContent = "✓ 담김";
+          var r = await window.gijo.addTask(it.task, { priority: it.p, ref: "maintenance.html" });
+          // ★ 이미 담겨 있던 것이면 그렇게 말한다(2026-08-04). 그냥 "담김"이라고 하면
+          //   담당자는 새로 담긴 줄 알고, 다음에 또 눌러 같은 줄을 늘린다.
+          btn.textContent = r && r.이미있었다 ? "✓ 이미 담겨 있음" : "✓ 담김";
           btn.classList.remove("prim");
         } catch (e) {
           // 실패를 삼키면 담긴 줄 알고 넘어간다 — 버튼에 그대로 적는다.
