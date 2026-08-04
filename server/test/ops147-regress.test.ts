@@ -127,6 +127,31 @@ describe("③④ 절차 질문이 35초·33초 — 규칙에 없어 남의 제�
   });
 });
 
+describe("⑥ 「위험도 높은 자산 알려줘」가 29자 — 목록을 물었는데 한 건을 답했다", () => {
+  const loop = 읽기("engine/agentloop.ts");
+  const tools = 읽기("engine/agenttools.ts");
+  const re = /(위험도?\s*(높은|높음|큰)|고위험|위험한|위험\s*큰)\s*(ai\s*)?자산/i;
+
+  it("★ 고위험 자산 목록으로 간다", () => {
+    expect(loop).toMatch(/tool: "list_assets",\s*\n\s*args: \{ risk: "high" \}/);
+    expect(re.test("위험도 높은 자산 알려줘")).toBe(true);
+    expect(re.test("고위험 자산 뭐 있어?")).toBe(true);
+  });
+
+  it("★★ 「위험한 취약점」은 가로채지 않는다 — 자산 목록이 아니다", () => {
+    expect(re.test("위험한 취약점 알려줘"), "'자산'이라는 말이 있어야 한다").toBe(false);
+    expect(re.test("제일 위험한 거 하나만")).toBe(false);
+  });
+
+  it("★★ 등급 판정이 화면·KPI와 **같은 규칙**이다 — 어긋난 두 숫자는 둘 다 못 믿게 만든다", () => {
+    expect(tools).toContain("function 자산위험등급");
+    // kpi.ts riskCounts와 같은 규칙: critical/high → 고위험, medium → 중위험
+    expect(tools).toMatch(/sev\.has\("critical"\) \|\| sev\.has\("high"\)[\s\S]{0,40}return "high"/);
+    const kpi = 읽기("engine/kpi.ts");
+    expect(kpi, "KPI 쪽 규칙이 바뀌면 이 시험이 알려 준다").toMatch(/sev\.has\("critical"\) \|\| sev\.has\("high"\)/);
+  });
+});
+
 describe("지적함 2건 — 규칙이 없어 모델이 매번 다르게 골랐다 (2026-08-04)", () => {
   const loop = 읽기("engine/agentloop.ts");
   const 규칙 = (tool: string): RegExp => {

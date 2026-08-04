@@ -209,9 +209,50 @@ function findingSummary(asset: Asset): string {
 /** 한 번에 보여 주는 자산 수. 넘으면 **잘랐다고 밝힌다.** */
 const 보여줄자산 = 15;
 
+/**
+ * 자산 위험 등급 — **자산 화면·KPI와 같은 규칙**이다(kpi.ts riskCounts).
+ * critical/high가 하나라도 있으면 고위험 · medium만 있으면 중위험 · 그 밖은 저위험.
+ * ⚠ 여기서 제 나름대로 세면 화면은 「고위험 27」인데 대화창은 다른 수를 말하게 된다 —
+ *   어긋난 두 숫자는 **둘 다** 못 믿게 만든다.
+ */
+function 자산위험등급(a: { findings: { severity: string }[] }): "high" | "medium" | "low" {
+  const sev = new Set((a.findings ?? []).map((f) => f.severity));
+  if (sev.has("critical") || sev.has("high")) return "high";
+  if (sev.has("medium")) return "medium";
+  return "low";
+}
+
 function runListAssets(args: Record<string, string> = {}): string {
   const all = listAssets();
   if (all.length === 0) return "등록된 AI 자산이 없습니다.";
+
+  // ★ 2026-08-04 147상황: 「위험도 높은 자산 알려줘」가 **자산 한 건**을 답했다
+  //   ("이 자산에서 발견된 1개 취약점은 낮은 심각도입니다" — 29자). 목록을 물었는데
+  //   단건 도구로 갔다. 등급으로 좁히는 길을 아예 만들어 둔다.
+  const 등급 = String(args.risk ?? "").trim().toLowerCase();
+  if (등급 === "high" || 등급 === "medium" || 등급 === "low") {
+    const 이름 = { high: "고위험", medium: "중위험", low: "저위험" }[등급]!;
+    const 걸린것 = all.filter((a) => 자산위험등급(a) === 등급);
+    if (!걸린것.length) {
+      return `${이름} 자산이 없습니다 (전체 ${all.length}개). ` +
+        `${표식.다음} 전체를 보시려면 "자산 목록 보여줘"라고 하세요.`;
+    }
+    // 심각한 것이 많은 순으로 — 같은 등급 안에서도 먼저 볼 것이 있다.
+    const 센다 = (a: (typeof 걸린것)[number], s: string) => a.findings.filter((f) => f.severity === s).length;
+    const 줄세움 = [...걸린것].sort((a, b) =>
+      센다(b, "critical") - 센다(a, "critical") || 센다(b, "high") - 센다(a, "high"));
+    const 보일것 = 줄세움.slice(0, 보여줄자산);
+    return [
+      `${이름} 자산 **${걸린것.length}개**` + (걸린것.length > 보일것.length ? ` — 아래는 ${보일것.length}개입니다` : ""),
+      ...보일것.map((a) => {
+        const c = 센다(a, "critical"), h = 센다(a, "high"), m = 센다(a, "medium");
+        const 내역 = [c ? `매우 심각 ${c}` : "", h ? `높음 ${h}` : "", m ? `보통 ${m}` : ""].filter(Boolean).join(" · ");
+        return `  - ${자산표시이름(a.id)}${a.owner ? ` (담당 ${a.owner})` : " (담당 미지정)"}${내역 ? ` — ${내역}` : ""}`;
+      }),
+      "",
+      `${표식.다음} 하나를 깊이 보시려면 "○○ 자산 취약점 알려줘", 바로 손대시려면 "미배정 취약점 담당자 배정해줘"라고 하세요.`,
+    ].join("\n");
+  }
 
   // ⚠ 조건을 받고도 안 거르면 **방화벽을 물었는데 전체 57건**이 나온다(2026-08-02 실측).
   const q = String(args.query ?? "").trim();
@@ -3204,7 +3245,10 @@ const TOOLS: AgentTool[] = [
     //   `등록된 AI 자산 총 57개입니다.` 한 줄만 남겼다 — **개수를 물었는데 잘림 고지가 사라졌다.**
     //   출력이 이미 우리말 요약이라 다시 쓸 이유가 없고, 재작성 시간(20~30초)도 아낀다.
     directAnswer: true,
-    params: [{ name: "query", label: "찾을 말", description: "유형·이름·카테고리·서비스 (선택, 비우면 전체)", required: false }],
+    params: [
+      { name: "query", label: "찾을 말", description: "유형·이름·카테고리·서비스 (선택, 비우면 전체)", required: false },
+      { name: "risk", label: "위험 등급", description: "high(고위험)·medium·low 로 좁힐 때 (선택)", required: false },
+    ],
     run: runListAssets,
   },
   {
