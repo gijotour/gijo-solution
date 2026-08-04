@@ -152,6 +152,21 @@ describe("⑥ 「위험도 높은 자산 알려줘」가 29자 — 목록을 물
   });
 });
 
+describe("「이 화면 설명해줘」 — 앱이 유도하는 말이 함수에 안 걸렸다 (게이트가 잡음)", () => {
+  it("★★ 이 화면 설명해줘/안내해줘가 화면안내로 간다", async () => {
+    const { isHelpIntent } = await import("../src/engine/screenguide");
+    expect(isHelpIntent("이 화면 설명해줘", "analysis.html"), "앱 상단 「이 화면 설명 듣기」가 유도하는 말").toBe(true);
+    expect(isHelpIntent("이 화면 안내해줘", "inventory.html")).toBe(true);
+    expect(isHelpIntent("이 화면 소개해줘", "dashboard.html")).toBe(true);
+  });
+
+  it("★ 홀로 「설명해줘」는 잡지 않는다 — 대상이 없어 화면안내가 아니다", async () => {
+    const { isHelpIntent } = await import("../src/engine/screenguide");
+    expect(isHelpIntent("설명해줘", "analysis.html")).toBe(false);
+    expect(isHelpIntent("Log4Shell 설명해줘", "vulnscan.html"), "취약점 설명은 explain의 몫").toBe(false);
+  });
+});
+
 describe("지적함 2건 — 규칙이 없어 모델이 매번 다르게 골랐다 (2026-08-04)", () => {
   const loop = 읽기("engine/agentloop.ts");
   const 규칙 = (tool: string): RegExp => {
