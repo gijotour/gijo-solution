@@ -1047,6 +1047,9 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   // 화면을 모르거나 전역 화면(대시보드)이면 undefined라 종전대로 전체가 후보가 된다.
   const loop = await runAgentLoop(instructionText, contextText, {
     domains: toolDomainsForScreen(screen),
+    // 권한을 실어 admin 전용 도구(지식 번들 반입 등)가 대화창에서 라우팅되게 한다.
+    //   없으면 forcedToolFor의 available에서 빠져 조용히 다른 도구로 샌다(E2E가 잡은 결함).
+    role: viewer?.role ?? undefined,
     qa,
     actor,
     대화: 대화열쇠,
@@ -1150,7 +1153,7 @@ export function registerDispatcherRoutes(app: Express): void {
       //   무한정은 아니다. 매달린 요청이 게이트를 영영 멈추게 하면 안 되므로 상한을 둔다.
       const limitMs = qa ? QA_LONG_ANSWER_MS : LONG_ANSWER_MS;
       const work = runWithProgress(progressId, user?.id ?? null, () =>
-        dispatchInstruction(text, sessionId, screen, user?.displayName, qa, isNonLearningAccount(user?.username), { userId: user?.id, clearance: user?.clearance })
+        dispatchInstruction(text, sessionId, screen, user?.displayName, qa, isNonLearningAccount(user?.username), { userId: user?.id, clearance: user?.clearance, role: user?.role })
       );
       let handedOff = false;
       const timer = new Promise<null>((resolve) => setTimeout(() => resolve(null), limitMs));

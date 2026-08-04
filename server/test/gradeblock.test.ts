@@ -105,7 +105,9 @@ describe("★ 사람이 묻는 입구에서는 반드시 열람 등급을 싣는
   });
 
   it("디스패치 입구(/api/dispatch)도 넘긴다", () => {
-    expect(dispSrc).toContain("{ userId: user?.id, clearance: user?.clearance }");
+    // 닫는 중괄호는 뺀다 — 2026-08-04 뒤에 role(admin 도구 라우팅용)을 함께 실으면서 늘어났다.
+    // 이 시험의 요지는 **등급(clearance)이 입구에서 실린다**이지 뒤에 무엇이 더 붙느냐가 아니다.
+    expect(dispSrc).toContain("{ userId: user?.id, clearance: user?.clearance");
   });
 
   it("chat()이 받은 등급을 RAG 검색까지 흘린다", () => {

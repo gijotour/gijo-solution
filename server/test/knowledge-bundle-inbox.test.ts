@@ -24,6 +24,7 @@ import { listInboxBundles, importBundleFromInbox, BUNDLE_INBOX_DIR } from "../sr
 import { forcedToolFor } from "../src/engine/agentloop";
 import { findAgentTool } from "../src/engine/agenttools";
 import { listAudit } from "../src/engine/audit";
+import { dispatchInstruction } from "../src/engine/dispatcher";
 
 // ── 서명 번들 만들기 (bundleverify.test.ts와 같은 방식) ──────────────────────
 const 발행키 = crypto.generateKeyPairSync("ed25519");
@@ -88,6 +89,21 @@ describe("대화창 라우팅 — 지식 번들 상태·반입", () => {
 
   it("이 라우팅 대조가 헛돌지 않는다 — 통제 문구가 제 도구로 간다", () => {
     expect(forcedToolFor("오늘 뭐부터 조치해야 해?", {})?.tool).toBe("today");
+  });
+});
+
+// ⚠ forcedToolFor에 {role:"admin"}을 **직접** 넘기면 위 시험은 통과하지만, 실제 대화창은
+//   dispatch 파이프라인이 사용자 권한을 scope로 실어 날라야 admin 도구가 보인다. 2026-08-04
+//   E2E에서 "지식 번들 넣어줘"가 **권한 누락으로** 상태 조회로 새는 것을 잡았다(파이프라인이
+//   viewer에 role을 안 실었음). 그 통합 지점을 여기서 결정적으로 지킨다 — 단위 라우팅과 다른 축.
+describe("파이프라인이 권한을 실어 admin 도구를 라우팅한다 (E2E가 잡은 결함)", () => {
+  it("admin이 「지식 번들 넣어줘」라 하면 반입 결재판이 뜬다", async () => {
+    const r = await dispatchInstruction("지식 번들 넣어줘", undefined, undefined, "관리자시험", true, undefined, { role: "admin" });
+    expect(r.approval?.tool).toBe("knowledge_bundle_import");
+  });
+  it("권한이 없으면 반입으로 새지 않는다 — 도구가 목록에서 숨는다", async () => {
+    const r = await dispatchInstruction("지식 번들 넣어줘", undefined, undefined, "일반시험", true, undefined, {});
+    expect(r.approval?.tool ?? null).not.toBe("knowledge_bundle_import");
   });
 });
 

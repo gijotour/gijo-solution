@@ -109,6 +109,10 @@ export function documentsForAsset(assetId: string): { documentId: string; source
 export interface Viewer {
   userId?: string | null;
   clearance?: string | null;
+  // 권한 — 요청 파이프라인이 admin 전용 도구(requiredRole)를 대화창에서 라우팅할 수 있게 실어 나른다.
+  //   없으면 admin 도구는 목록에서 숨는다(안전 기본값). 2026-08-04: 첫 admin 전용 도구
+  //   (지식 번들 반입)가 대화창에서 안 불리던 것을 E2E가 잡아 추가.
+  role?: string | null;
 }
 
 const gradedDocsStmt = db.prepare("SELECT documentId, grade FROM memory_documents");
