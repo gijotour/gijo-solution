@@ -167,6 +167,21 @@ describe("지적함 2건 — 규칙이 없어 모델이 매번 다르게 골랐�
     expect(re.test("통합 보안 분석 현황"), "기존 물음도 그대로").toBe(true);
   });
 
+  it("★ 3차: 「이상한 접속 시도 있었어?」 — 회차마다 답이 달랐다(29.9초 → 되물음)", () => {
+    const re = 규칙("analysis_status");
+    expect(re.test("이상한 접속 시도 있었어?")).toBe(true);
+    expect(re.test("수상한 로그인 있었나?")).toBe(true);
+  });
+
+  it("★ 3차: 「검증은 어떻게 하는 거야?」(32초) — 단계 이름 + 은/는 + 어떻게", () => {
+    const m = loop.match(/re:\s*(\/\(단계\|절차\)[^\n]+\/),\s*\n\s*tool:\s*"workflow_status"/);
+    const re = eval(m![1]) as RegExp;
+    expect(re.test("검증은 어떻게 하는 거야?")).toBe(true);
+    expect(re.test("조치는 어떻게 해?")).toBe(true);
+    // ⚠ 「은/는」을 요구해 **그 건을 지목한 물음**은 비켜 준다 — 그건 remediation의 몫이다.
+    expect(re.test("이 취약점 조치 어떻게 해?"), "지목한 취약점의 조치법을 빼앗으면 안 된다").toBe(false);
+  });
+
   it("★ 「○○ 취약점 정리해줘」가 우리 취약점을 답한다 — 남의 진단 방법론이 아니라", () => {
     const re = 규칙("search");
     expect(re.test("SSH 취약점 정리해줘")).toBe(true);
