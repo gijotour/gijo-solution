@@ -17,6 +17,7 @@ import { asyncRoute } from "../util/asyncRoute";
 import { llamaBinPath } from "../util/llamabin";
 import { db } from "../db";
 import { emitLlmActivity, modelBasename } from "./llmactivity";
+import { adaptModel, getAdaptation, type ModelAdaptation } from "./modelquirks";
 
 const LLAMA_SERVER_PATH = process.env.GIJO_LLAMA_SERVER_PATH ?? llamaBinPath("llama-server");
 const MODELS_DIR = process.env.GIJO_MODELS_DIR ?? "models";
@@ -105,6 +106,8 @@ export interface LoadedModelInfo {
   modelId: string;
   port: number;
   ready: boolean;
+  // BYOM 자동 적응 내용(thinking 끔·ctx 맞춤) — 화면·리포트가 "무엇을 맞췄는지" 보여줄 근거.
+  adaptation?: ModelAdaptation | null;
 }
 
 export interface LocalEngineStatus {
@@ -116,7 +119,7 @@ export interface LocalEngineStatus {
 }
 
 export function getLocalEngineStatus(): LocalEngineStatus {
-  const loaded: LoadedModelInfo[] = [...pool.values()].map((m) => ({ modelId: m.modelId, port: m.port, ready: m.ready }));
+  const loaded: LoadedModelInfo[] = [...pool.values()].map((m) => ({ modelId: m.modelId, port: m.port, ready: m.ready, adaptation: getAdaptation(m.modelId) }));
   const primary = loaded.find((m) => m.port === PORT) ?? loaded[0];
   return {
     running: pool.size > 0,
@@ -345,9 +348,21 @@ async function ensureModelLoaded(modelId: string): Promise<LoadedModel> {
   await makeRoomFor(modelId);
 
   const port = allocPort();
+  // BYOM 자동 적응(modelquirks, 2026-08-05) — 올린 모델을 이 환경에 맞춘다:
+  //   · thinking(추론) 모델이면 생각을 끈다(--reasoning off) — Qwen3를 기본으로 띄우면
+  //     생각이 토큰 예산을 다 써 **답이 빈칸**이 되는 것을 실측으로 확인했다.
+  //   · 컨텍스트는 모델 native보다 크게 안 띄운다(로드 실패·rope 왜곡 방지).
+  //   비-thinking 모델은 extraArgs가 비어 **기존과 완전히 같다**(현행 함대 무영향).
+  const adaptation = adaptModel(modelId, modelFilePath(modelId), currentTierSettings().ctxSize);
+  if (adaptation.thinking || (adaptation.nativeCtx && adaptation.fittedCtx !== currentTierSettings().ctxSize)) {
+    console.log(
+      `[localengine] 모델 적응: ${modelId} —${adaptation.thinking ? " thinking 끔" : ""}` +
+      `${adaptation.nativeCtx ? ` · ctx ${adaptation.fittedCtx}(native ${adaptation.nativeCtx})` : ""} [판별: ${adaptation.판별}]`
+    );
+  }
   const spawned = spawn(
     LLAMA_SERVER_PATH,
-    ["-m", modelFilePath(modelId), "-ngl", "-1", "--ctx-size", String(currentTierSettings().ctxSize), "--port", String(port)],
+    ["-m", modelFilePath(modelId), "-ngl", "-1", "--ctx-size", String(adaptation.fittedCtx), "--port", String(port), ...adaptation.extraArgs],
     { stdio: "pipe" }
   );
   drainProcessOutput(spawned, `채팅 모델 ${modelId}`);

@@ -3,6 +3,7 @@
 
 import type { Express, Request } from "express";
 import { 예고서두, 인사서두, 소개서두, 표식 } from "./tone";
+import { stripThink } from "./modelquirks";
 import http from "node:http";
 import https from "node:https";
 import { authMiddleware } from "../auth/auth";
@@ -614,7 +615,10 @@ export async function chat(args: ChatArgs): Promise<string> {
     usage?: { prompt_tokens?: number; completion_tokens?: number };
     timings?: { predicted_per_second?: number };
   };
-  const rawContent = data.choices?.[0]?.message?.content ?? "";
+  // 생각 블록 안전망(modelquirks) — 기동 플래그(--reasoning off)가 정상이면 아예 안 나오지만,
+  // 플래그 없이 떠 있던 모델·감지 못한 thinking 모델이 새면 여기서 걷어낸다.
+  // ⚠ 스키마(JSON) 경로보다 먼저다 — <think>가 앞에 붙으면 JSON.parse가 통째로 깨진다.
+  const rawContent = stripThink(data.choices?.[0]?.message?.content ?? "");
 
   // 스키마 강제 응답은 JSON 그대로 반환 — 후처리(서두 제거·중국어 재생성)가 JSON을 훼손하면 안 된다.
   if (args.responseSchema) {

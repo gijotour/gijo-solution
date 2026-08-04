@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>시안(추천 1안) — BYOM 모델 자동 적응 리포트 카드</title>
+<style>
+  /* 제품 다크 톤 준수. 밀도 기준: 시스템 로그 화면(줄 21~29px). */
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#0d1117; color:#c9d1d9; font-family:"Malgun Gothic","Segoe UI",sans-serif; font-size:13px; padding:24px; }
+  .wrap { max-width:860px; margin:0 auto; }
+  .note { background:#161b22; border:1px solid #30363d; border-radius:6px; padding:10px 14px; margin-bottom:18px; color:#8b949e; line-height:1.5; }
+  .note b { color:#c9d1d9; }
+  h2 { font-size:14px; color:#e6edf3; margin:14px 0 6px; }
+  .identity { color:#8b949e; font-size:12px; margin-bottom:10px; } /* 정체성 한 줄 — 사용법은 챗봇(원칙) */
+
+  /* 모델 행(기존 로드 목록) — 28px */
+  .model-row { display:flex; align-items:center; gap:8px; height:28px; padding:0 10px; background:#161b22; border:1px solid #30363d; border-radius:6px 6px 0 0; }
+  .model-row .name { font-weight:bold; color:#e6edf3; }
+  .model-row .port { color:#8b949e; font-size:11px; }
+  .badge { font-size:11px; padding:1px 7px; border-radius:10px; border:1px solid; height:18px; line-height:16px; }
+  .b-ok    { color:#3fb950; border-color:#238636; }
+  .b-fit   { color:#58a6ff; border-color:#1f6feb; }
+  .b-warn  { color:#d29922; border-color:#9e6a03; }
+  .b-plan  { color:#8b949e; border-color:#30363d; }
+
+  /* 적응 카드 — 줄 24px × 4 = 96px + 여백 (카드 세로 총합 ≈ 128px) */
+  .fit-card { background:#0f141a; border:1px solid #30363d; border-top:none; border-radius:0 0 6px 6px; padding:8px 12px 10px; }
+  .fit-line { display:flex; gap:8px; height:24px; line-height:24px; }
+  .fit-line .k { width:104px; color:#8b949e; flex:none; }
+  .fit-line .v { color:#c9d1d9; }
+  .fit-line .v code { background:#161b22; border:1px solid #30363d; border-radius:4px; padding:0 5px; font-size:11px; color:#79c0ff; }
+  .arrow { color:#8b949e; }
+  .why { color:#8b949e; font-size:11px; }
+
+  .plan-box { margin-top:8px; border-top:1px dashed #30363d; padding-top:8px; display:flex; align-items:center; gap:8px; height:32px; color:#8b949e; }
+
+  .spec { margin-top:22px; background:#161b22; border:1px solid #30363d; border-radius:6px; padding:12px 14px; font-size:12px; line-height:1.7; color:#8b949e; }
+  .spec b { color:#c9d1d9; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="note">
+    <b>시안(추천 1안) — BYOM 모델 자동 적응 리포트 카드</b> · 자리: 설정 &gt; 서버·AI &gt; 로드된 모델 목록의 각 행 아래.<br>
+    설계 근거(2026-08-05 조사): LM Studio는 사람이 ⚙로 모델마다 컨텍스트를 손으로 맞춘다 — 우리는 반대로
+    <b>제품이 알아서 맞추고 "무엇을 맞췄는지"만 보여준다</b>(메뉴는 보기용 원칙). 입력칸·버튼 없음 — 정정은 대화창.
+  </div>
+
+  <h2>로드된 모델</h2>
+  <div class="identity">지금 이 서버에 올라와 실행 중인 AI 모델과, 제품이 자동으로 맞춘 내용입니다.</div>
+
+  <!-- 사례 1: 고객이 올린 thinking 모델(Qwen3) — 자동 적응이 일한 경우 -->
+  <div class="model-row">
+    <span class="name">우리회사모델.gguf</span><span class="port">:8082</span>
+    <span class="badge b-ok">실행 중</span>
+    <span class="badge b-fit">자동 적응 2건</span>
+  </div>
+  <div class="fit-card">
+    <div class="fit-line"><span class="k">생각(추론) 모드</span>
+      <span class="v">껐습니다 <span class="why">— 켜 두면 답 대신 생각이 나와 대화가 비어 보입니다</span></span></div>
+    <div class="fit-line"><span class="k">판별 근거</span>
+      <span class="v">모델 파일(GGUF) 대화 템플릿에 thinking 배선 발견 <span class="why">— 파일명이 아니라 내용물로 판별</span></span></div>
+    <div class="fit-line"><span class="k">컨텍스트</span>
+      <span class="v">40,960(모델 한계) <span class="arrow">→</span> 32,768 <span class="why">— 서버 티어(Standard) 상한</span></span></div>
+    <div class="fit-line"><span class="k">적용 방법</span>
+      <span class="v"><code>--reasoning off</code> <code>--reasoning-budget 0</code> <span class="why">— 기동 플래그(요청마다가 아니라 모델을 띄울 때)</span></span></div>
+    <div class="plan-box">
+      <span class="badge b-plan">2단계 예정</span> 올린 직후 스모크 검증(한국어·라우팅·안전 4문항) 결과가 여기 표시됩니다
+      <span class="badge b-plan">예정</span> 판별 정정은 대화창 「이 모델 생각 모드 켜줘/꺼줘」
+    </div>
+  </div>
+
+  <div style="height:14px"></div>
+
+  <!-- 사례 2: 적응할 것 없는 일반 모델 — 조용히(단서 없음 원칙) -->
+  <div class="model-row">
+    <span class="name">gijo-main-orchestrator</span><span class="port">:8080</span>
+    <span class="badge b-ok">실행 중</span>
+  </div>
+  <div class="fit-card">
+    <div class="fit-line"><span class="k">자동 적응</span>
+      <span class="v"><span class="why">맞출 것 없음 — 기존 그대로 동작합니다 (적응 배지도 안 붙습니다: 늘 붙는 단서는 아무도 안 읽습니다)</span></span></div>
+  </div>
+
+  <div class="spec">
+    <b>밀도 명세(칸 낭비 최소화 기준)</b> — 모델 행 28px · 카드 줄 24px×4 + 예정줄 32px = 카드 세로 총합 <b>≈146px</b>(패딩 포함).
+    적응 없는 모델은 카드 1줄(24px)만. 기준 화면(시스템 로그 21~29px) 준수.<br>
+    <b>원칙 준수</b> — ① 입력칸·설정 폼 없음(메뉴는 보기용, 정정은 대화창) ② 정체성 한 줄만, 사용법·용어는 챗봇 화면안내
+    ③ 예정 기능은 「예정」 배지로 정직하게 ④ 데이터는 전부 실존 API(/api/localengine/status의 adaptation 필드) — 가짜 UI 없음.<br>
+    <b>구현 시 연결</b> — settings.html 서버·AI 탭 로드 모델 목록. adaptation이 null이거나 맞춘 게 없으면 카드 최소화.
+  </div>
+</div>
+</body>
+</html>
