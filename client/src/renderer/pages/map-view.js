@@ -68,12 +68,21 @@
   }
 
   function render(container, assets, ctx) {
-    // 구획별로 묶고, 미조치 합이 큰 구획을 위로 — 급한 동네부터 보인다.
+    // ★ flat 모드(2026-08-04, 취약점 화면 ㉯): 구획 없이 **심각도 순 한 판**.
+    //   취약점 화면은 「오늘 뭐부터」가 목적이라 동네보다 급한 순이 맞다.
+    //   자산 화면은 동네(대역)로 묶는다 — 같은 지도지만 화면 목적에 맞춘다.
     const 구획 = new Map();
-    for (const a of assets) {
-      const k = 구획열쇠(a);
-      if (!구획.has(k)) 구획.set(k, []);
-      구획.get(k).push(a);
+    if (ctx && ctx.flat) {
+      const 진짜 = (a) => (ctx.activeFindings(a) || []).filter(진짜취약).length;
+      const 정렬 = [...assets].sort((x, y) => (ctx.riskOf(y).level === "high") - (ctx.riskOf(x).level === "high") || 진짜(y) - 진짜(x));
+      구획.set("취약점 있는 자산 — 심각도 순", 정렬);
+    } else {
+      // 구획별로 묶고, 미조치 합이 큰 구획을 위로 — 급한 동네부터 보인다.
+      for (const a of assets) {
+        const k = 구획열쇠(a);
+        if (!구획.has(k)) 구획.set(k, []);
+        구획.get(k).push(a);
+      }
     }
     const 정렬 = [...구획.entries()].map(([k, list]) => {
       const 합 = list.reduce((s, a) => s + (ctx.activeFindings(a) || []).filter(진짜취약).length, 0);

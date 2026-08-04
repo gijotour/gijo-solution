@@ -95,6 +95,17 @@ describe("★★ 관제 4소스 히트맵 — 서버 상관과 어긋나지 않�
   });
 });
 
+describe("★ flat 모드(취약점 히트맵 ㉯) — 구획 없이 심각도 순 한 판", () => {
+  // render는 DOM을 만들어 붙이므로, 여기서는 flat 정렬 규칙이 map-view에 실재하는지 소스로 확인한다.
+  const src = readFileSync(join(__dirname, "..", "..", "client", "src", "renderer", "pages", "map-view.js"), "utf8");
+  it("ctx.flat이면 한 구획에 심각도 순으로 담는다", () => {
+    expect(src).toMatch(/ctx && ctx\.flat/);
+    expect(src, "flat은 취약점 있는 자산 심각도 순 한 판").toMatch(/취약점 있는 자산 — 심각도 순/);
+    // high 먼저, 그다음 진짜 취약점 수 — 취약점 화면의 「오늘 뭐부터」에 맞다.
+    expect(src).toMatch(/riskOf\(y\)\.level === "high"\) - \(ctx\.riskOf\(x\)\.level === "high"\)/);
+  });
+});
+
 describe("구획 열쇠 — 네트워크 대역으로 묶는다", () => {
   it("같은 /24는 한 구획, AI 자산은 따로", () => {
     expect(mv.구획열쇠({ ip: "172.168.50.142" })).toBe(mv.구획열쇠({ ip: "172.168.50.99" }));
