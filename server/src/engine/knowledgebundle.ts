@@ -56,6 +56,13 @@ export const BUNDLE_ATTRIBUTIONS = [
 
 const STATE_KEY = "knowledgeBundle:applied"; // JSON {version, at, triples, docs}
 
+// 반입 대기 폴더 — 폐쇄망 담당자가 파일로 받은 번들을 여기 떨궈 두면 대화창에서 반입한다. (후-3 3단계)
+//   지금까지 반입은 CLI(import.mjs)로만 가능했다. 담당자가 대화창에서 다루려면 서버가 읽을 수
+//   있는 자리에 파일이 있어야 하는데, 폐쇄망이라 어차피 파일은 서버 머신에 떨어진다.
+//   DB와 같은 데이터 뿌리 아래 둔다 — 운영 위치를 옮기면(GIJO_DB_PATH) 이 폴더도 함께 옮겨진다.
+const DATA_ROOT = path.dirname(process.env.GIJO_DB_PATH ?? path.join("data", "gijo-as.sqlite"));
+export const BUNDLE_INBOX_DIR = process.env.GIJO_BUNDLE_INBOX ?? path.join(DATA_ROOT, "bundle-inbox");
+
 const getStateStmt = db.prepare("SELECT value FROM app_state WHERE key = ?");
 const setStateStmt = db.prepare(
   "INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
@@ -242,6 +249,84 @@ export async function importVerifiedBundle(
   });
 
   return { version: manifest.version, triplesAdded, triplesReplaced: removed, docsWritten, at: state.at };
+}
+
+// ── 반입 대기 폴더(대화창 반입 경로, 후-3 3단계) ────────────────────────────
+
+export interface InboxBundle {
+  file: string;
+  bytes: number;
+  ok: boolean;              // 서명·해시 검증 통과 여부
+  version?: string;         // ok일 때만
+  issuedAt?: string;
+  counts?: { triples: number; docs: number };
+  reason?: string;          // ok=false일 때 거부 사유(담당자가 읽을 한 줄)
+}
+
+/**
+ * 반입 대기 폴더의 번들 파일을 훑어 **서명까지 확인**한다. 폴더가 없으면 빈 목록.
+ * 목록만 만드는 읽기 동작이라 아무것도 바꾸지 않는다 — 반입은 별도(importBundleFromInbox).
+ */
+export function listInboxBundles(): InboxBundle[] {
+  let names: string[];
+  try {
+    names = fs.readdirSync(BUNDLE_INBOX_DIR).filter((n) => n.toLowerCase().endsWith(".gijobundle"));
+  } catch {
+    return []; // 폴더 없음 = 대기 중인 번들 없음(에러 아님)
+  }
+  names.sort();
+  return names.map((file) => {
+    let raw: Buffer;
+    try {
+      raw = fs.readFileSync(path.join(BUNDLE_INBOX_DIR, file));
+    } catch {
+      return { file, bytes: 0, ok: false, reason: "파일을 읽을 수 없습니다." };
+    }
+    const v = verifyBundle(raw);
+    if (!v.ok || !v.manifest) return { file, bytes: raw.length, ok: false, reason: v.reason };
+    return { file, bytes: raw.length, ok: true, version: v.manifest.version, issuedAt: v.manifest.issuedAt, counts: v.manifest.counts };
+  });
+}
+
+/**
+ * 반입 대기 폴더의 번들을 **이름으로 골라 반입**한다(대화창 경로). 서명이 맞을 때만.
+ *
+ * ⚠ 거부는 HTTP 반입과 **똑같이 감사기록에 남긴다** — 가짜 번들 반입 시도는 그 자체가 사건이다.
+ * ⚠ basename만 취한다 — 이름에 경로(`../` 등)가 섞여도 대기 폴더 밖은 못 읽는다.
+ *   verifyBundle이 내용도 다시 검증하지만, 방어는 파일을 여는 자리에서 먼저 겹쳐 둔다.
+ */
+export async function importBundleFromInbox(
+  fileName: string,
+  actor: string
+): Promise<
+  | { ok: true; version: string; triplesAdded: number; triplesReplaced: number; docsWritten: number }
+  | { ok: false; reason: string }
+> {
+  const safe = path.basename(String(fileName ?? "").trim());
+  if (!safe || !safe.toLowerCase().endsWith(".gijobundle")) {
+    return { ok: false, reason: "번들 파일 이름(.gijobundle)이 필요합니다. 「지식 번들 상태」로 대기 목록을 볼 수 있습니다." };
+  }
+  let raw: Buffer;
+  try {
+    raw = fs.readFileSync(path.join(BUNDLE_INBOX_DIR, safe));
+  } catch {
+    return { ok: false, reason: `반입 대기 폴더에 파일이 없습니다: ${safe}` };
+  }
+
+  const v = verifyBundle(raw);
+  if (!v.ok || !v.manifest || !v.payload) {
+    recordAudit({
+      kind: "block",
+      actor,
+      action: "지식 번들 반입 거부(대화창)",
+      target: safe,
+      detail: v.reason ?? "검증 실패",
+      result: "blocked",
+    });
+    return { ok: false, reason: v.reason ?? "서명 검증에 실패했습니다." };
+  }
+  const r = await importVerifiedBundle(v.manifest, v.payload, actor);
+  return { ok: true, version: r.version, triplesAdded: r.triplesAdded, triplesReplaced: r.triplesReplaced, docsWritten: r.docsWritten };
 }
 
 export function registerKnowledgeBundleRoutes(app: Express): void {

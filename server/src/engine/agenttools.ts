@@ -63,6 +63,10 @@ import { listTasks, createTask, setTaskDone, setGuideStepDone, routineSuggestion
 import { buildMyWork } from "./mywork";
 import { getGuide as 가이드가져오기 } from "./workguide";
 import { getScreenGuide } from "./screenguide";
+// 지식 번들(후-3 구독화) — 지금 실린 지식이 언제 기준인지 보기 + 대기 폴더 번들 반입.
+import { getBundleStatus, listInboxBundles, importBundleFromInbox, KNOWLEDGE_BUNDLE_VERSION } from "./knowledgebundle";
+import { currentViewer } from "./viewerctx";
+import { findUserById } from "../auth/users";
 
 /** 화면 파일명 → 담당자가 메뉴에서 보는 한글 이름. 못 찾으면 파일명 대신 빈 값을 쓰지 않고
  *  그대로 두되, screenguide에 제목이 있으면 그것을 쓴다(안내 문구와 메뉴 이름이 같아야 한다). */
@@ -2515,6 +2519,66 @@ async function runKnowledgeStatus(): Promise<string> {
   return `${head}\n${scopes}\n최근 인입:\n${recent.join("\n")}`;
 }
 
+// ── 지식 번들 현황·반입 (후-3 구독화 코드 슬라이스) ────────────────────────
+//
+// knowledge_status(장기기억 문서/트리플 재고)와 **다른 도구**다. 이쪽은 "제품에 실려 나가는
+// 표준·위협·법령 지식이 **언제 기준인가**"를 본다 — 구독의 본질은 "얼마나 최신인가"라서다.
+
+/** CalVer "2026.07-1" → "2026년 7월 기준". 지식은 기능이 아니라 "언제의 세상인가"가 본질이다. */
+function 번들언제기준(version: string): string {
+  const m = /^(\d{4})\.(\d{1,2})/.exec(version);
+  return m ? `${m[1]}년 ${Number(m[2])}월 기준` : `${version} 기준`;
+}
+
+async function runKnowledgeBundleStatus(): Promise<string> {
+  const s = getBundleStatus();
+  const lines: string[] = [];
+  lines.push(`지금 실린 지식: ${번들언제기준(s.bundleVersion)} (번들 ${s.bundleVersion})`);
+  lines.push(`· 표준 지식 ${s.ontology.sources.length}종 · 관계 ${s.ontology.triples.toLocaleString()}개(온톨로지 트리플)`);
+  lines.push(`· 지식 문서 ${s.docs.total}건${s.docs.withFile < s.docs.total ? ` (파일 확인 ${s.docs.withFile}건)` : ""}`);
+  if (s.applied) {
+    const when = koDateTimeString(s.applied.at);
+    lines.push(`· 마지막 적용: ${when}${s.upToDate ? " · 최신" : " · ⚠ 코드가 실은 버전과 다름(재적용 필요)"}`);
+  } else {
+    lines.push("· 아직 한 번도 적용되지 않았습니다 — 「지식 번들 넣어줘」 또는 서버 재기동으로 적용됩니다.");
+  }
+  lines.push("· 출처 표시: MITRE(ATT&CK·ATLAS·CWE)·OWASP·NIST·KISA — 재배포 고지 포함");
+
+  // 반입 대기 폴더 — 담당자가 파일로 받아 둔 번들이 있으면 여기서 골라 넣는다.
+  const inbox = listInboxBundles();
+  if (inbox.length) {
+    lines.push("");
+    lines.push("반입 대기 중인 번들:");
+    for (const b of inbox) {
+      if (b.ok) {
+        const 발행 = (b.issuedAt ?? "").slice(0, 10);
+        lines.push(`· ${b.file} — 버전 ${b.version} (${번들언제기준(b.version ?? "")}${발행 ? `, 발행 ${발행}` : ""})`);
+      } else {
+        lines.push(`· ${b.file} — ⚠ 반입 불가: ${b.reason}`);
+      }
+    }
+    if (inbox.some((b) => b.ok)) lines.push('넣으려면 「지식 번들 넣어줘」라고 하시면 확인창(결재판)이 뜹니다.');
+  } else {
+    lines.push("");
+    lines.push("반입 대기 중인 번들 없음 — 새 번들 파일을 받으면 반입 대기 폴더에 두고 「지식 번들 넣어줘」라고 하세요.");
+  }
+  return lines.join("\n");
+}
+
+/** 대화창 반입 실행 — 결재판을 통과한 뒤에만 여기 온다. 사람 이름은 요청 꼬리표에서 찾는다. */
+async function runKnowledgeBundleImport(args: Record<string, string>): Promise<string> {
+  const v = currentViewer();
+  const actor = (v?.userId ? findUserById(v.userId)?.displayName : null) ?? "담당자(대화창)";
+  const r = await importBundleFromInbox(args.file ?? "", actor);
+  if (!r.ok) return `번들을 반입하지 못했습니다 — ${r.reason}`;
+  return [
+    `지식 번들 ${r.version}을 반입했습니다 (${번들언제기준(r.version)}).`,
+    `· 표준 지식 ${r.triplesAdded.toLocaleString()}건 적재${r.triplesReplaced ? ` (이전 ${r.triplesReplaced.toLocaleString()}건 정리 — 손으로 넣은 지식은 보존)` : ""}`,
+    r.docsWritten ? `· 지식 문서 ${r.docsWritten}건 기록` : "",
+    "이제부터 AI 답변은 이 버전의 지식을 근거로 씁니다.",
+  ].filter(Boolean).join("\n");
+}
+
 // ── 레지스트리 ──────────────────────────────────────────────────────────
 
 const TOOLS: AgentTool[] = [
@@ -2981,6 +3045,54 @@ const TOOLS: AgentTool[] = [
     // 출력이 이미 한국어 요약이라 LLM 재작성을 생략한다(2026-08-02: 재작성이 20~30초를 더 썼다).
     directAnswer: true,
     run: runKnowledgeStatus,
+  },
+  {
+    // 지식 번들 현황 — knowledge_status(재고)와 달리 "실린 표준·위협 지식이 언제 기준인가"를 본다.
+    // 구독화(후-3)의 첫 대화창 창구: 담당자가 "지금 최신인가/무엇이 실렸나"를 스스로 확인한다.
+    name: "knowledge_bundle_status",
+    label: "지식 번들 현황",
+    domain: "knowledge",
+    write: false,
+    description:
+      '제품에 실려 나가는 표준·위협 지식이 **언제 기준인지**(번들 버전)와 반입 대기 중인 번들을 본다. ' +
+      '"지식 번들 상태", "지금 실린 지식 언제 기준이야?", "무슨 표준이 들어 있어?" 같은 물음에 쓴다. ' +
+      "장기기억 문서 재고(knowledge_status)와는 다르다.",
+    params: [],
+    directAnswer: true,
+    run: runKnowledgeBundleStatus,
+  },
+  {
+    // 지식 번들 반입 — 폐쇄망 담당자가 파일로 받은 번들을 대화창에서 넣는다(쓰기·결재판).
+    // ⚠ admin만: 온톨로지를 통째로 갈아끼우는 운영 행위라 한 사람이 전체 지식을 바꾼다.
+    //   서명이 맞아야만 반입되고(bundleverify), 맞지 않으면 감사기록에 남기고 거부한다.
+    name: "knowledge_bundle_import",
+    label: "지식 번들 반입",
+    domain: "knowledge",
+    write: true,
+    requiredRole: "admin",
+    description:
+      '반입 대기 폴더에 있는 지식 번들(.gijobundle) 파일을 서명 검증 후 반입한다. ' +
+      '"지식 번들 넣어줘", "새 번들 반입해줘"처럼 말할 때 쓴다. 파일 이름은 「지식 번들 상태」로 확인한다. ' +
+      '예: {"file":"gijo-knowledge-2026.10-1.gijobundle"}',
+    params: [
+      { name: "file", label: "번들 파일", description: "반입 대기 폴더의 .gijobundle 파일 이름. 「지식 번들 상태」로 목록을 볼 수 있습니다.", required: true },
+    ],
+    // 대기 폴더에 서명 통과 번들이 **딱 하나면** 그것으로 채운다(결재판에 "자동"으로 표시).
+    autoFill: (args): Record<string, string> => {
+      if ((args.file ?? "").trim()) return {};
+      const ok = listInboxBundles().filter((b) => b.ok);
+      return ok.length === 1 && ok[0].file ? { file: ok[0].file } : {};
+    },
+    effect: (args) => {
+      const f = (args.file ?? "").trim();
+      const b = listInboxBundles().find((x) => x.file === f);
+      if (b?.ok) {
+        return `번들 ${b.version}(발행 ${(b.issuedAt ?? "").slice(0, 10)})을 반입 — 표준 지식 ${b.counts?.triples ?? "?"}건·문서 ${b.counts?.docs ?? "?"}건을 이 버전으로 교체합니다. 손으로 넣은 지식은 보존됩니다.`;
+      }
+      return `반입 대기 폴더의 번들 「${f || "(미지정)"}」을 서명 검증한 뒤 반입합니다. 서명이 맞지 않으면 거부하고 기록에 남깁니다.`;
+    },
+    undo: "이전 버전 번들을 다시 반입하면 되돌아갑니다(번들은 출처별 교체라 멱등합니다).",
+    run: runKnowledgeBundleImport,
   },
   {
     // 도구가 하나도 없던 화면들을 메운다(2026-07-27 공백 점검) — 기록은 이미 쌓여 있는데

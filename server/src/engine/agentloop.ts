@@ -836,6 +836,22 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }
     tool: "report_activity",
     args: {},
   },
+  // 지식 번들 반입 — 폐쇄망 담당자가 파일로 받은 번들을 대화창에서 넣는다(후-3 구독화 3단계, 쓰기·결재판·admin).
+  //   ⚠ **상태(아래)보다 먼저 본다** — "번들 넣어줘"의 「번들」만 보면 상태 규칙도 걸린다.
+  //   반입은 명령형 어미(넣/올려/반입/적용/갱신)를 못 박아 상태 조회와 갈라 낸다.
+  //   "번들"은 다른 어느 규칙에도 없는 낱말이라 앞선 규칙을 가로채지 않는다(2026-08-04 확인).
+  {
+    re: /(지식\s*)?번들.{0,4}(반입|넣어|넣는|넣|올려|적용|갱신|업데이트)|(반입|갱신|업데이트)\s*할?\s*(지식\s*)?번들/,
+    tool: "knowledge_bundle_import",
+    args: {},
+  },
+  // 지식 번들 현황 — "지금 실린 지식이 언제 기준인가"(구독의 본질=최신성). knowledge_status(재고)와 다르다.
+  //   ⚠ 반입(위)이 명령형을 먼저 가져가므로 여기는 조회 어미만 남는다.
+  {
+    re: /(지식\s*)?번들\s*(을|를|이|은|의)?\s*(상태|버전|현황|정보|목록|뭐|무엇|어떤|언제|실렸|실려|들어)|(지금|현재)\s*(실린|들어\s*있는|쓰는)\s*지식\s*(은|이|의)?\s*(버전|기준|뭐|무엇|언제|어떤)|지식\s*번들/,
+    tool: "knowledge_bundle_status",
+    args: {},
+  },
 ];
 // 등록된 보안제품 이름을 콕 집어 "설명해줘"라고 물으면 그 제품의 사내 근거(매뉴얼·온톨로지)를
 // 모아 답한다. [2026-07-26 실사용] "Tenable Web App Scanning 주요기능 설명해줘"에 도구를 하나도
@@ -890,7 +906,8 @@ export function isHowtoNotCommand(instruction: string): boolean {
   return howto && !imperative;
 }
 
-function forcedToolFor(instruction: string, scope?: ToolScope): { tool: string; args: Record<string, string> } | null {
+// export: 시험이 **실제 라우팅 함수**를 그대로 불러 대조한다(정규식을 베껴 쓰면 드리프트한다).
+export function forcedToolFor(instruction: string, scope?: ToolScope): { tool: string; args: Record<string, string> } | null {
   // ⚠ 강제 분기는 **화면 도메인 좁히기를 따르지 않는다**(검토 지적 2026-07-29).
   //   도메인 좁히기의 목적은 "LLM에게 보여 줄 도구 목록을 짧게 유지해 선택이 흔들리지 않게" 하는
   //   것인데, 강제 분기는 LLM을 아예 거치지 않는다 — 좁힐 이유가 없다. 그런데 좁힌 목록으로

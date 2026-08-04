@@ -7,11 +7,15 @@ import { toolDomainsForScreen } from "../src/engine/screencontext";
 // "인증키를 넣으세요"로 막아, 예전에 사내 문서로 답하던 것을 못 답하게 만든다.
 const OPTIONAL_OFF = ["law_lookup"];
 const alwaysOn = () => listAgentTools().filter((t) => !OPTIONAL_OFF.includes(t.name));
+// role 없이 목록을 뽑으면 **admin 전용 도구도 숨는다**(listToolsFor의 requiredRole 게이트).
+// 2026-08-04 지식 번들 반입(knowledge_bundle_import)이 첫 admin 전용 도구가 되면서
+// "무권한 가시 = 전체 − 꺼진 기능 − admin 전용"이 실제 계약이 됐다.
+const 무권한가시 = () => alwaysOn().filter((t) => t.requiredRole !== "admin");
 
 describe("도구 도메인 필터", () => {
-  it("범위를 안 주면 (꺼진 선택 기능만 빼고) 전체를 준다", () => {
-    expect(listToolsFor()).toHaveLength(alwaysOn().length);
-    expect(listToolsFor([])).toHaveLength(alwaysOn().length);
+  it("범위를 안 주면 (꺼진 선택 기능 + admin 전용을 빼고) 전체를 준다", () => {
+    expect(listToolsFor()).toHaveLength(무권한가시().length);
+    expect(listToolsFor([])).toHaveLength(무권한가시().length);
   });
 
   it("꺼진 선택 기능의 도구는 목록에 없다 — 질문을 가로채 막다른 답을 주지 않게", () => {
