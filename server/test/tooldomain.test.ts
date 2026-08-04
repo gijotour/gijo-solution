@@ -32,7 +32,8 @@ describe("도구 도메인 필터", () => {
   });
 
   it("cross 도구는 어느 도메인에서도 빠지지 않는다 — 검색·설명은 어디서나 필요하다", () => {
-    const crossNames = alwaysOn().filter((t) => t.domain === "cross").map((t) => t.name);
+    // 무권한 가시 기준 — admin 전용 cross 도구(set_model_thinking 등)는 role 없는 목록에서 원래 빠진다.
+    const crossNames = 무권한가시().filter((t) => t.domain === "cross").map((t) => t.name);
     for (const d of ["assets", "vuln", "sbom", "report"]) {
       const names = listToolsFor([d]).map((t) => t.name);
       for (const c of crossNames) expect(names, `${d}에서 ${c}`).toContain(c);

@@ -136,6 +136,10 @@ describe("내부 프롬프트는 게이트를 다시 지나지 않는다", () =>
       "redteam.ts": "의도적 raw 호출 — 공격 페이로드를 보내야 하므로 관문을 지나면 안 된다",
       "localengine.ts": "hang 감시 프로브('ping') — 사용자 입력이 아니다",
       "cloudllm.ts": "외부 클라우드 — askCloud가 gateUserInput(…, \"cloud\")를 먼저 지난다",
+      // 2026-08-05 검토: 문항은 SMOKE_PROBES 고정 상수라 사용자 입력이 안 흐르고,
+      // 응답은 결정적 규칙(빈칸·한글·거절 낱말)으로 판정만 한다 — 제품 답변에 재주입되지
+      // 않는다(preview는 담당자가 눈으로 보는 발췌). localengine의 ping 프로브와 같은 부류.
+      "modelsmoke.ts": "BYOM 스모크 4문항 — 고정 내부 문항, 사용자 입력 아님, 응답은 판정만",
     };
     const 발견: string[] = [];
     for (const f of fs.readdirSync(engineDir).filter((x) => x.endsWith(".ts"))) {

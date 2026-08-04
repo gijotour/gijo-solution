@@ -66,6 +66,10 @@ import { getScreenGuide } from "./screenguide";
 // 지식 번들(후-3 구독화) — 지금 실린 지식이 언제 기준인지 보기 + 대기 폴더 번들 반입.
 import { getBundleStatus, listInboxBundles, importBundleFromInbox, KNOWLEDGE_BUNDLE_VERSION } from "./knowledgebundle";
 import { airgapStatus } from "./airgap";
+// BYOM 모델 자동 적응(2단계) — 적응 내용 조회·스모크 검증·판별 정정을 대화창으로.
+import { getLocalEngineStatus } from "./localengine";
+import { getAdaptation, setThinkingOverride } from "./modelquirks";
+import { runSmoke } from "./modelsmoke";
 import { currentViewer } from "./viewerctx";
 import { findUserById } from "../auth/users";
 
@@ -2602,6 +2606,60 @@ async function runAirgapStatus(): Promise<string> {
   return lines.join("\n");
 }
 
+// ── BYOM 모델 적응 상태 + 스모크 검증 (자동 적응 2단계) ────────────────────
+// "올린 모델이 이 환경에 맞춰졌고, 지금 말이 되는 상태인가"를 대화창에서 한 번에 본다.
+async function runModelFitStatus(): Promise<string> {
+  const st = getLocalEngineStatus();
+  if (!st.running || !st.loaded.length) {
+    return "로드된 채팅 모델이 없습니다 — 에이전트 AI 화면에서 모델을 먼저 시작하세요.";
+  }
+  const lines: string[] = [];
+  lines.push("로드된 모델과 자동 적응 내용:");
+  for (const m of st.loaded) {
+    const a = getAdaptation(m.modelId);
+    const 적응 = a
+      ? [
+          a.thinking ? "생각(추론) 모드 껐음" : null,
+          a.nativeCtx && a.fittedCtx < a.nativeCtx ? `컨텍스트 ${a.fittedCtx.toLocaleString()}(모델 한계 ${a.nativeCtx.toLocaleString()})` : `컨텍스트 ${a.fittedCtx.toLocaleString()}`,
+          a.thinking ? `판별: ${a.판별 === "template" ? "파일 내용(템플릿)" : a.판별 === "name" ? "이름 규칙" : "관리자 지정"}` : null,
+        ].filter(Boolean).join(" · ")
+      : "적응 정보 없음(이 배포 전에 로드됨 — 재시작하면 생깁니다)";
+    lines.push(`· ${m.modelId}${m.ready ? "" : " (로딩 중)"} — ${적응}`);
+  }
+
+  // 스모크 4문항 — 대표 모델에 실제로 물어 결정적 규칙으로 판정한다(LLM 채점 아님).
+  const smoke = await runSmoke();
+  if ("error" in smoke) {
+    lines.push("");
+    lines.push(`스모크 검증: ${smoke.error}`);
+  } else {
+    lines.push("");
+    lines.push(`스모크 검증(${smoke.modelId}): ${smoke.passed}/${smoke.total} 통과`);
+    for (const d of smoke.details) {
+      lines.push(`${d.ok ? "✓" : "✗"} ${d.id} — ${d.why}${d.ok ? "" : d.preview ? ` (답 앞부분: "${d.preview.slice(0, 60)}…")` : ""}`);
+    }
+    if (smoke.passed < smoke.total) {
+      lines.push("⚠ 실패 문항이 있습니다 — 이 모델을 기본으로 쓰기 전에 평가 게이트(3축)로 정식 대조를 권합니다.");
+    }
+  }
+  return lines.join("\n");
+}
+
+/** 판별 정정(쓰기·admin) — 자동 판별이 틀렸을 때 사람이 바로잡는 마지막 문. */
+function runSetModelThinking(args: Record<string, string>): string {
+  const model = (args.model ?? "").trim();
+  const mode = (args.mode ?? "").trim();
+  if (!model) return "모델 이름이 필요합니다 — 「모델 적응 상태」로 로드된 모델 이름을 확인하세요.";
+  const 끄기 = /꺼|끔|off|비활성/i.test(mode);
+  const 켜기 = /켜|켬|on|활성/i.test(mode);
+  if (!끄기 && !켜기) return "모드를 알 수 없습니다 — '끔' 또는 '켬'으로 알려 주세요.";
+  setThinkingOverride(model, 켜기); // thinking=true면 생각 모드가 있는 모델로 취급(끄는 플래그 적용)
+  return [
+    `${model}의 생각(추론) 모드 판별을 「${켜기 ? "thinking 모델(생각 끄는 플래그 적용)" : "일반 모델(플래그 없음)"}」로 지정했습니다.`,
+    "⚠ 이 지정은 **다음에 모델을 로드할 때부터** 적용됩니다 — 지금 떠 있는 모델은 그대로입니다.",
+  ].join("\n");
+}
+
 // ── 레지스트리 ──────────────────────────────────────────────────────────
 
 const TOOLS: AgentTool[] = [
@@ -3129,6 +3187,39 @@ const TOOLS: AgentTool[] = [
     params: [],
     directAnswer: true,
     run: runAirgapStatus,
+  },
+  {
+    // BYOM 모델 적응 상태 + 스모크(자동 적응 2단계) — 올린 모델이 맞춰졌고 말이 되는지.
+    name: "model_fit_status",
+    label: "모델 적응 상태",
+    domain: "cross",
+    write: false,
+    description:
+      '로드된 모델의 자동 적응 내용(생각 모드·컨텍스트)과 스모크 검증(4문항: 빈칸·한국어·지시·거절)을 본다. ' +
+      '"모델 적응 상태", "올린 모델 괜찮아?", "모델 검증해줘" 같은 물음에 쓴다. ' +
+      "지금 무슨 모델을 쓰는지만 물으면 system_health가 맞다.",
+    params: [],
+    directAnswer: true,
+    run: runModelFitStatus,
+  },
+  {
+    // 판별 정정(쓰기·admin) — 자동 판별이 틀렸을 때. 다음 로드부터 적용.
+    name: "set_model_thinking",
+    label: "모델 생각 모드 지정",
+    domain: "cross",
+    write: true,
+    requiredRole: "admin",
+    description:
+      '모델의 생각(추론) 모드 판별을 사람이 지정한다 — 자동 판별이 틀렸을 때만. ' +
+      'mode는 끔(일반 모델 취급) 또는 켬(thinking 모델 취급·생각 끄는 플래그 적용). ' +
+      '예: {"model":"qwen3-14b","mode":"켬"}',
+    params: [
+      { name: "model", label: "모델", description: "모델 이름(「모델 적응 상태」로 확인)", required: true },
+      { name: "mode", label: "지정", description: "끔(일반 모델) 또는 켬(thinking 모델)", required: true },
+    ],
+    effect: (args) => `${args.model ?? "?"}을(를) 「${/켜|켬|on/i.test(args.mode ?? "") ? "thinking 모델(생각 끄는 플래그 적용)" : "일반 모델(플래그 없음)"}」로 지정 — 다음 로드부터 적용됩니다.`,
+    undo: "「모델 적응 상태」로 확인 후 반대 모드로 다시 지정하면 되돌아갑니다.",
+    run: runSetModelThinking,
   },
   {
     // 도구가 하나도 없던 화면들을 메운다(2026-07-27 공백 점검) — 기록은 이미 쌓여 있는데
