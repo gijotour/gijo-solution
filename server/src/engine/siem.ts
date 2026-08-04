@@ -20,6 +20,7 @@ import type { Express } from "express";
 import * as dgram from "dgram";
 import * as net from "net";
 import * as tls from "tls";
+import { assertEgressAllowed } from "./airgap";
 import * as os from "os";
 import { authMiddleware, adminMiddleware } from "../auth/auth";
 import { db } from "../db";
@@ -328,6 +329,9 @@ async function drain(): Promise<void> {
 export function sendToSiem(e: SiemEvent, cfg = getSiemConfig()): Promise<boolean> {
   if (!cfg.enabled || !cfg.host) return Promise.resolve(false);
   if (SEV_RANK[e.severity] < SEV_RANK[cfg.minSeverity]) return Promise.resolve(false);
+  // 에어갭 봉인(후-4) — SIEM은 소켓(UDP/TCP/TLS)이라 fetch 관문이 못 본다. 외부 SIEM이면
+  //   큐에 담지도 않는다(감사는 assert가 첫 1회 남긴다). 내부망 SIEM은 사설IP·명시허용으로 통과.
+  try { assertEgressAllowed(cfg.host, "SIEM 전달"); } catch { return Promise.resolve(false); }
   enqueue(formatEvent(e, cfg));
   void drain();
   return Promise.resolve(true);
@@ -337,6 +341,9 @@ export function sendToSiem(e: SiemEvent, cfg = getSiemConfig()): Promise<boolean
 export async function testSiem(cfg = getSiemConfig()): Promise<{ ok: boolean; error?: string; confirmed: boolean; target: string }> {
   const target = `${cfg.host}:${cfg.port} (${cfg.transport})`;
   if (!cfg.host) return { ok: false, error: "SIEM 주소가 비어 있습니다", confirmed: false, target };
+  // 에어갭 봉인 시 외부 SIEM 연결 시험은 정직하게 막고 사유를 그대로 알린다(가짜 성공 금지).
+  try { assertEgressAllowed(cfg.host, "SIEM 연결 시험"); }
+  catch (e) { return { ok: false, error: e instanceof Error ? e.message : "에어갭 봉인", confirmed: false, target }; }
   const ok = await deliver(
     formatEvent(
       { category: "audit", severity: "info", action: "GIJO AS 연결 시험", actor: "GIJO AS", detail: "이 메시지가 SIEM에 보이면 연동 정상" },

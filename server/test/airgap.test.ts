@@ -9,7 +9,7 @@
 import { describe, it, expect, vi } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
-import { egressAllowed, isPrivateIp, airgapStatus, EGRESS_POINTS, installAirgapGuard } from "../src/engine/airgap";
+import { egressAllowed, isPrivateIp, airgapStatus, EGRESS_POINTS, installAirgapGuard, assertEgressAllowed } from "../src/engine/airgap";
 import { forcedToolFor } from "../src/engine/agentloop";
 import { findAgentTool } from "../src/engine/agenttools";
 
@@ -73,6 +73,30 @@ describe("에어갭 카탈로그 — 실제 외부 호출을 다 덮는다(봉�
   it("이 대조가 헛돌지 않는다 — 카탈로그가 비지 않았다", () => {
     expect(EGRESS_POINTS.length, "카탈로그가 너무 작다").toBeGreaterThanOrEqual(6);
     expect(EGRESS_POINTS.every((p) => p.host && p.대체), "통로마다 호스트·대체가 있어야 한다").toBe(true);
+  });
+});
+
+describe("에어갭 소켓 관문 — SMTP·SIEM(fetch가 아닌 통로)", () => {
+  it("assertEgressAllowed: 봉인+외부는 던지고, 내부·꺼짐은 통과", () => {
+    expect(() => assertEgressAllowed("smtp.gmail.com", "SMTP"), "봉인 꺼짐이면 무엇이든 통과").not.toThrow();
+    vi.stubEnv("GIJO_AIRGAP", "1");
+    try {
+      expect(() => assertEgressAllowed("smtp.gmail.com", "SMTP 메일 발송"), "외부 메일 서버").toThrow(/에어갭/);
+      expect(() => assertEgressAllowed("10.0.0.5", "SIEM 전달"), "사설 IP").not.toThrow();
+      expect(() => assertEgressAllowed("127.0.0.1", "SMTP"), "루프백").not.toThrow();
+    } finally { vi.unstubAllEnvs(); }
+  });
+
+  it("email.ts·siem.ts가 실제로 소켓 관문을 부른다(카탈로그가 봉인을 약속하고 코드가 안 지키는 것 방지)", () => {
+    const dir = path.join(__dirname, "../src/engine");
+    for (const f of ["email.ts", "siem.ts"]) {
+      const src = fs.readFileSync(path.join(dir, f), "utf8");
+      expect(src.includes("assertEgressAllowed("), `${f}가 소켓 관문을 안 부른다 — 카탈로그는 봉인을 약속하는데 코드가 안 지킨다`).toBe(true);
+    }
+    // 카탈로그에 SMTP·SIEM이 실려 있어야 상태 도구가 "전부"를 정직하게 말한다.
+    const ids = EGRESS_POINTS.map((p) => p.id);
+    expect(ids).toContain("smtp");
+    expect(ids).toContain("siem");
   });
 });
 

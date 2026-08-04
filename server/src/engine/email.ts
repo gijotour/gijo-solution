@@ -4,6 +4,7 @@
 
 import type { Express } from "express";
 import nodemailer from "nodemailer";
+import { assertEgressAllowed } from "./airgap";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { db, assertTestDb } from "../db";
@@ -102,6 +103,9 @@ function buildTransport() {
   if (!row) {
     throw new Error("SMTP 설정이 없습니다 — 설정 화면에서 사내 SMTP 서버 정보를 먼저 등록하세요.");
   }
+  // 에어갭 봉인(후-4) — SMTP는 fetch가 아니라 소켓이라 fetch 관문이 못 본다. 여기서 호스트를
+  //   직접 검사한다. 봉인 상태에서 외부 메일 서버면 던진다(내부망 릴레이는 사설IP·명시허용으로 통과).
+  assertEgressAllowed(row.host, "SMTP 메일 발송");
   const password = row.encryptedPassword ? decryptString(row.encryptedPassword, getEncryptionKey()) : undefined;
   return {
     transport: nodemailer.createTransport({

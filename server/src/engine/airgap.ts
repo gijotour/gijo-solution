@@ -32,6 +32,11 @@ export const EGRESS_POINTS: EgressPoint[] = [
   { id: "lawinfo", label: "법제처 법령 조회", host: "www.law.go.kr", 대체: "사내 규정 문서(RAG)" },
   { id: "hfmodels", label: "HuggingFace 모델 검색·다운로드", host: "huggingface.co", 대체: "사전 반입한 모델 파일(오프라인 이식)" },
   { id: "reposcan", label: "외부 저장소 스캔", host: "api.github.com", 대체: "사내 저장소(사설망 IP·명시 허용)" },
+  // ⚠ fetch가 아닌 통로 — SMTP·SIEM은 소켓(nodemailer·dgram/net/tls)이라 fetch 관문이 못 본다.
+  //   그래서 email.ts·siem.ts가 연결 직전에 assertEgressAllowed로 **호스트를 따로** 검사한다.
+  //   봉인 대상 호스트는 설정값이라 고정 이름이 없다(내부망만 허용, 외부는 차단).
+  { id: "smtp", label: "메일 발송(SMTP)", host: "설정한 메일 서버(소켓)", 대체: "내부망 릴레이만 허용 · 외부 메일 서버는 봉인" },
+  { id: "siem", label: "SIEM 전달(syslog UDP·TCP·TLS)", host: "설정한 SIEM 서버(소켓)", 대체: "내부망 SIEM만 허용 · 외부는 봉인" },
 ];
 
 const LOOPBACK = new Set(["localhost", "127.0.0.1", "::1", "0.0.0.0"]);
@@ -65,23 +70,59 @@ export function isAirgapOn(): boolean {
   return v === "1" || v === "true" || v === "on" || v === "yes";
 }
 
+/** 호스트 하나가 에어갭에서 내부로 인정되는가(default-deny). fetch URL·소켓 공용 판정. */
+export function hostAllowed(host: string): { allowed: boolean; reason: string } {
+  const h = (host ?? "").toLowerCase().replace(/^\[|\]$/g, "");
+  if (!h) return { allowed: true, reason: "호스트 없음" };
+  if (LOOPBACK.has(h)) return { allowed: true, reason: "루프백" };
+  if (isPrivateIp(h)) return { allowed: true, reason: "사설 IP 대역(내부망)" };
+  if (명시허용().includes(h)) return { allowed: true, reason: "명시 허용(GIJO_AIRGAP_ALLOW)" };
+  return { allowed: false, reason: "외부 호스트 — 에어갭 봉인" };
+}
+
 /** 이 URL이 에어갭에서 나가도 되는가. default-deny — 내부로 확인될 때만 허용. */
 export function egressAllowed(urlString: string): { allowed: boolean; host: string; reason: string } {
   let host = "";
   try {
-    host = new URL(urlString).hostname.toLowerCase();
+    host = new URL(urlString).hostname;
   } catch {
     // 상대경로·비정상 URL은 나갈 호스트가 없다 — fetch가 알아서 처리하게 둔다(우리가 막을 것이 없다).
     return { allowed: true, host: "", reason: "호스트 없음" };
   }
-  if (LOOPBACK.has(host)) return { allowed: true, host, reason: "루프백" };
-  if (isPrivateIp(host)) return { allowed: true, host, reason: "사설 IP 대역(내부망)" };
-  if (명시허용().includes(host)) return { allowed: true, host, reason: "명시 허용(GIJO_AIRGAP_ALLOW)" };
-  return { allowed: false, host, reason: "외부 호스트 — 에어갭 봉인" };
+  const d = hostAllowed(host);
+  return { allowed: d.allowed, host: host.toLowerCase(), reason: d.reason };
 }
 
 let 설치됨 = false;
 let 차단수 = 0;
+const 감사된키 = new Set<string>(); // 같은 통로의 반복 차단으로 감사가 넘치지 않게 첫 1회만 남긴다
+
+/** 첫 발생만 감사에 남긴다(true 반환). SIEM처럼 잦은 통로의 로그 폭주 방지. */
+function 처음차단인가(key: string): boolean {
+  if (감사된키.has(key)) return false;
+  감사된키.add(key);
+  return true;
+}
+
+/**
+ * fetch가 아닌 통로(SMTP·SIEM 소켓 등)를 봉인하는 관문 — **연결 직전에** 호출한다.
+ * 에어갭이고 호스트가 외부면 던진다. 봉인이 아니면 아무것도 안 한다(일반 배치 무영향).
+ * fetch 관문이 못 보는 소켓 경로의 구멍을 이걸로 막는다(v1은 fetch만 덮어 SMTP·SIEM이 샜다).
+ */
+export function assertEgressAllowed(host: string, label: string): void {
+  if (!isAirgapOn()) return;
+  const d = hostAllowed(host);
+  if (d.allowed) return;
+  차단수++;
+  if (처음차단인가(`${label}:${host}`)) {
+    recordAudit({
+      kind: "block", actor: "시스템(에어갭)",
+      action: "에어갭 외부 연결 차단", target: `${label}:${host}`,
+      detail: `막은 연결: ${label} → ${host} (소켓 통로)`, result: "blocked",
+    });
+  }
+  throw new Error(`에어갭 모드: ${label}의 외부 호스트(${host}) 연결이 봉인으로 차단됐습니다.`);
+}
 
 /** globalThis.fetch를 감싸 에어갭 봉인을 강제한다. 부팅 아주 이른 시점에 한 번 부른다(멱등). */
 export function installAirgapGuard(): void {
@@ -101,12 +142,14 @@ export function installAirgapGuard(): void {
     const v = egressAllowed(urlStr);
     if (!v.allowed) {
       차단수++;
-      // 봉인 위반 시도는 그 자체가 사건이다 — 감사에 남긴다. 캐치되어 조용히 사라지지 않게.
-      recordAudit({
-        kind: "block", actor: "시스템(에어갭)",
-        action: "에어갭 외부 요청 차단", target: v.host,
-        detail: `막은 요청: ${urlStr.slice(0, 120)}`, result: "blocked",
-      });
+      // 봉인 위반 시도는 그 자체가 사건이다 — 감사에 남긴다(같은 호스트는 첫 1회만, 폭주 방지).
+      if (처음차단인가(`fetch:${v.host}`)) {
+        recordAudit({
+          kind: "block", actor: "시스템(에어갭)",
+          action: "에어갭 외부 요청 차단", target: v.host,
+          detail: `막은 요청: ${urlStr.slice(0, 120)}`, result: "blocked",
+        });
+      }
       throw new Error(`에어갭 모드: 외부 호스트(${v.host}) 요청이 봉인으로 차단됐습니다.`);
     }
     return 원래fetch(input, init);
