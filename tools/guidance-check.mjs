@@ -1,0 +1,130 @@
+// guidance-check — **제품이 「이렇게 말하세요」라고 안내한 명령이 실제로 걸리는가.**
+//
+//   node tools/guidance-check.mjs          ← 전수 점검
+//   node tools/guidance-check.mjs --목록   ← 뽑아낸 안내 문구만 보기
+//
+// 왜 필요한가(2026-08-04):
+//   147상황을 회차마다 재는데 **매번 144/147이고 불편 건이 바뀐다.** 147개 중 95개가
+//   모델 판단이라 거기서 흔들린다. 규칙을 하나씩 못 박는 방식은 두더지잡기였다 —
+//   무엇이 튀어나올지 모르니 끝을 알 수 없다.
+//
+//   그런데 흔들려도 되는 말과 **절대 흔들리면 안 되는 말**은 다르다.
+//   담당자가 아무렇게나 친 말은 모델이 잘 골라 주면 된다. 그러나 **제품이 직접
+//   "이렇게 물어보세요"라고 적어 준 말**은 이야기가 다르다 — 우리가 시킨 대로 쳤는데
+//   답이 회차마다 다르면, 그건 제품이 자기 말을 못 지킨 것이다.
+//
+//   그래서 재는 대상을 **제품이 약속한 말**로 좁힌다. 이건 유한하고, 셀 수 있고,
+//   전부 결정적으로 만들 수 있다. 두더지잡기가 아니라 **끝이 있는 목록**이 된다.
+//
+// ⚠ 이 도구는 제품을 흉내 내지 않는다 — route-explain과 같이 실제 소스에서 정규식을 읽는다.
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const 뿌리 = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
+const 엔진 = (f) => fs.readFileSync(path.join(뿌리, "server/src/engine", f), "utf8");
+
+// ── 안내 문구 뽑기 ────────────────────────────────────────────────────────────
+// 제품이 답변 안에서 따옴표로 적어 주는 명령들. `"○○ 자산 취약점 알려줘"` 꼴.
+function 안내명령들() {
+  const 줄들 = ["agenttools.ts", "agentloop.ts", "dispatcher.ts", "screenguide.ts", "workflow.ts"]
+    .flatMap((f) => { try { return 엔진(f).split("\n"); } catch { return []; } });
+  const 끝맺음 = /(해줘|알려줘|보여줘|만들어줘|읽어줘|배정해줘|정리해줘|확인해줘|추천해줘|복구해줘|찾아줘)$/;
+  const 본것 = new Set();
+  const 결과 = [];
+  let 설명안 = false;
+  for (const 줄 of 줄들) {
+    // ⚠ **도구 설명(description) 안의 예시는 세지 않는다**(2026-08-04 스스로 정정).
+    //   그건 담당자에게 주는 약속이 아니라 **LLM 라우터에게 주는 예시**다 — 모델이
+    //   고르라고 적어 둔 것을 "모델 판단이라 문제"라고 세면 숫자가 부풀려진다.
+    //   처음 돌렸을 때 29개가 나왔는데, 그중 상당수가 이것이었다.
+    if (/^\s*description:/.test(줄)) 설명안 = true;
+    else if (/^\s*(name|label|domain|write|params|run|effect|undo|directAnswer|autoFill|\}|\{)/.test(줄)) 설명안 = false;
+    if (설명안) continue;
+    // 주석 안의 예시도 세지 않는다 — 담당자가 보는 글이 아니다.
+    if (/^\s*(\/\/|\*|\/\*)/.test(줄)) continue;
+
+    for (const m of 줄.matchAll(/"([^"\n]{4,44})"/g)) {
+      let s = m[1].trim();
+      if (!끝맺음.test(s)) continue;
+      if (s.includes("${")) continue;              // 코드 조각(자리표시자)은 그대로 못 친다
+      if (/^[a-z_]+$/i.test(s)) continue;           // 도구 이름
+      // ⚠ 두 낱말 이하의 토막(「배정해줘」·「설명해줘」)은 안내가 아니라 **말투 예시**다.
+      //   그대로 쳐도 대상이 없어 안 되는 게 맞다 — 결함으로 세면 안 된다.
+      if (s.split(/\s+/).length < 2) continue;
+      // 「○○」는 담당자가 실제 이름을 넣는 자리다 — 우리 데이터에 있는 이름으로 바꿔 잰다.
+      const 원문 = s;
+      s = s.replace(/○○/g, "GIJO AS 서버");
+      if (본것.has(s)) continue;
+      본것.add(s);
+      결과.push({ 원문, 질문: s });
+    }
+  }
+  return 결과;
+}
+
+// ── 강제 규칙 읽기(route-explain과 같은 방식) ─────────────────────────────────
+function 강제규칙들() {
+  const a = 엔진("agentloop.ts");
+  const i = a.indexOf("const FORCED_INTENTS");
+  const 블록 = a.slice(i, a.indexOf("\n];", i));
+  const 규칙 = [];
+  // `re: /…/,` 다음 줄들에서 `tool: "…"`를 찾는다.
+  const re = /re:\s*(\/(?:[^/\\\n]|\\.)+\/[gimsuy]*)\s*,\s*\n\s*tool:\s*"([a-z_]+)"/g;
+  for (const m of 블록.matchAll(re)) {
+    try { 규칙.push({ re: eval(m[1]), tool: m[2] }); } catch { /* 못 읽은 것은 건너뛴다 */ }
+  }
+  return 규칙;
+}
+
+// dispatcher의 특수 경로(결정적으로 답하는 자리)도 본다.
+function 특수경로들() {
+  const d = 엔진("dispatcher.ts");
+  const 목 = [];
+  for (const m of d.matchAll(/const ([A-Z_]+_RE)\s*=\s*(\/(?:[^/\\\n]|\\.)+\/[gimsuy]*)/g)) {
+    try { 목.push({ 이름: m[1], re: eval(m[2]) }); } catch { /* 건너뜀 */ }
+  }
+  return 목;
+}
+
+const 규칙 = 강제규칙들();
+const 특수 = 특수경로들();
+const 안내 = 안내명령들();
+
+if (process.argv.includes("--목록")) {
+  안내.forEach((x) => console.log("  " + x.원문 + (x.원문 !== x.질문 ? `   → 잴 때: ${x.질문}` : "")));
+  console.log(`\n총 ${안내.length}개`);
+  process.exit(0);
+}
+
+// ⚠ **이 점검이 헛돌고 있지 않은가.** 규칙을 하나도 못 읽었으면 전부 「모델 판단」으로 나온다 —
+//   그건 결함이 아니라 내 도구가 눈을 감은 것이다.
+if (규칙.length < 20 || 안내.length < 10) {
+  console.error(`✗ 점검이 헛돈다 — 규칙 ${규칙.length}개 · 안내 ${안내.length}개밖에 못 읽었다.`);
+  console.error("  소스 형식이 바뀌었을 수 있다. 고치기 전에는 이 결과를 믿지 말 것.");
+  process.exit(2);
+}
+
+const 결정적 = [];
+const 모델판단 = [];
+for (const x of 안내) {
+  const r = 규칙.find((g) => g.re.test(x.질문));
+  const s = 특수.find((g) => g.re.test(x.질문));
+  if (r) 결정적.push({ ...x, 도착: r.tool });
+  else if (s) 결정적.push({ ...x, 도착: s.이름 });
+  else 모델판단.push(x);
+}
+
+console.log("\n  제품이 「이렇게 말하세요」라고 안내한 명령 — 실제로 걸리는가\n");
+console.log(`    안내 문구 ${안내.length}개 · 규칙 ${규칙.length}개 · 특수경로 ${특수.length}개`);
+console.log(`    ✓ 결정적으로 걸림 ${결정적.length}개`);
+console.log(`    ⚠ 모델 판단 ${모델판단.length}개  ← 회차마다 답이 달라질 수 있는 자리\n`);
+
+if (모델판단.length) {
+  console.log("  모델 판단으로 가는 안내 문구:");
+  모델판단.forEach((x) => console.log("    · " + x.원문));
+  console.log("\n  ⚠ 이것들이 곧 「우리가 시킨 대로 쳤는데 답이 흔들리는」 자리다.");
+}
+
+// 정보만 준다 — 통과·실패를 여기서 정하지 않는다(기준은 시험이 정한다).
+process.exit(0);
