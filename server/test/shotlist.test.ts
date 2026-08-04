@@ -47,6 +47,34 @@ describe("★★ 자료에 들어갈 화면이 빠지지 않는다", () => {
     ).toEqual([]);
   });
 
+  it("★★ 고객에게 주는 자료가 **없는 화면**을 가리키지 않는다", () => {
+    // 실사고(2026-08-04): 사용자 매뉴얼과 제품소개가 은퇴한 화면 4개의 옛 사진을 가리키고
+    // 있었다 — 고객이 "이 메뉴 어디 있어요?"라고 물으면 답이 없다.
+    // 파일은 남아 있어 링크는 안 깨진다. **그래서 아무도 모른다.**
+    const 은퇴 = ["04-운영가이드", "07-추천LLM가이드", "16-지식모델-온톨로지", "19-사용량-요금"];
+    const 고객자료 = ["GIJO_AS_제품소개서.md", "GIJO_AS_시연_패키지.md"];
+    const 걸린것: string[] = [];
+    for (const f of 고객자료) {
+      const p = join(ROOT, f);
+      let t = "";
+      try { t = readFileSync(p, "utf8"); } catch { continue; }
+      for (const s of 은퇴) if (t.includes(s)) 걸린것.push(`${f} → ${s}`);
+    }
+    expect(걸린것, `없어진 화면의 옛 사진을 가리킨다:\n  ${걸린것.join("\n  ")}`).toEqual([]);
+  });
+
+  it("★ 고객 자료의 그림 링크가 실제 파일을 가리킨다", () => {
+    const 끊긴것: string[] = [];
+    for (const f of ["GIJO_AS_제품소개서.md", "GIJO_AS_시연_패키지.md"]) {
+      let t = "";
+      try { t = readFileSync(join(ROOT, f), "utf8"); } catch { continue; }
+      for (const m of t.matchAll(/!\[[^\]]*\]\(([^)]+)\)/g)) {
+        try { readFileSync(join(ROOT, m[1])); } catch { 끊긴것.push(`${f} → ${m[1]}`); }
+      }
+    }
+    expect(끊긴것, `그림 파일이 없다:\n  ${끊긴것.join("\n  ")}`).toEqual([]);
+  });
+
   it("⚠ 감시가 헛돌지 않는가 — 메뉴 화면을 실제로 세고 있다", () => {
     // 메뉴 목록이 0개로 읽히면 위 시험은 **항상 통과한다**(빈 배열끼리 비교).
     // 그건 지키는 게 아니라 안 보는 것이다.
