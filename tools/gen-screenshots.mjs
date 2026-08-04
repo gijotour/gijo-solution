@@ -181,6 +181,10 @@ async function main() {
       // ★ 2026-08-04 새로 찍는 화면(작업 세션·리포트).
       //   ⚠ 아래 Proxy가 모르는 함수에 **빈 배열**을 돌려주므로, 안 적으면 화면이 깨지지 않고
       //     **조용히 비어 보인다.** 빈 화면을 제안 자료에 넣으면 "이 기능은 아무것도 없나 보다"가 된다.
+      // ⚠ 이건 **동기 함수**다(Promise가 아니다). Proxy 기본값(Promise)이 걸리면
+      //   `info.remainingMs`가 undefined가 되어 상단에 「⏳ 세션 NaN:NaN」이 찍힌다
+      //   — 제안 자료에 그 글자가 들어갈 뻔했다(2026-08-04).
+      sessionActivity: () => ({ remainingMs: 27 * 60 * 1000, monitorMode: false }),
       listWorkSessions: () => R(DATA.workSessions || []),
       sessionPatterns: () => R(DATA.sessionPatterns || {}),
       listReportHistory: () => R(DATA.reportHistory || []),

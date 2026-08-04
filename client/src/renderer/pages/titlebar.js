@@ -396,7 +396,15 @@
       return;
     }
     var info; try { info = window.gijo.sessionActivity(); } catch (e) { return; }
-    var ms = Math.max(0, info.remainingMs);
+    // ⚠ 값이 없으면 **NaN을 그대로 보여 주지 않는다**(2026-08-04 발견: 「⏳ 세션 NaN:NaN」).
+    //   숫자가 아니면 "--:--"로 둔다 — 담당자가 NaN을 보면 제품이 고장 난 줄 안다.
+    var ms = info && typeof info.remainingMs === "number" && isFinite(info.remainingMs)
+      ? Math.max(0, info.remainingMs) : null;
+    if (ms === null) {
+      sessTimeEl.textContent = "--:--";
+      sessChip.style.display = "inline-flex";
+      return;
+    }
     var m = Math.floor(ms / 60000), s = Math.floor((ms % 60000) / 1000);
     sessTimeEl.textContent = m + ":" + String(s).padStart(2, "0");
     var rgb = ms > 300000 ? "30,185,128" : ms > 120000 ? "240,160,32" : "226,72,61";
