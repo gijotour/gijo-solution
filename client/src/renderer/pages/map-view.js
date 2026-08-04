@@ -23,9 +23,15 @@
 
   const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 
-  /** 서버 isRealVulnerability와 같은 잣대(agenttools.ts) — 이름으로는 거르지 않는다. */
+  // 서버 isRealVulnerability(agenttools.ts SCAN_NOISE)와 **같은 목록**이어야 한다 —
+  // 하나라도 빠지면 지도 타일 크기가 표와 어긋난다(2026-08-04: scan_not_supported가 빠져 있었다).
+  var SCAN_NOISE = ["scan_error", "scan_not_supported"];
+  /** 서버 isRealVulnerability와 같은 잣대 — 이름으로는 거르지 않는다(심각도만 본다). */
   function 진짜취약(f) {
-    return f.state !== "fixed" && f.finding_type !== "scan_error" && f.severity !== "info";
+    if (f.state === "fixed") return false;
+    if (SCAN_NOISE.indexOf(f.finding_type) >= 0) return false;
+    if (String(f.severity || "").toLowerCase() === "info") return false;
+    return true;
   }
 
   /**
