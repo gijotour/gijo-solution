@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>시안 — 지도 문법을 관제·취약점으로 (전-7 · 지형도 3단계)</title>
+<style>
+  :root{ --bg:#141312; --panel:#1c1b19; --panel2:#242220; --line:#332f2b; --text:#e9e7e2; --dim:#9a938a;
+         --red:#e5484d; --org:#f2811d; --amb:#f0a020; --grn:#46a758; --blu:#5b8dd6; --pur:#8b7cf0; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:13px/1.45 "Malgun Gothic","맑은 고딕",system-ui,sans-serif}
+  .wrap{max-width:1180px;margin:0 auto;padding:14px 16px 40px}
+  h1{font-size:15px;margin:0 0 2px}
+  h2{font-size:13.5px;margin:20px 0 6px}
+  .sub{color:var(--dim);font-size:12px;margin:0 0 12px}
+  .note{border:1px dashed #4a423a;background:#1a1714;color:#d8cfc2;padding:9px 11px;border-radius:5px;font-size:12px;margin:12px 0}
+  .note b{color:#f0e6d8}
+  .note table{border-collapse:collapse;width:100%;font-size:12px;margin-top:6px}
+  .note th,.note td{border-bottom:1px solid var(--line);padding:4px 7px;text-align:left}
+  .note th{color:var(--dim);font-weight:500}
+  .screen{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
+  .stitle{padding:7px 10px;border-bottom:1px solid var(--line);font-size:12px;color:var(--dim)}
+  .stitle b{color:var(--text)}
+
+  /* ── ㉮ 관제 4소스 히트맵 ── */
+  .hm{padding:12px;display:grid;grid-template-columns:120px repeat(4,1fr);gap:3px;align-items:stretch}
+  .hm .rh{font-size:11.5px;color:var(--dim);display:flex;align-items:center;padding-right:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hm .ch{font-size:11px;color:var(--dim);text-align:center;padding-bottom:3px;font-weight:600}
+  .cell{border-radius:4px;min-height:34px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;cursor:pointer;color:#fff}
+  .cell:hover{outline:1px solid #fff8}
+  .c0{background:#231f1c;color:var(--dim);font-weight:400}
+  .c1{background:rgba(70,167,88,.35)} .c2{background:rgba(240,160,32,.4)}
+  .c3{background:rgba(242,129,29,.5)} .c4{background:rgba(229,72,77,.62)}
+  .corr{outline:2px solid var(--pur)!important;position:relative}
+  .corr::after{content:"⚑";position:absolute;top:-4px;right:2px;font-size:10px;color:var(--pur)}
+
+  /* ── ㉯ 취약점 심각도 히트맵 ── */
+  .sev{display:flex;flex-wrap:wrap;gap:4px;padding:12px}
+  .sv{border-radius:4px;padding:5px 8px;font-size:11.5px;cursor:pointer;min-width:76px;color:#fff}
+  .sv b{display:block;font-size:13px}
+  .sv-c{background:rgba(229,72,77,.6)} .sv-h{background:rgba(242,129,29,.5)}
+  .sv-m{background:rgba(240,160,32,.42)} .sv-l{background:rgba(70,167,88,.35)}
+  .legend{font-size:11px;color:var(--dim);padding:0 12px 10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>시안 — <b>지도 문법을 관제·취약점으로</b> <span style="color:var(--dim);font-weight:400">(전-7 · 지형도 3단계)</span></h1>
+<p class="sub">1·2단계에서 자산 화면을 지도로 만들었습니다. 같은 문법(칸=대상 · 색=위험 · 클릭=상세 · 지시는 대화창)을 관제·취약점 화면에도 폅니다. 숫자는 2026-08-04 운영 실측.</p>
+
+<div class="note">
+  <b>지금 이 두 화면의 문제</b> — 파트너 지적(「첫장이 너무 복잡」)이 여기서도 반복됩니다.<br>
+  · 관제(analysis)는 4소스 이벤트 <b>4,845건</b>을 목록으로 쏟습니다 — 어느 자산이 여러 소스에 동시에 걸렸는지(상관)가 목록 속에 묻힙니다.<br>
+  · 취약점(vulnscan)은 <b>4,833건</b>을 표로 나열합니다 — 어디에 심각한 것이 몰렸는지 한눈에 안 보입니다.
+</div>
+
+<!-- ㉮ 관제 4소스 히트맵 -->
+<h2>㉮ 관제 — <b>자산 × 4소스</b> 히트맵 <span style="color:var(--dim);font-weight:400">(같은 자산이 여러 소스에 걸리면 ⚑ 상관)</span></h2>
+<div class="screen">
+  <div class="stitle">가로=소스(취약점·보안로그·운영리포트·하드닝) · 세로=자산 · 색 진할수록 건수 많음 · <b>⚑=두 소스 이상 동시 = 상관(가장 위험)</b></div>
+  <div class="hm" id="hm"></div>
+</div>
+<div class="note">
+  <b>왜 이게 관제의 핵심인가</b> — 취약점 하나, 로그 하나는 흔합니다. 그러나 <b>같은 자산이
+  취약점 + 이상 로그에 동시에</b> 뜨면 그건 「악용이 진행 중」일 수 있습니다. 히트맵은 그 교집합(⚑)을
+  색과 테두리로 즉시 드러냅니다 — 목록에서는 스크롤로 대조해야 보이던 것입니다.
+  <br>⚠ 지금 로그·리포트 소스는 <b>각 3·4건</b>뿐이라 상관 칸이 적습니다. 소스가 채워질수록 이 화면의 값이 커집니다(실데이터라 부풀리지 않습니다).
+</div>
+
+<!-- ㉯ 취약점 심각도 히트맵 -->
+<h2>㉯ 취약점 — <b>자산별 심각도</b> 히트맵 <span style="color:var(--dim);font-weight:400">(크기=건수 · 색=최고 심각도)</span></h2>
+<div class="screen">
+  <div class="stitle">「오늘의 조치」 목록은 그대로 두고, 그 아래 <b>[🗺 히트맵]</b> 탭을 추가합니다(자산 화면 지도 탭과 같은 방식).</div>
+  <div class="sev" id="sev"></div>
+  <div class="legend">색: <span style="color:#ff8f88">■</span> critical · <span style="color:#f7a86a">■</span> high · <span style="color:#f7c777">■</span> medium · <span style="color:#8fdca8">■</span> low · 클릭 → 우측 상세 + 「○○ 취약점 알려줘」(대화창)</div>
+</div>
+
+<div class="note">
+  <b>세 화면이 같은 문법을 씁니다 — 한 번 배우면 셋 다 압니다</b>
+  <table>
+    <tr><th>화면</th><th>칸</th><th>색</th><th>클릭</th></tr>
+    <tr><td>자산(1·2단계)</td><td>자산 타일</td><td>위험 등급</td><td rowspan="3" style="vertical-align:middle">상세 + 대화창에 묻기<br>(지시는 전부 대화창)</td></tr>
+    <tr><td>관제(3단계 ㉮)</td><td>자산×소스 칸</td><td>건수 + ⚑상관</td></tr>
+    <tr><td>취약점(3단계 ㉯)</td><td>자산 타일</td><td>최고 심각도</td></tr>
+  </table>
+</div>
+
+<div class="note">
+  <b>구현 제안 — 1·2단계와 같은 방식</b><br>
+  · 두 화면에 <b>[🗺 히트맵] 탭</b>만 추가(새 메뉴 안 늘림). map-view.js를 히트맵용으로 넓혀 재사용.<br>
+  · 판정은 <b>화면 것을 주입</b> — 관제는 analysis-hub 상관 결과, 취약점은 riskOf를 그대로 받아 씁니다(숫자가 표와 어긋나지 않게).<br>
+  · 색·클릭·대화창 규약은 자산 지도와 동일 — 코드도 문법도 재사용.
+</div>
+
+<div class="note">⚠ <b>구현은 승인 후.</b> 이 시안이 좋으면 관제(㉮)부터 붙이겠습니다 — 상관이 제품 1차 목표(3소스 통합 관제)의 핵심이라 값이 가장 큽니다.</div>
+
+<script>
+// 실측 표본(2026-08-04): 소스별 vuln 4828·log 3·product 4·hardening 10.
+// 자산별로 어느 소스에 몇 건 걸렸나(대표 자산 8 + 상관 사례).
+const ASSETS = [
+  { n:"192.168.219.98",      v:354, l:0, p:0, h:0 },
+  { n:"172.168.50.142",      v:1172,l:1, p:0, h:1 },   // 취약점+로그+하드닝 → 상관
+  { n:"192.168.219.111",     v:277, l:0, p:0, h:1 },   // 취약점+하드닝 → 상관
+  { n:"GIJO AS 서버(로컬)",   v:553, l:1, p:0, h:0 },   // 취약점+로그 → 상관
+  { n:"10.10.20.21",         v:88,  l:0, p:0, h:1 },
+  { n:"샘플-웹서버",          v:2,   l:1, p:1, h:0 },   // 취약점+로그+제품 → 상관
+  { n:"cert.aj-safe.co.kr",  v:5,   l:0, p:0, h:0 },
+  { n:"certify.aj-safe.co.kr",v:5,  l:0, p:1, h:0 },
+];
+const lvl = (n) => n===0?0 : n>=300?4 : n>=100?3 : n>=10?2 : 1;
+const SRC = [["v","취약점"],["l","보안로그"],["p","운영리포트"],["h","하드닝"]];
+const hm = document.getElementById("hm");
+hm.innerHTML = '<div></div>' + SRC.map(s=>`<div class="ch">${s[1]}</div>`).join("");
+for (const a of ASSETS) {
+  const 걸린소스 = SRC.filter(([k])=>a[k]>0).length;
+  hm.innerHTML += `<div class="rh" title="${a.n}">${a.n}</div>` + SRC.map(([k])=>{
+    const c = lvl(a[k]);
+    const corr = a[k]>0 && 걸린소스>=2 ? " corr" : "";
+    return `<div class="cell c${c}${corr}" onclick="alert('실제 구현: 우측 상세 + 대화창에 &quot;${a.n} 취약점 알려줘&quot;')">${a[k]||""}</div>`;
+  }).join("");
+}
+// ㉯ 취약점 심각도 히트맵 — 자산별 최고 심각도 표본
+const SEV = [
+  { n:"172.168.50.142", v:1172, s:"c" }, { n:"GIJO AS 서버(로컬)", v:553, s:"c" },
+  { n:"192.168.219.98", v:354, s:"c" }, { n:"192.168.219.111", v:277, s:"c" },
+  { n:"172.168.50.21", v:214, s:"h" }, { n:"10.10.20.21", v:88, s:"h" },
+  { n:"172.168.50.87", v:96, s:"h" }, { n:"172.168.50.1", v:44, s:"m" },
+  { n:"172.168.50.41", v:31, s:"m" }, { n:"certify", v:5, s:"m" },
+  { n:"cert", v:5, s:"m" }, { n:"샘플-웹서버", v:2, s:"m" },
+];
+document.getElementById("sev").innerHTML = SEV.map(x=>{
+  const sz = 76 + Math.sqrt(x.v)*6;
+  return `<div class="sv sv-${x.s}" style="flex-basis:${sz}px" onclick="alert('실제 구현: 우측 상세 + 대화창에 &quot;${x.n} 취약점 알려줘&quot;')">${x.n}<b>${x.v.toLocaleString()}건</b></div>`;
+}).join("");
+</script>
+</div>
+</body>
+</html>
