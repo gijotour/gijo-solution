@@ -1,0 +1,215 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>시안 — 보안 지형도: 지도가 곧 메뉴 (전-7)</title>
+<style>
+  :root{ --bg:#141312; --panel:#1c1b19; --panel2:#242220; --line:#332f2b; --text:#e9e7e2; --dim:#9a938a;
+         --red:#e5484d; --org:#f2811d; --amb:#f0a020; --grn:#46a758; --blu:#5b8dd6; --pur:#8b7cf0; }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font:13px/1.45 "Malgun Gothic","맑은 고딕",system-ui,sans-serif}
+  .wrap{max-width:1280px;margin:0 auto;padding:14px 16px 40px}
+  h1{font-size:15px;margin:0 0 2px}
+  .sub{color:var(--dim);font-size:12px;margin:0 0 12px}
+  .note{border:1px dashed #4a423a;background:#1a1714;color:#d8cfc2;padding:9px 11px;
+        border-radius:5px;font-size:12px;margin:12px 0}
+  .note b{color:#f0e6d8}
+  .note table{border-collapse:collapse;width:100%;font-size:12px;margin-top:6px}
+  .note th,.note td{border-bottom:1px solid var(--line);padding:4px 7px;text-align:left}
+  .note th{color:var(--dim);font-weight:500}
+
+  /* ── 화면 흉내(1440×776 기준) ── */
+  .screen{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--panel)}
+  .band{display:flex;gap:5px;padding:6px 8px;border-bottom:1px solid var(--line);font-size:11.5px;color:var(--dim)}
+  .band .st{background:#231f1c;border:1px solid var(--line);border-radius:4px;padding:3px 8px;white-space:nowrap}
+  .band .st b{color:var(--text);margin-left:4px}
+  .band .st.hot b{color:var(--red)}
+  .toolrow{display:flex;gap:6px;align-items:center;padding:6px 8px;border-bottom:1px solid var(--line);font-size:11.5px}
+  .chip{border:1px solid var(--line);border-radius:12px;padding:2px 10px;color:var(--dim);cursor:pointer}
+  .chip.on{background:rgba(91,141,214,.16);border-color:var(--blu);color:#bcd3f2}
+  .legend{margin-left:auto;display:flex;gap:8px;color:var(--dim);font-size:11px}
+  .sw{display:inline-block;width:9px;height:9px;border-radius:2px;margin-right:3px;vertical-align:-1px}
+
+  .stage{display:flex;height:520px}
+  .map{flex:1;padding:8px;display:flex;flex-direction:column;gap:8px;min-width:0}
+  .zone{border:1px solid var(--line);border-radius:6px;padding:5px 7px 7px;background:var(--panel2)}
+  .zone h4{margin:0 0 5px;font-size:11.5px;color:var(--dim);font-weight:600}
+  .zone h4 b{color:var(--text)}
+  .tiles{display:flex;flex-wrap:wrap;gap:5px}
+  .tile{border-radius:4px;padding:4px 7px;font-size:11.5px;cursor:pointer;border:1px solid transparent;
+        display:flex;flex-direction:column;justify-content:space-between;min-width:70px;position:relative}
+  .tile:hover{border-color:#fff5}
+  .tile.sel{border-color:#fff;box-shadow:0 0 0 1px #fff8}
+  .tile .nm{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .tile .ct{font-size:10.5px;opacity:.85}
+  .tile .kev{position:absolute;top:-5px;right:-5px;background:var(--red);color:#fff;border-radius:8px;
+             font-size:9px;padding:1px 5px;font-weight:800}
+  .t-high{background:rgba(229,72,77,.30);color:#ffd7d8}
+  .t-mid{background:rgba(240,160,32,.26);color:#ffe9c4}
+  .t-low{background:rgba(70,167,88,.22);color:#d2f2da}
+  .t-ai{outline:1px dashed rgba(139,124,240,.55)}
+
+  .side{width:320px;border-left:1px solid var(--line);padding:10px 12px;background:var(--panel);
+        display:flex;flex-direction:column;gap:8px;font-size:12px}
+  .side h3{margin:0;font-size:13px}
+  .side .rk{font-size:11.5px;padding:2px 8px;border-radius:4px;display:inline-block;margin-right:6px}
+  .side .row{border-bottom:1px solid var(--line);padding:5px 0}
+  .side .lbl{color:var(--dim);font-size:11px}
+  .askbtn{background:rgba(91,141,214,.16);border:1px solid var(--blu);color:#bcd3f2;border-radius:5px;
+          padding:6px 10px;cursor:pointer;font-size:12px;text-align:left}
+  .askbtn:hover{background:rgba(91,141,214,.28)}
+  .hint{color:var(--dim);font-size:11px;margin-top:auto}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<h1>시안 — <b>보안 지형도</b>: 지도가 곧 메뉴 <span style="color:var(--dim);font-weight:400">(전-7 · 「AI 아닌 듯한 화면」)</span></h1>
+<p class="sub">타일을 실제로 눌러 보세요 — 오른쪽 패널이 바뀝니다. 숫자는 2026-08-04 운영 실측값입니다.</p>
+
+<!-- ══ 실제 시안(동작함) ══ -->
+<div class="screen">
+  <div class="band">
+    <span class="st">① 발견·수집 <b>57</b></span><span class="st hot">② 우선순위 <b>4,833</b></span>
+    <span class="st">③ 조치 <b>0</b></span><span class="st">④ 검증 <b>29</b></span><span class="st">⑤ 보고 <b>1</b></span>
+    <span style="margin-left:auto;align-self:center;color:#8b8279">지도가 첫 화면 · 표는 [목록 보기]로</span>
+  </div>
+  <div class="toolrow">
+    <span class="chip on" onclick="filt(this,'all')">전체 57</span>
+    <span class="chip" onclick="filt(this,'kev')">🔴 실제 악용만</span>
+    <span class="chip" onclick="filt(this,'high')">고위험만 27</span>
+    <span class="chip" onclick="filt(this,'nobody')">담당 없는 곳</span>
+    <span class="chip" style="border-style:dashed">목록 보기 ⇄</span>
+    <span class="legend">
+      <span><span class="sw" style="background:rgba(229,72,77,.7)"></span>고위험</span>
+      <span><span class="sw" style="background:rgba(240,160,32,.7)"></span>중위험</span>
+      <span><span class="sw" style="background:rgba(70,167,88,.7)"></span>저위험</span>
+      <span><span class="sw" style="outline:1px dashed var(--pur);background:none"></span>AI 자산</span>
+      <span>타일 크기 = 미조치 취약점 수</span>
+    </span>
+  </div>
+  <div class="stage">
+    <div class="map" id="map"></div>
+    <div class="side" id="side"></div>
+  </div>
+</div>
+
+<div class="note">
+  <b>왜 이 모양인가 — 조사 근거</b>
+  <table>
+    <tr><th style="width:190px">근거</th><th>이 시안에서</th></tr>
+    <tr><td>Shneiderman 3박자<br><span style="color:#8b8279">훑어보기 → 좁히기 → 눌러서 상세</span></td>
+        <td>지도(전체 훑기) → 칩으로 좁히기(KEV만·고위험만) → 타일 클릭 상세. 정보 시각화의 학계 표준 — 지금 화면은 이 순서가 거꾸로였습니다(상세부터 쏟아냄)</td></tr>
+    <tr><td>업계 흐름(Wiz 보안 그래프,<br>MS 노출 관리, 공격표면 지도)</td>
+        <td>선두 제품들이 「목록」에서 「지도·그래프」로 옮겨 갔습니다 — 자산 사이 관계와 위험이 몰린 곳을 그림으로 먼저 보여 줍니다</td></tr>
+    <tr><td>트리맵(계층 + 크기 + 색)</td><td>구획=네트워크 대역 · 타일 크기=미조치 취약점 수 · 색=위험 등급. <b>등급 규칙은 자산 화면·KPI와 같은 함수</b> — 지도와 표의 숫자가 어긋나면 둘 다 못 믿습니다</td></tr>
+  </table>
+</div>
+
+<div class="note">
+  <b>제품 원칙과 이렇게 맞물립니다</b><br>
+  ① <b>메뉴는 보기용, 지시는 대화창</b> — 지도의 모든 단추는 「대화창에 묻기」로 끝납니다. 지도에서 직접 바꾸는 것은 없습니다.<br>
+  ② <b>클릭 한 번 = 데이터</b> — 타일 클릭이 끝입니다. 새 창도, 메뉴 이동도 없습니다.<br>
+  ③ <b>절차 띠 유지</b> — 맨 위 5단계는 그대로. 지도는 「①발견·②우선순위」를 그림으로 만든 것입니다.<br>
+  ④ <b>폐쇄망 안전</b> — 외부 지도타일·CDN 없이 순수 SVG/HTML. 공격경로(analysis)·온톨로지(memory) 그래프를 이미 손으로 그려 온 방식 그대로입니다.
+</div>
+
+<div class="note">
+  ⚠ <b>정직하게 — 데이터의 함정 두 가지</b><br>
+  ① <b>서비스 구획은 지금 못 그립니다</b> — 자산 57개 중 53개가 서비스 미지정입니다. 그래서 1차 구획은 <b>네트워크 대역</b>(IP는 전부 있음)이고,
+  서비스 지정이 채워지면 「서비스별 보기」가 열립니다. 오히려 지도에 「미지정」이 크게 보이면 채울 동기가 생깁니다.<br>
+  ② <b>타일 크기는 진짜 취약점만 셉니다</b> — 조사 정보(약 1,289건)를 섞으면 지도가 거짓말을 합니다. isRealVulnerability와 같은 잣대를 씁니다.
+</div>
+
+<div class="note">
+  <b>구현 제안 — 작게 시작</b>
+  <table>
+    <tr><th style="width:60px">단계</th><th>일</th><th style="width:90px">크기</th></tr>
+    <tr><td>1</td><td>자산 화면에 <b>[지도 보기 ⇄ 목록 보기]</b> 토글로 파일럿 — 새 메뉴를 늘리지 않고 기존 화면에 보기 전환만 추가</td><td>화면 1개</td></tr>
+    <tr><td>2</td><td>공격경로 겹쳐 그리기 — 지도 위에 진입→거점 화살표(엔진 이미 있음)</td><td>겹층 1개</td></tr>
+    <tr><td>3</td><td>반응 좋으면 취약점·관제 화면에도 같은 문법 확장(심각도 히트맵·4소스 겹침)</td><td>화면 2개</td></tr>
+  </table>
+</div>
+
+<script>
+// ── 실측 기반 자산 데이터(2026-08-04 운영값 표본) ─────────────────────────
+const A=[
+ {z:"172.168.50.x 대역 — 사무망",zs:[
+  {n:"172.168.50.142",v:1172,r:"h",kev:true,who:null,top:["OpenSSL 다중 취약점","SMB 서명 미설정","오래된 커널"]},
+  {n:"172.168.50.21 (tenable)",v:214,r:"h",kev:false,who:null,top:["TLS 1.0 허용","SSH 약한 알고리즘"]},
+  {n:"172.168.50.87",v:96,r:"h",kev:false,who:null,top:["웹서버 배너 노출"]},
+  {n:"172.168.50.1 (_gateway)",v:44,r:"m",kev:false,who:null,top:["SNMP 공개 커뮤니티"]},
+  {n:"…외 21개",v:300,r:"m",kev:false,who:null,top:["(구획 확대로 전체 보기)"],more:true},
+ ]},
+ {z:"192.168.219.x 대역 — 서버망",zs:[
+  {n:"192.168.219.98",v:354,r:"h",kev:true,who:null,top:["Oracle DB 다중 취약점 (EPSS 94%)","OpenSSH < 9.8 RCE"]},
+  {n:"192.168.219.111",v:277,r:"h",kev:true,who:null,top:["OpenSSH < 9.8 RCE (KEV)","SSH Terrapin"]},
+ ]},
+ {z:"10.x 대역 — 내부 인프라",zs:[
+  {n:"GIJO AS 서버(로컬)",v:553,r:"h",kev:false,who:null,top:["패키지 789개 직접 수집됨","오래된 openssl 계열"]},
+  {n:"10.10.20.21",v:88,r:"h",kev:true,who:null,top:["OpenSSH regreSSHion (KEV)"]},
+  {n:"샘플-웹서버 (10.0.0.100)",v:2,r:"m",kev:false,who:"brian",top:["OpenSSH 사용자 열거"]},
+  {n:"10.10.20.41",v:31,r:"m",kev:false,who:null,top:["SMB 서명"]},
+ ]},
+ {z:"AI 자산 — 우리 모델",zs:[
+  {n:"보안 어시스턴트(오케스트레이터)",v:0,r:"l",kev:false,who:"jyh",ai:true,top:["AI-BOM 13/13 기재 ✓","견고성: 실효 100점"]},
+  {n:"이상거래 탐지 AI(FDS)",v:0,r:"l",kev:false,who:"jyh",ai:true,top:["AI-BOM 13/13 기재 ✓"]},
+  {n:"고객상담 RAG 챗봇",v:0,r:"l",kev:false,who:"jyh",ai:true,top:["AI-BOM 13/13 기재 ✓"]},
+ ]},
+ {z:"외부 노출 — 인터넷에서 보이는 것",zs:[
+  {n:"cert.aj-safe.co.kr",v:5,r:"m",kev:false,who:null,top:["평문 전송 구간","디렉토리 인덱싱"]},
+  {n:"certify.aj-safe.co.kr",v:5,r:"m",kev:false,who:null,top:["점검 보고서 5건 (문서 근거)"]},
+ ]},
+];
+const RK={h:["고위험","rgba(229,72,77,.30)","#ffd7d8"],m:["중위험","rgba(240,160,32,.26)","#ffe9c4"],l:["저위험","rgba(70,167,88,.22)","#d2f2da"]};
+let mode="all",selEl=null;
+
+function draw(){
+  const map=document.getElementById("map"); map.innerHTML="";
+  for(const zone of A){
+    const zs=zone.zs.filter(a=>
+      mode==="all"|| (mode==="kev"&&a.kev) || (mode==="high"&&a.r==="h") || (mode==="nobody"&&!a.who&&a.v>0));
+    if(!zs.length) continue;
+    const 합=zs.reduce((s,a)=>s+a.v,0);
+    const el=document.createElement("div"); el.className="zone";
+    el.innerHTML=`<h4>${zone.z} — 자산 <b>${zone.zs.length}</b> · 미조치 <b>${합.toLocaleString()}</b></h4>`;
+    const t=document.createElement("div"); t.className="tiles";
+    for(const a of zs){
+      const d=document.createElement("div");
+      d.className="tile t-"+({h:"high",m:"mid",l:"low"})[a.r]+(a.ai?" t-ai":"");
+      // 타일 크기 = 미조치 수(제곱근 눌러 큰 값 폭주 방지)
+      d.style.flexBasis=(70+Math.sqrt(a.v)*7)+"px";
+      d.style.minHeight=(30+Math.sqrt(a.v)*1.5)+"px";
+      d.innerHTML=`<div class="nm">${a.n}</div><div class="ct">${a.v?("미조치 "+a.v.toLocaleString()):"취약점 없음"}${a.who?" · "+a.who:""}</div>`+(a.kev?'<span class="kev">KEV</span>':"");
+      d.onclick=()=>side(a,d);
+      t.appendChild(d);
+    }
+    el.appendChild(t); map.appendChild(el);
+  }
+}
+function side(a,el){
+  if(selEl) selEl.classList.remove("sel");
+  selEl=el; el.classList.add("sel");
+  const [이름,bg,fg]=RK[a.r];
+  document.getElementById("side").innerHTML=`
+    <h3>${a.n}</h3>
+    <div><span class="rk" style="background:${bg};color:${fg}">${이름}</span>${a.kev?'<span class="rk" style="background:rgba(229,72,77,.4);color:#ffd7d8">🔴 실제 악용 확인</span>':""}</div>
+    <div class="row"><div class="lbl">미조치 취약점</div><b style="font-size:16px">${a.v.toLocaleString()}건</b></div>
+    <div class="row"><div class="lbl">담당</div>${a.who?a.who:'<span style="color:var(--amb)">미지정 — 지금 배정할 수 있습니다</span>'}</div>
+    <div class="row"><div class="lbl">먼저 볼 것</div>${(a.top||[]).map(x=>"· "+x).join("<br>")}</div>
+    <button class="askbtn" onclick="alert('실제 구현에선 대화창에 이 문장이 담깁니다')">💬 "${a.n} 취약점 알려줘" — 대화창에 묻기</button>
+    ${a.v>0?`<button class="askbtn" onclick="alert('실제 구현에선 결재판이 뜹니다')">💬 "${a.n} 담당자 배정해줘" — 승인 후 실행</button>`:""}
+    <div class="hint">지시는 전부 대화창을 거칩니다 — 지도는 보기 전용입니다.</div>`;
+}
+function filt(chip,m){
+  mode=m;
+  document.querySelectorAll(".chip").forEach(c=>c.classList.remove("on"));
+  chip.classList.add("on"); draw();
+}
+draw();
+side(A[1].zs[0],null); selEl=null; // 첫 화면부터 상세가 차 있게 — 빈 패널은 죽은 화면처럼 보인다
+</script>
+</div>
+</body>
+</html>
