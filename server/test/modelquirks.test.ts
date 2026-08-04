@@ -110,16 +110,24 @@ describe("thinking 판별 · 적응(adaptModel)", () => {
     expect(a.extraArgs).toEqual(["--reasoning", "off", "--reasoning-budget", "0"]);
   });
 
-  it("템플릿에 배선이 없으면 이름이 그럴듯해도 안 끈다 (템플릿 > 이름)", () => {
+  it("템플릿에 배선이 없어도 이름이 thinking 계열이면 끈다 — R1은 템플릿이 아니라 모델이 <think>를 뱉는다", () => {
+    // 2026-08-05 e2e가 잡은 실버그: 실제 R1-Distill GGUF는 템플릿에 thinking 배선이 없다.
+    // 템플릿-부정이 이름 신호를 누르면 그런 모델이 빈칸으로 깨진다. 끄는 플래그는
+    // 비-thinking 모델에 no-op이라 이름-긍정을 믿는 쪽이 안전하다.
     const p = writeTemp(buildGguf([
-      kvString("general.architecture", "llama"),
-      kvU32("llama.context_length", 32768),
-      kvString("tokenizer.chat_template", "{{ messages }}"), // thinking 배선 없음
+      kvString("general.architecture", "qwen2"),
+      kvU32("qwen2.context_length", 131072),
+      kvString("tokenizer.chat_template", "{{ messages }}"), // 배선 없음 — 실제 R1 꼴
     ]));
     지운다.push(p);
-    const a = adaptModel("qwen3-이름만-흉내", p, 32768);
-    expect(a.thinking).toBe(false);
-    expect(a.extraArgs).toEqual([]); // 비-thinking = 플래그 0개 — 현행 함대 무영향 계약
+    const a = adaptModel("r1-distill-1.5b", p, 32768);
+    expect(a.thinking).toBe(true);
+    expect(a.판별).toBe("name");
+    expect(a.extraArgs).toEqual(["--reasoning", "off", "--reasoning-budget", "0"]);
+    // 이름에도 템플릿에도 신호가 없으면 근거 있는 false — 현행 함대 무영향 계약은 그대로
+    const b = adaptModel("평범한-사내모델", p, 32768);
+    expect(b.thinking).toBe(false);
+    expect(b.extraArgs).toEqual([]);
   });
 
   it("메타를 못 읽으면 이름으로 폴백 — qwen3·qwq·r1은 걸리고 qwen2.5·gijo는 안 걸린다", () => {

@@ -162,12 +162,17 @@ export function adaptModel(modelId: string, filePath: string, tierCtx: number): 
   const meta = readGgufMeta(filePath);
   const override = thinkingOverride(modelId);
 
+  // ⚠ 우선순위: 사람 지정 > 템플릿-긍정 > 이름-긍정 > 부정. (2026-08-05 e2e가 잡은 버그로 정정)
+  //   처음엔 "템플릿을 읽었으면 템플릿이 최종"으로 짰는데, 실제 R1-Distill GGUF는 템플릿에
+  //   thinking 배선이 **없고 모델이 스스로 <think>를 뱉는다** — 템플릿-부정이 이름 신호를
+  //   거부권으로 누르면 그런 모델이 빈칸으로 깨진다. 끄는 플래그는 비-thinking 모델에
+  //   아무 일도 안 하므로(no-op), 이름-긍정을 믿는 쪽이 안전하다.
   let thinking: boolean;
   let 판별: ModelAdaptation["판별"];
   if (override !== null) { thinking = override; 판별 = "override"; }
-  else if (meta?.chatTemplate) { thinking = THINKING_TEMPLATE_RE.test(meta.chatTemplate); 판별 = "template"; }
+  else if (meta?.chatTemplate && THINKING_TEMPLATE_RE.test(meta.chatTemplate)) { thinking = true; 판별 = "template"; }
   else if (THINKING_NAME_RE.test(modelId) || (meta?.name && THINKING_NAME_RE.test(meta.name))) { thinking = true; 판별 = "name"; }
-  else { thinking = false; 판별 = meta ? "template" : "none"; } // 메타는 읽었는데 템플릿에 배선 없음 = 근거 있는 false
+  else { thinking = false; 판별 = meta ? "template" : "none"; } // 템플릿에도 이름에도 신호 없음 = 근거 있는 false
 
   // 컨텍스트 맞춤 — 모델 native보다 크게 띄우면 로드 실패·품질 저하(rope 왜곡)라 줄인다.
   // 4096 밑으로는 안 내린다(RAG 프롬프트가 안 들어간다).
