@@ -859,7 +859,11 @@ tr:last-child td{border-bottom:none;}
 
 
 
-<div id="gijoChatWidget" data-prompts='["팀 구성 알려줘","에이전트에 모델은 어떻게 배정해"]'></div>
+<!-- ★ 2026-08-04 칩 문구 교체: 「팀 구성 알려줘」는 **전용 도구가 없어** 모델 판단으로 갔다.
+     칩은 담당자가 친 말이 아니라 **제품이 글자를 직접 넣어 주는 것**이라, 누르면 그대로
+     보내진다 — 그런데 답이 회차마다 다르면 그건 버튼이 고장 난 것이다.
+     없는 기능을 정규식으로 억지로 만들지 않고, **결정적으로 답하는 말**로 바꾼다. -->
+<div id="gijoChatWidget" data-prompts='["지금 무슨 모델 쓰고 있어?","이 화면 사용법 알려줘"]'></div>
 <script src="nav.js"></script>
 <script src="progresscard.js"></script>
 <script src="gijomd.js"></script>

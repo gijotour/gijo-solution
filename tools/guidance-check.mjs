@@ -26,9 +26,22 @@ const 엔진 = (f) => fs.readFileSync(path.join(뿌리, "server/src/engine", f),
 
 // ── 안내 문구 뽑기 ────────────────────────────────────────────────────────────
 // 제품이 답변 안에서 따옴표로 적어 주는 명령들. `"○○ 자산 취약점 알려줘"` 꼴.
+// ★ 2026-08-04 넓힘: **화면의 칩·버튼이 대화창에 넣어 주는 말**도 같은 약속이다.
+//   오히려 더 강한 약속이다 — 담당자가 친 게 아니라 **제품이 글자를 직접 넣어 준다.**
+//   누르면 그대로 보내지는데 답이 회차마다 다르면 그건 버튼이 고장 난 것이다.
+function 화면줄들() {
+  const dir = path.join(뿌리, "client/src/renderer/pages");
+  try {
+    return fs.readdirSync(dir)
+      .filter((f) => /\.(html|js)$/.test(f))
+      .flatMap((f) => fs.readFileSync(path.join(dir, f), "utf8").split("\n"));
+  } catch { return []; }
+}
+
 function 안내명령들() {
   const 줄들 = ["agenttools.ts", "agentloop.ts", "dispatcher.ts", "screenguide.ts", "workflow.ts"]
-    .flatMap((f) => { try { return 엔진(f).split("\n"); } catch { return []; } });
+    .flatMap((f) => { try { return 엔진(f).split("\n"); } catch { return []; } })
+    .concat(화면줄들());
   const 끝맺음 = /(해줘|알려줘|보여줘|만들어줘|읽어줘|배정해줘|정리해줘|확인해줘|추천해줘|복구해줘|찾아줘)$/;
   const 본것 = new Set();
   const 결과 = [];
@@ -44,11 +57,25 @@ function 안내명령들() {
     // 주석 안의 예시도 세지 않는다 — 담당자가 보는 글이 아니다.
     if (/^\s*(\/\/|\*|\/\*)/.test(줄)) continue;
 
-    for (const m of 줄.matchAll(/"([^"\n]{4,44})"/g)) {
+    // ⚠ 따옴표 세 종류를 **따로** 훑는다(2026-08-04 내가 낸 버그를 고친 것).
+    //   한 규칙으로 `["'\`]…["'\`]`를 쓰면 `'… "이 건 담당자 ○○로 배정해줘"'` 같은 줄에서
+    //   **바깥 작은따옴표가 안쪽 큰따옴표를 통째로 삼킨다** — 서버 문구가 26개에서 5개로
+    //   줄었는데 총계가 우연히 26으로 같아 하마터면 못 볼 뻔했다.
+    const 후보 = [
+      ...줄.matchAll(/"([^"\n]{4,44})"/g),
+      ...줄.matchAll(/'([^'\n]{4,44})'/g),
+      ...줄.matchAll(/`([^`\n]{4,44})`/g),
+    ];
+    for (const m of 후보) {
       let s = m[1].trim();
       if (!끝맺음.test(s)) continue;
-      if (s.includes("${")) continue;              // 코드 조각(자리표시자)은 그대로 못 친다
+      if (s.includes("${") || s.includes("<")) continue;  // 코드 조각·자리표시자는 그대로 못 친다
       if (/^[a-z_]+$/i.test(s)) continue;           // 도구 이름
+      // ⚠ 조각으로 시작하는 것은 안내가 아니다 — 화면이 앞에 대상 이름을 붙여 완성한다
+      //   (「의 가장 급한 취약점…」처럼 조사로 시작하는 줄). 그대로 재면 거짓 실패가 난다.
+      if (/^[의를을이가에]/.test(s)) continue;
+      // 안내 문장 안의 **예시**는 명령 자체가 아니다(「… 예: 방화벽 정책 점검해줘」).
+      if (/(예:|예를 들어|주세요\s*—)/.test(s)) continue;
       // ⚠ 두 낱말 이하의 토막(「배정해줘」·「설명해줘」)은 안내가 아니라 **말투 예시**다.
       //   그대로 쳐도 대상이 없어 안 되는 게 맞다 — 결함으로 세면 안 된다.
       if (s.split(/\s+/).length < 2) continue;
@@ -78,11 +105,19 @@ function 강제규칙들() {
 }
 
 // dispatcher의 특수 경로(결정적으로 답하는 자리)도 본다.
+// ★ 2026-08-04: 화면 안내(screenguide)도 같이 읽는다. 「○○ 사용법 알려줘」류는 여기서
+//   결정적으로 답하는데, 안 읽으면 **멀쩡한 것을 공백으로 잘못 세게 된다.**
+//   ⚠ 그래도 이 도구는 **정규식만** 읽는다 — isHelpIntent·parsePickCommand처럼 함수로
+//     판단하는 부분은 못 본다. 그래서 여기 「공백」으로 뜬 것은 **의심 목록**이지
+//     확정된 결함이 아니다. 실제로 물어봐서 확인해야 한다.
 function 특수경로들() {
-  const d = 엔진("dispatcher.ts");
   const 목 = [];
-  for (const m of d.matchAll(/const ([A-Z_]+_RE)\s*=\s*(\/(?:[^/\\\n]|\\.)+\/[gimsuy]*)/g)) {
-    try { 목.push({ 이름: m[1], re: eval(m[2]) }); } catch { /* 건너뜀 */ }
+  for (const f of ["dispatcher.ts", "screenguide.ts"]) {
+    let s = "";
+    try { s = 엔진(f); } catch { continue; }
+    for (const m of s.matchAll(/const ([A-Z_]+(?:_RE)?)\s*=\s*(\/(?:[^/\\\n]|\\.)+\/[gimsuy]*)/g)) {
+      try { 목.push({ 이름: m[1], re: eval(m[2]) }); } catch { /* 건너뜀 */ }
+    }
   }
   return 목;
 }
