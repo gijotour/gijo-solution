@@ -185,6 +185,37 @@
   .cov-tab .cnt{font-size:12px;font-weight:800;background:rgba(255,255,255,0.09);color:var(--muted);padding:1px 7px;border-radius:20px;}
   .cov-tab.on .cnt{background:rgba(59,130,246,0.18);color:var(--blue-light);}
   .cov-tab .cnt.warn{background:rgba(226,72,61,0.18);color:#ff8a80;}
+  /* ── 보안 지형도(🗺 지도 탭) — 시안 security-map-v1 ── */
+  .mv-chips{display:flex;gap:6px;align-items:center;margin:0 0 8px;font-size:12px;}
+  .mv-chip{border:1px solid var(--border);border-radius:12px;padding:3px 11px;color:var(--muted);cursor:pointer;}
+  .mv-chip.on{background:rgba(59,130,246,.16);border-color:var(--blue);color:#8fb8ff;}
+  .mv-legend{margin-left:auto;color:var(--muted-2);font-size:11px;}
+  .mv-stage{display:flex;gap:0;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--panel);min-height:420px;}
+  .mv-map{flex:1;padding:10px;display:flex;flex-direction:column;gap:8px;min-width:0;}
+  .mv-zone{border:1px solid var(--border);border-radius:8px;padding:6px 8px 8px;background:rgba(255,255,255,0.02);}
+  .mv-zone h4{margin:0 0 6px;font-size:11.5px;color:var(--muted);font-weight:600;}
+  .mv-zone h4 b{color:var(--text);}
+  .mv-tiles{display:flex;flex-wrap:wrap;gap:5px;}
+  .mv-tile{border-radius:5px;padding:4px 8px;font-size:11.5px;cursor:pointer;border:1px solid transparent;
+           display:flex;flex-direction:column;justify-content:space-between;min-width:72px;position:relative;}
+  .mv-tile:hover{border-color:rgba(255,255,255,0.35);}
+  .mv-tile.mv-sel{border-color:#fff;box-shadow:0 0 0 1px rgba(255,255,255,0.55);}
+  .mv-nm{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px;}
+  .mv-ct{font-size:10.5px;opacity:.85;}
+  .mv-kev{position:absolute;top:-5px;right:-5px;background:#e5484d;color:#fff;border-radius:8px;font-size:9px;padding:1px 5px;font-weight:800;}
+  .mv-high{background:rgba(229,72,77,.30);color:#ffd7d8;}
+  .mv-mid{background:rgba(240,160,32,.26);color:#ffe9c4;}
+  .mv-low{background:rgba(70,167,88,.22);color:#d2f2da;}
+  .mv-ai{outline:1px dashed rgba(139,124,240,.55);}
+  .mv-side{width:320px;border-left:1px solid var(--border);padding:12px 14px;display:flex;flex-direction:column;gap:8px;font-size:12.5px;}
+  .mv-side h3{margin:0;font-size:13.5px;}
+  .mv-rk{font-size:11.5px;padding:2px 8px;border-radius:4px;display:inline-block;margin-right:6px;}
+  .mv-row{border-bottom:1px solid var(--border);padding:6px 0;}
+  .mv-lbl{color:var(--muted);font-size:11px;}
+  .mv-ask{background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.5);color:#8fb8ff;border-radius:6px;
+          padding:7px 10px;cursor:pointer;font-size:12px;text-align:left;font-family:inherit;}
+  .mv-ask:hover{background:rgba(59,130,246,.26);}
+  .mv-hint{color:var(--muted-2);font-size:11px;margin-top:auto;}
 
   .gapbox{background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--amber);border-radius:12px;padding:16px 18px;margin-bottom:12px;}
   .gapbox.high{border-left-color:var(--red);}
@@ -313,6 +344,10 @@
     <!-- 목록(무엇이 있는가)과 커버리지(무엇을 모르는가)를 나눈다. 같은 표에 섞으면 둘 다 안 보인다. -->
     <div class="cov-tabs" id="covTabs">
       <div class="cov-tab on" data-tab="list">전체 목록<span class="cnt" id="tabCountList">-</span></div>
+      <!-- 🗺 지도 보기(2026-08-04, 시안 security-map-v1 승인) — 구획=네트워크 대역 ·
+           타일 크기=진짜 취약점 수 · 색=위험 등급(표와 같은 riskOf). 지도는 보기 전용,
+           행동은 전부 대화창으로. 툴바 필터·검색이 지도에도 그대로 적용된다. -->
+      <div class="cov-tab" data-tab="map">🗺 지도</div>
       <div class="cov-tab" data-tab="coverage">커버리지<span class="cnt" id="tabCountGap">-</span></div>
     </div>
 
@@ -367,6 +402,23 @@
 
     <div id="coveragePane" style="display:none;margin-top:18px;">
       <div id="coverageBody" style="color:var(--muted);font-size:13px;">불러오는 중...</div>
+    </div>
+
+    <!-- 보안 지형도 — 렌더링은 map-view.js(gijoMapView), 데이터·판정은 이 화면 것을 주입.
+         ⚠ 검색·필터 툴바는 목록 팬 안에 있어 지도 탭에선 못 만진다(실화면 검증에서 발견) —
+           그래서 지도엔 시안대로 **자체 좁히기 칩**을 둔다. 목록에서 건 필터도 함께 적용된다. -->
+    <div id="mapPane" style="display:none;margin-top:12px;">
+      <div class="mv-chips" id="mapChips">
+        <span class="mv-chip on" data-mode="all">전체</span>
+        <span class="mv-chip" data-mode="kev">🔴 실제 악용만</span>
+        <span class="mv-chip" data-mode="high">고위험만</span>
+        <span class="mv-chip" data-mode="nobody">담당 없는 곳</span>
+        <span class="mv-legend">색=위험 등급 · 타일 크기=미조치 취약점 수 · 구획=네트워크 대역</span>
+      </div>
+      <div class="mv-stage">
+        <div class="mv-map" id="mapZones"></div>
+        <div class="mv-side" id="mapSide"></div>
+      </div>
     </div>
 
     <div class="footer">
@@ -903,6 +955,9 @@
     document.getElementById("kpiMid").textContent = allAssets.filter((a) => riskOf(a).level === "mid").length;
     document.getElementById("kpiLow").textContent = allAssets.filter((a) => ["low", "none"].includes(riskOf(a).level)).length;
     document.getElementById("kpiNoSbom").textContent = allAssets.filter((a) => !a.sbomGeneratedAt).length;
+    // 지도 탭이 열려 있으면 함께 갱신 — 필터·검색·실시간 갱신 모든 경로가 render()를 거치므로
+    // 여기 한 곳만 걸면 지도가 표와 어긋나지 않는다.
+    if (activeTab === "map" && window.gijoMapView) renderMap();
   }
 
   function esc(s) {
@@ -1171,6 +1226,38 @@
     document.querySelectorAll(".cov-tab").forEach((el) => el.classList.toggle("on", el.dataset.tab === tab));
     document.getElementById("listPane").style.display = tab === "list" ? "" : "none";
     document.getElementById("coveragePane").style.display = tab === "coverage" ? "" : "none";
+    document.getElementById("mapPane").style.display = tab === "map" ? "" : "none";
+    if (tab === "map") renderMap();
+    // 고른 보기를 기억한다 — 지도가 마음에 든 담당자는 다음에도 지도로 연다.
+    try { localStorage.setItem("gijo:inv:tab", tab); } catch (e) {}
+  }
+
+  // ── 보안 지형도(2026-08-04, 시안 security-map-v1 승인) ──────────────────────
+  // 렌더링은 map-view.js가 하고, **데이터·판정 함수는 이 화면 것을 주입한다** —
+  // 지도가 제 나름대로 세면 표와 숫자가 어긋나고, 어긋난 두 숫자는 둘 다 못 믿게 된다.
+  // ⚠ applyFilters를 그대로 태운다 — **목록 탭에서 건** 검색·필터가 지도에도 유지된다.
+  //   다만 툴바 자체가 목록 팬 안에 있어 지도 탭에선 못 만진다(실화면 검증에서 발견) —
+  //   그래서 지도엔 자체 좁히기 칩(전체/KEV/고위험/담당없음)을 둔다. 시안에 있던 그 칩이다.
+  let mapMode = "all";
+  function renderMap() {
+    if (!window.gijoMapView) return; // 스크립트를 못 불렀으면 조용히 목록만 남긴다
+    const ctx = {
+      riskOf, activeFindings,
+      onDetail(a) {
+        document.getElementById("mapSide").innerHTML = window.gijoMapView.detailHtml(a, ctx);
+      },
+    };
+    let shown = applyFilters(allAssets);
+    if (mapMode === "kev") shown = shown.filter((a) => riskOf(a).kev);
+    else if (mapMode === "high") shown = shown.filter((a) => riskOf(a).level === "high");
+    else if (mapMode === "nobody") shown = shown.filter((a) => !a.owner && activeFindings(a).filter(window.gijoMapView.진짜취약).length > 0);
+    window.gijoMapView.render(document.getElementById("mapZones"), shown, ctx);
+    // 첫 화면부터 상세가 차 있게 — 빈 패널은 죽은 화면처럼 보인다. 제일 급한 자산을 미리 연다.
+    const 급한 = [...shown].sort((x, y) =>
+      activeFindings(y).filter(window.gijoMapView.진짜취약).length -
+      activeFindings(x).filter(window.gijoMapView.진짜취약).length)[0];
+    if (급한) ctx.onDetail(급한);
+    else document.getElementById("mapSide").innerHTML = '<div style="color:var(--muted)">표시할 자산이 없습니다</div>';
   }
 
   // assetId → { total, overdue } — 자산별 연결된 점검 건수. 인벤토리 행에 배지로 노출한다.
@@ -1495,6 +1582,27 @@
       if (tab) switchTab(tab.dataset.tab);
     });
 
+    // 지도 좁히기 칩 — Shneiderman 2박자(좁히기). 목록 필터와 별개로 지도에서 바로 거른다.
+    document.getElementById("mapChips").addEventListener("click", (e) => {
+      const c = e.target.closest(".mv-chip");
+      if (!c) return;
+      mapMode = c.dataset.mode;
+      document.querySelectorAll(".mv-chip").forEach((x) => x.classList.toggle("on", x === c));
+      renderMap();
+    });
+
+    // 지도 상세 패널의 「대화창에 묻기」 — 지시는 전부 대화창을 거친다(지도는 보기 전용).
+    document.getElementById("mapSide").addEventListener("click", (e) => {
+      const b = e.target.closest(".mv-ask");
+      if (b && b.dataset.ask && window.gijo && window.gijo.askConsole) window.gijo.askConsole(b.dataset.ask);
+    });
+
+    // 지난번에 고른 보기 복원 — 지도가 마음에 든 담당자는 지도로 다시 연다.
+    try {
+      const saved = localStorage.getItem("gijo:inv:tab");
+      if (saved === "map" || saved === "coverage") switchTab(saved);
+    } catch (e) {}
+
     document.getElementById("coverageBody").addEventListener("click", (e) => {
       const kind = e.target.dataset.gapFix;
       if (kind) runGapFix(kind);
@@ -1649,6 +1757,7 @@
 <script src="workflowrail.js"></script>
 <script src="progresscard.js"></script>
 <script src="gijomd.js"></script>
+<script src="map-view.js"></script>
 <script src="chatparts.js"></script>
 <script src="chatwidget.js"></script>
 </body>
