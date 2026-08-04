@@ -131,5 +131,81 @@
     );
   }
 
-  window.gijoMapView = { render, detailHtml, 진짜취약, 구획열쇠 };
+  // ── 공격경로 겹층(2026-08-04, 시안 2단계) ──────────────────────────────────
+  // 관제 허브의 공격경로(진입→거점→인접)를 지도 위에 화살표로 겹친다.
+  // ⚠ **관측된 신호만 잇는다** — 경로 엔진(analysishub)이 3소스 상관으로 만든 것 그대로.
+  //   지도가 새로 추정하는 것은 없다(추정을 얹으면 지도가 거짓말을 시작한다).
+  function 자산타일찾기(container, assets, 이름) {
+    const t = String(이름 || "").toLowerCase();
+    if (!t) return null;
+    const hit = assets.find((a) =>
+      [a.name, a.displayName, a.hostname, a.ip].filter(Boolean)
+        .some((s) => String(s).toLowerCase().includes(t) || t.includes(String(s).toLowerCase())));
+    if (!hit) return null;
+    return container.querySelector('.mv-tile[data-asset-id="' + CSS.escape(hit.id) + '"]');
+  }
+
+  /**
+   * 오버레이를 그린다. 호출 시점은 **타일 배치가 끝난 뒤**(requestAnimationFrame) —
+   * flex 배치 전에 재면 좌표가 전부 0이 되어 화살표가 왼쪽 위에 뭉친다.
+   */
+  // ⚠ 인접 이동(lateral)을 **전부** 그리면 거미줄이 된다(2026-08-04 실화면: 40개 자산에
+  //   화살표 125개 → 못 읽음). Shneiderman: 훑어보기는 깔끔해야 한다.
+  //   그래서 진입(entry)만 항상 그리고, **인접은 고른 거점의 것만** 그린다(details-on-demand).
+  //   focusEntity = 지금 상세 패널에 연 자산(있으면 그 자산의 인접 경로를 펼친다).
+  function overlay(container, assets, paths, focusEntity) {
+    const 이전 = container.querySelector(".mv-overlay");
+    if (이전) 이전.remove();
+    if (!paths || !paths.length) return 0;
+
+    const box = container.getBoundingClientRect();
+    const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    svg.setAttribute("class", "mv-overlay");
+    svg.setAttribute("width", box.width);
+    svg.setAttribute("height", box.height);
+    svg.innerHTML =
+      '<defs><marker id="mvArrow" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">' +
+      '<path d="M0,0 L7,3.5 L0,7 Z" fill="#f5928a"/></marker>' +
+      '<marker id="mvArrowB" markerWidth="7" markerHeight="7" refX="6" refY="3.5" orient="auto">' +
+      '<path d="M0,0 L7,3.5 L0,7 Z" fill="#8fb8ff"/></marker></defs>';
+
+    const 점 = (el) => {
+      const r = el.getBoundingClientRect();
+      return { x: r.left - box.left + r.width / 2, y: r.top - box.top + r.height / 2 };
+    };
+    const 초점 = String(focusEntity || "").toLowerCase();
+    let 그림 = 0;
+    for (const p of paths) {
+      const 거점 = 자산타일찾기(container, assets, p.entity);
+      if (!거점) continue;   // 필터로 가려졌으면 그 경로는 그리지 않는다(없는 타일에 못 긋는다)
+      거점.classList.add("mv-foothold");
+      const 이거점을골랐나 = 초점 && String(p.entity).toLowerCase().includes(초점);
+      const c = 점(거점);
+      for (const s of p.steps || []) {
+        if (s.kind === "entry") {
+          // 진입 — 지도 밖(위)에서 거점으로 내리꽂는 붉은 화살표. **항상** 그린다(거점이 어디 뚫리나).
+          const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          path.setAttribute("d", `M ${c.x - 34} ${Math.max(4, c.y - 46)} Q ${c.x - 10} ${c.y - 28} ${c.x} ${c.y - 12}`);
+          path.setAttribute("class", "mv-edge mv-edge-entry");
+          path.setAttribute("marker-end", "url(#mvArrow)");
+          svg.appendChild(path); 그림++;
+        } else if (s.kind === "lateral" && 이거점을골랐나) {
+          // 인접 이동 — **고른 거점의 것만** 그린다(전부 그리면 거미줄이 된다).
+          const 이웃 = 자산타일찾기(container, assets, s.entity);
+          if (!이웃 || 이웃 === 거점) continue;
+          const d = 점(이웃);
+          const mx = (c.x + d.x) / 2, my = (c.y + d.y) / 2 - 26;
+          const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+          path.setAttribute("d", `M ${c.x} ${c.y} Q ${mx} ${my} ${d.x} ${d.y}`);
+          path.setAttribute("class", "mv-edge mv-edge-lateral");
+          path.setAttribute("marker-end", "url(#mvArrowB)");
+          svg.appendChild(path); 그림++;
+        }
+      }
+    }
+    if (그림) container.appendChild(svg);
+    return 그림;
+  }
+
+  window.gijoMapView = { render, detailHtml, overlay, 진짜취약, 구획열쇠 };
 })();

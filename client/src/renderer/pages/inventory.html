@@ -207,6 +207,13 @@
   .mv-mid{background:rgba(240,160,32,.26);color:#ffe9c4;}
   .mv-low{background:rgba(70,167,88,.22);color:#d2f2da;}
   .mv-ai{outline:1px dashed rgba(139,124,240,.55);}
+  .mv-map{position:relative;} /* 오버레이 SVG 기준 */
+  .mv-overlay{position:absolute;inset:0;pointer-events:none;z-index:5;}
+  .mv-edge{fill:none;stroke-width:2;opacity:.85;}
+  .mv-edge-entry{stroke:#f5928a;stroke-dasharray:4 3;}
+  .mv-edge-lateral{stroke:#8fb8ff;}
+  .mv-tile.mv-foothold{box-shadow:0 0 0 2px rgba(245,146,138,.8);}
+  .mv-path-toggle.on{background:rgba(245,146,138,.18);border-color:#f5928a;color:#ffd7d8;}
   .mv-side{width:320px;border-left:1px solid var(--border);padding:12px 14px;display:flex;flex-direction:column;gap:8px;font-size:12.5px;}
   .mv-side h3{margin:0;font-size:13.5px;}
   .mv-rk{font-size:11.5px;padding:2px 8px;border-radius:4px;display:inline-block;margin-right:6px;}
@@ -413,7 +420,9 @@
         <span class="mv-chip" data-mode="kev">🔴 실제 악용만</span>
         <span class="mv-chip" data-mode="high">고위험만</span>
         <span class="mv-chip" data-mode="nobody">담당 없는 곳</span>
-        <span class="mv-legend">색=위험 등급 · 타일 크기=미조치 취약점 수 · 구획=네트워크 대역</span>
+        <!-- 공격경로 겹층(2단계) — 관제 허브가 만든 진입→거점→인접을 지도 위 화살표로. -->
+        <span class="mv-chip mv-path-toggle" id="mapPathToggle" title="관제 허브가 관측한 공격 경로를 화살표로 겹칩니다">🎯 공격경로</span>
+        <span class="mv-legend" id="mapLegend">색=위험 등급 · 타일 크기=미조치 취약점 수 · 구획=네트워크 대역</span>
       </div>
       <div class="mv-stage">
         <div class="mv-map" id="mapZones"></div>
@@ -1239,18 +1248,31 @@
   //   다만 툴바 자체가 목록 팬 안에 있어 지도 탭에선 못 만진다(실화면 검증에서 발견) —
   //   그래서 지도엔 자체 좁히기 칩(전체/KEV/고위험/담당없음)을 둔다. 시안에 있던 그 칩이다.
   let mapMode = "all";
+  let mapPathsOn = false;   // 공격경로 겹층(2단계) — 기본 꺼짐(먼저 지형을 보고, 필요할 때 켠다)
+  let mapPaths = null;      // 한 번 받아 캐시 — 화면이 열려 있는 동안 재요청하지 않는다
+  let mapFocus = null;      // 상세 패널에 연 자산 — 그 자산의 인접 경로만 펼친다
+  async function loadPaths() {
+    if (mapPaths) return mapPaths;
+    try { const r = await window.gijo.analysisAttackPaths(); mapPaths = (r && r.paths) || []; }
+    catch (e) { mapPaths = []; }
+    return mapPaths;
+  }
   function renderMap() {
     if (!window.gijoMapView) return; // 스크립트를 못 불렀으면 조용히 목록만 남긴다
     const ctx = {
       riskOf, activeFindings,
       onDetail(a) {
         document.getElementById("mapSide").innerHTML = window.gijoMapView.detailHtml(a, ctx);
+        // 공격경로가 켜져 있으면, 고른 자산의 **인접 경로만** 펼친다(거미줄 대신 details-on-demand).
+        mapFocus = a.hostname || a.ip || a.name;
+        if (mapPathsOn) drawPaths();
       },
     };
     let shown = applyFilters(allAssets);
     if (mapMode === "kev") shown = shown.filter((a) => riskOf(a).kev);
     else if (mapMode === "high") shown = shown.filter((a) => riskOf(a).level === "high");
     else if (mapMode === "nobody") shown = shown.filter((a) => !a.owner && activeFindings(a).filter(window.gijoMapView.진짜취약).length > 0);
+    window.__mapShown = shown; // 오버레이가 같은 목록을 봐야 타일을 찾는다
     window.gijoMapView.render(document.getElementById("mapZones"), shown, ctx);
     // 첫 화면부터 상세가 차 있게 — 빈 패널은 죽은 화면처럼 보인다. 제일 급한 자산을 미리 연다.
     const 급한 = [...shown].sort((x, y) =>
@@ -1258,6 +1280,21 @@
       activeFindings(x).filter(window.gijoMapView.진짜취약).length)[0];
     if (급한) ctx.onDetail(급한);
     else document.getElementById("mapSide").innerHTML = '<div style="color:var(--muted)">표시할 자산이 없습니다</div>';
+    // 공격경로가 켜져 있으면 타일 배치가 끝난 **다음 프레임**에 겹친다(배치 전엔 좌표가 0이다).
+    if (mapPathsOn) drawPaths();
+    else { const ov = document.getElementById("mapZones").querySelector(".mv-overlay"); if (ov) ov.remove(); }
+  }
+
+  async function drawPaths() {
+    const zones = document.getElementById("mapZones");
+    const paths = await loadPaths();
+    requestAnimationFrame(() => {
+      window.gijoMapView.overlay(zones, window.__mapShown || [], paths, mapFocus);
+      const lg = document.getElementById("mapLegend");
+      if (lg) lg.innerHTML = mapPathsOn
+        ? '<span style="color:#f5928a">━ ┈ 진입(어디로 들어오나)</span> · 붉은 테=거점 · <b>거점을 누르면</b> <span style="color:#8fb8ff">━ 인접 이동</span>을 펼칩니다 · 관측된 신호만'
+        : "색=위험 등급 · 타일 크기=미조치 취약점 수 · 구획=네트워크 대역";
+    });
   }
 
   // assetId → { total, overdue } — 자산별 연결된 점검 건수. 인벤토리 행에 배지로 노출한다.
@@ -1586,8 +1623,15 @@
     document.getElementById("mapChips").addEventListener("click", (e) => {
       const c = e.target.closest(".mv-chip");
       if (!c) return;
+      if (c.id === "mapPathToggle") {
+        // 공격경로 겹층 켜기/끄기 — 좁히기 칩(mode)과는 별개 토글이다.
+        mapPathsOn = !mapPathsOn;
+        c.classList.toggle("on", mapPathsOn);
+        renderMap();
+        return;
+      }
       mapMode = c.dataset.mode;
-      document.querySelectorAll(".mv-chip").forEach((x) => x.classList.toggle("on", x === c));
+      document.querySelectorAll(".mv-chip:not(.mv-path-toggle)").forEach((x) => x.classList.toggle("on", x === c));
       renderMap();
     });
 
