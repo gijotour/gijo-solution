@@ -213,5 +213,53 @@
     return 그림;
   }
 
-  window.gijoMapView = { render, detailHtml, overlay, 진짜취약, 구획열쇠 };
+  // ── 관제 4소스 히트맵(2026-08-04, 지형도 3단계 ㉮) ─────────────────────────
+  // 관제 이벤트를 자산 × 소스(취약점·보안로그·운영리포트·하드닝) 격자로 집계한다.
+  // ⚠ 상관(같은 자산이 두 소스 이상)은 **서버 correlations를 그대로 믿는다** —
+  //   화면이 새로 계산하면 목록의 상관 판정과 어긋난다(로그 entity=공격자 IP 함정 때문에
+  //   서버는 peers까지 봐서 묶는다. 화면이 entity만 보면 로그가 절대 안 묶인다).
+  var HM_SOURCES = [["vuln", "🔍 취약점"], ["log", "📊 보안로그"], ["product", "🧰 운영리포트"], ["hardening", "🛡 하드닝"]];
+  var HM_MAXROWS = 24; // 자산이 많으면 위험 큰 것부터 이만큼만(스크롤 없이 훑기)
+
+  /**
+   * @param events  data.events (source·entity·severity·peers·title)
+   * @param correlations  data.correlations (서버 판정 — 이름 목록)
+   * @param 표시이름  (entity)=>보기 좋은 이름. 없으면 entity 그대로.
+   * 돌려주는 것: { rows: [{name, cells:[{count,max,corr}], total}], sources }
+   */
+  function heatmapData(events, correlations, 표시이름) {
+    표시이름 = 표시이름 || ((s) => s);
+    // 상관으로 묶인 이름(소문자)을 집합으로 — 서버가 이미 "2소스 이상"만 담아 준다.
+    var 상관이름 = new Set();
+    for (var c of correlations || []) 상관이름.add(String(c.entity || c.name || "").toLowerCase());
+    // 자산(entity)별로 소스 건수·최고 심각도 집계. entity가 곧 우리 쪽 개체다(목록과 같은 키).
+    var RANK = { critical: 4, high: 3, medium: 2, low: 1 };
+    var by = new Map();
+    for (var e of events || []) {
+      // ⚠ **우리 쪽 개체**로 집계한다 — 로그 이벤트의 entity는 공격자 IP다(서버가 peers에
+      //   대상 호스트를 실어 둔다). peers가 있으면 그것을, 없으면 entity를 쓴다.
+      //   담당자가 찾는 것은 "누가 때렸나"가 아니라 "우리 어느 장비가 걸렸나"다.
+      var key = String((e.peers && e.peers.length ? e.peers[0] : e.entity) || "").trim();
+      if (!key) continue;
+      var cur = by.get(key.toLowerCase()) || { name: 표시이름(key) || key, cnt: {}, max: {} };
+      cur.cnt[e.source] = (cur.cnt[e.source] || 0) + 1;
+      var r = RANK[String(e.severity || "").toLowerCase()] || 0;
+      if (r > (cur.max[e.source] || 0)) cur.max[e.source] = r;
+      by.set(key.toLowerCase(), cur);
+    }
+    var rows = [];
+    for (var [k, v] of by) {
+      var total = HM_SOURCES.reduce((s, [src]) => s + (v.cnt[src] || 0), 0);
+      var corr = 상관이름.has(k);
+      rows.push({
+        name: v.name, total, corr,
+        cells: HM_SOURCES.map(([src]) => ({ count: v.cnt[src] || 0, max: v.max[src] || 0, corr: corr })),
+      });
+    }
+    // 상관 먼저, 그다음 건수 큰 순 — 가장 위험한 동네가 위로.
+    rows.sort((a, b) => (b.corr - a.corr) || (b.total - a.total));
+    return { rows: rows.slice(0, HM_MAXROWS), 전체행수: rows.length, sources: HM_SOURCES };
+  }
+
+  window.gijoMapView = { render, detailHtml, overlay, heatmapData, 진짜취약, 구획열쇠, HM_SOURCES: HM_SOURCES };
 })();

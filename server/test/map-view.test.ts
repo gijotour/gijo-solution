@@ -59,6 +59,42 @@ describe("★★ 지도의 「진짜 취약점」이 서버 isRealVulnerability�
   });
 });
 
+describe("★★ 관제 4소스 히트맵 — 서버 상관과 어긋나지 않는다 (지형도 3단계)", () => {
+  const events = [
+    { source: "vuln", entity: "172.168.50.142", severity: "critical" },
+    { source: "vuln", entity: "172.168.50.142", severity: "high" },
+    { source: "hardening", entity: "172.168.50.142", severity: "medium" },
+    // ⚠ 로그의 entity는 공격자 IP · peers에 대상 — 우리 자산으로 귀속돼야 한다
+    { source: "log", entity: "203.0.113.9", peers: ["172.168.50.142"], severity: "high" },
+    { source: "vuln", entity: "192.168.219.98", severity: "critical" },
+    { source: "product", entity: "샘플-웹서버", severity: "low" },
+  ];
+  const correlations = [{ entity: "172.168.50.142" }];  // 서버가 준 상관(2소스 이상)
+
+  it("로그의 공격자 IP가 아니라 **우리 대상 자산**으로 집계된다", () => {
+    const hd = mv.heatmapData(events, correlations, (s: string) => s);
+    const 대상 = hd.rows.find((r: any) => r.name === "172.168.50.142");
+    expect(대상, "peers 대상으로 집계돼야 한다").toBeTruthy();
+    // 취약점 2 · 보안로그 1 · 운영 0 · 하드닝 1
+    expect(대상.cells.map((c: any) => c.count)).toEqual([2, 1, 0, 1]);
+    expect(hd.rows.find((r: any) => r.name === "203.0.113.9"), "공격자 IP는 행이 되면 안 된다").toBeUndefined();
+  });
+
+  it("★ 상관은 **서버 correlations를 그대로 믿는다** — 화면이 새로 판정하지 않는다", () => {
+    const hd = mv.heatmapData(events, correlations, (s: string) => s);
+    expect(hd.rows.find((r: any) => r.name === "172.168.50.142").corr).toBe(true);
+    expect(hd.rows.find((r: any) => r.name === "192.168.219.98").corr).toBe(false);
+    // correlations가 비면 아무 행도 상관이 아니다(화면이 지어내지 않는다)
+    const hd2 = mv.heatmapData(events, [], (s: string) => s);
+    expect(hd2.rows.every((r: any) => !r.corr)).toBe(true);
+  });
+
+  it("위험 큰 순으로 세우되 상관을 맨 위로", () => {
+    const hd = mv.heatmapData(events, correlations, (s: string) => s);
+    expect(hd.rows[0].name).toBe("172.168.50.142"); // 상관 + 최다
+  });
+});
+
 describe("구획 열쇠 — 네트워크 대역으로 묶는다", () => {
   it("같은 /24는 한 구획, AI 자산은 따로", () => {
     expect(mv.구획열쇠({ ip: "172.168.50.142" })).toBe(mv.구획열쇠({ ip: "172.168.50.99" }));

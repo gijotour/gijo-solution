@@ -83,6 +83,19 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
    ⚠ 560px 고정이던 시절, 배율 125%·작은 창에서 목록이 창보다 길어져 위쪽 탭줄까지 밀려났다
    (2026-08-02 사용자 지적 "상단 메뉴가 안 보이지 않는 정도의 세로 길이로"). */
 .risk-list{max-height:320px;overflow-y:auto;}
+.vchip.on{background:rgba(59,130,246,.16);border-color:var(--blue)!important;color:#8fb8ff;}
+/* ── 관제 4소스 히트맵(지형도 3단계) ── */
+.hm-grid{display:grid;grid-template-columns:150px repeat(4,1fr);gap:3px;padding:4px 2px 8px;}
+.hm-ch{font-size:11px;color:var(--muted);text-align:center;padding-bottom:2px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hm-rh{font-size:11.5px;color:var(--muted);display:flex;align-items:center;padding-right:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}
+.hm-rh:hover{color:var(--text)}
+.hm-cell{border-radius:4px;min-height:32px;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;cursor:pointer;color:#fff}
+.hm-cell:hover{outline:1px solid rgba(255,255,255,.5)}
+.hm-0{background:rgba(255,255,255,.03);color:var(--muted);font-weight:400}
+.hm-1{background:rgba(70,167,88,.35)} .hm-2{background:rgba(240,160,32,.42)}
+.hm-3{background:rgba(242,129,29,.5)} .hm-4{background:rgba(229,72,77,.62)}
+.hm-corr{outline:2px solid #8b7cf0!important;position:relative}
+.hm-corr::after{content:"⚑";position:absolute;top:-5px;right:1px;font-size:10px;color:#8b7cf0}
 .risk-row{display:flex;align-items:center;gap:11px;padding:11px 6px;border-bottom:1px solid var(--border);cursor:pointer;}
 .risk-row:hover{background:var(--panel-2);}.risk-row.sel{background:rgba(59,130,246,.07);}
 .rank{font-size:14px;font-weight:800;color:var(--muted-2);width:22px;text-align:center;flex:none;}
@@ -157,7 +170,13 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     <div class="two">
       <div class="panel">
-        <div class="ph">통합 위험 우선순위 <span style="font-size:12.25px;color:var(--muted);font-weight:600">— 4소스 병합</span></div>
+        <div class="ph" style="display:flex;align-items:center;gap:10px">통합 위험 우선순위 <span style="font-size:12.25px;color:var(--muted);font-weight:600">— 4소스 병합</span>
+          <!-- 🗺 히트맵(2026-08-04, 지형도 3단계). 목록은 그대로, 보기만 전환. -->
+          <span style="margin-left:auto;display:flex;gap:4px">
+            <span class="vchip on" id="vwList" data-view="list" style="font-size:12px;border:1px solid var(--border);border-radius:12px;padding:2px 10px;cursor:pointer">목록</span>
+            <span class="vchip" id="vwHeat" data-view="heat" style="font-size:12px;border:1px solid var(--border);border-radius:12px;padding:2px 10px;cursor:pointer" title="자산 × 4소스 격자 — 같은 자산이 여러 소스에 걸리면 상관(⚑)">🗺 히트맵</span>
+          </span>
+        </div>
         <div class="filters" id="filters">
           <span class="fchip active" data-src="all">전체</span>
           <span class="fchip" data-src="vuln">🔍 취약점</span>
@@ -166,6 +185,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
           <span class="fchip" data-src="hardening">🛡 하드닝</span>
         </div>
         <div class="risk-list" id="riskList" data-gijo-fit><div class="empty">불러오는 중…</div></div>
+        <!-- 히트맵 뷰 -->
+        <div id="heatWrap" style="display:none">
+          <div id="heatBody"></div>
+          <div id="heatNote" style="font-size:11.5px;color:var(--muted);padding:6px 2px"></div>
+        </div>
       </div>
       <div class="panel ana">
         <div class="ph" id="anaTitle">항목을 선택하세요</div>
@@ -207,6 +231,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   let data = { events: [], summary: null, correlations: [] };
   let filter = "all";
   let selectedId = null;
+  let view = "list";   // list | heat — 관제 목록/히트맵 전환(2026-08-04)
   const STATUS_LABEL = { open:"열림", ack:"확인", inprogress:"처리중", done:"완료", ignored:"무시" };
 
   function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
@@ -336,6 +361,45 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     box.querySelectorAll(".risk-row").forEach(r => r.addEventListener("click", () => selectEvent(r.dataset.id)));
     // 그린 **뒤에** 잰다 — 그리기 전에는 위쪽(상관 줄·필터 칩)이 아직 제자리가 아니다.
     목록높이맞추기();
+    if (view === "heat") renderHeatmap();
+  }
+
+  // ── 관제 4소스 히트맵(2026-08-04, 지형도 3단계 ㉮, 시안 security-map-v2 승인) ──
+  // ⚠ 렌더는 map-view.js(gijoMapView.heatmapData), **판정은 서버 것을 그대로 쓴다** —
+  //   상관은 data.correlations(서버가 peers까지 봐서 묶은 것). 화면이 새로 계산하면
+  //   로그(entity=공격자 IP)가 절대 안 묶여 목록의 상관 판정과 어긋난다.
+  function renderHeatmap(){
+    if (!window.gijoMapView || !window.gijoMapView.heatmapData) return;
+    const wrap = document.getElementById("heatBody");
+    const hd = window.gijoMapView.heatmapData(data.events, data.correlations || [], (s)=>s);
+    if (!hd.rows.length){ wrap.innerHTML = '<div class="empty">표시할 이벤트가 없습니다.</div>'; document.getElementById("heatNote").textContent=""; return; }
+    const cls = (max)=> max>=4?"hm-4":max>=3?"hm-3":max>=2?"hm-2":max>=1?"hm-1":"hm-0";
+    let h = '<div class="hm-grid"><div></div>' + hd.sources.map(s=>`<div class="hm-ch">${esc(s[1])}</div>`).join("");
+    for (const r of hd.rows){
+      // 자산 이름을 누르면 대화창에 그 자산을 물어본다 — 지시는 전부 대화창(제품 원칙).
+      h += `<div class="hm-rh" data-ask="${esc(r.name)} 취약점 알려줘" title="${esc(r.name)}${r.corr?' · ⚑ 두 소스 이상 동시(상관)':''}">${r.corr?'⚑ ':''}${esc(r.name)}</div>`;
+      h += r.cells.map(c=>{
+        const corr = c.count>0 && r.corr ? " hm-corr" : "";
+        return `<div class="hm-cell ${cls(c.max)}${corr}" data-ask="${esc(r.name)} 취약점 알려줘">${c.count||""}</div>`;
+      }).join("");
+    }
+    h += '</div>';
+    wrap.innerHTML = h;
+    wrap.querySelectorAll("[data-ask]").forEach(el => el.addEventListener("click", ()=>{
+      if (window.gijo && window.gijo.askConsole) window.gijo.askConsole(el.dataset.ask);
+    }));
+    const 상관수 = hd.rows.filter(r=>r.corr).length;
+    document.getElementById("heatNote").innerHTML =
+      `가로=소스 · 세로=자산(위험 큰 순 ${hd.rows.length}${hd.전체행수>hd.rows.length?'/'+hd.전체행수:''}) · 색=최고 심각도 · <span style="color:#a99cf5">⚑=두 소스 이상 동시 = 상관 ${상관수}건</span> · 칸을 누르면 대화창에 묻습니다`;
+  }
+  function setView(v){
+    view = v;
+    document.getElementById("vwList").classList.toggle("on", v==="list");
+    document.getElementById("vwHeat").classList.toggle("on", v==="heat");
+    document.getElementById("riskList").style.display = v==="list" ? "" : "none";
+    document.getElementById("heatWrap").style.display = v==="heat" ? "" : "none";
+    if (v==="heat") renderHeatmap();
+    try { localStorage.setItem("gijo:ana:view", v); } catch(e){}
   }
   function selectEvent(id){
     selectedId = id;
@@ -555,6 +619,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.querySelectorAll("#filters .fchip").forEach(x=>x.classList.toggle("active", x===c));
     renderList();
   });
+  // 목록 ⇄ 히트맵 전환(지형도 3단계)
+  document.getElementById("vwList").addEventListener("click", ()=>setView("list"));
+  document.getElementById("vwHeat").addEventListener("click", ()=>setView("heat"));
+  try { const v = localStorage.getItem("gijo:ana:view"); if (v==="heat") setView("heat"); } catch(e){}
   document.querySelector(".graph-toggle").addEventListener("click", (ev)=>{
     const g = ev.target.closest(".gt"); if(!g) return;
     graphMode = g.dataset.mode;
@@ -603,6 +671,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 <script src="workflowrail.js"></script>
 <script src="progresscard.js"></script>
 <script src="gijomd.js"></script>
+<script src="map-view.js"></script>
 <script src="chatparts.js"></script>
 <script src="chatwidget.js"></script>
 </body>
