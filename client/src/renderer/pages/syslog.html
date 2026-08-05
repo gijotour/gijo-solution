@@ -180,8 +180,13 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   // ── 그림 먼저(전-7 ①, 2026-08-05) ──────────────────────────────────────
   // 이 화면엔 이미 갈래 칩이 있다 — 새 필터를 만들지 않고 **그 칩을 그림으로 바꿔** 세운다.
   // 그래야 칩과 막대가 서로 다른 상태를 가리키는 일이 생기지 않는다.
-  const 갈래한글 = { console: "서버 콘솔", modelscan: "모델 스캔", reposcan: "저장소 스캔",
-    "extract-doc": "문서 추출", train: "학습", merge: "모델 합치기" };
+  // ⚠ 이름표를 **칩에서 읽는다** — 표를 따로 적었더니 칩에는 「파인튜닝」인데 막대는 finetune으로
+  //   나오고, 표에만 있던 train·merge는 어디에도 없는 키였다(2026-08-05 검토 지적).
+  //   같은 뜻의 이름은 한 곳에서만 정한다.
+  function 갈래이름(src) {
+    const chip = document.querySelector('#sourceFilters .filter-chip[data-src="' + src + '"]');
+    return chip ? chip.textContent.trim() : src;
+  }
 
   function 갈래고르기(src) {
     activeFilter = src || "all";
@@ -206,7 +211,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         {
           kind: "bars",
           segments: 키들.map((k) => ({
-            key: k, label: 갈래한글[k] || k, value: 갈래별[k],
+            key: k, label: 갈래이름(k), value: 갈래별[k],
             // 오류가 섞인 갈래는 붉게 — 어디서 터졌는지가 이 화면의 첫 물음이다.
             color: logEntries.some((e) => (e.source || "console") === k && /error|err|fail|실패|오류/i.test(String(e.level || "") + " " + String(e.message || ""))) ? "bad" : "blue",
           })),
@@ -228,7 +233,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     if (activeFilter === "all") { window.gijoViz.filterBar(el, null, null); return; }
     const 보임 = logEntries.filter((e) => (e.source || "console") === activeFilter).length;
     window.gijoViz.filterBar(el,
-      { label: 갈래한글[activeFilter] || activeFilter, 보임, 전체: logEntries.length, 단위: "줄" },
+      { label: 갈래이름(activeFilter), 보임, 전체: logEntries.length, 단위: "줄" },
       () => {
         갈래고르기(null);
         document.querySelectorAll("#vizStrip .gviz-bar").forEach((b) => b.classList.remove("on"));
@@ -247,6 +252,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const 셈 = document.getElementById("logErrCount");
     if (셈) 셈.textContent = String(오류);
     if (window.gijoFold) window.gijoFold.refresh();
+    // ★ 2026-08-05: 요약채우기가 **어디에서도 안 불리고 있었다** — 위 한 줄(#logKpi)이 늘 빈
+    //   채였는데, 이번에 붙인 화면 안내는 그 자리를 설명하고 있었다(없는 것을 설명함).
+    //   함수만 만들어 두고 부르지 않은 자리는 시험도 스윕도 못 잡는다 — 여기서 부른다.
+    요약채우기(오류);
   }
 
   /**

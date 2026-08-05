@@ -1179,20 +1179,31 @@ tr:last-child td{border-bottom:none;}
   }
   // ───────────────────────────────────────────────────────────────────────
 
+  // ⚠ 목록 상한(2026-08-05 검토 지적). 전에는 목록이 비어 있어(init에서 안 불렀다) 몰랐는데,
+  //   고치고 나니 **1,809건을 통째로 DOM에 그리고 행마다 삭제 리스너를 단다.** 관계도는
+  //   GRAPH_CAP=60으로 자르고 그 사실을 적어 주는데 목록에는 상한도 안내도 없었다.
+  //   ⚠ 줄여서 보여주되 **있는 것을 숨기지 않는다** — 몇 건 중 몇 건인지 늘 적는다.
+  const LIST_CAP = 300;
+
   function renderList(전체) {
     그림띠();
     const triples = 관계필터 ? (전체 || []).filter((t) => t.predicate === 관계필터) : (전체 || []);
     const box = document.getElementById("tripleList");
-    document.getElementById("listCount").textContent = `· ${triples.length}건`;
+    const 보일것 = triples.slice(0, LIST_CAP);
+    document.getElementById("listCount").textContent =
+      triples.length > LIST_CAP ? `· ${LIST_CAP}건 표시 (전체 ${triples.length.toLocaleString()}건)` : `· ${triples.length}건`;
     if (triples.length === 0) { box.innerHTML = `<div style="color:var(--muted-2);font-size:12.5px;padding:14px 0">등록된 관계가 없습니다. 위 "샘플 지식 불러오기"로 시작하거나 직접 추가하세요.</div>`; return; }
-    box.innerHTML = triples.map((t) => `
+    box.innerHTML = 보일것.map((t) => `
       <div class="triple-row">
         <span class="chip chip-s">${esc(t.subject)}</span>
         <span class="arrow">—</span><span class="pred">${esc(t.predicate)}</span><span class="arrow">→</span>
         <span class="chip chip-o">${esc(t.object)}</span>
         ${t.source ? `<span class="src-tag">${esc(t.source)}</span>` : ""}
         <button class="del-btn" data-id="${t.id}" title="삭제">🗑</button>
-      </div>`).join("");
+      </div>`).join("") +
+      (triples.length > LIST_CAP
+        ? `<div style="color:var(--muted-2);font-size:12.25px;padding:10px 0">앞 ${LIST_CAP}건만 보입니다 — 전체 ${triples.length.toLocaleString()}건입니다. 위 막대나 주어 찾기로 좁혀 보세요.</div>`
+        : "");
     // 무엇을 지우는지 확인 창에 그대로 보여준다 — "이 관계"라고만 하면 어느 것인지 모른다.
     box.querySelectorAll(".del-btn").forEach((b) =>
       b.addEventListener("click", () => removeTriple(b.dataset.id, (b.closest(".triple") || b.parentElement)?.innerText.replace(/\s+/g, " ").trim()))

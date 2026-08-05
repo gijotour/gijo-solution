@@ -382,10 +382,10 @@
       // 맨 위 고정 세 자리 — 가지에 안 달렸으니 들여쓰지 않고, 아래에 얇은 금으로 구분한다.
       ".gn-top-fixed{padding-bottom:7px;margin-bottom:3px;border-bottom:1px solid rgba(255,255,255,.07);}" +
       ".gn-top-fixed .gn-item{padding-left:11px;}" +
-      // 찾기 — 가지를 기본으로 접어 두니(4.0.0) "어느 가지에 있더라"를 모르면 하나씩 열어봐야 한다.
-      // 이름만 알면 바로 닿는 길을 둔다. 상시 보이게 두는 게 중요하다 — 단축키만 있으면 모르는
-      // 사람은 영영 못 쓴다(담당자가 다 개발자는 아니다).
-      "color:var(--text,#e9e7e2);font-size:12px;padding:7px 26px 7px 28px;outline:none;font-family:inherit;}" +
+      // ★ 여기 있던 **셀렉터 없는 CSS 조각**을 지웠다(2026-08-05 검토 지적). 찾기 입력칸이
+      //   상단 바로 이사할 때 셀렉터만 지워지고 선언부가 남았는데, CSS 파서는 그 조각을
+      //   다음 규칙의 앞머리로 먹어 **.gn-none까지 통째로 버렸다** — 찾기 「결과 없음」
+      //   문구의 모양이 안 먹고 있었다. 규칙 수만 세는 QA로는 이 형태가 안 잡힌다.
       ".gn-none{font-size:12.5px;color:var(--muted-2,#a49d95);padding:10px 12px;}" +
       ".gn-fav-g{color:var(--amber,#f0a020);}" +
       // ☆ 별표 — 평소엔 숨어 있다가 그 줄에 마우스를 올리면 나온다(30줄에 별이 다 떠 있으면
@@ -477,7 +477,7 @@
     // 아이콘 — 단선 SVG를 **글자 앞에** 넣는다(2026-08-05). 예전엔 CSS ::before로 이모지를
     // 붙였는데, 이모지는 색을 우리가 못 정해 옆 글자와 톤이 어긋났다. SVG는 currentColor라
     // 글자와 같이 밝아지고 어두워진다. label 자체는 그대로 둔다 — 탭 이름으로도 쓰이기 때문이다.
-    var svg = it.icon ? iconSvg(it.icon) : (it.iconOf ? iconSvg(it.iconOf) : null);
+    var svg = it.icon ? iconSvg(it.icon) : null;
     if (svg) el.appendChild(svg);
     var lab = document.createElement("span"); lab.className = "gn-label"; lab.textContent = it.label; el.appendChild(lab);
 
@@ -670,12 +670,23 @@
   // 대시보드가 '전체메뉴' 모드에서 같은 메뉴를 렌더하도록 공개(단일 소스).
   window.gijoRenderMenu = buildMenu;
 
+  /**
+   * 아이콘 마크업을 **여기서만** 만들어 내준다(2026-08-05 검토 지적).
+   * 상단 🔍 화면 찾기가 예전엔 이모지(it.ic)를 받아 그렸는데, 이모지를 걷어 내면서
+   * 그 값이 undefined가 되어 **30줄이 전부 「▪」로 죽었다.** 아이콘을 저쪽에 베껴 적으면
+   * 또 갈라지므로, 같은 ICON 표에서 만든 마크업을 넘긴다.
+   */
+  window.gijoIconMarkup = function (name) {
+    var el = iconSvg(name);
+    return el ? el.outerHTML : "";
+  };
+
   /** 찾기용 납작한 목록 — {page|win, label, group}. 자료는 위 TOP/GROUPS 하나에서만 온다. */
   window.gijoScreenList = function () {
     var out = [];
-    TOP.forEach(function (t) { out.push({ page: t.page, win: t.win, label: t.label, ic: t.ic, group: "" }); });
+    TOP.forEach(function (t) { out.push({ page: t.page, win: t.win, label: t.label, icon: t.icon, group: "" }); });
     GROUPS.forEach(function (g) {
-      g.items.forEach(function (i) { out.push({ page: i.page, win: i.win, label: i.label, ic: g.ic, group: g.label }); });
+      g.items.forEach(function (i) { out.push({ page: i.page, win: i.win, label: i.label, icon: g.icon, group: g.label }); });
     });
     return out;
   };

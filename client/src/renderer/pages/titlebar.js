@@ -91,6 +91,9 @@
     ".gtb-fr{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:8px;font-size:13.5px;color:var(--muted,#b3ada4);cursor:pointer;}",
     ".gtb-fr.on{background:rgba(59,130,246,.18);color:#fff;}",
     ".gtb-fr .fg{margin-left:auto;font-size:12px;color:var(--muted-2,#a49d95);flex:0 0 auto;}",
+    // 찾기 결과의 아이콘 — 왼쪽 메뉴와 같은 단선 SVG(2026-08-05).
+    ".gtb-fi{flex:0 0 auto;width:15px;height:15px;display:flex;align-items:center;justify-content:center;}",
+    ".gtb-fi svg{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;opacity:.7;}",
     ".gtb-fnone{padding:16px;font-size:13px;color:var(--muted-2,#a49d95);text-align:center;}",
     ".gtb-fhint{padding:7px 12px;border-top:1px solid var(--border,rgba(255,255,255,.10));font-size:12px;color:var(--muted-2,#a49d95);display:flex;gap:14px;}",
   ].join("");
@@ -601,7 +604,9 @@
       걸린것.forEach(function (it, n) {
         var r = document.createElement("div");
         r.className = "gtb-fr" + (n === 0 ? " on" : "");
-        r.innerHTML = "<span>" + (it.ic || "▪") + "</span><span>" + it.label + "</span>" +
+        // 아이콘은 nav.js의 ICON 표 하나에서 온다(2026-08-05) — 여기서 따로 그리면 갈라진다.
+        var 아이콘 = (window.gijoIconMarkup && it.icon) ? window.gijoIconMarkup(it.icon) : "";
+        r.innerHTML = '<span class="gtb-fi">' + (아이콘 || "▪") + "</span><span>" + it.label + "</span>" +
                       (it.group ? '<span class="fg">' + it.group + "</span>" : "");
         r.addEventListener("click", function () { closeFinder(); window.gijoOpenScreen(it); });
         list.appendChild(r);

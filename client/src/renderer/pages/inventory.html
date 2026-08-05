@@ -713,8 +713,16 @@
     if (!window.gijoViz) return;
     const el = document.getElementById("vizFilter");
     if (!종류필터) { window.gijoViz.filterBar(el, null, null); return; }
-    const 보임 = allAssets.filter((a) => (a.assetType || "기타") === 종류필터).length;
-    window.gijoViz.filterBar(el, { label: 종류한글[종류필터] || 종류필터, 보임, 전체: allAssets.length, 단위: "자산" },
+    // ⚠ 목록이 실제로 세는 것과 **같은 조건**으로 센다(2026-08-05 검토 지적).
+    //   예전엔 종류로만 세어, 검색어를 친 채 막대를 누르면 목록은 3줄인데 띠는 "자산 40"이라 했다.
+    //   「전체」도 종류만 뺀 수여야 한다 — 그래야 "40 중 3"이 아니라 "3 / 12"처럼 읽힌다.
+    const 보임 = applyFilters(allAssets).length;
+    const 종류뺀전체 = (() => {
+      const 기억 = 종류필터; 종류필터 = null;
+      const n = applyFilters(allAssets).length;
+      종류필터 = 기억; return n;
+    })();
+    window.gijoViz.filterBar(el, { label: 종류한글[종류필터] || 종류필터, 보임, 전체: 종류뺀전체, 단위: "자산" },
       () => {
         종류필터 = null;
         document.querySelectorAll("#vizStrip .gviz-bar").forEach((b) => b.classList.remove("on"));

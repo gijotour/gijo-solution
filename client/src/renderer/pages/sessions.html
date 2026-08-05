@@ -361,7 +361,8 @@
   // ── 세션 목록 ────────────────────────────────────────────────────────
   function sessionMatches(s, q) {
     if (q && !((s.title || "").toLowerCase().includes(q) || (s.lastPreview || "").toLowerCase().includes(q))) return false;
-    if (statusFilter !== "all" && s.status !== statusFilter) return false;
+    // 상태가 비어 오면 **진행중**으로 본다 — 막대가 그렇게 세므로 목록도 같아야 한다.
+    if (statusFilter !== "all" && (s.status || "active") !== statusFilter) return false;
     return true;
   }
   const STATUS_BADGE = { active: "b-active", done: "b-done", ignored: "b-ignored" };
@@ -405,9 +406,12 @@
     if (!window.gijoViz) return;
     const el = document.getElementById("vizFilter");
     if (statusFilter === "all") { window.gijoViz.filterBar(el, null, null); return; }
-    const 보임 = sessions.filter((s) => (s.status || "active") === statusFilter).length;
+    // ⚠ 목록과 **같은 조건**(sessionMatches: 검색어 + 상태)으로 센다 — 검색 중에 띠만
+    //   다른 수를 말하면 무엇을 믿을지 알 수 없다(2026-08-05 검토 지적).
+    const 보임 = sessions.filter((s) => sessionMatches(s, searchQuery)).length;
+    const 상태뺀전체 = (() => { const 기억 = statusFilter; statusFilter = "all"; const n = sessions.filter((s) => sessionMatches(s, searchQuery)).length; statusFilter = 기억; return n; })();
     window.gijoViz.filterBar(el,
-      { label: STATUS_LABEL[statusFilter] || statusFilter, 보임, 전체: sessions.length, 단위: "건" },
+      { label: STATUS_LABEL[statusFilter] || statusFilter, 보임, 전체: 상태뺀전체, 단위: "건" },
       () => {
         상태고르기(null);
         document.querySelectorAll("#vizStrip .gviz-bar").forEach((b) => b.classList.remove("on"));

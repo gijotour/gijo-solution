@@ -214,10 +214,15 @@
       ".gviz-hint{color:var(--muted-2,#a49d95);font-size:11px;margin-left:auto}",
       ".gviz-row{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap}",
       ".gviz-bars{display:flex;gap:6px;align-items:flex-end;height:" + 그림높이 + "px}",
-      ".gviz-bar{width:44px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;cursor:pointer}",
+      // ⚠ 칸을 44px로 고정했더니 **한글 이름표가 전부 줄바꿈**돼 13px 칸을 37px까지 넘쳤다
+      //   (2026-08-05 실측: 「인프라 호스트」·「완화통제」는 물론 두 글자 「서버」까지 접혔다).
+      //   한글은 아무 데서나 접히므로 nowrap + 말줄임으로 막고, 칸은 이름표에 맞춰 늘리되
+      //   상한을 둔다(무한정 늘리면 막대가 아니라 또 하나의 목록이 된다). 전체 이름은 툴팁에 있다.
+      ".gviz-bar{min-width:44px;max-width:82px;padding:0 3px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;cursor:pointer}",
       ".gviz-bar .v{font-size:11px;color:var(--text,#e9e7e2);margin-bottom:2px}",
       ".gviz-bar .b{width:100%;border-radius:3px 3px 0 0;transition:.12s}",
-      ".gviz-bar .l{font-size:11px;color:var(--muted,#b3ada4);margin-top:3px;height:13px}",
+      ".gviz-bar .l{font-size:11px;color:var(--muted,#b3ada4);margin-top:3px;line-height:14px;height:14px;" +
+        "max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}",
       ".gviz-bar:hover .b{filter:brightness(1.35)}",
       ".gviz-bar.on .b{outline:2px solid var(--blue-light,#5fa1ff);outline-offset:1px}",
       ".gviz-donut-w{text-align:center}",
