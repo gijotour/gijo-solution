@@ -38,15 +38,19 @@ const 화면 = [
   "sbom.html", "sessions.html", "syslog.html", "threat.html", "vulnscan.html",
 ];
 
-// ⚠ 포트를 고르게 둔다 — 9223에는 **설치본**(app.asar)이 떠 있을 수 있고, 설치본에는 방금 고친
-//   HTML이 없다. 고친 것을 재려면 개발 실행(기본 9224)에 붙어야 한다.
-const PORT = process.env.CDP_PORT || "9224";
+// 기본 9223 — QA 전수조사가 쓰는 자리다(sweep·shell·download와 같은 앱을 본다).
+// ⚠ 그 자리에 **설치본**(app.asar)이 떠 있으면 방금 고친 HTML이 없다. 고친 것을 재려면
+//   개발 실행을 따로 띄우고 CDP_PORT=9224로 부른다. 어느 쪽을 쟀는지 아래에서 밝힌다.
+const PORT = process.env.CDP_PORT || "9223";
 const browser = await chromium.connectOverCDP("http://localhost:" + PORT);
 const ctx = browser.contexts()[0];
 
 const pages = ctx.pages();
 const hub = pages.find((p) => p.url().includes("hub.html")) || pages.find((p) => !p.url().includes("office.html"));
 if (!hub) { console.log("✗ 창을 못 찾음 — 클라가 떠 있고 로그인돼 있는지 확인"); process.exit(1); }
+
+// 설치본을 재고 있는지 밝힌다 — 개발 중 고친 HTML이 없는 앱을 재고 "통과"라 말하면 거짓이 된다.
+const 설치본 = hub.url().includes("app.asar");
 
 const 오류들 = [];
 hub.on("console", (m) => { if (m.type() === "error") 오류들.push(m.text().slice(0, 160)); });
@@ -176,7 +180,11 @@ for (const r of 결과) {
   if (r.바뀐수 > 1) console.log("       같이 바뀐 자리: " + r.바뀐목록.join(" "));
 }
 console.log("");
+console.log(`  (CDP ${PORT} · ${설치본 ? "설치본(app.asar) — 방금 고친 HTML은 없을 수 있습니다" : "개발 실행"})`);
 console.log("  " + (빨강 ? `✗ 결과가 화면 밖인 화면 ${빨강}개 — 띠를 목록 위로 옮겨야 합니다.` : "✓ 화면 밖으로 나간 곳 없음"));
 if (노랑) console.log(`  △ 조금 넘치는 곳 ${노랑}개`);
 if (못잼) console.log(`  ? 못 잰 곳 ${못잼}개 — 위 사유를 하나씩 확인할 것(0건인지, 코드가 죽은 것인지).`);
+// ⚠ QA 전수조사가 잡을 수 있게 **0이 아닌 값으로 끝낸다**. 화면에만 ✗를 찍고 조용히 0으로
+//   끝나면 점검에 넣어도 늘 통과로 보인다 — 감시가 헛도는 대표 꼴이다.
+if (빨강) process.exitCode = 1;
 await browser.close();

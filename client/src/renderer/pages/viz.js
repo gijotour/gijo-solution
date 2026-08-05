@@ -257,7 +257,23 @@
   function mount(자리, spec) {
     if (!자리) return null;
     스타일주입();
-    var d = 띠(spec.title || "한눈에", spec.hint);
+    // ⚠ **누를 게 없으면 "누르면"이라 적지 않는다**(2026-08-06 실측으로 발견).
+    //   값이 전부 0이면 bars()가 「표시할 값이 없습니다」를 그리는데, 안내 문구는 화면이 준
+    //   "누르면 목록이 좁혀집니다"가 그대로 남았다 — 누를 것이 없는데 누르라고 적혀 있었다.
+    //   화면 4곳이 이 문구를 조건 없이 달고 있었다(조치·승인/규정 준수/위협 인텔/취약점).
+    //   ⚠ 화면마다 조건을 달게 하면 **반드시 새 화면에서 또 샌다** — 그래서 여기 한 곳에서
+    //     실제로 누를 수 있을 때만 약속이 남게 한다. 화면은 늘 하던 대로 문구를 주면 된다.
+    var 누를것있음 = (spec.parts || []).some(function (p) {
+      return p && p.kind === "bars" && typeof p.onPick === "function"
+        && (p.segments || []).some(function (s) { return (s.value || 0) > 0; });
+    });
+    var 안내 = String(spec.hint == null ? "" : spec.hint);
+    if (!누를것있음 && /누르면/.test(안내)) {
+      // 약속 구절만 걷어내고 **나머지 사실(기준·근거)은 남긴다** — 기준을 같이 지우면
+      // "무엇을 센 숫자인지"가 사라진다(SBOM 화면이 그렇다).
+      안내 = 안내.replace(/누르면[^·]*/g, "").replace(/^\s*·\s*/, "").replace(/\s*·\s*$/, "").trim();
+    }
+    var d = 띠(spec.title || "한눈에", 안내);
     var r = 줄(d);
     (spec.parts || []).forEach(function (p) {
       if (!p) return;
