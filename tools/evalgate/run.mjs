@@ -150,13 +150,25 @@ async function dispatch(text, screen) {
 }
 
 // ── 채점(결정적) ─────────────────────────────────────────────────────
+// ★ 우리 코드가 붙이는 머리말은 **채점 대상이 아니다**(2026-08-05 검토 지적 — 심각).
+//   「⚠ 근거 약함 — 질문에 딱 맞는 사내 자료는 **없습니다**」를 붙이게 고쳤더니,
+//   `no-hit-honest`의 정직 표현 `없|찾지 못|확인되지|등록`을 **배너가 대신 만족**시켰다.
+//   그러면 모델이 자료를 지어내도 그 문항은 영원히 초록불이다 — 게이트가 "모델이 정직한가"가
+//   아니라 "우리 코드가 정직 문구를 붙였는가"를 재게 된다.
+//   ⚠ 이 파일 앞부분(2026-08-03 주석)이 이미 이 위험을 예고해 두었는데 그 반대로 갔다.
+//   → 채점은 **배너를 뗀 본문**으로 한다. 배너가 붙었는지 자체는 제품 시험이 따로 지킨다
+//     (server/test/promptleak-overlap.test.ts).
+const 배너_RE = /^\s*⚠\s*\*\*근거 약함[^\n]*\n+/;
+const 본문만 = (s) => String(s ?? "").replace(배너_RE, "");
+
 function grade(c, r, axis) {
   const why = [];
   const out = String(r.output ?? "");
   if (LONG_ANSWER_RE.test(out)) return { skipped: true, why: ["30초 초과 — 리포트 전환(측정 못 함)"], out };
   if (isFallback(out)) why.push("폴백/오류 문구");
-  for (const p of c.expect ?? []) if (!new RegExp(p, "i").test(out)) why.push(`누락: /${p}/`);
-  for (const p of c.forbid ?? []) if (new RegExp(p, "i").test(out)) why.push(`금지 포함: /${p}/`);
+  const 채점본 = 본문만(out);
+  for (const p of c.expect ?? []) if (!new RegExp(p, "i").test(채점본)) why.push(`누락: /${p}/`);
+  for (const p of c.forbid ?? []) if (new RegExp(p, "i").test(채점본)) why.push(`금지 포함: /${p}/`);
   const s = c.signals ?? {};
   // AgentToolCall의 필드는 name이 아니라 tool이다(agentloop.ts) — 실측으로 확인.
   const toolNames = (r.toolCalls ?? []).map((t) => t.tool);
@@ -354,21 +366,34 @@ for (const axis of runAxes) {
         //   ⚠ 진짜 하락은 이 재측정을 못 빠져나간다. 깨진 기능은 5회 중 5회 실패한다.
         //     흔들림만 살아남는다. **과반이 통과해야** 흔들림으로 인정한다.
         //   ⚠ 흔들림으로 넘긴 것도 **감추지 않는다** — FLAKY로 세어 리포트에 남긴다.
+        // ⚠ **첫 재측정이 실패하면 더 돌지 않는다** — 어차피 흔들림 판정이 불가능한데
+        //   남은 회차를 도는 것은 낭비고, 나쁜 후보일수록 운영을 오래 점거하게 된다.
         const 확인횟수 = 4;
         const 추가 = [];
+        let 시간초과 = 0;
         for (let k = 0; k < 확인횟수; k++) {
           const t = await runCase(c, axis);
-          if (t.skipped) continue;          // 시간초과는 판정에 안 쓴다(위 규칙과 같다)
+          if (t.skipped) { 시간초과++; continue; }
           추가.push(t.ok);
+          if (!t.ok) break;                 // 하나라도 재현되면 흔들림이 아니다 — 즉시 그만
+        }
+        // ⚠ **재측정을 못 했으면 「측정 못 함」이다 — 하락이 아니다**(2026-08-05 검토 지적).
+        //   이 파일 위쪽(1·2회차)은 이미 그렇게 다루는데 여기만 달랐다. 규칙이 갈리면
+        //   느린 후보에서 **거짓 보류**가 난다 — 거짓 통과만큼 나쁘다.
+        if (추가.length === 0) {
+          results[axis].push({ id: c.id, skipped: true, why: [`재측정 ${시간초과}회 전부 시간초과 — 측정 못 함`], ms: r.ms });
+          console.log(`◦ ${c.id} — 재측정 ${시간초과}회가 전부 시간초과라 판정 못 함(실패로 세지 않는다)`);
+          continue;
         }
         const 시도 = [false, false, ...추가];   // 처음 2회는 실패였다
         const 통과수 = 시도.filter(Boolean).length;
-        if (추가.length >= 3 && 통과수 * 2 > 시도.length) {
+        // 재측정이 **전부 통과**해야 흔들림으로 인정한다(과반보다 엄격 — 안전한 쪽).
+        if (추가.length >= 3 && 추가.every(Boolean)) {
           results[axis].push({ id: c.id, pass: true, flaky: true, why: r.why, ms: r.ms });
-          console.log(`~ ${c.id} — 흔들림으로 판정(${통과수}/${시도.length} 통과) · 1차 사유: ${r.why.join(", ")}`);
+          console.log(`~ ${c.id} — 흔들림으로 판정(재측정 ${추가.length}회 전부 통과) · 1차 사유: ${r.why.join(", ")}`);
           continue;
         }
-        console.log(`✗ ${c.id} — 재측정에서도 재현(${통과수}/${시도.length} 통과) — 흔들림이 아니라 하락이다`);
+        console.log(`✗ ${c.id} — 재측정에서도 재현(${통과수}/${시도.length} 통과, 시간초과 ${시간초과}회) — 흔들림이 아니라 하락이다`);
         r = retry;
       }
       results[axis].push({ id: c.id, pass: r.ok, canary: !!c.canary, why: r.why, ms: r.ms });
@@ -564,6 +589,16 @@ if (flag("--accept-baseline")) {
   if (실패축.length) {
     console.error(`\n기준선 확정 불가 — 실패가 있는 결과입니다: ${실패축.map((a) => `${a} ${axes[a].pass}/${axes[a].total}${axes[a].canaryFail ? ` (카나리 ${axes[a].canaryFail})` : ""}`).join(", ")}`);
     console.error("먼저 고치고 통과한 실행에서 확정하세요. 실패를 기준선으로 박으면 그 실패가 정상이 됩니다.");
+    process.exit(2);
+  }
+  // ★ **흔들린 결과도 기준선으로 박지 않는다**(2026-08-05 검토 지적).
+  //   흔들림은 pass:true로 세지므로 위 검사를 그냥 통과한다 — 재측정 경로를 넓히면서
+  //   그 우회로도 함께 넓어졌다. 여러 번 시도해 겨우 살린 100%를 기준선에 박으면,
+  //   다음부터는 "원래 흔들리던 문항"이라는 사실이 어디에도 안 남는다.
+  const 흔들린축 = AXES.filter((a) => axes[a].flaky > 0);
+  if (흔들린축.length) {
+    console.error(`\n기준선 확정 불가 — 흔들린 문항이 있습니다: ${흔들린축.map((a) => `${a} FLAKY ${axes[a].flaky}`).join(", ")}`);
+    console.error("흔들림이 0인 실행에서 확정하세요. 겨우 살린 통과를 기준선으로 박으면 그 불안정이 정상이 됩니다.");
     process.exit(2);
   }
   // ★ 맨몸 견고성은 **명시할 때만** 갱신한다(2026-07-31 신설).

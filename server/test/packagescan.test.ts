@@ -45,7 +45,11 @@ describe("★ 원격으로 보내는 명령이 읽기 전용인가", () => {
     const 시작 = src.indexOf("export const 수집명령");
     const 끝 = src.indexOf("};", 시작);
     expect(시작, "수집명령을 못 찾았다 — 이 시험이 헛돌고 있다").toBeGreaterThan(0);
-    const 본문 = src.slice(시작, 끝);
+    // ⚠ 수집명령 블록만 보면 **나중에 더한 상수가 범위 밖으로 샌다**(2026-08-05 검토 지적).
+    //   원격으로 나가는 명령 상수를 **전부** 같은 잣대로 본다.
+    const 라이선스시작 = src.indexOf("export const 데비안라이선스명령");
+    expect(라이선스시작, "데비안라이선스명령을 못 찾았다 — 이 시험이 헛돌고 있다").toBeGreaterThan(0);
+    const 본문 = src.slice(시작, 끝) + "\n" + src.slice(라이선스시작, src.indexOf(";", 라이선스시작));
     expect(본문.length).toBeGreaterThan(200);
     // ⚠ 주석은 **먼저 걷어 낸다**(2026-08-05). 주석에 적은 백틱까지 실패로 잡으면
     //   "설명을 쓰면 시험이 깨지는" 그물이 되어, 다음 사람이 그물을 느슨하게 풀게 된다.
@@ -218,8 +222,8 @@ describe("데비안 라이선스 채우기", () => {
     const 표 = 데비안라이선스파싱(out);
     expect(표.curl).toBe("curl");
     expect(표.zlib1g).toBe("Zlib");
-    // "A and B"는 앞부분만 — 첫 줄 하나로 정확한 조합을 단정하지 않는다.
-    expect(표.openssl).toBe("OpenSSL");
+    // ⚠ 「and」는 **둘 다 지켜야 한다**는 뜻이라 자르면 뜻이 반대가 된다(2026-08-05 교정).
+    expect(표.openssl).toBe("OpenSSL and SSLeay");
     expect(표.bash).toBeUndefined();
   });
 

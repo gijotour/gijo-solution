@@ -56,7 +56,10 @@ const ANSWER_MAX = 4000;
 
 // 근거 인용 신호 — 사내 문서가 녹은 답. "(일반 지식 기준)" 꼬리는 근거 없이 답했다는 정직 표식이라 제외.
 const CITE_RE = /참고했|근거|\.pdf|\.docx|\.hwpx|\.md\b/i;
-const NO_GROUND_RE = /\(일반 지식 기준\)/;
+// ⚠ 「근거 약함」 배너는 **근거가 있다는 신호가 아니라 정반대**다(2026-08-05 검토 지적).
+//   그런데 CITE_RE의 `근거`에 걸려 인용 점수를 받고 있었다 — **근거가 없다고 스스로 밝힌 답이
+//   학습 후보 상위**에 올랐다. 배너가 붙은 답은 인용으로 세지 않는다.
+const NO_GROUND_RE = /\(일반 지식 기준\)|근거 약함/;
 
 /** 같은 문답을 다시 후보로 내밀지 않기 위한 정규화 지문. */
 function fingerprint(question: string, answer: string): string {

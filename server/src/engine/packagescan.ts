@@ -77,8 +77,12 @@ export function 데비안라이선스파싱(out: string): Record<string, string>
     const m = line.match(/^\/usr\/share\/doc\/([^/]+)\/copyright:\s*License:\s*(.+)$/);
     if (!m) continue;
     const 이름 = m[1].trim();
-    // 첫 줄만 쓰므로 값이 길 리 없지만, 주석이 붙는 경우가 있어 앞부분만 취한다.
-    const 값 = m[2].trim().split(/\s+(?:and|or)\s+/i)[0].trim();
+    // ⚠ **자르지 않는다**(2026-08-05 검토 지적). 예전엔 `A and B`에서 앞만 취했는데,
+    //   「and」는 **둘 다 지켜야 한다**는 뜻이라 한쪽만 적으면 뜻이 반대가 된다
+    //   (실측: `OpenSSL and SSLeay` → `OpenSSL`). 라이선스 칸은 법무가 보는 자리다.
+    //   길면 자르되 **잘랐다고 표시**한다 — 조용히 줄이면 아는 척이 된다.
+    let 값 = m[2].trim();
+    if (값.length > 60) 값 = 값.slice(0, 60).trim() + "…";
     if (!이름 || !값) continue;
     if (!표[이름]) 표[이름] = 값;   // 먼저 나온 것을 남긴다(grep -m1이라 파일당 하나뿐)
   }
@@ -98,6 +102,16 @@ export function 라이선스채우기(부품: AssetComponent[], 표: Record<stri
 }
 
 /** 어떤 장비인지 알아내는 **판별 명령**(이것도 읽기 전용). */
+/**
+ * ⚠ **검사기를 통과하지 못하는 유일한 예외**다(2026-08-05 검토가 짚어 명시).
+ *   `>`·`&&`·`||`가 들어 있어 `안전한명령인가()`는 이것을 거부한다 — 그 규칙은
+ *   「셸이 해석하는 것 금지」이고 이 명령은 그 문법 자체가 본질이기 때문이다.
+ *
+ *   그래도 안전한 근거: ① 고정 상수라 사용자 입력이 낄 자리가 없다 ② `command -v`(조회)와
+ *   `echo`(출력)뿐이고 `>`는 /dev/null 버리기다 ③ 무엇도 바꾸지 않는다.
+ *   ⚠ export 하지 않는다 — 밖에서 조립해 쓰지 못하게. 대신 여기 적어 다음 사람이 알게 한다.
+ *   시험(packagescan.test.ts)은 이 예외를 **알고 있는 상태로** 나머지를 검사한다.
+ */
 const 판별명령 = "(command -v rpm >/dev/null && echo rpm) || (command -v dpkg-query >/dev/null && echo deb) || echo unknown";
 
 /**
