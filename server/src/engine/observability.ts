@@ -116,7 +116,7 @@ function checkKnowledge(): HealthCheck {
     return {
       id: "knowledge", label: "지식베이스", level: "fail",
       detail: "등록된 문서가 0건입니다 — AI가 사내 근거 없이 답하게 됩니다.",
-      action: "기억·학습 화면에서 문서를 올리거나, 서버를 재시작해 기본 지식 번들이 적용되게 하세요.",
+      action: "AI 지식 화면에서 문서를 올리거나, 서버를 재시작해 기본 지식 번들이 적용되게 하세요.",
     };
   }
   return { id: "knowledge", label: "지식베이스", level: n < 5 ? "warn" : "ok", detail: `문서 ${n}건` };

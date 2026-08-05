@@ -2438,7 +2438,7 @@ async function runAuditSearch(args: Record<string, string>): Promise<string> {
     `사람별: ${Object.entries(byActor).sort((a, b) => b[1] - a[1]).slice(0, 5).map(([k, v]) => `${k} ${v}`).join(" · ")}`,
     "",
     ...lines,
-    hit.length > 12 ? `… 외 ${hit.length - 12}건 (작업 기록 화면에서 전체 확인)` : "",
+    hit.length > 12 ? `… 외 ${hit.length - 12}건 (기록 보기 화면(설정)에서 전체 확인)` : "",
   ].filter(Boolean).join("\n");
 }
 
@@ -2459,7 +2459,7 @@ async function runHandoverStatus(): Promise<string> {
     ...recent,
     "",
     "⚠ 어떤 문서를 이번 인수인계에 담았는지와 검증 통과율은 담당자 PC에 저장되어 서버가 알지 못합니다.",
-    "   인수인계 화면에서 [검증 시작]을 눌러야 통과율이 나오고, 그 결과만 감사 기록에 남습니다.",
+    "   업무 넘기기 화면(설정)에서 [▶ 검증 시작]을 눌러야 통과율이 나오고, 그 결과만 감사 기록에 남습니다.",
   ].join("\n");
 }
 

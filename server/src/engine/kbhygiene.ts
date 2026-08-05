@@ -187,7 +187,7 @@ export function formatKbHygiene(r: HygieneReport): string {
     L.push(`  대상: ${f.documents.slice(0, 5).join(", ")}${f.documents.length > 5 ? ` 외 ${f.documents.length - 5}건` : ""}`);
     L.push(`  → ${f.suggestion}`);
   }
-  L.push("\n※ 삭제는 자동으로 하지 않습니다 — 기억·학습 화면에서 확인 후 지우세요.");
+  L.push("\n※ 삭제는 자동으로 하지 않습니다 — AI 지식 화면에서 확인 후 지우세요.");
   return L.join("\n");
 }
 

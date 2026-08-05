@@ -322,3 +322,44 @@ describe("rpm 실장비 실증 — 진짜 AlmaLinux 9 패키지 출력", () => {
     expect(rpm값).toBe(라이선스다듬기(긴것));
   });
 });
+
+// ── 윈도우 실장비 실증 (2026-08-06, 중-7) ────────────────────────────────────
+// ★ 근거는 진짜 출력이다: 이 개발 PC(한국어 Windows 11)에서 제품의 수집 명령을
+//   **제품의 실행기(winHostRunner — chcp 65001 포함)** 그대로 돌려 받은 189줄 중,
+//   저장소에 넣어도 되는 잘 알려진 항목 26줄만 추렸다(개인 설치 목록 전체는 사적 정보).
+//
+// ★ 이 실증이 잡은 결함: 윈도우 출력 셋째 칸은 **Publisher(제조사)**인데 파서가 그것을
+//   license 칸에 넣고 있었다 — 실측 189개 전부 「Kakao Corp.」가 라이선스로 저장됐고,
+//   요약문은 "라이선스를 아는 것은 189개"라는 거짓을 말했다.
+// ★ 함께 확인한 것: 한글 이름(팟플레이어-64비트 등)이 제품 실행기에서는 안 깨진다.
+//   (처음 잰 내 하네스는 chcp 없이 돌려 전부 깨졌다 — 제품이 아니라 하네스 잘못이었다.)
+describe("윈도우 실장비 실증 — 진짜 설치 목록 출력", () => {
+  const 실출력 = fs.readFileSync(new URL("./fixtures/windows-real-output.tsv", import.meta.url), "utf8");
+
+  it("★ 제조사는 publisher 칸으로, license는 「-」(미상)로 — 회사 이름은 라이선스가 아니다", () => {
+    const 부품 = 패키지파싱("windows", 실출력);
+    expect(부품.length).toBeGreaterThanOrEqual(20);
+    for (const c of 부품) {
+      expect(c.license, `${c.name}의 license에 제조사가 들어갔다: ${c.license}`).toBe("-");
+    }
+    const git = 부품.find((c) => c.name === "Git")!;
+    expect(git.publisher).toBe("The Git Development Community");
+    expect(git.version).toBe("2.55.0.2");
+  });
+
+  it("한글 이름이 그대로 살아 있다 — 제품 실행기는 chcp 65001을 켠다", () => {
+    const 부품 = 패키지파싱("windows", 실출력);
+    const 한글 = 부품.filter((c) => /[가-힣]/.test(c.name));
+    expect(한글.length, "fixture에서 한글 항목이 사라졌다 — 이 시험이 지키는 것이 없어진다").toBeGreaterThanOrEqual(2);
+    expect(부품.some((c) => c.name === "팟플레이어-64비트")).toBe(true);
+    expect(부품.every((c) => !/\uFFFD/.test(c.name)), "이름에 깨진 글자(\uFFFD)가 있다").toBe(true);
+  });
+
+  it("★ 요약문이 거짓말을 하지 않는다 — 윈도우는 라이선스 없음을 밝힌다", async () => {
+    const r = await 패키지수집(가짜실행({ powershell: { out: 실출력 } }), true);
+    expect(r.ok).toBe(true);
+    expect(r.말).toContain("라이선스 정보가 없습니다");
+    expect(r.말, "제조사를 라이선스로 세면 안 된다").not.toMatch(/라이선스를 아는 것은 \d+개/);
+    expect(덮는범위글(r.부품)).toContain("라이선스를 아는 것은 0개");
+  });
+});
