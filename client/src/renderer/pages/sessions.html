@@ -156,6 +156,7 @@
   .ws-bar .wb-sub b{color:var(--text);font-weight:800;font-size:13px;}
   .ws-bar .wb-note{font-size:12.5px;color:var(--muted-2);margin-top:5px;}
 </style>
+<script src="viz.js"></script>
 </head>
 <body>
 <div class="header">
@@ -187,6 +188,12 @@
       <span class="wb-sub">🟢 진행중 <b id="kActive">-</b> · 완료 <b id="kDone">-</b> · 오늘 생성 <b id="kToday">-</b></span>
     </div>
   </div>
+
+  <!-- 그림 먼저(전-7 ①, 2026-08-05). 위 한 줄은 글로 「진행중 3 · 완료 40」이라 적혀 있어
+       어느 쪽이 무거운지 눈에 안 잡힌다 — 막대로 세운다. 누르면 아래 목록이 그 상태만 남고,
+       기존 상태 칩과 **같은 필터**를 쓴다(둘이 서로 다른 상태를 가리키지 않게). -->
+  <div id="vizStrip" style="max-width:1100px"></div>
+  <div id="vizFilter" style="display:none;max-width:1100px"></div>
 
   <!-- 쌓인 내역에서 뽑은 업무 패턴(2026-07-28 사용자 요청) — 나중에 참고할 자료로 둔다.
        ⚠ 여기 결과를 자동으로 어디에 먹이지 않는다. 대화를 그대로 지식으로 삼으면 잡담·오답이
@@ -358,7 +365,59 @@
     return true;
   }
   const STATUS_BADGE = { active: "b-active", done: "b-done", ignored: "b-ignored" };
+  // ── 그림 먼저(전-7 ①, 2026-08-05) ──────────────────────────────────────
+  // 새 필터를 만들지 않고 **기존 상태 칩(statusFilter)을 그림으로 바꿔** 세운다.
+  // ⚠ 막대는 검색어와 무관하게 **전체 내역**으로 센다 — 검색 중에 막대까지 줄면
+  //   "우리 내역이 몇 건인가"를 어디서도 못 본다.
+  const 상태색 = { active: "warn", done: "ok", ignored: "idle" };
+
+  function 상태고르기(st) {
+    statusFilter = st || "all";
+    const 칸 = document.getElementById("statusFilters");
+    if (칸) 칸.querySelectorAll(".fchip").forEach((x) => x.classList.toggle("active", (x.dataset.st || "all") === statusFilter));
+    renderSessionList();
+  }
+
+  function 그림띠() {
+    const 자리 = document.getElementById("vizStrip");
+    if (!자리 || !window.gijoViz) return;
+    const 셈 = {};
+    sessions.forEach((s) => { const k = s.status || "active"; 셈[k] = (셈[k] || 0) + 1; });
+    window.gijoViz.mount(자리, {
+      title: "한눈에",
+      hint: sessions.length ? "누르면 목록이 좁혀집니다" : "",
+      parts: [{
+        kind: "bars",
+        segments: ["active", "done", "ignored"].map((k) => ({
+          key: k, label: STATUS_LABEL[k] || k, value: 셈[k] || 0, color: 상태색[k],
+        })),
+        onPick: (key) => { 상태고르기(key); },
+      }],
+    });
+    if (statusFilter !== "all") {
+      const b = 자리.querySelector('.gviz-bar[data-key="' + statusFilter + '"]');
+      if (b) b.classList.add("on");
+    }
+    필터띠();
+  }
+
+  function 필터띠() {
+    if (!window.gijoViz) return;
+    const el = document.getElementById("vizFilter");
+    if (statusFilter === "all") { window.gijoViz.filterBar(el, null, null); return; }
+    const 보임 = sessions.filter((s) => (s.status || "active") === statusFilter).length;
+    window.gijoViz.filterBar(el,
+      { label: STATUS_LABEL[statusFilter] || statusFilter, 보임, 전체: sessions.length, 단위: "건" },
+      () => {
+        상태고르기(null);
+        document.querySelectorAll("#vizStrip .gviz-bar").forEach((b) => b.classList.remove("on"));
+        필터띠();
+      });
+  }
+  // ───────────────────────────────────────────────────────────────────────
+
   function renderSessionList() {
+    그림띠();
     const filtered = sessions.filter((s) => sessionMatches(s, searchQuery));
     document.getElementById("listCount").textContent = sessions.length ? `${filtered.length}/${sessions.length}건` : "";
     if (!filtered.length) {

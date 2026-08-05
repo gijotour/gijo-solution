@@ -271,6 +271,7 @@
   .ad-ask code{background:var(--panel);border:1px solid var(--border);border-radius:5px;padding:1px 6px;color:var(--blue-light);}
   .ad-empty{font-size:12.25px;color:var(--muted-2);padding:4px 0;}
 </style>
+<script src="viz.js"></script>
 </head>
 <body>
 
@@ -347,6 +348,12 @@
       <div id="serviceImpactBody" style="display:flex;flex-direction:column;gap:8px;">불러오는 중...</div>
     </div>
     </div>
+
+    <!-- 그림 먼저(전-7 ①, 2026-08-05). 위 KPI는 위험 등급을 말하고 🗺 지도는 배치를 말한다 —
+         이 띠는 어디에도 없던 물음, **무엇이 얼마나 있나(자산 종류)**를 말한다.
+         누르면 아래 목록이 그 종류만 남는다. -->
+    <div id="vizStrip"></div>
+    <div id="vizFilter" style="display:none"></div>
 
     <!-- 목록(무엇이 있는가)과 커버리지(무엇을 모르는가)를 나눈다. 같은 표에 섞으면 둘 다 안 보인다. -->
     <div class="cov-tabs" id="covTabs">
@@ -659,9 +666,63 @@
       if (activeFilter === "nosbom" && a.sbomGeneratedAt) return false;
       if (activeFilter === "unscanned" && a.lastScannedAt) return false;
       if (activeFilter === "recent" && Date.now() - a.registeredAt > 7 * 24 * 3600 * 1000) return false;
+      // 그림 띠에서 고른 자산 종류(전-7 ①, 2026-08-05) — 기존 조건들과 **곱해서** 건다.
+      if (종류필터 && (a.assetType || "기타") !== 종류필터) return false;
       return true;
     });
   }
+
+  // ── 그림 먼저(전-7 ①, 2026-08-05) ──────────────────────────────────────
+  // ⚠ 막대는 **전체 자산**으로 센다 — 눌러 좁혀도 위 KPI와 막대 높이는 그대로여야 한다.
+  //   좁힌 목록으로 다시 세면 "누를 때마다 자산이 줄어드는" 화면이 된다.
+  let 종류필터 = null;
+  // 화면에 나가는 글자는 한글로(제품 원칙). 원문 그대로 두면 「infra-h…」처럼 잘려 뜻을 잃는다.
+  const 종류한글 = { "infra-host": "인프라 호스트", server: "서버", network: "네트워크 장비",
+    endpoint: "단말", container: "컨테이너", repo: "코드 저장소" };
+
+  function 그림띠() {
+    const 자리 = document.getElementById("vizStrip");
+    if (!자리 || !window.gijoViz) return;
+    const 종류별 = {};
+    allAssets.forEach((a) => { const t = a.assetType || "기타"; 종류별[t] = (종류별[t] || 0) + 1; });
+    const 키들 = Object.keys(종류별).sort((x, y) => 종류별[y] - 종류별[x]).slice(0, 7);
+    // 위험 등급 분포는 riskOf 하나로 낸다 — 표·지도와 같은 판정을 써야 숫자가 어긋나지 않는다.
+    const 위험별 = { high: 0, mid: 0, low: 0, none: 0 };
+    allAssets.forEach((a) => { const L = riskOf(a).level; 위험별[L] = (위험별[L] || 0) + 1; });
+
+    window.gijoViz.mount(자리, {
+      title: "한눈에",
+      hint: 키들.length ? "누르면 목록이 좁혀집니다" : "",
+      parts: [
+        {
+          kind: "bars",
+          segments: 키들.map((t) => { const L = 종류한글[t] || t; return { key: t, label: L.length > 7 ? L.slice(0, 7) + "…" : L, value: 종류별[t], color: "blue" }; }),
+          onPick: (key) => { 종류필터 = key; 필터띠(); render(); },
+        },
+        { kind: "donut", value: 위험별.high, total: allAssets.length, label: "고위험", color: "bad", showRatio: true },
+      ],
+    });
+    if (종류필터) {
+      const b = 자리.querySelector('.gviz-bar[data-key="' + (window.CSS && CSS.escape ? CSS.escape(종류필터) : 종류필터) + '"]');
+      if (b) b.classList.add("on");
+    }
+    필터띠();
+  }
+
+  function 필터띠() {
+    if (!window.gijoViz) return;
+    const el = document.getElementById("vizFilter");
+    if (!종류필터) { window.gijoViz.filterBar(el, null, null); return; }
+    const 보임 = allAssets.filter((a) => (a.assetType || "기타") === 종류필터).length;
+    window.gijoViz.filterBar(el, { label: 종류한글[종류필터] || 종류필터, 보임, 전체: allAssets.length, 단위: "자산" },
+      () => {
+        종류필터 = null;
+        document.querySelectorAll("#vizStrip .gviz-bar").forEach((b) => b.classList.remove("on"));
+        필터띠();
+        render();
+      });
+  }
+  // ───────────────────────────────────────────────────────────────────────
 
   async function generateSbomFor(assetId, btnEl) {
     btnEl.textContent = "생성 중...";
@@ -908,6 +969,7 @@
   }
 
   function render() {
+    그림띠();
     const filtered = sortByPriority(applyFilters(allAssets));
     const rankedById = new Map(coverage.ranked.map((r) => [r.id, r]));
     renderHead();

@@ -151,6 +151,7 @@ tr:last-child td{border-bottom:none;}
 .result-chunk{padding:7px 0;border-bottom:1px solid var(--border);line-height:1.6;}
 .result-chunk:last-child{border-bottom:none;}
 </style>
+<script src="viz.js"></script>
 </head>
 <body>
 
@@ -402,6 +403,10 @@ tr:last-child td{border-bottom:none;}
 
     <div class="panel">
       <div class="panel-title">📋 등록된 관계 <span id="listCount" style="color:var(--muted);font-weight:600;font-size:12px"></span></div>
+      <!-- 그림 먼저(전-7 ①, 2026-08-05). 위 숫자 카드는 「몇 개인가」만 말한다 —
+           이 띠는 **어떤 관계가 지식을 이루는가**를 말한다. 누르면 아래 목록이 그 관계만 남는다. -->
+      <div id="vizStrip"></div>
+      <div id="vizFilter" style="display:none"></div>
       <div class="list-box" id="tripleList"></div>
     </div>
     </div>
@@ -1056,6 +1061,11 @@ tr:last-child td{border-bottom:none;}
 
     await loadDocuments();
     loadHygiene();
+    // ★ 2026-08-05 발견: 온톨로지(「등록된 관계」)를 **화면 진입 시 아예 안 불렀다**.
+    //   목록이 빈 채로 있다가 필터를 넣거나 항목을 지워야 채워져, 담당자는 "지식이 없다"고
+    //   읽었다(실제로는 있다). 그림 띠를 붙이며 드러났다 — 띠도 이 값으로 그린다.
+    //   실패해도 화면 로드는 계속한다(부가 정보다).
+    refresh().catch(() => {});
     document.getElementById("hygieneScanBtn").addEventListener("click", function (e) { e.stopPropagation(); loadHygiene(true); });
 
     document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
@@ -1128,7 +1138,50 @@ tr:last-child td{border-bottom:none;}
     document.getElementById("statPreds").textContent = preds.size;
   }
 
-  function renderList(triples) {
+  // ── 그림 먼저(전-7 ①, 2026-08-05) ──────────────────────────────────────
+  // ⚠ 막대는 **전체 트리플**로 센다 — 눌러 좁혀도 위 숫자 카드와 막대 높이는 그대로다.
+  let 관계필터 = null;
+
+  function 그림띠() {
+    const 자리 = document.getElementById("vizStrip");
+    if (!자리 || !window.gijoViz) return;
+    const 관계별 = {};
+    allTriples.forEach((t) => { 관계별[t.predicate] = (관계별[t.predicate] || 0) + 1; });
+    const 키들 = Object.keys(관계별).sort((a, b) => 관계별[b] - 관계별[a]).slice(0, 7);
+    window.gijoViz.mount(자리, {
+      title: "한눈에",
+      hint: 키들.length ? "누르면 목록이 좁혀집니다" : "",
+      parts: [{
+        kind: "bars",
+        segments: 키들.map((k) => ({ key: k, label: k.length > 7 ? k.slice(0, 7) + "…" : k, value: 관계별[k], color: "blue" })),
+        onPick: (key) => { 관계필터 = key; 필터띠(); renderList(allTriples); },
+      }],
+    });
+    if (관계필터) {
+      const b = 자리.querySelector('.gviz-bar[data-key="' + (window.CSS && CSS.escape ? CSS.escape(관계필터) : 관계필터) + '"]');
+      if (b) b.classList.add("on");
+    }
+    필터띠();
+  }
+
+  function 필터띠() {
+    if (!window.gijoViz) return;
+    const el = document.getElementById("vizFilter");
+    if (!관계필터) { window.gijoViz.filterBar(el, null, null); return; }
+    const 보임 = allTriples.filter((t) => t.predicate === 관계필터).length;
+    window.gijoViz.filterBar(el, { label: 관계필터, 보임, 전체: allTriples.length, 단위: "관계" },
+      () => {
+        관계필터 = null;
+        document.querySelectorAll("#vizStrip .gviz-bar").forEach((b) => b.classList.remove("on"));
+        필터띠();
+        renderList(allTriples);
+      });
+  }
+  // ───────────────────────────────────────────────────────────────────────
+
+  function renderList(전체) {
+    그림띠();
+    const triples = 관계필터 ? (전체 || []).filter((t) => t.predicate === 관계필터) : (전체 || []);
     const box = document.getElementById("tripleList");
     document.getElementById("listCount").textContent = `· ${triples.length}건`;
     if (triples.length === 0) { box.innerHTML = `<div style="color:var(--muted-2);font-size:12.5px;padding:14px 0">등록된 관계가 없습니다. 위 "샘플 지식 불러오기"로 시작하거나 직접 추가하세요.</div>`; return; }

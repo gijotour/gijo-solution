@@ -123,6 +123,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .footer img{height:16px;opacity:.6;}
 .toast{position:fixed;bottom:20px;right:20px;background:var(--panel);border:1px solid var(--border-strong);border-radius:9px;padding:12px 16px;font-size:12.5px;color:var(--text);box-shadow:0 6px 24px rgba(0,0,0,.4);display:none;}
 </style>
+<script src="viz.js"></script>
 </head>
 <body class="g-ui">
 
@@ -158,6 +159,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <span class="rb-src">🔍 취약점 <b id="tVuln">-</b> · 📊 보안로그 <b id="tLog">-</b> · 🧰 운영리포트 <b id="tProduct">-</b> · 🛡 하드닝 <b id="tHardening">-</b></span>
       <button class="btn-ghost rb-refresh" id="refreshBtn">↻ 새로고침</button>
     </div>
+
+    <!-- 그림 먼저(전-7 ①, 2026-08-05). 위 한 줄은 「P0 12 · P1 30 · P2 5」라고 글로 적혀 있어
+         어느 쪽이 무거운지 눈으로 안 잡힌다 — 막대로 세우고, 누르면 아래 목록이 그 급만 남는다.
+         (소스별 숫자는 이미 한 줄에 있고 소스 칩으로 거를 수 있어 여기서 또 세우지 않는다.) -->
+    <div id="vizStrip"></div>
+    <div id="vizFilter" style="display:none"></div>
 
     <!-- 소스 겹침 그림 (2026-08-04 파트너 의견 5번 — "상관/위험 분석을 그래프로")
          ⚠ **겹치는 자산이 있을 때만** 나타난다. 겹침이 없는데 빈 그림을 띄우면 자리만 먹는다. -->
@@ -341,11 +348,70 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     if (window.gijoFitList) window.gijoFitList(box);
   }
 
+  // ── 그림 먼저(전-7 ①, 2026-08-05) ──────────────────────────────────────
+  // ⚠ 막대는 **전체 이벤트**로 센다(소스 칩과 무관) — 소스로 좁혀 놓고 급을 또 누르면
+  //   둘이 곱해져 목록이 좁혀지지만, 막대 높이는 "우리 전체에 P0가 몇 건인가"여야 한다.
+  let 급필터 = null;
+
+  function 그림띠(){
+    const 자리 = document.getElementById("vizStrip");
+    if (!자리 || !window.gijoViz || !data.events) return;
+    const 셈 = (p) => data.events.filter(e => e.priority === p).length;
+    // 해결된 것(done·ignored)은 「지금 급한 것」이 아니다 — 열린 것만 센다.
+    const 열림 = data.events.filter(e => !e.status || e.status === "open");
+    const 열림셈 = (p) => 열림.filter(e => e.priority === p).length;
+    window.gijoViz.mount(자리, {
+      title: "지금 급한 것 — 급별",
+      hint: data.events.length ? "누르면 목록이 좁혀집니다" : "",
+      parts: [{
+        kind: "bars",
+        segments: [
+          { key: "P0", label: "P0", value: 열림셈("P0"), color: "critical" },
+          { key: "P1", label: "P1", value: 열림셈("P1"), color: "high" },
+          { key: "P2", label: "P2", value: 열림셈("P2"), color: "medium" },
+        ],
+        onPick: (key) => { 급필터 = key; 필터띠(); renderList(); },
+      }, {
+        kind: "donut", value: data.events.length - 열림.length, total: data.events.length,
+        label: "정리됨", color: "ok", showRatio: true,
+      }],
+    });
+    if (급필터) {
+      const b = 자리.querySelector('.gviz-bar[data-key="' + 급필터 + '"]');
+      if (b) b.classList.add("on");
+    }
+    필터띠();
+  }
+
+  function 필터띠(){
+    if (!window.gijoViz) return;
+    const el = document.getElementById("vizFilter");
+    if (!급필터 || !data.events) { window.gijoViz.filterBar(el, null, null); return; }
+    let 바탕 = data.events;
+    if (filter !== "all") 바탕 = 바탕.filter(e => e.source === filter);
+    const 보임 = 바탕.filter(e => e.priority === 급필터).length;
+    window.gijoViz.filterBar(el, { label: 급필터, 보임, 전체: 바탕.length, 단위: "건" },
+      () => {
+        급필터 = null;
+        document.querySelectorAll("#vizStrip .gviz-bar").forEach(b => b.classList.remove("on"));
+        필터띠();
+        renderList();
+      });
+  }
+  // ───────────────────────────────────────────────────────────────────────
+
   function renderList(){
+    그림띠();
     const box = document.getElementById("riskList");
     let evs = data.events;
     if(filter !== "all") evs = evs.filter(e => e.source === filter);
-    if(!evs.length){ box.innerHTML = '<div class="empty">해당 소스의 위험 항목이 없습니다.</div>'; 목록높이맞추기(); return; }
+    if(급필터) evs = evs.filter(e => e.priority === 급필터);   // 소스 칩과 곱해서 건다
+    if(!evs.length){
+      box.innerHTML = '<div class="empty">' +
+        (급필터 ? "고른 급에 해당하는 항목이 없습니다 — 위 「✕ 해제」를 누르면 전체가 다시 보입니다."
+                : "해당 소스의 위험 항목이 없습니다.") + "</div>";
+      목록높이맞추기(); return;
+    }
     const shown = evs.slice(0, MAX_ROWS);
     box.innerHTML = shown.map((e, i) => {
       const sub = (e.signals && e.signals.length ? e.signals.join(" · ") + " · " : "") + esc(e.entity);

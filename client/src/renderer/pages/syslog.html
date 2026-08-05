@@ -101,6 +101,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   .kpi-mini .l{font-size:12px;color:var(--muted);}
   .kpi-mini .v{font-size:18px;font-weight:800;color:#fff;}
 </style>
+<script src="viz.js"></script>
 </head>
 <body>
 
@@ -127,6 +128,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     <!-- 요약 한 줄 — 표식만 달면 공용 변환기(nav.js)가 막대로 바꾼다. 화면마다 새로 짜지 않는다. -->
     <div class="kpi" id="logKpi" data-gijo-summary></div>
+
+    <!-- 그림 먼저(전-7 ①, 2026-08-05). 위 한 줄은 「얼마나 쌓였나」고, 이 띠는 **어디서 나왔나**다.
+         막대를 누르면 아래 로그가 그 갈래만 남는다 — 기존 갈래 칩과 같은 필터를 쓴다. -->
+    <div id="vizStrip"></div>
+    <div id="vizFilter" style="display:none"></div>
 
     <!-- 화면엔 정체성 한 줄만 — 사용법·주의사항은 챗봇(screenguide)에 있다(우리 규약). -->
     <!-- 시스템 로그 — logs.html 화면에서 이관(2026-07-28). 작업 기록이 '누가 무엇을 했나'라면
@@ -171,7 +177,68 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     return `<div class="${cls}"><span class="log-ts">${time}</span><span class="${srcClass}">${src}</span>${String(entry.message).replace(/</g, "&lt;")}</div>`;
   }
 
+  // ── 그림 먼저(전-7 ①, 2026-08-05) ──────────────────────────────────────
+  // 이 화면엔 이미 갈래 칩이 있다 — 새 필터를 만들지 않고 **그 칩을 그림으로 바꿔** 세운다.
+  // 그래야 칩과 막대가 서로 다른 상태를 가리키는 일이 생기지 않는다.
+  const 갈래한글 = { console: "서버 콘솔", modelscan: "모델 스캔", reposcan: "저장소 스캔",
+    "extract-doc": "문서 추출", train: "학습", merge: "모델 합치기" };
+
+  function 갈래고르기(src) {
+    activeFilter = src || "all";
+    document.querySelectorAll("#sourceFilters .filter-chip").forEach((c) => {
+      c.classList.toggle("active", (c.dataset.src || "all") === activeFilter);
+    });
+    renderLogs();
+  }
+
+  function 그림띠() {
+    const 자리 = document.getElementById("vizStrip");
+    if (!자리 || !window.gijoViz) return;
+    const 갈래별 = {};
+    logEntries.forEach((e) => { const k = e.source || "console"; 갈래별[k] = (갈래별[k] || 0) + 1; });
+    const 키들 = Object.keys(갈래별).sort((a, b) => 갈래별[b] - 갈래별[a]).slice(0, 6);
+    const 오류 = logEntries.filter((e) => /error|err|fail|실패|오류/i.test(String(e.level || "") + " " + String(e.message || ""))).length;
+
+    window.gijoViz.mount(자리, {
+      title: "한눈에",
+      hint: 키들.length ? "누르면 목록이 좁혀집니다" : "",
+      parts: [
+        {
+          kind: "bars",
+          segments: 키들.map((k) => ({
+            key: k, label: 갈래한글[k] || k, value: 갈래별[k],
+            // 오류가 섞인 갈래는 붉게 — 어디서 터졌는지가 이 화면의 첫 물음이다.
+            color: logEntries.some((e) => (e.source || "console") === k && /error|err|fail|실패|오류/i.test(String(e.level || "") + " " + String(e.message || ""))) ? "bad" : "blue",
+          })),
+          onPick: (key) => { 갈래고르기(key); 필터띠(); },
+        },
+        { kind: "donut", value: 오류, total: logEntries.length, label: "오류", showRatio: true, color: 오류 ? "bad" : "ok" },
+      ],
+    });
+    if (activeFilter !== "all") {
+      const b = 자리.querySelector('.gviz-bar[data-key="' + activeFilter + '"]');
+      if (b) b.classList.add("on");
+    }
+    필터띠();
+  }
+
+  function 필터띠() {
+    if (!window.gijoViz) return;
+    const el = document.getElementById("vizFilter");
+    if (activeFilter === "all") { window.gijoViz.filterBar(el, null, null); return; }
+    const 보임 = logEntries.filter((e) => (e.source || "console") === activeFilter).length;
+    window.gijoViz.filterBar(el,
+      { label: 갈래한글[activeFilter] || activeFilter, 보임, 전체: logEntries.length, 단위: "줄" },
+      () => {
+        갈래고르기(null);
+        document.querySelectorAll("#vizStrip .gviz-bar").forEach((b) => b.classList.remove("on"));
+        필터띠();
+      });
+  }
+  // ───────────────────────────────────────────────────────────────────────
+
   function renderLogs() {
+    그림띠();
     const shown = activeFilter === "all" ? logEntries : logEntries.filter((e) => (e.source || "console") === activeFilter);
     logConsole.innerHTML = shown.map(lineHtml).join("") || '<div style="color:var(--muted)">표시할 로그가 없습니다.</div>';
     logConsole.scrollTop = logConsole.scrollHeight;
@@ -221,6 +288,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       logConsole.insertAdjacentHTML("beforeend", lineHtml(entry));
       while (logConsole.childElementCount > 500) logConsole.removeChild(logConsole.firstChild);
       logConsole.scrollTop = logConsole.scrollHeight;
+    }
+    // 로그는 흘러들어오는데 그림이 그대로면 **띠가 낡은 숫자를 말한다**. 다만 줄마다 다시 그리면
+    // 로그가 쏟아질 때 화면이 버벅인다 — 2초에 한 번만 새로 낸다.
+    if (!appendLogEntry.타이머) {
+      appendLogEntry.타이머 = setTimeout(function () { appendLogEntry.타이머 = null; 그림띠(); }, 2000);
     }
   }
 

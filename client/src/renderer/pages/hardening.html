@@ -58,6 +58,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .page-guide b{color:#fff;font-weight:700;}
 .page-guide .std{color:var(--blue-light,#5fa1ff);font-weight:700;}
 </style>
+<script src="viz.js"></script>
 </head>
 <body class="g-ui">
 
@@ -90,6 +91,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     <div class="page-guide">읽기 전용 진단 명령만 실행합니다(설정 변경 없음).</div>
 
     <div class="kpis" id="kpiRow" data-gijo-summary></div>
+    <!-- 그림 먼저(전-7 ①, 2026-08-05). 위 숫자는 평균 하나를 말한다 — 이 띠는 **어느 구간에
+         몇 대가 몰려 있나**를 말한다(평균 80%여도 40%짜리 한 대가 숨어 있을 수 있다).
+         누르면 아래 장비 카드가 그 구간만 남는다. -->
+    <div id="vizStrip"></div>
+    <div id="vizFilter" style="display:none"></div>
+
     <div class="sec">🖥 장비별 현황 <span id="cntLbl" style="color:var(--muted-2);font-weight:600;font-size:var(--g-t-xs)"></span></div>
     <div id="cardGrid" class="grid"></div>
   </div>
@@ -186,11 +193,73 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       `<div class="g-kpi" ${worse ? 'style="border-color:rgba(226,72,61,.4)"' : ""}><div class="kv" style="color:${worse ? "#e2483d" : "#b3ada4"}">${worse}</div><div class="kl">악화 경고</div></div>`;
   }
 
+  // ── 그림 먼저(전-7 ①, 2026-08-05) ──────────────────────────────────────
+  // 구간 판정은 **rc()와 같은 경계**(80/60)를 쓴다 — 카드 색과 막대 구간이 어긋나면
+  // "초록 카드인데 왜 보통에 세어졌지"가 된다. 판정은 한 곳에서만 한다.
+  let 구간필터 = null;
+  const 구간 = (r) => (r == null ? "none" : r >= 80 ? "good" : r >= 60 ? "fair" : "poor");
+  const 구간한글 = { good: "양호 80%↑", fair: "보통 60~79%", poor: "위험 60%↓", none: "미점검" };
+
+  function 그림띠() {
+    const 자리 = $("vizStrip");
+    if (!자리 || !window.gijoViz) return;
+    const 셈 = { good: 0, fair: 0, poor: 0, none: 0 };
+    TARGETS.forEach((t) => { const d = deriveTarget(t); 셈[구간(d.latest ? d.latest.rate : null)]++; });
+    const 악화 = TARGETS.filter((t) => deriveTarget(t).worsening).length;
+
+    window.gijoViz.mount(자리, {
+      title: "한눈에",
+      hint: TARGETS.length ? "누르면 목록이 좁혀집니다" : "",
+      parts: [
+        {
+          kind: "bars",
+          segments: [
+            { key: "poor", label: "위험", value: 셈.poor, color: "bad" },
+            { key: "fair", label: "보통", value: 셈.fair, color: "warn" },
+            { key: "good", label: "양호", value: 셈.good, color: "ok" },
+            { key: "none", label: "미점검", value: 셈.none, color: "idle" },
+          ],
+          onPick: (key) => { 구간필터 = key; 필터띠(); renderCards(); },
+        },
+        // 악화는 "지난번보다 나빠진 장비" — 0이면 그리지 않는다(없는 걱정을 만들지 않는다).
+        악화 ? { kind: "donut", value: 악화, total: TARGETS.length, label: "악화", color: "bad", showRatio: true } : null,
+      ],
+    });
+    if (구간필터) {
+      const b = 자리.querySelector('.gviz-bar[data-key="' + 구간필터 + '"]');
+      if (b) b.classList.add("on");
+    }
+    필터띠();
+  }
+
+  function 필터띠() {
+    if (!window.gijoViz) return;
+    const el = $("vizFilter");
+    if (!구간필터) { window.gijoViz.filterBar(el, null, null); return; }
+    const 보임 = TARGETS.filter((t) => 구간(deriveTarget(t).latest ? deriveTarget(t).latest.rate : null) === 구간필터).length;
+    window.gijoViz.filterBar(el, { label: 구간한글[구간필터], 보임, 전체: TARGETS.length, 단위: "대" },
+      () => {
+        구간필터 = null;
+        document.querySelectorAll("#vizStrip .gviz-bar").forEach((b) => b.classList.remove("on"));
+        필터띠();
+        renderCards();
+      });
+  }
+  // ───────────────────────────────────────────────────────────────────────
+
   function renderCards() {
+    그림띠();
+    // ⚠ 「N대」는 **전체 대수**다 — 좁혀 보는 중에도 이 숫자는 안 줄어든다(위 KPI와 같은 규칙).
     $("cntLbl").textContent = `${TARGETS.length}대`;
     if (!TARGETS.length) { $("cardGrid").className = ""; $("cardGrid").innerHTML = '<div class="empty">등록된 점검 대상이 없습니다. 오른쪽 위 <b>＋ 대상 등록</b>으로 보안장비를 추가하세요.</div>'; return; }
+    const 보일것 = 구간필터 ? TARGETS.filter((t) => 구간(deriveTarget(t).latest ? deriveTarget(t).latest.rate : null) === 구간필터) : TARGETS;
+    if (!보일것.length) {
+      $("cardGrid").className = "";
+      $("cardGrid").innerHTML = '<div class="empty">고른 구간에 해당하는 장비가 없습니다 — 위 「✕ 해제」를 누르면 전체가 다시 보입니다.</div>';
+      return;
+    }
     $("cardGrid").className = "grid";
-    $("cardGrid").innerHTML = TARGETS.map((t) => {
+    $("cardGrid").innerHTML = 보일것.map((t) => {
       const d = deriveTarget(t);
       const rate = d.latest ? d.latest.rate : null;
       const stdLabel = STD_SHORT[stdFor(t)] || "리눅스";

@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>GIJO AS — 왼쪽 메뉴 정돈 시안 (nav-refine-v1)</title>
+<style>
+:root{
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#fff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);padding:26px 30px 60px;}
+h1{font-size:19px;font-weight:800;margin-bottom:4px;}
+.sub{font-size:12.5px;color:var(--muted);margin-bottom:20px;line-height:1.7;max-width:1000px;}
+.sub b{color:var(--blue-light);}
+.stage{display:flex;gap:26px;align-items:flex-start;flex-wrap:wrap;margin-bottom:26px;}
+.col{}
+.col h2{font-size:13px;font-weight:800;margin-bottom:8px;color:var(--muted);}
+.col h2 .tag{font-size:11px;font-weight:700;border-radius:4px;padding:1px 6px;margin-left:6px;}
+.t-now{background:rgba(226,72,61,.16);color:#f5928a;}
+.t-new{background:rgba(30,185,128,.16);color:var(--teal);}
+.frame{width:236px;background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:10px 8px;height:660px;overflow:auto;}
+.frame.now{width:232px;}
+.note{font-size:12px;color:var(--muted-2);margin-top:8px;width:236px;line-height:1.7;}
+
+/* ══════════ 지금(현재 제품 그대로) ══════════ */
+.o-item{display:flex;align-items:center;gap:7px;padding:8px 11px;border-radius:8px;font-size:13px;font-weight:600;color:var(--muted);margin-bottom:1px;white-space:nowrap;cursor:pointer;}
+.o-item .lb{flex:1;overflow:hidden;text-overflow:ellipsis;}
+.o-item .st{opacity:.28;font-size:12px;}
+.o-home{color:#cfe0ff;border:1px solid rgba(59,130,246,.42);background:rgba(59,130,246,.07);margin-bottom:5px;}
+.o-active{color:#fff;background:rgba(59,130,246,.14);box-shadow:inset 3px 0 0 var(--blue);}
+.o-grp{display:flex;align-items:center;gap:6px;padding:7px 10px;font-size:12px;font-weight:700;color:var(--muted-2);margin-top:8px;cursor:pointer;}
+.o-badge{margin-left:auto;background:var(--red);color:#fff;font-size:11px;font-weight:800;padding:1px 6px;border-radius:20px;}
+
+/* ══════════ 정돈안 ══════════ */
+.n-wrap{--row:30px;}
+.n-item{display:flex;align-items:center;gap:9px;height:var(--row);padding:0 10px;border-radius:6px;
+  font-size:12.5px;font-weight:500;color:var(--muted);cursor:pointer;position:relative;}
+.n-item .lb{flex:1;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.1px;}
+.n-item svg{flex:0 0 auto;width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.5;
+  stroke-linecap:round;stroke-linejoin:round;opacity:.62;}
+.n-item:hover{color:var(--text);background:rgba(255,255,255,.035);}
+.n-item:hover svg{opacity:.95;}
+/* 활성 — 왼쪽 얇은 막대 하나로만 말한다(배경은 아주 옅게). */
+.n-item.on{color:#fff;background:rgba(255,255,255,.055);font-weight:600;}
+.n-item.on svg{opacity:1;color:var(--blue-light);}
+.n-item.on::before{content:"";position:absolute;left:0;top:6px;bottom:6px;width:2px;border-radius:2px;background:var(--blue-light);}
+/* 즐겨찾기 별 — 평소엔 없다. 손이 올라간 줄과 이미 꽂은 줄에만. */
+.n-item .st{flex:0 0 auto;font-size:11px;color:var(--muted-2);opacity:0;}
+.n-item:hover .st{opacity:.5;}
+.n-item .st.pin{opacity:1;color:var(--amber);}
+.n-badge{flex:0 0 auto;background:var(--red);color:#fff;font-size:10.5px;font-weight:800;padding:0 5px;border-radius:9px;line-height:15px;}
+/* 구역 제목 — 선 하나와 작은 글씨. 이모지 없음. */
+.n-sec{display:flex;align-items:center;gap:7px;height:24px;padding:0 10px;margin:9px 0 1px;
+  font-size:10.5px;font-weight:700;color:var(--muted-2);letter-spacing:.6px;cursor:pointer;}
+.n-sec .num{font-size:10px;font-weight:800;color:var(--muted-2);opacity:.75;
+  border:1px solid var(--border-strong);border-radius:3px;width:14px;height:14px;
+  display:flex;align-items:center;justify-content:center;flex:0 0 auto;}
+.n-sec .ln{flex:1;height:1px;background:var(--border);}
+.n-sec .car{font-size:9px;opacity:.5;}
+.n-sec:hover{color:var(--muted);}
+.n-grp{padding-left:6px;}
+.n-div{height:1px;background:var(--border);margin:10px 6px;}
+
+.tbl{border-collapse:collapse;font-size:12.5px;margin-top:6px;}
+.tbl th,.tbl td{border:1px solid var(--border);padding:7px 12px;text-align:left;}
+.tbl th{background:var(--panel);color:var(--muted);font-size:12px;font-weight:700;}
+.tbl td b{color:var(--teal);}
+.tbl td.bad{color:#f5928a;}
+.why{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 18px;max-width:1000px;font-size:12.5px;line-height:1.85;margin-top:18px;}
+.why h3{font-size:13px;font-weight:800;margin-bottom:8px;color:#fff;}
+.why li{margin-left:18px;margin-bottom:5px;}
+.why code{background:var(--panel-2);border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:12px;}
+.warn{color:var(--amber);}
+</style>
+</head>
+<body>
+
+<h1>왼쪽 메뉴 정돈 — 시안 <span style="color:var(--muted-2);font-size:13px">nav-refine-v1</span></h1>
+<div class="sub">
+사용자 지시(2026-08-05): <b>“왼쪽 메뉴도 세련되고 직관적이게, AI 느낌 안 나게, 메뉴들 내용과 조화되게”</b>.<br>
+진단부터: <b>「AI 느낌」의 정체는 이모지 12종</b>입니다(🏠🏢💬⭐🔍🎯🔧✅📊🗂🤖⚙). 컬러 이모지는 폰트가 제멋대로 색·굵기를 정해
+한 벌로 보이지 않고, 업무 도구보다 <b>장난감처럼</b> 보이게 만듭니다. 조사에서도 기업용 사이드바는 <b>아이콘 한 벌 통일 · 라벨과 짝 · 활성 상태 절제</b>가 표준이었습니다.
+</div>
+
+<div class="stage">
+
+  <!-- ═══════════════ 지금 ═══════════════ -->
+  <div class="col">
+    <h2>지금<span class="tag t-now">실측</span></h2>
+    <div class="frame now">
+      <div class="o-item o-home"><span class="lb">🏠 대시보드</span><span class="o-badge">11</span></div>
+      <div class="o-item"><span class="lb">🏢 팀 사무실 (창)</span></div>
+      <div class="o-item"><span class="lb">💬 작업 내역</span></div>
+
+      <div class="o-grp">▼ ⭐ 즐겨찾기 <span style="margin-left:auto;opacity:.6">0</span></div>
+
+      <div class="o-grp">▼ 🔍 ① 발견·수집</div>
+      <div class="o-item"><span class="lb">통합 관제</span><span class="st">☆</span></div>
+      <div class="o-item"><span class="lb">위협 인텔</span><span class="st">☆</span></div>
+      <div class="o-item"><span class="lb">자산 목록</span><span class="st">☆</span></div>
+
+      <div class="o-grp">▼ 🎯 ② 우선순위</div>
+      <div class="o-item o-active"><span class="lb">취약점</span><span class="st">☆</span></div>
+      <div class="o-item"><span class="lb">AI-BOM</span><span class="st">☆</span></div>
+
+      <div class="o-grp">▼ 🔧 ③ 조치</div>
+      <div class="o-item"><span class="lb">조치·승인</span><span class="st">☆</span></div>
+      <div class="o-item"><span class="lb">정기 점검</span><span class="st">☆</span></div>
+      <div class="o-item"><span class="lb">명령창</span><span class="st">☆</span></div>
+
+      <div class="o-grp">▼ ✅ ④ 검증</div>
+      <div class="o-item"><span class="lb">보안설정 점검</span><span class="st">☆</span></div>
+
+      <div class="o-grp">▼ 📊 ⑤ 보고</div>
+      <div class="o-item"><span class="lb">리포트</span><span class="st">☆</span></div>
+      <div class="o-item"><span class="lb">보안 KPI</span><span class="st">☆</span></div>
+      <div class="o-item"><span class="lb">컴플라이언스</span><span class="st">☆</span></div>
+
+      <div class="o-grp">▼ 🗂 등록부</div>
+      <div class="o-item"><span class="lb">보안제품</span><span class="st">☆</span></div>
+
+      <div class="o-grp">▼ 🤖 AI 운영</div>
+      <div class="o-item"><span class="lb">에이전트 AI</span><span class="st">☆</span></div>
+      <div class="o-item"><span class="lb">AI 공격 시험·차단</span><span class="st">☆</span></div>
+      <div class="o-item"><span class="lb">AI 지식</span><span class="st">☆</span></div>
+    </div>
+    <div class="note">
+      줄 높이 <b style="color:#f5928a">38px</b>(대시보드만 40) · 항목 28개 = <b style="color:#f5928a">1,069px</b> + 구역 9개 274px.<br>
+      가운데 스크롤 칸은 <b>724px</b>인데 내용이 <b style="color:#f5928a">1,402px</b> —
+      <b style="color:#f5928a">678px가 잘려</b> 늘 굴려야 아래 메뉴가 보입니다.<br>
+      이모지 12종 · ☆가 모든 줄에 상시 노출.
+    </div>
+  </div>
+
+  <!-- ═══════════════ 정돈안 ═══════════════ -->
+  <div class="col">
+    <h2>정돈안<span class="tag t-new">추천</span></h2>
+    <div class="frame n-wrap">
+
+      <div class="n-item on">
+        <svg viewBox="0 0 16 16"><path d="M2 6.5 8 2l6 4.5"/><path d="M3.5 7.4V13.5h9V7.4"/></svg>
+        <span class="lb">대시보드</span><span class="n-badge">11</span>
+      </div>
+      <div class="n-item">
+        <svg viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="7" height="11"/><path d="M9.5 6.5h4v7h-4"/><path d="M4.5 5h3M4.5 7.5h3M4.5 10h3M11 9h1"/></svg>
+        <span class="lb">팀 사무실</span><span style="font-size:10px;color:var(--muted-2);opacity:.6">창</span>
+      </div>
+      <div class="n-item">
+        <svg viewBox="0 0 16 16"><path d="M13.5 9.5a1.5 1.5 0 0 1-1.5 1.5H6l-3 2.5V4a1.5 1.5 0 0 1 1.5-1.5h7A1.5 1.5 0 0 1 13.5 4z"/></svg>
+        <span class="lb">작업 내역</span>
+      </div>
+
+      <div class="n-div"></div>
+
+      <div class="n-sec"><span class="car">▾</span><span>즐겨찾기</span><span class="ln"></span><span style="opacity:.6">0</span></div>
+
+      <div class="n-sec"><span class="car">▾</span><span class="num">1</span><span>발견 · 수집</span><span class="ln"></span></div>
+      <div class="n-grp">
+        <div class="n-item"><svg viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/></svg><span class="lb">통합 관제</span><span class="st">☆</span></div>
+        <div class="n-item"><svg viewBox="0 0 16 16"><path d="M8 1.8 13.6 4v4c0 3.4-2.4 5.4-5.6 6.2C4.8 13.4 2.4 11.4 2.4 8V4z"/><path d="M8 6v2.6"/><path d="M8 10.6v.1"/></svg><span class="lb">위협 인텔</span><span class="st">☆</span></div>
+        <div class="n-item"><svg viewBox="0 0 16 16"><rect x="2.2" y="3" width="11.6" height="7"/><path d="M5 13h6M8 10v3"/></svg><span class="lb">자산 목록</span><span class="st">☆</span></div>
+      </div>
+
+      <div class="n-sec"><span class="car">▾</span><span class="num">2</span><span>우선순위</span><span class="ln"></span></div>
+      <div class="n-grp">
+        <div class="n-item on"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.6"/><circle cx="8" cy="8" r="2.4"/></svg><span class="lb">취약점</span><span class="st pin">★</span></div>
+        <div class="n-item"><svg viewBox="0 0 16 16"><path d="M8 1.8 13.6 5v6L8 14.2 2.4 11V5z"/><path d="M2.4 5 8 8.2 13.6 5M8 8.2v6"/></svg><span class="lb">AI-BOM</span><span class="st">☆</span></div>
+      </div>
+
+      <div class="n-sec"><span class="car">▾</span><span class="num">3</span><span>조치</span><span class="ln"></span></div>
+      <div class="n-grp">
+        <div class="n-item"><svg viewBox="0 0 16 16"><path d="M2.5 8.4 6 11.9l7.5-7.8"/></svg><span class="lb">조치·승인</span><span class="st">☆</span></div>
+        <div class="n-item"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.7"/><path d="M8 4.6V8l2.4 1.6"/></svg><span class="lb">정기 점검</span><span class="st">☆</span></div>
+        <div class="n-item"><svg viewBox="0 0 16 16"><rect x="2.2" y="3" width="11.6" height="10"/><path d="M4.6 6.4 6.8 8.4 4.6 10.4M8.4 10.6h3"/></svg><span class="lb">명령창</span><span class="st">☆</span></div>
+      </div>
+
+      <div class="n-sec"><span class="car">▾</span><span class="num">4</span><span>검증</span><span class="ln"></span></div>
+      <div class="n-grp">
+        <div class="n-item"><svg viewBox="0 0 16 16"><path d="M8 1.8 13.6 4v4c0 3.4-2.4 5.4-5.6 6.2C4.8 13.4 2.4 11.4 2.4 8V4z"/><path d="M5.8 7.9 7.4 9.5l3-3.2"/></svg><span class="lb">보안설정 점검</span><span class="st">☆</span></div>
+      </div>
+
+      <div class="n-sec"><span class="car">▾</span><span class="num">5</span><span>보고</span><span class="ln"></span></div>
+      <div class="n-grp">
+        <div class="n-item"><svg viewBox="0 0 16 16"><path d="M3.4 1.9h6l3.2 3.2v9H3.4z"/><path d="M9.2 1.9v3.4h3.4M5.6 8.4h4.8M5.6 10.9h3.2"/></svg><span class="lb">리포트</span><span class="st">☆</span></div>
+        <div class="n-item"><svg viewBox="0 0 16 16"><path d="M2.4 13.4h11.2"/><path d="M4.6 13.4V8M8 13.4V3.8M11.4 13.4V6.4"/></svg><span class="lb">보안 KPI</span><span class="st">☆</span></div>
+        <div class="n-item"><svg viewBox="0 0 16 16"><path d="M3.6 2.4h8.8v11.2H3.6z"/><path d="M5.9 5.6h4.2M5.9 8h4.2M5.9 10.4h2.6"/></svg><span class="lb">컴플라이언스</span><span class="st">☆</span></div>
+      </div>
+
+      <div class="n-sec"><span class="car">▾</span><span>등록부</span><span class="ln"></span></div>
+      <div class="n-grp">
+        <div class="n-item"><svg viewBox="0 0 16 16"><rect x="2.2" y="3.4" width="11.6" height="2.8"/><path d="M3.4 6.2v6.4h9.2V6.2M6.4 8.9h3.2"/></svg><span class="lb">보안제품</span><span class="st">☆</span></div>
+      </div>
+
+      <div class="n-sec"><span class="car">▾</span><span>AI 운영</span><span class="ln"></span></div>
+      <div class="n-grp">
+        <div class="n-item"><svg viewBox="0 0 16 16"><rect x="4.6" y="4.6" width="6.8" height="6.8" rx="1"/><path d="M6.6 2.2v2.4M9.4 2.2v2.4M6.6 11.4v2.4M9.4 11.4v2.4M2.2 6.6h2.4M2.2 9.4h2.4M11.4 6.6h2.4M11.4 9.4h2.4"/></svg><span class="lb">에이전트 AI</span><span class="st">☆</span></div>
+        <div class="n-item"><svg viewBox="0 0 16 16"><path d="M8 1.8 13.6 4v4c0 3.4-2.4 5.4-5.6 6.2C4.8 13.4 2.4 11.4 2.4 8V4z"/><path d="M6.2 6.2l3.6 3.6M9.8 6.2l-3.6 3.6"/></svg><span class="lb">AI 공격 시험·차단</span><span class="st">☆</span></div>
+        <div class="n-item"><svg viewBox="0 0 16 16"><path d="M3.4 3.2h4.2c.9 0 1.6.7 1.6 1.6v8c0-.7-.6-1.3-1.3-1.3H3.4z"/><path d="M12.6 3.2H9.2v10c0-.7.6-1.3 1.3-1.3h2.1z"/></svg><span class="lb">AI 지식</span><span class="st">☆</span></div>
+      </div>
+    </div>
+    <div class="note">
+      줄 높이 <b>30px</b> · 항목 28개 = <b>840px</b>(−229) + 구역 9개 216px(−58).<br>
+      내용 <b>≈1,076px</b> — 잘리는 양이 678px → <b>약 352px</b>로 줄어듭니다.<br>
+      <span class="warn">⚠ 스크롤이 없어지지는 않습니다</span> — 화면이 30개라 한 화면에 다 담기지 않습니다.
+      다만 <b>한 번에 6줄을 더 봅니다</b>(19줄 → 25줄).<br>
+      아이콘 <b>단선 한 벌</b>(선 굵기 1.5, 글자색 상속) · ☆는 손이 올라간 줄과 꽂은 줄에만.
+    </div>
+  </div>
+
+  <!-- ═══════════════ 비교표 ═══════════════ -->
+  <div class="col" style="flex:1;min-width:340px">
+    <h2>무엇이 달라지나</h2>
+    <table class="tbl">
+      <tr><th style="width:112px">항목</th><th>지금</th><th>정돈안</th></tr>
+      <tr><td>아이콘</td><td class="bad">컬러 이모지 12종<br>(폰트가 색·굵기를 정함)</td><td><b>단선 SVG 한 벌</b><br>선 1.5 · 글자색을 따름</td></tr>
+      <tr><td>줄 높이</td><td class="bad">38px</td><td><b>30px</b> (−8)</td></tr>
+      <tr><td>세로 총합</td><td class="bad">1,402px<br>(스크롤 칸 724px — <b>678px 잘림</b>)</td><td><b>≈1,076px</b><br>(잘리는 양 <b>352px</b>로 줄어듦)</td></tr>
+      <tr><td>한 번에 보이는 줄</td><td class="bad">19줄</td><td><b>25줄</b> (+6)</td></tr>
+      <tr><td>구역 제목</td><td class="bad">▼ + 이모지 + ①<br>+ 이름 (요소 4개)</td><td>▾ + 숫자칩 + 이름<br>+ <b>가는 선</b> (이모지 없음)</td></tr>
+      <tr><td>즐겨찾기 ☆</td><td class="bad">28줄 전부에 상시</td><td><b>손 올린 줄·꽂은 줄만</b></td></tr>
+      <tr><td>지금 있는 곳</td><td>파란 배경 + 3px 막대</td><td><b>2px 막대 + 옅은 배경</b><br>아이콘만 파랗게</td></tr>
+      <tr><td>대시보드</td><td class="bad">혼자 파란 테두리 상자</td><td>같은 모양 · <b>맨 위 자리</b>로 구분</td></tr>
+      <tr><td>글자</td><td>13px / 굵기 600 전부</td><td>12.5px / 평소 500<br><b>지금 있는 곳만 600</b></td></tr>
+    </table>
+
+    <div class="why">
+      <h3>이 안을 고른 이유</h3>
+      <ul>
+        <li><b>“AI 느낌”의 정체 = 이모지.</b> 컬러 이모지는 우리가 색을 못 정합니다(운영체제 폰트가 정함).
+          그래서 12개가 한 벌로 안 보이고, 화면 톤과 늘 겉돕니다. 단선 아이콘은 <code>currentColor</code>를 따라가
+          <b>글자와 같은 색으로 늙습니다</b> — 이게 “조화되게”의 실체입니다.</li>
+        <li><b>메뉴 내용과의 조화</b> — 아이콘을 업무 뜻에 맞췄습니다. 발견=돋보기, 우선순위=과녁,
+          조치=체크, 검증=방패+체크, 보고=문서·막대, 보안제품=서랍, AI 운영=칩.
+          <span class="warn">①②③④⑤ 숫자는 남깁니다</span> — 업무 순서(전-7 업무 절차 5단계)라 뜻이 있고,
+          서버 <code>workflow.ts</code>가 같은 표를 보기 때문입니다. 다만 원문자 이모지(①)가 아니라
+          <b>테두리 숫자칩</b>으로 그려 톤을 낮춥니다.</li>
+        <li><b>세로를 287px 법니다.</b> <span class="warn">스크롤이 아주 없어지지는 않습니다</span> —
+          화면이 30개라 어떻게 줄여도 한 화면에 다 담기지 않습니다. 정직하게 말하면
+          <b>잘리는 양이 678px → 352px</b>, <b>한 번에 보이는 줄이 19 → 25줄</b>이 됩니다.
+          지금은 아래쪽 메뉴(설정·기록 보기·시스템 로그)가 늘 화면 밖입니다.</li>
+        <li><b>☆를 숨기는 이유</b> — 28개의 ☆는 “고르라”는 신호를 28번 보내는 것과 같습니다.
+          꽂아 둔 것만 노랗게 남기면 <b>내가 꽂은 것이 무엇인지</b>가 오히려 잘 보입니다.</li>
+      </ul>
+    </div>
+
+    <div class="why">
+      <h3>바꾸지 않는 것 (일부러)</h3>
+      <ul>
+        <li><b>메뉴 구성·순서·이름</b> — 업무 절차 5단계는 서버가 단일 출처라 화면이 마음대로 바꾸면 어긋납니다.
+          이번 건은 <b>겉모습만</b>입니다.</li>
+        <li><b>즐겨찾기 · 접기 기억 · 배지 · 챗봇 버튼</b> — 동작 그대로.</li>
+        <li><b>폭 232px</b> — 조사 기준(220~260px) 안이고, 한글 라벨이 줄바꿈 없이 들어갑니다.</li>
+      </ul>
+    </div>
+
+    <div class="note" style="width:auto;max-width:520px">
+      ⚠ 이 파일은 <b>시안</b>입니다 — 실제 동작하지 않는 그림입니다. 승인해 주시면 <code>nav.js</code>에 구현하고
+      26화면 전수 스윕으로 회귀를 봅니다(공용 파일이라 스윕 대상).
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
