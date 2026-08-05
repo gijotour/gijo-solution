@@ -17,7 +17,7 @@ vi.mock("../src/engine/llm", () => ({
 
 import {
   수집명령, 안전한명령인가, 장비종류판별, 패키지파싱, 패키지수집, 구성요소합치기, 덮는범위글,
-  데비안라이선스명령, 데비안라이선스파싱, 라이선스채우기,
+  데비안라이선스명령, 데비안라이선스파싱, 라이선스채우기, 라이선스다듬기, 라이선스최대길이,
 } from "../src/engine/packagescan";
 import type { RunFn } from "../src/engine/hardeningscan";
 
@@ -277,5 +277,48 @@ describe("데비안 라이선스 채우기", () => {
     const r = await 패키지수집(실행);
     expect(r.부품[0].license).toBe("MIT");
     expect(부른명령.some((c) => c.includes("grep -m1 -H")), "rpm인데 라이선스 명령을 돌렸다").toBe(false);
+  });
+});
+
+// ── rpm 실장비 실증 (2026-08-06, 중-7) ────────────────────────────────────────
+// ★ 이 구역의 근거는 **지어낸 출력이 아니라 진짜 rpm이 진짜 패키지를 읽은 출력**이다.
+//   fixtures/rpm-almalinux9-real.tsv = AlmaLinux 9 BaseOS의 bash·curl·glibc 패키지를
+//   내려받아, 제품이 쓰는 `--qf` 문자열 그대로 rpm 4.18.2에 물려 받은 결과다.
+//   (레드햇 계열 장비가 없어 rpm 바이너리만 따로 풀어 돌렸다 — 그래서 "장비 한 대 전수"가
+//    아니라 "진짜 패키지 3개"까지가 이 시험이 증명하는 범위다. 넘겨짚지 않는다.)
+//
+// ★ 이 실증이 실제로 잡은 결함: **glibc의 라이선스가 571자**였다. deb 쪽에만 길이 상한이
+//   있고 rpm 쪽엔 없어, 그대로 저장되면 SBOM 화면 막대 이름이 571자가 된다.
+describe("rpm 실장비 실증 — 진짜 AlmaLinux 9 패키지 출력", () => {
+  const 실출력 = fs.readFileSync(new URL("./fixtures/rpm-almalinux9-real.tsv", import.meta.url), "utf8");
+
+  it("진짜 rpm 출력에서 이름·버전·라이선스를 모두 읽는다", () => {
+    const 부품 = 패키지파싱("rpm", 실출력);
+    expect(부품.map((c) => c.name)).toEqual(["bash", "curl", "glibc"]);
+    expect(부품.find((c) => c.name === "curl")?.license).toBe("MIT");
+    expect(부품.find((c) => c.name === "bash")?.version).toBe("5.1.8-9.el9");
+    // rpm은 라이선스를 직접 준다 — deb과 달리 두 번째 명령이 필요 없다.
+    expect(부품.every((c) => c.license && c.license !== "-"), "rpm인데 라이선스가 빈 부품이 있다").toBe(true);
+  });
+
+  it("★ 571자짜리 SPDX 라이선스를 칸에 맞게 줄이고 **줄였다고 표시**한다", () => {
+    const 원본 = 실출력.split("\n").find((l) => l.startsWith("glibc"))!.split("\t")[2];
+    expect(원본.length, "fixture가 바뀌었다 — 긴 라이선스가 사라지면 이 시험은 아무것도 안 지킨다")
+      .toBeGreaterThan(200);
+
+    const glibc = 패키지파싱("rpm", 실출력).find((c) => c.name === "glibc")!;
+    expect(glibc.license!.length).toBeLessThanOrEqual(라이선스최대길이 + 1); // +1 = 「…」
+    expect(glibc.license!.endsWith("…"), "잘랐으면 잘랐다고 표시해야 한다").toBe(true);
+    // 앞부분은 원문 그대로 — 뜻을 바꾸며 줄이지 않는다.
+    expect(원본.startsWith(glibc.license!.slice(0, -1))).toBe(true);
+  });
+
+  it("★ rpm과 deb이 **같은 다듬기 규칙**을 쓴다 — 한쪽만 고치면 다른 쪽이 샌다", () => {
+    const 긴것 = "A".repeat(200);
+    const rpm줄 = `pkg\t1.0\t${긴것}`;
+    const rpm값 = 패키지파싱("rpm", rpm줄)[0].license;
+    const deb값 = 데비안라이선스파싱(`/usr/share/doc/pkg/copyright:License: ${긴것}`)["pkg"];
+    expect(rpm값).toBe(deb값);
+    expect(rpm값).toBe(라이선스다듬기(긴것));
   });
 });

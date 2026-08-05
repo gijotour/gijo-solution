@@ -170,11 +170,6 @@ table th:last-child,table td:last-child{white-space:nowrap;}
   <div class="kpi-mini"><div class="kpi-mini-label">영향받는 내부 자산</div><div class="kpi-mini-value" style="color:var(--amber)" id="affectedAssetCount">-</div></div>
 </div>
 
-<!-- 그림 먼저(전-7 ①, 2026-08-05). 심각도 막대를 누르면 아래 「최근 탐지 내역」이
-     그 심각도만 남는다 — 그 구역이 접혀 있으면 함께 펼친다(막다른 길 금지). -->
-<div id="vizStrip"></div>
-<div id="vizFilter" style="display:none"></div>
-
 <!-- 순서(2026-08-02 사용자 지시): 무엇을 구독·감시 중인가 → 그래서 우리에게 오는 위협 →
      참고로 훑는 탐지 내역. 탐지 내역은 표가 넓어 **가로를 다 쓴다**(오른쪽 열에 두면 칸이 좁아
      심각도가 "정 / 보"로 갈라졌다). -->
@@ -195,6 +190,15 @@ table th:last-child,table td:last-child{white-space:nowrap;}
 <div class="panel" style="border-color:rgba(240,160,32,0.35)" data-gijo-fold="🎯 내부 자산에 영향을 주는 위협">
   <div class="panel-title">🎯 내부 자산에 영향을 주는 위협 <span style="font-size:12.25px;font-weight:600;color:var(--muted)">CTI ↔ 자산 자동 매칭</span></div><div id="ctiMatchBody" style="margin-top:10px;display:flex;flex-direction:column;gap:9px;">불러오는 중...</div>
 </div>
+
+<!-- 그림 먼저(전-7 ①, 2026-08-05). 심각도 막대를 누르면 아래 「최근 탐지 내역」이
+     그 심각도만 남는다 — 그 구역이 접혀 있으면 함께 펼친다(막다른 길 금지).
+     ⚠ 자리: **반드시 「최근 탐지 내역」 바로 위**에 둔다. 처음엔 KPI 밑(화면 맨 위)에 뒀는데,
+       실측해 보니 누른 결과가 화면 아래로 **5,791px 밖**이었다(2026-08-05). 위 두 구역
+       (구독 피드·자산 영향 위협)이 길어 그 사이를 다 밀어낸 것이다. 막대를 눌러 접힌 서랍을
+       열어 줘도 그 서랍이 저 아래 있으면 담당자는 아무 일도 안 일어난 줄 안다. -->
+<div id="vizStrip"></div>
+<div id="vizFilter" style="display:none"></div>
 
 <!-- 접기(2026-08-01) — 이 화면의 본업은 위 「내부 자산에 영향을 주는 위협」이다.
      최근 탐지 내역은 훑어보는 참고 목록이라 접어 두고, **건수를 배지로** 남긴다.

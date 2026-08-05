@@ -105,6 +105,25 @@ const isFallback = (out) => FALLBACK_RE.test(String(out ?? "").slice(0, 160));
 // 그래서 '측정 못 함'으로 따로 세고 분모에서 뺀다(건수는 리포트에 남겨 눈에 보이게).
 // 견고성 측정 — 45회 실측(2026-07-30)으로 정한 값. 1회 폭 43점 / 3회 15점 / **9회 7점**.
 // 한 번이 6~7초라 9회에 약 64초(게이트 전체의 7%). 임계 15점은 정상 변동(7점)의 두 배 여유다.
+// ── 재측정 예산 (2026-08-06, 중-3 실측) ──────────────────────────────────────
+// 흔들림·하락을 가르는 재측정을 넣은 뒤 **얼마나 느려지는지** 실제로 재 봤다.
+//   · 기본: 99문항 × 문항당 8.6초 = 852초(약 14분). 4차 실행 실측 939초와 맞는다.
+//   · 하락이 많은 날: 깨진 문항은 첫 재측정에서 바로 재현돼 **즉시 그만두므로**(early break)
+//     문항당 추가는 2회뿐이다. 99문항이 전부 깨져도 약 43분에서 멈춘다 — 감당된다.
+//   · 흔들림이 많은 날: 흔들리는 문항만 4회를 다 돈다(문항당 +5회). 극단적으로 전 문항이
+//     흔들리면 약 85분. 여기가 진짜 위험 구간이다.
+//   · 게다가 이 게이트는 **후보 모델 채택**에도 쓴다 — 느린 후보(문항당 25초)면 기본만 41분,
+//     흔들림까지 겹치면 두 시간을 넘긴다. 코드 주석에도 "나쁜 후보일수록 운영을 오래
+//     점거한다"고 적혀 있었는데 상한이 없었다.
+//
+// ⚠ 예산이 다 되면 **흔들림 면제를 더 주지 않을 뿐**, 없는 실패를 만들지 않는다.
+//   그 문항은 이미 1차·재시도에서 **두 번 떨어진** 것이다 — 실패는 잰 사실이고,
+//   재측정은 "그게 흔들림이냐"는 면제 심사일 뿐이다. 못 재면 면제가 없는 것이지
+//   "측정 못 함"이 아니다(측정 못 함은 답 자체를 못 받은 경우에만 쓴다).
+const REMEASURE_BUDGET_S = Number(process.env.GIJO_EVALGATE_REMEASURE_BUDGET_S ?? 900);
+let 재측정쓴시간 = 0;
+let 예산소진건수 = 0;
+
 const ROBUSTNESS_RUNS = Number(process.env.GIJO_EVALGATE_ROBUSTNESS_RUNS ?? 9);
 const ROBUSTNESS_DROP = 15;
 const LONG_ANSWER_RE = /시간이 걸리는 작업이라 리포트로 작성해 드리겠습니다/;
@@ -371,8 +390,16 @@ for (const axis of runAxes) {
         const 확인횟수 = 4;
         const 추가 = [];
         let 시간초과 = 0;
+        // 예산이 다 됐으면 면제 심사를 건너뛴다 — 두 번 떨어진 결과는 그대로 둔다(위 주석 참고).
+        if (재측정쓴시간 >= REMEASURE_BUDGET_S) {
+          예산소진건수++;
+          results[axis].push({ id: c.id, pass: false, why: [...r.why, `재측정 예산(${REMEASURE_BUDGET_S}초) 소진 — 흔들림 심사 없이 하락`], ms: r.ms });
+          console.log(`✗ ${c.id} — 재측정 예산 소진, 흔들림 심사 없이 하락으로 둔다(1차·재시도 모두 실패)`);
+          continue;
+        }
         for (let k = 0; k < 확인횟수; k++) {
           const t = await runCase(c, axis);
+          재측정쓴시간 += (t.ms ?? 0) / 1000;
           if (t.skipped) { 시간초과++; continue; }
           추가.push(t.ok);
           if (!t.ok) break;                 // 하나라도 재현되면 흔들림이 아니다 — 즉시 그만
@@ -483,6 +510,15 @@ if (effVerdict) {
   if (effVerdict.fail) verdict = "채택 보류";
   reasons.push(effVerdict.reason);
 }
+// ⚠ 재측정 예산이 소진됐으면 **반드시 드러낸다.** 그 문항들은 흔들림 심사를 못 받고
+//   하락으로 남았다 — 안 적으면 "흔들림인데 하락으로 잡힌 것"이 조용히 판정에 섞인다.
+if (예산소진건수) {
+  reasons.push(
+    `⚠ 재측정 예산(${REMEASURE_BUDGET_S}초) 소진 — ${예산소진건수}문항이 흔들림 심사 없이 하락으로 남았습니다. ` +
+    "실패가 유난히 많았거나 후보 모델이 느렸다는 뜻입니다. 하락 목록을 그대로 믿기 전에 " +
+    "GIJO_EVALGATE_REMEASURE_BUDGET_S를 늘려 다시 재 보세요.",
+  );
+}
 if (!baseline) {
   verdict = "기준선 없음";
   reasons.push("첫 실행 — 결과를 읽고 --accept-baseline으로 기준선을 확정해야 게이트가 가동됩니다.");
@@ -523,7 +559,9 @@ const meta = {
   robustnessScore: redteamReport?.robustnessScore ?? null,
 };
 
-const report = { meta, axes, robustness, effective, verdict, reasons, baseline: baseline ? { acceptedAt: baseline.acceptedAt, caseSetHash: baseline.caseSetHash, axes: baseline.axes } : null, results };
+// 재측정에 실제로 쓴 시간을 남긴다 — 다음에 예산을 정할 근거가 된다(추정 말고 실측으로).
+const 재측정 = { 예산초: REMEASURE_BUDGET_S, 쓴초: Math.round(재측정쓴시간), 예산소진건수 };
+const report = { meta, axes, robustness, effective, 재측정, verdict, reasons, baseline: baseline ? { acceptedAt: baseline.acceptedAt, caseSetHash: baseline.caseSetHash, axes: baseline.axes } : null, results };
 fs.mkdirSync(path.join(repoRoot, ".tmp-reports"), { recursive: true });
 fs.writeFileSync(path.join(repoRoot, ".tmp-reports", "evalgate-report.json"), JSON.stringify(report, null, 2));
 

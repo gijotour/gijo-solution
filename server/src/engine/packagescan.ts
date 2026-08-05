@@ -67,6 +67,28 @@ export const 수집명령: Record<장비종류, string> = {
 export const 데비안라이선스명령 =
   "grep -m1 -H '^License:' /usr/share/doc/*/copyright";
 
+/** 라이선스 칸 길이 상한. 화면 막대 이름·표 한 칸에 들어가야 한다. */
+export const 라이선스최대길이 = 60;
+
+/**
+ * 라이선스 문자열을 칸에 맞게 다듬는다 — **자를 땐 잘랐다고 표시한다**.
+ *
+ * ⚠ **rpm·deb 두 길이 같은 규칙을 보게** 여기 하나로 모았다(2026-08-06 실측).
+ *   deb 쪽에만 상한을 두고 rpm 쪽엔 두지 않았더니, 진짜 AlmaLinux 9 패키지를 읽었을 때
+ *   glibc의 라이선스가 **571자 그대로** 들어왔다("LGPL-2.1-or-later AND SunPro AND …"가
+ *   스물몇 개 이어진 SPDX 식이다). 그대로 두면 SBOM 화면 막대 이름이 571자가 되고 표가 깨진다.
+ *   한쪽에만 규칙을 두면 반드시 다른 쪽이 샌다 — 그래서 함수로 묶고 양쪽이 이것만 부른다.
+ * ⚠ **뜻을 바꾸며 줄이지 않는다.** 예전에 `A and B`에서 앞만 취한 적이 있는데, 「and」는
+ *   둘 다 지켜야 한다는 뜻이라 한쪽만 적으면 뜻이 뒤집힌다(`OpenSSL and SSLeay` → `OpenSSL`).
+ *   그래서 뜻으로 자르지 않고 **길이로만** 자르며, 잘렸다는 표시(…)를 반드시 남긴다.
+ *   라이선스 칸은 법무가 보는 자리다.
+ */
+export function 라이선스다듬기(값: string): string {
+  const s = String(값 ?? "").trim();
+  if (s.length <= 라이선스최대길이) return s;
+  return s.slice(0, 라이선스최대길이).trim() + "…";
+}
+
 /**
  * `/usr/share/doc/<pkg>/copyright:License: GPL-2+` 꼴을 {패키지 → 라이선스}로.
  * ⚠ 경로에서 패키지 이름을 뽑는다 — 파일 이름(copyright)이 아니라 **그 위 폴더**다.
@@ -77,12 +99,8 @@ export function 데비안라이선스파싱(out: string): Record<string, string>
     const m = line.match(/^\/usr\/share\/doc\/([^/]+)\/copyright:\s*License:\s*(.+)$/);
     if (!m) continue;
     const 이름 = m[1].trim();
-    // ⚠ **자르지 않는다**(2026-08-05 검토 지적). 예전엔 `A and B`에서 앞만 취했는데,
-    //   「and」는 **둘 다 지켜야 한다**는 뜻이라 한쪽만 적으면 뜻이 반대가 된다
-    //   (실측: `OpenSSL and SSLeay` → `OpenSSL`). 라이선스 칸은 법무가 보는 자리다.
-    //   길면 자르되 **잘랐다고 표시**한다 — 조용히 줄이면 아는 척이 된다.
-    let 값 = m[2].trim();
-    if (값.length > 60) 값 = 값.slice(0, 60).trim() + "…";
+    // 다듬기 규칙은 라이선스다듬기() 하나뿐 — rpm 쪽과 갈리지 않게(위 주석 참고).
+    const 값 = 라이선스다듬기(m[2]);
     if (!이름 || !값) continue;
     if (!표[이름]) 표[이름] = 값;   // 먼저 나온 것을 남긴다(grep -m1이라 파일당 하나뿐)
   }
@@ -176,7 +194,9 @@ export function 패키지파싱(종류: 장비종류, out: string): AssetCompone
       version: version || "-",
       // ⚠ 라이선스를 못 읽는 장비가 있다(데비안·윈도우). 모르는 것을 "-"로 두고
       //   **아는 척하지 않는다**. SBOM 라이선스 칸은 법무가 보는 칸이다.
-      license: license || "-",
+      // ⚠ 길이는 deb 쪽과 **같은 규칙**으로 다듬는다 — rpm은 SPDX 식이 통째로 오는 일이
+      //   흔하다(진짜 AlmaLinux 9 glibc = 571자, 2026-08-06 실측).
+      license: 라이선스다듬기(license) || "-",
       from: "package",
     });
     if (종류 === "windows" && 결과.length >= 3000) break; // 터무니없이 길면 자른다(아래에서 밝힌다)
