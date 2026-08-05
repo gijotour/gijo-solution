@@ -195,3 +195,53 @@ export interface AirgapStatus {
 export function airgapStatus(): AirgapStatus {
   return { on: isAirgapOn(), blockedCount: 차단수, allow: 명시허용(), points: EGRESS_POINTS };
 }
+
+/**
+ * 봉인 증명서 — 감사관·조달 심사에 그대로 낼 수 있는 한 장짜리 기록. (후-4)
+ *
+ * ■ 왜 별도인가
+ *   「에어갭 상태」는 담당자가 지금 확인하는 화면 글이고, 이건 **제출물**이다.
+ *   심사자는 "무엇을 어떻게 막았고, 그것을 무엇으로 확인했는가"를 묻는다 —
+ *   통로 목록·차단 방식·실제 차단 이력·확인 시각이 한 장에 있어야 한다.
+ *
+ * ■ 정직 원칙(이 문서가 팔려 나가므로 특히)
+ *   · 봉인이 꺼져 있으면 **꺼져 있다고 첫 줄에 쓴다** — 증명서 모양만 갖춘 종이를 만들지 않는다.
+ *   · 관문 밖(자식 프로세스)을 **한계 절에 명시**한다. 빠뜨리면 그게 거짓 증명이다.
+ *   · 차단 이력은 **작업 기록 실측**을 센다(우리가 주장하는 수가 아니라 남은 기록).
+ */
+export function airgapCertificate(blocks: { at: number; target: string | null; detail: string | null }[]): string {
+  const s = airgapStatus();
+  const 이제 = new Date();
+  const L: string[] = [];
+  L.push("■ 에어갭 봉인 증명서 (GIJO AS)");
+  L.push(`발행 시각: ${이제.toLocaleString("ko-KR")} · 이 문서는 발행 시점의 실측 상태입니다`);
+  L.push("");
+  L.push(s.on
+    ? "1. 봉인 상태: 🔒 **적용됨(ON)** — 제품이 직접 여는 인터넷 통로가 관문에서 차단되고 있습니다."
+    : "1. 봉인 상태: **적용 안 됨(OFF)** — 이 서버는 일반 배치입니다. 아래 통로가 열려 있습니다.");
+  L.push(`   · 잠금 방식: 서버 기동 환경변수(GIJO_AIRGAP) — 화면·API로는 바꿀 수 없습니다(운영자만 지정).`);
+  L.push(`   · 판정 기준: 기본 거부(default-deny) — 루프백·사설 IP 대역·명시 허용 호스트만 통과`);
+  L.push(`   · 명시 허용: ${s.allow.length ? s.allow.join(", ") : "(없음)"}`);
+  L.push("");
+  L.push(`2. 봉인 대상 통로 ${s.points.length}종`);
+  for (const p of s.points) L.push(`   · ${p.label} — ${p.host}\n     대체: ${p.대체}`);
+  L.push("");
+  L.push("3. 차단 실적(작업 기록 실측)");
+  if (!blocks.length) {
+    L.push("   · 기록된 차단 시도 없음" + (s.on ? " — 봉인 후 외부로 나가려 한 요청이 없었습니다." : " (봉인이 꺼져 있어 차단이 일어나지 않습니다)"));
+  } else {
+    L.push(`   · 총 ${blocks.length}건 (최근 순)`);
+    for (const b of blocks.slice(0, 10)) {
+      L.push(`   · ${new Date(b.at).toLocaleString("ko-KR")} · ${b.target ?? "?"} — ${(b.detail ?? "").slice(0, 80)}`);
+    }
+    if (blocks.length > 10) L.push(`   · … 외 ${blocks.length - 10}건 (전체는 설정 > 기록 보기에서 확인)`);
+  }
+  L.push("");
+  L.push("4. 이 증명의 한계 (정직하게 밝힙니다)");
+  L.push("   · 관문은 **제품이 직접 여는 통로**(HTTP 요청·메일/SIEM 소켓)를 덮습니다.");
+  L.push("   · 학습·모델 병합 등 **외부 프로그램(python)을 실행하는 기능은 제품 밖**에서 돌아 이 관문을 지나지 않습니다.");
+  L.push("     봉인 시 오프라인 환경변수(HF_HUB_OFFLINE 등)로 누르지만 **완전한 차단은 아닙니다** —");
+  L.push("     기밀 배치에서는 해당 기능을 쓰지 않거나 사전 반입 자료로만 쓰기를 권고합니다.");
+  L.push("   · 이 문서는 **제품 자체 점검 결과**입니다. 망 분리 자체의 검증(방화벽·스위치)은 별도입니다.");
+  return L.join("\n");
+}

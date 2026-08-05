@@ -217,6 +217,31 @@ describe("에어갭 라우팅·도구", () => {
     }
   });
 
+  // 봉인 증명서 — 감사관 제출물. **거짓 증명을 만들지 않는 것**이 이 시험의 요지다.
+  it("증명서는 봉인 OFF를 감추지 않고, 관문 밖 한계를 반드시 밝힌다", async () => {
+    const { airgapCertificate } = await import("../src/engine/airgap");
+    const 꺼짐 = airgapCertificate([]);
+    expect(꺼짐).toMatch(/적용 안 됨\(OFF\)/);          // 모양만 갖춘 종이를 만들지 않는다
+    expect(꺼짐).toContain("완전한 차단은 아닙니다");     // 한계 명시(자식 프로세스)
+    expect(꺼짐).toContain("기본 거부");                 // 판정 기준
+    expect(꺼짐).toMatch(/봉인 대상 통로 \d+종/);
+    vi.stubEnv("GIJO_AIRGAP", "1");
+    try {
+      const 켜짐 = airgapCertificate([{ at: Date.now(), target: "api.openai.com", detail: "막은 요청: https://api.openai.com/v1" }]);
+      expect(켜짐).toMatch(/적용됨\(ON\)/);
+      expect(켜짐).toContain("api.openai.com");         // 차단 실적이 실려야 증명이다
+      expect(켜짐).toContain("완전한 차단은 아닙니다");   // 켜져 있어도 한계는 그대로 밝힌다
+    } finally { vi.unstubAllEnvs(); }
+  });
+
+  it("증명서 라우팅은 상태 조회보다 먼저 잡는다", async () => {
+    const { forcedToolFor } = await import("../src/engine/agentloop");
+    for (const q of ["에어갭 봉인 증명서", "에어갭 증명해줘", "봉인 감사 자료 뽑아줘"]) {
+      expect(forcedToolFor(q, {})?.tool, `"${q}"`).toBe("airgap_certificate");
+    }
+    expect(forcedToolFor("에어갭 상태", {})?.tool).toBe("airgap_status"); // 조회는 그대로
+  });
+
   it("읽기 도구이고 봉인 여부·통로·대체를 답한다", async () => {
     const t = findAgentTool("airgap_status");
     expect(t, "airgap_status 도구가 없다").toBeTruthy();

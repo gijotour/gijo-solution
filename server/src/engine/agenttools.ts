@@ -65,7 +65,7 @@ import { getGuide as 가이드가져오기 } from "./workguide";
 import { getScreenGuide } from "./screenguide";
 // 지식 번들(후-3 구독화) — 지금 실린 지식이 언제 기준인지 보기 + 대기 폴더 번들 반입.
 import { getBundleStatus, listInboxBundles, importBundleFromInbox, KNOWLEDGE_BUNDLE_VERSION } from "./knowledgebundle";
-import { airgapStatus } from "./airgap";
+import { airgapStatus, airgapCertificate } from "./airgap";
 // BYOM 모델 자동 적응(2단계) — 적응 내용 조회·스모크 검증·판별 정정을 대화창으로.
 import { getLocalEngineStatus } from "./localengine";
 import { getAdaptation, setThinkingOverride } from "./modelquirks";
@@ -3190,6 +3190,26 @@ const TOOLS: AgentTool[] = [
     params: [],
     directAnswer: true,
     run: runAirgapStatus,
+  },
+  {
+    // 봉인 증명서(후-4) — 감사관·조달 심사 제출용. 상태 조회와 달리 **제출물** 형식이다.
+    name: "airgap_certificate",
+    label: "에어갭 봉인 증명서",
+    domain: "cross",
+    write: false,
+    description:
+      '에어갭 봉인 증명서를 발행한다 — 봉인 상태·대상 통로·차단 실적·한계를 한 장으로 정리해 ' +
+      '감사관이나 조달 심사에 그대로 낼 수 있는 형식이다. "봉인 증명서", "에어갭 증명해줘", ' +
+      '"에어갭 감사 자료" 같은 요청에 쓴다. 지금 상태만 궁금하면 airgap_status가 맞다.',
+    params: [],
+    directAnswer: true,
+    run: () => {
+      // 차단 실적은 **작업 기록 실측**을 센다 — 우리가 세는 수가 아니라 남은 기록이 근거다.
+      const blocks = listAudit({ kind: "block", limit: 500 })
+        .filter((e) => e.action.includes("에어갭"))
+        .map((e) => ({ at: e.at, target: e.target, detail: e.detail }));
+      return airgapCertificate(blocks);
+    },
   },
   {
     // BYOM 모델 적응 상태 + 스모크(자동 적응 2단계) — 올린 모델이 맞춰졌고 말이 되는지.
