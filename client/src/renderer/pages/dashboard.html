@@ -549,11 +549,10 @@
     try {
       var k = ((await window.gijo.getSecurityKpi()) || {}).current || {};
       var h = "";
-      if (k.posture) {
-        h += '<div style="padding:4px 0 8px"><span class="big" style="color:' + (BAND_COLOR[k.posture.band] || "var(--muted)") + '">' +
-          Math.round(k.posture.score) + '</span> <span style="font-size:12.25px;color:var(--muted)">/100 보안 태세 · ' +
-          (BAND[k.posture.band] || "-") + "</span></div>";
-      }
+      // 그림 먼저(전-7 ①, 2026-08-05). 대시보드는 **훑는 자리**라 여기서 거르지 않는다 —
+      // 카드를 누르면 보안 KPI 화면으로 넘어가는 기존 길이 세부다(막다른 길 아님).
+      // ⚠ 점수를 그림으로 바꾸되 **숫자도 그대로 적는다**(도넛 가운데 점수). 그림만 남기면
+      //   "몇 점인지"를 눈대중해야 한다.
       function kv(label, val, color) {
         if (val == null) return;
         h += '<div class="kv"><span>' + label + '</span><b' + (color ? ' style="color:' + color + '"' : "") + ">" + val + "</b></div>";
@@ -568,7 +567,24 @@
       // coverageRate는 서버에서 이미 0~100 퍼센트로 계산해 온다(engine/kpi.ts의 compRate).
       // 여기서 100을 또 곱해 1400%가 찍힌 적이 있다 — 소수 비율로 넘겨받는다고 넘겨짚었다.
       if (k.compliance) kv("컴플라이언스", Math.round(k.compliance.coverageRate) + "%");
-      box.innerHTML = h || '<div class="empty">아직 집계할 데이터가 없습니다.</div>';
+      box.innerHTML = '<div id="kpiViz"></div>' + (h || '<div class="empty">아직 집계할 데이터가 없습니다.</div>');
+      if (k.posture && window.gijoViz) {
+        window.gijoViz.mount($("kpiViz"), {
+          title: "보안 태세",
+          hint: (BAND[k.posture.band] || "-"),
+          parts: [{
+            // ⚠ %가 아니라 **몇/100점**으로 적는다(2026-08-05 실측): 만점이 100이라 도넛이
+            //   "53%"로 나오는데, 이건 비율이 아니라 점수다 — 읽는 사람이 다르게 새긴다.
+            kind: "donut", value: Math.round(k.posture.score), total: 100, showRatio: true,
+            label: "점수(100점 만점)", color: k.posture.band === "good" ? "ok" : k.posture.band === "fair" ? "warn" : "bad",
+          }],
+        });
+      } else if (k.posture) {
+        // viz.js가 없어도 점수는 보여야 한다.
+        $("kpiViz").innerHTML = '<div style="padding:4px 0 8px"><span class="big" style="color:' +
+          (BAND_COLOR[k.posture.band] || "var(--muted)") + '">' + Math.round(k.posture.score) +
+          '</span> <span style="font-size:12.25px;color:var(--muted)">/100 보안 태세 · ' + (BAND[k.posture.band] || "-") + "</span></div>";
+      }
       box.style.cursor = "pointer";
       box.title = "보안 KPI 화면으로";
     } catch (e) {
@@ -739,6 +755,7 @@
   loadKpi();
 })();
 </script>
+<script src="viz.js"></script>
 <script src="nav.js"></script>
 <script src="titlebar.js"></script>
 <script src="progresscard.js"></script>

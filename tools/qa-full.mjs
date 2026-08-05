@@ -107,6 +107,15 @@ if (picks.has("sweep") || picks.has("shell") || picks.has("download")) {
   }
 }
 
+// ⚠ 순서가 중요하다 — **화면 계층(CDP)을 먼저** 돌린다(2026-08-05 실측).
+//   아래 API 계층들(regress·drawer 등)은 QA 계정으로 force 로그인하는데, 이 제품은
+//   계정당 세션이 하나다. 그래서 regress가 먼저 돌면 **띄워 둔 Electron이 로그인 화면으로
+//   튕겨** sweep·download·shell이 "셸에 못 들어감"으로 실패한다 — 제품 잘못이 아니라
+//   점검 도구가 스스로를 깨뜨린 것이다. 화면 계층을 앞에 두면 이 자충수가 사라진다.
+run("shell", "node", ["tools/qa-shell.mjs"]);
+run("download", "node", ["tools/qa-download.mjs"]);
+run("sweep", "node", ["tools/menu-sweep.mjs"]);
+
 run("server", "node", ["tools/qa-auto.mjs", "--layer=server"]);
 run("vitest", "npm", ["test"], { cwd: path.join(ROOT, "server") });
 run("client", "node", ["tools/qa-auto.mjs", "--layer=client"]);
@@ -114,9 +123,6 @@ run("knowledge", "node", ["tools/qa-auto.mjs", "--layer=knowledge"]);
 run("maintenance", "node", ["tools/qa-auto.mjs", "--layer=maintenance"]);
 run("regress", "node", ["tools/regress/run.mjs"]);
 run("verify", "node", ["tools/qa-verify.mjs"]);
-run("shell", "node", ["tools/qa-shell.mjs"]);
-run("download", "node", ["tools/qa-download.mjs"]);
-run("sweep", "node", ["tools/menu-sweep.mjs"]);
 // 서랍은 "이건 된다"고 약속하는 자리다 — 한 번 확인하고 두면 데이터가 바뀌며 늙는다.
 run("drawer", "node", ["tools/drawer-audit.mjs"]);
 // 라우팅 겹침 — 규칙을 넓힐 때마다 사람이 기억해서 돌리는 방식은 반드시 샌다.
