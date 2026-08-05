@@ -329,7 +329,13 @@
     var nm = document.createElement("span"); nm.className = "ua-name"; nm.textContent = "";
     // ⚙는 **상단 ☰로 이사했다**(2026-08-02). 비는 줄 끝에는 문서함을 넣는다 —
     // 늘 쓰는 곳이라 메뉴 목록을 훑지 않고 바로 닿는다(사용자 지시).
-    var gear = document.createElement("span"); gear.className = "gtb-gear"; gear.textContent = "📚";
+    // 아이콘은 왼쪽 메뉴와 **같은 결**로 — 단선 SVG(2026-08-05, 시안 nav-refine-v1).
+    // 여기만 컬러 이모지(📚)로 남겨 두면 정돈한 메뉴 아래에서 그 하나가 튄다.
+    var gear = document.createElement("span"); gear.className = "gtb-gear";
+    gear.innerHTML = '<svg viewBox="0 0 16 16" aria-hidden="true" style="width:14px;height:14px;stroke:currentColor;' +
+      'fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round">' +
+      '<path d="M3.4 3.2h4.2c.9 0 1.6.7 1.6 1.6v8c0-.7-.6-1.3-1.3-1.3H3.4z"/>' +
+      '<path d="M12.6 3.2H9.2v10c0-.7.6-1.3 1.3-1.3h2.1z"/></svg>';
     gear.title = "문서함 열기 — 가이드·아키텍처를 읽는 별도 창";
     row.appendChild(av); row.appendChild(nm); row.appendChild(gear);
     area.appendChild(row);

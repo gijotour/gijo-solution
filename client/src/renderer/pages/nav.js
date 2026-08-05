@@ -25,14 +25,46 @@
   //  · 작업 내역  — 지금까지 AI와 한 일. '작업 세션'에서 이름을 바꿨다(2026-07-28 사용자 지시)
   //    — '세션'은 로그인 세션과도 헷갈리는 개발자 말이고, 이 화면은 결국 한 일의 기록이다.
   // fixed:true — 이 셋은 늘 맨 위에 있으므로 즐겨찾기 별표를 달지 않는다.
+  // ── 단선 아이콘 한 벌 (2026-08-05, 시안 nav-refine-v1 승인) ─────────────────
+  // 왜 이모지를 걷어내나: **컬러 이모지는 색을 우리가 못 정한다**(운영체제 폰트가 정함).
+  //   그래서 옆 글자가 흐릴 때도 이모지만 쨍하게 남아 톤이 겉돌고, 업무 도구보다 장난감처럼
+  //   보인다. 단선 SVG는 stroke:currentColor라 **글자와 같은 색으로 밝아지고 어두워진다**.
+  // ⚠ 아이콘은 여기 한 곳에서만 만든다 — 화면마다 베끼면 굵기·크기가 갈라져 한 벌이 아니게 된다.
+  // ⚠ label에는 넣지 않는다. label은 탭 이름·검색 결과·즐겨찾기에 그대로 따라다닌다.
+  var ICON = {
+    home:   '<path d="M2 6.5 8 2l6 4.5"/><path d="M3.5 7.4V13.5h9V7.4"/>',
+    office: '<rect x="2.5" y="2.5" width="7" height="11"/><path d="M9.5 6.5h4v7h-4"/><path d="M4.5 5h3M4.5 7.5h3M4.5 10h3"/>',
+    chat:   '<path d="M13.5 9.5a1.5 1.5 0 0 1-1.5 1.5H6l-3 2.5V4a1.5 1.5 0 0 1 1.5-1.5h7A1.5 1.5 0 0 1 13.5 4z"/>',
+    book:   '<path d="M3.4 3.2h4.2c.9 0 1.6.7 1.6 1.6v8c0-.7-.6-1.3-1.3-1.3H3.4z"/><path d="M12.6 3.2H9.2v10c0-.7.6-1.3 1.3-1.3h2.1z"/>',
+    star:   '<path d="M8 2.2l1.8 3.7 4 .6-2.9 2.8.7 4L8 11.4l-3.6 1.9.7-4L2.2 6.5l4-.6z"/>',
+    search: '<circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5 14 14"/>',
+    target: '<circle cx="8" cy="8" r="5.6"/><circle cx="8" cy="8" r="2.4"/>',
+    check:  '<path d="M2.5 8.4 6 11.9l7.5-7.8"/>',
+    shield: '<path d="M8 1.8 13.6 4v4c0 3.4-2.4 5.4-5.6 6.2C4.8 13.4 2.4 11.4 2.4 8V4z"/><path d="M5.8 7.9 7.4 9.5l3-3.2"/>',
+    chart:  '<path d="M2.4 13.4h11.2"/><path d="M4.6 13.4V8M8 13.4V3.8M11.4 13.4V6.4"/>',
+    drawer: '<rect x="2.2" y="3.4" width="11.6" height="2.8"/><path d="M3.4 6.2v6.4h9.2V6.2M6.4 8.9h3.2"/>',
+    chip:   '<rect x="4.6" y="4.6" width="6.8" height="6.8" rx="1"/><path d="M6.6 2.2v2.4M9.4 2.2v2.4M6.6 11.4v2.4M9.4 11.4v2.4M2.2 6.6h2.4M2.2 9.4h2.4M11.4 6.6h2.4M11.4 9.4h2.4"/>',
+    slider: '<path d="M2.4 4.6h11.2M2.4 8h11.2M2.4 11.4h11.2"/><circle cx="5.6" cy="4.6" r="1.5"/><circle cx="10" cy="8" r="1.5"/><circle cx="6.8" cy="11.4" r="1.5"/>',
+  };
+  function iconSvg(name) {
+    var d = ICON[name];
+    if (!d) return null;
+    var s = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    s.setAttribute("viewBox", "0 0 16 16");
+    s.setAttribute("class", "gn-ic");
+    s.setAttribute("aria-hidden", "true");   // 뜻은 옆 글자가 말한다 — 읽어 주면 두 번 읽힌다
+    s.innerHTML = d;
+    return s;
+  }
+
   var TOP = [
-    { page: "dashboard.html", label: "대시보드", fixed: true },
+    { page: "dashboard.html", label: "대시보드", icon: "home", fixed: true },
     // ⚠ 별도 창으로 여는 항목은 **win에 여는 함수 이름을 적는다**(preload의 window.gijo.*).
     //   예전엔 `office: true` 같은 항목별 표시를 두고 클릭 처리에서 이름을 하나씩 봤는데,
     //   문서함을 더할 때 그 분기를 안 더해서 **메뉴를 눌러도 아무 일도 안 났다**(4.9.0 실사고).
     //   page가 없는 항목이 탭 열기로 떨어져 undefined 탭을 여니 조용히 실패한다.
     //   win을 보고 처리하면 새 창 항목을 더해도 클릭 처리를 고칠 일이 없다.
-    { win: "openTeamOffice", label: "팀 사무실 (창)", ic: "🏢", fixed: true },
+    { win: "openTeamOffice", label: "팀 사무실 (창)", icon: "office", fixed: true },
     // ⚠ 「내 업무」 메뉴는 없앴다(2026-08-01 사용자 지시 — "내업무 메뉴는 삭제하고 그 안에
     //   있는 모든 내용은 대화창에서"). 목록·담기·완료·절차 밟기는 전부 대화창 도구로 옮겼다:
     //   picklist 결정적 목록 + add_task·complete_task·work_steps·step_done·step_undo·routine_tasks.
@@ -41,8 +73,8 @@
     // ⚠ hidden: 메뉴 목록에는 **안 그린다**(2026-08-02 사용자 지시 — 왼쪽 아래 사용자 줄 끝
     //   📚로 옮겼으니 같은 것이 두 번 보일 이유가 없다). 자료는 지우지 않는다:
     //   상단 🔍 화면 찾기는 이 목록을 쓰므로, 지우면 이름으로도 못 찾게 된다.
-    { win: "openDocbox", label: "문서함 (창)", ic: "📚", fixed: true, hidden: true },
-    { page: "sessions.html", label: "작업 내역", fixed: true },
+    { win: "openDocbox", label: "문서함 (창)", icon: "book", fixed: true, hidden: true },
+    { page: "sessions.html", label: "작업 내역", icon: "chat", fixed: true },
   ];
 
   var GROUPS = [
@@ -59,36 +91,36 @@
     //   늘 하는 일이고, 결과는 ① 발견으로 들어온다. 메뉴를 늘리는 대신 루프가 ①로 돌아오게 둔다.
     // ⚠ 네 업무(취약점·보안제품 운영·AI 보안·보안로그)가 **같은 5단계**를 돈다. 그래서 업무별로
     //   메뉴를 따로 만들지 않는다 — 그러면 메뉴가 4배가 되어 원점이다.
-    { id: "s1-find", ic: "🔍", label: "① 발견·수집", items: [
+    { id: "s1-find", icon: "search", num: "1", label: "발견 · 수집", items: [
       { page: "analysis.html", label: "통합 관제" },
       { page: "threat.html", label: "위협 인텔" },
       { page: "inventory.html", label: "자산 목록" },
     ]},
-    { id: "s2-triage", ic: "🎯", label: "② 우선순위", items: [
+    { id: "s2-triage", icon: "target", num: "2", label: "우선순위", items: [
       { page: "vulnscan.html", label: "취약점" },
       { page: "sbom.html", label: "AI-BOM" },
     ]},
-    { id: "s3-fix", ic: "🔧", label: "③ 조치", items: [
+    { id: "s3-fix", icon: "check", num: "3", label: "조치", items: [
       { page: "approvals.html", label: "조치·승인" },
       { page: "maintenance.html", label: "정기 점검" },
       { page: "terminal.html", label: "명령창" },
     ]},
-    { id: "s4-verify", ic: "✅", label: "④ 검증", items: [
+    { id: "s4-verify", icon: "shield", num: "4", label: "검증", items: [
       { page: "hardening.html", label: "보안설정 점검" },
     ]},
-    { id: "s5-report", ic: "📊", label: "⑤ 보고", items: [
+    { id: "s5-report", icon: "chart", num: "5", label: "보고", items: [
       { page: "report.html", label: "리포트" },
       { page: "kpi.html", label: "보안 KPI" },
       { page: "compliance.html", label: "컴플라이언스" },
     ]},
 
     // ── 기반 — 절차가 아니라 **참조하는 대장**이다. 절차 아래에 둔다. ────────────────
-    { id: "registry", ic: "🗂", label: "등록부", items: [
+    { id: "registry", icon: "drawer", label: "등록부", items: [
       { page: "products.html", label: "보안제품" },
     ]},
     // AI 운영 — 예전 「AI」와 「데이터 플라이휠」 두 그룹을 합쳤다. 6개면 한 그룹으로 충분하고,
     // 담당자에게 둘의 차이(기능 vs 되먹임 고리)는 우리 사정이지 업무 구분이 아니었다.
-    { id: "aiops", ic: "🤖", label: "AI 운영", items: [
+    { id: "aiops", icon: "chip", label: "AI 운영", items: [
       { page: "agent.html", label: "에이전트 AI" },
       { page: "redteam.html", label: "AI 공격 시험·차단" },
       { page: "memory.html", label: "AI 지식" },
@@ -99,7 +131,7 @@
     // 내 것 / 모두의 것(서버·AI) / 바깥과 잇는 것 / 관리자만 / 보기만.
     // 같은 settings.html을 ?s= 로 걸러 보여준다(파일을 쪼개면 공통 스크립트가 어긋난다).
     // ⚠ 인수인계를 여기로 옮겼다 — 「업무 관리」 그룹에 항목이 하나뿐이었다. 하나짜리는 그룹이 아니다.
-    { id: "settings", ic: "⚙", label: "설정", bottom: true, items: [
+    { id: "settings", icon: "slider", label: "설정", bottom: true, items: [
       { page: "settings.html?s=my", label: "내 설정" },
       { page: "settings.html?s=ai", label: "서버·AI" },
       { page: "settings.html?s=link", label: "연동" },
@@ -329,17 +361,24 @@
       // 한 번에 다 보이면 훑기 어렵다 — 안 쓰는 그룹은 접어 둘 수 있게).
       // 가지 이름은 메뉴를 훑는 기준점이라 본문 항목과 비슷한 크기로 둔다. 예전 9.5px·자간 1.2px는
       // 영문 대문자 소제목용 값이라 한글에서는 작고 성글어 읽히지 않았다(2026-07-28 사용자 지적).
-      ".gn-g{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:800;color:var(--muted);" +
-      "letter-spacing:.2px;margin:13px 6px 5px;padding:5px 5px;border-radius:6px;cursor:pointer;user-select:none;}" +
+      // 2026-08-05(시안 nav-refine-v1): 조용한 소제목 + 가는 선. 이름을 키우지 않고 **선**으로
+      // 구역을 나눈다 — 굵은 글씨 9개가 세로로 서면 그것도 목록처럼 읽힌다.
+      ".gn-g{display:flex;align-items:center;gap:6px;height:24px;font-size:10.5px;font-weight:700;color:var(--muted-2);" +
+      "letter-spacing:.6px;margin:9px 6px 1px;padding:0 5px;border-radius:5px;cursor:pointer;user-select:none;}" +
+      ".gn-g .gn-gname{flex:0 0 auto;white-space:nowrap;}" +
+      ".gn-g .gn-line{flex:1;height:1px;background:var(--border,rgba(255,255,255,.08));min-width:8px;}" +
+      // 단계 숫자칩 — 원문자 이모지(①) 대신 테두리 숫자. 뜻은 남기고 톤만 낮춘다.
+      ".gn-g .gn-num{flex:0 0 auto;width:14px;height:14px;display:flex;align-items:center;justify-content:center;" +
+      "font-size:9.5px;font-weight:800;border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:3px;opacity:.8;}" +
       ".gn-g:hover{color:var(--blue-light,#7ab0ff);background:rgba(255,255,255,.03);}" +
-      ".gn-g .car{font-size:11.25px;width:10px;flex:0 0 auto;transition:transform .13s;}" +
+      ".gn-g .car{font-size:9px;width:9px;flex:0 0 auto;opacity:.5;transition:transform .13s;}" +
       ".gn-g.open .car{transform:rotate(90deg);}" +
-      ".gn-g .cnt{margin-left:auto;font-size:11.75px;font-weight:700;color:var(--muted-2);opacity:.75;}" +
+      ".gn-g .cnt{flex:0 0 auto;font-size:10.5px;font-weight:700;color:var(--muted-2);opacity:.7;}" +
       ".gn-g.open .cnt{opacity:0;}" + // 펼치면 개수는 군더더기 — 눈으로 보인다
       ".gn-g:first-child{margin-top:2px;}" +
       ".gn-kids{display:block;}" +
       ".gn-kids.closed{display:none;}" +
-      ".gn-kids .gn-item{padding-left:20px;}" + // 한 칸 들여써서 가지에 달린 것임을 보인다
+      ".gn-kids .gn-item{padding-left:16px;}" + // 한 칸 들여써서 가지에 달린 것임을 보인다
       // 맨 위 고정 세 자리 — 가지에 안 달렸으니 들여쓰지 않고, 아래에 얇은 금으로 구분한다.
       ".gn-top-fixed{padding-bottom:7px;margin-bottom:3px;border-bottom:1px solid rgba(255,255,255,.07);}" +
       ".gn-top-fixed .gn-item{padding-left:11px;}" +
@@ -359,9 +398,19 @@
       ".gn-item .gn-star:hover{opacity:1;color:var(--amber,#f0a020);background:rgba(240,160,32,.14);}" +
       ".gn-item .gn-star.on{opacity:1;color:var(--amber,#f0a020);}" +
       // 메뉴 한 줄 — 가지 이름(12px)보다 살짝 크게 둬서 "무엇을 고르는가"가 주인공이 되게 한다.
-      ".gn-item{display:flex;align-items:center;gap:7px;padding:8px 11px;border-radius:8px;font-size:13px;font-weight:600;color:var(--muted);cursor:pointer;margin-bottom:1px;white-space:nowrap;overflow:hidden;}" +
+      // 2026-08-05: 38px → 30px. 화면이 30개라 세로가 늘 모자란다(가운데 칸 724px에 내용 1,402px).
+      // 평소 굵기는 500으로 낮추고 **지금 있는 곳만** 굵게 — 굵은 글씨 28줄은 강조가 아니라 소음이다.
+      ".gn-item{display:flex;align-items:center;gap:9px;height:30px;padding:0 10px;border-radius:6px;font-size:12.5px;font-weight:500;color:var(--muted);cursor:pointer;white-space:nowrap;overflow:hidden;position:relative;}" +
+      // 단선 아이콘 — 글자색을 따라간다(currentColor). 이게 "화면 톤과 조화"의 실체다.
+      ".gn-item .gn-ic{flex:0 0 auto;width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.5;" +
+      "stroke-linecap:round;stroke-linejoin:round;opacity:.62;}" +
+      ".gn-item:hover .gn-ic{opacity:.95;}" +
+      ".gn-item.active .gn-ic{opacity:1;color:var(--blue-light,#5fa1ff);}" +
+      ".gn-g .gn-ic{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.5;opacity:.6;flex:0 0 auto;}" +
       ".gn-item:hover{color:#fff;background:rgba(255,255,255,.04);}" +
-      ".gn-item.active{color:#fff;background:rgba(59,130,246,.14);box-shadow:inset 3px 0 0 var(--blue);cursor:default;}" +
+      // 지금 있는 곳 — 배경을 옅게 두고 **왼쪽 얇은 막대 하나**로 말한다(파란 판을 깔면 그 줄만 튄다).
+      ".gn-item.active{color:#fff;background:rgba(255,255,255,.055);font-weight:600;cursor:default;}" +
+      ".gn-item.active::before{content:'';position:absolute;left:0;top:6px;bottom:6px;width:2px;border-radius:2px;background:var(--blue-light,#5fa1ff);}" +
       ".gn-item .gn-label{flex:1;overflow:hidden;text-overflow:ellipsis;}" +
       // 그 화면의 챗봇을 여는 버튼 — 모든 항목에서 같은 자리(우측).
       ".gn-item .gn-bot{flex:0 0 auto;font-size:12px;opacity:.7;cursor:pointer;border-radius:6px;padding:1px 5px;line-height:1.4;}" +
@@ -371,17 +420,19 @@
       // 대시보드 — 다른 화면에서 돌아오는 '집' 자리다. 가장 자주 누르므로 한눈에 찾히게
       // 테두리를 준다(2026-07-27 사용자 요청). 지금 대시보드에 있으면 이미 .active가 있어
       // 테두리를 빼서, "돌아갈 곳"일 때만 눈에 띄게 한다.
-      ".gn-item.gn-home{color:#cfe0ff;border:1px solid rgba(59,130,246,.42);background:rgba(59,130,246,.07);margin-bottom:5px;}" +
-      ".gn-item.gn-home:hover{background:rgba(59,130,246,.16);border-color:var(--blue,#3b82f6);color:#fff;}" +
+      // 2026-08-05: 혼자 파란 테두리 상자였다 — 맨 위 자리 자체가 이미 "집"을 말하므로
+      // 상자를 걷고 글자색만 살짝 밝게 둔다(다른 줄과 같은 모양이어야 눈이 쉰다).
+      ".gn-item.gn-home{color:var(--text,#e9e7e2);}" +
+      ".gn-item.gn-home:hover{background:rgba(255,255,255,.05);color:#fff;}" +
       // 팝업이 떠 있으면 대시보드는 "돌아갈 곳"이라 누를 수 있어야 한다(아래 클릭 처리).
       ".gn-item.gn-home.active{cursor:pointer;}" +
-      ".gn-item.gn-home .gn-label::before{content:'🏠 ';}" +
+
       // 고정 세 자리에 아이콘을 맞춘다(2026-07-28 사용자 요청) — 팀 사무실만 🏢가 있고 작업 세션은
       // 맨몸이라 줄이 어긋나 보였다. 아이콘은 CSS ::before로 붙인다 — label 자체에 넣으면
       // 그 label이 탭 이름으로도 쓰여 탭줄에까지 이모지가 따라간다.
-      ".gn-item.gn-sess .gn-label::before{content:'💬 ';}" +
-      // ic를 준 항목(팀 사무실 등)은 인라인 변수로 아이콘을 받는다
-      ".gn-label[style*='--gn-ic']::before{content:var(--gn-ic);}";
+
+      // (예전엔 여기서 ::before로 이모지를 붙였다 — 2026-08-05에 단선 SVG로 옮겼다)
+      "";
     document.head.appendChild(st);
   }
 
@@ -423,10 +474,12 @@
     var el = document.createElement("div");
     el.className = "gn-item" + (it.page === here ? " active" : "") +
       (it.page === "dashboard.html" ? " gn-home" : "") + (it.page === "sessions.html" ? " gn-sess" : "");
+    // 아이콘 — 단선 SVG를 **글자 앞에** 넣는다(2026-08-05). 예전엔 CSS ::before로 이모지를
+    // 붙였는데, 이모지는 색을 우리가 못 정해 옆 글자와 톤이 어긋났다. SVG는 currentColor라
+    // 글자와 같이 밝아지고 어두워진다. label 자체는 그대로 둔다 — 탭 이름으로도 쓰이기 때문이다.
+    var svg = it.icon ? iconSvg(it.icon) : (it.iconOf ? iconSvg(it.iconOf) : null);
+    if (svg) el.appendChild(svg);
     var lab = document.createElement("span"); lab.className = "gn-label"; lab.textContent = it.label; el.appendChild(lab);
-    // 아이콘은 CSS ::before로만 붙인다 — label에 이모지를 넣으면 그 label이 탭 이름·즐겨찾기·
-    // 검색 결과에 그대로 따라다닌다. 고정 세 자리가 각기 다른 방식이라 줄이 어긋나 보였다.
-    if (it.ic) lab.style.setProperty("--gn-ic", "'" + it.ic + " '");
 
     // ☆ 별표 — 별도 창으로 여는 항목(팀 사무실)은 주소가 없어 즐겨찾기에 넣을 수 없다.
     // 맨 위 고정 세 자리도 뺀다: **이미 늘 보이는 것을 또 꽂는 건 뜻이 없고**, 실제로 눌러도
@@ -533,10 +586,12 @@
       fh.className = "gn-g open gn-fav-g";
       fh.setAttribute("role", "button");
       fh.title = "즐겨찾기 접기/펼치기 — 항목 위 ☆를 눌러 넣고 뺍니다";
-      var fcar = document.createElement("span"); fcar.className = "car"; fcar.textContent = "▶";
-      var fnm = document.createElement("span"); fnm.textContent = "⭐ 즐겨찾기";
+      var fcar = document.createElement("span"); fcar.className = "car"; fcar.textContent = "▸";
+      var fst = iconSvg("star");   // ⭐ 이모지 대신 단선 별 — 다른 구역과 같은 굵기·색
+      var fnm = document.createElement("span"); fnm.className = "gn-gname"; fnm.textContent = "즐겨찾기";
+      var fln = document.createElement("span"); fln.className = "gn-line";
       var fcnt = document.createElement("span"); fcnt.className = "cnt"; fcnt.textContent = favs.length;
-      fh.appendChild(fcar); fh.appendChild(fnm); fh.appendChild(fcnt);
+      fh.appendChild(fcar); if (fst) fh.appendChild(fst); fh.appendChild(fnm); fh.appendChild(fln); fh.appendChild(fcnt);
       container.appendChild(fh);
       // 즐겨찾기도 **기본 펼침** — 내가 직접 꽂아 둔 것들이라 접어 두면 꽂은 뜻이 없어진다.
       var favClosed = closed.has("__favClosed");
@@ -570,10 +625,22 @@
       gh.className = "gn-g" + (open ? " open" : "");
       gh.setAttribute("role", "button");
       gh.title = (open ? "접기" : "펼치기") + " — " + g.label;
-      var car = document.createElement("span"); car.className = "car"; car.textContent = "▶";
-      var nm = document.createElement("span"); nm.textContent = g.label;
+      // 구역 제목 = ▸ + (단계 숫자칩) + 이름 + 가는 선 + 개수 (2026-08-05, 시안 승인).
+      // ⚠ 단계 숫자(1~5)는 **뜻이 있어 남긴다** — 업무 절차 5단계이고 서버 workflow.ts가
+      //   같은 표를 본다. 다만 원문자 이모지(①)가 아니라 테두리 숫자칩으로 그려 톤을 낮춘다.
+      var car = document.createElement("span"); car.className = "car"; car.textContent = "▸";
+      gh.appendChild(car);
+      var gic = g.icon ? iconSvg(g.icon) : null;
+      if (gic) gh.appendChild(gic);
+      if (g.num) {
+        var num = document.createElement("span"); num.className = "gn-num"; num.textContent = g.num;
+        gh.appendChild(num);
+      }
+      var nm = document.createElement("span"); nm.className = "gn-gname"; nm.textContent = g.label;
+      gh.appendChild(nm);
+      var ln = document.createElement("span"); ln.className = "gn-line"; gh.appendChild(ln);
       var cnt = document.createElement("span"); cnt.className = "cnt"; cnt.textContent = g.items.length;
-      gh.appendChild(car); gh.appendChild(nm); gh.appendChild(cnt);
+      gh.appendChild(cnt);
       container.appendChild(gh);
 
       var kids = document.createElement("div");
