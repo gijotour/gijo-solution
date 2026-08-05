@@ -117,6 +117,7 @@ table th:last-child,table td:last-child{white-space:nowrap;}
 .feed-actions{display:flex;align-items:center;gap:8px;}
 .link-btn{background:none;border:none;color:var(--blue-light);font-size:12.5px;font-weight:700;cursor:pointer;padding:0;}
 </style>
+<script src="viz.js"></script>
 </head>
 <body>
 
@@ -264,7 +265,6 @@ table th:last-child,table td:last-child{white-space:nowrap;}
   // ── 그림 먼저(전-7 ①, 2026-08-05) ──────────────────────────────────────
   // 총계는 언제나 **전체 탐지**로 낸다 — 막대를 눌러 표를 좁혀도 위 KPI는 그대로여야 한다.
   let 심각도필터 = null;
-  let 탐지전체 = [];
 
   function 그림띠(findings) {
     const 자리 = document.getElementById("vizStrip");
@@ -273,7 +273,7 @@ table th:last-child,table td:last-child{white-space:nowrap;}
     const 좁히기 = () => 표그리기(findings);
     window.gijoViz.mount(자리, {
       title: "한눈에",
-      hint: "막대를 누르면 아래 탐지 내역이 그 심각도만 남습니다",
+      hint: "누르면 목록이 좁혀집니다",
       parts: [{
         kind: "bars",
         segments: [
@@ -281,15 +281,10 @@ table th:last-child,table td:last-child{white-space:nowrap;}
           { key: "warning", label: "주의", value: 셈("warning"), color: "medium" },
           { key: "info", label: "정보", value: 셈("info"), color: "info" },
         ],
-        onPick: (key, seg) => {
+        onPick: (key) => {
           심각도필터 = key;
           if (key && window.gijoFold) window.gijoFold.open("최근 탐지 내역");   // 접혀 있으면 펼친다
-          window.gijoViz.filterBar(document.getElementById("vizFilter"), seg, findings.length, () => {
-            심각도필터 = null;
-            자리.querySelectorAll(".gviz-bar").forEach((b) => b.classList.remove("on"));
-            window.gijoViz.filterBar(document.getElementById("vizFilter"), null, findings.length, null);
-            좁히기();
-          });
+          필터띠(findings);
           좁히기();
         },
       }],
@@ -298,6 +293,23 @@ table th:last-child,table td:last-child{white-space:nowrap;}
       const b = 자리.querySelector('.gviz-bar[data-key="' + 심각도필터 + '"]');
       if (b) b.classList.add("on");
     }
+    필터띠(findings);   // 다시 그릴 때 띠 숫자도 새로 낸다
+  }
+
+  // 필터 띠 — 목록 단위(탐지 건)로만 적는다.
+  function 필터띠(findings) {
+    if (!window.gijoViz) return;
+    const el = document.getElementById("vizFilter");
+    if (!심각도필터) { window.gijoViz.filterBar(el, null, null); return; }
+    const 보임 = findings.filter((f) => f.severity === 심각도필터).length;
+    window.gijoViz.filterBar(el,
+      { label: (SEVERITY_BADGE[심각도필터] || {}).label || 심각도필터, 보임, 전체: findings.length, 단위: "탐지" },
+      () => {
+        심각도필터 = null;
+        document.querySelectorAll("#vizStrip .gviz-bar").forEach((b) => b.classList.remove("on"));
+        필터띠(findings);
+        표그리기(findings);
+      });
   }
 
   // 표만 다시 그린다 — 막대를 눌러 좁힐 때 서버를 다시 부르지 않는다.
@@ -319,7 +331,6 @@ table th:last-child,table td:last-child{white-space:nowrap;}
   // ───────────────────────────────────────────────────────────────────────
 
   function renderFindings(findings) {
-    탐지전체 = findings;
     findingCountEl.textContent = findings.length;
     criticalCountEl.textContent = findings.filter((f) => f.severity === "critical").length;
     // 접기 배지가 읽을 숫자를 먼저 적고 도우미에 알린다 — 접힌 채로도 건수가 보여야 한다.
@@ -483,7 +494,6 @@ table th:last-child,table td:last-child{white-space:nowrap;}
 
 
 
-<script src="viz.js"></script>
 <script src="nav.js"></script>
 <script src="workflowrail.js"></script>
 <script src="progresscard.js"></script>

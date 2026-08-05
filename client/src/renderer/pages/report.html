@@ -128,6 +128,7 @@ tr:last-child td{border-bottom:none;}
   .rep-target{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
     line-height:1.6;max-height:calc(1.6em * 3);}
 </style>
+<script src="viz.js"></script>
 </head>
 <body>
 
@@ -466,26 +467,34 @@ tr:last-child td{border-bottom:none;}
     const 키들 = Object.keys(유형별).sort((a, b) => 유형별[b] - 유형별[a]);
     window.gijoViz.mount(자리, {
       title: "무엇을 많이 만들었나",
-      hint: 키들.length ? "막대를 누르면 아래 이력이 그 유형만 남습니다" : "",
+      hint: 키들.length ? "누르면 목록이 좁혀집니다" : "",
       parts: [{
         kind: "bars",
         segments: 키들.map((t) => ({ key: t, label: (TYPE_LABEL[t] || t).replace("정기 · ", ""), value: 유형별[t], color: "blue" })),
-        onPick: (key, seg) => {
-          유형필터 = key;
-          window.gijoViz.filterBar(document.getElementById("vizFilter"), seg, historyReports.length, () => {
-            유형필터 = null;
-            자리.querySelectorAll(".gviz-bar").forEach((b) => b.classList.remove("on"));
-            window.gijoViz.filterBar(document.getElementById("vizFilter"), null, historyReports.length, null);
-            줄그리기();
-          });
-          줄그리기();
-        },
+        onPick: (key) => { 유형필터 = key; 필터띠(); 줄그리기(); },
       }],
     });
     if (유형필터) {
       const b = 자리.querySelector('.gviz-bar[data-key="' + 유형필터 + '"]');
       if (b) b.classList.add("on");
     }
+    필터띠();
+  }
+
+  // 필터 띠 — 목록 단위(리포트)로만 적는다.
+  function 필터띠() {
+    if (!window.gijoViz) return;
+    const el = document.getElementById("vizFilter");
+    if (!유형필터) { window.gijoViz.filterBar(el, null, null); return; }
+    const 보임 = historyReports.filter((r) => r.type === 유형필터).length;
+    window.gijoViz.filterBar(el,
+      { label: TYPE_LABEL[유형필터] || 유형필터, 보임, 전체: historyReports.length, 단위: "리포트" },
+      () => {
+        유형필터 = null;
+        document.querySelectorAll("#vizStrip .gviz-bar").forEach((b) => b.classList.remove("on"));
+        필터띠();
+        줄그리기();
+      });
   }
   // ───────────────────────────────────────────────────────────────────────
 
@@ -891,7 +900,7 @@ tr:last-child td{border-bottom:none;}
 
 
 
-<script src="viz.js"></script>
+
 <script src="nav.js"></script>
 <script src="workflowrail.js"></script>
 <script src="progresscard.js"></script>

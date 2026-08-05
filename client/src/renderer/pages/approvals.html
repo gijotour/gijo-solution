@@ -44,6 +44,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
 .icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
 </style>
+<script src="viz.js"></script>
 </head>
 <body>
 
@@ -370,11 +371,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   function 그림띠() {
     const 자리 = document.getElementById("vizStrip");
     if (!자리 || !window.gijoViz) return;
-    const 열린것 = allReviews.filter((r) => ["pending", "in_progress", "verifying"].includes(r.status));
+    // ⚠ 이 화면이 스스로 세운 규칙을 막대도 지킨다(2026-08-05 검토 지적):
+    //   "자산으로 좁혀 보는 중이면 위 카드·칩 숫자도 그 자산 것이어야 한다."
+    //   막대만 전체를 세면 카드는 3건인데 바로 밑 막대가 4,890을 세운다.
+    const 범위 = scopeAsset ? allReviews.filter((r) => r.assetId === scopeAsset) : allReviews;
+    const 열린것 = 범위.filter((r) => ["pending", "in_progress", "verifying"].includes(r.status));
     const 셈 = (k) => 열린것.filter((r) => r.finding.severity === k).length;
     window.gijoViz.mount(자리, {
       title: "조치 대상 — 심각도별",
-      hint: "막대를 누르면 아래 목록이 그 심각도만 남습니다",
+      hint: "누르면 목록이 좁혀집니다",
       parts: [{
         kind: "bars",
         segments: [
@@ -383,22 +388,31 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
           { key: "medium", label: "보통", value: 셈("medium") },
           { key: "low", label: "낮음", value: 셈("low") },
         ],
-        onPick: (key, seg) => {
-          심각도필터 = key;
-          window.gijoViz.filterBar(document.getElementById("vizFilter"), seg, 열린것.length, () => {
-            심각도필터 = null;
-            자리.querySelectorAll(".gviz-bar").forEach((b) => b.classList.remove("on"));
-            window.gijoViz.filterBar(document.getElementById("vizFilter"), null, 열린것.length, null);
-            renderList();
-          });
-          renderList();
-        },
+        onPick: (key) => { 심각도필터 = key; 필터띠(); renderList(); },
       }],
     });
     if (심각도필터) {
       const b = 자리.querySelector('.gviz-bar[data-key="' + 심각도필터 + '"]');
       if (b) b.classList.add("on");
     }
+    필터띠();   // 승인·반려로 목록이 바뀌면 띠 숫자도 따라 바뀌어야 한다
+  }
+
+  // 필터 띠 — 목록 단위(건)로, **지금 화면에 걸린 모든 조건**을 반영해 센다.
+  const SEV_KO = { critical: "긴급", high: "높음", medium: "보통", low: "낮음" };
+  function 필터띠() {
+    if (!window.gijoViz) return;
+    const el = document.getElementById("vizFilter");
+    if (!심각도필터) { window.gijoViz.filterBar(el, null, null); return; }
+    const 보임 = allReviews.filter(matchFilter).length;
+    const 전체 = allReviews.filter((r) => (!scopeAsset || r.assetId === scopeAsset)).length;
+    window.gijoViz.filterBar(el, { label: SEV_KO[심각도필터] || 심각도필터, 보임, 전체, 단위: "건" },
+      () => {
+        심각도필터 = null;
+        document.querySelectorAll("#vizStrip .gviz-bar").forEach((b) => b.classList.remove("on"));
+        필터띠();
+        renderList();
+      });
   }
   // ───────────────────────────────────────────────────────────────────────
 
@@ -810,7 +824,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
 
 
-<script src="viz.js"></script>
+
 <script src="nav.js"></script>
 <script src="workflowrail.js"></script>
 <script src="progresscard.js"></script>

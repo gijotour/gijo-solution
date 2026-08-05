@@ -161,6 +161,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .del-opt .od{font-size:12.5px;color:var(--muted);margin-top:1px;line-height:1.5;}
 .del-warn{display:flex;gap:8px;background:rgba(240,160,32,.1);border:1px solid rgba(240,160,32,.3);border-radius:9px;padding:9px 11px;font-size:12.5px;color:#f5c877;}
 </style>
+<script src="viz.js"></script>
 </head>
 <body>
 
@@ -525,7 +526,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     window.gijoViz.mount(자리, {
       title: "한눈에",
-      hint: "칸에 마우스를 올리면 어떤 제품인지 보입니다",
+      hint: "누르면 그 갈래로 내려갑니다",
       parts: [
         {
           kind: "bars",
@@ -533,6 +534,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
             key: c.id, label: c.label, value: byCatCount(groups, c.id), color: "blue",
           })),
           // 기존 종류 칩(data-jump)이 이미 그 갈래로 데려간다 — 같은 일을 두 번 만들지 않고 그것을 누른다.
+          // ⚠ 이 칩이 하는 일은 **거르기가 아니라 「그 갈래 펼치고 그리로 이동」**이다.
+          //   그래서 툴팁도 그렇게 적는다 — 하지 않는 일을 약속하면 눌러 보고 속았다고 느낀다
+          //   (2026-08-05 검토 지적: 기본 문구가 "누르면 이것만 봅니다"였다).
+          누르면: "누르면 그 갈래로 내려갑니다",
           onPick: (key) => {
             if (!key) return;
             const chip = document.querySelector(`.cat-chip[data-jump="${key}"]`);
@@ -553,11 +558,19 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
               title: `${p.name} — ${매뉴얼 ? "매뉴얼 있음" : "매뉴얼 없음"} · ${점검 ? "점검 기록 있음" : "점검 기록 없음"}`,
             };
           }),
-          legend: [
-            { color: "ok", label: "정상", count: 전제품.filter((p) => ((p.docs || []).some((d) => d.kind === "manual")) && 점검있는제품.has(p.id)).length },
-            { color: "warn", label: "매뉴얼없음", count: 전체 - 매뉴얼있음 },
-            { color: "idle", label: "점검없음", count: 전체 - 점검함 },
-          ],
+          // ⚠ 범례는 **칸 색과 1:1**이어야 한다(2026-08-05 검토 지적). 칸 색은 배타적으로
+          //   정해지는데(매뉴얼 없음 → warn, 있고 점검 없음 → idle, 둘 다 있음 → ok) 범례를
+          //   따로 세면 매뉴얼도 점검도 없는 제품이 양쪽에 세어져 합이 제품 수를 넘는다.
+          legend: (() => {
+            const 매뉴얼있나 = (p) => (p.docs || []).some((d) => d.kind === "manual");
+            const warn = 전제품.filter((p) => !매뉴얼있나(p)).length;
+            const idle = 전제품.filter((p) => 매뉴얼있나(p) && !점검있는제품.has(p.id)).length;
+            return [
+              { color: "ok", label: "정상", count: 전체 - warn - idle },
+              { color: "warn", label: "매뉴얼없음", count: warn },
+              { color: "idle", label: "점검기록없음", count: idle },
+            ];
+          })(),
         },
       ],
     });
@@ -828,7 +841,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   </div>
 </div>
 
-<script src="viz.js"></script>
+
 <script src="nav.js"></script>
 <script src="progresscard.js"></script>
 <script src="gijomd.js"></script>

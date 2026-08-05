@@ -111,6 +111,7 @@ tr:last-child td{border-bottom:none;}
 .icon-btn.on{background:rgba(59,130,246,0.18);border-color:var(--blue);color:var(--blue-light);}
 .avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
 </style>
+<script src="viz.js"></script>
 </head>
 <body>
 
@@ -645,9 +646,8 @@ tr:last-child td{border-bottom:none;}
     window.gijoViz.mount(자리, {
       title: "한눈에",
       hint: !상위.length ? ""
-        : (미상뿐 ? "⚠ 부품에 라이선스 정보가 하나도 없습니다 — 스캐너·입력 자료를 확인하세요"
-                  : "막대를 누르면 아래 목록이 그 라이선스를 쓰는 자산만 남습니다")
-          + ` · 라이선스는 부품 정보가 있는 자산 ${부품있는자산}개(부품 ${총부품.toLocaleString()}개) 기준`,
+        : (미상뿐 ? "⚠ 부품에 라이선스 정보가 하나도 없습니다" : "누르면 목록이 좁혀집니다")
+          + ` · 라이선스는 부품 있는 자산 ${부품있는자산}개(부품 ${총부품.toLocaleString()}개) 기준`,
       parts: [
         { kind: "donut", value: 생성됨, total: allAssets.length, label: "SBOM 생성", showRatio: true },
         {
@@ -655,16 +655,7 @@ tr:last-child td{border-bottom:none;}
           segments: 상위.map((L) => ({
             key: L, label: L.length > 8 ? L.slice(0, 8) + "…" : L, value: 라이선스별[L], color: "blue",
           })),
-          onPick: (key, seg) => {
-            라이선스필터 = key;
-            window.gijoViz.filterBar(document.getElementById("vizFilter"), seg, allAssets.length, () => {
-              라이선스필터 = null;
-              자리.querySelectorAll(".gviz-bar").forEach((b) => b.classList.remove("on"));
-              window.gijoViz.filterBar(document.getElementById("vizFilter"), null, allAssets.length, null);
-              render();
-            });
-            render();
-          },
+          onPick: (key) => { 라이선스필터 = key; 필터띠(); render(); },
         },
       ],
     });
@@ -672,6 +663,22 @@ tr:last-child td{border-bottom:none;}
       const b = 자리.querySelector('.gviz-bar[data-key="' + (window.CSS && CSS.escape ? CSS.escape(라이선스필터) : 라이선스필터) + '"]');
       if (b) b.classList.add("on");
     }
+    필터띠();
+  }
+
+  // 필터 띠 — 목록 단위(자산)로만 적는다. 막대 값은 부품 수라 단위가 다르다.
+  function 필터띠() {
+    if (!window.gijoViz) return;
+    const el = document.getElementById("vizFilter");
+    if (!라이선스필터) { window.gijoViz.filterBar(el, null, null); return; }
+    const 보임 = allAssets.filter((a) => (a.components || []).some((c) => 라이선스이름(c.license) === 라이선스필터)).length;
+    window.gijoViz.filterBar(el, { label: 라이선스필터, 보임, 전체: allAssets.length, 단위: "자산" },
+      () => {
+        라이선스필터 = null;
+        document.querySelectorAll("#vizStrip .gviz-bar").forEach((b) => b.classList.remove("on"));
+        필터띠();
+        render();
+      });
   }
   // ───────────────────────────────────────────────────────────────────────
 
@@ -862,7 +869,7 @@ tr:last-child td{border-bottom:none;}
 
 
 
-<script src="viz.js"></script>
+
 <script src="nav.js"></script>
 <script src="workflowrail.js"></script>
 <script src="progresscard.js"></script>

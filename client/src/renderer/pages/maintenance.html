@@ -115,6 +115,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .maint-report-form button{background:var(--blue);color:#fff;border:none;border-radius:7px;padding:0 14px;font-size:12.5px;font-weight:800;cursor:pointer;}
 .maint-timeline{margin-top:12px;padding-left:6px;border-left:2px solid var(--border);display:flex;flex-direction:column;gap:12px;}
 </style>
+<script src="viz.js"></script>
 </head>
 <body>
 <div class="app">
@@ -326,23 +327,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     window.gijoViz.mount(자리, {
       title: "한눈에",
-      hint: 이름들.length ? "막대를 누르면 아래 목록이 그 제품만 남습니다" : "",
+      hint: 이름들.length ? "누르면 목록이 좁혀집니다" : "",
       parts: [
         {
           kind: "bars",
           segments: 이름들.map(function (n) {
             return { key: n, label: n.length > 6 ? n.slice(0, 6) + "…" : n, value: 제품별[n].open, color: 제품별[n].late ? "bad" : "warn" };
           }),
-          onPick: function (key, seg) {
-            제품필터 = key;
-            window.gijoViz.filterBar(document.getElementById("vizFilter"), seg, 항목.length, function () {
-              제품필터 = null;
-              자리.querySelectorAll(".gviz-bar").forEach(function (b) { b.classList.remove("on"); });
-              window.gijoViz.filterBar(document.getElementById("vizFilter"), null, 항목.length, null);
-              표그리기();
-            });
-            표그리기();
-          },
+          onPick: function (key) { 제품필터 = key; 필터띠(); 표그리기(); },
         },
         { kind: "donut", value: 승인, total: 검토완료, label: "준수율", color: "ok" },
       ],
@@ -351,6 +343,21 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       var b = 자리.querySelector('.gviz-bar[data-key="' + (window.CSS && CSS.escape ? CSS.escape(제품필터) : 제품필터) + '"]');
       if (b) b.classList.add("on");
     }
+    필터띠();
+  }
+
+  // 필터 띠 — 목록 단위(점검 건)로만 적는다.
+  function 필터띠() {
+    if (!window.gijoViz) return;
+    var el = document.getElementById("vizFilter");
+    if (!제품필터) { window.gijoViz.filterBar(el, null, null); return; }
+    var 보임 = 항목.filter(function (m) { return m.productName === 제품필터; }).length;
+    window.gijoViz.filterBar(el, { label: 제품필터, 보임: 보임, 전체: 항목.length, 단위: "점검" }, function () {
+      제품필터 = null;
+      document.querySelectorAll("#vizStrip .gviz-bar").forEach(function (b) { b.classList.remove("on"); });
+      필터띠();
+      표그리기();
+    });
   }
   // ───────────────────────────────────────────────────────────────────────
 
@@ -893,7 +900,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 </script>
 
 <script src="dialog.js"></script>
-<script src="viz.js"></script>
+
 <script src="nav.js"></script>
 <script src="workflowrail.js"></script>
 <script src="progresscard.js"></script>

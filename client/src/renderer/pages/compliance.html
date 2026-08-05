@@ -62,6 +62,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     background:rgba(226,72,61,.16);color:#f5928a;margin-left:auto;}
   .cat-head:hover .nm{color:var(--blue-light);}
 </style>
+<script src="viz.js"></script>
 </head>
 <body>
 
@@ -201,6 +202,18 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
   // 그림에서 고른 상태(전-7 ①). null이면 전체 — 목록은 **사라지지 않고** 걸러질 뿐이다.
   let 상태필터 = null;
+  const 상태한글 = { covered: "대응완료", partial: "부분", open: "미대응", na: "해당없음" };
+
+  // 필터 띠 — 목록 단위(항목)로만 적는다. ⚠ 해제할 때 띠도 함께 지운다(안 지우면 "아직 걸러져
+  // 있다"고 계속 말한다 — 2026-08-05 검토 지적).
+  function 필터띠() {
+    if (!window.gijoViz) return;
+    const el = document.getElementById("vizFilter");
+    if (!상태필터) { window.gijoViz.filterBar(el, null, null); return; }
+    const 보임 = catalog.filter((t) => t.status === 상태필터).length;
+    window.gijoViz.filterBar(el, { label: 상태한글[상태필터] || 상태필터, 보임, 전체: catalog.length, 단위: "항목" },
+      () => { 상태필터 = null; render(); });
+  }
 
   /**
    * 요약 그림 띠 — 상태 분포 막대 + 이행률 도넛.
@@ -213,7 +226,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     const na = catalog.length - applicable;
     window.gijoViz.mount(자리, {
       title: "한눈에",
-      hint: "막대를 누르면 아래 목록이 그 상태만 남습니다",
+      hint: "누르면 목록이 좁혀집니다",
       parts: [
         {
           kind: "bars",
@@ -223,17 +236,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
             { key: "open", label: "미대응", value: open, color: "open" },
             { key: "na", label: "해당없음", value: na, color: "na" },
           ],
-          onPick: (key, seg) => {
-            상태필터 = key;
-            render();
-            window.gijoViz.filterBar(document.getElementById("vizFilter"), seg, catalog.length, () => {
-              상태필터 = null; render();
-            });
-          },
+          onPick: (key) => { 상태필터 = key; render(); },
         },
         { kind: "donut", value: covered, total: applicable, label: "이행률(해당분)" },
       ],
     });
+    필터띠();   // 다시 그릴 때마다 띠 숫자도 새로 낸다(해제했는데 띠가 남아 있던 것을 고침)
     // 다시 그린 뒤에도 고른 조각이 눌린 채로 보이게 한다(누르면 목록이 바뀌는데 그림이 초기화되면 혼란).
     if (상태필터) {
       const b = 자리.querySelector('.gviz-bar[data-key="' + 상태필터 + '"]');
@@ -256,12 +264,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     const cats = document.getElementById("catalog");
     cats.innerHTML = CATEGORY_ORDER.map((cat) => {
-      const items = catalog.filter((t) => t.category === cat).filter((t) => !상태필터 || t.status === 상태필터);
+      const 갈래전체 = catalog.filter((t) => t.category === cat);
+      const items = 갈래전체.filter((t) => !상태필터 || t.status === 상태필터);
       if (items.length === 0) return "";
       // 제목 줄을 눌러 갈래를 접었다 편다(2026-08-02 사용자 지시).
       // ⚠ 접혀도 **미대응 건수**는 남긴다 — 숫자 없이 접으면 "안에 뭐가 있는지 모르는 서랍"이 된다.
+      // ⚠ 미대응은 **갈래 전체**로 센다(2026-08-05 검토 지적). 걸러진 목록으로 세면
+      //   「대응완료」만 보는 순간 빨간 배지가 전부 사라져 미대응이 없는 것처럼 보인다.
       const 접힘 = 접힌갈래.has(cat);
-      const 미대응 = items.filter((t) => t.status === "open").length;
+      const 미대응 = 갈래전체.filter((t) => t.status === "open").length;
       return `<div style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px 20px;margin-bottom:16px;">
         <div class="cat-head" data-cat="${cat}" role="button" tabindex="0">
           <span class="car">${접힘 ? "▶" : "▼"}</span>
@@ -359,7 +370,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
 
 
-<script src="viz.js"></script>
+
 <script src="nav.js"></script>
 <script src="workflowrail.js"></script>
 <script src="progresscard.js"></script>

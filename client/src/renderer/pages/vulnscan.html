@@ -133,6 +133,7 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
 .tp-due{font-size:12px;color:var(--muted);}
 .tp-overdue{color:#f5928a;font-weight:800;}
 </style>
+<script src="viz.js"></script>
 </head>
 <body>
 
@@ -303,17 +304,37 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
   // 목록보다 그림이 먼저 눈에 들어오게. 그리는 일은 viz.js 한 곳에서만 한다
   // (화면마다 따로 그리면 같은 데이터인데 화면마다 숫자가 달라진다 — 지도에서 겪은 함정).
   let 심각도필터 = null;
+  const 심각도한글 = { critical: "긴급", high: "높음", medium: "보통", low: "낮음" };
+
+  // 필터 띠 — 목록 단위(호스트)로만 적는다. 막대 값(취약점 건수)은 막대 위에 이미 있다.
+  function 필터띠(assets, 자산별) {
+    if (!window.gijoViz) return;
+    const el = document.getElementById("vizFilter");
+    if (!심각도필터) { window.gijoViz.filterBar(el, null, null); return; }
+    const 보임 = assets.filter((a) => (자산별.get(a.id) || {})[심각도필터] > 0).length;
+    window.gijoViz.filterBar(el, { label: 심각도한글[심각도필터] || 심각도필터, 보임, 전체: assets.length, 단위: "호스트" }, () => {
+      심각도필터 = null;
+      document.querySelectorAll("#vizStrip .gviz-bar").forEach((b) => b.classList.remove("on"));
+      필터띠(assets, 자산별);
+      호스트줄그리기(assets, 자산별);
+      if (vheatOn) renderVHeat();
+    });
+  }
 
   function 그림띠(assets, totals, 자산별) {
     const 자리 = document.getElementById("vizStrip");
     if (!자리 || !window.gijoViz) return;   // viz.js가 없으면 목록만 보인다(화면은 살아 있어야 한다)
-    const 전체취약점 = (assets || []).reduce((n, a) => n + (a.findings || []).length, 0);
+    // ⚠ 도넛 분모와 막대 합의 모수를 맞춘다(2026-08-05 검토 지적). 막대는 fixed를 빼고 세므로
+    //   도넛도 같은 모수(fixed 제외 + fixed)로 잡되, 분모를 **막대 합 + 고친 것**으로 둔다.
+    //   그래야 담당자가 막대를 더해 봤을 때 분모에서 고친 수를 뺀 값과 맞아떨어진다.
+    const 남음 = totals.critical + totals.high + totals.medium + totals.low;
     const 고침 = (assets || []).reduce((n, a) => n + (a.findings || []).filter((f) => f.state === "fixed").length, 0);
-    const 좁히기 = () => 호스트줄그리기(assets, 자산별);
+    const 전체취약점 = 남음 + 고침;
+    const 좁히기 = () => { 호스트줄그리기(assets, 자산별); if (vheatOn) renderVHeat(); };
 
     window.gijoViz.mount(자리, {
       title: "한눈에",
-      hint: "막대를 누르면 아래 목록이 그 심각도만 남습니다",
+      hint: "누르면 목록이 좁혀집니다",
       parts: [
         {
           kind: "bars",
@@ -323,14 +344,9 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
             { key: "medium", label: "보통", value: totals.medium },
             { key: "low", label: "낮음", value: totals.low },
           ],
-          onPick: (key, seg) => {
+          onPick: (key) => {
             심각도필터 = key;
-            window.gijoViz.filterBar(document.getElementById("vizFilter"), seg, assets.length, () => {
-              심각도필터 = null;
-              자리.querySelectorAll(".gviz-bar").forEach((b) => b.classList.remove("on"));
-              window.gijoViz.filterBar(document.getElementById("vizFilter"), null, assets.length, null);
-              좁히기();
-            });
+            필터띠(assets, 자산별);
             좁히기();
           },
         },
@@ -344,6 +360,7 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
       const b = 자리.querySelector('.gviz-bar[data-key="' + 심각도필터 + '"]');
       if (b) b.classList.add("on");
     }
+    필터띠(assets, 자산별);   // 다시 그릴 때 띠 숫자도 같이 새로 낸다(낡은 숫자가 남지 않게)
   }
   // ──────────────────────────────────────────────────────────────────────────
 
@@ -372,11 +389,17 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
     if (!window.gijoMapView) return;
     const ctx = vheatCtx();
     // 취약점 있는 자산만 — 미스캔·양호 타일이 지도를 채우면 「급한 것」이 안 보인다.
-    const shown = hostCache.filter((a) => activeCount(a.findings) > 0);
+    // ⚠ 그림 띠에서 고른 심각도를 **히트맵도 따른다**(2026-08-05 검토 지적). 예전엔 목록만
+    //   좁혀져, 히트맵 보기(저장된 선택이라 들어오자마자 이 상태일 수 있다)에서 막대를 누르면
+    //   띠는 좁혔다고 말하는데 지도는 하나도 안 변했다 — 눌러도 아무 일 없는 자리였다.
+    const shown = hostCache.filter((a) => activeCount(a.findings) > 0)
+      .filter((a) => !심각도필터 || sevCounts(a.findings)[심각도필터] > 0);
     window.gijoMapView.render(document.getElementById("vheatMap"), shown, ctx);
     const 급한 = [...shown].sort((x, y) => activeCount(y.findings) - activeCount(x.findings))[0];
     if (급한) ctx.onDetail(급한);
-    else document.getElementById("vheatSide").innerHTML = '<div style="color:var(--muted)">조치할 취약점이 없습니다 — 스캔 결과를 올려 주세요.</div>';
+    else document.getElementById("vheatSide").innerHTML = '<div style="color:var(--muted)">' +
+      (심각도필터 ? "고른 심각도의 자산이 없습니다 — 위 「✕ 해제」를 누르면 전체가 다시 보입니다."
+                  : "조치할 취약점이 없습니다 — 스캔 결과를 올려 주세요.") + "</div>";
   }
   function setVView(heat) {
     vheatOn = heat;
@@ -592,7 +615,11 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
       //   (창 높이 776px) — 8줄이 표를 화면 밖으로 밀어냈다. 5줄로 줄이면 표가 안으로 들어온다.
       //   ⚠ 이 구역은 **접지 않는다** — 「오늘 뭐부터」가 이 화면의 존재 이유다.
       //   ⚠ 줄인 것을 숨기지 않는다 — 나머지가 어디 있는지 한 줄로 말한다.
-      const 보일줄 = 5;
+      // ★ 2026-08-05 재실측: 그림 띠(144px)가 들어오면서 첫 표 줄이 **853px**로 다시 창 밖으로
+      //   나갔다. 같은 목적(표를 창 안에)으로 3줄까지 줄인다 — 실측 구성은 진행바 84 + KPI 48 +
+      //   오늘의 조치 425 + 띠 144 + 보기전환 26이고, 425가 가장 큰 덩어리라 여기서 던다.
+      //   ⚠ 3줄은 「무엇부터」를 말하기에 충분하다(1위가 곧 답이다). 그 아래는 표에서 본다.
+      const 보일줄 = 3;
       const { items } = await window.gijo.listActionPriorities(보일줄);
       if (!items || !items.length) {
         box.innerHTML = '<span style="color:var(--muted-2)">조치 대상 취약점이 없습니다 — 스캔 결과를 업로드하세요.</span>';
@@ -715,7 +742,7 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
 
 
 
-<script src="viz.js"></script>
+
 <script src="nav.js"></script>
 <script src="workflowrail.js"></script>
 <script src="progresscard.js"></script>

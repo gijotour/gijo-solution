@@ -21,10 +21,13 @@
   // 밀도(칸 낭비 최소화가 첫째 기준): 제목 20 + 그림 74 + 여백 22 = 세로 116px.
   var 그림높이 = 74;
 
+  // 색은 **제품 테마 그대로** 쓴다(2026-08-05 검토 지적). 다른 팔레트를 들고 오면
+  // 같은 심각도가 표에서는 살구색, 그림에서는 빨강으로 보인다 — "같은 데이터는 같게 보인다"는
+  // 이 모듈의 존재 이유와 정면으로 어긋난다. 아래 값은 화면들의 .sev-* / :root와 같은 색이다.
   var 색 = {
-    critical: "#da3633", high: "#f85149", medium: "#d29922", low: "#3fb950", info: "#484f58",
-    covered: "#3fb950", partial: "#d29922", open: "#da3633", na: "#484f58",
-    ok: "#3fb950", warn: "#d29922", bad: "#f85149", idle: "#484f58", blue: "#1f6feb",
+    critical: "#f5928a", high: "#f7a86a", medium: "#f0a020", low: "#b3ada4", info: "#a49d95",
+    covered: "#1eb980", partial: "#f0a020", open: "#f5928a", na: "#a49d95",
+    ok: "#1eb980", warn: "#f0a020", bad: "#f5928a", idle: "#a49d95", blue: "#5fa1ff",
   };
   function 색값(k) { return 색[k] || k || "#484f58"; }
 
@@ -69,7 +72,10 @@
         '<span class="v">' + esc(짧은수(s.value)) + "</span>" +
         '<div class="b" style="height:' + h + "px;background:" + 색값(s.color || s.key) + '"></div>' +
         '<span class="l">' + esc(s.label) + "</span>";
-      b.title = s.label + " " + s.value.toLocaleString() + "건 — 누르면 이것만 봅니다";
+      // ⚠ 하지 않는 일을 약속하지 않는다(2026-08-05 검토 지적). 누를 수 없으면 "누르면"을
+      //   붙이지 않고, 누른 결과가 거르기가 아닌 화면은 그 화면이 문구를 준다(opt.누르면).
+      b.title = s.label + " " + s.value.toLocaleString() + (s.단위 || "건") +
+        (opt.onPick ? " — " + (opt.누르면 || "누르면 이것만 봅니다") : "");
       if (opt.onPick) {
         b.addEventListener("click", function () {
           var 이미 = b.classList.contains("on");
@@ -97,7 +103,7 @@
     var pct = Math.round((값 / 전체) * 100);
     var c = 색값(opt.color || (pct >= 80 ? "ok" : pct >= 50 ? "warn" : "bad"));
     w.innerHTML =
-      '<div class="gviz-donut" style="background:conic-gradient(' + c + " 0 " + pct + "%, #30363d " + pct + '% 100%)">' +
+      '<div class="gviz-donut" style="background:conic-gradient(' + c + " 0 " + pct + "%, var(--border-strong,rgba(255,255,255,.16)) " + pct + '% 100%)">' +
       '<div class="in">' + (opt.showRatio ? 값 + "/" + 전체 : pct + "%") + "</div></div>" +
       '<div class="cap">' + esc(opt.label || "") + "</div>";
     w.title = (opt.label || "") + " " + 값 + "/" + 전체 + " (" + pct + "%)";
@@ -168,17 +174,23 @@
 
   /**
    * 필터 띠 — 클릭한 조각을 알리고 **되돌릴 길을 함께 준다**(막다른 길 금지).
-   * el에 그린다. 고른 것이 없으면 지운다.
+   * filterBar(el, { label, 보임, 전체, 단위 }, onClear) — 고른 것이 없으면(null) 지운다.
+   *
+   * ⚠ 숫자는 **목록의 단위 하나로만** 적는다(2026-08-05 검토 지적). 예전엔 칩에 막대 값
+   *   (취약점 812건)을, 「전체」에 목록 값(호스트 46건)을 적어 한 줄에 단위가 둘이었다 —
+   *   무엇이 812이고 무엇이 46인지 읽는 사람이 알 길이 없었다.
+   *   막대 값은 막대 위에 이미 적혀 있으니, 이 띠는 "지금 목록에 몇이 남았나"만 말한다.
    */
-  function filterBar(el, 고른것, 전체수, onClear) {
+  function filterBar(el, 고른것, onClear) {
     if (!el) return;
     if (!고른것) { el.innerHTML = ""; el.style.display = "none"; return; }
+    var 단위 = 고른것.단위 || "건";
     el.style.display = "";
     el.className = "gviz-filter";
     el.innerHTML =
-      "<span>목록</span>" +
-      '<span class="chip">' + esc(고른것.label) + " " + 짧은수(고른것.value) + "건</span>" +
-      '<span class="x">✕ 해제 · 전체 ' + 짧은수(전체수) + "건 보기</span>";
+      '<span class="chip">' + esc(고른것.label) + "</span>" +
+      "<span>만 보는 중 — " + 단위 + " " + 짧은수(고른것.보임) + " / 전체 " + 짧은수(고른것.전체) + "</span>" +
+      '<span class="x">✕ 해제 · 전체 보기</span>';
     var x = el.querySelector(".x");
     if (x && onClear) x.addEventListener("click", onClear);
   }
@@ -194,38 +206,40 @@
     var s = document.createElement("style");
     s.id = "gviz-style";
     s.textContent = [
-      ".gviz{background:var(--panel,#0f141a);border:1px solid var(--line,#30363d);border-radius:6px;padding:10px 12px 8px;margin-bottom:8px}",
+      // ⚠ 제품에 있는 변수만 쓴다(--line·--fg는 이 제품 테마에 없다 — 폴백 색으로 그려져
+      //   띠만 옆 판과 다른 색이 됐다, 2026-08-05 검토 지적).
+      ".gviz{background:var(--panel,#30302e);border:1px solid var(--border,rgba(255,255,255,.08));border-radius:6px;padding:10px 12px 8px;margin-bottom:8px}",
       ".gviz-head{display:flex;align-items:center;gap:8px;height:20px;margin-bottom:8px}",
-      ".gviz-t{color:var(--fg,#e6edf3);font-weight:bold;font-size:12px}",
-      ".gviz-hint{color:var(--muted-2,#6e7681);font-size:11px;margin-left:auto}",
+      ".gviz-t{color:var(--text,#e9e7e2);font-weight:bold;font-size:12px}",
+      ".gviz-hint{color:var(--muted-2,#a49d95);font-size:11px;margin-left:auto}",
       ".gviz-row{display:flex;gap:14px;align-items:flex-end;flex-wrap:wrap}",
       ".gviz-bars{display:flex;gap:6px;align-items:flex-end;height:" + 그림높이 + "px}",
       ".gviz-bar{width:44px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;cursor:pointer}",
-      ".gviz-bar .v{font-size:11px;color:var(--fg,#c9d1d9);margin-bottom:2px}",
+      ".gviz-bar .v{font-size:11px;color:var(--text,#e9e7e2);margin-bottom:2px}",
       ".gviz-bar .b{width:100%;border-radius:3px 3px 0 0;transition:.12s}",
-      ".gviz-bar .l{font-size:11px;color:var(--muted,#8b949e);margin-top:3px;height:13px}",
+      ".gviz-bar .l{font-size:11px;color:var(--muted,#b3ada4);margin-top:3px;height:13px}",
       ".gviz-bar:hover .b{filter:brightness(1.35)}",
-      ".gviz-bar.on .b{outline:2px solid #58a6ff;outline-offset:1px}",
+      ".gviz-bar.on .b{outline:2px solid var(--blue-light,#5fa1ff);outline-offset:1px}",
       ".gviz-donut-w{text-align:center}",
       ".gviz-donut{width:" + 그림높이 + "px;height:" + 그림높이 + "px;border-radius:50%;display:grid;place-items:center}",
-      ".gviz-donut .in{width:52px;height:52px;border-radius:50%;background:var(--panel,#0f141a);display:grid;place-items:center;font-size:13px;color:var(--fg,#e6edf3);font-weight:bold}",
-      ".gviz-donut-none{background:#30363d}",
-      ".gviz-donut-none .in{color:var(--muted,#8b949e)}",
-      ".gviz .cap{font-size:11px;color:var(--muted,#8b949e);margin-top:3px}",
-      ".gviz-muted{color:var(--muted-2,#6e7681)}",
+      ".gviz-donut .in{width:52px;height:52px;border-radius:50%;background:var(--panel,#30302e);display:grid;place-items:center;font-size:13px;color:var(--text,#e9e7e2);font-weight:bold}",
+      ".gviz-donut-none{background:var(--border-strong,rgba(255,255,255,.16))}",
+      ".gviz-donut-none .in{color:var(--muted,#b3ada4)}",
+      ".gviz .cap{font-size:11px;color:var(--muted,#b3ada4);margin-top:3px}",
+      ".gviz-muted{color:var(--muted-2,#a49d95)}",
       ".gviz-spark{display:flex;align-items:flex-end;gap:2px;height:" + (그림높이 - 14) + "px}",
-      ".gviz-spark i{width:7px;background:#1f6feb;border-radius:1px 1px 0 0;display:block}",
+      ".gviz-spark i{width:7px;background:var(--blue,#3b82f6);border-radius:1px 1px 0 0;display:block}",
       ".gviz-spark-w{text-align:center}",
       ".gviz-grid{display:flex;flex-wrap:wrap;gap:3px;max-width:240px}",
       ".gviz-cell{width:15px;height:15px;border-radius:2px}",
-      ".gviz-cell:hover{outline:1px solid #58a6ff}",
-      ".gviz-cell.on{outline:2px solid #58a6ff}",
+      ".gviz-cell:hover{outline:1px solid var(--blue-light,#5fa1ff)}",
+      ".gviz-cell.on{outline:2px solid var(--blue-light,#5fa1ff)}",
       ".gviz-legend{max-width:240px}",
-      ".gviz-empty{color:var(--muted-2,#6e7681);font-size:11px;height:" + 그림높이 + "px;display:flex;align-items:center}",
-      ".gviz-filter{display:flex;align-items:center;gap:6px;height:26px;padding:0 10px;background:var(--panel-2,#161b22);border:1px solid #1f6feb;border-radius:6px 6px 0 0;font-size:12px;margin-bottom:0}",
-      ".gviz-filter .chip{background:rgba(31,111,235,.14);border:1px solid #1f6feb;color:#79c0ff;border-radius:10px;padding:1px 8px;font-size:11px}",
-      ".gviz-filter .x{margin-left:auto;color:var(--muted,#8b949e);cursor:pointer;font-size:11px}",
-      ".gviz-filter .x:hover{color:#79c0ff}",
+      ".gviz-empty{color:var(--muted-2,#a49d95);font-size:11px;height:" + 그림높이 + "px;display:flex;align-items:center}",
+      ".gviz-filter{display:flex;align-items:center;gap:6px;height:26px;padding:0 10px;background:var(--panel-2,#1f1e1d);border:1px solid var(--blue,#3b82f6);border-radius:6px 6px 0 0;font-size:12px;margin-bottom:0}",
+      ".gviz-filter .chip{background:rgba(31,111,235,.14);border:1px solid var(--blue,#3b82f6);color:var(--blue-light,#5fa1ff);border-radius:10px;padding:1px 8px;font-size:11px}",
+      ".gviz-filter .x{margin-left:auto;color:var(--muted,#b3ada4);cursor:pointer;font-size:11px}",
+      ".gviz-filter .x:hover{color:var(--blue-light,#5fa1ff)}",
     ].join("");
     document.head.appendChild(s);
   }
