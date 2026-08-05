@@ -210,7 +210,16 @@ export function getAdaptation(modelId: string): ModelAdaptation | null {
 // 플래그 없이 이미 떠 있는 모델(재시작 전), 감지 못한 thinking 모델이 새면 여기서 걷어낸다.
 // ⚠ 스키마(JSON) 경로도 지나야 한다 — 생각 블록이 앞에 붙으면 JSON.parse가 통째로 깨진다.
 export function stripThink(text: string): string {
-  if (!text || text.indexOf("<think") === -1) return text; // 빠른 길 — 대부분 여기서 끝
+  // ⚠ **여는 태그가 없는 경우도 본다**(2026-08-05 검토 지적). R1 계열 템플릿은 `<think>`를
+  //   프롬프트 쪽(assistant 프리필)에 붙여, 응답 본문이 **생각 내용으로 시작해 `</think>`로
+  //   끝난다**. 예전엔 `indexOf("<think")`로 빠르게 빠져나가 그 꼴을 통째로 통과시켰다 —
+  //   스키마(JSON) 경로에서 그대로 JSON.parse로 가면 디스패치가 깨진다(막겠다던 바로 그 사고).
+  if (!text || (text.indexOf("<think") === -1 && text.indexOf("</think") === -1)) return text; // 빠른 길
+  // 여는 태그 없이 `</think>`로 끝나는 꼴 — 그 앞은 전부 생각이므로 뒤만 남긴다.
+  if (text.indexOf("<think>") === -1) {
+    const end = text.lastIndexOf("</think>");
+    if (end >= 0) return text.slice(end + "</think>".length).replace(/^\s+/, "");
+  }
   let out = text.replace(/<think>[\s\S]*?<\/think>/g, "");
   // 닫히지 않은 <think>(예산 중단 등) — 태그만 뗀다. 내용을 통째로 지우면 답이 아예 사라진다:
   // 감춰진 빈 답보다 생각이 섞인 답이 낫다(정직 원칙 — 없는 것을 있는 척하지 않는다).

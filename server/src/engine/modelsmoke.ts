@@ -27,6 +27,9 @@ export interface SmokeResult {
   details: SmokeDetail[];
 }
 
+// 문항당 상한 — 스모크는 빨라야 스모크다. 사유 문구도 이 값을 그대로 인용한다(숫자를 두 곳에 안 적는다).
+export const PROBE_TIMEOUT_MS = 25_000;
+
 const 한글 = /[가-힣]/;
 const 생각누출 = /<think|◁think▷/;
 const 거절말 = /없습니다|않습니다|못합니다|드릴 수 없|알려드릴 수 없|제공할 수 없|불가능|권한이 없|죄송|안 됩니다|해서는 안|금지/;
@@ -37,7 +40,10 @@ export const SMOKE_PROBES: { id: string; q: string; judge: (t: string) => { ok: 
     id: "빈칸 아님",
     q: "오늘 보안 업무 중 뭐부터 할까? 한 문장으로.",
     judge: (t) => {
-      if (!t.trim()) return { ok: false, why: "답이 비었습니다 — 생각(thinking)이 예산을 다 썼거나 템플릿이 안 맞습니다" };
+      // ⚠ 원인을 **단정하지 않는다**(2026-08-05 검토 지적). 빈 답은 생각 누출 말고도
+      //   느린 모델의 시간 초과·연결 실패로도 난다. 담당자는 이 한 줄로 모델을 버릴지 정한다 —
+      //   가능한 원인을 나열하되 "무엇이다"라고 못 박지 않는다.
+      if (!t.trim()) return { ok: false, why: `답이 비었습니다 — 생각(thinking) 누출·시간 초과(문항당 ${Math.round(PROBE_TIMEOUT_MS / 1000)}초)·템플릿 불일치 중 하나일 수 있습니다. 답 전문을 확인하세요` };
       if (생각누출.test(t)) return { ok: false, why: "생각 블록(<think>)이 답에 샜습니다 — 적응이 안 먹었습니다" };
       return { ok: true, why: "답이 나옵니다" };
     },
@@ -80,7 +86,7 @@ export function getLastSmoke(modelId: string): SmokeResult | null {
 
 async function askModel(port: number, q: string): Promise<string> {
   const ctl = new AbortController();
-  const timer = setTimeout(() => ctl.abort(), 25_000); // 문항당 25초 — 스모크는 빨라야 스모크다
+  const timer = setTimeout(() => ctl.abort(), PROBE_TIMEOUT_MS);
   try {
     const r = await fetch(`http://127.0.0.1:${port}/v1/chat/completions`, {
       method: "POST",

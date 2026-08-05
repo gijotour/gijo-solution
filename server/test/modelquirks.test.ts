@@ -215,6 +215,20 @@ describe("생각 블록 안전망(stripThink)", () => {
   it("닫히지 않은 태그는 태그만 뗀다 — 내용을 통째로 지우면 답이 사라진다(정직)", () => {
     expect(stripThink("<think>중단된 생각과 답")).toBe("중단된 생각과 답");
   });
+  // ★ 2026-08-05 검토관 발견: R1 계열은 여는 `<think>`가 **프롬프트 쪽**에 붙어, 응답이
+  //   생각 내용으로 시작해 `</think>`로 끝난다. 예전 빠른 길이 그 꼴을 통째로 통과시켰다.
+  it("여는 태그 없이 </think>로 끝나는 꼴도 걷어낸다 (R1 프리필 템플릿)", () => {
+    expect(stripThink("사용자가 무엇을 원하나 생각중… </think>답은 42")).toBe("답은 42");
+    expect(stripThink(' 고민 </think>{"tool":"today"}')).toBe('{"tool":"today"}'); // JSON 경로 보호
+    expect(stripThink("생각1 </think> 중간 </think> 최종")).toBe("최종"); // 마지막 닫기 기준
+  });
+
+  it("재생성(드리프트 retry) 경로도 안전망을 지난다", () => {
+    const src = fs.readFileSync(path.join(__dirname, "../src/engine/llm.ts"), "utf8");
+    expect(src, "retryReply가 stripThink를 안 지난다 — R1류가 자주 타는 경로다")
+      .toMatch(/retryReply\s*=\s*stripScaffoldEcho\(stripLeadingPreamble\(stripThink\(/);
+  });
+
   it("생각 없는 답은 그대로 (빠른 길)", () => {
     const s = "평범한 답입니다.";
     expect(stripThink(s)).toBe(s);

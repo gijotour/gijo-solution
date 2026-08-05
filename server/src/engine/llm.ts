@@ -677,7 +677,10 @@ export async function chat(args: ChatArgs): Promise<string> {
     }).catch(() => null); // 재작성 실패·시간 초과면 원래 답을 그대로 쓴다
     if (retryRes && retryRes.ok) {
       const retryData = (await retryRes.json()) as { choices?: { message?: { content?: string } }[] };
-      const retryReply = stripScaffoldEcho(stripLeadingPreamble(retryData.choices?.[0]?.message?.content ?? ""));
+      // ⚠ 재생성 답도 **생각 블록 안전망을 지난다**(2026-08-05 검토 지적). 여기가 빠져 있었는데
+      //   하필 이 경로(영어 드리프트 재생성)는 **R1류 thinking 모델이 자주 타는 자리**다 —
+      //   감지 못한 모델의 <think>가 그대로 화면에 나갈 수 있었다. 안전망은 두 파싱 지점 모두에.
+      const retryReply = stripScaffoldEcho(stripLeadingPreamble(stripThink(retryData.choices?.[0]?.message?.content ?? "")));
       if (retryReply && drift.isBetter(retryReply, reply)) reply = retryReply;
     }
 

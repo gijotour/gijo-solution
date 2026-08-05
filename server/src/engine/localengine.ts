@@ -447,7 +447,25 @@ export async function stopLocalEngine(): Promise<void> {
 function reapOrphanEngines(): void {
   if (process.platform === "win32") return; // 운영은 리눅스(WSL) — 개발 머신에서는 건너뛴다
   try {
-    // 우리가 방금 띄운 것은 아직 없다(부팅 시점) — 채팅 모델 프로세스는 전부 고아다.
+    // ⚠⚠ **다른 GIJO 서버가 이미 돌고 있으면 정리하지 않는다**(2026-08-05 실사고).
+    //   "부팅 시점이니 채팅 모델은 전부 고아"라는 가정은 **서버가 하나일 때만** 참이다.
+    //   에어갭 봉인을 실증하려고 별 포트(4100)·별 DB로 임시 인스턴스를 띄웠더니, 그 부팅이
+    //   **운영(4000)이 띄운 llama-server 2개를 고아로 보고 죽였다**. 포트·DB를 갈라도
+    //   llama 자식은 공유 자원이라 격리가 안 된다 — 담당자 전원의 채팅이 조용히 멎는다.
+    //   살아 있는 형제가 있으면 그 자식이 누구 것인지 우리는 알 수 없다. **모르면 안 죽인다.**
+    const 형제 = execFileSync("pgrep", ["-af", "node"], { encoding: "utf-8" })
+      .split("\n")
+      .filter((l) => /dist[/\\]index\.js/.test(l) && !l.includes("pgrep"))
+      .map((l) => Number(l.trim().split(/\s+/)[0]))
+      .filter((pid) => Number.isFinite(pid) && pid !== process.pid);
+    if (형제.length) {
+      console.warn(
+        `[localengine] 다른 GIJO 서버가 돌고 있어(pid ${형제.join(", ")}) 고아 정리를 건너뜁니다 — ` +
+        "한 머신에서 서버 둘을 띄우면 서로의 llama-server를 죽입니다. 시험용이면 운영을 먼저 내리세요."
+      );
+      return;
+    }
+    // 형제가 없으면 채팅 모델 프로세스는 전부 고아다(우리가 방금 띄운 것은 아직 없다).
     const out = execFileSync("pgrep", ["-af", "llama-server"], { encoding: "utf-8" });
     const orphans = out
       .split("\n")

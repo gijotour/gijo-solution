@@ -64,23 +64,57 @@ describe("에어갭 — 내부/외부 판정(default-deny)", () => {
 });
 
 describe("에어갭 카탈로그 — 실제 외부 호출을 다 덮는다(봉인 사각지대 방지)", () => {
-  it("코드의 외부 https 호출 호스트가 모두 EGRESS_POINTS에 있다", () => {
+  // ⚠ **engine/ 전체를 훑는다**(2026-08-05 검토 지적으로 넓힘). 예전엔 파일 7개를 손으로
+  //   적어 뒀는데, 그건 **이미 카탈로그에 있는 것만 다시 확인**하는 꼴이었다 —
+  //   새 파일이 외부로 나가면 시험은 조용히 통과한다. 사각지대 방지가 목적인 감시가
+  //   사각지대를 못 보면 없느니만 못하다. http도 함께 본다(외부 평문 호출도 통로다).
+  it("engine 전체에서 외부 호출 호스트가 모두 EGRESS_POINTS에 있다 (파일을 손으로 적지 않는다)", () => {
     const dir = path.join(__dirname, "../src/engine");
-    // fetch로 외부에 나가는 파일들 — 새 파일이 생기면 여기에 더한다(그 자체가 검토 지점).
-    const files = ["cloudllm.ts", "cti.ts", "kev.ts", "lawinfo.ts", "hfmodels.ts", "modelauth.ts", "reposcan.ts"];
-    const catalog = EGRESS_POINTS.map((p) => p.host).join(" ");
+    const catalog = EGRESS_POINTS.map((p) => p.host).join(" ").toLowerCase();
     const missing: string[] = [];
-    for (const f of files) {
+    let 훑은파일 = 0;
+    for (const f of fs.readdirSync(dir).filter((x) => x.endsWith(".ts"))) {
       const src = fs.readFileSync(path.join(dir, f), "utf8")
-        .split("\n").filter((l) => !/^\s*(\/\/|\*)/.test(l)).join("\n"); // 주석 줄 제외(문서 URL 오탐 방지)
-      for (const u of src.match(/https:\/\/[a-zA-Z0-9.-]+/g) ?? []) {
-        const host = u.replace("https://", "").toLowerCase();
-        if (host.endsWith(".local")) continue;            // 내부망 예시(gitlab.mycorp.local)
+        .split("\n").filter((l) => !/^\s*(\/\/|\*|\/\*)/.test(l)).join("\n"); // 주석 줄 제외(문서 URL 오탐)
+      훑은파일++;
+      // ⚠ **나가는 호출만** 본다. URL 문자열이 코드에 있다고 다 통로가 아니다 —
+      //   SPDX documentNamespace(문서 식별자)나 지식 문서 본문에 실린 참고 URL은 접속하지 않는다.
+      //   그래서 "fetch(…" / "axios(…" 같은 **호출 자리에 붙은 URL**만 대조한다.
+      //   (소켓 통로는 호스트가 설정값이라 이 정규식으로 안 잡히고, 카탈로그·별도 시험이 덮는다.)
+      const 호출 = src.match(/\b(?:fetch|axios(?:\.\w+)?|got|request)\s*\(\s*[`'"]https?:\/\/[a-zA-Z0-9.-]+/g) ?? [];
+      for (const m of 호출) {
+        const host = (m.match(/https?:\/\/([a-zA-Z0-9.-]+)/) ?? [])[1]?.toLowerCase() ?? "";
+        if (!host) continue;
+        if (host.endsWith(".local") || host.endsWith(".internal")) continue; // 내부망 예시
+        if (host === "localhost" || host.startsWith("127.") || host === "0.0.0.0") continue;
         if (isPrivateIp(host)) continue;                  // 사설 IP는 봉인 대상 아님
-        if (!catalog.toLowerCase().includes(host)) missing.push(`${f}: ${host}`);
+        if (!catalog.includes(host)) missing.push(`${f}: ${host}`);
       }
     }
+    expect(훑은파일, "engine 디렉터리를 못 읽었다 — 이 감시가 헛돌고 있다").toBeGreaterThan(50);
     expect(missing, `카탈로그에 없는 외부 호스트(봉인 사각지대):\n  ${missing.join("\n  ")}`).toEqual([]);
+  });
+
+  // ⚠ **이 감시가 실제로 잡을 수 있는지**를 잰다. 통과만 하고 아무것도 못 보는 감시가
+  //   가장 위험하다(넓히기 전 버전이 딱 그랬다 — 파일 7개를 손으로 적어 새 파일을 못 봤다).
+  it("감시가 새 사각지대를 실제로 잡는다 (일부러 만든 미등록 호출)", () => {
+    const dir = path.join(__dirname, "../src/engine");
+    const 가짜 = path.join(dir, "__airgap_probe_tmp.ts");
+    fs.writeFileSync(가짜, 'export const x = () => fetch("https://telemetry.notinthecatalog.example/beacon");\n');
+    try {
+      const catalog = EGRESS_POINTS.map((p) => p.host).join(" ").toLowerCase();
+      const found: string[] = [];
+      for (const f of fs.readdirSync(dir).filter((x) => x.endsWith(".ts"))) {
+        const src = fs.readFileSync(path.join(dir, f), "utf8");
+        for (const m of src.match(/\b(?:fetch|axios(?:\.\w+)?|got|request)\s*\(\s*[`'"]https?:\/\/[a-zA-Z0-9.-]+/g) ?? []) {
+          const host = (m.match(/https?:\/\/([a-zA-Z0-9.-]+)/) ?? [])[1]?.toLowerCase() ?? "";
+          if (host && !catalog.includes(host) && !host.endsWith(".local")) found.push(host);
+        }
+      }
+      expect(found, "새 외부 호출을 못 잡는다 — 감시가 헛돌고 있다").toContain("telemetry.notinthecatalog.example");
+    } finally {
+      fs.rmSync(가짜, { force: true }); // 흔적을 남기지 않는다
+    }
   });
 
   // ★ 2026-08-05 검토관 발견(중간): fetch·소켓 관문은 **우리 프로세스 안**에서만 돈다.
@@ -109,6 +143,20 @@ describe("에어갭 카탈로그 — 실제 외부 호출을 다 덮는다(봉�
     const 문구 = src.slice(i, i + 600);
     expect(문구).toContain("제품이 직접 여는");   // 범위 명시
     expect(문구).toContain("완전한 차단은 아닙니다"); // 한계 명시
+  });
+
+  // ★ 2026-08-05 실사고: 봉인 실증용 임시 인스턴스(별 포트·별 DB)가 **운영의 llama-server를
+  //   고아로 보고 죽였다**. 포트·DB를 갈라도 llama 자식은 공유 자원이라 격리가 안 된다.
+  it("다른 GIJO 서버가 살아 있으면 고아 정리를 건너뛴다 (형제의 자식을 죽이지 않는다)", () => {
+    const src = fs.readFileSync(path.join(__dirname, "../src/engine/localengine.ts"), "utf8");
+    const i = src.indexOf("function reapOrphanEngines");
+    expect(i, "고아 정리 함수를 못 찾았다 — 이 감시가 헛돌고 있다").toBeGreaterThan(0);
+    const 본문 = src.slice(i, i + 2000);
+    expect(본문, "형제 서버 탐지가 없다").toMatch(/pgrep[\s\S]{0,80}node/);
+    expect(본문, "형제가 있으면 조기 반환해야 한다").toMatch(/형제\.length[\s\S]{0,400}return;/);
+    // 형제 확인이 **kill보다 먼저**여야 의미가 있다
+    expect(본문.indexOf("형제.length"), "형제 확인이 kill보다 뒤면 이미 죽인 뒤다")
+      .toBeLessThan(본문.indexOf("process.kill"));
   });
 
   it("이 대조가 헛돌지 않는다 — 카탈로그가 비지 않았다", () => {
