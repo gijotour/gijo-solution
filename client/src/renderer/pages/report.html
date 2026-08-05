@@ -199,7 +199,12 @@ tr:last-child td{border-bottom:none;}
     <div class="panel">
       <div style="display:flex;align-items:flex-start;gap:12px;">
         <div style="flex:1;">
-          <div class="panel-title">리포트 이력</div></div>
+          <div class="panel-title">리포트 이력</div>
+          <!-- 그림 먼저(전-7 ①, 2026-08-05). 이력이 쌓이면 어떤 리포트를 주로 쓰는지가
+               표 스크롤 속에 묻힌다 — 유형별로 세워 두고 눌러서 그 유형만 본다. -->
+          <div id="vizStrip" style="margin-top:8px"></div>
+          <div id="vizFilter" style="display:none"></div>
+        </div>
         <div style="display:flex;align-items:center;gap:6px;white-space:nowrap;padding-top:2px;">
           <span style="font-size:12.5px;color:var(--muted)">오래된 리포트 정리</span>
           <select id="pruneDays" style="font-size:12.5px;background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);border-radius:6px;padding:4px 7px;outline:none;">
@@ -450,9 +455,51 @@ tr:last-child td{border-bottom:none;}
 
   function esc(s) { return String(s == null ? "" : s).replace(/[&<]/g, (c) => (c === "&" ? "&amp;" : "&lt;")); }
 
+  // ── 그림 먼저(전-7 ①, 2026-08-05) ──────────────────────────────────────
+  let 유형필터 = null;
+
+  function 그림띠() {
+    const 자리 = document.getElementById("vizStrip");
+    if (!자리 || !window.gijoViz) return;
+    const 유형별 = {};
+    historyReports.forEach((r) => { 유형별[r.type] = (유형별[r.type] || 0) + 1; });
+    const 키들 = Object.keys(유형별).sort((a, b) => 유형별[b] - 유형별[a]);
+    window.gijoViz.mount(자리, {
+      title: "무엇을 많이 만들었나",
+      hint: 키들.length ? "막대를 누르면 아래 이력이 그 유형만 남습니다" : "",
+      parts: [{
+        kind: "bars",
+        segments: 키들.map((t) => ({ key: t, label: (TYPE_LABEL[t] || t).replace("정기 · ", ""), value: 유형별[t], color: "blue" })),
+        onPick: (key, seg) => {
+          유형필터 = key;
+          window.gijoViz.filterBar(document.getElementById("vizFilter"), seg, historyReports.length, () => {
+            유형필터 = null;
+            자리.querySelectorAll(".gviz-bar").forEach((b) => b.classList.remove("on"));
+            window.gijoViz.filterBar(document.getElementById("vizFilter"), null, historyReports.length, null);
+            줄그리기();
+          });
+          줄그리기();
+        },
+      }],
+    });
+    if (유형필터) {
+      const b = 자리.querySelector('.gviz-bar[data-key="' + 유형필터 + '"]');
+      if (b) b.classList.add("on");
+    }
+  }
+  // ───────────────────────────────────────────────────────────────────────
+
   function renderReportRows() {
+    그림띠();
+    줄그리기();
+  }
+
+  function 줄그리기() {
+    const 보일것 = 유형필터 ? historyReports.filter((r) => r.type === 유형필터) : historyReports;
     if (historyReports.length === 0) {
       reportRows.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">아직 생성한 리포트가 없습니다 — "+ 리포트 생성"으로 만들어 보세요</td></tr>';
+    } else if (보일것.length === 0) {
+      reportRows.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">고른 유형의 리포트가 없습니다 — 위 「✕ 해제」를 누르면 전체가 다시 보입니다.</td></tr>';
     } else {
       const dlBtn = (name) =>
         `<button class="rep-dl" data-name="${name}" style="font-size:12.25px;background:var(--panel-2);border:1px solid var(--border-strong);color:var(--blue-light);border-radius:6px;padding:4px 9px;cursor:pointer;margin-right:5px;">${/\.pdf$/i.test(name) ? "📄 PDF" : "📥 DOCX"}</button>`;
@@ -475,7 +522,7 @@ tr:last-child td{border-bottom:none;}
           전체: 목록.join(", "),
         };
       };
-      reportRows.innerHTML = historyReports
+      reportRows.innerHTML = 보일것
         .map((r) => {
           const audLabel = r.audience === "internal" ? "🔍 내부용" : "📄 보고용";
           const target = 대상요약(r);
@@ -844,6 +891,7 @@ tr:last-child td{border-bottom:none;}
 
 
 
+<script src="viz.js"></script>
 <script src="nav.js"></script>
 <script src="workflowrail.js"></script>
 <script src="progresscard.js"></script>

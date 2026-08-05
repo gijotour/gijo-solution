@@ -162,6 +162,11 @@ tr:last-child td{border-bottom:none;}
   <span class="bom-dim">· 컴포넌트 <b id="kpiComponents">-</b> · 라이선스 <b id="kpiLicenses">-</b>종</span>
 </div>
 
+<!-- 그림 먼저(전-7 ①, 2026-08-05). 위 한 줄은 "라이선스 N종"까지만 말한다 —
+     어떤 라이선스가 얼마나 쓰이는지는 배포 가능 여부를 가르는 값이라 그림으로 먼저 보여 준다. -->
+<div id="vizStrip"></div>
+<div id="vizFilter" style="display:none"></div>
+
 <!-- Shadow AI — 미등록 AI 모델(통합 뷰에서 이관 2026-07-26). 발견 시에만 표시. -->
 <div id="shadowAiBanner" style="display:none;margin-bottom:14px;background:rgba(240,160,32,0.08);border:1px solid rgba(240,160,32,0.4);border-radius:12px;padding:12px 16px;">
   <div style="display:flex;align-items:center;gap:8px;font-size:13px;font-weight:800;color:#f7c777;margin-bottom:6px;">🕵 Shadow AI — 미등록 AI 모델 <span id="shadowAiCount"></span></div>
@@ -301,6 +306,8 @@ tr:last-child td{border-bottom:none;}
       if (q && !a.name.toLowerCase().includes(q)) return false;
       if (activeFilter === "generated" && !a.sbomGeneratedAt) return false;
       if (activeFilter === "missing" && a.sbomGeneratedAt) return false;
+      // 그림 띠에서 라이선스를 골랐으면 그 라이선스를 쓰는 자산만(전-7 ①, 2026-08-05)
+      if (라이선스필터 && !(a.components || []).some((c) => 라이선스이름(c.license) === 라이선스필터)) return false;
       return true;
     });
   }
@@ -604,6 +611,70 @@ tr:last-child td{border-bottom:none;}
     }
   }
 
+  // ── 그림 먼저(전-7 ①, 2026-08-05) ──────────────────────────────────────
+  // 위 한 줄 요약은 "라이선스 N종"까지만 말한다 — **어떤 라이선스가 많은지**는 어디에도 없었다.
+  // 라이선스는 배포 가능 여부를 가르는 값이라 그림으로 먼저 보여 준다.
+  let 라이선스필터 = null;
+  const 미상 = "미상";
+  // "-" · 빈칸 · 없는 필드는 전부 「미상」 하나로 묶는다(표기만 다른 같은 상태다).
+  const 라이선스이름 = (v) => {
+    const s = String(v == null ? "" : v).trim();
+    return (!s || s === "-" || s === "NOASSERTION" || s === "unknown") ? 미상 : s;
+  };
+
+  function 그림띠() {
+    const 자리 = document.getElementById("vizStrip");
+    if (!자리 || !window.gijoViz) return;
+    const 생성됨 = allAssets.filter((a) => a.sbomGeneratedAt).length;
+    // ⚠ 실측(2026-08-05): 운영 데이터 844개 컴포넌트의 라이선스가 **전부 문자 "-"** 였다.
+    //   빈 값을 조용히 버리면 "라이선스 정보 없음"이라는 사실 자체가 화면에서 사라진다 —
+    //   버리지 말고 「미상」이라 이름 붙여 그린다. 그래야 채워 넣을 일이 있다는 게 보인다.
+    const 라이선스별 = {};
+    allAssets.forEach((a) => (a.components || []).forEach((c) => {
+      const L = 라이선스이름(c.license);
+      라이선스별[L] = (라이선스별[L] || 0) + 1;
+    }));
+    const 상위 = Object.keys(라이선스별).sort((x, y) => 라이선스별[y] - 라이선스별[x]).slice(0, 6);
+    const 미상뿐 = 상위.length === 1 && 상위[0] === 미상;
+    // ⚠ 기준을 **화면에 적는다**(2026-08-05 실측). 위 한 줄 요약의 「컴포넌트」는 *SBOM 도장을 찍은
+    //   자산만* 세어 4인데, 라이선스는 부품 정보가 있는 자산 전체(43개·844부품)로 봐야 뜻이 있다.
+    //   같은 화면에 4와 844가 같이 있으면 무엇을 믿을지 알 수 없으므로, 기준이 다르다고 말한다.
+    const 부품있는자산 = allAssets.filter((a) => (a.components || []).length > 0).length;
+    const 총부품 = allAssets.reduce((n, a) => n + (a.components || []).length, 0);
+
+    window.gijoViz.mount(자리, {
+      title: "한눈에",
+      hint: !상위.length ? ""
+        : (미상뿐 ? "⚠ 부품에 라이선스 정보가 하나도 없습니다 — 스캐너·입력 자료를 확인하세요"
+                  : "막대를 누르면 아래 목록이 그 라이선스를 쓰는 자산만 남습니다")
+          + ` · 라이선스는 부품 정보가 있는 자산 ${부품있는자산}개(부품 ${총부품.toLocaleString()}개) 기준`,
+      parts: [
+        { kind: "donut", value: 생성됨, total: allAssets.length, label: "SBOM 생성", showRatio: true },
+        {
+          kind: "bars",
+          segments: 상위.map((L) => ({
+            key: L, label: L.length > 8 ? L.slice(0, 8) + "…" : L, value: 라이선스별[L], color: "blue",
+          })),
+          onPick: (key, seg) => {
+            라이선스필터 = key;
+            window.gijoViz.filterBar(document.getElementById("vizFilter"), seg, allAssets.length, () => {
+              라이선스필터 = null;
+              자리.querySelectorAll(".gviz-bar").forEach((b) => b.classList.remove("on"));
+              window.gijoViz.filterBar(document.getElementById("vizFilter"), null, allAssets.length, null);
+              render();
+            });
+            render();
+          },
+        },
+      ],
+    });
+    if (라이선스필터) {
+      const b = 자리.querySelector('.gviz-bar[data-key="' + (window.CSS && CSS.escape ? CSS.escape(라이선스필터) : 라이선스필터) + '"]');
+      if (b) b.classList.add("on");
+    }
+  }
+  // ───────────────────────────────────────────────────────────────────────
+
   function render() {
     const filtered = applyFilters(allAssets);
     if (filtered.length === 0) {
@@ -642,6 +713,7 @@ tr:last-child td{border-bottom:none;}
 
   async function refresh() {
     allAssets = await window.gijo.listAssets();
+    그림띠();
     render();
     renderAiAssets(); // AI 자산 목록(이 화면의 주인공, 2026-07-26 통합)
   }
@@ -790,6 +862,7 @@ tr:last-child td{border-bottom:none;}
 
 
 
+<script src="viz.js"></script>
 <script src="nav.js"></script>
 <script src="workflowrail.js"></script>
 <script src="progresscard.js"></script>

@@ -195,7 +195,20 @@
     }, 1000);
   }
 
-  window.gijoFold = { scan: scan, refresh: function () { entries.forEach(paintBadges); } };
+  // 이름으로 구역을 펼친다(2026-08-05, 전-7 ①). 그림 띠에서 조각을 눌렀는데 결과가 담긴
+  // 구역이 접혀 있으면 **눌러도 아무 일 없는 자리**가 된다 — 화면이 스스로 펼칠 길을 준다.
+  // 담당자가 접어 둔 기억은 건드리지 않는다(remember=false) — 이번 한 번만 펼친다.
+  function open(name) {
+    var found = false;
+    entries.forEach(function (e) {
+      if (e.name !== name) return;
+      found = true;
+      if (e.target.style.display === "none") setOpen(e, true, false);
+    });
+    return found;
+  }
+
+  window.gijoFold = { scan: scan, open: open, refresh: function () { entries.forEach(paintBadges); } };
 
   function boot() { scan(); watch(); }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);

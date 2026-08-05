@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>시안(추천 1안) — 그림 먼저, 목록은 클릭하면 (전-7 확장)</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:#0d1117; color:#c9d1d9; font-family:"Malgun Gothic","Segoe UI",sans-serif; font-size:13px; padding:20px; }
+  .wrap { max-width:1120px; margin:0 auto; }
+  .note { background:#161b22; border:1px solid #30363d; border-radius:6px; padding:10px 14px; margin-bottom:16px; color:#8b949e; line-height:1.55; }
+  .note b { color:#c9d1d9; }
+  h2 { font-size:14px; color:#e6edf3; margin:20px 0 6px; }
+  h2 .tag { font-size:11px; color:#8b949e; font-weight:normal; margin-left:6px; }
+  .identity { color:#8b949e; font-size:12px; margin-bottom:8px; }
+
+  /* ── 공용 시각화 띠 (viz-strip) — 모든 화면 맨 위 고정, 접지 않음 ── */
+  .viz { background:#0f141a; border:1px solid #30363d; border-radius:6px; padding:10px 12px 8px; margin-bottom:8px; }
+  .viz-head { display:flex; align-items:center; gap:8px; height:20px; margin-bottom:8px; }
+  .viz-head .t { color:#e6edf3; font-weight:bold; font-size:12px; }
+  .viz-head .hint { color:#6e7681; font-size:11px; margin-left:auto; }
+  .viz-row { display:flex; gap:14px; align-items:flex-end; }
+
+  /* 막대 — 심각도 분포 (클릭 대상) */
+  .bars { display:flex; gap:6px; align-items:flex-end; height:74px; }
+  .bar { width:44px; display:flex; flex-direction:column; justify-content:flex-end; align-items:center; cursor:pointer; }
+  .bar .v { font-size:11px; color:#c9d1d9; margin-bottom:2px; }
+  .bar .b { width:100%; border-radius:3px 3px 0 0; transition:.12s; }
+  .bar .l { font-size:10px; color:#8b949e; margin-top:3px; height:12px; }
+  .bar:hover .b { filter:brightness(1.35); }
+  .bar.on .b { outline:2px solid #58a6ff; outline-offset:1px; }
+  .c-crit{background:#da3633} .c-high{background:#f85149} .c-med{background:#d29922} .c-low{background:#3fb950} .c-info{background:#484f58}
+
+  /* 도넛 — 덮는 범위/이행률 */
+  .donut { width:74px; height:74px; border-radius:50%; display:grid; place-items:center; cursor:pointer;
+           background:conic-gradient(#3fb950 0 68%, #30363d 68% 100%); }
+  .donut .in { width:52px; height:52px; border-radius:50%; background:#0f141a; display:grid; place-items:center;
+               font-size:13px; color:#e6edf3; font-weight:bold; }
+  .donut-wrap { text-align:center; }
+  .donut-wrap .cap { font-size:10px; color:#8b949e; margin-top:3px; }
+
+  /* 스파크라인 — 추세 */
+  .spark { display:flex; align-items:flex-end; gap:2px; height:74px; }
+  .spark i { width:7px; background:#1f6feb; border-radius:1px 1px 0 0; display:block; }
+  .spark-wrap { text-align:center; }
+
+  /* 구획 그리드 — 자산/제품 배치도 */
+  .grid { display:flex; flex-wrap:wrap; gap:3px; max-width:220px; }
+  .cell { width:15px; height:15px; border-radius:2px; cursor:pointer; }
+  .cell:hover { outline:1px solid #58a6ff; }
+
+  /* ── 클릭 결과: 아래 목록이 걸러진다 ── */
+  .filterbar { display:flex; align-items:center; gap:6px; height:26px; padding:0 10px; background:#161b22;
+               border:1px solid #1f6feb; border-radius:6px 6px 0 0; font-size:12px; }
+  .filterbar .chip { background:#1f6feb22; border:1px solid #1f6feb; color:#79c0ff; border-radius:10px; padding:1px 8px; font-size:11px; }
+  .filterbar .x { margin-left:auto; color:#8b949e; cursor:pointer; font-size:11px; }
+  table { width:100%; border-collapse:collapse; background:#0f141a; border:1px solid #30363d; border-top:none; border-radius:0 0 6px 6px; }
+  th { text-align:left; font-size:11px; color:#8b949e; font-weight:normal; padding:5px 10px; border-bottom:1px solid #30363d; }
+  td { font-size:12px; padding:0 10px; height:26px; border-bottom:1px solid #21262d; }
+  tr:last-child td { border-bottom:none; }
+  .sev { font-size:10px; padding:1px 6px; border-radius:8px; }
+
+  .spec { margin-top:22px; background:#161b22; border:1px solid #30363d; border-radius:6px; padding:12px 14px; font-size:12px; line-height:1.75; color:#8b949e; }
+  .spec b { color:#c9d1d9; }
+  .spec code { background:#0d1117; border:1px solid #30363d; border-radius:3px; padding:0 4px; color:#79c0ff; font-size:11px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="note">
+    <b>시안(추천 1안) — 「그림 먼저, 목록은 클릭하면」</b> · 계획서 <b>전-7 ①「관계를 그림으로」의 전면 확장</b><br>
+    설계 근거(2026-08-05 조사): SOC 대시보드 표준은 <b>overview-first drill-down</b> — 요약 그림에서 시작해 관심 조각을 클릭하면 세부로 내려간다.
+    표는 "자세한 값"을 볼 때 쓰고, 첫인상은 그림이 맡는다.<br>
+    핵심 결정: 화면마다 따로 그리지 않고 <b>공용 시각화 띠(viz.js)</b> 하나를 만들어 전 메뉴가 같은 방식으로 쓴다 —
+    지도(map-view.js)를 공용으로 만든 것과 같은 방법. 한 곳만 고치면 26화면이 같이 좋아진다.
+  </div>
+
+  <!-- ───────── 사례 1: 취약점 ───────── -->
+  <h2>취약점 <span class="tag">— 지금은 목록이 먼저 나옵니다 → 그림이 먼저</span></h2>
+  <div class="identity">우리 자산에서 발견된 약점을 급한 순서로 봅니다.</div>
+
+  <div class="viz">
+    <div class="viz-head"><span class="t">한눈에</span><span class="hint">막대·도넛을 누르면 아래 목록이 그것만 남습니다</span></div>
+    <div class="viz-row">
+      <div class="bars">
+        <div class="bar on"><span class="v">37</span><div class="b c-crit" style="height:56px"></div><span class="l">긴급</span></div>
+        <div class="bar"><span class="v">142</span><div class="b c-high" style="height:44px"></div><span class="l">높음</span></div>
+        <div class="bar"><span class="v">311</span><div class="b c-med" style="height:32px"></div><span class="l">보통</span></div>
+        <div class="bar"><span class="v">208</span><div class="b c-low" style="height:22px"></div><span class="l">낮음</span></div>
+        <div class="bar"><span class="v">4.1k</span><div class="b c-info" style="height:12px"></div><span class="l">조사</span></div>
+      </div>
+      <div class="donut-wrap">
+        <div class="donut" style="background:conic-gradient(#f85149 0 12%, #30363d 12% 100%)"><div class="in">12%</div></div>
+        <div class="cap">조치 완료</div>
+      </div>
+      <div class="donut-wrap">
+        <div class="donut" style="background:conic-gradient(#d29922 0 41%, #30363d 41% 100%)"><div class="in">41%</div></div>
+        <div class="cap">담당자 배정</div>
+      </div>
+      <div class="spark-wrap">
+        <div class="spark">
+          <i style="height:30px"></i><i style="height:38px"></i><i style="height:26px"></i><i style="height:52px"></i>
+          <i style="height:44px"></i><i style="height:61px"></i><i style="height:48px"></i><i style="height:70px"></i>
+        </div>
+        <div class="cap" style="font-size:10px;color:#8b949e;margin-top:3px">최근 8주 신규</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="filterbar"><span>목록</span><span class="chip">긴급 37건</span><span class="x">✕ 필터 해제 — 전체 4,833건 보기</span></div>
+  <table>
+    <tr><th style="width:15%">심각도</th><th style="width:30%">자산</th><th>취약점</th><th style="width:14%">상태</th></tr>
+    <tr><td><span class="sev c-crit" style="color:#fff">긴급</span></td><td>안전대부 웹서버</td><td>Log4Shell (CVE-2021-44228) — 원격 코드 실행</td><td>미조치</td></tr>
+    <tr><td><span class="sev c-crit" style="color:#fff">긴급</span></td><td>내부 API 게이트웨이</td><td>Spring4Shell (CVE-2022-22965)</td><td>배정됨</td></tr>
+    <tr><td><span class="sev c-crit" style="color:#fff">긴급</span></td><td>결제 DB</td><td>인증 우회 (CVE-2023-1234)</td><td>미조치</td></tr>
+  </table>
+
+  <!-- ───────── 사례 2: 보안제품 ───────── -->
+  <h2>보안제품 <span class="tag">— 표만 있던 화면</span></h2>
+  <div class="identity">우리가 운영 중인 보안장비와 매뉴얼 보유 현황입니다.</div>
+
+  <div class="viz">
+    <div class="viz-head"><span class="t">한눈에</span><span class="hint">칸을 누르면 그 제품만 아래에 남습니다</span></div>
+    <div class="viz-row">
+      <div>
+        <div class="grid">
+          <div class="cell c-low" title="방화벽 A — 매뉴얼 있음"></div><div class="cell c-low"></div><div class="cell c-low"></div>
+          <div class="cell c-med" title="IPS — 매뉴얼 없음"></div><div class="cell c-low"></div><div class="cell c-crit" title="EOS 임박"></div>
+          <div class="cell c-low"></div><div class="cell c-med"></div>
+        </div>
+        <div class="cap" style="font-size:10px;color:#8b949e;margin-top:5px">제품 8종 · <span style="color:#3fb950">■</span>정상 5 <span style="color:#d29922">■</span>매뉴얼없음 2 <span style="color:#f85149">■</span>지원종료 임박 1</div>
+      </div>
+      <div class="donut-wrap">
+        <div class="donut" style="background:conic-gradient(#3fb950 0 75%, #30363d 75% 100%)"><div class="in">6/8</div></div>
+        <div class="cap">매뉴얼 보유</div>
+      </div>
+      <div class="donut-wrap">
+        <div class="donut" style="background:conic-gradient(#d29922 0 50%, #30363d 50% 100%)"><div class="in">4/8</div></div>
+        <div class="cap">점검 최신</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="filterbar"><span>목록</span><span class="chip">지원종료 임박 1건</span><span class="x">✕ 필터 해제</span></div>
+  <table>
+    <tr><th style="width:24%">제품</th><th style="width:18%">분류</th><th>비고</th><th style="width:16%">지원종료</th></tr>
+    <tr><td>Legacy VPN 3.2</td><td>원격접속</td><td>매뉴얼 있음 · 최근 점검 2026-06-14</td><td style="color:#f85149">2026-09-30</td></tr>
+  </table>
+
+  <!-- ───────── 사례 3: 컴플라이언스 ───────── -->
+  <h2>컴플라이언스 <span class="tag">— 표만 있던 화면</span></h2>
+  <div class="identity">규정·위협별 대응 이행 상태입니다.</div>
+
+  <div class="viz">
+    <div class="viz-head"><span class="t">한눈에</span><span class="hint">막대를 누르면 그 상태의 항목만 남습니다</span></div>
+    <div class="viz-row">
+      <div class="bars">
+        <div class="bar"><span class="v">18</span><div class="b c-low" style="height:52px"></div><span class="l">대응완료</span></div>
+        <div class="bar"><span class="v">9</span><div class="b c-med" style="height:30px"></div><span class="l">부분</span></div>
+        <div class="bar on"><span class="v">7</span><div class="b c-crit" style="height:24px"></div><span class="l">미대응</span></div>
+        <div class="bar"><span class="v">3</span><div class="b c-info" style="height:12px"></div><span class="l">해당없음</span></div>
+      </div>
+      <div class="donut-wrap">
+        <div class="donut" style="background:conic-gradient(#3fb950 0 49%, #d29922 49% 73%, #da3633 73% 92%, #484f58 92% 100%)"><div class="in">49%</div></div>
+        <div class="cap">전체 이행률</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="filterbar"><span>목록</span><span class="chip">미대응 7건</span><span class="x">✕ 필터 해제</span></div>
+  <table>
+    <tr><th style="width:12%">코드</th><th style="width:34%">위협</th><th>왜 필요한가</th></tr>
+    <tr><td>M06</td><td>탈옥(Jailbreak)</td><td>모델이 안전 규칙을 우회하도록 유도당함</td></tr>
+    <tr><td>M11</td><td>학습 데이터 오염</td><td>오염된 데이터로 모델 판단이 뒤틀림</td></tr>
+  </table>
+
+  <div class="spec">
+    <b>■ 공용 모듈 설계 — <code>viz.js</code>(map-view.js와 같은 방식)</b><br>
+    화면은 <b>데이터와 판정 함수를 넘겨주기만</b> 하고, 그리는 일과 클릭 처리는 모듈이 한다.
+    지도에서 배운 것 그대로 — 화면마다 따로 그리면 숫자가 표와 어긋난다(그 사고를 이미 겪었다).<br>
+    · <code>viz.bars(el, 구간[], {onPick})</code> — 심각도·상태 분포. 클릭 → 그 구간만 목록에 남김<br>
+    · <code>viz.donut(el, 값, 전체, {label})</code> — 이행률·덮는 범위<br>
+    · <code>viz.spark(el, 계열[])</code> — 추세(주간 신규 등)<br>
+    · <code>viz.grid(el, 항목[], {색})</code> — 구획 배치도(제품·자산)<br>
+    · 히트맵·지도는 <b>이미 있는 map-view.js</b>를 그대로 쓴다(중복 제작 안 함)<br><br>
+
+    <b>■ 밀도 명세(칸 낭비 최소화 기준)</b> — 시각화 띠 <b>세로 총합 116px</b>(제목 20 + 그림 74 + 여백 22).
+    목록 줄은 <b>26px</b>(기준 화면 21~29px 준수). 띠는 <b>접지 않는다</b> — 첫인상이 목적이라 접으면 뜻이 없다.
+    대신 <b>화면당 그림 3~4개까지만</b> — 더 넣으면 그것도 목록이 된다.<br><br>
+
+    <b>■ 지키는 원칙</b><br>
+    · <b>가짜 숫자 금지</b> — 위 값은 시안용 예시이고, 구현은 화면이 이미 받아 온 실데이터만 쓴다(새 API 없음)<br>
+    · <b>메뉴는 보기용</b> — 그림은 보여 주고 거르기만 한다. 입력칸·설정 폼은 두지 않고, 지시는 대화창<br>
+    · <b>클릭은 되돌릴 수 있다</b> — 필터 띠에 항상 「✕ 해제 — 전체 N건」이 함께 뜬다(막다른 길 금지)<br>
+    · <b>목록은 사라지지 않는다</b> — 그림 아래에 그대로 있다. 표로 값을 확인하던 담당자를 잃지 않는다<br>
+    · 그림·목록의 숫자는 <b>같은 판정 함수</b>에서 나온다(진짜 취약점 판정 등)<br><br>
+
+    <b>■ 단계 제안</b> — 1단계 <code>viz.js</code> + 취약점·컴플라이언스·보안제품(목록만이던 곳 중 값어치 큰 셋) ·
+    2단계 위협·SBOM·조치·유지보수 · 3단계 리포트·기록·대시보드 요약 띠.
+    ⚠ 대시보드는 <b>대화 중심</b>이라 성격이 달라 마지막에 따로 논의.
+  </div>
+</div>
+</body>
+</html>

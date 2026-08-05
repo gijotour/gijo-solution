@@ -116,6 +116,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     <div class="kpi" id="kpiRow" data-gijo-summary></div>
 
+    <!-- 그림 먼저(전-7 ①, 2026-08-05). 위 숫자는 "얼마나 쌓였나"만 말한다 — 이 띠는 **언제
+         움직였나**를 말한다(불러온 최근 기록 범위 안). 막대에 클릭을 달지 않았다: 날짜로
+         좁히는 필터가 이 화면에 없어서, 눌러도 아무 일 없는 자리가 되기 때문이다. -->
+    <div id="vizStrip"></div>
+
     <!-- 시스템 로그와 같은 모양으로 맞춘다(2026-08-02 사용자 지시) — 같은 성격(흐르는 기록)인데
          모양이 다르면 화면을 옮길 때마다 다시 배운다. 접기 제목 + 정체성 한 줄 + 콘솔형 상자. -->
     <div class="panel" data-gijo-fold="📜 작업 기록" data-gijo-fold-badges="kpiTotal:건">
@@ -225,6 +230,28 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   // 조건이 바뀌면 처음 50건부터 다시 — 앞 조건에서 늘려 둔 상태가 남으면 갑자기 500줄이 쏟아진다.
   function 다시처음부터() { 보이는수 = 한번에; render(); }
 
+  // ── 그림 먼저(전-7 ①, 2026-08-05) ──────────────────────────────────────
+  // 불러온 기록이 걸쳐 있는 **날짜 구간만** 그린다 — 없는 날을 0으로 채워 넣으면
+  // "그날 아무 일도 없었다"가 되는데, 실제로는 500건 한도 밖일 뿐이다.
+  function 그림띠() {
+    const 자리 = document.getElementById("vizStrip");
+    if (!자리 || !window.gijoViz || !entries.length) return;
+    const 날짜별 = new Map();
+    entries.forEach((e) => {
+      const d = new Date(e.at);
+      const k = `${d.getMonth() + 1}/${d.getDate()}`;
+      날짜별.set(k, (날짜별.get(k) || 0) + 1);
+    });
+    // entries는 최신순이라 뒤집어야 왼쪽이 옛날이 된다.
+    const 키들 = Array.from(날짜별.keys()).reverse().slice(-14);
+    window.gijoViz.mount(자리, {
+      title: "언제 움직였나",
+      hint: `불러온 최근 ${entries.length.toLocaleString()}건 기준 · ${키들[0]} ~ ${키들[키들.length - 1]}`,
+      parts: [{ kind: "spark", values: 키들.map((k) => 날짜별.get(k)), label: "하루당 기록 수" }],
+    });
+  }
+  // ───────────────────────────────────────────────────────────────────────
+
   function renderKpi(summary, retention) {
     const el = document.getElementById("kpiRow");
     const order = ["cli", "approval", "write", "block", "auth"];
@@ -240,6 +267,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       const r = await window.gijo.listAudit(undefined, 500);
       entries = r.entries || [];
       renderKpi(r.summary || { total: entries.length, byKind: {} }, r.retention);
+      그림띠();
       render();
     } catch (e) {
       panel.innerHTML = `<div class="empty">불러오지 못했습니다: ${esc(e.message || e)}</div>`;
@@ -282,6 +310,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 </script>
 
 <div id="gijoChatWidget" data-start="collapsed" data-prompts='["최근 작업 기록 알려줘"]'></div>
+<script src="viz.js"></script>
 <script src="nav.js"></script>
 <script src="progresscard.js"></script>
 <script src="gijomd.js"></script>

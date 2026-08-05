@@ -183,6 +183,11 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
     </div>
 
 
+    <!-- 그림 먼저(전-7 ①, 2026-08-05). 위 KPI는 "얼마나 남았나"의 숫자고, 이 띠는 **눌러서 좁히는** 그림이다.
+         심각도 막대를 누르면 아래 호스트 목록이 그 심각도를 가진 호스트만 남는다. -->
+    <div id="vizStrip"></div>
+    <div id="vizFilter" style="display:none"></div>
+
     <!-- 목록 ⇄ 🗺 히트맵(2026-08-04, 지형도 3단계 ㉯). 목록은 그대로, 보기만 전환. -->
     <div style="display:flex;gap:4px;margin:0 0 8px;justify-content:flex-end">
       <span class="vv on" id="vvList" style="font-size:12px;border:1px solid var(--border);border-radius:12px;padding:2px 10px;cursor:pointer">목록</span>
@@ -293,6 +298,54 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
     return c;
   }
   const activeCount = (findings) => (findings || []).filter((f) => f.state !== "fixed").length;
+
+  // ── 그림 먼저(전-7 ①, 2026-08-05) ─────────────────────────────────────────
+  // 목록보다 그림이 먼저 눈에 들어오게. 그리는 일은 viz.js 한 곳에서만 한다
+  // (화면마다 따로 그리면 같은 데이터인데 화면마다 숫자가 달라진다 — 지도에서 겪은 함정).
+  let 심각도필터 = null;
+
+  function 그림띠(assets, totals, 자산별) {
+    const 자리 = document.getElementById("vizStrip");
+    if (!자리 || !window.gijoViz) return;   // viz.js가 없으면 목록만 보인다(화면은 살아 있어야 한다)
+    const 전체취약점 = (assets || []).reduce((n, a) => n + (a.findings || []).length, 0);
+    const 고침 = (assets || []).reduce((n, a) => n + (a.findings || []).filter((f) => f.state === "fixed").length, 0);
+    const 좁히기 = () => 호스트줄그리기(assets, 자산별);
+
+    window.gijoViz.mount(자리, {
+      title: "한눈에",
+      hint: "막대를 누르면 아래 목록이 그 심각도만 남습니다",
+      parts: [
+        {
+          kind: "bars",
+          segments: [
+            { key: "critical", label: "긴급", value: totals.critical },
+            { key: "high", label: "높음", value: totals.high },
+            { key: "medium", label: "보통", value: totals.medium },
+            { key: "low", label: "낮음", value: totals.low },
+          ],
+          onPick: (key, seg) => {
+            심각도필터 = key;
+            window.gijoViz.filterBar(document.getElementById("vizFilter"), seg, assets.length, () => {
+              심각도필터 = null;
+              자리.querySelectorAll(".gviz-bar").forEach((b) => b.classList.remove("on"));
+              window.gijoViz.filterBar(document.getElementById("vizFilter"), null, assets.length, null);
+              좁히기();
+            });
+            좁히기();
+          },
+        },
+        // ⚠ 비율(%)이 아니라 **몇/몇**으로 적는다(2026-08-05 실측): 실제 5/4,890인데 반올림하면
+        //   0%가 되어 "하나도 안 했다"로 읽힌다. 적은 것을 적다고 말하되 없다고는 말하지 않는다.
+        { kind: "donut", value: 고침, total: 전체취약점, label: "조치 완료", color: "ok", showRatio: true },
+      ],
+    });
+    // 다시 그린 뒤에도 고른 상태가 남아 있게 — 막대 표시와 필터 띠를 맞춘다.
+    if (심각도필터) {
+      const b = 자리.querySelector('.gviz-bar[data-key="' + 심각도필터 + '"]');
+      if (b) b.classList.add("on");
+    }
+  }
+  // ──────────────────────────────────────────────────────────────────────────
 
   // ── 취약점 심각도 히트맵(2026-08-04, 지형도 3단계 ㉯, 시안 security-map-v2 승인) ──
   // 자산 지도(inventory)와 **같은 map-view.js를 재사용**하되, 취약점 화면은 「오늘 뭐부터」가
@@ -461,6 +514,34 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
     if (shown !== total) list.insertAdjacentHTML("afterbegin", `<div class="vd-empty" style="border-bottom:1px solid var(--border)">${shown.toLocaleString()}건 표시 (전체 ${total.toLocaleString()}건)</div>`);
   }
 
+  // 호스트 줄만 다시 그린다 — 막대를 눌러 좁힐 때 서버를 다시 부르지 않기 위해 떼어 냈다.
+  function 호스트줄그리기(assets, 자산별) {
+    const 보일자산 = 심각도필터 ? assets.filter((a) => (자산별.get(a.id) || {})[심각도필터] > 0) : assets;
+    if (assets.length === 0) {
+      hostRows.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">업로드된 취약점 스캔 결과가 없습니다. 위에서 Nessus 등의 결과 파일을 올려주세요.</td></tr>';
+      return;
+    }
+    if (보일자산.length === 0) {
+      hostRows.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">고른 심각도를 가진 호스트가 없습니다 — 위 「✕ 해제」를 누르면 전체가 다시 보입니다.</td></tr>';
+      return;
+    }
+    hostRows.innerHTML = 보일자산.map((a) => {
+      const c = 자산별.get(a.id) || sevCounts(a.findings);
+      const badges =
+        (c.critical ? `<span class="sev sev-c">C ${c.critical}</span>` : "") +
+        (c.high ? `<span class="sev sev-h">H ${c.high}</span>` : "") +
+        (c.medium ? `<span class="sev sev-m">M ${c.medium}</span>` : "") +
+        (c.low ? `<span class="sev sev-l">L ${c.low}</span>` : "") || '<span style="color:var(--muted)">—</span>';
+      const open = currentHostId === a.id ? " on" : "";
+      return `<tr data-id="${esc(a.id)}" class="${open.trim()}" title="클릭하면 이 호스트의 취약점 목록이 열립니다">
+        <td><div class="host-name"><span class="row-caret">${currentHostId === a.id ? "▾" : "▸"}</span>${esc(a.name)}</div></td>
+        <td style="color:var(--muted)">${esc(a.owner)}</td>
+        <td>${badges}</td>
+        <td style="color:var(--muted)">${fmtDate(a.lastScannedAt)}</td>
+      </tr>`;
+    }).join("");
+  }
+
   async function refresh() {
     let assets = [];
     try {
@@ -469,27 +550,17 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
       hostRows.innerHTML = '<tr><td colspan="4" style="color:#f5928a">자산을 불러오지 못했습니다</td></tr>';
       return;
     }
+    // ★ 총계는 **전체 자산**으로 먼저 낸다(2026-08-05, 전-7 ①). 막대를 눌러 목록을 좁혀도
+    //   위 KPI 숫자는 그대로여야 한다 — 좁힌 목록으로 총계를 내면 "고쳤더니 취약점이 줄었다"로 읽힌다.
     const totals = { critical: 0, high: 0, medium: 0, low: 0 };
-    if (assets.length === 0) {
-      hostRows.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">업로드된 취약점 스캔 결과가 없습니다. 위에서 Nessus 등의 결과 파일을 올려주세요.</td></tr>';
-    } else {
-      hostRows.innerHTML = assets.map((a) => {
-        const c = sevCounts(a.findings);
-        totals.critical += c.critical; totals.high += c.high; totals.medium += c.medium; totals.low += c.low;
-        const badges =
-          (c.critical ? `<span class="sev sev-c">C ${c.critical}</span>` : "") +
-          (c.high ? `<span class="sev sev-h">H ${c.high}</span>` : "") +
-          (c.medium ? `<span class="sev sev-m">M ${c.medium}</span>` : "") +
-          (c.low ? `<span class="sev sev-l">L ${c.low}</span>` : "") || '<span style="color:var(--muted)">—</span>';
-        const open = currentHostId === a.id ? " on" : "";
-        return `<tr data-id="${esc(a.id)}" class="${open.trim()}" title="클릭하면 이 호스트의 취약점 목록이 열립니다">
-          <td><div class="host-name"><span class="row-caret">${currentHostId === a.id ? "▾" : "▸"}</span>${esc(a.name)}</div></td>
-          <td style="color:var(--muted)">${esc(a.owner)}</td>
-          <td>${badges}</td>
-          <td style="color:var(--muted)">${fmtDate(a.lastScannedAt)}</td>
-        </tr>`;
-      }).join("");
-    }
+    const 자산별 = new Map();
+    assets.forEach((a) => {
+      const c = sevCounts(a.findings);
+      자산별.set(a.id, c);
+      totals.critical += c.critical; totals.high += c.high; totals.medium += c.medium; totals.low += c.low;
+    });
+    그림띠(assets, totals, 자산별);
+    호스트줄그리기(assets, 자산별);
     hostCache = assets;
     // 다른 화면에서 "이 자산" 을 지목해 들어왔으면 그 호스트를 펼친 채로 시작한다
     // (?host=<자산id>). 안 그러면 46개 목록에서 방금 보던 자산을 다시 찾아야 한다.
@@ -644,6 +715,7 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
 
 
 
+<script src="viz.js"></script>
 <script src="nav.js"></script>
 <script src="workflowrail.js"></script>
 <script src="progresscard.js"></script>

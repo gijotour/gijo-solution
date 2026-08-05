@@ -130,6 +130,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     <div id="gijoChatWidget" data-prompts='["기한 지난 점검 알려줘","이번 달 점검 일정 뭐야?"]' style="max-width:640px;margin-bottom:16px;"></div>
 
     <div class="sum" id="sumCards" data-gijo-summary></div>
+
+    <!-- 그림 먼저(전-7 ①, 2026-08-05). 위 카드는 "무엇부터"고, 이 띠는 **어느 제품이 밀렸나**다
+         — 예전엔 글줄로 늘어놓던 제품별 미완료를 막대로 세운다. 막대를 누르면 그 제품만 남는다. -->
+    <div id="vizStrip"></div>
+    <div id="vizFilter" style="display:none"></div>
     <div id="todoWrap"></div>
 
     <table class="tbl">
@@ -291,11 +296,63 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   }
 
   function 걸러진것() {
-    if (고른상태 === "late") return 항목.filter(지연인가);
-    if (고른상태 === "reported") return 항목.filter(function (m) { return m.status === "reported"; });
-    if (고른상태 === "month") return 항목.filter(function (m) { return m.scheduleDate.slice(0, 7) === 오늘.slice(0, 7) && !지연인가(m); });
-    return 항목;
+    var 목 = 제품필터 ? 항목.filter(function (m) { return m.productName === 제품필터; }) : 항목;
+    if (고른상태 === "late") return 목.filter(지연인가);
+    if (고른상태 === "reported") return 목.filter(function (m) { return m.status === "reported"; });
+    if (고른상태 === "month") return 목.filter(function (m) { return m.scheduleDate.slice(0, 7) === 오늘.slice(0, 7) && !지연인가(m); });
+    return 목;
   }
+
+  // ── 그림 먼저(전-7 ①, 2026-08-05) ──────────────────────────────────────
+  // 카드 숫자는 늘 **전체 점검**으로 낸다 — 제품 막대를 눌러 표를 좁혀도 위 카드는 그대로다.
+  var 제품필터 = null;
+
+  function 그림띠() {
+    var 자리 = document.getElementById("vizStrip");
+    if (!자리 || !window.gijoViz) return;
+    // 미완료(예정·보고됨)가 있는 제품만 — 끝난 제품까지 세우면 막대가 목록이 된다.
+    var 제품별 = {};
+    항목.forEach(function (m) {
+      if (m.status !== "scheduled" && m.status !== "reported") return;
+      var s = (제품별[m.productName] = 제품별[m.productName] || { open: 0, late: 0 });
+      s.open++;
+      if (지연인가(m)) s.late++;
+    });
+    var 이름들 = Object.keys(제품별)
+      .sort(function (a, b) { return 제품별[b].late - 제품별[a].late || 제품별[b].open - 제품별[a].open; })
+      .slice(0, 8);   // 8개까지 — 더 넣으면 그림이 아니라 또 하나의 목록이다
+    var 검토완료 = 항목.filter(function (m) { return m.status === "approved" || m.status === "rejected"; }).length;
+    var 승인 = 항목.filter(function (m) { return m.status === "approved"; }).length;
+
+    window.gijoViz.mount(자리, {
+      title: "한눈에",
+      hint: 이름들.length ? "막대를 누르면 아래 목록이 그 제품만 남습니다" : "",
+      parts: [
+        {
+          kind: "bars",
+          segments: 이름들.map(function (n) {
+            return { key: n, label: n.length > 6 ? n.slice(0, 6) + "…" : n, value: 제품별[n].open, color: 제품별[n].late ? "bad" : "warn" };
+          }),
+          onPick: function (key, seg) {
+            제품필터 = key;
+            window.gijoViz.filterBar(document.getElementById("vizFilter"), seg, 항목.length, function () {
+              제품필터 = null;
+              자리.querySelectorAll(".gviz-bar").forEach(function (b) { b.classList.remove("on"); });
+              window.gijoViz.filterBar(document.getElementById("vizFilter"), null, 항목.length, null);
+              표그리기();
+            });
+            표그리기();
+          },
+        },
+        { kind: "donut", value: 승인, total: 검토완료, label: "준수율", color: "ok" },
+      ],
+    });
+    if (제품필터) {
+      var b = 자리.querySelector('.gviz-bar[data-key="' + (window.CSS && CSS.escape ? CSS.escape(제품필터) : 제품필터) + '"]');
+      if (b) b.classList.add("on");
+    }
+  }
+  // ───────────────────────────────────────────────────────────────────────
 
   function 표그리기() {
     // 기한 순이 기본이다 — 점검은 "무엇이 늦었나"가 전부라 이름순·등록순은 쓸 일이 없다.
@@ -336,7 +393,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     }).join("");
   }
 
-  function 다시그리기() { 카드그리기(); 할일그리기(); 표그리기(); 배선(); }
+  function 다시그리기() { 카드그리기(); 그림띠(); 할일그리기(); 표그리기(); 배선(); }
 
   function 배선() {
     document.querySelectorAll("[data-filter]").forEach(function (el) {
@@ -836,6 +893,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 </script>
 
 <script src="dialog.js"></script>
+<script src="viz.js"></script>
 <script src="nav.js"></script>
 <script src="workflowrail.js"></script>
 <script src="progresscard.js"></script>

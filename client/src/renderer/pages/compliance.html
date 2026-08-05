@@ -100,6 +100,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       </div>
     </div>
 
+    <!-- 그림 먼저(전-7 ①) — 요약 띠에서 시작해 누르면 아래 목록이 그것만 남는다(overview-first drill-down).
+         숫자는 아래 목록과 **같은 catalog 배열**에서 나온다 — 따로 세면 반드시 어긋난다. -->
+    <div id="vizStrip"></div>
+    <div id="vizFilter" style="display:none"></div>
+
     <div id="catalog"><div style="color:var(--muted)">불러오는 중...</div></div>
 
     <div class="footer">
@@ -194,6 +199,48 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     </div>`;
   }
 
+  // 그림에서 고른 상태(전-7 ①). null이면 전체 — 목록은 **사라지지 않고** 걸러질 뿐이다.
+  let 상태필터 = null;
+
+  /**
+   * 요약 그림 띠 — 상태 분포 막대 + 이행률 도넛.
+   * ⚠ 숫자는 render()가 이미 센 값을 그대로 받는다. 여기서 다시 세면 목록과 어긋난다
+   *   (지도에서 배운 것 — 같은 뜻의 숫자는 한 곳에서만 만든다).
+   */
+  function 그림띠(covered, partial, open, applicable) {
+    const 자리 = document.getElementById("vizStrip");
+    if (!자리 || !window.gijoViz) return;
+    const na = catalog.length - applicable;
+    window.gijoViz.mount(자리, {
+      title: "한눈에",
+      hint: "막대를 누르면 아래 목록이 그 상태만 남습니다",
+      parts: [
+        {
+          kind: "bars",
+          segments: [
+            { key: "covered", label: "대응완료", value: covered, color: "covered" },
+            { key: "partial", label: "부분", value: partial, color: "partial" },
+            { key: "open", label: "미대응", value: open, color: "open" },
+            { key: "na", label: "해당없음", value: na, color: "na" },
+          ],
+          onPick: (key, seg) => {
+            상태필터 = key;
+            render();
+            window.gijoViz.filterBar(document.getElementById("vizFilter"), seg, catalog.length, () => {
+              상태필터 = null; render();
+            });
+          },
+        },
+        { kind: "donut", value: covered, total: applicable, label: "이행률(해당분)" },
+      ],
+    });
+    // 다시 그린 뒤에도 고른 조각이 눌린 채로 보이게 한다(누르면 목록이 바뀌는데 그림이 초기화되면 혼란).
+    if (상태필터) {
+      const b = 자리.querySelector('.gviz-bar[data-key="' + 상태필터 + '"]');
+      if (b) b.classList.add("on");
+    }
+  }
+
   function render() {
     const covered = catalog.filter((t) => t.status === "covered").length;
     const partial = catalog.filter((t) => t.status === "partial").length;
@@ -205,9 +252,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.getElementById("kpiOpen").textContent = open;
     document.getElementById("kpiRate").textContent = applicable ? Math.round((covered / applicable) * 100) + "%" : "—";
 
+    그림띠(covered, partial, open, applicable);
+
     const cats = document.getElementById("catalog");
     cats.innerHTML = CATEGORY_ORDER.map((cat) => {
-      const items = catalog.filter((t) => t.category === cat);
+      const items = catalog.filter((t) => t.category === cat).filter((t) => !상태필터 || t.status === 상태필터);
       if (items.length === 0) return "";
       // 제목 줄을 눌러 갈래를 접었다 편다(2026-08-02 사용자 지시).
       // ⚠ 접혀도 **미대응 건수**는 남긴다 — 숫자 없이 접으면 "안에 뭐가 있는지 모르는 서랍"이 된다.
@@ -310,6 +359,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
 
 
+<script src="viz.js"></script>
 <script src="nav.js"></script>
 <script src="workflowrail.js"></script>
 <script src="progresscard.js"></script>

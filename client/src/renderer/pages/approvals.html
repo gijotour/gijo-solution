@@ -95,6 +95,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div class="panel" style="margin:0"><div class="panel-sub" style="margin:0 0 6px">지연</div><div style="font-size:20px;font-weight:800;color:#f5928a" id="kOverdue">-</div></div>
     </div>
 
+    <!-- 그림 먼저(전-7 ①, 2026-08-05). 위 카드·칩은 **상태**를 말하고, 이 막대는 위 어디에도
+         없던 물음 — **어느 심각도가 밀려 있나**를 말한다. 누르면 아래 목록이 그 심각도만 남는다.
+         (도넛은 넣지 않았다 — 이 화면은 이미 카드 7장이라 세로가 빡빡하다.) -->
+    <div id="vizStrip" style="max-width:1100px"></div>
+    <div id="vizFilter" style="display:none;max-width:1100px"></div>
+
     <div class="rv-wrap">
       <div class="rv-list-pane">
         <!-- 자산 좁히기 띠 — 다른 화면에서 "이 건" 을 눌러 들어왔을 때만 나타난다.
@@ -280,8 +286,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   // "해당 IP나 호스트를 눌렀을 때 해당 취약점만 나와야 하는데 전체가 보인다").
   // ⚠ 상태 필터(rvFilter)와 **곱해서** 건다 — 자산으로 좁힌 뒤 상태 칩도 그대로 쓸 수 있어야 한다.
   let scopeAsset = null;
+  // 그림 띠에서 고른 심각도(전-7 ①, 2026-08-05). 상태 필터·자산 좁히기와 **곱해서** 건다.
+  let 심각도필터 = null;
+
   function matchFilter(r) {
     if (scopeAsset && r.assetId !== scopeAsset) return false;
+    if (심각도필터 && r.finding.severity !== 심각도필터) return false;
     switch (rvFilter) {
       case "active": return r.status === "pending" || r.status === "in_progress" || r.status === "verifying";
       case "in_progress": return r.status === "in_progress";
@@ -340,6 +350,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       const unassigned = cnt(isUnassigned);
       document.getElementById("kUnassigned").textContent = unassigned;
       document.getElementById("fcUnassigned").textContent = unassigned;
+      그림띠();
       renderList();
       // 상태가 바뀌면 VEX로 나갈 값도 바뀐다 — 칩을 같이 갱신한다(선언과 화면이 어긋나지 않게).
       if (window.gijoRefreshVex) window.gijoRefreshVex();
@@ -353,6 +364,44 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     }
   }
 
+  // ── 그림 먼저(전-7 ①, 2026-08-05) ──────────────────────────────────────
+  // 막대는 **조치 대상**(미검토·진행중·검증)만 센다 — 끝난 건까지 세우면 "얼마나 밀렸나"가
+  // 안 보인다. 총계는 늘 전체로 내고, 눌러 좁혀도 위 카드 숫자는 그대로다.
+  function 그림띠() {
+    const 자리 = document.getElementById("vizStrip");
+    if (!자리 || !window.gijoViz) return;
+    const 열린것 = allReviews.filter((r) => ["pending", "in_progress", "verifying"].includes(r.status));
+    const 셈 = (k) => 열린것.filter((r) => r.finding.severity === k).length;
+    window.gijoViz.mount(자리, {
+      title: "조치 대상 — 심각도별",
+      hint: "막대를 누르면 아래 목록이 그 심각도만 남습니다",
+      parts: [{
+        kind: "bars",
+        segments: [
+          { key: "critical", label: "긴급", value: 셈("critical") },
+          { key: "high", label: "높음", value: 셈("high") },
+          { key: "medium", label: "보통", value: 셈("medium") },
+          { key: "low", label: "낮음", value: 셈("low") },
+        ],
+        onPick: (key, seg) => {
+          심각도필터 = key;
+          window.gijoViz.filterBar(document.getElementById("vizFilter"), seg, 열린것.length, () => {
+            심각도필터 = null;
+            자리.querySelectorAll(".gviz-bar").forEach((b) => b.classList.remove("on"));
+            window.gijoViz.filterBar(document.getElementById("vizFilter"), null, 열린것.length, null);
+            renderList();
+          });
+          renderList();
+        },
+      }],
+    });
+    if (심각도필터) {
+      const b = 자리.querySelector('.gviz-bar[data-key="' + 심각도필터 + '"]');
+      if (b) b.classList.add("on");
+    }
+  }
+  // ───────────────────────────────────────────────────────────────────────
+
   function renderList() {
     const list = document.getElementById("rvList");
     const filtered = allReviews.filter(matchFilter).sort((a, b) => {
@@ -360,7 +409,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       return SEV_ORD[a.finding.severity] - SEV_ORD[b.finding.severity];
     });
     if (!filtered.length) {
-      list.innerHTML = '<div class="rv-empty">' + (allReviews.length ? "이 상태의 finding이 없습니다." : "검토할 finding이 없습니다 — 자산 스캔을 먼저 실행하세요.") + "</div>";
+      list.innerHTML = '<div class="rv-empty">' +
+        (!allReviews.length ? "검토할 finding이 없습니다 — 자산 스캔을 먼저 실행하세요."
+          : 심각도필터 ? "고른 심각도에 해당하는 건이 없습니다 — 위 「✕ 해제」를 누르면 전체가 다시 보입니다."
+          : "이 상태의 finding이 없습니다.") + "</div>";
       return;
     }
     list.innerHTML = filtered.map((r) => {
@@ -758,6 +810,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
 
 
+<script src="viz.js"></script>
 <script src="nav.js"></script>
 <script src="workflowrail.js"></script>
 <script src="progresscard.js"></script>

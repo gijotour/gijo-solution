@@ -169,6 +169,11 @@ table th:last-child,table td:last-child{white-space:nowrap;}
   <div class="kpi-mini"><div class="kpi-mini-label">영향받는 내부 자산</div><div class="kpi-mini-value" style="color:var(--amber)" id="affectedAssetCount">-</div></div>
 </div>
 
+<!-- 그림 먼저(전-7 ①, 2026-08-05). 심각도 막대를 누르면 아래 「최근 탐지 내역」이
+     그 심각도만 남는다 — 그 구역이 접혀 있으면 함께 펼친다(막다른 길 금지). -->
+<div id="vizStrip"></div>
+<div id="vizFilter" style="display:none"></div>
+
 <!-- 순서(2026-08-02 사용자 지시): 무엇을 구독·감시 중인가 → 그래서 우리에게 오는 위협 →
      참고로 훑는 탐지 내역. 탐지 내역은 표가 넓어 **가로를 다 쓴다**(오른쪽 열에 두면 칸이 좁아
      심각도가 "정 / 보"로 갈라졌다). -->
@@ -256,24 +261,73 @@ table th:last-child,table td:last-child{white-space:nowrap;}
     return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   }
 
+  // ── 그림 먼저(전-7 ①, 2026-08-05) ──────────────────────────────────────
+  // 총계는 언제나 **전체 탐지**로 낸다 — 막대를 눌러 표를 좁혀도 위 KPI는 그대로여야 한다.
+  let 심각도필터 = null;
+  let 탐지전체 = [];
+
+  function 그림띠(findings) {
+    const 자리 = document.getElementById("vizStrip");
+    if (!자리 || !window.gijoViz) return;
+    const 셈 = (k) => findings.filter((f) => f.severity === k).length;
+    const 좁히기 = () => 표그리기(findings);
+    window.gijoViz.mount(자리, {
+      title: "한눈에",
+      hint: "막대를 누르면 아래 탐지 내역이 그 심각도만 남습니다",
+      parts: [{
+        kind: "bars",
+        segments: [
+          { key: "critical", label: "긴급", value: 셈("critical"), color: "critical" },
+          { key: "warning", label: "주의", value: 셈("warning"), color: "medium" },
+          { key: "info", label: "정보", value: 셈("info"), color: "info" },
+        ],
+        onPick: (key, seg) => {
+          심각도필터 = key;
+          if (key && window.gijoFold) window.gijoFold.open("최근 탐지 내역");   // 접혀 있으면 펼친다
+          window.gijoViz.filterBar(document.getElementById("vizFilter"), seg, findings.length, () => {
+            심각도필터 = null;
+            자리.querySelectorAll(".gviz-bar").forEach((b) => b.classList.remove("on"));
+            window.gijoViz.filterBar(document.getElementById("vizFilter"), null, findings.length, null);
+            좁히기();
+          });
+          좁히기();
+        },
+      }],
+    });
+    if (심각도필터) {
+      const b = 자리.querySelector('.gviz-bar[data-key="' + 심각도필터 + '"]');
+      if (b) b.classList.add("on");
+    }
+  }
+
+  // 표만 다시 그린다 — 막대를 눌러 좁힐 때 서버를 다시 부르지 않는다.
+  function 표그리기(findings) {
+    const 보일것 = 심각도필터 ? findings.filter((f) => f.severity === 심각도필터) : findings;
+    if (보일것.length === 0) {
+      findingsBodyEl.innerHTML = findings.length
+        ? '<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:28px 10px">고른 심각도의 탐지가 없습니다 — 위 「✕ 해제」를 누르면 전체가 다시 보입니다.</td></tr>'
+        : '<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:28px 10px">탐지 내역이 없습니다. 연동된 CTI 피드가 없거나 아직 탐지된 항목이 없습니다.</td></tr>';
+      return;
+    }
+    findingsBodyEl.innerHTML = 보일것
+      .map((f) => {
+        const badge = SEVERITY_BADGE[f.severity] || SEVERITY_BADGE.info;
+        return `<tr><td>${esc(f.detectedAt)}</td><td>${esc(f.type)}</td><td>${esc(f.target)}</td><td>${esc(f.source)}</td><td><span class="badge ${badge.cls}">${badge.label}</span></td></tr>`;
+      })
+      .join("");
+  }
+  // ───────────────────────────────────────────────────────────────────────
+
   function renderFindings(findings) {
+    탐지전체 = findings;
     findingCountEl.textContent = findings.length;
     criticalCountEl.textContent = findings.filter((f) => f.severity === "critical").length;
     // 접기 배지가 읽을 숫자를 먼저 적고 도우미에 알린다 — 접힌 채로도 건수가 보여야 한다.
     const 셈 = document.getElementById("feedCount");
     if (셈) 셈.textContent = String(findings.length);
     if (window.gijoFold) window.gijoFold.refresh();
-    if (findings.length === 0) {
-      findingsBodyEl.innerHTML =
-        '<tr><td colspan="5" style="color:var(--muted);text-align:center;padding:28px 10px">탐지 내역이 없습니다. 연동된 CTI 피드가 없거나 아직 탐지된 항목이 없습니다.</td></tr>';
-      return;
-    }
-    findingsBodyEl.innerHTML = findings
-      .map((f) => {
-        const badge = SEVERITY_BADGE[f.severity] || SEVERITY_BADGE.info;
-        return `<tr><td>${esc(f.detectedAt)}</td><td>${esc(f.type)}</td><td>${esc(f.target)}</td><td>${esc(f.source)}</td><td><span class="badge ${badge.cls}">${badge.label}</span></td></tr>`;
-      })
-      .join("");
+    그림띠(findings);
+    표그리기(findings);
   }
 
   async function loadFindings() {
@@ -429,6 +483,7 @@ table th:last-child,table td:last-child{white-space:nowrap;}
 
 
 
+<script src="viz.js"></script>
 <script src="nav.js"></script>
 <script src="workflowrail.js"></script>
 <script src="progresscard.js"></script>
