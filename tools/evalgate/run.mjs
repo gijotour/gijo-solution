@@ -341,6 +341,34 @@ for (const axis of runAxes) {
           console.log(`~ ${c.id} [${(retry.ms / 1000).toFixed(1)}s] — FLAKY(1차: ${r.why.join(", ")})`);
           continue;
         }
+        // ★ 2026-08-05 — **흔들림과 하락을 가른다.** 문턱("하나라도 하락하면 보류")은 그대로 두고
+        //   **측정을 정확하게** 만든다. 문턱을 낮추면 안전망이 약해지지만, 측정이 부정확하면
+        //   안전망이 **거짓 경보만 내다 무시당한다** — 후자가 더 위험하다.
+        //
+        //   실측 근거(2026-08-05, 같은 코드로 게이트 2회):
+        //     · 1차 routing 98.5%(no-hit-honest) · 2차 korean 95.8%(kr-report-tone)
+        //     · **서로 다른 문항**이 걸렸고 둘 다 재측정에서 회복됐다(각각 5/5, 12/12).
+        //     · 문항당 흔들림이 1% 안팎인데 문항이 99개면 **매 실행 평균 1건**이 걸린다.
+        //       즉 지금 방식으로는 게이트가 통과를 거의 못 낸다 — 늘 켜져 있는 경보다.
+        //
+        //   ⚠ 진짜 하락은 이 재측정을 못 빠져나간다. 깨진 기능은 5회 중 5회 실패한다.
+        //     흔들림만 살아남는다. **과반이 통과해야** 흔들림으로 인정한다.
+        //   ⚠ 흔들림으로 넘긴 것도 **감추지 않는다** — FLAKY로 세어 리포트에 남긴다.
+        const 확인횟수 = 4;
+        const 추가 = [];
+        for (let k = 0; k < 확인횟수; k++) {
+          const t = await runCase(c, axis);
+          if (t.skipped) continue;          // 시간초과는 판정에 안 쓴다(위 규칙과 같다)
+          추가.push(t.ok);
+        }
+        const 시도 = [false, false, ...추가];   // 처음 2회는 실패였다
+        const 통과수 = 시도.filter(Boolean).length;
+        if (추가.length >= 3 && 통과수 * 2 > 시도.length) {
+          results[axis].push({ id: c.id, pass: true, flaky: true, why: r.why, ms: r.ms });
+          console.log(`~ ${c.id} — 흔들림으로 판정(${통과수}/${시도.length} 통과) · 1차 사유: ${r.why.join(", ")}`);
+          continue;
+        }
+        console.log(`✗ ${c.id} — 재측정에서도 재현(${통과수}/${시도.length} 통과) — 흔들림이 아니라 하락이다`);
         r = retry;
       }
       results[axis].push({ id: c.id, pass: r.ok, canary: !!c.canary, why: r.why, ms: r.ms });
