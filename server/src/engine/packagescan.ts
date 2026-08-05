@@ -35,12 +35,67 @@ export type 장비종류 = "rpm" | "deb" | "windows";
 export const 수집명령: Record<장비종류, string> = {
   // %{LICENSE}까지 한 번에 — 라이선스는 SBOM의 핵심 칸인데 스캐너는 안 준다.
   rpm: "rpm -qa --qf '%{NAME}\\t%{VERSION}-%{RELEASE}\\t%{LICENSE}\\n'",
-  // dpkg-query는 라이선스를 안 준다(데비안은 copyright 파일에 있다) — 비워 두고 밝힌다.
+  // dpkg-query는 라이선스를 안 준다 — 데비안은 /usr/share/doc/<pkg>/copyright에 적는다.
+  // 그래서 아래 데비안라이선스명령으로 **두 번째 읽기**를 해 채운다(2026-08-05).
   deb: "dpkg-query -W -f='${Package}\\t${Version}\\t\\n'",
   // 설치 목록은 레지스트리에 있다. wmic product는 **MSI 재구성을 유발**해 쓰지 않는다(느리고 위험).
   windows:
     'powershell -NoProfile -Command "Get-ItemProperty HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*, HKLM:\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\* | Where-Object DisplayName | ForEach-Object { $_.DisplayName + [char]9 + $_.DisplayVersion + [char]9 + $_.Publisher }"',
 };
+
+/**
+ * 데비안 계열 라이선스 채우기 (2026-08-05, 계획서 중-7).
+ *
+ * ★ 왜 필요했나 — **실측이 시켰다.** 운영 데이터의 부품 844개 중 **789개가 장비에서 직접 읽은
+ *   것**인데 라이선스가 전부 "-"였다. 파서가 틀린 게 아니라 `dpkg-query`가 라이선스 칸을
+ *   아예 안 주기 때문이다(데비안 정책상 라이선스는 copyright 파일에 있다).
+ *   라이선스는 **법무가 보는 칸**이라 비워 두면 SBOM을 내보내는 뜻이 절반 사라진다.
+ *
+ * ■ 이 명령이 안전한 이유
+ *   · `grep -m1`이라 파일당 **첫 줄 하나만** 읽는다 — 출력이 패키지 수를 넘지 않는다.
+ *   · 와일드카드는 셸이 펴지만 **사용자 입력이 들어갈 자리가 없다**(고정 상수).
+ *   · 읽기 전용이고 `안전한명령인가()`가 시험으로 다시 검사한다.
+ *
+ * ⚠ `2>/dev/null`을 **붙이지 않는다.** 처음엔 붙였는데 `안전한명령인가()`가 막았다 —
+ *   규칙 ③(파일 덮어쓰기 `>` 금지)에 걸린 것이다. 그물이 제 일을 했고, 규칙을 느슨하게
+ *   푸는 대신 명령에서 뺐다. 없는 파일에 대한 하소연은 stderr로 가고 우리는 stdout만 쓴다.
+ *
+ * ■ 못 읽는 경우가 있다(정직하게 비워 둔다)
+ *   · copyright가 DEP-5 형식이 아니면 `License:` 줄이 없다(오래된 패키지에 흔하다).
+ *   · 그런 패키지는 "-"로 남는다 — **추측해서 채우지 않는다.**
+ */
+export const 데비안라이선스명령 =
+  "grep -m1 -H '^License:' /usr/share/doc/*/copyright";
+
+/**
+ * `/usr/share/doc/<pkg>/copyright:License: GPL-2+` 꼴을 {패키지 → 라이선스}로.
+ * ⚠ 경로에서 패키지 이름을 뽑는다 — 파일 이름(copyright)이 아니라 **그 위 폴더**다.
+ */
+export function 데비안라이선스파싱(out: string): Record<string, string> {
+  const 표: Record<string, string> = {};
+  for (const line of String(out ?? "").split(/\r?\n/)) {
+    const m = line.match(/^\/usr\/share\/doc\/([^/]+)\/copyright:\s*License:\s*(.+)$/);
+    if (!m) continue;
+    const 이름 = m[1].trim();
+    // 첫 줄만 쓰므로 값이 길 리 없지만, 주석이 붙는 경우가 있어 앞부분만 취한다.
+    const 값 = m[2].trim().split(/\s+(?:and|or)\s+/i)[0].trim();
+    if (!이름 || !값) continue;
+    if (!표[이름]) 표[이름] = 값;   // 먼저 나온 것을 남긴다(grep -m1이라 파일당 하나뿐)
+  }
+  return 표;
+}
+
+/**
+ * 읽은 라이선스를 부품에 채운다. **이미 아는 것은 덮지 않는다** — rpm이 준 값이 더 정확하다.
+ * 못 찾은 것은 "-" 그대로 둔다(지어내지 않는다).
+ */
+export function 라이선스채우기(부품: AssetComponent[], 표: Record<string, string>): AssetComponent[] {
+  return (부품 ?? []).map((c) => {
+    if (c.license && c.license !== "-") return c;
+    const v = 표[c.name];
+    return v ? { ...c, license: v } : c;
+  });
+}
 
 /** 어떤 장비인지 알아내는 **판별 명령**(이것도 읽기 전용). */
 const 판별명령 = "(command -v rpm >/dev/null && echo rpm) || (command -v dpkg-query >/dev/null && echo deb) || echo unknown";
@@ -149,15 +204,28 @@ export async function 패키지수집(run: RunFn, 윈도우 = false): Promise<�
       말: `패키지 목록을 읽지 못했습니다(${종류}). ${r.err ? `사유: ${r.err.slice(0, 120)}` : "접속·권한을 확인해 주세요."} — **부품이 없다는 뜻이 아닙니다.**`,
     };
   }
-  const 부품 = 패키지파싱(종류, r.out);
+  let 부품 = 패키지파싱(종류, r.out);
   if (부품.length === 0) {
     return { ok: false, 종류, 부품: [], 말: `명령은 돌았는데 읽은 부품이 0개입니다(${종류}). 출력 형식이 예상과 다를 수 있습니다 — 확인이 필요합니다.` };
+  }
+  // 데비안 계열은 라이선스를 한 번 더 읽어 채운다(2026-08-05, 중-7).
+  // ⚠ 실패해도 수집 자체는 성공이다 — 라이선스는 부가 정보고, 못 읽으면 "-"로 남긴다.
+  let 라이선스보탬 = 0;
+  if (종류 === "deb") {
+    try {
+      const lr = await run(데비안라이선스명령);
+      const 표 = 데비안라이선스파싱(lr.out);
+      const 전 = 부품.filter((c) => c.license && c.license !== "-").length;
+      부품 = 라이선스채우기(부품, 표);
+      라이선스보탬 = 부품.filter((c) => c.license && c.license !== "-").length - 전;
+    } catch (e) { /* 못 읽어도 목록은 살린다 */ }
   }
   const 라이선스없음 = 부품.filter((c) => c.license === "-").length;
   return {
     ok: true, 종류, 부품,
     말:
       `${종류} 패키지 **${부품.length}개**를 읽었습니다.` +
+      (라이선스보탬 > 0 ? ` copyright 파일에서 라이선스 ${라이선스보탬}개를 더 읽었습니다.` : "") +
       (라이선스없음 ? ` 그중 ${라이선스없음}개는 라이선스를 못 읽었습니다(그 장비가 안 알려 줍니다 — 비워 둡니다).` : ""),
   };
 }

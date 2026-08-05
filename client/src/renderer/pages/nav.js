@@ -91,24 +91,24 @@
     //   늘 하는 일이고, 결과는 ① 발견으로 들어온다. 메뉴를 늘리는 대신 루프가 ①로 돌아오게 둔다.
     // ⚠ 네 업무(취약점·보안제품 운영·AI 보안·보안로그)가 **같은 5단계**를 돈다. 그래서 업무별로
     //   메뉴를 따로 만들지 않는다 — 그러면 메뉴가 4배가 되어 원점이다.
-    { id: "s1-find", icon: "search", num: "1", label: "발견 · 수집", items: [
+    { id: "s1-find", icon: "search", label: "① 발견·수집", items: [
       { page: "analysis.html", label: "통합 관제" },
       { page: "threat.html", label: "위협 인텔" },
       { page: "inventory.html", label: "자산 목록" },
     ]},
-    { id: "s2-triage", icon: "target", num: "2", label: "우선순위", items: [
+    { id: "s2-triage", icon: "target", label: "② 우선순위", items: [
       { page: "vulnscan.html", label: "취약점" },
       { page: "sbom.html", label: "AI-BOM" },
     ]},
-    { id: "s3-fix", icon: "check", num: "3", label: "조치", items: [
+    { id: "s3-fix", icon: "check", label: "③ 조치", items: [
       { page: "approvals.html", label: "조치·승인" },
       { page: "maintenance.html", label: "정기 점검" },
       { page: "terminal.html", label: "명령창" },
     ]},
-    { id: "s4-verify", icon: "shield", num: "4", label: "검증", items: [
+    { id: "s4-verify", icon: "shield", label: "④ 검증", items: [
       { page: "hardening.html", label: "보안설정 점검" },
     ]},
-    { id: "s5-report", icon: "chart", num: "5", label: "보고", items: [
+    { id: "s5-report", icon: "chart", label: "⑤ 보고", items: [
       { page: "report.html", label: "리포트" },
       { page: "kpi.html", label: "보안 KPI" },
       { page: "compliance.html", label: "컴플라이언스" },
@@ -363,17 +363,17 @@
       // 영문 대문자 소제목용 값이라 한글에서는 작고 성글어 읽히지 않았다(2026-07-28 사용자 지적).
       // 2026-08-05(시안 nav-refine-v1): 조용한 소제목 + 가는 선. 이름을 키우지 않고 **선**으로
       // 구역을 나눈다 — 굵은 글씨 9개가 세로로 서면 그것도 목록처럼 읽힌다.
-      ".gn-g{display:flex;align-items:center;gap:6px;height:24px;font-size:10.5px;font-weight:700;color:var(--muted-2);" +
+      ".gn-g{display:flex;align-items:center;gap:6px;height:24px;font-size:11px;font-weight:700;color:var(--muted-2);" +
       "letter-spacing:.6px;margin:9px 6px 1px;padding:0 5px;border-radius:5px;cursor:pointer;user-select:none;}" +
       ".gn-g .gn-gname{flex:0 0 auto;white-space:nowrap;}" +
       ".gn-g .gn-line{flex:1;height:1px;background:var(--border,rgba(255,255,255,.08));min-width:8px;}" +
       // 단계 숫자칩 — 원문자 이모지(①) 대신 테두리 숫자. 뜻은 남기고 톤만 낮춘다.
       ".gn-g .gn-num{flex:0 0 auto;width:14px;height:14px;display:flex;align-items:center;justify-content:center;" +
-      "font-size:9.5px;font-weight:800;border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:3px;opacity:.8;}" +
+      "font-size:11px;font-weight:800;border:1px solid var(--border-strong,rgba(255,255,255,.16));border-radius:3px;opacity:.8;}" +
       ".gn-g:hover{color:var(--blue-light,#7ab0ff);background:rgba(255,255,255,.03);}" +
-      ".gn-g .car{font-size:9px;width:9px;flex:0 0 auto;opacity:.5;transition:transform .13s;}" +
+      ".gn-g .car{font-size:11px;width:9px;flex:0 0 auto;opacity:.5;transition:transform .13s;}" +
       ".gn-g.open .car{transform:rotate(90deg);}" +
-      ".gn-g .cnt{flex:0 0 auto;font-size:10.5px;font-weight:700;color:var(--muted-2);opacity:.7;}" +
+      ".gn-g .cnt{flex:0 0 auto;font-size:11px;font-weight:700;color:var(--muted-2);opacity:.7;}" +
       ".gn-g.open .cnt{opacity:0;}" + // 펼치면 개수는 군더더기 — 눈으로 보인다
       ".gn-g:first-child{margin-top:2px;}" +
       ".gn-kids{display:block;}" +
@@ -632,11 +632,19 @@
       gh.appendChild(car);
       var gic = g.icon ? iconSvg(g.icon) : null;
       if (gic) gh.appendChild(gic);
-      if (g.num) {
-        var num = document.createElement("span"); num.className = "gn-num"; num.textContent = g.num;
+      // ⚠ 이름(g.label)은 **정본 그대로 둔다** — "② 우선순위"는 서버의 「다음 단계」 안내와
+      //   시험이 보는 이름이다(2026-08-05 실측: 화면에서 ②를 떼었더니 챗봇이 "사이드바에 없는
+      //   단계"로 안내하게 됐고 시험이 잡았다). **화면에서만** 원문자를 숫자칩으로 바꿔 그린다.
+      var 원문자 = "①②③④⑤⑥⑦⑧⑨";
+      var 첫 = (g.label || "").charAt(0);
+      var 번호 = 원문자.indexOf(첫);
+      var 보일이름 = g.label;
+      if (번호 >= 0) {
+        var num = document.createElement("span"); num.className = "gn-num"; num.textContent = String(번호 + 1);
         gh.appendChild(num);
+        보일이름 = g.label.slice(1).trim();
       }
-      var nm = document.createElement("span"); nm.className = "gn-gname"; nm.textContent = g.label;
+      var nm = document.createElement("span"); nm.className = "gn-gname"; nm.textContent = 보일이름;
       gh.appendChild(nm);
       var ln = document.createElement("span"); ln.className = "gn-line"; gh.appendChild(ln);
       var cnt = document.createElement("span"); cnt.className = "cnt"; cnt.textContent = g.items.length;

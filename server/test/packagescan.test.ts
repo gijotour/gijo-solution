@@ -17,6 +17,7 @@ vi.mock("../src/engine/llm", () => ({
 
 import {
   수집명령, 안전한명령인가, 장비종류판별, 패키지파싱, 패키지수집, 구성요소합치기, 덮는범위글,
+  데비안라이선스명령, 데비안라이선스파싱, 라이선스채우기,
 } from "../src/engine/packagescan";
 import type { RunFn } from "../src/engine/hardeningscan";
 
@@ -29,7 +30,10 @@ const 가짜실행 = (표: Record<string, { code?: number; out?: string; err?: s
 
 describe("★ 원격으로 보내는 명령이 읽기 전용인가", () => {
   it("수집 명령 전부가 읽기 전용이다 — 이게 무너지면 고객 장비가 바뀐다", () => {
-    for (const [종류, cmd] of Object.entries(수집명령)) {
+    // ⚠ 수집명령만 돌면 **나중에 더한 명령이 감시 밖으로 샌다**(2026-08-05 실측: 데비안
+    //   라이선스 명령을 더했을 때 이 시험이 안 봤다). 원격으로 나가는 명령을 전부 넣는다.
+    const 원격명령 = { ...수집명령, 데비안라이선스: 데비안라이선스명령 };
+    for (const [종류, cmd] of Object.entries(원격명령)) {
       expect(안전한명령인가(cmd), `${종류} 명령이 읽기 전용이 아니다: ${cmd}`).toBe(true);
     }
   });
@@ -43,9 +47,13 @@ describe("★ 원격으로 보내는 명령이 읽기 전용인가", () => {
     expect(시작, "수집명령을 못 찾았다 — 이 시험이 헛돌고 있다").toBeGreaterThan(0);
     const 본문 = src.slice(시작, 끝);
     expect(본문.length).toBeGreaterThan(200);
+    // ⚠ 주석은 **먼저 걷어 낸다**(2026-08-05). 주석에 적은 백틱까지 실패로 잡으면
+    //   "설명을 쓰면 시험이 깨지는" 그물이 되어, 다음 사람이 그물을 느슨하게 풀게 된다.
+    //   막아야 할 것은 **명령 문자열 안의** 값 끼워 넣기다.
+    const 코드 = 본문.replace(/\/\/[^\n]*/g, "");
     // 백틱 템플릿(값 끼워 넣기)과 문자열 더하기가 없어야 한다.
-    expect(본문, "명령에 값을 끼워 넣으면 그 값이 셸로 간다").not.toMatch(/`/);
-    expect(본문.replace(/\/\/[^\n]*/g, ""), "명령을 문자열로 이어붙이지 않는다").not.toMatch(/"\s*\+|\+\s*"/);
+    expect(코드, "명령에 값을 끼워 넣으면 그 값이 셸로 간다").not.toMatch(/`/);
+    expect(코드, "명령을 문자열로 이어붙이지 않는다").not.toMatch(/"\s*\+|\+\s*"/);
   });
 
   it("★ 이 검사가 헛돌지 않는다 — 쓰기 명령은 실제로 걸린다", () => {
@@ -192,5 +200,78 @@ describe("덮는범위글 — 부품 수가 실제보다 정확해 보이지 않
   it("★ 직접 읽은 부품이 하나도 없으면 CPE 수준이라고 밝힌다", () => {
     const 글 = 덮는범위글([{ name: "RHEL 8.10", version: "-", license: "-", from: "scanner" }]);
     expect(글, "이 고지가 없으면 파트너가 지적한 그 상태를 감추는 것이다").toContain("CPE");
+  });
+});
+
+// ── 데비안 라이선스 채우기 (2026-08-05, 중-7) ───────────────────────────────────
+// ★ 실측이 시킨 일: 운영 부품 844개 중 789개가 **장비에서 직접 읽은 것**인데 라이선스가
+//   전부 "-"였다. dpkg-query가 라이선스 칸을 안 주기 때문이다(데비안은 copyright에 적는다).
+describe("데비안 라이선스 채우기", () => {
+  it("copyright 출력에서 {패키지 → 라이선스}를 뽑는다", () => {
+    const out = [
+      "/usr/share/doc/curl/copyright:License: curl",
+      "/usr/share/doc/openssl/copyright:License: OpenSSL and SSLeay",
+      "/usr/share/doc/zlib1g/copyright:License: Zlib",
+      "쓰레기 줄",
+      "/usr/share/doc/bash/copyright:Files: *",         // License: 줄이 아니면 무시
+    ].join("\n");
+    const 표 = 데비안라이선스파싱(out);
+    expect(표.curl).toBe("curl");
+    expect(표.zlib1g).toBe("Zlib");
+    // "A and B"는 앞부분만 — 첫 줄 하나로 정확한 조합을 단정하지 않는다.
+    expect(표.openssl).toBe("OpenSSL");
+    expect(표.bash).toBeUndefined();
+  });
+
+  it("★ 아는 라이선스를 덮지 않고, 모르는 것은 지어내지 않는다", () => {
+    const 부품 = [
+      { name: "curl", version: "8.5", license: "-" },
+      { name: "rpmpkg", version: "1.0", license: "MIT" },   // 이미 아는 값
+      { name: "없는것", version: "1.0", license: "-" },
+    ];
+    const 결과 = 라이선스채우기(부품 as never, { curl: "curl", rpmpkg: "GPL-3" });
+    expect(결과[0].license).toBe("curl");     // 채워졌다
+    expect(결과[1].license).toBe("MIT");      // rpm이 준 값을 덮지 않는다
+    expect(결과[2].license).toBe("-");        // 모르면 모른 채로 둔다
+  });
+
+  it("deb 장비면 라이선스 명령을 한 번 더 돌려 채운다", async () => {
+    const r = await 패키지수집(
+      가짜실행({
+        "command -v rpm": { out: "deb" },
+        "dpkg-query": { out: "curl\t8.5\t\nzlib1g\t1.3\t\n" },
+        "grep -m1 -H": { out: "/usr/share/doc/curl/copyright:License: curl\n" },
+      }),
+    );
+    expect(r.ok).toBe(true);
+    expect(r.부품.find((c) => c.name === "curl")?.license).toBe("curl");
+    expect(r.부품.find((c) => c.name === "zlib1g")?.license).toBe("-");
+    expect(r.말).toContain("라이선스 1개를 더 읽었습니다");
+    expect(r.말).toContain("1개는 라이선스를 못 읽었습니다");   // 남은 것을 감추지 않는다
+  });
+
+  it("라이선스 명령이 실패해도 패키지 목록은 살아 있다", async () => {
+    const r = await 패키지수집(
+      가짜실행({
+        "command -v rpm": { out: "deb" },
+        "dpkg-query": { out: "curl\t8.5\t\n" },
+        "grep -m1 -H": { code: 2, out: "", err: "No such file" },
+      }),
+    );
+    expect(r.ok).toBe(true);
+    expect(r.부품).toHaveLength(1);
+    expect(r.부품[0].license).toBe("-");
+  });
+
+  it("rpm 장비에는 라이선스 명령을 돌리지 않는다 — 이미 라이선스를 준다", async () => {
+    const 부른명령: string[] = [];
+    const 실행: RunFn = async (cmd) => {
+      부른명령.push(cmd);
+      if (cmd.includes("command -v rpm")) return { code: 0, out: "rpm", err: "" };
+      return { code: 0, out: "curl\t8.5\tMIT\n", err: "" };
+    };
+    const r = await 패키지수집(실행);
+    expect(r.부품[0].license).toBe("MIT");
+    expect(부른명령.some((c) => c.includes("grep -m1 -H")), "rpm인데 라이선스 명령을 돌렸다").toBe(false);
   });
 });
