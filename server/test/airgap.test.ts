@@ -33,6 +33,19 @@ describe("에어갭 — 내부/외부 판정(default-deny)", () => {
     }
   });
 
+  // ★ 2026-08-05 검토관 발견(높음): IPv6 ULA 접두사(fc/fd/fe80) 판정을 **호스트명에도** 적용해
+  //   fcm.googleapis.com·fd-cdn.example.com 같은 외부 도메인이 "내부"로 통과했다.
+  //   봉인 ON인 기밀 배치에서 SIEM 호스트를 그런 이름으로 잡으면 감사가 그대로 밖으로 나간다.
+  it("fc/fd/fe80로 시작하는 **도메인**은 내부가 아니다 (IPv6 리터럴만 인정)", () => {
+    for (const h of ["fcm.googleapis.com", "fd-cdn.example.com", "fdx.attacker.io", "fe80-cdn.example.net", "fconnect.io"]) {
+      expect(isPrivateIp(h), h).toBe(false);
+      expect(egressAllowed(`https://${h}/x`).allowed, h).toBe(false);
+    }
+    // 진짜 IPv6 리터럴은 그대로 통과해야 한다(내부망 ULA·link-local)
+    for (const h of ["fd00::1", "fc00::abcd", "fe80::1", "::1"]) expect(isPrivateIp(h), h).toBe(true);
+    expect(egressAllowed("http://[fd00::1]:514/").allowed).toBe(true);
+  });
+
   it("172 대역 경계를 정확히 가른다", () => {
     expect(isPrivateIp("172.15.0.1")).toBe(false); // /12 밖
     expect(isPrivateIp("172.32.0.1")).toBe(false);
@@ -68,6 +81,34 @@ describe("에어갭 카탈로그 — 실제 외부 호출을 다 덮는다(봉�
       }
     }
     expect(missing, `카탈로그에 없는 외부 호스트(봉인 사각지대):\n  ${missing.join("\n  ")}`).toEqual([]);
+  });
+
+  // ★ 2026-08-05 검토관 발견(중간): fetch·소켓 관문은 **우리 프로세스 안**에서만 돈다.
+  //   spawn한 python·HF CLI는 관문 밖이라 "전부 막힘"은 과장이었다 — v2가 없애려던 거짓 안심.
+  it("자식 프로세스 통로가 카탈로그에 있고, 봉인 시 오프라인 env가 물린다", async () => {
+    const { airgapChildEnv } = await import("../src/engine/airgap");
+    expect(EGRESS_POINTS.map((p) => p.id)).toContain("child"); // 정직하게 실려 있다
+    expect(airgapChildEnv(), "봉인 아니면 무영향이어야 한다").toEqual({});
+    vi.stubEnv("GIJO_AIRGAP", "1");
+    try {
+      const env = airgapChildEnv();
+      expect(env.HF_HUB_OFFLINE).toBe("1");
+      expect(env.TRANSFORMERS_OFFLINE).toBe("1");
+    } finally { vi.unstubAllEnvs(); }
+    // 실제 spawn 자리가 이 env를 물었는지 — 만들어 놓고 안 부르면 아무 소용이 없다
+    const dir = path.join(__dirname, "../src/engine");
+    for (const f of ["hfmodels.ts", "learnloop.ts", "finetune.ts"]) {
+      expect(fs.readFileSync(path.join(dir, f), "utf8"), `${f}가 airgapChildEnv를 안 씀`).toContain("airgapChildEnv()");
+    }
+  });
+
+  it("상태 문구가 '전부 막혔다'고 과장하지 않는다 (범위를 밝힌다)", () => {
+    const src = fs.readFileSync(path.join(__dirname, "../src/engine/agenttools.ts"), "utf8");
+    const i = src.indexOf("에어갭 봉인: 🔒 ON");
+    expect(i, "봉인 ON 문구를 못 찾음 — 이 시험이 헛돌고 있다").toBeGreaterThan(0);
+    const 문구 = src.slice(i, i + 600);
+    expect(문구).toContain("제품이 직접 여는");   // 범위 명시
+    expect(문구).toContain("완전한 차단은 아닙니다"); // 한계 명시
   });
 
   it("이 대조가 헛돌지 않는다 — 카탈로그가 비지 않았다", () => {

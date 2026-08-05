@@ -18,6 +18,7 @@ import * as fs from "fs";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { attachProcessLogging, recordProcessOutput } from "./logs";
+import { airgapChildEnv } from "./airgap";
 import { getModelAuthSecrets } from "./modelauth";
 
 const HF_API_BASE = "https://huggingface.co/api";
@@ -81,7 +82,9 @@ export function buildDownloadEnv(base: NodeJS.ProcessEnv = process.env): NodeJS.
     env.HTTPS_PROXY = proxyUrl;
     env.HTTP_PROXY = proxyUrl;
   }
-  return env;
+  // 에어갭 봉인(후-4) — 자식 프로세스는 우리 fetch 관문 **밖**이라 오프라인 스위치로 누른다.
+  //   봉인이 아니면 빈 객체라 아무 영향이 없다.
+  return { ...env, ...airgapChildEnv() };
 }
 
 // 분할(-00001-of-000NN) 파일인지.

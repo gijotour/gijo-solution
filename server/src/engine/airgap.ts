@@ -37,6 +37,9 @@ export const EGRESS_POINTS: EgressPoint[] = [
   //   봉인 대상 호스트는 설정값이라 고정 이름이 없다(내부망만 허용, 외부는 차단).
   { id: "smtp", label: "메일 발송(SMTP)", host: "설정한 메일 서버(소켓)", 대체: "내부망 릴레이만 허용 · 외부 메일 서버는 봉인" },
   { id: "siem", label: "SIEM 전달(syslog UDP·TCP·TLS)", host: "설정한 SIEM 서버(소켓)", 대체: "내부망 SIEM만 허용 · 외부는 봉인" },
+  // ⚠ 자식 프로세스는 우리 관문 **밖**이다(2026-08-05 검토 지적). 오프라인 환경변수로 눌러
+  //   두지만 완전한 차단은 아니라, 카탈로그에 이렇게 **정직하게** 싣는다.
+  { id: "child", label: "학습·병합 도구(python·HF CLI)", host: "자식 프로세스(관문 밖)", 대체: "HF 오프라인 강제(HF_HUB_OFFLINE 등) · 사전 반입한 캐시·모델만 사용" },
 ];
 
 const LOOPBACK = new Set(["localhost", "127.0.0.1", "::1", "0.0.0.0"]);
@@ -54,6 +57,12 @@ export function isPrivateIp(host: string): boolean {
     return false;
   }
   const h = host.replace(/^\[|\]$/g, "").toLowerCase(); // IPv6 대괄호 제거
+  // ⚠ **IPv6 리터럴일 때만** 접두사를 본다(2026-08-05 검토관이 잡은 구멍).
+  //   그전엔 `startsWith("fc"|"fd"|"fe80")`를 호스트명에도 적용해 **fcm.googleapis.com·
+  //   fd-cdn.example.com 같은 외부 도메인이 "사설 IP 대역"으로 통과**했다 —
+  //   봉인의 default-deny("확실히 내부일 때만 통과")와 정면으로 어긋난다.
+  //   IPv6는 콜론이 있어야 한다: 도메인 이름에는 콜론이 못 들어간다(포트는 호출자가 이미 뗀다).
+  if (!h.includes(":")) return false; // 콜론 없음 = 호스트명 → 내부로 인정하지 않는다
   if (h === "::1") return true;
   if (h.startsWith("fc") || h.startsWith("fd")) return true; // ULA fc00::/7
   if (h.startsWith("fe80")) return true;                     // link-local
@@ -156,6 +165,25 @@ export function installAirgapGuard(): void {
   };
   globalThis.fetch = guarded;
   console.log(`[airgap] 봉인 ON 🔒 — 비-내부 fetch 전량 차단(외부 통로 ${EGRESS_POINTS.length}종). 명시 허용: ${명시허용().join(", ") || "(없음)"}`);
+}
+
+/**
+ * 자식 프로세스(python 학습·병합, HF CLI)에 물릴 봉인 환경변수. 봉인이 아니면 **빈 객체**(무영향).
+ *
+ * ⚠ 왜 별도인가(2026-08-05 검토 지적): fetch 관문도 소켓 관문도 **우리 프로세스 안**에서만 돈다.
+ *   spawn한 python은 부모의 globalThis.fetch 패치를 물려받지 않아 그대로 밖으로 나갈 수 있다.
+ *   HF 계열은 표준 오프라인 스위치를 존중하므로 그것을 강제한다.
+ * ⚠ **이건 완전한 차단이 아니다** — python이 임의 소켓을 열면 우리가 막을 수 없다.
+ *   그래서 상태 문구도 "제품이 직접 여는 통로"라고 범위를 밝힌다(거짓 안심 금지).
+ */
+export function airgapChildEnv(): Record<string, string> {
+  if (!isAirgapOn()) return {};
+  return {
+    HF_HUB_OFFLINE: "1",        // huggingface_hub — 네트워크 조회 거부(캐시만)
+    TRANSFORMERS_OFFLINE: "1",  // transformers — 허브 조회 안 함
+    HF_DATASETS_OFFLINE: "1",
+    NO_PROXY: "*",
+  };
 }
 
 export interface AirgapStatus {

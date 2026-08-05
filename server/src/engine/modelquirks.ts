@@ -129,6 +129,11 @@ export function thinkingOverride(modelId: string): boolean | null {
 export function setThinkingOverride(modelId: string, thinking: boolean | null): void {
   if (thinking === null) db.prepare("DELETE FROM app_state WHERE key = ?").run(`modelQuirks:${modelId}`);
   else setStateStmt.run(`modelQuirks:${modelId}`, JSON.stringify({ thinking }));
+  // ⚠ **캐시를 반드시 버린다**(2026-08-05 검토관이 잡은 결함). 안 버리면 adaptModel이
+  //   파일 mtime·ctx만 보고 캐시본을 그대로 돌려줘, 사람이 고쳐도 다음 로드에 안 먹었다 —
+  //   "다음에 모델을 로드할 때부터 적용됩니다"라고 답해 놓고 **노드 재시작 전엔 영영 안 먹는**
+  //   상태였다. 자동 판별의 마지막 문이 잠겨 있으면 문이 없는 것과 같다.
+  적응캐시.delete(modelId);
 }
 
 // ── 적응 결과 ────────────────────────────────────────────────────────────────
@@ -149,7 +154,13 @@ const 적응캐시 = new Map<string, { mtimeMs: number; adaptation: ModelAdaptat
 /**
  * 모델 하나를 이 환경에 맞춘다 — 기동 직전에 부른다.
  * 반환의 extraArgs를 spawn 인자에 덧붙이고 fittedCtx를 --ctx-size로 쓴다.
- * 비-thinking 모델은 extraArgs가 빈 배열이라 **기존 동작과 완전히 같다.**
+ * 비-thinking 모델은 extraArgs가 빈 배열이다.
+ * ⚠ 다만 **ctx는 thinking 여부와 무관하게** min(티어, native)로 산출된다 — "완전히 같다"는
+ *   말은 부정확했다(2026-08-05 검토 지적). 실측으로 확인한 현재 영향은 0이다:
+ *   현행 함대 native ctx = orchestrator/ko/merged-lily/qwen2.5-14b/exaone **전부 32768**(=티어값),
+ *   qwen3-14b 40960·r1 131072은 티어로 내려가는 게 의도한 동작. 임베딩(bge-m3 8192)은
+ *   적응 경로를 타지 않는다(채팅 풀 전용). **native가 티어보다 작은 모델을 새로 들이면
+ *   그 모델의 ctx가 조용히 줄어든다** — 그때는 적응 카드·상태 도구가 그 사실을 보여준다.
  */
 export function adaptModel(modelId: string, filePath: string, tierCtx: number): ModelAdaptation {
   let mtimeMs = 0;

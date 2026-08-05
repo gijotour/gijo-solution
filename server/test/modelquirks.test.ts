@@ -142,6 +142,29 @@ describe("thinking 판별 · 적응(adaptModel)", () => {
     expect(adaptModel("merged-lily-gijo-loop-ai-securityllm", p, 32768).thinking).toBe(false);
   });
 
+  // ★ 2026-08-05 검토관 발견(높음): setThinkingOverride가 적응 캐시를 안 지워, 이미 적응된
+  //   모델은 사람이 고쳐도 **다음 로드에 안 먹었다**(노드 재시작 전까지). 도구는 "다음에 모델을
+  //   로드할 때부터 적용됩니다"라고 답하는데 실제로는 잠긴 문이었다.
+  //   ⚠ 기존 시험은 **한 번도 적응 안 한 modelId**에 override를 걸어 캐시가 비어 있었다 —
+  //     실제 순서(적응 → 정정 → 재로드)를 안 태워서 못 잡았다. 이 시험이 그 순서를 태운다.
+  it("이미 적응된 모델도 수동 지정이 다음 적응에 즉시 반영된다 (캐시 무효화)", () => {
+    const p = writeTemp(buildGguf([
+      kvString("general.architecture", "llama"),
+      kvU32("llama.context_length", 32768),
+      kvString("tokenizer.chat_template", "{{ messages }}"), // 배선 없음 → 자동은 false
+    ]));
+    지운다.push(p);
+    const 첫판 = adaptModel("캐시시험모델", p, 32768); // ① 먼저 적응(캐시가 채워진다)
+    expect(첫판.thinking).toBe(false);
+    setThinkingOverride("캐시시험모델", true);          // ② 사람이 정정
+    const 재적응 = adaptModel("캐시시험모델", p, 32768); // ③ 같은 파일·같은 ctx로 재로드
+    expect(재적응.thinking, "캐시가 안 지워지면 여기서 false로 남는다").toBe(true);
+    expect(재적응.판별).toBe("override");
+    expect(재적응.extraArgs).toEqual(["--reasoning", "off", "--reasoning-budget", "0"]);
+    setThinkingOverride("캐시시험모델", null);          // ④ 해제도 즉시 반영
+    expect(adaptModel("캐시시험모델", p, 32768).thinking).toBe(false);
+  });
+
   it("admin 수동 지정이 자동 판별을 이긴다 (마지막 문)", () => {
     const p = writeTemp(buildGguf([
       kvString("tokenizer.chat_template", "{%- if enable_thinking %}..."),

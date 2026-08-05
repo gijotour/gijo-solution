@@ -1220,7 +1220,9 @@ export function registerDispatcherRoutes(app: Express): void {
         //   (2026-08-04 자체 검토: 없으면 도구 내부 감사가 '담당자(대화창)' 일반값으로 남았다).
         const output = await runWithViewer(
           { userId: user?.id, clearance: user?.clearance },
-          () => executeApprovedTool(toolName, args)
+          // ⚠ 실행자 권한을 넘긴다 — 이 라우트는 authMiddleware(로그인)만 지나므로,
+          //   admin 전용 도구를 막는 곳은 executeApprovedTool뿐이다(2026-08-05 검토 지적).
+          () => executeApprovedTool(toolName, args, user?.role)
         );
         const undoId = undoCommit(toolName, output.slice(0, 50), undoBefore); // 변화 있으면 되돌리기 항목 등록
         collab(undefined, { from: "orchestrator", to: "orchestrator", message: `실행 완료: ${collabNote(output)}` });

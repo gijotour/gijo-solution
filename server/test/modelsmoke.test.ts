@@ -3,6 +3,8 @@
 // 스모크 판정은 LLM이 아니라 글자 규칙이다(LLM이 LLM을 채점하면 회차마다 흔들린다 — 게이트 원칙).
 // 여기서는 그 규칙 자체가 정직한지: 빈 답·생각 누출·영어 답·지시 무시·거절 없음을 제대로 가르는지 잰다.
 import { describe, it, expect } from "vitest";
+import fs from "node:fs";
+import path from "node:path";
 import { SMOKE_PROBES } from "../src/engine/modelsmoke";
 import { forcedToolFor } from "../src/engine/agentloop";
 import { findAgentTool } from "../src/engine/agenttools";
@@ -63,6 +65,28 @@ describe("도구 계약", () => {
     expect((w.effect?.({ model: "m", mode: "켬" }) ?? "")).toContain("다음 로드부터");
     expect((w.undo ?? "").length).toBeGreaterThan(5);
   });
+  // ★ 2026-08-05 검토관 발견(높음): requiredRole은 **목록에서 숨기는 것**뿐이었고 실행 문턱에
+  //   권한 검사가 없었다 — 담당자가 /api/agent/approve를 직접 부르면 admin 도구가 그냥 돌았다.
+  //   숨기기(목록)와 막기(실행)는 다른 일이다. 이 시험이 실행 쪽을 지킨다.
+  it("admin 전용 쓰기 도구는 권한 없이 승인 실행되지 않는다 (화면 우회 방어)", async () => {
+    const { executeApprovedTool } = await import("../src/engine/agenttools");
+    await expect(executeApprovedTool("set_model_thinking", { model: "m", mode: "켬" }, "security_officer"))
+      .rejects.toThrow(/관리자만/);
+    await expect(executeApprovedTool("set_model_thinking", { model: "m", mode: "켬" }))
+      .rejects.toThrow(/관리자만/); // role 미지정도 막는다(안전 기본값)
+    await expect(executeApprovedTool("knowledge_bundle_import", { file: "x.gijobundle" }, "security_officer"))
+      .rejects.toThrow(/관리자만/);
+    // admin은 통과해 도구 자체 검증까지 간다(권한에서 막히지 않는다)
+    const out = String(await executeApprovedTool("set_model_thinking", { model: "권한시험", mode: "켬" }, "admin"));
+    expect(out).toContain("다음에 모델을 로드할 때부터");
+    setThinkingOverride("권한시험", null);
+  });
+
+  it("승인 라우트가 실행자 role을 넘긴다 — 검사가 있어도 안 넘기면 무권한이 된다", () => {
+    const src = fs.readFileSync(path.join(__dirname, "../src/engine/dispatcher.ts"), "utf8");
+    expect(src).toContain("executeApprovedTool(toolName, args, user?.role)");
+  });
+
   it("set_model_thinking 실행이 지정을 저장하고, 빈 입력은 안내로 되돌린다", async () => {
     const w = findAgentTool("set_model_thinking")!;
     expect(String(await w.run({ model: "", mode: "끔" }))).toContain("모델 이름");

@@ -30,6 +30,7 @@ import { startFinetune, isFinetuneRunning } from "./finetune";
 import { pauseInferenceEngines, resumeInferenceEngines } from "./localengine";
 import { setAgentModel, getAgentById } from "./agents";
 import { attachProcessLogging, recordProcessOutput } from "./logs";
+import { airgapChildEnv } from "./airgap";
 
 const MODELS_DIR = process.env.GIJO_MODELS_DIR ?? "models";
 const SMOKE = () => process.env.GIJO_LEARNLOOP_SMOKE === "1";
@@ -470,7 +471,8 @@ function runExport(datasetId: string, outputModelId: string): Promise<void> {
     const args = ["scripts/export_gguf.py", "--adapter", adapter, "--model-id", outputModelId];
     recordProcessOutput("learnloop-export", "log", `$ python ${args.join(" ")}`);
     // PYTHONUTF8=1: cp949 콘솔에서 한국어/특수문자 로그가 깨지거나 스크립트가 죽는 함정 방지.
-    const proc = spawn("python", args, { env: { ...process.env, PYTHONUTF8: "1" } });
+    // 에어갭 봉인 시 HF 오프라인 강제(자식 프로세스는 fetch 관문 밖) — 봉인 아니면 무영향.
+    const proc = spawn("python", args, { env: { ...process.env, PYTHONUTF8: "1", ...airgapChildEnv() } });
     attachProcessLogging(proc, "learnloop-export");
     let stderrTail = "";
     proc.stderr?.on("data", (d) => {

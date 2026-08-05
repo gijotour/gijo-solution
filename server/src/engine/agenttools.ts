@@ -2590,8 +2590,11 @@ async function runAirgapStatus(): Promise<string> {
   const s = airgapStatus();
   const lines: string[] = [];
   if (s.on) {
-    lines.push("에어갭 봉인: 🔒 ON — 인터넷으로 나가는 길이 전부 막혀 있습니다.");
+    // ⚠ "전부 막혔다"고 말하지 않는다(2026-08-05 검토 지적) — 자식 프로세스(python 학습·병합)는
+    //   우리 관문 밖이라, 범위를 밝히지 않으면 v2가 없애려던 **거짓 안심**을 우리가 다시 만든다.
+    lines.push("에어갭 봉인: 🔒 ON — 제품이 직접 여는 인터넷 통로는 전부 막혀 있습니다.");
     lines.push(`· 봉인한 외부 통로 ${s.points.length}종 · 봉인 후 차단된 시도 ${s.blockedCount}건`);
+    lines.push("⚠ 다만 학습·병합에 쓰는 외부 도구(python)는 제품 밖에서 도는 프로그램이라, 오프라인으로 눌러 두되 완전한 차단은 아닙니다 — 그 기능을 쓰지 않거나 사전 반입한 캐시로만 쓰세요.");
   } else {
     lines.push("에어갭 봉인: 열림 — 외부 통로가 열려 있는 일반 배치입니다.");
     lines.push("(기밀·방산 폐쇄망은 서버를 GIJO_AIRGAP=1로 띄워 봉인합니다.)");
@@ -3891,10 +3894,19 @@ export function buildApproval(
 
 // 승인된 쓰기 도구를 실행한다 — 화면에서 사람이 확인(값 수정 가능)한 뒤에만 여기로 온다.
 // 규칙 검증은 여기서 한 번 더 한다(화면을 우회한 호출 방어).
-export async function executeApprovedTool(toolName: string, args: Record<string, string>): Promise<string> {
+//
+// ⚠ **권한도 여기서 다시 본다**(2026-08-05 검토관이 잡은 결함). requiredRole은 그전까지
+//   listToolsFor가 **목록에서 숨기는 것**뿐이었다 — 실행 문턱에는 검사가 하나도 없어서
+//   담당자(security_officer)가 /api/agent/approve를 직접 부르면 admin 전용 도구가 그냥 돌았다.
+//   결재판은 "LLM의 오발동"을 막는 장치지 "권한 없는 직접 호출"을 막는 장치가 아니다.
+//   숨기기(목록)와 막기(실행)는 다른 일이고, 막는 쪽이 없으면 숨기기는 장식이다.
+export async function executeApprovedTool(toolName: string, args: Record<string, string>, role?: string): Promise<string> {
   const tool = findAgentTool(toolName);
   if (!tool) throw new Error(`존재하지 않는 도구: ${toolName}`);
   if (!tool.write) throw new Error(`${toolName}은(는) 승인이 필요한 쓰기 도구가 아닙니다`);
+  if (tool.requiredRole === "admin" && role !== "admin") {
+    throw new Error(`${tool.label}은(는) 관리자만 실행할 수 있습니다.`);
+  }
   const invalid = validateToolArgs(tool, args);
   if (invalid) throw new Error(invalid);
   return String(await tool.run(args));

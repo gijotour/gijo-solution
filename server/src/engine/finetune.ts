@@ -7,6 +7,7 @@ import { spawn } from "child_process";
 import { authMiddleware } from "../auth/auth";
 import { recordProcessOutput } from "./logs";
 import { pauseInferenceEngines, resumeInferenceEngines } from "./localengine";
+import { airgapChildEnv } from "./airgap";
 
 export interface FinetuneArgs {
   agentId: string;
@@ -103,7 +104,8 @@ function spawnTraining(args: FinetuneArgs): Promise<void> {
     // PYTHONUTF8=1: Windows 기본 콘솔 코드페이지(cp949)로는 한국어 로그가 파이프에서 깨지고
     // em-dash 같은 문자는 UnicodeEncodeError로 스크립트를 죽인다 (modelscan_wrapper와 같은 함정).
     const proc = spawn("python", scriptArgs, {
-      env: { ...process.env, PYTHONUTF8: "1", ...(args.baseModel ? { GIJO_FT_BASE_MODEL: args.baseModel } : {}) },
+      // 에어갭 봉인 시 HF 오프라인 강제(자식 프로세스는 fetch 관문 밖) — 봉인 아니면 무영향.
+      env: { ...process.env, PYTHONUTF8: "1", ...(args.baseModel ? { GIJO_FT_BASE_MODEL: args.baseModel } : {}), ...airgapChildEnv() },
     });
     let stderrTail = "";
     let settled = false;
