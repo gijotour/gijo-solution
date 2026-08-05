@@ -364,7 +364,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     if(!rep || rep.total == null){
       document.getElementById("effScore").textContent = "-";
       document.getElementById("effLeakWord").textContent = "미측정";
-      document.getElementById("effRanAt").textContent = "아직 실효 점검 기록이 없습니다 — [실효 점검 실행]을 누르면 지금 방어 상태를 잽니다.";
+      // ⚠ 버튼 이름을 **화면에 있는 그대로** 적는다(2026-08-06 promise-check가 잡았다).
+      //   예전엔 「실효 점검 실행」이라 적어 뒀는데 실제 버튼은 「▶ 지금 점검」이라, 안내대로
+      //   찾으면 그런 버튼이 없다. 빈 화면 안내는 **처음 온 사람만** 보는 글이라 평소 눈에
+      //   안 띄고, 하필 그 사람이 가장 헤맨다.
+      document.getElementById("effRanAt").textContent = "아직 실효 점검 기록이 없습니다 — 위 [▶ 지금 점검]을 누르면 지금 방어 상태를 잽니다.";
       return;
     }
     const leaked = rep.leaked || 0;

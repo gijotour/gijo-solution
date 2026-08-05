@@ -20,6 +20,7 @@
 //   shell       대시보드 팝업 셸 (tools/qa-shell.mjs — CDP 9223 필요)
 //   download    파일 받기가 실제로 저장되는가 (tools/qa-download.mjs — ⚠ Playwright 금지·순수 CDP)
 //   sweep       Electron 전 화면 스윕 (menu-sweep — CDP 9223 필요, 없으면 안내 후 스킵)
+//   promise     화면이 적어 둔 「누르면 …됩니다」 약속이 실제 버튼 이름과 맞는가 (promise-check)
 //   viz         그림 띠를 눌렀을 때 좁혀진 목록이 **그 화면에 보이는가** (viz-gap-measure — CDP 9223)
 //   drawer      대화창 서랍이 약속한 질문이 실제로 되는가 (tools/drawer-audit.mjs)
 
@@ -72,16 +73,16 @@ for (const f of changed) {
   if (DOWNLOAD_RE.test(f)) { picks.add("download"); reasons.push(`${f} → 파일 받기 계층`); }
   if (QUALITY_RE.test(f)) { picks.add("knowledge"); picks.add("maintenance"); picks.add("regress"); picks.add("vitest"); reasons.push(`${f} → 지식·시나리오·회귀`); }
   else if (f.startsWith("server/")) { picks.add("vitest"); reasons.push(`${f} → 서버 단위테스트`); }
-  else if (f.startsWith("client/src/")) { picks.add("client"); picks.add("sweep"); picks.add("viz"); reasons.push(`${f} → 클라 실페이지·스윕·띠 자리`); }
+  else if (f.startsWith("client/src/")) { picks.add("client"); picks.add("sweep"); picks.add("viz"); picks.add("promise"); reasons.push(`${f} → 클라 실페이지·스윕·띠 자리·적어 둔 약속`); }
   if (DRAWER_RE.test(f)) { picks.add("drawer"); reasons.push(`${f} → 서랍 약속 점검`); }
   if (ROUTING_RE.test(f)) { picks.add("routing"); picks.add("vitest"); reasons.push(`${f} → 라우팅 겹침·규칙표`); }
   else if (f.startsWith("tools/regress/") || f.startsWith("rag-seed/")) { picks.add("regress"); reasons.push(`${f} → 회귀 하네스`); }
 }
-if (ALL) for (const l of ["vitest", "client", "knowledge", "maintenance", "regress", "verify", "shell", "download", "sweep", "viz", "drawer", "routing"]) picks.add(l);
+if (ALL) for (const l of ["vitest", "client", "knowledge", "maintenance", "regress", "verify", "shell", "download", "sweep", "viz", "drawer", "routing", "promise"]) picks.add(l);
 if (FAST) { picks.delete("vitest"); picks.delete("maintenance"); }
 
 console.log(`■ QA 전수조사 — 기준: ${since ? since.slice(0, 8) + "..HEAD" : "(첫 실행 — 마커 없음, 전 계층)"}`);
-if (!since) for (const l of ["vitest", "client", "knowledge", "maintenance", "regress", "verify", "shell", "download", "sweep", "viz", "drawer", "routing"]) { if (!FAST || (l !== "vitest" && l !== "maintenance")) picks.add(l); }
+if (!since) for (const l of ["vitest", "client", "knowledge", "maintenance", "regress", "verify", "shell", "download", "sweep", "viz", "drawer", "routing", "promise"]) { if (!FAST || (l !== "vitest" && l !== "maintenance")) picks.add(l); }
 console.log(`  변경 파일 ${changed.length}개 → 계층 [${[...picks].join(", ")}]${ALL ? " (--all)" : ""}${FAST ? " (--fast)" : ""}`);
 for (const r of reasons.slice(0, 8)) console.log(`   · ${r}`);
 if (reasons.length > 8) console.log(`   · … 외 ${reasons.length - 8}건`);
@@ -129,6 +130,10 @@ run("regress", "node", ["tools/regress/run.mjs"]);
 run("verify", "node", ["tools/qa-verify.mjs"]);
 // 서랍은 "이건 된다"고 약속하는 자리다 — 한 번 확인하고 두면 데이터가 바뀌며 늙는다.
 run("drawer", "node", ["tools/drawer-audit.mjs"]);
+// 화면이 적어 둔 「누르면 …됩니다」 약속 — 특히 **버튼 이름을 콕 집은 안내**가 실제 이름과
+//   맞는지. 실측(2026-08-06): 레드팀 화면이 「실효 점검 실행」을 누르라는데 버튼은 「▶ 지금 점검」
+//   이었다. 빈 화면 안내는 처음 온 사람만 보는 글이라 평소 눈에 안 띈다.
+run("promise", "node", ["tools/promise-check.mjs"]);
 // 라우팅 겹침 — 규칙을 넓힐 때마다 사람이 기억해서 돌리는 방식은 반드시 샌다.
 //   실측(2026-08-02): 넓은 규칙을 앞에 넣어 today를 가로챘고 라우팅이 100%→96.9%로 떨어졌는데,
 //   평가 게이트(20분)를 돌리고서야 알았다. 여기서는 1초에 알린다.
