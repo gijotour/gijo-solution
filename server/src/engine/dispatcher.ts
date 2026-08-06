@@ -40,6 +40,7 @@ import { ACTION_CHECK_RE, runActionCheck } from "./actioncheck";
 import { appendTurn, recentTurnsText, getSession, createSession } from "./worksessions";
 import { LONG_ANSWER_MS, QA_LONG_ANSWER_MS, startLongAnswer, finishLongAnswer, failLongAnswer } from "./longanswer";
 import { runWithProgress, isValidProgressId, reportProgress, reportBigStep, registerProgressRoutes } from "./progress";
+import { recordAnswerTiming } from "./observability";
 
 // 협업 로그는 "무슨 일이 있었나"를 남기는 활동 기록이다 — 답변 전문을 그대로 실으면 화면에
 // 같은 글이 두 번 보인다(2026-07-26 사용자 지적: 같은 답이 연달아 두 번 나옴). 앞부분만 남긴다.
@@ -1152,6 +1153,7 @@ export function registerDispatcherRoutes(app: Express): void {
       //   (실측 2026-07-31: 라우팅 축에서 2문항이 그렇게 빠졌다).
       //   무한정은 아니다. 매달린 요청이 게이트를 영영 멈추게 하면 안 되므로 상한을 둔다.
       const limitMs = qa ? QA_LONG_ANSWER_MS : LONG_ANSWER_MS;
+      const t0 = Date.now(); // 느린 답 원장(관측성) — 담당자를 기다리게 한 질문을 제품이 스스로 적는다
       const work = runWithProgress(progressId, user?.id ?? null, () =>
         dispatchInstruction(text, sessionId, screen, user?.displayName, qa, isNonLearningAccount(user?.username), { userId: user?.id, clearance: user?.clearance, role: user?.role })
       );
@@ -1160,6 +1162,7 @@ export function registerDispatcherRoutes(app: Express): void {
       const first = await Promise.race([work, timer]);
 
       if (first !== null) {
+        recordAnswerTiming(text, Date.now() - t0, qa, (first as { route?: { agentId?: string } }).route?.agentId);
         // 말투 규범 감시 — **여기가 답이 담당자에게 나가는 마지막 지점**이다.
         // ⚠ 막지 않는다. 기록만 하고 답은 그대로 보낸다(tonewatch.ts 머리말 참고).
         //   오탐 하나로 답이 통째로 막히면 놓치는 것보다 나쁘다.
@@ -1174,6 +1177,8 @@ export function registerDispatcherRoutes(app: Express): void {
       work
         .then(async (r) => {
           if (!handedOff) return;
+          // 리포트로 넘어간 답도 소요 시간은 적는다 — 30초를 넘긴 것이야말로 원장의 몫이다.
+          recordAnswerTiming(text, Date.now() - t0, qa, r.route?.agentId);
           await finishLongAnswer(longId, r.output || "(내용 없음)", actor);
         })
         .catch((e: unknown) => {

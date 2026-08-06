@@ -321,9 +321,55 @@ function checkEmbedding(): HealthCheck {
   }
 }
 
+// ── 느린 답 원장 ─────────────────────────────────────────────────────────────
+// 왜(2026-08-07): 147상황에서 "이번 주 예정된 점검"이 30초, "KISA 대응 현황"이 31초 —
+// **매번 사후에 수동으로 추적**해야 어떤 질문이 왜 느렸는지 알 수 있었다. 온프렘에선
+// 우리가 그 자리에 없다. 담당자를 기다리게 한 질문을 제품이 스스로 적어 두고,
+// 자가 진단이 "요즘 어떤 질문이 느린가"를 한 줄로 답한다.
+db.exec(`CREATE TABLE IF NOT EXISTS slow_answers (
+  at INTEGER NOT NULL,
+  question TEXT NOT NULL,   -- 담당자가 친 문장(앞 200자) — 느린 이유를 찾는 열쇠다
+  ms INTEGER NOT NULL,
+  agentId TEXT              -- 어느 경로가 받았나(있으면)
+)`);
+
+/** 이보다 오래 걸리면 "담당자를 기다리게 했다"로 적는다. 리포트 전환(30초)보다 훨씬 앞이다. */
+export const SLOW_ANSWER_MS = 8000;
+
+const insertSlow = db.prepare("INSERT INTO slow_answers (at, question, ms, agentId) VALUES (?, ?, ?, ?)");
+const pruneSlow = db.prepare("DELETE FROM slow_answers WHERE at < ?");
+
+/**
+ * 대화창 답변의 소요 시간을 받아, 느린 것만 남긴다.
+ * ⚠ qa(평가 게이트·QA 전수조사) 호출은 **적지 않는다** — 측정 도구가 원장을 도배하면
+ *   실사용자의 느린 답이 묻힌다(작업원장이 테스트 흔적을 배제하는 것과 같은 잣대).
+ */
+export function recordAnswerTiming(question: string, ms: number, qa: boolean, agentId?: string | null): void {
+  if (qa || ms < SLOW_ANSWER_MS) return;
+  try {
+    insertSlow.run(Date.now(), String(question ?? "").slice(0, 200), Math.round(ms), agentId ?? null);
+    pruneSlow.run(Date.now() - 14 * 24 * 3600000); // 14일이면 경향을 보기에 충분하다
+  } catch { /* 원장 기록 실패가 답 전달을 막으면 안 된다 */ }
+}
+
+function checkSlowAnswers(): HealthCheck {
+  const since = Date.now() - 24 * 3600000;
+  const rows = db.prepare("SELECT question, ms FROM slow_answers WHERE at >= ? ORDER BY ms DESC LIMIT 3").all(since) as { question: string; ms: number }[];
+  const n = (db.prepare("SELECT COUNT(*) AS n FROM slow_answers WHERE at >= ?").get(since) as { n: number }).n;
+  if (n === 0) return { id: "slow", label: "최근 24시간 느린 답", level: "ok", detail: `${SLOW_ANSWER_MS / 1000}초 넘게 걸린 답 없음` };
+  const 예 = rows.map((r) => `"${r.question.slice(0, 40)}"(${Math.round(r.ms / 1000)}초)`).join(" · ");
+  return {
+    id: "slow", label: "최근 24시간 느린 답",
+    // 느린 답은 장애가 아니라 **경향**이다 — 몇 건 쌓여야 노랑을 든다.
+    level: n >= 5 ? "warn" : "ok",
+    detail: `${SLOW_ANSWER_MS / 1000}초 초과 ${n}건 — ${예}`,
+    action: n >= 5 ? "같은 질문이 반복해서 느리면 그 문장을 그대로 지원 창구에 알려주세요 — 즉답 경로로 만들 수 있습니다." : undefined,
+  };
+}
+
 export function systemHealth(): SystemHealth {
   // 가장 자주 죽는 것부터 본다 — 모델·임베딩이 앞이다.
-  const checks = [checkModel(), checkEmbedding(), checkBackup(), checkKnowledge(), checkDatabase(), checkRecentErrors(), checkDisk(), checkSiem()].filter((c): c is HealthCheck => c !== null);
+  const checks = [checkModel(), checkEmbedding(), checkBackup(), checkKnowledge(), checkDatabase(), checkRecentErrors(), checkSlowAnswers(), checkDisk(), checkSiem()].filter((c): c is HealthCheck => c !== null);
   // 전체 판정은 가장 나쁜 항목을 따른다 — 평균을 내면 문제 하나가 정상 넷에 묻힌다.
   const level = WORST.find((l) => checks.some((c) => c.level === l)) ?? "ok";
   const bad = checks.filter((c) => c.level === "fail" || c.level === "warn");
