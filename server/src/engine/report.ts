@@ -796,7 +796,12 @@ export async function deleteReport(base: string): Promise<{ deleted: string[] }>
     throw new Error("잘못된 리포트 식별자입니다");
   }
   const deleted: string[] = [];
-  for (const ext of ["docx", "pdf", "json"]) {
+  // ⚠ md를 빼먹으면 **지워지지 않는 리포트**가 생긴다(2026-08-06 사용자 신고 "리포트 삭제했는데
+  //   데이터가 보임"). 이력 목록(listReportHistory)은 md도 리포트로 나열하는데 — 긴 작업 답변
+  //   (longanswer)·파일 인입 진행내역(ingestreport)이 md로 저장된다, 운영 실측 278개 — 삭제
+  //   3종(개별·일괄·전체)은 docx/pdf/json만 지워서, 담당자가 지워도 md 리포트는 그대로 보였다.
+  //   목록에 보이는 것과 지우는 것의 확장자 집합은 **같아야 한다.**
+  for (const ext of ["docx", "pdf", "md", "json"]) {
     const p = path.join(REPORT_DIR, `${safe}.${ext}`);
     try {
       await fs.unlink(p);
@@ -819,7 +824,8 @@ export async function pruneReports(olderThanDays: number): Promise<{ deletedRepo
   const files = await fs.readdir(REPORT_DIR);
   const byBase = new Map<string, string[]>();
   for (const f of files) {
-    const m = /^(.+)\.(docx|pdf|json)$/i.exec(f);
+    // md 포함 — 이력 목록과 같은 확장자 집합(2026-08-06, deleteReport의 주석 참고).
+    const m = /^(.+)\.(docx|pdf|md|json)$/i.exec(f);
     if (!m) continue;
     const arr = byBase.get(m[1]) ?? [];
     arr.push(f);
@@ -858,9 +864,10 @@ export async function deleteAllReports(): Promise<{ deletedReports: number; dele
   const bases = new Set<string>();
   let deletedFiles = 0;
   for (const f of files) {
-    const m = /^(.+)\.(docx|pdf|json)$/i.exec(f);
+    // md 포함 — 이력 목록과 같은 확장자 집합. md만 있는 리포트(긴 작업 답변)도 리포트로 센다.
+    const m = /^(.+)\.(docx|pdf|md|json)$/i.exec(f);
     if (!m) continue;
-    if (/docx|pdf/i.test(m[2])) bases.add(m[1]);
+    if (/docx|pdf|md/i.test(m[2])) bases.add(m[1]);
     try {
       await fs.unlink(path.join(REPORT_DIR, f));
       deletedFiles++;

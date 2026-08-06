@@ -18,7 +18,7 @@ vi.mock("../src/engine/llm", () => ({
 
 const { createApp } = await import("../src/app");
 const { resetAssetsForTests, listAssets } = await import("../src/engine/assets");
-const { maintenanceSummary, collectVulnReportData, vulnCases, stripMetaPreamble } = await import("../src/engine/report");
+const { maintenanceSummary, collectVulnReportData, vulnCases, stripMetaPreamble, deleteReport, pruneReports, deleteAllReports, listReportHistory } = await import("../src/engine/report");
 const { importVulnScan } = await import("../src/engine/vulnscan");
 const { resetKevForTests } = await import("../src/engine/kev");
 const { createTask, resetTasksForTests } = await import("../src/engine/tasks");
@@ -204,5 +204,44 @@ describe("stripMetaPreamble — 요약 서두 메타 문장 제거", () => {
     expect(r).not.toMatch(/살펴볼 수 있는|요약입니다/);
     expect(r).toContain("16건");
     expect(r).toContain("Critical 60건");
+  });
+});
+
+// ── 삭제는 목록과 같은 것을 지운다 (2026-08-06 사용자 신고 "리포트 삭제했는데 데이터가 보임") ──
+// 이력 목록(listReportHistory)은 md도 리포트로 나열한다 — 긴 작업 답변(longanswer)·파일 인입
+// 진행내역(ingestreport)이 md로 저장된다(운영 실측 278개). 그런데 삭제 3종이 docx/pdf/json만
+// 지워서, 담당자가 "전체 삭제"를 눌러도 md 리포트는 목록에 그대로 남았다.
+// **목록에 보이는 확장자 집합과 지우는 집합은 같아야 한다** — 이 시험이 그 계약을 지킨다.
+describe("리포트 삭제 — 목록에 보이는 것은 지워진다", () => {
+  const 만들기 = (base: string, exts: string[]) => {
+    for (const e of exts) fs.writeFileSync(path.join(tmpReportDir, `${base}.${e}`), `내용-${base}`);
+  };
+  const 남은파일 = () => fs.readdirSync(tmpReportDir).filter((f) => /\.(docx|pdf|md|json)$/i.test(f));
+
+  it("★ 개별 삭제 — md 리포트도 지워진다", async () => {
+    만들기(`answer-${Date.now()}`, ["md", "json"]);
+    const base = 남은파일()[0].replace(/\.[a-z]+$/i, "");
+    await deleteReport(base);
+    expect(남은파일().filter((f) => f.startsWith(base)), "md가 남으면 목록에 계속 보인다").toHaveLength(0);
+  });
+
+  it("★ 전체 삭제 — md만 있는 리포트도 리포트로 세고 지운다", async () => {
+    만들기(`answer-${Date.now()}`, ["md"]);
+    만들기(`vuln-${Date.now()}`, ["docx", "json"]);
+    const r = await deleteAllReports();
+    expect(r.deletedReports).toBeGreaterThanOrEqual(2); // md만 있는 것도 리포트다
+    expect(남은파일()).toHaveLength(0);
+    expect((await listReportHistory()).length, "지웠는데 이력에 남으면 이 신고가 재발한다").toBe(0);
+  });
+
+  it("★ 일괄(N일 이전) 삭제 — 오래된 md도 지워진다", async () => {
+    const 옛 = Date.now() - 40 * 86400000;
+    만들기(`answer-${옛}`, ["md"]);         // 파일명 타임스탬프가 40일 전
+    만들기(`answer-${Date.now()}`, ["md"]); // 방금 것 — 남아야 한다
+    const r = await pruneReports(30);
+    expect(r.deletedReports).toBe(1);
+    const 남은 = 남은파일();
+    expect(남은).toHaveLength(1);
+    expect(남은[0]).not.toContain(String(옛));
   });
 });
