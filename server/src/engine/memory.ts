@@ -240,7 +240,8 @@ export function categorizeByRules(documentId: string, text: string): Category | 
 }
 
 /** 업무영역 확정 — 규칙 → (허용 시) LLM → "일반". LLM 실패해도 인입은 계속된다. */
-async function categorizeDocument(documentId: string, text: string, allowLlm: boolean): Promise<Category> {
+// export는 시험용이다(2026-08-07 검토관: 분류 거부 계약이 소스 문자열 검사로만 증명돼 있었다)
+export async function categorizeDocument(documentId: string, text: string, allowLlm: boolean): Promise<Category> {
   const byRule = categorizeByRules(documentId, text);
   if (byRule) return byRule;
   if (!allowLlm) return "일반";

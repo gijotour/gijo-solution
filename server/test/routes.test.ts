@@ -18,12 +18,24 @@ const 소스: Record<string, string> = {
 };
 
 describe("라우팅 규칙표 — 표가 코드를 정직하게 말한다", () => {
-  it("표가 가리키는 판별자가 코드에 실재한다", () => {
+  it("표가 가리키는 판별자가 코드에 실재하고 **실제로 불린다**", () => {
+    // ⚠ 「파일에 그 글자가 있다」로만 봤다가 치명 결함을 놓쳤다(2026-08-07 검토관 발견):
+    //   가리킬것없는대명사가 dispatcher의 **import 줄에만** 있고 호출부가 없는데 초록이었다 —
+    //   규칙표가 거짓을 말하는데 감시가 통과였다. 함수꼴 판별자는 **호출 자리**(이름 뒤 여는 괄호,
+    //   import·export·정의 줄 제외)까지 요구한다.
+    const 불리나 = (파일: string, 이름: string): boolean => {
+      const src = 소스[파일];
+      if (!/^[A-Za-z가-힣_][A-Za-z가-힣0-9_]*$/.test(이름)) return src.includes(이름); // 함수꼴 아님 — 존재만 본다
+      // 쓰임 = 이름 뒤 여는 괄호(함수 호출) 또는 .test( (정규식 판별). import·정의 줄은 쓰임이 아니다.
+      const 쓰임 = new RegExp(`${이름}(\\.test)?\\(`);
+      const 정의 = new RegExp(`function ${이름}\\b|const ${이름}\\s*[=:]`);
+      return src.split("\n").some((l) => !/^\s*import\b/.test(l) && !정의.test(l) && 쓰임.test(l));
+    };
     const 없는것 = 길목록
       .filter((r) => !/^FORCED_INTENTS\[\d+\]$/.test(r.판별))
-      .filter((r) => !r.판별.split(" + ").every((n) => 소스[r.파일].includes(n)))
+      .filter((r) => !r.판별.split(" + ").every((n) => 불리나(r.파일, n)))
       .map((r) => `${r.이름}: ${r.파일} → ${r.판별}`);
-    expect(없는것, `표에 적힌 판별자가 코드에 없다(표가 낡았다):\n  ${없는것.join("\n  ")}`).toEqual([]);
+    expect(없는것, `표에 적힌 판별자가 코드에 없거나 **불리지 않는다**(표가 거짓말한다):\n  ${없는것.join("\n  ")}`).toEqual([]);
   });
 
   it("강제 도구 자리 번호가 실제 배열과 맞는다", () => {

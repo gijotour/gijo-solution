@@ -10,8 +10,6 @@
 //   ② 모델이 고른 영역의 **신호가 0점이면 그 분류를 거부**하고 「일반」으로 둔다 —
 //      모르는 것은 모른다고 두는 편이 틀린 이름표보다 낫다
 import { describe, it, expect, vi } from "vitest";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 
 const chatMock = vi.fn();
 vi.mock("../src/engine/llm", async (importOriginal) => {
@@ -32,14 +30,22 @@ describe("규칙이 스스로 잡는 범위 — 흔한 보안 낱말", () => {
     expect(r).toBeNull();
   });
 
-  it("★★ 신호가 0점인 영역은 분류로 받지 않는다 — 근거 없는 이름표 금지", () => {
-    const 본문 = "방화벽 정책 변경 절차와 담당자 연락망입니다. 피싱 대응 절차도 함께 적어 둡니다.";
-    // 실측에서 7B가 고른 답이 바로 이것이었다 — 그런데 이 문서에 취약점 신호는 0점이다.
-    const src = readFileSync(join(__dirname, "..", "src", "engine", "memory.ts"), "utf8");
-    expect(src, "모델 답을 그대로 받으면 근거 없는 분류가 들어온다").toContain("분류 거부");
-    expect(src).toMatch(/categorySignalScores\(text\)[\s\S]{0,80}\[고른것\] === 0/);
-    // 신호 계산이 실제로 0인지도 확인(거부가 발동할 조건이 맞는지)
-    expect(본문.match(/취약점|CVE-\d{4}|CVSS|위험도|스캔|패치|익스플로잇|EPSS|KEV/g)).toBeNull();
+  it("★★ [행동] 모델이 근거 0점 영역을 골라도 받지 않는다 — 실제 경로로 증명", async () => {
+    // 검토관 지적(2026-08-07): 이 계약이 소스 문자열 검사로만 증명돼 있었다 — 리팩터링으로
+    // 조건이 무력화돼도 글자만 남으면 초록이었다. **모킹한 LLM으로 실제 함수를 태운다.**
+    const { categorizeDocument } = await import("../src/engine/memory");
+    // ⚠ 실측 본문 그대로 쓴다 — 문장을 줄이면 동점이 깨져 **규칙이 스스로 확정**해 버려
+    //   모델 경로(이 시험의 대상)에 아예 안 간다(처음에 그렇게 틀렸다).
+    const 본문 = "방화벽 정책 변경 절차와 담당자 연락망입니다. 피싱 대응 절차도 함께 적어 둡니다. 정기 점검 주기는 분기 1회입니다.";
+    // 실측 재현: 7B가 「취약점」이라 답한다 — 이 문서에 취약점 신호는 0점이므로 거부 → 일반
+    chatMock.mockResolvedValueOnce("취약점");
+    expect(await categorizeDocument("운영메모.md", 본문, true), "근거 없는 분류를 받았다").toBe("일반");
+    // 근거가 있는 답은 받는다 — 피싱·대응 절차는 위협대응 신호가 있다
+    chatMock.mockResolvedValueOnce("위협대응");
+    expect(await categorizeDocument("운영메모.md", 본문, true)).toBe("위협대응");
+    // 모델이 죽어도 인입은 계속된다 — 「일반」 폴백
+    chatMock.mockRejectedValueOnce(new Error("모델 다운"));
+    expect(await categorizeDocument("운영메모.md", 본문, true)).toBe("일반");
   });
 
   it("파일명이 분명하면 내용을 보지 않는다(기존 계약 유지)", () => {
