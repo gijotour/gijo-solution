@@ -412,4 +412,19 @@ export function registerObservabilityRoutes(app: Express): void {
   app.get("/api/system-health", authMiddleware, asyncRoute(async (_req, res) => {
     res.json(systemHealth());
   }));
+
+  // 느린 답 원장 — **반복 등장 질문**이 다음 즉답화(강제 라우팅) 후보다. 같은 질문을 띄어쓰기만
+  // 다르게 쳐도 한 묶음으로 센다. 자가 진단(상위 3건)보다 넓게, 14일 전체를 묶어서 본다.
+  app.get("/api/slow-answers", authMiddleware, asyncRoute(async (_req, res) => {
+    const rows = db.prepare("SELECT question, ms, at, agentId FROM slow_answers ORDER BY at DESC").all() as
+      { question: string; ms: number; at: number; agentId: string | null }[];
+    const 묶음 = new Map<string, { question: string; count: number; maxMs: number; lastAt: number }>();
+    for (const r of rows) {
+      const k = r.question.toLowerCase().replace(/\s+/g, "");
+      const g = 묶음.get(k) ?? { question: r.question, count: 0, maxMs: 0, lastAt: 0 };
+      g.count++; g.maxMs = Math.max(g.maxMs, r.ms); g.lastAt = Math.max(g.lastAt, r.at);
+      묶음.set(k, g);
+    }
+    res.json({ thresholdMs: SLOW_ANSWER_MS, total: rows.length, groups: [...묶음.values()].sort((a, b) => b.count - a.count || b.maxMs - a.maxMs) });
+  }));
 }

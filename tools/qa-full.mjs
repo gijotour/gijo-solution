@@ -73,16 +73,16 @@ for (const f of changed) {
   if (DOWNLOAD_RE.test(f)) { picks.add("download"); reasons.push(`${f} → 파일 받기 계층`); }
   if (QUALITY_RE.test(f)) { picks.add("knowledge"); picks.add("maintenance"); picks.add("regress"); picks.add("vitest"); reasons.push(`${f} → 지식·시나리오·회귀`); }
   else if (f.startsWith("server/")) { picks.add("vitest"); reasons.push(`${f} → 서버 단위테스트`); }
-  else if (f.startsWith("client/src/")) { picks.add("client"); picks.add("sweep"); picks.add("viz"); picks.add("promise"); reasons.push(`${f} → 클라 실페이지·스윕·띠 자리·적어 둔 약속`); }
+  else if (f.startsWith("client/src/")) { picks.add("client"); picks.add("sweep"); picks.add("windows"); picks.add("viz"); picks.add("promise"); reasons.push(`${f} → 클라 실페이지·스윕·띠 자리·적어 둔 약속`); }
   if (DRAWER_RE.test(f)) { picks.add("drawer"); reasons.push(`${f} → 서랍 약속 점검`); }
   if (ROUTING_RE.test(f)) { picks.add("routing"); picks.add("vitest"); reasons.push(`${f} → 라우팅 겹침·규칙표`); }
   else if (f.startsWith("tools/regress/") || f.startsWith("rag-seed/")) { picks.add("regress"); reasons.push(`${f} → 회귀 하네스`); }
 }
-if (ALL) for (const l of ["vitest", "client", "knowledge", "maintenance", "regress", "verify", "shell", "download", "sweep", "viz", "drawer", "routing", "promise"]) picks.add(l);
+if (ALL) for (const l of ["vitest", "client", "knowledge", "maintenance", "regress", "verify", "shell", "download", "sweep", "windows", "viz", "drawer", "routing", "promise"]) picks.add(l);
 if (FAST) { picks.delete("vitest"); picks.delete("maintenance"); }
 
 console.log(`■ QA 전수조사 — 기준: ${since ? since.slice(0, 8) + "..HEAD" : "(첫 실행 — 마커 없음, 전 계층)"}`);
-if (!since) for (const l of ["vitest", "client", "knowledge", "maintenance", "regress", "verify", "shell", "download", "sweep", "viz", "drawer", "routing", "promise"]) { if (!FAST || (l !== "vitest" && l !== "maintenance")) picks.add(l); }
+if (!since) for (const l of ["vitest", "client", "knowledge", "maintenance", "regress", "verify", "shell", "download", "sweep", "windows", "viz", "drawer", "routing", "promise"]) { if (!FAST || (l !== "vitest" && l !== "maintenance")) picks.add(l); }
 console.log(`  변경 파일 ${changed.length}개 → 계층 [${[...picks].join(", ")}]${ALL ? " (--all)" : ""}${FAST ? " (--fast)" : ""}`);
 for (const r of reasons.slice(0, 8)) console.log(`   · ${r}`);
 if (reasons.length > 8) console.log(`   · … 외 ${reasons.length - 8}건`);
@@ -99,11 +99,11 @@ function run(name, cmd, args, opts = {}) {
 
 // Electron이 필요한 계층(스윕·팝업 셸)은 CDP가 살아 있을 때만 — 없으면 스킵 사유를 남긴다
 // (자동 기동은 하지 않는다: 쓰고 있는 세션을 방해하지 않기 위해).
-if (picks.has("sweep") || picks.has("shell") || picks.has("download") || picks.has("viz")) {
+if (picks.has("sweep") || picks.has("shell") || picks.has("download") || picks.has("viz") || picks.has("windows")) {
   const cdpUp = await fetch("http://127.0.0.1:9223/json/version").then((r) => r.ok).catch(() => false);
   if (!cdpUp) {
     console.log("\n── [sweep/shell/download] 스킵 — Electron(CDP 9223) 미기동. /GIJOAS클라시작 후 로그인하고 다시 돌리면 포함됩니다.");
-    for (const l of ["sweep", "shell", "download", "viz"]) {
+    for (const l of ["sweep", "shell", "download", "viz", "windows"]) {
       if (picks.has(l)) { picks.delete(l); results.push({ name: l, ok: null, ms: 0, note: "스킵(Electron 미기동)" }); }
     }
   }
@@ -117,6 +117,9 @@ if (picks.has("sweep") || picks.has("shell") || picks.has("download") || picks.h
 run("shell", "node", ["tools/qa-shell.mjs"]);
 run("download", "node", ["tools/qa-download.mjs"]);
 run("sweep", "node", ["tools/menu-sweep.mjs"]);
+// 별도 창(문서함·팀 사무실·대화 분리창) — 본창 탭 스윕의 사각지대였다(2026-08-07 실사고:
+// 문서함이 gijomd.js를 안 실어 모든 문서 열기가 TypeError였는데 스윕이 못 잡음).
+run("windows", "node", ["tools/window-sweep.mjs"]);
 // 띠 자리 — "누르면 목록이 좁혀집니다"라 적어 두고 결과가 화면 밖에 있으면 안내가 거짓이 된다.
 //   실측(2026-08-06): 작업 내역 880px·위협 인텔 5,791px 밖이었고, 눈으로는 둘 다 멀쩡해 보였다.
 run("viz", "node", ["tools/viz-gap-measure.mjs"]);
