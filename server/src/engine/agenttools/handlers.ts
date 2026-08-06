@@ -1622,7 +1622,9 @@ export function runAssetCoverage(args: Record<string, string>): string {
   if (!kind) return `알 수 없는 결손 종류입니다: ${args.gap}\n가능한 값: owner(담당부서), service(서비스), sbom, unscanned(미점검)`;
 
   const gap = cov.gaps.find((g) => g.kind === kind);
-  if (!gap) return `${only} 결손은 없습니다. 해당 항목은 전체 ${cov.total}건이 모두 채워져 있습니다.`;
+  // 저장값(unscanned…)을 사람에게 내보이지 않는다 — 말투 규범(영문 상태값 노출 금지).
+  const 우리말: Record<GapKind, string> = { owner: "담당부서 미지정", service: "서비스 미기재", sbom: "SBOM 미생성", unscanned: "미점검" };
+  if (!gap) return `${우리말[kind]} 자산은 없습니다. 전체 ${cov.total}건이 모두 채워져 있습니다.`;
   // ⚠ **내부 id를 그대로 내지 않는다**(2026-08-04 말투 감시가 잡음: `- vuln:cert.aj-safe.co.kr`).
   //   담당자에게 `vuln:` 접두는 아무 뜻이 없고, 그 값으로는 화면에서 찾을 수도 없다.
   //   오늘 오탐 이력에서 고친 것과 같은 종류다 — 사람이 읽는 글자로 낸다.
