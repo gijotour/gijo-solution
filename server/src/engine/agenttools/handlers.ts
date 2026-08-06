@@ -812,7 +812,8 @@ export async function runSearch(args: Record<string, string>): Promise<string> {
 export function runToday(args: Record<string, string>): string {
   const limit = Math.min(Math.max(Number(args.limit) || 5, 1), 20);
   const top = prioritizedReviews(limit);
-  if (top.length === 0) return "지금 조치할 취약점이 없습니다. (오탐 판정·조치완료 제외)";
+  // 조치할 게 없어도 새 문서 소식은 알린다 — 조용한 날일수록 들어온 문서가 그날의 일이다.
+  if (top.length === 0) return ["지금 조치할 취약점이 없습니다. (오탐 판정·조치완료 제외)", 새문서한줄()].filter(Boolean).join("\n");
   const lines = top.map((r, i) => {
     const f = r.finding;
     const tags = [
@@ -833,8 +834,26 @@ export function runToday(args: Record<string, string>): string {
     ...lines,
     overdue ? `⚠ 기한 초과 ${overdue}건 포함` : "",
     시연데이터알림(top.map((r) => r.finding)),
+    새문서한줄(),
     다음걸음("조치·승인 화면에서 담당자·기한을 배정하거나, 여기서 \"1번 담당자 배정해줘\"라고 말해도 됩니다."),
   ].filter(Boolean).join("\n").slice(0, 2500);
+}
+
+// 이번 주 새로 들어온 문서가 있으면 브리핑에 한 줄 알린다(문서 반입 소식, 2026-08-06).
+// 0건이면 아무 줄도 안 붙인다 — 매일 보는 답에 빈 소식을 실으면 그게 잡음이다.
+function 새문서한줄(): string {
+  try {
+    // 동적 require — docdigest는 llm을 물고 있어, 정적 임포트로 today 경로에 무게를 얹지 않는다.
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { listRecentDocs } = require("../docdigest") as typeof import("../docdigest");
+    const rows = listRecentDocs(7);
+    if (!rows.length) return "";
+    const byCat = new Map<string, number>();
+    for (const r of rows) byCat.set(r.category ?? "일반", (byCat.get(r.category ?? "일반") ?? 0) + 1);
+    return `📄 이번 주 새 문서 ${rows.length}건(${[...byCat].map(([c, n]) => `${c} ${n}`).join(" · ")}) — "새로 들어온 문서 알려줘"라고 물으면 요약까지 보입니다.`;
+  } catch {
+    return ""; // 소식 실패가 오늘 우선순위 답을 막으면 안 된다
+  }
 }
 
 /**
@@ -2513,6 +2532,15 @@ export async function runKnowledgeStatus(): Promise<string> {
   const scopes = `범위별: ${Object.entries(byScope).map(([s, n]) => `${s} ${n}`).join(", ")}`;
   const recent = docs.slice(-5).map((d) => `- ${d.documentId}`).reverse();
   return `${head}\n${scopes}\n최근 인입:\n${recent.join("\n")}`;
+}
+
+// ── 문서 반입 소식 (2026-08-06 · 1차 목표 소스 확장 + 후-6) ────────────────
+// "새 문서 뭐 들어왔어?" — 대장(memory_documents)+소식(doc_digests)을 결정적으로 읽는다.
+// 요약이 없으면 없다고 말한다 — CrowdStrike 리포트처럼 올리고 잊히는 문서를 없앤다.
+export async function runRecentDocuments(args: Record<string, string>): Promise<string> {
+  const days = Math.max(1, Math.min(90, Number(args.days) || 7));
+  const { recentDocumentsText } = await import("../docdigest.js");
+  return recentDocumentsText(days);
 }
 
 // ── 지식 번들 현황·반입 (후-3 구독화 코드 슬라이스) ────────────────────────

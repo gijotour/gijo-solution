@@ -276,7 +276,8 @@ describe("★ 목록 끝에 다음 걸음 한 줄 (2026-08-01 하루 실전)", (
 
   it("today 답이 다음 행동을 알려 준다", () => {
     const i = src.indexOf("function runToday");
-    const 본문 = src.slice(i, i + 1400);
+    // 2,400자 — 새 문서 소식 한 줄(2026-08-06)이 끼며 1,400자 창 밖으로 밀렸다(내용은 그대로).
+    const 본문 = src.slice(i, i + 2400);
     expect(본문, "우선순위만 보여 주고 끝나면 담당자가 화면을 헤맨다").toContain("다음걸음(");
   });
 

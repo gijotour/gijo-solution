@@ -570,6 +570,15 @@ export async function ingestText(documentId: string, raw: string, scope: string 
     }
   }
 
+  // 문서 반입 소식(2026-08-06) — 사람이 올린 문서(uploadedBy 있음)만 백그라운드로 세 줄 요약과
+  // 온톨로지 접점을 만든다. docsbundle 같은 프로그램 수집은 uploadedBy가 없어 자연히 건너뛴다.
+  // 실패해도 인입은 이미 성공 — 소식은 소식일 뿐, 여기서 죽지 않는다(동적 임포트 = 순환 차단).
+  if (uploadedBy) {
+    void import("./docdigest.js")
+      .then((d) => d.makeDigest(documentId, raw, resolvedCategory))
+      .catch((err) => console.warn(`[docdigest] 소식 생성 실패(${documentId}): ${err instanceof Error ? err.message : String(err)}`));
+  }
+
   return { documentId, chunks: chunks.length, embeddingModel: "local-embedding-server", scope, docClass, linkedProduct, category: resolvedCategory };
 }
 
