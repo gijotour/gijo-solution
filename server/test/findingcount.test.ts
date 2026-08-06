@@ -22,7 +22,7 @@ const 엔진 = path.join(__dirname, "../src/engine");
  * 이유 없이 이름만 추가하는 것은 시험을 끄는 것과 같다.
  */
 const 예외: Record<string, string> = {
-  "agenttools.ts": "판정 함수(isRealVulnerability·findingSummary)가 사는 곳 — 여기가 원본이다",
+  "agenttools/handlers.ts": "판정 함수(isRealVulnerability·findingSummary)가 사는 곳 — 여기가 원본이다",
   "assets.ts": "저장·삭제 계층. 세는 것이 아니라 **보관**한다 — 스캔 실패도 기록으로 남겨야 한다",
   "kbhygiene.ts": "여기의 findings는 취약점이 아니라 **지식베이스 점검 결과**다(같은 이름 다른 뜻)",
   "ctimatch.ts": "취약점 문구를 CTI와 대조하는 자리 — 세지 않고 **글자만** 본다",
@@ -32,7 +32,18 @@ const 예외: Record<string, string> = {
 };
 
 function ts파일들(): string[] {
-  return fs.readdirSync(엔진).filter((f) => f.endsWith(".ts"));
+  // 하위 폴더까지 — agenttools/가 2026-08-06에 폴더로 나뉘었다. 평면만 훑으면
+  // 판정 코드가 사는 handlers.ts가 감시 밖으로 빠진다(지키는 게 아니라 안 보는 것).
+  const out: string[] = [];
+  const 걷기 = (rel: string) => {
+    for (const e of fs.readdirSync(path.join(엔진, rel), { withFileTypes: true })) {
+      const r = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) 걷기(r);
+      else if (e.name.endsWith(".ts")) out.push(r);
+    }
+  };
+  걷기("");
+  return out;
 }
 
 /** 이 줄이 findings를 **세거나 훑는** 자리인가(단순 참조는 뺀다). */

@@ -11,8 +11,9 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { 심각도한글, 심각도표식, 표식 } from "../src/engine/tone";
+import { agenttoolsSource } from "./util/toolsrc";
 
-const 소스 = fs.readFileSync(path.join(__dirname, "../src/engine/agenttools.ts"), "utf8");
+const 소스 = agenttoolsSource();
 
 describe("심각도 우리말 변환기", () => {
   it("네 등급을 우리말로 준다", () => {

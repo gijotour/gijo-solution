@@ -10,6 +10,7 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { findAgentTool } from "../src/engine/agenttools";
+import { agenttoolsSource } from "./util/toolsrc";
 
 const 소스 = (f: string) => fs.readFileSync(path.join(__dirname, "../src/engine", f), "utf8");
 
@@ -24,7 +25,7 @@ describe("보고서 작성 현황을 챗봇이 답한다", () => {
 
   it("★ 절차 띠 ⑤ 보고 칸과 **같은 함수**로 센다", () => {
     // ⚠ 따로 세면 반드시 어긋나고, 어긋난 두 숫자는 담당자가 **둘 다** 안 믿게 만든다.
-    const a = 소스("agenttools.ts");
+    const a = agenttoolsSource();
     const w = 소스("workflow.ts");
     expect(a, "agenttools가 reportActivity를 안 쓴다 — 따로 세고 있다").toContain("reportActivity(");
     expect(w, "workflow가 reportActivity를 안 쓴다").toContain("reportActivity(");

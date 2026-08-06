@@ -22,8 +22,9 @@ import * as fs from "fs";
 import * as path from "path";
 import { 자산이걸린이유 } from "../src/engine/agenttools";
 import { registerAsset, recordFindings, getAsset } from "../src/engine/assets";
+import { agenttoolsSource } from "./util/toolsrc";
 
-const SRC = path.resolve(__dirname, "../src/engine/agenttools.ts");
+
 
 /** brian이 겪은 그 자산을 그대로 만든다 — 이름은 IP뿐, hostname 없음, 출처만 오라클. */
 function 오라클서버() {
@@ -74,7 +75,7 @@ describe("★ 소스 감시 — 검색 조건이 두 벌로 갈리지 않는가"
   // 왜 소스를 읽나: 이 저장소의 단골 결함은 "함수를 만들어 놓고 호출부가 안 부르는" 것이다.
   // 목록 조회(list_assets)와 통합 검색(searchOne)이 각각 filter를 짜면, 같은 "oracle"에
   // 한쪽만 답이 나온다. 동작 시험은 그 어긋남을 못 잡는다 — 둘 다 "답이 나오긴" 하기 때문이다.
-  const src = fs.readFileSync(SRC, "utf8");
+  const src = agenttoolsSource();
 
   // ⚠ **주석을 걷고 센다.** 처음엔 그냥 셌다가 설명 주석 안의 `자산이걸린이유()` 언급까지
   //   세어 3이 나왔다. 주석이 호출로 잡히면, 코드가 안 부르는데도 주석만 늘려 통과시킬 수 있다.

@@ -14,6 +14,7 @@ vi.mock("../src/engine/llm", () => ({
 }));
 
 import { 인터넷노출로적혔나 } from "../src/engine/agenttools";
+import { agenttoolsSource } from "./util/toolsrc";
 
 describe("인터넷노출로적혔나 — 등록부에 적힌 말로 판정한다", () => {
   // 값은 실제 운영 등록부에서 그대로 가져왔다(2026-08-03). 지어낸 예로 시험하면
@@ -42,7 +43,7 @@ describe("인터넷노출로적혔나 — 등록부에 적힌 말로 판정한�
 describe("답이 판정 근거를 숨기지 않는다", () => {
   it("스캔이 아니라 등록부로 판정했다고 밝히고, 모르는 건수를 따로 말한다", async () => {
     const src = await import("node:fs").then((fs) =>
-      fs.readFileSync(new URL("../src/engine/agenttools.ts", import.meta.url), "utf8")
+      agenttoolsSource()
     );
     const 시작 = src.indexOf("function runExposedAssets");
     const 끝 = src.indexOf("function runReportActivity", 시작);

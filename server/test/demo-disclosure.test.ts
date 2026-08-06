@@ -11,6 +11,7 @@ import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
 import { 시연데이터알림 } from "../src/engine/agenttools";
+import { agenttoolsSource } from "./util/toolsrc";
 
 const 시연 = { source_tool: "demo-scan.csv", finding_type: "cve" };
 const 실제 = { source_tool: "tenable", finding_type: "cve" };
@@ -51,7 +52,7 @@ describe("★ 안 섞여 있으면 아무 말도 안 붙인다 — 늘 붙는 �
 
 describe("★ 숫자를 말하는 곳에 실제로 붙어 있다 — 소스 감시", () => {
   it("오늘 할 일과 취약점 현황 둘 다 부른다", () => {
-    const s = fs.readFileSync(path.join(__dirname, "../src/engine/agenttools.ts"), "utf8");
+    const s = agenttoolsSource();
     const 부른수 = (s.match(/시연데이터알림\(/g) ?? []).length;
     // 정의 1 + 부르는 곳 2 이상
     expect(부른수, "만들어 놓고 아무 데서도 안 부른다 — 담당자에겐 없는 기능이다").toBeGreaterThanOrEqual(3);

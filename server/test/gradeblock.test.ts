@@ -7,6 +7,7 @@
 import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
 import { gradeOf, clearanceOf, canRead, blockedGrades, GRADES, DEFAULT_DOC_GRADE } from "../src/engine/grades";
+import { agenttoolsSource } from "./util/toolsrc";
 
 describe("★ 모르면 닫힌다 — 단, '안 매겼다'와 '깨졌다'는 다르다", () => {
   it("★ 등급을 아직 안 매긴 자료는 공개로 본다 — 통제 대상이 아니다", () => {
@@ -162,7 +163,7 @@ describe("★ 사람이 묻는 입구에서는 반드시 열람 등급을 싣는
   it("★ 제목도 가린다 — 파일명만으로 새는 것이 있다", () => {
     // "퇴사자명단_최종.xlsx"는 열어 보지 않아도 알려 준다.
     const memSrc6 = fs.readFileSync(new URL("../src/engine/memory.ts", import.meta.url), "utf8");
-    const toolSrc = fs.readFileSync(new URL("../src/engine/agenttools.ts", import.meta.url), "utf8");
+    const toolSrc = agenttoolsSource();
     expect(memSrc6).toContain("export async function listVisibleDocuments");
     expect(toolSrc, "AI 도구가 전체 목록을 그대로 보여 준다").not.toContain("await listDocuments()");
   });

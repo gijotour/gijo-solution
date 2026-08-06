@@ -12,6 +12,7 @@ import { runAgentLoop, setLastTarget, resetContextForTests, 사람용으로다�
 import fs from "node:fs";
 import { listAgentTools, findAgentTool, validateToolArgs } from "../src/engine/agenttools";
 import { resetAssetsForTests, registerAsset, recordFindings, getAsset } from "../src/engine/assets";
+import { agenttoolsSource } from "./util/toolsrc";
 
 
 /**
@@ -321,7 +322,7 @@ describe("★ 내부 식별자는 사람에게 안 보인다", () => {
     expect(getAsset("샘플-웹서버")?.id, "화면에 보인 이름으로 못 찾으면 후속 지시가 끊긴다").toBe("vuln:sample-web01");
 
     // 그리고 그 id가 **화면에는 안 나가야** 한다.
-    const src = fs.readFileSync(new URL("../src/engine/agenttools.ts", import.meta.url), "utf8");
+    const src = agenttoolsSource();
     expect(src, "내부 id를 답에 다시 실었다 — 담당자가 읽을 글자가 아니다").not.toContain("(id=${r.assetId})");
   });
 });

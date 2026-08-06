@@ -9,6 +9,7 @@
 import { describe, expect, it } from "vitest";
 import * as fs from "fs";
 import { 한줄풀이찾기, 한줄풀이글, 조사정보인가, 덮는범위 } from "../src/engine/findingplain";
+import { agenttoolsSource } from "./util/toolsrc";
 
 describe("한줄풀이 — 종류를 알아본다", () => {
   it("가장 위험한 것부터 알아본다", () => {
@@ -53,11 +54,12 @@ describe("한줄풀이 — 종류를 알아본다", () => {
   it("★ 소스 감시 — 만들어만 두고 안 부르면 아무 일도 안 일어난다", () => {
     // 이 저장소의 단골 결함: 함수를 만들어 놓고 호출부가 안 부른다(9곳 실측된 적 있다).
     // 취약점 이름이 나가는 **목록 두 곳**(finding_status · 통합 검색)이 실제로 부르는지 읽는다.
-    const src = fs.readFileSync(new URL("../src/engine/agenttools.ts", import.meta.url), "utf8");
+    const src = agenttoolsSource();
     const 부른횟수 = (src.match(/한줄풀이글\(/g) || []).length;
     expect(부른횟수, "취약점 이름을 내는 목록 두 곳이 불러야 한다").toBeGreaterThanOrEqual(2);
     // 헛돌지 않는지 — import가 실제로 있어야 위 숫자가 뜻이 있다.
-    expect(src, "import 없이 이름만 세면 주석도 세어 통과한다").toMatch(/from "\.\/findingplain"/);
+    // 경로 깊이는 묻지 않는다 — agenttools가 폴더로 나뉘며 "../findingplain"이 됐다(2026-08-06).
+    expect(src, "import 없이 이름만 세면 주석도 세어 통과한다").toMatch(/from "\.\.?\/findingplain"/);
   });
 
   it("덮는범위는 **얼마나 덮는지 밝힌다** — 안 밝히면 「다 설명된다」로 읽힌다", () => {

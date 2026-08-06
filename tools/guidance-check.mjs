@@ -39,7 +39,8 @@ function 화면줄들() {
 }
 
 function 안내명령들() {
-  const 줄들 = ["agenttools.ts", "agentloop.ts", "dispatcher.ts", "screenguide.ts", "workflow.ts"]
+  // agenttools는 2026-08-06에 3파일로 나뉨 — 배럴만 읽으면 안내 문구를 몽땅 놓친다
+  const 줄들 = ["agenttools.ts", "agenttools/handlers.ts", "agenttools/registry.ts", "agentloop.ts", "dispatcher.ts", "screenguide.ts", "workflow.ts"]
     .flatMap((f) => { try { return 엔진(f).split("\n"); } catch { return []; } })
     .concat(화면줄들());
   const 끝맺음 = /(해줘|알려줘|보여줘|만들어줘|읽어줘|배정해줘|정리해줘|확인해줘|추천해줘|복구해줘|찾아줘)$/;

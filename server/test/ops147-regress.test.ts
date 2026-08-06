@@ -9,11 +9,12 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { 대명사뿐인가 } from "../src/engine/agentloop";
+import { agenttoolsSource } from "./util/toolsrc";
 
 const 읽기 = (p: string) => readFileSync(join(__dirname, "..", "src", p), "utf8");
 
 describe("① 「SSH 취약점 찾아줘」가 2,561자 — 우리 제품 문서가 남의 점검 보고서로 둔갑했다", () => {
-  const src = 읽기("engine/agenttools.ts");
+  const src = agenttoolsSource();
 
   it("★★ 제품 이름은 자산 표식이 될 수 없다 — 「GIJO」 하나로 전 사내 문서가 걸렸다", () => {
     expect(src, "제품이름인가 걸름망이 있어야 한다").toContain("function 제품이름인가");
@@ -48,7 +49,7 @@ describe("① 「SSH 취약점 찾아줘」가 2,561자 — 우리 제품 문서
 
 describe("② 「자산 중에 AI-BOM 비어 있는 거 뭐야?」가 27자 — 규칙에 아예 안 걸렸다", () => {
   const loop = 읽기("engine/agentloop.ts");
-  const tools = 읽기("engine/agenttools.ts");
+  const tools = agenttoolsSource();
 
   it("★ AI-BOM 창구가 있다", () => {
     expect(loop).toMatch(/re:\s*\/ai\[-\\s_\]\?bom\/i,\s*\n\s*tool:\s*"aibom_status"/);
@@ -82,7 +83,7 @@ describe("② 「자산 중에 AI-BOM 비어 있는 거 뭐야?」가 27자 — 
 
 describe("③④ 절차 질문이 35초·33초 — 규칙에 없어 남의 제품 가이드를 읽어 줬다", () => {
   const loop = 읽기("engine/agentloop.ts");
-  const tools = 읽기("engine/agenttools.ts");
+  const tools = agenttoolsSource();
 
   it("★ 「○○ 단계에서 뭘 해야 해?」·「다음 단계가 뭐야?」가 규칙에 걸린다", () => {
     const m = loop.match(/re:\s*(\/\(단계\|절차\)[^\n]+\/),\s*\n\s*tool:\s*"workflow_status"/);
@@ -129,7 +130,7 @@ describe("③④ 절차 질문이 35초·33초 — 규칙에 없어 남의 제�
 
 describe("⑥ 「위험도 높은 자산 알려줘」가 29자 — 목록을 물었는데 한 건을 답했다", () => {
   const loop = 읽기("engine/agentloop.ts");
-  const tools = 읽기("engine/agenttools.ts");
+  const tools = agenttoolsSource();
   const re = /(위험도?\s*(높은|높음|큰)|고위험|위험한|위험\s*큰)\s*(ai\s*)?자산/i;
 
   it("★ 고위험 자산 목록으로 간다", () => {

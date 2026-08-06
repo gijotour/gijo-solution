@@ -12,6 +12,7 @@ import path from "node:path";
 import { egressAllowed, isPrivateIp, airgapStatus, EGRESS_POINTS, installAirgapGuard, assertEgressAllowed } from "../src/engine/airgap";
 import { forcedToolFor } from "../src/engine/agentloop";
 import { findAgentTool } from "../src/engine/agenttools";
+import { agenttoolsSource } from "./util/toolsrc";
 
 describe("에어갭 — 내부/외부 판정(default-deny)", () => {
   it("루프백·사설 IP는 허용", () => {
@@ -137,7 +138,7 @@ describe("에어갭 카탈로그 — 실제 외부 호출을 다 덮는다(봉�
   });
 
   it("상태 문구가 '전부 막혔다'고 과장하지 않는다 (범위를 밝힌다)", () => {
-    const src = fs.readFileSync(path.join(__dirname, "../src/engine/agenttools.ts"), "utf8");
+    const src = agenttoolsSource();
     const i = src.indexOf("에어갭 봉인: 🔒 ON");
     expect(i, "봉인 ON 문구를 못 찾음 — 이 시험이 헛돌고 있다").toBeGreaterThan(0);
     const 문구 = src.slice(i, i + 600);

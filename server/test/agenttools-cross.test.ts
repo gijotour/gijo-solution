@@ -25,6 +25,7 @@ import { resetAnalysisHubForTests, rebuildVulnEvents } from "../src/engine/analy
 import { resetKpiForTests } from "../src/engine/kpi";
 import { createSession, appendTurn, setSessionStatus } from "../src/engine/worksessions";
 import { db } from "../src/db";
+import { agenttoolsSource } from "./util/toolsrc";
 
 const run = (name: string, args: Record<string, string> = {}) => Promise.resolve(findAgentTool(name)!.run(args)).then(String);
 
@@ -271,7 +272,7 @@ describe("work_session_status — 작업 세션 현황", () => {
 describe("★ 목록 끝에 다음 걸음 한 줄 (2026-08-01 하루 실전)", () => {
   // 숫자와 목록은 잘 나오는데 담당자에게 "그래서 뭘 하지"가 남았다.
   // 특히 "오늘 뭐부터 볼까?"는 제품에서 가장 많이 쓰는 답인데 조치하러 갈 길이 없었다.
-  const src = fs.readFileSync(new URL("../src/engine/agenttools.ts", import.meta.url), "utf8");
+  const src = agenttoolsSource();
 
   it("today 답이 다음 행동을 알려 준다", () => {
     const i = src.indexOf("function runToday");

@@ -8,6 +8,7 @@
 //   보안담당자에게 "할 일이 없다"고 잘못 답하는 것은 이 제품에서 가장 나쁜 실패다.
 import { describe, it, expect } from "vitest";
 import { 상태값들, 필터에맞나 } from "../src/engine/statuswords";
+import { agenttoolsSource } from "./util/toolsrc";
 
 describe("우리말 상태어", () => {
   it("아직 손이 필요한 말을 저장값으로 옮긴다", () => {
@@ -83,7 +84,7 @@ describe("0건일 때의 말", () => {
     // 조건에 안 맞는 것과 아예 없는 것은 담당자에게 뜻이 완전히 다르다.
     // "조건에 맞는 게 없다"를 "없다"로 말하면 담당자는 할 일이 없다고 믿는다.
     const fs = await import("node:fs");
-    const src = fs.readFileSync(new URL("../src/engine/agenttools.ts", import.meta.url), "utf8");
+    const src = agenttoolsSource();
     const 못찾음 = (src.match(/못 찾았습니다/g) ?? []).length;
     expect(못찾음, "조건 불일치를 '없습니다'로 말하는 곳이 남았다").toBeGreaterThanOrEqual(4);
   });

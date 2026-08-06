@@ -17,6 +17,7 @@ import { db } from "../src/db";
 import {
   createAlertSchedule, listAlertSchedules, runDueAlerts, buildAlertBody, alertScheduleText, resetAlertsForTests, setAlertEnabled,
 } from "../src/engine/alertschedule";
+import { agenttoolsSource } from "./util/toolsrc";
 
 beforeEach(async () => {
   resetAlertsForTests();
@@ -136,7 +137,7 @@ describe("★ 등록 0건 안내가 실제로 되는 길만 말한다 (2026-08-0
     const t = alertScheduleText();
     expect(t, "어떻게 거는지가 없으면 안내가 아니다").toMatch(/말로|말하|예:/);
     // 그 길이 진짜 있는지 도구 목록에서 확인한다 — 안내와 기능이 어긋나면 안 된다.
-    const src = fs.readFileSync(new URL("../src/engine/agenttools.ts", import.meta.url), "utf8");
+    const src = agenttoolsSource();
     expect(src, "안내는 대화창에서 걸라고 하는데 그 도구가 없다").toContain('name: "alert_schedule_add"');
   });
 
