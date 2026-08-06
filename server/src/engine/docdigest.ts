@@ -107,6 +107,22 @@ export async function makeDigest(documentId: string, raw: string, category?: str
     model: summary ? "로컬 모델 자체 요약" : null,
     failedReason, madeAt: new Date().toISOString(),
   });
+
+  // 반입 소식 2차(2026-08-06) — 요약이 끝나면 **스스로 한 줄 알린다.** 물어봐야만 아는 것은
+  // 알림이 아니다(CrowdStrike 실측: 요약이 30초 뒤에 나와 올린 사람이 그걸 볼 방법이 없었다).
+  // ⚠ 새 통로를 만들지 않는다 — 대화창 하단 협업 독이 이미 실시간으로 흐른다.
+  //   리포트로도 만들지 않는다(요약은 대장에 있고, 리포트 목록을 어지럽히면 그게 잡음이다).
+  try {
+    const { emitCollaboration } = await import("./collaboration.js");
+    const 접점수 = matches.length;
+    emitCollaboration({
+      from: "analyze",
+      to: "orchestrator",
+      message: summary
+        ? `📄 새 문서 「${documentId}」 요약 완료${접점수 ? ` · 우리 지식과 접점 ${접점수}건` : ""} — "새 문서 뭐 들어왔어?"로 볼 수 있습니다.`
+        : `📄 새 문서 「${documentId}」 들어옴 — 요약은 만들지 못했습니다(${(failedReason ?? "사유 미상").slice(0, 40)}).`,
+    });
+  } catch { /* 알림 실패가 소식 저장을 되돌리지 않는다 */ }
 }
 
 export interface RecentDoc {

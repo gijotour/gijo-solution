@@ -89,6 +89,33 @@ describe("문서 반입 소식 — 요약(슬라이스 2)", () => {
   });
 });
 
+describe("반입 소식 2차 — 스스로 알린다(2026-08-06)", () => {
+  // 협업 독으로 흐르는 알림을 붙잡는다(emitCollaboration은 WebSocket으로 나가므로 여기서 가로챈다).
+  const 흐른것: string[] = [];
+  beforeEach(async () => {
+    흐른것.length = 0;
+    const col = await import("../src/engine/collaboration");
+    vi.spyOn(col, "emitCollaboration").mockImplementation((e) => { 흐른것.push(e.message); });
+  });
+
+  it("★ 요약이 끝나면 한 줄 흐른다 — 물어봐야만 아는 것은 알림이 아니다", async () => {
+    putDoc("QA소식-알림.pdf", 0);
+    vi.mocked(chat).mockResolvedValue("첫 줄입니다. 둘째 줄입니다. 셋째 줄입니다.");
+    await makeDigest("QA소식-알림.pdf", "본문", "위협대응");
+    const 알림 = 흐른것.find((m) => m.includes("QA소식-알림.pdf"));
+    expect(알림, "요약을 끝내고도 아무도 모른다").toBeTruthy();
+    expect(알림!).toContain("요약 완료");
+  });
+
+  it("요약이 실패해도 알린다 — 들어온 사실은 알려야 한다", async () => {
+    putDoc("QA소식-알림실패.pdf", 0);
+    vi.mocked(chat).mockRejectedValue(new Error("모델 꺼짐"));
+    await makeDigest("QA소식-알림실패.pdf", "본문", "일반");
+    const 알림 = 흐른것.find((m) => m.includes("QA소식-알림실패.pdf"));
+    expect(알림!).toContain("요약은 만들지 못했습니다");
+  });
+});
+
 describe("문서 반입 소식 — 온톨로지 접점(슬라이스 3, 결정적)", () => {
   it("본문에 등장한 표제어의 연결 지식이 접점으로 나온다 — LLM 없이", () => {
     addTriple({ subject: "피싱공격", predicate: "완화통제", object: "이메일게이트웨이", source: "QA소식시드" });
