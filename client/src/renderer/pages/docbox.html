@@ -121,6 +121,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
 <div class="status" id="status"></div>
 
+<!-- 공용 마크다운 렌더러 — ⚠ 이 줄이 빠져 있어 window.gijoMd가 undefined였고, 목록은 나오는데
+     **모든 문서 열기가 TypeError로 죽었다**(2026-08-07 사용자 신고 "문서함 문서열려?" 실체).
+     이 화면이 gijoMd를 쓰는 유일한 별도 창이라 대화창 쪽 스윕에 안 걸렸다. -->
+<script src="gijomd.js"></script>
 <script>
 (function () {
   var api = window.gijo;
