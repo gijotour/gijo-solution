@@ -11,7 +11,7 @@
 // - 요약은 "자체 요약" 표기와 함께 보인다 — 7B 숫자 오독 전례(2026-08-03) 때문에 원문 대체가 아니다.
 import { db } from "../db";
 import { chat } from "./llm";
-import { expandOntology } from "./ontology";
+import { listTriples } from "./ontology";
 
 db.exec(`CREATE TABLE IF NOT EXISTS doc_digests (
   documentId TEXT PRIMARY KEY,
@@ -29,10 +29,53 @@ const upsert = db.prepare(`INSERT INTO doc_digests (documentId, summary, keyword
     matches=excluded.matches, model=excluded.model, failedReason=excluded.failedReason, madeAt=excluded.madeAt`);
 
 /** 온톨로지 표제어와 문서 본문을 결정적으로 대조 — "보고서의 ○○ ↔ 우리 지식의 △△" 접점.
- *  본문에 실제 등장하는 표제어 찾기·확장은 expandOntology가 이미 한다(시드 탐지+홉 확장) — 재사용. */
+ *
+ *  처음엔 expandOntology를 재사용했는데 **운영 실측(2026-08-06)에서 오탐이 났다**:
+ *  CrowdStrike 보고서에 "Logs"·"Environment" 같은 일반 영단어가 있다는 이유로 남의 장비
+ *  매뉴얼 트리플(sc-logs.txt 저장 파일 따위)이 접점으로 붙었다. 잘못된 접점은 없느니만 못하다.
+ *  그래서 시드 자격을 강화한다 — 한글 포함, 숫자 포함(CVE-… ·T1566), 4자 이상 전부 대문자
+ *  약어만 표제어로 친다. 일반 영단어(Logs·Dependency)는 어느 문서에나 있어 표식이 못 된다. */
+function 표제어자격(w: string): boolean {
+  if (w.length < 3 || w.length > 60) return false;
+  if (/[가-힣]/.test(w)) return true;
+  if (/\d/.test(w)) return true;
+  if (w.length >= 4 && w === w.toUpperCase() && /^[A-Z][A-Z-]+$/.test(w)) return true;
+  return false;
+}
+
 export function ontologyMatchesFor(text: string, limit = 5): string[] {
-  return expandOntology(text, undefined, { hops: 1, limit })
-    .map((t) => `${t.subject} —[${t.predicate}]→ ${t.object}`);
+  const lowered = text.toLowerCase();
+  const all = listTriples();
+  const seen = new Set<string>();
+  const 접점: string[] = [];
+  for (const t of all) {
+    for (const w of [t.subject, t.object]) {
+      if (접점.length >= limit) return 접점;
+      const term = String(w ?? "").trim();
+      if (seen.has(term) || !표제어자격(term)) continue;
+      if (!lowered.includes(term.toLowerCase())) continue;
+      seen.add(term);
+      접점.push(`${t.subject} —[${t.predicate}]→ ${t.object}`);
+      break; // 같은 트리플을 subject·object로 두 번 싣지 않는다
+    }
+  }
+  return 접점;
+}
+
+/** 7B 응답을 세 줄 요약으로 정리 — 코드로 고친다(프롬프트로 7B 행동 교정 금지 원칙).
+ *  실측(2026-08-06 운영): 지시문을 복창한 서두("…요약을 작성해주세요") + 742자 한 덩어리가 왔다. */
+export function 요약정리(out: string): { summary: string | null; keywords: string | null } {
+  const 줄들 = out.split("\n").map((l) => l.trim()).filter(Boolean);
+  const kwLine = 줄들.find((l) => /^핵심어\s*[:：]/.test(l));
+  const keywords = kwLine ? kwLine.replace(/^핵심어\s*[:：]\s*/, "").trim() || null : null;
+  let body = 줄들.filter((l) => !/^핵심어\s*[:：]/.test(l)).join(" ");
+  // 지시 복창 서두 제거 — "…요약을 작성해주세요/해줘" 류 문장은 내용이 아니다
+  body = body.replace(/^[^.!?]*요약[^.!?]*(작성|해\s*주|해줘)[^.!?]*[.!?]\s*/, "").trim();
+  // 문장 단위로 최대 3개, 한 문장 120자 상한(넘치면 말줄임 — 원문 대체가 아니라 소식이다)
+  const 문장들 = body.split(/(?<=[.!?])\s+|(?<=다\.)\s*/).map((s) => s.trim()).filter((s) => s.length >= 8);
+  if (!문장들.length) return { summary: null, keywords };
+  const summary = 문장들.slice(0, 3).map((s) => (s.length > 120 ? `${s.slice(0, 117)}…` : s)).join("\n");
+  return { summary, keywords };
 }
 
 /** 반입 직후 백그라운드로 요약·접점을 만든다 — 실패해도 인입은 이미 성공, 여기서 죽지 않는다. */
@@ -51,10 +94,9 @@ export async function makeDigest(documentId: string, raw: string, category?: str
       trusted: true, // 내부 조립 프롬프트(gateway 자기차단 함정 — 보안 어휘가 규칙에 걸린다)
       noLearn: true, // 자동 요약이 학습 이력을 오염시키지 않게
     });
-    const 줄들 = out.split("\n").map((l) => l.trim()).filter(Boolean);
-    const kwLine = 줄들.find((l) => l.startsWith("핵심어"));
-    keywords = kwLine ? kwLine.replace(/^핵심어\s*[:：]\s*/, "") : null;
-    summary = 줄들.filter((l) => !l.startsWith("핵심어")).slice(0, 3).join("\n") || null;
+    const 정리 = 요약정리(out);
+    summary = 정리.summary;
+    keywords = 정리.keywords;
     if (!summary) failedReason = "모델 응답에서 요약을 못 뽑음";
   } catch (err) {
     failedReason = err instanceof Error ? err.message.slice(0, 200) : String(err);

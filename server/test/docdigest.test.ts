@@ -17,7 +17,7 @@ vi.mock("../src/engine/llm", async (importOriginal) => {
 import { db } from "../src/db";
 import { chat } from "../src/engine/llm";
 import { addTriple, deleteTriplesBySource } from "../src/engine/ontology";
-import { makeDigest, listRecentDocs, recentDocumentsText, ontologyMatchesFor } from "../src/engine/docdigest";
+import { makeDigest, listRecentDocs, recentDocumentsText, ontologyMatchesFor, 요약정리 } from "../src/engine/docdigest";
 import { forcedToolFor } from "../src/engine/agentloop";
 
 // memory.ts를 통째로 안 끌고 오려고(무거운 lancedb) 대장 테이블만 직접 보장한다 —
@@ -99,6 +99,25 @@ describe("문서 반입 소식 — 온톨로지 접점(슬라이스 3, 결정적
 
   it("아무 표제어도 안 나오면 접점 0건 — 억지로 잇지 않는다", () => {
     expect(ontologyMatchesFor("전혀 무관한 요리 이야기")).toHaveLength(0);
+  });
+
+  it("★ 일반 영단어는 표제어가 아니다 — 운영 실측 오탐(Logs·Environment) 재발 방지", () => {
+    // CrowdStrike 실측(2026-08-06): "Logs"가 남의 장비 매뉴얼 트리플을 접점으로 끌어왔다
+    addTriple({ subject: "Logs", predicate: "저장 파일", object: "sc-logs.txt", source: "QA소식시드" });
+    addTriple({ subject: "Environment", predicate: "저장 파일", object: "sc-environment.txt", source: "QA소식시드" });
+    const 접점 = ontologyMatchesFor("This report covers logs and environment across the cloud.");
+    expect(접점.join("\n")).not.toContain("sc-logs");
+    expect(접점.join("\n")).not.toContain("sc-environment");
+    // 숫자·코드꼴은 자격 있음
+    addTriple({ subject: "CVE-2021-44228", predicate: "완화통제", object: "Log4j 업그레이드", source: "QA소식시드" });
+    expect(ontologyMatchesFor("The actor exploited CVE-2021-44228 in the wild.").join("\n")).toContain("CVE-2021-44228");
+  });
+
+  it("★ 7B 복창 서두를 코드로 걷어내고 문장 셋으로 만든다 — 운영 실측 재현", () => {
+    const 실측꼴 = "CROWDSTRIKE 2026 글로벌 위협 보고서에 대해 간략한 요약을 작성해주세요. 주요 포인트는 침해 가능성이 증가하였습니다. 공격자는 신뢰를 악용하여 빠르게 데이터 유출을 수행하였습니다. 속도가 가장 중요해지고 있습니다. 클라우드 위협도 증가하였습니다.";
+    const r = 요약정리(실측꼴);
+    expect(r.summary).not.toContain("작성해주세요"); // 지시 복창은 내용이 아니다
+    expect(r.summary!.split("\n")).toHaveLength(3); // 한 덩어리가 아니라 세 줄
   });
 
   it("접점은 요약 실패와 무관하게 저장된다", async () => {
