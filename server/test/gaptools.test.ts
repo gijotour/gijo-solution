@@ -91,10 +91,13 @@ describe("인수인계 현황 (handover_status)", () => {
     expect(out).toContain("대화 콘솔의 ＋");
   });
 
-  it("서버가 모르는 것(담은 문서·통과율)은 모른다고 밝힌다", async () => {
+  // 2026-08-06 해자 슬라이스 2: 서버가 **이제 안다**(handover_history). 예전 계약은
+  // "모르는 것은 모른다고 밝힌다"였는데, 모름 자체가 해소됐으므로 계약을 옮긴다 —
+  // 이력이 없으면 "아직 한 번도 안 돌렸다"고 정직하게 말하는 것이 새 계약이다.
+  it("이력이 없으면 없다고 말한다 — 없는 실적을 지어내지 않는다", async () => {
     mockListDocuments.mockResolvedValueOnce([{ documentId: "인수인계_방화벽.pdf", chunks: 12, scope: "global" }]);
     const out = await run("handover_status");
     expect(out).toContain("인수인계_방화벽.pdf");
-    expect(out).toContain("서버가 알지 못합니다");
+    expect(out).toContain("한 번도 돌리지 않았습니다");
   });
 });

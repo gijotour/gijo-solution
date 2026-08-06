@@ -2462,14 +2462,28 @@ export async function runHandoverStatus(): Promise<string> {
   }
   const chunks = docs.reduce((n, d) => n + (d.chunks ?? 0), 0);
   const recent = docs.slice(-5).reverse().map((d) => `- ${d.documentId}`);
+  // 이관 이력(해자 슬라이스 2, 2026-08-06) — 예전에는 "서버가 알지 못합니다"라고 정직하게
+  // 적어 두기만 했다. 이제 서버가 안다 — 그 문구를 지우는 대신 **실제 이력**으로 바꾼다.
+  const { listHandoverHistory } = await import("../handover.js");
+  const 이력 = listHandoverHistory(5);
+  const 이력줄 = 이력.length
+    ? [
+        "",
+        `지금까지 넘긴 기록 ${이력.length}회(최근 순):`,
+        ...이력.map((b) => {
+          const 날 = b.verifiedAt.slice(0, 10);
+          const 누가 = b.actor ? ` · ${b.actor}` : "";
+          const 마감 = b.completedAt ? " · 완료 처리됨" : " · 검증만 하고 완료 처리 안 됨";
+          return `- ${날}${누가} — 문서 ${b.total}건 중 ${b.cited}건이 답변 근거로 확인(${b.passRate}%)${마감}`;
+        }),
+      ]
+    : ["", "아직 인수인계 검증을 한 번도 돌리지 않았습니다 — 설정 > 업무 넘기기에서 [▶ 검증 시작]을 누르면 여기에 기록이 쌓입니다."];
   return [
     `지식베이스에 문서 ${docs.length}건(조각 ${chunks}개)이 쌓여 있습니다 — 인수인계에 담을 수 있는 자료입니다.`,
     "",
     "최근 올린 문서:",
     ...recent,
-    "",
-    "⚠ 어떤 문서를 이번 인수인계에 담았는지와 검증 통과율은 담당자 PC에 저장되어 서버가 알지 못합니다.",
-    "   업무 넘기기 화면(설정)에서 [▶ 검증 시작]을 눌러야 통과율이 나오고, 그 결과만 감사 기록에 남습니다.",
+    ...이력줄,
   ].join("\n");
 }
 

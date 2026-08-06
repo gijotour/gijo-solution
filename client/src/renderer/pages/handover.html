@@ -290,7 +290,7 @@ td.doc{color:#dfe6ff;font-weight:700;max-width:220px;word-break:break-all;}
     const btn = document.getElementById("completeBtn");
     btn.disabled = true;
     try {
-      await window.gijo.handoverComplete({ documentIds: docs, cited: lastReport.cited, total: lastReport.total, passRate: lastReport.passRate });
+      await window.gijo.handoverComplete({ documentIds: docs, cited: lastReport.cited, total: lastReport.total, passRate: lastReport.passRate, batchId: lastReport.batchId });
       btn.textContent = "✓ 완료 처리됨 (감사 로그 기록)";
       document.getElementById("completeHint").textContent = "감사 로그에 기록되었습니다. 후임자는 대화창에 물어보는 것만으로 노하우를 근거와 함께 조회합니다.";
     } catch (e) { btn.disabled = false; gijoTell("완료 처리 실패: " + e.message); }

@@ -34,6 +34,7 @@ export interface HandoverCheck {
   error?: string;
 }
 export interface HandoverReport {
+  batchId: string;
   total: number;
   cited: number;
   passRate: number;
@@ -42,7 +43,7 @@ export interface HandoverReport {
 export const handoverApi = {
   verify: (documentIds: string[]) =>
     request<HandoverReport>("/api/handover/verify", { method: "POST", body: { documentIds } }),
-  complete: (p: { documentIds: string[]; cited: number; total: number; passRate: number }) =>
+  complete: (p: { documentIds: string[]; cited: number; total: number; passRate: number; batchId?: string }) =>
     request<{ ok: boolean }>("/api/handover/complete", { method: "POST", body: p }),
 };
 

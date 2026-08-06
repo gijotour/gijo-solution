@@ -7,10 +7,73 @@
 // 결과 리포트는 퇴사 절차의 감사 증적(무엇을 이관했고 검증 통과율 몇 %)으로 쓸 수 있다.
 
 import type { Express, Request } from "express";
+import { db } from "../db";
 import { authMiddleware } from "../auth/auth";
 import type { GijoUser } from "../auth/users";
 import { asyncRoute } from "../util/asyncRoute";
 import { recordAudit } from "./audit";
+
+// ── 이관 이력 (해자 슬라이스 2, 2026-08-06) ─────────────────────────────────
+// 실태(설계문서): 검증 결과가 담당자 PC(localStorage)에만 남고 **서버는 알지 못했다** —
+// 퇴사자가 떠나면 "무엇을 이관했고 그게 실제로 작동했나"가 통째로 사라졌다.
+// 이제 검증 한 회차를 배치로 묶어 서버에 남긴다. 이것이 조직에 쌓이는 자산(해자)이다.
+//
+// ★ 개인정보 경계 — 남길 것과 안 남길 것을 먼저 정했다:
+//   남긴다: 문서 이름 · 자동 생성 질문 · 인용 여부 · 근거 문서 이름 3개까지 · 이관자 표시이름
+//           (증적의 최소 단위 — 무엇을, 언제, 누가, 통했나)
+//   안 남긴다: **답변 본문(answerPreview)** · 근거 전체 목록.
+//           답변에는 사내 문서 내용이 그대로 실린다. 증적에 필요한 것은 "통했다/아니다"이지
+//           그때 무슨 말이 오갔는지가 아니다 — 남기면 나중에 열람 통제 대상이 늘기만 한다.
+db.exec(`CREATE TABLE IF NOT EXISTS handover_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  batchId TEXT NOT NULL,        -- 검증 한 회차(같은 실행이면 같은 값)
+  verifiedAt TEXT NOT NULL,
+  documentId TEXT NOT NULL,
+  question TEXT,                -- 자동 생성 질문(사람 발화가 아니다)
+  cited INTEGER NOT NULL,       -- 1이면 그 문서가 답변 근거로 올랐다 = 이관 성공
+  sourceNames TEXT,             -- 실제 근거 문서 이름(최대 3, 쉼표) — 본문은 저장하지 않는다
+  actor TEXT,                   -- 이관자 표시이름
+  completedAt TEXT              -- 인수인계 완료 처리 시각(마감 전에는 NULL)
+)`);
+const insertHistoryStmt = db.prepare(
+  `INSERT INTO handover_history (batchId, verifiedAt, documentId, question, cited, sourceNames, actor)
+   VALUES (@batchId, @verifiedAt, @documentId, @question, @cited, @sourceNames, @actor)`
+);
+
+export interface HandoverHistoryBatch {
+  batchId: string; verifiedAt: string; actor: string | null;
+  total: number; cited: number; passRate: number; completedAt: string | null; documents: string[];
+}
+
+/** 회차별로 묶어 돌려준다 — 목록은 "언제 누가 몇 건을 넘겼고 몇 %가 통했나"가 보여야 쓸모 있다. */
+export function listHandoverHistory(limit = 20): HandoverHistoryBatch[] {
+  const rows = db.prepare(
+    `SELECT batchId, verifiedAt, actor, documentId, cited, completedAt FROM handover_history
+      ORDER BY id DESC LIMIT ?`
+  ).all(Math.max(1, Math.min(500, limit * 10))) as {
+    batchId: string; verifiedAt: string; actor: string | null; documentId: string; cited: number; completedAt: string | null;
+  }[];
+  const byBatch = new Map<string, HandoverHistoryBatch>();
+  for (const r of rows) {
+    let b = byBatch.get(r.batchId);
+    if (!b) {
+      b = { batchId: r.batchId, verifiedAt: r.verifiedAt, actor: r.actor, total: 0, cited: 0, passRate: 0, completedAt: r.completedAt, documents: [] };
+      byBatch.set(r.batchId, b);
+    }
+    b.total += 1;
+    b.cited += r.cited ? 1 : 0;
+    if (b.documents.length < 5) b.documents.push(r.documentId);
+    if (r.completedAt && !b.completedAt) b.completedAt = r.completedAt;
+  }
+  const out = [...byBatch.values()].map((b) => ({ ...b, passRate: b.total ? Math.round((b.cited / b.total) * 100) : 0 }));
+  return out.slice(0, limit);
+}
+
+/** 완료 처리 — 그 회차 줄들에 완료 시각을 찍는다(어느 검증이 실제 인계로 이어졌나). */
+export function markHandoverCompleted(batchId: string): number {
+  return db.prepare(`UPDATE handover_history SET completedAt = ? WHERE batchId = ? AND completedAt IS NULL`)
+    .run(new Date().toISOString(), batchId).changes;
+}
 
 export interface HandoverCheck {
   documentId: string;
@@ -22,6 +85,7 @@ export interface HandoverCheck {
 }
 
 export interface HandoverReport {
+  batchId: string; // 이 검증 회차의 식별자 — 완료 처리 때 이 회차를 마감한다
   total: number;
   cited: number;
   passRate: number; // 0~100
@@ -63,7 +127,11 @@ async function defaultDeps(): Promise<HandoverDeps> {
 
 const MAX_DOCS = 10; // 한 번에 검증할 문서 상한 — 문서당 LLM 2회(질문 생성+디스패치)라 배치를 제한한다
 
-export async function verifyHandover(documentIds: string[], deps?: HandoverDeps): Promise<HandoverReport> {
+export async function verifyHandover(
+  documentIds: string[],
+  deps?: HandoverDeps,
+  meta?: { actor?: string | null; record?: boolean }
+): Promise<HandoverReport> {
   const d = deps ?? (await defaultDeps());
   const results: HandoverCheck[] = [];
   for (const documentId of documentIds.slice(0, MAX_DOCS)) {
@@ -89,7 +157,26 @@ export async function verifyHandover(documentIds: string[], deps?: HandoverDeps)
     }
   }
   const cited = results.filter((r) => r.cited).length;
-  return { total: results.length, cited, passRate: results.length ? Math.round((cited / results.length) * 100) : 0, results };
+  const batchId = `hv-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  // 이력 저장 — 시험이 부를 때는 남기지 않는다(record:false). 저장 실패가 검증 결과를 되돌리지 않는다.
+  if (meta?.record !== false && results.length) {
+    const verifiedAt = new Date().toISOString();
+    try {
+      for (const r of results) {
+        insertHistoryStmt.run({
+          batchId, verifiedAt, documentId: r.documentId,
+          question: (r.question || "").slice(0, 300),
+          cited: r.cited ? 1 : 0,
+          // 근거 문서 **이름만** 3개까지 — 답변 본문(answerPreview)은 일부러 안 남긴다(위 경계 참고).
+          sourceNames: r.sources.slice(0, 3).join(", ") || null,
+          actor: meta?.actor ?? null,
+        });
+      }
+    } catch (e) {
+      console.warn(`[handover] 이관 이력 저장 실패: ${e instanceof Error ? e.message : String(e)}`);
+    }
+  }
+  return { batchId, total: results.length, cited, passRate: results.length ? Math.round((cited / results.length) * 100) : 0, results };
 }
 
 export function registerHandoverRoutes(app: Express): void {
@@ -105,7 +192,8 @@ export function registerHandoverRoutes(app: Express): void {
         res.status(400).json({ error: "documentIds(검증할 문서 ID 배열)가 필요합니다" });
         return;
       }
-      res.json(await verifyHandover(ids));
+      const actor = (req as Request & { user?: GijoUser }).user?.displayName ?? null;
+      res.json(await verifyHandover(ids, undefined, { actor }));
     })
   );
 
@@ -121,6 +209,10 @@ export function registerHandoverRoutes(app: Express): void {
       const total = Number(req.body?.total ?? ids.length);
       const passRate = Number(req.body?.passRate ?? 0);
       const actor = (req as Request & { user?: GijoUser }).user?.displayName ?? null;
+      // 이 검증 회차를 마감한다 — 어느 검증이 실제 인계로 이어졌는지가 증적의 핵심이다.
+      // batchId가 없으면(구버전 클라) 이력은 열린 채로 남고 감사 기록만 남는다 — 조용히 실패하지 않게 표시.
+      const batchId = typeof req.body?.batchId === "string" ? req.body.batchId : "";
+      const marked = batchId ? markHandoverCompleted(batchId) : 0;
       recordAudit({
         kind: "write",
         actor,
@@ -129,7 +221,17 @@ export function registerHandoverRoutes(app: Express): void {
         detail: `문서 ${total}건 이관 · 검증 인용 ${cited}/${total} (${passRate}%) — ${ids.slice(0, 10).join(", ")}${ids.length > 10 ? " 외" : ""}`,
         result: "ok",
       });
-      res.json({ ok: true });
+      res.json({ ok: true, marked, historyRecorded: marked > 0 });
+    })
+  );
+
+  // 이관 이력 조회 — 서버가 들고 있는 증적(해자 슬라이스 2).
+  app.get(
+    "/api/handover/history",
+    authMiddleware,
+    asyncRoute(async (req, res) => {
+      const limit = Math.max(1, Math.min(100, Number(req.query.limit) || 20));
+      res.json(listHandoverHistory(limit));
     })
   );
 }
