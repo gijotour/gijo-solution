@@ -19,7 +19,7 @@ import { 모델스캔, StandardFinding } from "./bridge";
 import { chat } from "./llm";
 import { isNonLearningAccount } from "./learnpolicy";
 import type { Viewer } from "./memory";
-import { runAgentLoop, AgentToolCall, 가리킬것없는대명사, 대명사뿐인가, 대명사확인, 되물음 } from "./agentloop";
+import { runAgentLoop, AgentToolCall, 가리킬것없는대명사, 가리킨자산이없나, 대명사뿐인가, 대명사확인, 되물음, 자산되물음 } from "./agentloop";
 import { executeApprovedTool, findAgentTool, buildApproval, PendingApproval } from "./agenttools";
 import { appendApprovedDecision } from "./orchestrator-dataset";
 import { undoSnapshot, undoCommit } from "./undo";
@@ -1007,7 +1007,9 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     const 확인 = 대명사확인(대화열쇠);
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
     completeTask(task.id);
-    return { task, route: { agentId: "orchestrator", action: "chat" }, output: 확인 ?? 되물음() };
+    // 자산을 가리킨 말(「이 서버」)에는 자산용 되묻기 — 「그거」라 답하면 어색하다(실측).
+    const 물음 = 가리킨자산이없나(instructionText) ? 자산되물음() : 되물음();
+    return { task, route: { agentId: "orchestrator", action: "chat" }, output: 확인 ?? 물음 };
   }
 
   // ── 시연 실측이 잡은 라우팅 결함 2건의 결정적 분기 (2026-07-29, 계획서 전-1) ──────────

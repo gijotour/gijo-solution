@@ -220,7 +220,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       highlight(view, searchTerm);
       document.getElementById("status").textContent = doc.title + " · " + doc.markdown.length.toLocaleString() + "자";
     } catch (e) {
-      view.innerHTML = '<div class="empty">문서를 열지 못했습니다 — ' + esc((e && e.message) || e) + "</div>";
+      // 본문 열기도 같은 막다른 길이 있다 — 세션이 풀렸으면 원인을 말하고 재시도를 준다.
+      var m = String((e && e.message) || e);
+      view.innerHTML = '<div class="empty">' +
+        (/unauthorized|401/i.test(m)
+          ? "로그인이 풀려 문서를 못 열었습니다.<br>본창에서 다시 로그인한 뒤 왼쪽 목록에서 다시 누르세요."
+          : "문서를 열지 못했습니다 — " + esc(m)) + "</div>";
     }
   }
 
@@ -239,11 +244,25 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       document.getElementById("status").textContent = "문서 " + docs.length + "건";
       if (docs.length) open(docs[0].id);
     } catch (e) {
+      // ⚠ 막다른 길 금지(2026-08-07 사용자 신고 "문서함 문서열려?"): 세션이 풀리면(어제처럼
+      //   서버 열쇠 교체·중복 로그인) 이 창은 별도 창이라 **로그인 화면으로 돌아가지 않는다.**
+      //   재로그인해도 이미 열린 이 창은 영영 빈 채였다 — 원인과 다음 걸음, 다시 시도할 단추를 준다.
+      var msg = String((e && e.message) || e);
+      var 세션 = /unauthorized|401/i.test(msg);
       document.getElementById("toc").innerHTML =
-        '<div style="color:var(--muted-2);font-size:12px;padding:8px">목록을 불러오지 못했습니다.</div>';
-      document.getElementById("status").textContent = (e && e.message) || String(e);
+        '<div style="color:var(--muted-2);font-size:12px;padding:8px;line-height:1.6">' +
+        (세션
+          ? "로그인이 풀려 목록을 못 불러왔습니다.<br>본창에서 다시 로그인한 뒤 아래를 누르세요."
+          : "목록을 불러오지 못했습니다.") +
+        '<br><button id="btnRetry" style="margin-top:8px;padding:4px 10px;cursor:pointer">다시 불러오기</button></div>';
+      document.getElementById("btnRetry").addEventListener("click", load);
+      document.getElementById("status").textContent = msg;
     }
   }
+
+  // 창을 다시 볼 때(재로그인하고 돌아왔을 때) 목록이 비어 있으면 스스로 다시 불러온다 —
+  // 단추를 못 찾는 사람도 창 클릭만으로 살아나게.
+  window.addEventListener("focus", function () { if (!docs.length) load(); });
 
   // ── 검색 ────────────────────────────────────────────────────────────────
   var timer = null;
