@@ -844,10 +844,15 @@ export async function embed(texts: string[]): Promise<number[][]> {
   const res = await embedPost(`${EMBEDDING_SERVER_URL}/embeddings`, { model: "local", input: texts }, LLM_TIMEOUT_MS);
 
   if (!res.ok) {
-    emitLlmActivity({ kind: "embed", phase: "error", model: "임베딩", detail: "임베딩 서버 연결 실패" });
-    throw new Error(
-      "임베딩 서버에 연결할 수 없습니다. 별도 llama-server를 --embedding 플래그로 " + EMBEDDING_SERVER_URL + " 에 기동하세요."
-    );
+    // 연결 실패(status 0)와 HTTP 거절(4xx/5xx)은 원인이 정반대다 — 전자는 서버가 없는 것,
+    // 후자는 서버는 멀쩡한데 **요청이 잘못된 것**(입력이 문자열이 아님·ubatch 초과 등).
+    // 실측(2026-08-06): 잘못된 인자로 온 500을 "연결할 수 없습니다"로 안내해 1시간을
+    // 연결 문제로 헤맸다. 상태코드와 응답 본문을 그대로 보인다 — 오류문은 진단서다.
+    const 원인 = res.status === 0
+      ? "임베딩 서버에 연결할 수 없습니다. 별도 llama-server를 --embedding 플래그로 " + EMBEDDING_SERVER_URL + " 에 기동하세요."
+      : `임베딩 서버가 요청을 거절했습니다(HTTP ${res.status}) — 입력 형식(문자열 배열)·길이를 확인하세요. 응답: ${res.text.slice(0, 200)}`;
+    emitLlmActivity({ kind: "embed", phase: "error", model: "임베딩", detail: res.status === 0 ? "임베딩 서버 연결 실패" : `임베딩 HTTP ${res.status}` });
+    throw new Error(원인);
   }
   const data = JSON.parse(res.text) as { data?: { embedding: number[] }[] };
   if (!data.data) throw new Error("임베딩 서버 응답 형식이 올바르지 않습니다.");
