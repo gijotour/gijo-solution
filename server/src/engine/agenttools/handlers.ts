@@ -2583,7 +2583,9 @@ export async function runFpPatterns(args: Record<string, string>): Promise<strin
   }
   const 총 = rows.reduce((n, r) => n + r.count, 0);
   const lines: string[] = [
-    `${머리} — ${최소}회 이상 반복 ${rows.length}개 (오탐 처리 누적 ${총}건)`,
+    // "누적"이라 부르지 않는다(검토관 2026-08-07) — 상한(기본 10개)을 넘는 패턴이 있으면
+    // 이 합은 총계가 아니라 부분합이다. 표시분의 합이라고 정직하게 적는다.
+    `${머리} — ${최소}회 이상 반복 ${rows.length}개 (표시된 패턴의 오탐 합계 ${총}건)`,
     "",
     `${표식.주의} 이 목록은 표시만 합니다 — 자동으로 오탐 제외하지 않습니다. 지금 열려 있는 동일 패턴은 사람이 하나씩 확인한 후 판정합니다.`,
     "",

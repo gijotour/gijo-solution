@@ -18,7 +18,7 @@ import { emitCollaboration } from "./collaboration";
 import { listProducts } from "./securityproducts";
 import { recordWork, TOOL_WORK_KIND } from "./worklog";
 import { listTasks } from "./tasks";
-import { 자산표시이름 } from "./assets";
+import { 자산표시이름, listAssets } from "./assets";
 
 const MAX_STEPS = 5;
 
@@ -190,9 +190,9 @@ export function 가리킨자산이없나(instruction: string): boolean {
   if (/\d{1,3}(\.\d{1,3}){3}/.test(t)) return false;            // IP를 적었다 = 특정했다
   if (/전체|모든|전부|목록|리스트/.test(t)) return false;         // 대상이 하나가 아니다
   // 등록된 자산 이름이 문장에 있으면 특정한 것이다(이름으로 부르는 게 이 제품의 관례).
+  // (검토관 2026-08-07: require는 vitest ESM 변환에서 미정의로 죽어 catch에 삼켜질 수 있다
+  //  — 시험과 제품이 딴 길을 걷는 유일한 자리였다. 이미 정적 임포트하는 assets에서 가져온다.)
   try {
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
-    const { listAssets } = require("./assets") as typeof import("./assets");
     for (const a of listAssets()) {
       const 이름 = String(a.name ?? "").trim();
       if (이름.length >= 3 && t.includes(이름)) return false;
@@ -645,9 +645,11 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }
   // 24초를 쓰고도 도구를 하나도 안 골랐다(LLM 판단). 화면·메뉴 이름 그대로 물은 건 결정적으로 잇는다.
   {
     // 2026-08-06 147상황 실측: 「KISA 위협 대응 현황 알려줘」가 **30.7초**였다(답은 맞았다).
-    //   담당자는 화면 이름(컴플라이언스)이 아니라 **표준 이름**(KISA·ISMS-P·ISO)으로도 묻는다.
-    //   이 제품의 컴플라이언스 축이 KISA AI 위협 대응 매뉴얼이라 같은 자리로 이어야 한다.
-    re: /컴플라이언스\s*(현황|이행|상태|어때|보여|요약)|(규제|통제)\s*항목\s*(현황|이행)|이행\s*현황\s*(확인|알려|보여|요약)|(KISA|ISMS-?P|ISO\s*27001)[^.\n]{0,10}(위협\s*)?(대응|이행|준수)\s*(현황|상태|어때|보여|알려|요약)/i,
+    //   이 제품의 컴플라이언스 대장은 KISA AI 위협 대응 매뉴얼이므로 **KISA만** 이 자리로 잇는다.
+    //   ⚠ ISMS-P·ISO 27001을 넣었다가 검토관이 잡았다(2026-08-07): 그 표준을 물어도 KISA
+    //   카탈로그가 **표준이 다르다는 말 한 줄 없이** 확실하게 나간다 — 100% 재현되는 오답이라
+    //   느린 정답(모델 경로)보다 나쁘다. 다른 표준 대장이 생기면 그때 각자 규칙을 단다.
+    re: /컴플라이언스\s*(현황|이행|상태|어때|보여|요약)|(규제|통제)\s*항목\s*(현황|이행)|이행\s*현황\s*(확인|알려|보여|요약)|KISA[^.\n]{0,10}(위협\s*)?(대응|이행|준수)\s*(현황|상태|어때|보여|알려|요약)/i,
     tool: "compliance_status",
     args: {},
   },
@@ -996,7 +998,9 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }
   //   위 [유지보수] 규칙은 「유지보수·정비」 낱말을 요구해 이 말을 못 받았다 — 기간+점검 꼴을 받는다.
   //   ⚠ 절차·방법을 묻는 지식 질문은 비켜 준다(위 규칙과 같은 제외구).
   {
-    re: /^(?!.*(절차|방법|항목\s*설명|순서|체크\s*리스트|어떻게\s*하))(?:.*(이번\s*주|이번주|다음\s*주|다음주|이번\s*달|이번달|오늘|내일)\s*[^.\n]{0,6}(예정|잡[힌혀]|남[은아])?\s*[^.\n]{0,4}점검[^.\n]{0,8}(있|뭐|무엇|보여|알려|현황|어때))/,
+    //   ⚠ 검토관 2026-08-07: 「예정」 앵커를 선택(?)으로 뒀더니 「오늘 점검 **결과** 알려줘」
+    //   같은 과거 질문까지 삼킬 수 있었다 — 앵커를 필수로 좁히고, 결과·이력도 제외구에 넣는다.
+    re: /^(?!.*(절차|방법|항목\s*설명|순서|체크\s*리스트|어떻게\s*하|결과|이력|보고))(?:.*(이번\s*주|이번주|다음\s*주|다음주|이번\s*달|이번달|오늘|내일)\s*[^.\n]{0,6}(예정|잡[힌혀]|남[은아])\s*[^.\n]{0,4}점검[^.\n]{0,8}(있|뭐|무엇|보여|알려|현황|어때))/,
     tool: "maintenance_status",
     args: {},
   },

@@ -35,6 +35,9 @@ const 유형 = (r: Row): string => {
   } catch { return ""; }
 };
 
+// 묶음 열쇠 — 대소문자·겹공백 차이로 같은 오탐이 딴 패턴으로 갈리지 않게(스캐너별 표기 차이가 흔하다).
+const 열쇠 = (t: string): string => t.toLowerCase().replace(/\s+/g, " ");
+
 /**
  * 오탐이 잦은 패턴을 센다. **읽기 전용** — 아무 상태도 바꾸지 않는다.
  * @param minCount 몇 번 이상이어야 「패턴」으로 볼지(기본 2 — 1회는 우연)
@@ -46,16 +49,22 @@ export function listFpPatterns(minCount = 2, limit = 10): FpPattern[] {
 
   const 오탐 = new Map<string, Row[]>();
   const 진짜 = new Map<string, Row[]>();
+  const 표기 = new Map<string, string>(); // 열쇠 → 처음 본 원문 표기(사람에게는 원문으로 보인다)
   for (const r of rows) {
-    const t = 유형(r);
-    if (!t) continue;
+    const 원문 = 유형(r);
+    if (!원문) continue;
+    const t = 열쇠(원문);
+    if (!표기.has(t)) 표기.set(t, 원문);
     // 오탐(false_positive)만 센다 — 보상통제(compensating_control)는 "위험은 있지만 다른 걸로 막았다"라
     // 뜻이 다르다. 둘을 섞으면 "오탐이 잦은 패턴"이 거짓이 된다(반려 사유를 나눠 둔 이유 그대로).
     if (r.status === "rejected" && r.rejectReason === "false_positive") {
       if (!오탐.has(t)) 오탐.set(t, []);
       오탐.get(t)!.push(r);
-    } else if (r.status === "approved") {
-      // 같은 유형인데 **진짜 취약점으로 확정**된 이력 — 일반화가 위험하다는 증거다.
+    } else if (["approved", "in_progress", "verifying"].includes(r.status)) {
+      // 같은 유형인데 **진짜로 인정된** 이력 — 일반화가 위험하다는 증거다.
+      // ⚠ approved만 봤다가 검토관이 잡았다(2026-08-07): 옆 자산에서 **지금 조치 중**(in_progress·
+      //   verifying)인 것도 진짜로 인정된 것이다 — 이걸 빼면 ⚠ 없이 "오탐 3건"만 보이고,
+      //   담당자가 일반화해 열려 있는 진짜 건을 반려한다. 이 기능이 막겠다던 바로 그 실패다.
       if (!진짜.has(t)) 진짜.set(t, []);
       진짜.get(t)!.push(r);
     }
@@ -66,7 +75,7 @@ export function listFpPatterns(minCount = 2, limit = 10): FpPattern[] {
     if (list.length < minCount) continue;
     const 정렬 = list.slice().sort((a, b) => String(b.reviewedAt ?? "").localeCompare(String(a.reviewedAt ?? "")));
     out.push({
-      type,
+      type: 표기.get(type) ?? type,
       count: list.length,
       assets: new Set(list.map((r) => r.assetId)).size,
       lastAt: 정렬[0]?.reviewedAt ?? null,

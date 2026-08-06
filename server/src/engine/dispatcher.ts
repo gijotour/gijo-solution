@@ -999,7 +999,11 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   // ★ 2026-08-04 재측정: 직전 대상이 **있을 때**가 오히려 나빴다. 되묻기 경로를 비켜 가
   //   모델로 넘어갔고, 모델은 25초를 쓰고 **똑같이 되물었다**(23자, 더 불친절하게).
   //   대명사뿐인 말에 모델이 필요할 리 없다 — 대상이 있으면 짚어 확인받고, 없으면 되묻는다.
-  if (대명사뿐인가(instructionText)) {
+  // ★ 2026-08-07 검토관 발견(치명): 「이 서버 어떤 서비스 돌고 있어?」용 판정
+  //   (가리킨자산이없나)을 만들어 놓고 **여기 관문에 배선하지 않아** 한 번도 실행되지 않았다.
+  //   47초·엉뚱한 답을 낸 그 경로가 그대로였다. 대명사뿐인 말과 대상 안 밝힌 자산 질문은
+  //   같은 병(대상 불명)이라 같은 관문에서 잡는다.
+  if (대명사뿐인가(instructionText) || 가리킬것없는대명사(instructionText, 대화열쇠)) {
     const 확인 = 대명사확인(대화열쇠);
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
     completeTask(task.id);
