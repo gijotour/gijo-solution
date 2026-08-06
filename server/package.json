@@ -15,7 +15,6 @@
   "dependencies": {
     "@cyclonedx/cyclonedx-library": "^10.1.0",
     "@lancedb/lancedb": "^0.31.0",
-    "@modelcontextprotocol/sdk": "^1.29.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/better-sqlite3": "^7.6.13",
     "@types/jsonwebtoken": "^9.0.10",

@@ -58,7 +58,6 @@ const SCREENS: Record<string, ScreenContext> = {
   // 오케스트레이션 대상이 아닌 화면들 — defaultAction 없음(추측하지 않는다).
   "merge.html": { label: "LLM 합성", domain: "모델 병합" },
   "learnloop.html": { label: "학습 루프", domain: "파인튜닝 파이프라인" },
-  "docenrich.html": { label: "문서 보강", domain: "문서 보강 인입" },
   "settings.html": { label: "설정", domain: "서버·계정·엔진 설정" },
 };
 

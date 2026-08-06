@@ -242,8 +242,6 @@ async function main() {
     //   업무 절차 재편(2026-08-02) 뒤 생긴 화면들이 빠져 있어 자료가 지금 제품과 달라진다.
     { page: "sessions.html", name: "28-작업세션" },
     { page: "report.html", name: "29-리포트" },
-    { page: "reference.html", name: "30-참고자료" },
-    { page: "docenrich.html", name: "31-문서보강" },
   ];
 
   // GIJO_SHOT_ONLY="05,06" — 일부 화면만 다시 찍고 싶을 때(파일명 접두 번호로 필터). 없으면 전체.
