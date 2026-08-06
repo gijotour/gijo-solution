@@ -358,7 +358,9 @@ describe("윈도우 실장비 실증 — 진짜 설치 목록 출력", () => {
   it("★ 요약문이 거짓말을 하지 않는다 — 윈도우는 라이선스 없음을 밝힌다", async () => {
     const r = await 패키지수집(가짜실행({ powershell: { out: 실출력 } }), true);
     expect(r.ok).toBe(true);
-    expect(r.말).toContain("라이선스 정보가 없습니다");
+    expect(r.말).toContain("라이선스 정보가 없");
+    // 제조사는 단정이 아니라 **센 수**로 말한다(검토 #11) — fixture 26줄 전부 Publisher가 있다.
+    expect(r.말).toContain("26개만 따로 담았습니다");
     expect(r.말, "제조사를 라이선스로 세면 안 된다").not.toMatch(/라이선스를 아는 것은 \d+개/);
     expect(덮는범위글(r.부품)).toContain("라이선스를 아는 것은 0개");
   });

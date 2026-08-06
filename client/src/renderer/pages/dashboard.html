@@ -179,7 +179,9 @@
 <div class="app">
   <div class="sidebar" id="gijoNav"></div>
   <div class="main">
-    <div class="scr-id">🏠 <b>대시보드</b> — 오늘 무엇이 급한지 AI가 먼저 알려주는 자리입니다.
+    <!-- 정체성 한 줄 — 2026-08-06 브리핑이 대화창으로 가면서 "AI가 먼저 알려주는"이 거짓이 됐다.
+         이 화면이 실제로 하는 일(급한 것을 보여주고, 지시는 대화창)만 말한다. -->
+    <div class="scr-id">🏠 <b>대시보드</b> — 오늘 급한 것을 한눈에 보고, 지시는 아래 대화창에서 하는 자리입니다.
       <span class="ask" id="askInfo">· 이 화면 설명 듣기</span></div>
 
 
@@ -269,7 +271,8 @@
   // 화면 열기 — 셸이 있으면 새 탭, 없으면(분리창) 그 자리 이동. 다리는 nav.js가 놓는다.
   function go(page) { if (window.gijoOpenScreen) window.gijoOpenScreen(page); else location.href = page; }
 
-  // today 항목 id 접두사 → 실제로 조치하는 화면. 브리핑 버튼과 급한 것 목록이 같은 규칙을 쓴다.
+  // today 항목 id 접두사 → 실제로 조치하는 화면. 급한 것 목록이 이 규칙을 쓴다
+  // (브리핑 버튼도 같이 쓰던 것은 2026-08-06 대화창 이동으로 없어졌다).
   function screenOf(id) {
     var s = String(id || "");
     if (s.indexOf("vulnhost:") === 0) return "vulnscan.html";

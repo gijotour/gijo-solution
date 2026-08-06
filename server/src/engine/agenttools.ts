@@ -25,7 +25,7 @@ import { workflowStages } from "./workflow";
 import { 한줄풀이글, 섞임고지 } from "./findingplain";
 import { eol찾기, eol한줄 } from "./eol-seed";
 import { 패키지수집, 구성요소합치기, 덮는범위글 } from "./packagescan";
-import { targetRunner } from "./hardeningscan";
+import { targetRunner, runnerFor } from "./hardeningscan";
 import { listTargets } from "./hardeningtargets";
 import { 잃은취약점찾기, 잃은취약점현황글, 되살리기 } from "./findingsrestore";
 import { listProducts, createProduct, PRODUCT_CATEGORIES } from "./securityproducts";
@@ -1997,7 +1997,11 @@ async function runCollectPackages(말: string): Promise<string> {
   const t = 대상찾기(말);
   if (!t) return `"${말}"에 해당하는 점검 대상을 찾지 못했습니다 — 먼저 하드닝 점검 대상으로 등록해 주세요.`;
   const 윈도우 = t.standard === "kisa_pc";
-  const r = await 패키지수집(targetRunner(t), 윈도우);
+  // ⚠ targetRunner가 아니라 **runnerFor**(2026-08-06 실측으로 잡음). targetRunner는 로컬이면
+  //   무조건 hostRunner(WSL bash)를 주는데, 로컬 **윈도우 PC** 대상(kisa_pc)의 수집 명령은
+  //   powershell이라 WSL로 가면 실행 자체가 안 된다. runnerFor는 표준이 windows면
+  //   winHostRunner(chcp 65001 포함)를 준다 — 하드닝 점검이 이미 쓰는 그 길이다.
+  const r = await 패키지수집(runnerFor(t, t.standard ?? "kisa"), 윈도우);
   if (!r.ok) return `${표식.나쁨} ${t.label} — ${r.말}`;
 
   // 이 대상에 맞는 자산을 찾는다. 못 찾으면 **읽은 것을 버리지 않고 그렇게 말한다.**
@@ -3381,10 +3385,25 @@ const TOOLS: AgentTool[] = [
     ],
     // 상대 기한("다음주 월요일")을 YYYY-MM-DD로 정정한다(assign_finding의 dueDate와 같은 규칙).
     autoFill: (args, instruction): Record<string, string> => {
+      const out: Record<string, string> = {};
       const raw = (args.scheduleDate ?? "").trim();
-      if (DUE_RE.test(raw)) return {};
-      const parsed = parseRelativeDueDate(raw) ?? parseRelativeDueDate(instruction);
-      return parsed ? { scheduleDate: parsed } : {};
+      if (!DUE_RE.test(raw)) {
+        const parsed = parseRelativeDueDate(raw) ?? parseRelativeDueDate(instruction);
+        if (parsed) out.scheduleDate = parsed;
+      }
+      // ⚠ 제품명은 **등록부 대조로** 채운다(2026-08-06 — 강제 라우팅을 붙이자 결재판은 즉시
+      //   뜨는데 productName이 비어, 서랍이 넣어 준 「FOCS 메뉴얼 ver1 2 정기점검 잡아줘」에서
+      //   사람이 제품명을 다시 쳐야 했다). LLM 추출이 아니라 등록된 이름과의 결정적 대조라
+      //   지어낼 수 없고, 지시에 없는 제품이면 그대로 비워 사람에게 묻는다.
+      //   가장 긴 일치를 고른다 — 「FOCS」와 「FOCS 메뉴얼 ver1 2」가 다 걸리면 긴 쪽이 맞다.
+      if (!(args.productName ?? "").trim()) {
+        const 소문 = instruction.toLowerCase();
+        const hit = listProducts()
+          .filter((p) => p.name && 소문.includes(p.name.trim().toLowerCase()))
+          .sort((a, b) => b.name.length - a.name.length)[0];
+        if (hit) out.productName = hit.name;
+      }
+      return out;
     },
     effect: (args) => `점검 일정 등록 — ${(args.productName ?? "").trim()} · ${(args.scheduleDate ?? "").trim()} · 알림/승인 흐름과 연동`,
     undo: "운영 가이드(점검) 화면에서 일정을 삭제하면 원복됩니다.",

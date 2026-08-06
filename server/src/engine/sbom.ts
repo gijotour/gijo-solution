@@ -17,6 +17,8 @@ export interface SbomComponent {
   name: string;
   version: string;
   license: string;
+  /** 제조사(Publisher) — 윈도우 설치 목록이 주는 값. 라이선스가 아니라 별도 칸이다(2026-08-06). */
+  publisher?: string;
   knownVulns: string[];
 }
 
@@ -61,8 +63,10 @@ export function buildSpdxJson(assetId: string, components: SbomComponent[]): str
       downloadLocation: "NOASSERTION",
       filesAnalyzed: false,
       licenseConcluded: "NOASSERTION",
-      licenseDeclared: c.license || "NOASSERTION",
+      licenseDeclared: c.license && c.license !== "-" ? c.license : "NOASSERTION",
       copyrightText: "NOASSERTION",
+      // SPDX supplier — 윈도우 부품의 제조사(2026-08-06). 형식은 표준대로 "Organization: 이름".
+      ...(c.publisher ? { supplier: `Organization: ${c.publisher}` } : {}),
       primaryPackagePurpose: "LIBRARY",
     })),
   ];
@@ -93,7 +97,9 @@ function buildCycloneDxJson(assetId: string, components: SbomComponent[]): strin
 
   for (const c of components) {
     const component = new Models.Component(Enums.ComponentType.Library, c.name, { version: c.version });
-    if (c.license) component.licenses.add(new Models.NamedLicense(c.license));
+    if (c.license && c.license !== "-") component.licenses.add(new Models.NamedLicense(c.license));
+    // CycloneDX 표준의 publisher 필드 — 윈도우 부품의 제조사가 여기 실린다(2026-08-06).
+    if (c.publisher) component.publisher = c.publisher;
     bom.components.add(component);
   }
 
@@ -382,6 +388,7 @@ export async function generateSbom(assetId: string): Promise<SbomDocument> {
     name: c.name,
     version: c.version,
     license: c.license,
+    ...(c.publisher ? { publisher: c.publisher } : {}),
     knownVulns: activeFindings.filter((f) => f.evidence.includes(c.name)).map((f) => f.finding_type),
   }));
   markSbomGenerated(assetId);

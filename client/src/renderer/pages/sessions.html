@@ -676,16 +676,14 @@
     // ⚠ 예전엔 <details>의 toggle 이벤트를 썼다 — 우리 접기로 바꾸면서 gijo:fold 알림으로 옮겼다.
     const pat = document.querySelector(".ws-pat");
     if (pat) pat.addEventListener("gijo:fold", (e) => { if (e.detail && e.detail.open && !patLoaded) { patLoaded = true; loadPatterns(); } });
-    // ★ 2026-08-04 실화면에서 발견: **펼쳐 둔 채로 화면을 열면 영영 「불러오는 중…」**이었다.
-    //   gijo:fold는 「펼치는 순간」에만 울린다 — 이미 펼쳐져 있으면 아무도 안 부른다.
-    //   접기 상태는 담당자가 저장해 두는 값이라(gijo:fold:*) 대부분 이 길로 들어온다.
-    //   ⚠ 접힘 판정은 **본문의 display**로 한다 — fold.js가 그렇게 접는다(클래스가 아니다).
-    //   ⚠ 접혀 있으면 여전히 안 부른다 — 안 보이는 것을 계산할 이유가 없다.
-    //   fold.js가 우리보다 늦게 자리를 잡을 수 있어 한 박자 뒤에 본다.
-    setTimeout(() => {
-      const body = document.getElementById("patBody");
-      if (body && body.offsetParent !== null && !patLoaded) { patLoaded = true; loadPatterns(); }
-    }, 0);
+    // ★ 2026-08-06 — **접혀 있어도 항상 부른다**(검토 #6이 잡은 교착 해소).
+    //   이 구역이 기본 접힘이 되면서(위 data-gijo-fold-closed), "펼칠 때만 부른다"는 예전
+    //   규칙과 맞물려 배지(기간)가 **영영 안 채워졌다** — 펼쳐야 값이 생기는데 기본이 접힘이라
+    //   접기 원칙("접힌 줄에 핵심 숫자 배지")을 첫 적용 화면이 스스로 어기는 상태였다.
+    //   패턴 계산은 결정적 SQL 집계라(초 미만) 항상 불러도 부담이 없고, 값이 채워지면
+    //   fold.js watch()가 접힌 제목줄의 기간 배지를 그린다.
+    //   (2026-08-04의 "펼쳐 둔 채 열면 영영 불러오는 중" 문제도 이 길로 함께 덮인다.)
+    if (!patLoaded) { patLoaded = true; loadPatterns(); }
     await loadExplorerData();
     // 다른 화면에서 넘어온 딥링크(localStorage) — 특정 내역 열기.
     // 'gijo:sessions:new'(새 세션으로 시작) 갈래는 ＋ 새 세션과 함께 없앴다. 옛 앱이 남긴

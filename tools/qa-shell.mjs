@@ -32,7 +32,12 @@ const browser = await chromium.connectOverCDP("http://127.0.0.1:9223");
 const ctx = browser.contexts()[0];
 let page = ctx.pages().find((p) => p.url().includes("login.html"));
 if (!page) {
-  const m = ctx.pages().find((p) => /app\.html|dashboard\.html|office\.html/.test(p.url()));
+  // ⚠ 세 이름만 찾으면 **직전 자동화가 어느 화면에 두고 갔는지**에 따라 즉사한다(2026-08-06 실측:
+  //   사전 검증이 sbom.html에 두고 QA를 시작 → "페이지를 찾지 못함" 0초 실패. 제품이 아니라
+  //   시작 조건이 깨진 것). 이 제품 창이면 어느 화면이든 붙잡는다 — 어차피 바로 아래에서
+  //   login.html로 보내 처음부터 시작한다.
+  const m = ctx.pages().find((p) => /app\.html|dashboard\.html|office\.html/.test(p.url()))
+    || ctx.pages().find((p) => /\/pages\/[a-z-]+\.html/.test(p.url()) && !p.url().startsWith("devtools"));
   if (!m) { console.error("Electron 페이지를 찾지 못함"); process.exit(2); }
   await m.evaluate(() => { window.gijo.navigateTo("login.html"); }).catch(() => {});
   await m.waitForURL(/login\.html/, { timeout: 10000 });

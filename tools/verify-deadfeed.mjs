@@ -75,13 +75,14 @@ if (office) {
   office.on("console", (m) => { if (m.type() === "error") 오류2.push(m.text().slice(0, 160)); });
   await office.reload({ waitUntil: "domcontentloaded" }).catch(() => {});
   await office.waitForTimeout(6000);
+  // ⚠ 브리핑 열(.brief-col)은 2026-08-06 대화창 이동으로 제거됐다 — 그 선택자로 판정하면
+  //   제품이 멀쩡한데 무조건 실패한다(검토 지적 #7). 지금도 있는 뼈대(할일·사무실 캔버스)로 본다.
   const r = await office.evaluate(() => ({
     할일: !!document.querySelector(".todo .t-head"),
-    브리핑: !!document.querySelector(".brief-col .bc-h"),
-    머리글: (document.querySelector(".brief-col .bc-h") || {}).textContent || "",
+    사무실: !!document.getElementById("office"),
   }));
-  적기("팀 사무실 렌더", r.할일 && r.브리핑 && 오류2.length === 0,
-    오류2.length ? "콘솔오류: " + 오류2[0] : JSON.stringify(r.머리글));
+  적기("팀 사무실 렌더", r.할일 && r.사무실 && 오류2.length === 0,
+    오류2.length ? "콘솔오류: " + 오류2[0] : JSON.stringify(r));
 } else {
   적기("팀 사무실 렌더", false, "창을 못 열었다");
 }

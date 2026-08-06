@@ -78,7 +78,10 @@
   .t-add button { width: 34px; height: 34px; border-radius: 8px; border: none; background: var(--teal); color: #04110b;
     font-weight: 800; font-size: 16px; cursor: pointer; flex: 0 0 auto; }
   .t-list { flex: 1 1 auto; overflow-y: auto; padding: 0 12px; min-height: 0; }
-  /* 가이드형 브리핑 CSS(.g-*/.brief-sec)는 2026-08-06 대화창 이동으로 제거 */
+  /* 가이드형 브리핑 CSS(.g- 계열과 .brief-sec)는 2026-08-06 대화창 이동으로 제거.
+     ⚠ 이 주석에 「.g-」 뒤 별표·빗금을 쓰면 안 된다 — CSS 주석이 거기서 닫혀 남은 글자가
+       선택자로 흘러가고, 파서가 다음 규칙(.my-h)을 통째로 삼킨다. 5.5.0에서 실제로 그랬다
+       (「내 체크리스트」 소제목이 16px 본문으로 렌더 — 검토 지적 #2). */
   .my-h { font-size: 11.5px; font-weight: 800; color: var(--muted-2); padding: 6px 2px 2px; letter-spacing: .3px; }
   .t-item { display: flex; gap: 7px; align-items: flex-start; padding: 6px 2px; border-bottom: 1px solid var(--border); font-size: 12px; }
   .t-item input { margin-top: 2px; accent-color: var(--teal); cursor: pointer; }
