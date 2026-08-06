@@ -175,6 +175,7 @@ import {
   runKnowledgeStatus,
   runRecentDocuments,
   runActionCheckHistory,
+  runFpPatterns,
   번들언제기준,
   runKnowledgeBundleStatus,
   runKnowledgeBundleImport,
@@ -651,6 +652,19 @@ const TOOLS: AgentTool[] = [
   {
     // 지식 번들 현황 — knowledge_status(재고)와 달리 "실린 표준·위협 지식이 언제 기준인가"를 본다.
     // 구독화(후-3)의 첫 대화창 창구: 담당자가 "지금 최신인가/무엇이 실렸나"를 스스로 확인한다.
+    name: "fp_patterns",
+    label: "오탐 자주 나는 패턴",
+    domain: "vuln",
+    write: false,
+    description:
+      '이 조직에서 **반복해서 오탐으로 판정된 취약점 유형**을 모아 본다 — 몇 번, 몇 개 자산에서, 누가 판정했는지. ' +
+      '"오탐 자주 나는 패턴 알려줘", "자주 틀리는 탐지 뭐야?" 같은 물음에 쓴다. ' +
+      "⚠ 표시만 하는 도구다 — 자동으로 오탐 처리하지 않는다(잘못 일반화하면 진짜 취약점을 숨긴다).",
+    params: [{ name: "minCount", label: "최소 반복 횟수", description: "몇 회 이상을 패턴으로 볼지 — 기본 2", required: false }],
+    directAnswer: true,
+    run: runFpPatterns,
+  },
+  {
     name: "action_check_history",
     label: "규정 대조 이력",
     domain: "knowledge",

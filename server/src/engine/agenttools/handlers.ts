@@ -2559,6 +2559,39 @@ export async function runRecentDocuments(args: Record<string, string>): Promise<
   return recentDocumentsText(days);
 }
 
+// ── 오탐 자주 나는 패턴 (해자 슬라이스 3, 2026-08-06 시안 승인) ────────────
+// "오탐 자주 나는 패턴 알려줘" — 조직이 쌓은 오탐 판단을 **모아서 보여 준다.**
+// ★★ 자동 제외 없음. 잘못 일반화하면 진짜 취약점을 숨긴다 — 읽기만 하고, 사람이 판단한다.
+export async function runFpPatterns(args: Record<string, string>): Promise<string> {
+  const { listFpPatterns } = await import("../fppattern.js");
+  const 최소 = Math.max(2, Math.min(10, Number(args.minCount) || 2));
+  const rows = listFpPatterns(최소);
+  const 머리 = "오탐 자주 나는 패턴";
+  if (!rows.length) {
+    return [
+      `${머리} — ${최소}회 이상 반복된 것이 아직 없습니다.`,
+      "오탐 판정이 쌓이면 여기에 모입니다(조치·승인 화면에서 「오탐」으로 처리한 기록이 재료입니다).",
+    ].join("\n");
+  }
+  const 총 = rows.reduce((n, r) => n + r.count, 0);
+  const lines: string[] = [
+    `${머리} — ${최소}회 이상 반복 ${rows.length}개 (오탐 처리 누적 ${총}건)`,
+    "",
+    `${표식.주의} 이 목록은 표시만 합니다 — 자동으로 오탐 제외하지 않습니다. 지금 열려 있는 동일 패턴은 사람이 하나씩 확인한 후 판정합니다.`,
+    "",
+  ];
+  for (const r of rows) {
+    const 날 = r.lastAt ? r.lastAt.slice(0, 10) : "-";
+    lines.push(`- ${r.type} — 오탐 ${r.count}건 · 자산 ${r.assets}대 · 최근 ${날}${r.lastBy ? ` · ${r.lastBy}` : ""}`);
+    if (r.reasons.length) lines.push(`    판정 사유: ${r.reasons.join(" / ").slice(0, 120)}`);
+    // ⚠ 같은 패턴인데 다른 자산에서는 **진짜로 판정**된 이력 — 일반화가 위험하다는 증거다.
+    for (const c of r.conflict) {
+      lines.push(`    ${표식.주의} ${자산표시이름(c.assetId)} — ${c.at ? c.at.slice(0, 10) : "-"}에 같은 패턴이 실제 취약점으로 판정됨${c.by ? `(${c.by})` : ""}`);
+    }
+  }
+  return lines.join("\n");
+}
+
 // ── 규정 대조 판정 이력 (해자 슬라이스 1, 2026-08-06) ──────────────────────
 // "규정 대조 이력 보여줘" — 쌓인 판정을 결정적으로 읽는다. 같은 사안의 판정이 바뀐 것(⚠)은
 // 규정 개정을 담당자가 알아차리는 신호다 — 제품이 판단하지 않고 표시만 한다.
