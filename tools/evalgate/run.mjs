@@ -78,6 +78,46 @@ const caseSetHash = crypto.createHash("sha256")
 // 한 번 받은 토큰으로 끝까지 가려다 마지막 문항에서 401로 멈췄다(2026-07-29 첫 실행 실측).
 // 만료되면 다시 로그인해 이어간다. 여기서 쓰는 force:true는 **자기 세션 교체**라 안전하다
 // (계정당 세션 1개 규칙 — 그래서 게이트가 도는 동안 그 계정을 다른 데서 쓰면 안 되는 건 그대로다).
+// ── --accept-baseline --from-report: **재실행 없이** 직전 리포트로 기준선 확정 ──────
+// 왜(2026-08-06 실측): 문항당 흔들림 ~1% × 99문항 → 실행당 평균 1건. "흔들림 0인 실행에서만
+// 확정" 규칙(옳다)과 겹치면 확정 겸 재실행은 **~37% 확률 도박**이 된다 — 실제로 이날
+// 흔들림 0 통과 실행이 있었는데도, 확정 플래그를 안 걸었다는 이유로 15분짜리 재실행을
+// 두 번 돌려 두 번 다 흔들림 1로 거부당했다. 이미 검증된 실행의 리포트로 확정하는 길을 둔다.
+// ⚠ 안전장치는 그대로다 — 리포트가 다음을 전부 만족할 때만: 판정=통과 · 흔들림 0 ·
+//   측정 못 함 0 · 문항셋 해시가 **지금 문항셋과 일치**(문항을 고친 뒤 옛 리포트로 확정 금지)
+//   · 실효 견고성 뚫림 0. "사람이 결과를 읽고 결정했을 때만"은 이 모드에도 똑같이 적용된다.
+if (flag("--accept-baseline") && flag("--from-report")) {
+  const rp = path.join(repoRoot, ".tmp-reports", "evalgate-report.json");
+  let r;
+  try { r = JSON.parse(fs.readFileSync(rp, "utf8")); } catch {
+    console.error("리포트가 없습니다 — 먼저 게이트를 한 번 돌려야 합니다."); process.exit(2);
+  }
+  const 사유 = [];
+  if (r.verdict !== "통과") 사유.push(`판정이 통과가 아님(${r.verdict})`);
+  if (r.meta?.caseSetHash !== caseSetHash) 사유.push(`문항셋이 다름(리포트 ${r.meta?.caseSetHash} ↔ 지금 ${caseSetHash})`);
+  let fl = 0, sk = 0;
+  for (const a of AXES) { fl += r.axes?.[a]?.flaky ?? 0; sk += r.axes?.[a]?.skipped ?? 0;
+    if ((r.axes?.[a]?.pass ?? 0) < (r.axes?.[a]?.total ?? 1)) 사유.push(`${a} 축에 실패가 있음`); }
+  if (fl) 사유.push(`흔들림 ${fl}건 — 겨우 살린 통과를 기준선으로 박지 않는다`);
+  if (sk) 사유.push(`측정 못 함 ${sk}건 — 빈칸 있는 기준선 금지`);
+  if (r.effective?.score == null || (r.effective?.leaked ?? 1) > 0) 사유.push("실효 견고성 미측정 또는 뚫림 있음");
+  if (사유.length) { console.error("리포트로 확정 불가:\n  - " + 사유.join("\n  - ")); process.exit(2); }
+  // 기존 baseline.json과 **같은 꼴**로 쓴다(읽는 쪽이 axes[a].passRate·canaryFail 등을 기대) —
+  // 리포트의 축 블록을 그대로 옮기고 출처(fromReport)만 덧붙인다.
+  const bp = path.join(here, "baseline.json");
+  fs.writeFileSync(bp, JSON.stringify({
+    acceptedAt: new Date().toISOString(),
+    gitRev: r.meta?.gitRev ?? null,
+    caseSetHash,
+    axes: Object.fromEntries(AXES.map((a) => [a, r.axes[a]])),
+    robustness: r.robustness ?? null,
+    effective: r.effective,
+    note: `리포트 기준 확정(재실행 없음) — 원 실행 ${r.meta?.ranAt ?? "?"}`,
+  }, null, 2));
+  console.log(`기준선 확정(리포트 기준, 재실행 없음) — ${AXES.map((a) => a + " " + r.axes[a].passRate + "%").join(" · ")} · 실효 뚫림 0`);
+  process.exit(0);
+}
+
 let AUTH;
 async function loginNow() {
   const j = await (await fetch(base + "/api/auth/login", {
