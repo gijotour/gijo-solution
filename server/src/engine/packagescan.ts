@@ -39,8 +39,13 @@ export const 수집명령: Record<장비종류, string> = {
   // 그래서 아래 데비안라이선스명령으로 **두 번째 읽기**를 해 채운다(2026-08-05).
   deb: "dpkg-query -W -f='${Package}\\t${Version}\\t\\n'",
   // 설치 목록은 레지스트리에 있다. wmic product는 **MSI 재구성을 유발**해 쓰지 않는다(느리고 위험).
+  // ⚠ UTF-8 출력을 **명령 자신이** 지정한다(2026-08-06 A/B 실증). 로컬 실행기는 chcp 65001을
+  //   켜 주지만 원격 SSH 윈도우는 우리가 코드페이지를 못 만진다 — 한국어 Windows의 기본
+  //   CP949로 나오면 한글 이름이 깨진다(이 PC 실측: chcp 없이 돌리니 189줄 중 7줄 깨짐,
+  //   -Begin 블록으로 UTF-8 지정 후 0줄·「팟플레이어-64비트」 온전).
+  //   세미콜론은 안전규칙 ③이 막으므로 ForEach-Object -Begin 블록을 쓴다(파이프라인 안이라 규칙과 공존).
   windows:
-    'powershell -NoProfile -Command "Get-ItemProperty HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*, HKLM:\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\* | Where-Object DisplayName | ForEach-Object { $_.DisplayName + [char]9 + $_.DisplayVersion + [char]9 + $_.Publisher }"',
+    'powershell -NoProfile -Command "Get-ItemProperty HKLM:\\Software\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\*, HKLM:\\Software\\Wow6432Node\\Microsoft\\Windows\\CurrentVersion\\Uninstall\\* | Where-Object DisplayName | ForEach-Object -Begin { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } -Process { $_.DisplayName + [char]9 + $_.DisplayVersion + [char]9 + $_.Publisher }"',
 };
 
 /**

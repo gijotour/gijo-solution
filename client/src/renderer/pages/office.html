@@ -49,12 +49,8 @@
   .socbar .v small{font-size:11.75px;font-weight:600;color:var(--muted);margin-left:3px;}
   .socbar .v.red{color:#ff7a6e}.socbar .v.amber{color:var(--amber)}
   .socbar .v.teal{color:#4fd39a}.socbar .v.blue{color:var(--blue-light)}
-  .body { display: grid; grid-template-columns: 236px minmax(0,1fr) 250px; grid-template-rows: minmax(0,1fr) 170px; gap: 10px; padding: 0 10px 10px; flex: 1 1 auto; min-height: 0; }
-  .brief-col { grid-column: 3; grid-row: 1; background: var(--panel); border: 1px solid var(--border); border-radius: 12px; display: flex; flex-direction: column; min-height: 0; }
-  .brief-col .bc-h { padding: 10px 12px 6px; font-size: 12px; font-weight: 800; color: #fff; flex: 0 0 auto; }
-  .brief-col .bc-b { padding: 0 12px 10px; overflow-y: auto; overflow-x: hidden; min-height: 0; font-size: 12px; line-height: 1.7; color: var(--muted); }
-  /* 창을 넓혀도 긴 단어·항목이 삐져나오지 않게 못박는다 — 잘린 글은 없느니만 못하다. */
-  .brief-col .bc-b, .brief-col .bc-b * { max-width: 100%; overflow-wrap: anywhere; word-break: break-word; white-space: normal; }
+  .body { display: grid; grid-template-columns: 236px minmax(0,1fr); /* 브리핑 열(250px)은 2026-08-06 대화창 이동으로 제거 — 3열→2열 */ grid-template-rows: minmax(0,1fr) 170px; gap: 10px; padding: 0 10px 10px; flex: 1 1 auto; min-height: 0; }
+  /* .brief-col — 2026-08-06 대화창 이동으로 제거 */
   /* v5(2026-07-26): 할일=왼쪽, 오피스=중앙, LIVE 채팅=오른쪽(세션 팝업에서 이관) */
   .todo { order: 0; grid-column: 1; grid-row: 1; }
   .office-col { order: 1; grid-column: 2; grid-row: 1; } /* 위 화면 꽉 차게 */
@@ -82,52 +78,7 @@
   .t-add button { width: 34px; height: 34px; border-radius: 8px; border: none; background: var(--teal); color: #04110b;
     font-weight: 800; font-size: 16px; cursor: pointer; flex: 0 0 auto; }
   .t-list { flex: 1 1 auto; overflow-y: auto; padding: 0 12px; min-height: 0; }
-  /* ── 가이드형 브리핑 + 선택지(시안 C) ── 280px 폭 전제: 버튼을 가로로 늘어놓지 않는다. */
-  .guide { margin: 8px 0 10px; }
-  .g-brief { background: linear-gradient(180deg, rgba(59,130,246,.1), transparent);
-             border: 1px solid var(--border-strong); border-radius: 9px; padding: 8px 10px;
-             font-size: 12.25px; line-height: 1.6; margin-bottom: 7px; cursor: pointer; }
-  .g-brief .g-by { display: block; font-size: 11.5px; font-weight: 800; color: var(--blue-light); margin-bottom: 3px; }
-  /* 브리핑은 하단 접이식 참고 섹션 — 펼치면 전문을 줄임 없이 그대로 보여준다(글자 안 짤림). */
-  .g-brief .g-txt { display: block; }
-  /* 접이식: 기본은 한 줄(제목+배지)만. 펼쳐야 근거·대상·조치가 나온다.
-     280px 패널에 5건을 다 펼쳐 놓으면 533px가 되어 브리핑이 밀려난다(실측). */
-  .g-item { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
-            margin-bottom: 4px; overflow: hidden; }
-  .g-item.now { border-left: 3px solid var(--red); }
-  .g-item.today { border-left: 3px solid var(--amber); }
-  .g-head { display: flex; gap: 6px; align-items: center; padding: 6px 8px; cursor: pointer; }
-  .g-head:hover { background: rgba(59,130,246,.07); }
-  .g-num { width: 16px; height: 16px; border-radius: 5px; background: var(--blue); color: #fff;
-           font-size: 11.25px; font-weight: 800; display: flex; align-items: center; justify-content: center; flex: 0 0 auto; }
-  .g-t { font-size: 12.25px; font-weight: 700; line-height: 1.3; flex: 1; min-width: 0;
-         overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-  .g-caret { font-size: 11.25px; color: var(--muted-2); flex: 0 0 auto; transition: transform .15s; }
-  .g-item.open .g-caret { transform: rotate(90deg); }
-  .g-item.open .g-t { white-space: normal; }
-  .g-detail { display: none; padding: 0 8px 8px 30px; }
-  .g-item.open .g-detail { display: block; }
-  .g-s { font-size: 11.5px; color: var(--muted); word-break: break-all; }
-  .g-w { font-size: 11.75px; color: var(--blue-light); margin-top: 3px; line-height: 1.45; }
-  .g-a { font-size: 11.75px; color: var(--text); margin-top: 5px; line-height: 1.45; }
-  .g-go { margin-top: 7px; width: 100%; background: var(--blue); color: #fff; border: none;
-          border-radius: 6px; padding: 6px 10px; font-size: 12px; font-weight: 800; cursor: pointer; font-family: inherit; }
-  .g-go:hover { filter: brightness(1.12); }
-  .g-go:disabled { opacity: .5; cursor: default; }
-  .g-bd { font-size: 11px; font-weight: 800; padding: 1px 5px; border-radius: 20px; flex: 0 0 auto;
-          border: 1px solid var(--border-strong); color: var(--muted); }
-  .g-bd.kev { color: #f5928a; border-color: rgba(226,72,61,.45); background: rgba(226,72,61,.12); }
-  .g-more { font-size: 11.75px; color: var(--muted-2); text-align: center; padding: 5px;
-            border: 1px dashed var(--border); border-radius: 7px; }
-  /* 하단 접이식 "오늘 브리핑" — 참고용. 기본 접힘, 헤더를 누르면 전문이 펼쳐진다. */
-  .brief-sec { border-top: 1px solid var(--border); margin-top: 8px; }
-  .brief-toggle { display: flex; align-items: center; gap: 6px; padding: 9px 4px 8px; cursor: pointer;
-                  font-size: 12.5px; font-weight: 800; color: var(--blue-light); }
-  .brief-toggle .bt-hint { font-size: 11.25px; font-weight: 600; color: var(--muted-2); }
-  .brief-toggle .bt-caret { margin-left: auto; font-size: 11.25px; color: var(--muted-2); transition: transform .15s; }
-  .brief-sec.open .brief-toggle .bt-caret { transform: rotate(90deg); }
-  .brief-body { display: none; padding-bottom: 8px; }
-  .brief-sec.open .brief-body { display: block; }
+  /* 가이드형 브리핑 CSS(.g-*/.brief-sec)는 2026-08-06 대화창 이동으로 제거 */
   .my-h { font-size: 11.5px; font-weight: 800; color: var(--muted-2); padding: 6px 2px 2px; letter-spacing: .3px; }
   .t-item { display: flex; gap: 7px; align-items: flex-start; padding: 6px 2px; border-bottom: 1px solid var(--border); font-size: 12px; }
   .t-item input { margin-top: 2px; accent-color: var(--teal); cursor: pointer; }
@@ -186,17 +137,8 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
       <!-- A안: 팀 대화 피드 삭제 — 대화는 캐릭터 말풍선 + 대시보드 실시간 세션에서 확인. 방을 아래까지 꽉. -->
       <canvas id="office"></canvas>
     </div>
-    <!-- 오늘 브리핑 — 왼쪽 할일 패널 안에 접혀 있던 것을 오른쪽 열로 뺐다(2026-07-26 사용자 요청).
-         자리가 넓어져 접지 않고 그대로 보여준다. -->
-    <div class="brief-col">
-      <div class="bc-h">🧭 오늘 브리핑</div>
-      <div class="bc-b" id="guideBox" style="display:none">
-        <div class="g-brief" id="guideBrief"></div>
-        <div id="guideList"></div>
-        <div class="g-more" id="guideMore" style="display:none"></div>
-      </div>
-      <div class="bc-b" id="guideEmpty" style="font-size:12.5px;color:var(--muted-2)">브리핑을 불러오는 중…</div>
-    </div>
+    <!-- 브리핑 열은 2026-08-06 사용자 지시("ai브리핑은 대화창으로 전부 이동")로 제거.
+         브리핑·오늘 항목은 대화창 「오늘 브리핑」으로 받는다(서버 briefing 도구 그대로). -->
     <!-- 사무실 LIVE 채팅 — 작업 세션 팝업에서 이관(2026-07-26 사용자 결정) -->
     <div class="olive"><div class="ol-h">사무실 LIVE 채팅<span class="lv">LIVE</span></div>
       <div class="ol-feed" id="oliveFeed"><div style="font-size:12.25px;color:var(--muted-2);padding:6px 0">팀이 움직이면 대화가 여기 실시간으로 흐릅니다.</div></div></div>
@@ -740,10 +682,7 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
   const todoList = document.getElementById("todoList");
   const todoCnt = document.getElementById("todoCnt");
   const ctaBtn = document.getElementById("ctaBtn");
-  const guideBox = document.getElementById("guideBox");
-  const guideBrief = document.getElementById("guideBrief");
-  const guideList = document.getElementById("guideList");
-  const guideMore = document.getElementById("guideMore");
+
   const myTasks = document.getElementById("myTasks");
 
   const AGENT_COLOR = {}; // name → color (피드 색상, 캔버스 팔레트와 동일 순서)
@@ -893,127 +832,15 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
     renderTasks();
   }
 
-  // ── 가이드형 브리핑 + 선택지 ────────────────────────────────────────────
-  // 서버가 취약점(이벤트)·정기점검(주기)·유지보수를 합쳐 계산해 내려준다. 화면은 판단하지 않고
-  // 받은 그대로 렌더한다 — 숫자·우선순위·추천 조치는 전부 서버에서 규칙으로 계산된 값이다.
-  //
-  // 2단 로딩: 먼저 brief=false로 즉답(목록만)을 받아 화면을 채우고, 그 다음 LLM 브리핑 문장만
-  // 갈아 끼운다. LLM이 5~10초 걸려도 담당자는 목록을 바로 본다.
-  let guideItems = [];
-  let guideFirstRender = true;
-  // 헤더 건수는 두 구획(오늘 브리핑 + 내 체크리스트)의 합이다. 한쪽만 세면 화면과 숫자가 어긋난다.
+  // 가이드형 브리핑(renderGuide·loadGuide·맡기기 핸들러)은 2026-08-06 대화창으로 이동했다.
+  // ⚠ getToday(true) 호출도 함께 사라졌다 — 창을 열 때마다 LLM에 문장 생성을 시키던 것이
+  //   없어져, 사람이 시키지 않은 지시가 나가지 않는다(㉮안). 데이터 자체(오늘 항목)는
+  //   대화창 「오늘 브리핑」이 같은 서버 계산을 그대로 쓴다.
+  // 헤더 건수 — 예전엔 브리핑 항목+체크리스트 합이었지만 이제 체크리스트만 센다.
   let myTaskCount = 0;
   function updateTodoCount() {
-    const n = guideItems.length + myTaskCount;
-    todoCnt.textContent = n ? `${n}건` : "";
+    todoCnt.textContent = myTaskCount ? `${myTaskCount}건` : "";
   }
-
-  function renderGuide(data) {
-    guideItems = data.items || [];
-    updateTodoCount();
-    if (!guideItems.length) { guideBox.style.display = "none"; return; }
-    guideBox.style.display = ""; { const ge = document.getElementById("guideEmpty"); if (ge) ge.style.display = "none"; }
-
-    // 브리핑 출처를 정직하게 구분 — LLM 문장인지 규칙 요약인지 담당자가 알 수 있어야 한다.
-    // 브리핑 출처를 정직하게 구분 — LLM 문장인지 규칙 요약인지 담당자가 알 수 있어야 한다.
-    // "AI 제안"이라고 쓰지 않는다: 항목들은 AI가 제안한 게 아니라 규칙으로 계산된 사실
-    // (KEV 등재·기한 초과·점검 주기 도래)이다. AI가 쓴 건 이 문장 하나뿐이라, "AI 제안"으로
-    // 묶으면 확정 사실의 신뢰도를 오히려 낮춰 전달하게 된다.
-    const byLabel = data.briefBy === "llm" ? "🧭 오늘 브리핑" : "🧭 오늘 브리핑 (자동 요약)";
-    guideBrief.innerHTML = `<span class="g-by">${byLabel}</span><span class="g-txt">${esc(data.brief || "")}</span>`;
-
-    // 접힌 상태에서는 번호·제목·핵심 배지 한 줄만. 펼치면 대상·근거·추천 조치가 나온다.
-    // 배지는 접힌 줄에 하나만(KEV 우선) — 여러 개를 늘어놓으면 제목이 밀린다.
-    guideList.innerHTML = guideItems.map((it, n) => {
-      const badges = it.badges || [];
-      const lead = badges.find((b) => b === "KEV") || badges[0];
-      return `
-      <div class="g-item ${it.urgency === "now" ? "now" : "today"}" data-idx="${n}">
-        <div class="g-head">
-          <div class="g-num">${n + 1}</div>
-          <div class="g-t">${esc(it.title)}</div>
-          ${lead ? `<span class="g-bd${lead === "KEV" ? " kev" : ""}">${esc(lead)}</span>` : ""}
-          <span class="g-caret">▶</span>
-        </div>
-        <div class="g-detail">
-          <div class="g-s">${esc(it.subtitle)}</div>
-          <div class="g-w">${esc(it.why)}</div>
-          <div class="g-a">→ ${esc(it.action)}</div>
-          <button class="g-go" data-go="${n}">▶ AI 팀에 맡기기</button>
-        </div>
-      </div>`;
-    }).join("");
-
-    const c = data.counts || {};
-    const rest = (c.now || 0) + (c.today || 0) - guideItems.length;
-    guideMore.style.display = rest > 0 ? "" : "none";
-    if (rest > 0) guideMore.textContent = `그 외 ${rest}건 — 취약점 화면에서 전체 보기`;
-
-    // 창을 열면 브리핑부터 보여야 한다(실측: 렌더 후 스크롤이 506px 내려가 브리핑이 가려졌다).
-    // 초기 로딩(즉답 + 브리핑 2단) 동안만 올린다 — 담당자가 아래를 보는 중에 갱신이 오면 위치를 뺏지 않는다.
-    if (guideFirstRender) todoList.scrollTop = 0;
-  }
-
-  async function loadGuide() {
-    try {
-      renderGuide(await window.gijo.getToday(false)); // ① 즉답(LLM 미호출)
-      renderGuide(await window.gijo.getToday(true));  // ② 브리핑 문장 갱신
-      guideFirstRender = false; // 초기 2단이 끝났다 — 이후 갱신은 스크롤을 건드리지 않는다
-    } catch (err) {
-      guideBox.style.display = "none"; // 실패해도 아래 "내 할일"은 그대로 뜬다
-      알림(document.querySelector(".brief-col .bc-h"), "⚠ 브리핑을 불러오지 못했습니다", "🧭 오늘 브리핑", 15000);
-    }
-  }
-
-  guideBrief.addEventListener("click", () => guideBrief.classList.toggle("open"));
-  // 하단 "오늘 브리핑" 접이식 — 헤더를 누르면 참고용 전문이 펼쳐진다(기본 접힘).
-  // 브리핑은 오른쪽 열로 나가면서 접이식이 아니게 됐다(자리가 넓어졌다) — 토글은 없앤다.
-
-  // 줄을 누르면 펼치기만 한다(아코디언 — 한 번에 하나). 실행은 펼친 뒤 버튼으로.
-  // 처음엔 줄 클릭이 곧바로 지시를 보냈는데, 확인 없이 실행되는 건 위험하다 — 근거를 보고
-  // 누르도록 한 단계를 뒀다.
-  guideList.addEventListener("click", async (e) => {
-    const row = e.target.closest(".g-item");
-    if (!row) return;
-
-    const goBtn = e.target.closest(".g-go");
-    if (!goBtn) { // 헤더 클릭 → 펼치기/접기
-      const wasOpen = row.classList.contains("open");
-      guideList.querySelectorAll(".g-item.open").forEach((r) => r.classList.remove("open"));
-      if (!wasOpen) row.classList.add("open");
-      return;
-    }
-
-    const it = guideItems[Number(row.dataset.idx)];
-    if (!it) return;
-    const instruction = it.axis === "device"
-      ? `${it.subtitle}의 ${it.title}을 진행해줘. (${it.why})`
-      : `${it.subtitle} 자산의 ${it.title} 조치를 진행해줘. 근거: ${it.why}`;
-    // 보낸 지시를 여기 되뇌지 않는다 — 대화창이 그대로 보여 준다(옛 피드 줄은 그릴 자리가 없었다).
-    goBtn.disabled = true;
-    goBtn.textContent = "대화창으로 넘기는 중…";
-    try {
-      // 맡긴 항목은 체크리스트에도 남아야 한다 — 안 그러면 지시만 나가고 "맡겼는데 어디 갔지?"가
-      // 된다(사용자 지적, 2026-07-22). 미완료로 등록해 두고, 처리 여부는 담당자가 체크리스트에서
-      // 직접 완료 처리한다(자동완료는 결재 대기 등 실제 완료가 아닐 수 있어 안 함).
-      await window.gijo.addTask(instruction, { ref: "brief:" + it.id });
-      // ⚠ 여기서 직접 sendInstruction을 부르던 것을 대화창으로 돌린다(2026-08-01).
-      //   이 지시는 "조치를 진행해줘"라 **쓰기**다. 쓰기 도구는 결재판(approval)으로만 실행되는데
-      //   이 화면은 결재판을 그릴 줄 몰라 응답의 approval을 버렸다 — 담당자는 맡겼다고 믿지만
-      //   아무것도 실행되지 않았다. 결재판·근거를 아는 곳은 대화창뿐이므로 거기로 보낸다.
-      지휘소로(instruction);
-      await loadGuide();
-      await loadTasks();
-      // ⚠ 확인 문구를 **버튼에 쓰면 안 된다** — 바로 위 loadGuide()가 목록을 다시 그려 그 버튼이
-      //   통째로 갈린다(실앱에서 확인: 눌러도 옛 글자 그대로였다). 다시 그려도 남는 자리인
-      //   브리핑 머리글에 적는다. feedLine은 피드 패널이 없어져 아무것도 안 그린다(아래 주석).
-      알림(document.querySelector(".brief-col .bc-h"), "💬 대화창으로 넘겼습니다 — 거기서 승인하세요", "🧭 오늘 브리핑");
-    } catch (err) {
-      알림(document.querySelector(".brief-col .bc-h"), "⚠ 넘기지 못했습니다 — 다시 눌러 주세요", "🧭 오늘 브리핑");
-      goBtn.disabled = false;
-      goBtn.textContent = "▶ AI 팀에 맡기기";
-    }
-  });
 
   todoList.addEventListener("click", async (e) => {
     const item = e.target.closest(".t-item");
@@ -1123,8 +950,7 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
       return;
     }
     try {
-      // loadGuide는 실패해도 나머지를 막지 않는다(내부에서 자체 처리) — Promise.all에 함께 둔다.
-      await Promise.all([loadAgents(), loadTasks(), loadSessions(), loadGuide(), loadSocBar()]);
+      await Promise.all([loadAgents(), loadTasks(), loadSessions(), loadSocBar()]);
       setInterval(loadSocBar, 60000); // 관제 상태 띠 갱신(1분)
       const history = await window.gijo.listCollaborationHistory();
       (history || []).slice(-40).forEach((e) => appendOlive(e.from, e.to, e.message)); // LIVE 채팅 초기 채움(v5)

@@ -1,0 +1,71 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>시안 — SBOM 컴포넌트 상세에 제조사 칸</title>
+<style>
+  :root{--bg:#1f1e1d;--panel:#30302e;--panel2:#262524;--border:rgba(255,255,255,.08);
+        --text:#e9e7e2;--muted:#b3ada4;--muted2:#a49d95;--blue:#5fa1ff;--ok:#1eb980;--bad:#f5928a}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:13px/1.6 "Malgun Gothic",system-ui,sans-serif;padding:22px}
+  h1{font-size:17px;margin:0 0 4px}
+  .sub{color:var(--muted);font-size:12.5px;margin-bottom:16px}
+  .sec{margin:22px 0 8px;font-size:14px;font-weight:800;border-left:3px solid var(--blue);padding-left:8px}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:start}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px}
+  .card h3{margin:0 0 8px;font-size:12.5px;color:var(--muted2);font-weight:800}
+  .before{border-color:rgba(245,146,138,.35)} .after{border-color:rgba(30,185,128,.35)}
+  table{border-collapse:collapse;width:100%;font-size:12px}
+  th,td{border:1px solid var(--border);padding:5px 8px;text-align:left;height:26px}
+  th{background:var(--panel2);color:var(--muted2);font-size:11.5px}
+  .dim{color:var(--muted2)}
+  .warn{background:rgba(240,160,32,.10);border:1px solid rgba(240,160,32,.35);border-radius:8px;
+        padding:10px 12px;margin:14px 0;font-size:12.5px}
+  ul{margin:6px 0 0;padding-left:18px} li{margin:3px 0}
+  code{background:var(--panel2);padding:1px 5px;border-radius:4px;font-size:11.5px}
+</style>
+
+<h1>시안 — SBOM 컴포넌트 상세에 「제조사」 칸 (중-7)</h1>
+<div class="sub">
+  2026-08-06 윈도우 실증에서 제조사(Publisher)를 <b>따로 저장</b>하게 했는데, 화면 어디에도 안 보입니다 —
+  모으고 안 보여 주면 없는 것과 같습니다. 자산의 컴포넌트 상세 표(4칸)에 한 칸을 더합니다.
+</div>
+
+<div class="sec">컴포넌트 상세 표 — 지금 vs 바뀐 뒤</div>
+<div class="two">
+  <div class="card before">
+    <h3>지금 (4칸 — 윈도우 자산은 라이선스가 전부 「미상」이고 그 이상 정보가 없음)</h3>
+    <table>
+      <tr><th>컴포넌트</th><th>버전</th><th>라이선스</th><th>알려진 취약점</th></tr>
+      <tr><td>Git</td><td>2.55.0.2</td><td class="dim">미상</td><td class="dim">-</td></tr>
+      <tr><td>팟플레이어-64비트</td><td>26.07.01.0</td><td class="dim">미상</td><td class="dim">-</td></tr>
+      <tr><td>openssl <span class="dim">(리눅스 자산)</span></td><td>3.0.7</td><td>Apache-2.0</td><td class="dim">-</td></tr>
+    </table>
+  </div>
+  <div class="card after">
+    <h3>바뀐 뒤 (5칸 — 아는 것은 보여 주고, 모르는 것은 계속 「-」)</h3>
+    <table>
+      <tr><th>컴포넌트</th><th>버전</th><th>제조사</th><th>라이선스</th><th>알려진 취약점</th></tr>
+      <tr><td>Git</td><td>2.55.0.2</td><td>The Git Development Community</td><td class="dim">미상</td><td class="dim">-</td></tr>
+      <tr><td>팟플레이어-64비트</td><td>26.07.01.0</td><td>Kakao Corp.</td><td class="dim">미상</td><td class="dim">-</td></tr>
+      <tr><td>openssl <span class="dim">(리눅스 자산)</span></td><td>3.0.7</td><td class="dim">-</td><td>Apache-2.0</td><td class="dim">-</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="sec">밀도 — 숫자로</div>
+<ul>
+  <li>줄 높이 <b>26px 그대로</b> — 칸이 늘 뿐 줄은 안 커집니다(밀도 기준 유지).</li>
+  <li>제조사 칸 폭 최대 180px, 넘치면 말줄임(…) — 컴포넌트 이름 칸을 밀지 않습니다.</li>
+  <li>리눅스 자산은 제조사가 원래 없으므로 「-」 — 지어내지 않습니다.</li>
+</ul>
+
+<div class="warn">
+  <b>왜 상세 표에만 넣나</b> — 자산 목록(위쪽 표)은 자산 단위라 제조사가 자산당 수십 개입니다.
+  칸을 넣으면 "여러 곳" 같은 뭉개진 말이 되므로, 부품 하나하나가 보이는 상세 표에만 넣습니다.
+  「한눈에」 띠·KPI도 그대로입니다 — 제조사는 세는 숫자가 아니라 읽는 정보입니다.
+</div>
+
+<div class="sec">구현 범위 (승인 시)</div>
+<ul>
+  <li><code>sbom.html</code> 컴포넌트 상세 표에 칸 1개 + 렌더 한 줄 — 다른 화면은 손대지 않음</li>
+  <li>서버는 변경 없음(이미 저장하고 내려줌)</li>
+</ul>

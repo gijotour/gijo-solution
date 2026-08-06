@@ -160,9 +160,18 @@
     // 기본은 펼침. 담당자가 직접 접은 구역("0")만 접힌 채로 연다.
     // 단 위험 신호(hot)가 있으면 접어 둔 구역도 펼친다 — 가려서 놓치는 일은 없어야 한다.
     // (data-gijo-fold-open 표식은 이제 기본과 같은 뜻이라 남아 있어도 동작이 달라지지 않는다.)
+    //
+    // data-gijo-fold-closed — **이 구역만 기본 접힘**(2026-08-06 사용자 승인, 1~8 일괄 진행의 6번).
+    //   전역 기본(펼침, 2026-08-02 결정)은 그대로 두고, "나중에 참고할 자료"처럼 매일 볼 것이
+    //   아닌 구역에만 화면이 표식을 단다. 실측 근거: 작업 내역의 업무 패턴이 펼쳐진 채 541px을
+    //   차지해, 창 1125px에서 정작 본업(목록)이 225px만 보였다.
+    //   담당자가 한 번이라도 직접 펴면("1") 그 선택이 표식을 이긴다 — 기억이 우선이다.
+    //   위험 신호(hot)면 여기도 펼친다 — 가려서 놓치는 일은 없어야 한다.
+    var 기본닫힘 = target.hasAttribute("data-gijo-fold-closed");
     var saved = null;
     try { saved = localStorage.getItem(KEY_PREFIX + screenKey() + ":" + name); } catch (err) {}
-    setOpen(e, saved === "0" ? hot : true, false);
+    var 열기 = saved === "0" ? hot : saved === "1" ? true : 기본닫힘 ? hot : true;
+    setOpen(e, 열기, false);
 
     function toggle() { setOpen(e, e.target.style.display === "none", true); }
     head.addEventListener("click", toggle);

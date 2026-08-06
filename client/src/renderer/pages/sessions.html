@@ -196,13 +196,14 @@
          접기 기본값은 2026-08-02 사용자 지시로 **펼침**으로 뒤집혔다("접기가 아니라 펼치기로
          하자 — 못 보는 부분이 있는 것 같다"). 담당자가 직접 접은 것만 접힌 채로 열린다.
          실측: 이 구역이 펼쳐진 채 541px을 쓰고, 그래서 그림 띠 y=769 · 목록 y=900이 된다
-         (창 1125px 기준 목록이 225px만 보인다). 접힘 기억이 **없는데도** 그렇다 —
-         자동화가 열어 둔 탓이 아니라 이게 기본이다. 좁히려면 접기 기본값을 되돌리는
-         결정이 필요하다(사용자 몫). -->
+         (창 1125px 기준 목록이 225px만 보인다). 접힘 기억이 **없는데도** 그렇다.
+         → 2026-08-06 사용자 승인(1~8 일괄 진행의 6번)으로 **이 구역만** data-gijo-fold-closed
+           표식을 달아 기본 접힘으로 했다. 전역 기본(펼침)은 그대로다. 담당자가 직접 편
+           기억("1")과 위험 신호는 표식을 이긴다. -->
   <!-- ⚠ 기간 표시(#patPeriod)는 예전 <summary> 안에 있었다. 접기로 바꾸며 summary를 지웠더니
        이 요소가 함께 사라져 채우는 코드가 null을 만났다(2026-08-02, 시험이 잡았다).
        접기 제목은 도우미가 만들므로, 기간은 **내용 안 첫 줄**로 옮겨 살려 둔다. -->
-  <div class="ws-pat" data-gijo-fold="업무 패턴" data-gijo-fold-badges="patPeriod:기간"
+  <div class="ws-pat" data-gijo-fold="업무 패턴" data-gijo-fold-badges="patPeriod:기간" data-gijo-fold-closed
        style="background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:0 15px;margin-bottom:14px;">
     <div id="patPeriod" style="padding:10px 0 0;font-weight:600;color:var(--muted-2);font-size:12.25px"></div>
     <div id="patBody" style="padding:2px 0 14px;font-size:12px;color:var(--muted);">불러오는 중…</div>

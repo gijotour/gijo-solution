@@ -221,11 +221,12 @@ ipcMain.handle("office:open", async () => {
     return;
   }
   officeWindow = new BrowserWindow({
-    // 3열(할일 236 · 사무실 · 브리핑 250)이 다 들어가야 글이 안 잘린다(2026-07-26 사용자 결정).
+    // 2열(할일 236 · 사무실) 기준 — 브리핑 열(250px)은 2026-08-06 대화창 이동으로 빠졌다.
+    // (예전 3열 기준 1360/1080은 2026-07-26 결정 — 열이 빠진 만큼 260px 줄인다.)
     // 화면이 작으면 그 화면에 맞춰 줄인다 — 창이 화면 밖으로 나가는 게 더 나쁘다.
-    width: Math.min(1360, Math.max(1000, screen.getPrimaryDisplay().workAreaSize.width - 120)),
+    width: Math.min(1100, Math.max(900, screen.getPrimaryDisplay().workAreaSize.width - 120)),
     height: Math.min(840, Math.max(700, screen.getPrimaryDisplay().workAreaSize.height - 120)),
-    minWidth: 1080,
+    minWidth: 820,
     minHeight: 620,
     backgroundColor: "#262624",
     title: "GIJO AS — 우리 AI 팀 사무실",
