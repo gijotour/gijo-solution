@@ -166,8 +166,39 @@ function decisionPrompt(instruction: string, calls: AgentToolCall[], context = "
  *   · 대명사 말고 **다른 내용이 있으면** 잡지 않는다("그 취약점 담당자 배정해줘"는 진짜 지시다)
  */
 export function 가리킬것없는대명사(instruction: string, 대화 = 기본대화): boolean {
-  if (!대명사뿐인가(instruction)) return false;
+  if (!대명사뿐인가(instruction) && !가리킨자산이없나(instruction)) return false;
   return !recentTarget(대화);   // **이 대화의** 직전 대상이 있으면 맥락으로 푼다
+}
+
+/**
+ * 「이 서버 어떤 서비스 돌고 있어?」처럼 **대상을 가리키기만 하고 무엇인지 안 밝힌** 자산 질문.
+ *
+ * ★ 왜 갈랐나(2026-08-06 147상황 실측): 이 말이 **47초**를 쓰고 엉뚱한 답을 냈다 —
+ *   "이 자산에서 발견된 1개 취약점 중 우선순위가 낮은 것은 1건입니다"(서비스를 물었는데 취약점).
+ *   위 「대명사뿐인가」는 뒤에 내용이 붙어 있어 안 걸렸고, 모델은 **어느 서버인지 모르는 채로**
+ *   아무 도구나 골랐다. 대상이 없으면 답이 아니라 **되묻기**가 맞다(27초 사고와 같은 병).
+ *
+ * ⚠ 좁게 잡는다 — 자산을 특정하는 말(이름·IP·호스트명·「전체/모든」)이 있으면 진짜 지시다.
+ */
+export function 가리킨자산이없나(instruction: string): boolean {
+  const t = String(instruction ?? "").trim();
+  if (!/(이|그|저|해당)\s*(서버|자산|장비|호스트|시스템|머신)/.test(t)) return false;
+  // ⚠ **속성을 캐묻는 말만** 잡는다(어떤·무슨·뭐가·어디). 「이 자산 취약점 알려줘」처럼
+  //   갈 도구가 분명한 지시는 삼키지 않는다 — 진짜 지시를 되묻기로 막으면 그게 더 나쁘다
+  //   (2026-08-06 회귀: 이 조건 없이 만들었다가 기존 시험이 그 자리에서 잡았다).
+  if (!/(어떤|무슨|뭐가|뭘|어디|어느)/.test(t)) return false;
+  if (/\d{1,3}(\.\d{1,3}){3}/.test(t)) return false;            // IP를 적었다 = 특정했다
+  if (/전체|모든|전부|목록|리스트/.test(t)) return false;         // 대상이 하나가 아니다
+  // 등록된 자산 이름이 문장에 있으면 특정한 것이다(이름으로 부르는 게 이 제품의 관례).
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const { listAssets } = require("./assets") as typeof import("./assets");
+    for (const a of listAssets()) {
+      const 이름 = String(a.name ?? "").trim();
+      if (이름.length >= 3 && t.includes(이름)) return false;
+    }
+  } catch { /* 목록을 못 봐도 판정은 계속한다 — 못 보면 되묻는 쪽이 안전하다 */ }
+  return true;
 }
 
 /**

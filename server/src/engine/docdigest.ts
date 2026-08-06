@@ -161,7 +161,8 @@ export function recentDocumentsText(days = 7): string {
     let 소식 = "";
     if (r.summary) 소식 = `\n   ${r.summary.split("\n").join("\n   ")}\n   (로컬 모델 자체 요약 — 원문 확인은 지식 화면에서)`;
     else if (r.failedReason) 소식 = `\n   요약 없음(${r.failedReason.slice(0, 60)})`;
-    if (r.matches) 소식 += `\n   🔗 우리 지식과의 접점: ${r.matches.split("\n").slice(0, 2).join(" / ")}`;
+    // 줄 맨 앞 아이콘 금지(말투 규범 — 그 자리는 상태 표식 자리다. 🔗도 사전 밖 기호다).
+    if (r.matches) 소식 += `\n   우리 지식과의 접점: ${r.matches.split("\n").slice(0, 2).join(" / ")}`;
     return `- ${r.documentId} [${r.category ?? "일반"}] ${when}${who}${소식}`;
   });
   const tail = rows.length > 10 ? `\n(외 ${rows.length - 10}건 — 지식 화면에서 전체 목록)` : "";
