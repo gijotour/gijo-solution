@@ -174,6 +174,7 @@ import {
   runOntologyQuery,
   runKnowledgeStatus,
   runRecentDocuments,
+  runActionCheckHistory,
   번들언제기준,
   runKnowledgeBundleStatus,
   runKnowledgeBundleImport,
@@ -650,6 +651,18 @@ const TOOLS: AgentTool[] = [
   {
     // 지식 번들 현황 — knowledge_status(재고)와 달리 "실린 표준·위협 지식이 언제 기준인가"를 본다.
     // 구독화(후-3)의 첫 대화창 창구: 담당자가 "지금 최신인가/무엇이 실렸나"를 스스로 확인한다.
+    name: "action_check_history",
+    label: "규정 대조 이력",
+    domain: "knowledge",
+    write: false,
+    description:
+      '지금까지의 행동 대조(○/△/×) 판정 이력을 본다 — 무엇을 물었고 어떤 판정이 났는지, 판정이 바뀐 사안(⚠)은 어디인지. ' +
+      '"규정 대조 이력 보여줘", "판정 기록 알려줘" 같은 물음에 쓴다. 새 판정을 하는 게 아니라 **기록을 읽는** 도구다.',
+    params: [],
+    directAnswer: true,
+    run: runActionCheckHistory,
+  },
+  {
     name: "recent_documents",
     label: "새 문서 소식",
     domain: "knowledge",

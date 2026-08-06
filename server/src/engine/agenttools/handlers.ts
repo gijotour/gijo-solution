@@ -2543,6 +2543,36 @@ export async function runRecentDocuments(args: Record<string, string>): Promise<
   return recentDocumentsText(days);
 }
 
+// ── 규정 대조 판정 이력 (해자 슬라이스 1, 2026-08-06) ──────────────────────
+// "규정 대조 이력 보여줘" — 쌓인 판정을 결정적으로 읽는다. 같은 사안의 판정이 바뀐 것(⚠)은
+// 규정 개정을 담당자가 알아차리는 신호다 — 제품이 판단하지 않고 표시만 한다.
+export async function runActionCheckHistory(): Promise<string> {
+  const { listActionCheckHistory } = await import("../actioncheck.js");
+  const rows = listActionCheckHistory(30);
+  if (!rows.length) return '규정 대조 판정 이력이 아직 없습니다. "○○해도 돼?"라고 물으면 사내 규정과 대조해 판정하고, 그 기록이 여기 쌓입니다.';
+  const 기호: Record<string, string> = { allow: "○", conditional: "△", deny: "×", insufficient: "보류" };
+  // 같은 사안(normQuestion+basisRefs)에서 판정이 갈린 적 있는지 — 뒤집힘 표시용
+  const byIssue = new Map<string, Set<string>>();
+  for (const r of rows) {
+    const k = `${r.normQuestion}|${r.basisRefs}`;
+    if (!byIssue.has(k)) byIssue.set(k, new Set());
+    byIssue.get(k)!.add(r.verdict);
+  }
+  const lines = rows.slice(0, 10).map((r) => {
+    const flip = byIssue.get(`${r.normQuestion}|${r.basisRefs}`)!.size > 1 ? " ⚠판정 바뀐 이력 있음" : "";
+    const refs = r.basisRefs ? ` (근거: ${r.basisRefs.split(",").slice(0, 2).join(", ")})` : "";
+    return `- ${r.askedAt.slice(0, 10)} ${기호[r.verdict] ?? r.verdict} ${r.question.slice(0, 60)}${refs}${flip}`;
+  });
+  const denies = rows.filter((r) => r.verdict === "deny").length;
+  // ⚠ 「다음 걸음」을 붙이지 않는다 — 현황 조회(이력)라 다음 행동이 사람마다 다르다
+  //   (agenttools-cross 시험이 지키는 원칙 — exposed_assets 때 같은 함정을 잡은 전례 그대로).
+  return [
+    `규정 대조 판정 이력 ${rows.length}건(최근 10건 표시)${denies ? ` — 그중 × 금지 ${denies}건` : ""}:`,
+    ...lines,
+    "같은 질문을 다시 물으면 새 판정과 함께 지난 판정이 참고로 붙습니다.",
+  ].join("\n");
+}
+
 // ── 지식 번들 현황·반입 (후-3 구독화 코드 슬라이스) ────────────────────────
 //
 // knowledge_status(장기기억 문서/트리플 재고)와 **다른 도구**다. 이쪽은 "제품에 실려 나가는

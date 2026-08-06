@@ -15,6 +15,7 @@ import * as os from "os";
 import { db, isDbEncrypted } from "../db";
 import { unsealWithMachine, toSqlcipherKey } from "../dbkey";
 import { authMiddleware, adminMiddleware } from "../auth/auth";
+import { sessionArchiveDir } from "./worksessions";
 
 function backupDir(): string {
   return process.env.GIJO_BACKUP_DIR ?? path.join("data", "backups");
@@ -42,7 +43,7 @@ function dirSize(dir: string): number {
 }
 
 // 실제 백업 수행(라우트·스케줄러 공용). 스냅샷 후 보관정책으로 오래된 것 정리.
-export async function performBackup(): Promise<{ file: string; sizeBytes: number; lanceIncluded: boolean; pruned: number }> {
+export async function performBackup(): Promise<{ file: string; sizeBytes: number; lanceIncluded: boolean; archiveIncluded: boolean; pruned: number }> {
   const dir = backupDir();
   fs.mkdirSync(dir, { recursive: true });
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -59,8 +60,17 @@ export async function performBackup(): Promise<{ file: string; sizeBytes: number
     await fs.promises.cp(lanceSrc, path.join(dir, `gijo-as-${stamp}.lancedb`), { recursive: true });
     lanceIncluded = true;
   }
+  // 해자 슬라이스 0(2026-08-06 실측 결함): 세션 전문이 100건 초과분부터 session-archive/*.jsonl로
+  // 빠져나가는데 백업이 이 폴더를 안 담았다 — 재해복구 시 축적 기록(해자 자산)이 조용히 소실.
+  // LanceDB와 같은 방식으로 같은 타임스탬프 짝 폴더로 담는다.
+  const archiveSrc = sessionArchiveDir();
+  let archiveIncluded = false;
+  if (fs.existsSync(archiveSrc)) {
+    await fs.promises.cp(archiveSrc, path.join(dir, `gijo-as-${stamp}.session-archive`), { recursive: true });
+    archiveIncluded = true;
+  }
   const pruned = pruneOldBackups(dir);
-  return { file, sizeBytes: fs.statSync(dest).size, lanceIncluded, pruned };
+  return { file, sizeBytes: fs.statSync(dest).size, lanceIncluded, archiveIncluded, pruned };
 }
 
 // 보관정책 — 최신 BACKUP_KEEP개만 남기고 SQLite+짝 LanceDB 폴더를 함께 삭제한다.
@@ -77,6 +87,8 @@ function pruneOldBackups(dir: string): number {
       fs.rmSync(path.join(dir, f), { force: true });
       const lance = path.join(dir, f.replace(/\.sqlite$/, ".lancedb"));
       if (fs.existsSync(lance)) fs.rmSync(lance, { recursive: true, force: true });
+      const arch = path.join(dir, f.replace(/\.sqlite$/, ".session-archive"));
+      if (fs.existsSync(arch)) fs.rmSync(arch, { recursive: true, force: true });
       pruned++;
     } catch (e) {
       console.warn(`[backup] 오래된 백업 삭제 실패(${f}): ${e instanceof Error ? e.message : String(e)}`);

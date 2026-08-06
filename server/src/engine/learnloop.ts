@@ -27,6 +27,7 @@ import { recordAudit } from "./audit";
 import { llamaBinPath } from "../util/llamabin";
 import { db, assertTestDb } from "../db";
 import { startFinetune, isFinetuneRunning } from "./finetune";
+import { sessionArchiveDir } from "./worksessions";
 import { pauseInferenceEngines, resumeInferenceEngines } from "./localengine";
 import { setAgentModel, getAgentById } from "./agents";
 import { attachProcessLogging, recordProcessOutput } from "./logs";
@@ -226,15 +227,40 @@ let insertsSincePrune = 0;
 
 // 상한 초과분을 삭제한다. 학습 대기 후보(👍/미평가 미사용)는 보호하고 안전한 행(이미 학습됨 또는
 // 👎)부터 지운 뒤, 그래도 넘치면 최후 수단으로 가장 오래된 것을 지운다. 테스트에서도 직접 부른다.
+//
+// 해자 슬라이스 0(2026-08-06): 예전엔 정리분이 **아카이브조차 없이 영구 소실**됐다(설계문서
+// 실측). 이제 지우기 전에 session-archive/chatlogs-*.jsonl 로 내리고, **다 쓴 것을 확인한 뒤에만**
+// 지운다(worksessions 아카이브와 같은 순서 계약). 내리기가 실패하면 지우지 않는다 — 캡 초과로
+// 디스크가 조금 더 쓰이는 쪽이 기록 소실보다 낫다.
 export function pruneChatLogs(cap = CHATLOG_MAX): number {
   const total = (countLogsStmt.get() as { n: number }).n;
-  let over = total - cap;
+  const over = total - cap;
   if (over <= 0) return 0;
-  let removed = pruneSafeLogsStmt.run(over).changes;
-  over -= removed;
-  if (over > 0) removed += pruneOldestLogsStmt.run(over).changes;
+  // 지울 행을 먼저 고른다(안전한 행 우선 → 오래된 순) — 지우는 것과 내리는 것이 같은 집합이어야 한다.
+  const safe = db.prepare(
+    "SELECT * FROM chat_logs WHERE usedInDataset = 1 OR rating = -1 ORDER BY createdAt ASC LIMIT ?"
+  ).all(over) as { id: string }[];
+  let doomed = safe;
+  if (safe.length < over) {
+    const got = new Set(safe.map((r) => r.id));
+    const oldest = (db.prepare("SELECT * FROM chat_logs ORDER BY createdAt ASC LIMIT ?").all(over) as { id: string }[])
+      .filter((r) => !got.has(r.id)).slice(0, over - safe.length);
+    doomed = [...safe, ...oldest];
+  }
+  if (!doomed.length) return 0;
+  try {
+    const dir = sessionArchiveDir();
+    fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, `chatlogs-${new Date().toISOString().slice(0, 7)}.jsonl`);
+    fs.appendFileSync(file, doomed.map((r) => JSON.stringify(r)).join("\n") + "\n", "utf8");
+  } catch (e) {
+    console.warn(`[learnloop] 정리분 아카이브 실패 — 지우지 않고 보류: ${e instanceof Error ? e.message : String(e)}`);
+    return 0;
+  }
+  const del = db.prepare(`DELETE FROM chat_logs WHERE id IN (${doomed.map(() => "?").join(",")})`);
+  const removed = del.run(...doomed.map((r) => r.id)).changes;
   if (removed > 0) {
-    console.warn(`[learnloop] 수집 로그 보존 상한(${cap}) 초과 — 오래된 ${removed}건 정리`);
+    console.warn(`[learnloop] 수집 로그 보존 상한(${cap}) 초과 — ${removed}건 아카이브 후 정리`);
   }
   return removed;
 }

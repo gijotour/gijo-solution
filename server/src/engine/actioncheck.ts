@@ -10,6 +10,7 @@
 //   3) 판정의 근거는 **사내규정 조각(원문 인용 가능)** 만이다. 법제처 검색은 제목·링크만 오므로
 //      판단 근거가 될 수 없다 — "관련 법령(원문 확인)" 안내로만 붙인다.
 //   4) 면책 상시 부착(LEGAL_DISCLAIMER) — 법률 자문이 아니다.
+import { db } from "../db";
 import { chat } from "./llm";
 import { queryMemoryScored, listDocuments, RAG_RELEVANCE_MAX_DISTANCE } from "./memory";
 import { getLawConfig, searchLaw, LEGAL_DISCLAIMER, LawHit } from "./lawinfo";
@@ -83,6 +84,47 @@ const VERDICT_SCHEMA = {
   },
   required: ["verdict", "reason"],
 } as const;
+
+// ── 판정 이력 (해자 슬라이스 1, 2026-08-06 설계문서 승인) ─────────────────────
+// 판정문이 세션 대화록에만 남아 쌓이지도 재사용되지도 않던 것을 전용 테이블로.
+// 원칙: 판정 캐싱·자동 재사용 ✗ (규정이 바뀌면 답도 바뀌어야 한다) — **병기만** 한다.
+db.exec(`CREATE TABLE IF NOT EXISTS action_check_history (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  askedAt TEXT NOT NULL,
+  question TEXT NOT NULL,
+  normQuestion TEXT NOT NULL,
+  verdict TEXT NOT NULL,
+  basisRefs TEXT NOT NULL,      -- 근거 문서 id들(정렬·쉼표) — 같은 사안 판별의 절반
+  verdictText TEXT,             -- 모델 소견(그때 뭐라 했나)
+  qa INTEGER NOT NULL DEFAULT 0 -- 게이트/QA 호출 — 저장은 하되 표시·집계에서 제외
+)`);
+const insertHistoryStmt = db.prepare(
+  `INSERT INTO action_check_history (askedAt, question, normQuestion, verdict, basisRefs, verdictText, qa)
+   VALUES (@askedAt, @question, @normQuestion, @verdict, @basisRefs, @verdictText, @qa)`
+);
+const prevVerdictStmt = db.prepare(
+  `SELECT askedAt, verdict, basisRefs FROM action_check_history
+    WHERE normQuestion = ? AND basisRefs = ? AND qa = 0 ORDER BY id DESC LIMIT 1`
+);
+
+// 같은 사안 판별은 결정적으로 — 정규화 후 완전 일치만(임베딩 유사도는 1차 제외, 법무 리스크).
+export function normalizeActionQuestion(q: string): string {
+  return q.replace(/[\s?.!~‥…]/g, "").toLowerCase();
+}
+
+const VERDICT_SYMBOL: Record<Verdict["verdict"], string> = { allow: "○", conditional: "△", deny: "×", insufficient: "보류" };
+
+export interface ActionCheckHistoryRow {
+  askedAt: string; question: string; normQuestion: string; verdict: Verdict["verdict"]; basisRefs: string; verdictText: string | null;
+}
+
+/** 대화창 조회용 — qa 행 제외(게이트 오염 배제 계약). */
+export function listActionCheckHistory(limit = 30): ActionCheckHistoryRow[] {
+  return db.prepare(
+    `SELECT askedAt, question, normQuestion, verdict, basisRefs, verdictText
+       FROM action_check_history WHERE qa = 0 ORDER BY id DESC LIMIT ?`
+  ).all(Math.max(1, Math.min(200, limit))) as ActionCheckHistoryRow[];
+}
 
 const VERDICT_LABEL: Record<Verdict["verdict"], string> = {
   allow: "○ 허용 — 사내 근거상 가능",
@@ -222,7 +264,32 @@ export async function runActionCheck(question: string, qa?: boolean): Promise<Ac
   } else if (lawNote) {
     lines.push("", lawNote);
   }
+  // ── 지난 판정 병기 (해자 슬라이스 1) — 같은 사안(정규화 완전 일치 + 같은 근거 집합)만.
+  //    판정은 이미 위에서 새로 했다 — 이 줄은 참고이지 캐시가 아니다. qa 호출은 병기 생략
+  //    (게이트 출력이 이력 유무에 따라 흔들리면 안 된다).
+  const normQ = normalizeActionQuestion(question);
+  const basisKey = [...docs].sort().join(",");
+  if (!qa) {
+    const prev = prevVerdictStmt.get(normQ, basisKey) as { askedAt: string; verdict: Verdict["verdict"] } | undefined;
+    if (prev) {
+      const 뒤집힘 = prev.verdict !== v.verdict;
+      lines.push(
+        "",
+        `${뒤집힘 ? "⚠ " : ""}※ 지난 판정: ${prev.askedAt.slice(0, 10)} ${VERDICT_SYMBOL[prev.verdict]}` +
+          `${뒤집힘 ? ` → 이번 ${VERDICT_SYMBOL[v.verdict]} — 판정이 바뀌었습니다. 규정이 바뀌었거나 상황이 다른 것입니다(근거 원문을 확인하세요).` : " — 이번 판정과 같습니다."}`
+      );
+    }
+  }
   lines.push("", ACTION_DISCLAIMER, LEGAL_DISCLAIMER);
+  // 판정 이력 저장 — qa 호출도 저장은 한다(표시·집계만 제외). NA는 판정이 아니라 저장 안 함.
+  try {
+    insertHistoryStmt.run({
+      askedAt: new Date().toISOString(), question: question.slice(0, 500), normQuestion: normQ,
+      verdict: v.verdict, basisRefs: basisKey, verdictText: v.reason.slice(0, 500), qa: qa ? 1 : 0,
+    });
+  } catch (e) {
+    console.warn(`[actioncheck] 판정 이력 저장 실패: ${e instanceof Error ? e.message : String(e)}`);
+  }
   // 근거를 찾아 판정까지 한 경우만 작업 원장에 남긴다(중-2) — 판단 불가(NA)는 일한 게 아니다.
   recordWork({ kind: "action_checked", detail: question.slice(0, 60), source: "chat", qa });
   return { output: lines.join("\n"), sources: docs };
