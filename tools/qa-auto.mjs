@@ -712,9 +712,10 @@ async function runClient() {
     when: "클라이언트가 그 실패를 Error로 바꾸면",
     then: "사유가 첫 줄에 오고, URL·JSON 같은 기술 정보는 뒤로 간다",
   }, async () => {
-    const src = fs.readFileSync(path.join(ROOT, "client", "src", "apiClient.ts"), "utf8");
+    // 2026-08-06 apiClient.ts 분리 — request()와 오류 처리부는 api/core.ts에 산다.
+    const src = fs.readFileSync(path.join(ROOT, "client", "src", "api", "core.ts"), "utf8");
     const 시작 = src.indexOf("if (!res.ok)");
-    if (시작 < 0) throw new Error("응답 오류 처리부를 못 찾음 — apiClient.ts 구조가 바뀌었나");
+    if (시작 < 0) throw new Error("응답 오류 처리부를 못 찾음 — api/core.ts 구조가 바뀌었나");
     const 조각 = src.slice(시작, 시작 + 1400);
     // ⚠ 예전 검사는 `body?.error ?? body?.message` **순서를 못박고** 있었다. 그런데 그 순서가
     //   틀렸다(2026-07-30 발견): error는 "password_required" 같은 **기계 코드**이고 message가
