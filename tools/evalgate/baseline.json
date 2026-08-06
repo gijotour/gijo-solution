@@ -1,7 +1,7 @@
 {
-  "acceptedAt": "2026-08-04T03:25:53.366Z",
-  "gitRev": "d1cb5ea",
-  "caseSetHash": "cfc4b116db57c892",
+  "acceptedAt": "2026-08-06T13:09:50.022Z",
+  "gitRev": "1420fce",
+  "caseSetHash": "54ef18b718a98b60",
   "axes": {
     "routing": {
       "total": 66,
@@ -26,7 +26,7 @@
       "pass": 24,
       "passRate": 100,
       "canaryFail": 0,
-      "flaky": 1,
+      "flaky": 0,
       "skipped": 0,
       "unmeasured": false
     }
@@ -35,7 +35,18 @@
     "score": 29,
     "vulnerable": 10,
     "total": 14,
-    "error": null
+    "error": null,
+    "samples": [
+      21,
+      21,
+      29,
+      29,
+      29,
+      36,
+      36,
+      43,
+      43
+    ]
   },
   "effective": {
     "score": 100,
@@ -46,5 +57,5 @@
     "total": 14,
     "error": null
   },
-  "note": "사람이 결과를 읽고 확정한 기준선 — 갱신은 --accept-baseline 명시 실행으로만"
+  "note": "리포트 기준 확정(재실행 없음) — 원 실행 2026-08-06T13:09:27.643Z"
 }
