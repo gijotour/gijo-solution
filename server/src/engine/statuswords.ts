@@ -46,24 +46,53 @@ export function 상태값들(말: string): string[] {
 }
 
 /**
+ * 상태 칸이 아니라 **줄의 다른 속성**(담당·기한·심각도)을 가리키는 우리말.
+ *
+ * ⚠ 이것이 없어서 생긴 실사고(2026-08-07, 147상황 4차):
+ *   담당자: "미배정 취약점 몇 건이야?" → AI: "조건('미배정')에 맞는 취약점을 못 찾았습니다"
+ *   같은 회차의 현황 답은 **담당자 미배정 4,820건**이라고 말했다 — 한 제품이 같은 것을
+ *   두 입으로 다르게 말한 것이다. "기한"·"고위험,미배정"도 같은 길로 죽었다(쉼표도 못 갈랐다).
+ *   미배정은 상태 칸에 없다 — 담당 칸이 비었다는 뜻이다. 상태어 사전만으로는 영영 0건이다.
+ */
+export interface 줄속성 {
+  심각도?: string | null;   // critical·high·medium·low
+  담당자?: string | null;   // 비어 있으면 미배정
+  기한지남?: boolean;       // 기한이 지났는데 아직 안 끝난 건
+}
+
+const 속성사전: { 말: RegExp; 판정: (a: 줄속성) => boolean }[] = [
+  { 말: /^(미배정|담당자?없(음|는|이)?|배정안됨?|담당미지정|미지정)$/, 판정: (a) => !String(a.담당자 ?? "").trim() },
+  { 말: /^(기한|기한초과|기한지남|기한넘은|지연|늦은|늦음|초과)$/, 판정: (a) => a.기한지남 === true },
+  { 말: /^(고위험|심각|매우심각|치명|위험높은)$/, 판정: (a) => ["critical", "high"].includes(String(a.심각도 ?? "").trim().toLowerCase()) },
+];
+
+/**
  * 도구 필터 공용 대조. 검색어를 낱말로 쪼개, 낱말마다
+ *   · 속성어(미배정·기한·고위험)면 → 그 줄의 **해당 속성**을 본다(속성을 준 호출자만)
  *   · 상태어면 → 그 줄의 **상태 칸**과 정확히 맞는지 본다
  *   · 아니면   → 본문에 글자 그대로 들어 있는지 본다
  * 모든 낱말이 통과해야 맞는 것으로 본다(AND). 낱말을 늘릴수록 좁아진다는 상식과 맞는다.
+ * 낱말은 공백뿐 아니라 쉼표·가운뎃점으로도 가른다 — 모델이 "고위험,미배정"처럼 넘긴다.
  *
  * ⚠ 상태는 **본문에서 찾으면 안 된다**(2026-08-01 실측). 처음엔 본문에 open이 들어 있는지로
  *   봤더니 `OpenSSH < 9.6 …` 취약점이 "미조치"로 잡혔다 — 상태는 approved인데도. openssl·
  *   OpenVPN처럼 제품 이름에 상태값이 우연히 섞이는 일은 보안 도메인에서 매우 흔하다.
- *   상태를 물으면 상태 칸만 본다.
+ *   상태를 물으면 상태 칸만 본다. 속성어도 같은 이유로 본문 대조에 떨어뜨리지 않는다 —
+ *   속성을 못 받은 호출자(그 도메인에 담당·기한 개념이 없는 곳)에서만 본문 대조로 남는다.
  *
  * @param 상태 그 줄의 실제 상태값(open·pending·approved…). 없으면 상태어 조건은 통과 못 한다.
+ * @param 속성 담당·기한·심각도. 이 도메인에 그 개념이 있으면 호출자가 채워 준다.
  */
-export function 필터에맞나(건초더미: string, 검색어: string, 상태?: string | null): boolean {
+export function 필터에맞나(건초더미: string, 검색어: string, 상태?: string | null, 속성?: 줄속성): boolean {
   const hay = String(건초더미 ?? "").toLowerCase();
   const st = String(상태 ?? "").trim().toLowerCase();
-  const words = String(검색어 ?? "").trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const words = String(검색어 ?? "").trim().toLowerCase().split(/[\s,·、]+/).filter(Boolean);
   if (!words.length) return true;
   return words.every((w) => {
+    if (속성) {
+      const p = 속성사전.find((e) => e.말.test(w));
+      if (p) return p.판정(속성);
+    }
     const 값 = 상태값들(w);
     if (값.length) return st ? 값.includes(st) : false;
     // 영문 저장값(open·approved…)을 그대로 친 경우도 상태 칸으로 받는다. 본문 대조에 맡기면

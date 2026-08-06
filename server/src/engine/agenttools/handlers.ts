@@ -1487,12 +1487,20 @@ export function runFindingStatusOverview(args: Record<string, string>): string {
   //   총계처럼 말했다. 2026-08-03에 잃었던 취약점 4,833건을 되살리자 **총계가 200에 멈춰**
   //   그 거짓말이 드러났다. 담당자는 이 숫자로 임원 보고를 쓴다.
   const rows = prioritizedReviews(현황상한);
+  // 속성어(미배정·기한·고위험)를 알아듣도록 담당·기한·심각도를 넘긴다 — 2026-08-07 실측:
+  // "미배정 취약점 몇 건이야?"가 0건이라 답했는데 같은 회차 현황이 미배정 4,820건이라 말했다.
+  const 오늘 = dateOnlyLocal(new Date());
   const matched = filter
     ? rows.filter((r) =>
         필터에맞나(
           `${r.assetId} ${r.finding.finding_type} ${r.finding.severity} ${r.finding.evidence ?? ""} ${r.assignee ?? ""}`,
           filter,
           r.status,
+          {
+            심각도: r.finding.severity,
+            담당자: r.assignee,
+            기한지남: !!(r.dueDate && r.dueDate < 오늘 && r.status === "pending"),
+          },
         ))
     : rows;
 
