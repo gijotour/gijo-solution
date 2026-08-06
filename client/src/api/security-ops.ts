@@ -1,0 +1,504 @@
+// GIJO AS 클라이언트 API — 보안 운영(제품 등록부·분석 허브·SBOM·CTI·하드닝·승인·조치 검증·AI 견고성)
+// 2026-08-06 apiClient.ts(2,141줄)에서 분리 — 구역 본문은 원문 그대로, 공통은 core.ts.
+import { request } from "./core";
+import type { ThreatCompliance } from "./assets";
+
+// ── 유지보수 일정 · 점검서 · 승인(거버넌스 검증) ──────────────────────
+export interface MaintenanceItem {
+  id: string;
+  title: string;
+  productName: string;
+  scheduleDate: string;
+  intervalDays?: number;
+  status: "scheduled" | "reported" | "approved" | "rejected";
+  assetId?: string;
+  assetName?: string;
+  productId?: string; // 연결된 보안제품(security_products) — 서버가 제품명 유사 매칭으로 자동 해석
+  reportNote?: string;
+  reportDocName?: string;
+  reportedBy?: string;
+  reportedAt?: number;
+  reviewedBy?: string;
+  reviewedAt?: number;
+  reviewNote?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface MaintenanceEvent {
+  id: string;
+  itemId: string;
+  event: "created" | "reported" | "approved" | "rejected";
+  actor?: string;
+  note?: string;
+  at: number;
+}
+
+export const maintenanceApi = {
+  list: () => request<MaintenanceItem[]>("/api/maintenance"),
+  due: () => request<MaintenanceItem[]>("/api/maintenance/due"),
+  byAsset: (assetId: string) => request<MaintenanceItem[]>(`/api/assets/${encodeURIComponent(assetId)}/maintenance`),
+  create: (args: { title: string; productName: string; scheduleDate: string; intervalDays?: number; assetId?: string; productId?: string }) =>
+    request<MaintenanceItem>("/api/maintenance", { method: "POST", body: args }),
+  report: (id: string, args: { note: string; filename?: string; content?: string }) =>
+    request<MaintenanceItem>(`/api/maintenance/${id}/report`, { method: "POST", body: args }),
+  approve: (id: string) => request<MaintenanceItem>(`/api/maintenance/${id}/approve`, { method: "POST" }),
+  reject: (id: string, reason: string) =>
+    request<MaintenanceItem>(`/api/maintenance/${id}/reject`, { method: "POST", body: { reason } }),
+  history: (id: string) => request<MaintenanceEvent[]>(`/api/maintenance/${id}/history`),
+  getNotify: () => request<{ recipients: string[]; dueCount: number }>("/api/maintenance/notify"),
+  notify: (to: string[]) => request<{ sent: boolean; count: number }>("/api/maintenance/notify", { method: "POST", body: { to } }),
+};
+
+// ── 보안제품 등록부(종류별 관리 + 제품/로그 매뉴얼) ─────────────────────
+export interface ProductDoc {
+  id: string;
+  productId: string;
+  kind: string; // manual | logManual | etc
+  title: string;
+  docName?: string;
+  note?: string;
+  uploadedBy?: string;
+  at: number;
+}
+export interface SecurityProduct {
+  id: string;
+  name: string;
+  category: string;
+  vendor?: string;
+  model?: string;
+  assetId?: string;
+  assetName?: string;
+  note?: string;
+  docs: ProductDoc[];
+  createdAt: number;
+  updatedAt: number;
+}
+export interface ProductCategoryMeta {
+  id: string;
+  label: string;
+  icon: string;
+}
+export interface ProductGroup {
+  category: string;
+  label: string;
+  icon: string;
+  products: SecurityProduct[];
+}
+// 제품 "정형 정보"(온톨로지 기반 양식) — 매뉴얼 업로드가 RAG 검색용 텍스트로만 남던 것을 보완해,
+// 고정된 9개 항목(펌웨어·시리얼·관리IP 등)을 구조화된 값으로 관리한다.
+export interface ProductFieldValue {
+  key: string;
+  label: string;
+  value: string;
+}
+
+export const securityProductsApi = {
+  list: () => request<SecurityProduct[]>("/api/security-products"),
+  grouped: () => request<ProductGroup[]>("/api/security-products/grouped"),
+  categories: () =>
+    request<{ categories: ProductCategoryMeta[]; docKinds: { id: string; label: string }[] }>("/api/security-products/categories"),
+  create: (args: { name: string; category: string; vendor?: string; model?: string; assetId?: string; note?: string }) =>
+    request<SecurityProduct>("/api/security-products", { method: "POST", body: args }),
+  update: (id: string, patch: { name?: string; category?: string; vendor?: string; model?: string; assetId?: string; note?: string }) =>
+    request<SecurityProduct>(`/api/security-products/${encodeURIComponent(id)}`, { method: "PUT", body: patch }),
+  // 제품을 지우면 걸려 있던 매뉴얼이 어떻게 되는지 미리 본다(다른 제품과 공용인 건 보존된다).
+  deletePreview: (id: string) =>
+    request<{
+      productName: string;
+      manuals: { docName: string; title: string; sharedWith: string[] }[];
+      removable: number;
+      shared: number;
+    }>(`/api/security-products/${encodeURIComponent(id)}/delete-preview`),
+  // manuals: keep=지식베이스에 남김 · kb=임베딩만 삭제(재업로드로 복구) · file=원본까지 삭제(복구 불가)
+  remove: (id: string, manuals: "keep" | "kb" | "file" = "keep") =>
+    request<{ ok: boolean; removed: string[]; keptShared: { docName: string; sharedWith: string[] }[] }>(
+      `/api/security-products/${encodeURIComponent(id)}?manuals=${manuals}`,
+      { method: "DELETE" }
+    ),
+  addDoc: (id: string, args: { kind: string; title: string; note?: string; filename?: string; content?: string }) =>
+    request<ProductDoc>(`/api/security-products/${encodeURIComponent(id)}/docs`, { method: "POST", body: args }),
+  removeDoc: (docId: string) =>
+    request<{ ok: boolean }>(`/api/security-products/docs/${encodeURIComponent(docId)}`, { method: "DELETE" }),
+  getFields: (id: string) => request<ProductFieldValue[]>(`/api/security-products/${encodeURIComponent(id)}/fields`),
+  saveFields: (id: string, fields: { key: string; value: string }[]) =>
+    request<ProductFieldValue[]>(`/api/security-products/${encodeURIComponent(id)}/fields`, { method: "POST", body: { fields } }),
+  // 매뉴얼 파일에서 AI가 정형 정보 초안을 뽑는다 — 저장 안 됨, 화면에서 확인 후 saveFields로 별도 저장.
+  draftFields: (id: string, filename: string, content: string) =>
+    request<ProductFieldValue[]>(`/api/security-products/${encodeURIComponent(id)}/fields/draft`, { method: "POST", body: { filename, content } }),
+  // 매뉴얼 자동 분류 임포트 — 파일명으로 제품 매칭(없으면 자동 등록)·종류·문서구분까지 반영.
+  importDoc: (filename: string, content?: string) =>
+    request<{
+      filename: string;
+      productId: string;
+      productName: string;
+      category: string;
+      kind: string;
+      createdProduct: boolean;
+      reason: string;
+      docName?: string;
+    }>("/api/security-products/import-doc", { method: "POST", body: { filename, content } }),
+};
+
+// ── AI 견고성: 레드팀(사후 실측) + 가드레일(실시간 방어) ────────────────
+export interface RedTeamResult {
+  id: string;
+  category: string;
+  severity: string;
+  desc: string;
+  vulnerable: boolean;
+  prompt: string;
+  basis: string;
+  responseExcerpt: string;
+}
+export interface RedTeamReport {
+  ranAt: number;
+  model: string;
+  total: number;
+  vulnerable: number;
+  robustnessScore: number;
+  byCategory: Record<string, { total: number; vulnerable: number }>;
+  results: RedTeamResult[];
+}
+export interface RedTeamTargetAsset {
+  id: string;
+  name: string;
+  assetType: string;
+  modelRef: string;
+  robustness: { score: number | null; vulnerable: number; total: number; ranAt: number; modelId: string };
+}
+export interface RedTeamTargets {
+  models: { id: string; running: boolean }[];
+  assets: RedTeamTargetAsset[];
+}
+export const redteamApi = {
+  // opts 없음=오케스트레이터, {modelId}=특정 로컬 모델, {assetId}=AI-BOM 자산(결과가 자산에 기록됨).
+  run: (opts?: { modelId?: string; assetId?: string }) =>
+    request<RedTeamReport & { targetKey?: string }>("/api/redteam/run", { method: "POST", body: opts ?? {} }),
+  last: (target?: string) => request<RedTeamReport>(`/api/redteam/last${target ? `?target=${encodeURIComponent(target)}` : ""}`),
+  targets: () => request<RedTeamTargets>("/api/redteam/targets"),
+  payloads: () => request<{ id: string; category: string; severity: string; desc: string }[]>("/api/redteam/payloads"),
+  // 제품 경로 실효 견고성 — 담당자가 실제로 쓰는 경로(가드레일 뒤)로 같은 공격을 보낸 결과.
+  // 위 run/last의 "맨몸 점수"와는 다른 것을 잰다(섞으면 안 된다 — 화면에서도 구분해 보여준다).
+  effectiveLast: () => request<EffectiveReport | null>("/api/redteam/effective/last"),
+  runEffective: () => request<EffectiveReport>("/api/redteam/effective", { method: "POST", body: {} }),
+};
+
+export interface EffectiveReport {
+  ranAt: number;
+  total: number;
+  blockedAtGate: number; // 입구에서 막힘(모델에 닿지 않음)
+  modelHeld: number; // 모델이 버팀
+  leaked: number; // 실제로 뚫림
+  effectiveScore: number;
+  leakedIds: string[];
+  results: { id: string; severity: string; outcome: "blocked" | "held" | "leaked"; excerpt: string }[];
+}
+
+// ── 통합 보안 분석(관제) 허브 — 취약점·로그·운영리포트 3소스 정규화 ──────────
+export type EventStatus = "open" | "ack" | "inprogress" | "done" | "ignored";
+export interface AnalysisEvent {
+  id: string;
+  source: "vuln" | "log" | "product";
+  title: string;
+  entity: string;
+  severity: "critical" | "high" | "medium" | "low" | "info";
+  priority: "P0" | "P1" | "P2" | "P3";
+  detail: string;
+  signals: string[];
+  aiSummary: string;
+  ref: string;
+  at: number;
+  status?: EventStatus;
+  statusNote?: string;
+}
+export interface AnalysisCorrelation {
+  entity: string;
+  sources: ("vuln" | "log" | "product")[];
+  eventIds: string[];
+  note: string;
+}
+export interface AnalysisHubData {
+  events: AnalysisEvent[];
+  summary: {
+    total: number;
+    bySource: { vuln: number; log: number; product: number };
+    byPriority: { P0: number; P1: number; P2: number; P3: number };
+    overall: "높음" | "보통" | "낮음";
+  };
+  correlations: AnalysisCorrelation[];
+}
+export const analysisHubApi = {
+  events: () => request<AnalysisHubData>("/api/analysis-hub/events"),
+  rebuildVuln: () => request<{ inserted: number }>("/api/analysis-hub/rebuild-vuln", { method: "POST" }),
+  analyze: (eventId: string) => request<{ aiSummary: string }>("/api/analysis-hub/analyze", { method: "POST", body: { eventId } }),
+  setStatus: (eventId: string, status: EventStatus, note = "") =>
+    request<{ ok: boolean; status: EventStatus }>(`/api/analysis-hub/events/${encodeURIComponent(eventId)}/status`, { method: "POST", body: { status, note } }),
+  // 드롭존 통합 인입 — 서버가 로그/리포트를 자동 판별해 라우팅.
+  ingest: (filename: string, content: string) =>
+    request<{ routedTo: "log" | "report"; created: number; events: AnalysisEvent[] }>("/api/analysis-hub/ingest", {
+      method: "POST",
+      body: { filename, content },
+    }),
+  attackPaths: () => request<{ paths: AttackPath[] }>("/api/analysis-hub/attack-paths"),
+};
+
+export interface AttackPathStep { kind: "entry" | "foothold" | "lateral"; entity: string; label: string; source: string; severity: string }
+export interface AttackPath { id: string; entity: string; reachability: "확인됨" | "높음" | "보통"; reachScore: number; steps: AttackPathStep[]; note: string }
+
+// ── SBOM ─────────────────────────────────────────────────────────────
+export const sbomApi = {
+  generate: (assetId: string) => request(`/api/sbom/${assetId}/generate`, { method: "POST" }),
+  export: (assetId: string, format: "cyclonedx" | "spdx") =>
+    request(`/api/sbom/${assetId}/export`, { method: "POST", body: { format } }),
+  aibomExport: (assetId: string) =>
+    request<{ path: string; filename: string; json: string }>(`/api/sbom/${assetId}/aibom-export`, { method: "POST" }),
+  aibomThreats: (assetId: string) => request<AiBomThreatReport>(`/api/assets/${assetId}/aibom/threats`),
+};
+
+export interface AiBomThreatMatch {
+  code: string;
+  name: string;
+  category: string;
+  categoryLabel: string;
+  matchedAreas: string[];
+  status: "covered" | "partial" | "na" | "open";
+  owasp: string[];
+  nist: string[];
+}
+export interface AiBomThreatReport {
+  assetId: string;
+  assetName: string;
+  matches: AiBomThreatMatch[];
+  summary: { relevant: number; covered: number; partial: number; na: number; open: number };
+}
+
+// ── CTI(위협 인텔리전스) ──────────────────────────────────────────────
+export interface CtiAssetMatch {
+  finding: { id: string; detectedAt: string; type: string; target: string; source: string; severity: "info" | "warning" | "critical" };
+  matchedAssets: { assetId: string; assetName: string; matchedOn: string[] }[];
+}
+
+export const ctiApi = {
+  feeds: () => request("/api/cti/feeds"),
+  findings: () => request("/api/cti/findings"),
+  configureFeed: (feedId: string, apiKey: string) =>
+    request(`/api/cti/feeds/${feedId}/configure`, { method: "POST", body: { apiKey } }),
+  // 커스텀 벤더 직접 추가 — 이름을 직접 입력해 등록·키 설정.
+  addCustomFeed: (name: string, apiKey: string) =>
+    request("/api/cti/feeds", { method: "POST", body: { name, apiKey } }),
+  disconnectFeed: (feedId: string) => request(`/api/cti/feeds/${feedId}/disconnect`, { method: "POST" }),
+  assetMatches: () =>
+    request<{ matches: CtiAssetMatch[]; summary: { totalFindings: number; matchedFindings: number; affectedAssets: number; criticalMatches: number } }>(
+      "/api/cti/asset-matches"
+    ),
+};
+
+// ── 보안장비 하드닝(보안설정) 점검 — 표준 기준 체크리스트 실행·리포트 ──────────
+export type HardeningStatus = "PASS" | "FAIL" | "WARN" | "NA";
+export interface HardeningItem { id: string; cat: string; title: string; ref: string; remediation: string; status: HardeningStatus; evidence: string }
+export interface HardeningReport {
+  standard: "kisa" | "cis";
+  standardLabel: string;
+  target: string;
+  startedAt: string;
+  durationMs: number;
+  items: HardeningItem[];
+  summary: { total: number; pass: number; fail: number; warn: number; na: number; scored: number; rate: number; verdict: string };
+}
+export interface HardeningChecklist { id: "kisa" | "cis"; label: string; count: number; items: { id: string; cat: string; title: string; ref: string }[] }
+
+// 원격 SSH 정기점검 — 대상(장비)·스케줄·이력
+export type HardeningAuth = "local" | "key" | "password";
+export interface HardeningTargetPublic { id: string; label: string; host: string; port: number; username: string | null; authMethod: HardeningAuth; hasSecret: boolean }
+export interface HardeningScheduleRow { id: string; targetId: string; targetLabel: string; standard: "kisa" | "cis"; intervalHours: number; enabled: number; lastRunAt: number | null; nextRunAt: number; lastRate: number | null; lastFail: number | null; createdAt: number }
+export interface HardeningRun { id: string; targetId: string; targetLabel: string; standard: string; at: number; rate: number; pass: number; fail: number; warn: number; na: number; source: string; summary: string | null }
+export interface NewTarget { label: string; host: string; port?: number; username?: string; authMethod: HardeningAuth; secret?: string }
+
+export const hardeningApi = {
+  checklists: () => request<{ standards: HardeningChecklist[] }>("/api/hardening/checklists"),
+  scan: (standard: "kisa" | "cis", target?: string) =>
+    request<{ report: HardeningReport; markdown: string; summary: string }>("/api/hardening/scan", { method: "POST", body: { standard, target } }),
+  // 대상(장비)
+  listTargets: () => request<{ targets: HardeningTargetPublic[] }>("/api/hardening/targets"),
+  createTarget: (t: NewTarget) => request<{ target: HardeningTargetPublic }>("/api/hardening/targets", { method: "POST", body: t }),
+  deleteTarget: (id: string) => request<{ ok: boolean }>(`/api/hardening/targets/${id}`, { method: "DELETE" }),
+  probeTarget: (id: string) => request<{ ok: boolean; detail: string }>(`/api/hardening/targets/${id}/probe`, { method: "POST", body: {} }),
+  scanTarget: (id: string, standard: "kisa" | "cis") =>
+    request<{ report: HardeningReport; summary: string }>(`/api/hardening/targets/${id}/scan`, { method: "POST", body: { standard } }),
+  // 스케줄
+  listSchedules: () => request<{ schedules: HardeningScheduleRow[] }>("/api/hardening/schedules"),
+  createSchedule: (targetId: string, standard: "kisa" | "cis", intervalHours: number) =>
+    request<{ schedule: HardeningScheduleRow }>("/api/hardening/schedules", { method: "POST", body: { targetId, standard, intervalHours } }),
+  toggleSchedule: (id: string, enabled: boolean) =>
+    request<{ ok: boolean }>(`/api/hardening/schedules/${id}`, { method: "PATCH", body: { enabled } }),
+  deleteSchedule: (id: string) => request<{ ok: boolean }>(`/api/hardening/schedules/${id}`, { method: "DELETE" }),
+  // 이력
+  runs: (targetId?: string, limit?: number) => {
+    const q = new URLSearchParams();
+    if (targetId) q.set("targetId", targetId);
+    if (limit) q.set("limit", String(limit));
+    const qs = q.toString();
+    return request<{ runs: HardeningRun[] }>(`/api/hardening/runs${qs ? `?${qs}` : ""}`);
+  },
+};
+
+// ── 승인 워크플로우(스캔 finding 검토 → 승인/반려) ──────────────────────
+export type ApprovalStatus = "pending" | "in_progress" | "verifying" | "approved" | "rejected";
+export type RejectReason = "false_positive" | "compensating_control";
+
+export interface FindingReview {
+  assetId: string;
+  assetName: string;
+  findingKey: string;
+  finding: { finding_type: string; severity: "low" | "medium" | "high" | "critical"; evidence: string; source_tool: string };
+  status: ApprovalStatus;
+  reviewedBy?: string;
+  reviewedAt?: number;
+  note?: string;
+  assignee?: string; // 실수행담당자
+  securityOwner?: string; // 보안담당자(감독)
+  dueDate?: string;
+  rejectReason?: RejectReason;
+  verifyRequestedAt?: number;
+  verifyRequestedBy?: string;
+  resolvedAt?: number;
+  overdue?: boolean;
+  gone?: boolean; // 재스캔에서 사라짐
+}
+
+export interface ReviewPatch {
+  status?: ApprovalStatus;
+  note?: string;
+  assignee?: string;
+  securityOwner?: string;
+  dueDate?: string;
+  rejectReason?: RejectReason | "";
+}
+
+export interface ApprovalSummary {
+  total: number; pending: number; in_progress: number; verifying: number; approved: number; rejected: number; overdue: number;
+  // 스캔이 실패해 결과를 못 받은 건수 — 취약점이 아니라 **스캐너를 고칠 일**이라 따로 센다.
+  // (2026-08-01: 605건 중 602건이 스캔 오류였는데 "미검토 602건"으로 보였다.)
+  scanFailed?: number;
+}
+
+export const approvalsApi = {
+  list: () =>
+    request<{ reviews: FindingReview[]; summary: ApprovalSummary }>("/api/approvals"),
+  // status·note·assignee·dueDate를 부분 갱신(merge). 판정 없이 담당자·기한만 배정도 가능.
+  set: (assetId: string, key: string, patch: ReviewPatch) =>
+    request(`/api/approvals/${encodeURIComponent(assetId)}/${encodeURIComponent(key)}`, { method: "POST", body: patch }),
+  // 담당자에게 조치 배정 메일 발송 — 서버가 배정 정보·취약점 내용으로 본문 구성, 수신 주소만 전달.
+  notify: (assetId: string, key: string, to: string) =>
+    request<{ ok: boolean }>(`/api/approvals/${encodeURIComponent(assetId)}/${encodeURIComponent(key)}/notify`, { method: "POST", body: { to } }),
+  // 오늘의 조치 — 전 자산 finding을 KEV·EPSS·VPR·심각도로 정렬한 우선순위 목록.
+  priorities: (limit = 10) =>
+    request<{ items: (FindingReview & { score: number })[] }>(`/api/approvals/priorities?limit=${limit}`),
+  // AI 조치 브리핑 — 상위 취약점 [근거·권장조치·기한] 초안(로컬 LLM).
+  triage: (limit = 5) => request<{ draft: string; count: number }>("/api/approvals/triage", { method: "POST", body: { limit } }),
+};
+
+// ── 조치 검증 — 찾은 취약점이 실제로 닫혔는지 대상에 접속해 확인한다 ───────────
+// 스캐너가 아니다(더 찾지 않는다). 판정은 서버가 결정적으로 하고, 화면은 근거를 그대로 보여준다.
+export interface VerifyOutcome {
+  findingKey: string;
+  title: string;
+  cve?: string;
+  status: "PASS" | "FAIL" | "WARN" | "NA"; // PASS=조치확인 · FAIL=미조치 · NA=수동확인 필요
+  evidence: string;                        // 실행한 명령과 출력 — 담당자가 판정을 믿을 근거
+  expectedKind: "version" | "absent" | "config" | "cert" | "manual";
+  // 사내 문서 근거(RAG) — 보상통제·장비 확인법·사내 기준. ⚠ 제안일 뿐 판정을 바꾸지 않는다.
+  basis?: { kind: "device_howto" | "compensating" | "internal_rule"; label: string; excerpt: string; documentId: string }[];
+  hint?: { need: string }; // 근거가 없을 때 "어떤 문서가 있으면 되는지"
+}
+export interface VerifyRunResult {
+  assetId: string;
+  assetName?: string;
+  target: string;
+  results: VerifyOutcome[];
+  summary: { total: number; fixed: number; still: number; manual: number };
+  note?: string;
+}
+// VEX — 승인 상태를 국제 표준 문서로 내보낸다(협력사·규제기관 문의에 캡처 대신 파일로 답).
+export const vexApi = {
+  summary: (assetId?: string) =>
+    request<{ total: number; byState: Record<string, number>; withoutCve: number }>(
+      `/api/vex/summary${assetId ? `?assetId=${encodeURIComponent(assetId)}` : ""}`
+    ),
+  // 파일 본문(JSON 문자열) — 화면이 blob으로 만들어 저장한다.
+  exportDoc: (assetId?: string) =>
+    request<Record<string, unknown>>(`/api/vex/export${assetId ? `?assetId=${encodeURIComponent(assetId)}` : ""}`),
+};
+
+export const verifyApi = {
+  // 이 자산을 검증할 수 있는가(권한 + 접속 대상 등록 여부). 버튼 상태를 정하는 데 쓴다 —
+  // 최종 판단은 서버 실행 API가 다시 한다(화면 판단만 믿으면 우회된다).
+  can: (assetId: string, findingKey?: string) =>
+    request<{ allowed: boolean; reason: string; hasTarget: boolean; targetLabel: string | null }>(
+      `/api/verify/can/${encodeURIComponent(assetId)}${findingKey ? `?key=${encodeURIComponent(findingKey)}` : ""}`
+    ),
+  run: (assetId: string, findingKey?: string) =>
+    request<VerifyRunResult>("/api/verify/run", { method: "POST", body: { assetId, ...(findingKey ? { findingKey } : {}) } }),
+};
+
+export const complianceApi = {
+  list: () => request<ThreatCompliance[]>("/api/compliance"),
+  setStatus: (code: string, status: string, note: string) =>
+    request<ThreatCompliance>(`/api/compliance/${code}`, { method: "PUT", body: { status, note } }),
+  // AI 초안 — 위협별 대응 상태 제안(저장 아님). 담당자 검토용.
+  draft: (code: string) => request<{ status: string; note: string }>(`/api/compliance/${code}/draft`, { method: "POST" }),
+};
+
+// 저장 암호화(at-rest) — 상태 조회와 복구 열쇠 재발급(2026-07-30).
+// 켜는 것은 화면에서 못 한다(서버 정지가 필요) — 상태를 정직하게 보여주는 것이 이 API의 일이다.
+export const dbCryptApi = {
+  status: () =>
+    request<{
+      encrypted: boolean;
+      keyFilePresent: boolean;
+      keyCreatedAt: number | null;
+      machineBinding: { sources: number; strong: boolean };
+      covers: string[];
+      notCovered: string[];
+      howToEnable: string | null;
+      plaintextCopies: { count: number; files: string[]; totalMb: number };
+    }>("/api/dbcrypt/status"),
+  // 응답의 recoveryKey는 **한 번만** 내려온다. 어디에도 저장하지 않는다.
+  rotateRecovery: () =>
+    request<{ recoveryKey: string; notice: string }>("/api/dbcrypt/rotate-recovery", { method: "POST" }),
+};
+
+// 문서함 — 출하 문서를 담당자가 직접 읽는 통로(2026-07-31).
+// id는 서버 목록이 준 것만 쓴다 — 클라이언트가 파일 경로를 정하지 않는다(서버가 화이트리스트).
+export const docboxApi = {
+  list: () => request<{ documents: { id: string; title: string; group: "guide" | "policy"; why?: string }[] }>("/api/docbox"),
+  read: (id: string) => request<{ id: string; title: string; markdown: string }>(`/api/docbox/${encodeURIComponent(id)}`),
+  search: (q: string) =>
+    request<{ results: { id: string; title: string; hits: number; snippet: string }[] }>(
+      `/api/docbox/search?q=${encodeURIComponent(q)}`
+    ),
+};
+
+// 문서함 요청 만들기 — 서버가 문서를 조립하고, **파일 저장은 클라이언트가 한다**
+// (사용자 결정 2026-07-30: 전달은 담당자가 파일을 직접 다룬다 — 메일 발송 없음).
+export const docRequestApi = {
+  build: (input: {
+    kind: "bug" | "feature" | "ui" | "etc";
+    title: string;
+    tried: string;
+    happened: string;
+    images: string[];
+    screen?: string;
+    clientVersion?: string;
+    platform?: string;
+  }) =>
+    request<{ fileName: string; markdown: string; maskedCount: number; maskedKinds: string[]; imageCount: number; sizeBytes: number }>(
+      "/api/docbox/request",
+      { method: "POST", body: input }
+    ),
+  list: () =>
+    request<{ requests: { id: string; at: number; kind: string; title: string; actor: string | null; fileName: string }[] }>(
+      "/api/docbox/requests"
+    ),
+};
