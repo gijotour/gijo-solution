@@ -97,52 +97,7 @@
 
   /* 브리핑 블록(.brief/.act*)은 2026-08-06 대화창 이동으로 제거 — 스타일도 함께 걷었다. */
 
-  /* 시작 가이드 카드 — 4대 시나리오 실행 진입점 */
-  .guide{background:var(--panel);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:12px;max-width:1220px;}
-  .g-head{display:flex;align-items:center;gap:9px;padding:13px 15px;cursor:pointer;user-select:none;}
-  .g-head .car{color:var(--muted-2);font-size:11.75px;transition:transform .15s;}
-  .guide.open .g-head .car{transform:rotate(90deg);}
-  .g-head h3{font-size:12.5px;font-weight:800;}
-  .g-head .gsub{font-size:12.25px;color:var(--muted-2);font-weight:600;}
-  .g-prog{margin-left:auto;display:flex;align-items:center;gap:8px;}
-  .g-bar{width:78px;height:5px;border-radius:4px;background:#1f1e1d;overflow:hidden;}
-  .g-bar i{display:block;height:100%;background:var(--teal);width:0;}
-  .g-cnt{font-size:12.25px;color:var(--muted);font-weight:700;font-variant-numeric:tabular-nums;}
-  .g-body{display:none;border-top:1px solid var(--border);}
-  .guide.open .g-body{display:block;}
-  .sc{border-bottom:1px solid var(--border);}
-  .sc:last-child{border-bottom:0;}
-  .sc-head{display:flex;align-items:center;gap:10px;padding:11px 15px;cursor:pointer;}
-  .sc-head:hover{background:rgba(255,255,255,.02);}
-  .sc-n{width:19px;height:19px;border-radius:50%;background:#1f1e1d;border:1px solid rgba(255,255,255,.16);
-        display:flex;align-items:center;justify-content:center;font-size:11.75px;font-weight:800;color:var(--muted);flex:0 0 auto;}
-  .sc.done .sc-n{background:rgba(30,185,128,.16);border-color:rgba(30,185,128,.4);color:var(--teal);}
-  .sc-t{font-size:12.5px;font-weight:700;}
-  .sc-d{font-size:12.25px;color:var(--muted-2);}
-  .sc-r{margin-left:auto;font-size:12.25px;color:var(--muted-2);font-weight:700;}
-  .sc.done .sc-r{color:var(--teal);}
-  .sc-steps{display:none;padding:2px 15px 12px 44px;}
-  .sc.open .sc-steps{display:block;}
-  .gst{display:flex;align-items:center;gap:9px;padding:6px 0;}
-  .gst-c{width:15px;height:15px;border-radius:4px;border:1px solid rgba(255,255,255,.16);flex:0 0 auto;
-         display:flex;align-items:center;justify-content:center;font-size:11.25px;color:transparent;}
-  .gst.done .gst-c{background:var(--teal);border-color:var(--teal);color:#06281c;}
-  .gst-t{font-size:12px;flex:1;min-width:0;}
-  .gst.done .gst-t{color:var(--muted);}
-  .gst-q{font-family:Consolas,monospace;font-size:12.25px;color:var(--blue-l);}
-  .gst-go{background:transparent;border:1px solid rgba(255,255,255,.16);color:var(--muted);border-radius:7px;
-          padding:4px 10px;font-size:12.25px;font-weight:700;cursor:pointer;font-family:inherit;flex:0 0 auto;}
-  .gst-go:hover{border-color:var(--blue);color:#fff;}
-  .gst.done .gst-go{opacity:.55;}
-  /* ⚠ 접혀 있으면 꼬리말도 같이 감춘다(2026-08-04). 단계가 안 보이는데 "각 단계를 누르면
-     실제로 실행됩니다"만 남으면 무슨 말인지 알 수 없고, 접은 보람도 45px 줄어든다. */
-  .g-foot{display:none;padding:10px 15px;border-top:1px solid var(--border);font-size:12.25px;color:var(--muted-2);align-items:center;gap:10px;}
-  .guide.open .g-foot{display:flex;}
-  .g-foot button{margin-left:auto;background:transparent;border:1px solid rgba(255,255,255,.16);color:var(--muted);
-          border-radius:7px;padding:4px 10px;font-size:12.25px;font-weight:700;cursor:pointer;font-family:inherit;}
-  .g-done{display:flex;align-items:center;gap:8px;padding:11px 15px;font-size:12px;color:var(--teal);}
-  .g-done button{margin-left:auto;background:transparent;border:1px solid rgba(255,255,255,.16);color:var(--muted);
-          border-radius:7px;padding:4px 10px;font-size:12.25px;font-weight:700;cursor:pointer;font-family:inherit;}
+  /* 시작 가이드 카드 CSS는 2026-08-06 문서함 이관으로 제거 */
 
   .grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
   @media (max-width:1000px){.grid{grid-template-columns:1fr;}}
@@ -172,17 +127,48 @@
   .addrow button{background:rgba(255,255,255,.06);border:1px solid var(--border);color:var(--muted);
     border-radius:8px;padding:0 11px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;}
   .addrow button:hover{color:#fff;border-color:var(--blue);}
+  /* 표준 상단바 — 조치·승인(approvals.html)과 같은 규칙. 허브 탭(embed)에서는 nav.js가
+     숨기므로 단독 창에서만 보인다. 문구·수치까지 25화면과 동일하게 유지할 것. */
+  .header{display:flex;align-items:center;justify-content:space-between;padding:12px 20px;border-bottom:1px solid var(--border);background:var(--panel-2,#1f1e1d);}
+  .header-left{display:flex;align-items:center;gap:12px;}
+  .header-left img{height:22px;}
+  .app-title{font-size:15px;font-weight:800;color:#fff;}
+  .clock{font-size:12px;color:var(--blue-light,var(--blue-l));font-weight:600;}
+  .header-right{display:flex;align-items:center;gap:10px;}
+  .status-pill{display:flex;align-items:center;gap:6px;background:rgba(30,185,128,0.15);border:1px solid rgba(30,185,128,0.4);color:var(--teal);padding:6px 14px;border-radius:20px;font-size:12px;font-weight:800;}
+  .status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);}
+  .beta-tag{background:var(--teal);color:#06281c;font-size:11.25px;font-weight:800;padding:1px 6px;border-radius:4px;margin-left:2px;}
+  .avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
+  .icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
 </style>
 <script src="viz.js"></script>
 </head>
 <body class="g-ui">
+<!-- 표준 상단바(2026-08-06 사용자 지시 "조치승인처럼 상단바 전체 통일") — 대시보드만 이 바가
+     없어 탭마다 위가 달랐다. 뼈대는 다른 25화면과 같고, 시계·세션칩·조작줄은 titlebar.js가
+     .header를 찾아 채운다(대시보드에 .header가 없어서 그동안 아무것도 못 붙었던 것). -->
+<div class="header">
+  <div class="header-left">
+    <span style="display:flex;align-items:center;gap:12px"><img src="gijo-wordmark.svg" alt="GIJO">
+    <div class="app-title">GIJO AS</div></span>
+    <div class="clock" id="clockEl">-</div>
+  </div>
+  <div class="header-right">
+    <div class="status-pill" id="statusPill"><span class="dot"></span>연결 확인 중<span class="beta-tag">LIVE</span></div>
+    <div class="avatar-btn" id="avatarBtn">-</div>
+    <div class="icon-btn" id="settingsBtn">⚙</div>
+  </div>
+</div>
+
 <div class="app">
   <div class="sidebar" id="gijoNav"></div>
   <div class="main">
     <!-- 정체성 한 줄 — 2026-08-06 브리핑이 대화창으로 가면서 "AI가 먼저 알려주는"이 거짓이 됐다.
-         이 화면이 실제로 하는 일(급한 것을 보여주고, 지시는 대화창)만 말한다. -->
-    <div class="scr-id">🏠 <b>대시보드</b> — 오늘 급한 것을 한눈에 보고, 지시는 아래 대화창에서 하는 자리입니다.
-      <span class="ask" id="askInfo">· 이 화면 설명 듣기</span></div>
+         이 화면이 실제로 하는 일(급한 것을 보여주고, 지시는 대화창)만 말한다.
+         「이 화면 설명 듣기」 링크는 2026-08-06 사용자 지시로 제거 — 궁금하면 대화창에
+         물으면 된다("물어보기는 대화창으로 통일"). 챗봇을 부르는 자리가 화면마다 있으면
+         입구가 다시 여러 개가 된다. -->
+    <div class="scr-id">🏠 <b>대시보드</b> — 오늘 급한 것을 한눈에 보고, 지시는 아래 대화창에서 하는 자리입니다.</div>
 
 
     <!-- AI 팀 — 지금 누가 일하고 있는지 아이콘으로만 보여준다(2026-07-28 사용자 요청).
@@ -202,13 +188,14 @@
          오른쪽은 기계: 서버·엔진·리소스·AI 팀을 한 판에. "AI가 왜 답을 안 하지?"의 답이
          대개 여기 있다 — 모델이 안 떴거나, 임베딩이 죽었거나, VRAM이 없거나. -->
     <div class="head">
+      <!-- 2026-08-06 사용자 지시로 개편: "오늘 무엇부터 볼지…" 문장을 없애고
+           탭 사용법·대화창 사용법·안전(가드레일 차단) 안내로. 인사 아래는 쓰는 법만 남긴다. -->
       <div class="hello">
         <div class="hi" id="helloLine">안녕하세요</div>
-        <div class="how">오늘 무엇부터 볼지 AI가 아래에 정리해 뒀습니다.</div>
         <div class="steps">
-          <span class="step"><span class="n">1</span>왼쪽 메뉴에서 화면을 고르면 <b>탭</b>으로 열립니다</span>
-          <span class="step"><span class="n">2</span>지시는 <b>아래 대화창</b>에 적습니다</span>
-          <span class="step"><span class="n">3</span>지금 보는 탭이 곧 지시의 대상입니다</span>
+          <span class="step"><span class="n">1</span>왼쪽 메뉴에서 화면을 고르면 <b>탭</b>으로 열립니다 — 탭을 오가도 보던 화면은 그대로입니다</span>
+          <span class="step"><span class="n">2</span>일은 <b>아래 대화창</b>에 시킵니다 — 지금 보는 탭이 곧 지시의 대상입니다</span>
+          <span class="step"><span class="n">3</span>위험한 명령은 <b>가드레일이 차단</b>하고, 바꾸는 일은 <b>결재판</b>으로 확인받습니다 — 편하게 물어보세요</span>
         </div>
       </div>
 
@@ -232,11 +219,7 @@
            첫 화면이 느려지고 "지시는 대화창에서만" 원칙과도 어긋난다.
          ⚠ 「급한 것」 목록은 브리핑이 아니라 규칙 계산이므로 남는다 — loadToday가 계속 그린다. -->
 
-    <!-- 시작 가이드 카드 — 4대 시나리오를 담당자가 직접 눌러 따라 해 보는 자리.
-         읽는 안내가 아니라 **실행 진입점**이다: 각 단계가 콘솔에 실제로 물어보거나 화면을 연다.
-         다 해 보면 한 줄로 접힌다(매일 쓰는 사람의 첫 화면을 잡아먹지 않게).
-         2026-07-30 — onboarding.js 오버레이·런처·코치마크를 이 카드가 대신한다(조작 개념 -1). -->
-    <div class="guide" id="guideCard" style="display:none"></div>
+    <!-- 시작 가이드 카드 → 2026-08-06 문서함으로 이관(위 JS 주석 참고) -->
 
     <div class="grid">
       <div class="card"><h3>🔥 급한 것 <span class="cnt" id="urgentCnt"></span></h3>
@@ -305,10 +288,32 @@
     var rows = [];
 
     // 서버 — health가 돌면 운영 중이다. 여기가 꺼져 있으면 나머지는 볼 것도 없다.
+    // 상단바 연결상태 칩도 같은 결과로 채운다(2026-08-06 상단바 통일 — 다른 화면들과 같은 문구).
+    var pill = document.getElementById("statusPill");
     try {
       var h = await window.gijo.checkServerHealth();
       rows.push(stateRow(!!(h && (h.ok || h.status === "ok")), "서버", "운영 중", "연동 서버가 응답합니다"));
-    } catch (e) { rows.push(stateRow(false, "서버", "응답 없음", "연동 서버에 닿지 못합니다")); }
+      if (pill) pill.innerHTML = '<span class="dot"></span>서버 연결상태 양호';
+    } catch (e) {
+      rows.push(stateRow(false, "서버", "응답 없음", "연동 서버에 닿지 못합니다"));
+      if (pill) pill.innerHTML = '<span class="dot" style="background:#e2483d"></span>서버 연결상태 불량';
+    }
+    try {
+      var u = await window.gijo.me();
+      var av = document.getElementById("avatarBtn");
+      if (av) av.textContent = (u.displayName || u.username || "-").charAt(0);
+    } catch (e) {}
+    // 시계 — 다른 25화면과 같은 tick(조치·승인과 동일 포맷·주기). 단독 창으로 열었을 때 보인다.
+    if (!window.__gijoClockTick) {
+      window.__gijoClockTick = function () {
+        var c = document.getElementById("clockEl");
+        if (c) c.textContent = new Date().toLocaleString("ko-KR", {
+          hour: "2-digit", minute: "2-digit", hour12: true, year: "numeric", month: "2-digit", day: "2-digit",
+        });
+      };
+      window.__gijoClockTick();
+      setInterval(window.__gijoClockTick, 30000);
+    }
 
     try {
       var s = await window.gijo.getLocalEngineStatus();
@@ -534,158 +539,16 @@
   $("kpiBox").addEventListener("click", function () { go("kpi.html"); });
 
   // ⓘ — 화면 설명은 셸 콘솔이 답한다(프로젝트 원칙: 화면엔 정체성 한 줄만)
-  $("askInfo").addEventListener("click", function () {
-    if (window.gijoExplain) window.gijoExplain("대시보드");
-  });
 
   // 자산이 바뀌면(스캔 인입 등) 브리핑·지표가 낡는다 — 알림이 오면 다시 읽는다.
   if (window.gijo && window.gijo.onAssetUpdated) {
     try { window.gijo.onAssetUpdated(function () { loadToday(); loadKpi(); }); } catch (e) {}
   }
 
-  // ── 시작 가이드 카드 ──────────────────────────────────────────────────
-  // 4대 시나리오(GIJO_AS_시연_패키지.md)를 담당자가 **직접 눌러 따라 해 보는** 자리.
-  // 문구는 그 문서의 실측된 지시문 그대로다 — 카드가 가르치는 말이 실제로 통하는 말이어야 한다.
-  //
-  // 왜 오버레이가 아니라 카드인가(2026-07-30 사용자 결정): 예전 온보딩은 오버레이라 평소엔
-  // 안 보였고, 그래서 "있는 줄 모르는 기능"이 됐다. 첫 화면에 두되 다 해 보면 접는다.
-  // 콘솔은 셸(app.html)에 있고 이 화면은 iframe 안이라 직접 못 부른다 — postMessage로 부탁한다.
-  var GUIDE_KEY = "gijo:guide:done";      // 끝낸 단계 id 배열
-  var GUIDE_FOLD = "gijo:guide:folded";   // 담당자가 손으로 접었나
-  var SCENARIOS = [
-    { id: "s1", t: "오늘 뭐부터 할지 정하기", d: "쌓인 스캐너 결과에서 급한 것 고르기", steps: [
-      { k: "ask", t: "콘솔에 물어보기", q: "오늘 뭐부터 볼까?" },
-      { k: "ask", t: "콘솔에 물어보기", q: "미조치 취약점 알려줘" },
-      { k: "go", t: "조치·승인 화면 — 결재판 확인", page: "approvals.html" },
-      { k: "ask", t: "콘솔에 물어보기", q: "이번 주 예정된 점검 있어?" },
-    ]},
-    { id: "s2", t: "담당자 인수인계 남기기", d: "퇴사·이동 전에 노하우를 시스템에", steps: [
-      { k: "go", t: "인수인계 화면 — 4단계 마법사", page: "handover.html" },
-      { k: "go", t: "기억·학습 — 사내 문서 올리기", page: "memory.html" },
-      { k: "ask", t: "후임자처럼 물어보기", q: "ASA 106023 로그가 한 IP에서 계속 올라오는데 무슨 의미야?" },
-    ]},
-    { id: "s3", t: "이거 해도 되는지 확인하기", d: "사내 규정·법령에 맞는지 대조", steps: [
-      { k: "ask", t: "규정 찾기", q: "접속기록 보관 기간 규정 알려줘" },
-      { k: "ask", t: "행동 대조 — 해도 되는지 묻기", q: "개인정보 시스템 접속기록 보관 주기를 6개월로 줄여도 돼?" },
-      { k: "go", t: "컴플라이언스 — 대응 현황", page: "compliance.html" },
-    ]},
-    { id: "s4", t: "보고서 만들기", d: "주간 현황을 격식 문서로", steps: [
-      { k: "ask", t: "말로 현황 받기", q: "오늘 브리핑 해줘" },
-      { k: "ask", t: "문서로 만들기", q: "내부 검토용 주간 리포트 작성해줘" },
-      { k: "go", t: "보안 KPI — 임원 보고용 화면", page: "kpi.html" },
-    ]},
-  ];
-  var guideDone = readGuideDone();
-  var guideOpenSc = {};
-
-  function readGuideDone() {
-    try { var v = JSON.parse(localStorage.getItem(GUIDE_KEY) || "[]"); return Array.isArray(v) ? v : []; }
-    catch (e) { return []; }
-  }
-  function saveGuideDone() { try { localStorage.setItem(GUIDE_KEY, JSON.stringify(guideDone)); } catch (e) {} }
-  function stepKey(sc, i) { return sc.id + ":" + i; }
-  function stepDone(sc, i) { return guideDone.indexOf(stepKey(sc, i)) >= 0; }
-  function scDoneCount(sc) { var n = 0; for (var i = 0; i < sc.steps.length; i++) if (stepDone(sc, i)) n++; return n; }
-  function scDone(sc) { return scDoneCount(sc) === sc.steps.length; }
-  function guideDoneCount() { var n = 0; SCENARIOS.forEach(function (s) { if (scDone(s)) n++; }); return n; }
-
-  function guideStep(si, i) {
-    var sc = SCENARIOS[si], st = sc.steps[i];
-    if (!stepDone(sc, i)) { guideDone.push(stepKey(sc, i)); saveGuideDone(); }
-    renderGuide();
-    // 지시는 대화창으로, 화면 열기는 셸로. 둘은 주인이 다르다.
-    // ⚠ 옛 길(`gijo:ask` postMessage)은 셸에게 보냈는데, 대화창을 창으로 빼 두면 셸의
-    //   대화창은 접혀 있어 **눌러도 아무 일이 없어 보였다**(2026-08-01 검토). askConsole은
-    //   도킹이든 분리창이든 지금 보이는 쪽으로 간다.
-    try {
-      if (st.k === "ask") {
-        if (window.gijo && window.gijo.askConsole) window.gijo.askConsole(st.q);
-        else window.parent.postMessage({ type: "gijo:ask", text: st.q }, "*"); // 구버전 대비
-      } else {
-        window.parent.postMessage({ type: "gijo:openTab", page: st.page }, "*");
-      }
-    } catch (e) {}
-  }
-  function toggleSc(id) { guideOpenSc[id] = !guideOpenSc[id]; renderGuide(); }
-  function toggleGuide() {
-    var el = document.getElementById("guideCard");
-    var open = !el.classList.contains("open");
-    el.classList.toggle("open", open);
-    try { localStorage.setItem(GUIDE_FOLD, open ? "0" : "1"); } catch (e) {}
-  }
-  function resetGuide() {
-    guideDone = []; saveGuideDone(); guideOpenSc = {};
-    try { localStorage.setItem(GUIDE_FOLD, "0"); } catch (e) {}
-    document.getElementById("guideCard").classList.add("open");
-    renderGuide();
-  }
-  window.gijoGuide = { step: guideStep, toggleSc: toggleSc, toggle: toggleGuide, reset: resetGuide };
-
-  function renderGuide() {
-    var el = document.getElementById("guideCard");
-    if (!el) return;
-    el.style.display = "";
-    var doneN = guideDoneCount();
-    // 숫자는 **시나리오** 단위(0/4), 막대는 **단계** 단위로 채운다. 막대까지 시나리오 단위로 하면
-    // 4단계 중 3개를 한 사람에게도 0%가 보여 "아무것도 안 한 것"처럼 느껴진다 — 진행 표시는
-    // 실제로 한 만큼 보여야 믿을 수 있다.
-    var stepTotal = 0, stepDoneN = 0;
-    SCENARIOS.forEach(function (sc) { stepTotal += sc.steps.length; stepDoneN += scDoneCount(sc); });
-    var head =
-      '<div class="g-head" onclick="gijoGuide.toggle()"><span class="car">▶</span>' +
-      "<h3>이렇게 쓰면 됩니다</h3><span class='gsub'>— 4가지 상황으로 익히기</span>" +
-      '<span class="g-prog"><span class="g-bar"><i style="width:' + (stepTotal ? stepDoneN / stepTotal * 100 : 0) + '%"></i></span>' +
-      '<span class="g-cnt">' + doneN + "/4</span></span></div>";
-
-    if (doneN === 4) {
-      // 다 해 봤으면 한 줄로 — 매일 쓰는 사람의 첫 화면을 잡아먹지 않는다.
-      el.classList.remove("open");
-      el.innerHTML = head +
-        '<div class="g-done">✓ 4가지 모두 해봤습니다 — 이제 콘솔에 바로 지시하세요' +
-        '<button onclick="gijoGuide.reset()">다시 보기</button></div>';
-      return;
-    }
-    var body = SCENARIOS.map(function (sc, si) {
-      var d = scDone(sc);
-      var steps = sc.steps.map(function (st, i) {
-        var sd = stepDone(sc, i);
-        var label = st.k === "ask"
-          ? esc(st.t) + ' <span class="gst-q">"' + esc(st.q) + '"</span>'
-          : esc(st.t);
-        return '<div class="gst' + (sd ? " done" : "") + '"><span class="gst-c">✓</span>' +
-          '<span class="gst-t">' + label + "</span>" +
-          '<button class="gst-go" onclick="gijoGuide.step(' + si + "," + i + ')">' +
-          (sd ? "다시" : st.k === "ask" ? "물어보기" : "열기") + "</button></div>";
-      }).join("");
-      return '<div class="sc' + (d ? " done" : "") + (guideOpenSc[sc.id] ? " open" : "") + '">' +
-        "<div class='sc-head' onclick=\"gijoGuide.toggleSc('" + sc.id + "')\">" +
-        '<span class="sc-n">' + (d ? "✓" : si + 1) + "</span>" +
-        "<span><span class='sc-t'>" + esc(sc.t) + "</span><br><span class='sc-d'>" + esc(sc.d) + "</span></span>" +
-        '<span class="sc-r">' + scDoneCount(sc) + "/" + sc.steps.length + "</span></div>" +
-        "<div class='sc-steps'>" + steps + "</div></div>";
-    }).join("");
-    el.innerHTML = head + '<div class="g-body">' + body + "</div>" +
-      '<div class="g-foot"><span>각 단계를 누르면 실제로 실행됩니다 — 읽기만 하는 안내가 아닙니다.</span>' +
-      '<button onclick="gijoGuide.reset()">진행 초기화</button></div>';
-  }
-
-  // 첫 표시 여부 — 담당자가 손으로 접었으면 그 선택을 존중한다.
-  // 예전 온보딩을 이미 다 끝낸 사람은 제품을 아는 사람이므로 접힌 채로 시작한다.
-  (function initGuide() {
-    // ★ 2026-08-04 기본 접기(시안 first-screen-v1 · 파트너 지적 「모든 메뉴의 첫장은 너무
-    //   복잡해 보이지 않게」). 실측: 이 카드가 펼쳐져 있어 **「급한 것」 첫 줄이 894px**에
-    //   있었다(창 776px) — 담당자가 매일 보는 일감이 화면 밖으로 밀려났다.
-    //   ⚠ 감추는 것이 아니다. 접혀도 제목·진행 막대·「0/4」가 그대로 보이고 한 번 누르면
-    //     펼쳐진다 — 배지 없이 접으면 그건 접기가 아니라 삭제다.
-    //   ⚠ 한 번이라도 펼치거나 접은 사람의 선택(GUIDE_FOLD)은 그대로 존중한다.
-    var folded = true;
-    try {
-      var 저장 = localStorage.getItem(GUIDE_FOLD);
-      if (저장 !== null) folded = 저장 === "1";
-    } catch (e) {}
-    if (!folded) document.getElementById("guideCard").classList.add("open");
-    renderGuide();
-  })();
+  // 「이렇게 쓰면 됩니다」 카드는 2026-08-06 사용자 지시로 **문서함으로 이관**했다
+  // (GIJO_AS_이렇게_쓰면_됩니다.md — docs-manifest 등록, 문서함 창에서 읽는다).
+  // 첫 화면은 급한 것·할 일·대화창에 집중한다. 눌러서 실행되던 단계는 문서의
+  // "대화창에 이렇게 치세요" 문장으로 옮겼다 — 어차피 실제로 통하는 말 그대로였다.
 
   loadHello();
   loadEngines();
