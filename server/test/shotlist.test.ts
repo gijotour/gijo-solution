@@ -17,7 +17,10 @@ const PAGES = join(ROOT, "client", "src", "renderer", "pages");
 
 const 실제화면 = new Set(readdirSync(PAGES).filter((f) => f.endsWith(".html")));
 const 도구 = readFileSync(join(ROOT, "tools", "gen-screenshots.mjs"), "utf8");
-const 찍는화면 = [...도구.matchAll(/page:\s*"([a-z0-9-]+\.html)"/g)].map((m) => m[1]);
+// 파일 존재 검사는 파일명으로, 중복 검사는 **탭까지 포함한 주소**로 본다 —
+// settings.html과 settings.html?s=ai는 담당자에게 다른 화면이다(2026-08-06 소개덱 갱신).
+const 찍는주소 = [...도구.matchAll(/page:\s*"([a-z0-9-]+\.html(?:\?[^"]*)?)"/g)].map((m) => m[1]);
+const 찍는화면 = 찍는주소.map((p) => p.split("?")[0]);
 
 // nav.js가 거는 것 중 **파일이 실재하는 것**만 메뉴 화면이다.
 // (없는 것들은 옛 주소를 새 화면으로 보내는 별칭표다 — 죽은 링크가 아니다.)
@@ -33,7 +36,7 @@ describe("★ 스크린샷 도구가 없는 화면을 찍으려 하지 않는다
 
   it("같은 화면을 두 번 찍지 않는다", () => {
     const 본것 = new Set<string>();
-    const 중복 = 찍는화면.filter((p) => (본것.has(p) ? true : (본것.add(p), false)));
+    const 중복 = 찍는주소.filter((p) => (본것.has(p) ? true : (본것.add(p), false)));
     expect(중복, `두 번 적힌 화면: ${중복.join(", ")}`).toEqual([]);
   });
 });
@@ -45,6 +48,18 @@ describe("★★ 자료에 들어갈 화면이 빠지지 않는다", () => {
       빠진것,
       `메뉴에 있는데 안 찍는 화면(자료에 그 화면이 없게 된다): ${빠진것.join(", ")}`,
     ).toEqual([]);
+  });
+
+  it("★★ 소개덱 생성기도 은퇴한 화면 사진을 쓰지 않는다", () => {
+    // 실사고(2026-08-06 소스 정리): 문서만 검사하고 **도구는 안 봤다** — gen-intro-deck.mjs가
+    // 04·07·16·19 옛 사진을 계속 슬라이드에 넣고 있었다(그래서 그 사진들을 못 지웠다).
+    // 고객이 받는 PDF를 만드는 코드도 같은 잣대로 본다.
+    const deck = readFileSync(join(ROOT, "tools", "gen-intro-deck.mjs"), "utf8");
+    const 은퇴사진 = ["04-운영가이드-점검거버넌스", "07-추천LLM가이드", "16-지식모델-온톨로지", "19-사용량-요금"];
+    const 걸린것 = 은퇴사진.filter((s) => deck.includes(s));
+    expect(걸린것, `소개덱이 없어진 화면의 옛 사진을 쓴다: ${걸린것.join(", ")}`).toEqual([]);
+    // 감시가 헛돌지 않는가 — 덱이 실제로 사진을 지정하고 있어야 한다
+    expect((deck.match(/shot:\s*"/g) ?? []).length).toBeGreaterThan(10);
   });
 
   it("★★ 고객에게 주는 자료가 **없는 화면**을 가리키지 않는다", () => {

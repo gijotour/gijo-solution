@@ -43,13 +43,20 @@ async function main() {
     }),
   }).then((r) => r.json());
   const token = login.accessToken;
+  // 로그인이 실패하면 이후 모든 g()가 오류 **객체**를 돌려주고, 그 객체를 배열처럼 돌다
+  // "not iterable"로 죽는다(2026-08-06 실측 — 원인이 로그인인데 증상이 데이터라 헷갈린다).
+  // 여기서 먼저 정직하게 세운다.
+  if (!token) {
+    console.error(`로그인 실패 — ${JSON.stringify(login).slice(0, 200)}\n  (계정: ${process.env.GIJO_SHOT_USER ?? "jyh"} · 서버: ${BASE})`);
+    process.exit(2);
+  }
   const auth = { headers: { Authorization: `Bearer ${token}` } };
   const g = async (p) => fetch(`${BASE}${p}`, auth).then((r) => r.json()).catch(() => null);
 
   // 화면들이 로드 시 부르는 GET 응답을 미리 수집(백데이터).
   const maintenance = await g("/api/maintenance");
   const histById = {};
-  for (const m of maintenance || []) histById[m.id] = await g(`/api/maintenance/${m.id}/history`);
+  for (const m of Array.isArray(maintenance) ? maintenance : []) histById[m.id] = await g(`/api/maintenance/${m.id}/history`);
 
   const DATA = {
     me: login.user ?? { displayName: "정요한", username: "jyh", role: "admin" },
@@ -261,7 +268,11 @@ async function main() {
   for (const s of shotList) {
     const page = await ctx.newPage();
     try {
-      await page.goto(pathToFileURL(path.join(PAGES_DIR, s.page)).href, { waitUntil: "load", timeout: 15000 });
+      // 탭 주소(settings.html?s=ai)도 찍는다 — 파일 경로와 질의문자열을 나눠 붙여야 한다
+      // (통째로 pathToFileURL에 넣으면 "?"까지 파일명이 되어 ERR_FILE_NOT_FOUND, 2026-08-06 실측).
+      const [파일, 질의] = s.page.split("?");
+      const 주소 = pathToFileURL(path.join(PAGES_DIR, 파일)).href + (질의 ? `?${질의}` : "");
+      await page.goto(주소, { waitUntil: "load", timeout: 15000 });
       // 헤더 로고는 gijo.ai에서 받아오는데 오프라인이라 차단된다 → 깨진 이미지 아이콘이 남으므로 숨긴다.
       // (옆에 "GIJO AS" 텍스트가 이미 있어 로고가 빠져도 헤더가 비지 않는다.)
       await page.addStyleTag({ content: 'img[src*="gijo.ai"]{display:none!important}' });
@@ -271,6 +282,9 @@ async function main() {
         await page.evaluate(() => document.querySelector("#rvList .rv-row")?.click());
         await page.waitForTimeout(500);
       }
+      // ⚠ 설정 화면을 탭 주소로 찍어 보았으나(2026-08-06) 접힌 구역 구조라 한 장에 안 담기고,
+      //   이 캡처 환경은 GPU를 못 봐 "NVIDIA GPU 없음"이 찍힌다 — 고객 자료에 사실과 다른
+      //   문구를 넣지 않으려고 촬영을 접었다. 소개덱도 그 장을 뺐다(gen-intro-deck.mjs).
       const outFile = path.join(OUT_DIR, `${s.name}.png`);
       if (DECK) {
         await page.screenshot({ path: outFile }); // 뷰포트만(16:10)
