@@ -118,9 +118,10 @@ export async function makeDigest(documentId: string, raw: string, category?: str
     emitCollaboration({
       from: "analyze",
       to: "orchestrator",
+      // 줄 맨 앞 아이콘 금지(말투 규범 — 그 자리는 상태 표식 자리다). 협업 독도 같은 잣대로 본다.
       message: summary
-        ? `📄 새 문서 「${documentId}」 요약 완료${접점수 ? ` · 우리 지식과 접점 ${접점수}건` : ""} — "새 문서 뭐 들어왔어?"로 볼 수 있습니다.`
-        : `📄 새 문서 「${documentId}」 들어옴 — 요약은 만들지 못했습니다(${(failedReason ?? "사유 미상").slice(0, 40)}).`,
+        ? `새 문서 「${documentId}」 요약 완료${접점수 ? ` · 우리 지식과 접점 ${접점수}건` : ""} — "새 문서 뭐 들어왔어?"로 볼 수 있습니다.`
+        : `새 문서 「${documentId}」 들어옴 — 요약은 만들지 못했습니다(${(failedReason ?? "사유 미상").slice(0, 40)}).`,
     });
   } catch { /* 알림 실패가 소식 저장을 되돌리지 않는다 */ }
 }

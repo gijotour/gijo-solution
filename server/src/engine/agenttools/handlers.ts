@@ -850,7 +850,9 @@ function 새문서한줄(): string {
     if (!rows.length) return "";
     const byCat = new Map<string, number>();
     for (const r of rows) byCat.set(r.category ?? "일반", (byCat.get(r.category ?? "일반") ?? 0) + 1);
-    return `📄 이번 주 새 문서 ${rows.length}건(${[...byCat].map(([c, n]) => `${c} ${n}`).join(" · ")}) — "새로 들어온 문서 알려줘"라고 물으면 요약까지 보입니다.`;
+    // ⚠ 줄 맨 앞에 아이콘을 두지 않는다 — 말투 감시는 그 자리를 **상태 표식**으로 읽는다
+    //   (📄는 사물 이름표라 표식 사전에 없다. 2026-08-06 실측: 실전 답 6건이 이 한 줄 때문에 걸렸다).
+    return `이번 주 새 문서 ${rows.length}건(${[...byCat].map(([c, n]) => `${c} ${n}`).join(" · ")}) — "새로 들어온 문서 알려줘"라고 물으면 요약까지 보입니다.`;
   } catch {
     return ""; // 소식 실패가 오늘 우선순위 답을 막으면 안 된다
   }
