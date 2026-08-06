@@ -75,6 +75,8 @@
       ".cs-del{margin-left:auto;font-size:12px;opacity:.55;flex:0 0 auto;}",
       ".cs-del:hover{opacity:1;}",
       ".b-mine{background:rgba(240,160,32,.16);color:var(--amber,#f0a020);}",
+      // 「지금 화면」 — 보고 있는 탭에서 할 수 있는 갈래(2026-08-06)
+      ".b-now{background:rgba(59,130,246,.18);color:var(--blue-light,#7ab0ff);}",
       // 펼쳤을 때 대화를 다 밀어내면 안 된다 — 최대 높이를 주고 그 안에서 스크롤한다.
       ".cs-db{max-height:240px;overflow-y:auto;padding:2px 0 7px;}",
       // 갈래 한 줄 — 누르면 그 갈래 질문이 대화에 뜬다.
@@ -619,8 +621,13 @@
   //   here — 대화창 안에서 답이 끝난다(도구가 조회해 온다)
   //   ok   — 상태를 바꾸므로 결재판을 거쳐 실행된다
   //   go   — 대화로 하면 안 되는 것(설정·계정·열쇠). 순서를 알려 주고 화면을 열어 준다.
+  //
+  // screens — **지금 보는 탭에서 할 수 있는 것**을 위로 올리는 데 쓴다(2026-08-06 사용자 지시
+  //   "무엇을 할 수 있나를 해당 메뉴에서 할 수 있는 것으로"). 갈래를 지우지는 않는다:
+  //   대화창의 강점이 화면 경계를 가로지르는 것이라, 해당 화면 것을 **먼저** 보이고
+  //   나머지는 아래에 남긴다(2026-07-31 "하는 일로 묶는다" 결정과 충돌하지 않게).
   var CAN = [
-    { cat: "지금 급한 것", kind: "here", qs: [
+    { cat: "지금 급한 것", kind: "here", screens: ["dashboard.html", "approvals.html", "vulnscan.html", "kpi.html"], qs: [
       // 보안 KPI 화면에 있던 「지금 손댈 일」 줄을 여기로 옮겼다(2026-08-02 사용자 지시).
       //   서버 도구 urgent_todo가 화면과 **같은 규칙 한 벌**로 만든다.
       { ic: "🎯", q: "지금 손댈 일 뭐야?" },
@@ -628,7 +635,7 @@
       { ic: "⏰", q: "기한 지난 일 보여줘" },
       { ic: "✅", q: "승인 기다리는 것 있어?" },
     ]},
-    { cat: "살펴보기", kind: "here", qs: [
+    { cat: "살펴보기", kind: "here", screens: ["analysis.html","threat.html","inventory.html","vulnscan.html","sbom.html","syslog.html"], qs: [
       { ic: "🛡", q: "미조치 취약점 뭐 있어?" },
       { ic: "📦", q: "우리 자산 현황 알려줘" },
       { ic: "🌐", q: "새로 올라온 위협 중에 우리 자산에 해당하는 게 있어?" },
@@ -639,17 +646,17 @@
     //   운영에 없어서 첫 클릭이 "그런 자산이 없습니다"로 끝났다. 서랍은 "이건 된다"고 약속하는
     //   자리라 첫 클릭이 실패하면 없느니만 못하다).
     //   {제품} 자리는 서랍을 펼칠 때 **실제 등록된 제품 이름**으로 채운다. 하나도 없으면 그 줄을 뺀다.
-    { cat: "처리하기", kind: "ok", qs: [
+    { cat: "처리하기", kind: "ok", screens: ["approvals.html","maintenance.html","inventory.html","products.html"], qs: [
       { ic: "🔧", q: "{제품} 정기점검 잡아줘", needs: "product" },
       { ic: "📝", q: "새 자산 등록할게" },
       { ic: "🚦", q: "가장 급한 취약점에 담당자 배정해줘" },
     ]},
-    { cat: "정리하기", kind: "here", qs: [
+    { cat: "정리하기", kind: "here", screens: ["report.html","kpi.html","compliance.html","audit.html"], qs: [
       { ic: "📄", q: "이번 주 보안 현황을 요약해줘" },
       { ic: "📊", q: "이번 달 보안 지표를 지난달과 비교해줘" },
       { ic: "🧾", q: "최근 작업 기록에서 이상한 게 있어?" },
     ]},
-    { cat: "설정·관리", kind: "go", qs: [
+    { cat: "설정·관리", kind: "go", screens: ["settings.html","handover.html"], qs: [
       { ic: "🔐", q: "2차 인증 켜려면 어떻게 해?" },
       { ic: "🔑", q: "복구 열쇠 재발급하려면 어떻게 해?" },
       { ic: "👤", q: "담당자 계정 추가하려면 어떻게 해?" },
@@ -715,8 +722,15 @@
   function renderDrawer() {
     var el = document.getElementById("csDrawer");
     if (!el) return;
-    var cats = CAN.map(function (c) { return { cat: c.cat, kind: c.kind, qs: fillQs(c.qs) }; })
-      .filter(function (c) { return c.qs.length > 0; });
+    var 지금화면 = (ctx && ctx.screen) || "";
+    var cats = CAN.map(function (c) {
+      return { cat: c.cat, kind: c.kind, qs: fillQs(c.qs), 지금: !!(지금화면 && c.screens && c.screens.indexOf(지금화면) >= 0) };
+    }).filter(function (c) { return c.qs.length > 0; });
+    // 내가 등록한 지시 — 항상 맨 위(내 말이 우리 목록보다 먼저다).
+    var 내것 = 내지시목록();
+    if (내것.length) cats.unshift({ cat: "내가 등록한 지시", kind: "mine", qs: 내것, 지금: false, mine: true });
+    // 지금 보는 탭에서 할 수 있는 갈래를 위로(내 지시 바로 다음). 나머지는 순서를 지킨다.
+    cats.sort(function (a, b) { return (b.mine ? 2 : b.지금 ? 1 : 0) - (a.mine ? 2 : a.지금 ? 1 : 0); });
     var n = cats.reduce(function (a, c) { return a + c.qs.length; }, 0);
     var head =
       '<div class="cs-dh" id="csDrawerH"><span class="car">' + (drawerOpen ? "▼" : "▶") + "</span>" +
@@ -726,16 +740,27 @@
     // ⚠ 예전엔 서랍이 **질문 18줄을 통째로** 폈다. 서랍만으로 대화창 절반을 먹고,
     //   정작 오간 말이 밀려 올라갔다(2026-08-02 사용자 지시: 갈래만 보이고 누르면 대화에 뜨게).
     //   갈래 다섯 줄이면 "무엇을 할 수 있나"가 한눈에 들어오고, 고른 뒤에야 질문이 나온다.
+    // ＋ 등록 상자 — 예전엔 스타일(.cs-addbox)만 있고 **그리는 코드가 없어서** ＋ 등록을 눌러도
+    //   아무 일도 안 일어났다(2026-08-06 사용자 신고 "등록하려는데 안 되네"). 만들어만 두고
+    //   안 부르면 아무 일도 안 일어난다 — 그 계열의 사고다.
+    var addbox = !등록열림 ? "" :
+      '<div class="cs-addbox">' +
+      '<input id="csAddInput" placeholder="자주 쓰는 지시를 그대로 적으세요 — 예: 이번 주 미조치 취약점 알려줘" maxlength="120">' +
+      '<button id="csAddSave">등록</button>' +
+      '<button id="csAddCancel" class="ghost">취소</button>' +
+      '<span class="hint">이 PC에만 저장됩니다(최대 30개). 등록하면 서랍 맨 위 「내가 등록한 지시」에 생깁니다.</span>' +
+      "</div>";
     var body = !drawerOpen ? "" :
       '<div class="cs-db">' + cats.map(function (c) {
         var bd = KIND_BADGE[c.kind];
         return '<div class="cs-catrow" data-cat="' + esc(c.cat) + '">' +
           '<span class="nm">' + esc(c.cat) + "</span>" +
+          (c.지금 ? '<span class="cs-bd b-now">지금 화면</span>' : "") +
           '<span class="cs-bd ' + bd[1] + '">' + bd[0] + "</span>" +
           '<span class="cs-n">' + c.qs.length + "</span></div>";
       }).join("") + "</div>";
     el.className = "cs-drawer" + (drawerOpen ? " open" : "");
-    el.innerHTML = head + body;
+    el.innerHTML = head + addbox + body;
     document.getElementById("csDrawerH").addEventListener("click", function () {
       drawerOpen = !drawerOpen;
       // 펼칠 때 실제 이름을 불러온다(닫힌 채로는 부르지 않는다 — 안 쓸 수도 있는 호출을 아낀다).
@@ -797,10 +822,14 @@
       '<div class="cb"><div class="cn">' + esc(c.cat) +
       '<span class="cs-bd ' + bd[1] + '" style="margin-left:6px">' + bd[0] + "</span></div>" +
       '<div class="cs-picks">' + c.qs.map(function (x) {
-        return '<div class="cs-q" data-q="' + esc(x.q) + '"><span class="ic">' + x.ic + "</span>" + esc(x.q) + "</div>";
+        // 내가 등록한 것만 지울 수 있다 — 우리 기본 목록은 담당자가 못 지운다(다시 만들 길이 없다).
+        return '<div class="cs-q" data-q="' + esc(x.q) + '"><span class="ic">' + x.ic + "</span>" + esc(x.q) +
+          (c.mine ? '<span class="cs-del" data-del="' + esc(x.q) + '" title="이 지시 지우기">✕</span>' : "") + "</div>";
       }).join("") + "</div></div>";
     el.querySelectorAll(".cs-q").forEach(function (q) {
-      q.addEventListener("click", function () {
+      q.addEventListener("click", function (ev) {
+        var del = ev.target && ev.target.getAttribute && ev.target.getAttribute("data-del");
+        if (del) { ev.stopPropagation(); 내지시삭제(del); q.remove(); renderDrawer(); return; }
         var input = document.getElementById("chatInput");
         input.value = q.getAttribute("data-q");
         submit();
@@ -853,6 +882,9 @@
     if (!chip || !input) return;
     chip.textContent = ctx.label || "대시보드";
     input.placeholder = ctx.label ? "「" + ctx.label + "」 화면에 대해 지시…" : "지시를 입력하세요…";
+    // 탭이 바뀌면 서랍의 「지금 화면」 순서도 따라 바뀌어야 한다(2026-08-06) —
+    // 안 그리면 옆 화면 것이 위에 남아 "해당 메뉴에서 할 수 있는 것"이라는 약속이 깨진다.
+    renderDrawer();
   }
   function readCtxFromShell() {
     if (IS_WINDOW || !window.gijoTabs) return;
