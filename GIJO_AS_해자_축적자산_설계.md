@@ -77,3 +77,22 @@ id · askedAt · question(원문) · verdict(○/△/×) · basisRefs(인용 문
 슬라이스 0은 결함이라 즉시. 1은 테이블 1개 + 저장 1곳 + 병기 1곳 + 도구 1개 —
 반나절. 2는 개인정보 설계가 먼저라 별도 승인. 3은 오탐을 잘못 일반화하면 **진짜
 취약점을 숨기는** 최악의 실패라 "표시만"부터 천천히.
+
+---
+
+## 4. 구현 기록 (2026-08-06)
+
+**슬라이스 0 완료**(커밋 08b3e9d): `performBackup`이 `session-archive/`를 같은 타임스탬프
+짝 폴더(`gijo-as-<stamp>.session-archive`)로 담고, 보관정리도 짝을 함께 지운다.
+`pruneChatLogs`는 지울 행을 먼저 고른 뒤 `chatlogs-YYYY-MM.jsonl`로 내리고 **성공한 뒤에만**
+삭제한다 — 내리기 실패 시 0건 반환(디스크를 더 쓰는 쪽이 기록 소실보다 낫다).
+
+**슬라이스 1 완료**(같은 커밋): `action_check_history`(askedAt·question·normQuestion·verdict·
+basisRefs·verdictText·qa) + 판정 직후 저장. 재질문 병기는 **정규화 완전 일치 + 같은
+basisRefs**일 때만, 판정이 갈리면 ⚠. 조회 도구 `action_check_history`(즉답) +
+`FORCED_INTENTS[47]`. qa 행은 저장하되 조회·집계에서 제외.
+
+설계와 달라진 것 1건: 조회 답에 「다음 걸음」을 붙였다가 **감시 시험이 잡아 뺐다** —
+현황 조회는 다음 행동이 사람마다 다르다는 기존 원칙(exposed_assets 전례) 준수.
+
+**남은 슬라이스**: 2(인수인계 이력 — 개인정보 설계 선행) · 3(오탐 족보 일반화 — 표시만).
