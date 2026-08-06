@@ -210,10 +210,14 @@ function classifyByFilename(documentId: string): string {
 function categorySignalScores(text: string): Record<Exclude<Category, "일반">, number> {
   const head = text.slice(0, 2000);
   return {
-    취약점: (head.match(/취약점|CVE-\d{4}|CVSS|위험도|조치\s*(기한|방안)|스캔/g) ?? []).length,
-    장비운영: (head.match(/설정\s*방법|명령어|콘솔|장비|펌웨어|유지보수|정기\s*점검|로그\s*필드/g) ?? []).length,
-    사내규정: (head.match(/규정|지침|준수|의무|금지|승인\s*절차|보관\s*(기간|의무)|법령/g) ?? []).length,
-    위협대응: (head.match(/공격|침해|탐지\s*룰|시그니처|차단|대응\s*절차|IOC|악성/g) ?? []).length,
+    // 2026-08-07 보강: 대량 반입 실측에서 「방화벽 정책 변경 절차 + 피싱 대응」 메모가
+    //   신호 1점씩만 나와 규칙이 확신을 못 하고 LLM으로 넘어갔고, 7B가 「취약점」이라 답했다.
+    //   ⚠ 프롬프트를 고치지 않는다(이 크기 모델에 규칙을 더해 행동을 고치려는 시도는 반복 실패).
+    //   **흔한 보안 낱말을 신호에 넣어 규칙이 더 자주 스스로 답하게** 한다.
+    취약점: (head.match(/취약점|CVE-\d{4}|CVSS|위험도|조치\s*(기한|방안)|스캔|패치|익스플로잇|EPSS|KEV/g) ?? []).length,
+    장비운영: (head.match(/설정\s*방법|명령어|콘솔|장비|펌웨어|유지보수|정기\s*점검|로그\s*필드|방화벽|스위치|라우터|IPS|IDS|WAF|EDR|백업\s*절차/g) ?? []).length,
+    사내규정: (head.match(/규정|지침|준수|의무|금지|승인\s*절차|보관\s*(기간|의무)|법령|정책\s*(변경|수립|문서)?|내부\s*통제/g) ?? []).length,
+    위협대응: (head.match(/공격|침해|탐지\s*룰|시그니처|차단|대응\s*절차|IOC|악성|피싱|랜섬웨어|멀웨어|스미싱|디도스|DDoS/g) ?? []).length,
   };
 }
 
@@ -254,7 +258,18 @@ async function categorizeDocument(documentId: string, text: string, allowLlm: bo
       // trusted — 문서 내용이 들어가지만 '사용자 지시'가 아니라 자료다. 보안 문서에는 '탈옥·인젝션' 같은 낱말이 당연히 들어 있어, 입력 차단으로 막으면 정상 문서 인입이 통째로 실패한다. 자료 안의 지시를 따르지 않게 하는 것은 프롬프트 구조(자료/지시 분리)의 몫이다.
       trusted: true,
     });
-    return CATEGORIES.find((c) => reply.includes(c)) ?? "일반";
+    const 고른것 = CATEGORIES.find((c) => reply.includes(c));
+    if (!고른것 || 고른것 === "일반") return "일반";
+    // ★ **근거 없는 분류는 받지 않는다**(2026-08-07 실측): 방화벽 정책·피싱 대응 메모를
+    //   7B가 「취약점」이라고 답했는데, 그 문서에 취약점 신호는 **0점**이었다.
+    //   분류가 틀리면 나중에 그 문서를 못 찾고 화면별 검색 우선순위도 어긋난다.
+    //   모델이 고른 영역의 신호가 하나도 없으면 **일반**으로 둔다 — 모르는 것은 모른다고 두는 편이
+    //   틀린 이름표보다 낫다(억지 분류가 오분류보다 나쁘다는 위 규칙과 같은 계열).
+    if ((categorySignalScores(text) as Record<string, number>)[고른것] === 0) {
+      console.warn(`[memory] 분류 거부 — 모델이 「${고른것}」이라 했지만 그 신호가 0점: ${documentId}`);
+      return "일반";
+    }
+    return 고른것;
   } catch {
     return "일반";
   }

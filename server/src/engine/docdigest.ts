@@ -72,7 +72,13 @@ export function 요약정리(out: string): { summary: string | null; keywords: s
   // 지시 복창 서두 제거 — "…요약을 작성해주세요/해줘" 류 문장은 내용이 아니다
   body = body.replace(/^[^.!?]*요약[^.!?]*(작성|해\s*주|해줘)[^.!?]*[.!?]\s*/, "").trim();
   // 문장 단위로 최대 3개, 한 문장 120자 상한(넘치면 말줄임 — 원문 대체가 아니라 소식이다)
-  const 문장들 = body.split(/(?<=[.!?])\s+|(?<=다\.)\s*/).map((s) => s.trim()).filter((s) => s.length >= 8);
+  // ⚠ 목록 번호를 문장 끝으로 착각하지 않는다(2026-08-07 실측): 7B가 "…요약하면 다음과
+  //   같습니다: 1. …"처럼 답하면 「1.」에서 잘려 **끝맺지 못한 줄**이 담당자에게 나갔다.
+  //   숫자 뒤 마침표는 문장 부호가 아니라 번호다 — 자르기 전에 가운뎃점으로 바꿔 지켜 준다.
+  const 안전 = body.replace(/(^|\s)(\d{1,2})\.\s/g, "$1$2· ");
+  const 문장들 = 안전.split(/(?<=[.!?])\s+|(?<=다\.)\s*/).map((s) => s.trim())
+    // 끝맺지 못한 꼬리("…다음과 같습니다:")는 요약이 아니다 — 버린다.
+    .filter((s) => s.length >= 8 && !/[:：]$/.test(s));
   if (!문장들.length) return { summary: null, keywords };
   const summary = 문장들.slice(0, 3).map((s) => (s.length > 120 ? `${s.slice(0, 117)}…` : s)).join("\n");
   return { summary, keywords };

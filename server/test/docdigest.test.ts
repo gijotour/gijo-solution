@@ -140,6 +140,15 @@ describe("문서 반입 소식 — 온톨로지 접점(슬라이스 3, 결정적
     expect(ontologyMatchesFor("The actor exploited CVE-2021-44228 in the wild.").join("\n")).toContain("CVE-2021-44228");
   });
 
+  it("★ 목록 번호에서 잘리지 않는다 — 대량 반입 실측 재현(2026-08-07)", () => {
+    // 실측: "…요약하면 다음과 같습니다: 1." 에서 끊긴 줄이 담당자에게 나갔다.
+    const 실측꼴 = "운영 메모 4에서는 방화벽 정책 변경 절차가 다뤄져 있습니다. 정기 점검은 분기 1회입니다. 이 정보를 요약해보면 다음과 같습니다: 1. 방화벽 정책 변경 2. 피싱 대응";
+    const r = 요약정리(실측꼴);
+    expect(r.summary, "끝맺지 못한 꼬리가 요약에 남았다").not.toMatch(/[:：]$/m);
+    expect(r.summary, "목록 번호에서 잘려 한 글자짜리 줄이 생겼다").not.toMatch(/^\s*\d\.?\s*$/m);
+    for (const 줄 of r.summary!.split("\n")) expect(줄.length).toBeGreaterThanOrEqual(8);
+  });
+
   it("★ 7B 복창 서두를 코드로 걷어내고 문장 셋으로 만든다 — 운영 실측 재현", () => {
     const 실측꼴 = "CROWDSTRIKE 2026 글로벌 위협 보고서에 대해 간략한 요약을 작성해주세요. 주요 포인트는 침해 가능성이 증가하였습니다. 공격자는 신뢰를 악용하여 빠르게 데이터 유출을 수행하였습니다. 속도가 가장 중요해지고 있습니다. 클라우드 위협도 증가하였습니다.";
     const r = 요약정리(실측꼴);
