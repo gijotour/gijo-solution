@@ -922,7 +922,10 @@ export async function runThreats(args: Record<string, string>): Promise<string> 
   const 심각도말 = (s: string) => (s === "critical" ? "심각" : s === "warning" ? "경고" : "참고");
   const 표 = (s: string) => (s === "critical" ? 표식.위험 : s === "warning" ? 표식.주의 : "·");
   const lines = top.map((m) => {
-    const hit = m.matchedAssets.map((a) => a.assetName).join(", ");
+    // 걸린 자산이 수십 대면 나열이 답을 2,000자 밖으로 밀어낸다(150상황 선제 회차 실측:
+    // 2,195자 — 담당자는 안 읽는다). 3대까지 보이고 나머지는 수로 — 판단 재료는 그대로다.
+    const names = m.matchedAssets.map((a) => a.assetName);
+    const hit = names.slice(0, 3).join(", ") + (names.length > 3 ? ` 외 ${names.length - 3}대` : "");
     return `${표(m.finding.severity)} [${심각도말(m.finding.severity)}] ${m.finding.type} — ${m.finding.target} → 우리 자산: ${hit} (출처 ${m.finding.source})`;
   });
   const 잘림 =
