@@ -21,11 +21,18 @@ describe("셸 뼈대 — 상단·하단 고정 바", () => {
     expect(m![0]).toContain("grid-template-rows:minmax(0,1fr)");
   });
 
-  it("세로 3층이다 — 몸통이 flex 세로이고 위·아래 바는 줄어들지 않는다", () => {
+  // 2026-08-07 상단 통합(시안 승인): 조작줄(#shellHeader 46px)을 없애고 **탭줄 하나(44px)**가
+  // 상단 바다. 경로 표시가 두 함수에서 따로 갱신돼 어긋나던 사고의 구조적 제거 — 옛 조작줄이
+  // 되살아나면 그 사고도 되살아나므로, 없는 것을 여기서 못 박는다.
+  it("옛 조작줄(#shellHeader)은 없다 — 되살리면 경로 어긋남 사고도 되살아난다", () => {
+    expect(APP).not.toContain('id="shellHeader"');
+  });
+
+  it("세로 층 — 몸통이 flex 세로이고 탭줄·하단 바는 줄어들지 않는다", () => {
     expect(APP).toMatch(/body\{[^}]*flex-direction:column/s);
-    const 상단 = APP.match(/#shellHeader\{[^}]*\}/s);
+    const 탭줄 = APP.match(/\.tabbar\{[^}]*\}/s);
     const 하단 = APP.match(/\.shellfoot\{[^}]*\}/s);
-    expect(상단![0]).toContain("flex:0 0 auto");   // 눌리면 OS 창 버튼이 삐져나온다
+    expect(탭줄![0]).toContain("flex:0 0 auto");   // 눌리면 OS 창 버튼이 삐져나온다
     expect(하단![0]).toContain("flex:0 0 auto");
   });
 
@@ -35,8 +42,14 @@ describe("셸 뼈대 — 상단·하단 고정 바", () => {
     expect(m![0]).toContain("min-height:0");
   });
 
-  it("상단 바 높이는 OS 창 버튼(titleBarOverlay)과 같은 46px이다", () => {
-    const 상단 = APP.match(/#shellHeader\{[^}]*\}/s);
-    expect(상단![0]).toMatch(/min-height:46px/);
+  it("탭줄 높이(44px)는 OS 창 버튼(titleBarOverlay)과 같다 — 다르면 버튼이 삐져나온다", () => {
+    const 탭줄 = APP.match(/\.tabbar\{[^}]*\}/s);
+    expect(탭줄![0]).toMatch(/height:44px/);
+    const MAIN = fs.readFileSync(path.resolve(__dirname, "../../client/src/main.ts"), "utf-8");
+    expect(MAIN, "main.ts 오버레이 높이가 탭줄과 다르다").toMatch(/titleBarOverlay:\s*\{[^}]*height:\s*44/);
+  });
+
+  it("탭줄에 정보 자리(#tbInfo)가 있다 — 시계·서버상태·세션이 셸 한 곳에 모인 자리", () => {
+    expect(APP).toContain('id="tbInfo"');
   });
 });
