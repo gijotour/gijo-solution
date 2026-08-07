@@ -25,9 +25,13 @@ const TOPIC = arg("--topic", "취약점");
 const CAP = Number(arg("--cap", "300"));
 const APPLY = argv.includes("--apply");
 
+// ⚠ rating=-1도 후보에 넣는다(2026-08-08 실측 근거): 취약점 549건 중 530건이 -1인데, 그중에
+//   명백히 옳은 설명 답(Log4Shell=RCE, KEV 기한=BOD 22-01)이 다수다 — 개별 품질 판정이 아니라
+//   **예전 일반 루프 후보함을 비우던 일괄 처리**였다는 증거다. 목적이 다른 재검토(주제별 전문가
+//   재료)이므로 품질 기준을 통과한 것만 골라 다시 승인하고, 그 사실을 감사 기록에 남긴다.
 const rows = db.prepare(
-  `SELECT id, question, answer, agentId, createdAt FROM chat_logs
-    WHERE topic = ? AND (rating IS NULL OR rating = 1) AND (usedInDataset IS NULL OR usedInDataset = 0)
+  `SELECT id, question, answer, agentId, rating, createdAt FROM chat_logs
+    WHERE topic = ? AND (usedInDataset IS NULL OR usedInDataset = 0)
     ORDER BY createdAt DESC`
 ).all(TOPIC);
 
@@ -35,9 +39,19 @@ const 제외사유 = new Map();
 const 세다 = (k) => 제외사유.set(k, (제외사유.get(k) ?? 0) + 1);
 
 function 좋은가(q, a) {
+  // 기계가 만든 합성 프롬프트가 질문 칸에 남은 것 — 사람 질문이 아니라 학습 재료가 못 된다.
+  if (/사용자 지시:|방금 시스템에서 조회한|이전 대화 맥락|\[현재 지시\]/.test(q)) return 세다("합성 프롬프트"), false;
+  // 현재 상태를 묻는 데이터 질문 — 답이 그날 데이터에 달려 있어 학습하면 지어내기를 가르친다.
+  if (/몇\s*건|보여\s*줘|리스트|목록|추려서|현황\s*(알려|보여)/.test(q)) return 세다("현재 상태 질문"), false;
   if (q.length < 8 || q.length > 140) return 세다("질문 길이"), false;
   if (a.length < 100 || a.length > 1800) return 세다("답 길이"), false;
   if (/연결.{0,3}실패|오류가 발생|죄송|알 수 없습니다|찾지 못했|불러오지 못/.test(a)) return 세다("폴백·오류"), false;
+  // 표본 검수(2026-08-08)에서 자동 선별을 뚫고 나온 4종 — 전부 우리가 코드로 잡아 온 결함이라
+  // 학습하면 그 결함을 도로 가르치는 셈이다.
+  if (/인사말.{0,8}(생략|없이)|서두 없이|바로 본론으로 시작/.test(a)) return 세다("내부 지시문 복창"), false;
+  if (/\[(대상|리스트|내용|이름|값|목록)\]/.test(a)) return 세다("자리표시자"), false;
+  if (/보안 담당자 여러분|보안 담당자로 주|안녕하세요[,.! ]/.test(a)) return 세다("헛인사"), false;
+  if (/저는 GIJO|보안 AI로 (작동|동작)/.test(a)) return 세다("자기소개 서두"), false;
   if (a.trim().endsWith("?")) return 세다("되물음"), false;
   if (/준비했습니다|승인해 주세요|결재판|확인하고 승인/.test(a)) return 세다("결재판"), false;
   if (/차단했습니다|프롬프트 인젝션/.test(a)) return 세다("가드레일"), false;
@@ -56,7 +70,7 @@ for (const r of rows) {
   if (!좋은가(q, a)) continue;
   const 열쇠 = q.replace(/\s+/g, " ").toLowerCase();
   const 기존 = 고른것.get(열쇠);
-  if (!기존 || a.length > 기존.answer.length) 고른것.set(열쇠, { id: r.id, question: q, answer: a });
+  if (!기존 || a.length > 기존.answer.length) 고른것.set(열쇠, { id: r.id, question: q, answer: a, rating: r.rating });
 }
 const 최종 = [...고른것.values()].slice(0, CAP);
 
@@ -74,7 +88,7 @@ if (!APPLY) {
   process.exit(0);
 }
 
-const now = Date.now();
+const 재검토 = 최종.filter((s) => s.rating === -1).length;
 const rate = db.prepare("UPDATE chat_logs SET rating = 1 WHERE id = ?");
 const tx = db.transaction(() => { for (const s of 최종) rate.run(s.id); });
 tx();
@@ -87,7 +101,7 @@ try {
   const { recordAudit } = require(path.resolve("dist/engine/audit.js"));
   recordAudit({
     kind: "write", action: "learnloop_rate_batch", target: dsId,
-    detail: `LoRA 재료 승인 배치 — 주제 ${TOPIC} ${최종.length}건 승인(기준: 개념·절차형만, 상태 나열·폴백·결재판 제외), 데이터셋 ${dsId}`,
+    detail: `LoRA 재료 승인 배치 — 주제 ${TOPIC} ${최종.length}건 승인(그중 예전 일괄 부정의 재검토 ${재검토}건 — 명백히 옳은 답이 -1로 남아 있어 일괄 처리로 판정). 기준: 개념·절차형만, 상태 나열·폴백·결재판·합성 프롬프트 제외. 데이터셋 ${dsId}`,
     actor: "claude(위임 승인 배치)",
   });
 } catch (e) { console.warn("감사 기록 실패(승인 자체는 완료):", e?.message); }
