@@ -37,3 +37,17 @@ describe("[54] 컴플라이언스 부정형 — compliance_status 결정화", ()
     expect(forcedToolFor("컴플라이언스 현황 요약해줘", {})?.tool).toBe("compliance_status");
   });
 });
+
+describe("2026-08-08 새벽 — 150상황 2회차가 잡은 두 결함", () => {
+  it("★ 자모 앞말 「ㅇㅇ 취약점 정리해줘」 — 조회로 간다(쓰기 결재판 오라우팅 31초의 수리)", async () => {
+    const { forcedToolFor } = await import("../src/engine/agentloop");
+    expect(forcedToolFor("ㅇㅇ 취약점 정리해줘", {})?.tool).toBe("search");
+  });
+  it("★ 「아까 그거 다시」 — 대명사 관문이 잡는다(모델 7자 단답의 수리)", async () => {
+    const { 대명사뿐인가 } = await import("../src/engine/agentloop");
+    expect(대명사뿐인가("아까 그거 다시")).toBe(true);
+    expect(대명사뿐인가("아까 그거 다시 보여줘")).toBe(true);
+    // 실제 내용이 있으면 안 잡는다 — 「아까 올린 문서 다시 보여줘」는 문서 조회로 가야 한다
+    expect(대명사뿐인가("아까 올린 문서 다시 보여줘")).toBe(false);
+  });
+});
