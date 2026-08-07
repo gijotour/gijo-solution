@@ -119,7 +119,10 @@ async function defaultDeps(): Promise<HandoverDeps> {
         maxTokens: 120,
       }),
     ask: async (q) => {
-      const r = await dispatchInstruction(q);
+      // qa:true — 기계가 만든 검증 질문이다. 작업 세션·협업 피드·학습 수집에 남기지 않는다.
+      // (예전엔 무표식이라 검증 1회마다 작업 세션이 생기고, 수집을 출구로 옮긴 2026-08-07부터는
+      //  기계 문답이 학습 후보함까지 오염시킬 뻔했다. 답 경로 자체는 실사용과 동일하다.)
+      const r = await dispatchInstruction(q, undefined, undefined, "인수인계-자동검증", true);
       return { output: r.output, sources: r.sources };
     },
   };

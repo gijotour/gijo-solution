@@ -18,6 +18,7 @@ import { emitCollaboration } from "./collaboration";
 import { 모델스캔, StandardFinding } from "./bridge";
 import { chat } from "./llm";
 import { isNonLearningAccount } from "./learnpolicy";
+import { recordChatLog } from "./learnloop";
 import type { Viewer } from "./memory";
 import { runAgentLoop, AgentToolCall, 가리킬것없는대명사, 가리킨자산이없나, 대명사뿐인가, 대명사확인, 되물음, 자산되물음 } from "./agentloop";
 import { executeApprovedTool, findAgentTool, buildApproval, PendingApproval } from "./agenttools";
@@ -298,7 +299,8 @@ async function executeRoutedAction(route: RoutedIntent, instructionText: string,
       const message = contextText ? `${contextText}
 
 [현재 지시] ${instructionText}` : instructionText;
-      return { output: await chat({ agentId: route.agentId, message, remember: true, trusted: true, explain: true, screen, qa, noLearn, viewer, logQuestion: instructionText }) };
+      // noLearn:true — 수집은 dispatchInstructionScoped 출구 한 곳에서 한다(이중 기록 방지).
+      return { output: await chat({ agentId: route.agentId, message, remember: true, trusted: true, explain: true, screen, qa, noLearn: true, viewer, logQuestion: instructionText }) };
     }
     case "analyze":
     case "chat":
@@ -309,7 +311,8 @@ async function executeRoutedAction(route: RoutedIntent, instructionText: string,
       // trusted: 지시문은 dispatchInstructionCore에서 이미 관문을 지났다(이중 집계 방지).
       // explain: 지휘 콘솔에 그대로 표시되는 답변이다.
       reportProgress("write", "사내 근거를 찾아 답을 쓰고 있습니다"); // chat 내부에서 RAG 검색+작성이 함께 돈다
-      return { output: await chat({ agentId: route.agentId, message, remember: true, trusted: true, explain: true, screen, qa, noLearn, viewer, logQuestion: instructionText }) };
+      // noLearn:true — 수집은 dispatchInstructionScoped 출구 한 곳에서 한다(이중 기록 방지).
+      return { output: await chat({ agentId: route.agentId, message, remember: true, trusted: true, explain: true, screen, qa, noLearn: true, viewer, logQuestion: instructionText }) };
     }
   }
 }
@@ -393,7 +396,8 @@ async function runOrchestration(instructionText: string, steps: OrchestrationSte
       } else if (step.action === "analyze") {
         output = accumulated.length
           ? (await analyzeFindings(accumulated)).summary
-          : await chat({ agentId: "analysis", message: instructionText, remember: true, trusted: true, qa });
+          // noLearn:true — 수집은 dispatchInstructionScoped 출구 한 곳에서 한다(이중 기록 방지).
+          : await chat({ agentId: "analysis", message: instructionText, remember: true, trusted: true, qa, noLearn: true });
       } else {
         // report — 앞 단계에서 스캔한 자산이 있으면 그 범위로, 없으면 전체로 보고서를 만든다.
         const scoped = scannedAssetIds.size ? [...scannedAssetIds] : undefined;
@@ -570,6 +574,15 @@ async function dispatchInstructionScoped(instructionText: string, sessionId?: st
   }
   const core = await dispatchInstructionCore(instructionText, contextText, screen, actor, undefined, noLearn, viewer);
   const result: DispatchResult = { ...core, ...(await computeOfferSignals(core, instructionText, screen)) };
+  // 헤르메스 학습 루프 ① 수집 — **대화창 출구 한 곳**에서 남긴다(2026-08-07).
+  // 예전에는 chat() 내부(remember:true)에서만 수집해, 코드가 만든 즉답·도구 답·에이전트 루프 답이
+  // 전부 빠졌다 — 즉답 전환을 늘릴수록 수집이 말라 가는 구조였다(실측: 반나절 유입 1건).
+  // 갈래마다 수집을 심으면 새 갈래가 생길 때마다 또 샌다 — 출구 하나면 어떤 갈래든 걸린다.
+  // ⚠ 결재판·확인 대기는 남기지 않는다 — 끝난 대화가 아니다(승인 뒤 실행 결과가 진짜 답).
+  // ⚠ executeRoutedAction의 chat() 호출은 noLearn:true로 내부 수집을 껐다 — 이중 기록 방지.
+  if (!noLearn && result.output && !result.approval && !result.confirm) {
+    recordChatLog(result.route?.agentId ?? "orchestrator", 기록문, result.output);
+  }
   if (session) {
     appendTurn(session.id, "assistant", result.output, turnToolTag(result));
     collab(qa, { from: "orchestrator", to: "세션", message: `💬 [${title}] ${result.output.slice(0, 600)}` });

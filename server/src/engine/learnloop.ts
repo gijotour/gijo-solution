@@ -1,7 +1,7 @@
 // engine/learnloop.ts — 헤르메스 폐쇄형 학습 루프 (수집 → 정제 → 학습 → 배포)
 //
 // 사용 데이터가 폐쇄망 밖으로 나가지 않는 자가학습 사이클의 오케스트레이터:
-//  ① 수집: llm.ts chat()의 remember:true 경로에서 실제 대화(질문/답변)를 chat_logs에 영속 저장.
+//  ① 수집: 대화창 출구(dispatcher) + 직접 채팅 API(llm.ts chat())에서 실제 대화(질문/답변)를 chat_logs에 영속 저장.
 //  ② 정제: 담당자가 👍/👎로 평가한 로그 중 긍정만 골라 데이터셋(data/datasets/loop-*.json)으로.
 //  ③ 학습: finetune.ts(QLoRA, Unsloth)에 설정된 베이스 모델(기본 Hermes 3)을 주입해 실행.
 //  ④ 배포: 고아 스크립트였던 scripts/export_gguf.py를 호출해 LoRA→병합→GGUF→models/ 배치 후
@@ -300,8 +300,9 @@ export function 질문주제(question: string): string | null {
 }
 
 // ── ① 수집 ────────────────────────────────────────────────────────────
-// llm.ts chat()의 remember:true 경로에서 호출된다. 캡처 실패가 채팅 응답을 죽이면 안 되므로
-// 전체를 try/catch로 감싼다. autoCollect가 꺼져 있으면 조용히 무시.
+// 두 입구에서 호출된다(2026-08-07): ① 대화창 출구(dispatcher dispatchInstructionScoped) —
+// 즉답·도구 답·LLM 답 가리지 않고 한 곳에서 / ② 직접 채팅 API(llm.ts chat() remember:true).
+// 캡처 실패가 채팅 응답을 죽이면 안 되므로 전체를 try/catch로 감싼다. autoCollect가 꺼져 있으면 조용히 무시.
 export function recordChatLog(agentId: string, question: string, answer: string): void {
   try {
     if (!getLearnloopConfig().autoCollect) return;

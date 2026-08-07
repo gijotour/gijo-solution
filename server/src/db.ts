@@ -221,7 +221,7 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_maintenance_events_itemId ON maintenance_events(itemId);
 
   -- 헤르메스 폐쇄형 학습 루프(engine/learnloop.ts) ① 수집: 실제 대화(질문/답변)를 영속 저장.
-  -- llm.ts chat()의 remember:true 경로에서만 기록한다. rating: NULL=미평가, 1=긍정(학습 채택),
+  -- 대화창 출구(dispatcher)와 직접 채팅 API(llm.ts chat())에서 기록한다. rating: NULL=미평가, 1=긍정(학습 채택),
   -- -1=부정(제외). usedInDataset: 데이터셋으로 이미 내보낸 로그는 재사용하지 않는다.
   CREATE TABLE IF NOT EXISTS chat_logs (
     id TEXT PRIMARY KEY,
