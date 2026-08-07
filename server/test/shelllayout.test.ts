@@ -52,4 +52,16 @@ describe("셸 뼈대 — 상단·하단 고정 바", () => {
   it("탭줄에 정보 자리(#tbInfo)가 있다 — 시계·서버상태·세션이 셸 한 곳에 모인 자리", () => {
     expect(APP).toContain('id="tbInfo"');
   });
+
+  // 2026-08-07 사본 23개 삭제. 한 화면에라도 헤더 사본이 되살아나면 문구·시계가 다시 갈라진다
+  // (실측: 삭제 전 이미 "연결 확인 중"/"운영중"/하드코딩 아바타로 갈라져 있었다).
+  it("화면 파일에 헤더 사본이 없다 — 상단 바는 titlebar.js 한 곳", () => {
+    const pages = ["handover", "dashboard", "sessions", "sbom", "redteam", "learnloop", "threat",
+      "syslog", "memory", "inventory", "analysis", "hardening", "vulnscan", "products", "report",
+      "approvals", "compliance", "audit", "agent", "merge", "kpi", "terminal", "settings"];
+    for (const p of pages) {
+      const html = fs.readFileSync(path.resolve(__dirname, `../../client/src/renderer/pages/${p}.html`), "utf-8");
+      expect(html, `${p}.html에 헤더 사본이 되살아났다`).not.toContain('<div class="header">');
+    }
+  });
 });
