@@ -650,6 +650,18 @@ const TOOLS: AgentTool[] = [
     run: runKnowledgeStatus,
   },
   {
+    // 중복 문서 후보 — 제목 뿌리가 같은 문서를 묶어 **표시만** 한다(삭제는 결재판).
+    name: "doc_duplicates",
+    label: "중복 문서 확인",
+    domain: "knowledge",
+    write: false,
+    description:
+      '지식베이스에서 **제목이 겹치는 문서**(같은 자료를 이름만 바꿔 두 번 올린 후보)를 묶어 보여 준다. "중복된 문서 있어?", "겹치는 문서 정리해야 해?" 같은 물음에 쓴다. 표시만 하며 지우지 않는다 — 삭제는 결재판에서.',
+    params: [],
+    directAnswer: true,
+    run: async () => (await import("../docdupe.js")).duplicateDocsText(),
+  },
+  {
     // 오탐 패턴(해자 슬라이스 3) — 반복 오탐 판정을 묶어 **표시만** 한다. 자동 제외 금지.
     // (검토관 2026-08-07: 지식 번들 주석 아래에 끼어 있어 딴 도구로 읽혔다 — 제 주석을 단다.)
     name: "fp_patterns",

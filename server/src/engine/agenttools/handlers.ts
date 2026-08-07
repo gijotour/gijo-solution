@@ -252,6 +252,25 @@ export function runListAssets(args: Record<string, string> = {}): string {
 
   // ⚠ 조건을 받고도 안 거르면 **방화벽을 물었는데 전체 57건**이 나온다(2026-08-02 실측).
   const q = String(args.query ?? "").trim();
+
+  // 「최근에 추가된 자산」 — "최근"은 이름이 아니라 **시간 조건**이다(147상황 실측 2026-08-07:
+  // 이름 검색으로 흘러 "「최근」에 해당하는 것을 찾지 못했습니다"가 나갔다). 등록 시각으로 거른다.
+  if (/최근|새로\s*(추가|등록|들어온)|요즘\s*(추가|등록)/.test(q)) {
+    const 기준 = Date.now() - 30 * 24 * 3600000; // 최근 = 30일(자산 등록은 드문 일이라 넉넉히)
+    const 최근것 = all.filter((a) => a.registeredAt >= 기준).sort((a, b) => b.registeredAt - a.registeredAt);
+    if (!최근것.length) {
+      return `최근 30일 사이 새로 등록된 자산이 없습니다 (전체 ${all.length}개는 그 전에 등록됨).\n` +
+        `${표식.다음} 전체를 보시려면 "자산 목록 보여줘"`;
+    }
+    const 보일 = 최근것.slice(0, 15);
+    return [
+      `최근 30일 새로 등록된 자산 **${최근것.length}개**` + (최근것.length > 보일.length ? ` — 아래는 ${보일.length}개` : ""),
+      ...보일.map((a) => `  - ${자산표시이름(a.id)} · ${koDateTimeString(a.registeredAt).slice(0, 10)} 등록${a.owner ? ` · 담당 ${a.owner}` : " · 담당 미지정"}`),
+      "",
+      `${표식.다음} 하나를 깊이 보시려면 "○○ 자산 취약점 알려줘"`,
+    ].join("\n");
+  }
+
   const tokens = q ? queryTokens(q) : [];
   // 걸리는 조건은 자산이걸린이유() 하나가 정한다 — 통합 검색과 갈리면 같은 말에 다른 답이 나온다.
   const 이유 = new Map<string, string>();

@@ -1035,6 +1035,14 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }
     tool: "asset_coverage",
     args: { gap: "unscanned" },
   },
+  // [51] 「중복된 문서 있어?」 — 147상황 상비 질문인데 도구가 없어 모델이 근처 도구(새 문서
+  //   목록)를 골라 답하던 미비(2026-08-07 도구 신설과 함께 결정화). ⚠ 문서 낱말 필수 —
+  //   「중복된 자산」·「중복 로그인」은 다른 영토다.
+  {
+    re: /(중복|겹치)[^.\n]{0,6}문서[^.\n]{0,8}(있|없|찾|보여|알려|확인|정리)/,
+    tool: "doc_duplicates",
+    args: {},
+  },
 ];
 // 등록된 보안제품 이름을 콕 집어 "설명해줘"라고 물으면 그 제품의 사내 근거(매뉴얼·온톨로지)를
 // 모아 답한다. [2026-07-26 실사용] "Tenable Web App Scanning 주요기능 설명해줘"에 도구를 하나도
