@@ -1378,7 +1378,10 @@ export interface BulkMatch { assetId: string; key: string; label: string; }
 export function matchFindingsByFilter(filter: string): BulkMatch[] {
   const f = (filter ?? "").toLowerCase();
   let sel = prioritizedReviews(2000); // 전 자산 finding(오탐 제외), 우선순위순
-  if (/critical|크리티컬|심각/.test(f)) sel = sel.filter((r) => r.finding.severity === "critical");
+  // 「고위험」= critical+high 묶음(담당자 말버릇 — 파일럿 리허설 실측 2026-08-07: 이 낱말을
+  //   못 알아듣고 남은 키워드로 흘려 0건을 잡을 뻔했다. "고위험인데 미배정 배정해줘"가 그 꼴).
+  if (/고위험|위험\s*높은?/.test(f)) sel = sel.filter((r) => r.finding.severity === "critical" || r.finding.severity === "high");
+  else if (/critical|크리티컬|심각/.test(f)) sel = sel.filter((r) => r.finding.severity === "critical");
   else if (/high|높/.test(f)) sel = sel.filter((r) => r.finding.severity === "high");
   else if (/medium|중간/.test(f)) sel = sel.filter((r) => r.finding.severity === "medium");
   else if (/\blow\b|낮/.test(f)) sel = sel.filter((r) => r.finding.severity === "low");
@@ -1386,7 +1389,7 @@ export function matchFindingsByFilter(filter: string): BulkMatch[] {
   if (/미배정|담당\s*없|미지정/.test(f)) sel = sel.filter((r) => !r.assignee);
   if (/기한\s*초과|지연|overdue/.test(f)) sel = sel.filter((r) => r.overdue);
   // 남은 키워드(심각도·KEV·집합어 제거 후)로 유형·근거 매칭
-  const kw = f.replace(/critical|high|medium|low|크리티컬|심각|높은?|중간|낮은?|kev|실제\s*악용|악용|미배정|담당\s*없음?|미지정|기한\s*초과|지연|overdue|전부|모두|다|취약점|것들?|전체/g, "").trim();
+  const kw = f.replace(/critical|high|medium|low|크리티컬|심각|고위험|위험\s*높은?|높은?|중간|낮은?|kev|실제\s*악용|악용|미배정|담당\s*없음?|미지정|기한\s*초과|지연|overdue|전부|모두|다|취약점|것들?|전체/g, "").trim();
   if (kw.length >= 2) sel = sel.filter((r) => matches(`${r.finding.finding_type} ${r.finding.evidence}`, kw));
   return sel.map((r) => ({ assetId: r.assetId, key: r.findingKey, label: `[${심각도한글(r.finding.severity)}] ${r.finding.finding_type} @ ${r.assetName}` }));
 }

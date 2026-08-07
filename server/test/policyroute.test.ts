@@ -25,3 +25,18 @@ describe("사내 규정 조회 — 사내 문서로 못 박는다", () => {
     expect(사내규정질문("점검 기록 보여줘")).toBe(false);
   });
 });
+
+describe("조건 일괄 배정 — 조건·집합어·이름이 셋 다 있으면 결재판까지 결정적으로", () => {
+  it("★ 파일럿 리허설 문장이 bulk_update로 간다(조건·담당자 추출까지)", () => {
+    const r = forcedToolFor("고위험인데 미배정인 취약점 전부 담당자 김도희로 배정해줘");
+    expect(r?.tool).toBe("bulk_update");
+    expect(r?.args.filter).toBe("고위험 미배정");
+    expect(r?.args.assignee).toBe("김도희");
+  });
+
+  it("★★ 하나라도 빠지면 안 잡는다 — 잘못 일괄하면 4,800건을 엉뚱하게 쓴다", () => {
+    expect(forcedToolFor("가장 급한 취약점에 담당자 배정해줘")?.tool, "단건(집합어 없음)").not.toBe("bulk_update");
+    expect(forcedToolFor("전부 배정해줘")?.tool, "조건도 이름도 없음").not.toBe("bulk_update");
+    expect(forcedToolFor("고위험 취약점 전부 배정해줘")?.tool, "담당자 이름 없음 — 되물어야 한다").not.toBe("bulk_update");
+  });
+});

@@ -1141,6 +1141,25 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): { tool: s
     return { tool: "explain", args: { topic: instruction.replace(/\s*(알려|찾아|보여|확인)[^.\n]*$/, "").trim() || instruction } };
   }
 
+  // 조건 일괄 배정 — 「고위험인데 미배정인 취약점 **전부** 담당자 김도희로 배정해줘」.
+  //   파일럿 리허설 실측(2026-08-07): 조건·전부·이름을 다 말했는데 LLM이 **단건** 배정 도구를
+  //   골라 "자산 id가 필요합니다"라고 되물었다 — 담당자는 이미 다 말했다. 일괄 도구(bulk_update)가
+  //   있으니 조건을 뽑아 결재판까지 결정적으로 잇는다(실행은 여전히 승인 후).
+  //   ⚠ 좁게: 집합어(전부/모두/일괄) + 조건 토큰 + 담당자 이름이 **셋 다** 있을 때만.
+  if (available.has("bulk_update") && /전부|모두|모조리|일괄|다\s*배정/.test(instruction) && /배정|맡겨/.test(instruction)) {
+    const 토큰: string[] = [];
+    if (/고위험|위험\s*높/.test(instruction)) 토큰.push("고위험");
+    else if (/critical|크리티컬|매우\s*심각/i.test(instruction)) 토큰.push("critical");
+    else if (/high|높은/i.test(instruction)) 토큰.push("high");
+    if (/미배정|담당\s*없|미지정/.test(instruction)) 토큰.push("미배정");
+    if (/kev|실제\s*악용/i.test(instruction)) 토큰.push("kev");
+    if (/기한\s*초과|지연/.test(instruction)) 토큰.push("기한초과");
+    const 이름 = /담당자?\s*(?:를|을)?\s*([가-힣]{2,4})\s*(?:로|으로|한테|에게)/.exec(instruction)?.[1];
+    if (토큰.length && 이름) {
+      return { tool: "bulk_update", args: { filter: 토큰.join(" "), assignee: 이름 } };
+    }
+  }
+
   // "가장 급한 취약점 담당자·기한 배정해줘"처럼 배정/지정 지시면 우선순위 조회(today)로 못박지 않는다
   // — LLM이 assign_finding(쓰기)을 고르도록 둔다(실측: today 강제가 배정 명령까지 흡수했었음).
   const isAssign = /배정|담당자\s*(를|을|.{0,2})?(지정|정해|배치|맡|줘|넣)|기한\s*(을|를)?\s*(지정|정해|설정|잡)|맡겨|배치해줘/.test(instruction);
