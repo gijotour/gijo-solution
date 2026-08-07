@@ -657,7 +657,11 @@ async function runClient() {
     if (!문서함.있나) throw new Error(`문서함(📚)이 사용자 이름 옆에도 없다: ${문서함.글}`);
     if (!m.fav) throw new Error("⭐즐겨찾기 가지가 안 보인다 — 비어 있어도 보여야 한다");
     if (!(m.starOpacity > 0.15)) throw new Error(`☆가 마우스 없이는 안 보인다(opacity ${m.starOpacity}) — 즐겨찾기를 발견할 수 없다`);
-    if (m.total < 28) throw new Error(`항목 ${m.total}개 — 허브가 덜 풀렸다`);
+    // 하한 27(2026-08-08): 「모델 합치기」를 메뉴에서 내렸다(사용자 결정 "머지·추천은 접는다"
+    //   — 화면·기록은 보존, 저장된 탭·직접 주소로는 열림). 28→27은 의도한 감소다.
+    //   ⚠ 하한을 또 내릴 일이 생기면 먼저 "지운 게 맞나"부터 물을 것 — 이 검사의 본래 몫이다.
+    if (m.total < 27) throw new Error(`항목 ${m.total}개 — 허브가 덜 풀렸다(의도한 제거인지 확인)`);
+    if (m.all.some((x) => x.includes("모델 합치기"))) throw new Error("내린 「모델 합치기」가 메뉴에 되살아났다");
     // 허브 안에서만 통하던 짧은 이름이 남으면 밖에서 무엇의 '통합 뷰'인지 알 수 없다.
     for (const bad of ["통합 뷰", "등록부", "유지보수"]) if (m.all.includes(bad)) throw new Error(`홀로 못 서는 이름 남음: ${bad}`);
     // 없앤 화면이 메뉴에 남아 있으면 눌러도 죽는다.
