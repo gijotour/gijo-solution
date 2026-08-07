@@ -147,18 +147,7 @@
 <!-- 표준 상단바(2026-08-06 사용자 지시 "조치승인처럼 상단바 전체 통일") — 대시보드만 이 바가
      없어 탭마다 위가 달랐다. 뼈대는 다른 25화면과 같고, 시계·세션칩·조작줄은 titlebar.js가
      .header를 찾아 채운다(대시보드에 .header가 없어서 그동안 아무것도 못 붙었던 것). -->
-<div class="header">
-  <div class="header-left">
-    <span style="display:flex;align-items:center;gap:12px"><img src="gijo-wordmark.svg" alt="GIJO">
-    <div class="app-title">GIJO AS</div></span>
-    <div class="clock" id="clockEl">-</div>
-  </div>
-  <div class="header-right">
-    <div class="status-pill" id="statusPill"><span class="dot"></span>연결 확인 중<span class="beta-tag">LIVE</span></div>
-    <div class="avatar-btn" id="avatarBtn">-</div>
-    <div class="icon-btn" id="settingsBtn">⚙</div>
-  </div>
-</div>
+<!-- 상단 바는 공용이다 — titlebar.js가 그린다(분리창=공용 헤더, 탭 안=셸 탭줄). 화면마다 두던 사본 23개를 지웠다(2026-08-07). -->
 
 <div class="app">
   <div class="sidebar" id="gijoNav"></div>

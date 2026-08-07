@@ -68,6 +68,15 @@
     ".gtb-mx{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:#a49d95;font-size:12.5px;cursor:pointer;flex:0 0 auto;}",
     ".gtb-mx:hover{background:rgba(226,72,61,.16);color:#f5928a;}",
 
+    // 공용 헤더(2026-08-07) — 화면마다 두던 .header 사본 23개를 지우고 여기서 하나로 그린다.
+    ".header.gtb-made{display:flex;align-items:center;justify-content:space-between;min-height:" + BAR_H + "px;",
+    "border-bottom:1px solid var(--border,rgba(255,255,255,.08));}",
+    ".gtb-made .header-right{display:flex;align-items:center;gap:9px;padding-right:6px;-webkit-app-region:no-drag;}",
+    ".gtb-made .gtb-clock{font-size:12.25px;color:var(--muted,#b3ada4);white-space:nowrap;}",
+    ".gtb-made .gtb-status{display:flex;align-items:center;gap:5px;font-size:12px;font-weight:800;color:var(--teal,#1eb980);",
+    "background:rgba(30,185,128,.14);border:1px solid rgba(30,185,128,.4);padding:3px 10px;border-radius:16px;white-space:nowrap;}",
+    ".gtb-made .gtb-status .dot{width:6px;height:6px;border-radius:50%;background:currentColor;}",
+
     // ── 상단 조작 줄 (2026-08-02) ────────────────────────────────────────
     // 흩어져 있던 조작 셋(설정=사이드바 맨 아래 / 접기=화면 한가운데 딱지 / 찾기=사이드바 맨 위)을
     // 한 줄로 모으고 뒤로·앞으로를 더한다. 상단은 **메뉴를 접어도 남는 유일한 자리**다.
@@ -443,7 +452,7 @@
     // 순서 통일(2026-07-26): 대시보드와 동일하게 [서버 연결상태] → [세션] 순으로 놓는다.
     // 연결상태 칩 바로 뒤에 붙이고, 없으면 우측 영역 끝에.
     var right = hdr.querySelector(".header-right") || hdr;
-    var statusPill = hdr.querySelector("#statusPill, .status-pill, .tb-status");
+    var statusPill = hdr.querySelector("#statusPill, .status-pill, .tb-status, .gtb-status");
     sessChip = document.createElement("div");
     sessChip.className = "gtb-sess";
     sessChip.title = "남은 세션 시간 — 마우스·키보드를 쓰면 자동 연장. 클릭하면 연장/관제 선택";
@@ -744,15 +753,13 @@
     return true;
   }
 
-  // ── 셸 탭줄 오른쪽 정보(시계·서버상태) — 2026-08-07 상단 통합 ─────────────
+  // ── 시계·서버상태 쌍 — 셸 탭줄(#tbInfo)과 공용 헤더가 **같은 코드**로 그린다 ──
   // 예전에는 화면(iframe)마다 자기 시계·상태를 갖고 있었는데 탭 안에서는 헤더가 숨어 안 보였고,
-  // 문구조차 화면마다 갈랐다("서버 연결상태 양호" vs "운영중"). 셸 한 곳에서만 그린다.
+  // 문구조차 화면마다 갈랐다("서버 연결상태 양호" vs "운영중"). 이제 여기 한 곳이다.
   // 문구는 대시보드와 같게 — 「서버 연결상태 양호/불량」(2026-08-06 통일 문구).
-  function mountShellInfo() {
-    var host = document.getElementById("tbInfo");
-    if (!host || host.querySelector(".tb-clock")) return;
+  function 정보채우기(host, clockCls, statusCls) {
     var clock = document.createElement("span");
-    clock.className = "tb-clock";
+    clock.className = clockCls;
     var tick = function () {
       clock.textContent = new Date().toLocaleString("ko-KR", {
         hour: "2-digit", minute: "2-digit", hour12: true, year: "numeric", month: "2-digit", day: "2-digit",
@@ -762,7 +769,7 @@
     host.appendChild(clock);
 
     var pill = document.createElement("span");
-    pill.className = "tb-status";
+    pill.className = statusCls;
     pill.innerHTML = '<span class="dot"></span>연결 확인 중';
     host.appendChild(pill);
     var probe = async function () {
@@ -775,6 +782,29 @@
     };
     if (authed && window.gijo && window.gijo.checkServerHealth) { probe(); setInterval(probe, 30000); }
     else pill.style.display = "none";
+  }
+
+  function mountShellInfo() {
+    var host = document.getElementById("tbInfo");
+    if (!host || host.querySelector(".tb-clock")) return;
+    정보채우기(host, "tb-clock", "tb-status");
+  }
+
+  // ── 공용 헤더 — 화면마다 두던 .header 사본 23개를 끝냈다(2026-08-07 시안 원안 완성) ──
+  // 실측으로 정리한 사실: ① 화면 헤더는 분리창에서만 보였는데 **분리창은 OS 타이틀바가 있는
+  // 일반 창**이라(드래그·닫기 존재) 헤더는 순수 장식이었고, 시계·상태는 셸 한 곳에 이미 있다 —
+  // 그래서 분리창에는 **아예 만들지 않는다**(밀도 원칙: 그 창의 존재 이유가 내용을 크게 보기다).
+  // ② titlebar.js를 로드하는 최상위 화면(대시보드·조치승인 등)을 **직접 문서로** 열었을 때만
+  // 여기서 하나 만들어 조작줄·시계·상태가 붙을 자리를 준다. 셸·embed·login은 해당 없다.
+  function ensureHeader() {
+    if (셸인가 || document.querySelector(".header")) return;
+    if (/(^|[?&])popout=1(&|$)/.test(location.search)) return; // 분리창 — OS 타이틀바로 충분
+    if (!document.getElementById("gijoNav") && !document.querySelector(".app, .explorer")) return; // login 등
+    var h = document.createElement("div");
+    h.className = "header gtb-made";
+    h.innerHTML = '<div class="header-left"></div><div class="header-right"></div>';
+    document.body.insertBefore(h, document.body.firstChild);
+    정보채우기(h.querySelector(".header-right"), "gtb-clock", "gtb-status");
   }
 
   // 단축키 — 안내한 것은 반드시 걸려 있어야 한다(안내만 하고 안 걸어 둔 전례가 있다).
@@ -827,8 +857,11 @@
 
   // 별도 창(팀 사무실·문서함·대화창)에는 왼쪽 패널이 없다 — 그래도 상단 조작 줄은 붙인다
   // (▣만 빠지고 ☰·🔍·←·→는 그대로 쓴다). 셸은 탭줄에, 그 밖은 .header에 마운트.
+  // 화면 파일에는 이제 .header가 없다(사본 23개 삭제) — 분리창·직접 연 화면은 여기서 만든다.
+  ensureHeader();
   if (셸인가 || document.querySelector(".header")) mountTopbar();
-  if (셸인가) { mountShellInfo(); mountSessChip(); }
+  if (셸인가) mountShellInfo();
+  if (셸인가 || document.querySelector(".header.gtb-made")) mountSessChip();
 
   var navRoot = document.getElementById("gijoNav");
   if (navRoot || document.querySelector(".explorer")) {

@@ -221,18 +221,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 <!-- data-screen: 공용 CSS가 "이 화면은 폼이다"를 알아보는 표식(2026-08-01). 없으면 폭 규칙이 안 걸린다. -->
 <body data-screen="settings">
 
-<div class="header">
-  <div class="header-left">
-    <span id="homeLink" data-page="dashboard.html" title="대시보드로 이동" style="display:flex;align-items:center;gap:12px;cursor:pointer"><img src="gijo-wordmark.svg" alt="GIJO">
-    <div class="app-title">GIJO AS</div></span>
-    <div class="clock" id="clockEl">-</div>
-  </div>
-  <div class="header-right">
-    <div class="status-pill" id="statusPill"><span class="dot"></span>연결 확인 중<span class="beta-tag">LIVE</span></div>
-    <div class="avatar-btn" id="avatarBtn">-</div>
-    <div class="icon-btn" id="settingsBtn">⚙</div>
-  </div>
-</div>
+<!-- 상단 바는 공용이다 — titlebar.js가 그린다(분리창=공용 헤더, 탭 안=셸 탭줄). 화면마다 두던 사본 23개를 지웠다(2026-08-07). -->
 
 <div class="app">
   <div class="sidebar" id="gijoNav"></div>
