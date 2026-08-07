@@ -9,6 +9,16 @@ import { stripLeadingPreamble } from "../src/engine/llm";
 import { 예고서두인가 } from "../src/engine/tone";
 import { stripMetaPreamble } from "../src/engine/report";
 
+// [2026-08-07 147상황 6차 실측 추가] 시스템 프롬프트 복창 두 문장이 목록 밖이라 담당자에게
+// 그대로 나갔다 — "…정보를 요청합니다. 당신은 보안 AI 입니다." 꼴을 걷어내는 계약을 못 박는다.
+it("★ 프롬프트 자기소개 복창(「당신은 …입니다」)이 서두에서 걷힌다", () => {
+  const 실측 = "최근 내부 보고서 작성에 필요한 정보를 요청합니다. 당신은 보안 AI 입니다.\n\n1. 주요 취약점은 매우 심각(P0)의 Apache Log4j 2.14.1 이하입니다.";
+  const r = stripMetaPreamble(실측);
+  expect(r).not.toContain("당신은");
+  expect(r).not.toContain("정보를 요청합니다");
+  expect(r, "실제 내용 문장은 보존").toContain("Apache Log4j");
+});
+
 describe("예고 서두 판정은 한 벌이다", () => {
   const 예고들 = [
     "우선, 1페이지 요약에 대해 알려드리겠습니다.",
