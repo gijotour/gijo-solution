@@ -93,6 +93,7 @@ describe("반입 소식 2차 — 스스로 알린다(2026-08-06)", () => {
   // 협업 독으로 흐르는 알림을 붙잡는다(emitCollaboration은 WebSocket으로 나가므로 여기서 가로챈다).
   const 흐른것: string[] = [];
   beforeEach(async () => {
+    await (await import("../src/engine/docdigest")).알림창닫기(); // 앞선 시험의 잔여 창 비우기
     흐른것.length = 0;
     const col = await import("../src/engine/collaboration");
     vi.spyOn(col, "emitCollaboration").mockImplementation((e) => { 흐른것.push(e.message); });
@@ -102,6 +103,7 @@ describe("반입 소식 2차 — 스스로 알린다(2026-08-06)", () => {
     putDoc("QA소식-알림.pdf", 0);
     vi.mocked(chat).mockResolvedValue("첫 줄입니다. 둘째 줄입니다. 셋째 줄입니다.");
     await makeDigest("QA소식-알림.pdf", "본문", "위협대응");
+    await (await import("../src/engine/docdigest")).알림창닫기(); // 도배 방지 창(60초)을 지금 닫는다
     const 알림 = 흐른것.find((m) => m.includes("QA소식-알림.pdf"));
     expect(알림, "요약을 끝내고도 아무도 모른다").toBeTruthy();
     expect(알림!).toContain("요약 완료");
@@ -111,6 +113,7 @@ describe("반입 소식 2차 — 스스로 알린다(2026-08-06)", () => {
     putDoc("QA소식-알림실패.pdf", 0);
     vi.mocked(chat).mockRejectedValue(new Error("모델 꺼짐"));
     await makeDigest("QA소식-알림실패.pdf", "본문", "일반");
+    await (await import("../src/engine/docdigest")).알림창닫기();
     const 알림 = 흐른것.find((m) => m.includes("QA소식-알림실패.pdf"));
     expect(알림!).toContain("요약은 만들지 못했습니다");
   });

@@ -51,6 +51,19 @@ describe("라우팅 [51]", () => {
   });
 });
 
+describe("반입 알림 묶음 — 폴더째 반입이 협업 독을 도배하지 않는다(30건 스트레스 실측)", () => {
+  it("★ 여러 건은 한 줄로, 단건은 예전 문구 그대로", async () => {
+    const { 반입알림문구 } = await import("../src/engine/docdigest");
+    const 여럿 = 반입알림문구({ 성공: 28, 실패: 2, 접점: 5, 첫문서: "a.pdf", 첫실패사유: "모델 다운" });
+    expect(여럿).toContain("30건");
+    expect(여럿).toContain("요약 실패 2건");
+    expect(여럿, "낱개 문서명 나열 금지 — 그게 도배다").not.toContain("a.pdf");
+    const 단건 = 반입알림문구({ 성공: 1, 실패: 0, 접점: 2, 첫문서: "CrowdStrike_보고서.pdf", 첫실패사유: null });
+    expect(단건).toContain("「CrowdStrike_보고서.pdf」");
+    expect(단건).toContain("접점 2건");
+  });
+});
+
 describe("라우팅 [52] — 최근 추가 자산은 자산 도구로(문서 소식이 뺏던 실측)", () => {
   it("자산 낱말이 있으면 list_assets, 문서 질문은 그대로 문서 소식", () => {
     const r = forcedToolFor("최근에 추가된 자산 뭐야?");

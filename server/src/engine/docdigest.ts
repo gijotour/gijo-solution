@@ -126,18 +126,49 @@ export async function makeDigest(documentId: string, raw: string, category?: str
   // 알림이 아니다(CrowdStrike 실측: 요약이 30초 뒤에 나와 올린 사람이 그걸 볼 방법이 없었다).
   // ⚠ 새 통로를 만들지 않는다 — 대화창 하단 협업 독이 이미 실시간으로 흐른다.
   //   리포트로도 만들지 않는다(요약은 대장에 있고, 리포트 목록을 어지럽히면 그게 잡음이다).
+  // ⚠ 문서마다 1줄이면 폴더째 반입(30건 스트레스 실측 2026-08-07)에서 협업 독이 30줄로
+  //   도배된다 — 60초 창에 합류해 한 줄로 말한다(단건이면 예전 문구 그대로).
+  알림합류(documentId, !!summary, matches.length, failedReason);
+}
+
+// ── 반입 알림 묶음 ───────────────────────────────────────────────────────────
+const 알림창MS = 60_000;
+let 알림묶음: { 성공: number; 실패: number; 접점: number; 첫문서: string; 첫실패사유: string | null } | null = null;
+let 알림타이머: ReturnType<typeof setTimeout> | null = null;
+
+/** 묶음 상태를 한 줄로 — 순수 함수(시험이 이것을 대조한다). */
+export function 반입알림문구(m: { 성공: number; 실패: number; 접점: number; 첫문서: string; 첫실패사유: string | null }): string {
+  const 전체 = m.성공 + m.실패;
+  if (전체 === 1) {
+    return m.성공
+      ? `새 문서 「${m.첫문서}」 요약 완료${m.접점 ? ` · 우리 지식과 접점 ${m.접점}건` : ""} — "새 문서 뭐 들어왔어?"로 볼 수 있습니다.`
+      : `새 문서 「${m.첫문서}」 들어옴 — 요약은 만들지 못했습니다(${(m.첫실패사유 ?? "사유 미상").slice(0, 40)}).`;
+  }
+  const 실패쪽 = m.실패 ? ` · 요약 실패 ${m.실패}건` : "";
+  const 접점쪽 = m.접점 ? ` · 우리 지식과 접점 ${m.접점}건` : "";
+  return `새 문서 ${전체}건 요약 완료${실패쪽}${접점쪽} — "새 문서 뭐 들어왔어?"로 볼 수 있습니다.`;
+}
+
+/** 열려 있는 창을 지금 닫아 흘려보낸다(시험도 이것을 쓴다 — 실타이머 60초를 기다리지 않게). */
+export async function 알림창닫기(): Promise<void> {
+  if (알림타이머) { clearTimeout(알림타이머); 알림타이머 = null; }
+  const m = 알림묶음;
+  알림묶음 = null;
+  if (!m) return;
   try {
     const { emitCollaboration } = await import("./collaboration.js");
-    const 접점수 = matches.length;
-    emitCollaboration({
-      from: "analyze",
-      to: "orchestrator",
-      // 줄 맨 앞 아이콘 금지(말투 규범 — 그 자리는 상태 표식 자리다). 협업 독도 같은 잣대로 본다.
-      message: summary
-        ? `새 문서 「${documentId}」 요약 완료${접점수 ? ` · 우리 지식과 접점 ${접점수}건` : ""} — "새 문서 뭐 들어왔어?"로 볼 수 있습니다.`
-        : `새 문서 「${documentId}」 들어옴 — 요약은 만들지 못했습니다(${(failedReason ?? "사유 미상").slice(0, 40)}).`,
-    });
+    // 줄 맨 앞 아이콘 금지(말투 규범 — 그 자리는 상태 표식 자리다). 협업 독도 같은 잣대로 본다.
+    emitCollaboration({ from: "analyze", to: "orchestrator", message: 반입알림문구(m) });
   } catch { /* 알림 실패가 소식 저장을 되돌리지 않는다 */ }
+}
+
+function 알림합류(documentId: string, 성공: boolean, 접점수: number, failedReason: string | null): void {
+  if (!알림묶음) 알림묶음 = { 성공: 0, 실패: 0, 접점: 0, 첫문서: documentId, 첫실패사유: null };
+  if (성공) 알림묶음.성공++; else { 알림묶음.실패++; 알림묶음.첫실패사유 ??= failedReason; }
+  알림묶음.접점 += 접점수;
+  if (알림타이머) return; // 창이 이미 열려 있다 — 닫힐 때 한 줄로 나간다
+  알림타이머 = setTimeout(() => { void 알림창닫기(); }, 알림창MS);
+  알림타이머.unref?.(); // 시험·종료 시 프로세스를 붙잡지 않는다
 }
 
 export interface RecentDoc {
