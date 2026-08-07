@@ -163,7 +163,11 @@ function 불편찾기(q, r) {
   if (부정.test(o)) 목.push({ 종류: "있는 기능을 없다고 함", 상세: o.slice(0, 70) });
   if (내부id.test(o)) 목.push({ 종류: "내부 식별자 노출", 상세: (o.match(내부id) || [""])[0] });
   if (영문상태.test(o)) 목.push({ 종류: "영문 상태값 노출", 상세: (o.match(영문상태) || [""])[0] });
-  if (r.ms > 30000) 목.push({ 종류: "너무 오래 걸림", 상세: Math.round(r.ms / 1000) + "초" });
+  // ⚠ wouldHandoff — **서버가 준 신호**다(qa는 리포트 전환 없이 끝까지 기다리므로, 사람
+  //   경로였다면 3초에 "리포트로 작성해 드리겠습니다"로 물러났을 답). 판별을 여기서 흉내 내지
+  //   않는다(보고서꼴 단일 소스). 담당자는 3초 + 완료 팝업을 겪으므로 30초 불편이 아니다 —
+  //   단, 감추지 않고 「리포트 전환」으로 따로 센다.
+  if (r.ms > 30000 && !r.wouldHandoff) 목.push({ 종류: "너무 오래 걸림", 상세: Math.round(r.ms / 1000) + "초" });
   if (o.length > 2000) 목.push({ 종류: "너무 긺", 상세: o.length + "자 — 읽지 않는다" });
   if (o.replace(/\s/g, "").length < 25 && !없음답.test(o)) 목.push({ 종류: "너무 짧음", 상세: o.length + "자" });
   // 숫자를 세어 주면서 갈 곳을 안 알려 주는 것 — 이 제품에서 반복된 결함
@@ -213,7 +217,7 @@ async function 물어보기(H, text, screen, sessionId) {
     if (status !== 200) {
       return { out: "", action: "HTTP" + status, ms: Date.now() - t0, err: "HTTP " + status };
     }
-    return { out: String(j.output ?? ""), action: j.route?.action ?? "?", ms: Date.now() - t0, sources: j.sources, picklist: !!j.picklist };
+    return { out: String(j.output ?? ""), action: j.route?.action ?? "?", ms: Date.now() - t0, sources: j.sources, picklist: !!j.picklist, wouldHandoff: !!j.wouldHandoff };
   } catch (e) {
     return { out: "", action: "ERROR", ms: Date.now() - t0, err: String(e).slice(0, 120) };
   }
@@ -242,7 +246,7 @@ for (let i = 0; i < 대상.length; i++) {
   const 남 = Math.round(((대상.length - i - 1) * 평균) / 60000);
   console.log(
     (불편.length ? "⚠" : "✓") + ` [${i + 1}/${대상.length}] ${c.q.slice(0, 30)}` +
-    ` (${(r.ms / 1000).toFixed(1)}s${불편.length ? " — " + 불편.map((x) => x.종류).join(", ") : ""})  ~${남}분`
+    ` (${(r.ms / 1000).toFixed(1)}s${r.wouldHandoff ? " · 리포트 전환" : ""}${불편.length ? " — " + 불편.map((x) => x.종류).join(", ") : ""})  ~${남}분`
   );
   if (i % 10 === 0 || i === 대상.length - 1) fs.writeFileSync(path.join(OUT, "ops-sim.json"), JSON.stringify(결과, null, 1), "utf8");
 }
@@ -259,6 +263,8 @@ for (const r of 결과) {
 }
 const 분 = Math.round((Date.now() - t0) / 60000);
 const 느린 = [...결과].sort((a, b) => b.ms - a.ms).slice(0, 8);
+// 리포트 전환 건 — 불편이 아니지만 **감추지 않는다**(사람 경로: 3초 안내 + 완료 팝업).
+const 전환건 = 결과.filter((r) => r.wouldHandoff);
 
 const md = [
   "# 보안담당자 하루 실전 — 운영 상황 " + 결과.length + "가지",
@@ -289,6 +295,17 @@ const md = [
   "|---:|---|---|",
   ...느린.map((r) => `| ${(r.ms / 1000).toFixed(1)} | ${r.마당.slice(0, 12)} | ${r.q} |`),
   "",
+  ...(전환건.length
+    ? ["### 리포트 전환 건 — 불편 아님, 그래도 감추지 않는다",
+       "",
+       "사람 경로는 **3초 안에 \"리포트로 작성해 드리겠습니다\"** + 완료 팝업(2026-08-07 보고서꼴 조기 전환).",
+       "qa 측정은 전환 없이 끝까지 기다려 실작성 시간이 그대로 찍힌다 — 서버 신호(wouldHandoff)로 구분한다.",
+       "",
+       "| 실작성 초 | 물음 |",
+       "|---:|---|",
+       ...전환건.map((r) => `| ${(r.ms / 1000).toFixed(1)} | ${r.q} |`),
+       ""]
+    : []),
   불편건.length ? "## 불편 목록 (전부)" : "## 불편 없음",
   "",
   ...(불편건.length

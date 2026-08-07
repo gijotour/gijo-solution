@@ -39,7 +39,7 @@ import { listFindingReviews } from "./approvals";
 import { listMaintenanceItems } from "./maintenance";
 import { ACTION_CHECK_RE, runActionCheck } from "./actioncheck";
 import { appendTurn, recentTurnsText, getSession, createSession } from "./worksessions";
-import { LONG_ANSWER_MS, QA_LONG_ANSWER_MS, startLongAnswer, finishLongAnswer, failLongAnswer } from "./longanswer";
+import { LONG_ANSWER_MS, QA_LONG_ANSWER_MS, REPORT_HANDOFF_MS, 보고서꼴, startLongAnswer, finishLongAnswer, failLongAnswer } from "./longanswer";
 import { runWithProgress, isValidProgressId, reportProgress, reportBigStep, registerProgressRoutes } from "./progress";
 import { recordAnswerTiming } from "./observability";
 import { 내부키치환 } from "./tone";
@@ -1172,7 +1172,9 @@ export function registerDispatcherRoutes(app: Express): void {
       //   그 문항은 '측정 못 함'으로 분모에서 빠졌다 — **그 자리에 결함이 숨어도 안 보인다**
       //   (실측 2026-07-31: 라우팅 축에서 2문항이 그렇게 빠졌다).
       //   무한정은 아니다. 매달린 요청이 게이트를 영영 멈추게 하면 안 되므로 상한을 둔다.
-      const limitMs = qa ? QA_LONG_ANSWER_MS : LONG_ANSWER_MS;
+      // 보고서꼴("보고서 만들어줘")은 3초만 기다린다(2026-08-07) — 리포트가 곧 요청물이라
+      // 리포트 저장+알림이 답을 깎는 게 아니다. 그 밖은 기존 30초 그대로.
+      const limitMs = qa ? QA_LONG_ANSWER_MS : 보고서꼴(text) ? REPORT_HANDOFF_MS : LONG_ANSWER_MS;
       const t0 = Date.now(); // 느린 답 원장(관측성) — 담당자를 기다리게 한 질문을 제품이 스스로 적는다
       const work = runWithProgress(progressId, user?.id ?? null, () =>
         dispatchInstruction(text, sessionId, screen, user?.displayName, qa, isNonLearningAccount(user?.username), { userId: user?.id, clearance: user?.clearance, role: user?.role })
@@ -1191,6 +1193,12 @@ export function registerDispatcherRoutes(app: Express): void {
         // ⚠ 막지 않는다. 기록만 하고 답은 그대로 보낸다(tonewatch.ts 머리말 참고).
         //   오탐 하나로 답이 통째로 막히면 놓치는 것보다 나쁘다.
         말투재기(text, String(답.output ?? ""));
+        // qa 측정용 신호 — qa는 전환 없이 끝까지 기다리므로, **사람 경로였다면 리포트로
+        // 물러났을 답**임을 판정기에 알려 준다(판별은 보고서꼴 한 곳 — 판정기가 따로 흉내 내면
+        // 두 판별이 어긋난다). 사람 응답에는 안 실린다.
+        if (qa && 보고서꼴(text) && Date.now() - t0 > REPORT_HANDOFF_MS) {
+          (first as { wouldHandoff?: boolean }).wouldHandoff = true;
+        }
         res.json(first);
         return;
       }
