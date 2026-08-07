@@ -479,11 +479,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div id="hfJobs" style="font-size:12px;margin-top:8px"></div>
     </div>
 
-    <!-- 추천 모델 목록 — llmguide.html 화면을 통째로 이관(2026-07-28).
-         "무엇을 받을지 모르겠다"는 물음의 답이 받는 자리에서 바로 보여야 한다. -->
-    <div data-sec="ai" class="panel" data-gijo-fold="추천 모델 목록">
-      <div class="panel-title">추천 모델 목록</div>
-      <div id="llmGuide"><div style="color:var(--muted);font-size:12px">불러오는 중...</div></div>
+    <!-- 모델 안내 — 추천 카탈로그를 표준 안내 두 줄로 단순화(2026-08-08 사용자 결정
+         "머지·추천은 접는다"). 카탈로그는 추천 모델이 서버에 없는 죽은 안내를 낸 전례가 있고,
+         기준 모델을 정한 지금 "무엇을 받을까" 고민을 고객에게 시킬 이유가 없다. -->
+    <div data-sec="ai" class="panel" data-gijo-fold="모델 안내">
+      <div class="panel-title">모델 안내</div>
+      <div id="llmGuide" style="font-size:12.5px;color:var(--muted);line-height:1.8">
+        <b style="color:var(--text)">기준 모델은 qwen3-14b 하나입니다</b> — 라우팅·안전·한국어 평가를 통과해 채택됐고, 역할 전문화는 학습 루프의 어댑터가 맡습니다.<br>
+        조직이 승인한 다른 모델을 쓰시려면 위 「모델 검색 · 받기」로 반입하세요 — 자동 적응(생각 모드·컨텍스트 맞춤)이 받쳐 줍니다.
+      </div>
     </div>
 
     <!-- 에이전트 모델 배정 — AI 팀 화면에서 이관(2026-07-28, 설정 통합 ③단계).
@@ -1621,7 +1625,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   // 받기는 서버 백그라운드 큐가 처리한다 — 이 화면을 떠나도 계속되고, 돌아오면 이어서 보여준다.
   const dirNameOf = (id) => id.replace(/\//g, "__");
   const hfJobs = new Map();
-  let recByModel = {};
 
   function renderHfJobs() {
     const el = document.getElementById("hfJobs");
@@ -1688,53 +1691,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     }
   }
 
-  function modelCardHtml(m, installed) {
-    const tag = m.tag ? `<span class="mc-tag">${esc(m.tag)}</span>` : "";
-    const foot = installed
-      ? `<span class="mc-gb">${esc(m.approxGb)}</span><span class="mc-installed">✓ 설치됨</span>`
-      : `<span class="mc-gb">${esc(m.approxGb)}</span><button class="mc-dl" data-load="${esc(m.id)}">받기</button>`;
-    const agents = recByModel[m.id];
-    const agentsRow = agents && agents.length
-      ? `<div class="mc-agents"><span class="mc-agents-label">🤖 추천 에이전트</span>${agents.map((n) => `<span class="mc-agent">${esc(n)}</span>`).join("")}</div>`
-      : "";
-    return `<div class="model-card" data-dir="${esc(dirNameOf(m.id))}">` +
-      `<div class="mc-top"><span class="mc-name">${esc(m.name)}</span><span class="mc-size">${esc(m.size)}</span>${tag}</div>` +
-      `<div class="mc-desc">${esc(m.desc)}</div>` + agentsRow +
-      `<div class="mc-id">${esc(m.id)}</div>` +
-      `<div class="mc-foot">${foot}</div><div class="mc-status"></div></div>`;
-  }
+  // (modelCardHtml·loadLlmGuide는 추천 카탈로그와 함께 지웠다 — 2026-08-08 모델 안내 단순화.
+  //  applyJobToCard는 남긴다: 카드가 없으면 조용히 비켜 가는 가드가 있고, 검색·받기 흐름이 쓴다.)
 
-  async function loadLlmGuide() {
-    const root = document.getElementById("llmGuide");
-    if (!root) return;
-    try {
-      const [cats, models, recs, agents] = await Promise.all([
-        window.gijo.listLlmGuide(),
-        window.gijo.listModels().catch(() => []),
-        window.gijo.getAgentRecommendations().catch(() => ({})),
-        window.gijo.listAgents().catch(() => []),
-      ]);
-      const installed = new Set((models || []).map((x) => x.id));
-      const agentName = Object.fromEntries((agents || []).map((a) => [a.id, a.name]));
-      recByModel = {};
-      for (const [agentId, r] of Object.entries(recs || {})) {
-        (recByModel[r.id] = recByModel[r.id] || []).push(agentName[agentId] || agentId);
-      }
-      root.innerHTML = cats.map((c) =>
-        `<div class="cat"><div class="cat-head"><span style="font-size:16px">${esc(c.icon)}</span>` +
-        `<span class="cat-title">${esc(c.title)}</span></div>` +
-        `<div class="cat-intro">${esc(c.intro)}</div>` +
-        `<div class="model-grid">${c.models.map((m) => modelCardHtml(m, installed.has(dirNameOf(m.id)))).join("")}</div></div>`
-      ).join("");
-      // 이미 받는 중인 게 있으면 카드에 이어서 표시
-      const jobs = await window.gijo.listHfDownloadJobs().catch(() => []);
-      jobs.filter((j) => j.status === "queued" || j.status === "downloading").forEach(applyJobToCard);
-    } catch (e) {
-      root.innerHTML = '<div style="color:#f5928a;font-size:12px">추천 목록을 불러오지 못했습니다: ' + esc((e && e.message) || e) + "</div>";
-    }
-  }
-
-  // 받기 버튼 — 검색 결과와 추천 카드 양쪽에서 같은 방식으로 처리한다.
+  // 받기 버튼 — 검색 결과에서 처리한다.
   async function queueDownload(modelId, btn, statusEl) {
     btn.disabled = true;
     btn.textContent = "대기열에 추가...";
@@ -2160,16 +2120,13 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       const id = e.target.dataset.load;
       if (id) queueDownload(id, e.target, null);
     });
-    document.getElementById("llmGuide").addEventListener("click", (e) => {
-      const btn = e.target.closest(".mc-dl");
-      if (!btn) return;
-      queueDownload(btn.dataset.load, btn, btn.closest(".model-card").querySelector(".mc-status"));
-    });
+    // 추천 카탈로그 클릭 핸들러·loadLlmGuide 호출은 걷어냈다(2026-08-08 모델 안내 단순화).
+    // 정의(loadLlmGuide·modelCardHtml 등)는 함께 지웠다 — 부르는 곳 없는 정의를 남기면
+    // deadelements류 감시가 잡기 전까지 "있는 줄 아는 기능"이 된다.
     window.gijo.onHfDownloadProgress(onHfJobUpdate);
     window.gijo.listHfDownloadJobs()
       .then((jobs) => jobs.filter((j) => j.status === "queued" || j.status === "downloading").forEach(onHfJobUpdate))
       .catch(() => {});
-    loadLlmGuide();
     // 모델 받기 인증(2026-07-28) — 토큰은 넣기만 하고 다시 보여주지 않는다.
     document.getElementById("saveHfTokenBtn").addEventListener("click", () => {
       const v = document.getElementById("hfTokenInput").value.trim();
