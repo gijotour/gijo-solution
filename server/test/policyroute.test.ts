@@ -26,6 +26,17 @@ describe("사내 규정 조회 — 사내 문서로 못 박는다", () => {
   });
 });
 
+describe("CVE 설명 — 식별자가 있으면 근거 수집 경로로(모델 자유작문 27~34초 → ~9초)", () => {
+  it("★ 「CVE-… 이 뭐야?」가 explain으로 간다", () => {
+    const r = forcedToolFor("CVE-2021-44228이 뭐야?");
+    expect(r?.tool).toBe("explain");
+    expect(r?.args.topic).toBe("CVE-2021-44228");
+  });
+  it("★★ 조치·절차를 물으면 비켜 준다 — 플레이북의 영토", () => {
+    expect(forcedToolFor("CVE-2021-44228 조치 절차 알려줘")?.tool).not.toBe("explain");
+  });
+});
+
 describe("조건 일괄 배정 — 조건·집합어·이름이 셋 다 있으면 결재판까지 결정적으로", () => {
   it("★ 파일럿 리허설 문장이 bulk_update로 간다(조건·담당자 추출까지)", () => {
     const r = forcedToolFor("고위험인데 미배정인 취약점 전부 담당자 김도희로 배정해줘");

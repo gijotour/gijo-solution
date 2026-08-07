@@ -1111,6 +1111,15 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): { tool: s
     if (product) return { tool: "explain", args: { topic: product } };
   }
 
+  // CVE 식별자 + 「뭐야/설명」 — 실측(2026-08-07): 모델 자유작문으로 27~34초를 오갔다.
+  //   같은 질문을 explain(근거 수집) 경로로 던지면 같은 내용이 ~9초에 나온다(실측 대조).
+  //   식별자가 문장에 있으면 그 경로로 못 박는다. ⚠ 조치·절차·대응을 물으면 비켜 준다 —
+  //   그건 플레이북(조치 절차)의 영토다.
+  const cveId = /(CVE-\d{4}-\d{4,})/i.exec(instruction)?.[1];
+  if (available.has("explain") && cveId && /뭐야|뭔가요|무엇|설명/.test(instruction) && !/조치|절차|대응|패치/.test(instruction)) {
+    return { tool: "explain", args: { topic: cveId.toUpperCase() } };
+  }
+
   // 점검 "절차·방법·항목"을 묻는 말은 **사내 문서 근거**로 결정적으로 잇는다.
   // [2026-07-31 QA-M04 재발] "방화벽 월간 정기점검 절차를 알려줘"에 처음엔 스케줄 조회가
   // (빈 스케줄), 그걸 고치자 이번엔 LLM이 분석 허브를 골라 취약점 목록이 돌아왔다.
