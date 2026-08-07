@@ -25,7 +25,7 @@ import type { GijoUser } from "../auth/users";
 import { asyncRoute } from "../util/asyncRoute";
 import { recordAudit } from "./audit";
 import { llamaBinPath } from "../util/llamabin";
-import { db, assertTestDb } from "../db";
+import { db, assertTestDb, migrate } from "../db";
 import { startFinetune, isFinetuneRunning } from "./finetune";
 import { sessionArchiveDir } from "./worksessions";
 import { pauseInferenceEngines, resumeInferenceEngines } from "./localengine";
@@ -75,8 +75,22 @@ export interface LearnloopConfig {
 }
 
 // ── prepared statements ──────────────────────────────────────────────
+// 주제(업무영역) 딱지 — [2026-08-07 「전문 에이전트」 논의에서 실측이 시킨 것]
+//
+// 역할 딱지(agentId)는 이미 있었지만 **한쪽에만 쌓였다**: orchestrator 1,403건(66%) ·
+// normaltic 562 · analysis 97 · report 57 · **scan 10 · ti 9**. 대화창 지시는 전부
+// orchestrator로 가고 전문 역할은 파이프라인에서만 불리기 때문이다 — 이대로면 파일럿 4주가
+// 지나도 전문가별 학습 재료는 **한 자릿수**다.
+//
+// 그래서 "누가 답했나"(agentId) 옆에 **"무슨 주제인가"(topic)**를 함께 남긴다. 전문가 학습의
+// 진짜 재료는 답한 주체가 아니라 다뤄진 주제다 — 취약점 질문 1,000건이 모이면 그것이
+// 취약점 전문가의 데이터셋이 된다(누가 답했든).
+// ⚠ 판정은 **코드로만** 한다(learncandidates 원칙 2와 같은 잣대) — 같은 질문에 같은 딱지가
+//   나와야 "지난달 이건 왜 취약점이었지"를 답할 수 있다.
+migrate("chat-logs-topic-2026-08-07", "ALTER TABLE chat_logs ADD COLUMN topic TEXT");
+
 const insertLogStmt = db.prepare(
-  "INSERT INTO chat_logs (id, agentId, question, answer, rating, usedInDataset, createdAt) VALUES (@id, @agentId, @question, @answer, NULL, 0, @createdAt)"
+  "INSERT INTO chat_logs (id, agentId, topic, question, answer, rating, usedInDataset, createdAt) VALUES (@id, @agentId, @topic, @question, @answer, NULL, 0, @createdAt)"
 );
 const listLogsStmt = db.prepare("SELECT * FROM chat_logs ORDER BY createdAt DESC LIMIT ? OFFSET ?");
 const logKpiStmt = db.prepare(
@@ -265,6 +279,26 @@ export function pruneChatLogs(cap = CHATLOG_MAX): number {
   return removed;
 }
 
+/**
+ * 질문의 업무영역을 **결정적으로** 판정한다(LLM 없이). 확신 못 하면 null — 억지로 붙이지 않는다
+ * (문서 분류의 「억지 분류가 오분류보다 나쁘다」와 같은 잣대).
+ *
+ * ⚠ 문서 분류(categorizeByRules)와 따로 두는 이유: 문서는 본문 수천 자로 판정하지만 질문은
+ *   한 줄이다. 같은 규칙을 쓰면 거의 전부 "확신 못 함"이 된다 — 질문에는 질문의 신호가 있다.
+ */
+export function 질문주제(question: string): string | null {
+  const q = String(question ?? "");
+  const 점수: Record<string, number> = {
+    취약점: (q.match(/취약점|CVE-\d{4}|CVSS|EPSS|KEV|패치|스캔|익스플로잇|조치\s*기한|미조치/g) ?? []).length,
+    장비운영: (q.match(/방화벽|스위치|라우터|WAF|IPS|IDS|EDR|장비|펌웨어|점검|유지보수|매뉴얼|룰셋|로그\s*필드/g) ?? []).length,
+    사내규정: (q.match(/규정|지침|정책|해도\s*(되|돼)|보관\s*기간|승인\s*절차|컴플라이언스|준수|반출/g) ?? []).length,
+    위협대응: (q.match(/공격|침해|피싱|랜섬웨어|악성|탐지|차단|IOC|위협|인텔|대응\s*절차/g) ?? []).length,
+  };
+  const 정렬 = Object.entries(점수).sort((a, b) => b[1] - a[1]);
+  // 1점만 있어도 받는다(질문은 짧다). 단 **동점이면 확신하지 않는다** — 경계 질문이다.
+  return 정렬[0][1] >= 1 && 정렬[0][1] > 정렬[1][1] ? 정렬[0][0] : null;
+}
+
 // ── ① 수집 ────────────────────────────────────────────────────────────
 // llm.ts chat()의 remember:true 경로에서 호출된다. 캡처 실패가 채팅 응답을 죽이면 안 되므로
 // 전체를 try/catch로 감싼다. autoCollect가 꺼져 있으면 조용히 무시.
@@ -275,6 +309,7 @@ export function recordChatLog(agentId: string, question: string, answer: string)
     insertLogStmt.run({
       id: "cl" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
       agentId,
+      topic: 질문주제(question),
       question,
       answer,
       createdAt: Date.now(),
@@ -627,6 +662,22 @@ export function resetLearnloopForTests(): void {
 
 // ── 라우트 ────────────────────────────────────────────────────────────
 export function registerLearnloopRoutes(app: Express): void {
+  // 주제별 재료 현황 — **전문가 학습을 언제 시작할 수 있나**를 답한다(2026-08-07).
+  // 역할(agentId)로는 못 본다: 대화창 지시가 전부 orchestrator로 가서 66%가 한 칸에 쌓인다.
+  app.get("/api/learnloop/topics", authMiddleware, (_req, res) => {
+    const rows = db.prepare(
+      `SELECT COALESCE(topic, '(미분류)') AS topic, COUNT(*) AS total,
+              SUM(CASE WHEN rating = 1 THEN 1 ELSE 0 END) AS approved
+         FROM chat_logs GROUP BY COALESCE(topic, '(미분류)') ORDER BY total DESC`
+    ).all() as { topic: string; total: number; approved: number }[];
+    // 전문가 LoRA는 승인된 좋은 문답 기준이다(LIMA — 수작업 수천이 기계생성 수만을 이긴다).
+    const 목표 = 300;
+    res.json({
+      목표승인건수: 목표,
+      주제: rows.map((r) => ({ ...r, 준비됨: r.approved >= 목표, 남은건수: Math.max(0, 목표 - r.approved) })),
+    });
+  });
+
   app.get("/api/learnloop/logs", authMiddleware, (req, res) => {
     const limit = Math.min(Number(req.query.limit ?? 50) || 50, 200);
     const offset = Number(req.query.offset ?? 0) || 0;

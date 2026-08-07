@@ -152,12 +152,46 @@ export function categoryForScreen(screen?: string): Category | undefined {
  */
 export const CATEGORY_BOOST = 0.008;
 
-/** 화면의 우선 업무영역과 같은 조각의 순위를 올린다. category가 없으면(부스트 불가) 그대로. */
-export function applyCategoryBoost(chunks: FusedChunk[], preferred?: Category): FusedChunk[] {
+/**
+ * **역할별 검색 정책**(2026-08-07 사용자 지시 "전문 에이전트" 논의에서 나온 방식).
+ *
+ * 창고를 업무영역별로 쪼개자는 안을 실측으로 물렸다 — 운영 지식이 「일반」에 2,866조각
+ * 몰려 있어(전체의 절반) 물리 분리를 하면 그 절반이 **어느 전문가도 안 보는 고아**가 되고,
+ * 분류 오류가 곧 "영영 못 찾음"이 된다(같은 날 7B가 방화벽 메모를 취약점으로 오분류).
+ *
+ * 대신 **우선순위를 세게, 벽은 세우지 않는다**:
+ *   · 그 역할의 영역이면 강한 가산점(전문가는 제 자료를 먼저 본다)
+ *   · 다른 영역도 후보에는 남는다(폴백 — 분류가 틀려도 답을 잃지 않는다)
+ *   · 「일반」은 벌하지 않는다 — 아직 분류가 안 된 것이지 무관한 것이 아니다
+ */
+export const ROLE_BOOST = 0.02; // RRF 1위(≈0.0164)를 넘는 세기 — 동률이면 제 영역이 확실히 이긴다
+
+/** 화면의 우선 업무영역과 같은 조각의 순위를 올린다. category가 없으면(부스트 불가) 그대로.
+ *  @param 강하게 역할 검색(전문가 경로)이면 true — 화면 맥락보다 세게 건다. */
+export function applyCategoryBoost(chunks: FusedChunk[], preferred?: Category, 강하게 = false): FusedChunk[] {
   if (!preferred) return chunks;
+  const 가산 = 강하게 ? ROLE_BOOST : CATEGORY_BOOST;
   return chunks
-    .map((c) => ({ ...c, rrf: c.rrf + (c.category === preferred ? CATEGORY_BOOST : 0) }))
+    .map((c) => ({ ...c, rrf: c.rrf + (c.category === preferred ? 가산 : 0) }))
     .sort((a, b) => b.rrf - a.rrf);
+}
+
+// 에이전트(역할) → 그 전문가가 먼저 보는 업무영역. 화면 매핑과 별개다 —
+// 화면은 "지금 보고 있는 곳", 역할은 "누가 답하는가"다.
+export const ROLE_CATEGORY: Record<string, Category> = {
+  scan: "취약점",      // 스캔 해석 — 취약점 자료가 먼저
+  analysis: "취약점",  // 우선순위 판단 — 같은 축
+  ti: "위협대응",      // CTI·위협 모니터링
+  report: "사내규정",  // 보고서 서식·보고 규정
+  normaltic: "일반",   // 사내지식 해설 — 전 영역을 봐야 하므로 치우치지 않는다
+};
+
+/** 그 역할이 먼저 볼 업무영역. 없으면 undefined(부스트 없음 = 전 영역 평등). */
+export function categoryForRole(agentId?: string): Category | undefined {
+  if (!agentId) return undefined;
+  const c = ROLE_CATEGORY[agentId];
+  // 「일반」은 우선영역으로 쓰지 않는다 — 미분류를 밀어 올리면 진짜 자료가 밀린다.
+  return c && c !== "일반" ? c : undefined;
 }
 
 export interface FusionInput {

@@ -23,6 +23,7 @@ import {
   isRelevant,
   applyCategoryBoost,
   categoryForScreen,
+  categoryForRole,
   CATEGORIES,
   type Category,
   type FusedChunk,
@@ -773,9 +774,14 @@ async function hybridSearch(question: string, topK: number, agentId?: string, sc
     }
   }
 
-  // 화면 맥락 부스트 — 유지보수 화면에선 장비 문서가, 컴플라이언스 화면에선 규정 문서가 먼저.
-  // soft boost라 다른 영역 문서도 밀려날 뿐 사라지지 않는다(관련성 게이트는 부스트와 무관).
+  // 부스트 두 겹 — **역할이 화면보다 앞선다**(2026-08-07 「전문 에이전트」 설계).
+  //  ① 역할(누가 답하나): 취약점 전문가는 취약점 자료를 먼저 본다. 화면 부스트보다 세다(0.02).
+  //  ② 화면(어디서 물었나): 역할이 안 정해진 호출에만 기존 세기(0.008)로 건다.
+  // ⚠ 어느 쪽도 **벽이 아니다** — 다른 영역 자료는 밀릴 뿐 사라지지 않는다. 창고를 쪼개지
+  //   않은 이유와 같다(지식의 절반이 「일반」이라, 벽을 세우면 그 절반이 고아가 된다).
   const fused = fuseResults({ vector, lexical }, terms.codes);
+  const 역할영역 = categoryForRole(agentId);
+  if (역할영역) return applyCategoryBoost(fused, 역할영역, true).slice(0, topK);
   return applyCategoryBoost(fused, categoryForScreen(screen)).slice(0, topK);
 }
 
