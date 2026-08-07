@@ -240,9 +240,6 @@ tr:last-child td{border-bottom:none;}
 </div>
 
 <script>
-  const clockEl = document.getElementById("clockEl");
-  const statusPill = document.getElementById("statusPill");
-  const avatarBtn = document.getElementById("avatarBtn");
   const sbomRows = document.getElementById("sbomRows");
   const searchInput = document.getElementById("searchInput");
   const filterChips = document.getElementById("filterChips");
@@ -256,27 +253,8 @@ tr:last-child td{border-bottom:none;}
   let activeFilter = "all";
   const exportLog = [];
 
-  function tick() {
-    clockEl.textContent = new Date().toLocaleString("ko-KR", {
-      hour: "2-digit", minute: "2-digit", hour12: true, year: "numeric", month: "2-digit", day: "2-digit",
-    });
-  }
 
-  async function loadHealth() {
-    try {
-      await window.gijo.checkServerHealth();
-      statusPill.innerHTML = '<span class="dot"></span>운영중<span class="beta-tag">LIVE</span>';
-    } catch (e) {
-      statusPill.innerHTML = '<span class="dot" style="background:#e2483d"></span>서버 연결 끊김';
-    }
-  }
 
-  async function loadUser() {
-    try {
-      const user = await window.gijo.me();
-      avatarBtn.textContent = (user.displayName || user.username || "-").charAt(0);
-    } catch (e) {}
-  }
 
   function fmtDate(ts) {
     if (!ts) return "—";
@@ -814,10 +792,6 @@ tr:last-child td{border-bottom:none;}
   }
 
   async function init() {
-    tick();
-    setInterval(tick, 30000);
-    await loadUser();
-    await loadHealth();
     await loadThreatMap();
     await refresh();
     loadShadowAi(); // 비치명적 — 실패해도 화면은 정상
@@ -854,7 +828,6 @@ tr:last-child td{border-bottom:none;}
       }
     });
 
-    document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => {
       el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
     });

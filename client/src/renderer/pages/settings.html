@@ -724,28 +724,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 </div>
 
 <script>
-  const clockEl = document.getElementById("clockEl");
-  const statusPill = document.getElementById("statusPill");
-  const avatarBtn = document.getElementById("avatarBtn");
   const serverUrlInput = document.getElementById("serverUrlInput");
   const serverStatusLine = document.getElementById("serverStatusLine");
   const engineStatusLine = document.getElementById("engineStatusLine");
   const modelIdInput = document.getElementById("modelIdInput");
 
-  function tick() {
-    clockEl.textContent = new Date().toLocaleString("ko-KR", {
-      hour: "2-digit", minute: "2-digit", hour12: true, year: "numeric", month: "2-digit", day: "2-digit",
-    });
-  }
 
-  async function loadHealth() {
-    try {
-      await window.gijo.checkServerHealth();
-      statusPill.innerHTML = '<span class="dot"></span>운영중<span class="beta-tag">LIVE</span>';
-    } catch (e) {
-      statusPill.innerHTML = '<span class="dot" style="background:#e2483d"></span>서버 연결 끊김';
-    }
-  }
 
   let currentUser = null;
 
@@ -753,7 +737,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     try {
       const user = await window.gijo.me();
       currentUser = user;
-      avatarBtn.textContent = (user.displayName || user.username || "-").charAt(0);
+
       document.getElementById("accountUsername").textContent = user.username || "-";
       document.getElementById("accountDisplayName").textContent = user.displayName || "-";
       document.getElementById("accountRole").textContent = user.role || "-";
@@ -1316,7 +1300,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     }
     window.gijo.setServerUrl(url);
     testConnection();
-    loadHealth();
   }
 
   async function loadEngineStatus() {
@@ -2029,7 +2012,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   }
 
   function mcpWire() {
-    tick(); setInterval(tick, 30000); loadUser(); loadHealth();
+    loadUser(); 
     $("addBtn").addEventListener("click", openAdd);
     $("mCancel").addEventListener("click", () => $("mbg").classList.remove("on"));
     $("mSave").addEventListener("click", saveNew);
@@ -2140,8 +2123,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   }
 
   async function init() {
-    tick();
-    setInterval(tick, 30000);
     serverUrlInput.value = window.gijo.getServerUrl();
     await loadUser();
     await Promise.all([loadHealth(), loadEngineStatus(), loadSmtpConfig(), loadTier()]);
@@ -2290,7 +2271,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       }
     });
     document.getElementById("logoutBtn").addEventListener("click", logout);
-    document.getElementById("settingsBtn").addEventListener("click", () => {}); // 이미 설정 화면
 
     document.querySelectorAll("[data-page]").forEach((el) => {
       el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));

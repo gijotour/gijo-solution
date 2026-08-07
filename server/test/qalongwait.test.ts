@@ -21,7 +21,8 @@ describe("★ 게이트는 사람보다 오래 기다린다", () => {
   it("dispatch 라우트가 qa일 때 그 시간을 쓴다", () => {
     // 상수만 만들고 안 쓰면 아무것도 안 바뀐다 — 실제로 갈아 끼웠는지 소스로 본다.
     const src = fs.readFileSync(new URL("../src/engine/dispatcher.ts", import.meta.url), "utf8");
-    expect(src).toContain("qa ? QA_LONG_ANSWER_MS : LONG_ANSWER_MS");
+    // 2026-08-08: 보고서꼴 3초 조기 전환이 끼면서 삼항이 한 단 늘었다 — qa 분기가 맨 앞인 것이 계약이다.
+    expect(src).toContain("qa ? QA_LONG_ANSWER_MS : 보고서꼴(text) ? REPORT_HANDOFF_MS : LONG_ANSWER_MS");
     expect(src, "만든 상수를 타이머에 안 물리면 소용없다").toContain("resolve(null), limitMs)");
   });
 

@@ -278,31 +278,15 @@
 
     // 서버 — health가 돌면 운영 중이다. 여기가 꺼져 있으면 나머지는 볼 것도 없다.
     // 상단바 연결상태 칩도 같은 결과로 채운다(2026-08-06 상단바 통일 — 다른 화면들과 같은 문구).
-    var pill = document.getElementById("statusPill");
     try {
       var h = await window.gijo.checkServerHealth();
       rows.push(stateRow(!!(h && (h.ok || h.status === "ok")), "서버", "운영 중", "연동 서버가 응답합니다"));
-      if (pill) pill.innerHTML = '<span class="dot"></span>서버 연결상태 양호';
     } catch (e) {
       rows.push(stateRow(false, "서버", "응답 없음", "연동 서버에 닿지 못합니다"));
-      if (pill) pill.innerHTML = '<span class="dot" style="background:#e2483d"></span>서버 연결상태 불량';
     }
     try {
       var u = await window.gijo.me();
-      var av = document.getElementById("avatarBtn");
-      if (av) av.textContent = (u.displayName || u.username || "-").charAt(0);
     } catch (e) {}
-    // 시계 — 다른 25화면과 같은 tick(조치·승인과 동일 포맷·주기). 단독 창으로 열었을 때 보인다.
-    if (!window.__gijoClockTick) {
-      window.__gijoClockTick = function () {
-        var c = document.getElementById("clockEl");
-        if (c) c.textContent = new Date().toLocaleString("ko-KR", {
-          hour: "2-digit", minute: "2-digit", hour12: true, year: "numeric", month: "2-digit", day: "2-digit",
-        });
-      };
-      window.__gijoClockTick();
-      setInterval(window.__gijoClockTick, 30000);
-    }
 
     try {
       var s = await window.gijo.getLocalEngineStatus();

@@ -142,15 +142,7 @@ tr:last-child td{border-bottom:none;}
 </div>
 
 <script>
-  const clockEl = document.getElementById("clockEl");
-  const statusPill = document.getElementById("statusPill");
-  const avatarBtn = document.getElementById("avatarBtn");
 
-  function tick() {
-    clockEl.textContent = new Date().toLocaleString("ko-KR", {
-      hour: "2-digit", minute: "2-digit", hour12: true, year: "numeric", month: "2-digit", day: "2-digit",
-    });
-  }
 
   const ARCH_COLOR = { mistral: "rgba(139,124,240,0.14)", llama: "rgba(59,130,246,0.14)", qwen2: "rgba(30,185,128,0.14)", other: "rgba(139,147,171,0.12)" };
   const ARCH_TEXT = { mistral: "var(--purple)", llama: "var(--blue-light)", qwen2: "var(--teal)", other: "var(--muted)" };
@@ -233,21 +225,8 @@ tr:last-child td{border-bottom:none;}
   }
 
   async function init() {
-    tick();
-    setInterval(tick, 30000);
-    try {
-      await window.gijo.checkServerHealth();
-      statusPill.innerHTML = '<span class="dot"></span>운영중<span class="beta-tag">LIVE</span>';
-    } catch (e) {
-      statusPill.innerHTML = '<span class="dot" style="background:#e2483d"></span>서버 연결 끊김';
-    }
-    try {
-      const user = await window.gijo.me();
-      avatarBtn.textContent = (user.displayName || user.username || "-").charAt(0);
-    } catch (e) {}
     await loadDex();
     document.getElementById("planBtn").addEventListener("click", planSynthesis);
-    document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => {
       el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
     });

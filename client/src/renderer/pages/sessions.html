@@ -290,9 +290,6 @@
 
 <script src="session-explorer.js"></script>
 <script>
-  const clockEl = document.getElementById("clockEl");
-  const statusPill = document.getElementById("statusPill");
-  const avatarBtn = document.getElementById("avatarBtn");
   const sessionListEl = document.getElementById("sessionList");
   const convEl = document.getElementById("conv");
   const convHead = document.getElementById("convHead");
@@ -331,9 +328,6 @@
   let searchQuery = "";
   let statusFilter = "all"; // 전체/active/done/ignored
 
-  function tick() {
-    clockEl.textContent = new Date().toLocaleString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: true, year: "numeric", month: "2-digit", day: "2-digit" });
-  }
   function fmtTime(ms) {
     const d = new Date(ms); const now = new Date();
     const sameDay = d.toDateString() === now.toDateString();
@@ -343,13 +337,6 @@
     return `${d.getMonth() + 1}/${d.getDate()}`;
   }
 
-  async function loadHealth() {
-    try { await window.gijo.checkServerHealth(); statusPill.innerHTML = '<span class="dot"></span>서버 연결상태 양호'; }
-    catch (e) { statusPill.innerHTML = '<span class="dot" style="background:#e2483d"></span>서버 연결상태 불량'; }
-  }
-  async function loadUser() {
-    try { const u = await window.gijo.me(); avatarBtn.textContent = (u.displayName || u.username || "-").charAt(0); } catch (e) {}
-  }
 
   // 추천 다음 단계(contextRef 세션)를 위해 탐색기 데이터만 미리 로드(트리 렌더는 하지 않음 — 탐색기 화면 제거됨).
   async function loadExplorerData() {
@@ -659,8 +646,7 @@
   }
 
   async function init() {
-    tick(); setInterval(tick, 30000);
-    await loadUser(); await loadHealth();
+    await await 
     // 업무 패턴은 **펼칠 때** 불러온다(무거운 계산이라 접힌 채로는 부르지 않는다).
     // ⚠ 예전엔 <details>의 toggle 이벤트를 썼다 — 우리 접기로 바꾸면서 gijo:fold 알림으로 옮겼다.
     const pat = document.querySelector(".ws-pat");
@@ -687,7 +673,6 @@
     if (openId && sessions.some((s) => s.id === openId)) openSession(openId);
 
     document.querySelectorAll(".header [data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
-    document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.getElementById("pruneBtn").addEventListener("click", pruneOld);
     document.getElementById("deleteAllBtn").addEventListener("click", deleteAll);
     document.getElementById("statusFilters").querySelectorAll(".fchip").forEach((c) => c.addEventListener("click", () => {

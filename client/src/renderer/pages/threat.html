@@ -226,15 +226,7 @@ table th:last-child,table td:last-child{white-space:nowrap;}
   const findingsBodyEl = document.getElementById("findingsBody");
   const findingCountEl = document.getElementById("findingCount");
   const criticalCountEl = document.getElementById("criticalCount");
-  const clockEl = document.getElementById("clockEl");
 
-  function tick() {
-    clockEl.textContent = new Date().toLocaleString("ko-KR", {
-      hour: "2-digit", minute: "2-digit", hour12: true, year: "numeric", month: "2-digit", day: "2-digit",
-    });
-  }
-  tick();
-  setInterval(tick, 30000);
 
   const SEVERITY_BADGE = {
     critical: { cls: "b-red", label: "긴급" },
@@ -441,7 +433,6 @@ table th:last-child,table td:last-child{white-space:nowrap;}
     }
   });
 
-  document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
   document.querySelectorAll("[data-page]").forEach((el) => {
     el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
   });

@@ -145,9 +145,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   const authBadge = (a) => ({ key: "🔑 SSH 키", password: "🔒 비밀번호", local: "🖥 로컬" }[a] || a);
   let TARGETS = [], SCHEDULES = [], RUNS = [];
 
-  function tick() { $("clockEl").textContent = new Date().toLocaleString("ko-KR", { hour: "2-digit", minute: "2-digit", hour12: true, year: "numeric", month: "2-digit", day: "2-digit" }); }
-  async function loadHealth() { try { await window.gijo.checkServerHealth(); $("statusPill").innerHTML = '<span class="dot"></span>운영중<span class="beta-tag">LIVE</span>'; } catch (e) { $("statusPill").innerHTML = '<span class="dot" style="background:#e2483d"></span>서버 연결 끊김'; } }
-  async function loadUser() { try { const u = await window.gijo.me(); $("avatarBtn").textContent = (u.displayName || u.username || "-").charAt(0); } catch (e) {} }
   function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 3500); }
 
   function spark(vals, w = 90, h = 26, color = "#5fa1ff") {
@@ -356,8 +353,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   }
 
   async function init() {
-    tick(); setInterval(tick, 30000);
-    await loadUser(); loadHealth();
     await loadAll();
     $("addBtn").addEventListener("click", openReg);
     $("rCancel").addEventListener("click", () => $("regModal").classList.remove("g-on"));
@@ -365,7 +360,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     $("rAuth").addEventListener("change", syncCred); syncCred();
     $("sCancel").addEventListener("click", () => $("schModal").classList.remove("g-on"));
     $("sSubmit").addEventListener("click", submitSched);
-    $("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
     // 모달 배경 클릭 시 닫기
     document.querySelectorAll(".g-modal-bg").forEach((bg) => bg.addEventListener("click", (e) => { if (e.target === bg) bg.classList.remove("g-on"); }));

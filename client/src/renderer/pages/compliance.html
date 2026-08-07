@@ -105,15 +105,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 </div>
 
 <script>
-  const clockEl = document.getElementById("clockEl");
-  const statusPill = document.getElementById("statusPill");
-  const avatarBtn = document.getElementById("avatarBtn");
 
-  function tick() {
-    clockEl.textContent = new Date().toLocaleString("ko-KR", {
-      hour: "2-digit", minute: "2-digit", hour12: true, year: "numeric", month: "2-digit", day: "2-digit",
-    });
-  }
 
   const STATUS_OPTS = [
     { v: "open", label: "미대응", color: "#f5928a" },
@@ -326,25 +318,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   }
 
   async function init() {
-    tick();
-    setInterval(tick, 30000);
-    try {
-      await window.gijo.checkServerHealth();
-      statusPill.innerHTML = '<span class="dot"></span>운영중<span class="beta-tag">LIVE</span>';
-    } catch (e) {
-      statusPill.innerHTML = '<span class="dot" style="background:#e2483d"></span>서버 연결 끊김';
-    }
-    try {
-      const user = await window.gijo.me();
-      avatarBtn.textContent = (user.displayName || user.username || "-").charAt(0);
-    } catch (e) {}
     try {
       catalog = await window.gijo.listCompliance();
       render();
     } catch (e) {
       document.getElementById("catalog").innerHTML = '<div style="color:#f5928a">위협 카탈로그를 불러오지 못했습니다: ' + e.message + "</div>";
     }
-    document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => {
       el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
     });

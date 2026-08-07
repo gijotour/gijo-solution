@@ -226,9 +226,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 </div>
 
 <script>
-  const clockEl = document.getElementById("clockEl");
-  const statusPill = document.getElementById("statusPill");
-  const avatarBtn = document.getElementById("avatarBtn");
   const runBtn = document.getElementById("runBtn");
 
   const CAT_LABEL = {
@@ -246,9 +243,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   const SEV_LABEL = { critical: "CRITICAL", high: "HIGH", medium: "MEDIUM" };
 
   function esc(s){ return String(s == null ? "" : s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
-  function tick(){ clockEl.textContent = new Date().toLocaleString("ko-KR",{hour:"2-digit",minute:"2-digit",hour12:true,year:"numeric",month:"2-digit",day:"2-digit"}); }
-  async function loadHealth(){ try{ await window.gijo.checkServerHealth(); statusPill.innerHTML='<span class="dot"></span>서버 연결상태 양호'; }catch(e){ statusPill.innerHTML='<span class="dot" style="background:#e2483d"></span>서버 연결상태 불량'; } }
-  async function loadUser(){ try{ const u=await window.gijo.me(); avatarBtn.textContent=(u.displayName||u.username||"-").charAt(0); }catch(e){} }
 
   // ── 가드레일 ──
   function renderGuard(status){
@@ -456,13 +450,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     finally{ runBtn.disabled = false; runBtn.textContent = orig; }
   });
 
-  document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
   document.querySelectorAll("[data-page]").forEach(el => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
 
   if(!window.gijo.isAuthenticated()){ window.gijo.navigateTo("login.html"); }
   else {
-    tick(); setInterval(tick, 30000);
-    loadHealth(); loadUser(); loadGuard(); loadEffective();
+    loadGuard(); loadEffective();
     loadTargets().then(loadLast);
     if(window.gijoRealtime) window.gijoRealtime.connect();
   }

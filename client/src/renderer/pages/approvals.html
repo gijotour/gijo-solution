@@ -246,16 +246,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 <datalist id="gijoUserList"></datalist>
 
 <script>
-  const clockEl = document.getElementById("clockEl");
-  const statusPill = document.getElementById("statusPill");
-  const avatarBtn = document.getElementById("avatarBtn");
   const esc = (s) => String(s == null ? "" : s).replace(/</g, "&lt;");
 
-  function tick() {
-    clockEl.textContent = new Date().toLocaleString("ko-KR", {
-      hour: "2-digit", minute: "2-digit", hour12: true, year: "numeric", month: "2-digit", day: "2-digit",
-    });
-  }
 
   const ST_LABEL = { pending: "미검토", in_progress: "진행중", verifying: "검증 대기", approved: "완료", rejected: "반려" };
   const REJ_LABEL = { false_positive: "오탐", compensating_control: "다른 보안으로 방어 중" };
@@ -666,18 +658,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       const wantKey = q.get("finding");
       if (wantKey && scopeAsset) currentKey = `${scopeAsset}\0${wantKey}`;
     } catch (e) { /* 주소가 이상해도 화면은 떠야 한다 */ }
-    tick();
-    setInterval(tick, 30000);
-    try {
-      await window.gijo.checkServerHealth();
-      statusPill.innerHTML = '<span class="dot"></span>서버 연결상태 양호';
-    } catch (e) {
-      statusPill.innerHTML = '<span class="dot" style="background:#e2483d"></span>서버 연결상태 불량';
-    }
-    try {
-      const user = await window.gijo.me();
-      avatarBtn.textContent = (user.displayName || user.username || "-").charAt(0);
-    } catch (e) {}
     // 자산으로 좁혀 들어왔으면 상태 칩은 '전체'로 둔다 — 그 자산의 조치완료·반려까지 다 보여야
     // "이 호스트 상황"이 한눈에 들어온다(조치대상만 보이면 왜 몇 건뿐인지 또 헷갈린다).
     if (scopeAsset) {
@@ -783,7 +763,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       await loadReviews();
       if (fails.length) gijoTell(`${ok}건 배정 완료 · ${fails.length}건 실패\n${fails[0]}`);
     });
-    document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => {
       el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
     });

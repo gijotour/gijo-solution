@@ -499,9 +499,6 @@
 </div>
 
 <script>
-  const clockEl = document.getElementById("clockEl");
-  const statusPill = document.getElementById("statusPill");
-  const avatarBtn = document.getElementById("avatarBtn");
   const assetRows = document.getElementById("assetRows");
   const searchInput = document.getElementById("searchInput");
   // (filterChips는 없앴다 — 그 요소는 툴바 개편 때 사라졌고 지금 필터는 #ddRiskMenu에 있다.)
@@ -571,27 +568,8 @@
   let visibleCols = loadCols();
   let drawerOrder = [], drawerOn = new Set(); // 드로어 편집용 임시 상태
 
-  function tick() {
-    clockEl.textContent = new Date().toLocaleString("ko-KR", {
-      hour: "2-digit", minute: "2-digit", hour12: true, year: "numeric", month: "2-digit", day: "2-digit",
-    });
-  }
 
-  async function loadHealth() {
-    try {
-      await window.gijo.checkServerHealth();
-      statusPill.innerHTML = '<span class="dot"></span>운영중<span class="beta-tag">LIVE</span>';
-    } catch (e) {
-      statusPill.innerHTML = '<span class="dot" style="background:#e2483d"></span>서버 연결 끊김';
-    }
-  }
 
-  async function loadUser() {
-    try {
-      const user = await window.gijo.me();
-      avatarBtn.textContent = (user.displayName || user.username || "-").charAt(0);
-    } catch (e) {}
-  }
 
   const SEVERITY_RANK = { critical: 3, high: 3, medium: 2, low: 1 };
 
@@ -1640,10 +1618,6 @@
 
   async function init() {
     줄클릭묶기();
-    tick();
-    setInterval(tick, 30000);
-    await loadUser();
-    await loadHealth();
     await refresh();
     subscribeToLiveUpdates();
 
@@ -1824,7 +1798,6 @@
     document.getElementById("catInput").addEventListener("keydown", (e) => { if (e.key === "Enter") saveCatModal(); });
     document.getElementById("catModal").addEventListener("click", (e) => { if (e.target.id === "catModal") closeCatModal(); });
 
-    document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => {
       el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
     });

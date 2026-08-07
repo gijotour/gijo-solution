@@ -408,31 +408,9 @@ tr:last-child td{border-bottom:none;}
 </div>
 
 <script>
-  const clockEl = document.getElementById("clockEl");
-  const statusPill = document.getElementById("statusPill");
-  const avatarBtn = document.getElementById("avatarBtn");
 
-  function tick() {
-    clockEl.textContent = new Date().toLocaleString("ko-KR", {
-      hour: "2-digit", minute: "2-digit", hour12: true, year: "numeric", month: "2-digit", day: "2-digit",
-    });
-  }
 
-  async function loadHealth() {
-    try {
-      await window.gijo.checkServerHealth();
-      statusPill.innerHTML = '<span class="dot"></span>운영중<span class="beta-tag">LIVE</span>';
-    } catch (e) {
-      statusPill.innerHTML = '<span class="dot" style="background:#e2483d"></span>서버 연결 끊김';
-    }
-  }
 
-  async function loadUser() {
-    try {
-      const user = await window.gijo.me();
-      avatarBtn.textContent = (user.displayName || user.username || "-").charAt(0);
-    } catch (e) {}
-  }
 
   // 기본 지식 번들 상태 — 서버 실측값 한 줄. 실패하면 줄 자체를 숨긴다(가짜 문구 금지).
   async function loadBundleStatus() {
@@ -1041,10 +1019,6 @@ tr:last-child td{border-bottom:none;}
   }
 
   async function init() {
-    tick();
-    setInterval(tick, 30000);
-    await loadUser();
-    await loadHealth();
     await loadAgentScopes();
     loadBundleStatus(); // 실패해도 화면 로드는 계속 — await 안 한다
 
@@ -1057,7 +1031,6 @@ tr:last-child td{border-bottom:none;}
     refresh().catch(() => {});
     document.getElementById("hygieneScanBtn").addEventListener("click", function (e) { e.stopPropagation(); loadHygiene(true); });
 
-    document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     // learnloopLink 요소는 IA 통합 때 제거됨 — 잔존 배선이 null 크래시로 아래 업로드 버튼까지 죽였다(2026-07-25 스윕 발견).
     document.querySelectorAll("[data-page]").forEach((el) => {
       el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));

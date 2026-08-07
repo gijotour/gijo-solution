@@ -159,16 +159,6 @@ td.doc{color:#dfe6ff;font-weight:700;max-width:220px;word-break:break-all;}
   let lastReport = null;
   let meName = "";
 
-  // ── 헤더(시계·연결·사용자) ──
-  function tick() { document.getElementById("clockEl").textContent = new Date().toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }); }
-  async function loadHealth() {
-    const pill = document.getElementById("statusPill");
-    try { await window.gijo.checkServerHealth(); pill.classList.remove("err"); document.getElementById("statusTxt").textContent = "서버 연결상태 양호"; }
-    catch (e) { pill.classList.add("err"); document.getElementById("statusTxt").textContent = "서버 연결 실패"; }
-  }
-  async function loadUser() {
-    try { const u = await window.gijo.me(); meName = u.displayName || u.username || ""; document.getElementById("avatarBtn").textContent = (meName || "-").charAt(0); } catch (e) {}
-  }
 
   // ── 스테퍼 상태 ──
   function refreshSteps() {
@@ -300,8 +290,6 @@ td.doc{color:#dfe6ff;font-weight:700;max-width:220px;word-break:break-all;}
   }
 
   function init() {
-    tick(); setInterval(tick, 30000);
-    loadUser(); loadHealth();
     initChecklist();
     try { docs = JSON.parse(localStorage.getItem(DOCS_KEY) || "[]"); } catch (e) { docs = []; }
     renderDocs();
@@ -311,7 +299,6 @@ td.doc{color:#dfe6ff;font-weight:700;max-width:220px;word-break:break-all;}
     document.getElementById("verifyFailBtn").addEventListener("click", () => runVerify(lastReport ? lastReport.results.filter((r) => !r.cited).map((r) => r.documentId) : [], true));
     document.getElementById("completeBtn").addEventListener("click", complete);
     document.getElementById("downloadBtn").addEventListener("click", download);
-    document.getElementById("settingsBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
     document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));
     if (window.gijoRealtime) window.gijoRealtime.connect();
     refreshSteps();
