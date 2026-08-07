@@ -44,6 +44,17 @@ def main() -> None:
     if tok.pad_token is None:
         tok.pad_token = tok.eos_token
 
+    def ids_of(x):
+        # transformers 5의 apply_chat_template(tokenize=True)는 dict(BatchEncoding)를 돌려준다
+        # (첫 실행에서 collate의 dict+list TypeError로 실측). 리스트로 통일한다.
+        if isinstance(x, dict):
+            x = x["input_ids"]
+        elif hasattr(x, "input_ids"):
+            x = x.input_ids
+        if x and isinstance(x[0], list):  # 배치 차원 [[ids]] 벗기기
+            x = x[0]
+        return list(x)
+
     def render(q: str, a: str):
         msgs_prompt = [{"role": "system", "content": args.system}, {"role": "user", "content": q}]
         kw = {}
@@ -52,9 +63,9 @@ def main() -> None:
             kw["enable_thinking"] = False
         except (TypeError, ValueError):
             pass
-        prompt_ids = tok.apply_chat_template(msgs_prompt, tokenize=True, add_generation_prompt=True, **kw)
-        full_ids = tok.apply_chat_template(
-            msgs_prompt + [{"role": "assistant", "content": a}], tokenize=True, add_generation_prompt=False, **kw)
+        prompt_ids = ids_of(tok.apply_chat_template(msgs_prompt, tokenize=True, add_generation_prompt=True, **kw))
+        full_ids = ids_of(tok.apply_chat_template(
+            msgs_prompt + [{"role": "assistant", "content": a}], tokenize=True, add_generation_prompt=False, **kw))
         if len(full_ids) > args.max_seq:
             return None
         labels = [-100] * len(prompt_ids) + full_ids[len(prompt_ids):]
