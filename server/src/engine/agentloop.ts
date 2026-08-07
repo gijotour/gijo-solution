@@ -1089,6 +1089,13 @@ export function isHowtoNotCommand(instruction: string): boolean {
   return howto && !imperative;
 }
 
+/** 사내 규정·지침을 조회하는 말인가 — 법령(외부)·판정 이력·행동 대조와 갈라야 한다.
+ *  ⚠ 제외어에 「기록」을 넣지 않는다 — 「접속**기록** 보관 규정」이 걸려 정작 시연 문장이
+ *  새 나간다(첫 구현에서 실제로 그랬다). 이웃 보호는 이력·대조 + 규정낱말 요구로 충분하다. */
+export function 사내규정질문(instruction: string): boolean {
+  return /^(?!.*(법령|법적|법제처|판례|법률|이력|대조))(?:.*(사내\s*)?(규정|지침|정책)[^.\n]{0,10}(알려|찾|보여|뭐야|확인))/.test(instruction);
+}
+
 // export: 시험이 **실제 라우팅 함수**를 그대로 불러 대조한다(정규식을 베껴 쓰면 드리프트한다).
 export function forcedToolFor(instruction: string, scope?: ToolScope): { tool: string; args: Record<string, string> } | null {
   // ⚠ 강제 분기는 **화면 도메인 좁히기를 따르지 않는다**(검토 지적 2026-07-29).
@@ -1122,6 +1129,16 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): { tool: s
   //   "어떻게 해"만으로 잡으면 내 할 일 절차(work_steps)를 가로챈다.
   if (available.has("explain") && 제품설정질문(instruction)) {
     return { tool: "explain", args: { topic: instruction.replace(/\s*(어떻게|어케)\s*.*$/, "").trim() || instruction } };
+  }
+
+  // 사내 규정을 묻는 말은 **사내 문서**가 근거다 — 법제처(외부)로 보내지 않는다.
+  //   실측(2026-08-07 시연 대본 대조): "접속기록 보관 기간 규정 알려줘"를 LLM이 법령 조회로
+  //   보냈고, 법제처 API가 IP 검증으로 거부하자 **그 오류문이 담당자에게 그대로** 나갔다.
+  //   시연 ③이 가르치는 문장이다 — 사내 규정 문서(RAG)를 근거로 답해야 한다.
+  //   ⚠ 법령·법적 근거·판례를 명시하면 법제처가 맞다(비켜 준다). 「규정 대조 이력」(판정 기록
+  //   조회)과 「~해도 돼?」(행동 대조)도 다른 말이다 — 이력·기록·대조를 제외한다.
+  if (available.has("explain") && 사내규정질문(instruction)) {
+    return { tool: "explain", args: { topic: instruction.replace(/\s*(알려|찾아|보여|확인)[^.\n]*$/, "").trim() || instruction } };
   }
 
   // "가장 급한 취약점 담당자·기한 배정해줘"처럼 배정/지정 지시면 우선순위 조회(today)로 못박지 않는다
