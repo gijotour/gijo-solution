@@ -147,7 +147,8 @@ function createMainWindow(): void {
     //   "그냥 네모칸 넣자"는 결정으로 OS에 맡긴다 — 제목 줄 더블클릭 최대화도 이때 같이 살아난다.
     maximizable: true,
     titleBarStyle: "hidden",
-    titleBarOverlay: { color: "#1f1e1d", symbolColor: "#b3ada4", height: 46 }, // 상단 바(.header)와 같은 색이어야 한 줄로 보인다
+    // 높이 44 = 셸 탭줄(.tabbar) 높이(2026-08-07 상단 통합 — 조작줄을 없애 탭줄이 곧 상단 바다).
+    titleBarOverlay: { color: "#1f1e1d", symbolColor: "#b3ada4", height: 44 }, // 상단 바와 같은 색이어야 한 줄로 보인다
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,

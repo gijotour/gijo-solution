@@ -10,7 +10,7 @@
   if (window.top !== window) return; // embed iframe — 타이틀바/사용자 영역은 상위 문서 몫
   if (new URLSearchParams(location.search).has("embed")) return;
 
-  var BAR_H = 46; // main.ts titleBarOverlay.height와 반드시 일치
+  var BAR_H = 44; // main.ts titleBarOverlay.height와 반드시 일치(2026-08-07 상단 통합: 46→44)
 
   // ── 스타일 ──────────────────────────────────────────────────────────────
   var css = [
@@ -435,14 +435,15 @@
   }
 
   function mountSessChip() {
-    var hdr = document.querySelector(".header");
+    // 셸(app.html)은 상단 바가 탭줄 하나다(2026-08-07) — 세션 칩은 탭줄 오른쪽 #tbInfo에 붙는다.
+    var hdr = document.getElementById("tbInfo") || document.querySelector(".header");
     if (!hdr || document.querySelector(".gtb-sess")) return;
     // 대시보드에 이미 자체 칩(#sessionChip)이 있으면 그걸 쓰고 공용은 만들지 않는다(중복 방지).
     if (document.getElementById("sessionChip")) return;
     // 순서 통일(2026-07-26): 대시보드와 동일하게 [서버 연결상태] → [세션] 순으로 놓는다.
     // 연결상태 칩 바로 뒤에 붙이고, 없으면 우측 영역 끝에.
-    var right = hdr.querySelector(".header-right") || hdr.lastElementChild || hdr;
-    var statusPill = hdr.querySelector("#statusPill, .status-pill");
+    var right = hdr.querySelector(".header-right") || hdr;
+    var statusPill = hdr.querySelector("#statusPill, .status-pill, .tb-status");
     sessChip = document.createElement("div");
     sessChip.className = "gtb-sess";
     sessChip.title = "남은 세션 시간 — 마우스·키보드를 쓰면 자동 연장. 클릭하면 연장/관제 선택";
@@ -684,8 +685,10 @@
    *   만들어 두고 아무 일도 안 하게 두면 "눌러도 반응 없는 자리"가 된다(전수 점검에서 잡던 결함).
    */
   function mountTopbar() {
-    // 화면은 .header, 별도 창(팀 사무실·문서함)은 .head를 쓴다 — 둘 다 받는다.
-    var hdr = document.querySelector(".header");
+    // 셸(app.html)의 상단 바는 **탭줄 하나**다(2026-08-07 시안 승인) — 조작 단추를 탭줄 맨 앞에
+    // 붙이고, 경로 표시(topWhereEl)는 만들지 않는다. **활성 탭이 곧 경로**라(구역 › 이름을 탭이
+    // 그린다) 따로 갱신할 상태가 없다 — 두 함수가 따로 갱신하다 어긋나던 사고의 구조적 제거.
+    var hdr = 셸인가 ? document.getElementById("tabBar") : document.querySelector(".header");
     if (!hdr || hdr.querySelector(".gtb-acts")) return false;
     // ⚠ 분리창(popout=1)은 **왼쪽 메뉴를 강제로 숨긴다**(nav.js applyPopout). 요소는 남아 있으므로
     //   "있으니 만들자"로 판단하면 ▣가 붙고, 눌러도 아무 일이 없다 — 딱 우리가 없애려던 자리다.
@@ -720,9 +723,12 @@
     topFwdBtn = 아이콘단추("앞으로 (Alt+→)", '<path d="M5 12h14M13 6l6 6-6 6"/>', function () { 이력이동(1); });
     acts.appendChild(topBackBtn); acts.appendChild(topFwdBtn);
 
-    topWhereEl = document.createElement("div");
-    topWhereEl.className = "gtb-where";
-    acts.appendChild(topWhereEl);
+    if (!셸인가) {
+      // 경로 표시는 셸 밖(분리창·별도 창)에서만 — 셸에서는 활성 탭이 곧 경로다.
+      topWhereEl = document.createElement("div");
+      topWhereEl.className = "gtb-where";
+      acts.appendChild(topWhereEl);
+    }
 
     hdr.insertBefore(acts, hdr.firstChild);
 
@@ -736,6 +742,39 @@
 
     window.gijoSyncTopbar();
     return true;
+  }
+
+  // ── 셸 탭줄 오른쪽 정보(시계·서버상태) — 2026-08-07 상단 통합 ─────────────
+  // 예전에는 화면(iframe)마다 자기 시계·상태를 갖고 있었는데 탭 안에서는 헤더가 숨어 안 보였고,
+  // 문구조차 화면마다 갈랐다("서버 연결상태 양호" vs "운영중"). 셸 한 곳에서만 그린다.
+  // 문구는 대시보드와 같게 — 「서버 연결상태 양호/불량」(2026-08-06 통일 문구).
+  function mountShellInfo() {
+    var host = document.getElementById("tbInfo");
+    if (!host || host.querySelector(".tb-clock")) return;
+    var clock = document.createElement("span");
+    clock.className = "tb-clock";
+    var tick = function () {
+      clock.textContent = new Date().toLocaleString("ko-KR", {
+        hour: "2-digit", minute: "2-digit", hour12: true, year: "numeric", month: "2-digit", day: "2-digit",
+      });
+    };
+    tick(); setInterval(tick, 30000);
+    host.appendChild(clock);
+
+    var pill = document.createElement("span");
+    pill.className = "tb-status";
+    pill.innerHTML = '<span class="dot"></span>연결 확인 중';
+    host.appendChild(pill);
+    var probe = async function () {
+      var ok = false;
+      try { var h = await window.gijo.checkServerHealth(); ok = !!(h && (h.ok || h.status === "ok")); } catch (e) {}
+      pill.innerHTML = '<span class="dot"></span>' + (ok ? "서버 연결상태 양호" : "서버 연결상태 불량");
+      pill.style.color = ok ? "var(--teal,#1eb980)" : "#e2483d";
+      pill.style.background = ok ? "rgba(30,185,128,.14)" : "rgba(226,72,61,.14)";
+      pill.style.borderColor = ok ? "rgba(30,185,128,.4)" : "rgba(226,72,61,.4)";
+    };
+    if (authed && window.gijo && window.gijo.checkServerHealth) { probe(); setInterval(probe, 30000); }
+    else pill.style.display = "none";
   }
 
   // 단축키 — 안내한 것은 반드시 걸려 있어야 한다(안내만 하고 안 걸어 둔 전례가 있다).
@@ -787,8 +826,9 @@
   }
 
   // 별도 창(팀 사무실·문서함·대화창)에는 왼쪽 패널이 없다 — 그래도 상단 조작 줄은 붙인다
-  // (▣만 빠지고 ☰·🔍·←·→는 그대로 쓴다). 붙일 .header가 있으면 언제든 마운트.
-  if (document.querySelector(".header")) mountTopbar();
+  // (▣만 빠지고 ☰·🔍·←·→는 그대로 쓴다). 셸은 탭줄에, 그 밖은 .header에 마운트.
+  if (셸인가 || document.querySelector(".header")) mountTopbar();
+  if (셸인가) { mountShellInfo(); mountSessChip(); }
 
   var navRoot = document.getElementById("gijoNav");
   if (navRoot || document.querySelector(".explorer")) {
