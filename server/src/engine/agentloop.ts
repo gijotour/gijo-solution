@@ -1043,6 +1043,14 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }
     tool: "doc_duplicates",
     args: {},
   },
+  // [52] 「최근에 추가된 자산 뭐야?」 — 운영 실측(2026-08-07): 도구에 시간 필터를 넣었는데
+  //   모델이 **문서 소식**(recent_documents)을 골라 자산 질문에 문서 목록이 나갔다.
+  //   자산 낱말이 있으면 자산 도구다 — 시간 분기는 list_assets 안(query의 「최근」)이 받는다.
+  {
+    re: /(최근|새로|요즘)[^.\n]{0,6}(추가|등록|들어온)[^.\n]{0,4}(자산|장비|서버)[^.\n]{0,8}(뭐|목록|보여|알려|있)/,
+    tool: "list_assets",
+    args: { query: "최근 추가" },
+  },
 ];
 // 등록된 보안제품 이름을 콕 집어 "설명해줘"라고 물으면 그 제품의 사내 근거(매뉴얼·온톨로지)를
 // 모아 답한다. [2026-07-26 실사용] "Tenable Web App Scanning 주요기능 설명해줘"에 도구를 하나도

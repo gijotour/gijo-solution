@@ -50,3 +50,13 @@ describe("라우팅 [51]", () => {
     expect(forcedToolFor("중복 로그인 확인해줘")?.tool).not.toBe("doc_duplicates");
   });
 });
+
+describe("라우팅 [52] — 최근 추가 자산은 자산 도구로(문서 소식이 뺏던 실측)", () => {
+  it("자산 낱말이 있으면 list_assets, 문서 질문은 그대로 문서 소식", () => {
+    const r = forcedToolFor("최근에 추가된 자산 뭐야?");
+    expect(r?.tool).toBe("list_assets");
+    expect(r?.args.query).toContain("최근");
+    expect(forcedToolFor("새로 등록된 장비 목록 보여줘")?.tool).toBe("list_assets");
+    expect(forcedToolFor("최근 들어온 문서 뭐야?")?.tool, "[46]의 영토 보존").toBe("recent_documents");
+  });
+});
