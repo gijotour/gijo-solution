@@ -2125,7 +2125,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   async function init() {
     serverUrlInput.value = window.gijo.getServerUrl();
     await loadUser();
-    await Promise.all([loadHealth(), loadEngineStatus(), loadSmtpConfig(), loadTier()]);
+    await Promise.all([loadEngineStatus(), loadSmtpConfig(), loadTier()]);
 
     document.getElementById("testConnectionBtn").addEventListener("click", testConnection);
     document.getElementById("saveServerUrlBtn").addEventListener("click", saveServerUrl);
