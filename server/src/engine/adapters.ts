@@ -92,6 +92,72 @@ export function registerAdapter(args: {
   return fromRow(getStmt.get(args.id) as Row);
 }
 
+// ── 어댑터 반입(2026-08-09, 후-3 연장 — 사용자 지시 "학습이 잘된 LoRA 등을 넣어서") ──────
+//
+// 다른 사이트·이전 구축에서 검증된 GGUF LoRA를 등록부에 들여온다. **반입도 등록일 뿐이다** —
+// 채택은 여전히 평가 게이트+근거 필수, 총괄 장착 금지도 그대로. 밖에서 온 파일일수록
+// 관문을 세게 지킨다: GGUF 매직 검사·sha256 기록·출처 기록, 실행 없이 등록만.
+import * as path from "path";
+import * as crypto from "crypto";
+
+const LORA_DIR = process.env.GIJO_LORA_DIR ?? path.join("data", "lora");
+
+export function importAdapterFromFile(args: {
+  /** 반입할 파일 — data/lora 안 파일명 또는 절대 경로 */
+  file: string;
+  baseModelId: string;
+  topic?: string | null;
+  note?: string | null;
+  actor?: string | null;
+}): LoraAdapter {
+  const 이름 = (args.file ?? "").trim();
+  if (!이름) throw new Error("반입할 어댑터 파일명이 비었습니다");
+  if (!/\.gguf$/i.test(이름)) throw new Error("어댑터는 GGUF 파일(.gguf)만 반입할 수 있습니다");
+  // 경로 주입 방어 — 파일명만 왔으면 반입함(data/lora)에서 찾고, 경로면 그대로 확인.
+  const 후보 = path.isAbsolute(이름) || 이름.includes(path.sep) || 이름.includes("/")
+    ? 이름
+    : path.join(LORA_DIR, path.basename(이름));
+  if (!fs.existsSync(후보)) {
+    throw new Error(
+      `반입할 파일을 찾지 못했습니다: ${path.basename(이름)} — 먼저 파일을 서버의 ${LORA_DIR} 폴더에 넣어 주세요.`
+    );
+  }
+  // GGUF 매직 — 아무 파일이나 어댑터로 등록되는 것을 막는다(첫 4바이트 "GGUF").
+  const fd = fs.openSync(후보, "r");
+  const head = Buffer.alloc(4);
+  try { fs.readSync(fd, head, 0, 4, 0); } finally { fs.closeSync(fd); }
+  if (head.toString("ascii") !== "GGUF") {
+    throw new Error(`GGUF 형식이 아닙니다: ${path.basename(후보)} — LoRA 어댑터 파일이 맞는지 확인하세요.`);
+  }
+  const sha = crypto.createHash("sha256").update(fs.readFileSync(후보)).digest("hex");
+
+  // 반입함 밖의 파일은 산출처(data/lora)로 복사해 둔다 — 원본이 치워져도 서빙이 안 깨진다.
+  let 최종경로 = 후보;
+  if (path.resolve(path.dirname(후보)) !== path.resolve(LORA_DIR)) {
+    fs.mkdirSync(LORA_DIR, { recursive: true });
+    최종경로 = path.join(LORA_DIR, path.basename(후보));
+    fs.copyFileSync(후보, 최종경로);
+  }
+
+  const slug = path.basename(후보, path.extname(후보)).toLowerCase().replace(/[^a-z0-9-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 48) || "adapter";
+  const id = getStmt.get(slug) ? `${slug}-${sha.slice(0, 8)}` : slug;
+  const adapter = registerAdapter({
+    id,
+    topic: args.topic ?? null,
+    baseModelId: args.baseModelId,
+    file: 최종경로,
+    note: `반입(미채택) — 출처 ${후보} · sha256 ${sha.slice(0, 12)}…${args.note ? ` · ${args.note}` : ""}`,
+  });
+  recordAudit({
+    kind: "config", actor: args.actor ?? null,
+    action: `전문가 어댑터 반입: ${id}`,
+    target: args.baseModelId,
+    detail: `sha256 ${sha.slice(0, 12)} · ${path.basename(후보)} — 등록만(채택은 게이트+근거 필수)`,
+    result: "ok",
+  });
+  return adapter;
+}
+
 export function listAdapters(): LoraAdapter[] {
   return (listStmt.all() as Row[]).map(fromRow);
 }

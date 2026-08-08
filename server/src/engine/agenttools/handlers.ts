@@ -2908,3 +2908,39 @@ export async function runAdapterAssign(args: Record<string, string>): Promise<st
     return `배정하지 못했습니다 — ${(e as Error).message}`;
   }
 }
+
+/** 전문가 어댑터 반입(쓰기·admin·결재판) — 밖에서 검증된 GGUF LoRA를 등록부에 들여온다.
+ *  반입=등록일 뿐, 채택은 여전히 게이트+근거 필수(등록≠채택 원칙 그대로). */
+export async function runAdapterImport(args: Record<string, string>): Promise<string> {
+  const { importAdapterFromFile } = await import("../adapters.js");
+  const { servingBaseModelId } = await import("../learnloop.js");
+  const file = (args.file ?? "").trim();
+  if (!file) {
+    return "반입할 어댑터 파일명을 알려 주세요 — 예: 「sec-expert-vuln-v2.gguf 어댑터 반입해줘」. 파일은 먼저 서버의 data/lora 폴더에 넣어야 합니다.";
+  }
+  // 주제 별칭 — 담당자는 짧게 말한다("장비", "규정"). 등록부 딱지는 네 가지 정식 이름만 쓴다.
+  const 주제별칭: Record<string, string> = {
+    취약점: "취약점", 장비: "장비운영", 장비운영: "장비운영", 규정: "사내규정", 사내규정: "사내규정",
+    위협: "위협대응", 위협대응: "위협대응",
+  };
+  const topic = 주제별칭[(args.topic ?? "").trim()] ?? null;
+  const base = (args.base ?? "").trim() || servingBaseModelId();
+  try {
+    const a = importAdapterFromFile({
+      file, baseModelId: base, topic,
+      note: (args.note ?? "").trim() || null,
+      actor: (() => { const v = currentViewer(); return (v?.userId ? findUserById(v.userId)?.displayName : null) ?? "담당자(대화창)"; })(),
+    });
+    return (
+      `어댑터를 반입해 등록했습니다: ${a.id}` +
+      (a.topic ? ` (전문 분야: ${a.topic})` : "") +
+      `\n· 붙는 베이스 모델: ${a.baseModelId}\n· ${a.note}\n\n` +
+      `⚠ 아직 **미채택**입니다 — 실서비스에 실리지 않습니다. 다음 걸음:\n` +
+      `① 평가 게이트(tools/evalgate)로 품질을 재고\n` +
+      `② 「${a.id} 어댑터 채택, 근거: (게이트 결과)」로 채택\n` +
+      `③ 「(팀원)에 ${a.id} 배정해줘」로 팀원에 장착 (총괄에는 장착할 수 없습니다)`
+    );
+  } catch (e) {
+    return `반입하지 못했습니다 — ${(e as Error).message}`;
+  }
+}

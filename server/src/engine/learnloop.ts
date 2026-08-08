@@ -112,11 +112,13 @@ const pickLogsWithUnratedStmt = db.prepare(
   "SELECT * FROM chat_logs WHERE usedInDataset = 0 AND (rating = 1 OR rating IS NULL) ORDER BY createdAt ASC"
 );
 // 주제별 전문가 학습(재설계 2단계) — 그 주제 딱지가 붙은 것만 재료로 쓴다.
-const pickLogsByTopicStmt = db.prepare(
-  "SELECT * FROM chat_logs WHERE usedInDataset = 0 AND rating = 1 AND topic = ? ORDER BY createdAt ASC"
+// ⚠ 2026-08-09부터 주제 데이터셋은 아래 pickAll* (전체 승인분)을 쓴다 — vN+1 재학습이
+//   이전에 배운 것을 잃지 않게. usedInDataset 필터 판은 참고용으로 남긴다(레거시 경로 형태).
+const pickAllApprovedByTopicStmt = db.prepare(
+  "SELECT * FROM chat_logs WHERE rating = 1 AND topic = ? ORDER BY createdAt ASC"
 );
-const pickLogsWithUnratedByTopicStmt = db.prepare(
-  "SELECT * FROM chat_logs WHERE usedInDataset = 0 AND (rating = 1 OR rating IS NULL) AND topic = ? ORDER BY createdAt ASC"
+const pickAllWithUnratedByTopicStmt = db.prepare(
+  "SELECT * FROM chat_logs WHERE (rating = 1 OR rating IS NULL) AND topic = ? ORDER BY createdAt ASC"
 );
 // 학습 시작 게이트용 — usedInDataset 여부와 무관하게 그 주제의 **승인 총량**을 센다
 // (게이트는 "재료가 이만큼 모였나"의 판정이지 "아직 안 쓴 게 몇 개냐"가 아니다).
@@ -391,9 +393,15 @@ export function deleteChatLog(id: string): void {
 // LLM 재변환이 필요 없다. 저장 성공 후 같은 트랜잭션에서 usedInDataset=1 마킹.
 export async function buildDatasetFromLogs(opts: { includeUnrated?: boolean; minExamples?: number; topic?: string } = {}): Promise<{ datasetId: string; examples: number; fingerprint: string; dropped: Record<string, number> }> {
   const minExamples = opts.minExamples ?? 5;
+  // 주제 학습은 **전체 승인 데이터**로 굽는다(2026-08-09 추가 교육 정책, 사용자 지시).
+  //   어댑터 vN+1은 vN을 대체하므로, "새로 쌓인 것만"으로 구우면 이전에 배운 것이 통째로
+  //   빠진 어댑터가 나온다(usedInDataset=0 필터가 옛 승인분을 걸러 버림 — 실코드 검토에서 발견).
+  //   LoRA에 덧학습(이어서 학습)하는 방식은 망각·과적합 함정이 커서 쓰지 않는다 —
+  //   이전+새 승인분을 합쳐 처음부터 다시 굽는 재학습이 정도다.
+  //   usedInDataset 마킹은 비주제(레거시) 경로에만 계속 쓴다.
   const rows = (
     opts.topic
-      ? (opts.includeUnrated ? pickLogsWithUnratedByTopicStmt : pickLogsByTopicStmt).all(opts.topic)
+      ? (opts.includeUnrated ? pickAllWithUnratedByTopicStmt : pickAllApprovedByTopicStmt).all(opts.topic)
       : (opts.includeUnrated ? pickLogsWithUnratedStmt : pickLogsStmt).all()
   ) as ChatLogRow[];
   if (rows.length < minExamples) {
@@ -624,7 +632,7 @@ export const adapterOutPath = (adapterId: string): string => path.join(LORA_DIR,
 
 // 산출 어댑터가 붙을 **서빙 베이스 모델 id**(GGUF, models/의 폴더명). 학습 베이스(HF repo)와
 // 다른 좌표계다 — 운영자가 고른 기본 모델(defaultModelId)이 곧 어댑터가 얹힐 그릇이다.
-function servingBaseModelId(): string {
+export function servingBaseModelId(): string {
   const stored = (getStateStmt.get("defaultModelId") as { value: string } | undefined)?.value;
   return stored ?? process.env.GIJO_DEFAULT_MODEL_ID ?? "gijo-main-orchestrator";
 }

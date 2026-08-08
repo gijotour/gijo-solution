@@ -1170,6 +1170,12 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): { tool: s
   // 인자를 못 뽑으면 강제하지 않고 흘려보낸다(LLM 추출이 이어받음) — 빈 인자 결재판을 만들지 않는다.
   if (/어댑터/.test(instruction) && !/네트워크\s*어댑터|랜\s*어댑터/i.test(instruction)) {
     const 어댑터명 = /([a-z][a-z0-9]*(?:[.-][a-z0-9]+)+)/i.exec(instruction)?.[1] ?? "";
+    // 반입 — "xxx.gguf 어댑터 반입해줘". 파일명이 없으면 강제하지 않는다(빈 결재판 방지).
+    if (available.has("import_adapter") && /(반입|가져와|가져오|들여와|들여오)/.test(instruction)) {
+      const 파일 = /([\w가-힣.-]+\.gguf)/i.exec(instruction)?.[1] ?? "";
+      const 분야 = /(취약점|장비운영|장비|사내규정|규정|위협대응|위협)/.exec(instruction)?.[1] ?? "";
+      if (파일) return { tool: "import_adapter", args: { file: 파일, topic: 분야 } };
+    }
     if (available.has("adopt_adapter") && /(채택|승인)/.test(instruction) && !/배정/.test(instruction) && 어댑터명) {
       const 해제 = /(채택|승인)\s*(해제|취소)|해제|내려/.test(instruction);
       const 근거 = /근거\s*[:：]\s*([^\n]+)/.exec(instruction)?.[1]?.trim() ?? "";

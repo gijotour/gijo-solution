@@ -119,6 +119,26 @@ describe("learnloop 주제별 전문가 학습 (재설계 2·3단계)", () => {
     expect(남은.body.error).toContain("취약점");
   });
 
+  it("추가 교육(재학습)은 이전에 쓴 승인분도 다시 담는다 — vN+1이 배운 것을 잃지 않게", async () => {
+    // 2026-08-09 정책(사용자 지시 "잘 학습된 LoRA를 넣어 추가 교육"): 어댑터 vN+1은 vN을
+    // **대체**하므로, 데이터셋을 "아직 안 쓴 것만"으로 지으면 이전에 배운 승인분이 통째로
+    // 빠진 어댑터가 나온다(usedInDataset 필터의 함정 — 실코드 검토에서 발견).
+    await seed장비운영(6);
+    const 첫 = await request(app).post("/api/learnloop/build-dataset").set(auth()).send({ topic: "장비운영" });
+    expect(첫.status).toBe(200);
+    expect(첫.body.examples).toBe(6);
+    savedDatasets.push(첫.body.datasetId);
+
+    // 새 승인 1건이 더 쌓인 뒤 다시 지으면 — 이전 6건을 버리지 않고 7건이어야 한다.
+    recordChatLog("analysis", "추가질문: 방화벽 이중화 구성 점검은 어떻게?", "HA 상태와 정책 동기화 여부를 확인합니다.");
+    const 새로그 = (await request(app).get("/api/learnloop/logs").set(auth())).body.logs[0];
+    await request(app).post(`/api/learnloop/logs/${새로그.id}/rate`).set(auth()).send({ rating: 1 });
+    const 둘 = await request(app).post("/api/learnloop/build-dataset").set(auth()).send({ topic: "장비운영" });
+    expect(둘.status).toBe(200);
+    expect(둘.body.examples).toBe(7); // usedInDataset 필터가 되살아나면 1이 나와 여기서 실패한다
+    savedDatasets.push(둘.body.datasetId);
+  });
+
   it("산출 배선 소스 감시 — 병합이 아니라 어댑터 등록(미채택)이다", () => {
     const s = fs.readFileSync(path.join(__dirname, "..", "src", "engine", "learnloop.ts"), "utf8");
     expect(s).toContain("convert_lora_to_gguf.py"); // 병합(export_gguf) 은퇴, 어댑터 변환으로

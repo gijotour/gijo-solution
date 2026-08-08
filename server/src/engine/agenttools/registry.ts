@@ -185,6 +185,7 @@ import {
   runAdapterStatus,
   runAdapterAdopt,
   runAdapterAssign,
+  runAdapterImport,
 } from "./handlers";
 
 const TOOLS: AgentTool[] = [
@@ -1412,6 +1413,28 @@ const TOOLS: AgentTool[] = [
         : `${args.agent} 팀원에 어댑터 ${args.adapter}를 배정합니다 — 서빙에 실려 있으면 다음 답변부터 적용됩니다.`,
     undo: "같은 팀원에 「없음」으로 다시 지시하면 배정이 해제됩니다.",
     run: runAdapterAssign,
+  },
+  {
+    // 어댑터 반입(쓰기·admin·결재판) — 밖에서 검증된 GGUF LoRA를 등록부로. 등록≠채택 그대로.
+    // 지식 번들 반입과 같은 성격의 문이라 admin만 연다 — 밖에서 온 파일일수록 관문이 세야 한다.
+    name: "import_adapter",
+    label: "전문가 어댑터 반입",
+    domain: "cross",
+    write: true,
+    requiredRole: "admin",
+    description:
+      '외부에서 학습·검증된 LoRA 어댑터(.gguf)를 등록부에 반입한다. 파일을 먼저 서버 data/lora 폴더에 넣고 부른다. ' +
+      '"sec-expert-vuln-v2.gguf 어댑터 반입해줘", "취약점 어댑터로 반입"처럼 말할 때 쓴다. 반입해도 채택 전에는 실서비스에 실리지 않는다. ' +
+      '예: {"file":"sec-expert-vuln-v2.gguf","topic":"취약점"}',
+    params: [
+      { name: "file", label: "파일", description: "반입할 GGUF 파일명(서버 data/lora 폴더 기준)", required: true },
+      { name: "topic", label: "전문 분야", description: "취약점·장비운영·사내규정·위협대응 중 하나(선택)", required: false },
+      { name: "note", label: "메모", description: "출처·검증 이력 메모(선택)", required: false },
+    ],
+    effect: (args) =>
+      `어댑터 파일 ${args.file}을 등록부에 반입합니다 — GGUF 형식 검사·지문(sha256) 기록 후 **미채택**으로 등록됩니다. 실서비스 반영은 게이트 통과·채택 후입니다.`,
+    undo: "반입만으로는 아무것도 실행되지 않습니다 — 등록부에서 삭제 지시로 되돌릴 수 있습니다.",
+    run: runAdapterImport,
   },
 ];
 

@@ -29,6 +29,18 @@ afterEach(() => {
 describe("강제 라우팅 — 어댑터 지시", () => {
   const admin = { role: "admin" as const };
 
+  it("「xxx.gguf 어댑터 반입해줘」가 import_adapter로 결정적으로 간다(파일·분야 추출)", () => {
+    const r = forcedToolFor("site-b-expert.gguf 어댑터 취약점 분야로 반입해줘", admin);
+    expect(r?.tool).toBe("import_adapter");
+    expect(r?.args.file).toBe("site-b-expert.gguf");
+    expect(r?.args.topic).toBe("취약점");
+  });
+
+  it("반입인데 파일명이 없으면 강제하지 않는다 — 빈 인자 결재판을 만들지 않는다", () => {
+    const r = forcedToolFor("어댑터 반입해줘", admin);
+    expect(r?.tool).not.toBe("import_adapter");
+  });
+
   it("「채택, 근거:」 지시가 adopt_adapter로 결정적으로 간다(근거까지 추출)", () => {
     const r = forcedToolFor("sec-expert-vuln-v2 어댑터 채택, 근거: 게이트 routing 66/66 통과", admin);
     expect(r?.tool).toBe("adopt_adapter");
