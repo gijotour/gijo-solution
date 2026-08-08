@@ -80,6 +80,27 @@ export interface SanitizeResult {
  *   지금은 **원문에서 걸린 문장만 도려낸다** — 지울 게 없으면 원문이 한 글자도 안 바뀐다.
  *   이건 시험으로 못 박아 뒀다("지울 게 없으면 원문 그대로").
  */
+/**
+ * 바이너리꼴 조각 판정(2026-08-09) — PDF 압축 스트림 같은 덩어리가 텍스트 추출 없이 인입돼
+ * 지식 저장소에 남으면, 검색 상위를 차지해 **정작 근거를 밀어내고** LLM 문맥을 쓰레기로
+ * 채운다(실사고: "WizCLM 비교" 1순위 히트가 base64 덩어리 → 모델이 일반 지식으로 지어냄).
+ *
+ * 판정은 결정적 2단: ① 공백이 거의 없고(5% 미만) base64 문자셋이 90% 이상 ② 평균 낱말
+ * 길이가 30자를 넘으면서 base64 문자셋 85% 이상. 자연어(한국어 공백 ~15%, 영어 ~15%)와
+ * 표·코드 조각(공백 충분)은 안 걸리고, 조각 전체가 URL 하나뿐인 극단만 함께 걸린다 —
+ * 그런 조각은 어차피 근거 가치가 없다.
+ */
+export function isBinaryLikeChunk(text: string): boolean {
+  const t = (text ?? "").trim();
+  if (t.length < 40) return false; // 짧은 조각은 판정 근거가 부족하다 — 통과
+  const 공백비율 = (t.match(/\s/g) ?? []).length / t.length;
+  const 몸통 = t.replace(/\s+/g, "");
+  const 낱말수 = t.split(/\s+/).length;
+  const 평균낱말 = 몸통.length / Math.max(낱말수, 1);
+  const base64꼴 = (몸통.match(/[A-Za-z0-9+/=\\-]/g) ?? []).length / Math.max(몸통.length, 1);
+  return (공백비율 < 0.05 && base64꼴 > 0.9) || (평균낱말 > 30 && base64꼴 > 0.85);
+}
+
 export function sanitizeChunk(chunk: string): SanitizeResult {
   const removed: string[] = [];
   const labels = new Set<string>();

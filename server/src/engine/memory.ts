@@ -10,6 +10,7 @@ import * as lancedb from "@lancedb/lancedb";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { embed, chat } from "./llm";
+import { isBinaryLikeChunk } from "./ragsanitize";
 import { db, migrate } from "../db";
 import { clearanceOf, gradeOf, blockedGrades } from "./grades";
 import { currentViewer } from "./viewerctx";
@@ -418,8 +419,10 @@ export function chunkText(text: string, size = CHUNK_SIZE, overlap = CHUNK_OVERL
   }
   if (cur.trim()) chunks.push(cur.trim());
   // 잡음만 남은 초단문 청크 제거 — 단, 문서 자체가 짧으면(전부 걸러지면) 원문을 보존한다.
-  const filtered = chunks.filter((c) => c.length >= 20);
-  if (filtered.length === 0 && cleaned.trim().length > 0) return [cleaned.trim().slice(0, size)];
+  // 바이너리꼴 조각(PDF 압축 스트림 등)도 여기서 거른다(2026-08-09) — 인입돼 봤자 검색
+  // 상위를 차지해 진짜 근거를 밀어낸다(실사고: WizCLM 비교 1순위가 base64 덩어리).
+  const filtered = chunks.filter((c) => c.length >= 20 && !isBinaryLikeChunk(c));
+  if (filtered.length === 0 && cleaned.trim().length > 0 && !isBinaryLikeChunk(cleaned)) return [cleaned.trim().slice(0, size)];
   return filtered;
 }
 
@@ -746,7 +749,11 @@ async function hybridSearch(question: string, topK: number, agentId?: string, sc
     const rows = (await table.search(queryVector).where(whereClause).limit(candidates).toArray()) as (MemoryRow & {
       _distance?: number;
     })[];
-    vector = rows.map((r) => ({
+    vector = rows
+      // 이미 저장돼 있는 바이너리꼴 조각(과거 인입분)은 후보에서 뺀다 — 인입 필터(chunkText)가
+      // 새 오염을 막고, 이 줄이 **기존 오염**을 막는다. 후보를 topK의 2배로 떠 오므로 topK는 찬다.
+      .filter((r) => !isBinaryLikeChunk(r.text))
+      .map((r) => ({
       text: r.text,
       documentId: r.documentId,
       distance: Number(r._distance ?? Number.POSITIVE_INFINITY),
@@ -767,7 +774,7 @@ async function hybridSearch(question: string, topK: number, agentId?: string, sc
         .where(whereClause)
         .limit(candidates)
         .toArray()) as MemoryRow[];
-      lexical = rows.map((r) => ({ text: r.text, documentId: r.documentId, ...(r.category ? { category: r.category } : {}) }));
+      lexical = rows.filter((r) => !isBinaryLikeChunk(r.text)).map((r) => ({ text: r.text, documentId: r.documentId, ...(r.category ? { category: r.category } : {}) }));
     } catch (err) {
       // 전문 검색만 실패하면 벡터 결과로 계속 간다 — 기존 품질은 보장된다.
       console.warn(`[memory] 전문 검색 실패 — 벡터 결과만 사용합니다: ${err instanceof Error ? err.message : String(err)}`);

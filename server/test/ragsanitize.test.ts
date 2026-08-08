@@ -8,7 +8,7 @@
 //   우리 고객 문서에는 "프롬프트 인젝션"이 정당하게 실린다(레드팀 보고서·사례집·제품 매뉴얼).
 //   그것까지 지우면 제품이 자기 도메인 문서를 못 읽는다.
 import { describe, it, expect, beforeEach } from "vitest";
-import { sanitizeChunk, sanitizeRagChunks, scanDocumentForInjection } from "../src/engine/ragsanitize";
+import { sanitizeChunk, sanitizeRagChunks, scanDocumentForInjection, isBinaryLikeChunk } from "../src/engine/ragsanitize";
 import { resetAuditForTests, listAudit } from "../src/engine/audit";
 
 beforeEach(() => resetAuditForTests());
@@ -154,5 +154,22 @@ describe("인입 점검은 알리기만 하고 막지 않는다", () => {
 
   it("깨끗한 문서는 0건", () => {
     expect(scanDocumentForInjection("방화벽 정책은 최소 권한으로 구성한다.").found).toBe(0);
+  });
+});
+
+describe("바이너리꼴 조각 판정 (2026-08-09 — WizCLM 비교 오염 실사고)", () => {
+  it("PDF 압축 스트림 덩어리(실사고 표본)를 걸러낸다", () => {
+    const junk = "zSVra2PdRrs46rp9zuh4+vXv8weDN-\nxHNLLDbps/Pj8PDBh5ZRbGpdpFUdOQxyH9GqDrm38OjIil0wPe+OrHwZvJ45DerFBl2-\n3/7dqfsVyxdWn8IY6chjgO6aUGTWWbNu0OeVww/b1xrDhyGuI4pFca9NjG/Sl373c-\nvjT/EkdMQxyG90KApbvO0TWNWejc75ZrGnRPFkdMQxyE936Bq4+w6mHW8tvNq69L4Y7";
+    expect(isBinaryLikeChunk(junk)).toBe(true);
+  });
+
+  it("정상 한국어·영어·표 조각은 안 걸린다", () => {
+    expect(isBinaryLikeChunk("WizCLM은 SSL/TLS 인증서 통합관리 솔루션이다. Agent, Agentless, API 세 방식으로 인증서를 검색한다.")).toBe(false);
+    expect(isBinaryLikeChunk("Keyfactor Command provides certificate lifecycle automation with Any CA integration and one-click renewal.")).toBe(false);
+    expect(isBinaryLikeChunk("항목 | 값\n만료일 | 2026-09-01\n담당자 | 김보안\n장비 | FW-01 방화벽")).toBe(false);
+  });
+
+  it("짧은 조각은 판정하지 않는다(근거 부족 — 통과)", () => {
+    expect(isBinaryLikeChunk("abc+/=")).toBe(false);
   });
 });
