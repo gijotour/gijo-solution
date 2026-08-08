@@ -18,6 +18,7 @@ import { llamaBinPath } from "../util/llamabin";
 import { db } from "../db";
 import { emitLlmActivity, modelBasename } from "./llmactivity";
 import { adaptModel, getAdaptation, type ModelAdaptation } from "./modelquirks";
+import { adoptedAdaptersFor, type LoraAdapter } from "./adapters";
 
 const LLAMA_SERVER_PATH = process.env.GIJO_LLAMA_SERVER_PATH ?? llamaBinPath("llama-server");
 const MODELS_DIR = process.env.GIJO_MODELS_DIR ?? "models";
@@ -53,6 +54,9 @@ interface LoadedModel {
   ready: boolean;
   lastUsed: number;
   loadingPromise?: Promise<boolean>;
+  // 스폰 시 --lora로 함께 올린 전문가 어댑터들(채택분). llama-server의 요청별 lora 선택은
+  // **적재 순서 인덱스**로 어댑터를 가리키므로 그 순서를 그대로 보존한다.
+  adapters: { id: string; index: number; topic: string | null }[];
 }
 
 // 채팅 모델 풀 (modelId -> 로드된 llama-server). 임베딩은 별도 단일 프로세스.
@@ -108,6 +112,8 @@ export interface LoadedModelInfo {
   ready: boolean;
   // BYOM 자동 적응 내용(thinking 끔·ctx 맞춤) — 화면·리포트가 "무엇을 맞췄는지" 보여줄 근거.
   adaptation?: ModelAdaptation | null;
+  // 함께 적재된 전문가 어댑터(채택분) — 화면이 "이 베이스에 어떤 전문성이 실려 있나"를 보여줄 근거.
+  adapters?: { id: string; index: number; topic: string | null }[];
 }
 
 export interface LocalEngineStatus {
@@ -119,7 +125,7 @@ export interface LocalEngineStatus {
 }
 
 export function getLocalEngineStatus(): LocalEngineStatus {
-  const loaded: LoadedModelInfo[] = [...pool.values()].map((m) => ({ modelId: m.modelId, port: m.port, ready: m.ready, adaptation: getAdaptation(m.modelId) }));
+  const loaded: LoadedModelInfo[] = [...pool.values()].map((m) => ({ modelId: m.modelId, port: m.port, ready: m.ready, adaptation: getAdaptation(m.modelId), adapters: m.adapters }));
   const primary = loaded.find((m) => m.port === PORT) ?? loaded[0];
   return {
     running: pool.size > 0,
@@ -360,13 +366,30 @@ async function ensureModelLoaded(modelId: string): Promise<LoadedModel> {
       `${adaptation.nativeCtx ? ` · ctx ${adaptation.fittedCtx}(native ${adaptation.nativeCtx})` : ""} [판별: ${adaptation.판별}]`
     );
   }
+  // 전문가 어댑터(재설계 1단계): 이 모델을 베이스로 하는 **채택** 어댑터를 스케일 0으로 함께
+  // 적재한다(--lora-init-without-apply). 기본 동작은 베이스 그대로이고, 요청이 lora 필드로
+  // 명시할 때만 어댑터가 켜진다 — 어댑터가 하나도 없으면 인자가 비어 기존과 완전히 같다.
+  const 어댑터들 = adoptedAdaptersFor(modelId);
+  const loraArgs = 어댑터들.length
+    ? ["--lora-init-without-apply", ...어댑터들.flatMap((a) => ["--lora", a.file])]
+    : [];
+  if (어댑터들.length) {
+    console.log(`[localengine] 전문가 어댑터 ${어댑터들.length}개 적재: ${어댑터들.map((a) => a.id).join(", ")} (베이스 ${modelId})`);
+  }
   const spawned = spawn(
     LLAMA_SERVER_PATH,
-    ["-m", modelFilePath(modelId), "-ngl", "-1", "--ctx-size", String(adaptation.fittedCtx), "--port", String(port), ...adaptation.extraArgs],
+    ["-m", modelFilePath(modelId), "-ngl", "-1", "--ctx-size", String(adaptation.fittedCtx), "--port", String(port), ...adaptation.extraArgs, ...loraArgs],
     { stdio: "pipe" }
   );
   drainProcessOutput(spawned, `채팅 모델 ${modelId}`);
-  const model: LoadedModel = { modelId, port, process: spawned, ready: false, lastUsed: Date.now() };
+  const model: LoadedModel = {
+    modelId,
+    port,
+    process: spawned,
+    ready: false,
+    lastUsed: Date.now(),
+    adapters: 어댑터들.map((a: LoraAdapter, index: number) => ({ id: a.id, index, topic: a.topic })),
+  };
   pool.set(modelId, model);
   setStateStmt.run("lastModelId", modelId);
   const loadStart = Date.now();
@@ -792,6 +815,31 @@ export async function ensureAgentModel(agentId: string): Promise<string> {
   }
   const model = await ensureModelLoaded(modelId);
   return `http://localhost:${model.port}/v1`;
+}
+
+// 요청별 전문가 어댑터 선택(재설계 1단계) — llm.ts가 chat/completions 본문에 펼쳐 넣는다.
+//
+// 서빙 모델에 어댑터가 하나도 안 실려 있으면 **빈 객체**를 돌려줘 기존 요청과 완전히 같다
+// (현행 함대 무영향 보장). 어댑터가 실려 있으면:
+//   · 배정 어댑터가 있고 그 모델에 적재돼 있으면 lora:[{id: 적재 인덱스, scale:1}]
+//   · 배정이 없으면 lora:[] (모든 어댑터 스케일 0 = 베이스 그대로를 명시)
+//   · 어느 쪽이든 cache_prompt:false — llama-server가 어댑터가 다른 요청끼리 프롬프트 KV를
+//     재사용해 **답이 이전 어댑터에 오염되는 실측 이슈**(ggml-org/llama.cpp#26207)의 방어.
+//     프롬프트 재처리 비용이 들지만, 오염된 답보다 느린 답이 낫다. 팀원별 슬롯 고정은 후속 최적화.
+export async function agentRequestExtras(agentId: string): Promise<Record<string, unknown>> {
+  const { getAgentModel, getAgentAdapter } = await import("./agents.js");
+  const assignedModel = getAgentModel(agentId);
+  const model =
+    assignedModel && pool.has(assignedModel)
+      ? pool.get(assignedModel)!
+      : [...pool.values()].find((m) => m.port === PORT) ?? null;
+  if (!model || model.adapters.length === 0) return {};
+  const adapterId = getAgentAdapter(agentId);
+  const loaded = adapterId ? model.adapters.find((a) => a.id === adapterId) : undefined;
+  if (adapterId && !loaded) {
+    console.warn(`[localengine] 에이전트 ${agentId}의 어댑터 ${adapterId}가 서빙 모델 ${model.modelId}에 안 실려 있어 베이스로 답합니다`);
+  }
+  return { lora: loaded ? [{ id: loaded.index, scale: 1 }] : [], cache_prompt: false };
 }
 
 // 임의의 로컬 모델을 서빙 보장하고 그 OpenAI 호환 base URL을 돌려준다(레드팀 대상 다변화용).

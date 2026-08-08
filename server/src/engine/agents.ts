@@ -4,6 +4,7 @@ import type { Express } from "express";
 import { authMiddleware, adminMiddleware } from "../auth/auth";
 import { db } from "../db";
 import { isModelAvailable } from "./localengine";
+import { getAdapter } from "./adapters";
 
 export type AgentStatus = "idle" | "working" | "watching";
 
@@ -18,6 +19,9 @@ export interface AgentDefinition {
   // 이 에이전트 전용으로 할당된 모델. null이면 "전역 모델 따름"(현재 로컬 엔진에 떠 있는 모델).
   // app_state에 영속화되며, 채팅 시 localengine.ensureAgentModel이 필요하면 스왑한다.
   assignedModelId: string | null;
+  // 전문가 LoRA 어댑터(재설계 1단계, 2026-08-08). null이면 베이스 그대로 — 어댑터는 게이트
+  // 통과 채택분만 배정할 수 있고, 배정돼 있어도 서빙 모델에 적재되지 않았으면 조용히 무시된다.
+  assignedAdapterId: string | null;
 }
 
 // status는 의도적으로 영속화하지 않는다 — "지금 누가 뭘 하고 있는지"를 나타내는 휘발성 라이브
@@ -115,6 +119,29 @@ export function setAgentName(agentId: string, name: string | null): void {
   setModelStmt.run(nameKey(agentId), trimmed);
 }
 
+// ── 전문가 어댑터 배정 (재설계 1단계) ──────────────────────────────────
+const adapterKey = (agentId: string) => `agentAdapter:${agentId}`;
+
+export function getAgentAdapter(agentId: string): string | null {
+  return (getModelStmt.get(adapterKey(agentId)) as { value: string } | undefined)?.value ?? null;
+}
+
+// adapterId=null 이면 해제(베이스 그대로). 오케스트레이터는 금지 — 라우팅은 결정성이 생명이라
+// 어댑터로 답 분포가 흔들리면 안 된다(파인튜닝이 라우팅을 8/8→7/8로 떨어뜨린 실측, 2026-08-05).
+// 채택(adopted)된 어댑터만 배정할 수 있다 — 등록만 된 어댑터는 게이트를 안 거친 것이다.
+export function setAgentAdapter(agentId: string, adapterId: string | null): void {
+  if (!AGENT_DEFS.some((a) => a.id === agentId)) throw new Error(`존재하지 않는 에이전트: ${agentId}`);
+  if (adapterId === null || adapterId === "") {
+    delModelStmt.run(adapterKey(agentId));
+    return;
+  }
+  if (agentId === "orchestrator") throw new Error("총괄(orchestrator)에는 어댑터를 배정할 수 없습니다 — 라우팅 결정성 보호");
+  const adapter = getAdapter(adapterId);
+  if (!adapter) throw new Error(`등록되지 않은 어댑터입니다: ${adapterId}`);
+  if (!adapter.adopted) throw new Error(`채택되지 않은 어댑터입니다: ${adapterId} — 평가 게이트 통과 후 채택하면 배정할 수 있습니다`);
+  setModelStmt.run(adapterKey(agentId), adapterId);
+}
+
 // modelId=null 이면 할당 해제(전역 모델 따름). 존재하지 않는 모델은 거부한다.
 export function setAgentModel(agentId: string, modelId: string | null): void {
   if (!AGENT_DEFS.some((a) => a.id === agentId)) throw new Error(`존재하지 않는 에이전트: ${agentId}`);
@@ -136,6 +163,7 @@ function toAgent(base: AgentBase): AgentDefinition {
     defaultStatus: base.defaultStatus,
     status: liveStatus.get(base.id) ?? base.defaultStatus,
     assignedModelId: getAgentModel(base.id),
+    assignedAdapterId: getAgentAdapter(base.id),
   };
 }
 
@@ -168,6 +196,17 @@ export function registerAgentsRoutes(app: Express): void {
   app.post("/api/agents/:id/model", authMiddleware, adminMiddleware, (req, res) => {
     try {
       setAgentModel(String(req.params.id), req.body.modelId ?? null);
+      res.json(getAgentById(String(req.params.id)));
+    } catch (err) {
+      res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
+    }
+  });
+
+  // 전문가 어댑터 배정 — admin만. body.adapterId=null 이면 해제(베이스 그대로).
+  // 채택된 어댑터만 배정 가능·오케스트레이터 금지(setAgentAdapter가 강제).
+  app.post("/api/agents/:id/adapter", authMiddleware, adminMiddleware, (req, res) => {
+    try {
+      setAgentAdapter(String(req.params.id), req.body.adapterId ?? null);
       res.json(getAgentById(String(req.params.id)));
     } catch (err) {
       res.status(400).json({ error: err instanceof Error ? err.message : String(err) });

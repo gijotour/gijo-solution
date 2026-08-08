@@ -10,6 +10,7 @@ import { registerMfaRoutes } from "./auth/mfaroutes";
 import { registerUsersRoutes } from "./auth/users";
 import { isAirgapOn, EGRESS_POINTS } from "./engine/airgap";
 import { registerAgentsRoutes } from "./engine/agents";
+import { registerAdapterRoutes } from "./engine/adapters";
 import { registerAssetsRoutes } from "./engine/assets";
 import { registerAssetImportRoutes } from "./engine/assetimport";
 import { registerRepoScanRoutes } from "./engine/reposcan";
@@ -139,6 +140,7 @@ export function createApp(): Express {
   registerMfaRoutes(app);
   registerUsersRoutes(app);
   registerAgentsRoutes(app);
+  registerAdapterRoutes(app);
   registerAssetsRoutes(app);
   registerAssetImportRoutes(app);
   registerRepoScanRoutes(app);

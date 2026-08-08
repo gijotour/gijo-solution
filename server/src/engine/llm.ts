@@ -622,6 +622,10 @@ export async function chat(args: ChatArgs): Promise<string> {
   const baseUrl = await import("./localengine.js")
     .then((m) => m.ensureAgentModel(args.agentId))
     .catch(() => LOCAL_LLM_BASE_URL);
+  // 전문가 어댑터 선택(재설계 1단계) — 서빙 모델에 어댑터가 없으면 빈 객체라 기존과 동일.
+  const loraExtras = await import("./localengine.js")
+    .then((m) => m.agentRequestExtras(args.agentId))
+    .catch(() => ({}) as Record<string, unknown>);
 
   emitLlmActivity({ kind: "chat", phase: "start", agent: agentName, detail: "추론 요청" });
 
@@ -632,7 +636,7 @@ export async function chat(args: ChatArgs): Promise<string> {
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "local", messages, ...constrained, max_tokens: args.maxTokens ?? DEFAULT_MAX_TOKENS }),
+    body: JSON.stringify({ model: "local", messages, ...constrained, ...loraExtras, max_tokens: args.maxTokens ?? DEFAULT_MAX_TOKENS }),
     signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
   }).catch((err: unknown) => ((err as Error)?.name === "TimeoutError" ? ("timeout" as const) : null));
 
@@ -711,7 +715,7 @@ export async function chat(args: ChatArgs): Promise<string> {
     const retryRes = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: "local", messages: retryMessages, grammar: NO_HAN_GRAMMAR, max_tokens: args.maxTokens ?? DEFAULT_MAX_TOKENS }),
+      body: JSON.stringify({ model: "local", messages: retryMessages, grammar: NO_HAN_GRAMMAR, ...loraExtras, max_tokens: args.maxTokens ?? DEFAULT_MAX_TOKENS }),
       signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
     }).catch(() => null); // 재작성 실패·시간 초과면 원래 답을 그대로 쓴다
     if (retryRes && retryRes.ok) {
