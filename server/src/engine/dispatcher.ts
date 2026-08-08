@@ -517,9 +517,16 @@ async function learnloopConfirmResult(instructionText: string, qa?: boolean): Pr
   collab(qa, { from: "orchestrator", to: "analysis", message: "학습 루프 실행 요청 — 확인 절차 안내" });
   const { listDatasets } = await import("./dataset.js");
   const datasets = listDatasets();
+  // 주제별 전문가 진척(재설계 3단계) — "어느 전문가부터 학습 가능한가"를 확인 안내에 함께.
+  const { topicTrainGate, TOPICS } = await import("./learnloop.js");
+  const 진척 = TOPICS.map((t) => {
+    const g = topicTrainGate(t);
+    return `${t} ${g.approved}/${g.target}${g.ok ? " ✓학습 가능" : ""}`;
+  }).join(" · ");
   const output = [
-    "학습 루프(파인튜닝)는 실 GPU 학습이 실행되고, 학습하는 동안 로컬 LLM 엔진이 일시 중단됩니다.",
+    "학습 루프(전문가 어댑터 학습)는 실 GPU 학습이 실행되고, 학습하는 동안 로컬 LLM 엔진이 일시 중단됩니다.",
     "오발동 방지를 위해 지시만으로는 시작하지 않습니다 — 아래에서 데이터셋을 고르고 '학습 시작'을 직접 확인해 주세요.",
+    `주제별 재료(승인 문답): ${진척} — 목표에 찬 주제부터 전문가 학습을 시작할 수 있습니다.`,
     datasets.length
       ? `사용 가능한 데이터셋 ${datasets.length}개: ${datasets.map((d) => `${d.id}(${d.examples}건)`).join(", ")}`
       : "사용 가능한 데이터셋이 없습니다 — 학습 루프 화면에서 대화 로그로 데이터셋을 먼저 만들어 주세요.",

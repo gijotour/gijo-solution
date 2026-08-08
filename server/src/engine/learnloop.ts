@@ -4,8 +4,8 @@
 //  ① 수집: 대화창 출구(dispatcher) + 직접 채팅 API(llm.ts chat())에서 실제 대화(질문/답변)를 chat_logs에 영속 저장.
 //  ② 정제: 담당자가 👍/👎로 평가한 로그 중 긍정만 골라 데이터셋(data/datasets/loop-*.json)으로.
 //  ③ 학습: finetune.ts(QLoRA)에 설정된 베이스 모델(기본 Qwen3-14B — 배치 모델과 같은 계열)을 주입해 실행.
-//  ④ 배포: 고아 스크립트였던 scripts/export_gguf.py를 호출해 LoRA→병합→GGUF→models/ 배치 후
-//     대상 에이전트에 자동 할당 — 기존에 끊겨 있던 "학습 산출물→서빙" 연결(고질 문제)을 잇는다.
+//  ④ 등록: convert_lora_to_gguf.py로 GGUF LoRA 어댑터를 구워 어댑터 등록부(adapters.ts)에
+//     **미채택**으로 올린다 — 평가 게이트 통과 후 사람이 채택해야 서빙·팀원 배정에 실린다(재설계 2단계).
 //
 // GPU 1대(RTX 3090) 전제: 파이프라인 시작 시 추론 llama-server 풀·임베딩 서버를 내리고(학습·병합이
 // VRAM을 독점), 성공/실패와 무관하게 finally에서 재기동한다 — 실패해도 추론이 죽은 채 남지 않는다.
@@ -29,7 +29,7 @@ import { db, assertTestDb, migrate } from "../db";
 import { startFinetune, isFinetuneRunning } from "./finetune";
 import { sessionArchiveDir } from "./worksessions";
 import { pauseInferenceEngines, resumeInferenceEngines } from "./localengine";
-import { setAgentModel, getAgentById } from "./agents";
+import { getAgentById } from "./agents";
 import { attachProcessLogging, recordProcessOutput } from "./logs";
 import { airgapChildEnv } from "./airgap";
 
@@ -61,7 +61,8 @@ export interface LearnloopRun {
   id: string;
   datasetId: string;
   baseModel: string;
-  outputModelId: string;
+  outputModelId: string; // 산출 어댑터 id (재설계 2단계부터 — 병합 모델이 아니라 GGUF LoRA)
+  topic: string | null; // 주제별 전문가 학습이면 그 주제 — null이면 전 주제(범용)
   stage: LearnloopStage;
   error?: string;
   startedAt: number;
@@ -110,6 +111,18 @@ const pickLogsStmt = db.prepare(
 const pickLogsWithUnratedStmt = db.prepare(
   "SELECT * FROM chat_logs WHERE usedInDataset = 0 AND (rating = 1 OR rating IS NULL) ORDER BY createdAt ASC"
 );
+// 주제별 전문가 학습(재설계 2단계) — 그 주제 딱지가 붙은 것만 재료로 쓴다.
+const pickLogsByTopicStmt = db.prepare(
+  "SELECT * FROM chat_logs WHERE usedInDataset = 0 AND rating = 1 AND topic = ? ORDER BY createdAt ASC"
+);
+const pickLogsWithUnratedByTopicStmt = db.prepare(
+  "SELECT * FROM chat_logs WHERE usedInDataset = 0 AND (rating = 1 OR rating IS NULL) AND topic = ? ORDER BY createdAt ASC"
+);
+// 학습 시작 게이트용 — usedInDataset 여부와 무관하게 그 주제의 **승인 총량**을 센다
+// (게이트는 "재료가 이만큼 모였나"의 판정이지 "아직 안 쓴 게 몇 개냐"가 아니다).
+const topicApprovedCountStmt = db.prepare(
+  "SELECT COUNT(*) AS n FROM chat_logs WHERE rating = 1 AND topic = ?"
+);
 const markUsedStmt = db.prepare("UPDATE chat_logs SET usedInDataset = 1 WHERE id = ?");
 const countLogsStmt = db.prepare("SELECT COUNT(*) AS n FROM chat_logs");
 // 보존 상한 초과분을 오래된 순으로 지운다 — 단, 아직 학습에 쓰지 않은 후보(👍/미평가 미사용)는
@@ -125,8 +138,11 @@ const pruneOldestLogsStmt = db.prepare(
   `DELETE FROM chat_logs WHERE id IN (SELECT id FROM chat_logs ORDER BY createdAt ASC LIMIT ?)`
 );
 
+// 주제별 전문가 학습(재설계 2·3단계) — 어느 주제의 어댑터를 구운 실행인지 이력에 남긴다.
+migrate("learnloop-runs-topic-2026-08-08", "ALTER TABLE learnloop_runs ADD COLUMN topic TEXT");
+
 const insertRunStmt = db.prepare(
-  "INSERT INTO learnloop_runs (id, datasetId, baseModel, outputModelId, stage, error, startedAt, finishedAt) VALUES (@id, @datasetId, @baseModel, @outputModelId, @stage, NULL, @startedAt, NULL)"
+  "INSERT INTO learnloop_runs (id, datasetId, baseModel, outputModelId, topic, stage, error, startedAt, finishedAt) VALUES (@id, @datasetId, @baseModel, @outputModelId, @topic, @stage, NULL, @startedAt, NULL)"
 );
 const updateRunStmt = db.prepare("UPDATE learnloop_runs SET stage = ?, error = ?, finishedAt = ? WHERE id = ?");
 const listRunsStmt = db.prepare("SELECT * FROM learnloop_runs ORDER BY startedAt DESC LIMIT 20");
@@ -160,6 +176,7 @@ interface RunRow {
   datasetId: string;
   baseModel: string;
   outputModelId: string;
+  topic: string | null;
   stage: LearnloopStage;
   error: string | null;
   startedAt: number;
@@ -183,6 +200,7 @@ const runFromRow = (r: RunRow): LearnloopRun => ({
   datasetId: r.datasetId,
   baseModel: r.baseModel,
   outputModelId: r.outputModelId,
+  topic: r.topic ?? null,
   stage: r.stage,
   error: r.error ?? undefined,
   startedAt: r.startedAt,
@@ -214,7 +232,7 @@ const DEFAULT_CONFIG: LearnloopConfig = {
 };
 
 
-// 산출 모델 id는 <prefix>-v<N> — export_gguf.py의 규칙(^[a-z0-9][a-z0-9.-]{0,63}$)에 맞아야 한다.
+// 산출 어댑터 id는 <prefix>-v<N> — convert 산출 파일명 규칙(^[a-z0-9][a-z0-9.-]{0,63}$)에 맞아야 한다.
 const PREFIX_RE = /^[a-z0-9][a-z0-9-]{0,40}$/;
 
 function stateGet(key: string): string | undefined {
@@ -300,6 +318,15 @@ export function pruneChatLogs(cap = CHATLOG_MAX): number {
  * ⚠ 문서 분류(categorizeByRules)와 따로 두는 이유: 문서는 본문 수천 자로 판정하지만 질문은
  *   한 줄이다. 같은 규칙을 쓰면 거의 전부 "확신 못 함"이 된다 — 질문에는 질문의 신호가 있다.
  */
+// 주제(업무영역) 상수 — 질문주제 판정·주제별 학습 게이트·topics API가 같은 값을 본다.
+export const TOPICS = ["취약점", "장비운영", "사내규정", "위협대응"] as const;
+// 어댑터 id는 영문 제약(export_gguf 규칙과 동일)이라 주제를 슬러그로 바꾼다.
+const TOPIC_SLUGS: Record<string, string> = { 취약점: "vuln", 장비운영: "ops", 사내규정: "policy", 위협대응: "threat" };
+const topicSlug = (topic: string): string => TOPIC_SLUGS[topic] ?? "misc";
+// 주제별 전문가 학습 개시선(승인 문답 수). LIMA 계열 근거 + 1회전 실측(85쌍은 생성 안정성이
+// 무너짐 — 반복 루프·설정 키 날조)에서 나온 값. topics API의 "준비됨" 판정과 같은 값이어야 한다.
+export const TOPIC_TRAIN_TARGET = 300;
+
 export function 질문주제(question: string): string | null {
   const q = String(question ?? "");
   const 점수: Record<string, number> = {
@@ -362,12 +389,16 @@ export function deleteChatLog(id: string): void {
 // ── ② 정제 → 데이터셋 ────────────────────────────────────────────────
 // 긍정 평가(옵션: +미평가) 미사용 로그를 {question,answer}[]로 변환해 저장한다 — 이미 Q&A 쌍이라
 // LLM 재변환이 필요 없다. 저장 성공 후 같은 트랜잭션에서 usedInDataset=1 마킹.
-export async function buildDatasetFromLogs(opts: { includeUnrated?: boolean; minExamples?: number } = {}): Promise<{ datasetId: string; examples: number; fingerprint: string; dropped: Record<string, number> }> {
+export async function buildDatasetFromLogs(opts: { includeUnrated?: boolean; minExamples?: number; topic?: string } = {}): Promise<{ datasetId: string; examples: number; fingerprint: string; dropped: Record<string, number> }> {
   const minExamples = opts.minExamples ?? 5;
-  const rows = (opts.includeUnrated ? pickLogsWithUnratedStmt.all() : pickLogsStmt.all()) as ChatLogRow[];
+  const rows = (
+    opts.topic
+      ? (opts.includeUnrated ? pickLogsWithUnratedByTopicStmt : pickLogsByTopicStmt).all(opts.topic)
+      : (opts.includeUnrated ? pickLogsWithUnratedStmt : pickLogsStmt).all()
+  ) as ChatLogRow[];
   if (rows.length < minExamples) {
     throw new Error(
-      `학습에 쓸 로그가 부족합니다 (현재 ${rows.length}건, 최소 ${minExamples}건). 대화를 더 수집하고 👍 평가를 남겨주세요.`
+      `학습에 쓸 로그가 부족합니다 (${opts.topic ? `주제 「${opts.topic}」 ` : ""}현재 ${rows.length}건, 최소 ${minExamples}건). 대화를 더 수집하고 👍 평가를 남겨주세요.`
     );
   }
   const now = new Date();
@@ -437,6 +468,13 @@ function nextOutputModelId(prefix: string): string {
       if (m) max = Math.max(max, Number(m[1]));
     }
   }
+  // 어댑터 산출처(data/lora)도 본다 — 재설계 2단계부터 산출이 여기로 온다(<id>.gguf).
+  if (fs.existsSync(LORA_DIR)) {
+    for (const entry of fs.readdirSync(LORA_DIR)) {
+      const m = re.exec(entry.replace(/\.gguf$/, ""));
+      if (m) max = Math.max(max, Number(m[1]));
+    }
+  }
   for (const row of runModelIdsStmt.all() as { outputModelId: string }[]) {
     const m = re.exec(row.outputModelId);
     if (m) max = Math.max(max, Number(m[1]));
@@ -454,20 +492,46 @@ function setStage(run: LearnloopRun, stage: LearnloopStage, error?: string): voi
   recordProcessOutput("learnloop", error ? "error" : "log", `[${run.id}] ${stage}${error ? ` — ${error}` : ""}`);
 }
 
-export async function startLearnloopRun(opts: { datasetId?: string } = {}): Promise<LearnloopRun> {
+// 주제별 학습 개시 게이트(재설계 3단계) — "언제 전문가를 학습시킬 수 있나"의 단일 판정.
+// force는 목표 미달 강행(관리자 실험용) — 산출 어댑터 note에 강행 사실이 남는다.
+export function topicTrainGate(topic: string): { ok: boolean; approved: number; target: number; 남은건수: number } {
+  if (!(TOPICS as readonly string[]).includes(topic)) {
+    throw new Error(`알 수 없는 주제입니다: ${topic} — 가능한 주제: ${TOPICS.join("·")}`);
+  }
+  const approved = (topicApprovedCountStmt.get(topic) as { n: number }).n;
+  return { ok: approved >= TOPIC_TRAIN_TARGET, approved, target: TOPIC_TRAIN_TARGET, 남은건수: Math.max(0, TOPIC_TRAIN_TARGET - approved) };
+}
+
+export async function startLearnloopRun(opts: { datasetId?: string; topic?: string; force?: boolean } = {}): Promise<LearnloopRun> {
   if (loopRunning) throw new Error("이미 학습 루프가 진행 중입니다");
   if (isFinetuneRunning()) throw new Error("파인튜닝이 이미 진행 중입니다 — 끝난 뒤 다시 시도하세요");
 
+  // 주제별 전문가 학습이면 개시선(승인 300)을 먼저 확인한다 — 1회전 실측(85쌍 → 반복 루프·
+  // 키 날조)이 이 게이트의 이유. 미달이면 진척 수치와 함께 정직하게 거절한다.
+  const topic = opts.topic ?? null;
+  let 강행 = false;
+  if (topic) {
+    const gate = topicTrainGate(topic);
+    if (!gate.ok && !opts.force) {
+      throw new Error(
+        `주제 「${topic}」의 승인 문답이 아직 ${gate.approved}/${gate.target}건입니다 — ${gate.남은건수}건 더 모여야 전문가 학습을 시작할 수 있습니다. ` +
+          `(1회전 실측: 소량 재료 학습은 답이 망가집니다. 후보함에서 좋은 문답을 승인해 주세요.)`
+      );
+    }
+    강행 = !gate.ok; // force로 뚫었다는 사실 — 산출 어댑터 note에 남긴다
+  }
+
   const config = getLearnloopConfig();
-  // datasetId가 없으면 수집 로그로 즉석 데이터셋을 만든다(원클릭 루프).
-  const datasetId = opts.datasetId ?? (await buildDatasetFromLogs()).datasetId;
-  const outputModelId = nextOutputModelId(config.modelPrefix);
+  // datasetId가 없으면 수집 로그로 즉석 데이터셋을 만든다(원클릭 루프). 주제가 있으면 그 주제만.
+  const datasetId = opts.datasetId ?? (await buildDatasetFromLogs({ topic: topic ?? undefined })).datasetId;
+  const outputModelId = nextOutputModelId(topic ? `${config.modelPrefix}-${topicSlug(topic)}` : config.modelPrefix);
 
   const run: LearnloopRun = {
     id: "run" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
     datasetId,
     baseModel: config.baseModel,
     outputModelId,
+    topic,
     stage: "stopping-engines",
     startedAt: Date.now(),
   };
@@ -476,7 +540,7 @@ export async function startLearnloopRun(opts: { datasetId?: string } = {}): Prom
   currentRun = run;
   broadcastRun(run);
 
-  void runPipeline(run, config).finally(() => {
+  void runPipeline(run, config, 강행).finally(() => {
     loopRunning = false;
   });
   return run;
@@ -486,7 +550,7 @@ export async function startLearnloopRun(opts: { datasetId?: string } = {}): Prom
 // 첫 await 없이 동기로 완주해 202 응답 전에 이미 done이 돼버린다(전이 브로드캐스트도 못 봄).
 const smokeTick = () => new Promise<void>((r) => setTimeout(r, 25));
 
-async function runPipeline(run: LearnloopRun, config: LearnloopConfig): Promise<void> {
+async function runPipeline(run: LearnloopRun, config: LearnloopConfig, 목표미달강행 = false): Promise<void> {
   let failure: string | null = null;
   try {
     // (1) 추론 엔진 정지 — 학습·병합이 GPU(VRAM)를 독점해야 한다. 진행 중 채팅/RAG은 일시 불가.
@@ -510,19 +574,33 @@ async function runPipeline(run: LearnloopRun, config: LearnloopConfig): Promise<
       });
     }
 
-    // (3) GGUF 변환·배치 — 고아였던 export_gguf.py를 여기서 호출해 루프를 닫는다.
+    // (3) 어댑터 변환(재설계 2단계) — 병합 GGUF 대신 **GGUF LoRA 어댑터**를 굽는다.
+    // 병합은 베이스 통째 복제(수 GB×버전)였고, 어댑터(수십 MB)는 베이스 1개 위에 여럿을
+    // 얹을 수 있다("베이스 1 + 어댑터 N"). 병합 경로(export_gguf.py)는 은퇴 — 머지 메뉴를
+    // 내린 사용자 결정(2026-08-08)과 같은 계열이다.
     setStage(run, "exporting");
     if (SMOKE()) await smokeTick();
     else {
-      await runExport(run.datasetId, run.outputModelId);
+      await runAdapterExport(run.datasetId, run.outputModelId);
     }
 
-    // (4) 대상 에이전트에 새 모델 할당 — models/ live 스캔이라 서버 재시작 불필요.
-    // 스모크에선 실제 gguf 파일이 없어 setAgentModel이 "배치되지 않은 모델"로 거부하므로 생략.
+    // (4) 등록(미채택) — **자동 부착 금지**. 어댑터 1호가 게이트 없이 나갔다면 설정 키 날조가
+    // 실서비스에 실렸을 것이다(2026-08-08 실측). 평가 게이트 통과 후 사람이 채택해야
+    // 서빙에 실리고 팀원에 배정할 수 있다. 스모크에선 실제 파일이 없어 생략.
     setStage(run, "deploying");
     if (SMOKE()) await smokeTick();
     else {
-      setAgentModel(config.targetAgent, run.outputModelId);
+      const { registerAdapter } = await import("./adapters.js");
+      registerAdapter({
+        id: run.outputModelId,
+        topic: run.topic,
+        baseModelId: servingBaseModelId(),
+        file: adapterOutPath(run.outputModelId),
+        note:
+          `미채택 — 평가 게이트(tools/evalgate) + A/B(lora-ab) 통과 후 채택하세요. ` +
+          `학습 베이스 ${run.baseModel} · 데이터셋 ${run.datasetId}` +
+          (목표미달강행 ? ` · ⚠개시선(${TOPIC_TRAIN_TARGET}건) 미달 강행 학습` : ""),
+      });
     }
   } catch (err) {
     failure = `${run.stage} 단계 실패: ${err instanceof Error ? err.message : String(err)}`;
@@ -540,11 +618,24 @@ async function runPipeline(run: LearnloopRun, config: LearnloopConfig): Promise<
   else setStage(run, "done");
 }
 
-// scripts/export_gguf.py 실행 — stdout/stderr는 로그 화면(learnloop-export 소스)으로 흘린다.
-function runExport(datasetId: string, outputModelId: string): Promise<void> {
+// 산출 어댑터 보관처 — models/(베이스)와 분리해 "베이스 1 + 어댑터 N"의 물리 구조를 그대로 둔다.
+const LORA_DIR = process.env.GIJO_LORA_DIR ?? path.join("data", "lora");
+export const adapterOutPath = (adapterId: string): string => path.join(LORA_DIR, `${adapterId}.gguf`);
+
+// 산출 어댑터가 붙을 **서빙 베이스 모델 id**(GGUF, models/의 폴더명). 학습 베이스(HF repo)와
+// 다른 좌표계다 — 운영자가 고른 기본 모델(defaultModelId)이 곧 어댑터가 얹힐 그릇이다.
+function servingBaseModelId(): string {
+  const stored = (getStateStmt.get("defaultModelId") as { value: string } | undefined)?.value;
+  return stored ?? process.env.GIJO_DEFAULT_MODEL_ID ?? "gijo-main-orchestrator";
+}
+
+// llama.cpp convert_lora_to_gguf.py 실행 — HF LoRA 산출(outputs/<ds>/lora-adapter)을
+// GGUF LoRA(data/lora/<id>.gguf)로 변환한다. 1회전(2026-08-08)에서 실검증된 경로.
+function runAdapterExport(datasetId: string, adapterId: string): Promise<void> {
   return new Promise<void>((resolve, reject) => {
+    fs.mkdirSync(LORA_DIR, { recursive: true });
     const adapter = path.join("outputs", datasetId, "lora-adapter");
-    const args = ["scripts/export_gguf.py", "--adapter", adapter, "--model-id", outputModelId];
+    const args = [path.join(LLAMA_CPP_DIR, "convert_lora_to_gguf.py"), adapter, "--outfile", adapterOutPath(adapterId)];
     recordProcessOutput("learnloop-export", "log", `$ python ${args.join(" ")}`);
     // PYTHONUTF8=1: cp949 콘솔에서 한국어/특수문자 로그가 깨지거나 스크립트가 죽는 함정 방지.
     // 에어갭 봉인 시 HF 오프라인 강제(자식 프로세스는 fetch 관문 밖) — 봉인 아니면 무영향.
@@ -686,10 +777,10 @@ export function registerLearnloopRoutes(app: Express): void {
          FROM chat_logs GROUP BY COALESCE(topic, '(미분류)') ORDER BY total DESC`
     ).all() as { topic: string; total: number; approved: number }[];
     // 전문가 LoRA는 승인된 좋은 문답 기준이다(LIMA — 수작업 수천이 기계생성 수만을 이긴다).
-    const 목표 = 300;
+    // 학습 시작 게이트(startLearnloopRun)와 같은 상수를 봐야 "준비됨"과 "시작 가능"이 안 어긋난다.
     res.json({
-      목표승인건수: 목표,
-      주제: rows.map((r) => ({ ...r, 준비됨: r.approved >= 목표, 남은건수: Math.max(0, 목표 - r.approved) })),
+      목표승인건수: TOPIC_TRAIN_TARGET,
+      주제: rows.map((r) => ({ ...r, 준비됨: r.approved >= TOPIC_TRAIN_TARGET, 남은건수: Math.max(0, TOPIC_TRAIN_TARGET - r.approved) })),
     });
   });
 
@@ -727,7 +818,7 @@ export function registerLearnloopRoutes(app: Express): void {
     authMiddleware,
     asyncRoute(async (req, res) => {
       try {
-        res.json(await buildDatasetFromLogs({ includeUnrated: !!req.body?.includeUnrated }));
+        res.json(await buildDatasetFromLogs({ includeUnrated: !!req.body?.includeUnrated, topic: req.body?.topic }));
       } catch (err) {
         res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
       }
@@ -739,7 +830,17 @@ export function registerLearnloopRoutes(app: Express): void {
     authMiddleware,
     asyncRoute(async (req, res) => {
       try {
-        const run = await startLearnloopRun({ datasetId: req.body?.datasetId });
+        // topic: 주제별 전문가 학습(승인 300 게이트) · force: 미달 강행(관리자 실험용 — 감사에 남김)
+        if (req.body?.force) {
+          recordAudit({
+            kind: "config",
+            actor: (req as Request & { user?: GijoUser }).user?.username ?? "unknown",
+            action: "학습 개시선 미달 강행",
+            target: String(req.body?.topic ?? "(전체)"),
+            result: "ok",
+          });
+        }
+        const run = await startLearnloopRun({ datasetId: req.body?.datasetId, topic: req.body?.topic, force: !!req.body?.force });
         res.status(202).json(run);
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);

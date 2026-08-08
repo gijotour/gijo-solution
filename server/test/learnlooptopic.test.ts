@@ -1,0 +1,129 @@
+// test/learnlooptopic.test.ts — 주제별 전문가 학습 게이트·데이터셋 필터·어댑터 산출 배선
+// (AI팀 재설계 2·3단계, 2026-08-08)
+//
+// 계약: ① 주제 학습은 승인 300(TOPIC_TRAIN_TARGET) 미달이면 진척 수치와 함께 거절 — 1회전
+// 실측(85쌍 → 반복 루프·키 날조)이 근거 ② force 강행은 산출에 흔적이 남는다 ③ 주제 데이터셋은
+// 그 주제 딱지만 담는다 ④ 산출은 병합 모델이 아니라 어댑터 등록(미채택)이다 — 소스 감시 포함.
+
+import { describe, it, expect, beforeEach, beforeAll, afterAll } from "vitest";
+import request from "supertest";
+import * as fs from "fs";
+import * as path from "path";
+import { createApp } from "../src/app";
+import {
+  recordChatLog,
+  resetLearnloopForTests,
+  getLearnloopStatus,
+  topicTrainGate,
+  TOPIC_TRAIN_TARGET,
+  TOPICS,
+} from "../src/engine/learnloop";
+
+async function login(app: ReturnType<typeof createApp>) {
+  const res = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" });
+  return res.body.accessToken as string;
+}
+
+function waitUntil(cond: () => boolean, timeoutMs = 10000): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const start = Date.now();
+    const timer = setInterval(() => {
+      if (cond()) {
+        clearInterval(timer);
+        resolve();
+      } else if (Date.now() - start > timeoutMs) {
+        clearInterval(timer);
+        reject(new Error("waitUntil timeout"));
+      }
+    }, 25);
+  });
+}
+
+describe("learnloop 주제별 전문가 학습 (재설계 2·3단계)", () => {
+  let app: ReturnType<typeof createApp>;
+  let token: string;
+  const auth = () => ({ Authorization: `Bearer ${token}` });
+  const savedDatasets: string[] = [];
+
+  beforeAll(() => {
+    process.env.GIJO_LEARNLOOP_SMOKE = "1";
+  });
+
+  afterAll(() => {
+    delete process.env.GIJO_LEARNLOOP_SMOKE;
+    for (const id of savedDatasets) {
+      fs.rmSync(path.join(process.env.GIJO_DATASETS_DIR ?? path.join("data", "datasets"), `${id}.json`), { force: true });
+    }
+  });
+
+  beforeEach(async () => {
+    resetLearnloopForTests();
+    app = createApp();
+    token = await login(app);
+  });
+
+  // 주제 딱지는 질문주제()가 결정적으로 붙인다 — "방화벽"은 장비운영, "CVE-…"는 취약점.
+  async function seed장비운영(n: number) {
+    for (let i = 0; i < n; i++) {
+      recordChatLog("analysis", `질문 ${i}: 방화벽 룰셋 점검은 어떻게?`, `답변 ${i}: 정책 검토 후 미사용 룰을 정리합니다.`);
+    }
+    const res = await request(app).get("/api/learnloop/logs").set(auth()).query({ limit: 200 });
+    for (const log of res.body.logs) {
+      await request(app).post(`/api/learnloop/logs/${log.id}/rate`).set(auth()).send({ rating: 1 });
+    }
+  }
+
+  it("topicTrainGate — 미달이면 ok:false와 진척 수치, 모르는 주제는 거절", () => {
+    const gate = topicTrainGate("장비운영");
+    expect(gate.ok).toBe(false);
+    expect(gate.target).toBe(TOPIC_TRAIN_TARGET);
+    expect(gate.남은건수).toBeGreaterThan(0);
+    expect(() => topicTrainGate("요리")).toThrow(/알 수 없는 주제/);
+    expect(TOPICS).toContain("장비운영");
+  });
+
+  it("주제 학습 시작은 승인 300 미달이면 400 — 진척 수치를 정직하게 말한다", async () => {
+    await seed장비운영(6);
+    const res = await request(app).post("/api/learnloop/run").set(auth()).send({ topic: "장비운영" });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toContain("장비운영");
+    expect(res.body.error).toMatch(/6\/300/);
+    expect(res.body.error).toContain("294건");
+  });
+
+  it("force 강행은 202로 시작되고 산출 id에 주제 슬러그가 붙는다", async () => {
+    await seed장비운영(6);
+    const res = await request(app).post("/api/learnloop/run").set(auth()).send({ topic: "장비운영", force: true });
+    expect(res.status).toBe(202);
+    expect(res.body.topic).toBe("장비운영");
+    expect(res.body.outputModelId).toMatch(/^sec-expert-ops-v\d+$/);
+    savedDatasets.push(res.body.datasetId);
+    await waitUntil(() => getLearnloopStatus().running === false);
+  });
+
+  it("주제 데이터셋은 그 주제 딱지만 담는다 — 다른 주제·미분류는 제외", async () => {
+    await seed장비운영(6);
+    // 취약점 로그도 섞어 둔다(승인 포함) — 필터가 없으면 함께 딸려 들어간다
+    recordChatLog("analysis", "CVE-2026-0001 패치 상태는?", "해당 자산 3대 중 2대 조치 완료입니다.");
+    const 취약점로그 = (await request(app).get("/api/learnloop/logs").set(auth())).body.logs[0];
+    await request(app).post(`/api/learnloop/logs/${취약점로그.id}/rate`).set(auth()).send({ rating: 1 });
+
+    const res = await request(app).post("/api/learnloop/build-dataset").set(auth()).send({ topic: "장비운영" });
+    expect(res.status).toBe(200);
+    expect(res.body.examples).toBe(6); // 취약점 1건은 안 들어감
+    savedDatasets.push(res.body.datasetId);
+
+    // 취약점 쪽은 아직 미사용으로 남아 있어야 한다(다음 취약점 데이터셋의 재료)
+    const 남은 = await request(app).post("/api/learnloop/build-dataset").set(auth()).send({ topic: "취약점" });
+    expect(남은.status).toBe(400); // 1건뿐 — 최소 5건 미달이지만 "주제 「취약점」" 표기로 정직하게
+    expect(남은.body.error).toContain("취약점");
+  });
+
+  it("산출 배선 소스 감시 — 병합이 아니라 어댑터 등록(미채택)이다", () => {
+    const s = fs.readFileSync(path.join(__dirname, "..", "src", "engine", "learnloop.ts"), "utf8");
+    expect(s).toContain("convert_lora_to_gguf.py"); // 병합(export_gguf) 은퇴, 어댑터 변환으로
+    expect(s).toContain("registerAdapter({"); // deploying 단계 = 등록
+    expect(s).not.toMatch(/setAgentModel\(config\.targetAgent/); // 자동 부착 금지 — 게이트 우회 경로 차단
+    expect(s).toContain("미채택");
+  });
+});
