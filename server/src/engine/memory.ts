@@ -429,6 +429,14 @@ export function chunkText(text: string, size = CHUNK_SIZE, overlap = CHUNK_OVERL
 /** 글자로 그냥 읽으면 안 되는(추출이 필요한) 형식 — 그대로 읽으면 압축 바이트가 지식이 된다. */
 const 추출필요 = new Set([".pdf", ".hwp", ".hwpx", ".docx", ".doc", ".pptx", ".xlsx"]);
 
+/**
+ * 위생 필터를 거치기 **전** 원문이 몇 조각짜리인지 — 인입 품질 판정의 분모.
+ * 걸러진 뒤(chunks)와 비교해 "거의 다 버려졌다"면 그 문서는 읽지 못한 것이다.
+ */
+function 대략조각수(raw: string): number {
+  return Math.max(1, Math.ceil((raw ?? "").trim().length / CHUNK_SIZE));
+}
+
 export async function ingestDocument(filePath: string, scope: string = GLOBAL_SCOPE, classify = false, uploadedBy?: string): Promise<IngestResult> {
   const resolved = assertWithinIngestRoot(filePath);
   const ext = path.extname(resolved).toLowerCase();
@@ -451,6 +459,17 @@ export async function ingestDocument(filePath: string, scope: string = GLOBAL_SC
 // 서버 밖 클라이언트에서 올린 문서용. ingestDocument는 파일을 읽어 이 함수로 위임한다.
 export async function ingestText(documentId: string, raw: string, scope: string = GLOBAL_SCOPE, sourcePath?: string, classify = false, uploadedBy?: string, category?: string): Promise<IngestResult> {
   const chunks = chunkText(raw);
+  // ⚠ 읽을 수 없는 문서를 **조용히 받아들이지 않는다**(2026-08-08 실사고).
+  //   저장소 조각의 73%가 PDF 압축 바이트였는데, 숫자로는 "지식 5,631조각"이라 건강해
+  //   보였다. 아무도 내용을 안 봤기 때문에 몇 달을 몰랐다. chunkText가 쓰레기를 걸러
+  //   내므로 **걸러낸 뒤 남은 게 거의 없다면 그 문서는 못 읽은 것**이다 — 성공한 척하지 않는다.
+  const 원문조각 = 대략조각수(raw);
+  if (원문조각 >= 3 && chunks.length < 원문조각 * 0.2) {
+    throw new Error(
+      `문서를 읽지 못했습니다(${documentId}) — 내용이 글자가 아닌 것 같습니다. ` +
+      `PDF·한글 문서는 텍스트 추출을 거쳐야 합니다. 추출 도구가 준비돼 있는지 확인하세요.`
+    );
+  }
   if (chunks.length === 0) return { documentId, chunks: 0, embeddingModel: "none", scope };
 
   // 인입 점검 — 문서에 AI를 조종하려는 지시문이 숨어 있는지 미리 본다.
