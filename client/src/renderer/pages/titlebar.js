@@ -350,6 +350,21 @@
       '<path d="M12.6 3.2H9.2v10c0-.7.6-1.3 1.3-1.3h2.1z"/></svg>';
     gear.title = "문서함 열기 — 가이드·아키텍처를 읽는 별도 창";
     row.appendChild(av); row.appendChild(nm); row.appendChild(gear);
+    // 「⇤ 대화 여기로 다시 붙이기」 — 문서함 줄 **바로 위**(2026-08-08 사용자 지시·시안 승인).
+    // 예전 자리는 본문 아래 가로 한 줄(38px)이라, 대화창을 뺄수록 화면이 좁아지는 모순이 있었다.
+    // ⚠ 셸(app.html)에만 만든다 — 분리창·직접 연 화면에는 되돌릴 대화창 자체가 없다.
+    // ⚠ 보이고 숨는 것은 app.html의 `body.console-popped #csBackRow`가 정한다(상태는 셸이 안다).
+    if (document.getElementById("screens")) {
+      var backRow = document.createElement("div");
+      backRow.id = "csBackRow";
+      var backBtn = document.createElement("button");
+      backBtn.className = "tb-btn";
+      backBtn.id = "csBackBtn";
+      backBtn.textContent = "⇤ 대화 여기로 다시 붙이기";
+      backBtn.title = "별도 창으로 빼놓은 대화를 이 자리로 되돌립니다";
+      backRow.appendChild(backBtn);
+      area.appendChild(backRow);
+    }
     area.appendChild(row);
     gear.addEventListener("click", function (e) {
       e.stopPropagation();
@@ -449,16 +464,18 @@
     if (!hdr || document.querySelector(".gtb-sess")) return;
     // 대시보드에 이미 자체 칩(#sessionChip)이 있으면 그걸 쓰고 공용은 만들지 않는다(중복 방지).
     if (document.getElementById("sessionChip")) return;
-    // 순서 통일(2026-07-26): 대시보드와 동일하게 [서버 연결상태] → [세션] 순으로 놓는다.
-    // 연결상태 칩 바로 뒤에 붙이고, 없으면 우측 영역 끝에.
     var right = hdr.querySelector(".header-right") || hdr;
-    var statusPill = hdr.querySelector("#statusPill, .status-pill, .tb-status, .gtb-status");
     sessChip = document.createElement("div");
     sessChip.className = "gtb-sess";
     sessChip.title = "남은 세션 시간 — 마우스·키보드를 쓰면 자동 연장. 클릭하면 연장/관제 선택";
     sessChip.innerHTML = '⏳ 세션 <span class="t">--:--</span> <span style="opacity:.7">▾</span>';
     sessTimeEl = sessChip.querySelector(".t");
-    if (statusPill && statusPill.parentNode) statusPill.parentNode.insertBefore(sessChip, statusPill.nextSibling);
+    // ⚠ 자리를 **남에게 기대지 않는다**(2026-08-08 사용자 신고: "세션이 메인화면 아래로 나온다").
+    //   예전에는 연결상태 배지를 찾아 그 **뒤에** 끼워 넣고, 못 찾으면 영역 끝에 떨어뜨렸다.
+    //   그 배지를 없앤 지금은 기준 자체가 사라져 매번 끝으로 밀린다 — 시계 **바로 왼쪽**으로 못 박는다
+    //   (「남은 시간」과 「지금 시각」은 붙어 있어야 뜻이 산다).
+    var clock = right.querySelector(".tb-clock, .gtb-clock");
+    if (clock && clock.parentNode === right) right.insertBefore(sessChip, clock);
     else right.appendChild(sessChip);
 
     var closePop = function () { if (sessPop) { sessPop.remove(); sessPop = null; } };
@@ -694,10 +711,13 @@
    *   만들어 두고 아무 일도 안 하게 두면 "눌러도 반응 없는 자리"가 된다(전수 점검에서 잡던 결함).
    */
   function mountTopbar() {
-    // 셸(app.html)의 상단 바는 **탭줄 하나**다(2026-08-07 시안 승인) — 조작 단추를 탭줄 맨 앞에
-    // 붙이고, 경로 표시(topWhereEl)는 만들지 않는다. **활성 탭이 곧 경로**라(구역 › 이름을 탭이
-    // 그린다) 따로 갱신할 상태가 없다 — 두 함수가 따로 갱신하다 어긋나던 사고의 구조적 제거.
-    var hdr = 셸인가 ? document.getElementById("tabBar") : document.querySelector(".header");
+    // 셸(app.html)의 상단은 **조작 줄(#shellTop)**이다 — 탭은 아래로 내려갔다(2026-08-08 시안 ㉯).
+    // 조작 단추를 이 줄 맨 앞에 붙이고, 경로 표시(topWhereEl)는 만들지 않는다. **활성 탭이 곧
+    // 경로**라(구역 › 이름을 탭이 그린다) 따로 갱신할 상태가 없다 — 두 함수가 따로 갱신하다
+    // 어긋나던 사고의 구조적 제거.
+    // ⚠ #tabBar로 폴백하지 않는다 — 탭줄은 이제 하단이라, 못 찾았을 때 조용히 아래에 붙으면
+    //   "조작 단추가 어디 갔지"가 된다. 없으면 안 만드는 편이 낫다.
+    var hdr = 셸인가 ? document.getElementById("shellTop") : document.querySelector(".header");
     if (!hdr || hdr.querySelector(".gtb-acts")) return false;
     // ⚠ 분리창(popout=1)은 **왼쪽 메뉴를 강제로 숨긴다**(nav.js applyPopout). 요소는 남아 있으므로
     //   "있으니 만들자"로 판단하면 ▣가 붙고, 눌러도 아무 일이 없다 — 딱 우리가 없애려던 자리다.
@@ -768,20 +788,12 @@
     tick(); setInterval(tick, 30000);
     host.appendChild(clock);
 
-    var pill = document.createElement("span");
-    pill.className = statusCls;
-    pill.innerHTML = '<span class="dot"></span>연결 확인 중';
-    host.appendChild(pill);
-    var probe = async function () {
-      var ok = false;
-      try { var h = await window.gijo.checkServerHealth(); ok = !!(h && (h.ok || h.status === "ok")); } catch (e) {}
-      pill.innerHTML = '<span class="dot"></span>' + (ok ? "서버 연결상태 양호" : "서버 연결상태 불량");
-      pill.style.color = ok ? "var(--teal,#1eb980)" : "#e2483d";
-      pill.style.background = ok ? "rgba(30,185,128,.14)" : "rgba(226,72,61,.14)";
-      pill.style.borderColor = ok ? "rgba(30,185,128,.4)" : "rgba(226,72,61,.4)";
-    };
-    if (authed && window.gijo && window.gijo.checkServerHealth) { probe(); setInterval(probe, 30000); }
-    else pill.style.display = "none";
+    // ⚠ 서버 연결상태 배지는 **없앴다**(2026-08-08 사용자 지시). 양호일 때가 거의 전부라
+    //   늘 켜져 있는 초록 칩이 자리만 먹었다. 인자 statusCls는 부르는 쪽 두 곳을 함께
+    //   고치지 않으려고 남겨 둔다(쓰지 않는다).
+    //   ⚠ 서버가 죽었을 때 알 길이 함께 사라진 것은 사실이다 — 그때는 화면이 값을 못 채워
+    //   드러나고, 「자가 진단」·설정 › 서버에서 확인한다.
+    void statusCls;
   }
 
   function mountShellInfo() {

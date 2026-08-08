@@ -98,6 +98,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
 /* 카테고리 막대 + 항목 (시안 B+C) */
 .cols{display:grid;grid-template-columns:340px 1fr;gap:16px;max-width:1080px;align-items:start;}
+/* ⚠ 왼쪽 구역을 **접으면** 그 칸이 340px를 그대로 먹어, 오른쪽 결과 옆에 43px짜리 빈 기둥이
+   선다(2026-08-08 사용자 신고 "별도로 화면 분리되는거"). 접힌 동안은 한 칸으로 펴서
+   접힌 머리줄이 위에 한 줄로 얹히게 한다 — 펼치면 저절로 두 칸으로 돌아온다.
+   (같은 증상이 다른 2열 화면에서도 나오면 이 규칙을 fold.js 공용으로 올린다.) */
+.cols:has(> .gjf-cell > .gjf-h:not(.on)){grid-template-columns:1fr;}
 .catbar{margin:11px 0;}
 .catbar .top{display:flex;justify-content:space-between;font-size:12.5px;margin-bottom:4px;}
 .catbar .track{height:9px;background:var(--panel-2);border-radius:5px;overflow:hidden;}

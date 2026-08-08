@@ -276,7 +276,7 @@
       + ".gj-onecol > *{max-width:none;width:100% !important;min-width:0;flex:none;}"
       // 누른 줄 바로 아래 자세히 — 왼쪽 파란 선으로 "위 줄에 딸린 것"임을 보인다.
       + ".gj-underrow{box-shadow:inset 3px 0 0 var(--blue,#3b82f6);border-radius:0 8px 8px 0;" +
-        "margin:0 0 6px 0;min-height:0 !important;}"
+        "margin:0 0 6px 0;min-height:0 !important;position:relative;}"
       + ".gj-picked{background:rgba(59,130,246,.12);}"
       // 요약 줄 + 상단 버튼을 한 줄로 — 버튼은 오른쪽 끝에 붙는다.
       + ".gsum-host{display:flex !important;align-items:center;gap:10px;flex-wrap:wrap;}"
@@ -288,6 +288,15 @@
         "white-space:nowrap;overflow:hidden;padding-top:5px;padding-bottom:5px;min-height:0;}"
       + ".gj-rows1 > *:not(.gj-underrow) > *{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;margin:0;}"
       + ".gj-rows1 > *:not(.gj-underrow) > *:nth-child(2){flex:1;}"
+      // ⚠ 「2번째가 제목」은 **체크박스가 없을 때만** 맞다(2026-08-08 실사고, 사용자 신고
+      //   "색깔표시가 너무 길어"). 조치·승인 줄은 [체크박스][점][본문][배지]라 2번째가 점이었고,
+      //   8px 점이 **307px 색 막대**로 늘어나 줄의 절반을 먹었다.
+      //   크기가 고정된 표식(체크박스·점)은 늘리지 않고, 그 뒤 칸을 대신 늘린다.
+      + ".gj-rows1 > *:not(.gj-underrow) > input,"
+      + ".gj-rows1 > *:not(.gj-underrow) > [class*=dot]{flex:0 0 auto;}"
+      + ".gj-rows1 > *:not(.gj-underrow) > input:nth-child(1) ~ [class*=dot]:nth-child(2) ~ *:nth-child(3),"
+      + ".gj-rows1 > *:not(.gj-underrow) > [class*=dot]:nth-child(2) ~ *:nth-child(3),"
+      + ".gj-rows1 > *:not(.gj-underrow) > input:nth-child(2) ~ *:nth-child(3){flex:1;}"
       // 줄 안에서 제목·부제를 **세로로 쌓아 둔 판**도 눕힌다(통합 관제·작업 내역이 그렇다).
       + ".gj-rows1 > *:not(.gj-underrow) > div{display:flex;align-items:baseline;gap:7px;min-width:0;}"
       + ".gj-rows1 > *:not(.gj-underrow) > div > *{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}"
@@ -297,6 +306,13 @@
         "background:rgba(59,130,246,.05);border-bottom:1px solid rgba(255,255,255,.045);" +
         "box-shadow:inset 3px 0 0 var(--blue,#3b82f6);}"
       + ".gj-detail b{color:var(--text,#e9e7e2);}"
+      // 자세히를 닫는 ✕ — 오른쪽 위 모서리에 얹는다(내용을 가리지 않게 자리를 따로 안 준다).
+      + ".gj-detail{position:relative;}"
+      + ".gj-detail-x{position:absolute;top:6px;right:8px;z-index:2;width:22px;height:22px;padding:0;"
+      + "display:flex;align-items:center;justify-content:center;border-radius:6px;cursor:pointer;"
+      + "background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.14);"
+      + "color:var(--muted-2,#a49d95);font-size:12px;line-height:1;}"
+      + ".gj-detail-x:hover{background:rgba(226,72,61,.3);color:#fff;border-color:rgba(226,72,61,.6);}"
       + ".gj-detail .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px;}"
       + ".gj-detail .acts button,.gj-detail .acts a{background:var(--panel-2,#1f1e1d);border:1px solid var(--border-strong,rgba(255,255,255,.16));" +
         "color:var(--blue-light,#5fa1ff);border-radius:7px;padding:4px 11px;font-size:11.75px;font-weight:700;" +
@@ -792,6 +808,21 @@
     if (내용 == null) 내용 = "";
     if (내용 && 내용.nodeType) box.appendChild(내용);
     else box.innerHTML = String(내용);
+    // 닫는 단추 — 편 것은 **닫을 수 있어야 한다**(2026-08-08 사용자 지시 "선택시 X 넣어서 닫게").
+    // 예전엔 같은 줄을 다시 누르는 것이 유일한 길이었는데, 편 내용이 길면 그 줄이 위로 밀려
+    // 화면 밖에 있다 — 눈앞에서 닫을 자리가 필요하다.
+    var 닫기 = document.createElement("button");
+    닫기.className = "gj-detail-x";
+    닫기.type = "button";
+    닫기.title = "닫기";
+    닫기.setAttribute("aria-label", "자세히 닫기");
+    닫기.textContent = "✕";
+    닫기.addEventListener("click", function (e) {
+      e.stopPropagation();
+      box.remove();
+      row.classList.remove("on");
+    });
+    box.appendChild(닫기);
     row.classList.add("on");
     목록.insertBefore(box, row.nextSibling);
     // 펴 놓고 화면 밖으로 나가 버리면 편 뜻이 없다 — 상자 안에서만 살짝 굴린다.
@@ -840,6 +871,26 @@
       목록.classList.add("gj-rows1");   // 줄을 한 줄로 (아래 CSS)
       자세히.style.display = "none";   // 고르기 전에는 자리도 차지하지 않는다
 
+      // 닫는 단추 — 편 것은 **닫을 수 있어야 한다**(2026-08-08 사용자 지시 "선택시 X 넣어서 닫게").
+      // 예전엔 닫을 길이 없어, 편 내용이 길면 목록이 그만큼 밀린 채로 남았다.
+      // ⚠ 화면이 자세히 칸을 **innerHTML로 다시 그린다**(조치·승인이 그렇다) — 한 번만 만들면
+      //   다음 선택에서 조용히 사라진다. 그래서 옮길 때마다 있는지 보고 없으면 다시 만든다.
+      function 닫기보장() {
+        if (자세히.querySelector(":scope > .gj-detail-x")) return;
+        var 닫기 = document.createElement("button");
+        닫기.className = "gj-detail-x";
+        닫기.type = "button";
+        닫기.title = "닫기";
+        닫기.setAttribute("aria-label", "자세히 닫기");
+        닫기.textContent = "✕";
+        닫기.addEventListener("click", function (e) {
+          e.stopPropagation();
+          자세히.style.display = "none";
+          목록.querySelectorAll(".gj-picked").forEach(function (r) { r.classList.remove("gj-picked"); });
+        });
+        자세히.appendChild(닫기);
+      }
+
       // ⚠ **잡는 단계(capture)**로 받는다. 줄이 자기 처리에서 위로 못 올라가게 막으면
       //   보통 방식(bubble)으로는 아예 안 들어온다(2026-08-02 실측 — 통합 관제·작업 내역).
       목록.addEventListener("click", function (e) {
@@ -871,6 +922,7 @@
           if (대상.nextSibling !== 자세히) 판.insertBefore(자세히, 대상.nextSibling);
           목록.querySelectorAll(".gj-picked").forEach(function (r) { r.classList.remove("gj-picked"); });
           대상.classList.add("gj-picked");
+          닫기보장();
           return true;
         }
         setTimeout(function () { if (!옮기기()) setTimeout(옮기기, 450); }, 0);

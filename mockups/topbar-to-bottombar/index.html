@@ -1,0 +1,327 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>시안 — 상단 조작을 하단바로 · 세션 자리 고정 (전-7)</title>
+<style>
+  :root{
+    --g-bg:#262624; --g-surface-1:#30302e; --g-surface-2:#1f1e1d;
+    --g-border:rgba(255,255,255,.08); --g-border-strong:rgba(255,255,255,.16);
+    --g-teal:#1eb980; --g-amber:#f0a020; --g-red:#e2483d; --g-blue:#3b82f6;
+    --g-text:#e9e7e2; --g-muted:#b3ada4; --g-muted-2:#a49d95;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0;padding:28px 32px 60px;background:var(--g-bg);color:var(--g-text);
+    font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;font-size:13.5px;line-height:1.6;}
+  h1{font-size:19px;margin:0 0 4px;}
+  h2{font-size:15px;margin:30px 0 10px;padding-bottom:7px;border-bottom:1px solid var(--g-border);}
+  .sub{color:var(--g-muted);font-size:12.5px;margin:0 0 18px;}
+  .req{background:var(--g-surface-2);border:1px solid var(--g-border);border-radius:10px;
+    padding:12px 16px;margin:0 0 6px;font-size:12.75px;}
+  .req ol{margin:0;padding-left:20px;} .req li{margin:3px 0;}
+  .tag{display:inline-block;font-size:11px;font-weight:800;padding:1px 7px;border-radius:999px;
+    background:rgba(59,130,246,.16);color:#5fa1ff;margin-left:6px;}
+  .tag.del{background:rgba(226,72,61,.16);color:#e2483d;}
+  .tag.add{background:rgba(30,185,128,.16);color:var(--g-teal);}
+
+  /* ── 앱 재현틀 ── */
+  .app{border:1px solid var(--g-border-strong);border-radius:10px;overflow:hidden;
+    background:var(--g-bg);margin:10px 0 4px;}
+  .row{display:flex;height:300px;}
+  .side{width:232px;flex:0 0 232px;background:var(--g-surface-2);border-right:1px solid var(--g-border);
+    display:flex;flex-direction:column;}
+  .side .menu{flex:1;padding:9px 10px;font-size:12px;color:var(--g-muted);overflow:hidden;}
+  .side .menu div{padding:4px 8px;border-radius:6px;}
+  .side .menu div.on{background:rgba(255,255,255,.06);color:var(--g-text);font-weight:700;}
+  .side .grp{font-size:10.5px;font-weight:800;color:var(--g-muted-2);letter-spacing:.4px;margin:8px 0 2px;padding:0 8px;}
+  .userrow{display:flex;align-items:center;gap:8px;height:38px;padding:0 12px;
+    border-top:1px solid var(--g-border);font-size:12.25px;}
+  .avatar{width:20px;height:20px;border-radius:50%;background:#4b4a47;display:flex;align-items:center;
+    justify-content:center;font-size:11px;font-weight:800;}
+  .book{margin-left:auto;opacity:.75;font-size:13px;}
+
+  .work{flex:1;display:flex;flex-direction:column;min-width:0;}
+  .tabbar{height:44px;flex:0 0 auto;display:flex;align-items:center;gap:2px;
+    padding:0 10px;border-bottom:1px solid var(--g-border);background:var(--g-surface-2);}
+  .acts{display:flex;gap:3px;font-size:12px;color:var(--g-muted);margin-right:6px;}
+  .tab{height:30px;display:flex;align-items:center;padding:0 11px;border-radius:7px 7px 0 0;
+    font-size:12.25px;color:var(--g-muted);white-space:nowrap;}
+  .tab.on{background:var(--g-bg);color:var(--g-text);font-weight:700;}
+  .spacer{flex:1;}
+  .tb-btn{height:22px;display:inline-flex;align-items:center;padding:0 8px;border-radius:6px;
+    border:1px solid var(--g-border-strong);background:rgba(255,255,255,.04);
+    font-size:11.75px;color:var(--g-muted);white-space:nowrap;}
+  .tb-status{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:800;
+    color:var(--g-teal);background:rgba(30,185,128,.14);border:1px solid rgba(30,185,128,.4);
+    padding:3px 10px;border-radius:16px;white-space:nowrap;}
+  .tb-status .dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
+  .tb-sess{display:inline-flex;align-items:center;gap:4px;font-size:12px;font-weight:700;
+    color:var(--g-muted);background:rgba(255,255,255,.05);border:1px solid var(--g-border-strong);
+    padding:3px 9px;border-radius:16px;white-space:nowrap;}
+  .tb-clock{font-size:12.25px;color:var(--g-muted);white-space:nowrap;margin-left:8px;}
+  .winbtns{margin-left:14px;color:var(--g-muted-2);font-size:12px;letter-spacing:3px;}
+
+  .screen{flex:1;background:var(--g-bg);display:flex;align-items:center;justify-content:center;
+    color:var(--g-muted-2);font-size:12px;min-height:0;}
+  .console{flex:0 0 86px;border-top:1px solid var(--g-border);background:var(--g-surface-1);
+    display:flex;align-items:center;justify-content:center;color:var(--g-muted-2);font-size:12px;}
+  .consoleout{flex:0 0 auto;display:flex;align-items:center;justify-content:center;gap:10px;
+    padding:9px 14px;border-top:1px solid var(--g-border);background:var(--g-surface-2);
+    font-size:12.5px;color:var(--g-muted);}
+  .shellfoot{height:34px;flex:0 0 auto;display:flex;align-items:center;gap:9px;padding:0 16px;
+    border-top:1px solid var(--g-border);background:var(--g-surface-2);color:var(--g-muted-2);font-size:12px;}
+  .sym{width:13px;height:13px;border-radius:3px;background:var(--g-muted-2);opacity:.5;flex:0 0 auto;}
+  .brand{margin-left:auto;}
+
+  .mark{outline:2px solid var(--g-amber);outline-offset:2px;border-radius:6px;}
+  .mark-del{outline:2px dashed var(--g-red);outline-offset:2px;border-radius:6px;opacity:.45;}
+  .mark-new{outline:2px solid var(--g-teal);outline-offset:2px;border-radius:6px;}
+
+  .cap{font-size:11.75px;color:var(--g-muted-2);margin:2px 0 20px;}
+  table{border-collapse:collapse;width:100%;font-size:12.5px;margin:8px 0 4px;}
+  th,td{border:1px solid var(--g-border);padding:6px 10px;text-align:left;vertical-align:top;}
+  th{background:var(--g-surface-2);color:var(--g-muted-2);font-size:11.5px;font-weight:800;}
+  td.num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .good{color:var(--g-teal);font-weight:700;} .bad{color:var(--g-red);font-weight:700;}
+  .warn{background:rgba(240,160,32,.09);border:1px solid rgba(240,160,32,.35);border-radius:9px;
+    padding:11px 15px;margin:12px 0;font-size:12.5px;}
+  .warn b{color:var(--g-amber);}
+  .toggle{display:flex;gap:8px;margin:14px 0 4px;}
+  .toggle button{padding:6px 14px;border-radius:8px;border:1px solid var(--g-border-strong);
+    background:var(--g-surface-2);color:var(--g-muted);font-size:12.25px;cursor:pointer;font-family:inherit;}
+  .toggle button.on{background:rgba(59,130,246,.16);border-color:var(--g-blue);color:#5fa1ff;font-weight:700;}
+  code{background:var(--g-surface-2);padding:1px 5px;border-radius:4px;font-size:11.75px;}
+</style>
+</head>
+<body>
+
+<h1>시안 — 상단 조작을 하단바로 · 세션 자리 고정</h1>
+<p class="sub">계획서 <b>전-7</b>(보여 주기 — 첫인상) · 2026-08-08 사용자 요청 4건 · 추천안 1개</p>
+
+<div class="req">
+  <ol>
+    <li>서버 연결상태 배지 삭제 <span class="tag del">지움</span> — 세션 배지는 남김</li>
+    <li>상단 창 조작 4개(⧉ 창으로 · 모두 닫기 · ▥ 옆으로 · 🗔 창 N)를 하단 메뉴바로 <span class="tag">이사</span></li>
+    <li>「⇤ 여기로 다시 붙이기」를 왼쪽 패널 문서함 줄 <b>위</b>에 고정 <span class="tag">이사</span></li>
+    <li>세션 배지가 화면 아래로 흐르는 것 잡기 <span class="tag add">수리</span></li>
+  </ol>
+</div>
+
+<h2>1. 지금 (변경 전)</h2>
+
+<div class="app">
+  <div class="row">
+    <div class="side">
+      <div class="menu">
+        <div class="grp">① 발견</div>
+        <div class="on">대시보드</div><div>통합 관제</div><div>자산 목록</div>
+        <div class="grp">② 우선순위</div>
+        <div>취약점</div><div>위협 인텔</div>
+      </div>
+      <div class="userrow">
+        <span class="avatar">정</span><span>정요한</span><span class="book">📖</span>
+      </div>
+    </div>
+    <div class="work">
+      <div class="tabbar">
+        <span class="acts">⚙ ▣ 🔍 ← →</span>
+        <div class="tab on">대시보드</div><div class="tab">통합 관제</div><div class="tab">자산 목록</div>
+        <div class="spacer"></div>
+        <span class="mark-del" style="display:inline-flex;gap:4px">
+          <span class="tb-btn">⧉ 창으로</span><span class="tb-btn">모두 닫기</span>
+          <span class="tb-btn">▥ 옆으로</span><span class="tb-btn">🗔 창 1</span>
+        </span>
+        <span class="tb-status mark-del" style="margin-left:6px"><span class="dot"></span>서버 연결상태 양호</span>
+        <span class="tb-sess" style="margin-left:5px">⏳ 세션 30:00 ▾</span>
+        <span class="tb-clock">오전 11:48</span>
+        <span class="winbtns">─▢✕</span>
+      </div>
+      <div class="screen">화면(탭 내용)</div>
+      <div class="consoleout mark-del">
+        <span>대화를 별도 창으로 빼놨습니다.</span><span class="tb-btn">⇤ 여기로 다시 붙이기</span>
+      </div>
+      <div class="shellfoot">
+        <span class="sym"></span><span class="brand">GIJO Technology</span>
+      </div>
+    </div>
+  </div>
+</div>
+<p class="cap">붉은 점선 = 없애거나 옮길 것. 탭줄 오른쪽에 조작 4개 + 배지 2개가 몰려 있고, 하단바 <b>가운데는 통째로 비어 있다</b>.
+대화창을 창으로 빼면 본문 아래에 안내 줄(38px)이 가로로 한 줄 더 생긴다.</p>
+
+<h2>2. 추천안 (변경 후)</h2>
+
+<div class="toggle">
+  <button class="on" onclick="setMode('dock',this)">평상시 (대화창 붙어 있음)</button>
+  <button onclick="setMode('pop',this)">대화창을 창으로 뺀 상태</button>
+</div>
+
+<div class="app">
+  <div class="row">
+    <div class="side">
+      <div class="menu">
+        <div class="grp">① 발견</div>
+        <div class="on">대시보드</div><div>통합 관제</div><div>자산 목록</div>
+        <div class="grp">② 우선순위</div>
+        <div>취약점</div><div>위협 인텔</div>
+      </div>
+      <!-- ③ 다시 붙이기 — 문서함 줄 바로 위, 분리 상태에서만 -->
+      <div id="backRow" style="display:none;padding:5px 10px;border-top:1px solid var(--g-border);">
+        <span class="tb-btn mark-new" style="width:100%;justify-content:center;height:24px;">⇤ 대화 여기로 다시 붙이기</span>
+      </div>
+      <div class="userrow">
+        <span class="avatar">정</span><span>정요한</span><span class="book">📖</span>
+      </div>
+    </div>
+    <div class="work">
+      <div class="tabbar">
+        <span class="acts">⚙ ▣ 🔍 ← →</span>
+        <div class="tab on">대시보드</div><div class="tab">통합 관제</div><div class="tab">자산 목록</div>
+        <div class="tab">취약점</div><div class="tab">보안 로그</div>
+        <div class="spacer"></div>
+        <span class="tb-sess mark" >⏳ 세션 30:00 ▾</span>
+        <span class="tb-clock">오전 11:48</span>
+        <span class="winbtns">─▢✕</span>
+      </div>
+      <div class="screen">화면(탭 내용) — 세로가 넓어졌다</div>
+      <div class="console" id="consoleBox">대화창 (도킹)</div>
+      <div class="shellfoot">
+        <span class="sym"></span>
+        <span class="mark-new" style="display:inline-flex;gap:5px;">
+          <span class="tb-btn">⧉ 창으로</span><span class="tb-btn">모두 닫기</span>
+          <span class="tb-btn">▥ 옆으로</span><span class="tb-btn">🗔 창 1</span>
+        </span>
+        <span class="brand">GIJO Technology</span>
+      </div>
+    </div>
+  </div>
+</div>
+<p class="cap">초록 = 새로 온 자리, 노랑 = 자리를 못 박은 것.
+탭줄은 <b>탭과 세션·시계만</b> 갖고, 비어 있던 하단바 가운데가 창 조작을 받는다.
+대화창을 빼도 본문 아래에 줄이 생기지 않는다 — 되돌리는 단추는 왼쪽 패널 문서함 위에 있다.</p>
+
+<h2>3. 밀도 — 숫자로</h2>
+
+<table>
+  <tr><th>자리</th><th class="num">지금</th><th class="num">추천안</th><th>차이</th></tr>
+  <tr><td>탭줄 높이</td><td class="num">44px</td><td class="num">44px</td><td>그대로</td></tr>
+  <tr><td>하단바 높이</td><td class="num">34px</td><td class="num">34px</td><td>그대로 — 버튼 22px가 34px 안에 들어간다</td></tr>
+  <tr><td>탭줄에서 탭이 쓸 수 있는 가로</td><td class="num">−396px</td><td class="num">−108px</td><td class="good">+288px (탭 3~4개 더 보임)</td></tr>
+  <tr><td>대화창 분리 시 본문 세로</td><td class="num">−38px</td><td class="num">0px</td><td class="good">+38px</td></tr>
+  <tr><td>왼쪽 패널(분리 시에만)</td><td class="num">0px</td><td class="num">+34px</td><td>메뉴 34px 가림 — 분리 상태에서만</td></tr>
+  <tr><td>세로 총합(평상시)</td><td class="num">78px</td><td class="num">78px</td><td>변화 없음</td></tr>
+</table>
+<p class="cap">가로 −396px 계산: 창으로 72 + 모두닫기 72 + 옆으로 72 + 창N 60 + 연결상태 120 = 396px(시안 렌더 기준 추정, 배율 100%).
+구현 때 실화면에서 다시 잰다.</p>
+
+<h2>4. 세션 배지가 아래로 흐르던 것 — 원인과 처방</h2>
+
+<div class="warn">
+  <b>원인(코드에서 확인).</b> 세션 칩은 <b>연결상태 배지를 찾아 그 뒤에</b> 끼워 넣습니다 —
+  <code>titlebar.js:461</code>의 <code>statusPill.parentNode.insertBefore(sessChip, statusPill.nextSibling)</code>.
+  연결상태가 없으면 <code>right.appendChild()</code>로 <b>영역 끝에 떨어집니다</b>.
+  즉 <b>1번(연결상태 삭제)을 그냥 하면 세션 칩이 흐르는 증상이 더 심해집니다</b> — 기준으로 삼던 것이 사라지기 때문입니다.
+</div>
+
+<p style="font-size:12.75px;margin:6px 0 0">
+<b>처방 — 자리를 남에게 기대지 않게 못 박는다.</b>
+세션 칩을 <code>#tbInfo</code> 안 <b>시계 바로 왼쪽</b>으로 고정합니다(다른 요소를 찾지 않음).
+붙을 자리(<code>#tbInfo</code>)가 아예 없는 화면에서는 <b>만들지 않습니다</b> — 지금은 <code>.header</code>를 대신 찾아
+본문 아래에 붙는 경로가 있는데, 이것이 "메인화면 아래로 나온다"의 정체로 보입니다.
+확정은 구현 때 실앱(CDP)에서 <b>셸·분리창·직접 문서 3가지 경우</b>를 실제로 열어 확인하겠습니다.
+</p>
+
+<h2>5. 추가 요청 — 탭도 아래로 (2026-08-08)</h2>
+
+<div class="warn">
+  <b>피할 수 없는 제약이 하나 있습니다.</b> 창 버튼(─ ▢ ✕)은 <b>Windows가 상단에 직접 그립니다</b>
+  (<code>main.ts:151</code> <code>titleBarOverlay height:44</code>) — 아래로 내릴 수 없습니다.
+  게다가 지금은 <b>탭줄이 창을 끄는 유일한 손잡이</b>입니다(<code>app.html:87</code>).
+  그래서 탭을 내리면 <b>상단 44px는 어차피 비워야 하고</b>, 그냥 두면 빈 띠가 됩니다.
+</div>
+
+<table>
+  <tr><th>안</th><th>상단</th><th>하단</th><th class="num">세로 총합</th><th>판정</th></tr>
+  <tr>
+    <td>지금</td><td>탭줄 44px</td><td>바 34px</td><td class="num">78px</td><td>기준</td>
+  </tr>
+  <tr>
+    <td><b>㉮ 탭줄만 통째로 내림</b></td>
+    <td>빈 띠 44px<br><span style="color:var(--g-muted-2)">창 버튼 자리·드래그용</span></td>
+    <td>탭줄 44 + 바 34</td>
+    <td class="num bad">122px</td>
+    <td class="bad">+44px — 빈 띠가 생긴다</td>
+  </tr>
+  <tr>
+    <td><b>㉯ 탭을 하단바와 합침 (추천)</b></td>
+    <td>조작 줄 44px<br><span style="color:var(--g-muted-2)">⚙▣🔍←→ · 세션 · 시계</span></td>
+    <td>탭 + 창 조작 + 브랜드<br>한 줄 40px</td>
+    <td class="num">84px</td>
+    <td class="good">+6px — 빈 자리가 없다</td>
+  </tr>
+</table>
+
+<p class="cap">㉯는 상단 44px를 <b>빈 띠로 버리지 않고</b> 조작·세션·시계에 쓰고, 하단 한 줄이 탭과 창 조작을 함께 답니다.</p>
+
+<div class="app">
+  <div class="row" style="height:230px;flex-direction:column;">
+    <!-- 상단 조작 줄 -->
+    <div class="tabbar" style="border-bottom:1px solid var(--g-border);">
+      <span class="acts">⚙ ▣ 🔍 ← →</span>
+      <div class="spacer"></div>
+      <span class="tb-sess">⏳ 세션 30:00 ▾</span>
+      <span class="tb-clock">오전 11:48</span>
+      <span class="winbtns">─▢✕</span>
+    </div>
+    <div style="display:flex;flex:1;min-height:0;">
+      <div class="side" style="width:232px;">
+        <div class="menu">
+          <div class="grp">① 발견</div><div class="on">대시보드</div><div>통합 관제</div><div>자산 목록</div>
+        </div>
+        <div class="userrow"><span class="avatar">정</span><span>정요한</span><span class="book">📖</span></div>
+      </div>
+      <div class="work">
+        <div class="screen">화면(탭 내용)</div>
+        <div class="console">대화창 (도킹)</div>
+        <!-- 하단 통합 줄 — 탭 + 창 조작 + 브랜드 -->
+        <div class="shellfoot mark-new" style="height:40px;gap:6px;">
+          <div class="tab on" style="height:26px;border-radius:7px;">대시보드</div>
+          <div class="tab" style="height:26px;">통합 관제</div>
+          <div class="tab" style="height:26px;">자산 목록</div>
+          <span style="flex:1"></span>
+          <span class="tb-btn">⧉ 창으로</span><span class="tb-btn">모두 닫기</span>
+          <span class="tb-btn">▥ 옆으로</span><span class="tb-btn">🗔 창 1</span>
+          <span class="sym" style="margin-left:8px"></span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<p class="cap">㉯ 그림. 탭이 아래로 내려가고, 상단은 조작·세션·시계를 맡는다.
+「GIJO Technology」 글자는 자리가 빠듯해 <b>심볼만</b> 남겼다(글자는 설정 › 정보로).</p>
+
+<div class="warn">
+  <b>솔직히 말씀드릴 것.</b> ㉯는 2026-08-07에 <b>없앴던 「조작줄 + 탭줄」 2줄 구조로 되돌아갑니다</b>
+  (그때 90px → 44px로 줄였습니다). 다만 그때와 달리 탭줄이 하단바와 <b>합쳐지므로</b>
+  총합은 90px가 아니라 84px입니다. 되돌아가는 것이 맞는지는 결정해 주셔야 합니다 —
+  <b>탭이 아래에 있는 것이 6px보다 중요하면 ㉯가 맞습니다.</b>
+</div>
+
+<h2>6. 결정해 주실 것</h2>
+<table>
+  <tr><th>항목</th><th>추천</th><th>왜</th></tr>
+  <tr><td>하단바에서 창 조작의 자리</td><td>왼쪽(심볼 옆)</td><td>오른쪽 끝은 「GIJO Technology」가 이미 쓰고 있고, 눈은 왼쪽부터 읽는다</td></tr>
+  <tr><td>「⇤ 다시 붙이기」를 늘 보일지</td><td>분리했을 때만</td><td>붙어 있을 때는 누를 일이 없는 단추다 — 늘 두면 메뉴 34px를 상시로 먹는다</td></tr>
+  <tr><td>세션 칩 자리</td><td>시계 왼쪽 고정</td><td>「남은 시간」과 「지금 시각」은 붙어 있어야 뜻이 산다</td></tr>
+</table>
+
+<script>
+function setMode(m, btn){
+  document.querySelectorAll('.toggle button').forEach(function(b){b.classList.remove('on');});
+  btn.classList.add('on');
+  document.getElementById('backRow').style.display = (m === 'pop') ? 'block' : 'none';
+  document.getElementById('consoleBox').style.display = (m === 'pop') ? 'none' : 'flex';
+}
+</script>
+</body>
+</html>

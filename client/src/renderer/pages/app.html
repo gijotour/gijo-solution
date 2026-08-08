@@ -19,14 +19,25 @@
   /* 상단 조작 줄 — 높이는 OS 창 버튼(titleBarOverlay 46px)과 맞춘다.
      낮으면 버튼이 줄 밖으로 삐져나오고, 높으면 화면이 그만큼 줄어든다. */
   /* 하단 고정바 — 상단 바와 짝을 이룬다(같은 바탕·같은 테두리 두께). */
-  .shellfoot{display:flex;align-items:center;gap:9px;flex:0 0 auto;height:34px;padding:0 16px;
+  /* 하단 통합 줄 — 탭 + 창 조작 + 심볼이 **한 줄**에 산다(2026-08-08 시안 ㉯ 승인).
+     34px → 40px로 6px만 늘렸다: 탭줄(44px)을 따로 두면 상단 빈 띠까지 122px가 되지만,
+     합치면 84px(상단 44 + 여기 40)로 끝난다. 세로를 파는 대신 탭을 아래로 옮긴 값이다. */
+  .shellfoot{display:flex;align-items:center;gap:9px;flex:0 0 auto;height:40px;padding:0 12px;
     border-top:1px solid var(--border);background:var(--panel-2);color:var(--muted-2);font-size:12px;}
   .shellfoot img{height:14px;opacity:.55;}
-  .shellfoot span{margin-left:auto;}
-  /* 상단 조작 줄은 없앴다(2026-08-07 시안 승인) — 조작줄(46px)과 탭줄(44px)이 따로 있어
-     ① 경로 표시가 활성 탭과 따로 갱신돼 어긋나고(실측: 대시보드를 보는데 「설정 › 시스템 로그」)
-     ② 세로 90px를 먹었다. 탭줄 하나(44px)에 조작·탭·시계·상태·세션을 다 담는다 —
-     경로는 **활성 탭이 곧 경로**라 따로 갱신할 상태 자체가 없다. */
+  /* ⚠ 예전엔 `.shellfoot span{margin-left:auto}`였다. 창 조작이 내려오면서 버튼 **안의**
+     <span id="tbWinCnt">까지 이 규칙에 걸려 「🗔 창」과 숫자가 갈라졌다 — 클래스로 좁힌다. */
+  .shellfoot .brand{flex:0 0 auto;margin-left:auto;}
+  /* 하단 줄 안 조작 단추 — 40px 안에 24px 단추가 들어간다. */
+  .shellfoot .tb-act{padding-bottom:0;}
+  .shellfoot .tb-btn{padding:3px 8px;font-size:11.75px;}
+  /* 상단 줄의 내력 — 두 번 바뀌었다. 다음 사람이 "왜 이 모양인가"를 알아야 또 안 뒤집는다.
+     ① ~2026-08-07: 조작줄(46px) + 탭줄(44px) 두 줄 = 90px. 경로 표시가 활성 탭과 따로 갱신돼
+        어긋나는 사고까지 있었다(실측: 대시보드를 보는데 「설정 › 시스템 로그」).
+     ② 2026-08-07: 탭줄 하나(44px)로 합침. 경로는 **활성 탭이 곧 경로**라 갱신할 상태가 없다.
+     ③ 2026-08-08(지금): 사용자 지시로 **탭을 아래로** 내렸다(시안 ㉯ 승인). 상단 44px는
+        창 버튼(OS가 그린다) 때문에 어차피 비워야 하므로, 빈 띠 대신 조작·세션·시계를 둔다.
+        탭은 하단 줄(40px)이 창 조작과 함께 받는다 — 총합 84px(②보다 6px 늘고 ①보다 6px 준다). */
   /* ⚠ **줄 높이를 못 박는다**(2026-08-02 사용자 신고: "상단 하단 고정탭 아직도 문제있음 …
        고정값이 필요할듯"). 격자 줄은 기본이 auto라 **내용이 요구하는 만큼 늘어난다** —
        실측에서 안쪽 내용이 900px를 요구해 854px 칸을 넘겼고, 그만큼 하단 바가 창 밖으로
@@ -38,21 +49,32 @@
   #gijoNav{border-right:1px solid var(--border);background:var(--panel-2);min-height:0;display:flex;flex-direction:column;}
   .work{display:flex;flex-direction:column;min-width:0;min-height:0;}
 
-  /* 탭줄
+  /* 상단 조작 줄(#shellTop) — 탭이 아래로 내려간 뒤 이 자리를 맡는다(2026-08-08 시안 ㉯).
      ⚠ 오른쪽 끝은 **비워 둬야 한다.** 이 앱은 OS 타이틀바를 숨기고(titleBarStyle:hidden)
-       창 컨트롤(─ ▢ ✕)을 오버레이로 그리게 해 뒀는데(main.ts, 높이 46px), 그 자리가 바로
-       탭줄 오른쪽이다. 그냥 두면 「⧉ 창으로」·「모두 닫기」가 창 버튼 **밑에 깔린다** —
-       좁을 땐 탭에 가려 안 보이다가 창을 넓히면 삐져나오고, 겹친 가장자리는 클릭도 된다
+       창 컨트롤(─ ▢ ✕)을 오버레이로 그리게 해 뒀는데(main.ts, 높이 44px), 그 자리가 바로
+       이 줄의 오른쪽이다. 그냥 두면 시계·세션이 창 버튼 **밑에 깔린다** —
+       좁을 땐 가려 안 보이다가 창을 넓히면 삐져나오고, 겹친 가장자리는 클릭도 된다
        (2026-07-28 사용자 신고: "오른쪽 위 종료 버튼 있는 데 뒤에 뭐가 보인다").
      ⚠ 폭을 숫자로 박지 않는다 — 창 버튼 너비는 OS·테마·배율마다 다르다.
        브라우저가 알려주는 실제 값(env(titlebar-area-*))으로 남는 폭만큼만 비운다.
-       그 값이 없는 환경(오버레이 미사용)에서는 fallback으로 0이 된다. */
-  .tabbar{flex:0 0 auto;display:flex;align-items:stretch;gap:2px;height:44px;
-    padding:7px 10px 0;
+       그 값이 없는 환경(오버레이 미사용)에서는 fallback으로 0이 된다.
+     ⚠ 높이 44px는 main.ts titleBarOverlay와 **같아야 한다**(다르면 창 버튼이 삐져나온다). */
+  .topbar{flex:0 0 auto;display:flex;align-items:center;gap:8px;height:44px;
+    padding:0 10px;
     padding-right:calc(10px + 100vw - env(titlebar-area-width, 100vw) - env(titlebar-area-x, 0px));
-    border-bottom:1px solid var(--border);background:var(--panel-2);overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;}
-  /* 조작 단추(⚙ ▣ 🔍 ← →)는 titlebar.js가 여기 맨 앞에 붙인다 — 예전 조작줄에서 이사 */
-  .tabbar .gtb-acts{padding-bottom:6px;}
+    border-bottom:1px solid var(--border);background:var(--panel-2);
+    -webkit-app-region:drag;}
+  .topbar .spacer{flex:1 1 auto;}
+  /* 창을 끄는 손잡이는 이제 이 줄뿐이다 — 그 안의 누르는 것들만 되돌린다
+     (안 되돌리면 단추가 안 눌리고 창만 끌린다). */
+  .topbar button,.topbar .gtb-acts,.topbar .gtb-sess,.topbar input,.topbar select{-webkit-app-region:no-drag;}
+  /* 조작 단추(⚙ ▣ 🔍 ← →)는 titlebar.js가 여기 맨 앞에 붙인다 */
+  .topbar .gtb-acts{padding-bottom:0;}
+
+  /* 탭줄 — **하단 통합 줄 안**에 산다(2026-08-08 시안 ㉯). 높이는 하단 줄이 정하고
+     여기서는 남는 가로만 쓴다. 탭이 많으면 이 안에서 가로로 스크롤된다. */
+  .tabbar{flex:1 1 auto;display:flex;align-items:center;gap:2px;min-width:0;height:100%;
+    overflow-x:auto;overflow-y:hidden;scrollbar-width:thin;}
   /* 활성 탭 앞의 구역 표시 — 「② 우선순위 ›」. 탭이 곧 경로다(별도 상태 없음). */
   .tab .tgrp{flex:0 0 auto;font-weight:600;color:var(--muted-2);overflow:hidden;white-space:nowrap;}
   /* 오른쪽 정보(시계·서버상태·세션) — titlebar.js가 채운다. 창 버튼 여백 바로 앞. */
@@ -63,8 +85,10 @@
   #tbInfo .tb-status .dot{width:6px;height:6px;border-radius:50%;background:currentColor;}
   .tabbar::-webkit-scrollbar{height:5px;}
   .tabbar::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:3px;}
-  .tab{display:flex;align-items:center;gap:7px;padding:8px 10px 8px 12px;border-radius:9px 9px 0 0;font-size:12.5px;font-weight:600;
-    color:var(--muted);cursor:pointer;white-space:nowrap;border:1px solid transparent;border-bottom:none;max-width:230px;flex:0 0 auto;}
+  /* 탭이 **아래**에 있으므로 둥근 쪽도 아래다(2026-08-08 시안 ㉯) — 화면과 맞닿는 위쪽은
+     각지게 두어야 활성 탭이 그 위 화면과 한 덩어리로 읽힌다. */
+  .tab{display:flex;align-items:center;gap:7px;padding:6px 10px 6px 12px;border-radius:0 0 9px 9px;font-size:12.5px;font-weight:600;
+    color:var(--muted);cursor:pointer;white-space:nowrap;border:1px solid transparent;border-top:none;max-width:230px;flex:0 0 auto;}
   .tab:hover{color:#fff;background:rgba(255,255,255,.04);}
   .tab.on{color:#fff;background:var(--bg);border-color:var(--border);font-weight:700;}
   .tab .nm{overflow:hidden;text-overflow:ellipsis;}
@@ -77,18 +101,18 @@
      이 앱은 윈도우 제목표시줄을 숨기고(main.ts titleBarStyle:"hidden") 버튼 셋만 OS가 그린다.
      그런데 셸에는 끌 수 있는 자리가 **하나도 없어서 본창을 아예 못 옮겼다** — 실앱에서
      맨 위 가운데를 찍어 보니 잡히는 것이 DIV.spacer였고 drag 영역이 아니었다.
-     탭 띠 전체를 손잡이로 삼되, 그 안의 누르는 것들은 no-drag로 되돌린다
-     (안 되돌리면 탭·버튼이 안 눌리고 창만 끌린다). */
-  .tabbar{-webkit-app-region:drag;}
+     ⚠ 그 손잡이는 **탭줄에서 상단 조작 줄(.topbar)로 넘어갔다**(2026-08-08 탭을 아래로 내리면서).
+       탭줄이 아래로 간 뒤에도 여기에 drag를 남겨 두면, 탭을 누르려다 창이 끌린다. */
   .tabbar .tab,.tabbar button,.tabbar .winmenu,.tabbar input,.tabbar select{-webkit-app-region:no-drag;}
-  .tabbar .spacer{flex:1 1 auto;}
-  .tb-act{flex:0 0 auto;display:flex;align-items:center;gap:4px;padding-bottom:6px;}
+  .tb-act{flex:0 0 auto;display:flex;align-items:center;gap:4px;}
   .tb-btn{font-size:12.25px;font-weight:700;color:var(--muted);background:transparent;border:1px solid var(--border);border-radius:7px;padding:4px 9px;cursor:pointer;white-space:nowrap;}
   .tb-btn:hover{color:#fff;border-color:var(--blue);}
 
   /* 열린 창 목록 */
   .winmenu{position:relative;}
-  .winpop{display:none;position:absolute;right:0;top:calc(100% + 5px);z-index:60;min-width:230px;
+  /* ⚠ 창 목록은 **위로** 연다 — 단추가 하단바로 내려갔기 때문이다(2026-08-08).
+     top으로 두면 목록이 창 아래로 나가 한 줄도 안 보인다. */
+  .winpop{display:none;position:absolute;right:0;bottom:calc(100% + 5px);z-index:60;min-width:230px;
     background:var(--panel);border:1px solid var(--border-strong);border-radius:10px;padding:5px;
     box-shadow:0 12px 34px rgba(0,0,0,.5);}
   .winpop.on{display:block;}
@@ -128,48 +152,48 @@
         660px만 남아 표가 깨진다. 그래서 **창 너비로 자동 전환**하고, 담당자가 언제든 바꾼다.
      기준 1600px 근거: Material Design 3의 Extra-large 등급(1600~)이 다분할 배치를 권한다.
         1600에서 패널 380을 빼도 본문이 1220 남아 우리 표가 들어간다. */
+  /* ⚠ 줄 구성이 2026-08-08에 뒤집혔다. 예전에는 [1행=탭줄 / 2행=화면+콘솔]이었는데
+     탭이 하단 줄로 내려가면서 **[1행=화면+콘솔 / 2행=하단 줄]**이 됐다.
+     ⚠ 실측 사고: 이 격자를 안 고치고 탭만 옮겼더니 .shellfoot이 자리를 못 받아
+       자동 배치로 **1행(맨 위 y=44)에 붙었다** — 하단 줄이 위로 올라가 보였다.
+       격자에서는 "자리를 안 주면 아래로 가는" 것이 아니라 **빈 칸을 찾아 위로 간다.** */
   .work.console-side{display:grid;grid-template-columns:minmax(0,1fr) var(--console-w, 380px);
-    grid-template-rows:auto minmax(0,1fr);}
-  .work.console-side .tabbar{grid-column:1 / -1;}
-  .work.console-side .console{grid-column:2;grid-row:2;height:auto;min-height:0;
+    grid-template-rows:minmax(0,1fr) auto;}
+  .work.console-side .console{grid-column:2;grid-row:1;height:auto;min-height:0;
     border-top:0;border-left:1px solid var(--border);}
-  .work.console-side .screens{grid-column:1;grid-row:2;}
-  .work.console-side .console-out{grid-column:1 / -1;}
+  .work.console-side .screens{grid-column:1;grid-row:1;}
+  .work.console-side .shellfoot{grid-column:1 / -1;grid-row:2;}
   /* ⚠ 대화창을 **창으로 빼 두면** 도킹 콘솔은 숨겨진다(.console{display:none}). 그때도 옆 자리를
      비워 두면 **본문만 380px 줄고 그 자리가 텅 빈다**(실측: 1196 → 816). 없는 것을 위해
      자리를 남기지 않는다 — 분리 상태에서는 한 칸으로 되돌린다. */
   body.console-popped .work.console-side{display:flex;flex-direction:column;}
-  /* 창으로 빼냈을 때 — 손잡이·콘솔을 접고 안내만 얇게 남긴다(화면이 100%가 된다) */
-  .console-out{display:none;flex:0 0 auto;align-items:center;justify-content:center;gap:10px;padding:9px 14px;
-    border-top:1px solid var(--border);background:var(--panel-2);font-size:12.5px;color:var(--muted);}
+  /* 창으로 빼냈을 때 — 콘솔을 접는다(화면이 100%가 된다).
+     예전엔 본문 아래에 안내 줄(.console-out, 38px)을 가로로 깔았는데, 대화창을 뺄수록
+     화면이 좁아지는 모순이 있어 **왼쪽 패널 문서함 줄 위로** 옮겼다(2026-08-08 시안 승인). */
   body.console-popped .console{display:none;}
-  body.console-popped .console-out{display:flex;}
+  /* 대화 되돌리기 줄 — titlebar.js가 사용자 영역 안에 만든다. 분리했을 때만 보인다
+     (붙어 있을 때는 누를 일이 없는 단추라, 늘 두면 메뉴 높이를 상시로 먹는다). */
+  #csBackRow{display:none;}
+  body.console-popped #csBackRow{display:block;}
+  #csBackRow .tb-btn{width:100%;text-align:center;padding:4px 6px;font-size:11.75px;}
 </style>
 </head>
 <body class="g-ui">
 
-<!-- 상단 바는 탭줄 하나다(2026-08-07 시안 승인, 90px→44px). 조작 단추(⚙ ▣ 🔍 ← →)와
-     시계·서버상태·세션은 titlebar.js가 이 탭줄에 붙인다 — 여기에 직접 적지 말 것(단일 소스). -->
+<!-- 상단 조작 줄(#shellTop, 44px) — **탭은 아래에 있다**(2026-08-08 사용자 지시·시안 ㉯ 승인).
+     ⚠ 이 44px는 없앨 수 없다: 창 버튼(─ ▢ ✕)을 Windows가 상단에 직접 그린다
+       (main.ts titleBarOverlay height:44). 그래서 빈 띠로 버리는 대신 조작·세션·시계에 쓴다.
+     ⚠ 창을 끄는 **유일한 손잡이**이기도 하다(예전엔 탭줄이 그 일을 했다).
+     조작 단추(⚙ ▣ 🔍 ← →)와 시계·세션은 titlebar.js가 붙인다 — 여기 직접 적지 말 것(단일 소스). -->
+<div class="topbar" id="shellTop">
+  <div class="spacer"></div>
+  <!-- 시계·세션 — titlebar.js가 채운다(예전에 화면마다 있던 것을 셸 한 곳으로).
+       ⚠ 서버 연결상태 배지는 없앴다(2026-08-08 사용자 지시) — titlebar.js 정보채우기 참조. -->
+  <div id="tbInfo"></div>
+</div>
 <div class="app">
   <div id="gijoNav"></div>
   <div class="work">
-    <div class="tabbar" id="tabBar">
-      <div class="spacer"></div>
-      <div class="tb-act">
-        <button class="tb-btn" id="tbPopout" title="지금 탭을 별도 창으로 빼냅니다 — 두 화면을 나란히 볼 때">⧉ 창으로</button>
-        <button class="tb-btn" id="tbCloseAll" title="고정하지 않은 탭을 모두 닫습니다">모두 닫기</button>
-        <!-- 대화창 자리 바꾸기 — 넓은 창이면 기본이 「옆」이고, 여기서 언제든 되돌린다. -->
-        <button class="tb-btn" id="tbConsoleSide" title="대화창 자리를 바꿉니다">▥ 옆으로</button>
-        <!-- 열린 창 목록 — 빼낸 창이 본창 뒤에 숨어 못 찾는 일을 없앤다(4.0.1 사용자 요청).
-             창 버튼(─ ▢ ✕) 바로 옆자리다. -->
-        <div class="winmenu">
-          <button class="tb-btn" id="tbWins" title="열려 있는 창 목록 — 누르면 그 창이 앞으로">🗔 창 <span id="tbWinCnt"></span></button>
-          <div class="winpop" id="winPop"></div>
-        </div>
-      </div>
-      <!-- 시계·서버상태·세션 — titlebar.js가 채운다(예전에 화면마다 있던 것을 셸 한 곳으로) -->
-      <div id="tbInfo"></div>
-    </div>
     <div class="screens" id="screens"><div class="blank">왼쪽 메뉴에서 화면을 고르면 탭으로 열립니다.</div></div>
     <!-- 콘솔은 console.js가 그린다 — 별도 창(console.html)과 같은 파일을 쓴다(자리만 다르다). -->
     <div class="console" id="console"><div id="consoleHost" data-mode="dock"></div></div>
@@ -178,14 +202,29 @@
          왼쪽 아래 사용자 줄 **옆**에서 시작해 창 오른쪽 끝까지 간다(.work 안이라 자동으로 그렇다).
          ⚠ 화면 안 푸터는 전부 감춘다 — 두 개가 겹쳐 보이면 "왜 두 번 나오지"가 된다. -->
     <div class="shellfoot">
-      <img src="gijo-symbol.svg" alt="GIJO">
-      <span>GIJO Technology</span>
+      <!-- 하단 한 줄이 **탭과 창 조작을 함께** 단다(2026-08-08 시안 ㉯ 승인).
+           탭줄(44px)을 따로 두면 상단 빈 띠 44px까지 더해 122px가 된다 — 합쳐서 84px로 끝낸다.
+           ⚠ 창 목록 팝업(winpop)은 **위로** 열어야 한다(아래로 열면 창 밖이다). -->
+      <div class="tabbar" id="tabBar"></div>
+      <div class="tb-act">
+        <button class="tb-btn" id="tbPopout" title="지금 탭을 별도 창으로 빼냅니다 — 두 화면을 나란히 볼 때">⧉ 창으로</button>
+        <button class="tb-btn" id="tbCloseAll" title="고정하지 않은 탭을 모두 닫습니다">모두 닫기</button>
+        <!-- 대화창 자리 바꾸기 — 넓은 창이면 기본이 「옆」이고, 여기서 언제든 되돌린다. -->
+        <button class="tb-btn" id="tbConsoleSide" title="대화창 자리를 바꿉니다">▥ 옆으로</button>
+        <!-- 열린 창 목록 — 빼낸 창이 본창 뒤에 숨어 못 찾는 일을 없앤다(4.0.1 사용자 요청). -->
+        <div class="winmenu">
+          <button class="tb-btn" id="tbWins" title="열려 있는 창 목록 — 누르면 그 창이 앞으로">🗔 창 <span id="tbWinCnt"></span></button>
+          <div class="winpop" id="winPop"></div>
+        </div>
+      </div>
+      <!-- 브랜드는 **심볼만** 남긴다(시안 ㉯). 탭이 같은 줄에 오면서 「GIJO Technology」 글자까지
+           두면 탭이 그만큼 좁아진다 — 글자는 설정 › 정보에 있다. -->
+      <img class="brand" src="gijo-symbol.svg" alt="GIJO">
     </div>
 
-    <div class="console-out" id="consoleOut">
-      <span>대화를 별도 창으로 빼놨습니다.</span>
-      <button class="tb-btn" id="csBackBtn">⇤ 여기로 다시 붙이기</button>
-    </div>
+    <!-- 「⇤ 여기로 다시 붙이기」는 **왼쪽 패널 문서함 줄 위로 이사했다**(2026-08-08 시안 승인).
+         본문 아래 가로 한 줄(38px)을 통째로 먹던 자리라, 대화창을 빼낼수록 화면이 좁아졌다.
+         만드는 곳은 titlebar.js buildUserArea(셸에서만) — 보이고 숨는 것은 아래 CSS가 정한다. -->
   </div>
 </div>
 
@@ -570,7 +609,14 @@
   window.gijoRefreshWinCount = refreshWinCount; // 아래 onPopoutContext 쪽에서도 부른다
   // ⚠ onPopoutContext는 removeAllListeners로 등록하므로 여기서 또 부르면 **앞서 붙인 것이
   //   지워진다**(맥락 전달이 죽는다). 그래서 따로 붙이지 않고, 원래 핸들러 안에서 같이 센다.
-  $("csBackBtn").addEventListener("click", function () { if (window.gijo && window.gijo.dockConsoleWindow) window.gijo.dockConsoleWindow(); });
+  // ⚠ 「⇤ 다시 붙이기」는 이제 **왼쪽 패널 안**에 있고 titlebar.js가 나중에 만든다 —
+  //   여기서 getElementById로 잡으면 그 시점엔 없어서 TypeError로 셸 초기화가 통째로 죽는다
+  //   (없는 것을 부르는 단추 사고의 재발 방지). 문서에 위임해 두면 언제 생기든 걸린다.
+  document.addEventListener("click", function (e) {
+    var t = e.target;
+    if (!t || !t.closest || !t.closest("#csBackBtn")) return;
+    if (window.gijo && window.gijo.dockConsoleWindow) window.gijo.dockConsoleWindow();
+  });
   // 빼낸 창을 클릭해 보고 있으면 그 화면이 맥락이다 — 규칙은 하나: **보고 있는 것이 맥락**.
   // 창을 닫으면 다시 활성 탭으로 돌아온다.
   if (window.gijo && window.gijo.onPopoutContext) {
