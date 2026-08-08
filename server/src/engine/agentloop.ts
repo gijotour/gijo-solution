@@ -1209,6 +1209,18 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): { tool: s
     return { tool: "explain", args: { topic: instruction.replace(/\s*(알려|찾아|보여|확인)[^.\n]*$/, "").trim() || instruction } };
   }
 
+  // 상태어·속성어 + 취약점 조회 — 「미조치 취약점 알려줘」(2026-08-08 리허설 실측: 3/3 재현).
+  //   search가 "미조치"로 **지식 문서**(생애주기 설명)를 끌어와 실데이터(미검토 4,826)를 안
+  //   보여줬다 — 상태·속성은 글자 검색이 아니라 상태 칸의 몫이다(2026-08-04 원칙). 상태어를
+  //   그대로 필터로 넘긴다 — 속성사전(필터에맞나)이 그 말을 안다. 필터가 동적이라 FORCED
+  //   배열이 아닌 여기서(정적 args 한계). ⚠ 파일럿 첫날 대본 4절의 문장이라 흔들리면 안 된다.
+  {
+    const 상태어취약점 = /^(미조치|미검토|미배정|열린|고위험|매우\s*심각한?|심각한|critical|high|kev|실제\s*악용)\s*(된|인)?\s*(상태\s*)?취약점[^.\n]{0,8}(알려|보여|뭐|현황|목록|있)/i.exec(instruction);
+    if (available.has("finding_status") && 상태어취약점) {
+      return { tool: "finding_status", args: { filter: 상태어취약점[1].replace(/\s+/g, "") } };
+    }
+  }
+
   // 조건 일괄 배정 — 「고위험인데 미배정인 취약점 **전부** 담당자 김도희로 배정해줘」.
   //   파일럿 리허설 실측(2026-08-07): 조건·전부·이름을 다 말했는데 LLM이 **단건** 배정 도구를
   //   골라 "자산 id가 필요합니다"라고 되물었다 — 담당자는 이미 다 말했다. 일괄 도구(bulk_update)가

@@ -64,3 +64,21 @@ describe("[55] 기한 넘긴 취약점 — finding_status 결정화 (게이트 s
     expect(forcedToolFor("기한 지난 할 일 있어?", {})?.tool ?? "(없음)").not.toBe("finding_status");
   });
 });
+
+describe("상태어 + 취약점 조회 — finding_status 동적 필터 (첫날 대본 4절)", () => {
+  it("★ 「미조치 취약점 알려줘」가 search의 지식 문서 강의로 새지 않는다(3/3 재현 수리)", async () => {
+    const { forcedToolFor } = await import("../src/engine/agentloop");
+    const r = forcedToolFor("미조치 취약점 알려줘", {});
+    expect(r?.tool).toBe("finding_status");
+    expect(r?.args.filter).toBe("미조치");
+  });
+  it("변형 — 미배정·고위험도 상태 칸으로 간다", async () => {
+    const { forcedToolFor } = await import("../src/engine/agentloop");
+    expect(forcedToolFor("미배정 취약점 현황 보여줘", {})?.args.filter).toBe("미배정");
+    expect(forcedToolFor("고위험 취약점 뭐 있어?", {})?.args.filter).toBe("고위험");
+  });
+  it("★★ 자산 이름 앞말은 여전히 search 영토 — 「sample-web01 취약점 알려줘」", async () => {
+    const { forcedToolFor } = await import("../src/engine/agentloop");
+    expect(forcedToolFor("sample-web01 취약점 알려줘", {})?.tool).toBe("search");
+  });
+});
