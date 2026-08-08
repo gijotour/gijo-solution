@@ -5,6 +5,7 @@ import { execFile } from "child_process";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { recordProcessOutput } from "./logs";
+import { serverPython } from "../util/pythonbin";
 
 export interface ScanAdapter {
   id: string;
@@ -45,7 +46,7 @@ const adapters: Record<string, ScanAdapter> = {
     run: (assetPath) =>
       new Promise((resolve, reject) => {
         recordProcessOutput("modelscan", "log", `$ python modelscan_wrapper.py ${assetPath}`);
-        execFile("python", ["modelscan_wrapper.py", assetPath], (err, stdout, stderr) => {
+        execFile(serverPython(), ["modelscan_wrapper.py", assetPath], (err, stdout, stderr) => {
           if (stderr) recordProcessOutput("modelscan", "warn", stderr);
           if (err) {
             recordProcessOutput("modelscan", "error", err.message);

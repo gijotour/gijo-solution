@@ -10,6 +10,7 @@ import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { chat } from "./llm";
 import { recordProcessOutput } from "./logs";
+import { serverPython } from "../util/pythonbin";
 // 학습 데이터가 디스크에 닿는 유일한 자리라, 위생을 여기서 건다(호출부마다 붙이면 또 빠뜨린다).
 import { cleanForTraining, type 데이터종류 } from "./datasethygiene";
 
@@ -27,7 +28,10 @@ export async function extractDocumentText(filename: string, base64: string): Pro
   try {
     const text = await new Promise<string>((resolve, reject) => {
       execFile(
-        "python",
+        // ⚠ 맨 "python"을 부르면 안 된다 — 운영(WSL)에는 그 이름이 없어(python3만 존재)
+        //   추출이 **한 번도 성공한 적 없었다**(2026-08-08 실측). 그 여파로 경로 인입이
+        //   PDF를 글자로 그냥 읽어 저장소 조각의 73%가 압축 바이트였다.
+        serverPython(),
         ["scripts/extract_doc.py", tmp],
         { env: { ...process.env, PYTHONUTF8: "1" }, maxBuffer: 256 * 1024 * 1024 },
         (err, stdout, stderr) => {

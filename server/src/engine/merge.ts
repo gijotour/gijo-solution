@@ -13,6 +13,7 @@ import * as os from "os";
 import * as path from "path";
 import { authMiddleware } from "../auth/auth";
 import { llamaBinPath } from "../util/llamabin";
+import { serverPython } from "../util/pythonbin";
 import { SECURITY_LLM_DEX, DexModel } from "./modeldex";
 
 const OUTPUTS_DIR = process.env.GIJO_OUTPUTS_DIR ?? "outputs";
@@ -124,7 +125,7 @@ function isModelCached(modelId: string): boolean {
 // mergekit 설치 여부 — python 모듈 존재만 빠르게 확인(find_spec, 모듈 로드 안 함).
 function mergekitInstalled(): boolean {
   const probe = spawnSync(
-    "python",
+    serverPython(),
     ["-c", "import importlib.util,sys; sys.exit(0 if importlib.util.find_spec('mergekit') else 1)"],
     { encoding: "utf-8" }
   );

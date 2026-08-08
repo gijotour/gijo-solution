@@ -426,8 +426,23 @@ export function chunkText(text: string, size = CHUNK_SIZE, overlap = CHUNK_OVERL
   return filtered;
 }
 
+/** 글자로 그냥 읽으면 안 되는(추출이 필요한) 형식 — 그대로 읽으면 압축 바이트가 지식이 된다. */
+const 추출필요 = new Set([".pdf", ".hwp", ".hwpx", ".docx", ".doc", ".pptx", ".xlsx"]);
+
 export async function ingestDocument(filePath: string, scope: string = GLOBAL_SCOPE, classify = false, uploadedBy?: string): Promise<IngestResult> {
   const resolved = assertWithinIngestRoot(filePath);
+  const ext = path.extname(resolved).toLowerCase();
+  // ⚠ 실사고(2026-08-08): 여기서 PDF를 **UTF-8 글자로 그대로 읽고 있었다.** 그 결과 압축
+  //   스트림 바이트가 "지식"으로 들어가 저장소 조각의 73%(Tenable 매뉴얼 4종 등)가 사람이
+  //   읽을 수 없는 쓰레기였다. 검색은 그 쓰레기를 상위로 올려 진짜 근거를 밀어냈다.
+  //   업로드 경로(/api/memory/ingest-file)는 추출기를 거치는데 경로 인입만 빠져 있었다.
+  if (추출필요.has(ext)) {
+    const buf = await fs.readFile(resolved);
+    const { extractDocumentText } = await import("./dataset.js");
+    const text = await extractDocumentText(path.basename(resolved), buf.toString("base64"));
+    if (!text.trim()) throw new Error(`문서에서 텍스트를 추출하지 못했습니다: ${path.basename(resolved)}`);
+    return ingestText(path.basename(resolved), text, scope, resolved, classify, uploadedBy);
+  }
   const raw = await fs.readFile(resolved, "utf-8");
   return ingestText(path.basename(resolved), raw, scope, resolved, classify, uploadedBy);
 }
@@ -715,7 +730,21 @@ async function refreshFtsIndex(table: lancedb.Table): Promise<void> {
   try {
     await table.optimize();
   } catch (err) {
-    console.warn(`[memory] 전문 검색 인덱스 갱신 실패(다음 검색에 일부 조각 누락 가능): ${err instanceof Error ? err.message : String(err)}`);
+    // ⚠ optimize()는 이 저장소에서 **늘 깨진다** — lance 8.0.0의 내부 디코드 버그다(2026-08-08).
+    //   깨끗하게 새로 지은 저장소에서도 같은 오류가 나 데이터 문제가 아님을 확인했다.
+    //   다행히 새로 넣은 조각은 색인 전에도 검색에 잡히므로(미색인 구간은 훑어서 찾는다)
+    //   답이 틀리지는 않는다. 다만 쌓이면 느려지므로 **인덱스를 통째로 다시 만든다** —
+    //   그 경로는 실측으로 통과한다. 이것마저 실패하면 벡터 검색만으로 계속 간다.
+    console.warn(`[memory] 증분 색인 실패(알려진 lance 버그) — 인덱스를 다시 만듭니다: ${err instanceof Error ? err.message : String(err)}`);
+    try {
+      const existing = (await table.listIndices()).find((i) => i.columns.includes("text"));
+      if (existing) await table.dropIndex(existing.name);
+      await table.createIndex("text", {
+        config: lancedb.Index.fts({ lowercase: true, asciiFolding: true, withPosition: true }),
+      });
+    } catch (err2) {
+      console.warn(`[memory] 인덱스 재생성도 실패 — 벡터 검색만 사용합니다: ${err2 instanceof Error ? err2.message : String(err2)}`);
+    }
   }
 }
 

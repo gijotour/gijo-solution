@@ -13,6 +13,7 @@
 import { execFile } from "child_process";
 import * as path from "path";
 import type { RunFn, RunResult, HardeningTarget } from "./hardeningscan";
+import { serverPython } from "../util/pythonbin";
 
 /** 장비 종류 → Netmiko device_type. 모르는 장비는 null(→ 일반 SSH로 처리하게 둔다). */
 export function deviceTypeOf(target: HardeningTarget): string | null {
@@ -28,7 +29,9 @@ export function deviceTypeOf(target: HardeningTarget): string | null {
 }
 
 const SCRIPT = path.join(process.cwd(), "scripts", "netmiko_runner.py");
-const PYTHON = process.env.GIJO_PYTHON ?? "python";
+// ⚠ 예전엔 `?? "python"`이었다 — 운영(WSL)에 그 이름이 없어(python3만 존재) 조용히 실패한다.
+//   서버 도구용 파이썬은 한 곳에서 고른다(util/pythonbin, 2026-08-08 문서 추출 사고).
+const PYTHON = serverPython();
 const TIMEOUT_MS = Number(process.env.GIJO_NETMIKO_TIMEOUT_MS ?? 45_000);
 
 interface BridgeResponse {

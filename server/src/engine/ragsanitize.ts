@@ -93,6 +93,16 @@ export interface SanitizeResult {
 export function isBinaryLikeChunk(text: string): boolean {
   const t = (text ?? "").trim();
   if (t.length < 40) return false; // 짧은 조각은 판정 근거가 부족하다 — 통과
+
+  // ⓐ **날것 바이너리** — 2026-08-08 실측으로 추가한 판정. 첫 판(base64꼴)은 표본 하나(PDF
+  //   압축 스트림이 base64로 인코딩된 경우)만 보고 만들어, 정작 더 흔한 **원본 바이트가
+  //   그대로 들어온 경우**를 통째로 놓쳤다. 저장소를 세어 보니 조각의 73%가 이 꼴이었는데
+  //   판정기는 5건만 잡고 있었다. 제어문자(줄바꿈·탭 제외)와 대체문자(U+FFFD)가 섞여 있으면
+  //   사람이 읽을 수 있는 글이 아니다 — 검색 근거로도 쓸 수 없다.
+  const 제어 = (t.match(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\uFFFD]/g) ?? []).length;
+  if (제어 / t.length > 0.02) return true;
+
+  // ⓑ base64/hex 덩어리 — 제어문자 없이 인코딩만 된 경우(첫 판이 잡던 꼴).
   const 공백비율 = (t.match(/\s/g) ?? []).length / t.length;
   const 몸통 = t.replace(/\s+/g, "");
   const 낱말수 = t.split(/\s+/).length;

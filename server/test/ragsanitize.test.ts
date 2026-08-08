@@ -173,3 +173,26 @@ describe("바이너리꼴 조각 판정 (2026-08-09 — WizCLM 비교 오염 실
     expect(isBinaryLikeChunk("abc+/=")).toBe(false);
   });
 });
+
+describe("날것 바이너리 — 저장소 73% 오염의 실제 꼴(2026-08-08 실측)", () => {
+  // 첫 판(base64꼴)은 표본 하나(인코딩된 스트림)만 보고 만들어, 더 흔한 **원본 바이트가
+  // 그대로 들어온 경우**를 통째로 놓쳤다. 운영 저장소를 세어 보니 조각의 73%가 이 꼴인데
+  // 판정기는 5건만 잡고 있었다 — Tenable 매뉴얼 4종(4,100여 조각)이 검색 상위를 차지했다.
+  it("제어문자가 섞인 PDF 압축 스트림을 잡는다", () => {
+    //  ~ 대역이 섞인 실제 저장 조각의 축소판.
+    const 실제꼴 = "\bzb~'}2rWjvzgh}-ft}-¢irfޮM>O\n-g*')ޞys#?]y}xƮ-m5C^z{bt^u(Wl杪x(67z%\fymƫxǝƥ\"wnjQ'z2EZTj{)Z*')";
+    expect(isBinaryLikeChunk(실제꼴)).toBe(true);
+  });
+
+  it("대체문자(U+FFFD)가 흩뿌려진 깨진 인코딩도 잡는다", () => {
+    // ⚠ 40자 미만은 근거 부족으로 통과시킨다(원래 가드) — 실제 저장 조각은 수백 자다.
+    const 깨짐 = "��PK��텍스트가 아닌 바이트가 글자로 읽힌 자리�� �" + " 압축된 내용이 그대로 흘러들어와 사람이 읽을 수 없는 상태로 남은 자리";
+    expect(깨짐.length).toBeGreaterThanOrEqual(40);
+    expect(isBinaryLikeChunk(깨짐)).toBe(true);
+  });
+  it("정상 본문은 통과한다 — 표·코드처럼 줄바꿈·탭이 많아도(오탐 방지)", () => {
+    expect(isBinaryLikeChunk("SSL/TLS 인증서 유효기간이 47일로 단축되면 수작업 갱신은 한계에 부딪힙니다. 자동화가 필요합니다.")).toBe(false);
+    expect(isBinaryLikeChunk("Keyfactor Command provides certificate lifecycle automation across any CA and any cloud.")).toBe(false);
+    expect(isBinaryLikeChunk("항목\t값\n포트\t443\n프로토콜\tTLS 1.3\n갱신주기\t90일\n담당자\t보안운영팀\n비고\t자동 갱신")).toBe(false);
+  });
+});

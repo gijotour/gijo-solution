@@ -21,6 +21,7 @@ import { db, migrate } from "../db";
 import { authMiddleware } from "../auth/auth";
 import { SMALLTALK, NO_ANSWER } from "./sessionpatterns";
 import { rateChatLog, 질문주제 } from "./learnloop";
+import { isNonLearningSessionOwner } from "./learnpolicy";
 // work_session_turns 테이블은 worksessions.ts의 migrate가 만든다 — 이 모듈이 먼저 적재되면
 // 아래 prepare가 "no such table"로 죽는다(테스트에서 실측). 소유 모듈을 명시적으로 실어 보장한다.
 import "./worksessions";
@@ -79,10 +80,18 @@ export interface LearnCandidate {
 }
 
 interface ChatLogRow { id: string; agentId: string; question: string; answer: string; rating: number | null; usedInDataset: number; createdAt: number }
-interface TurnRow { id: string; sessionId: string; role: "user" | "assistant"; content: string; tool: string | null; at: number }
+interface TurnRow { id: string; sessionId: string; role: "user" | "assistant"; content: string; tool: string | null; at: number; createdBy: string | null }
 
 const unratedLogsStmt = db.prepare("SELECT * FROM chat_logs WHERE rating IS NULL AND usedInDataset = 0 ORDER BY createdAt DESC LIMIT 500");
-const turnsStmt = db.prepare("SELECT id, sessionId, role, content, tool, at FROM work_session_turns WHERE at >= ? ORDER BY sessionId, at ASC");
+// 세션을 **누가 열었는지**(createdBy)를 함께 가져온다 — 배포·게시 계정이 검증하느라 던진
+// 문답이 후보함에 그대로 흘러들던 구멍을 막기 위해서다(2026-08-08 실측: 후보 13건 중 7건이
+// 내 QA·리허설 대화였다). 대화 로그 경로는 isNonLearningAccount로 이미 막혀 있었는데
+// **작업 내역 경로만 그 정책을 안 보고 있었다** — 정책이 있어도 안 부르면 소용없다.
+const turnsStmt = db.prepare(
+  "SELECT t.id, t.sessionId, t.role, t.content, t.tool, t.at, s.createdBy" +
+  "  FROM work_session_turns t LEFT JOIN work_sessions s ON s.id = t.sessionId" +
+  " WHERE t.at >= ? ORDER BY t.sessionId, t.at ASC"
+);
 const decisionStmt = db.prepare("SELECT id, decision FROM learn_candidate_decisions");
 const putDecisionStmt = db.prepare(
   "INSERT INTO learn_candidate_decisions (id, decision, decidedAt, decidedBy) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET decision=excluded.decision, decidedAt=excluded.decidedAt, decidedBy=excluded.decidedBy"
@@ -169,6 +178,9 @@ export function listLearnCandidates(days = 30, limit = 60): {
     if (u.role !== "user" || b.role !== "assistant" || u.sessionId !== b.sessionId) continue;
     const id = `ws:${u.id}:${b.id}`;
     if (decided.has(id)) continue; // 이미 승인/제외 결정됨
+    // 배포·게시 계정이 검증하느라 나눈 대화는 **업무 문답이 아니다**. 그대로 배우면
+    // 제품이 아니라 시험을 배운다(learnpolicy의 확립된 원칙 — 대화 로그 경로는 이미 막혀 있다).
+    if (isNonLearningSessionOwner(u.createdBy)) { drop("자동화 계정"); continue; }
     const why = excluded(u.content, b.content);
     if (why) { drop(why); continue; }
     const fp = fingerprint(u.content, b.content);

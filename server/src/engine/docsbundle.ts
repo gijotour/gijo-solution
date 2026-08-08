@@ -94,6 +94,24 @@ async function resolveDocPath(file: string): Promise<string | null> {
 //   문서를 고치는 일은 앞으로도 계속 있으므로, 사람이 기억해서 지웠다 넣는 절차로 두지 않는다.
 const hashOf = (raw: string) => createHash("sha256").update(raw, "utf8").digest("hex").slice(0, 16);
 const HASH_KEY = (docId: string) => `docsbundle:hash:${docId}`;
+
+/** 글자로 그냥 읽으면 안 되는 형식 — memory.ingestDocument와 같은 목록을 본다. */
+const 추출필요 = new Set([".pdf", ".hwp", ".hwpx", ".docx", ".doc", ".pptx", ".xlsx"]);
+
+/**
+ * 번들 문서 한 편을 **읽을 수 있는 글자로** 가져온다.
+ * PDF·한글·오피스 문서는 추출기를 거친다 — 안 그러면 압축 바이트가 지식이 된다
+ * (2026-08-08 실사고: 저장소 조각의 73%가 그렇게 들어왔다).
+ */
+async function readBundleDoc(docPath: string): Promise<string> {
+  const ext = path.extname(docPath).toLowerCase();
+  if (!추출필요.has(ext)) return fs.readFile(docPath, "utf-8");
+  const buf = await fs.readFile(docPath);
+  const { extractDocumentText } = await import("./dataset.js");
+  const text = await extractDocumentText(path.basename(docPath), buf.toString("base64"));
+  if (!text.trim()) throw new Error(`텍스트를 추출하지 못했습니다(${path.basename(docPath)})`);
+  return text;
+}
 const getHashStmt = db.prepare("SELECT value FROM app_state WHERE key = ?");
 const setHashStmt = db.prepare("INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value");
 
@@ -139,7 +157,10 @@ export async function bootstrapDocsBundle(): Promise<DocsBundleResult> {
     }
     let raw: string;
     try {
-      raw = await fs.readFile(docPath, "utf-8");
+      // ⚠ 여기도 PDF를 **글자로 그냥 읽고 있었다**(2026-08-08). 부팅 때마다 압축 바이트가
+      //   지식으로 들어가, 담당자가 아무것도 안 해도 저장소가 오염됐다. 경로 인입
+      //   (memory.ingestDocument)과 같은 관문을 쓰게 한다 — 추출이 필요한 형식은 추출기로.
+      raw = await readBundleDoc(docPath);
     } catch (err) {
       result.failed.push({ file: entry.file, reason: err instanceof Error ? err.message : String(err) });
       continue;

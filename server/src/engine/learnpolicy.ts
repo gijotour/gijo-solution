@@ -24,3 +24,26 @@ const NON_LEARNING_ACCOUNTS = new Set(["claude-deploy", "gijo-publish"]);
 export function isNonLearningAccount(username?: string | null): boolean {
   return !!username && NON_LEARNING_ACCOUNTS.has(username);
 }
+
+/**
+ * 작업 내역(세션)을 연 사람이 자동화 계정인가 — **후보함이 보는 판별자.**
+ *
+ * ⚠ 세션에는 계정 아이디가 아니라 **표시 이름**이 적힌다(createdBy = displayName).
+ *   그래서 위 아이디 집합만으로는 못 거른다. 실제로 이 구멍으로 QA·리허설 문답 7건이
+ *   후보함에 올라왔다(2026-08-08 — 대화 로그 경로는 막혀 있었는데 세션 경로만 뚫려 있었다).
+ *   정책이 있어도 **부르지 않으면 소용없다**는 이 저장소의 반복 교훈이 또 나온 자리다.
+ * ⚠ 사람 이름을 넣지 말 것 — 담당자 문답이 학습에서 통째로 빠진다.
+ */
+const NON_LEARNING_SESSION_OWNERS = new Set([
+  "배포 자동화 전용", // claude-deploy
+  "게시 전용", // gijo-publish
+  "인수인계-자동검증",
+  "redteam-effective",
+  "시스템",
+]);
+
+export function isNonLearningSessionOwner(createdBy?: string | null): boolean {
+  if (!createdBy) return false;
+  const 이름 = createdBy.trim();
+  return NON_LEARNING_SESSION_OWNERS.has(이름) || NON_LEARNING_ACCOUNTS.has(이름);
+}
