@@ -224,54 +224,40 @@
     <!-- 시작 가이드 카드 → 2026-08-06 문서함으로 이관(위 JS 주석 참고) -->
 
     <div class="grid">
-      <div class="card"><h3>🔥 급한 것 <span class="cnt" id="urgentCnt"></span></h3>
-        <div id="urgentList"><div class="empty">불러오는 중…</div></div></div>
+      <!-- 오늘 계획 판 — 카드 줄 **그 자리에 상시**(2026-08-09 사용자 "캡처 자리에 · 기존
+           카드는 다 포함이니 없애도 됨"). 급한 것·오늘 할 일 카드를 이 판이 흡수했다:
+           왼쪽=후보(급한 것·하던 일·그 외, 가이드 한 줄), 오른쪽=오늘 내 계획(완료 체크·빼기). -->
+      <div id="planInline" class="card" style="grid-column:1/3">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <h3 style="margin:0">☑ 오늘 할 일 — 계획 짜기 <span class="cnt" id="planHeadCnt"></span></h3>
+        </div>
+        <div style="display:flex;gap:14px;flex-wrap:wrap">
+          <div style="flex:1.4;min-width:320px">
+            <div class="plan-sec-h">🔥 급한 것 <span id="planUrgentCnt"></span></div>
+            <div id="planUrgent"><div class="empty">불러오는 중…</div></div>
+            <div class="plan-sec-h" style="margin-top:10px">⏳ 하던 일 · 안 끝난 것 <span id="planUnfinCnt"></span></div>
+            <div id="planUnfin"></div>
+            <div class="plan-sec-h" style="margin-top:10px">📅 그 외 후보 <span id="planEtcCnt"></span></div>
+            <div id="planEtc"></div>
+          </div>
+          <div style="flex:1;min-width:260px;border-left:1px solid var(--border,#2a313c);padding-left:14px">
+            <div class="plan-sec-h">☑ 오늘 내 계획 <span id="planTodayCnt"></span></div>
+            <div id="planToday"></div>
+            <div style="display:flex;gap:8px;margin-top:10px">
+              <button id="planWrite" style="flex:1" title="대화창에 '할 일 추가: '를 얹습니다">＋ 직접 적기(대화창)</button>
+            </div>
+            <div style="font-size:11.5px;color:var(--muted-2,#6b7482);margin-top:8px;line-height:1.5">
+              담기·빼기·완료는 즉시 저장됩니다 — 팀 사무실 창과 절차 띠가 같은 목록을 봅니다.
+            </div>
+          </div>
+        </div>
+      </div>
 
-      <!-- 오늘 할 일 — **읽기 전용 요약**이다(2026-07-31).
-           같은 목록을 대시보드·팀 사무실 창·내 업무 세 군데서 각각 적어 넣고 있었다(전부 /api/tasks).
-           적어 넣는 창구는 '내 업무' 하나로 모으고, 여기는 "지금 몇 건 남았나"만 보여준다.
-           대시보드는 훑는 자리지 일하는 자리가 아니다. -->
-      <div class="card"><h3>☑ 오늘 할 일 <span class="cnt" id="taskCnt"></span></h3>
-        <div id="taskList"><div class="empty">불러오는 중…</div></div>
-        <div class="addrow" style="display:flex;gap:6px">
-          <button id="planOpen" style="flex:1.4;background:var(--blue,#3b82f6);border-color:var(--blue,#3b82f6);color:#fff" title="급한 것·하던 일·그 외 후보를 보고 오늘 계획을 직접 고릅니다">📝 오늘 계획 짜기</button>
-          <button id="taskOpen" style="flex:1" title="대화창에 "할 일 추가: "를 얹어 드립니다">＋ 대화창에서 적기</button>
-        </div></div>
-
+      <!-- 급한 것·오늘 할 일 카드는 2026-08-09 사용자 지시로 제거 — 위 계획 판이 두 내용을
+           전부 담는다(급한 것=후보 구획, 오늘 할 일=오늘 내 계획+완료 체크). 중복이 두 곳이면
+           숫자가 어긋나는 순간 담당자는 둘 다 안 믿는다. -->
       <div class="card"><h3>📊 한눈에</h3>
         <div id="kpiBox"><div class="empty">불러오는 중…</div></div></div>
-    </div>
-  </div>
-</div>
-
-<!-- 오늘 계획 짜기 겹판(시안 추천안 승인 2026-08-09) — 후보(코드가 뽑음)는 왼쪽,
-     내 계획은 오른쪽. 고르기(클릭)는 화면에서, 자유 작성은 대화창으로(입력칸 신설 금지 원칙). -->
-<div id="planOverlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:60;align-items:center;justify-content:center">
-  <div style="background:var(--panel,#161b22);border:1px solid var(--border-strong,#3a4250);border-radius:14px;width:760px;max-width:94vw;max-height:86vh;overflow:auto;padding:16px;box-shadow:0 18px 48px rgba(0,0,0,.5)">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
-      <b style="font-size:14px">📝 오늘 계획 짜기</b>
-      <button id="planClose" style="background:none;border:none;color:var(--muted,#9aa4b2);font-size:15px;cursor:pointer" title="닫기">✕</button>
-    </div>
-    <div style="display:flex;gap:14px">
-      <div style="flex:1.4;min-width:0">
-        <div class="plan-sec-h">🔥 급한 것 <span id="planUrgentCnt"></span></div>
-        <div id="planUrgent"><div class="empty">불러오는 중…</div></div>
-        <div class="plan-sec-h" style="margin-top:10px">⏳ 하던 일 · 안 끝난 것 <span id="planUnfinCnt"></span></div>
-        <div id="planUnfin"></div>
-        <div class="plan-sec-h" style="margin-top:10px">📅 그 외 후보 <span id="planEtcCnt"></span></div>
-        <div id="planEtc"></div>
-      </div>
-      <div style="flex:1;min-width:0;border-left:1px solid var(--border,#2a313c);padding-left:14px">
-        <div class="plan-sec-h">☑ 오늘 내 계획 <span id="planTodayCnt"></span></div>
-        <div id="planToday"></div>
-        <div style="display:flex;gap:8px;margin-top:10px">
-          <button id="planWrite" style="flex:1" title="대화창에 '할 일 추가: '를 얹습니다">＋ 직접 적기(대화창)</button>
-          <button id="planDone" style="background:var(--blue,#3b82f6);border-color:var(--blue,#3b82f6);color:#fff">이대로 확정</button>
-        </div>
-        <div style="font-size:11.5px;color:var(--muted-2,#6b7482);margin-top:8px;line-height:1.5">
-          담기·빼기는 즉시 저장됩니다 — 팀 사무실 창과 절차 띠가 같은 목록을 봅니다.
-        </div>
-      </div>
     </div>
   </div>
 </div>
@@ -422,96 +408,38 @@
     if (!window.gijo || !window.gijo.getToday) return;
     try {
       todayCache = await window.gijo.getToday(false);   // 규칙 계산 즉답 — LLM 안 부른다
-      renderUrgent(todayCache);
+      renderPlan(); // 급한 것·그 외 후보가 계획 판에 그려진다(카드 흡수, 2026-08-09)
     } catch (e) {
-      $("urgentList").innerHTML = '<div class="empty">불러오지 못했습니다.</div>';
+      $("planUrgent").innerHTML = '<div class="empty">불러오지 못했습니다.</div>';
     }
   }
 
-  // ── 급한 것 ──────────────────────────────────────────────────────────
-  function renderUrgent(d) {
-    var box = $("urgentList"), items = (d && d.items) || [];
-    $("urgentCnt").textContent = items.length ? String(items.length) : "";
-    if (!items.length) {
-      box.innerHTML = '<div class="empty">급한 항목이 없습니다.<br>취약점 스캔 결과나 점검 일정이 들어오면 여기 쌓입니다.</div>';
-      return;
-    }
-    box.innerHTML = items.slice(0, 8).map(function (i) {
-      var dot = i.urgency === "now" ? "red" : (i.axis === "device" ? "amber" : "blue");
-      var tag = (i.badges && i.badges[0]) || (i.urgency === "now" ? "지금" : "오늘");
-      return '<div class="li go" data-page="' + esc(screenOf(i.id)) + '" title="' + esc(i.why || "") + '">' +
-        '<span class="b ' + dot + '"></span>' +
-        '<span class="tx">' + esc(i.subtitle || i.title) + " — " + esc(i.title) + "</span>" +
-        '<span class="m">' + esc(tag) + "</span></div>";
-    }).join("");
-  }
-  $("urgentList").addEventListener("click", function (e) {
-    var row = e.target.closest(".li.go");
-    if (row) go(row.dataset.page);
-  });
-
-  // ── 오늘 할 일 ───────────────────────────────────────────────────────
+  // ── 오늘 할 일(계획 판이 흡수 — 급한 것·오늘 할 일 카드는 2026-08-09 제거) ──
   var P_ORDER = { P0: 0, P1: 1, P2: 2, P3: 3 };
   function rank(p) { return P_ORDER[p] != null ? P_ORDER[p] : 9; }
-  // 세 카드는 나란히 서야 읽힌다. 할 일이 쌓이면(운영 DB에 1,689건이 있었다) 이 카드만
-  // 세로로 늘어나 옆 카드가 허공에 뜬다 — 기본은 급한 순 7건만 보이고 나머지는 펼쳐서 본다.
-  var TASK_HEAD = 7, taskAll = false;
   async function loadTasks() {
-    var box = $("taskList");
     if (!window.gijo || !window.gijo.listTasks) return;
     try {
-      var all = (await window.gijo.listTasks()) || [];
-      var open = all.filter(function (t) { return !t.done; }).sort(function (a, b) {
-        return rank(a.priority) - rank(b.priority) || (a.dueAt || Infinity) - (b.dueAt || Infinity);
-      });
-      var done = all.filter(function (t) { return t.done; }).sort(function (a, b) { return b.createdAt - a.createdAt; });
-      // 배지는 "남은 건수" — 완료가 1,677건이라는 사실은 오늘 할 일을 고르는 데 도움이 안 된다.
-      $("taskCnt").textContent = open.length ? "남은 " + open.length + "건" : (all.length ? "다 했습니다" : "");
-      if (!all.length) { box.innerHTML = '<div class="empty">할 일이 없습니다. 아래에 적어 두면 여기 남습니다.</div>'; return; }
-      var shown = taskAll ? open : open.slice(0, TASK_HEAD);
-      var rest = open.length - shown.length;
-      var h = shown.concat(done.slice(0, 3)).map(function (t) {
-        return '<div class="li' + (t.done ? " done" : "") + '" data-id="' + esc(t.id) + '">' +
-          '<input type="checkbox" class="ck"' + (t.done ? " checked" : "") + ' title="완료 표시">' +
-          '<span class="tx" title="' + esc(t.text) + '">' + esc(t.text) + "</span>" +
-          '<span class="m">' + esc(t.done ? "완료" : (t.priority || "")) + "</span></div>";
-      }).join("");
-      if (rest > 0) h += '<div class="more" id="taskMore">남은 ' + rest + "건 더 보기</div>";
-      else if (taskAll && open.length > TASK_HEAD) h += '<div class="more" id="taskMore">접기</div>';
-      box.innerHTML = h;
-      var more = $("taskMore");
-      if (more) more.addEventListener("click", function () { taskAll = !taskAll; loadTasks(); });
+      planTasks = (await window.gijo.listTasks()) || [];
+      renderPlan();
     } catch (e) {
-      box.innerHTML = '<div class="empty">할 일을 불러오지 못했습니다.</div>';
+      $("planToday").innerHTML = '<div class="empty">할 일을 불러오지 못했습니다.</div>';
     }
   }
-  $("taskList").addEventListener("change", async function (e) {
-    if (!e.target.classList.contains("ck")) return;
-    var row = e.target.closest(".li");
-    try { await window.gijo.toggleTask(row.dataset.id, e.target.checked); } catch (err) {}
-    loadTasks();
-  });
   // 적어 넣기는 **대화창**으로 보낸다(2026-08-01, 내 업무 메뉴 폐지). 거기서 담고·끝내고·
   // 순서까지 안내받는다 — "메뉴는 보기 용도, 입력·설정은 대화창에서"라는 원칙 그대로다.
   // ⚠ 화면 이동이 아니라 **명령창에 문장을 얹어 둔다** — 담당자가 무슨 말을 해야 하는지
   //   모른 채 빈 칸을 마주하면 그 자리에서 멈춘다(2026-07-31 실측).
-  $("taskOpen").addEventListener("click", function () {
-    // ⚠ window.gijoConsole은 **셸(app.html)에 있고 이 화면은 iframe 안**이라 여기서는 없다
-    //   (2026-08-01 실앱에서 확인 — 그냥 뒀으면 눌러도 아무 일이 없는 버튼이 됐다).
-    //   같은 화면의 검증된 통로(gijo.askConsole → 없으면 postMessage)를 그대로 쓴다.
-    window.parent.postMessage({ type: "gijo:prefill", text: "할 일 추가: " }, "*");
-  });
-
-  // ── 오늘 계획 짜기 겹판 (시안 추천안 승인 2026-08-09) ─────────────────
+  // ── 오늘 계획 판 (상시, 2026-08-09 — 급한 것·오늘 할 일 카드 흡수) ─────
   // 후보는 전부 기존 서버 계산 재사용: 급한 것·그 외=getToday(false)의 items(why가 가이드),
   // 하던 일=할 일 목록의 미완료 중 오늘 이전 것. 새 API 없음 — 후보 계산이 두 곳이 되면 어긋난다.
   var planTasks = [];
   function planOpenTexts() {
     return planTasks.filter(function (t) { return !t.done; }).map(function (t) { return t.text; });
   }
-  function candRow(text, guide, pri, added) {
-    return '<div class="plan-cand' + (added ? " added" : "") + '" data-text="' + esc(text) + '"' + (pri ? ' data-pri="' + esc(pri) + '"' : "") + ">" +
-      '<span class="main">' + (pri ? '<span class="plan-' + pri.toLowerCase() + '">' + esc(pri) + "</span> " : "") + esc(text) +
+  function candRow(text, guide, pri, added, page) {
+    return '<div class="plan-cand' + (added ? " added" : "") + '" data-text="' + esc(text) + '"' + (pri ? ' data-pri="' + esc(pri) + '"' : "") + (page ? ' data-page="' + esc(page) + '"' : "") + ">" +
+      '<span class="main"' + (page ? ' style="cursor:pointer" title="누르면 해당 화면으로 갑니다"' : "") + ">" + (pri ? '<span class="plan-' + pri.toLowerCase() + '">' + esc(pri) + "</span> " : "") + esc(text) +
       (guide ? ' <span class="guide">— ' + esc(guide) + "</span>" : "") + "</span>" +
       '<span class="padd">' + (added ? "담김 ✓" : "＋ 담기") + "</span></div>";
   }
@@ -522,7 +450,7 @@
     var etc = items.filter(function (i) { return i.urgency !== "now"; });
     var candText = function (i) { return (i.subtitle ? i.subtitle + " — " : "") + i.title; };
     $("planUrgent").innerHTML = urgent.length
-      ? urgent.slice(0, 8).map(function (i) { return candRow(candText(i), i.why || "", i.urgency === "now" ? "P0" : "", open.indexOf(candText(i)) >= 0); }).join("")
+      ? urgent.slice(0, 8).map(function (i) { return candRow(candText(i), i.why || "", i.urgency === "now" ? "P0" : "", open.indexOf(candText(i)) >= 0, screenOf(i.id)); }).join("")
       : '<div class="empty">급한 항목이 없습니다.</div>';
     $("planUrgentCnt").textContent = urgent.length ? urgent.length + "건 — 기한·실제 악용 기준" : "";
     // 하던 일 — 오늘 0시 이전에 담아 둔 미완료. "N일째"가 가이드다.
@@ -536,38 +464,40 @@
       : '<div class="empty">어제까지 담아 둔 미완료가 없습니다.</div>';
     $("planUnfinCnt").textContent = unfin.length ? unfin.length + "건 — 이미 목록에 있습니다" : "";
     $("planEtc").innerHTML = etc.length
-      ? etc.slice(0, 8).map(function (i) { return candRow(candText(i), i.why || "", "", open.indexOf(candText(i)) >= 0); }).join("")
+      ? etc.slice(0, 8).map(function (i) { return candRow(candText(i), i.why || "", "", open.indexOf(candText(i)) >= 0, screenOf(i.id)); }).join("")
       : '<div class="empty">그 외 후보가 없습니다.</div>';
     $("planEtcCnt").textContent = etc.length ? etc.length + "건 — 일정·점검·현황" : "";
-    var todayOpen = planTasks.filter(function (t) { return !t.done; });
-    $("planToday").innerHTML = todayOpen.length
-      ? todayOpen.map(function (t) {
-          return '<div class="plan-trow" data-id="' + esc(t.id) + '"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' +
-            (t.priority ? '<span class="plan-' + String(t.priority).toLowerCase() + '">' + esc(t.priority) + "</span> " : "") + esc(t.text) +
-            '</span><span class="rm" title="계획에서 빼기">✕</span></div>';
-        }).join("")
+    // 오늘 내 계획 — 완료 체크(기존 오늘 할 일 카드의 기능 흡수) + 빼기, 완료 최근 3건은 취소선.
+    var todayOpen = planTasks.filter(function (t) { return !t.done; }).sort(function (a, b) {
+      return rank(a.priority) - rank(b.priority) || (a.dueAt || Infinity) - (b.dueAt || Infinity);
+    });
+    var doneRecent = planTasks.filter(function (t) { return t.done; })
+      .sort(function (a, b) { return b.createdAt - a.createdAt; }).slice(0, 3);
+    var rowHtml = function (t) {
+      return '<div class="plan-trow" data-id="' + esc(t.id) + '">' +
+        '<input type="checkbox" class="pck"' + (t.done ? " checked" : "") + ' title="완료 표시" style="accent-color:var(--teal,#1eb980)">' +
+        '<span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap' + (t.done ? ";color:var(--muted-2);text-decoration:line-through" : "") + '">' +
+        (t.priority && !t.done ? '<span class="plan-' + String(t.priority).toLowerCase() + '">' + esc(t.priority) + "</span> " : "") + esc(t.text) +
+        "</span>" + (t.done ? "" : '<span class="rm" title="계획에서 빼기">✕</span>') + "</div>";
+    };
+    $("planToday").innerHTML = (todayOpen.length || doneRecent.length)
+      ? todayOpen.map(rowHtml).join("") + doneRecent.map(rowHtml).join("")
       : '<div class="empty">아직 담은 일이 없습니다 — 왼쪽에서 고르세요.</div>';
     $("planTodayCnt").textContent = todayOpen.length ? todayOpen.length + "건" : "";
+    $("planHeadCnt").textContent = todayOpen.length ? "남은 " + todayOpen.length + "건" : (planTasks.length ? "다 했습니다" : "");
   }
-  async function openPlan() {
-    $("planOverlay").style.display = "flex";
-    try {
-      if (!todayCache) todayCache = await window.gijo.getToday(false);
-      planTasks = (await window.gijo.listTasks()) || [];
-      renderPlan();
-    } catch (e) {
-      $("planUrgent").innerHTML = '<div class="empty">후보를 불러오지 못했습니다.</div>';
-    }
-  }
-  $("planOpen").addEventListener("click", openPlan);
-  $("planClose").addEventListener("click", function () { $("planOverlay").style.display = "none"; loadTasks(); });
-  $("planDone").addEventListener("click", function () { $("planOverlay").style.display = "none"; loadTasks(); });
   $("planWrite").addEventListener("click", function () {
-    $("planOverlay").style.display = "none";
+    // ⚠ window.gijoConsole은 셸(app.html)에 있고 이 화면은 iframe 안 — postMessage 통로 사용.
     window.parent.postMessage({ type: "gijo:prefill", text: "할 일 추가: " }, "*");
   });
-  $("planOverlay").addEventListener("click", async function (e) {
-    if (e.target === $("planOverlay")) { $("planOverlay").style.display = "none"; loadTasks(); return; }
+  $("planInline").addEventListener("click", async function (e) {
+    // 완료 체크(오늘 내 계획) — 기존 오늘 할 일 카드의 토글 흡수.
+    if (e.target.classList && e.target.classList.contains("pck")) {
+      var trow = e.target.closest(".plan-trow");
+      try { await window.gijo.toggleTask(trow.dataset.id, e.target.checked); } catch (err) {}
+      loadTasks();
+      return;
+    }
     var add = e.target.closest(".plan-cand:not(.added) .padd");
     if (add) {
       var row = add.closest(".plan-cand");
@@ -585,6 +515,13 @@
         planTasks = (await window.gijo.listTasks()) || [];
         renderPlan();
       } catch (err) { /* 행이 남아 있으면 실패를 알 수 있다 */ }
+      return;
+    }
+    // 후보 제목 클릭 = 그 화면으로(기존 급한 것 카드의 이동 기능 보존) — 담기 버튼과 분리돼 있다.
+    var main = e.target.closest(".plan-cand .main");
+    if (main) {
+      var page = main.closest(".plan-cand").dataset.page;
+      if (page) go(page);
     }
   });
 
