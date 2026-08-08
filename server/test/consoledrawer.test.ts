@@ -39,7 +39,9 @@ describe("서랍 — 지금 보는 화면 것을 먼저", () => {
   it("★ 탭이 바뀌면 서랍을 다시 그린다 — 안 그리면 옆 화면 것이 위에 남는다", () => {
     const i = src.indexOf("function applyCtx");
     expect(i).toBeGreaterThan(0);
-    expect(src.slice(i, i + 700), "applyCtx가 renderDrawer를 안 부른다").toContain("renderDrawer()");
+    // 2026-08-09 메뉴 연동 재설계로 applyCtx가 길어졌다(구분선·칩·절차 띠) — 창을 함수 전체로 넓힌다.
+    // 계약은 그대로다: renderDrawer 호출이 applyCtx **안**에 있어야 한다.
+    expect(src.slice(i, i + 3500), "applyCtx가 renderDrawer를 안 부른다").toContain("renderDrawer()");
   });
 
   it("갈래를 지우지는 않는다 — 대화창은 화면 경계를 가로지른다(2026-07-31 결정 유지)", () => {

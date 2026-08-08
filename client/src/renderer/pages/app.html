@@ -488,7 +488,10 @@
     }
     // ② "이 화면 설명해줘"(ⓘ) — 화면 안 챗봇을 없앴으므로 콘솔이 답한다.
     if (d.type === "gijo:explain" && window.gijoConsole) {
-      window.gijoConsole.ask(d.topic ? '"' + d.topic + '" 사용법 알려줘' : "이 화면에서 뭐 할 수 있어?");
+      // 화면 안내는 카드 한 장으로(2026-08-09 재설계) — 말풍선으로 쌓으면 같은 안내가
+      // 중복된다(실측 3중복). 특정 주제(topic)는 일반 대화로 — 그건 안내가 아니라 질문이다.
+      if (!d.topic && window.gijoConsole.guide) window.gijoConsole.guide();
+      else window.gijoConsole.ask(d.topic ? '"' + d.topic + '" 사용법 알려줘' : "이 화면에서 뭐 할 수 있어?");
       return;
     }
     // ③ "이 지시를 대신 물어봐" — 콘솔은 셸에 있고 화면은 iframe 안이라 화면이 직접 못 부른다.

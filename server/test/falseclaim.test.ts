@@ -72,7 +72,8 @@ describe("거짓 완료 관문은 대화창 출구 한 곳에 있다", () => {
     const fs = await import("node:fs");
     const src = fs.readFileSync(new URL("../src/engine/dispatcher.ts", import.meta.url), "utf8");
     expect(src, "출구 함수가 없다").toContain("function 거짓완료를걸러낸다");
-    expect(src, "출구에서 안 부르면 아무 갈래도 안 걸린다").toContain("return 거짓완료를걸러낸다(instructionText, result)");
+    // 2026-08-09: 출구에 해석 한 줄(해석을단다)이 겹쳐졌다 — 관문 통과 **후** 해석을 단다.
+    expect(src, "출구에서 안 부르면 아무 갈래도 안 걸린다").toContain("거짓완료를걸러낸다(instructionText, result)");
   });
 
   it("갈래마다 흩어 놓지 않는다 — 관문 호출은 출구 한 곳뿐", async () => {

@@ -16,10 +16,13 @@ const 엔진방 = path.join(__dirname, "..", "src");
 function 소스전부(dir: string): { 파일: string; 내용: string }[] {
   const out: { 파일: string; 내용: string }[] = [];
   for (const name of fs.readdirSync(dir)) {
+    // __로 시작하는 파일은 다른 시험(airgap)이 잠깐 만드는 표본이다 — 제품 소스가 아니고,
+    // 병렬 실행 중 읽는 순간 사라질 수 있다(실측: __airgap_probe_tmp.ts ENOENT로 이 시험이 깨짐).
+    if (name.startsWith("__")) continue;
     const full = path.join(dir, name);
-    const st = fs.statSync(full);
+    let st; try { st = fs.statSync(full); } catch { continue; }
     if (st.isDirectory()) out.push(...소스전부(full));
-    else if (name.endsWith(".ts")) out.push({ 파일: path.relative(엔진방, full), 내용: fs.readFileSync(full, "utf8") });
+    else if (name.endsWith(".ts")) { try { out.push({ 파일: path.relative(엔진방, full), 내용: fs.readFileSync(full, "utf8") }); } catch { /* 경합으로 사라짐 */ } }
   }
   return out;
 }

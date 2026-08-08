@@ -1476,6 +1476,15 @@ export function findAgentTool(name: string): AgentTool | undefined {
  * @param role    호출자 권한. "admin"이 아니면 requiredRole="admin"인 도구를 숨긴다 —
  *                오케스트레이터가 애초에 후보로 삼지 못하게 해, 권한 없는 실행 시도 자체를 없앤다.
  */
+/**
+ * 도구 이름 → 사람 말 라벨. 해석 한 줄("이렇게 알아들었습니다: …")이 쓴다 —
+ * 내부 식별자(finding_status)를 담당자에게 보여 주면 안 되기 때문이다(내부 식별자 노출 금지 원칙).
+ */
+export function toolLabel(name: string): string | null {
+  const t = TOOLS.find((x) => x.name === name);
+  return t ? t.label : null;
+}
+
 export function listToolsFor(domains?: string[], role?: string): AgentTool[] {
   // 꺼져 있는 선택 기능의 도구는 아예 목록에서 뺀다.
   // ⚠ 2026-07-26 회귀: 법령 조회(기본 꺼짐)를 켜지 않은 상태에서도 law_lookup이 목록에 남아,

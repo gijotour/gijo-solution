@@ -5,6 +5,7 @@
 import type { Express, Request } from "express";
 import { 말투재기 } from "./tonewatch";
 import { 거짓완료차단 } from "./falseclaim";
+import { toolLabel } from "./agenttools";
 import { authMiddleware } from "../auth/auth";
 import { runWithViewer } from "./viewerctx";
 import type { GijoUser } from "../auth/users";
@@ -87,6 +88,9 @@ export interface DispatchResult {
   output: string;
   steps?: StepResult[]; // 복합(멀티스텝) 지시일 때 각 단계 결과
   toolCalls?: AgentToolCall[]; // 에이전트 루프가 실행한 도구 내역(화면 표시용)
+  // 해석 한 줄 — 질문을 어느 도구로 알아들었는지 사람 말로(2026-08-09, Purple AI의 쿼리 투명성 채택).
+  // 라우팅이 어긋났을 때 담당자가 **그 자리에서** 알아차리게 한다. 도구가 돈 답에만 붙는다.
+  해석?: string;
   // 쓰기 도구 지시 시: 실행하지 않고 결재판을 돌려준다 — 화면에서 승인해야 실행된다(시안 B).
   approval?: PendingApproval;
   // 학습 루프 실행 요청 시: 바로 실행하지 않고 화면의 명시적 확인 버튼으로만 시작(오발동 방지).
@@ -554,7 +558,22 @@ export async function dispatchInstruction(instructionText: string, sessionId?: s
   const result = await runWithViewer(viewer, () =>
     dispatchInstructionScoped(instructionText, sessionId, screen, actor, qa, noLearn, viewer)
   );
-  return 거짓완료를걸러낸다(instructionText, result);
+  return 해석을단다(거짓완료를걸러낸다(instructionText, result));
+}
+
+/**
+ * 해석 한 줄 — 도구가 돈 답에 "질문을 무엇으로 알아들었는지"를 사람 말로 단다
+ * (2026-08-09, Purple AI·Charlotte의 쿼리 투명성 채택). 라우팅이 어긋난 날,
+ * 담당자가 20분짜리 게이트를 기다리지 않고 **그 자리에서** 알아차리는 장치다.
+ *
+ * ⚠ 결재판에는 안 단다 — 결재판 자체가 이미 "무엇을 하려는지"를 보여 준다.
+ * ⚠ 라벨을 못 찾으면(내부 도구 등) 그 도구는 건너뛴다 — 내부 식별자를 내보내지 않는다.
+ */
+function 해석을단다(r: DispatchResult): DispatchResult {
+  if (r.해석 || r.approval || r.confirm || !r.toolCalls?.length) return r;
+  const 라벨 = [...new Set(r.toolCalls.map((t) => toolLabel(t.tool)).filter((x): x is string => !!x))];
+  if (!라벨.length) return r;
+  return { ...r, 해석: `${라벨.join(" → ")}(으)로 알아들었습니다` };
 }
 
 /**

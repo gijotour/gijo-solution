@@ -9,6 +9,7 @@
 import { describe, it, expect, vi } from "vitest";
 import fs from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { egressAllowed, isPrivateIp, airgapStatus, EGRESS_POINTS, installAirgapGuard, assertEgressAllowed } from "../src/engine/airgap";
 import { forcedToolFor } from "../src/engine/agentloop";
 import { findAgentTool } from "../src/engine/agenttools";
@@ -99,8 +100,13 @@ describe("에어갭 카탈로그 — 실제 외부 호출을 다 덮는다(봉�
   // ⚠ **이 감시가 실제로 잡을 수 있는지**를 잰다. 통과만 하고 아무것도 못 보는 감시가
   //   가장 위험하다(넓히기 전 버전이 딱 그랬다 — 파일 7개를 손으로 적어 새 파일을 못 봤다).
   it("감시가 새 사각지대를 실제로 잡는다 (일부러 만든 미등록 호출)", () => {
-    const dir = path.join(__dirname, "../src/engine");
-    const 가짜 = path.join(dir, "__airgap_probe_tmp.ts");
+    // ⚠ 표본을 **src/engine에 쓰지 않는다**(2026-08-09 수리). 예전엔 __airgap_probe_tmp.ts를
+    //   실제 엔진 폴더에 만들었는데, 병렬로 도는 다른 소스 감시 시험들(auditactor·findingcount 등)이
+    //   그 폴더를 훑다가 표본이 사라지는 순간 ENOENT로 깨졌다 — 매 회차 다른 시험이 희생됐다.
+    //   여기서 검증할 것은 **잡는 기제(regex)**다. 표본은 임시 폴더에 두고 같은 기제로 훑는다.
+    //   "실제 엔진 폴더를 읽는가"는 위 시험(훑은파일 > 50)이 이미 지킨다 — 둘을 합치면 덮는 범위가 같다.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "airgap-probe-"));
+    const 가짜 = path.join(dir, "probe.ts");
     fs.writeFileSync(가짜, 'export const x = () => fetch("https://telemetry.notinthecatalog.example/beacon");\n');
     try {
       const catalog = EGRESS_POINTS.map((p) => p.host).join(" ").toLowerCase();
@@ -114,7 +120,7 @@ describe("에어갭 카탈로그 — 실제 외부 호출을 다 덮는다(봉�
       }
       expect(found, "새 외부 호출을 못 잡는다 — 감시가 헛돌고 있다").toContain("telemetry.notinthecatalog.example");
     } finally {
-      fs.rmSync(가짜, { force: true }); // 흔적을 남기지 않는다
+      fs.rmSync(dir, { recursive: true, force: true }); // 흔적을 남기지 않는다
     }
   });
 

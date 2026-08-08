@@ -55,6 +55,37 @@
       ".cs-row .cm{font-size:12.5px;color:var(--text,#e9e7e2);word-break:break-word;line-height:1.62;}",
       // 마크다운으로 그린 답 — **표·목록·굵은 글씨**가 좁은 창에서도 읽히게(2026-07-31).
       // ⚠ 표는 폭이 좁으면 글자가 겹친다 → 표만 가로 스크롤을 준다(창은 안 밀린다).
+      // ── 메뉴 연동 재설계(2026-08-09 시안 승인) ──────────────────────────
+      // 절차 띠 — 업무 5단계에서 지금 어디인지. 앞·다음을 누르면 그 탭이 열린다.
+      ".cs-flow{display:flex;align-items:center;gap:5px;padding:0 12px 7px;font-size:11px;color:var(--muted-2,#a49d95);flex-wrap:wrap;}",
+      ".cs-flow .st{border:1px solid var(--border,rgba(255,255,255,.12));border-radius:5px;padding:1px 7px;cursor:pointer;white-space:nowrap;}",
+      ".cs-flow .st:hover{color:var(--blue-light,#7ab0ff);border-color:var(--blue,#3b82f6);}",
+      ".cs-flow .st.now{background:rgba(30,185,128,.12);border-color:rgba(30,185,128,.5);color:#5fe0aa;font-weight:800;cursor:default;}",
+      // 살아 있는 숫자 — 그 화면의 요약 1줄(절차 띠 데이터 재사용, 새 계산 없음)
+      ".cs-live{margin-left:auto;font-size:11.5px;color:var(--muted,#b3ada4);white-space:nowrap;}",
+      ".cs-live b{color:#f5928a;font-weight:800;}",
+      // 맥락 떼기 ✕ — VS Code implicit context의 결론(보이게+뗄 수 있게)을 처음부터
+      ".cs-ctx .x{margin-left:5px;color:var(--muted-2,#a49d95);cursor:pointer;font-weight:400;}",
+      ".cs-ctx .x:hover{color:#f5928a;}",
+      ".cs-ctx.off{opacity:.55;text-decoration:line-through;}",
+      // 화면별 칩 — 그 화면에서 실제로 하는 물음 3~5개(첫 칩은 항상 ⓘ)
+      ".cs-chips{display:flex;flex-wrap:wrap;gap:5px;padding:8px 11px;border-bottom:1px solid var(--border,rgba(255,255,255,.08));}",
+      ".cs-chip{font-size:11.75px;border:1px solid var(--border,rgba(255,255,255,.14));border-radius:13px;padding:2px 10px;",
+      "cursor:pointer;color:var(--text,#e9e7e2);background:transparent;white-space:nowrap;}",
+      ".cs-chip:hover{border-color:var(--teal,#1eb980);color:var(--teal,#1eb980);}",
+      ".cs-chip.ok{border-style:dashed;}", // 점선 = 승인 후 실행
+      // 화면 안내 카드 — ⓘ 답이 말풍선으로 쌓이지 않고 이 카드 한 장을 갈아끼운다(중복 구조적 차단)
+      ".cs-guide{margin:0 0 4px;border:1px solid var(--border,rgba(255,255,255,.1));border-left:3px solid var(--blue,#3b82f6);",
+      "border-radius:8px;background:var(--panel-2,#1f1e1d);padding:8px 10px;font-size:12px;color:var(--muted,#b3ada4);}",
+      ".cs-guide .gh{display:flex;align-items:center;gap:6px;color:#fff;font-weight:700;font-size:12px;cursor:pointer;user-select:none;}",
+      ".cs-guide .gh .car{margin-left:auto;color:var(--muted-2,#a49d95);font-size:11px;}",
+      ".cs-guide .gb{margin-top:6px;display:none;line-height:1.6;}",
+      ".cs-guide.open .gb{display:block;}",
+      // 화면 전환 구분선 — 답의 소속을 가른다
+      ".cs-div{display:flex;align-items:center;gap:8px;color:var(--muted-2,#a49d95);font-size:11px;margin:2px 0;}",
+      ".cs-div::before,.cs-div::after{content:'';flex:1;border-top:1px solid var(--border,rgba(255,255,255,.08));}",
+      // 해석 한 줄 — 질문을 무엇으로 알아들었는지(어긋나면 그 자리에서 보인다)
+      ".cs-parse{font-size:11px;color:var(--muted-2,#a49d95);margin-bottom:3px;}",
       // 서랍 — 무엇을 할 수 있나. 접혀 있는 게 기본(대화가 주인공이다).
       ".cs-drawer{flex:0 0 auto;border-bottom:1px solid var(--border,rgba(255,255,255,.08));background:var(--panel-2,#1f1e1d);}",
       ".cs-dh{display:flex;align-items:center;gap:7px;padding:7px 11px;cursor:pointer;font-size:12.5px;user-select:none;}",
@@ -190,12 +221,16 @@
     injectCss();
     host.innerHTML =
       '<div class="cs-head">' +
-        '<span class="cs-ctx" id="csCtx">대시보드</span>' +
+        '<span class="cs-ctx" id="csCtx" title="지금 지시의 대상 화면 — ✕로 떼면 화면과 무관하게 묻습니다">대시보드</span>' +
         '<span class="cs-hint" id="csHint">보고 있는 화면 기준으로 지시합니다</span>' +
         '<button class="cs-btn" id="csToggleHost" title="' +
           (IS_WINDOW ? "이 창을 닫고 앱 아래에 다시 붙입니다" : "대화를 별도 창으로 빼냅니다 — 화면을 100%로 쓸 때") + '">' +
           (IS_WINDOW ? "⇤ 앱에 붙이기" : "⧉ 창으로") + "</button>" +
       "</div>" +
+      // 절차 띠 + 살아 있는 숫자(2026-08-09 시안) — 절차 화면이 아니면 통째로 숨는다
+      '<div class="cs-flow" id="csFlow" style="display:none"></div>' +
+      // 화면별 칩 — 지금 화면에서 실제로 하는 물음. 전체 갈래는 아래 서랍(무엇을 할 수 있나)에 보존
+      '<div class="cs-chips" id="csChips"></div>' +
       '<div class="cs-drawer" id="csDrawer"></div>' +
       '<div class="cs-body" id="csBody"><div class="cs-empty">지시하면 여기서 실시간으로 흐릅니다. 위 <b>무엇을 할 수 있나</b>에서 골라도 됩니다.</div></div>' +
       '<div class="cs-dock">' +
@@ -215,6 +250,13 @@
 
     wireUpload();
     renderDrawer();
+
+    // C. 맥락 떼기 — ✕를 누르면 화면 무관, 다시 칩을 누르면 붙는다.
+    //   칩 내용은 applyCtx가 매번 다시 그리므로, 리스너는 부모(고정 요소)에 한 번만 단다.
+    document.getElementById("csCtx").addEventListener("click", function (e) {
+      if (e.target && e.target.classList.contains("x")) { ctxOff = true; applyCtx(); return; }
+      if (ctxOff) { ctxOff = false; applyCtx(); }
+    });
 
     document.getElementById("csToggleHost").addEventListener("click", function () {
       if (!window.gijo) return;
@@ -627,7 +669,7 @@
   //   대화창의 강점이 화면 경계를 가로지르는 것이라, 해당 화면 것을 **먼저** 보이고
   //   나머지는 아래에 남긴다(2026-07-31 "하는 일로 묶는다" 결정과 충돌하지 않게).
   var CAN = [
-    { cat: "지금 급한 것", kind: "here", screens: ["dashboard.html", "approvals.html", "vulnscan.html", "kpi.html"], qs: [
+    { cat: "지금 급한 것", kind: "here", screens: ["dashboard.html", "approvals.html", "vulnscan.html", "kpi.html", "triage.html", "fix.html"], qs: [
       // 보안 KPI 화면에 있던 「지금 손댈 일」 줄을 여기로 옮겼다(2026-08-02 사용자 지시).
       //   서버 도구 urgent_todo가 화면과 **같은 규칙 한 벌**로 만든다.
       { ic: "🎯", q: "지금 손댈 일 뭐야?" },
@@ -635,7 +677,7 @@
       { ic: "⏰", q: "기한 지난 일 보여줘" },
       { ic: "✅", q: "승인 기다리는 것 있어?" },
     ]},
-    { cat: "살펴보기", kind: "here", screens: ["analysis.html","threat.html","inventory.html","vulnscan.html","sbom.html","syslog.html"], qs: [
+    { cat: "살펴보기", kind: "here", screens: ["analysis.html","threat.html","inventory.html","vulnscan.html","sbom.html","syslog.html","discover.html","triage.html"], qs: [
       { ic: "🛡", q: "미조치 취약점 뭐 있어?" },
       { ic: "📦", q: "우리 자산 현황 알려줘" },
       { ic: "🌐", q: "새로 올라온 위협 중에 우리 자산에 해당하는 게 있어?" },
@@ -646,12 +688,12 @@
     //   운영에 없어서 첫 클릭이 "그런 자산이 없습니다"로 끝났다. 서랍은 "이건 된다"고 약속하는
     //   자리라 첫 클릭이 실패하면 없느니만 못하다).
     //   {제품} 자리는 서랍을 펼칠 때 **실제 등록된 제품 이름**으로 채운다. 하나도 없으면 그 줄을 뺀다.
-    { cat: "처리하기", kind: "ok", screens: ["approvals.html","maintenance.html","inventory.html","products.html"], qs: [
+    { cat: "처리하기", kind: "ok", screens: ["approvals.html","maintenance.html","inventory.html","products.html","fix.html","verify.html"], qs: [
       { ic: "🔧", q: "{제품} 정기점검 잡아줘", needs: "product" },
       { ic: "📝", q: "새 자산 등록할게" },
       { ic: "🚦", q: "가장 급한 취약점에 담당자 배정해줘" },
     ]},
-    { cat: "정리하기", kind: "here", screens: ["report.html","kpi.html","compliance.html","audit.html"], qs: [
+    { cat: "정리하기", kind: "here", screens: ["report.html","kpi.html","compliance.html","audit.html","reporting.html"], qs: [
       { ic: "📄", q: "이번 주 보안 현황을 요약해줘" },
       { ic: "📊", q: "이번 달 보안 지표를 지난달과 비교해줘" },
       { ic: "🧾", q: "최근 작업 기록에서 이상한 게 있어?" },
@@ -880,11 +922,128 @@
     var chip = document.getElementById("csCtx");
     var input = document.getElementById("chatInput");
     if (!chip || !input) return;
-    chip.textContent = ctx.label || "대시보드";
-    input.placeholder = ctx.label ? "「" + ctx.label + "」 화면에 대해 지시…" : "지시를 입력하세요…";
+    // 화면이 실제로 바뀌었으면 대화에 구분선을 남긴다 — 답의 소속이 갈리도록(2026-08-09 시안 ④).
+    // 첫 로드(prevScreen==null)나 같은 화면 재통지에는 안 남긴다.
+    if (prevScreen != null && ctx.screen && ctx.screen !== prevScreen) {
+      var bodyEl = document.getElementById("csBody");
+      if (bodyEl && bodyEl.querySelector(".cs-row")) {
+        var dv = document.createElement("div");
+        dv.className = "cs-div";
+        dv.textContent = (ctx.label || ctx.screen) + "(으)로 이동";
+        bodyEl.appendChild(dv);
+        bodyEl.scrollTop = bodyEl.scrollHeight;
+      }
+      ctxOff = false; // 새 화면에 왔으면 맥락은 다시 붙는다(뗀 것은 그 화면에서의 선택이었다)
+    }
+    prevScreen = ctx.screen || prevScreen;
+    // 맥락 칩 — 이름 + ✕(떼기). VS Code implicit context의 결론(보이게+뗄 수 있게)을 그대로.
+    chip.classList.toggle("off", ctxOff);
+    chip.innerHTML = esc(ctx.label || "대시보드") + (ctxOff ? "" : ' <span class="x" title="이번 질문들을 화면과 무관하게 묻습니다">✕</span>');
+    var hint = document.getElementById("csHint");
+    if (hint) hint.textContent = ctxOff ? "화면 무관 — 칩을 누르면 다시 붙습니다" : "보고 있는 화면 기준으로 지시합니다";
+    input.placeholder = ctxOff ? "지시를 입력하세요… (화면 무관)"
+      : ctx.label ? "「" + ctx.label + "」 화면에 대해 지시…" : "지시를 입력하세요…";
+    renderChips();
+    renderFlow();
     // 탭이 바뀌면 서랍의 「지금 화면」 순서도 따라 바뀌어야 한다(2026-08-06) —
     // 안 그리면 옆 화면 것이 위에 남아 "해당 메뉴에서 할 수 있는 것"이라는 약속이 깨진다.
     renderDrawer();
+  }
+
+  // ── 메뉴 연동 재설계(2026-08-09 시안 승인 + 외부사례 B·C) ────────────────
+  var prevScreen = null;
+  var ctxOff = false; // C. 맥락 떼기 — 켜지면 지시에 화면을 안 싣는다
+
+  /** ② 화면별 칩 — 그 화면 갈래(CAN.screens)에서 3~4개 + 첫 칩은 항상 ⓘ. */
+  function renderChips() {
+    var el = document.getElementById("csChips");
+    if (!el) return;
+    var 지금 = (ctx && ctx.screen) || "";
+    var qs = [];
+    CAN.forEach(function (c) {
+      if (c.screens && c.screens.indexOf(지금) >= 0) qs = qs.concat(fillQs(c.qs).map(function (x) { return { q: x.q, ok: c.kind === "ok" }; }));
+    });
+    var html = '<span class="cs-chip" data-guide="1" title="이 화면이 뭐 하는 곳인지 카드로 안내합니다">ⓘ 이 화면 안내</span>';
+    qs.slice(0, 4).forEach(function (x) {
+      html += '<span class="cs-chip' + (x.ok ? " ok" : "") + '" data-q="' + esc(x.q) + '"' + (x.ok ? ' title="승인 후 실행됩니다"' : "") + ">" + esc(x.q) + "</span>";
+    });
+    el.innerHTML = html;
+    el.querySelectorAll(".cs-chip").forEach(function (b) {
+      b.addEventListener("click", function () {
+        if (b.dataset.guide) return guideAsk();
+        ask(b.dataset.q);
+      });
+    });
+  }
+
+  /** ① 절차 띠 + 살아 있는 숫자 — /api/workflow/stages 재사용(새 계산 없음). 60초 캐시. */
+  var stagesCache = { at: 0, stages: null };
+  function renderFlow() {
+    var el = document.getElementById("csFlow");
+    if (!el) return;
+    var screenFile = ((ctx && ctx.screen) || "").split("/").pop().split("?")[0];
+    var draw = function (stages) {
+      var idx = -1;
+      stages.forEach(function (s, i) { if ((s.screens || []).indexOf(screenFile) >= 0) idx = i; });
+      if (idx < 0) { el.style.display = "none"; return; } // 절차 밖 화면 — 띠를 안 그린다(빈 띠는 고장으로 읽힌다)
+      var html = "";
+      stages.forEach(function (s, i) {
+        if (Math.abs(i - idx) > 1) return; // 앞·지금·다음만 — 다섯 칸을 다 그리면 띠가 줄바꿈된다
+        html += '<span class="st' + (i === idx ? " now" : "") + '" data-page="' + esc(s.page) + '" data-label="' + esc(s.label) + '" title="' +
+          (i === idx ? "지금 여기" : "누르면 이 단계 화면으로") + '">' + s.no + " " + esc(s.label) + "</span>";
+        if (i === idx || (i === idx - 1)) html += '<span class="ar">→</span>';
+      });
+      // 살아 있는 숫자 — 지금 단계의 count·alert(서버가 이미 계산해 주는 값 그대로)
+      var me = stages[idx];
+      var live = "";
+      if (me.count != null) live += "대상 " + me.count;
+      if (me.alert != null && me.alertLabel) live += (live ? " · " : "") + me.alertLabel + " <b>" + me.alert + "</b>";
+      html += '<span class="cs-live">' + live + "</span>";
+      el.innerHTML = html;
+      el.style.display = "flex";
+      el.querySelectorAll(".st:not(.now)").forEach(function (b) {
+        b.addEventListener("click", function () {
+          if (window.gijoTabs) window.gijoTabs.open(b.dataset.page, b.dataset.label);
+          else if (window.gijo && window.gijo.openTabInShell) window.gijo.openTabInShell(b.dataset.page, b.dataset.label);
+        });
+      });
+    };
+    if (stagesCache.stages && Date.now() - stagesCache.at < 60000) return draw(stagesCache.stages);
+    if (!window.gijo || !window.gijo.workflowStages) { el.style.display = "none"; return; }
+    window.gijo.workflowStages().then(function (r) {
+      stagesCache = { at: Date.now(), stages: (r && r.stages) || [] };
+      draw(stagesCache.stages);
+    }).catch(function () { el.style.display = "none"; }); // 못 읽으면 숨긴다 — 빈 띠로 채우지 않는다
+  }
+
+  /** ③ 화면 안내 카드 — ⓘ 답이 말풍선으로 쌓이지 않고 카드 한 장을 갈아끼운다(중복 구조 차단). */
+  var guideBusy = false;
+  function guideAsk() {
+    var body = document.getElementById("csBody");
+    if (!body || guideBusy || !window.gijo || !window.gijo.sendInstruction) return;
+    var card = document.getElementById("csGuide");
+    if (!card) {
+      card = document.createElement("div");
+      card.className = "cs-guide open";
+      card.id = "csGuide";
+      var empty = body.querySelector(".cs-empty");
+      if (empty) empty.remove();
+      body.insertBefore(card, body.firstChild); // 항상 대화 맨 위 — 안내는 배경이지 대화가 아니다
+    }
+    var label = (ctx && ctx.label) || "이 화면";
+    card.innerHTML = '<div class="gh"><span>ⓘ ' + esc(label) + ' — 화면 안내</span><span class="car">불러오는 중…</span></div><div class="gb"></div>';
+    guideBusy = true;
+    window.gijo.sendInstruction("이 화면에서 뭐 할 수 있어?", session ? session.id : undefined, ctx.screen || undefined)
+      .then(function (r) {
+        card.innerHTML = '<div class="gh"><span>ⓘ ' + esc(label) + ' — 화면 안내</span><span class="car">▾ 접기/펴기</span></div>' +
+          '<div class="gb">' + fmt("reply", (r && r.output) || "(안내를 받지 못했습니다)") + "</div>";
+        card.classList.add("open");
+        card.querySelector(".gh").addEventListener("click", function () { card.classList.toggle("open"); });
+      })
+      .catch(function (e) {
+        card.innerHTML = '<div class="gh"><span>ⓘ ' + esc(label) + ' — 화면 안내</span><span class="car">불러오기 실패 — ' + esc((e && e.message) || "오류") + "</span></div>";
+      })
+      .finally(function () { guideBusy = false; });
   }
   function readCtxFromShell() {
     if (IS_WINDOW || !window.gijoTabs) return;
@@ -925,7 +1084,9 @@
     try {
       // 맥락(screen)을 함께 보낸다 — "정리해줘"가 취약점 화면 앞에서는 취약점 정리로 해석된다
       // (server/engine/screencontext.ts). 보고 있는 탭이 곧 그 맥락이다.
-      var r = await window.gijo.sendInstruction(text, session ? session.id : undefined, ctx.screen || undefined, pid);
+      // C. 맥락을 뗐으면(ctxOff) 화면을 싣지 않는다 — "NIST CSF가 뭐야?" 같은 일반 질문에
+      //    화면 맥락이 오히려 해석을 비트는 경우가 있다(외부사례: VS Code implicit context 논쟁).
+      var r = await window.gijo.sendInstruction(text, session ? session.id : undefined, (ctxOff ? undefined : ctx.screen) || undefined, pid);
       if (pc) pc.stop();
       if (r && r.sessionId) {
         session = { id: r.sessionId };
@@ -935,6 +1096,15 @@
         icon: "🧭", name: "AI 팀", message: (r && r.output) || "(응답 없음)",
         full: !!(r && r.openScreen), // 순서 안내는 접지 않는다 — 접으면 순서를 못 읽는다
       });
+      // B. 해석 한 줄 — 질문을 어느 도구로 알아들었는지(서버가 사람 말로 만들어 준다).
+      //    라우팅이 어긋난 날 담당자가 이 줄에서 바로 알아차린다(Purple AI 쿼리 투명성 채택).
+      if (r && r.해석) {
+        var parseEl = document.createElement("div");
+        parseEl.className = "cs-parse";
+        parseEl.textContent = "🧭 " + r.해석;
+        var cmHost = replyEl.querySelector(".cm");
+        if (cmHost && cmHost.parentNode) cmHost.parentNode.insertBefore(parseEl, cmHost);
+      }
       // 지적 버튼 — 방금 보낸 질문과 이 답을 짝지어 둔다(중-1 피드백 루프).
       attachFlag(replyEl, text, (r && r.output) || "");
       // 근거 원문 — 답의 숫자를 담당자가 눈으로 검증할 수 있게(2026-08-01).
@@ -1120,7 +1290,7 @@
     input.focus();
     try { input.setSelectionRange(input.value.length, input.value.length); } catch (e) {}
   }
-  window.gijoConsole = { append: append, syncCtx: readCtxFromShell, submit: submit, ask: ask, prefill: prefill };
+  window.gijoConsole = { append: append, syncCtx: readCtxFromShell, submit: submit, ask: ask, prefill: prefill, guide: guideAsk };
 
   // 다른 화면·다른 창에서 "이 지시를 대화창에서 이어서" 하고 넘겨 준 것을 받는다.
   // ⚠ 빈 글이면 **보내지 않는다** — 「이어서 지시하기」만 누른 사람은 아직 할 말을 안 정했다.

@@ -37,6 +37,9 @@ function ts파일들(): string[] {
   const out: string[] = [];
   const 걷기 = (rel: string) => {
     for (const e of fs.readdirSync(path.join(엔진, rel), { withFileTypes: true })) {
+      // __로 시작하는 파일은 다른 시험(airgap)이 잠깐 만드는 표본 — 제품 소스가 아니고,
+      // 병렬 실행 중 읽는 순간 사라진다(실측 ENOENT: __airgap_probe_tmp.ts가 이 시험을 깨뜨림).
+      if (e.name.startsWith("__")) continue;
       const r = rel ? `${rel}/${e.name}` : e.name;
       if (e.isDirectory()) 걷기(r);
       else if (e.name.endsWith(".ts")) out.push(r);
