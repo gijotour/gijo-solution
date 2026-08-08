@@ -157,8 +157,11 @@
   background:var(--panel-2);color:var(--muted-2);}
 .plan-cand .lv.p0{background:#3a1f1d;color:#ff8b80;}
 .plan-cand .lv.p1{background:#33290f;color:#f5bb55;}
-.plan-cand .main{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;}
-.plan-cand .main .sub{font-weight:400;color:var(--muted);}
+/* ⚠ 이름을 .main으로 두면 **화면 레이아웃용 .main**(위 42행, padding 18/22/40)을 물려받는다 —
+   실측(2026-08-09 실앱 CDP): 줄은 26px인데 이 칸만 77px이 되어 글자가 줄 밖으로 삐져나가고
+   등급 배지가 아래로 밀렸다. 같은 이름이 두 뜻으로 쓰이면 언젠가 부딪힌다. 여기 것은 .what으로 가른다. */
+.plan-cand .what{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;padding:0;}
+.plan-cand .what .sub{font-weight:400;color:var(--muted);}
 .plan-cand .why{font-size:11px;color:var(--muted);white-space:nowrap;background:var(--panel-2);
   border:1px solid var(--border);border-radius:5px;padding:0 6px;line-height:17px;}
 .plan-cand .why.hot{color:#ffb0a8;border-color:#4a3038;}
@@ -484,7 +487,7 @@
     return '<div class="plan-cand' + (added ? " added" : "") + '" data-text="' + esc(text) + '"' + (pri ? ' data-pri="' + esc(pri) + '"' : "") + (page ? ' data-page="' + esc(page) + '"' : "") +
       (guide ? ' title="' + esc(guide) + '"' : "") + ">" +
       '<span class="lv' + (pri ? " " + pri.toLowerCase() : "") + '">' + (pri ? esc(pri) : "·") + "</span>" +
-      '<span class="main"' + (page ? ' style="cursor:pointer"' : "") + ">" + 대상꼴(text) + "</span>" +
+      '<span class="what"' + (page ? ' style="cursor:pointer"' : "") + ">" + 대상꼴(text) + "</span>" +
       (칩 ? '<span class="why' + (급함 ? " hot" : "") + '">' + esc(칩) + "</span>" : "<span></span>") +
       '<span class="padd">' + (added ? "담김" : "담기") + "</span></div>";
   }
@@ -563,7 +566,7 @@
       return;
     }
     // 후보 제목 클릭 = 그 화면으로(기존 급한 것 카드의 이동 기능 보존) — 담기 버튼과 분리돼 있다.
-    var main = e.target.closest(".plan-cand .main");
+    var main = e.target.closest(".plan-cand .what");
     if (main) {
       var page = main.closest(".plan-cand").dataset.page;
       if (page) go(page);
