@@ -364,6 +364,9 @@ const gijoApi = {
 
   // 통합 보안 분석(관제) 허브
   analysisEvents: () => api.analysisHubApi.events(),
+  logAnalysisFiles: () => api.logAnalysisApi.files(),
+  listProductIntros: () => api.productIntroApi.list(),
+  logAnalysisGuide: (eventId: string) => api.logAnalysisApi.guide(eventId),
   analysisAttackPaths: () => api.analysisHubApi.attackPaths(),
   analysisRebuildVuln: () => api.analysisHubApi.rebuildVuln(),
   analysisIngest: (filename: string, content: string) => api.analysisHubApi.ingest(filename, content),

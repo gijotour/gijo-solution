@@ -228,6 +228,20 @@ export interface AnalysisHubData {
   };
   correlations: AnalysisCorrelation[];
 }
+// ── 보안 로그 파일 분석(추가 기능, 2026-08-09) ─────────────────────────
+export interface LogFileSummary { ref: string; events: number; p0: number; p1: number; open: number; latestAt: number }
+export interface LogResponseGuide { kind: string; title: string; basis: string; steps: string[]; followup: string }
+// 제품 소개자료 — 보안제품 등록부와 **별도 대장**(2026-08-09 사용자 지시)
+export interface ProductIntroItem { id: string; name: string; category: string; vendor: string | null; summary: string | null; docName: string | null; createdAt: number }
+export const productIntroApi = {
+  list: () => request<{ items: ProductIntroItem[] }>("/api/product-intro"),
+};
+
+export const logAnalysisApi = {
+  files: () => request<{ files: LogFileSummary[] }>("/api/loganalysis/files"),
+  guide: (eventId: string) => request<{ guide: LogResponseGuide | null; message?: string }>(`/api/loganalysis/guide/${encodeURIComponent(eventId)}`),
+};
+
 export const analysisHubApi = {
   events: () => request<AnalysisHubData>("/api/analysis-hub/events"),
   rebuildVuln: () => request<{ inserted: number }>("/api/analysis-hub/rebuild-vuln", { method: "POST" }),

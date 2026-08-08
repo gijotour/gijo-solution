@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 제품 소개자료</title>
+<!--
+  소개자료 (추가 기능, 2026-08-09 사용자 지시 · mockups/product-intro 추천안).
+  보안 제품을 분류별로 훑고, 2~3개를 골라 비교하는 자리.
+  · 데이터는 **제품 소개자료 대장**(productintro — 보안제품 등록부와 별도, 2026-08-09 사용자 지시)
+  · 비교표는 등록부에 적힌 것만 정직하게 — 자료에 없는 칸은 "—" (지어내지 않는다)
+  · 등록은 대화창 「제품 소개자료 등록: 이름, 분류: …」(결재판 경유) — 이 화면은 보는 자리
+-->
+<style>
+:root{
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;}
+.app{display:grid;grid-template-columns:212px 1fr;min-height:100vh;}
+.sidebar{border-right:1px solid var(--border);background:#1f1e1d;}
+.main{padding:18px 22px 40px;max-width:1800px;}
+.scr-id{font-size:12.5px;color:var(--muted);margin-bottom:12px;}
+.scr-id b{color:var(--text);font-weight:800;}
+
+.chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px;}
+.chip{background:var(--panel);border:1px solid var(--border-strong);color:var(--muted);padding:6px 13px;border-radius:18px;font-size:12.25px;font-weight:700;cursor:pointer;}
+.chip.on{background:rgba(59,130,246,.16);border-color:var(--blue);color:#fff;}
+
+/* 제품 목록 — 온톨로지 「등록된 관계」처럼 촘촘한 표(2026-08-09 사용자 지시 "리스트로").
+   줄높이 ~27px(밀도 기준 21~29px 안). */
+.prow{display:flex;align-items:center;gap:10px;padding:3px 6px;border-top:1px solid rgba(255,255,255,.05);font-size:12.5px;min-width:0;}
+.prow:hover{background:rgba(255,255,255,.03);}
+.prow.picked{background:rgba(59,130,246,.09);}
+.prow input{flex:0 0 auto;width:13px;height:13px;accent-color:var(--blue);cursor:pointer;}
+.prow .nm{flex:0 0 200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:#fff;font-weight:800;}
+.c-cat{flex:0 0 auto;font-size:11.5px;font-weight:800;padding:1px 8px;border-radius:9px;color:var(--blue-light);background:rgba(59,130,246,.13);white-space:nowrap;}
+.prow .sub{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted-2);}
+.prow .docs{flex:0 0 auto;color:var(--muted);font-size:12px;white-space:nowrap;}
+
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:13px 15px;min-width:0;}
+.ph{font-size:13px;font-weight:800;color:#fff;margin-bottom:4px;display:flex;align-items:center;gap:8px;}
+.ph .cnt{margin-left:auto;font-size:12px;color:var(--muted-2);font-weight:700;}
+.honest{font-size:11.75px;color:var(--muted-2);margin-bottom:8px;}
+table{width:100%;border-collapse:collapse;font-size:12.5px;}
+th,td{padding:6px 9px;border-top:1px solid rgba(255,255,255,.06);text-align:left;vertical-align:top;line-height:1.55;min-width:0;}
+th{color:var(--muted-2);font-weight:700;white-space:nowrap;width:110px;}
+td b{color:#fff;}
+.empty{font-size:12.5px;color:var(--muted-2);padding:10px 2px;line-height:1.7;}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="gijoNav"></aside>
+  <div class="main">
+    <div class="scr-id"><b>제품 소개자료</b> — 보안 제품을 분류별로 훑고, 골라서 비교합니다. 자료는 대화창 ＋로 올립니다.</div>
+
+    <div class="chips" id="catChips"></div>
+    <div class="panel" style="margin-bottom:12px">
+      <div class="ph">📦 제품 목록 <span class="cnt" id="listCnt"></span></div>
+      <div id="cardGrid"><div class="empty">불러오는 중…</div></div>
+    </div>
+
+    <div class="panel">
+      <div class="ph">⚖ 비교 <span class="cnt" id="cmpCnt"></span></div>
+      <div class="honest">비교는 등록부·반입 자료에 적힌 것만 보여 줍니다 — 자료에 없는 칸은 "—" 입니다.</div>
+      <div id="cmpBox"><div class="empty">위 카드에서 [비교]를 2~3개 담으면 여기 표가 생깁니다.</div></div>
+    </div>
+  </div>
+</div>
+
+<div id="gijoChatWidget"></div>
+
+<script src="dialog.js"></script>
+<script src="nav.js"></script>
+<script src="gijomd.js"></script>
+<script src="chatparts.js"></script>
+<script src="chatwidget.js"></script>
+<script src="titlebar.js"></script>
+<script>
+(function () {
+  "use strict";
+  if (!window.gijo || !window.gijo.isAuthenticated || !window.gijo.isAuthenticated()) { location.href = "login.html"; return; }
+
+  var 제품들 = [];
+  var 분류 = "전체";
+  var 담김 = [];   // productId 최대 3
+  var esc = function (s) { return String(s ?? "").replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); };
+  var 값 = function (v) { return v && String(v).trim() ? esc(v) : "—"; };   // 없는 칸은 정직하게 —
+
+  function 자료요약(p) {
+    return p.docName ? "📄 소개서 연결" : "자료 없음";
+  }
+
+  function renderChips() {
+    var cats = ["전체"].concat([...new Set(제품들.map(function (p) { return p.category || "기타"; }))]);
+    document.getElementById("catChips").innerHTML = cats.map(function (c) {
+      var n = c === "전체" ? 제품들.length : 제품들.filter(function (p) { return (p.category || "기타") === c; }).length;
+      return '<div class="chip' + (분류 === c ? " on" : "") + '" data-c="' + esc(c) + '">' + esc(c) + " " + n + "</div>";
+    }).join("");
+    document.querySelectorAll("#catChips .chip").forEach(function (ch) {
+      ch.addEventListener("click", function () { 분류 = ch.dataset.c; renderChips(); renderCards(); });
+    });
+  }
+
+  // 온톨로지 「등록된 관계」처럼 촘촘한 목록(2026-08-09 사용자 지시 "리스트로") — 한 줄 = 한 제품.
+  function renderCards() {
+    var box = document.getElementById("cardGrid");
+    var rows = 분류 === "전체" ? 제품들 : 제품들.filter(function (p) { return (p.category || "기타") === 분류; });
+    document.getElementById("listCnt").textContent = rows.length ? rows.length + "개" : "";
+    if (!제품들.length) {
+      box.innerHTML = '<div class="empty">등록된 소개자료가 없습니다.<br>대화창에 「제품 소개자료 등록: 제품명, 분류: 방화벽, 벤더: ○○」라고 하면 결재판 확인 후 여기 쌓입니다.<br>소개서 파일은 대화창 ＋로 올립니다.</div>';
+      return;
+    }
+    box.innerHTML = rows.map(function (p) {
+      var picked = 담김.indexOf(p.id) >= 0;
+      return '<div class="prow' + (picked ? " picked" : "") + '" data-id="' + esc(p.id) + '">' +
+        '<input type="checkbox" title="비교에 담기"' + (picked ? " checked" : "") + ">" +
+        '<span class="nm">' + esc(p.name) + "</span>" +
+        '<span class="c-cat">' + esc(p.category || "기타") + "</span>" +
+        '<span class="sub">' + 값(p.vendor) + (p.summary ? " · " + esc(p.summary) : "") + "</span>" +
+        '<span class="docs">' + 자료요약(p) + "</span></div>";
+    }).join("");
+    box.querySelectorAll(".prow input").forEach(function (ck) {
+      ck.addEventListener("change", function () {
+        var id = ck.closest(".prow").dataset.id;
+        if (ck.checked) {
+          if (담김.length >= 3) { ck.checked = false; if (window.gijoTell) window.gijoTell("비교는 한 번에 3개까지입니다 — 하나를 빼고 담아 주세요."); return; }
+          담김.push(id);
+        } else {
+          담김 = 담김.filter(function (x) { return x !== id; });
+        }
+        renderCards(); renderCompare();
+      });
+    });
+  }
+
+  function renderCompare() {
+    var box = document.getElementById("cmpBox");
+    var picked = 담김.map(function (id) { return 제품들.find(function (p) { return p.id === id; }); }).filter(Boolean);
+    document.getElementById("cmpCnt").textContent = picked.length ? picked.length + "개 담김" : "";
+    if (picked.length < 2) { box.innerHTML = '<div class="empty">위 카드에서 [비교]를 2~3개 담으면 여기 표가 생깁니다.</div>'; return; }
+    var 행 = function (label, f) {
+      return "<tr><th>" + label + "</th>" + picked.map(function (p) { return "<td>" + f(p) + "</td>"; }).join("") + "</tr>";
+    };
+    box.innerHTML = '<div style="overflow-x:auto"><table>' +
+      "<tr><th></th>" + picked.map(function (p) { return "<td><b>" + esc(p.name) + "</b></td>"; }).join("") + "</tr>" +
+      행("분류", function (p) { return 값(p.category); }) +
+      행("벤더", function (p) { return 값(p.vendor); }) +
+      행("한 줄 소개", function (p) { return 값(p.summary); }) +
+      행("소개서", function (p) { return p.docName ? "📄 " + esc(p.docName) : "—"; }) +
+      "</table></div>" +
+      '<div class="honest" style="margin-top:8px">더 깊은 비교(기능·성능)는 대화창에 「' + picked.map(function (p) { return p.name; }).join("와 ") + ' 비교해줘」라고 물으면 반입된 매뉴얼·소개서를 근거로 답합니다.</div>';
+  }
+
+  window.gijo.listProductIntros().then(function (r) {
+    제품들 = (r && r.items) || [];
+    renderChips(); renderCards(); renderCompare();
+  }).catch(function () {
+    document.getElementById("cardGrid").innerHTML = '<div class="empty">제품 목록을 불러오지 못했습니다 — 서버 연결을 확인해 주세요.</div>';
+  });
+})();
+</script>
+</body>
+</html>

@@ -186,6 +186,7 @@ import {
   runAdapterAdopt,
   runAdapterAssign,
   runAdapterImport,
+  runProductIntroAdd,
 } from "./handlers";
 
 const TOOLS: AgentTool[] = [
@@ -1435,6 +1436,27 @@ const TOOLS: AgentTool[] = [
       `어댑터 파일 ${args.file}을 등록부에 반입합니다 — GGUF 형식 검사·지문(sha256) 기록 후 **미채택**으로 등록됩니다. 실서비스 반영은 게이트 통과·채택 후입니다.`,
     undo: "반입만으로는 아무것도 실행되지 않습니다 — 등록부에서 삭제 지시로 되돌릴 수 있습니다.",
     run: runAdapterImport,
+  },
+  {
+    // 제품 소개자료 등록(쓰기·결재판) — 보안제품 등록부와 별도 대장. 화면(intro.html)은 보기 전용.
+    name: "register_product_intro",
+    label: "제품 소개자료 등록",
+    domain: "cross",
+    write: true,
+    description:
+      '도입 검토용 제품 소개자료를 별도 대장에 등록한다(보안제품 등록부와 다름 — 검토 중 제품도 됨). ' +
+      '"제품 소개자료 등록: SecuFW, 분류: 방화벽, 벤더: 시큐업"처럼 말할 때 쓴다. ' +
+      '예: {"name":"SecuFW","category":"방화벽","vendor":"시큐업","summary":"차세대 방화벽"}',
+    params: [
+      { name: "name", label: "제품 이름", description: "소개자료의 제품 이름", required: true },
+      { name: "category", label: "분류", description: "방화벽·EDR·SIEM·WAF 등(비우면 기타)", required: false },
+      { name: "vendor", label: "벤더", description: "제조사(선택)", required: false },
+      { name: "summary", label: "한 줄 소개", description: "자료에 적힌 한 줄 소개(선택)", required: false },
+      { name: "doc", label: "소개서 문서명", description: "대화창 ＋로 올린 소개서 문서명(선택)", required: false },
+    ],
+    effect: (args) => "제품 소개자료 대장에 \"" + args.name + "\"을(를) 등록합니다 — 소개자료 화면 목록·비교에 나타납니다.",
+    undo: "소개자료 화면에서 확인 후, 삭제 지시로 되돌릴 수 있습니다.",
+    run: runProductIntroAdd,
   },
 ];
 

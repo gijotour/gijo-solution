@@ -131,6 +131,8 @@
     //   여기로 들어온다(계획 확정 전 빈 메뉴를 미리 달지 않는다 — 정직한 구현 원칙).
     //   alwaysGroup: 항목이 1개여도 대표 메뉴로 접지 않는다 — 곧 늘어날 그룹이다.
     { id: "extras", icon: "drawer", label: "추가 기능", bottom: true, alwaysGroup: true, items: [
+      { page: "loganalysis.html", label: "보안 로그 파일 분석" },
+      { page: "intro.html", label: "제품 소개자료" },
       { page: "handover.html", label: "업무 넘기기" },
     ]},
     // 설정 그룹 정리(2026-08-09 사용자 지시) — 7줄에서 3줄로.
@@ -141,7 +143,7 @@
     //   · 업무 넘기기는 설정이 아니라 업무 행위 — 통합하지 않고 별도로 둔다(사용자 지시).
     { id: "settings", icon: "slider", label: "설정", bottom: true, items: [
       { page: "settings.html?s=my", label: "설정" },
-      { page: "handover.html", label: "업무 넘기기" },
+      // 업무 넘기기는 「추가 기능」 그룹에 있다(2026-08-09 사용자 재확인 — 두 곳에 두지 않는다).
       { page: "records.html", label: "기록" },
     ]},
   ];

@@ -1165,6 +1165,18 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): { tool: s
   //   권한(role)은 그대로 지킨다 — admin 전용 도구가 강제 분기로 새면 안 된다.
   const available = new Set(listToolsFor(undefined, scope?.role).map((t) => t.name));
 
+  // 제품 소개자료 등록(추가 기능 2026-08-09) — 소개자료 화면이 "등록은 대화창에서"라고 안내한다.
+  // 「제품 소개자료」 낱말 묶음은 다른 영토와 안 겹친다. 이름을 못 뽑으면 강제하지 않는다.
+  if (available.has("register_product_intro") && /제품\s*소개\s*자료/.test(instruction) && /(등록|올려|추가)/.test(instruction)) {
+    // "제품 소개자료 등록: SecuFW, 분류: 방화벽, 벤더: 시큐업, 소개: …" 꼴에서 결정적으로 뽑는다.
+    const name = /(?:등록|추가|올려)[^:：]*[:：]\s*([^,，\n]+)/.exec(instruction)?.[1]?.trim()
+      ?? /소개\s*자료\s*(?:등록|추가)?\s*[:：]?\s*「([^」]+)」/.exec(instruction)?.[1]?.trim() ?? "";
+    const category = /분류\s*[:：]\s*([^,，\n]+)/.exec(instruction)?.[1]?.trim() ?? "";
+    const vendor = /벤더\s*[:：]\s*([^,，\n]+)/.exec(instruction)?.[1]?.trim() ?? "";
+    const summary = /소개\s*[:：]\s*([^,，\n]+)/.exec(instruction)?.[1]?.trim() ?? "";
+    if (name) return { tool: "register_product_intro", args: { name, category, vendor, summary } };
+  }
+
   // 전문가 어댑터 지시(재설계 2026-08-08) — 「어댑터」 낱말은 다른 영토와 안 겹쳐 결정적으로 잇는다.
   // 화면(설정·에이전트)이 "채택·배정은 대화창에서"라고 안내하므로 이 경로가 없으면 안내가 거짓이 된다.
   // 인자를 못 뽑으면 강제하지 않고 흘려보낸다(LLM 추출이 이어받음) — 빈 인자 결재판을 만들지 않는다.

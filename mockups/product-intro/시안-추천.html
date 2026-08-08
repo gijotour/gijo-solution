@@ -1,0 +1,380 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 소개자료 시안(추천)</title>
+<style>
+  :root{
+    --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,.09);
+    --border-strong:rgba(255,255,255,.16);--text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;
+    --blue:#3b82f6;--blue-light:#5fa1ff;--teal:#1eb980;--red:#e2483d;--amber:#f0a020;--purple:#8b7cf0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{background:var(--bg);}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;color:var(--text);font-size:13px;}
+
+  /* ── 레이아웃 골격 — 실 코드 사이드바 232px(nav.js "통일 사이드바" 2026-07-25)를 그대로 씀 ── */
+  .app{display:grid;grid-template-columns:232px 1fr;min-height:100vh;}
+  .main{padding:16px 24px 40px;min-width:0;max-width:1120px;}
+  .scr-id{font-size:12.5px;color:var(--muted);margin-bottom:4px;}
+  .scr-id b{color:#fff;font-weight:800;}
+  .static-note{font-size:11.5px;color:var(--muted-2);margin-bottom:14px;}
+
+  /* ── 사이드바 암시 — 실제 nav.js 그룹 순서를 옮겨 암시. 「추가 기능」 그룹만 펼쳐 「소개자료」를 켠다 ── */
+  .sidebar{display:flex;flex-direction:column;height:100vh;position:sticky;top:0;
+    background:var(--panel-2);border-right:1px solid var(--border);padding:10px 8px;}
+  .sb-top{padding-bottom:7px;margin-bottom:5px;border-bottom:1px solid var(--border);}
+  .sb-row{height:26px;display:flex;align-items:center;gap:7px;padding:0 9px;border-radius:6px;
+    font-size:12.25px;color:var(--muted-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .sb-g{display:flex;align-items:center;gap:6px;height:20px;font-size:10.75px;font-weight:700;
+    color:var(--muted-2);letter-spacing:.5px;margin:8px 5px 1px;opacity:.75;}
+  .sb-g .ln{flex:1;height:1px;background:var(--border);}
+  .sb-row.active{color:#fff;background:rgba(255,255,255,.055);font-weight:800;position:relative;font-size:12.5px;}
+  .sb-row.active::before{content:'';position:absolute;left:0;top:5px;bottom:5px;width:2px;
+    border-radius:2px;background:var(--blue-light);}
+  .sb-g.on{color:var(--blue-light);opacity:1;}
+  .sb-bottom{margin-top:auto;padding-top:6px;border-top:1px solid var(--border);}
+
+  /* ── 상단: 아이콘·제목 + 챗봇 위젯 자리(실 코드 patterns.html의 #gijoChatWidget 자리와 동일) ── */
+  .page-title{font-size:18px;font-weight:800;color:#fff;margin-bottom:10px;}
+  .chatwidget-stub{max-width:640px;margin-bottom:14px;background:var(--panel);border:1px dashed var(--border-strong);
+    border-radius:10px;padding:9px 13px;font-size:11.75px;color:var(--muted-2);}
+  .chatwidget-stub b{color:var(--blue-light);}
+
+  /* ── 분류 칩 줄 — products.html .cat-summary/.cat-chip 그대로(치수·클래스 재사용) ── */
+  .cat-summary{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px;}
+  .cat-chip{display:flex;align-items:center;gap:7px;background:var(--panel);border:1px solid var(--border);
+    border-radius:20px;padding:7px 14px;font-size:12.5px;font-weight:700;color:var(--text);cursor:pointer;}
+  .cat-chip.active{border-color:var(--blue);background:rgba(59,130,246,.12);color:#fff;}
+  .cat-chip .cnt{background:var(--blue);color:#fff;border-radius:10px;padding:0 8px;font-size:12.25px;font-weight:800;}
+  .cat-chip.active .cnt{background:#fff;color:var(--blue);}
+
+  /* ── 제품 카드 그리드 — 3열, 카드 높이 계산: 패딩24 + 이름줄18 + 메타줄16 + 소개줄16 + 하단줄18 + 행간12 ≈ 104~118px ── */
+  .card-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-bottom:22px;}
+  .pcard{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:12px 13px;
+    display:flex;flex-direction:column;gap:5px;min-height:112px;}
+  .pcard.picked{border-color:var(--blue);background:rgba(59,130,246,.07);}
+  .pcard.nodoc{opacity:.72;}
+  .pc-top{display:flex;align-items:center;gap:7px;flex-wrap:wrap;}
+  .pc-name{font-size:12.75px;font-weight:800;color:#fff;}
+  .pc-badge{font-size:11px;font-weight:800;color:var(--blue-light);background:rgba(59,130,246,.14);
+    border-radius:5px;padding:1px 6px;flex:0 0 auto;}
+  .pc-vendor{font-size:11.5px;color:var(--muted-2);}
+  .pc-desc{font-size:11.75px;color:var(--muted);line-height:1.45;overflow:hidden;text-overflow:ellipsis;
+    white-space:nowrap;}
+  .pc-bottom{margin-top:auto;display:flex;align-items:center;justify-content:space-between;gap:6px;
+    padding-top:6px;border-top:1px dashed var(--border);}
+  .pc-docs{font-size:11.25px;color:var(--muted-2);}
+  .pc-docs.none{color:var(--muted-2);opacity:.7;}
+  .pc-pick{display:flex;align-items:center;gap:5px;font-size:11.25px;color:var(--muted);white-space:nowrap;}
+  .pc-pick input{width:13px;height:13px;accent-color:var(--blue);}
+  .pc-pick.disabled{opacity:.45;}
+
+  /* ── 비교 판 ── */
+  .cmp-box{background:var(--panel-2);border:1px solid var(--border);border-radius:12px;padding:16px 18px;}
+  .cmp-head{display:flex;align-items:center;gap:10px;margin-bottom:6px;}
+  .cmp-title{font-size:13.5px;font-weight:800;color:#fff;}
+  .cmp-count{font-size:11.5px;color:var(--muted-2);}
+  .cmp-hint{font-size:11.5px;color:var(--muted-2);line-height:1.6;margin-bottom:12px;}
+  .cmp-hint b{color:var(--amber);}
+  table.cmp-tbl{width:100%;border-collapse:collapse;font-size:11.75px;}
+  table.cmp-tbl th,table.cmp-tbl td{padding:8px 12px;border-bottom:1px solid var(--border);vertical-align:top;
+    text-align:left;}
+  table.cmp-tbl th.rowlb{width:150px;color:var(--muted-2);font-weight:700;background:transparent;}
+  table.cmp-tbl thead th{color:#fff;font-size:12.5px;font-weight:800;border-bottom:1px solid var(--border-strong);}
+  table.cmp-tbl thead th .rm{float:right;color:var(--muted-2);font-weight:400;cursor:pointer;font-size:11px;}
+  table.cmp-tbl td.dash{color:var(--muted-2);opacity:.6;text-align:center;}
+  table.cmp-tbl td .feat{display:block;line-height:1.55;}
+
+  /* ── 결정용 설명 상자 — 시안 문서 본문(실제 제품 화면에는 없음) ── */
+  .why-box{max-width:1120px;margin:28px auto 40px;background:var(--panel);
+    border:1px dashed var(--border-strong);border-radius:12px;padding:18px 24px;
+    font-size:12.75px;line-height:1.75;color:var(--muted);}
+  .why-box h2{font-size:14.5px;color:#fff;margin-bottom:9px;}
+  .why-box b{color:var(--text);}
+  .why-box ul{margin:5px 0 10px 18px;}
+  .why-box .src{font-size:11.75px;color:var(--muted-2);margin-top:10px;}
+  .why-box .src a{color:var(--blue-light);}
+  .mock-tag{position:fixed;top:10px;right:14px;background:rgba(240,160,32,.16);color:var(--amber);
+    border:1px solid rgba(240,160,32,.4);font-size:11.5px;font-weight:800;padding:3px 10px;
+    border-radius:20px;z-index:50;}
+</style>
+</head>
+<body>
+
+<!--
+  ============================================================================
+  소개자료 시안(추천 1개) — mockups/product-intro/시안-추천.html
+  ============================================================================
+  무엇을 만드나: 사이드바 「추가 기능」 그룹에 들어갈 신규 화면. 제품 등록부(보안제품 대장)와
+  반입된 매뉴얼·소개서에서 나온 자료를 분류별로 훑고, 2~3개를 골라 나란히 비교하는 "보는 자리".
+  업로드 입력칸은 없다 — 자료 반입은 대화창 ＋(2026-07-27 사용자 지시로 업로드 입구를 대시보드
+  ＋ 하나로 통일한 원칙, products.html doc-add 주석 참고)로만 한다.
+
+  설계 근거 3줄(설계 전 조사):
+  1) 비교는 2~5개로 제한 — NN/g "Comparison Tables for Products, Services, and Features":
+     비교표는 대안이 적을 때만 유효한 "보상적 의사결정(compensatory decision making)"을 돕고,
+     5개를 넘으면 정적 비교표로는 과부하다(권장 상한 4~5개). 이 화면은 보안 담당자가 실제로
+     결정을 내리는 좁힌 범위(2~3개)를 기본값으로 잡았다.
+  2) 분류 칩 + 개수 배지 — 이미 이 제품이 쓰는 실제 패턴(client/src/renderer/pages/products.html
+     .cat-summary/.cat-chip)을 그대로 재사용했다(치수·클래스명 동일). 전자상거래 필터 UX
+     일반론에서도 "활성 필터를 칩으로, 개수와 함께" 보여주는 것이 표준 패턴으로 꼽힌다
+     (검색결과 참고: 필터 칩+카운트 배지가 훑기·선택 모두를 돕는다).
+  3) 빈 칸은 "—" — 이 제품의 상시 원칙(정직한 구현, 폴백 문구 금지)을 비교표에도 그대로
+     적용했다. 반입된 자료에 없는 값은 채워 넣지 않고 "—"로 정직하게 비운다(3.3.2 조치 검증
+     화면에서 확립한 "모르면 NA" 계약과 같은 결이다).
+
+  대상 사용자: 보안담당자(고객). 카드·표의 숫자·제품명·벤더명은 전부 데모값이다(<!-- 데모값 -->
+  주석으로 표시). 실제 구현 시 데이터 출처는 제품 등록부(listSecurityProductsGrouped)와 제품
+  문서(docs: manual/introDoc)이며, "우리 자산 연결"은 products.html의 assetName 연결과 같은 값을
+  재사용한다 — 새 계산식을 만들지 않는다.
+
+  정직한 시안 표기: 이 파일은 정적 그림이다. 스크립트가 없어 아무 것도 실제로 동작하지 않는다.
+  체크박스의 "담김" 표시·비교 판 내용은 전부 고정된 데모 상태다(클릭해도 바뀌지 않는다).
+  ============================================================================
+-->
+
+<div class="mock-tag">시안 · 결정용 그림</div>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="sb-top">
+      <div class="sb-row">⌂ 대시보드</div>
+      <div class="sb-row">▦ 팀 사무실 (창)</div>
+      <div class="sb-row">💬 작업 내역</div>
+    </div>
+
+    <div class="sb-g"><span>① 발견·수집</span><span class="ln"></span></div>
+    <div class="sb-row">발견·수집</div>
+    <div class="sb-g"><span>② 우선순위</span><span class="ln"></span></div>
+    <div class="sb-row">우선순위</div>
+    <div class="sb-g"><span>③ 조치</span><span class="ln"></span></div>
+    <div class="sb-row">조치</div>
+    <div class="sb-g"><span>④ 검증</span><span class="ln"></span></div>
+    <div class="sb-row">검증</div>
+    <div class="sb-g"><span>⑤ 보고</span><span class="ln"></span></div>
+    <div class="sb-row">보고</div>
+
+    <div class="sb-g"><span>등록부</span><span class="ln"></span></div>
+    <div class="sb-row">보안제품</div>
+
+    <div class="sb-g"><span>AI</span><span class="ln"></span></div>
+    <div class="sb-row">AI</div>
+
+    <!-- 이번 시안의 대상 그룹 — 「추가 기능」을 펼쳐 「소개자료」를 켠다 -->
+    <div class="sb-g on"><span>추가 기능</span><span class="ln"></span></div>
+    <div class="sb-row">보안 로그 파일 분석</div>
+    <div class="sb-row active">소개자료</div>
+    <div class="sb-row">업무 넘기기</div>
+
+    <div class="sb-bottom">
+      <div class="sb-g"><span>설정</span><span class="ln"></span></div>
+      <div class="sb-row">설정</div>
+      <div class="sb-row">기록</div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="page-title">📑 소개자료</div>
+    <div class="scr-id"><b>소개자료</b> — 보안 제품을 분류별로 훑고, 골라서 비교합니다. 자료는 대화창 ＋로 올립니다.</div>
+    <div class="static-note">※ 정적 시안입니다 — 실제 화면에서는 칩·카드·체크박스가 눌러 반응합니다. 지금은 「전체」를 고르고 2개를 비교 판에 담은 상태 1장만 보여줍니다.</div>
+
+    <div class="chatwidget-stub">💬 대화창 — 예: <b>"방화벽 소개자료 뭐 있어?"</b> · 자료 반입은 여기 ＋ 버튼</div>
+
+    <!-- ── 분류 칩 줄 — 숫자는 전부 데모값, 합이 「전체」와 일치하도록 맞췄다 ── -->
+    <div class="cat-summary">
+      <div class="cat-chip active"><span>전체</span><span class="cnt"><!-- 데모값 -->8</span></div>
+      <div class="cat-chip"><span>🧱 방화벽</span><span class="cnt"><!-- 데모값 -->2</span></div>
+      <div class="cat-chip"><span>🖥 EDR</span><span class="cnt"><!-- 데모값 -->1</span></div>
+      <div class="cat-chip"><span>📊 SIEM</span><span class="cnt"><!-- 데모값 -->1</span></div>
+      <div class="cat-chip"><span>🌐 WAF</span><span class="cnt"><!-- 데모값 -->1</span></div>
+      <div class="cat-chip"><span>🔑 NAC</span><span class="cnt"><!-- 데모값 -->1</span></div>
+      <div class="cat-chip"><span>🦠 백신</span><span class="cnt"><!-- 데모값 -->1</span></div>
+      <div class="cat-chip"><span>📦 기타</span><span class="cnt"><!-- 데모값 -->1</span></div>
+    </div>
+
+    <!-- ── 제품 카드 그리드 — 8장(3열 × 3행, 마지막 행 2장). 2장이 비교 판에 담긴 상태 ── -->
+    <div class="card-grid">
+
+      <div class="pcard picked">
+        <div class="pc-top"><span class="pc-name"><!-- 데모값 -->FW-01 시큐넥스트 방화벽</span><span class="pc-badge">방화벽</span></div>
+        <div class="pc-vendor"><!-- 데모값 -->㈜시큐텍</div>
+        <div class="pc-desc" title="다중 인터페이스 트래픽을 필터링하고 침입을 차단하는 온프렘 차세대 방화벽">다중 인터페이스 트래픽을 필터링하고 침입을 차단하는 온프렘 차세대 방화벽</div>
+        <div class="pc-bottom">
+          <span class="pc-docs">📄 매뉴얼 2 · 소개서 1</span>
+          <label class="pc-pick"><input type="checkbox" checked disabled> 비교에 담기</label>
+        </div>
+      </div>
+
+      <div class="pcard">
+        <div class="pc-top"><span class="pc-name"><!-- 데모값 -->FW-02 게이트쉴드 방화벽</span><span class="pc-badge">방화벽</span></div>
+        <div class="pc-vendor"><!-- 데모값 -->㈜게이트정보보안</div>
+        <div class="pc-desc" title="지사간 VPN과 트래픽 검사를 함께 지원하는 통합 게이트웨이형 방화벽">지사간 VPN과 트래픽 검사를 함께 지원하는 통합 게이트웨이형 방화벽</div>
+        <div class="pc-bottom">
+          <span class="pc-docs">📄 매뉴얼 1 · 소개서 0</span>
+          <label class="pc-pick"><input type="checkbox" disabled> 비교에 담기</label>
+        </div>
+      </div>
+
+      <div class="pcard picked">
+        <div class="pc-top"><span class="pc-name"><!-- 데모값 -->EDR-01 엔드가드 EDR</span><span class="pc-badge">EDR</span></div>
+        <div class="pc-vendor"><!-- 데모값 -->㈜엔드포인트랩</div>
+        <div class="pc-desc" title="엔드포인트 행위 탐지와 격리 대응을 지원하는 EDR 솔루션">엔드포인트 행위 탐지와 격리 대응을 지원하는 EDR 솔루션</div>
+        <div class="pc-bottom">
+          <span class="pc-docs">📄 매뉴얼 1 · 소개서 1</span>
+          <label class="pc-pick"><input type="checkbox" checked disabled> 비교에 담기</label>
+        </div>
+      </div>
+
+      <div class="pcard">
+        <div class="pc-top"><span class="pc-name"><!-- 데모값 -->SIEM-01 로그마스터 SIEM</span><span class="pc-badge">SIEM</span></div>
+        <div class="pc-vendor"><!-- 데모값 -->㈜로그인텔리전스</div>
+        <div class="pc-desc" title="여러 장비의 로그를 모아 상관분석하는 통합 로그 관제 솔루션">여러 장비의 로그를 모아 상관분석하는 통합 로그 관제 솔루션</div>
+        <div class="pc-bottom">
+          <span class="pc-docs">📄 매뉴얼 3 · 소개서 1</span>
+          <label class="pc-pick"><input type="checkbox" disabled> 비교에 담기</label>
+        </div>
+      </div>
+
+      <div class="pcard">
+        <div class="pc-top"><span class="pc-name"><!-- 데모값 -->WAF-01 웹실드 WAF</span><span class="pc-badge">WAF</span></div>
+        <div class="pc-vendor"><!-- 데모값 -->㈜웹시큐어</div>
+        <div class="pc-desc" title="웹 애플리케이션 공격을 탐지·차단하는 웹 방화벽">웹 애플리케이션 공격을 탐지·차단하는 웹 방화벽</div>
+        <div class="pc-bottom">
+          <span class="pc-docs">📄 매뉴얼 0 · 소개서 1</span>
+          <label class="pc-pick"><input type="checkbox" disabled> 비교에 담기</label>
+        </div>
+      </div>
+
+      <div class="pcard">
+        <div class="pc-top"><span class="pc-name"><!-- 데모값 -->NAC-01 접근지킴이 NAC</span><span class="pc-badge">NAC</span></div>
+        <div class="pc-vendor"><!-- 데모값 -->㈜넷억세스</div>
+        <div class="pc-desc" title="사내 접속 단말을 식별하고 정책에 따라 접근을 통제하는 NAC">사내 접속 단말을 식별하고 정책에 따라 접근을 통제하는 NAC</div>
+        <div class="pc-bottom">
+          <span class="pc-docs">📄 매뉴얼 1 · 소개서 0</span>
+          <label class="pc-pick"><input type="checkbox" disabled> 비교에 담기</label>
+        </div>
+      </div>
+
+      <div class="pcard">
+        <div class="pc-top"><span class="pc-name"><!-- 데모값 -->AV-01 바이러스캐치 백신</span><span class="pc-badge">백신</span></div>
+        <div class="pc-vendor"><!-- 데모값 -->㈜바이러스넷</div>
+        <div class="pc-desc" title="엔드포인트 악성코드를 탐지·차단하는 백신 솔루션">엔드포인트 악성코드를 탐지·차단하는 백신 솔루션</div>
+        <div class="pc-bottom">
+          <span class="pc-docs">📄 매뉴얼 2 · 소개서 0</span>
+          <label class="pc-pick"><input type="checkbox" disabled> 비교에 담기</label>
+        </div>
+      </div>
+
+      <div class="pcard nodoc">
+        <div class="pc-top"><span class="pc-name"><!-- 데모값 -->ETC-01 통합보안게이트웨이</span><span class="pc-badge">기타</span></div>
+        <div class="pc-vendor"><!-- 데모값 -->㈜올인원시큐리티</div>
+        <div class="pc-desc" title="여러 보안 기능을 하나로 묶은 통합 보안 게이트웨이">여러 보안 기능을 하나로 묶은 통합 보안 게이트웨이</div>
+        <div class="pc-bottom">
+          <span class="pc-docs none">📄 매뉴얼 0 · 소개서 0 — 자료 없음</span>
+          <label class="pc-pick disabled" title="반입된 자료가 없어 비교할 내용이 없습니다"><input type="checkbox" disabled> 비교에 담기</label>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ── 비교 판 — 담긴 2개(FW-01, EDR-01) ── -->
+    <div class="cmp-box">
+      <div class="cmp-head">
+        <span class="cmp-title">⚖ 비교 판</span>
+        <span class="cmp-count">2개 담김 <span style="color:var(--muted-2)">(최대 3개)</span></span>
+      </div>
+      <div class="cmp-hint">비교는 반입된 자료에 적힌 것만 정직하게 보여 줍니다. 자료에 없는 칸은 <b>—</b></div>
+
+      <table class="cmp-tbl">
+        <thead>
+          <tr>
+            <th class="rowlb"></th>
+            <th>FW-01 시큐넥스트 방화벽 <span class="rm" title="비교에서 빼기(정적 시안)">✕ 빼기</span></th>
+            <th>EDR-01 엔드가드 EDR <span class="rm" title="비교에서 빼기(정적 시안)">✕ 빼기</span></th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th class="rowlb">분류</th>
+            <td>방화벽</td>
+            <td>EDR</td>
+          </tr>
+          <tr>
+            <th class="rowlb">벤더</th>
+            <td>㈜시큐텍</td>
+            <td>㈜엔드포인트랩</td>
+          </tr>
+          <tr>
+            <th class="rowlb">주요 기능</th>
+            <td>
+              <span class="feat">· NAT/VPN 게이트웨이</span>
+              <span class="feat">· 침입 차단(IPS 연동)</span>
+              <span class="feat">· 다중 WAN 이중화</span>
+            </td>
+            <td>
+              <span class="feat">· 엔드포인트 행위 탐지</span>
+              <span class="feat">· 자동 격리 대응</span>
+              <span class="feat" style="color:var(--muted-2)">· — <span style="opacity:.75">(자료에 세 번째 기능 언급 없음)</span></span>
+            </td>
+          </tr>
+          <tr>
+            <th class="rowlb">도입 형태</th>
+            <td>온프렘</td>
+            <td class="dash">—</td>
+          </tr>
+          <tr>
+            <th class="rowlb">우리 자산 연결</th>
+            <td>🔗 연결 3대</td>
+            <td class="dash">—</td>
+          </tr>
+          <tr>
+            <th class="rowlb">자료</th>
+            <td>매뉴얼 2 · 소개서 1</td>
+            <td>매뉴얼 1 · 소개서 1</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- ── 왜 이렇게 했나 (결정용 설명 — 실 제품 화면에는 넣지 않습니다) ── -->
+<div class="why-box">
+  <h2>왜 이렇게 했나</h2>
+  <ul>
+    <li><b>왜 "훑기 → 담기 → 비교" 3단인가</b> — 이 화면의 일은 "무엇이 있나 훑기"와 "고른 몇 개를
+      나란히 보기"로 성격이 다르다. 칩(거르기)·카드(훑기)·비교 판(대조)을 한 화면에 층으로 쌓아
+      스크롤 한 번으로 세 동작을 다 마치게 했다 — 새 화면을 열지 않는다.</li>
+    <li><b>왜 카드마다 체크박스가 흐리게 꺼져 있나(자료 없는 제품)</b> — ETC-01처럼 반입된 매뉴얼·
+      소개서가 0건이면 비교할 내용 자체가 없다. 누를 수 있게 두고 담은 뒤 "자료 없음"으로 표시하는
+      대신, 애초에 못 담게 막아 헛수고를 줄였다(체크박스에 이유를 tooltip으로 남김).</li>
+    <li><b>왜 표에 "—"가 실제로 보이나</b> — 비교표가 실제로 정직하게 동작할 때 어떤 모습인지
+      결정자가 미리 보게 하려고, 데모 값 자체를 일부러 비대칭(FW-01은 도입형태·자산연결 있음,
+      EDR-01은 없음)으로 잡았다. "전부 다 채워진 예쁜 표"만 보여주면 실제 반입 자료가 빈약할 때의
+      화면을 상상하기 어렵다.</li>
+    <li><b>왜 3개까지인가</b> — 아래 출처(NN/g)의 권장 상한(4~5개)보다 더 좁혔다. 이 화면의 카드
+      폭(3열)과 표 열 너비를 생각하면 4개부터는 가로 스크롤이 생겨 "한눈에 대조"라는 목적을
+      해친다 — 밀도보다 대조 가독성을 우선했다.</li>
+    <li>카드·표의 <b>제품명·벤더명·숫자는 전부 데모값</b>이다(코드 안에 <!-- 데모값 --> 주석으로
+      표시). 실제 구현 시 카드 목록은 products.html이 쓰는
+      <code>listSecurityProductsGrouped()</code>를, 문서 보유 수는 같은 화면의 <code>docs</code>
+      배열을, "우리 자산 연결"은 <code>assetName</code>을 그대로 재사용한다 — 새 계산식을 만들지
+      않는다.</li>
+    <li>이 파일은 <b>정적 그림</b>이다. 스크립트가 없고, 체크박스·칩·"✕ 빼기"를 눌러도 아무 것도
+      바뀌지 않는다.</li>
+  </ul>
+  <div class="src">
+    참고 표준·근거: Nielsen Norman Group,
+    <a href="https://www.nngroup.com/articles/comparison-tables/" target="_blank" rel="noopener">
+    "Comparison Tables for Products, Services, and Features"</a>(비교표는 보상적 의사결정을
+    돕는 도구이며 정적 비교는 4~5개 이하를 권장) ·
+    필터 칩 UX 일반 패턴(활성 필터를 칩+개수로 표시, 2026 필터 UI 리뷰 다수 자료 공통).
+    제품 내부 선례: client/src/renderer/pages/products.html(.cat-summary/.cat-chip 분류 칩,
+    doc 보유 표시), GIJO_AS_보안제품관리_지침.md(매뉴얼 자동분류·문서 경계).
+  </div>
+</div>
+
+</body>
+</html>

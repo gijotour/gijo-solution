@@ -2944,3 +2944,29 @@ export async function runAdapterImport(args: Record<string, string>): Promise<st
     return `반입하지 못했습니다 — ${(e as Error).message}`;
   }
 }
+
+/** 제품 소개자료 등록(쓰기·결재판) — 보안제품 등록부와 **별도 대장**(productintro.ts).
+ *  "처음 올릴 때 결재판에서 확인"(2026-08-09 사용자 지시) — write 도구라 결재판을 거친다. */
+export async function runProductIntroAdd(args: Record<string, string>): Promise<string> {
+  const { addProductIntro } = await import("../productintro.js");
+  const name = (args.name ?? "").trim();
+  if (!name) return "제품 이름을 알려 주세요 — 예: 「제품 소개자료 등록: SecuFW, 분류: 방화벽, 벤더: 시큐업」";
+  try {
+    const v = currentViewer();
+    const it = addProductIntro({
+      name,
+      category: (args.category ?? "").trim() || "기타",
+      vendor: (args.vendor ?? "").trim() || null,
+      summary: (args.summary ?? "").trim() || null,
+      docName: (args.doc ?? "").trim() || null,
+      actor: (v?.userId ? findUserById(v.userId)?.displayName : null) ?? "담당자(대화창)",
+    });
+    return (
+      `제품 소개자료를 등록했습니다: ${it.name} (분류: ${it.category}${it.vendor ? ` · 벤더: ${it.vendor}` : ""})\n` +
+      `「추가 기능 > 제품 소개자료」 화면에서 목록·비교로 볼 수 있습니다.` +
+      (it.docName ? "" : "\n소개서 파일이 있으면 대화창 ＋로 올린 뒤 문서명을 함께 알려 주시면 비교의 근거로 씁니다.")
+    );
+  } catch (e) {
+    return `등록하지 못했습니다 — ${(e as Error).message}`;
+  }
+}
