@@ -47,15 +47,41 @@ const 공용모듈 = ["viz.js", "nav.js", "fold.js", "titlebar.js", "console.js"
   .map((n) => { try { return fs.readFileSync(path.join(화면방, n), "utf8"); } catch { return ""; } })
   .join("\n");
 
+// 파일 하나의 클릭 신호 수 — 확실히 아는 신호만 센다.
+const 클릭수 = (코드) =>
+  (코드.match(/addEventListener\(\s*["']click["']/g) || []).length +
+  (코드.match(/\bonclick\s*=/g) || []).length +
+  (코드.match(/\bon\w*Pick\b|\bonPick\b/g) || []).length;
+
+// ⚠ 허브 화면(discover 등)의 판 클릭은 grouphub.js가 **동적으로** 붙인다(2026-08-09 실측 —
+//   화면 파일만 보면 "누를 자리 0"으로 잡혀 멀쩡한 약속 4건이 실패했다). 화면이 <script src>로
+//   실제로 싣는 이웃 스크립트의 클릭 신호를 **그 화면의 것으로 합산**한다. 화면에 없는
+//   스크립트는 안 세므로, 아무 데서나 빌려 오는 헛통과는 아니다.
+const 스크립트클릭 = new Map(); // js 파일명 → 클릭 신호 수(캐시)
+// ⚠ 차대(사이드바·상단 바·접기·확인창)는 **모든 화면**에 실린다 — 합산하면 "누를 자리 0"
+//   검사가 영원히 통과해 물이 된다(실패할 수 없는 검사는 QA가 아니다). 화면 **내용**을
+//   그리는 스크립트만 센다.
+const 차대 = new Set(["nav.js", "titlebar.js", "fold.js", "dialog.js", "console.js", "chatparts.js"]);
+function 포함스크립트클릭수(html) {
+  let n = 0;
+  for (const m of html.matchAll(/<script[^>]+src=["']([^"']+\.js)["']/g)) {
+    const 이름 = m[1].split("/").pop();
+    if (차대.has(이름)) continue;
+    if (!스크립트클릭.has(이름)) {
+      try { 스크립트클릭.set(이름, 클릭수(주석지우기(fs.readFileSync(path.join(화면방, 이름), "utf8")))); }
+      catch { 스크립트클릭.set(이름, 0); }
+    }
+    n += 스크립트클릭.get(이름);
+  }
+  return n;
+}
+
 const 결과 = [];
 for (const f of fs.readdirSync(화면방).filter((x) => /\.(html|js)$/.test(x))) {
   const 원본 = fs.readFileSync(path.join(화면방, f), "utf8");
   const 코드 = 주석지우기(원본);
-  // 그 파일이 무언가를 누를 수 있게 만들고 있는가 — 확실히 아는 신호만 센다.
-  const 누를자리 =
-    (코드.match(/addEventListener\(\s*["']click["']/g) || []).length +
-    (코드.match(/\bonclick\s*=/g) || []).length +
-    (코드.match(/\bon\w*Pick\b|\bonPick\b/g) || []).length;
+  // 그 파일이 무언가를 누를 수 있게 만들고 있는가 — 자기 코드 + 실제로 싣는 스크립트.
+  const 누를자리 = 클릭수(코드) + (f.endsWith(".html") ? 포함스크립트클릭수(원본) : 0);
 
   코드.split("\n").forEach((line, i) => {
     if (!약속말.test(line)) return;
@@ -163,8 +189,10 @@ function 지목화면찾기(글) {
   //   · 「내 업무」 — 「업무」가 「업무 넘기기」에 가려지던 같은 꼴
   //   · 「기록 보기 화면(설정)에서」 — 괄호 위치 표기(정규식 밖에 있던 꼴)
   //   · 「감사 기록 화면에서」 — 짧은 후보 「기록」이 옛 「작업기록」에 잘못 걸리면 안 되는 쪽
+  // ⚠ '현재 라벨' 표본은 개편에도 안 흔들릴 것으로 — 「취약점」을 쓰다가 그 화면이 허브로
+  //   흡수되며(2026-08-09) 라벨에서 사라져 자기 검증이 깨졌다. 맨 위 고정 「대시보드」로 바꾼다.
   const 검증 = 지목화면찾기(
-    "취약점 화면에서 확인하세요. 레드팀 화면에서 하세요. 알수없는말 화면에서. " +
+    "대시보드 화면에서 확인하세요. 레드팀 화면에서 하세요. 알수없는말 화면에서. " +
     "작업 기록 화면에서 보세요. 내 업무 화면에서 하세요. 기록 보기 화면(설정)에서 확인. 감사 기록 화면에서 봅니다.");
   const 기대 = ["현재", "낡음", "모름", "낡음", "낡음", "현재", "현재"];
   if (!(검증.length === 기대.length && 검증.every((r, i) => r.판정 === 기대[i]))) {

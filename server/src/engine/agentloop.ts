@@ -1394,6 +1394,16 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): { tool: s
 }
 
 /**
+ * 온톨로지 도구가 답할 질문인가 — **연결·매핑·관계**를 물을 때만 참.
+ * "리눅스 SSH root 원격 로그인 차단은 KISA 어떤 점검항목이야?"처럼 항목 자체를 묻는
+ * 질문은 거짓 — 그건 RAG(지식 검색)의 영토다. LLM이 온톨로지를 잘못 골라도
+ * 이 판별이 코드로 되돌린다(runAgentLoop의 거부 분기).
+ */
+export function isRelationQuestion(instruction: string): boolean {
+  return /온톨로지|지식\s*그래프|트리플|연결|매핑|관계|이어져|이어진/.test(instruction);
+}
+
+/**
  * "Log4Shell 완화 방법을 온톨로지에서 찾아줘" → "Log4Shell 완화 방법"
  * 온톨로지·지식그래프라는 말 자체와 지시 어미를 걷어 낸 나머지가 검색어다.
  */
@@ -1512,6 +1522,13 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
       // 첫 수라면 루프를 접고 지식(RAG·채팅)으로 넘긴다 — 그쪽이 방법 설명을 잘한다.
       if (calls.length === 0) return null;
       result = "이 지시는 점검 '방법'을 묻는 질문이라 점검을 실행하지 않았다. 아는 지식으로 절차를 설명하라.";
+    } else if (tool.name === "ontology_query" && !isRelationQuestion(instruction)) {
+      // "○○은 KISA 어떤 점검항목이야?" 같은 **정의·해당 항목 질문**에 LLM이 온톨로지를 고르면
+      // 트리플에 그 서술이 없어 "연결을 찾지 못했다"가 답이 된다 — RAG가 1순위로 근거를 들고
+      // 있는데도(2026-08-08 kisa-u01 회귀 2연속 실측). 도구 설명("연결·매핑을 물을 때만")은
+      // 7B/14B가 흘려듣는다 — 프롬프트가 아니라 코드로 막는다(확립 원칙).
+      if (calls.length === 0) return null; // 지식(RAG·채팅) 폴백 — 그쪽이 근거를 갖고 있다
+      result = "이 지시는 연결 관계가 아니라 항목 자체를 묻는 질문이다. 아는 지식으로 답하라.";
     } else if (tool.write) {
       // 쓰기 도구는 여기서 실행하지 않는다 — 값을 결재판으로 만들어 돌려주고, 사람이 승인해야
       // /api/agent/approve에서 실행된다(오발동 방지). 루프는 여기서 끝난다.

@@ -27,7 +27,7 @@ vi.mock("../src/engine/hardeningscan", async (importOriginal) => ({
 }));
 
 import { dispatchInstruction, formatRejectHistory, REPORT_CREATE_RE, REPORT_QUERY_EXCLUDE_RE } from "../src/engine/dispatcher";
-import { isHowtoNotCommand, ontologyQueryOf } from "../src/engine/agentloop";
+import { isHowtoNotCommand, ontologyQueryOf, isRelationQuestion } from "../src/engine/agentloop";
 import { resetAssetsForTests, registerAsset, recordFindings } from "../src/engine/assets";
 import { updateFindingReview, findingKey } from "../src/engine/approvals";
 import { db } from "../src/db";
@@ -139,6 +139,23 @@ describe("⑥ 검토가 잡은 결함 — 온톨로지 강제분기가 검색어
   it("현황 질문('뭐 들어있어')은 검색어가 아니라 빈 문자열 — 강제하지 않고 LLM에 맡긴다", () => {
     expect(ontologyQueryOf("온톨로지에 뭐 들어있어?")).toBe("");
     expect(ontologyQueryOf("지식 그래프 보여줘")).toBe("");
+  });
+});
+
+describe("⑥-2 회귀가 잡은 결함 — 항목 질문에 LLM이 온톨로지를 잘못 고르던 것", () => {
+  // kisa-u01 회귀 2연속 실패(2026-08-08): "…KISA 어떤 점검항목이야?"에 LLM이 ontology_query를
+  // 골라 "연결을 찾지 못했다"가 답이 됐다 — RAG는 U-01 근거를 1순위로 들고 있었다.
+  // 도구 설명("연결·매핑만")은 프롬프트라 흘려듣는다 — isRelationQuestion이 코드로 되돌린다.
+  it("항목 자체를 묻는 질문은 관계 질문이 아니다 → 온톨로지 거부(RAG 폴백)", () => {
+    expect(isRelationQuestion("리눅스 SSH root 원격 로그인 차단은 KISA 어떤 점검항목이야?")).toBe(false);
+    expect(isRelationQuestion("U-01이 뭐야?")).toBe(false);
+  });
+
+  it("연결·매핑·관계를 물으면 온톨로지가 맞다", () => {
+    expect(isRelationQuestion("CWE-79는 뭐랑 연결돼 있어?")).toBe(true);
+    expect(isRelationQuestion("이 코드에 매핑된 다른 표준 알려줘")).toBe(true);
+    expect(isRelationQuestion("Log4Shell 완화 방법을 온톨로지에서 찾아줘")).toBe(true);
+    expect(isRelationQuestion("U-01과 CIS의 관계 보여줘")).toBe(true);
   });
 });
 

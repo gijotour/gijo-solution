@@ -85,15 +85,24 @@ const clickMenu = async (label) => {
   }, label);
   await page.waitForTimeout(3200);
 };
+// 대표 그룹(그룹 줄=메뉴, 2026-08-09 그룹 통합) — 절차 허브는 .gn-item이 아니라 .gn-g를 누른다.
+const clickHub = async (name) => {
+  await page.evaluate((n) => {
+    const gh = [...document.querySelectorAll("#gijoNav .gn-g")].find((e) => e.querySelector(".gn-gname")?.textContent === n);
+    gh?.click();
+  }, name);
+  await page.waitForTimeout(3200);
+};
 
 // 2) 첫 실행 — 대시보드 탭 하나
 const s0 = await snap();
 ok("첫 실행에 대시보드 탭이 열려 있다", s0.탭.includes("대시보드"), s0.탭.join(" | "));
 
 // 3) 메뉴를 눌러도 셸을 떠나지 않고 탭이 늘어난다
+//    '취약점'·'조치·승인'은 허브로 흡수됐다(2026-08-09) — 대표 그룹을 눌러 허브 탭을 연다.
 const urlBefore = page.url();
-await clickMenu("취약점");
-await clickMenu("조치·승인");
+await clickHub("우선순위");
+await clickHub("조치");
 const s1 = await snap();
 ok("메뉴 클릭이 탭으로 열린다(화면 이동 아님)", page.url() === urlBefore && s1.탭.length === 3, s1.탭.join(" | "));
 ok("보이는 프레임은 하나, 나머지는 살아서 숨는다", s1.프레임 === 3 && s1.보이는프레임 === 1, `프레임 ${s1.프레임} / 보임 ${s1.보이는프레임}`);
@@ -114,7 +123,7 @@ ok("입력칸이 지시 대상을 말해 준다", ph.includes(s1.활성), ph);
 
 // 6) 보던 상태가 남는가 — 탭을 옮겼다 돌아와도 다시 안 읽힌다
 await page.evaluate(() => { document.querySelector("#screens iframe.on").contentWindow.__gijoAlive = "표시"; });
-await page.evaluate(() => [...document.querySelectorAll("#tabBar .tab")].find((t) => t.textContent.includes("취약점"))?.click());
+await page.evaluate(() => [...document.querySelectorAll("#tabBar .tab")].find((t) => t.textContent.includes("우선순위"))?.click());
 await page.waitForTimeout(700);
 await page.evaluate(() => [...document.querySelectorAll("#tabBar .tab")].find((t) => t.textContent.includes("조치"))?.click());
 await page.waitForTimeout(900);
@@ -172,7 +181,7 @@ const afterRows = await page.evaluate(() => document.querySelectorAll("#csBody .
 ok("화면 ⓘ 설명을 콘솔이 대신 묻는다", explainable === "function" && afterRows > beforeRows, `통로=${explainable}, ${beforeRows} → ${afterRows}`);
 
 // 11) 탭 닫기·고정
-await page.evaluate(() => [...document.querySelectorAll("#tabBar .tab")].find((t) => t.textContent.includes("취약점"))?.querySelector(".x").click());
+await page.evaluate(() => [...document.querySelectorAll("#tabBar .tab")].find((t) => t.textContent.includes("우선순위"))?.querySelector(".x").click());
 await page.waitForTimeout(800);
 const s2 = await snap();
 ok("탭을 닫으면 프레임도 함께 사라진다", s2.탭.length === 2 && s2.프레임 === 2, s2.탭.join(" | "));
@@ -244,8 +253,16 @@ ok("셸을 다시 열어도 탭이 복원된다", s3.탭.length >= 2, s3.탭.joi
 
 // 15) 설정 관리자 구역에 업데이트가 펼쳐져 보인다
 //     두 번 깨졌던 자리다(2026-07-28): 링크가 옛 주소라 엉뚱한 곳이 열렸고, 닿아도 접혀 있었다.
-await clickMenu("관리자");
+//     설정 그룹 정리(2026-08-09) — '관리자'는 사이드바 항목이 아니라 settings.html 안
+//     구역 탭줄(#secNav)의 탭이다(admin 게이트가 되살린다). 「설정」을 열고 탭을 누른다.
+await clickMenu("설정");
 await page.waitForTimeout(3000);
+await page.evaluate(() => {
+  const f = document.querySelector("#screens iframe.on");
+  const t = [...(f?.contentDocument?.querySelectorAll("#secNav .sec-tab") ?? [])].find((x) => x.textContent.includes("관리자"));
+  t?.click(); // location.replace(s=admin)로 프레임이 다시 뜬다
+});
+await page.waitForTimeout(3500);
 const upd = await page.evaluate((visSrc) => {
   const isVis = eval(visSrc);
   const f = document.querySelector("#screens iframe.on");
@@ -279,7 +296,7 @@ if (!upd2.보임) {
     } catch (e) { return { err: String(e).slice(0, 60) }; }
   }, VIS);
 }
-ok("설정 관리자에서 업데이트를 펼치면 버전이 보인다", upd2.활성 === "관리자" && upd2.보임 && !!upd2.버전, JSON.stringify(upd2));
+ok("설정 관리자에서 업데이트를 펼치면 버전이 보인다", upd2.활성 === "설정" && upd2.보임 && !!upd2.버전, JSON.stringify(upd2));
 
 // 16) JS 오류 — preload 주입 플레이크의 1회성 오류(치유 전 프레임 소음)는 구분 집계
 const transient = jsErrors.filter((e) => e.includes("reading 'isAuthenticated'"));

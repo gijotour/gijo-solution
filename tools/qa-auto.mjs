@@ -445,17 +445,20 @@ async function runClient() {
 
   // 4.0.0 — 허브(2단 탭)를 없애고 화면을 셸 탭으로 연다. 겹이 셸→실화면 2겹으로 고정되는 것이
   // 이 구조의 핵심이다(3겹이던 시절 레이아웃이 0으로 굳어 빈 화면이 됐다 — 2026-07-28).
+  // 그룹 통합(2026-08-09 사용자 승인) — 절차 그룹은 **그룹 줄 자체가 메뉴**(대표 메뉴)다.
+  // 옛 검사는 '취약점' 항목을 눌렀는데, 그 화면은 이제 ② 우선순위 허브 무대에서 열린다 —
+  // 사이드바에서 누르는 것은 허브이고, 탭 이름도 허브 이름이다.
   await scenario("QA-C01", "탭 셸", "메뉴를 누르면 화면이 탭으로 열린다(이동 아님)", {
     given: "탭 셸(app.html)에서",
-    when: "왼쪽 메뉴의 '취약점'을 누르면",
-    then: "주소는 셸 그대로이고 탭이 하나 생기며, 탭 안은 vulnscan.html을 **직접** 품는다(중간에 허브가 없다)",
+    when: "왼쪽 메뉴의 대표 그룹 '② 우선순위'를 누르면",
+    then: "주소는 셸 그대로이고 탭이 하나 생기며, 탭 안은 triage.html 허브를 **직접** 품는다",
   }, async () => {
     await open("app.html");
     await page.waitForTimeout(1500);
     const before = page.url();
     await page.evaluate(() => {
-      const it = [...document.querySelectorAll("#gijoNav .gn-item")].find((e) => e.querySelector(".gn-label")?.textContent === "취약점");
-      it?.querySelector(".gn-label").click();
+      const gh = [...document.querySelectorAll("#gijoNav .gn-g")].find((e) => e.querySelector(".gn-gname")?.textContent === "우선순위");
+      gh?.click();
     });
     await page.waitForTimeout(1200);
     if (page.url() !== before) throw new Error(`셸을 떠났다: ${page.url().split("/").pop()}`);
@@ -464,8 +467,8 @@ async function runClient() {
       활성: document.querySelector("#tabBar .tab.on .nm")?.textContent,
       src: decodeURIComponent(document.querySelector("#screens iframe.on")?.getAttribute("src") || ""),
     }));
-    if (!st.탭.includes("취약점")) throw new Error(`탭 없음: ${st.탭.join(",")}`);
-    if (!/^vulnscan\.html\?embed=1/.test(st.src)) throw new Error(`탭 안이 직접 화면이 아님: ${st.src}`);
+    if (!st.탭.includes("우선순위")) throw new Error(`탭 없음: ${st.탭.join(",")}`);
+    if (!/^triage\.html\?embed=1/.test(st.src)) throw new Error(`탭 안이 직접 화면이 아님: ${st.src}`);
     return `탭[${st.탭.join("·")}] 활성=${st.활성}, 안=${st.src}`;
   });
 
@@ -474,20 +477,25 @@ async function runClient() {
     when: "다른 탭으로 갔다가 돌아오면",
     then: "iframe이 그대로 살아 있어 다시 읽히지 않는다(보던 상태가 유지된다 — 팝업을 없앨 수 있는 근거)",
   }, async () => {
+    // '자산 목록'은 ① 발견·수집 허브로 흡수됐다(2026-08-09) — 대표 그룹을 눌러 두 번째 탭을 연다.
+    // ⚠ 없는 라벨을 누르면 이 검사는 탭 하나로 **헛통과**한다(실측 — 옮기기 실패가 아니라
+    //   아무 일도 안 한 것). 그래서 아래에서 탭이 실제로 2개인지 먼저 못 박는다.
     await page.evaluate(() => {
-      const it = [...document.querySelectorAll("#gijoNav .gn-item")].find((e) => e.querySelector(".gn-label")?.textContent === "자산 목록");
-      it?.querySelector(".gn-label").click();
+      const gh = [...document.querySelectorAll("#gijoNav .gn-g")].find((e) => e.querySelector(".gn-gname")?.textContent === "발견·수집");
+      gh?.click();
     });
     await page.waitForTimeout(1500);
+    const 탭수 = await page.evaluate(() => document.querySelectorAll("#tabBar .tab").length);
+    if (탭수 < 2) throw new Error(`탭이 ${탭수}개 — 두 번째 탭이 안 열려 검사가 헛돈다`);
     // ⚠ 프레임 **안**(contentWindow)은 이 하네스에서 못 만진다 — file://이 서로 다른 출처라
     //   SecurityError가 난다(2026-07-28 실측). 그래서 프레임 **요소**에 표시를 남겨,
     //   탭을 옮겼다 돌아왔을 때 그 요소가 그대로인지(=지워지고 다시 만들어지지 않았는지) 본다.
     //   안쪽 내용까지 살아 있는지는 실제 앱으로 도는 shell 계층이 확인한다.
     await page.evaluate(() => { document.querySelector("#screens iframe.on").dataset.qaMark = "표시"; });
     const srcBefore = await page.evaluate(() => document.querySelector("#screens iframe.on").src);
-    await page.evaluate(() => [...document.querySelectorAll("#tabBar .tab")].find((t) => t.textContent.includes("취약점"))?.click());
+    await page.evaluate(() => [...document.querySelectorAll("#tabBar .tab")].find((t) => t.textContent.includes("우선순위"))?.click());
     await page.waitForTimeout(600);
-    await page.evaluate(() => [...document.querySelectorAll("#tabBar .tab")].find((t) => t.textContent.includes("자산 목록"))?.click());
+    await page.evaluate(() => [...document.querySelectorAll("#tabBar .tab")].find((t) => t.textContent.includes("발견·수집"))?.click());
     await page.waitForTimeout(800);
     const alive = await page.evaluate(() => {
       const f = document.querySelector("#screens iframe.on");
@@ -498,20 +506,28 @@ async function runClient() {
     return `프레임 ${alive.frames}개가 살아 있고 같은 프레임으로 돌아왔다`;
   });
 
-  await scenario("QA-C03", "메뉴 C안", "설정 허브 + 업데이트 배지", {
+  // 설정 그룹 정리(2026-08-09 사용자 지시) — 5구역은 사이드바 나열이 아니라 settings.html
+  // **안의 구역 탭줄**이 됐다. 사이드바에는 「설정·기록」 두 줄만 남는다. 화면 안 탭줄과
+  // 관리자 게이트는 실앱으로 도는 shell 계층이 지킨다(파일 하네스는 로그인이 없어 못 본다).
+  await scenario("QA-C03", "메뉴 C안", "설정 그룹 2줄 + 업데이트 배지", {
     given: "새 버전이 있다고 서버가 알려줄 때",
-    when: "셸(app.html)에서 설정 구역을 열면",
-    then: "설정 5탭(내 설정·서버·AI·연동·관리자·기록 보기)이 뜨고 사이드바 설정 항목에 업데이트 배지가 표시된다",
+    when: "셸(app.html)의 사이드바 설정 그룹을 보면",
+    then: "「설정」·「기록」 두 줄이 있고(5구역 나열은 화면 안 탭줄로 이관), 업데이트 배지가 표시된다",
   }, async () => {
     await open("app.html");
     await page.waitForTimeout(1500);
     const r = await page.evaluate(() => {
       const labels = [...document.querySelectorAll("#gijoNav .gn-item .gn-label")].map((e) => e.textContent);
-      return { 설정구역: labels.filter((l) => ["내 설정", "서버·AI", "연동", "관리자", "기록 보기"].includes(l)), 배지: !!document.querySelector(".gn-upbadge") };
+      return {
+        설정그룹: labels.filter((l) => ["설정", "기록"].includes(l)),
+        옛나열: labels.filter((l) => ["내 설정", "서버·AI", "연동", "관리자", "기록 보기"].includes(l)),
+        배지: !!document.querySelector(".gn-upbadge"),
+      };
     });
-    if (r.설정구역.length !== 5) throw new Error(`설정 구역 ${r.설정구역.length}개: ${r.설정구역.join(",")}`);
+    if (r.설정그룹.length !== 2) throw new Error(`설정 그룹 ${r.설정그룹.length}줄: ${r.설정그룹.join(",")}`);
+    if (r.옛나열.length) throw new Error(`이관한 5구역 나열이 사이드바에 되살아남: ${r.옛나열.join(",")}`);
     if (!r.배지) throw new Error("업데이트 배지 없음");
-    return `설정 5구역(${r.설정구역.join("·")}) + 업데이트 배지 표시`;
+    return `설정 그룹 [${r.설정그룹.join("·")}] + 업데이트 배지 표시`;
   });
 
   // 4.0.0 기대값 현행화: 오른쪽 숨은 팝업(commandpanel.js)을 통째로 삭제했다.
@@ -582,10 +598,10 @@ async function runClient() {
     return `규칙 ${r.규칙수}개 · 항목 글씨 ${r.글씨}`;
   });
 
-  await scenario("QA-C05", "전체메뉴", "허브를 걷어낸 평평한 메뉴", {
-    given: "4.0.0에서 허브(2단 탭)를 없앤 뒤",
+  await scenario("QA-C05", "전체메뉴", "9그룹 — 절차 5허브 + 기반 4그룹", {
+    given: "그룹 통합(2026-08-09 사용자 승인)으로 절차·등록부·AI가 허브 대표 메뉴가 된 뒤",
     when: "셸의 왼쪽 메뉴를 보면",
-    then: "4그룹에 화면이 그대로 늘어서고(약 30개), 허브 주소나 없어진 화면이 남아 있지 않다",
+    then: "9그룹이 절차 순서대로 서고, 대표 그룹은 하위 줄이 없으며, 항목은 승인된 집합 그대로다",
   }, async () => {
     await open("app.html");
     await page.waitForTimeout(1500);
@@ -606,6 +622,8 @@ async function runClient() {
       const favG = document.querySelector("#gijoNav .gn-fav-g");
       return {
         groups: groups.map((x) => x.g), fixed, total: all.length, all,
+        // 대표 그룹(그룹 줄=메뉴)은 하위 줄이 없어야 한다 — 그룹별 항목 수를 같이 본다.
+        perGroup: groups.map((x) => ({ g: x.g, n: x.items.length })),
         // 즐겨찾기 가지는 비어 있어도 보여야 한다 — 안 보이면 '별표'라는 기능이 있는 줄도 모른다
         // (4.1.0에서 고친 실사고). 세는 데선 뺐으니 존재는 여기서 따로 지킨다.
         fav: !!favG,
@@ -618,23 +636,32 @@ async function runClient() {
         })(),
       };
     });
-    // 그룹 7개(2026-08-01 사용자 지시로 재편) — 관제 · 자산·조치 · 보안제품 · 업무 관리 ·
-    // AI · 데이터 플라이휠 · 설정. 자산·조치에 10개가 몰려 있던 것을 갈랐다.
-    // 개수만 세면 "무엇이 바뀌었는지"를 못 잡으므로 이름까지 확인한다.
-    // 그룹 8개 — **업무 절차 5단계 + 기반 3그룹**(2026-08-02 사용자 승인, 시안 menu-workflow).
-    //   예전 7그룹은 **데이터 종류**로 묶여 있었다(관제/자산·조치/보안제품/업무 관리/AI/플라이휠/설정).
-    //   담당자가 하는 일은 절차인데 메뉴가 창고라, 취약점 한 바퀴에 그룹 3개를 오갔다.
+    // 그룹 9개 — **절차 5허브 + 등록부 + AI + 추가 기능 + 설정**(2026-08-09 사용자 승인).
+    //   그룹 통합으로 절차 그룹은 각각 허브 한 화면(대표 메뉴)이 됐고, 「추가 기능」 그룹이
+    //   신설됐다(보안 로그 파일 분석·제품 소개자료·업무 넘기기). AI 운영은 「AI」로 줄었다.
     // ⚠ 기대값만 바꾸지 않는다 — **순서까지** 지킨다. 절차는 위에서 아래로 한 방향이어야
     //   의미가 있고, 순서가 섞이면 개편의 뜻이 사라지는데 개수 검사로는 안 잡힌다.
-    if (m.groups.length !== 8) throw new Error(`그룹 ${m.groups.length}개: ${m.groups.join(",")}`);
-    const 절차순서 = ["발견", "우선순위", "조치", "검증", "보고"];
-    절차순서.forEach((이름, i) => {
+    if (m.groups.length !== 9) throw new Error(`그룹 ${m.groups.length}개: ${m.groups.join(",")}`);
+    const 그룹순서 = ["발견", "우선순위", "조치", "검증", "보고", "등록부", "AI", "추가 기능", "설정"];
+    그룹순서.forEach((이름, i) => {
       if (!m.groups[i] || !m.groups[i].includes(이름)) {
         throw new Error(`${i + 1}번째 그룹이 '${이름}'이 아니다: ${m.groups.join(",")}`);
       }
     });
-    for (const 있어야 of ["등록부", "AI 운영", "설정"]) {
-      if (!m.groups.some((g) => g.includes(있어야))) throw new Error(`그룹에 '${있어야}'가 없다: ${m.groups.join(",")}`);
+    // 대표 그룹(절차 5 + 등록부 + AI)은 **하위 줄이 없어야** 한다 — 그룹 줄 자체가 메뉴다.
+    // 하위 줄이 되살아나면 "하나뿐인 아이를 접었다 폈다"가 돌아온 것이다.
+    m.perGroup.forEach((pg, i) => {
+      const 대표 = i < 7; // 순서 검증을 통과했으므로 앞 7개가 대표 그룹이다
+      if (대표 && pg.n !== 0) throw new Error(`대표 그룹 '${pg.g}'에 하위 줄 ${pg.n}개가 생겼다`);
+    });
+    // 항목은 **정확 집합**으로 지킨다 — 허브 통합으로 항목이 8개뿐이라, 하한(27)은 뜻을
+    // 잃었고 개수만 세면 무엇이 사라졌는지 못 잡는다. 화면 자체는 파일로 살아 허브 무대에서
+    // 열린다(사라진 게 아니라 들어간 것) — 그건 sweep·QA-C06이 지킨다.
+    const 기대항목 = ["대시보드", "팀 사무실 (창)", "작업 내역", "보안 로그 파일 분석", "제품 소개자료", "업무 넘기기", "설정", "기록"];
+    const 없는 = 기대항목.filter((x) => !m.all.includes(x));
+    const 남는 = m.all.filter((x) => !기대항목.includes(x));
+    if (없는.length || 남는.length) {
+      throw new Error(`항목이 승인 집합과 다르다 — 빠짐[${없는.join(",")}] 넘침[${남는.join(",")}]`);
     }
     // 맨 위 고정 **3자리** — 대시보드 · 팀 사무실(창) · 작업 내역.
     // 2026-07-31 문서함(창)으로 4가 됐다가, 2026-08-02 사용자 지시로 문서함을 **왼쪽 메뉴에서
@@ -657,15 +684,8 @@ async function runClient() {
     if (!문서함.있나) throw new Error(`문서함(📚)이 사용자 이름 옆에도 없다: ${문서함.글}`);
     if (!m.fav) throw new Error("⭐즐겨찾기 가지가 안 보인다 — 비어 있어도 보여야 한다");
     if (!(m.starOpacity > 0.15)) throw new Error(`☆가 마우스 없이는 안 보인다(opacity ${m.starOpacity}) — 즐겨찾기를 발견할 수 없다`);
-    // 하한 27(2026-08-08): 「모델 합치기」를 메뉴에서 내렸다(사용자 결정 "머지·추천은 접는다"
-    //   — 화면·기록은 보존, 저장된 탭·직접 주소로는 열림). 28→27은 의도한 감소다.
-    //   ⚠ 하한을 또 내릴 일이 생기면 먼저 "지운 게 맞나"부터 물을 것 — 이 검사의 본래 몫이다.
-    if (m.total < 27) throw new Error(`항목 ${m.total}개 — 허브가 덜 풀렸다(의도한 제거인지 확인)`);
-    if (m.all.some((x) => x.includes("모델 합치기"))) throw new Error("내린 「모델 합치기」가 메뉴에 되살아났다");
-    // 허브 안에서만 통하던 짧은 이름이 남으면 밖에서 무엇의 '통합 뷰'인지 알 수 없다.
-    for (const bad of ["통합 뷰", "등록부", "유지보수"]) if (m.all.includes(bad)) throw new Error(`홀로 못 서는 이름 남음: ${bad}`);
-    // 없앤 화면이 메뉴에 남아 있으면 눌러도 죽는다.
-    for (const gone of ["LLM 가이드", "MCP 연동", "업데이트", "로그"]) if (m.all.includes(gone)) throw new Error(`없앤 화면이 메뉴에 남음: ${gone}`);
+    // (2026-08-09) 하한 27·「모델 합치기」·홀로 못 서는 이름·없앤 화면 검사는 위 **정확 집합**
+    // 검사가 전부 대신한다 — 집합 밖 항목은 무엇이든 '넘침'으로, 빠진 항목은 '빠짐'으로 잡힌다.
     return `${m.groups.join("·")} / 항목 ${m.total}개(고정 ${m.fixed.length} 포함)`;
   });
 

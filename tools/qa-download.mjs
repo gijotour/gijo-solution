@@ -71,7 +71,11 @@ if (t) {
 // ⚠ 앱이 어느 화면에 있든 스스로 되돌린다(2026-07-28). 예전엔 대시보드에 있을 때만 통과해서,
 //    같은 전수조사 안의 sweep 계층(허브 화면을 요구)과 서로의 상태를 깨뜨렸다 — 한 번에 둘 다
 //    통과할 수 없는 구조였다. 어느 계층이 먼저 돌든 상관없게 만든다.
-t = await attach(/dashboard\.html|approvals\.html/, 3);
+// ⚠ approvals.html은 ③ 조치 허브로 흡수됐다(2026-08-09, nav.js TAB_REDIRECT →
+//    fix.html?panel=approvals). 허브 무대(ghStage)가 approvals.html?embed=1&hub=1을
+//    끼움 창으로 열므로, 그 프레임이 CDP 대상으로 잡히면 그대로 쓰고, 허브(fix.html)만
+//    잡히면 무대 iframe을 거쳐 들어간다(아래 DOC 참고).
+t = await attach(/dashboard\.html|approvals\.html|panel=approvals/, 3);
 if (!t) {
   const any = await attach(/\.html/, 3);
   if (any) {
@@ -79,7 +83,7 @@ if (!t) {
     await c.evalx(`(location.href = 'dashboard.html'), 'go'`);
     c.ws.close();
     await new Promise((r) => setTimeout(r, 7000));
-    t = await attach(/dashboard\.html|approvals\.html/);
+    t = await attach(/dashboard\.html|approvals\.html|panel=approvals/);
   }
 }
 if (!t) { ok("앱 화면 도달", false, "대시보드를 찾지 못함"); process.exit(1); }
@@ -87,20 +91,26 @@ if (/dashboard\.html/.test(t.url)) {
   const c = conn(t); await c.ready; await c.send("Runtime.enable");
   await c.evalx(`window.gijo.navigateTo('approvals.html'), 'go'`);
   c.ws.close();
-  await new Promise((r) => setTimeout(r, 7000));
-  t = await attach(/approvals\.html/);
+  await new Promise((r) => setTimeout(r, 9000));
+  t = await attach(/approvals\.html|panel=approvals/);
 }
 if (!t) { ok("조치·승인 화면 도달", false); process.exit(1); }
 
+// 허브에 붙었으면 무대 iframe의 문서로, 화면에 직접 붙었으면 제 문서로 — 같은 식으로 쓴다.
+const DOC = `((() => {
+  const f = [...document.querySelectorAll("iframe")].find((x) => (x.getAttribute("src") || "").indexOf("approvals.html") >= 0);
+  return f ? f.contentDocument : document;
+})())`;
+
 // ③ VEX 받기 → 파일이 진짜 생기는지
 const c = conn(t); await c.ready; await c.send("Runtime.enable");
-const hasBtn = await c.evalx(`Boolean(document.getElementById('btnVexExport'))`);
+const hasBtn = await c.evalx(`Boolean(${DOC}.getElementById('btnVexExport'))`);
 ok("VEX 받기 버튼 존재", Boolean(hasBtn));
 if (hasBtn) {
-  await c.evalx(`document.getElementById('btnVexExport').click(), 'clicked'`);
+  await c.evalx(`${DOC}.getElementById('btnVexExport').click(), 'clicked'`);
   // 저장 안내는 잠시 뒤 원래 칩으로 돌아간다 — 사라지기 전에 읽는다(늦게 읽어 실패한 이력 있음).
   await new Promise((r) => setTimeout(r, 4000));
-  const shown = await c.evalx(`document.getElementById('vexChips').textContent.trim().slice(0,80)`);
+  const shown = await c.evalx(`${DOC}.getElementById('vexChips').textContent.trim().slice(0,80)`);
   await new Promise((r) => setTimeout(r, 3000)); // 저장 완료까지 여유
   const made = fs.readdirSync(DL).filter((f) => !before.has(f) && /gijo-vex/.test(f));
   ok("다운로드 폴더에 파일이 실제로 생성", made.length > 0, made.join(", ") || "없음");
