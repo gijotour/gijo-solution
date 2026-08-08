@@ -120,6 +120,12 @@ async function main() {
     workSessions: await g("/api/work-sessions"),
     sessionPatterns: await g("/api/session-patterns?days=30"),
     reportHistory: await g("/api/report/history"),
+    // ★ 2026-08-08 추가 기능 화면(제품 소개자료·보안 로그 분석).
+    //   ⚠ 여기 안 적으면 아래 Proxy가 빈 배열을 돌려줘 **조용히 빈 화면**이 찍힌다.
+    //     실제로 그렇게 찍어 봤다 — 「등록된 소개자료가 없습니다」가 자료에 들어갈 뻔했다.
+    productIntros: await g("/api/product-intro"),
+    logFiles: await g("/api/loganalysis/files"),
+    analysisEvents: await g("/api/analysis/events"),
   };
 
   // 브라우저에 주입할 window.gijo 스텁(읽기=주입 데이터 반환, 쓰기/구독=no-op). 페이지 스크립트보다 먼저 실행.
@@ -195,6 +201,10 @@ async function main() {
       listWorkSessions: () => R(DATA.workSessions || []),
       sessionPatterns: () => R(DATA.sessionPatterns || {}),
       listReportHistory: () => R(DATA.reportHistory || []),
+      listProductIntros: () => R(DATA.productIntros || { items: [] }),
+      logAnalysisFiles: () => R(DATA.logFiles || { files: [] }),
+      analysisEvents: () => R(DATA.analysisEvents || { events: [] }),
+      logAnalysisGuide: () => R({ steps: [] }),
       onCollaborationEvent: noop,
       // 터미널 화면 — 실제 로컬 셸 스폰 없이 빈 상태(대기 화면)만 보여준다.
       terminal: {
