@@ -18,7 +18,7 @@
 import type { Express, Request } from "express";
 import crypto from "crypto";
 import { db, migrate } from "../db";
-import { authMiddleware } from "../auth/auth";
+import { authMiddleware, adminMiddleware } from "../auth/auth";
 import { SMALLTALK, NO_ANSWER } from "./sessionpatterns";
 import { rateChatLog, 질문주제 } from "./learnloop";
 import { isNonLearningSessionOwner } from "./learnpolicy";
@@ -275,5 +275,49 @@ export function registerLearnCandidateRoutes(app: Express): void {
     const r = acceptStrongCandidates(Number(req.body?.minScore) || 3, actorOf(req));
     recordAudit({ kind: "write", actor: actorOf(req), action: "학습 후보 일괄 승인", target: `${r.accepted}건`, result: "ok" });
     res.json(r);
+  });
+
+  // 사내 문서에서 뽑아 **사람이 검수한** 문답을 학습 재료로 편입한다(시드).
+  //
+  // 왜 필요한가(2026-08-09): 주제별 어댑터 개시선은 300건인데 후보함이 0건이었다.
+  // 실사용이 쌓일 때까지 기다리면 언제 될지 알 수 없어, 사내 지식 문서에서 문답을 뽑아
+  // 마중물로 넣는다(tools/seed-candidates.mjs가 뽑고 사람이 고른 것만 여기로 온다).
+  //
+  // ⚠ **출처를 지운 채 섞지 않는다.** agentId를 "seed-docs"로 박아, 나중에 "이 어댑터는
+  //   실사용에서 배웠나 문서에서 배웠나"를 셀 수 있게 한다. 섞어 버리면 그 질문에 답할 수 없다.
+  app.post("/api/learnloop/seed", authMiddleware, adminMiddleware, (req, res) => {
+    const items = (req.body?.items ?? []) as { question?: string; answer?: string; topic?: string }[];
+    if (!Array.isArray(items) || items.length === 0) {
+      res.status(400).json({ error: "items(문답 배열)가 필요합니다" });
+      return;
+    }
+    let 넣음 = 0;
+    const 거른것: Record<string, number> = {};
+    const 있는지문 = new Set((allLogFingerprintRowsStmt.all() as { question: string; answer: string }[]).map((r) => fingerprint(r.question, r.answer)));
+    for (const it of items) {
+      const q = String(it.question ?? "").trim();
+      const a = String(it.answer ?? "").trim();
+      if (!q || !a) { 거른것["빈 문답"] = (거른것["빈 문답"] ?? 0) + 1; continue; }
+      // 제품이 쓰는 제외 규칙을 **그대로** 지난다 — 시드라고 봐주면 위생이 뚫린다.
+      const why = excluded(q, a);
+      if (why) { 거른것[why] = (거른것[why] ?? 0) + 1; continue; }
+      const fp = fingerprint(q, a);
+      if (있는지문.has(fp)) { 거른것["이미 있음"] = (거른것["이미 있음"] ?? 0) + 1; continue; }
+      있는지문.add(fp);
+      insertLogStmt.run({
+        id: "sd" + Date.now().toString(36) + Math.random().toString(36).slice(2, 8),
+        agentId: "seed-docs",
+        question: q,
+        answer: a,
+        createdAt: Date.now(),
+        topic: it.topic ?? 질문주제(q),
+      });
+      넣음 += 1;
+    }
+    recordAudit({
+      kind: "write", actor: actorOf(req), action: "학습 재료 시드 편입",
+      target: `${넣음}건`, detail: `요청 ${items.length}건 · 거름 ${JSON.stringify(거른것)}`, result: "ok",
+    });
+    res.json({ 넣음, 거른것 });
   });
 }
