@@ -77,13 +77,15 @@ export const dispatchApi = {
   // 호출자가 안 주면 현재 문서 경로에서 자동으로 채운다.
   // progressId: 클라가 만든 UUID. 주면 서버가 처리 단계를 기록하고, progress()로 0.7초마다
   // 조회해 진행 카드를 그린다(2026-07-30 — "처리 중…" 침묵 구간 해소).
-  send: (text: string, sessionId?: string, screen?: string, progressId?: string) =>
+  // selection: 화면에서 골라 둔 항목(2026-08-09 2단계) — 「이거」의 대상. 서버가 맥락 앞머리에 싣는다.
+  send: (text: string, sessionId?: string, screen?: string, progressId?: string, selection?: string) =>
     request<DispatchResult>("/api/dispatch", {
       method: "POST",
       body: {
         text,
         ...(sessionId ? { sessionId } : {}),
         ...(progressId ? { progressId } : {}),
+        ...(selection ? { selection } : {}),
         screen: screen ?? currentScreen(),
       },
     }),

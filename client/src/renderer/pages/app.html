@@ -487,6 +487,11 @@
       return;
     }
     // ② "이 화면 설명해줘"(ⓘ) — 화면 안 챗봇을 없앴으므로 콘솔이 답한다.
+    // ⑤′ "이걸 골랐어" — 화면(iframe)이 항목을 고르면 대화창 머리에 📌칩이 붙는다(2026-08-09 2단계).
+    if (d.type === "gijo:select" && window.gijoConsole && window.gijoConsole.select) {
+      window.gijoConsole.select(d.label && d.text ? { label: String(d.label), text: String(d.text) } : null);
+      return;
+    }
     if (d.type === "gijo:explain" && window.gijoConsole) {
       // 화면 안내는 카드 한 장으로(2026-08-09 재설계) — 말풍선으로 쌓으면 같은 안내가
       // 중복된다(실측 3중복). 특정 주제(topic)는 일반 대화로 — 그건 안내가 아니라 질문이다.

@@ -23,7 +23,7 @@ import { isNonLearningAccount } from "./learnpolicy";
 import { recordChatLog } from "./learnloop";
 import { faqAnswerFor } from "./productfaq";
 import type { Viewer } from "./memory";
-import { runAgentLoop, AgentToolCall, 가리킬것없는대명사, 가리킨자산이없나, 대명사뿐인가, 대명사확인, 되물음, 자산되물음 } from "./agentloop";
+import { runAgentLoop, AgentToolCall, 가리킬것없는대명사, 가리킨자산이없나, 대명사뿐인가, 대명사확인, 되물음, 자산되물음, 선택을박는다 } from "./agentloop";
 import { executeApprovedTool, findAgentTool, buildApproval, PendingApproval } from "./agenttools";
 import { appendApprovedDecision } from "./orchestrator-dataset";
 import { undoSnapshot, undoCommit } from "./undo";
@@ -551,12 +551,12 @@ async function learnloopConfirmResult(instructionText: string, qa?: boolean): Pr
 // sessionId가 없으면 자동으로 새 세션을 만들어 기록한다(사용자 요청 2026-07-20 — "모든 행위를
 // 작업 세션에": 팀 사무실 CTA·에이전트 페이지 등 세션 없이 오던 지시도 이력에 남게).
 // 응답의 sessionId를 클라이언트가 저장하면 그 세션으로 "이어서" 지시가 된다.
-export async function dispatchInstruction(instructionText: string, sessionId?: string, screen?: string, actor?: string, qa?: boolean, noLearn?: boolean, viewer?: Viewer): Promise<DispatchResult> {
+export async function dispatchInstruction(instructionText: string, sessionId?: string, screen?: string, actor?: string, qa?: boolean, noLearn?: boolean, viewer?: Viewer, 선택?: string): Promise<DispatchResult> {
   // ★ 이 요청이 끝날 때까지 "누가 묻는지"를 달아 둔다. 아래에서 도는 AI 도구(search·explain)는
   //   run(args) 한 모양이라 사람을 넘길 자리가 없다 — 꼬리표가 없으면 대화는 등급을 지키는데
   //   도구로 물으면 기밀 문서가 그대로 나온다(2026-08-01 실검증에서 잡은 뚫린 문. viewerctx.ts).
   const result = await runWithViewer(viewer, () =>
-    dispatchInstructionScoped(instructionText, sessionId, screen, actor, qa, noLearn, viewer)
+    dispatchInstructionScoped(instructionText, sessionId, screen, actor, qa, noLearn, viewer, 선택)
   );
   return 해석을단다(거짓완료를걸러낸다(instructionText, result));
 }
@@ -594,12 +594,15 @@ function 거짓완료를걸러낸다(지시: string, r: DispatchResult): Dispatc
   return { ...r, output: 검사.답 };
 }
 
-async function dispatchInstructionScoped(instructionText: string, sessionId?: string, screen?: string, actor?: string, qa?: boolean, noLearn?: boolean, viewer?: Viewer): Promise<DispatchResult> {
+async function dispatchInstructionScoped(instructionText: string, sessionId?: string, screen?: string, actor?: string, qa?: boolean, noLearn?: boolean, viewer?: Viewer, 선택?: string): Promise<DispatchResult> {
   // 평가 게이트/QA 실행(중-3): 작업 세션·협업 피드에 기록하지 않는다 — 게이트 문답 수백 건이
   // 작업내역에 쌓이면 학습 후보함(출처 B)과 담당자의 작업 이력을 오염시킨다. 맥락도 싣지 않아
   // 문항 간 독립(재현성)을 보장한다. 라우팅·RAG·가드레일 등 제품 판단 경로는 전부 동일하다.
+  // 화면에서 골라 둔 항목(2026-08-09 2단계) — 「이거」의 대상. 대화 이력과 달리 이건 **질문의
+  // 일부**라 qa에도 싣는다(라우트에서 이미 한 줄 눌러쓰기·200자 상한을 지났다).
+  const 선택맥락 = 선택 ? `[지금 화면에서 선택한 항목] ${선택}` : "";
   if (qa) {
-    const core = await dispatchInstructionCore(instructionText, "", screen, actor, true, noLearn, viewer);
+    const core = await dispatchInstructionCore(instructionText, 선택맥락, screen, actor, true, noLearn, viewer, 선택);
     // ⚠ 신호(dataHits·internalMiss·sources)는 **답의 일부**다 — 기록이 아니라 계산이라서
     //   qa에서도 그대로 내야 한다. 여기서 건너뛰었더니 회귀 하네스가 internalMiss=undefined로
     //   깨졌다(2026-07-30 실측). 게이트 문항은 이 신호를 안 써서 게이트 결과는 무사했지만,
@@ -610,7 +613,9 @@ async function dispatchInstructionScoped(instructionText: string, sessionId?: st
   // 누가 한 일인지 알 수 없었다(2026-07-26 사용자 지적).
   const session = (sessionId ? getSession(sessionId) : null) ?? createSession(undefined, undefined, actor);
   // 맥락은 이번 지시를 기록하기 "전" 시점의 대화로 계산한다(방금 넣은 user 턴이 맥락에 중복되지 않게).
-  const contextText = session ? recentTurnsText(session.id) : "";
+  const 대화맥락 = session ? recentTurnsText(session.id) : "";
+  // 선택이 먼저다 — 「이거」는 대화 이력보다 방금 화면에서 고른 것을 가리킨다.
+  const contextText = [선택맥락, 대화맥락].filter(Boolean).join("\n\n");
   let title = session?.title;
   // 기록에는 사람 말만 남긴다 — 목록에서 고를 때 붙는 기계용 표식(sha1 해시)이 그대로 저장되면
   // 작업 내역과 이어보기가 해시 범벅이 되어 담당자가 자기 대화를 못 알아본다(2026-07-31 실화면).
@@ -623,7 +628,7 @@ async function dispatchInstructionScoped(instructionText: string, sessionId?: st
     // "어느 세션에서 온 작업인지"가 로그에 드러나게 한다(대시보드 📡 실시간 협업 피드에 표시).
     collab(qa, { from: "세션", to: "orchestrator", message: `💬 [${title}] ${기록문}` });
   }
-  const core = await dispatchInstructionCore(instructionText, contextText, screen, actor, undefined, noLearn, viewer);
+  const core = await dispatchInstructionCore(instructionText, contextText, screen, actor, undefined, noLearn, viewer, 선택);
   const result: DispatchResult = { ...core, ...(await computeOfferSignals(core, instructionText, screen)) };
   // 헤르메스 학습 루프 ① 수집 — **대화창 출구 한 곳**에서 남긴다(2026-08-07).
   // 예전에는 chat() 내부(remember:true)에서만 수집해, 코드가 만든 즉답·도구 답·에이전트 루프 답이
@@ -719,7 +724,7 @@ function turnToolTag(r: DispatchResult): string | undefined {
   return undefined;
 }
 
-async function dispatchInstructionCore(instructionText: string, contextText = "", screen?: string, actor?: string, qa?: boolean, noLearn?: boolean, viewer?: Viewer): Promise<DispatchResult> {
+async function dispatchInstructionCore(instructionText: string, contextText = "", screen?: string, actor?: string, qa?: boolean, noLearn?: boolean, viewer?: Viewer, 선택?: string): Promise<DispatchResult> {
   // 대화 열쇠 — "아까 그거"가 **이 사람의** 직전 대상만 가리키게 한다.
   //   예전에는 전역 1건이라 담당자 A가 방금 다룬 취약점을 담당자 B의 "아까 그거"가 가리켰다.
   //   ⚠ 사람을 못 알아내면 기본 대화를 쓴다 — 예전 동작 그대로다(더 나빠지지 않는다).
@@ -1081,7 +1086,9 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   //   (가리킨자산이없나)을 만들어 놓고 **여기 관문에 배선하지 않아** 한 번도 실행되지 않았다.
   //   47초·엉뚱한 답을 낸 그 경로가 그대로였다. 대명사뿐인 말과 대상 안 밝힌 자산 질문은
   //   같은 병(대상 불명)이라 같은 관문에서 잡는다.
-  if (대명사뿐인가(instructionText) || 가리킬것없는대명사(instructionText, 대화열쇠)) {
+  // ★ 화면에서 항목을 골라 둔 상태(선택)면 「이거」의 대상이 있다 — 되묻지 않는다(2026-08-09 2단계).
+  //   선택은 아래에서 contextText 앞머리에 실려 도구·모델이 그걸 가리키게 된다.
+  if (!선택 && (대명사뿐인가(instructionText) || 가리킬것없는대명사(instructionText, 대화열쇠))) {
     const 확인 = 대명사확인(대화열쇠);
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
     completeTask(task.id);
@@ -1123,6 +1130,13 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     };
   }
 
+  // ★ 선택 치환(2026-08-09 2단계 e2e가 잡은 결함): 선택맥락은 contextText에 실리지만
+  //   **강제 분기(forcedToolFor)는 지시문만 본다** — 「이 자산 취약점 몇 건이야?」가 선택을
+  //   무시하고 전역 집계(finding_status)로 갔다. 대명사 자리에 고른 항목을 박은 실행문을
+  //   루프에 준다 — 규칙·모델·도구 인자가 전부 구체적 대상을 보게 된다.
+  //   기록(task·감사)은 담당자가 친 원문 그대로 남긴다.
+  const 실행문 = 선택 ? 선택을박는다(instructionText, 선택) : instructionText;
+
   // 에이전트 루프를 intent 분류보다 **먼저** 시도한다. 등록된 도구로 답할 수 있으면 그것으로 끝낸다.
   // 순서가 중요하다(2026-07-17 실측): 예전엔 4분류 intent(scan/analyze/report/chat)가 앞을 막아
   // "지금 급한 취약점 상위 3건만 알려줘"가 analyze로 분류돼 루프에 도달하지 못했다. 그 4분류는
@@ -1130,7 +1144,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   // 루프가 처리 못 하면(null) 아래 기존 경로로 그대로 폴백하므로 스캔·리포트 동작은 보존된다.
   // 화면에서 온 업무 영역으로 도구 후보를 좁힌다 — 도구가 늘어도 프롬프트가 커지지 않게 하는 장치.
   // 화면을 모르거나 전역 화면(대시보드)이면 undefined라 종전대로 전체가 후보가 된다.
-  const loop = await runAgentLoop(instructionText, contextText, {
+  const loop = await runAgentLoop(실행문, contextText, {
     domains: toolDomainsForScreen(screen),
     // 권한을 실어 admin 전용 도구(지식 번들 반입 등)가 대화창에서 라우팅되게 한다.
     //   없으면 forcedToolFor의 available에서 빠져 조용히 다른 도구로 샌다(E2E가 잡은 결함).
@@ -1226,6 +1240,11 @@ export function registerDispatcherRoutes(app: Express): void {
       // progressId — 클라가 만든 UUID. 있으면 처리 중 단계를 기록해 두고 클라가 폴링으로 본다
       // (2026-07-30 사용자 요청 "진행사항을 %나 진행 바로"). 없으면(구버전·QA) 완전 무동작.
       const progressId = isValidProgressId(req.body?.progressId) ? (req.body.progressId as string) : null;
+      // selection — 화면에서 골라 둔 항목(2026-08-09 2단계). 줄바꿈을 눌러 한 줄로 만들고 200자에서
+      // 자른다 — 화면 라벨이 프롬프트 구조(줄 단위 지시)를 흔들지 못하게 하는 최소 방어다.
+      const 선택 = typeof req.body?.selection === "string" && req.body.selection.trim()
+        ? req.body.selection.replace(/\s+/g, " ").trim().slice(0, 200)
+        : undefined;
 
       // 30초 안에 안 끝나면 "리포트로 작성해 드리겠다"고 답하고 물러난다(사용자 결정 2026-07-26, 10초→30초).
       // 작업은 뒤에서 계속 돌고, 끝나면 리포트로 저장한 뒤 화면에 팝업으로 알린다.
@@ -1241,7 +1260,7 @@ export function registerDispatcherRoutes(app: Express): void {
       const limitMs = qa ? QA_LONG_ANSWER_MS : 보고서꼴(text) ? REPORT_HANDOFF_MS : LONG_ANSWER_MS;
       const t0 = Date.now(); // 느린 답 원장(관측성) — 담당자를 기다리게 한 질문을 제품이 스스로 적는다
       const work = runWithProgress(progressId, user?.id ?? null, () =>
-        dispatchInstruction(text, sessionId, screen, user?.displayName, qa, isNonLearningAccount(user?.username), { userId: user?.id, clearance: user?.clearance, role: user?.role })
+        dispatchInstruction(text, sessionId, screen, user?.displayName, qa, isNonLearningAccount(user?.username), { userId: user?.id, clearance: user?.clearance, role: user?.role }, 선택)
       );
       let handedOff = false;
       const timer = new Promise<null>((resolve) => setTimeout(() => resolve(null), limitMs));

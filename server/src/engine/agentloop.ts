@@ -227,6 +227,25 @@ export function 대명사뿐인가(instruction: string): boolean {
   return 남은.length <= 2;
 }
 
+/**
+ * 선택 치환(2026-08-09 2단계) — 화면에서 고른 항목이 있으면 대명사 자리에 **그 이름을 박는다**.
+ * 「이 자산 취약점 몇 건이야?」 + 선택 「자산 웹서버A」 → 「자산 웹서버A 취약점 몇 건이야?」.
+ * 왜: 선택맥락은 contextText로 모델에게 가지만 **강제 분기(forcedToolFor)는 지시문만 본다** —
+ * 치환 없이는 선택을 무시하고 전역 도구로 갔다(실앱 e2e 실측: 한 자산을 골라 물었는데 4,828건).
+ * ⚠ 대명사가 없으면 원문 그대로 둔다 — 「미조치 취약점 몇 건?」은 전역 질문일 수 있어
+ *   칩이 붙어 있다고 마음대로 좁히면 묻지 않은 답을 주게 된다(선택은 맥락으로만 동행).
+ */
+export function 선택을박는다(instruction: string, 선택: string): string {
+  const t = String(instruction ?? "");
+  // ⚠ 앞이 문장 시작·공백일 때만 — 안 그러면 「필요 자산」의 「요 자산」, 「높이」의 「이」까지 문다.
+  const 지시어 =
+    /(^|\s)(?:(?:이|그|저|해당|요)\s*(?:자산|서버|장비|호스트|시스템|머신|항목|취약점|거)|(?:지금\s*)?(?:선택한?|고른)\s*(?:자산|서버|장비|호스트|시스템|머신|항목|취약점|거|것)|이거|이걸|이것|얘)/;
+  const m = 지시어.exec(t);
+  if (!m) return t;
+  return (t.slice(0, m.index) + m[1] + String(선택 ?? "").trim() + t.slice(m.index + m[0].length))
+    .replace(/\s+/g, " ").trim();
+}
+
 /** 직전 대상이 있을 때 — **무엇을 가리키는지 짚어 확인받고** 이어갈 길을 준다(즉답). */
 export function 대명사확인(대화 = 기본대화): string | null {
   const t = recentTarget(대화);
@@ -1380,7 +1399,14 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): { tool: s
           : /미배정|배정\s*안|담당자?\s*없/.test(instruction) ? "미배정"
           : /기한\s*(초과|지난)|지연/.test(instruction) ? "기한"
           : "";
-        return { tool: f.tool, args: 조건 ? { filter: 조건 } : {} };
+        // ★ 자산을 지목한 세는 질문은 **그 자산으로 좁힌다**(2026-08-09 2단계 e2e가 잡은 공백).
+        //   「172.168.50.142 취약점 몇 건이야?」에 전역 4,828건이 나갔다 — 이름을 직접 쳐도
+        //   화면에서 골라도(선택 치환) 같았다. 유일하게 특정될 때만 좁힌다(모호하면 전역 그대로 —
+        //   없는 조건을 지어내 엉뚱하게 좁히는 것이 더 나쁘다). 필터 토큰은 id다: 현황 도구의
+        //   건초더미가 assetId라 표시 이름 토큰은 안 맞는다.
+        const 지목 = 지목된자산아이디(instruction);
+        const filter = [조건, 지목].filter(Boolean).join(" ");
+        return { tool: f.tool, args: filter ? { filter } : {} };
       }
       if (f.tool === "briefing" && /리포트|보고서|report/i.test(instruction)) continue; // 문서 리포트는 briefing 아님
       // 하드닝 점검 기준 선택: CIS 명시→cis, PC/윈도우→kisa_pc, 네트워크 장비→kisa_net, 그 외→국내 CCE(kisa).
@@ -1408,6 +1434,26 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): { tool: s
     }
   }
   return null;
+}
+
+/**
+ * 문장이 등록된 자산 **하나**를 지목하면 그 id를 준다 (2026-08-09 2단계).
+ * 표시 이름·원래 이름·id 어느 글자로 불러도 잡는다 — 담당자가 보는 글자는 표시 이름이고,
+ * 선택 치환이 박는 글자도 표시 이름이다. 둘 이상 걸리면 빈 문자열(모호 — 좁히지 않는다).
+ * ⚠ 토큰은 공백 없는 id만 쓴다 — 필터가 공백으로 토큰을 가르기 때문(필터에맞나).
+ */
+export function 지목된자산아이디(instruction: string): string {
+  const 문장 = instruction.toLowerCase();
+  const 걸림 = new Set<string>();
+  for (const a of listAssets()) {
+    const 이름들 = [(a as { displayName?: string }).displayName, a.name, a.id].filter(
+      (n): n is string => typeof n === "string" && n.trim().length >= 2,
+    );
+    if (이름들.some((n) => 문장.includes(n.toLowerCase()))) 걸림.add(a.id);
+    if (걸림.size > 1) return "";
+  }
+  const [단하나] = [...걸림];
+  return 단하나 && !/\s/.test(단하나) ? 단하나 : "";
 }
 
 /**

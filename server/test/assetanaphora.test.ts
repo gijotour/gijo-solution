@@ -43,8 +43,10 @@ describe("대상을 안 밝힌 자산 질문 — 되묻는다", () => {
     const src = (await import("node:fs")).readFileSync(
       (await import("node:path")).join(__dirname, "..", "src", "engine", "dispatcher.ts"), "utf8"
     );
+    // 2026-08-09 2단계: 화면에서 고른 항목(선택)이 있으면 대상이 있으므로 되묻지 않는다.
+    // 관문 자체는 그대로 배선돼 있다 — !선택 조건이 앞에 붙었을 뿐이다.
     expect(src, "관문에서 가리킬것없는대명사를 호출하지 않는다").toMatch(
-      /if \(대명사뿐인가\(instructionText\) \|\| 가리킬것없는대명사\(instructionText, 대화열쇠\)\)/
+      /if \(!선택 && \(대명사뿐인가\(instructionText\) \|\| 가리킬것없는대명사\(instructionText, 대화열쇠\)\)\)/
     );
   });
 

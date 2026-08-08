@@ -64,6 +64,10 @@
       // 살아 있는 숫자 — 그 화면의 요약 1줄(절차 띠 데이터 재사용, 새 계산 없음)
       ".cs-live{margin-left:auto;font-size:11.5px;color:var(--muted,#b3ada4);white-space:nowrap;}",
       ".cs-live b{color:#f5928a;font-weight:800;}",
+      // 📌 선택 칩 — 화면에서 고른 항목이 「이거」가 된다(2026-08-09 2단계)
+      ".cs-sel{font-size:11.5px;font-weight:700;color:#ffd9a8;border:1px solid rgba(240,160,32,.45);border-radius:12px;padding:1px 9px;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis;}",
+      ".cs-sel .x{margin-left:5px;color:var(--muted-2,#a49d95);cursor:pointer;font-weight:400;}",
+      ".cs-sel .x:hover{color:#f5928a;}",
       // 맥락 떼기 ✕ — VS Code implicit context의 결론(보이게+뗄 수 있게)을 처음부터
       ".cs-ctx .x{margin-left:5px;color:var(--muted-2,#a49d95);cursor:pointer;font-weight:400;}",
       ".cs-ctx .x:hover{color:#f5928a;}",
@@ -222,6 +226,7 @@
     host.innerHTML =
       '<div class="cs-head">' +
         '<span class="cs-ctx" id="csCtx" title="지금 지시의 대상 화면 — ✕로 떼면 화면과 무관하게 묻습니다">대시보드</span>' +
+        '<span class="cs-sel" id="csSel" style="display:none" title="화면에서 고른 항목 — 「이거」가 이걸 가리킵니다"></span>' +
         '<span class="cs-hint" id="csHint">보고 있는 화면 기준으로 지시합니다</span>' +
         '<button class="cs-btn" id="csToggleHost" title="' +
           (IS_WINDOW ? "이 창을 닫고 앱 아래에 다시 붙입니다" : "대화를 별도 창으로 빼냅니다 — 화면을 100%로 쓸 때") + '">' +
@@ -253,6 +258,9 @@
 
     // C. 맥락 떼기 — ✕를 누르면 화면 무관, 다시 칩을 누르면 붙는다.
     //   칩 내용은 applyCtx가 매번 다시 그리므로, 리스너는 부모(고정 요소)에 한 번만 단다.
+    document.getElementById("csSel").addEventListener("click", function (e) {
+      if (e.target && e.target.classList.contains("x")) setSelection(null);
+    });
     document.getElementById("csCtx").addEventListener("click", function (e) {
       if (e.target && e.target.classList.contains("x")) { ctxOff = true; applyCtx(); return; }
       if (ctxOff) { ctxOff = false; applyCtx(); }
@@ -934,6 +942,7 @@
         bodyEl.scrollTop = bodyEl.scrollHeight;
       }
       ctxOff = false; // 새 화면에 왔으면 맥락은 다시 붙는다(뗀 것은 그 화면에서의 선택이었다)
+      setSelection(null); // 선택도 푼다 — 옆 화면 항목을 계속 가리키면 「이거」가 거짓말이 된다
     }
     prevScreen = ctx.screen || prevScreen;
     // 맥락 칩 — 이름 + ✕(떼기). VS Code implicit context의 결론(보이게+뗄 수 있게)을 그대로.
@@ -953,6 +962,17 @@
   // ── 메뉴 연동 재설계(2026-08-09 시안 승인 + 외부사례 B·C) ────────────────
   var prevScreen = null;
   var ctxOff = false; // C. 맥락 떼기 — 켜지면 지시에 화면을 안 싣는다
+
+  // ── 2단계: 선택 항목 맥락 — 화면에서 고른 것이 「이거」가 된다 ──────────
+  var sel = null; // { label, text } | null — 화면(iframe)이 gijo:select로 알려 준다
+  function setSelection(s) {
+    sel = s && s.label && s.text ? s : null;
+    var el = document.getElementById("csSel");
+    if (!el) return;
+    if (!sel) { el.style.display = "none"; el.innerHTML = ""; return; }
+    el.style.display = "";
+    el.innerHTML = "📌 " + esc(sel.label) + ' <span class="x" title="선택을 풉니다">✕</span>';
+  }
 
   /** ② 화면별 칩 — 그 화면 갈래(CAN.screens)에서 3~4개 + 첫 칩은 항상 ⓘ. */
   function renderChips() {
@@ -1086,7 +1106,7 @@
       // (server/engine/screencontext.ts). 보고 있는 탭이 곧 그 맥락이다.
       // C. 맥락을 뗐으면(ctxOff) 화면을 싣지 않는다 — "NIST CSF가 뭐야?" 같은 일반 질문에
       //    화면 맥락이 오히려 해석을 비트는 경우가 있다(외부사례: VS Code implicit context 논쟁).
-      var r = await window.gijo.sendInstruction(text, session ? session.id : undefined, (ctxOff ? undefined : ctx.screen) || undefined, pid);
+      var r = await window.gijo.sendInstruction(text, session ? session.id : undefined, (ctxOff ? undefined : ctx.screen) || undefined, pid, sel ? sel.text : undefined);
       if (pc) pc.stop();
       if (r && r.sessionId) {
         session = { id: r.sessionId };
@@ -1290,7 +1310,7 @@
     input.focus();
     try { input.setSelectionRange(input.value.length, input.value.length); } catch (e) {}
   }
-  window.gijoConsole = { append: append, syncCtx: readCtxFromShell, submit: submit, ask: ask, prefill: prefill, guide: guideAsk };
+  window.gijoConsole = { append: append, syncCtx: readCtxFromShell, submit: submit, ask: ask, prefill: prefill, guide: guideAsk, select: setSelection };
 
   // 다른 화면·다른 창에서 "이 지시를 대화창에서 이어서" 하고 넘겨 준 것을 받는다.
   // ⚠ 빈 글이면 **보내지 않는다** — 「이어서 지시하기」만 누른 사람은 아직 할 말을 안 정했다.

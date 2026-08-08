@@ -105,6 +105,16 @@
           container.querySelectorAll(".mv-tile.mv-sel").forEach((x) => x.classList.remove("mv-sel"));
           el.classList.add("mv-sel");
           ctx.onDetail(a);
+          // 선택을 셸에 알린다(2026-08-09 2단계) — 대화창 머리에 📌칩이 붙고,
+          // "이거 취약점 몇 개야?"의 「이거」가 이 자산을 가리키게 된다.
+          // ⚠ 여기(클릭)에서만 알린다 — 화면이 로드되며 자동으로 여는 상세(onDetail 직접 호출)는
+          //   담당자가 고른 게 아니라서 선택으로 잡으면 안 붙어야 할 칩이 붙는다.
+          // ⚠ parent가 아니라 **top**이다 — 이 화면은 허브 화면(discover 등) 안에 한 겹 더
+          //   들어가 parent=허브라서 메시지가 셸에 못 닿았다(2026-08-09 실측). 셸은 항상 최상위 창.
+          try {
+            const 이름 = a.displayName || a.name || "";
+            if (이름 && window.top !== window) window.top.postMessage({ type: "gijo:select", label: 이름, text: "자산 " + 이름 }, "*");
+          } catch (e) { /* 셸 밖(단독 열람)에서는 조용히 없던 일로 */ }
         });
         t.appendChild(el);
       }
