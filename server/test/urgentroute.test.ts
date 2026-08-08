@@ -51,3 +51,16 @@ describe("2026-08-08 새벽 — 150상황 2회차가 잡은 두 결함", () => {
     expect(대명사뿐인가("아까 올린 문서 다시 보여줘")).toBe(false);
   });
 });
+
+describe("[55] 기한 넘긴 취약점 — finding_status 결정화 (게이트 sla-overdue)", () => {
+  it("★ 게이트 문항 원문·SLA 변형이 잡힌다", async () => {
+    const { forcedToolFor } = await import("../src/engine/agentloop");
+    expect(forcedToolFor("조치 기한 넘긴 취약점 있어?", {})?.tool).toBe("finding_status");
+    expect(forcedToolFor("SLA 초과된 건 알려줘", {})?.tool).toBe("finding_status");
+  });
+  it("★★ 점검·일정·할 일 영토는 안 삼킨다", async () => {
+    const { forcedToolFor } = await import("../src/engine/agentloop");
+    expect(forcedToolFor("기한 지난 점검 일정 있어?", {})?.tool ?? "(없음)").not.toBe("finding_status");
+    expect(forcedToolFor("기한 지난 할 일 있어?", {})?.tool ?? "(없음)").not.toBe("finding_status");
+  });
+});
