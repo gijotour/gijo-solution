@@ -378,7 +378,7 @@ async function ensureModelLoaded(modelId: string): Promise<LoadedModel> {
   }
   const spawned = spawn(
     LLAMA_SERVER_PATH,
-    ["-m", modelFilePath(modelId), "-ngl", "-1", "--ctx-size", String(adaptation.fittedCtx), "--port", String(port), ...adaptation.extraArgs, ...loraArgs],
+    ["-m", modelFilePath(modelId), "-ngl", "-1", "--ctx-size", String(adaptation.fittedCtx), ...확인용칸(adaptation.fittedCtx), "--port", String(port), ...adaptation.extraArgs, ...loraArgs],
     { stdio: "pipe" }
   );
   drainProcessOutput(spawned, `채팅 모델 ${modelId}`);
@@ -694,6 +694,28 @@ export function stopEmbeddingMonitor(): void {
 // 자동복구가 없어 사람이 수동 재시작해야 했음). 짧은 완성 요청을 실제로 돌려보고, 연속 실패하면
 // 그 모델을 죽이고 새로 띄운다. 타임아웃을 넉넉히(30s) 잡아 정상적인 긴 응답을 hang으로 오판하지
 // 않게 하고, 2회 연속 실패(≈3분 무응답)일 때만 재기동한다.
+/**
+ * 상태 점검(ping)이 담당자의 프롬프트 캐시를 밀어내지 않도록 **칸(slot)을 하나 더** 준다.
+ *
+ * 실측(2026-08-09) — 이 한 줄이 없을 때 담당자가 겪던 것:
+ *   ① "머부터해야되나요"  43.2초   ← 유휴 뒤 첫 질문
+ *   ② 바로 다시            0.7초   ← 캐시가 살아 있음
+ *   ③ 감시 ping 발사 후    34.4초   ← **ping이 캐시를 밀어냈다**
+ *   ④ 다시                 0.6초
+ * 90초마다 도는 상태 점검이 칸 하나를 통째로 덮어써서, 그 뒤 첫 질문은 시스템 프롬프트를
+ * 처음부터 다시 읽어야 했다. 아침에 앱을 열고 처음 묻는 사람은 **매번** 40초를 기다린 셈이다.
+ *
+ * llama.cpp는 앞부분이 가장 많이 겹치는 칸을 고른다 — 칸이 둘이면 짧은 ping은 남는 칸으로 가고
+ * 담당자의 긴 프롬프트는 제 칸에 그대로 남는다. 총 문맥은 --ctx-size 그대로이고 칸끼리 나눠 쓰므로
+ * **메모리는 늘지 않는다.** 다만 칸당 문맥이 절반이 되니, 절반이 8192 미만이면 칸을 안 나눈다
+ * (문맥을 줄여 가며 얻을 속도가 아니다).
+ */
+function 확인용칸(fittedCtx: number): string[] {
+  const 칸당 = Math.floor(fittedCtx / 2);
+  if (칸당 < 8192) return [];
+  return ["--parallel", "2"];
+}
+
 async function probeChatAlive(port: number, timeoutMs = 30000): Promise<boolean> {
   return fetch(`http://localhost:${port}/v1/chat/completions`, {
     method: "POST",
