@@ -402,6 +402,7 @@ const gijoApi = {
   buildLearnloopDataset: (includeUnrated?: boolean) => api.learnloopApi.buildDataset(includeUnrated),
   startLearnloopRun: (datasetId?: string, topic?: string) => api.learnloopApi.run(datasetId, topic),
   listAdapters: () => api.adaptersApi.list(),
+  deleteAdapter: (id: string) => api.adaptersApi.remove(id),
   getLearnloopStatus: () => api.learnloopApi.status(),
   listLearnloopRuns: () => api.learnloopApi.runs(),
   getLearnloopConfig: () => api.learnloopApi.getConfig(),

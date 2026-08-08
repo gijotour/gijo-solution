@@ -196,6 +196,8 @@ export interface LoraAdapterInfo {
 }
 export const adaptersApi = {
   list: () => request<{ adapters: LoraAdapterInfo[] }>("/api/adapters"),
+  // 등록부 삭제(admin) — 반입 도구가 "삭제로 되돌릴 수 있다"고 안내하므로 이 길이 실재해야 한다.
+  remove: (id: string) => request<{ ok: boolean }>(`/api/adapters/${encodeURIComponent(id)}`, { method: "DELETE" }),
 };
 
 // ── HuggingFace 모델 ──────────────────────────────────────────────────
