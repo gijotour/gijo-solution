@@ -181,6 +181,21 @@ dispatch(text, sessionId, screen)
 
 대화창 답변은 **dispatcher 출구 한 곳**에서 chat_logs로 수집됩니다 — 즉답·도구 답·LLM 답을 가리지 않습니다(예전엔 chat() 내부에만 걸려 즉답이 전부 빠졌음). 빠지는 것은 qa(측정)·noLearn(배포 계정)·결재판/확인 대기뿐. 수집 시 **주제 딱지(topic)** 를 코드로 판정해 붙입니다(취약점·장비운영·사내규정·위협대응 — 동점·애매면 null). 이 딱지가 주제별 전문가 LoRA의 재료 축입니다(`GET /api/learnloop/topics`).
 
+### 2-3¾. 전문가 어댑터 체제 — 베이스 1 + LoRA N (2026-08-08 재설계)
+
+AI팀은 **베이스 모델 하나** 위에 주제별 LoRA 어댑터를 갈아입히는 구조입니다(팀원마다 통째 모델을 두던 구조를 대체). 고객은 BYOM으로 베이스만 고르고, 전문성은 현장에서 굽습니다 — LoRA는 베이스에 종속되라 어댑터를 미리 배포하면 BYOM 자유가 죽기 때문입니다.
+
+| 단계 | 내용 | 코드 |
+|---|---|---|
+| 재료 | 주제 딱지 붙은 승인 문답 — **주제별 300건이 개시선**(`topicTrainGate`, 1회전 실측 근거) | learnloop.ts |
+| 학습 | QLoRA → GGUF LoRA 어댑터(`data/lora/<prefix>-<주제슬러그>-vN.gguf`) | finetune.ts·convert_lora_to_gguf |
+| 등록 | 어댑터 등록부에 **미채택** 등록 — 자동 부착 금지 | adapters.ts |
+| 채택 | 평가 게이트+A/B 통과 근거(note)와 함께 사람이 채택 — 채택분만 서빙 적재 | adapters.ts |
+| 서빙 | 스폰 시 `--lora-init-without-apply`로 전부 적재, 요청마다 `lora:[{id,scale}]`로 팀원 어댑터 선택 | localengine.ts |
+| 배정 | 팀원별 adapterId(오케스트레이터 금지 — 라우팅 결정성) | agents.ts |
+
+⚠ 함정: 어댑터가 실린 모델은 요청마다 `cache_prompt:false` — llama.cpp가 어댑터가 다른 요청끼리 프롬프트 캐시를 재사용해 답이 오염되는 실측 이슈(#26207)의 방어입니다. 베이스를 바꾸면(BYOM 교체) 기존 어댑터는 무효 — 재학습이 필요합니다.
+
 ### 2-4. 온톨로지 — RAG의 짝
 
 문서 검색과 별개로 **표준 코드 사이의 관계**를 그래프로 갖고 있습니다
