@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<!--
+  GIJO AS 시안 — 학습 후보함(learnloop.html)에 "주제 딱지 · 주제별 진척" 붙이기
+  대상 화면: client/src/renderer/pages/learnloop.html (216~239행, "학습 후보함" .cat 블록)
+  추천 시안 1개 원칙(2026-07-25 확정) — 아래 하나만 제안합니다.
+
+  ── 설계 전 조사(요청 규칙: 만들기 전 표준·모범사례 조사 후 근거를 상단에 남긴다) ──
+  1) 가는 진행바(4px)로 충분하다 — Material Design 3 "Progress indicators" 스펙: determinate
+     linear indicator의 기본 두께는 4dp. 자리를 많이 안 써도 "진행 중" 신호는 충분히 전달된다.
+     https://m3.material.io/components/progress-indicators/specs
+  2) 카테고리 다중 필터는 칩(chip)이 정석 — SaaS 대시보드 필터 UX 가이드 다수가 "카테고리·라벨을
+     동시에 보여주면서 고르게 하려면 상단의 칩 행"을 권장(선택 상태가 눈에 바로 보이고, 별도
+     필터 패널 없이 화면 공간을 거의 안 씀).
+     https://www.eleken.co/blog-posts/filter-ux-and-ui-for-saas
+     https://www.aufaitux.com/blog/dashboard-filter-design-guide/
+  3) 새 색을 만들지 않는다(제품 원칙) — 4개 주제 배지는 이 화면에 이미 있는 --red/--blue/--amber
+     /--purple 토큰만 재사용(사내규정=노랑 요청이지만 제품엔 순수 노랑 토큰이 없어 --amber로 근사
+     — 근거 없이 새 색을 넣지 않기 위한 선택, 아래 "왜" 참고).
+  4) 칩 배지 규격은 이 화면에 이미 있는 .lc-sig(font-size 11.5px, padding 2px 7px)를 그대로
+     재사용 — 새 규격을 만들면 그 줄의 높이가 달라진다. 기존 배지와 "같은 키"로 넣어야
+     행 높이가 0으로 유지된다(feedback_density_first 원칙).
+
+  ── 실측 재료(2026-08-08 현재, server/src/engine/learnloop.ts 질문주제()/GET /api/learnloop/topics) ──
+  취약점 549 · 장비운영 295 · 사내규정 128 · 위협대응 72 · 미분류 1,095 (합 2,139)
+  전문가 어댑터 학습 조건 = 주제별 승인(👍) 300건 (LIMA 논거 — 코드 주석에 이미 근거 있음).
+  지금 승인은 주제당 3~30건 수준 — 아래 수치는 그 범위 안에서 실제 있을 법한 값을 썼습니다.
+-->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>시안 — 학습 후보함 주제 딱지·진척</title>
+<style>
+/* ── 제품 실제 토큰(client/src/renderer/pages/learnloop.html :root 그대로 복사) ── */
+:root{
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);padding:30px 34px 60px;}
+
+/* ── 문서용(시안 설명) 크롬 — 실제 제품 화면에는 없는, 이 시안 문서 전용 요소.
+     솔리드 박스는 "실제 화면 재현", 점선 박스는 "시안 설명"으로 시각 구분한다. ── */
+.doc-h1{font-size:19px;font-weight:800;color:#fff;margin-bottom:6px;}
+.doc-lead{font-size:12.5px;color:var(--muted);line-height:1.7;max-width:900px;margin-bottom:22px;}
+.doc-lead b{color:var(--blue-light);}
+.doc-section-label{font-size:11.5px;font-weight:800;color:var(--muted-2);letter-spacing:1px;text-transform:uppercase;margin:26px 0 8px;}
+.doc-note{border:1.5px dashed var(--border-strong);border-radius:10px;background:var(--panel-2);padding:10px 14px;font-size:12px;color:var(--muted);line-height:1.6;max-width:900px;margin-top:10px;}
+.doc-note b{color:var(--text);}
+.doc-tag{display:inline-block;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:5px;background:rgba(59,130,246,0.15);color:var(--blue-light);margin-right:6px;}
+
+/* ── 실제 화면 재현 프레임(client .main 리듬만 축소 재현 — 사이드바는 이 시안 범위 밖) ── */
+.screen-frame{background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:26px 30px;max-width:1040px;}
+.screen-frame.as-is{opacity:.68;}
+
+/* ── learnloop.html에서 그대로 가져온 클래스(수정 없이 복사) ── */
+.cat{margin-bottom:0;max-width:1000px;}
+.cat-head{display:flex;align-items:baseline;gap:10px;margin-bottom:4px;}
+.cat-title{font-size:16px;font-weight:800;color:#fff;}
+.cat-intro{font-size:12.5px;color:var(--muted);margin-bottom:14px;line-height:1.6;max-width:860px;}
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:10px;}
+.kpi{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;}
+.kpi .k-label{font-size:12.25px;color:var(--muted);margin-bottom:6px;}
+.kpi .k-value{font-size:19px;font-weight:800;color:#fff;word-break:break-all;}
+.btn-primary{background:var(--blue);color:#fff;border:none;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:800;cursor:pointer;}
+.btn-ghost{background:transparent;border:1px solid var(--border-strong);color:var(--text);padding:10px 16px;border-radius:8px;font-size:12.5px;font-weight:700;cursor:pointer;}
+.actions-row{display:flex;gap:10px;align-items:center;margin-bottom:8px;flex-wrap:wrap;}
+.run-line{font-size:12px;color:var(--muted);min-height:16px;}
+.lc-card{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:12px 14px;margin-bottom:8px;}
+.lc-card.lc-dim{opacity:.75;}
+.lc-top{display:flex;gap:6px;align-items:center;margin-bottom:7px;flex-wrap:wrap;}
+.lc-sig{font-size:11.5px;font-weight:800;padding:2px 7px;border-radius:5px;}
+.lc-doc{color:var(--teal);background:rgba(30,185,128,.13);}
+.lc-tool{color:var(--blue-light);background:rgba(59,130,246,.13);}
+.lc-ok{color:var(--teal);background:rgba(30,185,128,.08);}
+.lc-src{color:var(--muted);background:rgba(255,255,255,.06);}
+.lc-weak{color:#f5928a;background:rgba(226,72,61,.12);}
+.lc-q{font-size:12.5px;font-weight:700;color:#fff;margin-bottom:4px;}
+.lc-a{font-size:12.5px;color:var(--muted);line-height:1.65;}
+.lc-act{display:flex;gap:6px;margin-top:9px;}
+.lc-yes{background:var(--teal);color:#06281c;border:none;border-radius:7px;padding:6px 14px;font-size:12.5px;font-weight:800;cursor:not-allowed;opacity:.55;}
+.lc-no{background:transparent;color:var(--muted);border:1px solid var(--border-strong);border-radius:7px;padding:6px 12px;font-size:12.5px;cursor:not-allowed;opacity:.55;}
+
+/* ══ 신규: 주제별 진척 요약 띠(요청 1) — 후보함 맨 위, cat-head 바로 아래 ══
+   높이 28px(line-height) + margin-bottom 10px = 총 38px. 그 외 어떤 기존 요소의 높이도 바꾸지 않는다. */
+.topic-strip{height:28px;line-height:28px;margin:0 0 10px;display:flex;align-items:center;gap:16px;flex-wrap:nowrap;overflow:hidden;}
+.topic-seg{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 7px;border-radius:12px;border:1px solid transparent;cursor:pointer;user-select:none;flex-shrink:0;}
+.topic-seg:hover{background:rgba(255,255,255,.04);}
+.topic-seg.active{background:rgba(255,255,255,.06);}
+.tp-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0;}
+.tp-label{font-size:11.75px;font-weight:800;}
+.tp-count{font-size:11px;color:var(--muted-2);font-variant-numeric:tabular-nums;}
+.tp-bar{width:42px;height:4px;border-radius:2px;background:var(--panel-2);border:1px solid var(--border);overflow:hidden;flex-shrink:0;}
+.tp-fill{height:100%;border-radius:2px;display:block;}
+.tp-ready{font-size:10px;font-weight:800;padding:1px 6px;border-radius:5px;background:rgba(30,185,128,.18);color:var(--teal);margin-left:2px;}
+/* 주제색(제품 기존 토큰 재사용 — 새 색 없음) */
+.tp-vuln .tp-dot,.tp-vuln .tp-fill{background:var(--red);} .tp-vuln.active{border-color:rgba(226,72,61,.5);} .tp-vuln .tp-label{color:#f5928a;}
+.tp-ops .tp-dot,.tp-ops .tp-fill{background:var(--blue-light);} .tp-ops.active{border-color:rgba(59,130,246,.5);} .tp-ops .tp-label{color:var(--blue-light);}
+.tp-policy .tp-dot,.tp-policy .tp-fill{background:var(--amber);} .tp-policy.active{border-color:rgba(240,160,32,.5);} .tp-policy .tp-label{color:var(--amber);}
+.tp-threat .tp-dot,.tp-threat .tp-fill{background:var(--purple);} .tp-threat.active{border-color:rgba(139,124,240,.5);} .tp-threat .tp-label{color:var(--purple);}
+.tp-none{color:var(--muted-2);font-size:11px;margin-left:2px;flex-shrink:0;}
+.tp-none .tp-dot{background:var(--muted-2);width:5px;height:5px;display:inline-block;margin-right:5px;vertical-align:middle;}
+
+/* ══ 신규: 행 앞 주제 배지(요청 2) — 기존 .lc-sig와 완전히 같은 규격이라 lc-top 줄 높이가 안 바뀐다 ══ */
+.tp-badge{display:inline-flex;align-items:center;gap:4px;}
+.tp-badge .tp-dot{width:6px;height:6px;}
+.tp-badge.b-vuln{color:#f5928a;background:rgba(226,72,61,.12);}
+.tp-badge.b-vuln .tp-dot{background:var(--red);}
+.tp-badge.b-ops{color:var(--blue-light);background:rgba(59,130,246,.13);}
+.tp-badge.b-ops .tp-dot{background:var(--blue-light);}
+.tp-badge.b-policy{color:var(--amber);background:rgba(240,160,32,.13);}
+.tp-badge.b-policy .tp-dot{background:var(--amber);}
+.tp-badge.b-threat{color:var(--purple);background:rgba(139,124,240,.13);}
+.tp-badge.b-threat .tp-dot{background:var(--purple);}
+.tp-badge.b-none{color:var(--muted-2);background:rgba(255,255,255,.05);}
+.tp-badge.b-none .tp-dot{background:var(--muted-2);}
+
+.lc-card[data-topic]{display:block;}
+.lc-card.filtered-out{display:none;}
+</style>
+</head>
+<body>
+
+<div class="doc-h1">학습 후보함 — 주제 딱지 · 주제별 진척 (추천 시안 1개)</div>
+<p class="doc-lead">
+<span class="doc-tag">대상</span> client/src/renderer/pages/learnloop.html의 "🗳 학습 후보함" 블록(216~239행) 하나만 바꿉니다.
+<span class="doc-tag">배경</span> 주제 딱지(취약점·장비운영·사내규정·위협대응)는 이미 서버가 질문마다 코드로 붙이고 있고(server/src/engine/learnloop.ts 질문주제()),
+전문가 어댑터 학습은 <b>주제별 승인(👍) 300건</b>이 조건입니다. 지금은 그 진행 상황이 화면 어디에도 안 보여서, 담당자가
+"이 주제는 얼마나 더 승인해야 학습이 되는지" 알 방법이 없습니다. 아래는 그 상태를 한 줄로 보여주고, 문답 행마다 어느 주제인지
+바로 알아보게 하는 안입니다. 아래 실선 박스가 실제 화면 모습이고, 점선 박스는 시안 설명입니다(제품에는 안 들어갑니다).
+</p>
+
+<div class="doc-section-label">현재(AS-IS) — 비교용</div>
+<div class="screen-frame as-is">
+  <div class="cat">
+    <div class="cat-head"><span style="font-size:18px">🗳</span><span class="cat-title">학습 후보함</span></div>
+    <div class="cat-intro">쌓인 대화·작업 내역에서 배울 만한 문답을 코드가 골라 놓았습니다. 승인하면 👍로 기록되어 다음 학습에 채택됩니다.</div>
+    <div class="kpi-grid">
+      <div class="kpi"><div class="k-label">후보</div><div class="k-value">41</div></div>
+      <div class="kpi"><div class="k-label">신호 강함(3점↑)</div><div class="k-value" style="color:var(--amber)">16</div></div>
+      <div class="kpi"><div class="k-label">승인됨(👍 대기)</div><div class="k-value" style="color:var(--teal)">9</div></div>
+      <div class="kpi"><div class="k-label">지식 구멍</div><div class="k-value" style="color:var(--amber)">2</div></div>
+    </div>
+  </div>
+</div>
+<div class="doc-note">주제가 549:295:128:72로 몹시 불균형한데도, 어느 주제가 300건에 가까운지는 이 화면만 봐서는 전혀 알 수 없습니다.</div>
+
+<div class="doc-section-label">추천안(AFTER) — 실제 화면 재현</div>
+<div class="screen-frame">
+  <div class="cat">
+    <div class="cat-head"><span style="font-size:18px">🗳</span><span class="cat-title">학습 후보함</span></div>
+
+    <!-- 신규: 주제별 진척 요약 띠 (요청 1) -->
+    <div class="topic-strip" id="topicStrip">
+      <div class="topic-seg tp-vuln" data-topic="취약점"><span class="tp-dot"></span><span class="tp-label">취약점</span><span class="tp-count">22/300</span><span class="tp-bar"><span class="tp-fill" style="width:8%"></span></span></div>
+      <div class="topic-seg tp-ops active" data-topic="장비운영"><span class="tp-dot"></span><span class="tp-label">장비운영</span><span class="tp-count">14/300</span><span class="tp-bar"><span class="tp-fill" style="width:5%"></span></span></div>
+      <div class="topic-seg tp-policy" data-topic="사내규정"><span class="tp-dot"></span><span class="tp-label">사내규정</span><span class="tp-count">9/300</span><span class="tp-bar"><span class="tp-fill" style="width:3%"></span></span></div>
+      <div class="topic-seg tp-threat" data-topic="위협대응"><span class="tp-dot"></span><span class="tp-label">위협대응</span><span class="tp-count">5/300</span><span class="tp-bar"><span class="tp-fill" style="width:2%"></span></span></div>
+      <span class="tp-none"><span class="tp-dot"></span>미분류 1,095건</span>
+    </div>
+
+    <div class="cat-intro">쌓인 대화·작업 내역에서 배울 만한 문답을 코드가 골라 놓았습니다. 승인하면 👍로 기록되어 다음 학습에 채택됩니다 — 승인 없이 자동으로 학습되는 일은 없습니다.</div>
+
+    <div class="kpi-grid">
+      <div class="kpi"><div class="k-label">후보</div><div class="k-value">41</div></div>
+      <div class="kpi"><div class="k-label">신호 강함(3점↑)</div><div class="k-value" style="color:var(--amber)">16</div></div>
+      <div class="kpi"><div class="k-label">승인됨(👍 대기)</div><div class="k-value" style="color:var(--teal)">9</div></div>
+      <div class="kpi"><div class="k-label">지식 구멍</div><div class="k-value" style="color:var(--amber)">2</div></div>
+    </div>
+
+    <div class="actions-row" style="margin-top:10px">
+      <button class="btn-primary" disabled style="opacity:.55;cursor:not-allowed">신호 강한 후보 모두 승인</button>
+      <span class="run-line">(시안 — 이 버튼은 동작하지 않습니다)</span>
+    </div>
+
+    <div id="lcList">
+      <div class="lc-card" data-topic="취약점">
+        <div class="lc-top">
+          <span class="lc-sig tp-badge b-vuln"><span class="tp-dot"></span>취약점</span>
+          <span class="lc-sig lc-doc">📄 근거 인용</span>
+          <span class="lc-sig lc-src">출처: 대화 로그 08/07</span>
+        </div>
+        <div class="lc-q">Q. CVE-2026-31847 이 자산에서 조치기한이 언제까지인가요?</div>
+        <div class="lc-a">A. CVSS 9.1·KEV 등재로 우선순위 1군입니다. 스캔 결과 기준 조치기한은 7일 이내이며 현재 미조치 상태입니다.</div>
+        <div class="lc-act"><button class="lc-yes">✓ 승인 — 학습에 채택</button><button class="lc-no">✕ 제외</button></div>
+      </div>
+
+      <div class="lc-card" data-topic="장비운영">
+        <div class="lc-top">
+          <span class="lc-sig tp-badge b-ops"><span class="tp-dot"></span>장비운영</span>
+          <span class="lc-sig lc-tool">🔧 도구 성공</span>
+          <span class="lc-sig lc-ok">수용됨</span>
+          <span class="lc-sig lc-src">출처: 대화 로그 08/06</span>
+        </div>
+        <div class="lc-q">Q. 코어 스위치 펌웨어 업데이트는 몇 개월 주기로 하나요?</div>
+        <div class="lc-a">A. 제조사 매뉴얼 기준 분기 점검이며, 보안 패치가 나오면 별도 유지보수 창에서 즉시 적용합니다.</div>
+        <div class="lc-act"><button class="lc-yes">✓ 승인 — 학습에 채택</button><button class="lc-no">✕ 제외</button></div>
+      </div>
+
+      <div class="lc-card lc-dim" data-topic="장비운영">
+        <div class="lc-top">
+          <span class="lc-sig tp-badge b-ops"><span class="tp-dot"></span>장비운영</span>
+          <span class="lc-sig lc-src">출처: 작업 내역 08/05</span>
+          <span class="lc-sig lc-weak">신호 약함</span>
+        </div>
+        <div class="lc-q">Q. 방화벽 룰셋 백업은 어디서 확인하나요?</div>
+        <div class="lc-a">A. IPS/방화벽 관리 화면의 '룰셋 이력'에서 최근 30일 백업본을 내려받을 수 있습니다.</div>
+        <div class="lc-act"><button class="lc-yes">✓ 승인 — 학습에 채택</button><button class="lc-no">✕ 제외</button></div>
+      </div>
+
+      <div class="lc-card" data-topic="사내규정">
+        <div class="lc-top">
+          <span class="lc-sig tp-badge b-policy"><span class="tp-dot"></span>사내규정</span>
+          <span class="lc-sig lc-doc">📄 근거 인용</span>
+          <span class="lc-sig lc-src">출처: 대화 로그 08/07</span>
+        </div>
+        <div class="lc-q">Q. 외장하드로 로그 반출해도 되나요, 승인 절차가 어떻게 되죠?</div>
+        <div class="lc-a">A. 사내 지침상 반출은 정보보안팀 승인 후에만 가능하며, 보관 기간 준수 여부도 함께 확인합니다.</div>
+        <div class="lc-act"><button class="lc-yes">✓ 승인 — 학습에 채택</button><button class="lc-no">✕ 제외</button></div>
+      </div>
+
+      <div class="lc-card" data-topic="위협대응">
+        <div class="lc-top">
+          <span class="lc-sig tp-badge b-threat"><span class="tp-dot"></span>위협대응</span>
+          <span class="lc-sig lc-tool">🔧 도구 성공</span>
+          <span class="lc-sig lc-src">출처: 대화 로그 08/08</span>
+        </div>
+        <div class="lc-q">Q. 피싱 메일 신고가 들어왔는데 대응 절차가 어떻게 되나요?</div>
+        <div class="lc-a">A. IOC를 추출해 차단 목록에 등록하고, 동일 발신 도메인의 위협 인텔 조회 후 탐지 룰을 갱신합니다.</div>
+        <div class="lc-act"><button class="lc-yes">✓ 승인 — 학습에 채택</button><button class="lc-no">✕ 제외</button></div>
+      </div>
+
+      <div class="lc-card lc-dim" data-topic="미분류">
+        <div class="lc-top">
+          <span class="lc-sig tp-badge b-none"><span class="tp-dot"></span>미분류</span>
+          <span class="lc-sig lc-src">출처: 대화 로그 08/06</span>
+          <span class="lc-sig lc-weak">신호 약함</span>
+        </div>
+        <div class="lc-q">Q. 이거 왜 이렇게 표시되는 거예요?</div>
+        <div class="lc-a">A. 화면에 보이는 상태값은 최근 갱신 시각 기준입니다. 새로고침하면 최신값으로 바뀝니다.</div>
+        <div class="lc-act"><button class="lc-yes">✓ 승인 — 학습에 채택</button><button class="lc-no">✕ 제외</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="doc-note">
+<b>주제 칩은 실제로 눌립니다</b>(요청 3: "칩 클릭 시 그 주제만 보이는 모습"의 실물 예시로, 위 요약 띠에서 어떤 주제든 눌러 보세요 — 지금은 "장비운영"이 선택된 초기 상태라 2건만 보이고, 나머지는 사라져 있습니다.
+같은 칩을 다시 누르면 전체 보기로 돌아갑니다. 승인/제외 버튼은 서버 호출이 필요해 이 시안에서는 눌러도 반응하지 않습니다(위에 표기됨).
+</div>
+
+<div class="doc-section-label">참고 — 300건 도달 시 모습(현재 실측에는 없는 상태라 별도 예시)</div>
+<div class="topic-strip" style="height:auto;margin:0">
+  <div class="topic-seg tp-ops active" style="cursor:default"><span class="tp-dot"></span><span class="tp-label">장비운영</span><span class="tp-count">300/300</span><span class="tp-bar"><span class="tp-fill" style="width:100%"></span></span><span class="tp-ready">✓ 학습 가능</span></div>
+</div>
+
+<div class="doc-section-label">왜 이 배치인가</div>
+<div class="doc-note" style="max-width:900px">
+1. 요약 띠를 <b>cat-head 바로 아래</b>(cat-intro보다 위)에 둔 것은, 이 섹션을 열자마자 "지금 어느 주제가 300에 가까운가"부터 보여야
+승인 우선순위를 바로 정할 수 있기 때문입니다 — 설명 문장(cat-intro)보다 상태가 먼저입니다.<br>
+2. 행 배지는 새 규격을 만들지 않고 <b>기존 .lc-sig 칩과 완전히 같은 padding·font-size</b>를 재사용했습니다 — 그래서 문답 행(lc-top) 줄의
+높이가 1px도 늘지 않습니다(아래 세로 비용 참고).<br>
+3. 사내규정 배지는 제품에 순수 노랑 토큰이 없어 <b>기존 --amber를 재사용</b>했습니다 — 새 색을 만들지 않는다는 원칙을 지키되, 색이
+겹치는 곳(신호 강함 배지)이 있다는 점은 결정 시 참고해 주세요. 원하시면 --amber 대신 텍스트 라벨만으로 구분하는 대안도 가능합니다.
+</div>
+
+<script>
+  // 주제 칩 클릭 → 후보 목록 필터(실제로 동작 — 이 시안 안에서만).
+  var strip = document.getElementById("topicStrip");
+  var cards = document.querySelectorAll("#lcList .lc-card");
+  function applyFilter(topic) {
+    cards.forEach(function (c) {
+      c.classList.toggle("filtered-out", !!topic && c.dataset.topic !== topic);
+    });
+  }
+  applyFilter("장비운영"); // 초기 상태 = 선택 예시(요청 3)
+  strip.querySelectorAll(".topic-seg").forEach(function (seg) {
+    seg.addEventListener("click", function () {
+      var isActive = seg.classList.contains("active");
+      strip.querySelectorAll(".topic-seg").forEach(function (s) { s.classList.remove("active"); });
+      if (isActive) { applyFilter(null); return; }
+      seg.classList.add("active");
+      applyFilter(seg.dataset.topic);
+    });
+  });
+</script>
+
+</body>
+</html>

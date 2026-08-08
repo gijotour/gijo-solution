@@ -506,12 +506,20 @@
 
   $("tbCloseAll").addEventListener("click", closeAll);
 
-  // ── 대화창 자리: 넓으면 옆(세로 패널), 좁으면 아래 ──────────────────────
-  // 사용자 결정(2026-08-01, 시안 ③): **창 너비**로 자동 전환하되 담당자가 언제든 바꾼다.
-  // 신호를 창 너비 하나로 둔 이유 — 모니터 방향을 따로 물으면 세로 모니터(1080 폭)가
-  // "세로니까 옆으로"라는 엉뚱한 판단을 받는다. 폭만 보면 그 경우 자연히 아래로 남는다.
+  // ── 대화창 자리: **오른쪽이 기본** ──────────────────────────────────────
+  // 사용자 결정(2026-08-09): "아래는 쓰지 말자 — 대화 쓸 공간이 없다. 오른쪽에 붙는 걸 기본으로."
+  //   아래에 붙이면 높이가 얼마 안 남아 몇 줄 쓰면 화면이 꽉 찬다. 옆에 세우면 세로를 다 쓴다.
+  //   (그전 규칙은 창 너비 1600 이상일 때만 옆이었다 — 그래서 넓지 않은 창에서는 늘 아래였다.)
+  // 버튼은 그대로 둔다 — 좁은 화면에서 아래가 나은 사람은 언제든 바꾼다. 다만 **기본이 옆**이다.
   var SIDE_KEY = "gijo:console:side"; // "auto" | "side" | "dock"
-  var SIDE_MIN = 1600;
+  // 예전에 아래로 굳어 있던 설정을 한 번만 풀어 준다(담당자가 이 결정 뒤에 고른 값은 그대로 둔다).
+  var SIDE_MIGRATED = "gijo:console:side:v2";
+  try {
+    if (!localStorage.getItem(SIDE_MIGRATED)) {
+      if (localStorage.getItem(SIDE_KEY) === "dock") localStorage.removeItem(SIDE_KEY);
+      localStorage.setItem(SIDE_MIGRATED, "1");
+    }
+  } catch (e) {}
   function 자리모드() {
     try { return localStorage.getItem(SIDE_KEY) || "auto"; } catch (e) { return "auto"; }
   }
@@ -519,7 +527,7 @@
     var m = 자리모드();
     if (m === "side") return true;
     if (m === "dock") return false;
-    return window.innerWidth >= SIDE_MIN;
+    return true; // auto = 오른쪽(기본)
   }
   function 자리적용() {
     var 옆 = 옆에둘까();

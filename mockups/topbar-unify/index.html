@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>GIJO AS 시안 — 상단 바 통합 (topbar-unify)</title>
+<!--
+  ════════════════════════════════════════════════════════════════════════
+  topbar-unify — 「세부 메뉴 이동 시 상단 깨짐」 수정 시안 (추천 1개 원칙)
+  ════════════════════════════════════════════════════════════════════════
+  이 파일은 mockups/topbar-unify/index.html — 결정을 받기 위한 그림이다.
+  제품 코드(client/, server/)는 전혀 건드리지 않았다. 자체완결 HTML(외부 CDN·웹폰트·
+  원격 이미지 없음) — 더블클릭으로 바로 열린다.
+
+  ── 설계 전 조사 (근거) ──────────────────────────────────────────────────
+  1) 브레드크럼(경로 표시) — 계층형 트레일이 최선이며, 가장 오른쪽 마디는 반드시
+     "지금 보는 화면"과 정확히 일치해야 한다는 것이 정설이다. 사이트 구조와 어긋나면
+     오히려 혼란을 준다.
+     참고: HubSpot "9 Breadcrumb Tips to Make Your Site Easier to Navigate"
+           (blog.hubspot.com/marketing/navigation-breadcrumbs),
+           gazhall.com "Breadcrumb Navigation: Best Practices"
+     → 이 시안의 핵심 결정: 경로를 "따로 계산"하지 않고 **활성 탭에서 그대로 도출**한다.
+       두 값을 따로 갱신하면 반드시 어긋나는 순간이 생긴다(아래 실측이 바로 그 증거).
+
+  2) 탭줄을 창 조작줄에 합쳐 세로 공간을 되찾는 패턴은 이미 브라우저가 검증했다.
+     Internet Explorer 9가 처음으로 탭을 타이틀바 안에 넣어 페이지에 세로를 돌려줬고,
+     Microsoft Edge는 세로 탭을 쓸 때 상단 타이틀바 자체를 숨기는 옵션까지 제공한다
+     — "제목줄 한 줄 + 탭 전용 줄"을 유지할 이유가 없다는 뜻이다.
+     참고: pureinfotech.com "How to (force) enable Vertical Tabs on Chrome for Windows 11",
+           positioniseverything.net "Hide Title Bar with Vertical Tabs in Microsoft Edge",
+           windowslatest.com "Microsoft Edge now lets you stack tabs vertically without title bar"
+
+  3) Windows 앱 타이틀바 디자인 가이드 — 기본 32px, "상호작용 가능한 콘텐츠"를 얹을 때는
+     더 큰(Tall) 옵션을 쓰라고 권장한다.
+     참고: Microsoft Learn "Windows app title bar" (learn.microsoft.com/windows/apps/design/basics/titlebar-design)
+     → 우리 제품 탭줄의 기존 실측 높이(44px)가 이미 이 "상호작용 줄" 범위에 있다.
+       그래서 **새 높이를 만들지 않고, 기존 탭줄 높이를 그대로 승격**시켜 조작줄 역할까지 얹는다.
+
+  ── 실측/코드 근거 (2026-08-07, 제품 코드 읽기 전용 확인) ──────────────────
+   - client/src/renderer/pages/app.html:26  #shellHeader{min-height:46px}
+   - client/src/renderer/pages/app.html:50  .tabbar{...}  (실측 44px)
+   - client/src/renderer/pages/titlebar.js:9-11
+       window.top!==window 이거나 ?embed=1 이면 **아무 일도 하지 않는다**(no-op) —
+       화면(iframe) 안에서는 시계·상태·세션을 셸로 옮기는 로직 자체가 안 돈다.
+   - client/src/renderer/pages/nav.js:1167
+       .header{display:none!important}#gijoNav{display:none!important} — 임베드에서
+       **감추기만** 한다. 마크업·CSS·JS(시계 tick, 상태 폴링)는 그대로 남는다.
+   - grep class="header" → client/src/renderer/pages/*.html 24개 파일에서 검출.
+       셸(app.html) 1개를 빼면 **23개 화면이 각자 자기 .header를 갖고 있다**(중복).
+       문구조차 갈라져 있다 — dashboard.html·approvals.html은 "서버 연결상태 양호/불량",
+       analysis·agent·audit·compliance·hardening·inventory·kpi·learnloop·memory 등은
+       "운영중"/"서버 연결 끊김". 한 곳으로 모으지 않으면 이런 말 갈라짐이 계속 생긴다.
+   - client/src/renderer/pages/titlebar.js:339, 345
+       탭을 누르면 setCtx(t.label)과 gijoNoteScreen(t.page,t.label)이 **두 곳에서 따로**
+       "지금 화면"을 갱신한다 — 하나가 늦거나 빠지면 경로 표시가 이전 화면에 멈춘다.
+       (2026-08-07 사용자 실측 재현: 대시보드를 보는데 상단엔 「설정 › 시스템 로그」)
+
+  ⚠ 이 문서 자체는 셸 조작줄이 아니라 **결정을 위한 설명 문서**라 설명 글이 있다.
+    아래 실제로 재현한 상단 바 컴포넌트 안에는 문구를 넣지 않았다 — 아이콘·툴팁·라벨뿐이다
+    (화면엔 정체성 한 줄과 경고만, 사용법은 챗봇이라는 제품 원칙을 조작줄에도 지켰다).
+  ════════════════════════════════════════════════════════════════════════
+-->
+<style>
+  :root{
+    --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);--border-strong:rgba(255,255,255,0.16);
+    --blue:#3b82f6;--blue-light:#5fa1ff;--text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--teal:#1eb980;--red:#e2483d;--amber:#f0a020;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{background:#18181694;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:#1a1a19;color:var(--text);font-size:13px;line-height:1.55;padding:28px 0 60px;}
+  .wrap{max-width:1680px;margin:0 auto;padding:0 24px;}
+
+  /* ── 문서 머리 ───────────────────────────────────────────────────── */
+  .doc-head{margin-bottom:22px;}
+  .doc-head h1{font-size:19px;font-weight:800;color:#fff;letter-spacing:-.2px;}
+  .doc-head .sub{margin-top:6px;font-size:12.5px;color:var(--muted);max-width:920px;}
+  .doc-head .tag{display:inline-flex;align-items:center;gap:5px;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);
+    color:var(--blue-light);font-size:11.5px;font-weight:800;padding:2px 8px;border-radius:12px;margin-right:6px;}
+
+  section.panel{background:var(--panel);border:1px solid var(--border);border-radius:14px;padding:18px 20px;margin-bottom:18px;}
+  section.panel h2{font-size:14px;font-weight:800;color:#fff;margin-bottom:4px;display:flex;align-items:center;gap:8px;}
+  section.panel .desc{font-size:12.25px;color:var(--muted);margin-bottom:14px;max-width:1000px;}
+  .num{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;
+    background:rgba(59,130,246,.18);color:var(--blue-light);font-size:11.5px;font-weight:800;flex:0 0 auto;}
+
+  /* ── 실측 근거 리스트 ────────────────────────────────────────────── */
+  .evid{list-style:none;font-size:12px;color:var(--muted);margin:8px 0 4px;}
+  .evid li{padding:4px 0 4px 16px;position:relative;border-top:1px solid rgba(255,255,255,.05);}
+  .evid li:first-child{border-top:none;}
+  .evid li::before{content:"›";position:absolute;left:0;color:var(--blue-light);font-weight:800;}
+  .evid code{background:#141312;border:1px solid var(--border);border-radius:4px;padding:1px 5px;font-size:11.25px;color:#cfe0ff;}
+
+  /* ══ 상단 바 재현 공용 부품 (실제 색·글꼴·크기를 그대로 복제) ══════════ */
+  .demo{width:1600px;max-width:100%;overflow-x:auto;border:1px solid var(--border-strong);border-radius:10px;background:var(--bg);}
+  .demo-cap{font-size:11.25px;color:var(--muted-2);padding:6px 10px 0;}
+
+  .tb-row{height:44px;min-height:44px;display:flex;align-items:center;gap:3px;background:var(--panel-2);
+    border-bottom:1px solid var(--border);padding:0 10px;position:relative;}
+  .tb-ib{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;color:var(--muted);
+    background:none;border:1px solid transparent;flex:0 0 auto;cursor:default;}
+  .tb-ib svg{width:16px;height:16px;stroke:currentColor;stroke-width:1.8;fill:none;stroke-linecap:round;stroke-linejoin:round;}
+  .tb-ib[data-off]{opacity:.32;}
+  .tb-vr{width:1px;height:20px;background:var(--border);margin:0 5px;flex:0 0 auto;}
+
+  .tb-path{display:flex;align-items:center;gap:6px;flex:0 0 auto;padding-right:10px;white-space:nowrap;}
+  .tb-path .g{font-size:12px;color:var(--muted-2);}
+  .tb-path .n{font-size:13px;font-weight:800;color:var(--text);}
+  .tb-path.stale{outline:1px dashed var(--red);outline-offset:3px;border-radius:6px;}
+
+  .tb-tabs{display:flex;align-items:flex-end;gap:2px;height:100%;overflow-x:auto;flex:0 1 auto;min-width:0;}
+  .tb-tab{display:flex;align-items:center;gap:6px;padding:7px 10px 7px 11px;border-radius:8px 8px 0 0;font-size:12.25px;font-weight:600;
+    color:var(--muted);white-space:nowrap;border:1px solid transparent;border-bottom:none;flex:0 0 auto;height:31px;}
+  .tb-tab.on{color:#fff;background:var(--bg);border-color:var(--border);font-weight:700;}
+  .tb-tab .x{opacity:.6;font-size:11px;color:var(--muted-2);}
+
+  .tb-spacer{flex:1 1 auto;}
+
+  .tb-act{display:flex;align-items:center;gap:4px;flex:0 0 auto;}
+  .tb-btn{font-size:11.75px;font-weight:700;color:var(--muted);background:transparent;border:1px solid var(--border);
+    border-radius:7px;padding:4px 8px;white-space:nowrap;}
+
+  .tb-clock{font-size:11.75px;color:var(--blue-light);font-weight:600;white-space:nowrap;flex:0 0 auto;padding:0 4px;}
+  .tb-status{display:flex;align-items:center;gap:5px;background:rgba(30,185,128,.15);border:1px solid rgba(30,185,128,.4);
+    color:var(--teal);padding:4px 10px;border-radius:14px;font-size:11.5px;font-weight:800;flex:0 0 auto;white-space:nowrap;}
+  .tb-status .dot{width:6px;height:6px;border-radius:50%;background:var(--teal);}
+  .tb-sess{display:flex;align-items:center;gap:4px;background:rgba(30,185,128,.14);border:1px solid rgba(30,185,128,.4);
+    color:var(--teal);padding:4px 9px;border-radius:14px;font-size:11.5px;font-weight:800;flex:0 0 auto;white-space:nowrap;}
+
+  .tb-os{flex:0 0 auto;display:flex;align-items:center;gap:3px;padding:3px 8px;margin-left:4px;border:1px dashed var(--border-strong);
+    border-radius:7px;color:var(--muted-2);font-size:11px;}
+
+  .content-peek{height:38px;display:flex;align-items:center;gap:16px;padding:0 16px;background:var(--bg);
+    border-bottom:1px dashed var(--border);font-size:11.75px;color:var(--muted-2);}
+  .content-peek b{color:var(--muted);font-weight:700;}
+
+  .callout{display:flex;align-items:flex-start;gap:8px;background:rgba(226,72,61,.1);border:1px solid rgba(226,72,61,.35);
+    border-radius:9px;padding:9px 12px;font-size:12px;color:#f5928a;margin-top:10px;}
+  .callout.ok{background:rgba(30,185,128,.1);border-color:rgba(30,185,128,.35);color:#8fe4c4;}
+  .callout b{color:#fff;}
+
+  .strike-wrap{position:relative;width:640px;max-width:100%;border:1px solid var(--border-strong);border-radius:10px;overflow:hidden;opacity:.62;}
+  .strike-wrap .ribbon{position:absolute;top:10px;right:-38px;background:var(--red);color:#fff;font-size:11px;font-weight:800;
+    padding:3px 46px;transform:rotate(35deg);box-shadow:0 4px 10px rgba(0,0,0,.4);z-index:2;}
+  .old-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:var(--panel-2);height:50px;}
+  .old-header .l{display:flex;align-items:center;gap:10px;}
+  .old-logo{width:20px;height:20px;border-radius:5px;background:linear-gradient(135deg,var(--blue),var(--teal));
+    display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;color:#0c0c0b;}
+  .old-title{font-size:13.5px;font-weight:800;color:#fff;}
+  .old-clock{font-size:11px;color:var(--blue-light);}
+  .old-header .r{display:flex;align-items:center;gap:8px;}
+  .old-pill{display:flex;align-items:center;gap:5px;background:rgba(30,185,128,.15);border:1px solid rgba(30,185,128,.4);
+    color:var(--teal);padding:3px 9px;border-radius:12px;font-size:10.75px;font-weight:800;}
+  .old-avatar{width:22px;height:22px;border-radius:50%;background:var(--blue);}
+  .old-gear{width:22px;height:22px;border-radius:6px;background:var(--panel);border:1px solid var(--border);}
+  .file-list{font-size:11.25px;color:var(--muted-2);line-height:1.9;margin-top:8px;}
+  .file-list code{background:#141312;border:1px solid var(--border);border-radius:4px;padding:0 4px;margin:0 1px;color:#cfa9a5;}
+
+  table.pxtable{border-collapse:collapse;width:100%;max-width:640px;font-size:12.5px;margin-top:6px;}
+  table.pxtable th,table.pxtable td{border:1px solid var(--border);padding:8px 12px;text-align:left;}
+  table.pxtable th{background:var(--panel-2);color:var(--muted-2);font-size:11.5px;font-weight:800;}
+  table.pxtable td b{color:#fff;}
+  table.pxtable .now{color:#f5928a;}
+  table.pxtable .prop{color:#8fe4c4;}
+  table.pxtable tr.sum td{background:rgba(59,130,246,.08);font-weight:800;}
+
+  .barviz{display:flex;align-items:flex-end;gap:22px;margin-top:14px;height:130px;}
+  .bv{display:flex;flex-direction:column;align-items:center;gap:6px;width:120px;}
+  .bv .stack{width:64px;display:flex;flex-direction:column-reverse;border-radius:4px;overflow:hidden;}
+  .bv .seg{width:100%;display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:800;color:#0c0c0b;}
+  .bv .lbl{font-size:11.5px;color:var(--muted);font-weight:700;text-align:center;}
+  .bv .lbl small{display:block;font-weight:500;color:var(--muted-2);font-size:10.5px;}
+  .arrow-save{display:flex;align-items:center;font-size:12px;color:var(--muted-2);}
+
+  footer.why{background:linear-gradient(180deg,rgba(59,130,246,.08),transparent);border:1px solid var(--border);
+    border-radius:14px;padding:18px 20px;}
+  footer.why h2{font-size:14px;font-weight:800;color:#fff;margin-bottom:10px;}
+  footer.why ol{margin-left:18px;font-size:12.5px;color:var(--text);line-height:1.9;}
+  footer.why .src{margin-top:14px;padding-top:12px;border-top:1px solid var(--border);font-size:11.25px;color:var(--muted-2);line-height:1.9;}
+  footer.why .src b{color:var(--muted);}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="doc-head">
+    <h1>세부 메뉴 이동 시 상단 깨짐 — 상단 바 통합 시안</h1>
+    <p class="sub">
+      <span class="tag">추천 1개</span>
+      <span class="tag">mockups/topbar-unify</span>
+      셸(app.html)과 화면(iframe)이 각자 갖고 있던 상단 바를 <b style="color:#fff">셸 하나</b>로 합친다.
+      경로 표시는 별도로 계산하지 않고 <b style="color:#fff">활성 탭에서 그대로 읽는다</b> — 그래야 어긋날 수가 없다.
+    </p>
+  </div>
+
+  <!-- ══ 1. 지금 구조 — 문제 재현 ══════════════════════════════════════ -->
+  <section class="panel">
+    <h2><span class="num">1</span>지금 구조 — 재현된 문제(2026-08-07 실측)</h2>
+    <p class="desc">셸 상단 조작줄(46px)과 탭줄(44px)이 따로 있고, 경로 표시는 조작줄 쪽에서 별도 함수로 갱신된다.
+      탭을 누르면 <code style="font-size:11px">setCtx()</code>와 <code style="font-size:11px">gijoNoteScreen()</code> 두 곳이 각각 "지금 화면"을 갱신하는데,
+      아래는 그중 하나가 늦어 경로가 이전 화면에 멈춘 상태를 그대로 재현한 것이다.</p>
+
+    <div class="demo">
+      <div class="demo-cap">#shellHeader (app.html) · 실측 46px</div>
+      <div class="tb-row" style="height:46px;">
+        <div class="tb-ib"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg></div>
+        <div class="tb-ib"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg></div>
+        <div class="tb-ib"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></div>
+        <div class="tb-vr"></div>
+        <div class="tb-ib"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></div>
+        <div class="tb-ib" data-off><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+        <div class="tb-vr"></div>
+        <div class="tb-path stale"><span class="g">설정 ›</span><span class="n">시스템 로그</span></div>
+        <div class="tb-spacer"></div>
+        <div style="font-size:11px;color:var(--muted-2);border:1px dashed var(--border-strong);border-radius:7px;padding:4px 10px;">
+          시계 없음 · 서버 연결상태 없음 — 코드에 0건
+        </div>
+      </div>
+      <div class="demo-cap" style="padding-bottom:6px;">.tabbar (app.html) · 실측 44px</div>
+      <div class="tb-row">
+        <div class="tb-tabs">
+          <div class="tb-tab on">대시보드</div>
+          <div class="tb-tab">취약점 <span class="x">✕</span></div>
+          <div class="tb-tab">시스템 로그 <span class="x">✕</span></div>
+        </div>
+        <div class="tb-spacer"></div>
+        <div class="tb-act">
+          <div class="tb-btn">⧉ 창으로</div>
+          <div class="tb-btn">모두 닫기</div>
+          <div class="tb-btn">▥ 옆으로</div>
+          <div class="tb-btn">🗔 창</div>
+        </div>
+      </div>
+    </div>
+    <div class="callout">
+      ⚠ <span><b>대시보드</b> 탭이 활성(굵게 강조)인데, 바로 위 경로 표시는 <b>「설정 › 시스템 로그」</b>(이전 화면 것)로 남아 있다.
+      두 줄이 서로 다른 함수·다른 시점에 갱신되기 때문에 생기는 불일치다.</span>
+    </div>
+  </section>
+
+  <!-- ══ 2. 제안 ══════════════════════════════════════════════════════ -->
+  <section class="panel">
+    <h2><span class="num">2</span>제안 — 상단 바 하나로 통합(전체 44px)</h2>
+    <p class="desc">조작줄과 탭줄을 <b style="color:#fff">한 줄</b>로 합친다. 경로 표시는 활성 탭에서 그대로 읽으므로 별도로 갱신할 대상이 없다 —
+      탭이 곧 경로다. 시계·서버 연결상태·세션은 화면(iframe)마다 있던 것을 여기 하나로 모은다.
+      아래는 <b style="color:#fff">같은 상단 바</b>로 두 화면을 오간 예시다(탭 전환 외 아무것도 손대지 않았다).</p>
+
+    <div class="demo-cap" style="padding-top:2px;">예시 1 — 대시보드 탭 클릭 직후</div>
+    <div class="demo">
+      <div class="tb-row">
+        <div class="tb-ib" title="설정 — 배율·전체화면·서버·업데이트"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg></div>
+        <div class="tb-ib" title="왼쪽 메뉴 접기 (Ctrl+B)"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg></div>
+        <div class="tb-ib" title="화면 찾기 (Ctrl+K)"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></div>
+        <div class="tb-vr"></div>
+        <div class="tb-ib" title="뒤로 (Alt+←)"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></div>
+        <div class="tb-ib" data-off title="앞으로 (Alt+→)"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+        <div class="tb-vr"></div>
+        <div class="tb-path"><span class="n">대시보드</span></div>
+        <div class="tb-tabs">
+          <div class="tb-tab on">대시보드</div>
+          <div class="tb-tab">취약점 <span class="x">✕</span></div>
+          <div class="tb-tab">시스템 로그 <span class="x">✕</span></div>
+        </div>
+        <div class="tb-spacer"></div>
+        <div class="tb-act">
+          <div class="tb-btn" title="지금 탭을 별도 창으로 빼냅니다 — 두 화면을 나란히 볼 때">⧉ 창으로</div>
+          <div class="tb-btn" title="고정하지 않은 탭을 모두 닫습니다">모두 닫기</div>
+          <div class="tb-btn" title="대화창 자리를 바꿉니다">▥ 옆으로</div>
+          <div class="tb-btn" title="열려 있는 창 목록">🗔 창</div>
+        </div>
+        <div class="tb-vr"></div>
+        <div class="tb-clock">2026. 08. 07. 오후 2:15</div>
+        <div class="tb-status"><span class="dot"></span>서버 연결상태 양호</div>
+        <div class="tb-sess" title="남은 세션 시간 — 클릭하면 연장/관제 선택">⏳ 세션 27:00 ▾</div>
+        <div class="tb-os">─ ▢ ✕</div>
+      </div>
+      <div class="content-peek">🔥 <b>급한 것</b> 12 · ☑ <b>오늘 할 일</b> 5 · 📊 <b>한눈에</b> — 자산 57대 · 위험 3건</div>
+    </div>
+
+    <div class="demo-cap" style="padding-top:14px;">예시 2 — 같은 상단 바에서 「취약점」 탭 클릭 후</div>
+    <div class="demo">
+      <div class="tb-row">
+        <div class="tb-ib" title="설정 — 배율·전체화면·서버·업데이트"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19.4 15a1.6 1.6 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.6 1.6 0 0 0-1.8-.3 1.6 1.6 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1A1.6 1.6 0 0 0 9 19.4a1.6 1.6 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.6 1.6 0 0 0 .3-1.8 1.6 1.6 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1A1.6 1.6 0 0 0 4.6 9a1.6 1.6 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.6 1.6 0 0 0 1.8.3H9a1.6 1.6 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.6 1.6 0 0 0 1 1.5 1.6 1.6 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.6 1.6 0 0 0-.3 1.8V9a1.6 1.6 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.6 1.6 0 0 0-1.5 1z"/></svg></div>
+        <div class="tb-ib" title="왼쪽 메뉴 접기 (Ctrl+B)"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16"/></svg></div>
+        <div class="tb-ib" title="화면 찾기 (Ctrl+K)"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg></div>
+        <div class="tb-vr"></div>
+        <div class="tb-ib" title="뒤로 (Alt+←)"><svg viewBox="0 0 24 24"><path d="M19 12H5M11 6l-6 6 6 6"/></svg></div>
+        <div class="tb-ib" title="앞으로 (Alt+→)"><svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+        <div class="tb-vr"></div>
+        <div class="tb-path"><span class="g">② 우선순위 ›</span><span class="n">취약점</span></div>
+        <div class="tb-tabs">
+          <div class="tb-tab">대시보드</div>
+          <div class="tb-tab on">취약점 <span class="x">✕</span></div>
+          <div class="tb-tab">시스템 로그 <span class="x">✕</span></div>
+        </div>
+        <div class="tb-spacer"></div>
+        <div class="tb-act">
+          <div class="tb-btn" title="지금 탭을 별도 창으로 빼냅니다 — 두 화면을 나란히 볼 때">⧉ 창으로</div>
+          <div class="tb-btn" title="고정하지 않은 탭을 모두 닫습니다">모두 닫기</div>
+          <div class="tb-btn" title="대화창 자리를 바꿉니다">▥ 옆으로</div>
+          <div class="tb-btn" title="열려 있는 창 목록">🗔 창</div>
+        </div>
+        <div class="tb-vr"></div>
+        <div class="tb-clock">2026. 08. 07. 오후 2:16</div>
+        <div class="tb-status"><span class="dot"></span>서버 연결상태 양호</div>
+        <div class="tb-sess" title="남은 세션 시간 — 클릭하면 연장/관제 선택">⏳ 세션 26:41 ▾</div>
+        <div class="tb-os">─ ▢ ✕</div>
+      </div>
+      <div class="content-peek">🎯 <b>취약점 132건</b> · 심각 4 · 높음 21 · 미조치 57 — 자산 57대 기준</div>
+    </div>
+    <div class="callout ok">
+      ✓ <span>경로("② 우선순위 › 취약점")와 활성 탭이 <b>같은 렌더에서</b> 나온다 — 탭 목록(nav.js GROUPS)에 이미 있는
+      그룹명·라벨을 그대로 읽을 뿐, 별도로 저장·동기화하는 상태가 없다. 그래서 어긋날 방법이 없다.</span>
+    </div>
+  </section>
+
+  <!-- ══ 3. 화면 안 헤더 제거 ══════════════════════════════════════════ -->
+  <section class="panel">
+    <h2><span class="num">3</span>화면(iframe) 안 헤더 — 제거</h2>
+    <p class="desc">지금은 nav.js가 <code style="font-size:11px">.header{display:none}</code>로 <b style="color:#fff">감추기만</b> 한다 —
+      마크업·CSS·시계 tick·상태 폴링 JS는 23개 화면 파일에 그대로 남아 있다. 통합 후엔 <b style="color:#fff">코드에서 완전히 삭제</b>한다(감추는 게 아니라 지운다).</p>
+    <div class="strike-wrap">
+      <div class="ribbon">삭제 대상</div>
+      <div class="old-header">
+        <div class="l">
+          <div class="old-logo">G</div>
+          <div class="old-title">GIJO AS</div>
+          <div class="old-clock">2026. 08. 07. 오후 2:15</div>
+        </div>
+        <div class="r">
+          <div class="old-pill"><span style="width:5px;height:5px;border-radius:50%;background:var(--teal)"></span>서버 연결상태 양호<span style="background:var(--teal);color:#06281c;font-size:9px;font-weight:800;padding:1px 4px;border-radius:3px;">LIVE</span></div>
+          <div class="old-avatar"></div>
+          <div class="old-gear"></div>
+        </div>
+      </div>
+    </div>
+    <div class="file-list">
+      grep <code>class="header"</code> → client/src/renderer/pages/*.html <b style="color:#fff">24개</b> 검출, 셸(app.html) 제외 <b style="color:#fff">23개 화면</b>이 각자 보유:<br>
+      <code>dashboard</code><code>approvals</code><code>analysis</code><code>agent</code><code>audit</code><code>compliance</code><code>handover</code>
+      <code>hardening</code><code>inventory</code><code>kpi</code><code>learnloop</code><code>memory</code><code>merge</code><code>products</code>
+      <code>redteam</code><code>report</code><code>sbom</code><code>sessions</code><code>settings</code><code>syslog</code><code>terminal</code>
+      <code>threat</code><code>vulnscan</code>
+    </div>
+  </section>
+
+  <!-- ══ 4. 세로 픽셀 ════════════════════════════════════════════════ -->
+  <section class="panel">
+    <h2><span class="num">4</span>세로 픽셀 — 지금 vs 제안 (숫자)</h2>
+    <p class="desc">밀도 우선 원칙에 따른 절감치. 하단 고정바(.shellfoot 34px)·대화창 도킹(190px)은 이번 시안 범위 밖(그대로 유지).</p>
+    <table class="pxtable">
+      <tr><th>구간</th><th>지금</th><th>제안</th><th>비고</th></tr>
+      <tr><td>#shellHeader (조작줄)</td><td class="now"><b>46px</b></td><td class="prop"><b>0px</b></td><td>탭줄에 흡수 — 별도 줄 없음</td></tr>
+      <tr><td>.tabbar (탭줄)</td><td class="now"><b>44px</b></td><td class="prop"><b>44px</b></td><td>그대로, 내용만 확장(경로·시계·상태·세션)</td></tr>
+      <tr class="sum"><td>합계(화면 위 고정 chrome)</td><td class="now"><b>90px</b></td><td class="prop"><b>44px</b></td><td><b style="color:#8fe4c4">−46px 절감 (51.1%)</b></td></tr>
+    </table>
+
+    <div class="barviz">
+      <div class="bv">
+        <div class="stack" style="height:100px;">
+          <div class="seg" style="height:44px;background:#5b5a55;">.tabbar 44px</div>
+          <div class="seg" style="height:46px;background:#8a5a56;color:#fff;">헤더 46px</div>
+        </div>
+        <div class="lbl">지금<small>90px</small></div>
+      </div>
+      <div class="arrow-save">→<br><span style="color:#8fe4c4;font-weight:800;">−46px</span></div>
+      <div class="bv">
+        <div class="stack" style="height:44px;">
+          <div class="seg" style="height:44px;background:#3f7a63;">통합줄 44px</div>
+        </div>
+        <div class="lbl">제안<small>44px</small></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══ 왜 이 배치인가 ════════════════════════════════════════════════ -->
+  <footer class="why">
+    <h2>왜 이 배치인가</h2>
+    <ol>
+      <li>경로 표시가 탭 활성과 <b>따로 계산·따로 갱신</b>돼 어긋났다(실측 재현) — 탭줄에 합쳐 <b>탭이 곧 경로</b>가 되면 두 상태가 아예 없어져 어긋날 수가 없다.</li>
+      <li>시계·서버 연결상태는 이미 23개 화면 파일에 각자 박혀 있었고 문구조차 갈라져 있었다("양호/불량" vs "운영중/끊김") — 셸 한 곳으로 모으면 23곳을 지우고 1곳만 관리하면 된다.</li>
+      <li>조작줄+탭줄을 한 줄로 합치는 것은 브라우저가 이미 검증한 패턴(IE9의 탭-in-타이틀바, Edge의 세로탭+타이틀바 숨김)이다 — 새 높이를 만들지 않고 기존 탭줄 44px을 그대로 승격시켜 46px를 통째로 없앤다.</li>
+    </ol>
+    <div class="src">
+      <b>참고 표준·근거</b><br>
+      · HubSpot "9 Breadcrumb Tips to Make Your Site Easier to Navigate" — blog.hubspot.com/marketing/navigation-breadcrumbs<br>
+      · gazhall.com "Breadcrumb Navigation: Best Practices"<br>
+      · pureinfotech.com "How to (force) enable Vertical Tabs on Chrome for Windows 11" / positioniseverything.net "Hide Title Bar with Vertical Tabs in Microsoft Edge" / windowslatest.com (Edge 세로탭+타이틀바 숨김 사례)<br>
+      · Microsoft Learn "Windows app title bar" — learn.microsoft.com/windows/apps/design/basics/titlebar-design (기본 32px, 상호작용 콘텐츠는 더 큰 높이 권장)<br>
+      · 제품 코드 실측 — client/src/renderer/pages/app.html, titlebar.js, nav.js (2026-08-07)
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>
