@@ -490,11 +490,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     <!-- 모델 안내 — 추천 카탈로그를 표준 안내 두 줄로 단순화(2026-08-08 사용자 결정
          "머지·추천은 접는다"). 카탈로그는 추천 모델이 서버에 없는 죽은 안내를 낸 전례가 있고,
          기준 모델을 정한 지금 "무엇을 받을까" 고민을 고객에게 시킬 이유가 없다. -->
-    <div data-sec="ai" class="panel" data-gijo-fold="모델 안내">
-      <div class="panel-title">모델 안내</div>
-      <div id="llmGuide" style="font-size:12.5px;color:var(--muted);line-height:1.8">
-        <b style="color:var(--text)">기준 모델은 qwen3-14b 하나입니다</b> — 라우팅·안전·한국어 평가를 통과해 채택됐고, 역할 전문화는 학습 루프의 어댑터가 맡습니다.<br>
-        조직이 승인한 다른 모델을 쓰시려면 위 「모델 검색 · 받기」로 반입하세요 — 자동 적응(생각 모드·컨텍스트 맞춤)이 받쳐 줍니다.
+    <!-- 「모델 안내」 구역은 문서함으로 이관(2026-08-09 설정 정리) — 안내 글은 문서함
+         「모델 선택 가이드」가 맡고, 설정에는 링크 한 줄만 남긴다(읽을거리는 문서함이라는 원칙). -->
+    <div data-sec="ai" class="panel">
+      <div style="font-size:12.5px;color:var(--muted);line-height:1.7">
+        기준 모델은 <b style="color:var(--text)">qwen3-14b</b>입니다 — 장비 등급별 구성·모델 고르는 법은
+        <a href="#" id="modelGuideDocLink" style="color:var(--blue-light);font-weight:700">문서함 「모델 선택 가이드」</a>에서 읽어 주세요.
       </div>
     </div>
 
@@ -1730,6 +1731,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     }
   }
 
+  // 모델 선택 가이드 링크 → 문서함 창(2026-08-09 설정 정리 — 안내 글은 문서함이 맡는다)
+  document.getElementById("modelGuideDocLink")?.addEventListener("click", (e) => {
+    e.preventDefault();
+    if (window.gijo && typeof window.gijo.openDocbox === "function") window.gijo.openDocbox();
+    else alert("문서함을 열 수 없습니다 — 앱을 다시 시작해 보시고, 계속되면 알려주세요.");
+  });
   // (modelCardHtml·loadLlmGuide는 추천 카탈로그와 함께 지웠다 — 2026-08-08 모델 안내 단순화.
   //  applyJobToCard는 남긴다: 카드가 없으면 조용히 비켜 가는 가드가 있고, 검색·받기 흐름이 쓴다.)
 

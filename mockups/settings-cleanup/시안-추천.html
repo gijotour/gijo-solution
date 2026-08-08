@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 설정 그룹 정리 시안 (추천 1개)</title>
+<!--
+  ══ 설계 근거 (설계 전 조사, gijo-mockup 규칙) ══════════════════════════════════════
+
+  1) 메뉴와 탭의 중복 — Nielsen Norman Group
+     "The Same Link Twice: Do Duplicates Help or Hurt?"에서 같은 대상을 가리키는 항목이
+     페이지 안에 여럿 있으면 선택지가 늘어 인지 부담만 커진다고 지적한다. "Tabs, Used Right"는
+     한 화면 안의 탭 목록을 내비게이션에도 그대로 늘어놓지 말고 하나의 표현 방식을 택하라고
+     권한다 — 「설정」 탭 4개(내 설정·서버·AI·연동·관리자)가 이미 settings.html 안의 탭인데
+     사이드바에도 4줄로 또 나열된 것이 이 경우다. → 탭 4줄을 「설정」 한 줄로 합친다.
+     출처: nngroup.com/articles/duplicate-links , nngroup.com/articles/tabs-used-right
+
+  2) 감사기록 + 시스템/이벤트 로그를 한 대시보드에서 — SIEM류 제품 관행
+     Datadog Cloud SIEM·WorkOS 감사로그 가이드 등은 관리자 행위 로그(audit log)와 시스템
+     이벤트 로그를 같은 대시보드에서 "건수 요약 위젯(오늘 몇 건·소스별 건수)" + 상세 드릴다운
+     구조로 함께 보여준다(둘 다 "무슨 일이 있었나"를 남기는 동류 기록이라는 성격이 같기 때문).
+     이 시안의 "한눈에 2판 + 아래 무대" 구조가 같은 패턴이다.
+     출처: datadoghq.com/blog/datadog-cloud-siem-atlassian , workos.com/blog/the-developers-guide-to-audit-logs-siem
+
+  3) 새 틀을 만들지 않는다 — 제품에 이미 있는 승인된 패턴 재사용
+     "한눈에 띠 + 아래 무대" 틀은 discover.html + grouphub.js로 이미 만들어 사용자가 승인한
+     구조다(2026-08-09, mockups/discover-hub). 「기록」도 같은 틀을 그대로 쓴다 — 화면마다
+     다른 대시보드 모양이 생기면 담당자가 화면을 옮길 때마다 다시 배워야 한다.
+
+  4) 밀도 — 이 제품의 내부 확립 원칙("칸 낭비 최소화가 첫째 기준", 기준 화면=시스템 로그)
+     표 줄은 27px(패딩 5px+5px, 글자 12.25px·줄간격 1.35 ≈ 17px) × 6줄 = 162px로 맞춘다.
+     한눈에 판은 discover.html과 같은 138px 고정.
+
+  ⚠ 이 파일은 정지 화면입니다 — 칩·버튼·사이드바 항목은 눌리지 않습니다(설계 의도만 봅니다).
+  ⚠ 숫자(47·3·2·1·4·812 등)는 전부 데모값입니다. 실제 API 연동 없음.
+-->
+<style>
+  :root{
+    --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,.09);
+    --border-strong:rgba(255,255,255,.16);--text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;
+    --blue:#3b82f6;--blue-light:#5fa1ff;--teal:#1eb980;--red:#e2483d;--amber:#f0a020;--purple:#8b7cf0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;}
+  .app{display:grid;grid-template-columns:212px 1fr;min-height:100vh;}
+
+  /* ── 사이드바 암시 — 눌리지 않는 그림입니다 ─────────────────────────────── */
+  .sidebar{background:var(--panel-2);border-right:1px solid var(--border);padding:12px 6px;font-size:12.5px;}
+  .sb-tag{font-size:10.5px;color:var(--muted-2);padding:0 8px 10px;letter-spacing:.2px;}
+  .sb-ellipsis{font-size:11.5px;color:var(--muted-2);padding:4px 10px 12px;border-bottom:1px solid var(--border);margin-bottom:6px;}
+  .gn-g-mock{height:22px;display:flex;align-items:center;padding:0 8px;color:var(--muted-2);
+    font-size:11px;font-weight:700;letter-spacing:.4px;border-radius:5px;margin:1px 0;}
+  .gn-g-mock.open{color:var(--muted);margin-top:12px;padding-top:10px;border-top:1px solid var(--border);}
+  .gn-item-mock{height:28px;display:flex;align-items:center;gap:6px;padding:0 10px 0 20px;
+    border-radius:6px;font-size:12.25px;color:var(--muted);margin:1px 0;position:relative;}
+  .gn-item-mock.active{color:#fff;background:rgba(255,255,255,.055);font-weight:700;}
+  .gn-item-mock.active::before{content:'';position:absolute;left:8px;top:5px;bottom:5px;
+    width:2px;border-radius:2px;background:var(--blue-light);}
+  .gn-item-mock .now{margin-left:auto;font-size:10px;font-weight:800;color:var(--blue-light);
+    background:rgba(59,130,246,.15);border:1px solid var(--blue);border-radius:10px;padding:1px 6px;}
+
+  /* ── 본문 ────────────────────────────────────────────────────────────── */
+  .main{padding:18px 24px 26px;display:flex;flex-direction:column;gap:12px;min-width:0;}
+  .scr-id{font-size:12.5px;color:var(--muted);}
+  .scr-id b{color:#fff;font-weight:800;}
+
+  .note-line{font-size:11.5px;color:var(--muted-2);background:var(--panel-2);
+    border:1px dashed var(--border-strong);border-radius:8px;padding:7px 12px;}
+
+  /* 한눈에 띠 — discover.html gh-card와 같은 규격(138px) */
+  .gh-strip{display:grid;grid-template-columns:repeat(2,300px);gap:10px;}
+  .gh-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    padding:12px 14px;height:138px;position:relative;}
+  .gh-card.on{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue);}
+  .gh-head{font-size:13.5px;font-weight:800;color:var(--text);margin-bottom:8px;}
+  .gh-row{display:flex;justify-content:space-between;font-size:12.25px;color:var(--muted);padding:3px 0;}
+  .gh-row b{color:var(--text);font-size:12.5px;}
+  .gh-foot{font-size:11.5px;color:var(--muted-2);margin-top:8px;padding-top:8px;border-top:1px solid var(--border);}
+
+  /* 무대 — 기록 보기(audit.html) 축약 미리보기 */
+  .stage{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;}
+  .stage-top{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:9px;gap:10px;flex-wrap:wrap;}
+  .stage-title{font-size:12.5px;font-weight:800;color:var(--text);}
+  .stage-hint{font-size:11.25px;color:var(--muted-2);}
+  .chips{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:9px;}
+  .chip{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);
+    padding:4px 12px;border-radius:20px;font-size:11.5px;font-weight:700;}
+  .chip.on{background:rgba(59,130,246,.15);border-color:var(--blue);color:var(--blue-light);}
+  .search-mock{margin-left:auto;background:var(--panel-2);border:1px solid var(--border-strong);
+    border-radius:8px;padding:4px 10px;font-size:11.25px;color:var(--muted-2);}
+
+  /* 표 밀도 — 줄 27px(패딩 5px×2 + 글자 12.25px·line-height 1.35≈17px) × 6줄 = 162px */
+  .rec-list{background:#1a1a19;border:1px solid var(--border-strong);border-radius:8px;overflow:hidden;}
+  .rec-row{display:flex;gap:10px;align-items:center;padding:5px 14px;
+    border-bottom:1px solid rgba(255,255,255,.05);font-size:12.25px;line-height:1.35;}
+  .rec-row:last-child{border-bottom:none;}
+  .rec-row .k{color:var(--muted-2);width:104px;flex:0 0 auto;font-size:11.75px;white-space:nowrap;}
+  .rec-row .tag{font-size:11px;font-weight:800;padding:2px 7px;border-radius:5px;flex:0 0 auto;white-space:nowrap;}
+  .t-cli{background:rgba(30,185,128,.16);color:var(--teal);}
+  .t-approval{background:rgba(240,160,32,.16);color:var(--amber);}
+  .t-write{background:rgba(139,124,240,.16);color:var(--purple);}
+  .t-block{background:rgba(226,72,61,.16);color:#f5928a;}
+  /* t-privacy: 실제 audit.html엔 이 배지 색이 아직 정의돼 있지 않아 회색으로 표기(참고용 관찰) */
+  .t-privacy{background:rgba(255,255,255,.08);color:var(--muted);}
+  .t-auth{background:rgba(59,130,246,.16);color:var(--blue-light);}
+  .rec-row .bd{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .rec-row .bd b{color:var(--text);font-weight:600;}
+  .rec-row .bd span{color:var(--muted-2);margin-left:6px;}
+
+  .why{border:1px dashed var(--border-strong);border-radius:10px;padding:14px 16px;
+    font-size:12.25px;color:var(--muted);line-height:1.75;}
+  .why h3{font-size:12.5px;color:#fff;margin-bottom:7px;}
+  .why ul{margin:0 0 0 18px;padding:0;}
+  .why li{margin-bottom:4px;}
+  .why b{color:var(--text);}
+  .why .src{margin-top:8px;font-size:11px;color:var(--muted-2);}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- 왼쪽 사이드바 암시 — 정지 화면, 눌리지 않습니다 -->
+  <aside class="sidebar">
+    <div class="sb-tag">사이드바 암시 (212px) — 그림입니다</div>
+    <div class="sb-ellipsis">⋮ 대시보드 · 팀 사무실 · 작업 내역 (위 생략)</div>
+
+    <!-- 다른 그룹은 회색 한 줄씩만 암시 -->
+    <div class="gn-g-mock">① 발견·수집</div>
+    <div class="gn-g-mock">② 우선순위</div>
+    <div class="gn-g-mock">③ 조치</div>
+    <div class="gn-g-mock">④ 검증</div>
+    <div class="gn-g-mock">⑤ 보고</div>
+    <div class="gn-g-mock">등록부</div>
+    <div class="gn-g-mock">AI</div>
+
+    <!-- 「설정」 그룹 — 7줄 → 3줄로 정리된 모습 -->
+    <div class="gn-g-mock open">설정 — 정리 후 3줄</div>
+    <div class="gn-item-mock">설정</div>
+    <div class="gn-item-mock">업무 넘기기</div>
+    <div class="gn-item-mock active">기록<span class="now">지금 보는 곳</span></div>
+  </aside>
+
+  <!-- 본문 = 「기록」 허브 (discover.html 틀 재사용) -->
+  <div class="main">
+    <div class="scr-id"><b>기록</b> — 누가 무엇을 했고, 시스템에 무슨 일이 있었는지 봅니다.</div>
+
+    <div class="note-line">설정 화면은 그대로 — 메뉴만 한 줄이 됩니다 (내 설정·서버·AI·연동·관리자 탭은 화면 안에 있습니다)</div>
+
+    <!-- 한눈에 띠 2판, 각 138px — 숫자는 전부 데모값입니다 -->
+    <div class="gh-strip">
+      <div class="gh-card on">
+        <div class="gh-head">🗒 작업 기록</div>
+        <!-- 데모값: 오늘 기록 47 / 차단 3 / 개인정보 가림 2 -->
+        <div class="gh-row"><span>오늘 기록</span><b>47</b></div>
+        <div class="gh-row"><span>차단</span><b style="color:var(--red)">3</b></div>
+        <div class="gh-row"><span>개인정보 가림</span><b>2</b></div>
+        <div class="gh-foot">쓰기·승인·CLI가 전부 남습니다</div>
+      </div>
+      <div class="gh-card">
+        <div class="gh-head">⚙ 시스템 로그</div>
+        <!-- 데모값: 오늘 오류 1 / 경고 4 / 정보 812 -->
+        <div class="gh-row"><span>오늘 오류</span><b style="color:var(--red)">1</b></div>
+        <div class="gh-row"><span>경고</span><b style="color:var(--amber)">4</b></div>
+        <div class="gh-row"><span>정보</span><b>812</b></div>
+        <div class="gh-foot">서버·엔진의 동작 기록입니다</div>
+      </div>
+    </div>
+
+    <!-- 무대 — 기록 보기(audit.html) 축약 미리보기 -->
+    <div class="stage">
+      <div class="stage-top">
+        <div class="stage-title">📜 작업 기록 — 화면 축약 미리보기 (선택된 판)</div>
+        <div class="stage-hint">칩을 누르면 아래 목록이 좁혀집니다 →</div>
+      </div>
+      <div class="chips">
+        <span class="chip on">전체</span>
+        <span class="chip">CLI</span>
+        <span class="chip">승인</span>
+        <span class="chip">쓰기</span>
+        <span class="chip">차단</span>
+        <span class="chip">개인정보</span>
+        <span class="chip">로그인</span>
+        <span class="search-mock">🔎 내용 검색 (동작 안 함 — 시안)</span>
+      </div>
+      <!-- 표 6줄, 데모값. 실제 audit.html 컬럼(시각·종류·행위·대상)을 그대로 축약 -->
+      <div class="rec-list">
+        <div class="rec-row"><span class="k">08-08 14:32</span><span class="tag t-cli">CLI 실행</span>
+          <span class="bd"><b>방화벽 정책 조회 실행</b><span>· fw-edge-02</span></span></div>
+        <div class="rec-row"><span class="k">08-08 14:20</span><span class="tag t-approval">승인</span>
+          <span class="bd"><b>조치 승인 대기 배정</b><span>· CVE-2026-31442</span></span></div>
+        <div class="rec-row"><span class="k">08-08 13:58</span><span class="tag t-write">쓰기</span>
+          <span class="bd"><b>자산 메모 저장</b><span>· web-prod-03</span></span></div>
+        <div class="rec-row"><span class="k">08-08 13:41</span><span class="tag t-block">차단</span>
+          <span class="bd"><b>위험 명령 실행 차단</b><span>· terminal.html</span></span></div>
+        <div class="rec-row"><span class="k">08-08 13:05</span><span class="tag t-privacy">개인정보</span>
+          <span class="bd"><b>로그에서 개인정보 가림 처리</b><span>· 시스템 로그 812건 중</span></span></div>
+        <div class="rec-row"><span class="k">08-08 12:50</span><span class="tag t-auth">로그인</span>
+          <span class="bd"><b>로그인 성공</b><span>· admin@gijo</span></span></div>
+      </div>
+    </div>
+
+    <!-- "왜 이렇게 했나" — 사용자가 보고 결정하는 설명 블록 -->
+    <div class="why">
+      <h3>왜 이렇게 정리했나</h3>
+      <ul>
+        <li><b>탭 4줄 → 설정 한 줄</b>: 내 설정·서버·AI·연동·관리자는 전부 같은 settings.html 안의
+          탭이라, 화면을 열면 탭이 그대로 있다. 사이드바에도 4줄로 늘어놓는 건 같은 선택지를
+          두 곳(메뉴+탭)에서 또 고르게 하는 중복이다.</li>
+        <li><b>기록 보기 + 시스템 로그 → 기록 허브</b>: 둘 다 "무슨 일이 있었나"를 남기는 동류
+          기록(감사=누가 뭘 했나 / 시스템=서버가 뭘 했나)이라, discover.html에서 이미 승인받은
+          "한눈에 2판 + 무대" 틀을 그대로 재사용해 한 화면에서 요약을 보고 눌러서 들어간다.</li>
+        <li><b>업무 넘기기는 별도 유지</b>: 이건 설정(환경을 정하는 일)이 아니라 인수인계라는
+          업무 행위라, 통합 대상에서 뺀다 — "통합 안 되는 것은 별도로" 원칙.</li>
+        <li>결과: 그룹 줄 수 <b>7 → 3</b> (설정 · 업무 넘기기 · 기록), 클릭 깊이는 그대로
+          유지된다(허브 안 무대가 기존 화면을 그대로 끼움 창으로 연다 — 화면을 새로 안 만듦).</li>
+      </ul>
+      <div class="src">근거: NN/g "Duplicate Links"·"Tabs, Used Right" (nngroup.com) · SIEM 통합 로그 대시보드
+        관행(datadoghq.com, workos.com) · 제품 내 기존 승인 틀 discover.html+grouphub.js(2026-08-09) ·
+        내부 밀도 원칙(기준 화면=시스템 로그, 줄 21~29px)</div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

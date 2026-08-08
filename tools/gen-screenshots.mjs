@@ -236,6 +236,7 @@ async function main() {
     { page: "verify.html", name: "23-검증-허브" },
     { page: "reporting.html", name: "24-보고-허브" },
     { page: "aihub.html", name: "25-AI-허브" },
+    { page: "records.html", name: "26-기록-허브" },
     { page: "redteam.html", name: "15-레드팀-가드레일" },
     { page: "memory.html", name: "17-기억학습-문서관리" },
     { page: "merge.html", name: "18-LLM합성-모델머지" },

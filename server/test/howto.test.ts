@@ -81,7 +81,12 @@ describe("★ 안내가 실제 화면을 가리킨다", () => {
       // 2026-08-09 그룹 통합: 항목이 하나인 그룹은 **그룹 줄 자체가 메뉴**여서 사이드바에 보이는
       //   글자가 그룹 이름("③ 조치")이다. 그래서 항목 이름 **또는 그 화면을 품은 그룹 이름**과
       //   같으면 통과다 — 둘 다 아니면 안내가 없는 자리를 가리키는 것이다.
-      const 항목이름 = navSrc.includes(`page: "${h.page}", label: "${leaf}"`);
+      // 2026-08-09 설정 정리: 같은 화면의 탭(settings.html?s=admin 등)은 사이드바에서 접혔다 —
+      //   메뉴엔 「설정」 한 줄뿐이므로, **질의문자열을 뗀 같은 화면**의 항목 이름과 맞으면 통과다
+      //   (안내의 page는 탭까지 여는 깊은 주소를 유지한다 — 그게 담당자에게 더 친절하다).
+      const 같은화면 = (a: string, b: string) => a.split("?")[0] === b.split("?")[0];
+      const 항목들 = [...navSrc.matchAll(/\{\s*page:\s*"([^"]+)",\s*label:\s*"([^"]+)"/g)].map((m) => ({ page: m[1], label: m[2] }));
+      const 항목이름 = 항목들.some((i) => 같은화면(i.page, h.page) && i.label === leaf);
       const 그룹블록 = navSrc.split(/\{\s*id:\s*"/).find((b) => b.includes(`page: "${h.page}"`)) ?? "";
       const 그룹이름 = new RegExp(`label:\\s*"${leaf.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`).test(그룹블록.split("items:")[0] ?? "");
       expect(항목이름 || 그룹이름, `nav.js에서 ${h.page}의 이름은 '${leaf}'가 아니다`).toBe(true);
@@ -193,7 +198,8 @@ describe("안내문 자체", () => {
 
   it("순서와 이유가 한 덩이로 나온다", () => {
     const md = howToMarkdown(HOWTOS.find((h) => h.key === "mfa-on")!);
-    expect(md).toContain("설정 > 내 설정");
+    // 2026-08-09 설정 정리 — 사이드바가 「설정」 한 줄이 되어 안내 자리말도 「설정」이다.
+    expect(md).toContain("설정");
     expect(md).toContain("1. ");
     expect(md).toContain("[2차 인증 켜기]");
   });

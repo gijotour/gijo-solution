@@ -43,7 +43,7 @@ describe("메뉴 항목은 전부 어딘가로 연결돼 있다", () => {
   it("항목을 실제로 읽어 온다 — 정규식이 헛돌면 이 시험 전체가 거짓 통과다", () => {
     // 2026-08-09 그룹 통합(절차 5그룹+AI 그룹이 허브 한 화면씩)으로 항목 수가 줄었다 —
     //   0에 가깝게 떨어지면 파싱이 죽은 것이므로 하한은 남긴다.
-    expect(items.length).toBeGreaterThan(14);
+    expect(items.length).toBeGreaterThan(10);
     expect(items.some((i) => i.label.includes("문서함"))).toBe(true);
     expect(items.some((i) => i.label.includes("팀 사무실"))).toBe(true);
   });

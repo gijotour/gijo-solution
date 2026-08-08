@@ -350,6 +350,46 @@
         });
       } },
     ],
+
+    // 기록 — 작업 기록(감사)과 시스템 로그(2026-08-09 설정 그룹 정리, 사용자 승인).
+    records: [
+      { id: "audit", title: "🗒 작업 기록", page: "audit.html", load: function () {
+        return window.gijo.listAudit(undefined, 500).then(function (r) {
+          var 항목 = (r && r.entries) || r || [];
+          var 오늘0시 = new Date(); 오늘0시.setHours(0, 0, 0, 0);
+          var 오늘 = 항목.filter(function (e) { return (e.at || 0) >= 오늘0시.getTime(); });
+          var 셈 = function (k) { return 오늘.filter(function (e) { return e.kind === k; }).length; };
+          // ⚠ 조회 상한(500)에 닿았으면 "더 있다"고 말한다 — 상한을 총계처럼 말하면 거짓이다
+          //   (실측: 전 메뉴 사용 기록이 요청마다 남아 하루 500건을 넘긴다).
+          var 다받음 = 항목.length < 500;
+          return {
+            rows: [
+              ["오늘 기록", 오늘.length.toLocaleString() + (다받음 ? "" : "+")],
+              ["차단", String(셈("block")), 셈("block") ? "var(--red,#e2483d)" : ""],
+              ["개인정보 가림", String(셈("privacy"))],
+            ],
+            foot: "쓰기·승인·CLI가 전부 남습니다",
+          };
+        });
+      } },
+      { id: "syslog", title: "⚙ 시스템 로그", page: "syslog.html", load: function () {
+        return window.gijo.listLogs().then(function (list) {
+          list = list || [];
+          var 오늘0시 = new Date(); 오늘0시.setHours(0, 0, 0, 0);
+          var 오늘 = list.filter(function (e) { return (e.timestamp || 0) >= 오늘0시.getTime(); });
+          var 셈 = function (lv) { return 오늘.filter(function (e) { return e.level === lv; }).length; };
+          return {
+            badge: 셈("error") ? { text: "오류 " + 셈("error"), color: "var(--red,#e2483d)" } : null,
+            rows: [
+              ["오늘 오류", String(셈("error")), 셈("error") ? "var(--red,#e2483d)" : ""],
+              ["경고", String(셈("warn")), 셈("warn") ? "var(--amber,#f0a020)" : ""],
+              ["정보", 셈("log").toLocaleString()],
+            ],
+            foot: "서버·엔진의 동작 기록입니다",
+          };
+        });
+      } },
+    ],
   };
 
   window.gijoGroupPanels = 그룹;

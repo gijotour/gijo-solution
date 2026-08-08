@@ -126,16 +126,23 @@
     // 내 것 / 모두의 것(서버·AI) / 바깥과 잇는 것 / 관리자만 / 보기만.
     // 같은 settings.html을 ?s= 로 걸러 보여준다(파일을 쪼개면 공통 스크립트가 어긋난다).
     // ⚠ 인수인계를 여기로 옮겼다 — 「업무 관리」 그룹에 항목이 하나뿐이었다. 하나짜리는 그룹이 아니다.
-    { id: "settings", icon: "slider", label: "설정", bottom: true, items: [
-      { page: "settings.html?s=my", label: "내 설정" },
-      { page: "settings.html?s=ai", label: "서버·AI" },
-      { page: "settings.html?s=link", label: "연동" },
-      { page: "settings.html?s=admin", label: "관리자" },
+    // 추가 기능(2026-08-09 사용자 지시) — 절차 5단계에 안 얹히는 부가 기능들의 자리.
+    //   지금은 업무 넘기기 하나지만 「보안 로그 파일 분석」·「제품 소개자료·비교」가 준비되면
+    //   여기로 들어온다(계획 확정 전 빈 메뉴를 미리 달지 않는다 — 정직한 구현 원칙).
+    //   alwaysGroup: 항목이 1개여도 대표 메뉴로 접지 않는다 — 곧 늘어날 그룹이다.
+    { id: "extras", icon: "drawer", label: "추가 기능", bottom: true, alwaysGroup: true, items: [
       { page: "handover.html", label: "업무 넘기기" },
-      { page: "audit.html", label: "기록 보기" },
-      // 시스템 로그 — 기록 보기 안에 접어 두던 것을 **별도 화면**으로 뺐다(2026-08-02 사용자 지시).
-      // 「기록 보기」가 누가 무엇을 했나(감사)라면 이쪽은 서버가 무엇을 했나(진단)다.
-      { page: "syslog.html", label: "시스템 로그" },
+    ]},
+    // 설정 그룹 정리(2026-08-09 사용자 지시) — 7줄에서 3줄로.
+    //   · 내 설정·서버·AI·연동·관리자는 **같은 settings.html의 탭**이라 사이드바 나열이 중복
+    //     이었다 → 「설정」 한 줄. 화면 안 탭·기존 바로가기("설정 > 서버·AI")는 그대로 동작.
+    //   · 기록 보기+시스템 로그 → 「기록」 허브(records.html) — 누가 무엇을 했나(감사)와
+    //     서버가 무엇을 했나(진단)를 한 자리에서, 판으로 갈라 본다.
+    //   · 업무 넘기기는 설정이 아니라 업무 행위 — 통합하지 않고 별도로 둔다(사용자 지시).
+    { id: "settings", icon: "slider", label: "설정", bottom: true, items: [
+      { page: "settings.html?s=my", label: "설정" },
+      { page: "handover.html", label: "업무 넘기기" },
+      { page: "records.html", label: "기록" },
     ]},
   ];
 
@@ -161,6 +168,11 @@
     // 태우면 허브 안에서 허브를 또 여는 무한 중첩이 된다.
     // ②③④⑤ 그룹 통합(2026-08-09) — 개별 화면 링크·열어 둔 탭을 해당 허브로(판 켠 채).
     // AI 운영 그룹 통합(2026-08-09) — 옛 링크·열어 둔 탭을 AI 허브로(판 켠 채).
+    // 설정 그룹 정리(2026-08-09) — 기록 화면 2종을 허브로(판 켠 채).
+    "audit.html": "records.html?panel=audit",
+    "audit.html?embed=1": "records.html?embed=1&panel=audit",
+    "syslog.html": "records.html?panel=syslog",
+    "syslog.html?embed=1": "records.html?embed=1&panel=syslog",
     "agent.html": "aihub.html?panel=team",
     "agent.html?embed=1": "aihub.html?embed=1&panel=team",
     "memory.html": "aihub.html?panel=knowledge",
@@ -713,7 +725,7 @@
       // 통합 그룹(항목 1개) = **그룹 줄 자체가 그 메뉴**다(2026-08-09 사용자 지시 "통합 메뉴가
       // 대표 메뉴로, 하위 메뉴로 만들지 말 것"). 개수 배지·접기 삼각형·하위 줄을 두지 않는다 —
       // 하나뿐인 아이를 접었다 폈다 하는 조작은 뜻이 없고 세로만 먹는다.
-      var 대표 = g.items.length === 1 && g.items[0].page;
+      var 대표 = g.items.length === 1 && g.items[0].page && !g.alwaysGroup;
       if (!대표) {
         var cnt = document.createElement("span"); cnt.className = "cnt"; cnt.textContent = g.items.length;
         gh.appendChild(cnt);
