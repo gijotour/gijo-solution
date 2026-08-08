@@ -3,7 +3,7 @@
 // 사용 데이터가 폐쇄망 밖으로 나가지 않는 자가학습 사이클의 오케스트레이터:
 //  ① 수집: 대화창 출구(dispatcher) + 직접 채팅 API(llm.ts chat())에서 실제 대화(질문/답변)를 chat_logs에 영속 저장.
 //  ② 정제: 담당자가 👍/👎로 평가한 로그 중 긍정만 골라 데이터셋(data/datasets/loop-*.json)으로.
-//  ③ 학습: finetune.ts(QLoRA, Unsloth)에 설정된 베이스 모델(기본 Hermes 3)을 주입해 실행.
+//  ③ 학습: finetune.ts(QLoRA)에 설정된 베이스 모델(기본 Qwen3-14B — 배치 모델과 같은 계열)을 주입해 실행.
 //  ④ 배포: 고아 스크립트였던 scripts/export_gguf.py를 호출해 LoRA→병합→GGUF→models/ 배치 후
 //     대상 에이전트에 자동 할당 — 기존에 끊겨 있던 "학습 산출물→서빙" 연결(고질 문제)을 잇는다.
 //
@@ -136,6 +136,14 @@ const getStateStmt = db.prepare("SELECT value FROM app_state WHERE key = ?");
 const setStateStmt = db.prepare(
   "INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
 );
+// Hermes 시대(2026-07) 기본값이 app_state에 저장돼 화면이 낡은 베이스를 보여 주던 것을
+// 1회성으로 이행한다 — 옛 "기본값 그대로"인 저장값만 지운다(그 외 사용자 지정값은 존중).
+migrate(
+  "learnloop-hermes-defaults-2026-08-08",
+  `DELETE FROM app_state
+    WHERE (key = 'learnloop:baseModel' AND value = 'NousResearch/Hermes-3-Llama-3.1-8B')
+       OR (key = 'learnloop:modelPrefix' AND value = 'hermes-sec-tuned')`
+);
 
 interface ChatLogRow {
   id: string;
@@ -196,12 +204,15 @@ function broadcastRun(run: LearnloopRun): void {
 }
 
 // ── 설정 (app_state KV — localengine lastModelId 패턴) ────────────────
+// 기본 베이스는 실제 1회전(2026-08-08)에 쓴 Qwen3-14B — 배치 모델과 같은 계열이어야
+// 산출 어댑터를 서빙 베이스에 붙일 수 있다(LoRA는 베이스 종속).
 const DEFAULT_CONFIG: LearnloopConfig = {
   autoCollect: true,
-  baseModel: "NousResearch/Hermes-3-Llama-3.1-8B",
-  modelPrefix: "hermes-sec-tuned",
+  baseModel: "Qwen/Qwen3-14B",
+  modelPrefix: "sec-expert",
   targetAgent: "model-evolution",
 };
+
 
 // 산출 모델 id는 <prefix>-v<N> — export_gguf.py의 규칙(^[a-z0-9][a-z0-9.-]{0,63}$)에 맞아야 한다.
 const PREFIX_RE = /^[a-z0-9][a-z0-9-]{0,40}$/;
@@ -221,7 +232,7 @@ export function getLearnloopConfig(): LearnloopConfig {
 
 export function putLearnloopConfig(patch: Partial<LearnloopConfig>): LearnloopConfig {
   if (patch.modelPrefix !== undefined && !PREFIX_RE.test(patch.modelPrefix)) {
-    throw new Error("모델 접두어는 영문 소문자/숫자/하이픈 41자 이내여야 합니다 (예: hermes-sec-tuned)");
+    throw new Error("모델 접두어는 영문 소문자/숫자/하이픈 41자 이내여야 합니다 (예: sec-expert)");
   }
   if (patch.targetAgent !== undefined && !getAgentById(patch.targetAgent)) {
     throw new Error(`존재하지 않는 에이전트: ${patch.targetAgent}`);
@@ -482,7 +493,7 @@ async function runPipeline(run: LearnloopRun, config: LearnloopConfig): Promise<
     if (SMOKE()) await smokeTick();
     else await pauseInferenceEngines();
 
-    // (2) QLoRA 학습 — 설정된 베이스 모델(Hermes 3 기본)을 주입.
+    // (2) QLoRA 학습 — 설정된 베이스 모델(Qwen3-14B 기본)을 주입.
     // manageEngines:false — 엔진 정지/재기동은 루프가 export까지 포함해 직접 관리한다(이중 정지 방지).
     setStage(run, "training");
     if (SMOKE()) await smokeTick();

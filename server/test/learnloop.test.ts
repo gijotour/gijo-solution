@@ -146,8 +146,8 @@ describe("learnloop (헤르메스 폐쇄형 학습 루프)", () => {
     const res = await request(app).post("/api/learnloop/run").set(auth()).send({});
     expect(res.status).toBe(202);
     expect(res.body.stage).toBe("stopping-engines");
-    expect(res.body.baseModel).toBe("NousResearch/Hermes-3-Llama-3.1-8B"); // 기본 Hermes
-    expect(res.body.outputModelId).toMatch(/^hermes-sec-tuned-v\d+$/);
+    expect(res.body.baseModel).toBe("Qwen/Qwen3-14B"); // 기본 = 실1회전 베이스(재설계 0단계)
+    expect(res.body.outputModelId).toMatch(/^sec-expert-v\d+$/);
     savedDatasets.push(res.body.datasetId);
 
     await waitUntil(() => getLearnloopStatus().running === false);
@@ -180,21 +180,21 @@ describe("learnloop (헤르메스 폐쇄형 학습 루프)", () => {
 
   it("output model version increments across runs even without real gguf files", async () => {
     const first = await request(app).post("/api/learnloop/run").set(auth()).send({ datasetId: "ds-a" });
-    expect(first.body.outputModelId).toBe("hermes-sec-tuned-v1");
+    expect(first.body.outputModelId).toBe("sec-expert-v1");
     await waitUntil(() => getLearnloopStatus().running === false);
 
     const second = await request(app).post("/api/learnloop/run").set(auth()).send({ datasetId: "ds-b" });
     // 스모크 모드라 gguf 파일은 안 생기지만, 실행 이력에서 v1을 보고 v2를 발급해야 한다
-    expect(second.body.outputModelId).toBe("hermes-sec-tuned-v2");
+    expect(second.body.outputModelId).toBe("sec-expert-v2");
     await waitUntil(() => getLearnloopStatus().running === false);
   });
 
-  it("config defaults to Hermes and PUT roundtrips with validation", async () => {
+  it("config defaults to Qwen3-14B and PUT roundtrips with validation", async () => {
     const defaults = (await request(app).get("/api/learnloop/config").set(auth())).body;
     expect(defaults).toEqual({
       autoCollect: true,
-      baseModel: "NousResearch/Hermes-3-Llama-3.1-8B",
-      modelPrefix: "hermes-sec-tuned",
+      baseModel: "Qwen/Qwen3-14B",
+      modelPrefix: "sec-expert",
       targetAgent: "model-evolution",
     });
 

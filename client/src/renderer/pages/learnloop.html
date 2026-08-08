@@ -182,7 +182,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     <div class="loop-strip">
       <div class="loop-card"><div class="lc-step">STEP 1</div><div class="lc-name">📥 수집</div><div class="lc-desc">에이전트 실제 대화(질문·답변)를 자동 저장 — 아래 목록에서 확인</div></div>
       <div class="loop-card"><div class="lc-step">STEP 2</div><div class="lc-name">🧹 정제</div><div class="lc-desc">담당자가 👍한 대화만 골라 학습 데이터셋으로 변환</div></div>
-      <div class="loop-card"><div class="lc-step">STEP 3</div><div class="lc-name">🎓 학습</div><div class="lc-desc">Hermes 3 베이스에 QLoRA 파인튜닝 (RTX 3090 로컬)</div></div>
+      <div class="loop-card"><div class="lc-step">STEP 3</div><div class="lc-name">🎓 학습</div><div class="lc-desc">설정된 베이스 모델에 QLoRA 어댑터 학습 (로컬 GPU)</div></div>
       <div class="loop-card"><div class="lc-step">STEP 4</div><div class="lc-name">🚀 배포</div><div class="lc-desc">GGUF 변환 후 대상 에이전트에 새 버전 자동 할당</div></div>
     </div>
 
@@ -218,8 +218,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div class="cat-intro">모델·대상은 신중히 바꾸세요. 베이스 모델은 HuggingFace 원본 repo id(HF transformers)이며, GGUF id가 아닙니다.</div>
       <div class="cfg-panel">
         <label class="cfg-toggle"><input type="checkbox" id="cfgAutoCollect">대화 자동 수집</label>
-        <div class="cfg-field"><label>학습 베이스 모델 (HF repo)</label><input id="cfgBaseModel" class="wide" placeholder="NousResearch/Hermes-3-Llama-3.1-8B"></div>
-        <div class="cfg-field"><label>배포 모델 접두어</label><input id="cfgPrefix" placeholder="hermes-sec-tuned"></div>
+        <div class="cfg-field"><label>학습 베이스 모델 (HF repo)</label><input id="cfgBaseModel" class="wide" placeholder="Qwen/Qwen3-14B"></div>
+        <div class="cfg-field"><label>배포 접두어 (산출 어댑터 이름)</label><input id="cfgPrefix" placeholder="sec-expert"></div>
         <div class="cfg-field"><label>배포 대상 에이전트</label><select id="cfgAgent"></select></div>
         <button class="btn-ghost" id="cfgSaveBtn">저장</button>
         <span class="run-line" id="cfgLine"></span>

@@ -13,7 +13,7 @@ export interface FinetuneArgs {
   agentId: string;
   datasetId: string;
   // 학습 베이스 모델(HF repo id). 지정 시 GIJO_FT_BASE_MODEL 환경변수로 스크립트에 전달 —
-  // 학습 루프(learnloop.ts)가 설정된 베이스(예: Hermes 3)를 주입하는 경로.
+  // 학습 루프(learnloop.ts)가 설정된 베이스(예: Qwen3-14B)를 주입하는 경로.
   baseModel?: string;
   // 종료 콜백(성공/실패 공통) — 학습 루프가 다음 단계(GGUF export)로 이어가기 위해 쓴다.
   // 폴링 대신 콜백인 이유: exit/error 어느 쪽으로 끝나든 정확히 한 번 호출된다.
