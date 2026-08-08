@@ -36,11 +36,10 @@ describe("★ 탭 안에서의 이동은 탭을 죽이지 않는다", () => {
 });
 
 describe("★ 특정 항목을 누르면 그 항목으로 좁혀 간다", () => {
-  it("취약점 화면의 '오늘의 조치' 행이 자산·건 키를 실어 보낸다", () => {
-    const src = read("vulnscan.html");
-    expect(src, "행에 자산 id가 없으면 무엇을 눌렀는지 전할 수 없다").toContain('data-a="${esc(r.assetId)}"');
-    expect(src).toContain("asset=${encodeURIComponent(row.dataset.a)}");
-  });
+  // 「오늘의 조치」 블록은 2026-08-09 사용자 지시로 취약점 화면에서 **삭제**됐다 — 대시보드
+  //   오늘 계획 판의 「급한 것」이 같은 목록을 같은 규칙으로 이미 보여 주기 때문이다. 그래서
+  //   그 블록을 지키던 시험도 함께 걷는다: 없는 기능을 지키는 시험은 다음 사람에게 "있는 줄"
+  //   알게 만든다. 아래 두 계약(조치·승인의 ?asset= 수신, 취약점 화면의 ?host= 펼침)은 그대로다.
 
   it("조치·승인 화면이 ?asset= 을 읽어 그 자산만 보여준다", () => {
     const src = read("approvals.html");
