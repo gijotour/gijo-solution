@@ -22,6 +22,7 @@ import { authMiddleware } from "../auth/auth";
 import { SMALLTALK, NO_ANSWER } from "./sessionpatterns";
 import { rateChatLog, 질문주제 } from "./learnloop";
 import { isNonLearningSessionOwner } from "./learnpolicy";
+import { 학습재료가못되나 } from "./datasethygiene";
 // work_session_turns 테이블은 worksessions.ts의 migrate가 만든다 — 이 모듈이 먼저 적재되면
 // 아래 prepare가 "no such table"로 죽는다(테스트에서 실측). 소유 모듈을 명시적으로 실어 보장한다.
 import "./worksessions";
@@ -130,6 +131,12 @@ function excluded(question: string, answer: string): string | null {
   if (TOOL_ECHO_RE.test(answer)) return "도구 원출력 복창";
   if (answer.trim().length < ANSWER_MIN || answer.length > ANSWER_MAX) return "길이 극단";
   if (question.trim().length < 5) return "질문 너무 짧음";
+  // ⚠ 데이터셋 만들 때 거르는 것만으로는 **늦다** — 후보함이 못 쓸 것으로 채워지면
+  //   담당자가 그걸 하나씩 들여다보며 시간을 쓰고, 주제별 진척(300건)도 가짜로 부푼다.
+  //   실측(2026-08-09): 대기 4건이 전부 그날의 숫자이거나 문서 본문 복사였다.
+  //   판별식은 위생 모듈과 **같은 것**을 쓴다(두 곳에 적으면 언젠가 어긋난다).
+  const 못쓸이유 = 학습재료가못되나(question, answer);
+  if (못쓸이유) return 못쓸이유;
   return null;
 }
 
