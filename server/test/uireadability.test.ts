@@ -14,6 +14,7 @@ const 클라 = path.resolve(__dirname, "..", "..", "client", "src");
 const 화면들 = path.join(클라, "renderer", "pages");
 const main = fs.readFileSync(path.join(클라, "main.ts"), "utf-8");
 const settings = fs.readFileSync(path.join(화면들, "settings.html"), "utf-8");
+const titlebar = fs.readFileSync(path.join(화면들, "titlebar.js"), "utf-8");
 
 function 기본배율(): number {
   const m = main.match(/const ZOOM_DEFAULT = ([\d.]+)/);
@@ -35,16 +36,17 @@ describe("화면 배율 — 말과 코드 맞추기", () => {
     expect(기본배율()).toBeGreaterThan(1);
   });
 
-  it("설정 화면의 「기본」 딱지는 메인 프로세스가 알려 준 값에 붙는다", () => {
-    // 이름표에 "기본"을 박아 두면 기본값이 바뀔 때마다 어긋난다. 딱지는 state.default로 붙인다.
+  it("배율 UI는 상단 바 ⚙ 하나다 — 프리셋은 메인 프로세스가 준다(하드코딩 금지)", () => {
+    // 2026-08-09 설정 정리: 설정 화면의 「화면 크기」 구역을 걷었다(같은 조절이 두 곳이면
+    // 어느 쪽이 진짜인지 헷갈린다). 이제 이 계약은 상단 바(titlebar.js)가 진다.
+    expect(settings, "설정 화면에 배율 UI가 되살아나면 두 곳이 된다").not.toContain("zoomGrid");
     expect(main).toMatch(/ipcMain\.handle\("ui:getZoom".*default: ZOOM_DEFAULT/s);
-    expect(settings).toMatch(/기본배율\s*=\s*Number\(state && state\.default\)/);
-    const 이름표 = settings.match(/const ZOOM_NAME = \{([^}]*)\}/)![1];
-    expect(이름표, "이름표에는 크기만 적는다 — 「기본」은 코드가 붙인다").not.toContain("기본");
+    expect(titlebar, "상단 바가 프리셋을 메인 프로세스 state로 그린다").toContain("getUiZoom()");
+    expect(titlebar).toMatch(/z\.steps\.forEach/);
   });
 
   it("안내한 단축키(＋ · − · 0)가 실제로 걸려 있다", () => {
-    expect(settings, "설정 화면이 단축키를 안내한다").toMatch(/Ctrl \+.*0.*기본값/s);
+    expect(titlebar, "상단 바가 단축키를 안내한다").toContain("Ctrl +");
     expect(main).toContain("before-input-event");
     expect(main, "0은 기본 배율로 되돌린다").toMatch(/k === "0"[\s\S]{0,80}화면크기적용\(ZOOM_DEFAULT\)/);
     expect(main, "＋는 한 칸 키운다").toMatch(/k === "\+"[\s\S]{0,120}화면크기한칸\(1\)/);

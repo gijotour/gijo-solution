@@ -29,6 +29,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .btn-primary:disabled{opacity:0.5;cursor:not-allowed;}
 .btn-ghost{background:transparent;border:1px solid var(--border-strong);color:var(--text);padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;}
 .btn-danger{background:transparent;border:1px solid rgba(226,72,61,0.5);color:#f5928a;padding:9px 16px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;}
+/* 구역 탭줄(2026-08-09) — 사이드바가 「설정」 한 줄이 되면서 구역 전환이 화면 안으로 들어왔다. */
+.sec-tab{background:var(--panel);border:1px solid var(--border-strong);color:var(--muted);padding:7px 14px;border-radius:9px;font-size:12.5px;font-weight:700;cursor:pointer;font-family:inherit;}
+.sec-tab:hover{border-color:var(--blue);color:#fff;}
+.sec-tab.on{background:rgba(59,130,246,.16);border-color:var(--blue);color:#fff;}
 .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:20px;margin-bottom:16px;max-width:640px;}
 .panel-title{font-size:14.5px;font-weight:800;color:#fff;margin-bottom:4px;}
 .panel-sub{font-size:12.5px;color:var(--muted);margin-bottom:16px;}
@@ -54,14 +58,6 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .field.inline+.status-line{margin-top:6px;}
 .hint{font-size:12.5px;color:var(--muted-2);margin-top:8px;line-height:1.6;}
 .status-line{font-size:12.5px;margin-top:10px;}
-/* 화면 크기 선택 — 칸 수를 고정하지 않고 폭에 맞춰 접히게 한다(이 화면 자체가 반응형 예시). */
-.zoom-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(96px,1fr));gap:8px;}
-.zoom-opt{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:9px;padding:10px 8px;text-align:center;cursor:pointer;user-select:none;transition:.12s;}
-.zoom-opt:hover{border-color:var(--blue);color:#fff;}
-.zoom-opt.on{background:rgba(59,130,246,.16);border-color:rgba(59,130,246,.55);}
-.zoom-opt .zo-pct{font-size:14px;font-weight:800;color:#fff;}
-.zoom-opt .zo-name{font-size:12px;color:var(--muted);margin-top:3px;}
-.zoom-opt.on .zo-name{color:var(--blue-light,#5fa1ff);}
 .status-ok{color:var(--teal);}
 .status-err{color:#f5928a;}
 .log-console{background:#1a1a19;border:1px solid var(--border-strong);border-radius:8px;padding:10px 12px;height:260px;overflow-y:auto;font-family:"Consolas","Cascadia Mono",monospace;font-size:12.5px;line-height:1.6;}
@@ -232,20 +228,17 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         <div class="page-title">설정</div>
       </div>
     </div>
-
-    <!-- 화면 크기 — 모니터·시력이 사람마다 달라 자동 반응형만으로는 못 맞추는 취향을 여기서 고른다.
-         배율은 앱 전체(허브 탭 포함)에 걸리고 다음 실행에도 유지된다. -->
-    <div data-sec="my" class="panel">
-      <div class="panel-title">🔍 화면 크기</div>
-      <div data-gijo-fold="🔍 화면 크기">
-      <div style="font-size:12px;color:var(--muted);margin-bottom:12px;line-height:1.6">
-        글씨와 여백이 함께 커지고 작아집니다. <b>작게</b>는 한 화면에 더 많이, <b>크게</b>는 읽기 편하게.
-        단축키 <b>⌘/Ctrl +</b> · <b>−</b> · <b>0</b>(기본값)으로도 바꿀 수 있습니다.
-      </div>
-      <div class="zoom-grid" id="zoomGrid"></div>
-      <div class="status-line" id="zoomStatusLine"></div>
-      </div><!-- /🔍 화면 크기 접기 -->
+    <!-- 구역 탭줄(2026-08-09) — 사이드바가 「설정」 한 줄이 되면서 구역 전환 길이 화면 안으로
+         들어왔다. 관리자 탭은 admin 게이트가 되살릴 때만 보인다(담당자에겐 없는 탭). -->
+    <div id="secNav" style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:14px">
+      <button class="sec-tab" data-s="my">내 설정</button>
+      <button class="sec-tab" data-s="ai">서버·AI</button>
+      <button class="sec-tab" data-s="link">연동</button>
+      <button class="sec-tab" data-s="admin" id="secAdminTab" style="display:none">관리자 <span class="badge b-teal" style="margin-left:2px">admin</span></button>
     </div>
+
+    <!-- 「화면 크기」 구역은 제거(2026-08-09 사용자 지시) — 상단 바 ⚙ 설정 팝오버(배율 6단·확대/축소·단축키)가
+         같은 일을 하며, 같은 조절이 두 곳이면 어느 쪽이 진짜인지 헷갈린다. 배율 프리셋은 메인 프로세스가 계속 가진다. -->
 
     <div data-sec="ai" class="panel" data-gijo-fold="서버 연결">
       <div class="panel-title">서버 연결</div>
@@ -756,6 +749,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       document.getElementById("accountRole").textContent = user.role || "-";
       await loadMfa();
       if (user.role === "admin") {
+        // 구역 탭줄의 「관리자」 탭도 admin에게만 보인다 — 담당자에겐 없는 탭이다.
+        document.getElementById("secAdminTab").style.display = "";
         document.getElementById("userManagementPanel").style.display = "";
         document.getElementById("mfaAdminPanel").style.display = "";
         await loadMfaAdmin();
@@ -1623,6 +1618,20 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.head.appendChild(st);
   }
 
+  // 구역 탭줄 배선 — 같은 화면을 s=만 바꿔 다시 연다(replace: 탭이 늘지 않고 그 자리에서 전환).
+  (function () {
+    const cur = CURRENT_SECTION || "my";
+    document.querySelectorAll("#secNav .sec-tab").forEach((b) => {
+      if (b.dataset.s === cur) b.classList.add("on");
+      b.addEventListener("click", () => {
+        if (b.dataset.s === cur) return;
+        const q = new URLSearchParams(location.search);
+        q.set("s", b.dataset.s);
+        location.replace("settings.html?" + q.toString());
+      });
+    });
+  })();
+
   function esc(s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
   // 클라우드 API 사용량 표 — 사용량·요금 화면 제거(메뉴 정리 2026-07-25)로 이관.
   // ── 법령·판례 조회(선택) ─────────────────────────────────────────────
@@ -2279,51 +2288,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page));
     });
 
-    initZoom();
   }
 
-  // 화면 크기 — 프리셋은 메인 프로세스가 갖고 있다(단축키와 같은 값을 써야 하므로 화면이 따로 정의하지 않는다).
-  // ⚠ 「기본」 표시는 **실제 기본값과 같아야 한다**(2026-08-01). 기본을 110%로 올렸는데
-  //   라벨은 100%를 기본이라 부르고 있었다 — 말과 코드가 어긋나면 담당자가 헷갈린다.
-  //   그래서 이름표에는 크기만 적고, 「기본」 딱지는 메인 프로세스가 알려 준 값에 붙인다(다시 어긋날 수 없게).
-  const ZOOM_NAME = { 0.8: "아주 작게", 0.9: "많이 작게", 1: "작게", 1.1: "조금 작게", 1.25: "보통", 1.5: "크게" };
-  async function initZoom() {
-    const grid = document.getElementById("zoomGrid");
-    const line = document.getElementById("zoomStatusLine");
-    if (!grid || !window.gijo || !window.gijo.getUiZoom) return;
-    let state;
-    try {
-      state = await window.gijo.getUiZoom();
-    } catch (e) {
-      grid.innerHTML = '<div style="font-size:12px;color:var(--muted-2)">이 버전에서는 화면 크기를 바꿀 수 없습니다.</div>';
-      return;
-    }
-    const steps = (state && state.steps) || [0.8, 0.9, 1, 1.1, 1.25, 1.5];
-    let current = (state && state.zoom) || 1;
-    const 기본배율 = Number(state && state.default) || 1.25;
+  // 화면 크기 조절은 상단 바 ⚙ 팝오버로 이관(2026-08-09) — initZoom 제거.
 
-    function paint() {
-      grid.innerHTML = steps
-        .map((s) => {
-          const on = Math.abs(s - current) < 0.001;
-          const 기본 = Math.abs(s - 기본배율) < 0.001 ? " · 기본" : "";
-          return (
-            '<div class="zoom-opt' + (on ? " on" : "") + '" data-z="' + s + '">' +
-            '<div class="zo-pct">' + Math.round(s * 100) + "%</div>" +
-            '<div class="zo-name">' + (ZOOM_NAME[s] || "") + 기본 + "</div></div>"
-          );
-        })
-        .join("");
-      grid.querySelectorAll(".zoom-opt").forEach((el) => {
-        el.addEventListener("click", async () => {
-          current = await window.gijo.setUiZoom(Number(el.dataset.z));
-          paint();
-          if (line) line.innerHTML = '<span style="color:var(--teal,#1eb980)">✓ 화면 크기 ' + Math.round(current * 100) + "% 적용 — 다음 실행에도 유지됩니다.</span>";
-        });
-      });
-    }
-    paint();
-  }
 
   reapplySectionFilter(); // 로그인 확인 전에 걸어 둔다 — 잠깐이라도 다른 탭 것이 비치지 않게
   if (!window.gijo.isAuthenticated()) {
