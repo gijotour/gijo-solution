@@ -163,7 +163,8 @@ export const learnloopApi = {
   removeLog: (id: string) => request(`/api/learnloop/logs/${encodeURIComponent(id)}`, { method: "DELETE" }),
   buildDataset: (includeUnrated?: boolean) =>
     request<{ datasetId: string; examples: number }>("/api/learnloop/build-dataset", { method: "POST", body: { includeUnrated } }),
-  run: (datasetId?: string) => request<LearnloopRun>("/api/learnloop/run", { method: "POST", body: { datasetId } }),
+  // topic: 주제별 전문가 어댑터 학습(재설계 3단계) — 서버가 승인 300 개시선을 강제한다.
+  run: (datasetId?: string, topic?: string) => request<LearnloopRun>("/api/learnloop/run", { method: "POST", body: { datasetId, topic } }),
   // 학습 후보함(환류 1단계, 2026-07-29) — 코드가 고른 후보를 승인/제외. 승인=👍 기록.
   candidates: (days?: number, limit?: number) =>
     request<{
@@ -181,6 +182,20 @@ export const learnloopApi = {
   runs: () => request<LearnloopRun[]>("/api/learnloop/runs"),
   getConfig: () => request<LearnloopConfig>("/api/learnloop/config"),
   putConfig: (patch: Partial<LearnloopConfig>) => request<LearnloopConfig>("/api/learnloop/config", { method: "PUT", body: patch }),
+};
+
+// ── 전문가 어댑터 등록부 (재설계 1단계, 2026-08-08) ─────────────────────
+// 보기 전용 — 채택·해제·배정 지시는 대화창에서(메뉴는 보기용 원칙).
+export interface LoraAdapterInfo {
+  id: string;
+  topic: string | null;
+  baseModelId: string;
+  adopted: boolean;
+  note: string | null;
+  createdAt: number;
+}
+export const adaptersApi = {
+  list: () => request<{ adapters: LoraAdapterInfo[] }>("/api/adapters"),
 };
 
 // ── HuggingFace 모델 ──────────────────────────────────────────────────

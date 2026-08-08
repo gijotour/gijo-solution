@@ -116,6 +116,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .lt-chip .bar{width:34px;height:4px;border-radius:2px;background:rgba(255,255,255,.10);overflow:hidden;flex:0 0 auto;}
 .lt-chip .bar i{display:block;height:100%;border-radius:2px;}
 .lt-chip .ok{color:var(--teal);font-weight:800;}
+.lt-train{font-size:11px;font-weight:800;color:#0d1117;background:var(--teal);border-radius:9px;padding:1px 8px;cursor:pointer;}
+.lt-train:hover{filter:brightness(1.12);}
 .lt-misc{font-size:11.5px;color:var(--muted-2);margin-left:auto;flex:0 0 auto;}
 .lc-topic{font-size:11.5px;font-weight:800;padding:2px 7px;border-radius:5px;}
 /* 주제색 — 기존 토큰만 쓴다(새 색 금지). 사내규정=amber는 「신호 강함」과 색이 겹치지만 글자가 구분자다(시안 결정). */
@@ -380,7 +382,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         const done = t.approved >= 목표;
         return `<span class="lt-chip${ltFilter === n ? " on" : ""}" data-topic="${n}">` +
           `<span class="dot" style="background:${주제색[n]}"></span>${n} ${t.approved}/${목표}` +
-          (done ? ` <span class="ok">✓ 학습 가능</span>` : `<span class="bar"><i style="width:${pct}%;background:${주제색[n]}"></i></span>`) +
+          (done
+            ? ` <span class="ok">✓</span> <span class="lt-train" data-train="${n}">학습 시작</span>`
+            : `<span class="bar"><i style="width:${pct}%;background:${주제색[n]}"></i></span>`) +
           `</span>`;
       }).join("") + `<span class="lt-misc">미분류 ${(map["(미분류)"] || { total: 0 }).total.toLocaleString()}건</span>`;
     } catch (e) { el.innerHTML = ""; }
@@ -649,7 +653,25 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     loadCandidates();
     loadTopicStrip();
     document.getElementById("lcList").addEventListener("click", onCandidateAction);
-    document.getElementById("ltStrip").addEventListener("click", (e) => {
+    document.getElementById("ltStrip").addEventListener("click", async (e) => {
+      // 개시선 도달 주제의 [학습 시작] — GPU 학습이라 확인 후에만(오발동 방지 원칙, 서버도 재검증).
+      const train = e.target.closest(".lt-train");
+      if (train) {
+        const topic = train.dataset.train;
+        const ok = await gijoAsk(
+          `「${topic}」 전문가 어댑터 학습을 시작할까요?\nGPU 학습이 돌고, 그동안 채팅·문서검색이 일시 중단됩니다(끝나면 자동 재개).\n산출 어댑터는 평가 게이트 통과 후 채택해야 실서비스에 실립니다.`,
+          { ok: "학습 시작" }
+        );
+        if (!ok) return;
+        try {
+          const run = await window.gijo.startLearnloopRun(undefined, topic);
+          gijoTell(`「${topic}」 전문가 학습을 시작했습니다 — 산출: ${run.outputModelId}. 진행은 아래 실행 이력에서 볼 수 있습니다.`);
+          loadRuns();
+        } catch (err) {
+          gijoTell("학습을 시작하지 못했습니다: " + ((err && err.message) || err));
+        }
+        return;
+      }
       const chip = e.target.closest(".lt-chip");
       if (!chip) return;
       ltFilter = ltFilter === chip.dataset.topic ? null : chip.dataset.topic;

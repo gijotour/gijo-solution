@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>어댑터 가시화 — 추천 시안 (2026-08-08)</title>
+<style>
+  :root{--bg:#0d1117;--panel:#161b22;--panel-2:#1c2129;--border:#2a313c;--border-strong:#3a4250;--text:#e6e8eb;--muted:#9aa4b2;--muted-2:#6b7482;--blue:#3b82f6;--teal:#1eb980;--amber:#f0a020;--purple:#8b7cf0;--red:#f5928a;}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;font-size:13px;margin:0;padding:24px;max-width:980px;}
+  h2{font-size:15px;margin:26px 0 8px;} .note{color:var(--muted);font-size:12px;margin-bottom:10px;}
+  .num{color:var(--teal);font-size:11.5px;}
+  /* A. 팀원 카드 전문 분야 줄 — 높이 20px, 카드 세로 +20px만 증가 */
+  .agent-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;width:300px;display:inline-block;vertical-align:top;margin-right:12px;}
+  .agent-name{font-weight:700;} .agent-role{color:var(--muted);font-size:12px;margin-top:2px;}
+  .spec-line{display:flex;align-items:center;gap:6px;height:20px;margin-top:8px;font-size:12px;color:var(--muted);}
+  .spec-badge{font-size:11.5px;font-weight:800;padding:1px 7px;border-radius:5px;}
+  .t-vuln{color:var(--red);background:rgba(226,72,61,.12);} .t-none{color:var(--muted-2);}
+  select{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:6px;padding:6px 8px;color:var(--text);font-size:12.5px;margin-top:8px;}
+  /* B. 설정 등록부 — 행 24px, 보기 전용 */
+  table{border-collapse:collapse;width:100%;background:var(--panel);border:1px solid var(--border);border-radius:8px;}
+  th,td{height:24px;padding:0 10px;font-size:12px;text-align:left;border-bottom:1px solid var(--border);}
+  th{color:var(--muted-2);font-weight:600;} td .ok{color:var(--teal);font-weight:700;} td .wait{color:var(--muted-2);}
+  /* C. 띠 학습 단추 */
+  .lt-chip{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:800;padding:3px 9px;border-radius:14px;border:1px solid var(--border);color:var(--muted);}
+  .dot{width:7px;height:7px;border-radius:50%;} .ok{color:var(--teal);}
+  .lt-train{font-size:11px;font-weight:800;color:#0d1117;background:var(--teal);border-radius:9px;padding:1px 8px;cursor:pointer;}
+</style>
+</head>
+<body>
+<h1 style="font-size:17px">어댑터 가시화 — 추천 시안 <span class="num">(후-6 · 2026-08-08 · "2번 시안도 추천으로 진행" 승인)</span></h1>
+<p class="note">원칙: 화면은 보기용(조작 없음), 채택·해제·배정 지시는 대화창에서. 밀도 우선 — 추가 세로: A +20px/카드 · B 표 헤더24+행24×N · C +0px(칩 안에 흡수).</p>
+
+<h2>A. 에이전트 AI — 팀원 카드에 「전문 분야」 한 줄 <span class="num">(줄 높이 20px)</span></h2>
+<div class="agent-card">
+  <div class="agent-name">Scan Agent</div>
+  <div class="agent-role">초기 데이터 해석 · 자산 반영</div>
+  <select disabled><option>전역 모델 따름</option></select>
+  <div class="spec-line">🎓 전문 분야: <span class="spec-badge t-vuln">취약점</span> <span style="color:var(--muted-2)">(sec-expert-vuln-v2)</span></div>
+</div>
+<div class="agent-card">
+  <div class="agent-name">Security Orchestrator</div>
+  <div class="agent-role">작업 분배 · 결과 취합</div>
+  <select disabled><option>전역 모델 따름</option></select>
+  <div class="spec-line t-none">🎓 총괄은 어댑터를 두지 않습니다 — 지시 분배는 흔들리면 안 됩니다</div>
+</div>
+<div class="agent-card">
+  <div class="agent-name">Report Agent</div>
+  <div class="agent-role">내부 보고서 작성</div>
+  <select disabled><option>전역 모델 따름</option></select>
+  <div class="spec-line t-none">🎓 전문 분야: 베이스 그대로 — 어댑터 미배정</div>
+</div>
+
+<h2>B. 설정 › 서버·AI — 「전문가 어댑터 등록부」 구역 <span class="num">(접기 기본 · 행 24px · 보기 전용)</span></h2>
+<p class="note">정체성 한 줄: "학습이 구운 전문가 어댑터의 등록·채택 현황입니다. ⚠채택 전에는 실서비스에 실리지 않습니다 — 채택·배정은 대화창에서 지시하세요."</p>
+<table>
+  <tr><th>어댑터</th><th>주제</th><th>베이스</th><th>상태</th><th>근거</th></tr>
+  <tr><td>sec-expert-vuln-v2</td><td><span class="spec-badge t-vuln">취약점</span></td><td>qwen3-14b</td><td><span class="ok">✓ 채택</span></td><td>게이트 routing 66/66 · A/B 10문 통과</td></tr>
+  <tr><td>sec-expert-vuln-v1</td><td><span class="spec-badge t-vuln">취약점</span></td><td>qwen3-14b</td><td><span class="wait">미채택</span></td><td>미채택 — 평가 게이트 통과 후 채택하세요</td></tr>
+</table>
+<p class="note">빈 상태: "등록된 어댑터가 없습니다 — 학습 루프가 어댑터를 구우면 여기 등록됩니다."</p>
+
+<h2>C. 기억·학습 — 개시선 도달 주제 칩에 [학습 시작] 단추 <span class="num">(칩 안 흡수 · +0px)</span></h2>
+<span class="lt-chip"><span class="dot" style="background:#e2483d"></span>취약점 300/300 <span class="ok">✓</span> <span class="lt-train">학습 시작</span></span>
+<span class="lt-chip" style="margin-left:8px"><span class="dot" style="background:#3b82f6"></span>장비운영 4/300</span>
+<p class="note">누르면 확인창: "「취약점」 전문가 어댑터 학습을 시작할까요? GPU 학습이 돌고, 그동안 채팅·문서검색이 일시 중단됩니다(끝나면 자동 재개)." → 승인 시 주제 학습 실행. 미달 주제엔 단추가 아예 없음(누르면 필터만).</p>
+</body>
+</html>
