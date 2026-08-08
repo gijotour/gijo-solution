@@ -52,7 +52,9 @@ describe("업무 절차 5단계", () => {
     // ⚠ nav.js 파싱이 빈손이면 위 시험은 **통과하면서 아무것도 안 본다**.
     const nav = 사이드바단계();
     const 총합 = Object.values(nav).flat().length;
-    expect(총합, "사이드바에서 화면을 하나도 못 뽑았다 — 위 대조는 빈 검사다").toBeGreaterThanOrEqual(10);
+    // 2026-08-09 그룹 통합으로 각 절차 그룹은 **허브 한 화면**이 됐다 — 5개가 정상.
+    //   (0이면 파싱이 죽은 것이고, 그때 위 대조는 빈 검사가 된다.)
+    expect(총합, "사이드바에서 화면을 하나도 못 뽑았다 — 위 대조는 빈 검사다").toBeGreaterThanOrEqual(5);
   });
 
   it("단계의 대표 화면은 그 단계 안에 있다", () => {
@@ -68,12 +70,12 @@ describe("업무 절차 5단계", () => {
     }
     expect(stageOfScreen(undefined)).toBeNull();
     // 물음표가 붙어도 알아본다(hub는 "settings.html?s=my" 꼴로 넘긴다)
-    expect(stageOfScreen("vulnscan.html?x=1")).toBe(2);
-    expect(stageOfScreen("pages/report.html")).toBe(5);
+    expect(stageOfScreen("triage.html?x=1")).toBe(2);
+    expect(stageOfScreen("pages/reporting.html")).toBe(5);
   });
 
   it("화면 안내가 절차 화면에만 단계를 말한다", () => {
-    for (const s of ["vulnscan.html", "approvals.html", "hardening.html", "report.html"]) {
+    for (const s of ["triage.html", "fix.html", "verify.html", "reporting.html"]) {
       expect(formatScreenGuide(s), `${s}에 절차 줄이 없다`).toContain("📍 업무 절차");
     }
     for (const s of ["settings.html", "audit.html", "dashboard.html"]) {
@@ -84,11 +86,11 @@ describe("업무 절차 5단계", () => {
   it("안내의 우리말 조사가 맞다 (로 / 으로)", () => {
     // ⚠ 단계 이름을 그냥 이어 붙였다가 "**4 검증**로 갑니다"가 나갔다(2026-08-02).
     //   담당자가 읽는 우리말이라 받침에 맞아야 한다.
-    expect(formatScreenGuide("approvals.html")).toContain("**4 검증**으로 갑니다");
-    expect(formatScreenGuide("vulnscan.html")).toContain("**3 조치**로 갑니다");
-    expect(formatScreenGuide("hardening.html")).toContain("**5 보고**로 갑니다");
+    expect(formatScreenGuide("fix.html")).toContain("**4 검증**으로 갑니다");
+    expect(formatScreenGuide("triage.html")).toContain("**3 조치**로 갑니다");
+    expect(formatScreenGuide("verify.html")).toContain("**5 보고**로 갑니다");
     // 마지막 단계는 "다음"이 없다 — 없는 다음을 지어내지 않는다.
-    expect(formatScreenGuide("report.html")).toContain("여기까지가 한 바퀴입니다");
+    expect(formatScreenGuide("reporting.html")).toContain("여기까지가 한 바퀴입니다");
   });
 
   it("⑤ 보고 칸이 더는 늘 비어 있지 않다", () => {

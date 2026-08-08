@@ -78,7 +78,13 @@ describe("★ 안내가 실제 화면을 가리킨다", () => {
       // where("설정 > 내 설정")의 끝 이름이 nav.js에서 그 page에 붙은 label과 같아야 한다.
       // 다르면 "설정 > 관리자로 가세요"라고 해 놓고 정작 다른 구역을 여는 꼴이 된다.
       const leaf = h.where.split(">").pop()!.trim();
-      expect(navSrc.includes(`page: "${h.page}", label: "${leaf}"`), `nav.js에서 ${h.page}의 이름은 '${leaf}'가 아니다`).toBe(true);
+      // 2026-08-09 그룹 통합: 항목이 하나인 그룹은 **그룹 줄 자체가 메뉴**여서 사이드바에 보이는
+      //   글자가 그룹 이름("③ 조치")이다. 그래서 항목 이름 **또는 그 화면을 품은 그룹 이름**과
+      //   같으면 통과다 — 둘 다 아니면 안내가 없는 자리를 가리키는 것이다.
+      const 항목이름 = navSrc.includes(`page: "${h.page}", label: "${leaf}"`);
+      const 그룹블록 = navSrc.split(/\{\s*id:\s*"/).find((b) => b.includes(`page: "${h.page}"`)) ?? "";
+      const 그룹이름 = new RegExp(`label:\\s*"${leaf.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}"`).test(그룹블록.split("items:")[0] ?? "");
+      expect(항목이름 || 그룹이름, `nav.js에서 ${h.page}의 이름은 '${leaf}'가 아니다`).toBe(true);
     });
   }
 

@@ -228,6 +228,13 @@ async function main() {
     // 전 메뉴 커버(제품소개 자료용) — 위 12장에 없던 나머지 화면.
     { page: "dashboard.html", name: "13-메인대시보드-지휘콘솔" },
     { page: "analysis.html", name: "14-통합관제-보안분석" },
+    // 2026-08-09 그룹 통합 — 사이드바 다섯 절차는 각각 허브 한 화면이다(한눈에 띠 + 무대).
+    //   자료에는 담당자가 실제로 여는 이 화면이 들어가야 한다.
+    { page: "discover.html", name: "20-발견수집-허브" },
+    { page: "triage.html", name: "21-우선순위-허브" },
+    { page: "fix.html", name: "22-조치-허브" },
+    { page: "verify.html", name: "23-검증-허브" },
+    { page: "reporting.html", name: "24-보고-허브" },
     { page: "redteam.html", name: "15-레드팀-가드레일" },
     { page: "memory.html", name: "17-기억학습-문서관리" },
     { page: "merge.html", name: "18-LLM합성-모델머지" },

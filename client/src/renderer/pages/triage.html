@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GIJO AS — 발견·수집</title>
+<title>GIJO AS — 우선순위</title>
 <link rel="stylesheet" href="gijo-ui.css">
 <!--
   발견·수집 허브 — 그룹 통합 1호 (2026-08-09 사용자 승인, mockups/discover-hub 추천안).
@@ -45,7 +45,7 @@
 <div class="app">
   <aside class="sidebar" id="gijoNav"></aside>
   <div class="main">
-    <div class="scr-id"><b>발견·수집</b> — 관제·위협·자산의 한눈에를 한 줄로 보고, 누르면 그 메뉴가 아래에 열립니다.</div>
+    <div class="scr-id"><b>우선순위</b> — 무엇부터 손댈지 한 줄로 보고, 누르면 그 메뉴가 아래에 열립니다.</div>
     <div id="hubHost" style="display:flex;flex-direction:column;flex:1;min-height:0"></div>
   </div>
 </div>
@@ -66,9 +66,9 @@
   "use strict";
   if (!window.gijo || !window.gijo.isAuthenticated || !window.gijo.isAuthenticated()) { location.href = "login.html"; return; }
   // 판 정의는 grouppanels.js 한 곳에 있다(그룹이 늘어도 화면은 그룹 이름만 넘긴다).
-  var panels = (window.gijoGroupPanels || {})["discover"] || [];
+  var panels = (window.gijoGroupPanels || {})["triage"] || [];
   var want = new URLSearchParams(location.search).get("panel");
-  var initial = panels.some(function (p) { return p.id === want; }) ? want : "analysis";
+  var initial = panels.some(function (p) { return p.id === want; }) ? want : "vuln";
   window.gijoGroupHub.mount(document.getElementById("hubHost"), { panels: panels, initial: initial });
 })();
 </script>

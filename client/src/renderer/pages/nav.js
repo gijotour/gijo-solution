@@ -96,22 +96,19 @@
       // 개별 화면(analysis·threat·inventory)은 파일 그대로 살아 허브 안 끼움 창으로 열린다.
       { page: "discover.html", label: "발견·수집" },
     ]},
+    // 그룹 통합(2026-08-09 사용자 지시) — 다섯 절차 그룹은 각각 허브 한 화면이다.
+    // 개별 화면은 파일 그대로 살아 허브 무대(끼움 창)에서 열린다.
     { id: "s2-triage", icon: "target", label: "② 우선순위", items: [
-      { page: "vulnscan.html", label: "취약점" },
-      { page: "sbom.html", label: "AI-BOM" },
+      { page: "triage.html", label: "우선순위" },
     ]},
     { id: "s3-fix", icon: "check", label: "③ 조치", items: [
-      { page: "approvals.html", label: "조치·승인" },
-      { page: "maintenance.html", label: "정기 점검" },
-      { page: "terminal.html", label: "명령창" },
+      { page: "fix.html", label: "조치" },
     ]},
     { id: "s4-verify", icon: "shield", label: "④ 검증", items: [
-      { page: "hardening.html", label: "보안설정 점검" },
+      { page: "verify.html", label: "검증" },
     ]},
     { id: "s5-report", icon: "chart", label: "⑤ 보고", items: [
-      { page: "report.html", label: "리포트" },
-      { page: "kpi.html", label: "보안 KPI" },
-      { page: "compliance.html", label: "컴플라이언스" },
+      { page: "reporting.html", label: "보고" },
     ]},
 
     // ── 기반 — 절차가 아니라 **참조하는 대장**이다. 절차 아래에 둔다. ────────────────
@@ -166,6 +163,25 @@
     // 발견·수집 그룹 통합(2026-08-09) — 세 메뉴는 discover 허브가 받는다. 열어 둔 탭(?embed=1)과
     // 쿼리 없는 직접 링크 둘 다 흡수. ⚠ 허브 무대(?embed=1&hub=1)는 키가 달라 여길 안 탄다 —
     // 태우면 허브 안에서 허브를 또 여는 무한 중첩이 된다.
+    // ②③④⑤ 그룹 통합(2026-08-09) — 개별 화면 링크·열어 둔 탭을 해당 허브로(판 켠 채).
+    "vulnscan.html": "triage.html?panel=vuln",
+    "vulnscan.html?embed=1": "triage.html?embed=1&panel=vuln",
+    "sbom.html": "triage.html?panel=sbom",
+    "sbom.html?embed=1": "triage.html?embed=1&panel=sbom",
+    "approvals.html": "fix.html?panel=approvals",
+    "approvals.html?embed=1": "fix.html?embed=1&panel=approvals",
+    "maintenance.html": "fix.html?panel=maintenance",
+    "maintenance.html?embed=1": "fix.html?embed=1&panel=maintenance",
+    "terminal.html": "fix.html?panel=terminal",
+    "terminal.html?embed=1": "fix.html?embed=1&panel=terminal",
+    "hardening.html": "verify.html?panel=hardening",
+    "hardening.html?embed=1": "verify.html?embed=1&panel=hardening",
+    "report.html": "reporting.html?panel=report",
+    "report.html?embed=1": "reporting.html?embed=1&panel=report",
+    "kpi.html": "reporting.html?panel=kpi",
+    "kpi.html?embed=1": "reporting.html?embed=1&panel=kpi",
+    "compliance.html": "reporting.html?panel=compliance",
+    "compliance.html?embed=1": "reporting.html?embed=1&panel=compliance",
     "analysis.html": "discover.html?panel=analysis",
     "analysis.html?embed=1": "discover.html?embed=1&panel=analysis",
     "threat.html": "discover.html?panel=threat",

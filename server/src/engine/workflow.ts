@@ -32,10 +32,10 @@ export const STAGE_SCREENS: Record<number, string[]> = {
   // 표도 하나다(감시 시험: 서버 표 = 사이드바). 개별 화면은 허브 무대 안에서만 열리고
   // 직접 주소는 nav.js가 허브로 흡수하므로 여기 남길 필요가 없다.
   1: ["discover.html"],
-  2: ["vulnscan.html", "sbom.html"],
-  3: ["approvals.html", "maintenance.html", "terminal.html"],
-  4: ["hardening.html"],
-  5: ["report.html", "kpi.html", "compliance.html"],
+  2: ["triage.html"],
+  3: ["fix.html"],
+  4: ["verify.html"],
+  5: ["reporting.html"],
 };
 
 /** 이 화면이 몇 단계인가. 절차 화면이 아니면 null(띠도 안 그리고 안내도 안 붙인다). */
@@ -123,13 +123,13 @@ export function workflowStages(): WorkflowStage[] {
   //   도착한 순간 띠가 다른 단계를 가리킨다. workflow.test.ts가 대조해 막는다.
   return [
     { no: 1, key: "find", label: "발견·수집", count: assets.length, alert: 오늘신규, alertLabel: "오늘 신규", page: "discover.html", screens: STAGE_SCREENS[1] },
-    { no: 2, key: "triage", label: "우선순위", count: 취약, alert: kev, alertLabel: "실제 악용(KEV)", page: "vulnscan.html", screens: STAGE_SCREENS[2] },
-    { no: 3, key: "fix", label: "조치", count: 진행, alert: 미배정, alertLabel: "미배정", page: "approvals.html", screens: STAGE_SCREENS[3] },
-    { no: 4, key: "verify", label: "검증", count: 실패항목, alert: 미확인, alertLabel: "미점검 대상", page: "hardening.html", screens: STAGE_SCREENS[4] },
+    { no: 2, key: "triage", label: "우선순위", count: 취약, alert: kev, alertLabel: "실제 악용(KEV)", page: "triage.html", screens: STAGE_SCREENS[2] },
+    { no: 3, key: "fix", label: "조치", count: 진행, alert: 미배정, alertLabel: "미배정", page: "fix.html", screens: STAGE_SCREENS[3] },
+    { no: 4, key: "verify", label: "검증", count: 실패항목, alert: 미확인, alertLabel: "미점검 대상", page: "verify.html", screens: STAGE_SCREENS[4] },
     // ⑤ 보고 — 이번 주 쓴 보고서 수와 마지막 보고 후 지난 날수(2026-08-02 규칙 확정).
     //    ⚠ 한동안 비워 뒀던 칸이다. 다섯 칸 중 하나가 늘 비어 있으면 담당자는 고장으로 읽는다.
     //    ⚠ 못 읽으면 여전히 **비운다** — 0으로 채우면 "안 썼다"가 되어 거짓이다.
-    { no: 5, key: "report", label: "보고", count: 보고?.thisWeek ?? null, alert: 보고?.daysSinceLast ?? null, alertLabel: 보고?.daysSinceLast == null ? "" : "마지막 보고 후(일)", page: "report.html", screens: STAGE_SCREENS[5] },
+    { no: 5, key: "report", label: "보고", count: 보고?.thisWeek ?? null, alert: 보고?.daysSinceLast ?? null, alertLabel: 보고?.daysSinceLast == null ? "" : "마지막 보고 후(일)", page: "reporting.html", screens: STAGE_SCREENS[5] },
   ];
 }
 

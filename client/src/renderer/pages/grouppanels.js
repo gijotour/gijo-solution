@@ -1,0 +1,270 @@
+// grouppanels.js — 그룹 허브의 판(한눈에) 정의 한 곳 (2026-08-09).
+//
+// 사이드바 5개 업무 그룹을 각각 "한눈에 띠 + 하단 무대" 한 화면으로 통합했다(사용자 지시).
+// 판 정의를 화면마다 흩어 두면 그룹이 늘 때마다 같은 코드를 베끼게 되고, 숫자 기준이 서로
+// 어긋난다 — **여기 한 곳**에 모아 두고 각 허브 화면은 그룹 이름만 넘긴다.
+//
+// 규칙
+//   · 요약 숫자는 **그 메뉴 화면이 쓰는 것과 같은 API·같은 기준**으로 센다.
+//   · 데이터가 없어도 **같은 모양**으로 그린다(0은 0으로 — 판이 사라지거나 모양이 달라지면
+//     담당자는 "고장인가?"를 먼저 의심한다. 2026-08-09 사용자 지시).
+//   · 못 구한 값은 "-"로 둔다 — 0으로 채우면 "없다"는 뜻이 되어 거짓이 된다.
+(function () {
+  "use strict";
+  var R = "var(--red,#e2483d)", A = "var(--amber,#f0a020)", B = "var(--blue,#3b82f6)",
+      T = "var(--teal,#1eb980)", G = "#8a8478", O = "#e8823c";
+  var 살아있는 = function (f) { return f.state !== "fixed"; };
+  var n = function (v) { return (v == null ? 0 : v).toLocaleString(); };
+
+  // 스캔 오류는 취약점이 아니다(서버 isRealVulnerability와 같은 잣대) — 세는 자리마다 지킨다.
+  var SCAN_NOISE = { scan_error: true, info: true };
+  var 진짜취약점 = function (f) { return !SCAN_NOISE[f.finding_type] && !SCAN_NOISE[f.severity]; };
+
+  var 그룹 = {
+    // ① 발견·수집
+    discover: [
+      { id: "posture", title: "📊 보안 태세", page: "kpi.html", load: function () {
+        return window.gijo.getSecurityKpi().then(function (k) {
+          var c = (k || {}).current || {};
+          var BAND = { good: "양호", warn: "주의", bad: "미흡" };
+          return {
+            badge: c.posture ? { text: BAND[c.posture.band] || "", color: R } : null,
+            rows: [
+              ["종합 점수", c.posture ? c.posture.score + "/100" : "-"],
+              ["미조치 취약점", c.vulnerabilities ? n(c.vulnerabilities.active) : "-", R],
+              ["실제 악용(KEV)", c.vulnerabilities && c.vulnerabilities.kev != null ? String(c.vulnerabilities.kev) : "-", R],
+            ],
+            foot: c.compliance ? "컴플라이언스 " + Math.round(c.compliance.coverageRate) + "%" : "",
+          };
+        });
+      } },
+      { id: "analysis", title: "🚨 통합 관제", page: "analysis.html", load: function () {
+        return window.gijo.analysisEvents().then(function (d) {
+          var ev = (d && d.events) || [];
+          var 열림 = function (e) { return !(e.status === "done" || e.status === "ignored"); };
+          var 셈 = function (p) { return ev.filter(function (e) { return e.priority === p && 열림(e); }).length; };
+          return {
+            segments: [
+              { key: "P0", label: "P0", value: 셈("P0"), color: R },
+              { key: "P1", label: "P1", value: 셈("P1"), color: O },
+              { key: "P2", label: "P2", value: 셈("P2"), color: A },
+            ],
+            foot: "정리됨 " + n(ev.length - ev.filter(열림).length) + "/" + n(ev.length),
+          };
+        });
+      } },
+      { id: "threat", title: "🌐 위협 인텔", page: "threat.html", load: function () {
+        return window.gijo.listCtiFindings().then(function (fs) {
+          fs = fs || [];
+          var 셈 = function (k) { return fs.filter(function (f) { return f.severity === k; }).length; };
+          return {
+            segments: [
+              { key: "critical", label: "긴급", value: 셈("critical"), color: R },
+              { key: "warning", label: "주의", value: 셈("warning"), color: A },
+              { key: "info", label: "정보", value: 셈("info"), color: G },
+            ],
+            foot: "전체 " + n(fs.length) + "건",
+          };
+        });
+      } },
+      { id: "assets", title: "🖥 자산", page: "inventory.html", load: function () {
+        return window.gijo.listAssets().then(function (assets) {
+          assets = assets || [];
+          // 자산 화면(inventory.html 종류한글)과 같은 이름표·같은 필드(assetType).
+          var 종류한글 = { "infra-host": "인프라 호스트", server: "서버", network: "네트워크 장비", endpoint: "단말", container: "컨테이너", repo: "코드 저장소" };
+          var 종류별 = {};
+          assets.forEach(function (a) { var t = a.assetType || "기타"; 종류별[t] = (종류별[t] || 0) + 1; });
+          var 상위 = Object.entries(종류별).sort(function (x, y) { return y[1] - x[1]; }).slice(0, 4);
+          var 고위험 = assets.filter(function (a) {
+            return (a.findings || []).some(function (f) { return (f.severity === "critical" || f.severity === "high") && 살아있는(f); });
+          }).length;
+          return {
+            segments: 상위.map(function (kv) {
+              var L = String(종류한글[kv[0]] || kv[0]);
+              return { key: kv[0], label: L.length > 6 ? L.slice(0, 6) + "…" : L, value: kv[1], color: B };
+            }),
+            foot: "고위험 " + 고위험 + "/" + assets.length,
+          };
+        });
+      } },
+    ],
+
+    // ② 우선순위
+    triage: [
+      { id: "vuln", title: "🔍 취약점", page: "vulnscan.html", load: function () {
+        return window.gijo.listAssets().then(function (assets) {
+          assets = assets || [];
+          var 셈 = { critical: 0, high: 0, medium: 0 }, kev = 0, 전체 = 0;
+          assets.forEach(function (a) {
+            (a.findings || []).forEach(function (f) {
+              if (!살아있는(f) || !진짜취약점(f)) return;
+              전체++;
+              if (f.kev) kev++;
+              if (셈[f.severity] != null) 셈[f.severity]++;
+            });
+          });
+          return {
+            badge: kev ? { text: "KEV " + kev, color: R } : null,
+            segments: [
+              { key: "critical", label: "매우 심각", value: 셈.critical, color: R },
+              { key: "high", label: "높음", value: 셈.high, color: O },
+              { key: "medium", label: "보통", value: 셈.medium, color: A },
+            ],
+            foot: "미조치 " + n(전체) + "건",
+          };
+        });
+      } },
+      { id: "sbom", title: "📦 AI-BOM · 구성", page: "sbom.html", load: function () {
+        return window.gijo.listAssets().then(function (assets) {
+          assets = assets || [];
+          var 있음 = assets.filter(function (a) { return a.sbomGeneratedAt; }).length;
+          var ai = assets.filter(function (a) { return a.assetType === "llm-service" || a.assetType === "ml-model"; }).length;
+          return {
+            rows: [
+              ["구성 명세(SBOM) 있음", n(있음)],
+              ["아직 없음", n(assets.length - 있음), A],
+              ["AI 자산", n(ai)],
+            ],
+            foot: "전체 자산 " + n(assets.length),
+          };
+        });
+      } },
+    ],
+
+    // ③ 조치
+    fix: [
+      { id: "approvals", title: "✅ 조치·승인", page: "approvals.html", load: function () {
+        return window.gijo.listApprovals().then(function (r) {
+          var rows = (r && r.reviews) || r || [];
+          var 셈 = function (s) { return rows.filter(function (x) { return x.status === s; }).length; };
+          var 미배정 = rows.filter(function (x) { return !x.assignee && x.status !== "approved" && x.status !== "rejected"; }).length;
+          return {
+            badge: 미배정 ? { text: "미배정 " + n(미배정), color: A } : null,
+            segments: [
+              { key: "pending", label: "검토 대기", value: 셈("pending"), color: A },
+              { key: "in_progress", label: "진행 중", value: 셈("in_progress"), color: B },
+              { key: "approved", label: "완료", value: 셈("approved"), color: T },
+            ],
+            foot: "전체 " + n(rows.length) + "건",
+          };
+        });
+      } },
+      { id: "maintenance", title: "🛠 정기 점검", page: "maintenance.html", load: function () {
+        return window.gijo.listMaintenance().then(function (r) {
+          var list = (r && r.items) || r || [];
+          var now = Date.now();
+          var 기한초과 = list.filter(function (m) { return m.dueAt && m.dueAt < now && m.status !== "done"; }).length;
+          var 예정 = list.filter(function (m) { return m.status !== "done"; }).length;
+          return {
+            badge: 기한초과 ? { text: "기한 초과 " + n(기한초과), color: R } : null,
+            rows: [
+              ["예정·진행", n(예정)],
+              ["기한 초과", n(기한초과), 기한초과 ? R : ""],
+              ["완료", n(list.length - 예정)],
+            ],
+            foot: "점검 항목 " + n(list.length) + "건",
+          };
+        });
+      } },
+      { id: "terminal", title: "⌨ 명령창", page: "terminal.html", load: function () {
+        // 명령창은 "지금 몇 건"이 아니라 **최근에 무엇을 했나**가 요약이다(감사 기록 기준).
+        return window.gijo.listAudit("cli", 200).then(function (r) {
+          var list = (r && r.entries) || r || [];
+          var 하루 = Date.now() - 86400000;
+          var 최근 = list.filter(function (e) { return (e.at || e.createdAt || 0) >= 하루; }).length;
+          var 차단 = list.filter(function (e) { return e.result === "blocked"; }).length;
+          return {
+            rows: [
+              ["최근 24시간 실행", n(최근)],
+              ["차단된 위험 명령", n(차단), 차단 ? A : ""],
+              ["기록 보관", n(list.length)],
+            ],
+            foot: "허용 목록 밖 명령은 실행 전에 막습니다",
+          };
+        });
+      } },
+    ],
+
+    // ④ 검증 — 데이터가 없어도 **같은 모양**으로(2026-08-09 사용자 지시: 0이면 0으로 그린다)
+    verify: [
+      { id: "hardening", title: "🛡 보안설정 점검", page: "hardening.html", load: function () {
+        return Promise.all([
+          window.gijo.hardeningTargets.list().catch(function () { return []; }),
+          window.gijo.hardeningSchedules.list().catch(function () { return []; }),
+          window.gijo.hardeningRuns(undefined, 300).catch(function () { return []; }),
+        ]).then(function (r) {
+          // 응답은 껍데기에 담겨 온다({targets}/{schedules}/{runs}) — 배열로 벗겨 쓴다.
+          var targets = (r[0] && r[0].targets) || r[0] || [], schedules = (r[1] && r[1].schedules) || r[1] || [], runs = (r[2] && r[2].runs) || r[2] || [];
+          var 활성 = schedules.filter(function (s) { return s.enabled !== false; }).length;
+          // 준수율 = 대상별 **가장 최근** 결과만(옛 결과까지 더하면 고친 것이 계속 세어진다).
+          var 최근 = {};
+          runs.forEach(function (x) { if (!(x.targetId in 최근)) 최근[x.targetId] = x; });
+          var vals = Object.values(최근);
+          var 합 = vals.reduce(function (a, x) { return a + (x.pass || 0); }, 0);
+          var 총 = vals.reduce(function (a, x) { return a + (x.pass || 0) + (x.fail || 0); }, 0);
+          return {
+            rows: [
+              ["등록 장비", n(targets.length)],
+              ["활성 스케줄", n(활성)],
+              ["평균 준수율", 총 ? Math.round((합 / 총) * 100) + "%" : "-"],
+            ],
+            foot: vals.length ? "점검 이력 " + n(runs.length) + "회" : "아직 점검 이력이 없습니다",
+          };
+        });
+      } },
+    ],
+
+    // ⑤ 보고
+    reporting: [
+      { id: "report", title: "📄 리포트", page: "report.html", load: function () {
+        return window.gijo.listReportHistory().then(function (r) {
+          var list = (r && r.reports) || r || [];
+          var 주 = Date.now() - 7 * 86400000;
+          var 이번주 = list.filter(function (x) { return (x.createdAt || 0) >= 주 && !x.qa; }).length;
+          var 최근 = list.filter(function (x) { return !x.qa; })[0];
+          var 지난날 = 최근 ? Math.floor((Date.now() - 최근.createdAt) / 86400000) : null;
+          return {
+            rows: [
+              ["이번 주 작성", n(이번주)],
+              ["마지막 보고 후", 지난날 == null ? "-" : 지난날 + "일"],
+              ["보관 중", n(list.length)],
+            ],
+            foot: "정기·수시 보고서가 여기 쌓입니다",
+          };
+        });
+      } },
+      { id: "kpi", title: "📈 보안 KPI", page: "kpi.html", load: function () {
+        return window.gijo.getSecurityKpi().then(function (k) {
+          var c = (k || {}).current || {};
+          var BAND = { good: "양호", warn: "주의", bad: "미흡" };
+          return {
+            badge: c.posture ? { text: BAND[c.posture.band] || "", color: R } : null,
+            rows: [
+              ["종합 점수", c.posture ? c.posture.score + "/100" : "-"],
+              ["미조치 취약점", c.vulnerabilities ? n(c.vulnerabilities.active) : "-", R],
+              ["기한 지난 조치", c.remediation && c.remediation.overdue != null ? n(c.remediation.overdue) : "-", A],
+            ],
+            foot: "지표는 서버가 한 곳에서 셉니다",
+          };
+        });
+      } },
+      { id: "compliance", title: "📋 컴플라이언스", page: "compliance.html", load: function () {
+        return window.gijo.listCompliance().then(function (r) {
+          var list = (r && r.items) || r || [];
+          var 셈 = function (s) { return list.filter(function (x) { return x.status === s; }).length; };
+          return {
+            // 상태 값은 서버 정의 그대로(covered/partial/open/na) — 화면과 같은 말을 쓴다.
+            segments: [
+              { key: "covered", label: "이행", value: 셈("covered"), color: T },
+              { key: "partial", label: "부분", value: 셈("partial"), color: A },
+              { key: "open", label: "미이행", value: 셈("open"), color: R },
+            ],
+            foot: "항목 " + n(list.length) + "개",
+          };
+        });
+      } },
+    ],
+  };
+
+  window.gijoGroupPanels = 그룹;
+})();

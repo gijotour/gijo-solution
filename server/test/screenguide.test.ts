@@ -350,7 +350,9 @@ describe("★ 메뉴에 있는 화면은 챗봇 안내도 있어야 한다", () 
     for (const m of nav.matchAll(/\{\s*page:\s*"([a-z0-9_-]+\.html)(?:\?[^"]*)?",\s*label:/g)) {
       if (!메뉴.includes(m[1])) 메뉴.push(m[1]);
     }
-    expect(메뉴.length, "nav에서 화면을 못 찾았다 — 시험이 헛돌고 있다").toBeGreaterThan(20);
+    // 2026-08-09 그룹 통합으로 절차 5그룹이 각각 허브 한 화면이 됐다(개별 화면은 허브 무대에서 열림)
+    //   — 메뉴에 적힌 화면 수가 줄었다. 0이면 파싱이 죽은 것이므로 하한은 남긴다.
+    expect(메뉴.length, "nav에서 화면을 못 찾았다 — 시험이 헛돌고 있다").toBeGreaterThan(12);
     const 없음 = 메뉴.filter((p) => !getScreenGuide(p));
     expect(없음, "이 화면들은 챗봇이 설명하지 못한다").toEqual([]);
   });
