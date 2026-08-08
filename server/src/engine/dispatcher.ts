@@ -4,6 +4,7 @@
 
 import type { Express, Request } from "express";
 import { 말투재기 } from "./tonewatch";
+import { 거짓완료차단 } from "./falseclaim";
 import { authMiddleware } from "../auth/auth";
 import { runWithViewer } from "./viewerctx";
 import type { GijoUser } from "../auth/users";
@@ -313,7 +314,12 @@ async function executeRoutedAction(route: RoutedIntent, instructionText: string,
       // explain: 지휘 콘솔에 그대로 표시되는 답변이다.
       reportProgress("write", "사내 근거를 찾아 답을 쓰고 있습니다"); // chat 내부에서 RAG 검색+작성이 함께 돈다
       // noLearn:true — 수집은 dispatchInstructionScoped 출구 한 곳에서 한다(이중 기록 방지).
-      return { output: await chat({ agentId: route.agentId, message, remember: true, trusted: true, explain: true, screen, qa, noLearn: true, viewer, logQuestion: instructionText }) };
+      const 답 = await chat({ agentId: route.agentId, message, remember: true, trusted: true, explain: true, screen, qa, noLearn: true, viewer, logQuestion: instructionText });
+      // 여기는 **도구가 하나도 안 돈 경로**다. 그런데 답이 "등록하였습니다"라고 말하면 거짓이다
+      // (2026-08-09 평가 게이트 실측 — 등록부는 비어 있었다). 내보내기 전에 막는다.
+      const 검사 = 거짓완료차단(instructionText, 답);
+      if (검사.막았나) console.warn(`[거짓완료차단] 잡담 경로가 완료를 주장해 대체함 — "${instructionText.slice(0, 40)}"`);
+      return { output: 검사.답 };
     }
   }
 }
