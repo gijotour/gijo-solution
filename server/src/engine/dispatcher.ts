@@ -314,12 +314,9 @@ async function executeRoutedAction(route: RoutedIntent, instructionText: string,
       // explain: 지휘 콘솔에 그대로 표시되는 답변이다.
       reportProgress("write", "사내 근거를 찾아 답을 쓰고 있습니다"); // chat 내부에서 RAG 검색+작성이 함께 돈다
       // noLearn:true — 수집은 dispatchInstructionScoped 출구 한 곳에서 한다(이중 기록 방지).
-      const 답 = await chat({ agentId: route.agentId, message, remember: true, trusted: true, explain: true, screen, qa, noLearn: true, viewer, logQuestion: instructionText });
-      // 여기는 **도구가 하나도 안 돈 경로**다. 그런데 답이 "등록하였습니다"라고 말하면 거짓이다
-      // (2026-08-09 평가 게이트 실측 — 등록부는 비어 있었다). 내보내기 전에 막는다.
-      const 검사 = 거짓완료차단(instructionText, 답);
-      if (검사.막았나) console.warn(`[거짓완료차단] 잡담 경로가 완료를 주장해 대체함 — "${instructionText.slice(0, 40)}"`);
-      return { output: 검사.답 };
+      // 거짓 완료(하지 않은 일을 했다는 답)는 여기서 막지 않는다 — **출구 한 곳**
+      // (dispatchInstruction의 거짓완료를걸러낸다)에서 모든 갈래를 한꺼번에 본다.
+      return { output: await chat({ agentId: route.agentId, message, remember: true, trusted: true, explain: true, screen, qa, noLearn: true, viewer, logQuestion: instructionText }) };
     }
   }
 }
@@ -554,7 +551,28 @@ export async function dispatchInstruction(instructionText: string, sessionId?: s
   // ★ 이 요청이 끝날 때까지 "누가 묻는지"를 달아 둔다. 아래에서 도는 AI 도구(search·explain)는
   //   run(args) 한 모양이라 사람을 넘길 자리가 없다 — 꼬리표가 없으면 대화는 등급을 지키는데
   //   도구로 물으면 기밀 문서가 그대로 나온다(2026-08-01 실검증에서 잡은 뚫린 문. viewerctx.ts).
-  return runWithViewer(viewer, () => dispatchInstructionScoped(instructionText, sessionId, screen, actor, qa, noLearn, viewer));
+  const result = await runWithViewer(viewer, () =>
+    dispatchInstructionScoped(instructionText, sessionId, screen, actor, qa, noLearn, viewer)
+  );
+  return 거짓완료를걸러낸다(instructionText, result);
+}
+
+/**
+ * 대화창 출구 한 곳에서 「하지 않은 일을 했다」는 답을 걸러낸다.
+ *
+ * 갈래(잡담·리포트·분석·오케스트레이션)마다 심으면 **새 갈래가 생길 때마다 또 샌다** —
+ * 수집(recordChatLog)을 출구 하나로 모은 것과 같은 이유다. 여기 하나면 어떤 갈래든 걸린다.
+ *
+ * 「도구가 돌았나」의 판단 근거는 `toolCalls`다. 도구가 실제로 돌았으면 "등록했습니다"는 사실이고,
+ * 결재판·확인 대기는 아직 실행 전이라 완료를 주장할 수도 없다(둘 다 그대로 통과).
+ */
+function 거짓완료를걸러낸다(지시: string, r: DispatchResult): DispatchResult {
+  if (r.approval || r.confirm) return r;
+  const 도구가돌았나 = !!r.toolCalls?.length;
+  const 검사 = 거짓완료차단(지시, r.output ?? "", 도구가돌았나);
+  if (!검사.막았나) return r;
+  console.warn(`[거짓완료차단] 도구가 안 돌았는데 완료를 주장해 대체함 — "${지시.slice(0, 40)}"`);
+  return { ...r, output: 검사.답 };
 }
 
 async function dispatchInstructionScoped(instructionText: string, sessionId?: string, screen?: string, actor?: string, qa?: boolean, noLearn?: boolean, viewer?: Viewer): Promise<DispatchResult> {

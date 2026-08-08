@@ -63,3 +63,29 @@ describe("자산 등록 라우팅 — 조사 하나로 새지 않는가", () => 
     });
   }
 });
+
+// ── 관문이 출구 한 곳에 있는가 (소스 감시) ────────────────────────────────────
+// 갈래(잡담·리포트·분석·오케스트레이션)마다 심으면 새 갈래가 생길 때 또 샌다.
+// 실측(2026-08-09): 처음엔 잡담 갈래에만 붙여 리포트·계획 갈래가 그대로 열려 있었다.
+describe("거짓 완료 관문은 대화창 출구 한 곳에 있다", () => {
+  it("dispatchInstruction이 결과를 걸러 낸 뒤 돌려준다", async () => {
+    const fs = await import("node:fs");
+    const src = fs.readFileSync(new URL("../src/engine/dispatcher.ts", import.meta.url), "utf8");
+    expect(src, "출구 함수가 없다").toContain("function 거짓완료를걸러낸다");
+    expect(src, "출구에서 안 부르면 아무 갈래도 안 걸린다").toContain("return 거짓완료를걸러낸다(instructionText, result)");
+  });
+
+  it("갈래마다 흩어 놓지 않는다 — 관문 호출은 출구 한 곳뿐", async () => {
+    const fs = await import("node:fs");
+    const src = fs.readFileSync(new URL("../src/engine/dispatcher.ts", import.meta.url), "utf8");
+    const 호출 = (src.match(/거짓완료차단\(/g) ?? []).length;
+    expect(호출, "관문을 두 곳 이상에서 부르면 갈래 관리로 되돌아간 것이다").toBe(1);
+  });
+
+  it("도구가 돈 답과 결재판은 통과시킨다(계약)", async () => {
+    const fs = await import("node:fs");
+    const src = fs.readFileSync(new URL("../src/engine/dispatcher.ts", import.meta.url), "utf8");
+    expect(src).toContain("if (r.approval || r.confirm) return r;");
+    expect(src).toContain("!!r.toolCalls?.length");
+  });
+});

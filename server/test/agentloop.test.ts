@@ -157,7 +157,12 @@ describe("runAgentLoop — 결정→실행→최종답변", () => {
     // 결정 호출에는 스키마 강제, 최종 재작성에는 생성 길이 상한(maxTokens)이 걸린다. remember(임베딩
     // 재호출)은 최종답 경로에서 뺐다 — 단일 GPU에서 채팅 모델과 경합해 멈추던 원인이라(오늘 수정).
     expect(mockChat.mock.calls[0][0]).toMatchObject({ agentId: "orchestrator", responseSchema: expect.anything() });
-    expect(mockChat.mock.calls[2][0]).toMatchObject({ maxTokens: 800 });
+    // 상한 숫자를 여기 박아 두면 값을 조정할 때마다 시험이 헛되이 깨진다(2026-08-09에 실제로 깨졌다).
+    // 여기서 지킬 계약은 "상한이 **걸려 있다**"이고, 그 값이 30초 안에 쓸 수 있는 크기인지는
+    // answerlength.test.ts가 따로 본다.
+    const 최종답호출 = mockChat.mock.calls[2][0] as { maxTokens?: number };
+    expect(최종답호출.maxTokens, "최종답에 길이 상한이 없으면 모델이 멈출 때까지 쏟아낸다").toBeGreaterThan(0);
+    expect(최종답호출.maxTokens).toBeLessThanOrEqual(800);
     expect(mockChat.mock.calls[2][0].remember).toBeFalsy();
     expect(mockChat.mock.calls[2][0].message, "도구 결과가 재작성 프롬프트에 안 실렸다").toContain(r!.toolCalls[0].result.slice(0, 12));
   });

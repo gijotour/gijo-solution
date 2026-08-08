@@ -254,6 +254,10 @@ export interface EffectiveReport {
   effectiveScore: number; // (total - leaked) / total * 100
   leakedIds: string[];
   results: { id: string; severity: string; outcome: "blocked" | "held" | "leaked"; excerpt: string }[];
+  // 잴 때 가드레일이 어느 모드였나 — 이게 없으면 "입구 차단 0"이 **고장인지 설정인지** 구분이 안 된다.
+  // 실제로 그 혼동이 있었다(2026-08-09 평가 게이트): 담당자가 flag(기록만)로 바꿔 둔 상태였는데
+  // 게이트는 "가드레일이 풀렸는지 확인할 것"이라는 헛경보를 냈다. 숫자 옆에 조건을 같이 적는다.
+  guardMode?: "off" | "flag" | "block";
 }
 
 // ⚠ 메모리에만 두면 **재시작하면 사라진다.** 운영 서버는 코드 갱신·복구로 자주 재시작하는데,
@@ -300,7 +304,16 @@ export async function runEffectiveRedTeam(
     });
   }
   const leakedIds = results.filter((r) => r.outcome === "leaked").map((r) => r.id);
+  // ⚠ 정적 import를 쓰면 guardrail ↔ redteam 순환이 된다(guardrail이 detectInjectionAttempt를
+  //   가져다 쓴다). 실행 시점에 가져오면 둘 다 이미 올라와 있어 안전하다.
+  let guardMode: EffectiveReport["guardMode"];
+  try {
+    guardMode = (await import("./guardrail.js")).guardrailStatus().mode;
+  } catch {
+    guardMode = undefined; // 모드를 못 읽어도 측정 자체는 유효하다 — 다만 조건을 모른다고 적는다
+  }
   const report: EffectiveReport = {
+    guardMode,
     ranAt: Date.now(),
     total: results.length,
     blockedAtGate: results.filter((r) => r.outcome === "blocked").length,
@@ -315,10 +328,21 @@ export async function runEffectiveRedTeam(
 }
 
 /** 사람이 읽는 요약 — 챗봇·화면이 그대로 쓴다. */
+/**
+ * 「입구에서 차단 0건」이 고장인지 설정인지 한 줄로 밝힌다.
+ * flag(기록만)·off로 두면 차단이 0인 게 **정상**이다 — 그 조건을 안 적으면 다음 사람이 헛다리를 짚는다.
+ */
+export function 가드모드꼬리(r: EffectiveReport): string {
+  if (r.guardMode === "flag") return " ⚠ 가드레일이 「기록만」 모드라 막지 않습니다 — 0건이 정상입니다";
+  if (r.guardMode === "off") return " ⚠ 가드레일이 꺼져 있습니다 — 0건이 정상입니다";
+  if (!r.guardMode) return " (잴 때 가드레일 모드를 확인하지 못했습니다)";
+  return "";
+}
+
 export function effectiveReportText(r: EffectiveReport, rawScore?: number | null): string {
   const lines = [
     `🛡 제품 경로 실효 견고성 ${r.effectiveScore}점 — 공격 ${r.total}종을 실제 사용 경로로 보낸 결과`,
-    `  · 입구에서 차단 ${r.blockedAtGate}건 (가드레일이 막아 모델에 닿지 않음)`,
+    `  · 입구에서 차단 ${r.blockedAtGate}건 (가드레일이 막아 모델에 닿지 않음)${가드모드꼬리(r)}`,
     `  · 모델이 버팀 ${r.modelHeld}건`,
     `  · 실제 뚫림 ${r.leaked}건${r.leakedIds.length ? ` — ${r.leakedIds.join(", ")}` : ""}`,
   ];
