@@ -182,6 +182,9 @@ import {
   runAirgapStatus,
   runModelFitStatus,
   runSetModelThinking,
+  runAdapterStatus,
+  runAdapterAdopt,
+  runAdapterAssign,
 } from "./handlers";
 
 const TOOLS: AgentTool[] = [
@@ -1351,6 +1354,64 @@ const TOOLS: AgentTool[] = [
     },
     undo: "승인 화면(취약점 관리)에서 개별로 되돌릴 수 있습니다. 범위가 크면 filter를 좁혀 다시 지시하세요.",
     run: runBulkUpdate,
+  },
+  {
+    // 전문가 어댑터 현황(재설계, 2026-08-08) — 등록부·팀원 배정·주제 재료를 한 번에.
+    name: "adapter_status",
+    label: "전문가 어댑터 현황",
+    domain: "cross",
+    write: false,
+    description:
+      'AI팀의 전문가 어댑터(LoRA) 등록·채택 현황과 팀원 배정, 주제별 학습 재료 진척을 본다. ' +
+      '"어댑터 현황", "전문가 어댑터 뭐 있어?", "어댑터 채택됐어?" 같은 물음에 쓴다.',
+    params: [],
+    directAnswer: true,
+    run: runAdapterStatus,
+  },
+  {
+    // 어댑터 채택/해제(쓰기·admin) — 등록≠채택 관문. 채택엔 게이트 근거(note) 필수.
+    // ⚠ admin만: 채택된 어댑터는 다음 재기동부터 실서비스 답변에 실린다.
+    name: "adopt_adapter",
+    label: "전문가 어댑터 채택",
+    domain: "cross",
+    write: true,
+    requiredRole: "admin",
+    description:
+      '학습이 구운 어댑터를 실서비스에 실릴 수 있게 채택(또는 해제)한다. 채택에는 평가 게이트 근거가 필수다. ' +
+      '"sec-expert-vuln-v2 어댑터 채택, 근거: 게이트 통과", "어댑터 채택 해제해줘"처럼 말할 때 쓴다. ' +
+      '예: {"adapter":"sec-expert-vuln-v2","mode":"채택","note":"게이트 routing 66/66 · A/B 통과"}',
+    params: [
+      { name: "adapter", label: "어댑터", description: "등록부의 어댑터 이름 — 「어댑터 현황」으로 확인", required: true },
+      { name: "mode", label: "채택/해제", description: "「채택」 또는 「해제」 — 비우면 채택", required: false },
+      { name: "note", label: "근거", description: "채택 근거(게이트·A/B 결과) — 채택 시 필수", required: false },
+    ],
+    effect: (args) =>
+      (args.mode ?? "").trim() === "해제"
+        ? `어댑터 ${args.adapter}를 서빙 대상에서 내립니다 — 다음 모델 재기동부터 빠지고, 배정 팀원은 베이스로 답합니다.`
+        : `어댑터 ${args.adapter}를 채택합니다 — 다음 모델 재기동부터 서빙에 실리고 팀원 배정이 가능해집니다. 근거: ${(args.note ?? "").trim() || "(없음 — 실행 시 거절됩니다)"}`,
+    undo: "같은 어댑터를 「해제」로 다시 지시하면 서빙 대상에서 내려갑니다.",
+    run: runAdapterAdopt,
+  },
+  {
+    // 팀원 어댑터 배정(쓰기) — 채택분만·총괄 금지는 서버(agents)가 강제한다.
+    name: "assign_adapter",
+    label: "팀원 어댑터 배정",
+    domain: "cross",
+    write: true,
+    description:
+      'AI팀원에게 채택된 전문가 어댑터를 배정(또는 해제)한다 — 배정하면 그 팀원 답변에 전문 어댑터가 켜진다. ' +
+      '"스캔 팀원에 sec-expert-vuln-v2 배정해줘", "리포트 팀원 어댑터 해제"처럼 말할 때 쓴다. ' +
+      '예: {"agent":"스캔","adapter":"sec-expert-vuln-v2"}',
+    params: [
+      { name: "agent", label: "팀원", description: "팀원 이름·역할(스캔·분석·리포트·TI·GIJO)", required: true },
+      { name: "adapter", label: "어댑터", description: "채택된 어댑터 이름 — 「없음」이면 배정 해제", required: false },
+    ],
+    effect: (args) =>
+      !((args.adapter ?? "").trim()) || /^(없음|해제|베이스)$/.test((args.adapter ?? "").trim())
+        ? `${args.agent} 팀원의 어댑터 배정을 해제합니다 — 베이스 그대로 답하게 됩니다.`
+        : `${args.agent} 팀원에 어댑터 ${args.adapter}를 배정합니다 — 서빙에 실려 있으면 다음 답변부터 적용됩니다.`,
+    undo: "같은 팀원에 「없음」으로 다시 지시하면 배정이 해제됩니다.",
+    run: runAdapterAssign,
   },
 ];
 

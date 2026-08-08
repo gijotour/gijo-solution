@@ -2799,3 +2799,112 @@ export function runSetModelThinking(args: Record<string, string>): string {
 }
 
 // ── 레지스트리 ──────────────────────────────────────────────────────────
+
+// ── 전문가 어댑터 대화창 도구 (AI팀 재설계 화면 연결, 2026-08-08) ─────────────
+// 설정·에이전트 화면이 "채택·배정은 대화창에서"라고 안내한다 — 그 안내가 막다른 길이
+// 되지 않게 실제 경로를 여기 둔다(「안내한 말은 흔들리지 않는다」).
+
+/** 어댑터 현황(읽기·즉답) — 등록부 + 팀원 배정 + 주제 재료 진척을 한 번에. */
+export async function runAdapterStatus(): Promise<string> {
+  const { listAdapters } = await import("../adapters.js");
+  const { listAgents, getAgentAdapter } = await import("../agents.js");
+  const { topicTrainGate, TOPICS } = await import("../learnloop.js");
+  const adapters = listAdapters();
+  const lines: string[] = [];
+  if (!adapters.length) {
+    lines.push("등록된 전문가 어댑터가 없습니다 — 학습 루프가 어댑터를 구우면 여기 등록됩니다.");
+  } else {
+    lines.push(`전문가 어댑터 ${adapters.length}개:`);
+    for (const a of adapters) {
+      lines.push(
+        `· ${a.id} — ${a.topic ?? "미분류"} · 베이스 ${a.baseModelId} · ${a.adopted ? "✓ 채택" : "미채택"}${a.note ? ` · ${a.note}` : ""}`
+      );
+    }
+  }
+  const 배정 = listAgents()
+    .map((ag) => ({ ag, adapterId: getAgentAdapter(ag.id) }))
+    .filter((x) => x.adapterId);
+  lines.push("");
+  lines.push(
+    배정.length
+      ? `팀원 배정: ${배정.map((x) => `${x.ag.name}=${x.adapterId}`).join(" · ")}`
+      : "팀원 배정: 없음 — 전 팀원이 베이스 그대로 답합니다."
+  );
+  const 진척 = TOPICS.map((t) => {
+    const g = topicTrainGate(t);
+    return `${t} ${g.approved}/${g.target}${g.ok ? " ✓" : ""}`;
+  }).join(" · ");
+  lines.push(`주제 재료(승인 문답): ${진척}`);
+  lines.push("");
+  lines.push("채택: 「(어댑터 이름) 어댑터 채택, 근거: 게이트 결과」 · 배정: 「스캔 팀원에 (어댑터 이름) 어댑터 배정해줘」");
+  return lines.join("\n");
+}
+
+/** 어댑터 채택/해제(쓰기·admin·결재판) — 채택에는 게이트 근거가 필수다(등록≠채택). */
+export async function runAdapterAdopt(args: Record<string, string>): Promise<string> {
+  const { setAdapterAdopted, getAdapter } = await import("../adapters.js");
+  const id = (args.adapter ?? "").trim();
+  const 해제 = (args.mode ?? "").trim() === "해제";
+  if (!id) return "어느 어댑터인지 지정해 주세요 — 「어댑터 현황 알려줘」로 이름을 볼 수 있습니다.";
+  if (!getAdapter(id)) return `등록되지 않은 어댑터입니다: ${id} — 「어댑터 현황 알려줘」로 이름을 확인해 주세요.`;
+  const note = (args.note ?? "").trim();
+  if (!해제 && !note) {
+    return "채택에는 평가 근거가 필요합니다 — 「" + id + " 어댑터 채택, 근거: 게이트 routing 66/66·A/B 통과」처럼 근거를 함께 적어 주세요. (게이트를 안 거친 어댑터가 실서비스에 실리는 것을 막는 관문입니다)";
+  }
+  try {
+    const updated = setAdapterAdopted(id, !해제, 해제 ? undefined : note);
+    const v = currentViewer();
+    recordAudit({
+      kind: "config",
+      actor: (v?.userId ? findUserById(v.userId)?.displayName : null) ?? "담당자(대화창)",
+      action: updated.adopted ? "전문가 어댑터 채택" : "전문가 어댑터 채택 해제",
+      target: id,
+      detail: updated.note ?? "",
+      result: "ok",
+    });
+    return updated.adopted
+      ? `어댑터 ${id}를 채택했습니다 (근거: ${updated.note}).\n⚠ 서빙 반영은 채팅 모델을 다음에 다시 올릴 때부터입니다 — 이미 떠 있는 엔진에는 안 실립니다. 이후 「(팀원)에 ${id} 배정해줘」로 팀원에 붙일 수 있습니다.`
+      : `어댑터 ${id}의 채택을 해제했습니다 — 다음 모델 재기동부터 서빙에서 빠지고, 배정된 팀원은 베이스로 답합니다.`;
+  } catch (e) {
+    return `처리하지 못했습니다 — ${(e as Error).message}`;
+  }
+}
+
+/** 팀원 어댑터 배정/해제(쓰기·결재판) — 채택된 어댑터만, 총괄 금지는 agents가 강제. */
+export async function runAdapterAssign(args: Record<string, string>): Promise<string> {
+  const { listAgents, setAgentAdapter } = await import("../agents.js");
+  const 팀원말 = (args.agent ?? "").trim();
+  const adapterId = (args.adapter ?? "").trim();
+  const agents = listAgents();
+  // 담당자는 한글 역할말("스캔 팀원")로 부르는데 기본 이름은 영문(Scan Agent)이다 — 별칭으로 잇는다.
+  const 별칭: Record<string, string> = {
+    스캔: "scan", 분석: "analysis", 리포트: "report", 보고서: "report",
+    티아이: "ti", 기조: "normaltic", 해설: "normaltic", 총괄: "orchestrator", 오케스트레이터: "orchestrator",
+  };
+  const 별칭id = 별칭[팀원말] ?? 별칭[팀원말.replace(/\s*(팀원|에이전트)$/, "")];
+  const found = agents.find(
+    (a) => a.id === 별칭id || a.id === 팀원말 || a.name === 팀원말 || a.defaultName === 팀원말 ||
+      (팀원말 && (a.name.includes(팀원말) || a.defaultName.toLowerCase().includes(팀원말.toLowerCase()) || a.role.includes(팀원말)))
+  );
+  if (!found) {
+    return `어느 팀원인지 찾지 못했습니다: 「${팀원말 || "(미지정)"}」 — 팀원: ${agents.map((a) => a.name).join(", ")}`;
+  }
+  const 해제 = !adapterId || /^(없음|해제|베이스)$/.test(adapterId);
+  try {
+    setAgentAdapter(found.id, 해제 ? null : adapterId);
+    const v = currentViewer();
+    recordAudit({
+      kind: "config",
+      actor: (v?.userId ? findUserById(v.userId)?.displayName : null) ?? "담당자(대화창)",
+      action: 해제 ? "팀원 어댑터 배정 해제" : "팀원 어댑터 배정",
+      target: found.id,
+      detail: 해제 ? "" : adapterId,
+      result: "ok",
+    });
+    return 해제
+      ? `${found.name}의 어댑터 배정을 해제했습니다 — 베이스 그대로 답합니다.`
+      : `${found.name}에 어댑터 ${adapterId}를 배정했습니다 — 서빙 모델에 이 어댑터가 실려 있으면 다음 답변부터 바로 적용됩니다(재기동 불필요).`;
+  } catch (e) {
+    return `배정하지 못했습니다 — ${(e as Error).message}`;
+  }
+}

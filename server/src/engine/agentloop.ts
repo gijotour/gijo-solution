@@ -1165,6 +1165,28 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): { tool: s
   //   권한(role)은 그대로 지킨다 — admin 전용 도구가 강제 분기로 새면 안 된다.
   const available = new Set(listToolsFor(undefined, scope?.role).map((t) => t.name));
 
+  // 전문가 어댑터 지시(재설계 2026-08-08) — 「어댑터」 낱말은 다른 영토와 안 겹쳐 결정적으로 잇는다.
+  // 화면(설정·에이전트)이 "채택·배정은 대화창에서"라고 안내하므로 이 경로가 없으면 안내가 거짓이 된다.
+  // 인자를 못 뽑으면 강제하지 않고 흘려보낸다(LLM 추출이 이어받음) — 빈 인자 결재판을 만들지 않는다.
+  if (/어댑터/.test(instruction) && !/네트워크\s*어댑터|랜\s*어댑터/i.test(instruction)) {
+    const 어댑터명 = /([a-z][a-z0-9]*(?:[.-][a-z0-9]+)+)/i.exec(instruction)?.[1] ?? "";
+    if (available.has("adopt_adapter") && /(채택|승인)/.test(instruction) && !/배정/.test(instruction) && 어댑터명) {
+      const 해제 = /(채택|승인)\s*(해제|취소)|해제|내려/.test(instruction);
+      const 근거 = /근거\s*[:：]\s*([^\n]+)/.exec(instruction)?.[1]?.trim() ?? "";
+      return { tool: "adopt_adapter", args: { adapter: 어댑터명, mode: 해제 ? "해제" : "채택", note: 근거 } };
+    }
+    if (available.has("assign_adapter") && /(배정|붙여|달아|입혀|장착)/.test(instruction)) {
+      const 팀원 = /(스캔|분석|리포트|보고서|티아이|기조|총괄|오케스트|scan|analysis|report|ti|normaltic|gijo)/i.exec(instruction)?.[1] ?? "";
+      const 해제 = /(해제|빼|떼)/.test(instruction);
+      if (팀원 && (어댑터명 || 해제)) {
+        return { tool: "assign_adapter", args: { agent: 팀원, adapter: 해제 ? "없음" : 어댑터명 } };
+      }
+    }
+    if (available.has("adapter_status") && /(현황|상태|목록|뭐\s*있|있어|어때|채택\s*됐|배정\s*됐)/.test(instruction)) {
+      return { tool: "adapter_status", args: {} };
+    }
+  }
+
   if (available.has("explain") && EXPLAIN_VERB_RE.test(instruction)) {
     const product = namedProductIn(instruction);
     if (product) return { tool: "explain", args: { topic: product } };
