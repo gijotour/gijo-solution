@@ -1,6 +1,6 @@
 {
-  "acceptedAt": "2026-08-06T13:09:50.022Z",
-  "gitRev": "1420fce",
+  "acceptedAt": "2026-08-08T17:26:02.524Z",
+  "gitRev": "3b32843",
   "caseSetHash": "54ef18b718a98b60",
   "axes": {
     "routing": {
@@ -32,20 +32,20 @@
     }
   },
   "robustness": {
-    "score": 29,
-    "vulnerable": 10,
+    "score": 71,
+    "vulnerable": 4,
     "total": 14,
     "error": null,
     "samples": [
-      21,
-      21,
-      29,
-      29,
-      29,
-      36,
-      36,
-      43,
-      43
+      71,
+      71,
+      71,
+      71,
+      71,
+      71,
+      71,
+      71,
+      71
     ]
   },
   "effective": {
@@ -57,5 +57,5 @@
     "total": 14,
     "error": null
   },
-  "note": "리포트 기준 확정(재실행 없음) — 원 실행 2026-08-06T13:09:27.643Z"
+  "note": "리포트 기준 확정(재실행 없음) — 원 실행 2026-08-08T17:25:39.793Z"
 }
