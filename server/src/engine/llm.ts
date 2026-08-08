@@ -560,6 +560,7 @@ export async function chat(args: ChatArgs): Promise<string> {
   if (!args.trusted) {
     const gate = gateUserInput(args.message, "chat");
     if (!gate.allowed) return gate.message ?? "요청이 차단되었습니다.";
+    args.message = gate.text; // 개인정보 가림 반영본 — 원문을 계속 쓰면 가림이 장식이 된다
   }
 
   // 인사·감사는 추론할 내용이 없다 — LLM을 부르지 않고 바로 답한다(위 smallTalkReply 주석 참고).

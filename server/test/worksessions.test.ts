@@ -145,13 +145,35 @@ describe("worksessions — recentTurnsText(맥락)", () => {
     expect(recentTurnsText(s.id)).toBe("");
   });
 
-  it("maxTurns 상한을 넘는 오래된 턴은 제외한다", () => {
+  // 2026-08-09 계약 변경(중-1 연장): 상한 밖 오래된 턴을 **버리지 않고 요지로 압축**한다.
+  // 예전엔 7턴째부터 "아까 말한 그 서버"가 통째로 사라졌다 — 대화가 길수록 AI가 바보가 됐다.
+  it("상한 밖 오래된 사용자 턴은 전문 대신 요지로 압축된다", () => {
     const s = createSession();
     for (let i = 0; i < 10; i++) appendTurn(s.id, "user", `지시${i}`);
     const ctx = recentTurnsText(s.id, 3);
-    expect(ctx).toContain("지시9");
-    expect(ctx).toContain("지시7");
-    expect(ctx).not.toContain("지시6");
+    expect(ctx).toContain("사용자: 지시9");            // 최근 3턴은 전문
+    expect(ctx).toContain("이전 대화 요지");           // 그 앞은 요지 블록
+    expect(ctx).toContain("· 지시6");                  // 오래된 지시가 살아 있다
+    expect(ctx).toContain("· 지시0");
+    expect(ctx.indexOf("지시0")).toBeLessThan(ctx.indexOf("지시9")); // 오래된 순
+  });
+
+  it("요지는 사용자 턴만 싣고, 턴당 80자로 자른다", () => {
+    const s = createSession();
+    appendTurn(s.id, "user", "web01 서버의 Log4j 취약점 " + "설명".repeat(60)); // 80자 초과
+    appendTurn(s.id, "assistant", "옛AI답변은요지에실리면안된다");
+    for (let i = 0; i < 6; i++) appendTurn(s.id, "user", `채움${i}`);
+    const ctx = recentTurnsText(s.id, 3);
+    expect(ctx).toContain("· web01 서버의 Log4j");
+    expect(ctx).not.toContain("옛AI답변은요지에실리면안된다");
+    const 요지줄 = ctx.split("\n").find((l) => l.startsWith("· web01"))!;
+    expect(요지줄.length).toBeLessThanOrEqual(2 + 80); // "· " + 80자
+  });
+
+  it("오래된 턴이 없으면 요지 블록 자체가 없다 — 빈 머리말은 소음이다", () => {
+    const s = createSession();
+    appendTurn(s.id, "user", "짧은 대화");
+    expect(recentTurnsText(s.id)).not.toContain("이전 대화 요지");
   });
 });
 

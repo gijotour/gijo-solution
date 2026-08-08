@@ -28,9 +28,13 @@ export interface GateResult {
   categories: AttackCategory[];
   /** 차단됐을 때 사용자에게 보여줄 문구. allowed=true면 undefined. */
   message?: string;
+  /**
+   * LLM에 실제로 넘길 텍스트 — 개인정보가 가려졌으면 원문과 다르다(2026-08-09 PII 층).
+   * ⚠ 호출자는 원문이 아니라 **반드시 이 값**을 이후 경로에 써야 한다. 원문을 계속 쓰면
+   *   가림이 "검사만 하고 흘려보내는" 장식이 된다 — gatewaypii 소스 감시 시험이 못 박는다.
+   */
+  text: string;
 }
-
-const PASS: GateResult = { allowed: true, flagged: false, categories: [] };
 
 /**
  * 해로운 요청 — **모델의 판단에 맡기지 않고 여기서 끝낸다**(2026-08-02 신설).
@@ -110,13 +114,99 @@ function 차단안내(사유: string): string {
   );
 }
 
+// ── 개인정보 가리기(PII 마스킹) — 2026-08-09 신설(중-1·후-6 연장, 사용자 승인) ──────────
+//
+// 원칙: **가릴 것과 기록만 할 것을 가른다.**
+//   · 가림(마스킹): 주민등록번호·카드번호 — 보안 업무 입력에 정당하게 나올 일이 없는 숫자다.
+//     LLM에 닿기 전 가리고, 가렸다는 사실을 privacy 감사로 남긴다(요청은 그대로 진행).
+//   · 기록만: 전화번호·이메일 — 이 제품에선 **업무 데이터다**("리포트를 kim@corp.com으로
+//     보내줘", 담당자 연락처 등록). 가리면 그 지시가 통째로 깨진다. 그래서 흘려보내되
+//     privacy 감사에 "지나갔다"고 남긴다.
+//   · 손대지 않음: IP·호스트명·자산 식별자 — 보안 담당자의 원료 그 자체다.
+//
+// ⚠ 주민번호 13자리는 **밀리초 epoch(13자리)와 생김새가 같다**. 하이픈 없는 13자리는
+//   생년월일(MM 01-12, DD 01-31)과 7번째 자리(1-8)가 맞을 때만 주민번호로 본다 —
+//   epoch는 월 자리가 어긋나 걸리지 않는다(예: 1786176659365 → 월 "86").
+// ⚠ 카드번호는 Luhn 검산을 통과할 때만 가린다 — 자산 일련번호 같은 16자리 숫자를
+//   함부로 가리면 업무 데이터가 깨진다.
+const 주민_구분자 = /\b\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])[-\s][1-8]\d{6}\b/g;
+const 주민_붙음 = /\b\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])[1-8]\d{6}\b/g;
+const 카드_후보 = /\b\d{4}[- ]?\d{4}[- ]?\d{4}[- ]?\d{3,4}\b/g;
+const 전화 = /\b01[016789][- ]?\d{3,4}[- ]?\d{4}\b/g;
+const 이메일 = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
+
+function luhnOk(digits: string): boolean {
+  let sum = 0, alt = false;
+  for (let i = digits.length - 1; i >= 0; i--) {
+    let d = digits.charCodeAt(i) - 48;
+    if (alt) { d *= 2; if (d > 9) d -= 9; }
+    sum += d; alt = !alt;
+  }
+  return sum % 10 === 0;
+}
+
+export interface PiiResult {
+  /** 가린 뒤 텍스트(가릴 것이 없으면 원문 그대로) */
+  text: string;
+  /** 가린 항목별 건수 */
+  masked: Partial<Record<"주민등록번호" | "카드번호", number>>;
+  /** 기록만 한 항목별 건수(텍스트는 손대지 않음) */
+  noted: Partial<Record<"전화번호" | "이메일", number>>;
+}
+
+export function maskPii(raw: string): PiiResult {
+  const masked: PiiResult["masked"] = {};
+  const noted: PiiResult["noted"] = {};
+  let text = raw;
+
+  // 전화번호를 먼저 센다 — 주민·카드 치환 뒤에 세면 자릿수가 이미 바뀌어 있다.
+  const 전화수 = (raw.match(전화) ?? []).length;
+  if (전화수) noted["전화번호"] = 전화수;
+  const 메일수 = (raw.match(이메일) ?? []).length;
+  if (메일수) noted["이메일"] = 메일수;
+
+  let 주민수 = 0;
+  text = text.replace(주민_구분자, () => { 주민수++; return "<주민등록번호 가림>"; });
+  // ⚠ 전화번호(01x-xxxx-xxxx의 하이픈 없는 11자리)는 13자리가 아니라 안 걸린다.
+  text = text.replace(주민_붙음, () => { 주민수++; return "<주민등록번호 가림>"; });
+  if (주민수) masked["주민등록번호"] = 주민수;
+
+  let 카드수 = 0;
+  text = text.replace(카드_후보, (m) => {
+    const digits = m.replace(/[- ]/g, "");
+    if (digits.length < 15 || digits.length > 16 || !luhnOk(digits)) return m; // 검산 실패 = 카드 아님
+    카드수++;
+    return `<카드번호 가림·끝 ${digits.slice(-4)}>`;
+  });
+  if (카드수) masked["카드번호"] = 카드수;
+
+  return { text, masked, noted };
+}
+
 /**
  * 사용자 입력이 LLM으로 들어가기 전 반드시 지나야 하는 관문.
  * @param text   사용자가 준 원문
  * @param source 어느 입구인지(가드레일 로그에 남아 사후 추적에 쓰인다)
+ * 돌아온 값의 `text`가 이후 경로에 써야 할 텍스트다(개인정보 가림 반영본).
  */
 export function gateUserInput(text: string, source: GateSource): GateResult {
-  if (!text || !text.trim()) return PASS;
+  if (!text || !text.trim()) return { allowed: true, flagged: false, categories: [], text };
+
+  // ⓪ 개인정보 가리기 — 검사(①②)보다 먼저. 차단 사유 기록(audit detail)에도 원문 대신
+  //   가린 본이 남아야 하므로, 이 아래 모든 단계는 pii.text를 쓴다.
+  const pii = maskPii(text);
+  const 가림항목 = Object.entries(pii.masked).map(([k, v]) => `${k} ${v}건`);
+  const 기록항목 = Object.entries(pii.noted).map(([k, v]) => `${k} ${v}건`);
+  if (가림항목.length || 기록항목.length) {
+    recordAudit({
+      kind: "privacy", actor: "guardrail",
+      action: 가림항목.length ? `개인정보 가림(${가림항목.join(" · ")})` : `개인정보 감지·기록(${기록항목.join(" · ")})`,
+      target: source,
+      detail: [가림항목.length ? `가림: ${가림항목.join(", ")}` : "", 기록항목.length ? `기록만: ${기록항목.join(", ")}` : ""].filter(Boolean).join(" / "),
+      result: "ok",
+    });
+  }
+  text = pii.text;
 
   // ① 해로운 요청은 **모델에 닿기 전에** 여기서 끝낸다(2026-08-02 신설).
   const 해로움 = 해로운요청(text);
@@ -127,7 +217,7 @@ export function gateUserInput(text: string, source: GateSource): GateResult {
       target: source, detail: text.replace(/\s+/g, " ").slice(0, 160), result: "blocked",
     });
     return {
-      allowed: false, flagged: true, categories: [],
+      allowed: false, flagged: true, categories: [], text,
       message:
         `🛡 ${GUARDRAIL_BLOCK_MARK}했습니다 — 이 요청은 도와드릴 수 없습니다 — ${해로움}에 해당합니다. ` +
         차단안내(해로움),
@@ -135,12 +225,13 @@ export function gateUserInput(text: string, source: GateSource): GateResult {
   }
 
   const guard = guardInput(text, source);
-  if (!guard.flagged) return PASS;
+  if (!guard.flagged) return { allowed: true, flagged: false, categories: [], text };
 
   return {
     allowed: guard.allowed,
     flagged: true,
     categories: guard.categories,
+    text,
     message: guard.allowed
       ? undefined
       : `🛡 가드레일이 이 요청을 차단했습니다 — 프롬프트 인젝션 시도로 판단(${guard.categories.join(", ")}). ` +

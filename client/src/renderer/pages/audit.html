@@ -122,6 +122,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         <div class="filter-chip" data-kind="approval">승인</div>
         <div class="filter-chip" data-kind="write">쓰기</div>
         <div class="filter-chip" data-kind="block">차단</div>
+        <div class="filter-chip" data-kind="privacy">개인정보</div>
         <div class="filter-chip" data-kind="auth">로그인</div>
         <div class="filter-chip" data-kind="config">설정·메모</div>
       </div>
@@ -158,7 +159,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
   let activeKind = "all";
   let entries = [];
-  const KIND_LABEL = { cli: "CLI", approval: "승인", write: "쓰기", block: "차단", auth: "로그인", config: "설정" };
+  const KIND_LABEL = { cli: "CLI", approval: "승인", write: "쓰기", block: "차단", privacy: "개인정보", auth: "로그인", config: "설정" };
   const esc = (s) => String(s == null ? "" : s).replace(/</g, "&lt;");
 
 
@@ -231,7 +232,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
   function renderKpi(summary, retention) {
     const el = document.getElementById("kpiRow");
-    const order = ["cli", "approval", "write", "block", "auth"];
+    const order = ["cli", "approval", "write", "block", "privacy", "auth"];
     el.innerHTML = `<div class="kpi-mini"><div class="l">전체</div><div class="v" id="kpiTotal">${summary.total}</div></div>` +
       order.map((k) => `<div class="kpi-mini"><div class="l">${KIND_LABEL[k]}</div><div class="v">${summary.byKind[k] || 0}</div></div>`).join("") +
       // 보관 기간을 같이 보여준다 — 감사 대응 때 "옛날 기록이 왜 없나"를 여기서 바로 답한다.

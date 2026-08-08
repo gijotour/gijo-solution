@@ -313,6 +313,35 @@ export function recentTurnsText(sessionId: string, maxTurns = 6): string {
   if (!turns.length) return "";
   const recent = turns.slice(-maxTurns);
   const lines = recent.map((t) => `${t.role === "user" ? "사용자" : "AI"}: ${t.content.replace(/\s+/g, " ").trim().slice(0, 300)}`);
+
+  // ── 오래된 턴 요지(2026-08-09, 중-1 연장 — "긴 세션에서 아까 말한 그 서버를 잊는다") ──
+  // 예전엔 최근 6턴 이전을 **통째로 버렸다**. 7턴째부터 담당자가 앞서 말한 자산·결정이
+  // 사라져, 대화가 길수록 AI가 바보가 되는 역설이 있었다.
+  // LLM 요약이 아니라 **결정적 압축**으로 한다: 7B/14B 요약은 지어냄이 섞일 수 있고
+  // (실측: 리포트 요약 서두 메타복창), 요약 오류가 이후 모든 턴에 주입되는 위치라 위험이
+  // 배가된다. "사용자가 말한 것의 앞머리"는 지어낼 수 없다.
+  //   · 사용자 턴만 싣는다 — 지시·언급된 자산이 담긴 쪽이고, AI 답은 다시 만들 수 있다.
+  //   · 오래된 순으로 최대 12턴, 턴당 80자, 전체 1,000자 상한 — 맥락 창을 잠식하지 않게.
+  const old = turns.slice(0, -maxTurns).filter((t) => t.role === "user");
+  if (old.length) {
+    const digest: string[] = [];
+    let budget = 1000;
+    for (const t of old.slice(-12)) {
+      const line = `· ${t.content.replace(/\s+/g, " ").trim().slice(0, 80)}`;
+      if (budget - line.length < 0) break;
+      budget -= line.length;
+      digest.push(line);
+    }
+    if (digest.length) {
+      return [
+        `이전 대화 요지(더 오래된 사용자 지시 ${digest.length}건, 오래된 순):`,
+        ...digest,
+        "",
+        "이전 대화 맥락(같은 세션):",
+        ...lines,
+      ].join("\n");
+    }
+  }
   return ["이전 대화 맥락(같은 세션):", ...lines].join("\n");
 }
 

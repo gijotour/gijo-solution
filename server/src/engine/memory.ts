@@ -1066,6 +1066,7 @@ export function registerMemoryRoutes(app: Express): void {
         res.status(400).json({ error: gate.message });
         return;
       }
+      req.body.question = gate.text; // 개인정보 가림 반영본으로 검색(임베딩에 원문이 닿지 않게)
       // ★ 열람 등급을 싣는다. 안 실으면 이 경로로 기밀 문서가 그대로 나온다 —
       //   대화창은 막아 놓고 검색창은 열어 두는, 뚫린 문(2026-08-01 실검증에서 발견).
       //   등급은 요청이 아니라 **로그인 사용자**에서 읽는다.

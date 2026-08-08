@@ -9,7 +9,10 @@ import { asyncRoute } from "../util/asyncRoute";
 import { db } from "../db";
 import type { GijoUser } from "../auth/users";
 
-export type AuditKind = "cli" | "approval" | "write" | "block" | "auth" | "config";
+// privacy — 개인정보 가림(2026-08-09 신설). 차단(block)과 다르다: 요청은 그대로 진행되고
+//   민감한 숫자만 가려서 LLM에 전달됐다는 **사실의 기록**이다. 담당자가 "내 입력이 어디까지
+//   갔나"를 사후에 확인할 수 있어야 가림이 신뢰를 얻는다.
+export type AuditKind = "cli" | "approval" | "write" | "block" | "auth" | "config" | "privacy";
 export type AuditResult = "ok" | "blocked" | "error" | "pending";
 
 export interface AuditEntry {

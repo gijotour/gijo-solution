@@ -292,7 +292,8 @@ export interface CloudAskResult {
 }
 
 export async function askCloud(question: string, user?: GijoUser): Promise<CloudAskResult> {
-  const q = (question ?? "").trim();
+  let q = (question ?? "").trim(); // 관문(gate.text)의 개인정보 가림 반영본으로 갈아탄다
+
   if (!q) return { routedToCloud: false, blocked: false, reasons: [], error: "질문이 비어 있습니다." };
   if (!isEnabled()) return { routedToCloud: false, blocked: false, reasons: [], error: "클라우드 LLM이 비활성 상태입니다(설정에서 관리자가 켜야 합니다)." };
 
@@ -308,6 +309,8 @@ export async function askCloud(question: string, user?: GijoUser): Promise<Cloud
     logEgress({ userId: user?.id, provider, decision: "blocked", reasons: gate.categories, question: q });
     return { routedToCloud: false, blocked: true, reasons: gate.categories, error: gate.message };
   }
+  // 밖으로 나가는 경로일수록 가림이 중요하다 — 주민·카드번호를 클라우드에 내보내지 않는다.
+  q = gate.text;
 
   // 결정적 유출 방지 게이트 — 내부 식별자가 하나라도 걸리면 클라우드로 보내지 않는다.
   const decision = screenForCloud(q);

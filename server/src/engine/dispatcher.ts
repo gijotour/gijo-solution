@@ -685,6 +685,9 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   // guardInput을 직접 부르지 않고 게이트웨이를 거친다 — 검사 지점을 한 곳으로 모아, 앞으로
   // 검사가 늘어도(PII·출력 필터 등) 모든 입구에 자동으로 적용되게 하기 위함이다.
   const guard = gateUserInput(instructionText, "dispatch");
+  // 개인정보 가림 반영본으로 갈아탄다 — 이후의 라우팅·도구 인자 추출·작업 기록 전부가
+  // 가린 본을 쓴다(주민·카드번호는 도구 인자일 수 없어 추출이 깨질 일이 없다).
+  instructionText = guard.text;
   if (guard.flagged) {
     collab(qa, { from: "orchestrator", to: "orchestrator", message: `🛡 가드레일: 프롬프트 인젝션 시도 감지(${guard.categories.join(", ")})${guard.allowed ? " — 기록 후 진행" : " — 차단"}` });
   }

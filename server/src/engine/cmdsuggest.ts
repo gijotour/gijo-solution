@@ -63,7 +63,7 @@ export function registerCmdSuggestRoutes(app: Express): void {
         res.json({ command: "", explanation: gate.message ?? "요청이 차단되었습니다." });
         return;
       }
-      res.json(await suggestCommand(request));
+      res.json(await suggestCommand(gate.text)); // 개인정보 가림 반영본으로
     })
   );
 }
