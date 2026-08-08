@@ -141,14 +141,32 @@
   .avatar-btn{width:32px;height:32px;border-radius:50%;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;}
   .icon-btn{width:32px;height:32px;border-radius:8px;background:var(--panel);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);cursor:pointer;}
 /* 오늘 계획 짜기 겹판 — 후보 행 26px(제목+가이드 한 줄), 시안 추천안 밀도 그대로 */
-.plan-sec-h{display:flex;align-items:center;gap:6px;height:22px;font-size:12px;font-weight:800;color:var(--muted);}
-.plan-sec-h span{font-size:11px;color:var(--muted-2);font-weight:600;}
-.plan-cand{display:flex;align-items:center;gap:7px;min-height:26px;font-size:12.25px;border-bottom:1px solid var(--border);}
-.plan-cand:last-child{border-bottom:none;}
-.plan-cand .main{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.plan-cand .guide{color:var(--muted-2);font-size:11.5px;}
-.plan-cand .padd{flex:0 0 auto;font-size:11px;font-weight:800;color:#0d1117;background:var(--teal,#1eb980);border-radius:8px;padding:1px 8px;cursor:pointer;}
-.plan-cand.added .padd{background:var(--panel-2);color:var(--muted-2);border:1px solid var(--border);cursor:default;}
+/* 후보 목록 정돈(2026-08-09 시안 승인) — 난잡해 보인다는 지적.
+   ① 이유는 한 개만: "실제 악용 11건 · 취약점 249건 · 최고 심각도 critical · 최고 악용예측 100%"가
+      한 줄에 붙어 있으면 눈이 어디를 볼지 못 정한다. 순서를 정한 근거 하나만 칩으로 세운다.
+   ② 칸을 맞춘다: 등급/대상/이유/담기 네 칸이 세로로 줄을 맞춰야 위아래 비교가 된다.
+   ③ 담기 단추를 뒤로: 초록 알약 여섯 개가 내용보다 먼저 보였다. 평소엔 테두리만, 올릴 때만 채운다.
+   ④ 구획 머리의 설명 꼬리는 뗀다 — 사용법 설명은 화면이 아니라 대화창(ⓘ)이 맡는다(제품 규칙). */
+.plan-sec-h{display:flex;align-items:baseline;gap:7px;height:20px;font-size:11.5px;font-weight:800;
+  color:var(--muted-2);letter-spacing:.02em;border-bottom:1px solid var(--border);}
+.plan-sec-h span{font-size:11.5px;color:var(--muted);font-weight:700;}
+.plan-cand{display:grid;grid-template-columns:26px 1fr auto auto;align-items:center;gap:8px;
+  height:26px;font-size:12.25px;border-radius:6px;padding:0 4px;margin:0 -4px;}
+.plan-cand:hover{background:var(--panel-2);}
+.plan-cand .lv{font-size:10.5px;font-weight:800;text-align:center;border-radius:4px;padding:1px 0;
+  background:var(--panel-2);color:var(--muted-2);}
+.plan-cand .lv.p0{background:#3a1f1d;color:#ff8b80;}
+.plan-cand .lv.p1{background:#33290f;color:#f5bb55;}
+.plan-cand .main{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;}
+.plan-cand .main .sub{font-weight:400;color:var(--muted);}
+.plan-cand .why{font-size:11px;color:var(--muted);white-space:nowrap;background:var(--panel-2);
+  border:1px solid var(--border);border-radius:5px;padding:0 6px;line-height:17px;}
+.plan-cand .why.hot{color:#ffb0a8;border-color:#4a3038;}
+.plan-cand .padd{flex:0 0 auto;font-size:11px;font-weight:800;color:var(--teal,#1eb980);
+  border:1px solid #244b3c;border-radius:6px;padding:0 8px;line-height:18px;background:transparent;cursor:pointer;}
+.plan-cand:hover .padd{background:var(--teal,#1eb980);color:#0d1117;}
+.plan-cand.added .padd{color:var(--muted-2);border-color:var(--border);cursor:default;}
+.plan-cand.added:hover .padd{background:transparent;color:var(--muted-2);}
 .plan-trow{display:flex;align-items:center;gap:8px;min-height:26px;font-size:12.5px;border-bottom:1px solid var(--border);}
 .plan-trow:last-child{border-bottom:none;}
 .plan-trow .rm{color:var(--muted-2);cursor:pointer;font-size:12px;flex:0 0 auto;}
@@ -238,11 +256,11 @@
         </div>
         <div style="display:flex;gap:14px;flex-wrap:wrap">
           <div style="flex:1.4;min-width:320px">
-            <div class="plan-sec-h">🔥 급한 것 <span id="planUrgentCnt"></span></div>
+            <div class="plan-sec-h">급한 것 <span id="planUrgentCnt"></span></div>
             <div id="planUrgent"><div class="empty">불러오는 중…</div></div>
-            <div class="plan-sec-h" style="margin-top:10px">⏳ 하던 일 · 안 끝난 것 <span id="planUnfinCnt"></span></div>
+            <div class="plan-sec-h" style="margin-top:12px">하던 일 <span id="planUnfinCnt"></span></div>
             <div id="planUnfin"></div>
-            <div class="plan-sec-h" style="margin-top:10px">📅 그 외 후보 <span id="planEtcCnt"></span></div>
+            <div class="plan-sec-h" style="margin-top:12px">그 외 <span id="planEtcCnt"></span></div>
             <div id="planEtc"></div>
           </div>
           <div style="flex:1;min-width:260px;border-left:1px solid var(--border,#2a313c);padding-left:14px">
@@ -443,11 +461,32 @@
   function planOpenTexts() {
     return planTasks.filter(function (t) { return !t.done; }).map(function (t) { return t.text; });
   }
+  // 긴 이유에서 **순서를 정한 근거 하나만** 뽑는다. 나머지는 눌러서 들어간 화면에 다 있다.
+  //   "실제 악용(KEV) 11건 · 취약점 249건 · 최고 심각도 critical · …" → "실제 악용 11건"
+  //   "1일째 미완료 — 오늘 끝낼 수 있으면 담으세요"                   → "1일째"
+  // ⚠ 원문은 title로 남긴다 — 줄인 것이지 버린 것이 아니다.
+  function 이유칩(guide) {
+    if (!guide) return "";
+    var s = String(guide).split(/\s*[·—]\s*/)[0].trim();
+    s = s.replace(/\(KEV\)/, "").replace(/\s+/g, " ").trim();
+    if (s.length > 16) s = s.slice(0, 15) + "…";
+    return s;
+  }
+  // 대상 이름에서 뒤에 붙은 갈래말을 흐리게 — "10.10.20.22 — 취약점 점검"에서 앞이 대상이다.
+  function 대상꼴(text) {
+    var m = String(text).split(/\s+—\s+/);
+    if (m.length < 2) return esc(text);
+    return esc(m[0]) + ' <span class="sub">' + esc(m.slice(1).join(" — ")) + "</span>";
+  }
   function candRow(text, guide, pri, added, page) {
-    return '<div class="plan-cand' + (added ? " added" : "") + '" data-text="' + esc(text) + '"' + (pri ? ' data-pri="' + esc(pri) + '"' : "") + (page ? ' data-page="' + esc(page) + '"' : "") + ">" +
-      '<span class="main"' + (page ? ' style="cursor:pointer" title="누르면 해당 화면으로 갑니다"' : "") + ">" + (pri ? '<span class="plan-' + pri.toLowerCase() + '">' + esc(pri) + "</span> " : "") + esc(text) +
-      (guide ? ' <span class="guide">— ' + esc(guide) + "</span>" : "") + "</span>" +
-      '<span class="padd">' + (added ? "담김 ✓" : "＋ 담기") + "</span></div>";
+    var 칩 = 이유칩(guide);
+    var 급함 = /실제\s*악용|기한\s*지남|초과/.test(guide || "");
+    return '<div class="plan-cand' + (added ? " added" : "") + '" data-text="' + esc(text) + '"' + (pri ? ' data-pri="' + esc(pri) + '"' : "") + (page ? ' data-page="' + esc(page) + '"' : "") +
+      (guide ? ' title="' + esc(guide) + '"' : "") + ">" +
+      '<span class="lv' + (pri ? " " + pri.toLowerCase() : "") + '">' + (pri ? esc(pri) : "·") + "</span>" +
+      '<span class="main"' + (page ? ' style="cursor:pointer"' : "") + ">" + 대상꼴(text) + "</span>" +
+      (칩 ? '<span class="why' + (급함 ? " hot" : "") + '">' + esc(칩) + "</span>" : "<span></span>") +
+      '<span class="padd">' + (added ? "담김" : "담기") + "</span></div>";
   }
   function renderPlan() {
     var open = planOpenTexts();
@@ -458,7 +497,7 @@
     $("planUrgent").innerHTML = urgent.length
       ? urgent.slice(0, 8).map(function (i) { return candRow(candText(i), i.why || "", i.urgency === "now" ? "P0" : "", open.indexOf(candText(i)) >= 0, screenOf(i.id)); }).join("")
       : '<div class="empty">급한 항목이 없습니다.</div>';
-    $("planUrgentCnt").textContent = urgent.length ? urgent.length + "건 — 기한·실제 악용 기준" : "";
+    $("planUrgentCnt").textContent = urgent.length || "";
     // 하던 일 — 오늘 0시 이전에 담아 둔 미완료. "N일째"가 가이드다.
     var 오늘0시 = new Date(); 오늘0시.setHours(0, 0, 0, 0);
     var unfin = planTasks.filter(function (t) { return !t.done && t.createdAt < 오늘0시.getTime(); });
@@ -468,11 +507,11 @@
           return candRow(t.text, days + "일째 미완료 — 오늘 끝낼 수 있으면 담으세요", t.priority || "", true);
         }).join("")
       : '<div class="empty">어제까지 담아 둔 미완료가 없습니다.</div>';
-    $("planUnfinCnt").textContent = unfin.length ? unfin.length + "건 — 이미 목록에 있습니다" : "";
+    $("planUnfinCnt").textContent = unfin.length || "";
     $("planEtc").innerHTML = etc.length
       ? etc.slice(0, 8).map(function (i) { return candRow(candText(i), i.why || "", "", open.indexOf(candText(i)) >= 0, screenOf(i.id)); }).join("")
       : '<div class="empty">그 외 후보가 없습니다.</div>';
-    $("planEtcCnt").textContent = etc.length ? etc.length + "건 — 일정·점검·현황" : "";
+    $("planEtcCnt").textContent = etc.length || "";
     // 오늘 내 계획 — 완료 체크(기존 오늘 할 일 카드의 기능 흡수) + 빼기, 완료 최근 3건은 취소선.
     var todayOpen = planTasks.filter(function (t) { return !t.done; }).sort(function (a, b) {
       return rank(a.priority) - rank(b.priority) || (a.dueAt || Infinity) - (b.dueAt || Infinity);

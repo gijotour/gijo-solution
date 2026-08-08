@@ -71,18 +71,18 @@ for (const f of changed) {
   if (VERIFY_RE.test(f)) { picks.add("verify"); picks.add("vitest"); reasons.push(`${f} → 조치검증·VEX 계층`); }
   if (SHELL_RE.test(f)) { picks.add("shell"); reasons.push(`${f} → 탭 셸 계층`); }
   if (DOWNLOAD_RE.test(f)) { picks.add("download"); reasons.push(`${f} → 파일 받기 계층`); }
-  if (QUALITY_RE.test(f)) { picks.add("knowledge"); picks.add("maintenance"); picks.add("regress"); picks.add("vitest"); reasons.push(`${f} → 지식·시나리오·회귀`); }
+  if (QUALITY_RE.test(f)) { picks.add("knowledge"); picks.add("maintenance"); picks.add("regress"); picks.add("vitest"); picks.add("docprobe"); reasons.push(`${f} → 지식·시나리오·회귀`); }
   else if (f.startsWith("server/")) { picks.add("vitest"); reasons.push(`${f} → 서버 단위테스트`); }
   else if (f.startsWith("client/src/")) { picks.add("client"); picks.add("sweep"); picks.add("windows"); picks.add("viz"); picks.add("promise"); reasons.push(`${f} → 클라 실페이지·스윕·띠 자리·적어 둔 약속`); }
   if (DRAWER_RE.test(f)) { picks.add("drawer"); reasons.push(`${f} → 서랍 약속 점검`); }
   if (ROUTING_RE.test(f)) { picks.add("routing"); picks.add("vitest"); reasons.push(`${f} → 라우팅 겹침·규칙표`); }
   else if (f.startsWith("tools/regress/") || f.startsWith("rag-seed/")) { picks.add("regress"); reasons.push(`${f} → 회귀 하네스`); }
 }
-if (ALL) for (const l of ["vitest", "client", "knowledge", "maintenance", "regress", "verify", "shell", "download", "sweep", "windows", "viz", "drawer", "routing", "promise"]) picks.add(l);
+if (ALL) for (const l of ["vitest", "client", "knowledge", "maintenance", "regress", "verify", "shell", "download", "sweep", "windows", "viz", "drawer", "routing", "promise", "docprobe"]) picks.add(l);
 if (FAST) { picks.delete("vitest"); picks.delete("maintenance"); }
 
 console.log(`■ QA 전수조사 — 기준: ${since ? since.slice(0, 8) + "..HEAD" : "(첫 실행 — 마커 없음, 전 계층)"}`);
-if (!since) for (const l of ["vitest", "client", "knowledge", "maintenance", "regress", "verify", "shell", "download", "sweep", "windows", "viz", "drawer", "routing", "promise"]) { if (!FAST || (l !== "vitest" && l !== "maintenance")) picks.add(l); }
+if (!since) for (const l of ["vitest", "client", "knowledge", "maintenance", "regress", "verify", "shell", "download", "sweep", "windows", "viz", "drawer", "routing", "promise", "docprobe"]) { if (!FAST || (l !== "vitest" && l !== "maintenance")) picks.add(l); }
 console.log(`  변경 파일 ${changed.length}개 → 계층 [${[...picks].join(", ")}]${ALL ? " (--all)" : ""}${FAST ? " (--fast)" : ""}`);
 for (const r of reasons.slice(0, 8)) console.log(`   · ${r}`);
 if (reasons.length > 8) console.log(`   · … 외 ${reasons.length - 8}건`);
@@ -141,6 +141,11 @@ run("promise", "node", ["tools/promise-check.mjs"]);
 //   실측(2026-08-02): 넓은 규칙을 앞에 넣어 today를 가로챘고 라우팅이 100%→96.9%로 떨어졌는데,
 //   평가 게이트(20분)를 돌리고서야 알았다. 여기서는 1초에 알린다.
 run("routing", "node", ["tools/route-explain.mjs", "--겹침"]);
+// 지식 문서가 **실제 질문에 걸리는지** — 문서가 멀쩡해 보이는데 안 걸리는 경우는 눈으로 못 잡는다.
+//   실측(2026-08-09): 월간 점검 7항목이 「장비 공통」으로만 적혀 「방화벽」이 한 번도 안 나왔고,
+//   담당자가 늘 하는 질문("방화벽 월간 정기점검 절차")에 **상위 6건에도 못 들었다** —
+//   대신 샘플 데모 파일이 1위였다. 문서를 고쳐 30/30을 만들었고, 여기서 지킨다.
+run("docprobe", "node", ["tools/doc-probe.mjs"]);
 // 문서를 고쳐도 운영 AI가 **옛 판으로 답하던** 것(2026-08-08 실사고) — 배포가 소스만 옮기고
 //   문서는 아무도 안 옮겼고, 운영 서버에는 같은 이름의 사본이 세 곳에 있었다.
 //   리포지토리 ↔ 운영 문서 폴더 ↔ 지식 저장소를 한 줄로 대조한다.
