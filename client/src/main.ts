@@ -912,13 +912,19 @@ function setupDownloads(): void {
 
     item.once("done", (_ev, state) => {
       const win = BrowserWindow.fromWebContents(contents);
-      // 렌더러가 "어디에 저장됐는지"를 사용자에게 보여줄 수 있게 알린다.
-      win?.webContents.send("download:done", {
+      const info = {
         ok: state === "completed",
         path: state === "completed" ? dest : null,
         filename: path.basename(dest),
         state,
-      });
+      };
+      // 렌더러가 "어디에 저장됐는지"를 사용자에게 보여줄 수 있게 알린다.
+      // ⚠ webContents.send는 **최상위 프레임에만** 닿는다 — 받기 버튼과 안내 칩은 탭·허브
+      //   iframe 안(approvals 등)에 있어 통보가 영영 안 오고, 버튼이 "저장 중…"으로 굳는다
+      //   (2026-08-08 실측 — 파일은 생기는데 화면만 모른다). 모든 프레임에 알린다.
+      for (const f of win?.webContents.mainFrame.framesInSubtree ?? []) {
+        try { f.send("download:done", info); } catch { /* 떠나는 중인 프레임 */ }
+      }
     });
   });
 }

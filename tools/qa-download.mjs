@@ -108,9 +108,15 @@ const hasBtn = await c.evalx(`Boolean(${DOC}.getElementById('btnVexExport'))`);
 ok("VEX 받기 버튼 존재", Boolean(hasBtn));
 if (hasBtn) {
   await c.evalx(`${DOC}.getElementById('btnVexExport').click(), 'clicked'`);
-  // 저장 안내는 잠시 뒤 원래 칩으로 돌아간다 — 사라지기 전에 읽는다(늦게 읽어 실패한 이력 있음).
-  await new Promise((r) => setTimeout(r, 4000));
-  const shown = await c.evalx(`${DOC}.getElementById('vexChips').textContent.trim().slice(0,80)`);
+  // 저장 안내는 떴다가 원래 칩으로 **돌아간다** — 한 번 읽기는 이르든 늦든 놓친다
+  // (4초 고정 읽기가 두 방향 모두로 실패한 이력). 짧게 여러 번 읽어 지나가는 안내를 잡는다.
+  let shown = "";
+  for (let i = 0; i < 16; i++) {
+    await new Promise((r) => setTimeout(r, 500));
+    const now = await c.evalx(`${DOC}.getElementById('vexChips').textContent.trim().slice(0,80)`);
+    if (/저장됨/.test(now || "")) { shown = now; break; }
+    shown = now || shown;
+  }
   await new Promise((r) => setTimeout(r, 3000)); // 저장 완료까지 여유
   const made = fs.readdirSync(DL).filter((f) => !before.has(f) && /gijo-vex/.test(f));
   ok("다운로드 폴더에 파일이 실제로 생성", made.length > 0, made.join(", ") || "없음");
