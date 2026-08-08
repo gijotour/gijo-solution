@@ -223,11 +223,16 @@
 
     <!-- 시작 가이드 카드 → 2026-08-06 문서함으로 이관(위 JS 주석 참고) -->
 
+    <!-- 현황 조망 한 줄(2026-08-09 사용자 지시) — 카드를 없애고 위 한 줄로. 누르면 허브. -->
+    <div id="glanceGo" title="발견·수집 열기" style="display:flex;align-items:center;gap:8px;height:30px;padding:0 12px;margin-bottom:12px;background:var(--panel);border:1px solid var(--border);border-radius:9px;font-size:12.5px;color:var(--muted);cursor:pointer">
+      <span>📊 현황 조망</span><span style="color:var(--muted-2)">보안 태세·통합 관제·위협 인텔·자산 요약은 <b style="color:var(--blue-l)">발견·수집</b>에서 한 줄로 봅니다</span>
+      <span style="margin-left:auto;color:var(--blue-l);font-weight:700">열기 →</span>
+    </div>
     <div class="grid">
       <!-- 오늘 계획 판 — 카드 줄 **그 자리에 상시**(2026-08-09 사용자 "캡처 자리에 · 기존
            카드는 다 포함이니 없애도 됨"). 급한 것·오늘 할 일 카드를 이 판이 흡수했다:
            왼쪽=후보(급한 것·하던 일·그 외, 가이드 한 줄), 오른쪽=오늘 내 계획(완료 체크·빼기). -->
-      <div id="planInline" class="card" style="grid-column:1/3">
+      <div id="planInline" class="card" style="grid-column:1/-1">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
           <h3 style="margin:0">☑ 오늘 할 일 — 계획 짜기 <span class="cnt" id="planHeadCnt"></span></h3>
         </div>
@@ -256,16 +261,9 @@
       <!-- 급한 것·오늘 할 일 카드는 2026-08-09 사용자 지시로 제거 — 위 계획 판이 두 내용을
            전부 담는다(급한 것=후보 구획, 오늘 할 일=오늘 내 계획+완료 체크). 중복이 두 곳이면
            숫자가 어긋나는 순간 담당자는 둘 다 안 믿는다. -->
-      <!-- 「한눈에」 카드는 2026-08-09 사용자 지시로 **발견·수집 허브의 보안 태세 판**으로
-           이사했다(현황 조망은 허브, 대시보드는 오늘 계획+대화창). -->
-      <div class="card" style="display:flex;flex-direction:column;justify-content:center;gap:8px;cursor:pointer" id="glanceGo" title="발견·수집 허브로">
-        <h3 style="margin:0">📊 한눈에 · 현황 조망</h3>
-        <div style="font-size:12.5px;color:var(--muted);line-height:1.7">
-          보안 태세·통합 관제·위협 인텔·자산 요약은 <b style="color:var(--blue-l)">발견·수집</b> 화면에서
-          한 줄로 보고, 누르면 그 메뉴가 바로 아래 열립니다.
-        </div>
-        <div style="font-size:12.5px;color:var(--blue-l);font-weight:700">발견·수집 열기 →</div>
-      </div>
+      <!-- 「한눈에」 카드는 2026-08-09 사용자 지시로 **위 한 줄 안내**로 올라갔다(#glanceGo).
+           카드 자리를 비워 오늘 계획 판이 화면 전체 폭을 쓴다. -->
+
     </div>
   </div>
 </div>
@@ -553,7 +551,7 @@
   loadEngines();
   loadTeam();
   loadToday();
-  loadTasks();
+  loadTasks();
 })();
 </script>
 

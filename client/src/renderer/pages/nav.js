@@ -306,6 +306,21 @@
       + ".gj-rows1 > *:not(.gj-underrow) > input:nth-child(1) ~ [class*=dot]:nth-child(2) ~ *:nth-child(3),"
       + ".gj-rows1 > *:not(.gj-underrow) > [class*=dot]:nth-child(2) ~ *:nth-child(3),"
       + ".gj-rows1 > *:not(.gj-underrow) > input:nth-child(2) ~ *:nth-child(3){flex:1;}"
+      // ⚠ 같은 함정을 **딱지(배지)**가 또 밟았다(2026-08-09 사용자 신고 "앞에 취약점이 긴
+      //   이유가 있어?"): 통합 관제 줄은 [순번][소스 딱지][본문][우선순위]라 2번째가 딱지였고,
+      //   글자 3자짜리 딱지가 **540px 빨간 막대**로 늘어나 줄의 3분의 1을 먹었다.
+      //   점·체크박스만 예외로 두면 다음 화면에서 또 터진다 — **크기가 내용에 맞아야 하는 표식
+      //   전부**(딱지·칩·태그·배지·순번·우선순위)를 고정하고, 본문 칸을 대신 늘린다.
+      + ".gj-rows1 > *:not(.gj-underrow) > .src,"
+      + ".gj-rows1 > *:not(.gj-underrow) > .pri,"
+      + ".gj-rows1 > *:not(.gj-underrow) > .rank,"
+      + ".gj-rows1 > *:not(.gj-underrow) > [class*=badge],"
+      + ".gj-rows1 > *:not(.gj-underrow) > [class*=chip],"
+      + ".gj-rows1 > *:not(.gj-underrow) > [class*=tag]{flex:0 0 auto;}"
+      // 본문 칸이 이름을 달고 있으면(.rr-main·.bd·…-main) 그 칸을 늘린다 — 자리 순서가 아니라
+      // **뜻**으로 고른다. 이름이 없는 줄은 위의 2번째 규칙이 그대로 맡는다.
+      + ".gj-rows1 > *:not(.gj-underrow) > [class*=main],"
+      + ".gj-rows1 > *:not(.gj-underrow) > .bd{flex:1 1 auto;min-width:0;}"
       // 줄 안에서 제목·부제를 **세로로 쌓아 둔 판**도 눕힌다(통합 관제·작업 내역이 그렇다).
       + ".gj-rows1 > *:not(.gj-underrow) > div{display:flex;align-items:baseline;gap:7px;min-width:0;}"
       + ".gj-rows1 > *:not(.gj-underrow) > div > *{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}"
@@ -693,7 +708,13 @@
 
       if (대표) {
         gh.title = g.label + " 열기";
-        gh.addEventListener("click", function () { go(g.items[0].page); });
+        // ⚠ 여는 방식은 **항목(makeItem)과 똑같아야 한다**(2026-08-09 실측 사고):
+        //   셸에서 go()를 부르면 탭이 아니라 **셸 창 자체가 그 화면으로 이동**해 탭·대화가 통째로
+        //   사라진다. 셸 안이면 gijoTabs.open, 셸 밖(분리창)에서만 화면 이동.
+        gh.addEventListener("click", function () {
+          if (window.gijoTabs) window.gijoTabs.open(g.items[0].page, g.items[0].label || g.label);
+          else go(g.items[0].page);
+        });
         return; // 하위 줄을 그리지 않는다
       }
 
@@ -1249,6 +1270,11 @@
       // ⚠ 분리창(별도 창)에서는 대시보드가 없으므로 지우지 않는다 — embed(팝업 안)에서만.
       "#gijoChatWidget{display:none !important;}" +
       ".main{padding-top:16px !important;}" +
+      // 그룹 허브 무대 안(&hub=1)에서는 화면 제 「한눈에」 그림띠를 숨긴다 — 허브가 바로 위에
+      // 같은 그림을 이미 두고 있어 한 화면에 같은 숫자가 두 번 나온다(2026-08-09 사용자 지적).
+      // ⚠ 요약 줄(전체 자산 57·고위험 27…)과 필터 표시(#vizFilter)는 **남긴다** — 그림띠와
+      //   다른 정보이고, 지우면 무대에서 무엇이 걸러졌는지 알 수 없다.
+      (/[?&]hub=1/.test(location.search) ? "#vizStrip{display:none !important;}" : "") +
       목록양식CSS();
     document.head.appendChild(st);
   }
