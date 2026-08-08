@@ -151,6 +151,9 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
            거기서는 적으면 그 일을 어떤 순서로 하는지까지 안내받는다. 여기는 팀이 뭘 하는지
            보는 창이므로 "지금 뭐가 남았나"만 보여준다. -->
       <div class="t-head">☑ 오늘의 할일 <span class="t-cnt" id="todoCnt"></span></div>
+      <!-- 진행률 바(시안 추천안 2026-08-09) — 대시보드에서 짠 계획을 이 창이 하루 종일 따라간다 -->
+      <div id="todoProg" style="display:none;height:6px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden;margin:2px 10px 6px"><div id="todoProgBar" style="height:100%;width:0;background:var(--teal,#1eb980)"></div></div>
+      <div id="todoNow" style="display:none;margin:0 10px 6px;background:var(--panel-2,#1c2129);border:1px solid var(--border,#2a313c);border-radius:8px;padding:7px 9px;font-size:11.75px;color:var(--muted,#9aa4b2);line-height:1.5"></div>
       <div class="t-add">
         <button id="todoOpenBtn" style="width:100%" title="본창 대화창에서 오늘 할 일을 엽니다">대화창에서 열기 →</button>
       </div>
@@ -808,6 +811,24 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
     const later = open.length - today.length;
     myTaskCount = today.length;
     updateTodoCount();
+    // 진행률 + 「지금 이것부터」(시안 추천안) — 전부 규칙 계산, LLM 없음.
+    // 오늘 것 = 오늘 기한이거나 오늘 만든 것(완료 포함) — 완료를 세지 않으면 바가 늘 0이다.
+    const 오늘0시 = new Date(); 오늘0시.setHours(0, 0, 0, 0);
+    const todayAll = allTasks.filter((t) => isToday(t) || t.createdAt >= 오늘0시.getTime());
+    const doneCnt = todayAll.filter((t) => t.done).length;
+    const prog = document.getElementById("todoProg"), progBar = document.getElementById("todoProgBar"), nowBox = document.getElementById("todoNow");
+    if (todayAll.length) {
+      prog.style.display = "block";
+      progBar.style.width = Math.round((doneCnt / todayAll.length) * 100) + "%";
+      todoCnt.textContent = `${doneCnt}/${todayAll.length} 완료`;
+    } else prog.style.display = "none";
+    if (today.length) {
+      nowBox.style.display = "block";
+      const first = today[0];
+      nowBox.innerHTML = `🤖 <b style="color:var(--text,#e6e8eb)">지금 이것부터</b>: ${esc(first.text)}` +
+        (first.dueAt && first.dueAt < Date.now() ? ' <span style="color:#f5928a;font-weight:700">— 기한이 지났습니다</span>'
+          : first.dueAt && first.dueAt <= endOfToday() ? ' <span style="color:var(--amber,#f0a020);font-weight:700">— 오늘 기한</span>' : "");
+    } else nowBox.style.display = "none";
     if (!today.length) {
       myTasks.innerHTML = '<div class="t-empty">오늘 처리할 일이 없어요 — 위에 직접 추가하거나, 아래 <b>운영 시작</b>을 누르면 AI 팀이 오늘의 루틴으로 채워줘요 📌</div>'
         + (later > 0 ? `<div class="t-more">이후 기한 할일 ${later}건은 에이전트 AI 페이지에서</div>` : "");

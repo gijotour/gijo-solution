@@ -29,7 +29,7 @@ import type { GijoUser } from "../auth/users";
 type ExpressRequestWithUser = Request & { user?: GijoUser };
 
 export interface ReportRequest {
-  type: "weekly" | "quarterly" | "ondemand" | "daily" | "monthly"; // daily/monthly는 reportschedule.ts의 정기 스케줄에서만 옴
+  type: "weekly" | "quarterly" | "ondemand" | "daily" | "monthly"; // daily/monthly는 reportschedule.ts의 정기 스케줄에서만 옴 (work-progress는 별도 함수)
   assetIds?: string[];
   format?: "docx" | "pdf" | "both"; // 기본 docx. pdf/both면 PDF도 생성(개선 #3).
   // 대상 독자: internal=내부 검토용(격식 없이 액션 중심) / official=보고용(격식·거버넌스 강조). 기본 official.
@@ -654,6 +654,111 @@ export async function generateReport(req: ReportRequest): Promise<ReportResult> 
   return result;
 }
 
+// ── 업무 진행 리포트 (3연결 시나리오, 2026-08-09) ─────────────────────────
+// 대시보드(계획)→팀 사무실(진행)→작업 내역(선택 리포트)의 세 번째 고리. 취약점 현황
+// 리포트와 달리 **내가 오늘 계획하고 한 일**이 내용이다. 전부 결정적(LLM 없음) — 보고
+// 숫자는 흔들리면 안 되고, 선택한 내역이 그대로 실려야 한다.
+export interface WorkProgressRequest {
+  sessionIds?: string[]; // 작업 내역 화면에서 고른 항목들 — 비우면 기간 내 전부
+  days?: number; // 기간(일) — 기본 1(오늘)
+  format?: "docx" | "pdf" | "both";
+  createdBy?: string;
+  qa?: boolean;
+}
+
+export async function generateWorkProgressReport(req: WorkProgressRequest): Promise<ReportResult> {
+  const { listSessions, getSession } = await import("./worksessions.js");
+  const days = Math.min(31, Math.max(1, Number(req.days) || 1));
+  const since = Date.now() - days * 86400000;
+
+  const 계획 = listTasks(); // listTasks 기본이 화면용 목록(에이전트 실행 기록 제외)이다
+
+  const 완료 = 계획.filter((t) => t.done);
+  const 미완료 = 계획.filter((t) => !t.done);
+
+  const sessions = req.sessionIds?.length
+    ? req.sessionIds.map((id) => getSession(id)).filter((s): s is NonNullable<ReturnType<typeof getSession>> => !!s)
+    : listSessions(200).filter((s) => s.updatedAt >= since);
+
+  const 기간말 = days === 1 ? "오늘" : `최근 ${days}일`;
+  const executiveSummary =
+    `${기간말} 계획 ${계획.length}건 중 ${완료.length}건 완료` +
+    (계획.length ? `(${Math.round((완료.length / 계획.length) * 100)}%)` : "") +
+    ` · 작업 내역 ${sessions.length}건${req.sessionIds?.length ? " (담당자 선택)" : ""}` +
+    (미완료.length ? ` · 남은 일 ${미완료.length}건` : " · 남은 일 없음");
+
+  const when = (ts: number) => new Date(ts).toLocaleString("ko-KR", { month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit" });
+  const row = (cells: string[], bold = false) =>
+    new TableRow({ children: cells.map((t) => new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: t, bold })] })] })) });
+
+  const doc = new Document({
+    sections: [{
+      children: [
+        new Paragraph({ text: `GIJO AS 업무 진행 리포트 (${기간말})`, heading: HeadingLevel.TITLE }),
+        new Paragraph({ text: "요약", heading: HeadingLevel.HEADING_1 }),
+        new Paragraph({ children: [new TextRun(executiveSummary)] }),
+        new Paragraph({ text: "오늘 계획", heading: HeadingLevel.HEADING_1 }),
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          rows: [
+            row(["항목", "상태", "우선순위"], true),
+            ...계획.map((t) => row([t.text, t.done ? "완료" : "진행 중", t.priority ?? "-"])),
+            ...(계획.length ? [] : [row(["(계획한 일이 없습니다)", "-", "-"])]),
+          ],
+        }),
+        new Paragraph({ text: req.sessionIds?.length ? "수행 내역 (담당자 선택)" : "수행 내역", heading: HeadingLevel.HEADING_1 }),
+        new Table({
+          width: { size: 100, type: WidthType.PERCENTAGE },
+          rows: [
+            row(["시각", "내용", "상태"], true),
+            ...sessions.map((s) => row([when(s.updatedAt), s.title, s.status === "done" ? "완료" : s.status === "active" ? "진행 중" : "보류"])),
+            ...(sessions.length ? [] : [row(["-", "(기간 내 작업 내역이 없습니다)", "-"])]),
+          ],
+        }),
+        new Paragraph({ text: "다음 걸음", heading: HeadingLevel.HEADING_1 }),
+        ...(미완료.length
+          ? 미완료.map((t) => new Paragraph({ children: [new TextRun(`· ${t.text}${t.priority ? ` (${t.priority})` : ""}`)] }))
+          : [new Paragraph({ children: [new TextRun("남은 계획이 없습니다 — 수고하셨습니다.")] })]),
+      ],
+    }],
+  });
+
+  await fs.mkdir(REPORT_DIR, { recursive: true });
+  const base = `work-progress-${Date.now()}`;
+  const filePath = path.join(REPORT_DIR, `${base}.docx`);
+  await fs.writeFile(filePath, await Packer.toBuffer(doc));
+  const result: ReportResult = { filePath, executiveSummary, audience: "internal" };
+
+  if (req.format === "pdf" || req.format === "both") {
+    const esc = (s: string) => String(s).replace(/[&<>]/g, (c) => (({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }) as Record<string, string>)[c]);
+    const html =
+      `<h1>GIJO AS 업무 진행 리포트 (${esc(기간말)})</h1><p>${esc(executiveSummary)}</p>` +
+      `<h2>오늘 계획</h2><table border="1" cellspacing="0" cellpadding="4"><tr><th>항목</th><th>상태</th></tr>` +
+      계획.map((t) => `<tr><td>${esc(t.text)}</td><td>${t.done ? "완료" : "진행 중"}</td></tr>`).join("") + `</table>` +
+      `<h2>수행 내역</h2><table border="1" cellspacing="0" cellpadding="4"><tr><th>시각</th><th>내용</th></tr>` +
+      sessions.map((s) => `<tr><td>${esc(when(s.updatedAt))}</td><td>${esc(s.title)}</td></tr>`).join("") + `</table>`;
+    const pdfPath = path.join(REPORT_DIR, `${base}.pdf`);
+    if (await renderPdf(html, pdfPath)) result.pdfPath = pdfPath;
+    else result.pdfError = "PDF 렌더 실패(headless 브라우저 미가용). DOCX만 제공됩니다.";
+  }
+
+  try {
+    const meta = {
+      base, type: "work-progress", audience: "internal",
+      assetIds: [], assetNames: [],
+      createdAt: Date.now(),
+      docx: path.basename(filePath),
+      pdf: result.pdfPath ? path.basename(result.pdfPath) : undefined,
+      summary: executiveSummary.slice(0, 400),
+      createdBy: req.createdBy,
+      qa: req.qa === true ? true : undefined,
+    };
+    await fs.writeFile(path.join(REPORT_DIR, `${base}.json`), JSON.stringify(meta, null, 2), "utf-8");
+  } catch { /* 메타 실패해도 리포트는 유효 */ }
+  recordWork({ kind: "report_generated", detail: "work-progress/internal", actor: req.createdBy ?? null, source: "chat", qa: req.qa });
+  return result;
+}
+
 // 저장된 리포트 이력 — data/reports/의 파일을 base(파일명 접두)로 묶어 최신순으로 나열한다.
 // 사이드카(.json)가 있으면 대상 자산·독자·요약까지, 없으면(구버전) 파일명·mtime으로 폴백.
 export interface ReportHistoryEntry {
@@ -1021,7 +1126,18 @@ export function registerReportRoutes(app: Express): void {
     authMiddleware,
     asyncRoute(async (req, res) => {
       const actor = (req as ExpressRequestWithUser).user?.displayName ?? null;
-      const result = await generateReport({ ...req.body, createdBy: actor ?? undefined }); // 작업 귀속 — 생성자 기록
+      // 모르는 type이 취약점 리포트로 조용히 폴백되던 것을 정직하게 거절한다(2026-08-09 실측 —
+      // work-progress를 요청했는데 취약점 요약이 나왔다. 틀린 리포트는 없느니만 못하다).
+      const 알려진 = ["weekly", "quarterly", "ondemand", "daily", "monthly", "work-progress"];
+      const type = req.body?.type ?? "ondemand";
+      if (!알려진.includes(type)) {
+        res.status(400).json({ error: `알 수 없는 리포트 종류: ${type} — 가능한 종류: ${알려진.join(", ")}` });
+        return;
+      }
+      const result =
+        type === "work-progress"
+          ? await generateWorkProgressReport({ ...req.body, createdBy: actor ?? undefined })
+          : await generateReport({ ...req.body, createdBy: actor ?? undefined }); // 작업 귀속 — 생성자 기록
       // 작업 기록(감사)에 남긴다 → onAudit 훅으로 작업 세션 목록에도 자동 반영("모든 행위" 요청).
       recordAudit({
         kind: "write", actor, action: `리포트 생성 (${req.body?.type ?? "ondemand"})`,

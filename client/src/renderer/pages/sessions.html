@@ -233,7 +233,16 @@
   <div class="two">
     <!-- 좌: 작업 내역 목록 -->
     <div class="panel">
-      <div class="ph">작업 내역 <span id="listCount" style="font-size:12.25px;color:var(--muted-2);font-weight:600"></span></div>
+      <div class="ph" style="display:flex;align-items:center;gap:8px">작업 내역 <span id="listCount" style="font-size:12.25px;color:var(--muted-2);font-weight:600"></span>
+        <button id="pickReportBtn" style="margin-left:auto;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:4px 9px;color:var(--text);font-size:11.75px;cursor:pointer" title="진행사항을 골라 업무 진행 리포트를 만듭니다">📄 골라서 리포트</button>
+      </div>
+      <!-- 선택 모드 띠(시안 추천안 2026-08-09) — 3연결의 세 번째 고리: 계획→진행→리포트 -->
+      <div id="pickBar" style="display:none;align-items:center;gap:8px;background:rgba(59,130,246,.10);border:1px solid var(--blue,#3b82f6);border-radius:8px;padding:6px 10px;margin:6px 0;font-size:12px">
+        <span id="pickCnt" style="font-weight:700">0건 선택</span>
+        <span style="color:var(--muted-2)">— 리포트에 실을 진행사항을 목록에서 체크하세요</span>
+        <button id="pickGo" style="margin-left:auto;background:var(--blue,#3b82f6);border:none;border-radius:7px;padding:4px 10px;color:#fff;font-size:11.75px;font-weight:700;cursor:pointer">리포트 만들기</button>
+        <button id="pickCancel" style="background:none;border:none;color:var(--muted-2);font-size:12px;cursor:pointer">취소</button>
+      </div>
       <div class="search">🔎<input id="sessionSearch" placeholder="내역 검색…" aria-label="작업 내역 검색"></div>
       <div class="filters" id="statusFilters">
         <span class="fchip active" data-st="all">전체</span>
@@ -422,6 +431,7 @@
       const label = st === "done" ? (s.doneBy === "auto" ? "자동완료" : "완료") : (STATUS_LABEL[st] || st);
       const preview = s.lastPreview ? esc(s.lastPreview) : "아직 대화 없음";
       return `<div class="srow ${s.id === currentId ? "on" : ""}" data-id="${s.id}">
+        ${pickMode ? `<input type="checkbox" class="spick" data-pick="${s.id}" ${picked.has(s.id) ? "checked" : ""} style="accent-color:var(--blue,#3b82f6)">` : ""}
         <span class="sdot ${st}"></span>
         <div class="sr-main"><div class="sr-title">${esc(s.title)}</div><div class="sr-sub">${preview}</div></div>
         <div class="sr-meta"><span class="badge ${STATUS_BADGE[st] || "b-active"}">${label}</span> ${s.createdBy ? "· 👤 " + esc(s.createdBy) + " " : ""}· ${fmtTime(s.updatedAt)} · ${s.turnCount || 0}턴</div>
@@ -430,9 +440,60 @@
     }).join("");
     sessionListEl.querySelectorAll(".srow").forEach((el) => el.addEventListener("click", (e) => {
       if (e.target.closest(".sdel")) { e.stopPropagation(); deleteSessionById(el.dataset.id); return; }
+      // 선택 모드에선 행 클릭도 체크 토글 — 좁은 체크박스만 노리게 하지 않는다.
+      if (pickMode) {
+        e.stopPropagation();
+        const id = el.dataset.id;
+        if (picked.has(id)) picked.delete(id); else picked.add(id);
+        renderSessionList();
+        updatePickBar();
+        return;
+      }
       openSession(el.dataset.id);
     }));
   }
+
+  // ── 골라서 리포트(3연결 세 번째 고리, 시안 추천안 승인 2026-08-09) ────
+  // 선택은 화면에서(선택은 입력이 아니다), 산출은 읽기(업무 진행 리포트) — 파괴 없음.
+  let pickMode = false;
+  const picked = new Set();
+  function updatePickBar() {
+    document.getElementById("pickCnt").textContent = `${picked.size}건 선택`;
+    document.getElementById("pickGo").disabled = picked.size === 0;
+  }
+  document.getElementById("pickReportBtn").addEventListener("click", () => {
+    pickMode = !pickMode;
+    if (!pickMode) picked.clear();
+    document.getElementById("pickBar").style.display = pickMode ? "flex" : "none";
+    renderSessionList();
+    updatePickBar();
+  });
+  document.getElementById("pickCancel").addEventListener("click", () => {
+    pickMode = false;
+    picked.clear();
+    document.getElementById("pickBar").style.display = "none";
+    renderSessionList();
+  });
+  document.getElementById("pickGo").addEventListener("click", async () => {
+    if (!picked.size) return;
+    const btn = document.getElementById("pickGo");
+    btn.disabled = true;
+    btn.textContent = "만드는 중…";
+    try {
+      const r = await window.gijo.generateReport({ type: "work-progress", sessionIds: [...picked], format: "both" });
+      btn.textContent = "리포트 만들기";
+      // 결과는 그 자리에서 요약으로 — 파일은 리포트 화면(리포트 이력)에서 연다.
+      gijoTell(`업무 진행 리포트가 만들어졌습니다.\n${r.executiveSummary}\n\n파일은 「리포트」 화면의 이력에서 열 수 있습니다${r.pdfPath ? " (DOCX·PDF)" : " (DOCX)"}.`);
+      pickMode = false;
+      picked.clear();
+      document.getElementById("pickBar").style.display = "none";
+      renderSessionList();
+    } catch (e) {
+      btn.disabled = false;
+      btn.textContent = "리포트 만들기";
+      gijoTell("리포트를 만들지 못했습니다: " + ((e && e.message) || e));
+    }
+  });
   async function loadSessions(selectFirst) {
     try {
       sessions = await window.gijo.listWorkSessions();
@@ -708,6 +769,7 @@
     걸기();
   })();
 </script>
+<script src="dialog.js"></script>
 <script src="nav.js"></script>
 <script src="progresscard.js"></script>
 <script src="gijomd.js"></script>

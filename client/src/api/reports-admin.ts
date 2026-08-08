@@ -144,10 +144,10 @@ export const kpiApi = {
 // ── 내부 리포트 ───────────────────────────────────────────────────────
 export const reportApi = {
   generate: (
-    type: "weekly" | "quarterly" | "ondemand",
+    type: "weekly" | "quarterly" | "ondemand" | "work-progress",
     assetIds?: string[],
-    opts?: { audience?: "internal" | "official"; format?: "docx" | "pdf" | "both" }
-  ) => request("/api/report/generate", { method: "POST", body: { type, assetIds, audience: opts?.audience, format: opts?.format } }),
+    opts?: { audience?: "internal" | "official"; format?: "docx" | "pdf" | "both"; sessionIds?: string[]; days?: number }
+  ) => request("/api/report/generate", { method: "POST", body: { type, assetIds, audience: opts?.audience, format: opts?.format, sessionIds: opts?.sessionIds, days: opts?.days } }),
   // 생성된 리포트 파일 내용(base64) — 클라이언트가 blob으로 만들어 열기/저장.
   file: (name: string) =>
     request<{ name: string; mime: string; base64: string }>(`/api/report/file/${encodeURIComponent(name)}`),

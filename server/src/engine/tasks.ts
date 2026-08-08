@@ -370,14 +370,27 @@ export function registerTasksRoutes(app: Express): void {
     const 전 = listTasks({ includeAgentRuns: true }).length;
     const 일 = createTask({ text: String(b.text), priority, dueAt: typeof b.dueAt === "number" ? b.dueAt : undefined, assignee: b.assignee, ref: b.ref });
     const 이미있었다 = listTasks({ includeAgentRuns: true }).length === 전;
+    // 담기도 작업 내역에 남긴다(재설계 시나리오 실측 2026-08-09 — 삭제만 남고 담기·완료가
+    // 안 남아 "오늘 뭘 했나"를 작업 내역이 답하지 못했다). onAudit 훅이 작업 세션에도 반영한다.
+    if (!이미있었다) {
+      recordAudit({ kind: "write", action: "할 일 담기", target: 일.text.slice(0, 80), actor: (req as Request & { user?: GijoUser }).user?.displayName ?? null });
+    }
     res.json({ ...일, 이미있었다 });
   });
   // completeTask는 디스패처를 위해 실행 기록까지 돌려준다 — 화면에 줄 땐 거른다.
   app.post("/api/tasks/:id/complete", authMiddleware, (req, res) => {
+    const t = getTask(String(req.params.id));
     completeTask(String(req.params.id));
+    recordAudit({ kind: "write", action: "할 일 완료", target: (t?.text ?? String(req.params.id)).slice(0, 80), actor: (req as Request & { user?: GijoUser }).user?.displayName ?? null });
     res.json(listTasks());
   });
-  app.post("/api/tasks/:id/toggle", authMiddleware, (req, res) => res.json(setTaskDone(String(req.params.id), !!req.body.done)));
+  app.post("/api/tasks/:id/toggle", authMiddleware, (req, res) => {
+    const t = getTask(String(req.params.id));
+    const done = !!req.body.done;
+    const out = setTaskDone(String(req.params.id), done);
+    recordAudit({ kind: "write", action: done ? "할 일 완료" : "할 일 다시 열기", target: (t?.text ?? String(req.params.id)).slice(0, 80), actor: (req as Request & { user?: GijoUser }).user?.displayName ?? null });
+    res.json(out);
+  });
   app.delete("/api/tasks/:id", authMiddleware, (req, res) => {
     recordAudit({ kind: "write", action: "작업 삭제", target: String(req.params.id), actor: (req as Request & { user?: GijoUser }).user?.displayName ?? null });
     res.json(deleteTask(String(req.params.id)));

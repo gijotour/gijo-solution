@@ -424,8 +424,8 @@ const gijoApi = {
   getSecurityKpi: () => api.kpiApi.get(),
 
   // 내부 리포트
-  generateReport: (opts: { type: "weekly" | "quarterly" | "ondemand"; assetIds?: string[]; audience?: "internal" | "official"; format?: "docx" | "pdf" | "both" }) =>
-    api.reportApi.generate(opts.type, opts.assetIds, { audience: opts.audience, format: opts.format }),
+  generateReport: (opts: { type: "weekly" | "quarterly" | "ondemand" | "work-progress"; assetIds?: string[]; sessionIds?: string[]; days?: number; audience?: "internal" | "official"; format?: "docx" | "pdf" | "both" }) =>
+    api.reportApi.generate(opts.type, opts.assetIds, { audience: opts.audience, format: opts.format, sessionIds: opts.sessionIds, days: opts.days }),
   downloadReportFile: (name: string) => api.reportApi.file(name),
   listReportHistory: () => api.reportApi.history(),
   deleteReport: (base: string) => api.reportApi.remove(base),
