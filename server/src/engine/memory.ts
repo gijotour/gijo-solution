@@ -649,7 +649,10 @@ async function ensureCategoryColumn(table: lancedb.Table): Promise<void> {
 let ftsIndexChecked = false;
 let ftsIndexReady = false;
 // 인덱스 옵션을 바꿀 때 이 문자열을 올리면 다음 기동의 첫 검색에서 한 번 재색인된다.
-const FTS_GENERATION = "2-with-position";
+// 3세대(2026-08-09): 운영 인덱스가 lance 내부 오류(offset 초과)로 **깨져** optimize가 계속
+// 실패했다 — 그 뒤 인입된 문서 전부가 글자 검색(BM25)에 빠져, WizCLM 비교가 근거 없이
+// 지어지는 실사고의 뿌리였다. 세대를 올리면 다음 기동에서 깨진 인덱스를 버리고 다시 만든다.
+const FTS_GENERATION = "3-rebuild-after-corruption";
 const FTS_GEN_KEY = "memory:ftsIndexGeneration";
 const getFtsGenStmt = db.prepare("SELECT value FROM app_state WHERE key = ?");
 const setFtsGenStmt = db.prepare(
