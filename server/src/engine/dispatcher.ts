@@ -19,6 +19,7 @@ import { 모델스캔, StandardFinding } from "./bridge";
 import { chat } from "./llm";
 import { isNonLearningAccount } from "./learnpolicy";
 import { recordChatLog } from "./learnloop";
+import { faqAnswerFor } from "./productfaq";
 import type { Viewer } from "./memory";
 import { runAgentLoop, AgentToolCall, 가리킬것없는대명사, 가리킨자산이없나, 대명사뿐인가, 대명사확인, 되물음, 자산되물음 } from "./agentloop";
 import { executeApprovedTool, findAgentTool, buildApproval, PendingApproval } from "./agenttools";
@@ -714,6 +715,16 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
     completeTask(task.id);
     return { task, route: { agentId: "orchestrator", action: "chat" }, output: 낱말 };
+  }
+
+  // ★ 제품 지식 즉답 카드(2026-08-08) — 답이 변하지 않는 지식은 코드가 그대로 낸다.
+  //   야간 150상황의 마지막 불편 3건(CEF 헤더·학습 확인·지어냄 식별)이 전부 이 부류였다:
+  //   14B가 매번 30초씩 옳은 답을 새로 썼다. 카드 기준은 productfaq.ts 머리말.
+  const 지식카드 = faqAnswerFor(instructionText);
+  if (지식카드) {
+    const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
+    completeTask(task.id);
+    return { task, route: { agentId: "orchestrator", action: "chat" }, output: 지식카드.answer };
   }
 
   // ★ "내 업무 화면 어디 갔어?" — 없앤 메뉴를 찾는 말(2026-08-01, 메뉴 폐지).
