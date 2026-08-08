@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>대화창 — 보는 메뉴에 맞춰 내용이 바뀌는 재설계 시안</title>
+<style>
+  :root{
+    --bg:#0d1117; --panel:#161b22; --panel-2:#1c2230; --border:#2a3140;
+    --fg:#e6edf3; --muted:#9aa7b8; --muted-2:#6e7b8d; --teal:#1eb980; --blue:#5fa1ff;
+    --warn:#f0a020; --red:#ff8b80;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);
+       font:13px/1.55 "Pretendard","Malgun Gothic",system-ui,sans-serif;padding:24px}
+  h1{font-size:17px;margin:0 0 4px}
+  .lead{color:var(--muted);font-size:12.5px;margin:0 0 14px;max-width:980px}
+  .why{max-width:980px;background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--warn);
+       border-radius:8px;padding:10px 12px;margin:0 0 20px;font-size:12.5px;color:var(--muted)}
+  .why b{color:var(--fg)}
+
+  /* ── 데모 무대: 탭 셸 흉내 ─────────────────────────────── */
+  .stage{max-width:1180px;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:#11151c}
+  .tabs{display:flex;gap:2px;background:#0a0d12;padding:8px 10px 0;border-bottom:1px solid var(--border)}
+  .tab{padding:7px 16px;font-size:12.5px;color:var(--muted);background:transparent;border:1px solid transparent;
+       border-bottom:none;border-radius:8px 8px 0 0;cursor:pointer}
+  .tab.on{background:#11151c;color:var(--fg);border-color:var(--border);font-weight:700}
+  .split{display:grid;grid-template-columns:1fr 380px;min-height:520px}
+  .screen{padding:18px;border-right:1px solid var(--border);color:var(--muted-2);font-size:12.5px}
+  .screen .ph{border:1px dashed var(--border);border-radius:10px;height:100%;min-height:460px;
+              display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.9}
+
+  /* ── 대화창(정돈안) ─────────────────────────────────────── */
+  .console{display:flex;flex-direction:column;background:var(--panel)}
+
+  /* ① 화면 머리판 — 어디에 있고, 앞뒤가 무엇인지 */
+  .ctx{border-bottom:1px solid var(--border);padding:9px 12px 8px;background:var(--panel-2)}
+  .ctx .row1{display:flex;align-items:center;gap:8px}
+  .ctx .name{font-weight:800;font-size:13px}
+  .ctx .live{margin-left:auto;font-size:11.5px;color:var(--muted)}
+  .ctx .live b{color:var(--red);font-weight:700}
+  .flow{display:flex;align-items:center;gap:5px;margin-top:6px;font-size:11px;color:var(--muted-2)}
+  .flow .st{border:1px solid var(--border);border-radius:5px;padding:1px 7px;cursor:pointer;white-space:nowrap}
+  .flow .st:hover{color:var(--blue);border-color:var(--blue)}
+  .flow .st.now{background:rgba(30,185,128,.12);border-color:#1f5240;color:#5fe0aa;font-weight:800;cursor:default}
+  .flow .ar{color:var(--muted-2)}
+
+  /* ② 지금 여기서 할 것 — 화면별 칩 3~5개 + 전부 보기 */
+  .chips{display:flex;flex-wrap:wrap;gap:6px;padding:9px 12px;border-bottom:1px solid var(--border)}
+  .chip{font-size:12px;border:1px solid var(--border);border-radius:14px;padding:3px 11px;cursor:pointer;
+        color:var(--fg);background:transparent;white-space:nowrap}
+  .chip:hover{border-color:var(--teal);color:var(--teal)}
+  .chip.ok{border-style:dashed}
+  .chip.all{color:var(--muted-2)}
+
+  /* ③ 대화 본문 — 안내 카드 1장 + 전환 구분선 */
+  .body{flex:1;padding:10px 12px;display:flex;flex-direction:column;gap:9px;overflow:auto;min-height:280px}
+  .guide{border:1px solid var(--border);border-left:3px solid var(--blue);border-radius:8px;
+         background:var(--panel-2);padding:8px 10px;font-size:12px;color:var(--muted)}
+  .guide .gh{display:flex;align-items:center;gap:6px;color:var(--fg);font-weight:700;font-size:12px;cursor:pointer}
+  .guide .gh .car{color:var(--muted-2);font-size:10px}
+  .guide .gb{margin-top:6px;display:none}
+  .guide.open .gb{display:block}
+  .divider{display:flex;align-items:center;gap:8px;color:var(--muted-2);font-size:10.5px;margin:2px 0}
+  .divider::before,.divider::after{content:"";flex:1;border-top:1px solid var(--border)}
+  .me{align-self:flex-end;background:var(--panel-2);border:1px solid var(--border);
+      border-radius:10px 10px 2px 10px;padding:6px 10px;font-size:12.5px;max-width:85%}
+  .ai{font-size:12.5px;white-space:pre-wrap}
+  .next{display:flex;flex-wrap:wrap;gap:5px;margin-top:4px}
+  .next .n{font-size:11px;border:1px solid #244b3c;color:var(--teal);border-radius:5px;padding:1px 8px;cursor:pointer}
+  .next .n:hover{background:var(--teal);color:#0d1117}
+
+  .input{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--border)}
+  .input input{flex:1;background:#0d1117;border:1px solid var(--border);border-radius:8px;
+               padding:8px 10px;color:var(--fg);font-size:12.5px;font-family:inherit}
+  .input button{background:var(--blue);color:#0d1117;font-weight:800;border:none;border-radius:8px;
+                padding:0 18px;cursor:pointer}
+
+  .notes{max-width:1180px;margin-top:22px;border-top:1px solid var(--border);padding-top:14px}
+  .notes h3{font-size:13px;margin:14px 0 8px}
+  .notes ul{margin:0;padding-left:18px;color:var(--muted);font-size:12.5px}
+  .notes li{margin:5px 0}.notes b{color:var(--fg)}
+  table{border-collapse:collapse;margin-top:8px;font-size:12px}
+  th,td{border:1px solid var(--border);padding:4px 10px;text-align:left}
+  th{color:var(--muted-2);font-weight:700}
+  td.win{color:#5fe0aa;font-weight:700}
+</style>
+</head>
+<body>
+
+<h1>대화창 — 보는 메뉴에 맞춰 내용이 바뀌게 (재설계 시안 · 추천안)</h1>
+<p class="lead">위 탭(대시보드 / 취약점 점검 / 설정)을 눌러 보세요 — 오른쪽 대화창의 <b>머리판·칩·안내</b>가 그 화면 것으로 바뀝니다. 대화 자체는 끊기지 않고, 화면을 옮긴 자리에 가는 구분선만 남습니다.</p>
+
+<div class="why">
+  <b>왜 다시 짜나 — 실앱에서 확인한 문제 셋</b><br>
+  ① 같은 화면 안내가 대화에 <b>3번 중복</b>으로 쌓여 있었다(2026-08-09 실화면). 안내가 대화를 밀어낸다.<br>
+  ② 「무엇을 할 수 있나」는 어느 화면에서나 <b>같은 17가지</b>다 — 순서만 바뀌고 내용이 안 바뀐다.<br>
+  ③ 화면을 옮겨도 대화에 아무 흔적이 없어, 어느 답이 어느 화면 이야기였는지 뒤에서 못 가른다.
+</div>
+
+<div class="stage">
+  <div class="tabs" id="tabs"></div>
+  <div class="split">
+    <div class="screen"><div class="ph" id="ph"></div></div>
+    <div class="console">
+      <div class="ctx">
+        <div class="row1">
+          <span class="name" id="cxName"></span>
+          <span class="live" id="cxLive"></span>
+        </div>
+        <div class="flow" id="cxFlow"></div>
+      </div>
+      <div class="chips" id="cxChips"></div>
+      <div class="body" id="cxBody"></div>
+      <div class="input">
+        <input id="cxInput" placeholder="">
+        <button>전송</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="notes">
+  <h3>무엇이 바뀌나 — 네 가지</h3>
+  <ul>
+    <li><b>① 화면 머리판.</b> 지금 화면 이름 옆에 <b>그 화면의 살아 있는 숫자 한 줄</b>(취약점 탭이면 "미검토 4,826 · 기한 초과 3")과, 업무 절차 5단계에서 <b>지금 어디인지</b>(앞 ← 지금 → 다음)를 붙입니다. 앞·다음 단계를 누르면 그 탭이 열립니다 — 절차 출처는 기존 workflow.ts 한 곳 그대로, 숫자는 화면이 이미 부르는 요약 API를 같이 읽습니다(새 계산 없음).</li>
+    <li><b>② 지금 여기서 할 것 — 칩 3~5개.</b> 접힌 서랍 대신, 그 화면에서 실제로 하는 물음을 칩으로 한 줄에 폅니다. 첫 칩은 항상 <b>ⓘ 이 화면 뭐 하는 곳?</b>. 나머지 전체 갈래(화면을 가로지르는 물음·내가 등록한 지시)는 「전부 ▾」에 그대로 보존됩니다 — 서랍의 강점을 지웁니다가 아니라 뒤로 물립니다.</li>
+    <li><b>③ 화면 안내는 카드 1장.</b> ⓘ 안내가 대화에 말풍선으로 쌓이지 않고, 대화 맨 위 <b>접히는 카드 한 장</b>을 갈아끼웁니다. 같은 화면에서 또 물으면 카드가 갱신될 뿐 중복이 안 쌓입니다 — 실앱의 3중복이 이 구조에서 사라집니다.</li>
+    <li><b>④ 전환 구분선 + 다음 걸음.</b> 탭을 옮기면 대화에 가는 구분선("── 취약점 점검으로 이동 ──")이 남아 답의 소속이 갈립니다. 답 끝에는 <b>다음 걸음 칩</b>(눌러서 이어 묻기)을 답니다 — 서버가 이미 계산하는 「다음 걸음」을 버리지 않고 누를 수 있게.</li>
+  </ul>
+
+  <h3>바꾸지 않는 것 (원칙 보존)</h3>
+  <ul>
+    <li>대화는 화면을 옮겨도 <b>끊기지 않는다</b> — 구분선만 남는다.</li>
+    <li>지시는 여전히 <b>대화창 한 곳</b>. 화면에는 입력칸이 안 생긴다.</li>
+    <li>쓰기는 <b>결재판</b>을 거친다. 칩도 예외 없다(점선 테두리 칩 = 승인 후 실행).</li>
+    <li>서랍의 화면 가로지르기 갈래·내가 등록한 지시(최대 30개)는 「전부 ▾」에 그대로.</li>
+  </ul>
+
+  <h3>재 본 값 — 취약점 탭에 도착한 순간 기준</h3>
+  <table>
+    <tr><th>항목</th><th>지금</th><th>정돈안</th></tr>
+    <tr><td>이 화면 전용 정보가 보이기까지</td><td>서랍 펼침 1클릭 + 훑기 (전용 아님 — 순서만 위)</td><td class="win">0클릭 — 머리판 숫자·칩이 이미 그 화면 것</td></tr>
+    <tr><td>같은 안내 중복</td><td>물을 때마다 말풍선 누적 (실측 3중복)</td><td class="win">카드 1장 갱신 — 중복 0</td></tr>
+    <tr><td>답의 화면 소속</td><td>구분 없음</td><td class="win">전환 구분선으로 갈림</td></tr>
+    <tr><td>절차 연계(앞/다음 단계)</td><td>없음 (별도 절차 카드 요청 시)</td><td class="win">머리판 상시 1줄 · 클릭 이동</td></tr>
+    <tr><td>대화창 위 고정부 높이</td><td>헤더+접힌 서랍 ≈ 68px</td><td>머리판+칩 ≈ 88px (+20px — 대신 본문 중복 제거로 회수)</td></tr>
+  </table>
+
+  <h3>구현 범위 (승인 시)</h3>
+  <ul>
+    <li>클라 console.js — 머리판·칩 렌더(화면별 정의는 기존 CAN의 screens 매핑 재사용) · 안내 카드 · 구분선. 서버는 <b>화면 요약 숫자 1개 API 재사용</b>과 screenguide 응답에 「칩용 짧은 갈래」 필드 추가 정도 — 큰 서버 변경 없음.</li>
+    <li>QA — 스윕·서랍 감사(drawer-audit)가 칩을 같이 검사하게 확장. 칩 문구도 「첫 클릭이 실패하면 없느니만 못하다」 원칙 그대로(실데이터 없는 물음은 칩에서 뺌).</li>
+  </ul>
+</div>
+
+<script>
+  // ── 화면별 정의 — 실제 구현에서는 CAN.screens 매핑 + screenguide에서 온다 ──
+  var SCREENS = [
+    {
+      id: "dashboard", label: "대시보드",
+      live: '급한 것 <b>3</b> · 남은 계획 1',
+      stage: null, // 대시보드는 절차 밖 — 절차 띠 대신 "오늘의 출발점" 한 줄
+      chips: [
+        { t: "ⓘ 이 화면 뭐 하는 곳?", guide: true },
+        { t: "오늘 뭐부터 해야 해?" },
+        { t: "기한 지난 일 보여줘" },
+        { t: "승인 기다리는 것 있어?" },
+      ],
+      guide: "오늘 급한 것을 한눈에 보고, 지시는 이 대화창에서 하는 자리입니다. 왼쪽 급한 것을 「담기」로 계획에 올리고, 막히면 여기서 물으세요.",
+      ph: "🏠 대시보드 화면\n(급한 것 3건 · 오늘 내 계획)",
+      demo: [
+        { me: "오늘 뭐부터 해야 해?" },
+        { ai: "오늘 조치 우선순위 상위 5건 (KEV→EPSS→VPR 순):\n1. 🔴 Apache Log4j RCE (CVE-2021-44228) — 192.168.219.98", next: ["이 취약점 조치 절차 알려줘", "담당자 배정해줘"] },
+      ]
+    },
+    {
+      id: "vulnscan", label: "취약점 점검",
+      live: '미검토 <b>4,826</b> · 기한 초과 <b>3</b>',
+      stage: 1, // 절차 5단계 중 두 번째(우선순위)
+      chips: [
+        { t: "ⓘ 이 화면 뭐 하는 곳?", guide: true },
+        { t: "미조치 취약점 뭐 있어?" },
+        { t: "고위험인데 담당자 없는 거 있어?" },
+        { t: "담당자 배정해줘", ok: true },
+        { t: "오탐으로 표시해줘", ok: true },
+      ],
+      guide: "스캐너가 찾은 취약점을 검토하고 우선순위를 정하는 자리입니다. 심각도(CVSS)보다 실제 악용(KEV)·악용확률(EPSS)을 먼저 보세요. 담당자 배정·오탐 표시는 결재판을 거칩니다.",
+      ph: "🛡 취약점 점검 화면\n(목록 4,826건 · KEV 필터)",
+      demo: [
+        { div: "취약점 점검으로 이동" },
+        { me: "고위험인데 담당자 없는 거 있어?" },
+        { ai: "고위험 미배정 4,820건 — 실제 악용(KEV) 걸린 것부터 보면 11건입니다.", next: ["KEV 11건 목록 보여줘", "전부 담당자 배정해줘"] },
+      ]
+    },
+    {
+      id: "settings", label: "설정",
+      live: '가드레일 <b>기록만</b> · 백업 4시간 전',
+      stage: null,
+      chips: [
+        { t: "ⓘ 이 화면 뭐 하는 곳?", guide: true },
+        { t: "2차 인증 켜려면 어떻게 해?" },
+        { t: "복구 열쇠 재발급하려면 어떻게 해?" },
+        { t: "가드레일 모드가 지금 뭐야?" },
+      ],
+      guide: "계정·서버·AI 구성을 다루는 자리입니다. 여기 일(계정 추가·열쇠 재발급)은 대화로 실행되지 않습니다 — 순서를 알려 드리고 해당 화면을 열어 드립니다(가서 하기).",
+      ph: "⚙ 설정 화면\n(서버·AI · 사용자 관리 · 기록)",
+      demo: [
+        { div: "설정으로 이동" },
+        { me: "가드레일 모드가 지금 뭐야?" },
+        { ai: "「기록만(flag)」 모드입니다 — 위험 입력을 탐지해 기록하되 막지는 않습니다. 막으려면 아래에서 block으로 바꾸세요.", next: ["가드레일 로그 보여줘"] },
+      ]
+    },
+  ];
+  var STAGES = ["① 발견·수집", "② 우선순위", "③ 조치", "④ 검증", "⑤ 보고"];
+
+  var cur = 0;
+  function esc(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;"); }
+
+  function render() {
+    var s = SCREENS[cur];
+    document.getElementById("tabs").innerHTML = SCREENS.map(function (x, i) {
+      return '<div class="tab' + (i === cur ? " on" : "") + '" onclick="go(' + i + ')">' + esc(x.label) + "</div>";
+    }).join("");
+    document.getElementById("ph").innerText = s.ph;
+    document.getElementById("cxName").textContent = s.label;
+    document.getElementById("cxLive").innerHTML = s.live;
+    // 절차 띠 — 절차 화면이면 앞←지금→다음, 아니면 정체 한 줄
+    var flow = document.getElementById("cxFlow");
+    if (s.stage != null) {
+      flow.innerHTML = STAGES.map(function (n, i) {
+        if (Math.abs(i - s.stage) > 1) return "";
+        return '<span class="st' + (i === s.stage ? " now" : "") + '" title="' + (i === s.stage ? "지금 여기" : "누르면 이 단계 화면으로") + '">' + n + "</span>" + (i < s.stage + 1 && i >= s.stage - 1 && i < 4 ? '<span class="ar">→</span>' : "");
+      }).join("");
+    } else {
+      flow.innerHTML = '<span style="color:var(--muted-2)">' + (s.id === "dashboard" ? "업무 절차의 출발점 — 급한 것에서 ② 우선순위로 이어집니다" : "절차 밖 화면 — 구성·관리") + "</span>";
+    }
+    // 칩
+    document.getElementById("cxChips").innerHTML = s.chips.map(function (c) {
+      return '<span class="chip' + (c.ok ? " ok" : "") + '"' + (c.ok ? ' title="승인 후 실행"' : "") + ">" + esc(c.t) + "</span>";
+    }).join("") + '<span class="chip all">전부 ▾</span>';
+    // 본문: 안내 카드 1장 + 데모 대화(이전 화면 대화 유지 흉내)
+    var body = [];
+    body.push('<div class="guide" id="gcard"><div class="gh" onclick="this.parentNode.classList.toggle(\'open\')"><span>ⓘ ' + esc(s.label) + ' — 화면 안내</span><span class="car">▼ 접기/펴기 · 다시 물어도 이 카드가 갱신됩니다(중복 없음)</span></div><div class="gb">' + esc(s.guide) + "</div></div>");
+    for (var i = 0; i <= cur; i++) {
+      SCREENS[i].demo.forEach(function (m) {
+        if (m.div && i > 0) body.push('<div class="divider">' + esc(m.div) + "</div>");
+        if (m.me) body.push('<div class="me">' + esc(m.me) + "</div>");
+        if (m.ai) body.push('<div class="ai">' + esc(m.ai) + (m.next ? '<div class="next">' + m.next.map(function (n) { return '<span class="n">' + esc(n) + "</span>"; }).join("") + "</div>" : "") + "</div>");
+      });
+    }
+    document.getElementById("cxBody").innerHTML = body.join("");
+    document.getElementById("cxInput").placeholder = "「" + s.label + "」 화면에 대해 지시…";
+    var b = document.getElementById("cxBody"); b.scrollTop = b.scrollHeight;
+  }
+  function go(i){ cur = i; render(); }
+  render();
+  document.getElementById("gcard") && document.getElementById("gcard").classList.add("open");
+</script>
+
+</body>
+</html>
