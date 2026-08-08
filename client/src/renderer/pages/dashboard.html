@@ -256,8 +256,16 @@
       <!-- 급한 것·오늘 할 일 카드는 2026-08-09 사용자 지시로 제거 — 위 계획 판이 두 내용을
            전부 담는다(급한 것=후보 구획, 오늘 할 일=오늘 내 계획+완료 체크). 중복이 두 곳이면
            숫자가 어긋나는 순간 담당자는 둘 다 안 믿는다. -->
-      <div class="card"><h3>📊 한눈에</h3>
-        <div id="kpiBox"><div class="empty">불러오는 중…</div></div></div>
+      <!-- 「한눈에」 카드는 2026-08-09 사용자 지시로 **발견·수집 허브의 보안 태세 판**으로
+           이사했다(현황 조망은 허브, 대시보드는 오늘 계획+대화창). -->
+      <div class="card" style="display:flex;flex-direction:column;justify-content:center;gap:8px;cursor:pointer" id="glanceGo" title="발견·수집 허브로">
+        <h3 style="margin:0">📊 한눈에 · 현황 조망</h3>
+        <div style="font-size:12.5px;color:var(--muted);line-height:1.7">
+          보안 태세·통합 관제·위협 인텔·자산 요약은 <b style="color:var(--blue-l)">발견·수집</b> 화면에서
+          한 줄로 보고, 누르면 그 메뉴가 바로 아래 열립니다.
+        </div>
+        <div style="font-size:12.5px;color:var(--blue-l);font-weight:700">발견·수집 열기 →</div>
+      </div>
     </div>
   </div>
 </div>
@@ -525,68 +533,15 @@
     }
   });
 
-  // ── 한눈에 ───────────────────────────────────────────────────────────
-  // 서버 KPI에 실제로 있는 값만 쓴다. 없는 항목은 줄 자체를 안 만든다(빈칸에 0을 채우지 않는다).
-  var BAND = { good: "양호", fair: "보통", poor: "미흡" };
-  var BAND_COLOR = { good: "var(--teal)", fair: "var(--amber)", poor: "#f5928a" };
-  async function loadKpi() {
-    var box = $("kpiBox");
-    if (!window.gijo || !window.gijo.getSecurityKpi) return;
-    try {
-      var k = ((await window.gijo.getSecurityKpi()) || {}).current || {};
-      var h = "";
-      // 그림 먼저(전-7 ①, 2026-08-05). 대시보드는 **훑는 자리**라 여기서 거르지 않는다 —
-      // 카드를 누르면 보안 KPI 화면으로 넘어가는 기존 길이 세부다(막다른 길 아님).
-      // ⚠ 점수를 그림으로 바꾸되 **숫자도 그대로 적는다**(도넛 가운데 점수). 그림만 남기면
-      //   "몇 점인지"를 눈대중해야 한다.
-      function kv(label, val, color) {
-        if (val == null) return;
-        h += '<div class="kv"><span>' + label + '</span><b' + (color ? ' style="color:' + color + '"' : "") + ">" + val + "</b></div>";
-      }
-      if (k.vulnerabilities) {
-        kv("미조치 취약점", k.vulnerabilities.active.toLocaleString(), "#f5928a");
-        if (k.vulnerabilities.kev) kv("실제 악용(KEV)", k.vulnerabilities.kev, "#f5928a");
-      }
-      if (k.remediation && k.remediation.overdue) kv("기한 지난 조치", k.remediation.overdue, "var(--amber)");
-      if (k.findings) kv("승인 대기", k.findings.pending);
-      if (k.assets) kv("자산", k.assets.total);
-      // coverageRate는 서버에서 이미 0~100 퍼센트로 계산해 온다(engine/kpi.ts의 compRate).
-      // 여기서 100을 또 곱해 1400%가 찍힌 적이 있다 — 소수 비율로 넘겨받는다고 넘겨짚었다.
-      if (k.compliance) kv("컴플라이언스", Math.round(k.compliance.coverageRate) + "%");
-      // ⚠ "없습니다"는 **정말 아무것도 없을 때만**(2026-08-05 검토 지적). 태세 점수를 h에서
-      //   떼어 내면서, 점수는 있는데 세부 줄이 비면 도넛 밑에 "없습니다"가 함께 뜨게 됐었다.
-      box.innerHTML = '<div id="kpiViz"></div>' +
-        (h || (k.posture ? "" : '<div class="empty">아직 집계할 데이터가 없습니다.</div>'));
-      if (k.posture && window.gijoViz) {
-        window.gijoViz.mount($("kpiViz"), {
-          title: "보안 태세",
-          hint: (BAND[k.posture.band] || "-"),
-          parts: [{
-            // ⚠ %가 아니라 **몇/100점**으로 적는다(2026-08-05 실측): 만점이 100이라 도넛이
-            //   "53%"로 나오는데, 이건 비율이 아니라 점수다 — 읽는 사람이 다르게 새긴다.
-            kind: "donut", value: Math.round(k.posture.score), total: 100, showRatio: true,
-            label: "점수(100점 만점)", color: k.posture.band === "good" ? "ok" : k.posture.band === "fair" ? "warn" : "bad",
-          }],
-        });
-      } else if (k.posture) {
-        // viz.js가 없어도 점수는 보여야 한다.
-        $("kpiViz").innerHTML = '<div style="padding:4px 0 8px"><span class="big" style="color:' +
-          (BAND_COLOR[k.posture.band] || "var(--muted)") + '">' + Math.round(k.posture.score) +
-          '</span> <span style="font-size:12.25px;color:var(--muted)">/100 보안 태세 · ' + (BAND[k.posture.band] || "-") + "</span></div>";
-      }
-      box.style.cursor = "pointer";
-      box.title = "보안 KPI 화면으로";
-    } catch (e) {
-      box.innerHTML = '<div class="empty">지표를 불러오지 못했습니다.</div>';
-    }
-  }
-  $("kpiBox").addEventListener("click", function () { go("kpi.html"); });
+  // 「한눈에」 계산·렌더는 발견·수집 허브(discover.html)로 이사했다(2026-08-09).
+  $("glanceGo").addEventListener("click", function () { go("discover.html"); });
+
 
   // ⓘ — 화면 설명은 셸 콘솔이 답한다(프로젝트 원칙: 화면엔 정체성 한 줄만)
 
   // 자산이 바뀌면(스캔 인입 등) 브리핑·지표가 낡는다 — 알림이 오면 다시 읽는다.
   if (window.gijo && window.gijo.onAssetUpdated) {
-    try { window.gijo.onAssetUpdated(function () { loadToday(); loadKpi(); }); } catch (e) {}
+    try { window.gijo.onAssetUpdated(function () { loadToday(); }); } catch (e) {}
   }
 
   // 「이렇게 쓰면 됩니다」 카드는 2026-08-06 사용자 지시로 **문서함으로 이관**했다
@@ -598,8 +553,7 @@
   loadEngines();
   loadTeam();
   loadToday();
-  loadTasks();
-  loadKpi();
+  loadTasks();
 })();
 </script>
 

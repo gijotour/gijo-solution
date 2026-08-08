@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<title>발견·수집 허브 — 추천 시안 (2026-08-09)</title>
+<style>
+  :root{--bg:#262624;--panel:#30302e;--border:rgba(255,255,255,.09);--text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--blue:#3b82f6;--teal:#1eb980;--red:#f5928a;--amber:#f0a020;}
+  body{background:var(--bg);color:var(--text);font-family:'Segoe UI',sans-serif;font-size:13px;margin:0;padding:24px;}
+  h2{font-size:15px;margin:20px 0 8px;} .note{color:var(--muted);font-size:12px;margin-bottom:12px;max-width:920px;line-height:1.6;}
+  .num{color:var(--teal);font-size:11.5px;}
+  /* 한눈에 띠 — 4판 가로, 판 높이 132px(그림+숫자 2줄), 클릭=아래 화면 전환 */
+  .glance{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;max-width:1100px;}
+  .gcard{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:11px 13px;height:132px;cursor:pointer;position:relative;}
+  .gcard:hover{border-color:rgba(59,130,246,.5);}
+  .gcard.on{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue);}
+  .gcard.on::after{content:"▼";position:absolute;bottom:-14px;left:50%;transform:translateX(-50%);color:var(--blue);font-size:10px;}
+  .gh{font-size:11.75px;font-weight:800;color:var(--muted);margin-bottom:8px;display:flex;justify-content:space-between;}
+  .gh .b{color:var(--red);font-weight:800;}
+  .row{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);padding:2.5px 0;}
+  .row b{color:var(--text);}
+  .bar{display:flex;align-items:flex-end;gap:8px;height:52px;margin:4px 2px 6px;}
+  .bar .c{background:var(--amber);border-radius:3px 3px 0 0;min-width:30px;text-align:center;font-size:10.5px;color:var(--muted);}
+  .stage{background:var(--panel);border:1px solid var(--blue);border-radius:12px;max-width:1100px;margin-top:18px;height:130px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12.5px;}
+</style>
+</head>
+<body>
+<h1 style="font-size:17px">「발견·수집」 허브 — 추천 시안 <span class="num">(그룹 통합 1호 · 2026-08-09)</span></h1>
+<p class="note"><b>구조</b>: 상단 한눈에 띠 4판(가로 132px) + 하단 무대(클릭한 메뉴의 <b>기존 화면 그대로</b>).
+판을 누르면 아래 무대만 바뀌고 띠는 늘 보입니다 — 어느 메뉴를 보고 있어도 나머지 요약이 시야에 남습니다.</p>
+
+<div class="glance">
+  <div class="gcard">
+    <div class="gh">📊 보안 태세 <span class="b">미흡</span></div>
+    <div class="row"><span>종합 점수</span><b>53/100</b></div>
+    <div class="row"><span>미조치 취약점</span><b style="color:var(--red)">4,828</b></div>
+    <div class="row"><span>실제 악용(KEV)</span><b style="color:var(--red)">21</b></div>
+    <div class="row"><span>컴플라이언스</span><b>48%</b></div>
+  </div>
+  <div class="gcard on">
+    <div class="gh">🚨 통합 관제 — 급별</div>
+    <div class="bar"><span class="c" style="height:8px;background:var(--red)">11</span><span class="c" style="height:48px">1,390</span><span class="c" style="height:46px;background:#d98f2b">1,340</span></div>
+    <div class="row"><span>P0 · P1 · P2</span><b>정리됨 0/4,845</b></div>
+  </div>
+  <div class="gcard">
+    <div class="gh">🌐 위협 인텔</div>
+    <div class="bar"><span class="c" style="height:6px;background:var(--red)">1</span><span class="c" style="height:10px">2</span><span class="c" style="height:48px;background:#8a8478">52</span></div>
+    <div class="row"><span>긴급 · 주의 · 정보</span><b>55건</b></div>
+  </div>
+  <div class="gcard">
+    <div class="gh">🖥 자산</div>
+    <div class="bar"><span class="c" style="height:48px;background:var(--blue)">53</span><span class="c" style="height:8px;background:var(--blue)">2</span><span class="c" style="height:6px;background:var(--blue)">1</span><span class="c" style="height:6px;background:var(--blue)">1</span></div>
+    <div class="row"><span>호스트·LLM·모델·서버</span><b style="color:var(--red)">고위험 27/57</b></div>
+  </div>
+</div>
+
+<div class="stage">▼ 클릭한 메뉴의 기존 화면이 그대로 들어옵니다 (지금은 통합 관제) — 화면을 새로 만들지 않고 iframe 재사용</div>
+
+<h2>제 의견(추천 이유) 4가지</h2>
+<p class="note">
+① <b>기존 세 화면은 부수지 않습니다</b> — 하단 무대에 iframe으로 그대로 들어옵니다(끼움 창 패턴은 셸 탭에서 이미 검증됨). 화면 재작성 없이 통합되고, 회귀 위험이 최소입니다.<br>
+② <b>한눈에 숫자는 각 화면의 기존 API를 그대로 씁니다</b> — 요약 계산이 두 곳이 되면 어긋나는 순간 둘 다 못 믿습니다.<br>
+③ <b>사이드바 그룹 1은 「발견·수집」 한 항목이 됩니다</b>(메뉴 3→1). 개별 메뉴로 가던 검색·연결 고리는 허브가 받아 해당 판을 켠 상태로 엽니다.<br>
+④ <b>대시보드의 한눈에 카드는 여기 1번 판으로 이사</b> — 대시보드는 오늘 계획+대화창에 집중, 현황 조망은 허브가 맡습니다.<br>
+⚠ 정직 고지: 다른 그룹(우선순위·조치·검증…)으로의 확장은 이 틀이 실사용 검증된 뒤 같은 방식으로 — 이번엔 발견·수집만 합니다.
+</p>
+<p class="note num">밀도: 띠 4판 한 줄 132px(현행 대시보드 한눈에 카드 ~330px보다 조망 밀도 높음) · 하단 무대 = 남은 세로 전부. 예상 구현 2~2.5시간(허브 화면+nav 그룹 교체+대시보드 카드 이사+연계 조정+스윕).</p>
+</body>
+</html>

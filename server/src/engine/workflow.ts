@@ -28,7 +28,10 @@ import { reportActivity } from "./report";
  * ⚠ nav.js의 5개 절차 그룹과 **같아야 한다** — workflow.test.ts가 대조해 막는다.
  */
 export const STAGE_SCREENS: Record<number, string[]> = {
-  1: ["analysis.html", "threat.html", "inventory.html"],
+  // 발견·수집은 허브 한 화면으로 통합됐다(2026-08-09) — 사이드바가 discover 하나이므로
+  // 표도 하나다(감시 시험: 서버 표 = 사이드바). 개별 화면은 허브 무대 안에서만 열리고
+  // 직접 주소는 nav.js가 허브로 흡수하므로 여기 남길 필요가 없다.
+  1: ["discover.html"],
   2: ["vulnscan.html", "sbom.html"],
   3: ["approvals.html", "maintenance.html", "terminal.html"],
   4: ["hardening.html"],
@@ -119,7 +122,7 @@ export function workflowStages(): WorkflowStage[] {
   // ⚠ page는 **STAGE_SCREENS의 그 단계 안에 있는 화면**이어야 한다 — 아니면 띠에서 눌러
   //   도착한 순간 띠가 다른 단계를 가리킨다. workflow.test.ts가 대조해 막는다.
   return [
-    { no: 1, key: "find", label: "발견·수집", count: assets.length, alert: 오늘신규, alertLabel: "오늘 신규", page: "analysis.html", screens: STAGE_SCREENS[1] },
+    { no: 1, key: "find", label: "발견·수집", count: assets.length, alert: 오늘신규, alertLabel: "오늘 신규", page: "discover.html", screens: STAGE_SCREENS[1] },
     { no: 2, key: "triage", label: "우선순위", count: 취약, alert: kev, alertLabel: "실제 악용(KEV)", page: "vulnscan.html", screens: STAGE_SCREENS[2] },
     { no: 3, key: "fix", label: "조치", count: 진행, alert: 미배정, alertLabel: "미배정", page: "approvals.html", screens: STAGE_SCREENS[3] },
     { no: 4, key: "verify", label: "검증", count: 실패항목, alert: 미확인, alertLabel: "미점검 대상", page: "hardening.html", screens: STAGE_SCREENS[4] },

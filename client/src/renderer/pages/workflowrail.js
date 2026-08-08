@@ -82,6 +82,9 @@
 
   async function 붙이기() {
     if (!window.gijo || !window.gijo.workflowStages) return;
+    // 그룹 허브의 무대 안(&hub=1)에서는 그리지 않는다 — 허브가 이미 같은 띠를 위에 두고 있어
+    // 한 화면에 절차 띠가 둘이 된다(2026-08-09 발견·수집 통합 실측).
+    if (/[?&]hub=1/.test(location.search)) return;
     try {
       var r = await window.gijo.workflowStages();
       if (!r || !Array.isArray(r.stages) || !r.stages.length) return;

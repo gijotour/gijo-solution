@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 발견·수집</title>
+<link rel="stylesheet" href="gijo-ui.css">
+<!--
+  발견·수집 허브 — 그룹 통합 1호 (2026-08-09 사용자 승인, mockups/discover-hub 추천안).
+  사이드바 그룹 1(통합 관제·위협 인텔·자산 목록)을 한 화면으로: 상단 한눈에 띠 4판(늘 보임)
+  + 하단 무대(클릭한 메뉴의 기존 화면을 embed 끼움 창으로 그대로). 화면을 새로 만들지 않는다.
+  요약 숫자는 각 화면과 같은 원천 API·같은 기준(정리됨=done/ignored 등)으로 센다.
+  다른 그룹도 같은 틀(grouphub.js)로 확장 예정 — 이 파일은 설정+요약 로더만 갖는 얇은 껍데기.
+-->
+<style>
+  :root{--bg:#262624;--panel:#30302e;--border:rgba(255,255,255,.09);--text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--blue:#3b82f6;--blue-light:#5fa1ff;--teal:#1eb980;--red:#e2483d;--amber:#f0a020;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;}
+  .app{display:grid;grid-template-columns:212px 1fr;min-height:100vh;}
+  .sidebar{border-right:1px solid var(--border);background:#1f1e1d;}
+  .main{padding:14px 18px 0;display:flex;flex-direction:column;height:100vh;min-width:0;}
+  .scr-id{font-size:12.5px;color:var(--muted);margin-bottom:10px;}
+  .scr-id b{color:var(--text);font-weight:800;}
+  /* 한눈에 띠 — 판 132px, 늘 보임 */
+  .gh-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;flex:0 0 auto;}
+  .gh-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:10px 12px;height:138px;cursor:pointer;position:relative;overflow:hidden;}
+  .gh-card:hover{border-color:rgba(59,130,246,.5);}
+  .gh-card.on{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue);}
+  .gh-head{font-size:11.75px;font-weight:800;color:var(--muted);margin-bottom:6px;display:flex;justify-content:space-between;gap:6px;}
+  .gh-badge{font-weight:800;font-size:11.5px;}
+  .gh-row{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);padding:2px 0;}
+  .gh-row b{color:var(--text);}
+  .gh-bars{display:flex;align-items:flex-end;gap:10px;height:46px;margin:2px 2px 4px;overflow:hidden;}
+  .gh-bcol{display:flex;flex-direction:column;align-items:center;gap:2px;min-width:34px;}
+  .gh-bv{font-size:10.5px;color:var(--muted);}
+  .gh-bar{width:100%;border-radius:3px 3px 0 0;min-height:4px;}
+  .gh-bl{font-size:10.5px;color:var(--muted-2);white-space:nowrap;}
+  .gh-foot{font-size:11.5px;color:var(--muted-2);margin-top:4px;}
+  .gh-empty{font-size:12px;color:var(--muted-2);}
+  /* 무대 — 남은 세로 전부 */
+  .gh-stage{flex:1;width:100%;border:none;border-radius:12px 12px 0 0;margin-top:12px;background:var(--bg);}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar" id="gijoNav"></aside>
+  <div class="main">
+    <div class="scr-id"><b>발견·수집</b> — 관제·위협·자산의 한눈에를 한 줄로 보고, 누르면 그 메뉴가 아래에 열립니다.</div>
+    <div id="hubHost" style="display:flex;flex-direction:column;flex:1;min-height:0"></div>
+  </div>
+</div>
+
+<div id="gijoChatWidget"></div>
+
+<script src="dialog.js"></script>
+<script src="nav.js"></script>
+<script src="workflowrail.js"></script>
+<script src="grouphub.js"></script>
+<script src="gijomd.js"></script>
+<script src="chatparts.js"></script>
+<script src="chatwidget.js"></script>
+<script src="titlebar.js"></script>
+<script>
+(function () {
+  "use strict";
+  if (!window.gijo || !window.gijo.isAuthenticated || !window.gijo.isAuthenticated()) {
+    location.href = "login.html";
+    return;
+  }
+
+  // 각 판의 요약 — **그 메뉴 화면과 같은 원천 API·같은 기준**으로 센다(계산 어긋남 방지).
+  var 심각높음 = { critical: true, high: true }; // inventory riskOf의 high 기준과 동일(랭크 3 이상)
+
+  var panels = [
+    {
+      id: "posture",
+      title: "📊 보안 태세",
+      page: "kpi.html", // 판 클릭 = 보안 KPI 화면(대시보드 한눈에 카드가 가던 길 그대로)
+      load: function () {
+        return window.gijo.getSecurityKpi().then(function (k) {
+          var c = (k || {}).current || {};
+          var BAND = { good: "양호", warn: "주의", bad: "미흡" };
+          return {
+            badge: c.posture ? { text: BAND[c.posture.band] || "", color: "var(--red)" } : null,
+            // 132px 카드에 머리+3줄+꼬리가 정확히 들어간다(4줄이면 넘쳐 잘린다 — 2026-08-09 실측)
+            rows: [
+              ["종합 점수", c.posture ? c.posture.score + "/100" : "-"],
+              ["미조치 취약점", c.vulnerabilities ? c.vulnerabilities.active.toLocaleString() : "-", "var(--red)"],
+              ["실제 악용(KEV)", c.vulnerabilities && c.vulnerabilities.kev != null ? String(c.vulnerabilities.kev) : "-", "var(--red)"],
+            ],
+            foot: c.compliance ? "컴플라이언스 " + Math.round(c.compliance.coverageRate) + "%" : "",
+          };
+        });
+      },
+    },
+    {
+      id: "analysis",
+      title: "🚨 통합 관제",
+      page: "analysis.html",
+      load: function () {
+        return window.gijo.analysisEvents().then(function (d) {
+          var ev = (d && d.events) || [];
+          var 정리 = ev.filter(function (e) { return e.status === "done" || e.status === "ignored"; }).length;
+          var 셈 = function (p) { return ev.filter(function (e) { return e.priority === p && !(e.status === "done" || e.status === "ignored"); }).length; };
+          return {
+            segments: [
+              { key: "P0", label: "P0", value: 셈("P0"), color: "var(--red)" },
+              { key: "P1", label: "P1", value: 셈("P1"), color: "#e8823c" },
+              { key: "P2", label: "P2", value: 셈("P2"), color: "var(--amber)" },
+            ],
+            foot: "정리됨 " + 정리.toLocaleString() + "/" + ev.length.toLocaleString(),
+          };
+        });
+      },
+    },
+    {
+      id: "threat",
+      title: "🌐 위협 인텔",
+      page: "threat.html",
+      load: function () {
+        return window.gijo.listCtiFindings().then(function (fs) {
+          fs = fs || [];
+          var 셈 = function (k) { return fs.filter(function (f) { return f.severity === k; }).length; };
+          return {
+            segments: [
+              { key: "critical", label: "긴급", value: 셈("critical"), color: "var(--red)" },
+              { key: "warning", label: "주의", value: 셈("warning"), color: "var(--amber)" },
+              { key: "info", label: "정보", value: 셈("info"), color: "#8a8478" },
+            ],
+            foot: "전체 " + fs.length.toLocaleString() + "건",
+          };
+        });
+      },
+    },
+    {
+      id: "assets",
+      title: "🖥 자산",
+      page: "inventory.html",
+      load: function () {
+        return window.gijo.listAssets().then(function (assets) {
+          assets = assets || [];
+          // 자산 화면(inventory.html 종류한글)과 같은 이름표 — 두 화면이 다른 말을 쓰면 안 된다.
+          var 종류한글 = { "infra-host": "인프라 호스트", server: "서버", network: "네트워크 장비", endpoint: "단말", container: "컨테이너", repo: "코드 저장소" };
+          var 종류별 = {};
+          assets.forEach(function (a) { var t = a.assetType || "기타"; 종류별[t] = (종류별[t] || 0) + 1; }); // 자산 화면과 같은 필드(assetType)
+          var 상위 = Object.entries(종류별).sort(function (a, b) { return b[1] - a[1]; }).slice(0, 4);
+          // 고위험 = 열린 결함 중 critical/high 보유(자산 화면 riskOf의 high 기준과 동일)
+          var 고위험 = assets.filter(function (a) {
+            return (a.findings || []).some(function (f) { return 심각높음[f.severity] && f.state !== "fixed"; });
+          }).length;
+          return {
+            segments: 상위.map(function (kv) {
+              var L = String(종류한글[kv[0]] || kv[0]);
+              return { key: kv[0], label: L.length > 6 ? L.slice(0, 6) + "…" : L, value: kv[1], color: "var(--blue)" };
+            }),
+            foot: "고위험 " + 고위험 + "/" + assets.length,
+          };
+        });
+      },
+    },
+  ];
+
+  // 옛 개별 메뉴 링크가 흡수돼 올 때(panel=threat 등) 그 판을 켠 채 연다 — 목적지 보존.
+  var want = new URLSearchParams(location.search).get("panel");
+  var initial = panels.some(function (p) { return p.id === want; }) ? want : "analysis";
+  window.gijoGroupHub.mount(document.getElementById("hubHost"), { panels: panels, initial: initial });
+})();
+</script>
+</body>
+</html>

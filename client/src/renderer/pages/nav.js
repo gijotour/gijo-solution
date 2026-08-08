@@ -92,9 +92,9 @@
     // ⚠ 네 업무(취약점·보안제품 운영·AI 보안·보안로그)가 **같은 5단계**를 돈다. 그래서 업무별로
     //   메뉴를 따로 만들지 않는다 — 그러면 메뉴가 4배가 되어 원점이다.
     { id: "s1-find", icon: "search", label: "① 발견·수집", items: [
-      { page: "analysis.html", label: "통합 관제" },
-      { page: "threat.html", label: "위협 인텔" },
-      { page: "inventory.html", label: "자산 목록" },
+      // 그룹 통합 1호(2026-08-09 사용자 승인) — 세 메뉴는 discover 허브의 한눈에 띠+무대로.
+      // 개별 화면(analysis·threat·inventory)은 파일 그대로 살아 허브 안 끼움 창으로 열린다.
+      { page: "discover.html", label: "발견·수집" },
     ]},
     { id: "s2-triage", icon: "target", label: "② 우선순위", items: [
       { page: "vulnscan.html", label: "취약점" },
@@ -163,6 +163,15 @@
     // 「자산 통합 뷰」는 자산 목록으로 합쳤다(2026-08-02) — 같은 자산을 두 화면에서
     // 보던 것을 하나로. 옛 링크·북마크·열어 둔 탭이 막다른 길이 되지 않게 돌려보낸다.
     "assethub.html": "inventory.html",
+    // 발견·수집 그룹 통합(2026-08-09) — 세 메뉴는 discover 허브가 받는다. 열어 둔 탭(?embed=1)과
+    // 쿼리 없는 직접 링크 둘 다 흡수. ⚠ 허브 무대(?embed=1&hub=1)는 키가 달라 여길 안 탄다 —
+    // 태우면 허브 안에서 허브를 또 여는 무한 중첩이 된다.
+    "analysis.html": "discover.html?panel=analysis",
+    "analysis.html?embed=1": "discover.html?embed=1&panel=analysis",
+    "threat.html": "discover.html?panel=threat",
+    "threat.html?embed=1": "discover.html?embed=1&panel=threat",
+    "inventory.html": "discover.html?panel=assets",
+    "inventory.html?embed=1": "discover.html?embed=1&panel=assets",
     "ontology.html": "memory.html",             // 온톨로지 → AI 지식(관계 탭)에 흡수
     // 내 업무 → 대시보드(2026-08-01 화면 폐지, 그 일은 대화창이 받는다). ⚠ 이걸 빼면
     // **업데이트 전에 「내 업무」 탭을 열어 둔 담당자**의 그 탭이 영구 빈 화면이 된다
@@ -665,13 +674,28 @@
       var nm = document.createElement("span"); nm.className = "gn-gname"; nm.textContent = 보일이름;
       gh.appendChild(nm);
       var ln = document.createElement("span"); ln.className = "gn-line"; gh.appendChild(ln);
-      var cnt = document.createElement("span"); cnt.className = "cnt"; cnt.textContent = g.items.length;
-      gh.appendChild(cnt);
+      // 통합 그룹(항목 1개) = **그룹 줄 자체가 그 메뉴**다(2026-08-09 사용자 지시 "통합 메뉴가
+      // 대표 메뉴로, 하위 메뉴로 만들지 말 것"). 개수 배지·접기 삼각형·하위 줄을 두지 않는다 —
+      // 하나뿐인 아이를 접었다 폈다 하는 조작은 뜻이 없고 세로만 먹는다.
+      var 대표 = g.items.length === 1 && g.items[0].page;
+      if (!대표) {
+        var cnt = document.createElement("span"); cnt.className = "cnt"; cnt.textContent = g.items.length;
+        gh.appendChild(cnt);
+      } else {
+        car.style.visibility = "hidden"; // 접을 것이 없다
+        if (here === g.items[0].page) gh.classList.add("on");
+      }
       container.appendChild(gh);
 
       var kids = document.createElement("div");
       kids.className = "gn-kids" + (open ? "" : " closed");
       container.appendChild(kids);
+
+      if (대표) {
+        gh.title = g.label + " 열기";
+        gh.addEventListener("click", function () { go(g.items[0].page); });
+        return; // 하위 줄을 그리지 않는다
+      }
 
       gh.addEventListener("click", function () {
         var nowOpen = kids.classList.toggle("closed") === false;
@@ -1326,7 +1350,18 @@
     var 요약감시 = setInterval(function () { 요약막대로(); if (++요약틱 > 10) clearInterval(요약감시); }, 700);
     // 목록 높이도 같은 이유로 첫 그림 뒤에 한 번 더 잰다.
     [300, 900, 2000, 4000].forEach(function (ms) { setTimeout(function () { window.gijoFitList && window.gijoFitList(); }, ms); });
-    if (IS_EMBED) { applyEmbed(); return; }
+    // 탭 안(embed)에서도 흡수는 태운다 — 열어 둔 탭이 옛 화면에 그대로 머물면 담당자는
+    // "메뉴는 없어졌는데 탭에는 있는" 두 세계를 보게 된다(2026-08-09 발견·수집 통합에서 실측).
+    // ⚠ 허브 무대(&hub=1)는 흡수 대상이 아니다 — 태우면 허브 안에서 허브를 여는 무한 중첩.
+    //    이 자리에서는 navigateTo(새 탭 열기)가 아니라 **그 자리 교체**(replace)여야 한다.
+    if (IS_EMBED) {
+      if (!/[?&]hub=1/.test(location.search)) {
+        var 흡수 = TAB_REDIRECT[currentPage() + (location.search || "")];
+        if (흡수) { location.replace(흡수); return; }
+      }
+      applyEmbed();
+      return;
+    }
     // 탭으로 흡수된 페이지에 직접 들어오면(대시보드 바로가기·챗봇 링크 등) 허브의 그 탭으로 보낸다.
     // ⚠ 설정처럼 한 파일이 여러 탭인 화면은 **쿼리까지 봐야** 한다(2026-07-28 실측):
     //    쿼리를 무시하면 ?s=link로 들어와도 서버·AI 탭으로 끌려가 늘 같은 화면만 보인다.
