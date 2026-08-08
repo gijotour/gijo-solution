@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — AI 허브 시안(추천)</title>
+<style>
+  :root{
+    --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,.09);
+    --border-strong:rgba(255,255,255,.16);--text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;
+    --blue:#3b82f6;--blue-light:#5fa1ff;--teal:#1eb980;--red:#e2483d;--amber:#f0a020;--purple:#8b7cf0;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  html,body{background:var(--bg);}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;color:var(--text);font-size:13px;}
+
+  /* ── 레이아웃 골격 — discover.html(제품 실 코드)과 같은 212px + 1fr, 판 138px를 그대로 씀 ── */
+  .app{display:grid;grid-template-columns:212px 1fr;min-height:100vh;}
+  .main{padding:16px 20px 8px;min-width:0;}
+  .scr-id{font-size:12.5px;color:var(--muted);margin-bottom:4px;}
+  .scr-id b{color:#fff;font-weight:800;}
+  .static-note{font-size:11.5px;color:var(--muted-2);margin-bottom:10px;}
+
+  /* ── 사이드바 암시 — 실제 nav.js 그룹 순서만 옮겨 암시. 「AI」 한 줄만 켠다 ── */
+  .sidebar{display:flex;flex-direction:column;height:100vh;position:sticky;top:0;
+    background:var(--panel-2);border-right:1px solid var(--border);padding:10px 8px;}
+  .sb-top{padding-bottom:7px;margin-bottom:5px;border-bottom:1px solid var(--border);}
+  .sb-row{height:26px;display:flex;align-items:center;padding:0 9px;border-radius:6px;
+    font-size:12.25px;color:var(--muted-2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .sb-g{display:flex;align-items:center;gap:6px;height:20px;font-size:10.75px;font-weight:700;
+    color:var(--muted-2);letter-spacing:.5px;margin:8px 5px 1px;opacity:.75;}
+  .sb-g .ln{flex:1;height:1px;background:var(--border);}
+  .sb-row.active{color:#fff;background:rgba(255,255,255,.055);font-weight:800;position:relative;font-size:12.5px;}
+  .sb-row.active::before{content:'';position:absolute;left:0;top:5px;bottom:5px;width:2px;
+    border-radius:2px;background:var(--blue-light);}
+  .sb-g.on{color:var(--blue-light);opacity:1;}
+  .sb-bottom{margin-top:auto;padding-top:6px;border-top:1px solid var(--border);}
+
+  /* ── 한눈에 띠 4판 — 실 grouphub.js .gh-card·.gh-row·.gh-foot 그대로(치수·클래스 재사용) ── */
+  .gh-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;}
+  .gh-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    padding:10px 12px;height:138px;position:relative;overflow:hidden;cursor:pointer;}
+  .gh-card:hover{border-color:rgba(59,130,246,.5);}
+  .gh-card.on{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue);}
+  .gh-head{font-size:11.75px;font-weight:800;color:var(--muted);margin-bottom:6px;
+    display:flex;justify-content:space-between;gap:6px;}
+  .gh-badge{font-weight:800;font-size:11.5px;}
+  .gh-row{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);padding:2px 0;}
+  .gh-row b{color:#fff;}
+  .gh-foot{font-size:11.5px;color:var(--muted-2);margin-top:5px;}
+
+  /* 판1(AI 팀) 전용 — 모델 한 줄 + 팀원 미니아이콘 4개 + 어댑터 배지 */
+  .gh-model-line{font-size:12px;color:var(--text);margin-bottom:5px;}
+  .gh-team-row{display:flex;gap:6px;margin-bottom:6px;}
+  .gh-team-mini{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:2px;}
+  .gh-team-mini .d{width:18px;height:18px;border-radius:6px;display:flex;align-items:center;
+    justify-content:center;font-size:10.5px;font-weight:800;}
+  .gh-team-mini .lb{font-size:11.5px;color:var(--muted-2);white-space:nowrap;}
+  .gh-adapter-badge{display:inline-block;font-size:11.5px;font-weight:700;padding:2px 7px;
+    border-radius:5px;background:rgba(240,160,32,.16);color:var(--amber);}
+
+  /* 판3(학습) 전용 — 가로 미니 막대 한 줄형(제품 learnloop.js 주제 띠와 같은 모양) */
+  .gh-topic{display:flex;align-items:center;gap:6px;font-size:11.5px;color:var(--muted);margin:4px 0;}
+  .gh-topic .d{width:6px;height:6px;border-radius:50%;flex:0 0 auto;}
+  .gh-topic .nm{flex:0 0 auto;width:42px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .gh-topic .bar{flex:1;height:5px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden;}
+  .gh-topic .bar i{display:block;height:100%;border-radius:3px;}
+  .gh-topic .fr{flex:0 0 auto;font-size:11.5px;color:var(--muted-2);}
+
+  /* ── 아래 무대 — 「AI 팀」 판을 골랐을 때 열리는 화면(에이전트 AI 재해석) ── */
+  .gh-stage{margin-top:14px;padding-top:2px;}
+  .stage-id{font-size:12px;color:var(--muted-2);margin-bottom:10px;}
+  .cg{display:grid;grid-template-columns:1.7fr 1fr;gap:14px;align-items:start;}
+
+  .team-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;}
+  .team-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;
+    padding:12px 14px;position:relative;}
+  .team-top{display:flex;align-items:center;gap:9px;margin-bottom:6px;}
+  .team-icon{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;
+    justify-content:center;font-size:14px;flex:0 0 auto;}
+  .team-name{font-size:13px;font-weight:800;color:#fff;}
+  .team-role{font-size:11.75px;color:var(--muted);margin-top:1px;}
+  .team-model{font-size:11.75px;color:var(--muted-2);margin-top:7px;padding-top:7px;border-top:1px solid var(--border);}
+  .team-adapter{font-size:11.5px;margin-top:4px;}
+  .team-adapter.on{color:var(--amber);font-weight:700;}
+  .team-adapter.off{color:var(--muted-2);}
+  .team-status{position:absolute;top:12px;right:12px;display:flex;align-items:center;gap:5px;
+    font-size:11.5px;font-weight:700;}
+  .team-status .d{width:6px;height:6px;border-radius:50%;}
+  .team-status.work{color:var(--teal);} .team-status.work .d{background:var(--teal);}
+  .team-status.idle{color:var(--muted-2);} .team-status.idle .d{background:var(--muted-2);}
+
+  .stack-box{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px;}
+  .stack-title{font-size:12.75px;font-weight:800;color:#fff;margin-bottom:10px;}
+  .stack-layer{background:var(--panel-2);border:1px solid var(--border);border-radius:7px;
+    padding:8px 10px;margin-bottom:2px;}
+  .stack-layer .t{font-size:12px;font-weight:800;color:#fff;}
+  .stack-layer .d{font-size:11.5px;color:var(--muted);line-height:1.45;margin-top:2px;}
+  .l1{border-left:3px solid var(--blue-light);}
+  .l2{border-left:3px solid var(--amber);}
+  .l3{border-left:3px solid var(--teal);}
+  .l4{border-left:3px solid var(--purple);}
+  .stack-arrow{text-align:center;color:var(--muted-2);font-size:11px;line-height:1;margin:1px 0;}
+
+  /* ── 결정용 설명 상자 — 시안 문서 본문(실제 제품 화면에는 없음) ── */
+  .why-box{max-width:1080px;margin:26px auto 40px;background:var(--panel);
+    border:1px dashed var(--border-strong);border-radius:12px;padding:18px 24px;
+    font-size:12.75px;line-height:1.75;color:var(--muted);}
+  .why-box h2{font-size:14.5px;color:#fff;margin-bottom:9px;}
+  .why-box b{color:var(--text);}
+  .why-box ul{margin:5px 0 10px 18px;}
+  .why-box .src{font-size:11.75px;color:var(--muted-2);margin-top:10px;}
+  .why-box .src a{color:var(--blue-light);}
+  .mock-tag{position:fixed;top:10px;right:14px;background:rgba(240,160,32,.16);color:var(--amber);
+    border:1px solid rgba(240,160,32,.4);font-size:11.5px;font-weight:800;padding:3px 10px;
+    border-radius:20px;z-index:50;}
+</style>
+</head>
+<body>
+
+<!--
+  ============================================================================
+  AI 허브 시안(추천 1개) — mockups/ai-hub/시안-추천.html
+  ============================================================================
+  무엇을 바꾸나: 사이드바 「AI 운영」 그룹(에이전트 AI·AI 공격 시험·차단·AI 지식·학습 루프, 4개 화면)을
+  다른 5개 절차 그룹(발견·수집·우선순위·조치·검증·보고)과 같은 방식으로 "그룹 = 허브 한 화면"으로
+  통합한다. 그룹 줄 자체가 대표 메뉴가 되고 하위 메뉴는 없앤다.
+
+  설계 근거 3줄(설계 전 조사):
+  1) 새 틀을 만들지 않는다 — 이 틀은 이미 이 제품이 2026-08-09 사용자 승인으로 쓰고 있는 실제
+     패턴이다(client/src/renderer/pages/discover.html + grouphub.js + grouppanels.js, 절차
+     5개 그룹에 적용 중). AI 운영은 6번째로 같은 틀을 확장하는 것뿐이다 — 판 138px·gh-card·
+     gh-row 등 치수·클래스명을 이 시안에서도 그대로 재사용했다(수치를 새로 지어내지 않았다).
+  2) 첫 화면은 개요, 고른 것만 상세 — Ben Shneiderman의 시각 정보탐색 만트라 "Overview first,
+     zoom and filter, then details-on-demand"를 따른다. 보안 인텔리전스 대시보드에도 같은
+     원칙이 권장된다(Recorded Future, "How to Use the Information-Seeking Mantra in Cyber
+     Intelligence Dashboards"). 4판이 개요, 무대가 상세.
+  3) 칸 낭비 최소화(2026-08-02 사용자 지시) — 판 높이·목록 밀도는 이 제품의 기준 화면(시스템
+     로그)과 discover.html 실측값을 그대로 따랐다. 판 안 글자는 11.5px 미만을 쓰지 않았다.
+
+  대상 사용자: 보안담당자(고객). "브레인 모델"·"헤르메스" 같은 개발자 말은 쓰지 않았다 — 화면에
+  보이는 모델 이름은 실제 채택 모델명(Qwen3-14B)만 그대로 노출했다(그 자체는 고객이 고른 값이라
+  숨길 이유가 없다).
+
+  정직한 시안 표기: 이 파일은 정적 그림이다. 스크립트가 없어 아무 것도 실제로 동작하지 않는다.
+  실제 구현 시에는 discover.html과 동일하게 grouphub.js를 그대로 재사용하고(새 JS를 만들지
+  않는다), grouppanels.js에 "aiops" 키로 판 4개의 load()만 추가한다(각 판이 agent.html·
+  memory.html·learnloop.html·redteam.html이 쓰는 것과 같은 API로 숫자를 센다).
+  모든 숫자는 데모값이다 — 해당 위치마다 <!-- 데모값 --> 주석으로 표시했다.
+  ============================================================================
+-->
+
+<div class="mock-tag">시안 · 결정용 그림</div>
+
+<div class="app">
+  <aside class="sidebar">
+    <div class="sb-top">
+      <div class="sb-row">⌂ 대시보드</div>
+      <div class="sb-row">▦ 팀 사무실 (창)</div>
+      <div class="sb-row">💬 작업 내역</div>
+    </div>
+
+    <div class="sb-g"><span>① 발견·수집</span><span class="ln"></span></div>
+    <div class="sb-row">발견·수집</div>
+    <div class="sb-g"><span>② 우선순위</span><span class="ln"></span></div>
+    <div class="sb-row">우선순위</div>
+    <div class="sb-g"><span>③ 조치</span><span class="ln"></span></div>
+    <div class="sb-row">조치</div>
+    <div class="sb-g"><span>④ 검증</span><span class="ln"></span></div>
+    <div class="sb-row">검증</div>
+    <div class="sb-g"><span>⑤ 보고</span><span class="ln"></span></div>
+    <div class="sb-row">보고</div>
+
+    <div class="sb-g"><span>등록부</span><span class="ln"></span></div>
+    <div class="sb-row">보안제품</div>
+
+    <!-- 이번 시안의 대상 — 하위 메뉴 없이 그룹 자체가 한 줄(다른 5개 그룹과 같은 모양) -->
+    <div class="sb-g on"><span>AI 운영</span><span class="ln"></span></div>
+    <div class="sb-row active">AI</div>
+
+    <div class="sb-bottom">
+      <div class="sb-g"><span>설정</span><span class="ln"></span></div>
+      <div class="sb-row">내 설정 · 서버·AI …</div>
+    </div>
+  </aside>
+
+  <div class="main">
+    <div class="scr-id"><b>AI</b> — 내 보안 AI가 어떻게 구성되고, 무엇을 알고, 어떻게 배우는지 봅니다.</div>
+    <div class="static-note">※ 정적 시안입니다 — 실제 화면에서는 판을 클릭하면 아래 무대가 바뀝니다(발견·수집 허브와 같은 동작). 지금은 「AI 팀」 판을 고른 상태 1장만 보여줍니다.</div>
+
+    <!-- ── 한눈에 띠 4판 ── -->
+    <div class="gh-strip">
+
+      <!-- 판1: AI 팀 (선택됨) -->
+      <div class="gh-card on">
+        <div class="gh-head">🤖 AI 팀</div>
+        <div class="gh-model-line">베이스 모델 <b style="color:#fff">Qwen3-14B</b> <span style="color:var(--muted-2)">(내가 고른 모델)</span></div>
+        <div class="gh-team-row">
+          <div class="gh-team-mini"><div class="d" style="background:rgba(59,130,246,.18);color:var(--blue-light)">◆</div><div class="lb">총괄</div></div>
+          <div class="gh-team-mini"><div class="d" style="background:rgba(139,124,240,.18);color:var(--purple)">▤</div><div class="lb">스캔</div></div>
+          <div class="gh-team-mini"><div class="d" style="background:rgba(240,160,32,.18);color:var(--amber)">◈</div><div class="lb">분석</div></div>
+          <div class="gh-team-mini"><div class="d" style="background:rgba(139,124,240,.18);color:var(--purple)">▣</div><div class="lb">리포트</div></div>
+        </div>
+        <span class="gh-adapter-badge">🎓 취약점 전문 v1 (후보)</span>
+        <div class="gh-foot">모델 교체는 설정 &gt; 서버·AI</div>
+      </div>
+
+      <!-- 판2: 지식 -->
+      <div class="gh-card">
+        <div class="gh-head">📚 지식</div>
+        <!-- 데모값: 문서·표준관계망·오늘 반입 숫자는 실 데이터 연결 전 예시입니다 -->
+        <div class="gh-row"><span>올린 문서</span><b>128</b></div>
+        <div class="gh-row"><span>표준 관계망(온톨로지)</span><b>2,004</b></div>
+        <div class="gh-row"><span>오늘 반입</span><b style="color:var(--blue-light)">2</b></div>
+        <div class="gh-foot">새 문서는 대화창 ＋로 올립니다</div>
+      </div>
+
+      <!-- 판3: 학습 -->
+      <div class="gh-card">
+        <div class="gh-head">🎓 학습</div>
+        <!-- 데모값: 주제별 승인 진척(분모 300은 실제 채택 게이트 기준값) -->
+        <div class="gh-topic"><span class="d" style="background:#e2483d"></span><span class="nm">취약점</span><span class="bar"><i style="width:10%;background:#e2483d"></i></span><span class="fr">31/300</span></div>
+        <div class="gh-topic"><span class="d" style="background:#3b82f6"></span><span class="nm">장비운영</span><span class="bar"><i style="width:4%;background:#3b82f6"></i></span><span class="fr">12/300</span></div>
+        <div class="gh-topic"><span class="d" style="background:#f0a020"></span><span class="nm">사내규정</span><span class="bar"><i style="width:3%;background:#f0a020"></i></span><span class="fr">8/300</span></div>
+        <div class="gh-topic"><span class="d" style="background:#8b7cf0"></span><span class="nm">위협대응</span><span class="bar"><i style="width:2%;background:#8b7cf0"></i></span><span class="fr">5/300</span></div>
+        <div class="gh-foot">300이 차면 전문가 어댑터를 학습할 수 있습니다</div>
+      </div>
+
+      <!-- 판4: 안전장치 -->
+      <div class="gh-card">
+        <div class="gh-head">🛡 안전장치<span class="gh-badge" style="color:var(--amber)"><!-- 데모값 -->결재 대기 1</span></div>
+        <div class="gh-row"><span>가드레일 차단(이번 주)</span><b><!-- 데모값 -->3</b></div>
+        <div class="gh-row"><span>모의 공격 통과율</span><b style="color:var(--teal)"><!-- 데모값 -->92%</b></div>
+        <div class="gh-row"><span>결재 대기</span><b style="color:var(--amber)"><!-- 데모값 -->1</b></div>
+        <div class="gh-foot">쓰기 지시는 항상 결재판을 거칩니다</div>
+      </div>
+    </div>
+
+    <!-- ── 아래 무대 — 「에이전트 AI」 화면을 고객 언어로 재해석 ── -->
+    <div class="gh-stage">
+      <div class="stage-id">🤖 AI 팀 — 우리 보안 AI 팀이 어떻게 구성되어 있는지 봅니다 <span style="color:var(--muted-2)">(에이전트 AI 화면을 고객 언어로 다시 풀었습니다)</span></div>
+
+      <div class="cg">
+        <!-- 팀원 카드 4장 -->
+        <div class="team-grid">
+          <div class="team-card">
+            <div class="team-status idle"><span class="d"></span>대기</div>
+            <div class="team-top">
+              <div class="team-icon" style="background:rgba(59,130,246,.18);color:var(--blue-light)">◆</div>
+              <div><div class="team-name">총괄</div><div class="team-role">지시를 팀원에게 나누고 결과를 정리</div></div>
+            </div>
+            <div class="team-model">담당 모델: Qwen3-14B</div>
+            <div class="team-adapter off">전문 분야: 배정 없음 — 지시 배분은 항상 흔들림 없이</div>
+          </div>
+
+          <div class="team-card">
+            <div class="team-status work"><span class="d"></span>작업 중</div>
+            <div class="team-top">
+              <div class="team-icon" style="background:rgba(139,124,240,.18);color:var(--purple)">▤</div>
+              <div><div class="team-name">스캔</div><div class="team-role">취약점 스캐너·보안 로그를 읽고 정리</div></div>
+            </div>
+            <div class="team-model">담당 모델: Qwen3-14B</div>
+            <div class="team-adapter on">🎓 취약점 전문 v1 (후보 — 검증 31/300)</div>
+          </div>
+
+          <div class="team-card">
+            <div class="team-status idle"><span class="d"></span>대기</div>
+            <div class="team-top">
+              <div class="team-icon" style="background:rgba(240,160,32,.18);color:var(--amber)">◈</div>
+              <div><div class="team-name">분석</div><div class="team-role">찾은 문제의 우선순위를 매기고 원인을 살핌</div></div>
+            </div>
+            <div class="team-model">담당 모델: Qwen3-14B</div>
+            <div class="team-adapter off">전문 분야: 배정 없음 — 베이스 모델 그대로</div>
+          </div>
+
+          <div class="team-card">
+            <div class="team-status idle"><span class="d"></span>대기</div>
+            <div class="team-top">
+              <div class="team-icon" style="background:rgba(139,124,240,.18);color:var(--purple)">▣</div>
+              <div><div class="team-name">리포트</div><div class="team-role">결과를 사람이 읽을 보고서로 정리</div></div>
+            </div>
+            <div class="team-model">담당 모델: Qwen3-14B</div>
+            <div class="team-adapter off">전문 분야: 배정 없음 — 베이스 모델 그대로</div>
+          </div>
+        </div>
+
+        <!-- 안내 상자 — 4층 계층도(CSS만) -->
+        <div class="stack-box">
+          <div class="stack-title">우리 AI는 이렇게 구성됩니다</div>
+
+          <div class="stack-layer l1">
+            <div class="t">① 베이스 모델</div>
+            <div class="d">Qwen3-14B — 내가 고른 모델</div>
+          </div>
+          <div class="stack-arrow">▼</div>
+
+          <div class="stack-layer l2">
+            <div class="t">② 전문가 어댑터</div>
+            <div class="d">현장 대화·조치 경험을 학습한 추가 지식 (예: 취약점 전문 v1, 아직 후보)</div>
+          </div>
+          <div class="stack-arrow">▼</div>
+
+          <div class="stack-layer l3">
+            <div class="t">③ 지식</div>
+            <div class="d">올린 문서 검색(RAG) + 표준 관계망(온톨로지)</div>
+          </div>
+          <div class="stack-arrow">▼</div>
+
+          <div class="stack-layer l4">
+            <div class="t">④ 안전장치</div>
+            <div class="d">위험한 지시는 가드레일이 막고, 쓰기 작업은 결재판을 거칩니다</div>
+          </div>
+
+          <div style="font-size:11.5px;color:var(--muted-2);margin-top:9px;line-height:1.5;">
+            위에서 아래로 쌓입니다 — ①은 내가 고르고, ②~④는 쓰는 동안 현장에서 자랍니다.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ── 왜 이렇게 했나 (결정용 설명 — 실 제품 화면에는 넣지 않습니다) ── -->
+<div class="why-box">
+  <h2>왜 이렇게 했나</h2>
+  <ul>
+    <li><b>왜 판이 4개인가</b> — 지금 4개 화면(에이전트 AI·AI 공격 시험·차단·AI 지식·학습 루프)이 하던 일을
+      고객이 묻는 질문 4개로 다시 나눴습니다: 누가 일하나(팀) · 무엇을 아나(지식) · 얼마나 배웠나(학습) ·
+      안전한가(안전장치). 다른 5개 절차 그룹과 같은 개수·같은 판 크기(138px)를 써서, AI 그룹만 유난히
+      다르게 보이지 않게 했습니다.</li>
+    <li><b>왜 「AI 팀」 판을 첫 무대로 뒀나</b> — 담당자가 이 그룹에 처음 들어와 가장 궁금한 것은
+      "지금 이 AI가 무슨 일을 하고 있나"입니다. 개요(4판) → 고른 것만 상세(무대) 순서를 따랐습니다
+      (아래 출처 참고).</li>
+    <li><b>왜 4층 그림을 새로 그렸나</b> — 장식이 아니라 실제 구조입니다. 베이스 모델(고객이 고름) →
+      전문가 어댑터(등록≠채택, 300건 검증 게이트를 통과해야 실제로 씀) → 지식(문서 RAG + 온톨로지) →
+      안전장치(가드레일 flag/block + 쓰기 지시 결재판)는 코드에 실재하는 4겹입니다.</li>
+    <li><b>배지의 "(후보)"는 왜 있나</b> — 이 제품은 <b>등록과 채택을 구분</b>합니다. 학습된 어댑터가
+      있어도 평가 게이트를 통과하기 전까지는 후보일 뿐이고, 실제로 팀원에게 배정되지 않습니다. 이
+      배지를 빼면 "이미 쓰고 있다"는 거짓 인상을 줍니다.</li>
+    <li><b>숫자는 전부 데모값</b>입니다(코드 안에 <!-- 데모값 --> 주석으로 표시). 실제 구현 때는
+      grouphub.js를 그대로 재사용하고, grouppanels.js에 "aiops" 판 4개의 load()만 추가해
+      agent.html·memory.html·learnloop.html·redteam.html이 쓰는 것과 같은 API로 채웁니다 —
+      새 계산식을 만들지 않습니다.</li>
+    <li>이 파일은 <b>정적 그림</b>입니다. 스크립트가 없고, 어떤 요소도 실제로 동작하지 않습니다.</li>
+  </ul>
+  <div class="src">
+    참고 표준·근거: Shneiderman의 시각 정보탐색 만트라("Overview first, zoom and filter, then
+    details-on-demand") — 보안 인텔리전스 대시보드 적용 예: Recorded Future,
+    <a href="https://www.recordedfuture.com/blog/information-seeking-mantra" target="_blank" rel="noopener">
+    "How to Use the Information-Seeking Mantra in Cyber Intelligence Dashboards"</a>.
+    제품 내부 선례: client/src/renderer/pages/discover.html + grouphub.js + grouppanels.js
+    (2026-08-09 사용자 승인, 5개 절차 그룹에 이미 적용 중).
+  </div>
+</div>
+
+</body>
+</html>

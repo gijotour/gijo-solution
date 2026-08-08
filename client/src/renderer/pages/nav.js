@@ -117,14 +117,10 @@
     ]},
     // AI 운영 — 예전 「AI」와 「데이터 플라이휠」 두 그룹을 합쳤다. 6개면 한 그룹으로 충분하고,
     // 담당자에게 둘의 차이(기능 vs 되먹임 고리)는 우리 사정이지 업무 구분이 아니었다.
-    { id: "aiops", icon: "chip", label: "AI 운영", items: [
-      { page: "agent.html", label: "에이전트 AI" },
-      { page: "redteam.html", label: "AI 공격 시험·차단" },
-      { page: "memory.html", label: "AI 지식" },
-      { page: "learnloop.html", label: "학습 루프" },
-      // 모델 합치기(merge.html)는 메뉴에서 내렸다(2026-08-08 사용자 결정 — "머지·추천은 접는다").
-      // 7B 둘을 합쳐 품질을 짜내던 시절의 답이고, 14B 단일 채택으로 존재 이유가 사라졌다.
-      // ⚠ 화면 파일·검증 기록은 보존 — 저장된 탭·직접 주소로는 여전히 열린다(삭제 아님).
+    // AI 운영도 허브 한 화면으로 통합(2026-08-09 사용자 지시 — "고객한테 가이드하는 화면으로").
+    // 에이전트·지식·학습·안전장치는 aihub 무대에서 열린다. 합성(merge)은 문서함 가이드로.
+    { id: "aiops", icon: "chip", label: "AI", items: [
+      { page: "aihub.html", label: "AI" },
     ]},
     // 설정 5구역(2026-07-28) — 기준은 기능이 아니라 **결정권자**다.
     // 내 것 / 모두의 것(서버·AI) / 바깥과 잇는 것 / 관리자만 / 보기만.
@@ -164,6 +160,15 @@
     // 쿼리 없는 직접 링크 둘 다 흡수. ⚠ 허브 무대(?embed=1&hub=1)는 키가 달라 여길 안 탄다 —
     // 태우면 허브 안에서 허브를 또 여는 무한 중첩이 된다.
     // ②③④⑤ 그룹 통합(2026-08-09) — 개별 화면 링크·열어 둔 탭을 해당 허브로(판 켠 채).
+    // AI 운영 그룹 통합(2026-08-09) — 옛 링크·열어 둔 탭을 AI 허브로(판 켠 채).
+    "agent.html": "aihub.html?panel=team",
+    "agent.html?embed=1": "aihub.html?embed=1&panel=team",
+    "memory.html": "aihub.html?panel=knowledge",
+    "memory.html?embed=1": "aihub.html?embed=1&panel=knowledge",
+    "learnloop.html": "aihub.html?panel=learning",
+    "learnloop.html?embed=1": "aihub.html?embed=1&panel=learning",
+    "redteam.html": "aihub.html?panel=safety",
+    "redteam.html?embed=1": "aihub.html?embed=1&panel=safety",
     "vulnscan.html": "triage.html?panel=vuln",
     "vulnscan.html?embed=1": "triage.html?embed=1&panel=vuln",
     "sbom.html": "triage.html?panel=sbom",

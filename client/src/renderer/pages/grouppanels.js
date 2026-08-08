@@ -264,6 +264,92 @@
         });
       } },
     ],
+
+    // AI — 내 보안 AI의 구성·지식·학습·안전장치(2026-08-09 사용자 지시 "고객 가이드 화면으로").
+    // 숫자는 각 화면과 같은 API. 데이터가 없어도 판 모양은 같다(0은 0으로).
+    aiops: [
+      { id: "team", title: "🤖 AI 팀", page: "agent.html", load: function () {
+        return Promise.all([
+          window.gijo.listAgents().catch(function () { return []; }),
+          window.gijo.listAdapters().catch(function () { return { adapters: [] }; }),
+        ]).then(function (r) {
+          var agents = r[0] || [];
+          var adapters = (r[1] && r[1].adapters) || [];
+          // "베이스 모델" = 팀원들이 실제로 쓰는 모델. 개별 배정이 없으면 전역 모델을 따른다.
+          var 모델들 = agents.map(function (a) { return a.assignedModelId; }).filter(Boolean);
+          var 베이스 = 모델들.length ? 모델들[0] : "전역 모델";
+          var 채택 = adapters.filter(function (a) { return a.adopted; }).length;
+          var 후보 = adapters.length - 채택;
+          return {
+            rows: [
+              ["베이스 모델", String(베이스).length > 14 ? String(베이스).slice(0, 14) + "…" : String(베이스)],
+              ["팀원", agents.length + "명"],
+              ["전문가 어댑터", 채택 + "채택 · " + 후보 + "후보"],
+            ],
+            foot: "모델 교체는 설정 > 서버·AI",
+          };
+        });
+      } },
+      { id: "knowledge", title: "📚 지식", page: "memory.html", load: function () {
+        return Promise.all([
+          window.gijo.listMemoryDocuments().catch(function () { return []; }),
+          window.gijo.ontologyStats().catch(function () { return null; }),
+        ]).then(function (r) {
+          var docs = r[0] || [];
+          var 오늘 = new Date().toISOString().slice(0, 10);
+          var 오늘반입 = docs.filter(function (d) { return String(d.ingestedAt || "").slice(0, 10) === 오늘; }).length;
+          return {
+            rows: [
+              ["올린 문서", docs.length.toLocaleString()],
+              ["표준 관계망(온톨로지)", r[1] && r[1].count != null ? r[1].count.toLocaleString() : "-"],
+              ["오늘 반입", String(오늘반입)],
+            ],
+            foot: "새 문서는 대화창 ＋로 올립니다",
+          };
+        });
+      } },
+      { id: "learning", title: "🎓 학습", page: "learnloop.html", load: function () {
+        return window.gijo.listLearnloopTopics().then(function (r) {
+          var 전체 = (r && r.주제) || [];
+          var 짧은 = { "취약점": "취약점", "장비운영": "장비", "사내규정": "규정", "위협대응": "위협" };
+          // 정의된 4주제만, 이 순서로 — "(미분류)" 뭉치가 판 한 자리를 먹으면 정작 주제가 밀린다(실측).
+          var 순서 = ["취약점", "장비운영", "사내규정", "위협대응"];
+          var 주제 = 순서.map(function (name) {
+            return 전체.filter(function (t) { return t.topic === name; })[0] || { topic: name, approved: 0, 준비됨: false };
+          });
+          return {
+            segments: 주제.map(function (t) {
+              return { key: t.topic, label: (짧은[t.topic] || t.topic) + " " + t.approved, value: t.approved, color: t.준비됨 ? "var(--teal,#1eb980)" : "var(--blue,#3b82f6)" };
+            }),
+            foot: (r && r.목표승인건수 ? r.목표승인건수 : 300) + "이 차면 전문가 어댑터를 학습할 수 있습니다",
+          };
+        });
+      } },
+      { id: "safety", title: "🛡 안전장치", page: "redteam.html", load: function () {
+        // ⚠ 「쓰기 결재 대기」에 조치·승인 검토 대장을 갖다 쓰면 안 된다(2026-08-09 실측 4,830):
+        //   그 대장은 스캔 발견 건 전체(스캔 오류 포함)라 결재판과 전혀 다른 숫자다.
+        //   여기는 **정확히 셀 수 있는 것만** 싣는다 — 가드레일·모의 공격·개인정보 가림.
+        return Promise.all([
+          window.gijo.guardrailStatus().catch(function () { return null; }),
+          window.gijo.lastRedTeam().catch(function () { return null; }),
+          window.gijo.listAudit("privacy", 300).catch(function () { return null; }),
+        ]).then(function (r) {
+          var g = r[0], rt = r[1], pv = r[2];
+          var 항목 = (pv && pv.entries) || pv || [];
+          var 주 = Date.now() - 7 * 86400000;
+          var 가림 = 항목.filter ? 항목.filter(function (e) { return (e.at || 0) >= 주; }).length : null;
+          var MODE = { off: "꺼짐", flag: "기록만", block: "차단" };
+          return {
+            rows: [
+              ["가드레일", g ? (MODE[g.mode] || g.mode) + " 모드 · 막음 " + (g.blockedCount || 0) : "-"],
+              ["모의 공격 견고성", rt && rt.robustnessScore != null ? rt.robustnessScore + "/100" : "-"],
+              ["개인정보 가림(이번 주)", 가림 == null ? "-" : String(가림)],
+            ],
+            foot: "쓰기 지시는 항상 결재판을 거칩니다",
+          };
+        });
+      } },
+    ],
   };
 
   window.gijoGroupPanels = 그룹;

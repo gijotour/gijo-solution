@@ -192,80 +192,19 @@ tr:last-child td{border-bottom:none;}
 </div>
 
 <style>
-  .mg-gpu{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:11px 13px;margin-bottom:14px;}
-  .mg-gpu-row{display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-bottom:7px;}
-  .mg-gpu-name{font-weight:700;color:#dfe6ff;} .mg-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--teal);margin-right:6px;}
-  .mg-gpu-free{color:var(--muted);}
-  .mg-bar{height:8px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden;}
-  .mg-bar > i{display:block;height:100%;width:0;background:linear-gradient(90deg,var(--teal),var(--blue));transition:width .4s;}
-  .mg-verdict{margin-top:9px;font-size:12px;color:var(--muted);} .mg-verdict b{color:#6fdcb5;}
-  .mg-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:11px;margin-bottom:14px;}
-  .mg-card{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:13px;display:flex;flex-direction:column;gap:9px;position:relative;}
-  .mg-card.rec{border-color:rgba(59,130,246,.55);box-shadow:0 0 0 1px rgba(59,130,246,.3),0 8px 24px rgba(0,0,0,.35);}
-  .mg-rec-badge{position:absolute;top:-10px;left:13px;background:var(--blue);color:#fff;font-size:11.5px;font-weight:800;padding:2px 9px;border-radius:20px;display:none;}
-  .mg-tier{display:flex;align-items:baseline;gap:7px;} .mg-tier .t{font-size:14px;font-weight:900;color:#fff;} .mg-tier .v{font-size:12px;color:var(--muted-2);font-weight:700;}
-  .mg-opt{border-top:1px dashed var(--border);padding-top:8px;} .mg-opt.first{border-top:none;padding-top:0;}
-  .mg-opt-name{font-size:12px;font-weight:800;color:var(--blue-light);margin-bottom:3px;} .mg-opt-name.q{color:var(--purple);}
-  .mg-opt-desc{font-size:12.25px;color:var(--muted);line-height:1.55;}
-  .mg-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px;}
-  .mg-chip{font-size:11.25px;font-weight:800;padding:1px 7px;border-radius:20px;}
-  .mg-chip.fast{background:rgba(30,185,128,.14);color:#6fdcb5;border:1px solid rgba(30,185,128,.35);}
-  .mg-chip.par{background:rgba(59,130,246,.14);color:var(--blue-light);border:1px solid rgba(59,130,246,.35);}
-  .mg-chip.qual{background:rgba(139,124,240,.14);color:#b3a6ff;border:1px solid rgba(139,124,240,.35);}
-  .mg-chip.slow{background:rgba(240,160,32,.14);color:var(--amber);border:1px solid rgba(240,160,32,.35);}
-  .mg-when{margin-top:auto;font-size:11.75px;color:var(--muted-2);line-height:1.5;}
-  .mg-key{background:linear-gradient(180deg,rgba(30,185,128,.08),rgba(59,130,246,.06));border:1px solid rgba(30,185,128,.35);border-radius:10px;padding:12px 14px;margin-bottom:14px;}
-  .mg-key .k-t{font-size:12.5px;font-weight:800;color:#6fdcb5;margin-bottom:4px;} .mg-key .k-b{font-size:12.5px;color:#cfe0ff;line-height:1.65;} .mg-key .k-b b{color:#fff;}
-  .mg-acts{display:flex;flex-wrap:wrap;gap:8px;}
-  .mg-btn{font-size:12.5px;font-weight:700;padding:8px 13px;border-radius:8px;cursor:pointer;border:1px solid var(--border-strong);background:var(--panel-2);color:var(--text);}
-  .mg-btn.primary{background:rgba(59,130,246,.16);border-color:rgba(59,130,246,.5);color:#cfe0ff;} .mg-btn:hover{filter:brightness(1.15);}
-  @media(max-width:820px){.mg-cards{grid-template-columns:1fr;}}
 </style>
-<div class="panel" id="modelGuidePanel" data-gijo-fold="환경별 모델 선택 가이드">
-  <div class="panel-title">🖥 환경별 모델 선택 가이드</div>
-    <div class="mg-gpu" id="mgGpu"><div class="mg-verdict">GPU 실측 중…</div></div>
-  <div class="mg-cards" id="mgCards">
-    <div class="mg-card" data-tier="lite">
-      <span class="mg-rec-badge">✓ 내 환경 추천</span>
-      <div class="mg-tier"><span class="t">Lite</span><span class="v">12GB급</span></div>
-      <div class="mg-opt first"><div class="mg-opt-name">7B 단일 + RAG</div><div class="mg-opt-desc">보안 특화 7B 1개에 사내 근거(RAG)를 붙여 답. 빠르고 가벼움.</div><div class="mg-chips"><span class="mg-chip fast">빠름</span><span class="mg-chip qual">근거 정확</span></div></div>
-      <div class="mg-when">1인 담당자 · 엔트리 GPU(RTX 3060/4060 등). 대부분의 보안 질의에 충분.</div>
-    </div>
-    <div class="mg-card" data-tier="standard">
-      <span class="mg-rec-badge">✓ 내 환경 추천</span>
-      <div class="mg-tier"><span class="t">Standard</span><span class="v">24GB급</span></div>
-      <div class="mg-opt first"><div class="mg-opt-name">A. 7B 2개 병렬 <span style="color:var(--muted-2);font-weight:600">(현행 기본)</span></div><div class="mg-opt-desc">오케스트레이터·팀원이 서로 다른 모델로 <b>동시</b> 작업. 반응 빠름.</div><div class="mg-chips"><span class="mg-chip fast">빠름</span><span class="mg-chip par">병렬 에이전트</span></div></div>
-      <div class="mg-opt"><div class="mg-opt-name q">B. 14B 단일 <span style="color:var(--muted-2);font-weight:600">(고품질)</span></div><div class="mg-opt-desc">강한 모델 1개가 전 역할. 답이 더 간결·안정적이나 <b>2~3배 느리고</b> 병렬은 포기.</div><div class="mg-chips"><span class="mg-chip qual">품질↑</span><span class="mg-chip slow">느림</span></div></div>
-      <div class="mg-when">2~3인 팀 · RTX 3090/4090. 반응속도 우선=A, 품질 우선=B.</div>
-    </div>
-    <div class="mg-card" data-tier="pro">
-      <span class="mg-rec-badge">✓ 내 환경 추천</span>
-      <div class="mg-tier"><span class="t">Pro</span><span class="v">32GB급+</span></div>
-      <div class="mg-opt first"><div class="mg-opt-name">7B 3개 병렬</div><div class="mg-opt-desc">에이전트 다수를 동시 구동. SOC 팀 규모에 적합.</div><div class="mg-chips"><span class="mg-chip par">다중 병렬</span></div></div>
-      <div class="mg-opt"><div class="mg-opt-name q">14B/32B 단일·대문맥</div><div class="mg-opt-desc">최고 품질 노선. 32B는 문맥이 짧아지고 가장 느림.</div><div class="mg-chips"><span class="mg-chip qual">최고 품질</span><span class="mg-chip slow">가장 느림</span></div></div>
-      <div class="mg-when">SOC 팀 · A6000/L40/다중 GPU. 팀 규모·품질 우선도로 선택.</div>
-    </div>
-  </div>
-  <div class="mg-key">
-    <div class="k-t">💡 핵심 — 큰 모델보다 ‘사내 근거(RAG)’가 답 품질을 좌우합니다</div>
-    <div class="k-b">GIJO AS는 <b>RAG 그라운딩</b>으로 사내 자료를 근거로 답하도록 설계됐습니다. 실측 결과 <b>7B도 근거만 있으면 정확</b>했고, 14B로 키워도 근거가 없으면 똑같이 틀립니다. 큰 모델은 <b>속도·병렬을 내주고 품질을 조금 더</b> 얻는 선택이지 필수가 아닙니다 — 대부분의 고객은 <b>현재 티어의 7B 구성으로 충분</b>합니다.</div>
-  </div>
-  <div class="mg-acts">
-    <button class="mg-btn primary" id="mgTierBtn">⚙ 설정에서 티어 적용 (동시 모델·문맥)</button>
-    <button class="mg-btn" id="mgGuideBtn">📚 추천 모델 목록 — 어떤 모델 받을지 (설정)</button>
-    <button class="mg-btn" id="mgRosterBtn">🧩 에이전트별 모델 지정 (로스터로)</button>
-  </div>
-</div>
+<!-- 「환경별 모델 선택 가이드」 구역은 2026-08-09 사용자 지시로 **문서함 가이드**(GIJO_AS_모델_선택_가이드.md)로
+     이관 — 화면은 보는 자리로 줄이고, 읽을거리는 문서함이 맡는다. 티어 적용·모델 받기는 설정 > 서버·AI. -->
 
 <div class="content-grid">
   <div class="panel" data-gijo-fold="터미널 — 협업">
-    <div class="panel-title">터미널 — 협업 · LLM 실동작 로그</div><div class="terminal" id="terminalLog">
+    <div class="panel-title">팀 활동 — 협업 · 실동작 기록</div><div class="terminal" id="terminalLog">
       <div class="out">이벤트 대기 중...</div>
     </div>
   </div>
   <div>
-    <div class="panel" data-gijo-fold="에이전트별 브레인 모델">
-      <div class="panel-title">에이전트별 브레인 모델</div>
+    <div class="panel" data-gijo-fold="팀원별 담당 모델">
+      <div class="panel-title">팀원별 담당 모델</div>
       <!-- 바꾸는 곳은 설정으로 옮겼다(2026-07-28). 여기는 지금 무엇을 쓰는지 보는 자리로 남긴다 —
            로스터 카드 옆에서 한눈에 대조하려면 이 목록이 있어야 한다. -->
       <div id="brainList" style="font-size:12px;color:var(--muted)">불러오는 중...</div>
@@ -765,36 +704,6 @@ tr:last-child td{border-bottom:none;}
     if (addBtn) addBtn.style.display = "none";
   }
 
-  // 환경별 모델 선택 가이드 — GPU 실측(티어 API 재활용)으로 채우고 권장 티어 카드를 하이라이트.
-  async function loadModelGuide() {
-    const tierLabel = (id) => ({ lite: "Lite(12GB급)", standard: "Standard(24GB급)", pro: "Pro(32GB급+)" }[id] || "-");
-    const box = document.getElementById("mgGpu");
-    if (!box) return;
-    try {
-      const t = await window.gijo.getLlmTier();
-      const gpu = t && t.gpu, rec = t && t.recommended;
-      if (gpu) {
-        const totalGb = (gpu.totalMb / 1024).toFixed(0);
-        const freeGb = (gpu.freeMb / 1024).toFixed(1);
-        const usedPct = Math.min(100, Math.max(3, Math.round((gpu.usedMb / gpu.totalMb) * 100)));
-        box.innerHTML =
-          '<div class="mg-gpu-row"><span class="mg-gpu-name"><span class="mg-dot"></span>감지된 GPU — VRAM ' + totalGb + 'GB</span><span class="mg-gpu-free">여유 ' + freeGb + 'GB</span></div>' +
-          '<div class="mg-bar"><i style="width:' + usedPct + '%"></i></div>' +
-          '<div class="mg-verdict">이 환경 권장: <b>' + tierLabel(rec) + '</b> — 아래에서 <b>내 환경 추천</b>으로 표시됩니다.</div>';
-      } else {
-        box.innerHTML = '<div class="mg-verdict" style="color:var(--amber)">이 PC에서 NVIDIA GPU를 찾지 못했습니다 — 로컬 LLM 구동 미지원 환경입니다. (필요 시 클라우드 하이브리드 옵션을 검토하세요.)</div>';
-      }
-      document.querySelectorAll("#mgCards .mg-card").forEach((c) => {
-        const on = c.dataset.tier === rec;
-        c.classList.toggle("rec", on);
-        const badge = c.querySelector(".mg-rec-badge");
-        if (badge) badge.style.display = on ? "" : "none";
-      });
-    } catch (e) {
-      box.innerHTML = '<div class="mg-verdict" style="color:var(--muted)">GPU 정보를 불러오지 못했습니다.</div>';
-    }
-  }
-
   async function init() {
     applyAdminGating();
     await Promise.all([loadAgents(), loadTaskKpis(), loadCollaboration(), loadEngineStatus()]);
@@ -808,17 +717,7 @@ tr:last-child td{border-bottom:none;}
     });
     // 지시바 배선도 걷었다(2026-08-01) — 부를 함수가 없어졌고, 애초에 붙일 요소도 없었다.
 
-    const goGuide = () => window.gijo.navigateTo("settings.html");
-    // 환경별 모델 선택 가이드 — 액션 배선
-    document.getElementById("mgTierBtn").addEventListener("click", () => window.gijo.navigateTo("settings.html"));
-    document.getElementById("mgGuideBtn").addEventListener("click", goGuide);
-    document.getElementById("mgRosterBtn").addEventListener("click", () => {
-      const rp = document.getElementById("rosterPanel");
-      if (rp) rp.scrollIntoView({ behavior: "smooth", block: "start" });
-      const sel = document.querySelector(".agent-model-select");
-      if (sel) setTimeout(() => { try { sel.focus(); } catch (e) {} }, 400);
-    });
-    loadModelGuide();
+
 
     // clearFeedBtn 배선도 걷었다 — 버튼도, 지울 피드도 없어진 지 오래다(협업현황 패널 제거).
     // 두 버튼 모두 팀 설정 모달을 연다. "추가"는 역할이 고정이라 실제 추가는 없고, 모달이
