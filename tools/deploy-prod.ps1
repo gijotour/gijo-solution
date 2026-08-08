@@ -36,6 +36,27 @@ Step "3/5 WSL 운영 서버로 소스 동기화 + 빌드"
 wsl -d $distro -- bash -c "rsync -a --delete '/mnt/d/Connect AI/server/src/' '$wslServer/src/' && cd '$wslServer' && npx tsc -p tsconfig.json && echo BUILD_OK"
 if ($LASTEXITCODE -ne 0) { throw "WSL 동기화/빌드 실패 — 배포 중단 (운영은 아직 이전 코드로 구동 중)" }
 
+# ⚠ 문서도 함께 옮긴다(2026-08-08 실사고). 예전엔 소스만 옮겨서, 문서를 고쳐도 운영 AI는
+#   **옛 문서를 근거로 계속 답했다**(8월 7일판이 쓰이고 있었다). 사람이 기억해야만 맞는 구조였다.
+#   ⚠ 운영이 읽는 곳은 **env가 가리키는 한 곳뿐**이다(gijo-as.env의 GIJO_DOCS_DIR).
+#      다른 폴더에 복사하면 조용히 옛 문서가 계속 쓰인다 — 그래서 env를 읽어 그 자리에 넣는다.
+Step "3.5/5 제품 문서 동기화 (docs-manifest 열거분)"
+$docsDir = (wsl -d $distro -- bash -c "grep -m1 '^GIJO_DOCS_DIR=' /home/gijo/gijo-as/gijo-as.env | cut -d= -f2").Trim()
+if (-not $docsDir) { $docsDir = "$wslServer/docs" }
+Write-Output "운영 문서 위치: $docsDir"
+$manifest = Get-Content "$repo\server\docs-manifest.json" -Raw -Encoding UTF8 | ConvertFrom-Json
+$문서옮김 = 0; $문서없음 = @()
+foreach ($entry in $manifest.files) {
+  $src = Join-Path $repo $entry.file
+  if (Test-Path $src) {
+    $wslSrc = "/mnt/d/Connect AI/" + $entry.file
+    wsl -d $distro -- bash -c "cp '$wslSrc' '$docsDir/'"
+    if ($LASTEXITCODE -eq 0) { $문서옮김++ }
+  } else { $문서없음 += $entry.file }
+}
+Write-Output "문서 $문서옮김건 동기화"
+if ($문서없음.Count -gt 0) { Write-Warning "리포지토리에 없는 문서(목록만 있고 파일 없음): $($문서없음 -join ', ')" }
+
 Step "4/5 운영 프로세스 재시작 (systemd Restart=always)"
 # grep/awk 파이프는 셸 경유 인용 문제로 빈 결과가 나는 함정(2026-07-24 실측) — systemd MainPID 직접 조회.
 $pid = (wsl -d $distro -- systemctl show gijo-as.service -p MainPID --value).Trim()
