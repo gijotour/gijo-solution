@@ -45,6 +45,7 @@ export interface ChatLog {
   rating: number | null; // null=미평가, 1=긍정(학습 채택), -1=부정(제외)
   usedInDataset: boolean;
   createdAt: number;
+  topic: string | null; // 주제 딱지(취약점·장비운영·사내규정·위협대응) — 애매하면 null
 }
 
 export type LearnloopStage =
@@ -165,6 +166,8 @@ const logFromRow = (r: ChatLogRow): ChatLog => ({
   rating: r.rating,
   usedInDataset: r.usedInDataset === 1,
   createdAt: r.createdAt,
+  // 후보함이 행마다 주제 배지를 단다(2026-08-08 시안 승인) — SELECT *라 값은 이미 온다.
+  topic: (r as ChatLogRow & { topic?: string | null }).topic ?? null,
 });
 
 const runFromRow = (r: RunRow): LearnloopRun => ({

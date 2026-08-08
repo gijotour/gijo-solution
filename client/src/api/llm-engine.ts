@@ -150,6 +150,9 @@ export interface LearnloopPreflightCheck {
 }
 
 export const learnloopApi = {
+  // 주제별 승인 진척(중-4) — 전문가 어댑터 조건(주제별 300건)의 시계다.
+  topics: () =>
+    request<{ 목표승인건수: number; 주제: { topic: string; total: number; approved: number; 준비됨: boolean; 남은건수: number }[] }>("/api/learnloop/topics"),
   preflight: () => request<{ checks: LearnloopPreflightCheck[]; ready: boolean }>("/api/learnloop/preflight"),
   logs: (limit?: number, offset?: number) =>
     request<{ logs: LearnloopChatLog[]; kpis: { total: number; positive: number; negative: number; unused: number } }>(

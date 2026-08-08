@@ -107,6 +107,23 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .log-list{display:flex;flex-direction:column;gap:8px;}
 .log-item{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:11px 14px;}
 /* 학습 후보함(환류 1단계, 2026-07-29) */
+/* 주제 딱지·진척 띠(2026-08-08 시안 승인) — 띠 28px 한 줄, 행 높이 증가 0(.lc-sig 규격 재사용) */
+.lt-strip{display:flex;align-items:center;gap:8px;height:28px;margin-bottom:10px;flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;}
+.lt-chip{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:800;padding:3px 9px;border-radius:14px;border:1px solid var(--border);color:var(--muted);cursor:pointer;white-space:nowrap;flex:0 0 auto;}
+.lt-chip:hover{color:#fff;border-color:var(--border-strong);}
+.lt-chip.on{color:#fff;border-color:var(--blue);background:rgba(59,130,246,.12);}
+.lt-chip .dot{width:7px;height:7px;border-radius:50%;flex:0 0 auto;}
+.lt-chip .bar{width:34px;height:4px;border-radius:2px;background:rgba(255,255,255,.10);overflow:hidden;flex:0 0 auto;}
+.lt-chip .bar i{display:block;height:100%;border-radius:2px;}
+.lt-chip .ok{color:var(--teal);font-weight:800;}
+.lt-misc{font-size:11.5px;color:var(--muted-2);margin-left:auto;flex:0 0 auto;}
+.lc-topic{font-size:11.5px;font-weight:800;padding:2px 7px;border-radius:5px;}
+/* 주제색 — 기존 토큰만 쓴다(새 색 금지). 사내규정=amber는 「신호 강함」과 색이 겹치지만 글자가 구분자다(시안 결정). */
+.lt-취약점{color:#f5928a;background:rgba(226,72,61,.12);}
+.lt-장비운영{color:var(--blue-light);background:rgba(59,130,246,.13);}
+.lt-사내규정{color:var(--amber);background:rgba(240,160,32,.13);}
+.lt-위협대응{color:var(--purple, #8b7cf0);background:rgba(139,124,240,.14);}
+.lt-미분류{color:var(--muted-2);background:rgba(255,255,255,.05);}
 .lc-card{background:var(--panel);border:1px solid var(--border);border-radius:11px;padding:12px 14px;margin-bottom:8px;}
 .lc-card.lc-dim{opacity:.75;}
 .lc-top{display:flex;gap:6px;align-items:center;margin-bottom:7px;flex-wrap:wrap;}
@@ -215,6 +232,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
          승인 = 👍 기록 → 아래 기존 정제·데이터셋·학습 흐름이 그대로 이어받는다. -->
     <div class="cat" data-gijo-fold="학습 후보함" data-gijo-fold-open data-gijo-fold-badges="lcStrong:신호 강함:warn">
       <div class="cat-head"><span style="font-size:18px">🗳</span><span class="cat-title">학습 후보함</span></div>
+      <!-- 주제별 승인 진척(2026-08-08 시안 승인) — 섹션을 열자마자 "어느 주제가 300에 가까운가"부터. 칩 클릭=그 주제만 보기 -->
+      <div class="lt-strip" id="ltStrip"></div>
       <div class="cat-intro">쌓인 대화·작업 내역에서 <b>배울 만한 문답을 코드가 골라</b> 놓았습니다. 승인하면 👍로 기록되어 다음 학습에 채택됩니다 — 승인 없이 자동으로 학습되는 일은 없습니다. 잘못 승인해도 아래 수집된 대화에서 👎로 되돌리면 됩니다.</div>
       <div class="kpi-grid" style="margin-bottom:10px">
         <div class="kpi"><div class="k-label">후보</div><div class="k-value" id="lcCount">-</div></div>
@@ -344,6 +363,29 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     return t.join("");
   }
 
+  // 주제 띠(2026-08-08 시안 승인) — 클릭한 주제만 후보를 보인다. 재클릭=전체.
+  let ltFilter = null;
+  const 주제색 = { 취약점: "#e2483d", 장비운영: "#3b82f6", 사내규정: "#f0a020", 위협대응: "#8b7cf0" };
+  async function loadTopicStrip() {
+    const el = document.getElementById("ltStrip");
+    if (!el) return;
+    try {
+      const r = await window.gijo.listLearnloopTopics();
+      const 목표 = r.목표승인건수 || 300;
+      const 이름순 = ["취약점", "장비운영", "사내규정", "위협대응"];
+      const map = Object.fromEntries((r.주제 || []).map((t) => [t.topic, t]));
+      el.innerHTML = 이름순.map((n) => {
+        const t = map[n] || { approved: 0 };
+        const pct = Math.min(100, Math.round((t.approved / 목표) * 100));
+        const done = t.approved >= 목표;
+        return `<span class="lt-chip${ltFilter === n ? " on" : ""}" data-topic="${n}">` +
+          `<span class="dot" style="background:${주제색[n]}"></span>${n} ${t.approved}/${목표}` +
+          (done ? ` <span class="ok">✓ 학습 가능</span>` : `<span class="bar"><i style="width:${pct}%;background:${주제색[n]}"></i></span>`) +
+          `</span>`;
+      }).join("") + `<span class="lt-misc">미분류 ${(map["(미분류)"] || { total: 0 }).total.toLocaleString()}건</span>`;
+    } catch (e) { el.innerHTML = ""; }
+  }
+
   async function loadCandidates() {
     const list = document.getElementById("lcList");
     try {
@@ -363,16 +405,17 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       }
       // 승인됨(👍 대기) = 기존 KPI의 미사용 👍 수와 같은 값 — loadLogs가 채우는 것을 재사용
       try { document.getElementById("lcApproved").textContent = document.getElementById("kpiPositive").textContent; } catch (e) {}
-      list.innerHTML = r.candidates.length
-        ? r.candidates.map((c) =>
+      const 보일후보 = ltFilter ? r.candidates.filter((c) => (c.topic || "미분류") === ltFilter) : r.candidates;
+      list.innerHTML = 보일후보.length
+        ? 보일후보.map((c) =>
             `<div class="lc-card${c.score < 3 ? " lc-dim" : ""}" data-id="${esc(c.id)}">` +
-            `<div class="lc-top">${lcSignalTags(c)}</div>` +
+            `<div class="lc-top"><span class="lc-topic lt-${esc(c.topic || "미분류")}">${esc(c.topic || "미분류")}</span>${lcSignalTags(c)}</div>` +
             `<div class="lc-q">Q. ${esc(c.question).slice(0, 160)}</div>` +
             `<div class="lc-a">A. ${esc(c.answer).slice(0, 220)}</div>` +
             `<div class="lc-act"><button class="lc-yes" data-accept="1">✓ 승인 — 학습에 채택</button>` +
             `<button class="lc-no" data-accept="0">✕ 제외</button></div></div>`
           ).join("")
-        : '<div style="color:var(--muted);font-size:12px">지금은 후보가 없습니다 — 대화가 더 쌓이면 코드가 다시 골라 놓습니다.</div>';
+        : '<div style="color:var(--muted);font-size:12px">' + (ltFilter ? esc(ltFilter) + ' 주제의 후보가 지금은 없습니다 — 칩을 다시 눌러 전체를 보세요.' : '지금은 후보가 없습니다 — 대화가 더 쌓이면 코드가 다시 골라 놓습니다.') + '</div>';
     } catch (e) {
       list.innerHTML = '<div style="color:#f5928a;font-size:12px">후보를 불러오지 못했습니다: ' + esc((e && e.message) || e) + "</div>";
     }
@@ -390,6 +433,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       card.querySelectorAll("button").forEach((b) => (b.disabled = true));
       // 승인은 👍 수에 바로 반영된다 — KPI를 다시 읽어 화면 숫자가 거짓말하지 않게.
       await loadLogs();
+      loadTopicStrip();
       try { document.getElementById("lcApproved").textContent = document.getElementById("kpiPositive").textContent; } catch (err) {}
     } catch (err) {
       btn.disabled = false;
@@ -408,6 +452,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       line.textContent = `✓ ${r.accepted}건 승인됨 — 아래 '데이터셋만 만들기'로 바로 이을 수 있습니다`;
       await loadCandidates();
       await loadLogs();
+      loadTopicStrip();
     } catch (e) {
       line.textContent = "실패: " + ((e && e.message) || e);
     }
@@ -436,6 +481,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       `<div class="log-q">Q. ${esc(l.question)}</div>` +
       `<div class="log-a">A. ${esc(l.answer)}</div>` +
       `<div class="log-foot">` +
+      `<span class="lc-topic lt-${esc(l.topic || "미분류")}">${esc(l.topic || "미분류")}</span>` +
       `<span class="log-agent">${esc(l.agentId)}</span>` +
       `<span class="log-when">${fmtTime(l.createdAt)}</span>` +
       (l.usedInDataset ? `<span class="log-used">✓ 학습에 사용됨</span>` : "") +
@@ -459,6 +505,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       const already = (val === 1 && e.target.classList.contains("on-up")) || (val === -1 && e.target.classList.contains("on-down"));
       await window.gijo.rateLearnloopLog(id, already ? 0 : val).catch((err) => gijoTell("평가 실패: " + err.message));
       await loadLogs();
+      loadTopicStrip();
     }
   }
 
@@ -600,7 +647,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.getElementById("logList").addEventListener("click", onLogAction);
     // 학습 후보함(환류 1단계)
     loadCandidates();
+    loadTopicStrip();
     document.getElementById("lcList").addEventListener("click", onCandidateAction);
+    document.getElementById("ltStrip").addEventListener("click", (e) => {
+      const chip = e.target.closest(".lt-chip");
+      if (!chip) return;
+      ltFilter = ltFilter === chip.dataset.topic ? null : chip.dataset.topic;
+      loadTopicStrip();
+      loadCandidates();
+    });
     document.getElementById("lcBulkBtn").addEventListener("click", onBulkAccept);
     document.getElementById("lcGapGo").addEventListener("click", () => window.gijo.navigateTo("sessions.html"));
   }

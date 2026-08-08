@@ -20,7 +20,7 @@ import crypto from "crypto";
 import { db, migrate } from "../db";
 import { authMiddleware } from "../auth/auth";
 import { SMALLTALK, NO_ANSWER } from "./sessionpatterns";
-import { rateChatLog } from "./learnloop";
+import { rateChatLog, 질문주제 } from "./learnloop";
 // work_session_turns 테이블은 worksessions.ts의 migrate가 만든다 — 이 모듈이 먼저 적재되면
 // 아래 prepare가 "no such table"로 죽는다(테스트에서 실측). 소유 모듈을 명시적으로 실어 보장한다.
 import "./worksessions";
@@ -74,6 +74,7 @@ export interface LearnCandidate {
   answer: string;
   createdAt: number;
   signals: { cite: boolean; tool: boolean; accepted: boolean; lengthOk: boolean };
+  topic: string | null; // 주제 딱지 — 후보함 배지·주제별 진척(2026-08-08 시안 승인)
   score: number; // cite 3 + tool 2 + accepted 1 + lengthOk 1
 }
 
@@ -87,7 +88,8 @@ const putDecisionStmt = db.prepare(
   "INSERT INTO learn_candidate_decisions (id, decision, decidedAt, decidedBy) VALUES (?, ?, ?, ?) ON CONFLICT(id) DO UPDATE SET decision=excluded.decision, decidedAt=excluded.decidedAt, decidedBy=excluded.decidedBy"
 );
 const insertLogStmt = db.prepare(
-  "INSERT INTO chat_logs (id, agentId, question, answer, rating, usedInDataset, createdAt) VALUES (@id, @agentId, @question, @answer, 1, 0, @createdAt)"
+  // topic도 함께 적는다(2026-08-08) — 승인 경로로 들어온 행이 주제 진척에서 빠지면 300건 시계가 어긋난다.
+  "INSERT INTO chat_logs (id, agentId, question, answer, rating, usedInDataset, createdAt, topic) VALUES (@id, @agentId, @question, @answer, 1, 0, @createdAt, @topic)"
 );
 const allLogFingerprintRowsStmt = db.prepare("SELECT question, answer FROM chat_logs");
 
@@ -156,7 +158,7 @@ export function listLearnCandidates(days = 30, limit = 60): {
     // 해서, 여기서는 이미 out에 담은 것과만 비교한다.
     if (out.some((c) => fingerprint(c.question, c.answer) === fp)) { drop("중복"); continue; }
     const signals = buildSignals(r.question, r.answer, false, false);
-    out.push({ id: `cl:${r.id}`, source: "chatlog", question: r.question, answer: r.answer, createdAt: r.createdAt, signals, score: scoreOf(signals) });
+    out.push({ id: `cl:${r.id}`, source: "chatlog", question: r.question, answer: r.answer, createdAt: r.createdAt, signals, score: scoreOf(signals), topic: 질문주제(r.question) });
   }
 
   // ── 출처 B: 작업내역 user→assistant 짝 ──────────────────────────────
@@ -175,7 +177,7 @@ export function listLearnCandidates(days = 30, limit = 60): {
     const nextUser = turns.slice(i + 2).find((t) => t.sessionId === u.sessionId && t.role === "user");
     const accepted = !nextUser || !isRephrase(u.content, nextUser.content);
     const signals = buildSignals(u.content, b.content, Boolean(b.tool), accepted);
-    out.push({ id, source: "worksession", question: u.content, answer: b.content, createdAt: b.at, signals, score: scoreOf(signals) });
+    out.push({ id, source: "worksession", question: u.content, answer: b.content, createdAt: b.at, signals, score: scoreOf(signals), topic: 질문주제(u.content) });
   }
 
   out.sort((a, c) => c.score - a.score || c.createdAt - a.createdAt);
@@ -206,6 +208,7 @@ export function decideLearnCandidate(id: string, accept: boolean, actor?: string
         question: u.content,
         answer: b.content,
         createdAt: b.at,
+        topic: 질문주제(u.content),
       });
     }
     putDecisionStmt.run(id, accept ? "accept" : "reject", now, actor ?? null);
