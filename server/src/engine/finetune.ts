@@ -8,6 +8,7 @@ import { authMiddleware } from "../auth/auth";
 import { recordProcessOutput } from "./logs";
 import { pauseInferenceEngines, resumeInferenceEngines } from "./localengine";
 import { airgapChildEnv } from "./airgap";
+import { trainPython, TRAIN_SCRIPT, adapterWorkDir } from "./trainenv";
 
 export interface FinetuneArgs {
   agentId: string;
@@ -97,20 +98,25 @@ async function runFinetuneJob(args: FinetuneArgs): Promise<void> {
 // 여기서 하고, Promise는 프로세스가 끝난 뒤 resolve된다(reject하지 않음 — 실패도 정상 종결로 취급).
 function spawnTraining(args: FinetuneArgs): Promise<void> {
   return new Promise<void>((resolve) => {
-    const scriptArgs = ["scripts/finetune_unsloth.py", "--dataset", args.datasetId];
-    // 테스트/CI 전용: GPU·unsloth 없이 파이프라인 계약만 검증
+    // 학습 스크립트·파이썬·산출 위치는 trainenv가 단독으로 정한다(2026-08-08 실사고).
+    //   예전엔 여기서 곧장 `python scripts/finetune_unsloth.py`를 불렀는데, 그 파이썬은
+    //   **서버 자신의 가상환경**이라 학습 의존성이 없었고("No module named 'unsloth'"),
+    //   스크립트도 은퇴한 unsloth 전제였다. 세 단계가 같은 환경을 보게 한 곳으로 모은다.
+    const python = trainPython();
+    const scriptArgs = [TRAIN_SCRIPT, "--dataset", args.datasetId, "--output", adapterWorkDir(args.datasetId)];
+    // 테스트/CI 전용: GPU·학습 의존성 없이 파이프라인 계약만 검증
     if (process.env.GIJO_FINETUNE_SMOKE === "1") scriptArgs.push("--smoke");
 
     // PYTHONUTF8=1: Windows 기본 콘솔 코드페이지(cp949)로는 한국어 로그가 파이프에서 깨지고
     // em-dash 같은 문자는 UnicodeEncodeError로 스크립트를 죽인다 (modelscan_wrapper와 같은 함정).
-    const proc = spawn("python", scriptArgs, {
+    const proc = spawn(python, scriptArgs, {
       // 에어갭 봉인 시 HF 오프라인 강제(자식 프로세스는 fetch 관문 밖) — 봉인 아니면 무영향.
       env: { ...process.env, PYTHONUTF8: "1", ...(args.baseModel ? { GIJO_FT_BASE_MODEL: args.baseModel } : {}), ...airgapChildEnv() },
     });
     let stderrTail = "";
     let settled = false;
 
-    recordProcessOutput("finetune", "log", `$ python ${scriptArgs.join(" ")}`);
+    recordProcessOutput("finetune", "log", `$ ${python} ${scriptArgs.join(" ")}`);
     proc.stdout.on("data", (chunk: Buffer) => {
       recordProcessOutput("finetune", "log", chunk.toString());
       for (const line of chunk.toString().split("\n")) {

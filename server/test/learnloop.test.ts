@@ -217,9 +217,13 @@ describe("learnloop (헤르메스 폐쇄형 학습 루프)", () => {
     expect(typeof res.body.ready).toBe("boolean");
     // 예상 점검 항목이 모두 있는지(환경마다 ok 값은 다르므로 존재+형태만 확인)
     const keys = res.body.checks.map((c: { key: string }) => c.key);
-    for (const k of ["python", "unsloth", "gguf", "llama-convert", "llama-quantize", "base-model", "training-data"]) {
+    // 2026-08-08: unsloth는 점검 항목에서 내렸다 — 지금 학습 스크립트(finetune_qlora14b.py)는
+    //   그것 없이 transformers+peft로 돈다. 없는 것을 필수로 요구하면 담당자가 설치하고도
+    //   다음 단계에서 또 막힌다(원클릭 루프 실패의 실제 원인). 대신 진짜 쓰는 것들을 본다.
+    for (const k of ["python", "torch", "transformers", "peft", "bitsandbytes", "gguf", "llama-convert", "llama-quantize", "base-model", "training-data"]) {
       expect(keys, `${k} 누락`).toContain(k);
     }
+    expect(keys, "은퇴한 unsloth 점검이 되살아남").not.toContain("unsloth");
     for (const c of res.body.checks) {
       expect(typeof c.ok).toBe("boolean");
       expect(typeof c.required).toBe("boolean");

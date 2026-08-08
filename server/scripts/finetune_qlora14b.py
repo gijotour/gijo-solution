@@ -25,9 +25,31 @@ def main() -> None:
     p.add_argument("--lr", type=float, default=1e-4)
     p.add_argument("--max-seq", type=int, default=1024)
     p.add_argument("--rank", type=int, default=16)
+    # --smoke: GPU·학습 의존성 없이 **파이프라인 계약만** 확인한다(시험·CI 전용).
+    #   원클릭 루프가 이 스크립트를 부르게 되면서 필요해졌다 — 예전 스크립트에는 있고
+    #   여기엔 없어, 배선을 바꾸면 스모크 시험이 통째로 죽는다(2026-08-08).
+    p.add_argument("--smoke", action="store_true")
     args = p.parse_args()
 
     ds_path = os.path.join("data", "datasets", f"{args.dataset}.json")
+    if not os.path.exists(ds_path):
+        # 없는 데이터셋은 **스모크에서도** 실패여야 한다 — 이 오류 문구가 화면까지 전달되는지가
+        # 시험 계약이다(실학습 경로와 같은 출력 계약, 구 finetune_unsloth.py에서 이어받음).
+        print(f"[finetune] ERROR: 데이터셋 파일이 없습니다: {ds_path}", file=sys.stderr, flush=True)
+        sys.exit(1)
+
+    if args.smoke:
+        os.makedirs(args.output, exist_ok=True)
+        # 다음 단계(GGUF 변환)가 읽을 자리의 **모양만** 갖춘다. 내용은 학습물이 아니므로
+        # 실제 변환은 하지 않는다 — 루프도 스모크에서는 변환을 건너뛴다.
+        with open(os.path.join(args.output, "adapter_config.json"), "w", encoding="utf-8") as f:
+            json.dump({"smoke": True, "dataset": args.dataset}, f)
+        for i in range(1, 11):  # 10스텝 — 구 스크립트와 같은 진행률 계약(화면 막대가 이 꼴만 읽는다)
+            log(f"step {i}/10 loss={1.0 - i * 0.05:.4f}")
+            time.sleep(0.01)
+        log(f"[finetune] done(smoke) output={args.output}")
+        return
+
     with open(ds_path, "r", encoding="utf-8") as f:
         rows = [r for r in json.load(f) if r.get("question") and r.get("answer")]
     if len(rows) < 20:
@@ -97,8 +119,18 @@ def main() -> None:
     model.config.use_cache = False
 
     t0 = time.time()
+
+    # 진행률 — 화면(학습 진행 막대)은 `step N/M loss=…` 꼴만 읽는다(finetune.ts 파서).
+    # 이게 없으면 몇 시간짜리 학습이 "아무 일도 안 하는 것처럼" 보인다.
+    from transformers import TrainerCallback
+
+    class 진행알림(TrainerCallback):
+        def on_log(self, cfg, state, control, logs=None, **kw):
+            if logs and "loss" in logs:
+                log(f"step {int(state.global_step)}/{int(state.max_steps)} loss={float(logs['loss']):.4f}")
+
     trainer = Trainer(
-        model=model, train_dataset=data, data_collator=collate,
+        model=model, train_dataset=data, data_collator=collate, callbacks=[진행알림()],
         args=TrainingArguments(
             output_dir=args.output, num_train_epochs=args.epochs, learning_rate=args.lr,
             per_device_train_batch_size=1, gradient_accumulation_steps=16,

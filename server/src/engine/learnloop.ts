@@ -32,6 +32,7 @@ import { pauseInferenceEngines, resumeInferenceEngines } from "./localengine";
 import { getAgentById } from "./agents";
 import { attachProcessLogging, recordProcessOutput } from "./logs";
 import { airgapChildEnv } from "./airgap";
+import { trainPython, probeTrainDeps, TRAIN_DEPS, hfSnapshotDir, isBaseModelCached, adapterWorkDir } from "./trainenv";
 
 const MODELS_DIR = process.env.GIJO_MODELS_DIR ?? "models";
 const SMOKE = () => process.env.GIJO_LEARNLOOP_SMOKE === "1";
@@ -589,7 +590,7 @@ async function runPipeline(run: LearnloopRun, config: LearnloopConfig, 목표미
     setStage(run, "exporting");
     if (SMOKE()) await smokeTick();
     else {
-      await runAdapterExport(run.datasetId, run.outputModelId);
+      await runAdapterExport(run.datasetId, run.outputModelId, run.baseModel);
     }
 
     // (4) 등록(미채택) — **자동 부착 금지**. 어댑터 1호가 게이트 없이 나갔다면 설정 키 날조가
@@ -639,15 +640,26 @@ export function servingBaseModelId(): string {
 
 // llama.cpp convert_lora_to_gguf.py 실행 — HF LoRA 산출(outputs/<ds>/lora-adapter)을
 // GGUF LoRA(data/lora/<id>.gguf)로 변환한다. 1회전(2026-08-08)에서 실검증된 경로.
-function runAdapterExport(datasetId: string, adapterId: string): Promise<void> {
+function runAdapterExport(datasetId: string, adapterId: string, baseModel: string): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     fs.mkdirSync(LORA_DIR, { recursive: true });
-    const adapter = path.join("outputs", datasetId, "lora-adapter");
+    // 학습이 떨군 자리를 그대로 읽는다(두 단계가 같은 상수를 본다 — trainenv.adapterWorkDir).
+    const adapter = adapterWorkDir(datasetId);
     const args = [path.join(LLAMA_CPP_DIR, "convert_lora_to_gguf.py"), adapter, "--outfile", adapterOutPath(adapterId)];
-    recordProcessOutput("learnloop-export", "log", `$ python ${args.join(" ")}`);
+    // --base: config.json이 든 **베이스 스냅샷 실경로**. 리포지터리 id를 그대로 주면 네트워크를
+    //   타려 해 폐쇄망에서 실패한다(1회전에서 실경로로 넘겨 통과시킨 길). 캐시가 없으면
+    //   지어내지 말고 여기서 멈춘다 — 사전 점검이 같은 것을 먼저 경고한다.
+    const base = hfSnapshotDir(baseModel);
+    if (!base) {
+      reject(new Error(`베이스 모델 캐시를 찾지 못했습니다(${baseModel}) — 변환에 필요한 config가 없습니다`));
+      return;
+    }
+    args.push("--base", base);
+    const python = trainPython(); // 변환도 학습과 같은 환경(gguf 패키지가 거기 있다)
+    recordProcessOutput("learnloop-export", "log", `$ ${python} ${args.join(" ")}`);
     // PYTHONUTF8=1: cp949 콘솔에서 한국어/특수문자 로그가 깨지거나 스크립트가 죽는 함정 방지.
     // 에어갭 봉인 시 HF 오프라인 강제(자식 프로세스는 fetch 관문 밖) — 봉인 아니면 무영향.
-    const proc = spawn("python", args, { env: { ...process.env, PYTHONUTF8: "1", ...airgapChildEnv() } });
+    const proc = spawn(python, args, { env: { ...process.env, PYTHONUTF8: "1", ...airgapChildEnv() } });
     attachProcessLogging(proc, "learnloop-export");
     let stderrTail = "";
     proc.stderr?.on("data", (d) => {
@@ -679,60 +691,38 @@ export interface PreflightCheck {
 const LLAMA_CPP_DIR = process.env.GIJO_LLAMA_CPP_DIR ?? "llama.cpp";
 
 // HuggingFace 허브 캐시 경로 후보들. HF_HOME > 기본 ~/.cache/huggingface/hub.
-function hfHubDirs(): string[] {
-  const dirs: string[] = [];
-  if (process.env.HF_HUB_CACHE) dirs.push(process.env.HF_HUB_CACHE);
-  if (process.env.HF_HOME) dirs.push(path.join(process.env.HF_HOME, "hub"));
-  dirs.push(path.join(os.homedir(), ".cache", "huggingface", "hub"));
-  return dirs;
-}
-
-// baseModel(HF repo id)의 fp16 가중치가 허브 캐시에 받아져 있는지 — 폐쇄망 이전 전 선행 다운로드 확인.
-function isBaseModelCached(baseModel: string): boolean {
-  const cacheName = "models--" + baseModel.replace(/\//g, "--");
-  return hfHubDirs().some((hub) => {
-    const dir = path.join(hub, cacheName);
-    // 스냅샷 폴더에 실제 파일이 있어야 "받아짐"으로 본다(빈 디렉터리 방어).
-    const snap = path.join(dir, "snapshots");
-    return fs.existsSync(snap) && fs.readdirSync(snap).length > 0;
-  });
-}
-
+// hfHubDirs·isBaseModelCached는 trainenv로 옮겼다 — 학습 경로 해석이 두 벌이면 어긋난다.
 export function preflightCheck(): { checks: PreflightCheck[]; ready: boolean } {
   const config = getLearnloopConfig();
   const checks: PreflightCheck[] = [];
 
-  // 1) python
-  const py = spawnSync("python", ["--version"], { encoding: "utf-8" });
+  // 1) python — **학습이 실제로 쓸 파이썬**을 본다(2026-08-08 실사고). 예전엔 그냥 `python`을
+  //    검사해 서버 자신의 가상환경이 잡혔고, 정작 학습은 다른 환경이 필요해 "준비됨"이 거짓이었다.
+  const python = trainPython();
+  const py = spawnSync(python, ["--version"], { encoding: "utf-8" });
   const pythonOk = py.status === 0;
   checks.push({
     key: "python",
-    label: "Python 실행 가능",
+    label: "학습용 Python",
     ok: pythonOk,
     required: true,
-    detail: pythonOk ? (py.stdout || py.stderr || "").trim() : undefined,
-    hint: pythonOk ? undefined : "GPU 머신에 Python이 설치돼 있어야 합니다.",
+    detail: pythonOk ? `${(py.stdout || py.stderr || "").trim()} · ${python}` : python,
+    hint: pythonOk ? undefined : "학습 전용 환경(venv-train)이 필요합니다. 경로를 직접 지정하려면 GIJO_TRAIN_PYTHON.",
   });
 
-  // 2·3) 학습(unsloth)·변환(gguf) 파이썬 패키지 — find_spec으로 한 번에 확인(모듈 로드 안 함).
-  let unsloth = false;
-  let gguf = false;
-  if (pythonOk) {
-    const probe = spawnSync(
-      "python",
-      ["-c", "import importlib.util as u,json;print(json.dumps({'unsloth':u.find_spec('unsloth') is not None,'gguf':u.find_spec('gguf') is not None}))"],
-      { encoding: "utf-8" }
-    );
-    try {
-      const parsed = JSON.parse((probe.stdout || "").trim());
-      unsloth = !!parsed.unsloth;
-      gguf = !!parsed.gguf;
-    } catch {
-      /* 파싱 실패 시 둘 다 false 유지 */
-    }
+  // 2) 학습·변환 파이썬 패키지 — find_spec으로 한 번에 확인(모듈 로드 안 함 = GPU 안 잡음).
+  //    ⚠ unsloth는 더 이상 보지 않는다. 지금 학습 스크립트(finetune_qlora14b.py)는 그것 없이
+  //    transformers+peft로 돈다 — 없는 것을 요구하면 "설치했는데 또 막힌다"가 된다.
+  const deps = pythonOk ? probeTrainDeps(python) : Object.fromEntries(TRAIN_DEPS.map((d) => [d.key, false]));
+  for (const d of TRAIN_DEPS) {
+    checks.push({
+      key: d.key,
+      label: d.label,
+      ok: !!deps[d.key],
+      required: true,
+      hint: deps[d.key] ? undefined : `학습 환경에 설치 필요: ${python} -m pip install ${d.key}`,
+    });
   }
-  checks.push({ key: "unsloth", label: "unsloth (QLoRA 학습)", ok: unsloth, required: true, hint: unsloth ? undefined : "pip install unsloth" });
-  checks.push({ key: "gguf", label: "gguf 패키지 (GGUF 변환)", ok: gguf, required: true, hint: gguf ? undefined : "pip install gguf" });
 
   // 4·5) llama.cpp 변환 스크립트 + 양자화 실행파일(export_gguf.py와 같은 경로 규칙).
   const convertOk = fs.existsSync(path.join(LLAMA_CPP_DIR, "convert_hf_to_gguf.py"));
@@ -750,15 +740,22 @@ export function preflightCheck(): { checks: PreflightCheck[]; ready: boolean } {
     hint: cached ? undefined : `hf download ${config.baseModel}`,
   });
 
-  // 7) 학습 데이터 준비(경고성) — 👍/미평가 미사용 로그가 최소치 이상인지.
-  const unused = (pickLogsStmt.all() as ChatLogRow[]).length;
+  // 7) 학습 데이터 준비(경고성) — **승인된 문답**이 얼마나 쌓였는지.
+  //    ⚠ 예전엔 "아직 학습에 안 쓴 것"만 셌다. 그래서 승인 50건이 있는데도 **0건**으로 보였다
+  //    (1회전에서 쓴 표시가 붙어 제외됨 — 2026-08-08 실측). 담당자는 승인을 해도 화면이
+  //    0이라 무엇이 문제인지 알 수 없었다. 주제 학습은 어차피 **전체 승인분**을 다시 굽는다
+  //    (재학습 정책) — 그러니 세는 것도 승인 총량이어야 뜻이 맞는다.
+  const 승인 = db.prepare("SELECT COUNT(*) AS n FROM chat_logs WHERE rating = 1").get() as { n: number };
+  const 주제별 = db.prepare(
+    "SELECT COALESCE(topic,'(미분류)') AS topic, COUNT(*) AS n FROM chat_logs WHERE rating = 1 GROUP BY COALESCE(topic,'(미분류)') ORDER BY n DESC LIMIT 3"
+  ).all() as { topic: string; n: number }[];
   checks.push({
     key: "training-data",
-    label: "학습 데이터(👍 대화)",
-    ok: unused >= 5,
+    label: "학습 재료(승인된 문답)",
+    ok: 승인.n >= 5,
     required: false,
-    detail: `현재 ${unused}건`,
-    hint: unused >= 5 ? undefined : "대화를 더 수집하고 👍를 남기거나, 기존 데이터셋으로 실행하세요.",
+    detail: `승인 ${승인.n}건` + (주제별.length ? ` · ${주제별.map((t) => `${t.topic} ${t.n}`).join(" · ")}` : ""),
+    hint: 승인.n >= 5 ? undefined : "기억학습 후보함에서 좋은 문답을 승인하거나, 기존 데이터셋으로 실행하세요.",
   });
 
   const ready = checks.every((c) => c.ok || !c.required);
