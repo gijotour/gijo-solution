@@ -695,7 +695,7 @@ export function registerHardeningRoutes(app: Express): void {
       // target은 표시용 라벨만으로 쓴다 — 절대 셸 명령에 넣지 않는다(인젝션 방지).
       const targetLabel = String(req.body?.target ?? "").trim().slice(0, 120) || undefined;
       const report = await runHardeningScan({ standard, target: targetLabel });
-      const actor = (req as unknown as { user?: GijoUser }).user?.username ?? "unknown";
+      const actor = (req as unknown as { user?: GijoUser }).user?.displayName ?? "(알 수 없음)";
       recordAudit({
         kind: "cli",
         actor,

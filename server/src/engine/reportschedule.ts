@@ -412,7 +412,7 @@ function validateInput(b: Record<string, unknown>): { input?: CreateScheduleInpu
 }
 
 export function registerReportScheduleRoutes(app: Express): void {
-  const actorOf = (req: Request) => (req as Request & { user?: GijoUser }).user?.username ?? "unknown";
+  const actorOf = (req: Request) => (req as Request & { user?: GijoUser }).user?.displayName ?? "(알 수 없음)";
   const label = (s: ReportSchedule) => `${SCHEDULE_TYPE_LABEL[s.type]} 리포트${s.assetIds?.length ? ` (자산 ${s.assetIds.length}건)` : ""}`;
 
   app.get("/api/report/schedules", authMiddleware, (_req, res) => {

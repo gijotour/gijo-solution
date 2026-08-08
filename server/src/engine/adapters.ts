@@ -202,7 +202,7 @@ export function registerAdapterRoutes(app: Express): void {
       const updated = setAdapterAdopted(req.params.id, adopted !== false, note);
       recordAudit({
         kind: "config",
-        actor: (req as { user?: GijoUser }).user?.username ?? "unknown",
+        actor: (req as { user?: GijoUser }).user?.displayName ?? "(알 수 없음)",
         action: updated.adopted ? "전문가 어댑터 채택" : "전문가 어댑터 채택 해제",
         target: updated.id,
         detail: updated.note ?? "",
@@ -224,7 +224,7 @@ export function registerAdapterRoutes(app: Express): void {
     deleteAdapter(req.params.id);
     recordAudit({
       kind: "config",
-      actor: (req as { user?: GijoUser }).user?.username ?? "unknown",
+      actor: (req as { user?: GijoUser }).user?.displayName ?? "(알 수 없음)",
       action: "전문가 어댑터 등록 삭제",
       target: cur.id,
       detail: cur.file,

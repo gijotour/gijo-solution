@@ -190,7 +190,7 @@ export function resetHardeningForTests(): void {
 
 // ── 라우트 ────────────────────────────────────────────────────────────────────
 export function registerHardeningTargetRoutes(app: Express): void {
-  const actorOf = (req: Request) => (req as Request & { user?: GijoUser }).user?.username ?? "unknown";
+  const actorOf = (req: Request) => (req as Request & { user?: GijoUser }).user?.displayName ?? "(알 수 없음)";
 
   // 대상 목록·등록·삭제
   app.get("/api/hardening/targets", authMiddleware, (_req, res) => {

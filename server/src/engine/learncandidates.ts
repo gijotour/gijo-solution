@@ -243,7 +243,7 @@ export function acceptStrongCandidates(minScore = 3, actor?: string): { accepted
 }
 
 export function registerLearnCandidateRoutes(app: Express): void {
-  const actorOf = (req: Request) => (req as Request & { user?: GijoUser }).user?.displayName ?? "unknown";
+  const actorOf = (req: Request) => (req as Request & { user?: GijoUser }).user?.displayName ?? "(알 수 없음)";
 
   app.get("/api/learnloop/candidates", authMiddleware, (req, res) => {
     res.json(listLearnCandidates(Number(req.query.days) || 30, Number(req.query.limit) || 60));

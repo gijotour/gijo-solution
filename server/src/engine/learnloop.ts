@@ -839,7 +839,7 @@ export function registerLearnloopRoutes(app: Express): void {
         if (req.body?.force) {
           recordAudit({
             kind: "config",
-            actor: (req as Request & { user?: GijoUser }).user?.username ?? "unknown",
+            actor: (req as Request & { user?: GijoUser }).user?.displayName ?? "(알 수 없음)",
             action: "학습 개시선 미달 강행",
             target: String(req.body?.topic ?? "(전체)"),
             result: "ok",

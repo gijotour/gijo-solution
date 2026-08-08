@@ -100,7 +100,7 @@ export function resetClientReleasesForTests(): void {
 }
 
 export function registerClientReleaseRoutes(app: Express): void {
-  const actorOf = (req: Request) => (req as Request & { user?: GijoUser }).user?.username ?? "unknown";
+  const actorOf = (req: Request) => (req as Request & { user?: GijoUser }).user?.displayName ?? "(알 수 없음)";
 
   // 클라이언트가 시작 시·수동으로 확인. ?current=2.4.0을 주면 업데이트 필요 여부까지 판정해 준다.
   app.get("/api/client/latest-release", authMiddleware, (req, res) => {

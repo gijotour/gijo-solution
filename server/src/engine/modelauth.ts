@@ -162,7 +162,7 @@ export async function testModelAuth(): Promise<{ ok: boolean; message: string; w
 }
 
 export function registerModelAuthRoutes(app: Express): void {
-  const actorOf = (req: Request) => (req as Request & { user?: GijoUser }).user?.username ?? "unknown";
+  const actorOf = (req: Request) => (req as Request & { user?: GijoUser }).user?.displayName ?? "(알 수 없음)";
 
   // 조회는 admin만 — 어떤 토큰이 걸려 있는지는 운영 정보다(값 자체는 어차피 안 나간다).
   app.get("/api/model-auth", authMiddleware, adminMiddleware, (_req, res) => {
