@@ -15,9 +15,19 @@ tools/deploy-prod.ps1과 같은 절차를 **단계별로** 수행한다 (스크�
 6. health 확인: Node fetch로 http://localhost:4000/api/health 를 최대 60초 폴링 (curl은 한글 응답 검증에 쓰지 말 것).
 7. 보고: 이전→새 PID, health, 배포된 커밋. ⚠ 재시작으로 접속 중 세션이 끊겼음을 명시.
 
-## macOS에서 (직접 배포하지 않음)
-운영 배포는 Windows 담당이다. 다음 중 하나를 안내:
-- 사용자 직접 실행용 한 줄 출력: `ssh user@10.8.0.1 "powershell -NoProfile -ExecutionPolicy Bypass -File 'd:/Connect AI/tools/deploy-prod.ps1'"`
-- 또는 /GIJOAS인계 인계 블록을 만들어 "Windows Claude에게 검토·배포 요청"을 권한다.
+## macOS에서 (2026-08-09 변경 — 우리 Mac에서 트리거한다)
+사장님의 M1 Max Mac은 **운영 배포를 직접 트리거한다**(그전에는 Windows 담당이었다).
+제임스 작업을 우리 Mac에서 확인한 뒤 그대로 운영에 넣기 위해서다 — `GIJO_AS_공동작업_가이드.md`.
+
+1. **테스트 게이트 먼저**: `cd server && npm test` — 실패하면 배포 중단, 결과 보고.
+2. 사용자 승인을 받는다. ⚠ 재시작하면 **접속 중인 전 사용자 세션이 끊긴다** — 반드시 사전 확인.
+3. 실행:
+   `ssh user@10.8.0.1 "powershell -NoProfile -ExecutionPolicy Bypass -File 'd:/Connect AI/tools/deploy-prod.ps1'"`
+4. health 확인: Node fetch로 `http://10.8.0.1:4000/api/health` (curl은 한글 검증에 쓰지 말 것).
+   `schema.latest`가 이번에 넣은 마이그레이션인지 확인 — 배포가 실제로 반영됐는지 가르는 가장 확실한 표시.
+5. 보고: 배포된 커밋, health 결과, **세션이 끊겼다는 사실**을 명시.
+
+⚠ **게시(/GIJOAS게시)는 여전히 Windows 전용이다** — Mac에서 대체 불가.
+⚠ 제임스 머신에서는 이 명령을 쓰지 않는다(운영 접근 없음).
 
 공통 규칙: 운영 배포는 사용자가 명시적으로 지시했을 때만 실행한다. 자동/선제 배포 금지.

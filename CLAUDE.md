@@ -29,7 +29,16 @@
 - `/GIJOAS게시` — 클라 빌드·게시. **Windows 전용**(claude-deploy 계정, 실화면 검증 필수)
 - `/GIJOAS서버시작` — Mac=개발 서버 빌드·기동·health / Windows=운영(WSL) 상태확인·재시작(사용자 확인 후)
 - `/GIJOAS클라시작` — 클라 빌드 후 Electron 개발 실행(CDP 9223 기본, electron.exe 직접 실행)
-역할 고정: Mac은 hub push까지, 검토·배포·게시는 Windows. GitHub(origin)는 사용자 요청 시만.
+역할 고정: 게시(클라 빌드)는 **Windows 전용**(electron-builder·claude-deploy·실화면 검증이 묶임). GitHub(origin)는 사용자 요청 시만 — **단, `hub`가 없는 머신(외부 협업자)은 origin이 유일한 통로라 이 제한이 적용되지 않는다.**
+
+## 공동작업 (사장님 ↔ 제임스, 2026-08-09 결정) — `GIJO_AS_공동작업_가이드.md`
+- **main 직접 push 금지 · 브랜치 + PR 필수**(양쪽 다). 자기 PR을 자기가 병합하지 않는다.
+  이유: 같은 날 커밋이 두 번 끼어들고 편집 중이던 screenguide.ts가 남의 커밋에 실렸다.
+- **제임스는 운영 서버(WSL 4000)·운영 데이터에 접근하지 않는다** — Mac mini M4 24GB에 독립 구축
+  (`GIJO_AS_MAC_M4_24GB_구성안.md`). 계정당 1세션·직렬 자원이라 공유하면 서로 깨뜨린다.
+- **제임스 작업은 우리 M1 Max Mac에서 확인 후 병합**하고, **운영 배포도 우리 Mac에서 트리거**한다
+  (ssh → deploy-prod.ps1). 게시만 Windows.
+- 공용 파일(nav.js·screenguide.ts·agentloop.ts·routes.ts·CLAUDE.md)은 손대기 전 알리고, 작게 올려 바로 병합.
 
 ## 서브에이전트 역할 분담 (.claude/agents/ — 양 머신 공통, 2026-07-29 확정)
 | 역할 | 권한 | 맡기는 일 |
