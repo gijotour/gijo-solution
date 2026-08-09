@@ -60,27 +60,53 @@ migrate(
    INSERT OR IGNORE INTO law_config (id, enabled) VALUES (1, 0);`
 );
 
-interface ConfigRow { encryptedKey: string | null; enabled: number; updatedAt: number | null }
+// 신청 도메인 — 법제처는 OC만으로 인증하지 않는다. 요청 헤더 Referer가 활용신청서의
+// "도메인주소"와 맞는지까지 본다(2026-08-09 실측). 비밀이 아니므로 평문으로 둔다.
+migrate("law-referer-domain-2026-08-09", `ALTER TABLE law_config ADD COLUMN domain TEXT`);
+
+interface ConfigRow { encryptedKey: string | null; enabled: number; updatedAt: number | null; domain: string | null }
 
 export interface LawConfigPublic {
   enabled: boolean;
   hasKey: boolean;
+  domain: string;
   updatedAt: number | null;
+}
+
+/**
+ * 신청 도메인을 호스트만 남겨 정규화한다.
+ * 담당자는 신청현황 화면에서 본 것을 그대로 붙여넣는다 — "www.gijo.ai"일 수도,
+ * "https://www.gijo.ai/"일 수도 있다. 어느 쪽이든 받아준다.
+ * ⚠ 하위 도메인은 법제처가 다른 곳으로 본다(sub.gijo.ai 거부 실측) — 여기서 손대지 않는다.
+ */
+export function normalizeLawDomain(raw: string): string {
+  return raw
+    .trim()
+    .replace(/^[a-z]+:\/\//i, "") // 스킴 제거
+    .replace(/\/.*$/, "")          // 경로 제거
+    .replace(/:\d+$/, "")          // 포트 제거
+    .trim()
+    .toLowerCase();
 }
 
 export function getLawConfig(): LawConfigPublic {
   const r = db.prepare(`SELECT * FROM law_config WHERE id = 1`).get() as ConfigRow;
-  return { enabled: r.enabled === 1, hasKey: Boolean(r.encryptedKey), updatedAt: r.updatedAt };
+  return { enabled: r.enabled === 1, hasKey: Boolean(r.encryptedKey), domain: r.domain ?? "", updatedAt: r.updatedAt };
 }
 
-/** 키를 넣으면 켜지고, 빈 값을 넣으면 지우고 꺼진다(CTI 피드와 같은 계약). */
-export function setLawKey(key: string): LawConfigPublic {
+/**
+ * 키를 넣으면 켜지고, 빈 값을 넣으면 지우고 꺼진다(CTI 피드와 같은 계약).
+ * 도메인은 키와 한 벌이다 — 둘 다 있어야 법제처가 응답한다.
+ */
+export function setLawConfig(key: string, domain = ""): LawConfigPublic {
   const t = key.trim();
+  const d = normalizeLawDomain(domain);
   if (!t) {
-    db.prepare(`UPDATE law_config SET encryptedKey = NULL, enabled = 0, updatedAt = ? WHERE id = 1`).run(Date.now());
+    db.prepare(`UPDATE law_config SET encryptedKey = NULL, enabled = 0, domain = NULL, updatedAt = ? WHERE id = 1`)
+      .run(Date.now());
   } else {
-    db.prepare(`UPDATE law_config SET encryptedKey = ?, enabled = 1, updatedAt = ? WHERE id = 1`)
-      .run(encryptString(t, getEncryptionKey()), Date.now());
+    db.prepare(`UPDATE law_config SET encryptedKey = ?, enabled = 1, domain = ?, updatedAt = ? WHERE id = 1`)
+      .run(encryptString(t, getEncryptionKey()), d || null, Date.now());
   }
   return getLawConfig();
 }
@@ -99,14 +125,46 @@ export interface LawHit {
   link: string; // 국가법령정보센터 원문 링크
 }
 
+/**
+ * 법제처가 주는 두 거절 문구는 짚어야 할 곳이 서로 다르다. 뭉뚱그리면 담당자가 헤맨다.
+ *  · "사용자 정보 검증에 실패"     → OC 자체를 못 알아봄(오타·미등록)
+ *  · "필수입력요소 검증에 실패"    → OC는 통과, Referer(신청 도메인)가 안 맞음
+ * 후자의 문구는 "필수 입력값이 존재하지 않습니다"라 파라미터 탓처럼 읽히므로 특히 갈라줘야 한다.
+ */
+function 진단(원문: string, domain: string): string {
+  if (원문.includes("사용자 정보 검증")) {
+    return (
+      "→ 법제처가 인증키(OC)를 알아보지 못했습니다. " +
+      "open.law.go.kr → 마이페이지 → API인증키관리의 「현재 API인증키(OC)」 값을 대소문자까지 그대로 넣으세요."
+    );
+  }
+  if (원문.includes("필수입력요소")) {
+    return domain
+      ? `→ 인증키(OC)는 확인됐지만 신청 도메인(${domain})이 맞지 않습니다. ` +
+        "open.law.go.kr → 마이페이지 → OPEN API 신청현황의 「도메인주소」 값과 같은지 확인하세요(하위 도메인은 인정되지 않습니다)."
+      : "→ 인증키(OC)는 확인됐지만 신청 도메인이 비어 있습니다. " +
+        "법제처는 인증키와 도메인을 함께 봅니다 — 설정 → 연동 → 법령·판례 조회의 「신청 도메인」에 " +
+        "OPEN API 신청현황의 「도메인주소」를 넣으세요.";
+  }
+  return "→ 설정 → 연동 → 법령·판례 조회의 인증키(OC)와 신청 도메인을 확인하세요.";
+}
+
 async function callApi(path: string, params: Record<string, string>): Promise<unknown> {
   const key = decryptedKey();
   if (!key) throw new Error("법령 조회가 꺼져 있습니다 — 설정에서 법제처 인증키를 넣으세요.");
+  const domain = getLawConfig().domain;
   const url = `${API_BASE}/${path}?` + new URLSearchParams({ OC: key, type: "JSON", ...params }).toString();
   const ctl = new AbortController();
   const timer = setTimeout(() => ctl.abort(), TIMEOUT_MS);
   try {
-    const res = await fetch(url, { signal: ctl.signal });
+    // ⚠ 법제처는 OC만으로 인증하지 않는다. Referer가 활용신청서의 "도메인주소"와 맞아야 답을 준다.
+    //   실사고(2026-08-09): OC·승인 모두 정상인데 조회가 계속 거부됐다. 원인은 우리가 Referer를
+    //   안 보낸 것 — 그런데 법제처 응답은 "필수 입력값이 존재하지 않습니다. 요청 URL을 확인해 주세요"라
+    //   URL 파라미터 탓처럼 읽혀 엉뚱한 데를 뒤지게 만들었다. 헤더 이야기다.
+    //   실측: www.gijo.ai ✅ / gijo.ai ✅ / sub.gijo.ai ❌ / 그 외 도메인 ❌ / 없음 ❌
+    const headers: Record<string, string> = {};
+    if (domain) headers.Referer = `https://${domain}/`;
+    const res = await fetch(url, { signal: ctl.signal, headers });
     if (!res.ok) throw new Error(`법제처 응답 오류 ${res.status}`);
     const data = await res.json();
     // ⚠ 법제처는 인증 실패·잘못된 요청에도 **HTTP 200**으로 답한다. 본문에만 result/msg가 담긴다.
@@ -118,11 +176,7 @@ async function callApi(path: string, params: Record<string, string>): Promise<un
       const d = data as Record<string, unknown>;
       if (d.result != null && d.msg != null) {
         const 원문 = `${String(d.result)} ${String(d.msg)}`.replace(/\s+/g, " ").trim();
-        throw new Error(
-          `법제처가 요청을 받지 않았습니다 — ${원문}\n` +
-          `설정 → 연동 → 법령·판례 조회의 인증값(OC)을 확인하세요. ` +
-          `OC는 국가법령정보 공동활용 사이트에 **신청·승인된 이메일 아이디**(@ 앞부분)입니다.`
-        );
+        throw new Error(`법제처가 요청을 받지 않았습니다 — ${원문}\n${진단(원문, domain)}`);
       }
     }
     return data;
@@ -240,14 +294,18 @@ export function registerLawRoutes(app: Express): void {
     authMiddleware,
     adminMiddleware,
     asyncRoute(async (req, res) => {
-      const key = String((req.body as { key?: string })?.key ?? "");
+      const body = req.body as { key?: string; domain?: string };
+      const key = String(body?.key ?? "");
+      const domain = String(body?.domain ?? "");
       const actor = (req as Request & { user?: GijoUser }).user?.displayName ?? null;
-      const cfg = setLawKey(key);
+      const cfg = setLawConfig(key, domain);
       recordAudit({
         kind: "write",
         action: "law_config",
         target: "법령 조회",
-        detail: cfg.enabled ? "법제처 인증키 설정 — 법령 조회 켜짐(외부 연결)" : "법령 조회 끔",
+        detail: cfg.enabled
+          ? `법제처 인증키 설정 — 법령 조회 켜짐(외부 연결, 신청 도메인 ${cfg.domain || "없음"})`
+          : "법령 조회 끔",
         actor,
       });
       res.json(cfg);

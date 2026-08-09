@@ -473,7 +473,7 @@ const gijoApi = {
 
   // 법령·판례 조회(법제처) — settings.html이 부르는데 통로가 빠져 있었다(2026-07-28 발견)
   lawConfig: () => api.lawApi.getConfig(),
-  setLawKey: (key: string) => api.lawApi.setKey(key),
+  setLawKey: (key: string, domain?: string) => api.lawApi.setKey(key, domain ?? ""),
   lawSearch: (query: string, target?: string, limit?: number) => api.lawApi.search(query, target, limit),
 
   // 모델 받기 인증(HuggingFace 토큰·프록시) — 토큰은 넣기만 하고 다시 나오지 않는다

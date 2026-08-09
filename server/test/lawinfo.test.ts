@@ -14,7 +14,7 @@ const law = await import("../src/engine/lawinfo");
 
 const fetchMock = vi.fn();
 beforeEach(() => {
-  db.prepare("UPDATE law_config SET encryptedKey = NULL, enabled = 0 WHERE id = 1").run();
+  db.prepare("UPDATE law_config SET encryptedKey = NULL, enabled = 0, domain = NULL WHERE id = 1").run();
   fetchMock.mockReset();
   vi.stubGlobal("fetch", fetchMock);
 });
@@ -24,7 +24,7 @@ const jsonRes = (body: unknown) => ({ ok: true, status: 200, json: async () => b
 
 describe("법령 조회 — 켜짐/꺼짐", () => {
   it("기본은 꺼져 있다 — 인터넷이 필요한 기능이라 켜려면 키를 넣어야 한다", () => {
-    expect(law.getLawConfig()).toEqual({ enabled: false, hasKey: false, updatedAt: null });
+    expect(law.getLawConfig()).toEqual({ enabled: false, hasKey: false, domain: "", updatedAt: null });
   });
 
   it("꺼진 상태로 조회하면 무엇을 해야 하는지 알려준다(조용히 실패 금지)", async () => {
@@ -33,18 +33,68 @@ describe("법령 조회 — 켜짐/꺼짐", () => {
   });
 
   it("키를 넣으면 켜지고, 빈 값을 넣으면 지워지고 꺼진다", () => {
-    expect(law.setLawKey("my-key")).toMatchObject({ enabled: true, hasKey: true });
-    expect(law.setLawKey("")).toMatchObject({ enabled: false, hasKey: false });
+    expect(law.setLawConfig("my-key", "www.example.kr")).toMatchObject({ enabled: true, hasKey: true });
+    expect(law.setLawConfig("")).toMatchObject({ enabled: false, hasKey: false, domain: "" });
   });
 
   it("키 원문은 응답에 실리지 않는다(hasKey 불리언만)", () => {
-    law.setLawKey("secret-oc-value");
+    law.setLawConfig("secret-oc-value", "www.example.kr");
     expect(JSON.stringify(law.getLawConfig())).not.toContain("secret-oc-value");
+  });
+
+  // 신청 도메인 — 담당자가 신청현황 화면에서 본 것을 그대로 붙여넣어도 받아야 한다.
+  it("도메인은 스킴·경로·포트를 떼고 호스트만 남긴다", () => {
+    for (const 넣은값 of ["https://www.gijo.ai/", "http://WWW.GIJO.AI", "www.gijo.ai/list?a=1", " www.gijo.ai:443 "]) {
+      expect(law.normalizeLawDomain(넣은값)).toBe("www.gijo.ai");
+    }
+  });
+
+  it("도메인은 비밀이 아니라 그대로 돌려준다 — 뭘 넣었는지 화면에서 봐야 고친다", () => {
+    expect(law.setLawConfig("k", "https://www.gijo.ai/").domain).toBe("www.gijo.ai");
+  });
+});
+
+describe("법령 조회 — 법제처 인증(Referer)", () => {
+  // ⚠ 실사고(2026-08-09): OC·승인 모두 정상인데 계속 거부됐다. 법제처는 OC만으로 인증하지 않고
+  //   Referer가 활용신청서의 "도메인주소"와 맞는지까지 본다. 우리가 Referer를 안 보내고 있었다.
+  it("신청 도메인을 Referer 헤더로 보낸다 — 없으면 법제처가 거부한다", async () => {
+    law.setLawConfig("test", "www.gijo.ai");
+    fetchMock.mockResolvedValue(jsonRes({ LawSearch: { law: [] } }));
+    await law.searchLaw("개인정보 보호법");
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.headers.Referer).toBe("https://www.gijo.ai/");
+  });
+
+  it("도메인이 없으면 Referer를 지어내지 않는다(엉뚱한 값은 어차피 거부된다)", async () => {
+    law.setLawConfig("test");
+    fetchMock.mockResolvedValue(jsonRes({ LawSearch: { law: [] } }));
+    await law.searchLaw("개인정보 보호법");
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.headers.Referer).toBeUndefined();
+  });
+
+  it("「사용자 정보 검증 실패」는 인증키(OC)를 짚어준다", async () => {
+    law.setLawConfig("wrong-oc", "www.gijo.ai");
+    fetchMock.mockResolvedValue(jsonRes({ result: "사용자 정보 검증에 실패하였습니다.", msg: "…IP주소 및 도메인주소를 등록해 주세요." }));
+    await expect(law.searchLaw("개인정보 보호법")).rejects.toThrow(/인증키\(OC\)를 알아보지 못했습니다/);
+  });
+
+  it("「필수입력요소 검증 실패」는 URL이 아니라 신청 도메인을 짚어준다", async () => {
+    law.setLawConfig("test", "www.wrong.kr");
+    fetchMock.mockResolvedValue(jsonRes({ result: "필수입력요소 검증에 실패하였습니다.", msg: "필수 입력값이 존재하지 않습니다. 요청 URL을 확인해 주세요." }));
+    const 오류 = law.searchLaw("개인정보 보호법");
+    await expect(오류).rejects.toThrow(/신청 도메인\(www\.wrong\.kr\)이 맞지 않습니다/);
+  });
+
+  it("도메인이 비어 있을 때는 '도메인을 넣으라'고 안내한다", async () => {
+    law.setLawConfig("test");
+    fetchMock.mockResolvedValue(jsonRes({ result: "필수입력요소 검증에 실패하였습니다.", msg: "필수 입력값이 존재하지 않습니다." }));
+    await expect(law.searchLaw("개인정보 보호법")).rejects.toThrow(/신청 도메인이 비어 있습니다/);
   });
 });
 
 describe("법령 조회 — 응답 가공", () => {
-  beforeEach(() => law.setLawKey("test"));
+  beforeEach(() => law.setLawConfig("test", "www.gijo.ai"));
 
   it("법령 검색 결과를 제목·시행일·소관부처와 공개 링크로 정리한다", async () => {
     fetchMock.mockResolvedValue(

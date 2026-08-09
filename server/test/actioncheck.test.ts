@@ -25,7 +25,7 @@ vi.mock("../src/engine/lawinfo", async (importOriginal) => {
   const orig = await importOriginal<typeof import("../src/engine/lawinfo")>();
   return {
     ...orig,
-    getLawConfig: vi.fn(() => ({ enabled: lawEnabled, updatedAt: null })),
+    getLawConfig: vi.fn(() => ({ enabled: lawEnabled, hasKey: lawEnabled, domain: "www.gijo.ai", updatedAt: null })),
     searchLaw: vi.fn(async () => lawResults),
   };
 });

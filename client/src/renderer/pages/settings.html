@@ -658,8 +658,17 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
           <input id="lawKeyInput" placeholder="법제처에서 발급받은 인증값 — 비우고 저장하면 꺼집니다" autocomplete="off">
         </div>
       </div>
+      <!-- 신청 도메인 — 법제처는 OC와 Referer(신청서의 도메인주소)를 함께 본다(2026-08-09 실측).
+           둘 중 하나만 넣으면 "필수 입력값이 존재하지 않습니다"로 거부된다. -->
+      <div class="field-row">
+        <div class="field">
+          <label for="lawDomainInput">신청 도메인</label>
+          <input id="lawDomainInput" placeholder="www.example.co.kr — 활용신청서에 적은 도메인 그대로" autocomplete="off">
+        </div>
+      </div>
       <div style="font-size:12.5px;color:var(--muted-2);line-height:1.7;margin:-4px 0 12px">
         키가 없으면 <b style="color:var(--blue-light)">open.law.go.kr</b> → OPEN API 신청에서 무료로 받습니다(가입 후 신청, 인증값은 가입 이메일의 아이디 부분).
+        <b style="color:var(--teal)">신청 도메인</b>은 그 신청서의 “도메인주소” 칸에 적은 값입니다 — 법제처가 이 둘을 함께 대조하므로 <b style="color:var(--teal)">둘 다 있어야 조회됩니다</b>(하위 도메인은 인정되지 않습니다).
         조회는 원문과 링크를 찾아주는 데까지이며 법률 자문이 아닙니다.
       </div>
       <button class="btn-primary" id="saveLawBtn">저장</button>
@@ -2042,21 +2051,33 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     try {
       const c = await window.gijo.lawConfig();
       const line = document.getElementById("lawStatusLine");
+      // 도메인은 비밀이 아니라 그대로 돌아온다 — 뭘 넣어뒀는지 눈으로 봐야 고칠 수 있다.
+      document.getElementById("lawDomainInput").value = c.domain || "";
       line.textContent = c.enabled
-        ? "켜짐 — 인증키가 설정되어 있습니다" + (c.updatedAt ? " (" + new Date(c.updatedAt).toLocaleString("ko-KR") + ")" : "")
+        ? (c.domain
+            ? "켜짐 — 인증키·신청 도메인(" + c.domain + ")이 설정되어 있습니다"
+            : "켜짐 — 다만 신청 도메인이 비어 있어 조회가 거부됩니다")
+          + (c.updatedAt ? " (" + new Date(c.updatedAt).toLocaleString("ko-KR") + ")" : "")
         : "꺼짐 — 인증키를 넣으면 켜집니다";
-      line.style.color = c.enabled ? "var(--teal)" : "var(--muted)";
+      line.style.color = !c.enabled ? "var(--muted)" : (c.domain ? "var(--teal)" : "var(--amber)");
     } catch (e) { /* 구버전 서버면 조용히 넘어간다 */ }
   }
   async function saveLawConfig() {
     const line = document.getElementById("lawStatusLine");
     const key = document.getElementById("lawKeyInput").value;
+    const domain = document.getElementById("lawDomainInput").value;
     line.textContent = "저장 중…"; line.style.color = "var(--muted)";
     try {
-      const c = await window.gijo.setLawKey(key);
+      const c = await window.gijo.setLawKey(key, domain);
       document.getElementById("lawKeyInput").value = "";
-      line.textContent = c.enabled ? "저장했습니다 — 법령 조회가 켜졌습니다" : "인증키를 지웠습니다 — 법령 조회가 꺼졌습니다";
-      line.style.color = c.enabled ? "var(--teal)" : "var(--muted)";
+      document.getElementById("lawDomainInput").value = c.domain || "";
+      // 도메인 없이 켜면 반드시 거부된다 — 저장은 해주되 그 사실을 그때 알린다(조용한 실패 금지).
+      line.textContent = !c.enabled
+        ? "인증키를 지웠습니다 — 법령 조회가 꺼졌습니다"
+        : c.domain
+          ? "저장했습니다 — 법령 조회가 켜졌습니다"
+          : "저장했습니다 — 다만 신청 도메인이 비어 있어 조회가 거부됩니다. 법제처는 인증키와 도메인을 함께 봅니다.";
+      line.style.color = !c.enabled ? "var(--muted)" : (c.domain ? "var(--teal)" : "var(--amber)");
     } catch (e) {
       line.textContent = "저장 실패: " + (e && e.message ? e.message : e);
       line.style.color = "var(--red)";

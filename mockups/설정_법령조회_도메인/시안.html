@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<title>시안 — 설정 › 연동 › 법령·판례 조회에 「신청 도메인」 추가</title>
+<style>
+:root{
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#fff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);
+  font:14px/1.6 -apple-system,"Segoe UI","Malgun Gothic",sans-serif;padding:28px}
+h1{font-size:19px;margin:0 0 4px}
+.sub{color:var(--muted-2);font-size:13px;margin:0 0 22px}
+.cols{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start}
+.col{flex:1 1 430px;min-width:390px}
+.col > h2{font-size:13px;color:var(--muted);margin:0 0 9px;font-weight:600;letter-spacing:.02em}
+
+/* ── 실제 설정 화면 판 ── */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:15px 17px}
+.panel-title{font-size:15px;font-weight:650;margin-bottom:13px;display:flex;align-items:center}
+.badge{background:rgba(139,124,240,.18);color:#b6acf7;border:1px solid rgba(139,124,240,.35);
+  border-radius:5px;font-size:11px;padding:2px 7px;margin-left:8px;font-weight:600}
+.fold{font-size:13px;color:var(--muted);background:var(--panel-2);border:1px solid var(--border);
+  border-radius:7px;padding:7px 11px;margin-bottom:12px}
+label{display:block;font-size:12.5px;color:var(--muted);margin-bottom:5px}
+input{width:100%;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;
+  color:var(--text);padding:9px 11px;font-size:13.5px;font-family:inherit}
+input::placeholder{color:#6f6a63}
+.field{margin-bottom:12px}
+.note{font-size:12.5px;color:var(--muted-2);line-height:1.7;margin:-2px 0 12px}
+.note b{color:var(--blue-light)}
+.btn-primary{background:var(--blue);color:#fff;border:0;border-radius:7px;padding:8px 17px;
+  font-size:13.5px;font-weight:600;cursor:pointer;font-family:inherit}
+.btn-ghost{background:transparent;color:var(--text);border:1px solid var(--border-strong);
+  border-radius:7px;padding:8px 15px;font-size:13.5px;cursor:pointer;margin-left:7px;font-family:inherit}
+.status-line{font-size:12.5px;margin-top:11px;line-height:1.65}
+.new{outline:2px dashed rgba(30,185,128,.55);outline-offset:5px;border-radius:8px}
+.tag-new{display:inline-block;background:rgba(30,185,128,.16);color:var(--teal);
+  border:1px solid rgba(30,185,128,.4);border-radius:5px;font-size:10.5px;padding:1px 6px;
+  margin-left:6px;font-weight:700;vertical-align:1px}
+
+/* ── 부속 설명 ── */
+.card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px 16px;margin-top:16px}
+.card h3{font-size:13.5px;margin:0 0 9px}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{text-align:left;padding:6px 9px;border-bottom:1px solid var(--border);vertical-align:top}
+th{color:var(--muted);font-weight:600;font-size:12px}
+td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+code{background:var(--panel-2);border:1px solid var(--border);border-radius:4px;
+  padding:1px 5px;font-size:12px;color:#cfc9c1}
+.ok{color:var(--teal)} .bad{color:var(--red)} .warn{color:var(--amber)} .mut{color:var(--muted-2)}
+.state{background:var(--panel-2);border:1px solid var(--border);border-radius:7px;
+  padding:9px 11px;margin-bottom:8px;font-size:12.5px;line-height:1.65}
+.state .lbl{color:var(--muted);font-size:11.5px;display:block;margin-bottom:3px}
+</style></head><body>
+
+<h1>시안 — 설정 › 연동 › 법령·판례 조회에 「신청 도메인」 한 칸 추가</h1>
+<p class="sub">2026-08-09 · 법제처가 <code>Referer</code>를 신청 도메인과 대조해 인증한다는 실측 결과 반영 · 추천안 1개</p>
+
+<div class="cols">
+
+  <!-- 지금 -->
+  <div class="col">
+    <h2>지금 (칸 1개) — 넣어도 안 됨</h2>
+    <div class="panel">
+      <div class="panel-title">⚖ 법령·판례 조회 (선택)<span class="badge">admin 전용</span></div>
+      <div class="fold">▼ 법령·판례 조회</div>
+      <div class="field">
+        <label>법제처 인증키(OC)</label>
+        <input value="gijoaslawapi2" readonly>
+      </div>
+      <div class="note">키가 없으면 <b>open.law.go.kr</b> → OPEN API 신청에서 무료로 받습니다(가입 후 신청, 인증값은 가입 이메일의 아이디 부분). 조회는 원문과 링크를 찾아주는 데까지이며 법률 자문이 아닙니다.</div>
+      <button class="btn-primary">저장</button><button class="btn-ghost">연결 확인</button>
+      <div class="status-line bad">확인 실패: 법제처가 요청을 받지 않았습니다 — 필수입력요소 검증에 실패하였습니다. 필수 입력값이 존재하지 않습니다. 요청 URL을 확인해 주세요. 설정 → 연동 → 법령·판례 조회의 인증값(OC)을 확인하세요…</div>
+    </div>
+    <p class="note" style="margin-top:10px">OC는 맞는데 “인증값을 확인하라”고 해서 <b style="color:var(--amber)">엉뚱한 곳을 뒤지게 만든다.</b></p>
+  </div>
+
+  <!-- 바뀜 -->
+  <div class="col">
+    <h2>시안 (칸 2개) — 도메인까지 받아 Referer로 보냄</h2>
+    <div class="panel">
+      <div class="panel-title">⚖ 법령·판례 조회 (선택)<span class="badge">admin 전용</span></div>
+      <div class="fold">▼ 법령·판례 조회</div>
+      <div class="field">
+        <label>법제처 인증키(OC)</label>
+        <input placeholder="법제처에서 발급받은 인증값 — 비우고 저장하면 꺼집니다">
+      </div>
+      <div class="field new">
+        <label>신청 도메인 <span class="tag-new">추가</span></label>
+        <input placeholder="www.gijo.ai — 활용신청서에 적은 도메인 그대로">
+      </div>
+      <div class="note">키가 없으면 <b>open.law.go.kr</b> → OPEN API 신청에서 무료로 받습니다(가입 후 신청, 인증값은 가입 이메일의 아이디 부분).
+        <b style="color:var(--teal)">신청 도메인</b>은 그 신청서의 “도메인주소” 칸에 적은 값입니다 — 법제처가 이 둘을 함께 대조하므로 <b style="color:var(--teal)">둘 다 있어야 조회됩니다.</b>
+        조회는 원문과 링크를 찾아주는 데까지이며 법률 자문이 아닙니다.</div>
+      <button class="btn-primary">저장</button><button class="btn-ghost">연결 확인</button>
+      <div class="status-line ok">정상 — 개인정보 보호법 (개인정보보호위원회 · 시행 2025-10-02 · 일부개정)</div>
+    </div>
+    <p class="note" style="margin-top:10px">칸 하나와 안내 두 줄만 늘었다. 접기·판 구조·버튼은 그대로.</p>
+  </div>
+</div>
+
+<!-- 상태줄 문구 -->
+<div class="card">
+  <h3>연결 확인 결과 문구 — 법제처가 주는 두 오류를 갈라서 안내</h3>
+  <p class="note" style="margin:0 0 10px">지금은 어떤 오류든 “인증값(OC)을 확인하세요” 한 가지로만 안내한다. 실측으로 두 오류의 뜻이 다른 것이 확인됐으므로 갈라서 서로 다른 곳을 짚어준다.</p>
+
+  <div class="state"><span class="lbl">① 정상</span>
+    <span class="ok">정상 — 개인정보 보호법 (개인정보보호위원회 · 시행 2025-10-02 · 일부개정)</span></div>
+
+  <div class="state"><span class="lbl">② 법제처 응답 <code>사용자 정보 검증에 실패하였습니다</code></span>
+    <span class="bad">확인 실패: 법제처가 <b>인증키(OC)를 알아보지 못했습니다.</b> open.law.go.kr → 마이페이지 → <b>API인증키관리</b>의 “현재 API인증키(OC)” 값을 그대로 넣으세요(대소문자까지 같아야 합니다).</span></div>
+
+  <div class="state"><span class="lbl">③ 법제처 응답 <code>필수입력요소 검증에 실패하였습니다</code> ← 이번 사례</span>
+    <span class="bad">확인 실패: 인증키(OC)는 확인됐지만 <b>신청 도메인이 맞지 않습니다.</b> open.law.go.kr → 마이페이지 → <b>OPEN API 신청현황</b>의 “도메인주소” 칸에 적힌 값을 <b>신청 도메인</b>에 그대로 넣으세요(예: www.gijo.ai). 하위 도메인은 인정되지 않습니다.</span></div>
+
+  <div class="state"><span class="lbl">④ 도메인 칸이 비어 있는데 저장한 경우 — 저장은 되고 경고만</span>
+    <span class="warn">저장했습니다 — 다만 <b>신청 도메인이 비어 있어 조회가 거부됩니다.</b> 법제처는 인증키와 도메인을 함께 봅니다.</span></div>
+</div>
+
+<!-- 밀도 -->
+<div class="card">
+  <h3>밀도 — 세로로 얼마나 늘어나나</h3>
+  <table>
+    <tr><th>요소</th><th class="n">지금</th><th class="n">시안</th><th class="n">증감</th></tr>
+    <tr><td>입력 칸(라벨 20 + 입력 38 + 아래여백 12)</td><td class="n">70px</td><td class="n">140px</td><td class="n ok">+70</td></tr>
+    <tr><td>안내문(12.5px · 줄높이 21.3px)</td><td class="n">3줄 64px</td><td class="n">5줄 107px</td><td class="n ok">+43</td></tr>
+    <tr><td>판 제목 · 접기 · 버튼 · 상태줄</td><td class="n">140px</td><td class="n">140px</td><td class="n mut">0</td></tr>
+    <tr><td><b>판 세로 총합</b></td><td class="n"><b>274px</b></td><td class="n"><b>387px</b></td><td class="n ok"><b>+113px</b></td></tr>
+  </table>
+  <p class="note" style="margin:10px 0 0">이 판은 <b>접혀 있는 게 기본</b>이고 admin에게만 보인다. 접힌 상태의 세로 높이는 <b>변화 없음(46px)</b> — 다른 연동 항목들의 위치는 그대로다.</p>
+</div>
+
+<!-- 근거 -->
+<div class="card">
+  <h3>왜 칸을 늘리나 — 실측 근거 (2026-08-09, OC=gijoaslawapi2 / 등록 도메인 www.gijo.ai)</h3>
+  <table>
+    <tr><th>보낸 Referer</th><th>법제처 응답</th></tr>
+    <tr><td class="mut">(없음) ← 지금 우리 서버</td><td class="bad">거부 — 필수입력요소 검증 실패</td></tr>
+    <tr><td><code>https://www.gijo.ai/</code></td><td class="ok">정상 조회</td></tr>
+    <tr><td><code>https://gijo.ai/</code></td><td class="ok">정상 조회</td></tr>
+    <tr><td><code>https://sub.gijo.ai/</code></td><td class="bad">거부</td></tr>
+    <tr><td><code>https://example.com/</code> · <code>http://localhost:4000/</code></td><td class="bad">거부</td></tr>
+  </table>
+  <p class="note" style="margin:10px 0 0">목록 조회(<code>lawSearch.do</code>)와 본문 조회(<code>lawService.do</code>) 모두 동일. 도메인은 고객마다 다르므로 <b>제품이 값을 받아야</b> 한다 — 코드에 박으면 우리 회사 전용이 된다.</p>
+</div>
+
+<p class="sub" style="margin:18px 0 0">시안 전용 정적 화면입니다 — 동작하지 않습니다. 승인되면 제품 코드에 구현합니다.</p>
+</body></html>

@@ -55,11 +55,13 @@ export const smtpInboundApi = {
 };
 
 // 법령·판례 조회(법제처 OPEN API). 인증키는 서버가 암호화 보관하고 돌려주지 않는다 — 켜짐/꺼짐만 온다.
-export interface LawConfig { enabled: boolean; updatedAt: number | null }
+// 신청 도메인은 비밀이 아니라 그대로 온다(담당자가 맞게 넣었는지 화면에서 봐야 하기 때문).
+export interface LawConfig { enabled: boolean; hasKey?: boolean; domain?: string; updatedAt: number | null }
 export interface LawHit { title: string; meta: string; link: string; mst?: string }
 export const lawApi = {
   getConfig: () => request<LawConfig>("/api/law/config"),
-  setKey: (key: string) => request<LawConfig>("/api/law/config", { method: "POST", body: { key } }),
+  setKey: (key: string, domain = "") =>
+    request<LawConfig>("/api/law/config", { method: "POST", body: { key, domain } }),
   search: (query: string, target = "law", limit = 5) =>
     request<{ hits: LawHit[]; disclaimer: string }>(
       `/api/law/search?query=${encodeURIComponent(query)}&target=${encodeURIComponent(target)}&limit=${limit}`
