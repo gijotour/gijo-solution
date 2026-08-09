@@ -236,4 +236,16 @@ describe("제품에 실린 공개키", () => {
   it("최소 한 개는 있어야 한다 — 비면 아무 번들도 못 받는다", () => {
     expect(BUNDLE_PUBLIC_KEYS.length).toBeGreaterThan(0);
   });
+
+  // 폐기한 키가 되살아나는 걸 막는다(2026-08-09). bundleverify.ts에 "되살리지 말 것"이라
+  // 적어 뒀지만 주석은 사람이 안 읽으면 그만이다 — 이 파일의 규범대로 코드로 막는다.
+  //   gijo-2026 개인키가 대화창에 업로드돼 기계 밖으로 나갔다. 남아 있으면 그 키로 위조한
+  //   번들이 검증을 통과해 고객 온톨로지를 통째로 바꾼다.
+  // ⚠ 이 시험이 빨간불이면 키를 지우기 전에 **왜 되살렸는지**부터 확인할 것.
+  it("★ 유출로 폐기한 gijo-2026은 신뢰 목록에 없다 — 되살리면 위조 번들이 통과한다", () => {
+    expect(BUNDLE_PUBLIC_KEYS.map((k) => k.keyId)).not.toContain("gijo-2026");
+    // 이름을 바꿔 되살리는 경우까지 — 폐기한 **공개키 값** 자체를 막는다.
+    const 폐기 = "MCowBQYDK2VwAyEAtrC37/48RV4zVkbdzbCX4dN1Of5hevjs5tmtdlZDbhQ=";
+    expect(BUNDLE_PUBLIC_KEYS.map((k) => k.spkiBase64)).not.toContain(폐기);
+  });
 });

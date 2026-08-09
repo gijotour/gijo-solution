@@ -24,9 +24,15 @@ import zlib from "zlib";
 
 /** 이 제품이 신뢰하는 발행 공개키. 개인키는 GIJO 빌드 환경에만 있고 제품에 실리지 않는다. */
 export const BUNDLE_PUBLIC_KEYS: { keyId: string; spkiBase64: string }[] = [
-  // 2026년 발행키. 키를 갈면 **옛 키를 지우지 않고 여기 덧붙인다** — 이미 배포된 번들이
-  // 갑자기 검증 실패하면 안 된다. 폐기가 필요하면 그때 명시적으로 뺀다.
-  { keyId: "gijo-2026", spkiBase64: "MCowBQYDK2VwAyEAtrC37/48RV4zVkbdzbCX4dN1Of5hevjs5tmtdlZDbhQ=" },
+  // 키를 갈면 **옛 키를 지우지 않고 여기 덧붙인다** — 이미 배포된 번들이 갑자기 검증
+  // 실패하면 안 된다. 폐기가 필요하면 그때 명시적으로 뺀다.
+  //
+  // ⚠ gijo-2026 폐기(2026-08-09) — 그 개인키가 대화창에 업로드돼 기계 밖으로 나갔다.
+  //   "덧붙이고 지우지 않는다"의 **예외**다: 유출된 키를 남겨 두면 그 키로 위조한 번들이
+  //   검증을 통과해 고객 온톨로지를 통째로 바꿀 수 있다(keygen.mjs 머리주석의 그 위험).
+  //   지금이 가장 싼 시점이라 뺐다 — 이 키로 서명해 배포한 번들이 없었다(시험용 1개뿐,
+  //   새 키로 재서명함). 옛 공개키를 되살리지 말 것.
+  { keyId: "gijo-2026b", spkiBase64: "MCowBQYDK2VwAyEAQai8YP8arT081tAQb1R1fePbWgansCK2cC25NhzOmGQ=" },
 ];
 
 /** 번들 파일 최대 크기 — 압축 폭탄과 실수로 통째로 만든 파일을 함께 막는다. */

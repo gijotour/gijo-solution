@@ -13,7 +13,7 @@
 //
 // 사용:
 //   node tools/knowledge-bundle/build.mjs --version 2026.10-1 \
-//        [--key D:\GIJO-AS-signing\gijo-2026.private.pem] [--key-id gijo-2026] [--out <경로>]
+//        [--key D:\GIJO-AS-signing\gijo-2026b.private.pem] [--key-id gijo-2026b] [--out <경로>]
 //   환경변수: GIJO_SERVER_URL(기본 http://localhost:4000), QA_USER/QA_PASS(admin 계정)
 import crypto from "node:crypto";
 import fs from "node:fs";
@@ -25,7 +25,9 @@ const arg = (n, d) => { const i = argv.indexOf(n); return i >= 0 ? argv[i + 1] :
 
 const BASE = process.env.GIJO_SERVER_URL ?? "http://localhost:4000";
 const version = arg("--version");
-const keyId = arg("--key-id", "gijo-2026");
+// ⚠ 기본값을 gijo-2026 → gijo-2026b로 갈았다(2026-08-09 유출 폐기). 옛 키로 서명하면
+//   제품이 우리 번들을 거부한다 — bundleverify.ts의 신뢰 목록에서 빠졌기 때문이다.
+const keyId = arg("--key-id", "gijo-2026b");
 const keyPath = arg("--key", `D:\\GIJO-AS-signing\\${keyId}.private.pem`);
 const BUNDLE_FORMAT = "gijobundle/1";
 
