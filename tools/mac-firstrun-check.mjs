@@ -33,6 +33,52 @@ import * as path from "node:path";
 
 const REPO = path.resolve(import.meta.dirname, "..");
 const APP_ARG = (() => { const i = process.argv.indexOf("--app"); return i >= 0 ? process.argv[i + 1] : null; })();
+const CDP_PORT = 9231; // 담당자가 쓰는 9223과 겹치지 않게 — 검사가 남의 앱에 붙으면 안 된다
+
+/**
+ * 첫 설치 화면을 대신 밟는다 — 2026-08-09부터 첫 실행은 로그인이 아니라 **관리자 계정 만들기**다.
+ * 계정을 넣기 전에는 서버가 뜨지 않으므로, 이 단계를 밟지 않으면 「데이터가 안 생긴다」는
+ * 거짓 실패가 난다(이 검사가 실제로 그렇게 한 번 빨간불이 됐다).
+ *
+ * ⚠ 여기 쓰는 계정은 **임시 폴더에서만 사는 검사용**이다. 검사가 끝나면 폴더째 지운다.
+ * ⚠ CDP는 --user-data-dir와 함께 써도 **된다.** 다만 포트가 열리고 응답이 오기까지
+ *   30초 넘게 걸릴 수 있다 — 일찍 포기하면 「CDP가 안 된다」고 오판한다(실제로 한 번 그랬다).
+ */
+async function 설정화면밟기() {
+  const 잠깐비동기 = (ms) => new Promise((r) => setTimeout(r, ms));
+  let 대상 = null;
+  for (let i = 0; i < 80; i++) { // 최대 80초
+    try {
+      const l = await (await fetch(`http://127.0.0.1:${CDP_PORT}/json`)).json();
+      대상 = l.find((x) => x.type === "page" && /setup\.html|login\.html|app\.html/.test(x.url));
+      if (대상) break;
+    } catch { /* 아직 안 열렸다 */ }
+    await 잠깐비동기(1000);
+  }
+  if (!대상) return "CDP에 붙지 못했습니다";
+  if (!대상.url.includes("setup.html")) return null; // 첫 설치가 아니다 — 밟을 것이 없다
+
+  const ws = new WebSocket(대상.webSocketDebuggerUrl);
+  await new Promise((r, j) => { ws.onopen = r; ws.onerror = j; });
+  const 답 = new Map();
+  ws.onmessage = (e) => { const m = JSON.parse(e.data); if (m.id) 답.set(m.id, m); };
+  ws.send(JSON.stringify({
+    id: 1, method: "Runtime.evaluate",
+    params: {
+      returnByValue: true,
+      expression: `(()=>{
+        const set=(el,v)=>{const s=Object.getOwnPropertyDescriptor(el.constructor.prototype,'value').set;s.call(el,v);el.dispatchEvent(new Event('input',{bubbles:true}));};
+        set(document.getElementById('id'),'checkadmin');
+        set(document.getElementById('pw'),'firstrun-check-1234');
+        set(document.getElementById('pw2'),'firstrun-check-1234');
+        document.getElementById('go').click(); return 'ok';
+      })()`,
+    },
+  }));
+  for (let i = 0; i < 100; i++) { if (답.has(1)) break; await 잠깐비동기(50); }
+  ws.close();
+  return 답.has(1) ? null : "설정 화면을 밟지 못했습니다";
+}
 
 if (process.platform !== "darwin") {
   console.error("이 검사는 macOS 전용입니다 (현재: " + process.platform + ").");
@@ -76,7 +122,11 @@ try {
   // open이 아니라 실행 파일을 직접 띄운다 — 이미 떠 있는 설치본을 활성화해 버리는 일을 막고,
   // 끝나고 확실히 죽일 수 있다. (2026-08-09에 open을 써서 옛 인스턴스가 살아난 적이 있다)
   const 실행파일 = path.join(앱, "Contents/MacOS", path.basename(앱, ".app"));
-  자식 = spawn(실행파일, [`--user-data-dir=${사용자데이터}`], { stdio: "ignore", detached: false });
+  자식 = spawn(실행파일, [`--user-data-dir=${사용자데이터}`, `--remote-debugging-port=${CDP_PORT}`], { stdio: "ignore", detached: false });
+
+  // 첫 실행은 계정을 받아야 서버가 뜬다 — 그 화면을 대신 밟는다(없으면 그냥 지나간다).
+  const 설정문제 = await 설정화면밟기();
+  if (설정문제) 기록("첫 설치 화면", false, 설정문제);
 
   const DB = path.join(사용자데이터, "data", "gijo-as.sqlite");
   let 생김 = false;
@@ -97,6 +147,43 @@ try {
 
   기록("고객 데이터가 userData에 생긴다", 생김,
     생김 ? `${fs.readdirSync(path.join(사용자데이터, "data")).join(", ")}` : "60초 안에 안 생겼습니다 — 서버가 못 떴을 수 있습니다(포트 4000 점유 여부 확인)");
+
+  // ── 업데이트가 고객 데이터를 지우지 않는가 ────────────────────────────────
+  //
+  // 데이터를 앱 번들 밖(userData)으로 옮긴 **이유가 바로 이것**이다. 그런데 옮겨 놓고
+  // 「업데이트해도 남는가」를 재보지 않으면 반쪽이다 — 고치려던 그 사고가 그대로일 수 있다.
+  //
+  // 고객이 하는 그대로 한다: 앱을 끄고, **.app을 통째로 새 것으로 바꾸고**, 다시 켠다.
+  // ⚠ 판정은 「파일이 있다」가 아니라 **「같은 파일인가」**로 한다. 지워지고 새로 만들어져도
+  //   파일은 있기 때문이다 — 그러면 고객은 데이터를 잃고도 「멀쩡해 보이는 빈 앱」을 본다.
+  //   그래서 inode와 생성 시각을 대조한다.
+  if (생김) {
+    const 전 = fs.statSync(DB);
+    자식?.kill("SIGTERM");
+    잠깐(4);
+    spawnSync("pkill", ["-f", 임시]);
+    잠깐(2);
+
+    fs.rmSync(앱, { recursive: true, force: true }); // 고객의 「교체하시겠습니까? → 예」
+    execFileSync("cp", ["-R", 원본, 앱]);
+    자식 = spawn(실행파일, [`--user-data-dir=${사용자데이터}`, `--remote-debugging-port=${CDP_PORT}`], { stdio: "ignore", detached: false });
+    잠깐(15);
+
+    const 남음 = fs.existsSync(DB);
+    const 후 = 남음 ? fs.statSync(DB) : null;
+    const 같은파일 = !!후 && 후.ino === 전.ino && Math.abs(후.birthtimeMs - 전.birthtimeMs) < 1000;
+    기록("★ 업데이트가 고객 데이터를 지우지 않는다", 같은파일,
+      !남음
+        ? "DB가 사라졌습니다 — 업데이트가 고객 데이터를 지웁니다"
+        : 같은파일
+          ? "같은 DB 파일이 그대로 남았습니다(inode·생성시각 일치)"
+          : "파일은 있지만 **새로 만들어졌습니다** — 고객은 빈 앱을 보게 됩니다");
+
+    // 재서명 봉인은 업데이트 뒤에도 살아 있어야 한다(새 .app이 곧 다시 더럽혀지면 같은 사고다).
+    const 봉인 = spawnSync("codesign", ["--verify", "--deep", "--strict", 앱], { encoding: "utf8" });
+    기록("업데이트 뒤에도 봉인 유지", 봉인.status === 0,
+      봉인.status === 0 ? "통과" : (봉인.stderr || "").trim().slice(0, 120));
+  }
 } catch (e) {
   기록("검사", false, e.message);
 } finally {
