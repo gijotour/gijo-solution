@@ -17,6 +17,20 @@ const dispatcherSrc = fs.readFileSync(
   "utf8",
 );
 
+/**
+ * 소스에서 **어떤 위치 바로 앞의** `re: /…/` 정규식을 꺼낸다.
+ * ⚠ `match`는 첫 매치를 준다 — 그대로 쓰면 파일 앞쪽의 남의 규칙을 잡는다(그래서 마지막을 쓴다).
+ * ⚠ 같은 코드를 세 번 베껴 쓰다 한 벌에서 이스케이프가 깨졌다(2026-08-10) — 그래서 한 곳으로 뺐다.
+ */
+function 앞의정규식(src: string, 위치: number): RegExp {
+  const 앞 = src.slice(0, 위치);
+  const 전부 = [...앞.matchAll(/re:\s*(\/(?:[^/\\\n]|\\.)+\/[a-z]*),\s*$/gm)];
+  if (!전부.length) throw new Error("앞쪽에서 re: 정규식을 못 읽었습니다");
+  const 리터럴 = 전부[전부.length - 1][1];
+  const 끝 = 리터럴.lastIndexOf("/");
+  return new RegExp(리터럴.slice(1, 끝), 리터럴.slice(끝 + 1));
+}
+
 /** dispatcher가 쓰는 플레이북 판별식을 **소스에서 그대로** 꺼낸다(베끼면 어긋난다). */
 function 플레이북정규식(): RegExp {
   const m = dispatcherSrc.match(/const REMEDIATION_INTENT_RE\s*=\s*(\/.*\/i?);/);
@@ -88,15 +102,7 @@ describe("「하려면」은 방법을 묻는 말이다 — 승인창을 띄우�
     const src = fs.readFileSync(path.join(__dirname, "..", "src", "engine", "agentloop.ts"), "utf8");
     const i = src.indexOf('tool: "register_asset"');
     expect(i, "register_asset 강제 규칙을 못 찾았습니다").toBeGreaterThan(-1);
-    // ⚠ `match`는 첫 매치를 준다 — 그대로 쓰면 **파일 앞쪽의 남의 규칙**을 잡는다
-    //   (이 시험을 처음 쓸 때 그래서 멀쩡한 정규식이 틀린 것처럼 나왔다).
-    //   register_asset **바로 앞**의 것을 써야 하므로 전부 모아 마지막을 쓴다.
-    const 앞 = src.slice(0, i);
-    const 전부 = [...앞.matchAll(/re:\s*(\/(?:[^/\\\n]|\\.)+\/[a-z]*),\s*$/gm)];
-    if (!전부.length) throw new Error("register_asset 앞의 re: 정규식을 못 읽었습니다");
-    const 리터럴 = 전부[전부.length - 1][1];
-    const body = 리터럴.slice(1, 리터럴.lastIndexOf("/"));
-    return new RegExp(body, 리터럴.slice(리터럴.lastIndexOf("/") + 1));
+    return 앞의정규식(src, i);
   }
 
   it("★ 「자산을 등록하려면 어떻게 해?」는 등록 실행으로 잡지 않는다", () => {
@@ -194,5 +200,38 @@ describe("장비 로그 코드는 변하지 않는 지식이다 — 회차마다
     const a = faqAnswerFor("ASA 106023 로그가 계속 올라오는데 무슨 의미야?")!.answer;
     expect(a).toMatch(/막힌 기록/);
     expect(a).toMatch(/뚫린 기록이 아닙니다|뚫린 것/);
+  });
+});
+
+describe("레드팀 — 「결과 조회」와 「점검 실행」을 가른다 (전-2)", () => {
+  it("★ 결과를 묻는 말이 조회 도구로 간다 — 고치기 전엔 실행 도구의 인자 오류를 답했다", () => {
+    const src = fs.readFileSync(path.join(__dirname, "..", "src", "engine", "agentloop.ts"), "utf8");
+    const i = src.indexOf('tool: "redteam_status"');
+    expect(i, "redteam_status 강제 규칙이 있어야 한다").toBeGreaterThan(-1);
+    const re = 앞의정규식(src, i);
+    for (const q of ["레드팀 점검 결과 알려줘", "레드팀 어땠어", "AI 견고성 점수 보여줘"]) {
+      expect(re.test(q), `${q}는 결과 조회다`).toBe(true);
+    }
+    // ⚠ 실행 지시는 잡으면 안 된다 — 잡으면 「점검해줘」가 조회로 새어 아무 일도 안 일어난다.
+    for (const q of ["레드팀 점검 해줘", "이 자산 레드팀 점검해줘", "레드팀 점검 어떻게 돌려?"]) {
+      expect(re.test(q), `${q}는 실행·안내다`).toBe(false);
+    }
+  });
+
+  it("★ 도구가 실제로 등록돼 있고 라우팅 표에도 적혀 있다 — 셋 중 하나만 빠져도 안 닿는다", () => {
+    const reg = fs.readFileSync(path.join(__dirname, "..", "src", "engine", "agenttools", "registry.ts"), "utf8");
+    const routes = fs.readFileSync(path.join(__dirname, "..", "src", "engine", "routes.ts"), "utf8");
+    expect(reg).toMatch(/name: "redteam_status"/);
+    expect(reg).toMatch(/run: runRedteamStatus/);
+    expect(routes).toMatch(/도착: "redteam_status"/);
+  });
+
+  it("한 번도 안 돌렸으면 없다고 말하고 돌리는 법을 알려 준다 — 빈손으로 돌려보내지 않는다", async () => {
+    const { runRedteamStatus } = await import("../src/engine/agenttools/handlers");
+    const 글 = runRedteamStatus();
+    expect(typeof 글).toBe("string");
+    expect(글.length).toBeGreaterThan(20);
+    // 기록이 있든 없든, 다음에 무엇을 할 수 있는지는 항상 있어야 한다.
+    expect(글).toMatch(/AI 공격 시험|이어서|화면/);
   });
 });

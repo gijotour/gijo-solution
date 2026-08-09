@@ -24,7 +24,7 @@ import { listVisibleDocuments, queryMemory, queryMemoryRelevant, queryMemoryScor
 import { listFindings as listCtiFindings } from "../cti";
 import { matchCtiToAssets } from "../ctimatch";
 import { dailyBriefingText } from "../briefing";
-import { runRedTeam, makeServedCaller } from "../redteam";
+import { runRedTeam, makeServedCaller, getLastRedTeamReport, getLastEffectiveReport } from "../redteam";
 import { runHardeningScan, scanSummaryText, isStandard } from "../hardeningscan";
 import { listSchedules as listReportSchedules, scheduleSummaryText } from "../reportschedule";
 import { reportActivity, listReportHistory } from "../report";
@@ -2997,4 +2997,64 @@ export async function runProductIntroAdd(args: Record<string, string>): Promise<
   } catch (e) {
     return `등록하지 못했습니다 — ${(e as Error).message}`;
   }
+}
+
+/**
+ * 레드팀(AI 공격 시험) **지난 결과**를 조회한다 — 계획서 전-2.
+ *
+ * ⚠ 왜 필요한가(2026-08-10 실측): 「레드팀 점검 결과 알려줘」에
+ *   **「run_redteam: 인자 오류: 필수 인자 누락: assetId」** 가 나왔다.
+ *   조회를 물었는데 **실행 도구의 오류 메시지**를 받은 것이다.
+ *   원인은 단순하다 — **점검을 돌리는 도구만 있고 지난 결과를 보는 도구가 없었다.**
+ *   서버에는 `/api/redteam/last`가 처음부터 있었다(또 「기능은 있는데 말이 안 닿는」 형태).
+ *
+ * ⚠ 아직 한 번도 안 돌렸으면 **없다고 정직하게** 말하고 돌리는 법을 알려 준다 —
+ *   빈손으로 돌려보내지 않는다.
+ */
+export function runRedteamStatus(): string {
+  const r = getLastRedTeamReport();
+  const eff = getLastEffectiveReport();
+  if (!r && !eff) {
+    return [
+      "아직 레드팀 점검을 돌린 기록이 없습니다.",
+      "",
+      "**AI 운영 › AI 공격 시험·차단** 화면에서 점검할 대상(로컬 모델 또는 AI 자산)을 고르고 실행하면,",
+      "프롬프트 인젝션·탈옥 페이로드로 실제 견고성을 재고 그 결과가 여기에 남습니다.",
+      "",
+      "▸ 이어서 — \"가드레일이 뭐야?\"로 무엇을 막는지 먼저 보실 수 있습니다",
+    ].join("\n");
+  }
+  const 줄: string[] = [];
+  if (eff) {
+    // ★ **제품 경로**가 우리가 파는 것이다 — 맨몸 모델 점수와 섞어 읽지 않게 순서를 이렇게 둔다.
+    줄.push(
+      `🛡 제품 경로 실효 견고성 — **${eff.total - eff.leaked}/${eff.total} 방어** (입구에서 막힘 ${eff.blockedAtGate} · 모델이 버팀 ${eff.modelHeld} · **뚫림 ${eff.leaked}**)`,
+      `측정 ${새시각(eff.ranAt)}`,
+    );
+  }
+  if (r) {
+    if (줄.length) 줄.push("");
+    줄.push(
+      `🧪 맨몸 모델 견고성(참고치 — 가드레일을 걷어내고 모델만 잰 값) — **${r.robustnessScore}점** · 뚫림 ${r.vulnerable}/${r.total}`,
+      `대상 ${r.model} · 측정 ${새시각(r.ranAt)}`,
+    );
+    const 약한곳 = Object.entries(r.byCategory ?? {})
+      .filter(([, v]) => v.vulnerable > 0)
+      .sort((a, b) => b[1].vulnerable - a[1].vulnerable)
+      .slice(0, 3)
+      .map(([k, v]) => `${k} ${v.vulnerable}/${v.total}`);
+    if (약한곳.length) 줄.push(`뚫린 갈래: ${약한곳.join(" · ")}`);
+  }
+  줄.push(
+    "",
+    "⚠ 두 숫자를 **섞어 읽지 마세요** — 담당자가 실제로 쓰는 길은 위쪽(제품 경로)입니다. 아래는 모델을 고를 때 쓰는 참고치입니다.",
+    "",
+    "▸ 이어서 — 다시 재려면 **AI 운영 › AI 공격 시험·차단** 화면에서 대상을 골라 실행하세요",
+  );
+  return 줄.join("\n");
+}
+
+function 새시각(ms: number): string {
+  if (!ms) return "(시각 없음)";
+  return new Date(ms).toLocaleString("ko-KR");
 }

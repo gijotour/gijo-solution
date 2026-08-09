@@ -154,6 +154,7 @@ import {
   runReportActivity,
   runHardeningScheduleList,
   runAnalysisStatus,
+  runRedteamStatus,
   runUrgentTodo,
   runKpiStatus,
   열린할일찾기,
@@ -520,6 +521,19 @@ const TOOLS: AgentTool[] = [
     directAnswer: true,
     params: [],
     run: runAnalysisStatus,
+  },
+  {
+    name: "redteam_status",
+    label: "AI 공격 시험(레드팀) 지난 결과",
+    // ⚠ 축은 TOOL_DOMAINS에 정의된 것만 쓴다 — "ai"라고 적었다가 시험이 잡았다(2026-08-10).
+    //   제품 자체의 상태라 어느 한 축에 안 들어간다 → cross.
+    domain: "cross",
+    write: false,
+    description:
+      'AI 공격 시험(레드팀)의 **지난 결과**를 조회한다 — 제품 경로 실효 견고성(입구 차단·모델 버팀·뚫림)과 맨몸 모델 견고성 점수. "레드팀 점검 결과 알려줘", "레드팀 어땠어", "AI 견고성 점수" 에 쓴다. ⚠ 점검을 **새로 돌리는 것은 run_redteam**이다 — 이 도구는 이미 잰 값을 보여 줄 뿐 아무것도 실행하지 않는다. 예: {}',
+    directAnswer: true,
+    params: [],
+    run: runRedteamStatus,
   },
   {
     name: "kpi_status",
