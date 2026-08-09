@@ -22,6 +22,7 @@
     "@types/node": "^20.14.0",
     "electron": "^31.0.0",
     "electron-builder": "^24.13.3",
+    "playwright-core": "^1.61.1",
     "esbuild": "^0.28.1",
     "typescript": "^5.5.0"
   },
