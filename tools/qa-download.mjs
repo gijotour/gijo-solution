@@ -45,7 +45,14 @@ function conn(t) {
 }
 
 const cdpUp = await fetch("http://127.0.0.1:9223/json/version").then((r) => r.ok).catch(() => false);
-if (!cdpUp) { console.log("[download] 스킵 — Electron(CDP 9223) 미기동"); process.exit(0); }
+// ⚠ 스킵은 통과가 아니다 — 문구를 분명히 한다(2026-08-09). exit 0을 유지하는 건
+//   qa-full이 이 계층을 자체 사전점검으로 `ok: null`(스킵)로 이미 표시하기 때문이다.
+//   단독으로 돌렸을 때 초록불로 **오해하지 않게** 검증 안 됐다고 못 박는다.
+if (!cdpUp) {
+  console.log("[download] ⏭ 검증 안 됨(통과 아님) — Electron(CDP 9223) 미기동");
+  console.log("           /GIJOAS클라시작 후 로그인하고 다시 돌리면 실제로 검증됩니다.");
+  process.exit(0);
+}
 
 console.log("\n[download] 파일 받기가 실제로 저장되는가 (순수 CDP — Playwright 미사용)");
 const before = new Set(fs.readdirSync(DL));

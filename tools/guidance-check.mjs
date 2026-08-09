@@ -91,6 +91,11 @@ function 안내명령들() {
   return 결과;
 }
 
+// 소스에서 못 읽어 **검사에서 빠진** 규칙들. 비어 있어야 정상이다.
+// ⚠ 이걸 안 세면 규칙 하나가 통째로 검사에서 사라져도 도구는 초록불을 낸다.
+//   정규식 추출은 소스 모양에 기대는 방식이라, 제품 코드가 바뀌면 조용히 못 읽게 된다.
+const 못읽은규칙 = [];
+
 // ── 강제 규칙 읽기(route-explain과 같은 방식) ─────────────────────────────────
 function 강제규칙들() {
   const a = 엔진("agentloop.ts");
@@ -100,7 +105,10 @@ function 강제규칙들() {
   // `re: /…/,` 다음 줄들에서 `tool: "…"`를 찾는다.
   const re = /re:\s*(\/(?:[^/\\\n]|\\.)+\/[gimsuy]*)\s*,\s*\n\s*tool:\s*"([a-z_]+)"/g;
   for (const m of 블록.matchAll(re)) {
-    try { 규칙.push({ re: eval(m[1]), tool: m[2] }); } catch { /* 못 읽은 것은 건너뛴다 */ }
+    // ⚠ 못 읽은 규칙을 **세어서 알린다**(2026-08-09). 예전엔 조용히 버렸다 —
+    //   그러면 그 규칙은 이 검사에서 통째로 빠지는데 도구는 멀쩡하다고 답한다.
+    //   같은 병으로 조치 검증이 열흘간 안 돌았던 전례가 있다(qa-verify).
+    try { 규칙.push({ re: eval(m[1]), tool: m[2] }); } catch { 못읽은규칙.push(m[2] || m[1].slice(0, 40)); }
   }
   return 규칙;
 }
@@ -115,9 +123,10 @@ function 특수경로들() {
   const 목 = [];
   for (const f of ["dispatcher.ts", "screenguide.ts"]) {
     let s = "";
-    try { s = 엔진(f); } catch { continue; }
+    // 파일을 못 읽으면 그 파일의 특수경로가 통째로 검사에서 빠진다 — 세어서 알린다.
+    try { s = 엔진(f); } catch { 못읽은규칙.push(`${f} (파일을 못 읽음 — 특수경로 전체 누락)`); continue; }
     for (const m of s.matchAll(/const ([A-Z_]+(?:_RE)?)\s*=\s*(\/(?:[^/\\\n]|\\.)+\/[gimsuy]*)/g)) {
-      try { 목.push({ 이름: m[1], re: eval(m[2]) }); } catch { /* 건너뜀 */ }
+      try { 목.push({ 이름: m[1], re: eval(m[2]) }); } catch { 못읽은규칙.push(`${f}:${m[1]}`); }
     }
   }
   return 목;
@@ -166,6 +175,12 @@ for (const x of 안내) {
 
 console.log("\n  제품이 「이렇게 말하세요」라고 안내한 명령 — 실제로 걸리는가\n");
 console.log(`    안내 문구 ${안내.length}개 · 규칙 ${규칙.length}개 · 특수경로 ${특수.length}개`);
+// 못 읽은 게 있으면 **먼저** 말한다 — 아래 숫자들이 그만큼 덜 센 결과이기 때문이다.
+if (못읽은규칙.length) {
+  console.log(`\n    ✗ 소스에서 못 읽어 검사에서 빠진 규칙 ${못읽은규칙.length}개 — 아래 집계는 그만큼 덜 셌다:`);
+  못읽은규칙.forEach((x) => console.log(`        · ${x}`));
+  console.log(`      (제품 코드 모양이 바뀌어 추출 정규식이 못 따라간 것이다. 도구를 맞춰야 한다.)`);
+}
 console.log(`    ✓ 결정적으로 걸림 ${결정적.length}개`);
 console.log(`    ○ 쓰기 안내 ${쓰기안내.length}개 — 모델 판단이지만 **결재판이 사람에게 확인받는다**`);
 console.log(`    ⚠ 읽기인데 모델 판단 ${모델판단.length}개  ← 답이 그대로 나가는데 회차마다 달라질 수 있다\n`);

@@ -159,9 +159,16 @@ try {
   for (const x of cur.filter((y) => y.label === LABEL || y.id === targetId)) {
     await fetch(`${B}/api/hardening/targets/${x.id}`, { method: "DELETE", headers: H }).catch(() => {});
   }
-  const assets = await (await fetch(`${B}/api/assets`, { headers: H })).json().catch(() => []);
-  const tg = (await (await fetch(`${B}/api/hardening/targets`, { headers: H })).json().catch(() => ({}))).targets || [];
-  ok("검증 데이터 회수(자산·대상)", !assets.some?.((x) => x.id === ASSET_ID) && !tg.some((x) => x.id === targetId));
+  // ⚠ 조회가 실패하면 빈 배열이 되어 "아무것도 안 남았다"가 **거짓으로 통과**한다(2026-08-09).
+  //   회수됐다는 판정은 **실제로 목록을 받아 봤을 때만** 의미가 있다. 못 받았으면 못 받았다고 한다.
+  let assets = null, tg = null;
+  try { assets = await (await fetch(`${B}/api/assets`, { headers: H })).json(); } catch { /* null로 남긴다 */ }
+  try { tg = (await (await fetch(`${B}/api/hardening/targets`, { headers: H })).json())?.targets ?? null; } catch { /* null로 남긴다 */ }
+  if (!Array.isArray(assets) || !Array.isArray(tg)) {
+    ok("검증 데이터 회수(자산·대상)", false, "목록을 못 받아 회수를 확인하지 못했다 — 남았는지 알 수 없다");
+  } else {
+    ok("검증 데이터 회수(자산·대상)", !assets.some((x) => x.id === ASSET_ID) && !tg.some((x) => x.id === targetId));
+  }
 }
 
 console.log(fails ? `\n[verify] ✗ 실패 ${fails}건` : "\n[verify] ✓ 전부 통과");
