@@ -942,6 +942,39 @@ export function 이름으로화면찾기(text: string): { screen: string; title:
   return 최선 ? { screen: 최선.screen, title: 최선.title } : null;
 }
 
+// ── 「○○ 하려면 어떻게 해?」 — 방법을 묻는 말 ────────────────────────────────
+//
+// ⚠ 왜 필요한가(2026-08-10 실측): 「자산을 등록하려면 어떻게 해?」가 **등록 승인창**을 띄웠다.
+//   담당자는 방법을 물었는데 제품이 등록을 하려 든 것이다. 그 강제 규칙을 좁혔더니
+//   이번엔 **9.6초 + 「근거 약함」 + 남의 제품 설명 유추**가 나왔다 — 그 규칙을 처음 만든
+//   이유(벤더 매뉴얼을 읽어 주던 사고)로 되돌아간 것이다.
+//   ⚠ **좁히기만 하면 그 자리가 비고, 빈 자리는 모델이 채운다.** 좁혔으면 대신 답할 것을 둔다.
+//
+// 그래서 「우리 화면 이름 + 방법 질문」이면 **그 화면 안내**로 결정적으로 답한다.
+// 자리 질문(「어디야?」)과 갈라 둔다 — 그건 위치를 묻고, 이건 하는 법을 묻는다.
+const 방법질문_RE =
+  /(하려면|하려는데|하는\s*(법|방법)|어떻게\s*(하|해|하나|합니까|하죠|하지)|어떻게\s*(등록|추가|올리|업로드|삭제|수정|내보내|백업|설정)|(등록|추가|올리|업로드|삭제|수정|내보내|백업|설정)(하려면|하는\s*법|하는\s*방법))/;
+
+/**
+ * 방법 질문이 가리키는 우리 화면. 없으면 null — 없는 것을 지어내지 않는다.
+ * ⚠ 영문 제품명이 함께 있으면(=남의 제품을 물은 것) 화면 안내가 아니다(2026-07-26 사고와 같은 이유).
+ */
+export function 방법질문화면찾기(text: string): { screen: string; title: string } | null {
+  const t = String(text ?? "");
+  if (!방법질문_RE.test(t)) return null;
+  if (hasSpecificSubject(t)) return null;
+  const 붙인질문 = t.replace(/\s/g, "");
+  let 최선: { screen: string; title: string; 길이: number } | undefined;
+  const 담기 = (screen: string, 이름: string) => {
+    if (이름.length < 2 || !붙인질문.includes(이름)) return;
+    if (최선 && 이름.length <= 최선.길이) return;
+    최선 = { screen, title: GUIDES[screen]?.title ?? 이름, 길이: 이름.length };
+  };
+  for (const [screen, g] of Object.entries(GUIDES)) 담기(screen, g.title.replace(/\s/g, ""));
+  for (const [별명, screen] of Object.entries(화면별칭)) 담기(screen, 별명);
+  return 최선 ? { screen: 최선.screen, title: 최선.title } : null;
+}
+
 /** 「○○은 여기 있습니다」 — 화면 위치 + 그 화면이 절차 몇 단계인지 + 거기서 하는 일. */
 export function 화면위치안내(screen: string, title: string): string {
   const g = getScreenGuide(screen);

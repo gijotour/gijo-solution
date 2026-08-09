@@ -26,13 +26,13 @@ import { faqAnswerFor } from "./productfaq";
 import type { Viewer } from "./memory";
 import { runAgentLoop, AgentToolCall, 가리킬것없는대명사, 가리킨자산이없나, 대명사뿐인가, 대명사확인, 되물음, 자산되물음, 선택을박는다, 직전대상자산 } from "./agentloop";
 import { 스트림자리 } from "./streamsink";
-import { 장애질문인가, 장애초동절차 } from "./incidentsteps";
+import { 장애질문인가, 장애초동절차, 침해사고질문인가, 침해사고초동절차 } from "./incidentsteps";
 import { executeApprovedTool, findAgentTool, buildApproval, PendingApproval } from "./agenttools";
 import { appendApprovedDecision } from "./orchestrator-dataset";
 import { undoSnapshot, undoCommit } from "./undo";
 import { gateUserInput } from "./gateway";
 import { toolDomainsForScreen } from "./screencontext";
-import { isHelpIntent, formatScreenGuide, 이름으로화면찾기, 화면위치안내 } from "./screenguide";
+import { isHelpIntent, formatScreenGuide, 이름으로화면찾기, 방법질문화면찾기, 화면위치안내 } from "./screenguide";
 import { findHowTo, howToMarkdown } from "./howto";
 import { buildFindingPicks, parsePickCommand, pickToolArgs, isFindingListAsk, findingListAnswer, isMyWorkAsk, myWorkAnswer, stripPickMarks, PickList } from "./picklist";
 import { isOutOfScope, outOfScopeAnswer, isTooVague, vagueAnswer, 한낱말되묻기 } from "./scopeguard";
@@ -1034,6 +1034,23 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     };
   }
 
+  // ★ "○○ 등록하려면 어떻게 해?" — **방법**을 묻는 말은 그 화면 안내로 답한다(2026-08-10).
+  //   실측: 이 말이 등록 **승인창**을 띄웠고, 강제 규칙을 좁히자 이번엔 9.6초짜리 「근거 약함 +
+  //   남의 제품 설명 유추」가 나왔다. ⚠ 좁히기만 하면 그 자리가 비고 **빈 자리는 모델이 채운다.**
+  //   ⚠ isHelpIntent보다 먼저 본다 — 그건 「지금 보고 있는 화면」을 안내하므로, 다른 화면
+  //     이름을 대고 물으면 엉뚱한 화면 설명이 나간다(위 자리 질문과 같은 이유).
+  const 방법화면 = 방법질문화면찾기(instructionText);
+  if (방법화면) {
+    const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
+    completeTask(task.id);
+    return {
+      task,
+      route: { agentId: "orchestrator", action: "chat" },
+      output: formatScreenGuide(방법화면.screen, instructionText),
+      openScreen: { page: 방법화면.screen, label: 방법화면.title },
+    };
+  }
+
   // 도움말/사용법 의도는 화면별 가이드로 결정적으로 답한다(LLM·도구 없이). "이 화면 뭐 할 수 있어?"
   // 같은 질문이 예전엔 일반 대화로 떨어져 화면과 무관한 답을 냈다 — screenguide로 그라운딩한다.
   if (isHelpIntent(instructionText, screen)) {
@@ -1068,7 +1085,20 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
 
   // "이 취약점 조치 방법 알려줘" — 결정적 조치 플레이북으로 답한다(LLM 없이). 단계·담당·SLA를
   // 규칙으로 제공해 MTTR을 줄인다. 실행 지시("조치해줘")가 아니라 방법 문의일 때만.
-  if (REMEDIATION_INTENT_RE.test(instructionText) && !/조치해|처리해|수정해|패치해/.test(instructionText)) {
+  //
+  // ★ 2026-08-10: **장애 질문을 삼키지 않는다.** 「방화벽 장비가 갑자기 죽었어. 어떻게 대응해?」가
+  //   `어떻게 대응`에 걸려 여기서 채였고, 담당자는 장애 상황에 **「일반 취약점 조치, 30일 내」**
+  //   표를 받았다. 어제 만든 장애 초동 절차(아래 1150줄대)는 되묻기 관문 뒤에 있어 닿지 못했다.
+  //   ⚠ 「기능을 만들었다」와 「그 기능에 말이 닿는다」는 다르다 — 앞 분기가 먼저 채 가면 없는 것과 같다.
+  //   ⚠ 순서를 바꾸지 않고 **여기서 비켜 준다** — 장애 분기를 위로 올리면 되묻기 관문(대상 없는
+  //     대명사)이 뚫린다. 배제가 이동보다 안전하다.
+  //   ⚠ 취약점·패치 물음은 incidentsteps의 「장애아님」이 이미 막으므로 플레이북 영토는 그대로다.
+  if (
+    REMEDIATION_INTENT_RE.test(instructionText) &&
+    !장애질문인가(instructionText) &&
+    !침해사고질문인가(instructionText) &&
+    !/조치해|처리해|수정해|패치해/.test(instructionText)
+  ) {
     const { formatRemediation } = await import("./playbook.js");
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
     completeTask(task.id);
@@ -1147,6 +1177,16 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P1" });
     completeTask(task.id);
     return { task, route: { agentId: "orchestrator", action: "chat" }, output: 장애초동절차(instructionText) };
+  }
+
+  // ★ 침해사고 의심 — 결정적 초동 절차로 즉답한다(2026-08-10, 계획서 전-4).
+  //   실측: 「침해사고 의심될 때 대응 절차 알려줘」에 **「일반 취약점 조치 · 30일 내」** 표가 나왔다.
+  //   침해는 지금 벌어지는 일인데 30일짜리 패치 일정표를 받은 것이다. 장애와 갈라 둔다 —
+  //   장애는 복구가 먼저지만 **침해는 증거 보전이 복구보다 먼저**라 순서가 반대다.
+  if (침해사고질문인가(instructionText)) {
+    const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P1" });
+    completeTask(task.id);
+    return { task, route: { agentId: "orchestrator", action: "chat" }, output: 침해사고초동절차(instructionText) };
   }
 
   // ── 시연 실측이 잡은 라우팅 결함 2건의 결정적 분기 (2026-07-29, 계획서 전-1) ──────────
