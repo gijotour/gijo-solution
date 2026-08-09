@@ -854,7 +854,7 @@ export function runToday(args: Record<string, string>): string {
   });
   const overdue = top.filter((r) => r.overdue).length;
   return [
-    `오늘 조치 우선순위 상위 ${top.length}건 (KEV→EPSS→VPR 순):`,
+    `${예시데이터머리말()}오늘 조치 우선순위 상위 ${top.length}건 (KEV→EPSS→VPR 순):`,
     ...lines,
     overdue ? `⚠ 기한 초과 ${overdue}건 포함` : "",
     시연데이터알림(top.map((r) => r.finding)),
@@ -2151,6 +2151,24 @@ export function runAnalysisStatus(): string {
  * 원칙 — **숫자가 0이면 줄을 만들지 않는다.** 할 일이 없는데 있는 척하면 목록을 안 믿게 된다.
  * ⚠ 스캔 실패는 취약점 줄과 **섞지 않는다**. 스캐너를 고칠 일이지 취약점이 아니다.
  */
+/**
+ * 실제 자산이 하나도 없을 때 답 머리에 붙일 한 줄. 있으면 빈 문자열.
+ *
+ * 왜 필요한가(2026-08-09 실측): 새로 설치한 앱에서 고객의 첫 대화가
+ *   「[P0] 실제 악용(KEV) 1건 — 이번 주 안에 막아야 합니다」
+ * 였다. 전부 씨앗 데이터인데 **답이 그 사실을 말하지 않았다.**
+ *
+ * ⚠ 어디에 붙일지 — **숫자로 위험을 주장하는 답**에만 붙인다.
+ *   목록을 나열하는 답(runListAssets 등)은 고객이 이름으로 알 수 있고(「샘플-웹서버」),
+ *   안내·사용법 답은 데이터와 무관하다. 다 붙이면 문구가 배경이 되어 아무도 안 읽는다.
+ * ⚠ 문구는 여기 한 곳에만 둔다. 여러 곳에 적으면 언젠가 어긋난다.
+ */
+function 예시데이터머리말(): string {
+  return 예시데이터뿐인가()
+    ? "⚠ 아래는 **예시 데이터**입니다 — 실제 자산을 등록하면 이 숫자는 사라집니다.\n"
+    : "";
+}
+
 export async function runUrgentTodo(): Promise<string> {
   const s = await computeKpiSnapshot();
   const a = s.aiSecurity;
@@ -2183,11 +2201,8 @@ export async function runUrgentTodo(): Promise<string> {
   //   된다. **가짜 P0로 시작하는 첫인상**이다(2026-08-09 새 설치 실측).
   //   데이터 자체는 정직하게 표시돼 있었다(source_tool="샘플" · owner="샘플(예시)") —
   //   그 표시를 옮기지 않은 것은 이 답이었다.
-  const 예시안내 = 예시데이터뿐인가()
-    ? "⚠ 아래는 **예시 데이터**입니다 — 실제 자산을 등록하면 이 숫자는 사라집니다.\n"
-    : "";
   return [
-    `${예시안내}지금 손댈 일 ${후보.length}건 (보안 KPI에서 나쁜 값만 골랐습니다):`,
+    `${예시데이터머리말()}지금 손댈 일 ${후보.length}건 (보안 KPI에서 나쁜 값만 골랐습니다):`,
     ...줄,
     "",
     "할 일로 담으려면 그대로 말씀하세요 — 예: \"기한 지난 조치 마무리를 할 일로 담아줘\"",
@@ -2209,7 +2224,7 @@ export async function runKpiStatus(): Promise<string> {
     `점검 ${s.inspections.total}건(지연 ${s.inspections.overdue} · 승인대기 ${s.inspections.pendingApproval})`,
     `컴플라이언스 이행률 ${s.compliance.coverageRate}%(${s.compliance.covered}/${s.compliance.total})`,
   ];
-  return `보안 KPI 현황(${s.date}):\n${lines.map((l) => `- ${l}`).join("\n")}`;
+  return `${예시데이터머리말()}보안 KPI 현황(${s.date}):\n${lines.map((l) => `- ${l}`).join("\n")}`;
 }
 
 // 작업 세션(대화 세션형, sessions.html) 현황 — 최근 대화 이력을 챗봇이 그대로 알 수 있게 한다.
