@@ -5,6 +5,7 @@
 import type { Express, Request } from "express";
 import { 말투재기 } from "./tonewatch";
 import { 거짓완료차단 } from "./falseclaim";
+import { 원문누출차단 } from "./rawleak";
 import { toolLabel } from "./agenttools";
 import { authMiddleware } from "../auth/auth";
 import { runWithViewer } from "./viewerctx";
@@ -563,7 +564,9 @@ export async function dispatchInstruction(instructionText: string, sessionId?: s
   const result = await runWithViewer(viewer, () =>
     dispatchInstructionScoped(instructionText, sessionId, screen, actor, qa, noLearn, viewer, 선택)
   );
-  return 해석을단다(거짓완료를걸러낸다(instructionText, result));
+  // 출구 관문은 여기 한 줄에 모은다 — 갈래마다 심으면 새 갈래가 생길 때 또 샌다.
+  //   ① 거짓 완료(하지 않은 일을 했다는 답)  ② 기계 데이터 누출(저장소 원문 조각)
+  return 해석을단다(기계데이터를걸러낸다(instructionText, 거짓완료를걸러낸다(instructionText, result)));
 }
 
 /**
@@ -595,6 +598,21 @@ function 해석을단다(r: DispatchResult): DispatchResult {
  * 「도구가 돌았나」의 판단 근거는 `toolCalls`다. 도구가 실제로 돌았으면 "등록했습니다"는 사실이고,
  * 결재판·확인 대기는 아직 실행 전이라 완료를 주장할 수도 없다(둘 다 그대로 통과).
  */
+/**
+ * 저장소 내부 표현이 답에 그대로 섞여 나가는 것을 막는다(2026-08-09).
+ *
+ * 자산 조회 답에 `"payload_id":"was_asset-…"` 같은 검색 원문 조각이 나온 사례가 있었다.
+ * **QA는 이걸 통과시켰다** — 도구도 맞고 숫자도 맞아서 형식 판정으로는 정상이었다.
+ * 결재판·확인 대기는 건드리지 않는다(그건 아직 보여줄 내용이 아니라 물음이다).
+ */
+function 기계데이터를걸러낸다(지시: string, r: DispatchResult): DispatchResult {
+  if (r.approval || r.confirm) return r;
+  const 검사 = 원문누출차단(지시, r.output ?? "");
+  if (!검사.막았나) return r;
+  console.warn(`[원문누출차단] 기계 데이터 ${검사.걸린수}줄을 걷어냄 — "${지시.slice(0, 40)}"`);
+  return { ...r, output: 검사.답 };
+}
+
 function 거짓완료를걸러낸다(지시: string, r: DispatchResult): DispatchResult {
   if (r.approval || r.confirm) return r;
   const 도구가돌았나 = !!r.toolCalls?.length;
