@@ -73,6 +73,7 @@
       "allowToChangeInstallationDirectory": false,
       "runAfterFinish": true,
       "include": "build/installer.nsh"
-    }
+    },
+    "afterSign": "build/mac-adhoc-sign.cjs"
   }
 }

@@ -5,7 +5,15 @@
 ## 0. 결론 · 사양 판단
 - **M4 24GB로 구동 가능** — 단, **단일 LLM 티어**(채팅 1개 + bge 임베딩). 통합메모리라 GPU(Metal)가 RAM을 공유하며, macOS(~6~8GB) 제외 실질 ~16GB를 모델이 쓴다.
 - 속도: 기본 M4에서 7~8B Q4 대략 **15~22 tok/s** 추정(대역폭 120GB/s 비례). 1인 관제·요약·챗봇엔 충분. 다중 사용자·2모델 동시는 부적합(→ M4 Pro 48GB↑).
-- **애플 공증($99) 스킵** — 자가 사용이라 서명 없이 빌드(`identity:null`), 첫 실행만 "우클릭 → 열기".
+- **애플 공증($99)은 여전히 선택 — 다만 「서명 없이」는 이제 안 된다**(2026-08-09 정정).
+  macOS 26에서 `identity:null`로만 빌드하면 첫 실행 때 **경고가 아니라 앱이 삭제된다**:
+  「악성 코드가 차단되고 휴지통으로 이동함」. 원인은 서명이 없어서가 아니라 **깨져서**다 —
+  서명 단계를 건너뛰면 Electron 원본의 ad-hoc 링커 서명이 남고(식별자가 `ai.gijo.as`가
+  아니라 `Electron`, 리소스 봉인 없음), macOS는 이를 「정품 앱을 뜯어고쳤다」로 읽는다.
+  → **ad-hoc 재서명은 필수**다. `client/build/mac-adhoc-sign.cjs`(afterSign 훅)가
+    빌드 산출물 자체를 재서명한다. 인증서 없이 되고, 삭제가 사라진다(Mac 실증).
+    첫 실행 「우클릭 → 열기」는 공증을 안 했으니 그대로 남는다 — 그건 경고일 뿐이다.
+  ⚠ 훅 없이 만든 dmg는 **고객이 고칠 수 없다**(고객은 재서명 못 한다). 빌드에서 끝내야 한다.
 
 ## 1. Phase 1 — 크로스플랫폼 코드 (완료, Windows에서 작업됨)
 이미 반영된 변경(현재 커밋):
@@ -28,7 +36,9 @@ cmake --build build --config Release -j
 
 ### 2-2. 앱 빌드 (Mac에서 `npm run dist`)
 - `build-server-dist.mjs`가 server-dist 네이티브를 **darwin-arm64로 재빌드**(better-sqlite3는 electron/rebuild, lancedb·onnxruntime·sharp는 `npm ci`가 arm64 프리빌드 획득).
-- electron-builder가 `GIJO AS-<ver>-arm64.dmg` 생성. 서명 없음 → 첫 실행 우클릭→열기.
+- electron-builder가 `GIJO AS-<ver>-arm64.dmg` 생성. afterSign 훅이 **ad-hoc 재서명**하고
+  식별자·봉인을 확인한다(식별자가 `Electron`으로 남으면 빌드를 실패시킨다 — 그대로 내보내면
+  고객 기계에서 앱이 지워진다). 공증은 안 했으므로 첫 실행만 우클릭→열기.
 - ⚠ 반드시 **Mac에서** 실행(Windows에서 mac dmg 크로스빌드 불가).
 
 ### 2-3. 실행 · 환경변수(데스크톱 앱이 서버 스폰 시 전달)
