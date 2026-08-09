@@ -250,12 +250,20 @@ export async function getLawArticles(mst: string, article?: string, limit = 5): 
   const data = (await callApi("lawService.do", { target: "law", MST: mst })) as Record<string, Record<string, unknown>>;
   const body = data["법령"] ?? {};
   const units = arr((body["조문"] as Record<string, unknown> | undefined)?.["조문단위"] as Record<string, unknown>[]);
-  const mapped = units.map((u) => ({
+  // 편·장·절 제목 칸("제4장 개인정보의 안전한 관리")은 조문이 아니다.
+  // ⚠ 이 칸들도 **조문번호를 갖고 있다** — 뒤따르는 조문의 번호가 그대로 박혀 있어서
+  //   "번호가 있으면 조문"으로 거르면 안 걸러진다. 실제로 제29조를 물으면 장 제목이
+  //   함께 딸려 나왔다(2026-08-09 실측: 개인정보 보호법 140칸 중 전문 14 · 조문 126).
+  //   법제처가 조문여부 필드로 갈라 주므로 그것을 본다. 필드가 없는 옛 응답만 옛 방식으로 뒤를 받친다.
+  const 조문칸 = units.filter((u) => {
+    const kind = str(u["조문여부"]);
+    return kind ? kind === "조문" : !/^\s*제\d+[편장절관]\s/.test(str(u["조문내용"]));
+  });
+  const mapped = 조문칸.map((u) => ({
     no: str(u["조문번호"]),
     title: str(u["조문제목"]),
     text: arr(u["조문내용"] as string | string[]).map(str).join("\n").trim(),
   }));
-  // 편·장 제목만 있는 칸(조문내용이 "제4장 …")은 조문이 아니다 — 본문 있는 것만 남긴다.
   const real = mapped.filter((m) => m.no && m.text);
   if (article) {
     const want = article.replace(/\D/g, "");

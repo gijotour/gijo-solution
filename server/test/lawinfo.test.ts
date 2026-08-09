@@ -152,6 +152,27 @@ describe("법령 조회 — 응답 가공", () => {
     expect(out).not.toMatch(/존재하지 않습니다/);
   });
 
+  // ⚠ 실사고(2026-08-09): 장 제목 칸도 **뒤따르는 조문의 번호를 갖고 있다**. 번호 유무로 거르면
+  //   제29조를 물었을 때 "제4장 개인정보의 안전한 관리"가 함께 나온다. 법제처의 조문여부로 갈라야 한다.
+  it("장 제목이 조문번호를 갖고 있어도 조문으로 세지 않는다(실데이터 꼴)", async () => {
+    fetchMock.mockResolvedValue(
+      jsonRes({
+        법령: {
+          조문: {
+            조문단위: [
+              { 조문번호: "29", 조문내용: "                        제4장 개인정보의 안전한 관리", 조문여부: "전문" },
+              { 조문번호: "29", 조문제목: "안전조치의무", 조문내용: "제29조(안전조치의무) 개인정보처리자는…", 조문여부: "조문" },
+            ],
+          },
+        },
+      })
+    );
+    const arts = await law.getLawArticles("270351", "제29조");
+    expect(arts).toHaveLength(1);
+    expect(arts[0].title).toBe("안전조치의무");
+    expect(arts[0].text).not.toContain("제4장");
+  });
+
   it("본문 조문에서 편·장 제목 칸은 걸러낸다", async () => {
     fetchMock.mockResolvedValue(
       jsonRes({
