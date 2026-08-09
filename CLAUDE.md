@@ -90,6 +90,7 @@
 - `client/server-dist/package.json`은 추적 산출물 — 빌드 후 `git checkout`으로 되돌려 clean 유지.
 - 한글 HTTP 검증에 curl 쓰지 말 것(깨짐) — Node fetch로. 한글 파일 조작은 perl 대신 Node. `PYTHONUTF8=1`.
 - 7B 모델에 프롬프트 규칙을 더해 행동 교정하려 하지 말 것 — 코드로 해결(반복 실패 사례 있음).
+- **강제 규칙(FORCED_INTENTS)을 배열 중간에 넣으면 routes.ts 표가 통째로 어긋난다**(자리 번호로 가리키기 때문). 넣은 뒤 `node tools/routes-renumber.mjs --write` — 손으로 세지 말 것(2026-08-10 실사고: 18줄이 밀렸고, route-explain이 엉뚱한 정규식을 읽어 **거짓 겹침 경보**까지 냈다).
 - 에이전트 모델 미배정은 조용히 기본모델 폴백 — app_state 직접 확인.
 - 임베딩 llama-server는 ctx/batch/ubatch 8192 명시 필수(512 초과 한글 입력 HTTP500 사고).
 - 운영(WSL) 서버는 watcher 없음 — 코드 갱신 후 프로세스 kill로 재시작(Restart=always). 단 전 사용자 세션 끊김.
