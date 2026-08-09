@@ -1,7 +1,7 @@
 {
-  "acceptedAt": "2026-08-08T17:26:02.524Z",
-  "gitRev": "3b32843",
-  "caseSetHash": "54ef18b718a98b60",
+  "acceptedAt": "2026-08-09T09:14:30.250Z",
+  "gitRev": "84d61c0",
+  "caseSetHash": "9462db589b00e4ac",
   "axes": {
     "routing": {
       "total": 66,
@@ -57,5 +57,5 @@
     "total": 14,
     "error": null
   },
-  "note": "리포트 기준 확정(재실행 없음) — 원 실행 2026-08-08T17:25:39.793Z"
+  "note": "리포트 기준 확정(재실행 없음) — 원 실행 2026-08-09T09:13:44.422Z"
 }
