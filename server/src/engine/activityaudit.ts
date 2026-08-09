@@ -31,6 +31,35 @@ const MENU: Record<string, string> = {
 
 const VERB: Record<string, string> = { POST: "추가·실행", PUT: "수정", PATCH: "수정", DELETE: "삭제" };
 
+/**
+ * 경로 끝마디가 이것이면 **무슨 일이었는지**를 행위 이름에 싣는다.
+ *
+ * 왜 필요한가(2026-08-09 실측): 비밀번호를 바꾸고 감사 기록을 찾았더니
+ *   `계정 관리 추가·실행 · target: umrnt7chkjh2peq/password`
+ * 였다. **계정을 새로 만든 것과 글자 그대로 같은 문구**다. 구분은 target 끝의
+ * `/password` 뿐이라, 「누가 언제 비밀번호를 바꿨나」를 뽑으려면 사람이 경로를 읽어야 한다.
+ * 보안 제품의 감사 기록이 그러면 안 된다 — 감사 대응은 대개 남이, 급할 때 본다.
+ *
+ * ⚠ 넓게 추론하지 않는다(끝마디가 영문이면 다 싣는 식). 감사 기록은 **틀린 이름이
+ *   붙는 것이 안 붙는 것보다 나쁘다.** 확실한 것만 표에 적고, 나머지는 지금처럼 둔다.
+ */
+const 세부행위: Record<string, string> = {
+  password: "비밀번호 변경",
+  "mfa/reset": "2차 인증 해제",
+  role: "권한 변경",
+  disable: "계정 잠금",
+  enable: "계정 잠금 해제",
+};
+
+/** target(경로 나머지)에서 세부 행위 이름을 찾는다. 없으면 null. */
+export function 세부행위이름(target: string): string | null {
+  if (!target || target === "-") return null;
+  const 조각 = target.split("/").filter(Boolean);
+  const 끝둘 = 조각.slice(-2).join("/");
+  const 끝 = 조각[조각.length - 1] ?? "";
+  return 세부행위[끝둘] ?? 세부행위[끝] ?? null;
+}
+
 /** 경로에서 메뉴 이름과 대상을 뽑는다. /api/assets/vuln:web01/scan → ["자산", "vuln:web01"] */
 export function describePath(path: string): { menu: string; target: string } {
   const parts = path.replace(/^\/api\//, "").split("?")[0].split("/").filter(Boolean);
@@ -55,7 +84,9 @@ export function registerActivityAudit(app: Express): void {
       if (!actor) return; // 로그인 안 된 요청(거부됨)은 인증 로그가 따로 남는다
       recordAudit({
         kind: "config", // 라우트가 자기 손으로 남기는 상세 기록(kind=write)과 구분한다
-        action: `${menu} ${VERB[req.method] ?? req.method}`,
+        // 무슨 일이었는지가 확실하면 그 이름을 쓴다 — 「계정 관리 추가·실행」으로 뭉뚱그리면
+        // 감사 때 비밀번호 변경과 계정 생성이 구분되지 않는다(실측으로 확인한 문제다).
+        action: `${menu} ${세부행위이름(target) ?? VERB[req.method] ?? req.method}`,
         target,
         detail: `${req.method} ${req.path}`,
         actor,
