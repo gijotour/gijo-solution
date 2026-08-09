@@ -363,8 +363,29 @@ function directAnswerFor(calls: AgentToolCall[]): string | null {
   if (INTERNAL_TOOL_ERROR_RE.test(only.result)) return null; // 실패 결과는 재작성 경로에서 안내
   // "못 찾았다"는 답은 그대로 내보낸다 — 재작성을 거치면 "존재하지 않습니다"로 부풀려
   // 담당자가 "우리 회사엔 없구나"로 오해하는 사고가 있었다(2026-07-26 실사용).
-  if (only.result.startsWith(NO_HIT_PREFIX)) return 사람용으로다듬기(only.result);
+  // ★ 법령만 예외 — 못 찾았으면 **모델에게 넘긴다**(2026-08-09, 회귀 하네스가 잡음).
+  //   법령 도구가 생기자 모델이 그걸 집으면서, 「접속기록 몇 년 보관?」처럼 답이 있던 질문에
+  //   "찾지 못했습니다"만 나갔다. 사내 지식을 뒤져 봐도 **0건**이라 되짚을 곳도 없다 —
+  //   원래 그 답은 모델이 알고 있던 것이었다(실측: 제30조·1년을 정확히 답한다).
+  //   ⚠ **찾았을 땐 절대 모델을 안 태운다**(아래 directAnswer 그대로) — 조문을 고쳐 쓰면
+  //     법률은 지어내기가 가장 위험한 영역이다. 못 찾은 경우에만 연다.
+  //   ⚠ 대신 「법제처에서 확인 못 한 일반 지식」이라는 딱지를 코드로 붙인다(법령한계를밝힌다).
+  if (only.result.startsWith(NO_HIT_PREFIX)) {
+    return only.tool === "law_lookup" ? null : 사람용으로다듬기(only.result);
+  }
   return findAgentTool(only.tool)?.directAnswer ? 사람용으로다듬기(only.result) : null;
+}
+
+/**
+ * 법령을 못 찾아 **모델이 대신 답한** 경우, 그 사실을 답에 못 박는다.
+ *
+ * 모델에게 "이렇게 말해"라고 시키지 않는다 — 7B/14B에 프롬프트 규칙을 더해 행동을 고치려던
+ * 시도는 이 저장소에서 반복해 실패했다. 붙일지 말지는 **도구 결과가 결정**하고 코드가 붙인다.
+ */
+export function 법령한계를밝힌다(answer: string, calls: AgentToolCall[]): string {
+  const 못찾은법령 = calls.some((c) => c.tool === "law_lookup" && c.result.startsWith(NO_HIT_PREFIX));
+  if (!못찾은법령 || !answer.trim()) return answer;
+  return `${answer.trim()}\n\n⚠ **법제처에서 원문을 확인하지 못한 답입니다** — 조문 번호와 내용은 반드시 국가법령정보센터에서 대조하세요. 법률 자문이 아닙니다.`;
 }
 
 // 최종 답 길이 상한 — 도구 결과를 프롬프트에 다시 실을 때 과도하게 커지지 않게 자른다(멈춤 방지).
@@ -1579,7 +1600,7 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
         if (!direct) reportProgress("write", "조회 결과로 답을 쓰고 있습니다");
         const composed = direct ?? (await composeFinalAnswer(instruction, calls, context));
         reportProgress("review", "답변을 검수하고 있습니다");
-        return { output: 다음단계붙이기(guardAgainstDenial(composed, calls), calls), toolCalls: calls };
+        return { output: 다음단계붙이기(법령한계를밝힌다(guardAgainstDenial(composed, calls), calls), calls), toolCalls: calls };
       } catch {
         /* 강제 실행 실패 시 아래 일반 루프로 폴백 */
       }
@@ -1619,7 +1640,7 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
       if (!direct) reportProgress("write", `조회 결과 ${calls.length}건으로 답을 쓰고 있습니다`);
       const composed = direct ?? (await composeFinalAnswer(instruction, calls, context));
       reportProgress("review", "답변을 검수하고 있습니다");
-      const output = 다음단계붙이기(guardAgainstDenial(composed, calls), calls);
+      const output = 다음단계붙이기(법령한계를밝힌다(guardAgainstDenial(composed, calls), calls), calls);
       return { output, toolCalls: calls };
     }
 
