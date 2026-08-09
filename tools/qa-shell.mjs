@@ -75,7 +75,10 @@ const snap = () => page.evaluate(() => ({
   활성: document.querySelector("#tabBar .tab.on .nm")?.textContent || null,
   프레임: document.querySelectorAll("#screens iframe").length,
   보이는프레임: document.querySelectorAll("#screens iframe.on").length,
-  맥락: document.getElementById("csCtx")?.textContent || null,
+  // ⚠ 맥락 칩은 **이름 + ✕(맥락 떼기)**다(2026-08-09 재설계). textContent를 통째로 읽으면
+  //   "조치 ✕"가 되어 활성 탭 이름("조치")과 영원히 안 맞는다 — 제품은 멀쩡한데 시험만 빨개진다
+  //   (실제로 이 회차에 그렇게 났다). 사람이 읽는 이름만 떼어 본다.
+  맥락: (document.getElementById("csCtx")?.firstChild?.textContent || "").trim() || null,
   activeScreen: window.gijoTabs?.activeScreen() || null,
 }));
 const clickMenu = async (label) => {
@@ -215,7 +218,8 @@ ok(
 );
 if (cw) {
   await cw.waitForTimeout(2500);
-  const wctx = await cw.evaluate(() => document.getElementById("csCtx")?.textContent || null);
+  // 위 snap()과 같은 이유로 이름만 뗀다 — 칩에 ✕가 붙어 있다.
+  const wctx = await cw.evaluate(() => (document.getElementById("csCtx")?.firstChild?.textContent || "").trim() || null);
   const cur = (await snap()).활성;
   ok("빼낸 창에도 맥락이 전달된다", wctx === cur, `창=${wctx} 활성=${cur}`);
   await cw.evaluate(() => document.getElementById("csToggleHost").click());
