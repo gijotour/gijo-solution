@@ -32,7 +32,13 @@ export const BUNDLE_PUBLIC_KEYS: { keyId: string; spkiBase64: string }[] = [
   //   검증을 통과해 고객 온톨로지를 통째로 바꿀 수 있다(keygen.mjs 머리주석의 그 위험).
   //   지금이 가장 싼 시점이라 뺐다 — 이 키로 서명해 배포한 번들이 없었다(시험용 1개뿐,
   //   새 키로 재서명함). 옛 공개키를 되살리지 말 것.
-  { keyId: "gijo-2026b", spkiBase64: "MCowBQYDK2VwAyEAQai8YP8arT081tAQb1R1fePbWgansCK2cC25NhzOmGQ=" },
+  //
+  // ⚠⚠ gijo-2026b도 폐기(2026-08-09, **같은 날 두 번째**) — 그 개인키 파일이 다시
+  //   대화창에 첨부돼 나갔다(Mac ~/Downloads). gijo-2026과 **정확히 같은 경로**다.
+  //   "파일 첨부"가 "대화창 업로드"와 같다는 게 직관적이지 않아 반복된 것으로 본다.
+  //   → 규칙만으로는 안 막힌다. tools/keyleak-check.mjs로 **기계가 잡게** 했다.
+  //   이번에도 배포한 번들이 없어 피해는 없었다(시험용 1개뿐, 새 키로 재서명).
+  { keyId: "gijo-2026c", spkiBase64: "MCowBQYDK2VwAyEA8bmTfarHDAbfGgeh/Z/ZKZVdukiLYTve2/0AoE7mH3s=" },
 ];
 
 /** 번들 파일 최대 크기 — 압축 폭탄과 실수로 통째로 만든 파일을 함께 막는다. */

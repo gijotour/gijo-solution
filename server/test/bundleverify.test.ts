@@ -242,10 +242,15 @@ describe("제품에 실린 공개키", () => {
   //   gijo-2026 개인키가 대화창에 업로드돼 기계 밖으로 나갔다. 남아 있으면 그 키로 위조한
   //   번들이 검증을 통과해 고객 온톨로지를 통째로 바꾼다.
   // ⚠ 이 시험이 빨간불이면 키를 지우기 전에 **왜 되살렸는지**부터 확인할 것.
-  it("★ 유출로 폐기한 gijo-2026은 신뢰 목록에 없다 — 되살리면 위조 번들이 통과한다", () => {
-    expect(BUNDLE_PUBLIC_KEYS.map((k) => k.keyId)).not.toContain("gijo-2026");
+  // ⚠ 폐기 목록은 **늘어난다.** 2026-08-09 하루에 두 번 유출됐다(gijo-2026 → 2026b).
+  //   둘 다 「개인키 파일을 대화창에 첨부」라는 같은 경로였다.
+  const 폐기키 = [
+    { keyId: "gijo-2026", spki: "MCowBQYDK2VwAyEAtrC37/48RV4zVkbdzbCX4dN1Of5hevjs5tmtdlZDbhQ=" },
+    { keyId: "gijo-2026b", spki: "MCowBQYDK2VwAyEAQai8YP8arT081tAQb1R1fePbWgansCK2cC25NhzOmGQ=" },
+  ];
+  it.each(폐기키)("★ 유출로 폐기한 $keyId 은 신뢰 목록에 없다 — 되살리면 위조 번들이 통과한다", ({ keyId, spki }) => {
+    expect(BUNDLE_PUBLIC_KEYS.map((k) => k.keyId)).not.toContain(keyId);
     // 이름을 바꿔 되살리는 경우까지 — 폐기한 **공개키 값** 자체를 막는다.
-    const 폐기 = "MCowBQYDK2VwAyEAtrC37/48RV4zVkbdzbCX4dN1Of5hevjs5tmtdlZDbhQ=";
-    expect(BUNDLE_PUBLIC_KEYS.map((k) => k.spkiBase64)).not.toContain(폐기);
+    expect(BUNDLE_PUBLIC_KEYS.map((k) => k.spkiBase64)).not.toContain(spki);
   });
 });
