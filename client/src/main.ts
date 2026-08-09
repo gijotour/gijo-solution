@@ -97,20 +97,50 @@ ipcMain.handle("creds:pwSupported", () => pwEncAvailable());
 function maybeStartBundledServer(): void {
   if (process.env.GIJO_SERVER_URL) return; // 원격 서버를 명시적으로 지정한 경우 번들 서버 기동 안 함
 
+  const 패키징경로 = path.join(process.resourcesPath, "server-dist/dist/index.js");
   const candidates = [
-    path.join(process.resourcesPath, "server-dist/dist/index.js"), // 패키징된 배포판(extraResources)
+    패키징경로, // 패키징된 배포판(extraResources)
     path.join(__dirname, "../server-dist/dist/index.js"), // dev: npm run build-server-dist
     path.join(__dirname, "../../server/dist/index.js"), // dev: sibling 폴더의 서버 직접 빌드
   ];
   const bundledServerEntry = candidates.find((p) => fs.existsSync(p));
   if (!bundledServerEntry) return; // 서버가 동봉되지 않은 배포(순수 클라이언트)
 
-  // cwd를 서버 자신의 위치(dist/의 부모)로 고정한다 — db.ts/memory.ts가 "data/..." 같은 상대경로를
-  // 쓰기 때문에, 지정하지 않으면 Electron이 실행된 위치에 따라 데이터가 엉뚱한 곳에 생긴다.
+  // cwd를 고정한다 — db.ts/memory.ts가 "data/..." 같은 상대경로를 쓰기 때문에, 지정하지 않으면
+  // Electron이 실행된 위치에 따라 데이터가 엉뚱한 곳에 생긴다.
   const serverRoot = path.dirname(path.dirname(bundledServerEntry));
+
+  // ⚠ **패키징본에서는 serverRoot에 쓰면 안 된다** — 그 자리가 앱 번들 **안**이다.
+  //   2026-08-09 mac 실측(첫 실행 한 번):
+  //     /Applications/GIJO AS.app/Contents/Resources/server-dist/data/
+  //       gijo-as.sqlite(마이그레이션 37건) · -wal 3.1MB · kev.json · memory.lancedb · backups/
+  //     codesign --verify → "a sealed resource is missing or invalid"
+  //   따라오는 피해가 셋이다:
+  //     ① **업데이트가 고객 데이터를 지운다** — 새 .app으로 교체하면 DB가 통째로 없어진다.
+  //        가장 확실하고 무거운 쪽이다.
+  //     ② **코드 서명 봉인이 첫 실행에 깨진다** — 같은 날 XProtect가 앱을 「악성」으로 보고
+  //        휴지통에 넣었던 그 상태다(client/build/mac-adhoc-sign.cjs 주석 참고). 승인된
+  //        앱은 당장 지워지지 않았지만, 다시 격리되는 경로(백업 복원·재다운로드·다른 기계로
+  //        이동)에서 되살아난다. verify가 실패하는 앱은 MDM·EDR 점검에서도 변조로 잡힌다.
+  //     ③ 쓰기 권한이 없는 자리(관리되는 Mac, Windows의 Program Files)에서는 아예 못 뜬다.
+  //
+  //   그래서 패키징본만 **사용자별 쓰기 가능한 자리**(userData)로 보낸다. 읽기 전용 자산
+  //   (docs/·docs-manifest.json)은 여전히 번들 안이므로 환경변수로 그 자리를 알려 준다 —
+  //   그 우회로는 서버에 이미 있었다(knowledgebundle.ts·docsbundle.ts·docbox.ts).
+  //
+  // ⚠ dev에서는 **바꾸지 않는다.** dev의 serverRoot는 server/(또는 client/server-dist/)라
+  //   원래 맞는 자리고, 여기서 userData로 옮기면 담당자가 쓰던 개발 DB를 못 보게 된다.
+  const 패키징본 = bundledServerEntry === 패키징경로;
+  const dataRoot = 패키징본 ? app.getPath("userData") : serverRoot;
+  const env: NodeJS.ProcessEnv = { ...process.env, ELECTRON_RUN_AS_NODE: "1" };
+  if (패키징본) {
+    try { fs.mkdirSync(dataRoot, { recursive: true }); } catch { /* 이미 있으면 그만 */ }
+    env.GIJO_DOCS_DIR = path.join(serverRoot, "docs");
+    env.GIJO_DOCS_MANIFEST = path.join(serverRoot, "docs-manifest.json");
+  }
   bundledServerProcess = spawn(process.execPath, [bundledServerEntry], {
-    cwd: serverRoot,
-    env: { ...process.env, ELECTRON_RUN_AS_NODE: "1" },
+    cwd: dataRoot,
+    env,
     stdio: "inherit",
   });
 }
