@@ -3,15 +3,15 @@
 // 실제 운영 디스패처(/api/dispatch)에 카탈로그(menu-scenarios.mjs)의 명령을 화면별로 보내
 // 선택된 도구/액션이 기대와 맞는지 측정한다. "비슷한 명령"이 같은 기능으로 라우팅되는지 수치로 본다.
 // 실행(WSL 운영서버에서): node tools/menu-dispatch-accuracy.mjs
-//   BASE 기본 http://localhost:4000 · 계정 GIJO_BENCH_USER/PASS(기본 jyh/gijohn00)
+//   BASE 기본 http://localhost:4000 · 계정은 환경변수로(GIJO_ADMIN_USER/GIJO_ADMIN_PASSWORD)
 
 import { CATALOG } from "./menu-scenarios.mjs";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { account } from "../../tools/qa-account.mjs";
 
 const BASE = process.env.GIJO_BASE ?? "http://localhost:4000";
-const USER = process.env.GIJO_BENCH_USER ?? "jyh";
-const PASS = process.env.GIJO_BENCH_PASS ?? "gijohn00";
+const { user: USER, pass: PASS } = account("메뉴 라우팅 정확도 측정");
 const REPORT_OUT = process.env.GIJO_REPORT_OUT ?? path.join("tools", "bench-results", "menu-dispatch-report.md");
 
 async function login() {

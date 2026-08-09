@@ -1,12 +1,15 @@
 // tools/hardening-remote-e2e.mjs — 원격 SSH 정기점검 파이프라인 실 e2e.
 // 대상 등록 → 접속확인 → 수동 점검 → 스케줄 등록 → 실제 스케줄러가 자동 실행 → 이력 확인 → 정리.
 // SSH 전송부는 유닛 검증(sshCommandFor)했고, 여기선 local 대상으로 전 파이프라인을 실 명령으로 e2e.
+import { account } from "./qa-account.mjs";
+
 const BASE = "http://127.0.0.1:4000";
 const sleep = (ms) => new Promise((s) => setTimeout(s, ms));
 const j = (r) => r.json();
+const { user: USER, pass: PASS } = account("원격 점검 e2e");
 
 async function login() {
-  const r = await fetch(`${BASE}/api/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: "jyh", password: "gijohn00", force: true }) });
+  const r = await fetch(`${BASE}/api/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: USER, password: PASS, force: true }) });
   return (await j(r)).accessToken;
 }
 const H = (tok, body) => ({ method: body ? "POST" : "GET", headers: { "Content-Type": "application/json", Authorization: `Bearer ${tok}` }, ...(body ? { body: JSON.stringify(body) } : {}) });

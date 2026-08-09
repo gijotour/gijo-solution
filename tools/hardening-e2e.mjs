@@ -1,9 +1,13 @@
 // tools/hardening-e2e.mjs — 운영 4000 서버 실 HTTP e2e: 하드닝 점검 엔드포인트를 실제 호출한다.
 // 서버(WSL 리눅스)가 곧 점검 대상 — 자기 자신을 실 명령으로 스캔한 실측 리포트를 받는다.
 // curl은 한글을 깨뜨리므로 Node fetch로 검증(프로젝트 규칙).
+import { account } from "./qa-account.mjs";
+
 const BASE = process.env.GIJO_SERVER_URL || "http://127.0.0.1:4000";
-const USER = process.env.GIJO_USER || "jyh";
-const PWS = (process.env.GIJO_PW || "gijohn00,changeme,gijohn00!").split(",");
+// ⚠ 예전엔 비밀번호 후보를 코드에 늘어놓고 차례로 시도했다 — 그게 곧 비밀번호를 저장소에
+//   적어 두는 일이었다(2026-08-09 정리). 하나만 받고, 없으면 무엇을 해야 하는지 말하고 멈춘다.
+const { user: USER, pass: PASS } = account("하드닝 점검 e2e");
+const PWS = [PASS];
 
 async function login() {
   for (const password of PWS) {

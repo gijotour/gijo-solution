@@ -14,7 +14,10 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 const APPLIANCE = process.env.SCAN_TARGET_LABEL || "fw-linux-appliance-01 (Ubuntu 24.04, 리눅스 기반 보안 어플라이언스)";
-const SUDO_PW = process.env.SCAN_SUDO_PW || "007700";
+// ⚠ 기본값을 두지 않는다 — 예전엔 실제 sudo 비밀번호가 여기 적혀 있었다(2026-08-09 정리).
+//   없으면 sudo가 필요한 항목만 건너뛴다(있는 척하지 않는다 — 조용한 실패 금지).
+const SUDO_PW = process.env.SCAN_SUDO_PW || "";
+if (!SUDO_PW) console.error("ℹ SCAN_SUDO_PW가 없어 sudo가 필요한 점검은 건너뜁니다(환경변수로 넣으면 전부 실행).");
 
 // "장비 CLI에 접속해 명령 실행" — 대역으로 WSL bash. (실 장비면 ssh user@host "cmd"로 교체)
 function runOnAppliance(cmd) {

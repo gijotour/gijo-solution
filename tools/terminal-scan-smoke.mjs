@@ -7,7 +7,9 @@ import { pathToFileURL, fileURLToPath } from "url";
 const ROOT = path.resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
 const require = createRequire(pathToFileURL(path.join(ROOT, "client", "package.json")));
 const { chromium } = require("playwright-core");
+const { account } = await import(pathToFileURL(path.join(ROOT, "tools", "qa-account.mjs")).href);
 const sleep = (ms) => new Promise((s) => setTimeout(s, ms));
+const { user: USER, pass: PASS } = account("터미널 화면 스모크");
 
 async function main() {
   let browser;
@@ -23,8 +25,8 @@ async function main() {
 
   if (page.url().includes("login")) {
     await page.fill("#serverUrl", "http://localhost:4000").catch(() => {});
-    await page.fill("#username", "jyh");
-    await page.fill("#password", "gijohn00");
+    await page.fill("#username", USER);
+    await page.fill("#password", PASS);
     await page.click("#loginBtn");
     await sleep(3000);
     page = ctx.pages()[0];

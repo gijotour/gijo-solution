@@ -8,8 +8,11 @@ import { readFileSync, writeFileSync, existsSync } from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
+import { account } from "../../tools/qa-account.mjs";
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const BASE = process.env.GIJO_BASE ?? "http://localhost:4000";
+const { user: USER, pass: PASS } = account("VPN 접속 점검");
 const STATE_PATH = process.env.GIJO_VPN_CHECK_STATE ?? path.join(__dirname, "..", "data", "vpn-access-check-state.json");
 // 사용자 요청(2026-07-22): 10.8.0.2~10 좁은 범위 → 10.8.0.x 전체(서브넷 전 대역)로 확대.
 const RANGE_LOW = Number(process.env.GIJO_VPN_RANGE_LOW ?? 0);
@@ -26,7 +29,7 @@ async function main() {
   const loginRes = await fetch(`${BASE}/api/auth/login`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username: "jyh", password: "gijohn00", force: true }),
+    body: JSON.stringify({ username: USER, password: PASS, force: true }),
   }).then((r) => r.json());
   const token = loginRes.accessToken;
   if (!token) { console.error("로그인 실패"); process.exit(1); }

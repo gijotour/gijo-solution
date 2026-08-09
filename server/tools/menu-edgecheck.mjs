@@ -2,8 +2,11 @@
 // 1회 측정으로는 실제 오라우팅과 변동성을 구분 못 한다(교훈). 각 케이스를 RUNS회 돌려 통과율을 본다.
 // 실행: node tools/menu-edgecheck.mjs   (RUNS 기본 3, GIJO_EDGE_RUNS로 조절)
 
+import { account } from "../../tools/qa-account.mjs";
+
 const BASE = process.env.GIJO_BASE ?? "http://localhost:4000";
 const RUNS = Number(process.env.GIJO_EDGE_RUNS ?? 3);
+const { user: USER, pass: PASS } = account("오라우팅 엣지 측정");
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const CASES = [
@@ -15,7 +18,7 @@ const CASES = [
 ];
 
 async function login() {
-  const r = await fetch(`${BASE}/api/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: "jyh", password: "gijohn00", force: true }) });
+  const r = await fetch(`${BASE}/api/auth/login`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ username: USER, password: PASS, force: true }) });
   const j = await r.json(); if (!j.accessToken) throw new Error("login fail"); return j.accessToken;
 }
 async function dispatch(ref, text, screen) {
