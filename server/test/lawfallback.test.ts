@@ -113,21 +113,30 @@ describe("배선 (소스 계약)", () => {
     expect(src).toContain("return findAgentTool(only.tool)?.directAnswer ? 사람용으로다듬기(only.result) : null;");
   });
 
-  it("★ 보강은 출구 두 곳 모두에 걸린다 — 한 곳만 걸면 다른 길로 샌다", () => {
-    // 강제 분기(forcedToolFor)와 일반 루프(action=final) 둘 다. 실사고 계열:
-    // 갈래마다 심는 구조는 새 갈래가 생기는 순간 조용히 샌다.
-    const 배선 = (src.match(/await 사내지식으로보강\(instruction, calls\)/g) ?? []).length;
-    expect(배선, "강제 분기 경로와 일반 루프 경로 둘 다").toBe(2);
+  // ⚠ 2026-08-10: 출구가 **네 곳**이었다(강제 분기·final·조회형 즉답·반복 상한).
+  //   두 곳에만 심었더니 law_lookup이 directAnswer라 「접속기록 몇 년?」이 즉답 출구로 샜다.
+  //   그래서 갈래마다 세는 시험을 버리고 **출구가 하나뿐임**을 지킨다 — 새 갈래가 생겨도
+  //   그 함수를 부르지 않으면 여기서 걸린다.
+  const 루프본문 = src.slice(src.indexOf("export async function runAgentLoop"));
+
+  it("★★ runAgentLoop의 모든 답 출구는 사람에게내보낸다()를 거친다", () => {
+    // toolCalls를 실어 돌려주는 return = 사람에게 답이 나가는 자리.
+    const 답출구 = [...루프본문.matchAll(/return \{[^}]*toolCalls: calls[^}]*\}/g)].map((m) => m[0]);
+    expect(답출구.length, "답 출구를 하나도 못 찾았으면 이 시험이 헛돌고 있다").toBeGreaterThan(2);
+    const 안거친것 = 답출구.filter((r) => !r.includes("사람에게내보낸다") && !r.includes("approvalMessage"));
+    expect(안거친것, "결재판(approval) 말고는 전부 그 함수를 거쳐야 한다").toEqual([]);
   });
 
-  it("★ 딱지도 출구 두 곳 모두에 걸린다", () => {
-    const 배선 = (src.match(/법령한계를밝힌다\(guardAgainstDenial\(composed, calls\), calls\)/g) ?? []).length;
-    expect(배선).toBe(2);
+  it("★ 보강·딱지는 그 함수 **안에서 한 번씩만** 불린다 — 갈래로 흩어지면 또 샌다", () => {
+    expect((src.match(/await 사내지식으로보강\(instruction, calls\)/g) ?? []).length).toBe(1);
+    expect((src.match(/법령한계를밝힌다\(guardAgainstDenial\(/g) ?? []).length).toBe(1);
   });
 
-  it("★★ 보강은 directAnswerFor **앞**에 있어야 한다 — 뒤에 있으면 이미 답이 나간 뒤다", () => {
-    for (const 조각 of src.split("await 사내지식으로보강(instruction, calls)").slice(1)) {
-      expect(조각.slice(0, 200), "보강 직후에 directAnswerFor가 온다").toContain("directAnswerFor(calls)");
-    }
+  it("★★ 보강이 조립보다 **먼저** 온다 — 뒤면 이미 답이 만들어진 뒤다", () => {
+    const 함수 = src.slice(src.indexOf("async function 사람에게내보낸다"));
+    const 보강 = 함수.indexOf("await 사내지식으로보강");
+    const 조립 = 함수.indexOf("composeFinalAnswer");
+    expect(보강).toBeGreaterThan(-1);
+    expect(보강, "보강 → 조립 순서여야 한다").toBeLessThan(조립);
   });
 });

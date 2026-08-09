@@ -403,6 +403,31 @@ export function 법령답이부족한가(instruction: string, result: string): b
   return 값을묻는말.test(instruction);
 }
 
+/**
+ * **답이 사람에게 나가는 마지막 한 곳.** 보강 → 조립 → 딱지 → 다음 단계를 여기서 다 한다.
+ *
+ * ⚠ 왜 한 곳으로 모았나(2026-08-10): 처음엔 출구 두 곳(강제 분기·일반 루프 final)에만
+ *   보강을 심었는데, `runAgentLoop`에는 출구가 **네 곳**이었다. law_lookup은 directAnswer
+ *   도구라 목록을 받는 순간 **early return**(조회형 즉답)으로 빠져나가 보강을 건너뛰었다 —
+ *   「접속기록 몇 년?」이 정확히 그 길로 샜다. 반복 상한 출구도 마찬가지였다.
+ *   이 저장소가 반복해 겪은 유형이다: **갈래마다 심으면 새 갈래가 생기는 순간 샌다.**
+ *   그래서 갈래를 없애고 함수 하나로 모은다. 새 출구가 생겨도 이 함수를 부르면 다 따라온다.
+ */
+async function 사람에게내보낸다(
+  instruction: string,
+  calls: AgentToolCall[],
+  context: string,
+  옵션: { 즉답?: string | null } = {},
+): Promise<string> {
+  await 사내지식으로보강(instruction, calls);
+  // 보강이 붙었으면 즉답(도구 원문 그대로)은 더 이상 답이 아니다 — 근거가 둘이 됐으므로 다시 쓴다.
+  const direct = 옵션.즉답 !== undefined ? (calls.length === 1 ? 옵션.즉답 : null) : directAnswerFor(calls);
+  if (!direct) reportProgress("write", "조회 결과로 답을 쓰고 있습니다");
+  const composed = direct ?? (await composeFinalAnswer(instruction, calls, context));
+  reportProgress("review", "답변을 검수하고 있습니다");
+  return 다음단계붙이기(법령한계를밝힌다(guardAgainstDenial(composed, calls), calls), calls);
+}
+
 /** 부족하면 사내 지식을 한 번 더 뒤져 calls에 근거로 얹는다(제자리 수정). */
 export async function 사내지식으로보강(instruction: string, calls: AgentToolCall[]): Promise<void> {
   const law = calls.find((c) => c.tool === "law_lookup");
@@ -1652,12 +1677,7 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
         const result = String(await tool.run(forced.args));
         recordToolWork(forced.tool, scope);
         const calls: AgentToolCall[] = [{ tool: forced.tool, args: forced.args, result }];
-        await 사내지식으로보강(instruction, calls); // 법령이 부족하면 사내 근거를 얹는다
-        const direct = directAnswerFor(calls);
-        if (!direct) reportProgress("write", "조회 결과로 답을 쓰고 있습니다");
-        const composed = direct ?? (await composeFinalAnswer(instruction, calls, context));
-        reportProgress("review", "답변을 검수하고 있습니다");
-        return { output: 다음단계붙이기(법령한계를밝힌다(guardAgainstDenial(composed, calls), calls), calls), toolCalls: calls };
+        return { output: await 사람에게내보낸다(instruction, calls, context), toolCalls: calls };
       } catch {
         /* 강제 실행 실패 시 아래 일반 루프로 폴백 */
       }
@@ -1693,13 +1713,7 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
 
     if (decision.action === "final") {
       if (calls.length === 0) return null; // 도구가 필요 없는 일반 대화 → 기존 채팅(RAG·이력)이 더 낫다
-      await 사내지식으로보강(instruction, calls); // 법령이 부족하면 사내 근거를 얹는다
-      const direct = directAnswerFor(calls);
-      if (!direct) reportProgress("write", `조회 결과 ${calls.length}건으로 답을 쓰고 있습니다`);
-      const composed = direct ?? (await composeFinalAnswer(instruction, calls, context));
-      reportProgress("review", "답변을 검수하고 있습니다");
-      const output = 다음단계붙이기(법령한계를밝힌다(guardAgainstDenial(composed, calls), calls), calls);
-      return { output, toolCalls: calls };
+      return { output: await 사람에게내보낸다(instruction, calls, context), toolCalls: calls };
     }
 
     // action=tool — 규칙 검증이 LLM 출력 뒤에 항상 위치한다(QA 원칙).
@@ -1772,13 +1786,13 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
     //   않는다 — 안전한 실패 방향으로 기울여 둔다.
     const early = directAnswerFor(calls);
     if (early && !ACTION_INTENT_RE.test(instruction)) {
-      return { output: 다음단계붙이기(guardAgainstDenial(early, calls), calls), toolCalls: calls };
+      // ⚠ 즉답이라도 **출구를 거친다**(2026-08-10). 예전엔 여기서 곧장 나가느라 보강도 딱지도
+      //   건너뛰었다 — law_lookup이 directAnswer라 「접속기록 몇 년?」이 정확히 이 길로 샜다.
+      return { output: await 사람에게내보낸다(instruction, calls, context, { 즉답: early }), toolCalls: calls };
     }
   }
 
   // 반복 상한 도달 — 지금까지 모은 결과로라도 답을 만든다(도구를 썼을 때만).
   if (calls.length === 0) return null;
-  const direct = directAnswerFor(calls);
-  const output = 다음단계붙이기(guardAgainstDenial(direct ?? (await composeFinalAnswer(instruction, calls, context)), calls), calls);
-  return { output, toolCalls: calls };
+  return { output: await 사람에게내보낸다(instruction, calls, context), toolCalls: calls };
 }
