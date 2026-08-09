@@ -39,6 +39,20 @@ fs.cpSync(path.join(serverDir, "dist"), path.join(outDir, "dist"), { recursive: 
 fs.copyFileSync(path.join(serverDir, "package.json"), path.join(outDir, "package.json"));
 fs.copyFileSync(path.join(serverDir, "package-lock.json"), path.join(outDir, "package-lock.json"));
 
+// 저장 암호화 전환·복구 스크립트 — **올인원 고객이 암호화를 켤 수 있으려면 함께 나가야 한다.**
+// 2026-08-09 실측: 새로 설치한 앱의 DB를 열쇠 없이 그대로 읽었다. 설정 화면은 정직하게
+// 「꺼져 있습니다」라고 말하고 켜는 방법도 안내하는데, 그 방법(node scripts/encrypt-db.mjs)이
+// **배포본에 없어서 따를 수가 없었다.** 여기 없는 것은 고객에게 나가지 않는다 — 그래서 담는다.
+// (앱이 이 스크립트를 직접 실행한다 — main.ts의 dbcrypt:enable. 고객은 터미널을 열지 않는다)
+const 스크립트 = ["encrypt-db.mjs", "recover-db-key.mjs"];
+const scriptsOut = path.join(outDir, "scripts");
+fs.mkdirSync(scriptsOut, { recursive: true });
+for (const f of 스크립트) {
+  const src = path.join(serverDir, "scripts", f);
+  if (fs.existsSync(src)) fs.copyFileSync(src, path.join(scriptsOut, f));
+  else console.warn(`[build-server-dist] ⚠ ${f} 없음 — 고객이 저장 암호화를 켤 수 없게 됩니다`);
+}
+
 // 제품 문서 기본 코퍼스(docsbundle.ts가 첫 기동 때 지식베이스에 인입한다). 설치본에는
 // 리포지토리가 없으므로 매니페스트에 열거된 문서만 골라 server-dist/docs/에 실어 보낸다 —
 // 여기 복사되지 않은 문서는 고객사에 나가지 않는다(내부 개발 문서 유출 차단이 목적).

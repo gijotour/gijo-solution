@@ -18,6 +18,8 @@ let docboxWindow: BrowserWindow | null = null; // 문서함 별도 창 — 제�
 let officeWindow: BrowserWindow | null = null; // "우리 AI 팀 사무실" 별도 창(시안 B) — 관제 모니터 상시용
 let quitConfirmed = false; // 메인 창 닫기 확인을 통과했는가 — 재시작·업데이트는 true로 건너뛴다
 let bundledServerProcess: ChildProcess | null = null;
+/** 이 앱이 서버를 직접 띄웠을 때만 채워진다 — 저장 암호화 전환처럼 **서버를 멈춰야 하는 일**에 쓴다. */
+let 번들서버: { entry: string; serverRoot: string; dataRoot: string; env: NodeJS.ProcessEnv } | null = null;
 
 // 페이지 전체 네비게이션(loadFile) 시마다 preload가 재실행되어 사라지는 인증 토큰/서버 주소를
 // 여기(메인 프로세스, 앱 생명주기 동안 유지됨)에 보관한다 — apiClient.ts가 동기 IPC로 읽고 쓴다.
@@ -138,12 +140,82 @@ function maybeStartBundledServer(): void {
     env.GIJO_DOCS_DIR = path.join(serverRoot, "docs");
     env.GIJO_DOCS_MANIFEST = path.join(serverRoot, "docs-manifest.json");
   }
+  // 계산한 값을 **그대로 보관한다.** 저장 암호화 전환(dbcrypt:enable)이 같은 DB를 봐야 하는데,
+  // 규칙을 그쪽에 한 번 더 적으면 언젠가 어긋나 **딴 DB를 암호화한다.**
+  번들서버 = { entry: bundledServerEntry, serverRoot, dataRoot, env };
   bundledServerProcess = spawn(process.execPath, [bundledServerEntry], {
     cwd: dataRoot,
     env,
     stdio: "inherit",
   });
 }
+
+// ── 저장 암호화 켜기 (앱이 직접 서버를 띄운 경우에만) ──────────────────────────
+//
+// 왜 앱이 해야 하나 (2026-08-09 실측): 새로 설치한 앱의 DB를 **열쇠 없이 그대로 읽었다.**
+// 설정 화면은 정직하게 「꺼져 있습니다」라고 말하고 켜는 방법도 안내하는데, 그 방법이
+// "서버를 멈추고 node scripts/encrypt-db.mjs 실행"이었다. 올인원 고객에게는
+//   · 따로 멈출 서버가 없고(앱이 곧 서버다)
+//   · 터미널을 여는 흐름이 없고
+//   · 애초에 그 스크립트가 배포본에 들어 있지도 않았다
+// 즉 **따를 수 없는 안내**였다. 서버를 쥐고 있는 것은 이 앱이므로, 멈추고·전환하고·다시
+// 띄우는 일을 앱이 한다. 전환 자체는 이미 검증된 scripts/encrypt-db.mjs를 그대로 쓴다 —
+// 백업 → 열쇠 생성 → rekey → 행 수 대조 검증 → 실패 시 백업으로 자동 복원이 그 안에 있다.
+// 여기서 암호화를 새로 구현하지 않는다.
+function 전환스크립트경로(): string | null {
+  if (!번들서버) return null;
+  const p = path.join(번들서버.serverRoot, "scripts", "encrypt-db.mjs");
+  return fs.existsSync(p) ? p : null;
+}
+
+ipcMain.handle("dbcrypt:canEnableInApp", () => {
+  if (!번들서버) return { can: false, why: "이 앱이 서버를 띄우지 않았습니다 — 분산 모드(사내 서버)에서는 서버 쪽에서 켜야 합니다." };
+  if (!전환스크립트경로()) return { can: false, why: "전환 도구가 이 설치에 없습니다." };
+  return { can: true };
+});
+
+ipcMain.handle("dbcrypt:enable", async () => {
+  const 스크립트 = 전환스크립트경로();
+  if (!번들서버 || !스크립트) return { ok: false, error: "이 설치에서는 켤 수 없습니다." };
+
+  // ① 서버를 멈춘다 — DB를 쥔 채로 rekey하면 안 된다.
+  if (bundledServerProcess) {
+    bundledServerProcess.kill();
+    bundledServerProcess = null;
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+
+  // ② 전환. DB 경로는 **서버가 쓰는 것과 같은 규칙**으로 정한다(어긋나면 딴 DB를 암호화한다).
+  const dbPath = 번들서버.env.GIJO_DB_PATH ?? path.join("data", "gijo-as.sqlite");
+  const 결과 = await new Promise<{ code: number; out: string }>((resolve) => {
+    const p = spawn(process.execPath, [스크립트, "--db", dbPath], {
+      cwd: 번들서버!.dataRoot,
+      env: { ...번들서버!.env, ELECTRON_RUN_AS_NODE: "1" },
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    let out = "";
+    p.stdout?.on("data", (d) => (out += String(d)));
+    p.stderr?.on("data", (d) => (out += String(d)));
+    p.on("close", (code) => resolve({ code: code ?? -1, out }));
+  });
+
+  // ③ 서버를 다시 띄운다 — 성공이든 실패든 **반드시** 한다. 여기서 안 띄우면 앱이 먹통이 된다.
+  maybeStartBundledServer();
+
+  if (결과.code !== 0) {
+    // 스크립트가 검증에 실패하면 스스로 백업으로 되돌린다 — 여기서 손대지 않는다.
+    return { ok: false, error: (결과.out.split("\n").filter(Boolean).pop() ?? "전환 실패").slice(0, 300) };
+  }
+
+  // ④ 복구 열쇠를 뽑는다. **위치가 아니라 형식으로** 찾는다 — 안내 문구가 바뀌어도 견딘다.
+  //    형식은 실측으로 확인했다: 5자 6묶음(EEFSF-KUD7C-MATSB-RMMDY-UAHQN-8YYXS).
+  const recoveryKey = /\b[A-Z0-9]{5}(?:-[A-Z0-9]{5}){5}\b/.exec(결과.out)?.[0] ?? null;
+  return {
+    ok: true,
+    recoveryKey, // null이면 전환은 됐는데 열쇠를 못 읽은 것 — 화면이 그렇게 말한다
+    note: recoveryKey ? null : "전환은 끝났지만 복구 열쇠를 화면에 옮기지 못했습니다. 설정에서 «복구 열쇠 재발급»으로 새로 받으세요.",
+  };
+});
 
 // 본 창 크기 — 화면(작업영역)에 맞춘다.
 // ⚠ 예전에는 1440×900·최소 1180으로 숫자가 박혀 있었다. 세로 모니터(예: 1080×1920)에서는

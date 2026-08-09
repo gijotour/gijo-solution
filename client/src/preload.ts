@@ -44,6 +44,10 @@ const gijoApi = {
   openDocbox: () => ipcRenderer.invoke("docbox:open"),
   dbCryptStatus: () => api.dbCryptApi.status(),
   dbCryptRotateRecovery: () => api.dbCryptApi.rotateRecovery(),
+  // 저장 암호화 켜기 — **서버가 아니라 메인 프로세스**가 한다. 전환에 서버 정지가 필요한데
+  // 그 서버를 띄운 것이 이 앱이기 때문이다(main.ts의 dbcrypt:enable 주석 참고).
+  dbCryptCanEnableInApp: () => ipcRenderer.invoke("dbcrypt:canEnableInApp"),
+  dbCryptEnable: () => ipcRenderer.invoke("dbcrypt:enable"),
   mfaResetUser: (userId: string) => api.authApi.mfaResetUser(userId),
   mfaPolicy: () => api.authApi.mfaPolicy(),
   mfaSetPolicy: (on: boolean) => api.authApi.mfaSetPolicy(on),
