@@ -96,8 +96,25 @@ ipcMain.handle("creds:pwSupported", () => pwEncAvailable());
  * `npm run rebuild-server-native`로 그때그때 재빌드해야 한다(테스트/독립 실행과 ABI가
  * 상충하므로 되돌리려면 `cd server && npm rebuild better-sqlite3`).
  */
-function maybeStartBundledServer(): void {
-  if (process.env.GIJO_SERVER_URL) return; // 원격 서버를 명시적으로 지정한 경우 번들 서버 기동 안 함
+/**
+ * **첫 설치인가** — 아직 DB가 없어서 관리자 계정이 만들어지기 전인가.
+ *
+ * ⚠ 반드시 **서버를 띄우기 전에** 판정한다. 서버가 뜨면 그 자리에서 DB가 생겨 판정이 뒤집힌다.
+ * 왜 필요한가(2026-08-09 실측): 배포본이 고객 기계에 **jyh/changeme**를 만들고 있었다.
+ * users.ts의 computeInitialAdmin은 「운영이면 랜덤 비번을 만들어 콘솔에 1회 출력」하는데,
+ * 그 갈래는 NODE_ENV==="production"일 때만 돌고 **Electron은 그 값을 설정하지 않는다.**
+ * 그래서 개발용 기본값이 그대로 고객에게 나갔다 — 게다가 고객 화면에 개발자 이름이 떴다.
+ * 랜덤 비번으로 바꾸는 것만으로는 더 나빠진다: 그 값이 찍히는 **콘솔을 고객은 볼 수 없어**
+ * 아예 못 들어간다. 그래서 **고객이 직접 정하게** 한다 — 보관할 비밀도, 잠기는 경우도 없다.
+ */
+let 첫설치 = false;
+export function 첫설치인가(): boolean {
+  return 첫설치;
+}
+
+/** 번들 서버의 자리와 실행 조건. **띄우지 않고** 계산만 한다(첫 설치 판정에 먼저 필요하다). */
+function 번들서버구성(): { entry: string; serverRoot: string; dataRoot: string; env: NodeJS.ProcessEnv; 패키징본: boolean } | null {
+  if (process.env.GIJO_SERVER_URL) return null; // 원격 서버를 명시적으로 지정한 경우 번들 서버 기동 안 함
 
   const 패키징경로 = path.join(process.resourcesPath, "server-dist/dist/index.js");
   const candidates = [
@@ -106,7 +123,7 @@ function maybeStartBundledServer(): void {
     path.join(__dirname, "../../server/dist/index.js"), // dev: sibling 폴더의 서버 직접 빌드
   ];
   const bundledServerEntry = candidates.find((p) => fs.existsSync(p));
-  if (!bundledServerEntry) return; // 서버가 동봉되지 않은 배포(순수 클라이언트)
+  if (!bundledServerEntry) return null; // 서버가 동봉되지 않은 배포(순수 클라이언트)
 
   // cwd를 고정한다 — db.ts/memory.ts가 "data/..." 같은 상대경로를 쓰기 때문에, 지정하지 않으면
   // Electron이 실행된 위치에 따라 데이터가 엉뚱한 곳에 생긴다.
@@ -140,11 +157,23 @@ function maybeStartBundledServer(): void {
     env.GIJO_DOCS_DIR = path.join(serverRoot, "docs");
     env.GIJO_DOCS_MANIFEST = path.join(serverRoot, "docs-manifest.json");
   }
+  return { entry: bundledServerEntry, serverRoot, dataRoot, env, 패키징본 };
+}
+
+/** 서버가 쓸 DB 파일의 실제 경로 — 첫 설치 판정과 암호화 전환이 **같은 것**을 봐야 한다. */
+function DB경로(구성: { dataRoot: string; env: NodeJS.ProcessEnv }): string {
+  return path.resolve(구성.dataRoot, 구성.env.GIJO_DB_PATH ?? path.join("data", "gijo-as.sqlite"));
+}
+
+function maybeStartBundledServer(추가환경?: NodeJS.ProcessEnv): void {
+  const 구성 = 번들서버구성();
+  if (!구성) return;
+  const env = { ...구성.env, ...(추가환경 ?? {}) };
   // 계산한 값을 **그대로 보관한다.** 저장 암호화 전환(dbcrypt:enable)이 같은 DB를 봐야 하는데,
   // 규칙을 그쪽에 한 번 더 적으면 언젠가 어긋나 **딴 DB를 암호화한다.**
-  번들서버 = { entry: bundledServerEntry, serverRoot, dataRoot, env };
-  bundledServerProcess = spawn(process.execPath, [bundledServerEntry], {
-    cwd: dataRoot,
+  번들서버 = { ...구성, env };
+  bundledServerProcess = spawn(process.execPath, [구성.entry], {
+    cwd: 구성.dataRoot,
     env,
     stdio: "inherit",
   });
@@ -217,6 +246,33 @@ ipcMain.handle("dbcrypt:enable", async () => {
   };
 });
 
+// ── 첫 설치: 관리자 계정을 **고객이 정한다** ────────────────────────────────
+// 서버는 이미 GIJO_INITIAL_ADMIN_USERNAME/PASSWORD 를 받게 돼 있다(users.ts). 여기서는
+// 그 값을 받아 서버를 띄우기만 한다 — 서버 코드는 고치지 않는다.
+ipcMain.handle("setup:needed", () => 첫설치인가());
+ipcMain.handle("setup:createAdmin", async (_e, username: string, password: string) => {
+  if (!첫설치) return { ok: false, error: "이미 설정이 끝났습니다." };
+  const id = String(username ?? "").trim();
+  if (!/^[A-Za-z0-9._-]{3,32}$/.test(id)) return { ok: false, error: "아이디는 영문·숫자와 . _ - 만 쓸 수 있고 3~32자입니다." };
+  const pw = String(password ?? "");
+  // 제품 최소는 8자다. 화면에서 12자 이상을 권하되, 여기서는 제품 규칙보다 엄하게 막지 않는다 —
+  // 두 곳이 다르면 화면이 통과시킨 값을 여기서 되돌려보내는 일이 생긴다.
+  if (pw.length < 8) return { ok: false, error: "비밀번호는 8자 이상이어야 합니다." };
+
+  maybeStartBundledServer({ GIJO_INITIAL_ADMIN_USERNAME: id, GIJO_INITIAL_ADMIN_PASSWORD: pw });
+
+  // 계정이 만들어질 때까지 기다린다 — 여기서 안 기다리면 로그인 화면이 먼저 떠서 실패한다.
+  // (포트는 login.html의 기본값과 같은 4000이다 — 두 곳이 어긋나면 첫 로그인이 조용히 실패한다)
+  for (let i = 0; i < 90; i++) {
+    try {
+      const r = await fetch("http://127.0.0.1:4000/api/health");
+      if (r.ok) { 첫설치 = false; return { ok: true }; }
+    } catch { /* 아직 안 떴다 */ }
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  return { ok: false, error: "서버가 뜨지 않았습니다. 앱을 다시 실행해 주세요." };
+});
+
 // 본 창 크기 — 화면(작업영역)에 맞춘다.
 // ⚠ 예전에는 1440×900·최소 1180으로 숫자가 박혀 있었다. 세로 모니터(예: 1080×1920)에서는
 //    창이 화면보다 넓게 열리려다 잘리고, 최소 너비(1180)가 화면 너비(1080)보다 커서
@@ -269,7 +325,11 @@ function createMainWindow(): void {
   bindZoom(mainWindow);
 
   // 최초 화면은 로그인. 인증 성공 후 renderer/core.ts가 대시보드로 전환한다.
-  mainWindow.loadFile(path.join(__dirname, "../src/renderer/pages/login.html"));
+  // 첫 설치면 로그인 대신 **관리자 계정 만들기**부터다 — 계정이 없는데 로그인 화면을 띄우면
+  // 고객은 들어갈 방법이 없다(예전엔 개발용 jyh/changeme가 그 자리를 메우고 있었다).
+  mainWindow.loadFile(
+    path.join(__dirname, `../src/renderer/pages/${첫설치인가() ? "setup.html" : "login.html"}`)
+  );
 
   // 대시보드(메인) 창 닫기 확인(2026-07-26 사용자 요청) — 진행 중 대화·열린 팝업이 있는 채로
   // 실수로 X를 눌러 통째로 잃는 것을 막는다. 팝업·사무실·분리 창은 해당 없음(닫아도 잃을 게 없다).
@@ -1069,7 +1129,12 @@ if (!app.requestSingleInstanceLock()) {
     loadSavedRoot(); // 마지막에 고른 파일 탐색기 폴더 복원 (userData는 ready 이후 접근)
     loadSavedZoom(); // 마지막에 고른 화면 크기(배율) 복원
     setupDownloads(); // 파일 받기 저장 경로 — 이게 없으면 내려받기가 조용히 실패한다
-    maybeStartBundledServer();
+    // ⚠ 순서가 중요하다 — **서버를 띄우기 전에** 첫 설치를 판정한다. 서버가 뜨면 그 자리에서
+    //   DB가 생겨 판정이 뒤집힌다. 그리고 첫 설치면 여기서 띄우지 않는다 —
+    //   관리자 계정을 고객에게 받아 그 값을 넣고 띄워야 하기 때문이다(setup:createAdmin).
+    const 서버구성 = 번들서버구성();
+    첫설치 = !!서버구성 && 서버구성.패키징본 && !fs.existsSync(DB경로(서버구성));
+    if (!첫설치) maybeStartBundledServer();
     createMainWindow();
 
     app.on("activate", () => {

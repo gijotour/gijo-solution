@@ -22,17 +22,27 @@ import fs from "fs";
 
 const main = fs.readFileSync(new URL("../../client/src/main.ts", import.meta.url), "utf8");
 
-/** maybeStartBundledServer 함수 본문만 잘라 본다 — 파일 전체를 보면 엉뚱한 곳에 걸린다. */
-function 번들서버기동부(): string {
-  const 시작 = main.indexOf("function maybeStartBundledServer");
-  expect(시작, "maybeStartBundledServer를 찾지 못했습니다 — 함수 이름이 바뀌었나요?").toBeGreaterThan(-1);
+/**
+ * 데이터 자리를 정하는 함수 본문만 잘라 본다 — 파일 전체를 보면 엉뚱한 곳에 걸린다.
+ *
+ * ⚠ 이름이 한 번 바뀐 적이 있다(2026-08-09): 첫 설치 판정이 서버 기동보다 **먼저** 필요해져
+ *   계산 부분이 maybeStartBundledServer에서 번들서버구성으로 갈라져 나갔다. 그때 이 시험이
+ *   빨간불이 되어 알았다 — 규칙이 사라진 게 아니라 **자리를 옮긴 것**이었다.
+ *   그래서 자리를 찾지 못하면 「규칙이 없어졌다」가 아니라 **여기부터 고치라고** 말한다.
+ */
+function 데이터자리결정부(): string {
+  const 시작 = main.indexOf("function 번들서버구성");
+  expect(
+    시작,
+    "번들서버구성을 찾지 못했습니다 — 함수 이름이 바뀌었다면 이 시험의 앵커도 같이 옮기세요(규칙 자체는 지우지 말 것).",
+  ).toBeGreaterThan(-1);
   const 끝 = main.indexOf("\n}", 시작);
   return main.slice(시작, 끝 > 0 ? 끝 : undefined);
 }
 
 describe("패키징본 데이터 저장 위치", () => {
   it("★ 패키징본은 cwd를 userData로 보낸다 — 앱 번들 안에 쓰지 않는다", () => {
-    const 본문 = 번들서버기동부();
+    const 본문 = 데이터자리결정부();
     expect(
       /getPath\(\s*["']userData["']\s*\)/.test(본문),
       "패키징본의 cwd가 userData가 아닙니다. 이대로면 고객 DB가 앱 번들 안에 생기고, " +
@@ -41,7 +51,7 @@ describe("패키징본 데이터 저장 위치", () => {
   });
 
   it("★ 읽기 전용 자산 경로를 환경변수로 알려 준다 — cwd를 옮겼으므로 필수다", () => {
-    const 본문 = 번들서버기동부();
+    const 본문 = 데이터자리결정부();
     // cwd만 옮기고 이 둘을 안 넘기면 docs/·docs-manifest.json을 못 찾는다
     // (knowledgebundle.ts·docsbundle.ts·docbox.ts가 cwd 기준 상대경로를 쓴다).
     expect(/GIJO_DOCS_DIR/.test(본문), "GIJO_DOCS_DIR을 넘기지 않습니다 — docs를 못 찾습니다").toBe(true);
@@ -49,7 +59,7 @@ describe("패키징본 데이터 저장 위치", () => {
   });
 
   it("dev에서는 서버 위치를 그대로 쓴다 — 담당자의 개발 DB가 보여야 한다", () => {
-    const 본문 = 번들서버기동부();
+    const 본문 = 데이터자리결정부();
     // 무조건 userData로 보내면 dev에서 server/data를 못 보게 된다. 갈래가 있어야 한다.
     expect(
       /serverRoot/.test(본문),
@@ -58,7 +68,7 @@ describe("패키징본 데이터 저장 위치", () => {
   });
 
   it("읽기 전용 자산 경로는 **번들 기준**으로 만든다(userData 기준이면 못 찾는다)", () => {
-    const 본문 = 번들서버기동부();
+    const 본문 = 데이터자리결정부();
     const docs = /GIJO_DOCS_DIR[^\n]*\n?[^\n]*/.exec(본문)?.[0] ?? "";
     expect(
       /serverRoot/.test(docs),

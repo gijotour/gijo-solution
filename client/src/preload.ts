@@ -48,6 +48,9 @@ const gijoApi = {
   // 그 서버를 띄운 것이 이 앱이기 때문이다(main.ts의 dbcrypt:enable 주석 참고).
   dbCryptCanEnableInApp: () => ipcRenderer.invoke("dbcrypt:canEnableInApp"),
   dbCryptEnable: () => ipcRenderer.invoke("dbcrypt:enable"),
+  // 첫 설치 — 관리자 계정을 고객이 정한다(setup.html). 서버는 이 값을 받아 계정을 만든다.
+  setupNeeded: () => ipcRenderer.invoke("setup:needed"),
+  setupCreateAdmin: (username: string, password: string) => ipcRenderer.invoke("setup:createAdmin", username, password),
   mfaResetUser: (userId: string) => api.authApi.mfaResetUser(userId),
   mfaPolicy: () => api.authApi.mfaPolicy(),
   mfaSetPolicy: (on: boolean) => api.authApi.mfaSetPolicy(on),
