@@ -59,8 +59,18 @@
        브라우저가 알려주는 실제 값(env(titlebar-area-*))으로 남는 폭만큼만 비운다.
        그 값이 없는 환경(오버레이 미사용)에서는 fallback으로 0이 된다.
      ⚠ 높이 44px는 main.ts titleBarOverlay와 **같아야 한다**(다르면 창 버튼이 삐져나온다). */
+  /* ⚠ **왼쪽도** 비워야 한다 — 위 설명은 오른쪽(Windows)만 보고 쓴 것이었다.
+       macOS는 창 버튼(신호등 ● ● ●)이 **왼쪽**에 그려진다. 왼쪽을 10px만 두면
+       맨 앞 단추(⚙)가 신호등 위로 올라간다 (2026-08-09 사용자 신고 화면: 톱니가
+       노란 버튼을 덮고 있었다). 겹친 자리는 눌리기까지 한다.
+     ⚠ 여기서도 숫자를 박지 않는다. env(titlebar-area-x)가 곧 「왼쪽에 비켜야 할 폭」이고,
+       창 버튼이 오른쪽인 Windows에서는 그 값이 0이라 10px 그대로 남는다 —
+       한 줄로 두 OS가 다 맞는다.
+       (같은 처리가 titlebar.js의 .header에는 이미 있었다. 30개 화면이 멀쩡하고
+        셸만 겹친 이유가 그것이다.) */
   .topbar{flex:0 0 auto;display:flex;align-items:center;gap:8px;height:44px;
     padding:0 10px;
+    padding-left:calc(10px + env(titlebar-area-x, 0px));
     padding-right:calc(10px + 100vw - env(titlebar-area-width, 100vw) - env(titlebar-area-x, 0px));
     border-bottom:1px solid var(--border);background:var(--panel-2);
     -webkit-app-region:drag;}
