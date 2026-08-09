@@ -8,7 +8,23 @@ import { pathToFileURL, fileURLToPath } from "url";
 
 const ROOT = path.resolve(fileURLToPath(new URL(".", import.meta.url)), "..");
 const require = createRequire(pathToFileURL(path.join(ROOT, "client", "package.json")));
-const { chromium } = require("playwright-core");
+// ⚠ playwright-core는 **client/package.json에 선언돼 있지 않다**(2026-08-09 확인).
+//   그래서 설치돼 있는 기계에서만 돌고, npm ci 한 번에 조용히 사라진다. 실제로 이 Mac에서는
+//   MODULE_NOT_FOUND 스택만 뱉고 죽었다 — 무엇이 없는지 알아내는 데 시간을 썼다.
+//   선언은 두 기계가 같은 버전을 써야 해서 함께 정할 일이라, 여기서는 **왜 안 되는지**만 말한다.
+//   (판정만 하면 되는 검사는 tools/ui-check.mjs — 의존성 없이 CDP를 직접 쓴다)
+let chromium;
+try {
+  ({ chromium } = require("playwright-core"));
+} catch {
+  console.error(
+    "playwright-core를 찾지 못했습니다 — client/package.json에 선언돼 있지 않습니다.\n" +
+      "  이 도구는 스크린샷을 찍어 **사람이 보는** 용도입니다.\n" +
+      "  기계가 판정하는 검사만 필요하면 의존성 없이 도는 tools/ui-check.mjs 를 쓰세요.\n" +
+      "  굳이 이 도구가 필요하면: cd client && npm i -D playwright-core (⚠ 의존성 변경 — 상대 머신에 알릴 것)"
+  );
+  process.exit(2);
+}
 
 const OUT = path.join(ROOT, "mockups", "gui-walkthrough");
 fs.mkdirSync(OUT, { recursive: true });

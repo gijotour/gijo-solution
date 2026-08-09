@@ -45,8 +45,39 @@ cmake --build build --config Release -j
 - `GIJO_MODELS_DIR`, `GIJO_DATA_DIR`, `GIJO_LLAMA_SERVER_PATH`, `GIJO_EMBEDDING_MODEL_ID=bge-m3`.
 - main.ts의 서버 스폰 경로가 mac에서도 OS-상대경로로 맞는지 1회 점검(Phase 2 확인 항목).
 
+### 2-4. 고객 기계에서의 첫 실행 (2026-08-09 신설 — 실측으로 셋을 고쳤다)
+
+**① 데이터는 앱 안이 아니라 `~/Library/Application Support/GIJO AS/` 에 쌓인다.**
+예전엔 서버의 cwd가 앱 번들 안이라 고객 DB가 `.app/Contents/Resources/server-dist/data/`에
+생겼다. 그러면 **업데이트로 새 .app을 덮는 순간 고객 데이터가 통째로 사라지고**, 코드 서명
+봉인도 첫 실행에 깨진다(=오늘 고친 삭제 문제가 되살아난다).
+- 읽기 전용 자산(`docs/`·`docs-manifest.json`)만 번들 안에 남고, 앱이 `GIJO_DOCS_*`로 알려준다.
+- ⚠ **5.14.0 이전 설치본이 있으면** 업데이트 전에 `.app` 안의 `server-dist/data/`를 먼저
+  꺼내라. 새 버전은 그 자리를 보지 않는다.
+- 회귀 감시: `server/test/packageddatapath.test.ts`(항상) · `tools/mac-firstrun-check.mjs`(내보내기 전)
+
+**② 첫 실행은 로그인이 아니라 「관리자 계정 만들기」 화면이다.**
+예전엔 개발용 **`jyh` / `changeme`** 가 고객 기계에 그대로 만들어졌고, 화면에 개발자 이름이
+떴다. 안전장치(`computeInitialAdmin`)는 있었지만 `NODE_ENV==="production"`일 때만 도는데
+Electron이 그 값을 설정하지 않아 **한 번도 발동하지 않았다.**
+- 이제 고객이 아이디·비밀번호를 직접 정한다(`setup.html`). 기본 비밀번호는 없다.
+- ⚠ 랜덤 생성으로 바꾸면 안 된다 — 그 값은 콘솔에 찍히는데 Finder로 실행한 고객에게는
+  **볼 콘솔이 없어** 아예 못 들어간다.
+
+**③ 저장 암호화는 이제 화면에서 켠다.**
+설정 → 관리자 → 저장 암호화 → 「저장 암호화 켜기」. 앱이 서버를 멈추고 전환한 뒤 다시 띄우고,
+**복구 열쇠를 딱 한 번** 보여준다(종이 보관 안내 포함).
+- 켜지 않으면 DB 파일을 가져가면 그대로 읽힌다. preflight가 `warn`으로 알린다.
+- 전환 전 평문 백업이 남는다 — 설정 화면이 「평문 사본」으로 잡아 경고하니 확인 후 지운다.
+- 분산 모드(사내 서버)에서는 화면에서 못 켠다 — 서버 쪽에서 `scripts/encrypt-db.mjs`.
+
 ## 3. 데이터 이식 (RAG·온톨로지·bge·운영데이터)
 **이식 단위 = `data/` + `models/` 두 디렉터리 복사면 끝.** 파일 포맷이 크로스플랫폼 호환.
+
+> ⚠ **어디에 넣을지는 개발 실행과 설치본이 다르다**(2026-08-09).
+> 개발 실행은 `server/` 아래지만, **설치본은 `~/Library/Application Support/GIJO AS/`** 다.
+> 설치본에 넣을 때 앱 번들 안(`.app/Contents/Resources/server-dist/`)에 두면 안 된다 —
+> 업데이트에 사라지고 코드 서명 봉인이 깨진다(2-4 ① 참고).
 
 | 항목 | 위치 | 이식 방식 |
 |---|---|---|
