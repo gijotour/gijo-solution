@@ -17,7 +17,7 @@
 - **화면 설명·기능 안내는 전부 챗봇(서버 screenguide panels + ⓘ gijo-info)으로.** 화면엔 정체성 한 줄과 ⚠경고만 둔다 — 사용법·주의사항·용어 풀이는 screenguide에 쓰고 ⓘ로 연다. **신규 작업은 무조건 이 방식, 기존 화면도 발견하는 대로 이관**(2026-07-25 사용자 지시 강화).
 
 ## 구조 요약
-- `client/` — Electron. 화면=src/renderer/pages/*.html (hub.html?g=X가 iframe 탭 컨테이너, nav.js 공용 사이드바). 빌드 `npm run dist`, 게시 `npm run publish-release`(서버 자체가 배포처).
+- `client/` — Electron. 화면=src/renderer/pages/*.html (**app.html이 탭 셸** — 각 화면을 `?embed=1` iframe으로 품는다(#tabBar·#screens). ⚠ hub.html은 삭제된 화면이다, nav.js 공용 사이드바). 빌드 `npm run dist`, 게시 `npm run publish-release`(서버 자체가 배포처).
 - `server/` — Express+TS. 엔진=src/engine/*.ts. DB=data/gijo-as.sqlite(better-sqlite3), RAG=data/memory.lancedb(LanceDB)+bge-m3 임베딩, 모델=models/<id>/<id>.gguf. 테스트 `npm test`(vitest, 900+개 — 실 LLM 스폰 안 함).
 - `server/src/engine/localengine.ts` — llama-server 프로세스 풀(VRAM 예산·LRU 스왑). 임베딩은 8081 별도 상주.
 - 운영: Windows PC의 WSL2 systemd(gijo-as.service, /home/gijo/gijo-as/server, 포트 4000).
