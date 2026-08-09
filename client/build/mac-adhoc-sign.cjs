@@ -23,7 +23,7 @@
 // ⚠ spctl은 여전히 rejected다 — 공증(notarization)을 안 했으니 정상이고, 첫 실행만
 //   「우클릭 → 열기」로 넘어간다. 우리가 고친 것은 **경고가 아니라 삭제**다.
 //   Apple Developer Program($99/년)은 여전히 선택이다.
-const { execFileSync } = require("node:child_process");
+const { execFileSync, spawnSync } = require("node:child_process");
 const path = require("node:path");
 
 exports.default = async function afterSign(context) {
@@ -43,8 +43,16 @@ exports.default = async function afterSign(context) {
   execFileSync("codesign", ["--verify", "--deep", "--strict", "--verbose=2", appPath], { stdio: "inherit" });
 
   // 식별자가 실제로 바뀌었는지 본다(Electron으로 남아 있으면 삭제가 재발한다).
-  const info = execFileSync("codesign", ["-dv", appPath], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
+  // ⚠ codesign -dv는 **stderr로 쓴다.** execFileSync는 stdout만 돌려주므로 그대로 쓰면
+  //   info가 늘 빈 문자열이고 아래 감시가 **항상 통과한다** — 2026-08-09 Mac에서 실측
+  //   (stdout 길이 0 · Identifier 추출 undefined). 두 갈래를 모두 받아야 한다.
+  const r = spawnSync("codesign", ["-dv", appPath], { encoding: "utf8" });
+  const info = `${r.stdout ?? ""}${r.stderr ?? ""}`;
   const id = /Identifier=(\S+)/.exec(info)?.[1];
+  // 못 읽은 경우도 실패로 본다 — 「확인 못 했다」를 「괜찮다」로 넘기면 이 훅을 만든 의미가 없다.
+  if (!id) {
+    throw new Error(`[mac-adhoc-sign] 서명 식별자를 읽지 못했다 — 확인 없이 내보낼 수 없다.\n${info.trim()}`);
+  }
   if (id === "Electron") {
     throw new Error(`[mac-adhoc-sign] 식별자가 아직 Electron이다 — 재서명이 안 먹었다. 이대로 내보내면 macOS가 앱을 지운다.`);
   }
