@@ -1,0 +1,202 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<title>시안 — 모델 받기: 검색 대신 권장 모델 한 번 누르기</title>
+<style>
+:root{--bg:#0f1115;--panel:#161a21;--panel-2:#1b2028;--border:#242a34;--border-strong:#2f3744;
+--text:#e6e9ef;--muted:#9aa4b2;--muted-2:#7b8697;--blue:#3b82f6;--blue-light:#7aa7ff;
+--green:#22c55e;--amber:#f59e0b;--red:#ef4444;}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:13px/1.6 "Malgun Gothic",-apple-system,sans-serif;padding:22px}
+.wrap{max-width:980px;margin:0 auto}
+h1{font-size:17px;margin:0 0 4px}
+.lead{color:var(--muted);font-size:12.5px;margin:0 0 18px}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:13px 15px;margin-bottom:12px}
+.panel-title{font-size:13px;font-weight:700;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+.badge{font-size:10.5px;padding:1px 7px;border-radius:99px;font-weight:700}
+.b-teal{background:#0f3d3a;color:#5eead4}
+.b-green{background:#0d2f1c;color:#4ade80}
+.b-amber{background:#3a2a08;color:#fbbf24}
+.b-red{background:#3b1414;color:#fca5a5}
+/* 권장 모델 카드 — 한 줄 40px */
+.rec{display:flex;align-items:center;gap:11px;padding:9px 11px;border:1px solid var(--border-strong);
+border-radius:8px;background:var(--panel-2);margin-bottom:7px}
+.rec:last-child{margin-bottom:0}
+.rec-main{flex:1;min-width:0}
+.rec-name{font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:7px}
+.rec-sub{font-size:11.5px;color:var(--muted-2);margin-top:1px}
+.btn{border-radius:6px;font-size:12px;font-weight:700;cursor:pointer;padding:5px 12px;white-space:nowrap}
+.btn-primary{background:var(--blue);border:1px solid var(--blue);color:#fff}
+.btn-ghost{background:transparent;border:1px solid var(--border-strong);color:var(--blue-light)}
+.btn-done{background:transparent;border:1px solid #14532d;color:#4ade80;cursor:default}
+.bar{height:4px;background:var(--border);border-radius:99px;overflow:hidden;margin-top:5px}
+.bar>i{display:block;height:100%;background:var(--blue);width:38%}
+details{margin-top:9px}
+summary{cursor:pointer;font-size:12px;color:var(--muted)}
+.warnbox{font-size:11.5px;color:#fbbf24;background:#251b06;border:1px solid #4a3a10;
+border-radius:7px;padding:7px 9px;margin:8px 0 0}
+.model-search{display:flex;gap:7px;margin:8px 0}
+.model-search input{flex:1;background:var(--panel-2);border:1px solid var(--border-strong);
+color:var(--text);border-radius:6px;padding:6px 9px;font-size:12px}
+table{width:100%;border-collapse:collapse;font-size:12px;margin-top:6px}
+th,td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--border)}
+th{color:var(--muted);font-weight:700;font-size:11.5px}
+.note{background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--blue);
+border-radius:8px;padding:12px 15px;margin-top:20px;font-size:12.5px;line-height:1.75}
+.note h2{font-size:13px;margin:0 0 8px}
+.note h3{font-size:12.5px;margin:14px 0 5px;color:var(--blue-light)}
+code{background:var(--panel-2);padding:1px 5px;border-radius:4px;font-size:11.5px}
+.bad{color:#fca5a5}.good{color:#4ade80}
+</style></head><body><div class="wrap">
+
+<h1>시안 — 모델 받기 (설정 › AI)</h1>
+<p class="lead">추천 1개 · 2026-08-10 작성 · <b>승인 전 구현 금지</b></p>
+
+<!-- ===== 시안 본체 ===== -->
+<div class="panel">
+  <div class="panel-title">모델 받기 <span class="badge b-teal">admin 전용</span></div>
+
+  <div style="font-size:12px;color:var(--muted);margin-bottom:9px">
+    권장 모델을 눌러 바로 받습니다. 이름을 검색해 고를 필요가 없습니다.
+  </div>
+
+  <!-- 1) 기준 모델 — 이미 있음 -->
+  <div class="rec">
+    <div class="rec-main">
+      <div class="rec-name">기준 두뇌 <span class="badge b-green">받음</span></div>
+      <div class="rec-sub">Qwen/Qwen3-14B-GGUF · Q4_K_M · 8.4GB · 24GB GPU 권장</div>
+    </div>
+    <button class="btn btn-done">✓ 사용 중</button>
+  </div>
+
+  <!-- 2) 임베딩 — 받는 중 -->
+  <div class="rec">
+    <div class="rec-main">
+      <div class="rec-name">지식 검색용 <span class="badge b-amber">받는 중</span></div>
+      <div class="rec-sub">BAAI/bge-m3-GGUF · 1.2GB · 한국어 지원 · 4분 남음</div>
+      <div class="bar"><i></i></div>
+    </div>
+    <button class="btn btn-ghost">중단</button>
+  </div>
+
+  <!-- 3) 가벼운 대안 — 안 받음 -->
+  <div class="rec">
+    <div class="rec-main">
+      <div class="rec-name">가벼운 두뇌 <span class="badge">선택</span></div>
+      <div class="rec-sub">LGAI-EXAONE/EXAONE-3.5-7.8B-Instruct-GGUF · 4.5GB · 12GB GPU · ⚠ 비상업용</div>
+    </div>
+    <button class="btn btn-primary">받기</button>
+  </div>
+
+  <!-- 4) 실패한 것 — 왜 안 됐는지 화면에 남는다 -->
+  <div class="rec" style="border-color:#4a1d1d">
+    <div class="rec-main">
+      <div class="rec-name">한국어 특화 <span class="badge b-red">받기 실패</span></div>
+      <div class="rec-sub bad">밖으로 나가지 못했습니다 — 사내망이면 위 「인증·프록시」에 프록시를 넣어 주세요.</div>
+    </div>
+    <button class="btn btn-ghost">다시 받기</button>
+  </div>
+
+  <div class="warnbox">
+    ⚠ 권장 목록은 <b>조직명까지 고정</b>돼 있습니다(<code>Qwen/Qwen3-14B-GGUF</code>).
+    이름만으로 검색하면 안전장치가 제거된 개조본이 먼저 나옵니다 — 보안 제품에서는 쓰면 안 됩니다.
+  </div>
+
+  <details>
+    <summary>고급 — 직접 검색해서 받기 (권장하지 않음)</summary>
+    <div class="model-search">
+      <input placeholder="예: Qwen/Qwen3-14B-GGUF — 조직명까지 정확히">
+      <button class="btn btn-ghost">검색</button>
+    </div>
+    <div style="font-size:11.5px;color:var(--muted-2)">
+      ⚠ 검색 결과에는 <b class="bad">Uncensored · abliterated · Heretic</b> 같은 개조본이 섞입니다.
+      이 이름이 붙은 모델은 안전장치가 제거돼 있어 <b>보안 관제 제품에 쓰면 감사 지적 사항</b>이 됩니다.
+      제품은 이런 이름을 발견하면 받기 전에 한 번 더 확인을 받습니다.
+    </div>
+  </details>
+</div>
+
+<!-- ===== 시안 설명 ===== -->
+<div class="note">
+  <h2>왜 이 안인가</h2>
+  <p>
+    Mac이 실측했습니다: <code>qwen3-14b</code>로 검색하면 상위가 <b class="bad">Uncensored · Heretic ·
+    abliterated</b>(안전정렬 제거 변종)이고, <code>Qwen3-14B-GGUF</code>로 쳐도 공식본이 안 나옵니다.
+    <b>조직명을 포함한 <code>Qwen/Qwen3-14B-GGUF</code>로만</b> 공식본이 나옵니다.
+    그런데 제품은 「기준 모델은 qwen3-14b입니다」라고만 안내합니다 —
+    <b>그대로 검색한 고객은 안전장치가 제거된 모델을 먼저 봅니다.</b>
+  </p>
+  <p>
+    그래서 <b>검색 단계를 없앴습니다.</b> 우리가 이미 기준 모델을 정했는데(평가 게이트 통과 근거까지 있음),
+    고객에게 「무엇을 받을까」를 고르게 할 이유가 없습니다. 이건 이 저장소의 기존 결정
+    (2026-08-08 「머지·추천은 접는다」)과 같은 방향이고, 그때 지운 추천 카탈로그를
+    <b>죽지 않는 형태</b>(조직명·파일명·크기 고정)로 되살리는 것입니다.
+  </p>
+
+  <h3>다른 길을 왜 안 골랐나</h3>
+  <table>
+    <tr><th>안</th><th>왜 안 골랐나</th></tr>
+    <tr><td>검색 결과에서 개조본만 걸러내기</td>
+        <td>이름 규칙(Uncensored 등)은 <b>계속 새로 생깁니다.</b> 거름망은 항상 뒤늦습니다 — 막는 쪽이 아니라 <b>고르지 않게 하는 쪽</b>이 확실합니다</td></tr>
+    <tr><td>안내 문구만 「조직명까지 쓰세요」로 고치기</td>
+        <td>가장 싸지만, 고객이 안 읽으면 그대로입니다. 어제 배운 것: <b>사람 주의력에 맡긴 자리에서만 사고가 났습니다</b></td></tr>
+    <tr><td>검색을 완전히 없애기</td>
+        <td>BYOM(고객이 자기 모델을 고르는 것)이 제품의 차별점입니다. <b>접어서 남깁니다</b> — 없애지 않습니다</td></tr>
+  </table>
+
+  <h3>무엇을 포기했나</h3>
+  <ul style="margin:4px 0 0;padding-left:18px">
+    <li>탐색의 재미 — 「뭐가 있나 둘러보기」는 고급 서랍으로 들어갑니다</li>
+    <li>권장 목록 유지보수 부담이 생깁니다 — 모델이 사라지면 <b>죽은 안내</b>가 됩니다.
+        그래서 <b>받기 전에 존재를 확인</b>하고, 없으면 목록에서 「확인 필요」로 표시합니다(과거 전례 대응)</li>
+  </ul>
+
+  <h3>밀도 숫자</h3>
+  <table>
+    <tr><th></th><th>지금</th><th>시안</th><th>증감</th></tr>
+    <tr><td>줄 높이(권장 항목)</td><td>—</td><td>40px</td><td>신설</td></tr>
+    <tr><td>구역 세로 총합(기본 상태)</td><td>약 96px<br><span style="color:var(--muted-2);font-size:11px">제목+검색칸+안내문</span></td>
+        <td>약 232px<br><span style="color:var(--muted-2);font-size:11px">제목+안내+4줄+경고+접힌서랍</span></td><td class="bad">+136px</td></tr>
+    <tr><td>모델 하나 받기까지 조작</td><td>4회<br><span style="color:var(--muted-2);font-size:11px">입력→검색→목록에서 고르기→받기</span></td>
+        <td class="good">1회</td><td class="good">−3</td></tr>
+    <tr><td>고객이 판단해야 하는 것</td><td>어떤 이름? 어느 변종? 어느 양자화?</td><td class="good">없음</td><td class="good">−3</td></tr>
+  </table>
+  <p style="margin:6px 0 0;font-size:12px">
+    ⚠ <b>세로가 136px 늘어납니다.</b> 밀도 우선 원칙에 어긋나는 방향이라 그냥 넘기지 않습니다 —
+    다만 <b>조작 4회→1회, 판단 3개→0개</b>가 값이라고 봅니다. 늘어난 세로는 대부분
+    「받음/받는 중/실패」 <b>상태 표시</b>이고, 그건 지금 화면엔 아예 없어서 고객이
+    <b>왜 안 되는지 모르던 자리</b>입니다(Mac이 어제 고친 「받기 실패가 화면에서 사라지던 것」과 같은 계열).
+    줄이려면 「받음」 항목을 접는 안이 있는데, <b>접기는 접은 채로 검증한다</b>는 원칙상 시안에는 펴 두었습니다.
+  </p>
+
+  <h3>제품 원칙 자가점검</h3>
+  <table>
+    <tr><th>원칙</th><th>지킴?</th><th>근거</th></tr>
+    <tr><td>메뉴는 보기용 · 지시는 대화창에서</td><td class="good">지킴</td>
+        <td>새 <b>입력칸을 만들지 않았습니다</b>. 검색칸은 기존 것을 서랍에 넣은 것뿐</td></tr>
+    <tr><td>화면엔 정체성 한 줄 + ⚠경고만</td><td class="good">지킴</td>
+        <td>설명은 문서함 「모델 선택 가이드」가 맡습니다. 화면엔 ⚠ 두 줄만</td></tr>
+    <tr><td>정직한 구현 — 가짜 UI 금지</td><td class="b-amber">주의</td>
+        <td>이 시안의 4줄은 <b>가짜 상태</b>입니다(시안이니까). 구현 시 실제 job 상태와 연결해야 하며,
+            <b>목록에 있는데 서버에 없는 모델을 「받기」로 보이면 안 됩니다</b></td></tr>
+    <tr><td>없으면 없다고 말한다</td><td class="good">지킴</td>
+        <td>실패 줄이 <b>왜</b> 실패했는지(프록시) 말합니다 — 조용히 사라지지 않습니다</td></tr>
+  </table>
+
+  <h3>⚠ 함께 풀어야 하는 것 (Mac 지적)</h3>
+  <p>
+    <code>hfmodels.ts</code>가 <b>전역 <code>fetch</code>를 직접</b> 씁니다(24·44·58행 확인).
+    화면에 프록시 입력칸이 있는데 <b>검색·받기가 그 프록시를 타지 않습니다.</b>
+    사내망 고객에게는 <b>원클릭도 0건</b>이 됩니다 — 이 시안만으로는 반쪽입니다.
+    프록시 경유를 함께 고치는 것을 전제로 합니다.
+  </p>
+
+  <h3>승인 시 구현 범위</h3>
+  <ol style="margin:4px 0 0;padding-left:18px">
+    <li>권장 카탈로그(조직명·파일·크기·용도) — 서버 상수 한 곳</li>
+    <li>받기 전 <b>존재 확인</b> → 없으면 「확인 필요」 표시(죽은 안내 방지)</li>
+    <li>고급 서랍에 검색 이동 + 개조본 이름 감지 시 확인 한 번 더</li>
+    <li><code>hfmodels.ts</code> 프록시 경유(전역 fetch → 프록시 적용 fetch)</li>
+  </ol>
+</div>
+
+</div></body></html>
