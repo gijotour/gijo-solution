@@ -124,9 +124,17 @@ export function saveModelAuth(input: SaveModelAuthInput, actor?: string): ModelA
 }
 
 /**
- * 실제로 HuggingFace에 닿는지 본다. 저장한 토큰·프록시를 그대로 써서 확인하므로
- * "저장은 됐는데 정작 받을 때 안 되는" 상황을 미리 잡는다.
- * ⚠ 여기서 토큰 값을 응답에 담지 않는다 — 상태만 말한다.
+ * 실제로 HuggingFace에 닿는지 본다. ⚠ 여기서 토큰 값을 응답에 담지 않는다 — 상태만 말한다.
+ *
+ * ⚠⚠ **프록시는 이 검사에 적용되지 않는다**(2026-08-10 확인). 사실대로 적는다:
+ *   · 받기(다운로드)  — `hf` CLI를 spawn하며 HTTPS_PROXY env를 넘긴다 → **프록시 적용됨**
+ *   · 검색·저장소 조회·이 검사 — Node 내장 `fetch` → **프록시를 타지 않는다**
+ *   Node 내장 fetch는 프록시 env를 보지 않는다. Node 24의 NODE_USE_ENV_PROXY로 풀 수 있으나
+ *   **운영(WSL)은 Node 20**이라 쓸 수 없고, undici 같은 의존성 추가가 필요하다.
+ *   의존성 변경은 상대 머신 시험을 통째로 깨뜨린 전례가 있어(2026-08-09) 혼자 넣지 않는다.
+ *   → 그때까지는 **못 하는 것을 못 한다고 말한다.** 예전엔 프록시를 안 타면서 실패하면
+ *     "프록시 주소가 맞는지 확인하세요"라고 안내했다 — 고객이 주소를 제대로 넣어도 계속
+ *     실패하니, 맞는 설정을 의심하게 만드는 **틀린 안내**였다.
  */
 export async function testModelAuth(): Promise<{ ok: boolean; message: string; whoami?: string }> {
   const { token, proxyUrl } = getModelAuthSecrets();
@@ -153,8 +161,10 @@ export async function testModelAuth(): Promise<{ ok: boolean; message: string; w
       return {
         ok: false,
         message: proxyUrl
-          ? "시간 안에 응답이 없습니다 — 프록시 주소가 맞는지 확인하세요."
-          : "시간 안에 응답이 없습니다 — 사내망이라면 프록시 주소가 필요할 수 있습니다.",
+          ? "시간 안에 응답이 없습니다 — ⚠ 이 검사와 모델 **검색**은 프록시를 거치지 않습니다(제품 한계). " +
+            "등록한 프록시는 **모델 받기(다운로드)에만** 적용되므로, 받기는 될 수 있습니다. 한 번 받아 보세요."
+          : "시간 안에 응답이 없습니다 — 사내망이라면 프록시 주소가 필요할 수 있습니다. " +
+            "⚠ 다만 프록시를 넣어도 이 검사와 검색은 거치지 않고 **받기에만** 적용됩니다.",
       };
     }
     return { ok: false, message: `연결하지 못했습니다: ${msg}` };
