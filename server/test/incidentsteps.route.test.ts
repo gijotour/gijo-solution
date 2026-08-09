@@ -144,3 +144,55 @@ describe("「○○ 하려면 어떻게 해?」는 그 화면 안내로 간다 �
     );
   });
 });
+
+describe("「어떻게 돌려?」도 방법 질문이다 — 다만 장애 질문을 삼키면 안 된다", () => {
+  it("★ 「레드팀 점검 어떻게 돌려?」가 레드팀 화면을 가리킨다", async () => {
+    const { 방법질문화면찾기 } = await import("../src/engine/screenguide");
+    const 찾음 = 방법질문화면찾기("레드팀 점검 어떻게 돌려?");
+    expect(찾음, "레드팀 화면을 찾아야 한다 — 고치기 전엔 엉뚱한 자산 이름을 답했다").not.toBeNull();
+    expect(찾음!.screen).toBe("redteam.html");
+  });
+
+  it("★★ 장애 질문은 여전히 방법 질문이 아니다 — 넓히면 오늘 고친 것이 다시 막힌다", async () => {
+    const { 방법질문화면찾기 } = await import("../src/engine/screenguide");
+    // 이 갈래는 플레이북·장애 분기보다 **앞**에 있다. 여기서 잡히면 초동 절차에 영영 못 닿는다.
+    expect(방법질문화면찾기("방화벽 장비가 갑자기 죽었어. 어떻게 대응해?")).toBeNull();
+    expect(방법질문화면찾기("침해사고 의심될 때 대응 절차 알려줘")).toBeNull();
+  });
+
+  it("★ 「가드레일이 뭐야?」에 제품이 자기 기능을 설명한다", async () => {
+    const { faqAnswerFor } = await import("../src/engine/productfaq");
+    const 카드 = faqAnswerFor("가드레일이 뭐야?");
+    expect(카드, "고치기 전엔 「근거가 없습니다」라고 답했다").not.toBeNull();
+    expect(카드!.answer).toMatch(/프롬프트 인젝션/);
+    expect(카드!.answer).toMatch(/작업 기록/);
+  });
+
+  it("설정 변경·결과 조회는 개념 카드가 아니다 — 뜻 묻는 말만 잡는다", async () => {
+    const { faqAnswerFor } = await import("../src/engine/productfaq");
+    expect(faqAnswerFor("가드레일 켜줘")).toBeNull();
+    expect(faqAnswerFor("가드레일 차단 기록 보여줘")).toBeNull();
+  });
+});
+
+describe("장비 로그 코드는 변하지 않는 지식이다 — 회차마다 답이 달라지면 안 된다", () => {
+  it("★ ASA 106023을 결정적으로 설명한다 — 한 회차는 옳고 한 회차는 「찾지 못했습니다」였다", async () => {
+    const { faqAnswerFor } = await import("../src/engine/productfaq");
+    for (const q of [
+      "ASA 106023 로그가 계속 올라오는데 무슨 의미야?",
+      "%ASA-4-106023 무슨 뜻이야?",
+      "ASA 로그 코드 의미 알려줘",
+    ]) {
+      const 카드 = faqAnswerFor(q);
+      expect(카드, `${q}에 카드가 나와야 한다`).not.toBeNull();
+      expect(카드!.answer).toMatch(/ACL|차단/);
+    }
+  });
+
+  it("막힌 기록과 뚫린 기록을 구분해 말한다 — 이 구분이 담당자의 판단을 가른다", async () => {
+    const { faqAnswerFor } = await import("../src/engine/productfaq");
+    const a = faqAnswerFor("ASA 106023 로그가 계속 올라오는데 무슨 의미야?")!.answer;
+    expect(a).toMatch(/막힌 기록/);
+    expect(a).toMatch(/뚫린 기록이 아닙니다|뚫린 것/);
+  });
+});
