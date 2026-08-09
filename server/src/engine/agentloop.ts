@@ -1437,8 +1437,13 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): { tool: s
             .replace(/\s*(이|가|을|를|은|는|의)\s*$/g, "")
             .trim();
         }
+        // ★ 조문 번호는 **따로 떼어 인자로** 넘긴다(2026-08-09, 후-3). 위 꼬리 털기가 「조문」을
+        //   지우므로 여기서 먼저 뽑지 않으면 「제29조」가 검색어에 남아 법제처가 0건을 준다.
+        //   법령(law) 갈래에서만 — 고시·판례는 조문 단위 조회 대상이 아니다.
+        const 조 = target === "law" ? /제?\s*(\d{1,3})\s*조/.exec(instruction)?.[1] : undefined;
+        if (조) q = q.replace(/제?\s*\d{1,3}\s*조\s*/g, " ").replace(/\s+/g, " ").trim();
         if (!q) continue; // 이름이 안 남으면 모델에게 넘긴다 — 빈 검색어로 부르지 않는다
-        return { tool: f.tool, args: { query: q, target } };
+        return { tool: f.tool, args: { query: q, target, ...(조 ? { article: 조 } : {}) } };
       }
       if (f.tool === "finding_status") {
         const 조건 = /(critical|긴급|매우\s*심각)/i.test(instruction) ? "critical"

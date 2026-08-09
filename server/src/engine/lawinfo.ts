@@ -301,6 +301,50 @@ export async function lawAnswer(query: string, target: LawTarget = "law"): Promi
   return lines.join("\n");
 }
 
+/**
+ * 물음에 든 조문 번호("제29조"·"29조") — 없으면 null.
+ * ⚠ 「제30조 3년」처럼 숫자가 이어 붙는 문장이 있어 **조/항 표기가 붙은 것만** 본다.
+ */
+export function 조문번호(text: string): string | null {
+  const m = /제?\s*(\d{1,3})\s*조/.exec(String(text ?? ""));
+  return m ? m[1] : null;
+}
+
+/**
+ * 조문 원문 답 — 「개인정보 보호법 제29조 알려줘」에 **본문**을 준다(2026-08-09, 계획서 후-3).
+ *
+ * 왜: getLawArticles는 어제 고쳤는데 **부르는 곳이 0**이었다(호출부 없는 기능 = 없는 기능).
+ * 담당자가 "제29조 알려줘"라고 물으면 지금까지는 법령 목록만 돌아왔다.
+ *
+ * ⚠ 조문 본문은 지어내면 가장 위험한 영역이라 **받은 그대로** 옮기고 원문 링크를 반드시 붙인다.
+ * ⚠ 못 찾으면 목록 답으로 물러난다 — 빈손으로 끝내지 않는다.
+ */
+export async function lawArticleAnswer(query: string, article: string): Promise<string> {
+  const hits = await searchLaw(query, "law", 3);
+  if (!hits.length) return lawAnswer(query, "law");
+  const 법 = hits[0];
+  // 본문 조회용 일련번호는 LawHit.id다(mst 아님 — 이름이 달라 헛짚기 쉬운 자리).
+  const mst = String(법.id ?? "").trim();
+  if (!mst) return lawAnswer(query, "law");
+  const articles = await getLawArticles(mst, article, 3).catch(() => []);
+  if (!articles.length) {
+    return [
+      `🔎 「${법.title}」에서 제${article}조 본문을 찾지 못했습니다 — 조문 번호를 확인해 주세요.`,
+      `   원문: ${법.link}`,
+      "",
+      LEGAL_DISCLAIMER,
+    ].join("\n");
+  }
+  const lines = [`${법.title} — 제${article}조`, ""];
+  for (const a of articles) {
+    lines.push(`제${a.no}조${a.title ? `(${a.title})` : ""}`);
+    lines.push(a.text);
+    lines.push("");
+  }
+  lines.push(`원문: ${법.link}`, "", LEGAL_DISCLAIMER);
+  return lines.join("\n");
+}
+
 export function registerLawRoutes(app: Express): void {
   app.get("/api/law/config", authMiddleware, (_req, res) => res.json(getLawConfig()));
 

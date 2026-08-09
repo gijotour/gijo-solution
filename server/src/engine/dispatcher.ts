@@ -25,6 +25,7 @@ import { faqAnswerFor } from "./productfaq";
 import type { Viewer } from "./memory";
 import { runAgentLoop, AgentToolCall, 가리킬것없는대명사, 가리킨자산이없나, 대명사뿐인가, 대명사확인, 되물음, 자산되물음, 선택을박는다, 직전대상자산 } from "./agentloop";
 import { 스트림자리 } from "./streamsink";
+import { 장애질문인가, 장애초동절차 } from "./incidentsteps";
 import { executeApprovedTool, findAgentTool, buildApproval, PendingApproval } from "./agenttools";
 import { appendApprovedDecision } from "./orchestrator-dataset";
 import { undoSnapshot, undoCommit } from "./undo";
@@ -1116,6 +1117,18 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     // 자산을 가리킨 말(「이 서버」)에는 자산용 되묻기 — 「그거」라 답하면 어색하다(실측).
     const 물음 = 가리킨자산이없나(instructionText) ? 자산되물음() : 되물음();
     return { task, route: { agentId: "orchestrator", action: "chat" }, output: 확인 ?? 물음 };
+  }
+
+  // ★ 장비 장애·중단 — 결정적 초동 절차로 즉답한다(2026-08-09, 계획서 전-4).
+  //   실측: 「방화벽 장비가 갑자기 죽었어」에 도구가 하나도 안 돌고 모델이 8~13초 동안
+  //   일반론을 썼다(사내 근거 0 → 「근거 약함」 배너). 지식 저장소를 뒤져도 장애 자료가 없고
+  //   무관한 문서(Tenable·악성코드 분석)만 걸렸다 — 제품은 정직했지만 담당자는 급할 때
+  //   출처 없는 글을 10초 기다려 받았다. 급한 절차는 코드가 즉답한다(logguide와 같은 원칙).
+  //   ⚠ 되묻기 관문 **뒤**에 둔다 — 대상 없는 대명사는 먼저 되물어야 한다.
+  if (장애질문인가(instructionText)) {
+    const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P1" });
+    completeTask(task.id);
+    return { task, route: { agentId: "orchestrator", action: "chat" }, output: 장애초동절차(instructionText) };
   }
 
   // ── 시연 실측이 잡은 라우팅 결함 2건의 결정적 분기 (2026-07-29, 계획서 전-1) ──────────

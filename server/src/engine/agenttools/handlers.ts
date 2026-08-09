@@ -41,7 +41,7 @@ import { computeKpiSnapshot, 점수영향글 } from "../kpi";
 import { listSessions as listWorkSessions } from "../worksessions";
 import { canonicalize, suggestionsFor } from "../terms";
 import { listAudit, recordAudit, type AuditEntry } from "../audit";
-import { lawAnswer, getLawConfig, type LawTarget } from "../lawinfo";
+import { lawAnswer, lawArticleAnswer, 조문번호, getLawConfig, type LawTarget } from "../lawinfo";
 // 담당자가 "미조치"라고 하면 저장값 open·pending을 뜻한다 — 글자 그대로 대조하면 늘 0건이다.
 import { 필터에맞나 } from "../statuswords";
 // 내 업무(할 일) — 화면을 없애고 대화창에서 한다(2026-08-01 사용자 결정).
@@ -790,6 +790,11 @@ export async function runLawLookup(args: Record<string, string>): Promise<string
   const t = (args.target || "law").trim() as LawTarget;
   const target = (["law", "admrul", "prec"] as const).includes(t as never) ? t : "law";
   try {
+    // ★ 조문 번호가 있으면 **본문**을 준다(2026-08-09, 후-3). 「제29조 알려줘」에 목록만 주던 것 —
+    //   getLawArticles가 고쳐져 있는데 부르는 곳이 없어(호출부 0) 기능이 죽어 있었다.
+    //   법령(law) 갈래에서만 — 고시·판례는 조문 단위 조회 대상이 아니다.
+    const 조 = args.article?.trim() || (target === "law" ? 조문번호(args.query) : null);
+    if (target === "law" && 조) return await lawArticleAnswer(args.query.trim(), 조);
     return await lawAnswer(args.query.trim(), target);
   } catch (e) {
     // 꺼져 있거나 외부가 막힌 상황은 담당자가 조치할 수 있게 그대로 알린다(조용히 실패 금지).

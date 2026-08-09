@@ -891,6 +891,8 @@ const TOOLS: AgentTool[] = [
     params: [
       { name: "query", label: "검색어", description: "법령명·고시명·판례 키워드", required: true },
       { name: "target", label: "종류", description: "law(법령)·admrul(고시)·prec(판례) — 비우면 법령", required: false },
+      // 조문 번호가 오면 목록이 아니라 **본문**을 준다(2026-08-09, 후-3).
+      { name: "article", label: "조문 번호", description: "숫자만 — 예: 29 (「제29조 알려줘」). 비우면 목록", required: false },
     ],
     // 결과가 이미 사람이 읽기 좋고 원문 링크가 붙어 있다 — LLM이 재작성하면 조문을 바꿔 쓸 위험이
     // 있어(법률은 지어내면 가장 위험한 영역) 그대로 내보낸다.

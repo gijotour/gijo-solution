@@ -161,6 +161,35 @@ for (let i = 0; i < 45; i++) {
 }
 ok("서버 응답이 콘솔에 표시된다", reply && (reply.kind === "reply" || reply.kind === "error"), JSON.stringify(reply));
 
+// 8-b) 답 스트리밍(2026-08-09 전-7) — **흐른 글자가 최종 답으로 갈아 끼워졌는가.**
+//   ⚠ 이 검사가 없으면 서버가 SSE를 안 내보내도 클라가 조용히 통짜 경로로 폴백해 아무도 모른다
+//     (스트리밍이 죽어도 답은 나오니 QA가 초록이다). 흔적을 남기게 만든 이유가 이것이다.
+const 스트림흔적 = await page.evaluate(() => ({
+  통로: typeof window.gijo?.sendInstructionStream === "function",
+  남은조각: !!document.querySelector(".cs-stream"), // 최종 교체 뒤엔 없어야 한다
+}));
+ok(
+  "답 스트리밍 통로가 있고, 흐른 글자가 최종 답으로 갈아 끼워졌다",
+  스트림흔적.통로 && !스트림흔적.남은조각,
+  JSON.stringify(스트림흔적)
+);
+
+// 8-c) 📌 선택 항목 맥락(2026-08-09 2단계) — 셸 API 계약. 화면 클릭 배선은 selectioncontext 시험이
+//   소스로 지키고, 여기서는 **셸에서 실제로 칩이 붙고 ✕로 풀리는지**를 화면으로 본다.
+const 칩 = await page.evaluate(async () => {
+  const g = window.gijoConsole;
+  if (!g || typeof g.select !== "function") return { 통로: false };
+  g.select({ label: "QA선택시험", text: "자산 QA선택시험" });
+  await new Promise((r) => setTimeout(r, 300));
+  const el = document.getElementById("csSel");
+  const 붙음 = !!el && el.style.display !== "none" && el.textContent.includes("📌");
+  el?.querySelector(".x")?.click();
+  await new Promise((r) => setTimeout(r, 300));
+  const 풀림 = !!el && el.style.display === "none";
+  return { 통로: true, 붙음, 풀림 };
+});
+ok("화면에서 고른 항목이 📌칩으로 붙고 ✕로 풀린다", 칩.통로 && 칩.붙음 && 칩.풀림, JSON.stringify(칩));
+
 // 9) 화면 안 챗봇 위젯은 뜨지 않는다(지시는 콘솔 한 곳)
 const widget = await page.evaluate((visSrc) => {
   const isVis = eval(visSrc);
@@ -301,6 +330,25 @@ if (!upd2.보임) {
   }, VIS);
 }
 ok("설정 관리자에서 업데이트를 펼치면 버전이 보인다", upd2.활성 === "설정" && upd2.보임 && !!upd2.버전, JSON.stringify(upd2));
+
+// 13-b) AI팀 구성(2026-08-09 전-7) — 기반 두뇌·팀원 카드·☁ 외부 상담역이 **그려지는가.**
+//   서버 집계(/api/team/composition)가 죽으면 카드가 통째로 비는데, 그건 화면을 열어야만 보인다.
+const 팀 = await page.evaluate(() => {
+  const f = document.querySelector("#screens iframe.on");
+  try {
+    const d = f.contentDocument;
+    const base = d.getElementById("teamBase");
+    const cards = d.getElementById("teamCards");
+    return {
+      기반: (base?.innerText || "").includes("기반 두뇌"),
+      카드수: cards ? cards.children.length : 0,
+      외부상담역: (cards?.innerText || "").includes("외부 상담역"),
+      공용: /지식\s*\d+건/.test(d.getElementById("teamShared")?.textContent || ""),
+    };
+  } catch (e) { return { err: String(e).slice(0, 60) }; }
+});
+// 팀원 6 + ☁ 1 = 7장. 숫자를 박아 두면 팀원이 늘 때 이 검사가 먼저 말해 준다.
+ok("AI팀 구성 — 기반 두뇌·팀원 카드·☁ 외부 상담역이 그려진다", 팀.기반 && 팀.카드수 === 7 && 팀.외부상담역 && 팀.공용, JSON.stringify(팀));
 
 // 16) JS 오류 — preload 주입 플레이크의 1회성 오류(치유 전 프레임 소음)는 구분 집계
 const transient = jsErrors.filter((e) => e.includes("reading 'isAuthenticated'"));
