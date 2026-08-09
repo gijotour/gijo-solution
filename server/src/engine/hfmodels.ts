@@ -297,6 +297,44 @@ function findGgufIn(dir: string): string | null {
 }
 
 export function registerHfModelsRoutes(app: Express): void {
+  // 권장 모델 목록 — 고객이 「무엇을 받을까」를 고르지 않게 한다(2026-08-10, 시안 승인).
+  //
+  // ⚠ 목록을 **그대로 믿지 않는다.** 2026-08-08에 추천 카탈로그를 지운 이유가
+  //   「추천 모델이 서버에 없는 죽은 안내를 냈다」였다. 그래서 화면에 뿌리기 전에
+  //   저장소가 실제로 있는지 확인하고, 확인 못 하면 그 사실을 함께 돌려준다.
+  //   ⚠ 확인에 실패해도 **목록을 감추지 않는다** — 사내망에서는 조회가 막혀도
+  //     받기(프록시 경유 CLI)는 될 수 있기 때문이다. 상태만 정직하게 붙인다.
+  app.get(
+    "/api/hfmodels/recommended",
+    authMiddleware,
+    asyncRoute(async (_req, res) => {
+      const { 권장모델목록, 로컬폴더후보 } = await import("./modelcatalog.js");
+      const { isModelAvailable } = await import("./localengine.js");
+      const 결과 = await Promise.all(
+        권장모델목록.map(async (m) => {
+          let 확인: "있음" | "없음" | "확인못함" = "확인못함";
+          try {
+            const r = await fetch(`${HF_API_BASE}/models/${m.repo}`, {
+              headers: hfHeaders(),
+              signal: AbortSignal.timeout(8_000),
+            });
+            확인 = r.ok ? "있음" : r.status === 404 ? "없음" : "확인못함";
+          } catch {
+            확인 = "확인못함"; // 사내망·에어갭 — 못 봤다는 뜻이지 없다는 뜻이 아니다
+          }
+          // ⚠ 이름이 **한 가지가 아니다.** 받기가 만드는 `org__repo`와, 운영에 실제로 있는
+          //   짧은 이름(qwen3-14b·bge-m3)을 다 본다 — 하나만 보면 이미 가진 모델에 「받기」가
+          //   떠서 8.4GB를 다시 받게 된다(2026-08-10 실측으로 잡음).
+          return {
+            ...m,
+            저장소확인: 확인,
+            이미받음: 로컬폴더후보(m.repo).some((n) => isModelAvailable(n)),
+          };
+        })
+      );
+      res.json(결과);
+    })
+  );
   app.get(
     "/api/hfmodels/search",
     authMiddleware,
