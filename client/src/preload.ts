@@ -432,6 +432,7 @@ const gijoApi = {
   onLearnloopProgress: (cb: (run: unknown) => void) => onChannel("learnloop:progress", cb),
 
   // HuggingFace 모델 검색 · 다운로드(백그라운드 큐 — load()는 잡을 반환하고 즉시 끝난다)
+  listRecommendedModels: () => api.hfModelsApi.recommended(),
   searchHfModels: (query: string) => api.hfModelsApi.search(query),
   loadHfModel: (modelId: string) => api.hfModelsApi.load(modelId),
   listHfDownloadJobs: () => api.hfModelsApi.jobs(),

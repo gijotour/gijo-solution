@@ -480,10 +480,25 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     <!-- 모델 검색 · 받기 — AI 팀 화면에서 이관(2026-07-28, 설정 통합 ②단계).
          인증 바로 아래에 둔다: 토큰을 왜 넣는지가 여기서 드러난다. -->
-    <div data-sec="ai" class="panel" data-gijo-fold="모델 검색 · 받기">
-      <div class="panel-title">모델 검색 · 받기</div>
-      <div class="model-search"><input id="hfSearchInput" placeholder="예: cybersecurity, WhiteRabbitNeo, Foundation-Sec"><button id="hfSearchBtn">검색</button></div>
-      <div id="hfResults" style="font-size:12px;color:var(--muted-2)">검색어를 입력하고 검색 버튼을 눌러주세요.</div>
+    <!-- ⚠ data-gijo-fold를 뺐다(2026-08-10 실화면 검증). 접혀 있으면 권장 목록이 안 보여
+         「검색 대신 목록」이라는 이 변경의 요점이 통째로 사라진다 — 고객은 예전과 똑같이
+         접힌 제목만 본다. 모델을 아직 안 받은 첫 실행에서 가장 먼저 보여야 할 구역이다. -->
+    <div data-sec="ai" class="panel">
+      <div class="panel-title">모델 받기</div>
+      <div style="font-size:12px;color:var(--muted);margin-bottom:9px">권장 모델을 눌러 바로 받습니다 — 이름을 검색해 고를 필요가 없습니다.</div>
+      <div id="hfRecommended" style="font-size:12px;color:var(--muted-2)">불러오는 중…</div>
+      <div style="font-size:11.5px;color:#fbbf24;background:#251b06;border:1px solid #4a3a10;border-radius:7px;padding:7px 9px;margin-top:8px">
+        ⚠ 권장 목록은 <b>조직명까지 고정</b>돼 있습니다. 이름만으로 검색하면 안전장치가 제거된 개조본이 먼저 나옵니다 — 보안 제품에는 쓰면 안 됩니다.
+      </div>
+      <!-- 고급 — 직접 검색. BYOM은 이 제품의 차별점이라 없애지 않고 접어서 남긴다. -->
+      <details style="margin-top:9px">
+        <summary style="cursor:pointer;font-size:12px;color:var(--muted)">고급 — 직접 검색해서 받기 (권장하지 않음)</summary>
+        <div class="model-search"><input id="hfSearchInput" placeholder="예: Qwen/Qwen3-14B-GGUF — 조직명까지 정확히"><button id="hfSearchBtn">검색</button></div>
+        <div id="hfResults" style="font-size:12px;color:var(--muted-2)">검색어를 입력하고 검색 버튼을 눌러주세요.</div>
+        <div style="font-size:11.5px;color:var(--muted-2);margin-top:6px">
+          ⚠ 검색 결과에는 <b style="color:#fca5a5">Uncensored · abliterated · Heretic</b> 같은 개조본이 섞입니다. 받기 전에 한 번 더 확인을 받습니다.
+        </div>
+      </details>
       <div id="hfJobs" style="font-size:12px;margin-top:8px"></div>
     </div>
 
@@ -494,7 +509,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
          「모델 선택 가이드」가 맡고, 설정에는 링크 한 줄만 남긴다(읽을거리는 문서함이라는 원칙). -->
     <div data-sec="ai" class="panel">
       <div style="font-size:12.5px;color:var(--muted);line-height:1.7">
-        기준 모델은 <b style="color:var(--text)">qwen3-14b</b>입니다 — 장비 등급별 구성·모델 고르는 법은
+        <!-- ⚠ 2026-08-10: 예전엔 「기준 모델은 qwen3-14b입니다」라고 **이름만** 적었다.
+             그 이름으로 검색하면 안전정렬이 제거된 개조본이 상위에 온다(Mac 실측) —
+             안내를 그대로 따른 고객이 위험한 모델을 먼저 본다. 이름 대신 **위 목록**을 가리킨다. -->
+        기준 모델은 위 <b style="color:var(--text)">모델 받기</b>의 맨 윗줄입니다 — 장비 등급별 구성·모델 고르는 법은
         <a href="#" id="modelGuideDocLink" style="color:var(--blue-light);font-weight:700">문서함 「모델 선택 가이드」</a>에서 읽어 주세요.
       </div>
     </div>
@@ -1803,7 +1821,72 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     hfJobs.set(job.id, job);
     renderHfJobs();
     applyJobToCard(job);
-    if (job.status === "done") { loadEngineStatus().catch(() => {}); }
+    // 권장 목록도 같은 신호로 다시 그린다 — 진행률·실패가 그 줄에서 보여야 한다.
+    // ⚠ 목록 자체(이미받음)는 서버가 판정하므로, 다 받았을 때만 서버에 다시 묻는다.
+    if (권장캐시.length) {
+      const el = document.getElementById("hfRecommended");
+      if (el) el.innerHTML = 권장캐시.map(권장줄).join("");
+    }
+    if (job.status === "done") {
+      loadEngineStatus().catch(() => {});
+      loadRecommended().catch(() => {}); // 「받음」으로 바뀌는지는 서버가 정한다
+    }
+  }
+
+  // ── 권장 모델 목록 (2026-08-10, 시안 승인) ──────────────────────────────────────
+  // 검색 대신 목록을 누른다. 「qwen3-14b」로 검색하면 상위가 안전정렬 제거 개조본이라
+  // (Mac 실측), 그대로 따른 고객이 위험한 모델을 먼저 본다 — 보안 제품에서 감사 지적 자리다.
+  //
+  // ⚠ 상태를 **네 가지 다** 그린다: 받음 · 받는 중 · 안 받음 · 실패.
+  //   실패를 빼면 「받는 중 0%」에 멈춘 채 화면을 떠났다 오면 통째로 사라진다
+  //   (2026-08-09 실측 — 고객은 왜 안 되는지 끝내 모른다).
+  let 권장캐시 = [];
+  function 권장줄(m) {
+    const 폴더 = m.repo.replace(/\//g, "__");
+    const job = Array.from(hfJobs.values()).filter((j) => j.modelId === m.repo).sort((a, b) => b.createdAt - a.createdAt)[0];
+    let 상태 = "", 단추 = "", 보조 = "";
+    if (m.이미받음) {
+      상태 = '<span class="badge b-green">받음</span>';
+      단추 = '<button class="hf-load" disabled style="color:#4ade80;border-color:#14532d;cursor:default">✓ 사용 중</button>';
+    } else if (job && (job.status === "queued" || job.status === "downloading")) {
+      상태 = '<span class="badge b-amber">받는 중</span>';
+      단추 = '<button class="hf-load" disabled>받는 중…</button>';
+      보조 = `<div style="height:4px;background:var(--border);border-radius:99px;overflow:hidden;margin-top:5px"><i style="display:block;height:100%;background:var(--blue);width:${Math.max(2, Number(job.progress) || 0)}%"></i></div>`;
+    } else if (job && job.status === "error") {
+      상태 = '<span class="badge b-red">받기 실패</span>';
+      단추 = `<button class="hf-load" data-load="${esc(m.repo)}">다시 받기</button>`;
+      // ⚠ 왜 실패했는지 그대로 보여준다 — 서버는 알고 있는데 화면만 모르던 자리다.
+      보조 = `<div style="color:#fca5a5;font-size:11.5px;margin-top:3px">${esc(job.error || "받기 실패")}</div>`;
+    } else {
+      상태 = m.기준 ? '<span class="badge b-teal">기준</span>' : '<span class="badge">선택</span>';
+      단추 = `<button class="hf-load" data-load="${esc(m.repo)}">받기</button>`;
+    }
+    // 저장소를 못 봤다는 것과 없다는 것은 다르다 — 사내망에서는 조회가 막혀도 받기는 될 수 있다.
+    const 확인 = m.저장소확인 === "없음"
+      ? '<span style="color:#fca5a5"> · ⚠ 저장소를 찾지 못했습니다(확인 필요)</span>'
+      : m.저장소확인 === "확인못함"
+        ? '<span style="color:var(--muted-2)"> · 저장소 확인 못 함(사내망이면 정상)</span>'
+        : "";
+    return `<div class="hf-result" style="align-items:flex-start">
+      <span style="flex:1;min-width:0">
+        <b>${esc(m.용도)}</b> ${상태}
+        <div class="hf-sub">${esc(m.repo)} · ${esc(m.대략크기)} · ${esc(m.권장장비)}${확인}</div>
+        ${m.주의 ? `<div class="hf-sub" style="color:#fbbf24">${esc(m.주의)}</div>` : ""}
+        ${보조}
+      </span>${단추}</div>`;
+  }
+  async function loadRecommended() {
+    const el = document.getElementById("hfRecommended");
+    if (!el) return;
+    try {
+      권장캐시 = await window.gijo.listRecommendedModels();
+      // ⚠ 0건이면 「없다」가 아니라 **뭔가 잘못된 것**이다. 빈 화면으로 두지 않는다.
+      el.innerHTML = 권장캐시.length
+        ? 권장캐시.map(권장줄).join("")
+        : '<div style="color:#fca5a5">권장 목록을 받지 못했습니다 — 서버가 최신인지 확인해 주세요.</div>';
+    } catch (e) {
+      el.innerHTML = `<div style="color:#fca5a5">권장 목록을 불러오지 못했습니다: ${esc((e && e.message) || String(e))}</div>`;
+    }
   }
 
   async function searchHf() {
@@ -2348,8 +2431,21 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.getElementById("hfSearchInput").addEventListener("keydown", (e) => { if (e.key === "Enter") searchHf(); });
     document.getElementById("hfResults").addEventListener("click", (e) => {
       const id = e.target.dataset.load;
+      if (!id) return;
+      // ⚠ 고급 검색으로 받을 때만 확인한다 — 권장 목록은 우리가 고른 것이라 묻지 않는다.
+      //   이름 규칙은 **마지막 그물**이다(표식 없이 개조한 모델은 못 잡는다). 진짜 방어는
+      //   위 권장 목록이고, 이건 「굳이 검색해서 받는」 길에 놓는 턱이다.
+      if (/(uncensored|abliterat|heretic|jailbr|unaligned|unfiltered)/i.test(id)) {
+        if (!confirm(`⚠ "${id}" 는 안전장치가 제거된 개조본일 수 있습니다.\n\n보안 관제 제품에 쓰면 감사 지적 사항이 됩니다.\n그래도 받으시겠습니까?`)) return;
+      }
+      queueDownload(id, e.target, null);
+    });
+    // 권장 목록 — 목록·클릭·진행 갱신 세 곳을 붙인다.
+    document.getElementById("hfRecommended")?.addEventListener("click", (e) => {
+      const id = e.target.dataset.load;
       if (id) queueDownload(id, e.target, null);
     });
+    loadRecommended().catch(() => {});
     // 추천 카탈로그 클릭 핸들러·loadLlmGuide 호출은 걷어냈다(2026-08-08 모델 안내 단순화).
     // 정의(loadLlmGuide·modelCardHtml 등)는 함께 지웠다 — 부르는 곳 없는 정의를 남기면
     // deadelements류 감시가 잡기 전까지 "있는 줄 아는 기능"이 된다.

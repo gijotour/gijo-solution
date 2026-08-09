@@ -214,7 +214,22 @@ export interface HfDownloadJob {
   createdAt: number;
   updatedAt: number;
 }
+/** 권장 모델 한 줄(2026-08-10). 서버 modelcatalog.ts가 단일 출처 — 여기 값을 다시 적지 않는다. */
+export interface RecommendedModel {
+  용도: string;
+  repo: string;
+  파일?: string;
+  대략크기: string;
+  권장장비: string;
+  주의?: string;
+  기준?: boolean;
+  /** 저장소를 실제로 봤는가. 「확인못함」은 사내망에서 정상이다 — 없다는 뜻이 아니다. */
+  저장소확인: "있음" | "없음" | "확인못함";
+  이미받음: boolean;
+}
+
 export const hfModelsApi = {
+  recommended: () => request<RecommendedModel[]>("/api/hfmodels/recommended"),
   search: (query: string) => request(`/api/hfmodels/search?q=${encodeURIComponent(query)}`),
   load: (modelId: string) => request<HfDownloadJob>("/api/hfmodels/load", { method: "POST", body: { modelId } }),
   jobs: () => request<HfDownloadJob[]>("/api/hfmodels/jobs"),
