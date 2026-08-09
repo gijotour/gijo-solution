@@ -8,6 +8,15 @@ tools/deploy-prod.ps1과 같은 절차를 **단계별로** 수행한다 (스크�
 1. `git fetch hub && git merge --ff-only hub/main` — 갈라졌으면 중단하고 /GIJOAS동기화 먼저.
 2. **테스트 게이트**: `cd server && npm test` — 하나라도 실패하면 **배포 중단**, 결과 보고.
 3. 의존성 변경 확인: 직전 배포 이후 server/package.json 변경 시 경고(WSL에서 npm ci 필요할 수 있음).
+3′. **파이썬 의존 실효 확인(필수)** — 배포 대상 환경에서 직접:
+   `wsl -d Ubuntu-24.04 -- bash -c "cd /home/gijo/gijo-as/server && node scripts/check-python-deps.mjs"`
+   종료코드 1이면 안내대로 설치 후 재확인. **통과 전에는 배포를 끝내지 않는다.**
+   - ⚠ 2026-08-09 실사고 2건: `pypdf`는 requirements.txt에 **적혀 있는데 설치가 안 돼**
+     PDF 추출이 몇 달간 죽어 있었고, `netmiko`(장비 접속)는 **적혀 있지도 않았다.**
+     둘 다 조용히 죽어 있었다 — 화면엔 아무 표시도 없었다.
+   - ⚠ 개발 기계의 `npm test`로는 못 잡는다. Windows 호스트의 python3은 0바이트 껍데기라
+     **제품이 도는 환경이 아니다.** 그래서 이 확인은 반드시 WSL 안에서 한다.
+   - 없으면: `venv/bin/pip install -r requirements.txt` (venv가 없으면 `python3 -m venv venv` 먼저)
 4. WSL 동기화+빌드:
    `wsl -d Ubuntu-24.04 -- bash -c "rsync -a --delete '/mnt/d/Connect AI/server/src/' /home/gijo/gijo-as/server/src/ && cd /home/gijo/gijo-as/server && npx tsc -p tsconfig.json && echo BUILD_OK"`
 5. 재시작 (grep/awk 파이프 금지 — 인용 함정):
