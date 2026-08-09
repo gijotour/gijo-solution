@@ -9,6 +9,7 @@ import { execFileSync } from "child_process";
 import { authMiddleware, adminMiddleware } from "../auth/auth";
 import { llamaBinPath } from "../util/llamabin";
 import { usingDefaultCredential } from "../auth/users";
+import { dbCryptStatus } from "./dbcrypt";
 
 export interface PreflightCheck {
   name: string;
@@ -76,6 +77,31 @@ export async function runPreflight(): Promise<{ checks: PreflightCheck[]; ready:
     status: usingDefault ? "fail" : "pass",
     detail: usingDefault ? "기본 비밀번호(changeme)가 그대로 — 즉시 변경 필요" : "기본 비밀번호 아님(양호)",
   });
+
+  // 저장 암호화(at-rest) — 자가 진단이 **말하지 않으면 없는 일이 된다**.
+  //
+  // 왜 넣었나(2026-08-09): 새로 설치한 올인원 앱의 DB를 열쇠 없이 그대로 읽었다
+  // (마이그레이션 37건·사용자 1명이 평문으로 나왔다). 설계상 암호화는 opt-in이고
+  // 설정 화면은 그 상태를 정직하게 보여주지만, **자가 진단은 이 항목을 아예 안 봤다.**
+  // 고객은 「이상 없음」을 받고 넘어간다 — 노트북을 잃으면 자산·취약점·감사로그가 그대로 읽힌다.
+  //
+  // ⚠ fail이 아니라 warn이다. 꺼져 있는 것은 **의도된 기본값**이라, fail로 만들면
+  //   모든 새 설치가 ready=false가 되어 「못 쓰는 제품」이라고 거짓말하게 된다
+  //   (ready = fail이 하나도 없을 때). 보이게 하되, 과장하지 않는다.
+  try {
+    const enc = dbCryptStatus();
+    checks.push({
+      name: "저장 암호화",
+      status: enc.encrypted ? "pass" : "warn",
+      detail: enc.encrypted
+        ? "켜짐 — DB 파일이 밖으로 나가도 열리지 않습니다"
+        : enc.enableAvailableHere
+          ? "꺼짐 — DB 파일을 가져가면 내용이 그대로 보입니다. 켜기: node scripts/encrypt-db.mjs"
+          : "꺼짐 — DB 파일을 가져가면 내용이 그대로 보입니다. 이 설치에는 전환 도구가 없어 지금은 켤 수 없습니다(디스크 암호화로 보호하세요)",
+    });
+  } catch (e) {
+    checks.push({ name: "저장 암호화", status: "warn", detail: "상태 확인 실패: " + (e as Error).message });
+  }
 
   // 데이터 디렉토리 쓰기 가능
   try {

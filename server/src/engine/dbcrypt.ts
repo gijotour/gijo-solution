@@ -26,8 +26,30 @@ export interface DbCryptStatus {
   covers: string[]; // 막는 것
   notCovered: string[]; // 못 막는 것 — 과장 방지의 핵심
   howToEnable: string | null; // 꺼져 있을 때만
+  /**
+   * **이 설치에서 실제로 켤 수 있는가.** 켜는 길은 scripts/encrypt-db.mjs 하나뿐인데,
+   * 올인원 배포본에는 그 스크립트가 **들어가지 않는다**(extraResources가 server-dist만
+   * 담고 그 안에 scripts/가 없다 — 2026-08-09 배포본 실측으로 확인).
+   * 그런 설치에 "서버를 멈추고 스크립트를 실행하세요"라고 안내하면 **따를 수 없는 방법**을
+   * 알려 주는 것이 된다. 이 제품의 정직 규칙에 어긋나므로 상태에 실어 화면이 사실대로
+   * 말하게 한다.
+   */
+  enableAvailableHere: boolean;
   /** 옆에 남아 있는 평문 DB 사본 — 이게 있으면 암호화가 무력화된다. */
   plaintextCopies: { count: number; files: string[]; totalMb: number };
+}
+
+/**
+ * 켜는 스크립트가 이 설치에 실제로 있는가.
+ * dist/engine/ 에서 두 단계 위가 서버 루트다 — dev는 server/, 배포본은 resources/server-dist/.
+ * cwd 기준으로 찾지 않는다: 배포본의 cwd는 userData라 언제나 없다고 나와 판정이 무의미해진다.
+ */
+function 켜는스크립트있나(): boolean {
+  try {
+    return fs.existsSync(path.join(__dirname, "..", "..", "scripts", "encrypt-db.mjs"));
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -99,9 +121,16 @@ export function dbCryptStatus(): DbCryptStatus {
       "서버가 살아 있는 동안의 침해 — 이 기계에서 관리자 권한을 얻으면 열 수 있습니다",
       "지식베이스(문서 원문·LanceDB)는 이 암호화 대상이 아닙니다",
     ],
+    enableAvailableHere: 켜는스크립트있나(),
+    // ⚠ 켤 수 없는 설치에 켜는 방법을 적지 않는다 — 따를 수 없는 안내는 안내가 아니다.
+    //   대신 **지금 무엇이 사실인지**를 말한다. 감추는 것보다 낫고, 없는 방법을 알려 주는
+    //   것보다도 낫다(이 파일 맨 위 「정직 규칙」).
     howToEnable: encrypted
       ? null
-      : "서버를 멈추고  node scripts/encrypt-db.mjs  실행 → 복구 열쇠를 종이에 보관 → 서버 재시작",
+      : 켜는스크립트있나()
+        ? "서버를 멈추고  node scripts/encrypt-db.mjs  실행 → 복구 열쇠를 종이에 보관 → 서버 재시작"
+        : "이 설치에서는 아직 켤 수 없습니다 — 전환 도구가 함께 배포되지 않았습니다. " +
+          "공급사에 문의하시거나, 그때까지는 이 기계 자체의 디스크 암호화(FileVault·BitLocker)로 보호하세요.",
   };
 }
 
