@@ -1,6 +1,6 @@
 // GIJO AS 클라이언트 API — 대화창·오케스트레이션(에이전트·지시·작업세션·내 업무)
 // 2026-08-06 apiClient.ts(2,141줄)에서 분리 — 구역 본문은 원문 그대로, 공통은 core.ts.
-import { request } from "./core";
+import { request, requestStream } from "./core";
 
 // ── 에이전트 AI ───────────────────────────────────────────────────────
 export interface AgentInfo {
@@ -89,6 +89,27 @@ export const dispatchApi = {
         screen: screen ?? currentScreen(),
       },
     }),
+  // 답 스트리밍(전-7, 2026-08-09) — 같은 dispatch를 SSE로. 산문이 생성되는 대로 onDelta가
+  // 불리고, 반환값은 출구 관문을 지난 **최종** 결과다 — 화면은 흐르던 글자를 이것으로 갈아 끼운다.
+  sendStream: (
+    text: string,
+    sessionId: string | undefined,
+    screen: string | undefined,
+    progressId: string | undefined,
+    selection: string | undefined,
+    on: { start?: () => void; delta?: (text: string) => void }
+  ) =>
+    requestStream<DispatchResult>(
+      "/api/dispatch/stream",
+      {
+        text,
+        ...(sessionId ? { sessionId } : {}),
+        ...(progressId ? { progressId } : {}),
+        ...(selection ? { selection } : {}),
+        screen: screen ?? currentScreen(),
+      },
+      on
+    ),
   progress: (progressId: string) =>
     request<{
       running: boolean; stage?: "understand" | "tools" | "write" | "review"; detail?: string;

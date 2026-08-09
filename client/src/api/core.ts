@@ -113,6 +113,53 @@ async function tryRefresh(usedAccessToken: string | null): Promise<boolean> {
   }
 }
 
+// 답 스트리밍(전-7) — SSE(POST)를 읽어 delta를 콜백으로 흘리고, done의 result를 돌려준다.
+// request()와 같은 401-1회-재발급 계약. done 없이 끊기면 **끊겼다고 던진다**(잘린 답을
+// 완성인 척 두지 않는다 — 시안의 정직 규칙).
+export async function requestStream<T = unknown>(
+  path: string,
+  body: unknown,
+  on: { start?: () => void; delta?: (text: string) => void }
+): Promise<T> {
+  const 한번 = async (retry: boolean): Promise<T> => {
+    const sentToken = accessToken;
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
+    if (sentToken) headers["Authorization"] = `Bearer ${sentToken}`;
+    const res = await fetch(`${serverUrl}${path}`, { method: "POST", headers, body: JSON.stringify(body) });
+    if (res.status === 401 && retry && (await tryRefresh(sentToken))) return 한번(false);
+    if (!res.ok || !res.body) throw new Error(`GIJO AS 서버 오류 ${res.status} ${path.split("?")[0]}`);
+
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    let 결과: T | undefined;
+    let 오류: string | null = null;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      let i: number;
+      while ((i = buf.indexOf("\n\n")) >= 0) {
+        const 블록 = buf.slice(0, i);
+        buf = buf.slice(i + 2);
+        const m = 블록.match(/^data: ([\s\S]*)$/);
+        if (!m) continue;
+        try {
+          const ev = JSON.parse(m[1]) as { t: string; text?: string; result?: T; message?: string };
+          if (ev.t === "start") on.start?.();
+          else if (ev.t === "delta") on.delta?.(ev.text ?? "");
+          else if (ev.t === "done") 결과 = ev.result;
+          else if (ev.t === "error") 오류 = ev.message ?? "알 수 없는 오류";
+        } catch { /* 깨진 이벤트는 건너뛴다 */ }
+      }
+    }
+    if (오류) throw new Error(오류);
+    if (결과 === undefined) throw new Error("답이 중간에 끊겼습니다 — 다시 물어봐 주세요.");
+    return 결과;
+  };
+  return 한번(true);
+}
+
 export async function request<T = unknown>(path: string, opts: RequestOpts = {}): Promise<T> {
   const headers: Record<string, string> = { "Content-Type": "application/json" };
   const sentToken = accessToken;

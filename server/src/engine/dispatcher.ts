@@ -24,6 +24,7 @@ import { recordChatLog } from "./learnloop";
 import { faqAnswerFor } from "./productfaq";
 import type { Viewer } from "./memory";
 import { runAgentLoop, AgentToolCall, 가리킬것없는대명사, 가리킨자산이없나, 대명사뿐인가, 대명사확인, 되물음, 자산되물음, 선택을박는다 } from "./agentloop";
+import { 스트림자리 } from "./streamsink";
 import { executeApprovedTool, findAgentTool, buildApproval, PendingApproval } from "./agenttools";
 import { appendApprovedDecision } from "./orchestrator-dataset";
 import { undoSnapshot, undoCommit } from "./undo";
@@ -1309,6 +1310,54 @@ export function registerDispatcherRoutes(app: Express): void {
       });
     })
   );
+  // 답 스트리밍(전-7, 2026-08-09 시안 「정돈안」 승인) — 같은 dispatch를 돌리되 산문이
+  // 생성되는 대로 토막(delta)을 SSE로 흘린다. 첫 글자가 1초 안에 나오는 것이 목적이다.
+  // ⚠ 정직 규칙: 흘린 글자는 「쓰는 중」 표시일 뿐이고 **최종 답은 done의 result.output**이다 —
+  //   출구 관문(거짓 완료·내부키 치환·말투 감시)이 손본 뒤의 텍스트라 화면은 반드시 갈아 끼운다.
+  //   쓰기 지시는 산문 생성이 없어 아무것도 흐르지 않는다(결재판만 done에 실림 — 시안 요구).
+  //   30초 리포트 전환은 여기 없다 — 스트리밍 자체가 「기다리게 하지 않기」라 물러날 이유가 없다.
+  app.post(
+    "/api/dispatch/stream",
+    authMiddleware,
+    asyncRoute(async (req, res) => {
+      const sessionId = typeof req.body?.sessionId === "string" ? req.body.sessionId : undefined;
+      const screen = typeof req.body?.screen === "string" ? req.body.screen : undefined;
+      const text = String(req.body?.text ?? "");
+      const user = (req as Request & { user?: GijoUser }).user;
+      const qa = req.body?.qa === true;
+      const progressId = isValidProgressId(req.body?.progressId) ? (req.body.progressId as string) : null;
+      const 선택 = typeof req.body?.selection === "string" && req.body.selection.trim()
+        ? req.body.selection.replace(/\s+/g, " ").trim().slice(0, 200)
+        : undefined;
+
+      res.setHeader("Content-Type", "text/event-stream; charset=utf-8");
+      res.setHeader("Cache-Control", "no-cache");
+      res.flushHeaders?.();
+      const 보냄 = (obj: unknown) => {
+        try { res.write(`data: ${JSON.stringify(obj)}\n\n`); } catch { /* 끊긴 연결 — 흘리기만 멈춘다 */ }
+      };
+      const 싱크 = { 시작: () => 보냄({ t: "start" }), 토막: (t: string) => 보냄({ t: "delta", text: t }) };
+
+      const t0 = Date.now();
+      try {
+        const r = await 스트림자리.run(싱크, () =>
+          runWithProgress(progressId, user?.id ?? null, () =>
+            dispatchInstruction(text, sessionId, screen, user?.displayName, qa, isNonLearningAccount(user?.username), { userId: user?.id, clearance: user?.clearance, role: user?.role }, 선택)
+          )
+        );
+        // 출구 손질은 기존 라우트와 같은 순서·같은 함수 — 여기만 다르면 두 입이 딴말을 한다.
+        recordAnswerTiming(text, Date.now() - t0, qa, r.route?.agentId);
+        if (typeof r.output === "string") r.output = 내부키치환(r.output, 자산표시이름);
+        말투재기(text, String(r.output ?? ""));
+        보냄({ t: "done", result: r });
+      } catch (err) {
+        // 정직: 흘리다 죽었으면 죽었다고 말한다 — 잘린 답을 완성인 척 두지 않는다(시안 명시).
+        보냄({ t: "error", message: err instanceof Error ? err.message : String(err) });
+      }
+      res.end();
+    })
+  );
+
   // 실행 없이 지시가 몇 단계로 계획되는지 미리 보여준다(복합 지시 여부 확인용).
   app.post("/api/dispatch/plan", authMiddleware, (req, res) => {
     const steps = planInstruction(String(req.body?.text ?? ""));

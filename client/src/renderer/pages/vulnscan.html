@@ -384,6 +384,14 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
   // CVSS 기반 Risk 는 Medium인데 실제 악용확률(EPSS)이 높은 건 — 등급만 보면 놓친다.
   const isMisfit = (f) => (f.epss ?? 0) >= 0.5 && f.severity !== "critical" && f.severity !== "high";
 
+  // 선택 알림(2026-08-09 3단계) — 고른 것을 셸 📌칩에 싣는다. 「이거」가 이걸 가리키게 된다.
+  // ⚠ parent가 아니라 top이다 — 이 화면은 허브 화면(triage) 안에 한 겹 더 들어간다(지도에서 실측).
+  function 선택알림(label, text) {
+    try {
+      if (window.top !== window) window.top.postMessage(label && text ? { type: "gijo:select", label: label, text: text } : { type: "gijo:select" }, "*");
+    } catch (e) { /* 셸 밖(단독 열람)에서는 조용히 없던 일로 */ }
+  }
+
   function closeDetail() {
     currentHostId = null;
     document.getElementById("vulnDetail").style.display = "none";
@@ -391,10 +399,12 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
       tr.classList.remove("on");
       const c = tr.querySelector(".row-caret"); if (c) c.textContent = "▸";
     });
+    선택알림(null, null); // 상세를 닫으면 가리키던 것도 없다
   }
 
   function openHost(asset, keepFilters) {
     currentHostId = asset.id;
+    선택알림(asset.name, "자산 " + asset.name); // 행을 골랐다 = 이 자산이 「이거」다
     if (!keepFilters) {
       vdFilter = "all";
       vdSort = "sev";
@@ -604,12 +614,20 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
       renderVdList();
     });
     document.getElementById("vdSearch").addEventListener("input", renderVdList);
-    // 취약점 항목 클릭 → 상세(CVE 목록·증거) 펼치기
+    // 취약점 항목 클릭 → 상세(CVE 목록·증거) 펼치기 + 선택(펼친 취약점이 「이거」)
     document.getElementById("vdList").addEventListener("click", (e) => {
       const btn = e.target.closest(".vd-remediate");
       if (btn) { e.stopPropagation(); if (!btn.classList.contains("done")) remediate(btn); return; }
       const item = e.target.closest(".vd-item");
-      if (item) item.classList.toggle("open");
+      if (!item) return;
+      item.classList.toggle("open");
+      const asset = hostCache.find((a) => a.id === currentHostId);
+      const 이름 = (item.querySelector(".vd-name") || {}).textContent || "";
+      if (item.classList.contains("open") && 이름 && asset) {
+        선택알림(이름.slice(0, 60), "자산 " + asset.name + "의 취약점 " + 이름);
+      } else if (asset) {
+        선택알림(asset.name, "자산 " + asset.name); // 접으면 열어 둔 자산으로 되돌아간다
+      }
     });
   }
 

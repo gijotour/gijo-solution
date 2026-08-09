@@ -90,6 +90,9 @@
       ".cs-div::before,.cs-div::after{content:'';flex:1;border-top:1px solid var(--border,rgba(255,255,255,.08));}",
       // 해석 한 줄 — 질문을 무엇으로 알아들었는지(어긋나면 그 자리에서 보인다)
       ".cs-parse{font-size:11px;color:var(--muted-2,#a49d95);margin-bottom:3px;}",
+      // 답 스트리밍 — 쓰는 대로 흐르는 글자(진행 카드 아래). 최종 답으로 갈아 끼워지는 임시 표시라
+      // 톤을 반 단계 죽여 「아직 완성이 아니다」가 눈에 보이게 한다.
+      ".cs-stream{white-space:pre-wrap;margin-top:6px;font-size:12.5px;line-height:1.5;color:var(--muted,#c9c3bb);}",
       // 서랍 — 무엇을 할 수 있나. 접혀 있는 게 기본(대화가 주인공이다).
       ".cs-drawer{flex:0 0 auto;border-bottom:1px solid var(--border,rgba(255,255,255,.08));background:var(--panel-2,#1f1e1d);}",
       ".cs-dh{display:flex;align-items:center;gap:7px;padding:7px 11px;cursor:pointer;font-size:12.5px;user-select:none;}",
@@ -1106,7 +1109,36 @@
       // (server/engine/screencontext.ts). 보고 있는 탭이 곧 그 맥락이다.
       // C. 맥락을 뗐으면(ctxOff) 화면을 싣지 않는다 — "NIST CSF가 뭐야?" 같은 일반 질문에
       //    화면 맥락이 오히려 해석을 비트는 경우가 있다(외부사례: VS Code implicit context 논쟁).
-      var r = await window.gijo.sendInstruction(text, session ? session.id : undefined, (ctxOff ? undefined : ctx.screen) || undefined, pid, sel ? sel.text : undefined);
+      var 화면인자 = (ctxOff ? undefined : ctx.screen) || undefined;
+      var 선택인자 = sel ? sel.text : undefined;
+      // 답 스트리밍(전-7, 시안 정돈안) — 산문이 생성되는 대로 진행 카드 아래에 글자가 흐른다.
+      // 흐른 글자는 「쓰는 중」 표시일 뿐 — done의 최종 답(출구 관문 통과본)으로 반드시 갈아 끼운다.
+      var live = null;
+      var onStart = function () { if (live) live.textContent = ""; };
+      var onDelta = function (t) {
+        if (!cmEl) return;
+        if (!live) {
+          live = document.createElement("div");
+          live.className = "cs-stream"; // ⚠ .cs-live는 절차 띠의 실시간 숫자 칸 — 딴 이름이어야 한다
+          cmEl.appendChild(live);
+        }
+        live.textContent += t;
+        var b = rows();
+        if (b) b.scrollTop = b.scrollHeight;
+      };
+      var r;
+      if (window.gijo.sendInstructionStream) {
+        try {
+          r = await window.gijo.sendInstructionStream(text, session ? session.id : undefined, 화면인자, pid, 선택인자, onDelta, onStart);
+        } catch (se) {
+          // 흐르다 끊겼으면(글자가 이미 보였으면) 끊겼다고 알린다 — 잘린 답을 완성인 척 안 한다.
+          // 아무것도 안 흘렀으면(구서버 404·연결 실패) 통짜 경로로 한 번 더 — 기능 후퇴는 없다.
+          if (live && live.textContent) throw se;
+          r = await window.gijo.sendInstruction(text, session ? session.id : undefined, 화면인자, pid, 선택인자);
+        }
+      } else {
+        r = await window.gijo.sendInstruction(text, session ? session.id : undefined, 화면인자, pid, 선택인자);
+      }
       if (pc) pc.stop();
       if (r && r.sessionId) {
         session = { id: r.sessionId };

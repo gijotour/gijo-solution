@@ -168,6 +168,18 @@ const gijoApi = {
   // selection: 화면에서 골라 둔 항목 — 「이거」의 대상(2026-08-09 2단계).
   sendInstruction: (text: string, sessionId?: string, screen?: string, progressId?: string, selection?: string) =>
     api.dispatchApi.send(text, sessionId, screen, progressId, selection),
+  // 답 스트리밍(전-7) — 산문이 생성되는 대로 onDelta(토막)·onStart(새 산문 시작)가 불린다.
+  // contextBridge는 인자로 넘긴 함수를 프록시로 감싸 렌더러로 되돌려 부른다.
+  // 반환값은 출구 관문을 지난 최종 결과 — 화면은 흐르던 글자를 반드시 이것으로 갈아 끼운다.
+  sendInstructionStream: (
+    text: string,
+    sessionId: string | undefined,
+    screen: string | undefined,
+    progressId: string | undefined,
+    selection: string | undefined,
+    onDelta: (t: string) => void,
+    onStart?: () => void
+  ) => api.dispatchApi.sendStream(text, sessionId, screen, progressId, selection, { delta: onDelta, start: onStart }),
   dispatchProgress: (progressId: string) => api.dispatchApi.progress(progressId),
   // 결재판 승인 실행 — 쓰기 도구는 이 경로로만 실행된다(지시만으로는 실행 안 됨).
   approveAgentTool: (tool: string, args: Record<string, string>, instruction = "") => api.dispatchApi.approve(tool, args, instruction),

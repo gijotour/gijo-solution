@@ -4,6 +4,7 @@
 import type { Express, Request } from "express";
 import { 예고서두, 인사서두, 소개서두, 표식 } from "./tone";
 import { stripThink } from "./modelquirks";
+import { 스트림자리, type 스트림싱크 } from "./streamsink";
 import http from "node:http";
 import https from "node:https";
 import { authMiddleware } from "../auth/auth";
@@ -554,6 +555,68 @@ export function smallTalkReply(message: string): string | null {
   return null;
 }
 
+/**
+ * llama.cpp SSE 응답을 토막 단위로 읽어 싱크에 흘리고, 비스트리밍과 같은 모양으로 조립해 준다.
+ * (답 스트리밍 전-7 — 뒤의 후처리(생각 블록·서두 제거·드리프트 재생성·근거약함 배너)는 전부
+ *  완성본에 다시 적용되므로, 여기서 흘린 글자는 「쓰는 중」 표시일 뿐이다. 화면은 done으로 갈아 끼운다.)
+ *
+ * ⚠ <think> 블록은 흘리지 않는다 — 최종 답은 stripThink가 걷어내지만, 흐르는 중간에 생각이
+ *   보이면 그 자체가 누출이다. 보이는 글(stripThink 결과)의 **늘어난 꼬리만** 내보낸다.
+ */
+async function 스트림으로읽는다(res: Response, 싱크: 스트림싱크): Promise<{
+  choices?: { message?: { content?: string } }[];
+  model?: string;
+  usage?: { prompt_tokens?: number; completion_tokens?: number };
+  timings?: { predicted_per_second?: number };
+}> {
+  싱크.시작();
+  let content = "";
+  let 보낸 = 0;
+  let model: string | undefined;
+  let usage: { prompt_tokens?: number; completion_tokens?: number } | undefined;
+  let timings: { predicted_per_second?: number } | undefined;
+  const dec = new TextDecoder();
+  let buf = "";
+  const body = res.body as unknown as AsyncIterable<Uint8Array> | null;
+  if (!body) return { choices: [{ message: { content: "" } }] };
+  for await (const chunk of body) {
+    buf += dec.decode(chunk, { stream: true });
+    let nl;
+    while ((nl = buf.indexOf("\n")) >= 0) {
+      const line = buf.slice(0, nl).trim();
+      buf = buf.slice(nl + 1);
+      if (!line.startsWith("data:")) continue;
+      const payload = line.slice(5).trim();
+      if (!payload || payload === "[DONE]") continue;
+      try {
+        const j = JSON.parse(payload) as {
+          choices?: { delta?: { content?: string } }[];
+          model?: string;
+          usage?: { prompt_tokens?: number; completion_tokens?: number };
+          timings?: { predicted_per_second?: number };
+        };
+        const d = j.choices?.[0]?.delta?.content ?? "";
+        if (d) {
+          content += d;
+          // 생각 블록이 열려 있으면(<think> 짝이 안 맞으면) 그 안은 안 흘린다.
+          const opens = (content.match(/<think>/g) ?? []).length;
+          if (opens === (content.match(/<\/think>/g) ?? []).length) {
+            const 보이는 = stripThink(content);
+            if (보이는.length > 보낸) {
+              싱크.토막(보이는.slice(보낸));
+              보낸 = 보이는.length;
+            }
+          }
+        }
+        if (j.model) model = j.model;
+        if (j.usage) usage = j.usage;         // llama.cpp는 마지막 토막에 실측치를 싣는다
+        if (j.timings) timings = j.timings;
+      } catch { /* 깨진 토막은 건너뛴다 — 다음 줄이 온다 */ }
+    }
+  }
+  return { choices: [{ message: { content } }], model, usage, timings };
+}
+
 export async function chat(args: ChatArgs): Promise<string> {
   // 단일 관문 — 사용자 입력이 LLM에 닿기 전 반드시 여기를 지난다(engine/gateway.ts 주석 참고).
   // trusted는 이미 관문을 지난 내부 재진입(dispatcher)만 쓴다.
@@ -634,10 +697,13 @@ export async function chat(args: ChatArgs): Promise<string> {
   const constrained = args.responseSchema
     ? { json_schema: args.responseSchema, temperature: 0 }
     : { grammar: NO_HAN_GRAMMAR };
+  // 답 스트리밍(전-7, 시안 정돈안) — 스트림 라우트가 싱크를 깔아 뒀고 **산문 호출일 때만** 흘린다.
+  // 스키마(JSON 결정) 호출은 제외 — 도구 고르는 내부 결정문이라 담당자에게 보일 글이 아니다.
+  const 싱크 = args.responseSchema ? undefined : 스트림자리.getStore();
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ model: "local", messages, ...constrained, ...loraExtras, max_tokens: args.maxTokens ?? DEFAULT_MAX_TOKENS }),
+    body: JSON.stringify({ model: "local", messages, ...constrained, ...loraExtras, max_tokens: args.maxTokens ?? DEFAULT_MAX_TOKENS, ...(싱크 ? { stream: true } : {}) }),
     signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
   }).catch((err: unknown) => ((err as Error)?.name === "TimeoutError" ? ("timeout" as const) : null));
 
@@ -653,12 +719,14 @@ export async function chat(args: ChatArgs): Promise<string> {
     // ① 이 PC에서 완결 — 설정 > 서버·AI에서 모델 내려받아 로드  ② 사내 GPU 서버에 연결 — 설정에서 서버 주소 입력.
     return "⚠ AI 모델이 아직 준비되지 않았습니다. 다음 중 하나로 해결하세요 — ① 설정 > 서버·AI > 모델 검색·받기에서 모델을 내려받아 로드, 또는 ② 설정에서 모델이 있는 사내 GPU 서버 주소를 입력해 연결.";
   }
-  const data = (await res.json()) as {
-    choices?: { message?: { content?: string } }[];
-    model?: string;
-    usage?: { prompt_tokens?: number; completion_tokens?: number };
-    timings?: { predicted_per_second?: number };
-  };
+  const data = 싱크
+    ? await 스트림으로읽는다(res, 싱크)
+    : ((await res.json()) as {
+        choices?: { message?: { content?: string } }[];
+        model?: string;
+        usage?: { prompt_tokens?: number; completion_tokens?: number };
+        timings?: { predicted_per_second?: number };
+      });
   // 생각 블록 안전망(modelquirks) — 기동 플래그(--reasoning off)가 정상이면 아예 안 나오지만,
   // 플래그 없이 떠 있던 모델·감지 못한 thinking 모델이 새면 여기서 걷어낸다.
   // ⚠ 스키마(JSON) 경로보다 먼저다 — <think>가 앞에 붙으면 JSON.parse가 통째로 깨진다.

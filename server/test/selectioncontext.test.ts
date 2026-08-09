@@ -52,6 +52,9 @@ describe("선택 치환 — 대명사 자리에 고른 항목을 박는다", () 
       .toBe("자산 172.168.50.142 미조치 취약점 몇 건이야?");
     expect(선택을박는다("이거 조치 절차 알려줘", "자산 안전대부 웹서버"))
       .toBe("자산 안전대부 웹서버 조치 절차 알려줘");
+    // 3단계(2026-08-09): 대시보드 할 일 줄 선택 — 「이 할 일」도 치환된다.
+    expect(선택을박는다("이 할 일 완료 처리해줘", "할 일 방화벽 정기점검"))
+      .toBe("할 일 방화벽 정기점검 완료 처리해줘");
   });
 
   it("★★ 대명사가 없으면 원문 그대로 — 칩이 붙었다고 마음대로 좁히지 않는다", () => {
@@ -87,5 +90,14 @@ describe("클라 배선 (소스 계약)", () => {
     const cs = fs.readFileSync(path.join(__dirname, "..", "..", "client", "src", "renderer", "pages", "console.js"), "utf8");
     expect(cs).toContain("setSelection(null); // 선택도 푼다");
     expect(cs).toContain("select: setSelection");
+  });
+
+  it("3단계 확장 화면도 top으로 보낸다 — 취약점 목록(호스트·항목)·할 일 줄", () => {
+    const vs = fs.readFileSync(path.join(__dirname, "..", "..", "client", "src", "renderer", "pages", "vulnscan.html"), "utf8");
+    expect(vs, "취약점 화면에 선택 배선").toContain("gijo:select");
+    expect(vs, "허브 한 겹 함정 — parent 금지").toContain("window.top !== window");
+    const db = fs.readFileSync(path.join(__dirname, "..", "..", "client", "src", "renderer", "pages", "dashboard.html"), "utf8");
+    expect(db, "할 일 줄에 선택 배선").toContain("gijo:select");
+    expect(db, "셸은 최상위 창").toContain("window.top.postMessage");
   });
 });
