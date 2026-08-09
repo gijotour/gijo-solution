@@ -6,7 +6,15 @@
 tools/deploy-prod.ps1과 같은 절차를 **단계별로** 수행한다 (스크립트 일괄 실행은 권한 정책에 막히므로 단계 분리가 표준):
 
 1. `git fetch hub && git merge --ff-only hub/main` — 갈라졌으면 중단하고 /GIJOAS동기화 먼저.
-2. **테스트 게이트**: `cd server && npm test` — 하나라도 실패하면 **배포 중단**, 결과 보고.
+2. **테스트 게이트 — WSL에서 돌린다**(2026-08-10 확립):
+   `wsl -d Ubuntu-24.04 -- bash "/mnt/d/Connect AI/tools/wsl-test.sh"`
+   하나라도 실패하면 **배포 중단**, 결과 보고.
+   - ⚠ **Windows에서 `cd server && npm test` 하지 말 것.** 느린 게 문제가 아니라
+     **제품이 안 도는 환경을 재는 것**이 문제다(그 python3은 0바이트 껍데기).
+     실측: Windows 한 파일 14분(전체는 못 끝냄) ↔ WSL 전체 2,979개 **27초**.
+   - ⚠ WSL 사본에서 **구조적으로 못 도는 시험 2개**는 스크립트가 끝에 이름을 찍는다
+     (`no-hardcoded-credentials`=git 필요 · `shotlist`=이미지 필요). 그 둘은 Windows에서 따로.
+     「WSL에서 전부 통과」는 이 둘을 뺀 말이다 — 그대로 말하면 거짓이 된다.
 3. 의존성 변경 확인: 직전 배포 이후 server/package.json 변경 시 경고(WSL에서 npm ci 필요할 수 있음).
 3′. **파이썬 의존 실효 확인(필수)** — 배포 대상 환경에서 직접:
    `wsl -d Ubuntu-24.04 -- bash -c "cd /home/gijo/gijo-as/server && node scripts/check-python-deps.mjs"`
