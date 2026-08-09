@@ -232,12 +232,29 @@ export function rebuildVulnEvents(): number {
 // 현재 커버: 인증 브루트포스(SSH/일반 auth). "Failed password ... from <IP>",
 // "authentication failure ... rhost=<IP>", "Invalid user ... from <IP>" 를 소스 IP별로 집계해
 // 임계치(기본 10회) 이상이면 이벤트를 만든다. 성공(Accepted) 로그가 있으면 "활성 악용"을 신호로 단다.
+// ★ 2026-08-10: **국내 보안장비 형식(CEF/LEEF·key=value)을 통째로 놓치고 있었다.**
+//   아래 세 줄은 전부 `from <IP>`·`rhost=<IP>`를 요구한다 — 리눅스 sshd 로그의 말투다.
+//   안랩 TrusGuard·시큐아이 같은 장비는 `src=203.0.113.9 dst=10.0.0.5 … auth failure`로 보낸다.
+//   즉 **그 장비를 쓰는 고객은 브루트포스가 한 건도 안 잡혔다**(목적지 이전에 이벤트 자체가 없다).
+//   ⚠ `src=`만으로 잡으면 모든 장비 로그가 인증 실패가 된다 — **인증 실패를 뜻하는 말이
+//     같은 줄에 있을 때만** 잡는다. 말이 앞에 오는 경우와 뒤에 오는 경우를 모두 받는다.
+const 인증실패말 = "auth(?:entication)?\\s*fail\\w*|login\\s*fail\\w*|failed\\s*(?:password|login)|invalid\\s*user";
+const IP4 = "\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}\\.\\d{1,3}";
 const FAIL_RES = [
   /Failed password .*? from\s+(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/i,
   /authentication failure;.*rhost=(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/i,
   /Invalid user .*? from\s+(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/i,
+  // key=value·CEF — 인증 실패 표시가 **앞**에 오는 줄
+  new RegExp(`(?:${인증실패말})[^\\n]*?\\bsrc\\s*=\\s*(${IP4})`, "i"),
+  // key=value·CEF — `src=`가 **앞**에 오는 줄
+  new RegExp(`\\bsrc\\s*=\\s*(${IP4})[^\\n]*?(?:${인증실패말})`, "i"),
 ];
-const ACCEPT_RE = /Accepted (?:password|publickey) .*? from\s+(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/i;
+// 성공 로그도 같은 이유로 넓힌다 — 성공이 안 잡히면 「활성 악용」 신호를 못 단다.
+const ACCEPT_RES = [
+  /Accepted (?:password|publickey) .*? from\s+(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})/i,
+  new RegExp(`(?:auth(?:entication)?\\s*success|login\\s*success|accepted\\s*(?:password|publickey))[^\\n]*?\\bsrc\\s*=\\s*(${IP4})`, "i"),
+  new RegExp(`\\bsrc\\s*=\\s*(${IP4})[^\\n]*?(?:auth(?:entication)?\\s*success|login\\s*success)`, "i"),
+];
 
 export interface LogParseResult {
   events: AnalysisEvent[];
@@ -261,12 +278,22 @@ function detectBruteForce(source: string, lines: string[], threshold: number, �
       const m = line.match(re);
       if (m) {
         fails.set(m[1], (fails.get(m[1]) ?? 0) + 1);
-        if (h) { const set = 줄대상.get(m[1]) ?? new Set<string>(); set.add(h); 줄대상.set(m[1], set); }
+        // ★ 2026-08-10: syslog 호스트 **와** `dst=` 둘 다 본다. 호스트 이름이 없는 형식
+        //   (CEF/LEEF·key=value)에서는 우리 자산을 통째로 놓치고 있었다 — 상관이 안 잡히는 원인.
+        //   실측: 보안로그 4건 중 목적지가 담긴 것이 1건뿐이었고, 겹침도 그 1건에서만 나왔다.
+        const 대상들 = [h, 목적지IP(line, m[1])].filter(Boolean) as string[];
+        if (대상들.length) {
+          const set = 줄대상.get(m[1]) ?? new Set<string>();
+          for (const t of 대상들) set.add(t);
+          줄대상.set(m[1], set);
+        }
         matched++; break;
       }
     }
-    const acc = line.match(ACCEPT_RE);
-    if (acc) accepts.add(acc[1]);
+    for (const re of ACCEPT_RES) {
+      const acc = line.match(re);
+      if (acc) { accepts.add(acc[1]); break; }
+    }
   }
   const events: AnalysisEvent[] = [];
   for (const [ip, count] of fails) {
@@ -284,6 +311,23 @@ function detectBruteForce(source: string, lines: string[], threshold: number, �
 
 // 탐지기 ②: 방화벽 차단 — iptables/UFW(SRC=/DPT=)·Cisco(dst .../port) 차단 로그를 소스 IP별로 집계.
 // 서로 다른 목적지 포트가 많으면 포트스캔, 차단 건수만 많으면 차단 폭주로 본다.
+/**
+ * 로그 한 줄에서 **목적지(우리 쪽) IP**를 뽑는다 — `dst=10.0.0.5` · `DST=10.0.0.5` · `dst 10.0.0.5`.
+ *
+ * ⚠ 왜 공용으로 뺐나(2026-08-10 실측): 방화벽 탐지기는 이걸 뽑는데 **인증 브루트포스 탐지기는
+ *   안 뽑았다.** 브루트포스는 전통 syslog 형식(`Aug 1 10:00:01 fw01 sshd[…]`)의 호스트 이름만
+ *   봤는데, 국내 보안장비는 대개 CEF/LEEF·key=value로 보낸다 — 그 줄에는 호스트 이름이 없다.
+ *   그래서 **같은 파일 안에서 한 탐지기는 우리 자산을 찾고 다른 탐지기는 못 찾는** 상태였다.
+ *   실측: 보안로그 4건 중 목적지가 담긴 것은 **1건뿐**이었고, 그 1건만 취약점과 상관이 잡혔다.
+ * ⚠ 출발지와 같으면 버린다 — 둘 다 「줄의 첫 IP」를 주운 경우다.
+ */
+export function 목적지IP(line: string, src?: string): string | undefined {
+  const m = (line.match(/\bDST=(\d+\.\d+\.\d+\.\d+)/i) ||
+    line.match(/\bdst\s*=\s*(\d+\.\d+\.\d+\.\d+)/i) ||
+    line.match(/\bdst\s+(\d+\.\d+\.\d+\.\d+)/i))?.[1];
+  return m && m !== src ? m : undefined;
+}
+
 const DENY_RE = /\b(DENY|DROP|BLOCK|Deny|denied|REJECT|blocked)\b/i;
 function extractDeny(line: string): { src: string; dpt?: string; dst?: string } | null {
   if (!DENY_RE.test(line)) return null;
@@ -293,9 +337,7 @@ function extractDeny(line: string): { src: string; dpt?: string; dst?: string } 
   //   보내는데(`CEF:0|AhnLab|TrusGuard|…|src=203.0.113.9 dst=10.0.0.5 dpt=445 act=deny`),
   //   그 줄에는 syslog 호스트 이름이 없다 — 즉 syslogHosts()로는 우리 쪽을 못 찾는다.
   //   dst가 상관을 잇는 유일한 끈이 된다. src와 같으면(둘 다 첫 IP를 주운 경우) 버린다.
-  const dstRaw = (line.match(/\bDST=(\d+\.\d+\.\d+\.\d+)/i) || line.match(/\bdst\s*=\s*(\d+\.\d+\.\d+\.\d+)/i) ||
-    line.match(/\bdst\s+(\d+\.\d+\.\d+\.\d+)/i))?.[1];
-  const dst = dstRaw && dstRaw !== src ? dstRaw : undefined;
+  const dst = 목적지IP(line, src);
   return src ? { src, dpt, dst } : null;
 }
 function detectFirewall(source: string, lines: string[], 대상: string[] = [], portScanPorts = 15, floodThreshold = 30): { events: AnalysisEvent[]; matched: number } {
@@ -585,7 +627,13 @@ export function computeCorrelations(events: AnalysisEvent[]): Correlation[] {
     if (!cur.evs.includes(e)) cur.evs.push(e);
     byKey.set(k, cur);
   };
-  for (const e of events) {
+  // ★ 2026-08-10: **처리를 끝냈거나 무시한 이벤트는 상관에서 뺀다.**
+  //   같은 화면의 「최우선 항목」은 이미 거르는데 상관만 안 걸러, 담당자가 "이건 아니다"라고
+  //   표시한 것이 상관 줄에는 계속 떴다. 한 화면에서 규칙이 어긋나면 목록을 안 믿게 된다.
+  //   ⚠ 「과거에 함께 나타났다」는 사실이 사라지는 것은 아니다 — 처리된 것을 **다시 알리지
+  //     않을** 뿐이다. 이력이 필요하면 이벤트 상태 기록에 남아 있다.
+  const 살아있는것 = events.filter((e) => e.status !== "done" && e.status !== "ignored");
+  for (const e of 살아있는것) {
     if (e.entity) 담기(e.entity, e, e.entity);
     for (const p of e.peers ?? []) if (p) 담기(p, e, p);
   }
