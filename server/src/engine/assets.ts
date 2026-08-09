@@ -539,6 +539,24 @@ seedSampleAssetsIfEmpty();
 // 실제 호스트가 하나라도 등록되면(infra-host 존재) 절대 끼어들지 않는다. 값은 실제와 유사하되
 // owner를 "샘플(예시)"로 표시해 진짜 스캔 결과와 구분한다.
 export const SAMPLE_VULN_HOST_ID = "vuln:sample-web01";
+
+/**
+ * 지금 보이는 것이 **예시 데이터뿐인가** — 실제 자산이 하나도 등록되지 않은 상태인가.
+ *
+ * 왜 필요한가(2026-08-09 실측): 새로 설치한 앱에서 고객이 처음 던진 질문의 답이
+ *   「[P0] 실제 악용(KEV) 1건 — 공격이 실제로 쓰이는 취약점, 이번 주 안에 막아야 합니다」
+ * 였다. **가짜 P0로 시작하는 첫인상**이다. 데이터 자체는 정직하게 표시돼 있는데
+ * (source_tool="샘플", owner="샘플(예시)") 답이 그 표시를 옮기지 않았다.
+ *
+ * ⚠ 자산이 하나도 없으면 false다 — 「예시뿐」이 아니라 「아무것도 없음」이고, 그때는
+ *   경고할 것도 없다. 실제 자산이 하나라도 들어오면 그 순간 false가 되어 문구가 사라진다.
+ */
+export function 예시데이터뿐인가(): boolean {
+  const rows = listAssetRowsStmt.all() as AssetRow[];
+  if (!rows.length) return false;
+  const 표본 = new Set<string>([...SAMPLE_ASSET_IDS, SAMPLE_VULN_HOST_ID]);
+  return rows.every((r) => 표본.has(r.id));
+}
 export function seedSampleVulnHostIfEmpty(): void {
   const hasHost = (listAssetRowsStmt.all() as AssetRow[]).some((r) => r.assetType === "infra-host");
   if (hasHost) return;

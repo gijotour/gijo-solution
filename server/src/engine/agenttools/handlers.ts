@@ -1,7 +1,7 @@
 // engine/agenttools/handlers.ts — 도구 핸들러·헬퍼 전부 (2026-08-06 agenttools.ts 3,956줄 분리)
 // 본문은 원문 그대로다. 레지스트리(등록표)는 registry.ts, 겉문은 ../agenttools.ts(배럴).
 import { dateOnlyLocal, addDaysLocal, koDateTimeString } from "../../util/date";
-import { listAssets, getAsset, registerAsset, updateAssetOwnership, updateAssetMeta, setAssetRobustness, isAiAsset, Asset, 자산표시이름 } from "../assets";
+import { listAssets, getAsset, registerAsset, updateAssetOwnership, updateAssetMeta, setAssetRobustness, isAiAsset, Asset, 자산표시이름, 예시데이터뿐인가 } from "../assets";
 import { computeAssetCoverage, coverageSummaryText, type GapKind } from "../assetcoverage";
 import { expandOntology } from "../ontology";
 import { prioritizedReviews, updateFindingReview, findingKey, ReviewPatch, ApprovalStatus } from "../approvals";
@@ -2178,8 +2178,16 @@ export async function runUrgentTodo(): Promise<string> {
   }
   const 줄 = 후보.map((x, i) => `${i + 1}. [${x.p}] ${x.무엇}
    ${x.왜} · 화면: ${x.어디}`);
+  // ⚠ 실제 자산이 하나도 없으면 이 숫자는 **전부 예시 데이터**에서 나온 것이다.
+  //   그 말을 안 하면 고객의 첫 대화가 「[P0] 실제 악용(KEV) 1건 — 이번 주 안에 막아야 합니다」가
+  //   된다. **가짜 P0로 시작하는 첫인상**이다(2026-08-09 새 설치 실측).
+  //   데이터 자체는 정직하게 표시돼 있었다(source_tool="샘플" · owner="샘플(예시)") —
+  //   그 표시를 옮기지 않은 것은 이 답이었다.
+  const 예시안내 = 예시데이터뿐인가()
+    ? "⚠ 아래는 **예시 데이터**입니다 — 실제 자산을 등록하면 이 숫자는 사라집니다.\n"
+    : "";
   return [
-    `지금 손댈 일 ${후보.length}건 (보안 KPI에서 나쁜 값만 골랐습니다):`,
+    `${예시안내}지금 손댈 일 ${후보.length}건 (보안 KPI에서 나쁜 값만 골랐습니다):`,
     ...줄,
     "",
     "할 일로 담으려면 그대로 말씀하세요 — 예: \"기한 지난 조치 마무리를 할 일로 담아줘\"",

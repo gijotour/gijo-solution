@@ -214,3 +214,29 @@ describe("자산 목록은 스캔 이력을 싣지 않는다", () => {
     expect(Array.isArray(one.body.scanHistory), "상세는 이력을 그대로 준다").toBe(true);
   });
 });
+
+// 예시 데이터를 「진짜」로 내보내지 않는가 (2026-08-09).
+//
+// 실측: 새로 설치한 앱에서 고객이 처음 던진 질문의 답이
+//   「[P0] 실제 악용(KEV) 1건 — 공격이 실제로 쓰이는 취약점, 이번 주 안에 막아야 합니다」
+// 였다. **가짜 P0로 시작하는 첫인상**이다. 데이터 자체는 정직하게 표시돼 있었는데
+// (source_tool="샘플" · owner="샘플(예시)") 답이 그 표시를 옮기지 않았다.
+describe("예시 데이터 판정", () => {
+  it("씨앗 자산만 있으면 예시뿐이라고 본다", async () => {
+    const { 예시데이터뿐인가 } = await import("../src/engine/assets");
+    // 첫 기동 시드가 그대로인 상태 — 실제 자산은 아직 하나도 없다.
+    expect(typeof 예시데이터뿐인가()).toBe("boolean");
+  });
+
+  it("★ 자산이 하나도 없으면 false — 「예시뿐」이 아니라 「아무것도 없음」이다", async () => {
+    const { 예시데이터뿐인가, listAssets } = await import("../src/engine/assets");
+    // 경고할 것이 없는 상태에까지 경고를 붙이면 문구가 값을 잃는다.
+    if (listAssets().length === 0) expect(예시데이터뿐인가()).toBe(false);
+  });
+
+  it("실제 자산이 하나라도 들어오면 예시뿐이 아니다", async () => {
+    const { 예시데이터뿐인가, registerAsset } = await import("../src/engine/assets");
+    registerAsset({ id: "real-one-01", name: "진짜 자산", path: "/srv/real", assetType: "LLM 서비스", owner: "보안팀" });
+    expect(예시데이터뿐인가()).toBe(false);
+  });
+});
