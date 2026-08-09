@@ -5,7 +5,7 @@ import { listAssets, getAsset, registerAsset, updateAssetOwnership, updateAssetM
 import { computeAssetCoverage, coverageSummaryText, type GapKind } from "../assetcoverage";
 import { expandOntology } from "../ontology";
 import { prioritizedReviews, updateFindingReview, findingKey, ReviewPatch, ApprovalStatus } from "../approvals";
-import { 표식, 심각도한글, 심각도표식 } from "../tone";
+import { 표식, 심각도한글, 심각도표식, 자산종류한글 } from "../tone";
 import { buildHub, sourceFileOf } from "../assethub";
 import { workflowStages } from "../workflow";
 import { 한줄풀이글, 섞임고지 } from "../findingplain";
@@ -194,12 +194,16 @@ export function findingSummary(asset: Asset): string {
   const errNote =
     (scanErrors ? ` · 스캔 실패 ${scanErrors}건(취약점 아님 — 재스캔 필요)` : "") +
     (조사 ? ` · 조사 정보 ${조사}건(취약점 아님 — 스캐너가 알아낸 사실)` : "");
-  if (real.length === 0) return `finding 없음${errNote}`;
+  // ★ 2026-08-10: **영문 내부 표기를 사람 말로.** `finding 3건 (medium 1, low 2)`가
+  //   담당자 답에 그대로 나갔다(요약이 실패하면 도구 원문이 곧 답이 된다 — 3회 중 1회 실측).
+  //   ⚠ 「폴백이 나가도 부끄럽지 않게」가 이 수리의 뜻이다. 도구 출력은 **언제든 사람에게 갈 수
+  //     있다**고 보고 쓴다 — 그러면 어느 경로로 새어 나가도 읽을 수 있다.
+  if (real.length === 0) return `확인된 취약점 없음${errNote}`;
   const counts = SEVERITY_ORDER.map((s) => [s, real.filter((f) => f.severity === s).length] as const)
     .filter(([, n]) => n > 0)
-    .map(([s, n]) => `${s} ${n}`)
-    .join(", ");
-  return `finding ${real.length}건 (${counts})${errNote}`;
+    .map(([s, n]) => `${심각도한글(s)} ${n}`)
+    .join(" · ");
+  return `취약점 ${real.length}건(${counts})${errNote}`;
 }
 
 /** 한 번에 보여 주는 자산 수. 넘으면 **잘랐다고 밝힌다.** */
@@ -666,9 +670,12 @@ export async function searchOne(q: string): Promise<string[]> {
   });
   if (assets.length) {
     // ⚠ 내부 id를 앞세우지 않는다 — 사람이 읽는 글자가 아니다(2026-08-03 말투 규범).
-    out.push(`AI 자산 ${assets.length}건:`, ...assets.slice(0, 6).map(
-      (a) => `  - ${자산표시이름(a.id)} | ${a.assetType} | ${findingSummary(a)}` +
-        (이유.get(a.id) ? ` | 걸린 이유=${이유.get(a.id)}` : "")
+    // ★ 2026-08-10: 파이프(|)로 이은 기계 표기를 사람 말로 바꿨다.
+    //   요약이 실패하면 이 줄이 **그대로 담당자 답이 된다**(3회 중 1회 실측) —
+    //   그때 `| infra-host | finding 3건 (medium 1, low 2)`가 나갔다.
+    out.push(`찾은 자산 ${assets.length}건:`, ...assets.slice(0, 6).map(
+      (a) => `  - ${자산표시이름(a.id)} — ${자산종류한글(a.assetType)} · ${findingSummary(a)}` +
+        (이유.get(a.id) ? ` · 걸린 이유: ${이유.get(a.id)}` : "")
     ));
     // 대상이 좁혀졌으면 취약점 **이름**까지 준다(2026-07-28 실측).
     // 건수만 주면 LLM은 아는 만큼만 말해 "medium 1건, low 2건"으로 끝난다 — 담당자가 알고 싶은 건

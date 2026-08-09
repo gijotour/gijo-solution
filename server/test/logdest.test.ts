@@ -119,3 +119,29 @@ describe("처리·무시한 이벤트는 상관에서 빠진다 — 한 화면�
     expect(r.length).toBe(0);
   });
 });
+
+describe("도구 출력은 **언제든 사람에게 갈 수 있다**고 보고 쓴다 (후-6 정직)", () => {
+  // ⚠ 2026-08-10 실측: 「안전대부 웹서버 취약점 알려줘」 3회 중 1회, 요약이 실패해
+  //   도구 원문이 그대로 담당자 답이 됐다 — `| infra-host | finding 3건 (medium 1, low 2)`.
+  //   요약 실패 자체를 없앨 수는 없으니(모델이 하는 일), **폴백이 나가도 읽히게** 만든다.
+  it("★ 자산 종류를 사람 말로 — 모르는 값은 그대로 둔다(고객이 정한 이름을 바꾸지 않는다)", async () => {
+    const { 자산종류한글 } = await import("../src/engine/tone");
+    expect(자산종류한글("infra-host")).toBe("인프라 서버");
+    expect(자산종류한글("server")).toBe("서버");
+    // 고객이 한글로 등록한 종류는 손대지 않는다.
+    expect(자산종류한글("LLM 서비스")).toBe("LLM 서비스");
+    expect(자산종류한글("이상탐지 모델")).toBe("이상탐지 모델");
+  });
+
+  it("★ 요약 실패 폴백은 **실패를 밝힌다** — 담당자가 정상 답으로 오해하면 안 된다", () => {
+    const src = fs.readFileSync(path.join(__dirname, "..", "src", "engine", "agentloop.ts"), "utf8");
+    expect(src, "예전의 「조회 결과입니다」 머리말은 실패를 감췄다").not.toMatch(/`조회 결과입니다\.\n\n\$\{facts\}`/);
+    expect(src).toMatch(/정리하지 못해/);
+  });
+
+  it("★ 자산 줄에 파이프 기계 표기를 쓰지 않는다", () => {
+    const src = fs.readFileSync(path.join(__dirname, "..", "src", "engine", "agenttools", "handlers.ts"), "utf8");
+    expect(src, "`| ${a.assetType} |` 같은 표기가 남아 있으면 안 된다").not.toMatch(/\|\s*\$\{a\.assetType\}\s*\|/);
+    expect(src, "영문 finding 라벨이 사람 답에 나가면 안 된다").not.toMatch(/`finding \$\{real\.length\}건/);
+  });
+});

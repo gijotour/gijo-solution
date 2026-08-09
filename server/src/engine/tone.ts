@@ -71,6 +71,27 @@ const 심각도표: Record<string, string> = { critical: "매우 심각", high: 
 export function 심각도한글(severity: string): string {
   return 심각도표[String(severity ?? "").toLowerCase()] ?? String(severity ?? "");
 }
+/**
+ * 자산 종류를 사람 말로 — `infra-host` → 「인프라 서버」.
+ *
+ * ⚠ 왜 필요한가(2026-08-10 실측): 도구 출력이 요약 없이 그대로 담당자에게 나가는 회차가 있는데
+ *   (3회 중 1회), 그때 `| infra-host | finding 3건 (medium 1, low 2)`가 그대로 보였다.
+ * ⚠ **모르는 값은 그대로 둔다.** 고객이 스스로 정한 종류 이름(「LLM 서비스」처럼 이미 한글)이
+ *   대부분이라, 억지로 바꾸면 담당자가 등록할 때 쓴 말과 달라진다.
+ */
+const 자산종류표: Record<string, string> = {
+  "infra-host": "인프라 서버",
+  server: "서버",
+  host: "호스트",
+  "web-app": "웹 서비스",
+  database: "데이터베이스",
+  network: "네트워크 장비",
+};
+export function 자산종류한글(kind: string): string {
+  const k = String(kind ?? "").trim();
+  return 자산종류표[k.toLowerCase()] ?? k;
+}
+
 /** 심각도에 맞는 표식(🔴🟠🟡🟢). 모르는 값이면 가운뎃점. */
 export function 심각도표식(severity: string): string {
   const s = String(severity ?? "").toLowerCase();

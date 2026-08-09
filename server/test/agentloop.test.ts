@@ -104,7 +104,7 @@ describe("agenttools — 「AI 자산」 조회 도구", () => {
     expect(out, "다음 걸음이 없다").toContain("▸");
   });
 
-  it("list_assets는 자산 개수·이름·finding 요약을 담는다", async () => {
+  it("list_assets는 자산 개수·이름·취약점 요약을 **사람 말로** 담는다", async () => {
     seedAsset();
     recordFindings("fraud-detect-llm", [
       { finding_type: "unsafe_pickle", severity: "critical", evidence: "e", source_tool: "modelscan" },
@@ -112,7 +112,10 @@ describe("agenttools — 「AI 자산」 조회 도구", () => {
     const out = String(await findAgentTool("list_assets")!.run({}));
     expect(out).toContain("1개");
     expect(out).toContain("fraud-detect-llm");
-    expect(out).toContain("critical 1");
+    // ★ 2026-08-10: 영문 심각도(`critical 1`)를 사람 말로 바꿨다 —
+    //   요약이 실패하면 이 줄이 **그대로 담당자 답이 된다**.
+    expect(out).toContain("매우 심각 1");
+    expect(out, "영문 내부 표기가 남으면 안 된다").not.toContain("critical 1");
   });
 
   it("get_asset은 없는 자산이면 등록된 자산 **이름**과 함께 안내한다", async () => {

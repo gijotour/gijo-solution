@@ -71,9 +71,12 @@ describe("guardAgainstDenial", () => {
     },
   ];
 
-  it("도구가 데이터를 줬는데 LLM이 부정하면 조회 결과 원문으로 되돌린다", () => {
+  it("도구가 데이터를 줬는데 LLM이 부정하면 원문으로 되돌리되 **실패를 밝힌다**", () => {
     const out = guardDenial("안전대부 웹서버에 대한 취약점 정보를 찾을 수 없습니다.", dataCall);
-    expect(out).toContain("조회 결과입니다");
+    // ★ 2026-08-10: 예전엔 「조회 결과입니다」라고만 해서, 담당자는 이것이 **정리에 실패한 답**인
+    //   줄 모른 채 기계 표기를 읽었다. 감추지 않고 밝힌다.
+    expect(out).toContain("정리하지 못해");
+    expect(out, "실패를 감추는 옛 머리말은 쓰지 않는다").not.toContain("조회 결과입니다");
     expect(out).toContain("IW-32");
   });
 
