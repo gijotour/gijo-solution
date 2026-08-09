@@ -1296,6 +1296,19 @@ export function registerDispatcherRoutes(app: Express): void {
       // screen — 클라이언트가 보내는 현재 화면(예: "vulnscan.html"). 없어도 동작한다(구버전 호환).
       const screen = typeof req.body?.screen === "string" ? req.body.screen : undefined;
       const text = String(req.body?.text ?? "");
+      // ★ 빈 지시는 **400으로 거절한다**(2026-08-09). 예전엔 빈 값으로도 처리에 들어가
+      //   "무엇을 도와드릴까요?" 안내가 200으로 나갔다 — 그럴듯해서 **호출부의 오류를 감춘다.**
+      //   실측: 본문 키를 text가 아닌 이름으로 보낸 호출이 200+안내를 받아, 재는 쪽이
+      //   "제품이 답을 못 한다"고 읽었다(하루에 네 번). 빈 요청은 사람이 보낸 것이 아니라
+      //   **부르는 쪽이 틀린 것**이므로 조용히 받아 주지 않고 어디가 틀렸는지 알려 준다.
+      //   ⚠ 두 입구(/api/dispatch·/api/dispatch/stream) 모두에 둔다 — 한 곳만 막으면 샌다.
+      if (!text.trim()) {
+        res.status(400).json({
+          error: "지시 내용이 비어 있습니다 — 본문에 text를 담아 보내세요.",
+          expected: { text: "string(필수)", sessionId: "string?", screen: "string?", selection: "string?" },
+        });
+        return;
+      }
       const user = (req as Request & { user?: GijoUser }).user;
       // qa=true — 평가 게이트/QA 호출 표시(중-3). 세션·학습 수집을 건너뛴다(오염 방지).
       // 판단 경로는 동일하므로 이 플래그로 점수가 후해지는 일은 없다.
@@ -1385,6 +1398,19 @@ export function registerDispatcherRoutes(app: Express): void {
       const sessionId = typeof req.body?.sessionId === "string" ? req.body.sessionId : undefined;
       const screen = typeof req.body?.screen === "string" ? req.body.screen : undefined;
       const text = String(req.body?.text ?? "");
+      // ★ 빈 지시는 **400으로 거절한다**(2026-08-09). 예전엔 빈 값으로도 처리에 들어가
+      //   "무엇을 도와드릴까요?" 안내가 200으로 나갔다 — 그럴듯해서 **호출부의 오류를 감춘다.**
+      //   실측: 본문 키를 text가 아닌 이름으로 보낸 호출이 200+안내를 받아, 재는 쪽이
+      //   "제품이 답을 못 한다"고 읽었다(하루에 네 번). 빈 요청은 사람이 보낸 것이 아니라
+      //   **부르는 쪽이 틀린 것**이므로 조용히 받아 주지 않고 어디가 틀렸는지 알려 준다.
+      //   ⚠ 두 입구(/api/dispatch·/api/dispatch/stream) 모두에 둔다 — 한 곳만 막으면 샌다.
+      if (!text.trim()) {
+        res.status(400).json({
+          error: "지시 내용이 비어 있습니다 — 본문에 text를 담아 보내세요.",
+          expected: { text: "string(필수)", sessionId: "string?", screen: "string?", selection: "string?" },
+        });
+        return;
+      }
       const user = (req as Request & { user?: GijoUser }).user;
       const qa = req.body?.qa === true;
       const progressId = isValidProgressId(req.body?.progressId) ? (req.body.progressId as string) : null;
