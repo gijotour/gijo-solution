@@ -31,9 +31,9 @@ const results = [];
 function add(cat, name, status, detail) {
   results.push({ cat, name, status, detail: String(detail ?? "").slice(0, 200) });
 }
-async function sh(file, args, timeout = 15000) {
+async function sh(file, args, timeout = 15000, opts = {}) {
   try {
-    const { stdout, stderr } = await exec(file, args, { timeout, maxBuffer: 4 * 1024 * 1024 });
+    const { stdout, stderr } = await exec(file, args, { timeout, maxBuffer: 4 * 1024 * 1024, ...opts });
     return { ok: true, out: (stdout || "").trim(), err: (stderr || "").trim() };
   } catch (e) {
     return { ok: false, out: (e.stdout || "").trim(), err: (e.stderr || e.message || "").trim() };
@@ -168,6 +168,24 @@ const st = await sh("git", ["-C", REPO, "status", "--porcelain"]);
 const dirty = st.out.split("\n").filter((l) => l.trim() && !l.includes("data.fresh-backup"));
 add("C.회귀", "작업트리", dirty.length === 0 ? "PASS" : "WARN",
   dirty.length === 0 ? "깨끗" : `미커밋 ${dirty.length}건: ${dirty.map((d) => d.slice(3)).join(", ").slice(0, 100)}`);
+
+// ── D. 유출 위생 — 도구가 있어도 아무도 안 부르면 규칙과 똑같이 뚫린다 ────────
+// 2026-08-09 **하루에 두 번** 발행 개인키가 대화창에 첨부돼 나갔다. 두 번 다 "대화창에
+// 올리지 않는다"가 문서에 이미 적혀 있었다. 그래서 keyleak-check.mjs를 만들었는데,
+// 만든 날 확인해 보니 **저장소 어디에서도 그걸 부르지 않았다** — 사람이 기억해야 도는,
+// 뚫린 규칙과 똑같은 구조였다. 그래서 QA에 붙인다. QA를 돌리면 항상 같이 돈다.
+{
+  const script = path.join(REPO, "tools/keyleak-check.mjs");
+  if (!fs.existsSync(script)) {
+    add("D.유출", "개인키 위치 검사", "FAIL", "tools/keyleak-check.mjs 없음 — hub에서 받으세요");
+  } else {
+    // cwd를 저장소로 고정한다 — keyleak-check는 "저장소" 자리를 process.cwd()로 잡는다.
+    const r = await sh(process.execPath, [script, "--quiet"], 60000, { cwd: REPO });
+    add("D.유출", "개인키 위치 검사", r.ok ? "PASS" : "FAIL",
+      r.ok ? "저장소·다운로드·바탕화면·동기화 폴더에 개인키 없음"
+           : `${r.out.replace(/\s+/g, " ").slice(0, 160)} — 이미 첨부·공유했다면 키를 갈아야 합니다`);
+  }
+}
 
 // ── 출력 ────────────────────────────────────────────────────────────────────
 const n = (s) => results.filter((r) => r.status === s).length;
