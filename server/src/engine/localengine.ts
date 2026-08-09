@@ -192,8 +192,59 @@ export function pickAutoStartModelId(): string | null {
 // Apple Silicon(mac)은 통합메모리라 GPU(Metal)가 시스템 RAM을 공유한다 — nvidia-smi가 없으므로
 // "여유 VRAM" = 여유 시스템 메모리로 본다. 이렇게 하면 makeRoom·티어 판정이 mac에서도 실수치로 돈다.
 const IS_MAC = process.platform === "darwin";
+/**
+ * macOS에서 「지금 더 쓸 수 있는 메모리」(MB).
+ *
+ * ⚠ os.freemem()을 쓰면 안 된다. macOS는 남는 RAM을 전부 파일 캐시로 채우므로
+ *   **정상 상태에서도 거의 0**이다. 2026-08-09 이 기계 실측:
+ *       os.freemem() 0.20GB  ·  실제로 더 쓸 수 있던 양 7.78GB  ·  스왑 사용 0
+ *   그 0.20GB가 makeRoomFor에 들어가면 「자리가 없다」로 읽혀, 여유가 있는데도
+ *   올라가 있는 모델을 내린다. 티어가 약속한 「채팅 LLM 2~3개 동시」가 mac에서만
+ *   성립하지 않게 된다.
+ *
+ * 공식: 총량 − (wired + active + 압축). 이 셋만이 **당장 내줄 수 없는** 메모리다.
+ *   inactive·speculative·purgeable은 필요해지면 회수된다.
+ *
+ * ⚠ 「free + inactive + purgeable + File-backed」로 세지 말 것 — File-backed는
+ *   active/inactive의 **다른 절단면**이라 inactive를 두 번 센다
+ *   (실측: inactive 6.73GB · File-backed 6.76GB로 사실상 같은 페이지).
+ *   그 공식은 13.7GB를 내놓아 macOS의 「free percentage 43%」와 우연히 맞지만,
+ *   할당 판단에 쓰면 과대평가라 스왑을 부른다. 배타적 분류로만 센다
+ *   (free+active+inactive+spec+wired+압축 = 31.13GB ≈ 총 32GB로 확인).
+ */
+/**
+ * vm_stat 출력에서 여유 MB를 계산한다. **순수 함수** — 형식이 바뀌면 시험이 잡는다
+ * (실행 시험으로는 "그럴듯한 숫자"가 나와 버려 안 드러난다).
+ * 읽지 못하면 null을 준다 — 0을 「여유가 전부」로 오해하지 않기 위해서다.
+ */
+export function parseMacAvailableMb(vmStat: string, totalBytes: number): number | null {
+  const 쪽크기 = Number(/page size of (\d+)/.exec(vmStat)?.[1] ?? 0);
+  if (!쪽크기) return null;
+  const 쪽수 = (키: string) => {
+    const m = new RegExp(`${키}:\\s+(\\d+)`).exec(vmStat);
+    return m ? Number(m[1]) : null;
+  };
+  const wired = 쪽수("Pages wired down");
+  const active = 쪽수("Pages active");
+  const 압축 = 쪽수("Pages occupied by compressor");
+  // 셋 중 하나라도 못 읽으면 계산이 과대평가로 기운다 — 차라리 모른다고 한다.
+  if (wired === null || active === null || 압축 === null) return null;
+  return Math.max(0, Math.round((totalBytes - (wired + active + 압축) * 쪽크기) / 1024 / 1024));
+}
+
+function macAvailableMb(): Promise<number> {
+  return new Promise((resolve) => {
+    const 물러나기 = () => resolve(Math.round(os.freemem() / 1024 / 1024));
+    execFile("vm_stat", [], (err, stdout) => {
+      if (err) return 물러나기(); // vm_stat이 없거나 실패 — 옛 방식으로라도 답한다
+      const v = parseMacAvailableMb(String(stdout), os.totalmem());
+      resolve(v ?? Math.round(os.freemem() / 1024 / 1024));
+    });
+  });
+}
+
 function getFreeVramMb(): Promise<number | null> {
-  if (IS_MAC) return Promise.resolve(Math.round(os.freemem() / 1024 / 1024));
+  if (IS_MAC) return macAvailableMb();
   return new Promise((resolve) => {
     execFile("nvidia-smi", ["--query-gpu=memory.free", "--format=csv,noheader,nounits"], (err, stdout) => {
       if (err) return resolve(null);
@@ -217,14 +268,20 @@ export function getGpuUsage(): Promise<GpuUsage> {
   // mac(Metal): nvidia-smi가 없다. 통합메모리를 "GPU 메모리"로 간주해 available:true로 보고한다
   // → 티어 자동판정·구동 가능 판정이 mac에서도 동작(utilization은 별도 도구 없이 못 재므로 0).
   if (IS_MAC) {
+    // ⚠ 여기서도 os.freemem()을 쓰면 안 된다 — 그러면 「사용 31.8GB / 32GB」처럼
+    //   **항상 꽉 찬 것처럼** 보인다(macOS가 남는 RAM을 파일 캐시로 채우므로).
+    //   2026-08-09 QA가 실제로 그 숫자를 띄웠고, 그때 스왑 사용은 0이었다.
+    //   makeRoomFor가 쓰는 값(macAvailableMb)과 **같은 기준**이어야 화면과 판단이 어긋나지 않는다.
     const totalMb = Math.round(os.totalmem() / 1024 / 1024);
-    const usedMb = Math.round((os.totalmem() - os.freemem()) / 1024 / 1024);
-    return Promise.resolve({
-      available: true,
-      utilization: 0,
-      memUsedMb: usedMb,
-      memTotalMb: totalMb,
-      memPercent: totalMb > 0 ? Math.round((usedMb / totalMb) * 100) : 0,
+    return macAvailableMb().then((availMb) => {
+      const usedMb = Math.max(0, totalMb - availMb);
+      return {
+        available: true,
+        utilization: 0,
+        memUsedMb: usedMb,
+        memTotalMb: totalMb,
+        memPercent: totalMb > 0 ? Math.round((usedMb / totalMb) * 100) : 0,
+      };
     });
   }
   return new Promise((resolve) => {
