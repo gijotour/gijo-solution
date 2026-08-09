@@ -300,10 +300,12 @@ export function runListAssets(args: Record<string, string> = {}): string {
   //   getAsset을 넓혔다 — 그러지 않으면 화면에서 본 이름으로 이어서 물을 수 없다.
   // 이름이 아닌 자리(호스트명·출처 파일)로 걸린 줄은 **왜 걸렸는지 적는다.**
   //   적지 않으면 담당자는 이름에 없는 말로 나온 줄을 오답으로 본다(brian 지적의 절반이 이것이다).
+  // ★ 2026-08-10: 파이프(|)로 이은 기계 표기를 사람 말로.
+  //   ⚠ 이 도구는 **즉답**이라 여기 적은 글자가 곧 담당자가 읽는 답이다 — 중간에 다듬는 단계가 없다.
   const lines = assets.slice(0, 보여줄자산).map((a) => {
     const 왜 = 이유.get(a.id);
-    return `- ${자산표시이름(a.id)} | 유형=${a.assetType} | 담당=${a.owner || "미지정"} | ${findingSummary(a)}` +
-      (왜 ? ` | 걸린 이유=${왜}` : "");
+    return `- ${자산표시이름(a.id)} — ${자산종류한글(a.assetType)} · 담당 ${a.owner || "미지정"} · ${findingSummary(a)}` +
+      (왜 ? ` · 걸린 이유: ${왜}` : "");
   });
   const 머리 = q
     ? `"${q}" 자산 ${assets.length}개` + (자름 ? ` · 아래는 ${보여줄자산}개입니다` : "") + ":"
@@ -344,10 +346,11 @@ export async function runGetAsset(args: Record<string, string>): Promise<string>
   const threats = ontologyLinesFor(`${asset.name} ${asset.assetType} ${b.model.foundationModel} ${b.model.architecture}`, 6);
   const 줄 = [
     `자산 ${asset.id} (${asset.name})`,
-    `유형=${asset.assetType} | 담당=${asset.owner || "미지정"} | 서비스=${asset.service ?? "미지정"} | 경로=${asset.path}`,
-    `마지막 스캔: ${asset.lastScannedAt ? koDateTimeString(asset.lastScannedAt) : "스캔 이력 없음"} | ${findingSummary(asset)}`,
+    // ★ 2026-08-10: `유형=… | 담당=…` 기계 표기를 사람 말로(이 답도 그대로 담당자에게 간다).
+    `${자산종류한글(asset.assetType)} · 담당 ${asset.owner || "미지정"} · 서비스 ${asset.service ?? "미지정"} · 경로 ${asset.path}`,
+    `마지막 스캔: ${asset.lastScannedAt ? koDateTimeString(asset.lastScannedAt) : "스캔 이력 없음"} · ${findingSummary(asset)}`,
     ...aibomLines,
-    ...(top.length ? ["주요 finding(심각도순, 최대 5건):", ...top] : []),
+    ...(top.length ? ["주요 취약점(심각도순, 최대 5건):", ...top] : []),
     ...(threats.length ? ["사내 온톨로지가 아는 관련 위협·통제:", ...threats] : []),
   ];
 
