@@ -635,7 +635,10 @@ export const adapterOutPath = (adapterId: string): string => path.join(LORA_DIR,
 // 다른 좌표계다 — 운영자가 고른 기본 모델(defaultModelId)이 곧 어댑터가 얹힐 그릇이다.
 export function servingBaseModelId(): string {
   const stored = (getStateStmt.get("defaultModelId") as { value: string } | undefined)?.value;
-  return stored ?? process.env.GIJO_DEFAULT_MODEL_ID ?? "gijo-main-orchestrator";
+  // ⚠ 마지막 폴백은 localengine.ts의 DEFAULT_MODEL_ID와 **같아야 한다.** 2026-08-09에
+  //   둘 다 7.6B로 낡아 있었고, 운영은 app_state가 14B를 덮어 멀쩡히 돌아 안 드러났다.
+  //   어긋나면 어댑터가 엉뚱한 그릇에 얹힌다 — modeldefault.test.ts가 두 값을 대조한다.
+  return stored ?? process.env.GIJO_DEFAULT_MODEL_ID ?? "qwen3-14b";
 }
 
 // llama.cpp convert_lora_to_gguf.py 실행 — HF LoRA 산출(outputs/<ds>/lora-adapter)을

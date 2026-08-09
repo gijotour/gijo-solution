@@ -80,6 +80,11 @@ for (const f of changed) {
 }
 if (ALL) for (const l of ["vitest", "client", "knowledge", "maintenance", "regress", "verify", "shell", "download", "sweep", "windows", "viz", "drawer", "routing", "promise", "docprobe"]) picks.add(l);
 if (FAST) { picks.delete("vitest"); picks.delete("maintenance"); }
+// ★ keyleak은 **변경 파일과 무관하게 늘 담는다.** 개인키는 코드를 안 고쳐도 새기 때문이다
+//   (2026-08-09: 하루에 두 번, 둘 다 파일을 옮기다 났고 커밋은 없었다).
+//   run()이 picks를 보므로 여기 안 담으면 위에서 run을 불러도 조용히 안 돈다 —
+//   오늘 종일 잡은 「만들어 놓고 안 도는 검사」가 될 뻔했다. --fast에서도 뺀다.
+picks.add("keyleak");
 
 console.log(`■ QA 전수조사 — 기준: ${since ? since.slice(0, 8) + "..HEAD" : "(첫 실행 — 마커 없음, 전 계층)"}`);
 if (!since) for (const l of ["vitest", "client", "knowledge", "maintenance", "regress", "verify", "shell", "download", "sweep", "windows", "viz", "drawer", "routing", "promise", "docprobe"]) { if (!FAST || (l !== "vitest" && l !== "maintenance")) picks.add(l); }
@@ -124,6 +129,11 @@ run("windows", "node", ["tools/window-sweep.mjs"]);
 //   실측(2026-08-06): 작업 내역 880px·위협 인텔 5,791px 밖이었고, 눈으로는 둘 다 멀쩡해 보였다.
 run("viz", "node", ["tools/viz-gap-measure.mjs"]);
 
+// 개인키가 새기 쉬운 자리에 있는지 — **항상 돈다**(변경 파일과 무관).
+// 2026-08-09 하루에 두 번 발행키가 대화창으로 샜다. 규칙에 적어 뒀는데도 두 번 다
+// 안 지켜졌다 — 사람의 주의력에 기대는 대신 매 전수조사가 파일 위치를 본다.
+// ⚠ 만들고 안 돌리면 오늘 종일 잡은 「조용히 안 도는 검사」가 된다. 그래서 여기 박는다.
+run("keyleak", "node", ["tools/keyleak-check.mjs", "--quiet"]);
 run("server", "node", ["tools/qa-auto.mjs", "--layer=server"]);
 run("vitest", "npm", ["test"], { cwd: path.join(ROOT, "server") });
 run("client", "node", ["tools/qa-auto.mjs", "--layer=client"]);

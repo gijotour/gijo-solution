@@ -27,10 +27,17 @@ const DEFAULT_CTX_SIZE = Number(process.env.GIJO_LOCAL_LLM_CTX_SIZE ?? 32768);
 // Java 참고 구현(LocalEngineService)과 동일하게 10초까지 정상 종료를 기다린 뒤 강제 종료한다.
 const STOP_TIMEOUT_MS = Number(process.env.GIJO_LOCAL_LLM_STOP_TIMEOUT_MS ?? 10000);
 
-// 제품 확정 모델 (2026-07-17 변경: gijo-main-orchestrator — GIJO 자체 오케스트레이터 LLM).
-// "마지막 사용 모델" 기록이 없을 때의 기본. models/gijo-main-orchestrator/gijo-main-orchestrator.gguf.
-// (이전 확정 모델 Lily-Cybersecurity-7B는 modeldex 카탈로그에 옵션으로 남아 있어 언제든 선택 가능.)
-const DEFAULT_MODEL_ID = process.env.GIJO_DEFAULT_MODEL_ID ?? "gijo-main-orchestrator";
+// 제품 확정 모델 — "마지막 사용 모델" 기록이 없을 때의 기본.
+//
+// 2026-08-09 승격: gijo-main-orchestrator(7.6B) → **qwen3-14b**.
+//   기준 모델을 14B 단일로 바꾸기로 한 결정(2026-08-07)이 코드에 반영되지 않고 있었다.
+//   운영은 app_state의 lastModelId가 14B를 덮고 있어 멀쩡히 돌았지만, 그건 **예전에
+//   골라 둔 기억**일 뿐이다 — 새로 설치한 기계에는 그 기억이 없어 7.6B로 부팅한다.
+//   Mac 올인원 dmg에서 실제로 7.6B를 물고 뜬 것을 Mac이 잡아냈다(2026-08-09 인계 ④).
+//   근거: qwen3-14b가 평가 게이트 통과(routing 66/66 · korean 24/24 · 견고성 29→71).
+// ⚠ 「돌고 있다」와 「기본값이 맞다」는 다르다. 기억이 덮고 있으면 기본값이 틀려도 안 드러난다.
+// (옛 모델들은 modeldex 카탈로그에 남아 있어 언제든 선택 가능.)
+const DEFAULT_MODEL_ID = process.env.GIJO_DEFAULT_MODEL_ID ?? "qwen3-14b";
 
 // RAG 임베딩용 별도 llama-server (llm.ts의 EMBEDDING_SERVER_URL과 짝). 스왑/풀 대상이 아니라
 // 부팅 시 1회 자동 기동만 관리한다.
