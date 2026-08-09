@@ -70,6 +70,19 @@ echo
 #     거짓이 되므로 실행 끝에 다시 알린다.
 SKIP_NOTE="no-hardcoded-credentials(git 필요) · shotlist(이미지 필요)"
 
+# ⚠ 2026-08-10 2차 수정 — **안내만 하고 그냥 돌렸더니 종료코드가 늘 1이었다.**
+#   그래서 진짜 실패(그날 corpusleak이 실제로 깨져 있었다)가 「원래 실패하는 둘」에 묻혀
+#   하마터면 통과로 읽을 뻔했다. 못 도는 것은 **실제로 빼야** 종료코드가 뜻을 갖는다.
+#   ⚠ 파일을 콕 집어 부른 경우(인자 있음)에는 빼지 않는다 — 부른 사람 뜻이 우선이다.
+SKIPPED=0
+if [ $# -eq 0 ]; then
+  for f in no-hardcoded-credentials shotlist; do
+    [ -f "$DST/test/$f.test.ts" ] && rm -f "$DST/test/$f.test.ts" && SKIPPED=$((SKIPPED+1))
+  done
+  echo "제외 $SKIPPED개(이 사본에서 구조적으로 못 도는 것) — 남은 시험만 돌립니다."
+  echo "  → 이제 종료코드 0 = **진짜 전부 통과**, 1 = **진짜 실패가 있다**."
+fi
+
 echo "=== 실행 ==="
 cd "$DST" || exit 1
 START=$(date +%s)
@@ -80,6 +93,10 @@ echo
 echo "⏱ $((END-START))초  ·  종료코드 $CODE"
 echo "   (참고: 같은 시험이 Windows 호스트에서는 파일당 수 분~14분 — 전체는 못 끝낸다)"
 echo
-echo "⚠ 이 사본에서 **구조적으로 못 도는 시험 2개**: $SKIP_NOTE"
-echo "   → Windows 호스트에서 따로 돌릴 것. 「WSL에서 전부 통과」는 이 둘을 뺀 말이다."
+if [ "$SKIPPED" -gt 0 ]; then
+  echo "⚠ 위 결과에서 **$SKIPPED개를 빼고** 잰 것입니다: $SKIP_NOTE"
+  echo "   → 이 둘은 Windows에서 **각 0.5초**로 끝난다(무거운 import가 없어서다 — 2026-08-10 실측)."
+  echo "     PowerShell:  cd 'D:\\Connect AI\\server'; npx vitest run test/no-hardcoded-credentials.test.ts test/shotlist.test.ts"
+  echo "   두 쪽을 다 돌려야 「서버 시험 전부 통과」라고 말할 수 있다."
+fi
 exit $CODE
