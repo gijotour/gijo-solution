@@ -111,30 +111,61 @@ function normalizeName(s: string): string {
   return s.replace(/[\s·・ㆍ]/g, "");
 }
 
-/** panel = 안내에서 찾은 구역, matched = 질문 안에서 실제로 걸린 글자(별명일 수 있다). */
-function resolvePanelHit(screen: string | undefined, q: string): { panel: string; matched: string } | null {
-  const g = screen ? GUIDES[screen] : undefined;
-  if (!g?.panels) return null;
+// 대화창 조작(공통 OVERVIEW.panels)을 담당자가 부르는 말 ↔ 구역 이름.
+// 사람은 화면에 보이는 기호로 말한다("📌 뭐야?", "칩 어떻게 떼?") — 정식 이름으로만 두면
+// 안내가 있어도 못 찾는다(2026-08-09 신설). 설명은 복사하지 않고 이름만 잇는다.
+const CONSOLE_PANEL_ALIASES: Record<string, string> = {
+  "📌": "선택 칩",
+  "선택칩": "선택 칩",
+  "고른 항목": "선택 칩",
+  "선택 항목": "선택 칩",
+  "🧭": "해석 한 줄",
+  "알아들었습니다": "해석 한 줄",
+  "해석 줄": "해석 한 줄",
+  "맥락 떼기": "화면 맥락 떼기",
+  "화면 칩": "화면 맥락 떼기",
+  "스트리밍": "답이 흐르는 것",
+  "흐르는 글자": "답이 흐르는 것",
+  "글자가 흐": "답이 흐르는 것",
+};
+
+/**
+ * panel = 안내에서 찾은 구역, matched = 질문 안에서 실제로 걸린 글자(별명일 수 있다),
+ * source = 그 구역이 실린 안내(화면별 또는 공통 OVERVIEW).
+ *
+ * ⚠ 화면 구역에서 못 찾으면 **공통 안내(OVERVIEW)의 대화창 조작**까지 본다(2026-08-09).
+ *   대화창 조작(📌 선택 칩·🧭 해석 한 줄·흐르는 답)은 어느 화면에서 물어도 같은 답이라
+ *   화면별 안내에 사본을 두면 화면 수만큼 어긋난다 — 공통에 한 벌 두고 여기서 찾는다.
+ *   이 폴백이 없으면 안내가 '"선택 칩" 사용법 알려줘'라고 적어 놓고 정작 그 물음에
+ *   답하지 못한다(과거 「안내한 말 점검」이 잡던 바로 그 어긋남).
+ */
+function resolvePanelHit(
+  screen: string | undefined,
+  q: string
+): { panel: string; matched: string; source: ScreenGuide } | null {
   const nq = normalizeName(q);
   // ⚠ 가장 **긴**(구체적인) 이름이 이긴다. 선언 순서로 고르면 "2차 인증"이 "계정별 2차 인증"을
   //   가려, "담당자 2차 인증 해제하는 방법"에 내 계정 안내가 나왔다(2026-07-30 실측).
   //   이름이 포개지는 구역(계정 ⊂ 계정별 …)은 앞으로도 생기니 순서에 기대지 않는다.
-  let best: { panel: string; matched: string } | null = null;
-  for (const name of Object.keys(g.panels)) {
-    const n = normalizeName(name);
-    if (nq.includes(n) && (!best || n.length > normalizeName(best.matched).length)) {
-      best = { panel: name, matched: name };
+  let best: { panel: string; matched: string; source: ScreenGuide } | null = null;
+  const 훑기 = (g: ScreenGuide | undefined, alias?: Record<string, string>): void => {
+    if (!g?.panels) return;
+    for (const name of Object.keys(g.panels)) {
+      const n = normalizeName(name);
+      if (nq.includes(n) && (!best || n.length > normalizeName(best.matched).length)) {
+        best = { panel: name, matched: name, source: g };
+      }
     }
-  }
-  const alias = screen ? PANEL_ALIASES[screen] : undefined;
-  if (alias) {
+    if (!alias) return;
     for (const [shown, real] of Object.entries(alias)) {
       const n = normalizeName(shown);
       if (nq.includes(n) && g.panels[real] && (!best || n.length > normalizeName(best.matched).length)) {
-        best = { panel: real, matched: shown };
+        best = { panel: real, matched: shown, source: g };
       }
     }
-  }
+  };
+  훑기(screen ? GUIDES[screen] : undefined, screen ? PANEL_ALIASES[screen] : undefined);
+  훑기(OVERVIEW, CONSOLE_PANEL_ALIASES); // 공통 — 대화창 조작은 어느 화면에서 물어도 같다
   return best;
 }
 function resolvePanel(screen: string | undefined, q: string): string | null {
@@ -142,8 +173,6 @@ function resolvePanel(screen: string | undefined, q: string): string | null {
 }
 
 function panelNameHit(text: string, screen?: string): boolean {
-  const g = screen ? GUIDES[screen] : undefined;
-  if (!g?.panels) return false;
   const q = text.replace(/\s/g, "");
   // 설명을 구하는 말투일 때만(단순히 패널명이 스친 지시는 도구가 처리해야 한다).
   // "좋아·좋을까·추천"은 고르는 질문의 말투다("어떤 모델 받으면 좋아?"). 구역 이름이 함께
@@ -773,14 +802,23 @@ const GUIDES: Record<string, ScreenGuide> = {
 // 화면을 모를 때 주는 전체 개요.
 const OVERVIEW: ScreenGuide = {
   title: "GIJO AS 대화창 사용 안내",
-  what: "어느 메뉴에서든 오른쪽 대화창에 그 화면 데이터를 물어보거나 작업을 지시할 수 있습니다.",
+  what: "어느 메뉴에서든 오른쪽 대화창에 그 화면 데이터를 물어보거나 작업을 지시할 수 있습니다. 화면에서 **항목을 클릭해 고르면** 「이거」가 그것을 가리킵니다.",
   can: [
     "\"오늘 뭐부터 볼까?\" — 우선 업무 브리핑",
     "\"미조치 Critical 취약점 알려줘\"",
     "\"하드닝 점검해줘\" — 장비 보안설정 점검",
+    "화면에서 자산·취약점·할 일을 클릭한 뒤 \"이거 조치 절차 알려줘\" — 고른 것 기준으로 답합니다",
     "각 메뉴에서 \"이 화면 뭐 할 수 있어?\"라고 물으면 그 화면 전용 안내를 드립니다.",
   ],
   tip: "쓰기 작업(등록·수정·조치)은 바로 반영되지 않고 결재판으로 떠서, 확인 후 승인해야 실행됩니다.",
+  // 대화창 조작은 화면이 아니라 여기서 설명한다(원칙: 설명은 전부 챗봇으로). 2026-08-09 신설 —
+  // 기능을 만들고 안내에 안 실으면 담당자는 그런 기능이 있는 줄도 모른다.
+  panels: {
+    "선택 칩": "화면에서 항목(자산 지도 타일·취약점 목록 줄·오늘 할 일 줄)을 클릭하면 대화창 머리에 **📌 이름**이 붙습니다. 그 상태로 \"이 자산 미조치 몇 건이야?\"처럼 물으면 **고른 것 기준으로** 답합니다.\n· 풀기: 📌 옆 **✕**를 누르거나 다른 화면으로 옮기면 저절로 풀립니다(옆 화면 것을 계속 가리키면 「이거」가 거짓말이 되기 때문입니다).\n· ⚠ 「이거·이 자산」처럼 **가리키는 말이 있을 때만** 좁힙니다. \"미조치 취약점 몇 건?\"처럼 대상을 안 가리킨 질문은 칩이 붙어 있어도 **전체 기준**으로 답합니다 — 묻지 않은 것을 마음대로 좁히지 않기 위해서입니다.",
+    "해석 한 줄": "답 위에 **🧭 「…」(으)로 알아들었습니다**가 붙습니다. 질문을 어느 기능으로 알아들었는지 밝히는 줄입니다 — 엉뚱한 답이 왔을 때 **그 자리에서** 왜 그런지 알 수 있습니다.\n직전에 다룬 자산을 이어 붙였을 때는 **「직전에 다룬 ○○ 기준으로 봤습니다」**라고 함께 적습니다. 그건 담당자가 고른 게 아니라 저희가 이어 붙인 추측이라, 틀렸으면 바로잡을 수 있게 밝힙니다.",
+    "화면 맥락 떼기": "대화창 머리의 화면 이름 칩(예: 「취약 자산」)은 **지금 지시의 대상 화면**입니다. 화면과 무관한 일반 질문(\"NIST CSF가 뭐야?\")을 할 때는 칩의 **✕**를 눌러 떼면 화면 맥락 없이 묻습니다. 다시 누르면 붙습니다.",
+    "답이 흐르는 것": "긴 답은 다 만들어질 때까지 기다리지 않고 **쓰이는 대로** 화면에 흐릅니다(첫 글자까지 보통 몇 초). 흐르는 글자는 「쓰는 중」 표시이고, 다 되면 검사를 마친 **완성본으로 바뀝니다**.\n· 중간에 끊기면 끊겼다고 알립니다 — 잘린 답을 완성된 답처럼 두지 않습니다.\n· 쓰기 지시(등록·수정)는 흐르지 않습니다 — 결재판이 뜨는 자리라 글자가 흐르면 \"벌써 실행됐나\" 오해를 부르기 때문입니다.",
+  },
 };
 
 // ── 제품 규칙(알아두기) — 명령창 아래 팁 줄에 돌아가며 뜬다 ─────────────────────
@@ -795,6 +833,10 @@ export const PRODUCT_RULES: string[] = [
   "＋로 파일을 올리면 종류를 자동으로 가려 취약점·매뉴얼·문서로 나눠 넣습니다.",
   "모든 처리는 사내에서만 이뤄집니다 — 외부로 자료가 나가지 않습니다.",
   "못 찾았다는 답이 곧 없다는 뜻은 아닙니다 — 다른 말로 한 번 더 물어보세요.",
+  // 2026-08-09 신설 기능 3종 — 만들고 안내에 안 실으면 있는 줄도 모른다(전-7).
+  "화면에서 항목을 클릭하면 대화창에 📌가 붙고, 「이거」가 그것을 가리킵니다 — ✕로 풉니다.",
+  "답 위 🧭 줄은 질문을 무엇으로 알아들었는지 밝힙니다 — 어긋났으면 그 자리에서 보입니다.",
+  "긴 답은 쓰이는 대로 흐르고, 다 되면 검사를 마친 완성본으로 바뀝니다.",
   "보안 업무와 상관없는 질문(날씨·번역·잡담 등)은 답하지 않습니다 — 사내 자료로 답할 수 있는 것만 다룹니다.",
 ];
 
@@ -930,16 +972,22 @@ function 절차줄(screen?: string): string | null {
 export function formatScreenGuide(screen?: string, question?: string): string {
   const g = getScreenGuide(screen);
   const q = (question ?? "").replace(/\s/g, "");
-  if (g.panels && q) {
+  // ⚠ 화면 안내에 구역이 없어도 본다 — 공통(대화창 조작) 구역이 걸릴 수 있다(2026-08-09).
+  if (q) {
     // 화면에 적힌 이름으로 물어도 찾도록 별명표까지 본다(PANEL_ALIASES).
-    const hit = resolvePanel(screen, q);
+    const hit = resolvePanelHit(screen, q);
     // ⚠ 화면 이름과 구역 이름이 같으면 **같은 말이 두 번** 나온다 — 실측(2026-08-01 챗봇 전수):
     //   "🤖 AI-BOM 구성 › AI-BOM 코드 의존성(SBOM)을 넘어…". 담당자에겐 앞머리가 군더더기고,
     //   점검에서는 "내부 규칙 누출"로 잡혔다. 겹치면 한 번만 적는다.
+    // ⚠ 본문·제목은 **그 구역이 실린 안내**에서 꺼낸다 — 공통(대화창 조작)에서 찾았는데
+    //   화면 안내에서 본문을 꺼내면 undefined가 그대로 나간다.
     if (hit) {
-      const 같은말 = g.title.replace(/\s/g, "").includes(hit.replace(/\s/g, ""));
-      const 머리 = 같은말 ? `${hit}` : `${g.title} › ${hit}`;
-      return `${머리}\n${g.panels[hit]}`;
+      const 본문 = hit.source.panels?.[hit.panel];
+      if (본문) {
+        const 같은말 = hit.source.title.replace(/\s/g, "").includes(hit.panel.replace(/\s/g, ""));
+        const 머리 = 같은말 ? `${hit.panel}` : `${hit.source.title} › ${hit.panel}`;
+        return `${머리}\n${본문}`;
+      }
     }
   }
   const L: string[] = [];

@@ -77,6 +77,23 @@ describe("선택 치환 — 대명사 자리에 고른 항목을 박는다", () 
   });
 });
 
+describe("직전 대상 이어 붙이기 (2026-08-09 ③ — 같은 병의 마지막 조각)", () => {
+  // 되묻기 관문은 직전 대상이 있으면 「맥락으로 풀린다」며 비켜 주는데, 정작 그 대상을 쓰는
+  // 곳이 없었다 — 「그 서버 취약점 몇 건?」이 관문을 지나 전역 4,828건을 답했다.
+  it("선택이 없으면 직전 대상을 쓴다 — 관문이 맥락이 있다고 판단했으면 실제로 써야 한다", () => {
+    expect(src).toContain("const 직전 = 선택 ? null : 직전대상자산(대화열쇠);");
+    expect(src).toContain("선택 ?? (직전 ? `자산 ${자산표시이름(직전.assetId)}` : undefined)");
+  });
+
+  it("★ 추측한 티를 낸다 — 화면 클릭과 달리 이어 붙이기는 우리 추측이다", () => {
+    // 라벨(도구)이 없어도 이 줄만은 달아야 한다 — 알릴 것이 있는데 형식 때문에 삼키면 안 된다.
+    expect(src).toContain("직전에 다룬 「${r.이어붙인대상}」 기준으로 봤습니다");
+    expect(src).toContain("const 줄 = [알아들음, 이어붙임].filter(Boolean).join(\" · \");");
+    // 말이 실제로 바뀌었을 때만 — 안 바뀌었으면 알릴 것이 없다.
+    expect(src).toContain("!선택 && 실행문 !== instructionText");
+  });
+});
+
 describe("클라 배선 (소스 계약)", () => {
   it("선택 알림은 클릭 한 곳에서만 — 자동 열림은 선택이 아니다", () => {
     const mv = fs.readFileSync(path.join(__dirname, "..", "..", "client", "src", "renderer", "pages", "map-view.js"), "utf8");

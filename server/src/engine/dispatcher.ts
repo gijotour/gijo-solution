@@ -23,7 +23,7 @@ import { isNonLearningAccount } from "./learnpolicy";
 import { recordChatLog } from "./learnloop";
 import { faqAnswerFor } from "./productfaq";
 import type { Viewer } from "./memory";
-import { runAgentLoop, AgentToolCall, 가리킬것없는대명사, 가리킨자산이없나, 대명사뿐인가, 대명사확인, 되물음, 자산되물음, 선택을박는다 } from "./agentloop";
+import { runAgentLoop, AgentToolCall, 가리킬것없는대명사, 가리킨자산이없나, 대명사뿐인가, 대명사확인, 되물음, 자산되물음, 선택을박는다, 직전대상자산 } from "./agentloop";
 import { 스트림자리 } from "./streamsink";
 import { executeApprovedTool, findAgentTool, buildApproval, PendingApproval } from "./agenttools";
 import { appendApprovedDecision } from "./orchestrator-dataset";
@@ -92,6 +92,9 @@ export interface DispatchResult {
   // 해석 한 줄 — 질문을 어느 도구로 알아들었는지 사람 말로(2026-08-09, Purple AI의 쿼리 투명성 채택).
   // 라우팅이 어긋났을 때 담당자가 **그 자리에서** 알아차리게 한다. 도구가 돈 답에만 붙는다.
   해석?: string;
+  // 화면 선택이 없어 **직전에 다룬 자산으로 이어 붙였을 때** 그 이름(2026-08-09 ③).
+  // 해석 한 줄이 이것을 밝힌다 — 우리가 한 추측이라 틀렸을 때 담당자가 그 자리에서 알아야 한다.
+  이어붙인대상?: string;
   // 쓰기 도구 지시 시: 실행하지 않고 결재판을 돌려준다 — 화면에서 승인해야 실행된다(시안 B).
   approval?: PendingApproval;
   // 학습 루프 실행 요청 시: 바로 실행하지 않고 화면의 명시적 확인 버튼으로만 시작(오발동 방지).
@@ -571,10 +574,15 @@ export async function dispatchInstruction(instructionText: string, sessionId?: s
  * ⚠ 라벨을 못 찾으면(내부 도구 등) 그 도구는 건너뛴다 — 내부 식별자를 내보내지 않는다.
  */
 function 해석을단다(r: DispatchResult): DispatchResult {
-  if (r.해석 || r.approval || r.confirm || !r.toolCalls?.length) return r;
-  const 라벨 = [...new Set(r.toolCalls.map((t) => toolLabel(t.tool)).filter((x): x is string => !!x))];
-  if (!라벨.length) return r;
-  return { ...r, 해석: `${라벨.join(" → ")}(으)로 알아들었습니다` };
+  if (r.해석 || r.approval || r.confirm) return r;
+  // ★ 직전 대상으로 이어 붙였으면 **반드시 밝힌다**(2026-08-09 ③). 화면 클릭은 담당자가 고른
+  //   것이지만 직전 대상은 **우리가 이어 붙인 추측**이라, 틀렸을 때 그 자리에서 보여야 한다.
+  //   도구가 안 돌아 라벨이 없어도 이 줄만은 단다 — 알릴 것이 있는데 형식 때문에 삼키면 안 된다.
+  const 이어붙임 = r.이어붙인대상 ? `직전에 다룬 「${r.이어붙인대상}」 기준으로 봤습니다` : "";
+  const 라벨 = [...new Set((r.toolCalls ?? []).map((t) => toolLabel(t.tool)).filter((x): x is string => !!x))];
+  const 알아들음 = 라벨.length ? `${라벨.join(" → ")}(으)로 알아들었습니다` : "";
+  const 줄 = [알아들음, 이어붙임].filter(Boolean).join(" · ");
+  return 줄 ? { ...r, 해석: 줄 } : r;
 }
 
 /**
@@ -1136,7 +1144,17 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   //   무시하고 전역 집계(finding_status)로 갔다. 대명사 자리에 고른 항목을 박은 실행문을
   //   루프에 준다 — 규칙·모델·도구 인자가 전부 구체적 대상을 보게 된다.
   //   기록(task·감사)은 담당자가 친 원문 그대로 남긴다.
-  const 실행문 = 선택 ? 선택을박는다(instructionText, 선택) : instructionText;
+  // ★ 2026-08-09 ③: 화면에서 고른 것이 없어도 **이 대화에서 방금 다룬 자산**이 있으면 그것으로
+  //   치환한다. 되묻기 관문은 직전 대상이 있으면 「맥락으로 풀린다」며 이미 비켜 주는데, 정작
+  //   그 대상을 쓰는 곳이 없어 「그 서버 취약점 몇 건?」이 전역 4,828건을 답했다 —
+  //   관문이 맥락이 있다고 판단했으면 그 맥락을 실제로 써야 말과 행동이 맞는다.
+  //   ⚠ 다만 **추측한 티를 낸다**(아래 해석 한 줄) — 화면 클릭(선택)은 담당자가 고른 것이지만
+  //     직전 대상은 우리가 이어 붙인 것이라, 틀렸을 때 담당자가 그 자리에서 알아야 한다.
+  const 직전 = 선택 ? null : 직전대상자산(대화열쇠);
+  const 맥락대상 = 선택 ?? (직전 ? `자산 ${자산표시이름(직전.assetId)}` : undefined);
+  const 실행문 = 맥락대상 ? 선택을박는다(instructionText, 맥락대상) : instructionText;
+  // 직전 대상으로 이어 붙였고 실제로 말이 바뀌었을 때만 표기한다(안 바뀌었으면 알릴 것이 없다).
+  const 이어붙인대상 = !선택 && 실행문 !== instructionText ? 자산표시이름(직전!.assetId) : undefined;
 
   // 에이전트 루프를 intent 분류보다 **먼저** 시도한다. 등록된 도구로 답할 수 있으면 그것으로 끝낸다.
   // 순서가 중요하다(2026-07-17 실측): 예전엔 4분류 intent(scan/analyze/report/chat)가 앞을 막아
@@ -1168,6 +1186,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
       route: { agentId: "orchestrator", action: "chat" },
       output: loop.output,
       toolCalls: loop.toolCalls,
+      ...(이어붙인대상 ? { 이어붙인대상 } : {}),
       ...(loop.approval ? { approval: loop.approval } : {}),
       ...picksFor(loop.output, loop.toolCalls, loop.approval),
     };

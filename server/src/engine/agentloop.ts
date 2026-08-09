@@ -53,6 +53,19 @@ export function setLastTarget(assetId: string, finding: string, label: string, �
     for (const [k] of 오래된순.slice(0, 대화별대상.size - 대화상한)) 대화별대상.delete(k);
   }
 }
+/**
+ * 이 대화에서 **직전에 다룬 자산**(2026-08-09 ③). 없으면 null.
+ *
+ * 왜 밖으로 내보내나: 되묻기 관문은 직전 대상이 있으면 「맥락으로 풀린다」고 보고 비켜 준다.
+ * 그런데 정작 그 대상을 **쓰는 곳이 없었다** — 「그 서버 취약점 몇 건?」이 관문을 지나
+ * 세는 질문 강제 분기로 가서 **전역 4,828건**을 답했다(선택 항목 맥락 ④와 같은 병의
+ * 마지막 조각). 관문이 있다고 판단했으면 그 맥락을 실제로 써야 말과 행동이 맞는다.
+ */
+export function 직전대상자산(대화 = 기본대화): { assetId: string; label: string } | null {
+  const t = recentTarget(대화);
+  return t ? { assetId: t.assetId, label: t.label } : null;
+}
+
 function recentTarget(대화 = 기본대화): LastTarget | null {
   const t = 대화별대상.get(대화);
   if (!t) return null;
