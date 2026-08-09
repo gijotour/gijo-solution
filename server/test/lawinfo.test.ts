@@ -24,7 +24,13 @@ const jsonRes = (body: unknown) => ({ ok: true, status: 200, json: async () => b
 
 describe("법령 조회 — 켜짐/꺼짐", () => {
   it("기본은 꺼져 있다 — 인터넷이 필요한 기능이라 켜려면 키를 넣어야 한다", () => {
-    expect(law.getLawConfig()).toEqual({ enabled: false, hasKey: false, domain: "", updatedAt: null });
+    expect(law.getLawConfig()).toMatchObject({ enabled: false, hasKey: false, domain: "", updatedAt: null });
+  });
+
+  // 화면이 목록을 또 적으면 두 곳이 어긋난다 — 서버 한 벌을 내려준다.
+  it("자주 걸리는 법 목록을 함께 준다(화면이 그대로 그린다)", () => {
+    expect(law.getLawConfig().laws).toContain("개인정보 보호법");
+    expect(law.getLawConfig().laws).toBe(law.IT_SECURITY_LAWS);
   });
 
   it("꺼진 상태로 조회하면 무엇을 해야 하는지 알려준다(조용히 실패 금지)", async () => {

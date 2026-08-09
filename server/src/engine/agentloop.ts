@@ -1138,6 +1138,17 @@ const FORCED_INTENTS: { re: RegExp; tool: string; args: Record<string, string> }
     tool: "finding_status",
     args: { filter: "기한초과" },
   },
+  // [56] 법령·고시·판례 찾기 — 「법령·판례」 화면(2026-08-09 신설)이 **누르면 이 말 그대로**
+  //   대화창에 넣는다. 제품이 적어 준 말은 결정적이어야 한다(guidance-check가 잡음).
+  //   ⚠ 사내 규정 대조(「~해도 돼?」)는 삼키지 않는다 — 그건 actioncheck의 영토이고,
+  //     법 원문 찾기와 답의 성격이 다르다(판정 ○/△/× vs 원문·링크).
+  //   ⚠ 「방법·사용법」의 '법'에 걸리지 않게 **법 이름 꼬리말**만 받는다(보호법·기본법·법률 등).
+  //   ⚠ law_lookup은 연동이 꺼져 있으면 도구 목록에 없다 → available 검사에서 자동으로 비켜간다.
+  {
+    re: /^(?!.*(해도\s*(돼|되나|될까|괜찮)|위반이야))(?=.*(법령|법률|시행령|시행규칙|고시|훈령|예규|행정규칙|판례|판결|보호법|기본법|거래법|촉진법|특별법|진흥법|방지법|관리법|보안법))(?=.*(찾아|알려|보여|검색|뭐라고|어떻게\s*(돼|되어)))/,
+    tool: "law_lookup",
+    args: {},
+  },
 ];
 // 등록된 보안제품 이름을 콕 집어 "설명해줘"라고 물으면 그 제품의 사내 근거(매뉴얼·온톨로지)를
 // 모아 답한다. [2026-07-26 실사용] "Tenable Web App Scanning 주요기능 설명해줘"에 도구를 하나도
@@ -1405,6 +1416,29 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): { tool: s
       //     (두 곳에서 가르면 반드시 어긋난다. 절차 숫자를 한 곳에서 세는 것과 같은 이유).
       if (f.tool === "workflow_status") {
         return { tool: f.tool, args: { stage: instruction } };
+      }
+      // ★ 법령 검색어는 **법 이름만** 넣는다(2026-08-09). 지시문을 통째로 넘기면 "찾아줘"까지
+      //   섞여 법제처가 0건을 준다 — 검색어 하나 원칙(search와 같은 함정).
+      //   종류는 말에서 읽는다: 판례→prec · 고시/훈령/행정규칙→admrul · 나머지→law.
+      if (f.tool === "law_lookup") {
+        const target = /판례|판결/.test(instruction) ? "prec"
+          : /고시|훈령|행정규칙|예규/.test(instruction) ? "admrul"
+          : "law";
+        let q = instruction
+          .replace(/[?？!！.]+\s*$/g, " ")
+          .replace(/(뭐라고|어떻게)\s*(돼|되어)\s*있(어|나|는지)?\s*$/g, " ")
+          .replace(/(찾아|알려|보여|검색해?)\s*(줘|주세요|줄래|주라|봐|보자)?\s*$/g, " ")
+          .trim();
+        // 꼬리에 붙은 종류말·「관련」·조사를 차례로 턴다("개인정보 유출 관련 판례" → "개인정보 유출").
+        for (let i = 0; i < 3; i++) {
+          q = q
+            .replace(/\s*(판례|판결|고시|훈령|행정규칙|예규|법령|법률|원문|조문)\s*$/g, "")
+            .replace(/\s*(관련|관한|에\s*대한)\s*$/g, "")
+            .replace(/\s*(이|가|을|를|은|는|의)\s*$/g, "")
+            .trim();
+        }
+        if (!q) continue; // 이름이 안 남으면 모델에게 넘긴다 — 빈 검색어로 부르지 않는다
+        return { tool: f.tool, args: { query: q, target } };
       }
       if (f.tool === "finding_status") {
         const 조건 = /(critical|긴급|매우\s*심각)/i.test(instruction) ? "critical"

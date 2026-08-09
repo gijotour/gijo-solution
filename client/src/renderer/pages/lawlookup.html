@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 법령·판례</title>
+<!--
+  법령·판례 (추가 기능, 2026-08-09 사용자 지시 · mockups/법령판례_화면 추천안).
+  "찾을 것을 고르는 자리 — 답은 대화창이 한다."
+  · 자유 입력칸 **0개**(제품 원칙: 지시는 대화창에서 — 용어사전 839줄). 고르면 askConsole로 넘긴다.
+  · 8대 법령 목록은 서버 IT_SECURITY_LAWS 한 벌을 받아 그린다 — 목록을 두 곳에 적지 않는다.
+  · 연동이 꺼져 있어도 메뉴·화면은 보인다. 대신 왜 안 되는지와 켜는 곳을 이 자리에서 말한다.
+  · ⚠ 인터넷 필요(폐쇄망 불가) · 법률 자문 아님 — 경고는 화면에, 사용법은 ⓘ(screenguide)로.
+-->
+<style>
+:root{
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;}
+.app{display:grid;grid-template-columns:212px 1fr;min-height:100vh;}
+.sidebar{border-right:1px solid var(--border);background:#1f1e1d;}
+.main{padding:18px 22px 40px;max-width:1400px;}
+.scr-id{font-size:12.5px;color:var(--muted);margin-bottom:12px;}
+.scr-id b{color:var(--text);font-weight:800;}
+
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:13px 15px;margin-bottom:12px;min-width:0;}
+.ph{font-size:13px;font-weight:800;color:#fff;margin-bottom:9px;display:flex;align-items:center;gap:8px;}
+.ph .cnt{margin-left:auto;font-size:12px;color:var(--muted-2);font-weight:700;}
+.cols{display:grid;grid-template-columns:1.15fr 1fr;gap:12px;align-items:start;}
+@media (max-width:1080px){.cols{grid-template-columns:1fr;}}
+
+.state{display:flex;align-items:center;gap:9px;font-size:12.5px;padding:8px 11px;border-radius:9px;margin-bottom:12px;}
+.state.on{background:rgba(30,185,128,.10);border:1px solid rgba(30,185,128,.32);color:var(--teal);}
+.state.off{background:rgba(240,160,32,.10);border:1px solid rgba(240,160,32,.32);color:var(--amber);}
+.state .go{margin-left:auto;color:var(--blue-light);cursor:pointer;font-weight:700;white-space:nowrap;}
+.state .go:hover{text-decoration:underline;}
+
+.warn{background:var(--panel-2);border:1px solid rgba(240,160,32,.28);border-radius:8px;
+  padding:8px 11px;font-size:12px;color:var(--amber);line-height:1.65;margin-bottom:12px;}
+
+.kinds{display:flex;gap:7px;margin-bottom:11px;}
+.kind{padding:5px 13px;border-radius:16px;border:1px solid var(--border-strong);color:var(--muted);
+  font-size:12.5px;font-weight:700;cursor:pointer;background:transparent;font-family:inherit;}
+.kind.on{background:rgba(59,130,246,.16);border-color:rgba(59,130,246,.5);color:#cfe0ff;}
+
+.row{display:flex;align-items:center;gap:9px;padding:6px 7px;border-top:1px solid rgba(255,255,255,.05);
+  font-size:12.5px;cursor:pointer;border-radius:6px;}
+.row:first-of-type{border-top:0;}
+.row:hover{background:rgba(255,255,255,.04);}
+.row .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);font-weight:700;}
+.row .tag{flex:0 0 auto;font-size:11px;color:var(--muted-2);}
+.row .arw{flex:0 0 auto;color:var(--blue-light);font-size:11.5px;opacity:0;font-weight:700;}
+.row:hover .arw{opacity:1;}
+.q{color:var(--muted-2);font-size:12px;padding:6px 7px;border-top:1px solid rgba(255,255,255,.05);cursor:pointer;border-radius:6px;}
+.q:first-of-type{border-top:0;}
+.q:hover{background:rgba(255,255,255,.04);color:var(--text);}
+.q b{color:var(--text);font-weight:700;}
+.note{font-size:12px;color:var(--muted-2);line-height:1.7;margin-top:9px;}
+.empty{color:var(--muted-2);font-size:12px;padding:8px 4px;}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="sidebar" id="gijoNav"></div>
+  <div class="main">
+    <div class="scr-id"><b>법령·판례</b> — 개인정보보호법·정보통신망법 같은 IT보안 법령과 고시·판례를 국가법령정보센터에서 찾습니다. 찾을 것을 고르면 <b>대화창</b>이 원문과 링크로 답합니다.</div>
+
+    <div id="stateLine" class="state off">연결 상태를 확인하는 중…</div>
+
+    <div class="warn">⚠ 이 기능은 <b>인터넷 연결이 필요합니다</b> — 폐쇄망(에어갭)에서는 쓸 수 없습니다. 찾아주는 것은 원문과 링크까지이며 <b>법률 자문이 아닙니다.</b></div>
+
+    <div class="kinds" id="kinds">
+      <button type="button" class="kind on" data-k="law">법령</button>
+      <button type="button" class="kind" data-k="admrul">고시·훈령</button>
+      <button type="button" class="kind" data-k="prec">판례</button>
+    </div>
+
+    <div class="cols">
+      <div class="panel">
+        <div class="ph">IT·보안 담당자가 자주 걸리는 법<span class="cnt" id="lawCnt">—</span></div>
+        <div id="lawList"><div class="empty">불러오는 중…</div></div>
+        <div class="note">누르면 대화창에 질문이 들어가고 거기서 답이 나옵니다. 여기 없는 법도 <b>대화창에 그냥 물으면</b> 찾습니다 — 이 목록은 자주 쓰는 입구일 뿐 전부가 아닙니다.</div>
+      </div>
+
+      <div>
+        <div class="panel">
+          <div class="ph">자주 묻는 것<span class="cnt" id="faqCnt">—</span></div>
+          <div id="faqList"></div>
+        </div>
+        <div class="panel">
+          <div class="ph">최근 찾아본 것<span class="cnt" id="recentCnt">0</span></div>
+          <div id="recentList"><div class="empty">아직 없습니다 — 왼쪽에서 하나 골라 보세요.</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="gijoChatWidget"></div>
+
+<script src="dialog.js"></script>
+<script src="nav.js"></script>
+<script src="gijomd.js"></script>
+<script src="chatparts.js"></script>
+<script src="chatwidget.js"></script>
+<script src="titlebar.js"></script>
+<script>
+(function () {
+  "use strict";
+  if (!window.gijo || !window.gijo.isAuthenticated || !window.gijo.isAuthenticated()) { location.href = "login.html"; return; }
+
+  var esc = function (s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); };
+  var 갈래 = "law";
+  var 갈래말 = { law: "법령", admrul: "고시", prec: "판례" };
+  var RECENT_KEY = "gijo.lawlookup.recent";
+
+  // 지시는 대화창 한 곳으로 — 화면이 스스로 dispatch를 부르면 결재판을 못 그린다(제품 원칙).
+  function 물어보기(질문, 이름) {
+    기억하기(이름 || 질문);
+    if (window.gijo && window.gijo.askConsole) { window.gijo.askConsole(질문); return; }
+    try { window.parent.postMessage({ type: "gijo:ask", text: 질문 }, "*"); } catch (e) {}   // 구버전 셸 대비
+  }
+
+  function 최근() {
+    try { return JSON.parse(localStorage.getItem(RECENT_KEY) || "[]"); } catch (e) { return []; }
+  }
+  function 기억하기(이름) {
+    var list = 최근().filter(function (r) { return !(r.name === 이름 && r.kind === 갈래); });
+    list.unshift({ name: 이름, kind: 갈래, at: Date.now() });
+    try { localStorage.setItem(RECENT_KEY, JSON.stringify(list.slice(0, 6))); } catch (e) {}
+    그리기최근();
+  }
+
+  // 갈래에 따라 묻는 말이 달라진다 — 같은 이름이라도 법령/고시/판례는 다른 것을 찾는다.
+  function 질문문구(이름) {
+    if (갈래 === "prec") return esc(이름) + " 관련 판례 찾아줘";
+    if (갈래 === "admrul") return esc(이름) + " 고시 찾아줘";
+    return 이름 + " 찾아줘";
+  }
+
+  var FAQ = [
+    { t: "<b>접속기록</b>은 몇 년 보관해야 해?", q: "개인정보 접속기록 몇 년 보관해야 해?" },
+    { t: "<b>금융권 망분리</b> 법적 근거가 뭐야?", q: "금융권 망분리 법적 근거가 뭐야?" },
+    { t: "개인정보 <b>유출 신고</b> 기한이 언제까지야?", q: "개인정보 유출 신고 기한이 언제까지야?" },
+    { t: "<b>퇴사자 계정</b>은 언제까지 남겨둬야 해?", q: "퇴사자 계정 언제까지 남겨둬야 해?" },
+    { t: "<b>클라우드 백업</b> 올려도 되는 근거가 뭐야?", q: "클라우드에 백업 올려도 되나?" },
+    { t: "개인정보 <b>안전성 확보조치 기준</b> 고시 찾아줘", q: "개인정보의 안전성 확보조치 기준 고시 찾아줘" }
+  ];
+
+  function 그리기법령(laws) {
+    var box = document.getElementById("lawList");
+    document.getElementById("lawCnt").textContent = laws.length;
+    if (!laws.length) { box.innerHTML = '<div class="empty">목록을 받지 못했습니다.</div>'; return; }
+    box.innerHTML = laws.map(function (n) {
+      return '<div class="row" data-n="' + esc(n) + '"><span class="nm">' + esc(n) +
+        '</span><span class="arw">대화창에 묻기 ›</span></div>';
+    }).join("");
+    Array.prototype.forEach.call(box.querySelectorAll(".row"), function (el) {
+      el.addEventListener("click", function () {
+        var n = el.getAttribute("data-n");
+        물어보기(질문문구(n), n);
+      });
+    });
+  }
+
+  function 그리기FAQ() {
+    var box = document.getElementById("faqList");
+    document.getElementById("faqCnt").textContent = FAQ.length;
+    box.innerHTML = FAQ.map(function (f, i) { return '<div class="q" data-i="' + i + '">' + f.t + "</div>"; }).join("");
+    Array.prototype.forEach.call(box.querySelectorAll(".q"), function (el) {
+      el.addEventListener("click", function () {
+        var f = FAQ[Number(el.getAttribute("data-i"))];
+        물어보기(f.q, f.q);
+      });
+    });
+  }
+
+  function 그리기최근() {
+    var list = 최근();
+    var box = document.getElementById("recentList");
+    document.getElementById("recentCnt").textContent = list.length;
+    if (!list.length) { box.innerHTML = '<div class="empty">아직 없습니다 — 왼쪽에서 하나 골라 보세요.</div>'; return; }
+    box.innerHTML = list.map(function (r, i) {
+      return '<div class="row" data-i="' + i + '"><span class="nm">' + esc(r.name) + '</span><span class="tag">' +
+        esc(갈래말[r.kind] || r.kind) + "</span><span class=\"arw\">다시 ›</span></div>";
+    }).join("");
+    Array.prototype.forEach.call(box.querySelectorAll(".row"), function (el) {
+      el.addEventListener("click", function () {
+        var r = 최근()[Number(el.getAttribute("data-i"))];
+        if (!r) return;
+        var 전 = 갈래; 갈래 = r.kind;
+        물어보기(질문문구(r.name), r.name);
+        갈래 = 전;
+      });
+    });
+  }
+
+  function 그리기상태(cfg) {
+    var el = document.getElementById("stateLine");
+    if (cfg && cfg.enabled && cfg.domain) {
+      el.className = "state on";
+      el.innerHTML = "✅ 연결됨 — 인증키·신청 도메인(" + esc(cfg.domain) + ") 설정 완료" +
+        '<span class="go" id="goSet">설정에서 바꾸기 ›</span>';
+    } else if (cfg && cfg.enabled) {
+      // 도메인 없이 켜면 법제처가 반드시 거부한다 — 켜졌다고만 말하면 거짓말이 된다.
+      el.className = "state off";
+      el.innerHTML = "⚠ 신청 도메인이 비어 있어 조회가 거부됩니다 — 법제처는 인증키와 도메인을 함께 봅니다" +
+        '<span class="go" id="goSet">설정 › 연동에서 넣기 ›</span>';
+    } else {
+      el.className = "state off";
+      el.innerHTML = "⚠ 꺼져 있습니다 — 법제처 인증키와 신청 도메인을 넣어야 찾을 수 있습니다" +
+        '<span class="go" id="goSet">설정 › 연동에서 켜기 ›</span>';
+    }
+    var go = document.getElementById("goSet");
+    if (go) go.addEventListener("click", function () {
+      if (window.gijo && window.gijo.navigateTo) window.gijo.navigateTo("settings.html?s=link");
+    });
+  }
+
+  Array.prototype.forEach.call(document.querySelectorAll("#kinds .kind"), function (b) {
+    b.addEventListener("click", function () {
+      Array.prototype.forEach.call(document.querySelectorAll("#kinds .kind"), function (x) { x.classList.remove("on"); });
+      b.classList.add("on");
+      갈래 = b.getAttribute("data-k");
+    });
+  });
+
+  그리기FAQ();
+  그리기최근();
+
+  window.gijo.lawConfig().then(function (cfg) {
+    그리기상태(cfg);
+    그리기법령((cfg && cfg.laws) || []);
+  }).catch(function () {
+    그리기상태(null);
+    document.getElementById("lawList").innerHTML = '<div class="empty">연결 상태를 확인하지 못했습니다.</div>';
+  });
+})();
+</script>
+</body>
+</html>

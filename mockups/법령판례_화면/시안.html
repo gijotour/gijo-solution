@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="ko"><head><meta charset="utf-8">
+<title>시안 — 추가 기능 › 법령·판례 (보기·고르기 전용)</title>
+<style>
+:root{
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#fff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;padding:22px}
+.wrap{max-width:1180px}
+h1{font-size:18px;margin-bottom:3px}
+.sub{color:var(--muted-2);font-size:12.5px;margin-bottom:18px}
+.scr-id{font-size:12.5px;color:var(--muted);margin-bottom:12px}
+.scr-id b{color:var(--text);font-weight:800}
+.info{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;
+  border:1px solid var(--border-strong);color:var(--muted-2);font-size:10px;margin-left:5px;cursor:pointer;vertical-align:1px}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:13px 15px;margin-bottom:12px}
+.ph{font-size:13px;font-weight:800;color:#fff;margin-bottom:9px;display:flex;align-items:center;gap:8px}
+.ph .cnt{margin-left:auto;font-size:12px;color:var(--muted-2);font-weight:700}
+.cols{display:grid;grid-template-columns:1.15fr 1fr;gap:12px;align-items:start}
+
+/* 상태 줄 */
+.state{display:flex;align-items:center;gap:9px;font-size:12.5px;padding:8px 11px;border-radius:9px;margin-bottom:12px}
+.state.on{background:rgba(30,185,128,.10);border:1px solid rgba(30,185,128,.32);color:var(--teal)}
+.state.off{background:rgba(240,160,32,.10);border:1px solid rgba(240,160,32,.32);color:var(--amber)}
+.state .go{margin-left:auto;color:var(--blue-light);cursor:pointer;font-weight:700}
+
+/* 갈래 고르기 */
+.kinds{display:flex;gap:7px;margin-bottom:11px}
+.kind{padding:5px 13px;border-radius:16px;border:1px solid var(--border-strong);color:var(--muted);
+  font-size:12.5px;font-weight:700;cursor:pointer;background:transparent}
+.kind.on{background:rgba(59,130,246,.16);border-color:rgba(59,130,246,.5);color:#cfe0ff}
+
+/* 누르는 줄 — 입력칸이 아니라 '고르는 것' */
+.row{display:flex;align-items:center;gap:9px;padding:6px 7px;border-top:1px solid rgba(255,255,255,.05);
+  font-size:12.5px;cursor:pointer;border-radius:6px}
+.row:first-of-type{border-top:0}
+.row:hover{background:rgba(255,255,255,.04)}
+.row .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text);font-weight:700}
+.row .tag{flex:0 0 auto;font-size:11px;color:var(--muted-2)}
+.row .arw{flex:0 0 auto;color:var(--blue-light);font-size:11.5px;opacity:0;font-weight:700}
+.row:hover .arw{opacity:1}
+.q{color:var(--muted-2);font-size:12px;padding:6px 7px;border-top:1px solid rgba(255,255,255,.05);cursor:pointer;border-radius:6px}
+.q:hover{background:rgba(255,255,255,.04);color:var(--text)}
+.q b{color:var(--text);font-weight:700}
+
+.note{font-size:12px;color:var(--muted-2);line-height:1.7;margin-top:9px}
+.warn{background:var(--panel-2);border:1px solid rgba(240,160,32,.28);border-radius:8px;
+  padding:8px 11px;font-size:12px;color:var(--amber);line-height:1.65;margin-bottom:12px}
+.demo{margin-top:20px;background:var(--panel-2);border:1px dashed var(--border-strong);border-radius:10px;padding:12px 14px}
+.demo h3{font-size:12.5px;color:var(--muted);margin-bottom:8px}
+.bubble{background:var(--panel);border:1px solid var(--border);border-radius:9px;padding:10px 12px;font-size:12.5px;line-height:1.75;white-space:pre-wrap}
+table{border-collapse:collapse;width:100%;font-size:12.5px;margin-top:8px}
+th,td{text-align:left;padding:6px 9px;border-bottom:1px solid var(--border);vertical-align:top}
+th{color:var(--muted);font-weight:600;font-size:12px}
+td.n{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.ok{color:var(--teal)}.mut{color:var(--muted-2)}
+</style></head><body><div class="wrap">
+
+<h1>시안 — 추가 기능 › 법령·판례</h1>
+<p class="sub">2026-08-09 · 보기·고르기 전용(자유 입력칸 0개) · 누르면 대화창이 답한다 · 추천안 1개</p>
+
+<div class="scr-id"><b>법령·판례</b> — 개인정보보호법·정보통신망법 같은 IT보안 법령과 고시·판례를 국가법령정보센터에서 찾습니다. 찾을 것을 고르면 <b>대화창</b>이 원문과 링크로 답합니다.<span class="info">i</span></div>
+
+<div class="state on">✅ 연결됨 — 인증키·신청 도메인(www.gijo.ai) 설정 완료<span class="go">설정에서 바꾸기 ›</span></div>
+
+<div class="warn">⚠ 이 기능은 <b>인터넷 연결이 필요합니다</b> — 폐쇄망(에어갭)에서는 쓸 수 없습니다. 찾아주는 것은 원문과 링크까지이며 <b>법률 자문이 아닙니다.</b></div>
+
+<div class="kinds">
+  <span class="kind on">법령</span><span class="kind">고시·훈령</span><span class="kind">판례</span>
+</div>
+
+<div class="cols">
+  <div class="panel">
+    <div class="ph">IT·보안 담당자가 자주 걸리는 법<span class="cnt">8</span></div>
+    <div class="row"><span class="nm">개인정보 보호법</span><span class="tag">개인정보보호위원회</span><span class="arw">대화창에 묻기 ›</span></div>
+    <div class="row"><span class="nm">정보통신망 이용촉진 및 정보보호 등에 관한 법률</span><span class="tag">과기정통부</span><span class="arw">대화창에 묻기 ›</span></div>
+    <div class="row"><span class="nm">정보통신기반 보호법</span><span class="tag">과기정통부</span><span class="arw">대화창에 묻기 ›</span></div>
+    <div class="row"><span class="nm">전자금융거래법</span><span class="tag">금융위</span><span class="arw">대화창에 묻기 ›</span></div>
+    <div class="row"><span class="nm">신용정보의 이용 및 보호에 관한 법률</span><span class="tag">금융위</span><span class="arw">대화창에 묻기 ›</span></div>
+    <div class="row"><span class="nm">클라우드컴퓨팅 발전 및 이용자 보호에 관한 법률</span><span class="tag">과기정통부</span><span class="arw">대화창에 묻기 ›</span></div>
+    <div class="row"><span class="nm">지능정보화 기본법</span><span class="tag">과기정통부</span><span class="arw">대화창에 묻기 ›</span></div>
+    <div class="row"><span class="nm">산업기술의 유출방지 및 보호에 관한 법률</span><span class="tag">산업부</span><span class="arw">대화창에 묻기 ›</span></div>
+    <div class="note">누르면 대화창에 <b>“개인정보 보호법 찾아줘”</b>가 들어가고 거기서 답이 나옵니다. 목록은 서버가 갖고 있는 한 벌을 그대로 씁니다(두 곳에 적지 않습니다).</div>
+  </div>
+
+  <div>
+    <div class="panel">
+      <div class="ph">자주 묻는 것<span class="cnt">6</span></div>
+      <div class="q"><b>접속기록</b>은 몇 년 보관해야 해?</div>
+      <div class="q"><b>금융권 망분리</b> 법적 근거가 뭐야?</div>
+      <div class="q">개인정보 <b>유출 신고</b> 기한이 언제까지야?</div>
+      <div class="q"><b>퇴사자 계정</b>은 언제까지 남겨둬야 해?</div>
+      <div class="q"><b>클라우드 백업</b> 올려도 되는 근거가 뭐야?</div>
+      <div class="q">개인정보 <b>안전성 확보조치 기준</b> 고시 찾아줘</div>
+    </div>
+
+    <div class="panel">
+      <div class="ph">최근 찾아본 것<span class="cnt">3</span></div>
+      <div class="row"><span class="nm">개인정보의 안전성 확보조치 기준</span><span class="tag">고시 · 오늘</span><span class="arw">다시 ›</span></div>
+      <div class="row"><span class="nm">개인정보 보호법</span><span class="tag">법령 · 오늘</span><span class="arw">다시 ›</span></div>
+      <div class="row"><span class="nm">시정명령등처분취소청구의소</span><span class="tag">판례 · 어제</span><span class="arw">다시 ›</span></div>
+      <div class="note">여기 없는 것은 <b>대화창에 그냥 물어보면</b> 됩니다 — 이 화면은 자주 쓰는 입구일 뿐 전부가 아닙니다.</div>
+    </div>
+  </div>
+</div>
+
+<div class="demo">
+  <h3>누르면 이렇게 됩니다 — 답은 화면이 아니라 대화창에서</h3>
+  <div class="bubble">법령 검색 — "개인정보 보호법" (상위 2건)
+
+1. 개인정보 보호법
+   개인정보보호위원회 · 시행 2025-10-02 · 일부개정
+   원문: https://www.law.go.kr/법령/개인정보 보호법
+2. 개인정보 보호법 시행령
+   개인정보보호위원회 · 시행 2026-05-19 · 일부개정
+   원문: https://www.law.go.kr/법령/개인정보 보호법 시행령
+
+※ 법령 원문을 찾아드린 것이며 법률 자문이 아닙니다. 적용 여부는 법무 검토를 받으세요.</div>
+  <p class="note">실제 운영 서버에서 받은 답입니다(2026-08-09 실측).</p>
+</div>
+
+<div class="panel" style="margin-top:16px">
+  <div class="ph">원칙을 지켰나</div>
+  <table>
+    <tr><th>원칙</th><th>이 화면</th></tr>
+    <tr><td>지시는 대화창에서 한다(용어사전 839줄)</td><td class="ok">자유 입력칸 <b>0개</b> — 고르기만 하고 질문은 대화창으로 넘긴다</td></tr>
+    <tr><td>추가 기능 3화면 전례(자유 입력 0)</td><td class="ok">동일 — 체크박스·버튼만</td></tr>
+    <tr><td>화면엔 정체성 한 줄과 ⚠경고만, 설명은 ⓘ로</td><td class="ok">정체성 1줄 + 인터넷 필요 경고 1개 + ⓘ(screenguide)</td></tr>
+    <tr><td>목록을 두 곳에 적지 않는다</td><td class="ok">8대 법령은 서버 IT_SECURITY_LAWS 한 벌을 받아 그린다</td></tr>
+  </table>
+</div>
+
+<div class="panel">
+  <div class="ph">꺼져 있을 때는 이렇게</div>
+  <div class="state off">⚠ 꺼져 있습니다 — 법제처 인증키와 신청 도메인을 넣어야 찾을 수 있습니다<span class="go">설정 › 연동에서 켜기 ›</span></div>
+  <p class="note">메뉴는 <b>늘 보입니다.</b> 조건부로 감추면 "왜 안 보이지"가 새 질문이 되고, 사이드바를 비동기로 다시 그려야 해 공용 파일(nav.js)에 위험이 붙습니다. 대신 <b>왜 안 되는지와 어디서 켜는지</b>를 이 자리에서 말합니다. 폐쇄망이면 "폐쇄망에서는 쓸 수 없습니다"로 바뀝니다.</p>
+</div>
+
+<div class="panel">
+  <div class="ph">밀도</div>
+  <table>
+    <tr><th>구역</th><th class="n">줄 높이</th><th class="n">세로</th></tr>
+    <tr><td>정체성 줄 + 상태 줄 + 경고</td><td class="n">—</td><td class="n">96px</td></tr>
+    <tr><td>갈래 고르기</td><td class="n">27px</td><td class="n">38px</td></tr>
+    <tr><td>8대 법령(8줄)</td><td class="n">27px</td><td class="n">216px</td></tr>
+    <tr><td>자주 묻는 것(6줄) · 최근(3줄)</td><td class="n">26px</td><td class="n">234px</td></tr>
+    <tr><td><b>첫 화면 세로 총합</b></td><td class="n">—</td><td class="n"><b>약 620px</b> — 스크롤 없이 다 보임</td></tr>
+  </table>
+</div>
+
+<p class="sub" style="margin-top:16px">시안 전용 정적 화면입니다 — 동작하지 않습니다.</p>
+</div></body></html>

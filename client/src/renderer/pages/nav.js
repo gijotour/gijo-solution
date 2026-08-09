@@ -132,6 +132,11 @@
     //   alwaysGroup: 항목이 1개여도 대표 메뉴로 접지 않는다 — 곧 늘어날 그룹이다.
     { id: "extras", icon: "drawer", label: "추가 기능", bottom: true, alwaysGroup: true, items: [
       { page: "loganalysis.html", label: "보안 로그 파일 분석" },
+      // 법령·판례(2026-08-09 사용자 지시 · mockups/법령판례_화면). 조항마다 법을 자동으로
+      // 붙이는 대신 **물어볼 때 찾는다** — 법은 자주 개정돼 붙여 둔 것이 금세 낡는다.
+      // ⚠ 연동이 꺼져 있어도 메뉴는 보인다. 조건부로 감추면 "왜 안 보이지"가 새 질문이 되고
+      //   사이드바를 비동기로 다시 그려야 한다 — 대신 화면이 왜 안 되는지와 켜는 곳을 말한다.
+      { page: "lawlookup.html", label: "법령·판례" },
       { page: "intro.html", label: "제품 소개자료" },
       { page: "handover.html", label: "업무 넘기기" },
     ]},

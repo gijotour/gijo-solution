@@ -70,6 +70,8 @@ export interface LawConfigPublic {
   enabled: boolean;
   hasKey: boolean;
   domain: string;
+  /** 화면이 그릴 「자주 걸리는 법」 한 벌 — 목록을 화면에 또 적지 않으려고 여기서 준다. */
+  laws: string[];
   updatedAt: number | null;
 }
 
@@ -91,7 +93,13 @@ export function normalizeLawDomain(raw: string): string {
 
 export function getLawConfig(): LawConfigPublic {
   const r = db.prepare(`SELECT * FROM law_config WHERE id = 1`).get() as ConfigRow;
-  return { enabled: r.enabled === 1, hasKey: Boolean(r.encryptedKey), domain: r.domain ?? "", updatedAt: r.updatedAt };
+  return {
+    enabled: r.enabled === 1,
+    hasKey: Boolean(r.encryptedKey),
+    domain: r.domain ?? "",
+    laws: IT_SECURITY_LAWS,
+    updatedAt: r.updatedAt,
+  };
 }
 
 /**
