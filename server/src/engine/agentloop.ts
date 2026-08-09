@@ -365,26 +365,82 @@ function directAnswerFor(calls: AgentToolCall[]): string | null {
   // 담당자가 "우리 회사엔 없구나"로 오해하는 사고가 있었다(2026-07-26 실사용).
   // ★ 법령만 예외 — 못 찾았으면 **모델에게 넘긴다**(2026-08-09, 회귀 하네스가 잡음).
   //   법령 도구가 생기자 모델이 그걸 집으면서, 「접속기록 몇 년 보관?」처럼 답이 있던 질문에
-  //   "찾지 못했습니다"만 나갔다. 사내 지식을 뒤져 봐도 **0건**이라 되짚을 곳도 없다 —
-  //   원래 그 답은 모델이 알고 있던 것이었다(실측: 제30조·1년을 정확히 답한다).
+  //   "찾지 못했습니다"만 나갔다.
   //   ⚠ **찾았을 땐 절대 모델을 안 태운다**(아래 directAnswer 그대로) — 조문을 고쳐 쓰면
   //     법률은 지어내기가 가장 위험한 영역이다. 못 찾은 경우에만 연다.
-  //   ⚠ 대신 「법제처에서 확인 못 한 일반 지식」이라는 딱지를 코드로 붙인다(법령한계를밝힌다).
+  //   ⚠ 정정(같은 날 오후): 처음엔 "사내 지식도 0건이라 되짚을 곳이 없다"고 적었는데
+  //     **그게 측정 실수였다**(질의 본문 키를 틀렸다). 사내 문서에 답이 있다 — 그래서
+  //     여기 오기 전에 사내지식으로보강()이 근거를 얹는다. 여긴 그마저 없을 때의 마지막 길이다.
   if (only.result.startsWith(NO_HIT_PREFIX)) {
     return only.tool === "law_lookup" ? null : 사람용으로다듬기(only.result);
   }
   return findAgentTool(only.tool)?.directAnswer ? 사람용으로다듬기(only.result) : null;
 }
 
+// ── 법령 도구가 답을 못 낸 자리를 사내 지식으로 메운다 (2026-08-09 재수리) ────────────────
+//
+// 어제 이 자리를 「법령은 못 찾으면 모델에게 넘긴다」로 고쳤다. 그 전제는 **"사내 지식을
+// 뒤져 봐도 0건"**이었는데 그게 **측정 실수**였다(/api/memory/query에 본문 키를 question이
+// 아닌 query로 보내 400을 0건으로 읽었다). 오늘 제대로 재니 두 질문 다 사내 문서가
+// **1~2위로** 잡힌다 — 전자금융감독규정 제15조도, 시행령 제30조·고시 제8조도 정확히 들어 있다.
+//
+// 즉 답은 있는데 **라우팅이 지식에 닿지 않아** 모델의 일반 지식으로 때우고 있었다.
+// 그래서 법령 도구가 부족할 때만 사내 지식을 한 번 더 뒤져 근거로 얹는다.
+//
+// ⚠ **찾았을 땐 건드리지 않는다.** 조문 원문을 모델이 고쳐 쓰는 것이 가장 위험하다.
+//   여는 경우는 딱 둘 — ①법제처가 못 찾음 ②목록만 왔는데 「몇 년?」처럼 값을 물음.
+//   ②를 넓히면 법령 조회의 본래 쓸모(목록·링크)가 흔들린다 — 어제 보류한 이유가 그것이다.
+const 법령목록머리 = /^(법령|행정규칙|판례) 검색 — /;
+const 값을묻는말 = /몇\s*(년|개월|달|일|시간|건|명|회|번|가지)|며칠|얼마(나|만큼|동안)?|어느\s*정도/;
+
+/** 사내 지식을 얹을 때 쓰는 이름. 등록된 도구가 아니라 **근거 꼬리표**다. */
+export const 사내지식꼬리표 = "사내지식";
+
+/** 법령 도구 결과가 질문에 답했는가 — 판정은 코드가 한다(프롬프트에 맡기지 않는다). */
+export function 법령답이부족한가(instruction: string, result: string): boolean {
+  if (result.startsWith(NO_HIT_PREFIX)) return true;
+  if (!법령목록머리.test(result.trimStart())) return false; // 조문 본문을 받았으면 충분하다
+  return 값을묻는말.test(instruction);
+}
+
+/** 부족하면 사내 지식을 한 번 더 뒤져 calls에 근거로 얹는다(제자리 수정). */
+export async function 사내지식으로보강(instruction: string, calls: AgentToolCall[]): Promise<void> {
+  const law = calls.find((c) => c.tool === "law_lookup");
+  if (!law || calls.some((c) => c.tool === 사내지식꼬리표)) return;
+  if (!법령답이부족한가(instruction, law.result)) return;
+  // 열람 등급은 viewerctx의 요청 꼬리표를 hybridSearch가 알아서 집는다 — 여기서 다시 싣지 않는다.
+  // 실패해도 조용히 넘어간다: 보강은 덤이고, 없다고 원래 답까지 죽이면 더 나쁘다.
+  const chunks = await import("./memory.js")
+    .then((m) => m.queryMemoryGraded(instruction, 5))
+    .then((r) => r.chunks)
+    .catch(() => [] as string[]);
+  if (!chunks.length) return;
+  calls.push({
+    tool: 사내지식꼬리표,
+    args: { question: instruction },
+    result: chunks.join("\n\n---\n\n").slice(0, 3000),
+  });
+}
+
 /**
- * 법령을 못 찾아 **모델이 대신 답한** 경우, 그 사실을 답에 못 박는다.
+ * 법령 답의 **근거가 어디서 왔는지**를 답에 못 박는다.
  *
  * 모델에게 "이렇게 말해"라고 시키지 않는다 — 7B/14B에 프롬프트 규칙을 더해 행동을 고치려던
  * 시도는 이 저장소에서 반복해 실패했다. 붙일지 말지는 **도구 결과가 결정**하고 코드가 붙인다.
  */
 export function 법령한계를밝힌다(answer: string, calls: AgentToolCall[]): string {
-  const 못찾은법령 = calls.some((c) => c.tool === "law_lookup" && c.result.startsWith(NO_HIT_PREFIX));
-  if (!못찾은법령 || !answer.trim()) return answer;
+  const law = calls.find((c) => c.tool === "law_lookup");
+  if (!law || !answer.trim()) return answer;
+  const 못찾음 = law.result.startsWith(NO_HIT_PREFIX);
+  if (calls.some((c) => c.tool === 사내지식꼬리표)) {
+    // 법제처가 준 목록·링크는 모델이 고쳐 쓸 수 있으므로 **원문 그대로** 덧붙여 보존한다.
+    const 원문 = 못찾음 ? "" : `\n\n▸ 법제처에서 찾은 법령\n${law.result.trim()}`;
+    const 꼬리 = 못찾음
+      ? "⚠ **사내 자료를 근거로 답했습니다** — 법제처에서 원문은 확인하지 못했습니다."
+      : "⚠ **사내 자료를 함께 근거로 답했습니다.**";
+    return `${answer.trim()}${원문}\n\n${꼬리} 조문 번호와 내용은 국가법령정보센터에서 대조하세요. 법률 자문이 아닙니다.`;
+  }
+  if (!못찾음) return answer;
   return `${answer.trim()}\n\n⚠ **법제처에서 원문을 확인하지 못한 답입니다** — 조문 번호와 내용은 반드시 국가법령정보센터에서 대조하세요. 법률 자문이 아닙니다.`;
 }
 
@@ -1596,6 +1652,7 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
         const result = String(await tool.run(forced.args));
         recordToolWork(forced.tool, scope);
         const calls: AgentToolCall[] = [{ tool: forced.tool, args: forced.args, result }];
+        await 사내지식으로보강(instruction, calls); // 법령이 부족하면 사내 근거를 얹는다
         const direct = directAnswerFor(calls);
         if (!direct) reportProgress("write", "조회 결과로 답을 쓰고 있습니다");
         const composed = direct ?? (await composeFinalAnswer(instruction, calls, context));
@@ -1636,6 +1693,7 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
 
     if (decision.action === "final") {
       if (calls.length === 0) return null; // 도구가 필요 없는 일반 대화 → 기존 채팅(RAG·이력)이 더 낫다
+      await 사내지식으로보강(instruction, calls); // 법령이 부족하면 사내 근거를 얹는다
       const direct = directAnswerFor(calls);
       if (!direct) reportProgress("write", `조회 결과 ${calls.length}건으로 답을 쓰고 있습니다`);
       const composed = direct ?? (await composeFinalAnswer(instruction, calls, context));

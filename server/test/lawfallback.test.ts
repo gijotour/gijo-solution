@@ -1,35 +1,98 @@
-// 법령을 못 찾으면 모델에게 넘긴다 — 가로채기 회귀 수리 (2026-08-09, 계획서 후-3).
+// 법령 답이 부족하면 사내 지식으로 메운다 (2026-08-09, 계획서 후-3 + 중-3).
 //
-// 무슨 일이 있었나: 법령 도구가 생기자 모델이 그걸 집으면서, 답이 있던 질문에도
-// "🔎 찾지 못했습니다"만 나갔다. 회귀 하네스(tools/regress)가 잡았다 —
-// 150상황은 **통과시켰다**(그 문항에 기대 신호가 없어 형식만 봤다).
+// 무슨 일이 있었나 — **두 번에 걸친 수리**다.
 //
-// 실측으로 확인한 것:
-//   · 사내 지식에 답이 있나 → **0건**(두 질문 모두). 되짚을 곳이 없다.
-//   · 모델이 직접 답하면?   → 제30조·1년을 정확히 답한다. 원래 답은 여기서 나왔다.
-// 그래서 「사내 지식으로 되짚기」가 아니라 **「못 찾으면 모델에게 넘기기」**가 맞는 수리다.
+// 1차(오전): 법령 도구가 생기자 모델이 그걸 집으면서, 답이 있던 질문에도
+//   "🔎 찾지 못했습니다"만 나갔다. 회귀 하네스(tools/regress)가 잡았다 —
+//   150상황은 **통과시켰다**(그 문항에 기대 신호가 없어 형식만 봤다).
+//   그때 「사내 지식은 0건이니 모델에게 넘기자」로 고쳤다.
+//
+// 2차(오후) — ⚠ **1차의 전제가 내 측정 실수였다.**
+//   /api/memory/query에 본문 키를 question이 아닌 query로 보내 400을 받아 놓고 0건으로 읽었다.
+//   제대로 재니 두 질문 다 사내 문서가 **1~2위로** 잡힌다:
+//     · 「금융권 망분리」 → 전자금융감독규정 제15조 (1위·3위)
+//     · 「접속기록 몇 년」 → 1년/2년 + 시행령 제30조·고시 제8조 (1위·2위)
+//   즉 **지식은 있는데 라우팅이 거기 닿지 않았다.** 모델의 일반 지식으로 때우고 있었던 것이다.
+//
+// 그래서 지금 규칙: 법령 도구가 **부족할 때만** 사내 지식을 얹는다. 찾았으면 안 건드린다 —
+// 조문 원문을 모델이 고쳐 쓰는 것이 이 영역에서 가장 위험하다.
 import { describe, it, expect } from "vitest";
 import fs from "fs";
 import path from "path";
-import { 법령한계를밝힌다 } from "../src/engine/agentloop";
+import { 법령한계를밝힌다, 법령답이부족한가, 사내지식꼬리표 } from "../src/engine/agentloop";
 import { NO_HIT_PREFIX } from "../src/engine/agenttools";
 
 const 못찾음 = `${NO_HIT_PREFIX} "금융권 망분리"로는 법령 검색 결과가 없습니다.`;
-const 찾음 = "법령 검색 — \"개인정보 보호법\" (상위 2건)\n1. 개인정보 보호법";
+const 목록 = '법령 검색 — "개인정보 보호법" (상위 2건)\n1. 개인정보 보호법\n   원문: https://www.law.go.kr/...';
+const 조문본문 = "개인정보 보호법 제29조(안전조치의무)\n개인정보처리자는 …";
+const 사내근거 = { tool: 사내지식꼬리표, args: {}, result: "접속기록은 1년 이상, 5만명 이상은 2년 이상." };
 
-describe("못 찾았을 때만 딱지를 붙인다", () => {
-  it("★ 못 찾아 모델이 대신 답했으면 — 확인 못 했다고 못 박는다", () => {
+describe("법령 답이 부족한가 — 판정은 코드가 한다", () => {
+  it("★ 못 찾았으면 부족하다", () => {
+    expect(법령답이부족한가("금융권 망분리 근거는?", 못찾음)).toBe(true);
+  });
+
+  it("★ 목록만 왔는데 「몇 년?」을 물었으면 부족하다 — 목록은 그 질문의 답이 아니다", () => {
+    expect(법령답이부족한가("접속기록은 최소 몇 년 보관해야 하고 근거 법령은?", 목록)).toBe(true);
+  });
+
+  it("★★ 목록을 **달라고** 물었으면 목록이 정답이다 — 법령 조회의 본래 쓸모를 흔들지 않는다", () => {
+    // 이걸 넓게 잡았다가 깨뜨리는 것이 어제 보류한 이유다. 값을 묻는 말일 때만 연다.
+    expect(법령답이부족한가("개인정보 보호법 찾아줘", 목록)).toBe(false);
+    expect(법령답이부족한가("전자금융거래법 관련 법령 보여줘", 목록)).toBe(false);
+  });
+
+  it("★★ 조문 본문을 받았으면 충분하다 — 모델을 태울 이유가 없다", () => {
+    expect(법령답이부족한가("개인정보 보호법 제29조는 몇 년이야?", 조문본문)).toBe(false);
+  });
+
+  it("값을 묻는 여러 말꼴을 잡는다", () => {
+    for (const q of ["몇 년 보관해?", "며칠 이내야?", "얼마나 걸려?", "몇 개월이야?", "몇 건이야?"]) {
+      expect(법령답이부족한가(q, 목록), q).toBe(true);
+    }
+  });
+
+  it("평범한 법령 질문을 값 질문으로 오인하지 않는다", () => {
+    for (const q of ["개인정보 보호법 알려줘", "망분리 관련 고시 검색", "판례 찾아줘", "시행령 원문 보여줘"]) {
+      expect(법령답이부족한가(q, 목록), q).toBe(false);
+    }
+  });
+});
+
+describe("근거가 어디서 왔는지 답에 못 박는다", () => {
+  it("★ 못 찾았지만 사내 자료로 답했으면 — 그렇게 밝힌다", () => {
+    const r = 법령한계를밝힌다("전자금융감독규정 제15조입니다.", [
+      { tool: "law_lookup", args: {}, result: 못찾음 },
+      사내근거,
+    ] as never);
+    expect(r).toContain("사내 자료를 근거로 답했습니다");
+    expect(r).toContain("법제처에서 원문은 확인하지 못했습니다");
+    expect(r).toContain("제15조"); // 원래 답은 살아 있다
+    // 사내 근거가 있는데 「일반 지식으로 답했다」는 딱지를 붙이면 거짓말이 된다.
+    expect(r).not.toContain("법제처에서 원문을 확인하지 못한 답입니다");
+  });
+
+  it("★★ 목록 + 사내 자료면 — 법제처 원문(링크)을 그대로 보존한다", () => {
+    const r = 법령한계를밝힌다("1년 이상입니다.", [
+      { tool: "law_lookup", args: {}, result: 목록 },
+      사내근거,
+    ] as never);
+    expect(r).toContain("사내 자료를 함께 근거로 답했습니다");
+    // 모델이 링크를 고쳐 쓰거나 빠뜨려도 코드가 원문을 덧붙여 살린다.
+    expect(r).toContain("▸ 법제처에서 찾은 법령");
+    expect(r).toContain("https://www.law.go.kr/");
+  });
+
+  it("★ 사내 자료도 없으면 — 일반 지식으로 답했다고 못 박는다(1차 수리 그대로)", () => {
     const r = 법령한계를밝힌다("접속기록은 최소 1년 보관해야 합니다.", [
       { tool: "law_lookup", args: {}, result: 못찾음 },
     ] as never);
     expect(r).toContain("법제처에서 원문을 확인하지 못한 답입니다");
-    expect(r).toContain("국가법령정보센터에서 대조");
-    expect(r).toContain("1년 보관"); // 원래 답은 살아 있다
+    expect(r).toContain("1년 보관");
   });
 
-  it("★★ 찾았으면 딱지를 안 붙인다 — 원문을 찾은 답까지 의심하게 만들면 안 된다", () => {
-    const r = 법령한계를밝힌다(찾음, [{ tool: "law_lookup", args: {}, result: 찾음 }] as never);
-    expect(r).toBe(찾음);
+  it("★★ 찾았고 사내 자료도 안 붙었으면 딱지를 안 붙인다 — 멀쩡한 답을 의심하게 만들지 않는다", () => {
+    expect(법령한계를밝힌다(목록, [{ tool: "law_lookup", args: {}, result: 목록 }] as never)).toBe(목록);
   });
 
   it("법령 도구를 안 썼으면 아무것도 안 붙인다", () => {
@@ -43,19 +106,28 @@ describe("못 찾았을 때만 딱지를 붙인다", () => {
   });
 });
 
-describe("직답 경로 예외 (소스 계약)", () => {
+describe("배선 (소스 계약)", () => {
   const src = fs.readFileSync(path.join(__dirname, "..", "src", "engine", "agentloop.ts"), "utf8");
-
-  it("★ 법령만 예외 — 못 찾으면 null을 돌려 모델에게 넘긴다", () => {
-    expect(src).toContain('return only.tool === "law_lookup" ? null : 사람용으로다듬기(only.result);');
-  });
 
   it("★★ 찾았을 땐 여전히 directAnswer — 조문을 모델이 고쳐 쓰지 못하게", () => {
     expect(src).toContain("return findAgentTool(only.tool)?.directAnswer ? 사람용으로다듬기(only.result) : null;");
   });
 
-  it("딱지는 출구 두 곳 모두에 걸린다 — 한 곳만 걸면 다른 길로 샌다", () => {
-    const 배선 = (src.match(/법령한계를밝힌다\(guardAgainstDenial\(composed, calls\), calls\)/g) ?? []).length;
+  it("★ 보강은 출구 두 곳 모두에 걸린다 — 한 곳만 걸면 다른 길로 샌다", () => {
+    // 강제 분기(forcedToolFor)와 일반 루프(action=final) 둘 다. 실사고 계열:
+    // 갈래마다 심는 구조는 새 갈래가 생기는 순간 조용히 샌다.
+    const 배선 = (src.match(/await 사내지식으로보강\(instruction, calls\)/g) ?? []).length;
     expect(배선, "강제 분기 경로와 일반 루프 경로 둘 다").toBe(2);
+  });
+
+  it("★ 딱지도 출구 두 곳 모두에 걸린다", () => {
+    const 배선 = (src.match(/법령한계를밝힌다\(guardAgainstDenial\(composed, calls\), calls\)/g) ?? []).length;
+    expect(배선).toBe(2);
+  });
+
+  it("★★ 보강은 directAnswerFor **앞**에 있어야 한다 — 뒤에 있으면 이미 답이 나간 뒤다", () => {
+    for (const 조각 of src.split("await 사내지식으로보강(instruction, calls)").slice(1)) {
+      expect(조각.slice(0, 200), "보강 직후에 directAnswerFor가 온다").toContain("directAnswerFor(calls)");
+    }
   });
 });
