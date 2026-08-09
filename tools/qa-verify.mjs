@@ -14,6 +14,9 @@ import fs from "node:fs";
 import path from "node:path";
 
 const B = process.env.GIJO_SERVER_URL || "http://localhost:4000";
+// 서버 폴더 — 주입 스크립트를 여기서 돌린다(dist/db.js·data/ 가 이 기준). mac처럼 서버가
+// 저장소 밖에 있으면 GIJO_SERVER_DIR로 알려준다.
+const SERVER_DIR = process.env.GIJO_SERVER_DIR || path.resolve(process.cwd(), "server");
 const USER = process.env.QA_USER || process.env.GIJO_ADMIN_USER;
 const PASS = process.env.QA_PASS || process.env.GIJO_ADMIN_PASSWORD;
 if (!USER || !PASS) { console.error("QA_USER/QA_PASS 필요"); process.exit(2); }
@@ -33,25 +36,51 @@ const ASSET_ID = "qa-verify-local";
 let targetId = null;
 
 // findings 주입 — 주입 API가 없어(스캔 어댑터 경유만) DB에 직접 심는다.
-// 운영 DB는 WSL에 있으므로 wsl 경유. 실패하면 그 시나리오만 건너뛴다(환경 의존).
+//
+// ⚠ 드라이버를 직접 열지 않고 **제품 자신의 db 모듈**을 빌려 쓴다(2026-08-09).
+//   DB 암호화 이후 일반 better-sqlite3로 열면 "file is not a database"로 죽는다 —
+//   잠긴 걸 못 읽는 건데 형식이 틀렸다는 말이 나와 원인을 엉뚱한 데서 찾게 된다.
+//   dist/db.js는 봉인 해제까지 끝내고 열어 주므로 열쇠를 여기서 다룰 필요가 없다.
+// ⚠ 실패하면 **건너뛰지 않고 실패로 센다.** 예전에는 조용히 넘어가서, Mac에서 이 판정
+//   시나리오가 통째로 안 도는데도 QA가 초록불이었다(2026-08-09 Mac 세션 발견).
 function injectFindings() {
   const script = `
-const D=require("better-sqlite3");const db=new D("data/gijo-as.sqlite");
+const {db}=require("./dist/db.js");
 const f=[
  {finding_type:"OpenSSH < 9.6 사용자 열거 (CVE-2024-6387)",severity:"high",evidence:"포트: tcp/22",source_tool:"QA",key:"qa-pass",state:"active"},
  {finding_type:"OpenSSH < 10.0 가상 취약점 (CVE-2099-00001)",severity:"medium",evidence:"포트: tcp/22",source_tool:"QA",key:"qa-fail",state:"active"},
  {finding_type:"권한 상승 가능성 있음",severity:"low",evidence:"동작 확인 필요",source_tool:"QA",key:"qa-manual",state:"active"}];
 const r=db.prepare("UPDATE assets SET findings=?, lastScannedAt=? WHERE id=?").run(JSON.stringify(f),Date.now(),"${ASSET_ID}");
 console.log(JSON.stringify({changed:r.changes,count:f.length}));`;
+  // 서버가 어디 있느냐로 갈린다 — Windows는 운영이 WSL 안, mac은 서버가 이 기계에 있다.
+  //   mac에서 wsl을 부르면 당연히 없어서 실패하는데, 예전 코드는 그걸 "환경 의존"이라며
+  //   건너뛰었다. mac 담당이 판정 시나리오를 통째로 잃고도 몰랐던 이유다.
+  // 스크립트는 **서버 폴더 안**에서 돌려야 한다 — ./dist/db.js 상대경로와 data/ 위치가
+  // 거기 기준이다.
+  const 로컬서버 = process.platform !== "win32";
+  const localScript = path.join(SERVER_DIR, "_qa-inject.cjs");
   const tmp = path.join(process.cwd(), ".tmp-reports", "_qa-inject.cjs");
-  fs.mkdirSync(path.dirname(tmp), { recursive: true });
-  fs.writeFileSync(tmp, script, "utf8");
   try {
-    const out = execFileSync("wsl", ["-d", "Ubuntu-24.04", "--", "bash", "-lc",
-      `cp '${tmp.replace(/\\/g, "/").replace(/^([A-Za-z]):/, (_m, d) => `/mnt/${d.toLowerCase()}`)}' /home/gijo/gijo-as/server/_qa.cjs && cd /home/gijo/gijo-as/server && node _qa.cjs; rm -f /home/gijo/gijo-as/server/_qa.cjs`],
-      { encoding: "utf8" }).trim();
-    return out.includes('"count":3');
-  } catch { return false; } finally { try { fs.unlinkSync(tmp); } catch {} }
+    let out;
+    if (로컬서버) {
+      fs.writeFileSync(localScript, script, "utf8");
+      out = execFileSync(process.execPath, ["_qa-inject.cjs"], { cwd: SERVER_DIR, encoding: "utf8" });
+    } else {
+      fs.mkdirSync(path.dirname(tmp), { recursive: true });
+      fs.writeFileSync(tmp, script, "utf8");
+      const wslPath = tmp.replace(/\\/g, "/").replace(/^([A-Za-z]):/, (_m, d) => `/mnt/${d.toLowerCase()}`);
+      out = execFileSync("wsl", ["-d", "Ubuntu-24.04", "--", "bash", "-lc",
+        `cp '${wslPath}' /home/gijo/gijo-as/server/_qa.cjs && cd /home/gijo/gijo-as/server && node _qa.cjs; rm -f /home/gijo/gijo-as/server/_qa.cjs`],
+        { encoding: "utf8" });
+    }
+    return { ok: String(out).includes('"count":3'), detail: String(out).trim().slice(-200) };
+  } catch (e) {
+    const msg = e?.stderr || e?.message || "실행 실패";
+    return { ok: false, detail: String(msg).trim().slice(-200) };
+  } finally {
+    try { fs.unlinkSync(tmp); } catch {}
+    try { fs.unlinkSync(localScript); } catch {}
+  }
 }
 
 try {
@@ -73,11 +102,11 @@ try {
   const can = await (await fetch(`${B}/api/verify/can/${ASSET_ID}`, { headers: H })).json();
   ok("검증 가능 판정(권한·대상 연결)", can.allowed && can.hasTarget, `${can.reason} / ${can.targetLabel}`);
 
+  // ⚠ 주입이 실패하면 **실패로 센다.** 아래 판정 6종이 이 주입에 얹혀 있어서, 조용히
+  //   건너뛰면 QA가 초록불인데 정작 조치 검증은 한 번도 안 돈 상태가 된다.
   const injected = injectFindings();
-  if (!injected) {
-    console.log("  ― 취약점 주입 실패(WSL 미가용) — 판정 시나리오 건너뜀");
-  } else {
-    ok("취약점 3건 주입", true);
+  ok("취약점 3건 주입", injected.ok, injected.detail);
+  if (injected.ok) {
     const run = await (await fetch(`${B}/api/verify/run`, {
       method: "POST", headers: H, body: JSON.stringify({ assetId: ASSET_ID }),
     })).json();

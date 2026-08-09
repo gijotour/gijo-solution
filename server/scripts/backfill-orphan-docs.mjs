@@ -29,6 +29,10 @@ const DB_PATH = path.resolve("data/memory.lancedb");
 const SQLITE = path.resolve("data/gijo-as.sqlite");
 const TABLE = "documents";
 
+// 저장 암호화 이후 일반 드라이버로는 못 연다 — 이유를 분명히 말하고 멈춘다(2026-08-09).
+const { 잠긴DB인가_확인 } = await import("./_dbguard.mjs");
+잠긴DB인가_확인(SQLITE, "backfill-orphan-docs");
+
 const sq = new Database(SQLITE);
 const have = new Set(sq.prepare("SELECT documentId FROM memory_documents").all().map((r) => r.documentId));
 

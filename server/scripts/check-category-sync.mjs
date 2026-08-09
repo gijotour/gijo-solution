@@ -16,6 +16,12 @@ const DB_PATH = path.resolve("data/memory.lancedb");
 const SQLITE = path.resolve("data/gijo-as.sqlite");
 const TABLE = "documents";
 
+// 저장 암호화 이후 일반 드라이버로는 못 연다 — "형식이 틀렸다"는 엉뚱한 말 대신 이유를 말한다.
+// ⚠ 제품의 db 모듈을 빌려 오지 않는 이유: 그 모듈은 마이그레이션까지 돈다. 이 도구는
+//   「읽기 전용이다 — 고치지 않는다」가 계약이라 그걸 깨면 안 된다.
+const { 잠긴DB인가_확인 } = await import("./_dbguard.mjs");
+잠긴DB인가_확인(SQLITE, "check-category-sync");
+
 const sq = new Database(SQLITE, { readonly: true });
 const meta = new Map(
   sq.prepare("SELECT documentId, category FROM memory_documents").all().map((r) => [r.documentId, r.category])

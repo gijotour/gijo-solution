@@ -21,6 +21,11 @@ const Database = require("better-sqlite3");
 const lancedb = require("@lancedb/lancedb");
 
 const DB_PATH = process.env.GIJO_MEMORY_DB_PATH ?? path.join("data", "memory.lancedb");
+
+// 저장 암호화 이후 일반 드라이버로는 못 연다 — 이유를 분명히 말하고 멈춘다(2026-08-09).
+const { 잠긴DB인가_확인 } = await import("./_dbguard.mjs");
+잠긴DB인가_확인(path.join("data", "gijo-as.sqlite"), "migrate-category");
+
 const sqlite = new Database(path.join("data", "gijo-as.sqlite"));
 
 const esc = (s) => s.replace(/'/g, "''");

@@ -67,3 +67,13 @@ Mac 클라     ── http://10.8.0.1:4000 ──▶ WSL 운영 서버 (기존 �
 - `data/`(sqlite·lancedb)는 **양쪽에서 동시에 쓰지 말 것** — 서로 다른 운영 데이터가 됨. 원본은 WSL 운영, mac은 시점 복사본으로 검증.
 - `client-예비.conf`를 Mac이 점유하므로 예비 슬롯 소진 — 향후 진짜 예비가 필요하면 새 피어 발급.
 - Windows OpenSSH 기본 셸은 cmd — git 명령은 동작하나, 문제가 생기면 `git-upload-pack` PATH를 확인.
+- **Mac: `npm ci` 하면 Electron 서명이 깨진다**(2026-08-09 실측). 앱이 안 뜨거나 손상됐다고 나오면
+  재서명하면 복구된다. **의존성을 설치할 때마다 재발**하므로 `qa-mac.mjs`가 이걸 잡는다 —
+  Mac에서 `npm ci` 뒤에는 QA를 한 번 돌리고 넘어갈 것.
+- **의존성이 바뀌면 받는 쪽은 `npm ci`부터.** 안 하면 원인이 엉뚱하게 보인다 — 2026-08-09에
+  `better-sqlite3-multiple-ciphers`가 추가된 걸 모르고 넘어가 Mac에서 **275개 시험 파일이
+  전부 실패**했다. 코드 문제로 오해하기 딱 좋다. (`/GIJOAS인계`가 이제 자동으로 확인해 적는다.)
+- **DB 저장 암호화 이후 `sqlite3` CLI·일반 드라이버로는 운영 DB를 못 연다.** "file is not a
+  database"가 나오면 파일이 깨진 게 아니라 **잠긴 것**이다. 서버 API를 쓰거나, 꼭 직접 읽어야
+  하면 서버 폴더에서 제품의 db 모듈을 빌린다(`node -e 'const {db}=require("./dist/db.js")'`).
+  `server/scripts/_dbguard.mjs`가 이 상황을 미리 알려 준다.
