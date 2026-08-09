@@ -86,6 +86,10 @@ if (FAST) { picks.delete("vitest"); picks.delete("maintenance"); }
 //   오늘 종일 잡은 「만들어 놓고 안 도는 검사」가 될 뻔했다. --fast에서도 뺀다.
 picks.add("keyleak");
 
+// ★ 2026-08-10: vitest를 돌린다면 **Windows 전용 2개도 같이** 돈다(WSL 사본이 못 도는 것들).
+//   ⚠ picks에 안 담으면 run()이 **조용히 건너뛴다** — 바로 위 주석이 경고하는 그 함정이다.
+if (picks.has("vitest") && process.platform === "win32") picks.add("vitest-win");
+
 console.log(`■ QA 전수조사 — 기준: ${since ? since.slice(0, 8) + "..HEAD" : "(첫 실행 — 마커 없음, 전 계층)"}`);
 if (!since) for (const l of ["vitest", "client", "knowledge", "maintenance", "regress", "verify", "shell", "download", "sweep", "windows", "viz", "drawer", "routing", "promise", "docprobe"]) { if (!FAST || (l !== "vitest" && l !== "maintenance")) picks.add(l); }
 console.log(`  변경 파일 ${changed.length}개 → 계층 [${[...picks].join(", ")}]${ALL ? " (--all)" : ""}${FAST ? " (--fast)" : ""}`);
@@ -98,7 +102,11 @@ function run(name, cmd, args, opts = {}) {
   if (!picks.has(name)) return;
   const t = Date.now();
   console.log(`\n── [${name}] ${cmd} ${args.join(" ")}`);
-  const r = spawnSync(cmd, args, { cwd: opts.cwd ?? ROOT, env, stdio: "inherit", shell: process.platform === "win32" });
+  // ⚠ opts.noShell — 인자에 **공백이 든 경로**가 있으면 셸이 쪼갠다(2026-08-10 실측:
+  //   `bash "/mnt/d/Connect AI/tools/wsl-test.sh"`가 0초 만에 실패했다). 그럴 땐 셸을 끄고
+  //   인자를 그대로 넘긴다.
+  const useShell = opts.noShell ? false : process.platform === "win32";
+  const r = spawnSync(cmd, args, { cwd: opts.cwd ?? ROOT, env, stdio: "inherit", shell: useShell });
   results.push({ name, ok: r.status === 0, ms: Date.now() - t });
 }
 
@@ -135,7 +143,22 @@ run("viz", "node", ["tools/viz-gap-measure.mjs"]);
 // ⚠ 만들고 안 돌리면 오늘 종일 잡은 「조용히 안 도는 검사」가 된다. 그래서 여기 박는다.
 run("keyleak", "node", ["tools/keyleak-check.mjs", "--quiet"]);
 run("server", "node", ["tools/qa-auto.mjs", "--layer=server"]);
-run("vitest", "npm", ["test"], { cwd: path.join(ROOT, "server") });
+// ★ 2026-08-10: 서버 시험은 **WSL에서** 돌린다.
+//   ⚠ 왜: 제품이 WSL에서 돈다. Windows 호스트에서 재면 **딴 환경을 검증**하는 것이고
+//     (그 python3은 0바이트 껍데기다), 무엇보다 **너무 느려 끝나지 않는다** —
+//     실측 Windows 파일당 수 분 vs WSL 전체 2,995개 27초. 이 계층이 오늘 실패한 이유다.
+//   ⚠ 이 규칙은 CLAUDE.md 「환경별 역할」에 못 박혀 있었는데 **이 도구엔 반영이 안 돼 있었다** —
+//     같은 것을 여러 곳에 적으면 어긋난다는 그 함정을 이 파일이 그대로 밟고 있었다.
+//   ⚠ WSL 사본에서 구조적으로 못 도는 2개(git·이미지 필요)는 wsl-test.sh가 빼므로
+//     **Windows에서 따로** 돌린다 — 각 0.5초라 부담이 없다. 두 쪽을 다 돌려야 「전부 통과」다.
+if (process.platform === "win32") {
+  run("vitest", "wsl", ["-d", "Ubuntu-24.04", "--", "bash", "/mnt/d/Connect AI/tools/wsl-test.sh"], { noShell: true });
+  run("vitest-win", "npx", ["vitest", "run", "test/no-hardcoded-credentials.test.ts", "test/shotlist.test.ts"], {
+    cwd: path.join(ROOT, "server"),
+  });
+} else {
+  run("vitest", "npm", ["test"], { cwd: path.join(ROOT, "server") });
+}
 run("client", "node", ["tools/qa-auto.mjs", "--layer=client"]);
 run("knowledge", "node", ["tools/qa-auto.mjs", "--layer=knowledge"]);
 run("maintenance", "node", ["tools/qa-auto.mjs", "--layer=maintenance"]);
