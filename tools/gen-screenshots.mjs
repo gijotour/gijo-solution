@@ -18,13 +18,13 @@ function requirePlaywright() {
       return createRequire(pathToFileURL(path.join(ROOT, ws, "package.json")))("playwright-core");
     } catch (e) { /* 다음 워크스페이스 시도 */ }
   }
-  // ⚠ 이 패키지는 **어느 package.json에도 선언돼 있지 않다**(2026-08-09 확인). 설치돼 있는
-  //   기계에서만 돌고, npm ci 한 번에 조용히 사라진다. 무엇이 없는지 바로 알게 적는다.
-  //   선언은 두 기계가 같은 버전을 써야 해서 함께 정할 일이다.
+  // 선언은 client/package.json devDependencies에 있다(^1.61.1, 2026-08-09 확정).
+  // 여기까지 왔다면 선언은 있는데 **설치가 안 된** 것이다 — 안내도 그렇게 적는다.
+  // (선언 자체가 사라지면 server/test/toolsdeps.test.ts 가 먼저 빨간불을 낸다)
   throw new Error(
     "playwright-core를 client/server 어느 node_modules에서도 찾지 못했습니다.\n" +
-      "  이 패키지는 package.json에 **선언돼 있지 않습니다** — 설치된 기계에서만 돌던 것입니다.\n" +
-      "  필요하면: cd client && npm i -D playwright-core (⚠ 의존성 변경 — 상대 머신에 알릴 것)"
+      "  client/package.json에 선언은 있습니다(devDependencies) — 설치가 안 된 상태입니다.\n" +
+      "  받으려면: cd client && npm i"
   );
 }
 const { chromium } = requirePlaywright();
