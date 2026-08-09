@@ -2347,8 +2347,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     // 정의(loadLlmGuide·modelCardHtml 등)는 함께 지웠다 — 부르는 곳 없는 정의를 남기면
     // deadelements류 감시가 잡기 전까지 "있는 줄 아는 기능"이 된다.
     window.gijo.onHfDownloadProgress(onHfJobUpdate);
+    // ⚠ **실패한 작업을 걸러내면 안 된다.** 예전엔 queued·downloading만 실었는데, 그 결과
+    //   받기가 실패해도 화면은 「받는 중… 0%」에 멈춰 있다가 화면을 떠났다 오면 **통째로
+    //   사라졌다** — 고객은 왜 안 되는지 끝내 모른다(2026-08-09 실측: 서버는 「huggingface
+    //   CLI(hf)를 찾을 수 없습니다」라고 정확히 알고 있었는데 화면만 몰랐다).
+    //   위 주석의 「돌아오면 이어서 보여준다」는 약속이 실패 쪽에서만 깨져 있었다.
+    //   done은 제외한다 — 끝난 일은 모델 목록에 실려 보이므로 여기 남겨 두면 잔소리가 된다.
     window.gijo.listHfDownloadJobs()
-      .then((jobs) => jobs.filter((j) => j.status === "queued" || j.status === "downloading").forEach(onHfJobUpdate))
+      .then((jobs) => jobs.filter((j) => j.status !== "done").forEach(onHfJobUpdate))
       .catch(() => {});
     // 모델 받기 인증(2026-07-28) — 토큰은 넣기만 하고 다시 보여주지 않는다.
     document.getElementById("saveHfTokenBtn").addEventListener("click", () => {
