@@ -14,8 +14,23 @@ export interface AgentInfo {
   defaultStatus: "idle" | "working" | "watching";
 }
 
+// AI팀 구성 한눈에(2026-08-09) — 기반 두뇌·팀원 전문성·공용 자산·☁ 외부 상담역을
+// 서버가 한 번에 집계해 준다. 설정 「AI팀 구성」과 팀 사무실이 같은 그림을 본다.
+export interface TeamComposition {
+  base: { modelId: string | null; running: boolean };
+  members: {
+    id: string; name: string; defaultName: string; role: string; desc: string;
+    status: "idle" | "working" | "watching";
+    adapterId: string | null; overrideModelId: string | null; dedicatedDocs: number;
+  }[];
+  shared: { globalDocs: number; totalDocs: number; ontologyTriples: number; tools: number };
+  adapters: { registered: number; adopted: number };
+  cloud: { enabled: boolean; activeProvider: string | null };
+}
+
 export const agentsApi = {
   list: () => request<AgentInfo[]>("/api/agents"),
+  composition: () => request<TeamComposition>("/api/team/composition"),
   setModel: (agentId: string, modelId: string | null) =>
     request<AgentInfo>(`/api/agents/${agentId}/model`, { method: "POST", body: { modelId } }),
   setName: (agentId: string, name: string | null) =>

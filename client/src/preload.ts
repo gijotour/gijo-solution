@@ -162,6 +162,8 @@ const gijoApi = {
   listAgents: () => api.agentsApi.list(),
   setAgentModel: (agentId: string, modelId: string | null) => api.agentsApi.setModel(agentId, modelId),
   setAgentName: (agentId: string, name: string | null) => api.agentsApi.setName(agentId, name),
+  // AI팀 구성 한눈에(2026-08-09) — 기반 두뇌·전문성·☁ 외부 상담역 집계(설정·팀 사무실 공용)
+  getTeamComposition: () => api.agentsApi.composition(),
   getAgentRecommendations: () => api.modelDexApi.agentRecommendations(),
   listModels: () => api.localEngineApi.models(),
   // screen: 지시가 들어온 화면 맥락 — 팝업 셸에서는 "지금 보고 있는 팝업"이 맥락이 된다(없으면 현재 문서).

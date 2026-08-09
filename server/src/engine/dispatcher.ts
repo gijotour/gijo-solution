@@ -639,6 +639,18 @@ async function dispatchInstructionScoped(instructionText: string, sessionId?: st
   }
   const core = await dispatchInstructionCore(instructionText, contextText, screen, actor, undefined, noLearn, viewer, 선택);
   const result: DispatchResult = { ...core, ...(await computeOfferSignals(core, instructionText, screen)) };
+  // 팀 사무실 「움직임」 신호(2026-08-09 AI팀 구성 재편) — 답이 사내 문서를 근거로 썼으면
+  // 협업 피드에 그 사실을 흘린다. 연출이 아니라 **실측(sources)이 있을 때만** — 없는 근거를
+  // 꾸며 보이면 사무실 창의 머리말 약속("전부 실데이터, 가짜 연출 없음")이 깨진다.
+  if (result.sources?.length) {
+    const 몇 = result.sources.length;
+    const 이름들 = result.sources.slice(0, 2).join(" · ");
+    collab(qa, {
+      from: result.route?.agentId ?? "orchestrator",
+      to: "orchestrator",
+      message: `📚 근거 — 사내 문서 ${몇}건 (${이름들}${몇 > 2 ? " 외" : ""})`,
+    });
+  }
   // 헤르메스 학습 루프 ① 수집 — **대화창 출구 한 곳**에서 남긴다(2026-08-07).
   // 예전에는 chat() 내부(remember:true)에서만 수집해, 코드가 만든 즉답·도구 답·에이전트 루프 답이
   // 전부 빠졌다 — 즉답 전환을 늘릴수록 수집이 말라 가는 구조였다(실측: 반나절 유입 1건).

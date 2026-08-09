@@ -492,11 +492,22 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       </div>
     </div>
 
-    <!-- 에이전트 모델 배정 — AI 팀 화면에서 이관(2026-07-28, 설정 통합 ③단계).
-         받은 모델을 누구에게 줄지는 '엔진·티어'와 같은 결정이라 여기 둔다. -->
-    <div data-sec="ai" class="panel" id="agentModelPanel" style="display:none" data-gijo-fold="에이전트 모델 배정">
-      <div class="panel-title">에이전트 모델 배정<span class="badge b-teal" style="margin-left:8px">admin 전용</span></div>
-      <div id="agentModelRows" style="font-size:12px;color:var(--muted)">불러오는 중...</div>
+    <!-- AI팀 구성(2026-08-09 재편, 전-7) — 「기반 두뇌는 고객이 고르고, 전문성은 GIJO가 고정한다」.
+         외부 조사: Security Copilot도 기반 모델 한 층 + 전문성(플러그인) 층 · 온프렘 표준은
+         베이스 1개 + 어댑터(S-LoRA 계열). 팀원별 모델 드롭다운 6개는 「고급」으로 접었다 —
+         단일 GPU에서 팀원마다 다른 대형 모델은 스왑·캐시·라우팅 결정성 실측 모두에 어긋난다. -->
+    <div data-sec="ai" class="panel" id="agentModelPanel" style="display:none" data-gijo-fold="AI팀 구성">
+      <div class="panel-title">AI팀 구성<span class="badge b-teal" style="margin-left:8px">admin 전용</span></div>
+      <!-- 기반 두뇌 — 자동 선택돼 보인다(첨부 화면 지적: 팀원마다 고르게 하지 않는다) -->
+      <div id="teamBase" style="display:flex;align-items:center;gap:10px;padding:9px 11px;border:1px solid var(--border-strong);border-radius:8px;background:var(--panel-2);margin-bottom:10px;font-size:12.5px">불러오는 중…</div>
+      <div id="teamCards" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:8px"></div>
+      <div id="teamShared" style="margin-top:10px;font-size:12px;color:var(--muted)"></div>
+      <!-- 고급 — 팀원별 예외 배정(기존 기능 보존). 32GB+ 티어·실험용 탈출구다. -->
+      <details style="margin-top:10px">
+        <summary style="cursor:pointer;font-size:12px;color:var(--muted)">고급 — 팀원별 예외 모델 배정 (기본은 전원 자동)</summary>
+        <div style="font-size:11.5px;color:var(--muted-2);margin:6px 0 4px">⚠ 단일 GPU에서는 팀원마다 다른 큰 모델을 두면 교체 대기(수십 초)가 생깁니다 — 전문성은 어댑터·지식으로 내는 것이 이 제품의 방식입니다.</div>
+        <div id="agentModelRows" style="font-size:12px;color:var(--muted)">불러오는 중...</div>
+      </details>
       <div class="status-line" id="agentModelStatusLine"></div>
     </div>
 
@@ -1778,29 +1789,108 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     }
   }
 
-  // ── 에이전트 모델 배정 (2026-07-28 이관) ────────────────────────────
+  // ── AI팀 구성 (2026-08-09 재편) — 기반 두뇌 1칸 + 팀원 카드 + ☁ 외부 상담역.
+  //    팀원별 드롭다운은 「고급」으로 접었다(기능 보존). 값은 전부 서버 집계 실측이다 —
+  //    어댑터가 채택 전이면 「준비 중」이 정직한 표기다(1·2회전 모두 불채택, 꾸미지 않는다).
   async function loadAgentModels() {
     const box = document.getElementById("agentModelRows");
     if (!box) return;
     try {
-      const [agents, models] = await Promise.all([
-        window.gijo.listAgents(),
+      const [team, models] = await Promise.all([
+        window.gijo.getTeamComposition(),
         window.gijo.listModels().catch(() => []),
       ]);
       const running = new Set((models || []).filter((m) => m.running).map((m) => m.id));
+
+      // 기반 두뇌 — 자동으로 선택돼 보인다. 교체는 「모델 검색·받기」+「로컬 LLM 엔진」이 담당.
+      const baseEl = document.getElementById("teamBase");
+      if (baseEl) {
+        baseEl.innerHTML = team.base.modelId
+          ? `<span style="font-size:16px">🧠</span><div><b>기반 두뇌</b> — ${esc(team.base.modelId)}` +
+            `<span class="badge ${team.base.running ? "b-teal" : "b-muted"}" style="margin-left:6px">${team.base.running ? "실행중" : "정지"}</span>` +
+            `<div style="color:var(--muted);font-size:11.5px;margin-top:2px">이 모델 하나를 전 팀원이 함께 씁니다 — 고객 모델로 바꿔도 아래 전문성은 그대로입니다(교체는 「모델 검색·받기」에서).</div></div>`
+          : `<span style="font-size:16px">🧠</span><div><b>기반 두뇌</b> — 아직 모델이 없습니다<div style="color:var(--muted);font-size:11.5px;margin-top:2px">「모델 검색·받기」에서 내려받으면 여기 자동으로 실립니다.</div></div>`;
+      }
+
+      // 팀원 카드 — 이름(✏만 수정 가능) · 고정 역할 · 전문성 실측 배지.
+      const cards = document.getElementById("teamCards");
+      const dot = (s) => s === "working" ? "🟢" : s === "watching" ? "🟡" : "⚪";
+      const badge = (txt, tone) => `<span class="badge ${tone}" style="margin:2px 4px 0 0;display:inline-block">${txt}</span>`;
+      if (cards) {
+        cards.innerHTML = team.members.map((m) => {
+          const 어댑터 = m.adapterId
+            ? badge(`🧠 전문 어댑터 ${esc(m.adapterId)}`, "b-teal")
+            : badge("🧠 어댑터 준비 중", "b-muted");
+          const 지식 = m.dedicatedDocs > 0
+            ? badge(`📚 전용 지식 ${m.dedicatedDocs}건`, "b-blue")
+            : badge(`📚 공용 지식 ${team.shared.globalDocs}건`, "b-muted");
+          const 예외 = m.overrideModelId ? badge(`⚠ 예외 모델 ${esc(m.overrideModelId)}`, "b-amber") : "";
+          return `<div style="border:1px solid var(--border);border-radius:8px;padding:9px 11px;background:var(--panel-2)">` +
+            `<div style="display:flex;align-items:center;gap:6px;font-size:13px"><span>${dot(m.status)}</span>` +
+            `<b class="tm-name" data-agent="${esc(m.id)}" style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(m.name)}</b>` +
+            `<span class="tm-rename" data-agent="${esc(m.id)}" title="이름 바꾸기 — 고객이 바꿀 수 있는 건 이름뿐입니다" style="cursor:pointer;color:var(--muted-2);font-size:11px">✏</span></div>` +
+            `<div style="font-size:11.5px;color:var(--muted);margin:3px 0 5px">${esc(m.role)}</div>` +
+            `<div>${어댑터}${지식}${예외}</div></div>`;
+        }).join("") +
+          // ☁ 외부 상담역 — GPU를 안 먹는 유일한 「다른 LLM」. 기본 꺼짐·명시적 요청에만.
+          `<div style="border:1px dashed var(--border-strong);border-radius:8px;padding:9px 11px;background:var(--panel-2)">` +
+          `<div style="display:flex;align-items:center;gap:6px;font-size:13px"><span>${team.cloud.enabled ? "🟢" : "⚪"}</span><b>☁ 외부 상담역</b></div>` +
+          `<div style="font-size:11.5px;color:var(--muted);margin:3px 0 5px">외부 API LLM — 요청할 때만 · 내부 자료는 나가지 않음(반출 게이트)</div>` +
+          `<div>${team.cloud.enabled ? badge(`켜짐 — ${esc(team.cloud.activeProvider || "")}`, "b-teal") : badge("꺼짐(기본) — 「클라우드 LLM」 구역에서 켭니다", "b-muted")}</div></div>`;
+      }
+
+      // 팀 공용 자산 — 전문성의 나머지 반(실측).
+      const shared = document.getElementById("teamShared");
+      if (shared) {
+        shared.textContent =
+          `팀 공용 자산 — 📚 사내 지식 ${team.shared.totalDocs}건 · 🕸 온톨로지 ${team.shared.ontologyTriples.toLocaleString()}관계 · 🔧 업무 도구 ${team.shared.tools}개` +
+          ` · 어댑터 등록부 ${team.adapters.adopted}/${team.adapters.registered} 채택`;
+      }
+
+      // 고급 — 팀원별 예외 배정(기존 기능 그대로, 위임 change 핸들러가 이 id를 본다).
       const opts = (sel) =>
-        ['<option value="">전역 모델 따름</option>']
+        ['<option value="">자동 — 기반 두뇌 따름</option>']
           .concat((models || []).map((m) =>
             `<option value="${esc(m.id)}"${sel === m.id ? " selected" : ""}>${esc(m.id)}${running.has(m.id) ? " (실행중)" : ""}</option>`))
           .join("");
-      box.innerHTML = (agents || []).map((a) =>
+      box.innerHTML = team.members.map((a) =>
         `<div class="am-row"><span class="am-name">${esc(a.name || a.id)}</span>` +
-        `<select class="am-select" data-agent="${esc(a.id)}">${opts(a.assignedModelId || "")}</select></div>`
+        `<select class="am-select" data-agent="${esc(a.id)}">${opts(a.overrideModelId || "")}</select></div>`
       ).join("") || '<div style="color:var(--muted)">등록된 에이전트가 없습니다</div>';
     } catch (e) {
-      box.innerHTML = '<div style="color:var(--muted)">배정 현황을 불러오지 못했습니다</div>';
+      box.innerHTML = '<div style="color:var(--muted)">팀 구성을 불러오지 못했습니다</div>';
     }
   }
+
+  // 이름 바꾸기(✏) — 카드에서 유일하게 고객이 바꾸는 값. 인라인 입력으로(팝업 대화상자 금지 —
+  // Electron에서 confirm/prompt는 조용히 안 뜨는 사고 이력이 있다).
+  document.getElementById("teamCards")?.addEventListener("click", async (e) => {
+    const pen = e.target.closest(".tm-rename");
+    if (!pen) return;
+    const id = pen.dataset.agent;
+    const nameEl = document.querySelector(`.tm-name[data-agent="${CSS.escape(id)}"]`);
+    if (!nameEl || nameEl.querySelector("input")) return;
+    const 원래 = nameEl.textContent;
+    nameEl.innerHTML = `<input style="width:110px;background:var(--panel);border:1px solid var(--border-strong);border-radius:4px;color:var(--text);font-size:12px;padding:2px 5px" value="${esc(원래)}">`;
+    const input = nameEl.querySelector("input");
+    input.focus(); input.select();
+    const 저장 = async () => {
+      const 새이름 = input.value.trim();
+      // 안 바꿨으면 아무것도 안 한다 — null을 보내면 커스텀 이름이 기본으로 **초기화**된다
+      // (열었다 그냥 닫았을 뿐인데 이름이 사라지는 함정).
+      if (!새이름 || 새이름 === 원래) { nameEl.textContent = 원래; return; }
+      try {
+        await window.gijo.setAgentName(id, 새이름);
+        await loadAgentModels();
+      } catch (err) {
+        nameEl.textContent = 원래;
+        const line = document.getElementById("agentModelStatusLine");
+        if (line) { line.className = "status-line status-err"; line.textContent = "이름 저장 실패: " + ((err && err.message) || err); }
+      }
+    };
+    input.addEventListener("keydown", (ev) => { if (ev.key === "Enter") input.blur(); if (ev.key === "Escape") { input.removeEventListener("blur", 저장); nameEl.textContent = 원래; } });
+    input.addEventListener("blur", 저장, { once: true });
+  });
 
   // ── 업데이트 (2026-07-28 update.html에서 이관) ──────────────────────
   function fmtBytes(n) { return n ? (n / 1024 / 1024).toFixed(1) + " MB" : "-"; }

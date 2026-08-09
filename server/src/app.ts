@@ -10,6 +10,7 @@ import { registerMfaRoutes } from "./auth/mfaroutes";
 import { registerUsersRoutes } from "./auth/users";
 import { isAirgapOn, EGRESS_POINTS } from "./engine/airgap";
 import { registerAgentsRoutes } from "./engine/agents";
+import { registerTeamViewRoutes } from "./engine/teamview";
 import { registerAdapterRoutes } from "./engine/adapters";
 import { registerAssetsRoutes } from "./engine/assets";
 import { registerAssetImportRoutes } from "./engine/assetimport";
@@ -142,6 +143,7 @@ export function createApp(): Express {
   registerMfaRoutes(app);
   registerUsersRoutes(app);
   registerAgentsRoutes(app);
+  registerTeamViewRoutes(app); // AI팀 구성 한눈에(2026-08-09) — 설정·팀 사무실이 같은 그림을 본다
   registerAdapterRoutes(app);
   registerAssetsRoutes(app);
   registerAssetImportRoutes(app);

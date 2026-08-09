@@ -135,6 +135,11 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
     <div class="st"><div class="l">근무 중</div><div class="v blue" id="socStaff">-</div></div>
   </div>
 
+  <!-- 팀 자산 줄(2026-08-09 AI팀 구성 재편) — 이 팀이 「무엇으로 일하는지」를 실측으로.
+       기반 두뇌(고객 BYOM 자리)는 갈아 끼워도, 여기 적힌 전문성(지식·온톨로지·도구)은 그대로다.
+       전부 /api/team/composition 실측 — 값이 안 오면 줄 자체를 숨긴다(지어내지 않는다). -->
+  <div id="teamAssets" style="display:none;padding:4px 14px 0;font-size:11.75px;color:var(--muted,#9aa4b2)"></div>
+
   <div class="body">
     <div class="office-col">
       <!-- A안: 팀 대화 피드 삭제 — 대화는 캐릭터 말풍선 + 대시보드 실시간 세션에서 확인. 방을 아래까지 꽉. -->
@@ -709,6 +714,25 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
     renderStat();
   }
 
+  // 팀 자산 줄(2026-08-09 AI팀 구성 재편) — 이 팀이 「무엇으로 일하는지」 실측.
+  // 기반 두뇌(고객 BYOM 자리)는 갈아 끼워도 전문성(지식·온톨로지·도구)은 그대로라는 것이
+  // 이 줄이 하는 이야기다. 값이 안 오면 줄을 숨긴다 — 지어내지 않는다(이 창의 약속).
+  async function loadTeamAssets() {
+    const el = document.getElementById("teamAssets");
+    if (!el || !window.gijo.getTeamComposition) return;
+    try {
+      const t = await window.gijo.getTeamComposition();
+      el.innerHTML =
+        `🧠 기반 두뇌 <b>${t.base.modelId || "-"}</b>` +
+        ` · 📚 사내 지식 <b>${t.shared.totalDocs}</b>건` +
+        ` · 🕸 온톨로지 <b>${t.shared.ontologyTriples.toLocaleString()}</b>관계` +
+        ` · 🔧 도구 <b>${t.shared.tools}</b>개` +
+        ` · 🧩 전문 어댑터 <b>${t.adapters.adopted}</b>/${t.adapters.registered} 채택` +
+        ` · ☁ 외부 상담역 <b>${t.cloud.enabled ? "켜짐(" + (t.cloud.activeProvider || "") + ")" : "꺼짐"}</b>`;
+      el.style.display = "";
+    } catch (e) { el.style.display = "none"; }
+  }
+
   // 외부 콘솔 접속자(서버에 로그인한 클라이언트) — presence는 최근 활동(lastSeenAt) 기준.
   // refresh token은 7일 살아 있으므로 "로그인만 해두고 떠난" 세션은 접속으로 치지 않는다.
   const ONLINE_WINDOW_MS = 3 * 60 * 1000;
@@ -974,8 +998,9 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
       return;
     }
     try {
-      await Promise.all([loadAgents(), loadTasks(), loadSessions(), loadSocBar()]);
+      await Promise.all([loadAgents(), loadTasks(), loadSessions(), loadSocBar(), loadTeamAssets()]);
       setInterval(loadSocBar, 60000); // 관제 상태 띠 갱신(1분)
+      setInterval(loadTeamAssets, 120000); // 팀 자산 줄 — 문서·어댑터 변화는 느려 2분이면 충분
       const history = await window.gijo.listCollaborationHistory();
       (history || []).slice(-40).forEach((e) => appendOlive(e.from, e.to, e.message)); // LIVE 채팅 초기 채움(v5)
       if (window.gijoRealtime) window.gijoRealtime.connect();
