@@ -39,8 +39,17 @@ RAG 오염(타사·엉뚱 문서가 우리 질문에 낌, 152문항 중 73건=53
 - **표식 정의 = 수집 경로**(Mac 확정): 프로그램 수집(`docsbundle.ts:189` ingestText)으로 들어온 것이 「내장」.
   `docs-manifest.json` 19건이 전부 `GIJO_AS_*`, 타사 0건 — 경로가 곧 귀속이다.
   ⚠ `docClass`로 정의하지 **않는다** — origin은 기계가 아는 사실, docClass는 사람이 정하는 값. 섞으면 못 가린다.
-- **넣는 쪽은 한 줄**: `docsbundle.ts:189`의 ingestText 호출에 `origin:'builtin'` 표식.
-  단 **앞으로 들어오는 것부터** 구분되고, 기존 문서는 **소급이 따로 필요**하다.
+- ⚠ **「189 한 줄」은 기존 설치에 0건이다**(Mac 실측, 코드 확인): `docsbundle.ts:171`의
+  `known===hash` skip이 189행을 막아, 매니페스트 19건은 다음 기동에 **전부 skip**된다
+  (파일이 바뀌어야만 189행이 돈다). **소급이 「따로」가 아니라 유일한 경로**다.
+- **소급 = sourcePath 기반 migrate + UPDATE**(Mac): sourcePath에 귀속이 들어 있다(번들 경로=우리 것).
+  `memory.ts:33` migrate 패턴(uploadedBy·category와 같은 자리)에 `origin` 칸 추가 + UPDATE 한 번.
+  재인입·재임베딩 불필요. ⚠ sourcePath는 **인입한 기계의 절대경로**라, 한 번 유도해 칸에 넣고
+  이후 검색은 **칸만 읽는다**(검색 때마다 경로 정규식 판정 금지 — Mac 경고).
+- ⚠ **운영(91건)은 Mac 복원본(40건)보다 복잡**하다(Windows 실측): 경로 있음 63 · **경로 없음 28** ·
+  이름 패턴 밖 55. UPDATE 한 번으로 sourcePath 있는 63건은 덮이나, **경로 없는 28건은
+  docs-manifest 대조** 등 별도 판정이 필요하다. → 착수 시 **서버 내부에서 sourcePath 문자열
+  정확 분류부터**(목록 API엔 hasSource boolean만 나온다). 재고 나서 범위를 정한다.
 - **검색에서 쓰는 법**: hybridSearch 뒤 **재정렬 신호**로. **거르지 말고 올리기만**(접점 없는 새 문서가
   통째로 안 보이면 안 된다 — Mac). ⚠ C-1(접점)이 아니라 **origin(내장 여부)** 신호다 — 접점은 타사에 쏠려 역효과였다.
 
