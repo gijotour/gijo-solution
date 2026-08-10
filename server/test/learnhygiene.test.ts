@@ -21,8 +21,10 @@ describe("★ 학습 기록에는 사람이 한 질문만 남는다", () => {
   });
 
   it("dispatcher가 맥락을 붙인 곳마다 logQuestion을 함께 넘긴다", () => {
-    // 맥락을 붙이는 자리(= [현재 지시] 를 만드는 곳)의 수만큼 logQuestion이 있어야 한다.
-    const 맥락붙임 = (dispSrc.match(/\[현재 지시\]/g) || []).length;
+    // 맥락을 붙이는 자리(= chat에 buildRagQuery로 만든 message를 주는 곳)의 수만큼 logQuestion이
+    // 있어야 한다. 맥락 조립은 buildRagQuery 한 함수로 모았다(2026-08-10 ③ — 배지도 같은 질문을
+    // 쓰게). [현재 지시]는 그 함수 안 한 곳뿐이라, chat용 message 조립(const message = buildRagQuery)을 센다.
+    const 맥락붙임 = (dispSrc.match(/const message = buildRagQuery\(/g) || []).length;
     const 원문전달 = (dispSrc.match(/logQuestion: instructionText/g) || []).length;
     expect(맥락붙임, "맥락을 붙이는 자리를 못 찾았다 — 시험이 헛돌고 있다").toBeGreaterThan(0);
     expect(원문전달, `맥락을 붙인 ${맥락붙임}곳 중 ${원문전달}곳만 원문을 넘긴다`).toBe(맥락붙임);

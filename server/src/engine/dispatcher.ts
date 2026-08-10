@@ -308,9 +308,7 @@ async function executeRoutedAction(route: RoutedIntent, instructionText: string,
       // 무엇을 담을 보고서인지 모르는 채 만들면 쓸모없는 문서가 나온다 — 먼저 되묻는다.
       // 대상·종류가 이미 지시에 있으면 되묻지 않고 그대로 진행한다.
       if (needsReportDetail(instructionText)) return { output: reportClarification() };
-      const message = contextText ? `${contextText}
-
-[현재 지시] ${instructionText}` : instructionText;
+      const message = buildRagQuery(instructionText, contextText);
       // noLearn:true — 수집은 dispatchInstructionScoped 출구 한 곳에서 한다(이중 기록 방지).
       return { output: await chat({ agentId: route.agentId, message, remember: true, trusted: true, explain: true, screen, qa, noLearn: true, viewer, logQuestion: instructionText }) };
     }
@@ -319,7 +317,7 @@ async function executeRoutedAction(route: RoutedIntent, instructionText: string,
     default: {
       // 모델 로드·선택은 chat() 내부(ensureAgentModel)에서 처리된다.
       // 세션 맥락이 있으면 앞에 붙여 "이어서/그거" 같은 대화형 후속을 이해하게 한다.
-      const message = contextText ? `${contextText}\n\n[현재 지시] ${instructionText}` : instructionText;
+      const message = buildRagQuery(instructionText, contextText);
       // trusted: 지시문은 dispatchInstructionCore에서 이미 관문을 지났다(이중 집계 방지).
       // explain: 지휘 콘솔에 그대로 표시되는 답변이다.
       reportProgress("write", "사내 근거를 찾아 답을 쓰고 있습니다"); // chat 내부에서 RAG 검색+작성이 함께 돈다
@@ -635,7 +633,7 @@ async function dispatchInstructionScoped(instructionText: string, sessionId?: st
     //   qa에서도 그대로 내야 한다. 여기서 건너뛰었더니 회귀 하네스가 internalMiss=undefined로
     //   깨졌다(2026-07-30 실측). 게이트 문항은 이 신호를 안 써서 게이트 결과는 무사했지만,
     //   "시험 경로가 실사용과 같은 답을 본다"는 전제가 조용히 깨져 있었다.
-    return { ...core, ...(await computeOfferSignals(core, instructionText, screen, viewer)) };
+    return { ...core, ...(await computeOfferSignals(core, instructionText, screen, viewer, 선택맥락)) };
   }
   // 세션을 새로 만들 땐 지시한 사람을 실행자로 남긴다 — 여러 담당자가 쓰는데 목록만 보고는
   // 누가 한 일인지 알 수 없었다(2026-07-26 사용자 지적).
@@ -657,7 +655,7 @@ async function dispatchInstructionScoped(instructionText: string, sessionId?: st
     collab(qa, { from: "세션", to: "orchestrator", message: `💬 [${title}] ${기록문}` });
   }
   const core = await dispatchInstructionCore(instructionText, contextText, screen, actor, undefined, noLearn, viewer, 선택);
-  const result: DispatchResult = { ...core, ...(await computeOfferSignals(core, instructionText, screen, viewer)) };
+  const result: DispatchResult = { ...core, ...(await computeOfferSignals(core, instructionText, screen, viewer, contextText)) };
   // 팀 사무실 「움직임」 신호(2026-08-09 AI팀 구성 재편) — 답이 사내 문서를 근거로 썼으면
   // 협업 피드에 그 사실을 흘린다. 연출이 아니라 **실측(sources)이 있을 때만** — 없는 근거를
   // 꾸며 보이면 사무실 창의 머리말 약속("전부 실데이터, 가짜 연출 없음")이 깨진다.
@@ -731,6 +729,14 @@ export function 근거재검색대상인가(
   return true;
 }
 
+/** 답이 RAG 검색·작성에 쓰는 질문 = 맥락(선택·대화) + 현재 지시. **배지도 이 질문으로** 근거를
+ *  내야 답과 일치한다(2026-08-10 ③ 잔여 20%: 배지가 instructionText만 써서 이어보기 턴에서
+ *  다른 문서를 가리켰다 — Mac 실측 완전다름 103/150·평균겹침 8%). 답 경로(chat)와 배지가 이 한
+ *  함수를 공유해 어긋남을 없앤다 — 조립 규칙을 두 벌로 두면 한쪽만 고쳐진다. */
+function buildRagQuery(instructionText: string, contextText: string): string {
+  return contextText ? `${contextText}\n\n[현재 지시] ${instructionText}` : instructionText;
+}
+
 // 화면 액션 알약(리포트·클라우드) 조건부 노출용 신호를 계산한다.
 // - dataHits: 자산·취약점 등 특정 내부 데이터를 실제로 건드렸는가(리포트로 정리할 거리가 있는가).
 // - internalMiss: 데이터 답이 아닌 일반 질의인데 사내 RAG 근거가 0인가(외부 자료가 필요한가).
@@ -739,6 +745,7 @@ async function computeOfferSignals(
   instructionText: string,
   screen?: string,
   viewer?: Viewer,
+  contextText = "",
 ): Promise<{ dataHits: number; internalMiss: boolean; sources?: string[]; quotes?: SourceQuote[] }> {
   let dataHits = 0;
   for (const s of result.steps ?? []) {
@@ -768,7 +775,9 @@ async function computeOfferSignals(
       //   근거를 낸다 — 옛 배지는 agentId 없이 queryMemoryScored로 재검색해 답과 **다른 문서**를
       //   근거로 실었다(dispatcher.ts:315 chat이 route.agentId·viewer로 답한다). graded.scored는
       //   이미 관련도 필터(RAG_RELEVANCE_MAX_DISTANCE)를 거쳤다 — 여기서 다시 거르지 않는다.
-      const graded = await queryMemoryGraded(instructionText, 4, result.route?.agentId, screen, viewer).catch(() => null);
+      // ③ 잔여 20%(2026-08-10 Mac 실측): 답은 buildRagQuery(맥락+지시)로 검색하는데 배지가
+      //   instructionText만 쓰면 이어보기 턴에서 다른 문서를 가리켰다. **같은 질문**으로 맞춘다.
+      const graded = await queryMemoryGraded(buildRagQuery(instructionText, contextText), 4, result.route?.agentId, screen, viewer).catch(() => null);
       if (graded) {
         const relevant = graded.scored;
         internalMiss = relevant.length === 0; // 검색 실패(null)면 미판정(false 유지)
