@@ -52,7 +52,9 @@ describe("근거재검색대상인가 — 답이 사내 문서(RAG)로 자유 �
   });
 
   it("⚠ 새 조회 도구 대표 — 상태·조회성 도구는 반드시 재검색에서 빠진다(정규식 누락 방지)", () => {
-    for (const tool of ["kpi_status", "posture_impact", "asset_coverage", "audit_search", "recent_documents", "ontology_query", "maintenance_status", "redteam_status"]) {
+    // action_check_history·report_activity: 예전엔 `cti`가 a"cti"on/a"cti"vity에 우연히 부분일치해
+    //   커버됐다. `cti`→`action_check` 수리 뒤에도 이 둘이 계속 빠지는지 못박는다(2026-08-10 Mac 발견).
+    for (const tool of ["kpi_status", "posture_impact", "asset_coverage", "audit_search", "recent_documents", "ontology_query", "maintenance_status", "redteam_status", "action_check_history", "report_activity"]) {
       expect(근거재검색대상인가(R({ toolCalls: [{ tool }] as any }), "질의"), `${tool}은 재검색에서 빠져야 한다`).toBe(false);
     }
   });

@@ -712,8 +712,12 @@ export function 근거재검색대상인가(
   if (result.approval || result.confirm) return false; // 결재·확인 대기
   if (isSmallTalkInstruction(instructionText)) return false; // 인사·잡담은 물어볼 자료가 아니다
   // ⚠ 새 조회 도구를 만들면 이 정규식에 넣어야 근거 둔갑이 안 생긴다 — sourcebadge.test가 못박는다.
+  // ⚠ 도구 **이름 조각**으로 매칭하므로 짧은 조각은 딴 이름에 부분일치한다. `cti`는 실제 도구가
+  //   없는데 action_check_history·report_activity의 a"cti"on/a"cti"vity에 우연히 걸려 있었다
+  //   (2026-08-10 Mac 발견). transaction·reaction 같은 이름이 생기면 조용히 걸린다 →
+  //   `cti`를 실제 도구 `action_check`로 바꿔 부분일치 함정을 없앤다(CTI 조회 도구가 생기면 그때 추가).
   const 집계조회도구_RE =
-    /asset|finding|cti|vuln|sbom|analys|scan|hardening|today|urgent|kpi|brief|posture|coverage|_status|report_|audit|packages|aibom|ontology|knowledge|recent|doc_|time_saved|compliance|maintenance|adapter|model_|threat|exposed|search|law_lookup|explain|article/i;
+    /asset|finding|action_check|vuln|sbom|analys|scan|hardening|today|urgent|kpi|brief|posture|coverage|_status|report_|audit|packages|aibom|ontology|knowledge|recent|doc_|time_saved|compliance|maintenance|adapter|model_|threat|exposed|search|law_lookup|explain|article/i;
   const 데이터집계로답함 =
     (result.steps ?? []).some((s) => (s.assetIds?.length ?? 0) + (s.findingCount ?? 0) > 0) ||
     (result.toolCalls ?? []).some((c) => 집계조회도구_RE.test(c.tool));
