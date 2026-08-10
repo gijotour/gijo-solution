@@ -16,7 +16,7 @@ import * as path from "path";
 import { createHash } from "crypto";
 
 import { db } from "../db";
-import { GLOBAL_SCOPE, ingestText, listDocuments, deleteDocument } from "./memory";
+import { GLOBAL_SCOPE, ingestText, listDocuments, deleteDocument, markDocumentsBuiltin } from "./memory";
 
 // 프로젝트 관례(localengine의 MODELS_DIR, memory의 DB_PATH)대로 cwd 기준 상대경로 + 환경변수
 // 오버라이드. 다만 저 둘과 달리 모듈 로드 시점에 상수로 굳히지 않고 호출할 때마다 읽는다 —
@@ -186,7 +186,7 @@ export async function bootstrapDocsBundle(): Promise<DocsBundleResult> {
       // classify=false로 넣는다. ① 분류는 LLM을 호출하는데 부팅 직후엔 아직 안 떠 있을 수 있고,
       // ② '매뉴얼'로 분류되면 보안제품 등록부에 자동 연결되는데(memory.linkManualToProduct)
       // GIJO 자체 매뉴얼이 남의 벤더 제품 매뉴얼로 붙는 건 등록부 오염이다.
-      await ingestText(docId, raw, scope, docPath, false);
+      await ingestText(docId, raw, scope, docPath, false, undefined, undefined, "builtin"); // origin=내장(①ⓑ)
       // 해시는 **인입에 성공한 뒤에만** 남긴다 — 실패했는데 기록해 두면 다음 기동에서
       // "그대로다"라고 판단해 영영 안 들어간다(조용한 지식 공백).
       setHashStmt.run(HASH_KEY(docId), hash);
@@ -195,6 +195,10 @@ export async function bootstrapDocsBundle(): Promise<DocsBundleResult> {
       result.failed.push({ file: entry.file, reason: err instanceof Error ? err.message : String(err) });
     }
   }
+  // ①ⓑ 소급(2026-08-10) — 매니페스트 문서(이미 인입돼 위에서 skip된 것 포함)의 origin을 'builtin'으로
+  // 굳힌다. 189행은 skip되면 안 돌아 「앞으로 것부터」가 번들엔 영영 안 오므로, 이 소급이 유일한 경로다.
+  const 표시 = markDocumentsBuiltin(manifest.files.map((e) => path.basename(String(e.file))));
+  if (표시 > 0) console.log(`[docsbundle] 내장(builtin) 표시 소급 ${표시}건 — 검색에서 우리 지식 우선(①ⓑ)`);
   return result;
 }
 

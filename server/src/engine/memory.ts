@@ -23,6 +23,7 @@ import {
   fuseResults,
   isRelevant,
   applyCategoryBoost,
+  applyOriginBoost,
   categoryForScreen,
   categoryForRole,
   CATEGORIES,
@@ -33,15 +34,44 @@ import {
 // 문서 단위 메타데이터(업로드 시각·원본 경로)는 SQLite에 둔다 — LanceDB 스키마는 건드리지 않는다.
 migrate("memory_documents-uploadedBy", "ALTER TABLE memory_documents ADD COLUMN uploadedBy TEXT"); // 작업 귀속(누가 올렸나) 표시용(2026-07-25)
 migrate("memory_documents-category", "ALTER TABLE memory_documents ADD COLUMN category TEXT"); // 업무영역 5종 — 화면 맥락 검색용(2026-07-25 RAG 전면 검토)
+// origin: 'builtin'(제품 내장 = docs-manifest 코퍼스) vs null(고객 업로드·데이터). 검색에서 우리
+// 질문에 우리 지식을 먼저 세우는 신호(2026-08-10 ①ⓑ). ⚠ 검색 때마다 경로를 재판정하지 않고 이 칸만 읽는다
+// — sourcePath는 인입한 기계의 절대경로라 기계마다 다르다(Mac 경고). origin은 한 번 유도해 칸에 굳힌다.
+migrate("memory_documents-origin", "ALTER TABLE memory_documents ADD COLUMN origin TEXT");
 const upsertDocMetaStmt = db.prepare(
-  `INSERT INTO memory_documents (documentId, scope, chunks, embeddingModel, sourcePath, ingestedAt, uploadedBy, category)
-   VALUES (@documentId, @scope, @chunks, @embeddingModel, @sourcePath, @ingestedAt, @uploadedBy, @category)
+  `INSERT INTO memory_documents (documentId, scope, chunks, embeddingModel, sourcePath, ingestedAt, uploadedBy, category, origin)
+   VALUES (@documentId, @scope, @chunks, @embeddingModel, @sourcePath, @ingestedAt, @uploadedBy, @category, @origin)
    ON CONFLICT(documentId) DO UPDATE SET
      scope=excluded.scope, chunks=excluded.chunks, embeddingModel=excluded.embeddingModel,
      sourcePath=COALESCE(excluded.sourcePath, memory_documents.sourcePath), ingestedAt=excluded.ingestedAt,
      uploadedBy=COALESCE(excluded.uploadedBy, memory_documents.uploadedBy),
-     category=COALESCE(excluded.category, memory_documents.category)`
+     category=COALESCE(excluded.category, memory_documents.category),
+     origin=COALESCE(excluded.origin, memory_documents.origin)`
 );
+/** origin='builtin'인 문서 id 집합 — 검색 재정렬용. 한 번 조회해 부스트에 쓴다. */
+const builtinDocIdsStmt = db.prepare("SELECT documentId FROM memory_documents WHERE origin = 'builtin'");
+export function builtinDocumentIds(): Set<string> {
+  try {
+    return new Set((builtinDocIdsStmt.all() as { documentId: string }[]).map((r) => r.documentId));
+  } catch {
+    return new Set();
+  }
+}
+/** 소급 표시 — 이미 인입된 문서(다음 기동에 해시가 같아 skip되는 것)의 origin을 'builtin'으로 굳힌다.
+ *  docsbundle이 매 기동에 매니페스트 전체로 부른다(idempotent). ⚠ 189행은 skip되면 안 돌아
+ *  「앞으로 것부터」가 번들엔 영영 안 온다(2026-08-10 실측) — 소급이 유일한 경로다. */
+const markBuiltinStmt = db.prepare("UPDATE memory_documents SET origin='builtin' WHERE documentId = ? AND (origin IS NULL OR origin <> 'builtin')");
+export function markDocumentsBuiltin(documentIds: string[]): number {
+  let n = 0;
+  try {
+    db.transaction((ids: string[]) => {
+      for (const id of ids) n += markBuiltinStmt.run(id).changes;
+    })(documentIds);
+  } catch (err) {
+    console.warn(`[memory] 내장 표시 실패: ${err instanceof Error ? err.message : String(err)}`);
+  }
+  return n;
+}
 const getDocMetaStmt = db.prepare("SELECT * FROM memory_documents WHERE documentId = ?");
 const deleteDocMetaStmt = db.prepare("DELETE FROM memory_documents WHERE documentId = ?");
 const setDocClassStmt = db.prepare("UPDATE memory_documents SET docClass = ? WHERE documentId = ?");
@@ -457,7 +487,7 @@ export async function ingestDocument(filePath: string, scope: string = GLOBAL_SC
 
 // 이미 추출된 텍스트를 지식 베이스에 직접 넣는다 — 파일 업로드(PDF/HWPX 추출 후)나
 // 서버 밖 클라이언트에서 올린 문서용. ingestDocument는 파일을 읽어 이 함수로 위임한다.
-export async function ingestText(documentId: string, raw: string, scope: string = GLOBAL_SCOPE, sourcePath?: string, classify = false, uploadedBy?: string, category?: string): Promise<IngestResult> {
+export async function ingestText(documentId: string, raw: string, scope: string = GLOBAL_SCOPE, sourcePath?: string, classify = false, uploadedBy?: string, category?: string, origin?: string): Promise<IngestResult> {
   const chunks = chunkText(raw);
   // ⚠ 읽을 수 없는 문서를 **조용히 받아들이지 않는다**(2026-08-08 실사고).
   //   저장소 조각의 73%가 PDF 압축 바이트였는데, 숫자로는 "지식 5,631조각"이라 건강해
@@ -607,6 +637,7 @@ export async function ingestText(documentId: string, raw: string, scope: string 
       ingestedAt: new Date().toISOString(),
       uploadedBy: uploadedBy ?? null, // 작업 귀속 — 누가 올렸는지(화면 표시용)
       category: resolvedCategory,
+      origin: origin ?? null, // 'builtin'(제품 내장) vs null(고객 업로드) — ①ⓑ 검색 재정렬용
     });
   } catch (err) {
     console.warn(`[memory] 문서 메타데이터 기록 실패: ${err instanceof Error ? err.message : String(err)}`);
@@ -837,7 +868,9 @@ async function hybridSearch(question: string, topK: number, agentId?: string, sc
   //  ② 화면(어디서 물었나): 역할이 안 정해진 호출에만 기존 세기(0.008)로 건다.
   // ⚠ 어느 쪽도 **벽이 아니다** — 다른 영역 자료는 밀릴 뿐 사라지지 않는다. 창고를 쪼개지
   //   않은 이유와 같다(지식의 절반이 「일반」이라, 벽을 세우면 그 절반이 고아가 된다).
-  const fused = fuseResults({ vector, lexical }, terms.codes);
+  // ③ 출처(내장인가): 우리 질문에 우리 지식(제품 내장)을 먼저 세운다(2026-08-10 ①ⓑ, RAG 오염 수리).
+  //    역할·화면보다 먼저 걸어, 그 위에 역할/화면 부스트가 더해진다. 벽이 아니라 올리기만 한다.
+  const fused = applyOriginBoost(fuseResults({ vector, lexical }, terms.codes), builtinDocumentIds());
   const 역할영역 = categoryForRole(agentId);
   if (역할영역) return applyCategoryBoost(fused, 역할영역, true).slice(0, topK);
   return applyCategoryBoost(fused, categoryForScreen(screen)).slice(0, topK);

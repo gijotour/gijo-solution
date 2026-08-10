@@ -176,6 +176,20 @@ export function applyCategoryBoost(chunks: FusedChunk[], preferred?: Category, �
     .sort((a, b) => b.rrf - a.rrf);
 }
 
+// 우리 질문에 우리 지식(제품 내장 = docs-manifest 코퍼스)을 먼저 세운다(2026-08-10 ①ⓑ).
+// ⚠ RAG 오염 실측: 타사 벤더 매뉴얼(Tenable·안전대부)이 우리 질문 근거의 절반 넘게 낀다.
+//   「조치 이력」에서 GIJO 매뉴얼(0.8470)이 Tenable(0.8455)보다 멀어, 문턱으로도 접점으로도 못 갈렸다.
+//   접점(C-1)은 GIJO 매뉴얼이 접점 0이라 역효과였다 — origin은 「내장 목록에 있나」만 보므로 확실히 올린다.
+// ⚠ **벽이 아니다** — builtin을 올릴 뿐 external(고객 로그·리포트)을 내리지 않는다. 접점 없는 새
+//   문서가 통째로 사라지면 안 된다(Mac 원칙: 거르지 말고 올리기만).
+export const ORIGIN_BOOST = 0.012; // ROLE_BOOST(0.02)보단 약하게(역할이 우선), CATEGORY_BOOST(0.008)보단 강하게.
+export function applyOriginBoost(chunks: FusedChunk[], builtinIds: Set<string>): FusedChunk[] {
+  if (builtinIds.size === 0) return chunks;
+  return chunks
+    .map((c) => (builtinIds.has(c.documentId) ? { ...c, rrf: c.rrf + ORIGIN_BOOST } : c))
+    .sort((a, b) => b.rrf - a.rrf);
+}
+
 // 에이전트(역할) → 그 전문가가 먼저 보는 업무영역. 화면 매핑과 별개다 —
 // 화면은 "지금 보고 있는 곳", 역할은 "누가 답하는가"다.
 export const ROLE_CATEGORY: Record<string, Category> = {
