@@ -635,7 +635,7 @@ async function dispatchInstructionScoped(instructionText: string, sessionId?: st
     //   qa에서도 그대로 내야 한다. 여기서 건너뛰었더니 회귀 하네스가 internalMiss=undefined로
     //   깨졌다(2026-07-30 실측). 게이트 문항은 이 신호를 안 써서 게이트 결과는 무사했지만,
     //   "시험 경로가 실사용과 같은 답을 본다"는 전제가 조용히 깨져 있었다.
-    return { ...core, ...(await computeOfferSignals(core, instructionText, screen)) };
+    return { ...core, ...(await computeOfferSignals(core, instructionText, screen, viewer)) };
   }
   // 세션을 새로 만들 땐 지시한 사람을 실행자로 남긴다 — 여러 담당자가 쓰는데 목록만 보고는
   // 누가 한 일인지 알 수 없었다(2026-07-26 사용자 지적).
@@ -657,7 +657,7 @@ async function dispatchInstructionScoped(instructionText: string, sessionId?: st
     collab(qa, { from: "세션", to: "orchestrator", message: `💬 [${title}] ${기록문}` });
   }
   const core = await dispatchInstructionCore(instructionText, contextText, screen, actor, undefined, noLearn, viewer, 선택);
-  const result: DispatchResult = { ...core, ...(await computeOfferSignals(core, instructionText, screen)) };
+  const result: DispatchResult = { ...core, ...(await computeOfferSignals(core, instructionText, screen, viewer)) };
   // 팀 사무실 「움직임」 신호(2026-08-09 AI팀 구성 재편) — 답이 사내 문서를 근거로 썼으면
   // 협업 피드에 그 사실을 흘린다. 연출이 아니라 **실측(sources)이 있을 때만** — 없는 근거를
   // 꾸며 보이면 사무실 창의 머리말 약속("전부 실데이터, 가짜 연출 없음")이 깨진다.
@@ -738,6 +738,7 @@ async function computeOfferSignals(
   result: DispatchResult,
   instructionText: string,
   screen?: string,
+  viewer?: Viewer,
 ): Promise<{ dataHits: number; internalMiss: boolean; sources?: string[]; quotes?: SourceQuote[] }> {
   let dataHits = 0;
   for (const s of result.steps ?? []) {
@@ -762,10 +763,14 @@ async function computeOfferSignals(
   //   analyze RAG 답의 근거 누락 / 데이터 집계·되묻기의 근거 둔갑을 함께 막는다(2026-08-10 사고).
   if (근거재검색대상인가(result, instructionText)) {
     try {
-      const { queryMemoryScored, RAG_RELEVANCE_MAX_DISTANCE } = await import("./memory.js");
-      const scored = await queryMemoryScored(instructionText, 4, undefined, screen).catch(() => null);
-      if (Array.isArray(scored)) {
-        const relevant = scored.filter((c) => c.distance <= RAG_RELEVANCE_MAX_DISTANCE);
+      const { queryMemoryGraded } = await import("./memory.js");
+      // ③ 배지 정확도(2026-08-10): 답 경로(chat→ragContextFor)와 **같은 함수·agentId·viewer**로
+      //   근거를 낸다 — 옛 배지는 agentId 없이 queryMemoryScored로 재검색해 답과 **다른 문서**를
+      //   근거로 실었다(dispatcher.ts:315 chat이 route.agentId·viewer로 답한다). graded.scored는
+      //   이미 관련도 필터(RAG_RELEVANCE_MAX_DISTANCE)를 거쳤다 — 여기서 다시 거르지 않는다.
+      const graded = await queryMemoryGraded(instructionText, 4, result.route?.agentId, screen, viewer).catch(() => null);
+      if (graded) {
+        const relevant = graded.scored;
         internalMiss = relevant.length === 0; // 검색 실패(null)면 미판정(false 유지)
         if (relevant.length > 0) {
           sources = [...new Set(relevant.map((c) => c.documentId).filter(Boolean))];
