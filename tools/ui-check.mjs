@@ -88,10 +88,31 @@ try {
       return 'ok';
     })()`);
     await 잠깐(6000);
+
+    // ⚠ 중복 로그인(409)을 「비밀번호가 틀렸다」로 오진하지 않는다.
+    //   담당자가 이미 앱을 켜 두었거나, 검사 전에 API로 로그인해 둔 세션이 있으면
+    //   서버가 「이미 다른 곳에서 로그인 중입니다」로 막고 화면에 «강제 로그인» 단추를 띄운다.
+    //   그걸 안 눌러 주면 검사가 실패하는데, **원인을 계정 탓으로 적으면 사람이 엉뚱한 데를 판다**
+    //   (2026-08-10 실측 — 실제로 그렇게 한 번 헤맸다).
+    const 중복 = await 평가(대상, `(()=>{
+      const b=document.getElementById('dupForce');
+      if(b && getComputedStyle(b).display!=='none'){ b.click(); return true; }
+      return false;
+    })()`).catch(() => false);
+    if (중복) await 잠깐(6000);
+
     대상 = (await 붙기("app.html")) ?? (await 붙기(null));
   }
-  기록("로그인", 대상.url.includes("app.html"), 대상.url.split("/").pop());
-  if (!대상.url.includes("app.html")) throw new Error("로그인 실패 — 계정을 확인하세요(비밀번호가 바뀌었을 수 있습니다)");
+  기록("로그인", 대상.url.includes("app.html"), 대상.url.split("/").pop() + (대상.url.includes("app.html") ? "" : " — 아래 사유 참고"));
+  if (!대상.url.includes("app.html")) {
+    // 화면이 남긴 말을 그대로 옮긴다 — 지어내지 않는다.
+    const 사유 = await 평가(대상, `(()=>{
+      const t=(document.body.innerText||'').replace(/\\s+/g,' ');
+      const m=t.match(/[^.|]*(이미 다른 곳|잘못|실패|오류|만료)[^.|]*/);
+      return m? m[0].trim().slice(0,120) : '';
+    })()`).catch(() => "");
+    throw new Error(사유 ? `로그인 실패 — 화면 메시지: ${사유}` : "로그인 실패 — 화면에 사유가 없습니다(서버 연결·계정 확인)");
+  }
 
   // ── ① 상단바가 창 버튼을 덮지 않는가 ──────────────────────────────────────
   // mac은 신호등이 **왼쪽**이라 왼쪽 여백을 안 비우면 첫 단추가 그 위에 올라간다(사용자 신고).
