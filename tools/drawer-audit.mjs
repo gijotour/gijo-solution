@@ -87,6 +87,14 @@ try {
 
 const items = readDrawer();
 console.log(`서랍 ${items.length}문항 · 서버 ${BASE} · 제품 예시=${product ?? "(없음 → 해당 줄 제외)"}\n`);
+// ⚠ **잰 것이 없으면 통과가 아니다.** readDrawer()는 console.js를 정규식으로 훑는데, 화면 구조가
+//   바뀌면 조용히 0문항이 된다 → 실패 0건 → 종료코드 0(통과). 화면엔 「서랍 0문항」이라고
+//   찍히지만 **CI·스크립트는 종료코드를 본다.** (2026-08-10: 같은 모양을 하루에 네 번 봤다.)
+if (items.length === 0) {
+  console.error("★ 서랍 문항을 하나도 못 읽었습니다 — 아무것도 재지 못했으므로 통과가 아닙니다.");
+  console.error("   client/src/renderer/pages/console.js 의 서랍 정의가 바뀌었는지 확인하세요(readDrawer의 정규식).");
+  process.exit(2);
+}
 
 const rows = [];
 for (const it of items) {

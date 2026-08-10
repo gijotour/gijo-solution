@@ -19,6 +19,14 @@ const 뿌리 = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const BASE = process.env.QA_BASE || "http://localhost:4000";
 const 몇위까지 = Number(process.argv[process.argv.indexOf("--top") + 1]) || 3;
 const 목록 = JSON.parse(fs.readFileSync(path.join(뿌리, "tools", "doc-probe.json"), "utf8"));
+// ⚠ **잰 것이 없으면 통과가 아니다.** 문항 파일이 비거나 모양이 바뀌면 검사 0건 → 실패 0건 →
+//   종료코드 0(통과)이 된다. 화면엔 「문서 0편」이라고 찍히지만 **CI·스크립트는 종료코드를 본다.**
+//   (2026-08-10: 같은 모양을 하루에 네 번 봤다 — 모델 미적재·토큰 만료·빈 DB·상충 잣대 인증 실패.
+//    잣대가 조용히 눈을 감으면 그 위에 쌓은 판정이 전부 무의미해진다.)
+if (!Array.isArray(목록.문서) || 목록.문서.length === 0) {
+  console.error("★ tools/doc-probe.json 에 문서가 없습니다 — 아무것도 재지 못했으므로 통과가 아닙니다.");
+  process.exit(2);
+}
 
 // ── 문서 본문을 읽어 두고, 조각이 어디서 왔는지 되찾는 데 쓴다 ────────────────
 const 눌러쓰기 = (s) => String(s).replace(/\s+/g, "");
@@ -117,4 +125,9 @@ fs.writeFileSync(나가는곳, 줄.join("\n"), "utf8");
 console.log(`1위 ${일위.length}/${결과.length} · ${몇위까지}위 이내 ${통과.length}/${결과.length} · 못 걸림 ${실패.length}건`);
 for (const r of 실패) console.log(`  ✗ ${path.basename(r.파일)} ← "${r.질문}"  대신: ${(r.상위 ?? []).map((x) => x ?? "(밖)").join(" · ")}`);
 console.log(`리포트: ${path.relative(뿌리, 나가는곳)}`);
+// ⚠ 질문이 하나도 안 돌았으면(문서에 질문이 없거나 전부 건너뜀) 실패 0건이 나온다 — 통과가 아니다.
+if (결과.length === 0) {
+  console.error("★ 질문을 하나도 재지 못했습니다 — 통과가 아닙니다(doc-probe.json의 질문을 확인하세요).");
+  process.exit(2);
+}
 process.exit(실패.length ? 1 : 0);
