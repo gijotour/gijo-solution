@@ -572,6 +572,17 @@ function reapOrphanEngines(): void {
 
 export async function autoStartLocalEngines(): Promise<void> {
   reapOrphanEngines();
+
+  // ⚠ 임베딩을 **먼저** 띄운다. 순서가 거꾸로면 임베딩이 항상 지는 경주가 된다(실측 2026-08-10):
+  //   채팅 모델의 적재 판단(ensureModelLoaded → needMb vs getFreeVramMb)은 **그 시점의 여유**를
+  //   본다. 임베딩이 아직 없으면 여유가 커 보여 채팅 모델이 임베딩 몫까지 먹고 들어간다.
+  //   그런데 spawnEmbeddingServer에는 여유 검사도 축출도 **없다** — 남은 자리에 그냥 밀어 넣는다.
+  //   빠듯한 기계에서 임베딩이 실패하거나 CPU로 떨어지면 **RAG가 죽는다.** 근거가 제품의 핵심
+  //   약속인데 조용히 빠지는 것이라 더 나쁘다.
+  //   실측 규모(CUDA): bge-m3 2.5GB · 14B@16K 10.7GB — 16GB 카드에서 2.5GB는 먹고 들어갈 크기다.
+  // 임베딩은 566M이라 몇 초면 뜬다. 채팅 모델(14B 예열 ~98초) 앞에 두는 대가가 작다.
+  await 자동시작_임베딩();
+
   const chatModelId = pickAutoStartModelId();
   if (chatModelId) {
     console.log(`[localengine] 부팅 자동 시작: ${chatModelId} (마지막 사용 모델 또는 기본 모델)`);
@@ -581,7 +592,11 @@ export async function autoStartLocalEngines(): Promise<void> {
       `[localengine] 자동 시작 건너뜀 — ${MODELS_DIR}/ 에 모델 파일 없음 (기본: ${DEFAULT_MODEL_ID}). 에이전트 AI 화면에서 수동 시작하거나 모델을 배치하세요.`
     );
   }
+}
 
+/** 임베딩 서버 자동 시작. **상주할 때까지 기다린다** — 기다리지 않으면 뒤이어 뜨는 채팅 모델이
+ *  아직 안 잡힌 임베딩 몫을 여유로 세어 위 순서 보정이 무의미해진다. */
+async function 자동시작_임베딩(): Promise<void> {
   const embPath = modelFilePath(EMBEDDING_MODEL_ID);
   // 이전 서버 프로세스가 남긴 임베딩 llama-server가 이미 포트를 잡고 정상 서빙 중이면 재사용한다.
   // 실측(2026-07-17): 서버 재시작 시 자식 llama-server가 고아로 살아남아 새 스폰이 포트 충돌로
@@ -601,13 +616,35 @@ export async function autoStartLocalEngines(): Promise<void> {
     embeddingModelId = EMBEDDING_MODEL_ID;
     return;
   }
-  if (fs.existsSync(embPath)) {
-    spawnEmbeddingServer(embPath);
-  } else {
+  if (!fs.existsSync(embPath)) {
     console.log(
       `[localengine] 임베딩 서버 자동 시작 건너뜀 — ${embPath} 없음. RAG를 쓰려면 임베딩 모델을 배치하거나 GIJO_EMBEDDING_MODEL_ID를 설정하세요.`
     );
+    return;
   }
+  spawnEmbeddingServer(embPath);
+  // 상주할 때까지 기다린다 — 스폰은 fire-and-forget이라, 안 기다리면 뒤이어 뜨는 채팅 모델이
+  // **아직 안 잡힌 임베딩 몫을 여유로 세고** 자리를 뺏는다(순서를 바꾼 이유가 그것이다).
+  // 실패해도 던지지 않는다: 임베딩이 안 떠도 채팅은 떠야 하고, 감시(startEmbeddingMonitor)가 이어받는다.
+  const 기한 = Date.now() + 60_000;
+  while (Date.now() < 기한) {
+    const 떴나 = await fetch(`http://localhost:${EMBEDDING_PORT}/v1/embeddings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ model: "local", input: "healthcheck" }),
+      signal: AbortSignal.timeout(4000),
+    })
+      .then((r) => r.ok)
+      .catch(() => false);
+    if (떴나) {
+      console.log(`[localengine] 임베딩 서버 준비됨(port ${EMBEDDING_PORT}) — 채팅 모델 적재 시작`);
+      return;
+    }
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  console.warn(
+    `[localengine] 임베딩 서버가 60초 안에 응답하지 않았습니다 — 채팅 모델을 먼저 올립니다(감시가 재기동을 이어받습니다). RAG가 잠시 degraded일 수 있습니다.`
+  );
 }
 
 // 임베딩 llama-server를 스폰한다(재기동에서도 재사용). -ngl -1: bge-m3를 GPU에 상주시켜 배치
@@ -771,12 +808,22 @@ export function stopEmbeddingMonitor(): void {
  *
  * llama.cpp는 앞부분이 가장 많이 겹치는 칸을 고른다 — 칸이 둘이면 짧은 ping은 남는 칸으로 가고
  * 담당자의 긴 프롬프트는 제 칸에 그대로 남는다. 총 문맥은 --ctx-size 그대로이고 칸끼리 나눠 쓰므로
- * **메모리는 늘지 않는다.** 다만 칸당 문맥이 절반이 되니, 절반이 8192 미만이면 칸을 안 나눈다
- * (문맥을 줄여 가며 얻을 속도가 아니다).
+ * **메모리는 늘지 않는다.** 다만 칸당 문맥이 절반이 되니, 한 칸에 담당자의 요청 하나가 통째로
+ * 안 들어가면 칸을 안 나눈다 — 캐시를 지키려다 **요청 자체를 못 담으면** 본말전도다.
  */
+// 칸 하나가 최소한 담아야 하는 문맥. 실측(2026-08-10, /api/llm-activity/history)에서 나왔다:
+//   구조화 응답(도구 고르는 결정문)  7,984 토큰  ← 매 요청 도는 최대치
+//   산문 응답                       3,028 / 2,620
+//   + 답변 생성분(llm.ts DEFAULT_MAX_TOKENS = 800)  →  **한 요청에 최소 8,784**
+// 예전 문턱 8192는 이 값을 재기 전에 정한 판단값이라 **이미 모자랐다.** ctx 16384(Lite)에서
+// 칸당이 정확히 8192가 되어 문턱을 아슬하게 넘어 칸을 나눴고, 프롬프트 7,984를 담고 나면
+// **여유가 208토큰**뿐이었다 — 대화 이력 한 줄이면 넘친다.
+// 12288은 8,784에 대화 이력 몫 ~3,500을 더한 값이다. ctx 32768(Standard·Pro)은 칸당 16384라
+// 그대로 두 칸을 쓰고, ctx 16384 이하만 한 칸으로 떨어진다(1인 티어라 칸을 나눌 이유도 없다).
+const 칸당_최소문맥 = 12288;
 function 확인용칸(fittedCtx: number): string[] {
   const 칸당 = Math.floor(fittedCtx / 2);
-  if (칸당 < 8192) return [];
+  if (칸당 < 칸당_최소문맥) return [];
   return ["--parallel", "2"];
 }
 
