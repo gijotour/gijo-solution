@@ -917,12 +917,20 @@ export async function queryMemoryRelevant(question: string, topK = 5, agentId?: 
 export const RAG_STRONG_MAX_DISTANCE = 0.85;
 export async function queryMemoryGraded(
   question: string, topK = 5, agentId?: string, screen?: string, viewer?: Viewer
-): Promise<{ chunks: string[]; 약한근거만: boolean }> {
+): Promise<{ chunks: string[]; scored: ScoredChunk[]; 약한근거만: boolean }> {
   const fused = await hybridSearch(question, topK, agentId, screen, viewer);
   const 쓸것 = fused.filter((c) => isRelevant(c, RAG_RELEVANCE_MAX_DISTANCE));
   // 코드가 글자 그대로 걸린 것(CVE·U-01 등)은 거리와 무관하게 **가까운 근거**로 본다.
   const 가까움 = 쓸것.some((c) => c.lexicalHit || c.distance <= RAG_STRONG_MAX_DISTANCE);
-  return { chunks: 쓸것.map((c) => c.text), 약한근거만: 쓸것.length > 0 && !가까움 };
+  // ③ 배지 정확도(2026-08-10): scored(documentId 포함)도 돌려준다 — 답이 **실제 읽은** 문서를
+  // 배지가 그대로 쓰게 한다. dispatcher가 배지용으로 이 함수를 **같은 agentId**로 부르면
+  // 답 경로(ragContextFor)와 동일 검색이라 근거가 어긋나지 않는다(옛 배지는 queryMemoryScored를
+  // agentId 없이 재검색해 답과 다른 문서를 근거로 실었다). 기존 chunks 소비자는 구조분해라 무영향.
+  return {
+    chunks: 쓸것.map((c) => c.text),
+    scored: 쓸것.map((c) => ({ text: c.text, distance: c.distance, documentId: c.documentId, lexicalHit: c.lexicalHit })),
+    약한근거만: 쓸것.length > 0 && !가까움,
+  };
 }
 
 /** 문서의 첫 조각 텍스트 — 인수인계 자동 검증의 질문 생성용. 없으면 null. */
