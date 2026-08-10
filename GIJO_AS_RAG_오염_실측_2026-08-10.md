@@ -316,3 +316,31 @@ dispatcher.ts:766 queryMemoryScored(instructionText, 4, undefined, screen) ← �
 - ⚠ **지연 이득은 기대하지 마라.** Metal에서만 크고 운영 CUDA에서는 작다
   ([[GIJO_AS_2026-08-10_하루정리.md]] §5 — 프리필 특성).
   **③은 정확도 항목으로만 값을 매겨야 한다.**
+
+### ③ 수리(`9c78a63`) 뒤 — 한 겹이 남았다
+
+수리는 배지 재검색을 `queryMemoryScored(…, undefined, screen)` →
+`queryMemoryGraded(instructionText, 4, route.agentId, screen, viewer)`로 통일했다.
+**함수·`agentId`·`viewer`는 맞춰졌다.** 남은 것은 **질문 텍스트**다:
+
+```
+dispatcher.ts:311·322  const message = contextText ? `${contextText}\n\n[현재 지시] ${instructionText}` : instructionText;
+dispatcher.ts:315      chat({ …, message, … })          ← 답은 message 로 검색
+dispatcher.ts:771      queryMemoryGraded(instructionText, …)  ← 배지는 instructionText 로 검색
+```
+
+`contextText = [선택맥락, 대화맥락]`이고 `대화맥락 = recentTurnsText(session.id)`이므로
+**첫 턴은 빈 값(→ `message === instructionText`, 완전 일치)**이고 **이어지는 턴은 맥락이 붙는다.**
+
+| | 배지 vs 답 |
+|---|---|
+| 첫 턴 (맥락 없음) | **100% 일치** ✅ |
+| 이어지는 턴 (맥락 붙음) | 완전일치 **0건** · 완전다름 **103/150** · **평균 겹침 8%** |
+
+`work_session_turns` 실측: 세션 78개 · 턴 98건 → **첫 턴 80% · 이어지는 턴 20%**.
+
+> **∴ ③은 80%가 닫히고 20%가 남았다.** 남은 20%에서는 배지와 답이 **거의 완전히 다른 문서**를 본다.
+> 고치려면 배지도 `message`(맥락 포함)로 검색해야 한다 — 답이 실제로 읽은 것이 그것이다.
+
+⚠ 턴 비율은 **Mac 복원본** 값이다(세션당 중앙값 1턴). 운영은 이어보기가 더 잦을 수 있으니
+**운영에서 다시 재야 한다** — 이어지는 턴이 많을수록 남은 20%가 커진다.
