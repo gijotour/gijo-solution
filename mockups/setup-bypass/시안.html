@@ -1,0 +1,87 @@
+<style>
+  /* 기존 setup.html의 디자인 토큰을 그대로 따른다(새 팔레트를 만들지 않는다 — 제품 화면 재현). */
+  :root {
+    --navy: #262624; --blue: #5fa1ff; --teal: #1eb980;
+    --text: #e9e7e2; --muted: #b3ada4; --muted2: #a49d95; --border: #3d3c38;
+    --amber: #f0a020; --red: #f5928a;
+  }
+  * { box-sizing: border-box; }
+  .stage {
+    margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(circle at 30% 20%, #35342f 0%, var(--navy) 60%);
+    font-family: "Pretendard", "Segoe UI", -apple-system, sans-serif;
+    color: var(--text); padding: 24px;
+  }
+  .card { width: 420px; max-width: calc(100vw - 40px); }
+  .brand { font-size: 12px; font-weight: 800; letter-spacing: 2px; color: var(--muted2); margin-bottom: 6px; }
+  h1 { font-size: 21px; margin: 0 0 6px; text-wrap: balance; }
+  .sub { font-size: 13px; color: var(--muted); line-height: 1.65; margin-bottom: 18px; }
+  label { display: block; font-size: 12.5px; color: var(--muted); margin: 12px 0 5px; }
+  input {
+    width: 100%; background: #30302e; border: 1px solid var(--border); border-radius: 9px;
+    color: var(--text); font-size: 14px; padding: 11px 13px; outline: none; font-family: inherit;
+  }
+  input:focus { border-color: var(--blue); }
+  .hint { font-size: 12px; color: var(--muted2); margin-top: 5px; line-height: 1.6; }
+  code { background: #30302e; border-radius: 4px; padding: 1px 5px; font-size: .92em; }
+  button {
+    width: 100%; border-radius: 9px; font-size: 14px; font-weight: 800; padding: 12px;
+    cursor: pointer; font-family: inherit; border: none;
+  }
+  .primary { margin-top: 20px; background: var(--blue); color: #10233f; }
+
+  /* ── 새로 더한 것: 「이미 서버가 있어요」 우회 ──────────────────── */
+  .orsep {
+    display: flex; align-items: center; gap: 12px; margin: 18px 0 14px;
+    color: var(--muted2); font-size: 11.5px; letter-spacing: 1px;
+  }
+  .orsep::before, .orsep::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+  .ghost {
+    background: transparent; color: var(--text); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .ghost:hover { border-color: var(--blue); color: var(--blue); }
+  .ghost .arrow { color: var(--blue); font-weight: 900; }
+  .ghost-hint {
+    font-size: 12px; color: var(--muted2); margin-top: 8px; line-height: 1.65; text-align: center;
+  }
+  .note {
+    margin-top: 18px; padding: 10px 12px; border-left: 3px solid var(--amber);
+    background: rgba(240,160,32,.07); border-radius: 8px; font-size: 12.25px; line-height: 1.7; color: var(--muted);
+  }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+</style>
+
+<div class="stage">
+  <div class="card">
+    <div class="brand">AI SECURITY MANAGER</div>
+    <h1>처음 설정 — 관리자 계정 만들기</h1>
+    <div class="sub">이 기계에서 쓸 관리자 계정을 정하세요. 여기서 정한 값 외에 기본 비밀번호는 없습니다.</div>
+
+    <label for="id">아이디</label>
+    <input id="id" placeholder="admin" value="" />
+    <div class="hint">영문·숫자와 <code>. _ -</code> 로 3~32자</div>
+
+    <label for="pw">비밀번호</label>
+    <input id="pw" type="password" value="············" />
+    <div class="hint">8자 이상(제품 최소). <b>12자 이상을 권합니다</b> — 이 계정은 모든 자산·취약점 정보를 봅니다.</div>
+
+    <label for="pw2">비밀번호 확인</label>
+    <input id="pw2" type="password" value="············" />
+
+    <button class="primary">계정 만들고 시작하기</button>
+
+    <div class="orsep">또는</div>
+
+    <button class="ghost">이미 GIJO 서버가 있어요 <span class="arrow">— 로그인으로 연결 →</span></button>
+    <div class="ghost-hint">
+      회사에 이미 GIJO 서버(WSL·다른 PC)가 설치돼 있다면,<br />
+      새 관리자를 만들지 말고 <b>그 서버에 로그인</b>하세요. 서버 주소를 입력하는 로그인 화면으로 갑니다.
+    </div>
+
+    <div class="note">
+      이 비밀번호는 <b>이 기계에만</b> 저장되고 공급사도 알 수 없습니다.
+      잊으면 되돌릴 방법이 없어 데이터를 지우고 다시 설치해야 합니다.
+    </div>
+  </div>
+</div>
