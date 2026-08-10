@@ -1,0 +1,117 @@
+<style>
+  /* 기존 setup/login 디자인 토큰 그대로. 강도색은 의미색(약=red·보통=amber·강=teal)으로 별도. */
+  :root {
+    --navy: #262624; --blue: #5fa1ff; --teal: #1eb980;
+    --text: #e9e7e2; --muted: #b3ada4; --muted2: #a49d95; --border: #3d3c38;
+    --amber: #f0a020; --red: #f5928a; --panel: #2f2e2b;
+  }
+  * { box-sizing: border-box; }
+  .stage {
+    margin: 0; min-height: 100vh; display: flex; align-items: center; justify-content: center;
+    background: radial-gradient(circle at 30% 20%, #35342f 0%, var(--navy) 60%);
+    font-family: "Pretendard", "Segoe UI", -apple-system, sans-serif; color: var(--text); padding: 24px;
+  }
+  .card { width: 420px; max-width: calc(100vw - 40px); }
+  .brand { font-size: 12px; font-weight: 800; letter-spacing: 2px; color: var(--muted2); margin-bottom: 6px; }
+  h1 { font-size: 21px; margin: 0 0 6px; text-wrap: balance; }
+  .sub { font-size: 13px; color: var(--muted); line-height: 1.65; margin-bottom: 18px; }
+  label { display: block; font-size: 12.5px; color: var(--muted); margin: 14px 0 5px; }
+  input {
+    width: 100%; background: #30302e; border: 1px solid var(--border); border-radius: 9px;
+    color: var(--text); font-size: 14px; padding: 11px 13px; outline: none; font-family: inherit;
+  }
+  input:focus { border-color: var(--blue); }
+
+  /* 강도 미터 */
+  .meter { height: 7px; border-radius: 4px; background: #262523; margin-top: 9px; overflow: hidden; }
+  .meter > i { display: block; height: 100%; width: 0; border-radius: 4px; transition: width .2s, background .2s; }
+  .meter-label { font-size: 12px; margin-top: 6px; color: var(--muted2); }
+  .meter-label b { font-weight: 700; }
+
+  /* 규칙 체크리스트 */
+  .checks { margin-top: 12px; display: flex; flex-direction: column; gap: 6px; }
+  .check { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--muted2); }
+  .check .mark { width: 16px; height: 16px; border-radius: 50%; border: 1.5px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 10px; flex: 0 0 auto; }
+  .check.ok { color: var(--text); }
+  .check.ok .mark { border-color: var(--teal); background: rgba(30,185,128,.15); color: var(--teal); }
+
+  button.go {
+    width: 100%; margin-top: 20px; border-radius: 9px; font-size: 14px; font-weight: 800;
+    padding: 12px; cursor: pointer; font-family: inherit; border: none; background: var(--blue); color: #10233f;
+  }
+  button.go:disabled { opacity: .45; cursor: default; }
+  .note {
+    margin-top: 16px; padding: 10px 12px; border-left: 3px solid var(--teal);
+    background: rgba(30,185,128,.07); border-radius: 8px; font-size: 12.25px; line-height: 1.7; color: var(--muted);
+  }
+  button:focus-visible, input:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+  @media (prefers-reduced-motion: reduce) { .meter > i { transition: none; } }
+</style>
+
+<div class="stage">
+  <div class="card">
+    <div class="brand">AI SECURITY MANAGER</div>
+    <h1>비밀번호를 바꿔 주세요</h1>
+    <div class="sub">보안 규칙이 새 기준으로 바뀌었습니다. 계속 쓰시려면 비밀번호를 한 번만 다시 정해 주세요.</div>
+
+    <label for="pw">새 비밀번호</label>
+    <input id="pw" type="password" autocomplete="new-password" placeholder="길고 남이 모르는 문장이 가장 안전합니다" />
+    <div class="meter"><i id="bar"></i></div>
+    <div class="meter-label" id="mlabel">비밀번호 강도: <b>—</b></div>
+
+    <div class="checks">
+      <div class="check" id="c-len"><span class="mark">✓</span> 10자 이상</div>
+      <div class="check" id="c-common"><span class="mark">✓</span> 흔한·유출된 비밀번호가 아님</div>
+      <div class="check" id="c-id"><span class="mark">✓</span> 아이디·회사 이름이 통째로 들어가지 않음</div>
+    </div>
+
+    <label for="pw2">새 비밀번호 확인</label>
+    <input id="pw2" type="password" autocomplete="new-password" />
+
+    <button type="button" class="go" id="go" disabled>바꾸고 계속하기</button>
+
+    <div class="note">
+      💡 <b>대문자·특수문자를 억지로 넣지 않아도 됩니다.</b> 요즘 보안 기준(개인정보 안전성 확보조치·NIST)은
+      복잡한 기호보다 <b>길이와 「남이 모르는 문장」</b>을 더 안전하게 봅니다. 예: <code>우리집강아지는2살반</code>.
+    </div>
+  </div>
+</div>
+
+<script>
+  // 시안 데모 — 실제 흔한/유출 비번 차단 목록·아이디 검사는 서버가 한 곳에서 판정한다.
+  var 흔한 = ["password", "12345678", "123456789", "qwerty123", "admin1234", "gijo1234", "0000000000", "asdf1234"];
+  var 아이디 = "admin"; // 로그인한 계정 아이디(데모)
+  var pw = document.getElementById("pw"), pw2 = document.getElementById("pw2"), go = document.getElementById("go");
+  var bar = document.getElementById("bar"), mlabel = document.getElementById("mlabel");
+  var cLen = document.getElementById("c-len"), cCommon = document.getElementById("c-common"), cId = document.getElementById("c-id");
+
+  function 검사() {
+    var v = pw.value || "";
+    var len = v.length >= 10;
+    var common = v && !흔한.includes(v.toLowerCase());
+    var idok = v && (아이디.length < 3 || !v.toLowerCase().includes(아이디.toLowerCase()));
+    cLen.classList.toggle("ok", len);
+    cCommon.classList.toggle("ok", !!common);
+    cId.classList.toggle("ok", !!idok);
+
+    // 강도: 길이 위주 + 종류 다양성 보조(강제 아님, 참고용)
+    var kinds = (/[a-z]/.test(v) ? 1 : 0) + (/[A-Z]/.test(v) ? 1 : 0) + (/[0-9]/.test(v) ? 1 : 0) + (/[^a-zA-Z0-9]/.test(v) ? 1 : 0);
+    var score = 0;
+    if (v.length >= 10) score += 2; if (v.length >= 14) score += 1; if (v.length >= 18) score += 1;
+    score += Math.max(0, kinds - 1);
+    if (흔한.includes(v.toLowerCase())) score = 0;
+    var pct, col, txt;
+    if (!v) { pct = 0; col = "var(--border)"; txt = "—"; }
+    else if (score <= 2) { pct = 33; col = "var(--red)"; txt = "약함"; }
+    else if (score <= 4) { pct = 66; col = "var(--amber)"; txt = "보통"; }
+    else { pct = 100; col = "var(--teal)"; txt = "강함"; }
+    bar.style.width = pct + "%"; bar.style.background = col;
+    mlabel.innerHTML = "비밀번호 강도: <b style='color:" + col + "'>" + txt + "</b>";
+
+    // 통과 = 길이·흔한비번·아이디 3개 + 확인 일치 (복잡도는 강제 아님)
+    go.disabled = !(len && common && idok && v && v === pw2.value);
+  }
+  pw.addEventListener("input", 검사);
+  pw2.addEventListener("input", 검사);
+  검사();
+</script>
