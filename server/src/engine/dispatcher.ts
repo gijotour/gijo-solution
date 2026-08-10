@@ -696,6 +696,37 @@ function isSmallTalkInstruction(text: string): boolean {
   return t.length > 0 && t.length <= 20 && SMALLTALK_RE.test(t);
 }
 
+/** 근거(sources) 재검색을 할 자리인가 — 답이 내부 데이터 집계나 코드 안내가 아니라
+ *  LLM이 사내 문서(RAG)로 자유 답했을 자리인가. dataHits(📄 리포트 알약용)와 **다른 잣대**다.
+ *  실측 사고(2026-08-10): 근거 배지가 "답의 실제 근거"와 어긋나 있었다.
+ *   ① analyze는 무조건 dataHits=1이라, RAG 문서로 답하는 analyze는 근거가 있는데도
+ *      재검색이 스킵돼 sources=null이었다(「안전대부 취약점 분석」→ 근거 **누락**).
+ *   ② urgent_todo·_status 같은 데이터 집계 즉답은 dataHits=0이 되고, 되묻기도 dataHits=0이라
+ *      무관한 문서가 근거로 **둔갑**했다(고객이 남의 웹취약점 보고서를 자기 것처럼 읽는 사고).
+ *  → analyze 같은 액션 이름이 아니라 "실제로 데이터 도구를 썼나 / 안내형 답인가"로 가른다. */
+export function 근거재검색대상인가(
+  result: Pick<DispatchResult, "steps" | "toolCalls" | "output" | "sources" | "approval" | "confirm">,
+  instructionText: string,
+): boolean {
+  if (result.sources !== undefined) return false; // 답을 만든 쪽이 근거를 이미 확정(빈 배열 포함)
+  if (result.approval || result.confirm) return false; // 결재·확인 대기
+  if (isSmallTalkInstruction(instructionText)) return false; // 인사·잡담은 물어볼 자료가 아니다
+  // ⚠ 새 조회 도구를 만들면 이 정규식에 넣어야 근거 둔갑이 안 생긴다 — sourcebadge.test가 못박는다.
+  const 집계조회도구_RE =
+    /asset|finding|cti|vuln|sbom|analys|scan|hardening|today|urgent|kpi|brief|posture|coverage|_status|report_|audit|packages|aibom|ontology|knowledge|recent|doc_|time_saved|compliance|maintenance|adapter|model_|threat|exposed|search|law_lookup|explain|article/i;
+  const 데이터집계로답함 =
+    (result.steps ?? []).some((s) => (s.assetIds?.length ?? 0) + (s.findingCount ?? 0) > 0) ||
+    (result.toolCalls ?? []).some((c) => 집계조회도구_RE.test(c.tool));
+  if (데이터집계로답함) return false;
+  // 되묻기·모호·대상 못 찾음 같은 코드가 낸 안내형 답은 문서 근거가 원리상 없다.
+  const 안내형답 =
+    /무엇을 알고 싶으신가요|무엇을 도와드릴까요|되묻습니다|자산 이름으로 다시|어느 자산|어떤 자산·어떤 항목/.test(
+      String(result.output ?? ""),
+    );
+  if (안내형답) return false;
+  return true;
+}
+
 // 화면 액션 알약(리포트·클라우드) 조건부 노출용 신호를 계산한다.
 // - dataHits: 자산·취약점 등 특정 내부 데이터를 실제로 건드렸는가(리포트로 정리할 거리가 있는가).
 // - internalMiss: 데이터 답이 아닌 일반 질의인데 사내 RAG 근거가 0인가(외부 자료가 필요한가).
@@ -723,11 +754,9 @@ async function computeOfferSignals(
   let internalMiss = false;
   let sources: string[] | undefined;
   let quotes: SourceQuote[] | undefined;
-  // 답을 만든 쪽이 근거를 이미 확정했으면(빈 배열 포함) 여기서 다시 채우지 않는다 —
-  // 행동 대조가 "판정 근거 없음(NA)"으로 답했는데 이 재검색이 참고 문서를 근거 배지로
-  // 둔갑시키는 실측 사고가 있었다(2026-07-29, Tenable 가이드가 NA 답의 근거로 표시됨).
-  const sourcesAlreadyDecided = result.sources !== undefined;
-  if (!sourcesAlreadyDecided && dataHits === 0 && !result.approval && !result.confirm && !isSmallTalkInstruction(instructionText)) {
+  // ⚠ 재검색 여부는 dataHits(리포트 알약)가 아니라 근거재검색대상인가()로 가른다 —
+  //   analyze RAG 답의 근거 누락 / 데이터 집계·되묻기의 근거 둔갑을 함께 막는다(2026-08-10 사고).
+  if (근거재검색대상인가(result, instructionText)) {
     try {
       const { queryMemoryScored, RAG_RELEVANCE_MAX_DISTANCE } = await import("./memory.js");
       const scored = await queryMemoryScored(instructionText, 4, undefined, screen).catch(() => null);
