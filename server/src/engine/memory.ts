@@ -824,7 +824,12 @@ async function hybridSearch(question: string, topK: number, agentId?: string, sc
     `scope IN (${scopes.map((s) => `'${s}'`).join(", ")})` +
     (가림.length ? ` AND documentId NOT IN (${가림.map((d) => `'${escapeLiteral(d)}'`).join(", ")})` : "");
   // 융합 전에는 각 검색이 넉넉히 후보를 내야 한다 — 한쪽에서 밀린 정답을 다른 쪽이 살린다.
-  const candidates = Math.max(topK * 2, 10);
+  // ⚠ 2026-08-10 실측(Mac): topK=4면 후보 10칸을 **청크 많은 타사 PDF 하나**가 채워, 정작
+  //   우리 문서(청크 30개)가 후보에 못 들어왔다 — origin 부스트(①ⓑ)를 걸 대상 자체가 없던 것이다.
+  //   후보를 넓히면 우리 문서가 들어와 부스트를 받는다. .slice(0, topK)는 융합·부스트 **뒤**라
+  //   프롬프트·지연은 그대로다(실측: 외부 1위 20→12, 지연 22→19ms). 부스트를 키우는 게 아니라
+  //   부스트가 일할 후보를 넣는 것이 순서다.
+  const candidates = Math.max(topK * 4, 16);
 
   let vector: { text: string; documentId: string; distance: number; category?: string }[] = [];
   try {
