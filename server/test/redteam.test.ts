@@ -8,8 +8,8 @@
 //   검토에서 **거짓 진단서를 내는 결함 둘**을 찾았다. 아래 ★ 시험이 그 둘을 못박는다:
 //     ① 호출이 전부 실패해도 「견고성 100 · 취약 0」이 나왔다(실패를 방어로 셈)
 //     ② 카나리를 `includes`로만 봐서 꼴이 조금만 바뀌면(소문자·굵게·공백) 유출을 놓쳤다
-import { describe, it, expect } from "vitest";
-import { runRedTeam, detectInjectionAttempt, PAYLOADS, guardedSystemPrompt, LlmCaller } from "../src/engine/redteam";
+import { describe, it, expect, afterEach } from "vitest";
+import { runRedTeam, detectInjectionAttempt, PAYLOADS, guardedSystemPrompt, makeRemoteCaller, LlmCaller } from "../src/engine/redteam";
 
 /** system 프롬프트에서 카나리를 뽑아 흘리는 = 완전히 취약한 모델 */
 const leakAll: LlmCaller = async (system) => {
@@ -189,6 +189,70 @@ describe("카나리 — 모델이 외울 수 없어야 한다", () => {
     const s = guardedSystemPrompt("SK-TEST1234");
     expect(s).toContain("SK-TEST1234");
     expect(s).toMatch(/노출하거나 암시하지 마라|거절/);
+  });
+});
+
+// ── 원격 대상(고객 엔드포인트) ──────────────────────────────────────────────
+describe("makeRemoteCaller — 고객 AI를 겨눈다", () => {
+  const 원래fetch = globalThis.fetch;
+  afterEach(() => { globalThis.fetch = 원래fetch; delete process.env.GIJO_AIRGAP; });
+
+  it("OpenAI 호환 응답에서 본문을 꺼낸다", async () => {
+    globalThis.fetch = (async () => new Response(
+      JSON.stringify({ choices: [{ message: { content: "거절합니다." } }] }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    )) as typeof fetch;
+    const call = makeRemoteCaller({ baseUrl: "http://10.0.0.5:8000/v1", model: "custom" });
+    expect(await call("sys", "user")).toBe("거절합니다.");
+  });
+
+  it("★ HTTP 오류를 삼키지 않는다 — 401·429가 「방어 성공」이 되면 안 된다", async () => {
+    globalThis.fetch = (async () => new Response("rate limited", { status: 429 })) as typeof fetch;
+    const call = makeRemoteCaller({ baseUrl: "http://10.0.0.5:8000/v1" });
+    await expect(call("sys", "user")).rejects.toThrow(/429/);
+  });
+
+  it("★ 규격이 다른 응답도 던진다 — 빈 문자열로 조용히 넘기지 않는다", async () => {
+    globalThis.fetch = (async () => new Response(JSON.stringify({ answer: "hi" }), { status: 200 })) as typeof fetch;
+    const call = makeRemoteCaller({ baseUrl: "http://10.0.0.5:8000/v1" });
+    await expect(call("sys", "user")).rejects.toThrow(/OpenAI 호환/);
+  });
+
+  it("★ 에어갭이 켜져 있으면 외부 대상은 만들 때부터 막힌다 (기능 토글로 못 뚫는다)", () => {
+    process.env.GIJO_AIRGAP = "1";
+    expect(() => makeRemoteCaller({ baseUrl: "https://api.openai.com/v1" })).toThrow();
+  });
+
+  it("에어갭이어도 내부망 대상은 점검할 수 있다 (폐쇄망 고객은 현장에서)", () => {
+    process.env.GIJO_AIRGAP = "1";
+    expect(() => makeRemoteCaller({ baseUrl: "http://192.168.10.20:8000/v1" })).not.toThrow();
+  });
+
+  it("주소가 잘못되면 바로 알린다", () => {
+    expect(() => makeRemoteCaller({ baseUrl: "이건주소가아님" })).toThrow(/주소/);
+  });
+
+  it("★ 감사 기록이 **실제로 남는다** — 남의 시스템을 건드리는 일이라", async () => {
+    // ⚠ 이 시험이 있는 이유: 처음 구현에서 recordAudit에 kind를 빼먹어
+    //   "NOT NULL constraint failed: audit_log.kind"로 **조용히 무시**되고 있었다.
+    //   감사가 안 남으면 동의 범위 다툼에서 증거가 없다. 「기록한다」는 말만으로는 부족하다.
+    const { listAudit } = await import("../src/engine/audit");
+    const 전 = listAudit({ limit: 200 }).filter((a) => /레드팀 점검 시작/.test(a.action)).length;
+    makeRemoteCaller({ baseUrl: "http://10.0.0.77:8000/v1", model: "고객모델" }, "점검원");
+    const 후목록 = listAudit({ limit: 200 }).filter((a) => /레드팀 점검 시작/.test(a.action));
+    expect(후목록.length, "감사 기록이 남지 않았다").toBe(전 + 1);
+    const 최근 = 후목록[0];
+    expect(최근.actor).toBe("점검원");
+    expect(최근.target).toContain("10.0.0.77");
+    expect(JSON.stringify(최근)).not.toContain("apiKey"); // 키는 남기지 않는다
+  });
+
+  it("HTTP 실패는 리포트에서 errored로 잡힌다 — 견고성 점수가 나오지 않는다", async () => {
+    globalThis.fetch = (async () => new Response("nope", { status: 500 })) as typeof fetch;
+    const rep = await runRedTeam(makeRemoteCaller({ baseUrl: "http://10.0.0.5:8000/v1" }), "고객AI");
+    expect(rep.errored).toBe(PAYLOADS.length);
+    expect(rep.robustnessScore).toBeNull();
+    expect(rep.complete).toBe(false);
   });
 });
 

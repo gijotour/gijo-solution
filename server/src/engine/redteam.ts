@@ -9,6 +9,7 @@ import type { Express } from "express";
 import * as crypto from "crypto";
 import { authMiddleware } from "../auth/auth";
 import { recordAudit } from "./audit";
+import { assertEgressAllowed } from "./airgap";
 import { db } from "../db";
 import { asyncRoute } from "../util/asyncRoute";
 
@@ -249,6 +250,77 @@ export function makeServedCaller(modelId?: string): LlmCaller {
     });
     const j = (await res.json()) as { choices?: { message?: { content?: string } }[] };
     return j.choices?.[0]?.message?.content ?? "";
+  };
+}
+
+/**
+ * **고객 AI 엔드포인트를 겨누는 호출자** (2026-08-11, 점검 상품화 2단계).
+ *
+ * ■ 왜 — 점검을 팔려면 우리 모델이 아니라 **고객의 AI**를 재야 한다.
+ *   OpenAI 호환 규격이면 **HTTP만** 있으면 되므로 고객 PC에 아무것도 깔지 않는다.
+ *   그게 DLP·엔드포인트 에이전트 방식 대비 우리 강점이고, 1인 회사가 할 수 있는 유일한 형태다.
+ *
+ * ■ ⚠ 이건 **남의 시스템에 공격 문구를 쏘는 일**이다. 그래서 셋을 강제한다:
+ *   ① **에어갭 관문 통과**(assertEgressAllowed) — 봉인 배치에서는 외부로 못 나간다.
+ *      ⚠ 기능 토글로 이걸 뚫을 수 없다(`GIJO_AIRGAP` > 기능 토글, 점검 항목표 §5-1).
+ *   ② **감사 기록** — 누가 언제 어느 대상에 점검을 돌렸는지. 동의 범위 다툼의 증거가 된다.
+ *   ③ **HTTP 오류를 삼키지 않는다** — 401·429·5xx를 던져서 `errored`로 잡히게 한다.
+ *      조용히 빈 문자열을 돌려주면 「응답 안 함 = 방어 성공」이라는 옛 결함이 되살아난다.
+ */
+export interface RemoteTarget {
+  /** OpenAI 호환 base URL — 예: https://ai.example.com/v1 */
+  baseUrl: string;
+  /** 모델 이름(고객 시스템 기준). 없으면 서버 기본값에 맡긴다. */
+  model?: string;
+  /** Bearer 토큰(있으면). 로그·리포트에 싣지 않는다. */
+  apiKey?: string;
+  timeoutMs?: number;
+}
+
+export function makeRemoteCaller(t: RemoteTarget, actor = "system"): LlmCaller {
+  const base = t.baseUrl.replace(/\/+$/, "");
+  let host = "";
+  try {
+    host = new URL(base).hostname;
+  } catch {
+    throw new Error(`점검 대상 주소가 올바르지 않습니다: ${t.baseUrl}`);
+  }
+  // ① 봉인 검사 — 막히면 여기서 던진다(호출을 시작조차 하지 않는다).
+  assertEgressAllowed(host, "redteam-remote");
+  // ② 감사 — 대상과 실행자를 남긴다. 키는 남기지 않는다.
+  recordAudit({
+    kind: "config", // ⚠ kind는 필수다 — 빠지면 NOT NULL 위반으로 **조용히 무시**된다(감사가 안 남는다)
+    actor,
+    action: `외부 AI 엔드포인트 레드팀 점검 시작 — ${host}${t.model ? ` (${t.model})` : ""}`,
+    target: host,
+    detail: "남의 시스템에 공격 문구를 보내는 작업 — 동의 범위 다툼의 증거로 남긴다",
+    result: "ok",
+  });
+
+  return async (system: string, user: string): Promise<string> => {
+    const res = await fetch(`${base}/chat/completions`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(t.apiKey ? { Authorization: `Bearer ${t.apiKey}` } : {}),
+      },
+      body: JSON.stringify({
+        model: t.model ?? "gpt-3.5-turbo",
+        messages: [{ role: "system", content: system }, { role: "user", content: user }],
+        temperature: 0,
+        max_tokens: 300,
+      }),
+      signal: AbortSignal.timeout(t.timeoutMs ?? 60000),
+    });
+    // ③ 오류를 삼키지 않는다 — 못 잰 것은 못 쟀다고 해야 한다.
+    if (!res.ok) {
+      const 본문 = await res.text().catch(() => "");
+      throw new Error(`HTTP ${res.status} ${res.statusText}${본문 ? ` — ${본문.slice(0, 120)}` : ""}`);
+    }
+    const j = (await res.json()) as { choices?: { message?: { content?: string } }[] };
+    const 답 = j.choices?.[0]?.message?.content;
+    if (typeof 답 !== "string") throw new Error("응답에 choices[0].message.content가 없습니다(OpenAI 호환 규격이 아닐 수 있음)");
+    return 답;
   };
 }
 

@@ -36,6 +36,9 @@ export const EGRESS_POINTS: EgressPoint[] = [
   //   그래서 email.ts·siem.ts가 연결 직전에 assertEgressAllowed로 **호스트를 따로** 검사한다.
   //   봉인 대상 호스트는 설정값이라 고정 이름이 없다(내부망만 허용, 외부는 차단).
   { id: "smtp", label: "메일 발송(SMTP)", host: "설정한 메일 서버(소켓)", 대체: "내부망 릴레이만 허용 · 외부 메일 서버는 봉인" },
+  // 점검 서비스(2026-08-11) — 고객 AI 엔드포인트로 공격 문구를 보낸다. 호스트가 고정이 아니라
+  // 요청마다 다르므로(smtp·siem과 같은 처지) redteam.ts가 호출 직전 assertEgressAllowed로 검사한다.
+  { id: "redteam-remote", label: "외부 AI 엔드포인트 레드팀 점검", host: "점검 대상 주소(요청마다 다름)", 대체: "내부망 AI만 점검 · 외부 대상은 봉인(폐쇄망 고객은 현장에서 내부망으로 점검)" },
   { id: "siem", label: "SIEM 전달(syslog UDP·TCP·TLS)", host: "설정한 SIEM 서버(소켓)", 대체: "내부망 SIEM만 허용 · 외부는 봉인" },
   // ⚠ 자식 프로세스는 우리 관문 **밖**이다(2026-08-05 검토 지적). 오프라인 환경변수로 눌러
   //   두지만 완전한 차단은 아니라, 카탈로그에 이렇게 **정직하게** 싣는다.
