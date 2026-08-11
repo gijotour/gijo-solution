@@ -13,6 +13,7 @@
 // 재진입은 이미 관문을 지난 것이므로 trusted로 표시해 다시 세지 않는다.
 
 import { guardInput } from "./guardrail";
+import { sanitizePastedData } from "./pasteddata";
 import { recordAudit } from "./audit";
 import type { AttackCategory } from "./redteam";
 import { GUARDRAIL_BLOCK_MARK } from "./redteam";
@@ -223,6 +224,13 @@ export function gateUserInput(text: string, source: GateSource): GateResult {
         차단안내(해로움),
     };
   }
+
+  // ② 붙여넣은 **자료 구간**의 지시문 제거 — 검사(③ 가드레일)보다 **먼저**다.
+  //   순서가 중요하다: 자료 안에 심긴 "이전 지시 무시"를 먼저 들어내야, 그 문장 때문에
+  //   담당자의 정당한 요청("이 로그 요약해줘")이 통째로 차단되는 일이 없다.
+  //   자료 채널만 손대므로 오탐 대가가 없다 — 자세한 근거는 pasteddata.ts 머리글.
+  const 붙여넣기 = sanitizePastedData(text, { source });
+  text = 붙여넣기.text;
 
   const guard = guardInput(text, source);
   if (!guard.flagged) return { allowed: true, flagged: false, categories: [], text };
