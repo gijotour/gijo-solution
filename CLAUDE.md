@@ -25,9 +25,9 @@
 - `server/src/engine/localengine.ts` — llama-server 프로세스 풀(VRAM 예산·LRU 스왑). 임베딩은 8081 별도 상주.
 - 운영: Windows PC의 WSL2 systemd(gijo-as.service, /home/gijo/gijo-as/server, 포트 4000).
 
-## 공용 슬래시 명령 (.claude/commands/ — 양 머신 공통, 워크플로 표준)
+## 공용 슬래시 명령 (.claude/commands/ — 세 머신 공통, 워크플로 표준)
 - `/GIJOAS동기화` — 작업 시작 전 hub 최신 받기(ff-only, 충돌 안내 포함)
-- `/GIJOAS인계` — 작업 마무리: 커밋→(서버 변경 시)테스트→hub push→**상대 머신 인계 블록 출력**
+- `/GIJOAS인계` — 작업 마무리: 커밋→(서버 변경 시)테스트→hub push→**(서버/도구 변경 시 Windows는 `git push gb10 main`)**→**상대 머신 인계 블록 출력**
 - `/GIJOAS배포` — 운영(WSL) 배포. Windows=단계별 직접 수행, Mac=ssh 한 줄 안내 또는 인계
 - `/GIJOAS게시` — 클라 빌드·게시. **Windows 전용**(claude-deploy 계정, 실화면 검증 필수)
 - `/GIJOAS서버시작` — Mac=개발 서버 빌드·기동·health / Windows=운영(WSL) 상태확인·재시작(사용자 확인 후)
@@ -43,7 +43,7 @@
   (ssh → deploy-prod.ps1). 게시만 Windows.
 - 공용 파일(nav.js·screenguide.ts·agentloop.ts·routes.ts·CLAUDE.md)은 손대기 전 알리고, 작게 올려 바로 병합.
 
-## 서브에이전트 역할 분담 (.claude/agents/ — 양 머신 공통, 2026-07-29 확정)
+## 서브에이전트 역할 분담 (.claude/agents/ — 세 머신 공통, 2026-07-29 확정 · 2026-08-11 재검토 유지)
 | 역할 | 권한 | 맡기는 일 |
 |---|---|---|
 | **메인(총괄)** | 전부 | 코드 구현 · 커밋/hub push · 실앱 검증 · 서버 배포 · 게시 · QA — **직렬 자원 전부 + 최종 판단** |
@@ -52,6 +52,19 @@
 | `gijo-mockup`(시안) | mockups/ 전용 쓰기 | UI 시안(자체완결 HTML) 제작 — 추천 1개 원칙, 제품 코드 수정 금지 |
 - **검증·배포·게시·QA는 어떤 에이전트에도 위임 금지** — 운영 서버(4000)·CDP(9223)·로그인 세션(계정당 1개)이 직렬 자원이라 병렬 실행이 서로를 깨뜨린다(2026-07-28 실측). 이 일들은 메인이 순서대로 수행.
 - 서브 산출물은 **보고까지만** — 반영(수정·커밋)은 메인이 검토 후 수행. 에이전트 정의는 세션 시작 때 읽힘(추가·수정 후 다음 세션부터 인식).
+- ⚠ **외부 다중에이전트 프레임워크(bkit 등)를 얹지 않는다**(2026-08-11 검토·기각). 그쪽 핵심이 프론트·백엔드·QA **병렬 실행**인데 우리 직렬 자원(4000·9229·CDP·계정 1세션)과 정면충돌하고, PDCA·품질게이트는 우리에게 이미 **전중후 계획서 + 시안 1개 + 평가게이트 + QA전수조사 + guidance-check/falseclaim**으로 있다. 둘을 함께 두면 「같은 것을 여러 곳에 적으면 어긋난다」가 방법론 층에서 재발한다. 써볼 땐 **빈 연습 저장소에서 격리 시험**.
+
+## 자율성 단계 — 어디까지 스스로 하고 어디서 멈추나 (2026-08-11 명문화)
+> 지금까지 글로 흩어져 있던 것을 표로 모은 것이다. 새 규칙이 아니라 **같은 규칙의 단일 출처**다.
+> 예약 루틴·서브에이전트에도 그대로 적용된다.
+
+| 단계 | 무엇 | 예 |
+|---|---|---|
+| **바로 한다** | 읽기·조사·측정(운영 데이터 안 바꾸는)·시험 실행·로컬 커밋·hub/gb10 push | grep·시험·`wsl-test.sh`·상태 확인 |
+| **하고 보고한다** | 되돌리기 쉽고 내 작업 범위 안인 상태 변경 | 홈 디렉터리 설치(Node·chromium)·ssh config·scratchpad |
+| **이해한 범위를 먼저 확인받는다** | 코드 구현 전반(관례 명령 "빌드해줘" 등은 예외) | 기능 추가·리팩터·공용 파일 수정 |
+| **승인 없이는 안 한다** | UI 변경(시안 1개 먼저) · 게시(dist·publish-release) · 운영 배포·서버 재시작 · GitHub(origin) push · major 올림 · 계획서에 없는 큰 작업 | — |
+| **절대 안 한다** | 미커밋 변경을 `git checkout`으로 날리기 · 남의 대역 스캔 · 측정 중 같은 계정 중복 로그인 · 예약 루틴이 코드 수정·배포 | — |
 
 ## 환경별 역할 — **무엇을 어디서 재는가** (2026-08-10 확립, 실사고 기반)
 > **제품이 도는 환경에서 잰다.** 편집하는 곳에서 재면 딴 환경을 검증하게 된다.
@@ -62,6 +75,7 @@
 | 서버 배포·의존성 확인 | WSL | `scripts/check-python-deps.mjs`를 **돌아갈 환경에서** |
 | 클라 빌드·게시·실화면 | **Windows**(exe) / Mac(dmg) | electron-builder·CDP가 거기 묶여 있다 |
 | `git ls-files`·이미지가 필요한 시험 | Windows 호스트 | WSL 사본은 git 저장소가 아니고 이미지를 안 가져간다 |
+| **ARM CUDA 빌드·실측**(llama.cpp `sm_121a`·네이티브 부품·통합메모리 티어) | **GB10** — `ssh gb10` | Pro/올인원이 실제로 돌 곳이 그 맨바닥이다. x86 CUDA·Metal에서는 원리상 못 잰다 |
 
 - ⚠ **서버 시험을 Windows에서 돌리지 말 것.** 느린 게 문제가 아니라 **딴 환경을 재는 것**이 문제다.
   실사고(2026-08-09~10): Windows의 `python3`은 **0바이트 껍데기**라 「제품 결함」으로 오판했고,
@@ -74,10 +88,22 @@
   (check-python-deps · pythondeps.test · wsl-test).
   단, Mac/Windows 에디션이 **다른 제품**이 되거나 릴리스가 갈리면 그때 다시 판단한다.
 
-## 2머신 개발환경 (Windows ↔ M1 Max) — GIJO_AS_2머신_개발환경_가이드.md
+## 3머신 개발환경 (Windows ↔ M1 Max ↔ GB10) — GIJO_AS_2머신_개발환경_가이드.md
 - Windows(desktop-4qplvnc)=주개발·윈도우 클라 테스트·운영 WSL·git 허브(D:\gijo-hub.git)·WireGuard 서버(10.8.0.1).
 - Mac(M1 Max 32GB)=mac 올인원(서버+Metal LLM) 개발·검증. VPN=client-mac.conf(10.8.0.11). 코드는 GitHub 또는 `ssh://user@10.8.0.1/d:/gijo-hub.git`.
+- **GB10(NVIDIA DGX Spark · ARM CUDA)=Pro/올인원 타깃 실측**(2026-08-11 편입). `ssh gb10`(10.8.0.12·계정 gijohn_llm). 상세는 아래 「GB10」 절.
 - 대용량(models/·data/)은 **시점 복사**(scp)만 — 실시간 동기화·양쪽 동시 사용 금지(DB 분기·깨짐). 원본은 WSL 운영.
+- **git 방향이 머신마다 다르다**: Mac은 hub에서 **당겨간다**(pull). GB10은 **Windows가 밀어넣는다**(push) — Windows sshd가 관리자 계정이라 GB10의 키를 `administrators_authorized_keys`에 넣으려면 권한 승격이 필요해서, 방향을 뒤집었다.
+
+## GB10 (ARM CUDA) — 무엇을 어떻게 (2026-08-11 편입)
+- **붙기**: `ssh gb10`(별칭 등록됨). ⚠ 내부망 192.168.219.66은 GB10 자기 공유기 안쪽이라 **이 PC에서 안 닿는다** — 통로는 WireGuard뿐. RTT 70~106ms라 **대용량 복사는 느리다**.
+- **코드 전달**: Windows에서 `git push gb10 main`. GB10 쪽 `receive.denyCurrentBranch=updateInstead`라 push하면 **작업트리까지 갱신**된다(GB10에서 pull 불필요).
+  ⚠ **Mac에서 GB10에 직접 밀지 말 것** — 두 곳에서 밀면 작업트리가 엉킨다. GB10 반영은 Windows 담당.
+- **환경**: 저장소 `~/gijo-as` · Node는 홈 tarball(`~/.local/opt/node`) · CUDA 13.0. **비대화형 ssh는 `.bashrc`를 안 읽으니 원격 명령마다 `. ~/gijo-env.sh` 먼저** 붙일 것.
+- **llama.cpp**: `-DGGML_CUDA=ON -DCMAKE_CUDA_ARCHITECTURES=121`(cmake가 `121a`로 올려 잡음). Windows와 **같은 판본**으로 맞춰야 실측을 비교할 수 있다.
+- ⚠ **nvidia-smi가 GPU 메모리를 `[N/A]`로 준다**(통합메모리·드라이버 차원 — 컨테이너 안에서도 같다). 판정은 `server/src/util/unifiedmem.ts` **한 곳**에서 받는다. 새로 nvidia-smi로 메모리를 읽는 코드를 쓰면 `server/test/unifiedmem.test.ts`의 소스 감시가 실패한다. **CUDA 런타임 API(llama.cpp `--list-devices`)는 정확히 보고한다** — 더 정밀한 값이 필요하면 그 경로.
+- ⚠ **npm 11.17+ allow-scripts 함정**: `npm ci`가 몇 초에 끝나고 「install scripts not yet covered by allowScripts」를 경고한다. **시간도 파일 존재도 증거가 아니다** — 네이티브 부품은 **불러서 기능까지** 확인할 것(모듈 확인 스크립트는 반드시 `server/` **안에서** 실행 — node가 스크립트 위치 기준으로 node_modules를 찾는다). 라이트 이미지 굽기·운영 배포에서 이 관문을 다시 만난다.
+- ⚠ **도커로 배포하지 않는다**(2026-08-11 판단). Docker 29.2.1 + NVIDIA Container Toolkit이 깔려 있고 GPU는 CDI(`--device nvidia.com/gpu=all`)로 붙지만, 라이트 배포는 WSL 이미지로 정해져 있고(고객 PC에 Docker Desktop을 얹는 건 「클라만 받아도 혼자」와 반대), 「제품이 도는 환경에서 잰다」에도 어긋난다. 도커는 **재현 검증·다른 CUDA 판본 시험** 용도로만.
 
 ## Mac에서의 주 임무 (Phase 2) — GIJO_AS_MAC_올인원_배포_가이드.md
 1. llama.cpp Metal 빌드(`cmake -B build -DGGML_METAL=ON`) → `llama.cpp/build/bin/llama-server` (경로 util/llamabin.ts가 darwin 자동 해석, `-ngl -1` Metal 동작)

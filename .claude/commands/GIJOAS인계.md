@@ -4,7 +4,12 @@
 
 1. `git status --short` — 커밋 안 된 작업 변경이 있으면 프로젝트 컨벤션(한국어 커밋 메시지, 왜/무엇 중심)으로 커밋한다. 무엇을 커밋할지 애매하면 사용자에게 확인.
    - 커밋 제외 대상: server-dist 산출물, data/·models/ 실데이터, mac 전용 네이티브 부산물(darwin binding 등), .tmp/스크래치.
-2. **server/ 를 건드렸으면 `npm test` 실행** — 실패하면 push 금지, 실패 내용 보고 후 중단.
+2. **server/ 를 건드렸으면 시험 실행** — 실패하면 push 금지, 실패 내용 보고 후 중단.
+   - ⚠ **Windows에서는 `npm test`를 쓰지 말 것.** 제품이 WSL에서 돈다 —
+     `wsl -d Ubuntu-24.04 -- bash "/mnt/d/Connect AI/tools/wsl-test.sh"`(전체 ~30초).
+     그 사본이 구조적으로 못 도는 2개(`no-hardcoded-credentials`·`shotlist`)만 Windows에서 따로:
+     `cd 'D:\Connect AI\server'; npx vitest run test/no-hardcoded-credentials.test.ts test/shotlist.test.ts`
+     **두 쪽을 다 돌려야 「전부 통과」라고 말할 수 있다.** (Mac은 `npm test` 그대로.)
 3. **의존성 변경 확인(자동)** — 사람 기억에 맡기지 말고 실제로 본다:
    ```
    git diff --name-only <직전 인계 커밋>..HEAD -- server/package.json client/package.json
@@ -20,6 +25,9 @@
      main에 직접 push하지 않는다. `GIJO_AS_공동작업_가이드.md` 참조.
    - `hub`가 있고 혼자 하는 작업이면 → `git push hub main`
    - `hub`가 없으면(외부 협업자 머신) → `git push origin <브랜치>` + PR. **origin이 유일한 통로다.**
+   - **Windows에서 `server/`나 `tools/`를 건드렸으면 GB10에도 밀어넣는다** → `git push gb10 main`
+     (GB10은 `updateInstead`라 push만으로 작업트리까지 갱신된다 — 거기서 pull하지 않는다).
+     ⚠ **Mac은 GB10에 밀지 않는다** — 두 곳에서 밀면 GB10 작업트리가 엉킨다. GB10 반영은 Windows 담당.
 4. 마지막에 **아래 형식의 "인계 블록"을 복사 가능한 코드블록으로 출력**한다 (사용자가 반대편 Claude에 붙여넣는 용도):
 
 ```
@@ -45,4 +53,6 @@
   또 비켜 가느라 아무도 안 하는 자리가 생긴다.
 - 긴급 건을 받아 계획이 바뀌면 **다음 인계에서 갱신**한다. 오래된 예고가 더 나쁘다.
 
-역할 규칙(변하지 않음): 게시(/GIJOAS게시)와 운영 배포(/GIJOAS배포 실행)는 Windows 담당. Mac은 hub push까지. GitHub(origin)는 사용자 명시 요청 시만.
+역할 규칙(변하지 않음): 게시(/GIJOAS게시)와 운영 배포(/GIJOAS배포 실행)는 Windows 담당. Mac은 hub push까지. **GB10 반영(`git push gb10`)도 Windows 담당.** GitHub(origin)는 사용자 명시 요청 시만.
+
+세 머신이므로 인계 블록의 「상대 머신」은 상황에 따라 둘일 수 있다 — Mac에 넘길 것과 GB10에서 재야 할 것이 다르면 **각각 적는다**(GB10은 사람이 앉아 있지 않으니 「Windows가 대신 할 일」로 적는다).
