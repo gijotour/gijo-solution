@@ -5,9 +5,9 @@
 import type { Express } from "express";
 import * as fs from "fs";
 import * as os from "os";
-import { execFileSync } from "child_process";
 import { authMiddleware, adminMiddleware } from "../auth/auth";
 import { llamaBinPath } from "../util/llamabin";
+import { gpuMemoryReport } from "../util/unifiedmem";
 import { usingDefaultCredential } from "../auth/users";
 import { dbCryptStatus } from "./dbcrypt";
 
@@ -23,12 +23,17 @@ function gpuAvailable(): { ok: boolean; detail: string } {
     const totalGb = (os.totalmem() / 1024 / 1024 / 1024).toFixed(0);
     return { ok: true, detail: `Apple Metal · 통합메모리 ${totalGb}GB` };
   }
-  try {
-    const out = execFileSync("nvidia-smi", ["--query-gpu=name,memory.total", "--format=csv,noheader"], { timeout: 5000 }).toString().trim();
-    return { ok: true, detail: out.split("\n")[0] || "GPU 감지" };
-  } catch {
-    return { ok: false, detail: "nvidia-smi 없음 — GPU 미감지(로컬 LLM이 느리거나 불가)" };
+  // ⚠ nvidia-smi를 여기서 직접 읽지 않는다. 예전엔 출력을 그대로 detail에 넣어 GB10에서
+  //   "NVIDIA GB10, [N/A]"를 띄웠고, **pass로 넘겼다** — 같은 순간 구동 티어는 「GPU 없음」이라
+  //   말해 두 화면이 서로 모순됐다(2026-08-11 실측). 판정은 util/unifiedmem.ts 한 곳에서 받는다.
+  const 보고 = gpuMemoryReport();
+  if (보고.kind === "none") return { ok: false, detail: "nvidia-smi 없음 — GPU 미감지(로컬 LLM이 느리거나 불가)" };
+  if (보고.kind === "unified") {
+    // 통합메모리(ARM CUDA — GB10·Jetson): GPU 전용 메모리를 따로 셀 수 없다. 시스템 총량을 적는다.
+    const totalGb = (os.totalmem() / 1024 / 1024 / 1024).toFixed(0);
+    return { ok: true, detail: `${보고.name} · 통합메모리 ${totalGb}GB(CPU와 공유 — GPU 전용 메모리 없음)` };
   }
+  return { ok: true, detail: `${보고.name} · VRAM ${보고.totalMb} MiB` };
 }
 
 export async function runPreflight(): Promise<{ checks: PreflightCheck[]; ready: boolean }> {

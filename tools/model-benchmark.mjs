@@ -13,6 +13,7 @@
 
 import { spawn, execFileSync } from "node:child_process";
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -28,12 +29,34 @@ const CTX = Number(arg("ctx", 8192));
 const PROMPT = arg("prompt", "보안 담당자를 위해 KEV 등재 취약점의 조치 우선순위 원칙을 3줄로 설명해줘.");
 const GEN_TOKENS = Number(arg("tokens", 160));
 
-function gpu() {
+/** /proc/meminfo의 MemAvailable(MB) — 「지금 실제로 더 쓸 수 있는 양」. 못 읽으면 null. */
+function memAvailableMb() {
   try {
-    const out = execFileSync("nvidia-smi", ["--query-gpu=memory.total,memory.used,memory.free", "--format=csv,noheader,nounits"], { encoding: "utf-8" });
-    const [total, used, free] = out.trim().split("\n")[0].split(",").map((s) => parseInt(s.trim(), 10));
-    return { total, used, free };
+    const m = /^MemAvailable:\s+(\d+)\s*kB/m.exec(fs.readFileSync("/proc/meminfo", "utf-8"));
+    return m ? Math.round(Number(m[1]) / 1024) : null;
   } catch { return null; }
+}
+
+// ⚠ 통합메모리 기계(NVIDIA GB10·DGX Spark·Jetson)는 nvidia-smi가 GPU 메모리를 **[N/A]** 로 준다.
+//   예전엔 그것을 parseInt로 읽어 NaN을 얻고도 null을 안 돌려줬다 → 티어 판정이 「❌ 미지원 환경」을
+//   찍고, 모델 스킵 판단(여유 VRAM 비교)이 NaN 비교가 돼 조용히 무너졌다(2026-08-11 GB10에서 확인).
+//   제품 쪽 단일 출처는 server/src/util/unifiedmem.ts다. 이 파일은 .mjs라 그 모듈을 import할 수
+//   없어 같은 판정을 한 번 더 적는다 — **둘이 어긋나지 않게** server/test/unifiedmem.test.ts가
+//   이 파일을 감시한다. 고칠 때는 두 곳을 같이 고칠 것.
+function gpu() {
+  let name = null, total = NaN, used = NaN, free = NaN;
+  try {
+    const out = execFileSync("nvidia-smi", ["--query-gpu=name,memory.total,memory.used,memory.free", "--format=csv,noheader,nounits"], { encoding: "utf-8" });
+    const parts = out.trim().split("\n")[0].split(",");
+    name = (parts[0] ?? "").trim();
+    [total, used, free] = parts.slice(1).map((s) => parseInt(s.trim(), 10));
+  } catch { return null; } // nvidia-smi 자체가 없다 = GPU 없음
+  if (!name) return null;
+  if (Number.isFinite(total) && total > 0) return { name, total, used, free, unified: false };
+  // 통합메모리: GPU 전용 메모리가 없다 — 시스템 메모리로 센다(모델도 여기 올라간다).
+  const totalMb = Math.round(os.totalmem() / 1048576);
+  const freeMb = memAvailableMb() ?? Math.round(os.freemem() / 1048576);
+  return { name, total: totalMb, used: Math.max(0, totalMb - freeMb), free: freeMb, unified: true };
 }
 
 function listModels() {
@@ -153,7 +176,13 @@ function printTier(g) {
     return;
   }
   console.log(`## GIJO AS 티어 판정 (이 장비 기준)`);
-  console.log(`- **판정: ${t.name}** — 총 VRAM ${(g.total / 1024).toFixed(1)}GB`);
+  if (g.unified) {
+    // 「총 VRAM」이라 부르면 거짓이다 — CPU와 나눠 쓰는 메모리다.
+    console.log(`- **판정: ${t.name}** — ${g.name} · 통합메모리 ${(g.total / 1024).toFixed(1)}GB(CPU와 공유)`);
+    console.log(`- ⚠ 티어 표는 **32GB급까지만** 정의돼 있다 — 이보다 큰 통합메모리에서 몇 개까지 상주 가능한지는 실측 후 판단할 것(표를 넓히는 것은 제품 결정).`);
+  } else {
+    console.log(`- **판정: ${t.name}** — 총 VRAM ${(g.total / 1024).toFixed(1)}GB`);
+  }
   console.log(`- 권장 구성: ${t.models} · 컨텍스트 ${t.ctx}`);
   console.log(`- 설치 설정(환경변수):`);
   for (const e of t.env) console.log(`  \`${e}\``);
@@ -165,7 +194,7 @@ function printTier(g) {
 async function main() {
   const g = gpu();
   console.log(`# 모델 실측 벤치마크 (${new Date().toLocaleString("ko-KR")})`);
-  console.log(`- GPU: ${g ? `total ${g.total}MB · used ${g.used}MB · free ${g.free}MB` : "nvidia-smi 없음"} · ctx=${CTX} · gen=${GEN_TOKENS}tok`);
+  console.log(`- GPU: ${g ? `${g.name} · total ${g.total}MB · used ${g.used}MB · free ${g.free}MB${g.unified ? " (통합메모리 — 시스템 메모리로 실측)" : ""}` : "nvidia-smi 없음"} · ctx=${CTX} · gen=${GEN_TOKENS}tok`);
   console.log("");
   printTier(g);
 

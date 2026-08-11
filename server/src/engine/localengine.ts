@@ -15,6 +15,7 @@ import * as os from "os";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { llamaBinPath } from "../util/llamabin";
+import { gpuMemoryReport, linuxAvailableMb } from "../util/unifiedmem";
 import { db } from "../db";
 import { emitLlmActivity, modelBasename } from "./llmactivity";
 import { adaptModel, getAdaptation, type ModelAdaptation } from "./modelquirks";
@@ -189,8 +190,12 @@ export function pickAutoStartModelId(): string | null {
 }
 
 // ── VRAM 예산 & 포트 할당 ────────────────────────────────────────────────────
-// Apple Silicon(mac)은 통합메모리라 GPU(Metal)가 시스템 RAM을 공유한다 — nvidia-smi가 없으므로
-// "여유 VRAM" = 여유 시스템 메모리로 본다. 이렇게 하면 makeRoom·티어 판정이 mac에서도 실수치로 돈다.
+// 통합메모리 기계는 GPU 전용 VRAM이 따로 없다 — "여유 VRAM" = 여유 시스템 메모리로 본다.
+// 이렇게 해야 makeRoom·티어 판정이 그 기계에서도 실수치로 돈다. 두 경우가 있다:
+//   ① Apple Silicon(mac) — nvidia-smi가 **아예 없다**. IS_MAC으로 가른다.
+//   ② ARM CUDA(NVIDIA GB10·Jetson) — nvidia-smi는 **있는데 메모리만 [N/A]** 로 준다.
+//      gpuMemoryReport().kind === "unified"로 가른다(판정은 util/unifiedmem.ts 한 곳).
+//      2026-08-11 GB10 실측 전까지 이 갈래가 없어 121GB 기계를 「GPU 없음」으로 봤다.
 const IS_MAC = process.platform === "darwin";
 /**
  * macOS에서 「지금 더 쓸 수 있는 메모리」(MB).
@@ -243,8 +248,21 @@ function macAvailableMb(): Promise<number> {
   });
 }
 
+/**
+ * 통합메모리 CUDA 기계(GB10 등)에서 「지금 더 쓸 수 있는 메모리」(MB) — mac의 macAvailableMb와 같은 자리.
+ * MemAvailable을 못 읽으면 os.freemem()으로 물러난다(mac과 같은 처리). 리눅스에서는 그 값이
+ * MemAvailable과 거의 같아(GB10 실측 차 6MB) 물러나도 판단이 크게 흔들리지 않는다 —
+ * 그래도 기준을 못박으려 MemAvailable을 먼저 읽는다(util/unifiedmem.ts 주석 참조).
+ */
+function unifiedAvailableMb(): number {
+  return linuxAvailableMb() ?? Math.round(os.freemem() / 1024 / 1024);
+}
+
 function getFreeVramMb(): Promise<number | null> {
   if (IS_MAC) return macAvailableMb();
+  // 통합메모리 CUDA(GB10 등): nvidia-smi가 memory.free를 [N/A]로 준다. 시스템이 지금 더 내줄 수
+  // 있는 양이 곧 GPU 여유다 — mac 갈래와 같은 기준(MemAvailable).
+  if (gpuMemoryReport().kind === "unified") return Promise.resolve(unifiedAvailableMb());
   return new Promise((resolve) => {
     execFile("nvidia-smi", ["--query-gpu=memory.free", "--format=csv,noheader,nounits"], (err, stdout) => {
       if (err) return resolve(null);
@@ -282,6 +300,25 @@ export function getGpuUsage(): Promise<GpuUsage> {
         memTotalMb: totalMb,
         memPercent: totalMb > 0 ? Math.round((usedMb / totalMb) * 100) : 0,
       };
+    });
+  }
+  // 통합메모리 CUDA(GB10 등): nvidia-smi가 **사용률은 주고 메모리만 [N/A]** 로 준다.
+  // → 사용률은 nvidia-smi에서 받고, 메모리는 시스템 값으로 채운다(makeRoomFor와 같은 기준이어야
+  //   화면과 판단이 어긋나지 않는다 — mac에서 배운 것과 같은 이유).
+  if (gpuMemoryReport().kind === "unified") {
+    const totalMb = Math.round(os.totalmem() / 1024 / 1024);
+    const usedMb = Math.max(0, totalMb - unifiedAvailableMb());
+    return new Promise((resolve) => {
+      execFile("nvidia-smi", ["--query-gpu=utilization.gpu", "--format=csv,noheader,nounits"], (err, stdout) => {
+        const util = err ? NaN : parseInt(String(stdout).trim().split("\n")[0], 10);
+        resolve({
+          available: true, // GPU는 분명히 있다 — 메모리를 못 세는 것과 없는 것은 다르다
+          utilization: Number.isFinite(util) ? Math.max(0, Math.min(100, util)) : 0,
+          memUsedMb: usedMb,
+          memTotalMb: totalMb,
+          memPercent: totalMb > 0 ? Math.round((usedMb / totalMb) * 100) : 0,
+        });
+      });
     });
   }
   return new Promise((resolve) => {
@@ -983,6 +1020,24 @@ export async function ensureModelServed(modelId: string): Promise<string> {
   return `http://localhost:${model.port}/v1`;
 }
 
+/**
+ * 구동 티어 화면에 보여줄 근거 한 줄.
+ *
+ * ⚠ 「GPU를 찾지 못했습니다」는 **정말 못 찾았을 때만** 말한다. 2026-08-11까지 GB10(1 PetaFLOP,
+ *   통합메모리 121GB)에 대고 이 문구를 띄웠다 — nvidia-smi가 메모리를 [N/A]로 준 것을
+ *   「GPU 없음」으로 읽었기 때문이다. 제품이 사용자에게 거짓을 말한 자리다.
+ */
+function tierReason(gpu: GpuUsage, recommended: GijoTierSpec["id"] | null): string {
+  if (!gpu.available) return "NVIDIA GPU를 찾지 못했습니다(nvidia-smi 없음) — 로컬 LLM 구동 미지원 환경입니다.";
+  const desc = GIJO_TIERS.find((t) => t.id === recommended)?.desc ?? "";
+  const gb = (gpu.memTotalMb / 1024).toFixed(1);
+  if (IS_MAC) return `Apple Metal · 통합메모리 ${gb}GB — ${desc}`;
+  const 보고 = gpuMemoryReport();
+  // 통합메모리 CUDA는 「총 VRAM」이라 부르면 거짓이다 — CPU와 나눠 쓰는 메모리다.
+  if (보고.kind === "unified") return `${보고.name} · 통합메모리 ${gb}GB(CPU와 공유) — ${desc}`;
+  return `총 VRAM ${gb}GB — ${desc}`;
+}
+
 export function registerLocalEngineRoutes(app: Express): void {
   app.get("/api/localengine/status", authMiddleware, (_req, res) => {
     res.json(getLocalEngineStatus());
@@ -999,11 +1054,7 @@ export function registerLocalEngineRoutes(app: Express): void {
         gpu: gpu.available ? { totalMb: gpu.memTotalMb, usedMb: gpu.memUsedMb, freeMb: gpu.memTotalMb - gpu.memUsedMb, utilization: gpu.utilization } : null,
         current,
         recommended,
-        reason: gpu.available
-          ? IS_MAC
-            ? `Apple Metal · 통합메모리 ${(gpu.memTotalMb / 1024).toFixed(1)}GB — ${GIJO_TIERS.find((t) => t.id === recommended)?.desc ?? ""}`
-            : `총 VRAM ${(gpu.memTotalMb / 1024).toFixed(1)}GB — ${GIJO_TIERS.find((t) => t.id === recommended)?.desc ?? ""}`
-          : "NVIDIA GPU를 찾지 못했습니다(nvidia-smi 없음) — 로컬 LLM 구동 미지원 환경입니다.",
+        reason: tierReason(gpu, recommended),
         tiers: GIJO_TIERS,
       });
     })
