@@ -1449,7 +1449,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   // ── GIJO 구동 티어(Lite/Standard/Pro) — GPU 실측·자동 판정·원클릭 적용 ──
   let tierInfo = null;
   const tierEl = (id) => document.getElementById(id);
-  function tierName(id) { return id === "lite" ? "Lite" : id === "standard" ? "Standard" : id === "pro" ? "Pro" : id; }
+  // ⚠ Lite는 이름에 제약을 달고 다닌다 — 여기서 떼면 지금 쓰는 사람이 표준과 같은 것으로 읽는다(2026-08-12).
+  function tierName(id) { return id === "lite" ? "Lite (일부 기능 제약)" : id === "standard" ? "Standard" : id === "pro" ? "Pro" : id; }
 
   // 전문가 어댑터 등록부(보기 전용, 2026-08-08) — 행 24px, 조작은 대화창 안내.
   async function loadAdapterRegistry() {

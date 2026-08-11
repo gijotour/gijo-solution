@@ -88,10 +88,18 @@ export interface GijoTierSpec {
   overheadMb: number;
   desc: string;
 }
+// ⚠ **채팅 모델 수는 실측으로 다시 잡았다**(2026-08-12). 14B@32K = 13.2GB · 임베딩(bge-m3) = 2.5GB
+//   실측 기준이라, 예전 값(Standard 2개·Pro 3개)은 **VRAM을 넘긴다**:
+//     32GB 기계에 Pro(3개)를 권하면 13.2×3 + 2.5 = **42.1GB** — 따르면 터진다.
+//   지금 값: Standard 13.2+2.5=15.7GB(24GB에 여유 8.3) · Pro 26.4+2.5=28.9GB(32GB에 여유 3.1).
+//   ★ 이제 **주 변수는 동시 모델 수가 아니라 ctx**다 — LoRA 설계(베이스 1 + 어댑터 N)라
+//     6에이전트가 14B 하나를 공유한다. 근거: `GIJO_AS_모델_메모리_실측_2026-08-10.md` §5
 export const GIJO_TIERS: GijoTierSpec[] = [
-  { id: "lite", label: "Lite", vramLabel: "12GB급", maxLoadedModels: 1, ctxSize: 16384, overheadMb: 3500, desc: "채팅 LLM 1개 · 16K 컨텍스트 — 1인 담당자·엔트리 GPU" },
-  { id: "standard", label: "Standard", vramLabel: "24GB급", maxLoadedModels: 2, ctxSize: 32768, overheadMb: 5000, desc: "채팅 LLM 2개 · 32K — 2~3인 팀(현행 기본값)" },
-  { id: "pro", label: "Pro", vramLabel: "32GB급", maxLoadedModels: 3, ctxSize: 32768, overheadMb: 5000, desc: "채팅 LLM 3개 · 32K — SOC 팀·대용량 GPU" },
+  // Lite는 **작은 모델(7.6B급) 전제**다 — 14B는 16K로 줄여도 11GB 안팎이라 12GB에 안 들어간다.
+  // 「일부 기능 제약」을 이름에 달아 둔다: 여기서 표준 기능 전량을 보증하지 않는다(2026-08-12 사용자 지시).
+  { id: "lite", label: "Lite (일부 기능 제약)", vramLabel: "12GB급", maxLoadedModels: 1, ctxSize: 16384, overheadMb: 3500, desc: "채팅 LLM 1개 · 16K — 작은 모델(7.6B급) 전제. 긴 문서 요약·다인 동시 사용에 제약이 있고, 표준 기능 전량은 24GB급부터입니다." },
+  { id: "standard", label: "Standard", vramLabel: "24GB급", maxLoadedModels: 1, ctxSize: 32768, overheadMb: 5000, desc: "채팅 LLM 1개 · 32K — 표준 구성(14B 기준 15.7GB 점유)" },
+  { id: "pro", label: "Pro", vramLabel: "32GB급", maxLoadedModels: 2, ctxSize: 32768, overheadMb: 5000, desc: "채팅 LLM 2개 · 32K — A/B·검증 병행(14B 기준 28.9GB 점유)" },
 ];
 function storedTier(): GijoTierSpec | null {
   try {
@@ -107,8 +115,12 @@ export function currentTierSettings(): { tier: GijoTierSpec["id"] | null; maxLoa
   return { tier: null, maxLoadedModels: MAX_LOADED_MODELS, ctxSize: DEFAULT_CTX_SIZE, overheadMb: MODEL_VRAM_OVERHEAD_MB };
 }
 // VRAM 총량 기준 권장 티어 — tools/model-benchmark.mjs 판정과 동일 기준.
+// ⚠ 경계도 실측으로 다시 잡았다(2026-08-12). 예전엔 28000 이상이면 Pro였는데,
+//   그 Pro가 채팅 3개(42.1GB 필요)라 **32GB 기계에 터지는 설정을 권하고 있었다.**
+//   지금은 24GB급(24576)부터 Standard, 32GB급(32768)부터 Pro다.
+//   24GB 미만은 Lite — 표준 기능 전량을 보증하지 않는 구간이라 티어 설명에 그렇게 적어 둔다.
 export function recommendTier(totalMb: number): GijoTierSpec["id"] {
-  return totalMb < 16000 ? "lite" : totalMb < 28000 ? "standard" : "pro";
+  return totalMb < 24000 ? "lite" : totalMb < 32000 ? "standard" : "pro";
 }
 const setStateStmt = db.prepare(
   "INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
