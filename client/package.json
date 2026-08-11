@@ -39,7 +39,8 @@
     "extraResources": [
       {
         "from": "server-dist",
-        "to": "server-dist"
+        "to": "server-dist",
+        "filter": ["**/*", "!**/*.map"]
       }
     ],
     "win": {
