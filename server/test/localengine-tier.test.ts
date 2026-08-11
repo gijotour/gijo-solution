@@ -22,7 +22,7 @@ describe("GIJO 구동 티어 (Lite/Standard/Pro)", () => {
   // ★ 이 시험이 지키는 것은 「숫자가 문서와 같은가」가 아니라 **권장이 기계를 안 터뜨리는가**다.
   //   실사고 직전(2026-08-12 발견): Pro가 채팅 3개였고 recommendTier가 28GB부터 Pro를 권해,
   //   32GB 기계에 **42.1GB 필요한 설정**을 권하고 있었다. 권장 판정 자체가 위험한 조언이었다.
-  const 티어VRAM: Record<string, number> = { lite: 12, standard: 24, pro: 32 };
+  const 티어VRAM: Record<string, number> = { lite: 12, standard: 24, pro: 48 }; // Pro는 48GB급(사용자 결정 2026-08-12)
 
   it("★ 등급 이름표(24GB급 등)가 그 플랫폼에서 실제로 들어가는 크기다", () => {
     // ⚠ CUDA만 보면 안 된다 — Metal은 같은 모델이 21% 무겁다(2026-08-12 Mac 실측:
@@ -33,10 +33,12 @@ describe("GIJO 구동 티어 (Lite/Standard/Pro)", () => {
     }
   });
 
-  it("★ Metal 32GB에는 Pro를 권하지 않는다 — 2개면 33.5GB라 축출·스왑이 반복된다", () => {
-    expect(tierFits(GIJO_TIERS[2], 32 * 1024, "metal")).toBe(false);
+  it("★ 32GB에는 Pro를 권하지 않는다 — Metal은 33.6GB라 못 들어가고, CUDA도 48GB급 약속 미만이다", () => {
+    expect(tierFits(GIJO_TIERS[2], 32 * 1024, "metal"), "Metal 32GB에 Pro가 들어간다고 봤다").toBe(false);
     expect(recommendTier(32 * 1024, "metal")).toBe("standard");
-    expect(recommendTier(32 * 1024, "cuda"), "CUDA 32GB는 Pro가 맞다").toBe("pro");
+    expect(recommendTier(32 * 1024, "cuda"), "CUDA 32GB는 계산상 들어가도 48GB급 약속 미만이다").toBe("standard");
+    expect(recommendTier(48 * 1024, "cuda"), "48GB CUDA는 Pro").toBe("pro");
+    expect(recommendTier(48 * 1024, "metal"), "48GB Metal도 Pro(33.6GB)").toBe("pro");
   });
 
   describe("★ 예정 등급(Max·관제용) — 보이되 고를 수 없다", () => {
@@ -85,9 +87,10 @@ describe("GIJO 구동 티어 (Lite/Standard/Pro)", () => {
     expect(recommendTier(12288)).toBe("lite"); // 12GB
     expect(recommendTier(16384)).toBe("lite"); // 16GB — 14B 32K가 안 들어간다
     expect(recommendTier(24576)).toBe("standard"); // 24GB (현행 운영)
-    expect(recommendTier(32768)).toBe("pro"); // 32GB
-    // ⚠ 예전 경계(28000부터 pro)의 회귀 방지 — 32GB 미만에 Pro를 권하면 안 된다.
-    expect(recommendTier(28672), "28GB에 Pro를 권하면 채팅 2개가 안 들어간다").toBe("standard");
+    expect(recommendTier(49152)).toBe("pro"); // 48GB — Pro는 48GB급
+    // ⚠ 회귀 방지: 예전엔 28GB부터 Pro였다(채팅 3개 = 42.1GB 필요). 지금은 48GB 미만이면 Standard다.
+    expect(recommendTier(28672)).toBe("standard");
+    expect(recommendTier(32768), "32GB에 Pro를 권하면 Metal에서 축출·스왑이 반복된다").toBe("standard");
   });
 
   it("저장된 티어가 없으면 환경변수/기본값으로 동작한다", () => {

@@ -88,6 +88,13 @@ export interface GijoTierSpec {
   overheadMb: number;
   desc: string;
   /**
+   * 이 등급의 **최소 요구 VRAM(GB)**. 계산상 들어가더라도 이 밑이면 권하지 않는다.
+   * ⚠ 왜 계산만으로 안 되나: 계산은 「지금 이 모델이 딱 들어가는가」만 본다. 등급은 그보다 큰 약속이다 —
+   *   여유가 없으면 모델을 조금만 키우거나 문서를 길게 물어도 바로 축출·스왑으로 간다.
+   *   사양 확정 전(예정 등급)이면 비워 둔다.
+   */
+  minVramGb?: number;
+  /**
    * **아직 못 파는 등급**. 표에는 보이되 고를 수 없고, 권장 판정에도 안 들어간다.
    * ⚠ 지금 없는 것을 고를 수 있게 두면 담당자가 골랐다가 안 되는 것을 겪는다 —
    *   「가짜 UI 금지」와 같은 자리다. 예정은 예정이라고만 적는다.
@@ -103,9 +110,9 @@ export interface GijoTierSpec {
 export const GIJO_TIERS: GijoTierSpec[] = [
   // Lite는 **작은 모델(7.6B급) 전제**다 — 14B는 16K로 줄여도 11GB 안팎이라 12GB에 안 들어간다.
   // 「일부 기능 제약」을 이름에 달아 둔다: 여기서 표준 기능 전량을 보증하지 않는다(2026-08-12 사용자 지시).
-  { id: "lite", label: "Lite (일부 기능 제약)", vramLabel: "12GB급", maxLoadedModels: 1, ctxSize: 16384, overheadMb: 3500, desc: "채팅 LLM 1개 · 16K — 작은 모델(7.6B급) 전제. 긴 문서 요약·다인 동시 사용에 제약이 있고, 표준 기능 전량은 24GB급부터입니다." },
-  { id: "standard", label: "Standard", vramLabel: "24GB급", maxLoadedModels: 1, ctxSize: 32768, overheadMb: 5000, desc: "채팅 LLM 1개 · 32K — 표준 구성(14B 기준 15.7GB 점유)" },
-  { id: "pro", label: "Pro", vramLabel: "32GB급", maxLoadedModels: 2, ctxSize: 32768, overheadMb: 5000, desc: "채팅 LLM 2개 · 32K — A/B·검증 병행(14B 기준 28.9GB 점유)" },
+  { id: "lite", label: "Lite (일부 기능 제약)", vramLabel: "12GB급", minVramGb: 12, maxLoadedModels: 1, ctxSize: 16384, overheadMb: 3500, desc: "채팅 LLM 1개 · 16K — 작은 모델(7.6B급) 전제. 긴 문서 요약·다인 동시 사용에 제약이 있고, 표준 기능 전량은 24GB급부터입니다." },
+  { id: "standard", label: "Standard", vramLabel: "24GB급", minVramGb: 24, maxLoadedModels: 1, ctxSize: 32768, overheadMb: 5000, desc: "채팅 LLM 1개 · 32K — 표준 구성(14B 기준 15.7GB 점유)" },
+  { id: "pro", label: "Pro", vramLabel: "48GB급", minVramGb: 48, maxLoadedModels: 2, ctxSize: 32768, overheadMb: 5000, desc: "채팅 LLM 2개 · 32K — A/B·검증 병행. CUDA 28.9GB·Metal 33.6GB 점유라 48GB급에서 여유를 두고 돕니다(사용자 결정 2026-08-12)." },
   // ── Max(관제용) — **예정**. 고를 수 없고 권장에도 안 나온다(planned).
   //   왜 지금 표에 넣나: 24시간 관제에서 **자동 작업이 담당자 대화를 갉아먹는 문제는 지금 있는 문제**다
   //   (야간 회귀·자동 스캔·리포트가 대화와 같은 모델을 쓴다). 그 몫을 떼는 것이 이 등급의 뼈대다.
@@ -158,6 +165,11 @@ const 여유계수 = 0.95;
 
 /** 이 등급이 그 기계에 **실제로 들어가는가**. 화면·시험·권장 판정이 모두 이 함수 하나를 쓴다. */
 export function tierFits(tier: GijoTierSpec, totalMb: number, platform: EnginePlatform): boolean {
+  // ① 등급이 내건 최소 사양을 넘는가 — 계산상 들어가도 이 밑이면 권하지 않는다.
+  //    Pro는 CUDA로 28.9GB면 32GB에도 「들어가긴」 한다. 그래도 48GB급으로 둔 것은
+  //    Metal 33.6GB·문서 길이·다음 모델까지 감당할 **여유**를 등급의 약속으로 삼았기 때문이다.
+  if (tier.minVramGb && totalMb < tier.minVramGb * 1024) return false;
+  // ② 실제로 들어가는가 — 플랫폼별 실측 점유로 계산한다.
   const 필요GB = tier.maxLoadedModels * TIER_COST[tier.id][platform] + EMBED_COST[platform];
   return 필요GB * 1024 <= totalMb * 여유계수;
 }
