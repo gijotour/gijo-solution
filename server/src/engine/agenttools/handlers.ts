@@ -1686,6 +1686,11 @@ export function runAibomStatus(args: Record<string, string>): string {
   if (only) {
     const a = listAssets().find((x) => x.id === only);
     if (!a) return `자산을 찾을 수 없습니다: ${only}`;
+    // 전체 현황은 IT 자산을 빼는데 단건 조회만 0/13 미기재로 답하면 앞뒤가 안 맞는다 —
+    // 방화벽에게 "시스템 프롬프트를 기재하라"고 요구하는 꼴이라 그대로 오도가 된다(2026-07-20 실측).
+    if (!isAiAsset(a)) {
+      return `${자산표시이름(a.id)} — IT 자산(${a.assetType})이라 AI-BOM 대상이 아닙니다. AI-BOM 5영역은 AI/모델 자산에만 적용됩니다.`;
+    }
     const { filled, total, missing } = aibomFilledFields(a);
     const r = a.aibom.robustness;
     const rob = r.ranAt ? `견고성 ${r.score ?? "-"}점 (취약 ${r.vulnerable}/${r.total})` : "견고성 미점검";
@@ -1697,8 +1702,13 @@ export function runAibomStatus(args: Record<string, string>): string {
 
   // 전체 현황은 AI/모델 자산만 센다 — 방화벽·DB 같은 IT 자산은 AI-BOM 대상이 아니라 제외한다
   // (안 그러면 IT 자산이 전부 "AI-BOM 미완성"으로 잡혀 거버넌스 현황이 노이즈로 덮인다).
-  const aiAssets = listAssets().filter(isAiAsset);
+  const all = listAssets();
+  const aiAssets = all.filter(isAiAsset);
   if (aiAssets.length === 0) return "등록된 AI/모델 자산이 없습니다. (방화벽·서버 등 IT 자산은 AI-BOM 대상이 아닙니다)";
+  // 인벤토리에는 16건이 보이는데 여기선 3건이라고만 하면 "나머지는 어디 갔나"로 읽힌다.
+  // 제외한 IT 자산 건수를 머리말에 붙여 수가 다른 이유를 스스로 설명하게 한다.
+  const itCount = all.length - aiAssets.length;
+  const itNote = itCount ? ` (IT 자산 ${itCount}건은 AI-BOM 대상이 아니라 제외)` : "";
 
   const rows = aiAssets.map((a) => ({ a, ...aibomFilledFields(a) }));
   const incomplete = rows.filter((r) => r.missing.length > 0);
@@ -1706,7 +1716,7 @@ export function runAibomStatus(args: Record<string, string>): string {
   const noRobustness = rows.filter((r) => !r.a.aibom.robustness.ranAt);
 
   const head =
-    `자산 ${rows.length}건 — AI-BOM 미완성 ${incomplete.length}건, SBOM 미생성 ${noSbom.length}건, 견고성 미점검 ${noRobustness.length}건`;
+    `AI 자산 ${rows.length}건${itNote} — AI-BOM 미완성 ${incomplete.length}건, SBOM 미생성 ${noSbom.length}건, 견고성 미점검 ${noRobustness.length}건`;
   const lines = rows
     .slice(0, 10)
     .map((r) => `- ${자산표시이름(r.a.id)}: ${r.filled}/${r.total} 기재${r.missing.length ? ` (미기재 ${r.missing.length}개)` : " ✓"}`);
