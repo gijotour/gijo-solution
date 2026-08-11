@@ -219,7 +219,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       </div>
       <div class="panel" style="margin-bottom:0">
         <div class="panel-title">공격 결과 <span class="muted" style="font-size:12.25px;font-weight:600">— 항목을 누르면 공격·응답·판정근거·권고</span></div>
-        <div id="results"><div class="empty">레드팀을 실행하면 14개 공격의 상세 결과가 여기 표시됩니다.</div></div>
+        <div id="results"><div class="empty">레드팀을 실행하면 각 공격의 상세 결과가 여기 표시됩니다.</div></div>
       </div>
     </div>
 
@@ -440,7 +440,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.getElementById("cats").innerHTML = "";
     document.getElementById("advice").style.display = "none";
     document.getElementById("ranAt").textContent = "이 대상은 아직 점검 기록이 없습니다. [레드팀 실행]을 누르세요.";
-    document.getElementById("results").innerHTML = '<div class="empty">이 대상을 점검하면 14개 공격의 상세 결과가 표시됩니다.</div>';
+    document.getElementById("results").innerHTML = '<div class="empty">이 대상을 점검하면 각 공격의 상세 결과가 표시됩니다.</div>';
   }
   async function loadLast(){
     const { key } = currentTarget();
@@ -456,7 +456,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
   runBtn.addEventListener("click", async () => {
     const { opts } = currentTarget();
-    runBtn.disabled = true; const orig = runBtn.textContent; runBtn.textContent = "실행 중… (14개 공격 · ~1분)";
+    runBtn.disabled = true; const orig = runBtn.textContent; runBtn.textContent = "실행 중… (전 공격 문항 · 1~2분)";
     try{ const rep = await window.gijo.runRedTeam(opts); renderReport(rep); }
     catch(e){ document.getElementById("results").innerHTML = '<div class="empty">실행 실패: '+esc(e.message||e)+'<br>대상 모델이 로드 가능한지 확인하세요.</div>'; }
     finally{ runBtn.disabled = false; runBtn.textContent = orig; }

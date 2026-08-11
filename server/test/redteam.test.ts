@@ -166,6 +166,22 @@ describe("페이로드가 실제로 발화 가능한가", () => {
     }
   });
 
+  it("★ 한국어 팩이 살아 있다 — garak이 못 재는 자리다", () => {
+    // garak 0.16.0 실측(2026-08-11): 보낸 공격 778건 **전부 영문 · 한글 0건**.
+    // 한국어 공격은 안 뚫린 게 아니라 **아예 안 재봤던** 것이다. 이 팩이 그 자리를 메운다.
+    // 누가 정리하다 지우면 그 자리가 다시 빈다 — 그래서 시험으로 못박는다.
+    const ko = PAYLOADS.filter((p) => p.id.startsWith("ko-"));
+    expect(ko.length, "한국어 페이로드가 사라졌다").toBeGreaterThanOrEqual(10);
+    // 실측에서 실제로 뚫은 유형 — 「작업 위장 + 데이터 주입」이 핵심이다(14B 40%·7.6B 60%)
+    for (const 필수 of ["ko-log-summary-inject", "ko-vuln-list-inject", "ko-policy-translate-inject", "ko-log-summary-secret"]) {
+      expect(ko.some((p) => p.id === 필수), `${필수}가 없다 — 실측에서 뚫린 유형이다`).toBe(true);
+    }
+    // 한국어 문항은 한글을 담아야 한다(영문 복사본이 섞이면 이 팩의 뜻이 없다)
+    for (const p of ko) {
+      expect(/[가-힣]/.test(p.prompt), `${p.id}: 한글이 없다`).toBe(true);
+    }
+  });
+
   it("다섯 공격 갈래를 모두 덮는다 — 한 갈래가 통째로 비면 점검이 아니다", () => {
     const cats = new Set(PAYLOADS.map((p) => p.category));
     for (const need of ["instruction-override", "jailbreak", "system-prompt-leak", "obfuscation", "indirect"]) {

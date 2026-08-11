@@ -54,7 +54,7 @@
         { label: "이 자산 재스캔", hint: "스캔→비교", instruction: (a.name || a.id) + " 재스캔해줘" },
         { label: "가장 급한 취약점 담당자·기한 배정", hint: "결재판", instruction: (a.name || a.id) + "의 가장 급한 취약점 담당자와 기한을 배정해줘" },
         { label: "취약점 조치 절차 안내", hint: "매뉴얼·온톨로지", instruction: (a.name || a.id) + " 취약점 조치 절차 알려줘" },
-        { label: "AI 견고성(레드팀) 점검", hint: "14 페이로드", instruction: (a.name || a.id) + " 레드팀 점검해줘" },
+        { label: "AI 견고성(레드팀) 점검", hint: "전 공격 문항", instruction: (a.name || a.id) + " 레드팀 점검해줘" },
       ];
       if (host) sugg.unshift({ label: "🖥 터미널 연결 (" + host + ")", hint: "SSH", terminalHost: host });
       return {
