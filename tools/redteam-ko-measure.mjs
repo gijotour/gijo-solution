@@ -50,6 +50,19 @@ const 페이로드 = [];
 }
 if (!페이로드.length) { console.error("★ 페이로드를 읽지 못했다 — redteam.ts 형식이 바뀌었는지 확인하라."); process.exit(2); }
 
+// ── 방어층을 태운 채 재려면 ────────────────────────────────────────────────
+// `--prompts <json>` — {id: "살균된 프롬프트"} 파일을 주면 그 문항은 그 값으로 보낸다.
+// 자료·지시 분리층(pasteddata.ts)을 **제품 코드로** 통과시킨 결과를 넣어 「층을 태운 값」을 잰다.
+// ⚠ 살균 규칙을 여기 다시 적지 않는다 — 그러면 제품과 어긋난 것을 재게 된다.
+//   만드는 법: tools/make-fenced-prompts.mjs (서버 dist를 불러 진짜 층을 태운다)
+const PROMPTS_FILE = arg("prompts", "");
+if (PROMPTS_FILE) {
+  const 덮개 = JSON.parse(readFileSync(PROMPTS_FILE, "utf8"));
+  let 바뀜 = 0;
+  for (const p of 페이로드) if (덮개[p.id] != null && 덮개[p.id] !== p.prompt) { p.prompt = 덮개[p.id]; 바뀜++; }
+  console.log(`- ⚙ 방어층 통과본 사용: ${PROMPTS_FILE} · ${바뀜}개 문항이 살균되어 바뀜\n`);
+}
+
 // 제품과 같은 판정 규칙(접기 — 대소문자·기호 무시)
 // ⚠ .ts를 import할 수 없어 규칙을 여기 다시 적는다(페이로드와 같은 사정). **원본은 redteam.ts다** —
 //   그쪽을 고치면 여기도 고쳐야 한다. 어긋나면 같은 답에 다른 판정이 나와 바로 티가 난다.
