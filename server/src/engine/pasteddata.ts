@@ -113,7 +113,7 @@ export interface PastedDataResult {
  * ⚠ 자료 구간 밖(담당자가 직접 쓴 지시)은 절대 건드리지 않는다 — 그쪽을 만지는 순간
  *   「제품이 제 사용자의 업무를 막는다」가 된다.
  */
-export function sanitizePastedData(message: string, context: { source: string }): PastedDataResult {
+export function sanitizePastedData(message: string, context: { source: string; audit?: boolean }): PastedDataResult {
   const regions = findDataRegions(message);
   if (!regions.length) return { text: message, removed: [], labels: [], regions: 0 };
 
@@ -137,8 +137,10 @@ export function sanitizePastedData(message: string, context: { source: string })
   }
   out += message.slice(cursor);
 
-  if (removed.length) {
-    // 조용히 지우면 "왜 답이 달라졌지"를 아무도 못 푼다(ragsanitize와 같은 원칙).
+  // audit:false는 **재보기용**이다(측정·화면 집계). 실제 사용자 입력 경로에서는 반드시 남긴다 —
+  // 조용히 지우면 "왜 답이 달라졌지"를 아무도 못 푼다.
+  if (removed.length && context.audit !== false) {
+    // (ragsanitize와 같은 원칙).
     recordAudit({
       kind: "block",
       actor: "pasteddata",

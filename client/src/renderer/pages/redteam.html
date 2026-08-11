@@ -123,7 +123,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 .sev.high{color:var(--amber);background:rgba(240,160,32,.14);}
 .sev.medium{color:#c9a227;background:rgba(201,162,39,.12);}
 .res{margin-left:auto;font-size:12px;font-weight:800;}
-.res.v{color:var(--red);}.res.s{color:var(--teal);}
+.res.v{color:var(--red);}.res.s{color:var(--teal);}.res.p{color:var(--orange,#db6d28);}
 .caret{color:var(--muted-2);transition:transform .15s;font-size:12.25px;width:12px;}
 .item.open .caret{transform:rotate(90deg);}
 .item-body{display:none;padding:2px 16px 16px 36px;font-size:12.5px;color:var(--muted);line-height:1.75;}
@@ -178,6 +178,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         <span><i class="dot" style="background:rgba(30,185,128,.35)"></i>AI가 버팀 <b id="effHeld">-</b> <span class="muted">— 닿았지만 넘어가지 않음</span></span>
         <span><i class="dot" style="background:var(--red)"></i>뚫림 <b id="effLeaked">-</b> <span class="muted">— 감춰야 할 내용이 새어 나감</span></span>
       </div>
+      <!-- 자료 살균 — 있을 때만 나온다(0건이면 세로 0px). 시안 승인분 2026-08-12. -->
+      <div id="effSanitized" class="muted" style="display:none;font-size:12px;margin-top:6px"></div>
       <div class="hero-foot">
         <span id="effRanAt" class="muted">-</span>
         <button class="btn-primary" id="runEffBtn" style="white-space:nowrap">▶ 지금 점검</button>
@@ -309,6 +311,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.getElementById("kTotal").textContent = rep.total;
     var 꼬리 = "";
     if(rep.errored){ 꼬리 = " · ⚠ 못 잰 문항 " + rep.errored + "개(부분 측정)"; }
+    // 부분 유출 — 점수는 안 깎지만 **같은 자리에서 보이게** 한다(2026-08-12 시안 승인).
+    //   완전일치 문턱을 지키는 것이 카나리 방식의 값어치라 판정은 그대로 두고, 옆에 병기만 한다.
+    if(rep.partialLeaks){ 꼬리 += " · 🟠 부분 유출 " + rep.partialLeaks + "건(취약으로 세지 않았으나 비밀이 거의 드러난 답)"; }
     document.getElementById("ranAt").textContent = "대상: " + (rep.model||"orchestrator") + " · " + new Date(rep.ranAt).toLocaleString("ko-KR") + 꼬리;
 
     // 카테고리 막대
@@ -343,7 +348,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         '<div class="item-head"><span class="caret">▶</span>'+
           (r.vulnerable ? '<span class="sev '+r.severity+'">'+r.severity+'</span>' : '')+
           '<span>'+esc(r.desc)+'</span>'+
-          '<span class="res '+(r.vulnerable?"v":"s")+'">'+(r.vulnerable?"뚫림":"방어")+'</span></div>'+
+          '<span class="res '+(r.vulnerable?"v":(r.partialLeak?"p":"s"))+'">'+(r.vulnerable?"뚫림":(r.partialLeak?"부분 유출":"방어"))+'</span></div>'+
         '<div class="item-body">'+
           '<div><span class="lbl">공격:</span> '+esc(r.prompt)+'</div>'+
           '<div style="margin-top:6px"><span class="lbl">모델 응답:</span></div><pre>'+esc(r.responseExcerpt||"(응답 없음)")+'</pre>'+
@@ -385,6 +390,13 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.getElementById("effHeld").textContent = rep.modelHeld;
     document.getElementById("effLeaked").textContent = leaked;
     document.getElementById("effLegend").style.display = "flex";
+    // 자료 살균 — 「막았다」가 아니라 「자료에서 지시문을 빼고 일은 그대로 했다」는 뜻이다.
+    //   이 줄이 없으면 담당자는 왜 안 통했는지를 잘못 배운다(2026-08-12 시안 승인분).
+    var 살균줄 = document.getElementById("effSanitized");
+    if(살균줄){
+      if(rep.sanitized){ 살균줄.style.display=""; 살균줄.textContent = "🧹 자료 살균 " + rep.sanitized + "건 — 붙여넣은 자료 구간에서 지시문만 빼고 요약·번역은 그대로 수행했습니다"; }
+      else 살균줄.style.display="none";
+    }
     document.getElementById("effRanAt").textContent =
       "마지막 점검 " + new Date(rep.ranAt).toLocaleString("ko-KR") + " · 공격 " + rep.total + "종";
   }

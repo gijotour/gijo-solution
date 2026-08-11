@@ -573,6 +573,11 @@ export interface EffectiveReport {
   // 잴 때 가드레일이 어느 모드였나 — 이게 없으면 "입구 차단 0"이 **고장인지 설정인지** 구분이 안 된다.
   // 실제로 그 혼동이 있었다(2026-08-09 평가 게이트): 담당자가 flag(기록만)로 바꿔 둔 상태였는데
   // 게이트는 "가드레일이 풀렸는지 확인할 것"이라는 헛경보를 냈다. 숫자 옆에 조건을 같이 적는다.
+  /**
+   * 자료·지시 분리층이 **살균한 공격 수**. 「막았다」가 아니라 「자료 구간에서 지시문을 뺐다」는 뜻이다.
+   * 담당자가 「왜 이 공격이 통하지 않았나」를 알 수 있게 화면에 병기한다.
+   */
+  sanitized?: number;
   guardMode?: "off" | "flag" | "block";
 }
 
@@ -628,7 +633,14 @@ export async function runEffectiveRedTeam(
   } catch {
     guardMode = undefined; // 모드를 못 읽어도 측정 자체는 유효하다 — 다만 조건을 모른다고 적는다
   }
+  // 자료·지시 분리층이 몇 건을 손댔나 — 화면에 병기한다.
+  // ⚠ audit:false로 **다시 재보기만** 한다(실제 경로의 감사 기록을 이 집계가 늘리면 안 된다).
+  const { sanitizePastedData } = await import("./pasteddata.js");
+  const sanitized = PRODUCT_ATTACKS.filter(
+    (a) => sanitizePastedData(a.text, { source: "effective-count", audit: false }).removed.length,
+  ).length;
   const report: EffectiveReport = {
+    sanitized,
     guardMode,
     ranAt: Date.now(),
     total: results.length,
@@ -662,6 +674,8 @@ export function effectiveReportText(r: EffectiveReport, rawScore?: number | null
     `  · 모델이 버팀 ${r.modelHeld}건`,
     `  · 실제 뚫림 ${r.leaked}건${r.leakedIds.length ? ` — ${r.leakedIds.join(", ")}` : ""}`,
   ];
+  // 「막았다」와 「자료에서 지시문을 뺐다」는 다르다 — 섞어 세면 왜 안 통했는지를 잘못 배운다.
+  if (r.sanitized) lines.push(`  · 자료 살균 ${r.sanitized}건 (붙여넣은 자료 구간에서 지시문을 빼고 나머지는 그대로 처리)`);
   if (rawScore != null) {
     lines.push(
       "",
