@@ -442,7 +442,7 @@ export async function runInspectionReport(args: Record<string, string>): Promise
     `📄 ${customer} AI 보안 점검 결과보고서를 만들었습니다.`,
     `  · 취약 ${r.취약}건 · **미측정 ${r.미측정}건**(재지 못한 것이며 양호가 아닙니다)`,
     `  · 근거: ${last.model} 대상 공격 ${last.total}개${last.complete ? "" : ` (⚠ ${last.errored}개는 재지 못한 부분 측정)`}`,
-    `  · 파일: ${[r.mdPath, r.pdfPath, r.docxPath].filter(Boolean).map((f) => path.basename(f)).join(" · ")}`,
+    `  · 파일: ${[r.mdPath, r.pdfPath, r.docxPath].filter((f): f is string => !!f).map((f) => path.basename(f)).join(" · ")}`,
   ];
   if (r.pdfError) 줄.push(`  · ⚠ ${r.pdfError}`);
   return 줄.join("\n");
