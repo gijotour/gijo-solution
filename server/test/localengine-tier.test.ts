@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import request from "supertest";
 import { createApp } from "../src/app";
-import { GIJO_TIERS, recommendTier, currentTierSettings } from "../src/engine/localengine";
+import { GIJO_TIERS, recommendTier, tierFits, currentTierSettings } from "../src/engine/localengine";
 import { db } from "../src/db";
 
 async function login(app: ReturnType<typeof createApp>) {
@@ -22,18 +22,20 @@ describe("GIJO 구동 티어 (Lite/Standard/Pro)", () => {
   // ★ 이 시험이 지키는 것은 「숫자가 문서와 같은가」가 아니라 **권장이 기계를 안 터뜨리는가**다.
   //   실사고 직전(2026-08-12 발견): Pro가 채팅 3개였고 recommendTier가 28GB부터 Pro를 권해,
   //   32GB 기계에 **42.1GB 필요한 설정**을 권하고 있었다. 권장 판정 자체가 위험한 조언이었다.
-  const 모델GB = 13.2; // 14B @ 32K 실측
-  const 임베딩GB = 2.5; // bge-m3 상주
   const 티어VRAM: Record<string, number> = { lite: 12, standard: 24, pro: 32 };
 
-  it("★ 권장 설정이 그 등급의 VRAM 안에 들어간다 — 넘으면 따르는 순간 터진다", () => {
+  it("★ 등급 이름표(24GB급 등)가 그 플랫폼에서 실제로 들어가는 크기다", () => {
+    // ⚠ CUDA만 보면 안 된다 — Metal은 같은 모델이 21% 무겁다(2026-08-12 Mac 실측:
+    //   14B@32K 16.0GB · bge 1.55GB). CUDA 상수만 쓰다 32GB Mac에 33.5GB짜리 Pro를 권했다.
     for (const t of GIJO_TIERS) {
-      if (t.id === "lite") continue; // Lite는 작은 모델(7.6B급) 전제라 14B 계수로 재지 않는다
-      const 점유 = t.maxLoadedModels * 모델GB + 임베딩GB;
-      expect(점유, `${t.label}: ${점유.toFixed(1)}GB 필요한데 ${티어VRAM[t.id]}GB급에 권한다`).toBeLessThan(
-        티어VRAM[t.id],
-      );
+      expect(tierFits(t, 티어VRAM[t.id] * 1024, "cuda"), `${t.label}: CUDA ${티어VRAM[t.id]}GB에 안 들어간다`).toBe(true);
     }
+  });
+
+  it("★ Metal 32GB에는 Pro를 권하지 않는다 — 2개면 33.5GB라 축출·스왑이 반복된다", () => {
+    expect(tierFits(GIJO_TIERS[2], 32 * 1024, "metal")).toBe(false);
+    expect(recommendTier(32 * 1024, "metal")).toBe("standard");
+    expect(recommendTier(32 * 1024, "cuda"), "CUDA 32GB는 Pro가 맞다").toBe("pro");
   });
 
   it("티어 사양 3종 — Lite는 「일부 기능 제약」으로 남긴다(2026-08-12 사용자 지시)", () => {

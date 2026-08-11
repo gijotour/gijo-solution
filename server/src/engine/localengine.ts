@@ -114,13 +114,45 @@ export function currentTierSettings(): { tier: GijoTierSpec["id"] | null; maxLoa
   if (t) return { tier: t.id, maxLoadedModels: t.maxLoadedModels, ctxSize: t.ctxSize, overheadMb: t.overheadMb };
   return { tier: null, maxLoadedModels: MAX_LOADED_MODELS, ctxSize: DEFAULT_CTX_SIZE, overheadMb: MODEL_VRAM_OVERHEAD_MB };
 }
+/**
+ * 등급별 실제 점유(GB) — **손으로 적은 문턱 숫자를 쓰지 않는다.**
+ *
+ * ⚠ 문턱을 손으로 적었다가 두 번 틀렸다(2026-08-12):
+ *   ① 28GB부터 Pro(채팅 3개=42.1GB) — 32GB 기계에 터지는 설정을 권했다.
+ *   ② 고친 뒤에도 **CUDA 상수만** 써서, Metal(21% 무겁다)에서는 여전히 안 들어갔다.
+ *      Mac 실측(2026-08-12): 14B@32K **16.0GB** · bge-m3 **1.55GB**
+ *      → Pro 2개 = 33.55GB인데 32GB 기계에 Pro를 권하고 있었다.
+ *   그래서 이제 **계산으로 고른다** — 등급마다 「이 플랫폼에서 얼마 먹나」를 적고,
+ *   실제로 들어가는 가장 높은 등급을 고른다. 새 플랫폼·새 모델이 와도 표만 고치면 된다.
+ */
+export type EnginePlatform = "cuda" | "metal";
+export const TIER_COST: Record<GijoTierSpec["id"], Record<EnginePlatform, number>> = {
+  lite: { cuda: 6.5, metal: 7.6 }, // 7.6B급 채팅 1개
+  standard: { cuda: 13.2, metal: 16.0 }, // 14B @ 32K 채팅 1개
+  pro: { cuda: 13.2, metal: 16.0 }, // 같은 모델 — 개수는 maxLoadedModels가 곱한다
+};
+export const EMBED_COST: Record<EnginePlatform, number> = { cuda: 2.5, metal: 1.55 }; // bge-m3 상주
+/**
+ * 여유 계수 — 총량의 5%는 남긴다(OS·표시장치·순간 피크).
+ * ⚠ 이 값은 **판단**이지 실측이 아니다. 0.90으로 하면 CUDA 32GB에서 Pro가 떨어지고,
+ *   1.00으로 하면 16GB CUDA에 Standard(15.7GB)를 권해 0.3GB만 남는다. 시험이 두 경계를 못 박는다.
+ */
+const 여유계수 = 0.95;
+
+/** 이 등급이 그 기계에 **실제로 들어가는가**. 화면·시험·권장 판정이 모두 이 함수 하나를 쓴다. */
+export function tierFits(tier: GijoTierSpec, totalMb: number, platform: EnginePlatform): boolean {
+  const 필요GB = tier.maxLoadedModels * TIER_COST[tier.id][platform] + EMBED_COST[platform];
+  return 필요GB * 1024 <= totalMb * 여유계수;
+}
+
 // VRAM 총량 기준 권장 티어 — tools/model-benchmark.mjs 판정과 동일 기준.
-// ⚠ 경계도 실측으로 다시 잡았다(2026-08-12). 예전엔 28000 이상이면 Pro였는데,
-//   그 Pro가 채팅 3개(42.1GB 필요)라 **32GB 기계에 터지는 설정을 권하고 있었다.**
-//   지금은 24GB급(24576)부터 Standard, 32GB급(32768)부터 Pro다.
-//   24GB 미만은 Lite — 표준 기능 전량을 보증하지 않는 구간이라 티어 설명에 그렇게 적어 둔다.
-export function recommendTier(totalMb: number): GijoTierSpec["id"] {
-  return totalMb < 24000 ? "lite" : totalMb < 32000 ? "standard" : "pro";
+export function recommendTier(totalMb: number, platform: EnginePlatform = "cuda"): GijoTierSpec["id"] {
+  // 높은 등급부터 훑어 **들어가는 첫 등급**을 고른다.
+  for (let i = GIJO_TIERS.length - 1; i >= 0; i--) {
+    if (tierFits(GIJO_TIERS[i], totalMb, platform)) return GIJO_TIERS[i].id;
+  }
+  // 하나도 안 들어가는 기계 — Lite로 안내하되, 설명에 「일부 기능 제약」이 적혀 있다.
+  return "lite";
 }
 const setStateStmt = db.prepare(
   "INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value"
@@ -1061,7 +1093,9 @@ export function registerLocalEngineRoutes(app: Express): void {
     asyncRoute(async (_req, res) => {
       const gpu = await getGpuUsage();
       const current = currentTierSettings();
-      const recommended = gpu.available ? recommendTier(gpu.memTotalMb) : null;
+      // ⚠ 플랫폼을 넘긴다 — Metal은 같은 모델이 21% 무겁다(2026-08-12 Mac 실측).
+      //   안 넘기면 32GB Mac에 33.5GB짜리 Pro를 권하게 된다(축출·스왑이 반복된다).
+      const recommended = gpu.available ? recommendTier(gpu.memTotalMb, IS_MAC ? "metal" : "cuda") : null;
       res.json({
         gpu: gpu.available ? { totalMb: gpu.memTotalMb, usedMb: gpu.memUsedMb, freeMb: gpu.memTotalMb - gpu.memUsedMb, utilization: gpu.utilization } : null,
         current,
