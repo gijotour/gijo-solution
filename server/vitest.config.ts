@@ -26,6 +26,10 @@ export default defineConfig({
       // 이력 100건 상한 밖으로 실제 사용자 리포트가 밀려나는 사고가 있었다. 여기서 기본값 자체를
       // 막아두면 개별 파일이 격리를 깜빡하거나 워커 간 모듈 캐시 타이밍이 어긋나도 운영 데이터는 안전하다.
       GIJO_REPORT_DIR: "data/test-tmp/reports",
+      // merge.ts의 산출물 기본 경로는 cwd의 outputs/다 — 운영과 같은 cwd(WSL /home/gijo/gijo-as/server)에서
+      // 시험을 돌리면 merge.test.ts가 만든 설정 파일이 **운영 outputs/에 생겼다 지워졌다** 한다(2026-07-17 실사고).
+      // merge.ts 쪽은 그때 env를 읽도록 고쳤는데 여기서 값을 안 걸어줘 반쪽만 수리돼 있었다(2026-08-12 발견).
+      GIJO_OUTPUTS_DIR: "data/test-tmp/outputs",
     },
     testTimeout: 15000, // 실 spawn 회피해도 연결 실패 폴백까지 여유(기본 5s는 부하 시 빠듯).
   },
