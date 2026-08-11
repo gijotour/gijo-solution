@@ -1450,7 +1450,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   let tierInfo = null;
   const tierEl = (id) => document.getElementById(id);
   // ⚠ Lite는 이름에 제약을 달고 다닌다 — 여기서 떼면 지금 쓰는 사람이 표준과 같은 것으로 읽는다(2026-08-12).
-  function tierName(id) { return id === "lite" ? "Lite (일부 기능 제약)" : id === "standard" ? "Standard" : id === "pro" ? "Pro" : id; }
+  function tierName(id) { return id === "lite" ? "Lite (일부 기능 제약)" : id === "standard" ? "Standard" : id === "pro" ? "Pro" : id === "max" ? "Max (관제용 · 예정)" : id; }
 
   // 전문가 어댑터 등록부(보기 전용, 2026-08-08) — 행 24px, 조작은 대화창 안내.
   async function loadAdapterRegistry() {
@@ -1514,8 +1514,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       tierEl("tierApplyBtn").disabled = true;
     }
     const sel = tierEl("tierManualSelect");
+    // ⚠ 예정 등급(planned)은 **보이되 고를 수 없다** — 고르게 두면 없는 구성으로 풀이 뜬다.
+    //   목록에서 아예 빼면 「그런 계획이 있다」는 것도 안 보여 문의가 반복된다. 보이고, 막는다.
     sel.innerHTML = tiers.map((t) =>
-      `<option value="${t.id}"${current.tier === t.id ? " selected" : ""}>${t.label} — LLM ${t.maxLoadedModels}개 · ${Math.round(t.ctxSize / 1024)}K (${t.vramLabel})</option>`
+      `<option value="${t.id}"${current.tier === t.id ? " selected" : ""}${t.planned ? " disabled" : ""}>${t.label} — LLM ${t.maxLoadedModels}개 · ${Math.round(t.ctxSize / 1024)}K (${t.vramLabel})${t.planned ? " · 준비 중" : ""}</option>`
     ).join("");
   }
 

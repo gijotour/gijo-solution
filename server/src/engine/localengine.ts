@@ -80,13 +80,19 @@ const getStateStmt = db.prepare("SELECT value FROM app_state WHERE key = ?");
 // 우선한다 — 환경변수는 설치 시 기본값, 티어는 운영 중 조정값. 세 값 모두 함수 경유로 읽히므로
 // 노드 프로세스 재시작 없이 채팅 모델 풀 재기동만으로 적용된다(ctx는 스폰 인자라서).
 export interface GijoTierSpec {
-  id: "lite" | "standard" | "pro";
+  id: "lite" | "standard" | "pro" | "max";
   label: string;
   vramLabel: string;
   maxLoadedModels: number;
   ctxSize: number;
   overheadMb: number;
   desc: string;
+  /**
+   * **아직 못 파는 등급**. 표에는 보이되 고를 수 없고, 권장 판정에도 안 들어간다.
+   * ⚠ 지금 없는 것을 고를 수 있게 두면 담당자가 골랐다가 안 되는 것을 겪는다 —
+   *   「가짜 UI 금지」와 같은 자리다. 예정은 예정이라고만 적는다.
+   */
+  planned?: boolean;
 }
 // ⚠ **채팅 모델 수는 실측으로 다시 잡았다**(2026-08-12). 14B@32K = 13.2GB · 임베딩(bge-m3) = 2.5GB
 //   실측 기준이라, 예전 값(Standard 2개·Pro 3개)은 **VRAM을 넘긴다**:
@@ -100,6 +106,14 @@ export const GIJO_TIERS: GijoTierSpec[] = [
   { id: "lite", label: "Lite (일부 기능 제약)", vramLabel: "12GB급", maxLoadedModels: 1, ctxSize: 16384, overheadMb: 3500, desc: "채팅 LLM 1개 · 16K — 작은 모델(7.6B급) 전제. 긴 문서 요약·다인 동시 사용에 제약이 있고, 표준 기능 전량은 24GB급부터입니다." },
   { id: "standard", label: "Standard", vramLabel: "24GB급", maxLoadedModels: 1, ctxSize: 32768, overheadMb: 5000, desc: "채팅 LLM 1개 · 32K — 표준 구성(14B 기준 15.7GB 점유)" },
   { id: "pro", label: "Pro", vramLabel: "32GB급", maxLoadedModels: 2, ctxSize: 32768, overheadMb: 5000, desc: "채팅 LLM 2개 · 32K — A/B·검증 병행(14B 기준 28.9GB 점유)" },
+  // ── Max(관제용) — **예정**. 고를 수 없고 권장에도 안 나온다(planned).
+  //   왜 지금 표에 넣나: 24시간 관제에서 **자동 작업이 담당자 대화를 갉아먹는 문제는 지금 있는 문제**다
+  //   (야간 회귀·자동 스캔·리포트가 대화와 같은 모델을 쓴다). 그 몫을 떼는 것이 이 등급의 뼈대다.
+  //   ⚠ 사양은 **확정 전**이다 — VRAM을 숫자로 단언하지 않는다. 동시 인원도 적지 않는다:
+  //     지금 구조는 칸당 12,288토큰이 필요하고 모델 native 40,960이 상한이라 **3칸이 물리적 한계**다.
+  //     4명 이상은 VRAM이 아니라 **프롬프트 축소**(도구 카탈로그 13,674자)가 선결이다.
+  { id: "max", label: "Max (관제용 · 예정)", vramLabel: "대용량 GPU (사양 확정 전)", maxLoadedModels: 3, ctxSize: 32768, overheadMb: 5000, planned: true,
+    desc: "관제 상시 운영용 — 대화 LLM 2개 + **배치 전용 1개**(야간 회귀·자동 스캔·리포트를 담당자 대화와 분리) + 임베딩. 준비 중인 등급이라 아직 고를 수 없고, 필요 사양·동시 인원은 확정되면 여기에 적습니다." },
 ];
 function storedTier(): GijoTierSpec | null {
   try {
@@ -130,6 +144,9 @@ export const TIER_COST: Record<GijoTierSpec["id"], Record<EnginePlatform, number
   lite: { cuda: 6.5, metal: 7.6 }, // 7.6B급 채팅 1개
   standard: { cuda: 13.2, metal: 16.0 }, // 14B @ 32K 채팅 1개
   pro: { cuda: 13.2, metal: 16.0 }, // 같은 모델 — 개수는 maxLoadedModels가 곱한다
+  // Max는 예정 등급이라 권장 판정에 안 쓰이지만, 표에서 빼면 타입이 깨진다(tsc가 잡았다).
+  // 사양이 확정되면 여기 값도 실측으로 채운다 — 지금은 Pro와 같은 모델을 전제한 자리표다.
+  max: { cuda: 13.2, metal: 16.0 },
 };
 export const EMBED_COST: Record<EnginePlatform, number> = { cuda: 2.5, metal: 1.55 }; // bge-m3 상주
 /**
@@ -147,8 +164,10 @@ export function tierFits(tier: GijoTierSpec, totalMb: number, platform: EnginePl
 
 // VRAM 총량 기준 권장 티어 — tools/model-benchmark.mjs 판정과 동일 기준.
 export function recommendTier(totalMb: number, platform: EnginePlatform = "cuda"): GijoTierSpec["id"] {
-  // 높은 등급부터 훑어 **들어가는 첫 등급**을 고른다.
+  // 높은 등급부터 훑어 **들어가는 첫 등급**을 고른다. ⚠ 예정 등급은 건너뛴다 —
+  //   못 파는 것을 권하면 담당자가 고르려다 막힌다.
   for (let i = GIJO_TIERS.length - 1; i >= 0; i--) {
+    if (GIJO_TIERS[i].planned) continue;
     if (tierFits(GIJO_TIERS[i], totalMb, platform)) return GIJO_TIERS[i].id;
   }
   // 하나도 안 들어가는 기계 — Lite로 안내하되, 설명에 「일부 기능 제약」이 적혀 있다.
@@ -1115,7 +1134,13 @@ export function registerLocalEngineRoutes(app: Express): void {
       const tier = String(req.body?.tier ?? "");
       const spec = GIJO_TIERS.find((t) => t.id === tier);
       if (!spec) {
-        res.status(400).json({ error: "tier는 lite·standard·pro 중 하나여야 합니다" });
+        const 고를수있는것 = GIJO_TIERS.filter((t) => !t.planned).map((t) => t.id).join("·");
+        res.status(400).json({ error: `tier는 ${고를수있는것} 중 하나여야 합니다` });
+        return;
+      }
+      // 예정 등급은 적용하지 않는다 — 고르게 두면 없는 구성으로 풀이 뜬다(가짜 UI 금지).
+      if (spec.planned) {
+        res.status(400).json({ error: `${spec.label}은 준비 중인 등급이라 아직 적용할 수 없습니다.` });
         return;
       }
       setStateStmt.run("gijoTier", tier);

@@ -28,6 +28,7 @@ describe("GIJO 구동 티어 (Lite/Standard/Pro)", () => {
     // ⚠ CUDA만 보면 안 된다 — Metal은 같은 모델이 21% 무겁다(2026-08-12 Mac 실측:
     //   14B@32K 16.0GB · bge 1.55GB). CUDA 상수만 쓰다 32GB Mac에 33.5GB짜리 Pro를 권했다.
     for (const t of GIJO_TIERS) {
+      if (t.planned) continue; // 예정 등급은 사양이 확정 전이라 이름표가 없다
       expect(tierFits(t, 티어VRAM[t.id] * 1024, "cuda"), `${t.label}: CUDA ${티어VRAM[t.id]}GB에 안 들어간다`).toBe(true);
     }
   });
@@ -38,8 +39,37 @@ describe("GIJO 구동 티어 (Lite/Standard/Pro)", () => {
     expect(recommendTier(32 * 1024, "cuda"), "CUDA 32GB는 Pro가 맞다").toBe("pro");
   });
 
-  it("티어 사양 3종 — Lite는 「일부 기능 제약」으로 남긴다(2026-08-12 사용자 지시)", () => {
-    expect(GIJO_TIERS.map((t) => t.id)).toEqual(["lite", "standard", "pro"]);
+  describe("★ 예정 등급(Max·관제용) — 보이되 고를 수 없다", () => {
+    // ⚠ 「지금 없는 것을 있는 척하지 않는다」가 이 제품의 규칙이다. 목록에서 아예 빼면
+    //   계획이 있다는 것도 안 보여 문의가 반복되고, 고르게 두면 없는 구성으로 풀이 뜬다. 보이고, 막는다.
+    const max = () => GIJO_TIERS.find((t) => t.id === "max")!;
+
+    it("표에는 있고 planned로 표시된다", () => {
+      expect(max(), "Max 등급이 표에 없다").toBeTruthy();
+      expect(max().planned).toBe(true);
+      expect(max().label + max().desc, "예정이라는 말이 없다").toContain("예정");
+    });
+
+    it("사양을 숫자로 단언하지 않는다 — 확정 전이다", () => {
+      expect(max().vramLabel, "확정되지 않은 VRAM을 숫자로 못 박았다").not.toMatch(/^\d+GB급$/);
+    });
+
+    it("권장 판정에 절대 안 나온다 — 아무리 큰 기계여도", () => {
+      for (const mb of [32768, 49152, 98304, 131072]) {
+        expect(recommendTier(mb, "cuda"), `${mb}MB에 Max를 권했다`).not.toBe("max");
+        expect(recommendTier(mb, "metal")).not.toBe("max");
+      }
+    });
+
+    it("적용하려 하면 400 — 준비 중이라고 답한다", async () => {
+      const res = await request(app).post("/api/localengine/tier").set("Authorization", `Bearer ${token}`).send({ tier: "max" });
+      expect(res.status).toBe(400);
+      expect(res.body.error).toContain("준비 중");
+    });
+  });
+
+  it("티어 사양 4종 — Lite는 「일부 기능 제약」으로 남긴다(2026-08-12 사용자 지시)", () => {
+    expect(GIJO_TIERS.map((t) => t.id)).toEqual(["lite", "standard", "pro", "max"]);
     const lite = GIJO_TIERS[0];
     expect(lite.maxLoadedModels).toBe(1);
     expect(lite.ctxSize).toBe(16384);
@@ -69,7 +99,7 @@ describe("GIJO 구동 티어 (Lite/Standard/Pro)", () => {
   it("GET /api/localengine/tier — 현재·권장·사양표를 돌려준다", async () => {
     const res = await request(app).get("/api/localengine/tier").set("Authorization", `Bearer ${token}`);
     expect(res.status).toBe(200);
-    expect(res.body.tiers).toHaveLength(3);
+    expect(res.body.tiers).toHaveLength(4); // Max(예정) 포함
     expect(res.body.current).toBeDefined();
     // GPU 유무는 실행 환경에 따라 다르다 — 있으면 권장 판정, 없으면 미지원 안내가 온다.
     if (res.body.gpu) expect(["lite", "standard", "pro"]).toContain(res.body.recommended);

@@ -69,10 +69,10 @@ export interface CloudUsageSummary {
 // ── 로컬 엔진(llama.cpp 서버) ─────────────────────────────────────────
 export interface GijoTierInfo {
   gpu: { totalMb: number; usedMb: number; freeMb: number; utilization: number } | null;
-  current: { tier: "lite" | "standard" | "pro" | null; maxLoadedModels: number; ctxSize: number; overheadMb: number };
-  recommended: "lite" | "standard" | "pro" | null;
+  current: { tier: "lite" | "standard" | "pro" | "max" | null; maxLoadedModels: number; ctxSize: number; overheadMb: number };
+  recommended: "lite" | "standard" | "pro" | "max" | null;
   reason: string;
-  tiers: { id: string; label: string; vramLabel: string; maxLoadedModels: number; ctxSize: number; desc: string }[];
+  tiers: { id: string; label: string; vramLabel: string; maxLoadedModels: number; ctxSize: number; desc: string; planned?: boolean }[];
 }
 
 export const localEngineApi = {
