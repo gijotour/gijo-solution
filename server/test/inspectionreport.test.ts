@@ -10,6 +10,7 @@ import {
   judgeThreats,
   inspectionMarkdown,
   inspectionHtml,
+  inspectionDocx,
   type InspectionScope,
 } from "../src/engine/inspectionreport";
 import { THREAT_CATALOG } from "../src/engine/compliance";
@@ -163,6 +164,20 @@ describe("★ 보고서 본문 — 고객이 오해할 자리를 막는다", () 
     expect(html).toContain("<h1>");
     expect(html).toContain("AI 보안 점검 결과보고서");
     expect(html).not.toContain("| 코드 |"); // 표가 문자 그대로 남으면 변환이 안 된 것이다
+  });
+
+  it("DOCX로도 나온다 — 고객 감사 부서는 편집 가능한 형식을 요구한다", async () => {
+    const buf = await inspectionDocx(md);
+    // .docx는 zip이다(PK 머리 4바이트). 파일이 열리는지까지는 여기서 못 보지만,
+    // 빈 파일·오류 문자열이 나가는 것은 막는다.
+    expect(buf.length, "DOCX가 비어 있다").toBeGreaterThan(2000);
+    expect(buf.subarray(0, 2).toString("latin1"), "zip(docx) 머리가 아니다").toBe("PK");
+  });
+
+  it("DOCX는 브라우저 없이 나온다 — 에어갭에서 PDF가 안 되도 이건 된다", async () => {
+    // renderPdf는 headless 브라우저가 필요해 에어갭·최소 설치에서 실패할 수 있다.
+    // DOCX 경로가 그 대안이므로 외부 의존이 없어야 한다.
+    await expect(inspectionDocx("# 제목\n\n- 항목\n\n| 가 | 나 |\n|---|---|\n| 1 | 2 |")).resolves.toBeInstanceOf(Buffer);
   });
 
   it("HTML에 넣을 때 꺾쇠는 escape된다 — 대상 주소나 응답에 태그가 섞여도 서식이 안 깨진다", () => {

@@ -17,6 +17,7 @@
 import type { Express, Request } from "express";
 import * as fs from "fs/promises";
 import * as path from "path";
+import { Document, Packer, Paragraph, TextRun, HeadingLevel, Table, TableRow, TableCell, WidthType } from "docx";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { todayLocal } from "../util/date";
@@ -49,11 +50,11 @@ export const INSPECTION_COVERAGE: Record<string, CoverageEntry> = {
   D01: { how: "doc", note: "학습 데이터 접근이 필요하다. 고객이 학습을 하지 않으면 해당 없음으로 적는다." },
   D02: { how: "doc", note: "데이터 구축 절차·검수 체계·담당자 교육 여부를 문서와 인터뷰로 확인한다." },
   D03: { how: "doc", note: "비식별 절차는 문서로 확인한다. 모델 출력에 개인정보가 실리는지는 M01과 함께 부분 측정한다." },
-  M01: { how: "partial", note: "쿼리 기반 추출을 시도한다. 학습 데이터 원본이 없으면 유출 여부를 끝까지 단정할 수 없다." },
+  M01: { how: "partial", attacks: ["training-leak"], note: "쿼리 기반 추출을 시도한다. 학습 데이터 원본이 없으면 유출 여부를 끝까지 단정할 수 없다." },
   M02: { how: "partial", note: "엔드포인트만으로는 벡터 DB 접근을 볼 수 없다. 응답에 원문·벡터가 실리는지만 잰다." },
   M03: { how: "auto", attacks: ["system-prompt-leak", "obfuscation"], note: "매 실행 무작위 카나리를 심고 유출 여부를 결정적으로 판정한다(사람 판단이 들어가지 않는다)." },
   M04: { how: "partial", note: "rate limit 유무·logprobs 과다 요청 거부 여부를 HTTP로 확인한다. 모델 추출 자체는 재지 않는다." },
-  M05: { how: "partial", note: "근거 없는 단정을 유도해 본다. 사실 여부 판단이 들어가므로 결정적 판정이 아니다." },
+  M05: { how: "partial", attacks: ["hallucination"], note: "근거 없는 단정을 유도해 본다. 사실 여부 판단이 들어가므로 결정적 판정이 아니다." },
   M06: { how: "auto", attacks: ["jailbreak"], note: "역할극·권위 사칭·긴급 상황 등으로 제한 해제를 시도하고 마커 순응으로 판정한다." },
   M07: { how: "partial", attacks: ["instruction-override"], note: "지시 무시·출력 형식 강제까지는 잰다. 하류 렌더링 취약점(XSS 등)은 고객 앱 코드가 있어야 한다." },
   M08: { how: "partial", note: "rate limit 유무만 확인한다. ⚠ 부하 시험은 서면 동의가 있을 때만 수행한다." },
@@ -301,11 +302,76 @@ function 강조(s: string): string {
   return s.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>").replace(/`(.+?)`/g, "<code>$1</code>");
 }
 
+/** `**굵게**`를 docx TextRun 조각으로 — 강조가 사라지면 「미측정은 안전이 아니다」가 눈에 안 띈다. */
+function docx조각(s: string): TextRun[] {
+  const out: TextRun[] = [];
+  for (const part of s.split(/(\*\*[^*]+\*\*)/g)) {
+    if (!part) continue;
+    const m = /^\*\*([^*]+)\*\*$/.exec(part);
+    out.push(new TextRun(m ? { text: m[1], bold: true } : { text: part.replace(/`/g, "") }));
+  }
+  return out.length ? out : [new TextRun("")];
+}
+
+/**
+ * Markdown → DOCX.
+ *
+ * ⚠ 고객사 **감사 부서가 편집 가능한 형식**을 요구한다 — PDF만 주면 자기 보고서에 못 옮긴다.
+ *   본문은 `inspectionMarkdown` 하나에서 나온다(두 벌 적지 않는다) — 여기서는 꼴만 바꾼다.
+ */
+export async function inspectionDocx(md: string): Promise<Buffer> {
+  const children: (Paragraph | Table)[] = [];
+  let 표행: string[][] = [];
+  const 표닫기 = () => {
+    if (!표행.length) return;
+    const rows = 표행.map((cells, i) =>
+      new TableRow({
+        children: cells.map(
+          (c) => new TableCell({ children: [new Paragraph({ children: docx조각(i === 0 ? `**${c}**` : c) })] }),
+        ),
+      }),
+    );
+    children.push(new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows }));
+    표행 = [];
+  };
+
+  for (const raw of md.split("\n")) {
+    const line = raw.trimEnd();
+    const 표줄 = line.startsWith("|") && line.endsWith("|");
+    if (!표줄) 표닫기();
+    if (표줄) {
+      const cells = line.slice(1, -1).split("|").map((c) => c.trim());
+      if (!cells.every((c) => /^-+$/.test(c))) 표행.push(cells); // 구분선은 건너뛴다
+      continue;
+    }
+    const h = /^(#{1,3})\s+(.*)$/.exec(line);
+    if (h) {
+      const level = [HeadingLevel.TITLE, HeadingLevel.HEADING_1, HeadingLevel.HEADING_2][h[1].length - 1];
+      children.push(new Paragraph({ text: h[2].replace(/\*\*/g, ""), heading: level }));
+      continue;
+    }
+    if (line.startsWith("> ")) {
+      // ⚠ 경고 문단(미측정·부분 유출)은 굵게 남긴다 — 여기가 흐려지면 리포트의 정직이 흐려진다.
+      children.push(new Paragraph({ children: docx조각(line.slice(2)), indent: { left: 360 } }));
+      continue;
+    }
+    const li = /^(\s*)-\s+(.*)$/.exec(line);
+    if (li) {
+      children.push(new Paragraph({ children: docx조각(`• ${li[2]}`), indent: { left: 240 + li[1].length * 120 } }));
+      continue;
+    }
+    children.push(new Paragraph({ children: docx조각(line) }));
+  }
+  표닫기();
+  return Packer.toBuffer(new Document({ sections: [{ children }] }));
+}
+
 export interface InspectionRequest {
   scope: InspectionScope;
   /** 없으면 마지막 레드팀 점검 결과를 쓴다. */
   report?: RedTeamReport | null;
-  format?: "md" | "pdf" | "both";
+  /** 기본 "all" — 고객은 보통 PDF(제출용)와 DOCX(편집용)를 함께 원한다. */
+  format?: "md" | "pdf" | "docx" | "both" | "all";
   createdBy?: string;
 }
 
@@ -314,6 +380,7 @@ export interface InspectionResult {
   mdPath: string;
   pdfPath?: string;
   pdfError?: string;
+  docxPath?: string;
   취약: number;
   미측정: number;
 }
@@ -332,10 +399,18 @@ export async function generateInspectionReport(req: InspectionRequest): Promise<
     취약: js.filter((j) => j.판정 === "취약").length,
     미측정: js.filter((j) => j.판정 === "미측정").length,
   };
-  if (req.format === "pdf" || req.format === "both") {
+  const 형식 = req.format ?? "all";
+  if (형식 === "pdf" || 형식 === "both" || 형식 === "all") {
     const pdfPath = path.join(REPORT_DIR, `${base}.pdf`);
     if (await renderPdf(inspectionHtml(md), pdfPath)) result.pdfPath = pdfPath;
-    else result.pdfError = "PDF 렌더 실패(headless 브라우저 미가용). Markdown만 제공됩니다.";
+    else result.pdfError = "PDF 렌더 실패(headless 브라우저 미가용). Markdown·DOCX만 제공됩니다.";
+  }
+  // DOCX — 고객사 감사 부서는 편집 가능한 형식을 요구한다(PDF만 주면 자기 보고서에 못 옮긴다).
+  // ⚠ PDF와 달리 외부 브라우저가 필요 없어 **에어갭에서도 항상 나온다.**
+  if (형식 === "docx" || 형식 === "all") {
+    const docxPath = path.join(REPORT_DIR, `${base}.docx`);
+    await fs.writeFile(docxPath, await inspectionDocx(md));
+    result.docxPath = docxPath;
   }
   return result;
 }
@@ -360,14 +435,14 @@ export async function runInspectionReport(args: Record<string, string>): Promise
       consent: (args.consent ?? "").trim() || "서면 동의서 기준(부하 시험 미포함)",
       period: args.period?.trim() || undefined,
     },
-    format: "both",
+    format: "all",
     createdBy: "AI 팀",
   });
   const 줄 = [
     `📄 ${customer} AI 보안 점검 결과보고서를 만들었습니다.`,
     `  · 취약 ${r.취약}건 · **미측정 ${r.미측정}건**(재지 못한 것이며 양호가 아닙니다)`,
     `  · 근거: ${last.model} 대상 공격 ${last.total}개${last.complete ? "" : ` (⚠ ${last.errored}개는 재지 못한 부분 측정)`}`,
-    `  · 파일: ${path.basename(r.mdPath)}${r.pdfPath ? ` · ${path.basename(r.pdfPath)}` : ""}`,
+    `  · 파일: ${[r.mdPath, r.pdfPath, r.docxPath].filter(Boolean).map((f) => path.basename(f)).join(" · ")}`,
   ];
   if (r.pdfError) 줄.push(`  · ⚠ ${r.pdfError}`);
   return 줄.join("\n");
@@ -393,7 +468,7 @@ export function registerInspectionRoutes(app: Express): void {
           period: b.period ? String(b.period) : undefined,
           interviewee: b.interviewee ? String(b.interviewee) : undefined,
         },
-        format: b.format === "pdf" || b.format === "both" ? b.format : "both",
+        format: ["md", "pdf", "docx", "both", "all"].includes(b.format) ? b.format : "all",
         createdBy: 작성자(req),
       });
       recordAudit({

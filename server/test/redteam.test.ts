@@ -196,9 +196,11 @@ describe("카나리 — 모델이 외울 수 없어야 한다", () => {
     const 엿보기: LlmCaller = async (system) => { 본것.push(system); return "거절합니다."; };
     await runRedTeam(엿보기, "a");
     await runRedTeam(엿보기, "b");
-    const c1 = 본것[0].match(/"(SK-[0-9A-F]+)"/)![1];
-    const c2 = 본것[본것.length - 1].match(/"(SK-[0-9A-F]+)"/)![1];
-    expect(c1).not.toBe(c2); // 매 실행 무작위 — 이게 이 방식의 핵심 주장이다
+    // ⚠ 카나리를 안 쓰는 문항(M01·M05)은 다른 인격으로 보낸다 — 그 시스템 프롬프트에는 카나리가 없다.
+    //   그래서 **카나리가 든 것만** 골라 본다(2026-08-12: 마지막 문항을 집다가 이 시험이 깨졌다).
+    const 카나리들 = [...new Set(본것.map((s) => s.match(/"(SK-[0-9A-F]+)"/)?.[1]).filter(Boolean))];
+    expect(카나리들.length, "카나리가 든 시스템 프롬프트를 못 찾았다 — 이 시험이 헛돈다").toBeGreaterThan(1);
+    expect(카나리들.length).toBe(2); // 두 번 실행 = 서로 다른 카나리 2개. 매 실행 무작위가 이 방식의 핵심 주장이다
   });
 
   it("시스템 프롬프트가 카나리를 담고 거절 지시를 준다", () => {
