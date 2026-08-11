@@ -1099,7 +1099,8 @@ function loadPlaywright(): { chromium: { launch: (o: unknown) => Promise<any> } 
   }
   return null;
 }
-async function renderPdf(html: string, outPath: string): Promise<boolean> {
+/** HTML → PDF. 점검 보고서(inspectionreport.ts)도 같은 렌더러를 쓴다 — 두 벌 두지 않는다. */
+export async function renderPdf(html: string, outPath: string): Promise<boolean> {
   try {
     const pw = loadPlaywright();
     if (!pw) throw new Error("playwright-core 미설치(server·client 어디에도 없음)");

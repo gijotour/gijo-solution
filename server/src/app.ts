@@ -37,6 +37,7 @@ import { registerOrchestratorDatasetRoutes } from "./engine/orchestrator-dataset
 import { registerBriefingRoutes } from "./engine/briefing";
 import { registerUndoRoutes } from "./engine/undo";
 import { registerRedteamRoutes } from "./engine/redteam";
+import { registerInspectionRoutes } from "./engine/inspectionreport";
 import { registerGuardrailRoutes } from "./engine/guardrail";
 import { registerWorkflowRoutes } from "./engine/workflow";
 import { registerAnalysisHubRoutes } from "./engine/analysishub";
@@ -170,6 +171,7 @@ export function createApp(): Express {
   registerBriefingRoutes(app);
   registerUndoRoutes(app);
   registerRedteamRoutes(app);
+  registerInspectionRoutes(app);  // 고객사 AI 보안 점검 결과보고서(점검 상품화 4단계)
   registerGuardrailRoutes(app);
   registerWorkflowRoutes(app);   // 업무 절차 5단계 현황(절차 띠가 읽는다)
   registerAnalysisHubRoutes(app);

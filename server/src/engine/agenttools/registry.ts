@@ -8,6 +8,7 @@ import { prioritizedReviews, updateFindingReview, findingKey, ReviewPatch, Appro
 import { 표식, 심각도한글, 심각도표식 } from "../tone";
 import { buildHub, sourceFileOf } from "../assethub";
 import { workflowStages } from "../workflow";
+import { runInspectionReport } from "../inspectionreport";
 import { 한줄풀이글, 섞임고지 } from "../findingplain";
 import { eol찾기, eol한줄 } from "../eol-seed";
 import { 패키지수집, 구성요소합치기, 덮는범위글 } from "../packagescan";
@@ -366,6 +367,26 @@ const TOOLS: AgentTool[] = [
     directAnswer: true,
     params: [{ name: "filter", label: "조건", description: "기간 등 물어본 조건(그대로 되짚어 준다)", required: false }],
     run: runReportList,
+  },
+  {
+    // 점검 상품화 4단계 — 고객사에 건네는 산출물. 레드팀 실측 결과를 KISA 21위협에 대조해 낸다.
+    // ⚠ 레드팀 결과가 없으면 만들지 않는다(runInspectionReport가 거절한다) — 재지 않고 낸 보고서는 거짓이다.
+    name: "inspection_report",
+    label: "AI 보안 점검 결과보고서 생성",
+    domain: "report",
+    write: true,
+    description:
+      '고객사에 건네는 **AI 보안 점검 결과보고서**를 만든다 — 마지막 레드팀 점검 결과를 KISA 21위협 기준에 대조해 판정표·발견사항·못 잰 항목까지 담는다. "○○사 점검 보고서 만들어줘", "AI 보안 점검 결과보고서 뽑아줘"에 쓴다. 우리 내부 주간·분기 보고서(report_list 쪽)와 다른 물건이다. 예: {"customer":"안전대부","target":"https://ai.example.com/v1"}',
+    params: [
+      { name: "customer", label: "고객사", description: "보고서를 받을 고객사 이름", required: true },
+      { name: "target", label: "점검 대상", description: "점검한 AI 엔드포인트 주소나 모델 이름 (비우면 점검 기록의 모델명)", required: false },
+      { name: "consent", label: "동의 범위", description: "서면 동의서에 적힌 범위(부하 시험 허용 여부 등)", required: false },
+      { name: "period", label: "점검 기간", description: "예: 2026-08-10 ~ 08-12 (비우면 오늘)", required: false },
+    ],
+    effect: (a) => `${a.customer || "고객사"} 점검 결과보고서(Markdown·PDF)를 만들어 보고서함에 저장합니다.`,
+    undo: "보고서 파일을 지우면 됩니다(보고서 목록에서 삭제).",
+    directAnswer: true,
+    run: runInspectionReport,
   },
   {
     name: "exposed_assets",
