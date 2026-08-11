@@ -1049,11 +1049,18 @@ export async function runRunRedteam(args: Record<string, string>): Promise<strin
     .filter(([, c]) => c.vulnerable > 0)
     .sort((a, b) => b[1].vulnerable - a[1].vulnerable)[0];
   const vulnList = report.results.filter((r) => r.vulnerable).slice(0, 5).map((r) => `  ${심각도표식(r.severity)} [${심각도한글(r.severity)}] ${r.desc} (${r.basis})`);
+  // ⚠ robustnessScore는 null일 수 있다(전부 못 잼) — 「null점」이라고 쓰면 안 되고,
+  //   못 잰 것을 「방어 성공」으로 세어도 안 된다. 못 잰 사실을 그대로 적는다.
+  const 잰것 = report.total - report.errored;
+  if (report.robustnessScore == null) {
+    return `${asset.name} 레드팀 점검 — **측정하지 못했습니다**(${report.total}문항 전부 응답 실패). 견고성 점수를 낼 수 없습니다. 첫 실패: ${report.results[0]?.errorNote ?? "알 수 없음"}`;
+  }
   return [
-    `${asset.name} 레드팀 점검 완료 — 견고성 ${report.robustnessScore}점 (${report.total - report.vulnerable}/${report.total} 방어 성공)`,
-    worst ? `가장 취약한 유형: ${worst[0]} (${worst[1].vulnerable}/${worst[1].total}건 뚫림)` : "14개 공격 유형 전부 방어 성공",
+    `${asset.name} 레드팀 점검 완료 — 견고성 ${report.robustnessScore}점 (${잰것 - report.vulnerable}/${잰것} 방어 성공)`,
+    report.complete ? null : `⚠ 부분 측정 — ${report.errored}개 문항은 응답 실패로 못 쟀습니다(점수는 잰 ${잰것}개 기준).`,
+    worst ? `가장 취약한 유형: ${worst[0]} (${worst[1].vulnerable}/${worst[1].total}건 뚫림)` : `${잰것}개 공격 유형 전부 방어 성공`,
     ...(vulnList.length ? ["뚫린 공격:", ...vulnList] : []),
-  ].join("\n");
+  ].filter(Boolean).join("\n");
 }
 
 // 보안장비 하드닝(보안설정) 점검 — 대상 장비 CLI에서 표준 기준 점검 명령을 실제 실행해 리포트한다.
@@ -3044,8 +3051,12 @@ export function runRedteamStatus(): string {
   }
   if (r) {
     if (줄.length) 줄.push("");
+    // ⚠ null이면 못 잰 것이다 — 「null점」·「0점」으로 적지 않는다(2026-08-11).
     줄.push(
-      `🧪 맨몸 모델 견고성(참고치 — 가드레일을 걷어내고 모델만 잰 값) — **${r.robustnessScore}점** · 뚫림 ${r.vulnerable}/${r.total}`,
+      r.robustnessScore == null
+        ? `🧪 맨몸 모델 견고성 — **측정 못 함**(${r.total}문항 응답 실패). 점수를 낼 수 없습니다.`
+        : `🧪 맨몸 모델 견고성(참고치 — 가드레일을 걷어내고 모델만 잰 값) — **${r.robustnessScore}점** · 뚫림 ${r.vulnerable}/${r.total - (r.errored ?? 0)}` +
+          ((r.errored ?? 0) ? ` · ⚠ 못 잰 문항 ${r.errored}개` : ""),
       `대상 ${r.model} · 측정 ${새시각(r.ranAt)}`,
     );
     const 약한곳 = Object.entries(r.byCategory ?? {})

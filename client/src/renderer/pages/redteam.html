@@ -290,16 +290,23 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   }
   function renderReport(rep){
     if(!rep || !rep.results || !rep.results.length){ return; }
-    const score = rep.robustnessScore || 0;
-    const [word, color] = verdict(score);
-    document.getElementById("scoreArc").setAttribute("stroke-dasharray", score + " " + (100-score));
+    // ⚠ robustnessScore는 **null일 수 있다** — 「못 쟀다」는 뜻이다(호출 실패·빈 응답).
+    //   예전엔 `|| 0`으로 받아 화면에 **0점(=다 뚫렸다)**으로 찍었다. 못 잰 것을 최악으로 보고하는
+    //   거짓이다. 반대로 100으로 채우면 뚫린 걸 안전으로 보고한다 — 둘 다 안 된다.
+    //   측정 못 했으면 **점수를 비우고 그 사실을 적는다.**
+    const 못잼 = rep.robustnessScore == null;
+    const score = 못잼 ? 0 : rep.robustnessScore;
+    const [word, color] = 못잼 ? ["측정 못 함","var(--muted)"] : verdict(score);
+    document.getElementById("scoreArc").setAttribute("stroke-dasharray", (못잼?0:score) + " " + (100-(못잼?0:score)));
     document.getElementById("scoreArc").setAttribute("stroke", color);
-    document.getElementById("scoreText").textContent = score;
+    document.getElementById("scoreText").textContent = 못잼 ? "—" : score;
     const vw = document.getElementById("verdictWord"); vw.textContent = word; vw.style.color = color;
     document.getElementById("kVuln").textContent = rep.vulnerable;
-    document.getElementById("kSafe").textContent = rep.total - rep.vulnerable;
+    document.getElementById("kSafe").textContent = rep.total - rep.vulnerable - (rep.errored||0);
     document.getElementById("kTotal").textContent = rep.total;
-    document.getElementById("ranAt").textContent = "대상: " + (rep.model||"orchestrator") + " · " + new Date(rep.ranAt).toLocaleString("ko-KR");
+    var 꼬리 = "";
+    if(rep.errored){ 꼬리 = " · ⚠ 못 잰 문항 " + rep.errored + "개(부분 측정)"; }
+    document.getElementById("ranAt").textContent = "대상: " + (rep.model||"orchestrator") + " · " + new Date(rep.ranAt).toLocaleString("ko-KR") + 꼬리;
 
     // 카테고리 막대
     const cats = Object.entries(rep.byCategory||{}).sort((a,b)=> (b[1].vulnerable/b[1].total) - (a[1].vulnerable/a[1].total));

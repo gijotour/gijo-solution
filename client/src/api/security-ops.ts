@@ -156,8 +156,13 @@ export interface RedTeamReport {
   model: string;
   total: number;
   vulnerable: number;
-  robustnessScore: number;
-  byCategory: Record<string, { total: number; vulnerable: number }>;
+  /** 못 잰 문항 수(호출 실패·빈 응답). 0이 아니면 부분 측정이다. */
+  errored: number;
+  /** ⚠ **null이면 「못 쟀다」** — 0점(다 뚫림)도 100점(안전)도 아니다. 화면에서 채우지 말 것. */
+  robustnessScore: number | null;
+  /** 못 잰 문항이 하나도 없을 때만 true. */
+  complete: boolean;
+  byCategory: Record<string, { total: number; vulnerable: number; errored: number }>;
   results: RedTeamResult[];
 }
 export interface RedTeamTargetAsset {
