@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS Lite — 나만의 기억</title>
+<link rel="stylesheet" href="gijo-ui.css">
+<!--
+  lite-memory.html — 라이트 「나만의 기억」(메뉴 8).
+  사장님 말: 「RAG, Graphify, LLM Wiki를 이용해서 넣고 관리하기」
+
+  ■ 세 조각의 역할이 다르다(지식그래프 도입계획 §0 판단 그대로):
+    · RAG      — 이미 있다. 이 화면의 뼈대다.
+    · 그래프ⓐ  — **보여 주기.** 우리는 이미 온톨로지를 갖고 있다(2,186 트리플).
+                 Graphify를 통째로 들이지 않는다 — 그건 코드베이스용이고 우리는 보안 데이터다.
+                 쓸 것은 「연결을 그림으로 본다」는 **발상**이지 그 도구가 아니다.
+    · 위키ⓑ    — 넣은 문서의 **정리본**. ⚠ 라이트에서 값이 특히 크다:
+                 ctx 8192에서 긴 원문 대신 정리본을 넣으면 토큰이 준다(Lite 계획서 §4).
+
+  ■ ⚠ ⓑ는 아직 **만들지 않았다.** 여기서는 그 자리를 비워 두되 **없다고 분명히 말한다** —
+    라이트의 고유 위험이 「없는 걸 있다고 하는 것」이다.
+
+  ■ 다리: listMemoryDocuments · queryMemory · memoryDocumentChunks · ingestMemoryFile ·
+          setDocCategory · deleteMemoryDocument · expandOntology
+-->
+<style>
+  :root{--bg:#262624;--panel:#30302e;--border:rgba(255,255,255,.09);--text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--blue:#3b82f6;--teal:#1eb980;--red:#e2483d;--amber:#f0a020;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;overflow-y:auto}
+  .wrap{padding:18px 22px 40px;display:flex;flex-direction:column;gap:14px;max-width:900px}
+  .scr-id{font-size:12.5px;color:var(--muted)}
+  .scr-id b{color:var(--text);font-weight:800}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+  .card h2{font-size:13px;font-weight:800;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+  .card .sub{font-size:11.5px;color:var(--muted-2);margin-bottom:10px;line-height:1.6}
+  .ask{display:flex;gap:8px;margin-bottom:6px}
+  .ask input{flex:1;background:#262624;border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font:inherit}
+  button{background:transparent;border:1px solid var(--border);border-radius:8px;padding:7px 13px;color:var(--text);font:inherit;font-size:12.5px;cursor:pointer}
+  button.go{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700}
+  button.danger:hover{border-color:var(--red);color:var(--red)}
+  button:disabled{opacity:.5;cursor:default}
+  .doc{display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid var(--border)}
+  .doc:last-child{border-bottom:0}
+  .doc .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
+  .doc .n:hover{color:var(--blue)}
+  .doc .m{font-size:11.5px;color:var(--muted-2);flex:0 0 auto}
+  .hit{padding:10px 0;border-bottom:1px solid var(--border);font-size:12.5px;line-height:1.75;white-space:pre-wrap}
+  .hit:last-child{border-bottom:0}
+  .read{font-size:12.5px;line-height:1.8;white-space:pre-wrap;max-height:46vh;overflow:auto;padding-right:6px}
+  .empty{font-size:12.5px;color:var(--muted);line-height:1.75;padding:6px 2px}
+  .empty b{color:var(--text)}
+  .err{font-size:12.5px;color:var(--red);padding:6px 2px}
+  .ok{font-size:12.5px;color:var(--teal);padding:6px 2px}
+  .warn{font-size:11.5px;color:var(--amber);line-height:1.7;margin-top:8px}
+  .warn b{color:var(--text)}
+  .tri{display:flex;gap:8px;flex-wrap:wrap;margin-top:2px}
+  .tri span{font-size:11.5px;background:#262624;border:1px solid var(--border);border-radius:999px;padding:3px 10px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="scr-id"><b>나만의 기억</b> — 내가 넣은 자료를 쌓아 두고, 물으면 그 안에서 찾습니다.</div>
+
+  <section class="card">
+    <h2>물어보기</h2>
+    <div class="sub">내가 넣은 자료 + 제품에 들어 있는 자료를 함께 봅니다.</div>
+    <div class="ask">
+      <input id="q" type="text" placeholder="예: 우리 백업 며칠마다 돌리기로 했더라?" aria-label="질문">
+      <button class="go" id="askGo">찾기</button>
+    </div>
+    <div id="hits"></div>
+    <div id="graph"></div>
+  </section>
+
+  <section class="card">
+    <h2>자료 넣기</h2>
+    <div class="sub">넣으면 바로 위에서 찾을 수 있습니다.</div>
+    <div class="ask">
+      <input id="file" type="file" accept=".md,.txt,.log,.csv" aria-label="자료 파일">
+      <button id="upGo">넣기</button>
+    </div>
+    <div id="upMsg"></div>
+    <div class="warn">⚠ 지금은 <b>글자 파일(.md · .txt 등)</b>만 됩니다. PDF·워드는 아직 이 화면에서 못 넣습니다.</div>
+  </section>
+
+  <section class="card">
+    <h2>넣어 둔 자료 <span id="cnt" style="font-size:11.5px;color:var(--muted);font-weight:600"></span></h2>
+    <div class="sub">제품과 함께 온 것은 빼고, <b>내가 넣은 것</b>만 보여 줍니다.</div>
+    <div id="docs">불러오는 중…</div>
+  </section>
+
+  <section class="card">
+    <h2>정리본(LLM 위키) <span class="pill" style="font-size:11px;padding:1px 8px;border-radius:999px;background:rgba(240,160,32,.16);color:var(--amber)">아직 없음</span></h2>
+    <div class="sub">넣은 문서를 미리 정리해 두면, 긴 원문 대신 그 정리본으로 답합니다.</div>
+    <div class="empty"><b>아직 만들지 않았습니다.</b><br>
+      라이트는 문맥이 8K로 좁아서 긴 원문을 매번 넣으면 자리가 모자랍니다 —
+      정리본은 그 자리를 되사는 장치입니다. 값이 큰 만큼 뒤에 제대로 만들 자리입니다.</div>
+  </section>
+
+  <section class="card" id="readCard" style="display:none">
+    <h2 id="readTitle"></h2>
+    <div class="read" id="readBody"></div>
+  </section>
+</div>
+
+<script>
+// lite-memory — 다리는 window.gijo만. ⓑ 위키는 아직 없다고 **분명히** 말한다.
+(function () {
+  "use strict";
+  var g = window.gijo || null;
+  var esc = function (v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+  function 오류문구(e, 무엇) {
+    var m = String((e && e.message) || e || "");
+    if (/401|unauthorized/i.test(m)) return "로그인이 풀렸습니다 — 다시 로그인해 주세요.";
+    if (/403|forbidden/i.test(m)) return "이 계정에는 권한이 없습니다.";
+    if (/fetch|network|ECONN/i.test(m)) return "서버에 닿지 못했습니다 — 서버가 켜져 있는지 확인해 주세요.";
+    return 무엇 + "을 못 했습니다 — " + esc(m);
+  }
+  function 다듬기(t) {
+    return String(t || "").split("\n")
+      .filter(function (l) { return !/^!\[/.test(l.trim()); })
+      .filter(function (l) { return !/^[\s|:-]+$/.test(l); })
+      .map(function (l) {
+        var s = l.replace(/\*\*/g, "").replace(/^#{1,6}\s*/, "");
+        if (/^\s*\|.*\|\s*$/.test(s)) s = s.replace(/^\s*\|/, "").replace(/\|\s*$/, "").split("|")
+          .map(function (c) { return c.trim(); }).filter(Boolean).join(" · ");
+        return s;
+      }).join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  }
+  if (!g) {
+    document.getElementById("docs").innerHTML = '<div class="err">앱 밖에서 열려 있어 데이터를 못 읽습니다 — GIJO AS 앱에서 열어 주세요.</div>';
+    return;
+  }
+
+  // ⚠ 「내가 넣은 것」만 보여 준다 — 제품과 함께 온 GIJO_AS_*·지식 시드는 뺀다.
+  //   섞으면 「내 문서함」이 아니라 그냥 전체 목록이 되어 이 화면의 뜻이 없어진다.
+  function 내가넣은것인가(d) {
+    var id = String(d.documentId || "");
+    if (/^GIJO_AS_/.test(id)) return false;
+    if (/^GIJO_지식_/.test(id)) return false;
+    return true;
+  }
+
+  async function 목록() {
+    var box = document.getElementById("docs");
+    try {
+      var all = await g.listMemoryDocuments();
+      var arr = (Array.isArray(all) ? all : all.documents || []).filter(내가넣은것인가);
+      document.getElementById("cnt").textContent = arr.length ? arr.length + "건" : "";
+      if (!arr.length) {
+        box.innerHTML = '<div class="empty"><b>아직 넣은 자료가 없습니다.</b><br>' +
+          "위에서 파일을 넣으면 여기 쌓이고, 그때부터 그 안을 물어볼 수 있습니다.<br>" +
+          "사내 규정·회의록·장비 설정 메모처럼 <b>나만 갖고 있는 것</b>부터 넣으면 값이 큽니다.</div>";
+        return;
+      }
+      box.innerHTML = arr.sort(function (a, b) { return String(b.ingestedAt).localeCompare(String(a.ingestedAt)); })
+        .map(function (d) {
+          return '<div class="doc"><span class="n" data-id="' + esc(d.documentId) + '">' + esc(d.documentId) + "</span>" +
+            '<span class="m">' + esc(d.chunks || 0) + "조각 · " + esc(String(d.ingestedAt || "").slice(0, 10)) + "</span>" +
+            '<button class="danger" data-del="' + esc(d.documentId) + '">빼기</button></div>';
+        }).join("");
+      box.querySelectorAll(".n").forEach(function (el) { el.addEventListener("click", function () { 읽기(el.dataset.id); }); });
+      box.querySelectorAll("[data-del]").forEach(function (el) { el.addEventListener("click", function () { 빼기(el.dataset.del); }); });
+    } catch (e) { box.innerHTML = '<div class="err">' + 오류문구(e, "자료 목록") + "</div>"; }
+  }
+
+  async function 빼기(id) {
+    // ⚠ 지우는 것은 되돌릴 수 없다 — 한 번 묻는다. 라이트엔 결재판이 없으니 이 확인이 마지막 문이다.
+    if (!confirm("「" + id + "」을 지식에서 뺍니다.\n원본 파일은 그대로 두고 검색에서만 빠집니다.\n계속할까요?")) return;
+    try { await g.deleteMemoryDocument(id, false); } catch (e) { alert(오류문구(e, "빼기")); }
+    목록();
+  }
+
+  async function 읽기(id) {
+    var card = document.getElementById("readCard");
+    document.getElementById("readTitle").textContent = id;
+    document.getElementById("readBody").textContent = "불러오는 중…";
+    card.style.display = "";
+    try {
+      var ch = await g.memoryDocumentChunks(id, 40);
+      var arr = Array.isArray(ch) ? ch : ch.chunks || [];
+      document.getElementById("readBody").textContent = arr.length
+        ? 다듬기(arr.map(function (c) { return typeof c === "string" ? c : (c.text || ""); }).join("\n\n"))
+        : "이 문서는 조각이 없습니다 — 반입이 덜 끝났을 수 있습니다.";
+    } catch (e) { document.getElementById("readBody").textContent = 오류문구(e, "문서"); }
+    card.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  async function 찾기() {
+    var q = String(document.getElementById("q").value || "").trim();
+    var box = document.getElementById("hits"), gbox = document.getElementById("graph"), btn = document.getElementById("askGo");
+    if (!q) return;
+    btn.disabled = true; box.innerHTML = '<div class="empty">찾는 중…</div>'; gbox.innerHTML = "";
+    try {
+      var hits = await g.queryMemory(q, 5);
+      var arr = (Array.isArray(hits) ? hits : []).map(function (h) { return typeof h === "string" ? h : (h.text || ""); }).filter(Boolean);
+      box.innerHTML = arr.length
+        ? arr.map(function (t) { var c = 다듬기(t); return '<div class="hit">' + esc(c.slice(0, 800)) + (c.length > 800 ? " …" : "") + "</div>"; }).join("")
+        : '<div class="empty"><b>이 물음에 닿는 대목을 못 찾았습니다.</b><br>' +
+          "자료를 아직 안 넣었거나, 말을 조금 바꾸면 닿을 수 있습니다.</div>";
+    } catch (e) { box.innerHTML = '<div class="err">' + 오류문구(e, "찾기") + "</div>"; }
+
+    // ⓐ 그래프 — **연결을 보여 주는 것**이 값이다. 없으면 조용히 접는다(빈 상자를 남기지 않는다).
+    try {
+      // ⚠ 다리 이름은 `expandOntology`다. 처음에 g.ontologyQuery로 썼는데 **그런 다리가 없다** —
+      //   가드(if)가 조용히 건너뛰어서 「그래프가 원래 안 나오나 보다」로 보였다.
+      //   내가 오늘 내내 잡아 온 「조용히 없어지는 기능」을 내가 만든 셈이다.
+      if (typeof g.expandOntology === "function") {
+        var tri = await g.expandOntology(q);
+        var list = Array.isArray(tri) ? tri : (tri && (tri.triples || tri.results)) || [];
+        gbox.innerHTML = '<div class="sub" style="margin-top:12px">🕸 이 물음과 이어진 표준 코드</div>' + (list.length
+          ? '<div class="tri">' + list.slice(0, 12).map(function (t) {
+              var s = typeof t === "string" ? t : [t.subject, t.predicate, t.object].filter(Boolean).join(" → ");
+              return "<span>" + esc(s) + "</span>";
+            }).join("") + "</div>"
+          // ⚠ **빈 것을 조용히 숨기지 않는다.** 숨기면 담당자는 이 기능이 있는 줄도 모른다 —
+          //   내가 오늘 내내 잡아 온 「조용히 없어지는 기능」이 바로 이 모양이다.
+          //   2026-08-12 max 실측: 「피싱」에도 0건이었다. 도입계획 §5가 적은 그대로 —
+          //   그래프는 만들어 뒀는데 **문서와의 접점이 거의 안 쌓였다**(문서 트리플 3개).
+          : '<div class="empty">이 물음에 이어진 표준 코드가 <b>아직 없습니다.</b><br>' +
+            "표준 코드(ATT&CK 등)와 내 문서를 잇는 작업이 아직 덜 됐습니다 — 기능이 없는 것이 아니라 <b>연결이 덜 쌓인 것</b>입니다.</div>");
+      }
+    } catch (e) { /* 그래프는 덤이다 — 실패해도 본 답을 가리지 않는다 */ }
+    btn.disabled = false;
+  }
+
+  async function 넣기() {
+    var f = document.getElementById("file").files[0];
+    var msg = document.getElementById("upMsg"), btn = document.getElementById("upGo");
+    if (!f) { msg.innerHTML = '<div class="err">파일을 고르세요.</div>'; return; }
+    btn.disabled = true; msg.innerHTML = '<div class="empty">넣는 중…</div>';
+    try {
+      var text = await f.text();
+      await g.ingestMemoryFile(f.name, text, "global");
+      var 들어갔나 = false;
+      try {
+        var all = await g.listMemoryDocuments();
+        들어갔나 = (Array.isArray(all) ? all : all.documents || []).some(function (d) { return d.documentId === f.name; });
+      } catch (e2) { /* 확인 실패는 무해 */ }
+      msg.innerHTML = 들어갔나
+        ? '<div class="ok">넣었습니다 — 이제 위에서 찾을 수 있습니다.</div>'
+        : '<div class="ok">넣었습니다.</div><div class="warn">⚠ 다만 목록에서 확인되지 않았습니다 — 잠시 뒤 새로고침해 보세요.</div>';
+      document.getElementById("file").value = "";
+    } catch (e) { msg.innerHTML = '<div class="err">' + 오류문구(e, "자료 넣기") + "</div>"; }
+    btn.disabled = false;
+    목록();
+  }
+
+  function 시작() {
+    document.getElementById("askGo").addEventListener("click", 찾기);
+    document.getElementById("q").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); 찾기(); } });
+    document.getElementById("upGo").addEventListener("click", 넣기);
+    목록();
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", 시작);
+  else 시작();
+})();
+</script>
+</body>
+</html>
