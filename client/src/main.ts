@@ -116,18 +116,25 @@ export function 첫설치인가(): boolean {
 function 번들서버구성(): { entry: string; serverRoot: string; dataRoot: string; env: NodeJS.ProcessEnv; 패키징본: boolean } | null {
   if (process.env.GIJO_SERVER_URL) return null; // 원격 서버를 명시적으로 지정한 경우 번들 서버 기동 안 함
 
-  const 패키징경로 = path.join(process.resourcesPath, "server-dist/dist/index.js");
-  const candidates = [
-    패키징경로, // 패키징된 배포판(extraResources)
-    path.join(__dirname, "../server-dist/dist/index.js"), // dev: npm run build-server-dist
-    path.join(__dirname, "../../server/dist/index.js"), // dev: sibling 폴더의 서버 직접 빌드
+  // ⚠ 라이트는 서버도 **라이트 진입점**으로 띄워야 한다(max 실물 확인 2026-08-13) —
+  //   setToolAllowlist를 부르는 곳이 dist/lite/index.js **한 곳뿐**이라, 본 진입점으로 띄우면
+  //   화면만 라이트고 **도구는 78개 그대로**다. 라이트 게이트 32/33이 뜻을 잃는 자리였다.
+  //   라이트 진입점은 require("../index")로 본 서버를 그대로 올리고 도구만 줄인다 — 딴 분기 없음.
+  const 서버몸통 = 에디션() === "lite" ? "dist/lite/index.js" : "dist/index.js";
+  // ⚠ 진입점이 dist/ 한 단 아래가 아닐 수 있게 됐으므로(라이트는 dist/lite/), serverRoot를
+  //   dirname 횟수로 셈하지 않고 **뿌리 후보를 찾고 진입점을 그 밑에서 조립**한다 —
+  //   dirname(dirname()) 셈법이면 라이트의 뿌리가 dist/로 어긋나 data/가 엉뚱한 곳에 생긴다.
+  const 뿌리후보 = [
+    path.join(process.resourcesPath, "server-dist"), // 패키징된 배포판(extraResources)
+    path.join(__dirname, "../server-dist"), // dev: npm run build-server-dist
+    path.join(__dirname, "../../server"), // dev: sibling 폴더의 서버 직접 빌드
   ];
-  const bundledServerEntry = candidates.find((p) => fs.existsSync(p));
-  if (!bundledServerEntry) return null; // 서버가 동봉되지 않은 배포(순수 클라이언트)
-
+  const serverRoot = 뿌리후보.find((r) => fs.existsSync(path.join(r, 서버몸통)));
+  if (!serverRoot) return null; // 서버가 동봉되지 않은 배포(순수 클라이언트)
+  const 패키징경로 = path.join(뿌리후보[0], 서버몸통);
   // cwd를 고정한다 — db.ts/memory.ts가 "data/..." 같은 상대경로를 쓰기 때문에, 지정하지 않으면
   // Electron이 실행된 위치에 따라 데이터가 엉뚱한 곳에 생긴다.
-  const serverRoot = path.dirname(path.dirname(bundledServerEntry));
+  const bundledServerEntry = path.join(serverRoot, 서버몸통);
 
   // ⚠ **패키징본에서는 serverRoot에 쓰면 안 된다** — 그 자리가 앱 번들 **안**이다.
   //   2026-08-09 mac 실측(첫 실행 한 번):

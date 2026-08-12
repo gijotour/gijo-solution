@@ -253,6 +253,31 @@ export async function searchLaw(query: string, target: LawTarget = "law", limit 
 
 export interface LawArticle { no: string; title: string; text: string }
 
+/**
+ * 조문 한 칸의 **본문 전체**를 편다 — 머리줄(조문내용) + 항 + 호 + 목.
+ *
+ * ⚠ 2026-08-13 실사고(max 발견): `조문내용`만 읽으면 **항이 여럿인 조문은 제목 줄만 남는다.**
+ *   법제처는 본문을 `항[].항내용`, 그 아래를 `호[].호내용` · `목[].목내용`에 따로 담는다.
+ *   실측: 개인정보 보호법 조문 126건 중 **97건(77%)이 본문 0자** · 시행령 140건 중 96건(69%).
+ *   빠진 자리에 「유출 신고 **72시간**」(시행령 제40조①)이 있어, 제품이
+ *   "법령에 명시되어 있지 않다"고 **단정**했다 — 과태료가 걸린 법정 기한을 없다고 한 것이다.
+ *   제1조(목적)처럼 항 없는 단항 조문만 살아남아, 시험 몇 개로는 안 잡혔다.
+ * (export는 시험용 — 실데이터 없이 법제처 응답 모양 픽스처로 이 함수를 그대로 잰다.)
+ */
+export function 조문본문(u: Record<string, unknown>): string {
+  const 머리 = arr(u["조문내용"] as string | string[]).map(str).join("\n").trim();
+  const 몸 = arr(u["항"] as Record<string, unknown>[]).map((h) => {
+    const 호들 = arr(h["호"] as Record<string, unknown>[]).map((o) => {
+      const 목들 = arr(o["목"] as Record<string, unknown>[])
+        .map((m) => arr(m["목내용"] as string | string[]).map(str).join("\n"))
+        .filter(Boolean);
+      return [str(o["호내용"]).trim(), ...목들].filter(Boolean).join("\n");
+    }).filter(Boolean);
+    return [str(h["항내용"]).trim(), ...호들].filter(Boolean).join("\n");
+  }).filter(Boolean);
+  return [머리, ...몸].filter(Boolean).join("\n").trim();
+}
+
 /** 법령 본문 조문. article을 주면 그 조문만(예: "29"), 없으면 앞에서부터 몇 개. */
 export async function getLawArticles(mst: string, article?: string, limit = 5): Promise<LawArticle[]> {
   const data = (await callApi("lawService.do", { target: "law", MST: mst })) as Record<string, Record<string, unknown>>;
@@ -270,7 +295,7 @@ export async function getLawArticles(mst: string, article?: string, limit = 5): 
   const mapped = 조문칸.map((u) => ({
     no: str(u["조문번호"]),
     title: str(u["조문제목"]),
-    text: arr(u["조문내용"] as string | string[]).map(str).join("\n").trim(),
+    text: 조문본문(u),
   }));
   const real = mapped.filter((m) => m.no && m.text);
   if (article) {
@@ -326,7 +351,23 @@ export async function lawArticleAnswer(query: string, article: string): Promise<
   // 본문 조회용 일련번호는 LawHit.id다(mst 아님 — 이름이 달라 헛짚기 쉬운 자리).
   const mst = String(법.id ?? "").trim();
   if (!mst) return lawAnswer(query, "law");
-  const articles = await getLawArticles(mst, article, 3).catch(() => []);
+  // ⚠ 실패와 없음을 가른다(2026-08-13). 전에는 `.catch(() => [])`가 API 실패를 「조문 없음」으로
+  //   뭉갰고, 아랫줄이 「조문 번호를 확인해 주세요」라고 **담당자 탓**을 했다. 조회가 죽은 것과
+  //   그 조문이 없는 것은 다른 사실이고, 뭉개면 모델이 그 빈자리를 「법에 없다」로 메운다 —
+  //   77% 누락 사고에서 이 삼킴이 오진을 한 단계 더 굳혔다.
+  let 조회실패: string | null = null;
+  const articles = await getLawArticles(mst, article, 3).catch((e) => {
+    조회실패 = e instanceof Error ? e.message : String(e);
+    return [] as LawArticle[];
+  });
+  if (조회실패) {
+    return [
+      `⚠ 「${법.title}」 조문 원문을 가져오지 못했습니다(${조회실패}) — **법에 없다는 뜻이 아닙니다.** 원문 링크에서 직접 확인해 주세요.`,
+      `   원문: ${법.link}`,
+      "",
+      LEGAL_DISCLAIMER,
+    ].join("\n");
+  }
   if (!articles.length) {
     return [
       `🔎 「${법.title}」에서 제${article}조 본문을 찾지 못했습니다 — 조문 번호를 확인해 주세요.`,
