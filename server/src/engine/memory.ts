@@ -18,6 +18,7 @@ import { emitCollaboration } from "./collaboration";
 import { gateUserInput } from "./gateway";
 import {
   extractLexicalTerms,
+  normalizeForSearch,
   buildFtsPlan,
   shouldRunLexical,
   fuseResults,
@@ -810,7 +811,13 @@ async function hybridSearch(question: string, topK: number, agentId?: string, sc
   if (!names.includes(TABLE_NAME)) return [];
 
   const table = await db.openTable(TABLE_NAME);
-  const [queryVector] = await embed([question]);
+  // ★ **원문 + 말투를 다듬은 질의**를 함께 태운다(2026-08-12). 같은 문서를 두 말투로 물으면
+  //   거리가 평균 0.19 벌어지고, 그 차이가 「근거 약함」 문턱(0.85)을 넘기게 만들었다.
+  //   ⚠ 원문 결과를 **버리지 않는다** — 두 결과를 합쳐 조각마다 **가까운 쪽 거리**를 쓴다.
+  //   정규화가 뜻을 바꿔도 원문이 남아 있어 안전하다(오늘 「좁히다 기능을 죽인」 반복을 피한다).
+  const 다듬은 = normalizeForSearch(question);
+  const 질의들 = 다듬은 ? [question, 다듬은] : [question];
+  const queryVectors = await embed(질의들);
   const scopes = agentId && agentId !== GLOBAL_SCOPE ? [GLOBAL_SCOPE, safeScope(agentId)] : [GLOBAL_SCOPE];
   // ★ 등급 차단은 **검색 조건에 넣는다**(가져온 뒤 거르지 않는다).
   //   표준(OWASP RAG 등)이 한목소리로 권하는 방식이다 — 가져온 뒤 지우면 AI가 이미 본
@@ -833,19 +840,25 @@ async function hybridSearch(question: string, topK: number, agentId?: string, sc
 
   let vector: { text: string; documentId: string; distance: number; category?: string }[] = [];
   try {
-    const rows = (await table.search(queryVector).where(whereClause).limit(candidates).toArray()) as (MemoryRow & {
-      _distance?: number;
-    })[];
-    vector = rows
-      // 이미 저장돼 있는 바이너리꼴 조각(과거 인입분)은 후보에서 뺀다 — 인입 필터(chunkText)가
-      // 새 오염을 막고, 이 줄이 **기존 오염**을 막는다. 후보를 topK의 2배로 떠 오므로 topK는 찬다.
-      .filter((r) => !isBinaryLikeChunk(r.text))
-      .map((r) => ({
-      text: r.text,
-      documentId: r.documentId,
-      distance: Number(r._distance ?? Number.POSITIVE_INFINITY),
-      ...(r.category ? { category: r.category } : {}),
-    }));
+    // 질의마다 후보를 떠 와 **조각 단위로 가까운 거리**만 남긴다(합집합·최소거리).
+    const 모음 = new Map<string, { text: string; documentId: string; distance: number; category?: string }>();
+    for (const qv of queryVectors) {
+      const rows = (await table.search(qv).where(whereClause).limit(candidates).toArray()) as (MemoryRow & {
+        _distance?: number;
+      })[];
+      for (const r of rows) {
+        // 이미 저장돼 있는 바이너리꼴 조각(과거 인입분)은 후보에서 뺀다 — 인입 필터(chunkText)가
+        // 새 오염을 막고, 이 줄이 **기존 오염**을 막는다. 후보를 topK의 4배로 떠 오므로 topK는 찬다.
+        if (isBinaryLikeChunk(r.text)) continue;
+        const key = `${r.documentId} ${r.text}`;
+        const d = Number(r._distance ?? Number.POSITIVE_INFINITY);
+        const 이전 = 모음.get(key);
+        if (!이전) 모음.set(key, { text: r.text, documentId: r.documentId, distance: d, ...(r.category ? { category: r.category } : {}) });
+        else if (d < 이전.distance) 이전.distance = d;
+      }
+    }
+    // 거리순으로 정렬해 넘긴다 — 융합(RRF)이 **순위**를 쓰므로 순서가 곧 신호다.
+    vector = [...모음.values()].sort((a, b) => a.distance - b.distance).slice(0, candidates);
   } catch (err) {
     console.warn(`[memory] 지식 베이스 검색 실패: ${err instanceof Error ? err.message : String(err)}`);
     return [];
