@@ -30,7 +30,11 @@ const PLAYBOOKS: Playbook[] = [
   {
     id: "rce",
     title: "원격 코드 실행(RCE) 취약점",
-    match: /rce|remote code|원격 코드|log4shell|log4j|deserial|역직렬화/i,
+    // ⚠ `rce`에 **낱말 경계**가 없어 `force`를 물고 있었다(2026-08-12 실측).
+    //   "brute force 로그인 시도가 계속 잡히는데 어떻게 대응해?"가 **RCE 취약점 플레이북**을
+    //   받았다. force·source·resource·enforcement·workforce·Salesforce·SourceTree가 전부 걸린다.
+    //   보안 문서에 흔한 낱말들이라 조용히 엉뚱한 절차를 내주고 있었다.
+    match: /\brce\b|remote code|원격 코드|log4shell|log4j|deserial|역직렬화/i,
     slaDays: { critical: 3, high: 7, medium: 30, low: 90 },
     owner: "보안담당자(+시스템 담당)",
     steps: [
@@ -118,6 +122,34 @@ const DEFAULT_PLAYBOOK: Playbook = {
 export function playbookFor(findingType: string): Playbook {
   const t = findingType ?? "";
   return PLAYBOOKS.find((p) => p.match.test(t)) ?? DEFAULT_PLAYBOOK;
+}
+
+/**
+ * 이 말이 **조치 플레이북이 답할 자리**인가 (2026-08-12 신설).
+ *
+ * ■ 왜 필요한가 — 「어떻게 대응해?」라고만 물으면 **무엇이든** 취약점 플레이북이 나왔다.
+ *   실측(win·max 양쪽에서 재현):
+ *     "직원이 퇴사하는데 어떻게 대응해?"           → 🛠 일반 취약점 조치, 30일 내
+ *     "고객사에서 견적서를 요청했는데 어떻게 대응해?" → 같은 표
+ *     "내부 PC 445 급증 어떻게 대응해?"            → 같은 표 (정작 문서에 초동 절차가 있다)
+ *   담당자가 받은 것은 **내용이 없는 표**다. 지식 저장소에 답이 있어도 거기까지 못 간다.
+ *
+ * ■ 왜 배제 낱말을 더 넣지 않았나
+ *   이 분기에는 이미 배제가 세 겹(장애·침해사고·실행지시) 있다. 사고가 날 때마다 덧댄 것이다.
+ *   그런데 **담당자는 라벨이 아니라 증상으로 묻는다** — "445 급증"·"로그가 안 쌓이는데"는
+ *   어느 목록에도 없다. 목록을 늘리는 한 다음 표현이 또 샌다.
+ *   그래서 방향을 뒤집는다: **「무엇을 뺄까」가 아니라 「답할 근거가 있을 때만 답한다」.**
+ *
+ * ■ 판정 — 둘 중 하나면 우리 자리다.
+ *   ① 특정 플레이북(RCE·인젝션·설정미흡 등)에 걸린다 → 줄 것이 실제로 있다.
+ *   ② 질문이 **취약점 자체**를 말한다("이 취약점 조치 방법", "조치 플레이북 보여줘").
+ *      이때는 「일반」 표가 정답이다 — 담당자가 일반 절차를 물은 것이다.
+ *   둘 다 아니면 **비켜 준다.** 모르는 주제에 표를 내미느니 지식 조회로 보내는 편이 낫다.
+ */
+export function 플레이북영토인가(text: string): boolean {
+  const t = String(text ?? "");
+  if (playbookFor(t).id !== "generic") return true;
+  return /(취약점|취약\s*점|vulnerabilit|플레이북|playbook)/i.test(t);
 }
 
 // 특정 finding에 대한 완결 조치 안내 — 플레이북 + KEV 반영 SLA + 권장 기한(오늘로부터).

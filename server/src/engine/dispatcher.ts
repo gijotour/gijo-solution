@@ -1140,11 +1140,22 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   //   ⚠ 순서를 바꾸지 않고 **여기서 비켜 준다** — 장애 분기를 위로 올리면 되묻기 관문(대상 없는
   //     대명사)이 뚫린다. 배제가 이동보다 안전하다.
   //   ⚠ 취약점·패치 물음은 incidentsteps의 「장애아님」이 이미 막으므로 플레이북 영토는 그대로다.
+  //
+  // ★★ 2026-08-12: **배제를 네 번째로 덧대지 않고 방향을 뒤집었다.**
+  //   위 세 겹(장애·침해사고·실행지시)은 전부 「이런 말이면 빼 준다」는 낱말 목록이다.
+  //   그런데 담당자는 라벨이 아니라 **증상**으로 묻는다 — "445 급증"·"로그가 안 쌓이는데"는
+  //   어느 목록에도 없다. 실측(win·max 양쪽): "직원이 퇴사하는데 어떻게 대응해?"에도
+  //   「일반 취약점 조치 30일 내」 표가 나갔다. 목록을 늘리는 한 다음 표현이 또 샌다.
+  //   그래서 `플레이북영토인가`로 **답할 근거가 있을 때만** 답하게 했다(playbook.ts 참고).
+  // ★ 실행지시 배제도 좁혔다 — `/조치해/`가 "조치**해야 해?**"라는 **질문**까지 밀어내
+  //   정작 플레이북이 맞는 물음이 8초 LLM으로 샜다. 명령형일 때만 비켜 준다.
   if (
     REMEDIATION_INTENT_RE.test(instructionText) &&
     !장애질문인가(instructionText) &&
     !침해사고질문인가(instructionText) &&
-    !/조치해|처리해|수정해|패치해/.test(instructionText)
+    !/(조치|처리|수정|패치)\s*해\s*(줘|주세요|주라|다오|라|$)/.test(instructionText) &&
+    // ⚠ 앞의 값싼 검사를 전부 통과했을 때만 부른다(동적 import — 이 파일의 기존 방식).
+    (await import("./playbook.js")).플레이북영토인가(instructionText)
   ) {
     const { formatRemediation } = await import("./playbook.js");
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
