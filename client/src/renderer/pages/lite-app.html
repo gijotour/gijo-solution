@@ -30,6 +30,8 @@
   .lite-brand .p { font-weight: 700; font-size: 14px; letter-spacing: .2px; }
   .lite-brand .e { font-size: 11px; opacity: .62; margin-top: 2px; }
   #liteNav { padding: 8px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+  /* 설정은 번호 매긴 업무 메뉴와 성격이 달라 아래에 따로 둔다. */
+  #liteNavFoot { margin-top: auto; padding: 8px; border-top: 1px solid var(--g-border, #262a33); }
 
   .lite-nav-item {
     display: flex; align-items: center; gap: 8px; width: 100%;
@@ -67,6 +69,7 @@
       <div class="e">Lite — 담당자 PC 1인용</div>
     </div>
     <div id="liteNav" role="list"></div>
+    <div id="liteNavFoot"></div>
   </nav>
   <main class="lite-main">
     <div id="liteScreen"></div>
@@ -89,6 +92,7 @@
   "use strict";
 
   var 화면목록 = [];
+  var 자료 = null;   // lite-screens.json 원본(설정 항목이 여기 있다)
   var 지금 = null;
 
   // 공용 디자인 시스템 — 라이트도 같은 그림을 쓴다(여기서 갈라질 이유가 없다).
@@ -124,10 +128,12 @@
   }
 
   function 열기(id) {
-    var s = 화면목록.find(function (x) { return x.id === id; });
+    var s = 화면목록.find(function (x) { return x.id === id; })
+         || (자료 && 자료.settings && 자료.settings.id === id ? 자료.settings : null);
     if (!s) return;
     지금 = id;
     그리기();
+    설정그리기();
     var 자리 = document.getElementById("liteScreen");
     if (!자리) return;
 
@@ -137,9 +143,10 @@
       자리.innerHTML =
         '<div class="lite-todo">' +
         '<div class="h">' + esc(s.이름) + " — 아직 만들지 않았습니다</div>" +
-        // ⚠ 열쇠가 세 갈래다(사장님말·왜·왜새로) — 하나만 읽으면 조용히 빈칸이 된다.
-        //   실제로 대시보드가 「왜새로」만 갖고 있어 설명이 안 나왔다(2026-08-12 화면에서 발견).
-        '<div class="d">' + esc(s.사장님말 || s.왜 || s.왜새로 || "") + "</div>" +
+        // ⚠ **`설명` 하나만 읽는다.** 예전엔 사장님말·왜·왜새로·_왜별도로 갈려 있어
+        //   폴백 사슬을 썼는데, 새 항목이 다른 열쇠를 쓰면 또 샜다 — 실제로 두 번 빈칸이 났다
+        //   (대시보드·설정, 2026-08-12 화면에서 발견). 사슬을 늘리는 대신 **열쇠를 하나로 못박았다.**
+        '<div class="d">' + esc(s.설명 || "") + "</div>" +
         '<div class="m">품 ' + esc(s.품 || "?") + (s.본 ? " · 본 " + esc(s.본) : " · 새로 만듭니다") + "</div>" +
         "</div>";
       return;
@@ -149,6 +156,21 @@
     f.src = "lite-" + id.replace(/^lite-/, "") + ".html?embed=1";
     f.setAttribute("title", s.이름);
     자리.appendChild(f);
+  }
+
+  // ⚠ 설정은 **화면목록에 안 섞는다.** 섞으면 번호가 10이 되고, 그러면 사장님이 정하신
+  //   「메뉴 9개」와 어긋난다. 목록은 업무 화면만이고 설정은 아래 자리에 따로 그린다.
+  function 설정그리기() {
+    var 설정 = 자료 && 자료.settings;
+    var box = document.getElementById("liteNavFoot");
+    if (!설정 || !box) return;
+    var a = document.createElement("button");
+    a.className = "lite-nav-item" + (지금 === 설정.id ? " on" : "") + (설정.구현됨 ? "" : " todo");
+    a.type = "button"; a.dataset.id = 설정.id;
+    a.innerHTML = '<span class="n">⚙</span><span class="t">' + esc(설정.이름) + "</span>" +
+      (설정.구현됨 ? "" : '<span class="badge">준비 중</span>');
+    a.addEventListener("click", function () { 열기(설정.id); });
+    box.innerHTML = ""; box.appendChild(a);
   }
 
   // 화면(iframe) 안에서 다른 화면을 열 때 쓰는 다리 — 공용 셸의 window.gijoOpenScreen과 같은 이름.
@@ -163,6 +185,7 @@
     try {
       var r = await fetch("lite-screens.json", { cache: "no-store" });
       var d = await r.json();
+      자료 = d;
       화면목록 = (d.screens || []).slice().sort(function (a, b) { return a.no - b.no; });
     } catch (e) {
       console.error("[lite-nav] 화면 목록을 못 읽었습니다:", e);
@@ -171,6 +194,7 @@
       return;
     }
     그리기();
+    설정그리기();
     if (화면목록.length) 열기(화면목록[0].id);
   }
 
