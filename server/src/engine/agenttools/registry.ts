@@ -1522,6 +1522,40 @@ export function toolLabel(name: string): string | null {
   return t ? t.label : null;
 }
 
+/**
+ * 에디션별 도구 허용 목록 (2026-08-12 신설 — 라이트 에디션 요청 ①).
+ *
+ * ■ 왜 필요한가
+ *   지금까지 **티어로 도구를 거르는 장치가 없었다.** 라이트는 도구 78개 중 13개만 쓰는데,
+ *   그 결정을 코드에 반영할 자리가 제품에 아예 없었다(max 확인).
+ *
+ * ■ ⚠ VRAM을 줄이려고 두는 것이 **아니다** — 그렇게 적힌 문서가 있으면 그게 틀렸다.
+ *   llama.cpp는 KV 캐시를 `--ctx-size`만큼 **미리** 잡는다. 프롬프트가 25,769자든 4,056자든
+ *   잡히는 메모리는 같다. 이걸로 얻는 것은 **처리 속도**와 **같은 ctx 안의 여유**지 VRAM이 아니다.
+ *   (2026-08-12: 「프롬프트 91% 감소가 8GB 등급의 근거」라는 서술이 있었는데 성립하지 않는다.)
+ *
+ * ■ 목록 자체는 여기 두지 않는다 — 에디션을 아는 쪽이 넣는다(`server/src/lite/lite-tools.json`).
+ *   레지스트리는 「무엇을 거를지」만 알고 「무엇이 라이트인지」는 모른다.
+ *
+ * ⚠ 이 목록은 **카탈로그(LLM이 고를 후보)**만 거른다. `findAgentTool`은 안 거른다 —
+ *   강제 의도(FORCED_INTENTS)가 이름으로 직접 부르는 경로가 있어서, 거기까지 막으면
+ *   결정 분기가 조용히 죽는다. 실행까지 막아야 하면 `isToolAllowed`를 그 자리에서 쓸 것.
+ */
+let 허용목록: Set<string> | null = null;
+
+export function setToolAllowlist(names: string[] | null): void {
+  if (names === null) { 허용목록 = null; return; }
+  // ⚠ 모르는 이름이 있으면 **조용히 넘기지 않는다.** 오타 하나로 도구가 사라지면
+  //   「그 기능이 원래 없나 보다」로 읽힌다 — 오늘 라우팅 결함이 정확히 그렇게 오래 남았다.
+  const 모르는것 = names.filter((n) => !TOOLS.some((t) => t.name === n));
+  if (모르는것.length) throw new Error(`도구 허용목록에 없는 이름: ${모르는것.join(", ")}`);
+  허용목록 = new Set(names);
+}
+
+export function isToolAllowed(name: string): boolean {
+  return 허용목록 === null || 허용목록.has(name);
+}
+
 export function listToolsFor(domains?: string[], role?: string): AgentTool[] {
   // 꺼져 있는 선택 기능의 도구는 아예 목록에서 뺀다.
   // ⚠ 2026-07-26 회귀: 법령 조회(기본 꺼짐)를 켜지 않은 상태에서도 law_lookup이 목록에 남아,
@@ -1532,6 +1566,7 @@ export function listToolsFor(domains?: string[], role?: string): AgentTool[] {
   try { lawOn = getLawConfig().enabled; } catch { lawOn = false; }
 
   return TOOLS.filter((t) => {
+    if (!isToolAllowed(t.name)) return false; // 에디션 허용목록(설정 안 됐으면 통과)
     if (t.name === "law_lookup" && !lawOn) return false;
     if (t.requiredRole === "admin" && role !== "admin") return false;
     if (!domains || domains.length === 0) return true;
