@@ -1,0 +1,76 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<title>GIJO AS Lite</title>
+<link rel="stylesheet" href="gijo-ui.css">
+<!--
+  lite-app.html — 라이트 에디션 셸.
+
+  ■ 왜 app.html을 안 쓰나 (작업경계 §4)
+    공용 셸은 **탭 셸**이다(살아 있는 iframe 최대 8개 · 상태 보존 · 구역 표시 · 콘솔 연동).
+    그 값은 화면을 자주 오가는 관제 자리에서 나온다. 라이트는 **1인·9화면**이라
+    탭이 주는 값이 작고, 그 기계가 app.html 700줄의 상당 부분이다.
+    라이트 원칙은 빼기다 — 사이드바 + 화면 한 자리로 시작한다.
+    ⚠ 탭이 필요해지면 그때 넣는다. 지금 넣으면 「쓸지 모르는 것」을 8GB급에 지고 간다.
+
+  ■ 화면 목록은 여기 없다 — lite-screens.json이 단일 소스다(lite-nav.js가 읽는다).
+    메뉴를 HTML에 박으면 서버의 화면 정의와 어긋난다.
+-->
+<style>
+  html, body { height: 100%; margin: 0; }
+  body { display: flex; font-family: inherit; background: var(--g-bg, #0f1115); color: var(--g-fg, #e6e8ec); }
+
+  /* 사이드바 — 9개뿐이라 접기·검색이 없다. 없는 것이 라이트의 값이다. */
+  .lite-side {
+    width: 216px; flex: 0 0 216px; display: flex; flex-direction: column;
+    border-right: 1px solid var(--g-border, #262a33); background: var(--g-panel, #141821);
+  }
+  .lite-brand { padding: 14px 16px 10px; border-bottom: 1px solid var(--g-border, #262a33); }
+  .lite-brand .p { font-weight: 700; font-size: 14px; letter-spacing: .2px; }
+  .lite-brand .e { font-size: 11px; opacity: .62; margin-top: 2px; }
+  #liteNav { padding: 8px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
+
+  .lite-nav-item {
+    display: flex; align-items: center; gap: 8px; width: 100%;
+    padding: 9px 10px; border: 0; border-radius: 8px; cursor: pointer;
+    background: transparent; color: inherit; font: inherit; text-align: left;
+  }
+  .lite-nav-item:hover { background: var(--g-hover, #1c212c); }
+  .lite-nav-item.on { background: var(--g-accent-weak, #1f2937); font-weight: 600; }
+  .lite-nav-item .n {
+    flex: 0 0 20px; text-align: center; font-size: 11px; opacity: .55;
+    font-variant-numeric: tabular-nums;
+  }
+  .lite-nav-item .t { flex: 1 1 auto; font-size: 13px; }
+  .lite-nav-item.todo .t { opacity: .55; }
+  .lite-nav-item .badge {
+    font-size: 10px; padding: 1px 6px; border-radius: 999px;
+    background: var(--g-border, #262a33); opacity: .8;
+  }
+
+  /* 화면 한 자리 — 탭이 없으니 자리도 하나다. */
+  .lite-main { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; }
+  #liteScreen { flex: 1 1 auto; min-height: 0; }
+  #liteScreen iframe { width: 100%; height: 100%; border: 0; display: block; }
+
+  .lite-todo { padding: 44px 40px; max-width: 640px; }
+  .lite-todo .h { font-size: 17px; font-weight: 700; margin-bottom: 10px; }
+  .lite-todo .d { font-size: 13px; line-height: 1.7; opacity: .8; }
+  .lite-todo .m { font-size: 12px; opacity: .5; margin-top: 14px; }
+</style>
+</head>
+<body class="g-ui">
+  <nav class="lite-side" aria-label="라이트 메뉴">
+    <div class="lite-brand">
+      <div class="p">GIJO AS</div>
+      <div class="e">Lite — 담당자 PC 1인용</div>
+    </div>
+    <div id="liteNav" role="list"></div>
+  </nav>
+  <main class="lite-main">
+    <div id="liteScreen"></div>
+  </main>
+  <script src="lite-nav.js"></script>
+</body>
+</html>
