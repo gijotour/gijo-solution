@@ -4,6 +4,13 @@
 
 1. `git status --short` — 커밋 안 된 작업 변경이 있으면 프로젝트 컨벤션(한국어 커밋 메시지, 왜/무엇 중심)으로 커밋한다. 무엇을 커밋할지 애매하면 사용자에게 확인.
    - 커밋 제외 대상: server-dist 산출물, data/·models/ 실데이터, mac 전용 네이티브 부산물(darwin binding 등), .tmp/스크래치.
+   - ⚠ **`git add -A` 뒤에는 파일 수를 세고 커밋한다** — `git diff --cached --stat | tail -1`.
+     **기대보다 많으면 멈춘다.** 실사고(2026-08-12): 문서 몇 개 고친 커밋에 `git add -A`가
+     `server/data.before-migrate-*`·`data.fresh-backup`을 쓸어 담아 **1,674파일 397MB**가
+     이력에 들어갔다. 그 안에 계정·비밀번호 해시·TOTP 비밀·감사로그가 있었다.
+     `.gitignore`가 `data`라는 **이름만** 막고 `data.<무엇>`은 안 막던 게 뿌리였고(지금은 막힌다),
+     사장님 결정으로 hub 이력을 고쳐 썼다. origin에는 안 나가 있어 그때가 가장 싼 시점이었다.
+     ▶ 「잰 건수가 기대와 같은가」를 커밋에도 적용한다. 파일 수는 3초면 센다.
 2. **server/ 를 건드렸으면 시험 실행** — 실패하면 push 금지, 실패 내용 보고 후 중단.
    - ⚠ **`win`에서는 `npm test`를 쓰지 말 것.** 제품이 WSL에서 돈다 —
      `wsl -d Ubuntu-24.04 -- bash "/mnt/d/Connect AI/tools/wsl-test.sh"`(전체 ~30초).
