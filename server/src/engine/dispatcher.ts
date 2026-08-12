@@ -524,7 +524,15 @@ const SHADOW_AI_INTENT_RE = /shadow\s*ai|미등록\s*(ai|모델|엘엘엠|llm)|�
 // "공격 경로 / 도달성 / 측면 이동" 분석
 const ATTACK_PATH_INTENT_RE = /공격\s*경로|attack\s*path|도달\s*(성|가능)|측면\s*이동|lateral|reachab|이동\s*경로/i;
 // "지식베이스 정리·중복·상충 점검"
-const KB_HYGIENE_INTENT_RE = /(지식\s*베이스|지식|문서|rag|자료).{0,6}(정리|중복|상충|위생|점검|청소|정돈)|(중복|상충)\s*(문서|자료)/i;
+// ⚠ 2026-08-13 — 둘째 갈래가 **붙어 있는 말만** 받고 있었다: `(중복|상충)\s*(문서|자료)`.
+//   그래서 「문서함에 중복된 거」(첫 갈래)는 여기로 오는데 「중복**된** 문서」는 사이의 「된 」에
+//   막혀 비켜 갔고, 뒤의 doc_duplicates 강제분기로 떨어졌다. **같은 뜻인데 어순·어미로 답이 갈렸다.**
+//   그리고 갈라진 두 답은 품질이 다르다 — 여기(kbhygiene)는 제목 정규화 + **본문 지문(근접중복)**
+//   + 버전상충 + 오래됨까지 보고, doc_duplicates는 **제목 뿌리만** 본다. 여기가 상위집합이다.
+//   (실측 2026-08-13: 같은 문서함에서 여기는 「정리 필요 2건」, 저쪽은 「없습니다」)
+//   → 사이를 {0,4}로 열고 「겹치」도 같은 뜻이라 함께 받는다. 중복을 묻는 말은 **한 곳으로** 간다.
+//   ⚠ {0,4}로 좁게 둔다 — 「중복 로그인 관련 문서」처럼 먼 동거를 삼키면 안 된다.
+const KB_HYGIENE_INTENT_RE = /(지식\s*베이스|지식|문서|rag|자료).{0,6}(정리|중복|상충|위생|점검|청소|정돈)|(중복|상충|겹치)[^.\n]{0,4}(문서|자료)/i;
 const LEARN_RUN_RE = /실행|시작|돌려|가동|run|start/i;
 
 async function learnloopConfirmResult(instructionText: string, qa?: boolean): Promise<DispatchResult> {

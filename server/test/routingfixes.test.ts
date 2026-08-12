@@ -150,20 +150,42 @@ describe("⑥ 검토가 잡은 결함 — 온톨로지 강제분기가 검색어
 //
 // ⚠ 정규식을 여기 베껴 쓰지 않는다(agentloop.ts:1348의 원칙) — 실제 라우팅 함수를 부른다.
 //   베껴 쓰면 제품이 바뀌어도 시험만 통과하는 드리프트가 생긴다.
-describe("⑦ 라이트 게이트가 잡은 결함 — 중복 문서 강제분기가 어순 한쪽만 받았다", () => {
-  it("「중복된 문서 있어?」 (중복 → 문서) — 종전 어순은 그대로 간다", () => {
-    expect(forcedToolFor("중복된 문서 있어?")?.tool).toBe("doc_duplicates");
-    expect(forcedToolFor("겹치는 문서 찾아줘")?.tool).toBe("doc_duplicates");
+// ⚠ **이 시험은 반드시 `dispatchInstruction`으로 잰다 — `forcedToolFor`로 재면 안 된다.**
+//   처음엔 forcedToolFor만 불러 3개를 통과시켰다. 그런데 실제 경로에는 **앞 층이 있다** —
+//   dispatcher의 KB_HYGIENE_INTENT_RE가 먼저 채 가서, 시험은 초록인데 사람이 치는 말은
+//   안 닿았다(max 실측 d37a299). 「기능은 있는데 말이 안 닿는다」를 고치는 수리가
+//   **같은 함정에 빠진 것**이다. 앞 층이 안 보이는 자로 재면 안 보이는 것을 못 잡는다.
+describe("⑦ 중복 문서를 묻는 말은 어순·어미가 달라도 한 곳으로 간다", () => {
+  const KB위생 = "🧹 지식베이스 점검";
+
+  it("★「중복된 문서」와 「문서함에 중복된 거」가 같은 답으로 간다", async () => {
+    // 전에는 「된 」 두 글자 때문에 앞은 doc_duplicates(제목만 봄), 뒤는 kbhygiene으로 갈렸다.
+    for (const q of ["중복된 문서 있어?", "내 문서함에 중복된 거 있어?", "문서 중복 확인해줘"]) {
+      const r = await dispatchInstruction(q);
+      expect(r.output, `「${q}」`).toContain(KB위생);
+    }
   });
 
-  it("★「내 문서함에 중복된 거 있어?」 (문서 → 중복) — 이게 안 걸리던 자리다", () => {
-    expect(forcedToolFor("내 문서함에 중복된 거 있어?")?.tool).toBe("doc_duplicates");
-    expect(forcedToolFor("문서함 중복 정리해줘")?.tool).toBe("doc_duplicates");
+  it("「겹치는 문서」도 같은 곳 — 같은 뜻의 다른 낱말이 답을 가르면 안 된다", async () => {
+    const r = await dispatchInstruction("겹치는 문서 찾아줘");
+    expect(r.output).toContain(KB위생);
   });
 
-  it("문서 낱말이 없으면 안 삼킨다 — 「중복된 자산」·「중복 로그인」은 다른 영토다", () => {
-    expect(forcedToolFor("중복된 자산 있어?")?.tool).not.toBe("doc_duplicates");
-    expect(forcedToolFor("중복 로그인 확인해줘")?.tool).not.toBe("doc_duplicates");
+  it("문서·자료 낱말이 없으면 안 삼킨다 — 「중복된 자산」·「중복 로그인」은 다른 영토다", async () => {
+    for (const q of ["중복된 자산 있어?", "중복 로그인 확인해줘"]) {
+      const r = await dispatchInstruction(q);
+      expect(r.output, `「${q}」`).not.toContain(KB위생);
+    }
+  });
+
+  it("먼 동거는 안 삼킨다 — 「중복 로그인 관련 문서」는 중복 점검이 아니다", async () => {
+    const r = await dispatchInstruction("중복 로그인 관련 문서 찾아줘");
+    expect(r.output).not.toContain(KB위생);
+  });
+
+  // 제목만 보는 강제분기는 남겨 둔다 — kbhygiene이 안 받는 먼 어순의 안전망이다.
+  it("doc_duplicates 강제분기 자체는 살아 있다(안전망)", () => {
+    expect(forcedToolFor("중복이 있는 문서 보여줘")?.tool).toBe("doc_duplicates");
   });
 });
 
