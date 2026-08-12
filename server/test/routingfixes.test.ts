@@ -27,7 +27,7 @@ vi.mock("../src/engine/hardeningscan", async (importOriginal) => ({
 }));
 
 import { dispatchInstruction, formatRejectHistory, REPORT_CREATE_RE, REPORT_QUERY_EXCLUDE_RE } from "../src/engine/dispatcher";
-import { isHowtoNotCommand, ontologyQueryOf, isRelationQuestion } from "../src/engine/agentloop";
+import { isHowtoNotCommand, ontologyQueryOf, isRelationQuestion, forcedToolFor } from "../src/engine/agentloop";
 import { resetAssetsForTests, registerAsset, recordFindings } from "../src/engine/assets";
 import { updateFindingReview, findingKey } from "../src/engine/approvals";
 import { db } from "../src/db";
@@ -139,6 +139,31 @@ describe("⑥ 검토가 잡은 결함 — 온톨로지 강제분기가 검색어
   it("현황 질문('뭐 들어있어')은 검색어가 아니라 빈 문자열 — 강제하지 않고 LLM에 맡긴다", () => {
     expect(ontologyQueryOf("온톨로지에 뭐 들어있어?")).toBe("");
     expect(ontologyQueryOf("지식 그래프 보여줘")).toBe("");
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────
+// [라이트 게이트 lt-dup-1 수리 2026-08-13 · 계획서 전-1]
+// `max`가 라이트 게이트를 처음 끝에서 끝까지 돌려(f491ff2) 남긴 5건 중 하나.
+// 「도구를 켜 뒀는데 모델이 안 고른다」로 보였지만, **강제분기가 애초에 안 걸리고 있었다** —
+// FORCED_INTENTS[51]이 「중복 → 문서」 어순만 받아 「문서함에 중복된 거」를 놓쳤다.
+//
+// ⚠ 정규식을 여기 베껴 쓰지 않는다(agentloop.ts:1348의 원칙) — 실제 라우팅 함수를 부른다.
+//   베껴 쓰면 제품이 바뀌어도 시험만 통과하는 드리프트가 생긴다.
+describe("⑦ 라이트 게이트가 잡은 결함 — 중복 문서 강제분기가 어순 한쪽만 받았다", () => {
+  it("「중복된 문서 있어?」 (중복 → 문서) — 종전 어순은 그대로 간다", () => {
+    expect(forcedToolFor("중복된 문서 있어?")?.tool).toBe("doc_duplicates");
+    expect(forcedToolFor("겹치는 문서 찾아줘")?.tool).toBe("doc_duplicates");
+  });
+
+  it("★「내 문서함에 중복된 거 있어?」 (문서 → 중복) — 이게 안 걸리던 자리다", () => {
+    expect(forcedToolFor("내 문서함에 중복된 거 있어?")?.tool).toBe("doc_duplicates");
+    expect(forcedToolFor("문서함 중복 정리해줘")?.tool).toBe("doc_duplicates");
+  });
+
+  it("문서 낱말이 없으면 안 삼킨다 — 「중복된 자산」·「중복 로그인」은 다른 영토다", () => {
+    expect(forcedToolFor("중복된 자산 있어?")?.tool).not.toBe("doc_duplicates");
+    expect(forcedToolFor("중복 로그인 확인해줘")?.tool).not.toBe("doc_duplicates");
   });
 });
 
