@@ -1117,7 +1117,7 @@ export function registerMemoryRoutes(app: Express): void {
     "/api/memory/ingest-file",
     authMiddleware,
     asyncRoute(async (req, res) => {
-      const { filename, content, scope } = req.body as { filename?: string; content?: string; scope?: string };
+      const { filename, content, scope, origin } = req.body as { filename?: string; content?: string; scope?: string; origin?: string };
       if (!filename || !content) {
         res.status(400).json({ error: "filename과 content(base64)가 필요합니다" });
         return;
@@ -1143,7 +1143,20 @@ export function registerMemoryRoutes(app: Express): void {
         }
         // 사용자 업로드 경로 — Scan·Analyze Agent 분류 포함.
         const actor = (req as unknown as { user?: { displayName?: string } }).user?.displayName;
-        const ingested = await ingestText(filename, text, scope ?? GLOBAL_SCOPE, savedPath, true, actor);
+        // ★ origin='builtin'은 **관리자만** 지정할 수 있다(2026-08-12 신설).
+        //   왜 필요한가: 제품이 기본 제공하는 보안 지식(rag-seed 33건)이 이 경로로 들어오는데
+        //   origin이 안 붙어 **검색에서 타사 벤더 매뉴얼과 같은 취급**을 받았다. 그 결과
+        //   「EPSS와 VPR 차이」 질문에서 정답 문서(거리 0.664)가 **12위로 밀려 LLM에 안 갔고**
+        //   더 먼 문서(0.915)가 1위였다 — 오전에 넣은 ORIGIN_BOOST(+0.012)가 RRF 1위 점수
+        //   (0.0164)에 비해 커서 순위를 뒤집기 때문이다.
+        //   ⚠ **아무나 지정하게 하면 안 된다** — 고객 업로드가 builtin을 사칭해 가산을 받으면
+        //   그 부스트가 「우리 지식을 올린다」는 뜻을 잃는다. 그래서 관리자로 제한한다.
+        const role = (req as unknown as { user?: { role?: string } }).user?.role;
+        const 요청origin = origin === "builtin" && role === "admin" ? "builtin" : undefined;
+        if (origin === "builtin" && role !== "admin") {
+          console.warn(`[memory] origin=builtin 요청을 무시함(관리자 아님): ${filename}`);
+        }
+        const ingested = await ingestText(filename, text, scope ?? GLOBAL_SCOPE, savedPath, true, actor, undefined, 요청origin);
         // 자동화 작업 원장(중-2) — 사람이 하면 읽고 요약하고 분류해 넣어야 하는 일이다.
         // 부팅 시 기본 코퍼스 인입(docsbundle)은 이 경로를 타지 않으므로 제품 자랑에 섞이지 않는다.
         const { recordWork } = await import("./worklog.js");

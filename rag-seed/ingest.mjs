@@ -37,7 +37,11 @@ for (const fn of files) {
     const r = await fetch(base + "/api/memory/ingest-file", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + login.accessToken },
-      body: JSON.stringify({ filename: fn, content, scope: "global" }),
+      // ★ origin=builtin — **이 시드는 제품이 기본 제공하는 지식**이다(README: 「권위 있는 문서를
+      //   넣어 올바른 청크가 검색되게 하는 것」). 표시가 없으면 검색에서 **타사 벤더 매뉴얼과
+      //   같은 취급**을 받아, 오전에 넣은 ORIGIN_BOOST가 우리 지식을 같이 눌렀다(2026-08-12 실측:
+      //   「EPSS와 VPR 차이」에서 정답 문서가 12위로 밀렸다). 서버는 **관리자일 때만** 이 값을 받는다.
+      body: JSON.stringify({ filename: fn, content, scope: "global", origin: "builtin" }),
       signal: AbortSignal.timeout(120000),
     });
     const j = await r.json();
