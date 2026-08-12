@@ -7,6 +7,7 @@ import type { Express } from "express";
 import * as fs from "fs/promises";
 import * as path from "path";
 import * as lancedb from "@lancedb/lancedb";
+import { rewriteForSearch } from "./searchrewrite";
 import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { embed, chat } from "./llm";
@@ -815,8 +816,14 @@ async function hybridSearch(question: string, topK: number, agentId?: string, sc
   //   거리가 평균 0.19 벌어지고, 그 차이가 「근거 약함」 문턱(0.85)을 넘기게 만들었다.
   //   ⚠ 원문 결과를 **버리지 않는다** — 두 결과를 합쳐 조각마다 **가까운 쪽 거리**를 쓴다.
   //   정규화가 뜻을 바꿔도 원문이 남아 있어 안전하다(오늘 「좁히다 기능을 죽인」 반복을 피한다).
+  //   ★ 2026-08-12 추가: 규칙 정규화는 **2/8**밖에 못 고쳤다. 모델에게 「주제 + 문제 유형」으로
+  //     다시 쓰게 하면 **4/6**이 좋아진다("IPS가 자꾸 같은 걸 잡는데" → "IPS 오탐 튜닝",
+  //     못 찾던 문서가 0.508로 온다). 평균 327ms — 답 전체가 7~15초라 2~5%다.
+  //     ⚠ 재작성이 **낱말을 바꿔 나빠지는 경우도 있다**(smb_445 +0.125). 그래서 셋을 다 태우고
+  //       조각마다 **가장 가까운 거리**를 쓴다. 실패·느림이면 조용히 빠진다(searchrewrite 참고).
   const 다듬은 = normalizeForSearch(question);
-  const 질의들 = 다듬은 ? [question, 다듬은] : [question];
+  const 다시쓴 = await rewriteForSearch(question);
+  const 질의들 = [question, ...(다듬은 ? [다듬은] : []), ...(다시쓴 && 다시쓴 !== 다듬은 ? [다시쓴] : [])];
   const queryVectors = await embed(질의들);
   const scopes = agentId && agentId !== GLOBAL_SCOPE ? [GLOBAL_SCOPE, safeScope(agentId)] : [GLOBAL_SCOPE];
   // ★ 등급 차단은 **검색 조건에 넣는다**(가져온 뒤 거르지 않는다).

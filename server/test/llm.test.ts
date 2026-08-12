@@ -290,8 +290,16 @@ describe("llm chat system prompt (한국어 기본 처리)", () => {
       await chat({ agentId: "analysis", message: "첫 질문", remember: true, explain: true });
       await chat({ agentId: "analysis", message: "두 번째 질문", remember: true, explain: true });
 
-      const secondBody = JSON.parse(fetchMock.mock.calls[1][1].body);
-      const assistantTurn = secondBody.messages.find((m: { role: string }) => m.role === "assistant");
+      // ⚠ 호출 **순번**으로 집지 않는다(2026-08-12). 검색 질의 재작성(searchrewrite)이
+      //   같은 /chat/completions를 한 번 더 부르면서 순번이 밀려 이 시험이 깨졌다.
+      //   순번은 옆 기능이 늘 때마다 어긋난다 — **대화 이력을 실은 호출**을 내용으로 찾는다.
+      const 대화호출 = fetchMock.mock.calls
+        .map((c: unknown[]) => {
+          try { return JSON.parse(String((c[1] as { body?: unknown })?.body ?? "{}")); } catch { return null; }
+        })
+        .filter((b: { messages?: { role: string }[] } | null) => b?.messages?.some((m) => m.role === "assistant"));
+      expect(대화호출.length, "이전 답을 실어 보낸 호출이 없다").toBeGreaterThan(0);
+      const assistantTurn = 대화호출[대화호출.length - 1].messages.find((m: { role: string }) => m.role === "assistant");
       expect(assistantTurn.content).toBe(WITH_TERMS);
     });
   });
