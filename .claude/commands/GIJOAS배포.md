@@ -30,7 +30,15 @@ tools/deploy-prod.ps1과 같은 절차를 **단계별로** 수행한다 (스크�
 5. 재시작 (grep/awk 파이프 금지 — 인용 함정):
    `wsl -d Ubuntu-24.04 -- systemctl show gijo-as.service -p MainPID --value` 로 PID 얻고 `wsl -d Ubuntu-24.04 -- kill <PID>`
 6. health 확인: Node fetch로 http://localhost:4000/api/health 를 최대 60초 폴링 (curl은 한글 응답 검증에 쓰지 말 것).
-7. 보고: 이전→새 PID, health, 배포된 커밋. ⚠ 재시작으로 접속 중 세션이 끊겼음을 명시.
+6′. **PID가 실제로 바뀌었는지 확인(필수)** — ⚠ **「health 200 = 새 코드」는 거짓이다.**
+   `systemctl show gijo-as.service -p MainPID --value` 를 **다시** 읽어 **이전 PID와 다른지**,
+   그리고 `ps -o lstart= -p <새PID>` 가 `stat -c '%y' .../dist/index.js` **보다 뒤인지** 본다.
+   같으면 배포 실패다 — **옛 프로세스가 health에 답하고 있는 것**이고 새 코드는 안 올라갔다.
+   - 실사고(2026-08-12, `max`): 재기동 스크립트가 「재기동됨·HEALTH OK」를 찍었는데 손으로 띄운
+     옛 프로세스가 포트를 쥐고 있어 새 인스턴스가 EADDRINUSE로 죽었다. 옛 코드를 재고
+     **「기계 차이」로 보고될 뻔했다.** `tools/deploy-prod.ps1`은 이제 이걸 검사하고 실패시킨다.
+7. 보고: 이전→새 PID, **프로세스 기동 시각 vs dist 빌드 시각**, health, 배포된 커밋.
+   ⚠ 재시작으로 접속 중 세션이 끊겼음을 명시.
 
 ## `max`에서 (2026-08-09 변경 — `max`에서 트리거한다)
 사장님의 `max`는 **운영 배포를 직접 트리거한다**(그전에는 `win` 담당이었다).

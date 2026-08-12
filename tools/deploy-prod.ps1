@@ -67,7 +67,15 @@ if ($pid -and $pid -ne "0") {
   Write-Output "no running pid (systemd가 새로 띄움)"
 }
 
-Step "5/5 health 확인 (최대 60초 대기)"
+Step "5/5 health + **PID가 실제로 바뀌었는지** 확인 (최대 60초 대기)"
+# ⚠ **「health 200 = 새 코드」는 거짓이다**(2026-08-12, max에서 실사고).
+#   max의 개발 서버에서 재기동 스크립트가 「재기동됨·HEALTH OK」를 찍었는데, 손으로 띄운
+#   옛 프로세스가 포트를 쥐고 있어 새 인스턴스는 EADDRINUSE로 죽고 **옛 프로세스가 200을
+#   답했다.** 그 상태로 라우팅을 재서 「max 8/13 vs win 0/13 = 기계 차이」로 보고될 뻔했다.
+#   여기(systemd)는 사정이 다르지만 — kill이 빗나가거나 PID를 잘못 읽으면 Restart=always가
+#   되살릴 것도 없이 **옛 프로세스가 그대로 응답한다.** 그러면 배포는 안 됐는데 초록이 뜬다.
+#   그래서 health만으로 끝내지 않는다: **PID가 바뀌었고, 그 프로세스가 빌드보다 뒤에 떴는가.**
+$before = $pid
 $ok = $false
 foreach ($i in 1..12) {
   Start-Sleep -Seconds 5
@@ -77,6 +85,17 @@ foreach ($i in 1..12) {
   } catch {}
 }
 if (-not $ok) { throw "health 실패 — 운영 서버가 60초 내에 응답하지 않음. WSL 로그 확인 필요." }
+
+$after_pid = (wsl -d $distro -- systemctl show gijo-as.service -p MainPID --value).Trim()
+if (-not $after_pid -or $after_pid -eq "0") { throw "재시작 확인 실패 — MainPID가 비어 있다(서비스가 안 떴다). health 200은 다른 프로세스가 답했을 수 있다." }
+if ($before -and $before -ne "0" -and $after_pid -eq $before) {
+  throw "재시작 확인 실패 — PID가 $before 그대로다. **옛 프로세스가 health에 답하고 있다.** 새 코드가 안 올라갔다."
+}
+$started = (wsl -d $distro -- bash -c "ps -o lstart= -p $after_pid").Trim()
+$built = (wsl -d $distro -- bash -c "stat -c '%y' /home/gijo/gijo-as/server/dist/index.js").Trim()
+Write-Output "PID $before → $after_pid"
+Write-Output "  프로세스 기동: $started"
+Write-Output "  dist 빌드    : $built   ← 기동이 빌드보다 뒤여야 새 코드다"
 
 Write-Output ""
 Write-Output "✅ 배포 완료: $($after.Substring(0,7)) ($(git -C $repo log -1 --format=%s))"
