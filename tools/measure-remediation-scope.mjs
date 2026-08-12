@@ -49,9 +49,12 @@ const 플레이북질문 = [
   "조치 플레이북 보여줘",
 ];
 
+// ⚠ 계정 이름은 **기계 접두사**를 붙인다(사장님 결정 2026-08-12): win_claude-qa · max_claude-qa.
+//   두 기계에 같은 이름이 있던 것이 헷갈림의 원인이었다.
+const USER = process.env.GIJO_QA_USER || "win_claude-qa";
 const l = await fetch(`${BASE}/api/auth/login`, {
   method: "POST", headers: { "Content-Type": "application/json" },
-  body: JSON.stringify({ username: "claude-qa", password: PW, force: true }),
+  body: JSON.stringify({ username: USER, password: PW, force: true }),
 });
 if (!l.ok) { console.error(`★ 로그인 실패 ${l.status}`); process.exit(2); }
 const { accessToken, refreshToken } = await l.json();

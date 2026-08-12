@@ -28,7 +28,7 @@
 //   GIJO_ADMIN_PASSWORD : 그 관리자의 비밀번호 — 계정을 만들 권한
 //   GIJO_QA_PASSWORD    : 새로 만들 QA 계정의 비밀번호
 //   GIJO_SERVER_URL     : 기본 http://localhost:4000
-//   GIJO_QA_USER        : 기본 claude-qa
+//   GIJO_QA_USER        : 기본 win_claude-qa — **다른 기계에서는 반드시 넘길 것**(max_claude-qa)
 //
 // ⚠ 이 스크립트는 **관리자로 로그인한다.** 계정당 1세션이라, 지금 앱에 같은 관리자 계정으로
 //   들어가 있으면 그 세션이 끊긴다(2026-07 중복로그인 방지). 앱을 닫고 돌리는 편이 안전하다.
@@ -36,7 +36,9 @@
 const BASE = process.env.GIJO_SERVER_URL || "http://localhost:4000";
 const ADMIN = process.env.GIJO_ADMIN_USER || "claude-deploy";
 const ADMIN_PW = process.env.GIJO_ADMIN_PASSWORD;
-const QA_USER = process.env.GIJO_QA_USER || "claude-qa";
+// ⚠ **기계 접두사를 붙인다**(사장님 결정 2026-08-12): win_claude-qa · max_claude-qa.
+//   두 기계에 `claude-qa`가 같이 있던 것이 헷갈림의 원인이었다 — 어느 기계 계정인지 안 보였다.
+const QA_USER = process.env.GIJO_QA_USER || "win_claude-qa";
 const QA_PW = process.env.GIJO_QA_PASSWORD;
 
 function 죽는다(말) { console.error(`★ ${말}`); process.exit(2); }

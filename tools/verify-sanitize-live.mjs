@@ -13,7 +13,8 @@
 // ⚠ qa:true로 보낸다(학습·세션 오염 없음). 끝나면 세션을 비운다.
 
 const BASE = process.env.GIJO_SERVER_URL || "http://localhost:4000";
-const USER = process.env.GIJO_QA_USER || "claude-qa";
+// ⚠ 기계 접두사(사장님 결정 2026-08-12) — win_claude-qa · max_claude-qa.
+const USER = process.env.GIJO_QA_USER || "win_claude-qa";
 const PW = process.env.GIJO_QA_PASSWORD;
 if (!PW) { console.error("★ GIJO_QA_PASSWORD가 없다."); process.exit(2); }
 
