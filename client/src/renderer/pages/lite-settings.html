@@ -1,0 +1,332 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS Lite — 설정</title>
+<link rel="stylesheet" href="gijo-ui.css">
+<!--
+  lite-settings.html — 라이트 「설정」(사이드바 아래 ⚙).
+
+  ■ 본은 settings.html(2,691줄 · 패널 22개)이고 그중 **9개만** 남긴다.
+    뺀 13개는 「여럿이 쓰거나·조직 데이터가 있거나·운영자용」이다 —
+    도구를 78→13으로 줄인 기준과 같다(lite-screens.json settings 참고).
+
+  ■ ⚠ **「계정 관리」는 없다.** 1인용엔 관리할 남의 계정이 없다(사장님 물음에 대한 답).
+    「계정」(내 비밀번호 바꾸기)만 남긴다.
+
+  ■ 순서가 곧 첫날 동선이다: 모델을 받아 → 엔진이 돌고 → 그 위에 나머지.
+    라이트는 서버 관리자가 없어서, 이 화면이 안 되면 제품이 아예 안 돈다.
+
+  ■ 다리는 전부 preload(window.gijo). 생 fetch 금지 — 토큰이 거기 한 곳에 있다.
+-->
+<style>
+  :root{--bg:#262624;--panel:#30302e;--border:rgba(255,255,255,.09);--text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--blue:#3b82f6;--teal:#1eb980;--red:#e2483d;--amber:#f0a020;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px}
+  /* ⚠ 스크롤은 **바깥이 맡는다.** wrap이 max-width면서 동시에 스크롤 상자면
+     막대가 900px 자리에 서서 **화면 한가운데 뜬다**(2026-08-12 갈무리에서 발견). */
+  html,body{height:100%}
+  body{overflow-y:auto}
+  .wrap{padding:18px 22px 40px;display:flex;flex-direction:column;gap:14px;max-width:900px}
+  .scr-id{font-size:12.5px;color:var(--muted)}
+  .scr-id b{color:var(--text);font-weight:800}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+  .card h2{font-size:13px;font-weight:800;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+  .card .sub{font-size:11.5px;color:var(--muted-2);margin-bottom:10px;line-height:1.6}
+  .row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12.5px}
+  .row:last-child{border-bottom:0}
+  .row .k{flex:0 0 140px;color:var(--muted)}
+  .row .v{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis}
+  input,select{background:#262624;border:1px solid var(--border);border-radius:8px;padding:7px 10px;color:var(--text);font:inherit;font-size:12.5px}
+  input{flex:1;min-width:0}
+  button{background:transparent;border:1px solid var(--border);border-radius:8px;padding:6px 12px;color:var(--text);font:inherit;font-size:12.5px;cursor:pointer}
+  button:hover{border-color:var(--blue)}
+  button.go{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700}
+  button:disabled{opacity:.5;cursor:default}
+  .pill{font-size:11px;padding:1px 8px;border-radius:999px}
+  .pill.on{background:rgba(30,185,128,.16);color:var(--teal)}
+  .pill.off{background:rgba(226,72,61,.16);color:var(--red)}
+  .pill.warn{background:rgba(240,160,32,.16);color:var(--amber)}
+  .note{font-size:11.5px;color:var(--muted-2);line-height:1.7;margin-top:8px}
+  .note b{color:var(--text)}
+  .err{font-size:12.5px;color:var(--red);padding:4px 0}
+  .ok{font-size:12.5px;color:var(--teal);padding:4px 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="scr-id"><b>설정</b> — 이 PC에서 GIJO AS가 돌기 위한 것들입니다.</div>
+
+  <section class="card">
+    <h2>🧠 모델 · 엔진 <span class="pill" id="engPill">확인 중</span></h2>
+    <div class="sub">라이트의 <b>첫날 관문</b>입니다 — 모델이 없으면 대화도 검색도 못 합니다.</div>
+    <div id="engBox">불러오는 중…</div>
+  </section>
+
+  <section class="card">
+    <h2>구동 등급</h2>
+    <div class="sub">이 PC 사양에 맞는 등급입니다. 라이트는 <b>10GB급 · 문맥 8K</b>가 기준입니다.</div>
+    <div id="tierBox">불러오는 중…</div>
+  </section>
+
+  <section class="card">
+    <h2>🔒 저장 암호화 <span class="pill" id="cryptPill">확인 중</span></h2>
+    <div class="sub">⚠ <b>담당자 PC에서 더 중요합니다</b> — PC는 서버보다 분실·도난이 흔한데 회사 문서가 여기 쌓입니다.</div>
+    <div id="cryptBox">불러오는 중…</div>
+  </section>
+
+  <section class="card">
+    <h2>계정</h2>
+    <div class="sub">내 비밀번호를 바꿉니다. ⚠ 라이트는 1인용이라 <b>남의 계정을 관리하는 자리는 없습니다.</b></div>
+    <div id="acctBox">불러오는 중…</div>
+  </section>
+
+  <section class="card">
+    <h2>2차 인증 <span class="pill" id="mfaPill">확인 중</span></h2>
+    <div class="sub">보안 제품이 자기 보안을 안 하면 팔 말이 없습니다.</div>
+    <div id="mfaBox">불러오는 중…</div>
+  </section>
+
+  <section class="card">
+    <h2>⚖ 법령·판례 조회 <span class="pill" id="lawPill">확인 중</span></h2>
+    <div class="sub">라이트에서 <b>유일하게 바깥과 통신하는 기능</b>입니다. 기본은 꺼져 있고, 꺼진 채로도 법규 질문은 번들 문서로 답합니다.</div>
+    <div id="lawBox">불러오는 중…</div>
+  </section>
+
+  <section class="card">
+    <h2>업데이트</h2>
+    <div class="sub">혼자 쓰는 PC라 스스로 받아야 합니다.</div>
+    <div id="updBox">불러오는 중…</div>
+  </section>
+
+  <section class="card">
+    <h2>서버 연결</h2>
+    <div id="srvBox">불러오는 중…</div>
+  </section>
+</div>
+
+<script>
+// lite-settings — 라이트 설정. 다리는 전부 window.gijo(생 fetch 금지).
+//
+// ⚠ 이 화면의 규칙 셋(오늘 세 번 물린 것들):
+//   ① **0건·미설정을 「없다」로 말하지 않는다** — 「아직 안 했다」로 말한다.
+//   ② **401을 「서버 오류」라고 하지 않는다** — 사람이 할 일이 다르다.
+//   ③ **못 하는 것을 할 수 있는 것처럼 보이지 않는다** — 조건이 안 되면 이유를 적는다.
+(function () {
+  "use strict";
+  var esc = function (v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+  var g = window.gijo || null;
+
+  function 오류문구(e, 무엇) {
+    var m = String((e && e.message) || e || "");
+    if (/401|unauthorized/i.test(m)) return "로그인이 풀렸습니다 — 다시 로그인해 주세요.";
+    if (/403|forbidden/i.test(m)) return "이 계정에는 권한이 없습니다.";
+    if (/fetch|network|ECONN|Failed to fetch/i.test(m)) return "서버에 닿지 못했습니다 — 서버가 켜져 있는지 확인해 주세요.";
+    return 무엇 + "을 못 읽었습니다 — " + esc(m);
+  }
+  function 칸(box, html) { var e = document.getElementById(box); if (e) e.innerHTML = html; }
+  function 알약(id, 글, cls) { var e = document.getElementById(id); if (e) { e.textContent = 글; e.className = "pill " + cls; } }
+  function 줄(k, v) { return '<div class="row"><span class="k">' + esc(k) + '</span><span class="v">' + v + "</span></div>"; }
+  var GB = function (mb) { return mb == null ? "?" : (Number(mb) / 1024).toFixed(1) + "GB"; };
+
+  if (!g) {
+    ["engBox","tierBox","cryptBox","acctBox","mfaBox","lawBox","updBox","srvBox"].forEach(function (b) {
+      칸(b, '<div class="err">앱 밖에서 열려 있어 데이터를 못 읽습니다 — GIJO AS 앱에서 열어 주세요.</div>');
+    });
+    return;
+  }
+
+  // ── 모델·엔진 ───────────────────────────────────────────────────────
+  async function 엔진() {
+    try {
+      var st = await g.getLocalEngineStatus();
+      var models = await g.listModels();
+      var 적재 = (st.loaded || []).filter(function (l) { return l.ready; });
+      var 있는것 = (Array.isArray(models) ? models : models.models || []);
+      알약("engPill", 적재.length ? "돌고 있음" : (있는것.length ? "멈춤" : "모델 없음"),
+           적재.length ? "on" : (있는것.length ? "warn" : "off"));
+
+      if (!있는것.length) {
+        // ⚠ 규칙 ① — 「모델이 없습니다」로 끝내지 않는다. 무엇을 해야 하는지 적는다.
+        칸("engBox", '<div class="note"><b>아직 받은 모델이 없습니다.</b><br>' +
+          "라이트는 이 PC 안에서 답을 만들기 때문에 모델 파일이 먼저 있어야 합니다. " +
+          "받는 자리는 설치 안내서를 따라 주세요 — 받고 나면 여기에 목록으로 나타납니다.</div>");
+        return;
+      }
+      var h = 있는것.map(function (m) {
+        var on = 적재.some(function (l) { return l.modelId === (m.id || m); });
+        var id = m.id || m;
+        return 줄(id, (on ? '<span class="pill on">적재됨</span>' : '<span class="pill off">내려감</span>') +
+          ' <button data-eng="' + esc(id) + '">' + (on ? "내리기" : "올리기") + "</button>");
+      }).join("");
+      칸("engBox", h);
+      document.querySelectorAll("[data-eng]").forEach(function (b) {
+        b.addEventListener("click", async function () {
+          b.disabled = true; b.textContent = "…";
+          try { b.textContent === "…" && (await (적재.some(function (l) { return l.modelId === b.dataset.eng; }) ? g.stopLocalEngine() : g.startLocalEngine(b.dataset.eng))); }
+          catch (e) { alert(오류문구(e, "엔진")); }
+          엔진();
+        });
+      });
+    } catch (e) { 칸("engBox", '<div class="err">' + 오류문구(e, "엔진 상태") + "</div>"); }
+  }
+
+  // ── 구동 등급 ───────────────────────────────────────────────────────
+  async function 등급() {
+    try {
+      var t = await g.getLlmTier();
+      var cur = (t.current && (t.current.tier || t.current.id)) || "?";
+      var rec = t.recommended || "?";
+      var gpu = t.gpu ? GB(t.gpu.totalMb) : "확인 안 됨";
+      var h = 줄("지금 등급", '<b>' + esc(cur) + "</b>" + (cur !== rec ? ' <span class="pill warn">권장은 ' + esc(rec) + "</span>" : ' <span class="pill on">권장과 같음</span>')) +
+              줄("이 PC 메모리", esc(gpu)) +
+              줄("바꾸기", '<select id="tierSel">' + (t.tiers || []).filter(function (x) { return !x.planned; })
+                  .map(function (x) { return '<option value="' + esc(x.id) + '"' + (x.id === cur ? " selected" : "") + ">" + esc(x.label) + " · " + esc(x.vramLabel) + "</option>"; }).join("") +
+                  '</select> <button id="tierGo">적용</button>');
+      칸("tierBox", h + '<div class="note">⚠ 등급을 바꾸면 <b>엔진이 다시 뜹니다</b> — 대화 중이면 잠깐 멈춥니다.</div>');
+      var go = document.getElementById("tierGo");
+      if (go) go.addEventListener("click", async function () {
+        go.disabled = true;
+        try { await g.setLlmTier(document.getElementById("tierSel").value); } catch (e) { alert(오류문구(e, "등급")); }
+        setTimeout(function () { 등급(); 엔진(); }, 3000);
+      });
+    } catch (e) { 칸("tierBox", '<div class="err">' + 오류문구(e, "구동 등급") + "</div>"); }
+  }
+
+  // ── 저장 암호화 ─────────────────────────────────────────────────────
+  async function 암호화() {
+    try {
+      var s = await g.dbCryptStatus();
+      var on = !!(s && (s.enabled || s.on));
+      알약("cryptPill", on ? "켜짐" : "꺼짐", on ? "on" : "off");
+      if (on) { 칸("cryptBox", 줄("상태", "이 PC의 데이터가 암호화되어 있습니다") +
+        줄("복구 열쇠", '<button id="rotKey">다시 발급</button>') +
+        '<div class="note">⚠ 복구 열쇠는 <b>딱 한 번</b> 보여 줍니다. 종이에 적어 따로 보관하세요.</div>');
+        var rk = document.getElementById("rotKey");
+        if (rk) rk.addEventListener("click", async function () {
+          rk.disabled = true;
+          try { var r = await g.dbCryptRotateRecovery(); alert("새 복구 열쇠:\n\n" + (r.recoveryKey || JSON.stringify(r)) + "\n\n지금 적어 두세요. 다시 안 보여 줍니다."); }
+          catch (e) { alert(오류문구(e, "복구 열쇠")); }
+          rk.disabled = false;
+        });
+        return;
+      }
+      var can = await g.dbCryptCanEnableInApp();
+      // ⚠ 규칙 ③ — 못 켜는 상황이면 버튼만 놓고 실패하게 두지 않는다. 이유를 먼저 적는다.
+      칸("cryptBox", (can && can.ok !== false
+        ? 줄("켜기", '<button class="go" id="cryptGo">지금 켜기</button>')
+        : 줄("켤 수 없음", '<span class="pill warn">' + esc((can && (can.reason || can.why)) || "이 상태에서는 못 켭니다") + "</span>")) +
+        '<div class="note"><b>아직 안 켰습니다.</b> 켜면 이 PC의 데이터베이스가 통째로 암호화됩니다 — ' +
+        "노트북을 잃어버려도 파일만으로는 못 엽니다. 켜는 데 서버가 잠깐 멈춥니다.</div>");
+      var cg = document.getElementById("cryptGo");
+      if (cg) cg.addEventListener("click", async function () {
+        cg.disabled = true; cg.textContent = "켜는 중…";
+        try { var r = await g.dbCryptEnable(); alert(r && r.recoveryKey ? ("복구 열쇠:\n\n" + r.recoveryKey + "\n\n지금 적어 두세요. 다시 안 보여 줍니다.") : "켰습니다."); }
+        catch (e) { alert(오류문구(e, "저장 암호화")); }
+        암호화();
+      });
+    } catch (e) { 칸("cryptBox", '<div class="err">' + 오류문구(e, "저장 암호화 상태") + "</div>"); }
+  }
+
+  // ── 계정 ────────────────────────────────────────────────────────────
+  async function 계정() {
+    try {
+      var me = await g.me();
+      var u = (me && (me.user || me)) || {};
+      칸("acctBox", 줄("아이디", esc(u.username || "?")) + 줄("이름", esc(u.displayName || "-")) +
+        줄("새 비밀번호", '<input id="pw1" type="password" placeholder="12자 이상 권장"> <button id="pwGo">바꾸기</button>') +
+        '<div id="pwMsg"></div>');
+      var go = document.getElementById("pwGo");
+      if (go) go.addEventListener("click", async function () {
+        var v = document.getElementById("pw1").value;
+        var msg = document.getElementById("pwMsg");
+        if (!v || v.length < 8) { msg.innerHTML = '<div class="err">8자 이상이어야 합니다(12자 이상을 권합니다).</div>'; return; }
+        go.disabled = true;
+        try { await g.changeUserPassword(u.id, v); msg.innerHTML = '<div class="ok">바꿨습니다.</div>'; document.getElementById("pw1").value = ""; }
+        catch (e) { msg.innerHTML = '<div class="err">' + 오류문구(e, "비밀번호") + "</div>"; }
+        go.disabled = false;
+      });
+    } catch (e) { 칸("acctBox", '<div class="err">' + 오류문구(e, "계정") + "</div>"); }
+  }
+
+  // ── 2차 인증 ────────────────────────────────────────────────────────
+  async function 이차인증() {
+    try {
+      var s = await g.mfaStatus();
+      var on = !!(s && s.enabled);
+      알약("mfaPill", on ? "켜짐" : "꺼짐", on ? "on" : "off");
+      칸("mfaBox", on
+        ? 줄("상태", "이 계정에 2차 인증이 걸려 있습니다") + '<div class="note">끄거나 복구 코드를 다시 받으려면 비밀번호가 필요합니다 — 본 제품 설정 화면에서 하세요.</div>'
+        : '<div class="note"><b>아직 안 켰습니다.</b> 담당자 PC를 남이 잠깐 만져도 열리지 않게 하려면 켜 두는 편이 좋습니다.</div>');
+    } catch (e) { 칸("mfaBox", '<div class="err">' + 오류문구(e, "2차 인증") + "</div>"); }
+  }
+
+  // ── 법령 조회 ───────────────────────────────────────────────────────
+  async function 법령() {
+    try {
+      var c = await g.lawConfig();
+      var on = !!(c && c.enabled);
+      알약("lawPill", on ? "켜짐" : "꺼짐(기본)", on ? "on" : "off");
+      칸("lawBox", 줄("인증키", '<input id="lawKey" type="password" placeholder="' + (on ? "이미 넣어 두었습니다" : "국가법령정보센터 인증키") + '"> <button id="lawGo">저장</button>') +
+        '<div id="lawMsg"></div>' +
+        '<div class="note">' + (on
+          ? "켜져 있습니다 — 이 기능만 바깥으로 나갑니다."
+          : "<b>아직 안 켰습니다.</b> 안 켜도 법규 질문은 <b>번들 문서로 답합니다</b> — 꺼진 기능이 멀쩡하던 답을 빼앗지 않습니다.") +
+        "</div>");
+      var go = document.getElementById("lawGo");
+      if (go) go.addEventListener("click", async function () {
+        var v = document.getElementById("lawKey").value;
+        var msg = document.getElementById("lawMsg");
+        if (!v) { msg.innerHTML = '<div class="err">인증키를 넣어 주세요.</div>'; return; }
+        go.disabled = true;
+        try { await g.setLawKey(v); msg.innerHTML = '<div class="ok">저장했습니다.</div>'; document.getElementById("lawKey").value = ""; 법령(); }
+        catch (e) { msg.innerHTML = '<div class="err">' + 오류문구(e, "인증키") + "</div>"; }
+        go.disabled = false;
+      });
+    } catch (e) { 칸("lawBox", '<div class="err">' + 오류문구(e, "법령 조회 설정") + "</div>"); }
+  }
+
+  // ── 업데이트 ────────────────────────────────────────────────────────
+  async function 업데이트() {
+    try {
+      var v = await g.update.currentVersion();
+      칸("updBox", 줄("지금 판", esc(v || "?")) + 줄("확인", '<button id="updGo">새 판 확인</button>') + '<div id="updMsg"></div>');
+      var go = document.getElementById("updGo");
+      if (go) go.addEventListener("click", async function () {
+        var msg = document.getElementById("updMsg"); go.disabled = true; msg.textContent = "확인 중…";
+        try {
+          var r = await g.update.checkForUpdate();
+          msg.innerHTML = r && r.available
+            ? '<div class="ok">새 판 ' + esc(r.version) + "이 있습니다 — 본 제품 설정에서 설치하세요.</div>"
+            : '<div class="note">지금이 최신입니다.</div>';
+        } catch (e) { msg.innerHTML = '<div class="err">' + 오류문구(e, "업데이트") + "</div>"; }
+        go.disabled = false;
+      });
+    } catch (e) { 칸("updBox", '<div class="err">' + 오류문구(e, "업데이트") + "</div>"); }
+  }
+
+  // ── 서버 연결 ───────────────────────────────────────────────────────
+  async function 서버() {
+    try {
+      var u = await g.getServerUrl();
+      칸("srvBox", 줄("주소", '<input id="srvUrl" type="text" value="' + esc(u || "") + '"> <button id="srvGo">바꾸기</button>') +
+        '<div class="note">라이트는 보통 이 PC 안(<b>localhost:4000</b>)입니다. 사내 서버를 쓸 때만 바꿉니다.</div><div id="srvMsg"></div>');
+      var go = document.getElementById("srvGo");
+      if (go) go.addEventListener("click", async function () {
+        go.disabled = true;
+        try { await g.setServerUrl(document.getElementById("srvUrl").value); document.getElementById("srvMsg").innerHTML = '<div class="ok">바꿨습니다 — 다시 로그인해야 할 수 있습니다.</div>'; }
+        catch (e) { document.getElementById("srvMsg").innerHTML = '<div class="err">' + 오류문구(e, "서버 주소") + "</div>"; }
+        go.disabled = false;
+      });
+    } catch (e) { 칸("srvBox", '<div class="err">' + 오류문구(e, "서버 주소") + "</div>"); }
+  }
+
+  function 시작() { 엔진(); 등급(); 암호화(); 계정(); 이차인증(); 법령(); 업데이트(); 서버(); }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", 시작);
+  else 시작();
+})();
+</script>
+</body>
+</html>
