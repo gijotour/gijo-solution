@@ -1,0 +1,88 @@
+{
+  "_설명": "GIJO AS Lite — 화면 9개 정의. **데이터다**(작업경계 §0 원칙 2). 사장님이 정하신 메뉴 그대로다(2026-08-12). 화면 파일은 전부 `lite-` 접두사로 새로 만든다 — 기존 7개를 재사용하면 「회사 데이터 위젯 빼기」가 전부 공용 파일 수정이 되기 때문이다(작업경계 §4). ⚠ 논리는 중복하지 않는다: 화면(HTML/JS)만 따로 두고 검색·살균·계산은 공용을 그대로 부른다.",
+  "screens": [
+    {
+      "no": 1, "id": "lite-dashboard", "이름": "대시보드",
+      "파일": "client/src/renderer/pages/lite-dashboard.html",
+      "도구": ["knowledge_status", "recent_documents", "work_session_status"],
+      "품": "M",
+      "왜새로": "⚠ **9개 중 유일하게 새로 짜는 화면.** 지금 대시보드는 회사 자산·취약점 집계인데 혼자 쓰는 PC엔 그 데이터가 없다. 라이트 대시보드는 「내 문서 · 내 할 일 · 최근 분석」이다"
+    },
+    {
+      "no": 2, "id": "lite-records", "이름": "작업 내역",
+      "파일": "client/src/renderer/pages/lite-records.html",
+      "본": "records.html",
+      "도구": ["work_session_status", "add_task", "complete_task", "reopen_task"],
+      "품": "XS",
+      "왜": "개인 할 일 크기에 이미 맞는다. 담당자 배정·결재 칸만 감춘다"
+    },
+    {
+      "no": 3, "id": "lite-loganalysis", "이름": "로그파일 분석",
+      "파일": "client/src/renderer/pages/lite-loganalysis.html",
+      "본": "loganalysis.html",
+      "도구": ["search", "explain", "ontology_query", "remediation"],
+      "품": "L",
+      "사장님말": "첨부된 자산 메뉴의 내용으로 확인하고 공격경로 분석 가능하게 · Graphify 이용할 수 있으면 이용",
+      "왜": "분석 자체는 있다. **새 일은 첨부 연계와 공격경로**다 — 지식그래프 도입계획의 ⓒ(검색이 그래프를 쓰기)가 그 실체다",
+      "주의": "⚠ 도입계획 §5가 「접점이 데이터에 거의 없다」고 적어 뒀다(문서 트리플 3개). C-0(접점 쌓기)부터다"
+    },
+    {
+      "no": 4, "id": "lite-scan", "이름": "스캐너",
+      "파일": "client/src/renderer/pages/lite-scan.html",
+      "본": "hardening.html",
+      "도구": ["run_hardening_scan"],
+      "품": "M",
+      "사장님말": "우리 가능한 스캐너 탑재 · 스캔결과 또한 첨부파일 자산에서 확인 가능하게",
+      "왜": "`kisa_pc`(임직원 Windows PC)가 담당자 PC 점검에 그대로 맞는다. 결과를 놓을 자산 등록부가 없던 것이 원래 걸림돌이었는데, **첨부를 그릇으로 쓰자는 사장님 안이 그걸 푼다**",
+      "주의": "⚠ 스캔 대상은 **사람이 입력한 것만**(결정 ③). 대역 스캔은 넣지 않는다 — 허가 없는 사내망 스캔은 사고다"
+    },
+    {
+      "no": 5, "id": "lite-manuals", "이름": "보안 장비 등록부",
+      "파일": "client/src/renderer/pages/lite-manuals.html",
+      "도구": ["search", "knowledge_status"],
+      "품": "S",
+      "사장님말": "메뉴얼 등록해서 특정 내용 확인하기",
+      "왜": "⚠ **자산 관리가 아니다.** 사장님 문장은 「매뉴얼 넣고 찾기」이고 그건 문서함+RAG다 — 이미 있다. 문서에 「장비」 딱지만 붙이면 된다. 자산 등록부(list_assets·register_asset)는 안 쓴다"
+    },
+    {
+      "no": 6, "id": "lite-law", "이름": "법령 판례 조회",
+      "파일": "client/src/renderer/pages/lite-law.html",
+      "본": "lawlookup.html",
+      "도구": ["law_lookup", "search"],
+      "품": "M",
+      "사장님말": "개인이 계정받아서 등록",
+      "왜": "라이트에서 **유일하게 외부망이 필요한 화면**",
+      "주의": "⚠ 기본 꺼짐 + 계정 넣으면 켜짐 + **꺼져 있으면 번들 문서(search)로 답한다**(결정 ②). 온프렘 원칙과 부딪히는 유일한 자리라, 꺼도 제품이 도는 형태여야 한다"
+    },
+    {
+      "no": 7, "id": "lite-products", "이름": "제품 소개자료",
+      "파일": "client/src/renderer/pages/lite-products.html",
+      "본": "products.html",
+      "도구": ["search"],
+      "품": "XS",
+      "사장님말": "제품 비교 및 주요 기능 정리",
+      "왜": "번들 문서로 답이 된다 — 회사 데이터가 필요 없다. ⚠ `product_status`(회사 보유 제품 현황)와 **다른 것**이다"
+    },
+    {
+      "no": 8, "id": "lite-memory", "이름": "나만의 기억",
+      "파일": "client/src/renderer/pages/lite-memory.html",
+      "본": "memory.html · docbox.html",
+      "도구": ["search", "knowledge_status", "recent_documents", "doc_duplicates", "ontology_query", "explain"],
+      "품": "L",
+      "사장님말": "RAG, Graphify, LLM Wiki를 이용해서 넣고 관리하기",
+      "왜": "RAG는 있다. **새 일은 ⓐ 그래프 보여 주기와 ⓑ LLM 위키(정리본)**다",
+      "주의": "⚠ **ⓑ가 ctx 문제를 덜어 준다** — 긴 원문 대신 정리본을 넣으면 토큰이 준다. 8GB(C안)를 고수할수록 값이 커진다(Lite 계획서 §4)"
+    },
+    {
+      "no": 9, "id": "lite-memo", "이름": "나만의 메모장",
+      "파일": "미정 — 외부 연동",
+      "도구": [],
+      "품": "?",
+      "사장님말": "GIJO Smart MD Studio · 내가 따로 업그레이드 중이라 연동이나 포함",
+      "결정": "**연동**(포함 아님) — 사장님 결정 2026-08-12 ④",
+      "왜": "포함이면 두 제품의 배포·버전이 묶여 Smart MD Studio 일정에 라이트가 끌려간다. 연동이면 **없어도 라이트가 돌아야 한다**"
+    }
+  ],
+  "_착수순서": "품 작은 것부터 — 2(작업 내역) → 7(제품 소개) → 5(장비 매뉴얼). 셋 다 기존 기능을 거의 그대로 쓴다. 그다음 1(개인 대시보드), 그다음 3·8(그래프·위키가 걸린 것).",
+  "_전제": "작업경계 §5의 구멍 넷(도구 고르기 훅 · 화면 설명 합류점 · 라이트 티어 값 · 빌드 타깃)이 win에서 뚫린 뒤에 화면 착수. 이 두 JSON은 그 전에도 만들 수 있어 먼저 뒀다."
+}
