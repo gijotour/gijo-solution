@@ -29,8 +29,22 @@ echo "━━ 3/4 서버 재시작 ━━"
 # 이유: 에이전트는 KeepAlive라 pkill 하면 launchd가 곧바로 되살린다 — 여기서 nohup으로
 # 또 띄우면 두 프로세스가 4000 포트를 다투게 된다(EADDRINUSE). kickstart -k는
 # "죽이고 다시 띄우기"를 launchd가 원자적으로 처리하므로 충돌이 없다.
+#
+# ★ 2026-08-12 — **재기동 전 PID를 기록한다.** 아래 4/4에서 PID가 바뀌었는지 본다.
+#   실사고: 손으로 띄운 프로세스가 4000을 쥐고 있으면 kickstart가 띄운 새 인스턴스는
+#   EADDRINUSE로 죽고, **옛 프로세스가 health에 200을 답한다.** 이 스크립트는 그걸
+#   「재기동 성공」으로 찍었고, 그 뒤 측정 18문항이 통째로 옛 코드에서 나왔다.
+#   health는 「서버가 살아 있나」만 답한다 — 「새 코드인가」는 안 답한다.
+PREV_PID=$(lsof -nP -iTCP:4000 -sTCP:LISTEN -t 2>/dev/null | head -1)
 AGENT="com.gijo.as.server"
 if launchctl print "gui/$(id -u)/$AGENT" >/dev/null 2>&1; then
+  # 에이전트가 등록만 되고 **안 돌고 있는데** 포트는 남이 쥔 상태를 먼저 푼다.
+  AGENT_PID=$(launchctl list 2>/dev/null | awk -v a="$AGENT" '$3==a {print $1}')
+  if [ -n "$PREV_PID" ] && [ "$AGENT_PID" != "$PREV_PID" ]; then
+    echo "⚠ 4000을 쥔 PID $PREV_PID 는 launchd 소유가 아니다(에이전트: ${AGENT_PID:--}) — 내리고 넘긴다"
+    kill "$PREV_PID" 2>/dev/null || true
+    sleep 3
+  fi
   launchctl kickstart -k "gui/$(id -u)/$AGENT"
   echo "launchd 재기동: $AGENT"
 else
@@ -42,13 +56,31 @@ else
   echo "새 프로세스 PID: $!"
 fi
 
-echo "━━ 4/4 health 확인 (최대 30초) ━━"
+echo "━━ 4/4 health + **새 코드인지** 확인 (최대 30초) ━━"
 for i in $(seq 1 10); do
   sleep 3
-  if curl -sf http://localhost:4000/api/health | grep -q '"ok":true'; then
-    echo "✅ HEALTH OK — 갱신 완료: $AFTER"
-    exit 0
+  curl -sf http://localhost:4000/api/health | grep -q '"ok":true' || continue
+
+  # ★ health만으로는 부족하다 — 옛 프로세스도 200을 답한다. **PID가 바뀌었는지** 본다.
+  NOW_PID=$(lsof -nP -iTCP:4000 -sTCP:LISTEN -t 2>/dev/null | head -1)
+  if [ -n "$PREV_PID" ] && [ "$NOW_PID" = "$PREV_PID" ]; then
+    echo "❌ **재기동이 안 됐다** — 4000을 쥔 PID가 그대로다($NOW_PID)."
+    echo "   health는 200이지만 그건 **옛 프로세스**가 답한 것이다. 새 코드가 아니다."
+    echo "   이 상태로 잰 값은 전부 무효다. 아래를 확인할 것:"
+    echo "     launchctl list | grep gijo      # 에이전트가 실제로 도는가"
+    echo "     lsof -nP -iTCP:4000 -sTCP:LISTEN"
+    echo "     tail -40 \$HOME/gijo-as-server.log"
+    exit 1
   fi
+
+  # 빌드보다 프로세스가 나중에 떴는지까지 본다(PID 재사용·경합 대비).
+  # ⚠ 23행에서 이미 `cd server` 했다 — 여기 cwd는 server/ 다. 경로에 server/를 또 붙이지 말 것.
+  if [ -n "$NOW_PID" ] && [ -f dist/index.js ]; then
+    PROC_START=$(ps -o lstart= -p "$NOW_PID" 2>/dev/null | xargs)
+    echo "   프로세스 시작: ${PROC_START:-?}  ·  dist 빌드: $(stat -f '%Sm' dist/index.js 2>/dev/null)"
+  fi
+  echo "✅ HEALTH OK · PID ${PREV_PID:--} → $NOW_PID — 갱신 완료: $AFTER"
+  exit 0
 done
 echo "❌ health 실패 — ~/gijo-as-server.log 확인 필요"
 exit 1
