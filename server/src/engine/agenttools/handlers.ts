@@ -224,7 +224,10 @@ export function 자산위험등급(a: { findings: { severity: string }[] }): "hi
 
 export function runListAssets(args: Record<string, string> = {}): string {
   const all = listAssets();
-  if (all.length === 0) return "등록된 AI 자산이 없습니다.";
+  // ⚠ 0건은 「없다」가 아니라 **「아직 안 넣었다」**다(2026-08-12 전수 점검).
+  //   그냥 "없습니다"로 끝내면 담당자는 「우리 환경엔 없구나」로 읽는다 — 사실은 등록 전이다.
+  //   이 원칙은 아래 2124줄대에 이미 적혀 있었는데 여기까지 안 왔다.
+  if (all.length === 0) return "등록된 AI 자산이 없습니다. — 아직 등록 전이라는 뜻입니다. 자산 화면에서 추가하거나 스캐너 결과를 올리면 자동으로 채워집니다.";
 
   // ★ 2026-08-04 147상황: 「위험도 높은 자산 알려줘」가 **자산 한 건**을 답했다
   //   ("이 자산에서 발견된 1개 취약점은 낮은 심각도입니다" — 29자). 목록을 물었는데
@@ -997,7 +1000,7 @@ export function runScanStatus(args: Record<string, string>): string {
   // ⚠ 못 구하면 비운다 — 0이나 오늘로 채우면 "방금 본 것"이라는 거짓이 된다.
   const 시각들 = assets.map((a) => a.lastScannedAt).filter((t): t is number => typeof t === "number" && t > 0);
   const 신선도 = (() => {
-    if (시각들.length === 0) return "· 반입 시각을 기록한 자산이 없습니다 — 언제 것인지 알 수 없습니다.";
+    if (시각들.length === 0) return "· 반입 시각을 기록한 자산이 없습니다 — 언제 것인지 알 수 없습니다. 스캔 결과를 다시 올리면 반입 시각이 함께 기록됩니다.";
     const 최근 = Math.max(...시각들);
     const 가장오래 = Math.min(...시각들);
     const 며칠 = (t: number) => Math.floor((Date.now() - t) / 86400000);
@@ -1704,7 +1707,7 @@ export function runAibomStatus(args: Record<string, string>): string {
   // (안 그러면 IT 자산이 전부 "AI-BOM 미완성"으로 잡혀 거버넌스 현황이 노이즈로 덮인다).
   const all = listAssets();
   const aiAssets = all.filter(isAiAsset);
-  if (aiAssets.length === 0) return "등록된 AI/모델 자산이 없습니다. (방화벽·서버 등 IT 자산은 AI-BOM 대상이 아닙니다)";
+  if (aiAssets.length === 0) return "등록된 AI/모델 자산이 없습니다. (방화벽·서버 등 IT 자산은 AI-BOM 대상이 아닙니다) — 아직 등록 전이라는 뜻입니다. AI 모델·에이전트를 자산으로 넣으면 AI-BOM이 채워집니다.";
   // 인벤토리에는 16건이 보이는데 여기선 3건이라고만 하면 "나머지는 어디 갔나"로 읽힌다.
   // 제외한 IT 자산 건수를 머리말에 붙여 수가 다른 이유를 스스로 설명하게 한다.
   const itCount = all.length - aiAssets.length;
@@ -1738,7 +1741,7 @@ export function runAibomStatus(args: Record<string, string>): string {
 export function runProductStatus(args: Record<string, string>): string {
   const q = (args.query ?? "").trim().toLowerCase();
   const all = listProducts();
-  if (all.length === 0) return "등록된 보안제품이 없습니다.";
+  if (all.length === 0) return "등록된 보안제품이 없습니다. — 아직 등록 전이라는 뜻입니다. 보안제품 화면에서 방화벽·IPS·EDR 등을 추가하면 매뉴얼·점검 이력이 함께 쌓입니다.";
 
   const matched = q
     ? all.filter((p) => 필터에맞나(`${p.name} ${p.category} ${p.vendor ?? ""} ${p.model ?? ""} ${p.note ?? ""}`, q))
@@ -1766,7 +1769,7 @@ export function runProductStatus(args: Record<string, string>): string {
 // 정기 점검은 "기한이 지났는가"가 전부다. 지연된 것부터 보여준다.
 export function runMaintenanceStatus(args: Record<string, string>): string {
   const items = listMaintenanceItems();
-  if (items.length === 0) return "등록된 점검 일정이 없습니다.";
+  if (items.length === 0) return "등록된 점검 일정이 없습니다. — 아직 등록 전이라는 뜻입니다. 일정을 넣으면 기한 임박·지연을 여기서 알려 드립니다.";
 
   const today = dateOnlyLocal(new Date());
   const q = (args.filter ?? "").trim().toLowerCase();
@@ -1793,7 +1796,7 @@ export function runMaintenanceStatus(args: Record<string, string>): string {
 // "지금 보고할 거리가 무엇인가" — 컴플라이언스 이행 현황이다.
 export function runComplianceStatus(args: Record<string, string>): string {
   const rows = listCompliance();
-  if (rows.length === 0) return "등록된 컴플라이언스 항목이 없습니다.";
+  if (rows.length === 0) return "등록된 컴플라이언스 항목이 없습니다. — 아직 등록 전이라는 뜻입니다. 컴플라이언스 화면에서 기준(ISMS-P·N2SF 등)을 불러오면 이행 현황이 채워집니다.";
 
   const q = (args.filter ?? "").trim().toLowerCase();
   const matched = q
@@ -1882,7 +1885,10 @@ export function runExposedAssets(): string {
 
   const 머리 = 적힌것.length
     ? `인터넷 노출로 **적혀 있는** 자산 ${적힌것.length}건 (전체 ${hub.rows.length}건)`
-    : `인터넷 노출로 적혀 있는 자산이 없습니다 (전체 ${hub.rows.length}건)`;
+    // ⚠ 0건일 때 「없습니다」로 끝내면 **「우리는 노출이 없구나」**로 읽힌다(2026-08-12 실측).
+    //   이 도구가 아는 것은 **등록부에 적혀 있는가**뿐이다 — 실제 노출 여부는 스캔이 판단한다.
+    //   담당자가 "S3에 퍼블릭 걸린 게 있대"라고 말한 상황에서 이 답이 나갔다. 둘을 갈라 적는다.
+    : `인터넷 노출로 적혀 있는 자산이 없습니다 (전체 ${hub.rows.length}건) — **적혀 있지 않다는 뜻이지, 노출이 없다는 뜻이 아닙니다.**`;
   const 줄 = 적힌것
     .slice()
     .sort((x, y) => y.exposureScore - x.exposureScore)
@@ -2031,7 +2037,7 @@ export function 대상찾기(말: string) {
  */
 export function runSbomCoverage(assetId?: string): string {
   const 자산들 = assetId ? [getAsset(assetId)].filter(Boolean) : listAssets();
-  if (자산들.length === 0) return assetId ? `"${assetId}" 자산을 찾지 못했습니다.` : "등록된 자산이 없습니다.";
+  if (자산들.length === 0) return assetId ? `"${assetId}" 자산을 찾지 못했습니다.` : "등록된 자산이 없습니다. — 아직 등록 전이라는 뜻입니다. 자산을 넣으면 SBOM 커버리지를 잽니다.";
   if (assetId) {
     const a = 자산들[0]!;
     // ★ 지원 종료(EOL)를 함께 본다(2026-08-04 파트너 지적 3번) — 지원이 끝난 부품은
