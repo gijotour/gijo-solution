@@ -91,11 +91,13 @@
   </section>
 
   <section class="card">
-    <h2>정리본(LLM 위키) <span class="pill" style="font-size:11px;padding:1px 8px;border-radius:999px;background:rgba(240,160,32,.16);color:var(--amber)">아직 없음</span></h2>
-    <div class="sub">넣은 문서를 미리 정리해 두면, 긴 원문 대신 그 정리본으로 답합니다.</div>
-    <div class="empty"><b>아직 만들지 않았습니다.</b><br>
-      라이트는 문맥이 8K로 좁아서 긴 원문을 매번 넣으면 자리가 모자랍니다 —
-      정리본은 그 자리를 되사는 장치입니다. 값이 큰 만큼 뒤에 제대로 만들 자리입니다.</div>
+    <h2>정리본(LLM 위키) <span id="wikiCnt" style="font-size:11.5px;color:var(--muted);font-weight:600"></span></h2>
+    <div class="sub">넣은 문서를 미리 정리해 두면, 긴 원문 대신 그 정리본으로 답합니다 —
+      라이트는 문맥이 8K로 좁아서 그 자리를 되사는 값이 큽니다.</div>
+    <div id="wiki">불러오는 중…</div>
+    <div id="wikiMsg"></div>
+    <div class="warn">⚠ 정리본은 <b>이 PC의 모델</b>이 씁니다 — 모델이 멈춰 있으면 못 만듭니다(⚙ 설정에서 올립니다).
+      원문이 길면 앞부분만 읽고 만들며, 그럴 때는 정리본에 그렇게 적습니다.</div>
   </section>
 
   <section class="card" id="readCard" style="display:none">
@@ -160,12 +162,23 @@
     return !/^GIJO_AS_/.test(id) && !/^GIJO_지식_/.test(id);
   }
 
+  // ── 정리본(LLM 위키) ⓑ ────────────────────────────────────────────────
+  // 계획서 §4: 「넣은 문서를 정리본으로 만들어 두면 ctx가 짧아도 답이 는다」.
+  // 정리본도 **그냥 문서**로 넣는다 — 따로 표를 만들면 검색·삭제·백업이 다 따로 놀아
+  // 라이트가 감당할 물건이 아니게 된다. 이름 앞에 「정리본_」을 붙여 구분한다.
+  var 위키앞머리 = "정리본_";
+  function 정리본인가(id) { return String(id || "").indexOf(위키앞머리) === 0; }
+  function 정리본이름(원본) { return 위키앞머리 + String(원본 || ""); }
+
   async function 목록() {
     var box = document.getElementById("docs");
     try {
       var 번들 = await 번들파일들();
       var all = await g.listMemoryDocuments();
-      var arr = (Array.isArray(all) ? all : all.documents || []).filter(function (d) { return 내가넣은것인가(d, 번들); });
+      var 내것 = (Array.isArray(all) ? all : all.documents || []).filter(function (d) { return 내가넣은것인가(d, 번들); });
+      // 정리본은 이 목록에서 뺀다 — 원본과 나란히 세면 「내가 넣은 것」이 두 배로 보인다.
+      var arr = 내것.filter(function (d) { return !정리본인가(d.documentId); });
+      위키그리기(내것, arr);
       document.getElementById("cnt").textContent = arr.length ? arr.length + "건" : "";
       if (!arr.length) {
         box.innerHTML = '<div class="empty"><b>아직 넣은 자료가 없습니다.</b><br>' +
@@ -182,6 +195,80 @@
       box.querySelectorAll(".n").forEach(function (el) { el.addEventListener("click", function () { 읽기(el.dataset.id); }); });
       box.querySelectorAll("[data-del]").forEach(function (el) { el.addEventListener("click", function () { 빼기(el.dataset.del); }); });
     } catch (e) { box.innerHTML = '<div class="err">' + 오류문구(e, "자료 목록") + "</div>"; }
+  }
+
+  function 위키그리기(내것, 원본들) {
+    var box = document.getElementById("wiki");
+    var 있는것 = {};
+    내것.forEach(function (d) { if (정리본인가(d.documentId)) 있는것[String(d.documentId).slice(위키앞머리.length)] = d; });
+    var 만든수 = 원본들.filter(function (d) { return 있는것[d.documentId]; }).length;
+    document.getElementById("wikiCnt").textContent = 원본들.length ? 만든수 + " / " + 원본들.length + "건" : "";
+    if (!원본들.length) {
+      box.innerHTML = '<div class="empty">먼저 자료를 넣어 주세요 — 넣은 자료마다 정리본을 만들 수 있습니다.</div>';
+      return;
+    }
+    box.innerHTML = 원본들.map(function (d) {
+      var w = 있는것[d.documentId];
+      return '<div class="doc"><span class="n" ' + (w ? 'data-id="' + esc(w.documentId) + '"' : "") + ">" +
+        esc(d.documentId) + "</span>" +
+        '<span class="m">' + (w ? esc(w.chunks || 0) + "조각 · 정리됨" : "아직 없음") + "</span>" +
+        (w ? '<button data-redo="' + esc(d.documentId) + '">다시 만들기</button>'
+           : '<button class="go" data-make="' + esc(d.documentId) + '">정리본 만들기</button>') + "</div>";
+    }).join("");
+    box.querySelectorAll("[data-id]").forEach(function (el) { el.addEventListener("click", function () { 읽기(el.dataset.id); }); });
+    box.querySelectorAll("[data-make],[data-redo]").forEach(function (el) {
+      el.addEventListener("click", function () { 정리본만들기(el.dataset.make || el.dataset.redo, el); });
+    });
+  }
+
+  // ⚠ 원문에 없는 것을 쓰면 정리본이 **거짓말의 출처**가 된다 — 그게 이 제품에서 가장 나쁜 실패다.
+  //   그래서 프롬프트가 그것부터 못 박는다. 그리고 자른 경우 **자랐다고 정리본 안에 적는다.**
+  var 최대글자 = 6000;
+  function 정리시킬말(이름, 본문, 잘랐나) {
+    return [
+      "다음은 담당자가 보관 중인 문서다. 나중에 빨리 찾아보려고 정리본을 만든다.",
+      "규칙:",
+      "1. 원문에 없는 내용은 **절대** 쓰지 마라. 모르면 안 쓴다.",
+      // ⚠ 제목을 지정하지 않으면 모델이 **지시문 문구를 그대로 받아쓴다**
+      //   (2026-08-13 실측: 정리본 첫 줄이 「다섯 줄 이내 요약:」으로 나왔다).
+      "2. 「## 요약」이라는 제목을 쓰고 그 아래 다섯 줄 이내로 쓴다.",
+      "3. 「## 다시 찾을 값」이라는 제목을 쓰고 그 아래 날짜·이름·수치·기한을 빠짐없이 목록으로 적는다.",
+      "4. 한국어로, 마크다운으로 쓴다. 인사말·사족·지시문 되풀이는 쓰지 마라.",
+      잘랐나 ? "5. 원문이 길어 앞부분만 받았다. 정리본 맨 끝에 「⚠ 원문 앞부분만 보고 정리했습니다」라고 적어라." : "",
+      "",
+      "문서 제목: " + 이름,
+      "---",
+      본문,
+    ].filter(Boolean).join("\n");
+  }
+
+  function 답에서글자빼기(r) {
+    if (typeof r === "string") return r;
+    if (!r || typeof r !== "object") return "";
+    return String(r.reply || r.output || r.text || r.message || r.content || "");
+  }
+
+  async function 정리본만들기(원본id, btn) {
+    var msg = document.getElementById("wikiMsg");
+    btn.disabled = true;
+    msg.innerHTML = '<div class="empty">정리본을 만드는 중입니다 — 이 PC의 모델이 씁니다. 30초~1분쯤 걸립니다.</div>';
+    try {
+      var cs = await g.memoryDocumentChunks(원본id);
+      var 조각들 = (Array.isArray(cs) ? cs : (cs && cs.chunks) || []).map(function (c) {
+        return typeof c === "string" ? c : String((c && c.text) || "");
+      }).filter(Boolean);
+      var 본문 = 조각들.join("\n");
+      if (!본문.trim()) { msg.innerHTML = '<div class="err">원문을 읽지 못했습니다 — 조각이 비어 있습니다.</div>'; return; }
+      var 잘랐나 = 본문.length > 최대글자;
+      var 답 = await g.chat("analysis", 정리시킬말(원본id, 본문.slice(0, 최대글자), 잘랐나));
+      var 글 = 답에서글자빼기(답).trim();
+      if (!글) { msg.innerHTML = '<div class="err">모델이 빈 답을 줬습니다 — ⚙ 설정에서 모델이 올라와 있는지 봐 주세요.</div>'; return; }
+      await g.ingestMemoryFile(정리본이름(원본id), 글을base64로(글), "global");
+      msg.innerHTML = '<div class="ok">정리본을 만들었습니다 — 이제 물어보면 이 정리본도 함께 봅니다.</div>';
+      목록();
+    } catch (e) {
+      msg.innerHTML = '<div class="err">' + esc(오류문구(e, "정리본 만들기")) + "</div>";
+    } finally { btn.disabled = false; }
   }
 
   async function 빼기(id) {
@@ -247,12 +334,13 @@
   // ⚠ `/api/memory/ingest-file`의 content는 **base64**다(server `memory.ts:1142·1159`).
   //   평문을 보내면 서버가 base64로 되돌려 읽어 **깨진 글이 지식으로 들어가는데 응답은 성공**이다.
   //   2026-08-13 실측: 평문 조각이 `"M0n6S /"`였다 — 그 글이 챗봇 답변의 근거가 된다.
-  async function 파일을base64로(f) {
-    var buf = new Uint8Array(await f.arrayBuffer());
+  function 바이트를base64로(buf) {
     var bin = "";
     for (var i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
     return btoa(bin);
   }
+  async function 파일을base64로(f) { return 바이트를base64로(new Uint8Array(await f.arrayBuffer())); }
+  function 글을base64로(글) { return 바이트를base64로(new TextEncoder().encode(String(글 == null ? "" : 글))); }
 
   async function 넣기() {
     var f = document.getElementById("file").files[0];
