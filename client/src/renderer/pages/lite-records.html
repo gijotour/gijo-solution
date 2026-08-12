@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS Lite — 작업 내역</title>
+<link rel="stylesheet" href="gijo-ui.css">
+<!--
+  lite-records.html — 라이트 「작업 내역」(메뉴 2).
+
+  ■ 본은 records.html이지만 그 파일은 76줄짜리 **허브 껍데기**다 — 내용은 공용 모듈
+    (grouphub·grouppanels·workflowrail·chatwidget·titlebar)에 있고, 그 모듈들은
+    감사 기록·시스템 로그 패널까지 함께 얹는다. 라이트에 필요 없는 것들이다.
+    그래서 여기서는 **API를 직접 부른다**: GET /api/tasks · GET /api/work-sessions.
+    ⚠ 논리를 복사한 것이 아니다 — 계산은 서버가 하고 이 화면은 그리기만 한다.
+
+  ■ 라이트에서 뺀 것: 담당자 배정 · 결재 · 감사 기록 패널 · 시스템 로그 패널.
+    앞의 둘은 여럿이 써야 뜻이 있고(1인용엔 없는 절차), 뒤의 둘은 운영자용이다.
+
+  ■ ⚠ **0건일 때 「없다」고 하지 않는다.** 라이트 첫 실행이 정확히 0건 상태다 —
+    고객이 처음 보는 화면이 여기다. 「아직 안 넣었다」로 말한다(win 2026-08-12 수리와 같은 규칙).
+-->
+<style>
+  :root{--bg:#262624;--panel:#30302e;--border:rgba(255,255,255,.09);--text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--blue:#3b82f6;--teal:#1eb980;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px}
+  .wrap{padding:18px 22px;display:flex;flex-direction:column;gap:16px;height:100vh;overflow:auto}
+  .scr-id{font-size:12.5px;color:var(--muted)}
+  .scr-id b{color:var(--text);font-weight:800}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+  .card > h2{font-size:13px;font-weight:800;margin-bottom:10px;display:flex;align-items:center;gap:8px}
+  .count{font-size:11.5px;color:var(--muted);font-weight:600}
+
+  .add{display:flex;gap:8px;margin-bottom:10px}
+  .add input{flex:1;background:#262624;border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font:inherit}
+  .add button{background:var(--blue);border:0;border-radius:8px;padding:8px 14px;color:#fff;font:inherit;font-weight:700;cursor:pointer}
+  .add button:disabled{opacity:.5;cursor:default}
+
+  ul{list-style:none}
+  li{display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid var(--border)}
+  li:last-child{border-bottom:0}
+  li .t{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  li.done .t{opacity:.5;text-decoration:line-through}
+  li .p{font-size:11px;color:var(--muted-2);flex:0 0 24px}
+  li button{background:transparent;border:1px solid var(--border);border-radius:6px;padding:3px 9px;color:var(--muted);font:inherit;font-size:11.5px;cursor:pointer}
+  li button:hover{color:var(--text);border-color:var(--blue)}
+
+  .sess{display:flex;flex-direction:column;gap:2px;padding:9px 2px;border-bottom:1px solid var(--border)}
+  .sess:last-child{border-bottom:0}
+  .sess .h{display:flex;gap:8px;align-items:baseline}
+  .sess .h b{font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .sess .m{font-size:11.5px;color:var(--muted-2);flex:0 0 auto}
+  .sess .pv{font-size:11.5px;color:var(--muted-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .st{font-size:11px;padding:1px 7px;border-radius:999px;flex:0 0 auto}
+  .st.active{background:rgba(59,130,246,.18);color:var(--blue)}
+  .st.done{background:rgba(30,185,128,.16);color:var(--teal)}
+
+  /* ⚠ 0건 자리 — 「없다」가 아니라 「아직 안 넣었다」 */
+  .empty{font-size:12.5px;color:var(--muted);line-height:1.75;padding:6px 2px}
+  .empty b{color:var(--text)}
+  .err{font-size:12.5px;color:#e2483d;padding:6px 2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="scr-id"><b>작업 내역</b> — 내 할 일과 지금까지의 대화를 봅니다.</div>
+
+  <section class="card">
+    <h2>내 할 일 <span class="count" id="taskCount"></span></h2>
+    <div class="add">
+      <input id="taskInput" type="text" placeholder="할 일을 적고 Enter" aria-label="할 일 입력">
+      <button id="taskAdd" type="button">담기</button>
+    </div>
+    <div id="taskBox"><div class="empty">불러오는 중…</div></div>
+  </section>
+
+  <section class="card">
+    <h2>작업 내역 <span class="count" id="sessCount"></span></h2>
+    <div id="sessBox"><div class="empty">불러오는 중…</div></div>
+  </section>
+</div>
+
+<script src="lite-records.js"></script>
+</body>
+</html>
