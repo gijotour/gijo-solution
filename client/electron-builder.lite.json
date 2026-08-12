@@ -4,6 +4,9 @@
   "directories": {
     "output": "release-lite"
   },
+  "extraMetadata": {
+    "gijoEdition": "lite"
+  },
   "files": [
     "dist/**/*",
     "src/renderer/**/*"

@@ -357,10 +357,44 @@ function createMainWindow(): void {
   });
 }
 
+// ── 에디션 판별 — 이 배포본이 라이트인가 (2026-08-13) ─────────────────────────
+//
+// ■ 왜 필요한가
+//   로그인 성공 뒤 `login.html:302`가 **app.html로 못박아** 부른다. 라이트는 화면이 9개인데
+//   app.html은 40개짜리 탭 셸이라, 그대로 두면 **도구는 13개인데 화면은 40개**가 보인다 —
+//   「없는 기능이 보이는」 가장 나쁜 조합이다(max 지적, a83cf52).
+//
+// ■ ⚠ 왜 `GIJO_EDITION` 환경변수만 보지 않는가 — **패키징본에서는 아무도 그걸 안 넣는다.**
+//   그 이름은 저장소에 **문서에만** 있었고(서버 쪽 설계 문서·인계 메모), 클라 빌드·실행
+//   어디에도 설정하는 곳이 없다. electron-builder는 앱 실행 환경변수를 심는 물건이 아니다.
+//   env만 보고 분기했으면 **패키징본에서 항상 거짓** — 고쳤다고 믿는데 안 고쳐진 자리가 된다.
+//   그래서 **빌드 산출물 안에 글로 남긴다**: `electron-builder.lite.json`의 `extraMetadata`가
+//   라이트 빌드의 package.json에만 `gijoEdition: "lite"`를 박는다. 지우려면 빌드 설정을
+//   고쳐야 하므로 실수로 사라지지 않는다.
+//   env는 **개발 중 흉내내기**용으로만 남긴다(`GIJO_EDITION=lite npm start`).
+let 에디션캐시: string | null = null;
+function 에디션(): string {
+  if (에디션캐시) return 에디션캐시;
+  let 값 = process.env.GIJO_EDITION ?? "";
+  if (!값) {
+    // __dirname은 dev에서 client/dist, 패키징본에서 app.asar/dist — 둘 다 ../package.json이다.
+    try {
+      값 = JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"), "utf8")).gijoEdition ?? "";
+    } catch { 값 = ""; }
+  }
+  에디션캐시 = 값 === "lite" ? "lite" : "standard";
+  return 에디션캐시;
+}
+/** 본 제품 셸(app.html)을 부르면 라이트에서는 라이트 셸로 돌린다. 그 외 화면은 그대로 둔다. */
+function 셸화면보정(file: string): string {
+  return 에디션() === "lite" && file === "app.html" ? "lite-app.html" : file;
+}
+
 ipcMain.handle("navigate:to", async (_e, page: string) => {
   if (!mainWindow) return;
   // 파일 경로와 쿼리를 분리해 loadFile에 넘긴다(settings.html?s=ai 같은 구역 딥링크 지원).
-  const [file, qs] = String(page).split("?");
+  const [요청파일, qs] = String(page).split("?");
+  const file = 셸화면보정(요청파일);
   const query: Record<string, string> = {};
   if (qs) for (const [k, v] of new URLSearchParams(qs)) query[k] = v;
   let target = path.join(__dirname, `../src/renderer/pages/${file}`);
@@ -368,8 +402,10 @@ ipcMain.handle("navigate:to", async (_e, page: string) => {
   // 부르면 loadFile이 실패해 흰 오류 화면이 뜬다. 예전엔 nav.js의 리다이렉트가 안전망인 척
   // 했지만 파일이 없으면 nav.js 자체가 실리지 못한다 — 안전망은 로드 전에, 여기서만 가능하다.
   if (!fs.existsSync(target)) {
-    console.warn(`[navigate] 없는 화면 ${file} → app.html로 대체`);
-    target = path.join(__dirname, "../src/renderer/pages/app.html");
+    // ⚠ 안전망도 에디션을 따른다 — 라이트에서 없는 화면을 부르면 본 제품 셸로 떨어지던 자리다.
+    const 셸 = 셸화면보정("app.html");
+    console.warn(`[navigate] 없는 화면 ${file} → ${셸}로 대체`);
+    target = path.join(__dirname, `../src/renderer/pages/${셸}`);
     await mainWindow.loadFile(target);
     return;
   }
