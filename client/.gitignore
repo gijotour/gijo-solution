@@ -7,10 +7,18 @@ release/
 release-lite/
 release-*/
 *.log
-# build-server-dist가 설치본용으로 복사하는 산출물(매번 재생성) — server-dist/package.json만 추적.
+# build-server-dist가 설치본용으로 복사하는 산출물 — **전부 매번 재생성된다. 하나도 추적하지 않는다.**
 server-dist/docs/
 server-dist/docs-manifest.json
 # ⚠ 2026-08-12 — scripts/도 build-server-dist가 매번 만든다(encrypt-db·recover-db-key).
-#   위 규칙의 뜻(「매번 재생성 — package.json만 추적」)에 따라 막는다.
-#   안 막으면 빌드할 때마다 ?? 로 남아 **커밋 파일 수 세기를 흐린다** — 오늘 그것에 한 번 걸렸다.
+#   안 막으면 빌드할 때마다 ?? 로 남아 **커밋 파일 수 세기를 흐린다** — 그날 그것에 한 번 걸렸다.
 server-dist/scripts/
+# ⚠ 2026-08-13 — package.json·package-lock.json도 **추적을 끊었다.**
+#   여기까지 「package.json만 추적」이라는 예외를 두고 있었는데, 그 둘은
+#   `build-server-dist.mjs:39-40`이 **server/의 같은 파일을 그대로 복사**한 것이다 —
+#   저장소에 이미 있는 파일의 사본이라 담는 정보가 0이다. 그런데 실제로 **어긋나 있었다**:
+#   커밋된 값 0.1.0 vs server/package.json 2.1.0(@modelcontextprotocol/sdk 유무까지 달랐다).
+#   「같은 것을 여러 곳에 적으면 어긋난다」의 교과서 사례다. 사본을 지우면 원본만 남는다.
+#   ★ 이로써 CLAUDE.md의 「빌드 후 git checkout으로 되돌려 clean 유지」 규칙은 **필요 없어진다.**
+server-dist/package.json
+server-dist/package-lock.json

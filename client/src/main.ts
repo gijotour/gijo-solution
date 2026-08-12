@@ -385,9 +385,38 @@ function 에디션(): string {
   에디션캐시 = 값 === "lite" ? "lite" : "standard";
   return 에디션캐시;
 }
-/** 본 제품 셸(app.html)을 부르면 라이트에서는 라이트 셸로 돌린다. 그 외 화면은 그대로 둔다. */
+/**
+ * 라이트에서 열어도 되는 화면인가.
+ *
+ * ■ 왜 접두사로 가르나 — `lite-screens.json`이 화면 9개의 **단일 출처**이고, 그 규칙이
+ *   「화면 파일은 전부 `lite-` 접두사로 새로 만든다」이다. 여기서 그 목록을 다시 읽으면
+ *   **같은 것을 두 곳에 적는 것**이 된다(이 저장소가 반복해 겪은 유형). 그래서 여기는
+ *   **거친 문지기**만 한다 — `lite-*`인가. 정확한 9개 대조는 셸 안에서 `lite-nav.js`가
+ *   이미 하고 있다(없는 화면이면 안 열고 경고). 두 겹이지만 **출처는 하나**다.
+ * ■ setup·login은 에디션과 무관한 **입구**다. 막으면 첫 실행과 로그아웃이 죽는다.
+ */
+function 라이트에서열수있나(file: string): boolean {
+  return file.startsWith("lite-") || file === "login.html" || file === "setup.html";
+}
+/**
+ * 라이트에서 본 제품 화면으로 가는 것을 막는다.
+ *
+ * ■ 왜 필요한가 — 라이트는 도구가 13개인데 본 제품 화면은 40개다. 한 곳이라도 새면
+ *   **없는 기능이 보이는** 가장 나쁜 조합이 된다(그 화면들은 회사 데이터를 전제해 「없습니다」만 낸다).
+ * ■ 사람에게 따로 안내하지 않고 라이트 셸로 되돌린다 — 여기 걸린다는 건 **코드가 잘못 부른 것**이라
+ *   들을 사람은 담당자가 아니라 개발자다. 그래서 경고는 로그로 남긴다.
+ *   (담당자가 누를 수 있는 자리는 셸 안이고, 거기선 lite-nav.js가 이미 「라이트에 없는 화면」이라 알린다.)
+ * ⚠ 남은 구멍: 별도 창(office·docbox·console)은 `navigate:to`를 안 거친다. 라이트 셸에 그 버튼이
+ *   없어 지금은 안 닿지만, 라이트에서 그 창을 열 길이 생기면 여기와 같은 문지기가 필요하다.
+ */
 function 셸화면보정(file: string): string {
-  return 에디션() === "lite" && file === "app.html" ? "lite-app.html" : file;
+  if (에디션() !== "lite") return file;
+  if (file === "app.html") return "lite-app.html";
+  if (!라이트에서열수있나(file)) {
+    console.warn(`[navigate] 라이트에 없는 화면 ${file} → lite-app.html로 되돌림`);
+    return "lite-app.html";
+  }
+  return file;
 }
 
 ipcMain.handle("navigate:to", async (_e, page: string) => {

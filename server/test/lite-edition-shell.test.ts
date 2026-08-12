@@ -34,7 +34,24 @@ describe("라이트 에디션 — 로그인 뒤 라이트 셸로 들어간다", 
     expect(fs.existsSync(라이트셸)).toBe(true);
   });
 
-  it("④ 로그인이 여전히 app.html을 부른다 — 이게 바뀌면 위 보정이 헛돈다", () => {
+  it("④ 표준 화면으로 가는 길을 막는다 — 도구 13개인데 화면 40개가 보이면 안 된다", () => {
+    // 접두사 문지기 + 입구 예외(setup·login). 정확한 9개 대조는 셸의 lite-nav.js 몫이다.
+    expect(mainSrc).toContain("라이트에서열수있나");
+    expect(mainSrc).toMatch(/startsWith\("lite-"\)/);
+    // ⚠ 입구를 막으면 첫 실행과 로그아웃이 죽는다 — 예외가 사라지면 알려 준다.
+    expect(mainSrc).toContain('file === "login.html"');
+    expect(mainSrc).toContain('file === "setup.html"');
+  });
+
+  it("⑤ 라이트 화면 파일이 전부 lite- 접두사다 — 문지기의 전제", () => {
+    const 목록 = JSON.parse(
+      fs.readFileSync(new URL("../../client/src/renderer/pages/lite-screens.json", import.meta.url), "utf8")
+    );
+    const ids: string[] = [...목록.screens.map((s: { id: string }) => s.id), 목록.settings.id];
+    for (const id of ids) expect(id, `화면 id ${id}`).toMatch(/^lite-/);
+  });
+
+  it("⑥ 로그인이 여전히 app.html을 부른다 — 이게 바뀌면 위 보정이 헛돈다", () => {
     // 보정은 「app.html을 부르면 돌린다」는 전제 위에 있다. 로그인이 다른 화면으로 가도록
     // 바뀌면 라이트는 조용히 그 화면으로 들어간다 — 그때 이 시험이 알려 준다.
     expect(loginSrc).toContain('navigateTo("app.html")');

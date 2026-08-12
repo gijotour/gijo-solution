@@ -125,7 +125,7 @@
 - Phase 1(크로스플랫폼 분기: localengine·preflight·build-server-dist·package.json mac 타깃)은 완료 상태(2026-07-24).
 
 ## 주의·함정 (실사고 기반)
-- `client/server-dist/package.json`은 추적 산출물 — 빌드 후 `git checkout`으로 되돌려 clean 유지.
+- ~~`client/server-dist/package.json`은 추적 산출물 — 빌드 후 `git checkout`으로 되돌려 clean 유지.~~ **2026-08-13 폐지** — 추적을 끊었다(`client/.gitignore`). `build-server-dist.mjs:39-40`이 `server/`의 같은 파일을 그대로 복사하는 **사본**이라 담는 정보가 0인데 실제로 어긋나 있었다(커밋 0.1.0 vs server 2.1.0). 이제 빌드해도 트리가 안 더러워지므로 **되돌릴 일이 없다.**
 - 한글 HTTP 검증에 curl 쓰지 말 것(깨짐) — Node fetch로. 한글 파일 조작은 perl 대신 Node. `PYTHONUTF8=1`.
 - 7B 모델에 프롬프트 규칙을 더해 행동 교정하려 하지 말 것 — 코드로 해결(반복 실패 사례 있음).
 - **강제 규칙(FORCED_INTENTS)을 배열 중간에 넣으면 routes.ts 표가 통째로 어긋난다**(자리 번호로 가리키기 때문). 넣은 뒤 `node tools/routes-renumber.mjs --write` — 손으로 세지 말 것(2026-08-10 실사고: 18줄이 밀렸고, route-explain이 엉뚱한 정규식을 읽어 **거짓 겹침 경보**까지 냈다).
