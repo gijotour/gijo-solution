@@ -31,6 +31,12 @@
 ⚠ 왜 나눴나: "윈도우 클라이언트에서 계정을 만드세요"가 *어느 기계냐*로 안 읽혀 실제로 헷갈렸다(2026-08-12 QA 계정 건).
 ⚠ 사람에게 안내할 때 **기계 이름을 먼저** 적는다 — "`win`에서 …", "`max`에서 …". 자세한 건 `GIJO_AS_2머신_개발환경_가이드.md` §0.
 
+### 제품 분담 — **라이트는 `max`, 메인 제품은 `win`** (2026-08-13 사용자 결정)
+- **`max` = 라이트 에디션 전담**: 라이트 화면 9개 · `lite-*` 파일 · `lite-screens.json`/`lite-tools.json` · 라이트 게이트(`tools/lite-gate.mjs`·`lite-routing.json`) · 라이트 빌드(dmg·`electron-builder.lite.json`).
+- **`win` = 메인 제품 전담**: 계획서 전·중·후 항목 · 공용 엔진 · 운영 배포 · 게시 · QA.
+- ⚠ **경계는 공용 파일에서 겹친다** — 라이트 결함의 뿌리가 공용 파일(`main.ts`·`agentloop.ts`·`dispatcher.ts`·`lawinfo.ts`·`registry.ts`)인 경우가 실제로 반복됐다(2026-08-13: 라이트 진입점·법령 77%·중복문서 어순 셋 다). **뿌리가 공용이면 `win`이 고친다** — 라이트에서 발견해도 그렇다. `max`는 발견·재현·패치안까지 내고 인계한다(그 방식이 실제로 잘 돌았다).
+- ⚠ 라이트에서 나온 결함을 **「라이트 문제」로 닫지 말 것.** 위 셋 다 메인 제품에도 있던 결함이었다.
+
 ## 구조 요약
 - `client/` — Electron. 화면=src/renderer/pages/*.html (**app.html이 탭 셸** — 각 화면을 `?embed=1` iframe으로 품는다(#tabBar·#screens). ⚠ hub.html은 삭제된 화면이다, nav.js 공용 사이드바). 빌드 `npm run dist`, 게시 `npm run publish-release`(서버 자체가 배포처).
 - `server/` — Express+TS. 엔진=src/engine/*.ts. DB=data/gijo-as.sqlite(better-sqlite3), RAG=data/memory.lancedb(LanceDB)+bge-m3 임베딩, 모델=models/<id>/<id>.gguf. 테스트 `npm test`(vitest, 900+개 — 실 LLM 스폰 안 함).
