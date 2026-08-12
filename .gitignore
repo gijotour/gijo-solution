@@ -6,6 +6,16 @@ dist/
 # runtime data (SBOM exports, generated reports, LanceDB vector store, session state)
 server/data/
 data/
+# ⚠ 위 두 줄은 **정확히 `data`라는 이름**만 막는다 — 옆에 이름을 바꿔 둔 사본은 안 막혔다.
+#   2026-08-12에 그 구멍으로 `server/data.before-migrate-20260809-1505/`와
+#   `server/data.fresh-backup/`이 새어 **397MB가 커밋됐다**: 운영 SQLite 본체와 백업 3개,
+#   LanceDB 지식 저장소까지. 그 DB에는 계정·비밀번호 해시·TOTP 비밀·감사로그가 들어 있다.
+#   이력에 한 번 들어가면 clone·push마다 따라다니고, GitHub에 올라가면 되돌릴 수 없다.
+#   마이그레이션·백업 때 `data.<무엇>`으로 옆에 두는 습관이 있으니 그 꼴을 통째로 막는다.
+server/data.*/
+server/data-*/
+data.*/
+data-*/
 
 # local LLM assets — huge binaries, never belong in git
 server/models/

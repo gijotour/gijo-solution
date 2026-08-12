@@ -19,6 +19,18 @@
 - **업무 마무리 보고에는 📖 용어 풀이를 따로 붙인다**(2026-07-27 사용자 지시). 새 용어가 생기면 `GIJO_AS_용어사전.md`에 그때 바로 추가 — 이 파일은 계속 갱신하는 문서다(요청 없이도 갱신 대상인 유일한 예외).
 - **화면 설명·기능 안내는 전부 챗봇(서버 screenguide panels + ⓘ gijo-info)으로.** 화면엔 정체성 한 줄과 ⚠경고만 둔다 — 사용법·주의사항·용어 풀이는 screenguide에 쓰고 ⓘ로 연다. **신규 작업은 무조건 이 방식, 기존 화면도 발견하는 대로 이관**(2026-07-25 사용자 지시 강화).
 
+## 기계 이름 — `win` · `max` · `gb10` (2026-08-12 사용자 결정)
+기계는 **이 세 이름으로만** 부른다. "윈도우"·"맥"은 **고객 OS**를 가리킬 때만 쓴다(라이트 에디션 「윈도우/맥 설치 가이드」가 그 예).
+
+| 이름 | 기계 | VPN | 맡은 일 |
+|---|---|---|---|
+| `win` | Windows PC (desktop-4qplvnc) | `10.8.0.1` | 주 개발 · **운영 서버(WSL 4000)** · **git 허브**(`D:\gijo-hub.git`) · WireGuard 서버 · 클라 게시 |
+| `max` | M1 Max 32GB (GIJOHNMAC, arm64) | `10.8.0.11` | `max` 개발 · 올인원(서버+Metal LLM) 빌드·검증 |
+| `gb10` | NVIDIA GB10 / DGX Spark (`gijohn_llm`) | `10.8.0.12` | ARM CUDA 실측 — **준비 중**(2026-08-12: 4000·22 닫힘) |
+
+⚠ 왜 나눴나: "윈도우 클라이언트에서 계정을 만드세요"가 *어느 기계냐*로 안 읽혀 실제로 헷갈렸다(2026-08-12 QA 계정 건).
+⚠ 사람에게 안내할 때 **기계 이름을 먼저** 적는다 — "`win`에서 …", "`max`에서 …". 자세한 건 `GIJO_AS_2머신_개발환경_가이드.md` §0.
+
 ## 구조 요약
 - `client/` — Electron. 화면=src/renderer/pages/*.html (**app.html이 탭 셸** — 각 화면을 `?embed=1` iframe으로 품는다(#tabBar·#screens). ⚠ hub.html은 삭제된 화면이다, nav.js 공용 사이드바). 빌드 `npm run dist`, 게시 `npm run publish-release`(서버 자체가 배포처).
 - `server/` — Express+TS. 엔진=src/engine/*.ts. DB=data/gijo-as.sqlite(better-sqlite3), RAG=data/memory.lancedb(LanceDB)+bge-m3 임베딩, 모델=models/<id>/<id>.gguf. 테스트 `npm test`(vitest, 900+개 — 실 LLM 스폰 안 함).
@@ -27,12 +39,12 @@
 
 ## 공용 슬래시 명령 (.claude/commands/ — 세 머신 공통, 워크플로 표준)
 - `/GIJOAS동기화` — 작업 시작 전 hub 최신 받기(ff-only, 충돌 안내 포함)
-- `/GIJOAS인계` — 작업 마무리: 커밋→(서버 변경 시)테스트→hub push→**(서버/도구 변경 시 Windows는 `git push gb10 main`)**→**상대 머신 인계 블록 출력**
-- `/GIJOAS배포` — 운영(WSL) 배포. Windows=단계별 직접 수행, Mac=ssh 한 줄 안내 또는 인계
-- `/GIJOAS게시` — 클라 빌드·게시. **Windows 전용**(claude-deploy 계정, 실화면 검증 필수)
-- `/GIJOAS서버시작` — Mac=개발 서버 빌드·기동·health / Windows=운영(WSL) 상태확인·재시작(사용자 확인 후)
+- `/GIJOAS인계` — 작업 마무리: 커밋→(서버 변경 시)테스트→hub push→**(서버/도구 변경 시 `win`은 `git push gb10 main`)**→**상대 머신 인계 블록 출력**
+- `/GIJOAS배포` — 운영(WSL) 배포. `win`=단계별 직접 수행, `max`=ssh 한 줄 안내 또는 인계
+- `/GIJOAS게시` — 클라 빌드·게시. **`win` 전용**(claude-deploy 계정, 실화면 검증 필수)
+- `/GIJOAS서버시작` — `max`=개발 서버 빌드·기동·health / `win`=운영(WSL) 상태확인·재시작(사용자 확인 후)
 - `/GIJOAS클라시작` — 클라 빌드 후 Electron 개발 실행(CDP 9223 기본, electron.exe 직접 실행)
-역할 고정: 게시(클라 빌드)는 **Windows 전용**(electron-builder·claude-deploy·실화면 검증이 묶임). GitHub(origin)는 사용자 요청 시만 — **단, `hub`가 없는 머신(외부 협업자)은 origin이 유일한 통로라 이 제한이 적용되지 않는다.**
+역할 고정: 게시(클라 빌드)는 **`win` 전용**(electron-builder·claude-deploy·실화면 검증이 묶임). GitHub(origin)는 사용자 요청 시만 — **단, `hub`가 없는 머신(외부 협업자)은 origin이 유일한 통로라 이 제한이 적용되지 않는다.**
 
 ## 공동작업 (사장님 ↔ 제임스, 2026-08-09 결정) — `GIJO_AS_공동작업_가이드.md`
 - **main 직접 push 금지 · 브랜치 + PR 필수**(양쪽 다). 자기 PR을 자기가 병합하지 않는다.

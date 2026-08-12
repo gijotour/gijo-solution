@@ -3,7 +3,7 @@
 사용자가 "QA 전수조사"(또는 이 명령)를 말하면 아래를 수행한다.
 
 ## 절차
-1. **실행** (Windows PowerShell 기준):
+1. **실행** (`win`의 PowerShell 기준):
    ```powershell
    Set-Location "D:\Connect AI"
    $env:QA_USER="claude-deploy"; $env:QA_PASS=[Environment]::GetEnvironmentVariable("GIJO_ADMIN_PASSWORD","User")
