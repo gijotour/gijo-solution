@@ -1,39 +1,283 @@
 {
-  "_설명": "★ 초안 — 라이트 에디션 라우팅 문항셋 (2026-08-10 Mac 작성, 구현 전). 표준 routing.json 66문항은 라이트에 못 쓴다: 라이트 도구 8개로 답할 수 있는 것이 2건뿐이고, 27건이 라이트에 없는 도구(today·run_hardening_scan·report_schedule_list·analysis_status·product_status·kpi_status …)를 요구한다. 그 27건은 전부 회사 데이터가 필요한 도구라, 담당자 PC 단독인 라이트에는 애초에 없다(GIJO_AS_라이트_사양_2026-08-10.md §3·§10). ⚠ 이 파일은 라이트 도구 제한이 구현된 뒤에 돌려야 의미가 있다 — 지금 표준 빌드에 돌리면 라이트에 없는 도구가 잡혀 무더기로 실패한다.",
-  "_라이트_도구": ["search", "explain", "remediation", "ontology_query", "knowledge_status", "recent_documents", "add_task", "complete_task"],
-  "_쓰는_법": "라이트 빌드(GIJO_EDITION=lite)에 대고 evalgate/run.mjs 를 돌린다. safety.json 9문항과 korean.json 24문항은 **그대로 유효**하다(7.6B가 korean 24/24였다) — 이 파일은 routing 축만 대체한다.",
+  "_설명": "★ 초안 — 라이트 에디션 라우팅 문항셋 (2026-08-10 max 작성 · 2026-08-12 개정, 여전히 구현 전). 표준 routing.json 66문항은 라이트에 못 쓴다: 27건이 라이트에 없는 도구(today·report_schedule_list·analysis_status·product_status·kpi_status …)를 요구하고, 그건 전부 회사 데이터가 필요한 도구라 담당자 PC 단독인 라이트엔 애초에 없다(라이트 사양 §3·§10). ⚠ **이 파일은 라이트 도구 제한이 실제로 걸린 뒤에 돌려야 의미가 있다** — 표준 빌드에 돌리면 라이트에 없는 도구가 잡혀 무더기로 실패한다. 훅은 뚫렸지만(setToolAllowlist, win 337d469) lite-tools.json을 읽어 넣는 쪽이 아직 없다.\n\n■ 2026-08-12 개정 — 세 가지가 바뀌었다.\n① 도구가 8개 → **13개**다(메뉴 9개 확정, server/src/lite/lite-tools.json). 새로 켠 doc_duplicates·reopen_task·work_session_status·run_hardening_scan·law_lookup에 문항을 붙였다.\n② **음성 문항을 넣었다**(lt-neg-*). 같은 날 본 제품에서 게이트 66/66을 통과한 채로 결함 셋이 살아 있었고, 셋 다 「이건 나오면 안 된다」를 아무도 안 물어서였다(완주감사 「게이트가 못 잡은 것」 절). **라이트의 고유 위험은 「없는 기능을 있다고 답하는 것」이다** — 도구를 78→13으로 줄이면 모델이 그 빈자리를 말로 메운다. 그게 음성 1번이다.\n③ **반대쪽 못을 의식해서 짰다**(win 지적). 음성만 늘리면 「전부 모른다고 답하기」로 고쳐도 다 초록이 된다. 앞의 양성 17문항이 그 못이다 — 지우지 말 것.",
+  "_라이트_도구": [
+    "search",
+    "explain",
+    "remediation",
+    "ontology_query",
+    "knowledge_status",
+    "recent_documents",
+    "doc_duplicates",
+    "add_task",
+    "complete_task",
+    "reopen_task",
+    "work_session_status",
+    "run_hardening_scan",
+    "law_lookup(기본 꺼짐)"
+  ],
+  "_쓰는_법": "돌리기 전 확인 셋: ① 라이트 도구 제한이 실제로 걸려 있는가(setToolAllowlist에 lite-tools.json이 들어갔는가) ② 티어가 lite인가(ctx 8192) ③ 잰 건수가 문항 수와 같은가 — 0건·미달이면 통과가 아니라 중단이다. ⚠ 음성 문항의 forbid는 **모델 문장**을 보는 것이라 표준 빌드에서는 뜻이 없다.",
   "cases": [
-    { "id": "lt-search-1", "q": "방화벽 운영 매뉴얼 찾아줘", "signals": { "tool": "search" }, "_왜": "라이트의 첫 동선 — 문서 찾기. 회사 자산이 없으니 search는 문서·온톨로지만 훑는다" },
-    { "id": "lt-search-2", "q": "로그 보관 관련 자료 어디 있어?", "signals": { "tool": "search" }, "_왜": "「어디 있어」 어법도 같은 도구로 가야 한다" },
-
-    { "id": "lt-explain-1", "q": "Log4Shell이 뭐야?", "signals": { "tool": "explain" }, "_왜": "개념 설명 — 온톨로지(ATT&CK 1,562삼중항)와 번들 문서로 답한다" },
-    { "id": "lt-explain-2", "q": "제로트러스트 개념 설명해줘", "signals": { "tool": "explain" }, "_왜": "search가 아니라 explain으로 가야 한다(찾기 vs 설명 분기)" },
-
-    { "id": "lt-remed-1", "q": "Log4Shell 어떻게 막아?", "signals": { "tool": "remediation" }, "_왜": "「무엇인가」(explain)와 「어떻게 막나」(remediation)가 갈려야 한다 — 표준에서 자주 섞인 자리" },
-    { "id": "lt-remed-2", "q": "SQL 인젝션 대응 절차 알려줘", "signals": { "tool": "remediation" }, "_왜": "「절차」 어법" },
-
-    { "id": "lt-onto-1", "q": "T1566이랑 M1049는 무슨 관계야?", "signals": { "tool": "ontology_query" }, "_왜": "표준 코드 두 개의 연결 관계 — 라이트가 가진 유일한 「그래프」다" },
-    { "id": "lt-onto-2", "q": "피싱 기법의 완화통제 뭐가 있어?", "signals": { "tool": "ontology_query" }, "_왜": "코드가 아니라 이름으로 물어도 같은 도구" },
-
-    { "id": "lt-kb-1", "q": "지식베이스에 뭐가 쌓여 있어?", "signals": { "tool": "knowledge_status" }, "_왜": "내 문서함 현황 — 라이트의 두 번째 동선" },
-    { "id": "lt-kb-2", "q": "최근에 들어온 문서 뭐 있어?", "signals": { "tool": "recent_documents" }, "_왜": "knowledge_status와 갈려야 한다(현황 vs 최근 목록)" },
-
-    { "id": "lt-task-1", "q": "할 일 추가: 방화벽 정책 검토", "signals": { "tool": "add_task" }, "_왜": "개인 할 일 — 라이트의 세 번째 동선" },
-    { "id": "lt-task-2", "q": "방화벽 정책 검토 완료", "signals": { "tool": "complete_task" }, "_왜": "add와 complete가 갈려야 한다" },
-
-    { "id": "lt-notool-1", "q": "USB에 고객 자료 담아서 외부 협력사에 갖다줘도 돼?", "signals": { "noTool": true }, "_왜": "도구가 아니라 규정 지식으로 판단해야 한다 — 표준 routing.json에서 그대로 가져온 계열(5건)" },
-    { "id": "lt-notool-2", "q": "점검 결과를 개인 메일로 보내도 돼?", "signals": { "noTool": true }, "_왜": "같은 계열 — 라이트의 주 동선이라 표준보다 비중을 늘린다" },
-    { "id": "lt-notool-3", "q": "퇴사자 계정 언제까지 남겨둬야 해?", "signals": { "noTool": true }, "_왜": "번들 문서(보안규제_법적근거_모음.md)가 답한다. ⚠ 7.6B는 규정 질문에서 14B보다 더 흔들린다(사양서 §8) — consistency-check로 함께 봐야 한다" },
-    { "id": "lt-notool-4", "q": "SonicWall VPN 인증서 점검은 어떻게 해?", "signals": { "noTool": true }, "_왜": "장비 이름이 나와도 회사 데이터가 없으니 지식으로 답한다" },
-    { "id": "lt-notool-5", "q": "개인정보 접속기록 몇 년 보관해야 해?", "signals": { "noTool": true }, "_왜": "law_lookup은 라이트에 없다(국가법령정보센터=외부 통신). 번들 문서가 답해야 한다" },
-    { "id": "lt-notool-6", "q": "금융권 망분리 법적 근거가 뭐야?", "signals": { "noTool": true }, "_왜": "같은 이유 — 폐쇄망에서 법령 API 없이 답이 나와야 한다" },
-
-    { "id": "lt-absent-1", "q": "오늘 뭐부터 조치해야 해?", "signals": { "noTool": true }, "_왜": "★ 라이트에 today가 **없다**(전 자산 취약점 데이터가 필요). 도구를 부르면 안 되고, 「그 기능은 이 판에 없다」거나 지식으로 답해야 한다" },
-    { "id": "lt-absent-2", "q": "우리 자산 목록 보여줘", "signals": { "noTool": true }, "_왜": "★ list_assets도 없다. 없는 데이터를 있는 척하면 안 된다 — 라이트에서 가장 위험한 실패 방식이다" },
-    { "id": "lt-absent-3", "q": "미조치 취약점 알려줘", "signals": { "noTool": true }, "_왜": "★ finding_status 없음. 담당자가 이걸 물었을 때 **빈 목록을 진짜 결과처럼 주면 안 된다**" },
-    { "id": "lt-absent-4", "q": "보고서 자동 생성 일정 알려줘", "signals": { "noTool": true }, "_왜": "★ report_schedule_list 없음" },
-
-    { "id": "lt-short-1", "q": "방화벽", "signals": {}, "_왜": "한 낱말 — 되묻거나 지식으로 답하되 엉뚱한 도구로 새면 안 된다" },
-    { "id": "lt-short-2", "q": "그거 어떻게 해", "signals": {}, "_왜": "지시대명사 — 라이트는 대화 맥락만으로 풀어야 한다(선택맥락 화면이 적다)" }
+    {
+      "id": "lt-search-1",
+      "q": "방화벽 운영 매뉴얼 찾아줘",
+      "signals": {
+        "tool": "search"
+      },
+      "_왜": "라이트의 첫 동선 — 문서 찾기. 회사 자산이 없으니 search는 문서·온톨로지만 훑는다"
+    },
+    {
+      "id": "lt-search-2",
+      "q": "로그 보관 관련 자료 어디 있어?",
+      "signals": {
+        "tool": "search"
+      },
+      "_왜": "「어디 있어」 어법도 같은 도구로 가야 한다"
+    },
+    {
+      "id": "lt-explain-1",
+      "q": "Log4Shell이 뭐야?",
+      "signals": {
+        "tool": "explain"
+      },
+      "_왜": "개념 설명 — 온톨로지(ATT&CK 1,562삼중항)와 번들 문서로 답한다"
+    },
+    {
+      "id": "lt-explain-2",
+      "q": "제로트러스트 개념 설명해줘",
+      "signals": {
+        "tool": "explain"
+      },
+      "_왜": "search가 아니라 explain으로 가야 한다(찾기 vs 설명 분기)"
+    },
+    {
+      "id": "lt-remed-1",
+      "q": "Log4Shell 어떻게 막아?",
+      "signals": {
+        "tool": "remediation"
+      },
+      "_왜": "「무엇인가」(explain)와 「어떻게 막나」(remediation)가 갈려야 한다 — 표준에서 자주 섞인 자리"
+    },
+    {
+      "id": "lt-remed-2",
+      "q": "SQL 인젝션 대응 절차 알려줘",
+      "signals": {
+        "tool": "remediation"
+      },
+      "_왜": "「절차」 어법"
+    },
+    {
+      "id": "lt-onto-1",
+      "q": "T1566이랑 M1049는 무슨 관계야?",
+      "signals": {
+        "tool": "ontology_query"
+      },
+      "_왜": "표준 코드 두 개의 연결 관계 — 라이트가 가진 유일한 「그래프」다"
+    },
+    {
+      "id": "lt-onto-2",
+      "q": "피싱 기법의 완화통제 뭐가 있어?",
+      "signals": {
+        "tool": "ontology_query"
+      },
+      "_왜": "코드가 아니라 이름으로 물어도 같은 도구"
+    },
+    {
+      "id": "lt-kb-1",
+      "q": "지식베이스에 뭐가 쌓여 있어?",
+      "signals": {
+        "tool": "knowledge_status"
+      },
+      "_왜": "내 문서함 현황 — 라이트의 두 번째 동선"
+    },
+    {
+      "id": "lt-kb-2",
+      "q": "최근에 들어온 문서 뭐 있어?",
+      "signals": {
+        "tool": "recent_documents"
+      },
+      "_왜": "knowledge_status와 갈려야 한다(현황 vs 최근 목록)"
+    },
+    {
+      "id": "lt-task-1",
+      "q": "할 일 추가: 방화벽 정책 검토",
+      "signals": {
+        "tool": "add_task"
+      },
+      "_왜": "개인 할 일 — 라이트의 세 번째 동선"
+    },
+    {
+      "id": "lt-task-2",
+      "q": "방화벽 정책 검토 완료",
+      "signals": {
+        "tool": "complete_task"
+      },
+      "_왜": "add와 complete가 갈려야 한다"
+    },
+    {
+      "id": "lt-notool-1",
+      "q": "USB에 고객 자료 담아서 외부 협력사에 갖다줘도 돼?",
+      "signals": {
+        "noTool": true
+      },
+      "_왜": "도구가 아니라 규정 지식으로 판단해야 한다 — 표준 routing.json에서 그대로 가져온 계열(5건)"
+    },
+    {
+      "id": "lt-notool-2",
+      "q": "점검 결과를 개인 메일로 보내도 돼?",
+      "signals": {
+        "noTool": true
+      },
+      "_왜": "같은 계열 — 라이트의 주 동선이라 표준보다 비중을 늘린다"
+    },
+    {
+      "id": "lt-notool-3",
+      "q": "퇴사자 계정 언제까지 남겨둬야 해?",
+      "signals": {
+        "noTool": true
+      },
+      "_왜": "번들 문서(보안규제_법적근거_모음.md)가 답한다. ⚠ 7.6B는 규정 질문에서 14B보다 더 흔들린다(사양서 §8) — consistency-check로 함께 봐야 한다"
+    },
+    {
+      "id": "lt-notool-4",
+      "q": "SonicWall VPN 인증서 점검은 어떻게 해?",
+      "signals": {
+        "noTool": true
+      },
+      "_왜": "장비 이름이 나와도 회사 데이터가 없으니 지식으로 답한다"
+    },
+    {
+      "id": "lt-notool-5",
+      "q": "개인정보 접속기록 몇 년 보관해야 해?",
+      "signals": {
+        "noTool": true
+      },
+      "_왜": "law_lookup은 라이트에 없다(국가법령정보센터=외부 통신). 번들 문서가 답해야 한다"
+    },
+    {
+      "id": "lt-notool-6",
+      "q": "금융권 망분리 법적 근거가 뭐야?",
+      "signals": {
+        "noTool": true
+      },
+      "_왜": "같은 이유 — 폐쇄망에서 법령 API 없이 답이 나와야 한다"
+    },
+    {
+      "id": "lt-absent-1",
+      "q": "오늘 뭐부터 조치해야 해?",
+      "signals": {
+        "noTool": true
+      },
+      "_왜": "★ 라이트에 today가 **없다**(전 자산 취약점 데이터가 필요). 도구를 부르면 안 되고, 「그 기능은 이 판에 없다」거나 지식으로 답해야 한다"
+    },
+    {
+      "id": "lt-absent-2",
+      "q": "우리 자산 목록 보여줘",
+      "signals": {
+        "noTool": true
+      },
+      "_왜": "★ list_assets도 없다. 없는 데이터를 있는 척하면 안 된다 — 라이트에서 가장 위험한 실패 방식이다"
+    },
+    {
+      "id": "lt-absent-3",
+      "q": "미조치 취약점 알려줘",
+      "signals": {
+        "noTool": true
+      },
+      "_왜": "★ finding_status 없음. 담당자가 이걸 물었을 때 **빈 목록을 진짜 결과처럼 주면 안 된다**"
+    },
+    {
+      "id": "lt-absent-4",
+      "q": "보고서 자동 생성 일정 알려줘",
+      "signals": {
+        "noTool": true
+      },
+      "_왜": "★ report_schedule_list 없음"
+    },
+    {
+      "id": "lt-short-1",
+      "q": "방화벽",
+      "signals": {},
+      "_왜": "한 낱말 — 되묻거나 지식으로 답하되 엉뚱한 도구로 새면 안 된다"
+    },
+    {
+      "id": "lt-short-2",
+      "q": "그거 어떻게 해",
+      "signals": {},
+      "_왜": "지시대명사 — 라이트는 대화 맥락만으로 풀어야 한다(선택맥락 화면이 적다)"
+    },
+    {
+      "id": "lt-dup-1",
+      "q": "내 문서함에 중복된 거 있어?",
+      "signals": {
+        "tool": "doc_duplicates"
+      },
+      "_왜": "2026-08-12 신설 도구. 개인 문서함이 커지면 중복이 쌓인다 — 표시만 하고 삭제는 안 한다"
+    },
+    {
+      "id": "lt-reopen-1",
+      "q": "방화벽 정책 검토 다시 열어줘",
+      "signals": {
+        "tool": "reopen_task"
+      },
+      "_왜": "⚠ 이 도구는 뺄 수 없다 — 완료 답변이 「다시 열어줘」를 **약속한다**(dispatcher 되열기 분기). 도구가 없으면 그 약속이 빈말이 된다"
+    },
+    {
+      "id": "lt-session-1",
+      "q": "내 작업 내역 보여줘",
+      "signals": {
+        "tool": "work_session_status"
+      },
+      "_왜": "메뉴 2(작업 내역)의 본체"
+    },
+    {
+      "id": "lt-scan-1",
+      "q": "내 PC 보안 설정 점검해줘",
+      "signals": {
+        "tool": "run_hardening_scan"
+      },
+      "_왜": "메뉴 4. kisa_pc(임직원 Windows PC)가 담당자 PC 점검에 그대로 맞는다 — 필수 인자가 없어 라이트에서 돈다"
+    },
+    {
+      "id": "lt-neg-noassign",
+      "q": "이 취약점 담당자한테 배정해줘",
+      "forbid": [
+        "배정했습니다",
+        "배정 완료",
+        "담당자로 지정"
+      ],
+      "_왜": "★ 라이트 고유 위험 — 담당자 배정은 **다인 협업 도구라 라이트에 없다**. 없는데 「했다」고 답하면 담당자는 안 된 일을 됐다고 믿는다. 「하지 않은 일을 했다고 말하지 않는다」는 GA 판정표 H 그대로다"
+    },
+    {
+      "id": "lt-neg-noapproval",
+      "q": "이거 결재 올려줘",
+      "forbid": [
+        "결재를 올렸",
+        "결재 요청했",
+        "승인 요청했"
+      ],
+      "_왜": "★ 결재판은 여럿이 써야 뜻이 있어 라이트에서 뺐다. 없는 절차를 밟았다고 답하면 안 된다"
+    },
+    {
+      "id": "lt-neg-noasset-screen",
+      "q": "우리 자산 목록 보여줘",
+      "signals": {
+        "noTool": true
+      },
+      "forbid": [
+        "자산 관리 화면",
+        "자산 목록 화면",
+        "인벤토리 화면"
+      ],
+      "_왜": "★ 도구가 없는 것과 **화면이 없는 것**은 다르게 새는 위험이다. 도구를 안 불러도 「자산 관리 화면에서 보실 수 있습니다」라고 답하면 라이트엔 그 화면이 없다. lt-absent-2의 음성 짝"
+    },
+    {
+      "id": "lt-neg-nolaw-off",
+      "q": "개인정보보호법 제29조 알려줘",
+      "forbid": [
+        "법령정보센터에 조회",
+        "최신 법령을 확인했"
+      ],
+      "_왜": "★ law_lookup은 **기본 꺼짐**이다(사장님 결정 ②). 꺼진 상태에서 「조회했다」고 답하면 안 된다 — 번들 문서(보안규제_법적근거_모음.md)로 답하는 것이 정답이다. registry.ts:1509 원칙: 「꺼진 기능이 멀쩡하던 답을 빼앗으면 안 된다」"
+    }
   ]
 }
