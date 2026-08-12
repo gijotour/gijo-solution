@@ -162,7 +162,15 @@ export function currentTierSettings(): { tier: GijoTierSpec["id"] | null; maxLoa
  */
 export type EnginePlatform = "cuda" | "metal";
 export const TIER_COST: Record<GijoTierSpec["id"], Record<EnginePlatform, number>> = {
-  lite: { cuda: 6.5, metal: 7.6 }, // 7.6B급 채팅 1개
+  // ⚠ cuda 값은 **gb10 실측**(2026-08-12): gijo-main-orchestrator(8B급 Q4, 5.07GB) @ ctx 8192
+  //   → 적재 직후 6,011 MiB · **예열 3회 후 5,912 MiB(5.77GB)**. 예열해도 안 늘었다 —
+  //   llama.cpp가 KV를 ctx만큼 **미리** 잡기 때문이다(같은 날 「프롬프트 감축 ≠ VRAM 감축」 정정과 같은 성질).
+  //   6.5는 ctx 16384 시절 값이라 0.6GB쯤 과하게 잡고 있었다. 5.9로 내린다(측정 5.77 + 여유).
+  //   ⚠ **32GB 기계에서 10GB 등급을 흉내 내 재지 말 것**(max 2026-08-12: 세 번 재서 세 번 다
+  //     다른 변수에 걸렸다). 재려는 구성 그대로 뜨는 기계에서 잰다 — 그래서 gb10이다.
+  // ⚠ metal은 **아직 ctx 16384 값(7.6)**이다 — max 실측이지만 ctx가 다르다. 낮춰 잡으면
+  //   안 들어가는 기계에 권하게 되므로 **실측 전까지 안 내린다.** 지금 이대로도 10GB엔 들어간다.
+  lite: { cuda: 5.9, metal: 7.6 }, // 8B급 채팅 1개 @ ctx 8192 (cuda=gb10 실측 · metal=16K 보수값)
   standard: { cuda: 13.2, metal: 16.0 }, // 14B @ 32K 채팅 1개
   pro: { cuda: 13.2, metal: 16.0 }, // 같은 모델 — 개수는 maxLoadedModels가 곱한다
   // Max는 예정 등급이라 권장 판정에 안 쓰이지만, 표에서 빼면 타입이 깨진다(tsc가 잡았다).
