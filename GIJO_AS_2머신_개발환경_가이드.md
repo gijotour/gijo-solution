@@ -117,7 +117,7 @@ node server/scripts/migrate-data-to-mac.mjs verify   # 온전성 확인
 | 기계 | 자리 | 넣기 | 꺼내기 |
 |---|---|---|---|
 | **`win`** | Windows **사용자 환경변수** | `setx GIJO_ADMIN_PASSWORD "<값>"` | `$env:GIJO_ADMIN_PASSWORD` |
-| **`max`** | **macOS 키체인** | `security add-generic-password -a claude-qa -s gijo-max-claude-qa -U -w` | `security find-generic-password -a claude-qa -s gijo-max-claude-qa -w` |
+| **`max`** | **macOS 키체인** | `security add-generic-password -a gijo-qa -s gijo-max-claude-qa -w` | `security find-generic-password -a gijo-qa -s gijo-max-claude-qa -w` |
 | **`gb10`** | `~/.gijo-secrets` (**`chmod 600`**) — `~/gijo-env.sh`에서 `source` | 편집기로 `export KEY=값` | `. ~/gijo-env.sh` 뒤 `$KEY` |
 
 현재 쓰는 것: `win`은 게시·QA용 `claude-deploy` 계정 비밀번호(`GIJO_ADMIN_PASSWORD`),
@@ -128,11 +128,22 @@ node server/scripts/migrate-data-to-mac.mjs verify   # 온전성 확인
 - **`-w`는 값 없이 쓴다.** `security add-generic-password … -w` 뒤에 값을 붙이면 그 비밀번호가
   `~/.zsh_history`와 `ps` 출력에 **평문으로 남는다.** 값 없이 쓰면 화면에서 입력받는다(재입력까지 요구).
 - **꺼내는 명령은 화면에 평문을 찍는다.** 터미널 스크롤백·화면 갈무리·대화 기록에 그대로 남는다.
-  스크립트에서는 변수로 받을 것: `PASS=$(security find-generic-password -a claude-qa -s gijo-max-claude-qa -w)`
+  스크립트에서는 변수로 받을 것: `PASS=$(security find-generic-password -a gijo-qa -s gijo-max-claude-qa -w)`
 - **`-a`와 `-s`가 한 글자라도 다르면 못 찾는다**(종료코드 44, "could not be found in the keychain").
-  넣을 때와 꺼낼 때 **같은 이름**을 쓴다 — 계정은 `claude-qa`, 서비스는 `gijo-max-claude-qa`로 맞췄다.
-  (2026-08-12에 `-a gijo-qa`로 넣고 `claude-qa`로 꺼내려다 어긋날 뻔했다.)
-- **이미 있으면 `add`는 오류 45로 실패한다**(덮어쓰지 않는다). 바꿀 때는 `-U`를 붙인다.
+  넣을 때와 꺼낼 때 **같은 이름**을 쓴다.
+- **이미 있으면 `add`는 오류 45로 실패한다**(덮어쓰지 않는다). **그 실패가 안전장치다.**
+  `-U`는 **바꿀 때만** 붙인다 — 기본 명령에 넣어 두지 않는다.
+
+> **2026-08-12 정정 — 이 절의 `max` 명령이 잠시 `-a claude-qa -U`로 적혔다. 둘 다 틀렸다.**
+> · **`-a`는 `gijo-qa`다.** `max` 키체인에 실제로 사는 항목 셋(`gijo-qa-pass`·`gijo-ops-claude-qa`·
+>   `gijo-max-claude-qa`)이 전부 `-a gijo-qa`이고, `-a claude-qa`로는 **아무것도 안 나온다(44)**.
+>   넣을 때와 꺼낼 때 모두 `gijo-qa`로 썼으므로 어긋난 적은 없다.
+>   `-a`는 **키체인 항목의 이름표**이지 제품 계정명이 아니다 — `gijo-qa-pass`에는 `jyh`의 비밀번호가
+>   들어 있어서, 이름표를 `claude-qa`로 바꾸면 오히려 틀린 이름이 된다.
+> · **`-U`를 기본 명령에 두면 안 된다.** 2026-08-12에 실제로 이걸로 사고가 날 뻔했다 —
+>   `-U`를 붙인 `add`가 **같은 이름의 기존 항목(`gijo-qa-pass`, `jyh`의 비밀번호)을 말없이 덮어썼다.**
+>   같은 값을 다시 넣으셔서 살았지 다른 값이었으면 그 자리에서 접근이 끊겼다.
+>   바로 위 줄대로 **오류 45가 안전장치다.** 그걸 기본으로 꺼 두면 안 된다.
 
 > ⚠ **`gb10`의 `~/gijo-env.sh`에는 비밀을 넣지 말 것.** 2026-08-12 확인 시 권한이 `664`라
 > **같은 기계의 다른 사용자도 읽을 수 있다.** 비밀은 반드시 `~/.gijo-secrets`(`chmod 600`)에 두고
