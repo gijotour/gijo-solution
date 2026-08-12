@@ -44,17 +44,29 @@ Step "3.5/5 제품 문서 동기화 (docs-manifest 열거분)"
 $docsDir = (wsl -d $distro -- bash -c "grep -m1 '^GIJO_DOCS_DIR=' /home/gijo/gijo-as/gijo-as.env | cut -d= -f2").Trim()
 if (-not $docsDir) { $docsDir = "$wslServer/docs" }
 Write-Output "운영 문서 위치: $docsDir"
+# ⚠ 매니페스트도 함께 옮긴다 — 새 문서를 목록에 더해도 운영 매니페스트가 옛것이면
+#   서버는 그 문서를 **아예 모른다**(2026-08-13: 운영 매니페스트가 8월 9일판이었다).
+wsl -d $distro -- bash -c "cp '/mnt/d/Connect AI/server/docs-manifest.json' '$wslServer/docs-manifest.json'"
 $manifest = Get-Content "$repo\server\docs-manifest.json" -Raw -Encoding UTF8 | ConvertFrom-Json
 $문서옮김 = 0; $문서없음 = @()
 foreach ($entry in $manifest.files) {
   $src = Join-Path $repo $entry.file
-  if (Test-Path $src) {
-    $wslSrc = "/mnt/d/Connect AI/" + $entry.file
-    wsl -d $distro -- bash -c "cp '$wslSrc' '$docsDir/'"
-    if ($LASTEXITCODE -eq 0) { $문서옮김++ }
+  if (Test-Path -LiteralPath $src) {
+    $wslSrc = "/mnt/d/Connect AI/" + ($entry.file -replace '\\', '/')
+    # ⚠ **하위 폴더를 살려서 넣는다**(2026-08-13 실사고). 예전엔 `cp <파일> <docsDir>/`로
+    #   평평하게 복사했는데, 서버는 매니페스트 경로 그대로 찾는다
+    #   (docsbundle.ts resolveDocPath = path.resolve(docsDir, "knowledge/…")).
+    #   그래서 `knowledge/` 문서를 이 스크립트로 넣으면 **영영 인입되지 않았다** —
+    #   지금 운영에 있는 지식 7종은 누군가 8월에 **손으로** 넣어 둔 것이고,
+    #   그 뒤로 아무도 그 사실을 몰랐다. 새 지식 문서를 더한 사람은 시험을 통과시키고
+    #   배포까지 끝내고도 **AI는 그 문서를 모르는** 상태가 된다(조용한 지식 공백).
+    $하위 = Split-Path $entry.file -Parent
+    $대상 = if ($하위) { "$docsDir/" + ($하위 -replace '\\', '/') } else { $docsDir }
+    wsl -d $distro -- bash -c "mkdir -p '$대상' && cp '$wslSrc' '$대상/'"
+    if ($LASTEXITCODE -eq 0) { $문서옮김++ } else { $문서없음 += ("복사실패:" + $entry.file) }
   } else { $문서없음 += $entry.file }
 }
-Write-Output "문서 $문서옮김건 동기화"
+Write-Output "문서 $문서옮김건 동기화 (하위 폴더 유지)"
 if ($문서없음.Count -gt 0) { Write-Warning "리포지토리에 없는 문서(목록만 있고 파일 없음): $($문서없음 -join ', ')" }
 
 Step "4/5 운영 프로세스 재시작 (systemd Restart=always)"

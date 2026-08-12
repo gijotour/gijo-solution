@@ -32,6 +32,17 @@ tools/deploy-prod.ps1과 같은 절차를 **단계별로** 수행한다 (스크�
      `npm run build`는 이 둘을 함께 돌리는데 **배포 절차만 앞의 하나를 부르고 있었다** —
      새 자료 파일을 더한 사람은 시험을 통과시키고도 운영에서 조용히 그 기능이 꺼진다.
      (`import`로 읽는 .json은 tsc가 알아서 옮긴다 — `lite-tools.json`·`onto-aliases-ko.json`.)
+4′. **제품 문서 동기화(필수)** — ⚠ 4단계는 `server/src/`만 옮긴다. **문서와 매니페스트는 안 간다.**
+   `node tools/docs-drift.mjs` 로 먼저 재고(읽기만 함), 어긋나면 `tools/deploy-prod.ps1`의
+   3.5단계와 같은 일을 한다: `server/docs-manifest.json` → 운영 서버로,
+   그리고 매니페스트에 열거된 문서를 **하위 폴더를 살려서** `GIJO_DOCS_DIR`로.
+   - ⚠ **평평하게 복사하면 안 된다**(2026-08-13 실사고). 서버는 매니페스트 경로 그대로 찾는다
+     (`docsbundle.ts` `resolveDocPath` = `path.resolve(docsDir, "knowledge/…")`).
+     `knowledge/` 문서를 `docsDir/` 바로 밑에 넣으면 **영영 인입되지 않는다** —
+     운영의 지식 7종은 누군가 8월에 **손으로** 넣어 둔 것이었고 아무도 그 사실을 몰랐다.
+   - ⚠ 문서를 바꿨으면 **재시작해야 재인입**된다(해시가 같으면 건너뛴다).
+   - 끝나고 `node tools/docs-drift.mjs`를 **다시** 돌려 초록인지 본다.
+     「고쳤다」와 「AI가 안다」는 다른 말이다.
 5. 재시작 (grep/awk 파이프 금지 — 인용 함정):
    `wsl -d Ubuntu-24.04 -- systemctl show gijo-as.service -p MainPID --value` 로 PID 얻고 `wsl -d Ubuntu-24.04 -- kill <PID>`
 6. health 확인: Node fetch로 http://localhost:4000/api/health 를 최대 60초 폴링 (curl은 한글 응답 검증에 쓰지 말 것).
