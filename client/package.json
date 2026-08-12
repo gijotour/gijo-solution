@@ -10,6 +10,7 @@
     "start": "npm run build && electron .",
     "watch": "tsc -p tsconfig.json --watch",
     "dist": "npm run build && npm run build-server-dist && electron-builder",
+    "dist:lite": "npm run build && npm run build-server-dist && electron-builder --config electron-builder.lite.json",
     "rebuild-server-native": "node scripts/rebuild-server-native.mjs",
     "build-server-dist": "node scripts/build-server-dist.mjs",
     "publish-release": "node scripts/publish-release.mjs",
