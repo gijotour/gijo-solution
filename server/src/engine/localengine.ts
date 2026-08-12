@@ -110,7 +110,21 @@ export interface GijoTierSpec {
 export const GIJO_TIERS: GijoTierSpec[] = [
   // Lite는 **작은 모델(7.6B급) 전제**다 — 14B는 16K로 줄여도 11GB 안팎이라 12GB에 안 들어간다.
   // 「일부 기능 제약」을 이름에 달아 둔다: 여기서 표준 기능 전량을 보증하지 않는다(2026-08-12 사용자 지시).
-  { id: "lite", label: "Lite (일부 기능 제약)", vramLabel: "12GB급", minVramGb: 12, maxLoadedModels: 1, ctxSize: 16384, overheadMb: 3500, desc: "채팅 LLM 1개 · 16K — 작은 모델(7.6B급) 전제. 긴 문서 요약·다인 동시 사용에 제약이 있고, 표준 기능 전량은 24GB급부터입니다." },
+  // ⚠ **8GB가 아니라 10GB다**(사장님 결정 2026-08-12, 앞선 「8GB·8192」를 대체).
+  //   8GB로 내리려다 산수가 안 맞는 것을 제품 함수로 확인했다:
+  //     CUDA  채팅 6.5 + 임베딩 2.5 = 9.00GB  vs  8GB에서 쓸 수 있는 7.60GB → 안 들어감
+  //     Metal 채팅 7.6 + 임베딩 1.55 = 9.15GB vs 7.60GB → 안 들어감
+  //   `tierFits`가 임베딩(bge-m3)을 **등급과 무관하게 항상** 더하기 때문이다. 8GB에서 그걸 빼면
+  //   채팅 모델에 5.1GB밖에 안 남아 7.6B급이 원리상 못 들어간다.
+  //   minVramGb만 8로 내렸으면 **「8GB급」이라 적어 놓고 8GB에선 안 들어간다고 판정하는 등급**이 됐다.
+  //   ▶ 8GB를 정말 하려면 임베딩을 **작은 모델로 바꾸는 것**(상주 유지, 6.5+0.5=7.0)이 답이다.
+  //     상주를 없애는 길은 비싸다 — 임베딩 상주가 **채팅 모델 적재 순서의 기준점**이고
+  //     (아래 `자동시작_임베딩` 주석), 없애면 첫 RAG 질문이 최대 60초가 된다.
+  //     그 길은 임베딩 모델 조사가 먼저다(벡터 전량 재생성이 딸린다). 별건으로 남긴다.
+  // ⚠ ctx는 8192로 내렸는데 TIER_COST.lite(6.5/7.6)는 **16K 기준 옛 값 그대로**다.
+  //   실측 전까지 **일부러 안 내린다** — 낮춰 잡으면 안 들어가는 기계에 권하게 된다.
+  //   보수적으로 두면 조금 엄격할 뿐이다. 재측정하면 그때 낮춘다.
+  { id: "lite", label: "Lite (일부 기능 제약)", vramLabel: "10GB급", minVramGb: 10, maxLoadedModels: 1, ctxSize: 8192, overheadMb: 3500, desc: "채팅 LLM 1개 · 8K — 작은 모델(7.6B급) 전제. 긴 문서 요약·다인 동시 사용에 제약이 있고, 표준 기능 전량은 24GB급부터입니다." },
   { id: "standard", label: "Standard", vramLabel: "24GB급", minVramGb: 24, maxLoadedModels: 1, ctxSize: 32768, overheadMb: 5000, desc: "채팅 LLM 1개 · 32K — 표준 구성(14B 기준 15.7GB 점유)" },
   { id: "pro", label: "Pro", vramLabel: "48GB급", minVramGb: 48, maxLoadedModels: 2, ctxSize: 32768, overheadMb: 5000, desc: "채팅 LLM 2개 · 32K — A/B·검증 병행. CUDA 28.9GB·Metal 33.6GB 점유라 48GB급에서 여유를 두고 돕니다(사용자 결정 2026-08-12)." },
   // ── Max(관제용) — **예정**. 고를 수 없고 권장에도 안 나온다(planned).

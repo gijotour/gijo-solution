@@ -22,7 +22,11 @@ describe("GIJO 구동 티어 (Lite/Standard/Pro)", () => {
   // ★ 이 시험이 지키는 것은 「숫자가 문서와 같은가」가 아니라 **권장이 기계를 안 터뜨리는가**다.
   //   실사고 직전(2026-08-12 발견): Pro가 채팅 3개였고 recommendTier가 28GB부터 Pro를 권해,
   //   32GB 기계에 **42.1GB 필요한 설정**을 권하고 있었다. 권장 판정 자체가 위험한 조언이었다.
-  const 티어VRAM: Record<string, number> = { lite: 12, standard: 24, pro: 48 }; // Pro는 48GB급(사용자 결정 2026-08-12)
+  // ⚠ Lite는 **10GB**다(사장님 결정 2026-08-12 — 앞선 「8GB」를 대체).
+  //   8GB로 내리려다 이 검사에 걸렸다: 채팅 6.5 + 임베딩 2.5 = 9.00GB인데 8GB에서 쓸 수 있는 건
+  //   7.60GB뿐이라 **「8GB급」이라 적어 놓고 8GB엔 안 들어가는 등급**이 될 뻔했다.
+  //   이 표가 그걸 잡는 자리다 — 이름표와 실제가 어긋나면 여기서 빨개진다.
+  const 티어VRAM: Record<string, number> = { lite: 10, standard: 24, pro: 48 }; // Pro는 48GB급(사용자 결정 2026-08-12)
 
   it("★ 등급 이름표(24GB급 등)가 그 플랫폼에서 실제로 들어가는 크기다", () => {
     // ⚠ CUDA만 보면 안 된다 — Metal은 같은 모델이 21% 무겁다(2026-08-12 Mac 실측:
@@ -74,7 +78,7 @@ describe("GIJO 구동 티어 (Lite/Standard/Pro)", () => {
     expect(GIJO_TIERS.map((t) => t.id)).toEqual(["lite", "standard", "pro", "max"]);
     const lite = GIJO_TIERS[0];
     expect(lite.maxLoadedModels).toBe(1);
-    expect(lite.ctxSize).toBe(16384);
+    expect(lite.ctxSize).toBe(8192);
     // 이름·설명에 제약이 드러나야 한다 — 안 적으면 담당자가 표준과 같은 것으로 읽는다.
     expect(lite.label + lite.desc, "Lite에 「일부 기능 제약」 표기가 없다").toContain("제약");
     const std = GIJO_TIERS[1];
@@ -116,7 +120,7 @@ describe("GIJO 구동 티어 (Lite/Standard/Pro)", () => {
     const s = currentTierSettings();
     expect(s.tier).toBe("lite");
     expect(s.maxLoadedModels).toBe(1);
-    expect(s.ctxSize).toBe(16384);
+    expect(s.ctxSize).toBe(8192);
   });
 
   it("알 수 없는 티어는 400", async () => {
