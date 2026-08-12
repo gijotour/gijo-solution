@@ -13,11 +13,19 @@
 //
 // 사용:
 //   win:  node tools/create-qa-account.mjs
-//   max:  GIJO_QA_PASSWORD=$(security find-generic-password -a claude-qa -s gijo-max-claude-qa -w) \
+//   max:  GIJO_QA_PASSWORD=$(security find-generic-password -a gijo-qa -s gijo-max-claude-qa -w) \
+//         GIJO_ADMIN_USER=jyh \
+//         GIJO_ADMIN_PASSWORD=$(security find-generic-password -a gijo-qa -s gijo-qa-pass -w) \
 //         GIJO_SERVER_URL=http://localhost:4000 node tools/create-qa-account.mjs
 //
+// ⚠ **기계마다 다른 두 가지**(2026-08-12 max에서 확인) — 기본값은 win 기준이다:
+//   · 관리자 계정 이름이 다르다. win=claude-deploy · **max=jyh**. 안 넘기면 win 것으로 붙는다.
+//   · 키체인 `-a`는 **gijo-qa**다. `-a claude-qa`로는 아무것도 안 나온다(종료코드 44) —
+//     그러면 빈 비밀번호가 조용히 들어간다. 가이드 §8 정정 참고.
+//
 // 환경변수
-//   GIJO_ADMIN_PASSWORD : 관리자(claude-deploy) 비밀번호 — 계정을 만들 권한
+//   GIJO_ADMIN_USER     : 관리자 아이디 — 기본 claude-deploy(win). **max는 jyh를 넘길 것**
+//   GIJO_ADMIN_PASSWORD : 그 관리자의 비밀번호 — 계정을 만들 권한
 //   GIJO_QA_PASSWORD    : 새로 만들 QA 계정의 비밀번호
 //   GIJO_SERVER_URL     : 기본 http://localhost:4000
 //   GIJO_QA_USER        : 기본 claude-qa
@@ -38,9 +46,15 @@ if (!QA_PW) {
   죽는다(
     "GIJO_QA_PASSWORD가 없다.\n" +
     "  win:  setx GIJO_QA_PASSWORD \"<값>\"  (새 터미널에서 다시 실행)\n" +
-    "  max:  export GIJO_QA_PASSWORD=$(security find-generic-password -a claude-qa -s gijo-max-claude-qa -w)"
+    "  max:  export GIJO_QA_PASSWORD=$(security find-generic-password -a gijo-qa -s gijo-max-claude-qa -w)"
   );
 }
+
+// ⚠ 키체인이 못 찾으면 `$(...)`는 **빈 문자열**이 된다 — 위 검사는 통과하지 못하지만,
+//   공백이나 개행만 든 값은 통과해 버린다. 빈 비밀번호로 계정을 만들면 나중에
+//   "왜 로그인이 안 되지"만 남는다. 여기서 끊는다.
+if (!QA_PW.trim()) 죽는다("GIJO_QA_PASSWORD가 비어 있다 — 키체인 -a/-s 이름을 확인할 것(못 찾으면 종료코드 44).");
+if (!ADMIN_PW.trim()) 죽는다("GIJO_ADMIN_PASSWORD가 비어 있다 — 같은 이유일 수 있다.");
 
 async function 부른다(길, 옵션 = {}, 토큰) {
   const r = await fetch(`${BASE}${길}`, {
