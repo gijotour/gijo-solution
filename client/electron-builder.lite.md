@@ -48,3 +48,23 @@ node -e 'console.log(require("@electron/asar").listPackage("<앱>/Contents/Resou
 
 ⚠ **`llama-server`는 여전히 0개다.** 위 ②가 실물로 확인된 것이다 —
 　이 dmg를 받은 고객은 화면은 다 보이는데 **대화가 안 된다.**
+
+## ★ 2026-08-13 — 배포본이 실제로 라이트로 들어간다(실물 확인)
+
+`win`이 `GIJO_EDITION` 환경변수 대신 `extraMetadata.gijoEdition = "lite"`로 바꿨다(6d4458e).
+**그 판단이 옳았다** — env로 했으면 패키징본에서 항상 거짓이라 dmg는 여전히 `app.html`로 들어갔다.
+
+dmg를 다시 떠서 확인했다:
+
+```
+app.asar 안 package.json → gijoEdition: "lite" ✅
+배포본 실행 → login.html
+  navigateTo("app.html")  ← login.html:302이 하는 그대로
+  → **lite-app.html로 갔다** ✅
+사이드바 업무 9 + 설정 1 · 작업내역 화면 실데이터(할 일 5/7 · 내역 100건) · 오류 0
+```
+
+⚠ 확인하며 배운 것: **`window.gijo.login()`만 불러서는 화면이 안 넘어간다.**
+　`login.html`이 폼 흐름에서 `navigateTo`를 따로 부르기 때문이다.
+　처음에 그걸 모르고 「로그인했는데 login.html 그대로 → 수리가 안 걸린다」로 읽을 뻔했다.
+　**로그인과 이동은 다른 일이다.**
