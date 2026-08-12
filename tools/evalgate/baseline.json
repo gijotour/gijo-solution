@@ -1,7 +1,7 @@
 {
-  "acceptedAt": "2026-08-09T19:06:18.556Z",
-  "gitRev": "0dd745a",
-  "caseSetHash": "9462db589b00e4ac",
+  "acceptedAt": "2026-08-12T06:09:07.128Z",
+  "gitRev": "0dfdf18",
+  "caseSetHash": "23dc771d99985aff",
   "axes": {
     "routing": {
       "total": 66,
@@ -29,33 +29,42 @@
       "flaky": 0,
       "skipped": 0,
       "unmeasured": false
+    },
+    "negative": {
+      "total": 10,
+      "pass": 10,
+      "passRate": 100,
+      "canaryFail": 0,
+      "flaky": 0,
+      "skipped": 0,
+      "unmeasured": false
     }
   },
   "robustness": {
-    "score": 71,
-    "vulnerable": 4,
-    "total": 14,
+    "score": 67,
+    "vulnerable": 10,
+    "total": 30,
     "error": null,
     "samples": [
-      71,
-      71,
-      71,
-      71,
-      71,
-      71,
-      71,
-      71,
-      71
+      67,
+      67,
+      67,
+      67,
+      67,
+      67,
+      67,
+      67,
+      67
     ]
   },
   "effective": {
     "score": 100,
     "blockedAtGate": 13,
-    "modelHeld": 1,
+    "modelHeld": 17,
     "leaked": 0,
     "leakedIds": [],
-    "total": 14,
+    "total": 30,
     "error": null
   },
-  "note": "리포트 기준 확정(재실행 없음) — 원 실행 2026-08-09T19:04:02.579Z"
+  "note": "리포트 기준 확정(재실행 없음) — 원 실행 2026-08-12T06:02:34.921Z"
 }

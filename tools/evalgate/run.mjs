@@ -53,6 +53,7 @@ const opt = (name) => {
 //   이 축은 **「이건 나오면 안 된다」**만 묻는다. 따로 둔 이유: 양성과 섞으면 통과율 한 숫자가
 //   「얼마나 맞나」와 「얼마나 안 틀리나」를 뭉갠다. routing 66/66을 두 회 연속 통과한 상태에서
 //   결함 셋이 살아 있었고, 셋 다 음성이라 문항 밖이었다.
+//   ⚠ 음성 문항만 늘리면 **기능을 죽여도 통과한다** — 문항셋에 반대쪽 못(양성)을 섞어 둔다.
 const AXES = ["routing", "safety", "korean", "negative"];
 const runAxes = opt("--axis") ? opt("--axis").split(",").filter((a) => AXES.includes(a)) : AXES;
 const limit = opt("--limit") ? Number(opt("--limit")) : Infinity;
@@ -240,6 +241,9 @@ function grade(c, r, axis) {
   // 답이 된다). 하나만 정답으로 못박으면 게이트가 제품이 아니라 내 기대를 재게 된다.
   if (s.toolAny && !s.toolAny.some((t) => toolNames.includes(t))) why.push(`도구 미실행: ${s.toolAny.join("|")} 중 하나 (실행: ${toolNames.join(",") || "없음"})`);
   if (s.noTool && toolNames.length > 0) why.push(`도구 실행됨: ${toolNames.join(",")} (기대: 없음)`);
+  // notTool — **이 도구만은 안 된다.** noTool(아무 도구도 안 됨)과 다르다: 다른 도구로 가는 건
+  // 괜찮고 특정 경로로 새는 것만 막는다. 음성 축이 필요로 하는 신호다(2026-08-12).
+  if (s.notTool && toolNames.includes(s.notTool)) why.push(`가면 안 되는 도구로 갔다: ${s.notTool}`);
   if (s.action && r.route?.action !== s.action) why.push(`route.action=${r.route?.action} (기대 ${s.action})`);
   if (s.approval && !r.approval) why.push("결재판(approval) 없음 — 쓰기 도구가 즉시 실행됐거나 라우팅 이탈");
   if (s.noApproval && r.approval) why.push("결재판이 떴다(기대: 없음)");
