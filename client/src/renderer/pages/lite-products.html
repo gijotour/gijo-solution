@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS Lite — 제품 소개자료</title>
+<link rel="stylesheet" href="gijo-ui.css">
+<!--
+  lite-products.html — 라이트 「제품 소개자료」(메뉴 7).
+  사장님 말: 「제품 비교 및 주요 기능 정리」
+
+  ■ 회사 데이터가 필요 없다 — 번들 문서로 답이 된다. 그래서 라이트에서 품이 가장 작다.
+    ⚠ `product_status`(회사가 **보유한** 보안제품 현황)와 **다른 것**이다.
+
+  ■ 다리: listMemoryDocuments · queryMemory(조각 텍스트 배열) · memoryDocumentChunks
+    ⚠ queryMemory는 **문자열 배열**을 돌려준다(객체 아님) — 실제로 재서 확인했다(2026-08-12).
+-->
+<style>
+  :root{--bg:#262624;--panel:#30302e;--border:rgba(255,255,255,.09);--text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--blue:#3b82f6;--teal:#1eb980;--red:#e2483d;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;overflow-y:auto}
+  .wrap{padding:18px 22px 40px;display:flex;flex-direction:column;gap:14px;max-width:900px}
+  .scr-id{font-size:12.5px;color:var(--muted)}
+  .scr-id b{color:var(--text);font-weight:800}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+  .card h2{font-size:13px;font-weight:800;margin-bottom:4px}
+  .card .sub{font-size:11.5px;color:var(--muted-2);margin-bottom:10px;line-height:1.6}
+  .ask{display:flex;gap:8px;margin-bottom:6px}
+  .ask input{flex:1;background:#262624;border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text);font:inherit}
+  button{background:transparent;border:1px solid var(--border);border-radius:8px;padding:7px 13px;color:var(--text);font:inherit;font-size:12.5px;cursor:pointer}
+  button.go{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700}
+  button:disabled{opacity:.5;cursor:default}
+  .doc{display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid var(--border);cursor:pointer}
+  .doc:last-child{border-bottom:0}
+  .doc:hover .n{color:var(--blue)}
+  .doc .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .doc .m{font-size:11.5px;color:var(--muted-2);flex:0 0 auto}
+  .hit{padding:10px 0;border-bottom:1px solid var(--border);font-size:12.5px;line-height:1.75;white-space:pre-wrap}
+  .hit:last-child{border-bottom:0}
+  .read{font-size:12.5px;line-height:1.8;white-space:pre-wrap;max-height:52vh;overflow:auto;padding-right:6px}
+  .empty{font-size:12.5px;color:var(--muted);line-height:1.75;padding:6px 2px}
+  .empty b{color:var(--text)}
+  .err{font-size:12.5px;color:var(--red);padding:6px 2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="scr-id"><b>제품 소개자료</b> — GIJO AS가 무엇을 하는 제품인지, 무엇이 다른지 봅니다.</div>
+
+  <section class="card">
+    <h2>물어보기</h2>
+    <div class="sub">문서를 읽지 않아도 됩니다 — 물으면 해당 대목을 찾아 줍니다.</div>
+    <div class="ask">
+      <input id="q" type="text" placeholder="예: 다른 제품이랑 뭐가 달라?" aria-label="질문">
+      <button class="go" id="askGo">찾기</button>
+    </div>
+    <div id="hits"></div>
+  </section>
+
+  <section class="card">
+    <h2>자료 <span id="cnt" style="font-size:11.5px;color:var(--muted);font-weight:600"></span></h2>
+    <div class="sub">제품과 함께 들어온 소개·안내 문서입니다.</div>
+    <div id="docs">불러오는 중…</div>
+  </section>
+
+  <section class="card" id="readCard" style="display:none">
+    <h2 id="readTitle"></h2>
+    <div class="read" id="readBody"></div>
+  </section>
+</div>
+
+<script>
+// lite-products — 다리는 window.gijo만(생 fetch 금지).
+// ⚠ 규칙: 0건을 「없다」로 말하지 않는다 · 401을 「서버 오류」라 하지 않는다.
+(function () {
+  "use strict";
+  var g = window.gijo || null;
+  var esc = function (v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+  function 오류문구(e, 무엇) {
+    var m = String((e && e.message) || e || "");
+    if (/401|unauthorized/i.test(m)) return "로그인이 풀렸습니다 — 다시 로그인해 주세요.";
+    if (/403|forbidden/i.test(m)) return "이 계정에는 열람 권한이 없습니다.";
+    if (/fetch|network|ECONN/i.test(m)) return "서버에 닿지 못했습니다 — 서버가 켜져 있는지 확인해 주세요.";
+    return 무엇 + "을 못 읽었습니다 — " + esc(m);
+  }
+  if (!g) {
+    document.getElementById("docs").innerHTML = '<div class="err">앱 밖에서 열려 있어 데이터를 못 읽습니다 — GIJO AS 앱에서 열어 주세요.</div>';
+    return;
+  }
+
+  // 제품 소개 계열 문서 — 번들로 들어온 GIJO_AS_* 문서가 그것이다.
+  // ⚠ 회사가 **보유한** 보안제품(product_status)과 다르다. 그건 라이트에 없다.
+  function 제품문서인가(id) { return /^GIJO_AS_.*\.(md|txt|pdf)$/i.test(String(id)); }
+
+  // ⚠ **조각을 날것으로 내보내면 못 읽는다.** 2026-08-12 갈무리에서 확인 —
+  //   표 문법(`--|`, `| 🧱 방화벽 |`), `**굵게**`, 이미지 링크가 그대로 나왔다.
+  //   조각은 문서 중간에서 잘려 오므로 표가 머리 없이 시작하기도 한다.
+  //   마크다운 렌더러를 들이지 않고(공용 스크립트라 이 화면 몫이 아니다) **읽히게만** 다듬는다.
+  function 다듬기(t) {
+    return String(t || "")
+      .split("\n")
+      .filter(function (l) { return !/^!\[/.test(l.trim()); })            // 이미지 링크 줄
+      .filter(function (l) { return !/^[\s|:-]+$/.test(l); })             // 표 구분선(--|, |:--|)
+      .map(function (l) {
+        var s = l.replace(/\*\*/g, "").replace(/^#{1,6}\s*/, "");        // 굵게·머리표
+        if (/^\s*\|.*\|\s*$/.test(s)) {                                  // 표 한 줄 → 가운뎃점
+          s = s.replace(/^\s*\|/, "").replace(/\|\s*$/, "").split("|")
+               .map(function (c) { return c.trim(); }).filter(Boolean).join(" · ");
+        }
+        return s;
+      })
+      .join("\n")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
+
+  async function 목록() {
+    var box = document.getElementById("docs");
+    try {
+      var all = await g.listMemoryDocuments();
+      var arr = (Array.isArray(all) ? all : all.documents || []).filter(function (d) { return 제품문서인가(d.documentId); });
+      document.getElementById("cnt").textContent = arr.length ? arr.length + "건" : "";
+      if (!arr.length) {
+        // ⚠ 「자료가 없습니다」로 끝내지 않는다 — 왜 비었는지와 무엇을 할지 적는다.
+        box.innerHTML = '<div class="empty"><b>아직 들어온 소개자료가 없습니다.</b><br>' +
+          "제품과 함께 오는 문서라 보통은 설치할 때 같이 들어옵니다. 안 보이면 설치가 덜 끝난 것입니다.</div>";
+        return;
+      }
+      box.innerHTML = arr.sort(function (a, b) { return String(a.documentId).localeCompare(String(b.documentId)); })
+        .map(function (d) {
+          return '<div class="doc" data-id="' + esc(d.documentId) + '">' +
+            '<span class="n">' + esc(String(d.documentId).replace(/^GIJO_AS_/, "").replace(/\.(md|txt|pdf)$/i, "").replace(/_/g, " ")) + "</span>" +
+            '<span class="m">' + esc(d.chunks || 0) + "조각</span></div>";
+        }).join("");
+      box.querySelectorAll(".doc").forEach(function (el) {
+        el.addEventListener("click", function () { 읽기(el.dataset.id); });
+      });
+    } catch (e) { box.innerHTML = '<div class="err">' + 오류문구(e, "자료 목록") + "</div>"; }
+  }
+
+  async function 읽기(id) {
+    var card = document.getElementById("readCard");
+    document.getElementById("readTitle").textContent = String(id).replace(/_/g, " ");
+    document.getElementById("readBody").textContent = "불러오는 중…";
+    card.style.display = "";
+    try {
+      var ch = await g.memoryDocumentChunks(id, 40);
+      var arr = Array.isArray(ch) ? ch : ch.chunks || [];
+      document.getElementById("readBody").textContent = arr.length
+        ? 다듬기(arr.map(function (c) { return typeof c === "string" ? c : (c.text || ""); }).join("\n\n"))
+        : "이 문서는 조각이 없습니다 — 반입이 덜 끝났을 수 있습니다.";
+    } catch (e) { document.getElementById("readBody").textContent = 오류문구(e, "문서"); }
+    card.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+
+  async function 찾기() {
+    var q = String(document.getElementById("q").value || "").trim();
+    var box = document.getElementById("hits");
+    var btn = document.getElementById("askGo");
+    if (!q) return;
+    btn.disabled = true; box.innerHTML = '<div class="empty">찾는 중…</div>';
+    try {
+      // ⚠ queryMemory는 **문자열 배열**을 돌려준다(2026-08-12 실측).
+      var hits = await g.queryMemory(q, 4);
+      var arr = (Array.isArray(hits) ? hits : []).map(function (h) { return typeof h === "string" ? h : (h.text || ""); }).filter(Boolean);
+      box.innerHTML = arr.length
+        ? arr.map(function (t) { var c = 다듬기(t); return '<div class="hit">' + esc(c.slice(0, 900)) + (c.length > 900 ? " …" : "") + "</div>"; }).join("")
+        : '<div class="empty"><b>이 물음에 닿는 대목을 못 찾았습니다.</b><br>' +
+          "말을 조금 바꿔 보시거나, 아래 자료를 직접 열어 보세요.</div>";
+    } catch (e) { box.innerHTML = '<div class="err">' + 오류문구(e, "찾기") + "</div>"; }
+    btn.disabled = false;
+  }
+
+  function 시작() {
+    document.getElementById("askGo").addEventListener("click", 찾기);
+    document.getElementById("q").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); 찾기(); } });
+    목록();
+  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", 시작);
+  else 시작();
+})();
+</script>
+</body>
+</html>
