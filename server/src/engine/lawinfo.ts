@@ -292,15 +292,27 @@ export async function getLawArticles(mst: string, article?: string, limit = 5): 
     const kind = str(u["조문여부"]);
     return kind ? kind === "조문" : !/^\s*제\d+[편장절관]\s/.test(str(u["조문내용"]));
   });
-  const mapped = 조문칸.map((u) => ({
-    no: str(u["조문번호"]),
-    title: str(u["조문제목"]),
-    text: 조문본문(u),
-  }));
+  // ⚠ **가지번호(제40조의2)를 본다**(2026-08-13 운영 실측). 법제처는 「제40조」와 「제40조의2」에
+  //   **같은 조문번호 40**을 주고 가지만 `조문가지번호`로 따로 준다. 그래서 「제40조 알려줘」에
+  //   제40조의2가 함께 나왔고, 형식이 그것까지 「제40조」라 찍어 **엉뚱한 조문을 물어본 조문인 양**
+  //   보여 줬다(노출 개인정보 삭제 요청 기관 조문이 유출 신고 조문 자리에 붙었다).
+  //   조문 번호는 지어내면 안 되는 값이라, 있는 그대로 「40의2」로 만들고 정확히 대조한다.
+  const mapped = 조문칸.map((u) => {
+    const 가지 = str(u["조문가지번호"]).replace(/\D/g, "");
+    const 번호 = str(u["조문번호"]).replace(/\D/g, "");
+    return {
+      no: 번호 && 가지 && 가지 !== "0" ? `${번호}의${가지}` : 번호,
+      title: str(u["조문제목"]),
+      text: 조문본문(u),
+    };
+  });
   const real = mapped.filter((m) => m.no && m.text);
   if (article) {
-    const want = article.replace(/\D/g, "");
-    return real.filter((m) => m.no.replace(/\D/g, "") === want);
+    // 「40」은 제40조만 · 「40의2」는 제40조의2만. 가지를 안 적었으면 가지 없는 본조를 뜻한다.
+    const want = article.replace(/\s/g, "").replace(/조$/, "");
+    const m = /^제?(\d+)(?:의(\d+))?$/.exec(want);
+    const 원하는 = m ? (m[2] ? `${m[1]}의${m[2]}` : m[1]) : want.replace(/\D/g, "");
+    return real.filter((a) => a.no === 원하는);
   }
   return real.slice(0, limit);
 }
@@ -378,7 +390,12 @@ export async function lawArticleAnswer(query: string, article: string): Promise<
   }
   const lines = [`${법.title} — 제${article}조`, ""];
   for (const a of articles) {
-    lines.push(`제${a.no}조${a.title ? `(${a.title})` : ""}`);
+    // ⚠ 머리줄을 두 번 찍지 않는다(2026-08-13 운영 실측). 본문 조립이 「항」까지 읽게 되면서
+    //   `조문내용`의 제목 줄이 text 앞에 들어왔고, 그 위에 이 줄을 또 찍어 **제목이 두 줄**로 나왔다.
+    //   text에서 지우지 않고 여기서 건너뛴다 — 제1조처럼 제목과 본문이 한 줄인 조문이 있어
+    //   text를 손대면 본문이 잘린다.
+    const 머리 = `제${a.no}조${a.title ? `(${a.title})` : ""}`;
+    if (!a.text.startsWith(`제${a.no}조`)) lines.push(머리);
     lines.push(a.text);
     lines.push("");
   }
