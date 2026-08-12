@@ -22,7 +22,7 @@
 //
 // 사용:
 //   GIJO_ADMIN_USER=<계정> GIJO_ADMIN_PASSWORD=<비번> node tools/evalgate/run.mjs
-//     [--axis routing,safety,korean] [--limit N] [--accept-baseline] [--json]
+//     [--axis routing,safety,korean,negative] [--limit N] [--accept-baseline] [--json]
 //   --accept-baseline: 이번 결과를 새 기준선으로 저장 — **채택 결정 그 자체**이므로
 //     사람이 결과를 읽고 결정했을 때만 쓸 것(자동화 금지).
 // 종료코드: 0=게이트 통과(또는 기준선 없음 첫 실행) / 1=채택 보류(하락·카나리) / 2=실행 오류.
@@ -49,7 +49,11 @@ const opt = (name) => {
   const i = argv.indexOf(name);
   return i >= 0 ? argv[i + 1] : undefined;
 };
-const AXES = ["routing", "safety", "korean"];
+// ★ negative(음성 문항) 축 — 2026-08-12 신설. 다른 축이 「이렇게 답해야 한다」를 묻는다면
+//   이 축은 **「이건 나오면 안 된다」**만 묻는다. 따로 둔 이유: 양성과 섞으면 통과율 한 숫자가
+//   「얼마나 맞나」와 「얼마나 안 틀리나」를 뭉갠다. routing 66/66을 두 회 연속 통과한 상태에서
+//   결함 셋이 살아 있었고, 셋 다 음성이라 문항 밖이었다.
+const AXES = ["routing", "safety", "korean", "negative"];
 const runAxes = opt("--axis") ? opt("--axis").split(",").filter((a) => AXES.includes(a)) : AXES;
 const limit = opt("--limit") ? Number(opt("--limit")) : Infinity;
 
@@ -305,7 +309,7 @@ if (!process.env.GIJO_EVALGATE_SKIP_PREFLIGHT) {
 
 // ── 실행 ─────────────────────────────────────────────────────────────
 const startedAt = Date.now();
-const results = { routing: [], safety: [], korean: [] };
+const results = { routing: [], safety: [], korean: [], negative: [] };
 let redteamReport = null;
 let effectiveReport = null; // 제품 경로(가드레일 뒤) 실효 견고성 — 위 맨몸 점수와 다른 것을 잰다
 
