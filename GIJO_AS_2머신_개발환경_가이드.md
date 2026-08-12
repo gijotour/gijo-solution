@@ -108,3 +108,35 @@ node server/scripts/migrate-data-to-mac.mjs verify   # 온전성 확인
   database"가 나오면 파일이 깨진 게 아니라 **잠긴 것**이다. 서버 API를 쓰거나, 꼭 직접 읽어야
   하면 서버 폴더에서 제품의 db 모듈을 빌린다(`node -e 'const {db}=require("./dist/db.js")'`).
   `server/scripts/_dbguard.mjs`가 이 상황을 미리 알려 준다.
+
+## 8. 비밀번호·자격증명은 어디에 두나 (기계마다 자리가 다르다)
+
+**공통 원칙 하나: 저장소(repo)에는 절대 적지 않는다.** 기계마다 OS가 주는 금고가 달라서
+넣고 꺼내는 명령만 다를 뿐, 「코드 밖에 둔다」는 같다.
+
+| 기계 | 자리 | 넣기 | 꺼내기 |
+|---|---|---|---|
+| **`win`** | Windows **사용자 환경변수** | `setx GIJO_ADMIN_PASSWORD "<값>"` | `$env:GIJO_ADMIN_PASSWORD` |
+| **`max`** | **macOS 키체인** | `security add-generic-password -a claude-qa -s gijo-max-claude-qa -U -w` | `security find-generic-password -a claude-qa -s gijo-max-claude-qa -w` |
+| **`gb10`** | `~/.gijo-secrets` (**`chmod 600`**) — `~/gijo-env.sh`에서 `source` | 편집기로 `export KEY=값` | `. ~/gijo-env.sh` 뒤 `$KEY` |
+
+현재 쓰는 것: `win`은 게시·QA용 `claude-deploy` 계정 비밀번호(`GIJO_ADMIN_PASSWORD`),
+`max`는 QA 계정 `claude-qa`. `gb10`은 **아직 담을 비밀이 없다**(자리만 정해 둔 것).
+
+### 지키면 사고가 안 나는 네 가지
+
+- **`-w`는 값 없이 쓴다.** `security add-generic-password … -w` 뒤에 값을 붙이면 그 비밀번호가
+  `~/.zsh_history`와 `ps` 출력에 **평문으로 남는다.** 값 없이 쓰면 화면에서 입력받는다(재입력까지 요구).
+- **꺼내는 명령은 화면에 평문을 찍는다.** 터미널 스크롤백·화면 갈무리·대화 기록에 그대로 남는다.
+  스크립트에서는 변수로 받을 것: `PASS=$(security find-generic-password -a claude-qa -s gijo-max-claude-qa -w)`
+- **`-a`와 `-s`가 한 글자라도 다르면 못 찾는다**(종료코드 44, "could not be found in the keychain").
+  넣을 때와 꺼낼 때 **같은 이름**을 쓴다 — 계정은 `claude-qa`, 서비스는 `gijo-max-claude-qa`로 맞췄다.
+  (2026-08-12에 `-a gijo-qa`로 넣고 `claude-qa`로 꺼내려다 어긋날 뻔했다.)
+- **이미 있으면 `add`는 오류 45로 실패한다**(덮어쓰지 않는다). 바꿀 때는 `-U`를 붙인다.
+
+> ⚠ **`gb10`의 `~/gijo-env.sh`에는 비밀을 넣지 말 것.** 2026-08-12 확인 시 권한이 `664`라
+> **같은 기계의 다른 사용자도 읽을 수 있다.** 비밀은 반드시 `~/.gijo-secrets`(`chmod 600`)에 두고
+> 거기서 `source`한다. 지금은 `CUDA_HOME`·`PATH`·`LD_LIBRARY_PATH`뿐이라 위험하지 않다.
+
+> ⚠ 비대화형 ssh(`ssh gb10 '<명령>'`)는 `.bashrc`를 안 읽는다. 원격 명령마다
+> `. ~/gijo-env.sh &&` 를 앞에 붙여야 값이 보인다.
