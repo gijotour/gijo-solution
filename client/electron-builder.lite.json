@@ -1,0 +1,55 @@
+{
+  "appId": "ai.gijo.as.lite",
+  "productName": "GIJO AS Lite",
+  "directories": {
+    "output": "release-lite"
+  },
+  "files": [
+    "dist/**/*",
+    "src/renderer/**/*"
+  ],
+  "extraResources": [
+    {
+      "from": "server-dist",
+      "to": "server-dist",
+      "filter": [
+        "**/*",
+        "!**/*.map"
+      ]
+    }
+  ],
+  "win": {
+    "target": "nsis"
+  },
+  "mac": {
+    "target": [
+      {
+        "target": "dmg",
+        "arch": [
+          "arm64"
+        ]
+      },
+      {
+        "target": "zip",
+        "arch": [
+          "arm64"
+        ]
+      }
+    ],
+    "category": "public.app-category.business",
+    "artifactName": "${productName}-${version}-${arch}.${ext}",
+    "hardenedRuntime": false,
+    "identity": null
+  },
+  "dmg": {
+    "title": "${productName} ${version}"
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": false,
+    "runAfterFinish": true,
+    "include": "build/installer.nsh"
+  },
+  "afterSign": "build/mac-adhoc-sign.cjs"
+}

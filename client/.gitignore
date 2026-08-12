@@ -1,7 +1,16 @@
 node_modules/
 dist/
 release/
+# ⚠ 2026-08-12 — `release/` 하나만 막혀 있어 **`release-lite/`(940MB)가 통째로 들어갈 뻔했다.**
+#   같은 날 아침 server/의 `data`만 막고 `data.*`가 새어 운영 DB 397MB가 이력에 들어간 것과
+#   **똑같은 모양**이다: 이름 하나만 막으면 그 옆에 만든 것이 샌다. 뿌리를 막는다.
+release-lite/
+release-*/
 *.log
 # build-server-dist가 설치본용으로 복사하는 산출물(매번 재생성) — server-dist/package.json만 추적.
 server-dist/docs/
 server-dist/docs-manifest.json
+# ⚠ 2026-08-12 — scripts/도 build-server-dist가 매번 만든다(encrypt-db·recover-db-key).
+#   위 규칙의 뜻(「매번 재생성 — package.json만 추적」)에 따라 막는다.
+#   안 막으면 빌드할 때마다 ?? 로 남아 **커밋 파일 수 세기를 흐린다** — 오늘 그것에 한 번 걸렸다.
+server-dist/scripts/
