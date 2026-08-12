@@ -17,6 +17,9 @@
 // ⚠ 이 파일은 **티어를 바꾸지 않는다.** 메모리 등급(10GB·ctx 8192)은 설치할 때 정해지는 것이고
 //   여기서 바꾸면 「라이트를 켰더니 문맥이 줄었다」가 조용히 일어난다. 등급은 설정 화면의 몫이다.
 
+// ⚠ 이 import가 **반드시 첫 줄**이어야 한다 — 동봉물 경로(env)를 registry의 import 사슬이
+//   localengine에 닿기 전에 알려야 한다. 순서를 바꾸면 오류 없이 조용히 무시된다(env.ts 머리말).
+import "./env";
 import { setToolAllowlist, findAgentTool } from "../engine/agenttools/registry";
 import liteTools from "./lite-tools.json";
 
