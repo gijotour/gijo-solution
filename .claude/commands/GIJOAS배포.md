@@ -26,7 +26,12 @@ tools/deploy-prod.ps1과 같은 절차를 **단계별로** 수행한다 (스크�
      **제품이 도는 환경이 아니다.** 그래서 이 확인은 반드시 WSL 안에서 한다.
    - 없으면: `venv/bin/pip install -r requirements.txt` (venv가 없으면 `python3 -m venv venv` 먼저)
 4. WSL 동기화+빌드:
-   `wsl -d Ubuntu-24.04 -- bash -c "rsync -a --delete '/mnt/d/Connect AI/server/src/' /home/gijo/gijo-as/server/src/ && cd /home/gijo/gijo-as/server && npx tsc -p tsconfig.json && echo BUILD_OK"`
+   `wsl -d Ubuntu-24.04 -- bash -c "rsync -a --delete '/mnt/d/Connect AI/server/src/' /home/gijo/gijo-as/server/src/ && cd /home/gijo/gijo-as/server && npx tsc -p tsconfig.json && node scripts/copy-assets.mjs && echo BUILD_OK"`
+   - ⚠ **`copy-assets.mjs`를 빼지 말 것**(2026-08-13에 빠져 있던 것을 찾음). `tsc`만 돌리면
+     `import`로 읽지 않는 자료 파일(`engine/examquestions.json` 등)이 dist에 안 들어간다.
+     `npm run build`는 이 둘을 함께 돌리는데 **배포 절차만 앞의 하나를 부르고 있었다** —
+     새 자료 파일을 더한 사람은 시험을 통과시키고도 운영에서 조용히 그 기능이 꺼진다.
+     (`import`로 읽는 .json은 tsc가 알아서 옮긴다 — `lite-tools.json`·`onto-aliases-ko.json`.)
 5. 재시작 (grep/awk 파이프 금지 — 인용 함정):
    `wsl -d Ubuntu-24.04 -- systemctl show gijo-as.service -p MainPID --value` 로 PID 얻고 `wsl -d Ubuntu-24.04 -- kill <PID>`
 6. health 확인: Node fetch로 http://localhost:4000/api/health 를 최대 60초 폴링 (curl은 한글 응답 검증에 쓰지 말 것).
