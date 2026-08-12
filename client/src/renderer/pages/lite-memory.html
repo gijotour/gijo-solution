@@ -134,20 +134,38 @@
     return;
   }
 
-  // ⚠ 「내가 넣은 것」만 보여 준다 — 제품과 함께 온 GIJO_AS_*·지식 시드는 뺀다.
+  // ⚠ 「내가 넣은 것」만 보여 준다 — 제품과 함께 온 것은 뺀다.
   //   섞으면 「내 문서함」이 아니라 그냥 전체 목록이 되어 이 화면의 뜻이 없어진다.
-  function 내가넣은것인가(d) {
+  //
+  // ⚠ 2026-08-13 첫 실행 실측에서 고침. 이름 규칙(GIJO_AS_*·GIJO_지식_*)으로 걸렀더니
+  //   번들 문서 하나(보안규제_법적근거_모음.md)가 새서, **막 설치한 기계인데
+  //   「내가 넣은 것 1건」**으로 떴다. 고객은 넣은 적이 없다.
+  //   제품이 **정확한 목록**을 준다 — knowledge-bundle/status의 docs.fingerprints[].file(19건).
+  //   이름 규칙은 그것을 못 받았을 때의 뒷받침으로만 남긴다(안 남기면 전부 「내 것」이 된다).
+  var 번들목록 = null;
+  async function 번들파일들() {
+    if (번들목록 !== null) return 번들목록;
+    try {
+      var s = await g.knowledgeBundleStatus();
+      var f = (s && s.docs && s.docs.fingerprints) || [];
+      // ⚠ 지문은 「knowledge/GIJO_지식_….md」처럼 **경로가 붙어 오고**, 장기기억은 파일명만 쓴다.
+      //   그대로 맞대면 19건 중 7건이 안 겹쳐 「내가 넣은 것 7건」이 된다(2026-08-13에 실제로 그랬다).
+      번들목록 = new Set(f.map(function (x) { return String(x.file || "").split("/").pop(); }));
+    } catch (e) { 번들목록 = new Set(); }
+    return 번들목록;
+  }
+  function 내가넣은것인가(d, 번들) {
     var id = String(d.documentId || "");
-    if (/^GIJO_AS_/.test(id)) return false;
-    if (/^GIJO_지식_/.test(id)) return false;
-    return true;
+    if (번들 && 번들.size) return !번들.has(id);
+    return !/^GIJO_AS_/.test(id) && !/^GIJO_지식_/.test(id);
   }
 
   async function 목록() {
     var box = document.getElementById("docs");
     try {
+      var 번들 = await 번들파일들();
       var all = await g.listMemoryDocuments();
-      var arr = (Array.isArray(all) ? all : all.documents || []).filter(내가넣은것인가);
+      var arr = (Array.isArray(all) ? all : all.documents || []).filter(function (d) { return 내가넣은것인가(d, 번들); });
       document.getElementById("cnt").textContent = arr.length ? arr.length + "건" : "";
       if (!arr.length) {
         box.innerHTML = '<div class="empty"><b>아직 넣은 자료가 없습니다.</b><br>' +

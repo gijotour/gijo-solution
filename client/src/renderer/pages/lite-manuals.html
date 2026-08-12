@@ -76,7 +76,8 @@
   </section>
 
   <section class="card">
-    <h2>넣어 둔 매뉴얼 <span id="cnt" style="font-size:11.5px;color:var(--muted);font-weight:600"></span></h2>
+    <!-- ⚠ 「넣어 둔」이라고 쓰지 않는다 — 첫날 목록은 전부 제품이 넣어 준 것이다(2026-08-13 실측). -->
+    <h2>매뉴얼 <span id="cnt" style="font-size:11.5px;color:var(--muted);font-weight:600"></span></h2>
     <div id="docs">불러오는 중…</div>
   </section>
 
@@ -133,7 +134,22 @@
     try {
       var all = await g.listMemoryDocuments();
       var arr = (Array.isArray(all) ? all : all.documents || []).filter(function (d) { return d.category === 분류; });
-      document.getElementById("cnt").textContent = arr.length ? arr.length + "건" : "";
+      // ⚠ 2026-08-13 첫 실행 실측: 막 설치한 기계에서 「넣어 둔 매뉴얼 7건」으로 떴다.
+      //   7건은 전부 제품이 함께 넣어 준 것이다 — 고객은 아직 아무것도 안 넣었다.
+      //   제품이 정확한 목록을 준다(knowledge-bundle/status). 각 줄에 「제품 제공」을 붙이고,
+      //   머리 숫자도 내가 넣은 것과 갈라 센다.
+      var 번들 = new Set();
+      try {
+        var s = await g.knowledgeBundleStatus();
+        // ⚠ 지문은 경로가 붙어 온다(knowledge/…). 장기기억은 파일명만 쓴다 — 떼고 맞춘다.
+        ((s && s.docs && s.docs.fingerprints) || []).forEach(function (x) { 번들.add(String(x.file || "").split("/").pop()); });
+      } catch (e) { /* 못 받으면 표시 없이 예전처럼 센다 */ }
+      var 내것수 = 번들.size ? arr.filter(function (d) { return !번들.has(String(d.documentId || "")); }).length : null;
+      var 제품수 = 내것수 === null ? 0 : arr.length - 내것수;
+      document.getElementById("cnt").textContent = !arr.length ? ""
+        : 내것수 === null ? arr.length + "건"
+        : 내것수 === 0 ? "제품 제공 " + 제품수 + "건 · 내가 넣은 것 없음"
+        : 내것수 + "건" + (제품수 ? " · 제품 제공 " + 제품수 + "건" : "");
       if (!arr.length) {
         // ⚠ 「매뉴얼이 없습니다」로 끝내지 않는다 — 첫날 화면이 이것이다.
         box.innerHTML = '<div class="empty"><b>아직 넣은 매뉴얼이 없습니다.</b><br>' +
@@ -143,8 +159,9 @@
       }
       box.innerHTML = arr.sort(function (a, b) { return String(b.ingestedAt).localeCompare(String(a.ingestedAt)); })
         .map(function (d) {
+          var 제품것 = 번들.has(String(d.documentId || ""));
           return '<div class="doc"><span class="n" data-id="' + esc(d.documentId) + '">' + esc(d.documentId) + "</span>" +
-            '<span class="m">' + esc(d.chunks || 0) + "조각 · " + esc(String(d.ingestedAt || "").slice(0, 10)) + "</span></div>";
+            '<span class="m">' + (제품것 ? "제품 제공 · " : "") + esc(d.chunks || 0) + "조각 · " + esc(String(d.ingestedAt || "").slice(0, 10)) + "</span></div>";
         }).join("");
       box.querySelectorAll(".n").forEach(function (el) { el.addEventListener("click", function () { 읽기(el.dataset.id); }); });
     } catch (e) { box.innerHTML = '<div class="err">' + 오류문구(e, "매뉴얼 목록") + "</div>"; }

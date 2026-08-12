@@ -133,6 +133,18 @@
     if (!Array.isArray(tasks)) tasks = [];
     if (!Array.isArray(sess)) sess = [];
 
+    // ⚠ 2026-08-13 첫 실행 실측: 막 설치한 기계에서 이 칸이 **「내 문서 19」**로 떴다.
+    //   19건은 전부 제품이 함께 넣어 준 것이고 고객이 넣은 것은 0이다.
+    //   「나만의 기억」 화면은 같은 순간 「1건」이라고 말했다 — **두 화면이 다른 숫자를 말했다.**
+    //   제품이 정확한 목록을 준다(knowledge-bundle/status의 docs.fingerprints[].file).
+    var 번들 = new Set();
+    try {
+      var st2 = await g.knowledgeBundleStatus();
+      // ⚠ 지문은 경로가 붙어 온다(knowledge/…). 장기기억은 파일명만 쓴다 — 떼고 맞춘다.
+      ((st2 && st2.docs && st2.docs.fingerprints) || []).forEach(function (x) { 번들.add(String(x.file || "").split("/").pop()); });
+    } catch (e) { /* 못 받으면 아래에서 전부 「내 것」으로 세지 않고 그냥 합계만 말한다 */ }
+    var 내것 = 번들.size ? docs.filter(function (d) { return !번들.has(String(d.documentId || "")); }) : null;
+
     // ⚠ 하나가 실패해도 나머지는 그린다 — 화면 전체가 빈칸이 되면 무엇이 문제인지 안 보인다.
     if (실패.length) {
       document.getElementById("todoBox").innerHTML =
@@ -142,8 +154,12 @@
     var 안끝난것 = tasks.filter(function (t) { return !t.done; });
     document.getElementById("tTask").textContent = 안끝난것.length;
     document.getElementById("dTask").textContent = tasks.length ? "전체 " + tasks.length + "건 중" : "아직 담은 것 없음";
-    document.getElementById("tDoc").textContent = docs.length;
-    document.getElementById("dDoc").textContent = docs.length ? "지식으로 쓰입니다" : "아직 넣은 것 없음";
+    // 내가 넣은 것을 센다. 제품 자료는 아래 줄에 따로 밝힌다 — 합쳐서 세면 첫날부터 19가 뜬다.
+    document.getElementById("tDoc").textContent = 내것 ? 내것.length : docs.length;
+    document.getElementById("dDoc").textContent = 내것
+      ? (내것.length ? "지식으로 쓰입니다 · 제품 자료 " + (docs.length - 내것.length) + "건 별도"
+                     : (docs.length ? "제품 자료 " + docs.length + "건은 이미 쓰입니다" : "아직 넣은 것 없음"))
+      : (docs.length ? "지식으로 쓰입니다" : "아직 넣은 것 없음");
     document.getElementById("tSess").textContent = sess.length;
     document.getElementById("dSess").textContent = sess.length ? "지금까지 나눈 대화" : "아직 없음";
 
