@@ -244,14 +244,23 @@
     btn.disabled = false;
   }
 
+  // ⚠ `/api/memory/ingest-file`의 content는 **base64**다(server `memory.ts:1142·1159`).
+  //   평문을 보내면 서버가 base64로 되돌려 읽어 **깨진 글이 지식으로 들어가는데 응답은 성공**이다.
+  //   2026-08-13 실측: 평문 조각이 `"M0n6S /"`였다 — 그 글이 챗봇 답변의 근거가 된다.
+  async function 파일을base64로(f) {
+    var buf = new Uint8Array(await f.arrayBuffer());
+    var bin = "";
+    for (var i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+    return btoa(bin);
+  }
+
   async function 넣기() {
     var f = document.getElementById("file").files[0];
     var msg = document.getElementById("upMsg"), btn = document.getElementById("upGo");
     if (!f) { msg.innerHTML = '<div class="err">파일을 고르세요.</div>'; return; }
     btn.disabled = true; msg.innerHTML = '<div class="empty">넣는 중…</div>';
     try {
-      var text = await f.text();
-      await g.ingestMemoryFile(f.name, text, "global");
+      await g.ingestMemoryFile(f.name, await 파일을base64로(f), "global");
       var 들어갔나 = false;
       try {
         var all = await g.listMemoryDocuments();

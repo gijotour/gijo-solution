@@ -198,14 +198,25 @@
     btn.disabled = false;
   }
 
+  // ⚠ `/api/memory/ingest-file`의 content는 **base64**다(server `memory.ts:1142·1159` —
+  //   `Buffer.from(content, "base64")`). 평문을 그대로 보내면 서버가 그걸 base64로 되돌려 읽어
+  //   **알아볼 수 없는 글이 지식으로 들어간다.** 그런데 응답은 성공이라 화면은 「넣었습니다」라고 말한다.
+  //   2026-08-13 실측: 평문으로 넣은 조각이 `"M0n6S /"` — 그 글이 챗봇 답변의 근거가 된다.
+  //   ⚠ f.text() → btoa()로 돌리지 않는다. 바이트를 그대로 담는 게 맞다(인코딩을 두 번 안 거친다).
+  async function 파일을base64로(f) {
+    var buf = new Uint8Array(await f.arrayBuffer());
+    var bin = "";
+    for (var i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode.apply(null, buf.subarray(i, i + 0x8000));
+    return btoa(bin);
+  }
+
   async function 넣기() {
     var f = document.getElementById("file").files[0];
     var msg = document.getElementById("upMsg"), btn = document.getElementById("upGo");
     if (!f) { msg.innerHTML = '<div class="err">파일을 고르세요.</div>'; return; }
     btn.disabled = true; msg.innerHTML = '<div class="empty">넣는 중…</div>';
     try {
-      var text = await f.text();
-      await g.ingestMemoryFile(f.name, text, "global");
+      await g.ingestMemoryFile(f.name, await 파일을base64로(f), "global");
       // ⚠ 넣자마자 분류를 붙인다 — 안 붙이면 이 화면 목록에 안 나타난다.
       //   「넣었는데 안 보인다」가 가장 헷갈리는 실패다.
       try { await g.setDocCategory(f.name, 분류); } catch (e2) { /* 분류 실패는 아래에서 알린다 */ }
