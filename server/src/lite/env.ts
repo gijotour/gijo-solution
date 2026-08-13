@@ -78,3 +78,14 @@ console.log(`[lite] 모델 폴더(쓰기 가능): ${쓰기모델자리} — 챗 
 //   ⚠ 등급표(TIER_SPECS) 자체는 「표준 제품 완성 후 다시 본다」는 결정이 서 있어 안 건드린다.
 if (!process.env.GIJO_LOCAL_LLM_CTX_SIZE) process.env.GIJO_LOCAL_LLM_CTX_SIZE = "8192";
 if (!process.env.GIJO_MAX_LOADED_MODELS) process.env.GIJO_MAX_LOADED_MODELS = "1";
+
+// ★ 라이트 기본 포트 7445 (사장님 지시 2026-08-13 · 라이트 7445 / 스탠다드·프로 7446).
+//
+// ⚠ max가 이 한 줄을 **일부러 안 켜 두었다** — 클라(헬스 폴링·렌더러 기본 주소)가 아직 4000을
+//   보고 있을 때 서버만 7445로 옮기면 **지금 잘 도는 dmg가 깨진다**(서버는 7445, 클라는 4000).
+//   그래서 클라 쪽 단일 출처(main.ts 서버포트())와 **같은 커밋**에서 켠다.
+// ⚠ 클라가 띄울 때는 spawn env에 GIJO_SERVER_PORT가 이미 실려 오므로 이 줄은 안 덮는다.
+//   여기가 사는 자리는 **라이트 서버를 직접 띄우는 길**이다(개발·라이트 게이트 측정) —
+//   그 길이 4000으로 뜨면 「제품이 가는 길이 아닌 것」을 재게 된다(max가 32/33에서 겪은 그 함정).
+if (!process.env.GIJO_SERVER_PORT) process.env.GIJO_SERVER_PORT = "7445";
+console.log(`[lite] 서버 포트: ${process.env.GIJO_SERVER_PORT}`);

@@ -30,7 +30,38 @@ interface AuthState {
 }
 let authState: AuthState = { accessToken: null, refreshToken: null, serverUrl: null };
 
+/**
+ * 에디션이 정하는 **기본 포트** — 라이트 7445 · 스탠다드/프로 7446 (사장님 지시 2026-08-13).
+ *
+ * ⚠ **여기가 단일 출처다.** 예전에는 `4000`이 네 곳에 따로 박혀 있었고(서버 listen · 헬스 폴링 ·
+ *   렌더러 기본 주소 · login 안내문), 네 곳이 **전부 같아야 첫 로그인이 된다.** 하나만 어긋나면
+ *   화면은 멀쩡히 뜨는데 로그인만 **조용히** 실패한다 — 아래 헬스 폴링 주석이 이미 경고하던 자리다.
+ *
+ * ⚠ **프로는 스탠다드와 같은 포트(7446)를 쓴다**(사장님 결정 2026-08-13, max 권고안 B).
+ *   프로는 별도 빌드가 아니라 스탠다드의 **런타임 티어**(app_state gijoTier)라 같은 프로세스다.
+ *   포트는 **부팅 때** 정해지는데 티어는 **부팅 후 DB에서** 읽으므로, 포트를 가르려면 런처가
+ *   부팅 전에 티어를 알아야 한다 — 그 상태와 DB 티어가 어긋나면 엉뚱한 포트로 뜬다.
+ *   프로는 「기능 등급」이지 「다른 서버」가 아니므로 가를 실익이 없다.
+ *
+ * ⚠ 지금 4000에서 도는 앱은 그대로 둔다 — **다음 빌드부터** 새 포트다(사장님 「그대로 두고 다음부터」).
+ *   env로 명시한 값이 있으면 그것이 이긴다(개발·원격 지정).
+ */
+function 서버포트(): number {
+  const 지정 = Number(process.env.GIJO_SERVER_PORT);
+  if (Number.isFinite(지정) && 지정 > 0) return 지정;
+  return 에디션() === "lite" ? 7445 : 7446;
+}
+
+/** 이 앱이 기본으로 붙을 서버 주소 — 렌더러(core.ts)가 auth:getState로 이 값을 집는다. */
+function 기본서버주소(): string {
+  return process.env.GIJO_SERVER_URL ?? `http://localhost:${서버포트()}`;
+}
+
 ipcMain.on("auth:getState", (event) => {
+  // ⚠ serverUrl을 **첫 실행에 seed**한다(2026-08-13). core.ts는 렌더러라 에디션을 모르고
+  //   `persisted.serverUrl ?? DEFAULT_SERVER_URL`로 떨어지는데, 그 DEFAULT가 literal 4000이었다.
+  //   여기서 채워 주면 core.ts의 상수를 안 건드리고도 에디션 포트가 렌더러까지 흐른다.
+  if (!authState.serverUrl) authState.serverUrl = 기본서버주소();
   event.returnValue = authState;
 });
 ipcMain.on("auth:setState", (_event, state: AuthState) => {
@@ -158,7 +189,14 @@ function 번들서버구성(): { entry: string; serverRoot: string; dataRoot: st
   //   원래 맞는 자리고, 여기서 userData로 옮기면 담당자가 쓰던 개발 DB를 못 보게 된다.
   const 패키징본 = bundledServerEntry === 패키징경로;
   const dataRoot = 패키징본 ? app.getPath("userData") : serverRoot;
-  const env: NodeJS.ProcessEnv = { ...process.env, ELECTRON_RUN_AS_NODE: "1" };
+  // ⚠ 포트를 **spawn env로 넘긴다** — server/src/index.ts:42가 `GIJO_SERVER_PORT ?? 4000`이라
+  //   env가 이긴다. 서버 쪽 기본값(4000)은 손대지 않는다(직접 띄우는 개발 경로를 안 깨려고).
+  //   서버포트()가 이미 process.env 지정을 존중하므로 여기서 또 갈래를 두지 않는다.
+  const env: NodeJS.ProcessEnv = {
+    ...process.env,
+    ELECTRON_RUN_AS_NODE: "1",
+    GIJO_SERVER_PORT: String(서버포트()),
+  };
   if (패키징본) {
     try { fs.mkdirSync(dataRoot, { recursive: true }); } catch { /* 이미 있으면 그만 */ }
     env.GIJO_DOCS_DIR = path.join(serverRoot, "docs");
@@ -269,10 +307,11 @@ ipcMain.handle("setup:createAdmin", async (_e, username: string, password: strin
   maybeStartBundledServer({ GIJO_INITIAL_ADMIN_USERNAME: id, GIJO_INITIAL_ADMIN_PASSWORD: pw });
 
   // 계정이 만들어질 때까지 기다린다 — 여기서 안 기다리면 로그인 화면이 먼저 떠서 실패한다.
-  // (포트는 login.html의 기본값과 같은 4000이다 — 두 곳이 어긋나면 첫 로그인이 조용히 실패한다)
+  // ⚠ 포트는 **서버포트() 한 곳**에서 온다(2026-08-13). 예전엔 여기·렌더러·login 안내문에
+  //   `4000`이 따로 박혀 있었고, 하나만 어긋나면 첫 로그인이 **조용히** 실패했다.
   for (let i = 0; i < 90; i++) {
     try {
-      const r = await fetch("http://127.0.0.1:4000/api/health");
+      const r = await fetch(`http://127.0.0.1:${서버포트()}/api/health`);
       if (r.ok) { 첫설치 = false; return { ok: true }; }
     } catch { /* 아직 안 떴다 */ }
     await new Promise((r) => setTimeout(r, 1000));
