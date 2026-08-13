@@ -51,6 +51,12 @@ const gijoApi = {
   // 첫 설치 — 관리자 계정을 고객이 정한다(setup.html). 서버는 이 값을 받아 계정을 만든다.
   setupNeeded: () => ipcRenderer.invoke("setup:needed"),
   setupCreateAdmin: (username: string, password: string) => ipcRenderer.invoke("setup:createAdmin", username, password),
+  // 에디션 조회·라이트 모드 전환(2026-08-13 사장님 지시 2번) — main.ts의 seam(edition:get/set)에
+  // 닿는 **유일한 다리**다. ⚠ 이 두 줄이 없으면 seam은 「설계는 됐고 쓰인 적 없다」가 된다
+  //   (max가 정확히 그렇게 짚었다: 「preload 다리 0 · 설정 토글 0 — 켜고 끌 방법이 없다」).
+  //   스위치 UI는 시안 승인 후 설정 화면에 얹는다 — 다리는 UI가 아니므로 먼저 놓는다.
+  editionGet: () => ipcRenderer.invoke("edition:get"),
+  editionSet: (mode: string) => ipcRenderer.invoke("edition:set", mode),
   mfaResetUser: (userId: string) => api.authApi.mfaResetUser(userId),
   mfaPolicy: () => api.authApi.mfaPolicy(),
   mfaSetPolicy: (on: boolean) => api.authApi.mfaSetPolicy(on),

@@ -165,6 +165,14 @@ describe("★ 라이트 모드 옵션 — 자리가 열려 있다 (2026-08-13)",
     expect(main, "dataRoot가 전환을 안 본다").toMatch(/라이트모드전환\(\)[\s\S]{0,120}userData[\s\S]{0,40}"lite"/);
   });
 
+  it("★ preload 다리가 있다 — 없으면 seam은 「설계는 됐고 쓰인 적 없다」다 (2026-08-13)", () => {
+    // max가 정확히 짚었다: 「preload 다리 0 · 설정 토글 0 — 켜고 끌 방법이 없다」.
+    // 스위치 UI는 시안 승인 후지만, 다리는 UI가 아니므로 먼저 놓는다.
+    const preload = fs.readFileSync(new URL("../../client/src/preload.ts", import.meta.url), "utf8");
+    expect(preload, "editionGet 다리가 없다").toMatch(/editionGet.*edition:get/);
+    expect(preload, "editionSet 다리가 없다").toMatch(/editionSet.*edition:set/);
+  });
+
   it("모드 변경 통로가 있고, 변경은 재시작을 요구한다", () => {
     expect(main, "edition:get 통로가 없다").toMatch(/ipcMain\.handle\("edition:get"/);
     expect(main, "edition:set 통로가 없다").toMatch(/ipcMain\.handle\("edition:set"/);

@@ -503,7 +503,7 @@ export function seedSampleAssetsIfEmpty(): void {
   if ((listAssetRowsStmt.all() as AssetRow[]).length > 0) return;
   registerAsset({
     id: "ai-secbot-01",
-    name: "사내 보안 상담 챗봇",
+    name: "샘플-보안 상담 챗봇",
     path: "/srv/ai/secbot",
     assetType: "LLM 서비스",
     owner: "보안팀",
@@ -515,7 +515,7 @@ export function seedSampleAssetsIfEmpty(): void {
   });
   registerAsset({
     id: "ai-doccls-02",
-    name: "문서 민감도 분류 AI",
+    name: "샘플-문서 민감도 분류 AI",
     path: "/srv/ai/doc-classifier",
     assetType: "분류 모델",
     owner: "정보보호팀",
@@ -524,7 +524,7 @@ export function seedSampleAssetsIfEmpty(): void {
   });
   registerAsset({
     id: "ai-anomaly-03",
-    name: "이상행위 탐지 엔진",
+    name: "샘플-이상행위 탐지 엔진",
     path: "/srv/ai/anomaly",
     assetType: "이상탐지 모델",
     owner: "SOC",

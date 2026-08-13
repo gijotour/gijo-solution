@@ -434,7 +434,7 @@ function seedSamplesIfEmpty(): void {
   // 5) 문서분류 AI(AI 자산 연결) — 반려→재점검→승인 전체 사이클(타임라인 시연용)
   const dcBase = now - 14 * DAY;
   const doc = save({
-    id: newId(), title: "학습데이터 접근권한 점검", productName: "문서 민감도 분류 AI",
+    id: newId(), title: "학습데이터 접근권한 점검", productName: "샘플-문서 민감도 분류 AI",
     assetId: "ai-doccls-02", scheduleDate: dstr(dcBase), intervalDays: 30, status: "approved",
     reportNote: "2차 재점검 — 접근권한 최소화 적용 완료", reportedBy: "정요한", reportedAt: dcBase + 4 * DAY,
     reviewedBy: "정요한", reviewedAt: dcBase + 5 * DAY, createdAt: dcBase, updatedAt: dcBase + 5 * DAY,
@@ -447,7 +447,7 @@ function seedSamplesIfEmpty(): void {
 
   // 6) 이상탐지 엔진(AI 자산 연결) — 반려(재보고 대기)
   const an = save({
-    id: newId(), title: "오탐 룰 점검", productName: "이상행위 탐지 엔진",
+    id: newId(), title: "오탐 룰 점검", productName: "샘플-이상행위 탐지 엔진",
     assetId: "ai-anomaly-03", scheduleDate: dstr(now - 3 * DAY), intervalDays: 90, status: "rejected",
     reportNote: "오탐 룰 검토, 일부 임계값만 조정", reportedBy: "정요한", reportedAt: now - 4 * DAY,
     reviewedBy: "정요한", reviewedAt: now - 3 * DAY, reviewNote: "오탐률 여전히 높음 — 임계값 재산정 후 재보고",
