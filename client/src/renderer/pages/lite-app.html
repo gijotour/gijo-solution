@@ -135,8 +135,9 @@
       a.className = "lite-nav-item" + (지금 === s.id ? " on" : "") + (s.구현됨 ? "" : " todo");
       a.type = "button";
       a.dataset.id = s.id;
+      // no=0은 번호 없는 특별 항목(AI에게 물어보기) — 숫자 대신 💬.
       a.innerHTML =
-        '<span class="n">' + s.no + "</span>" +
+        '<span class="n">' + (s.no ? s.no : "💬") + "</span>" +
         '<span class="t">' + esc(s.이름) + "</span>" +
         (s.구현됨 ? "" : '<span class="badge">준비 중</span>');
       a.addEventListener("click", function () { 열기(s.id); });

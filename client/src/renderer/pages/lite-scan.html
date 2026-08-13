@@ -56,7 +56,7 @@
 </head>
 <body>
 <div class="wrap">
-  <div class="scr-id"><b>스캐너</b> — 이 PC의 보안 설정 점검 + 이 PC의 AI 견고성 점검.</div>
+  <div class="scr-id"><b>스캐너</b> — 보안 설정 점검(이 PC·지정 대상) + AI 견고성 점검(대상 골라). 결과는 아래 「지난 점검」에 쌓입니다.</div>
 
   <section class="card">
     <h2>점검하기 <span style="font-size:11px;color:var(--muted);font-weight:600">보안 설정(CCE·CIS)</span></h2>
@@ -74,16 +74,22 @@
   </section>
 
   <section class="card">
-    <h2>AI 견고성 점검 <span style="font-size:11px;color:var(--muted);font-weight:600">이 PC의 AI</span></h2>
-    <div class="sub">이 PC에서 도는 AI에 공격 문항 30여 개를 보내 <b>얼마나 잘 버티는지</b> 점검합니다.
-      프롬프트 인젝션·탈옥·시스템 프롬프트 유출 같은 것을 시험합니다.</div>
+    <h2>AI 견고성 점검</h2>
+    <div class="sub">AI에 공격 문항 30여 개를 보내 <b>얼마나 잘 버티는지</b> 점검합니다 —
+      프롬프트 인젝션·탈옥·시스템 프롬프트 유출 등. 스캐너처럼 <b>대상을 골라</b> 점검하세요.</div>
+    <div class="row"><span class="k">대상 AI</span><select id="rtTarget" style="flex:1"></select></div>
     <div class="row"><button class="go" id="rtGo">점검 시작</button>
       <span style="font-size:11.5px;color:var(--muted-2)">약 1분 걸립니다 — 그동안 대화는 잠깐 느려질 수 있습니다.</span></div>
     <div id="rtMsg"></div>
     <div class="res" id="rtRes"></div>
-    <div class="guard">⚠ 점수는 <b>지금 이 PC에 올라온 모델</b> 기준입니다. 라이트 동봉 모델은 작아
-      점수가 낮게 나올 수 있습니다 — 더 큰 모델(스탠다드급)일수록 견고성이 올라갑니다.
-      이건 <b>내 AI가 얼마나 단단한지 스스로 확인</b>하는 것이지, 제품 고장이 아닙니다.</div>
+    <div class="guard">⚠ 점수는 <b>고른 모델</b> 기준입니다 — 작은 모델은 낮게 나올 수 있고, 큰 모델일수록 올라갑니다.
+      <b>내 AI가 얼마나 단단한지 스스로 확인</b>하는 것이지 제품 고장이 아닙니다.
+      (사내 다른 AI 서버 점검은 원격 GPU 연동이 열리면 여기에 대상으로 추가됩니다.)</div>
+  </section>
+
+  <section class="card">
+    <h2>지난 AI 견고성 점검 <span id="rtHistCnt" style="font-size:11.5px;color:var(--muted);font-weight:600"></span></h2>
+    <div id="rtHist">불러오는 중…</div>
   </section>
 
   <section class="card" id="saveCard" style="display:none">
@@ -228,30 +234,58 @@
     "jailbreak": "탈옥", "obfuscation": "우회·인코딩", "indirect": "간접 주입",
     "training-leak": "학습데이터 유출", "hallucination": "환각",
   };
+  // 대상 목록 — 등록된 챗 모델 중에 고른다(스캐너의 「대상」에 대응). 비우면 기본(올라온 모델).
+  async function 대상목록() {
+    var sel = document.getElementById("rtTarget");
+    try {
+      var m = await g.listModels();
+      var arr = (Array.isArray(m) ? m : (m && m.models) || []);
+      sel.innerHTML = '<option value="">지금 올라온 모델(기본)</option>' +
+        arr.map(function (x) { var id = x.id || x; return '<option value="' + esc(id) + '">' + esc(id) + "</option>"; }).join("");
+    } catch (e) { sel.innerHTML = '<option value="">지금 올라온 모델(기본)</option>'; }
+  }
+  // 견고성 결과 한 덩이를 그린다(방금 점검·지난 점검 공용).
+  function 결과HTML(r) {
+    var total = r.total ?? 0, vuln = r.vulnerable ?? 0, err = r.errored ?? 0, 막음 = total - vuln - err;
+    var 점수 = r.robustnessScore;
+    var 색 = 점수 == null ? "var(--muted)" : 점수 >= 70 ? "var(--teal)" : 점수 >= 40 ? "var(--amber)" : "var(--red)";
+    var 갈래 = r.byCategory || {};
+    var 줄 = Object.keys(갈래).map(function (k) {
+      var v = 갈래[k] || {}; var t = v.total ?? 0, bad = v.vulnerable ?? 0;
+      return '<div class="run"><span class="t">' + esc(갈래이름[k] || k) + "</span>" +
+        '<span class="m">' + (bad ? '<span style="color:var(--red)">막지 못함 ' + bad + "</span> · " : "") +
+        "막음 " + (t - bad) + " / " + t + "</span></div>";
+    }).join("");
+    return '<div style="font-size:22px;font-weight:800;color:' + 색 + ';padding:6px 0">견고성 ' +
+      (점수 == null ? "?" : 점수) + '<span style="font-size:13px;color:var(--muted);font-weight:600"> / 100</span>' +
+      (r.model ? ' <span style="font-size:12px;color:var(--muted-2);font-weight:600">· ' + esc(r.model) + "</span>" : "") + "</div>" +
+      '<div class="sub" style="margin-bottom:8px">공격 ' + total + "개 중 <b>" + 막음 + "개 막음</b>" +
+      (vuln ? " · <span style=\"color:var(--red)\">" + vuln + "개 뚫림</span>" : " · 뚫림 없음") +
+      (err ? " · 오류 " + err : "") + "</div>" + 줄;
+  }
+  async function 견고성이력() {
+    var box = document.getElementById("rtHist");
+    try {
+      var last = await g.lastRedTeam();
+      if (!last || last.total == null) {
+        box.innerHTML = '<div class="empty">아직 AI 견고성을 점검한 적이 없습니다. 위에서 한 번 돌려 보세요.</div>';
+        document.getElementById("rtHistCnt").textContent = ""; return;
+      }
+      document.getElementById("rtHistCnt").textContent = "가장 최근";
+      box.innerHTML = 결과HTML(last) +
+        '<div class="note" style="font-size:11px;color:var(--muted-2);margin-top:6px">가장 최근 점검 결과입니다 — 다시 돌리면 갱신됩니다.</div>';
+    } catch (e) { box.innerHTML = '<div class="err">' + 오류문구(e, "지난 AI 견고성") + "</div>"; }
+  }
   async function 견고성점검() {
     var msg = document.getElementById("rtMsg"), res = document.getElementById("rtRes"), btn = document.getElementById("rtGo");
+    var 대상 = String(document.getElementById("rtTarget").value || "");
     btn.disabled = true; res.textContent = "";
     msg.innerHTML = '<div class="empty">AI에 공격 문항을 보내는 중입니다 — <b>약 1분</b> 걸립니다. 창을 닫지 마세요.</div>';
     try {
-      var r = await g.runRedTeam();
-      var total = r.total ?? 0, vuln = r.vulnerable ?? 0, err = r.errored ?? 0;
-      var 막음 = total - vuln - err;
-      var 점수 = r.robustnessScore;
-      var 색 = 점수 == null ? "var(--muted)" : 점수 >= 70 ? "var(--teal)" : 점수 >= 40 ? "var(--amber)" : "var(--red)";
+      var r = await g.runRedTeam(대상 ? { modelId: 대상 } : undefined);
       msg.innerHTML = '<div class="ok">끝났습니다.</div>';
-      var 갈래 = r.byCategory || {};
-      var 줄 = Object.keys(갈래).map(function (k) {
-        var v = 갈래[k] || {}; var t = v.total ?? 0, bad = v.vulnerable ?? 0;
-        return '<div class="run"><span class="t">' + esc(갈래이름[k] || k) + "</span>" +
-          '<span class="m">' + (bad ? '<span style="color:var(--red)">막지 못함 ' + bad + "</span> · " : "") +
-          "막음 " + (t - bad) + " / " + t + "</span></div>";
-      }).join("");
-      res.innerHTML =
-        '<div style="font-size:22px;font-weight:800;color:' + 색 + ';padding:6px 0">견고성 ' +
-          (점수 == null ? "?" : 점수) + '<span style="font-size:13px;color:var(--muted);font-weight:600"> / 100</span></div>' +
-        '<div class="sub" style="margin-bottom:8px">공격 ' + total + "개 중 <b>" + 막음 + "개 막음</b>" +
-          (vuln ? " · <span style=\"color:var(--red)\">" + vuln + "개 뚫림</span>" : " · 뚫림 없음") +
-          (err ? " · 오류 " + err : "") + "</div>" + 줄;
+      res.innerHTML = 결과HTML(r);
+      견고성이력();   // 지난 점검 칸도 갱신
     } catch (e) {
       msg.innerHTML = '<div class="err">' + 오류문구(e, "AI 견고성 점검") +
         '<br><span style="font-size:11.5px">모델이 올라와 있어야 합니다 — ⚙ 설정에서 확인해 주세요.</span></div>';
@@ -262,7 +296,7 @@
     document.getElementById("go").addEventListener("click", 점검);
     document.getElementById("saveGo").addEventListener("click", 남기기);
     document.getElementById("rtGo").addEventListener("click", 견고성점검);
-    기준목록(); 이력();
+    기준목록(); 이력(); 대상목록(); 견고성이력();
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", 시작);
   else 시작();

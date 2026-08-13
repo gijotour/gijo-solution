@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS Lite — AI에게 물어보기</title>
+<link rel="stylesheet" href="gijo-ui.css">
+<!--
+  lite-chat.html — 라이트 「AI에게 물어보기」(자유 대화). 2026-08-13 사장님 실사용 피드백:
+  「대화창이 없다」 — 9개 화면은 각자 영역 검색(RAG)만 했고, 13개 도구를 대화로 부를 UI가 없었다.
+
+  ■ 여기가 그 자리다 — dispatch(g.sendInstruction)로 태운다. dispatch가 도구를 골라 쓴다
+    (search·explain·remediation·law_lookup·add_task 등 라이트 13개). 각 화면의 「물어보기」는
+    자기 영역 안 검색이고, 여기는 **무엇이든** 묻는 곳이다.
+  ■ ⚠ 쓰기 도구(작업 추가 등)는 dispatch가 결재판을 띄운다 — 라이트도 그 규칙을 탄다.
+  ■ 다리: sendInstruction(text, sessionId) → { output, toolCalls }
+-->
+<style>
+  :root{--bg:#262624;--panel:#30302e;--border:rgba(255,255,255,.09);--text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--blue:#3b82f6;--teal:#1eb980;--red:#e2483d;--amber:#f0a020;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;
+    display:flex;flex-direction:column}
+  .scr-id{font-size:12.5px;color:var(--muted);padding:14px 22px 8px}
+  .scr-id b{color:var(--text);font-weight:800}
+  #log{flex:1 1 auto;overflow-y:auto;padding:6px 22px 12px;display:flex;flex-direction:column;gap:12px}
+  .msg{max-width:760px;line-height:1.75}
+  .me{align-self:flex-end;background:var(--blue);color:#fff;border-radius:12px 12px 3px 12px;padding:9px 13px;white-space:pre-wrap}
+  .ai{align-self:flex-start;background:var(--panel);border:1px solid var(--border);border-radius:12px 12px 12px 3px;padding:11px 14px;white-space:pre-wrap}
+  .ai .tools{font-size:11px;color:var(--muted-2);margin-top:8px;border-top:1px solid var(--border);padding-top:6px}
+  .empty{color:var(--muted);line-height:1.85;padding:10px 2px}
+  .empty b{color:var(--text)}
+  .empty .ex{display:inline-block;margin:4px 6px 0 0;padding:5px 11px;border:1px solid var(--border);border-radius:999px;cursor:pointer;color:var(--text)}
+  .empty .ex:hover{border-color:var(--blue);color:var(--blue)}
+  .bar{flex:0 0 auto;display:flex;gap:8px;padding:10px 22px 16px;border-top:1px solid var(--border);background:var(--bg)}
+  .bar textarea{flex:1;resize:none;height:44px;max-height:140px;background:#262624;border:1px solid var(--border);border-radius:10px;
+    padding:11px 13px;color:var(--text);font:inherit;line-height:1.5}
+  .bar button{flex:0 0 auto;background:var(--blue);border:1px solid var(--blue);color:#fff;font:inherit;font-weight:700;
+    border-radius:10px;padding:0 18px;cursor:pointer}
+  .bar button:disabled{opacity:.5;cursor:default}
+  .warn{font-size:11px;color:var(--muted-2);padding:0 22px 8px}
+</style>
+</head>
+<body>
+  <div class="scr-id"><b>AI에게 물어보기</b> — 무엇이든 물어보세요. 검색·설명·조치·법령을 알아서 골라 답합니다.</div>
+  <div id="log"></div>
+  <div class="warn">⚠ 답은 이 PC 안에서 만들어집니다. 자료를 <b>바꾸는 일</b>(작업 추가 등)은 확인(결재)을 거쳐 실행됩니다.</div>
+  <div class="bar">
+    <textarea id="q" placeholder="예: 랜섬웨어 걸리면 뭐부터 해야 돼?  ·  로그 보관 며칠?  ·  프롬프트 인젝션이 뭐야?" aria-label="질문"></textarea>
+    <button class="go" id="send">보내기</button>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+  var g = window.gijo || null;
+  var 세션 = "lite-chat";  // 대화 이어짐(같은 세션). ⚠ 길어지면 앱 재시작으로 초기화(이력 한계).
+  var 보내는중 = false;
+  var esc = function (v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) {
+    return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+
+  function 오류문구(e) {
+    var m = String((e && e.message) || e || "");
+    if (/401|unauthorized/i.test(m)) return "로그인이 풀렸습니다 — 다시 로그인해 주세요.";
+    if (/준비되지|모델/i.test(m)) return "AI 모델이 아직 안 올라왔습니다 — ⚙ 설정 → 모델·엔진에서 올려 주세요.";
+    if (/fetch|network|ECONN/i.test(m)) return "서버에 닿지 못했습니다.";
+    return "답을 못 만들었습니다 — " + m;
+  }
+
+  var log = document.getElementById("log");
+  function 빈화면() {
+    log.innerHTML = '<div class="empty"><b>무엇이든 물어보세요.</b> 아래를 눌러 시작해도 됩니다.<br>' +
+      '<span class="ex">랜섬웨어 걸리면 뭐부터 해야 돼?</span>' +
+      '<span class="ex">로그 보관 며칠 해야 돼?</span>' +
+      '<span class="ex">프롬프트 인젝션 막으려면?</span>' +
+      '<span class="ex">개인정보 유출되면 며칠 안에 신고?</span></div>';
+    log.querySelectorAll(".ex").forEach(function (el) {
+      el.addEventListener("click", function () { document.getElementById("q").value = el.textContent; 보내기(); });
+    });
+  }
+  function 줄(cls, html) {
+    var d = document.createElement("div"); d.className = "msg " + cls; d.innerHTML = html;
+    log.appendChild(d); log.scrollTop = log.scrollHeight; return d;
+  }
+
+  async function 보내기() {
+    if (보내는중 || !g) return;
+    var inp = document.getElementById("q"), btn = document.getElementById("send");
+    var 글 = String(inp.value || "").trim();
+    if (!글) return;
+    // 첫 질문이면 안내 화면을 지운다
+    if (log.querySelector(".empty")) log.innerHTML = "";
+    줄("me", esc(글));
+    inp.value = ""; 보내는중 = true; btn.disabled = true;
+    var 대기 = 줄("ai", '<span style="color:var(--muted)">…생각 중</span>');
+    try {
+      var r = await g.sendInstruction(글, 세션);
+      var out = String((r && (r.output || r.reply || r.text)) || "");
+      var tools = (r && r.toolCalls || []).map(function (t) { return t.tool; })
+        .filter(function (t) { return t && t !== "사내지식"; });
+      대기.innerHTML = esc(out || "(빈 답이 왔습니다)") +
+        (tools.length ? '<div class="tools">쓴 도구: ' + esc(tools.join(" · ")) + "</div>" : "");
+    } catch (e) {
+      대기.innerHTML = '<span style="color:var(--red)">' + esc(오류문구(e)) + "</span>";
+    } finally {
+      보내는중 = false; btn.disabled = false; log.scrollTop = log.scrollHeight; inp.focus();
+    }
+  }
+
+  document.getElementById("send").addEventListener("click", 보내기);
+  document.getElementById("q").addEventListener("keydown", function (e) {
+    // Enter=보내기, Shift+Enter=줄바꿈
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); 보내기(); }
+  });
+  if (!g) { log.innerHTML = '<div class="empty">앱 안에서만 동작합니다.</div>'; }
+  else 빈화면();
+})();
+</script>
+</body>
+</html>
