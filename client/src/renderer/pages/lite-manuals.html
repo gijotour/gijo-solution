@@ -47,11 +47,55 @@
   .err{font-size:12.5px;color:var(--red);padding:6px 2px}
   .ok{font-size:12.5px;color:var(--teal);padding:6px 2px}
   .warn{font-size:11.5px;color:var(--amber);line-height:1.7;margin-top:8px}
+  /* 등록 장비 — 목록·직접 접근·도달 확인 (localStorage, 이 PC에만 저장) */
+  .devbar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+  .dev{display:flex;align-items:center;gap:9px;padding:9px 2px;border-bottom:1px solid var(--border)}
+  .dev:last-child{border-bottom:0}
+  .dot{flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:var(--muted-2);opacity:.45}
+  .dot.up{background:var(--teal);opacity:1}
+  .dot.down{background:var(--red);opacity:1}
+  .dev .nm{flex:0 0 auto;font-weight:700;max-width:190px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dev .ty{flex:0 0 auto;font-size:10.5px;color:var(--muted-2);border:1px solid var(--border);border-radius:999px;padding:1px 8px}
+  .dev .ad{flex:1;min-width:60px;font-size:11.5px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .dev .st{flex:0 0 auto;font-size:10.5px;color:var(--muted-2);min-width:52px;text-align:right}
+  .dev .act{flex:0 0 auto;display:flex;gap:4px}
+  .dev .act button{padding:4px 9px;font-size:11px}
+  .dev .act .open{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700}
+  .dev .act .x{border-color:transparent;color:var(--muted-2);padding:4px 6px}
+  .dev .act .x:hover{color:var(--red)}
+  .devadd{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+  .devadd input,.devadd select{background:#262624;border:1px solid var(--border);border-radius:8px;padding:7px 9px;color:var(--text);font:inherit;font-size:12px}
+  .devadd .nName{flex:1 1 150px}.devadd .nAddr{flex:2 1 210px}.devadd .nPort{flex:0 1 84px}.devadd .nNote{flex:1 1 120px}.devadd select{flex:0 1 128px}
+  #devMsg{margin-top:8px}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="scr-id"><b>보안 장비 등록부</b> — 장비 매뉴얼을 넣어 두고, 필요할 때 그 안에서 찾습니다.</div>
+  <div class="scr-id"><b>보안 장비 등록부</b> — 장비를 등록해 바로 접속하고, 매뉴얼을 넣어 두고 그 안을 찾습니다.</div>
+
+  <section class="card">
+    <div class="devbar">
+      <h2 style="margin:0">등록 장비 <span id="devCnt" style="font-size:11.5px;color:var(--muted);font-weight:600"></span></h2>
+      <button id="devProbeAll">전체 도달 확인</button>
+    </div>
+    <div class="sub">방화벽·스위치·서버 같은 장비를 적어 두고 <b>[열기]</b>로 관리 화면에 바로 들어갑니다 — 필요 시 SSH·주소 복사도.
+      <b>이 목록은 이 PC에만 저장됩니다.</b></div>
+    <div id="devList">불러오는 중…</div>
+    <div class="devadd">
+      <input class="nName" id="dName" placeholder="이름 (예: 본사 방화벽)" aria-label="장비 이름">
+      <select id="dType" aria-label="장비 종류">
+        <option>방화벽</option><option>스위치·라우터</option><option>서버</option>
+        <option>EDR·백신</option><option>NAS·스토리지</option><option>무선 AP</option><option>기타</option>
+      </select>
+      <input class="nAddr" id="dAddr" placeholder="관리 주소 (예: 192.168.0.1 또는 https://fw.local:8443)" aria-label="관리 주소">
+      <input class="nPort" id="dPort" type="number" min="1" max="65535" placeholder="포트(선택)" aria-label="포트">
+      <input class="nNote" id="dNote" placeholder="메모(선택)" aria-label="메모">
+      <button class="go" id="dAdd">추가</button>
+    </div>
+    <div id="devMsg"></div>
+    <div class="warn">⚠ <b>비밀번호·키는 저장하지 않습니다</b> — 계정·포트는 참고용으로만 적으세요.
+      실제 로그인은 접속할 때 브라우저·원격 앱에서 직접 합니다.</div>
+  </section>
 
   <section class="card">
     <h2>매뉴얼에서 찾기</h2>
@@ -238,10 +282,126 @@
     목록();
   }
 
+  // ── 등록 장비 — localStorage(이 PC 전용). ⚠ 비밀번호·키는 저장하지 않는다(주소·포트·메모만). ──
+  var 장비키 = "gijo.lite.devices";
+  function 장비읽기() {
+    try { var a = JSON.parse(localStorage.getItem(장비키) || "[]"); return Array.isArray(a) ? a : []; }
+    catch (e) { return []; }
+  }
+  function 장비쓰기(a) {
+    try { localStorage.setItem(장비키, JSON.stringify(a)); }
+    catch (e) { 장비알림("저장하지 못했습니다 — 이 PC의 브라우저 저장소가 막혀 있습니다.", true); }
+  }
+  function 장비알림(msg, 나쁨) {
+    var el = document.getElementById("devMsg");
+    el.innerHTML = '<div class="' + (나쁨 ? "err" : "ok") + '">' + esc(msg) + "</div>";
+    if (!나쁨) setTimeout(function () { if (el.textContent === msg) el.innerHTML = ""; }, 4000);
+  }
+  // 주소에서 순수 호스트만 — 스킴·경로·포트를 떼어 도달 확인·SSH에 쓴다.
+  function 호스트만(d) { return String(d.주소 || "").replace(/^[a-z]+:\/\//i, "").replace(/[\/?].*$/, "").replace(/:\d+$/, ""); }
+  function 웹주소(d) {
+    var a = String(d.주소 || "").trim();
+    if (/^https?:\/\//i.test(a)) return a;            // 이미 웹 주소면 그대로
+    if (/^[a-z]+:\/\//i.test(a)) return a;             // 다른 스킴도 그대로(메인이 다시 검사)
+    var host = a.replace(/^\/+/, "");
+    var port = (d.포트 && !/:\d+$/.test(host)) ? (":" + d.포트) : "";
+    return "https://" + host + port;                   // 스킴 없으면 https 기본(대개 장비 관리 UI)
+  }
+  function ssh주소(d) { var p = (d.포트 && Number(d.포트) !== 22) ? (":" + d.포트) : ""; return "ssh://" + 호스트만(d) + p; }
+  async function 열기(url) {
+    if (!g.openExternal) { 장비알림("이 버전은 직접 열기가 없습니다 — 주소를 복사해 여세요: " + url, true); return; }
+    try { await g.openExternal(url); }
+    catch (e) { 장비알림("여는 데 실패했습니다 — 주소를 복사해 직접 여세요: " + url, true); }
+  }
+  async function 복사(text) {
+    try { await navigator.clipboard.writeText(text); 장비알림("복사했습니다 — " + text); return; }
+    catch (e) { /* 아래 폴백 */ }
+    try {
+      var ta = document.createElement("textarea"); ta.value = text; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
+      장비알림("복사했습니다 — " + text);
+    } catch (e2) { 장비알림("복사하지 못했습니다 — 수동으로: " + text, true); }
+  }
+  // 도달 확인 — host:port에 TCP로 붙어 살아있나만 본다(ICMP 아님). 포트 없으면 443.
+  async function 도달(d, dot, st) {
+    if (!g.probeHost) { st.textContent = ""; return; }
+    var port = Number(d.포트) || 443;
+    st.textContent = "확인 중…"; dot.className = "dot";
+    try {
+      var r = await g.probeHost(호스트만(d), port, 2000);
+      if (r && r.up) { dot.className = "dot up"; st.textContent = r.ms + "ms"; }
+      else { dot.className = "dot down"; st.textContent = "응답 없음"; }
+    } catch (e) { dot.className = "dot"; st.textContent = "확인 실패"; }
+  }
+  function 장비목록그리기() {
+    var box = document.getElementById("devList");
+    var arr = 장비읽기();
+    document.getElementById("devCnt").textContent = arr.length ? arr.length + "대" : "";
+    if (!arr.length) {
+      box.innerHTML = '<div class="empty"><b>아직 등록한 장비가 없습니다.</b><br>' +
+        "아래에 이름과 관리 주소(예: 192.168.0.1)를 적어 추가하면, <b>[열기]</b>로 바로 관리 화면에 들어갑니다.</div>";
+      return;
+    }
+    box.innerHTML = arr.map(function (d) {
+      return '<div class="dev" data-id="' + esc(d.id) + '">' +
+        '<span class="dot" title="도달 여부 — 눌러서 확인"></span>' +
+        '<span class="nm" title="' + esc(d.이름) + '">' + esc(d.이름) + "</span>" +
+        '<span class="ty">' + esc(d.종류 || "기타") + "</span>" +
+        '<span class="ad" title="' + esc(d.주소) + (d.메모 ? " · " + esc(d.메모) : "") + '">' + esc(d.주소) + (d.포트 ? " :" + esc(d.포트) : "") + "</span>" +
+        '<span class="st"></span>' +
+        '<span class="act">' +
+          '<button class="open" data-act="open">열기</button>' +
+          '<button data-act="ssh">SSH</button>' +
+          '<button data-act="copy">복사</button>' +
+          '<button class="x" data-act="del" title="지우기">✕</button>' +
+        "</span></div>";
+    }).join("");
+    box.querySelectorAll(".dev").forEach(function (row) {
+      var id = row.dataset.id, d = 장비읽기().filter(function (x) { return x.id === id; })[0];
+      if (!d) return;
+      var dot = row.querySelector(".dot"), st = row.querySelector(".st");
+      row.querySelector('[data-act="open"]').addEventListener("click", function () { 열기(웹주소(d)); });
+      row.querySelector('[data-act="ssh"]').addEventListener("click", function () { 열기(ssh주소(d)); });
+      row.querySelector('[data-act="copy"]').addEventListener("click", function () { 복사(String(d.주소 || "") + (d.포트 ? ":" + d.포트 : "")); });
+      row.querySelector('[data-act="del"]').addEventListener("click", function () { 장비지우기(id); });
+      dot.addEventListener("click", function () { 도달(d, dot, st); });
+    });
+  }
+  function 장비추가() {
+    var 이름 = String(document.getElementById("dName").value || "").trim();
+    var 종류 = document.getElementById("dType").value;
+    var 주소 = String(document.getElementById("dAddr").value || "").trim();
+    var 포트 = String(document.getElementById("dPort").value || "").trim();
+    var 메모 = String(document.getElementById("dNote").value || "").trim();
+    if (!이름 || !주소) { 장비알림("이름과 관리 주소는 꼭 적어 주세요.", true); return; }
+    if (포트 && !(Number(포트) >= 1 && Number(포트) <= 65535)) { 장비알림("포트는 1~65535 사이여야 합니다.", true); return; }
+    var arr = 장비읽기();
+    arr.push({ id: "d" + Date.now() + "-" + Math.floor(Math.random() * 1e4), 이름: 이름, 종류: 종류, 주소: 주소, 포트: 포트, 메모: 메모 });
+    장비쓰기(arr);
+    ["dName", "dAddr", "dPort", "dNote"].forEach(function (i) { document.getElementById(i).value = ""; });
+    장비목록그리기();
+    장비알림("추가했습니다 — " + 이름);
+  }
+  function 장비지우기(id) {
+    장비쓰기(장비읽기().filter(function (x) { return x.id !== id; }));
+    장비목록그리기();
+  }
+  async function 전체도달() {
+    var rows = document.querySelectorAll("#devList .dev");
+    for (var i = 0; i < rows.length; i++) {
+      var id = rows[i].dataset.id, d = 장비읽기().filter(function (x) { return x.id === id; })[0];
+      if (d) await 도달(d, rows[i].querySelector(".dot"), rows[i].querySelector(".st"));
+    }
+  }
+
   function 시작() {
     document.getElementById("askGo").addEventListener("click", 찾기);
     document.getElementById("q").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); 찾기(); } });
     document.getElementById("upGo").addEventListener("click", 넣기);
+    document.getElementById("dAdd").addEventListener("click", 장비추가);
+    document.getElementById("dAddr").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); 장비추가(); } });
+    document.getElementById("devProbeAll").addEventListener("click", 전체도달);
+    장비목록그리기();
     목록();
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", 시작);

@@ -10,6 +10,7 @@ import { 셸옮길자리 } from "./util/layout";
 import * as fs from "fs";
 import * as http from "http";
 import * as https from "https";
+import * as net from "net";
 import { URL } from "url";
 import { isDangerous } from "./terminalPolicy";
 
@@ -1053,6 +1054,52 @@ ipcMain.handle("doc:open-temp", async (_e, filename: string, base64: string) => 
   const errMsg = await shell.openPath(target); // 빈 문자열이면 성공
   if (errMsg) throw new Error(`파일을 열 수 없습니다: ${errMsg}`);
   return { path: target };
+});
+
+// 라이트 「보안 장비 등록부」 직접 접근 — 장비 관리 화면을 OS 기본 앱으로 연다.
+//   ⚠ 스킴을 검사한다: 웹(http/https)·원격(ssh/rdp/vnc)만 허용. javascript:·file:·data: 등은 막는다.
+//   렌더러가 넘긴 주소를 그대로 여는 게 아니라, 여기서 한 번 더 거른다(주입 방어).
+const 허용스킴 = new Set(["http:", "https:", "ssh:", "rdp:", "vnc:"]);
+ipcMain.handle("shell:openExternal", async (_e, rawUrl: string) => {
+  const s = String(rawUrl || "").trim();
+  if (!s) throw new Error("주소가 비었습니다");
+  let u: URL;
+  try {
+    u = new URL(s);
+  } catch {
+    throw new Error("주소 형식이 올바르지 않습니다 (예: https://192.168.0.1)");
+  }
+  if (!허용스킴.has(u.protocol)) {
+    throw new Error(`이 방식(${u.protocol})은 열 수 없습니다 — 웹·SSH·RDP·VNC만 됩니다`);
+  }
+  await shell.openExternal(u.toString());
+  return { ok: true };
+});
+
+// 도달 확인 — host:port에 TCP로 붙어 살아있나만 본다. ICMP(ping)가 아니라 권한이 필요 없다.
+//   ⚠ 이 앱이 임의 호스트로 대량 접속하는 통로가 되지 않게, 한 번에 하나·짧은 타임아웃만 건다.
+ipcMain.handle("net:probe", async (_e, host: string, port: number, timeoutMs?: number) => {
+  const h = String(host || "").trim();
+  const p = Number(port);
+  if (!h) throw new Error("호스트가 비었습니다");
+  if (!Number.isInteger(p) || p < 1 || p > 65535) throw new Error("포트가 올바르지 않습니다 (1~65535)");
+  const limit = Math.min(Math.max(Number(timeoutMs) || 2000, 300), 5000);
+  const started = Date.now();
+  return await new Promise<{ up: boolean; ms: number }>((resolve) => {
+    const sock = new net.Socket();
+    let done = false;
+    const finish = (up: boolean) => {
+      if (done) return;
+      done = true;
+      try { sock.destroy(); } catch { /* 무해 */ }
+      resolve({ up, ms: Date.now() - started });
+    };
+    sock.setTimeout(limit);
+    sock.once("connect", () => finish(true));
+    sock.once("timeout", () => finish(false));
+    sock.once("error", () => finish(false));
+    try { sock.connect(p, h); } catch { finish(false); }
+  });
 });
 
 // 사용자가 작업 폴더를 직접 고른다(폴더 선택 다이얼로그). 선택하면 그 폴더가 새 루트가 된다.
