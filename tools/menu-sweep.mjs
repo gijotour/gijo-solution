@@ -30,6 +30,10 @@ await p.waitForTimeout(1500);
 // nav.js 메뉴에서 전체 화면 목록을 뽑는다(코드가 곧 목록 — 드리프트 없음).
 // 4.0.0에서 허브를 없앴으므로 메뉴 항목이 곧 화면이다. 별도 창으로 여는 항목(팀 사무실)은 뺀다.
 await p.waitForTimeout(500);
+// ★ 「대표 그룹」도 화면이다(2026-08-13 실측: IA 통합으로 항목 1개 그룹은 하위 줄 없이
+//   **그룹 줄 자체가 메뉴**가 됐다 — nav.js `대표` 분기. .gn-item만 읽던 이 스윕이
+//   8개만 훑고 「통과」를 찍었다. 대표 그룹 7개(발견·수집/우선순위/조치/검증/보고/등록부/AI)가
+//   통째로 사각이었다). .gn-item + 대표 그룹 헤더(.gn-g에 개수 배지 .cnt 없음)를 함께 모은다.
 const pages = await p.evaluate(() => {
   const out = [];
   const seen = new Set(); // 즐겨찾기 가지에 같은 화면이 또 있다 — 두 번 훑을 필요는 없다
@@ -44,6 +48,15 @@ const pages = await p.evaluate(() => {
     //   창으로 여는 항목은 이름 끝에 "(창)"을 붙이는 것이 nav의 규약이므로 그걸로 판별한다.
     if (/\(창\)/.test(label)) return;
     out.push({ label: label });
+  });
+  document.querySelectorAll("#gijoNav .gn-g").forEach((gh) => {
+    if (gh.querySelector(".cnt")) return;               // 개수 배지가 있으면 접이식 그룹(대표 아님)
+    var nm = gh.querySelector(".gn-gname");
+    if (!nm) return;
+    var label = nm.textContent.trim();
+    if (!label || seen.has(label) || /즐겨찾기/.test(label)) return;
+    seen.add(label);
+    out.push({ label: label, 대표그룹: true });
   });
   return out;
 });
@@ -70,7 +83,11 @@ for (const t of pages) {
     await p.evaluate((label) => {
       const it = Array.from(document.querySelectorAll("#gijoNav .gn-item"))
         .find((e) => e.querySelector(".gn-label") && e.querySelector(".gn-label").textContent.trim() === label);
-      if (it) it.querySelector(".gn-label").click();
+      if (it) { it.querySelector(".gn-label").click(); return; }
+      // 대표 그룹 — 그룹 줄 자체가 메뉴다(여는 방식도 nav와 같게 헤더 클릭).
+      const gh = Array.from(document.querySelectorAll("#gijoNav .gn-g"))
+        .find((e) => !e.querySelector(".cnt") && e.querySelector(".gn-gname") && e.querySelector(".gn-gname").textContent.trim() === label);
+      if (gh) gh.click();
     }, t.label);
     await p.waitForTimeout(4000); // 탭 생성 + 초기 API 로드 대기
     // 실제 화면은 활성 탭 iframe 안에 있다.
@@ -98,8 +115,13 @@ for (const t of pages) {
     if (info.err) errors.push(info.err);
     // 내용이 있다는 것만으론 부족하다 — **누른 그 화면**이 열렸는지 봐야 한다.
     // (탭 상한·리다이렉트로 엉뚱한 화면이 활성인 채 통과하던 구멍을 막는다.)
-    if (!info.err && info.activeLabel !== t.label) {
+    // ⚠ 대표 그룹은 탭 라벨이 그룹명이 아니라 **항목 라벨**로 열린다(nav.js: items[0].label) —
+    //   같음 검사 대신 「탭이 하나 열렸는가」만 본다(닫고 시작했으므로 열렸으면 그 화면이다).
+    if (!info.err && !t.대표그룹 && info.activeLabel !== t.label) {
       errors.push(`다른 화면이 열렸다: 누름="${t.label}" 활성="${info.activeLabel}"`);
+    }
+    if (!info.err && t.대표그룹 && !info.activeLabel) {
+      errors.push(`대표 그룹이 탭을 못 열었다: "${t.label}"`);
     }
     // 리소스 404 등 네트워크성 콘솔 에러와 실제 JS 에러를 함께 본다(중복 제거).
     if (info.실패문구) errors.push("화면에 실패 문구: " + info.실패문구);
