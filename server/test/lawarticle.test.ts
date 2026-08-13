@@ -51,7 +51,9 @@ describe("배선 — 호출부가 실제로 있다(이번 결함의 본체)", ()
 
   it("★★ 못 찾으면 목록으로 물러나고 링크를 준다 — 빈손으로 끝내지 않는다", () => {
     const l = eng("lawinfo.ts");
-    expect(l).toContain("본문을 찾지 못했습니다");
+    // ⚠ 「찾지 못했습니다」 → 「검색되지 않았습니다」(2026-08-13) — drawer-audit의 실패 문구
+    //   목록과 겹쳐 정직한 안내에 실패 딱지가 붙던 계열(오늘 세 번째). 재는 것은 그대로다.
+    expect(l).toContain("본문이 검색되지 않았습니다");
     expect(l).toContain("return lawAnswer(query, \"law\");");
   });
 });

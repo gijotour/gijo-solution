@@ -333,6 +333,12 @@ export function 제목점수(title: string, 물음: string): number {
 
 /** 조문 본문 상한 — 프롬프트가 부풀어 최종답 생성이 멈추는 것을 막는다(MAX_FACT_CHARS와 같은 계열). */
 const 붙일조문 = 2;
+// ★ 상위 몇 개 **법령**까지 조문을 뒤질까 (2026-08-13).
+//   실무 기한은 대개 **시행령**에 있는데(72시간 = 개인정보 보호법 시행령 제40조①),
+//   검색 1위는 본법이다 — 「개인정보 보호법」 검색 실측: 1위 본법 · **2위 시행령**.
+//   1위만 뒤지면 72시간이 컨텍스트에 영영 안 들어가고 모델이 빈자리를 지어낸다(max 정밀 진단).
+//   ⚠ 늘릴 때는 법제처 호출이 법령당 1회씩 는다는 것을 함께 볼 것.
+const 조회할법령 = 3;
 const 조문본문상한 = 900;
 
 /**
@@ -357,40 +363,100 @@ const 조문본문상한 = 900;
  *   그 조문이 없는 것은 다른 사실이고, 뭉개면 모델이 그 빈자리를 「법에 없다」로 메운다
  *   (77% 누락 사고에서 `.catch(() => [])` 삼킴이 오진을 한 단계 더 굳혔다).
  */
-async function 물음에맞는조문본문(물음: string, 법: LawHit): Promise<string[]> {
-  const mst = String(법.id ?? "").trim();
-  if (!mst) return [];
-  let 조회실패: string | null = null;
-  // limit을 크게 준다 — 앞에서 N건만 받으면 제34조처럼 뒤에 있는 조문을 **고를 기회조차 없다.**
-  const articles = await getLawArticles(mst, undefined, 500).catch((e) => {
-    조회실패 = e instanceof Error ? e.message : String(e);
-    return [] as LawArticle[];
-  });
-  if (조회실패) {
-    return ["", `⚠ 「${법.title}」 조문 원문은 가져오지 못했습니다(${조회실패}) — **법에 없다는 뜻이 아닙니다.** 위 원문 링크에서 확인해 주세요.`];
+async function 물음에맞는조문본문(물음: string, 법들: LawHit[]): Promise<string[]> {
+  const 후보: { 법: LawHit; a: LawArticle; 점수: number }[] = [];
+  const 실패: string[] = [];
+  for (const 법 of 법들.slice(0, 조회할법령)) {
+    const mst = String(법.id ?? "").trim();
+    if (!mst) continue;
+    let 조회실패: string | null = null;
+    // limit을 크게 준다 — 앞에서 N건만 받으면 제34조처럼 뒤에 있는 조문을 **고를 기회조차 없다.**
+    const articles = await getLawArticles(mst, undefined, 500).catch((e) => {
+      조회실패 = e instanceof Error ? e.message : String(e);
+      return [] as LawArticle[];
+    });
+    if (조회실패) { 실패.push(`「${법.title}」(${조회실패})`); continue; }
+    for (const a of articles) {
+      const 점수 = 제목점수(`${a.title ?? ""} ${a.text.slice(0, 40)}`, 물음);
+      if (점수 > 0) 후보.push({ 법, a, 점수 });
+    }
   }
-  const 고른것 = articles
-    .map((a) => ({ a, 점수: 제목점수(`${a.title ?? ""} ${a.text.slice(0, 40)}`, 물음) }))
-    .filter((x) => x.점수 > 0)
-    .sort((x, y) => y.점수 - x.점수)
-    .slice(0, 붙일조문);
+  if (실패.length && !후보.length) {
+    return ["", `⚠ 조문 원문을 가져오지 못했습니다 — ${실패.join(" · ")}. **법에 없다는 뜻이 아닙니다.** 위 원문 링크에서 확인해 주세요.`];
+  }
+  // ★ **법령마다 가장 잘 맞는 것 하나씩 먼저 고른다.**
+  //   그냥 점수순으로 자르면 본법에서 두 건이 뽑혀 **시행령이 밀린다** — 그런데 실무 기한은
+  //   대개 시행령에 있다(72시간 = 개인정보 보호법 **시행령** 제40조①).
+  const 법령별최고 = new Map<string, { 법: LawHit; a: LawArticle; 점수: number }>();
+  for (const c of 후보) {
+    const k = String(c.법.id);
+    const 이전 = 법령별최고.get(k);
+    if (!이전 || 이전.점수 < c.점수) 법령별최고.set(k, c);
+  }
+  const 고른것 = [...법령별최고.values()].sort((x, y) => y.점수 - x.점수).slice(0, 붙일조문);
   if (!고른것.length) return [];
-  const out = ["", `▸ 「${법.title}」에서 물음과 맞닿은 조문 원문 ${고른것.length}건 (법제처에서 받은 그대로):`];
-  for (const { a } of 고른것) {
-    const 머리 = `제${a.no}조${a.title ? `(${a.title})` : ""}`;
+  const out = ["", `▸ 물음과 맞닿은 조문 원문 ${고른것.length}건 (법제처에서 받은 그대로):`];
+  for (const { 법, a } of 고른것) {
     out.push("");
-    if (!a.text.startsWith(`제${a.no}조`)) out.push(머리);
+    out.push(`[${법.title}] 제${a.no}조${a.title ? `(${a.title})` : ""}`);
     out.push(a.text.slice(0, 조문본문상한));
   }
   return out;
 }
 
+/**
+ * 물음에서 **아는 법령 이름**을 추려낸다. 없으면 null.
+ *
+ * ★ 왜 필요한가(2026-08-13 실측) — **법제처 검색은 「법령 제목」 검색이다.**
+ *   주제어를 섞으면 0건이 나오는데, 모델은 질문을 거의 그대로 넣는다:
+ *     「개인정보 보호법」                    → 2건 (본법 + 시행령)
+ *     「개인정보 보호법**에서 유출 신고**」   → **0건**
+ *     「개인정보 유출」                      → **0건**
+ *   0건이면 조문을 붙이는 수리(물음에맞는조문본문)가 **발동조차 못 한다** —
+ *   그래서 72시간이 컨텍스트에 안 들어가고 모델이 빈자리를 지어냈다.
+ *   ⚠ 프롬프트로 「법령 이름만 넣어라」라고 타이르지 않는다 — 이 크기 모델에 그 방식은
+ *     이 저장소에서 반복해 실패했다. **코드가 추려서 다시 찾는다.**
+ * ⚠ 긴 이름부터 본다 — 「개인정보 보호법 시행령」이 「개인정보 보호법」보다 먼저 걸려야 한다.
+ */
+export function 법령이름추리기(query: string): string | null {
+  const q = String(query ?? "").replace(/\s+/g, "");
+  const 후보 = [...IT_SECURITY_LAWS].sort((a, b) => b.length - a.length);
+  for (const 이름 of 후보) {
+    if (q.includes(이름.replace(/\s+/g, ""))) return 이름;
+  }
+  return null;
+}
+
 /** 챗봇 답변용 — 사람이 그대로 읽는 형식. 원문 링크를 반드시 함께 준다. */
 export async function lawAnswer(query: string, target: LawTarget = "law"): Promise<string> {
-  const hits = await searchLaw(query, target, 5);
+  let hits = await searchLaw(query, target, 5);
+  // ★ 0건이면 **아는 법령 이름으로 한 번 더** 찾는다(위 법령이름추리기 머리말 참고).
+  //   이 한 번이 「조문을 붙이는 수리」가 발동할 자리를 만든다.
+  if (!hits.length) {
+    const 이름 = 법령이름추리기(query);
+    if (이름) hits = await searchLaw(이름, target, 5).catch(() => []);
+  }
+  // ★ 그래도 0건이면 **긴 낱말부터 한 낱말씩** 다시 찾는다(2026-08-13 실측).
+  //   모델의 검색어는 「개인정보 유출 신고 기한」처럼 주제 문장이다 — 제목 검색이라 0건이다.
+  //   그런데 「개인정보」 **한 낱말**은 5건(본법+시행령)을 돌려준다. 법령 제목에 들어가는
+  //   낱말 하나면 충분한 것이다. 엉뚱한 법령이 걸려도 아래 조문 고르기(제목점수>0)가
+  //   걸러 낸다 — 물음과 안 겹치는 조문은 안 붙는다.
+  //   ⚠ 호출 상한 2회 — 재시도가 법제처를 두드리는 횟수를 묶는다.
+  if (!hits.length && target === "law") {
+    const 낱말들 = [...new Set(String(query).match(/[가-힣]{3,}/g) ?? [])]
+      .sort((a, b) => b.length - a.length)
+      .slice(0, 2);
+    for (const w of 낱말들) {
+      hits = await searchLaw(w, target, 5).catch(() => []);
+      if (hits.length) break;
+    }
+  }
   if (!hits.length) {
     return [
-      `🔎 찾지 못했습니다 — "${query}"로는 ${LAW_TARGETS[target].label} 검색 결과가 없습니다.`,
+      // ⚠ 「찾지 못했습니다」를 쓰지 않는다(2026-08-13) — 서랍 점검(drawer-audit.mjs)의
+      //   폴백 문구 목록(FAIL_MARKS)에 그 말이 있어 **제품이 정직하게 낸 답에 실패 딱지**가 붙는다.
+      //   오늘 llm.ts·actioncheck.ts에 이어 **세 번째로 같은 함정**을 만난 자리다.
+      `🔎 "${query}"로는 ${LAW_TARGETS[target].label} 검색 결과가 없습니다.`,
       "(없다는 뜻이 아니라 이 말로는 못 찾았다는 뜻입니다. 법령 이름을 정확히 쓰면 잘 찾습니다.)",
       "",
       `IT·보안 관련 법: ${IT_SECURITY_LAWS.slice(0, 4).join(" · ")} 등`,
@@ -404,7 +470,7 @@ export async function lawAnswer(query: string, target: LawTarget = "law"): Promi
   });
   // ★ 조문 번호가 없는 실무 질문에도 **본문**을 붙인다(위 물음에맞는조문본문 머리말 참고).
   //   ⚠ 법령일 때만 — 판례·행정규칙은 조문 조회(lawService.do target=law) 대상이 아니다.
-  if (target === "law") lines.push(...(await 물음에맞는조문본문(query, hits[0])));
+  if (target === "law") lines.push(...(await 물음에맞는조문본문(query, hits)));
   lines.push("", LEGAL_DISCLAIMER);
   return lines.join("\n");
 }
@@ -453,7 +519,7 @@ export async function lawArticleAnswer(query: string, article: string): Promise<
   }
   if (!articles.length) {
     return [
-      `🔎 「${법.title}」에서 제${article}조 본문을 찾지 못했습니다 — 조문 번호를 확인해 주세요.`,
+      `🔎 「${법.title}」에서 제${article}조 본문이 검색되지 않았습니다 — 조문 번호를 확인해 주세요.`,
       `   원문: ${법.link}`,
       "",
       LEGAL_DISCLAIMER,

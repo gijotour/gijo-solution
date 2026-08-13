@@ -946,6 +946,9 @@ export async function embed(texts: string[]): Promise<number[][]> {
     // 후자는 서버는 멀쩡한데 **요청이 잘못된 것**(입력이 문자열이 아님·ubatch 초과 등).
     // 실측(2026-08-06): 잘못된 인자로 온 500을 "연결할 수 없습니다"로 안내해 1시간을
     // 연결 문제로 헤맸다. 상태코드와 응답 본문을 그대로 보인다 — 오류문은 진단서다.
+    // FAIL_MARKS-예외: 이 문구는 throw로 나가는 **진짜 실패**다 — 점검 도구가 실패로 세는 것이 옳다.
+    //   (emptyanswer-guidance의 파일 전체 대조가 이 표시를 보고 이 줄을 건너뛴다. 정직한
+    //    「없다」 답변과 실제 오류를 가르는 표시이니, 답변 문자열에는 절대 붙이지 말 것.)
     const 원인 = res.status === 0
       ? "임베딩 서버에 연결할 수 없습니다. 별도 llama-server를 --embedding 플래그로 " + EMBEDDING_SERVER_URL + " 에 기동하세요."
       : `임베딩 서버가 요청을 거절했습니다(HTTP ${res.status}) — 입력 형식(문자열 배열)·길이를 확인하세요. 응답: ${res.text.slice(0, 200)}`;

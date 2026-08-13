@@ -2,6 +2,7 @@
 // 외부 호출은 스텁으로 막는다: 테스트가 인터넷에 의존하면 망 없는 곳에서 깨지고,
 // 법제처 사정으로 우리 CI가 빨개진다. 실제 호출은 별도로 실측했다(2026-07-26).
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
+import fs from "node:fs";
 
 vi.mock("../src/engine/llm", () => ({
   chat: vi.fn(async () => "[mock]"),
@@ -153,9 +154,39 @@ describe("법령 조회 — 응답 가공", () => {
   it("0건이면 '없다'고 단정하지 않고 다시 물어보게 안내한다", async () => {
     fetchMock.mockResolvedValue(jsonRes({ LawSearch: {} }));
     const out = await law.lawAnswer("존재하지않는법률XYZ");
-    expect(out).toContain("찾지 못했습니다");
+    // ⚠ 「찾지 못했습니다」를 기대하지 않는다(2026-08-13 계약 변경) — 그 말이 서랍 점검
+    //   (drawer-audit)의 실패 문구 목록에 있어 **정직한 0건 안내에 실패 딱지**가 붙었다.
+    //   오늘 llm.ts·actioncheck.ts에 이어 세 번째로 같은 함정을 밟은 자리라 문구를 바꿨다.
+    //   재는 것은 그대로다: 0건을 「없다」로 단정하지 않고 다시 물어보게 안내하는가.
+    expect(out).toContain("검색 결과가 없습니다");
     expect(out).toContain("없다는 뜻이 아니라");
     expect(out).not.toMatch(/존재하지 않습니다/);
+    expect(out, "실패 문구 목록과 겹친다 — 정직한 안내에 실패 딱지가 붙는다").not.toContain("찾지 못했습니다");
+  });
+
+  it("★ 0건이어도 물음에 아는 법령 이름이 들어 있으면 그 이름으로 한 번 더 찾는다 (2026-08-13)", async () => {
+    // 실측: 모델이 query에 질문을 거의 그대로 넣는다 — 「개인정보 보호법에서 유출 신고」.
+    // 법제처는 **제목 검색**이라 0건이고, 0건이면 조문 붙이기가 발동조차 못 한다.
+    // → 코드가 이름을 추려 재시도한다. 프롬프트로 타이르지 않는다(반복 실패한 방식).
+    expect(law.법령이름추리기("개인정보 보호법에서 유출 신고")).toBe("개인정보 보호법");
+    expect(law.법령이름추리기("전자금융거래법상 보존 기간")).toBe("전자금융거래법");
+    expect(law.법령이름추리기("우리 회사 방화벽 정책"), "아는 법령이 없으면 null").toBeNull();
+    // 재시도가 실제로 배선돼 있는지 — 함수만 있고 안 부르면 「설계는 됐고 쓰인 적 없다」다.
+    const src = fs.readFileSync(new URL("../src/engine/lawinfo.ts", import.meta.url), "utf8");
+    expect(src, "0건 재시도가 lawAnswer에 배선돼 있지 않다").toMatch(/법령이름추리기\(query\)/);
+  });
+
+  it("★ 이름도 없으면 긴 낱말부터 한 낱말씩 재시도한다 — 「개인정보」 한 낱말이면 본법+시행령이 나온다", async () => {
+    // 실측(2026-08-13): 모델 검색어 「개인정보 유출 신고 기한」 → 0건(제목 검색이라).
+    // 이름 추리기도 null(법령 이름이 아예 없다). 그런데 「개인정보」 한 낱말은 5건이다.
+    // 1차: 원문 그대로 → 0건 · 2차: 긴 낱말(개인정보) → hit. (이름 추리는 API 호출 없이 null)
+    fetchMock
+      .mockResolvedValueOnce(jsonRes({ LawSearch: {} }))
+      .mockResolvedValueOnce(jsonRes({ LawSearch: { law: [{ 법령명한글: "개인정보 보호법", 법령일련번호: "1" }] } }))
+      .mockResolvedValue(jsonRes({ 법령: {} })); // 이후 조문 조회는 빈 것으로
+    const out = await law.lawAnswer("개인정보 유출 신고 기한");
+    expect(out, "낱말 재시도가 안 돌았다 — 0건 안내로 끝났다").toContain("개인정보 보호법");
+    expect(out).not.toContain("검색 결과가 없습니다");
   });
 
   // ⚠ 실사고(2026-08-09): 장 제목 칸도 **뒤따르는 조문의 번호를 갖고 있다**. 번호 유무로 거르면
