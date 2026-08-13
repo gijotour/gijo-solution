@@ -2346,10 +2346,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     var now = document.getElementById("edNow"), msg = document.getElementById("edMsg");
     var bL = document.getElementById("edLite"), bS = document.getElementById("edStd"), bP = document.getElementById("edPro");
     var c = await window.gijo.editionGet();
-    var t = await window.gijo.getLlmTier().catch(function () { return {}; });
+    // ⚠ 등급 조회 실패를 「스탠다드」로 단정하지 않는다(검토관) — 실패는 실패라고 보인다.
+    var 등급실패 = false;
+    var t = await window.gijo.getLlmTier().catch(function () { 등급실패 = true; return {}; });
     var tier = (t && (t.tier || (t.settings && t.settings.tier))) || null;
     var 라이트 = c.현재 === "lite";
-    var 지금 = 라이트 ? "라이트" : (tier === "pro" ? "프로" : "스탠다드");
+    var 지금 = 라이트 ? "라이트" : (등급실패 ? "스탠다드 계열(엔진 등급 확인 실패)" : (tier === "pro" ? "프로" : "스탠다드"));
     now.textContent = 지금 + (c.빌드고정 ? " (라이트 전용 설치본 — 변경 불가)" : "") + (!라이트 && tier ? " · 엔진 등급 " + tier : "");
     // 지금 것은 눌러도 의미가 없다 — 잠가서 「내가 어디 있는지」가 보이게 한다.
     bL.disabled = 라이트 || !!c.빌드고정;
@@ -2372,12 +2374,23 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       } catch (e) { msg.textContent = String((e && e.message) || e); }
     };
     bP.onclick = async function () {
-      if (!confirm("프로(스탠다드 + LLM 2개 병행)로 바꿉니다.\n48GB급 GPU가 아니면 두 모델이 못 올라올 수 있습니다." + (라이트 ? "\n먼저 스탠다드 화면으로 바뀌며 앱 재시작이 필요합니다." : "\n엔진만 다시 뜹니다.") + " 계속할까요?")) return;
+      // ⚠ 라이트 상태에서 프로 티어를 지금 서버에 쓰면 **라이트 데이터 폴더의 DB**에 적힌다 —
+      //   재시작한 스탠다드는 딴 폴더(userData)를 읽어 그 값이 없다(검토관 지적: 약속-코드 불일치).
+      //   그래서 라이트에서는 **2단계로 정직하게** 안내한다: 먼저 스탠다드 전환·재시작, 그 다음 프로.
+      if (라이트) {
+        if (!confirm("프로는 스탠다드의 엔진 확장이라 두 단계입니다.\n① 지금: 스탠다드로 전환 저장(앱 재시작 필요)\n② 재시작 후: 이 판에서 「프로」를 다시 누르면 엔진만 재기동\n①을 진행할까요?")) return;
+        try {
+          var r2 = await window.gijo.editionSet("standard");
+          if (r2 && r2.ok === false) { msg.textContent = r2.error || "실패"; return; }
+          msg.textContent = "① 저장했습니다 — 앱을 다시 시작한 뒤, 이 판에서 「프로」를 다시 눌러 주세요.";
+        } catch (e) { msg.textContent = String((e && e.message) || e); }
+        return;
+      }
+      if (!confirm("프로(스탠다드 + LLM 2개 병행)로 바꿉니다.\n48GB급 GPU가 아니면 두 모델이 못 올라올 수 있습니다.\n엔진만 다시 뜹니다. 계속할까요?")) return;
       try {
-        if (라이트) { var r2 = await window.gijo.editionSet("standard"); if (r2 && r2.ok === false) { msg.textContent = r2.error || "실패"; return; } }
         await window.gijo.setLlmTier("pro");
-        msg.textContent = 라이트 ? "저장했습니다 — 앱 재시작 후 프로 등급으로 뜹니다." : "적용했습니다 — 엔진이 프로 등급(LLM 2개)으로 다시 뜹니다.";
-        if (!라이트) loadEdition();
+        msg.textContent = "적용했습니다 — 엔진이 프로 등급(LLM 2개)으로 다시 뜹니다.";
+        loadEdition();
       } catch (e) { msg.textContent = String((e && e.message) || e); }
     };
   }

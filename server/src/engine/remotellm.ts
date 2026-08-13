@@ -105,7 +105,8 @@ export function registerRemoteLlmRoutes(app: Express): void {
       const 문제 = remoteUrlProblem(url);
       if (문제) { res.status(400).json({ ok: false, error: 문제 }); return; }
       try {
-        const r = await fetch(`${url.replace(/\/+$/, "")}/models`, { signal: AbortSignal.timeout(5000) });
+        // redirect 금지(검토관) — 테스트 대상이 3xx로 공인 호스트를 가리켜도 따라가지 않는다.
+        const r = await fetch(`${url.replace(/\/+$/, "")}/models`, { signal: AbortSignal.timeout(5000), redirect: "error" });
         if (!r.ok) { res.json({ ok: false, error: `원격이 답했지만 거절했습니다(HTTP ${r.status}) — /v1 주소인지 확인하세요.` }); return; }
         const j = (await r.json().catch(() => null)) as { data?: unknown[] } | null;
         res.json({ ok: true, models: Array.isArray(j?.data) ? j.data.length : null });

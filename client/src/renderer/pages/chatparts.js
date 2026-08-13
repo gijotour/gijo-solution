@@ -59,7 +59,7 @@
       ".gcp-ev{margin-top:8px;border-top:1px solid rgba(255,255,255,.08);padding-top:8px;min-width:0;}",
       // 안전망 — 어쩌다 줄(.cs-row)에 직접 붙어도 **아래로** 가지 옆으로 가지 않게 한다.
       ".cs-row{flex-wrap:wrap;}",
-      ".cs-row > .gcp-ev, .cs-row > .gcp-src, .cs-row > .gcp-open, .cs-row > .gcp-picks{flex:1 1 100%;}",
+      ".cs-row > .gcp-ev, .cs-row > .gcp-src, .cs-row > .gcp-src2, .cs-row > .gcp-open, .cs-row > .gcp-picks{flex:1 1 100%;}",
       ".gcp-evh{font-size:12px;color:var(--muted,#b3ada4);cursor:pointer;user-select:none;}",
       ".gcp-q{border-left:3px solid rgba(59,130,246,.45);background:rgba(59,130,246,.05);padding:7px 10px;border-radius:0 6px 6px 0;margin-bottom:6px;}",
       ".gcp-qd{font-size:11.5px;color:var(--muted-2,#a49d95);margin-bottom:3px;}",
@@ -134,7 +134,10 @@
     var head = document.createElement("div");
     head.className = "gcp-evh";
     var open = false;
-    var draw = function () { head.textContent = (open ? "▾" : "▸") + " 📄 근거 원문 " + list.length + "대목 — 답이 맞는지 확인"; };
+    // ⚠ 약함이면 머리도 정직하게(검토관) — 배지는 「근거 아님」인데 바로 밑이 「근거 원문」이면
+    //   한 화면에서 같은 문서가 근거이며 근거 아님이 된다.
+    var 약함2 = 근거세기 === "약함";
+    var draw = function () { head.textContent = (open ? "▾" : "▸") + (약함2 ? " 📄 찾아본 자료 원문 " + list.length + "대목 — 근거로 쓰인 것은 아님" : " 📄 근거 원문 " + list.length + "대목 — 답이 맞는지 확인"); };
     draw();
     var body = document.createElement("div");
     body.style.cssText = "display:none;margin-top:6px";

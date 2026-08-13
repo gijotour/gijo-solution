@@ -388,7 +388,7 @@
     try {
       var u = await g.getServerUrl();
       칸("srvBox", 줄("주소", '<input id="srvUrl" type="text" value="' + esc(u || "") + '"> <button id="srvGo">바꾸기</button>') +
-        '<div class="note">라이트는 보통 이 PC 안(<b>localhost:4000</b>)입니다. 사내 서버를 쓸 때만 바꿉니다.</div><div id="srvMsg"></div>');
+        '<div class="note">라이트는 보통 이 PC 안입니다. 사내 서버를 쓸 때만 바꿉니다.</div><div id="srvMsg"></div>');
       var go = document.getElementById("srvGo");
       if (go) go.addEventListener("click", async function () {
         go.disabled = true;

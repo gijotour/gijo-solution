@@ -654,7 +654,12 @@ export async function chat(args: ChatArgs): Promise<string> {
     }
   }
 
-  let history = args.remember && !args.qa ? (histories.get(args.agentId) ?? []) : [];
+  // ⚠ 저장용 원본과 **보낼 사본**을 가른다(2026-08-13 검토관 지적 — 높음).
+  //   전엔 예산으로 자른 것을 그대로 되저장해 **대화 기억이 영구 삭제**됐다: 라이트(8K)에서
+  //   긴 문서 한 번이면 이전 대화가 사라지고, 「짧은 질문이 긴 이력을 밀어낸다」는 자연 회복도
+  //   없어졌다. 예산은 이번 요청의 프롬프트에만 적용하고, 저장은 원본 기준으로 한다.
+  const 전체이력 = args.remember && !args.qa ? (histories.get(args.agentId) ?? []) : [];
+  let history = 전체이력;
   const ragResult = args.remember ? await ragContextFor(args.message, args.agentId, args.screen, args.viewer) : null;
   const rag = ragResult?.context ?? null;
 
@@ -677,6 +682,11 @@ export async function chat(args: ChatArgs): Promise<string> {
   const systemContent = args.responseSchema
     ? "너는 지시를 읽고 도구를 고르는 분류기다. 설명·인사 없이 요청된 JSON 객체 하나만 출력한다."
     : [systemPromptFor(args.agentId), grounding, rag].filter(Boolean).join("\n\n");
+  // 원격 LLM 여부는 **예산 계산보다 먼저** 알아야 한다(검토관 확인 지적) — 원격이 켜졌는데
+  // 로컬 티어(라이트 8K)로 예산을 재면, 원격 32B에 붙여도 이력이 4,915자로 잘려
+  // 「기계 교체 없이 더 크게」가 반쪽이 된다. 원격이면 표준 32K 예산을 쓴다.
+  const 원격 = await import("./remotellm.js").then((m) => m.remoteLlmBaseUrl()).catch(() => null);
+
   // ★ 이력을 **글자 예산**으로도 자른다 (2026-08-13 — max 근본 규명 + win 로깅의 합작).
   //
   // ■ 무엇이 있었나: 라이트(ctx 8192)에서 긴 문서를 다루면 그 뒤로 **긴 질문만 0초에** 죽었다.
@@ -694,7 +704,7 @@ export async function chat(args: ChatArgs): Promise<string> {
   //     채팅 템플릿이 "roles must alternate"로 거부한다).
   //   ⚠ 개수 상한(HISTORY_LIMIT)은 그대로 둔다 — 이건 크기 상한이고 그건 개수 상한이다.
   {
-    const ctx = (await import("./localengine.js").then((m) => m.currentTierSettings().ctxSize).catch(() => 32768)) || 32768;
+    const ctx = 원격 ? 32768 : ((await import("./localengine.js").then((m) => m.currentTierSettings().ctxSize).catch(() => 32768)) || 32768);
     const 이력예산자 = Math.floor((ctx / 2) * 1.2);
     let 합 = 0;
     let 시작 = history.length;
@@ -719,7 +729,7 @@ export async function chat(args: ChatArgs): Promise<string> {
   // ★ 원격 LLM(BridgeAI 1단계, 2026-08-13)이 켜져 있으면 **로컬 llama를 아예 안 거치고**
   //   원격 /v1로 바로 간다 — ensureAgentModel을 부르면 로컬 모델 로드·스왑이 일어나므로
   //   우회가 아니라 **앞에서** 가른다. 판정은 remotellm.ts의 게터 한 곳(VPN 전용·에어갭 차단 포함).
-  const 원격 = await import("./remotellm.js").then((m) => m.remoteLlmBaseUrl()).catch(() => null);
+  // 원격은 위(예산 앞)에서 한 번 조회했다 — 두 번 재면 켜고 끄는 사이 값이 갈린다.
   const baseUrl = 원격 ?? (await import("./localengine.js")
     .then((m) => m.ensureAgentModel(args.agentId))
     .catch(() => LOCAL_LLM_BASE_URL));
@@ -742,6 +752,8 @@ export async function chat(args: ChatArgs): Promise<string> {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ model: "local", messages, ...constrained, ...loraExtras, max_tokens: args.maxTokens ?? DEFAULT_MAX_TOKENS, ...(싱크 ? { stream: true } : {}) }),
     signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
+    // 원격일 때 리다이렉트 금지(검토관) — VPN 안 서버가 3xx로 밖을 가리키면 질문 본문이 따라간다.
+    redirect: 원격 ? "error" : "follow",
   }).catch((err: unknown) => ((err as Error)?.name === "TimeoutError" ? ("timeout" as const) : null));
 
   if (res === "timeout") {
@@ -933,7 +945,8 @@ export async function chat(args: ChatArgs): Promise<string> {
   });
 
   if (args.remember && !args.qa && reply) {
-    const updated = [...history, { role: "user" as const, content: args.message }, { role: "assistant" as const, content: reply }];
+    // ⚠ history(예산으로 잘린 사본)가 아니라 **전체이력**에 잇는다 — 사본으로 이으면 영구 삭제다.
+    const updated = [...전체이력, { role: "user" as const, content: args.message }, { role: "assistant" as const, content: reply }];
     histories.set(args.agentId, updated.slice(-HISTORY_LIMIT));
     // 헤르메스 학습 루프 ① 수집: 실제 대화만 영속 저장한다(연결 실패 문자열은 위에서 조기 반환돼
     // 여기 못 온다). recordChatLog는 내부 try/catch — 수집 실패가 채팅을 죽이지 않는다.

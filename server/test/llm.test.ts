@@ -395,6 +395,7 @@ describe("★ RAG 0건 정직 배너 (#8)", () => {
   it("배너가 배선돼 있고 문구가 실패 목록과 안 겹친다", () => {
     expect(src2).toMatch(/ragResult\?\.자료없음 && reply/);
     expect(src2).toContain("이 PC의 사내 자료에는 이 내용이 없습니다");
-    expect(src2.includes("찾지 못했") && false, "").toBe(false); // FAIL_MARKS 전체 대조는 emptyanswer-guidance가 한다
+    // FAIL_MARKS 전체 대조는 emptyanswer-guidance(파일 전체 감시)가 맡는다 — 여기서는 배너 문구가
+    // 그 감시 대상 파일에 실제로 있는지만 본다(검토관: 항상-참 검사는 무의미했다).
   });
 });
