@@ -10,19 +10,22 @@
 //   → env 설정을 이 파일로 빼고, index.ts가 **첫 import**로 이 파일을 부른다.
 //   (tsc가 내는 CommonJS도 import 순서대로 require를 실행한다 — 순서가 지켜진다.)
 //
-// ■ 무엇을 알리나 (출하 결정서 2026-08-13: ⓑ llama-server 넣는다 · ⓒ-1 모델 전부 동봉)
-//   패키징본의 Resources/server-dist/ 안에 실행부와 모델이 함께 실린다:
+// ■ 무엇을 알리나 (출하 결정 2026-08-13 개정: ⓑ llama-server 동봉 · **챗 LLM은 고객이 등록**)
+//   패키징본의 Resources/server-dist/ 안에 실린다:
 //     server-dist/dist/lite/env.js    ← 이 파일 (__dirname = server-dist/dist/lite)
-//     server-dist/llama-metal/llama-server
-//     server-dist/models/{gijo-main-orchestrator, bge-m3}
-//   localengine의 기본 경로는 **cwd 상대**(`models`)인데 패키징본의 cwd는 userData다
-//   (main.ts가 DB를 번들 밖으로 보내는 그 설계). 그래서 절대경로로 알려 준다.
-//   환경변수가 이미 있으면 건드리지 않는다 — 개발·측정에서 덮어쓸 수 있어야 한다.
+//     server-dist/llama-metal/llama-server   (실행부 · 읽기 전용 · OK)
+//     server-dist/models/bge-m3              (임베딩만 동봉 — RAG가 첫날부터 돌아야)
+//   ★ **챗 모델은 더 이상 동봉하지 않는다**(사장님 결정 2026-08-13). 고객이 등록한다:
+//     · 온라인 → 설정에서 「권장 모델 받기」(HF 다운로드)
+//     · 폐쇄망 → gguf 파일을 모델 폴더에 넣으면 자동 인식
 //
-// ⚠ **이 자리는 읽기 전용이다.** 앱 번들 안에 한 글자라도 쓰면 코드 서명 봉인이 깨진다 —
-//   2026-08-09에 XProtect가 그런 앱을 「악성」으로 휴지통에 넣었다(client/src/main.ts:133 실사고).
-//   모델을 **받거나 지우는** 기능을 라이트에 들이려면 그때는 userData로 복사부터 해야 한다.
-//   (지금 라이트 화면·도구 13개에는 models/에 쓰는 경로가 없다 — 2026-08-13 전수 확인.)
+// ■ ⚠ 모델 폴더는 **쓰기 가능한 자리**여야 한다 — 받기·배치가 거기로 간다.
+//   앱 번들 안(server-dist/models)은 읽기 전용·서명 봉인이라 쓰면 깨진다(2026-08-09 XProtect 사고).
+//   그런데 다행히 **패키징 서버의 cwd가 userData다**(main.ts:183 `cwd: 구성.dataRoot`).
+//   그래서 localengine·hfmodels가 둘 다 쓰는 **cwd 상대 `models/`**가 곧 **userData/models**다
+//   (hfmodels.ts:142가 MODELS_DIR이 아니라 `path.join("models",…)`로 쓰는 것과도 여기서 일치한다).
+//   → GIJO_MODELS_DIR을 **번들로 덮어쓰지 않는다.** cwd/models(쓰기 가능)를 그대로 쓰게 둔다.
+//   → 동봉 임베딩(bge-m3)만 그 쓰기 폴더로 **한 번 복사**한다(첫 실행). 그래야 RAG가 바로 돈다.
 
 import path from "path";
 import fs from "fs";
@@ -35,17 +38,32 @@ if (!process.env.GIJO_LLAMA_SERVER_PATH && fs.existsSync(실행부)) {
   console.log(`[lite] 동봉 llama-server 사용: ${실행부}`);
 }
 
-const 모델자리 = path.join(뿌리, "models");
-if (!process.env.GIJO_MODELS_DIR && fs.existsSync(모델자리)) {
-  process.env.GIJO_MODELS_DIR = 모델자리;
-  console.log(`[lite] 동봉 모델 자리 사용: ${모델자리}`);
-}
+// 쓰기 가능한 모델 폴더 = cwd/models (패키징: userData/models · 개발: server/models).
+// GIJO_MODELS_DIR을 명시적으로 그 절대경로로 박는다 — localengine이 이걸 읽는다.
+// (안 박으면 localengine 기본값도 cwd/models라 같지만, 로그·명확성을 위해 박는다.)
+const 쓰기모델자리 = process.env.GIJO_MODELS_DIR
+  ? path.resolve(process.env.GIJO_MODELS_DIR)
+  : path.resolve(process.cwd(), "models");
+process.env.GIJO_MODELS_DIR = 쓰기모델자리;
+try { fs.mkdirSync(쓰기모델자리, { recursive: true }); } catch { /* 이미 있으면 그만 */ }
 
-// 라이트의 기본 채팅 모델은 동봉되는 그 모델이다. 제품 기본(qwen3-14b, 9GB급)은
-// 라이트 대상 사양(10GB, 결정서 ⓐ-1)에 화면 몫(~0.7GiB)까지 재면 안 들어간다.
-if (!process.env.GIJO_DEFAULT_MODEL_ID) {
-  process.env.GIJO_DEFAULT_MODEL_ID = "gijo-main-orchestrator";
+// 동봉 임베딩(bge-m3)을 쓰기 폴더로 한 번 복사 — RAG는 첫날부터 돌아야 하므로 등록 대상이 아니다.
+// ⚠ 챗 모델은 복사하지 않는다(동봉 자체를 뺐다). 없으면 「모델 없음」 상태로 뜨고 고객이 등록한다.
+const 동봉임베딩 = path.join(뿌리, "models", "bge-m3");
+const 임베딩목적 = path.join(쓰기모델자리, "bge-m3");
+if (fs.existsSync(동봉임베딩) && !fs.existsSync(임베딩목적)) {
+  try {
+    fs.cpSync(동봉임베딩, 임베딩목적, { recursive: true });
+    console.log(`[lite] 동봉 임베딩(bge-m3)을 쓰기 폴더로 복사: ${임베딩목적}`);
+  } catch (e) {
+    console.error(`[lite] ⚠ 임베딩 복사 실패 — RAG가 안 돌 수 있다: ${(e as Error).message}`);
+  }
 }
+console.log(`[lite] 모델 폴더(쓰기 가능): ${쓰기모델자리} — 챗 모델은 고객이 등록`);
+
+// ★ 챗 기본 모델을 **박지 않는다**(동봉이 없으므로). 부팅 자동 시작은 「마지막 사용 모델」을
+//   따르고, 첫 실행엔 챗 모델이 없어 「모델 없음」으로 뜬다 — 설정에서 등록하면 그때부터 뜬다.
+//   (임베딩 bge-m3는 GIJO_EMBEDDING_MODEL_ID 기본값 그대로 자동으로 뜬다.)
 
 // ⚠ **첫 실행에 등급이 안 정해진다** — 2026-08-13 출하본 실측.
 //   `/api/localengine/tier`가 `tier: null`이고, 그러면 `currentTierSettings()`가
