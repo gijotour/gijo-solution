@@ -1167,7 +1167,8 @@
       //     지우다가 옆 함수를 잘라 먹은 적이 있어(같은 날) **호출만 끊고 코드는 둔다** —
       //     다음 정리 때 시험이 통과하는 것을 보고 지운다.
       var P = window.gijoChatParts;
-      P.quotes(replyEl, r && r.quotes, (r && r.output) || "", r && r.sources);
+      // 근거세기 — 이 문서들이 **답의 근거인지 찾아보기만 한 자료인지**(4-ⓑ, 2026-08-13).
+      P.quotes(replyEl, r && r.quotes, (r && r.output) || "", r && r.sources, r && r.근거세기);
       // "가서 하기" — 계정·인증·열쇠처럼 AI가 대신 하면 안 되는 일은 순서만 안내하고,
       // 그 화면을 찾아 들어가는 수고는 없앤다(2026-07-31 사용자 지시).
       P.open(replyEl, r && r.openScreen, {

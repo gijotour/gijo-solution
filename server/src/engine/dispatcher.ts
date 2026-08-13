@@ -111,6 +111,21 @@ export interface DispatchResult {
   // 답변 그라운딩에 쓰인(검색된) 사내 문서 ID — 화면이 "근거: 문서명" 배지로 표시한다.
   // 인수인계 자동 검증도 이 필드로 "올린 문서가 실제로 인용되는가"를 판정한다.
   sources?: string[];
+  /**
+   * 그 sources가 **답의 근거인가, 찾아보기만 한 자료인가** (2026-08-13 · 계획서 전-4 4-ⓑ).
+   *
+   * ⚠ 왜 필요한가 — 배지가 거짓말을 하고 있었다(운영 실측 8문항 8회 재현):
+   *     "ISMS 인증 취득일은 사내 지식 베이스에 **포함되어 있지 않습니다**"
+   *       + 📄 근거: GIJO_지식_보안거버넌스_표준.md · ismsp_접근권한_검토.md
+   *   답은 없다는데 출처는 있다. 담당자가 그 문서를 보고서에 출처로 적을 수 있다.
+   *   뿌리: 이 sources는 **답이 실제로 인용한 자료가 아니라 따로 재검색해서 나온 후보**다.
+   *   그런데 화면 문구는 「📄 **근거**」라고 단언한다.
+   *
+   * ⚠ 새 판정기를 만들지 않는다 — 이미 코드가 계산해 둔 `queryMemoryGraded().약한근거만`을 쓴다
+   *   (llm.ts의 「⚠ 근거 약함」 배너가 이미 그 값으로 돈다). 낱말 판정으로 반복해 덴 자리라
+   *   겹침·유사도 판정기를 새로 두지 않는 것이 이 설계의 핵심이다.
+   */
+  근거세기?: "강함" | "약함";
   /** 근거 원문 대목 — 담당자가 답의 숫자를 눈으로 검증할 수 있게(2026-08-01). */
   quotes?: SourceQuote[];
   // "가서 하기" — AI가 대신 하면 안 되는 일(계정·인증·열쇠)에 순서를 안내하면서 그 화면을
@@ -758,7 +773,7 @@ async function computeOfferSignals(
   screen?: string,
   viewer?: Viewer,
   contextText = "",
-): Promise<{ dataHits: number; internalMiss: boolean; sources?: string[]; quotes?: SourceQuote[] }> {
+): Promise<{ dataHits: number; internalMiss: boolean; sources?: string[]; quotes?: SourceQuote[]; 근거세기?: "강함" | "약함" }> {
   let dataHits = 0;
   for (const s of result.steps ?? []) {
     dataHits += (s.assetIds?.length ?? 0) + (s.findingCount ?? 0);
@@ -778,6 +793,7 @@ async function computeOfferSignals(
   let internalMiss = false;
   let sources: string[] | undefined;
   let quotes: SourceQuote[] | undefined;
+  let 근거세기: "강함" | "약함" | undefined;
   // ⚠ 재검색 여부는 dataHits(리포트 알약)가 아니라 근거재검색대상인가()로 가른다 —
   //   analyze RAG 답의 근거 누락 / 데이터 집계·되묻기의 근거 둔갑을 함께 막는다(2026-08-10 사고).
   if (근거재검색대상인가(result, instructionText)) {
@@ -794,6 +810,14 @@ async function computeOfferSignals(
         const relevant = graded.scored;
         internalMiss = relevant.length === 0; // 검색 실패(null)면 미판정(false 유지)
         if (relevant.length > 0) {
+          // ★ 4-ⓑ(2026-08-13) — 이 문서들이 **답의 근거인지 찾아보기만 한 자료인지** 가른다.
+          //   `약한근거만`은 queryMemoryGraded가 이미 계산해 돌려주는 값이다(거리 0.85 안에
+          //   가까운 조각이 하나도 없으면 true). llm.ts의 「⚠ 근거 약함」 배너가 쓰는 그 값이라
+          //   **새 판정기가 0개**다 — 겹침·유사도를 새로 재지 않는다.
+          //   ⚠ 답이 「사내에 없다」고 말하는데 강한 근거로 잡히는 경우는 이것만으로 안 갈린다
+          //     (실측 8건 중 3건). 그건 답 문장을 봐야 하는데 낱말 판정이라 여기 두지 않는다 —
+          //     화면이 답과 배지를 나란히 보여 주므로, 우선 **약한 것부터 정직해진다.**
+          근거세기 = graded.약한근거만 ? "약함" : "강함";
           sources = [...new Set(relevant.map((c) => c.documentId).filter(Boolean))];
           // ★ 문서 **이름**만으로는 담당자가 답을 검증할 수 없다(2026-08-01 실측).
           //   실제 사고: 문서에 "미사용 룰 37개"라고 적혀 있는데 7B가 "27"이라고 답했다.
@@ -810,7 +834,13 @@ async function computeOfferSignals(
       /* 메모리 모듈 로드 실패 시 미판정 */
     }
   }
-  return { dataHits, internalMiss, ...(sources ? { sources } : {}), ...(quotes && quotes.length ? { quotes } : {}) };
+  return {
+    dataHits,
+    internalMiss,
+    ...(sources ? { sources } : {}),
+    ...(quotes && quotes.length ? { quotes } : {}),
+    ...(근거세기 ? { 근거세기 } : {}),
+  };
 }
 
 // 응답 턴에 붙일 짧은 도구/경로 배지 — 화면에서 "무엇으로 처리됐는지"를 한눈에 보여준다.
@@ -1115,7 +1145,10 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   if (isHelpIntent(instructionText, screen)) {
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
     completeTask(task.id);
-    return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatScreenGuide(screen, instructionText) };
+    // sources: [] — **코드가 낸 답이라 사내 문서를 본 적이 없다**(4-ⓑ, 2026-08-13).
+    //   안 실으면 근거재검색대상인가()가 통과시켜 배지용 재검색이 돌고, 답과 무관한 문서가
+    //   「📄 근거」로 붙는다. actioncheck가 이미 쓰는 계약을 그대로 쓴다(빈 배열 = 근거 없음 선언).
+    return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatScreenGuide(screen, instructionText), sources: [] };
   }
 
   // "지식베이스 정리/중복 점검" — 상충·중복·신선도를 결정적으로 점검(삭제 없이 리포트).
@@ -1178,6 +1211,9 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
       task,
       route: { agentId: "orchestrator", action: "chat" },
       output: formatRemediation({ findingType: instructionText, severity: sev as "critical" | "high" | "medium", kev }),
+      // sources: [] — 코드가 낸 플레이북이다(4-ⓑ). 실측: KEV 질문에 이 표가 나가면서
+      //   kev_bod_22-01_조치기한.md · GIJO_AS_제품소개.md가 「근거」로 붙었다.
+      sources: [],
     };
   }
 
@@ -1256,7 +1292,10 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   if (침해사고질문인가(instructionText)) {
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P1" });
     completeTask(task.id);
-    return { task, route: { agentId: "orchestrator", action: "chat" }, output: 침해사고초동절차(instructionText) };
+    // sources: [] — 코드가 낸 절차 답이다(4-ⓑ). 실측(2026-08-13): 「랜섬웨어 대응 5단계」에
+    //   0.7초 만에 이 템플릿이 나갔는데 배지엔 랜섬웨어_초동_대응.md · GIJO_AS_용어사전.md ·
+    //   **GIJO_AS_제품소개.md**가 붙었다 — AI가 불려나가지도 않았는데 「근거」가 셋이었다.
+    return { task, route: { agentId: "orchestrator", action: "chat" }, output: 침해사고초동절차(instructionText), sources: [] };
   }
 
   // ── 시연 실측이 잡은 라우팅 결함 2건의 결정적 분기 (2026-07-29, 계획서 전-1) ──────────

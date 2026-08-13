@@ -59,3 +59,81 @@ describe("근거재검색대상인가 — 답이 사내 문서(RAG)로 자유 �
     }
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ★ 근거 배지 3상태 — 배지가 **거짓말을 하지 않는다** (2026-08-13 · 전-4 4-ⓑ, 시안 승인)
+//
+// ■ 무엇이 있었나 (운영 실측 8문항 8회 재현)
+//     "ISMS 인증 취득일은 사내 지식 베이스에 **포함되어 있지 않습니다**"
+//       + 📄 근거: GIJO_지식_보안거버넌스_표준.md · ismsp_접근권한_검토.md
+//   답은 없다는데 출처는 있다. 담당자가 그 문서를 보고서에 출처로 적을 수 있다.
+//   뿌리: sources는 **답이 인용한 자료가 아니라 서버가 따로 재검색한 후보**인데
+//         화면 문구는 「📄 **근거**」라고 단언했다.
+//   더 나쁜 것: 「랜섬웨어 대응 5단계」는 0.7초 코드 템플릿(AI가 불려나가지도 않음)인데
+//         배지엔 GIJO_AS_제품소개.md까지 셋이 붙었다.
+//
+// ■ 설계 — 새 판정기 0개
+//   ① 강함  = queryMemoryGraded().약한근거만 === false  → 📄 근거
+//   ② 약함  = 그 값이 true                              → 📄 찾아본 자료 — 근거 아님
+//   ③ 없음  = 코드 템플릿이 sources: [] 를 **스스로 선언** → 배지 없음
+//   ①②는 llm.ts의 「⚠ 근거 약함」 배너가 이미 쓰는 값이고, ③은 actioncheck가 이미 쓰는 계약이다.
+import * as fs2 from "fs";
+
+describe("★ 근거 배지 3상태 (2026-08-13)", () => {
+  const disp = fs2.readFileSync(new URL("../src/engine/dispatcher.ts", import.meta.url), "utf8");
+  const parts = fs2.readFileSync(new URL("../../client/src/renderer/pages/chatparts.js", import.meta.url), "utf8");
+
+  it("서버가 근거세기를 **계산해서 실어 보낸다** — 계산만 하고 버리면 화면이 못 쓴다", () => {
+    expect(disp, "근거세기 필드가 응답 타입에 없다").toMatch(/근거세기\?:\s*"강함"\s*\|\s*"약함"/);
+    // 새 판정기를 만들지 않고 이미 있는 값을 쓴다 — 이게 이 설계의 핵심이다.
+    expect(disp, "약한근거만을 안 쓴다 — 새 판정기를 만들었다면 설계가 어긋난 것이다")
+      .toMatch(/graded\.약한근거만\s*\?\s*"약함"\s*:\s*"강함"/);
+    expect(disp, "근거세기를 응답에 안 싣는다").toMatch(/근거세기\s*\?\s*\{\s*근거세기\s*\}/);
+  });
+
+  it("★ 코드 템플릿 답이 sources: [] 로 「사내 자료를 안 봤다」를 스스로 선언한다", () => {
+    // 안 실으면 근거재검색대상인가()가 통과시켜 배지용 재검색이 돌고 무관한 문서가 붙는다.
+    //
+    // ⚠ **정규식을 쓰지 않는다.** 앵커에 괄호·중괄호가 들어 있어 이스케이프가 한 겹만 어긋나도
+    //   조용히 안 걸린다(2026-08-13에 실제로 그렇게 헛실패했다 — \\( 가 \( 로 줄어 정규식
+    //   그룹이 됐다). 문자열 위치로 본다: 읽기 쉽고 이스케이프 함정이 원리상 없다.
+    for (const [이름, 앵커] of [
+      ["침해사고 초동절차(랜섬웨어)", "침해사고초동절차(instructionText)"],
+      ["화면 안내(screenguide)", "formatScreenGuide(screen, instructionText)"],
+      ["조치 플레이북", "formatRemediation({ findingType"],
+    ] as [string, string][]) {
+      const i = disp.indexOf(앵커);
+      expect(i, `${이름} 의 앵커를 못 찾았다 — 코드가 바뀌었으면 이 시험도 같이 볼 것: ${앵커}`).toBeGreaterThan(-1);
+      expect(
+        disp.slice(i, i + 400),
+        `${이름} 이 sources: [] 를 선언하지 않는다 — 배지가 거짓 출처를 가리킨다`,
+      ).toContain("sources: []");
+    }
+  });
+
+  it("화면이 3상태를 그린다 — 약할 때 문구와 색이 다르다", () => {
+    expect(parts, "약함 배지 클래스가 없다").toContain("gcp-src2");
+    expect(parts, "약함 문구가 없다").toContain("찾아본 자료 — 근거 아님");
+    expect(parts, "근거세기를 안 받는다").toMatch(/function quotes\([^)]*근거세기/);
+
+    // ⚠ 「찾지 못했습니다」는 drawer-audit 실패 문구 목록에 있어 좋은 답에 실패 딱지가 붙는다.
+    //   ⚠ **주석은 빼고 본다** — 이 파일(chatparts.js)의 주석이 바로 그 규칙을 설명하느라
+    //     그 말을 인용한다. 주석까지 걸면 「왜 그 말을 쓰면 안 되는지」를 적을 수가 없다
+    //     (포트 시험에서 겪은 것과 같은 함정 — 역사를 적는 것을 시험이 막으면 안 된다).
+    const 코드만 = parts
+      .split("\n")
+      .filter((l) => !/^\s*[*/]/.test(l))
+      .map((l) => l.replace(/(^|[^:])\/\/.*$/, "$1"))
+      .join("\n");
+    expect(코드만, "실패 문구 목록과 겹치는 말을 배지에 썼다").not.toContain("찾지 못했습니다");
+    // 감시가 헛돌지 않는지 — 실제 배지 문구는 코드에 남아 있어야 한다.
+    expect(코드만, "배지 문구가 코드에서 사라졌다 — 주석 걸러내기가 코드까지 지웠다").toContain("찾아본 자료");
+  });
+
+  it("두 대화 입구가 **둘 다** 근거세기를 넘긴다 — 한쪽만 고치면 분리창에서 안 나온다", () => {
+    const con = fs2.readFileSync(new URL("../../client/src/renderer/pages/console.js", import.meta.url), "utf8");
+    const wid = fs2.readFileSync(new URL("../../client/src/renderer/pages/chatwidget.js", import.meta.url), "utf8");
+    expect(con, "지휘소가 근거세기를 안 넘긴다").toMatch(/P\.quotes\(replyEl[\s\S]{0,140}?근거세기/);
+    expect(wid, "분리창이 근거세기를 안 넘긴다").toMatch(/P\.quotes\(typing[\s\S]{0,140}?근거세기/);
+  });
+});

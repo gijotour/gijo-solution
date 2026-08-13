@@ -53,6 +53,9 @@
       ".gcp-open:hover{background:rgba(59,130,246,.18);}",
       ".gcp-open:disabled{color:var(--teal,#1eb980);background:rgba(30,185,128,.10);border-color:rgba(30,185,128,.35);cursor:default;}",
       ".gcp-src{margin-top:6px;font-size:11.5px;font-weight:700;color:#6fdcb5;}",
+      // ② 찾아보긴 했으나 근거는 아님 — 초록(근거 있음)과 **눈에 띄게 달라야** 한다.
+      //   호박색은 이 제품에서 「주의·확인 필요」 자리다(근거 약함 배너의 ⚠와 같은 결).
+      ".gcp-src2{margin-top:6px;font-size:11.5px;font-weight:700;color:#ffd88a;}",
       ".gcp-ev{margin-top:8px;border-top:1px solid rgba(255,255,255,.08);padding-top:8px;min-width:0;}",
       // 안전망 — 어쩌다 줄(.cs-row)에 직접 붙어도 **아래로** 가지 옆으로 가지 않게 한다.
       ".cs-row{flex-wrap:wrap;}",
@@ -92,14 +95,36 @@
     return el;
   }
 
-  function quotes(el, list, answer, sources) {
+  /**
+   * 근거 배지 — **3상태** (2026-08-13 · 계획서 전-4 4-ⓑ, 시안 승인).
+   *
+   * ★ 무엇이 문제였나(운영 실측 8문항 8회 재현): 배지가 거짓말을 했다.
+   *     "ISMS 인증 취득일은 사내 지식 베이스에 **포함되어 있지 않습니다**"
+   *       + 📄 근거: GIJO_지식_보안거버넌스_표준.md · ismsp_접근권한_검토.md
+   *   답은 없다는데 출처는 있다 — 담당자가 그 문서를 보고서에 출처로 적을 수 있다.
+   *   뿌리: 이 sources는 **답이 인용한 자료가 아니라 서버가 따로 재검색한 후보**인데,
+   *         문구는 「📄 **근거**」라고 단언한다.
+   *
+   * ① 근거로 답함        sources 있고 근거세기="강함"  → 📄 근거: …           (초록, 그대로)
+   * ② 찾아보긴 함        sources 있고 근거세기="약함"  → 📄 찾아본 자료 — 근거 아님: … (호박색, 신설)
+   * ③ 사내 자료를 안 봄  sources 없음/빈 배열          → **배지 없음**
+   *
+   * ⚠ 문서 이름은 ②에서도 **보여 준다** — 담당자가 「그럼 그 문서를 올려야겠다」로 이어갈
+   *   단서라서다. 떼면 이 배지를 단 이유(2026-08-01 "안 보여주면 못 잡는다")와 반대가 된다.
+   * ⚠ 아이콘은 📄 그대로다. tone.ts 표식 사전에 🔎="검색 0건"이 이미 예약돼 있어, 비슷한 🔍를
+   *   다른 뜻으로 쓰면 그 파일이 경고하는 문제("표식은 자리마다 뜻이 하나여야")를 반복한다.
+   * ⚠ 문구에 「찾지 못했습니다」를 쓰지 않는다 — drawer-audit의 실패 문구 목록에 있어
+   *   좋은 답에 실패 딱지가 붙는다(2026-08-13 actioncheck에서 겪은 그 함정).
+   */
+  function quotes(el, list, answer, sources, 근거세기) {
     el = 붙일자리(el);
     if (!el) return;
     ensureCss();
     if (Array.isArray(sources) && sources.length) {
+      var 약함 = 근거세기 === "약함";
       var badge = document.createElement("div");
-      badge.className = "gcp-src";
-      badge.textContent = "📄 근거: " + sources.slice(0, 4).join(" · ");
+      badge.className = 약함 ? "gcp-src2" : "gcp-src";
+      badge.textContent = (약함 ? "📄 찾아본 자료 — 근거 아님: " : "📄 근거: ") + sources.slice(0, 4).join(" · ");
       el.appendChild(badge);
     }
     if (!Array.isArray(list) || !list.length) return;

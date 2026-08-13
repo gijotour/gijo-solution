@@ -259,7 +259,7 @@
         //   ⚠ 배지 문구를 고칠 일이 생기면 이제 **chatparts.js 한 곳만** 고치면 된다.
         var P = window.gijoChatParts;
         if (P) {
-          P.quotes(typing, r.quotes, r.output || "", r.sources);
+          P.quotes(typing, r.quotes, r.output || "", r.sources, r.근거세기);
           P.picks(typing, r.picklist, function (보낼글) { send(보낼글); });
           // 분리창은 탭을 직접 못 연다 — 본창에 부탁한다(지휘소와 다른 유일한 대목).
           P.open(typing, r.openScreen, {
