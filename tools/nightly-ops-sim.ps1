@@ -8,6 +8,8 @@
 # ⚠ 측정 전용이다 — 코드 수정·배포는 하지 않는다(자율성 단계 표의 예약 루틴 원칙).
 
 $ErrorActionPreference = "Continue"
+# node의 utf8 출력을 PS 파이프가 OEM으로 읽어 로그가 깨졌다(첫 실행 실측 「醫낅즺肄붾뱶」) — 통일.
+[Console]::OutputEncoding = [Text.Encoding]::UTF8
 Set-Location "D:\Connect AI"
 $env:QA_USER = "claude-deploy"
 $env:QA_PASS = [Environment]::GetEnvironmentVariable("GIJO_ADMIN_PASSWORD", "User")
