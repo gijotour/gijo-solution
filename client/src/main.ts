@@ -1056,6 +1056,24 @@ ipcMain.handle("doc:open-temp", async (_e, filename: string, base64: string) => 
   return { path: target };
 });
 
+// ── 챗 모델 폴더 — 화면이 실제 경로를 직접 보여주고 「폴더 열기」로 탐색기까지 연다 (2026-08-14) ──
+//   왜: 라이트 고객 첫날, .gguf를 넣을 자리를 화면·안내서가 서로 미뤄(순환 참조) 아무도 못 얻었다.
+//   preload가 이 경로를 내려주면 서버가 아직 안 떠 있어도 화면에 값이 뜬다(dataRoot는 메인이 안다).
+//   ⚠ 폴더 이름과 파일 이름이 완전히 같아야 서버가 인식한다(server localengine.ts) — 화면이 그림으로 안내.
+function 모델폴더경로(): string {
+  const 구성 = 번들서버 ?? 번들서버구성();
+  const root = 구성 ? 구성.dataRoot : app.getPath("userData");
+  return path.join(root, "models");
+}
+ipcMain.handle("models:folder-path", () => 모델폴더경로());
+ipcMain.handle("models:open-folder", async () => {
+  const dir = 모델폴더경로();
+  try { fs.mkdirSync(dir, { recursive: true }); } catch { /* 이미 있으면 그만 — 서버가 부팅마다 만든다 */ }
+  const errMsg = await shell.openPath(dir); // 빈 문자열이면 성공
+  if (errMsg) throw new Error(`폴더를 열 수 없습니다: ${errMsg}`);
+  return { path: dir };
+});
+
 // 라이트 「보안 장비 등록부」 직접 접근 — 장비 관리 화면을 OS 기본 앱으로 연다.
 //   ⚠ 스킴을 검사한다: 웹(http/https)·원격(ssh/rdp/vnc)만 허용. javascript:·file:·data: 등은 막는다.
 //   렌더러가 넘긴 주소를 그대로 여는 게 아니라, 여기서 한 번 더 거른다(주입 방어).

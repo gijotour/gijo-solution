@@ -42,6 +42,10 @@ const gijoApi = {
   docRequestBuild: (input: Parameters<typeof api.docRequestApi.build>[0]) => api.docRequestApi.build(input),
   docRequestList: () => api.docRequestApi.list(),
   openDocbox: () => ipcRenderer.invoke("docbox:open"),
+  // 챗 모델 폴더 — 화면이 실제 경로를 보여주고(getModelsFolderPath) 「폴더 열기」로 탐색기까지 연다.
+  //   라이트 첫날 「.gguf 어디 넣지?」를 없앤다(순환 참조 수리, 2026-08-14).
+  getModelsFolderPath: () => ipcRenderer.invoke("models:folder-path") as Promise<string>,
+  openModelsFolder: () => ipcRenderer.invoke("models:open-folder") as Promise<{ path: string }>,
   // 라이트 「보안 장비 등록부」 직접 접근 — 장비 관리 URL을 OS 기본 앱(브라우저·SSH·RDP)으로 넘긴다.
   //   ⚠ 스킴은 메인에서 검사한다(http/https/ssh/rdp/vnc만). 비밀번호는 절대 실어 보내지 않는다.
   openExternal: (url: string) => ipcRenderer.invoke("shell:openExternal", url) as Promise<{ ok: boolean }>,
