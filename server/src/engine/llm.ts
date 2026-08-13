@@ -714,7 +714,32 @@ export async function chat(args: ChatArgs): Promise<string> {
   }
 
   if (!res || !res.ok) {
-    emitLlmActivity({ kind: "chat", phase: "error", agent: agentName, detail: "로컬 LLM 연결 실패" });
+    // ★ 2026-08-13 — **두 사실을 뭉개지 않는다**(max 인계: 모델교체후_긴프롬프트실패).
+    //
+    //   `!res`(연결 자체 실패)와 `!res.ok`(서버가 답했는데 거절)는 **완전히 다른 사실**인데
+    //   여태 같은 문구 하나로 나갔다. max가 「모델이 안 올라왔나」를 **세 번** 확인하고서야
+    //   llama-server는 멀쩡하고 서버 안 상태가 어긋난 것임을 알아냈다.
+    //   증상: 모델을 바꾼 뒤(또는 방아쇠 없이도) **300자 넘는 프롬프트만 0초에 실패**하고,
+    //         서버를 다시 띄우거나 ~10분 기다리면 낫는다. 원인은 **아직 미확정**이다.
+    //
+    //   ⚠ 그래서 여기서 원인을 **추측으로 고치지 않는다.** 대신 다음 재발 때 1분에 갈리도록
+    //     상태코드·본문·그리고 max가 짚은 두 단서를 남긴다:
+    //       · lora  — 스왑으로 풀이 바뀌면 **옛 적재 인덱스**가 남아 llama-server가 400을 낸다
+    //       · 길이  — 짧은 질문은 통과하고 긴 것만 죽는다(길이 의존이 핵심 단서다)
+    //   ⚠ **사용자 문구는 그대로 둔다.** 바꾸면 폴백 감지 목록(regress FALLBACK_RE ·
+    //     drawer-audit FAIL_MARKS)이 이 답을 못 알아봐 **나쁜 답이 통과**한다.
+    //     같은 말이 한쪽에선 벌, 한쪽에선 상이 되지 않게 — 문구를 고칠 때 측정 도구를 함께 본다.
+    const 본문 = res ? await res.text().catch(() => "") : "";
+    const 진단 = res
+      ? `HTTP ${res.status} ${res.statusText} · 본문 ${본문.slice(0, 300) || "(비어 있음)"}`
+      : "연결 실패(서버에 못 닿음)";
+    const 프롬프트길이 = messages.reduce((n, m) => n + String(m?.content ?? "").length, 0);
+    console.error(
+      `[llm] ${agentName} 요청 실패 — ${진단}` +
+        ` · baseUrl=${baseUrl} · 프롬프트 ${프롬프트길이}자 · lora=${JSON.stringify(loraExtras)}` +
+        ` · 스키마=${args.responseSchema ? "있음" : "없음"} · 스트림=${싱크 ? "예" : "아니오"}`,
+    );
+    emitLlmActivity({ kind: "chat", phase: "error", agent: agentName, detail: `로컬 LLM 실패 — ${진단.slice(0, 120)}` });
     // 최종 사용자용 안내(개발자용 원인 대신). 두 경로를 함께 제시한다:
     // ① 이 PC에서 완결 — 설정 > 서버·AI에서 모델 내려받아 로드  ② 사내 GPU 서버에 연결 — 설정에서 서버 주소 입력.
     return "⚠ AI 모델이 아직 준비되지 않았습니다. 다음 중 하나로 해결하세요 — ① 설정 > 서버·AI > 모델 검색·받기에서 모델을 내려받아 로드, 또는 ② 설정에서 모델이 있는 사내 GPU 서버 주소를 입력해 연결.";
