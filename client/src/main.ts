@@ -188,7 +188,14 @@ function 번들서버구성(): { entry: string; serverRoot: string; dataRoot: st
   // ⚠ dev에서는 **바꾸지 않는다.** dev의 serverRoot는 server/(또는 client/server-dist/)라
   //   원래 맞는 자리고, 여기서 userData로 옮기면 담당자가 쓰던 개발 DB를 못 보게 된다.
   const 패키징본 = bundledServerEntry === 패키징경로;
-  const dataRoot = 패키징본 ? app.getPath("userData") : serverRoot;
+  // ⚠ **라이트 모드로 전환한 스탠다드 배포본은 데이터 폴더를 가른다**(사장님 결정 2026-08-13).
+  //   스탠다드로 쌓은 회사 데이터(자산·결재)가 라이트 화면엔 안 보이고, 라이트로 만든 것이
+  //   스탠다드에 섞이면 같은 DB에 **도구 13개와 78개가 번갈아** 답하게 된다.
+  //   ⚠ 라이트 **전용** 배포본은 앱 이름이 달라 userData가 이미 따로다 — 거기서 또 가르면
+  //     지금 도는 라이트 dmg의 데이터가 하루아침에 안 보인다. 그래서 **전환한 경우만** 가른다.
+  const dataRoot = 패키징본
+    ? (라이트모드전환() ? path.join(app.getPath("userData"), "lite") : app.getPath("userData"))
+    : serverRoot;
   // ⚠ 포트를 **spawn env로 넘긴다** — server/src/index.ts:42가 `GIJO_SERVER_PORT ?? 4000`이라
   //   env가 이긴다. 서버 쪽 기본값(4000)은 손대지 않는다(직접 띄우는 개발 경로를 안 깨려고).
   //   서버포트()가 이미 process.env 지정을 존중하므로 여기서 또 갈래를 두지 않는다.
@@ -418,19 +425,70 @@ function createMainWindow(): void {
 //   라이트 빌드의 package.json에만 `gijoEdition: "lite"`를 박는다. 지우려면 빌드 설정을
 //   고쳐야 하므로 실수로 사라지지 않는다.
 //   env는 **개발 중 흉내내기**용으로만 남긴다(`GIJO_EDITION=lite npm start`).
+/** 빌드에 박힌 에디션 — 라이트 전용 배포본은 여기서 **잠긴다**(고객이 못 바꾼다). */
+function 빌드에디션(): string {
+  // __dirname은 dev에서 client/dist, 패키징본에서 app.asar/dist — 둘 다 ../package.json이다.
+  try {
+    return JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"), "utf8")).gijoEdition ?? "";
+  } catch { return ""; }
+}
+
+/** 런타임 선택(스탠다드 배포본에서 「라이트 모드」를 고른 경우)을 담아 두는 자리. */
+const 에디션파일 = () => path.join(app.getPath("userData"), "gijo-edition.txt");
+function 저장된에디션(): string {
+  try { return fs.readFileSync(에디션파일(), "utf8").trim(); } catch { return ""; }
+}
+
+/**
+ * 이 실행이 라이트인가 (2026-08-13 — 사장님 지시 2번: 기존 클라에 라이트 모드를 「선택 사항」으로).
+ *
+ * 우선순위: ① env(개발 흉내내기) → ② **빌드 고정**(라이트 전용 배포본은 잠김) → ③ 런타임 선택
+ *
+ * ⚠ ②가 ③보다 먼저인 것이 핵심이다. 라이트 전용 dmg는 package.json이 `lite`라 **항상 라이트**이고
+ *   고객이 못 바꾼다(그게 그 상품이다). 런타임 선택은 **스탠다드 배포본에서만** 뜻을 갖는다.
+ * ⚠ 부팅 때 한 번만 읽는다(캐시) — 서버 도구 13 vs 78과 진입점이 **부팅 때** 갈리므로,
+ *   모드 변경은 **재시작을 요구**한다. 실행 중에 바꿔 봐야 반만 바뀌어 더 나쁘다.
+ */
 let 에디션캐시: string | null = null;
 function 에디션(): string {
   if (에디션캐시) return 에디션캐시;
   let 값 = process.env.GIJO_EDITION ?? "";
-  if (!값) {
-    // __dirname은 dev에서 client/dist, 패키징본에서 app.asar/dist — 둘 다 ../package.json이다.
-    try {
-      값 = JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"), "utf8")).gijoEdition ?? "";
-    } catch { 값 = ""; }
-  }
+  if (!값) 값 = 빌드에디션();                    // ② 라이트 전용 배포본은 여기서 잠긴다
+  if (!값) 값 = 저장된에디션();                  // ③ 스탠다드 배포본의 런타임 선택
   에디션캐시 = 값 === "lite" ? "lite" : "standard";
   return 에디션캐시;
 }
+
+/**
+ * **스탠다드 배포본이 런타임으로 라이트를 고른 상태**인가 — 데이터 폴더를 가르는 기준.
+ *
+ * ⚠ 라이트 **전용** 배포본은 앱 이름이 달라 userData가 이미 따로다 — 여기서 또 가르면
+ *   지금 도는 라이트 dmg의 데이터가 하루아침에 안 보인다. 그래서 **전환한 경우만** 가른다.
+ */
+function 라이트모드전환(): boolean {
+  return 에디션() === "lite" && 빌드에디션() !== "lite";
+}
+
+// 라이트 모드 전환 읽기·쓰기 — 화면(설정)이 이 통로로 켜고 끈다.
+// ⚠ **화면은 아직 없다.** 스위치 UI는 시안 승인 후에 얹는다(UI는 시안 1개 먼저가 이 제품의 규칙).
+//   여기까지가 「자리를 여는」 몫이고, BridgeAI 1단계와 같은 구조다.
+ipcMain.handle("edition:get", () => ({
+  현재: 에디션(),
+  빌드고정: 빌드에디션() === "lite",   // true면 라이트 전용 배포본 — 고객이 못 바꾼다
+  전환됨: 라이트모드전환(),
+}));
+ipcMain.handle("edition:set", (_e, 모드: string) => {
+  if (빌드에디션() === "lite") return { ok: false, error: "이 배포본은 라이트 전용이라 모드를 바꿀 수 없습니다." };
+  const 값 = 모드 === "lite" ? "lite" : "standard";
+  try {
+    fs.writeFileSync(에디션파일(), 값, "utf8");
+  } catch (e) {
+    return { ok: false, error: `모드를 저장하지 못했습니다: ${(e as Error).message}` };
+  }
+  // ⚠ 캐시를 지우지 않는다 — 이 실행에서 바꾸면 진입점·도구는 그대로인 채 화면만 바뀌어
+  //   「도구 13개인데 화면 40개」의 거울상이 된다. **다음 실행부터** 적용된다고 알린다.
+  return { ok: true, 재시작필요: true, 다음실행: 값 };
+});
 /**
  * 라이트에서 열어도 되는 화면인가.
  *
