@@ -46,3 +46,17 @@ if (!process.env.GIJO_MODELS_DIR && fs.existsSync(모델자리)) {
 if (!process.env.GIJO_DEFAULT_MODEL_ID) {
   process.env.GIJO_DEFAULT_MODEL_ID = "gijo-main-orchestrator";
 }
+
+// ⚠ **첫 실행에 등급이 안 정해진다** — 2026-08-13 출하본 실측.
+//   `/api/localengine/tier`가 `tier: null`이고, 그러면 `currentTierSettings()`가
+//   등급표가 아니라 모듈 기본값(ctx 32768 · 동시 2개)으로 떨어진다.
+//   `recommended`는 계산해서 **보여만 주고 아무도 적용하지 않는다.**
+//   실측(이 32GB Mac): ctx 32768로 떠서 채팅 7.22GB + 임베딩 2.87GB = **10.09GB**.
+//   대상 기계(10GB)라면 **첫날부터 예산을 넘긴다** — 담당자는 설정 화면에 들어가
+//   「Lite」를 손으로 골라야 하는데, 그걸 알 방법이 없다.
+//   → 라이트 에디션은 **라이트 등급 값으로 시작한다**(ctx 8192 · 동시 1개).
+//   화면에서 고른 등급은 app_state에 남고 환경변수보다 우선하므로(localengine.ts:79),
+//   담당자가 더 큰 등급을 고르면 그쪽이 이긴다 — 이건 **바닥값**이지 상한이 아니다.
+//   ⚠ 등급표(TIER_SPECS) 자체는 「표준 제품 완성 후 다시 본다」는 결정이 서 있어 안 건드린다.
+if (!process.env.GIJO_LOCAL_LLM_CTX_SIZE) process.env.GIJO_LOCAL_LLM_CTX_SIZE = "8192";
+if (!process.env.GIJO_MAX_LOADED_MODELS) process.env.GIJO_MAX_LOADED_MODELS = "1";
