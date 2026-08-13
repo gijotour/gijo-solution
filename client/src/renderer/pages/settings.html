@@ -682,6 +682,41 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       </div><!-- /SIEM 연동 접기 -->
     </div>
 
+    <!-- 라이트 모드(2026-08-13 사장님 지시 2번) — 스탠다드 배포본을 라이트(화면 9·도구 13)로
+         전환하는 선택 사항. main.ts seam(edition:get/set)의 소비자 — 이 토글이 없으면
+         seam은 「설계는 됐고 쓰인 적 없다」였다(max 지적). -->
+    <div data-sec="admin" class="panel" id="editionPanel" style="display:none">
+      <div class="panel-title">🪶 라이트 모드 (선택)<span class="badge b-purple" style="margin-left:8px">admin 전용</span></div>
+      <div data-gijo-fold="라이트 모드">
+        <div class="hint" style="margin-bottom:8px">화면 9개·도구 13개의 1인용 구성으로 바꿉니다. ⚠ <b>데이터 폴더가 갈립니다</b> — 스탠다드로 쌓은 자산·결재는 라이트 화면에 안 보입니다(섞이면 도구 13개와 78개가 같은 DB에 번갈아 답하게 되어 일부러 가릅니다). ⚠ 적용은 <b>앱을 다시 시작해야</b> 됩니다.</div>
+        <div class="field-row">
+          <button class="btn" id="editionToggle">확인 중…</button>
+          <span id="editionState" class="hint"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 원격 GPU(BridgeAI 1단계 · 2026-08-13 사장님 결정: 전 제품 선택 연동 · VPN 전용).
+         서버 remotellm.ts 라우트의 소비자 — 라이트 카드(lite-settings)와 같은 모양·같은 다리. -->
+    <div data-sec="link" class="panel" id="rgpuPanel" style="display:none">
+      <div class="panel-title">🖧 원격 GPU (VPN·선택)<span class="badge b-purple" style="margin-left:8px">admin 전용</span></div>
+      <div data-gijo-fold="원격 GPU">
+        <div class="hint" style="margin-bottom:8px">⚠ 켜면 <b>질문이 VPN으로 원격 GPU 서버에 전송됩니다</b>. VPN 안 사설 주소(10.x·172.16-31.x·192.168.x·100.64-127.x)만 받습니다 — 기본은 꺼짐이고, 에어갭 모드에서는 기능 자체가 막힙니다.</div>
+        <div class="field-row">
+          <div class="field" style="flex:1">
+            <label for="rgpuUrl">원격 /v1 주소</label>
+            <input id="rgpuUrl" placeholder="http://10.8.0.12:8080/v1">
+          </div>
+        </div>
+        <div class="field-row">
+          <button class="btn" id="rgpuTest">연결 테스트</button>
+          <button class="btn primary" id="rgpuOn">켜기</button>
+          <span id="rgpuState" class="hint"></span>
+        </div>
+        <div id="rgpuMsg"></div>
+      </div>
+    </div>
+
     <!-- 법령·판례 조회 — 인터넷이 필요해 기본 꺼짐. 키를 넣어야 켜진다(2026-07-26). -->
     <div data-sec="link" class="panel" id="lawPanel" style="display:none">
       <div class="panel-title">⚖ 법령·판례 조회 (선택)<span class="badge b-purple" style="margin-left:8px">admin 전용</span></div>
@@ -805,11 +840,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         document.getElementById("smtpInboundPanel").style.display = "";
         document.getElementById("siemPanel").style.display = "";
         document.getElementById("lawPanel").style.display = "";
+        document.getElementById("rgpuPanel").style.display = "";
+        document.getElementById("editionPanel").style.display = "";
         document.getElementById("modelAuthPanel").style.display = "";
         document.getElementById("agentModelPanel").style.display = "";
         await loadAgentModels();
         await loadModelAuth();
         await loadLawConfig();
+        await loadRemoteGpu().catch(function () {});
+        await loadEdition().catch(function () {});
         await loadUserList();
         await loadReleases().catch(() => {});
         // admin 패널을 되살린 뒤 구역 필터를 다시 적용한다 — 순서가 뒤집히면
@@ -2286,6 +2325,46 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     mcpRender(); renderAudit();
   }
 
+
+  // ── 라이트 모드 토글 — main.ts edition seam의 소비자. 변경은 재시작 후 적용된다. ────
+  async function loadEdition() {
+    var b = document.getElementById("editionToggle"), st = document.getElementById("editionState");
+    var c = await window.gijo.editionGet();
+    if (c.빌드고정) { b.disabled = true; b.textContent = "라이트 전용 배포본"; st.textContent = "이 배포본은 라이트로 고정돼 있습니다."; return; }
+    var 라이트 = c.현재 === "lite";
+    b.textContent = 라이트 ? "스탠다드로 되돌리기" : "라이트 모드로 전환";
+    st.textContent = 라이트 ? "지금 라이트 모드 — 재시작 시 적용된 상태" : "지금 스탠다드 모드";
+    b.onclick = async function () {
+      if (!confirm((라이트 ? "스탠다드로 되돌립니다." : "라이트 모드로 전환합니다. 데이터 폴더가 갈립니다.") + " 적용은 앱 재시작 후입니다. 계속할까요?")) return;
+      var r = await window.gijo.editionSet(라이트 ? "standard" : "lite");
+      if (r && r.ok === false) { alert(r.error || "바꾸지 못했습니다."); return; }
+      st.textContent = "저장했습니다 — 앱을 다시 시작하면 적용됩니다.";
+      b.disabled = true;
+    };
+  }
+
+  // ── 원격 GPU(VPN) — 라이트 카드와 같은 다리(remoteLlmGet/Test/Set) ──────────────
+  async function loadRemoteGpu() {
+    var st = document.getElementById("rgpuState"), msg = document.getElementById("rgpuMsg");
+    var url = document.getElementById("rgpuUrl"), on = document.getElementById("rgpuOn");
+    var c = await window.gijo.remoteLlmGet();
+    url.value = c.url || "";
+    st.textContent = c.airgap ? "에어갭 모드 — 사용 불가" : (c.enabled ? "지금 켜짐 — 채팅이 원격으로 갑니다" : "꺼짐(로컬 모델 사용)");
+    on.textContent = c.enabled ? "끄기(로컬로 복귀)" : "켜기";
+    on.disabled = !!c.airgap;
+    document.getElementById("rgpuTest").onclick = async function () {
+      msg.innerHTML = '<div class="hint">확인 중…</div>';
+      try { var r = await window.gijo.remoteLlmTest(url.value.trim());
+        msg.innerHTML = r.ok ? '<div class="hint" style="color:var(--teal)">닿았습니다' + (r.models != null ? " — 모델 " + r.models + "개" : "") + "</div>"
+                             : '<div class="hint" style="color:var(--red)">' + esc(r.error || "실패") + "</div>";
+      } catch (e) { msg.innerHTML = '<div class="hint" style="color:var(--red)">' + esc(String((e && e.message) || e)) + "</div>"; }
+    };
+    on.onclick = async function () {
+      if (!c.enabled && !confirm("켜면 질문이 VPN으로 원격 GPU에 전송됩니다. 계속할까요?")) return;
+      try { await window.gijo.remoteLlmSet(!c.enabled, url.value.trim()); await loadRemoteGpu(); }
+      catch (e) { msg.innerHTML = '<div class="hint" style="color:var(--red)">' + esc(String((e && e.message) || e)) + "</div>"; }
+    };
+  }
 
   async function loadLawConfig() {
     try {

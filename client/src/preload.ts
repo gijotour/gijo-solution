@@ -61,6 +61,10 @@ const gijoApi = {
   // 닿는 **유일한 다리**다. ⚠ 이 두 줄이 없으면 seam은 「설계는 됐고 쓰인 적 없다」가 된다
   //   (max가 정확히 그렇게 짚었다: 「preload 다리 0 · 설정 토글 0 — 켜고 끌 방법이 없다」).
   //   스위치 UI는 시안 승인 후 설정 화면에 얹는다 — 다리는 UI가 아니므로 먼저 놓는다.
+  // 원격 GPU(BridgeAI · VPN 전용) — 설정 카드(라이트·표준 공용)가 쓴다.
+  remoteLlmGet: () => api.remoteLlmApi.get(),
+  remoteLlmTest: (url: string) => api.remoteLlmApi.test(url),
+  remoteLlmSet: (enabled: boolean, url: string) => api.remoteLlmApi.set(enabled, url),
   editionGet: () => ipcRenderer.invoke("edition:get"),
   editionSet: (mode: string) => ipcRenderer.invoke("edition:set", mode),
   mfaResetUser: (userId: string) => api.authApi.mfaResetUser(userId),

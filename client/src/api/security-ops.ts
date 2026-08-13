@@ -521,3 +521,10 @@ export const docRequestApi = {
       "/api/docbox/requests"
     ),
 };
+
+// ── 원격 LLM(BridgeAI 1단계 · VPN 전용) — 서버 remotellm.ts 라우트의 소비자 ──────────
+export const remoteLlmApi = {
+  get: () => request<{ enabled: boolean; url: string; lastCheck: number | null; airgap: boolean }>("/api/llm/remote"),
+  test: (url: string) => request<{ ok: boolean; models?: number | null; error?: string }>("/api/llm/remote/test", { method: "POST", body: { url } }),
+  set: (enabled: boolean, url: string) => request<{ enabled: boolean; url: string; airgap: boolean }>("/api/llm/remote", { method: "POST", body: { enabled, url } }),
+};

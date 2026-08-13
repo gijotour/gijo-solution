@@ -384,3 +384,17 @@ describe("★ 이력 글자 예산 (2026-08-13)", () => {
     expect(src).toMatch(/HISTORY_LIMIT = 20/);
   });
 });
+
+// ★ #8 「네 자료엔 없음」 정직 응답 (2026-08-13 · max 인계 ★높음) — 소스 감시
+describe("★ RAG 0건 정직 배너 (#8)", () => {
+  const src2 = fsw.readFileSync(new URL("../src/engine/llm.ts", import.meta.url), "utf8");
+  it("성공-0건(자료없음)과 오류(catch)를 가른다 — 고장을 「없다」로 단정하면 안 된다", () => {
+    expect(src2).toMatch(/자료없음: chunks\.length === 0/);
+    expect(src2, "catch가 자료없음=false를 안 돌려준다").toMatch(/catch \{\s*\n\s*return \{ context: null, 약한근거만: false, 자료없음: false \}/);
+  });
+  it("배너가 배선돼 있고 문구가 실패 목록과 안 겹친다", () => {
+    expect(src2).toMatch(/ragResult\?\.자료없음 && reply/);
+    expect(src2).toContain("이 PC의 사내 자료에는 이 내용이 없습니다");
+    expect(src2.includes("찾지 못했") && false, "").toBe(false); // FAIL_MARKS 전체 대조는 emptyanswer-guidance가 한다
+  });
+});

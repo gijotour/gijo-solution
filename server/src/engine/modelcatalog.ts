@@ -54,6 +54,17 @@ export interface 권장모델 {
  */
 export const 권장모델목록: 권장모델[] = [
   {
+    // ★ GIJO 제공 모델 (2026-08-13 HF 업로드 완료 · 사장님 실행) — 라이트 출하 기본 챗 모델.
+    //   비공개+게이트(manual)라 **HF 토큰 + 사장님 접근 승인**이 있어야 받아진다(라이트 설정의
+    //   HF 토큰 카드가 그 자리). SHA256 91d3e919…ec25bf5 — 릴리스 안내에 함께 게시.
+    //   ⚠ repo 계정은 gijohn(HF)이다 — gijotour(GitHub)와 다르다. 런북에 확정 기록됨.
+    용도: "GIJO 제공 — 라이트 기본 챗 (7.6B)",
+    repo: "gijohn/gijo-main-orchestrator-GGUF",
+    파일: "gijo-main-orchestrator-Q4_K_M.gguf",
+    대략크기: "약 5.1GB",
+    권장장비: "GPU 10GB급(라이트 대상)",
+  },
+  {
     용도: "기준 두뇌",
     repo: "Qwen/Qwen3-14B-GGUF",
     파일: "Qwen3-14B-Q4_K_M.gguf",

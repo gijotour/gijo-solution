@@ -106,7 +106,7 @@ export function resetChatHistoryForTests(): void {
 // 임베딩 서버가 없거나 지식 베이스가 비어 있으면 조용히 생략한다 — RAG가 안 된다고
 // 채팅 자체가 죽으면 안 된다. (memory.ts가 llm.ts의 embed를 쓰므로 순환 참조를 피해
 // 호출 시점에 동적 import.)
-async function ragContextFor(message: string, agentId: string, screen?: string, viewer?: Viewer): Promise<{ context: string | null; 약한근거만: boolean }> {
+async function ragContextFor(message: string, agentId: string, screen?: string, viewer?: Viewer): Promise<{ context: string | null; 약한근거만: boolean; 자료없음: boolean }> {
   try {
     const { queryMemoryGraded } = await import("./memory.js");
     // 에이전트 전용 지식 + 전역 지식만 검색 (다른 에이전트 전용 문서는 제외).
@@ -139,9 +139,12 @@ async function ragContextFor(message: string, agentId: string, screen?: string, 
       /* 온톨로지가 비어있거나 조회 실패해도 채팅은 계속된다 (RAG와 동일한 방어). */
     }
 
-    return { context: parts.length > 0 ? parts.join("\n\n") : null, 약한근거만 };
+    // 자료없음 — 검색은 **성공했는데** 문서 조각이 0건(온톨로지 규칙만으로는 사내 근거라 부르지 않는다).
+    // ⚠ 오류(catch)와 절대 뭉개지 않는다: 검색이 죽은 것과 자료가 없는 것은 다른 사실이고,
+    //   뭉개면 「검색 고장」을 담당자에게 「자료 없음」으로 단정해 말하게 된다(오늘 종일 잡은 그 병).
+    return { context: parts.length > 0 ? parts.join("\n\n") : null, 약한근거만, 자료없음: chunks.length === 0 };
   } catch {
-    return { context: null, 약한근거만: false };
+    return { context: null, 약한근거만: false, 자료없음: false };
   }
 }
 
@@ -902,6 +905,16 @@ export async function chat(args: ChatArgs): Promise<string> {
   //   ⚠ 「찾지 못했습니다」는 쓰지 않는다 — 서랍 점검의 폴백 문구 목록(FAIL_MARKS)에 있어
   //     좋은 답에 실패 딱지가 붙는다. 「없습니다」는 그 목록에 없고 게이트는 정직 표현으로 인정한다.
   //     같은 말이 한쪽에선 벌, 한쪽에선 상이 되지 않도록 문구를 고를 때 측정 도구를 함께 본다.
+  // ★ #8 「네 자료엔 없음」 (2026-08-13 · max 인계 ★높음) — RAG가 **성공했는데 0건**이면
+  //   일반지식 답 앞에 사실을 먼저 말한다. 보안 분석가에게 사내 답인 척하는 일반지식은
+  //   할루시네이션과 같은 급의 사고다(외부 사례 공통 지적 — Splunk·Elastic·MS Copilot).
+  //   ⚠ 검색 오류(catch)는 자료없음=false라 여기 안 걸린다 — 고장을 「없다」로 단정하지 않는다.
+  //   ⚠ 근거약함 배너와 상호배타(0건이면 약한근거만=false)라 두 배너가 겹칠 일은 없다.
+  //   ⚠ 문구는 FAIL_MARKS와 대조됨(emptyanswer-guidance 파일 전체 감시) — 「찾지 못했」 금지.
+  if (ragResult?.자료없음 && reply && !/자료에는 없|없습니다|근거 약함/.test(reply.slice(0, 60))) {
+    reply = `${표식.주의} **이 PC의 사내 자료에는 이 내용이 없습니다** — 아래는 **일반 지식 기준**의 답이니, 회사 규정·내부 데이터가 걸린 판단에는 그대로 쓰지 마세요.\n\n${reply}`;
+  }
+
   if (ragResult?.약한근거만 && reply && !/근거 약함|없습니다|확인되지/.test(reply.slice(0, 60))) {
     reply = `${표식.주의} **근거 약함 — 질문에 딱 맞는 사내 자료는 없습니다.** 아래는 **주변 자료로 유추한 것**이니 그대로 쓰기 전에 확인해 주세요.\n\n${reply}`;
   }
