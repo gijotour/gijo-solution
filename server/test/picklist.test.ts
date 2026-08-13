@@ -71,7 +71,7 @@ describe("고른 것만 정확히", () => {
 
   it("고른 게 전부 사라졌으면 처리하지 않고 알린다", () => {
     expect(() => findAgentTool("bulk_update")!.run({ ids: "pick-web::없는키0000000000", status: "오탐" }))
-      .toThrow(/목록에서 찾지 못했습니다|다시 불러/);
+      .toThrow(/목록에 없습니다|다시 불러/);
   });
 });
 

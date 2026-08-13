@@ -87,7 +87,11 @@ const 정직문구: { 자리: string; 글: string }[] = [];
 //   ★ 2026-08-14 handlers.ts 편입 — **네 번째 재발**(llm→actioncheck→lawinfo→handlers)을 계기로
 //     23곳 전수 교정(데이터-없음 17·입력값 3·능력경계 2·빈상태 2 → 「검색되지 않았습니다」 계열).
 //     도구 출력은 composeFinal 폴백(「그대로 보여 드립니다」)으로 원문이 사람에게 직접 간다.
-const 정직파일 = ["actioncheck.ts", "llm.ts", "lawinfo.ts", "agenttools/handlers.ts"];
+//   ★ 2026-08-14(2차) registry.ts·dispatcher.ts 편입 — 검토관이 **감시 밖 쌍둥이**를 찾았다:
+//     같은 도구가 결재판(registry)에선 옛 말, 실행 결과(handlers)에선 새 말을 썼다. 네 파일만
+//     지키면 「파일 전체 대조」라는 시험 이름이 다음 사람을 속인다. 사람에게 나가는 안내를
+//     내는 파일은 다 넣는다.
+const 정직파일 = ["actioncheck.ts", "llm.ts", "lawinfo.ts", "agenttools/handlers.ts", "agenttools/registry.ts", "dispatcher.ts"];
 const 코드만 = (src: string) =>
   src
     .split("\n")

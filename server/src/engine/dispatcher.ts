@@ -27,7 +27,7 @@ import type { Viewer } from "./memory";
 import { runAgentLoop, AgentToolCall, 가리킬것없는대명사, 가리킨자산이없나, 대명사뿐인가, 대명사확인, 되물음, 자산되물음, 선택을박는다, 직전대상자산 } from "./agentloop";
 import { 스트림자리 } from "./streamsink";
 import { 장애질문인가, 장애초동절차, 침해사고질문인가, 침해사고초동절차 } from "./incidentsteps";
-import { executeApprovedTool, findAgentTool, buildApproval, PendingApproval } from "./agenttools";
+import { executeApprovedTool, findAgentTool, buildApproval, PendingApproval, 에디션제한중 } from "./agenttools";
 import { appendApprovedDecision } from "./orchestrator-dataset";
 import { undoSnapshot, undoCommit } from "./undo";
 import { gateUserInput } from "./gateway";
@@ -1057,7 +1057,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     const 없음 = pick.ids.length - 있음.length;
     let 문장: string;
     if (있음.length === 0) {
-      문장 = `고르신 ${pick.ids.length}건을 지금 할 일 목록에서 찾지 못했습니다 — 그 사이에 처리됐거나 목록이 바뀌었을 수 있습니다.`;
+      문장 = `고르신 ${pick.ids.length}건이 지금 할 일 목록에 없습니다 — 그 사이에 처리됐거나 목록이 바뀌었을 수 있습니다.`;
     } else {
       for (const id of 있음) setTaskDone(id, true);
       문장 = `${있음.length}건을 끝냄으로 표시했습니다. 되돌리려면 "○○ 다시 열어줘"라고 말씀하세요.`;
@@ -1162,7 +1162,10 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   //   ⚠ isHelpIntent보다 먼저 본다 — 그건 「지금 보고 있는 화면」을 안내하므로, 다른 화면
   //     이름을 대고 물으면 엉뚱한 화면 설명이 나간다(위 자리 질문과 같은 이유).
   const 방법화면 = 방법질문화면찾기(instructionText);
-  if (방법화면) {
+  // ⚠ 라이트(도구 허용목록 걸림)에는 표준 화면(hardening.html 등)이 없다 — 화면이 전부 lite-*라
+  //   이름이 다르다. 표준전용 별칭이 없는 화면을 안내하지 않게 비켜 준다(검토관 2026-08-14).
+  //   비키면 이름 대조 실패 → LLM 일반 답으로 떨어진다(원래 동작). 라이트엔 lite-scan이 그 자리다.
+  if (방법화면 && !(방법화면.표준전용 && 에디션제한중())) {
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
     completeTask(task.id);
     return {
@@ -1439,6 +1442,8 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
       updateTaskPriority(task.id, priorityForFindings(result.findings));
     }
   } catch (err) {
+    // FAIL_MARKS-예외: 도구 실행이 실제로 예외를 던진 진짜 실패다(정직한 「없다」 답이 아니다).
+    //   서랍 점검이 이걸 실패로 세는 것이 맞다 — 그게 이 문구가 FAIL_MARKS에 있는 이유다.
     output = `실행 실패: ${err instanceof Error ? err.message : String(err)}`;
   }
 
@@ -1676,6 +1681,8 @@ export function registerDispatcherRoutes(app: Express): void {
       } catch (err) {
         resetAgentToDefault("orchestrator");
         completeTask(task.id);
+        // FAIL_MARKS-예외: 감사 로그의 action 문자열이다(사람 대면 답이 아니라 기록). 승인 실행이
+        //   실제로 예외를 던진 진짜 실패라 「실행 실패」로 적는 것이 맞다.
         recordAudit({ kind: "write", actor, action: `승인 실행 실패: ${toolName}`, detail: err instanceof Error ? err.message : String(err), result: "error" });
         res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
       }

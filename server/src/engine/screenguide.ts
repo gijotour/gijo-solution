@@ -967,19 +967,21 @@ const 방법질문_RE =
  * 방법 질문이 가리키는 우리 화면. 없으면 null — 없는 것을 지어내지 않는다.
  * ⚠ 영문 제품명이 함께 있으면(=남의 제품을 물은 것) 화면 안내가 아니다(2026-07-26 사고와 같은 이유).
  */
-export function 방법질문화면찾기(text: string): { screen: string; title: string } | null {
+export function 방법질문화면찾기(text: string): { screen: string; title: string; 표준전용?: boolean } | null {
   const t = String(text ?? "");
   if (!방법질문_RE.test(t)) return null;
   if (hasSpecificSubject(t)) return null;
   // ★ 정규식 별칭(2026-08-14, ops-sim 152 회귀에서 잡힘) — 「장비에 접속해서 확인하려면?」이
   //   화면 이름을 안 담아 아래 이름 대조로는 영영 못 잡고, 빈 자리를 7B가 하드닝 준수율
   //   보고로 채웠다(물은 건 방법인데 결과가 나감). 이름이 아니라 **말꼴**로 가리키는 질문은
-  //   여기서 잡는다. ⚠ 「접속기록」(보관연한 질문)과 겹치지 않게 장비류 낱말을 앞에 요구한다.
-  const 방법정규별칭: { re: RegExp; screen: string }[] = [
-    { re: /(장비|서버|스위치|방화벽|네트워크)\s*(에|에다|로)?\s*접속/, screen: "hardening.html" },
+  //   여기서 잡는다.
+  //   ⚠ 「접속기록」(로그 보관·조회)은 하드닝(장비 SSH 접속 점검)과 다른 일이다 — 검토관
+  //     지적(2026-08-14)으로 접속「기록」류를 명시 제외한다. 표준전용=라이트엔 이 화면이 없다.
+  const 방법정규별칭: { re: RegExp; screen: string; 표준전용?: boolean }[] = [
+    { re: /(장비|서버|스위치|방화벽|네트워크)\s*(에|에|에다|로)?\s*접속(?!\s*기록)/, screen: "hardening.html", 표준전용: true },
   ];
   for (const a of 방법정규별칭) {
-    if (a.re.test(t)) return { screen: a.screen, title: GUIDES[a.screen]?.title ?? a.screen };
+    if (a.re.test(t)) return { screen: a.screen, title: GUIDES[a.screen]?.title ?? a.screen, 표준전용: a.표준전용 };
   }
   const 붙인질문 = t.replace(/\s/g, "");
   let 최선: { screen: string; title: string; 길이: number } | undefined;

@@ -255,7 +255,7 @@ const TOOLS: AgentTool[] = [
         return `어느 장비에서 읽을지 정해 주세요. 등록된 점검 대상: ${있는것 || "(아직 없습니다 — 하드닝 점검 대상으로 먼저 등록해 주세요)"}`;
       }
       const t = 대상찾기(말);
-      if (!t) return `"${말}"에 해당하는 점검 대상을 찾지 못했습니다 — 먼저 하드닝 점검 대상으로 등록해 주세요.`;
+      if (!t) return `"${말}"에 해당하는 점검 대상이 검색되지 않았습니다 — 먼저 하드닝 점검 대상으로 등록해 주세요.`;
       return (
         `${t.label}(${t.host})에 접속해 **설치된 패키지 목록을 읽습니다.** ` +
         `읽기 전용 명령만 보냅니다(rpm -qa · dpkg-query · Windows 설치 목록 조회) — 장비를 바꾸지 않습니다. ` +
@@ -319,7 +319,7 @@ const TOOLS: AgentTool[] = [
     // 결재판에 뜨는 글 — **무엇이 얼마나 바뀌는지 숫자로** 보여 준다. "복구합니다"만으론 승인할 수 없다.
     effect: (args) => {
       const 후보 = 잃은취약점찾기().filter((c) => !args.assetId || c.assetId === args.assetId || c.이름 === args.assetId);
-      if (후보.length === 0) return "되살릴 것이 없습니다 — 잃은 취약점을 찾지 못했습니다.";
+      if (후보.length === 0) return "되살릴 것이 없습니다 — 잃은 취약점이 검색되지 않았습니다.";
       const 총건 = 후보.reduce((n, c) => n + c.되찾을건수, 0);
       const 가장오래된 = new Date(Math.min(...후보.map((c) => c.스캔시각))).toISOString().slice(0, 10);
       return `자산 ${후보.length}개에 취약점 ${총건}건을 되살립니다 — ${가장오래된} 이후 스캔 이력에 남아 있던 그대로입니다(지금 다시 스캔한 것이 아닙니다). 기존 스캔 실패 기록은 지우지 않고 함께 남깁니다.`;
@@ -330,7 +330,7 @@ const TOOLS: AgentTool[] = [
         ? 잃은취약점찾기().filter((c) => c.assetId === args.assetId || c.이름 === args.assetId).map((c) => c.assetId)
         : undefined;
       if (args.assetId && ids && ids.length === 0) {
-        return `"${args.assetId}"에서 되살릴 취약점을 찾지 못했습니다 — "잃은 취약점 있어?"로 먼저 확인해 주세요.`;
+        return `"${args.assetId}"에서 되살릴 취약점이 검색되지 않았습니다 — "잃은 취약점 있어?"로 먼저 확인해 주세요.`;
       }
       const r = 되살리기(ids);
       if (r.되살린자산 === 0) return "되살릴 것이 없었습니다.";
@@ -1554,6 +1554,17 @@ export function setToolAllowlist(names: string[] | null): void {
 
 export function isToolAllowed(name: string): boolean {
   return 허용목록 === null || 허용목록.has(name);
+}
+
+/**
+ * 도구 허용목록이 걸려 있는가 = **제한 에디션(라이트)로 부팅됐는가**.
+ * 서버가 가진 유일한 에디션 신호다(lite/index.ts가 부팅 전에 setToolAllowlist를 건다).
+ * ⚠ 표준 화면 이름을 안내하는 갈래(screenguide 방법정규별칭 등)가 라이트에서 **없는 화면**을
+ *   가리키지 않게 가를 때 쓴다 — 2026-08-14 검토관 지적(「장비 접속」이 라이트에 없는
+ *   hardening.html을 안내). 라이트는 화면이 전부 lite-*라 이름이 다르다.
+ */
+export function 에디션제한중(): boolean {
+  return 허용목록 !== null;
 }
 
 export function listToolsFor(domains?: string[], role?: string): AgentTool[] {

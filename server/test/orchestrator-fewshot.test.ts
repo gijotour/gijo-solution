@@ -86,7 +86,7 @@ describe("guardAgainstDenial", () => {
   });
 
   it("도구 결과가 실제로 0건이면 '없다'는 답을 유지한다(거짓 양성 방지)", () => {
-    const empty = [{ tool: "search", args: { query: "없는것" }, result: '"없는것"에 해당하는 자산·취약점·보안제품·문서·온톨로지 관계를 찾지 못했습니다.' }];
+    const empty = [{ tool: "search", args: { query: "없는것" }, result: '"없는것"에 해당하는 자산·취약점·보안제품·문서·온톨로지 관계가 검색되지 않았습니다.' }];
     const ans = "해당 자산을 찾을 수 없습니다.";
     expect(guardDenial(ans, empty)).toBe(ans);
   });

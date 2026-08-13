@@ -1497,7 +1497,7 @@ export function runBulkUpdate(args: Record<string, string>): string {
     대상설명 = "선택한 건";
     if (matched.length === 0) {
       throw new Error(
-        `고르신 ${못찾음.length}건을 지금 목록에서 검색되지 않았습니다 — 그 사이에 처리됐거나 목록이 바뀌었을 수 있습니다. 목록을 다시 불러 주세요.`
+        `고르신 ${못찾음.length}건이 지금 목록에 없습니다 — 그 사이에 처리됐거나 목록이 바뀌었을 수 있습니다. 목록을 다시 불러 주세요.`
       );
     }
   } else {
@@ -1623,7 +1623,7 @@ export function runReviewFinding(args: Record<string, string>): string {
   const hit = asset.findings.find((f) =>
     `${f.severity} ${f.finding_type} ${f.evidence ?? ""}`.toLowerCase().includes(target)
   );
-  if (!hit) return `"${args.finding}"에 해당하는 취약점을 ${assetId}에서 검색되지 않았습니다.`;
+  if (!hit) return `"${args.finding}"에 해당하는 취약점이 ${assetId}에서 검색되지 않았습니다.`;
 
   const status: ApprovalStatus =
     /승인|approve|조치완료|처리/.test(decision) ? "approved" : /반려|오탐|reject|false/.test(decision) ? "rejected" : "pending";

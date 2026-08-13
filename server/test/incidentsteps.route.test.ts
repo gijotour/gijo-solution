@@ -149,8 +149,27 @@ describe("「○○ 하려면 어떻게 해?」는 그 화면 안내로 간다 �
     const 찾음 = 방법질문화면찾기("장비에 접속해서 확인하려면?");
     expect(찾음).not.toBeNull();
     expect(찾음!.screen).toBe("hardening.html");
+    expect(찾음!.표준전용).toBe(true); // 라이트엔 이 화면이 없다 — dispatcher가 이 표식으로 가른다
     // 경계 — 「접속기록」(보관연한) 질문은 장비류 낱말이 없어 안 잡힌다.
     expect(방법질문화면찾기("접속기록은 얼마나 보관하려면 되나?")).toBeNull();
+  });
+
+  it("★ 「서버 접속기록 조회하려면?」은 하드닝으로 안 간다 — 로그 조회≠장비 접속 (검토관 2026-08-14 ⓒ/⑦)", async () => {
+    // 접속「기록」(로그)은 하드닝(장비 SSH 접속 점검)과 다른 일 — 부정형 선견으로 제외.
+    const { 방법질문화면찾기 } = await import("../src/engine/screenguide");
+    const r = 방법질문화면찾기("서버 접속기록 조회하려면 어떻게 해?");
+    expect(r?.screen).not.toBe("hardening.html");
+  });
+
+  it("★ 라이트(도구 허용목록 걸림)에서는 표준전용 별칭이 없는 화면을 안내하지 않는다 (검토관 2026-08-14 ⓒ)", async () => {
+    // dispatcher가 방법화면.표준전용 && 에디션제한중() 이면 비켜 준다 — 소스로 계약을 못박는다
+    // (실행하려면 라이트 서버 부팅이 필요해 여기서는 배선 존재를 확인한다).
+    const fs = await import("fs");
+    const path = await import("path");
+    const src = fs.readFileSync(path.join(__dirname, "../src/engine/dispatcher.ts"), "utf8");
+    expect(src).toContain("방법화면.표준전용 && 에디션제한중()");
+    const reg = fs.readFileSync(path.join(__dirname, "../src/engine/agenttools/registry.ts"), "utf8");
+    expect(reg).toContain("export function 에디션제한중()");
   });
 
   it("★ dispatcher가 실제로 이 갈래를 부른다 — 만들어 두고 안 부르면 없는 것과 같다", () => {
