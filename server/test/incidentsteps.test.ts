@@ -79,7 +79,7 @@ describe("초동 절차 — 급할 때 읽는 글", () => {
 
   it("★★ 못 찾으면 못 찾았다고 한다 — 없는 장비를 지어내지 않는다", () => {
     const s = 장애초동절차("듣보장비가 죽었어");
-    expect(s).toContain("찾지 못했습니다");
+    expect(s).toContain("검색되지 않았습니다");
     expect(s).not.toContain("담당 ");
   });
 

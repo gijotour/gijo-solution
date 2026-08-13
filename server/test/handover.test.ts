@@ -27,7 +27,7 @@ describe("verifyHandover", () => {
 
   it("문서 조각이 없으면(미인입) error를 남기고 계속 진행한다", async () => {
     const r = await verifyHandover(["없는문서.md", "fw_절차.md"], deps({ sampleOf: async (id) => (id === "없는문서.md" ? null : "본문") }));
-    expect(r.results[0].error).toContain("찾지 못했습니다");
+    expect(r.results[0].error).toContain("검색되지 않았습니다");
     expect(r.results[1].cited).toBe(true);
     expect(r.total).toBe(2);
     expect(r.passRate).toBe(50);

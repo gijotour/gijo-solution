@@ -45,7 +45,7 @@ export function findDuplicateDocs(): DupeGroup[] {
 /** 대화창 답변 — 없으면 없다고 말한다(0건 재작성 금지 원칙과 같은 계열). */
 export function duplicateDocsText(): string {
   const groups = findDuplicateDocs();
-  if (!groups.length) return "제목이 겹치는 문서를 찾지 못했습니다 — 같은 자료를 이름만 바꿔 두 번 올린 흔적이 없습니다.";
+  if (!groups.length) return "제목이 겹치는 문서가 검색되지 않았습니다 — 같은 자료를 이름만 바꿔 두 번 올린 흔적이 없습니다.";
   const lines: string[] = [
     `제목이 겹치는 문서 ${groups.length}묶음 — 같은 자료를 두 번 올렸는지 확인해 보세요.`,
     "⚠ 표시만 합니다 — 지우지 않았습니다. 어느 쪽이 최신·완전본인지는 사람이 판단합니다.",

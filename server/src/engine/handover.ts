@@ -141,7 +141,7 @@ export async function verifyHandover(
     try {
       const sample = await d.sampleOf(documentId);
       if (!sample) {
-        results.push({ documentId, question: "", cited: false, sources: [], answerPreview: "", error: "문서 조각을 찾지 못했습니다(인입 여부 확인)" });
+        results.push({ documentId, question: "", cited: false, sources: [], answerPreview: "", error: "문서 조각이 검색되지 않았습니다(인입 여부 확인)" });
         continue;
       }
       // 질문 생성 실패(LLM 다운 등)면 문서명 기반 폴백 질문 — 검증 자체는 계속한다.
