@@ -90,7 +90,7 @@ describe("도구 계약", () => {
   it("set_model_thinking 실행이 지정을 저장하고, 빈 입력은 안내로 되돌린다", async () => {
     const w = findAgentTool("set_model_thinking")!;
     expect(String(await w.run({ model: "", mode: "끔" }))).toContain("모델 이름");
-    expect(String(await w.run({ model: "시험모델", mode: "애매" }))).toContain("모드를 알 수 없습니다");
+    expect(String(await w.run({ model: "시험모델", mode: "애매" }))).toContain("모드 값이 올바르지 않습니다");
     const out = String(await w.run({ model: "시험모델", mode: "켬" }));
     expect(out).toContain("다음에 모델을 로드할 때부터");
     expect(thinkingOverride("시험모델")).toBe(true);

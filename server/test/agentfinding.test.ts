@@ -174,7 +174,7 @@ describe("resolveFinding — 지목의 판단은 서버 규칙 (LLM이 findingKe
   it("맞는 취약점이 없으면 실패하고 후보를 알려준다", async () => {
     await expect(
       executeApprovedTool("assign_finding", { assetId: "ai-secbot-01", finding: "SQL 인젝션", assignee: "김보안" })
-    ).rejects.toThrow(/찾지 못했습니다/);
+    ).rejects.toThrow(/검색되지 않았습니다/);
   });
 
   it("여러 건이 걸리면 실행하지 않고 더 구체적으로 지목하라고 한다", async () => {

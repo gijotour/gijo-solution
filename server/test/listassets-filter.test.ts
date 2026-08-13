@@ -44,7 +44,7 @@ describe("자산 목록 — 물어본 것만 보여 준다", () => {
   it("② 못 찾으면 전체를 쏟지 않는다 — 조건을 흘려버리면 안 된다", async () => {
     const out = await 목록({ query: "존재하지않는장비" });
     expect(out, "0건인데 자산 이름이 나왔다 = 전체를 쏟았다").not.toContain("본사 방화벽");
-    expect(out).toContain("찾지 못했습니다");
+    expect(out).toContain("검색되지 않았습니다");
     expect(out, "어떻게 하면 되는지 없으면 막다른 길이다").toMatch(/전체|다른 말/);
   });
 

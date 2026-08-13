@@ -187,7 +187,7 @@ describe("assign_owner — 자산 담당부서 채우기 (쓰기, 결재판 경�
   it("대상을 못 찾으면 등록 자산 목록을 안내한다(오발동 방지)", async () => {
     registerAsset({ id: "real-01", name: "실자산", path: "-" });
     const out = await executeApprovedTool("assign_owner", { assetId: "존재안함", owner: "x" });
-    expect(out).toContain("찾지 못했습니다");
+    expect(out).toContain("검색되지 않았습니다");
     // ⚠ 안내에는 **이름**이 나온다 — 내부 id는 사람이 읽는 글자가 아니다(2026-08-03 말투 규범).
     expect(out).toContain("실자산");
   });
@@ -238,7 +238,7 @@ describe("도메인 쓰기 역량 — 결재판 승인 실행", () => {
 
   it("set_compliance_status: 알 수 없는 코드/상태는 실행하지 않고 안내한다", async () => {
     expect(await executeApprovedTool("set_compliance_status", { code: "ZZ99", status: "covered" })).toContain("특정하지 못했");
-    expect(await executeApprovedTool("set_compliance_status", { code: "M06", status: "몰라요" })).toContain("알 수 없");
+    expect(await executeApprovedTool("set_compliance_status", { code: "M06", status: "몰라요" })).toContain("올바르지 않습니다");
   });
 
   it("register_product: 보안제품을 등록부에 추가한다", async () => {

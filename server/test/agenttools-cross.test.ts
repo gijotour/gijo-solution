@@ -62,7 +62,7 @@ describe("search — 메뉴를 가로지르는 단일 검색", () => {
 
   it("아무것도 없으면 없다고 정직하게 답한다", async () => {
     const out = await run("search", { query: "존재하지않는키워드zzz" });
-    expect(out).toContain("찾지 못했습니다");
+    expect(out).toContain("검색되지 않았습니다");
   });
 
   it("임베딩 서버가 죽어도 나머지 검색은 계속된다", async () => {
@@ -99,7 +99,7 @@ describe("search — 메뉴를 가로지르는 단일 검색", () => {
   it("낱말 중 하나라도 안 맞으면 억지로 끌어오지 않는다", async () => {
     registerAsset({ id: "web-01", name: "안전대부 본인인증 웹 서버", path: "p" });
     const out = await run("search", { query: "국민은행 웹서버" });
-    expect(out).toContain("찾지 못했습니다");
+    expect(out).toContain("검색되지 않았습니다");
   });
 
   it("'A와 B' 형태(한국어 조사)도 나눠 찾는다", async () => {

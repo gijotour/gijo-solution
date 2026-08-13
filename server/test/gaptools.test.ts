@@ -47,7 +47,7 @@ describe("작업 기록 조회 (audit_search)", () => {
 
   it("없는 검색어면 '못 찾았다'고 분명히 말한다 — 지어내지 않는다", async () => {
     const out = await run("audit_search", { query: "존재하지않는작업명XYZ" });
-    expect(out).toContain("찾지 못했습니다");
+    expect(out).toContain("검색되지 않았습니다");
   });
 });
 
@@ -79,7 +79,7 @@ describe("표준 코드 연결 조회 (ontology_query)", () => {
 
   it("못 찾으면 못 찾았다고 한다", async () => {
     const out = await run("ontology_query", { query: "없는코드ZZZ-999" });
-    expect(out).toContain("찾지 못했습니다");
+    expect(out).toContain("검색되지 않았습니다");
   });
 });
 

@@ -84,7 +84,10 @@ const 정직문구: { 자리: string; 글: string }[] = [];
 //   → **파일 전체**를 본다: 사람에게 나가는 문자열에 실패 문구가 있으면 잡는다.
 //   ⚠ 주석은 뺀다 — 이 규칙을 설명하는 주석이 그 말을 인용하기 때문이다(오늘 두 번 겪었다).
 //   ⚠ 새 파일을 여기 더할 때는 「사람에게 나가는 안내를 내는 파일」인지 보고 더한다.
-const 정직파일 = ["actioncheck.ts", "llm.ts", "lawinfo.ts"];
+//   ★ 2026-08-14 handlers.ts 편입 — **네 번째 재발**(llm→actioncheck→lawinfo→handlers)을 계기로
+//     23곳 전수 교정(데이터-없음 17·입력값 3·능력경계 2·빈상태 2 → 「검색되지 않았습니다」 계열).
+//     도구 출력은 composeFinal 폴백(「그대로 보여 드립니다」)으로 원문이 사람에게 직접 간다.
+const 정직파일 = ["actioncheck.ts", "llm.ts", "lawinfo.ts", "agenttools/handlers.ts"];
 const 코드만 = (src: string) =>
   src
     .split("\n")

@@ -261,12 +261,12 @@ export function runListAssets(args: Record<string, string> = {}): string {
   const q = String(args.query ?? "").trim();
 
   // 「최근에 추가된 자산」 — "최근"은 이름이 아니라 **시간 조건**이다(147상황 실측 2026-08-07:
-  // 이름 검색으로 흘러 "「최근」에 해당하는 것을 찾지 못했습니다"가 나갔다). 등록 시각으로 거른다.
+  // 이름 검색으로 흘러 "「최근」에 해당하는 것이 검색되지 않았습니다"가 나갔다). 등록 시각으로 거른다.
   if (/최근|새로\s*(추가|등록|들어온)|요즘\s*(추가|등록)/.test(q)) {
     const 기준 = Date.now() - 30 * 24 * 3600000; // 최근 = 30일(자산 등록은 드문 일이라 넉넉히)
     const 최근것 = all.filter((a) => a.registeredAt >= 기준).sort((a, b) => b.registeredAt - a.registeredAt);
     if (!최근것.length) {
-      return `최근 30일 사이 새로 등록된 자산이 없습니다 (전체 ${all.length}개는 그 전에 등록됨).\n` +
+      return `최근 30일 사이 새로 등록된 자산은 0건입니다 (전체 ${all.length}개는 그 전에 등록됨).\n` +
         `${표식.다음} 전체를 보시려면 "자산 목록 보여줘"`;
     }
     const 보일 = 최근것.slice(0, 15);
@@ -292,7 +292,7 @@ export function runListAssets(args: Record<string, string> = {}): string {
 
   // ⚠ 못 찾았다고 **전체를 쏟지 않는다.** 조건을 흘려버리고 전부 주면 담당자는 그게 답인 줄 안다.
   if (assets.length === 0) {
-    return `등록된 자산 ${all.length}개 중 "${q}"에 해당하는 것을 찾지 못했습니다. ` +
+    return `등록된 자산 ${all.length}개 중 "${q}"에 해당하는 것이 검색되지 않았습니다. ` +
       `이름·유형·카테고리·서비스·구성요소와 **올린 점검 파일 이름**으로 찾습니다 — ` +
       `다른 말로 물어보시거나 "자산 목록"으로 전체를 보세요.`;
   }
@@ -327,7 +327,7 @@ export async function runGetAsset(args: Record<string, string>): Promise<string>
     const 보기 = 전체.slice(0, 8).map((a) => 자산표시이름(a.id)).join(", ") || "(없음)";
     const 더 = 전체.length > 8 ? ` … 외 ${전체.length - 8}개` : "";
     return (
-      `자산 "${args.assetId}"을(를) 찾지 못했습니다.
+      `자산 "${args.assetId}"이(가) 검색되지 않았습니다.
 ` +
       `등록된 자산 ${전체.length}개 중 몇 개: ${보기}${더}
 ` +
@@ -789,7 +789,7 @@ export async function searchOne(q: string): Promise<string[]> {
 // search — 메뉴를 가로지르는 단일 검색. LLM이 "어느 메뉴를 봐야 하나"를 풀지 않아도 되게 한다.
 // 0건일 때 붙이는 머리말. 이걸로 시작하는 결과는 LLM 재작성 없이 그대로 나간다(agentloop) —
 // "못 찾았다"를 "존재하지 않는다"로 부풀려 답하던 사고(2026-07-26)를 구조적으로 막는다.
-export const NO_HIT_PREFIX = "🔎 찾지 못했습니다 —";
+export const NO_HIT_PREFIX = "🔎 검색되지 않았습니다 —";
 
 export function noHitMessage(q: string): string {
   const lines = [`${NO_HIT_PREFIX} "${q}"로는 결과가 없습니다.`, `(등록된 게 없다는 뜻이 아니라, 이 말로는 못 찾았다는 뜻입니다.)`];
@@ -845,7 +845,7 @@ export async function runSearch(args: Record<string, string>): Promise<string> {
   const blocks: string[] = [];
   for (const term of terms) {
     const out = await searchOne(term);
-    blocks.push(`■ "${term}"`, ...(out.length ? out : [`  해당하는 자산·취약점·보안제품·문서·온톨로지 관계를 찾지 못했습니다.`]));
+    blocks.push(`■ "${term}"`, ...(out.length ? out : [`  해당하는 자산·취약점·보안제품·문서·온톨로지 관계가 검색되지 않았습니다.`]));
   }
   return blocks.join("\n").slice(0, 3500);
 }
@@ -1007,7 +1007,7 @@ export function runScanStatus(args: Record<string, string>): string {
   // ⚠ 못 구하면 비운다 — 0이나 오늘로 채우면 "방금 본 것"이라는 거짓이 된다.
   const 시각들 = assets.map((a) => a.lastScannedAt).filter((t): t is number => typeof t === "number" && t > 0);
   const 신선도 = (() => {
-    if (시각들.length === 0) return "· 반입 시각을 기록한 자산이 없습니다 — 언제 것인지 알 수 없습니다. 스캔 결과를 다시 올리면 반입 시각이 함께 기록됩니다.";
+    if (시각들.length === 0) return "· 반입 시각을 기록한 자산이 없습니다 — 언제 것인지 기록이 없습니다. 스캔 결과를 다시 올리면 반입 시각이 함께 기록됩니다.";
     const 최근 = Math.max(...시각들);
     const 가장오래 = Math.min(...시각들);
     const 며칠 = (t: number) => Math.floor((Date.now() - t) / 86400000);
@@ -1042,7 +1042,7 @@ export async function runRunRedteam(args: Record<string, string>): Promise<strin
     const 보기 = 전체.slice(0, 8).map((a) => 자산표시이름(a.id)).join(", ") || "(없음)";
     const 더 = 전체.length > 8 ? ` … 외 ${전체.length - 8}개` : "";
     return (
-      `자산 "${args.assetId}"을(를) 찾지 못했습니다.
+      `자산 "${args.assetId}"이(가) 검색되지 않았습니다.
 ` +
       `등록된 자산 ${전체.length}개 중 몇 개: ${보기}${더}
 ` +
@@ -1051,7 +1051,7 @@ export async function runRunRedteam(args: Record<string, string>): Promise<strin
   }
   const modelId = asset.aibom?.model?.modelRef;
   if (!modelId) {
-    return `${asset.name}(${asset.id})에는 연결된 로컬 모델(AI-BOM modelRef)이 없어 레드팀 점검을 할 수 없습니다 — AI/LLM 자산만 점검 대상입니다.`;
+    return `${asset.name}(${asset.id})에는 연결된 로컬 모델(AI-BOM modelRef)이 없습니다 — 레드팀 점검은 AI/LLM 자산만 점검 대상입니다.`;
   }
   const report = await runRedTeam(makeServedCaller(modelId), asset.name);
   setAssetRobustness(asset.id, { score: report.robustnessScore, vulnerable: report.vulnerable, total: report.total, ranAt: report.ranAt, modelId });
@@ -1149,7 +1149,7 @@ export function runAssignOwner(args: Record<string, string>): string {
   const { resolved, unresolved } = resolveAssetList(args.assetId ?? "");
   if (resolved.length === 0) {
     const ids = listAssets().map((a) => 자산표시이름(a.id)).slice(0, 12).join(", ") || "(없음)";
-    return `대상 자산을 찾지 못했습니다: "${args.assetId}". 등록된 자산 id: ${ids}`;
+    return `대상 자산이 검색되지 않았습니다: "${args.assetId}". 등록된 자산 id: ${ids}`;
   }
   const owner = (args.owner ?? "").trim();
   const service = args.service?.trim();
@@ -1185,7 +1185,7 @@ export function runSetComplianceStatus(args: Record<string, string>): string {
   const threat = resolveThreatCode(args.code ?? "");
   if (!threat) return `위협을 특정하지 못했습니다: "${args.code}". 위협 현황(compliance_status)에서 코드(예: M06)나 위협명(예: 탈옥)을 확인하세요.`;
   const status = normalizeComplianceStatus(args.status ?? "");
-  if (!status) return `대응 상태를 알 수 없습니다: "${args.status}". covered(대응완료)·partial(부분)·na(해당없음)·open(미대응) 중 하나여야 합니다.`;
+  if (!status) return `대응 상태 값이 올바르지 않습니다: "${args.status}". covered(대응완료)·partial(부분)·na(해당없음)·open(미대응) 중 하나여야 합니다.`;
   setComplianceStatus(threat.code, status, (args.note ?? "").trim());
   const label: Record<ComplianceStatus, string> = { covered: "대응완료", partial: "부분대응", na: "해당없음", open: "미대응" };
   return `위협 ${threat.code}(${threat.name})의 대응 상태를 "${label[status]}"로 기록했습니다.`;
@@ -1245,7 +1245,7 @@ export function runRegisterProduct(args: Record<string, string>): string {
     const hit = resolveAsset(자산요청);
     if (!hit) {
       const ids = listAssets().map((a) => a.name).slice(0, 8).join(", ") || "(없음)";
-      return `연결할 자산을 찾지 못했습니다: "${자산요청}". 등록된 자산 예: ${ids}`;
+      return `연결할 자산이 검색되지 않았습니다: "${자산요청}". 등록된 자산 예: ${ids}`;
     }
     assetId = hit.id;
   }
@@ -1264,7 +1264,7 @@ export async function runGenerateSbom(args: Record<string, string>): Promise<str
   const asset = resolveAsset(args.assetId ?? "");
   if (!asset) {
     const ids = listAssets().map((a) => 자산표시이름(a.id)).slice(0, 12).join(", ") || "(없음)";
-    return `대상 자산을 찾지 못했습니다: "${args.assetId}". 등록된 자산 id: ${ids}`;
+    return `대상 자산이 검색되지 않았습니다: "${args.assetId}". 등록된 자산 id: ${ids}`;
   }
   const doc = await generateSbom(asset.id);
   const n = doc.components?.length ?? 0;
@@ -1337,7 +1337,7 @@ export function resolveFinding(assetId: string, needle: string): { ok: true; hit
   const hits = asset.findings.filter((f) => findingMatches(`${f.finding_type} ${f.severity} ${f.evidence}`, n));
   if (hits.length === 0) {
     const sample = asset.findings.slice(0, 6).map(findingLabel).join(" / ");
-    return { ok: false, error: `${asset.id}에서 "${needle}"에 맞는 취약점을 찾지 못했습니다. 이 자산의 취약점: ${sample}` };
+    return { ok: false, error: `${asset.id}에서 "${needle}"에 맞는 취약점이 검색되지 않았습니다. 이 자산의 취약점: ${sample}` };
   }
   if (hits.length > 1) {
     const sample = hits.slice(0, 6).map(findingLabel).join(" / ");
@@ -1497,7 +1497,7 @@ export function runBulkUpdate(args: Record<string, string>): string {
     대상설명 = "선택한 건";
     if (matched.length === 0) {
       throw new Error(
-        `고르신 ${못찾음.length}건을 지금 목록에서 찾지 못했습니다 — 그 사이에 처리됐거나 목록이 바뀌었을 수 있습니다. 목록을 다시 불러 주세요.`
+        `고르신 ${못찾음.length}건을 지금 목록에서 검색되지 않았습니다 — 그 사이에 처리됐거나 목록이 바뀌었을 수 있습니다. 목록을 다시 불러 주세요.`
       );
     }
   } else {
@@ -1623,7 +1623,7 @@ export function runReviewFinding(args: Record<string, string>): string {
   const hit = asset.findings.find((f) =>
     `${f.severity} ${f.finding_type} ${f.evidence ?? ""}`.toLowerCase().includes(target)
   );
-  if (!hit) return `"${args.finding}"에 해당하는 취약점을 ${assetId}에서 찾지 못했습니다.`;
+  if (!hit) return `"${args.finding}"에 해당하는 취약점을 ${assetId}에서 검색되지 않았습니다.`;
 
   const status: ApprovalStatus =
     /승인|approve|조치완료|처리/.test(decision) ? "approved" : /반려|오탐|reject|false/.test(decision) ? "rejected" : "pending";
@@ -2044,7 +2044,7 @@ export function 대상찾기(말: string) {
  */
 export function runSbomCoverage(assetId?: string): string {
   const 자산들 = assetId ? [getAsset(assetId)].filter(Boolean) : listAssets();
-  if (자산들.length === 0) return assetId ? `"${assetId}" 자산을 찾지 못했습니다.` : "등록된 자산이 없습니다. — 아직 등록 전이라는 뜻입니다. 자산을 넣으면 SBOM 커버리지를 잽니다.";
+  if (자산들.length === 0) return assetId ? `"${assetId}" 자산이 검색되지 않았습니다.` : "등록된 자산이 0건입니다 — 아직 등록 전이라는 뜻입니다. 자산을 넣으면 SBOM 커버리지를 잽니다.";
   if (assetId) {
     const a = 자산들[0]!;
     // ★ 지원 종료(EOL)를 함께 본다(2026-08-04 파트너 지적 3번) — 지원이 끝난 부품은
@@ -2083,7 +2083,7 @@ export function runSbomCoverage(assetId?: string): string {
 /** 실제 수집 — 승인 뒤에만 돈다. */
 export async function runCollectPackages(말: string): Promise<string> {
   const t = 대상찾기(말);
-  if (!t) return `"${말}"에 해당하는 점검 대상을 찾지 못했습니다 — 먼저 하드닝 점검 대상으로 등록해 주세요.`;
+  if (!t) return `"${말}"에 해당하는 점검 대상이 검색되지 않았습니다 — 먼저 하드닝 점검 대상으로 등록해 주세요.`;
   const 윈도우 = t.standard === "kisa_pc";
   // ⚠ targetRunner가 아니라 **runnerFor**(2026-08-06 실측으로 잡음). targetRunner는 로컬이면
   //   무조건 hostRunner(WSL bash)를 주는데, 로컬 **윈도우 PC** 대상(kisa_pc)의 수집 명령은
@@ -2537,7 +2537,7 @@ export async function runAuditSearch(args: Record<string, string>): Promise<stri
         [e.action, e.target, e.actor, e.detail].some((v) => (v ?? "").toLowerCase().includes(q.toLowerCase())))
     : rows;
   if (hit.length === 0) {
-    return `최근 ${days}일 작업 기록에서 ${q ? `"${q}"에 해당하는 ` : ""}내역을 찾지 못했습니다.`;
+    return `최근 ${days}일 작업 기록에서 ${q ? `"${q}"에 해당하는 ` : ""}내역이 검색되지 않았습니다.`;
   }
   const failed = hit.filter((e) => e.result !== "ok").length;
   const byActor = hit.reduce<Record<string, number>>((a, e) => {
@@ -2626,7 +2626,7 @@ export async function runOntologyQuery(args: Record<string, string>): Promise<st
   if (total === 0) return "온톨로지에 등록된 관계가 없습니다. 표준 번들을 먼저 임포트하세요.";
   const rel = expandOntology(q, undefined, { hops: 2, limit: 15 });
   if (rel.length === 0) {
-    return `"${q}"와 연결된 관계를 찾지 못했습니다 (전체 ${total}개 관계 중). 표준 코드(CWE-79·A03:2021 등)나 정확한 이름으로 물어보세요.`;
+    return `"${q}"와 연결된 관계가 검색되지 않았습니다 (전체 ${total}개 관계 중). 표준 코드(CWE-79·A03:2021 등)나 정확한 이름으로 물어보세요.`;
   }
   return [
     `"${q}" 관련 연결 ${rel.length}건 (전체 ${total}개 관계에서):`,
@@ -2858,7 +2858,7 @@ export function runSetModelThinking(args: Record<string, string>): string {
   if (!model) return "모델 이름이 필요합니다 — 「모델 적응 상태」로 로드된 모델 이름을 확인하세요.";
   const 끄기 = /꺼|끔|off|비활성/i.test(mode);
   const 켜기 = /켜|켬|on|활성/i.test(mode);
-  if (!끄기 && !켜기) return "모드를 알 수 없습니다 — '끔' 또는 '켬'으로 알려 주세요.";
+  if (!끄기 && !켜기) return "모드 값이 올바르지 않습니다 — '끔' 또는 '켬'으로 알려 주세요.";
   setThinkingOverride(model, 켜기); // thinking=true면 생각 모드가 있는 모델로 취급(끄는 플래그 적용)
   return [
     `${model}의 생각(추론) 모드 판별을 「${켜기 ? "thinking 모델(생각 끄는 플래그 적용)" : "일반 모델(플래그 없음)"}」로 지정했습니다.`,
@@ -2955,7 +2955,7 @@ export async function runAdapterAssign(args: Record<string, string>): Promise<st
       (팀원말 && (a.name.includes(팀원말) || a.defaultName.toLowerCase().includes(팀원말.toLowerCase()) || a.role.includes(팀원말)))
   );
   if (!found) {
-    return `어느 팀원인지 찾지 못했습니다: 「${팀원말 || "(미지정)"}」 — 팀원: ${agents.map((a) => a.name).join(", ")}`;
+    return `어느 팀원인지 알아듣지 못했습니다: 「${팀원말 || "(미지정)"}」 — 팀원: ${agents.map((a) => a.name).join(", ")}`;
   }
   const 해제 = !adapterId || /^(없음|해제|베이스)$/.test(adapterId);
   try {
@@ -3006,7 +3006,7 @@ export async function runAdapterImport(args: Record<string, string>): Promise<st
       `⚠ 아직 **미채택**입니다 — 실서비스에 실리지 않습니다. 다음 걸음:\n` +
       `① 평가 게이트(tools/evalgate)로 품질을 재고\n` +
       `② 「${a.id} 어댑터 채택, 근거: (게이트 결과)」로 채택\n` +
-      `③ 「(팀원)에 ${a.id} 배정해줘」로 팀원에 장착 (총괄에는 장착할 수 없습니다)`
+      `③ 「(팀원)에 ${a.id} 배정해줘」로 팀원에 장착 (총괄에는 장착 불가)`
     );
   } catch (e) {
     return `반입하지 못했습니다 — ${(e as Error).message}`;

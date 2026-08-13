@@ -121,7 +121,7 @@ describe("agenttools — 「AI 자산」 조회 도구", () => {
   it("get_asset은 없는 자산이면 등록된 자산 **이름**과 함께 안내한다", async () => {
     seedAsset();
     const out = String(await findAgentTool("get_asset")!.run({ assetId: "no-such" }));
-    expect(out).toContain("찾지 못했습니다");   // 「없다」가 아니라 「못 찾았다」 — 말투 규범
+    expect(out).toContain("검색되지 않았습니다");   // 「없다」가 아니라 「검색 안 됨」 — 말투 규범(FAIL_MARKS 회피, 2026-08-14)
     expect(out).toContain("fraud-detect-llm");
   });
 

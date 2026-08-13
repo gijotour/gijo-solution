@@ -84,7 +84,7 @@ describe("취약점(vuln) 도메인 역량", () => {
     expect(noAsset).toContain("찾을 수 없습니다");
 
     const noFinding = findAgentTool("review_finding")!.run({ assetId: "test-llm", finding: "존재하지않는취약점xyz", decision: "승인" }) as string;
-    expect(noFinding).toContain("찾지 못했습니다");
+    expect(noFinding).toContain("검색되지 않았습니다");
   });
 
   it("쓰기 도구는 결재판 대상으로 표시된다", () => {
