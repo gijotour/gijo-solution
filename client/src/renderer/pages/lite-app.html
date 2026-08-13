@@ -19,16 +19,36 @@
 -->
 <style>
   html, body { height: 100%; margin: 0; }
-  body { display: flex; font-family: inherit; background: var(--g-bg, #0f1115); color: var(--g-fg, #e6e8ec); }
+  /* ⚠ 창을 세로로 쌓는다 — 맨 위 44px 제목줄 + 그 아래 [사이드바 | 본문].
+     예전엔 body가 바로 [사이드바|본문]이라 창 버튼이 내용 위에 겹쳤다:
+       macOS는 신호등(● ● ●)이 **왼쪽 위**라 「GIJO AS」 글자를 덮었고(2026-08-13 사장님 신고),
+       Windows는 (─ ▢ ✕)가 **오른쪽 위**라 화면 제목을 덮는다.
+     본 제품 app.html이 쓰는 방식을 그대로 옮긴다 — 44px 제목줄이 창 버튼을 세로로 품고,
+     env(titlebar-area-*)로 좌우 버튼 자리를 비운다(두 OS가 한 줄로 맞는다). */
+  body { display: flex; flex-direction: column; font-family: inherit;
+    background: var(--g-bg, #0f1115); color: var(--g-fg, #e6e8ec); }
+
+  /* 제목줄 — 창을 끄는 손잡이. 브랜드를 여기 담는다(신호등 자리 밖으로 밀려 안 겹친다). */
+  .lite-titlebar {
+    flex: 0 0 44px; height: 44px; display: flex; align-items: center;
+    border-bottom: 1px solid var(--g-border, #262a33); background: var(--g-panel, #141821);
+    -webkit-app-region: drag;
+    /* macOS: 왼쪽 신호등 폭만큼 민다. Windows: env가 0이라 16px 그대로. */
+    padding-left: calc(16px + env(titlebar-area-x, 0px));
+    /* Windows: 오른쪽 창 버튼(─ ▢ ✕) 폭을 비운다. macOS: 거의 0. */
+    padding-right: calc(16px + 100vw - env(titlebar-area-width, 100vw) - env(titlebar-area-x, 0px));
+  }
+  .lite-titlebar .p { font-weight: 700; font-size: 13.5px; letter-spacing: .2px; }
+  .lite-titlebar .e { font-size: 11px; opacity: .62; margin-left: 8px; }
+
+  /* 제목줄 아래 본체 — 여기서만 [사이드바 | 본문]으로 나뉜다. */
+  .lite-body { flex: 1 1 auto; min-height: 0; display: flex; }
 
   /* 사이드바 — 9개뿐이라 접기·검색이 없다. 없는 것이 라이트의 값이다. */
   .lite-side {
     width: 216px; flex: 0 0 216px; display: flex; flex-direction: column;
     border-right: 1px solid var(--g-border, #262a33); background: var(--g-panel, #141821);
   }
-  .lite-brand { padding: 14px 16px 10px; border-bottom: 1px solid var(--g-border, #262a33); }
-  .lite-brand .p { font-weight: 700; font-size: 14px; letter-spacing: .2px; }
-  .lite-brand .e { font-size: 11px; opacity: .62; margin-top: 2px; }
   #liteNav { padding: 8px; display: flex; flex-direction: column; gap: 2px; overflow-y: auto; }
   /* 설정은 번호 매긴 업무 메뉴와 성격이 달라 아래에 따로 둔다. */
   #liteNavFoot { margin-top: auto; padding: 8px; border-top: 1px solid var(--g-border, #262a33); }
@@ -63,17 +83,20 @@
 </style>
 </head>
 <body class="g-ui">
-  <nav class="lite-side" aria-label="라이트 메뉴">
-    <div class="lite-brand">
-      <div class="p">GIJO AS</div>
-      <div class="e">Lite — 담당자 PC 1인용</div>
-    </div>
-    <div id="liteNav" role="list"></div>
-    <div id="liteNavFoot"></div>
-  </nav>
-  <main class="lite-main">
-    <div id="liteScreen"></div>
-  </main>
+  <!-- 제목줄 — 브랜드는 여기(창 버튼 자리를 CSS가 비운다). 창을 끄는 손잡이이기도 하다. -->
+  <div class="lite-titlebar">
+    <span class="p">GIJO AS</span>
+    <span class="e">Lite — 담당자 PC 1인용</span>
+  </div>
+  <div class="lite-body">
+    <nav class="lite-side" aria-label="라이트 메뉴">
+      <div id="liteNav" role="list"></div>
+      <div id="liteNavFoot"></div>
+    </nav>
+    <main class="lite-main">
+      <div id="liteScreen"></div>
+    </main>
+  </div>
   <script>
 // lite-nav.js — 라이트 에디션 사이드바 (메뉴 9개).
 //
