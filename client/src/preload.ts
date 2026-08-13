@@ -42,6 +42,12 @@ const gijoApi = {
   docRequestBuild: (input: Parameters<typeof api.docRequestApi.build>[0]) => api.docRequestApi.build(input),
   docRequestList: () => api.docRequestApi.list(),
   openDocbox: () => ipcRenderer.invoke("docbox:open"),
+  // 라이트 「보안 장비 등록부」 직접 접근 — 장비 관리 URL을 OS 기본 앱(브라우저·SSH·RDP)으로 넘긴다.
+  //   ⚠ 스킴은 메인에서 검사한다(http/https/ssh/rdp/vnc만). 비밀번호는 절대 실어 보내지 않는다.
+  openExternal: (url: string) => ipcRenderer.invoke("shell:openExternal", url) as Promise<{ ok: boolean }>,
+  //   도달 확인 — 지정 host:port에 TCP로 붙어 보고 살아있나만 본다(ICMP 아님, 권한 불필요).
+  probeHost: (host: string, port: number, timeoutMs?: number) =>
+    ipcRenderer.invoke("net:probe", host, port, timeoutMs) as Promise<{ up: boolean; ms: number }>,
   dbCryptStatus: () => api.dbCryptApi.status(),
   dbCryptRotateRecovery: () => api.dbCryptApi.rotateRecovery(),
   // 저장 암호화 켜기 — **서버가 아니라 메인 프로세스**가 한다. 전환에 서버 정지가 필요한데

@@ -52,6 +52,29 @@
   .ok{font-size:12.5px;color:var(--teal);padding:6px 2px}
   .warn{font-size:11.5px;color:var(--amber);line-height:1.7;margin-top:10px;border-top:1px solid var(--border);padding-top:10px}
   .warn b{color:var(--text)}
+  /* 한눈에 보기 — 그래프·히트맵 (넣은 로그에서 읽어 낸 사건을 시각화) */
+  .viz{display:flex;flex-direction:column;gap:18px}
+  .viz h3{font-size:12px;font-weight:800;color:var(--text);margin:0 0 8px}
+  .bar{display:flex;align-items:center;gap:8px;margin:3px 0}
+  .bar .lab{flex:0 0 84px;font-size:11.5px;color:var(--muted-2)}
+  .bar .track{flex:1;background:rgba(255,255,255,.05);border-radius:5px;height:15px;overflow:hidden}
+  .bar .fill{display:block;height:100%;border-radius:5px;min-width:2px}
+  .bar .val{flex:0 0 40px;font-size:11.5px;font-weight:700;color:var(--text);text-align:right}
+  .top .bar .lab{flex:0 0 150px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .hm{display:flex;flex-direction:column;gap:2px}
+  .hm-row{display:flex;align-items:center;gap:6px}
+  .hm-lab{flex:0 0 16px;font-size:10.5px;color:var(--muted-2);text-align:right}
+  .hm-cells{flex:1;display:grid;grid-template-columns:repeat(24,1fr);gap:2px}
+  .hm-cell{aspect-ratio:1;border-radius:2px;background:rgba(59,130,246,.05)}
+  .hm-axis .hm-hours{flex:1;display:flex;justify-content:space-between;font-size:10px;color:var(--muted-2);padding-top:3px}
+  .hm-row.wknd{background:rgba(240,160,32,.05);border-radius:3px}
+  .hm-row.wknd .hm-lab{color:var(--amber)}
+  .viz .note{font-size:11px;color:var(--muted-2);margin-top:7px;line-height:1.6}
+  .kpis{display:flex;flex-wrap:wrap;gap:8px}
+  .kpi{flex:1 1 120px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:9px;padding:9px 11px}
+  .kpi .k{font-size:10.5px;color:var(--muted-2)}
+  .kpi .v{font-size:19px;font-weight:800;color:var(--text);margin-top:2px;line-height:1.15;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .kpi .v.warn-v{color:var(--red)}
 </style>
 </head>
 <body>
@@ -67,6 +90,12 @@
     </div>
     <div id="upMsg"></div>
     <div class="res" id="res"></div>
+  </section>
+
+  <section class="card" id="vizCard" style="display:none">
+    <h2>한눈에 보기</h2>
+    <div class="sub">넣은 로그에서 읽어 낸 사건을 그래프와 히트맵으로 봅니다 — 무엇이·언제·어디서.</div>
+    <div class="viz" id="viz"></div>
   </section>
 
   <section class="card">
@@ -123,11 +152,106 @@
     return;
   }
 
+  // ── 한눈에 보기 — 그래프·히트맵 ─────────────────────────────────────────
+  //   analysisEvents(전체)로부터: ①심각도 분포 막대 ②요일×시간 히트맵(at=epoch) ③상위 출처 Top5.
+  //   외부 라이브러리 없이(폐쇄망) 인라인 SVG/CSS만 쓴다.
+  var 심각도표 = {
+    critical: { 나: "긴급", 색: "#e2483d" }, high: { 나: "높음", 색: "#f0803c" },
+    medium: { 나: "중간", 색: "#e6c229" }, low: { 나: "낮음", 색: "#3b82f6" }, info: { 나: "정보", 색: "#8a8f98" }
+  };
+  function 심각도키(e) {
+    var s = String((e && (e.severity || e.level)) || "").toLowerCase();
+    if (/critical|긴급/.test(s)) return "critical";
+    if (/high|높/.test(s)) return "high";
+    if (/medium|중/.test(s)) return "medium";
+    if (/low|낮/.test(s)) return "low";
+    return "info";
+  }
+  function 시각(e) { // at(epoch ms) 우선, 없으면 문자열 파싱
+    var t = Number(e && e.at);
+    if (t) return t;
+    var p = Date.parse(String((e && (e.at || e.createdAt)) || ""));
+    return p || 0;
+  }
+  function 막대(라벨, 값, 최대, 색, 라벨툴팁) {
+    var w = Math.round((값 / (최대 || 1)) * 100);
+    return '<div class="bar"><span class="lab"' + (라벨툴팁 ? ' title="' + esc(라벨) + '"' : "") + '>' + esc(라벨) + "</span>" +
+      '<span class="track"><span class="fill" style="width:' + w + "%;background:" + 색 + (값 ? "" : ";opacity:.25") + '"></span></span>' +
+      '<span class="val">' + 값 + "</span></div>";
+  }
+  function 한눈에(arr) {
+    var card = document.getElementById("vizCard"), box = document.getElementById("viz");
+    if (!arr || !arr.length) { card.style.display = "none"; return; }
+    card.style.display = "";
+    // ① 심각도 분포
+    var 셈 = { critical: 0, high: 0, medium: 0, low: 0, info: 0 };
+    arr.forEach(function (e) { 셈[심각도키(e)]++; });
+    var 최대 = Math.max(1, 셈.critical, 셈.high, 셈.medium, 셈.low, 셈.info);
+    var sevHtml = ["critical", "high", "medium", "low", "info"].map(function (k) {
+      return 막대(심각도표[k].나, 셈[k], 최대, 심각도표[k].색);
+    }).join("");
+    // ② 요일 × 시간 히트맵
+    var 요일 = ["일", "월", "화", "수", "목", "금", "토"];
+    var grid = [], d, h;
+    for (d = 0; d < 7; d++) { grid[d] = []; for (h = 0; h < 24; h++) grid[d][h] = 0; }
+    var 유효 = 0, hmMax = 1;
+    arr.forEach(function (e) {
+      var t = 시각(e); if (!t) return;
+      var dt = new Date(t); if (isNaN(dt.getTime())) return;
+      grid[dt.getDay()][dt.getHours()]++; 유효++;
+    });
+    for (d = 0; d < 7; d++) for (h = 0; h < 24; h++) if (grid[d][h] > hmMax) hmMax = grid[d][h];
+    var hmHtml;
+    if (유효) {
+      hmHtml = "";
+      for (d = 0; d < 7; d++) {
+        var cells = "";
+        for (h = 0; h < 24; h++) {
+          var n = grid[d][h], a = n ? (0.14 + 0.86 * (n / hmMax)) : 0;
+          cells += '<div class="hm-cell" title="' + 요일[d] + "요일 " + h + "시 · " + n + '건"' +
+            (n ? ' style="background:rgba(59,130,246,' + a.toFixed(3) + ')"' : "") + "></div>";
+        }
+        var wk = (d === 0 || d === 6) ? " wknd" : ""; // 주말(토·일) 강조 — 업무 외 시간 활동은 신호
+        hmHtml += '<div class="hm-row' + wk + '"><span class="hm-lab">' + 요일[d] + '</span><div class="hm-cells">' + cells + "</div></div>";
+      }
+      hmHtml += '<div class="hm-row hm-axis"><span class="hm-lab"></span>' +
+        '<div class="hm-hours"><span>0시</span><span>6</span><span>12</span><span>18</span><span>23</span></div></div>';
+    } else {
+      hmHtml = '<div class="note">사건에 시각 정보가 없어 히트맵을 그리지 못했습니다.</div>';
+    }
+    // ③ 상위 출처(entity) Top 5
+    var byEnt = {};
+    arr.forEach(function (e) { var k = String((e && e.entity) || "").trim(); if (k) byEnt[k] = (byEnt[k] || 0) + 1; });
+    var tops = Object.keys(byEnt).map(function (k) { return { k: k, v: byEnt[k] }; })
+      .sort(function (a, b) { return b.v - a.v; }).slice(0, 5);
+    var topHtml = tops.length
+      ? '<div class="top">' + tops.map(function (o) { return 막대(o.k, o.v, tops[0].v, "var(--blue)", true); }).join("") + "</div>"
+      : '<div class="note">출처가 표시된 사건이 없습니다.</div>';
+
+    // ⓪ KPI 타일 — 총 사건·주의(긴급+높음)·고유 출처·최다 출처
+    var 주의 = 셈.critical + 셈.high, 고유 = Object.keys(byEnt).length, 최다 = tops.length ? tops[0].k : "—";
+    var kpiHtml = '<div class="kpis">' +
+      '<div class="kpi"><div class="k">총 사건</div><div class="v">' + arr.length + "</div></div>" +
+      '<div class="kpi"><div class="k">주의 (긴급·높음)</div><div class="v' + (주의 ? " warn-v" : "") + '">' + 주의 + "</div></div>" +
+      '<div class="kpi"><div class="k">고유 출처</div><div class="v">' + 고유 + "</div></div>" +
+      '<div class="kpi"><div class="k">최다 출처</div><div class="v" title="' + esc(최다) + '">' + esc(최다) + "</div></div>" +
+      "</div>";
+
+    box.innerHTML =
+      kpiHtml +
+      '<div><h3>심각도 분포</h3>' + sevHtml + "</div>" +
+      '<div><h3>사건이 몰린 시간대 <span style="font-weight:600;color:var(--muted-2)">요일 × 시간</span></h3>' +
+        '<div class="hm">' + hmHtml + "</div>" +
+        '<div class="note">칸이 짙을수록 그 요일·시간대에 사건이 많았습니다.</div></div>' +
+      '<div><h3>가장 자주 나온 출처 <span style="font-weight:600;color:var(--muted-2)">Top ' + Math.max(1, tops.length) + "</span></h3>" + topHtml + "</div>";
+  }
+
   async function 목록() {
     var box = document.getElementById("events");
     try {
       var ev = await g.analysisEvents();
       var arr = Array.isArray(ev) ? ev : (ev && (ev.events || ev.items)) || [];
+      한눈에(arr);
       document.getElementById("cnt").textContent = arr.length ? arr.length + "건" : "";
       if (!arr.length) {
         box.innerHTML = '<div class="empty"><b>아직 넣은 로그가 없습니다.</b><br>' +

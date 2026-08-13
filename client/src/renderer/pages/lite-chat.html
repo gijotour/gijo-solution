@@ -28,6 +28,15 @@
   .me{align-self:flex-end;background:var(--blue);color:#fff;border-radius:12px 12px 3px 12px;padding:9px 13px;white-space:pre-wrap}
   .ai{align-self:flex-start;background:var(--panel);border:1px solid var(--border);border-radius:12px 12px 12px 3px;padding:11px 14px;white-space:pre-wrap}
   .ai .tools{font-size:11px;color:var(--muted-2);margin-top:8px;border-top:1px solid var(--border);padding-top:6px}
+  .ai .foot{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px;border-top:1px solid var(--border);padding-top:6px}
+  .ai .foot .used{flex:1;min-width:0;font-size:11px;color:var(--muted-2)}
+  .ai .foot .mini{flex:0 0 auto;background:transparent;border:1px solid var(--border);border-radius:7px;padding:3px 9px;
+    color:var(--muted-2);font:inherit;font-size:11px;cursor:pointer}
+  .ai .foot .mini:hover{border-color:var(--blue);color:var(--blue)}
+  .ai .sources{margin-top:8px;border-top:1px dashed var(--border);padding-top:8px;font-size:11.5px;color:var(--muted);line-height:1.7}
+  .ai .sources .src{padding:6px 0;border-bottom:1px solid var(--border);white-space:pre-wrap}
+  .ai .sources .src:last-child{border-bottom:0}
+  .ai .sources .src b{color:var(--text)}
   .empty{color:var(--muted);line-height:1.85;padding:10px 2px}
   .empty b{color:var(--text)}
   .empty .ex{display:inline-block;margin:4px 6px 0 0;padding:5px 11px;border:1px solid var(--border);border-radius:999px;cursor:pointer;color:var(--text)}
@@ -42,7 +51,7 @@
 </style>
 </head>
 <body>
-  <div class="scr-id"><b>AI에게 물어보기</b> — 무엇이든 물어보세요. 검색·설명·조치·법령을 알아서 골라 답합니다.</div>
+  <div class="scr-id"><b>AI에게 물어보기</b> — 제품자료·장비 매뉴얼·넣은 로그·나만의 기억을 두루 살펴, 검색·설명·조치·법령을 골라 답합니다.</div>
   <div id="log"></div>
   <div class="warn">⚠ 답은 이 PC 안에서 만들어집니다. 자료를 <b>바꾸는 일</b>(작업 추가 등)은 확인(결재)을 거쳐 실행됩니다.</div>
   <div class="bar">
@@ -58,6 +67,12 @@
   var 보내는중 = false;
   var esc = function (v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) {
     return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+  function 폴백복사(t) {
+    try {
+      var ta = document.createElement("textarea"); ta.value = t; ta.style.position = "fixed"; ta.style.opacity = "0";
+      document.body.appendChild(ta); ta.select(); document.execCommand("copy"); document.body.removeChild(ta);
+    } catch (e) { /* 무해 */ }
+  }
 
   function 오류문구(e) {
     var m = String((e && e.message) || e || "");
@@ -102,10 +117,37 @@
       //   approveAgentTool 그대로다.
       if (r && r.approval) { renderApproval(r.approval, 대기); return; }
       var out = String((r && (r.output || r.reply || r.text)) || "");
-      var tools = (r && r.toolCalls || []).map(function (t) { return t.tool; })
-        .filter(function (t) { return t && t !== "사내지식"; });
-      대기.innerHTML = esc(out || "(빈 답이 왔습니다)") +
-        (tools.length ? '<div class="tools">쓴 도구: ' + esc(tools.join(" · ")) + "</div>" : "");
+      var calls = (r && r.toolCalls) || [];
+      var tools = calls.map(function (t) { return t.tool; }).filter(function (t) { return t && t !== "사내지식"; });
+      // 근거(인용) — 도구가 실제로 찾아온 것. 있으면 [근거]로 펼쳐 원문 조각까지 보여준다(RAG 신뢰).
+      var 근거 = calls.filter(function (t) { return t && t.result && String(t.result).trim(); });
+      var srcHtml = 근거.map(function (t) {
+        var res = String(t.result).trim(); if (res.length > 600) res = res.slice(0, 600) + " …";
+        return '<div class="src"><b>' + esc(t.tool || "자료") + "</b> — " + esc(res) + "</div>";
+      }).join("");
+      대기.innerHTML =
+        '<div class="answer">' + esc(out || "(빈 답이 왔습니다)") + "</div>" +
+        '<div class="foot"><span class="used">' +
+          (tools.length ? "쓴 도구: " + esc(tools.join(" · ")) : "이 PC의 자료에서 찾았습니다") + "</span>" +
+          (srcHtml ? '<button class="mini src-btn" type="button">근거</button>' : "") +
+          '<button class="mini cp-btn" type="button">복사</button></div>' +
+        (srcHtml ? '<div class="sources" hidden>' + srcHtml + "</div>" : "");
+      // [근거] 펼치기/접기
+      var sbtn = 대기.querySelector(".src-btn"), srcBox = 대기.querySelector(".sources");
+      if (sbtn && srcBox) sbtn.addEventListener("click", function () {
+        var 접힘 = srcBox.hasAttribute("hidden");
+        if (접힘) srcBox.removeAttribute("hidden"); else srcBox.setAttribute("hidden", "");
+        sbtn.textContent = 접힘 ? "근거 접기" : "근거";
+        log.scrollTop = log.scrollHeight;
+      });
+      // [복사] 답 본문만
+      var cbtn = 대기.querySelector(".cp-btn");
+      if (cbtn) cbtn.addEventListener("click", function () {
+        var 됨 = function () { cbtn.textContent = "복사됨"; setTimeout(function () { cbtn.textContent = "복사"; }, 1500); };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(out).then(됨).catch(function () { 폴백복사(out); 됨(); });
+        } else { 폴백복사(out); 됨(); }
+      });
     } catch (e) {
       대기.innerHTML = '<span style="color:var(--red)">' + esc(오류문구(e)) + "</span>";
     } finally {
