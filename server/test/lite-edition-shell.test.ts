@@ -25,6 +25,17 @@ describe("라이트 에디션 — 로그인 뒤 라이트 셸로 들어간다", 
     expect(builderLite.extraMetadata?.gijoEdition).toBe("lite");
   });
 
+  it("①′ 라이트 빌드가 앱 이름도 박는다 — 빠지면 메인 제품과 userData를 공유한다 (2026-08-13 실사고)", () => {
+    // electron-builder의 최상위 productName은 설치본 파일명·설치 폴더만 정하고, 앱이 실행 중
+    // 읽는 이름(app.getName → userData 경로)은 **asar 안 package.json**에서 나온다. 거기엔
+    // client/package.json의 "GIJO AS"가 그대로 실려, 라이트가 Roaming/GIJO AS(메인 데이터)에
+    // 붙었다 — 5.18.1 재빌드 검증에서 사장님 개인 DB에 라이트가 붙는 것으로 실측.
+    // main.ts:466 「전용 배포본은 앱 이름이 달라 userData가 이미 따로다」가 성립하려면 이 줄이 필요하다.
+    const clientPkg = JSON.parse(fs.readFileSync(new URL("../../client/package.json", import.meta.url), "utf8"));
+    expect(builderLite.extraMetadata?.productName).toBeTruthy();
+    expect(builderLite.extraMetadata?.productName).not.toBe(clientPkg.productName);
+  });
+
   it("② main.ts가 그 값을 실제로 읽는다 — env만 보고 있으면 패키징본에서 안 걸린다", () => {
     expect(mainSrc).toContain("gijoEdition");
   });
