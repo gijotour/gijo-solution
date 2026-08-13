@@ -187,3 +187,27 @@ describe("ontology 시드 — KISA 위협 카탈로그 → 트리플 (실제 도
     expect(objs).toContain("VPR"); // 우선순위 지표로 연결
   });
 });
+
+// ★ 시드가 여럿이면 limit 안에서 **모든 시드가 대표된다** (2026-08-13 · 별칭 다중 표준의 후속)
+//
+// 실측: 「탈옥」 시드 둘(OWASP LLM01 + ATLAS AML.T0054)인데 limit 12를 DB 순서가 다 먹어
+// LLM01이 0건이었다. limit을 올리면 RAG 프롬프트가 부푼다(라이트 8K) — 배분만 공평하게.
+describe("★ expandOntology — 시드별 공평 배분", () => {
+  it("두 시드가 있으면 limit이 작아도 둘 다 나온다", () => {
+    // 독립 주어 두 개에 트리플을 여럿 달아, 한쪽이 칸을 다 먹는 옛 동작이면 실패하게 한다.
+    for (let i = 0; i < 10; i++) {
+      addTriple({ subject: "공평시드甲", predicate: "관련", object: `甲대상${i}`, scope: "global" });
+      addTriple({ subject: "공평시드乙", predicate: "관련", object: `乙대상${i}`, scope: "global" });
+    }
+    try {
+      const r = expandOntology("공평시드甲 그리고 공평시드乙 관계 알려줘", undefined, { hops: 1, limit: 6 });
+      const 주어들 = new Set(r.map((t) => t.subject));
+      expect(주어들.has("공평시드甲"), "甲이 굶었다").toBe(true);
+      expect(주어들.has("공평시드乙"), "乙이 굶었다 — DB 순서가 칸을 다 먹던 옛 동작").toBe(true);
+      expect(r.length).toBeLessThanOrEqual(6);
+    } finally {
+      // 시험 잔재가 다른 시험의 확장에 시드로 걸리지 않게 지운다.
+      db.prepare("DELETE FROM ontology_triples WHERE subject LIKE '공평시드%'").run();
+    }
+  });
+});

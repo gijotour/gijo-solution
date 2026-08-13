@@ -221,13 +221,29 @@ export function expandOntology(
   for (const e of frontierInit) seen.add(e);
 
   // BFS 홉 확장 — 시드에 연결된 트리플을 모으고, 새로 만난 엔티티를 다음 홉의 시작점으로.
+  //
+  // ★ 2026-08-13 — **시드별로 공평하게 담는다.** 예전엔 DB 순서대로 limit(12)칸을 채워,
+  //   「탈옥」처럼 시드가 둘인 질문(OWASP LLM01 + ATLAS AML.T0054)에서 먼저 나온 표준이
+  //   칸을 다 먹고 **다른 표준은 0건**이 됐다(실측: limit 12에 LLM01 부재, 400으로 올리면 등장).
+  //   별칭이 「두 표준을 함께 본다」로 고쳐졌는데 확장이 도로 한쪽을 굶기던 자리다.
+  //   limit을 올리는 길은 버렸다 — 이 결과가 RAG 프롬프트에 실리므로(ontologyContextFor)
+  //   키우면 라이트 8K 문맥부터 부푼다. 칸 수는 그대로, **배분만** 공평하게.
   const collected = new Map<string, Triple>();
   let frontier = frontierInit;
   for (let hop = 0; hop < hops && frontier.size > 0 && collected.size < limit; hop++) {
     const next = new Set<string>();
-    for (const t of all) {
-      if (collected.size >= limit) break;
-      if (frontier.has(t.subject) || frontier.has(t.object)) {
+    // 엔티티별 후보를 나눠 담아 라운드로빈으로 한 개씩 뽑는다 — 어느 시드도 0건이 안 되게.
+    const 후보별: Triple[][] = [...frontier].map((e) =>
+      all.filter((t) => t.subject === e || t.object === e)
+    );
+    let 남음 = true;
+    for (let i = 0; 남음 && collected.size < limit; i++) {
+      남음 = false;
+      for (const 줄 of 후보별) {
+        if (collected.size >= limit) break;
+        const t = 줄[i];
+        if (!t) continue;
+        남음 = true;
         if (!collected.has(t.id)) collected.set(t.id, t);
         if (!seen.has(t.subject)) { seen.add(t.subject); next.add(t.subject); }
         if (!seen.has(t.object)) { seen.add(t.object); next.add(t.object); }
