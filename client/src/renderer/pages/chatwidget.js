@@ -248,19 +248,18 @@
         var r = await window.gijo.sendInstruction(text, sessionId || undefined, undefined, pid);
         if (pc) pc.stop();
         typing.innerHTML = readBadge(r) + fmt(r.output || "(응답 없음)");
-        // 근거(출처) 배지 — 답변 그라운딩에 쓰인 사내 문서명(서버 sources). 인수인계 검증에도 쓰인다.
-        if (Array.isArray(r.sources) && r.sources.length) {
-          typing.innerHTML +=
-            '<div style="margin-top:6px;font-size:11.5px;font-weight:700;color:#6fdcb5">📄 근거: ' +
-            r.sources.slice(0, 4).map(esc).join(" · ") + "</div>";
-        }
         // ★ 아래 셋은 **지휘소와 같은 부품**을 쓴다(chatparts.js).
         //   분리창(⧉ 창으로)에서는 여기가 유일한 창구인데, 전엔 체크칸·가서 하기가 없어
         //   같은 답인데 창으로 빼면 목록에서 고를 수가 없었다(2026-08-01 실측).
         //   한쪽에만 고쳐 놓고 고쳤다고 믿는 일을 없애려고 부품을 한 곳에 두었다.
+        // ⚠ 근거 배지도 부품에 맡긴다(2026-08-13). 전엔 여기서 innerHTML로 **직접 그리고**
+        //   부품에는 null을 넘겨 껐다 — 부품을 둔 이유(한 벌로 두기)와 정면으로 어긋난 자리였다.
+        //   감시 시험(clientglobals)은 "옛 **함수**를 다시 부르나"만 봐서 인라인 사본을 못 잡았다.
+        //   ⚠ 모양은 그대로다 — .gcp-src가 같은 값이다(margin-top:6px·11.5px·700·#6fdcb5).
+        //   ⚠ 배지 문구를 고칠 일이 생기면 이제 **chatparts.js 한 곳만** 고치면 된다.
         var P = window.gijoChatParts;
         if (P) {
-          P.quotes(typing, r.quotes, r.output || "", null); // 근거 배지는 위에서 이미 그렸다
+          P.quotes(typing, r.quotes, r.output || "", r.sources);
           P.picks(typing, r.picklist, function (보낼글) { send(보낼글); });
           // 분리창은 탭을 직접 못 연다 — 본창에 부탁한다(지휘소와 다른 유일한 대목).
           P.open(typing, r.openScreen, {
