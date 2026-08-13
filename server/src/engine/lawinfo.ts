@@ -456,6 +456,9 @@ export async function lawAnswer(query: string, target: LawTarget = "law"): Promi
       // ⚠ 「찾지 못했습니다」를 쓰지 않는다(2026-08-13) — 서랍 점검(drawer-audit.mjs)의
       //   폴백 문구 목록(FAIL_MARKS)에 그 말이 있어 **제품이 정직하게 낸 답에 실패 딱지**가 붙는다.
       //   오늘 llm.ts·actioncheck.ts에 이어 **세 번째로 같은 함정**을 만난 자리다.
+      //   ★ 이 첫 줄을 고치면 아래 `법령검색없음표지`와 시험을 함께 볼 것 — QA 회귀(fin-mangbunri)
+      //     실사고: 이 문구 교체가 옛 표지(NO_HIT_PREFIX startsWith)와 어긋나 agentloop의
+      //     사내지식 보강이 소리 없이 통째로 죽었다. 발신자와 판정자는 한 표지를 쓴다.
       `🔎 "${query}"로는 ${LAW_TARGETS[target].label} 검색 결과가 없습니다.`,
       "(없다는 뜻이 아니라 이 말로는 못 찾았다는 뜻입니다. 법령 이름을 정확히 쓰면 잘 찾습니다.)",
       "",
@@ -476,6 +479,12 @@ export async function lawAnswer(query: string, target: LawTarget = "law"): Promi
 }
 
 /**
+ * 법령 0건 답의 표지 — agentloop `법령답이부족한가`가 이걸로 「부족」을 판정해 사내지식을 보강한다.
+ * ⚠ 위 lawAnswer의 0건 첫 줄과 **한 몸**이다(2026-08-13 QA 회귀 fin-mangbunri에서 어긋남 실측).
+ */
+export const 법령검색없음표지 = /^🔎 "[^"\n]*"로는 [^\n]*검색 결과가 없습니다/;
+
+/**
  * 물음에 든 조문 번호("제29조"·"29조") — 없으면 null.
  * ⚠ 「제30조 3년」처럼 숫자가 이어 붙는 문장이 있어 **조/항 표기가 붙은 것만** 본다.
  */
@@ -494,7 +503,19 @@ export function 조문번호(text: string): string | null {
  * ⚠ 못 찾으면 목록 답으로 물러난다 — 빈손으로 끝내지 않는다.
  */
 export async function lawArticleAnswer(query: string, article: string): Promise<string> {
-  const hits = await searchLaw(query, "law", 3);
+  let hits = await searchLaw(query, "law", 3);
+  // ★ 0건이면 긴 낱말로 한 번 더(2026-08-13 QA) — lawAnswer의 재시도 사다리와 같은 처방.
+  //   여기서 바로 목록으로 물러나면 담당자가 물은 **조문 본문 의도가 사라진다**
+  //   (「제40조 내용」→ 검색어에 낀 군말 하나로 0건 → 목록만 돌아온 실측).
+  if (!hits.length) {
+    const 낱말들 = [...new Set(String(query).match(/[가-힣]{3,}/g) ?? [])]
+      .sort((a, b) => b.length - a.length)
+      .slice(0, 2);
+    for (const w of 낱말들) {
+      hits = await searchLaw(w, "law", 3).catch(() => []);
+      if (hits.length) break;
+    }
+  }
   if (!hits.length) return lawAnswer(query, "law");
   const 법 = hits[0];
   // 본문 조회용 일련번호는 LawHit.id다(mst 아님 — 이름이 달라 헛짚기 쉬운 자리).

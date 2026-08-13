@@ -21,8 +21,13 @@ import fs from "fs";
 import path from "path";
 import { 법령한계를밝힌다, 법령답이부족한가, 사내지식꼬리표 } from "../src/engine/agentloop";
 import { NO_HIT_PREFIX } from "../src/engine/agenttools";
+import { 법령검색없음표지 } from "../src/engine/lawinfo";
 
-const 못찾음 = `${NO_HIT_PREFIX} "금융권 망분리"로는 법령 검색 결과가 없습니다.`;
+// ★ 2026-08-13 QA 회귀(fin-mangbunri)의 교훈: 이 표본이 **제품이 실제로 내는 문구**여야 한다.
+//   전에는 NO_HIT_PREFIX로 지어낸 표본을 썼는데, FAIL_MARKS 수리가 실제 문구를 바꾸자
+//   제품은 회귀했는데 이 시험은 옛 표본으로 계속 통과했다 — 시험이 가짜 과녁을 쥐고 있었다.
+//   아래 표본은 lawinfo.ts lawAnswer 0건 반환의 첫 두 줄 그대로다(어긋나면 아래 결속 시험이 잡는다).
+const 못찾음 = `🔎 "금융권 망분리 의무"로는 법령 검색 결과가 없습니다.\n(없다는 뜻이 아니라 이 말로는 못 찾았다는 뜻입니다. 법령 이름을 정확히 쓰면 잘 찾습니다.)`;
 const 목록 = '법령 검색 — "개인정보 보호법" (상위 2건)\n1. 개인정보 보호법\n   원문: https://www.law.go.kr/...';
 const 조문본문 = "개인정보 보호법 제29조(안전조치의무)\n개인정보처리자는 …";
 const 사내근거 = { tool: 사내지식꼬리표, args: {}, result: "접속기록은 1년 이상, 5만명 이상은 2년 이상." };
@@ -30,6 +35,20 @@ const 사내근거 = { tool: 사내지식꼬리표, args: {}, result: "접속기
 describe("법령 답이 부족한가 — 판정은 코드가 한다", () => {
   it("★ 못 찾았으면 부족하다", () => {
     expect(법령답이부족한가("금융권 망분리 근거는?", 못찾음)).toBe(true);
+  });
+
+  it("★★ 발신자와 판정자가 한 표지를 쓴다 — lawinfo의 실제 0건 문구가 표지에 걸린다", () => {
+    // lawinfo.ts 소스에서 0건 첫 줄 템플릿을 직접 읽어 표지와 대조 — 문구를 고치면 여기서 잡힌다.
+    const src = fs.readFileSync(path.join(__dirname, "../src/engine/lawinfo.ts"), "utf8");
+    const m = /`🔎 "\$\{query\}"로는 \$\{[^}]+\}\s*검색 결과가 없습니다\.`/.exec(src);
+    expect(m, "lawinfo의 0건 반환 첫 줄 템플릿을 못 찾았다 — 문구가 바뀌었으면 법령검색없음표지·이 시험을 함께 고칠 것").toBeTruthy();
+    const 실제꼴 = `🔎 "아무말"로는 법령 검색 결과가 없습니다.`;
+    expect(법령검색없음표지.test(실제꼴)).toBe(true);
+    expect(법령답이부족한가("아무 질문", 실제꼴)).toBe(true);
+  });
+
+  it("★★ 옛 표지(NO_HIT_PREFIX 꼴)도 여전히 부족으로 본다 — 다른 도구의 0건 형식", () => {
+    expect(법령답이부족한가("금융권 망분리 근거는?", `${NO_HIT_PREFIX} "금융권 망분리"로는 결과가 없습니다.`)).toBe(true);
   });
 
   it("★ 목록만 왔는데 「몇 년?」을 물었으면 부족하다 — 목록은 그 질문의 답이 아니다", () => {

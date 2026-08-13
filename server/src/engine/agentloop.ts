@@ -14,6 +14,7 @@ import { chat, 자료없음배너, 자료없음중복가드 } from "./llm";
 import { 표식 } from "./tone";
 import { reportProgress } from "./progress";
 import { listAgentTools, listToolsFor, findAgentTool, toolCatalogText, validateToolArgs, buildApproval, PendingApproval, NO_HIT_PREFIX, 지식근거없음표지 } from "./agenttools";
+import { 법령검색없음표지 } from "./lawinfo";
 import { emitCollaboration } from "./collaboration";
 import { listProducts } from "./securityproducts";
 import { recordWork, TOOL_WORK_KIND } from "./worklog";
@@ -398,7 +399,10 @@ export const 사내지식꼬리표 = "사내지식";
 
 /** 법령 도구 결과가 질문에 답했는가 — 판정은 코드가 한다(프롬프트에 맡기지 않는다). */
 export function 법령답이부족한가(instruction: string, result: string): boolean {
-  if (result.startsWith(NO_HIT_PREFIX)) return true;
+  // ★ 2026-08-13 QA 회귀(fin-mangbunri): FAIL_MARKS 문구 교체로 법령 0건 답이 NO_HIT_PREFIX로
+  //   시작하지 않게 되자 이 판정이 false → 사내지식 보강이 소리 없이 죽었다. 발신자(lawinfo)가
+  //   내보내는 표지(법령검색없음표지)를 직접 본다 — 문구와 판정은 한 몸이어야 한다.
+  if (result.startsWith(NO_HIT_PREFIX) || 법령검색없음표지.test(result.trimStart())) return true;
   if (!법령목록머리.test(result.trimStart())) return false; // 조문 본문을 받았으면 충분하다
   return 값을묻는말.test(instruction);
 }
@@ -475,7 +479,9 @@ export async function 사내지식으로보강(instruction: string, calls: Agent
 export function 법령한계를밝힌다(answer: string, calls: AgentToolCall[]): string {
   const law = calls.find((c) => c.tool === "law_lookup");
   if (!law || !answer.trim()) return answer;
-  const 못찾음 = law.result.startsWith(NO_HIT_PREFIX);
+  // ★ 법령검색없음표지 병기(2026-08-13 QA) — 법령답이부족한가와 같은 어긋남이 여기도 있었다.
+  //   실제 0건 문구가 NO_HIT_PREFIX로 안 시작해 「원문 미확인」 경고 꼬리가 통째로 죽어 있었다.
+  const 못찾음 = law.result.startsWith(NO_HIT_PREFIX) || 법령검색없음표지.test(law.result.trimStart());
   if (calls.some((c) => c.tool === 사내지식꼬리표)) {
     // 법제처가 준 목록·링크는 모델이 고쳐 쓸 수 있으므로 **원문 그대로** 덧붙여 보존한다.
     const 원문 = 못찾음 ? "" : `\n\n▸ 법제처에서 찾은 법령\n${law.result.trim()}`;
@@ -1609,9 +1615,11 @@ export function forcedToolFor(instruction: string, scope?: ToolScope): { tool: s
           .replace(/(찾아|알려|보여|검색해?)\s*(줘|주세요|줄래|주라|봐|보자)?\s*$/g, " ")
           .trim();
         // 꼬리에 붙은 종류말·「관련」·조사를 차례로 턴다("개인정보 유출 관련 판례" → "개인정보 유출").
+        // ★ 「내용·본문·전문」도 턴다(2026-08-13 QA): 「제40조 내용 알려줘」에서 알려줘만 떨어져
+        //   "…법 내용"이 검색어로 남았고, 법제처가 0건 → 조문 본문 대신 목록으로 물러났다.
         for (let i = 0; i < 3; i++) {
           q = q
-            .replace(/\s*(판례|판결|고시|훈령|행정규칙|예규|법령|법률|원문|조문)\s*$/g, "")
+            .replace(/\s*(판례|판결|고시|훈령|행정규칙|예규|법령|법률|원문|조문|내용|본문|전문)\s*$/g, "")
             .replace(/\s*(관련|관한|에\s*대한)\s*$/g, "")
             .replace(/\s*(이|가|을|를|은|는|의)\s*$/g, "")
             .trim();
