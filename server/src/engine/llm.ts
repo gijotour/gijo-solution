@@ -713,9 +713,13 @@ export async function chat(args: ChatArgs): Promise<string> {
   // 멀티모델 풀: 에이전트에 할당된 모델을 (필요하면 로드하고) 그 모델이 서빙되는 URL을 받는다.
   // 이렇게 해야 서로 다른 모델을 쓰는 에이전트들이 스왑 없이 각자 포트에서 병렬로 답한다.
   // (순환참조 회피 위해 동적 import. localengine을 못 불러오면 기본 URL로 폴백.)
-  const baseUrl = await import("./localengine.js")
+  // ★ 원격 LLM(BridgeAI 1단계, 2026-08-13)이 켜져 있으면 **로컬 llama를 아예 안 거치고**
+  //   원격 /v1로 바로 간다 — ensureAgentModel을 부르면 로컬 모델 로드·스왑이 일어나므로
+  //   우회가 아니라 **앞에서** 가른다. 판정은 remotellm.ts의 게터 한 곳(VPN 전용·에어갭 차단 포함).
+  const 원격 = await import("./remotellm.js").then((m) => m.remoteLlmBaseUrl()).catch(() => null);
+  const baseUrl = 원격 ?? (await import("./localengine.js")
     .then((m) => m.ensureAgentModel(args.agentId))
-    .catch(() => LOCAL_LLM_BASE_URL);
+    .catch(() => LOCAL_LLM_BASE_URL));
   // 전문가 어댑터 선택(재설계 1단계) — 서빙 모델에 어댑터가 없으면 빈 객체라 기존과 동일.
   const loraExtras = await import("./localengine.js")
     .then((m) => m.agentRequestExtras(args.agentId))

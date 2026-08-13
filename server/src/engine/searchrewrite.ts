@@ -22,7 +22,14 @@
 //   · `GIJO_SEARCH_REWRITE=0`으로 끌 수 있다. 시험 환경엔 모델이 없어 자연히 건너뛴다.
 
 const 켜짐 = process.env.GIJO_SEARCH_REWRITE !== "0";
-const 통로 = process.env.GIJO_LOCAL_LLM_URL ?? "http://localhost:8080/v1";
+// ⚠ 상수가 아니라 **매 호출 게터**다(2026-08-13 BridgeAI 1단계) — 원격 LLM이 켜져 있으면
+//   재작성도 그리로 간다. llm.ts와 같은 게터(remotellm.remoteLlmBaseUrl) 하나를 본다 —
+//   사본을 두면 채팅은 원격인데 재작성만 로컬을 찾다 죽는 어긋남이 생긴다.
+const 기본통로 = process.env.GIJO_LOCAL_LLM_URL ?? "http://localhost:8080/v1";
+async function 통로(): Promise<string> {
+  const 원격 = await import("./remotellm.js").then((m) => m.remoteLlmBaseUrl()).catch(() => null);
+  return 원격 ?? 기본통로;
+}
 /** 재작성에 줄 시간. 넘으면 포기하고 원문으로 검색한다 — 검색이 답보다 오래 걸리면 안 된다. */
 const 제한MS = Number(process.env.GIJO_SEARCH_REWRITE_TIMEOUT_MS ?? 1500);
 
@@ -57,7 +64,7 @@ export async function rewriteForSearch(question: string): Promise<string> {
 
   let 결과 = "";
   try {
-    const res = await fetch(`${통로}/chat/completions`, {
+    const res = await fetch(`${await 통로()}/chat/completions`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

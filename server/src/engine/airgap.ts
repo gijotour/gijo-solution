@@ -72,6 +72,24 @@ export function isPrivateIp(host: string): boolean {
   return false;
 }
 
+/**
+ * VPN 안이라고 볼 IP인가 — **원격 LLM(BridgeAI) 전용 판정** (2026-08-13 사장님 「VPN 전용」 결정).
+ *
+ * isPrivateIp(에어갭 봉인용) + CGNAT 100.64.0.0/10(WireGuard·Tailscale류 오버레이가 쓰는 대역).
+ * ⚠ 왜 isPrivateIp에 CGNAT를 **더하지 않았나**: 그 함수는 에어갭 봉인의 default-deny 잣대다.
+ *   봉인 범위를 넓히는 일은 이 기능의 몫이 아니다 — 두 판정을 이 파일에 나란히 두어
+ *   IP 대역 판단의 집이 한 곳(airgap.ts)이게 한다.
+ * ⚠ 호스트명은 여기서도 false다(isPrivateIp가 콜론 없는 이름을 거부한다) — 이름은 어디로든
+ *   풀릴 수 있어 「확실히 VPN 안」을 코드가 보증할 수 없다.
+ */
+export function isVpnRangeIp(host: string): boolean {
+  if (isPrivateIp(host)) return true;
+  const m = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(host);
+  if (!m) return false;
+  const a = Number(m[1]), b = Number(m[2]);
+  return a === 100 && b >= 64 && b <= 127; // CGNAT 100.64.0.0/10
+}
+
 function 명시허용(): string[] {
   return (process.env.GIJO_AIRGAP_ALLOW ?? "")
     .split(",").map((s) => s.trim().toLowerCase()).filter(Boolean);
