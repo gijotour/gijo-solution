@@ -56,10 +56,10 @@
 </head>
 <body>
 <div class="wrap">
-  <div class="scr-id"><b>스캐너</b> — 이 PC(또는 내가 적은 장비 하나)의 보안 설정을 점검합니다.</div>
+  <div class="scr-id"><b>스캐너</b> — 이 PC의 보안 설정 점검 + 이 PC의 AI 견고성 점검.</div>
 
   <section class="card">
-    <h2>점검하기</h2>
+    <h2>점검하기 <span style="font-size:11px;color:var(--muted);font-weight:600">보안 설정(CCE·CIS)</span></h2>
     <div class="sub">기준을 고르고 눌러 주세요. 읽기만 하고 아무것도 바꾸지 않습니다.</div>
     <div class="row"><span class="k">기준</span><select id="std" style="flex:1"></select></div>
     <div class="row"><span class="k">대상</span>
@@ -71,6 +71,19 @@
     <div class="guard">⚠ <b>대역 스캔은 없습니다.</b> 이 화면은 <b>이 PC</b>나 <b>내가 직접 적은 대상 하나</b>만 점검합니다 —
       「10.0.0.0/24」처럼 범위를 적는 칸을 일부러 두지 않았습니다.
       <b>허가 없는 사내망 스캔은 사고입니다</b>(사장님 결정 2026-08-12).</div>
+  </section>
+
+  <section class="card">
+    <h2>AI 견고성 점검 <span style="font-size:11px;color:var(--muted);font-weight:600">이 PC의 AI</span></h2>
+    <div class="sub">이 PC에서 도는 AI에 공격 문항 30여 개를 보내 <b>얼마나 잘 버티는지</b> 점검합니다.
+      프롬프트 인젝션·탈옥·시스템 프롬프트 유출 같은 것을 시험합니다.</div>
+    <div class="row"><button class="go" id="rtGo">점검 시작</button>
+      <span style="font-size:11.5px;color:var(--muted-2)">약 1분 걸립니다 — 그동안 대화는 잠깐 느려질 수 있습니다.</span></div>
+    <div id="rtMsg"></div>
+    <div class="res" id="rtRes"></div>
+    <div class="guard">⚠ 점수는 <b>지금 이 PC에 올라온 모델</b> 기준입니다. 라이트 동봉 모델은 작아
+      점수가 낮게 나올 수 있습니다 — 더 큰 모델(스탠다드급)일수록 견고성이 올라갑니다.
+      이건 <b>내 AI가 얼마나 단단한지 스스로 확인</b>하는 것이지, 제품 고장이 아닙니다.</div>
   </section>
 
   <section class="card" id="saveCard" style="display:none">
@@ -206,9 +219,49 @@
     } catch (e) { box.innerHTML = '<div class="err">' + 오류문구(e, "지난 점검") + "</div>"; }
   }
 
+  // ── AI 견고성 점검 (레드팀) ─────────────────────────────────────────────
+  // 다리 g.runRedTeam()은 단발 호출이고 **~1분** 걸린다(2026-08-13 실측: 30문항 62초, 출하 7.6B).
+  //   반환: { robustnessScore, total, vulnerable, errored, byCategory } — 문항 본문·응답은 안 그린다
+  //   (공격 프롬프트를 화면에 늘어놓을 이유가 없다. 숫자와 갈래만 본다).
+  var 갈래이름 = {
+    "instruction-override": "지시 무시", "system-prompt-leak": "시스템 프롬프트 유출",
+    "jailbreak": "탈옥", "obfuscation": "우회·인코딩", "indirect": "간접 주입",
+    "training-leak": "학습데이터 유출", "hallucination": "환각",
+  };
+  async function 견고성점검() {
+    var msg = document.getElementById("rtMsg"), res = document.getElementById("rtRes"), btn = document.getElementById("rtGo");
+    btn.disabled = true; res.textContent = "";
+    msg.innerHTML = '<div class="empty">AI에 공격 문항을 보내는 중입니다 — <b>약 1분</b> 걸립니다. 창을 닫지 마세요.</div>';
+    try {
+      var r = await g.runRedTeam();
+      var total = r.total ?? 0, vuln = r.vulnerable ?? 0, err = r.errored ?? 0;
+      var 막음 = total - vuln - err;
+      var 점수 = r.robustnessScore;
+      var 색 = 점수 == null ? "var(--muted)" : 점수 >= 70 ? "var(--teal)" : 점수 >= 40 ? "var(--amber)" : "var(--red)";
+      msg.innerHTML = '<div class="ok">끝났습니다.</div>';
+      var 갈래 = r.byCategory || {};
+      var 줄 = Object.keys(갈래).map(function (k) {
+        var v = 갈래[k] || {}; var t = v.total ?? 0, bad = v.vulnerable ?? 0;
+        return '<div class="run"><span class="t">' + esc(갈래이름[k] || k) + "</span>" +
+          '<span class="m">' + (bad ? '<span style="color:var(--red)">막지 못함 ' + bad + "</span> · " : "") +
+          "막음 " + (t - bad) + " / " + t + "</span></div>";
+      }).join("");
+      res.innerHTML =
+        '<div style="font-size:22px;font-weight:800;color:' + 색 + ';padding:6px 0">견고성 ' +
+          (점수 == null ? "?" : 점수) + '<span style="font-size:13px;color:var(--muted);font-weight:600"> / 100</span></div>' +
+        '<div class="sub" style="margin-bottom:8px">공격 ' + total + "개 중 <b>" + 막음 + "개 막음</b>" +
+          (vuln ? " · <span style=\"color:var(--red)\">" + vuln + "개 뚫림</span>" : " · 뚫림 없음") +
+          (err ? " · 오류 " + err : "") + "</div>" + 줄;
+    } catch (e) {
+      msg.innerHTML = '<div class="err">' + 오류문구(e, "AI 견고성 점검") +
+        '<br><span style="font-size:11.5px">모델이 올라와 있어야 합니다 — ⚙ 설정에서 확인해 주세요.</span></div>';
+    } finally { btn.disabled = false; }
+  }
+
   function 시작() {
     document.getElementById("go").addEventListener("click", 점검);
     document.getElementById("saveGo").addEventListener("click", 남기기);
+    document.getElementById("rtGo").addEventListener("click", 견고성점검);
     기준목록(); 이력();
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", 시작);

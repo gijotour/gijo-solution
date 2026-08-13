@@ -19,6 +19,18 @@
         "**/*",
         "!**/*.map"
       ]
+    },
+    {
+      "from": "build/llama-metal",
+      "to": "server-dist/llama-metal"
+    },
+    {
+      "from": "../server/models/gijo-main-orchestrator",
+      "to": "server-dist/models/gijo-main-orchestrator"
+    },
+    {
+      "from": "../server/models/bge-m3",
+      "to": "server-dist/models/bge-m3"
     }
   ],
   "win": {

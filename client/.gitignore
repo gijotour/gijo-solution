@@ -22,3 +22,4 @@ server-dist/scripts/
 #   ★ 이로써 CLAUDE.md의 「빌드 후 git checkout으로 되돌려 clean 유지」 규칙은 **필요 없어진다.**
 server-dist/package.json
 server-dist/package-lock.json
+build/llama-metal/

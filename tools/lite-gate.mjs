@@ -108,8 +108,12 @@ for (const c of cases) {
   if (why.length) for (const w of why) console.log(`     ${w}`);
 }
 
+// ⚠ **점수 옆에 모델 이름을 반드시 붙인다.** 2026-08-13에 「32/33」을 qwen3-14b로 재 놓고
+//   출하 모델(gijo-main-orchestrator 7.6B) 점수처럼 말할 뻔했다 — 다시 재니 29/33이었다.
+//   같은 문항셋도 모델이 다르면 다른 물건을 잰 것이다(오늘의 「겨눈 대상」 교훈의 세 번째 판).
+const 잰모델 = 적재.join(" · ") || "(적재 없음 — 이 값은 의심하라)";
 const 통과 = 결과.filter((x) => x.ok).length;
-console.log(`\n━━ 라이트 문항 ${통과}/${결과.length} 통과 ━━`);
+console.log(`\n━━ 라이트 문항 ${통과}/${결과.length} 통과 · 모델 ${잰모델} ━━`);
 if (통과 < 결과.length) {
   console.log("\n실패한 것:");
   for (const x of 결과.filter((y) => !y.ok)) console.log(`  ${x.id} — ${x.why.join(" · ")}`);

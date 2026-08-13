@@ -45,6 +45,8 @@
   .doc .n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;cursor:pointer}
   .doc .n:hover{color:var(--blue)}
   .doc .m{font-size:11.5px;color:var(--muted-2);flex:0 0 auto}
+  .doc .edit-btn{flex:0 0 auto;padding:3px 10px;font-size:11.5px;border-color:var(--border);color:var(--muted)}
+  .doc .edit-btn:hover{color:var(--blue);border-color:var(--blue)}
   .read{font-size:12.5px;line-height:1.8;white-space:pre-wrap;max-height:46vh;overflow:auto;padding-right:6px}
   .empty{font-size:12.5px;color:var(--muted);line-height:1.75;padding:6px 2px}
   .empty b{color:var(--text)}
@@ -87,10 +89,12 @@
   <section class="card">
     <h2>GIJO Smart MD Studio</h2>
     <div class="sub">메모를 <b>쓰고 고치는 것</b>은 Smart MD Studio가 맡습니다 — 라이트는 그것을 읽어 AI에 잇는 몫만 합니다.</div>
+    <div id="editHint" class="ok" style="display:none">Finder를 열었습니다 — 파일을 <b>Smart MD(또는 편집기)</b>로 열어 고친 뒤,
+      위 「다시 읽기」를 누르면 반영됩니다.</div>
     <div class="empty">
       Studio는 <b>따로 설치하는 제품</b>이라 라이트에 들어 있지 않습니다.
       없어도 이 화면은 그대로 돌아갑니다 — 메모장·VS Code·무엇으로 쓰든 <b>.md 파일이면 읽습니다.</b><br>
-      Studio를 쓰고 계시면 같은 폴더를 열어 두시면 됩니다. 고친 내용은 「다시 읽기」를 누르면 반영됩니다.
+      메모 옆 <b>「편집」</b>을 누르면 그 파일을 Finder에 띄웁니다 — Smart MD로 열어 고치고 「다시 읽기」로 반영하세요.
     </div>
   </section>
 </div>
@@ -101,6 +105,7 @@
   "use strict";
   var g = window.gijo || null;
   var 현재경로 = ".";
+  var 뿌리 = null;       // 절대 폴더 경로(listDir가 준다) — Finder에서 열기(편집)에 필요
   var 고른파일 = null;   // { 이름, 상대경로, 내용 }
   var esc = function (v) { return String(v == null ? "" : v).replace(/[&<>"']/g, function (c) {
     return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
@@ -129,6 +134,7 @@
 
   function 그리기(res) {
     var box = document.getElementById("list");
+    if (res.root) 뿌리 = res.root;   // 절대 폴더 경로 — Finder에서 열기(편집)에 쓴다
     document.getElementById("up").style.display = (현재경로 && 현재경로 !== ".") ? "" : "none";
     document.getElementById("reload").style.display = "";
     document.getElementById("path").textContent =
@@ -152,6 +158,7 @@
       }).join("") +
       메모들.map(function (f) {
         return '<div class="doc"><span class="n" data-file="' + esc(f.name) + '">' + esc(f.name) + "</span>" +
+          (뿌리 ? '<button class="edit-btn" data-edit="' + esc(f.name) + '" title="Finder에서 열기 — Smart MD 등으로 편집">편집</button>' : "") +
           '<span class="m">메모</span></div>';
       }).join("");
     box.querySelectorAll("[data-dir]").forEach(function (el) {
@@ -163,6 +170,21 @@
     box.querySelectorAll("[data-file]").forEach(function (el) {
       el.addEventListener("click", function () { 읽기(el.dataset.file); });
     });
+    box.querySelectorAll("[data-edit]").forEach(function (el) {
+      el.addEventListener("click", function (ev) { ev.stopPropagation(); 편집열기(el.dataset.edit); });
+    });
+  }
+
+  // Smart MD 연동 — GIJO는 **읽는 쪽**, 편집은 밖의 도구가 한다(사장님 결정 ④, 없어도 돎).
+  //   실제 파일을 Finder에 띄운다(revealDownload = shell.showItemInFolder). 담당자가 Smart MD
+  //   (또는 어떤 편집기든)로 열어 고치고, 「다시 읽기」로 반영한다. 새 다리를 안 만든다 —
+  //   listDir가 준 절대 뿌리 + 상대경로로 revealDownload를 부른다(main.ts 무수정).
+  function 편집열기(이름) {
+    if (!뿌리) return;
+    var 상대 = (현재경로 === "." ? "" : 현재경로 + "/") + 이름;
+    var 절대 = 뿌리.replace(/[\/\\]+$/, "") + "/" + 상대;
+    try { g.revealDownload(절대); } catch (e) { /* 조용히 — 확인용 편의 기능 */ }
+    document.getElementById("editHint").style.display = "";
   }
 
   async function 목록() {
