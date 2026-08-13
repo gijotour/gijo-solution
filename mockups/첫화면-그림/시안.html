@@ -1,0 +1,494 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<!--
+  ============================================================================
+  조사 근거 (설계 전 표준·모범사례 조사 — 2026-08-13, gijo-mockup)
+  ============================================================================
+  이 시안이 푸는 문제: 파트너 세 곳이 같은 말을 했다 — "설명이 많다, 연결 관계를
+  EDR 프로세스 트리처럼 보고 싶다" · "첫 화면이 복잡하지 않게"(취약점이 4,833건이
+  되며 다시 빽빽해짐). 계획서 전-7 ①(공격경로)+②(4소스 상관) 항목, 그림 3종은
+  이미 구현돼 있다 — 새로 그리는 게 아니라 요약판을 첫 화면에 얹는 시안이다.
+
+  1) Ben Shneiderman, "The Eyes Have It: A Task by Data Type Taxonomy for
+     Information Visualizations", IEEE Symposium on Visual Languages, 1996.
+     → "Overview first, zoom and filter, then details-on-demand." 첫 화면은
+       전체를 요약해 보여주고, 상세는 눌러서 간다 — 3종을 다 우겨넣지 않는
+       근거. 이 저장소도 이미 같은 근거를 쓰고 있다(client/src/renderer/pages/
+       map-view.js:5 "정보 시각화 표준(Shneiderman: 훑어보기→좁히기→눌러서
+       상세)를 그대로 따른다" — 새 근거가 아니라 기존 결정과 결이 같다).
+     → Recorded Future, "How to Use the Information-Seeking Mantra in Cyber
+       Intelligence Dashboards"(perceptualedge 계열 위협 인텔 대시보드 사례) —
+       이 만트라를 사이버 위협 대시보드에 적용한 사례로, 점을 눌러 상세를
+       여는 details-on-demand 패턴을 모범사례로 든다. 이 시안의 "그림 클릭 →
+       발견·수집 상세"가 같은 패턴이다.
+
+  2) Stephen Few, "Information Dashboard Design"(Perceptual Edge, 2006) 및
+     후속 강의자료(perceptualedge.com/files/Dashboard_Design_Course.pdf).
+     → "대시보드는 스크롤 없이 한 화면에 담겨야 한다" — 단기기억 한계 때문에
+       나눠 보면 연결을 못 본다는 것이 핵심 근거. 이 시안이 그림을 "크게"가
+       아니라 "작게"로 고른 가장 직접적인 근거 — 크게 그리면 이 원칙과 정면
+       충돌한다(아래 「밀도 숫자」 참고, 여유 220px 중 196px를 이미 쓴다).
+
+  3) SentinelOne "Storyline"(Deep Visibility) · CrowdStrike "Threat Graph"
+     (Incident Workbench) — 실사 조사(2026-08-13 웹서치, 아래 출처).
+     → SentinelOne: "Storyline이 관련 이벤트를 하나의 시각적 공격 타임라인으로
+       자동 연관시켜, 1선 분석가가 깊은 포렌식 지식 없이도 근본 원인을 그림만
+       보고 이해한다." — 고객이 말한 "EDR 프로세스 트리"가 정확히 이 부류다.
+       핵심은 그림의 **정교함**이 아니라 **설명 없이 읽힌다**는 값어치.
+     → CrowdStrike: 프로세스 트리가 인시던트의 **첫 화면**(Incident Workbench)에
+       나온다 — 상세 포렌식 화면이 아니라 트리아지 화면에 이미 있다는 것이
+       "관계 그림을 대시보드(첫 화면)에 놓는다"는 이 시안의 배치를 뒷받침한다.
+
+  4) 내부 선례 — 새 판정기·새 시각언어를 만들지 않기 위한 근거.
+     · client/src/renderer/pages/analysis.html:611 graphChain() — 공격자→외부
+       노출→취약점→대상자산 체인. 이 시안의 그림은 이 함수의 산출물을 축소
+       재현한 것이다(같은 색·같은 아이콘·같은 순서). 방사형(graphSource, 자산
+       1개 중심)도 검토했으나 아래 "버린 대안"에서 이유와 함께 기각.
+     · memory.html:1180 "표시 상한을 말하지 않고 잘라 왔다... 잘랐으면 잘랐다고
+       적는다" — 이 시안도 상위 2개만 보여주고 "전체 N개는 열기에서"를 반드시
+       적는다(그림 하단 캡션).
+     · kpi-detail-table 시안(2026-08-02 승인)의 밀도 캡션 관례, redteam-
+       partial-leak 시안(2026-08-12 승인)의 "왜/버린 대안/포기/밀도/자가점검"
+       절 구성을 그대로 따른다 — 이미 승인받은 문서 형식을 다시 쓴다.
+
+  결정 3줄: ① 그림 3종 각각의 미니어처가 아니라 **공격경로 1종만**, 그것도
+  "크게"가 아니라 **작게**(카드 226px) 얹는다 — 고객 문구가 가리키는 것도,
+  Few의 스크롤-금지 원칙도 하나를 가리킨다. ② 글 한 줄(#glanceGo, 42px)의
+  자리를 그림 카드가 그대로 이어받는다(1:1 교체, 새 조작 0개) — 순증
+  +196px. ③ 그림은 상위 2개 경로만 그리고 "전체 N개는 열기에서"라고
+  명시한다 — 데이터가 늘어도 카드 높이는 고정이다(리스트형 구획과 다른 점).
+-->
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>시안 — 대시보드 첫 화면에 「관계 그림」 얹기 · GIJO AS</title>
+<style>
+  :root{
+    /* 지시받은 고정 팔레트(보고서 캔버스) */
+    --bg:#1f1e1d; --text:#e9e7e2; --muted2:#a49d95; --blue:#5fa1ff; --teal:#6fdcb5;
+    --line:rgba(255,255,255,.10);
+    --panel:#262624; --panel2:#30302e; --red:#f5928a; --amber:#f0a020;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;
+    font-size:13.5px;line-height:1.7;padding:28px 32px 90px;}
+  h1{font-size:19px;font-weight:800;margin:0 0 5px;letter-spacing:-.2px}
+  .sub{color:var(--muted2);font-size:12.25px;margin-bottom:18px}
+  h2{font-size:14.5px;font-weight:800;margin:34px 0 13px;padding-top:22px;
+    border-top:1px solid var(--line);display:flex;align-items:center;gap:8px}
+  h3{font-size:12.75px;font-weight:800;color:var(--blue);margin:16px 0 8px}
+  p{margin:0 0 9px}
+  code{background:rgba(255,255,255,.07);padding:1px 5px;border-radius:4px;font-size:12px;font-family:Consolas,monospace}
+  .rpanel{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:15px 18px;margin-bottom:14px}
+  .tldr{background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.30);border-radius:11px;
+    padding:13px 16px;margin-bottom:20px;font-size:12.75px}
+  .tldr b{color:#fff}
+  .tldr ol{margin:6px 0 0 18px;padding:0}
+  .tldr li{margin-bottom:5px}
+  .num{font-family:Consolas,monospace;color:#fff;font-weight:700}
+  .tag{display:inline-block;font-size:10px;font-weight:800;border-radius:5px;padding:2px 7px;margin-left:8px;vertical-align:middle}
+  .tag.reject{background:rgba(226,72,61,.16);color:#f5928a}
+  .tag.pick{background:rgba(30,185,128,.16);color:var(--teal)}
+
+  /* 지금 vs 시안 미니 비교 */
+  .cmp{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:8px}
+  .win{border:1px solid rgba(255,255,255,.16);border-radius:10px;overflow:hidden;background:#161514}
+  .wh{height:30px;display:flex;align-items:center;padding:0 12px;background:#141312;border-bottom:1px solid var(--line);font-size:12px;color:var(--muted2)}
+  .stage{padding:12px 14px}
+  .cap{font-size:12px;color:var(--muted2);margin:8px 2px 0;line-height:1.6}
+  .cap b{color:var(--teal)}
+
+  /* 실물 재현(dashboard.html CSS·클래스명 그대로 복제 — 값은 실제 파일에서 그대로 옮김) */
+  .reprowrap{overflow-x:auto;border-radius:10px;margin-bottom:8px;background:#000}
+  .dashrepro{
+    --dbg:#262624;--dpanel:#30302e;--dborder:rgba(255,255,255,.08);
+    --dblue:#3b82f6;--dbluel:#5fa1ff;--dtext:#e9e7e2;--dmuted:#b3ada4;--dmuted2:#a49d95;
+    --dteal:#1eb980;--dred:#e2483d;--damber:#f0a020;
+    display:grid;grid-template-columns:212px 1fr;width:1920px;
+    font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;font-size:13px;
+    background:var(--dbg);color:var(--dtext);
+  }
+  .dashrepro .sidebar{border-right:1px solid var(--dborder);background:#1f1e1d;padding:14px 10px;}
+  .dashrepro .sb-item{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:8px;font-size:12.5px;color:var(--dmuted);margin-bottom:2px;}
+  .dashrepro .sb-item.on{background:rgba(59,130,246,.12);color:#fff;box-shadow:inset 3px 0 0 var(--dblue);}
+  .dashrepro .main{padding:18px 22px 40px;position:relative;}
+  .dashrepro .scr-id{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--dmuted);margin-bottom:14px;}
+  .dashrepro .scr-id b{color:var(--dtext);font-weight:800;}
+  .dashrepro .head{display:flex;gap:16px;margin-bottom:16px;align-items:stretch;}
+  .dashrepro .hello{flex:1 1 420px;min-width:0;background:linear-gradient(180deg,rgba(59,130,246,.08),transparent);border:1px solid var(--dborder);border-radius:12px;padding:16px 18px;display:flex;flex-direction:column;justify-content:center;}
+  .dashrepro .hi{font-size:23px;font-weight:800;color:#fff;letter-spacing:-.3px;}
+  .dashrepro .steps{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;}
+  .dashrepro .step{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--dmuted);background:var(--dpanel);border:1px solid var(--dborder);border-radius:9px;padding:6px 10px;}
+  .dashrepro .step b{color:var(--dbluel);font-weight:700;}
+  .dashrepro .step .n{flex:0 0 auto;width:16px;height:16px;border-radius:50%;background:rgba(59,130,246,.18);color:var(--dbluel);font-size:11.75px;font-weight:800;display:flex;align-items:center;justify-content:center;}
+  .dashrepro .state{flex:0 1 430px;min-width:0;background:var(--dpanel);border:1px solid var(--dborder);border-radius:12px;padding:13px 15px;}
+  .dashrepro .state h4{font-size:12.25px;font-weight:800;color:var(--dmuted2);margin-bottom:10px;letter-spacing:.3px;display:flex;align-items:center;gap:7px;}
+  .dashrepro .st{display:grid;grid-template-columns:1fr 1fr;gap:4px 16px;}
+  .dashrepro .s{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12.5px;color:var(--dmuted);padding:3px 0;min-width:0;}
+  .dashrepro .s b{color:var(--dtext);font-weight:700;}
+  .dashrepro .s .l{display:flex;align-items:center;flex:0 0 auto;}
+  .dashrepro .s .dot{width:6px;height:6px;border-radius:50%;background:var(--dmuted2);margin-right:5px;flex:0 0 auto;}
+  .dashrepro .s.on .dot{background:var(--dteal);}
+  .dashrepro .vram{margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06);}
+  .dashrepro .vram .t{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;color:var(--dmuted);margin-bottom:5px;}
+  .dashrepro .vram .t b{color:var(--dtext);font-weight:700;}
+  .dashrepro .vram .sub{margin-top:5px;font-size:12px;color:var(--dmuted2);}
+  .dashrepro .bar{height:5px;border-radius:3px;background:rgba(255,255,255,.08);overflow:hidden;}
+  .dashrepro .bar i{display:block;height:100%;background:linear-gradient(90deg,var(--dteal),var(--dblue));width:34%}
+  .dashrepro .team{display:flex;align-items:center;gap:6px;margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,255,255,.06);}
+  .dashrepro .tm{display:flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;font-size:13px;background:#1f1e1d;border:1px solid var(--dborder);color:var(--dmuted);}
+  .dashrepro .tm.working{border-color:rgba(30,185,128,.55);color:var(--dteal);}
+  .dashrepro .team-sum{font-size:12.5px;color:var(--dmuted2);margin-left:auto;white-space:nowrap;}
+  /* 글 한 줄(지금) */
+  .dashrepro .glance{display:flex;align-items:center;gap:8px;height:30px;padding:0 12px;margin-bottom:12px;background:var(--dpanel);border:1px solid var(--dborder);border-radius:9px;font-size:12.5px;color:var(--dmuted);}
+  /* 새 그림 카드(시안) */
+  .dashrepro .path-card{background:var(--dpanel);border:1px solid var(--dborder);border-radius:12px;padding:11px 16px 9px;margin-bottom:12px;}
+  .dashrepro .pc-head{height:20px;display:flex;align-items:center;gap:8px;margin-bottom:6px;}
+  .dashrepro .pc-head b{font-size:13.5px;font-weight:800;color:#fff;}
+  .dashrepro .pc-head .pcsub{font-size:12.25px;color:var(--dmuted2);font-weight:600;}
+  .dashrepro .pc-go{margin-left:auto;font-size:12.25px;font-weight:700;color:var(--dbluel);cursor:pointer;}
+  .dashrepro .pc-legend{margin-top:6px;font-size:11.25px;color:var(--dmuted2);line-height:16px;}
+  /* 계획 카드 */
+  .dashrepro .grid{display:grid;grid-template-columns:1fr;gap:12px;}
+  .dashrepro .card{background:var(--dpanel);border:1px solid var(--dborder);border-radius:12px;padding:13px 15px;}
+  .dashrepro .plan-sec-h{display:flex;align-items:baseline;gap:7px;height:20px;font-size:11.5px;font-weight:800;color:var(--dmuted2);border-bottom:1px solid var(--dborder);}
+  .dashrepro .plan-sec-h span{font-size:11.5px;color:var(--dmuted);font-weight:700;}
+  .dashrepro .plan-cand{display:grid;grid-template-columns:26px 1fr auto auto;align-items:center;gap:8px;height:26px;font-size:12.25px;border-radius:6px;padding:0 4px;margin:0 -4px;}
+  .dashrepro .plan-cand .lv{font-size:11px;font-weight:800;text-align:center;border-radius:4px;padding:1px 0;background:#1f1e1d;color:var(--dmuted2);}
+  .dashrepro .plan-cand .lv.p0{background:#3a1f1d;color:#ff8b80;}
+  .dashrepro .plan-cand .lv.p1{background:#33290f;color:#f5bb55;}
+  .dashrepro .plan-cand .what{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;}
+  .dashrepro .plan-cand .what .sub{font-weight:400;color:var(--dmuted);}
+  .dashrepro .plan-cand .why{font-size:11px;color:var(--dmuted);white-space:nowrap;background:#1f1e1d;border:1px solid var(--dborder);border-radius:5px;padding:0 6px;line-height:17px;}
+  .dashrepro .plan-cand .why.hot{color:#ffb0a8;border-color:#4a3038;}
+  .dashrepro .plan-cand .padd{font-size:11px;font-weight:800;color:var(--dmuted2);border:1px solid var(--dborder);border-radius:6px;padding:0 8px;line-height:18px;}
+  .dashrepro .plan-trow{display:flex;align-items:center;gap:8px;min-height:26px;font-size:12.5px;border-bottom:1px solid var(--dborder);}
+  .dashrepro .plan-trow .rm{color:var(--dmuted2);font-size:12px;}
+  .dashrepro .plan-p0{color:#f5928a;font-weight:800;} .dashrepro .plan-p1{color:var(--damber);font-weight:800;}
+  .dashrepro .col2{display:flex;gap:14px;flex-wrap:wrap;}
+  .dashrepro .colL{flex:1.4;min-width:320px;} .dashrepro .colR{flex:1;min-width:260px;border-left:1px solid var(--dborder);padding-left:14px;}
+  /* 1040px 경계선(1080p 작업영역 가정) */
+  .dashrepro .line1040{position:absolute;left:0;right:0;top:1040px;border-top:2px dashed #ff8b80;z-index:5;}
+  .dashrepro .line1040 .lbl{position:absolute;right:0;top:-21px;font-size:11px;font-weight:800;color:#ff8b80;background:#1f1e1d;padding:2px 9px;border-radius:4px;border:1px solid rgba(255,139,128,.4);white-space:nowrap;}
+
+  .why{background:var(--panel);border:1px solid var(--line);border-radius:11px;padding:16px 20px;font-size:13px;margin-top:10px}
+  .why ul{margin:6px 0 14px 20px;padding:0}
+  .why li{margin-bottom:8px;color:#d8d4cd}
+  .why li b{color:#fff}
+  table.dt{width:100%;border-collapse:collapse;font-size:12.5px;margin:8px 0 14px}
+  table.dt th,table.dt td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  table.dt th{color:var(--muted2);font-weight:800;font-size:10.75px;text-transform:uppercase;letter-spacing:.03em}
+  .selfcheck{display:grid;grid-template-columns:1fr 1fr;gap:6px 18px;margin:8px 0 4px}
+  .selfcheck div{font-size:12.5px;color:#d8d4cd}
+  .ok{color:var(--teal);font-weight:800}
+</style>
+</head>
+<body>
+
+<h1>대시보드 첫 화면 — 「관계 그림」 얹기</h1>
+<div class="sub">추천 시안 1개 · 2026-08-13 · 대상 화면 <code>client/src/renderer/pages/dashboard.html</code> ·
+  근거: 계획서 전-7 ①+②(사용자 승인, 묶어서 시안 1개) · 파트너 3곳 공통 의견</div>
+
+<div class="tldr">
+  <b>핵심 결정 3줄</b>
+  <ol>
+    <li><b>대표 1종(공격경로)만, 작게.</b> 그림 3종 미니어처를 다 얹지 않는다 — 고객 문구("EDR
+      프로세스 트리처럼")도, Few의 "대시보드는 스크롤 없이 한 화면"도 하나를 가리킨다.</li>
+    <li><b>글 한 줄(#glanceGo, 42px)의 자리를 그림 카드가 그대로 이어받는다.</b> 1:1 교체라 새
+      조작 개념은 0개. 순증 <span class="num">+196px</span>.</li>
+    <li><b>상위 2개 경로만 그리고 "전체는 열기에서"라고 적는다.</b> 그림은 데이터가 늘어도
+      카드 높이가 <span class="num">고정(226px)</span>이다 — 취약점이 4,833건이 되며 다시
+      빽빽해진 것은 목록형 구획(오늘 계획 판)이지 이 그림이 아니다.</li>
+  </ol>
+</div>
+
+<h2>① 지금 vs 시안 — 무엇이 바뀌나</h2>
+<div class="cmp">
+  <div class="win">
+    <div class="wh">지금 — 글 한 줄 (#glanceGo)</div>
+    <div class="stage">
+      <div style="display:flex;align-items:center;gap:8px;height:30px;padding:0 12px;background:#232120;border:1px solid rgba(255,255,255,.1);border-radius:9px;font-size:12.5px;color:#a49d95">
+        <span>📊 현황 조망</span><span>보안 태세·통합 관제·위협 인텔·자산 요약은 <b style="color:#5fa1ff">발견·수집</b>에서 한 줄로 봅니다</span>
+        <span style="margin-left:auto;color:#5fa1ff;font-weight:700">열기 →</span>
+      </div>
+    </div>
+    <div class="cap">높이 <b>30px</b> + 여백 12px = <b>42px</b>. 글로만 말한다 — "연결 관계를
+      그림으로 보고 싶다"는 요청에 답하지 못한다.</div>
+  </div>
+  <div class="win">
+    <div class="wh">시안 — 공격경로 그림 카드</div>
+    <div class="stage" style="background:#262624">
+      <div style="font-size:11px;color:#7a746c;margin-bottom:6px">(아래 ②에서 실제 크기로 재현)</div>
+      <div style="height:130px;border:1px dashed rgba(255,255,255,.2);border-radius:8px;display:flex;align-items:center;justify-content:center;color:#6b665f;font-size:12px">🧭 공격 경로 미니 그래프(2줄)</div>
+    </div>
+    <div class="cap">높이 <b>226px</b> + 여백 12px = <b>238px</b>. 순증 <b style="color:#ff9f97">+196px</b> —
+      같은 "열기 →" 동작 하나, 글 대신 그림.</div>
+  </div>
+</div>
+
+<h2>② 실물 재현 — 대시보드 전체(그림 얹은 뒤, 1920×1080 가정)</h2>
+<p style="color:var(--muted2);font-size:12.25px">사이드바 폭·색·클래스명·수치는 <code>dashboard.html</code>의
+  실제 CSS를 그대로 옮겼다(새로 디자인하지 않았다). 오늘 계획 판은 "보통" 시나리오(급한 것 5·하던 일 2·
+  그 외 5·오늘 내 계획 4건)로 채웠다 — 아래 밀도 표에 "상한(각 8건)" 수치도 함께 적는다. 붉은 점선은
+  1080p 작업영역(~1040px)의 경계선이다. ⚠ 이 계산은 <code>dashboard.html</code> 콘텐츠만 잰 것이다 —
+  <code>app.html</code> 탭줄 높이는 별도라 실제로는 이보다 조금 더 빠듯할 수 있다.</p>
+
+<div class="reprowrap">
+<div class="dashrepro">
+  <div class="sidebar">
+    <div class="sb-item on">🏠 대시보드</div>
+    <div class="sb-item">① 발견·수집</div>
+    <div class="sb-item">② 우선순위</div>
+    <div class="sb-item">③ 조치</div>
+    <div class="sb-item">④ 검증</div>
+    <div class="sb-item">⑤ 보고</div>
+    <div class="sb-item">등록부</div>
+    <div class="sb-item">AI</div>
+    <div class="sb-item" style="margin-top:auto">설정</div>
+  </div>
+  <div class="main">
+    <div class="line1040"><span class="lbl">1080p 작업영역 경계 (1040px)</span></div>
+
+    <div class="scr-id">🏠 <b>대시보드</b> — 오늘 급한 것을 한눈에 보고, 지시는 아래 대화창에서 하는 자리입니다.</div>
+
+    <div class="head">
+      <div class="hello">
+        <div class="hi">안녕하세요, 김보안님</div>
+        <div class="steps">
+          <span class="step"><span class="n">1</span>왼쪽 메뉴에서 화면을 고르면 <b>탭</b>으로 열립니다</span>
+          <span class="step"><span class="n">2</span>일은 <b>아래 대화창</b>에 시킵니다</span>
+          <span class="step"><span class="n">3</span>위험한 명령은 <b>가드레일이 차단</b>합니다</span>
+        </div>
+      </div>
+      <div class="state">
+        <h4>서버 · 엔진 · 리소스</h4>
+        <div class="st">
+          <div class="s on"><span class="l"><span class="dot"></span>서버</span><b>운영 중</b></div>
+          <div class="s on"><span class="l"><span class="dot"></span>로컬 LLM</span><b>1개 로드</b></div>
+          <div class="s on"><span class="l"><span class="dot"></span>임베딩</span><b>bge-m3</b></div>
+          <div class="s on"><span class="l"><span class="dot"></span>가드레일</span><b>차단</b></div>
+        </div>
+        <div class="vram">
+          <div class="t"><span>GPU 메모리</span><b>8.2 / 24.0 GB · 여유 15.8GB</b></div>
+          <div class="bar"><i></i></div>
+          <div class="sub">구동 티어 Pro — 채팅 LLM 2개 · 32K 컨텍스트</div>
+        </div>
+        <div class="team">
+          <div class="team-icons">
+            <span class="tm working">🧭</span><span class="tm">⊘</span><span class="tm working">◎</span><span class="tm">▣</span><span class="tm">🛰</span>
+            <span class="team-sum">AI 팀 5명 · 작업 중 2명</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 새 그림 카드 — 글 한 줄(#glanceGo) 자리를 그대로 이어받는다 -->
+    <div class="path-card">
+      <div class="pc-head"><b>🧭 공격 경로</b><span class="pcsub">— 오늘 가장 위험한 연결 상위 2개</span><span class="pc-go">발견·수집에서 전체 보기 →</span></div>
+      <svg viewBox="0 0 440 156" style="display:block;max-width:440px" role="img" aria-label="공격 경로 요약 — 상위 2개">
+        <defs>
+          <marker id="pcArrow" markerWidth="7" markerHeight="7" refX="6" refY="3.2" orient="auto">
+            <path d="M0,0 L7,3.2 L0,6.4 Z" fill="#b3ada4"/>
+          </marker>
+        </defs>
+        <line x1="78" y1="36" x2="162" y2="36" stroke="#b3ada4" stroke-width="1.8" marker-end="url(#pcArrow)"/>
+        <line x1="198" y1="36" x2="282" y2="36" stroke="#b3ada4" stroke-width="1.8" marker-end="url(#pcArrow)"/>
+        <line x1="318" y1="36" x2="377" y2="36" stroke="#b3ada4" stroke-width="1.8" marker-end="url(#pcArrow)"/>
+        <g><circle cx="60" cy="36" r="15" fill="#e2483d" stroke="rgba(255,255,255,.28)" stroke-width="2"/><text x="60" y="41" text-anchor="middle" font-size="15">🥷</text><text x="60" y="64" text-anchor="middle" font-size="10" font-weight="700" fill="#d3daec">공격자</text></g>
+        <g><circle cx="180" cy="36" r="15" fill="#f5928a" stroke="rgba(255,255,255,.28)" stroke-width="2"/><text x="180" y="41" text-anchor="middle" font-size="15">🌐</text><text x="180" y="64" text-anchor="middle" font-size="10" font-weight="700" fill="#d3daec">80/443</text></g>
+        <g><circle cx="300" cy="36" r="15" fill="#f7c777" stroke="rgba(255,255,255,.28)" stroke-width="2"/><text x="300" y="41" text-anchor="middle" font-size="15">⚠</text><text x="300" y="64" text-anchor="middle" font-size="10" font-weight="700" fill="#d3daec">Struts2</text></g>
+        <g><circle cx="395" cy="36" r="15" fill="#5fa1ff" stroke="rgba(255,255,255,.28)" stroke-width="2"/><text x="395" y="41" text-anchor="middle" font-size="15">🖥</text><text x="395" y="64" text-anchor="middle" font-size="10" font-weight="700" fill="#d3daec">회계DB01</text><text x="395" y="75" text-anchor="middle" font-size="8.5" fill="#7f88a3">도달성 높음</text></g>
+        <line x1="78" y1="112" x2="162" y2="112" stroke="#b3ada4" stroke-width="1.8" marker-end="url(#pcArrow)"/>
+        <line x1="198" y1="112" x2="282" y2="112" stroke="#b3ada4" stroke-width="1.8" marker-end="url(#pcArrow)"/>
+        <line x1="318" y1="112" x2="377" y2="112" stroke="#b3ada4" stroke-width="1.8" marker-end="url(#pcArrow)"/>
+        <g><circle cx="60" cy="112" r="15" fill="#e2483d" stroke="rgba(255,255,255,.28)" stroke-width="2"/><text x="60" y="117" text-anchor="middle" font-size="15">🥷</text><text x="60" y="140" text-anchor="middle" font-size="10" font-weight="700" fill="#d3daec">공격자</text></g>
+        <g><circle cx="180" cy="112" r="15" fill="#f5928a" stroke="rgba(255,255,255,.28)" stroke-width="2"/><text x="180" y="117" text-anchor="middle" font-size="15">🌐</text><text x="180" y="140" text-anchor="middle" font-size="10" font-weight="700" fill="#d3daec">VPN</text></g>
+        <g><circle cx="300" cy="112" r="15" fill="#f7c777" stroke="rgba(255,255,255,.28)" stroke-width="2"/><text x="300" y="117" text-anchor="middle" font-size="15">⚠</text><text x="300" y="140" text-anchor="middle" font-size="10" font-weight="700" fill="#d3daec">CVE-21762</text></g>
+        <g><circle cx="395" cy="112" r="15" fill="#5fa1ff" stroke="rgba(255,255,255,.28)" stroke-width="2"/><text x="395" y="117" text-anchor="middle" font-size="15">🖥</text><text x="395" y="140" text-anchor="middle" font-size="10" font-weight="700" fill="#d3daec">인사서버</text><text x="395" y="151" text-anchor="middle" font-size="8.5" fill="#7f88a3">도달성 확인됨</text></g>
+      </svg>
+      <div class="pc-legend">🥷 공격자 · 🌐 외부 노출 · ⚠ 취약점 · 🖥 대상 자산 · 관측 신호 기반(침투테스트 아님) · 상위 2개만 — 전체 7개는 위 "열기"에서</div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px">
+          <h3 style="margin:0;font-size:12px;font-weight:800;color:#e9e7e2">☑ 오늘 할 일 — 계획 짜기 <span style="color:#a49d95;font-weight:700">남은 9건</span></h3>
+        </div>
+        <div class="col2">
+          <div class="colL">
+            <div class="plan-sec-h">급한 것 <span>5</span></div>
+            <div class="plan-cand"><span class="lv p0">P0</span><span class="what">10.10.20.22 <span class="sub">— 원격 코드 실행</span></span><span class="why hot">실제 악용</span><span class="padd">담기</span></div>
+            <div class="plan-cand"><span class="lv p0">P0</span><span class="what">회계DB01 <span class="sub">— Struts2 취약점</span></span><span class="why hot">실제 악용</span><span class="padd">담기</span></div>
+            <div class="plan-cand added"><span class="lv p0">P0</span><span class="what">웹서버-EXT03 <span class="sub">— 인증 우회</span></span><span class="why">KEV 확인</span><span class="padd">담김</span></div>
+            <div class="plan-cand"><span class="lv p1">P1</span><span class="what">인사서버 <span class="sub">— SSL VPN 취약점</span></span><span class="why">높음</span><span class="padd">담기</span></div>
+            <div class="plan-cand"><span class="lv p1">P1</span><span class="what">개발DB02 <span class="sub">— 기본 계정 사용</span></span><span class="why">높음</span><span class="padd">담기</span></div>
+            <div class="plan-sec-h" style="margin-top:12px">하던 일 <span>2</span></div>
+            <div class="plan-cand added"><span class="lv p1">P1</span><span class="what">파일서버 <span class="sub">— 접근권한 재검토</span></span><span class="why">2일째</span><span class="padd">담김</span></div>
+            <div class="plan-cand added"><span class="lv">P2</span><span class="what">로그서버 <span class="sub">— 용량 확인</span></span><span class="why">1일째</span><span class="padd">담김</span></div>
+            <div class="plan-sec-h" style="margin-top:12px">그 외 <span>5</span></div>
+            <div class="plan-cand"><span class="lv">·</span><span class="what">백업서버 <span class="sub">— 미사용 포트 정리</span></span><span class="why">낮음</span><span class="padd">담기</span></div>
+            <div class="plan-cand"><span class="lv">·</span><span class="what">개발서버12 <span class="sub">— 소프트웨어 최신화</span></span><span class="why">낮음</span><span class="padd">담기</span></div>
+            <div class="plan-cand"><span class="lv">·</span><span class="what">프린터서버 <span class="sub">— 기본 비밀번호</span></span><span class="why">낮음</span><span class="padd">담기</span></div>
+            <div class="plan-cand"><span class="lv">·</span><span class="what">지사VPN <span class="sub">— 인증서 만료 임박</span></span><span class="why">30일 후</span><span class="padd">담기</span></div>
+            <div class="plan-cand"><span class="lv">·</span><span class="what">테스트DB <span class="sub">— 접근기록 미설정</span></span><span class="why">권고</span><span class="padd">담기</span></div>
+          </div>
+          <div class="colR">
+            <div class="plan-sec-h">☑ 오늘 내 계획 <span>4건</span></div>
+            <div class="plan-trow"><input type="checkbox"><span class="ptx"><span class="plan-p0">P0</span> 회계DB01 Struts2 조치</span><span class="rm">✕</span></div>
+            <div class="plan-trow"><input type="checkbox"><span class="ptx"><span class="plan-p1">P1</span> 인사서버 VPN 패치</span><span class="rm">✕</span></div>
+            <div class="plan-trow"><input type="checkbox"><span class="ptx">파일서버 권한 재검토</span><span class="rm">✕</span></div>
+            <div class="plan-trow"><input type="checkbox" checked><span class="ptx" style="color:#a49d95;text-decoration:line-through">지난주 백업 점검 완료</span></div>
+            <div style="display:flex;gap:8px;margin-top:10px"><button style="flex:1;background:#1f1e1d;border:1px solid var(--dborder);color:#e9e7e2;border-radius:8px;padding:7px 0;font-size:12px">＋ 직접 적기(대화창)</button></div>
+            <div style="font-size:11.5px;color:#6b6a68;margin-top:8px;line-height:1.5">담기·빼기·완료는 즉시 저장됩니다.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</div>
+<div class="cap">가로 스크롤이 보이면 정상입니다 — 실제 폭(1920px) 그대로 재현했습니다. 세로 총합은
+  아래 「밀도 숫자」 표에 정리했습니다. 위 재현은 "보통" 시나리오(1,016px, 경계까지 24px 남음)입니다.</div>
+
+<h2>③ 그림 카드 확대 — 색·아이콘·읽는 법</h2>
+<div class="rpanel">
+  <svg viewBox="0 0 440 156" style="display:block;max-width:620px;margin:0 auto" role="img" aria-label="공격 경로 요약 확대">
+    <defs><marker id="pcArrow2" markerWidth="7" markerHeight="7" refX="6" refY="3.2" orient="auto"><path d="M0,0 L7,3.2 L0,6.4 Z" fill="#b3ada4"/></marker></defs>
+    <line x1="78" y1="36" x2="162" y2="36" stroke="#b3ada4" stroke-width="1.8" marker-end="url(#pcArrow2)"/>
+    <line x1="198" y1="36" x2="282" y2="36" stroke="#b3ada4" stroke-width="1.8" marker-end="url(#pcArrow2)"/>
+    <line x1="318" y1="36" x2="377" y2="36" stroke="#b3ada4" stroke-width="1.8" marker-end="url(#pcArrow2)"/>
+    <g><circle cx="60" cy="36" r="15" fill="#e2483d" stroke="rgba(255,255,255,.28)" stroke-width="2"/><text x="60" y="41" text-anchor="middle" font-size="15">🥷</text><text x="60" y="64" text-anchor="middle" font-size="10" font-weight="700" fill="#d3daec">공격자</text></g>
+    <g><circle cx="180" cy="36" r="15" fill="#f5928a" stroke="rgba(255,255,255,.28)" stroke-width="2"/><text x="180" y="41" text-anchor="middle" font-size="15">🌐</text><text x="180" y="64" text-anchor="middle" font-size="10" font-weight="700" fill="#d3daec">80/443</text></g>
+    <g><circle cx="300" cy="36" r="15" fill="#f7c777" stroke="rgba(255,255,255,.28)" stroke-width="2"/><text x="300" y="41" text-anchor="middle" font-size="15">⚠</text><text x="300" y="64" text-anchor="middle" font-size="10" font-weight="700" fill="#d3daec">Struts2</text></g>
+    <g><circle cx="395" cy="36" r="15" fill="#5fa1ff" stroke="rgba(255,255,255,.28)" stroke-width="2"/><text x="395" y="41" text-anchor="middle" font-size="15">🖥</text><text x="395" y="64" text-anchor="middle" font-size="10" font-weight="700" fill="#d3daec">회계DB01</text><text x="395" y="75" text-anchor="middle" font-size="8.5" fill="#7f88a3">도달성 높음</text></g>
+    <line x1="78" y1="112" x2="162" y2="112" stroke="#b3ada4" stroke-width="1.8" marker-end="url(#pcArrow2)"/>
+    <line x1="198" y1="112" x2="282" y2="112" stroke="#b3ada4" stroke-width="1.8" marker-end="url(#pcArrow2)"/>
+    <line x1="318" y1="112" x2="377" y2="112" stroke="#b3ada4" stroke-width="1.8" marker-end="url(#pcArrow2)"/>
+    <g><circle cx="60" cy="112" r="15" fill="#e2483d" stroke="rgba(255,255,255,.28)" stroke-width="2"/><text x="60" y="117" text-anchor="middle" font-size="15">🥷</text><text x="60" y="140" text-anchor="middle" font-size="10" font-weight="700" fill="#d3daec">공격자</text></g>
+    <g><circle cx="180" cy="112" r="15" fill="#f5928a" stroke="rgba(255,255,255,.28)" stroke-width="2"/><text x="180" y="117" text-anchor="middle" font-size="15">🌐</text><text x="180" y="140" text-anchor="middle" font-size="10" font-weight="700" fill="#d3daec">VPN</text></g>
+    <g><circle cx="300" cy="112" r="15" fill="#f7c777" stroke="rgba(255,255,255,.28)" stroke-width="2"/><text x="300" y="117" text-anchor="middle" font-size="15">⚠</text><text x="300" y="140" text-anchor="middle" font-size="10" font-weight="700" fill="#d3daec">CVE-21762</text></g>
+    <g><circle cx="395" cy="112" r="15" fill="#5fa1ff" stroke="rgba(255,255,255,.28)" stroke-width="2"/><text x="395" y="117" text-anchor="middle" font-size="15">🖥</text><text x="395" y="140" text-anchor="middle" font-size="10" font-weight="700" fill="#d3daec">인사서버</text><text x="395" y="151" text-anchor="middle" font-size="8.5" fill="#7f88a3">도달성 확인됨</text></g>
+  </svg>
+  <p style="text-align:center;color:var(--muted2);font-size:12px;margin-top:10px">
+    색·아이콘·순서 모두 <code>analysis.html</code>의 <code>graphChain()</code>(전체 연관성 모드)을 그대로
+    가져왔다 — 새 시각 언어를 만들지 않았다. 배지(KEV·인터넷 노출)는 겹칠 위험이 있어 요약판에서는
+    뺐다(전체 화면에서만 보인다 — 아래 「포기」 참고).<br>
+    <b style="color:#ff9f97">이 시안은 정적 HTML입니다</b> — "열기 →"를 눌러도 실제로 이동하지 않습니다.
+    구현 시 <code>discover.html?panel=analysis</code>로 이동합니다(아래 「클릭 동선」 참고).
+  </p>
+</div>
+
+<div class="why">
+  <h3>1. 왜 이 안인가 — 3종 미니어처가 아니라 대표 1종, "크게"가 아니라 "작게"</h3>
+  <ul>
+    <li><b>고른 길: 공격경로 1종, 작게(카드 226px).</b> 고객 문구 "연결 관계를 EDR 프로세스 트리처럼"이
+      가리키는 것은 셋 중 공격경로뿐이다 — 4소스 겹침은 "겹침 집계"(2열 대응), 온톨로지는 "개념 간
+      관계"(원형 배치)라 트리처럼 안 읽힌다. 실사 조사(SentinelOne Storyline·CrowdStrike Threat
+      Graph)도 "1선 분석가가 설명 없이 근본 원인을 그림만 보고 이해"하는 것이 값어치라고 말한다 —
+      정교함이 아니라 압축이 핵심.<tag class="tag pick">채택</tag></li>
+    <li><b>버린 길 ①: 그림 3종 미니어처를 나란히.</b> 그림마다 범례·모드 전환이 따라와 조작 개념이
+      3배가 된다 — "첫 화면 단순화"와 정면 충돌. 하나만 작게 얹고 나머지 둘은 상세 화면(분석·AI 기억)
+      제자리에 둔다 — 그쪽은 분석가가 파고들 때 보는 그림이지 매일 여는 첫 화면용이 아니다.
+      <tag class="tag reject">기각</tag></li>
+    <li><b>버린 길 ②: 질문이 제시한 대로 "크게".</b> Few의 원칙(대시보드는 스크롤 없이 한 화면)과
+      정면 충돌한다 — 실측(아래 밀도 표)으로 이미 여유 220px 중 196px를 쓴다. "크게" 그리면 나머지
+      24px마저 없어져 급한 것 1건만 늘어도 스크롤이 생긴다. 고객의 둘째 요청("복잡하지 않게")이 첫째
+      요청("그림으로")을 이긴다고 판단했다.<tag class="tag reject">기각(부분)</tag></li>
+    <li><b>모드 선택: 방사형(소스별)이 아니라 체인(전체 연관성).</b> 방사형은 자산 1개의 상세(원형이라
+      정사각형에 가까운 면적 필요, 노드 3~4개면 세로 ≈220~260px)라 여러 자산을 동시에 못 보여준다.
+      체인은 가로로 눕는 행이라 자산 여러 개를 나란히 쌓기 쉽고(오늘의 "여러 경로"를 보여줌), 손으로
+      그린 좌표가 겹칠 위험도 낮다(직선 배치 — 이 문서를 만들며 스스로 검증할 수 있는 유일한 형태였다).</li>
+  </ul>
+
+  <h3>2. 자리 다툼 — 무엇을 내리고 무엇을 지켰나</h3>
+  <ul>
+    <li><b>내린 것: 글 한 줄 #glanceGo(42px).</b> 그림 카드가 같은 자리·같은 "열기 →" 동작을 그대로
+      이어받는다 — 1:1 교체라 화면에 새 개념이 생기지 않는다. 보안 태세·위협 인텔·자산 요약을 가리키던
+      부분은 잃지만, 그건 그림 카드 자체가 다루는 영역(통합 관제 안의 공격경로)이 아니므로 원래도
+      이 카드가 대신할 수 없다 — 발견·수집 허브에서는 여전히 다 보인다.</li>
+    <li><b>지킨 것: 「오늘 할 일 — 계획 짜기」 판은 손대지 않았다.</b> 급한 것·하던 일·그 외·오늘 내
+      계획, 행 구조·상한(각 8건)·"담기" 동작 전부 그대로다. 이 판은 실제 조치가 시작되는 자리라
+      건드릴 이유가 없었고, 이 시안의 요청 범위(관계 그림 얹기)를 벗어난다.</li>
+    <li><b>건드리지 않았지만 중요한 발견: 스크롤을 만드는 진짜 변수는 이 판이다.</b> 급한 것·하던
+      일·그 외가 각각 상한(8건)에 가까워지면 이 판 혼자 최대 <span class="num">약 761px</span>까지
+      늘어난다 — 그림 카드를 넣기 전에도 상한 근처에서는 이미 1,132px로 1,040px를 넘는다(아래 표).
+      "취약점이 4,833건이 되며 다시 빽빽해짐"이라는 고객 지적은 바로 이 지점이지, 이 시안이 만드는
+      문제가 아니다. <b>이 판의 표시 상한 조정은 이 시안의 범위 밖</b>이라 손대지 않았다 — 별도 결정이
+      필요하면 그때 다룬다.</li>
+  </ul>
+
+  <h3>3. 클릭 동선</h3>
+  <ul>
+    <li>그림(또는 "열기 →")을 누르면 <code>discover.html?panel=analysis</code>로 이동한다 — 실제로
+      이미 있는 경로다(<code>grouppanels.js:41</code> <code>analysis</code> 패널이 <code>analysis.html</code>을
+      그대로 품는다). 대시보드의 기존 <code>go(page)</code> 함수를 그대로 쓰면 된다(현재
+      <code>#glanceGo</code>가 <code>go("discover.html")</code>를 부르는 것과 같은 방식,
+      쿼리스트링만 <code>?panel=analysis</code> 추가).</li>
+    <li>도착한 화면에서 바로 "공격경로 분석" 탭이 열리며 같은 자산이 선택돼 있는 것이 이상적이지만,
+      지금 <code>analysis.html</code>은 위험 항목을 먼저 눌러야 탭이 나타난다(<code>anaTabs</code>가
+      선택 전엔 숨어 있다). 이 자동 선택은 <b>화면 간 상태 전달이 필요한 별도 구현 작업</b>이다 — 이
+      시안은 "그림을 얹는다"까지이고, 이 부분은 승인 후 구현 범위에 명시해 둔다(아래).</li>
+  </ul>
+
+  <h3>4. 무엇을 포기했나</h3>
+  <ul>
+    <li><b>배지(KEV·인터넷 노출)</b>를 요약판에서 뺐다 — 손으로 배치한 작은 그림이라 배지까지 넣으면
+      글자가 겹칠 위험이 있고(직접 렌더 확인 수단이 없는 정적 시안이라 안전한 쪽을 골랐다), 전체
+      화면(analysis.html)에는 이미 있다.</li>
+    <li><b>경로 3개 이상은 안 보여준다</b> — 카드가 더 커진다(1개 늘 때마다 svg 세로 +76px 추정).
+      "전체 7개는 열기에서"라고 캡션에 적어 잘랐다는 사실은 숨기지 않는다(memory.html의 관계 그래프가
+      쓰는 것과 같은 원칙).</li>
+    <li><b>화면 간 자동 선택 연동</b>(그림 클릭 시 해당 자산의 공격경로 탭이 바로 펼쳐지는 것)은 이번
+      시안에 안 넣었다 — 발견·수집 허브로 이동하는 것까지가 이 시안의 몫이다.</li>
+    <li><b>오늘 계획 판의 상한 조정</b> — 진짜 밀도 위험은 여기 있다는 것을 밝혔을 뿐, 손대는 것은
+      범위 밖이라 포기했다(위 「자리 다툼」 참고).</li>
+  </ul>
+
+  <h3>5. 밀도 숫자</h3>
+  <table class="dt">
+    <tr><th>구획</th><th>지금</th><th>시안</th><th>비고</th></tr>
+    <tr><td>글 한 줄 → 그림 카드</td><td>42px</td><td><b style="color:#fff">238px</b>(카드 226 + 여백 12)</td><td>svg 자체 156px · 순증 <b style="color:#ff9f97">+196px</b></td></tr>
+    <tr><td>정체성 한 줄</td><td colspan="2">≈32px (변경 없음)</td><td>CSS 합산 추정</td></tr>
+    <tr><td>머리(인사·상태판)</td><td colspan="2">≈239px (변경 없음)</td><td>상태판이 더 큼 — CSS 합산 추정</td></tr>
+    <tr><td>오늘 계획 판 — 보통(5·2·5·4건)</td><td colspan="2">449px (변경 없음)</td><td>목록형이라 건수 비례</td></tr>
+    <tr><td>오늘 계획 판 — 상한(각 8건)</td><td colspan="2">761px (변경 없음)</td><td>급한 것 6건만 돼도 그림 카드 포함 총합이 1,040px를 넘는다</td></tr>
+    <tr><td><b>전체 총합 — 보통</b></td><td>820px</td><td><b style="color:#fff">1,016px</b></td><td>1,040px 대비 여유 <b style="color:#6fdcb5">24px</b></td></tr>
+    <tr><td><b>전체 총합 — 상한</b></td><td>1,132px<span style="color:#ff9f97">(이미 초과)</span></td><td><b style="color:#ff9f97">1,328px</b></td><td>1,040px 대비 <b style="color:#ff9f97">+288px 초과</b></td></tr>
+  </table>
+  <p style="color:var(--muted2);font-size:12px;line-height:1.7">⚠ 위 표는 <code>dashboard.html</code>의
+    CSS 선언값(패딩·마진·명시된 height)을 손으로 합산한 추정치다 — 실행 중인 앱을 CDP로 재지
+    않았다(시안 규칙: mockups 밖 접속 금지, 실측은 승인 후 실화면에서). 줄 높이가 명시 안 된 곳은
+    폰트크기×1.4로 가정했다(±10~15px 오차 가능). <b>가장 중요한 발견</b>: 그림 카드는 데이터량과
+    무관하게 <b>238px 고정</b>이지만, 오늘 계획 판은 <b>449~761px로 목록 건수에 비례</b>한다 — "밀도
+    우선" 원칙에서 그림이 목록보다 안전한 이유가 바로 이것이다.</p>
+
+  <h3>6. 제품 원칙 자가점검</h3>
+  <div class="selfcheck">
+    <div><span class="ok">✅</span> <b>화면엔 정체성 한 줄+⚠만</b> — 그림 카드는 "설명"이 아니라
+      기존에도 있던 데이터 시각화(vizStrip·overlapPanel과 동급)다. "이게 뭔가요" 풀이는 넣지 않았다.</div>
+    <div><span class="ok">✅</span> <b>설명은 screenguide+ⓘ</b> — 카드 캡션은 범례(색=무엇)만이고,
+      "왜 위험한지" 설명은 안 넣었다. screenguide.ts에 패널 추가가 구현 범위에 있다(아래).</div>
+    <div><span class="ok">✅</span> <b>모든 텍스트 한글</b> — CVE 번호·CVSS류 코드값 외 전부 한글.</div>
+    <div><span class="ok">✅</span> <b>새 입력칸 금지</b> — 버튼·체크박스 0개 추가. "열기"는 기존
+      #glanceGo와 동일한 이동 전용 클릭이다.</div>
+    <div><span class="ok">✅</span> <b>정직</b> — 그림이 "관측 신호 기반(침투테스트 아님)"이라고
+      실제 문구를 그대로 옮겼다. 잘라낸 5개는 "전체 7개는 열기에서"로 숨기지 않았다.</div>
+    <div><span class="ok">✅</span> <b>제품 룩앤필</b> — 색·클래스·SVG 구조를 analysis.html에서
+      그대로 옮겼다. 새 색·새 아이콘 0개.</div>
+  </div>
+
+  <h3>7. 구현 범위(승인 시)</h3>
+  <ul>
+    <li><code>dashboard.html</code> — <code>#glanceGo</code> 블록을 그림 카드로 교체. 데이터는
+      <code>window.gijo.analysisAttackPaths()</code>(이미 있는 API, analysis.html이 쓰는 것과 동일)를
+      재사용 — 새 서버 API 0개. 상위 2개 선정 기준은 reachability(확인됨·높음 우선)·severity.</li>
+    <li>클릭 시 <code>go("discover.html?panel=analysis")</code> — 기존 <code>go()</code> 함수 재사용.</li>
+    <li><code>screenguide.ts</code> — "대시보드 공격 경로 그림" 패널 추가(⓪그림이 무엇인지 ①왜 상위
+      2개만인지 ②전체는 어디서 보는지). 공용 파일이라 Mac에 알림 필요.</li>
+    <li>후속 검토(별도 결정): 오늘 계획 판 상한 조정 여부, 그림 클릭 시 자산 자동 선택 연동 여부.</li>
+  </ul>
+</div>
+
+</body>
+</html>

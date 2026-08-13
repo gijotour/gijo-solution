@@ -244,10 +244,25 @@
 
     <!-- 시작 가이드 카드 → 2026-08-06 문서함으로 이관(위 JS 주석 참고) -->
 
-    <!-- 현황 조망 한 줄(2026-08-09 사용자 지시) — 카드를 없애고 위 한 줄로. 누르면 허브. -->
-    <div id="glanceGo" title="발견·수집 열기" style="display:flex;align-items:center;gap:8px;height:30px;padding:0 12px;margin-bottom:12px;background:var(--panel);border:1px solid var(--border);border-radius:9px;font-size:12.5px;color:var(--muted);cursor:pointer">
-      <span>📊 현황 조망</span><span style="color:var(--muted-2)">보안 태세·통합 관제·위협 인텔·자산 요약은 <b style="color:var(--blue-l)">발견·수집</b>에서 한 줄로 봅니다</span>
-      <span style="margin-left:auto;color:var(--blue-l);font-weight:700">열기 →</span>
+    <!-- 공격 경로 그림 카드(전-7 ①+② · 시안 승인 2026-08-13) — 현황 조망 한 줄(#glanceGo)의
+         자리를 1:1로 이어받았다(같은 클릭 동작, 새 조작 개념 0개). 고객 요구 "연결 관계를 EDR
+         프로세스 트리처럼"의 그 그림이다. 상위 2개만 — 카드 높이가 데이터량과 무관하게 고정돼야
+         첫 화면이 안 부푼다(진짜 밀도 위험은 목록형 계획 판이라는 것이 시안의 실측).
+         시각 언어는 analysis.html graphChain(공격자→외부노출→취약점→대상자산)과 동일 — 첫 화면과
+         상세 화면이 같은 그림이어야 담당자가 딴 물건으로 읽지 않는다.
+         데이터: window.gijo.analysisAttackPaths() (analysis.html이 쓰는 그 API — 새 서버 API 0개). -->
+    <div id="glanceGo" title="발견·수집 열기" style="background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:11px 16px 9px;margin-bottom:12px;cursor:pointer">
+      <div style="height:20px;display:flex;align-items:center;gap:8px;margin-bottom:6px">
+        <b style="font-size:13.5px;font-weight:800;color:#fff">🧭 공격 경로</b>
+        <span id="pcSub" style="font-size:12.25px;color:var(--muted-2);font-weight:600">— 오늘 가장 위험한 연결</span>
+        <span style="margin-left:auto;font-size:12.25px;font-weight:700;color:var(--blue-l)">발견·수집에서 전체 보기 →</span>
+      </div>
+      <div id="pcBody"><!-- JS가 그린다 — 못 그리면 옛 한 줄(현황 조망)로 남는다 -->
+        <div style="display:flex;align-items:center;gap:8px;height:30px;font-size:12.5px;color:var(--muted)">
+          <span>📊 현황 조망</span><span style="color:var(--muted-2)">보안 태세·위협 인텔·자산 요약은 <b style="color:var(--blue-l)">발견·수집</b>에서 봅니다</span>
+        </div>
+      </div>
+      <div id="pcLegend" style="display:none;margin-top:6px;font-size:11.25px;color:var(--muted-2);line-height:16px"></div>
     </div>
     <div class="grid">
       <!-- 오늘 계획 판 — 카드 줄 **그 자리에 상시**(2026-08-09 사용자 "캡처 자리에 · 기존
@@ -585,7 +600,65 @@
   });
 
   // 「한눈에」 계산·렌더는 발견·수집 허브(discover.html)로 이사했다(2026-08-09).
-  $("glanceGo").addEventListener("click", function () { go("discover.html"); });
+  // 그림 카드(전-7)는 분석 패널로 바로 간다 — 그림을 눌렀으면 그 그림의 전체가 나와야 한다.
+  $("glanceGo").addEventListener("click", function () { go("discover.html?panel=analysis"); });
+
+  // ── 공격 경로 그림(전-7 ①+② · 시안 승인 2026-08-13) ──────────────────────────
+  // 상위 2개만, 카드 높이 고정 — 못 그리면(오류·0건) 옛 「현황 조망」 한 줄이 그대로 남는다.
+  // 정직 규칙: 0건이면 0건이라고 말한다. 가짜 예시 경로를 그리지 않는다.
+  (async function () {
+    var e2 = function (s) { return String(s == null ? "" : s).replace(/[&<>"']/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]; }); };
+    var 짧게 = function (s, n) { s = String(s || ""); return s.length > n ? s.slice(0, n - 1) + "…" : s; };
+    try {
+      var r = await window.gijo.analysisAttackPaths();
+      var paths = (r && r.paths) || [];
+      if (!paths.length) {
+        $("pcSub").textContent = "— 아직 없습니다: 스캔 결과가 쌓이면 연결이 그려집니다";
+        return; // 본문은 옛 한 줄 유지 — 빈 그림을 억지로 그리지 않는다
+      }
+      // 상위 2개: 도달성(확인됨>높음>보통) 먼저, 같으면 점수 — 시안의 선정 기준 그대로.
+      var 순위 = { "확인됨": 0, "높음": 1, "보통": 2 };
+      paths.sort(function (a, b) {
+        var d = (순위[a.reachability] != null ? 순위[a.reachability] : 9) - (순위[b.reachability] != null ? 순위[b.reachability] : 9);
+        return d !== 0 ? d : (b.reachScore || 0) - (a.reachScore || 0);
+      });
+      var top = paths.slice(0, 2);
+      // 한 경로 = 노드 최대 4개: 🥷공격자(고정) → 🌐진입 → ⚠거점 → 🖥대상. 없는 단계는 건너뛴다.
+      var 줄그리기 = function (p, y) {
+        var entry = null, mid = null;
+        (p.steps || []).forEach(function (s) {
+          if (!entry && s.kind === "entry") entry = s;
+          else if (!mid && (s.kind === "foothold" || s.kind === "lateral")) mid = s;
+        });
+        var nodes = [{ 색: "#e2483d", 아이콘: "🥷", 라벨: "공격자" }];
+        if (entry) nodes.push({ 색: "#f5928a", 아이콘: "🌐", 라벨: 짧게(entry.label || entry.entity, 10) });
+        if (mid) nodes.push({ 색: "#f7c777", 아이콘: "⚠", 라벨: 짧게(mid.label || mid.entity, 10) });
+        nodes.push({ 색: "#5fa1ff", 아이콘: "🖥", 라벨: 짧게(p.entity, 10), 밑: "도달성 " + (p.reachability || "?") });
+        var xs = nodes.map(function (_, i) { return Math.round(60 + (335 * i) / Math.max(1, nodes.length - 1)); });
+        var out = "";
+        for (var i = 0; i < nodes.length - 1; i++) {
+          out += '<line x1="' + (xs[i] + 18) + '" y1="' + y + '" x2="' + (xs[i + 1] - 18) + '" y2="' + y + '" stroke="#b3ada4" stroke-width="1.8" marker-end="url(#pcArrow)"/>';
+        }
+        nodes.forEach(function (n, i) {
+          out += '<g><circle cx="' + xs[i] + '" cy="' + y + '" r="15" fill="' + n.색 + '" stroke="rgba(255,255,255,.28)" stroke-width="2"/>' +
+            '<text x="' + xs[i] + '" y="' + (y + 5) + '" text-anchor="middle" font-size="15">' + n.아이콘 + "</text>" +
+            '<text x="' + xs[i] + '" y="' + (y + 28) + '" text-anchor="middle" font-size="10" font-weight="700" fill="#d3daec">' + e2(n.라벨) + "</text>" +
+            (n.밑 ? '<text x="' + xs[i] + '" y="' + (y + 39) + '" text-anchor="middle" font-size="8.5" fill="#7f88a3">' + e2(n.밑) + "</text>" : "") + "</g>";
+        });
+        return out;
+      };
+      var 높이 = top.length === 2 ? 156 : 80;
+      var svg = '<svg viewBox="0 0 440 ' + 높이 + '" style="display:block;max-width:440px" role="img" aria-label="공격 경로 요약 — 상위 ' + top.length + '개">' +
+        '<defs><marker id="pcArrow" markerWidth="7" markerHeight="7" refX="6" refY="3.2" orient="auto"><path d="M0,0 L7,3.2 L0,6.4 Z" fill="#b3ada4"/></marker></defs>' +
+        줄그리기(top[0], 36) + (top[1] ? 줄그리기(top[1], 112) : "") + "</svg>";
+      $("pcBody").innerHTML = svg;
+      $("pcSub").textContent = "— 오늘 가장 위험한 연결 상위 " + top.length + "개";
+      var lg = $("pcLegend");
+      lg.style.display = "";
+      lg.textContent = "🥷 공격자 · 🌐 외부 노출 · ⚠ 취약점 · 🖥 대상 자산 · 관측 신호 기반(침투테스트 아님)" +
+        (paths.length > top.length ? " · 상위 " + top.length + "개만 — 전체 " + paths.length + "개는 위 「전체 보기」에서" : "");
+    } catch (e) { /* 못 그리면 옛 한 줄 그대로 — 그림은 덤이지 관문이 아니다 */ }
+  })();
 
 
   // ⓘ — 화면 설명은 셸 콘솔이 답한다(프로젝트 원칙: 화면엔 정체성 한 줄만)
