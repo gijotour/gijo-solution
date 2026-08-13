@@ -971,6 +971,16 @@ export function 방법질문화면찾기(text: string): { screen: string; title:
   const t = String(text ?? "");
   if (!방법질문_RE.test(t)) return null;
   if (hasSpecificSubject(t)) return null;
+  // ★ 정규식 별칭(2026-08-14, ops-sim 152 회귀에서 잡힘) — 「장비에 접속해서 확인하려면?」이
+  //   화면 이름을 안 담아 아래 이름 대조로는 영영 못 잡고, 빈 자리를 7B가 하드닝 준수율
+  //   보고로 채웠다(물은 건 방법인데 결과가 나감). 이름이 아니라 **말꼴**로 가리키는 질문은
+  //   여기서 잡는다. ⚠ 「접속기록」(보관연한 질문)과 겹치지 않게 장비류 낱말을 앞에 요구한다.
+  const 방법정규별칭: { re: RegExp; screen: string }[] = [
+    { re: /(장비|서버|스위치|방화벽|네트워크)\s*(에|에다|로)?\s*접속/, screen: "hardening.html" },
+  ];
+  for (const a of 방법정규별칭) {
+    if (a.re.test(t)) return { screen: a.screen, title: GUIDES[a.screen]?.title ?? a.screen };
+  }
   const 붙인질문 = t.replace(/\s/g, "");
   let 최선: { screen: string; title: string; 길이: number } | undefined;
   const 담기 = (screen: string, 이름: string) => {

@@ -142,6 +142,17 @@ describe("「○○ 하려면 어떻게 해?」는 그 화면 안내로 간다 �
     }
   });
 
+  it("★ 「장비에 접속해서 확인하려면?」이 하드닝 화면 안내로 간다 — 정규식 별칭 (2026-08-14 ops-sim 회귀)", async () => {
+    // 화면 이름이 안 든 말꼴 질문 — 이름 대조로는 영영 못 잡고 빈 자리를 7B가
+    // 하드닝 준수율 **결과**로 채웠다(물은 건 방법). 152상황 ⑬마당 문항 그대로.
+    const { 방법질문화면찾기 } = await import("../src/engine/screenguide");
+    const 찾음 = 방법질문화면찾기("장비에 접속해서 확인하려면?");
+    expect(찾음).not.toBeNull();
+    expect(찾음!.screen).toBe("hardening.html");
+    // 경계 — 「접속기록」(보관연한) 질문은 장비류 낱말이 없어 안 잡힌다.
+    expect(방법질문화면찾기("접속기록은 얼마나 보관하려면 되나?")).toBeNull();
+  });
+
   it("★ dispatcher가 실제로 이 갈래를 부른다 — 만들어 두고 안 부르면 없는 것과 같다", () => {
     expect(/const 방법화면 = 방법질문화면찾기\(instructionText\);/.test(dispatcherSrc)).toBe(true);
     // isHelpIntent보다 앞이어야 한다(다른 화면 이름을 대고 물을 때 엉뚱한 안내를 막는다).
