@@ -102,6 +102,13 @@ export function resetChatHistoryForTests(): void {
   histories.clear();
 }
 
+// ★ #8 「네 자료엔 없음」 배너 — 챗 RAG 경로(아래 chat())와 도구 경로(agentloop
+//   지식없음을밝힌다)가 **같은 문장**을 쓴다. 두 곳에 따로 적으면 어긋난다(이 저장소 반복 유형).
+//   문구는 FAIL_MARKS와 대조됨(emptyanswer-guidance 파일 전체 감시) — 「찾지 못했」 금지.
+export const 자료없음배너 = `${표식.주의} **이 PC의 사내 자료에는 이 내용이 없습니다** — 아래는 **일반 지식 기준**의 답이니, 회사 규정·내부 데이터가 걸린 판단에는 그대로 쓰지 마세요.`;
+// 답 머리가 이미 사실을 말하고 있으면 배너를 겹쳐 붙이지 않는다(머리 60자 검사).
+export const 자료없음중복가드 = /자료에는 없|없습니다|근거 약함/;
+
 // ── 장기 기억: LanceDB 지식 베이스 검색 결과를 참고 자료로 주입 ──────────────
 // 임베딩 서버가 없거나 지식 베이스가 비어 있으면 조용히 생략한다 — RAG가 안 된다고
 // 채팅 자체가 죽으면 안 된다. (memory.ts가 llm.ts의 embed를 쓰므로 순환 참조를 피해
@@ -923,8 +930,8 @@ export async function chat(args: ChatArgs): Promise<string> {
   //   ⚠ 검색 오류(catch)는 자료없음=false라 여기 안 걸린다 — 고장을 「없다」로 단정하지 않는다.
   //   ⚠ 근거약함 배너와 상호배타(0건이면 약한근거만=false)라 두 배너가 겹칠 일은 없다.
   //   ⚠ 문구는 FAIL_MARKS와 대조됨(emptyanswer-guidance 파일 전체 감시) — 「찾지 못했」 금지.
-  if (ragResult?.자료없음 && reply && !/자료에는 없|없습니다|근거 약함/.test(reply.slice(0, 60))) {
-    reply = `${표식.주의} **이 PC의 사내 자료에는 이 내용이 없습니다** — 아래는 **일반 지식 기준**의 답이니, 회사 규정·내부 데이터가 걸린 판단에는 그대로 쓰지 마세요.\n\n${reply}`;
+  if (ragResult?.자료없음 && reply && !자료없음중복가드.test(reply.slice(0, 60))) {
+    reply = `${자료없음배너}\n\n${reply}`;
   }
 
   if (ragResult?.약한근거만 && reply && !/근거 약함|없습니다|확인되지/.test(reply.slice(0, 60))) {

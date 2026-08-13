@@ -10,10 +10,10 @@
 // 폴백 계약: 이 루프는 실패하거나 할 일이 없으면 null을 돌려주고, 호출자(dispatcher)가 기존
 // 채팅 경로로 폴백한다. 즉 루프 도입으로 기존 동작이 나빠지는 회귀가 없다.
 
-import { chat } from "./llm";
+import { chat, 자료없음배너, 자료없음중복가드 } from "./llm";
 import { 표식 } from "./tone";
 import { reportProgress } from "./progress";
-import { listAgentTools, listToolsFor, findAgentTool, toolCatalogText, validateToolArgs, buildApproval, PendingApproval, NO_HIT_PREFIX } from "./agenttools";
+import { listAgentTools, listToolsFor, findAgentTool, toolCatalogText, validateToolArgs, buildApproval, PendingApproval, NO_HIT_PREFIX, 지식근거없음표지 } from "./agenttools";
 import { emitCollaboration } from "./collaboration";
 import { listProducts } from "./securityproducts";
 import { recordWork, TOOL_WORK_KIND } from "./worklog";
@@ -425,7 +425,26 @@ async function 사람에게내보낸다(
   if (!direct) reportProgress("write", "조회 결과로 답을 쓰고 있습니다");
   const composed = direct ?? (await composeFinalAnswer(instruction, calls, context));
   reportProgress("review", "답변을 검수하고 있습니다");
-  return 다음단계붙이기(법령한계를밝힌다(guardAgainstDenial(composed, calls), calls), calls);
+  return 다음단계붙이기(지식없음을밝힌다(법령한계를밝힌다(guardAgainstDenial(composed, calls), calls), calls), calls);
+}
+
+/**
+ * ★ #8 「네 자료엔 없음」 배너 — **도구 경로 판** (2026-08-13 라이트 QA에서 잡힘).
+ *
+ * 챗 RAG 경로는 llm.ts가 ragResult.자료없음으로 배너를 붙이는데, 도구 최종답
+ * (composeFinalAnswer)은 RAG를 **일부러 꺼서**(GPU 경합 — 300초 무응답 원인) 그 길이 없다.
+ * 여기서는 explain·remediation의 0-근거 문장(코드가 만든 결정적 표지, 지식근거없음표지)을
+ * 보고 붙인다 — 정직을 모델의 재작성 운에 맡기지 않는다(코드가 문장을 붙인다).
+ *
+ * ⚠ 모든 유효 호출이 0-근거일 때만 — 다른 도구가 사내 데이터를 가져왔으면 「자료 있는」 대화다.
+ * ⚠ 답 머리가 이미 「없습니다」로 시작하면 겹쳐 붙이지 않는다(llm.ts와 같은 가드).
+ */
+export function 지식없음을밝힌다(reply: string, calls: AgentToolCall[]): string {
+  if (!reply || !calls.length) return reply;
+  const useful = calls.filter((c) => !INTERNAL_TOOL_ERROR_RE.test(c.result));
+  if (!useful.length || !useful.every((c) => 지식근거없음표지.test(c.result))) return reply;
+  if (자료없음중복가드.test(reply.slice(0, 60))) return reply;
+  return `${자료없음배너}\n\n${reply}`;
 }
 
 /** 부족하면 사내 지식을 한 번 더 뒤져 calls에 근거로 얹는다(제자리 수정). */

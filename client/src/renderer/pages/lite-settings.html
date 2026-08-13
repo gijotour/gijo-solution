@@ -215,35 +215,7 @@
           //   (analysis 에이전트 프롬프트가 8192를 거의 다 먹는다, 인계 §6). 재시작은 상관없다.
           //   그래서 틀린 경고를 뺀다 — 잘못된 안내가 맞는 안내보다 나쁘다.
           칸("engMsg", "");
-  // ── 원격 GPU(VPN) — 서버 remotellm 라우트 소비자. 켜기 전 반드시 연결 테스트를 권한다. ──
-  async function 원격GPU() {
-    try {
-      var c = await g.remoteLlmGet();
-      알약("rgpuPill", c.airgap ? "에어갭 — 사용 불가" : (c.enabled ? "켜짐" : "꺼짐"), c.airgap ? "off" : (c.enabled ? "on" : "off"));
-      if (c.airgap) { 칸("rgpuBox", '<div class="note">에어갭 모드에서는 원격 전송 자체를 막습니다 — 정책입니다.</div>'); return; }
-      칸("rgpuBox",
-        '<div class="row"><span class="k">주소</span><input id="rgpuUrl" style="flex:1" placeholder="http://10.8.0.12:8080/v1" value="' + esc(c.url || "") + '"></div>' +
-        '<div class="row"><button id="rgpuTest">연결 테스트</button>' +
-        '<button id="rgpuOn">' + (c.enabled ? "끄기(로컬로 복귀)" : "켜기") + '</button></div>' +
-        '<div id="rgpuMsg"></div>');
-      document.getElementById("rgpuTest").addEventListener("click", async function () {
-        var u = document.getElementById("rgpuUrl").value.trim();
-        칸("rgpuMsg", '<div class="note">확인 중…</div>');
-        try { var r = await g.remoteLlmTest(u);
-          칸("rgpuMsg", r.ok ? '<div class="ok">닿았습니다' + (r.models != null ? " — 모델 " + r.models + "개" : "") + '</div>' : '<div class="err">' + esc(r.error || "실패") + '</div>');
-        } catch (e) { 칸("rgpuMsg", '<div class="err">' + 오류문구(e, "연결 테스트") + '</div>'); }
-      });
-      document.getElementById("rgpuOn").addEventListener("click", async function () {
-        var u = document.getElementById("rgpuUrl").value.trim();
-        if (!c.enabled && !confirm("켜면 질문이 VPN으로 원격 GPU에 전송됩니다. 계속할까요?")) return;
-        try { await g.remoteLlmSet(!c.enabled, u); 원격GPU(); }
-        catch (e) { 칸("rgpuMsg", '<div class="err">' + 오류문구(e, "저장") + '</div>'); }
-      });
-    } catch (e) { 칸("rgpuBox", '<div class="err">' + 오류문구(e, "원격 GPU 설정") + '</div>'); }
-  }
-
           엔진();
-  원격GPU();
         });
       });
     } catch (e) { 칸("engBox", '<div class="err">' + 오류문구(e, "엔진 상태") + "</div>"); }
@@ -399,6 +371,35 @@
     } catch (e) { 칸("srvBox", '<div class="err">' + 오류문구(e, "서버 주소") + "</div>"); }
   }
 
+  // ── 원격 GPU(VPN) — 서버 remotellm 라우트 소비자. 켜기 전 반드시 연결 테스트를 권한다. ──
+  //   ⚠ 2026-08-13 QA 결함: 이 함수가 엔진()의 클릭 핸들러 **안에** 정의·호출돼 있어
+  //     페이지를 열면 영영 안 불렸다(「불러오는 중…」 고착). 모듈 층위 + 시작() 편입으로 수리.
+  async function 원격GPU() {
+    try {
+      var c = await g.remoteLlmGet();
+      알약("rgpuPill", c.airgap ? "에어갭 — 사용 불가" : (c.enabled ? "켜짐" : "꺼짐"), c.airgap ? "off" : (c.enabled ? "on" : "off"));
+      if (c.airgap) { 칸("rgpuBox", '<div class="note">에어갭 모드에서는 원격 전송 자체를 막습니다 — 정책입니다.</div>'); return; }
+      칸("rgpuBox",
+        '<div class="row"><span class="k">주소</span><input id="rgpuUrl" style="flex:1" placeholder="http://10.8.0.12:8080/v1" value="' + esc(c.url || "") + '"></div>' +
+        '<div class="row"><button id="rgpuTest">연결 테스트</button>' +
+        '<button id="rgpuOn">' + (c.enabled ? "끄기(로컬로 복귀)" : "켜기") + '</button></div>' +
+        '<div id="rgpuMsg"></div>');
+      document.getElementById("rgpuTest").addEventListener("click", async function () {
+        var u = document.getElementById("rgpuUrl").value.trim();
+        칸("rgpuMsg", '<div class="note">확인 중…</div>');
+        try { var r = await g.remoteLlmTest(u);
+          칸("rgpuMsg", r.ok ? '<div class="ok">닿았습니다' + (r.models != null ? " — 모델 " + r.models + "개" : "") + '</div>' : '<div class="err">' + esc(r.error || "실패") + '</div>');
+        } catch (e) { 칸("rgpuMsg", '<div class="err">' + 오류문구(e, "연결 테스트") + '</div>'); }
+      });
+      document.getElementById("rgpuOn").addEventListener("click", async function () {
+        var u = document.getElementById("rgpuUrl").value.trim();
+        if (!c.enabled && !confirm("켜면 질문이 VPN으로 원격 GPU에 전송됩니다. 계속할까요?")) return;
+        try { await g.remoteLlmSet(!c.enabled, u); 원격GPU(); }
+        catch (e) { 칸("rgpuMsg", '<div class="err">' + 오류문구(e, "저장") + '</div>'); }
+      });
+    } catch (e) { 칸("rgpuBox", '<div class="err">' + 오류문구(e, "원격 GPU 설정") + '</div>'); }
+  }
+
   // ── 챗 모델 등록 (2026-08-13: 챗 모델은 고객이 등록한다) ──────────────────────
   //   ① 파일: gguf를 모델 폴더에 넣고 「다시 확인」 → listModels가 새로 잡는다(서버 무변경).
   //   ② 받기: listRecommendedModels로 목록, loadHfModel로 받고 getHfDownloadJob로 진행률.
@@ -492,7 +493,7 @@
   }
 
   function 시작() {
-    엔진(); 등급(); 암호화(); 계정(); 이차인증(); 법령(); 업데이트(); 서버();
+    엔진(); 등급(); 암호화(); 계정(); 이차인증(); 법령(); 업데이트(); 서버(); 원격GPU();
     권장모델(); 토큰(); 토큰배선();
     var rs = document.getElementById("rescan");
     if (rs) rs.addEventListener("click", function () {

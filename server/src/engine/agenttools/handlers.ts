@@ -414,6 +414,11 @@ export function ontologyLinesFor(text: string, limit: number): string[] {
 
 // explain — "이게 뭐야 / 어떤 위협이 걸려 / 우리 통제는?" 한 방에.
 // 온톨로지 관계 + 사내 문서(업로드·자동분류된 장기기억) + 보유 보안제품을 가로질러 근거를 모은다.
+// ★ #8 배너(도구 경로)의 표지 — explain·remediation이 사내 근거 0건일 때 내는 문장이다.
+//   agentloop의 지식없음을밝힌다가 이 표지를 보고 「일반 지식 기준」 배너를 붙인다(코드가 붙인다 —
+//   모델에게 맡기지 않는다). 아래 두 반환 문장을 고치면 이 정규식·explain-banner.test 를 함께 볼 것.
+export const 지식근거없음표지 = /(등록부에서 찾은 근거가 없습니다|매뉴얼 근거가 검색되지 않았습니다)/;
+
 export async function runExplain(args: Record<string, string>): Promise<string> {
   const topic = args.topic.trim();
   const out: string[] = [];
@@ -974,7 +979,9 @@ export async function runRemediation(args: Record<string, string>): Promise<stri
     /* 임베딩 미기동 — 문서 근거 없이 계속 */
   }
   if (out.length === 0) {
-    return `"${topic}"에 대한 사내 완화통제·보안제품·매뉴얼 근거를 찾지 못했습니다. 일반적 조치는 최신 패치 적용·설정 강화·접근통제이며, 관련 매뉴얼을 올리면 구체 절차가 쌓입니다.`;
+    // 「찾지 못했습니다」는 서랍 점검(drawer-audit) FAIL_MARKS에 있어 정직한 답에 실패 딱지가
+    // 붙는다(같은 함정 4번째 — llm→actioncheck→lawinfo→여기). 겹치지 않는 말로 쓴다.
+    return `"${topic}"에 대한 사내 완화통제·보안제품·매뉴얼 근거가 검색되지 않았습니다. 일반적 조치는 최신 패치 적용·설정 강화·접근통제이며, 관련 매뉴얼을 올리면 구체 절차가 쌓입니다.`;
   }
   return out.join("\n").slice(0, 2500);
 }
