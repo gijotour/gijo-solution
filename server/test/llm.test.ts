@@ -332,3 +332,55 @@ describe("stripLeadingPreamble — 2인칭 정체성 복창 서두(37f5ca3 흡�
     expect(stripLeadingPreamble(echoed)).toBe("취약점 3건을 발견했습니다.");
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ★ 이력은 개수만이 아니라 **글자 예산**으로도 잘린다 (2026-08-13 · max 근본 규명)
+//
+// ■ 무엇이 있었나 — 라이트(ctx 8192)에서 긴 문서를 다루면 그 뒤로 긴 질문만 0초에 죽었다.
+//   f57c2bd 진단 로그가 밝힘: HTTP 400 "request (8861 tokens) exceeds … (8192)".
+//   HISTORY_LIMIT=20은 개수 상한이라, 정리본이 긴 문서를 연달아 보내면 이력이 문맥을 다 먹는다.
+//   「10분 뒤 저절로 나음」=짧은 질문이 긴 이력을 밀어냄 · 「재시작하면 나음」=histories.clear().
+//
+// ■ 왜 소스 감시인가 — 조립부는 chat() 깊숙이 있어 순수 함수로 못 뗀다(모듈 상태·동적 import).
+//   대신 ① 예산 로직이 실제로 배선돼 있는지 ② 쌍 경계 셈이 맞는지(여기서 재현)를 본다.
+import * as fsw from "fs";
+
+describe("★ 이력 글자 예산 (2026-08-13)", () => {
+  const src = fsw.readFileSync(new URL("../src/engine/llm.ts", import.meta.url), "utf8");
+
+  it("예산 로직이 배선돼 있다 — ctx의 절반·보수 환산 1.2자/토큰", () => {
+    expect(src, "ctx를 티어에서 안 읽는다").toMatch(/currentTierSettings\(\)\.ctxSize/);
+    expect(src, "이력 예산이 없다").toContain("이력예산자");
+    // 보수 환산 — 1.44(실측 평균)로 잡으면 영문·코드 섞일 때 초과가 난다.
+    expect(src, "환산 계수가 보수적이지 않다").toMatch(/\* 1\.2/);
+  });
+
+  it("★ 쌍 경계를 지킨다 — 홀수로 자르면 Mistral류가 roles must alternate로 거부한다", () => {
+    expect(src).toMatch(/시작 % 2 === 1/);
+    // 셈을 여기서 재현해 확인한다(로직 사본이 아니라 **경계 조건의 진리표**다).
+    // ⚠ 실코드의 마지막 단계(시작 ≥ 길이면 전부 비움)까지 포함해 **남기는 개수**로 잰다 —
+    //   처음엔 날 인덱스로 쟀다가 그 단계를 빼먹어 시험 자신이 틀렸다(2026-08-13).
+    const 남기는수 = (lens: number[], 예산: number) => {
+      let 합 = 0, 시작 = lens.length;
+      for (let i = lens.length - 1; i >= 0; i--) {
+        합 += lens[i];
+        if (합 > 예산) break;
+        시작 = i;
+      }
+      if (시작 % 2 === 1) 시작 += 1;
+      return 시작 >= lens.length ? 0 : lens.length - 시작;
+    };
+    // [u,a,u,a] 각 100자, 예산 250 → 뒤에서 2개(200)까지 담고 3번째에서 초과 → 2개 남김(u부터, 쌍 유지)
+    expect(남기는수([100, 100, 100, 100], 250)).toBe(2);
+    // 예산 350 → 뒤에서 3개(300)까지 담김 → 홀수 경계(assistant부터)라 2개로 보정
+    expect(남기는수([100, 100, 100, 100], 350)).toBe(2);
+    // 전부 담기면 그대로 — 이력을 안 자른다
+    expect(남기는수([100, 100], 500)).toBe(2);
+    // 최신 한 턴조차 예산 초과 → 전부 버린다
+    expect(남기는수([9000], 100)).toBe(0);
+  });
+
+  it("개수 상한(HISTORY_LIMIT)은 그대로다 — 크기 상한이 개수 상한을 대체하지 않는다", () => {
+    expect(src).toMatch(/HISTORY_LIMIT = 20/);
+  });
+});

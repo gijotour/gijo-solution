@@ -651,7 +651,7 @@ export async function chat(args: ChatArgs): Promise<string> {
     }
   }
 
-  const history = args.remember && !args.qa ? (histories.get(args.agentId) ?? []) : [];
+  let history = args.remember && !args.qa ? (histories.get(args.agentId) ?? []) : [];
   const ragResult = args.remember ? await ragContextFor(args.message, args.agentId, args.screen, args.viewer) : null;
   const rag = ragResult?.context ?? null;
 
@@ -674,6 +674,36 @@ export async function chat(args: ChatArgs): Promise<string> {
   const systemContent = args.responseSchema
     ? "너는 지시를 읽고 도구를 고르는 분류기다. 설명·인사 없이 요청된 JSON 객체 하나만 출력한다."
     : [systemPromptFor(args.agentId), grounding, rag].filter(Boolean).join("\n\n");
+  // ★ 이력을 **글자 예산**으로도 자른다 (2026-08-13 — max 근본 규명 + win 로깅의 합작).
+  //
+  // ■ 무엇이 있었나: 라이트(ctx 8192)에서 긴 문서를 다루면 그 뒤로 **긴 질문만 0초에** 죽었다.
+  //   진단 로그가 밝힌 원인: HTTP 400 "request (8861 tokens) exceeds … (8192)".
+  //   HISTORY_LIMIT=20은 **개수** 상한이지 크기 상한이 아니다 — 정리본이 긴 문서(1,500자+)를
+  //   연달아 보내면 이력이 조 단위로 부풀어 문맥을 다 먹는다. max의 관찰이 전부 설명된다:
+  //     · 「~10분 뒤 저절로 나았다」 = 그 사이 짧은 질문들이 긴 이력을 **밀어낸** 것
+  //     · 「재시작하면 나았다」     = histories.clear()
+  //     · 「dispatch는 무사」       = 짧은 질문 + 다른 에이전트 이력
+  //
+  // ■ 예산: ctx 토큰의 절반을 이력에 준다. 나머지 절반이 시스템+RAG+이번 질문+생성분 몫이다.
+  //   한글 실측 환산 1.44자/토큰(max 로그: 12,773자=8,861토큰)에서 보수적으로 1.2자/토큰을 쓴다 —
+  //   영문·코드가 섞이면 토큰이 더 나오므로 낮게 잡아야 초과가 안 난다.
+  //   ⚠ 자르는 것은 **오래된 쪽부터**, user/assistant 쌍 경계를 지킨다(홀수로 자르면 Mistral류
+  //     채팅 템플릿이 "roles must alternate"로 거부한다).
+  //   ⚠ 개수 상한(HISTORY_LIMIT)은 그대로 둔다 — 이건 크기 상한이고 그건 개수 상한이다.
+  {
+    const ctx = (await import("./localengine.js").then((m) => m.currentTierSettings().ctxSize).catch(() => 32768)) || 32768;
+    const 이력예산자 = Math.floor((ctx / 2) * 1.2);
+    let 합 = 0;
+    let 시작 = history.length;
+    for (let i = history.length - 1; i >= 0; i--) {
+      합 += String(history[i]?.content ?? "").length;
+      if (합 > 이력예산자) break;
+      시작 = i;
+    }
+    if (시작 % 2 === 1) 시작 += 1; // 쌍 경계 — user부터 시작하게
+    if (시작 > 0 && 시작 < history.length) history = history.slice(시작);
+    else if (시작 >= history.length && history.length) history = []; // 최신 한 턴조차 예산 초과면 다 버린다
+  }
   const messages = [{ role: "system", content: systemContent }, ...history, { role: "user", content: args.message }];
 
   // 실시간 스트림용: 어느 에이전트가 지금 로컬 LLM으로 추론하는지 눈에 보이게 한다.
