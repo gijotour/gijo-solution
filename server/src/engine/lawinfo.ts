@@ -317,6 +317,74 @@ export async function getLawArticles(mst: string, article?: string, limit = 5): 
   return real.slice(0, limit);
 }
 
+/**
+ * 물음과 **제목이 겹치는 조문**을 골라 본문을 돌려준다. 못 고르면 null.
+ *
+ * ⚠ 겹침을 **제목 → 물음** 방향으로 본다. 반대로 하면 어미 때문에 거의 안 걸린다:
+ *   물음 「유출되면」 ⊄ 제목 「유출 등의 통지·신고」  ·  제목 낱말 「유출」 ⊂ 물음 ✅
+ *   조문 제목은 명사구라 어미가 없다 — 이쪽이 정확하다.
+ * ⚠ 점수 0이면 **안 붙인다.** 무관한 조문을 붙이면 없느니만 못하다.
+ */
+export function 제목점수(title: string, 물음: string): number {
+  const q = String(물음).replace(/\s+/g, "");
+  const 낱말 = [...new Set(String(title).match(/[가-힣]{2,}/g) ?? [])];
+  return 낱말.filter((w) => q.includes(w)).length;
+}
+
+/** 조문 본문 상한 — 프롬프트가 부풀어 최종답 생성이 멈추는 것을 막는다(MAX_FACT_CHARS와 같은 계열). */
+const 붙일조문 = 2;
+const 조문본문상한 = 900;
+
+/**
+ * ★ 2026-08-13 — **조문 번호 없는 실무 질문에도 본문을 준다.**
+ *
+ * 무엇이 있었나(max 실측, 인계_win_법령조문_본문누락):
+ *   파서 77% 누락을 고쳤는데도 「개인정보 유출되면 며칠 안에 신고해야 돼?」가 여전히 틀렸다.
+ *   원인이 한 겹 더 있었다 — **본문은 질문에 조문 번호가 있을 때만**(`조문번호()` →
+ *   `lawArticleAnswer`) 탄다. 담당자의 실무 질문에는 번호가 없다. 고친 파서에 **닿기 전에
+ *   흐름이 끝나** 여기서 제목·링크만 나갔다.
+ *
+ *   그리고 본문이 없으니 모델이 빈자리를 지어냈다(실측):
+ *     "실무에서는 … **최대 5일 이내**에 신고 … 이는 개인정보 보호법 **시행령 제16조**에 근거"
+ *   5일도 제16조도 **없는 것을 지어낸 것**이다 — 조문 번호까지 조작했다.
+ *   꼬리표(「원문 확인 못 함」)는 정직하게 붙었지만 담당자는 본문의 단정을 믿는다.
+ *
+ * → 상위 법령의 조문 목록을 받아 **물음과 제목이 겹치는 2건**의 본문을 붙인다.
+ *   「유출·신고」 → 제34조(유출 등의 통지·신고)·시행령 제40조(유출 등의 신고)가 걸리고,
+ *   72시간이 본문으로 들어와 **지어낼 자리가 없어진다.**
+ *
+ * ⚠ 덤이므로 실패해도 답을 죽이지 않는다. 다만 **감추지도 않는다** — 조회가 죽은 것과
+ *   그 조문이 없는 것은 다른 사실이고, 뭉개면 모델이 그 빈자리를 「법에 없다」로 메운다
+ *   (77% 누락 사고에서 `.catch(() => [])` 삼킴이 오진을 한 단계 더 굳혔다).
+ */
+async function 물음에맞는조문본문(물음: string, 법: LawHit): Promise<string[]> {
+  const mst = String(법.id ?? "").trim();
+  if (!mst) return [];
+  let 조회실패: string | null = null;
+  // limit을 크게 준다 — 앞에서 N건만 받으면 제34조처럼 뒤에 있는 조문을 **고를 기회조차 없다.**
+  const articles = await getLawArticles(mst, undefined, 500).catch((e) => {
+    조회실패 = e instanceof Error ? e.message : String(e);
+    return [] as LawArticle[];
+  });
+  if (조회실패) {
+    return ["", `⚠ 「${법.title}」 조문 원문은 가져오지 못했습니다(${조회실패}) — **법에 없다는 뜻이 아닙니다.** 위 원문 링크에서 확인해 주세요.`];
+  }
+  const 고른것 = articles
+    .map((a) => ({ a, 점수: 제목점수(`${a.title ?? ""} ${a.text.slice(0, 40)}`, 물음) }))
+    .filter((x) => x.점수 > 0)
+    .sort((x, y) => y.점수 - x.점수)
+    .slice(0, 붙일조문);
+  if (!고른것.length) return [];
+  const out = ["", `▸ 「${법.title}」에서 물음과 맞닿은 조문 원문 ${고른것.length}건 (법제처에서 받은 그대로):`];
+  for (const { a } of 고른것) {
+    const 머리 = `제${a.no}조${a.title ? `(${a.title})` : ""}`;
+    out.push("");
+    if (!a.text.startsWith(`제${a.no}조`)) out.push(머리);
+    out.push(a.text.slice(0, 조문본문상한));
+  }
+  return out;
+}
+
 /** 챗봇 답변용 — 사람이 그대로 읽는 형식. 원문 링크를 반드시 함께 준다. */
 export async function lawAnswer(query: string, target: LawTarget = "law"): Promise<string> {
   const hits = await searchLaw(query, target, 5);
@@ -334,6 +402,9 @@ export async function lawAnswer(query: string, target: LawTarget = "law"): Promi
     if (h.meta) lines.push(`   ${h.meta}`);
     lines.push(`   원문: ${h.link}`);
   });
+  // ★ 조문 번호가 없는 실무 질문에도 **본문**을 붙인다(위 물음에맞는조문본문 머리말 참고).
+  //   ⚠ 법령일 때만 — 판례·행정규칙은 조문 조회(lawService.do target=law) 대상이 아니다.
+  if (target === "law") lines.push(...(await 물음에맞는조문본문(query, hits[0])));
   lines.push("", LEGAL_DISCLAIMER);
   return lines.join("\n");
 }
