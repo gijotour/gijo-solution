@@ -21,16 +21,18 @@
       ]
     },
     {
-      "from": "build/llama-metal",
-      "to": "server-dist/llama-metal"
-    },
-    {
       "from": "../server/models/bge-m3",
       "to": "server-dist/models/bge-m3"
     }
   ],
   "win": {
-    "target": "nsis"
+    "target": "nsis",
+    "extraResources": [
+      {
+        "from": "build/llama-cuda",
+        "to": "server-dist/llama-cuda"
+      }
+    ]
   },
   "mac": {
     "target": [
@@ -50,7 +52,13 @@
     "category": "public.app-category.business",
     "artifactName": "${productName}-${version}-${arch}.${ext}",
     "hardenedRuntime": false,
-    "identity": null
+    "identity": null,
+    "extraResources": [
+      {
+        "from": "build/llama-metal",
+        "to": "server-dist/llama-metal"
+      }
+    ]
   },
   "dmg": {
     "title": "${productName} ${version}"

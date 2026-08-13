@@ -32,7 +32,12 @@ import fs from "fs";
 
 const 뿌리 = path.resolve(__dirname, "..", "..");
 
-const 실행부 = path.join(뿌리, "llama-metal", "llama-server");
+// 동봉 실행부 — mac은 llama-metal/, Windows는 llama-cuda/ (2026-08-13 ⑥ nsis 동봉).
+//   ⚠ Windows는 DLL 12개가 exe **옆에** 있어야 돈다(tools/stage-llama-cuda.mjs가 꾸리고
+//     빈 PATH로 자가 검증한다 — 개발 기계는 PATH의 CUDA 툴킷이 누락을 가려 거짓 통과한다).
+const 실행부 = process.platform === "win32"
+  ? path.join(뿌리, "llama-cuda", "llama-server.exe")
+  : path.join(뿌리, "llama-metal", "llama-server");
 if (!process.env.GIJO_LLAMA_SERVER_PATH && fs.existsSync(실행부)) {
   process.env.GIJO_LLAMA_SERVER_PATH = 실행부;
   console.log(`[lite] 동봉 llama-server 사용: ${실행부}`);
