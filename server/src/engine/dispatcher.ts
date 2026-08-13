@@ -548,6 +548,18 @@ const ATTACK_PATH_INTENT_RE = /공격\s*경로|attack\s*path|도달\s*(성|가�
 //   → 사이를 {0,4}로 열고 「겹치」도 같은 뜻이라 함께 받는다. 중복을 묻는 말은 **한 곳으로** 간다.
 //   ⚠ {0,4}로 좁게 둔다 — 「중복 로그인 관련 문서」처럼 먼 동거를 삼키면 안 된다.
 const KB_HYGIENE_INTENT_RE = /(지식\s*베이스|지식|문서|rag|자료).{0,6}(정리|중복|상충|위생|점검|청소|정돈)|(중복|상충|겹치)[^.\n]{0,4}(문서|자료)/i;
+
+// ── 「결재 승인 처리해줘」 — 결재판(pending approval) 승인 요청 (2026-08-14, 평가 게이트가 잡은 결함) ──
+//
+// 뿌리: 이 말이 강제 규칙 없이 LLM 선택으로 샜고, **결재를 대화창에서 승인하는 도구가 없어**
+//   모델이 자유작문으로 「✅ 승인 완료」를 지어냈다(도구·결재판 0건, 실제 실행 없음 — falseclaim).
+//   게이트 refuse-approve-own이 실측으로 잡았다(2026-08-14).
+// 두 가지를 코드로 못박는다: ① 결재는 결재판(화면 버튼)에서 처리한다 — 대화창이 지어내지 않는다.
+//   ② **자기가 올린 결재는 본인이 승인할 수 없다**(공동작업 원칙 「자기 PR 자기 병합 금지」와 같은 정신).
+// ⚠ 「취약점 승인·반려」(review_finding)와 안 겹치게 **「결재」 낱말**을 핵심으로 좁게 잡는다.
+//   「이 취약점 승인해줘」엔 「결재」가 없어 안 걸린다.
+export const 결재승인요청_RE = /결재[^.\n]{0,20}(승인|반려|처리|올려|처리해)|(승인|반려)\s*(대기|요청|올린|낸)[^.\n]{0,10}(승인|반려|처리)해/;
+export const 자기결재_RE = /(내가|본인이|제가|방금)[^.\n]{0,15}(올린|낸|신청한|요청한)|내\s*(가\s*)?(올린|낸|신청한|요청한)?\s*결재/;
 const LEARN_RUN_RE = /실행|시작|돌려|가동|run|start/i;
 
 async function learnloopConfirmResult(instructionText: string, qa?: boolean): Promise<DispatchResult> {
@@ -1186,6 +1198,20 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     //   안 실으면 근거재검색대상인가()가 통과시켜 배지용 재검색이 돌고, 답과 무관한 문서가
     //   「📄 근거」로 붙는다. actioncheck가 이미 쓰는 계약을 그대로 쓴다(빈 배열 = 근거 없음 선언).
     return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatScreenGuide(screen, instructionText), sources: [] };
+  }
+
+  // 결재 승인 요청 — 대화창이 「승인 완료」를 지어내지 않게 결재판으로 결정적으로 안내한다.
+  if (결재승인요청_RE.test(instructionText)) {
+    const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
+    completeTask(task.id);
+    const 자기결재 = 자기결재_RE.test(instructionText);
+    const 안내 = [
+      "결재(승인 대기)는 **오른쪽 결재판**에서 [승인]·[반려] 버튼으로 처리합니다 — 대화창은 결재를 대신 승인하지 않습니다(무엇이 얼마나 바뀌는지 보고 사람이 누릅니다).",
+      자기결재
+        ? "⚠ **본인이 올린 결재는 다른 담당자가 검토·승인합니다** — 본인은 승인 대상이 아닙니다(자기 결재 자기 승인 금지). 이는 감사·규정 준수를 위한 통제입니다."
+        : "⚠ 결재는 올린 사람이 아닌 **다른 담당자**가 검토·승인합니다(자기 결재 자기 승인 금지).",
+    ].join("\n\n");
+    return { task, route: { agentId: "orchestrator", action: "chat" }, output: 안내, sources: [] };
   }
 
   // "지식베이스 정리/중복 점검" — 상충·중복·신선도를 결정적으로 점검(삭제 없이 리포트).
