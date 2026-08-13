@@ -268,7 +268,7 @@ export const RRF_K = 60;
 /** 같은 조각을 (documentId, text) 기준으로 합치고 RRF로 순위를 낸다. */
 export function fuseResults(input: FusionInput, codes: string[]): FusedChunk[] {
   const byKey = new Map<string, FusedChunk>();
-  const keyOf = (documentId: string, text: string) => `${documentId} ${text}`;
+  const keyOf = (documentId: string, text: string) => `${documentId}\u0000${text}`;
 
   input.vector.forEach((r, i) => {
     const key = keyOf(r.documentId, r.text);

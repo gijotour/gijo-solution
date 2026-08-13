@@ -857,7 +857,7 @@ async function hybridSearch(question: string, topK: number, agentId?: string, sc
         // 이미 저장돼 있는 바이너리꼴 조각(과거 인입분)은 후보에서 뺀다 — 인입 필터(chunkText)가
         // 새 오염을 막고, 이 줄이 **기존 오염**을 막는다. 후보를 topK의 4배로 떠 오므로 topK는 찬다.
         if (isBinaryLikeChunk(r.text)) continue;
-        const key = `${r.documentId} ${r.text}`;
+        const key = `${r.documentId}\u0000${r.text}`;
         const d = Number(r._distance ?? Number.POSITIVE_INFINITY);
         const 이전 = 모음.get(key);
         if (!이전) 모음.set(key, { text: r.text, documentId: r.documentId, distance: d, ...(r.category ? { category: r.category } : {}) });
