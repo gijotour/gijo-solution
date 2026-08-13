@@ -46,6 +46,9 @@
   .empty{font-size:12.5px;color:var(--muted);line-height:1.75;padding:6px 2px}
   .empty b{color:var(--text)}
   .err{font-size:12.5px;color:var(--red);padding:6px 2px}
+  button.go{background:var(--blue);border:1px solid var(--blue);color:#fff;font:inherit;font-size:12.5px;font-weight:700;
+    border-radius:8px;padding:8px 14px;cursor:pointer}
+  button.go:hover{filter:brightness(1.08)}
 </style>
 </head>
 <body>
@@ -104,6 +107,13 @@
   }
 
   // ── 지금 돌고 있나 ─────────────────────────────────────────────────
+  // 화면(iframe) 안에서 설정을 여는 다리 — 셸의 gijoOpenScreen(설정도 연다, 2026-08-13).
+  function 설정으로() {
+    try { (window.parent && window.parent.gijoOpenScreen ? window.parent : window).gijoOpenScreen("lite-settings"); }
+    catch (e) { /* 셸 밖이면 조용히 */ }
+  }
+  window.__liteGoSettings = 설정으로;
+
   async function 엔진() {
     try {
       var st = await g.getLocalEngineStatus();
@@ -113,12 +123,28 @@
         pill.textContent = "돌고 있음"; pill.className = "pill on";
         document.getElementById("engBox").innerHTML =
           '<div class="empty">' + esc(적재.map(function (l) { return l.modelId; }).join(" · ")) + " 가 올라와 있습니다.</div>";
+        return;
+      }
+      // ⚠ 두 상태를 가른다(2026-08-13, 챗 모델은 고객 등록으로 바뀜):
+      //   ① 등록된 챗 모델이 아예 없다 → **등록하러 가라**(첫 실행의 기본 상태다).
+      //   ② 모델은 있는데 안 올라왔다 → **올려라**.
+      //   예전엔 늘 「올리면 됩니다」였는데, 동봉을 뺀 뒤로는 올릴 것이 없는 게 첫날 기본이다.
+      var models = [];
+      try { var m = await g.listModels(); models = Array.isArray(m) ? m : (m && m.models) || []; } catch (e) { /* 목록 실패는 아래서 일반 안내 */ }
+      pill.textContent = models.length ? "멈춰 있음" : "모델 없음"; pill.className = "pill off";
+      if (!models.length) {
+        document.getElementById("engBox").innerHTML =
+          '<div class="empty"><b>아직 챗 모델이 없습니다.</b><br>' +
+          "라이트는 챗 모델을 <b>고객이 등록</b>합니다 — 파일을 넣거나 받으면 됩니다. " +
+          "검색·임베딩은 이미 됩니다.<br>" +
+          '<button class="go" style="margin-top:10px" id="goReg">⚙ 챗 모델 등록하러 가기</button></div>';
+        var b = document.getElementById("goReg"); if (b) b.addEventListener("click", 설정으로);
       } else {
-        // ⚠ 「멈춰 있습니다」로 끝내지 않는다 — 어디로 가야 하는지 적는다.
-        pill.textContent = "멈춰 있음"; pill.className = "pill off";
         document.getElementById("engBox").innerHTML =
           '<div class="empty"><b>지금은 모델이 안 올라와 있습니다.</b><br>' +
-          "왼쪽 아래 <b>⚙ 설정 → 모델·엔진</b>에서 올리면 됩니다. 올리는 데 30초쯤 걸립니다.</div>";
+          "<b>⚙ 설정 → 모델·엔진</b>에서 「올리기」를 누르면 됩니다. 올리는 데 30초쯤 걸립니다.<br>" +
+          '<button class="go" style="margin-top:10px" id="goEng">⚙ 설정 열기</button></div>';
+        var b2 = document.getElementById("goEng"); if (b2) b2.addEventListener("click", 설정으로);
       }
     } catch (e) { document.getElementById("engBox").innerHTML = '<div class="err">' + 오류문구(e, "엔진 상태") + "</div>"; }
   }
