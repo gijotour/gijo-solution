@@ -685,14 +685,26 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     <!-- 라이트 모드(2026-08-13 사장님 지시 2번) — 스탠다드 배포본을 라이트(화면 9·도구 13)로
          전환하는 선택 사항. main.ts seam(edition:get/set)의 소비자 — 이 토글이 없으면
          seam은 「설계는 됐고 쓰인 적 없다」였다(max 지적). -->
+    <!-- 제품 구성 3택(2026-08-13 사장님 지시: 「라이트·표준·프로를 헷갈리지 않게 고르게」).
+         ⚠ 두 개념이 섞여 헷갈리던 자리다 — 에디션(라이트↔스탠다드: 화면·도구·데이터폴더가 갈림,
+         앱 재시작)과 구동 등급(프로: 같은 앱에서 엔진 능력만 큼, 엔진만 재기동). 담당자에게는
+         「어떤 제품으로 쓸까」 하나의 물음이라 **한 판에서 셋 중 하나**를 고르게 한다. -->
     <div data-sec="admin" class="panel" id="editionPanel" style="display:none">
-      <div class="panel-title">🪶 라이트 모드 (선택)<span class="badge b-purple" style="margin-left:8px">admin 전용</span></div>
-      <div data-gijo-fold="라이트 모드">
-        <div class="hint" style="margin-bottom:8px">화면 9개·도구 13개의 1인용 구성으로 바꿉니다. ⚠ <b>데이터 폴더가 갈립니다</b> — 스탠다드로 쌓은 자산·결재는 라이트 화면에 안 보입니다(섞이면 도구 13개와 78개가 같은 DB에 번갈아 답하게 되어 일부러 가릅니다). ⚠ 적용은 <b>앱을 다시 시작해야</b> 됩니다.</div>
-        <div class="field-row">
-          <button class="btn" id="editionToggle">확인 중…</button>
-          <span id="editionState" class="hint"></span>
+      <div class="panel-title">📦 제품 구성 — 라이트 · 스탠다드 · 프로<span class="badge b-purple" style="margin-left:8px">admin 전용</span></div>
+      <div data-gijo-fold="제품 구성">
+        <div class="hint" style="margin-bottom:8px">지금 구성: <b id="edNow">확인 중…</b></div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap">
+          <button class="btn" id="edLite" style="flex:1;min-width:200px;text-align:left;padding:10px 12px">
+            <b>🪶 라이트</b><br><span class="hint">1인용 · 화면 10개 · 도구 13개<br>⚠ 데이터 폴더가 갈립니다 · 앱 재시작 필요</span>
+          </button>
+          <button class="btn" id="edStd" style="flex:1;min-width:200px;text-align:left;padding:10px 12px">
+            <b>🏢 스탠다드</b><br><span class="hint">표준 구성 · 화면 전체 · 도구 78개<br>LLM 1개 · 32K 문맥</span>
+          </button>
+          <button class="btn" id="edPro" style="flex:1;min-width:200px;text-align:left;padding:10px 12px">
+            <b>🚀 프로</b><br><span class="hint">스탠다드 전체 + 엔진 확장(LLM 2개 병행 — A/B·검증)<br>48GB급 GPU 권장 · 엔진만 재기동</span>
+          </button>
         </div>
+        <div id="edMsg" class="hint" style="margin-top:8px"></div>
       </div>
     </div>
 
@@ -2326,20 +2338,47 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   }
 
 
-  // ── 라이트 모드 토글 — main.ts edition seam의 소비자. 변경은 재시작 후 적용된다. ────
+  // ── 제품 구성 3택 — 에디션(edition seam) + 구동 등급(tier)을 한 판에서 고른다. ────
+  //   라이트 = editionSet('lite') · 스탠다드 = edition standard + tier standard ·
+  //   프로 = edition standard + tier pro. 헷갈림의 뿌리(에디션 vs 등급 두 개념)를
+  //   화면에서는 하나의 물음으로 접는다 — 갈라진 사정은 각 버튼의 부제가 말한다.
   async function loadEdition() {
-    var b = document.getElementById("editionToggle"), st = document.getElementById("editionState");
+    var now = document.getElementById("edNow"), msg = document.getElementById("edMsg");
+    var bL = document.getElementById("edLite"), bS = document.getElementById("edStd"), bP = document.getElementById("edPro");
     var c = await window.gijo.editionGet();
-    if (c.빌드고정) { b.disabled = true; b.textContent = "라이트 전용 배포본"; st.textContent = "이 배포본은 라이트로 고정돼 있습니다."; return; }
+    var t = await window.gijo.getLlmTier().catch(function () { return {}; });
+    var tier = (t && (t.tier || (t.settings && t.settings.tier))) || null;
     var 라이트 = c.현재 === "lite";
-    b.textContent = 라이트 ? "스탠다드로 되돌리기" : "라이트 모드로 전환";
-    st.textContent = 라이트 ? "지금 라이트 모드 — 재시작 시 적용된 상태" : "지금 스탠다드 모드";
-    b.onclick = async function () {
-      if (!confirm((라이트 ? "스탠다드로 되돌립니다." : "라이트 모드로 전환합니다. 데이터 폴더가 갈립니다.") + " 적용은 앱 재시작 후입니다. 계속할까요?")) return;
-      var r = await window.gijo.editionSet(라이트 ? "standard" : "lite");
-      if (r && r.ok === false) { alert(r.error || "바꾸지 못했습니다."); return; }
-      st.textContent = "저장했습니다 — 앱을 다시 시작하면 적용됩니다.";
-      b.disabled = true;
+    var 지금 = 라이트 ? "라이트" : (tier === "pro" ? "프로" : "스탠다드");
+    now.textContent = 지금 + (c.빌드고정 ? " (라이트 전용 설치본 — 변경 불가)" : "") + (!라이트 && tier ? " · 엔진 등급 " + tier : "");
+    // 지금 것은 눌러도 의미가 없다 — 잠가서 「내가 어디 있는지」가 보이게 한다.
+    bL.disabled = 라이트 || !!c.빌드고정;
+    bS.disabled = (!라이트 && tier !== "pro") || !!c.빌드고정;
+    bP.disabled = (!라이트 && tier === "pro") || !!c.빌드고정;
+    if (c.빌드고정) { msg.textContent = "이 설치본은 라이트 전용이라 여기서 못 바꿉니다 — 표준 설치본을 쓰세요."; return; }
+    bL.onclick = async function () {
+      if (!confirm("라이트(1인용)로 전환합니다.\n⚠ 데이터 폴더가 갈려 스탠다드로 쌓은 자산·결재는 라이트 화면에 안 보입니다.\n적용은 앱을 다시 시작해야 됩니다. 계속할까요?")) return;
+      var r = await window.gijo.editionSet("lite");
+      if (r && r.ok === false) { msg.textContent = r.error || "바꾸지 못했습니다."; return; }
+      msg.textContent = "저장했습니다 — 앱을 다시 시작하면 라이트로 뜹니다.";
+    };
+    bS.onclick = async function () {
+      if (!confirm("스탠다드(표준 구성)로 바꿉니다." + (라이트 ? "\n적용은 앱 재시작 후입니다." : "\n엔진만 다시 뜹니다(앱 재시작 불필요).") + " 계속할까요?")) return;
+      try {
+        if (라이트) { var r = await window.gijo.editionSet("standard"); if (r && r.ok === false) { msg.textContent = r.error || "실패"; return; } }
+        if (tier === "pro") await window.gijo.setLlmTier("standard");
+        msg.textContent = 라이트 ? "저장했습니다 — 앱을 다시 시작하면 스탠다드로 뜹니다." : "적용했습니다 — 엔진이 표준 등급으로 다시 뜹니다.";
+        if (!라이트) loadEdition();
+      } catch (e) { msg.textContent = String((e && e.message) || e); }
+    };
+    bP.onclick = async function () {
+      if (!confirm("프로(스탠다드 + LLM 2개 병행)로 바꿉니다.\n48GB급 GPU가 아니면 두 모델이 못 올라올 수 있습니다." + (라이트 ? "\n먼저 스탠다드 화면으로 바뀌며 앱 재시작이 필요합니다." : "\n엔진만 다시 뜹니다.") + " 계속할까요?")) return;
+      try {
+        if (라이트) { var r2 = await window.gijo.editionSet("standard"); if (r2 && r2.ok === false) { msg.textContent = r2.error || "실패"; return; } }
+        await window.gijo.setLlmTier("pro");
+        msg.textContent = 라이트 ? "저장했습니다 — 앱 재시작 후 프로 등급으로 뜹니다." : "적용했습니다 — 엔진이 프로 등급(LLM 2개)으로 다시 뜹니다.";
+        if (!라이트) loadEdition();
+      } catch (e) { msg.textContent = String((e && e.message) || e); }
     };
   }
 
