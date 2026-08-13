@@ -1,0 +1,615 @@
+<!doctype html>
+<!--
+  ============================================================================
+  조사 근거 (설계 전 표준·모범사례 조사 — 2026-08-13, gijo-mockup)
+  ============================================================================
+
+  이 시안이 푸는 문제: 대화창의 "📄 근거: 문서명" 배지가 "답이 실제로 그 문서를
+  근거로 썼는가"가 아니라 "검색했더니 뭔가 걸렸는가"만 보고 붙는다. 그래서 "사내에
+  없습니다"라고 답한 자리에도 초록 배지가 붙는다(운영 실측 8문항 8회 전부).
+
+  1) Zhang 외, "Correctness is not Faithfulness in RAG Attributions"
+     (arXiv:2412.18004, 2024).
+     → 인용에는 두 축이 따로 있다: "정확성"(그 문서가 질문과 실제로 관련 있는가)과
+       "충실성"(모델이 실제로 그 문서를 근거로 삼아 이 문장을 만들었는가). 정확한
+       문서라도 충실하지 않을 수 있다 — 지금 배지 버그가 정확히 이 간극이다(검색은
+       맞았는데 답은 그걸로 쓴 게 아니다). 3상태 설계의 학술적 뼈대.
+
+  2) Es 외, RAGAS(검색증강생성 자동평가 프레임워크).
+     → Context Relevance(검색 품질)와 Faithfulness(생성 품질)를 서로 다른 계산으로
+       잰다. Faithfulness는 답을 주장(claim) 단위로 쪼개 문맥과 하나씩 대조해야 해서
+       비용·오탐 위험이 있다 — "답과 원문의 글자 겹침을 재서 실제 인용만 올린다"(검토
+       후 기각한 옵션 나)를 직접 실시간 배지 판정기로 새로 만들지 않은 근거.
+
+  3) Microsoft Learn, "Knowledge sources — Microsoft Copilot Studio"(공식 문서).
+     → "Grounded"(근거 기반) 응답과 "Ungrounded"(근거 없이 일반 지식으로 답함)를
+       제품이 사용자에게 명시적으로 구분해 알리는 것이 이미 업계 관행이다. 지금처럼
+       둘을 같은 배지로 뭉치지 않는다.
+
+  4) W3C WCAG 2.1 — SC 1.4.1(Use of Color) · SC 1.4.3(Contrast Minimum).
+     → 1.4.1: 상태①/②는 색뿐 아니라 문구 자체가 다르다("근거:" vs "찾아본 자료 —
+       근거 아님:") — 색맹이어도 구분된다. 1.4.3: 상대휘도 공식으로 직접 계산(수식은
+       W3C 정의 그대로, 로그·지수 손계산이라 소수 둘째 자리는 근사치)
+       — 상태① #6fdcb5 on #1f1e1d ≈ 9.9:1, 상태② #ffd88a on #1f1e1d ≈ 12.2:1.
+       WCAG AA(4.5:1)는 물론 AAA(7:1)까지 둘 다 충족(자릿수가 조금 흔들려도 결론은 안 바뀜).
+
+  5) 내부 규범 — server/src/engine/tone.ts (표식 사전, 2026-08-03 확정).
+     → "표식은 뜻이 하나여야 눈에 들어온다. 자리마다 다른 뜻으로 쓰면 아무 뜻도
+       없어진다." 이미 🔎 = "검색 0건"이 예약돼 있다. 상태②는 검색이 0건이 아니라
+       "검색은 됐지만 근거로 안 씀"이라 뜻이 다르다 — 비슷하게 생긴 🔍를 새 뜻으로
+       쓰지 않고, 아이콘은 📄(문서라는 사물 표식, tone.ts 분류상 상태 표식이 아님)를
+       그대로 두고 문구·색으로만 가른다.
+
+  6) 내부 선례 — 이미 코드가 계산해 둔 신호(새 판정기를 만들지 않기 위한 근거).
+     · server/src/engine/llm.ts:846 ragResult.약한근거만 — "⚠ 근거 약함" 배너를
+       붙일지 이미 판단하는 불리언.
+     · server/src/engine/sessionpatterns.ts NO_ANSWER 정규식 — 답이 "없습니다·찾을
+       수 없다" 계열인지 이미 분류한다(학습후보함에서 사용 중).
+     · server/src/engine/dispatcher.ts 근거재검색대상인가() — 데이터집계·안내형답·
+       잡담·"답을 만든 쪽이 이미 sources를 확정(빈 배열 포함)"이면 재검색 자체를
+       이미 건너뛴다. actioncheck.ts:219가 스스로 sources:[] 를 선언해 배지를 끄는
+       패턴도 이미 있다.
+
+  결정 3줄: ① 배지를 3상태로 가른다(근거로 답함=초록 유지 / 찾아본 자료-근거 아님=
+  호박색 신설 / 사내 자료 안 봄=배지 없음). ② 판정은 위 6)의 기존 신호만 조합한다 —
+  새 유사도·겹침 판정기 0개. ③ 아이콘은 📄 그대로, 문구·색으로만 가른다(🔍/🔎 신설 안 함).
+-->
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>시안 — 근거 배지 3상태 (정직화) · GIJO AS 대화창</title>
+<style>
+  :root{
+    --bg:#262624; --panel:#30302e; --panel-2:#1f1e1d;
+    --text:#e9e7e2; --muted:#b3ada4; --muted-2:#a49d95;
+    --blue:#3b82f6; --blue-light:#5fa1ff;
+    --teal:#1eb980; --teal-light:#6fdcb5;
+    --amber:#f0a020; --amber-light:#ffd88a;
+    --red:#e2483d;
+    --line:rgba(255,255,255,.10);      /* 작업 지시 지정 테두리값 */
+    --line-row:rgba(255,255,255,.03);  /* console.js 원본값(행 구분선) — 실제 복제부에만 씀 */
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;
+    font-size:13.5px;line-height:1.7;padding:28px 32px 80px;}
+  h1{font-size:19px;font-weight:800;margin:0 0 5px;letter-spacing:-.2px}
+  .sub{color:var(--muted-2);font-size:12.25px;margin-bottom:16px}
+  .sub code{font-size:11.5px}
+  h2{font-size:14.5px;font-weight:800;margin:34px 0 13px;padding-top:22px;
+    border-top:1px solid var(--line);display:flex;align-items:center;gap:8px}
+  h2 .no{color:var(--blue-light);font-family:Consolas,monospace;font-size:12.5px;font-weight:700}
+  h3{font-size:12.75px;font-weight:800;color:var(--blue-light);margin:16px 0 8px}
+  p{margin:0 0 9px}
+  a{color:var(--blue-light)}
+  .muted{color:var(--muted)}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:11px;
+    padding:15px 18px;margin-bottom:14px}
+  code{background:rgba(255,255,255,.07);padding:1px 5px;border-radius:4px;
+    font-size:12px;font-family:Consolas,monospace}
+  table{width:100%;border-collapse:collapse;font-size:12.25px;margin:6px 0}
+  th,td{text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+  th{color:var(--muted-2);font-weight:800;font-size:10.75px;text-transform:uppercase;letter-spacing:.03em}
+  ul.plain{margin:6px 0 10px 19px;padding:0}
+  ul.plain li{margin-bottom:8px}
+  .tag{display:inline-block;font-size:10px;font-weight:800;border-radius:5px;
+    padding:2px 7px;white-space:nowrap;margin-left:8px;vertical-align:middle}
+  .tag.reject{background:rgba(226,72,61,.14);color:#f5928a}
+  .tag.pick{background:rgba(30,185,128,.14);color:var(--teal-light)}
+  .tag.new{background:rgba(240,160,32,.16);color:var(--amber-light)}
+  .tag.gone{background:rgba(255,255,255,.08);color:var(--muted-2)}
+
+  /* TL;DR */
+  .tldr{background:rgba(59,130,246,.08);border:1px solid rgba(59,130,246,.30);
+    border-radius:11px;padding:13px 16px;margin-bottom:20px;font-size:12.75px}
+  .tldr b{color:#fff}
+  .tldr ol{margin:6px 0 0 18px;padding:0}
+  .tldr li{margin-bottom:5px}
+
+  /* 실측/경고 콜아웃(기존 mockups/answer-feedback 관례 재사용) */
+  .callout{background:rgba(240,160,32,.07);border:1px solid rgba(240,160,32,.35);
+    border-left:3px solid var(--amber);border-radius:10px;padding:12px 15px;
+    font-size:12.25px;color:var(--muted);line-height:1.75;margin:12px 0}
+  .callout b{color:#fff}
+  .callout code{font-size:11.5px}
+
+  /* ── 상태 스펙 카드 ─────────────────────────────────────────────── */
+  .statecards{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin:14px 0}
+  .scard{background:var(--panel-2);border:1px solid var(--line);border-radius:12px;padding:14px 15px}
+  .sc-h{font-size:13px;font-weight:800;margin-bottom:10px;display:flex;align-items:center}
+  .sc-body{background:rgba(0,0,0,.16);border-radius:9px;padding:10px 11px;margin-bottom:9px}
+  .sc-d{font-size:11.75px;color:var(--muted);line-height:1.7;margin:0}
+  .sc-hex{font-size:10.5px;color:var(--muted-2);font-family:Consolas,monospace;margin-top:6px}
+
+  /* ── 실제 대화창 마크업 복제(console.js / chatparts.js 그대로) ──────
+     ⚠ 아래 .cs-row / .ci / .cb / .cn / .cm / .gcp-src / .gcp-ev* 는
+     client/src/renderer/pages/console.js, chatparts.js의 CSS 값을 그대로 옮긴
+     것이다 — 새로 디자인하지 않았다("제품 룩앤필 따르기"). 상태② 전용
+     .gcp-src2 만 신설(구조는 .gcp-src와 동일, color만 다름). */
+  .cs-host{background:var(--panel-2)}
+  .cs-body{padding:8px 14px;display:flex;flex-direction:column}
+  .cs-row{display:flex;gap:9px;padding:7px 0;border-bottom:1px solid var(--line-row)}
+  .cs-row:last-child{border-bottom:none}
+  .cs-row .ci{flex:0 0 auto;width:22px;height:22px;border-radius:50%;
+    background:rgba(59,130,246,.16);display:flex;align-items:center;justify-content:center;
+    font-size:12.25px}
+  .cs-row.instr .ci{background:rgba(30,185,128,.16)}
+  .cs-row .cb{flex:1;min-width:0}
+  .cs-row .cn{font-size:12px;font-weight:800;color:var(--muted);margin-bottom:2px}
+  .cs-row .cn .ct{font-weight:500;color:var(--muted-2);margin-left:6px}
+  .cs-row .cm{font-size:12.5px;color:var(--text);word-break:break-word;line-height:1.62}
+  .cs-row .cm strong{color:#fff;font-weight:800}
+  .gcp-src{margin-top:6px;font-size:11.5px;font-weight:700;color:#6fdcb5}
+  .gcp-src2{margin-top:6px;font-size:11.5px;font-weight:700;color:#ffd88a}
+  .gcp-ev{margin-top:8px;border-top:1px solid rgba(255,255,255,.08);padding-top:8px;min-width:0}
+  .gcp-evh{font-size:12px;color:var(--muted);cursor:pointer;user-select:none}
+  .gcp-q{border-left:3px solid rgba(59,130,246,.45);background:rgba(59,130,246,.05);
+    padding:7px 10px;border-radius:0 6px 6px 0;margin-top:6px}
+  .gcp-qd{font-size:11.5px;color:var(--muted-2);margin-bottom:3px}
+  .gcp-qt{font-size:12.25px;line-height:1.75;color:#cdd4e6}
+
+  /* ── 비교용 라벨(제품 UI 아님 — 이 문서의 편집 주석) ───────────── */
+  .lbl{display:block;font-size:9px;font-weight:800;letter-spacing:.05em;
+    color:var(--muted-2);text-transform:uppercase;margin:9px 0 2px}
+  .lbl.new-el{color:var(--blue-light)}
+  .m-cap{font-size:10px;color:var(--muted-2);font-family:Consolas,monospace;margin-top:2px}
+  .gone{border:1px dashed rgba(255,255,255,.24);border-radius:7px;padding:7px 10px;margin-top:6px}
+  .gone .ghost{display:block;text-decoration:line-through;color:rgba(255,255,255,.20);
+    font-size:11.5px;font-weight:700;margin-bottom:4px}
+  .gone .gone-label{font-size:10.5px;color:var(--muted-2)}
+
+  /* ── 창 프레임 ─────────────────────────────────────────────────── */
+  .demo-note{background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:9px;
+    padding:11px 14px;font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.7}
+  .switch-row{display:flex;align-items:center;gap:10px;margin:0 0 18px;font-size:12.25px;color:var(--muted)}
+  .switch{position:relative;width:38px;height:21px;background:rgba(255,255,255,.16);
+    border-radius:20px;cursor:pointer;flex:0 0 auto}
+  .switch i{position:absolute;top:2px;left:2px;width:17px;height:17px;border-radius:50%;
+    background:#fff;transition:left .15s;font-style:normal}
+  .switch.on{background:rgba(59,130,246,.6)}
+  .switch.on i{left:19px}
+  .frames{display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap}
+  .frame{flex:0 0 auto}
+  .frame .fw{font-size:11.5px;font-weight:800;color:var(--muted-2);margin-bottom:7px}
+  .frame .fw b{color:var(--text)}
+  .frame .fw .src{display:block;font-weight:400;font-size:10.5px;color:var(--muted-2);margin-top:1px}
+  .win{border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:0 10px 30px rgba(0,0,0,.4)}
+  .win-bar{background:var(--panel);padding:6px 11px;font-size:11px;color:var(--muted-2);
+    border-bottom:1px solid var(--line)}
+
+  /* after-only 모드: "지금" 계열을 숨기고, 실측 캡션(.m-cap, 편집 주석)도 함께 숨겨
+     실사용 화면과 완전히 같은 모습으로 본다 — §5 데모의 "실사용 미리보기" 목적. */
+  body.after-only .old-el{display:none}
+  body.after-only .m-cap{display:none}
+
+  /* ── 자가점검 ─────────────────────────────────────────────────── */
+  .checklist{list-style:none;margin:6px 0;padding:0}
+  .checklist li{margin-bottom:9px;padding-left:22px;position:relative;font-size:12.5px;color:var(--muted)}
+  .checklist li b{color:var(--text)}
+  .checklist li::before{content:"✓";position:absolute;left:0;color:var(--teal-light);font-weight:800}
+
+  footer{margin-top:40px;padding-top:16px;border-top:1px solid var(--line);
+    font-size:11.5px;color:var(--muted-2)}
+</style>
+</head>
+<body>
+
+<h1>근거 배지 정직화 — 대화창 배지 3상태</h1>
+<div class="sub">추천 시안 1개 · 2026-08-13 · 대상 <code>client/src/renderer/pages/chatparts.js</code>
+  · <code>console.js</code>(배지 렌더링) — 서버 쪽 신호원은 <code>server/src/engine/{llm,dispatcher,sessionpatterns}.ts</code>(참고용, 이번 시안에서 수정 안 함)</div>
+
+<div class="tldr">
+  <b>핵심 결정 3줄</b>
+  <ol>
+    <li>배지를 3상태로 가른다 — <b style="color:#6fdcb5">① 근거로 답함</b>(초록, 그대로 유지) ·
+      <b style="color:#ffd88a">② 찾아본 자료지만 근거 아님</b>(호박색, 신설) ·
+      <b style="color:var(--muted-2)">③ 사내 자료를 안 봄</b>(배지 없음, 신설·제거).</li>
+    <li>세 상태 판정은 전부 <b>이미 코드가 계산해 둔 값</b>(약한근거만 플래그 · "없습니다" 계열 문구 ·
+      근거재검색대상인가 게이트)만 조합한다 — <b>새 유사도·겹침 판정기 0개.</b></li>
+    <li>380px 도킹 기본폭에서 문서 1건짜리 예시(②/③번 실측 사례)는 상태①(1줄 추정)→상태②(2줄 추정)로
+      <b>+1줄</b> 늘어난다. 문서 2건짜리는 상태①·②모두 2줄로 줄 수 변화 없음. 538px에서는 대체로 1줄 유지
+      (정확한 값은 §6, 이 파일을 열면 브라우저가 직접 잰다).</li>
+  </ol>
+</div>
+
+<!-- ════════════════════════ 1. 문제 ════════════════════════ -->
+<h2><span class="no">§1</span> 무엇이 문제인가 — 운영 실측(2026-08-13)</h2>
+<p>사내에 없는 것을 물은 <b>8문항 8회 전부</b> 초록 「📄 근거: 문서명」 배지가 붙었다.
+  담당자는 "포함되어 있지 않습니다"라는 문장과 배지를 <b>동시에</b> 본다 — 보고서에 그 문서를
+  출처로 적을 수 있다.</p>
+<table>
+  <tr><th style="width:20%">질문</th><th style="width:32%">답(요지)</th><th>오늘 붙은 배지(전부 초록)</th></tr>
+  <tr><td>ISMS 인증 취득일</td><td>"사내 지식 베이스에 <b>포함되어 있지 않습니다</b>"</td>
+    <td>GIJO_지식_보안거버넌스_표준.md · ismsp_접근권한_검토.md</td></tr>
+  <tr><td>해외 지사 담당자 연락처</td><td>"<b>포함되어 있지 않습니다</b>"</td>
+    <td>유의사항.txt · SKT 침해사고 보도자료.hwpx</td></tr>
+  <tr><td>2019년 감사 결과 <span class="muted">(3/3 재현)</span></td>
+    <td>⚠근거 약함 배너 + "<b>존재하지 않습니다</b>"</td>
+    <td>2024 하반기 사이버 위협 동향 보고서.pdf</td></tr>
+  <tr><td>랜섬웨어 대응 5단계</td><td>코드 템플릿 답(0.7초, <b>AI 자체를 안 부름</b>)</td>
+    <td>랜섬웨어_초동_대응.md · GIJO_AS_용어사전.md · GIJO_AS_제품소개.md</td></tr>
+</table>
+<p class="muted" style="font-size:11.75px">네 번째 줄이 특히 심각하다 — AI가 문서를 읽기는커녕
+  <b>불려나가지도 않았는데</b> 배지가 붙는다. 서버가 배지용으로 <b>별도 재검색</b>을 돌리기 때문이다
+  (아래 §3의 근거재검색대상인가() 참고).</p>
+
+<!-- ════════════════════════ 2. 설계 ════════════════════════ -->
+<h2><span class="no">§2</span> 설계 — 배지 3상태</h2>
+<div class="statecards">
+  <div class="scard">
+    <div class="sc-h" style="color:#6fdcb5">① 근거로 답함<span class="tag pick">그대로 유지</span></div>
+    <div class="sc-body">
+      <div class="cs-row" style="border:none;padding:0"><div class="ci">🧭</div><div class="cb">
+        <div class="cm">비밀번호는 <strong>최소 10자 · 특수문자 1개 이상</strong>이며 90일마다 변경합니다.</div>
+        <div class="gcp-src">📄 근거: GIJO_AS_계정관리_지침.md · 접근권한_검토표.xlsx</div>
+        <div class="gcp-ev" id="specFold">
+          <div class="gcp-evh" data-fold>▸ 📄 근거 원문 1대목 — 답이 맞는지 확인</div>
+          <div class="gcp-q" style="display:none;margin-top:6px">
+            <div class="gcp-qd">GIJO_AS_계정관리_지침.md</div>
+            <div class="gcp-qt">비밀번호는 최소 <mark style="background:rgba(240,160,32,.28);color:#ffd88a;padding:0 2px;border-radius:3px">10자</mark> 이상, 특수문자를 포함해야 하며…</div>
+          </div>
+        </div>
+      </div></div>
+    </div>
+    <p class="sc-d">이 문서들을 <b>실제로 써서</b> 답했다. 색·문구·구조·원문 접기 전부 그대로
+      — 이번 변경 대상이 아니다(아래 실제로 클릭해 열어볼 수 있다).</p>
+    <div class="sc-hex">color:#6fdcb5 on #1f1e1d → 대비 ≈9.9:1(WCAG AAA 충족, 손계산·근사)</div>
+  </div>
+
+  <div class="scard">
+    <div class="sc-h" style="color:#ffd88a">② 찾아보긴 했으나 근거 아님<span class="tag new">신설</span></div>
+    <div class="sc-body">
+      <div class="cs-row" style="border:none;padding:0"><div class="ci">🧭</div><div class="cb">
+        <div class="cm">ISMS 인증 취득일은 사내 지식 베이스에 <strong>포함되어 있지 않습니다.</strong></div>
+        <div class="gcp-src2">📄 찾아본 자료 — 근거 아님: GIJO_지식_보안거버넌스_표준.md · ismsp_접근권한_검토.md</div>
+      </div></div>
+    </div>
+    <p class="sc-d">검색은 됐지만 답은 그걸로 만든 게 아니다(자료가 멀거나, 답이 "없다"고 말함).
+      문서 <b>이름은 그대로 보여준다</b> — "이 문서를 새로 올려야겠다"로 이어갈 단서라서다.
+      원문 대목(접기)은 <b>안 보여준다</b>(아래 §4 참고).</p>
+    <div class="sc-hex">color:#ffd88a on #1f1e1d → 대비 ≈12.2:1(WCAG AAA 충족, 손계산·근사)</div>
+  </div>
+
+  <div class="scard">
+    <div class="sc-h" style="color:var(--muted-2)">③ 사내 자료를 안 봄<span class="tag gone">신설(제거)</span></div>
+    <div class="sc-body">
+      <div class="cs-row" style="border:none;padding:0"><div class="ci">🧭</div><div class="cb">
+        <div class="cm">랜섬웨어 감염 초동 대응 5단계입니다.<br><span class="muted" style="font-size:11px">(이하 절차 생략)</span></div>
+        <!-- 배지 자체가 없다 — DOM에 아무 것도 안 남는다. 아래는 "여기 있었다"를 보여주는 설명용 스케치. -->
+      </div></div>
+    </div>
+    <p class="sc-d">코드가 낸 절차 답 · 화면 안내 · 데이터 집계처럼 애초에 문서를 찾아본 적이 없다.
+      <b>배지가 아예 없다</b> — "배지 없음"이라는 상태를 그리지 않는다, 정말로 아무 것도 없다.</p>
+    <div class="sc-hex">해당 없음 — DOM 요소 자체가 없음(빈 문자열이 아니라 미생성)</div>
+  </div>
+</div>
+<div class="callout">
+  ⚠ <b>아이콘은 새로 안 만든다.</b> <code>server/src/engine/tone.ts</code>의 표식 사전(2026-08-03 확정)에
+  이미 🔎 = <b>"검색 0건"</b>이 예약돼 있다. 상태②는 검색이 <b>0건이 아니다</b>(찾긴 했다) — 그런데
+  얼핏 비슷해 보이는 🔍(반대 방향 돋보기)를 새 뜻으로 쓰면, 그 파일이 스스로 경고하는 문제
+  ("표식은 자리마다 뜻이 하나여야 눈에 들어온다 … 다른 뜻으로 쓰면 아무 뜻도 없어진다")를 이 배지에서
+  그대로 반복하게 된다. 그래서 <b>아이콘은 📄 그대로 두고, 문구와 색으로만</b> 상태를 가른다.
+</div>
+
+<!-- ════════════════════════ 3. 왜 이 안인가 ════════════════════════ -->
+<h2><span class="no">§3</span> 왜 이 안인가 — 다른 두 길을 왜 안 골랐나</h2>
+<ul class="plain">
+  <li><b>버린 길 (가): 답이 부정이면 배지를 아예 뗀다.</b><span class="tag reject">기각</span><br>
+    무엇을 찾아봤는지 자체가 사라진다 — 담당자가 "그럼 이 문서를 새로 올려야겠다"로 이어갈 단서가 없어진다.
+    애초에 이 배지를 단 이유(2026-08-01 실측: 문서엔 "37"인데 모델이 "27"이라 답한 사고 —
+    "안 보여주면 못 잡는다")와 정반대 방향이다.</li>
+  <li><b>버린 길 (나): 답과 원문의 글자 겹침을 재서 실제로 인용된 것만 올린다.</b><span class="tag reject">기각</span><br>
+    새 판정기다. RAGAS 같은 평가 프레임워크도 이 "충실성" 판정을 주장 단위 분해 + 문맥 대조로
+    계산한다(가볍지 않다, §조사근거 2). 겹침만 재면 표현은 다르지만 뜻이 같은 문장(동의어·요약)은
+    억울하게 "인용 아님"으로, 우연히 숫자 하나만 겹치면 "인용"으로 오판할 수 있다. 이 저장소는
+    낱말 판정으로 이미 덴 적이 있다(RAG 오염 사고의 뿌리 중 하나가 바로 근거배지였고, 상충 감지
+    낱말 판정은 아직 미해결 과제로 남아 있다) — 같은 함정을 배지에 또 놓지 않는다.</li>
+  <li><b>고른 길 (다): 이미 코드가 계산해 둔 결정적 신호만 쓴다.</b><span class="tag pick">채택</span><br>
+    <ul class="plain" style="margin-top:6px">
+      <li><b>신호 1</b> — <code>ragResult.약한근거만</code>(llm.ts) : 이미 "⚠ 근거 약함" 배너를
+        붙일지 판단하는 바로 그 불리언.</li>
+      <li><b>신호 2</b> — 답 자체가 "없습니다·찾을 수 없다" 계열인가 : <code>sessionpatterns.ts</code>의
+        NO_ANSWER 정규식, <code>llm.ts</code>가 배너 중복을 막을 때 쓰는 정규식이 이미 이 판별을 한다.</li>
+      <li><b>신호 3</b> — 배지를 낼지 말지 : <code>dispatcher.ts</code>의 <code>근거재검색대상인가()</code>가
+        이미 데이터집계·안내형답·잡담·"답을 만든 쪽이 sources를 이미 확정(빈 배열 포함)"을 걸러낸다.
+        <code>actioncheck.ts</code>가 스스로 <code>sources: []</code>를 선언해 배지를 끄는 것도
+        이미 있는 패턴이다 — 랜섬웨어 같은 결정적 절차 템플릿도 같은 패턴을 따르면 새 로직 없이 꺼진다.</li>
+    </ul>
+    세 신호를 조합만 하면 세 상태가 갈린다 — <b>문장 유사도를 재는 코드를 한 줄도 새로 안 짠다.</b></li>
+</ul>
+
+<!-- ════════════════════════ 4. 무엇을 포기했는지 ════════════════════════ -->
+<h2><span class="no">§4</span> 무엇을 포기했는지</h2>
+<ul class="plain">
+  <li>상태②에는 <b>근거 원문(접기) 아코디언을 안 둔다.</b> 이미 "근거 아님"이라 말한 자리에 원문을
+    나란히 두면 눈이 다시 "그럼 이거 본 거 아닌가"로 흐려진다 — 상태①의 취지(원문 대조로 검증)와
+    충돌한다. 문서 <b>이름</b>까지만 보여준다.</li>
+  <li>상태②를 더 잘게 쪼개지 않는다(예: "거리 0.71" 같은 근접도 수치 노출). 담당자에게 필요한 건
+    "이건 근거가 아니다"라는 이분법이지 내부 거리값이 아니다(레드팀 부분유출 시안에서
+    "편집거리 수치는 담당자에게 의미 없다"고 판단한 것과 같은 기준).</li>
+  <li>상태③에서 "왜 안 봤는지"를 화면 문구로 설명하지 않는다(예: "절차형 즉답이라 검색 안 함").
+    있어야 할 게 없어지는 것 자체가 설명이다. 궁금하면 챗봇(ⓘ)에서 풀이한다 — "화면엔 정체성
+    한 줄과 ⚠경고만" 원칙.</li>
+  <li>아이콘을 바꾸지 않는다(위 §2 콜아웃) — 색과 문구만으로 가른다.</li>
+  <li>문구는 과제가 제안한 전체 문장형("찾아본 자료 — <u>답의 근거는 아닙니다</u>", 11자)이 아니라
+    압축형("근거 아님", 5자)을 썼다 — 상태①의 기존 문법("근거:")도 이미 압축형이라 톤을 맞췄고,
+    380px에서 6글자(약 60~70px) 차이가 줄바꿈 여부를 가르는 경계라서(§6) 짧은 쪽을 골랐다.</li>
+</ul>
+
+<!-- ════════════════════════ 5. 380 / 538 나란히 · before-after ════════════════════════ -->
+<h2><span class="no">§5</span> 380px ↔ 538px 나란히 — before/after 실측 4건</h2>
+<div class="demo-note">
+  이 구역은 <b>실제로 동작하는 정적 HTML/JS</b>다(서버·API 호출 없음, 순수 예시 데이터).
+  380px = 도킹 콘솔 <b>기본값</b>(<code>app.html:170 var(--console-w, 380px)</code> — 가장 흔한 경우).
+  538px = 분리창 폭(<code>main.ts:698 Math.max(420, workArea.width*0.28)</code>, 1920px 모니터 기준
+  1920×0.28≈538). 각 말풍선 안의 "지금/이후" 두 줄은 <b>비교를 위해 나란히 둔 편집 주석</b>이다 —
+  실제 제품은 한 번에 하나만 보여준다. 아래 스위치를 켜면 "이후"만 남아 실사용 화면처럼 보인다.
+</div>
+<div class="switch-row">
+  <div class="switch" id="modeSwitch" role="switch" aria-checked="false" tabindex="0"><i></i></div>
+  <span id="modeLabel">두 줄 다 보기(비교 모드) — 클릭하면 "이후"만 남습니다</span>
+</div>
+<div class="frames">
+  <div class="frame">
+    <div class="fw"><b>380px</b> — 도킹 기본값(가장 흔한 경우)<span class="src">app.html:170</span></div>
+    <div class="win" style="width:380px">
+      <div class="win-bar">GIJO AS — 대화</div>
+      <div class="cs-host"><div class="cs-body" id="host380"></div></div>
+    </div>
+  </div>
+  <div class="frame">
+    <div class="fw"><b>538px</b> — 분리창(1920px 모니터 기준)<span class="src">main.ts:698</span></div>
+    <div class="win" style="width:538px">
+      <div class="win-bar">GIJO AS — 대화 <span class="muted">(별도 창)</span></div>
+      <div class="cs-host"><div class="cs-body" id="host538"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════ 6. 밀도 숫자 ════════════════════════ -->
+<h2><span class="no">§6</span> 밀도 숫자 — 이 창이 지금 직접 잰 값</h2>
+<p class="muted" style="font-size:11.75px">아래 표는 <code>Range.getClientRects()</code>로 실제 줄바꿈 수를,
+  <code>getBoundingClientRect()</code>로 실제 렌더 높이를 §5의 그 DOM에서 그대로 읽어 채운다
+  (하드코딩 없음 — 위 §5 배지를 고치면 이 표도 같이 바뀐다). 상태① 열은 "지금(오늘, 버그가 있는
+  그대로)", 상태②/③ 열은 "이후(이 시안)"다.</p>
+<table>
+  <thead><tr><th>예시</th><th>폭</th><th>상태①(지금)</th><th>상태②/③(이후)</th><th>증감</th></tr></thead>
+  <tbody id="densityBody"><tr><td colspan="5" class="muted">측정 중… (JS 실행 후 채워집니다)</td></tr></tbody>
+</table>
+<p class="muted" style="font-size:11.5px">
+  제작 중 손대략값(검증용, 11.5px/700weight 기준 한글≈11.5px·영숫자≈6.5px 폭 가정) —
+  문서 1건 예시(2019 감사)는 380px에서 1줄→2줄(+1줄), 문서 2건 예시(ISMS·해외지사)는 380px에서
+  이미 2줄→2줄(줄 수 변화 없음, 둘째 줄만 길어짐), 538px에서는 문서 2건까지도 대체로 1줄에 들어간다.
+  <b>정확한 값은 위 §6 표(실측)를 기준으로 삼는다</b> — 이 문단은 만드는 동안의 사전 검산일 뿐이다.
+</p>
+
+<!-- ════════════════════════ 7. 자가점검 ════════════════════════ -->
+<h2><span class="no">§7</span> 제품 원칙 자가점검</h2>
+<ul class="checklist">
+  <li><b>어려운 용어에 쉬운 풀이</b> — "근거 아님"이 낯설 수 있어 ⓘ(screenguide) 풀이 추가를
+    §8 구현 범위에 넣었다. 화면 자체에는 설명 문장을 안 심는다(아래 항목과 연결).</li>
+  <li><b>화면엔 정체성 한 줄과 ⚠경고만</b> — 배지 자체가 이미 그 원칙의 산물이다(사용법 설명이 아니라
+    상태 표시 한 줄). 이번 변경도 문구·색 외에 새 UI 요소를 늘리지 않았다(원문 접기도 안 늘림, §4).</li>
+  <li><b>모든 사용자 텍스트 한글</b> — 신규 문구 "찾아본 자료 — 근거 아님" 전부 한글, 영문 상태값
+    노출 없음.</li>
+  <li><b>자체완결 HTML</b> — 외부 CDN·웹폰트·원격 이미지 0개. 더블클릭으로 바로 열린다.</li>
+  <li><b>정직한 구현</b> — 이 파일 안의 토글·접기만 실제로 동작한다. "실측" 표기가 붙은 숫자는
+    전부 이 창이 직접 잰 값이고, 손대략값은 별도로 라벨을 붙였다. 서버 통신 0건.</li>
+</ul>
+
+<!-- ════════════════════════ 8. 구현 범위 ════════════════════════ -->
+<h2><span class="no">§8</span> 구현 범위(승인 시) — 참고용, 이번 작업에서는 미착수</h2>
+<ul class="plain">
+  <li><code>client/src/renderer/pages/chatparts.js</code> — <code>quotes()</code>, 그리고
+    <code>console.js</code>의 <code>attachQuotes()</code> 두 곳에 상태② 분기 추가. 서버가 신호를
+    실어 보내면(아래 항목) <code>sources</code> 옆의 그 값으로 <code>.gcp-src</code> vs
+    <code>.gcp-src2</code>를 고른다.</li>
+  <li><code>server/src/engine/dispatcher.ts</code> — 답 조립 결과에 이미 있는
+    <code>ragResult.약한근거만</code> 계열 신호를 응답 payload에 한 겹 더 실어 보낸다(지금은 배너
+    문구에만 쓰이고 버려진다). <b>새 계산 없음 — 배선 작업.</b></li>
+  <li><code>server/src/engine/incidentsteps.ts</code> 등 결정적 절차 템플릿 통로 —
+    <code>actioncheck.ts</code>처럼 <code>sources: []</code>를 스스로 선언(이미 있는 패턴 재사용)
+    → <code>근거재검색대상인가()</code>가 자동으로 재검색을 건너뛴다.</li>
+  <li>서버 테스트 — <code>sourcebadge</code> 계열에 상태② 케이스 추가, <code>drawer-audit.mjs</code>
+    FAIL_MARKS와 문구 겹침 없음을 재확인(이번 문구는 겹치지 않음, §조사근거·본문 확인 완료).</li>
+  <li><b>승인 전에는 위 파일을 하나도 건드리지 않는다</b> — 이 시안은 <code>mockups/근거배지/</code>
+    안에만 존재한다.</li>
+</ul>
+
+<footer>
+  mockups/근거배지/시안.html · gijo-mockup · 2026-08-13 · 제품 코드 미수정(읽기만 함:
+  chatparts.js, console.js, tone.ts, dispatcher.ts, llm.ts, sessionpatterns.ts, handover.ts, actioncheck.ts, app.html, main.ts)
+</footer>
+
+<script>
+(function(){
+  "use strict";
+  function esc(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+
+  // ── 실측 4건(운영 2026-08-13) — §1 표와 동일한 값을 그대로 쓴다(따로 베끼지 않음) ──
+  var EXNAME = {
+    1: "① ISMS 인증 취득일",
+    2: "② 해외 지사 담당자 연락처",
+    3: "③ 2019년 감사 결과(⚠근거약함)",
+    4: "④ 랜섬웨어 대응 5단계(AI 안 부름)"
+  };
+  var EXAMPLES = [
+    {
+      id: 1,
+      q: "ISMS 인증 취득일이 언제야?",
+      a: "ISMS 인증 취득일은 사내 지식 베이스에 <strong>포함되어 있지 않습니다.</strong>",
+      docs: ["GIJO_지식_보안거버넌스_표준.md", "ismsp_접근권한_검토.md"],
+      after: 2
+    },
+    {
+      id: 2,
+      q: "해외 지사 담당자 연락처 알려줘",
+      a: "해외 지사 담당자 연락처는 사내 지식 베이스에 <strong>포함되어 있지 않습니다.</strong>",
+      docs: ["유의사항.txt", "SKT 침해사고 보도자료.hwpx"],
+      after: 2
+    },
+    {
+      id: 3,
+      q: "2019년 감사 결과 알려줘",
+      // ⚠ 근거 약함 배너는 실제 llm.ts:847 문구를 그대로 옮겼다(만들어내지 않음).
+      a: "⚠ <strong>근거 약함 — 질문에 딱 맞는 사내 자료는 없습니다.</strong> 아래는 " +
+         "<strong>주변 자료로 유추한 것</strong>이니 그대로 쓰기 전에 확인해 주세요." +
+         "<br><br>2019년 감사 결과는 사내 지식 베이스에 <strong>존재하지 않습니다.</strong>",
+      docs: ["2024 하반기 사이버 위협 동향 보고서.pdf"],
+      after: 2
+    },
+    {
+      id: 4,
+      q: "랜섬웨어에 감염됐을 때 초동 대응 순서를 알려줘",
+      // 절차 내용은 이해를 돕기 위해 구성한 예시다(실제 코드 문구를 그대로 옮긴 것이 아님) — 이 시안이
+      // 다루는 것은 절차 문장이 아니라 "이 답엔 배지가 붙으면 안 된다"는 사실 하나다.
+      a: "랜섬웨어 감염 초동 대응 5단계입니다.<br><br>" +
+         "1. <strong>격리</strong> — 감염 장비를 네트워크에서 즉시 분리<br>" +
+         "2. <strong>보존</strong> — 랜섬노트·암호화 파일 목록 증거 확보<br>" +
+         "3. <strong>신고</strong> — 사내 대응팀·KISA(118) 신고<br>" +
+         "4. <strong>분석</strong> — 감염 경로·확산 범위 파악<br>" +
+         "5. <strong>복구</strong> — 백업 복구 후 원인 차단 확인",
+      docs: ["랜섬웨어_초동_대응.md", "GIJO_AS_용어사전.md", "GIJO_AS_제품소개.md"],
+      after: 3
+    }
+  ];
+
+  function badgeOldText(docs){ return "📄 근거: " + docs.slice(0, 4).join(" · "); }
+  function badgeNewText(docs){ return "📄 찾아본 자료 — 근거 아님: " + docs.slice(0, 4).join(" · "); }
+
+  function buildBubble(ex, w){
+    var afterHtml = ex.after === 2
+      ? '<div class="gcp-src2 new-el" data-measure data-ex="' + ex.id + '" data-w="' + w + '" data-state="after">' +
+          esc(badgeNewText(ex.docs)) + "</div>"
+      : '<div class="gone new-el" data-zero data-ex="' + ex.id + '" data-w="' + w + '">' +
+          '<span class="ghost">' + esc(badgeOldText(ex.docs)) + '</span>' +
+          '<span class="gone-label">배지 없음 — 사내 자료를 근거로 안 씀(참고용 설명, 실제 화면 요소 아님)</span>' +
+        "</div>";
+    var row =
+      '<div class="cs-row instr"><div class="ci">나</div><div class="cb">' +
+        '<div class="cn">나 → AI 팀</div><div class="cm">' + esc(ex.q) + "</div>" +
+      "</div></div>" +
+      '<div class="cs-row"><div class="ci">🧭</div><div class="cb">' +
+        '<div class="cn">AI 팀</div>' +
+        '<div class="cm">' + ex.a + "</div>" +
+        '<div class="lbl old-el">지금(오늘 · 버그)</div>' +
+        '<div class="gcp-src old-el" data-measure data-ex="' + ex.id + '" data-w="' + w + '" data-state="before">' +
+          esc(badgeOldText(ex.docs)) +
+        "</div>" +
+        '<div class="lbl new-el">이후(이 시안)</div>' +
+        afterHtml +
+      "</div></div>";
+    var wrap = document.createElement("div");
+    wrap.innerHTML = row;
+    return wrap;
+  }
+
+  function mount(){
+    ["380", "538"].forEach(function(w){
+      var host = document.getElementById("host" + w);
+      EXAMPLES.forEach(function(ex){
+        var b = buildBubble(ex, w);
+        while (b.firstChild) host.appendChild(b.firstChild);
+      });
+    });
+  }
+
+  // ── 실측: 실제 렌더 결과를 이 창에서 직접 잰다(하드코딩 없음) ──────────────
+  function measureAll(){
+    var recs = {};
+    document.querySelectorAll("[data-measure]").forEach(function(el){
+      var range = document.createRange();
+      range.selectNodeContents(el);
+      var rectsRaw = range.getClientRects();
+      var rects = [];
+      for (var i = 0; i < rectsRaw.length; i++){
+        if (rectsRaw[i].width > 0.5 && rectsRaw[i].height > 0.5) rects.push(rectsRaw[i]);
+      }
+      var lines = rects.length || 1;
+      var box = el.getBoundingClientRect();
+      var cs = getComputedStyle(el);
+      var mt = parseFloat(cs.marginTop) || 0;
+      var total = box.height + mt;
+      var cap = document.createElement("div");
+      cap.className = "m-cap";
+      cap.textContent = "실측 " + lines + "줄 · 배지 " + Math.round(box.height) + "px + 여백 " +
+        Math.round(mt) + "px = " + Math.round(total) + "px";
+      el.insertAdjacentElement("afterend", cap);
+      var key = el.getAttribute("data-ex") + "|" + el.getAttribute("data-w") + "|" + el.getAttribute("data-state");
+      recs[key] = { lines: lines, total: total };
+    });
+    document.querySelectorAll("[data-zero]").forEach(function(el){
+      var key = el.getAttribute("data-ex") + "|" + el.getAttribute("data-w") + "|after";
+      recs[key] = { lines: 0, total: 0 };
+      var cap = document.createElement("div");
+      cap.className = "m-cap";
+      cap.textContent = "실측 0줄 · 0px(배지 자체가 없음)";
+      el.insertAdjacentElement("afterend", cap);
+    });
+    renderDensityTable(recs);
+  }
+
+  function renderDensityTable(recs){
+    var body = document.getElementById("densityBody");
+    var rows = "";
+    [1, 2, 3, 4].forEach(function(ex){
+      ["380", "538"].forEach(function(w){
+        var b = recs[ex + "|" + w + "|before"];
+        var a = recs[ex + "|" + w + "|after"];
+        if (!b || !a) return;
+        var diffPx = Math.round(a.total - b.total);
+        var diffLines = a.lines - b.lines;
+        var diffColor = diffPx > 0 ? "#f5928a" : diffPx < 0 ? "#6fdcb5" : "var(--muted)";
+        var diffTxt = (diffPx > 0 ? "+" : "") + diffPx + "px" +
+          (diffLines !== 0 ? " · " + (diffLines > 0 ? "+" : "") + diffLines + "줄" : " · 줄수 동일");
+        rows += "<tr><td>" + EXNAME[ex] + "</td><td>" + w + "px</td>" +
+          "<td>" + b.lines + "줄 · " + Math.round(b.total) + "px</td>" +
+          "<td>" + a.lines + "줄 · " + Math.round(a.total) + "px</td>" +
+          '<td style="color:' + diffColor + ';font-weight:800">' + diffTxt + "</td></tr>";
+      });
+    });
+    body.innerHTML = rows || '<tr><td colspan="5" class="muted">측정 실패 — DOM 구조를 확인하세요</td></tr>';
+  }
+
+  // ── 상태① 스펙 카드의 근거 원문 접기(실제로 동작) ──────────────────────────
+  function wireFold(){
+    var head = document.querySelector('#specFold [data-fold]');
+    if (!head) return;
+    var body = head.nextElementSibling;
+    var open = false;
+    head.addEventListener("click", function(){
+      open = !open;
+      body.style.display = open ? "block" : "none";
+      head.textContent = (open ? "▾" : "▸") + " 📄 근거 원문 1대목 — 답이 맞는지 확인";
+    });
+  }
+
+  // ── 비교 모드 스위치(실제로 동작 — body 클래스 토글) ───────────────────────
+  function wireSwitch(){
+    var sw = document.getElementById("modeSwitch");
+    var label = document.getElementById("modeLabel");
+    function toggle(){
+      var on = document.body.classList.toggle("after-only");
+      sw.classList.toggle("on", on);
+      sw.setAttribute("aria-checked", on ? "true" : "false");
+      label.textContent = on
+        ? '"이후"만 보기(실사용 미리보기) — 클릭하면 "지금"도 같이 보입니다'
+        : '두 줄 다 보기(비교 모드) — 클릭하면 "이후"만 남습니다';
+    }
+    sw.addEventListener("click", toggle);
+    sw.addEventListener("keydown", function(e){ if (e.key === "Enter" || e.key === " "){ e.preventDefault(); toggle(); } });
+  }
+
+  document.addEventListener("DOMContentLoaded", function(){
+    mount();
+    wireFold();
+    wireSwitch();
+    // 레이아웃이 자리잡은 다음 프레임에 재는 것이 안전(글꼴 로딩 등) — rAF 두 번으로 충분.
+    requestAnimationFrame(function(){ requestAnimationFrame(measureAll); });
+  });
+})();
+</script>
+</body>
+</html>

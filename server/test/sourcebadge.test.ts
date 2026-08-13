@@ -137,3 +137,60 @@ describe("★ 근거 배지 3상태 (2026-08-13)", () => {
     expect(wid, "분리창이 근거세기를 안 넘긴다").toMatch(/P\.quotes\(typing[\s\S]{0,140}?근거세기/);
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// ★ 4-ⓑ 마무리 (2026-08-13) — ⓐ 남은 코드 템플릿 전부 + ⓑ 「강한 근거인데 없다-답」 강등
+import { 없다는답인가 } from "../src/engine/dispatcher";
+
+describe("★ 없다는답인가 — 강함→약함 강등 판정 (좁게, 머리만)", () => {
+  it("실측 3건 꼴을 잡는다", () => {
+    expect(없다는답인가("ISMS 인증 취득일은 사내 지식 베이스에 포함되어 있지 않습니다. 인증서를 확인하세요.")).toBe(true);
+    expect(없다는답인가("해외 지사 보안 담당자 연락처는 제공된 사내 지식 베이스에 포함되어 있지 않습니다.")).toBe(true);
+    expect(없다는답인가("해당 정보는 기업의 보안 감사 결과로, 관련 기록이 존재하지 않습니다.")).toBe(true);
+  });
+  it("★ 멀쩡한 답은 안 잡는다 — 강등 오탐은 좋은 답의 근거를 깎는다", () => {
+    expect(없다는답인가("제로트러스트는 네트워크 안에 있다는 이유만으로 믿지 않는 원칙입니다.")).toBe(false);
+    expect(없다는답인가("증거 보전이 먼저다. 지우거나 재부팅하지 않는다.")).toBe(false);
+    // 뒤에 딸린 단서는 결론이 아니다 — 머리 140자만 보므로 안 걸린다.
+    expect(없다는답인가("접속기록은 최소 1년 보관합니다. " + "상세 항목은 계정·일시·IP 등입니다. ".repeat(6) + "일부 세부 수치는 자료에 없습니다.")).toBe(false);
+  });
+  it("강등이 배선돼 있다 — 판정만 있고 안 부르면 쓰인 적 없는 설계다", () => {
+    const src = fs2.readFileSync(new URL("../src/engine/dispatcher.ts", import.meta.url), "utf8");
+    expect(src).toMatch(/없다는답인가\(String\(result\.output/);
+  });
+});
+
+describe("★ ⓐ 남은 코드 템플릿 전부가 sources를 선언한다 (정찰 전수 목록)", () => {
+  const disp2 = fs2.readFileSync(new URL("../src/engine/dispatcher.ts", import.meta.url), "utf8");
+  for (const [이름, 앵커] of [
+    ["FAQ 지식카드", "output: 지식카드.answer"],
+    ["화면 위치안내", "output: 화면위치안내(찾는화면.screen"],
+    ["방법질문 화면안내", "output: formatScreenGuide(방법화면.screen"],
+    ["지식 정리(kbhygiene)", "output: formatKbHygiene"],
+    ["공격 경로", "output: formatAttackPaths()"],
+    ["Shadow AI", "output: formatShadowAi()"],
+    ["장애 초동절차", "output: 장애초동절차(instructionText)"],
+    ["순서 안내(howto)", "output: howToMarkdown(howTo)"],
+  ] as [string, string][]) {
+    it(`${이름}`, () => {
+      const i = disp2.indexOf(앵커);
+      expect(i, `${이름} 앵커를 못 찾았다: ${앵커}`).toBeGreaterThan(-1);
+      expect(disp2.slice(i, i + 250), `${이름} 이 sources를 선언하지 않는다`).toContain("sources: []");
+    });
+  }
+  it("업무 도구 7종이 재검색 제외 목록에 있다 — toolCalls 경로는 이름으로 거른다", () => {
+    for (const t of ["reopen_task", "complete_task", "work_steps", "routine_tasks", "step_done", "step_undo", "add_task"]) {
+      expect(disp2, `${t} 가 집계조회도구_RE에 없다`).toContain(t);
+    }
+  });
+});
+
+// 운영 재실측(2026-08-13 두 번째)이 잡은 꼴 — 「기록되어 있지 않습니다」가 빠져 있었다.
+it("★ 강등 패턴 보강 — 실측에서 샌 꼴을 못박는다", () => {
+  expect(없다는답인가("해외 지사 보안 담당자 연락처는 사내 지식 베이스에 기록되어 있지 않습니다.")).toBe(true);
+});
+
+it("★ 어미 변주 전부 — 실측 회차마다 바뀐 꼴(포함·기록·명시)을 한 규칙이 덮는다", () => {
+  expect(없다는답인가("해외 지사 보안 담당자 연락처는 사내 지식 베이스에 명시되어 있지 않습니다.")).toBe(true);
+  expect(없다는답인가("그 항목은 시스템에 저장되어 있지 않습니다.")).toBe(true);
+});

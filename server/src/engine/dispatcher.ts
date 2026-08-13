@@ -742,7 +742,7 @@ export function 근거재검색대상인가(
   //   (2026-08-10 Mac 발견). transaction·reaction 같은 이름이 생기면 조용히 걸린다 →
   //   `cti`를 실제 도구 `action_check`로 바꿔 부분일치 함정을 없앤다(CTI 조회 도구가 생기면 그때 추가).
   const 집계조회도구_RE =
-    /asset|finding|action_check|vuln|sbom|analys|scan|hardening|today|urgent|kpi|brief|posture|coverage|_status|report_|audit|packages|aibom|ontology|knowledge|recent|doc_|time_saved|compliance|maintenance|adapter|model_|threat|exposed|search|law_lookup|explain|article/i;
+    /asset|finding|action_check|vuln|sbom|analys|scan|hardening|today|urgent|kpi|brief|posture|coverage|_status|report_|audit|packages|aibom|ontology|knowledge|recent|doc_|time_saved|compliance|maintenance|adapter|model_|threat|exposed|search|law_lookup|explain|article|reopen_task|complete_task|work_steps|routine_tasks|step_done|step_undo|add_task/i;
   const 데이터집계로답함 =
     (result.steps ?? []).some((s) => (s.assetIds?.length ?? 0) + (s.findingCount ?? 0) > 0) ||
     (result.toolCalls ?? []).some((c) => 집계조회도구_RE.test(c.tool));
@@ -754,6 +754,28 @@ export function 근거재검색대상인가(
     );
   if (안내형답) return false;
   return true;
+}
+
+/**
+ * 답 머리가 「그 정보는 없다」고 말하는가 — 배지 강등용 (2026-08-13 · 4-ⓑ 마무리 ⓑ).
+ *
+ * ■ 무엇을 잡나(운영 실측 3건): 검색 조각이 **가깝게** 잡혀 근거세기="강함"인데 답은
+ *   "ISMS 인증 취득일은 사내 지식 베이스에 포함되어 있지 않습니다" — 그런 답에 초록
+ *   「📄 근거」가 붙으면 담당자가 그 문서를 보고서 출처로 적는다.
+ *   답이 스스로 「없다」고 말했으면 그 문서들은 근거가 아니라 **찾아본 자료**다 → 약함으로 강등.
+ *
+ * ⚠ 낱말 판정의 한계를 알고 좁게 쓴다:
+ *   · **머리(첫 140자)만** 본다 — 뒤에 딸린 단서("…는 확인되지 않습니다")는 결론이 아니다.
+ *   · 정보 부재 꼴만 잡는다(정보/자료/내용/결과/기록 + 없습니다 계열). 「취약점이 없습니다」 같은
+ *     데이터 0건 답은 애초에 데이터집계 경로라 여기(재검색 대상)에 안 온다.
+ *   · 강등만 한다 — 없다-답을 막거나 바꾸지 않는다(정직한 답이다. 배지만 정직해지면 된다).
+ */
+export function 없다는답인가(output: string): boolean {
+  const 머리 = String(output ?? "").replace(/\s+/g, " ").slice(0, 140);
+  return /(정보|자료|내용|결과|기록|명단|목록|연락처|취득일)(는|가|은|이)?\s*(사내|지식\s*베이스|시스템)?[^.]{0,30}(없습니다|포함되어 있지 않|담겨 있지 않|존재하지 않|확인되지 않)/.test(머리)
+    // ⚠ 동사를 낱낱이 쫓지 않는다 — 실측마다 어미가 바뀌었다(포함→기록→명시…). 「~되어 있지 않」
+    //   꼴 전체를 잡는다. 머리 140자 + 재검색 대상(RAG 답)만 보므로 데이터 0건 답은 안 걸린다.
+    || /되어 있지 않/.test(머리);
 }
 
 /** 답이 RAG 검색·작성에 쓰는 질문 = 맥락(선택·대화) + 현재 지시. **배지도 이 질문으로** 근거를
@@ -818,6 +840,9 @@ async function computeOfferSignals(
           //     (실측 8건 중 3건). 그건 답 문장을 봐야 하는데 낱말 판정이라 여기 두지 않는다 —
           //     화면이 답과 배지를 나란히 보여 주므로, 우선 **약한 것부터 정직해진다.**
           근거세기 = graded.약한근거만 ? "약함" : "강함";
+          // ⓑ 답이 스스로 「없다」고 말했으면 강함이어도 **약함으로 강등**한다(위 없다는답인가 머리말).
+          //   실측 3건(ISMS·지사 연락처·임원 명단)이 이 자리다 — 조각은 가까운데 답은 없다고 말한다.
+          if (근거세기 === "강함" && 없다는답인가(String(result.output ?? ""))) 근거세기 = "약함";
           sources = [...new Set(relevant.map((c) => c.documentId).filter(Boolean))];
           // ★ 문서 **이름**만으로는 담당자가 답을 검증할 수 없다(2026-08-01 실측).
           //   실제 사고: 문서에 "미사용 룰 37개"라고 적혀 있는데 7B가 "27"이라고 답했다.
@@ -911,7 +936,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   if (지식카드) {
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
     completeTask(task.id);
-    return { task, route: { agentId: "orchestrator", action: "chat" }, output: 지식카드.answer };
+    return { task, route: { agentId: "orchestrator", action: "chat" }, output: 지식카드.answer, sources: [] };
   }
 
   // ★ "내 업무 화면 어디 갔어?" — 없앤 메뉴를 찾는 말(2026-08-01, 메뉴 폐지).
@@ -1070,6 +1095,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
       task,
       route: { agentId: "orchestrator", action: "chat" },
       output: howToMarkdown(howTo),
+      sources: [], // 코드가 낸 순서 안내다(4-ⓑ) — 배지 재검색이 무관한 문서를 붙이지 않게
       ...(howTo.page ? { openScreen: { page: howTo.page, label: howTo.where } } : {}),
     };
   }
@@ -1119,6 +1145,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
       task,
       route: { agentId: "orchestrator", action: "chat" },
       output: 화면위치안내(찾는화면.screen, 찾는화면.title),
+      sources: [], // 코드가 낸 안내다(4-ⓑ) — 안 실으면 배지 재검색이 무관한 문서를 붙인다
       openScreen: { page: 찾는화면.screen, label: 찾는화면.title },
     };
   }
@@ -1136,6 +1163,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
       task,
       route: { agentId: "orchestrator", action: "chat" },
       output: formatScreenGuide(방법화면.screen, instructionText),
+      sources: [], // 코드가 낸 안내다(4-ⓑ)
       openScreen: { page: 방법화면.screen, label: 방법화면.title },
     };
   }
@@ -1156,7 +1184,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     const { scanKbHygiene, formatKbHygiene } = await import("./kbhygiene.js");
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P3" });
     completeTask(task.id);
-    return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatKbHygiene(await scanKbHygiene()) };
+    return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatKbHygiene(await scanKbHygiene()), sources: [] };
   }
 
   // "공격 경로 / 도달성 분석" — 3소스 상관으로 진입→거점→인접 경로를 결정적으로 구성.
@@ -1164,7 +1192,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     const { formatAttackPaths } = await import("./analysishub.js");
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P2" });
     completeTask(task.id);
-    return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatAttackPaths() };
+    return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatAttackPaths(), sources: [] };
   }
 
   // "Shadow AI 점검해줘 / 미등록 AI 있어?" — 시스템 관측 신호로 미등록 모델을 결정적으로 찾는다.
@@ -1172,7 +1200,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     const { formatShadowAi } = await import("./shadowai.js");
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P2" });
     completeTask(task.id);
-    return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatShadowAi() };
+    return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatShadowAi(), sources: [] };
   }
 
   // "이 취약점 조치 방법 알려줘" — 결정적 조치 플레이북으로 답한다(LLM 없이). 단계·담당·SLA를
@@ -1282,7 +1310,7 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   if (장애질문인가(instructionText)) {
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P1" });
     completeTask(task.id);
-    return { task, route: { agentId: "orchestrator", action: "chat" }, output: 장애초동절차(instructionText) };
+    return { task, route: { agentId: "orchestrator", action: "chat" }, output: 장애초동절차(instructionText), sources: [] };
   }
 
   // ★ 침해사고 의심 — 결정적 초동 절차로 즉답한다(2026-08-10, 계획서 전-4).

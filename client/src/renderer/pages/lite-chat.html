@@ -95,6 +95,12 @@
     var 대기 = 줄("ai", '<span style="color:var(--muted)">…생각 중</span>');
     try {
       var r = await g.sendInstruction(글, 세션);
+      // ⚠ 결재판(2026-08-13, win) — 위 머리 주석과 아래 ⚠경고가 「확인(결재)을 거쳐 실행」을
+      //   **약속**하는데, 그리는 코드가 없었다. 서버는 쓰기 지시에 approval을 돌려주고 실행을
+      //   멈추므로, 안 그리면 쓰기 지시가 **조용히 증발**한다(공용 감시 dispatchentrances가 잡음).
+      //   본 제품 분리창 결재판(appendApproval)의 축소판 — 다리는 공용 preload의
+      //   approveAgentTool 그대로다.
+      if (r && r.approval) { renderApproval(r.approval, 대기); return; }
       var out = String((r && (r.output || r.reply || r.text)) || "");
       var tools = (r && r.toolCalls || []).map(function (t) { return t.tool; })
         .filter(function (t) { return t && t !== "사내지식"; });
@@ -105,6 +111,45 @@
     } finally {
       보내는중 = false; btn.disabled = false; log.scrollTop = log.scrollHeight; inp.focus();
     }
+  }
+
+  // 쓰기 작업 결재판 — 실행 전에 도구·인자를 보여 주고, 승인해야 실제로 실행한다.
+  // (본 제품 분리창 결재판(appendApproval)의 축소판 — 값 수정·필수값 잠금·실행 결과까지.)
+  function renderApproval(ap, 자리) { // 이름은 공용 감시(dispatchentrances) 계약 — attachApproval|appendApproval|renderApproval
+    var fields = ap.fields || [];
+    자리.innerHTML =
+      '<div style="font-weight:700">🗂️ 실행 승인 — ' + esc(ap.label || ap.tool) + "</div>" +
+      '<div style="color:var(--muted);font-size:12px;margin:4px 0 6px">지시를 아래와 같이 정리했습니다. 값을 확인한 뒤 승인하면 실행합니다.</div>' +
+      fields.map(function (f) {
+        return '<div style="margin:3px 0"><span style="color:var(--muted);font-size:12px">' + esc(f.label || f.key) + (f.required ? " *" : "") + "</span> " +
+          '<input class="ap-in" data-k="' + esc(f.key) + '" value="' + esc(f.value || "") + '" placeholder="' + esc(f.hint || "") + '" style="width:60%;background:transparent;border:1px solid rgba(255,255,255,.16);border-radius:6px;padding:3px 7px;color:inherit"></div>';
+      }).join("") +
+      '<div style="margin-top:7px"><button class="ap-go">✓ 승인하고 실행</button> <button class="ap-no">취소</button></div>';
+    var go = 자리.querySelector(".ap-go"), no = 자리.querySelector(".ap-no");
+    var inputs = Array.prototype.slice.call(자리.querySelectorAll(".ap-in"));
+    var collect = function () { var o = {}; inputs.forEach(function (i) { o[i.dataset.k] = i.value.trim(); }); return o; };
+    // 필수값이 비면 승인을 잠근다(서버도 재검증하지만 화면에서 먼저 막는다).
+    var required = fields.filter(function (f) { return f.required; }).map(function (f) { return f.key; });
+    var sync = function () {
+      var missing = required.filter(function (k) { return !collect()[k]; });
+      go.disabled = missing.length > 0;
+      go.textContent = missing.length ? "✓ 승인 (" + missing.length + "개 입력 필요)" : "✓ 승인하고 실행";
+    };
+    inputs.forEach(function (i) { i.addEventListener("input", sync); });
+    sync();
+    no.addEventListener("click", function () { 자리.innerHTML = "✕ 실행하지 않았습니다 — " + esc(ap.label || ap.tool); });
+    go.addEventListener("click", async function () {
+      go.disabled = true; go.textContent = "실행 중…";
+      try {
+        var r = await g.approveAgentTool(ap.tool, collect(), ap.instruction || "");
+        자리.innerHTML = "✅ <b>실행 완료</b> — " + esc(ap.tool) + "<br>" + esc(String((r && r.output) || ""));
+      } catch (e) {
+        go.disabled = false; go.textContent = "✓ 승인하고 실행";
+        자리.innerHTML += '<div style="color:var(--red)">실행 실패: ' + esc(오류문구(e)) + "</div>";
+      }
+      log.scrollTop = log.scrollHeight;
+    });
+    log.scrollTop = log.scrollHeight;
   }
 
   document.getElementById("send").addEventListener("click", 보내기);
