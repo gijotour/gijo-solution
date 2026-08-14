@@ -2042,27 +2042,40 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       //     이미 갖고 있다. 두 자리에서 켜면 켜는 규칙이 두 벌이 된다. 여기는 고르고 데려간다.
       const baseEl = document.getElementById("teamBase");
       if (baseEl) {
+        // ⚠ **담당자(비-admin)도 원격 여부를 봐야 한다**(검토관 지적 H4). remoteLlmGet은
+        //   admin 전용이라, 담당자 화면에서는 원격이 켜져 있어도 로컬 모델이 답하는 것처럼
+        //   보이고 「질문이 VPN으로 전송됩니다」 경고를 못 봤다 — 그 경고가 가장 필요한 사람이
+        //   질문을 입력하는 담당자다. 그래서 **보는 것은 where(전원 공개), 바꾸는 것은 admin**.
         let 원격 = null;
-        try { 원격 = await window.gijo.remoteLlmGet(); } catch (e) { /* 옛 서버면 로컬만 보인다 */ }
-        const 원격켜짐 = !!(원격 && 원격.enabled);
+        let 원격켜짐 = false;
+        try {
+          const w = await window.gijo.remoteLlmWhere();
+          원격켜짐 = !!(w && w.remote);
+        } catch (e) { /* 옛 서버면 로컬만 보인다 */ }
+        // 주소까지 보여주는 것은 admin의 몫이다(담당자에게는 「나간다」는 사실만).
+        try { 원격 = await window.gijo.remoteLlmGet(); } catch (e) { /* 담당자는 여기서 403 — 정상 */ }
         const 칩 = (on, 라벨, 힌트) =>
           `<span class="basesrc" data-src="${on ? "remote" : "local"}" title="${힌트}" ` +
           `style="cursor:pointer;font-size:11px;font-weight:700;border-radius:999px;padding:2px 8px;margin-right:5px;` +
           `border:1px solid ${on === 원격켜짐 ? "var(--teal,#1eb980)" : "var(--border)"};` +
           `color:${on === 원격켜짐 ? "var(--teal,#1eb980)" : "var(--muted)"}">${라벨}</span>`;
+        // ⚠ **경고는 담당자에게도 보인다**(H4). 칩(고르는 길)은 admin에게만 — 담당자가 눌러도
+        //   바꿀 수 없는 자리로 데려가면 헛걸음이다. 하지만 「내 질문이 나간다」는 사실은
+        //   질문을 입력하는 사람이 알아야 한다.
+        const 경고 = 원격켜짐
+          ? `<span style="color:var(--amber,#f0a020);font-size:11.5px">⚠ 질문이 VPN으로 원격 GPU에 전송됩니다</span>`
+          : "";
         const 고르는줄 = 원격
           ? `<div style="margin-top:6px">` +
             칩(false, "💻 이 PC", "이 PC의 GPU로 돌립니다") +
             칩(true, "🖧 원격 GPU(VPN)", "사내·집의 큰 GPU를 VPN으로 빌려 씁니다") +
-            (원격켜짐
-              ? `<span style="color:var(--amber,#f0a020);font-size:11.5px">⚠ 질문이 VPN으로 원격 GPU에 전송됩니다</span>`
-              : "") +
+            경고 +
             `</div>`
-          : "";
+          : (경고 ? `<div style="margin-top:6px">${경고}</div>` : "");
         baseEl.innerHTML = 원격켜짐
           ? `<span style="font-size:16px">🖧</span><div><b>기반 두뇌</b> — 원격 GPU` +
             `<span class="badge b-teal" style="margin-left:6px">VPN</span>` +
-            `<div style="color:var(--muted);font-size:11.5px;margin-top:2px">${esc(원격.url || "")} — 이 PC의 모델 대신 원격이 답합니다. 주소·끄기는 아래 「원격 GPU(VPN)」에서.</div>${고르는줄}</div>`
+            `<div style="color:var(--muted);font-size:11.5px;margin-top:2px">${원격 ? esc(원격.url || "") + " — " : ""}이 PC의 모델 대신 원격이 답합니다.${원격 ? " 주소·끄기는 아래 「원격 GPU(VPN)」에서." : ""}</div>${고르는줄}</div>`
           : (team.base.modelId
             ? `<span style="font-size:16px">🧠</span><div><b>기반 두뇌</b> — ${esc(team.base.modelId)}` +
               `<span class="badge ${team.base.running ? "b-teal" : "b-muted"}" style="margin-left:6px">${team.base.running ? "실행중" : "정지"}</span>` +
@@ -2508,21 +2521,26 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     on.disabled = !!c.airgap;
     row.style.display = c.enabled ? "" : "none";
     if (c.enabled) {
-      // 이 기계의 VPN 주소는 서버가 모른다(랜카드가 여럿이면 어느 것인지 고를 수 없다).
-      // 그래서 **지금 접속에 쓰고 있는 호스트**를 바탕으로 만들고, 사설이 아니면 그렇다고 말한다.
-      var 서버주소 = "";
-      try { 서버주소 = new URL(await window.gijo.getServerUrl()).hostname; } catch (e) {}
-      var 사설 = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)/.test(서버주소);
+      // ⚠ 사설 여부 판정을 화면에서 다시 만들지 않는다(검토관 지적 M6) — 서버가 airgap.ts
+      //   한 곳으로 판정해 `addressIsPrivate`로 내려준다. 화면이 정규식을 따로 뒀을 때
+      //   서버와 달라서(127.x 누락) 정상 상태에서도 경고가 항상 떴다.
+      // 주소도 서버가 **이 연결을 받은 주소**(seenAddress)를 알려준다 — 화면이 접속한 그 주소가
+      //   곧 상대가 쓸 주소다.
+      var 서버주소 = c.seenAddress || "";
+      if (!서버주소) { try { 서버주소 = new URL(await window.gijo.getServerUrl()).hostname; } catch (e) {} }
       addr.value = "http://" + (서버주소 || "이-PC의-VPN-주소") + ":" + c.port + "/api/llm/serve/v1";
-      msg.innerHTML = 사설
+      msg.innerHTML = c.addressIsPrivate
         ? '<div class="hint">저쪽 GIJO의 「원격 GPU」 칸에 위 주소를 넣고 <b>연결 테스트</b>를 누르면 됩니다.</div>'
-        : '<div class="hint" style="color:var(--amber)">⚠ 지금 접속 주소(' + esc(서버주소 || "없음") + ')가 VPN 주소가 아닙니다 — 위 주소의 앞부분을 <b>이 PC의 VPN 주소</b>(10.x 등)로 바꿔서 알려주세요. 붙는 쪽은 사설 주소만 받습니다.</div>';
+        : '<div class="hint" style="color:var(--amber)">⚠ 이 주소(' + esc(서버주소 || "없음") + ')는 VPN 대역이 아닙니다 — 앞부분을 <b>이 PC의 VPN 주소</b>(10.x 등)로 바꿔서 알려주세요. 붙는 쪽은 사설 주소만 받습니다.</div>';
     } else {
       msg.innerHTML = "";
     }
     document.getElementById("serveCopy").onclick = function () {
+      // 실패를 조용히 넘기지 않는다 — 복사가 안 됐는데 됐다고 믿으면 빈 주소를 상대에게 준다.
       navigator.clipboard.writeText(addr.value).then(function () {
         msg.innerHTML = '<div class="hint" style="color:var(--teal)">복사했습니다.</div>';
+      }).catch(function () {
+        msg.innerHTML = '<div class="hint" style="color:var(--red)">복사하지 못했습니다 — 위 주소를 직접 선택해 복사하세요.</div>';
       });
     };
     on.onclick = async function () {

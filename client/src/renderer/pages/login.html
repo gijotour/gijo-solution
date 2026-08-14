@@ -430,12 +430,16 @@
     // 라이트에 라이트 다운로드가 뜨는 쪽이, 표준에 안 뜨는 쪽보다 나쁘다.
     const freeBox = document.getElementById("freeBox");
     const freeMsg = document.getElementById("freeMsg");
+    const liteDlBtn = document.getElementById("liteDlBtn");
     (async () => {
       try {
         const e = await window.gijo.editionGet();
         if (e && e.현재 === "lite") return;   // 라이트면 감춘 채로
         freeBox.style.display = "";
-      } catch (err) { /* 옛 판이면 다리가 없다 — 감춘 채로 둔다 */ }
+      } catch (err) { return; /* 옛 판이면 다리가 없다 — 감춘 채로 둔다 */ }
+      // ⚠ 에어갭(봉인) 배치에서는 **내려받기를 권하지 않는다**(검토관 지적 L5) — 인터넷이 없는
+      //   기계에서 「받으세요」는 헛말이다. Smart MD는 앱 안에 있으니 그대로 둔다.
+      //   로그인 전이라 서버에 못 물으니, 열 때 실패하면 그때 정직하게 말한다(아래 openExternal).
     })();
 
     document.getElementById("smartMdBtn").addEventListener("click", async () => {
@@ -451,15 +455,18 @@
     // 라이트 설치본 배포처. 지금은 사장님 구글 드라이브가 통로다(임시) — 서버 배포로 옮기면
     // 이 주소 한 줄만 바뀐다. 폴더 링크라 설치본을 새 판으로 바꿔도 여기는 그대로다.
     const LITE_DL = "https://drive.google.com/drive/folders/1IYGXSz7aLzXP6LgGwI03fh0J8p48e4aX";
-    document.getElementById("liteDlBtn").addEventListener("click", async () => {
+    liteDlBtn.addEventListener("click", async () => {
       freeMsg.textContent = "";
       try {
-        await window.gijo.openExternal(LITE_DL);
+        // ⚠ 반환값을 본다(검토관 지적 M7) — openExternal은 실패를 예외가 아니라 {ok:false}로
+        //   돌려줄 수 있다. 안 보면 브라우저가 안 열렸는데 「열었습니다」라고 말한다.
+        const r = await window.gijo.openExternal(LITE_DL);
+        if (r && r.ok === false) throw new Error("열기 거절");
         freeMsg.style.color = "var(--muted)";
         freeMsg.textContent = "브라우저에서 받는 곳을 열었습니다 — 설치 안내서도 같은 폴더에 있습니다.";
       } catch (err) {
         freeMsg.style.color = "#ff8080";
-        freeMsg.textContent = "브라우저를 열지 못했습니다. 주소: " + LITE_DL;
+        freeMsg.textContent = "브라우저를 열지 못했습니다(인터넷이 막힌 기계일 수 있습니다). 주소: " + LITE_DL;
       }
     });
   </script>

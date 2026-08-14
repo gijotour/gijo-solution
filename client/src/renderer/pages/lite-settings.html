@@ -113,7 +113,9 @@
          같은 급의 선택지**여야 한다 — 이 PC에 GPU가 없어도 쓸 수 있다는 사실을 그때 알아야
          한다. 고른 뒤의 절차(파일로·받아서)는 아래 그대로다. -->
     <div class="where" id="whereBox">
-      <button class="wc on" id="whereLocal" type="button">
+      <!-- ⚠ 처음부터 「선택됨(on)」으로 그리지 않는다 — 상태를 읽기 전에 그러면 원격이 켜져
+           있어도 「이 PC」로 보인다(검토관 지적 M9). 선택 표시는 어디서()가 상태를 읽고 붙인다. -->
+      <button class="wc" id="whereLocal" type="button">
         <div class="wc-h">💻 이 PC에 모델 두기</div>
         <div class="wc-d">모델 파일을 이 PC에 두고 내 GPU로 돌립니다. 인터넷 없이도 됩니다. <b>NVIDIA GPU 10GB급 필요</b>.</div>
       </button>
@@ -509,32 +511,57 @@
     }
   }
 
+  // ⚠ 지금 상태를 **모듈 층위 한 곳**에 둔다(검토관 지적 M8). 예전엔 어디서()가 읽은 값을
+  //   클릭 핸들러가 계속 붙들고 있어(stale closure), 원격을 켠 뒤 「이 PC」를 누르면 끄는 자리가
+  //   아니라 파일 등록 블록으로 데려갔다 — 이 커밋이 스스로 경계한 「두 자리가 어긋난다」가
+  //   그대로 났던 자리다. 갈래 표시와 클릭 판단이 같은 값을 본다.
+  var 원격상태 = { enabled: false, airgap: false, 읽음: false };
+
   /** 상태만 다시 읽어 갈래 표시를 맞춘다(리스너는 다시 붙이지 않는다 — 중복 실행 방지). */
   async function 어디서다시() {
-    try { var c = await g.remoteLlmGet(); 어디서그리기(!!c.enabled, !!c.airgap); } catch (e) {}
+    try {
+      var c = await g.remoteLlmGet();
+      원격상태 = { enabled: !!c.enabled, airgap: !!c.airgap, 읽음: true };
+      어디서그리기(원격상태.enabled, 원격상태.airgap);
+    } catch (e) { /* 상태를 못 읽었으면 아래 안내가 그렇다고 말한다 */ }
   }
 
   async function 어디서() {
     var 로컬 = document.getElementById("whereLocal");
     var 원격 = document.getElementById("whereRemote");
+    var 안내 = document.getElementById("whereNote");
     if (!로컬 || !원격) return;
-    try {
-      var c = await g.remoteLlmGet();
-      어디서그리기(!!c.enabled, !!c.airgap);
-      원격.addEventListener("click", function () {
-        var 카드 = document.getElementById("rgpuBox");
-        if (!카드) return;
-        // 고르면 **설정하는 자리로 데려간다**. 여기서 켜지 않는다(위 주석).
+
+    // ⚠ 리스너는 **상태를 읽기 전에** 붙인다(검토관 지적 M9). 예전엔 remoteLlmGet이 실패하면
+    //   catch로 빠져 리스너가 안 붙어, 두 카드를 눌러도 아무 일이 없었다 —
+    //   4.9.0 문서함에서 겪은 「눌러도 아무 일 없다」와 같은 모양이다.
+    원격.addEventListener("click", function () {
+      var 카드 = document.getElementById("rgpuBox");
+      if (!카드 || !카드.closest("section")) return;
+      // 고르면 **설정하는 자리로 데려간다**. 여기서 켜지 않는다(위 주석).
+      카드.closest("section").scrollIntoView({ behavior: "smooth", block: "center" });
+      var url = document.getElementById("rgpuUrl");
+      if (url) url.focus();
+    });
+    로컬.addEventListener("click", function () {
+      // 원격이 켜져 있는데 이 PC를 고르면, 끄는 자리로 데려간다(끄는 것도 그 카드가 한다).
+      var 카드 = document.getElementById("rgpuBox");
+      if (원격상태.enabled && 카드 && 카드.closest("section")) {
         카드.closest("section").scrollIntoView({ behavior: "smooth", block: "center" });
-        var url = document.getElementById("rgpuUrl");
-        if (url) url.focus();
-      });
-      로컬.addEventListener("click", function () {
-        // 원격이 켜져 있는데 이 PC를 고르면, 끄는 자리로 데려간다(끄는 것도 그 카드가 한다).
-        if (c.enabled) { document.getElementById("rgpuBox").closest("section").scrollIntoView({ behavior: "smooth", block: "center" }); return; }
-        document.querySelector(".file-block").scrollIntoView({ behavior: "smooth", block: "center" });
-      });
-    } catch (e) { /* 옛 서버라 라우트가 없으면 두 갈래는 그냥 안내 없이 둔다 */ }
+        return;
+      }
+      var 파일 = document.querySelector(".file-block");
+      if (파일) 파일.scrollIntoView({ behavior: "smooth", block: "center" });
+    });
+
+    await 어디서다시();
+    // ⚠ 상태를 못 읽었으면 「이 PC 선택됨」으로 보이게 두지 않는다 — 모르는 것을 안다고 표시하면
+    //   담당자는 원격이 켜진 것을 모른 채 질문을 보낸다(정직 표기).
+    if (!원격상태.읽음) {
+      로컬.classList.remove("on");
+      원격.classList.remove("on");
+      if (안내) 안내.textContent = "지금 어디서 돌고 있는지 확인하지 못했습니다 — 아래 「원격 GPU (VPN)」 칸에서 상태를 보세요.";
+    }
   }
 
   // ── 챗 모델 등록 (2026-08-13: 챗 모델은 고객이 등록한다) ──────────────────────

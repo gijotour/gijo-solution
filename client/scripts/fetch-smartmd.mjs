@@ -43,7 +43,20 @@ if (process.argv.includes("--keep") && fs.existsSync(path.join(목적지, "index
 const 임시 = fs.mkdtempSync(path.join(os.tmpdir(), "gijo-smartmd-"));
 try {
   console.log(`Smart MD 원본을 받는 중… (${저장소})`);
-  execFileSync("git", ["clone", "--depth", "1", 저장소, 임시], { stdio: ["ignore", "pipe", "pipe"] });
+  // ⚠ 실패 사유를 화면에 보인다(검토관 지적 L3). 예전엔 stderr를 pipe로 삼켜, 게시 기계
+  //   (claude-deploy 계정)에서 SSH 키가 없어 실패해도 원인이 안 보였다. 게시는 이 단계가
+  //   조용히 실패하면 **Smart MD 없는 설치본**을 내보내게 되므로, 여기서 시끄러운 편이 낫다.
+  // ⚠ SSH가 안 되는 계정을 위해 https 폴백을 둔다 — 공개 저장소면 그쪽으로도 받아진다.
+  try {
+    execFileSync("git", ["clone", "--depth", "1", 저장소, 임시], { stdio: ["ignore", "inherit", "inherit"] });
+  } catch (e) {
+    const https판 = 저장소.replace(/^git@github\.com:/, "https://github.com/");
+    if (https판 === 저장소) throw e;
+    console.warn(`SSH로 못 받았습니다 — https로 다시 시도합니다(${https판})`);
+    fs.rmSync(임시, { recursive: true, force: true });
+    fs.mkdirSync(임시, { recursive: true });
+    execFileSync("git", ["clone", "--depth", "1", https판, 임시], { stdio: ["ignore", "inherit", "inherit"] });
+  }
 
   const 판 = (() => {
     try {

@@ -649,7 +649,11 @@ ipcMain.handle("smartmd:open", async () => {
     backgroundColor: "#262624",
     title: "GIJO Smart MD Studio — 문서 작성(무료 제공)",
     webPreferences: {
-      preload: path.join(__dirname, "preload.js"),
+      // ⚠ 제품 preload를 붙이지 않는다(검토관 지적 H6). 제품 preload는 로드 시점에 토큰을
+      //   복원해 **인증된 전 API**(터미널·파일·서버 전 라우트)를 그 창에 준다. 이 창에 실리는
+      //   코드는 **다른 저장소에서 받아온 것**이라, 저쪽 push 한 번이 그 전부를 얻게 된다.
+      //   그래서 이 창만 쓰는 최소 preload를 둔다 — gijoDesktop 두 함수뿐이다.
+      preload: path.join(__dirname, "smartmd-preload.js"),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -669,7 +673,9 @@ ipcMain.handle("smartmd:open", async () => {
 // printBackground가 없으면 어두운 코드블록 배경이 빠져 흰 바탕에 흰 글씨가 된다(원본 주석).
 ipcMain.handle("smartmd:exportPdf", async (e) => {
   const win = BrowserWindow.fromWebContents(e.sender);
-  if (!win) return null;
+  // ⚠ **Smart MD 창에서 온 것만** 받는다(검토관 지적 L6). 자기 창을 PDF로 뜨는 것뿐이라
+  //   위험이 크지 않지만, 표면은 줄일 수 있으면 줄인다.
+  if (!win || win !== smartMdWindow) return null;
   const buffer = await win.webContents.printToPDF({ printBackground: true });
   return new Uint8Array(buffer); // Buffer를 구조화 복제에 태우면 판본에 따라 조용히 멎는다(원본 주석)
 });

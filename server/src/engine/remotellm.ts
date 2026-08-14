@@ -91,6 +91,23 @@ export function registerRemoteLlmRoutes(app: Express): void {
     res.json({ ...remoteLlmConfig(), airgap: isAirgapOn() });
   });
 
+  /**
+   * **내 질문이 어디로 가나** — 로그인한 누구나 볼 수 있다(admin 아니어도).
+   *
+   * ⚠ 왜 라우트를 나눴나 (검토관 지적 H4 — 정직성 문제였다)
+   *   위 조회는 admin 전용이라, 담당자(비-admin) 화면에서는 원격이 켜져 있어도 **로컬 모델이
+   *   답하는 것처럼** 보였고 「질문이 VPN으로 전송됩니다」 경고를 **못 봤다**. 그 경고가 가장
+   *   필요한 사람은 질문을 실제로 입력하는 담당자다. 화면이 말하는 것과 코드가 하는 것이
+   *   정면으로 어긋나 있었다.
+   * ⚠ 그래서 **바꾸는 것은 그대로 admin**이고, **보는 것만** 연다. 주소는 알려주지 않는다 —
+   *   담당자에게 필요한 것은 「지금 바깥으로 나가는가」이고, 어디로 가는지는 설정 권한의 몫이다.
+   */
+  app.get("/api/llm/remote/where", authMiddleware, (_req, res) => {
+    const c = remoteLlmConfig();
+    const 원격중 = !isAirgapOn() && c.enabled && Boolean(c.url);
+    res.json({ remote: 원격중, airgap: isAirgapOn() });
+  });
+
   // 연결 테스트 — 저장 전에 도달을 확인한다. OpenAI 호환 /models를 찌른다.
   app.post(
     "/api/llm/remote/test",

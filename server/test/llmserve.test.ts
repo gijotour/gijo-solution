@@ -11,7 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Request } from "express";
 import { db } from "../src/db";
-import { llmServeConfig, llmServeOn, requesterAllowed } from "../src/engine/llmserve";
+import { llmServeConfig, llmServeOn, requesterAllowed, browserOriginated, servePort } from "../src/engine/llmserve";
 
 const put = db.prepare("INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value");
 const del = db.prepare("DELETE FROM app_state WHERE key = ?");
@@ -74,10 +74,63 @@ describe("★ 배선 — 창구가 실제로 열려 있고, 열린 중계기가 
     expect(src).toMatch(/\/api\/llm\/serve\/v1\/models/);
     expect(src).toMatch(/\/api\/llm\/serve\/v1\/chat\/completions/);
   });
-  it("★ 두 경로 모두 같은 관문을 지난다 — 하나라도 빠지면 그게 구멍이다", () => {
-    // 관문(req, res) 호출이 두 번(경로 수만큼) 나와야 한다.
-    const 호출 = src.match(/if \(!관문\(req, res\)\) return;/g) ?? [];
-    expect(호출.length, "관문을 안 거치는 경로가 있다").toBe(2);
+  it("★ 창구 경로 **전부**가 관문을 지난다 — 라우트 수와 관문 호출 수를 맞춘다", () => {
+    // ⚠ 예전엔 관문 호출이 「2개인지」만 봤다(검토관 지적 M10). 그러면 관문 없는 라우트를
+    //   새로 더해도 2로 남아 **통과**하고, 관문을 제대로 붙인 라우트를 더하면 3이 되어
+    //   **거짓 실패**한다 — 「하나라도 빠지면 구멍」이라 적어 둔 시험이 그 구멍을 못 봤다.
+    //   이제 등록된 창구 라우트 수를 세서 관문 호출 수와 **같은지**를 본다.
+    const 라우트 = src.match(/["'`]\/api\/llm\/serve\/v1\//g) ?? [];
+    const 관문호출 = src.match(/if \(!관문\(req, res\)\) return;/g) ?? [];
+    expect(라우트.length, "창구 라우트가 하나도 안 잡혔다 — 이 시험의 정규식을 확인하라").toBeGreaterThan(0);
+    expect(관문호출.length, `창구 라우트 ${라우트.length}개 중 관문을 거치는 것이 ${관문호출.length}개다`).toBe(라우트.length);
+  });
+
+  it("★ 관문은 **대역 판정을 맨 앞에서** 한다 — 밖에서 훑는 쪽에 제품 정보를 주지 않는다", () => {
+    // ⚠ 관문 **정의 뒤**의 첫 라우트까지를 자른다 — 그냥 indexOf("app.get(")를 쓰면 파일 위쪽의
+    //   상태 조회 라우트를 잡아 빈 문자열이 된다(이 시험이 처음에 그렇게 헛돌았다).
+    const 시작 = src.indexOf("const 관문");
+    const 본문 = src.slice(시작, src.indexOf("app.get(", 시작));
+    const 대역 = 본문.indexOf("requesterAllowed");
+    const 꺼짐 = 본문.indexOf("llmServeConfig().enabled");
+    const 에어갭 = 본문.indexOf("isAirgapOn");
+    expect(대역, "관문에 대역 판정이 없다").toBeGreaterThan(-1);
+    expect(대역, "꺼짐 응답이 대역 판정보다 먼저다 — 밖에서 제품 존재를 알아낸다").toBeLessThan(꺼짐);
+    expect(대역, "에어갭 응답이 대역 판정보다 먼저다").toBeLessThan(에어갭);
+  });
+
+  it("★ 브라우저에서 온 요청을 거절한다 — CORS가 열린 배포에서 남의 웹페이지가 부를 수 있었다", () => {
+    expect(src, "browserOriginated 판정이 없다").toMatch(/browserOriginated/);
+    expect(browserOriginated(요청("10.8.0.11", { origin: "https://evil.example.com" }))).toBe(true);
+    expect(browserOriginated(요청("10.8.0.11", { referer: "https://evil.example.com/p" }))).toBe(true);
+    expect(browserOriginated(요청("10.8.0.11", {})), "서버 대 서버 호출은 통과해야 한다").toBe(false);
+  });
+
+  it("★ 포트는 GIJO_SERVER_PORT에서 읽는다 — PORT는 이 저장소에서 아무도 넣지 않는다", () => {
+    // 실사고(2026-08-14): PORT로 읽어 카드가 **항상 4000**을 보였다. 라이트 7445·표준 7446인데
+    // 상대에게 알려 줄 주소가 틀려, 「붙을 상대가 없다」가 한 겹 위에서 재발할 자리였다.
+    // ⚠ 주석에도 이 이름이 나온다(왜 안 쓰는지 적어 뒀다) — **코드만** 본다.
+    const 코드만 = src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    expect(코드만, "process.env.PORT를 다시 쓰고 있다").not.toMatch(/process\.env\.PORT/);
+    expect(코드만).toMatch(/process\.env\.GIJO_SERVER_PORT/);
+    const 전 = process.env.GIJO_SERVER_PORT;
+    try {
+      process.env.GIJO_SERVER_PORT = "7445";
+      expect(servePort()).toBe(7445);
+    } finally {
+      if (전 === undefined) delete process.env.GIJO_SERVER_PORT; else process.env.GIJO_SERVER_PORT = 전;
+    }
+  });
+
+  it("★ 상류 스트림을 pipe로 잇지 않는다 — 리스너 없는 error가 서버를 죽인다", () => {
+    // pipe는 에러를 전달하지 않고, 이 저장소에는 process.on("uncaughtException")이 없다.
+    // 운영 서버가 죽으면 전 사용자 세션이 끊긴다(CLAUDE.md).
+    expect(src, "pipe(res)가 남아 있다 — pipeline+콜백을 쓸 것").not.toMatch(/\.pipe\(res\)/);
+    expect(src).toMatch(/pipeline\(/);
+    expect(src, "클라이언트가 끊었을 때 상류를 취소하지 않는다").toMatch(/res\.on\("close"/);
+  });
+
+  it("무인증 추론에 감사 기록을 남긴다 — 활동 감사는 actor가 없어 통째로 건너뛴다", () => {
+    expect(src).toMatch(/recordAudit\(/);
   });
   it("★ 임의 URL로 넘기지 않는다 — 요청 본문의 주소를 프록시 대상으로 쓰면 열린 중계기가 된다", () => {
     // 프록시 대상은 localBaseUrl()이 준 것만이어야 한다.
