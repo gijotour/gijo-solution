@@ -13,6 +13,13 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
+// ⚠ Windows 전용이다(CUDA .dll·nsis 동봉). dist:lite 선행 단계로 묶으면 mac에서도 불리므로
+//   여기서 비켜 준다 — mac은 stage-llama-metal(별도)이 llama-metal을 꾸린다. 검토관 낮음16 대비.
+if (process.platform !== "win32") {
+  console.log("[stage-llama-cuda] Windows가 아니라 건너뜁니다 — mac은 stage-llama-metal을 쓰세요.");
+  process.exit(0);
+}
+
 const 루트 = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const SRC = path.join(루트, "server", "llama.cpp", "build", "bin", "Release");
 const CUDA = "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v13.3/bin/x64";
