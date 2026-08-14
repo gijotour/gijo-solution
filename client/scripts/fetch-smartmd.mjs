@@ -66,6 +66,18 @@ try {
     execFileSync("git", ["clone", "--depth", "1", https판, 임시], { stdio: ["ignore", "inherit", "inherit"] });
   }
 
+  // ★ 판 고정(GIJO_SMARTMD_REF)은 **자산을 읽기 전에** 해야 한다.
+  //   ⚠ 처음엔 이 블록이 복사 **뒤**에 있었다(3차 검토 H-1): 자산은 기본 브랜치 최신이 담기는데
+  //     VERSION.json에는 고정한 커밋 해시가 적혔다 — 「모른다」보다 나쁜 **틀린 답을 확신 있게
+  //     기록**하는 것이고, 그 값을 게시 보고에 적으라고 해 뒀으니 보고서까지 거짓이 된다.
+  //     판 번호(아래 `판`)도 checkout 전 트리에서 읽고 있었다.
+  const 고정 = (process.env.GIJO_SMARTMD_REF ?? "").trim();
+  if (고정) {
+    console.log(`판 고정: ${고정}`);
+    execFileSync("git", ["-C", 임시, "fetch", "--depth", "1", "origin", 고정], { stdio: ["ignore", "inherit", "inherit"] });
+    execFileSync("git", ["-C", 임시, "checkout", "--detach", "FETCH_HEAD"], { stdio: ["ignore", "inherit", "inherit"] });
+  }
+
   const 판 = (() => {
     try {
       const p = JSON.parse(fs.readFileSync(path.join(임시, "package.json"), "utf8"));
@@ -87,14 +99,7 @@ try {
 
   // 어느 판을 담았는지 남긴다 — 화면(ⓘ)과 인계 보고가 이 값을 읽는다.
   //   ⚠ 시각은 담는 사람이 아니라 **원본 커밋**에서 가져온다(빌드 시각은 판을 구분하지 못한다).
-  // 판 고정(GIJO_SMARTMD_REF) — 태그·SHA를 주면 그 자리로 옮긴다. shallow clone이라 먼저 받아온다.
-  const 고정 = (process.env.GIJO_SMARTMD_REF ?? "").trim();
-  if (고정) {
-    console.log(`판 고정: ${고정}`);
-    execFileSync("git", ["-C", 임시, "fetch", "--depth", "1", "origin", 고정], { stdio: ["ignore", "inherit", "inherit"] });
-    execFileSync("git", ["-C", 임시, "checkout", "--detach", "FETCH_HEAD"], { stdio: ["ignore", "inherit", "inherit"] });
-  }
-
+  //   ⚠ 이 값은 **위에서 담은 그 트리**의 커밋이다(고정을 먼저 하는 이유 — H-1).
   const 커밋 = execFileSync("git", ["-C", 임시, "log", "-1", "--format=%H %ad", "--date=iso-strict"], { encoding: "utf8" }).trim();
   fs.writeFileSync(
     path.join(목적지, "GIJO-SMARTMD-VERSION.json"),

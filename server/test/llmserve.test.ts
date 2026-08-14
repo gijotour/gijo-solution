@@ -164,6 +164,21 @@ describe("★ 배선 — 창구가 실제로 열려 있고, 열린 중계기가 
     expect(serveInFlight().상한).toBeGreaterThan(0);
   });
 
+  it("★ 취소 통로가 **첫 await보다 먼저** 만들어진다 — 늦으면 그 사이 끊긴 요청을 못 잡는다", () => {
+    // 3차 검토 H-4: close 리스너가 둘로 쪼개져 있어, localBaseUrl() await 중에 끊기면
+    // 뒤에 등록될 리스너가 그 이벤트를 **영영 못 받았다**(EventEmitter는 재생하지 않는다).
+    // 결과: 상류 llama가 안 멈추고, 슬롯만 반납돼 **동시 상한이 우회**됐다.
+    const 시작 = src.indexOf("처리중 += 1");
+    const 취소생성 = src.indexOf("new AbortController()", 시작);
+    const 첫await = src.indexOf("await localBaseUrl()", 시작);
+    expect(취소생성, "취소 통로를 안 만든다").toBeGreaterThan(-1);
+    expect(첫await).toBeGreaterThan(-1);
+    expect(취소생성, "첫 await보다 뒤에서 취소 통로를 만든다 — 그 사이 끊기면 못 잡는다").toBeLessThan(첫await);
+    // close 리스너는 **하나**여야 한다(쪼개면 같은 틈이 다시 생긴다).
+    const 리스너 = src.match(/res\.on\("close"/g) ?? [];
+    expect(리스너.length, `res.on("close")가 ${리스너.length}곳 — 하나로 합칠 것`).toBe(1);
+  });
+
   it("★ 상한 검사와 계수 증가 사이에 await가 없다 — 있으면 폭주에 안 듣는다(TOCTOU)", () => {
     // 실사고 직전(재검토 A-6): 사이에 localBaseUrl()이 있어, 동시에 20건을 밀면 전부
     // 「처리중 0」에서 통과했다. 상한이 막으려던 바로 그 상황이다.

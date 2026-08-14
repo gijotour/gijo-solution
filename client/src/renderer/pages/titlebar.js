@@ -470,14 +470,26 @@
    * ⚠ 꺼져 있으면 **아무것도 그리지 않는다** — 평소에 없던 표시가 생기면 그게 신호다.
    */
   var 원격칩 = null;
+  var 원격조회중 = false;   // ⚠ 비동기 가드 — DOM 검사만으로는 못 막는다(아래)
+  var 원격주기 = null;
+
   function mount원격칩() {
     var hdr = document.getElementById("tbInfo") || document.querySelector(".header");
-    if (!hdr || document.querySelector(".gtb-remote")) return;
+    if (!hdr) return;
+    // ⚠ **DOM 검사만으로는 중복을 못 막는다**(3차 검토 H-2). 칩은 fetch가 끝난 뒤에 만들어지므로,
+    //   두 번째 호출이 첫 호출의 응답 전에 오면 가드를 그냥 통과해 칩이 **두 개** 뜬다.
+    //   실제 순서가 그랬다: titlebar 로드 시 1회 + nav 렌더 뒤 afterMount에서 1회.
+    //   세션 칩은 동기라 같은 실수를 안 했다 — 그래서 붙이면서 못 봤다.
+    if (원격조회중 || document.querySelector(".gtb-remote")) return;
     var right = hdr.querySelector(".header-right") || hdr;
     var g = window.gijo;
     if (!g || typeof g.remoteLlmWhere !== "function") return; // 옛 판이면 조용히 넘긴다
+    원격조회중 = true;
     g.remoteLlmWhere().then(function (w) {
+      원격조회중 = false;
+      원격주기시작();                                          // 켜지든 꺼지든 이후 변화를 따라간다
       if (!w || !w.remote) return;                            // 로컬이면 표시하지 않는다
+      if (document.querySelector(".gtb-remote")) return;       // 그 사이 다른 호출이 붙였으면 그만
       원격칩 = document.createElement("div");
       // ⚠ `gtb-sess` 클래스를 **주지 않는다** — 세션 칩이 `querySelector(".gtb-sess")`로
       //   중복을 막으므로, 그 이름을 쓰면 원격칩이 먼저 붙었을 때 **세션 칩이 사라진다.**
@@ -491,7 +503,28 @@
       var clock = right.querySelector(".tb-clock, .gtb-clock");
       if (clock && clock.parentNode === right) right.insertBefore(원격칩, clock);
       else right.appendChild(원격칩);
-    }).catch(function () { /* 못 읽으면 표시하지 않는다 — 없는 경고를 지어내지 않는다 */ });
+    }).catch(function () { 원격조회중 = false; /* 못 읽으면 표시하지 않는다 — 없는 경고를 지어내지 않는다 */ });
+  }
+
+  /**
+   * ⚠ 칩을 **주기적으로 다시 읽는다**(3차 검토 H-3).
+   *   예전엔 앱을 켤 때 한 번만 읽었다. 그런데 셸은 로그인 내내 살아 있어서:
+   *     · 관리자가 원격을 **켜면** → 담당자 화면에 칩이 안 생긴다(질문은 나가는데 표시가 없다)
+   *       ← 이것이 H4가 말한 바로 그 상황이다. 절반만 고쳐져 있었다.
+   *     · 관리자가 **끄면** → 칩이 남아 없는 경고를 계속 보인다(반대편 정직성 문제)
+   *   60초는 세션 칩과 같은 결의 주기다 — 설정 변경이 곧바로는 아니어도 **반드시** 따라온다.
+   */
+  function 원격주기시작() {
+    if (원격주기) return;
+    원격주기 = setInterval(function () {
+      var g = window.gijo;
+      if (!g || typeof g.remoteLlmWhere !== "function") return;
+      g.remoteLlmWhere().then(function (w) {
+        var 있음 = document.querySelector(".gtb-remote");
+        if (w && w.remote && !있음) { 원격조회중 = false; mount원격칩(); }
+        else if ((!w || !w.remote) && 있음) { 있음.remove(); 원격칩 = null; }
+      }).catch(function () { /* 못 읽은 회차는 건너뛴다 — 표시를 함부로 지우지 않는다 */ });
+    }, 60000);
   }
 
   function mountSessChip() {

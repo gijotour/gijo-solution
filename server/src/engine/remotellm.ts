@@ -80,7 +80,9 @@ export function remoteUrlProblem(raw: string): string | null {
   }
   if (u.protocol !== "http:" && u.protocol !== "https:") return "http(s) 주소만 됩니다.";
   if (!isVpnRangeIp(u.hostname)) {
-    return "VPN 안의 주소만 됩니다 — 사설 대역(10.x·172.16-31.x·192.168.x·100.64-127.x) IP로 넣어 주세요. 호스트명·공인 IP는 받지 않습니다(어디로 풀릴지 코드가 보증할 수 없습니다).";
+    // ⚠ 문구를 「사설 대역」으로 적는다(3차 검토 M-2) — 코드가 보는 것이 그것이고,
+    //   「VPN 안」이라고 말하면 사무실 LAN도 통과한다는 사실을 감춘다(문서는 이미 정정했다).
+    return "사설 대역 주소만 됩니다 — 10.x·172.16-31.x·192.168.x·100.64-127.x IP로 넣어 주세요. 호스트명·공인 IP는 받지 않습니다(어디로 풀릴지 코드가 보증할 수 없습니다).";
   }
   return null;
 }

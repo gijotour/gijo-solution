@@ -34,8 +34,8 @@ describe("remoteUrlProblem — 저장 관문", () => {
     expect(remoteUrlProblem("https://100.64.10.2:8443/v1")).toBeNull();
   });
   it("★ 공인·이름·형식 오류는 사람이 읽을 사유로 거부", () => {
-    expect(remoteUrlProblem("http://api.openai.com/v1")).toContain("VPN 안의 주소만");
-    expect(remoteUrlProblem("http://8.8.8.8/v1")).toContain("VPN 안의 주소만");
+    expect(remoteUrlProblem("http://api.openai.com/v1")).toContain("사설 대역 주소만");
+    expect(remoteUrlProblem("http://8.8.8.8/v1")).toContain("사설 대역 주소만");
     expect(remoteUrlProblem("ftp://10.8.0.12/v1")).toContain("http(s)");
     expect(remoteUrlProblem("이건 주소가 아님")).toContain("형식");
   });

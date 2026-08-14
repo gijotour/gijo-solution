@@ -159,9 +159,16 @@ function 거절로그(보낸곳: string, 사유: string): void {
   if (이전 && 이전.건수 > 1) console.warn(`[llmserve] ${보낸곳} 거절 ${이전.건수}건(직전 1분)`);
   거절기록.set(보낸곳, { 시각: now, 건수: 1 });
   console.warn(`[llmserve] 거절: ${보낸곳} — ${사유}`);
-  // 표가 무한히 자라지 않게(오래된 것 정리) — 무인증 경로라 출처가 많을 수 있다.
+  // 표가 무한히 자라지 않게 정리한다.
+  // ⚠ 예전엔 「size>500 **그리고** 5분 지난 것」만 지웠다(3차 검토 L-1): 살아 있는 출처가
+  //   500을 넘으면 **아무것도 안 지워지고 계속 자랐다.** 상한이 상한이 아니었다.
+  //   ▶ 오래된 것을 먼저 지우고, 그래도 넘치면 **가장 오래된 것부터 잘라** 500을 지킨다.
   if (거절기록.size > 500) {
     for (const [k, v] of 거절기록) if (now - v.시각 > 300_000) 거절기록.delete(k);
+    if (거절기록.size > 500) {
+      const 오래된순 = [...거절기록.entries()].sort((a, b) => a[1].시각 - b[1].시각);
+      for (const [k] of 오래된순.slice(0, 거절기록.size - 500)) 거절기록.delete(k);
+    }
   }
 }
 
@@ -328,10 +335,21 @@ export function registerLlmServeGateway(app: Express): void {
       처리중 += 1;
       let 되돌림 = false;
       const 놓기 = () => { if (!되돌림) { 되돌림 = true; 처리중 = Math.max(0, 처리중 - 1); } };
-      // ⚠ 아래 **모든 조기 return 경로**가 놓기()를 거쳐야 한다 — 하나라도 빠지면 창구가 영영 막힌다.
-      res.on("close", () => 놓기());
+
+      // ⚠ 취소 통로를 **await보다 먼저** 만든다(3차 검토 H-4 — 내가 A-6을 고치며 낸 틈).
+      //   예전엔 close 리스너가 둘로 쪼개져, 아래 localBaseUrl() await 중에 클라가 끊기면
+      //   그때 발생한 close를 **뒤에 등록될 리스너가 못 받았다**(EventEmitter는 지난 이벤트를
+      //   재생하지 않는다). 그러면 ① 상류 llama 생성이 취소되지 않고 ② 슬롯만 반납돼
+      //   **동시 상한이 우회**된다(요청 후 즉시 끊기를 반복하면 처리중 0인 채 GPU만 쌓인다).
+      //   ▶ 리스너를 **하나로** 두고, 만드는 것도 여기서 먼저 한다.
+      const 취소 = new AbortController();
+      const 시계 = setTimeout(() => 취소.abort(), 10 * 60 * 1000); // 큰 모델을 감안해 넉넉히
+      res.on("close", () => { clearTimeout(시계); 취소.abort(); 놓기(); });
 
       const base = await localBaseUrl();
+      // ⚠ await 사이에 이미 끊겼으면 여기서 접는다 — 위 리스너가 정리는 했지만, 끊긴 상대에게
+      //   응답을 쓰려 하거나 상류를 새로 부르는 일은 하지 않는다.
+      if (res.destroyed) { 놓기(); return; }
       if (!base) { 놓기(); res.status(503).json({ error: "이 PC에 서빙 중인 모델이 없습니다." }); return; }
 
       // ⚠ `enabled: true`를 박아 쓰지 않는다(검토관 지적 M3) — 관문 통과와 이 쓰기 사이에
@@ -358,12 +376,6 @@ export function registerLlmServeGateway(app: Express): void {
           result: 성공 ? "ok" : "error",
         });
       };
-
-      // ⚠ 상류를 취소할 통로를 만든다 — 클라이언트가 끊으면 llama 생성도 멈춘다(L1).
-      //   없으면 버려진 요청이 10분 타임아웃까지 슬롯을 점유한다.
-      const 취소 = new AbortController();
-      const 시계 = setTimeout(() => 취소.abort(), 10 * 60 * 1000); // 큰 모델을 감안해 넉넉히
-      res.on("close", () => { clearTimeout(시계); 취소.abort(); });
 
       try {
         const upstream = await fetch(`${base}/chat/completions`, {

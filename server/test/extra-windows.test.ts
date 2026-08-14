@@ -64,3 +64,36 @@ describe("별도 창을 여는 IPC — 문지기를 안 거치는 자리", () =>
     );
   });
 });
+
+/**
+ * Smart MD 봉인 — 고객 문서에 박은 약속의 **유일한 근거**를 시험으로 묶는다.
+ *
+ * ⚠ 왜 (3차 검토 M-4) 라이트 안내서·사용안내서에 「만든 글은 이 PC를 벗어나지 않습니다」라고
+ *   적었는데, 그 근거는 main.ts의 세 블록뿐이었다 — 누가 partition 한 줄을 지워도 시험 3,400개가
+ *   전부 초록이었다. 「세 번째면 소스 감시」에 걸리는 자리다.
+ */
+describe("Smart MD 창 봉인 — 「이 PC를 벗어나지 않습니다」의 근거", () => {
+  it("★ 전용 세션에 가둔다 — 기본 세션에 CSP를 걸면 제품 화면 전체가 그 규칙을 받는다", () => {
+    expect(mainSrc, "partition이 없다 — CSP가 기본 세션에 걸려 제품을 막는다").toMatch(
+      /partition:\s*["']persist:gijo-smartmd["']/
+    );
+  });
+
+  it("★ CSP로 바깥 연결을 막는다", () => {
+    expect(mainSrc).toMatch(/Content-Security-Policy/);
+    expect(mainSrc, "connect-src 'none'이 없다 — fetch·XHR·WebSocket이 나갈 수 있다").toMatch(/connect-src 'none'/);
+  });
+
+  it("★ 세션 층에서도 비-로컬 요청을 막는다(두 겹) — CSP는 페이지가 지키는 규칙일 뿐이다", () => {
+    expect(mainSrc).toMatch(/onBeforeRequest/);
+    expect(mainSrc, "로컬 스킴만 허용하는 검사가 없다").toMatch(/file\|devtools\|blob\|data/);
+  });
+
+  it("★ 새 창을 **바깥으로 열어 주지 않는다** — 그게 세 번째 문이었다", () => {
+    // window.open("https://…/?d=<본문>") 한 줄이면 두 겹을 우회해 글을 실어 내보낼 수 있었다.
+    const 핸들러 = mainSrc.slice(mainSrc.indexOf("smartMdWindow.webContents.setWindowOpenHandler"));
+    const 블록 = 핸들러.slice(0, 핸들러.indexOf("});") + 3);
+    expect(블록, "핸들러 안에서 openExternal로 바깥을 연다 — 봉인 밖 통로다").not.toMatch(/openExternal/);
+    expect(블록, "deny로 끝나지 않는다").toMatch(/action:\s*["']deny["']/);
+  });
+});

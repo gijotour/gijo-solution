@@ -694,7 +694,14 @@ ipcMain.handle("smartmd:open", async () => {
   //   창**을 띄운다(will-navigate는 그 길을 막지 못한다 — 다른 사건이다).
   //   외부 주소는 기본 브라우저로 보낸다(그쪽이 샌드박스다). 그 외 스킴은 그냥 버린다.
   smartMdWindow.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:\/\//i.test(url)) void shell.openExternal(url).catch(() => {});
+    // ⚠ **바깥으로 열어 주지 않는다**(3차 검토 M-1). 처음엔 http(s)를 기본 브라우저로 넘겼는데,
+    //   그게 위의 두 겹(CSP·세션 차단)을 **우회하는 세 번째 문**이었다:
+    //   `window.open("https://…/?d=<본문>")` 한 줄이면 편집 중인 글을 URL에 실어 내보낼 수 있다.
+    //   이 창의 위협 모델은 「저쪽 저장소 push 한 번」이고, 고객 안내서에 「이 PC를 벗어나지
+    //   않습니다」라고 적었다 — 그 약속과 이 문은 함께 설 수 없다.
+    //   ▶ 전부 거절하고 로그만 남긴다. 문서 안 링크를 열어야 할 일이 생기면, 그때 사람에게
+    //     주소를 보여 주고 확인받는 길을 따로 만든다(조용히 여는 것과 다르다).
+    console.warn(`[smartmd] 새 창 요청 거절: ${String(url).slice(0, 120)}`);
     return { action: "deny" };
   });
   await smartMdWindow.loadFile(index);
