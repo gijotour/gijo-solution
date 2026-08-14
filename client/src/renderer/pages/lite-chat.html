@@ -53,7 +53,10 @@
 <body>
   <div class="scr-id"><b>AI에게 물어보기</b> — 제품자료·장비 매뉴얼·넣은 로그·나만의 기억을 두루 살펴, 검색·설명·조치·법령을 골라 답합니다.</div>
   <div id="log"></div>
-  <div class="warn">⚠ 답은 이 PC 안에서 만들어집니다. 자료를 <b>바꾸는 일</b>(작업 추가 등)은 확인(결재)을 거쳐 실행됩니다.</div>
+  <!-- ⚠ 이 줄은 원격 GPU가 켜지면 **거짓이 된다**(2026-08-15 E2E가 잡음 — 원격 답변 아래에
+       「답은 이 PC 안에서 만들어집니다」가 그대로 붙어 있었다). 아래 스크립트가 상태를 읽어
+       바꾼다 — 정체성 한 줄이야말로 정확해야 한다. -->
+  <div class="warn" id="chatIdentity">⚠ 답은 이 PC 안에서 만들어집니다. 자료를 <b>바꾸는 일</b>(작업 추가 등)은 확인(결재)을 거쳐 실행됩니다.</div>
   <div class="bar">
     <textarea id="q" placeholder="예: 랜섬웨어 걸리면 뭐부터 해야 돼?  ·  로그 보관 며칠?  ·  프롬프트 인젝션이 뭐야?" aria-label="질문"></textarea>
     <button class="go" id="send">보내기</button>
@@ -201,6 +204,24 @@
   });
   if (!g) { log.innerHTML = '<div class="empty">앱 안에서만 동작합니다.</div>'; }
   else 빈화면();
+
+  // 정체성 한 줄을 실제 상태에 맞춘다(2026-08-15) — 원격 GPU가 켜져 있으면
+  // 「이 PC 안에서」가 거짓이다. 60초마다 다시 읽어 켜고 끔을 따라간다(제목줄 칩과 같은 결).
+  (function () {
+    if (!g || typeof g.remoteLlmWhere !== "function") return;
+    var 기본 = document.getElementById("chatIdentity") ? document.getElementById("chatIdentity").innerHTML : "";
+    function 맞추기() {
+      g.remoteLlmWhere().then(function (w) {
+        var el = document.getElementById("chatIdentity");
+        if (!el) return;
+        el.innerHTML = (w && w.remote)
+          ? '⚠ 지금은 <b>VPN 안의 원격 GPU</b>가 답을 만듭니다 — 질문이 그 기계로 전송됩니다. 자료를 <b>바꾸는 일</b>(작업 추가 등)은 확인(결재)을 거쳐 실행됩니다.'
+          : 기본;
+      }).catch(function () { /* 못 읽은 회차는 그대로 둔다 */ });
+    }
+    맞추기();
+    setInterval(맞추기, 60000);
+  })();
 })();
 </script>
 </body>
