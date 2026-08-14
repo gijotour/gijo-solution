@@ -2515,7 +2515,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     st.textContent = c.airgap
       ? "에어갭 모드 — 사용 불가"
       : (c.enabled
-        ? ("내주는 중" + (c.lastServedAt ? " · 마지막 사용 " + new Date(c.lastServedAt).toLocaleString("ko-KR") : " · 아직 쓰인 적 없음"))
+        ? ("내주는 중" + (c.lastServedAt ? " · 마지막 사용 " + new Date(c.lastServedAt).toLocaleString("ko-KR") : " · 아직 쓰인 적 없음")
+           // 동시 상한을 보인다 — 안 보이면 빌려주는 쪽은 자기 기계가 거절 중인 줄 모른다(B-8).
+           + (c.상한 ? " · 동시 " + (c.처리중 || 0) + "/" + c.상한 + "건" : ""))
         : "꺼짐");
     on.textContent = c.enabled ? "끄기" : "켜기";
     on.disabled = !!c.airgap;
@@ -2528,10 +2530,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       //   곧 상대가 쓸 주소다.
       var 서버주소 = c.seenAddress || "";
       if (!서버주소) { try { 서버주소 = new URL(await window.gijo.getServerUrl()).hostname; } catch (e) {} }
-      addr.value = "http://" + (서버주소 || "이-PC의-VPN-주소") + ":" + c.port + "/api/llm/serve/v1";
+      // ⚠ IPv6 리터럴은 **대괄호**로 감싸야 주소가 성립한다(재검토 A-2) — `http://::1:7446`은 잘못된 URL이다.
+      var 주소부 = 서버주소 && 서버주소.indexOf(":") >= 0 && 서버주소.indexOf("[") < 0 ? "[" + 서버주소 + "]" : (서버주소 || "이-PC의-VPN-주소");
+      addr.value = "http://" + 주소부 + ":" + c.port + "/api/llm/serve/v1";
       msg.innerHTML = c.addressIsPrivate
         ? '<div class="hint">저쪽 GIJO의 「원격 GPU」 칸에 위 주소를 넣고 <b>연결 테스트</b>를 누르면 됩니다.</div>'
-        : '<div class="hint" style="color:var(--amber)">⚠ 이 주소(' + esc(서버주소 || "없음") + ')는 VPN 대역이 아닙니다 — 앞부분을 <b>이 PC의 VPN 주소</b>(10.x 등)로 바꿔서 알려주세요. 붙는 쪽은 사설 주소만 받습니다.</div>';
+        : '<div class="hint" style="color:var(--amber)">⚠ 이 주소(' + esc(서버주소 || "없음") + ')는 <b>상대가 쓸 수 없는 주소</b>입니다 — 이 PC 자신만 가리키거나(localhost·127.x) VPN 대역이 아닙니다. 앞부분을 <b>이 PC의 VPN 주소</b>(10.x 등)로 바꿔서 알려주세요.</div>';
     } else {
       msg.innerHTML = "";
     }

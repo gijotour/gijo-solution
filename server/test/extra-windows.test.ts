@@ -15,17 +15,29 @@ import path from "node:path";
 
 const mainSrc = fs.readFileSync(path.join(__dirname, "../../client/src/main.ts"), "utf8");
 
-/** ipcMain.handle("<이름>:open", …) 꼴로 창을 여는 통로 전부. */
+/**
+ * 창을 여는 IPC 통로 전부.
+ *
+ * ⚠ 처음엔 `"<이름>:open"`만 셌다가 **전제가 틀렸다**(재검토 B-5): `shell:popout`·
+ *   `console:popout`이 빠져 있었다. 그중 `shell:popout`은 **렌더러가 준 페이지 이름으로**
+ *   새 창을 열어(main.ts) 이미 임의 화면을 띄운다 — 「네 번째가 제품 화면일 때 새는 것을
+ *   막는다」는 목적이 그 시점에 이미 성립하지 않았다. `:open`과 `:popout`을 함께 센다.
+ */
 function 창통로(): string[] {
-  return [...mainSrc.matchAll(/ipcMain\.handle\(\s*["']([a-zA-Z]+):open["']/g)].map((m) => m[1]);
+  return [...mainSrc.matchAll(/ipcMain\.handle\(\s*["']([a-zA-Z]+):(open|popout)["']/g)].map((m) => `${m[1]}:${m[2]}`);
 }
 
 describe("별도 창을 여는 IPC — 문지기를 안 거치는 자리", () => {
   // 판단이 끝난 것만 적는다. 새 이름이 생기면 아래 시험이 실패하고, 그때 판단해서 올린다.
   const 검토됨: Record<string, string> = {
-    docbox: "문서함 — 읽기 전용 문서. 라이트 셸에 버튼이 없어 닿지 않는다",
-    office: "팀 사무실 — 라이트 셸에 버튼이 없어 닿지 않는다",
-    smartmd: "문서 작성(Smart MD) — 전 에디션 무료 도구다(2026-08-14 사장님 결정). 막지 않는 것이 의도",
+    "docbox:open": "문서함 — 읽기 전용 문서. 라이트 셸에 버튼이 없어 닿지 않는다",
+    "office:open": "팀 사무실 — 라이트 셸에 버튼이 없어 닿지 않는다",
+    "smartmd:open": "문서 작성(Smart MD) — 전 에디션 무료 도구다(2026-08-14 사장님 결정). 막지 않는 것이 의도",
+    // ⚠ 아래 둘은 **임의 화면을 연다** — 재검토(B-5)로 드러났다. 라이트 셸(lite-app)에는 분리 단추가
+    //   없어 지금은 닿지 않지만, 위 셋과 성격이 다르다: 화면 이름을 **렌더러가 준다.**
+    //   라이트에서 이 길이 열리는 날 셸화면보정과 같은 문지기가 반드시 필요하다.
+    "shell:popout": "팝업 셸 분리창 — ⚠ 렌더러가 준 페이지를 연다(고정 상수가 아니다). 라이트 셸에 단추 없음",
+    "console:popout": "지휘소(대화 창) — 고정 화면(console.html). 라이트 셸에 단추 없음",
   };
 
   it("★ 새로 생긴 창 통로는 판단을 받아야 한다 — 목록에 없으면 실패한다", () => {

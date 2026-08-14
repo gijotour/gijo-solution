@@ -11,8 +11,16 @@
 //
 // ■ 무엇을 담나 — 웹 자산만(index.html·css·js·vendor·assets·icon).
 //   main.js·preload.js·package.json은 **담지 않는다**: 창을 여는 쪽이 우리 main.ts이고,
-//   Smart MD가 기대하는 window.gijoDesktop(exportPdf 등)은 우리 preload가 대신 준다.
+//   Smart MD가 기대하는 window.gijoDesktop(exportPdf 등)은 **그 창 전용 preload**
+//   (client/src/smartmd-preload.ts)가 대신 준다 — 제품 preload가 아니다(2026-08-14 H6).
 //   두 벌의 Electron 부팅 코드를 한 앱에 넣으면 어느 쪽이 도는지 헷갈린다.
+//
+// ■ ⚠ 어느 판을 담을지 — **고정할 수 있다**(2026-08-14 재검토 B-6)
+//   기본은 기본 브랜치 최신이다. 그런데 게시본에 「그때그때 최신 커밋」이 자동으로 들어가면,
+//   저쪽 저장소의 push 한 번이 다음 고객 설치본의 내용을 바꾼다 — 게시한 물건이 무엇인지
+//   우리가 말할 수 없게 된다. 판을 못 박으려면:
+//       GIJO_SMARTMD_REF=<태그 또는 커밋SHA> node scripts/fetch-smartmd.mjs
+//   담은 판은 smartmd/GIJO-SMARTMD-VERSION.json에 커밋 해시로 남는다(게시 보고에 그 값을 적는다).
 //
 // 쓰기:  node scripts/fetch-smartmd.mjs            (기본 브랜치 최신)
 //        node scripts/fetch-smartmd.mjs --keep     (이미 있으면 그대로 두고 끝냄)
@@ -79,6 +87,14 @@ try {
 
   // 어느 판을 담았는지 남긴다 — 화면(ⓘ)과 인계 보고가 이 값을 읽는다.
   //   ⚠ 시각은 담는 사람이 아니라 **원본 커밋**에서 가져온다(빌드 시각은 판을 구분하지 못한다).
+  // 판 고정(GIJO_SMARTMD_REF) — 태그·SHA를 주면 그 자리로 옮긴다. shallow clone이라 먼저 받아온다.
+  const 고정 = (process.env.GIJO_SMARTMD_REF ?? "").trim();
+  if (고정) {
+    console.log(`판 고정: ${고정}`);
+    execFileSync("git", ["-C", 임시, "fetch", "--depth", "1", "origin", 고정], { stdio: ["ignore", "inherit", "inherit"] });
+    execFileSync("git", ["-C", 임시, "checkout", "--detach", "FETCH_HEAD"], { stdio: ["ignore", "inherit", "inherit"] });
+  }
+
   const 커밋 = execFileSync("git", ["-C", 임시, "log", "-1", "--format=%H %ad", "--date=iso-strict"], { encoding: "utf8" }).trim();
   fs.writeFileSync(
     path.join(목적지, "GIJO-SMARTMD-VERSION.json"),

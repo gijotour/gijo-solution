@@ -11,7 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Request } from "express";
 import { db } from "../src/db";
-import { llmServeConfig, llmServeOn, requesterAllowed, browserOriginated, proxyDetected, servePort, serveInFlight } from "../src/engine/llmserve";
+import { llmServeConfig, llmServeOn, requesterAllowed, browserOriginated, proxyDetected, servePort, serveInFlight, 상대가쓸수있나 } from "../src/engine/llmserve";
 
 const put = db.prepare("INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value");
 const del = db.prepare("DELETE FROM app_state WHERE key = ?");
@@ -79,10 +79,12 @@ describe("★ 배선 — 창구가 실제로 열려 있고, 열린 중계기가 
     //   새로 더해도 2로 남아 **통과**하고, 관문을 제대로 붙인 라우트를 더하면 3이 되어
     //   **거짓 실패**한다 — 「하나라도 빠지면 구멍」이라 적어 둔 시험이 그 구멍을 못 봤다.
     //   이제 등록된 창구 라우트 수를 세서 관문 호출 수와 **같은지**를 본다.
+    // 관문은 **미들웨어 하나**로 두고 모든 창구 라우트에 같은 방식으로 붙인다(형태를 섞으면
+    // 이 시험이 형태 차이에 걸려 헛돈다 — 실제로 한 번 그랬다).
     const 라우트 = src.match(/["'`]\/api\/llm\/serve\/v1\//g) ?? [];
-    const 관문호출 = src.match(/if \(!관문\(req, res\)\) return;/g) ?? [];
+    const 관문붙임 = src.match(/^\s*관문미들,\s*$/gm) ?? [];
     expect(라우트.length, "창구 라우트가 하나도 안 잡혔다 — 이 시험의 정규식을 확인하라").toBeGreaterThan(0);
-    expect(관문호출.length, `창구 라우트 ${라우트.length}개 중 관문을 거치는 것이 ${관문호출.length}개다`).toBe(라우트.length);
+    expect(관문붙임.length, `창구 라우트 ${라우트.length}개 중 관문미들이 붙은 것이 ${관문붙임.length}개다`).toBe(라우트.length);
   });
 
   it("★ 관문은 **대역 판정을 맨 앞에서** 한다 — 밖에서 훑는 쪽에 제품 정보를 주지 않는다", () => {
@@ -124,7 +126,8 @@ describe("★ 배선 — 창구가 실제로 열려 있고, 열린 중계기가 
   it("★ 상류 스트림을 pipe로 잇지 않는다 — 리스너 없는 error가 서버를 죽인다", () => {
     // pipe는 에러를 전달하지 않고, 이 저장소에는 process.on("uncaughtException")이 없다.
     // 운영 서버가 죽으면 전 사용자 세션이 끊긴다(CLAUDE.md).
-    expect(src, "pipe(res)가 남아 있다 — pipeline+콜백을 쓸 것").not.toMatch(/\.pipe\(res\)/);
+    // ⚠ `\.pipe\(res\)`만 보면 `.pipe(res, {end:true})`를 놓친다(재검토 D) — 인자를 넓게 잡는다.
+    expect(src, "pipe(res…)가 남아 있다 — pipeline+콜백을 쓸 것").not.toMatch(/\.pipe\(\s*res\b/);
     expect(src).toMatch(/pipeline\(/);
     expect(src, "클라이언트가 끊었을 때 상류를 취소하지 않는다").toMatch(/res\.on\("close"/);
   });
@@ -156,9 +159,60 @@ describe("★ 배선 — 창구가 실제로 열려 있고, 열린 중계기가 
     expect(src).toMatch(/처리중 >= 동시상한/);
     expect(src, "429로 정직하게 거절하지 않는다").toMatch(/status\(429\)/);
     // 놓기()가 정상 종료·에러·끊김 세 길에서 모두 불려야 한다.
-    const 놓기호출 = src.match(/놓기\(\);/g) ?? [];
-    expect(놓기호출.length, `놓기() 호출이 ${놓기호출.length}곳 — 빠진 길이 있으면 상한이 새다`).toBeGreaterThanOrEqual(3);
+    const 놓기호출 = src.match(/놓기\(\)/g) ?? [];
+    expect(놓기호출.length, `놓기() 호출이 ${놓기호출.length}곳 — 빠진 길이 있으면 상한이 새다`).toBeGreaterThanOrEqual(4);
     expect(serveInFlight().상한).toBeGreaterThan(0);
+  });
+
+  it("★ 상한 검사와 계수 증가 사이에 await가 없다 — 있으면 폭주에 안 듣는다(TOCTOU)", () => {
+    // 실사고 직전(재검토 A-6): 사이에 localBaseUrl()이 있어, 동시에 20건을 밀면 전부
+    // 「처리중 0」에서 통과했다. 상한이 막으려던 바로 그 상황이다.
+    const 검사 = src.indexOf("처리중 >= 동시상한");
+    const 증가 = src.indexOf("처리중 += 1");
+    expect(검사).toBeGreaterThan(-1);
+    expect(증가, "계수 증가가 검사보다 앞이다").toBeGreaterThan(검사);
+    const 사이 = src.slice(검사, 증가);
+    expect(사이, "검사와 증가 사이에 await가 있다 — 그 틈으로 전부 통과한다").not.toMatch(/\bawait\b/);
+  });
+
+  it("★ 관문이 본문 파서보다 **앞**에 붙는다 — 뒤면 대역 밖 요청도 8MB를 먼저 파싱한다", () => {
+    const 라우트 = src.slice(src.indexOf('"/api/llm/serve/v1/chat/completions"'));
+    const 관문자리 = 라우트.indexOf("관문미들,");
+    const 파서자리 = 라우트.indexOf("본문,");
+    expect(관문자리, "이 라우트에 관문미들이 안 붙었다").toBeGreaterThan(-1);
+    expect(파서자리).toBeGreaterThan(-1);
+    expect(관문자리, "본문 파서가 관문보다 먼저다 — 무인증 파싱이 남는다").toBeLessThan(파서자리);
+  });
+
+  it("★ 무인증 거절이 DB에 쓰지 않는다 — 두드리는 쪽이 쓰기 원시기능을 갖는다", () => {
+    // 재검토 B-1: 관문 첫 줄부터 recordAudit이면 스캐너가 audit_log를 채워 **실제 보안 사건이
+    // 밀려나고**, 동기 쓰기가 이벤트 루프를 멈춘다. 거절은 로그로 접는다.
+    const 관문본문 = src.slice(src.indexOf("const 관문"), src.indexOf("const 본문"));
+    expect(관문본문, "관문 안에서 recordAudit을 부른다").not.toMatch(/recordAudit\(/);
+    expect(관문본문, "거절을 접어서 로그로 남기지 않는다").toMatch(/거절로그\(/);
+  });
+
+  it("★ 추론 감사는 **끝난 뒤에** 남는다 — 하기 전에 ok로 적으면 거짓 기록이다", () => {
+    // activityaudit.ts가 res.on("finish")를 기다리는 것과 같은 이유(B-2).
+    expect(src).toMatch(/마무리기록\(/);
+    const 마무리 = src.indexOf("const 마무리기록");
+    const 상류 = src.indexOf("await fetch(`${base}/chat/completions`");
+    expect(마무리, "마무리기록 정의가 없다").toBeGreaterThan(-1);
+    expect(상류, "상류 호출을 못 찾았다").toBeGreaterThan(마무리); // 정의는 앞, 호출은 뒤
+    // 상류 호출 **이전**에 성공 기록이 실행되지 않아야 한다.
+    const 이전 = src.slice(마무리, 상류);
+    expect(이전, "상류를 부르기 전에 마무리기록(true)를 실행한다").not.toMatch(/마무리기록\(true\)/);
+  });
+
+  it("★ 상대에게 줄 주소 판정은 루프백을 거른다 — 사설이라고 다 쓸 수 있는 주소가 아니다", () => {
+    // 재검토 A-2: isVpnRangeIp는 127.x를 사설로 통과시킨다(에어갭에선 맞다). 그대로 쓰면
+    // 화면이 「이 주소를 상대에게 주세요」라며 127.0.0.1을 확언한다 — H2와 같은 실패의 재발.
+    for (const h of ["127.0.0.1", "::1", "localhost", "169.254.1.2", "0.0.0.0"]) {
+      expect(상대가쓸수있나(h), `${h}는 상대가 쓸 수 없는 주소다`).toBe(false);
+    }
+    for (const h of ["10.8.0.12", "192.168.0.5", "172.20.1.9", "100.64.3.2"]) {
+      expect(상대가쓸수있나(h), `${h}는 상대가 쓸 수 있어야 한다`).toBe(true);
+    }
   });
   it("★ 임의 URL로 넘기지 않는다 — 요청 본문의 주소를 프록시 대상으로 쓰면 열린 중계기가 된다", () => {
     // 프록시 대상은 localBaseUrl()이 준 것만이어야 한다.

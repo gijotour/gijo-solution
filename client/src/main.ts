@@ -657,9 +657,33 @@ ipcMain.handle("smartmd:open", async () => {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // ⚠ **전용 세션**에 가둔다(2026-08-14). 아래 CSP를 기본 세션에 걸면 GIJO 화면 전체가
+      //   그 규칙을 받는다 — 그건 이 창 하나를 막으려다 제품을 막는 일이다.
+      //   덤으로 쿠키·저장소도 제품과 갈린다(남의 코드가 우리 세션 저장소를 못 본다).
+      partition: "persist:gijo-smartmd",
     },
   });
   smartMdWindow.removeMenu();
+  // ⚠ **이 창은 바깥으로 나가지 못한다**(2026-08-14 재검토 B-6). 고객 안내서에 「만든 글은 이 PC를
+  //   벗어나지 않습니다」라고 적었는데, 그 창의 코드는 **다른 저장소에서 받아온 것**이라 코드가
+  //   그것을 보장하고 있지 않았다(문구가 코드보다 앞서 나간 자리). CSP로 못 박는다:
+  //   connect-src 'none' — fetch·XHR·WebSocket이 아예 안 나간다. 편집기는 로컬 자산만 쓴다.
+  //   (위 partition으로 이 창만의 세션이므로, 이 규칙은 GIJO 제품 화면에 영향을 주지 않는다.)
+  smartMdWindow.webContents.session.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        "Content-Security-Policy": ["default-src 'self' 'unsafe-inline' data: blob:; connect-src 'none'; img-src 'self' data: blob:; font-src 'self' data:;"],
+      },
+    });
+  });
+  // 바깥으로 나가는 요청 자체를 세션 층에서도 막는다 — CSP는 페이지가 지키는 규칙이라
+  // 브라우저 밖 경로(예: 미래에 추가될 preload 기능)까지 덮지 못한다. 두 겹으로 둔다.
+  smartMdWindow.webContents.session.webRequest.onBeforeRequest((details, callback) => {
+    const 로컬 = /^(file|devtools|blob|data):/i.test(details.url);
+    if (!로컬) console.warn(`[smartmd] 바깥 요청 차단: ${details.url.slice(0, 120)}`);
+    callback({ cancel: !로컬 });
+  });
   // ⚠ 배율(bindZoom)은 걸지 않는다 — Smart MD는 자기 확대/축소를 가진 편집기다.
   //   GIJO 화면 배율을 강제하면 편집기 안에서 글자 크기를 조절하는 기능과 부딪힌다.
   smartMdWindow.on("closed", () => { smartMdWindow = null; });

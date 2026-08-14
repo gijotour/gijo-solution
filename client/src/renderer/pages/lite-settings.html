@@ -519,9 +519,12 @@
 
   /** 상태만 다시 읽어 갈래 표시를 맞춘다(리스너는 다시 붙이지 않는다 — 중복 실행 방지). */
   async function 어디서다시() {
+    // ⚠ **admin 전용 조회를 쓰지 않는다**(재검토 A-1). remoteLlmGet은 admin만 부를 수 있어,
+    //   담당자 계정이면 401/403으로 떨어져 「지금 원격인지」조차 못 본다.
+    //   보는 것은 전원(where), 주소·바꾸기는 admin(아래 원격 GPU 카드) — 그 경계를 여기서도 지킨다.
     try {
-      var c = await g.remoteLlmGet();
-      원격상태 = { enabled: !!c.enabled, airgap: !!c.airgap, 읽음: true };
+      const w = await g.remoteLlmWhere();
+      원격상태 = { enabled: !!(w && w.remote), airgap: !!(w && w.airgap), 읽음: true };
       어디서그리기(원격상태.enabled, 원격상태.airgap);
     } catch (e) { /* 상태를 못 읽었으면 아래 안내가 그렇다고 말한다 */ }
   }

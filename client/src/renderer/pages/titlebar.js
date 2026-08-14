@@ -458,6 +458,42 @@
     renderSessChip();
   }
 
+  /**
+   * 🖧 원격 표시 — **질문이 이 PC를 벗어나는 중이면 담당자에게 보인다** (2026-08-14).
+   *
+   * ⚠ 왜 여기인가 (재검토 A-1 — 내가 「고쳤다」고 적고 못 고친 자리)
+   *   원격 여부를 보여 주던 곳은 설정의 AI팀 구성 패널뿐이고, 그 패널은 **admin에게만** 뜬다.
+   *   그래서 담당자(비-admin)는 원격이 켜져 있어도 「로컬 모델이 답한다」고만 보고,
+   *   「질문이 VPN으로 나갑니다」를 **어디서도 못 봤다.** 그 경고가 가장 필요한 사람이
+   *   질문을 입력하는 담당자다. 그래서 **전 화면 공통 자리**(이 상단 바, 36화면)에 둔다.
+   *   보는 것은 전원(`/api/llm/remote/where`), 바꾸는 것은 그대로 admin이다.
+   * ⚠ 꺼져 있으면 **아무것도 그리지 않는다** — 평소에 없던 표시가 생기면 그게 신호다.
+   */
+  var 원격칩 = null;
+  function mount원격칩() {
+    var hdr = document.getElementById("tbInfo") || document.querySelector(".header");
+    if (!hdr || document.querySelector(".gtb-remote")) return;
+    var right = hdr.querySelector(".header-right") || hdr;
+    var g = window.gijo;
+    if (!g || typeof g.remoteLlmWhere !== "function") return; // 옛 판이면 조용히 넘긴다
+    g.remoteLlmWhere().then(function (w) {
+      if (!w || !w.remote) return;                            // 로컬이면 표시하지 않는다
+      원격칩 = document.createElement("div");
+      // ⚠ `gtb-sess` 클래스를 **주지 않는다** — 세션 칩이 `querySelector(".gtb-sess")`로
+      //   중복을 막으므로, 그 이름을 쓰면 원격칩이 먼저 붙었을 때 **세션 칩이 사라진다.**
+      원격칩.className = "gtb-remote";
+      원격칩.style.cssText =
+        "-webkit-app-region:no-drag;display:flex;align-items:center;gap:5px;padding:3px 10px;" +
+        "border-radius:16px;font-size:12.25px;font-weight:800;white-space:nowrap;cursor:default;" +
+        "background:rgba(240,160,32,.14);border:1px solid rgba(240,160,32,.45);color:#f0a020;";
+      원격칩.title = "이 PC 대신 VPN 안의 원격 GPU가 답하고 있습니다 — 질문이 그 기계로 전송됩니다. 끄는 것은 관리자(설정 › 연동 › 원격 GPU)입니다.";
+      원격칩.textContent = "🖧 원격 GPU로 전송 중";
+      var clock = right.querySelector(".tb-clock, .gtb-clock");
+      if (clock && clock.parentNode === right) right.insertBefore(원격칩, clock);
+      else right.appendChild(원격칩);
+    }).catch(function () { /* 못 읽으면 표시하지 않는다 — 없는 경고를 지어내지 않는다 */ });
+  }
+
   function mountSessChip() {
     // 셸(app.html)은 상단 바가 탭줄 하나다(2026-08-07) — 세션 칩은 탭줄 오른쪽 #tbInfo에 붙는다.
     var hdr = document.getElementById("tbInfo") || document.querySelector(".header");
@@ -861,6 +897,7 @@
 
   function afterMount() {
     mountSessChip(); // 세션 칩(전 화면 공용)
+    mount원격칩();   // 🖧 원격 GPU로 전송 중(켜졌을 때만) — 담당자도 봐야 하는 표시
     mountTopbar();   // 상단 조작 줄(☰ ▣ 🔍 ← →)
     // 화면 안에 남아 있던 ⚙ — 설정은 상단 ☰ 하나로 모았다(입구가 둘이면 하나만 고쳐진다).
     var oldGear = document.getElementById("settingsBtn");
@@ -873,7 +910,7 @@
   ensureHeader();
   if (셸인가 || document.querySelector(".header")) mountTopbar();
   if (셸인가) mountShellInfo();
-  if (셸인가 || document.querySelector(".header.gtb-made")) mountSessChip();
+  if (셸인가 || document.querySelector(".header.gtb-made")) { mountSessChip(); mount원격칩(); }
 
   var navRoot = document.getElementById("gijoNav");
   if (navRoot || document.querySelector(".explorer")) {

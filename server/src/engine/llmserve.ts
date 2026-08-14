@@ -144,6 +144,28 @@ export function serveInFlight(): { 처리중: number; 상한: number } {
 }
 
 /**
+ * 거절을 **접어서** 로그로 남긴다 — DB에 쓰지 않는다.
+ *
+ * ⚠ 왜 (재검토 B-1) 무인증 경로에서 요청마다 감사 INSERT를 하면, 두드리는 쪽이 그대로
+ *   **쓰기 원시기능**을 갖는다: audit_log가 부풀어 실제 보안 사건이 최신 목록에서 밀려나고,
+ *   better-sqlite3 동기 쓰기가 이벤트 루프를 멈춰 전 사용자가 느려진다.
+ *   같은 출처는 1분에 한 줄만 남기고 나머지는 센다 — 사후에 「누가 두드렸나」는 남되 값은 싸다.
+ */
+const 거절기록 = new Map<string, { 시각: number; 건수: number }>();
+function 거절로그(보낸곳: string, 사유: string): void {
+  const now = Date.now();
+  const 이전 = 거절기록.get(보낸곳);
+  if (이전 && now - 이전.시각 < 60_000) { 이전.건수 += 1; return; }
+  if (이전 && 이전.건수 > 1) console.warn(`[llmserve] ${보낸곳} 거절 ${이전.건수}건(직전 1분)`);
+  거절기록.set(보낸곳, { 시각: now, 건수: 1 });
+  console.warn(`[llmserve] 거절: ${보낸곳} — ${사유}`);
+  // 표가 무한히 자라지 않게(오래된 것 정리) — 무인증 경로라 출처가 많을 수 있다.
+  if (거절기록.size > 500) {
+    for (const [k, v] of 거절기록) if (now - v.시각 > 300_000) 거절기록.delete(k);
+  }
+}
+
+/**
  * 로컬 llama의 OpenAI 호환 base URL(기본 모델). 내줄 수 없으면 null.
  *
  * ⚠ `ensureAgentModel`은 **모델이 없어도 기본 포트 URL을 돌려준다**(localengine.ts:1083-1085).
@@ -156,10 +178,21 @@ async function localBaseUrl(): Promise<string | null> {
     const m = await import("./localengine.js");
     const { getAgentModel } = await import("./agents.js");
     const 배정 = getAgentModel("analysis");
-    // 배정 모델이 없으면 기본 모델(부팅 때 로드된 것)을 쓰는 구조다 — 그때는 살아 있는지
-    // /models 응답으로 판정한다(여기서 파일 목록을 다시 세지 않는다).
     if (배정 && !m.isModelAvailable(배정)) return null;
-    return await m.ensureAgentModel("analysis");
+    const base = await m.ensureAgentModel("analysis");
+    // ⚠ **미배정일 때가 문제였다**(재검토 A-4). 배정이 없으면 ensureAgentModel이 모델 유무와
+    //   무관하게 기본 포트 URL을 준다 — 모델이 0개인 기계는 대개 배정도 없다(미배정=조용한 폴백).
+    //   그래서 붙는 쪽이 「모델이 없음」인데 「닿지 못했습니다」를 받았다. 실제로 서빙 중인지
+    //   **한 번 찔러 본다**(파일 목록을 다시 세지 않는다 — 판정의 집은 localengine이다).
+    if (!배정) {
+      try {
+        const r = await fetch(`${base}/models`, { signal: AbortSignal.timeout(3000) });
+        if (!r.ok) return null;
+      } catch {
+        return null; // 기본 포트에 아무도 없다 = 내줄 모델이 없다
+      }
+    }
+    return base;
   } catch {
     return null;
   }
@@ -176,7 +209,29 @@ async function localBaseUrl(): Promise<string | null> {
  */
 function 주소재료(req: Request): { seenAddress: string; addressIsPrivate: boolean; port: number } {
   const raw = String(req.socket?.localAddress ?? "").replace(/^::ffff:/, "");
-  return { seenAddress: raw, addressIsPrivate: raw ? isVpnRangeIp(raw) : false, port: servePort() };
+  return { seenAddress: raw, addressIsPrivate: raw ? 상대가쓸수있나(raw) : false, port: servePort() };
+}
+
+/**
+ * **상대가 이 주소로 우리에게 붙을 수 있나** — 「사설인가」와 다른 질문이다.
+ *
+ * ⚠ 왜 따로 만들었나 (2026-08-14 재검토 A-2 — 내가 반쪽만 고쳤던 자리)
+ *   화면의 사설 판정을 서버로 모을 때 `isVpnRangeIp`를 그대로 썼다. 그런데 그 함수는
+ *   **루프백(127.x·::1)을 사설로 통과시킨다**(airgap.ts:58 — 에어갭 봉인에서는 맞는 판정이다).
+ *   번들 배포는 클라가 `http://localhost:<포트>`로 붙으므로 socket.localAddress가 127.0.0.1이 되고,
+ *   그러면 화면이 **경고를 끄고 「이 주소를 상대에게 주세요」라고 확언**했다 —
+ *   상대에게 `http://127.0.0.1:7446/...`을 넘기게 된다. H2와 **똑같은 실패**(붙을 상대가 없다)의
+ *   재발이고, 앞 검토가 「정상 상태에서도 경고가 떴다」고 한 그 상황은 실은 **정상이 아니었다.**
+ *   ▶ 판정 단일화(옳은 절반)는 남기고, 루프백·링크로컬은 「상대가 못 쓰는 주소」로 가른다.
+ */
+export function 상대가쓸수있나(host: string): boolean {
+  const h = String(host ?? "").replace(/^\[|\]$/g, "").toLowerCase();
+  if (!h) return false;
+  if (h === "::1" || h === "localhost" || h === "0.0.0.0") return false;
+  if (/^127\./.test(h)) return false;          // 루프백 — 상대 기계에서는 자기 자신을 가리킨다
+  if (/^169\.254\./.test(h)) return false;     // 링크로컬(자동 할당) — 라우팅되지 않는다
+  if (h.startsWith("fe80")) return false;      // IPv6 링크로컬
+  return isVpnRangeIp(h);
 }
 
 /**
@@ -198,21 +253,29 @@ export function registerLlmServeGateway(app: Express): void {
     //   쪽이 무인증으로 「이건 GIJO다 · 에어갭이다」를 알아냈다. 밖에서 온 것은 전부 같은 404다 —
     //   있는지 없는지조차 알려주지 않는다.
     if (!requesterAllowed(req)) {
-      recordAudit({ kind: "block", action: "원격 GPU 창구 거절(VPN 밖)", actor: `원격 ${보낸곳}`, result: "blocked" });
+      // ⚠ 여기서 **감사를 남기지 않는다**(재검토 B-1). 이 자리는 인증 이전이라 아무나 두드릴 수
+      //   있는데, 두드릴 때마다 SQLite에 동기 쓰기를 하면 ① 스캐너가 audit_log를 채워
+      //   **실제 보안 사건이 최신 목록에서 밀려나고** ② 동기 쓰기가 이벤트 루프를 멈춰
+      //   전 사용자 응답이 느려진다. 무인증 경로의 감사는 「기록」이 아니라 **쓰기 원시기능**이다.
+      //   대신 거절은 같은 IP를 접어서 로그로만 남긴다(아래 거절로그).
+      거절로그(보낸곳, "VPN 밖");
       res.status(404).json({ error: "not found" });
       return false;
     }
     // ⚠ 브라우저에서 온 것은 거절한다 — CORS가 모든 오리진을 허용하는 배포에서 남의 웹페이지가
     //   이 창구를 부를 수 있었다(H1, 실측 확인). 우리 GIJO의 서버 대 서버 fetch는 이 헤더가 없다.
     if (browserOriginated(req)) {
-      recordAudit({ kind: "block", action: "원격 GPU 창구 거절(브라우저 요청)", actor: `원격 ${보낸곳}`, detail: String(req.headers?.origin ?? req.headers?.referer ?? ""), result: "blocked" });
-      res.status(403).json({ error: "브라우저에서는 쓸 수 없습니다 — GIJO 서버끼리만 주고받는 창구입니다." });
+      거절로그(보낸곳, `브라우저 요청(${String(req.headers?.origin ?? req.headers?.referer ?? "")})`);
+      // ⚠ 본문을 **404와 같게** 준다(재검토 B-7). 브라우저 갈래에는 CORS 헤더가 붙어 응답이
+      //   크로스오리진으로 **읽히므로**, 「GIJO 창구다」라고 답하면 사내망 페이지가 포트를 훑어
+      //   제품을 식별할 수 있다. 대역 밖에 아무것도 안 알려주기로 한 것과 같은 자세다.
+      res.status(404).json({ error: "not found" });
       return false;
     }
     // ⚠ 앞단 프록시가 있으면 소켓 주소가 전부 127.0.0.1이라 대역 판정이 **전원 통과**가 된다(M2).
     //   모르면 막는다 — 이 창구는 「확실히 VPN 안」이 성립할 때만 열려야 한다.
     if (proxyDetected(req)) {
-      recordAudit({ kind: "block", action: "원격 GPU 창구 거절(앞단 프록시 감지)", actor: `원격 ${보낸곳}`, result: "blocked" });
+      거절로그(보낸곳, "앞단 프록시 감지");
       res.status(403).json({ error: "앞단에 프록시가 있어 요청자를 확인할 수 없습니다 — 이 창구는 프록시 없이 VPN으로 직접 붙을 때만 열립니다." });
       return false;
     }
@@ -226,11 +289,17 @@ export function registerLlmServeGateway(app: Express): void {
   //   200MB를 메모리에 밀어넣을 수 있다. 채팅 요청은 이보다 훨씬 작다.
   //   ⚠ 이 파서가 먹으려면 이 라우트가 전역 파서보다 **먼저 등록**돼야 한다(app.ts에서 그렇게 부른다).
   const 본문 = express.json({ limit: "8mb" });
+  // ⚠ 관문은 **미들웨어 하나**로 두고 모든 창구 라우트에 같은 방식으로 붙인다.
+  //   핸들러 안에서 부르는 형태와 섞으면 「관문을 거치는가」를 세는 시험이 형태 차이에 걸려
+  //   헛돈다(실제로 한 번 그랬다). 붙는 자리는 **본문 파서보다 앞**이다(A-5).
+  const 관문미들 = (req: Request, res: Response, next: express.NextFunction): void => {
+    if (관문(req, res)) next();
+  };
 
   app.get(
     "/api/llm/serve/v1/models",
+    관문미들,
     asyncRoute(async (req, res) => {
-      if (!관문(req, res)) return;
       const base = await localBaseUrl();
       if (!base) { res.status(503).json({ error: "이 PC에 서빙 중인 모델이 없습니다." }); return; }
       try {
@@ -244,39 +313,57 @@ export function registerLlmServeGateway(app: Express): void {
 
   app.post(
     "/api/llm/serve/v1/chat/completions",
+    // ⚠ 관문이 **본문 파서보다 앞**이다(재검토 A-5). 예전엔 파서가 먼저라, 대역 밖·프록시 뒤·
+    //   브라우저 요청도 8MB를 먼저 파싱한 뒤 거절됐다 — 무인증 CPU·메모리 소모가 그대로 남았다.
+    관문미들,
     본문,
     asyncRoute(async (req, res) => {
-      if (!관문(req, res)) return;
-      // ⚠ 동시 처리 상한(M5) — 내주는 것은 호의이지 무제한 위임이 아니다. 넘치면 429로
-      //   정직하게 거절한다(줄 세워 두면 붙는 쪽은 「느리다」로 오해하고 원인을 못 찾는다).
+      // ⚠ 상한 검사와 계수 증가 **사이에 await를 두지 않는다**(재검토 A-6, TOCTOU).
+      //   예전엔 사이에 localBaseUrl()(모델 로드·LRU 스왑이면 수십 초)이 있어, 동시에 20건을
+      //   밀면 20건 모두 「처리중 0」에서 통과해 GPU를 점유했다 — 상한이 막으려던 그 상황이다.
       if (처리중 >= 동시상한) {
         res.status(429).json({ error: `이 PC가 지금 ${동시상한}건을 처리 중입니다 — 잠시 뒤 다시 시도하세요.` });
         return;
       }
+      처리중 += 1;
+      let 되돌림 = false;
+      const 놓기 = () => { if (!되돌림) { 되돌림 = true; 처리중 = Math.max(0, 처리중 - 1); } };
+      // ⚠ 아래 **모든 조기 return 경로**가 놓기()를 거쳐야 한다 — 하나라도 빠지면 창구가 영영 막힌다.
+      res.on("close", () => 놓기());
+
       const base = await localBaseUrl();
-      if (!base) { res.status(503).json({ error: "이 PC에 서빙 중인 모델이 없습니다." }); return; }
+      if (!base) { 놓기(); res.status(503).json({ error: "이 PC에 서빙 중인 모델이 없습니다." }); return; }
 
       // ⚠ `enabled: true`를 박아 쓰지 않는다(검토관 지적 M3) — 관문 통과와 이 쓰기 사이에
       //   admin이 껐으면, 처리 중이던 요청이 **꺼진 스위치를 다시 켜** 화면이 「내주는 중」으로
       //   돌아온다. 지금 값을 읽어 그대로 두고 시각만 갱신한다.
       const 지금설정 = llmServeConfig();
-      if (!지금설정.enabled) { res.status(404).json({ error: "이 서버는 원격 GPU 제공이 꺼져 있습니다." }); return; }
-      save({ ...지금설정, lastServedAt: Date.now() }); // 「쓰이고 있나」를 화면이 보이게
+      if (!지금설정.enabled) { 놓기(); res.status(404).json({ error: "이 서버는 원격 GPU 제공이 꺼져 있습니다." }); return; }
       const 보낸곳 = String(req.socket?.remoteAddress ?? "(미상)");
-      // 무인증 창구라 활동 감사(actor 필요)가 통째로 건너뛴다 — 감사를 직접 남긴다(M4).
-      // 「누가·어디서 내 GPU를 썼나」를 사후에 알 길이 없으면 보안 제품에서 그 자체가 지적 대상이다.
-      recordAudit({ kind: "config", action: "원격 GPU 내줌(추론 1건)", actor: `원격 ${보낸곳}`, result: "ok" });
+
+      // ⚠ **일이 끝난 뒤에** 기록한다(재검토 B-2). 예전엔 상류를 부르기도 전에
+      //   `result:"ok"`와 「마지막 사용」을 남겨, 502로 끝난 요청도 「내줌·성공」으로 보였다 —
+      //   activityaudit.ts가 res.on("finish")를 기다리는 것과 같은 이유다(거짓 기록 금지).
+      let 기록함 = false;
+      const 마무리기록 = (성공: boolean) => {
+        if (기록함) return;
+        기록함 = true;
+        if (성공) save({ ...llmServeConfig(), lastServedAt: Date.now() }); // 「쓰이고 있나」 표시
+        // 무인증 창구라 활동 감사(actor 필요)가 통째로 건너뛴다 — 감사를 직접 남긴다(M4).
+        // ⚠ 이 감사는 **관문을 통과한 요청만** 남긴다(거절은 로그로 접는다 — B-1).
+        recordAudit({
+          kind: "config",
+          action: "원격 GPU 내줌(추론 1건)",
+          actor: `원격 ${보낸곳}`,
+          result: 성공 ? "ok" : "error",
+        });
+      };
 
       // ⚠ 상류를 취소할 통로를 만든다 — 클라이언트가 끊으면 llama 생성도 멈춘다(L1).
       //   없으면 버려진 요청이 10분 타임아웃까지 슬롯을 점유한다.
       const 취소 = new AbortController();
       const 시계 = setTimeout(() => 취소.abort(), 10 * 60 * 1000); // 큰 모델을 감안해 넉넉히
-      // ⚠ 상한 계수는 **끝날 때 반드시 되돌린다** — 안 그러면 몇 건 처리 후 창구가 영영 막힌다.
-      //   res의 close는 정상 종료·에러·클라이언트 끊김 어느 쪽에서도 온다.
-      처리중 += 1;
-      let 되돌림 = false;
-      const 놓기 = () => { if (!되돌림) { 되돌림 = true; 처리중 = Math.max(0, 처리중 - 1); } };
-      res.on("close", () => { clearTimeout(시계); 취소.abort(); 놓기(); });
+      res.on("close", () => { clearTimeout(시계); 취소.abort(); });
 
       try {
         const upstream = await fetch(`${base}/chat/completions`, {
@@ -288,7 +375,7 @@ export function registerLlmServeGateway(app: Express): void {
         res.status(upstream.status);
         const ct = upstream.headers.get("content-type");
         if (ct) res.setHeader("content-type", ct);
-        if (!upstream.body) { clearTimeout(시계); 놓기(); res.end(); return; }
+        if (!upstream.body) { clearTimeout(시계); 놓기(); 마무리기록(upstream.ok); res.end(); return; }
         // 스트리밍(SSE)도 그대로 흘려보낸다 — 통째로 모았다가 주면 답이 한참 뒤에 한꺼번에 뜬다.
         // ⚠ `.pipe()`를 쓰지 않는다(검토관 지적 H3): pipe는 에러를 전달하지 않고, 리스너 없는
         //   `error`는 **uncaught exception이라 서버 프로세스가 죽는다**. 이 저장소에는
@@ -297,6 +384,7 @@ export function registerLlmServeGateway(app: Express): void {
         pipeline(Readable.fromWeb(upstream.body as Parameters<typeof Readable.fromWeb>[0]), res, (err) => {
           clearTimeout(시계);
           놓기();
+          마무리기록(!err && upstream.ok); // 끝난 뒤에야 성공/실패를 안다
           if (!err) return;
           console.warn(`[llmserve] 중계 중 끊김: ${err.message}`);
           if (!res.headersSent) res.status(502).json({ error: "추론 중 연결이 끊겼습니다." });
@@ -305,6 +393,7 @@ export function registerLlmServeGateway(app: Express): void {
       } catch (e) {
         clearTimeout(시계);
         놓기();
+        마무리기록(false);
         res.status(502).json({ error: `추론에 실패했습니다 — ${e instanceof Error ? e.message : String(e)}` });
       }
     })
@@ -314,7 +403,9 @@ export function registerLlmServeGateway(app: Express): void {
 export function registerLlmServeRoutes(app: Express): void {
   // 상태 조회·전환 — admin 전용. 화면이 주소를 만들어 보여줄 수 있게 재료를 함께 준다.
   app.get("/api/llm/serve", authMiddleware, adminMiddleware, (req, res) => {
-    res.json({ ...llmServeConfig(), airgap: isAirgapOn(), ...주소재료(req) });
+    // 처리중/상한도 함께 준다(재검토 B-8) — 안 주면 빌려주는 쪽은 자기 기계가 지금 거절 중인 것을
+    // 알 길이 없다(붙는 쪽만 429를 본다).
+    res.json({ ...llmServeConfig(), airgap: isAirgapOn(), ...주소재료(req), ...serveInFlight() });
   });
 
   app.post(
