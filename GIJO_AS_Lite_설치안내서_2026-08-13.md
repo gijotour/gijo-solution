@@ -105,10 +105,10 @@
 ## 받은 파일 확인 (USB로 받으셨을 때)
 | | |
 |---|---|
-| 파일 | `GIJO AS Lite Setup 5.18.3.exe` (1,527MB) |
-| SHA256 | `0028c4bbc7e01ec5d71c4f9c608bf31886e34666e7592bca31a340a9c8836ecf` |
+| 파일 | `GIJO AS Lite Setup 1.0.0.exe` (1,527MB) |
+| SHA256 | `191ced6c6ef730a6631ca960cebb5a3e2070391fb8ceca18028b08f8f022e84c` |
 
-명령 프롬프트에서 대조: `certutil -hashfile "GIJO AS Lite Setup 5.18.3.exe" SHA256`
+명령 프롬프트에서 대조: `certutil -hashfile "GIJO AS Lite Setup 1.0.0.exe" SHA256`
 → 위 값과 **한 글자라도 다르면 설치하지 말고** 전달자에게 알려 주세요(전송 중 손상).
 
 ## 설치 → 첫 실행 (5분)

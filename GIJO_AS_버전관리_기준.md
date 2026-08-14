@@ -2,6 +2,16 @@
 
 제정 2026-07-26 (사용자 결정). **클라이언트 버전(X.Y.Z)이 제품의 공식 버전**이다 — 고객이 보는 유일한 번호이며, 설치본·자동 업데이트·릴리스 노트가 모두 이 번호를 쓴다.
 
+## ★ 라이트와 표준은 버전을 **따로** 키운다 (2026-08-14 사용자 결정)
+
+- **표준(메인 제품)** = `client/package.json`의 `version` (5.x.x). 자동 업데이트(서버 latest-release)·`publish-release`가 이 번호를 쓴다.
+- **라이트** = `client/electron-builder.lite.json`의 `extraMetadata.version` (**Lite 1.0.0부터 독자 semver**). electron-builder가 이 값으로 asar package.json을 덧써, 라이트 빌드(`dist:lite`)는 표준 번호와 무관하게 자기 번호를 쓴다.
+- **왜 나눴나**: 둘이 `package.json` 하나를 공유하던 때, 라이트를 5.18.1→2→3으로 게시하는 동안 표준(5.18.0)의 번호 공간이 섞였다. 「Lite 1.2」처럼 한눈에 갈리고 번호 충돌이 원천 없어진다.
+- ⚠ 감시: `lite-edition-shell.test.ts` ①″가 두 번호가 **다른지** 지킨다(같으면 분리가 무의미).
+- ⚠ 라이트는 자동 업데이트가 아니라 **Drive 수동 교체**다 — Drive 파일명(`GIJO AS Lite Setup <Lite버전>.exe`)·설치 안내서도 이 독자 번호를 쓴다.
+
+아래 X/Y/Z 자리 규칙은 **두 체계에 각각** 적용된다.
+
 ## 언제 어떤 자리를 올리나
 
 | 자리 | 올리는 때 | 예 |

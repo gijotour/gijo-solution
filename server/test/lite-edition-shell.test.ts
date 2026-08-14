@@ -36,6 +36,16 @@ describe("라이트 에디션 — 로그인 뒤 라이트 셸로 들어간다", 
     expect(builderLite.extraMetadata?.productName).not.toBe(clientPkg.productName);
   });
 
+  it("①″ 라이트·표준 버전이 따로 관리된다 — 번호 공간을 안 섞는다 (2026-08-14 사용자 결정)", () => {
+    // 뿌리: 둘이 package.json version 하나를 공유해, 라이트를 5.18.1→2→3으로 게시하는 동안
+    //   표준(5.18.0)의 번호 공간이 섞였다. 결정(ⓐ): 라이트는 Lite X.Y.Z 독자 체계
+    //   (electron-builder.lite.json extraMetadata.version), 표준은 package.json version.
+    const clientPkg = JSON.parse(fs.readFileSync(new URL("../../client/package.json", import.meta.url), "utf8"));
+    expect(builderLite.extraMetadata?.version, "라이트는 독자 version을 extraMetadata에 박는다").toBeTruthy();
+    // 라이트 독자 번호는 표준(package.json)과 달라야 한다 — 같으면 분리가 무의미하다.
+    expect(builderLite.extraMetadata?.version).not.toBe(clientPkg.version);
+  });
+
   it("② main.ts가 그 값을 실제로 읽는다 — env만 보고 있으면 패키징본에서 안 걸린다", () => {
     expect(mainSrc).toContain("gijoEdition");
   });

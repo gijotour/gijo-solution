@@ -6,7 +6,8 @@
   },
   "extraMetadata": {
     "gijoEdition": "lite",
-    "productName": "GIJO AS Lite"
+    "productName": "GIJO AS Lite",
+    "version": "1.0.0"
   },
   "files": [
     "dist/**/*",
