@@ -106,6 +106,9 @@
     //   여기는 1회성으로 남아 있었다). 라이트 셸도 세션 내내 살아 있어서, 설정에서 켜면
     //   칩이 안 생기고 끄면 남는 똑같은 반쪽이었다.
     (function () {
+      // ⚠ 다리가 없으면 조용히 접는다(관문 M-3) — 없는데 부르면 **동기 TypeError**가 이 스크립트
+      //   블록 전체를 죽여, 아래 「📝 문서 작성」 리스너까지 등록이 안 된다(눌러도 무반응 유형).
+      if (!window.gijo || typeof window.gijo.remoteLlmWhere !== "function") return;
       function 갱신() {
         window.gijo.remoteLlmWhere().then(function (w) {
           var chip = document.getElementById("liteRemoteChip");

@@ -57,7 +57,9 @@
 
   <section class="card">
     <h2>지금 돌고 있나 <span class="pill" id="engPill">확인 중</span></h2>
-    <div class="sub">라이트는 이 PC 안에서 답을 만듭니다 — 모델이 멈춰 있으면 무엇을 물어도 답이 안 나옵니다.</div>
+    <!-- ⚠ 이 줄은 원격 모드에서 스크립트가 바꾼다(관문 H-1) — 원격 카드 두 줄 위에서
+         「이 PC 안에서 답을 만듭니다」가 그대로 떠 한 카드 안에서 자기모순이었다. -->
+    <div class="sub" id="engSub">라이트는 이 PC 안에서 답을 만듭니다 — 모델이 멈춰 있으면 무엇을 물어도 답이 안 나옵니다.</div>
     <div id="engBox">불러오는 중…</div>
   </section>
 
@@ -126,10 +128,16 @@
         var w = await g.remoteLlmWhere();
         if (w && w.remote) {
           pill.textContent = "원격 GPU"; pill.className = "pill on";
+          // ⚠ 「답하고 있습니다」라고 **단언하지 않는다**(관문 M-1) — 이 갈래는 설정값만 본다.
+          //   어젯밤 실제로 원격이 켜진 채 VPN 경로가 끊겨 타임아웃이 났는데, 그때 이 카드가
+          //   초록으로 「답하고 있다」고 말하면 거짓이다. 아는 것(설정돼 있다)만 말한다.
           document.getElementById("engBox").innerHTML =
-            '<div class="empty"><b>🖧 원격 GPU가 답하고 있습니다</b> — 질문이 VPN으로 그 기계에 전송됩니다.<br>' +
+            '<div class="empty"><b>🖧 원격 GPU를 쓰도록 설정돼 있습니다</b> — 질문이 VPN으로 그 기계에 전송됩니다.<br>' +
             "이 PC에 챗 모델을 두지 않아도 대화가 됩니다. 원격이 로컬(7~8B)보다 <b>답이 오래 걸릴 수 있습니다</b>(더 큰 모델을 먼 기계에서 돌립니다).<br>" +
-            '끄면 이 PC의 모델로 돌아옵니다 — <button class="go" style="margin-top:10px" id="goRgpu">⚙ 원격 GPU 설정</button></div>';
+            '연결이 실제로 되는지는 ⚙ 설정의 <b>[연결 테스트]</b>가 확인해 줍니다 — <button class="go" style="margin-top:10px" id="goRgpu">⚙ 원격 GPU 설정</button></div>';
+          // 원격 카드 두 줄 위의 정체성 한 줄도 함께 바꾼다(관문 H-1 — 안 바꾸면 한 카드 안에서 자기모순).
+          var sub = document.getElementById("engSub");
+          if (sub) sub.textContent = "지금은 VPN 안의 원격 GPU가 답을 만듭니다 — 이 PC에 모델이 없어도 대화가 됩니다.";
           var br = document.getElementById("goRgpu"); if (br) br.addEventListener("click", 설정으로);
           return;
         }
