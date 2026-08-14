@@ -528,3 +528,10 @@ export const remoteLlmApi = {
   test: (url: string) => request<{ ok: boolean; models?: number | null; error?: string }>("/api/llm/remote/test", { method: "POST", body: { url } }),
   set: (enabled: boolean, url: string) => request<{ enabled: boolean; url: string; airgap: boolean }>("/api/llm/remote", { method: "POST", body: { enabled, url } }),
 };
+
+// ── 이 PC를 원격 GPU로 **내주기**(2026-08-14) — 서버 llmserve.ts의 소비자 ────────────
+//   위가 「붙는 쪽」이면 이건 「받는 쪽」이다. 둘이 짝이라 한 파일에 붙여 둔다.
+export const llmServeApi = {
+  get: () => request<{ enabled: boolean; lastServedAt: number | null; airgap: boolean; port: number }>("/api/llm/serve"),
+  set: (enabled: boolean) => request<{ enabled: boolean; lastServedAt: number | null; airgap: boolean; port: number }>("/api/llm/serve", { method: "POST", body: { enabled } }),
+};

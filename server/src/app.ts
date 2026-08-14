@@ -49,6 +49,7 @@ import { registerBackupRoutes } from "./engine/backup";
 import { registerDbCryptRoutes } from "./engine/dbcrypt";
 import { registerDocboxRoutes } from "./engine/docbox";
 import { registerRemoteLlmRoutes } from "./engine/remotellm";
+import { registerLlmServeRoutes } from "./engine/llmserve";
 import { registerDocRequestRoutes } from "./engine/docrequest";
 import { registerGitSyncRoutes } from "./engine/gitsync";
 import { registerHfModelsRoutes } from "./engine/hfmodels";
@@ -184,6 +185,7 @@ export function createApp(): Express {
   registerDbCryptRoutes(app); // 저장 암호화 상태·복구 열쇠 재발급
   registerDocboxRoutes(app); // 문서함 — 출하 문서를 담당자가 직접 읽는 통로
   registerRemoteLlmRoutes(app); // 원격 LLM(BridgeAI 1단계) — VPN 전용, 사장님 결정 2026-08-13
+  registerLlmServeRoutes(app); // 원격 GPU **내주는 쪽** — 붙을 상대가 없던 구멍을 메운다(2026-08-14)
   registerDocRequestRoutes(app); // 문서함 — 제품 요청 문서 만들기(파일 저장은 클라이언트가)
   registerGitSyncRoutes(app);
   registerHfModelsRoutes(app);

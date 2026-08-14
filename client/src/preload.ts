@@ -69,6 +69,9 @@ const gijoApi = {
   remoteLlmGet: () => api.remoteLlmApi.get(),
   remoteLlmTest: (url: string) => api.remoteLlmApi.test(url),
   remoteLlmSet: (enabled: boolean, url: string) => api.remoteLlmApi.set(enabled, url),
+  // 이 PC를 원격 GPU로 내주기(받는 쪽) — 붙는 쪽만 있고 붙을 상대를 만들 길이 없던 구멍을 메운다.
+  llmServeGet: () => api.llmServeApi.get(),
+  llmServeSet: (enabled: boolean) => api.llmServeApi.set(enabled),
   editionGet: () => ipcRenderer.invoke("edition:get"),
   editionSet: (mode: string) => ipcRenderer.invoke("edition:set", mode),
   mfaResetUser: (userId: string) => api.authApi.mfaResetUser(userId),

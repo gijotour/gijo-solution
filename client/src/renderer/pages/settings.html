@@ -729,6 +729,28 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       </div>
     </div>
 
+    <!-- 이 PC를 원격 GPU로 **내주기**(2026-08-14). 위 카드가 「붙는 쪽」이라면 여기는 「받는 쪽」이다.
+         왜 생겼나: 붙는 쪽만 있고 **붙을 상대를 만드는 길이 없었다** — llama는 127.0.0.1에만
+         묶여 있어(localengine) 큰 GPU 기계에 GIJO를 깔아도 옆 노트북이 못 붙었다. -->
+    <div data-sec="link" class="panel" id="servePanel" style="display:none">
+      <div class="panel-title">🎁 이 PC를 원격 GPU로 내주기<span class="badge b-purple" style="margin-left:8px">admin 전용</span></div>
+      <div data-gijo-fold="원격 GPU 내주기">
+        <div class="hint" style="margin-bottom:8px">이 기계에 큰 GPU가 있으면, <b>VPN 안의 다른 GIJO</b>가 이 PC의 모델로 답을 받아갑니다. ⚠ 켜면 VPN 안에서 <b>인증 없이</b> 이 PC의 AI를 쓸 수 있습니다 — 기본은 꺼짐, 에어갭이면 막힙니다.</div>
+        <div class="field-row">
+          <button class="btn primary" id="serveOn">켜기</button>
+          <span id="serveState" class="hint"></span>
+        </div>
+        <div class="field-row" id="serveAddrRow" style="display:none">
+          <div class="field" style="flex:1">
+            <label for="serveAddr">붙는 쪽에 넣을 주소 — 저쪽 「원격 GPU」 칸에 이대로 붙여넣습니다</label>
+            <input id="serveAddr" readonly>
+          </div>
+          <button class="btn" id="serveCopy">복사</button>
+        </div>
+        <div id="serveMsg"></div>
+      </div>
+    </div>
+
     <!-- 법령·판례 조회 — 인터넷이 필요해 기본 꺼짐. 키를 넣어야 켜진다(2026-07-26). -->
     <div data-sec="link" class="panel" id="lawPanel" style="display:none">
       <div class="panel-title">⚖ 법령·판례 조회 (선택)<span class="badge b-purple" style="margin-left:8px">admin 전용</span></div>
@@ -853,6 +875,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         document.getElementById("siemPanel").style.display = "";
         document.getElementById("lawPanel").style.display = "";
         document.getElementById("rgpuPanel").style.display = "";
+        document.getElementById("servePanel").style.display = "";   // 원격 GPU 내주기(받는 쪽)
         document.getElementById("editionPanel").style.display = "";
         document.getElementById("modelAuthPanel").style.display = "";
         document.getElementById("agentModelPanel").style.display = "";
@@ -860,6 +883,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         await loadModelAuth();
         await loadLawConfig();
         await loadRemoteGpu().catch(function () {});
+        await loadLlmServe().catch(function () {});
         // AI팀 구성의 「🖧 원격 GPU」 칩이 ?focus=rgpu로 데려온다 — 판이 실린 뒤에 스크롤한다.
         // (판이 admin에게만 보이므로 이 자리에서만 확실히 존재한다.)
         if (new URLSearchParams(location.search).get("focus") === "rgpu") {
@@ -2463,6 +2487,47 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     on.onclick = async function () {
       if (!c.enabled && !confirm("켜면 질문이 VPN으로 원격 GPU에 전송됩니다. 계속할까요?")) return;
       try { await window.gijo.remoteLlmSet(!c.enabled, url.value.trim()); await loadRemoteGpu(); }
+      catch (e) { msg.innerHTML = '<div class="hint" style="color:var(--red)">' + esc(String((e && e.message) || e)) + "</div>"; }
+    };
+  }
+
+  // 이 PC를 원격 GPU로 내주기(받는 쪽) — 위 loadRemoteGpu(붙는 쪽)와 짝이다.
+  //   ⚠ 주소는 **사람이 손으로 만들지 않는다.** 저쪽에 넣을 주소를 우리가 만들어 보여주고
+  //     복사시킨다 — 「10.8.0.1:4000/api/llm/serve/v1」을 외워서 치게 하면 반드시 틀린다.
+  async function loadLlmServe() {
+    var st = document.getElementById("serveState"), msg = document.getElementById("serveMsg");
+    var on = document.getElementById("serveOn"), row = document.getElementById("serveAddrRow");
+    var addr = document.getElementById("serveAddr");
+    var c = await window.gijo.llmServeGet();
+    st.textContent = c.airgap
+      ? "에어갭 모드 — 사용 불가"
+      : (c.enabled
+        ? ("내주는 중" + (c.lastServedAt ? " · 마지막 사용 " + new Date(c.lastServedAt).toLocaleString("ko-KR") : " · 아직 쓰인 적 없음"))
+        : "꺼짐");
+    on.textContent = c.enabled ? "끄기" : "켜기";
+    on.disabled = !!c.airgap;
+    row.style.display = c.enabled ? "" : "none";
+    if (c.enabled) {
+      // 이 기계의 VPN 주소는 서버가 모른다(랜카드가 여럿이면 어느 것인지 고를 수 없다).
+      // 그래서 **지금 접속에 쓰고 있는 호스트**를 바탕으로 만들고, 사설이 아니면 그렇다고 말한다.
+      var 서버주소 = "";
+      try { 서버주소 = new URL(await window.gijo.getServerUrl()).hostname; } catch (e) {}
+      var 사설 = /^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)/.test(서버주소);
+      addr.value = "http://" + (서버주소 || "이-PC의-VPN-주소") + ":" + c.port + "/api/llm/serve/v1";
+      msg.innerHTML = 사설
+        ? '<div class="hint">저쪽 GIJO의 「원격 GPU」 칸에 위 주소를 넣고 <b>연결 테스트</b>를 누르면 됩니다.</div>'
+        : '<div class="hint" style="color:var(--amber)">⚠ 지금 접속 주소(' + esc(서버주소 || "없음") + ')가 VPN 주소가 아닙니다 — 위 주소의 앞부분을 <b>이 PC의 VPN 주소</b>(10.x 등)로 바꿔서 알려주세요. 붙는 쪽은 사설 주소만 받습니다.</div>';
+    } else {
+      msg.innerHTML = "";
+    }
+    document.getElementById("serveCopy").onclick = function () {
+      navigator.clipboard.writeText(addr.value).then(function () {
+        msg.innerHTML = '<div class="hint" style="color:var(--teal)">복사했습니다.</div>';
+      });
+    };
+    on.onclick = async function () {
+      if (!c.enabled && !confirm("켜면 VPN 안의 다른 GIJO가 이 PC의 AI를 인증 없이 쓸 수 있습니다. 계속할까요?")) return;
+      try { await window.gijo.llmServeSet(!c.enabled); await loadLlmServe(); }
       catch (e) { msg.innerHTML = '<div class="hint" style="color:var(--red)">' + esc(String((e && e.message) || e)) + "</div>"; }
     };
   }
