@@ -106,7 +106,7 @@
 | | |
 |---|---|
 | 파일 | `GIJO AS Lite Setup 1.1.0.exe` (1,529MB) |
-| SHA256 | `843b401a6e01b7c66591730e7f906b847ad17d54571d4cccd95d61a5335d6c72` |
+| SHA256 | `3529bd3a8c8ba31505a31b9c5255d956a688e06e26099e1dbc7bbbf1e1723ad8` |
 
 명령 프롬프트에서 대조: `certutil -hashfile "GIJO AS Lite Setup 1.1.0.exe" SHA256`
 → 위 값과 **한 글자라도 다르면 설치하지 말고** 전달자에게 알려 주세요(전송 중 손상).
