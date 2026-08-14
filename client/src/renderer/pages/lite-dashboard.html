@@ -116,9 +116,26 @@
 
   async function 엔진() {
     try {
+      var pill = document.getElementById("engPill");
+      // ★ 원격 GPU가 켜져 있으면 **그것부터 말한다**(2026-08-15, 사장님 실사용이 잡음).
+      //   이 카드는 로컬 모델만 봐서, 원격으로 멀쩡히 답하는 중에도 「모델 없음 — 등록하러
+      //   가라」를 띄웠다. 답은 되는데 화면이 안 된다고 말하는 정직성 결함이다.
+      //   (max의 원래 인계에도 「켜지면 이 카드가 원격 상태를 보이게」가 적혀 있었다 — 그때
+      //   설정 카드만 만들고 이 카드를 빠뜨린 것이 오늘 실사용에서 드러났다.)
+      try {
+        var w = await g.remoteLlmWhere();
+        if (w && w.remote) {
+          pill.textContent = "원격 GPU"; pill.className = "pill on";
+          document.getElementById("engBox").innerHTML =
+            '<div class="empty"><b>🖧 원격 GPU가 답하고 있습니다</b> — 질문이 VPN으로 그 기계에 전송됩니다.<br>' +
+            "이 PC에 챗 모델을 두지 않아도 대화가 됩니다. 원격이 로컬(7~8B)보다 <b>답이 오래 걸릴 수 있습니다</b>(더 큰 모델을 먼 기계에서 돌립니다).<br>" +
+            '끄면 이 PC의 모델로 돌아옵니다 — <button class="go" style="margin-top:10px" id="goRgpu">⚙ 원격 GPU 설정</button></div>';
+          var br = document.getElementById("goRgpu"); if (br) br.addEventListener("click", 설정으로);
+          return;
+        }
+      } catch (e) { /* 옛 서버면 다리가 없다 — 로컬 판정으로 진행 */ }
       var st = await g.getLocalEngineStatus();
       var 적재 = (st.loaded || []).filter(function (l) { return l.ready; });
-      var pill = document.getElementById("engPill");
       if (적재.length) {
         pill.textContent = "돌고 있음"; pill.className = "pill on";
         document.getElementById("engBox").innerHTML =
