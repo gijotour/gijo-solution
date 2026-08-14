@@ -74,6 +74,11 @@
     //   📚로 옮겼으니 같은 것이 두 번 보일 이유가 없다). 자료는 지우지 않는다:
     //   상단 🔍 화면 찾기는 이 목록을 쓰므로, 지우면 이름으로도 못 찾게 된다.
     { win: "openDocbox", label: "문서함 (창)", icon: "book", fixed: true, hidden: true },
+    // GIJO Smart MD Studio — 로그인한 고객에게 주는 **무료** 문서 작성 도구(2026-08-14 사장님 결정).
+    // 별도 창이라 page가 아니라 win이다(위 ⚠ 규약). 설치본에 안 담겼으면 여는 쪽이 안내를 낸다.
+    // ⚠ 이름 끝의 「(창)」은 규약이다 — menu-sweep이 그 표기로 창 항목을 건너뛴다(navwiring 시험).
+    //   무료 표시는 그 **뒤에** 붙인다: (창) 앞에 끼우면 스윕이 못 알아본다.
+    { win: "openSmartMd", label: "문서 작성 (창) · 무료", icon: "book", fixed: true },
     { page: "sessions.html", label: "작업 내역", icon: "chat", fixed: true },
   ];
 
@@ -611,7 +616,7 @@
       // 없으면 조용히 넘기지 않고 알린다: 예전엔 아무 일도 안 나서 "눌러도 안 열린다"는
       // 증상만 남고 원인을 찾을 단서가 하나도 없었다(4.9.0 문서함).
       el.addEventListener("click", function () {
-        if (window.gijo && typeof window.gijo[it.win] === "function") window.gijo[it.win]();
+        if (window.gijo && typeof window.gijo[it.win] === "function") window.gijoOpenWindowResult(window.gijo[it.win](), it.label);
         else alert(it.label + "을(를) 열 수 없습니다 — 앱을 다시 시작해 보시고, 계속되면 알려주세요.");
       });
     } else if (window.gijoTabs) {
@@ -782,6 +787,21 @@
   window.gijoIconMarkup = function (name) {
     var el = iconSvg(name);
     return el ? el.outerHTML : "";
+  };
+
+  /**
+   * 별도 창 열기의 **결과**를 사람에게 전한다.
+   *
+   * 왜 필요한가: 창을 여는 다리 중에는 열지 못한 이유를 돌려주는 것이 있다
+   * (Smart MD는 설치본에 안 담겼을 수 있다 — 포함이 아니라 연동이라 그게 정상이다).
+   * 그 값을 안 보면 「눌러도 아무 일 없다」가 되어, 4.9.0 문서함 때와 같은 자리에 다시 선다.
+   * ⚠ 옛 다리들은 아무것도 안 돌려준다 — 그때는 조용히 지나간다(성공으로 본다).
+   */
+  window.gijoOpenWindowResult = function (p, label) {
+    if (!p || typeof p.then !== "function") return;
+    p.then(function (r) {
+      if (r && r.ok === false) alert((r.error || ((label || "이 창") + "을(를) 열지 못했습니다.")));
+    }).catch(function () { /* 다리 자체가 없는 옛 판 — 위 typeof 검사에서 이미 걸렀다 */ });
   };
 
   /** 찾기용 납작한 목록 — {page|win, label, group}. 자료는 위 TOP/GROUPS 하나에서만 온다. */
@@ -1277,8 +1297,8 @@
    */
   window.gijoOpenScreen = function (page, label) {
     if (page && typeof page === "object") { label = page.label || label; page = page.win ? { win: page.win } : page.page; }
-    if (page && page.win) {                                                    // 별도 창(팀 사무실·문서함)
-      if (window.gijo && typeof window.gijo[page.win] === "function") { window.gijo[page.win](); return true; }
+    if (page && page.win) {                                                    // 별도 창(팀 사무실·문서함·문서 작성)
+      if (window.gijo && typeof window.gijo[page.win] === "function") { window.gijoOpenWindowResult(window.gijo[page.win](), label); return true; }
       alert((label || "이 화면") + "을(를) 열 수 없습니다 — 앱을 다시 시작해 보시고, 계속되면 알려주세요.");
       return false;
     }

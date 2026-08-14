@@ -16,10 +16,13 @@
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    height: 100vh;
+    min-height: 100vh;
     display: flex;
+    flex-direction: column;   /* 로그인 카드 아래에 「무료 제공」 구역이 붙는다(2026-08-14) */
     align-items: center;
     justify-content: center;
+    gap: 18px;
+    padding: 24px 0;
     background: radial-gradient(circle at 30% 20%, #35342f 0%, var(--navy) 60%);
     font-family: "Pretendard", "Segoe UI", -apple-system, sans-serif;
     color: var(--text);
@@ -115,6 +118,20 @@
   .savepw { display: flex; align-items: center; gap: 7px; font-size: 12.5px; color: var(--muted); margin: -4px 0 16px; cursor: pointer; }
   .savepw input { width: auto; margin: 0; cursor: pointer; }
   .savepw.dim { opacity: .5; }
+  /* ── 무료 제공(2026-08-14 사장님 지시) ─────────────────────────────────────
+     로그인 상자가 주인공이다. 이 구역은 **보조** — 글자를 입력칸(14px)보다 작게 두고
+     간격으로 시선 순서(로그인 → 무료)를 지킨다. 라이트 빌드에서는 통째로 감춘다. */
+  .free { width: 380px; }
+  .free-t { font-size: 12.25px; color: var(--muted); margin-bottom: 8px; letter-spacing: .02em; }
+  .free-row { display: flex; gap: 8px; }
+  .fc { flex: 1; min-width: 0; text-align: left; background: rgba(14,20,36,.6); border: 1px solid var(--border);
+        border-radius: 10px; padding: 11px 12px; cursor: pointer; color: var(--text); font: inherit; }
+  .fc:hover { border-color: var(--blue); background: rgba(20,28,48,.75); }
+  .fc-h { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 700; }
+  .fc-b { flex: 0 0 auto; font-size: 11px; font-weight: 700; color: #7fd88f; border: 1px solid rgba(127,216,143,.4);
+          border-radius: 999px; padding: 1px 6px; }
+  .fc-d { margin-top: 5px; font-size: 11.5px; color: var(--muted); line-height: 1.5; }
+  .free-msg { margin-top: 7px; font-size: 11.5px; color: #ff8080; min-height: 14px; }
 </style>
 </head>
 <body>
@@ -184,6 +201,24 @@
       분산 모드: 사내망 GPU 서버 주소를 입력하세요.
     </div>
     <div class="ver" id="verLine">버전 확인 중…</div>
+  </div>
+
+  <!-- 무료 제공 — 사장님 지시(2026-08-14): 「Smart MD는 클라이언트에서 로그인할 때 제공되는
+       무료 툴로 같이 배포」 + 「표준 클라이언트 로그인창에서 라이트 버전 다운 가능하게」.
+       ⚠ 라이트 빌드에서는 감춘다 — 라이트에서 라이트를 받으라는 안내는 말이 안 된다. -->
+  <div class="free" id="freeBox" style="display:none">
+    <div class="free-t">무료로 함께 드리는 것</div>
+    <div class="free-row">
+      <button class="fc" id="smartMdBtn" type="button">
+        <div class="fc-h"><span>📝 Smart MD Studio</span><span class="fc-b">무료</span></div>
+        <div class="fc-d">화면 캡처를 붙여 넣어 문서를 만드는 편집기. 로그인 없이 바로 열립니다.</div>
+      </button>
+      <button class="fc" id="liteDlBtn" type="button">
+        <div class="fc-h"><span>⬇ GIJO AS 라이트</span><span class="fc-b">무료</span></div>
+        <div class="fc-d">서버 없이 내 PC에서 혼자 도는 개인용 판. Windows 설치본·안내서를 받습니다(NVIDIA GPU 10GB급).</div>
+      </button>
+    </div>
+    <div class="free-msg" id="freeMsg"></div>
   </div>
 
   <script>
@@ -389,6 +424,44 @@
 
     btn.addEventListener("click", () => doLogin(false));
     passInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(false); });
+
+    // ── 무료 제공 구역(2026-08-14) ─────────────────────────────────────────
+    // 라이트 빌드에서는 통째로 감춘다. 에디션을 못 읽으면 **감춘 채로 둔다** —
+    // 라이트에 라이트 다운로드가 뜨는 쪽이, 표준에 안 뜨는 쪽보다 나쁘다.
+    const freeBox = document.getElementById("freeBox");
+    const freeMsg = document.getElementById("freeMsg");
+    (async () => {
+      try {
+        const e = await window.gijo.editionGet();
+        if (e && e.현재 === "lite") return;   // 라이트면 감춘 채로
+        freeBox.style.display = "";
+      } catch (err) { /* 옛 판이면 다리가 없다 — 감춘 채로 둔다 */ }
+    })();
+
+    document.getElementById("smartMdBtn").addEventListener("click", async () => {
+      freeMsg.textContent = "";
+      try {
+        const r = await window.gijo.openSmartMd();
+        if (r && r.ok === false) freeMsg.textContent = r.error || "Smart MD를 열지 못했습니다.";
+      } catch (err) {
+        freeMsg.textContent = "이 판에는 Smart MD가 없습니다 — 최신 버전으로 올리면 함께 들어옵니다.";
+      }
+    });
+
+    // 라이트 설치본 배포처. 지금은 사장님 구글 드라이브가 통로다(임시) — 서버 배포로 옮기면
+    // 이 주소 한 줄만 바뀐다. 폴더 링크라 설치본을 새 판으로 바꿔도 여기는 그대로다.
+    const LITE_DL = "https://drive.google.com/drive/folders/1IYGXSz7aLzXP6LgGwI03fh0J8p48e4aX";
+    document.getElementById("liteDlBtn").addEventListener("click", async () => {
+      freeMsg.textContent = "";
+      try {
+        await window.gijo.openExternal(LITE_DL);
+        freeMsg.style.color = "var(--muted)";
+        freeMsg.textContent = "브라우저에서 받는 곳을 열었습니다 — 설치 안내서도 같은 폴더에 있습니다.";
+      } catch (err) {
+        freeMsg.style.color = "#ff8080";
+        freeMsg.textContent = "브라우저를 열지 못했습니다. 주소: " + LITE_DL;
+      }
+    });
   </script>
 <script src="titlebar.js"></script>
 <script src="footbar.js"></script>

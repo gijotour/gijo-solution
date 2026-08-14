@@ -26,3 +26,9 @@ build/llama-metal/
 
 # 빌드 산출물 — stage-llama-cuda.mjs가 만든다(커밋 금지)
 build/llama-cuda/
+
+# ⚠ 2026-08-14 — Smart MD Studio 자산(무료 제공 도구). scripts/fetch-smartmd.mjs가
+#   **사장님 저장소(gijo-smart-md-studio)에서 게시 직전에 받아** 넣는다.
+#   여기에 커밋하면 독립 제품의 소스가 두 벌이 되고, 저쪽이 올라가도 이쪽은 낡는다 —
+#   server-dist/package.json이 실제로 그렇게 어긋났던 것과 같은 모양이다. 원본이 단일 출처다.
+smartmd/

@@ -1,0 +1,678 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>시안 — Smart MD 무료 진입점 + 원격 GPU를 LLM 선택지로</title>
+<!--
+  시안 — Smart MD Studio 무료 진입점 + 원격 GPU(BridgeAI)를 "LLM을 고르는 순간의 정식 선택지"로
+  작성: 2026-08-14 · gijo-mockup(읽기 전용 정찰 후 작성 — client/·server/ 미수정)
+  추천 1개 원칙(2026-08-09 사용자 결정) — 대안은 아래 "다른 길을 왜 안 골랐나" 표에서 글로만 비교.
+
+  ■ 개정 이력(같은 날 두 차례 브리프 수정 — 코디네이터 지시)
+    · 1차: VRAM 부족 "자리 3곳에 안내를 붙이는" 안(오류 발생 시점의 넛지)을 통째로 뺀다.
+      대신 원격 GPU를 LLM을 **고르는 그 순간의 정식 선택지**로 그린다 — ①라이트 첫 모델 마련,
+      ②표준 AI팀 구성 기반 두뇌. Smart MD의 "여는 자리"·"열린 모습"은 원래 그대로 유지.
+    · 2차: 로그인 전 화면(login.html)에 "무료 제공" 구역을 신설 — Smart MD(로그인 없이도 열기)와
+      GIJO AS 라이트 내려받기(Drive 링크)가 같은 모양의 선택지 카드로 나란히. 로그인 상자가
+      주인공이므로 이 구역은 작게·보조로만. 라이트 빌드에서는 안 보인다는 표기 필요.
+    이 파일은 그 두 수정을 모두 반영한 **최종본**이다 — 섹션 1·2(여는 자리·열린 모습)는 처음 그대로.
+
+  ■ 대상 파일(정찰로 확인, 행 번호는 2026-08-14 기준 — 추측 아님)
+    · client/src/renderer/pages/app.html:46 — .app{grid-template-columns:232px …} 표준 사이드바 폭.
+    · client/src/renderer/pages/nav.js:60-78 — TOP 고정열. "win" 속성이 별도창 항목의 단일
+      표기법(609-616행: 없으면 alert로 알린다). 485행 .gn-item{height:30px}.
+    · client/src/main.ts:549-577 — office:open 핸들러(Smart MD 창이 복제할 패턴).
+    · client/src/main.ts:503-520 — 라이트 문지기. 514-515행: "별도 창은 라이트 셸에 그 버튼이
+      없어 지금은 안 닿지만, 열 길이 생기면 같은 문지기가 필요하다"(구현 단계 주의사항).
+    · client/src/renderer/pages/lite-app.html:32-42 — .lite-titlebar(44px, 지금은 오른쪽이 비어 있음).
+    · client/src/renderer/pages/login.html — 로그인 전 화면. 17-26행 body가 100vh 가운데
+      flex(align+justify center)로 `.card`(380px) 하나만 띄운다 — 그 밖엔 아무것도 없다.
+      189-392행 스크립트에 서버·에디션 관련 로직은 없다(로그인 성공 뒤 app.html로만 이동, 306행).
+    · client/src/renderer/pages/footbar.js — login.html에 이미 붙는 하단 고정바(34px, "GIJO
+      Technology"). 새 구역은 이 바 **위**, 로그인 카드 **아래**에 들어가야 겹치지 않는다
+      (28행 `body{padding-bottom:34px}`로 이미 자리를 비워 두고 있다는 것도 확인).
+    · client/src/main.ts:456-490 — 에디션 판별(빌드에디션·is라이트류). settings.html:2348
+      `window.gijo.editionGet()` → `{현재, 빌드고정}` — "라이트 빌드에서 이 구역 숨김" 조건의
+      실제 근거(새 판별 로직을 발명하지 않고 이미 있는 것을 재사용).
+    · client/src/renderer/pages/lite-settings.html:96-152 — "📥 챗 모델 등록" 카드(①파일로 ·
+      ②받아서 두 갈래, 464행 권장모델() · 490행 받기()). VRAM 선택 자리 ①.
+    · client/src/renderer/pages/lite-settings.html:185-192 — "🖧 원격 GPU (VPN)" 카드(목적지,
+      430-457행 원격GPU() 렌더) · **이미 구현·게시됨, 새로 그리지 않는다.**
+    · client/src/renderer/pages/settings.html:520-537 — "AI팀 구성" 패널(`id="agentModelPanel"`).
+      1993-2014행 loadAgentModels()가 `#teamBase`를 채운다 — 지금은 로컬 모델이 자동으로
+      실린 것만 보여준다("이 모델 하나를 전 팀원이 함께 씁니다…"). VRAM 선택 자리 ②.
+    · client/src/renderer/pages/settings.html:711-730 — "🖧 원격 GPU (VPN·선택)" 카드(표준 목적지,
+      remotellm.ts 소비자) · **이미 구현·게시됨, 새로 그리지 않는다.**
+    · Smart MD 실물 — scratchpad/gijo-smart-md-studio/index.html:21-150 · css/style.css:6-40
+      (자기 색 --accent-primary:#6366f1, --bg-primary:#0f172a — GIJO 팔레트와 의도적으로 다름).
+    · client/src/renderer/pages/gijo-ui.css:23-59(토큰) · 72-149(.g-btn/.g-badge/.g-chip) —
+      이 시안 CSS가 그대로 베낀 값.
+
+  ■ 설계 전 조사(요청한 표준·모범사례, 2026-08-14 확인)
+    · Nielsen Norman Group, "10 Usability Heuristics" 중 #1 Visibility of System Status
+      (nngroup.com/articles/ten-usability-heuristics) — "keep users informed about what is
+      going on". → 기반 두뇌를 원격으로 바꾸면 "질문이 VPN으로 원격 GPU에 전송됩니다"를
+      **바꾸는 그 자리에서 즉시** 밝힌다(나중에 알게 되는 일이 없게).
+    · 같은 문서 #6 Recognition rather than recall — 선택지는 서랍(고급/details)에 숨기지 않고
+      **보이는 카드**로 나란히 둔다. → 라이트 모델 등록·표준 기반 두뇌 모두 원격 GPU를 "찾아야
+      보이는 것"이 아니라 "펼쳐 보면 바로 보이는 것"으로 배치했다.
+    · Choice Architecture 원칙(uxglossary.com/glossary/choice-architecture · Medium "Designing
+      Decisions: The Art of Choice Architecture in UX") — 두 선택지를 **같은 시각적 무게**로
+      제시해야 조작(넛지가 아니라 강요)이 아니다. → 두 카드/두 칩을 같은 크기·같은 스타일로
+      그리고, 기본값(지금 상태)만 "선택됨" 표시로 구분한다 — 한쪽을 크게 키우거나 색으로
+      유도하지 않는다(원격 GPU가 "더 좋아 보이게" 꾸미지 않는다).
+    · Microsoft Learn, "Use the Window class to show secondary windows for an app"
+      (learn.microsoft.com/en-us/windows/apps/develop/ui/multiple-windows) — 보조 콘텐츠를
+      별도 창으로 떼어내는 것은 표준 패턴("un-docking a control … opening it in a new
+      window")이다. → Smart MD를 GIJO 탭(iframe) 안이 아니라 별도 창으로 두는 채택 방향의 근거
+      (섹션②에서 자세히).
+
+  ■ 범위 — 이 파일 하나. 섹션 ①여는 자리 ②열린 모습(둘 다 최초 브리프 그대로) ③로그인 전
+    무료 제공 구역(신설) ④LLM을 고르는 순간의 원격 GPU 선택지(신설, 옛 "VRAM 3곳" 대체) +
+    부속 설명. 제품 코드는 전혀 건드리지 않았다.
+-->
+<style>
+  :root{
+    --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,.08);
+    --border-strong:rgba(255,255,255,.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+    --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+    --r:12px;--r-sm:8px;--r-pill:999px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:var(--bg)}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;color:var(--text);
+    font-size:13px;line-height:1.65;padding:26px 22px 70px;}
+  .wrap{max-width:1080px;margin:0 auto}
+  h1{font-size:19px;font-weight:800;color:#fff}
+  .lead{color:var(--muted);font-size:12.5px;margin:5px 0 4px}
+  .disclaimer{font-size:11.75px;color:var(--muted-2);background:var(--panel-2);border:1px dashed var(--border-strong);
+    border-radius:var(--r-sm);padding:8px 11px;margin:12px 0 26px;line-height:1.6}
+  .disclaimer b{color:var(--amber)}
+
+  section{margin-bottom:34px}
+  .sec-h{display:flex;align-items:baseline;gap:9px;margin-bottom:12px;padding-bottom:7px;border-bottom:1px solid var(--border)}
+  .sec-h .n{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:rgba(59,130,246,.16);
+    border:1px solid var(--blue);color:var(--blue-light);font-size:12px;font-weight:800;
+    display:flex;align-items:center;justify-content:center}
+  .sec-h h2{font-size:14.5px;font-weight:800;color:#fff}
+  .sec-h .sub{font-size:11.75px;color:var(--muted-2);margin-left:4px}
+
+  /* 재현 프레임 — 실제 화면을 옮겨온 부분은 전부 이 틀 안에 있다. 틀 밖 글자는 "우리가 붙인 설명"이다. */
+  .frame-cap{font-size:11.25px;color:var(--muted-2);font-family:Consolas,"Cascadia Mono",monospace;margin-bottom:5px}
+  .frame-cap b{color:var(--blue-light);font-family:inherit}
+  .frame{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:10px;overflow:hidden}
+  .frame-note{font-size:11.75px;color:var(--muted-2);margin-top:6px;line-height:1.6}
+  .frame-note .new{color:var(--teal);font-weight:700}
+
+  .cuts{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start}
+  .cut{flex:1 1 380px;min-width:320px}
+
+  /* ── 표준 사이드바 재현 (app.html + nav.js) ───────────────────────── */
+  .std-frame{width:100%;max-width:360px;display:flex;height:392px}
+  .std-nav{width:232px;flex:0 0 232px;background:var(--panel-2);border-right:1px solid var(--border);
+    display:flex;flex-direction:column;height:100%}
+  .std-main{flex:1;background:var(--bg);display:flex;align-items:center;justify-content:center;
+    color:var(--muted-2);font-size:11.5px;text-align:center;padding:10px}
+  .gn-top{padding:8px;border-bottom:1px solid var(--border);flex:0 0 auto}
+  .gn-seg{display:flex;background:#1f1e1d;border:1px solid var(--border-strong);border-radius:9px;padding:3px;gap:3px}
+  .gn-seg span{flex:1;text-align:center;padding:5px 4px;border-radius:7px;font-size:11.5px;font-weight:800;color:var(--muted)}
+  .gn-seg span.on{background:rgba(59,130,246,.22);color:#fff}
+  .gn-mid{flex:1 1 auto;min-height:0;overflow:hidden;padding:4px 6px 8px;position:relative}
+  .gn-top-fixed{padding-bottom:7px;margin-bottom:3px;border-bottom:1px solid rgba(255,255,255,.07)}
+  .gn-item{display:flex;align-items:center;gap:9px;height:30px;padding:0 10px 0 11px;border-radius:6px;
+    font-size:12.5px;font-weight:500;color:var(--muted);white-space:nowrap;position:relative}
+  .gn-item .gn-ic{flex:0 0 auto;width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.5;
+    stroke-linecap:round;stroke-linejoin:round;opacity:.62}
+  .gn-item .gn-label{flex:1;overflow:hidden;text-overflow:ellipsis}
+  .gn-item.gn-home{color:var(--text)}
+  .gn-item.new{background:rgba(30,185,128,.10);outline:1.5px dashed var(--teal);color:#fff}
+  .gn-item .gn-free{flex:0 0 auto;background:rgba(30,185,128,.18);color:var(--teal);font-size:11px;
+    font-weight:900;border-radius:var(--r-pill);padding:1px 7px}
+  .gn-newtag{position:absolute;left:100%;top:50%;transform:translateY(-50%);margin-left:8px;
+    font-size:11px;color:var(--teal);font-weight:800;white-space:nowrap}
+  .gn-groups-hint{margin-top:4px;padding:6px 11px;font-size:11px;color:var(--muted-2);line-height:2.05}
+  .gn-fade{position:absolute;left:0;right:0;bottom:0;height:34px;
+    background:linear-gradient(to bottom, rgba(31,30,29,0), var(--panel-2))}
+  .gtb-userarea{border-top:1px solid rgba(255,255,255,.08);background:rgba(59,130,246,.05);
+    padding:0 10px;height:36px;display:flex;align-items:center;gap:8px;flex:0 0 auto}
+  .ua-avatar{width:20px;height:20px;border-radius:50%;background:var(--blue);color:#fff;font-size:11px;
+    font-weight:800;display:flex;align-items:center;justify-content:center;flex:0 0 auto}
+  .ua-name{flex:1;font-size:12px;font-weight:700;color:#dfe6ff}
+  .ua-gear{width:20px;height:20px;border-radius:6px;background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);
+    display:flex;align-items:center;justify-content:center;font-size:11px;color:#cfe0ff;flex:0 0 auto}
+
+  /* ── 라이트 제목줄 재현 (lite-app.html) ───────────────────────────── */
+  .lite-frame{max-width:100%;height:44px;display:flex;align-items:center;background:var(--panel-2);
+    border-bottom:1px solid var(--border);padding:0 16px}
+  .lite-frame .p{font-weight:700;font-size:13.5px;letter-spacing:.2px;color:#fff}
+  .lite-frame .e{font-size:11px;opacity:.62;margin-left:8px;color:var(--muted)}
+  .lite-frame .sp{flex:1}
+  .lite-smd-btn{display:flex;align-items:center;gap:6px;height:26px;padding:0 10px;border-radius:7px;
+    background:rgba(30,185,128,.12);border:1.5px dashed var(--teal);font-size:12px;font-weight:700;color:#fff}
+  .lite-smd-btn svg{width:13px;height:13px;stroke:currentColor;fill:none;stroke-width:1.5;
+    stroke-linecap:round;stroke-linejoin:round;opacity:.85}
+  .lite-smd-btn .free{font-size:11px;font-weight:900;color:var(--teal);background:rgba(30,185,128,.2);
+    border-radius:var(--r-pill);padding:1px 6px}
+  .lite-nondrag{margin-top:8px;font-size:11px;color:var(--muted-2);text-align:right}
+
+  /* ── 열린 모습(별도 창 위에 뜬 Smart MD) ──────────────────────────── */
+  .opened-frame{position:relative;height:360px;background:var(--panel-2);overflow:hidden}
+  .gijo-bg{position:absolute;inset:0;background:var(--bg);opacity:.55;filter:blur(.4px)}
+  .gijo-bg .bg-side{position:absolute;left:0;top:0;bottom:0;width:120px;background:var(--panel-2);
+    border-right:1px solid var(--border)}
+  .gijo-bg .bg-top{position:absolute;left:0;right:0;top:0;height:30px;background:var(--panel-2);
+    border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 14px;
+    font-size:11px;color:var(--muted-2)}
+  .gijo-bg .bg-label{position:absolute;left:140px;top:60px;right:24px;font-size:12px;color:var(--muted-2)}
+  .smd-win{position:absolute;left:74px;top:34px;right:26px;bottom:26px;border-radius:10px;overflow:hidden;
+    box-shadow:0 22px 60px rgba(0,0,0,.55);border:1px solid rgba(255,255,255,.14);
+    background:#0f172a;display:flex;flex-direction:column}
+  .smd-titlebar{height:30px;flex:0 0 auto;background:#161d2e;display:flex;align-items:center;
+    gap:8px;padding:0 10px;border-bottom:1px solid #232c40}
+  .smd-titlebar .dots{display:flex;gap:5px}
+  .smd-titlebar .dot{width:8px;height:8px;border-radius:50%;background:#39415a}
+  .smd-titlebar .ttl{font-size:11.5px;color:#c8cede;font-weight:700;margin-left:4px}
+  .smd-header{flex:0 0 auto;height:44px;background:linear-gradient(135deg,#1a2036,#151a2c);
+    display:flex;align-items:center;gap:10px;padding:0 14px;border-bottom:1px solid #232c40}
+  .smd-logo{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#6366f1,#a855f7);
+    flex:0 0 auto}
+  .smd-header .nm{font-size:12.5px;font-weight:800;color:#e7e9f5}
+  .smd-header .ver{font-size:11px;color:#8b93ad;background:#232c40;border-radius:5px;padding:1px 6px}
+  .smd-header .title-in{margin-left:14px;flex:1;height:24px;border-radius:6px;background:#1e2438;
+    border:1px solid #2b334c;display:flex;align-items:center;padding:0 9px;font-size:11.25px;color:#8b93ad}
+  .smd-body{flex:1;display:flex;min-height:0}
+  .smd-sidebar{width:96px;flex:0 0 96px;background:#131728;border-right:1px solid #232c40;padding:8px}
+  .smd-sidebar .sb-b{height:20px;border-radius:5px;background:linear-gradient(135deg,#6366f1,#a855f7);margin-bottom:7px}
+  .smd-sidebar .sb-l{height:8px;border-radius:3px;background:#232c40;margin-bottom:6px;width:80%}
+  .smd-editor{flex:1;display:flex}
+  .smd-editor .ed,.smd-editor .pv{flex:1;padding:10px}
+  .smd-editor .ed{border-right:1px solid #232c40}
+  .smd-editor .ln{height:7px;border-radius:3px;background:#232c40;margin-bottom:7px}
+  .smd-editor .ln.w60{width:60%}.smd-editor .ln.w80{width:80%}.smd-editor .ln.w40{width:40%}
+  .smd-caption{position:absolute;left:74px;right:26px;bottom:4px;text-align:center;font-size:11px;
+    color:#5c6480}
+  .opened-note{position:absolute;left:14px;top:70px;width:96px;font-size:11px;color:var(--muted-2);line-height:1.7}
+
+  /* ── 로그인 전 화면 재현 (login.html) ─────────────────────────────── */
+  .login-frame{position:relative;height:470px;display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:16px;
+    background:radial-gradient(circle at 30% 20%, #35342f 0%, var(--bg) 60%)}
+  .login-card{width:250px;background:rgba(14,20,36,.85);border:1px solid #3d3c38;border-radius:12px;
+    padding:20px 18px;box-shadow:0 16px 40px rgba(0,0,0,.4)}
+  .l-logo{display:flex;align-items:center;gap:7px;margin-bottom:13px}
+  .l-logo-ic{width:16px;height:16px;border-radius:4px;background:var(--blue-light);flex:0 0 auto}
+  .l-logo span{font-size:11px;color:var(--muted);letter-spacing:.04em}
+  .l-h1{font-size:14.5px;font-weight:800;margin-bottom:4px;color:#fff}
+  .l-sub{font-size:11.25px;color:var(--muted);margin-bottom:14px}
+  .l-label{font-size:11px;color:var(--muted);margin-bottom:4px}
+  .l-input{width:100%;height:26px;background:#1f1e1d;border:1px solid #3d3c38;border-radius:6px;margin-bottom:10px}
+  .l-btn{width:100%;background:#dd5a1c;border-radius:6px;padding:8px;text-align:center;color:#fff;
+    font-size:12.25px;font-weight:700}
+  .free-zone{width:280px;text-align:center}
+  .free-zone-h{font-size:11px;color:var(--muted-2);letter-spacing:.4px;margin-bottom:8px}
+  .free-cards{display:flex;gap:10px}
+  .free-card{flex:1;background:var(--panel);border:1px solid var(--border-strong);border-radius:9px;
+    padding:9px 8px;text-align:left}
+  .fc-ic{font-size:14px;margin-bottom:3px}
+  .fc-nm{font-size:11.5px;font-weight:800;color:#fff}
+  .fc-sub{font-size:11px;color:var(--muted-2);line-height:1.5;margin:2px 0 6px;min-height:33px}
+  .fc-badge{display:inline-block;font-size:11px;font-weight:800;border-radius:var(--r-pill);padding:1px 6px;
+    background:rgba(30,185,128,.18);color:var(--teal);margin-bottom:6px}
+  .fc-badge.alt{background:rgba(139,124,240,.18);color:var(--purple)}
+  .fc-btn{display:block;width:100%;text-align:center;font-size:11px;font-weight:700;color:var(--blue-light);
+    background:transparent;border:1px solid var(--border-strong);border-radius:6px;padding:5px 0;cursor:default}
+  .foot-hint{position:absolute;left:0;right:0;bottom:6px;text-align:center;font-size:11px;color:#5c6480}
+
+  .lite-mini{display:inline-flex;flex-direction:column;align-items:center;gap:6px;padding:14px 20px;
+    background:var(--panel-2);border:1px dashed var(--border-strong);border-radius:10px}
+  .lite-mini .login-card{width:180px;padding:14px 12px;transform:scale(.94)}
+  .lite-mini .l-h1{font-size:12.5px}
+
+  /* ── VRAM 선택 자리 공통(섹션④) ───────────────────────────────────── */
+  .spot{display:flex;gap:12px;margin-bottom:8px;align-items:flex-start}
+  .spot .tag{flex:0 0 auto;height:24px;padding:0 9px;border-radius:var(--r-pill);background:rgba(59,130,246,.16);
+    border:1px solid var(--blue);color:var(--blue-light);font-size:12px;font-weight:800;
+    display:flex;align-items:center;justify-content:center;margin-top:1px}
+  .spot-body{flex:1;min-width:0}
+  .spot-frame{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:13px 15px}
+  .badge{display:inline-block;padding:2px 8px;border-radius:6px;font-size:11.25px;font-weight:700}
+  .b-teal{background:rgba(30,185,128,.15);color:var(--teal)}
+  .b-purple{background:rgba(139,124,240,.15);color:var(--purple)}
+  .b-amber{background:rgba(240,160,32,.15);color:var(--amber)}
+  .panel-title{font-size:13.5px;font-weight:800;color:#fff;margin-bottom:8px;display:flex;align-items:center;gap:8px}
+  .hf-sub{font-size:12.25px;color:var(--muted-2)}
+
+  .fork-row{display:flex;gap:10px}
+  .fork-row.sm{gap:6px;margin-top:8px}
+  .fork-card{flex:1;background:var(--panel-2);border:1.5px solid var(--border-strong);border-radius:9px;
+    padding:10px 11px;position:relative}
+  .fork-card.on{border-color:var(--teal);background:rgba(30,185,128,.07)}
+  .fork-card.sm{padding:5px 9px;display:flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:700;color:var(--muted)}
+  .fork-card.sm.on{color:#fff}
+  .fork-ic{font-size:15px;margin-bottom:4px}
+  .fork-nm{font-size:12.25px;font-weight:800;color:#fff}
+  .fork-sub{font-size:11px;color:var(--muted-2);margin-top:2px;line-height:1.5;min-height:32px}
+  .fork-tag{position:absolute;top:8px;right:9px;font-size:11px;font-weight:800;border-radius:var(--r-pill);
+    padding:1px 7px;background:rgba(30,185,128,.18);color:var(--teal)}
+  .fork-tag.alt{background:rgba(139,124,240,.18);color:var(--purple)}
+  .fork-detail{margin-top:9px;padding-top:8px;border-top:1px dashed var(--border-strong);font-size:11.5px}
+
+  .teambase-box{display:flex;align-items:flex-start;gap:10px;padding:10px 11px;border:1px solid var(--border-strong);
+    border-radius:8px;background:var(--panel-2)}
+  .tb-sub{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.6}
+
+  .funnel-sm{text-align:center;font-size:11.5px;color:var(--muted-2);margin:10px 0}
+  .funnel-sm b{color:var(--blue-light)}
+
+  .dest{background:var(--panel);border:1px solid var(--border-strong);border-radius:10px;padding:14px 16px;margin:0 auto}
+  .dest .hint{font-size:11.5px;color:var(--muted-2);margin:6px 0 10px;line-height:1.6}
+  .dest .btnrow{display:flex;gap:8px}
+  .dest .btn-p{background:var(--blue);color:#fff;border:none;padding:6px 13px;border-radius:8px;
+    font-size:11.75px;font-weight:700;cursor:default}
+  .dest .btn-g{background:transparent;border:1px solid var(--border-strong);color:var(--text);
+    padding:6px 13px;border-radius:8px;font-size:11.75px;font-weight:600;cursor:default}
+  .whatsnew{font-size:11px;color:var(--muted-2);margin-top:6px}
+  .whatsnew code{background:var(--panel-2);padding:0 4px;border-radius:4px}
+
+  /* ── 부속 설명 블록 ────────────────────────────────────────────────── */
+  .note{background:var(--panel);border:1px solid var(--border);border-left:3px solid var(--blue);
+    border-radius:var(--r);padding:18px 20px;margin-top:8px;font-size:12.5px;line-height:1.8}
+  .note h2{font-size:14px;margin:0 0 9px;color:#fff}
+  .note h3{font-size:12.75px;margin:18px 0 7px;color:var(--blue-light)}
+  .note p{margin:0 0 8px}
+  .note code{background:var(--panel-2);padding:1px 5px;border-radius:4px;font-size:11.75px}
+  .note table{width:100%;border-collapse:collapse;font-size:12px;margin-top:4px}
+  .note th,.note td{text-align:left;padding:6px 9px;border-bottom:1px solid var(--border);vertical-align:top}
+  .note th{color:var(--muted);font-weight:700;font-size:11.5px;white-space:nowrap}
+  .good{color:#4ade80;font-weight:700}
+  .bad{color:#fca5a5;font-weight:700}
+  .warn{color:var(--amber);font-weight:700}
+  .note ul{margin:4px 0 0;padding-left:18px}
+  .note li{margin-bottom:5px}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>시안 — Smart MD 무료 진입점 + 원격 GPU를 LLM 선택지로</h1>
+  <p class="lead">추천 1개 · 2026-08-14 작성(같은 날 2차 수정 반영) · <b>승인 전 구현 금지</b> · 대상: login.html · 표준 클라(app.html+nav.js+settings.html) · 라이트 클라(lite-app.html+lite-settings.html)</p>
+  <div class="disclaimer">이 페이지는 <b>정적 시안</b>입니다 — 모든 버튼·카드·입력칸은 그림이며 눌러도 동작하지 않습니다(정직한 구현 원칙은 시안에도 적용). 실제 구현은 승인 뒤 메인 에이전트가 진행합니다.</div>
+
+  <!-- ============================================================ -->
+  <section id="s1">
+    <div class="sec-h"><span class="n">1</span><h2>여는 자리</h2><span class="sub">로그인 후 — 사이드바·제목줄. (로그인 전 진입점은 섹션③에 별도)</span></div>
+
+    <div class="cuts">
+      <!-- 표준 -->
+      <div class="cut">
+        <div class="frame-cap">재현 — <b>client/src/renderer/pages/app.html</b> 왼쪽 사이드바(nav.js TOP 고정열)</div>
+        <div class="frame std-frame">
+          <div class="std-nav">
+            <div class="gn-top"><div class="gn-seg"><span class="on">🏠 대시보드</span><span>☰ 전체메뉴</span></div></div>
+            <div class="gn-mid">
+              <div class="gn-top-fixed">
+                <div class="gn-item gn-home">
+                  <svg class="gn-ic" viewBox="0 0 16 16"><path d="M2 6.5 8 2l6 4.5"/><path d="M3.5 7.4V13.5h9V7.4"/></svg>
+                  <span class="gn-label">대시보드</span>
+                </div>
+                <div class="gn-item">
+                  <svg class="gn-ic" viewBox="0 0 16 16"><rect x="2.5" y="2.5" width="7" height="11"/><path d="M9.5 6.5h4v7h-4"/></svg>
+                  <span class="gn-label">팀 사무실 (창)</span>
+                </div>
+                <div class="gn-item new">
+                  <svg class="gn-ic" viewBox="0 0 16 16"><path d="M10.5 2.5l3 3-7.5 7.5H3v-3z"/><path d="M9.5 3.5l3 3"/></svg>
+                  <span class="gn-label">Smart MD (창)</span>
+                  <span class="gn-free">무료</span>
+                  <span class="gn-newtag">← 신설</span>
+                </div>
+                <div class="gn-item">
+                  <svg class="gn-ic" viewBox="0 0 16 16"><path d="M13.5 9.5a1.5 1.5 0 0 1-1.5 1.5H6l-3 2.5V4a1.5 1.5 0 0 1 1.5-1.5h7A1.5 1.5 0 0 1 13.5 4z"/></svg>
+                  <span class="gn-label">작업 내역</span>
+                </div>
+              </div>
+              <div class="gn-groups-hint">① 발견·수집 ›<br>② 우선순위 ›<br>③ 조치 › ⋯ (5단계 그대로)</div>
+              <div class="gn-fade"></div>
+            </div>
+            <div class="gtb-userarea">
+              <div class="ua-avatar">김</div>
+              <div class="ua-name">김보안</div>
+              <div class="ua-gear">⚙</div>
+            </div>
+          </div>
+          <div class="std-main">오른쪽은 탭 셸<br>(화면 영역, 변경 없음)</div>
+        </div>
+        <div class="frame-note">TOP 고정열에 <b class="new">4번째 항목</b>으로 추가 — "팀 사무실"과 <b>같은 표기법</b>(nav.js의 <code>win:</code> 속성, 별도 BrowserWindow). 문서함처럼 <code>hidden:true</code>로 숨기지 않고 <b>보이게</b> 둔다 — "무료로 제공된다"는 사실 자체가 알려야 할 정보라서.</div>
+      </div>
+
+      <!-- 라이트 -->
+      <div class="cut">
+        <div class="frame-cap">재현 — <b>client/src/renderer/pages/lite-app.html</b> 제목줄(.lite-titlebar, 44px)</div>
+        <div class="frame lite-frame">
+          <span class="p">GIJO AS</span>
+          <span class="e">Lite — 담당자 PC 1인용</span>
+          <div class="sp"></div>
+          <div class="lite-smd-btn">
+            <svg viewBox="0 0 16 16"><path d="M10.5 2.5l3 3-7.5 7.5H3v-3z"/><path d="M9.5 3.5l3 3"/></svg>
+            Smart MD <span class="free">무료</span>
+          </div>
+        </div>
+        <div class="lite-nondrag">↑ 오른쪽 non-drag 영역에 추가(창을 끄는 손잡이 자리는 그대로 유지)</div>
+        <div class="frame-note">라이트는 "9화면 + 설정" 목록에 <b>안 넣는다</b> — 팀 사무실·문서함이 라이트에 아예 없는 것과 같은 이유로, Smart MD도 <b>업무 화면이 아니라 상시 도구</b>다. 제목줄은 지금 브랜드+태그뿐이라 오른쪽이 비어 있다(코드 확인 — margin-left:auto 스페이서 없음). ⚠ <span class="warn">구현 시 주의</span>: main.ts:514-515가 "별도 창은 라이트 문지기 밖"이라고 이미 적어 뒀다 — Smart MD를 열 때도 같은 문지기가 필요하다.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="s2">
+    <div class="sec-h"><span class="n">2</span><h2>열린 모습</h2><span class="sub">GIJO 위에 뜨는 별도 창 — 내부는 실물 스타일 암시만(디자인 대상 아님)</span></div>
+
+    <div class="frame-cap">재현 — 클릭 시 뜨는 <b>Smart MD</b> 창(BrowserWindow), 뒤로 흐릿하게 표준 클라</div>
+    <div class="frame opened-frame">
+      <div class="gijo-bg">
+        <div class="bg-top">GIJO AS — 표준 클라(뒤에서 계속 켜져 있음)</div>
+        <div class="bg-side"></div>
+        <div class="bg-label">사이드바·탭·대화창 — 그대로 살아있다<br>(Smart MD를 닫으면 바로 여기로)</div>
+      </div>
+      <div class="opened-note">별도 창이라<br>표준 클라<br>레이아웃엔<br><b style="color:var(--teal)">0px</b> 영향</div>
+      <div class="smd-win">
+        <div class="smd-titlebar">
+          <div class="dots"><span class="dot"></span><span class="dot"></span><span class="dot"></span></div>
+          <span class="ttl">GIJO AS — Smart MD</span>
+        </div>
+        <div class="smd-header">
+          <div class="smd-logo"></div>
+          <span class="nm">GIJO Smart MD Studio</span>
+          <span class="ver">v2.0</span>
+          <div class="title-in">개발 요청 및 기술 문서.md</div>
+        </div>
+        <div class="smd-body">
+          <div class="smd-sidebar">
+            <div class="sb-b"></div>
+            <div class="sb-l"></div><div class="sb-l"></div><div class="sb-l" style="width:60%"></div>
+          </div>
+          <div class="smd-editor">
+            <div class="ed">
+              <div class="ln w80"></div><div class="ln w60"></div><div class="ln w40"></div><div class="ln w80"></div>
+            </div>
+            <div class="pv">
+              <div class="ln w60"></div><div class="ln w80"></div><div class="ln w40"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="smd-caption">내부 UI는 실물 그대로 옮겨지는 것 — 이 틀 안은 그리지 않는다</div>
+    </div>
+    <div class="frame-note">Smart MD는 <b>자기 색</b>(인디고 #6366f1 · 남색 배경 #0f172a)을 그대로 쓴다 — GIJO 다크톤(#262624)으로 새로 칠하지 않는다. 게시 때 통째로 자산을 받아 담는 별도 웹앱이라, 다시 칠하면 원본이 업데이트될 때마다 우리가 또 손봐야 한다. <b>정체성 한 줄</b>(창 제목 "GIJO AS — Smart MD")만 GIJO가 붙이고 안은 그대로 둔다.</div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="s3">
+    <div class="sec-h"><span class="n">3</span><h2>로그인 전 — 무료 제공 구역</h2><span class="sub">login.html · 로그인 상자가 주인공, 이 구역은 그 아래 작게</span></div>
+
+    <div class="frame-cap">재현 — <b>client/src/renderer/pages/login.html</b> 로그인 카드(.card) 아래 신설 구역, footbar.js 34px 바 위</div>
+    <div class="frame login-frame">
+      <div class="login-card">
+        <div class="l-logo"><span class="l-logo-ic"></span><span>AI SECURITY MANAGER</span></div>
+        <div class="l-h1">GIJO AS 로그인</div>
+        <div class="l-sub">보안담당자 계정으로 서버에 연결합니다.</div>
+        <div class="l-label">아이디</div><div class="l-input"></div>
+        <div class="l-label">비밀번호</div><div class="l-input"></div>
+        <div class="l-btn">로그인</div>
+      </div>
+      <div class="free-zone">
+        <div class="free-zone-h">무료로 제공됩니다</div>
+        <div class="free-cards">
+          <div class="free-card">
+            <div class="fc-ic">📝</div>
+            <div class="fc-nm">Smart MD Studio</div>
+            <div class="fc-sub">무료 문서 작성 도구 · 회의록·점검기록을 .md로</div>
+            <span class="fc-badge">로그인 없이도</span>
+            <div class="fc-btn">열기 →</div>
+          </div>
+          <div class="free-card">
+            <div class="fc-ic">🪶</div>
+            <div class="fc-nm">GIJO AS 라이트</div>
+            <div class="fc-sub">서버 없이 혼자 쓰는 개인용 판 · Win 1.5GB · GPU 10GB급</div>
+            <span class="fc-badge alt">Drive ↗</span>
+            <div class="fc-btn">받으러 가기 ↗</div>
+          </div>
+        </div>
+      </div>
+      <div class="foot-hint">(실제 화면엔 이 아래 footbar 34px "GIJO Technology"가 그대로 있음)</div>
+    </div>
+    <div class="frame-note">
+      로그인 카드는 <b>1px도 안 바꿨다</b> — 크기·위치·문구 전부 그대로(위 재현은 380px→250px로 <b>축소 비례</b>만 한 것). 새 구역은 그 <b>아래</b>(옆이 아니라)에 둔다 — 옆에 두려면 카드를 더 좁혀야 하는데, 아이디·비밀번호 입력칸은 좁아지면 안 되는 칸이다(설정 화면의 "적는 칸은 넓게" 원칙과 같은 이유, gijo-ui.css:277). 카드보다 글자·카드가 <b>확연히 작다</b> — 시선이 로그인에 먼저 간 다음에야 이 구역이 보인다.<br>
+      <b>Smart MD</b> 카드는 "로그인 없이도" 배지 — 클릭하면 인증 없이 별도 창이 뜬다(문서 도구는 서버 데이터를 안 건드리므로 로그인 게이트가 불필요). <b>라이트 내려받기</b> 카드는 "Drive ↗" 배지로 외부 브라우저 이동을 표시 — 실제 목적지는
+      <code style="font-size:11px">drive.google.com/drive/folders/1IYGXSz7aLzXP6LgGwI03fh0J8p48e4aX</code>(사장님 제공, 임시 통로 — 추후 서버 배포로 바뀔 수 있음).
+    </div>
+
+    <div style="margin-top:16px;display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div class="lite-mini">
+        <div class="login-card" style="width:180px">
+          <div class="l-logo"><span class="l-logo-ic"></span><span>AI SECURITY MANAGER</span></div>
+          <div class="l-h1">GIJO AS Lite 로그인</div>
+          <div class="l-label">아이디</div><div class="l-input"></div>
+          <div class="l-label">비밀번호</div><div class="l-input"></div>
+          <div class="l-btn">로그인</div>
+        </div>
+      </div>
+      <div style="max-width:420px;font-size:11.75px;color:var(--muted-2);line-height:1.7">
+        ⚠ <b style="color:var(--amber)">라이트 빌드에서는 "무료 제공" 구역 자체가 안 보인다</b> — 라이트가 라이트를
+        내려받으라고 안내하는 건 이상하다. Smart MD는 라이트에도 있으니(섹션①) 라이트 로그인엔
+        <b>구역 전체를 숨긴다</b>(칸 하나만 빼는 게 아니라). 판별은 새로 만들지 않고 기존
+        <code>editionGet()</code>의 <code>현재/빌드고정</code>을 그대로 쓴다(settings.html:2348,
+        main.ts:456-490) — 구현 시 이 값이 로그인 전(비인증) 창에서도 읽히는지만 확인하면 된다.
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <section id="s4">
+    <div class="sec-h"><span class="n">4</span><h2>LLM을 고르는 순간 — 원격 GPU를 정식 선택지로</h2><span class="sub">오류 안내가 아니다 — 처음부터 로컬과 동급인 선택지</span></div>
+
+    <!-- ① 라이트 -->
+    <div class="spot">
+      <div class="tag">①</div>
+      <div class="spot-body">
+        <div class="frame-cap">재현 — <b>lite-settings.html:96-152</b> "📥 챗 모델 등록" 카드 — 첫 실행(모델 0개) 장면</div>
+        <div class="spot-frame">
+          <div class="panel-title">📥 챗 모델 등록</div>
+          <div class="hf-sub" style="margin-bottom:10px">라이트는 챗 모델을 고객이 마련합니다 — 두 갈래 중 하나로.</div>
+          <div class="fork-row">
+            <div class="fork-card on">
+              <div class="fork-ic">💻</div>
+              <div class="fork-nm">이 PC에 모델 두기</div>
+              <div class="fork-sub">파일로 넣거나 내려받습니다 · 10GB급 PC 기준</div>
+              <span class="fork-tag">선택됨(기본)</span>
+            </div>
+            <div class="fork-card">
+              <div class="fork-ic">🖧</div>
+              <div class="fork-nm">원격 GPU(VPN)에 연결</div>
+              <div class="fork-sub">내 PC에 VRAM이 없어도 됩니다</div>
+              <span class="fork-tag alt">신설</span>
+            </div>
+          </div>
+          <div class="fork-detail" style="color:var(--muted-2)">
+            "이 PC에 모델 두기"를 고른 상태 — 기존 <b style="color:#fff">①파일로 / ②받아서</b> 화면이
+            그대로 이어집니다(문구·경로·트리 안내 전부 무변경).
+          </div>
+        </div>
+        <div class="whatsnew">신설은 카드 2장(선택 표시 포함)뿐 — <code>listRecommendedModels</code>·<code>loadHfModel</code> 등 기존 로직은 그대로.</div>
+
+        <div class="funnel-sm">"원격 GPU(VPN)에 연결"을 고르면 ↓ 같은 페이지 아래 카드로</div>
+        <div class="frame-cap" style="text-align:center">재현(축소) — <b>lite-settings.html:185-192</b> "🖧 원격 GPU (VPN)" · 이미 구현·게시됨, 새로 안 그림</div>
+        <div class="dest" style="max-width:400px">
+          <div class="panel-title" style="justify-content:space-between;margin-bottom:6px"><span>🖧 원격 GPU (VPN)</span><span class="badge b-amber">꺼짐</span></div>
+          <div class="hint">⚠ 켜면 질문이 VPN으로 원격 GPU에 전송됩니다. VPN 안 사설 주소만 됩니다 — 기본은 꺼짐.</div>
+          <div class="btnrow"><button class="btn-g">연결 테스트</button><button class="btn-p">켜기</button></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ② 표준 -->
+    <div class="spot" style="margin-top:30px">
+      <div class="tag">②</div>
+      <div class="spot-body">
+        <div class="frame-cap">재현 — <b>settings.html:520-537</b> "AI팀 구성" 패널 · <code>#teamBase</code>(1993-2014행 렌더)</div>
+        <div class="spot-frame">
+          <div class="panel-title">AI팀 구성<span class="badge b-teal">admin 전용</span></div>
+          <div class="teambase-box">
+            <span style="font-size:16px">🧠</span>
+            <div style="flex:1">
+              <div><b>기반 두뇌</b> — Qwen3-14B-GGUF <span class="badge b-teal">실행중</span></div>
+              <div class="tb-sub">이 모델 하나를 전 팀원이 함께 씁니다 — 고객 모델로 바꿔도 아래 전문성은 그대로입니다.</div>
+              <div class="fork-row sm">
+                <div class="fork-card sm on"><span>💻 이 PC(지금)</span></div>
+                <div class="fork-card sm"><span>🖧 원격 GPU(VPN)</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="funnel-sm">"원격 GPU(VPN)"을 고르면 — 같은 칸이 이렇게 바뀝니다 ↓</div>
+        <div class="spot-frame" style="border-style:dashed;border-color:rgba(30,185,128,.4)">
+          <div class="teambase-box">
+            <span style="font-size:16px">🖧</span>
+            <div style="flex:1">
+              <div><b>기반 두뇌</b> — 원격 GPU(VPN) <span class="badge b-teal">연결됨</span></div>
+              <div class="tb-sub" style="color:#fbbf24">⚠ 질문이 VPN으로 원격 GPU에 전송됩니다 — 팀 전체가 원격 응답을 받습니다.</div>
+              <div class="fork-row sm">
+                <div class="fork-card sm"><span>💻 이 PC</span></div>
+                <div class="fork-card sm on"><span>🖧 원격 GPU(지금)</span></div>
+              </div>
+              <div style="margin-top:7px"><span class="fc-btn" style="display:inline-block;width:auto;padding:5px 12px">← 이 PC로 되돌리기</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="whatsnew">신설은 <code>teamBase</code> 안 칩 2개(소스 전환)뿐 — 팀원 카드·공용 자산 등 나머지는 그대로. 내부적으로는 이미 있는 <code>rgpuPanel</code>/<code>remoteLlmSet</code>(settings.html:711-730)과 <b>같은 저장소</b>를 쓴다 — 새 설정을 안 만든다.</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============================================================ -->
+  <div class="note">
+    <h2>왜 이 안인가</h2>
+    <p>
+      세 지시를 하나의 틀로 묶었다 — <b>Smart MD는 "로그인 여부와 무관한 상시 무료 도구"</b>,
+      <b>라이트 다운로드는 "로그인 전에 던지는 또 다른 무료 제안"</b>, <b>원격 GPU는 "LLM을 고르는
+      순간의 동급 선택지"</b>다. 공통점은 <b>전부 이미 있는 것을 잇기만 한다</b>는 것 — Smart MD는
+      <code>office.html</code> 창 패턴을 복제하고, 라이트 다운로드는 이미 있는 Drive 링크를 걸고,
+      원격 GPU는 이미 게시된 <code>rgpuPanel</code>/원격GPU() 카드로 이어질 뿐이다.
+      <b>새 화면·새 카드·새 저장소를 하나도 안 만든다.</b>
+    </p>
+    <p>
+      원격 GPU를 "오류가 났을 때의 우회로"가 아니라 "처음부터 있는 선택지"로 바꾼 것이 이번 수정의
+      핵심이다. VPN 노트북·저사양 데스크톱을 쓰는 고객은 애초에 "부족을 겪은 뒤"가 아니라
+      <b>모델을 처음 고르는 그 순간</b>부터 원격이 정답일 수 있다 — 실패를 겪어야만 보이는 안내는
+      그런 고객에게 늦다. NN/G 휴리스틱 #6(Recognition rather than recall)과 Choice Architecture
+      원칙("두 선택지는 같은 시각적 무게로")에 따라, 로컬 카드와 원격 카드를 <b>같은 크기·같은
+      스타일</b>로 나란히 두고 지금 상태만 "선택됨" 표시로 구분했다 — 어느 쪽도 유도하지 않는다.
+    </p>
+
+    <h3>왜 별도 앱으로 동봉하지 않았나(Smart MD)</h3>
+    <p>
+      "클라 설치본에 담아 배포"를 별도 설치 파일(제2의 .exe/.dmg)로 읽을 수도 있었지만 기각했다.
+      ① 폐쇄망은 GIJO 클라 자체의 업데이트 채널(서버가 배포처)만 있고 <b>제2의 앱을 위한 채널이
+      없다.</b> ② 별도 프로세스는 <b>로그인 세션이 갈린다</b> — main.ts:549행 주석대로 지금은
+      새 창도 <code>authState</code>를 공유해서 "로그인하면 무료"가 그냥 되는데, 별도 앱이면 이
+      조건 자체를 다시 구현해야 한다. ③ 로그인 <b>전에도</b> 열려야 하므로(이번 로그인 화면
+      요구사항), 별도 설치 앱이면 "설치했는지" 자체가 새 상태가 되어 로그인 화면이 그걸 감지해야
+      한다 — 창은 그냥 뜬다.
+    </p>
+
+    <h3>다른 길을 왜 안 골랐나</h3>
+    <table>
+      <tr><th>주제</th><th>안</th><th>왜 안 골랐나 / 골랐나</th></tr>
+      <tr><td rowspan="3">Smart MD 배치</td><td>별도 설치 앱</td>
+          <td>위 문단 참조 — <b>기각</b></td></tr>
+      <tr><td>GIJO 탭(iframe)에 끼워넣기</td>
+          <td><code>healFrames</code>(app.html:293-321)가 "빈 화면"으로 오판하면 <b>src를 다시
+              읽는다</b> — 작성 중 초안 유실 위험. 최대 탭 8개(app.html:255)와도 경쟁. <b>기각</b></td></tr>
+      <tr><td>별도 창(BrowserWindow) — <b>채택</b></td>
+          <td>팀 사무실·문서함과 같은 패턴 · MS Learn 보조 창 표준과 일치 · 로그인 세션 공유 ·
+              로그인 전에도 뜰 수 있음</td></tr>
+      <tr><td rowspan="2">원격 GPU 노출 시점</td><td>오류(VRAM 부족) 발생 시점에만 안내</td>
+          <td>1차 브리프의 원안 — <b>기각</b>(사장님 지시). 실패를 겪어야만 보이는 안내는
+              "처음부터 원격이 답인" 고객에게 늦다</td></tr>
+      <tr><td>LLM을 고르는 순간의 동급 선택지 — <b>채택</b></td>
+          <td>NN/G #6(숨기지 않는다) · Choice Architecture(같은 무게) — 라이트 첫 모델 등록,
+              표준 기반 두뇌 배정, 둘 다 "모델을 정하는" 바로 그 화면</td></tr>
+    </table>
+
+    <h3>무엇을 포기했나</h3>
+    <ul>
+      <li><b>로그인 화면 밀도</b> — 로그인 상자만 있던 화면에 구역이 하나 더 생긴다. 작은 해상도
+          (예 1366×768)에서는 로그인 카드 + 새 구역 + footbar(34px) 총합이 뷰포트를 넘길 수 있다
+          — 그때는 새 구역만 스크롤되거나 살짝 줄어드는 처리가 필요하다(구현 시 확인 필요, 이
+          시안은 값을 정하지 않는다).</li>
+      <li><b>라이트 "챗 모델 등록"이 한 단 길어진다</b> — "선택 먼저" 구조라 이미 여러 번
+          등록해 본 재방문 고객에게는 여분 클릭처럼 느껴질 수 있다. 이 시안은 그 부담을 줄이는
+          "마지막으로 고른 갈래를 기억해 자동으로 펼치기" 같은 장치를 넣지 않았다 — 필요하면
+          승인 후 별도로 검토한다.</li>
+      <li><b>표준 기반 두뇌 전환의 영향(지연시간·응답 속도 변화)은 화면에 안 적는다</b> — "질문이
+          VPN으로 전송됩니다"라는 사실만 밝히고, 체감 속도·안정성 같은 설명은 ⓘ/screenguide로
+          미룬다(원칙 준수이지만, 화면만 보고 결정하기엔 정보가 적을 수 있다).</li>
+      <li>원격 GPU 카드로 "이어지기"만 할 뿐 <b>자동으로 켜주지 않는다</b> — 두 자리 모두 클릭
+          후에도 "연결 테스트 → 켜기" 확인 단계가 남는다. 검증 없이 VPN 트래픽을 트는 일을
+          피하려는 기존 카드의 설계를 그대로 존중한 결과다.</li>
+    </ul>
+
+    <h3>밀도 숫자</h3>
+    <table>
+      <tr><th>구역</th><th>지금</th><th>시안</th><th>증감</th></tr>
+      <tr><td>표준 사이드바 TOP 고정열<br><span style="color:var(--muted-2);font-size:11px">nav.js:60-78, 항목당 30px(485행)</span></td>
+          <td>3항목 × 30px = 90px</td><td>4항목 × 30px = 120px</td><td class="bad">+30px(+33%)</td></tr>
+      <tr><td>라이트 제목줄(44px 고정)</td><td>브랜드+태그만, 오른쪽 빈 공간</td>
+          <td>오른쪽에 버튼 1개(줄 높이 불변)</td><td class="good">세로 0px(가로만 사용)</td></tr>
+      <tr><td>열린 모습(Smart MD 창)</td><td>—</td>
+          <td>별도 BrowserWindow — 기존 레이아웃에 안 얹힘</td><td class="good">세로 0px</td></tr>
+      <tr><td><b>로그인 화면(login.html)</b><br><span style="color:var(--muted-2);font-size:11px">실측 아님 — 어림</span></td>
+          <td>로그인 카드만, 그 아래 전부 빈 배경</td>
+          <td>+"무료 제공" 헤더 1줄 + 카드 2장 가로 배치</td><td class="bad">약 +165px(카드 아래, 어림)</td></tr>
+      <tr><td>라이트 "챗 모델 등록" 카드</td>
+          <td>①파일로 / ②받아서 바로 시작</td>
+          <td>+선택 카드 2장(가로), 기존 ①②는 "이 PC" 선택 시 그대로</td><td class="bad">약 +76px(카드 1줄, 어림, 항상 보임)</td></tr>
+      <tr><td>표준 "AI팀 구성" 기반 두뇌 칸</td>
+          <td>모델명 + 설명 2줄</td>
+          <td>+소스 칩 2개짜리 줄 1개</td><td class="bad">약 +22px(칩 1줄, 어림, 항상 보임)</td></tr>
+    </table>
+    <p style="margin-top:8px">
+      1차 안(VRAM 오류 시점 안내)은 증가분이 <b>조건부</b>(오류가 날 때만)였지만, 이 안(선택
+      시점)은 <b>그 화면을 볼 때 항상</b> 보인다 — 대신 새 화면을 하나도 안 만들고 기존 화면
+      안의 카드·칩으로 압축했다. 항상 보이는 증가의 합은 표준 사이드바 +30px · 로그인 화면 약
+      +165px · 라이트 모델등록 약 +76px · 표준 기반두뇌 약 +22px이다. 로그인 화면의 165px이
+      가장 크다 — "로그인 상자가 주인공"이라는 제약과 정면으로 부딪히는 방향이라 숨기지 않는다.
+      다만 카드 글자 크기(11~11.5px)를 로그인 입력칸(12.25~14px)보다 작게 두고, 로그인 카드
+      아래 뚜렷한 간격을 둬 <b>시선 순서가 로그인 → 무료 구역</b>이 되도록 했다.
+    </p>
+
+    <h3>제품 원칙 자가점검</h3>
+    <table>
+      <tr><th>원칙</th><th>지킴?</th><th>근거</th></tr>
+      <tr><td>메뉴는 보기용 · 지시는 대화창에서 · 새 입력칸 금지</td><td class="good">지킴</td>
+          <td>모든 신설 요소는 클릭 카드/칩이다. 로그인 화면·모델 선택 화면 어디에도 새 텍스트
+              입력칸을 추가하지 않았다.</td></tr>
+      <tr><td>화면엔 정체성 한 줄 + ⚠경고만</td><td class="good">지킴</td>
+          <td>"질문이 VPN으로 전송됩니다" 한 줄이 기존 원격 GPU 카드 문구 그대로(재사용) — 새
+              설명 문단을 안 썼다. 라이트 다운로드 카드도 사양 3가지를 한 줄로 압축했다.</td></tr>
+      <tr><td>다크 팔레트 고정</td><td class="good">지킴</td>
+          <td>전 요소 <code>--bg:#262624</code> 계열(로그인 화면의 실제 그라디언트도 그대로
+              재현). Smart MD 내부만 자기 색(의도적 예외, 섹션②에서 이유 명시).</td></tr>
+      <tr><td>gijo-ui.css 결(색·간격·글꼴 크기)</td><td class="good">지킴</td>
+          <td>토큰을 그대로 복사. 가장 작은 글자 11px(선택 카드 배지) — 11px 미만 없음.</td></tr>
+      <tr><td>ⓘ 원칙(설명은 챗봇으로)</td><td class="good">지킴</td>
+          <td>새 문구는 전부 "무엇을 고를 수 있는지"뿐이다. "왜 원격이 필요한가"·"VPN이 뭔가"는
+              화면에 안 쓰고 기존 카드 hint·(구현되면) screenguide가 맡는다.</td></tr>
+      <tr><td>정직한 구현 — 가짜 UI 금지</td><td class="warn">주의 표시</td>
+          <td>모든 버튼·입력칸이 <b>동작하지 않음</b>을 상단에 고지했다. 라이트 Drive 링크는
+              실제 URL을 캡션에 텍스트로만 노출(가짜 클릭 유도 없음).</td></tr>
+      <tr><td>자체완결 HTML(외부 리소스 0)</td><td class="good">지킴</td>
+          <td>CDN·웹폰트·원격 이미지·실제 하이퍼링크 없음 — 로고도 실제 svg 대신 CSS 도형으로
+              대체했다.</td></tr>
+    </table>
+  </div>
+
+</div>
+</body>
+</html>

@@ -860,6 +860,12 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         await loadModelAuth();
         await loadLawConfig();
         await loadRemoteGpu().catch(function () {});
+        // AI팀 구성의 「🖧 원격 GPU」 칩이 ?focus=rgpu로 데려온다 — 판이 실린 뒤에 스크롤한다.
+        // (판이 admin에게만 보이므로 이 자리에서만 확실히 존재한다.)
+        if (new URLSearchParams(location.search).get("focus") === "rgpu") {
+          const p = document.getElementById("rgpuPanel");
+          if (p) { p.scrollIntoView({ behavior: "smooth", block: "center" }); const i = document.getElementById("rgpuUrl"); if (i) i.focus(); }
+        }
         await loadEdition().catch(function () {});
         await loadUserList();
         await loadReleases().catch(() => {});
@@ -2004,13 +2010,56 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       const running = new Set((models || []).filter((m) => m.running).map((m) => m.id));
 
       // 기반 두뇌 — 자동으로 선택돼 보인다. 교체는 「모델 검색·받기」+「로컬 LLM 엔진」이 담당.
+      //
+      // ★ 어디서 돌리나(2026-08-14 사장님 지시: 「표준은 ai팀 선택할 때 옵션으로」).
+      //   기반 두뇌는 팀에 **하나**다(2026-08-09 결정) — 그래서 「이 PC / 원격 GPU」가 정확히
+      //   이 한 칸의 성질이 된다. 원격을 고르면 전 팀원의 추론이 그리로 간다.
+      //   ⚠ 여기서 **켜지 않는다** — 주소·연결 테스트·투명성 확인은 「원격 GPU(VPN)」 카드가
+      //     이미 갖고 있다. 두 자리에서 켜면 켜는 규칙이 두 벌이 된다. 여기는 고르고 데려간다.
       const baseEl = document.getElementById("teamBase");
       if (baseEl) {
-        baseEl.innerHTML = team.base.modelId
-          ? `<span style="font-size:16px">🧠</span><div><b>기반 두뇌</b> — ${esc(team.base.modelId)}` +
-            `<span class="badge ${team.base.running ? "b-teal" : "b-muted"}" style="margin-left:6px">${team.base.running ? "실행중" : "정지"}</span>` +
-            `<div style="color:var(--muted);font-size:11.5px;margin-top:2px">이 모델 하나를 전 팀원이 함께 씁니다 — 고객 모델로 바꿔도 아래 전문성은 그대로입니다(교체는 「모델 검색·받기」에서).</div></div>`
-          : `<span style="font-size:16px">🧠</span><div><b>기반 두뇌</b> — 아직 모델이 없습니다<div style="color:var(--muted);font-size:11.5px;margin-top:2px">「모델 검색·받기」에서 내려받으면 여기 자동으로 실립니다.</div></div>`;
+        let 원격 = null;
+        try { 원격 = await window.gijo.remoteLlmGet(); } catch (e) { /* 옛 서버면 로컬만 보인다 */ }
+        const 원격켜짐 = !!(원격 && 원격.enabled);
+        const 칩 = (on, 라벨, 힌트) =>
+          `<span class="basesrc" data-src="${on ? "remote" : "local"}" title="${힌트}" ` +
+          `style="cursor:pointer;font-size:11px;font-weight:700;border-radius:999px;padding:2px 8px;margin-right:5px;` +
+          `border:1px solid ${on === 원격켜짐 ? "var(--teal,#1eb980)" : "var(--border)"};` +
+          `color:${on === 원격켜짐 ? "var(--teal,#1eb980)" : "var(--muted)"}">${라벨}</span>`;
+        const 고르는줄 = 원격
+          ? `<div style="margin-top:6px">` +
+            칩(false, "💻 이 PC", "이 PC의 GPU로 돌립니다") +
+            칩(true, "🖧 원격 GPU(VPN)", "사내·집의 큰 GPU를 VPN으로 빌려 씁니다") +
+            (원격켜짐
+              ? `<span style="color:var(--amber,#f0a020);font-size:11.5px">⚠ 질문이 VPN으로 원격 GPU에 전송됩니다</span>`
+              : "") +
+            `</div>`
+          : "";
+        baseEl.innerHTML = 원격켜짐
+          ? `<span style="font-size:16px">🖧</span><div><b>기반 두뇌</b> — 원격 GPU` +
+            `<span class="badge b-teal" style="margin-left:6px">VPN</span>` +
+            `<div style="color:var(--muted);font-size:11.5px;margin-top:2px">${esc(원격.url || "")} — 이 PC의 모델 대신 원격이 답합니다. 주소·끄기는 아래 「원격 GPU(VPN)」에서.</div>${고르는줄}</div>`
+          : (team.base.modelId
+            ? `<span style="font-size:16px">🧠</span><div><b>기반 두뇌</b> — ${esc(team.base.modelId)}` +
+              `<span class="badge ${team.base.running ? "b-teal" : "b-muted"}" style="margin-left:6px">${team.base.running ? "실행중" : "정지"}</span>` +
+              `<div style="color:var(--muted);font-size:11.5px;margin-top:2px">이 모델 하나를 전 팀원이 함께 씁니다 — 고객 모델로 바꿔도 아래 전문성은 그대로입니다(교체는 「모델 검색·받기」에서).</div>${고르는줄}</div>`
+            : `<span style="font-size:16px">🧠</span><div><b>기반 두뇌</b> — 아직 모델이 없습니다<div style="color:var(--muted);font-size:11.5px;margin-top:2px">「모델 검색·받기」에서 내려받거나, 이 PC에 GPU가 없으면 <b>원격 GPU</b>를 고르세요.</div>${고르는줄}</div>`);
+        // 칩을 누르면 **설정하는 자리로 데려간다**(켜는 것은 그 카드가 한다).
+        // ⚠ 원격 GPU 칸은 **다른 탭**(연동)에 있다 — 같은 화면 스크롤로는 못 간다.
+        //   탭 전환은 이 화면의 규약대로 ?s=만 바꿔 다시 연다(1777행 탭줄과 같은 길).
+        //   ⚠ admin이 아니면 그 판이 아예 안 뜬다(855행) — 그때는 데려가지 말고 이유를 말한다.
+        baseEl.querySelectorAll(".basesrc").forEach((el) => el.addEventListener("click", async () => {
+          let admin = false;
+          try { admin = (currentUser || await window.gijo.me()).role === "admin"; } catch (e) {}
+          if (!admin) {
+            alert("원격 GPU 설정은 관리자만 바꿀 수 있습니다 — 채팅이 어디로 가는지를 정하는 설정입니다.");
+            return;
+          }
+          const q = new URLSearchParams(location.search);
+          q.set("s", "link");
+          q.set("focus", "rgpu");   // 연동 탭이 열리면서 그 판으로 스크롤한다
+          location.replace("settings.html?" + q.toString());
+        }));
       }
 
       // 팀원 카드 — 이름(✏만 수정 가능) · 고정 역할 · 전문성 실측 배지.

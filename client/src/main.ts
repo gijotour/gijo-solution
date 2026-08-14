@@ -17,6 +17,7 @@ import { isDangerous } from "./terminalPolicy";
 let mainWindow: BrowserWindow | null = null;
 let docboxWindow: BrowserWindow | null = null; // 문서함 별도 창 — 제품 화면 셸(탭) 밖에서 돈다(사용자 결정 2026-07-30)
 let officeWindow: BrowserWindow | null = null; // "우리 AI 팀 사무실" 별도 창(시안 B) — 관제 모니터 상시용
+let smartMdWindow: BrowserWindow | null = null; // GIJO Smart MD Studio — 로그인 고객 무료 제공(2026-08-14)
 let quitConfirmed = false; // 메인 창 닫기 확인을 통과했는가 — 재시작·업데이트는 true로 건너뛴다
 let bundledServerProcess: ChildProcess | null = null;
 /** 이 앱이 서버를 직접 띄웠을 때만 채워진다 — 저장 암호화 전환처럼 **서버를 멈춰야 하는 일**에 쓴다. */
@@ -603,6 +604,74 @@ ipcMain.handle("docbox:open", async () => {
   bindZoom(docboxWindow); // 문서함도 같은 화면 크기(배율)를 따른다
   docboxWindow.on("closed", () => { docboxWindow = null; });
   await docboxWindow.loadFile(path.join(__dirname, "../src/renderer/pages/docbox.html"));
+});
+
+// ── GIJO Smart MD Studio — 로그인한 고객에게 주는 **무료 문서 작성 도구** ────────────────
+//
+// ■ 사장님 결정(2026-08-14): 「클라이언트에서 로그인할 때 제공되는 무료 툴로 같이 배포하고
+//   사용할 수 있게끔」. 전 에디션 공통이다(라이트·스탠다드·프로).
+//
+// ■ 왜 별도 창인가 — 탭(iframe) 안에 넣지 않는다. ① Smart MD는 자기 단축키·붙여넣기 처리·
+//   전체화면 편집을 전제한 **독립 편집기**다 ② app.html의 healFrames가 탭 iframe을 되살리며
+//   다시 로드하는데, 편집 중이던 글이 그때 날아간다 ③ 문서를 옆에 띄워 두고 GIJO를 조작하는
+//   쓰임이 문서함·사무실 창과 같다. 그 셋과 같은 패턴을 쓴다.
+//
+// ■ 없어도 GIJO가 돈다(사장님 원칙 ④ — 포함이 아니라 연동). 자산은 게시 때
+//   scripts/fetch-smartmd.mjs가 원본 저장소에서 받아 담는다. 개발 트리에 없을 수 있으므로
+//   **없으면 조용히 죽지 않고 사람이 읽을 안내**를 준다.
+//
+// ⚠ 라이트 문지기: 이 창은 셸화면보정을 안 거친다(navigate:to가 아니다). Smart MD는
+//   **전 에디션 공통 무료 도구**라 라이트에서 열려도 맞다 — 막지 않는 것이 의도다.
+//   (라이트에 없는 *제품* 화면을 별도 창으로 여는 길이 생기면 그때는 문지기가 필요하다.)
+function smartMdIndex(): string {
+  // 설치본에서는 asar 안(app/smartmd), 개발에서는 client/smartmd.
+  return path.join(__dirname, "../smartmd/index.html");
+}
+
+ipcMain.handle("smartmd:open", async () => {
+  const index = smartMdIndex();
+  if (!fs.existsSync(index)) {
+    return {
+      ok: false,
+      error: "Smart MD Studio가 이 설치본에 담겨 있지 않습니다. 개발 중이라면 client 폴더에서 `node scripts/fetch-smartmd.mjs`를 한 번 실행하세요.",
+    };
+  }
+  if (smartMdWindow && !smartMdWindow.isDestroyed()) {
+    smartMdWindow.focus();
+    return { ok: true, reused: true };
+  }
+  smartMdWindow = new BrowserWindow({
+    // 원본 앱의 기본 크기(1300×900)를 따르되, 작은 화면에서는 그 화면에 맞춘다.
+    width: Math.min(1300, Math.max(900, screen.getPrimaryDisplay().workAreaSize.width - 120)),
+    height: Math.min(900, Math.max(640, screen.getPrimaryDisplay().workAreaSize.height - 120)),
+    minWidth: 900,
+    minHeight: 600,
+    backgroundColor: "#262624",
+    title: "GIJO Smart MD Studio — 문서 작성(무료 제공)",
+    webPreferences: {
+      preload: path.join(__dirname, "preload.js"),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+  });
+  smartMdWindow.removeMenu();
+  // ⚠ 배율(bindZoom)은 걸지 않는다 — Smart MD는 자기 확대/축소를 가진 편집기다.
+  //   GIJO 화면 배율을 강제하면 편집기 안에서 글자 크기를 조절하는 기능과 부딪힌다.
+  smartMdWindow.on("closed", () => { smartMdWindow = null; });
+  // 드롭한 파일·링크가 창을 딴 데로 끌고 가지 못하게(원본 main.js의 방어를 그대로 옮긴다).
+  smartMdWindow.webContents.on("will-navigate", (e) => e.preventDefault());
+  await smartMdWindow.loadFile(index);
+  return { ok: true };
+});
+
+// Smart MD의 PDF 내보내기 — 원본 앱이 자기 main.js에서 하던 일을 여기서 대신한다.
+// printBackground가 없으면 어두운 코드블록 배경이 빠져 흰 바탕에 흰 글씨가 된다(원본 주석).
+ipcMain.handle("smartmd:exportPdf", async (e) => {
+  const win = BrowserWindow.fromWebContents(e.sender);
+  if (!win) return null;
+  const buffer = await win.webContents.printToPDF({ printBackground: true });
+  return new Uint8Array(buffer); // Buffer를 구조화 복제에 태우면 판본에 따라 조용히 멎는다(원본 주석)
 });
 
 // 관제 모니터 상시용 — 항상 위 고정 토글(office.html 헤더의 📌 버튼).

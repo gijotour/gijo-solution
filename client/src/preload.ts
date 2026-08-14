@@ -122,6 +122,9 @@ const gijoApi = {
     }
     return ipcRenderer.invoke("navigate:to", p);
   },
+  // GIJO Smart MD Studio — 로그인 고객에게 주는 무료 문서 작성 도구(2026-08-14 사장님 결정).
+  // 별도 창으로 연다. 설치본에 안 담겼으면 {ok:false, error}를 준다 — 부르는 쪽이 안내한다.
+  openSmartMd: (): Promise<{ ok: boolean; error?: string; reused?: boolean }> => ipcRenderer.invoke("smartmd:open"),
   // "우리 AI 팀 사무실" 별도 창(시안 B) — 열기 + 항상 위 고정 토글
   openTeamOffice: () => ipcRenderer.invoke("office:open"),
   setOfficeAlwaysOnTop: (on: boolean) => ipcRenderer.invoke("office:setAlwaysOnTop", on),
@@ -573,6 +576,22 @@ const gijoApi = {
 };
 
 contextBridge.exposeInMainWorld("gijo", gijoApi);
+
+// ── Smart MD Studio가 기대하는 표면 ────────────────────────────────────────────
+// Smart MD(독립 제품)는 Electron 안에서 돌 때 `window.gijoDesktop`을 찾는다:
+//   · exportPdf()      — 있으면 네이티브 PDF, 없으면 브라우저 인쇄로 폴백
+//   · onMenuCommand()  — 앱 메뉴에서 오는 명령. 우리 창은 메뉴를 안 달아 **부르지 않는다**.
+//     (Smart MD 화면 안에 새 문서·내보내기 버튼이 다 있어 메뉴 없이도 온전히 쓰인다.)
+// ⚠ 이 표면은 **Smart MD 창에서만 의미가 있다.** 다른 GIJO 화면에도 실리지만 아무도 안 부른다 —
+//   창마다 preload를 따로 두면 두 벌이 되고, 한쪽만 고쳐져 어긋난다(이 저장소의 반복 유형).
+// ⚠ 원본이 이 이름을 바꾸면 PDF 내보내기가 조용히 폴백된다. 이름은 원본
+//   gijo-smart-md-studio/preload.js가 단일 출처다 — fetch-smartmd로 판을 올릴 때 함께 본다.
+contextBridge.exposeInMainWorld("gijoDesktop", {
+  isElectron: true,
+  platform: process.platform,
+  exportPdf: () => ipcRenderer.invoke("smartmd:exportPdf"),
+  onMenuCommand: (_callback: (command: string) => void) => { /* 우리 창엔 앱 메뉴가 없다 */ },
+});
 
 // 로그인 성공 이후 렌더러가 이 시점에 WebSocket을 연다(인증 전 연결 방지).
 contextBridge.exposeInMainWorld("gijoRealtime", {

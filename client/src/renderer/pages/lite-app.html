@@ -40,6 +40,14 @@
   }
   .lite-titlebar .p { font-weight: 700; font-size: 13.5px; letter-spacing: .2px; }
   .lite-titlebar .e { font-size: 11px; opacity: .62; margin-left: 8px; }
+  /* 문서 작성(Smart MD) — 제목줄 **오른쪽 빈 자리**를 쓴다. 세로 높이는 그대로 44px이라
+     화면 세로 공간을 한 픽셀도 안 먹는다(2026-08-14 무료 도구 진입점). */
+  .lite-titlebar .smd {
+    margin-left: auto; -webkit-app-region: no-drag;   /* 창 끌기 영역 안의 버튼은 이걸 꺼야 눌린다 */
+    background: transparent; border: 1px solid var(--g-border, #262a33); color: var(--g-fg, #e6e8ec);
+    border-radius: 7px; padding: 4px 10px; font-size: 11.5px; font-weight: 700; cursor: pointer;
+  }
+  .lite-titlebar .smd:hover { border-color: var(--g-accent, #5fa1ff); color: var(--g-accent, #5fa1ff); }
 
   /* 제목줄 아래 본체 — 여기서만 [사이드바 | 본문]으로 나뉜다. */
   .lite-body { flex: 1 1 auto; min-height: 0; display: flex; }
@@ -87,7 +95,20 @@
   <div class="lite-titlebar">
     <span class="p">GIJO AS</span>
     <span class="e">Lite — 담당자 PC 1인용</span>
+    <!-- 무료로 함께 드리는 문서 작성 도구(Smart MD Studio). 별도 창으로 열린다. -->
+    <button class="smd" id="smdBtn" type="button" title="GIJO Smart MD Studio — 무료 문서 작성 도구(별도 창)">📝 문서 작성</button>
   </div>
+  <script>
+    // 없으면 조용히 지나가지 않고 이유를 말한다 — 「눌러도 아무 일 없다」를 만들지 않는다.
+    document.getElementById("smdBtn").addEventListener("click", async function () {
+      if (!window.gijo || typeof window.gijo.openSmartMd !== "function") {
+        alert("이 판에는 문서 작성 도구가 없습니다 — 최신 버전으로 올리면 함께 들어옵니다.");
+        return;
+      }
+      const r = await window.gijo.openSmartMd();
+      if (r && r.ok === false) alert(r.error || "문서 작성 도구를 열지 못했습니다.");
+    });
+  </script>
   <div class="lite-body">
     <nav class="lite-side" aria-label="라이트 메뉴">
       <div id="liteNav" role="list"></div>
