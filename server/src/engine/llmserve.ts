@@ -23,6 +23,7 @@
 //
 // ⚠ 인증(토큰)은 아직 없다 — 사장님 결정이 「VPN 전용」이고, VPN 안은 이미 신뢰 경계 안이라는
 //   같은 근거다(remotellm.ts 주석과 짝). 붙는 쪽에 자격증명이 생기는 날 여기도 함께 단다.
+import express from "express";
 import type { Express, Request, Response } from "express";
 import { Readable, pipeline } from "node:stream";
 import { db } from "../db";
@@ -114,6 +115,35 @@ export function browserOriginated(req: Request): boolean {
 }
 
 /**
+ * **앞단에 프록시가 있나** — 있으면 이 창구를 닫는다.
+ *
+ * ⚠ 왜 (검토관 지적 M2 — fail-open이었다)
+ *   대역 판정은 소켓 주소를 본다. 그런데 고객이 서버 앞에 nginx 같은 것을 두면 **모든 요청의
+ *   소켓 주소가 127.0.0.1**이 되어, 인터넷에서 온 것까지 전부 「사설」로 통과한다.
+ *   「X-Forwarded-For를 안 믿는다」는 신중해 보이지만, 그 헤더를 무시한 결과가 **전원 통과**라
+ *   방향이 거꾸로였다. 모르면 막는다(airgap의 default-deny와 같은 자세).
+ * ⚠ 우리 배포에는 프록시가 없다 — 그래서 평소에는 이 검사가 아무 일도 하지 않는다.
+ *   프록시를 둔 고객에게는 창구가 안 열리고, 그 이유를 화면과 응답이 말한다.
+ */
+export function proxyDetected(req: Request): boolean {
+  const h = (req.headers ?? {}) as Record<string, unknown>;
+  return Boolean(h["x-forwarded-for"] || h["x-real-ip"] || h["forwarded"] || h["x-forwarded-host"]);
+}
+
+/**
+ * 동시에 받아 줄 추론 수.
+ *
+ * ⚠ 왜 (검토관 지적 M5) — 무인증 경로에 상한이 없으면 사설망의 아무 장치가 요청을 몰아넣어
+ *   이 PC의 GPU를 독차지할 수 있다. 게다가 외부 요청이 모델 로드를 유발해 **로컬 사용자의
+ *   모델을 밀어낼** 수도 있다. 내주는 것은 호의이지 무제한 위임이 아니다.
+ */
+const 동시상한 = Number(process.env.GIJO_SERVE_CONCURRENCY ?? 2);
+let 처리중 = 0;
+export function serveInFlight(): { 처리중: number; 상한: number } {
+  return { 처리중, 상한: 동시상한 };
+}
+
+/**
  * 로컬 llama의 OpenAI 호환 base URL(기본 모델). 내줄 수 없으면 null.
  *
  * ⚠ `ensureAgentModel`은 **모델이 없어도 기본 포트 URL을 돌려준다**(localengine.ts:1083-1085).
@@ -149,6 +179,138 @@ function 주소재료(req: Request): { seenAddress: string; addressIsPrivate: bo
   return { seenAddress: raw, addressIsPrivate: raw ? isVpnRangeIp(raw) : false, port: servePort() };
 }
 
+/**
+ * **창구만** 등록한다 — 전역 JSON 파서보다 **먼저** 불려야 한다(app.ts).
+ *
+ * 왜 나눴나: 이 두 경로는 인증이 없어 본문 상한을 따로 걸어야 하는데, Express는 등록 순서대로
+ * 미들웨어를 쌓는다. 전역 파서 뒤에 두면 이미 200mb로 읽힌 뒤라 소용이 없다.
+ * 설정·조회 라우트(아래)는 인증이 있고 순서와 무관하므로 원래 자리에 그대로 둔다.
+ */
+export function registerLlmServeGateway(app: Express): void {
+  // ── OpenAI 호환 창구 ────────────────────────────────────────────────────
+  //   붙는 쪽(remotellm)이 기대하는 것은 `<base>/models`와 `<base>/chat/completions`다.
+  //   그래서 base는 `http://<이 서버>:<포트>/api/llm/serve/v1`이 된다.
+  //   ⚠ 이 두 경로는 **인증 미들웨어를 안 탄다**(VPN 대역 판정이 그 자리를 대신한다) —
+  //     그래서 아래 관문을 **모든 경로에서 똑같이** 통과시킨다. 하나라도 빠지면 그게 구멍이다.
+  const 관문 = (req: Request, res: Response): boolean => {
+    const 보낸곳 = String(req.socket?.remoteAddress ?? "(미상)");
+    // ⚠ **대역 판정이 맨 앞이다**(검토관 지적 M1). 예전엔 「꺼짐」을 먼저 답해서, 밖에서 훑는
+    //   쪽이 무인증으로 「이건 GIJO다 · 에어갭이다」를 알아냈다. 밖에서 온 것은 전부 같은 404다 —
+    //   있는지 없는지조차 알려주지 않는다.
+    if (!requesterAllowed(req)) {
+      recordAudit({ kind: "block", action: "원격 GPU 창구 거절(VPN 밖)", actor: `원격 ${보낸곳}`, result: "blocked" });
+      res.status(404).json({ error: "not found" });
+      return false;
+    }
+    // ⚠ 브라우저에서 온 것은 거절한다 — CORS가 모든 오리진을 허용하는 배포에서 남의 웹페이지가
+    //   이 창구를 부를 수 있었다(H1, 실측 확인). 우리 GIJO의 서버 대 서버 fetch는 이 헤더가 없다.
+    if (browserOriginated(req)) {
+      recordAudit({ kind: "block", action: "원격 GPU 창구 거절(브라우저 요청)", actor: `원격 ${보낸곳}`, detail: String(req.headers?.origin ?? req.headers?.referer ?? ""), result: "blocked" });
+      res.status(403).json({ error: "브라우저에서는 쓸 수 없습니다 — GIJO 서버끼리만 주고받는 창구입니다." });
+      return false;
+    }
+    // ⚠ 앞단 프록시가 있으면 소켓 주소가 전부 127.0.0.1이라 대역 판정이 **전원 통과**가 된다(M2).
+    //   모르면 막는다 — 이 창구는 「확실히 VPN 안」이 성립할 때만 열려야 한다.
+    if (proxyDetected(req)) {
+      recordAudit({ kind: "block", action: "원격 GPU 창구 거절(앞단 프록시 감지)", actor: `원격 ${보낸곳}`, result: "blocked" });
+      res.status(403).json({ error: "앞단에 프록시가 있어 요청자를 확인할 수 없습니다 — 이 창구는 프록시 없이 VPN으로 직접 붙을 때만 열립니다." });
+      return false;
+    }
+    if (isAirgapOn()) { res.status(404).json({ error: "not found" }); return false; }
+    if (!llmServeConfig().enabled) { res.status(404).json({ error: "이 서버는 원격 GPU 제공이 꺼져 있습니다." }); return false; }
+    return true;
+  };
+
+  // ⚠ **본문 상한을 따로 건다**(검토관 지적 M5). 전역 파서는 200mb인데(app.ts:139 — 매뉴얼
+  //   PDF 업로드 때문), 그 크기를 **인증 없는 경로**에 그대로 열어 두면 사설망의 아무 장치가
+  //   200MB를 메모리에 밀어넣을 수 있다. 채팅 요청은 이보다 훨씬 작다.
+  //   ⚠ 이 파서가 먹으려면 이 라우트가 전역 파서보다 **먼저 등록**돼야 한다(app.ts에서 그렇게 부른다).
+  const 본문 = express.json({ limit: "8mb" });
+
+  app.get(
+    "/api/llm/serve/v1/models",
+    asyncRoute(async (req, res) => {
+      if (!관문(req, res)) return;
+      const base = await localBaseUrl();
+      if (!base) { res.status(503).json({ error: "이 PC에 서빙 중인 모델이 없습니다." }); return; }
+      try {
+        const r = await fetch(`${base}/models`, { signal: AbortSignal.timeout(10000) });
+        res.status(r.status).json(await r.json().catch(() => ({ data: [] })));
+      } catch (e) {
+        res.status(502).json({ error: `이 PC의 모델에 닿지 못했습니다 — ${e instanceof Error ? e.message : String(e)}` });
+      }
+    })
+  );
+
+  app.post(
+    "/api/llm/serve/v1/chat/completions",
+    본문,
+    asyncRoute(async (req, res) => {
+      if (!관문(req, res)) return;
+      // ⚠ 동시 처리 상한(M5) — 내주는 것은 호의이지 무제한 위임이 아니다. 넘치면 429로
+      //   정직하게 거절한다(줄 세워 두면 붙는 쪽은 「느리다」로 오해하고 원인을 못 찾는다).
+      if (처리중 >= 동시상한) {
+        res.status(429).json({ error: `이 PC가 지금 ${동시상한}건을 처리 중입니다 — 잠시 뒤 다시 시도하세요.` });
+        return;
+      }
+      const base = await localBaseUrl();
+      if (!base) { res.status(503).json({ error: "이 PC에 서빙 중인 모델이 없습니다." }); return; }
+
+      // ⚠ `enabled: true`를 박아 쓰지 않는다(검토관 지적 M3) — 관문 통과와 이 쓰기 사이에
+      //   admin이 껐으면, 처리 중이던 요청이 **꺼진 스위치를 다시 켜** 화면이 「내주는 중」으로
+      //   돌아온다. 지금 값을 읽어 그대로 두고 시각만 갱신한다.
+      const 지금설정 = llmServeConfig();
+      if (!지금설정.enabled) { res.status(404).json({ error: "이 서버는 원격 GPU 제공이 꺼져 있습니다." }); return; }
+      save({ ...지금설정, lastServedAt: Date.now() }); // 「쓰이고 있나」를 화면이 보이게
+      const 보낸곳 = String(req.socket?.remoteAddress ?? "(미상)");
+      // 무인증 창구라 활동 감사(actor 필요)가 통째로 건너뛴다 — 감사를 직접 남긴다(M4).
+      // 「누가·어디서 내 GPU를 썼나」를 사후에 알 길이 없으면 보안 제품에서 그 자체가 지적 대상이다.
+      recordAudit({ kind: "config", action: "원격 GPU 내줌(추론 1건)", actor: `원격 ${보낸곳}`, result: "ok" });
+
+      // ⚠ 상류를 취소할 통로를 만든다 — 클라이언트가 끊으면 llama 생성도 멈춘다(L1).
+      //   없으면 버려진 요청이 10분 타임아웃까지 슬롯을 점유한다.
+      const 취소 = new AbortController();
+      const 시계 = setTimeout(() => 취소.abort(), 10 * 60 * 1000); // 큰 모델을 감안해 넉넉히
+      // ⚠ 상한 계수는 **끝날 때 반드시 되돌린다** — 안 그러면 몇 건 처리 후 창구가 영영 막힌다.
+      //   res의 close는 정상 종료·에러·클라이언트 끊김 어느 쪽에서도 온다.
+      처리중 += 1;
+      let 되돌림 = false;
+      const 놓기 = () => { if (!되돌림) { 되돌림 = true; 처리중 = Math.max(0, 처리중 - 1); } };
+      res.on("close", () => { clearTimeout(시계); 취소.abort(); 놓기(); });
+
+      try {
+        const upstream = await fetch(`${base}/chat/completions`, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(req.body ?? {}),
+          signal: 취소.signal,
+        });
+        res.status(upstream.status);
+        const ct = upstream.headers.get("content-type");
+        if (ct) res.setHeader("content-type", ct);
+        if (!upstream.body) { clearTimeout(시계); 놓기(); res.end(); return; }
+        // 스트리밍(SSE)도 그대로 흘려보낸다 — 통째로 모았다가 주면 답이 한참 뒤에 한꺼번에 뜬다.
+        // ⚠ `.pipe()`를 쓰지 않는다(검토관 지적 H3): pipe는 에러를 전달하지 않고, 리스너 없는
+        //   `error`는 **uncaught exception이라 서버 프로세스가 죽는다**. 이 저장소에는
+        //   process.on("uncaughtException")이 없고, 운영 서버가 죽으면 전 사용자 세션이 끊긴다.
+        //   실제 방아쇠가 가상이 아니다: 모델 LRU 스왑이 생성 중인 llama를 내릴 때·타임아웃·연결 리셋.
+        pipeline(Readable.fromWeb(upstream.body as Parameters<typeof Readable.fromWeb>[0]), res, (err) => {
+          clearTimeout(시계);
+          놓기();
+          if (!err) return;
+          console.warn(`[llmserve] 중계 중 끊김: ${err.message}`);
+          if (!res.headersSent) res.status(502).json({ error: "추론 중 연결이 끊겼습니다." });
+          else res.destroy(); // 이미 흘려보내던 중이면 소켓을 닫는 것이 유일한 정직한 마무리다
+        });
+      } catch (e) {
+        clearTimeout(시계);
+        놓기();
+        res.status(502).json({ error: `추론에 실패했습니다 — ${e instanceof Error ? e.message : String(e)}` });
+      }
+    })
+  );
+}
+
 export function registerLlmServeRoutes(app: Express): void {
   // 상태 조회·전환 — admin 전용. 화면이 주소를 만들어 보여줄 수 있게 재료를 함께 준다.
   app.get("/api/llm/serve", authMiddleware, adminMiddleware, (req, res) => {
@@ -176,102 +338,6 @@ export function registerLlmServeRoutes(app: Express): void {
         result: "ok",
       });
       res.json({ ...llmServeConfig(), airgap: isAirgapOn(), ...주소재료(req) });
-    })
-  );
-
-  // ── OpenAI 호환 창구 ────────────────────────────────────────────────────
-  //   붙는 쪽(remotellm)이 기대하는 것은 `<base>/models`와 `<base>/chat/completions`다.
-  //   그래서 base는 `http://<이 서버>:<포트>/api/llm/serve/v1`이 된다.
-  //   ⚠ 이 두 경로는 **인증 미들웨어를 안 탄다**(VPN 대역 판정이 그 자리를 대신한다) —
-  //     그래서 아래 관문을 **모든 경로에서 똑같이** 통과시킨다. 하나라도 빠지면 그게 구멍이다.
-  const 관문 = (req: Request, res: Response): boolean => {
-    const 보낸곳 = String(req.socket?.remoteAddress ?? "(미상)");
-    // ⚠ **대역 판정이 맨 앞이다**(검토관 지적 M1). 예전엔 「꺼짐」을 먼저 답해서, 밖에서 훑는
-    //   쪽이 무인증으로 「이건 GIJO다 · 에어갭이다」를 알아냈다. 밖에서 온 것은 전부 같은 404다 —
-    //   있는지 없는지조차 알려주지 않는다.
-    if (!requesterAllowed(req)) {
-      recordAudit({ kind: "block", action: "원격 GPU 창구 거절(VPN 밖)", actor: `원격 ${보낸곳}`, result: "blocked" });
-      res.status(404).json({ error: "not found" });
-      return false;
-    }
-    // ⚠ 브라우저에서 온 것은 거절한다 — CORS가 모든 오리진을 허용하는 배포에서 남의 웹페이지가
-    //   이 창구를 부를 수 있었다(H1, 실측 확인). 우리 GIJO의 서버 대 서버 fetch는 이 헤더가 없다.
-    if (browserOriginated(req)) {
-      recordAudit({ kind: "block", action: "원격 GPU 창구 거절(브라우저 요청)", actor: `원격 ${보낸곳}`, detail: String(req.headers?.origin ?? req.headers?.referer ?? ""), result: "blocked" });
-      res.status(403).json({ error: "브라우저에서는 쓸 수 없습니다 — GIJO 서버끼리만 주고받는 창구입니다." });
-      return false;
-    }
-    if (isAirgapOn()) { res.status(404).json({ error: "not found" }); return false; }
-    if (!llmServeConfig().enabled) { res.status(404).json({ error: "이 서버는 원격 GPU 제공이 꺼져 있습니다." }); return false; }
-    return true;
-  };
-
-  app.get(
-    "/api/llm/serve/v1/models",
-    asyncRoute(async (req, res) => {
-      if (!관문(req, res)) return;
-      const base = await localBaseUrl();
-      if (!base) { res.status(503).json({ error: "이 PC에 서빙 중인 모델이 없습니다." }); return; }
-      try {
-        const r = await fetch(`${base}/models`, { signal: AbortSignal.timeout(10000) });
-        res.status(r.status).json(await r.json().catch(() => ({ data: [] })));
-      } catch (e) {
-        res.status(502).json({ error: `이 PC의 모델에 닿지 못했습니다 — ${e instanceof Error ? e.message : String(e)}` });
-      }
-    })
-  );
-
-  app.post(
-    "/api/llm/serve/v1/chat/completions",
-    asyncRoute(async (req, res) => {
-      if (!관문(req, res)) return;
-      const base = await localBaseUrl();
-      if (!base) { res.status(503).json({ error: "이 PC에 서빙 중인 모델이 없습니다." }); return; }
-
-      // ⚠ `enabled: true`를 박아 쓰지 않는다(검토관 지적 M3) — 관문 통과와 이 쓰기 사이에
-      //   admin이 껐으면, 처리 중이던 요청이 **꺼진 스위치를 다시 켜** 화면이 「내주는 중」으로
-      //   돌아온다. 지금 값을 읽어 그대로 두고 시각만 갱신한다.
-      const 지금설정 = llmServeConfig();
-      if (!지금설정.enabled) { res.status(404).json({ error: "이 서버는 원격 GPU 제공이 꺼져 있습니다." }); return; }
-      save({ ...지금설정, lastServedAt: Date.now() }); // 「쓰이고 있나」를 화면이 보이게
-      const 보낸곳 = String(req.socket?.remoteAddress ?? "(미상)");
-      // 무인증 창구라 활동 감사(actor 필요)가 통째로 건너뛴다 — 감사를 직접 남긴다(M4).
-      // 「누가·어디서 내 GPU를 썼나」를 사후에 알 길이 없으면 보안 제품에서 그 자체가 지적 대상이다.
-      recordAudit({ kind: "config", action: "원격 GPU 내줌(추론 1건)", actor: `원격 ${보낸곳}`, result: "ok" });
-
-      // ⚠ 상류를 취소할 통로를 만든다 — 클라이언트가 끊으면 llama 생성도 멈춘다(L1).
-      //   없으면 버려진 요청이 10분 타임아웃까지 슬롯을 점유한다.
-      const 취소 = new AbortController();
-      const 시계 = setTimeout(() => 취소.abort(), 10 * 60 * 1000); // 큰 모델을 감안해 넉넉히
-      res.on("close", () => { clearTimeout(시계); 취소.abort(); });
-
-      try {
-        const upstream = await fetch(`${base}/chat/completions`, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(req.body ?? {}),
-          signal: 취소.signal,
-        });
-        res.status(upstream.status);
-        const ct = upstream.headers.get("content-type");
-        if (ct) res.setHeader("content-type", ct);
-        if (!upstream.body) { clearTimeout(시계); res.end(); return; }
-        // 스트리밍(SSE)도 그대로 흘려보낸다 — 통째로 모았다가 주면 답이 한참 뒤에 한꺼번에 뜬다.
-        // ⚠ `.pipe()`를 쓰지 않는다(검토관 지적 H3): pipe는 에러를 전달하지 않고, 리스너 없는
-        //   `error`는 **uncaught exception이라 서버 프로세스가 죽는다**. 이 저장소에는
-        //   process.on("uncaughtException")이 없고, 운영 서버가 죽으면 전 사용자 세션이 끊긴다.
-        //   실제 방아쇠가 가상이 아니다: 모델 LRU 스왑이 생성 중인 llama를 내릴 때·타임아웃·연결 리셋.
-        pipeline(Readable.fromWeb(upstream.body as Parameters<typeof Readable.fromWeb>[0]), res, (err) => {
-          clearTimeout(시계);
-          if (!err) return;
-          console.warn(`[llmserve] 중계 중 끊김: ${err.message}`);
-          if (!res.headersSent) res.status(502).json({ error: "추론 중 연결이 끊겼습니다." });
-          else res.destroy(); // 이미 흘려보내던 중이면 소켓을 닫는 것이 유일한 정직한 마무리다
-        });
-      } catch (e) {
-        clearTimeout(시계);
-        res.status(502).json({ error: `추론에 실패했습니다 — ${e instanceof Error ? e.message : String(e)}` });
-      }
     })
   );
 }

@@ -11,7 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import type { Request } from "express";
 import { db } from "../src/db";
-import { llmServeConfig, llmServeOn, requesterAllowed, browserOriginated, servePort } from "../src/engine/llmserve";
+import { llmServeConfig, llmServeOn, requesterAllowed, browserOriginated, proxyDetected, servePort, serveInFlight } from "../src/engine/llmserve";
 
 const put = db.prepare("INSERT INTO app_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value");
 const del = db.prepare("DELETE FROM app_state WHERE key = ?");
@@ -131,6 +131,34 @@ describe("★ 배선 — 창구가 실제로 열려 있고, 열린 중계기가 
 
   it("무인증 추론에 감사 기록을 남긴다 — 활동 감사는 actor가 없어 통째로 건너뛴다", () => {
     expect(src).toMatch(/recordAudit\(/);
+  });
+
+  it("★ 앞단 프록시가 감지되면 막는다 — 안 막으면 대역 판정이 전원 통과가 된다(fail-open)", () => {
+    // nginx 같은 것이 앞에 있으면 소켓 주소가 전부 127.0.0.1이 되어 인터넷도 「사설」로 읽힌다.
+    expect(proxyDetected(요청("10.8.0.11", { "x-forwarded-for": "8.8.8.8" }))).toBe(true);
+    expect(proxyDetected(요청("10.8.0.11", { "x-real-ip": "8.8.8.8" }))).toBe(true);
+    expect(proxyDetected(요청("10.8.0.11", { forwarded: "for=8.8.8.8" }))).toBe(true);
+    expect(proxyDetected(요청("10.8.0.11", {})), "프록시 없는 정상 요청은 통과해야 한다").toBe(false);
+    expect(src, "관문이 프록시 검사를 안 부른다").toMatch(/proxyDetected\(req\)/);
+  });
+
+  it("★ 창구는 **전역 200mb 파서보다 먼저** 등록된다 — 순서가 뒤집히면 상한이 조용히 돌아간다", () => {
+    // 무인증 경로에 200mb를 열어 두면 사설망의 아무 장치가 그만큼을 메모리에 밀어넣을 수 있다.
+    const 창구 = appSrc.indexOf("registerLlmServeGateway(app)");
+    const 전역파서 = appSrc.indexOf('express.json({ limit: "200mb" })');
+    expect(창구, "app.ts가 창구를 등록하지 않는다").toBeGreaterThan(-1);
+    expect(전역파서).toBeGreaterThan(-1);
+    expect(창구, "창구가 전역 파서 뒤에 등록돼 8mb 상한이 무효다").toBeLessThan(전역파서);
+    expect(src, "창구가 자기 본문 상한을 안 갖고 있다").toMatch(/express\.json\(\{ limit: "8mb" \}\)/);
+  });
+
+  it("★ 동시 처리 상한이 있고, 끝나면 반드시 되돌린다 — 안 되돌리면 창구가 영영 막힌다", () => {
+    expect(src).toMatch(/처리중 >= 동시상한/);
+    expect(src, "429로 정직하게 거절하지 않는다").toMatch(/status\(429\)/);
+    // 놓기()가 정상 종료·에러·끊김 세 길에서 모두 불려야 한다.
+    const 놓기호출 = src.match(/놓기\(\);/g) ?? [];
+    expect(놓기호출.length, `놓기() 호출이 ${놓기호출.length}곳 — 빠진 길이 있으면 상한이 새다`).toBeGreaterThanOrEqual(3);
+    expect(serveInFlight().상한).toBeGreaterThan(0);
   });
   it("★ 임의 URL로 넘기지 않는다 — 요청 본문의 주소를 프록시 대상으로 쓰면 열린 중계기가 된다", () => {
     // 프록시 대상은 localBaseUrl()이 준 것만이어야 한다.

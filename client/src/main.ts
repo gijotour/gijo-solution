@@ -665,6 +665,14 @@ ipcMain.handle("smartmd:open", async () => {
   smartMdWindow.on("closed", () => { smartMdWindow = null; });
   // 드롭한 파일·링크가 창을 딴 데로 끌고 가지 못하게(원본 main.js의 방어를 그대로 옮긴다).
   smartMdWindow.webContents.on("will-navigate", (e) => e.preventDefault());
+  // ⚠ **새 창을 열지 못하게 막는다**(검토관 의심 1). Smart MD는 마크다운을 렌더링하므로
+  //   문서 안의 링크가 `target=_blank`거나 window.open을 부르면, Electron이 **우리 통제 밖의
+  //   창**을 띄운다(will-navigate는 그 길을 막지 못한다 — 다른 사건이다).
+  //   외부 주소는 기본 브라우저로 보낸다(그쪽이 샌드박스다). 그 외 스킴은 그냥 버린다.
+  smartMdWindow.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https?:\/\//i.test(url)) void shell.openExternal(url).catch(() => {});
+    return { action: "deny" };
+  });
   await smartMdWindow.loadFile(index);
   return { ok: true };
 });

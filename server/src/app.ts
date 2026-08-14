@@ -49,7 +49,7 @@ import { registerBackupRoutes } from "./engine/backup";
 import { registerDbCryptRoutes } from "./engine/dbcrypt";
 import { registerDocboxRoutes } from "./engine/docbox";
 import { registerRemoteLlmRoutes } from "./engine/remotellm";
-import { registerLlmServeRoutes } from "./engine/llmserve";
+import { registerLlmServeRoutes, registerLlmServeGateway } from "./engine/llmserve";
 import { registerDocRequestRoutes } from "./engine/docrequest";
 import { registerGitSyncRoutes } from "./engine/gitsync";
 import { registerHfModelsRoutes } from "./engine/hfmodels";
@@ -136,6 +136,11 @@ export function createApp(): Express {
   // 자산 탐지 결과·Nessus 스캔·매뉴얼(base64) 업로드가 클 수 있어 기본 100kb 제한을 올린다.
   // 50mb = 스캔 텍스트 ~49MB / base64 문서 원본 ~36MB까지. 폐쇄망 단일 서버라 메모리만 유의.
   // 200mb: 대용량 보안운영 매뉴얼 PDF(base64로 약 1.33배 부풀음 — 실파일 ~150MB까지) 업로드 허용.
+  // ⚠ 원격 GPU **창구**는 전역 파서보다 **먼저** 등록한다(2026-08-14 검토관 지적 M5).
+  //   전역 200mb를 인증 없는 경로에 그대로 열어 두면 사설망의 아무 장치가 200MB를 메모리에
+  //   밀어넣을 수 있다. 이 창구는 자기 파서(8mb)를 들고 있어, 등록 순서가 그 상한을 정한다.
+  //   ⚠ 순서가 뒤집히면 상한이 조용히 200mb로 돌아간다 — llmserve.test가 이 순서를 지킨다.
+  registerLlmServeGateway(app);
   app.use(express.json({ limit: "200mb" }));
   app.use(usageLoggingMiddleware);
   // 담당자가 화면에서 한 "바꾸는 행위"를 전 메뉴에서 자동으로 남긴다(2026-07-26 사용자 지시).

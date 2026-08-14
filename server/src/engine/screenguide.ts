@@ -947,9 +947,12 @@ const 화면별칭: Record<string, string> = {
   문서함: "docbox.html",
   대시보드: "dashboard.html",
   // 별도 창이라 화면 파일이 없다 — 담당자가 부르는 이름으로 찾히게 둔다(2026-08-14).
+  // ⚠ 「마크다운」은 **넣지 않는다**(검토관 지적 M11로 재고). 이 표는 dispatcher에서
+  //   isHelpIntent보다 **먼저** 걸리는 가로채기 자리라, 흔한 낱말을 넣으면 다른 질문을 삼킨다 —
+  //   과거에 「법령」 낱말이 law_lookup으로 가로챈 실사고와 같은 모양이다.
+  //   화면 이름에 가까운 말만 둔다. (라우팅 회귀를 못 돌리는 상황이라 더 좁게 잡았다.)
   문서작성: "smartmd",
   스마트MD: "smartmd",
-  마크다운: "smartmd",
 };
 
 export function 이름으로화면찾기(text: string): { screen: string; title: string } | null {
