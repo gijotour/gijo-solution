@@ -50,16 +50,22 @@ const 실측 = REMOTE ? describe : describe.skip;
     expect(remoteLlmBaseUrl()).toBe(REMOTE);
 
     const { chat } = await import("../src/engine/llm");
+    // ⚠ 질문은 **모델의 지식을 묻지 않는다.** 여기서 재는 것은 「배관이 사는가」이지
+    //   「모델이 똑똑한가」가 아니다. 2026-08-14 실측에서 그 차이가 실제로 드러났다:
+    //   gb10의 14B가 KISA를 「한국인터넷정보센터」로 틀리게 답해 시험이 빨간불이 났는데,
+    //   원격 왕복은 741ms로 멀쩡했다 — 시험이 딴 것을 재고 있었던 것이다.
+    //   그래서 **지시를 그대로 따르는지**만 본다. 모델 크기·지식과 무관하게 배관만 잰다.
+    const 표식 = "원격연결확인";
     const 답 = await chat({
       agentId: "analysis",
-      message: "KISA는 무엇의 약자인가? 한 줄로만 답하라.",
+      message: `다음 낱말을 다른 말 없이 그대로 한 번만 적어라: ${표식}`,
       qa: true, // 이력·학습 수집에 끼어들지 않는다
     });
 
     expect(typeof 답).toBe("string");
     expect(답.length, `원격이 빈 답을 줬다: ${JSON.stringify(답)}`).toBeGreaterThan(2);
-    // 내용까지 본다 — 형식만 보면 폴백 문구도 통과한다(이 저장소의 반복 함정).
-    expect(답, `원격 답에 기대한 낱말이 없다: ${답.slice(0, 200)}`).toMatch(/한국인터넷진흥원|인터넷진흥원|KISA/);
+    // 형식만 보면 폴백 문구도 통과한다(이 저장소의 반복 함정) — 그래서 표식이 실제로 왔는지 본다.
+    expect(답, `원격이 지시를 따르지 않았다(배관은 살았을 수 있다): ${답.slice(0, 200)}`).toContain(표식);
   }, 120000);
 
   it("끄면 원격 주소를 안 준다 — 켜고 끄기가 실제로 갈린다", () => {
