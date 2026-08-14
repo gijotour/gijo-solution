@@ -180,6 +180,12 @@ function 거절로그(보낸곳: string, 사유: string): void {
  *   502 「닿지 못했습니다」를 받는다 — 원인은 「모델이 없음」인데 「닿지 못함」이라고 말하는 것이다
  *   (검토관 지적 M12). 그래서 **모델 파일이 있는지 먼저 본다.**
  */
+// 미배정 판정용 찌르기의 결과를 잠깐 기억한다(10초).
+// ⚠ 왜(3차 검토 L-3): 캐시가 없으면 **요청마다** 로컬 왕복이 하나 늘고, GET /models는 같은
+//   엔드포인트를 두 번(찌르기+본 호출) 부른다. 10초면 「모델을 방금 올렸는데 안 잡힌다」가
+//   체감되지 않을 만큼 짧고, 요청 폭주 때 찌르기 폭주를 막을 만큼은 길다.
+let 찔러본 = { 시각: 0, 살아있음: false };
+
 async function localBaseUrl(): Promise<string | null> {
   try {
     const m = await import("./localengine.js");
@@ -192,12 +198,15 @@ async function localBaseUrl(): Promise<string | null> {
     //   그래서 붙는 쪽이 「모델이 없음」인데 「닿지 못했습니다」를 받았다. 실제로 서빙 중인지
     //   **한 번 찔러 본다**(파일 목록을 다시 세지 않는다 — 판정의 집은 localengine이다).
     if (!배정) {
-      try {
-        const r = await fetch(`${base}/models`, { signal: AbortSignal.timeout(3000) });
-        if (!r.ok) return null;
-      } catch {
-        return null; // 기본 포트에 아무도 없다 = 내줄 모델이 없다
+      if (Date.now() - 찔러본.시각 > 10_000) {
+        let 살아있음 = false;
+        try {
+          const r = await fetch(`${base}/models`, { signal: AbortSignal.timeout(3000) });
+          살아있음 = r.ok;
+        } catch { /* 못 닿음 = 죽어 있음 */ }
+        찔러본 = { 시각: Date.now(), 살아있음 };
       }
+      if (!찔러본.살아있음) return null;
     }
     return base;
   } catch {
@@ -279,15 +288,19 @@ export function registerLlmServeGateway(app: Express): void {
       res.status(404).json({ error: "not found" });
       return false;
     }
+    if (isAirgapOn()) { res.status(404).json({ error: "not found" }); return false; }
+    if (!llmServeConfig().enabled) { res.status(404).json({ error: "이 서버는 원격 GPU 제공이 꺼져 있습니다." }); return false; }
     // ⚠ 앞단 프록시가 있으면 소켓 주소가 전부 127.0.0.1이라 대역 판정이 **전원 통과**가 된다(M2).
     //   모르면 막는다 — 이 창구는 「확실히 VPN 안」이 성립할 때만 열려야 한다.
+    // ⚠ 이 검사는 **꺼짐 검사 뒤**에 둔다(3차 검토 L-2): 도움말 문구는 켠 운영자의 고객에게만
+    //   의미가 있다. 기본값(꺼짐)에서는 XFF를 끼운 요청도 위와 같은 404를 받아, 사설망을 훑는
+    //   쪽이 헤더 한 줄로 제품 문구를 얻지 못한다. 켠 뒤에는 운영자가 스스로 연 것이라
+    //   문구의 값(프록시 구성을 고치라는 안내)이 지문 위험보다 크다.
     if (proxyDetected(req)) {
       거절로그(보낸곳, "앞단 프록시 감지");
       res.status(403).json({ error: "앞단에 프록시가 있어 요청자를 확인할 수 없습니다 — 이 창구는 프록시 없이 VPN으로 직접 붙을 때만 열립니다." });
       return false;
     }
-    if (isAirgapOn()) { res.status(404).json({ error: "not found" }); return false; }
-    if (!llmServeConfig().enabled) { res.status(404).json({ error: "이 서버는 원격 GPU 제공이 꺼져 있습니다." }); return false; }
     return true;
   };
 
@@ -308,7 +321,7 @@ export function registerLlmServeGateway(app: Express): void {
     관문미들,
     asyncRoute(async (req, res) => {
       const base = await localBaseUrl();
-      if (!base) { res.status(503).json({ error: "이 PC에 서빙 중인 모델이 없습니다." }); return; }
+      if (!base) { res.status(503).json({ error: "이 PC의 모델이 아직 준비되지 않았습니다 — 등록된 모델이 없거나 로딩 중입니다. 잠시 뒤 다시 시도하세요." }); return; }
       try {
         const r = await fetch(`${base}/models`, { signal: AbortSignal.timeout(10000) });
         res.status(r.status).json(await r.json().catch(() => ({ data: [] })));
@@ -350,7 +363,7 @@ export function registerLlmServeGateway(app: Express): void {
       // ⚠ await 사이에 이미 끊겼으면 여기서 접는다 — 위 리스너가 정리는 했지만, 끊긴 상대에게
       //   응답을 쓰려 하거나 상류를 새로 부르는 일은 하지 않는다.
       if (res.destroyed) { 놓기(); return; }
-      if (!base) { 놓기(); res.status(503).json({ error: "이 PC에 서빙 중인 모델이 없습니다." }); return; }
+      if (!base) { 놓기(); res.status(503).json({ error: "이 PC의 모델이 아직 준비되지 않았습니다 — 등록된 모델이 없거나 로딩 중입니다. 잠시 뒤 다시 시도하세요." }); return; }
 
       // ⚠ `enabled: true`를 박아 쓰지 않는다(검토관 지적 M3) — 관문 통과와 이 쓰기 사이에
       //   admin이 껐으면, 처리 중이던 요청이 **꺼진 스위치를 다시 켜** 화면이 「내주는 중」으로
