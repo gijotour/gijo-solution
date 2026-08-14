@@ -503,7 +503,13 @@
       var clock = right.querySelector(".tb-clock, .gtb-clock");
       if (clock && clock.parentNode === right) right.insertBefore(원격칩, clock);
       else right.appendChild(원격칩);
-    }).catch(function () { 원격조회중 = false; /* 못 읽으면 표시하지 않는다 — 없는 경고를 지어내지 않는다 */ });
+    }).catch(function () {
+      원격조회중 = false;
+      // ⚠ 실패해도 주기는 시작한다(관문 검토 지적): 첫 조회가 서버 재시작 순간에 걸려 reject되면
+      //   주기가 영영 안 돌아, 그 창은 로그인 내내 원격 표시가 없었다 — 「이후 변화를 따라간다」는
+      //   주석과 코드가 어긋나 있던 자리다. 못 읽은 회차는 표시하지 않되, 다음 회차는 온다.
+      원격주기시작();
+    });
   }
 
   /**

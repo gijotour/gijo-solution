@@ -19,27 +19,45 @@
 <!-- 콘솔 창(4.0.0) — 셸 아래 도킹과 **같은 console.js**를 쓴다. 다른 건 자리뿐이다.
      모니터가 여럿일 때 이 창을 보조 모니터에 두면 메인 창은 화면을 100%로 쓴다. -->
 <div id="consoleHost" data-mode="window"></div>
+<script src="progresscard.js"></script>
+<script src="gijomd.js"></script>
+<script src="chatparts.js"></script>
+<script src="console.js"></script>
 <script>
   // 🖧 원격 GPU로 전송 중 — **이 분리창은 질문을 입력하는 자리**인데 titlebar.js를 안 실어
-  //   원격 표시가 없었다(3차 검토 L-6). 셸에 도킹된 상태에서는 상단 바 칩이 보이지만,
-  //   창으로 떼어 보조 모니터에 두고 쓰는 담당자는 못 봤다.
-  //   모양·주기(60초)는 titlebar.js의 원격칩이 정본이다 — 여기는 창 우상단 고정의 최소판.
+  //   원격 표시가 없었다(3차 검토 L-6). 모양·주기(60초)는 titlebar.js의 원격칩이 정본이다.
   //   console.js는 셸과 공유라 건드리지 않는다(공용 파일 최소 접촉).
+  // ⚠ 칩은 **머리줄(.cs-head) 안**에 넣는다(관문 검토 지적): 처음엔 창 우상단 고정(fixed)으로
+  //   뒀는데, 그 자리가 「⇤ 앱에 붙이기」 단추 바로 위라 **원격을 켜면 단추가 칩에 가려졌다.**
+  //   pointer-events:none이라 눌리긴 하지만 보이지 않는 단추를 눌러야 했다.
+  //   그래서 이 스크립트는 console.js **뒤**에 실어 머리줄이 만들어진 상태에서 끼운다.
   (function () {
     var g = window.gijo;
     if (!g || typeof g.remoteLlmWhere !== "function") return;
+    function 만들기() {
+      var 칩 = document.createElement("span");
+      칩.id = "csRemoteChip";
+      칩.style.cssText = "flex:0 0 auto;margin-left:6px;font-size:11.5px;font-weight:700;" +
+        "padding:2px 8px;border-radius:14px;background:rgba(240,160,32,.14);" +
+        "border:1px solid rgba(240,160,32,.45);color:#f0a020;white-space:nowrap;";
+      칩.title = "이 PC 대신 VPN 안의 원격 GPU가 답하고 있습니다";
+      칩.textContent = "🖧 원격 GPU로 전송 중";
+      return 칩;
+    }
     function 갱신() {
       g.remoteLlmWhere().then(function (w) {
         var 칩 = document.getElementById("csRemoteChip");
         if (w && w.remote && !칩) {
-          칩 = document.createElement("div");
-          칩.id = "csRemoteChip";
-          칩.style.cssText = "position:fixed;top:8px;right:10px;z-index:999;font-size:11.5px;font-weight:700;" +
-            "padding:3px 9px;border-radius:14px;background:rgba(240,160,32,.14);" +
-            "border:1px solid rgba(240,160,32,.45);color:#f0a020;pointer-events:none;";
-          칩.title = "이 PC 대신 VPN 안의 원격 GPU가 답하고 있습니다";
-          칩.textContent = "🖧 원격 GPU로 전송 중";
-          document.body.appendChild(칩);
+          var 머리 = document.querySelector(".cs-head");
+          칩 = 만들기();
+          // ⚠ 다른 파일(console.js)이 만드는 요소를 id로 찾지 않는다(deadelements 감시 —
+          //   그 요소가 사라져도 여기는 조용히 남는 구조가 된다). 머리줄 **끝**에 붙인다:
+          //   도킹 단추의 오른쪽 옆이라 겹치지 않고, 머리줄이 사라지는 날은 아래 폴백이 받는다.
+          if (머리) 머리.appendChild(칩);
+          else { // 머리줄이 아직 없으면(렌더 전) 고정 배치로 폴백 — 단추 폭만큼 비켜 둔다
+            칩.style.cssText += "position:fixed;top:8px;right:150px;z-index:999;pointer-events:none;";
+            document.body.appendChild(칩);
+          }
         } else if ((!w || !w.remote) && 칩) {
           칩.remove(); // 껐으면 없는 경고를 남기지 않는다
         }
@@ -49,10 +67,6 @@
     setInterval(갱신, 60000);
   })();
 </script>
-<script src="progresscard.js"></script>
-<script src="gijomd.js"></script>
-<script src="chatparts.js"></script>
-<script src="console.js"></script>
 <script src="footbar.js"></script>
 </body>
 </html>
