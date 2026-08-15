@@ -692,7 +692,11 @@ export async function chat(args: ChatArgs): Promise<string> {
   // 원격 LLM 여부는 **예산 계산보다 먼저** 알아야 한다(검토관 확인 지적) — 원격이 켜졌는데
   // 로컬 티어(라이트 8K)로 예산을 재면, 원격 32B에 붙여도 이력이 4,915자로 잘려
   // 「기계 교체 없이 더 크게」가 반쪽이 된다. 원격이면 표준 32K 예산을 쓴다.
-  const 원격 = await import("./remotellm.js").then((m) => m.remoteLlmBaseUrl()).catch(() => null);
+  // ⚠ 토큰까지 포함한 목표를 받는다(2026-08-16) — baseUrl(토큰 뗀 것)과 headers(토큰)로 갈린다.
+  //   `원격`은 아래 여러 곳이 「원격인가」 불리언으로 쓰므로 baseUrl만 뽑아 유지한다.
+  const 원격목표 = await import("./remotellm.js").then((m) => m.remoteLlmTarget()).catch(() => null);
+  const 원격 = 원격목표?.baseUrl ?? null;
+  const 원격헤더 = 원격목표?.headers ?? {};
 
   // ★ 이력을 **글자 예산**으로도 자른다 (2026-08-13 — max 근본 규명 + win 로깅의 합작).
   //
@@ -756,7 +760,8 @@ export async function chat(args: ChatArgs): Promise<string> {
   const 싱크 = args.responseSchema ? undefined : 스트림자리.getStore();
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    // 원격일 때만 접속 토큰 헤더가 붙는다(로컬이면 원격헤더는 빈 객체라 기존과 동일).
+    headers: { "Content-Type": "application/json", ...원격헤더 },
     body: JSON.stringify({ model: "local", messages, ...constrained, ...loraExtras, max_tokens: args.maxTokens ?? DEFAULT_MAX_TOKENS, ...(싱크 ? { stream: true } : {}) }),
     signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
     // 원격일 때 리다이렉트 금지(검토관) — VPN 안 서버가 3xx로 밖을 가리키면 질문 본문이 따라간다.

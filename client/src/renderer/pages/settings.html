@@ -2532,7 +2532,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       if (!서버주소) { try { 서버주소 = new URL(await window.gijo.getServerUrl()).hostname; } catch (e) {} }
       // ⚠ IPv6 리터럴은 **대괄호**로 감싸야 주소가 성립한다(재검토 A-2) — `http://::1:7446`은 잘못된 URL이다.
       var 주소부 = 서버주소 && 서버주소.indexOf(":") >= 0 && 서버주소.indexOf("[") < 0 ? "[" + 서버주소 + "]" : (서버주소 || "이-PC의-VPN-주소");
-      addr.value = "http://" + 주소부 + ":" + c.port + "/api/llm/serve/v1";
+      // ⚠ 토큰을 주소에 실어 준다(2026-08-16) — 붙는 쪽이 이 주소를 그대로 넣으면 서버가
+      //   토큰을 떼어 헤더로 보낸다(사람이 토큰을 따로 다루지 않는다). 껐다 켜면 새 토큰이라
+      //   옛 주소는 무효가 된다.
+      var 토큰부 = c.token ? "?token=" + encodeURIComponent(c.token) : "";
+      addr.value = "http://" + 주소부 + ":" + c.port + "/api/llm/serve/v1" + 토큰부;
       msg.innerHTML = c.addressIsPrivate
         ? '<div class="hint">저쪽 GIJO의 「원격 GPU」 칸에 위 주소를 넣고 <b>연결 테스트</b>를 누르면 됩니다.</div>'
         : '<div class="hint" style="color:var(--amber)">⚠ 이 주소(' + esc(서버주소 || "없음") + ')는 <b>상대가 쓸 수 없는 주소</b>입니다 — 이 PC 자신만 가리키거나(localhost·127.x) VPN 대역이 아닙니다. 앞부분을 <b>이 PC의 VPN 주소</b>(10.x 등)로 바꿔서 알려주세요.</div>';

@@ -70,6 +70,29 @@ export function remoteLlmBaseUrl(): string | null {
   return c.enabled && c.url ? c.url : null;
 }
 
+/**
+ * 채팅이 쓸 **정리된 base URL + 헤더** — 토큰을 URL에서 떼어 헤더로 옮긴다(2026-08-16).
+ *
+ * ⚠ 왜: 내주는 쪽이 토큰을 주소 뒤 `?token=…`으로 실어 준다(사람이 토큰을 따로 안 다루게).
+ *   그런데 그대로 `${url}/chat/completions`를 부르면 쿼리가 경로 중간에 박혀 깨진다.
+ *   그래서 여기서 **URL은 토큰을 뗀 깨끗한 것**으로, **토큰은 헤더(x-gijo-serve-token)**로 가른다.
+ *   llm.ts·searchrewrite.ts가 이 하나를 쓴다 — 헤더 구성을 두 곳에 적으면 어긋난다.
+ * ⚠ �trailing slash도 여기서 정리한다(`/v1/` → `/v1`) — 소비자가 `${base}/models`를 붙이므로.
+ */
+export function remoteLlmTarget(): { baseUrl: string; headers: Record<string, string> } | null {
+  const raw = remoteLlmBaseUrl();
+  if (!raw) return null;
+  try {
+    const u = new URL(raw);
+    const token = u.searchParams.get("token");
+    u.search = ""; // 토큰(과 다른 쿼리)을 URL에서 제거
+    const baseUrl = u.toString().replace(/\/+$/, "");
+    return { baseUrl, headers: token ? { "x-gijo-serve-token": token } : {} };
+  } catch {
+    return { baseUrl: raw.replace(/\/+$/, ""), headers: {} };
+  }
+}
+
 /** URL이 VPN 전용 규칙에 맞는가 — 맞으면 null, 틀리면 사람이 읽을 거절 사유. */
 export function remoteUrlProblem(raw: string): string | null {
   let u: URL;
@@ -124,8 +147,19 @@ export function registerRemoteLlmRoutes(app: Express): void {
       const 문제 = remoteUrlProblem(url);
       if (문제) { res.status(400).json({ ok: false, error: 문제 }); return; }
       try {
+        // 토큰이 주소에 실려 있으면 떼어 헤더로 보낸다 — **실제 붙을 때와 같은 방식**이라야
+        // 연결 테스트가 토큰 오류까지 잡는다(2026-08-16). URL은 토큰 뗀 것으로 찌른다.
+        let 찌를url = url.replace(/\/+$/, "");
+        const 헤더: Record<string, string> = {};
+        try {
+          const u = new URL(url);
+          const tk = u.searchParams.get("token");
+          if (tk) 헤더["x-gijo-serve-token"] = tk;
+          u.search = "";
+          찌를url = u.toString().replace(/\/+$/, "");
+        } catch { /* URL 파싱 실패는 아래 fetch가 잡는다 */ }
         // redirect 금지(검토관) — 테스트 대상이 3xx로 공인 호스트를 가리켜도 따라가지 않는다.
-        const r = await fetch(`${url.replace(/\/+$/, "")}/models`, { signal: AbortSignal.timeout(5000), redirect: "error" });
+        const r = await fetch(`${찌를url}/models`, { headers: 헤더, signal: AbortSignal.timeout(5000), redirect: "error" });
         if (!r.ok) { res.json({ ok: false, error: `원격이 답했지만 거절했습니다(HTTP ${r.status}) — /v1 주소인지 확인하세요.` }); return; }
         const j = (await r.json().catch(() => null)) as { data?: unknown[] } | null;
         res.json({ ok: true, models: Array.isArray(j?.data) ? j.data.length : null });

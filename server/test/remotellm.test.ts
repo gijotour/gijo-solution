@@ -69,13 +69,16 @@ describe("★ 배선 — 게터가 실제로 채팅·재작성 경로에 물려 
   // 함수만 있고 안 부르면 「설계는 됐고 쓰인 적 없다」다 — 이 저장소의 반복 유형.
   it("llm.ts가 원격 게터를 ensureAgentModel **앞에서** 본다", () => {
     const src = fs.readFileSync(new URL("../src/engine/llm.ts", import.meta.url), "utf8");
-    expect(src, "원격 게터를 안 부른다").toMatch(/remoteLlmBaseUrl\(\)/);
+    // 2026-08-16: 게터가 remoteLlmTarget(baseUrl+headers)로 바뀌었다 — 토큰을 헤더로 보내려고.
+    expect(src, "원격 게터를 안 부른다").toMatch(/remoteLlmTarget\(\)/);
     // 원격이 있으면 로컬 로드를 아예 안 거쳐야 한다 — ?? 로 가른 자리.
     expect(src, "원격이 로컬 로드를 우회하지 않는다").toMatch(/원격 \?\? \(await import\("\.\/localengine\.js"\)/);
+    // 토큰 헤더가 실제로 fetch에 붙는다(토큰 인증의 배선).
+    expect(src, "원격 토큰 헤더가 fetch에 안 붙는다").toMatch(/\.\.\.원격헤더/);
   });
   it("searchrewrite.ts도 같은 게터를 본다 — 채팅만 원격이면 재작성이 로컬을 찾다 죽는다", () => {
     const src = fs.readFileSync(new URL("../src/engine/searchrewrite.ts", import.meta.url), "utf8");
-    expect(src).toMatch(/remoteLlmBaseUrl/);
+    expect(src).toMatch(/remoteLlmTarget/);
     expect(src, "통로가 아직 상수다").toMatch(/async function 통로\(\)/);
   });
   it("라우트 3개가 등록돼 있다(app.ts)", () => {

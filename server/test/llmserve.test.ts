@@ -243,3 +243,27 @@ describe("★ 배선 — 창구가 실제로 열려 있고, 열린 중계기가 
     expect(src).toMatch(/import \{[^}]*isVpnRangeIp[^}]*\} from "\.\/airgap"/);
   });
 });
+
+describe("접속 토큰 — 사설 대역이어도 토큰 없으면 못 붙는다 (2026-08-16)", () => {
+  const src = fs.readFileSync(path.join(__dirname, "../src/engine/llmserve.ts"), "utf8");
+  it("★ 켜기 라우트가 토큰을 만든다 — 사람이 정하지 않는다", () => {
+    expect(src, "켤 때 토큰 생성이 없다").toMatch(/토큰생성\(\)/);
+    expect(src, "토큰 생성이 randomBytes 기반이 아니다").toMatch(/randomBytes/);
+  });
+  it("★ 토큰 비교는 상수시간이다 — 한 글자씩 맞혀보기를 막는다", () => {
+    expect(src).toMatch(/timingSafeEqual/);
+    // 관문이 토큰을 검사하는 자리가 있다.
+    const 관문 = src.slice(src.indexOf("const 관문"), src.indexOf("const 본문"));
+    expect(관문, "관문에 토큰 검사가 없다").toMatch(/토큰일치/);
+  });
+  it("★ 토큰 검사는 프록시 검사 뒤(관문 맨 끝)다 — 앞서면 켜짐/대역을 토큰 없이 흘린다", () => {
+    const 관문 = src.slice(src.indexOf("const 관문"), src.indexOf("const 본문"));
+    const 프록시 = 관문.indexOf("proxyDetected");
+    const 토큰 = 관문.indexOf("토큰일치");
+    expect(프록시).toBeGreaterThan(-1);
+    expect(토큰, "토큰 검사가 프록시 검사보다 앞이다").toBeGreaterThan(프록시);
+  });
+  it("토큰이 없는 옛 설정은 통과시킨다 — 하위호환(켜기 라우트가 늘 만들므로 새 켜짐은 늘 가짐)", () => {
+    expect(src, "설정토큰이 있을 때만 검사하는 가드가 없다").toMatch(/const 설정토큰[\s\S]{0,40}if \(설정토큰\)/);
+  });
+});

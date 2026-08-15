@@ -29,8 +29,26 @@ import { Readable, pipeline } from "node:stream";
 import { db } from "../db";
 import { authMiddleware, adminMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
+import { randomBytes, timingSafeEqual } from "node:crypto";
 import { isAirgapOn, isVpnRangeIp } from "./airgap";
 import { recordAudit } from "./audit";
+
+/** 접속 토큰을 새로 만든다 — URL에 실려도 무방한 24바이트 base64url(사람이 안 정한다). */
+function 토큰생성(): string {
+  return randomBytes(24).toString("base64url");
+}
+
+/** 상수시간 비교 — 한 글자씩 맞혀보는 타이밍 공격을 막는다. 길이가 다르면 즉시 false. */
+function 토큰일치(준값: string, 설정값: string): boolean {
+  const a = Buffer.from(준값);
+  const b = Buffer.from(설정값);
+  if (a.length !== b.length) return false;
+  try {
+    return timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
 
 /**
  * 이 서버가 실제로 듣는 포트.
@@ -54,16 +72,25 @@ const STATE_KEY = "llm_serve";
 export interface LlmServeConfig {
   enabled: boolean;
   lastServedAt: number | null; // 마지막으로 남의 요청을 받아넘긴 시각 — 화면이 「쓰이고 있나」를 보인다
+  // 접속 토큰 — 붙는 쪽이 헤더로 제시해야 통과한다(2026-08-16 신설).
+  //   ⚠ 이것이 있으면 「사설 대역이면 누구나」가 아니라 「토큰을 아는 쪽만」이 된다 —
+  //     문서에 자백해야 했던 「사무실 LAN의 다른 PC도 붙는다」가 이걸로 닫힌다.
+  //   ⚠ 켤 때 서버가 만들어 준다(사람이 정하지 않는다 — 약한 토큰 방지). 주소와 함께 복사된다.
+  token: string | null;
 }
 
 export function llmServeConfig(): LlmServeConfig {
   try {
     const row = getStateStmt.get(STATE_KEY) as { value: string } | undefined;
-    if (!row) return { enabled: false, lastServedAt: null };
+    if (!row) return { enabled: false, lastServedAt: null, token: null };
     const v = JSON.parse(row.value) as Partial<LlmServeConfig>;
-    return { enabled: v.enabled === true, lastServedAt: typeof v.lastServedAt === "number" ? v.lastServedAt : null };
+    return {
+      enabled: v.enabled === true,
+      lastServedAt: typeof v.lastServedAt === "number" ? v.lastServedAt : null,
+      token: typeof v.token === "string" && v.token ? v.token : null,
+    };
   } catch {
-    return { enabled: false, lastServedAt: null };
+    return { enabled: false, lastServedAt: null, token: null };
   }
 }
 
@@ -223,9 +250,11 @@ async function localBaseUrl(): Promise<string | null> {
  *   서버 판정과 달라서(127.x·169.254.x 누락) 정상 상태에서도 「VPN 주소가 아닙니다」 경고가
  *   항상 떴다(검토관 지적 M6). 판정을 두 곳에 적으면 어긋난다 — 이 저장소의 반복 유형이다.
  */
-function 주소재료(req: Request): { seenAddress: string; addressIsPrivate: boolean; port: number } {
+function 주소재료(req: Request): { seenAddress: string; addressIsPrivate: boolean; port: number; token: string | null } {
   const raw = String(req.socket?.localAddress ?? "").replace(/^::ffff:/, "");
-  return { seenAddress: raw, addressIsPrivate: raw ? 상대가쓸수있나(raw) : false, port: servePort() };
+  // ⚠ 토큰은 화면이 주소 뒤에 `?token=…`으로 붙여 보여준다 — 붙는 쪽이 그 주소를 그대로
+  //   넣으면 remotellm이 토큰을 떼어 헤더로 보낸다(사람이 토큰을 따로 다루지 않는다).
+  return { seenAddress: raw, addressIsPrivate: raw ? 상대가쓸수있나(raw) : false, port: servePort(), token: llmServeConfig().token };
 }
 
 /**
@@ -301,6 +330,22 @@ export function registerLlmServeGateway(app: Express): void {
       거절로그(보낸곳, "앞단 프록시 감지");
       res.status(403).json({ error: "앞단에 프록시가 있어 요청자를 확인할 수 없습니다 — 이 창구는 프록시 없이 VPN으로 직접 붙을 때만 열립니다." });
       return false;
+    }
+    // ⚠ **토큰 검사가 마지막이다**(2026-08-16 신설). 여기까지 온 요청은 켜짐·사설 대역·비-브라우저·
+    //   프록시 없음이 확인된 상태다. 토큰이 설정돼 있으면 붙는 쪽이 헤더로 같은 값을 제시해야 한다.
+    //   이것이 「사설 대역이면 누구나」를 「토큰을 아는 쪽만」으로 좁힌다 — 문서에 자백해야 했던
+    //   「사무실 LAN의 다른 PC도 붙는다」가 이걸로 닫힌다.
+    //   ⚠ 토큰이 없는 설정(옛 켜짐·수동 편집)은 통과시킨다 — 하위호환. 다만 켜기 라우트가
+    //     항상 토큰을 만들므로 새 켜짐은 늘 토큰을 갖는다.
+    //   ⚠ 비교는 **길이 무관 상수시간**으로(timingSafeEqual) — 토큰을 한 글자씩 맞혀보는 걸 막는다.
+    const 설정토큰 = llmServeConfig().token;
+    if (설정토큰) {
+      const 준토큰 = String(req.headers?.["x-gijo-serve-token"] ?? "");
+      if (!토큰일치(준토큰, 설정토큰)) {
+        거절로그(보낸곳, "토큰 불일치");
+        res.status(401).json({ error: "접속 토큰이 필요합니다 — 빌려주는 쪽 화면의 주소에 포함된 토큰을 그대로 쓰세요." });
+        return false;
+      }
     }
     return true;
   };
@@ -445,10 +490,14 @@ export function registerLlmServeRoutes(app: Express): void {
         return;
       }
       const prev = llmServeConfig();
-      save({ enabled, lastServedAt: prev.lastServedAt });
+      // ⚠ 켤 때 토큰을 **만든다**(2026-08-16). 껐다 켜면 새 토큰이라, 옛 주소를 아는 쪽은
+      //   다시 못 붙는다(끄기가 실질적 무효화다 — 「안 쓸 때 꺼 두라」가 이걸로 힘을 갖는다).
+      //   끌 때는 토큰을 지운다(꺼진 창구에 토큰이 남을 이유가 없다).
+      const token = enabled ? 토큰생성() : null;
+      save({ enabled, lastServedAt: prev.lastServedAt, token });
       recordAudit({
         kind: "config",
-        action: enabled ? "원격 GPU 내주기 켬" : "원격 GPU 내주기 끔",
+        action: enabled ? "원격 GPU 내주기 켬(토큰 재발급)" : "원격 GPU 내주기 끔",
         // ⚠ 감사의 「누가」는 **사람이 읽는 이름**이다 — 계정 아이디(username)를 쓰면
         //   auditactor 시험이 막는다(담당자가 화면에서 읽는 글자이기 때문). 다른 라우트와 같은 꼴.
         actor: (req as unknown as { user?: { displayName?: string } }).user?.displayName ?? "(알 수 없음)",
