@@ -37,6 +37,9 @@ export interface StandardFinding {
   // 사라진 것은 정말 고쳐진 게 아니라 스캐너 가시성이 준 것일 수 있어 신뢰할 수 없다.
   // true=인증 재스캔으로 검증됨, false=비인증이라 미검증(재확인 필요), undefined=인증 여부 불명.
   fixedVerified?: boolean;
+  // 화면 표시용 한 줄 풀이 — 저장하지 않고 읽을 때(assets.fromRow) findingplain.한줄풀이찾기로 붙인다.
+  // 규칙이 늘면 재스캔 없이 다음 읽기부터 반영된다(계획서 전-7 ③). 못 찾으면 안 붙인다(원문만 보인다).
+  plain?: string;
 }
 
 const adapters: Record<string, ScanAdapter> = {

@@ -99,6 +99,9 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
 .vd-remediate.done{background:rgba(30,185,128,0.16);color:var(--teal);border-color:rgba(30,185,128,0.4);cursor:default;}
 .vd-ev{display:none;margin-top:8px;padding:10px 12px;background:var(--panel-2);border-radius:6px;font-size:12.5px;color:var(--muted);line-height:1.75;white-space:pre-wrap;word-break:break-word;max-height:240px;overflow-y:auto;}
 .vd-item.open .vd-ev{display:block;}
+/* 원문 아래 한글 한 줄 풀이(전-7 ③) — 같은 화면 .vd-sub의 글꼴/줄높이 그대로 재사용(새 색·글꼴 없음). 못 찾으면 아예 안 그림. */
+.vd-plain{font-size:12.5px;line-height:1.6;color:var(--muted);margin-top:4px;}
+.vd-plain b{color:var(--text);font-weight:700;}
 .vd-empty{padding:16px;color:var(--muted);font-size:12.5px;}
 .status-line{font-size:12.5px;margin-top:10px;}
 .footer{margin-top:8px;padding:18px 0 0;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;font-size:12.5px;color:var(--muted-2);}
@@ -371,6 +374,8 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
   }
 
   const esc = (s) => String(s == null ? "" : s).replace(/</g, "&lt;");
+  // findingplain의 `말`에 든 리터럴 **강조**를 <b>로 바꾼다. ⚠ esc 다음에 적용해야 별표가 화면에 안 남는다.
+  const boldify = (s) => String(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
 
   // ── 호스트 → 취약점 목록 드릴다운 ───────────────────────────────────────
   const SEV_ORDER = { critical: 0, high: 1, medium: 2, low: 3 };
@@ -493,6 +498,7 @@ tbody tr[data-id].on td{background:rgba(59,130,246,0.10);}
           `<span class="vd-name">${esc(f.finding_type)}</span>` +
           state + kev + misfit + epss + vpr + remediate +
           `</div>` +
+          (f.plain ? `<div class="vd-plain">→ ${boldify(esc(f.plain))}</div>` : "") +
           `<div class="vd-ev">${esc(f.evidence || "(상세 없음)")}</div>` +
           `</div>`
         );

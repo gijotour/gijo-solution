@@ -10,7 +10,7 @@ vi.mock("../src/engine/llm", () => ({
 }));
 
 import { createApp } from "../src/app";
-import { resetAssetsForTests, setAssetRobustness } from "../src/engine/assets";
+import { resetAssetsForTests, setAssetRobustness, registerAsset, recordFindings, getAsset } from "../src/engine/assets";
 
 async function login(app: ReturnType<typeof createApp>) {
   const res = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" });
@@ -40,6 +40,19 @@ describe("assets", () => {
 
     expect((await request(app).delete("/api/assets/nope").set("Authorization", `Bearer ${token}`)).status).toBe(404);
     expect((await request(app).delete("/api/assets/to-delete")).status).toBe(401); // 인증 필요
+  });
+
+  it("읽을 때 finding에 한글 한 줄(plain)을 붙인다 — 규칙 매칭분만, 저장 아님 (전-7 ③)", () => {
+    registerAsset({ id: "vuln-host-x", name: "10.0.0.9", path: "p" });
+    recordFindings("vuln-host-x", [
+      { finding_type: "Apache Log4j < 2.15.0 Remote Code Execution (CVE-2021-44228)", severity: "critical", evidence: "e", source_tool: "nessus" },
+      { finding_type: "Adobe Acrobat Reader DC Multiple Vulnerabilities (APSB24-01)", severity: "low", evidence: "e", source_tool: "nessus" },
+    ]);
+    const asset = getAsset("vuln-host-x")!;
+    const log4j = asset.findings.find((f) => f.finding_type.includes("Log4j"))!;
+    const adobe = asset.findings.find((f) => f.finding_type.includes("Adobe"))!;
+    expect(log4j.plain).toContain("원하는 명령을 실행"); // 규칙(실행)이 붙는다
+    expect(adobe.plain).toBeUndefined();                // 규칙이 없으면 안 붙인다(원문만 보인다)
   });
 
   it("registers an asset with defaults for optional fields", async () => {

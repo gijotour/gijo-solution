@@ -19,6 +19,7 @@ import { authMiddleware } from "../auth/auth";
 import { asyncRoute } from "../util/asyncRoute";
 import { runAdapter } from "./bridge";
 import type { StandardFinding } from "./bridge";
+import { 한줄풀이찾기 } from "./findingplain";
 import { db, assertTestDb } from "../db";
 import { emitCollaboration } from "./collaboration";
 import { recordAudit } from "./audit";
@@ -277,6 +278,14 @@ export function assetOriginOf(id: string): AssetOrigin {
   return "registered";
 }
 
+// 저장된 finding에 **화면용 한 줄 풀이**를 읽을 때 붙인다 — 저장하지 않는다(규칙이 늘면 재스캔
+// 없이 다음 읽기부터 반영, 계획서 전-7 ③). 못 찾으면 안 붙인다(원문만 보인다). 정규식표는 서버
+// findingplain 한 곳뿐 — 클라가 복제하지 않게 한다("그 값을 누가 넣는가" 원칙).
+function 풀이붙이기(f: StandardFinding): StandardFinding {
+  const 말 = 한줄풀이찾기(f.finding_type)?.말;
+  return 말 ? { ...f, plain: 말 } : f;
+}
+
 function fromRow(row: AssetRow): Asset {
   const derived = deriveHostIp(row.name);
   return {
@@ -289,7 +298,7 @@ function fromRow(row: AssetRow): Asset {
     owner: row.owner,
     service: row.service ?? null,
     components: JSON.parse(row.components) as AssetComponent[],
-    findings: JSON.parse(row.findings) as StandardFinding[],
+    findings: (JSON.parse(row.findings) as StandardFinding[]).map(풀이붙이기),
     scanHistory: scanHistoryOf(row.id),
     aibom: mergeAiBom(row.aibom),
     category: row.category ?? null,
