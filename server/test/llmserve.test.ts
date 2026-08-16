@@ -84,10 +84,16 @@ describe("★ 배선 — 창구가 실제로 열려 있고, 열린 중계기가 
     //   이제 등록된 창구 라우트 수를 세서 관문 호출 수와 **같은지**를 본다.
     // 관문은 **미들웨어 하나**로 두고 모든 창구 라우트에 같은 방식으로 붙인다(형태를 섞으면
     // 이 시험이 형태 차이에 걸려 헛돈다 — 실제로 한 번 그랬다).
-    const 라우트 = src.match(/["'`]\/api\/llm\/serve\/v1\//g) ?? [];
+    // ⚠ 창구 경로를 여는 app.get/app.post **블록마다** 관문미들이 하나 있어야 한다.
+    //   경로 문자열 수가 아니라 **라우트 등록(app.get|app.post) 수**를 센다 — 옛 라이트 호환으로
+    //   POST가 경로 배열(`["…/chat/completions", "…/v1"]`)을 받으면서 문자열 수와 블록 수가
+    //   달라졌다(2026-08-16). 관문을 거치는 것은 「블록」이지 「경로 문자열」이 아니다.
+    // app.get/app.post 등록부터 그 라우트의 관문미들까지 사이에 창구 경로가 있는 블록을 센다.
+    // POST가 주석 뒤 경로 배열을 받아도(옛 라이트 호환) 잡힌다 — 「블록」 단위로 본다.
+    const 창구블록 = [...src.matchAll(/app\.(get|post)\(([\s\S]*?)관문미들,/g)].filter((m) => m[2].includes("/api/llm/serve/v1"));
     const 관문붙임 = src.match(/^\s*관문미들,\s*$/gm) ?? [];
-    expect(라우트.length, "창구 라우트가 하나도 안 잡혔다 — 이 시험의 정규식을 확인하라").toBeGreaterThan(0);
-    expect(관문붙임.length, `창구 라우트 ${라우트.length}개 중 관문미들이 붙은 것이 ${관문붙임.length}개다`).toBe(라우트.length);
+    expect(창구블록.length, "창구 라우트가 하나도 안 잡혔다 — 이 시험의 정규식을 확인하라").toBeGreaterThan(0);
+    expect(관문붙임.length, `창구 라우트 블록 ${창구블록.length}개 중 관문미들이 붙은 것이 ${관문붙임.length}개다`).toBe(창구블록.length);
   });
 
   it("★ 관문은 **대역 판정을 맨 앞에서** 한다 — 밖에서 훑는 쪽에 제품 정보를 주지 않는다", () => {
@@ -305,5 +311,24 @@ describe("토큰 관문이 실제로 막고 통과시킨다 (라우트를 두드
     expect(llmServeOn(), "토큰 없는 켜짐이 llmServeOn을 통과한다").toBe(false);
     const r = await 창구요청();
     expect(r.status, "토큰 없는 켜짐이 무인증으로 열렸다").toBe(404);
+  });
+
+  it("★ 옛 라이트(1.1.1) 호환 — 토큰이 URL 쿼리에 박혀 와도 통과한다", async () => {
+    // 1.1.1 라이트는 http://…/v1?token=X 에 /models를 붙여 …/v1?token=X/models 를 만든다.
+    // express는 pathname=/api/llm/serve/v1, query=token=X/models 로 파싱한다.
+    put.run("llm_serve", JSON.stringify({ enabled: true, lastServedAt: null, token: "TESTTOKEN1234567890" }));
+    const request = (await import("supertest")).default;
+    const { createApp } = await import("../src/app");
+    // 토큰 뒤에 /models가 붙은 채(옛 라이트 그대로) — 헤더는 없다.
+    const r = await request(createApp()).get("/api/llm/serve/v1").query({ token: "TESTTOKEN1234567890/models" });
+    expect([401, 403, 404], `옛 라이트 호환 경로가 관문에서 막혔다(status ${r.status})`).not.toContain(r.status);
+  });
+
+  it("옛 라이트 경로도 토큰이 틀리면 401 — 호환이 무인증 구멍이 아니다", async () => {
+    put.run("llm_serve", JSON.stringify({ enabled: true, lastServedAt: null, token: "TESTTOKEN1234567890" }));
+    const request = (await import("supertest")).default;
+    const { createApp } = await import("../src/app");
+    const r = await request(createApp()).get("/api/llm/serve/v1").query({ token: "WRONG/models" });
+    expect(r.status).toBe(401);
   });
 });

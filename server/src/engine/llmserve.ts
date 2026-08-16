@@ -40,6 +40,22 @@ function 토큰생성(): string {
   return randomBytes(24).toString("base64url");
 }
 
+/**
+ * **옛 라이트(1.1.1) 호환** — 토큰을 URL 쿼리에서 떼어낸다.
+ *
+ * ⚠ 왜(2026-08-16): 토큰 인증은 1.1.1 **다음날** 생겼다. 1.1.1 라이트의 연결 테스트는 토큰을
+ *   헤더로 못 보내고 `http://…/v1?token=X`에 `/models`를 붙여 `…/v1?token=X/models`를 만든다.
+ *   express는 이를 pathname=`/v1`, query=`token=X/models`로 파싱한다 — 그래서 ① 이 창구가
+ *   `/v1`(models 없는) 경로도 받아야 하고 ② 토큰 값 끝의 `/models`(와 다른 경로 조각)를 떼야 한다.
+ *   새 라이트(1.1.2+)는 헤더로 보내므로 이 경로를 안 탄다 — **옛 판을 위한 다리**다.
+ */
+function 옛라이트토큰(req: Request): string {
+  const q = (req.query as Record<string, unknown> | undefined)?.token;
+  if (typeof q !== "string" || !q) return "";
+  // 토큰 뒤에 경로 조각이 붙어 올 수 있다(?token=X/models 또는 ?token=X/chat/completions).
+  return q.split("/")[0];
+}
+
 /** 상수시간 비교 — 한 글자씩 맞혀보는 타이밍 공격을 막는다. 길이가 다르면 즉시 false. */
 function 토큰일치(준값: string, 설정값: string): boolean {
   const a = Buffer.from(준값);
@@ -353,7 +369,9 @@ export function registerLlmServeGateway(app: Express): void {
     //   ⚠ 비교는 **길이 무관 상수시간**으로(timingSafeEqual) — 토큰을 한 글자씩 맞혀보는 걸 막는다.
     const 설정토큰 = llmServeConfig().token;
     if (설정토큰) {
-      const 준토큰 = String(req.headers?.["x-gijo-serve-token"] ?? "");
+      // 헤더가 정석이다. 다만 **옛 라이트(1.1.1)**는 토큰을 URL에 박은 채 보내 헤더가 없다 —
+      // 그때는 쿼리에서 받는다(아래 옛라이트토큰). 두 곳 다 없으면 거절.
+      const 준토큰 = String(req.headers?.["x-gijo-serve-token"] ?? "") || 옛라이트토큰(req);
       if (!토큰일치(준토큰, 설정토큰)) {
         거절로그(보낸곳, "토큰 불일치");
         res.status(401).json({ error: "접속 토큰이 필요합니다 — 빌려주는 쪽 화면의 주소에 포함된 토큰을 그대로 쓰세요." });
@@ -375,23 +393,36 @@ export function registerLlmServeGateway(app: Express): void {
     if (관문(req, res)) next();
   };
 
+  const models응답 = async (res: Response): Promise<void> => {
+    const base = await localBaseUrl();
+    if (!base) { res.status(503).json({ error: "이 PC의 모델이 아직 준비되지 않았습니다 — 등록된 모델이 없거나 로딩 중입니다. 잠시 뒤 다시 시도하세요." }); return; }
+    try {
+      const r = await fetch(`${base}/models`, { signal: AbortSignal.timeout(10000) });
+      res.status(r.status).json(await r.json().catch(() => ({ data: [] })));
+    } catch (e) {
+      res.status(502).json({ error: `이 PC의 모델에 닿지 못했습니다 — ${e instanceof Error ? e.message : String(e)}` });
+    }
+  };
+
+  // ⚠ **옛 라이트(1.1.1) 호환** — `/v1?token=X/models`가 pathname `/v1`로 오는 것을 받는다.
+  //   연결 테스트만 이 경로를 탄다(옛 라이트는 채팅도 헤더 없이 보내지만, 그건 chat 라우트가
+  //   같은 관문으로 쿼리 토큰을 받아 처리한다). 새 라이트는 정식 경로를 쓰므로 여기 안 온다.
+  app.get(
+    "/api/llm/serve/v1",
+    관문미들,
+    asyncRoute(async (_req, res) => { await models응답(res); })
+  );
+
   app.get(
     "/api/llm/serve/v1/models",
     관문미들,
-    asyncRoute(async (req, res) => {
-      const base = await localBaseUrl();
-      if (!base) { res.status(503).json({ error: "이 PC의 모델이 아직 준비되지 않았습니다 — 등록된 모델이 없거나 로딩 중입니다. 잠시 뒤 다시 시도하세요." }); return; }
-      try {
-        const r = await fetch(`${base}/models`, { signal: AbortSignal.timeout(10000) });
-        res.status(r.status).json(await r.json().catch(() => ({ data: [] })));
-      } catch (e) {
-        res.status(502).json({ error: `이 PC의 모델에 닿지 못했습니다 — ${e instanceof Error ? e.message : String(e)}` });
-      }
-    })
+    asyncRoute(async (_req, res) => { await models응답(res); })
   );
 
   app.post(
-    "/api/llm/serve/v1/chat/completions",
+    // 정식 경로 + **옛 라이트 호환** `/v1`(POST) — `/v1?token=X/chat/completions`가 pathname
+    // `/v1`로 오는 것을 같은 핸들러로 받는다(2026-08-16). 새 라이트는 정식 경로만 쓴다.
+    ["/api/llm/serve/v1/chat/completions", "/api/llm/serve/v1"],
     // ⚠ 관문이 **본문 파서보다 앞**이다(재검토 A-5). 예전엔 파서가 먼저라, 대역 밖·프록시 뒤·
     //   브라우저 요청도 8MB를 먼저 파싱한 뒤 거절됐다 — 무인증 CPU·메모리 소모가 그대로 남았다.
     관문미들,
