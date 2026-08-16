@@ -28,8 +28,11 @@ describe("기본은 꺼짐 — 켠 적 없으면 안 내준다", () => {
     expect(llmServeConfig().enabled).toBe(false);
     expect(llmServeOn()).toBe(false);
   });
-  it("켜면 켜짐", () => {
+  it("켜면 켜짐 — 단, 토큰이 있어야 한다(2026-08-16 관문 게이트)", () => {
+    // 토큰 없는 켜짐은 「꺼짐」으로 본다 — 배포 전 무인증 켜짐이 무인증으로 남지 않게.
     put.run("llm_serve", JSON.stringify({ enabled: true, lastServedAt: null }));
+    expect(llmServeOn(), "토큰 없는 켜짐이 열렸다").toBe(false);
+    put.run("llm_serve", JSON.stringify({ enabled: true, lastServedAt: null, token: "T1234567890" }));
     expect(llmServeOn()).toBe(true);
   });
   it("★ 저장 뒤 에어갭을 켜면 막힌다 — 저장 시에만 보면 이 틈이 샌다", () => {
@@ -93,7 +96,7 @@ describe("★ 배선 — 창구가 실제로 열려 있고, 열린 중계기가 
     const 시작 = src.indexOf("const 관문");
     const 본문 = src.slice(시작, src.indexOf("app.get(", 시작));
     const 대역 = 본문.indexOf("requesterAllowed");
-    const 꺼짐 = 본문.indexOf("llmServeConfig().enabled");
+    const 꺼짐 = 본문.indexOf("!llmServeOn()"); // 토큰 없는 켜짐도 「꺼짐」으로 막는다(게이트)
     const 에어갭 = 본문.indexOf("isAirgapOn");
     expect(대역, "관문에 대역 판정이 없다").toBeGreaterThan(-1);
     expect(대역, "꺼짐 응답이 대역 판정보다 먼저다 — 밖에서 제품 존재를 알아낸다").toBeLessThan(꺼짐);
@@ -263,7 +266,44 @@ describe("접속 토큰 — 사설 대역이어도 토큰 없으면 못 붙는�
     expect(프록시).toBeGreaterThan(-1);
     expect(토큰, "토큰 검사가 프록시 검사보다 앞이다").toBeGreaterThan(프록시);
   });
-  it("토큰이 없는 옛 설정은 통과시킨다 — 하위호환(켜기 라우트가 늘 만들므로 새 켜짐은 늘 가짐)", () => {
-    expect(src, "설정토큰이 있을 때만 검사하는 가드가 없다").toMatch(/const 설정토큰[\s\S]{0,40}if \(설정토큰\)/);
+  // 「토큰 없는 옛 켜짐」의 실제 동작(404로 막힘)은 아래 「토큰 관문이 실제로 막고 통과시킨다」가
+  // 라우트를 두드려 검증한다 — 소스 정규식이 아니라 동작으로(관문 게이트).
+});
+
+// ── 토큰 관문 **동작** 시험 (2026-08-16 관문 지적 — 소스 정규식만으론 우회를 못 잡는다) ──
+describe("토큰 관문이 실제로 막고 통과시킨다 (라우트를 두드린다)", () => {
+  beforeEach(() => { del.run("llm_serve"); delete process.env.GIJO_AIRGAP; });
+
+  async function 창구요청(headers: Record<string, string> = {}) {
+    const request = (await import("supertest")).default;
+    const { createApp } = await import("../src/app");
+    // supertest는 127.0.0.1에서 온다 — 대역·프록시·브라우저 관문을 지나 토큰 검사에 닿는다.
+    return request(createApp()).get("/api/llm/serve/v1/models").set(headers);
+  }
+
+  it("★ 토큰이 설정된 켜짐 — 토큰 없이 두드리면 401", async () => {
+    put.run("llm_serve", JSON.stringify({ enabled: true, lastServedAt: null, token: "TESTTOKEN1234567890" }));
+    const r = await 창구요청();
+    expect(r.status, "토큰 없이 통과했다").toBe(401);
+  });
+
+  it("★ 틀린 토큰이면 401", async () => {
+    put.run("llm_serve", JSON.stringify({ enabled: true, lastServedAt: null, token: "TESTTOKEN1234567890" }));
+    const r = await 창구요청({ "x-gijo-serve-token": "WRONG" });
+    expect(r.status).toBe(401);
+  });
+
+  it("★ 맞는 토큰이면 관문 통과 — 401/403/404가 아니다(그 뒤는 로컬 모델 사정)", async () => {
+    put.run("llm_serve", JSON.stringify({ enabled: true, lastServedAt: null, token: "TESTTOKEN1234567890" }));
+    const r = await 창구요청({ "x-gijo-serve-token": "TESTTOKEN1234567890" });
+    // 통과하면 로컬 llama가 없어 502/503이 난다 — 관문은 지난 것이다.
+    expect([401, 403, 404], `관문에서 막혔다(status ${r.status})`).not.toContain(r.status);
+  });
+
+  it("★ 토큰 없는 옛 켜짐은 열리지 않는다 — 관문 게이트(무인증 창구를 닫는다)", async () => {
+    put.run("llm_serve", JSON.stringify({ enabled: true, lastServedAt: null })); // token 필드 없음
+    expect(llmServeOn(), "토큰 없는 켜짐이 llmServeOn을 통과한다").toBe(false);
+    const r = await 창구요청();
+    expect(r.status, "토큰 없는 켜짐이 무인증으로 열렸다").toBe(404);
   });
 });

@@ -20,9 +20,11 @@
 //      에어갭이 켜지면 egress 봉인(installAirgapGuard)이 실제 전송도 막는다 — 이중 방어.
 //   ③ **admin 전용**: 채팅이 어디로 가는지를 바꾸는 설정이다.
 //
-// ■ 자격증명은 아직 없다 — 일부러다. BridgeAI 프록시는 그냥 /v1이라 URL만으로 된다(max).
-//   인증이 붙는 날 cloudllm.ts의 암호화 보관 패턴을 그대로 재사용한다. 지금 칸만 만들어 두면
-//   「소비자 없는 생산자」가 된다(그 값을 누가 넣는가 원칙).
+// ■ 자격증명(접속 토큰)이 붙었다(2026-08-16) — 내주는 쪽이 주소에 ?token=…으로 실어 준다.
+//   remoteLlmTarget()이 URL에서 토큰을 떼어 헤더(x-gijo-serve-token)로 보낸다.
+//   ⚠ 이 토큰은 URL의 일부로 app_state에 **평문** 저장된다 — cloudllm의 암호화 보관을 쓰지
+//   않는다. 근거: VPN 한정 · GPU 접속용(계정 비밀번호 아님) · admin이 껐다 켜면 재발급되는
+//   1회성에 가깝다. 계정 자격증명이 이 칸에 들어오는 날엔 그때 암호화를 단다.
 
 import type { Express } from "express";
 import { db } from "../db";

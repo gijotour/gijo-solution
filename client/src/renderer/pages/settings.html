@@ -735,7 +735,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     <div data-sec="link" class="panel" id="servePanel" style="display:none">
       <div class="panel-title">🎁 이 PC를 원격 GPU로 내주기<span class="badge b-purple" style="margin-left:8px">admin 전용</span></div>
       <div data-gijo-fold="원격 GPU 내주기">
-        <div class="hint" style="margin-bottom:8px">이 기계에 큰 GPU가 있으면, <b>VPN 안의 다른 GIJO</b>가 이 PC의 모델로 답을 받아갑니다. ⚠ 켜면 VPN 안에서 <b>인증 없이</b> 이 PC의 AI를 쓸 수 있습니다 — 기본은 꺼짐, 에어갭이면 막힙니다.</div>
+        <div class="hint" style="margin-bottom:8px">이 기계에 큰 GPU가 있으면, <b>VPN 안의 다른 GIJO</b>가 이 PC의 모델로 답을 받아갑니다. ⚠ 켜면 <b>주소에 담긴 접속 토큰을 아는 쪽만</b> 이 PC의 AI를 씁니다(토큰은 켤 때 자동 생성) — 기본은 꺼짐, 에어갭이면 막힙니다. 껐다 켜면 토큰이 새로 발급돼 옛 주소는 무효가 됩니다.</div>
         <div class="field-row">
           <button class="btn primary" id="serveOn">켜기</button>
           <span id="serveState" class="hint"></span>
@@ -2552,7 +2552,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       });
     };
     on.onclick = async function () {
-      if (!c.enabled && !confirm("켜면 VPN 안의 다른 GIJO가 이 PC의 AI를 인증 없이 쓸 수 있습니다. 계속할까요?")) return;
+      if (!c.enabled && !confirm("켜면 접속 토큰이 만들어지고, 그 토큰이 담긴 주소를 아는 VPN 안의 GIJO가 이 PC의 AI를 씁니다. 계속할까요?")) return;
       try { await window.gijo.llmServeSet(!c.enabled); await loadLlmServe(); }
       catch (e) { msg.innerHTML = '<div class="hint" style="color:var(--red)">' + esc(String((e && e.message) || e)) + "</div>"; }
     };

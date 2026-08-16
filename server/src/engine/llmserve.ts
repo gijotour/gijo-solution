@@ -21,8 +21,10 @@
 //   ③ **에어갭이면 켜져 있어도 막는다**(원격 제공도 바깥과의 통신이다).
 //   ④ 프록시 대상은 **로컬 llama뿐**이다. 임의 URL로 못 넘긴다(열린 중계기가 되면 안 된다).
 //
-// ⚠ 인증(토큰)은 아직 없다 — 사장님 결정이 「VPN 전용」이고, VPN 안은 이미 신뢰 경계 안이라는
-//   같은 근거다(remotellm.ts 주석과 짝). 붙는 쪽에 자격증명이 생기는 날 여기도 함께 단다.
+// ⚠ **접속 토큰이 붙었다**(2026-08-16). 처음엔 「VPN 전용이니 VPN 안은 신뢰 경계」라 무인증이었는데,
+//   그 판정이 사설 대역 전체(사무실 LAN 포함)라 문서에 자백해야 했다. 이제 켤 때 토큰을 만들어
+//   주소에 실어 주고, 붙는 쪽이 헤더로 제시해야 통과한다 — 「사설 대역이면 누구나」가 「토큰을
+//   아는 쪽만」이 됐다. 토큰 없는 옛 켜짐은 llmServeOn()이 「꺼짐」으로 막는다.
 import express from "express";
 import type { Express, Request, Response } from "express";
 import { Readable, pipeline } from "node:stream";
@@ -98,10 +100,19 @@ function save(c: LlmServeConfig): void {
   setStateStmt.run(STATE_KEY, JSON.stringify(c));
 }
 
-/** 내주는 중인가 — 에어갭이면 켜져 있어도 아니다(저장 뒤 에어갭을 켠 경우가 새지 않게). */
+/**
+ * 내주는 중인가 — 에어갭이면 켜져 있어도 아니다(저장 뒤 에어갭을 켠 경우가 새지 않게).
+ *
+ * ⚠ **토큰이 없는 켜짐은 「꺼짐」으로 본다**(2026-08-16 관문 게이트). 토큰 인증을 배포하기
+ *   **전에** 이미 enabled:true로 저장된 상태는 token 필드가 없어, 「토큰 있을 때만 검사」
+ *   하위호환이 그 창구를 **무인증 그대로** 뚫리게 했다 — 이 커밋의 목적(무인증을 닫는다)이
+ *   정작 기존 켜짐엔 반쪽이 되는 자리다. 토큰 없는 켜짐은 열지 않는다: admin이 한 번 껐다
+ *   켜면 토큰이 발급돼 정상 동작한다. 「덜 안전한 채로 조용히 도는 것」보다 「안 열리는 것」이 낫다.
+ */
 export function llmServeOn(): boolean {
   if (isAirgapOn()) return false;
-  return llmServeConfig().enabled;
+  const c = llmServeConfig();
+  return c.enabled && Boolean(c.token);
 }
 
 /**
@@ -318,7 +329,9 @@ export function registerLlmServeGateway(app: Express): void {
       return false;
     }
     if (isAirgapOn()) { res.status(404).json({ error: "not found" }); return false; }
-    if (!llmServeConfig().enabled) { res.status(404).json({ error: "이 서버는 원격 GPU 제공이 꺼져 있습니다." }); return false; }
+    // ⚠ llmServeOn()을 쓴다(단순 enabled가 아니라) — 토큰 없는 옛 켜짐은 여기서 「꺼짐」으로
+    //   막힌다(관문 게이트). 그래야 배포 즉시 무인증 창구가 닫히고, admin이 껐다 켜 토큰을 받는다.
+    if (!llmServeOn()) { res.status(404).json({ error: "이 서버는 원격 GPU 제공이 꺼져 있습니다." }); return false; }
     // ⚠ 앞단 프록시가 있으면 소켓 주소가 전부 127.0.0.1이라 대역 판정이 **전원 통과**가 된다(M2).
     //   모르면 막는다 — 이 창구는 「확실히 VPN 안」이 성립할 때만 열려야 한다.
     // ⚠ 이 검사는 **꺼짐 검사 뒤**에 둔다(3차 검토 L-2): 도움말 문구는 켠 운영자의 고객에게만
