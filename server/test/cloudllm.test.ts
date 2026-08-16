@@ -153,4 +153,94 @@ describe("cloud LLM 하이브리드", () => {
     const r = await request(app).post("/api/cloud/save-to-kb").set("Authorization", `Bearer ${admin}`).send({ question: "q" });
     expect(r.status).toBe(400);
   });
+
+  // ── custom 제공자(직접 입력 · OpenAI 호환) ─────────────────────────────────
+  // 사내 온프렘/타 GPU를 클라우드 답변선에 붙이는 경로. baseURL만 admin이 넣고, 나머지
+  // (이탈 게이트·키 암호화·감사로그)는 다른 제공자와 "완전히 같은 코드"를 탄다 — 그걸 증명한다.
+  describe("custom 제공자(직접 입력 OpenAI 호환)", () => {
+    it("baseURL은 그대로 왕복하되 키는 새지 않는다", async () => {
+      await request(app).post("/api/cloud/config").set("Authorization", `Bearer ${admin}`)
+        .send({ provider: "custom", apiKey: "sk-custom-should-not-leak", model: "qwen3-14b", customBaseUrl: "http://10.8.0.12:8080/v1" });
+      const cfg = await request(app).get("/api/cloud/config").set("Authorization", `Bearer ${admin}`);
+      expect(cfg.body.customBaseUrl).toBe("http://10.8.0.12:8080/v1");
+      const custom = cfg.body.providers.find((p: { provider: string }) => p.provider === "custom");
+      expect(custom.hasKey).toBe(true);
+      expect(custom.model).toBe("qwen3-14b");
+      expect(custom.label).toContain("직접 입력");
+      expect(JSON.stringify(cfg.body)).not.toContain("sk-custom-should-not-leak");
+    });
+
+    it("안전한 질문은 사용자가 지정한 baseURL의 /chat/completions로 나간다", async () => {
+      await request(app).post("/api/cloud/config").set("Authorization", `Bearer ${admin}`)
+        .send({ enabled: true, activeProvider: "custom", provider: "custom", apiKey: "sk-x", model: "qwen3-14b", customBaseUrl: "http://10.8.0.12:8080/v1" });
+      const fetchSpy = vi.spyOn(global, "fetch").mockResolvedValue(
+        new Response(JSON.stringify({ choices: [{ message: { content: "SQL 인젝션은 …입니다." } }], usage: { prompt_tokens: 10, completion_tokens: 20 } }), { status: 200 })
+      );
+      const r = await request(app).post("/api/cloud/ask").set("Authorization", `Bearer ${admin}`)
+        .send({ question: "SQL 인젝션 방어 일반적인 방법 알려줘" });
+      expect(r.body.routedToCloud).toBe(true);
+      expect(r.body.providerLabel).toContain("직접 입력");
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const [url, init] = fetchSpy.mock.calls[0];
+      expect(String(url)).toBe("http://10.8.0.12:8080/v1/chat/completions"); // 사용자 지정 주소로 정확히 나감
+      const sentBody = JSON.parse((init as RequestInit).body as string);
+      expect(sentBody.messages.find((m: { role: string }) => m.role === "user").content).toBe("SQL 인젝션 방어 일반적인 방법 알려줘");
+    });
+
+    it("custom도 이탈 게이트를 똑같이 거친다 — 내부 식별자가 있으면 안 나간다", async () => {
+      registerAsset({ id: "ai-secbot-01", name: "사내 챗봇XYZ", path: "p" });
+      await request(app).post("/api/cloud/config").set("Authorization", `Bearer ${admin}`)
+        .send({ enabled: true, activeProvider: "custom", provider: "custom", apiKey: "sk-x", model: "qwen3-14b", customBaseUrl: "http://10.8.0.12:8080/v1" });
+      const fetchSpy = vi.spyOn(global, "fetch");
+      const r = await request(app).post("/api/cloud/ask").set("Authorization", `Bearer ${admin}`)
+        .send({ question: "ai-secbot-01 자산 안전한가?" });
+      expect(r.body.blocked).toBe(true);
+      expect(r.body.routedToCloud).toBe(false);
+      expect(fetchSpy).not.toHaveBeenCalled(); // 내부 식별자는 custom이어도 절대 안 나감
+    });
+
+    it("http(s)가 아닌 주소는 400으로 거부한다", async () => {
+      for (const bad of ["ftp://10.8.0.12/v1", "javascript:alert(1)", "file:///etc/passwd"]) {
+        const r = await request(app).post("/api/cloud/config").set("Authorization", `Bearer ${admin}`).send({ customBaseUrl: bad });
+        expect(r.status).toBe(400);
+      }
+    });
+
+    it("주소를 안 넣고 custom을 켜면 크래시 없이 안전하게 실패한다", async () => {
+      await request(app).post("/api/cloud/config").set("Authorization", `Bearer ${admin}`)
+        .send({ enabled: true, activeProvider: "custom", provider: "custom", apiKey: "sk-x", model: "qwen3-14b" });
+      const fetchSpy = vi.spyOn(global, "fetch");
+      const r = await request(app).post("/api/cloud/ask").set("Authorization", `Bearer ${admin}`)
+        .send({ question: "CVSS 점수 계산법 알려줘" });
+      expect(r.body.routedToCloud).toBe(false);
+      expect(r.body.error).toContain("주소"); // "…서버 주소가 설정되지 않았습니다"
+      expect(fetchSpy).not.toHaveBeenCalled();
+    });
+
+    it("키 없이도 나간다 — 사내 GPU(키 없는 llama-server) 지원, Authorization 미전송", async () => {
+      // 키를 아예 안 넣고(온프렘 llama-server는 키가 없다) custom을 켠다.
+      await request(app).post("/api/cloud/config").set("Authorization", `Bearer ${admin}`)
+        .send({ enabled: true, activeProvider: "custom", provider: "custom", model: "qwen3-14b", customBaseUrl: "http://10.8.0.12:8080/v1" });
+      const fetchSpy = vi.spyOn(global, "fetch").mockResolvedValue(
+        new Response(JSON.stringify({ choices: [{ message: { content: "답변" } }] }), { status: 200 })
+      );
+      const r = await request(app).post("/api/cloud/ask").set("Authorization", `Bearer ${admin}`)
+        .send({ question: "포트 스캐닝 일반 개념 알려줘" });
+      expect(r.body.routedToCloud).toBe(true); // 키 없어도 거부 안 함
+      expect(fetchSpy).toHaveBeenCalledTimes(1);
+      const [, init] = fetchSpy.mock.calls[0];
+      const headers = (init as RequestInit).headers as Record<string, string>;
+      expect(headers.Authorization).toBeUndefined(); // 키 없으면 Authorization 헤더 자체를 안 보냄
+    });
+
+    it("링크-로컬(169.254.x) 주소는 400 — 메타데이터 SSRF 방어, 사내망은 허용", async () => {
+      const bad = await request(app).post("/api/cloud/config").set("Authorization", `Bearer ${admin}`)
+        .send({ customBaseUrl: "http://169.254.169.254/latest/meta-data" });
+      expect(bad.status).toBe(400);
+      // 사내망(10.x·192.168.x·127.x)은 의도된 허용 — 막히면 안 된다.
+      const ok = await request(app).post("/api/cloud/config").set("Authorization", `Bearer ${admin}`)
+        .send({ customBaseUrl: "http://10.8.0.12:8080/v1" });
+      expect(ok.status).toBe(200);
+    });
+  });
 });

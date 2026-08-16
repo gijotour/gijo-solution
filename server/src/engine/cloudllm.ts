@@ -220,7 +220,9 @@ interface CloudCallResult {
 async function callOpenAiCompatible(baseUrl: string, apiKey: string, model: string, system: string, user: string, maxTokens?: number): Promise<CloudCallResult> {
   const res = await fetch(`${baseUrl}/chat/completions`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
+    // 키가 없으면 Authorization을 아예 안 보낸다 — 사내 llama-server·vLLM은 보통 키가 없고
+    // 빈 "Bearer "를 거부하는 서버도 있다(custom 제공자의 키-없는 온프렘 연결 지원).
+    headers: { "Content-Type": "application/json", ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}) },
     body: JSON.stringify({
       model,
       messages: [{ role: "system", content: system }, { role: "user", content: user }],
@@ -270,9 +272,10 @@ export async function cloudComplete(system: string, user: string, maxTokens = 40
   if (!isEnabled()) throw new Error("클라우드 LLM이 비활성 상태입니다(설정에서 관리자가 켜야 합니다).");
   const provider = activeProvider();
   const key = providerKey(provider);
-  if (!key) throw new Error(`${PROVIDER_LABEL[provider]} API 키가 없습니다.`);
+  // custom(직접 입력)은 키가 선택 — 사내 llama-server·vLLM은 키가 없다. 그 외는 키 필수.
+  if (!key && provider !== "custom") throw new Error(`${PROVIDER_LABEL[provider]} API 키가 없습니다.`);
   const model = providerModel(provider);
-  const r = await callProvider(provider, key, model, system, user, maxTokens);
+  const r = await callProvider(provider, key ?? "", model, system, user, maxTokens);
   recordCloudUsage(provider, model, r.inTokens, r.outTokens);
   return r.text;
 }
@@ -295,7 +298,7 @@ async function listModelsFor(p: CloudProvider, apiKey: string): Promise<string[]
       : p === "openai" ? "https://api.openai.com/v1"
       : "https://generativelanguage.googleapis.com/v1beta/openai";
     if (!base) return []; // custom인데 주소 미설정 — 조회할 곳이 없다
-    const res = await fetch(`${base}/models`, { headers: { Authorization: `Bearer ${apiKey}` }, signal: AbortSignal.timeout(15_000) });
+    const res = await fetch(`${base}/models`, { headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {}, signal: AbortSignal.timeout(15_000) });
     if (!res.ok) return [];
     const j = (await res.json()) as { data?: { id: string }[] };
     return (j.data ?? []).map((m) => m.id.replace(/^models\//, ""));
@@ -324,7 +327,8 @@ export async function askCloud(question: string, user?: GijoUser): Promise<Cloud
 
   const provider = activeProvider();
   const apiKey = providerKey(provider);
-  if (!apiKey) return { routedToCloud: false, blocked: false, reasons: [], error: `${PROVIDER_LABEL[provider]} API 키가 설정돼 있지 않습니다.` };
+  // custom(직접 입력)은 키가 선택 — 사내 llama-server·vLLM은 키가 없다. 그 외 제공자는 키 필수.
+  if (!apiKey && provider !== "custom") return { routedToCloud: false, blocked: false, reasons: [], error: `${PROVIDER_LABEL[provider]} API 키가 설정돼 있지 않습니다.` };
 
   // 입력 관문 — 인젝션 시도는 밖으로 내보내지 않는다. 아래 screenForCloud(내부정보 유출 방지)와
   // 다른 검사다: 이쪽은 "이 요청이 AI를 조종하려는 것인가", 저쪽은 "우리 자료가 섞였는가".
@@ -347,7 +351,7 @@ export async function askCloud(question: string, user?: GijoUser): Promise<Cloud
 
   const model = providerModel(provider);
   try {
-    const r = await callProvider(provider, apiKey, model, CLOUD_SYSTEM_PROMPT, q);
+    const r = await callProvider(provider, apiKey ?? "", model, CLOUD_SYSTEM_PROMPT, q);
     const answer = r.text;
     recordCloudUsage(provider, model, r.inTokens, r.outTokens);
     logEgress({ userId: user?.id, provider, decision: "allowed", reasons: [], question: q });
@@ -410,7 +414,14 @@ export function registerCloudLlmRoutes(app: Express): void {
       // 직접 입력(OpenAI 호환) 서버 주소 — custom 제공자용. http(s)만 받는다(형식 검증).
       if (typeof body.customBaseUrl === "string") {
         const url = body.customBaseUrl.trim();
-        if (url && !/^https?:\/\//i.test(url)) { res.status(400).json({ error: "http(s) 주소만 됩니다 — 예: http://10.8.0.12:8000/v1" }); return; }
+        if (url) {
+          if (!/^https?:\/\//i.test(url)) { res.status(400).json({ error: "http(s) 주소만 됩니다 — 예: http://10.8.0.12:8000/v1" }); return; }
+          // 링크-로컬(169.254.x·fe80:) 거부 — 클라우드 메타데이터(169.254.169.254) 대역 SSRF 방어.
+          // 사내 GPU는 10.x·192.168.x·127.x를 쓴다(그건 의도된 허용) — 링크-로컬만 막는다.
+          let host = "";
+          try { host = new URL(url).hostname.replace(/^\[|\]$/g, ""); } catch { res.status(400).json({ error: "주소 형식이 올바르지 않습니다." }); return; }
+          if (/^169\.254\./.test(host) || /^fe80:/i.test(host)) { res.status(400).json({ error: "링크-로컬 주소(169.254.x·fe80:)는 쓸 수 없습니다 — 메타데이터 보호." }); return; }
+        }
         setCustomBaseUrl(url);
       }
       if (body.activeProvider && PROVIDERS.includes(body.activeProvider as CloudProvider)) {
@@ -463,8 +474,8 @@ export function registerCloudLlmRoutes(app: Express): void {
       const p = String(req.query.provider || activeProvider()) as CloudProvider;
       if (!PROVIDERS.includes(p)) return res.status(400).json({ error: "알 수 없는 제공자" });
       const key = providerKey(p);
-      if (!key) return res.status(400).json({ error: "이 제공자의 API 키가 없습니다." });
-      const models = await listModelsFor(p, key);
+      if (!key && p !== "custom") return res.status(400).json({ error: "이 제공자의 API 키가 없습니다." });
+      const models = await listModelsFor(p, key ?? "");
       res.json({ provider: p, models });
     })
   );
