@@ -4,11 +4,12 @@ import { request } from "./core";
 import type { DexModel } from "./assets";
 
 // ── 선택적 클라우드 LLM 하이브리드 (Gemini/Claude/OpenAI) ─────────────────
-export type CloudProvider = "gemini" | "claude" | "openai";
+export type CloudProvider = "gemini" | "claude" | "openai" | "custom";
 export interface CloudConfig {
   enabled: boolean;
   activeProvider: CloudProvider;
   providers: { provider: CloudProvider; label: string; hasKey: boolean; model: string }[];
+  customBaseUrl: string; // 직접 입력(OpenAI 호환) 서버 주소
 }
 export interface CloudAskResult {
   routedToCloud: boolean;
@@ -41,7 +42,7 @@ export interface CloudStatus {
 export const cloudApi = {
   status: () => request<CloudStatus>("/api/cloud/status"),
   getConfig: () => request<CloudConfig>("/api/cloud/config"),
-  saveConfig: (patch: { enabled?: boolean; activeProvider?: CloudProvider; provider?: CloudProvider; apiKey?: string; model?: string; clearKey?: boolean }) =>
+  saveConfig: (patch: { enabled?: boolean; activeProvider?: CloudProvider; provider?: CloudProvider; apiKey?: string; model?: string; clearKey?: boolean; customBaseUrl?: string }) =>
     request<CloudConfig>("/api/cloud/config", { method: "POST", body: patch }),
   ask: (question: string) => request<CloudAskResult>("/api/cloud/ask", { method: "POST", body: { question } }),
   screen: (question: string) => request<EgressScreen>("/api/cloud/screen", { method: "POST", body: { question } }),

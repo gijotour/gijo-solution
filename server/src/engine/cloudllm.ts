@@ -21,13 +21,18 @@ import { emitCollaboration } from "./collaboration";
 import { ingestText, GLOBAL_SCOPE } from "./memory";
 import { koDateTimeString } from "../util/date";
 
-export type CloudProvider = "gemini" | "claude" | "openai";
-const PROVIDERS: CloudProvider[] = ["gemini", "claude", "openai"];
+// ⚠ "custom" = **임의 OpenAI 호환 서버**(2026-08-16, 사장님 승인). 사내 vLLM·다른 GB10·
+//   타사 온프렘 등 `/chat/completions` + `Authorization: Bearer` 규격이면 무엇이든 붙인다.
+//   baseURL을 admin이 직접 넣는다(다른 셋은 고정). egress 게이트는 똑같이 탄다 — 임의 주소라고
+//   유출 방지가 느슨해지지 않는다(주소가 아니라 나가는 **내용**으로 막는다).
+export type CloudProvider = "gemini" | "claude" | "openai" | "custom";
+const PROVIDERS: CloudProvider[] = ["gemini", "claude", "openai", "custom"];
 
 const PROVIDER_LABEL: Record<CloudProvider, string> = {
   gemini: "Google Gemini",
   claude: "Anthropic Claude",
   openai: "OpenAI",
+  custom: "직접 입력 (OpenAI 호환)",
 };
 
 // 기본 모델(사용자가 설정에서 바꿀 수 있음). 비용·품질 균형점을 초깃값으로.
@@ -37,7 +42,17 @@ const DEFAULT_MODEL: Record<CloudProvider, string> = {
   gemini: "gemini-flash-latest",
   claude: "claude-sonnet-5",
   openai: "gpt-4o-mini",
+  custom: "", // 임의 서버는 모델명을 admin이 넣는다(기본 없음 — 서버마다 다르다)
 };
+
+// custom 제공자의 baseURL — app_state에 저장(키는 다른 셋과 같이 cloud_llm_keys 암호화 보관).
+// ⚠ baseURL은 비밀이 아니다(주소일 뿐) — 평문 app_state로 충분하다. 키만 암호화한다.
+function customBaseUrl(): string {
+  return ((getStateStmt.get("cloud:customBaseUrl") as { value: string } | undefined)?.value ?? "").trim();
+}
+function setCustomBaseUrl(url: string): void {
+  setStateStmt.run("cloud:customBaseUrl", String(url ?? "").trim());
+}
 
 // 클라우드로 나가는 유일한 시스템 프롬프트 — 내부 맥락이 없음을 명시하고 일반지식 범위로 못박는다.
 const CLOUD_SYSTEM_PROMPT =
@@ -83,6 +98,7 @@ export interface CloudConfigPublic {
   enabled: boolean;
   activeProvider: CloudProvider;
   providers: { provider: CloudProvider; label: string; hasKey: boolean; model: string }[];
+  customBaseUrl: string; // 직접 입력(OpenAI 호환) 서버 주소 — 비밀 아니라 그대로 내려준다
 }
 
 export function getCloudConfig(): CloudConfigPublic {
@@ -90,6 +106,7 @@ export function getCloudConfig(): CloudConfigPublic {
     enabled: isEnabled(),
     activeProvider: activeProvider(),
     providers: PROVIDERS.map((p) => ({ provider: p, label: PROVIDER_LABEL[p], hasKey: hasKey(p), model: providerModel(p) })),
+    customBaseUrl: customBaseUrl(),
   };
 }
 
@@ -238,6 +255,11 @@ async function callClaude(apiKey: string, model: string, system: string, user: s
 async function callProvider(p: CloudProvider, apiKey: string, model: string, system: string, user: string, maxTokens?: number): Promise<CloudCallResult> {
   if (p === "openai") return callOpenAiCompatible("https://api.openai.com/v1", apiKey, model, system, user, maxTokens);
   if (p === "gemini") return callOpenAiCompatible("https://generativelanguage.googleapis.com/v1beta/openai", apiKey, model, system, user, maxTokens);
+  if (p === "custom") {
+    const base = customBaseUrl().replace(/\/+$/, "");
+    if (!base) throw new Error("직접 입력(OpenAI 호환) 서버 주소가 설정되지 않았습니다 — 설정에서 넣어 주세요.");
+    return callOpenAiCompatible(base, apiKey, model, system, user, maxTokens);
+  }
   return callClaude(apiKey, model, system, user, maxTokens);
 }
 
@@ -269,7 +291,10 @@ async function listModelsFor(p: CloudProvider, apiKey: string): Promise<string[]
       const j = (await res.json()) as { data?: { id: string }[] };
       return (j.data ?? []).map((m) => m.id);
     }
-    const base = p === "openai" ? "https://api.openai.com/v1" : "https://generativelanguage.googleapis.com/v1beta/openai";
+    const base = p === "custom" ? customBaseUrl().replace(/\/+$/, "")
+      : p === "openai" ? "https://api.openai.com/v1"
+      : "https://generativelanguage.googleapis.com/v1beta/openai";
+    if (!base) return []; // custom인데 주소 미설정 — 조회할 곳이 없다
     const res = await fetch(`${base}/models`, { headers: { Authorization: `Bearer ${apiKey}` }, signal: AbortSignal.timeout(15_000) });
     if (!res.ok) return [];
     const j = (await res.json()) as { data?: { id: string }[] };
@@ -379,9 +404,15 @@ export function registerCloudLlmRoutes(app: Express): void {
     authMiddleware,
     adminMiddleware,
     asyncRoute(async (req, res) => {
-      const body = req.body as { enabled?: boolean; activeProvider?: string; provider?: string; apiKey?: string; model?: string; clearKey?: boolean };
+      const body = req.body as { enabled?: boolean; activeProvider?: string; provider?: string; apiKey?: string; model?: string; clearKey?: boolean; customBaseUrl?: string };
 
       if (typeof body.enabled === "boolean") setStateStmt.run("cloud:enabled", body.enabled ? "1" : "0");
+      // 직접 입력(OpenAI 호환) 서버 주소 — custom 제공자용. http(s)만 받는다(형식 검증).
+      if (typeof body.customBaseUrl === "string") {
+        const url = body.customBaseUrl.trim();
+        if (url && !/^https?:\/\//i.test(url)) { res.status(400).json({ error: "http(s) 주소만 됩니다 — 예: http://10.8.0.12:8000/v1" }); return; }
+        setCustomBaseUrl(url);
+      }
       if (body.activeProvider && PROVIDERS.includes(body.activeProvider as CloudProvider)) {
         setStateStmt.run("cloud:provider", body.activeProvider);
       }

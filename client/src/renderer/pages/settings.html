@@ -812,7 +812,14 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
           <option value="gemini">Google Gemini</option>
           <option value="claude">Anthropic Claude</option>
           <option value="openai">OpenAI</option>
+          <option value="custom">직접 입력 (OpenAI 호환)</option>
         </select>
+      </div>
+      <!-- custom 제공자를 고르면 나타나는 주소칸 — 사내 vLLM·다른 GB10·타사 온프렘 등
+           OpenAI 호환(/chat/completions + Bearer) 서버 주소를 직접 넣는다(2026-08-16). -->
+      <div class="field" id="cloudBaseUrlField" style="display:none">
+        <label for="cloudBaseUrlInput">서버 주소 (OpenAI 호환 /v1)</label>
+        <input id="cloudBaseUrlInput" placeholder="예: http://10.8.0.12:8000/v1  ·  https://내서버/v1">
       </div>
       <div class="field-row">
         <div class="field">
@@ -2628,12 +2635,20 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     document.getElementById("cloudApiKeyInput").value = "";
     document.getElementById("cloudApiKeyInput").placeholder = info && info.hasKey ? "설정됨 — 변경하지 않으려면 비워두세요" : "API 키 입력";
     document.getElementById("cloudKeyState").textContent = info && info.hasKey ? "· 설정됨" : "· 미설정";
+    // custom(직접 입력)일 때만 주소칸을 보이고 저장된 주소를 채운다.
+    const 주소칸 = document.getElementById("cloudBaseUrlField");
+    if (주소칸) {
+      주소칸.style.display = p === "custom" ? "" : "none";
+      if (p === "custom") document.getElementById("cloudBaseUrlInput").value = cloudCfg.customBaseUrl || "";
+    }
   }
   async function saveCloud() {
     const line = document.getElementById("cloudStatusLine");
     const provider = document.getElementById("cloudProviderSelect").value;
     const apiKey = document.getElementById("cloudApiKeyInput").value || undefined;
     const model = document.getElementById("cloudModelInput").value.trim() || undefined;
+    // custom일 때만 주소를 함께 보낸다(빈 문자열도 보내 지우기 허용).
+    const customBaseUrl = provider === "custom" ? document.getElementById("cloudBaseUrlInput").value.trim() : undefined;
     try {
       cloudCfg = await window.gijo.saveCloudConfig({
         enabled: document.getElementById("cloudEnabledInput").checked,
@@ -2641,6 +2656,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         provider,
         ...(apiKey ? { apiKey } : {}),
         ...(model ? { model } : {}),
+        ...(customBaseUrl !== undefined ? { customBaseUrl } : {}),
       });
       document.getElementById("cloudApiKeyInput").value = "";
       line.textContent = "✓ 저장되었습니다.";

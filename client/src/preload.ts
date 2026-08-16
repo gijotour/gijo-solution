@@ -394,7 +394,7 @@ const gijoApi = {
   // 선택적 클라우드 LLM 하이브리드(Gemini/Claude/OpenAI) — 기본 OFF·admin 설정, egress 게이트 통과분만.
   cloudStatus: () => api.cloudApi.status(),
   getCloudConfig: () => api.cloudApi.getConfig(),
-  saveCloudConfig: (patch: { enabled?: boolean; activeProvider?: import("./apiClient").CloudProvider; provider?: import("./apiClient").CloudProvider; apiKey?: string; model?: string; clearKey?: boolean }) =>
+  saveCloudConfig: (patch: { enabled?: boolean; activeProvider?: import("./apiClient").CloudProvider; provider?: import("./apiClient").CloudProvider; apiKey?: string; model?: string; clearKey?: boolean; customBaseUrl?: string }) =>
     api.cloudApi.saveConfig(patch),
   askCloud: (question: string) => api.cloudApi.ask(question),
   screenCloud: (question: string) => api.cloudApi.screen(question),
