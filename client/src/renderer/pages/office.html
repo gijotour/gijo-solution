@@ -849,7 +849,7 @@ if(location.search.indexOf("embed=1")>=0)document.documentElement.classList.add(
     if (today.length) {
       nowBox.style.display = "block";
       const first = today[0];
-      nowBox.innerHTML = `🤖 <b style="color:var(--text,#e6e8eb)">지금 이것부터</b>: ${esc(first.text)}` +
+      nowBox.innerHTML = `<b style="color:var(--text,#e6e8eb)">지금 이것부터</b>: ${esc(first.text)}` +
         (first.dueAt && first.dueAt < Date.now() ? ' <span style="color:#f5928a;font-weight:700">— 기한이 지났습니다</span>'
           : first.dueAt && first.dueAt <= endOfToday() ? ' <span style="color:var(--amber,#f0a020);font-weight:700">— 오늘 기한</span>' : "");
     } else nowBox.style.display = "none";
