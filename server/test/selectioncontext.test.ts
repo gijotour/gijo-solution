@@ -130,3 +130,54 @@ describe("클라 배선 (소스 계약)", () => {
     expect(db, "셸은 최상위 창").toContain("window.top.postMessage");
   });
 });
+
+// ── 조치·승인 화면 → 대화창 (2026-08-18, 「조치 항목 → 대화창 카드」 시안 승인분) ──────
+// 왜: 사장님 첫인상 QA 발견 — 조치 대상을 누르면 옆 패널만 열리고 대화창과 **완전히 끊겨**
+//   있었다(전수조사 실측: approvals.html의 gijo:select 호출 0건). 법령·판례는 이미
+//   고르면 대화창이 답하는데 조치 화면만 안 됐다.
+// ⚠ 이 감시가 없으면 조용히 되돌아간다 — "만들어만 두고 안 부른다"가 이 저장소의 반복 함정.
+describe("조치·승인 화면이 고른 항목을 대화창에 넘긴다", () => {
+  const ap = fs.readFileSync(path.join(__dirname, "..", "..", "client", "src", "renderer", "pages", "approvals.html"), "utf8");
+  const shell = fs.readFileSync(path.join(__dirname, "..", "..", "client", "src", "renderer", "pages", "app.html"), "utf8");
+  const cs = fs.readFileSync(path.join(__dirname, "..", "..", "client", "src", "renderer", "pages", "console.js"), "utf8");
+
+  it("항목을 누르면 gijo:select를 보낸다 — 그리고 실제로 불린다", () => {
+    expect(ap, "approvals.html이 gijo:select를 안 보낸다").toContain("gijo:select");
+    expect(ap, "알림 함수를 만들어만 두고 호출부가 없다").toContain("대화창에알림(r)");
+    // window.top — 셸 iframe 한 겹 위. parent면 허브가 낀 구성에서 죽는다(2026-08-09 함정).
+    expect(ap, "parent가 아니라 top으로 보내야 한다").toContain("window.top.postMessage");
+  });
+
+  it("셸이 fields를 걸러 버리지 않는다 — 아는 키만 문자열로 통과시킨다", () => {
+    // ⚠ 2026-08-18에 실제로 밟은 함정: app.html이 { label, text }만 다시 만들어 넘겨
+    //   fields가 조용히 사라졌다. 보내는 쪽·받는 쪽만 고치면 상태 패널이 영영 안 뜬다.
+    const i = shell.indexOf('d.type === "gijo:select"');
+    expect(i, "gijo:select 수신부를 못 찾았다 — 코드가 바뀌었으면 이 시험도 같이 볼 것").toBeGreaterThan(-1);
+    const 구간 = shell.slice(i, i + 1200);
+    expect(구간, "fields를 콘솔로 안 넘긴다").toContain("fields");
+    expect(구간, "iframe 값을 그대로 믿으면 안 된다 — String 강제가 있어야 한다").toContain("String(");
+    expect(구간, "아는 키만 통과시켜야 한다(허용 목록)").toMatch(/허용키|allow/);
+  });
+
+  it("대화창이 fields를 받으면 「지금 다루는 것」을 그린다 — 없으면 지금 그대로", () => {
+    expect(cs, "상태 패널을 그리는 함수가 없다").toContain("renderSelState");
+    expect(cs, "붙일 자리(csSelState)가 DOM에 없다").toContain('id="csSelState"');
+    // fields가 없으면 아무것도 안 그린다 — 기존 화면(vulnscan·dashboard·map-view) 무변경 호환.
+    expect(cs, "fields 없을 때 빠져나가는 갈래가 없다").toMatch(/if\s*\(!f\)/);
+  });
+
+  it("없는 함수를 부르지 않는다 — boldify는 console.js에 없다", () => {
+    // 2026-08-18에 실제로 이 실수를 했다가 잡았다. approvals.html엔 있고 console.js엔 없어서,
+    // 옮겨 심으면 TypeError로 조용히 죽는다(버튼이 무반응이 되는 그 부류).
+    const i = cs.indexOf("renderSelState");
+    const 구간 = cs.slice(i, i + 1800);
+    if (!/function boldify/.test(cs)) {
+      expect(구간, "console.js에 boldify가 없는데 부르고 있다").not.toContain("boldify(");
+    }
+  });
+
+  it("한글 한 줄을 다시 만들지 않고 화면이 준 것을 쓴다 — 같은 문장이 두 곳에서 갈라지지 않게", () => {
+    // 전-7③의 f.plain(서버 findingplain.ts가 만든 것)을 그대로 실어 보낸다.
+    expect(ap, "한글 한 줄(plain)을 안 싣는다").toMatch(/plain:\s*f\.plain/);
+  });
+});

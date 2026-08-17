@@ -68,6 +68,21 @@
       ".cs-sel{font-size:11.5px;font-weight:700;color:#ffd9a8;border:1px solid rgba(240,160,32,.45);border-radius:12px;padding:1px 9px;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis;}",
       ".cs-sel .x{margin-left:5px;color:var(--muted-2,#a49d95);cursor:pointer;font-weight:400;}",
       ".cs-sel .x:hover{color:#f5928a;}",
+      // 🎯 지금 다루는 것 — 고른 항목의 **실제 값**을 펼쳐 보인다(2026-08-18 시안 승인).
+      // 왜 칩 말고 이것도 두나: 칩(.cs-sel)은 **이름표 한 줄**뿐이라 무엇을 다루는지가 안 보였다.
+      // ⚠ 이 값은 대화 이력(6턴·300자 감쇠) 밖이다 — 선택은 매 요청 따로 실린다(dispatcher.ts:597·668).
+      //    그래서 대화가 길어져도 「지금 다루는 것」은 안 잃는다.
+      ".cs-state{margin:0 12px 8px;border:1px solid rgba(240,160,32,.35);background:rgba(240,160,32,.06);border-radius:9px;padding:7px 9px;}",
+      ".cs-state .h{display:flex;align-items:center;gap:6px;font-size:11.5px;font-weight:800;color:#ffd9a8;margin-bottom:4px;}",
+      ".cs-state .h .x{margin-left:auto;color:var(--muted-2,#a49d95);cursor:pointer;font-weight:400;}",
+      ".cs-state .h .x:hover{color:#f5928a;}",
+      ".cs-state .t{font-size:12.5px;font-weight:700;color:var(--text,#e9e7e2);line-height:1.45;}",
+      ".cs-state .m{font-size:11.5px;color:var(--muted,#b3ada4);margin-top:3px;line-height:1.5;}",
+      ".cs-state .p{font-size:11.5px;color:var(--muted,#b3ada4);margin-top:4px;line-height:1.55;}",
+      ".cs-state .p b{color:var(--text,#e9e7e2);font-weight:700;}",
+      ".cs-state .tag{display:inline-block;font-size:11px;font-weight:800;border-radius:4px;padding:0 5px;margin-right:4px;}",
+      ".cs-state .tag.kev{background:rgba(245,80,80,.16);color:#ff9d9d;}",
+      ".cs-state .tag.sev{background:rgba(255,255,255,.08);color:var(--muted,#b3ada4);}",
       // 맥락 떼기 ✕ — VS Code implicit context의 결론(보이게+뗄 수 있게)을 처음부터
       ".cs-ctx .x{margin-left:5px;color:var(--muted-2,#a49d95);cursor:pointer;font-weight:400;}",
       ".cs-ctx .x:hover{color:#f5928a;}",
@@ -239,6 +254,8 @@
       '<div class="cs-flow" id="csFlow" style="display:none"></div>' +
       // 화면별 칩 — 지금 화면에서 실제로 하는 물음. 전체 갈래는 아래 서랍(무엇을 할 수 있나)에 보존
       '<div class="cs-chips" id="csChips"></div>' +
+      // 🎯 지금 다루는 것 — 고른 항목의 실제 값(2026-08-18). fields를 보내는 화면에서만 뜬다.
+      '<div class="cs-state" id="csSelState" style="display:none"></div>' +
       '<div class="cs-drawer" id="csDrawer"></div>' +
       '<div class="cs-body" id="csBody"><div class="cs-empty">지시하면 여기서 실시간으로 흐릅니다. 위 <b>무엇을 할 수 있나</b>에서 골라도 됩니다.</div></div>' +
       '<div class="cs-dock">' +
@@ -967,14 +984,41 @@
   var ctxOff = false; // C. 맥락 떼기 — 켜지면 지시에 화면을 안 싣는다
 
   // ── 2단계: 선택 항목 맥락 — 화면에서 고른 것이 「이거」가 된다 ──────────
-  var sel = null; // { label, text } | null — 화면(iframe)이 gijo:select로 알려 준다
+  var sel = null; // { label, text, fields? } | null — 화면(iframe)이 gijo:select로 알려 준다
   function setSelection(s) {
     sel = s && s.label && s.text ? s : null;
     var el = document.getElementById("csSel");
     if (!el) return;
-    if (!sel) { el.style.display = "none"; el.innerHTML = ""; return; }
+    if (!sel) { el.style.display = "none"; el.innerHTML = ""; renderSelState(); return; }
     el.style.display = "";
     el.innerHTML = "📌 " + esc(sel.label) + ' <span class="x" title="선택을 풉니다">✕</span>';
+    renderSelState();
+  }
+
+  /** 🎯 지금 다루는 것 — fields가 온 화면에서만 그린다(2026-08-18 시안 승인).
+   *  ⚠ fields가 없으면 **아무것도 그리지 않는다** — 기존 화면(vulnscan·dashboard·map-view)은
+   *    label·text만 보내므로 지금과 똑같이 📌 칩만 뜬다(무변경 호환). */
+  function renderSelState() {
+    var box = document.getElementById("csSelState");
+    if (!box) return;
+    var f = sel && sel.fields;
+    if (!f) { box.style.display = "none"; box.innerHTML = ""; return; }
+    var 태그 = (f.kev ? '<span class="tag kev">🚨 ' + esc(f.kev) + "</span>" : "") +
+      (f.severity ? '<span class="tag sev">' + esc(f.severity) + "</span>" : "");
+    var 아래 = [f.status, f.owner ? "담당 " + f.owner : "", f.due ? "기한 " + f.due : ""].filter(Boolean).map(esc).join(" · ");
+    box.style.display = "";
+    box.innerHTML =
+      '<div class="h">🎯 지금 다루는 것<span class="x" title="선택을 풉니다">✕ 풀기</span></div>' +
+      (f.asset ? '<div class="m">' + esc(f.asset) + "</div>" : "") +
+      (f.title ? '<div class="t">' + 태그 + esc(f.title) + "</div>" : "") +
+      (아래 ? '<div class="m">' + 아래 + "</div>" : "") +
+      // 취약점 한글 한 줄(전-7③) — 화면이 이미 만든 문장을 그대로 재사용한다(다시 안 만든다).
+      // ⚠ **굵게(`**…**`)를 여기서 직접 푼다.** console.js엔 boldify가 없다 — 있는 줄 알고
+      //   부르면 TypeError로 조용히 죽는다(이 저장소의 반복 함정: 없는 함수를 부르는 버튼).
+      //   esc를 **먼저** 걸고 그다음 굵게를 푼다(순서가 바뀌면 주입 구멍이 된다).
+      (f.plain ? '<div class="p">→ ' + esc(f.plain).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>") + "</div>" : "");
+    var x = box.querySelector(".x");
+    if (x) x.addEventListener("click", function () { setSelection(null); });
   }
 
   /** ② 화면별 칩 — 그 화면 갈래(CAN.screens)에서 3~4개 + 첫 칩은 항상 ⓘ. */

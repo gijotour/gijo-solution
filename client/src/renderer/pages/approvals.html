@@ -444,6 +444,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         return;
       }
       currentKey = keyOf(r); renderList(); renderDetail(r);
+      대화창에알림(r); // 고른 것을 대화창이 「이거」로 잡게 한다(2026-08-18 시안 승인)
     }));
     renderBulkBar();
   }
@@ -456,6 +457,48 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   }
 
   function clearDetail() { document.getElementById("rvDetail").innerHTML = '<div class="rv-empty">왼쪽에서 finding을 선택하세요.</div>'; }
+
+  // ── 고른 항목을 대화창에 알린다 (2026-08-18, 「조치 항목 → 대화창 카드」 시안 승인분) ──
+  //
+  // 왜: 이 화면은 대화창과 **완전히 끊겨** 있었다(gijo:select 호출 0건 — 전수조사 실측).
+  //   그래서 항목을 골라도 대화창에 "이거 반려해줘"라고 못 했다. 법령·판례는 이미
+  //   고르면 대화창이 답하는데(lawlookup.html) 조치 화면만 안 됐다.
+  //
+  // ⚠ 두 가지를 함께 보낸다 — 쓰임이 다르다.
+  //   · text   — **서버로 가는 선택 맥락.** dispatcher.ts:1536에서 한 줄로 눌려 200자에서 잘린다.
+  //              사람이 읽는 말로 적는다(모델이 「이거」를 풀 때 쓴다).
+  //   · fields — **화면이 그릴 값.** 대화창 상태 패널·카드가 읽는다. 서버로 안 간다.
+  //              ⚠ app.html이 **아는 키만** 골라 문자열로 강제해 넘긴다(iframe 값을 그대로 믿지 않는다).
+  //
+  // ⚠ 여기서 `keyOf(r)`(구분자 \0)를 실어 보내지 않는다 — 위 427행이 적어 둔 그대로
+  //   **\0은 HTML/DOM을 오가며 유실**된다. 대상은 assetId·findingKey로 따로 싣는다.
+  const 상태말 = { pending: "미검토", in_progress: "진행중", verifying: "검증 대기", rejected: "반려", approved: "완료" };
+  function 대화창에알림(r) {
+    const f = r.finding || {};
+    const 상태 = 상태말[r.status] || r.status || "";
+    const text = [
+      `자산 ${r.assetName || r.assetId}`,
+      f.finding_type,
+      f.severity,
+      상태,
+      r.assignee ? `담당 ${r.assignee}` : "미배정",
+      r.overdue ? "기한 초과" : "",
+    ].filter(Boolean).join(" · ");
+    const fields = {
+      asset: r.assetName || r.assetId || "",
+      title: f.finding_type || "",
+      severity: f.severity || "",
+      status: 상태,
+      owner: r.assignee || "",
+      due: r.dueDate || "",
+      plain: f.plain || "",          // 취약점 한글 한 줄(전-7③) — 카드가 그대로 재사용한다
+      kev: f.kev ? "KEV" : "",
+      assetId: r.assetId || "",
+      findingKey: r.findingKey || "",
+    };
+    // ⚠ window.top — 이 화면은 셸(app.html)의 iframe 안이다. parent면 허브가 한 겹 더 있을 때 죽는다.
+    try { window.top.postMessage({ type: "gijo:select", label: f.finding_type || r.assetName || "선택", text, fields }, "*"); } catch (e) {}
+  }
 
   // 검증 결과 렌더 — 판정 배지 + 근거(명령·출력). 접기 가능하고 목록은 내부 스크롤.
   // ⚠ PASS여도 '완료'로 자동 확정하지 않는다 — 사람이 [완료 처리]를 눌러야 끝난다.
