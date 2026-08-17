@@ -181,6 +181,34 @@
     </div>
   </section>
 
+  <!-- ⑦ 재편(2026-08-17): 두뇌(모델) 선택 — 자체 LLM(위) 외에 OpenAI 호환 API 축을 더한다.
+       사장님 시나리오: OpenAI로 시작 → 나중에 자체 LLM. 나만의 자료(RAG)는 로컬 임베딩이라 두뇌와 무관하게 유지. -->
+  <section class="card">
+    <h2>🔌 OpenAI 호환 두뇌 (선택) <span class="pill" id="cloudPill">확인 중</span></h2>
+    <div class="sub">자체 LLM 대신 <b>OpenAI 호환 API</b>로 답을 만들 수 있습니다. <b>나만의 자료(RAG)는 로컬 임베딩이라 어느 두뇌를 골라도 그대로 유지됩니다.</b></div>
+    <div class="where" id="brainBox">
+      <button class="wc" id="brainOnprem" type="button">
+        <div class="wc-h">🏢 사내 온프렘 (vLLM 등)</div>
+        <div class="wc-d">사내에 둔 OpenAI 호환 서버(vLLM·다른 GIJO). <b>키 없이 · 데이터 사내 유지</b> — 폐쇄망 OK.</div>
+      </button>
+      <button class="wc" id="brainOpenai" type="button">
+        <div class="wc-h">☁ 공개 OpenAI</div>
+        <div class="wc-d">공개 OpenAI API. 빠른 시작이지만 <b>질문이 외부로 나갑니다</b> — 바깥 연결 게이트를 지납니다.</div>
+      </button>
+    </div>
+    <div id="brainForm" style="margin-top:8px"></div>
+    <div class="where-note" id="brainNote"></div>
+  </section>
+
+  <!-- ⑧ 재편(2026-08-17): 바깥 연결 — 이 PC를 벗어나는 통로를 한 판에 모으고 on/off 상태 시각화.
+       흩어진 선택(두뇌·원격 GPU·법령)을 여기서 본다. 하드 봉인(완전 폐쇄망)은 배치·라이선스로 고정(이 화면 밖). -->
+  <section class="card">
+    <h2>🌐 바깥 연결 <span class="pill" id="egPill">확인 중</span></h2>
+    <div class="sub">이 PC를 벗어나 <b>바깥과 통하는 통로</b>를 한눈에 모읍니다. 켜면 어디로 / 끄면 사내 대체. <b>나만의 자료(RAG)·검색·임베딩은 로컬</b>이라 바깥과 무관합니다.</div>
+    <div id="egList">불러오는 중…</div>
+    <div class="warn">완전 폐쇄망(하드 봉인)은 <b>배치·라이선스 정책</b>으로 고정됩니다 — 이 화면 밖입니다(침해 admin이 못 풀게).</div>
+  </section>
+
   <section class="card">
     <h2>구동 등급</h2>
     <div class="sub">이 PC 사양에 맞는 등급입니다. 라이트는 <b>10GB급 · 문맥 8K</b>가 기준입니다.</div>
@@ -686,9 +714,93 @@
     });
   }
 
+  // ── ⑦ 두뇌(모델) 선택 — OpenAI 호환(custom=사내 온프렘 / openai=공개). ────────────────
+  var 두뇌상태 = { enabled: false, provider: "", baseUrl: "", model: "", hasKey: false };
+  async function 두뇌() {
+    var pill = document.getElementById("cloudPill");
+    var op = document.getElementById("brainOnprem"), pub = document.getElementById("brainOpenai");
+    if (!pill || !op || !pub) return;
+    try {
+      var c = await g.getCloudConfig();
+      두뇌상태 = { enabled: !!(c && c.enabled), provider: (c && (c.activeProvider || c.provider)) || "", baseUrl: (c && c.customBaseUrl) || "", model: (c && c.model) || "", hasKey: !!(c && (c.hasKey || c.hasApiKey)) };
+    } catch (e) { pill.textContent = "확인 못 함"; pill.className = "pill off"; }
+    var on = 두뇌상태.enabled && (두뇌상태.provider === "custom" || 두뇌상태.provider === "openai");
+    pill.textContent = on ? (두뇌상태.provider === "custom" ? "사내 온프렘" : "공개 OpenAI") : "안 씀(자체 LLM)";
+    pill.className = "pill " + (on ? "on" : "off");
+    op.classList.toggle("on", on && 두뇌상태.provider === "custom");
+    pub.classList.toggle("on", on && 두뇌상태.provider === "openai");
+    op.onclick = function () { 두뇌폼("custom"); };
+    pub.onclick = function () { 두뇌폼("openai"); };
+    if (on) 두뇌폼(두뇌상태.provider); else document.getElementById("brainForm").innerHTML = "";
+    document.getElementById("brainNote").innerHTML = on
+      ? '지금 <b>' + (두뇌상태.provider === "custom" ? "사내 온프렘" : "공개 OpenAI") + '</b> 두뇌를 씁니다. 자체 LLM으로 돌아가려면 아래 [끄기].'
+      : "";
+  }
+  function 두뇌폼(prov) {
+    var box = document.getElementById("brainForm");
+    var custom = prov === "custom";
+    box.innerHTML =
+      (custom
+        ? '<label style="font-size:11px;color:var(--muted)">서버 주소(OpenAI 호환)</label><input id="brBase" style="width:100%;margin:3px 0 8px" value="' + esc(두뇌상태.baseUrl) + '" placeholder="http://10.8.0.12:8080/v1">'
+        : '<label style="font-size:11px;color:var(--muted)">OpenAI API 키</label><input id="brKey" type="password" style="width:100%;margin:3px 0 8px" placeholder="' + (두뇌상태.hasKey ? "저장됨 — 바꾸려면 새로 입력" : "sk-...") + '">') +
+      '<label style="font-size:11px;color:var(--muted)">모델</label><input id="brModel" style="width:100%;margin:3px 0 8px" value="' + esc(두뇌상태.model || (custom ? "" : "gpt-4o-mini")) + '" placeholder="' + (custom ? "예: qwen2.5-7b-instruct" : "gpt-4o-mini") + '">' +
+      '<div style="display:flex;gap:8px"><button class="go" id="brSave" type="button">' + (custom ? "🏢" : "☁") + ' 연결</button>' +
+      (두뇌상태.enabled ? '<button id="brOff" type="button">끄기(자체 LLM으로)</button>' : "") + '</div>' +
+      '<div id="brMsg" style="margin-top:6px"></div>';
+    document.getElementById("brSave").addEventListener("click", function () { 두뇌저장(prov); });
+    var off = document.getElementById("brOff"); if (off) off.addEventListener("click", 두뇌끄기);
+  }
+  async function 두뇌저장(prov) {
+    var msg = document.getElementById("brMsg");
+    var patch = { enabled: true, activeProvider: prov, provider: prov };
+    if (prov === "custom") {
+      var url = (document.getElementById("brBase").value || "").trim();
+      if (!url) { msg.innerHTML = '<div class="err">서버 주소를 넣으세요.</div>'; return; }
+      patch.customBaseUrl = url;
+    } else {
+      var key = (document.getElementById("brKey").value || "").trim();
+      if (key) patch.apiKey = key; else if (!두뇌상태.hasKey) { msg.innerHTML = '<div class="err">API 키를 넣으세요.</div>'; return; }
+    }
+    var model = (document.getElementById("brModel").value || "").trim(); if (model) patch.model = model;
+    msg.innerHTML = '<div class="empty">저장 중…</div>';
+    try { await g.saveCloudConfig(patch); msg.innerHTML = '<div class="ok">연결했습니다 — 이제 이 두뇌가 답을 만듭니다.</div>'; 두뇌(); if (typeof 바깥연결 === "function") 바깥연결(); }
+    catch (e) { msg.innerHTML = '<div class="err">' + 오류문구(e, "두뇌 연결") + "</div>"; }
+  }
+  async function 두뇌끄기() {
+    try { await g.saveCloudConfig({ enabled: false }); 두뇌(); if (typeof 바깥연결 === "function") 바깥연결(); }
+    catch (e) { alert(오류문구(e, "두뇌 끄기")); }
+  }
+
+  // ── ⑧ 바깥 연결 — 이 PC를 벗어나는 통로를 한 판에 모아 on/off 시각화(조작은 각 카드). ──
+  async function 바깥연결() {
+    var box = document.getElementById("egList"); var pill = document.getElementById("egPill");
+    if (!box || !pill) return;
+    var law = { enabled: false };
+    try { law = await g.lawConfig(); } catch (e) { /* 못 읽으면 꺼짐으로 본다 */ }
+    var 두뇌켜짐 = 두뇌상태.enabled && (두뇌상태.provider === "custom" || 두뇌상태.provider === "openai");
+    var 통로 = [
+      { 이름: "🔌 OpenAI 호환 두뇌", on: 두뇌켜짐, 어디: 두뇌상태.provider === "openai" ? "공개 OpenAI" : "사내 온프렘", 대체: "자체 LLM(이 PC)", 외부: 두뇌상태.provider === "openai" },
+      { 이름: "🖧 원격 GPU (VPN)", on: !!(원격상태 && 원격상태.enabled), 어디: "VPN 안 사내·집 GPU", 대체: "이 PC GPU", 외부: false },
+      { 이름: "⚖ 법령·판례 조회", on: !!(law && law.enabled), 어디: "국가법령정보센터", 대체: "번들 규제 문서", 외부: true }
+    ];
+    var 켜진수 = 통로.filter(function (t) { return t.on; }).length;
+    var 외부켜짐 = 통로.some(function (t) { return t.on && t.외부; });
+    pill.textContent = 켜진수 ? "🌐 오픈망 " + 켜진수 : "🔒 폐쇄망";
+    pill.className = "pill " + (외부켜짐 ? "off" : "on");
+    box.innerHTML = 통로.map(function (t) {
+      var 색 = t.on ? (t.외부 ? "var(--amber)" : "var(--teal)") : "var(--muted-2)";
+      return '<div style="display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid var(--border)">' +
+        '<span style="flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:' + 색 + ';opacity:' + (t.on ? "1" : ".4") + '"></span>' +
+        '<span style="flex:0 0 168px;font-weight:700">' + esc(t.이름) + '</span>' +
+        '<span style="flex:1;font-size:11.5px;color:var(--muted)">' + (t.on ? "→ " + esc(t.어디) + (t.외부 ? " ⚠ 바깥으로" : " · 사내 유지") : "꺼짐 · 사내 대체: " + esc(t.대체)) + '</span>' +
+        '<span style="flex:0 0 auto;font-size:11px;color:' + (t.on ? "var(--text)" : "var(--muted-2)") + '">' + (t.on ? "켜짐" : "꺼짐") + '</span></div>';
+    }).join("") +
+      '<div class="note" style="margin-top:8px;font-size:11.5px;color:var(--muted-2)">켜기/끄기는 위 해당 카드(두뇌·원격 GPU·법령)에서 — 여기서는 <b>지금 무엇이 바깥과 통하나</b>를 한눈에 봅니다.</div>';
+  }
+
   function 시작() {
     엔진(); 등급(); 암호화(); 계정(); 이차인증(); 법령(); 업데이트(); 서버(); 원격GPU(); 어디서();
-    권장모델(); 토큰(); 토큰배선(); 모델폴더();
+    권장모델(); 토큰(); 토큰배선(); 모델폴더(); 두뇌(); 바깥연결();
     var rs = document.getElementById("rescan");
     if (rs) rs.addEventListener("click", function () {
       document.getElementById("dlMsg").innerHTML = '<div class="ok">다시 확인했습니다.</div>';

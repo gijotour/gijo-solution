@@ -134,6 +134,51 @@
       setInterval(갱신, 60000);
     })();
 
+    // ⑧ 바깥 연결 상태 칩(🔒 폐쇄망 / 🌐 오픈망 N) — 지금 무엇이 바깥과 통하나를 제목줄에서 한눈에.
+    //   누르면 ⚙ 설정(바깥 연결 패널). 왼쪽(브랜드 옆)에 둬서 우측 원격칩·smd와 자리 안 겹친다.
+    (function () {
+      if (!window.gijo) return;
+      function egRefresh() {
+        Promise.all([
+          window.gijo.getCloudConfig ? window.gijo.getCloudConfig().catch(function () { return null; }) : Promise.resolve(null),
+          window.gijo.remoteLlmWhere ? window.gijo.remoteLlmWhere().catch(function () { return null; }) : Promise.resolve(null),
+          window.gijo.lawConfig ? window.gijo.lawConfig().catch(function () { return null; }) : Promise.resolve(null)
+        ]).then(function (r) {
+          var cloud = r[0], remote = r[1], law = r[2];
+          var prov = cloud && (cloud.activeProvider || cloud.provider);
+          var 두뇌on = !!(cloud && cloud.enabled && (prov === "custom" || prov === "openai"));
+          var 외부 = (두뇌on && prov === "openai") || !!(law && law.enabled);
+          var n = (두뇌on ? 1 : 0) + (remote && remote.remote ? 1 : 0) + (law && law.enabled ? 1 : 0);
+          var bar = document.querySelector(".lite-titlebar");
+          var sub = bar && bar.querySelector(".e");
+          if (!bar || !sub) return;
+          var chip = document.getElementById("liteEgressChip");
+          if (!chip) {
+            chip = document.createElement("span");
+            chip.id = "liteEgressChip";
+            chip.style.cssText = "-webkit-app-region:no-drag;margin-left:10px;cursor:pointer;font-size:11px;font-weight:700;padding:2px 9px;border-radius:14px;";
+            chip.addEventListener("click", function () { try { (window.gijoOpenScreen ? window : window.parent).gijoOpenScreen("lite-settings"); } catch (e) { /* 셸 밖이면 조용히 */ } });
+            sub.parentNode.insertBefore(chip, sub.nextSibling);
+          }
+          if (n) {
+            chip.textContent = "🌐 오픈망 " + n;
+            chip.style.background = 외부 ? "rgba(240,160,32,.14)" : "rgba(30,185,128,.14)";
+            chip.style.border = "1px solid " + (외부 ? "rgba(240,160,32,.45)" : "rgba(30,185,128,.4)");
+            chip.style.color = 외부 ? "#f0a020" : "#1eb980";
+            chip.title = "지금 " + n + "개 통로가 바깥과 통합니다" + (외부 ? " (외부로 나가는 것 포함)" : " (사내 유지)") + " — 누르면 ⚙ 설정 › 바깥 연결.";
+          } else {
+            chip.textContent = "🔒 폐쇄망";
+            chip.style.background = "rgba(30,185,128,.12)";
+            chip.style.border = "1px solid rgba(30,185,128,.35)";
+            chip.style.color = "#1eb980";
+            chip.title = "바깥으로 나가는 통로가 없습니다 — 이 PC 안에서만 답합니다. 누르면 ⚙ 설정 › 바깥 연결.";
+          }
+        }).catch(function () { /* 못 읽은 회차는 다음 회차가 온다 */ });
+      }
+      egRefresh();
+      setInterval(egRefresh, 60000);
+    })();
+
     // 없으면 조용히 지나가지 않고 이유를 말한다 — 「눌러도 아무 일 없다」를 만들지 않는다.
     document.getElementById("smdBtn").addEventListener("click", async function () {
       if (!window.gijo || typeof window.gijo.openSmartMd !== "function") {
