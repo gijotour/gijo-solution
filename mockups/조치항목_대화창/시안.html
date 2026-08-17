@@ -1,0 +1,891 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 조치 항목 → 대화창 카드 시안</title>
+<!--
+  ════════════════════════════════════════════════════════════════════════
+  GIJO AS 시안 — 조치 대상 개별 항목을 누르면 대화창(콘솔)에서 이어 일한다
+  파일: mockups/조치항목_대화창/시안.html — 제품 코드는 읽기만 했고 고치지 않았다.
+  요청: 2026-08-17 사장님 1인칭 QA "리스트 중 하나를 누르면 대화창에 뜨고 거기서 계속
+        일을 할 수 있었으면" · "하단 팝업이 아니라". 범위 = 조치 대상 개별 항목부터
+        (5단계 화면 전체·메뉴 타일은 이번 밖).
+
+  ■ 이 시안만 예외적으로 "동작"한다 — 왜(정직 원칙과의 관계)
+    이 저장소의 최근 시안들(mockups/vuln-plain-line-extend 등)은 "정지 그림"이 원칙이다
+    (버튼을 눌러도 반응 없음 — 결정 자료지 시연이 아니라서). 이번은 요청 자체가
+    "실제로 눌러 볼 수 있게"다 — 판단 대상이 **인터랙션 그 자체**(항목 클릭 → 카드가 뜨는
+    느낌)라 정지 그림으로는 검증이 안 된다. 그래서:
+      · 왼쪽 목록 클릭 → 오른쪽 카드 생성/누적 → 선택 상태 갱신 → 결재판 열기/승인/취소는
+        **전부 진짜 DOM/JS**로 동작한다(가짜 데이터 위에서지만 로직은 실제로 돈다).
+      · 다만 "서버가 실제로 답한다"는 부분은 흉내다 — 흉내인 곳마다 "(시연)"이라고
+        박아 둔다(정직한 구현 원칙 — 동작하지 않는 것을 동작하는 척하지 않는다).
+
+  ■ 설계 전 조사 — 표준·모범사례(직접 WebFetch/WebSearch로 확인한 것만 인용, 출처는
+    본문 "근거" 표에 URL과 함께 있다):
+     · Microsoft 365 Copilot MCP 앱 UX 가이드(2026) — 인라인 카드는 대화 흐름 "안"에,
+       액션은 최대 2개, 내부 스크롤·탭 금지("widget-sized, not application-sized"),
+       모델 텍스트와 위젯 내용을 중복하지 않는다, 민감한 동작은 명시적 확인을 거친다.
+     · Nielsen Norman Group, AI 챗봇 10원칙 — "사용자는 챗봇이 명시하지 않으면 지금 보는
+       것을 안다고 가정하지 않는다"(지침3) · "제안은 텍스트가 아니라 누르는 버튼으로"(지침4).
+     · Slack Unfurling / Work Objects — "레코드를 공유하면 메시지 줄 안에 카드+동작 버튼이
+       뜬다"는 기업용 채팅 관용구, 10년 가까이 쓰인 선례(이번이 발명이 아니라는 근거).
+     · LangChain, Human-in-the-loop — 승인/수정후실행/거부/직접응답 4갈래 표준. 우리
+       결재판(console.js attachApproval)이 이미 앞 3가지를 충족 — 새로 안 만든다.
+     · Arize AI, "Memory and State in LLM Applications" — 대화 기억 압축 4갈래(단순삭제·
+       AI요약·상태접기(state folding)·RAG) 중 상태접기가 "요약보다 통제 가능"하다는 근거.
+       이 시안의 "지금 다루는 것" 상태 패널의 근거.
+     · VS Code Copilot Chat 공식 문서(암묵적 맥락) — 확인함. "맥락 치환이 대화 시간순서를
+       잃게 한다"는 지적은 win의 내부 조사 전달이며, 1차 출처 URL은 이 세션에서
+       재확인하지 못했다(정직하게 표시 — 아래 "왜 이 안인지" 절 참고).
+
+  ■ 3차례 코디네이터 지시 반영 기록(2026-08-18, 작업 도중 수신 — 최종 반영본이 아래 본문)
+    ① "대화 기억 예산(6턴·300자, 80자·1000자)을 지키는 안이어야 한다" →
+    ② (완화) "결재판이 이미 안전판이다 — 카드에 'AI가 아는 부분/모르는 부분'을 가르는
+       새 장치를 만들지 마라. 읽기 답엔 기존 근거배지(강함/약함/없음)만 써라." →
+    ③ "곱씹어 보니 상태접기(State Folding) 문헌이 답이다 — 선택을 이름표가 아니라
+       실제 필드값이 있는 '상태 패널'로 그려라. 단, 서버가 그 값을 지금 안 보낸다는
+       것도 표시해라."
+    아래 본문은 ①②③을 전부 반영한 최종본이다(②가 ①을 대체한 것이 아니라 ①의 우려를
+    "결재판+상태패널"이라는 이미 있는/이번에 넓히는 장치로 해소한 것 — 새 장치 0개).
+  ════════════════════════════════════════════════════════════════════════
+-->
+<style>
+/* ════════ 1) 실제 화면 색 토큰 — approvals.html/lawlookup.html :root 그대로 ════════ */
+:root{
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;}
+
+/* ════════ 2-A) approvals.html 실제 CSS 발췌(client/src/renderer/pages/approvals.html:130-247) —
+   목록·배지·상태필은 원문 그대로 복사(비교 신뢰성을 위해 다시 쓰지 않았다). ════════ */
+.rv-filt{display:flex;gap:5px;flex-wrap:wrap;margin-bottom:9px;}
+.fchip{font-size:12.25px;padding:5px 10px;border-radius:20px;background:var(--panel);border:1px solid var(--border-strong);color:var(--muted);cursor:pointer;user-select:none;}
+.fchip b{margin-left:3px;color:var(--text);font-weight:800;}
+.fchip.on{background:var(--blue);border-color:var(--blue);color:#fff;}.fchip.on b{color:#fff;}
+.rv-rows{max-height:100%;overflow-y:auto;}
+.rv-row{display:flex;align-items:center;gap:9px;padding:10px;border-radius:9px;cursor:pointer;border:1px solid transparent;margin-bottom:3px;}
+.rv-row:hover{background:var(--panel);}
+.rv-row.on{background:var(--panel);border-color:rgba(59,130,246,.4);}
+.rv-dot{width:8px;height:8px;border-radius:50%;flex:none;}
+.d-pending{background:var(--amber);}.d-in_progress{background:var(--blue);}.d-verifying{background:var(--purple);}.d-approved{background:var(--teal);}.d-rejected{background:var(--muted-2);}.d-over{background:var(--red);}
+.rv-rmain{flex:1;min-width:0;}
+.rv-rt{font-size:12.5px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.rv-rs{font-size:12px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sev{font-size:11.25px;font-weight:800;padding:1px 6px;border-radius:5px;flex:none;}
+.sev-critical,.sev-high{color:#f5928a;background:rgba(226,72,61,.14);}
+.sev-medium{color:var(--amber);background:rgba(240,160,32,.14);}
+.sev-low{color:var(--blue-light);background:rgba(59,130,246,.14);}
+.rv-empty{padding:40px 16px;text-align:center;color:var(--muted-2);font-size:12.5px;}
+.st{font-size:12px;font-weight:800;padding:2px 9px;border-radius:20px;}
+.st-pending{color:var(--amber);background:rgba(240,160,32,.15);}
+.st-in_progress{color:var(--blue-light);background:rgba(59,130,246,.15);}
+.st-verifying{color:var(--purple);background:rgba(139,124,240,.16);}
+.st-approved{color:var(--teal);background:rgba(30,185,128,.14);}
+.st-rejected{color:var(--muted);background:rgba(255,255,255,.06);}
+.rv-kev{color:#f5928a;background:rgba(226,72,61,.18);font-size:11.75px;font-weight:800;padding:2px 8px;border-radius:6px;}
+.dt-over{color:#f5928a;background:rgba(226,72,61,.18);font-size:11.75px;font-weight:800;padding:2px 8px;border-radius:6px;}
+/* 취약점 한글 한 줄(전-7③) — vulnscan.html .vd-plain / approvals.html .dt-plain과 **글자 하나 안 다른 값** */
+.dt-plain{font-size:12.5px;line-height:1.6;color:var(--muted);margin:4px 0 12px;}
+.dt-plain b{color:var(--text);font-weight:700;}
+
+/* ════════ 2-B) console.js 실제 CSS 발췌(client/src/renderer/pages/console.js:30-223) —
+   콘솔 크롬(머리·칩·본문·결재판·해석줄·타이핑)은 원문 그대로 복사. ════════ */
+.cs-head{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:7px 14px;font-size:12.25px;color:var(--muted);border-bottom:1px solid rgba(255,255,255,.05);}
+.cs-ctx{background:rgba(59,130,246,.14);border:1px solid rgba(59,130,246,.4);color:var(--blue-light);border-radius:14px;padding:2px 10px;font-weight:800;white-space:nowrap;}
+.cs-hint{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;}
+.cs-btn{flex:0 0 auto;font-size:12.25px;font-weight:700;color:var(--muted);background:transparent;border:1px solid rgba(255,255,255,.1);border-radius:7px;padding:3px 9px;cursor:pointer;white-space:nowrap;}
+.cs-body{flex:1 1 auto;min-height:0;overflow-y:auto;padding:8px 14px;display:flex;flex-direction:column;}
+.cs-body>*:first-child{margin-top:auto;}
+.cs-empty{color:var(--muted-2);font-size:12px;padding:10px 0;}
+.cs-row{display:flex;gap:9px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.03);flex-wrap:wrap;}
+.cs-row .ci{flex:0 0 auto;width:22px;height:22px;border-radius:50%;background:rgba(59,130,246,.16);display:flex;align-items:center;justify-content:center;font-size:12.25px;}
+.cs-row.instr .ci{background:rgba(30,185,128,.16);}
+.cs-row .cb{flex:1;min-width:0;}
+.cs-row .cn{font-size:12px;font-weight:800;color:var(--muted);margin-bottom:2px;}
+.cs-row .cn .ct{font-weight:500;color:var(--muted-2);margin-left:6px;}
+.cs-row .cm{font-size:12.5px;color:var(--text);word-break:break-word;line-height:1.62;}
+.cs-parse{font-size:11px;color:var(--muted-2);margin-bottom:3px;flex:1 1 100%;}
+.cs-div{display:flex;align-items:center;gap:8px;color:var(--muted-2);font-size:11px;margin:2px 0;flex:1 1 100%;}
+.cs-div::before,.cs-div::after{content:'';flex:1;border-top:1px solid var(--border);}
+.cs-typing span{display:inline-block;width:5px;height:5px;margin-right:3px;border-radius:50%;background:var(--muted);animation:csb 1s infinite;}
+.cs-typing span:nth-child(2){animation-delay:.15s}.cs-typing span:nth-child(3){animation-delay:.3s}
+@keyframes csb{0%,60%,100%{opacity:.25}30%{opacity:1}}
+.cs-dock{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:9px 14px 12px;}
+.cs-dock input{flex:1;background:var(--panel);border:1px solid var(--border-strong);border-radius:11px;color:var(--text);font-size:13px;padding:11px 14px;outline:none;font-family:inherit;}
+.cs-dock input:focus{border-color:var(--blue);}
+.cs-plus{flex:0 0 auto;width:38px;height:38px;border-radius:11px;background:var(--panel);color:var(--muted);border:1px solid var(--border-strong);font-size:17px;line-height:1;cursor:pointer;}
+.cs-send{background:var(--blue);color:#fff;border:none;border-radius:11px;font-size:12.5px;font-weight:800;padding:11px 18px;cursor:pointer;}
+/* 실행 승인(결재판) — console.js:472-501 attachApproval과 완전히 같은 값 */
+.cs-ap{margin-top:8px;border:1px solid rgba(240,160,32,.35);background:rgba(240,160,32,.06);border-radius:9px;padding:9px 11px;flex:1 1 100%;}
+.cs-aph{font-size:12px;font-weight:800;color:var(--amber);margin-bottom:3px;}
+.cs-apsub{font-size:12.25px;color:var(--muted);margin-bottom:8px;}
+.cs-apf{display:flex;align-items:center;gap:8px;margin-bottom:5px;}
+.cs-apk{flex:0 0 96px;font-size:12.25px;color:var(--muted-2);}
+.cs-apin{flex:1;min-width:0;background:var(--panel-2);border:1px solid rgba(255,255,255,.16);border-radius:7px;padding:5px 9px;color:var(--text);font-size:12px;font-family:inherit;outline:none;}
+.cs-apin.need{border-color:rgba(226,72,61,.55);}
+.cs-ape{font-size:12.25px;color:var(--muted);margin-top:7px;line-height:1.6;}
+.cs-apb{display:flex;gap:6px;margin-top:9px;}
+.cs-apgo{font-size:12.5px;font-weight:800;color:#fff;background:var(--teal);border:none;border-radius:7px;padding:6px 12px;cursor:pointer;font-family:inherit;}
+.cs-apgo:disabled{background:rgba(255,255,255,.10);color:var(--muted-2);cursor:default;}
+.cs-apno{font-size:12.5px;font-weight:700;color:var(--muted);background:none;border:1px solid rgba(255,255,255,.14);border-radius:7px;padding:6px 12px;cursor:pointer;font-family:inherit;}
+.cs-apd{font-size:12px;color:var(--muted);flex:1 1 100%;}
+
+/* ════════ 2-C) chatparts.js 실제 CSS 발췌(근거 배지 3상태, chatparts.js:56-58,99-118) —
+   읽기형 답에 그대로 재사용한다(코디네이터 지시 ② — 새 배지를 만들지 않는다). ════════ */
+.gcp-src{margin-top:6px;font-size:11.5px;font-weight:700;color:#6fdcb5;flex:1 1 100%;}
+.gcp-src2{margin-top:6px;font-size:11.5px;font-weight:700;color:#ffd88a;flex:1 1 100%;}
+
+/* ════════ 3) 이번 시안에서 새로 제안하는 것 — 접두 itc-(item card) ════════
+   ⚠ 실제 구현 시 클래스 이름은 메인 에이전트가 console.js 관례(cs-*)에 맞춰 다시 지어도 된다 —
+   여기서 중요한 것은 이름이 아니라 구조와 크기다. */
+
+/* 3-A) 상태 패널("지금 다루는 것") — 코디네이터 지시③ State Folding 반영.
+   .cs-sel(이름표 칩)을 대신하는 것이 아니라 **넓히는** 것 — 실제 필드값이 보인다. */
+.itc-state{flex:0 0 auto;padding:8px 14px;border-bottom:1px solid var(--border);background:rgba(59,130,246,.05);}
+.itc-empty{font-size:12px;color:var(--muted-2);}
+.itc-row{display:flex;align-items:center;gap:8px;margin-bottom:5px;}
+.itc-tag{font-size:11.5px;font-weight:800;color:var(--blue-light);}
+.itc-x{margin-left:auto;cursor:pointer;color:var(--muted-2);font-size:12px;padding:1px 6px;border-radius:5px;}
+.itc-x:hover{color:#f5928a;background:rgba(226,72,61,.12);}
+.itc-fields{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:11.75px;margin-bottom:5px;}
+.itc-f{color:var(--text);}
+.itc-f b{color:#fff;}
+.itc-sep{color:var(--muted-2);}
+.itc-cap{font-size:11px;color:var(--muted-2);line-height:1.6;}
+.itc-budget{font-weight:800;color:var(--teal);}
+
+/* 3-B) 카드 — 목록 항목을 누르면 대화 줄(.cs-row) 안에 이 카드가 실린다 */
+.itc-card{border:1px solid rgba(255,255,255,.16);border-radius:10px;padding:10px 12px;background:var(--panel);flex:1 1 100%;}
+.itc-card.on{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue);}
+.itc-card.pulse{animation:itcpulse .5s ease;}
+@keyframes itcpulse{0%{box-shadow:0 0 0 1px var(--blue);}50%{box-shadow:0 0 0 3px var(--blue-light);}100%{box-shadow:0 0 0 1px var(--blue);}}
+.itc-top{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:6px;}
+.itc-title{font-size:13px;font-weight:800;color:#fff;line-height:1.4;margin-bottom:3px;}
+.itc-asset{font-size:11.75px;color:var(--purple);line-height:1.4;margin-bottom:6px;}
+.itc-evid{font-size:11.5px;line-height:1.5;font-family:Consolas,"D2Coding",monospace;color:var(--muted-2);background:var(--panel-2);border:1px solid var(--border);border-radius:7px;padding:6px 8px;margin-bottom:4px;word-break:break-all;}
+.itc-evid.clamp2{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;}
+.itc-more{display:inline-block;font-size:11.5px;font-weight:700;color:var(--blue-light);cursor:pointer;margin-bottom:8px;}
+.itc-meta{font-size:11.5px;color:var(--muted-2);margin-bottom:8px;}
+.itc-meta .need{color:#f5928a;font-weight:700;}
+.itc-label{font-size:11.5px;color:var(--muted-2);font-weight:700;margin-bottom:5px;}
+.itc-chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px;}
+.itc-chip{font-size:12px;border:1px solid rgba(59,130,246,.35);background:rgba(59,130,246,.10);color:#cfe0ff;border-radius:14px;padding:5px 10px;cursor:pointer;font-family:inherit;}
+.itc-chip:hover{background:rgba(59,130,246,.2);}
+.itc-open{font-size:11.75px;font-weight:700;color:var(--blue-light);cursor:pointer;padding-top:8px;border-top:1px solid rgba(255,255,255,.08);}
+
+/* ════════ 4) 데모 셸(실제 앱 축소 재현) ════════ */
+.demo-shell{max-width:1400px;margin:0 auto 14px;border:1px solid var(--border-strong);border-radius:14px;overflow:hidden;display:flex;height:700px;box-shadow:0 12px 34px rgba(0,0,0,.35);}
+.demo-side{flex:0 0 232px;background:#1f1e1d;border-right:1px solid var(--border);padding:14px 10px;}
+.demo-brand{font-size:12.5px;font-weight:800;color:#fff;padding:4px 8px 12px;}
+.demo-nav{font-size:12.75px;font-weight:700;color:var(--muted);padding:9px 10px;border-radius:8px;margin-bottom:2px;}
+.demo-nav.on{background:rgba(59,130,246,.14);color:#fff;box-shadow:inset 3px 0 0 var(--blue);}
+.demo-main{flex:1 1 auto;min-width:0;display:flex;flex-direction:column;padding:14px 16px;background:var(--bg);}
+.demo-scr-id{font-size:12.25px;color:var(--muted);margin-bottom:10px;line-height:1.6;}
+.demo-scr-id b{color:var(--text);font-weight:800;}
+.demo-list-pane{flex:1;min-height:0;background:var(--panel-2);border:1px solid var(--border);border-radius:12px;padding:10px;display:flex;flex-direction:column;}
+.demo-console{flex:0 0 380px;border-left:1px solid var(--border);background:var(--panel-2);display:flex;flex-direction:column;min-width:0;}
+.demo-try{font-size:11.75px;color:var(--blue-light);text-align:center;margin:0 auto 8px;font-weight:700;}
+
+/* ════════ 5) 이 문서(설명) 전용 CSS — 실제 제품엔 없다. vuln-plain-line-extend 시안과 같은 틀 ════════ */
+.docwrap{max-width:1180px;margin:0 auto;padding:26px 30px 40px;}
+h1{font-size:20px;font-weight:800;color:#fff;margin-bottom:6px;}
+.lead{font-size:12.5px;color:var(--muted);max-width:1020px;line-height:1.75;margin-bottom:16px;}
+.summary-box{border:1px solid var(--blue);background:rgba(59,130,246,.08);border-radius:10px;padding:14px 18px;margin-bottom:16px;font-size:12.75px;line-height:1.8;}
+.summary-box b{color:#fff;}
+.summary-box ol{margin-left:18px;margin-top:4px;}
+.banner{border:1px solid rgba(240,160,32,.5);background:rgba(240,160,32,.08);color:#f0c060;border-radius:8px;padding:11px 15px;font-size:12.25px;margin-bottom:22px;line-height:1.7;}
+.banner b{color:#fff;}
+h2{font-size:14.5px;font-weight:800;color:#fff;margin:32px 0 9px;padding-bottom:7px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+h2 .n{color:var(--blue-light);font-size:11px;font-weight:700;letter-spacing:.4px;border:1px solid var(--blue-light);border-radius:4px;padding:2px 7px;}
+h3{font-size:13px;font-weight:800;color:#fff;margin:16px 0 8px;}
+.note{font-size:12.25px;color:var(--muted);line-height:1.75;margin-bottom:10px;max-width:1040px;}
+.note b.hi{color:var(--text);}
+.note b.bad{color:#f5928a;}
+.note b.ok{color:var(--teal);}
+table.t{width:100%;border-collapse:collapse;font-size:12.15px;margin:8px 0 6px;}
+table.t th{text-align:left;color:var(--muted-2);font-weight:700;padding:6px 9px;border-bottom:1px solid var(--border);white-space:nowrap;}
+table.t td{padding:7px 9px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:top;}
+table.t tr:last-child td{border-bottom:none;}
+code{background:var(--panel-2);border-radius:4px;padding:1px 6px;font-size:11.5px;color:#dfe6ff;}
+.meas{font-size:12.25px;color:var(--muted-2);margin-top:8px;line-height:1.7;}
+.meas b{color:var(--teal);}
+.chk-table td:first-child{width:220px;color:var(--text);font-weight:600;}
+.chk-ok{color:var(--teal);font-weight:800;}
+.chk-warn{color:var(--amber);font-weight:800;}
+.qbox{border-left:3px solid rgba(59,130,246,.45);background:rgba(59,130,246,.05);padding:8px 12px;border-radius:0 8px 8px 0;margin:8px 0;font-size:12.25px;line-height:1.7;color:#cdd4e6;}
+footer.docfoot{margin-top:40px;padding-top:14px;border-top:1px solid var(--border);font-size:11.5px;color:var(--muted-2);}
+</style>
+</head>
+<body>
+
+<div class="docwrap">
+<h1>조치 대상 항목을 누르면 대화창에서 이어 일한다 — 시안</h1>
+<p class="lead">
+  사장님 지시(2026-08-17 1인칭 QA): "법률판례처럼 백데이터가 나오면 대화창으로 바로 띄워줄 수 있을까? 조치 대상을 리스트 중
+  하나를 누르면 대화창에 뜨고 거기서 계속 일을 할 수 있었으면" · "하단 팝업이 아니라". 본보기는 <code>lawlookup.html</code>(고르면
+  대화창이 원문과 링크로 답한다) — 대상은 <code>fix.html</code> → <code>approvals.html</code>의 조치 목록(<code>.rv-row</code>).
+  범위는 <b>조치 대상 개별 항목부터</b>(5단계 화면 전체·메뉴 타일은 이번 밖).
+</p>
+
+<div class="summary-box">
+  <b>핵심 결정 3줄</b>
+  <ol>
+    <li>우측 상세 패널(<code>.rv-detail</code>, 최소 520px)을 없애고 그 정보를 <b>콘솔 카드</b>로 옮긴다 — 목록은 넓어지고, 상세는 대화 안에서 이어 다룬다.</li>
+    <li>카드는 <b>쌓인다</b>(대화 기록처럼 append) — 그러나 「이거」(상태 패널·목록 강조·최신 카드 테두리 셋)는 항상 <b>가장 최근 것 하나</b>만 가리킨다.</li>
+    <li>이어서 할 일은 카드 안 <b>제안 칩 → 기존 결재판</b>으로만 나간다 — 새 입력칸도, 결재판을 대신할 새 승인 장치도 만들지 않는다.</li>
+  </ol>
+</div>
+
+<div class="banner">
+  ⚠ <b>정직 고지</b> — 아래 실습 영역은 <b>진짜로 동작한다</b>(가짜 데이터 6건, DOM/JS 전부 실행). 다만 "서버가 답했다"처럼 보이는
+  자리는 전부 <b>흉내</b>이고 그 자리마다 "(시연)"이라고 적었다 — 실제로는 <code>console.js</code>의 <code>sendInstruction</code>이
+  서버(<code>routes.ts</code>·<code>dispatcher.ts</code>)를 거쳐 답한다. 결재판 모양(<code>.cs-ap</code>)은 <code>console.js:472-501</code>
+  원문 그대로다.
+</div>
+
+<h2><span class="n">근거</span>설계 전 조사 — 표준·모범사례(직접 확인)</h2>
+<table class="t">
+  <tr><th style="width:250px">출처</th><th style="width:380px">확인한 내용</th><th>이 시안에 반영</th></tr>
+  <tr>
+    <td>Microsoft 365 Copilot — MCP 앱 UX 가이드<br><span style="color:var(--muted-2)">learn.microsoft.com/.../plugin-mcp-apps-ui-guidelines<br>(WebFetch 직접 확인, 2026)</span></td>
+    <td>원문 인용: <i>"Inline widgets appear directly within the chat flow, allowing users to view information and take action without leaving the conversation."</i> ·
+    <i>"Actions: Limit to two actions, placed at bottom of card."</i> · <i>"Avoid large, scroll-heavy layouts... Height should feel widget-sized, not application-sized."</i> ·
+    <i>"Don't duplicate content in model text and widget."</i></td>
+    <td>카드는 대화 줄 <b>안</b>에, 주 액션 <b>최대 2개</b> + 「자세히 보기」는 버튼이 아니라 하단 링크로 격을 낮춤, 증거 원문은 2줄 클램프(내부 스크롤·탭 없음), 카드 내용과 AI 말은 겹치지 않게(해석 한 줄만 덧붙임).</td>
+  </tr>
+  <tr>
+    <td>같은 문서 — 인간 통제 절</td>
+    <td>원문 인용: <i>"Preserve human control... Explicit confirmations for sensitive operations."</i></td>
+    <td>카드의 모든 「이어서 할 것」 칩은 곧장 실행하지 않고 <b>결재판</b>을 연다(원칙2 그대로).</td>
+  </tr>
+  <tr>
+    <td>Nielsen Norman Group — AI 챗봇 10원칙<br><span style="color:var(--muted-2)">nngroup.com/articles/ai-chatbots-design-guidelines/<br>(WebFetch 직접 확인)</span></td>
+    <td>지침3 원문: <i>"Users won't assume a chatbot knows what they're looking at unless the chatbot makes it explicit to them."</i> ·
+    지침4 원문: <i>"...present them as clickable buttons, rather than text."</i></td>
+    <td>「지금 다루는 것」 상태 패널로 <b>명시</b>(추측하게 두지 않음) · 이어서 할 것은 전부 <b>누르는 칩</b>(새 입력칸 없음).</td>
+  </tr>
+  <tr>
+    <td>Slack Unfurling links / Work Objects<br><span style="color:var(--muted-2)">docs.slack.dev/messaging/unfurling-links-in-messages<br>slack.dev/unfurl-the-future-with-work-objects</span></td>
+    <td>레코드를 공유/클릭하면 메시지 줄 <b>안</b>에 카드+동작 버튼이 뜨는 패턴 — 기업용 채팅에서 10년 가까이 쓰인 관용구.</td>
+    <td>"항목 클릭 → 대화 줄에 카드"가 이 제품의 발명이 아니라 <b>업계 표준 관용구의 적용</b>이라는 근거.</td>
+  </tr>
+  <tr>
+    <td>LangChain — Human-in-the-loop<br><span style="color:var(--muted-2)">docs.langchain.com/oss/python/langchain/human-in-the-loop<br>(WebSearch 확인)</span></td>
+    <td>승인(approve) / 수정 후 실행(edit) / 거부(reject) / 직접 응답(respond) 4갈래 표준. "승인·거부만 있는 시스템은 설계 공간의 2/3를 놓친 것"이라는 지적.</td>
+    <td>우리 결재판(<code>console.js:472-501 attachApproval</code>)은 이미 <b>승인·수정(필드 직접 고치기)·거부(취소)</b> 3가지를 갖췄다 — <b>새로 설계하지 않고 그대로</b> 재사용. "직접 응답"은 자유 입력창이 그 역할.</td>
+  </tr>
+  <tr>
+    <td>Arize AI — Memory and State in LLM Applications<br><span style="color:var(--muted-2)">arize.com/blog/memory-and-state-in-llm-applications<br>(WebSearch 확인)</span></td>
+    <td>대화 기억 압축 4갈래: 단순삭제(truncation) · AI요약(summarization) · <b>상태접기(state folding/scratchpad)</b> · RAG. 원문 인용:
+    <i>"[state folding] is far more controllable than summaries, because the LLM can be instructed carefully as of what it's critical to remember."</i></td>
+    <td>「지금 다루는 것」 상태 패널의 직접 근거 — 아래 "대화 기억 예산" 절에서 우리 코드와 대조.</td>
+  </tr>
+  <tr>
+    <td>VS Code Copilot Chat 공식 문서(암묵적 맥락)<br><span style="color:var(--muted-2)">code.visualstudio.com/docs/chat/copilot-chat-context<br>(WebSearch 확인)</span></td>
+    <td>활성 파일·선택 영역을 <b>암묵적으로</b> 대화에 얹는 방식(우리 <code>.cs-sel</code> 칩과 같은 계열). "맥락 치환이 대화의 시간 순서를 잃게 한다"는 비판은 <b>win의 내부 조사 전달</b>이며 1차 출처 URL은 이번 세션에서 재확인하지 못했다 — <b>정직하게 미확인으로 표시</b>한다.</td>
+    <td>아래 "왜 이 안인지"에서 Cursor식(입력칸에 채움) vs VS Code식(맥락으로 붙임) 중 <b>무엇을 골랐는지와 왜</b>를 밝힌다.</td>
+  </tr>
+</table>
+</div>
+
+<!-- ═══════════════════════════ 실습 영역 ═══════════════════════════ -->
+<p class="demo-try">↓ 여기서 직접 눌러 보세요 — 왼쪽 목록 항목을 클릭하면 오른쪽 대화창에 카드가 들어옵니다. 카드 안 칩도 눌러 보세요.</p>
+<div class="demo-shell">
+  <div class="demo-side">
+    <div class="demo-brand">GIJO AS</div>
+    <div class="demo-nav">대시보드</div>
+    <div class="demo-nav on">조치</div>
+    <div class="demo-nav">취약점</div>
+    <div class="demo-nav">위협 인텔</div>
+    <div class="demo-nav">자산 목록</div>
+    <div class="demo-nav">법령·판례</div>
+    <div class="demo-nav">보고서</div>
+    <div class="demo-nav">설정</div>
+  </div>
+  <div class="demo-main">
+    <div class="demo-scr-id"><b>조치</b> — 승인·점검·명령 현황을 한 줄로 보고, 누르면 대화창에서 이어 다룹니다.
+      <span style="color:var(--muted-2)">(실제 화면엔 정체성 한 줄만 — 사용법은 ⓘ/screenguide로. 이 줄은 시안 설명용으로 살짝 늘렸다.)</span></div>
+    <div class="rv-filt" id="rvFilt">
+      <span class="fchip on" data-f="active">조치대상 <b>0</b></span>
+      <span class="fchip" data-f="verifying">검증 <b>0</b></span>
+      <span class="fchip" data-f="rejected">반려 <b>0</b></span>
+      <span class="fchip" data-f="approved">완료 <b>0</b></span>
+      <span class="fchip" data-f="all">전체 <b>0</b></span>
+    </div>
+    <div class="demo-list-pane">
+      <div class="rv-rows" id="rvList"></div>
+    </div>
+  </div>
+  <div class="demo-console">
+    <div class="cs-head">
+      <span class="cs-ctx">조치</span>
+      <span class="cs-hint" id="csHint">보고 있는 화면 기준으로 지시합니다</span>
+      <button class="cs-btn" type="button" title="시안 데모 — 실제로는 대화를 별도 창으로 뺍니다">⧉ 창으로</button>
+    </div>
+    <div class="itc-state" id="itcState"></div>
+    <div class="cs-body" id="csBody"><div class="cs-empty">왼쪽 목록에서 항목을 누르면 여기 카드로 들어옵니다. 위 「무엇을 할 수 있나」류 서랍은 이 시안 범위 밖이라 생략했습니다.</div></div>
+    <div class="cs-dock">
+      <button class="cs-plus" type="button" title="시안 데모 — 실제 파일 올리기는 이 자리 그대로">＋</button>
+      <input id="chatInput" placeholder="지시를 입력하세요… (예: 이거 반려해줘)" aria-label="지시를 입력하세요">
+      <button class="cs-send" id="dockSend" type="button">전송</button>
+    </div>
+  </div>
+</div>
+
+<div class="docwrap">
+
+<h2><span class="n">경로</span>이 값이 실제로 어떻게 오가는가</h2>
+<p class="note">
+  다리는 <b class="hi">이미 있다</b> — <code>gijo:select</code> postMessage → <code>window.gijoConsole.select()</code>(<code>console.js:501,971-978</code>).
+  <code>vulnscan.html:396</code>·<code>dashboard.html:590</code>가 이미 쓰고 있고, <b class="bad">approvals.html은 이번에 grep으로 다시 확인했지만 0건</b> —
+  이 화면엔 아직 호출이 없다. 그래서 이 카드 기능은 approvals.html에 <b>처음</b> 붙는 것이다.
+</p>
+<table class="t">
+  <tr><th style="width:230px">항목</th><th style="width:330px">지금(코드로 확인)</th><th>이 시안</th></tr>
+  <tr><td>approvals.html의 <code>gijo:select</code> 호출</td><td>0건(이번 세션 grep 확인)</td><td>항목 클릭 시 1건 신규 — <code>선택알림()</code> 같은 함수 추가 필요(구현 몫)</td></tr>
+  <tr><td>서버로 가는 <code>selection</code> 문자열 상한</td><td><b class="hi">200자</b> — <code>routes.ts:1533-1537</code>·<code>1631-1633</code> <code>.replace(/\s+/g," ").trim().slice(0,200)</code>(이번 세션 직접 확인)</td><td>그대로 둔다 — 아래 상태줄 실측 최장 예시 약 136자, 캡에 안 걸림</td></tr>
+  <tr><td><code>preload.ts:206</code> <code>sendInstruction(text, sessionId, screen, progressId, selection)</code></td><td><code>selection?: string</code> — 문자열 하나</td><td><b class="ok">인터페이스 안 바꿔도 된다</b> — 지금도 문자열이고, 이 시안도 문자열 하나(구조화 한 줄)를 보낸다</td></tr>
+  <tr><td>console.js <code>select()</code>가 받는 값</td><td><code>{label, text}</code>뿐</td><td><code>{label, text, fields}</code> — <code>fields</code>는 <b>화면 렌더링 전용</b>(콘솔 헤더의 상태 패널을 예쁘게 그리는 데만 쓰고 HTTP로 <b>안 나간다</b>) — 서버 계약 변경 0</td></tr>
+</table>
+
+<h2><span class="n">기억</span>대화 기억 예산과 이 시안 — 세 번째 지시 반영</h2>
+<p class="note">
+  코드로 확인한 사실(추측 아님): <code>server/src/engine/worksessions.ts:311</code> <code>recentTurnsText()</code>는
+  <b>최근 6턴</b>만 싣되 <b>턴당 300자</b>로 자른다(315행 <code>.slice(0,300)</code>). 그 이전은 <b>사용자 턴만</b> 최대 12건·
+  <b>턴당 80자</b>·전체 <b>1,000자</b> 요지로 압축한다(325-334행) — AI 요약은 코드 주석 자체가 "지어냄이 섞일 수 있고,
+  요약 오류가 이후 모든 턴에 주입되는 위치라 위험이 배가된다"며 <b>일부러</b> 안 쓴다. 문헌(Arize AI, 위 근거표)의
+  "요약은 LLM이 무엇을 남길지 스스로 판단해야 해서 신뢰하기 어렵다"는 지적과 <b class="hi">우리 코드의 판단이 일치한다.</b>
+</p>
+<div class="qbox">
+  이 예산이 실제 위험이 되는 지점은 <b>쓰기(상태를 바꾸는) 지시</b>가 아니다 — 그건 이미 <b>결재판</b>이 막는다.
+  <code>attachApproval</code>은 "아래 내용대로 실행합니다. 값을 확인·수정한 뒤 승인하세요"라며 AI가 채운 값을 <b>필드로 펼쳐 보여주고</b>,
+  담당자가 그 자리에서 고치거나 취소할 수 있다. 필수 항목이 비면 승인 버튼이 막히고 "N개 입력 필요"로 센다
+  (<code>f.source==="empty"</code>면 <code>need</code> 표시로 <b>AI가 못 채운 자리를 스스로 드러낸다</b>). 카드 내용이 6턴 뒤
+  희미해져 AI가 잘못 짚었더라도, <b>실행 순간</b>에 그 값이 결재판에 드러나 고쳐지거나 취소된다 — 그래서 이 시안은
+  카드에 "AI가 아는 부분/모르는 부분"을 가르는 <b class="bad">새 장치를 만들지 않는다</b>(같은 일을 하는 자리가 둘이면 어긋난다는
+  이 저장소의 반복 원칙과 정면충돌하기 때문).
+</div>
+<p class="note">그래서 남는 진짜 문제는 <b>"쓰기 지시가 아닌 이어지는 대화"</b>(예: 카드를 본 지 5턴쯤 지나 "이거 왜 급해?")뿐이고, 세 갈래로 답한다:</p>
+<table class="t">
+  <tr><th style="width:260px">상황</th><th>이 시안의 답</th></tr>
+  <tr><td>핀이 <b>붙어 있는 동안</b> 이어지는 지시</td><td>상태 패널의 값(자산·제목·심각도·상태·담당·한글 한 줄)이 <b>매 요청마다 새로 실린다</b>(<code>선택인자</code>는 <code>work_session_turns</code>에 쓰는 "턴"이 아니라 <code>sendInstruction</code>의 별도 매개변수 — 6턴·300자·80자 감쇠 대상이 아니다). 화면의 상태 패널 캡션에 <b>지금 실려가는 글자 수</b>를 실측으로 보여준다(아래 실습에서 항목을 눌러 확인 가능).</td></tr>
+  <tr><td>핀이 <b>풀린 뒤</b>(다른 항목 클릭·✕·화면 이동) 그 항목을 다시 언급</td><td>더는 자동으로 안 실린다 — <b>정직하게 그렇다고 둔다.</b> 카드는 화면(사람이 읽는 것)에 그대로 남지만, 그건 브라우저 DOM일 뿐 서버 기억과 별개다. 다시 다루려면 다시 누르면 된다(비용 0 — 목록에 항상 있다).</td></tr>
+  <tr><td>여러 건을 연달아 고를 때 카드가 쌓이나 갈아치우나</td><td><b>화면 정리 문제</b>로 다룬다(코디네이터 지시② — "AI가 모를 위험"으로 안 다룸) — 아래 "설계 질문" Q2에서 답한다.</td></tr>
+</table>
+<p class="meas">
+  ⚠ <b>서버 예산 변경 필요 여부 — 없음.</b> 이 시안은 지금 값(6턴/300자, 12건/80자/1,000자, <code>selection</code> 200자)을
+  <b>그대로 둔 채</b> 성립한다. 상태 패널 문자열(<code>selectionText()</code>)의 실측 최장 예시(항목1, 자산+제목+CVE+심각도+상태+담당+한글 한 줄)는
+  약 <b>136자</b> — 200자 상한에 여유가 있다. 다만 <b class="bad">approvals.html이 <code>gijo:select</code>를 아직 안 부른다</b>는
+  것은 이 시안이 요구하는 "구현 필요" 항목이다(서버 예산과 무관 — 화면 쪽 호출 추가일 뿐).
+</p>
+<p class="note">
+  6턴이 지나면 카드가 화면에서 어떻게 보이나 — <b>그대로 남는다.</b> 접거나 흐리게 만들지 않는다. 화면(사람이 읽는 것)과
+  모델 기억(AI가 아는 것)은 다른 자원인데, 후자가 줄었다고 전자를 지우면 "방금 봤던 게 사라졌다"는 <b>새 혼란</b>이 생긴다.
+  대신 <b>핀이 풀렸다는 사실</b>은 상태 패널 하나만 보면 안다(비어 있거나 다른 항목으로 바뀌어 있다) — "지금 AI가 붙들고 있는 게
+  이거 맞나"를 확인할 자리를 하나로 유지한다(같은 값을 두 곳에 적지 않는다).
+</p>
+
+<h2><span class="n">문답</span>설계 질문 5개 — 답</h2>
+<table class="t">
+  <tr><th style="width:270px">질문</th><th>답</th></tr>
+  <tr><td>항목을 누르면 대화창에 <b>무엇이</b> 오나</td>
+    <td>카드 1장 — 상태·심각도·KEV/지연 배지, 제목, 자산명, 한글 한 줄(<code>.dt-plain</code> 그대로 재사용), 증거 원문(2줄 클램프+더보기),
+    담당자·기한(읽기전용), 상태별 「이어서 할 것」 칩 최대 2개(MS Copilot 가이드 "액션 2개 제한"), 「목록에서 자세히 보기」 링크.
+    반려사유 이력·검증 실행 로그·배정 입력폼 <b>전체</b>는 안 온다 — 카드는 요약, 전체는 화면.</td></tr>
+  <tr><td>여러 건 연달아 누르면 <b>쌓이나 갈아치우나</b></td>
+    <td><b>쌓는다</b>(대화 스크롤백에 남는다) — 콘솔의 다른 모든 메시지(질문·답·목록형 칩·결재판)가 이미 append 방식이고,
+    오직 화면 안내(<code>ⓘ</code>) 카드만 예외적으로 갈아끼우는데 그건 "같은 질문의 반복"이라 그렇다(코드 주석 "중복 구조적 차단").
+    서로 다른 항목을 보는 것은 반복이 아니라 새 메시지다. 단, 「이거」는 <b>가장 최근 것 하나</b>만(아래 Q5).
+    같은 항목을 다시 누르면 새 카드를 또 쌓지 않고 <b>기존 카드를 펄스로 강조</b>한다(실습에서 같은 행을 두 번 눌러 확인 가능).</td></tr>
+  <tr><td>카드에서 바로 <b>이어서 할 것</b>을 어떻게 주나</td>
+    <td>미리 정해진 문장 <b>칩</b>(예: "▶ 조치 시작으로 바꿀까요?") — 누르면 타이핑한 것과 동일하게 그 문장이 지시로 나간다(기존
+    <code>cs-picks</code>·<code>cs-catrow</code>와 같은 길, 서버는 이 지시에 결재판으로 답한다). 자유 입력창도 그대로 있다 — 카드가
+    「이거」를 고정해 주므로 "이거 반려해줘"라고만 쳐도 통한다. 카드 <b>안</b>에 새 입력칸은 만들지 않는다(원칙1) — 값이 필요한
+    조치(담당자 배정)는 다음 단계인 결재판 안 입력칸에서만 받는다(그 입력칸은 이미 있는 것 — <code>.cs-apin</code>).</td></tr>
+  <tr><td>목록은 그대로 두는가, <b>좁아지는가</b></td>
+    <td>남기고 <b>넓어진다</b> — 오른쪽 상세 패널(<code>.rv-detail</code>, 최소 520px)을 없애 그 폭을 목록에 돌려준다.
+    상세를 콘솔로 옮기는 것이므로 "상세 자리"를 두 곳에 두지 않는다.</td></tr>
+  <tr><td>왼쪽 <b>선택 표시</b>가 카드와 어긋나지 않게</td>
+    <td>세 신호가 항상 같은 것을 가리키게 했다 — ① 목록의 <code>.rv-row.on</code>(파란 테두리), ② 콘솔 머리의 상태 패널,
+    ③ 가장 최근 카드의 강조 테두리(<code>.itc-card.on</code>). 셋 다 "가장 최근 클릭"이라는 같은 규칙으로 갱신되고,
+    화면을 이동하면(<code>console.js:947-948</code> 그대로) 셋 다 함께 풀린다 — 이 시안에선 단일 화면이라 재현은 못 했고
+    상태 패널 캡션 문구로만 안내했다(⚠ 실제 화면 이동 테스트는 구현 후 검증 필요).</td></tr>
+</table>
+
+<h2><span class="n">왜</span>왜 이 안인지 — 기각한 다른 길</h2>
+<table class="t">
+  <tr><th style="width:280px">다른 길</th><th>왜 안 골랐나</th></tr>
+  <tr><td>지금의 우측 상세 패널(<code>.rv-detail</code>) 유지 + 칩만 추가</td><td>정보가 패널+칩 두 곳으로 갈라져 "이어서 하는 일"이 결국 패널로 돌아가야 한다 — 대화창이 입력이 되지 못한다(원칙1과 반대 방향). 520px 패널과 380px 콘솔을 동시에 쓰면 1440px 미만 창에서 목록이 밀린다.</td></tr>
+  <tr><td>하단 시트(팝업)</td><td>사장님이 명시적으로 반려("하단 팝업이 아니라"). 콘솔은 이미 하단 도킹(190px 고정) 옵션이 있어 시트를 또 만들면 "아래에서 올라오는 것"이 두 개가 된다.</td></tr>
+  <tr><td>새 창(분리 창)</td><td>콘솔은 이미 "⧉ 창으로" 빼는 기능이 있다. 클릭 한 번마다 새 창을 강제하면 목록 5~6건을 훑는 흐름과 안 맞는다 — app.html 자체 주석이 "팝업이 필요했던 유일한 이유(대화 유지)를 셸 구조로 이미 해결했다"고 적고 있다.</td></tr>
+  <tr><td>말풍선(사람이 친 것처럼 산문만)</td><td>상태·심각도·담당자 같은 구조화 값은 산문보다 배지·표가 스캔하기 쉽다 — MS Copilot 가이드 "구조화된 콘텐츠는 위젯으로"와 일치. 우리 콘솔이 이미 markdown 표를 렌더링하는 이유와 같은 결.</td></tr>
+  <tr><td>선택 맥락 방식 — <b>Cursor식</b>(고른 내용을 입력칸에 채워 넣기)</td><td><b>안 골랐다.</b> 우리 칩(제안 문장)은 이미 완성된 지시라 사람이 다듬을 말이 없다 — 채워 넣으면 매번 "지우고 다시 확인"하는 한 단계가 늘 뿐이다. 또한 원칙1(화면 입력칸 금지)의 유일한 예외 자리는 <b>콘솔의 기존 입력창 하나</b>인데, 프리필은 그 한 자리를 "편집 대기" 상태로 묶어 자유 타이핑과 경합한다.</td></tr>
+  <tr><td>선택 맥락 방식 — <b class="ok">VS Code식</b>(맥락으로 조용히 붙이기) — <b>이걸 골랐다</b></td><td>우리 <code>.cs-sel</code>이 이미 이 방식이고 원칙1과 맞는다. 알려진 약점("맥락이 대화 시간순 밖에서 암묵적으로 바뀌어 되짚기 어렵다" — win 내부 조사 전달, 1차 출처 미확인)은 <b>카드를 대화 스크롤백에 시간순 그대로 남긴다</b>는 이번 결정으로 상쇄했다 — 화면 밖 암묵 상태가 아니라 대화 안에 보이는 기록이다.</td></tr>
+</table>
+
+<h2><span class="n">포기</span>무엇을 포기했는지</h2>
+<table class="t">
+  <tr><th style="width:280px">포기한 것</th><th>왜 / 대안</th></tr>
+  <tr><td>목록과 상세를 <b>나란히</b> 동시에 못 본다</td><td>상세가 콘솔로 옮겨갔으니 "나란히"의 오른쪽 자리가 콘솔로 바뀐 것 — 완전히 잃은 것은 아니다(콘솔이 옆에 있으면 사실상 나란히 보인다). 다만 콘솔을 하단 도킹으로 바꾼 사람은 진짜로 세로 배치가 된다.</td></tr>
+  <tr><td>담당자·기한을 <b>바로 타이핑해 고치는 손맛</b></td><td>예전 우측 패널은 <code>&lt;input&gt;</code> 텍스트칸이라 클릭 후 바로 타이핑됐다. 카드엔 입력칸이 없다(원칙1) — "담당자 배정할까요?" 칩 → 결재판의 입력칸까지 한 단계 더 거친다. <b>클릭이 한 번 늘지만</b>, 그 대가로 실행 전 확인이 보장된다(원칙2 강화).</td></tr>
+  <tr><td>카드 폭이 좁다(내용 폭 약 320px)</td><td>콘솔 고정폭 380px(손잡이로 안 늘림, app.html 주석)에서 패딩·아이콘 칸을 빼면 이 정도다. 증거 원문이 길면 클램프+더보기로 대응 — 상세 패널(가로 700px대)보다는 한 줄에 담기는 글자 수가 적다.</td></tr>
+  <tr><td>여러 건을 <b>가로로 나란히</b> 비교하는 뷰는 없다</td><td>카드가 세로로 쌓이므로 비교하려면 스크롤해야 한다 — "여러 건 한눈 비교"가 목적이면 지금 목록 화면이 더 낫다. 카드는 "하나씩 훑고 이어서 지시"에 최적화됐다.</td></tr>
+  <tr><td>화면 이동 시 핀이 풀리는 것을 <b>이 시안에서 직접 검증</b></td><td>단일 화면 데모라 탭 전환을 재현하지 못했다 — <code>console.js:947-948</code> 로직을 그대로 쓴다고 <b>가정</b>만 했고, 구현 뒤 실제 화면에서 재확인이 필요하다(정직하게 명시).</td></tr>
+</table>
+
+<h2><span class="n">숫자</span>밀도 숫자 — 카드 1장 vs 기존 상세 패널 520px</h2>
+<p class="note">
+  실제 렌더링 측정이 아니라 위 CSS 값(패딩·line-height·margin)을 그대로 더한 <b>계산값</b>이다(app.html 주석 "맥락 줄 34 + 대화 4줄
+  22px×4=88 + 입력 52 ≒ 190px"과 같은 방식). 전형적 카드(제목 1줄, 한글 풀이 2줄, 증거 2줄 클램프, 칩 2개, 배정정보 1줄) 기준 —
+  실제 렌더링과 ±10~15px 오차 가능(정확한 값보다 방향이 중요해 과장하지 않는다).
+</p>
+<table class="t">
+  <tr><th style="width:230px">요소</th><th style="width:230px">font-size / line-height</th><th>계산 높이(margin 포함)</th></tr>
+  <tr><td>패딩+테두리(카드 전체)</td><td>10px×2 + 1px×2</td><td>22px</td></tr>
+  <tr><td>상단 배지 줄(.itc-top)</td><td>11.5~11.75px / ~1.3</td><td>26px</td></tr>
+  <tr><td>제목(.itc-title)</td><td>13px / 1.4 (1줄 가정)</td><td>21px</td></tr>
+  <tr><td>자산·메타(.itc-asset)</td><td>11.75px / 1.4</td><td>22px</td></tr>
+  <tr><td>한글 한 줄(.dt-plain, <b>기존 값 그대로</b>)</td><td>12.5px / 1.6 (2줄 가정)</td><td>50px</td></tr>
+  <tr><td>증거 원문(.itc-evid, 2줄 클램프)</td><td>11.5px / 1.5, 모노스페이스</td><td>50px</td></tr>
+  <tr><td>더보기 토글</td><td>11.5px</td><td>23px</td></tr>
+  <tr><td>담당자·기한(.itc-meta)</td><td>11.5px / 1.4</td><td>24px</td></tr>
+  <tr><td>"이어서 할 것" 라벨</td><td>11.5px</td><td>20px</td></tr>
+  <tr><td>칩 줄(.itc-chips, 칩 2개)</td><td>12px, padding 5/10</td><td>34px</td></tr>
+  <tr><td>「자세히 보기」 링크</td><td>11.75px + 위 테두리</td><td>24px</td></tr>
+  <tr><td><b>카드 합계</b></td><td>-</td><td><b class="ok">약 316px</b></td></tr>
+  <tr><td>대화 줄 포장(.cs-row) 오버헤드 — 패딩14+테두리1+이름줄18</td><td>-</td><td>+33px</td></tr>
+  <tr><td><b>실제 화면 점유(카드 1장, 대화 줄 포함)</b></td><td>-</td><td><b class="ok">약 349px</b></td></tr>
+</table>
+<p class="meas">
+  <b>기존 대비</b> — 우측 상세 패널 <code>.rv-detail{min-height:520px}</code> 대비 카드 자체는 <b class="ok">520 − 316 = −204px(약 −39%)</b>.
+  대화 줄 포장까지 넣어도 <b class="ok">520 − 349 = −171px(약 −33%)</b> — 그래도 기존보다 짧다. 단, 이건 <b>1건</b> 볼 때 비교이고,
+  카드는 <b>쌓이므로</b> 3건을 연달아 보면 약 349×3 ≈ <b>1,050px</b>(스크롤 영역, 1080p 세로에서 콘솔 가시영역이 대략 800~900px이라
+  2.3장 안팎이 스크롤 없이 보이고 나머지는 위로 스크롤).<br>
+  <b>줄 높이(line-height) 선택 근거</b> — 카드 안은 1.4~1.6(제목1.4·메타1.4·증거1.5·한글풀이1.6, 기존 값 유지)을 썼다.
+  본문 기본값(<code>body.g-ui{line-height:1.7}</code>, gijo-ui.css)보다 촘촘한데, 이는 <b>새 예외가 아니다</b> — 같은 파일이
+  이미 배지·칩·버튼·표·입력창을 1.45로 예외 처리해 뒀다("촘촘해야 하는 것은 되돌린다 — 높이가 정해진 컴포넌트는 벌리면 깨진다").
+  카드도 그 계열(데이터 나열형 밀집 컴포넌트)이라 같은 논리를 따른다.
+</p>
+
+<h2><span class="n">점검</span>제품 원칙 자가점검</h2>
+<table class="t chk-table">
+  <tr><th style="width:220px">원칙</th><th>이 시안에서</th></tr>
+  <tr><td>① 메뉴는 보기용, 대화창이 입력</td><td><span class="chk-ok">✓</span> 목록은 누르기만(선택) — 새 입력칸은 화면에도 카드 안에도 0개. 값이 필요한 조치는 기존 결재판(<code>.cs-apin</code>)에서만 받는다. 상태 패널도 읽기 전용(스스로 값을 고치는 자리 아님 — 고치려면 결재판을 거친다, "같은 일을 하는 자리 둘" 방지).</td></tr>
+  <tr><td>② 결재판(승인) 흐름 유지</td><td><span class="chk-ok">✓</span> 카드의 모든 "이어서 할 것" 칩은 곧장 실행하지 않고 <code>attachApproval</code>과 같은 모양의 결재판을 연다 — 새로 만들지 않고 그대로 재사용(LangChain human-in-the-loop 4갈래 중 승인·수정·거부 3가지 충족).</td></tr>
+  <tr><td>③ 정직</td><td><span class="chk-ok">✓</span>/<span class="chk-warn">⚠</span> 목록→카드 흐름·결재판 필드 편집·상태 갱신은 <b>실제로 동작</b>한다. 서버가 답하는 것처럼 보이는 자리(해석 줄·읽기형 답변·결재판 승인 완료)는 전부 "(시연)" 라벨을 붙였다 — 실제 서버 값이 아님을 매번 명시. 화면 이동 시 핀 해제는 단일 화면이라 <b>검증하지 못했다</b>고 위 "포기" 절에 적었다.</td></tr>
+  <tr><td>④ 다크 팔레트·순수 HTML/CSS/JS·gijo-ui.css 톤</td><td><span class="chk-ok">✓</span> :root 색 토큰은 approvals.html/lawlookup.html과 글자 하나 안 다름. 외부 CDN·웹폰트·원격 이미지 0개(시스템 폰트 폴백만).</td></tr>
+  <tr><td>⑤ 11px 미만 글자 금지</td><td><span class="chk-ok">✓</span> 이 시안에서 쓴 가장 작은 글자는 11px(<code>.cs-div</code>, 기존 값 그대로) — 신규로 만든 글자 중 가장 작은 것은 <code>.itc-x</code> 12px 등 전부 11.5px 이상. uireadability 게이트 기준(11px 미만) 회피.</td></tr>
+</table>
+
+<h2><span class="n">참고</span>구현 참고(메인 에이전트용 — 시안 승인 후)</h2>
+<table class="t">
+  <tr><th style="width:220px">항목</th><th>내용</th></tr>
+  <tr><td>approvals.html에 새로 추가</td><td><code>.rv-row</code> 클릭 핸들러(436행 근처)에 <code>window.top.postMessage({type:"gijo:select", label, text, fields}, "*")</code> 한 줄 — <code>선택인자</code>로 갈 <code>text</code>는 "자산 {assetName} · {finding_type} · {severity} · {상태} · 담당 {assignee||"미배정"} · {plain}" 형태(≤200자, 위 실측 근거).</td></tr>
+  <tr><td>console.js <code>setSelection()</code> 확장</td><td><code>fields</code>가 있으면 상태 패널(이 시안의 <code>.itc-state</code>)을 그리고, 없으면 <b>지금 그대로</b>(<code>.cs-sel</code> 단순 칩) — 기존 호출부(vulnscan.html·dashboard.html·map-view.js) 무변경으로 호환.</td></tr>
+  <tr><td>카드 렌더 함수</td><td>새 함수(가칭 <code>renderItemCard(item)</code>)를 <code>console.js</code>에 추가 — <code>attachApproval</code>·<code>attachPicks</code>와 같은 위치·같은 규약(붙일 자리는 <code>.cb</code>).</td></tr>
+  <tr><td>이어서 할 것 칩 → 서버</td><td>클릭 시 <code>submit(instrText)</code>(기존 함수 그대로) — 서버는 이미 오는 <code>selection</code>으로 대상을 알고, 결재판을 <code>r.approval</code>로 돌려주면 <code>attachApproval</code>이 그대로 그린다. <b>새 API 불필요.</b></td></tr>
+  <tr><td>소스 감시 테스트</td><td>approvals.html에 <code>gijo:select</code> 참조가 실제로 있는지 세는 감시(다른 화면 감시와 같은 방식) 추가를 권한다 — "만들어만 두고 안 부르면 안 된다"가 이 저장소의 반복 함정.</td></tr>
+</table>
+
+<footer class="docfoot">
+  mockups/조치항목_대화창/시안.html · GIJO AS 시안 · 제품 코드는 읽기만 했고 수정하지 않았다.
+</footer>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var esc = function(s){ return String(s==null?"":s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); };
+  var boldify = function(escaped){ return escaped.replace(/\*\*(.+?)\*\*/g,"<b>$1</b>"); };
+  var nowTime = function(){ return new Date().toLocaleTimeString("ko-KR",{hour12:false}); };
+
+  var ST_LABEL = { pending:"미검토", in_progress:"진행중", verifying:"검증 대기", approved:"완료", rejected:"반려" };
+
+  // ── 가짜 데이터 6건 — 5개 상태 + 미배정 지연 1건(실제 approvals.html 필드 구조 그대로) ──
+  var ITEMS = [
+    { id:"web-01:cve-2024-6387", asset:"web-01.internal",
+      title:"OpenSSL 원격 코드실행 취약점 (CVE-2024-6387)", severity:"critical",
+      status:"pending", kev:true, overdue:false, assignee:"박준영", dueDate:"2026-08-22",
+      epss:0.91, vpr:9.3, source:"Nessus",
+      plain:"인증 없이 원격에서 임의 명령을 실행할 수 있는 취약점입니다. **가장 급한 등급**입니다.",
+      evidence:"OpenSSL 3.0.x~3.3.1 — regreSSHion. sshd 재협상 처리 중 signal handler race condition. Nessus Plugin ID 200389." },
+    { id:"dc-02:cve-2020-1472", asset:"dc-02.internal",
+      title:"Netlogon 권한 상승 취약점 (CVE-2020-1472)", severity:"critical",
+      status:"in_progress", kev:true, overdue:false, assignee:"김보안", dueDate:"2026-08-20",
+      epss:0.97, vpr:9.8, source:"Nessus",
+      plain:"일반 권한으로 들어온 공격자가 **관리자 권한을 얻을 수 있습니다.**",
+      evidence:"Zerologon — 인증 없이 도메인 컨트롤러 관리자 권한 탈취 가능. Nessus Plugin ID 140968." },
+    { id:"was-03:cve-2023-25690", asset:"was-03.internal",
+      title:"Apache 경로 조작 취약점 (CVE-2023-25690)", severity:"high",
+      status:"verifying", kev:false, overdue:false, assignee:"이수현", dueDate:"2026-08-19",
+      epss:0.42, vpr:6.5, source:"Qualys",
+      plain:"공격자가 서버 안의 다른 파일을 읽어낼 수 있는 경로 조작 취약점입니다.",
+      evidence:"mod_rewrite 설정 오류로 상위 디렉터리 접근 가능 — /../../etc/passwd 접근 확인. Qualys QID 150123." },
+    { id:"legacy-app:tls10", asset:"legacy-app.internal",
+      title:"TLS 1.0/1.1 사용 중", severity:"medium",
+      status:"rejected", kev:false, overdue:false, assignee:"", dueDate:"",
+      epss:0.05, vpr:3.1, source:"OpenVAS",
+      plain:"오래된 암호화 방식이라 권고 기준과 다르지만, 이 지점은 **내부 전용 구간**에서만 접속됩니다.",
+      evidence:"TLS 1.0/1.1 활성화됨 — PCI-DSS 4.0 요건 미달. 내부 전용 VLAN(10.20.x)에서만 접속 가능." },
+    { id:"batch-01:cve-2021-44228", asset:"batch-01.internal",
+      title:"Log4j 원격 코드실행 취약점 (CVE-2021-44228)", severity:"critical",
+      status:"approved", kev:true, overdue:false, assignee:"김보안", dueDate:"",
+      epss:0.97, vpr:10.0, source:"Nessus",
+      plain:"문자열 하나로 서버 권한을 통째로 가져갈 수 있었던 대형 취약점입니다. **조치 완료됐습니다.**",
+      evidence:"JNDI lookup을 통한 원격 클래스 로딩 — log4j-core 2.14.1. 패치(2.17.1) 적용 확인됨." },
+    { id:"file-srv:smbv1", asset:"file-srv.internal",
+      title:"SMBv1 프로토콜 활성화", severity:"high",
+      status:"pending", kev:false, overdue:true, assignee:"", dueDate:"2026-08-10",
+      epss:0.31, vpr:6.0, source:"Nessus",
+      plain:"15년 넘은 오래된 파일 공유 프로토콜이라 **랜섬웨어가 자주 노립니다.**",
+      evidence:"SMBv1 서버 서비스 활성화 — WannaCry/NotPetya 계열 익스플로잇 대상. MS17-010 계열." }
+  ];
+
+  var selectedId = null;   // 「이거」 — 가장 최근 클릭 하나만
+  var lastCardId = null;   // 대화창에 가장 최근 쌓인 카드의 항목 id
+  var curFilter = "active";
+
+  function itemOf(id){ var r=null; ITEMS.forEach(function(x){ if(x.id===id) r=x; }); return r; }
+
+  // 상태 필드값 — 상태 패널과 카드가 **같은 함수**를 읽는다(두 곳에 값을 따로 안 적는다).
+  function stateOf(it){
+    return { asset:it.asset, title:it.title, severity:it.severity, status:ST_LABEL[it.status]||it.status,
+      assignee: it.assignee || "미배정", plain: (it.plain||"").replace(/\*\*/g,"") };
+  }
+  // 실제 gijo:select의 text(→서버 selection, 200자 상한)로 나갈 값 — 상태 패널 캡션에 글자 수를 그대로 보여준다.
+  function selectionText(it){
+    var s = stateOf(it);
+    var t = "자산 "+s.asset+" · "+s.title+" · "+s.severity+" · "+s.status+" · 담당 "+s.assignee+" · "+s.plain;
+    return t.length>200 ? t.slice(0,197)+"…" : t;
+  }
+
+  // ── 상태별 "이어서 할 것"(approvals.html renderDetail stageActions과 같은 갈래, 최대 2개 — MS가이드) ──
+  function followupsFor(it){
+    if (it.status==="pending" && !it.assignee) {
+      return [
+        { label:"👤 담당자부터 배정할까요?", instr:"이 건 담당자 배정해줘", newStatus:null,
+          ap:{ label:"담당자 배정", fields:[
+            {key:"assignee", label:"실제 수행 담당자", value:"", need:true, hint:"이름 입력"},
+            {key:"due", label:"조치 기한", value:"", hint:"YYYY-MM-DD"} ],
+            effect:"이 건에 담당자와 기한이 저장되고 목록의 '미배정' 표시가 사라집니다.", undo:"배정 값을 비우면 되돌릴 수 있습니다." } },
+        { label:"🛡 반려할까요?", instr:"이 건 반려해줘", newStatus:"rejected",
+          ap:{ label:"반려 처리", fields:[ {key:"reason", label:"반려 사유", value:"오탐(false positive)"} ],
+            effect:"상태가 '미검토' → '반려'로 바뀌고 사유가 기록됩니다.", undo:"'검토 재개'로 되돌릴 수 있습니다." } }
+      ];
+    }
+    if (it.status==="pending") {
+      return [
+        { label:"▶ 조치 시작으로 바꿀까요?", instr:"이 건 진행중으로 바꿔줘", newStatus:"in_progress",
+          ap:{ label:"상태 변경 — 진행중으로", fields:[ {key:"status", label:"바꿀 상태", value:"진행중"} ],
+            effect:"상태가 '미검토' → '진행중'으로 바뀝니다.", undo:"'미검토'로 되돌릴 수 있습니다." } },
+        { label:"🛡 반려할까요?", instr:"이 건 반려해줘", newStatus:"rejected",
+          ap:{ label:"반려 처리", fields:[ {key:"reason", label:"반려 사유", value:"오탐(false positive)"} ],
+            effect:"상태가 '미검토' → '반려'로 바뀌고 사유가 기록됩니다.", undo:"'검토 재개'로 되돌릴 수 있습니다." } }
+      ];
+    }
+    if (it.status==="in_progress") {
+      return [
+        { label:"🔍 조치 검증을 실행할까요?", instr:"이 건 조치 검증 실행해줘", newStatus:null,
+          ap:{ label:"조치 검증 실행", fields:[ {key:"target", label:"대상", value:it.asset} ],
+            effect:"대상에 접속해 같은 취약점이 남아 있는지 읽기 전용으로 확인합니다.", undo:"조회만 하므로 되돌릴 것이 없습니다." } },
+        { label:"🔁 완료 보고(검증 요청)할까요?", instr:"이 건 검증 요청으로 바꿔줘", newStatus:"verifying",
+          ap:{ label:"검증 요청으로 전환", fields:[ {key:"status", label:"바꿀 상태", value:"검증 대기"} ],
+            effect:"상태가 '진행중' → '검증 대기'로 바뀝니다.", undo:"'진행중'으로 되돌릴 수 있습니다." } }
+      ];
+    }
+    if (it.status==="verifying") {
+      return [
+        { label:"🔍 조치 검증을 다시 실행할까요?", instr:"이 건 조치 검증 다시 실행해줘", newStatus:null,
+          ap:{ label:"조치 검증 실행", fields:[ {key:"target", label:"대상", value:it.asset} ],
+            effect:"대상에 접속해 같은 취약점이 남아 있는지 읽기 전용으로 확인합니다.", undo:"조회만이라 되돌릴 것이 없습니다." } },
+        { label:"✓ 수동으로 완료 처리할까요?", instr:"이 건 완료 처리해줘", newStatus:"approved",
+          ap:{ label:"완료 처리(수동 확인)", fields:[ {key:"status", label:"바꿀 상태", value:"완료"} ],
+            effect:"상태가 '완료'로 바뀝니다 — 재스캔 확인 없이 담당자가 직접 확정합니다.", undo:"'진행중'으로 되돌릴 수 있습니다." } }
+      ];
+    }
+    if (it.status==="rejected") {
+      return [ { label:"↩ 검토를 다시 시작할까요?", instr:"이 건 검토 재개해줘", newStatus:"pending",
+        ap:{ label:"검토 재개", fields:[ {key:"status", label:"바꿀 상태", value:"미검토"} ],
+          effect:"상태가 '반려' → '미검토'로 바뀌어 다시 조치 대상이 됩니다.", undo:"다시 반려할 수 있습니다." } } ];
+    }
+    if (it.status==="approved") {
+      return [ { label:"↩ 진행중으로 되돌릴까요?", instr:"이 건 진행중으로 되돌려줘", newStatus:"in_progress",
+        ap:{ label:"상태 되돌리기", fields:[ {key:"status", label:"바꿀 상태", value:"진행중"} ],
+          effect:"'완료' → '진행중'으로 바뀝니다 — 재조치가 필요할 때만 쓰세요.", undo:"다시 '완료'로 표시할 수 있습니다." } } ];
+    }
+    return [];
+  }
+
+  // ── 왼쪽 목록 ──────────────────────────────────────────────────────────
+  function rowHtml(it){
+    var dot = it.overdue ? "d-over" : "d-"+it.status;
+    var bits = [it.asset];
+    if (it.assignee) bits.push(it.assignee); else if (it.status!=="rejected" && it.status!=="approved") bits.push("미배정");
+    if (it.status==="verifying") bits.push("검증 대기");
+    else if (it.status==="rejected") bits.push("반려");
+    else if (it.overdue) bits.push("⚠지연");
+    return '<div class="rv-row'+(selectedId===it.id?" on":"")+'" data-id="'+esc(it.id)+'">'
+      +'<span class="rv-dot '+dot+'"></span>'
+      +'<div class="rv-rmain"><div class="rv-rt">'+esc(it.title)+'</div><div class="rv-rs">'+esc(bits.join(" · "))+'</div></div>'
+      +'<span class="sev sev-'+esc(it.severity)+'">'+esc(it.severity)+'</span></div>';
+  }
+  function renderList(){
+    var box = document.getElementById("rvList");
+    var counts = { all:ITEMS.length, active:0, verifying:0, rejected:0, approved:0, pending:0, in_progress:0 };
+    ITEMS.forEach(function(it){
+      if (it.status==="pending"||it.status==="in_progress"||it.status==="verifying") counts.active++;
+      counts[it.status] = (counts[it.status]||0)+1;
+    });
+    Array.prototype.forEach.call(document.querySelectorAll("#rvFilt .fchip"), function(c){
+      var f = c.getAttribute("data-f"), b = c.querySelector("b");
+      if (b) b.textContent = counts[f]!=null ? counts[f] : 0;
+    });
+    var rows = ITEMS.filter(function(it){
+      if (curFilter==="active") return it.status==="pending"||it.status==="in_progress"||it.status==="verifying";
+      if (curFilter==="all") return true;
+      return it.status===curFilter;
+    });
+    box.innerHTML = rows.length ? rows.map(rowHtml).join("") : '<div class="rv-empty">이 상태의 항목이 없습니다.</div>';
+    Array.prototype.forEach.call(box.querySelectorAll(".rv-row"), function(el){
+      el.addEventListener("click", function(){ onPick(el.getAttribute("data-id")); });
+    });
+  }
+  document.getElementById("rvFilt").addEventListener("click", function(e){
+    var chip = e.target.closest(".fchip"); if (!chip) return;
+    curFilter = chip.getAttribute("data-f");
+    Array.prototype.forEach.call(document.querySelectorAll("#rvFilt .fchip"), function(c){ c.classList.toggle("on", c===chip); });
+    renderList();
+  });
+
+  // ── 상태 패널("지금 다루는 것") — State Folding, 매 요청 재전송·턴 감쇠 대상 아님 ──────
+  function renderState(){
+    var el = document.getElementById("itcState");
+    if (!selectedId) { el.innerHTML = '<span class="itc-empty">📌 아직 고른 항목이 없습니다 — 왼쪽 목록에서 항목을 눌러 보세요.</span>'; return; }
+    var it = itemOf(selectedId); if (!it) return;
+    var s = stateOf(it), txt = selectionText(it);
+    var shortTitle = s.title.length>32 ? s.title.slice(0,32)+"…" : s.title;
+    el.innerHTML =
+      '<div class="itc-row"><span class="itc-tag">🎯 지금 다루는 것</span><span class="itc-x" id="itcClear" title="선택을 풉니다">✕ 풀기</span></div>'
+      +'<div class="itc-fields">'
+      +'<span class="itc-f"><b>'+esc(s.asset)+'</b></span><span class="itc-sep">·</span>'
+      +'<span class="itc-f">'+esc(shortTitle)+'</span><span class="itc-sep">·</span>'
+      +'<span class="sev sev-'+esc(it.severity)+'">'+esc(it.severity)+'</span>'
+      +'<span class="st st-'+esc(it.status)+'">'+esc(s.status)+'</span>'
+      +'<span class="itc-f">담당 '+esc(s.assignee)+'</span>'
+      +'</div>'
+      +'<div class="itc-cap">다른 항목을 고르거나 「✕ 풀기」를 누르면 풀립니다 — 풀리기 전까지 지시마다 이 값이 매번 새로 실립니다'
+      +'(대화 기록칸이 아니라 요청마다 함께 보내는 값이라 6턴이 지나도 줄지 않습니다). 지금 실려가는 값 '
+      +'<span class="itc-budget">'+txt.length+'/200자</span>.</div>';
+    document.getElementById("itcClear").addEventListener("click", clearSelection);
+  }
+  function clearSelection(){
+    selectedId = null;
+    Array.prototype.forEach.call(document.querySelectorAll(".itc-card.on"), function(c){ c.classList.remove("on"); });
+    renderList(); renderState();
+  }
+
+  // ── 카드 ──────────────────────────────────────────────────────────────
+  function cardHtml(it){
+    var s = stateOf(it);
+    var flags = [];
+    if (it.kev) flags.push('<span class="rv-kev">🚨 KEV</span>');
+    if (it.overdue) flags.push('<span class="dt-over">⚠ 기한 초과</span>');
+    var meta = [it.epss!=null?("EPSS "+Math.round(it.epss*100)+"%"):"", it.vpr!=null?("VPR "+it.vpr):"", it.source].filter(Boolean).join(" · ");
+    var assignLine = (it.status==="rejected"||it.status==="approved") ? "" :
+      '<div class="itc-meta">👤 '+(it.assignee?esc(it.assignee):'<span class="need">미배정</span>')+(it.dueDate?(" · 기한 "+esc(it.dueDate)):"")+'</div>';
+    var fus = followupsFor(it);
+    var chipsHtml = fus.map(function(f,i){ return '<button type="button" class="itc-chip" data-idx="'+i+'">'+esc(f.label)+'</button>'; }).join("");
+    var evId = "ev-"+Math.random().toString(36).slice(2,9);
+    return ''
+      +'<div class="itc-card" data-id="'+esc(it.id)+'">'
+      +'<div class="itc-top"><span class="st st-'+esc(it.status)+'">'+esc(s.status)+'</span>'+flags.join("")
+      +'<span class="sev sev-'+esc(it.severity)+'" style="margin-left:auto">'+esc(it.severity)+'</span></div>'
+      +'<div class="itc-title">'+esc(it.title)+'</div>'
+      +'<div class="itc-asset">'+esc(it.asset)+(meta?(' · '+esc(meta)):'')+'</div>'
+      +(it.plain? ('<div class="dt-plain" style="margin:2px 0 8px">→ '+boldify(esc(it.plain))+'</div>') : "")
+      +'<div class="itc-evid clamp2" id="'+evId+'">'+esc(it.evidence)+'</div>'
+      +'<span class="itc-more" data-eid="'+evId+'">더보기 ▾</span>'
+      +assignLine
+      +(fus.length? ('<div class="itc-label">이어서 할 것</div><div class="itc-chips">'+chipsHtml+'</div>') : '')
+      +'<div class="itc-open">🗔 목록에서 자세히 보기</div>'
+      +'</div>';
+  }
+  function wireCard(cardEl, it){
+    var more = cardEl.querySelector(".itc-more");
+    if (more) more.addEventListener("click", function(){
+      var ev = document.getElementById(more.getAttribute("data-eid"));
+      var clamped = ev.classList.toggle("clamp2");
+      more.textContent = clamped ? "더보기 ▾" : "접기 ▴";
+    });
+    var fus = followupsFor(it);
+    Array.prototype.forEach.call(cardEl.querySelectorAll(".itc-chip"), function(ch){
+      var f = fus[Number(ch.getAttribute("data-idx"))];
+      ch.addEventListener("click", function(){ if (f) simulateSubmit(f.instr, it, f); });
+    });
+    var openBtn = cardEl.querySelector(".itc-open");
+    if (openBtn) openBtn.addEventListener("click", function(){ simulateSubmit("이 건 목록에서 자세히 보여줘", it, { kind:"open" }); });
+  }
+
+  function onPick(id){
+    var it = itemOf(id); if (!it) return;
+    var wasSame = (selectedId===id && lastCardId===id);
+    selectedId = id;
+    renderList(); renderState();
+    if (wasSame) { pulseLastCard(); return; }
+    appendCard(it);
+    lastCardId = id;
+  }
+  function appendCard(it){
+    var body = document.getElementById("csBody");
+    var empty = body.querySelector(".cs-empty"); if (empty) empty.remove();
+    Array.prototype.forEach.call(body.querySelectorAll(".itc-card.on"), function(c){ c.classList.remove("on"); });
+    var row = document.createElement("div");
+    row.className = "cs-row event";
+    row.innerHTML = '<div class="ci">🎯</div><div class="cb"><div class="cn">선택한 항목<span class="ct">'+nowTime()+'</span></div>'+cardHtml(it)+'</div>';
+    body.appendChild(row);
+    var cardEl = row.querySelector(".itc-card");
+    cardEl.classList.add("on");
+    wireCard(cardEl, it);
+    trimAndScroll(body);
+  }
+  function pulseLastCard(){
+    var el = document.querySelector(".itc-card.on");
+    if (!el) return;
+    el.classList.remove("pulse"); void el.offsetWidth; el.classList.add("pulse");
+  }
+
+  // ── 대화 보조 렌더 ────────────────────────────────────────────────────
+  function trimAndScroll(body){ while (body.childElementCount>40) body.removeChild(body.firstChild); body.scrollTop = body.scrollHeight; }
+  function appendInstr(body, text){
+    var row = document.createElement("div");
+    row.className = "cs-row instr";
+    row.innerHTML = '<div class="ci">나</div><div class="cb"><div class="cn">나 → AI 팀<span class="ct">'+nowTime()+'</span></div><div class="cm">'+esc(text)+'</div></div>';
+    body.appendChild(row);
+    return row;
+  }
+  function appendTyping(body){
+    var row = document.createElement("div");
+    row.className = "cs-row event";
+    row.innerHTML = '<div class="ci">🧭</div><div class="cb"><div class="cn">AI 팀</div><span class="cm cs-typing"><span></span><span></span><span></span></span></div>';
+    body.appendChild(row); body.scrollTop = body.scrollHeight;
+    return row;
+  }
+  function approvalHtml(ap, it){
+    var fields = ap.fields || [];
+    return '<div class="cs-ap">'
+      +'<div class="cs-aph">🗂 실행 승인(시연) — '+esc(ap.label)+'</div>'
+      +'<div class="cs-apsub">'+(it?('대상: '+esc(it.title)):'')+' — 아래 값을 확인·수정한 뒤 승인하세요.</div>'
+      +fields.map(function(f){
+        return '<div class="cs-apf"><span class="cs-apk">'+esc(f.label)+(f.need?"*":"")+'</span>'
+          +'<input class="cs-apin'+(f.need&&!f.value?" need":"")+'" data-k="'+esc(f.key)+'" data-req="'+(f.need?"1":"0")+'" value="'+esc(f.value||"")+'" placeholder="'+esc(f.hint||"")+'"></div>';
+      }).join("")
+      +(ap.effect? ('<div class="cs-ape"><b>실행되면:</b> '+esc(ap.effect)+'</div>') : "")
+      +(ap.undo? ('<div class="cs-ape"><b>되돌리기:</b> '+esc(ap.undo)+'</div>') : "")
+      +'<div class="cs-apb"><button type="button" class="cs-apgo">✓ 승인하고 실행</button><button type="button" class="cs-apno">취소</button></div>'
+      +'</div>';
+  }
+  function wireApproval(row, it, followup){
+    var box = row.querySelector(".cs-ap");
+    var inputs = Array.prototype.slice.call(box.querySelectorAll(".cs-apin"));
+    var go = box.querySelector(".cs-apgo");
+    function sync(){
+      var missing = inputs.filter(function(i){ return i.getAttribute("data-req")==="1" && !i.value.trim(); });
+      missing.concat(inputs).forEach(function(){}); // no-op guard
+      inputs.forEach(function(i){ if (i.getAttribute("data-req")==="1") i.classList.toggle("need", !i.value.trim()); });
+      go.disabled = missing.length>0;
+      go.textContent = missing.length ? ("✓ 승인 ("+missing.length+"개 입력 필요)") : "✓ 승인하고 실행";
+    }
+    inputs.forEach(function(i){ i.addEventListener("input", sync); });
+    sync();
+    box.querySelector(".cs-apno").addEventListener("click", function(){
+      box.innerHTML = '<div class="cs-apd">✕ 실행하지 않았습니다(시연) — '+esc(followup.ap.label)+'</div>';
+    });
+    go.addEventListener("click", function(){
+      if (go.disabled) return;
+      if (followup.newStatus) { it.status = followup.newStatus; if (followup.newStatus!=="pending") it.overdue = false; }
+      inputs.forEach(function(i){
+        if (i.getAttribute("data-k")==="assignee" && i.value.trim()) it.assignee = i.value.trim();
+        if (i.getAttribute("data-k")==="due" && i.value.trim()) it.dueDate = i.value.trim();
+      });
+      box.innerHTML = '<div class="cs-apd">✅ (시연) 처리 완료로 표시 — '+esc(followup.ap.label)+'. 왼쪽 목록이 갱신됩니다.</div>';
+      renderList();
+      if (selectedId===it.id) renderState();
+    });
+  }
+  // 읽기형 답 — 근거 배지는 chatparts.js의 3상태(강함/약함/없음)를 그대로 재사용(새로 발명 안 함).
+  function readReply(text, it){
+    if (!it) return { text:"(시연) 지금은 「이거」로 고정된 항목이 없습니다 — 왼쪽 목록에서 항목을 먼저 눌러 보세요.", badge:"" };
+    var weak = /정책|규정|법/.test(text);
+    var msg = "(시연 응답) " + stateOf(it).plain + " — 자세한 값은 실제 서버가 답합니다.";
+    var badge = weak
+      ? '<div class="gcp-src2">📄 찾아본 자료 — 근거 아님: 사내규정_취약점대응_v3.md</div>'
+      : '<div class="gcp-src">📄 근거: findingplain.ts 판정표 · '+esc(it.source)+' 원문</div>';
+    return { text: esc(msg), badge: badge };
+  }
+  function resolveSubmit(body, typingEl, text, it, followup){
+    typingEl.remove();
+    var row = document.createElement("div");
+    row.className = "cs-row reply";
+    var parseLine = it ? ('<div class="cs-parse">🧭 「이거」 = '+esc(stateOf(it).asset)+' · '+esc(it.title)+' 대상으로 확인 (실린 상태값 '+selectionText(it).length+'자, 6턴 감쇠 대상 아님)</div>') : "";
+    var mainHtml, apHtml = "";
+    if (followup && followup.kind==="open") {
+      mainHtml = '<div class="cm">🗔 (시연) 실제로는 승인 화면에서 이 항목의 전체 상세로 이동합니다 — 담당자 지정 입력폼·검증 실행 기록·반려 이력까지 거기서 봅니다.</div>';
+    } else if (followup && followup.ap) {
+      mainHtml = '<div class="cm">아래 내용대로 진행할까요? 확인 후 승인해 주세요. <i>(시연 — 실제 서버가 만드는 결재판과 모양은 같습니다, console.js:472-501)</i></div>';
+      apHtml = approvalHtml(followup.ap, it);
+    } else {
+      var r = readReply(text, it);
+      mainHtml = '<div class="cm">'+r.text+'</div>'+r.badge;
+    }
+    row.innerHTML = '<div class="ci">🧭</div><div class="cb"><div class="cn">AI 팀<span class="ct">'+nowTime()+'</span></div>'+parseLine+mainHtml+apHtml+'</div>';
+    body.appendChild(row);
+    if (apHtml) wireApproval(row, it, followup);
+    trimAndScroll(body);
+  }
+  function simulateSubmit(text, it, followup){
+    var body = document.getElementById("csBody");
+    var empty = body.querySelector(".cs-empty"); if (empty) empty.remove();
+    appendInstr(body, text);
+    var typingEl = appendTyping(body);
+    body.scrollTop = body.scrollHeight;
+    window.setTimeout(function(){ resolveSubmit(body, typingEl, text, it, followup); }, 650);
+  }
+
+  // 자유 입력 — 간단한 낱말 매칭으로 이미 있는 칩과 같은 지시를 재현(새 로직 발명 아님, followupsFor 재사용)
+  function detectFollowup(it, text){
+    if (!it) return null;
+    var fus = followupsFor(it);
+    var pick = function(pred){ for (var i=0;i<fus.length;i++) if (pred(fus[i])) return fus[i]; return null; };
+    if (/반려/.test(text)) return pick(function(f){ return f.newStatus==="rejected"; });
+    if (/담당자|배정/.test(text)) return pick(function(f){ return f.ap && f.ap.fields.some(function(x){return x.key==="assignee";}); });
+    if (/검증/.test(text)) return pick(function(f){ return /검증/.test(f.label); });
+    if (/진행중|시작/.test(text)) return pick(function(f){ return f.newStatus==="in_progress"; });
+    if (/완료/.test(text)) return pick(function(f){ return f.newStatus==="approved"; });
+    if (/재개|되돌/.test(text)) return pick(function(f){ return f.newStatus==="pending"||f.newStatus==="in_progress"; });
+    return null;
+  }
+  function onDockSend(){
+    var input = document.getElementById("chatInput");
+    var text = (input.value||"").trim();
+    if (!text) return;
+    input.value = "";
+    var it = selectedId ? itemOf(selectedId) : null;
+    var fu = detectFollowup(it, text);
+    simulateSubmit(text, it, fu);
+  }
+  document.getElementById("dockSend").addEventListener("click", onDockSend);
+  document.getElementById("chatInput").addEventListener("keydown", function(e){
+    if (e.key==="Enter" && !e.shiftKey) { e.preventDefault(); onDockSend(); }
+  });
+
+  renderList();
+  renderState();
+})();
+</script>
+</body>
+</html>
