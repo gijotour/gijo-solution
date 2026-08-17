@@ -26,6 +26,16 @@ describe("한줄풀이 — 종류를 알아본다", () => {
     expect(한줄풀이찾기("Service Detection")!.말).toContain("조치 대상이 아닙니다");
   });
 
+  it("배포판 보안권고(RHSA/RLSA…)·< 버전은 '업데이트' 안내를 붙인다 — 특정 유형은 우선 (2026-08-17 커버리지 확대)", () => {
+    expect(한줄풀이찾기("RHEL 8 : freerdp (RHSA-2026:8945)")!.종류).toBe("구식");
+    expect(한줄풀이찾기("RHEL 8 : freerdp (RHSA-2026:8945)")!.말).toContain("업데이트");
+    expect(한줄풀이찾기("Rocky Linux 9 : kernel (RLSA-2025:1234)")!.종류).toBe("구식");
+    expect(한줄풀이찾기("Mozilla Firefox 118.x < 119.0 Multiple Vulnerabilities")!.말).toContain("낡아");
+    expect(한줄풀이찾기("OpenSSH < 9.6 Multiple Vulnerabilities")!.종류).toBe("구식");
+    // 구체적 유형(RCE)은 배포판 규칙보다 위 — 더 정확한 게 이긴다
+    expect(한줄풀이찾기("RHEL 8 : kernel remote code execution (RHSA-2026:1)")!.종류).toBe("실행");
+  });
+
   it("★★ CVE가 붙었으면 「조치 대상이 아니다」라고 말하지 않는다", () => {
     // 실측: `RPC portmapper Service Detection (CVE-1999-0632)` — 이름은 조사인데 CVE가 있다.
     // 틀릴 거면 **더 보게 만드는 쪽으로** 틀린다. 넘기게 만드는 쪽이 훨씬 위험하다.

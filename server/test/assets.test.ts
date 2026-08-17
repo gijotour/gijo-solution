@@ -46,13 +46,13 @@ describe("assets", () => {
     registerAsset({ id: "vuln-host-x", name: "10.0.0.9", path: "p" });
     recordFindings("vuln-host-x", [
       { finding_type: "Apache Log4j < 2.15.0 Remote Code Execution (CVE-2021-44228)", severity: "critical", evidence: "e", source_tool: "nessus" },
-      { finding_type: "Adobe Acrobat Reader DC Multiple Vulnerabilities (APSB24-01)", severity: "low", evidence: "e", source_tool: "nessus" },
+      { finding_type: "scan_error", severity: "info", evidence: "e", source_tool: "nessus" },
     ]);
     const asset = getAsset("vuln-host-x")!;
     const log4j = asset.findings.find((f) => f.finding_type.includes("Log4j"))!;
-    const adobe = asset.findings.find((f) => f.finding_type.includes("Adobe"))!;
-    expect(log4j.plain).toContain("원하는 명령을 실행"); // 규칙(실행)이 붙는다
-    expect(adobe.plain).toBeUndefined();                // 규칙이 없으면 안 붙인다(원문만 보인다)
+    const nomatch = asset.findings.find((f) => f.finding_type === "scan_error")!;
+    expect(log4j.plain).toContain("원하는 명령을 실행"); // 규칙(실행) — RCE는 배포판·버전 규칙보다 우선
+    expect(nomatch.plain).toBeUndefined();               // 어느 규칙에도 안 걸리면 안 붙인다(원문만)
   });
 
   it("registers an asset with defaults for optional fields", async () => {

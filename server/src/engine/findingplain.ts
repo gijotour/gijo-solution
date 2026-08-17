@@ -86,6 +86,15 @@ const 규칙: { re: RegExp; 종류: 풀이종류; 말: string }[] = [
     말: "**보안 패치가 빠져** 있습니다. 벤더가 이미 고쳐 둔 문제입니다." },
   { re: /end of (life|support)|unsupported version|지원\s*종료/i, 종류: "구식",
     말: "**제조사 지원이 끝난** 버전입니다 — 앞으로 취약점이 나와도 고칠 패치가 없습니다." },
+  // ⚠ 실측(2026-08-17 운영): 미매칭 2,061가지의 큰 덩어리가 **배포판 보안권고**(RHSA/RLSA/ELSA/CESA…
+  //   "RHEL 8 : freerdp (RHSA-2026:8945)" 꼴)와 **"< 버전 Multiple Vulnerabilities"**였다. 둘 다 조치는
+  //   "그 업데이트를 적용하라"로 같다. 특정 규칙(RCE·권한 등)보다 아래라, 구체적 유형이 잡히면 그게 이긴다.
+  { re: /\b(rhsa|rlsa|elsa|cesa|rhba|rhel|rocky ?linux|rockylinux|centos|oracle linux|amazon linux|ubuntu|debian|suse|sles|almalinux|alma)\b/i,
+    종류: "구식",
+    말: "배포판이 낸 **보안 업데이트가 안 된** 패키지입니다 — 해당 업데이트를 적용하면 됩니다." },
+  { re: /<\s*\d+(\.\d+)*|multiple vulnerabilities|out.?of.?date|outdated/i,
+    종류: "구식",
+    말: "**설치된 버전이 낡아** 알려진 취약점이 있습니다 — 최신 버전으로 올리면 됩니다." },
   // ⚠ 실측에서 많이 남은 것들을 낱말로 담았다 — SMB Signing not required(14) · SELinux Status
   //   Check(13) · Password Authentication Accepted(19) 같은 **설정 상태** 항목이다.
   { re: /misconfigur|insecure configuration|hardening|설정\s*미흡|not (required|enabled|configured|set)|\b(disabled|enabled|accepted|permitted|allowed)\b|selinux|signing|policy check/i,
