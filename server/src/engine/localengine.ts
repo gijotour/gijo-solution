@@ -1140,9 +1140,32 @@ function tierReason(gpu: GpuUsage, recommended: GijoTierSpec["id"] | null): stri
 }
 
 export function registerLocalEngineRoutes(app: Express): void {
-  app.get("/api/localengine/status", authMiddleware, (_req, res) => {
-    res.json(getLocalEngineStatus());
-  });
+  app.get(
+    "/api/localengine/status",
+    authMiddleware,
+    asyncRoute(async (_req, res) => {
+      const st = getLocalEngineStatus();
+      // ★ pool엔 없지만 PORT에서 **실제로 도는** 모델(수동 기동·외부 GPU·사내 vLLM)을 놓치지 않는다
+      //   (max 발견#2 2026-08-17: 손으로 띄운 llama가 8080에 사는데 앱 pool 밖이라 대시보드가 거짓
+      //   '멈춤'을 냈다). loaded가 pool만 봤던 게 뿌리. ready 항목이 하나도 없을 때만 포트를 짧게
+      //   두드려, 살아 있으면 그 모델을 채워 '돌고 있음'으로 정직하게 말한다.
+      if (!st.loaded.some((l) => l.ready)) {
+        try {
+          const r = await fetch(`http://127.0.0.1:${PORT}/v1/models`, { signal: AbortSignal.timeout(2500) });
+          if (r.ok) {
+            const j = (await r.json()) as { models?: { name?: string }[]; data?: { id?: string }[] };
+            const mid = j.models?.[0]?.name || j.data?.[0]?.id || "외부 기동 모델";
+            st.running = true;
+            st.modelId = st.modelId ?? mid;
+            st.loaded = [...st.loaded, { modelId: mid, port: PORT, ready: true }];
+          }
+        } catch {
+          /* 포트가 안 살아 있으면 그대로 둔다 — 진짜 멈춤이다 */
+        }
+      }
+      res.json(st);
+    })
+  );
   // GIJO 구동 티어 조회 — GPU 실측 + 현재 티어 + 권장 판정 + 티어 사양표. 설정 화면 "구동 티어" 구역용.
   app.get(
     "/api/localengine/tier",
