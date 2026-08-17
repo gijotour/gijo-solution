@@ -6,12 +6,15 @@ import {
   shouldRunLexical,
   hasExactCode,
   fuseResults,
+  fuseVariantVectors,
   isRelevant,
   applyCategoryBoost,
   categoryForScreen,
   CATEGORY_BOOST,
   RRF_K,
+  REWRITE_RANK_PENALTY,
   type FusedChunk,
+  type VariantHit,
 } from "../src/engine/hybridsearch";
 
 const MAX_DIST = 0.95; // RAG_RELEVANCE_MAX_DISTANCE와 같은 값(실측으로 정해진 임계값)
@@ -212,5 +215,55 @@ describe("관련성 게이트 — 잡음 주입 방지(2026-07-19 사고 재발 
     // 실측된 무관 질문 거리 범위 1.086~1.285
     const irrelevant = [1.086, 1.2, 1.285].map((d) => chunk({ distance: d }));
     expect(irrelevant.filter((c) => isRelevant(c, MAX_DIST))).toHaveLength(0);
+  });
+});
+
+describe("질의 변형 융합 — 재작성 랭킹 페널티(2026-08-17 실측 결함 재현)", () => {
+  it("REWRITE_RANK_PENALTY는 근소한 오염만 거르는 보수적 값(큰 재작성 이득은 안 지운다)", () => {
+    expect(REWRITE_RANK_PENALTY).toBeGreaterThan(0);
+    expect(REWRITE_RANK_PENALTY).toBeLessThan(0.1); // 0.2대 재작성 이득(KEV 0.840→0.633 등)을 못 지운다
+  });
+
+  it("뜻 잃은 재작성 오염이 정답을 못 제친다 — 순위엔 벌점, 거리 칸엔 진짜값", () => {
+    // 실측 재현: 원문/정규화는 정답(good)이 0.478로 가깝고, 재작성 "제품 사용 방법"은
+    //   엉뚱한 문서(wrong)에 0.449로 가까웠다. 벌점이 없으면 오염이 1위가 된다.
+    const 원문: VariantHit[] = [{ text: "g", documentId: "good", distance: 0.478 }];
+    const 재작성: VariantHit[] = [{ text: "w", documentId: "wrong", distance: 0.449 }];
+
+    const 벌점없이 = fuseVariantVectors([{ hits: 원문, penalty: 0 }, { hits: 재작성, penalty: 0 }]);
+    expect(벌점없이[0].documentId).toBe("wrong"); // 이게 실측된 버그(0.449 < 0.478)
+
+    const 벌점 = fuseVariantVectors([{ hits: 원문, penalty: 0 }, { hits: 재작성, penalty: 0.05 }]);
+    expect(벌점[0].documentId).toBe("good"); // 정답 복귀(wrong 0.449+0.05=0.499 > 0.478)
+    // ⚠ 오염 조각의 **거리 칸은 진짜값(0.449)** — 게이트가 벌점에 오염되지 않는다
+    expect(벌점.find((h) => h.documentId === "wrong")!.distance).toBeCloseTo(0.449);
+  });
+
+  it("큰 재작성 이득은 벌점에도 살아남는다(0.05는 근소한 오염만 거른다)", () => {
+    // "IPS 오탐"류: 원문 0.47 → 재작성 0.384(이득 0.086). 벌점 0.05로도 재작성이 이긴다.
+    const 결과 = fuseVariantVectors([
+      { hits: [{ text: "a", documentId: "docA", distance: 0.47 }], penalty: 0 },
+      { hits: [{ text: "b", documentId: "docB", distance: 0.384 }], penalty: 0.05 },
+    ]);
+    expect(결과[0].documentId).toBe("docB"); // 0.384+0.05=0.434 < 0.47
+  });
+
+  it("같은 조각이 여러 변형에 걸리면 하나로 합치고 거리는 진짜 최소(벌점 무관)", () => {
+    const r = fuseVariantVectors([
+      { hits: [{ text: "shared", documentId: "d", distance: 0.6 }], penalty: 0 },
+      { hits: [{ text: "shared", documentId: "d", distance: 0.4 }], penalty: 0.05 },
+    ]);
+    expect(r).toHaveLength(1);
+    expect(r[0].distance).toBeCloseTo(0.4); // 게이트용 진짜 최소거리(벌점 미반영)
+  });
+
+  it("변형이 하나뿐(원문만)이어도 정상 — 페널티 0", () => {
+    const r = fuseVariantVectors([{ hits: [{ text: "x", documentId: "d", distance: 0.5 }], penalty: 0 }]);
+    expect(r.map((h) => h.distance)).toEqual([0.5]);
+  });
+
+  it("빈 입력에도 죽지 않는다", () => {
+    expect(fuseVariantVectors([])).toEqual([]);
+    expect(fuseVariantVectors([{ hits: [], penalty: 0 }])).toEqual([]);
   });
 });

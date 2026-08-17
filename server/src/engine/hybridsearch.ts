@@ -265,6 +265,76 @@ export interface FusedChunk {
 // 순위가 밀린 결과의 영향을 완만하게 줄여, 한쪽 검색이 크게 틀려도 다른 쪽이 회복시킨다.
 export const RRF_K = 60;
 
+/**
+ * **재작성 질의의 랭킹 페널티**(2026-08-17). rewriteForSearch가 만든 변형은 recall을 넓히지만,
+ * 뜻을 잃은 재작성이 엉뚱한 문서를 min-거리 융합으로 1위에 올리는 사고가 있었다.
+ *
+ * ■ 실측(doc-probe 유일 실패 1건): "이 제품으로 하루를 어떻게 시작해?"
+ *     원문/정규화는 정답(실무매뉴얼·이렇게_쓰면·활용가이드)이 이긴다(거리 0.48~0.51).
+ *     그런데 재작성이 "제품 사용 방법"으로 **의도어(하루·시작)를 버리고 '제품'만 남겨**,
+ *     제품(46회) 문서인 보안제품관리_지침에 0.449로 가장 가까워졌다. min-거리 융합이 그 0.449를
+ *     그 문서 점수로 삼아 정답 위로 올렸다 — 라이브 랭킹 1위가 보안제품관리였다.
+ *
+ * ■ 왜 페널티인가 — min-합집합은 recall만 늘리고 **정밀도 방어가 없다**(원문의 좋은 거리는
+ *   지켜지지만, 나쁜 재작성의 낮은 거리가 엉뚱한 문서에 그대로 붙는다). 재작성을 원문/정규화보다
+ *   조금 불리하게 둬 **재작성이 확실히 더 나을 때만(≥이 값) 순위를 바꾸게** 한다.
+ *
+ * ■ 왜 0.05인가(실측 스윕) — 목표 질문은 0.03부터 정답이 1위로 돌아오고, 큰 재작성 이득은
+ *   그대로 산다: "IPS 오탐 튜닝"(미검색→0.508)·"KEV 조치 기한"(0.840→0.633)처럼 0.2대 개선은
+ *   0.05로 못 지운다. 0.05는 **근소한 오염만** 걸러내는 보수적 문턱이다(정상 6종 질문 회귀 없음).
+ *
+ * ■ ⚠ **랭킹에만 쓴다.** 관련성 게이트(거리 임계값)·근거 세기 배지에는 진짜 최소거리를 쓴다 —
+ *   약한 근거를 인위로 강등하면 "직접 자료 못 찾음" 판정이 어긋난다(queryMemoryGraded 참고).
+ */
+export const REWRITE_RANK_PENALTY = ((): number => {
+  // ⚠ Number(env ?? 0.05)로 두면 오타("abc")가 NaN이 되고, rankDistance=거리+NaN → 정렬이
+  //   조용히 뒤엉킨다(재작성으로 잡힌 조각들의 순서 오염). 조용한 실패를 막는다:
+  //   미설정·빈값·비수치·음수는 기본 0.05로, 명시적 0(끄기)만 허용한다.
+  const raw = process.env.GIJO_SEARCH_REWRITE_PENALTY?.trim();
+  if (!raw) return 0.05;
+  const v = Number(raw);
+  return Number.isFinite(v) && v >= 0 ? v : 0.05;
+})();
+
+/** 한 질의 변형의 벡터 후보 하나. */
+export interface VariantHit {
+  text: string;
+  documentId: string;
+  distance: number;
+  category?: string;
+}
+
+/**
+ * **여러 질의 변형(원문·정규화·재작성)의 벡터 후보를 조각 단위로 합친다.**
+ *
+ * 조각마다 두 거리를 낸다:
+ *   · distance     — 변형 전체의 **진짜 최소거리**. 관련성 게이트·근거 세기 배지가 쓴다(페널티 없음).
+ *   · 랭킹거리(속) — 변형별 (거리 + 페널티)의 최소. **순위**에만 쓰고 결과엔 안 남긴다.
+ *
+ * 반환은 **랭킹거리 오름차순**이되 각 항목의 distance 칸은 진짜 최소거리다 — 그래서 뒤의
+ * fuseResults(RRF)는 이 순서를 순위 신호로 쓰고, isRelevant는 오염되지 않은 거리로 판정한다.
+ *
+ * 왜 페널티인가 — 재작성 변형은 recall을 넓히지만 뜻을 잃으면 엉뚱한 문서를 min-거리로 1위에
+ * 올린다(REWRITE_RANK_PENALTY 주석의 실측). 원문/정규화는 penalty=0, 재작성만 > 0을 줘
+ * **재작성이 확실히 더 나을 때만** 순위를 바꾸게 한다.
+ */
+export function fuseVariantVectors(variants: { hits: VariantHit[]; penalty: number }[]): VariantHit[] {
+  const byKey = new Map<string, { hit: VariantHit; rank: number }>();
+  for (const { hits, penalty } of variants) {
+    for (const h of hits) {
+      const key = JSON.stringify([h.documentId, h.text]); // (문서, 조각) 쌍 — 충돌 없는 키
+      const rank = h.distance + penalty; // 순위용 거리
+      const prev = byKey.get(key);
+      if (!prev) byKey.set(key, { hit: { ...h }, rank });
+      else {
+        if (h.distance < prev.hit.distance) prev.hit.distance = h.distance; // 게이트가 볼 진짜 최소거리
+        if (rank < prev.rank) prev.rank = rank; // 순위는 페널티 반영
+      }
+    }
+  }
+  return [...byKey.values()].sort((a, b) => a.rank - b.rank).map((v) => v.hit);
+}
+
 /** 같은 조각을 (documentId, text) 기준으로 합치고 RRF로 순위를 낸다. */
 export function fuseResults(input: FusionInput, codes: string[]): FusedChunk[] {
   const byKey = new Map<string, FusedChunk>();

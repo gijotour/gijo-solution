@@ -28,9 +28,12 @@ import {
   applyOriginBoost,
   categoryForScreen,
   categoryForRole,
+  fuseVariantVectors,
   CATEGORIES,
+  REWRITE_RANK_PENALTY,
   type Category,
   type FusedChunk,
+  type VariantHit,
 } from "./hybridsearch";
 
 // 문서 단위 메타데이터(업로드 시각·원본 경로)는 SQLite에 둔다 — LanceDB 스키마는 건드리지 않는다.
@@ -826,8 +829,15 @@ async function hybridSearch(question: string, topK: number, agentId?: string, sc
   //       조각마다 **가장 가까운 거리**를 쓴다. 실패·느림이면 조용히 빠진다(searchrewrite 참고).
   const 다듬은 = normalizeForSearch(question);
   const 다시쓴 = await rewriteForSearch(question);
-  const 질의들 = [question, ...(다듬은 ? [다듬은] : []), ...(다시쓴 && 다시쓴 !== 다듬은 ? [다시쓴] : [])];
-  const queryVectors = await embed(질의들);
+  // 변형마다 **랭킹 페널티**를 붙인다 — 원문·정규화는 뜻을 바꾸지 않아 0, 재작성만
+  //   REWRITE_RANK_PENALTY(뜻을 잃은 재작성이 엉뚱한 문서를 min-거리 융합으로 1위에 올리던 사고 방지).
+  //   ⚠ 페널티는 **순위**에만 쓰고, 관련성 게이트가 볼 거리(distance)는 진짜 최소값으로 남긴다(아래).
+  const 질의들: { text: string; penalty: number }[] = [
+    { text: question, penalty: 0 },
+    ...(다듬은 ? [{ text: 다듬은, penalty: 0 }] : []),
+    ...(다시쓴 && 다시쓴 !== 다듬은 ? [{ text: 다시쓴, penalty: REWRITE_RANK_PENALTY }] : []),
+  ];
+  const queryVectors = await embed(질의들.map((q) => q.text));
   const scopes = agentId && agentId !== GLOBAL_SCOPE ? [GLOBAL_SCOPE, safeScope(agentId)] : [GLOBAL_SCOPE];
   // ★ 등급 차단은 **검색 조건에 넣는다**(가져온 뒤 거르지 않는다).
   //   표준(OWASP RAG 등)이 한목소리로 권하는 방식이다 — 가져온 뒤 지우면 AI가 이미 본
@@ -850,25 +860,28 @@ async function hybridSearch(question: string, topK: number, agentId?: string, sc
 
   let vector: { text: string; documentId: string; distance: number; category?: string }[] = [];
   try {
-    // 질의마다 후보를 떠 와 **조각 단위로 가까운 거리**만 남긴다(합집합·최소거리).
-    const 모음 = new Map<string, { text: string; documentId: string; distance: number; category?: string }>();
-    for (const qv of queryVectors) {
-      const rows = (await table.search(qv).where(whereClause).limit(candidates).toArray()) as (MemoryRow & {
+    // 질의(변형)마다 후보를 떠 오고, 조각 단위 융합은 fuseVariantVectors에 맡긴다 —
+    //   진짜 최소거리(게이트·배지용)와 페널티 반영 랭킹거리(순위용)를 나눠, **순위만** 재작성 변형에 벌점을 준다.
+    const 변형결과: { hits: VariantHit[]; penalty: number }[] = [];
+    for (let vi = 0; vi < queryVectors.length; vi += 1) {
+      const rows = (await table.search(queryVectors[vi]).where(whereClause).limit(candidates).toArray()) as (MemoryRow & {
         _distance?: number;
       })[];
-      for (const r of rows) {
-        // 이미 저장돼 있는 바이너리꼴 조각(과거 인입분)은 후보에서 뺀다 — 인입 필터(chunkText)가
-        // 새 오염을 막고, 이 줄이 **기존 오염**을 막는다. 후보를 topK의 4배로 떠 오므로 topK는 찬다.
-        if (isBinaryLikeChunk(r.text)) continue;
-        const key = `${r.documentId}\u0000${r.text}`;
-        const d = Number(r._distance ?? Number.POSITIVE_INFINITY);
-        const 이전 = 모음.get(key);
-        if (!이전) 모음.set(key, { text: r.text, documentId: r.documentId, distance: d, ...(r.category ? { category: r.category } : {}) });
-        else if (d < 이전.distance) 이전.distance = d;
-      }
+      // 이미 저장돼 있는 바이너리꼴 조각(과거 인입분)은 후보에서 뺀다 — 인입 필터(chunkText)가 새 오염을,
+      // 이 줄이 **기존 오염**을 막는다. 후보를 topK의 4배로 떠 오므로 topK는 찬다.
+      const hits: VariantHit[] = rows
+        .filter((r) => !isBinaryLikeChunk(r.text))
+        .map((r) => ({
+          text: r.text,
+          documentId: r.documentId,
+          distance: Number(r._distance ?? Number.POSITIVE_INFINITY),
+          ...(r.category ? { category: r.category } : {}),
+        }));
+      변형결과.push({ hits, penalty: 질의들[vi].penalty });
     }
-    // 거리순으로 정렬해 넘긴다 — 융합(RRF)이 **순위**를 쓰므로 순서가 곧 신호다.
-    vector = [...모음.values()].sort((a, b) => a.distance - b.distance).slice(0, candidates);
+    // 순위는 **페널티 반영 거리**로, 넘기는 distance 칸은 **진짜 최소거리** — 뒤의 관련성 게이트·근거 세기
+    // 배지는 페널티에 영향받지 않는다(fuseVariantVectors 참고).
+    vector = fuseVariantVectors(변형결과).slice(0, candidates);
   } catch (err) {
     console.warn(`[memory] 지식 베이스 검색 실패: ${err instanceof Error ? err.message : String(err)}`);
     return [];
