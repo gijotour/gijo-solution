@@ -81,9 +81,16 @@
       <button id="upGo">넣기</button>
     </div>
     <div id="upMsg"></div>
+    <!-- ① 재편(2026-08-17): 나만의 메모장 통합 — 폴더 연결(Smart MD 흐름)을 여기로 흡수. -->
+    <div class="sub" style="margin-top:14px">또는 <b>폴더를 연결</b>해 그 안의 메모(.md·.txt)를 한 번에 넣습니다 — GIJO Smart MD로 쓴 문서도 이 흐름으로 지식이 됩니다.</div>
+    <div class="ask">
+      <button class="go" id="folderPick" type="button">📁 폴더에서 넣기</button>
+      <button id="smdOpen" type="button" title="GIJO Smart MD Studio — 무료 문서 작성 도구(별도 창)">📝 문서 작성 (창)</button>
+    </div>
+    <div id="folderMsg"></div>
     <!-- ⚠ 2026-08-13 확인: PDF 추출은 python3+pypdf인데 라이트 동봉본에 파이썬이 없다 — lite-manuals 주석 참조. -->
   <div class="warn">⚠ <b>글자 파일(.md · .txt · .log · .csv)</b>만 됩니다. PDF·워드는 추출기가 따로 필요해
-    라이트에는 아직 없습니다 — 지금 넣으면 <b>못 읽는 글이 지식으로 저장</b>되기 때문에 막아 두었습니다.</div>
+    라이트에는 아직 없습니다 — 지금 넣으면 <b>못 읽는 글이 지식으로 저장</b>되기 때문에 막아 두었습니다. 폴더 연결도 메모(.md·.txt)만 읽습니다.</div>
   </section>
 
   <section class="card">
@@ -456,10 +463,37 @@
     목록();
   }
 
+  // ① 재편: 폴더 연결(Smart MD 흐름) — 폴더의 메모(.md·.txt)를 통째로 넣는다. 읽기만 한다(쓰기 없음).
+  async function 폴더넣기() {
+    var msg = document.getElementById("folderMsg"), btn = document.getElementById("folderPick");
+    btn.disabled = true; msg.innerHTML = '<div class="empty">폴더 고르는 중…</div>';
+    try {
+      var pick = await g.pickWorkFolder();
+      if (!pick || pick.cancelled) { msg.innerHTML = ""; btn.disabled = false; return; }
+      var dir = await g.listDir("");
+      var 메모들 = ((dir && dir.items) || []).filter(function (x) { return !x.dir && /\.(md|markdown|txt)$/i.test(x.name); });
+      if (!메모들.length) { msg.innerHTML = '<div class="warn">이 폴더에 메모(.md·.txt)가 없습니다 — 다른 폴더를 골라 주세요.</div>'; btn.disabled = false; return; }
+      msg.innerHTML = '<div class="empty">' + 메모들.length + '개 메모 넣는 중…</div>';
+      var ok = 0, fail = 0;
+      for (var i = 0; i < 메모들.length; i++) {
+        try { var r = await g.readFile(메모들[i].name); await g.ingestMemoryFile(메모들[i].name, String(r.content || ""), "global"); ok++; }
+        catch (e) { fail++; }
+      }
+      msg.innerHTML = '<div class="ok">' + ok + '개 넣었습니다' + (fail ? ' (' + fail + '개 실패)' : '') + ' — 위에서 찾을 수 있습니다.</div>';
+      목록();
+    } catch (e) { msg.innerHTML = '<div class="err">' + 오류문구(e, "폴더 연결") + "</div>"; }
+    btn.disabled = false;
+  }
+
   function 시작() {
     document.getElementById("askGo").addEventListener("click", 찾기);
     document.getElementById("q").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); 찾기(); } });
     document.getElementById("upGo").addEventListener("click", 넣기);
+    document.getElementById("folderPick").addEventListener("click", 폴더넣기);
+    document.getElementById("smdOpen").addEventListener("click", function () {
+      if (g && g.openSmartMd) { try { g.openSmartMd(); return; } catch (e) { /* 아래 안내 */ } }
+      alert("이 판에는 문서 작성 도구(GIJO Smart MD)가 없습니다.");
+    });
     목록();
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", 시작);

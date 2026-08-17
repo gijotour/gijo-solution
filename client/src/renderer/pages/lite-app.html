@@ -191,14 +191,26 @@
       a.className = "lite-nav-item" + (지금 === s.id ? " on" : "") + (s.구현됨 ? "" : " todo");
       a.type = "button";
       a.dataset.id = s.id;
-      // no=0은 번호 없는 특별 항목(AI에게 물어보기) — 숫자 대신 💬.
+      // no=0은 번호 없는 특별 항목(💬). s.아이콘이 있으면 그걸 쓴다(📝 문서 작성=창 항목, 재편 ②).
       a.innerHTML =
-        '<span class="n">' + (s.no ? s.no : "💬") + "</span>" +
+        '<span class="n">' + (s.아이콘 || (s.no ? s.no : "💬")) + "</span>" +
         '<span class="t">' + esc(s.이름) + "</span>" +
+        (s.무료 ? '<span class="badge">무료</span>' : "") +
         (s.구현됨 ? "" : '<span class="badge">준비 중</span>');
-      a.addEventListener("click", function () { 열기(s.id); });
+      // 창 항목(② Smart MD)은 iframe이 아니라 별도 창을 연다 — 본문·하이라이트를 바꾸지 않는다.
+      a.addEventListener("click", function () { if (s.창) 창열기(s); else 열기(s.id); });
       box.appendChild(a);
     });
+  }
+
+  // 창-실행 항목(재편 ② — 표준 nav.js의 page.win과 같은 결) — window.gijo의 창 함수를 부른다.
+  //   iframe으로 못 여는 별도 창(Smart MD)이라 여기서 갈래를 둔다. 미동봉 판이면 규약대로 안내.
+  function 창열기(s) {
+    var fn = s.창;
+    if (window.gijo && typeof window.gijo[fn] === "function") {
+      try { window.gijo[fn](); return; } catch (e) { /* 아래 안내 */ }
+    }
+    alert("이 판에는 문서 작성 도구(GIJO Smart MD)가 없습니다.");
   }
 
   function esc(v) {
@@ -211,6 +223,7 @@
     var s = 화면목록.find(function (x) { return x.id === id; })
          || (자료 && 자료.settings && 자료.settings.id === id ? 자료.settings : null);
     if (!s) return;
+    if (s.창) { 창열기(s); return; } // 창 항목(② Smart MD)은 iframe으로 안 연다 — 본문 유지.
     지금 = id;
     그리기();
     설정그리기();
