@@ -1,0 +1,759 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 작업 내역 3층 분리 + 축 2개 + State Folding 시안</title>
+<!--
+  ════════════════════════════════════════════════════════════════════════
+  GIJO AS 시안 — 「작업 내역」에 쌓이는 기록을 감사/작업내역/기억(AI학습) 3층으로 가르고,
+  작업내역 화면 안에서 두 축(내가 시킨 일↔시스템 · 실행↔조회) + QA 표시로 "선택적으로 남긴다".
+  경로: mockups/작업내역_구분/시안.html — gijo-mockup 서브에이전트가 만듦(제품 코드는 읽기만 함).
+
+  【사장님 지시 원문(2026-08-17)】
+   "우리제품에도 너처럼 많은데이터가 오면 정리하고 작업내역에 선택적으로 남겼으면 좋겠다.
+    작업내역 구분도 필요한거 같아." → win 의견 제시 → 사장님 "너 의견대로 진행하자" 승인.
+
+  【이 파일이 실제로 하는 일 — 정지 그림이 아니다】
+   축 필터(주체/종류) · QA 포함 토글 · 검색 · 행 선택 · 접기/펼치기(State Folding)는 이 파일
+   안에서 실제로 동작한다(순수 JS, 가짜 데이터 20건). 다만 삭제·이름변경·리포트 만들기·
+   대화창 이동·감사 화면 이동처럼 이 화면 밖으로 나가거나 데이터를 바꾸는 동작은 자리만
+   있고 눌러도 아무 일도 하지 않는다 — 제품 코드(client/·server/)는 이 파일 밖 어디도
+   건드리지 않았다.
+
+  【설계 전 조사 — 요약(본문 "B. 근거" 표에 원문 인용·URL 전부 있음)】
+   · AWS CloudTrail readOnly 필드(docs.aws.amazon.com) — 읽기전용/쓰기전용을 API가 이미 구분.
+   · GitHub 감사 로그 actor_is_bot/actor_is_agent 필드(docs.github.com) — 사람/자동화 행위자 구분.
+   · "State Folding"(Fu et al. 2026, arXiv 2607.25066) — 대화를 자유 요약이 아니라 구조화된
+     값(key-value)으로 접는 기법. 트렁케이션·자유요약과 다른 세 번째 압축 방식.
+   · 감사 로그 vs 활동 피드(appmaster.io) — "완전·불변 기록"과 "사용자용 선별 화면"은 원래
+     같은 시스템의 다른 산출물이라는 업계 정리.
+   · 내부 선례 — server/src/engine/actioncheck.ts:91-99의 `qa INTEGER` 컬럼이 이미
+     "저장은 하되 표시·집계에서 제외"(원문 주석) 패턴을 쓰고 있다. 새 발명이 아니라
+     이 코드베이스에 이미 검증된 관례를 작업내역 화면에도 넓히는 것.
+
+  이 파일은 mockups/ 안에만 쓴다. client/·server/ 등 제품 코드는 읽었을 뿐 고치지 않았다.
+  ════════════════════════════════════════════════════════════════════════
+-->
+<style>
+/* ════════ 1) 실제 sessions.html :root 색 토큰 — 글자 하나도 안 바꿈 ════════
+   (client/src/renderer/pages/sessions.html:8-12 그대로 복사) */
+:root{
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
+
+/* ════════ 2) sessions.html 실제 CSS 발췌 — 재현에 쓰는 것만, 값 그대로(sessions.html:128-157) ════════ */
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:15px 17px;}
+.ph{font-size:13.5px;font-weight:800;color:#fff;margin-bottom:10px;}
+.two{display:grid;grid-template-columns:1.05fr 1.35fr;gap:16px;align-items:start;}
+.search{margin:9px 0 4px;display:flex;align-items:center;gap:7px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:7px 11px;}
+.search input{flex:1;background:transparent;border:0;outline:none;color:var(--text);font-size:12px;}
+.search input::placeholder{color:var(--muted-2);}
+.filters{display:flex;gap:6px;margin:8px 0;flex-wrap:wrap;}
+.fchip{font-size:12.5px;padding:5px 11px;border-radius:20px;background:var(--panel-2);border:1px solid var(--border);color:var(--muted);cursor:pointer;}
+.fchip.active{background:rgba(59,130,246,.12);border-color:rgba(59,130,246,.4);color:#fff;}
+.slist{max-height:640px;overflow-y:auto;}
+.sdot{width:8px;height:8px;border-radius:50%;flex:none;}
+.sdot.active{background:var(--teal);}.sdot.done{background:var(--muted-2);}.sdot.ignored{background:var(--muted-2);opacity:.5;}
+.sr-main{flex:1;min-width:0;}
+.sr-title{font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#fff;}
+.sr-sub{font-size:12px;color:var(--muted);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.sr-meta{font-size:11.5px;color:var(--muted-2);flex:none;text-align:right;white-space:nowrap;}
+.badge{font-size:11.25px;font-weight:800;padding:2px 8px;border-radius:20px;}
+.b-active{color:var(--teal);background:rgba(30,185,128,.14);}.b-done{color:var(--muted-2);background:rgba(255,255,255,.05);}.b-ignored{color:var(--muted-2);background:rgba(255,255,255,.04);}
+.conv{flex:1;overflow-y:auto;padding:2px 0;min-height:0;}
+.turn{margin-bottom:12px;}
+.you{background:var(--panel-2);border:1px solid var(--border);border-radius:9px;padding:9px 13px;font-size:12.5px;margin-bottom:6px;line-height:1.5;}
+.you b{color:var(--blue-light);}
+.ai{font-size:12.5px;color:var(--muted);line-height:1.65;padding-left:4px;white-space:pre-wrap;}
+.status-card{background:var(--panel-2);border:1px solid var(--border-strong);border-radius:10px;padding:11px 14px;margin-bottom:8px;}
+.cin{padding:11px 0 0;border-top:1px solid var(--border);display:flex;gap:8px;margin-top:10px;}
+.cin button{background:var(--blue);color:#fff;border:0;border-radius:9px;padding:9px 16px;font-weight:800;font-size:12.5px;cursor:pointer;flex:1;opacity:.55;cursor:not-allowed;}
+.list-empty{padding:22px 8px;color:var(--muted-2);font-size:12px;text-align:center;line-height:1.7;}
+.btn-ghost{background:var(--panel);color:var(--text);border:1px solid var(--border-strong);padding:6px 11px;border-radius:8px;font-size:11.75px;font-weight:700;cursor:not-allowed;opacity:.55;}
+.btn-danger{background:rgba(226,72,61,.14);color:#f5928a;border:1px solid #e2483d;padding:6px 11px;border-radius:8px;font-size:11.75px;font-weight:800;cursor:not-allowed;opacity:.55;}
+
+/* ════════ 3) 이번 시안의 신규 CSS — 실제 제품에는 아직 없다(3층 배지·축 필터·QA 표시·state-fold) ════════ */
+.layer-strip{display:flex;align-items:stretch;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--panel);margin-bottom:12px;}
+.lseg{flex:1;padding:11px 15px;}
+.lseg .lt{font-size:11.5px;font-weight:800;color:var(--muted-2);}
+.lseg .lc{display:block;font-size:19px;font-weight:800;color:#fff;margin:3px 0 2px;}
+.lseg .lsub{font-size:11.25px;color:var(--muted);line-height:1.55;}
+.lseg.on{background:rgba(59,130,246,.10);}
+.lseg.on .lt{color:var(--blue-light);}
+.larrow{display:flex;align-items:center;justify-content:center;width:32px;color:var(--muted-2);font-size:14px;background:var(--panel-2);flex:none;}
+
+.audit-only-note{font-size:11.5px;color:var(--muted-2);background:var(--panel-2);border:1px dashed var(--border-strong);border-radius:8px;padding:8px 12px;margin-bottom:12px;line-height:1.65;}
+.audit-only-note b{color:var(--text);}
+.ghostlink{color:var(--blue-light);text-decoration:none;border-bottom:1px dashed var(--blue-light);cursor:not-allowed;}
+
+.repl-disclaimer{font-size:11.25px;color:var(--muted-2);background:rgba(255,255,255,.03);border:1px dashed var(--border-strong);border-radius:8px;padding:7px 12px;margin-bottom:12px;line-height:1.65;}
+.repl-disclaimer b{color:var(--amber);}
+
+.axis-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin:6px 0;}
+.axis-label{font-size:11.25px;color:var(--muted-2);font-weight:800;width:34px;flex:none;}
+.axis-chip{font-size:11.75px;padding:4px 10px;border-radius:20px;background:var(--panel-2);border:1px solid var(--border);color:var(--muted);cursor:pointer;display:inline-flex;align-items:center;gap:5px;user-select:none;}
+.axis-chip b{font-weight:800;color:var(--muted-2);font-size:11.25px;}
+.axis-chip.on{background:rgba(59,130,246,.14);border-color:var(--blue);color:#fff;}
+.axis-chip.on b{color:var(--blue-light);}
+.qa-toggle{display:inline-flex;align-items:center;gap:7px;font-size:11.75px;color:var(--muted);cursor:pointer;background:var(--panel-2);border:1px dashed rgba(240,160,32,.45);border-radius:20px;padding:4px 10px;user-select:none;}
+.qa-toggle input{accent-color:var(--amber);}
+.qa-toggle b{color:var(--amber);font-size:11.25px;}
+
+.hidden-note{font-size:11.5px;color:var(--muted-2);padding:7px 2px 9px;line-height:1.65;border-bottom:1px solid var(--border);margin-bottom:5px;}
+.hidden-note b{color:var(--text);}
+.hidden-note .hb{color:var(--blue-light);font-weight:700;}
+
+.wrow{display:flex;align-items:center;gap:9px;border-radius:9px;cursor:pointer;margin-bottom:3px;border:1px solid transparent;}
+.wrow:hover{background:var(--panel-2);}
+.wrow.on{background:rgba(59,130,246,.10);border-color:rgba(59,130,246,.32);}
+.wrow-act{padding:10px 11px;}
+.wrow-qry{padding:7px 11px;font-size:12px;color:var(--muted);}
+.wrow-sys .sr-title{color:#c9bdf8;}
+.wrow-qa{border-style:dashed;border-color:rgba(240,160,32,.4);}
+.w-ic{font-size:12px;flex:none;}
+.w-qa{font-size:11px;font-weight:800;color:var(--amber);background:rgba(240,160,32,.14);border-radius:4px;padding:1px 5px;margin-left:5px;}
+.wr-line{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.wr-time{font-size:11.25px;color:var(--muted-2);flex:none;}
+
+.fold-card .fc-h{display:flex;align-items:center;gap:8px;font-weight:800;color:#fff;font-size:12.25px;margin-bottom:6px;}
+.fc-tag{font-size:11px;font-weight:800;color:var(--teal);background:rgba(30,185,128,.14);border-radius:5px;padding:1px 7px;}
+.fc-tag.sys{color:var(--purple);background:rgba(139,124,240,.14);}
+.fc-tag.qa{color:var(--amber);background:rgba(240,160,32,.14);}
+.fold-card .fc-line{font-size:13px;color:var(--text);line-height:1.6;margin-bottom:6px;}
+.fold-card .fc-meta{font-size:11.5px;color:var(--muted-2);}
+.fold-card .fc-note{font-size:11.25px;color:var(--muted-2);margin-top:9px;padding-top:9px;border-top:1px solid var(--border);line-height:1.65;}
+
+.fold-toggle{display:block;width:100%;background:var(--panel-2);border:1px dashed var(--border-strong);border-radius:8px;padding:8px;font-size:12px;font-weight:700;color:var(--blue-light);cursor:pointer;margin-bottom:9px;font-family:inherit;}
+.fold-toggle:hover{border-style:solid;border-color:var(--blue-light);}
+.turns-wrap{display:none;}
+
+.del-note{font-size:11.25px;color:var(--muted-2);margin-top:9px;line-height:1.65;}
+.del-note b{color:#f5928a;}
+.detail-head-row{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px;}
+.detail-title{font-weight:800;color:#fff;font-size:13.5px;line-height:1.5;}
+.detail-acts{display:flex;gap:6px;flex:none;}
+.status-sel{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--text);border-radius:7px;padding:4px 7px;font-size:11.75px;font-weight:700;}
+
+/* ════════ 4) 이 문서(시안) 전용 설명 CSS — 실제 제품엔 없다(vuln-plain-line-extend 시안과 같은 값 재사용) ════════ */
+.docwrap{max-width:1220px;margin:0 auto;padding:26px 30px 90px;}
+h1{font-size:20px;font-weight:800;color:#fff;margin-bottom:6px;}
+.lead{font-size:12.5px;color:var(--muted);max-width:1020px;line-height:1.75;margin-bottom:16px;}
+.summary-box{border:1px solid var(--blue);background:rgba(59,130,246,.08);border-radius:10px;padding:14px 18px;margin-bottom:16px;font-size:12.75px;line-height:1.8;}
+.summary-box b{color:#fff;}
+.summary-box ol{margin-left:18px;margin-top:4px;}
+.banner{border:1px solid rgba(240,160,32,.5);background:rgba(240,160,32,.08);color:#f0c060;border-radius:8px;padding:11px 15px;font-size:12.25px;margin-bottom:24px;line-height:1.7;}
+h2{font-size:14.5px;font-weight:800;color:#fff;margin:34px 0 9px;padding-bottom:7px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+h2 .n{color:var(--blue-light);font-size:11px;font-weight:700;letter-spacing:.4px;border:1px solid var(--blue-light);border-radius:4px;padding:2px 7px;}
+h3{font-size:13px;font-weight:800;color:#fff;margin:18px 0 8px;}
+.note{font-size:12.25px;color:var(--muted);line-height:1.75;margin-bottom:10px;max-width:1020px;}
+.note b.hi{color:var(--text);}
+.note b.bad{color:#f5928a;}
+.note b.ok{color:var(--teal);}
+table.t{width:100%;border-collapse:collapse;font-size:12.1px;margin:8px 0 6px;}
+table.t th{text-align:left;color:var(--muted-2);font-weight:700;padding:6px 9px;border-bottom:1px solid var(--border);white-space:nowrap;}
+table.t td{padding:6px 9px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:top;}
+table.t tr:last-child td{border-bottom:none;}
+code{background:var(--panel-2);border-radius:4px;padding:1px 6px;font-size:11.5px;color:#dfe6ff;}
+.meas{font-size:12.25px;color:var(--muted-2);margin-top:8px;line-height:1.7;}
+.meas b{color:var(--teal);}
+.mock-shell{border:1px dashed var(--border-strong);border-radius:12px;padding:16px 18px;margin:12px 0 8px;background:var(--bg);}
+.mock-shell-label{font-size:11px;color:var(--muted-2);margin-bottom:12px;letter-spacing:.3px;}
+.evid-box{border:1px solid rgba(59,130,246,.4);border-radius:10px;padding:12px 14px;background:rgba(59,130,246,.05);margin:10px 0;font-size:12.25px;line-height:1.7;color:var(--text);}
+.evid-box .cap{font-size:11.5px;color:var(--blue-light);font-weight:800;margin-bottom:6px;}
+.warn-box{border:1px solid rgba(240,160,32,.5);border-radius:10px;padding:12px 14px;background:rgba(240,160,32,.07);margin:10px 0;font-size:12.25px;line-height:1.75;color:var(--text);}
+.warn-box .cap{font-size:11.5px;color:#f0c060;font-weight:800;margin-bottom:6px;}
+.reject-box{border:1px solid rgba(226,72,61,.4);border-radius:10px;padding:12px 14px;background:rgba(226,72,61,.05);margin:10px 0;}
+.reject-cap{font-size:11.5px;color:#f5928a;font-weight:800;margin-bottom:8px;}
+.verdict{display:inline-block;font-size:11px;font-weight:800;padding:3px 10px;border-radius:20px;letter-spacing:.2px;}
+.verdict.go{color:var(--teal);background:rgba(30,185,128,.16);}
+.verdict.hold{color:var(--muted-2);background:rgba(255,255,255,.08);}
+.chk-ok{color:var(--teal);font-weight:800;}
+.chk-warn{color:var(--amber);font-weight:800;}
+footer.docfoot{margin-top:50px;padding-top:14px;border-top:1px solid var(--border);font-size:11.5px;color:var(--muted-2);line-height:1.7;}
+</style>
+</head>
+<body>
+<div class="docwrap">
+
+<h1>작업 내역, 뒤섞이지 않게 — 감사·작업내역·기억 3층 분리 + 축 2개(주체·종류) + QA 표시 + State Folding</h1>
+<p class="lead">
+  사장님 지시(2026-08-17): <i>"우리제품에도 너처럼 많은데이터가 오면 정리하고 작업내역에 선택적으로 남겼으면 좋겠다.
+  작업내역 구분도 필요한거 같아."</i> — win이 아래 뼈대로 의견을 냈고, 사장님이 <b>"너 의견대로 진행하자"</b>로 승인했다(2026-08-17).
+  이 시안은 <code>client/src/renderer/pages/sessions.html</code>(작업 내역 화면)을 실제로 어떻게 바꿀지의 <b>추천 1개</b>다.
+</p>
+
+<div class="summary-box">
+  <b>한눈에 — 핵심 결정 3가지</b>
+  <ol>
+    <li><b>기본값을 뒤집는다</b> — "다 남기고 문제되는 걸 뺀다" → <b style="color:var(--teal)">"담당자가 실행한 일만 기본 표시, 시스템이 한 일·조회·QA는 접힘(토글 한 번으로 열림)"</b>.</li>
+    <li><b>화면은 그대로, 축만 얹는다</b> — 새 화면·새 탭을 만들지 않는다. 지금 있는 sessions.html 뼈대(검색·필터·목록·상세) 위에
+      <b>주체(내가/시스템)</b> · <b>종류(실행/조회)</b> 두 축과 <b>QA 표시</b> 하나를 얹는다.</li>
+    <li><b>State Folding — 대화가 아니라 값으로 접는다</b> — 목록 한 줄·상세 첫 화면은 "자산·대상·조치·결과"를 그대로 이어붙인
+      한 줄이다. <b style="color:#f5928a">AI가 새로 요약하지 않는다</b> — 지어낼 수 없는 값 조합이라서다.</li>
+  </ol>
+</div>
+
+<div class="banner">
+  ⚠ <b>정직한 구현 고지</b> — 아래 재현(D절)은 <b>실제로 작동한다</b>: 검색·축 필터·QA 토글·행 선택·접기/펼치기는 이 파일 안에서
+  진짜로 눌러집니다(가짜 데이터 20건). 다만 삭제·이름변경·리포트 만들기·대화창 이동·감사 화면 이동처럼 <b>화면 밖으로 나가거나
+  데이터를 바꾸는</b> 동작은 자리만 있고 눌러도 동작하지 않습니다(회색 점선 표시) — <code>client/</code>·<code>server/</code>는
+  이 작업에서 한 줄도 고치지 않았습니다.
+</div>
+
+<!-- ═══════════════════════════ A. 배경 ═══════════════════════════ -->
+<h2><span class="n">A</span>배경 — 「전부 남긴다」가 이미 세 번 터졌다</h2>
+<div class="warn-box">
+  <div class="cap">실측 — server/src/engine/worksessions.ts:348-362 (그대로 남아 있는 사고 이력 주석)</div>
+  <b>① 로그인 기록으로 도배</b> → auth 제외(worksessions.ts:369 <code>if (e.kind === "auth") return;</code>)<br>
+  <b>② 같은 일이 두 번 보임</b> — 오래 걸린 요청이 리포트로 또 쌓임 → <code>long_answer_saved</code> 제외(worksessions.ts:364)<br>
+  <b>③ 스스로를 먹는 고리</b> — 세션 삭제가 감사에 남고, 그게 다시 새 세션을 만들어 제목이
+  <code>[실행] 작업 세션 삭제 — [실행] 작업 세션 삭제 — …</code>로 재귀했다. <b class="hi">테스트 세션 2,100건을 지워도
+  총계가 824건 그대로였다</b>(2026-07-27) → <code>SESSION_SELF_ACTION_RE</code>로 접두사 통째 차단(worksessions.ts:367).
+</div>
+<p class="note">
+  세 사고 전부 <b class="hi">"항목을 하나씩 예외 목록에 추가"</b>하는 방식으로 막았다 — 두더지 잡기다. 행위가 새로 늘 때마다(새 도구·새
+  자동화) 또 새는 구조다. 실제로 <code>server/src/engine/dispatcher.ts:664</code>는 이미 이렇게 적어 뒀다:
+  <i>"작업내역에 쌓이면 학습 후보함(출처 B)과 담당자의 작업 이력을 오염시킨다."</i> — <b class="bad">알고는 있었는데 구조가 안
+  바뀐 상태</b>였다.
+</p>
+<div class="evid-box">
+  <div class="cap">이미 있는 검증된 선례 — server/src/engine/actioncheck.ts:91-99, 125</div>
+  <code>qa INTEGER NOT NULL DEFAULT 0 -- 게이트/QA 호출 — 저장은 하되 표시·집계에서 제외</code><br>
+  <code>… WHERE qa = 0 ORDER BY id DESC LIMIT ?</code><br>
+  <span style="color:var(--muted-2)">→ 이 코드베이스는 이미 "지우지 않고, 표시에서만 뺀다"는 패턴을 <b>다른 이력 표에서 검증해 쓰고 있다.</b>
+  같은 부류 문제(조치 판정 이력 — 실측 123건 중 121건이 QA, 실사용 2건, 이전 점검 기억 메모 기준)가 <b>이 방어가 없던 표에서
+  실제로 벌어졌다.</b> 이번 시안은 새 발명이 아니라 <b class="ok">이 관례를 work_sessions·화면에도 넓히는 것</b>이다.</span>
+</div>
+<p class="note">
+  ⚠ 정확히 하자면 — <code>work_sessions</code> 테이블 자체는 지금 QA로 오염돼 있지 <b class="ok">않다</b>.
+  <code>dispatcher.ts:662-676</code>에서 <code>qa=true</code> 요청은 세션·협업 피드 기록을 아예 건너뛴다(코드로 확인).
+  이번 시안의 QA 축은 "지금 당장 여기 섞여 있어서"가 아니라 <b class="hi">① 이미 있는 방어를 화면에서도 보이게 하고,
+  ② 방어가 단일 지점(dispatcher.ts 한 곳)에 있어 라우트가 늘면 조용히 샐 수 있는 데 대한 안전판</b>으로 넣는다 — 아래 D절의
+  QA 데모 3건은 "혹시 샌다면 이렇게 보인다"는 가정 데이터임을 미리 밝힌다.
+</p>
+
+<!-- ═══════════════════════════ B. 근거 ═══════════════════════════ -->
+<h2><span class="n">B</span>근거 — 설계 전 조사(표준·모범사례, 전부 이번 작업에서 직접 확인)</h2>
+<table class="t">
+  <tr><th style="width:220px">출처</th><th style="width:380px">확인한 내용(원문 인용)</th><th>이 시안에 반영</th></tr>
+  <tr>
+    <td>AWS CloudTrail 이벤트 레코드<br><span style="color:var(--muted-2)">docs.aws.amazon.com/awscloudtrail/…/cloudtrail-event-reference-record-contents.html</span></td>
+    <td><i>"readOnly — Identifies whether this operation is a read-only operation… true – The operation is
+    read-only… false – The operation is write-only."</i></td>
+    <td><b class="hi">축②(실행/조회)</b>의 직접 근거 — "읽기냐 쓰기냐"를 이벤트 자체의 속성으로 두는 것은 클라우드 업계
+    표준 관제 도구가 이미 쓰는 분류다.</td>
+  </tr>
+  <tr>
+    <td>GitHub 감사 로그<br><span style="color:var(--muted-2)">docs.github.com — "Reviewing the audit log" / "Audit log events for your enterprise"</span></td>
+    <td>감사 로그 항목에 <code>actor_is_bot</code>·<code>actor_is_agent</code> 필드가 있어 자동화 행위자를 구분하고,
+    <code>-actor:hubot</code> 같은 제외 필터로 사람이 볼 화면에서 노이즈를 뺄 수 있다.</td>
+    <td><b class="hi">축①(내가 시킨 일/시스템)</b>의 직접 근거 — 사람 행위자와 자동화 행위자를 필드로 나누고 기본 화면에서
+    자동화를 뺄 수 있게 하는 것은 이미 검증된 업계 패턴이다.</td>
+  </tr>
+  <tr>
+    <td>"State Folding"(Fu et al. 2026)<br><span style="color:var(--muted-2)">arXiv 2607.25066, "Addressable Recall Compaction for
+    Long Context-Window Control in AI Agents"(WebFetch 직접 확인)</span></td>
+    <td><i>"Mapping conversational histories into explicit, structured JSON or key-value state objects."</i>
+    트렁케이션(그냥 버림)·자유요약과 구별되는 세 번째 압축 방식.</td>
+    <td><b class="hi">항목④(State Folding)</b>의 명칭과 정의 그 자체 — 목록 한 줄·상세 첫 화면을 <b>구조화된 값(자산·대상·조치·결과)의
+    조합</b>으로 만든다. 자유 요약이 아니므로 지어냄이 섞일 수 없다.</td>
+  </tr>
+  <tr>
+    <td>감사 로그 vs 활동 피드<br><span style="color:var(--muted-2)">appmaster.io/blog/audit-logging-internal-tools-activity-feed(WebFetch 직접 확인)</span></td>
+    <td><i>"An audit log is only useful if someone can read it quickly during a review or an incident."</i>
+    — 감사 로그(완전·불변)와 활동 피드(사용자용, 선별 표시)는 <b>같은 시스템의 서로 다른 산출물</b>이라는 정리.</td>
+    <td>이번 시안의 <b class="hi">3층 모델(감사↔작업내역)</b> 관계 정의 — 감사는 완전·불변으로 두고, 작업내역은 그 위의
+    "빨리 읽히는" 선별 화면으로 설계한다.</td>
+  </tr>
+  <tr>
+    <td>내부 선례<br><span style="color:var(--muted-2)">server/src/engine/actioncheck.ts:91-99, 125(이번 작업에서 직접 Read)</span></td>
+    <td><code>qa INTEGER NOT NULL DEFAULT 0 -- 저장은 하되 표시·집계에서 제외</code> · <code>WHERE qa = 0</code></td>
+    <td><b class="hi">QA 표시·토글</b>의 근거 — 이미 이 코드베이스에 있는 검증된 관례.</td>
+  </tr>
+  <tr>
+    <td>내부 실측<br><span style="color:var(--muted-2)">worksessions.ts:152, 348-362(이번 작업에서 직접 Read)</span></td>
+    <td>세션 824건까지 쌓인 실측, 3개 사고 이력 주석(위 A절)</td>
+    <td>"왜 지금인가"의 직접 근거 — 예외 목록 방식이 이미 3번 샜다는 사실 자체.</td>
+  </tr>
+</table>
+
+<!-- ═══════════════════════════ C. 설계 ═══════════════════════════ -->
+<h2><span class="n">C</span>설계 — 3층 · 축 2개 + 표시 1개 · 기본 뒤집기 · State Folding</h2>
+
+<h3>세 층 — 목적이 다르면 규칙도 다르다</h3>
+<table class="t">
+  <tr><th style="width:140px">층</th><th style="width:220px">무엇</th><th style="width:160px">누가 보나</th><th>규칙</th></tr>
+  <tr><td><b style="color:var(--text)">감사 기록</b><br><span style="color:var(--muted-2)">audit.html</span></td>
+    <td>법·규정 때문에 남기는 것 — 전부</td><td>사고 조사 때만</td><td><b class="ok">전부 남긴다 · 지우면 안 된다(불변)</b></td></tr>
+  <tr><td><b style="color:var(--text)">작업 내역</b><br><span style="color:var(--muted-2)">sessions.html — 이 시안의 대상</span></td>
+    <td>"내가 뭘 했나" 되짚는 곳</td><td>담당자가 매일</td><td><b class="hi">선택적이어야 한다 — 기본은 좁게, 토글로 넓힌다</b></td></tr>
+  <tr><td><b style="color:var(--text)">기억(AI 학습)</b><br><span style="color:var(--muted-2)">memory 화면 — 이번 범위 밖</span></td>
+    <td>AI가 배우는 재료</td><td>AI</td><td><b class="ok">깨끗해야 한다 — 사람이 고른 것만</b></td></tr>
+</table>
+<p class="note">
+  문제의 뿌리: 지금은 감사에 남는 행위 대부분이 <b class="bad">그대로</b> 작업내역에도 복사되고(worksessions.ts:368-384의
+  <code>onAudit</code> 훅), 작업내역이 다시 학습의 원재료 후보다(dispatcher.ts:664 주석). 잡음이 위로 그대로 전파되는 구조다.
+</p>
+
+<h3>축 2개 + 표시 1개 — 이 셋으로 "왜 보이는지/안 보이는지"를 전부 설명한다</h3>
+<table class="t">
+  <tr><th style="width:230px">구분</th><th style="width:330px">뜻</th><th>기본값</th></tr>
+  <tr><td><b>축① 주체</b> — 👤 내가 시킨 일 / 🤖 시스템이 스스로 한 일</td>
+    <td>사람이 대화창에 지시한 것 vs 하드닝 자동 점검·가드레일 차단·30분 자동완료처럼 시스템이 혼자 한 것</td>
+    <td><b class="ok">👤 내가 시킨 일</b> — 이 하나로 "도배" 문제가 사라진다</td></tr>
+  <tr><td><b>축② 종류</b> — 🔧 실행한 일 / 🔍 물어본 것(조회)</td>
+    <td>자산·정책을 바꾸거나 조치한 것 vs "몇 개야?" "이게 뭐야?" 류 질문-답</td>
+    <td>전체(둘 다 보임, 단 조회는 <b class="hi">시각적으로 낮은 값어치</b> — 줄이 작다)</td></tr>
+  <tr><td><b>표시 — QA·테스트</b></td>
+    <td>평가 게이트·회귀 하네스가 만든 문답(actioncheck.ts qa 컬럼과 같은 개념)</td>
+    <td><b class="ok">숨김</b>(토글로 켜야 보임) — "123건 중 121건 QA" 재발 방지</td></tr>
+</table>
+
+<h3>기본을 뒤집는다</h3>
+<p class="note">
+  "다 남기고 문제 되는 걸 뺀다"(예외 목록, 이미 3번 샘) → <b class="ok">"담당자가 실행한 일만 남기고, 시스템이 한 일은
+  감사에만 온전히 남되 작업내역에선 접혀 있다"</b>. 접힌 것은 사라진 게 아니다 — 축 칩을 누르면 그 자리에서 펼쳐진다.
+  <b class="hi">감췄으면 감췄다고 보인다</b>(아래 D절 hidden-note가 실시간으로 숫자를 보여준다).
+</p>
+
+<h3>State Folding — 대화를 상태로 접는다</h3>
+<p class="note">
+  같은 날 전수조사 결론: 대화 20턴을 그대로 쌓지 말고 <b class="hi">"이 자산의 이 취약점을 이렇게 처리함"</b> 한 줄로 접는다.
+  그게 담당자가 되짚고 싶은 단위다. ⚠ <b class="bad">AI 요약은 쓰지 않는다</b> — worksessions.ts:317-323 주석 그대로:
+  <i>"7B/14B 요약은 지어냄이 섞일 수 있고… 요약 오류가 이후 모든 턴에 주입되는 위치라 위험이 배가된다."</i> 그래서 접힌 한 줄은
+  <b>기록된 값(자산·대상·조치·결과, 또는 질문·답)을 그대로 이어붙인 것</b>이지 모델이 새로 쓰는 문장이 아니다 — B절 인용대로
+  "구조화된 key-value 상태로 접는" State Folding(Fu et al. 2026) 방식이다.
+</p>
+
+<!-- ═══════════════════════════ D. 시안 재현 ═══════════════════════════ -->
+<h2><span class="n">D</span>시안 — 실제로 눌러보기</h2>
+<p class="note">아래는 sessions.html 본문(사이드바 232px는 생략 — nav.js가 그리는 부분이라 이 재현엔 없다) 재구성이다.
+가짜 데이터 20건 — 담당자 실행 10 · 담당자 조회 3 · 시스템 자동 4 · QA(가정) 3.</p>
+
+<div class="mock-shell">
+  <div class="mock-shell-label">재현 — sessions.html 본문 (👇 아래는 실제로 눌립니다)</div>
+
+  <div class="repl-disclaimer">
+    ⚠ 실제로 눌리는 것: 검색 · 축①/축② 칩 · QA 토글 · 목록 행 선택 · <b>펼치기/접기</b>. 회색 점선 버튼(삭제·이름변경·
+    리포트 만들기·대화창 이동·감사 화면 이동)은 자리만 있고 동작하지 않습니다.
+  </div>
+
+  <div class="layer-strip">
+    <div class="lseg"><span class="lt">📜 감사 기록</span><span class="lc">43건</span><span class="lsub">전부 보존 · 못 지움(불변)</span></div>
+    <div class="larrow">→</div>
+    <div class="lseg on"><span class="lt">💬 작업 내역 후보</span><span class="lc">20건</span><span class="lsub">선택적 표시 대상(이 화면)</span></div>
+    <div class="larrow">→</div>
+    <div class="lseg"><span class="lt">🧠 기억(AI 학습) 후보</span><span class="lc">0건</span><span class="lsub">자동 편입 없음 · 이번 범위 밖</span></div>
+  </div>
+
+  <div class="audit-only-note">
+    ⓘ 감사 기록에는 있지만 <b>애초 작업 내역 후보에도 들어오지 않는 것</b> — 로그인 8건 · 메뉴 사용 15건
+    (근거: worksessions.ts:369-372 <code>onAudit</code> 훅이 <code>kind==="auth"</code>·<code>kind==="config"</code>를
+    이미 걸러낸다). <span class="ghostlink" title="이 목업에서는 이동하지 않습니다">📜 감사 기록에서 보기 →</span>
+  </div>
+
+  <div class="two">
+    <!-- 좌: 목록 -->
+    <div class="panel">
+      <div class="ph" style="display:flex;align-items:center;gap:8px">작업 내역 <span id="wCnt" style="font-size:12px;color:var(--muted-2);font-weight:600"></span>
+        <button class="btn-ghost" style="margin-left:auto" title="이 목업에서는 동작하지 않습니다">📄 골라서 리포트</button>
+      </div>
+      <div class="search">🔎<input id="wQ" placeholder="내역 검색…" aria-label="작업 내역 검색"></div>
+
+      <div class="axis-row">
+        <span class="axis-label">주체</span>
+        <span class="axis-chip on" data-axis="actor" data-v="user">👤 내가 시킨 일 <b id="c-actor-user"></b></span>
+        <span class="axis-chip" data-axis="actor" data-v="system">🤖 시스템 기록 <b id="c-actor-system"></b></span>
+        <span class="axis-chip" data-axis="actor" data-v="all">전체 <b id="c-actor-all"></b></span>
+      </div>
+      <div class="axis-row">
+        <span class="axis-label">종류</span>
+        <span class="axis-chip on" data-axis="op" data-v="all">전체 <b id="c-op-all"></b></span>
+        <span class="axis-chip" data-axis="op" data-v="action">🔧 실행 <b id="c-op-action"></b></span>
+        <span class="axis-chip" data-axis="op" data-v="query">🔍 조회 <b id="c-op-query"></b></span>
+      </div>
+      <div class="axis-row">
+        <label class="qa-toggle"><input type="checkbox" id="wQa"> 🧪 QA·테스트 포함 보기 <b id="c-qa"></b></label>
+      </div>
+
+      <div class="hidden-note" id="hiddenNote"></div>
+      <div class="slist" id="wList"></div>
+    </div>
+
+    <!-- 우: 상세 -->
+    <div class="panel" style="min-height:640px;display:flex;flex-direction:column">
+      <div class="ph">상세</div>
+      <div id="wDetail" style="flex:1;min-height:0;display:flex;flex-direction:column">
+        <div class="list-empty">왼쪽에서 항목을 고르면 접힌 요약이 먼저 보입니다. "펼치기"를 누르면 전체 대화가 나옵니다.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  // ── 가짜 데이터 20건 — action/query 각 fold 구조가 다르다(축②를 데이터 모양으로도 보여준다) ──
+  var DATA = [
+    {id:'w1',actor:'user',op:'action',qa:false,status:'done',time:'08/17 14:02',turnCount:2,
+      fold:{asset:'web-01.internal',target:'CVE-2020-1472(Zerologon)',act:'담당자 완료 처리',result:'재스캔 확인 완료'},
+      turns:[{r:'you',t:'web-01 넷로곤 취약점 패치 끝냈어, 완료로 바꿔줘'},{r:'ai',t:'완료 처리했습니다. 재스캔에서 해당 finding이 사라진 것을 확인했습니다 — 조치 리포트를 남겼습니다.'}]},
+    {id:'w2',actor:'user',op:'action',qa:false,status:'done',time:'08/17 11:40',turnCount:2,
+      fold:{asset:'PC-114(인사팀)',target:'사설 VPN 사용 정책',act:'조건부 승인(30일)',result:'사유: 재택 출장'},
+      turns:[{r:'you',t:'PC-114 재택 출장 때문에 사설 VPN 30일만 예외로 승인해줘'},{r:'ai',t:'조건부 승인으로 등록했습니다. 만료일(9/16) 지나면 자동으로 재검토 대상이 됩니다.'}]},
+    {id:'w3',actor:'user',op:'query',qa:false,status:'done',time:'08/17 09:15',turnCount:2,
+      fold:{q:'오늘 위험자산 몇 개야?',a:'3개(critical 1 · high 2)'},
+      turns:[{r:'you',t:'오늘 위험자산 몇 개야?'},{r:'ai',t:'현재 critical 1건, high 2건 — 총 3개 자산이 위험 등급입니다.'}]},
+    {id:'w4',actor:'user',op:'action',qa:false,status:'active',time:'08/17 08:50',turnCount:2,
+      fold:{asset:'web-03.internal',target:'CVE-2021-44228(Log4j)',act:'담당자 조치 진행중',result:'2.17.1 업그레이드 예정'},
+      turns:[{r:'you',t:'web-03 log4j 건 지금 업그레이드 준비 중이야, 진행중으로 남겨줘'},{r:'ai',t:'진행중으로 유지했습니다. 완료되면 알려주세요 — 재스캔 확인 후 자동으로 조치 리포트를 만듭니다.'}]},
+    {id:'w5',actor:'system',op:'action',qa:false,status:'done',time:'08/17 03:00',turnCount:1,
+      fold:{asset:'전 자산 27대',target:'분기 하드닝 점검',act:'자동 실행',result:'통과 25 · 경고 2'},
+      turns:[{r:'ai',t:'[승인] 분기 하드닝 점검 자동 실행 — 대상 27대, 통과 25 · 경고 2 (결과: ok)'}]},
+    {id:'w6',actor:'system',op:'action',qa:false,status:'done',time:'08/17 02:31',turnCount:1,
+      fold:{asset:'세션 3건',target:'30분 무대화',act:'자동 완료 처리',result:''},
+      turns:[{r:'ai',t:'[실행] 작업 세션 3건 — 30분 동안 대화가 없어 자동 완료 처리했습니다.'}]},
+    {id:'w7',actor:'user',op:'action',qa:false,status:'done',time:'08/16 17:20',turnCount:2,
+      fold:{asset:'대상 4건',target:'8월 3주차 진행사항',act:'골라서 리포트 생성',result:'DOCX+PDF 완료'},
+      turns:[{r:'you',t:'이번 주 진행사항 4건 골라서 리포트 만들어줘'},{r:'ai',t:'업무 진행 리포트를 만들었습니다. 파일은 리포트 화면 이력에서 열 수 있습니다(DOCX·PDF).'}]},
+    {id:'w8',actor:'user',op:'query',qa:false,status:'done',time:'08/16 15:05',turnCount:2,
+      fold:{q:'CVE-2020-1472 이게 뭐야?',a:'Zerologon — Netlogon 권한상승 취약점'},
+      turns:[{r:'you',t:'CVE-2020-1472 이게 뭐야?'},{r:'ai',t:'Zerologon이라 불리는 취약점입니다 — 인증 없이 도메인 컨트롤러 관리자 권한을 가져갈 수 있습니다.'}]},
+    {id:'w9',actor:'system',op:'action',qa:false,status:'done',time:'08/16 13:47',turnCount:1,
+      fold:{asset:'가드레일',target:'프롬프트 인젝션 시도',act:'차단·기록',result:'카테고리: 데이터유출유도'},
+      turns:[{r:'ai',t:'[차단] 프롬프트 인젝션 시도 감지 — 카테고리: 데이터유출유도. 요청을 거부하고 기록했습니다.'}]},
+    {id:'w10',actor:'user',op:'action',qa:false,status:'done',time:'08/16 11:12',turnCount:2,
+      fold:{asset:'DB서버-02',target:'원격접속 정책',act:'대조 요청 처리',result:'판정: 조건부(승인권자 서명 필요)'},
+      turns:[{r:'you',t:'DB서버-02 원격접속이 정책에 맞는지 대조해줘'},{r:'ai',t:'사내 규정 대조 결과 조건부입니다 — 승인권자 서명이 있으면 허용됩니다. 근거 문서를 함께 남겼습니다.'}]},
+    {id:'w11',actor:'user',op:'query',qa:true,status:'done',time:'08/16 10:00',turnCount:2,
+      fold:{q:'[평가 게이트] 라우팅 문항 #482',a:'(측정용 — 화면·학습에 반영 안 함)'},
+      turns:[{r:'you',t:'(게이트 문항 #482 — 자동 측정)'},{r:'ai',t:'(측정 응답 — 실제로는 qa=true라 세션·학습에 실리지 않습니다. 이 행은 "혹시 샌다면"의 가정 데이터입니다.)'}]},
+    {id:'w12',actor:'user',op:'query',qa:true,status:'done',time:'08/16 10:00',turnCount:2,
+      fold:{q:'[평가 게이트] 라우팅 문항 #483',a:'(측정용 — 화면·학습에 반영 안 함)'},
+      turns:[{r:'you',t:'(게이트 문항 #483 — 자동 측정)'},{r:'ai',t:'(측정 응답 — 가정 데이터)'}]},
+    {id:'w13',actor:'user',op:'query',qa:true,status:'done',time:'08/16 09:58',turnCount:2,
+      fold:{q:'[회귀 하네스] 152상황 — #071',a:'(측정용 — 화면·학습에 반영 안 함)'},
+      turns:[{r:'you',t:'(회귀 하네스 #071 — 야간 자동 회귀)'},{r:'ai',t:'(측정 응답 — 가정 데이터)'}]},
+    {id:'w14',actor:'user',op:'action',qa:false,status:'done',time:'08/15 16:30',turnCount:2,
+      fold:{asset:'방화벽-엣지',target:'정책 백업',act:'상태 확인',result:'최신본 있음(08/15)'},
+      turns:[{r:'you',t:'방화벽 정책 백업 최신인지 확인해줘'},{r:'ai',t:'최신본이 08/15자로 있습니다 — 문제 없습니다.'}]},
+    {id:'w15',actor:'user',op:'action',qa:false,status:'done',time:'08/15 14:10',turnCount:2,
+      fold:{asset:'web-05.internal',target:'Nessus 리포트',act:'PDF 등록',result:'신규 finding 4건 반영'},
+      turns:[{r:'you',t:'web-05 네서스 리포트 PDF 올렸어, 등록해줘'},{r:'ai',t:'등록했습니다 — 신규 finding 4건이 자산에 반영됐습니다.'}]},
+    {id:'w16',actor:'user',op:'action',qa:false,status:'ignored',time:'08/15 09:00',turnCount:2,
+      fold:{asset:'임시 자산 3건',target:'태그 정리',act:'담당자가 무시 처리',result:'사유: 우선순위 낮음'},
+      turns:[{r:'you',t:'임시 자산 태그 정리는 나중에 할게, 일단 무시로 둬'},{r:'ai',t:'무시로 표시했습니다. 필요할 때 다시 열어 진행하시면 됩니다.'}]},
+    {id:'w17',actor:'system',op:'action',qa:false,status:'done',time:'08/14 03:00',turnCount:1,
+      fold:{asset:'카나리 페이로드 14종',target:'레드팀 시나리오',act:'주간 자동 재실행',result:'통과 14/14'},
+      turns:[{r:'ai',t:'[승인] 레드팀 카나리 시나리오 주간 자동 재실행 — 14종 중 14종 통과.'}]},
+    {id:'w18',actor:'user',op:'action',qa:false,status:'active',time:'08/13 15:44',turnCount:2,
+      fold:{asset:'설정 › 인증 정책',target:'패스워드 정책 강화 검토',act:'조사 지시(진행중)',result:'NIST 최신 기준 확인 중'},
+      turns:[{r:'you',t:'요즘 비번 정책 대문자·기호 강제가 옛날 방식이라던데, 최신 기준으로 검토해줘'},{r:'ai',t:'NIST 최신 지침을 확인하는 중입니다 — 정리되면 초안으로 남기겠습니다.'}]},
+    {id:'w19',actor:'user',op:'query',qa:false,status:'done',time:'08/13 10:22',turnCount:2,
+      fold:{q:'취약점관리 지침 어디 있어?',a:'문서함 › 정책 폴더'},
+      turns:[{r:'you',t:'취약점관리 지침 어디 있어?'},{r:'ai',t:'문서함 › 정책 폴더에 있습니다 — 링크를 남겨둘게요.'}]},
+    {id:'w20',actor:'user',op:'action',qa:false,status:'done',time:'08/12 16:05',turnCount:2,
+      fold:{asset:'SW-12(네트워크 장비)',target:'접근이력 점검',act:'담당자 지시 처리',result:'이상 없음 확인'},
+      turns:[{r:'you',t:'SW-12 최근 접근이력 이상한 거 없는지 점검해줘'},{r:'ai',t:'최근 30일 접근이력을 확인했습니다 — 등록된 IP 외 접근은 없었습니다.'}]}
+  ];
+
+  var filters = {actor:'user', op:'all', qa:false, q:''};
+  var selectedId = null, expanded = false;
+
+  function esc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+  function foldLine(d){
+    if (d.op === 'query') return '질문 — ' + d.fold.q + '  ·  답 — ' + d.fold.a;
+    var f = d.fold;
+    return f.asset + ' · ' + f.target + ' · ' + f.act + (f.result ? (' · ' + f.result) : '');
+  }
+  function opLabel(d){ return d.op === 'action' ? '실행한 일' : '조회'; }
+  function actorLabel(d){ return d.actor === 'user' ? '담당자' : '시스템'; }
+
+  function passes(d){
+    if (filters.actor !== 'all' && d.actor !== filters.actor) return false;
+    if (filters.op !== 'all' && d.op !== filters.op) return false;
+    if (!filters.qa && d.qa) return false;
+    if (filters.q) {
+      var hay = (foldLine(d) + ' ' + (d.fold.q||'') ).toLowerCase();
+      if (hay.indexOf(filters.q) === -1) return false;
+    }
+    return true;
+  }
+
+  function rowHtml(d){
+    var compact = d.op === 'query';
+    var cls = ['wrow', compact ? 'wrow-qry' : 'wrow-act', d.actor === 'system' ? 'wrow-sys' : '', d.qa ? 'wrow-qa' : '', d.id === selectedId ? 'on' : ''].join(' ').trim();
+    var actorIc = d.actor === 'user' ? '👤' : '🤖';
+    var opIc = d.op === 'action' ? '🔧' : '🔍';
+    var qaTag = d.qa ? '<span class="w-qa">QA</span>' : '';
+    if (compact) {
+      return '<div class="' + cls + '" data-id="' + d.id + '">' +
+        '<span class="w-ic">' + actorIc + opIc + '</span>' +
+        '<div class="wr-line">' + esc(foldLine(d)) + '</div>' +
+        qaTag +
+        '<span class="wr-time">' + d.time + '</span>' +
+        '</div>';
+    }
+    return '<div class="' + cls + '" data-id="' + d.id + '">' +
+      '<span class="sdot ' + d.status + '"></span>' +
+      '<div class="sr-main">' +
+        '<div class="sr-title">' + actorIc + ' ' + esc(foldLine(d)) + '</div>' +
+        '<div class="sr-sub">' + opIc + ' ' + opLabel(d) + ' · ' + d.turnCount + '턴' + (d.qa ? ' · <span class="w-qa">QA</span>' : '') + '</div>' +
+      '</div>' +
+      '<div class="sr-meta">' + d.time + '</div>' +
+      '</div>';
+  }
+
+  function updateChips(){
+    document.querySelectorAll('.axis-chip').forEach(function(el){
+      var axis = el.dataset.axis, v = el.dataset.v;
+      el.classList.toggle('on', filters[axis] === v);
+    });
+    document.getElementById('wQa').checked = filters.qa;
+  }
+
+  function counts(){
+    var c = {'actor-all':DATA.length,'actor-user':0,'actor-system':0,'op-all':DATA.length,'op-action':0,'op-query':0,qa:0};
+    DATA.forEach(function(d){
+      c['actor-' + d.actor]++;
+      c['op-' + d.op]++;
+      if (d.qa) c.qa++;
+    });
+    Object.keys(c).forEach(function(k){
+      var el = document.getElementById('c-' + k);
+      if (el) el.textContent = c[k];
+    });
+  }
+
+  function renderHiddenNote(visible){
+    var total = DATA.length;
+    var bits = [];
+    if (filters.actor === 'user') {
+      var n = DATA.filter(function(d){ return d.actor === 'system'; }).length;
+      bits.push('🤖 시스템 기록 <b class="hb">' + n + '</b>건(위 칩으로 볼 수 있음)');
+    }
+    if (!filters.qa) {
+      var nq = DATA.filter(function(d){ return d.qa; }).length;
+      bits.push('🧪 QA·테스트 <b class="hb">' + nq + '</b>건(토글로 볼 수 있음)');
+    }
+    var el = document.getElementById('hiddenNote');
+    if (!bits.length) {
+      el.innerHTML = '표시 중 <b>' + visible + '</b> / 후보 ' + total + '건 — 숨김 없음(모든 축이 전체로 열려 있습니다).';
+    } else {
+      el.innerHTML = '표시 중 <b>' + visible + '</b> / 후보 ' + total + '건 · 숨김 ' + (total - visible) + '건 — ' + bits.join(' · ') + '.';
+    }
+  }
+
+  function renderList(){
+    var items = DATA.filter(passes);
+    document.getElementById('wCnt').textContent = items.length ? ('(' + items.length + '/' + DATA.length + ')') : '';
+    renderHiddenNote(items.length);
+    var listEl = document.getElementById('wList');
+    listEl.innerHTML = items.length
+      ? items.map(rowHtml).join('')
+      : '<div class="list-empty">조건에 맞는 내역이 없습니다. 축 칩이나 QA 토글을 눌러 넓혀 보세요.</div>';
+    listEl.querySelectorAll('.wrow').forEach(function(el){
+      el.addEventListener('click', function(){ selectItem(el.dataset.id); });
+    });
+    if (selectedId && !items.some(function(d){ return d.id === selectedId; })) {
+      selectedId = null;
+    }
+    if (!selectedId && items.length) selectItem(items[0].id);
+    else if (!items.length) renderDetail(null);
+  }
+
+  function fcTagHtml(d){
+    if (d.qa) return '<span class="fc-tag qa">QA·테스트(가정)</span>';
+    if (d.actor === 'system') return '<span class="fc-tag sys">🤖 시스템 자동 기록</span>';
+    return '<span class="fc-tag">State Folding — 값 조합, AI 아님</span>';
+  }
+
+  function selectItem(id, skipRerenderList){
+    selectedId = id;
+    expanded = false;
+    if (!skipRerenderList) {
+      document.querySelectorAll('.wrow').forEach(function(el){ el.classList.toggle('on', el.dataset.id === id); });
+    }
+    var d = DATA.filter(function(x){ return x.id === id; })[0];
+    renderDetail(d);
+  }
+
+  function renderDetail(d){
+    var box = document.getElementById('wDetail');
+    if (!d) {
+      box.innerHTML = '<div class="list-empty">왼쪽에서 항목을 고르면 접힌 요약이 먼저 보입니다. "펼치기"를 누르면 전체 대화가 나옵니다.</div>';
+      return;
+    }
+    var badge = '<span class="badge b-' + d.status + '">' + (d.status === 'active' ? '진행중' : d.status === 'ignored' ? '무시' : '완료') + '</span>';
+    box.innerHTML =
+      '<div class="detail-head-row">' +
+        '<div class="detail-title">' + (d.actor === 'user' ? '👤' : '🤖') + ' ' + esc(foldLine(d)) + '</div>' +
+        '<div class="detail-acts">' +
+          '<select class="status-sel" disabled title="이 목업에서는 동작하지 않습니다"><option>' + (d.status==='active'?'진행중':d.status==='ignored'?'무시':'완료') + '</option></select>' +
+          '<button class="btn-ghost" title="이 목업에서는 동작하지 않습니다">✎ 이름</button>' +
+          '<button class="btn-danger" title="이 목업에서는 동작하지 않습니다">🗑 삭제</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="status-card fold-card">' +
+        '<div class="fc-h">📌 접힌 요약 ' + fcTagHtml(d) + ' ' + badge + '</div>' +
+        '<div class="fc-line">' + esc(foldLine(d)) + '</div>' +
+        '<div class="fc-meta">' + actorLabel(d) + ' · ' + opLabel(d) + ' · ' + d.time + ' · ' + d.turnCount + '턴 기록' + (d.qa ? ' · 🧪 QA' : '') + '</div>' +
+        '<div class="fc-note">이 문장은 기록된 값(자산·대상·조치·결과, 또는 질문·답)을 그대로 이어붙인 것입니다 — AI가 새로 쓰지 않습니다.' +
+        '(근거: "State Folding", Fu et al. 2026 — 자유 요약이 아니라 구조화된 값으로 접는 방식.)</div>' +
+      '</div>' +
+      '<button class="fold-toggle" id="foldBtn">▾ 전체 대화 펼치기 (' + d.turnCount + '턴)</button>' +
+      '<div class="turns-wrap conv" id="turnsWrap">' +
+        d.turns.map(function(t){
+          return t.r === 'you'
+            ? '<div class="turn"><div class="you"><b>나</b> — ' + esc(t.t) + '</div></div>'
+            : '<div class="turn"><div class="ai">' + esc(t.t) + '</div></div>';
+        }).join('') +
+      '</div>' +
+      '<div class="del-note"><b>⚠</b> "삭제"는 작업 내역에서만 지웁니다 — 감사 기록은 별도로 남아 지워지지 않습니다(3층 모델, C절).</div>' +
+      '<div class="cin"><button disabled title="이 목업에서는 동작하지 않습니다">💬 대화창에서 이어서 지시하기</button></div>';
+
+    document.getElementById('foldBtn').addEventListener('click', function(){
+      expanded = !expanded;
+      var w = document.getElementById('turnsWrap');
+      w.style.display = expanded ? 'block' : 'none';
+      this.textContent = (expanded ? '▴ 접기' : '▾ 전체 대화 펼치기 (') + (expanded ? '' : d.turnCount + '턴)');
+    });
+  }
+
+  document.querySelectorAll('.axis-chip').forEach(function(el){
+    el.addEventListener('click', function(){
+      filters[el.dataset.axis] = el.dataset.v;
+      updateChips();
+      renderList();
+    });
+  });
+  document.getElementById('wQa').addEventListener('change', function(e){
+    filters.qa = e.target.checked;
+    renderList();
+  });
+  document.getElementById('wQ').addEventListener('input', function(e){
+    filters.q = e.target.value.trim().toLowerCase();
+    renderList();
+  });
+
+  counts();
+  updateChips();
+  renderList();
+})();
+</script>
+
+<!-- ═══════════════════════════ E. 밀도 숫자 ═══════════════════════════ -->
+<h2><span class="n">E</span>밀도 숫자 — 오늘 대비 증감</h2>
+<table class="t">
+  <tr><th style="width:300px">항목</th><th style="width:230px">오늘(sessions.html)</th><th style="width:260px">새 안(이 시안)</th><th>증감</th></tr>
+  <tr><td>목록 행 높이 — 실행(action) 항목</td>
+    <td>고정 <b>54px</b>(실측 주석: sessions.html:134 <code>/* 실측 행높이 54px×14 */</code>)</td>
+    <td>약 <b>59px</b>(icon·QA 배지 한 줄에 얹음, 패딩10+제목18.2+메타16.45+테두리1)</td>
+    <td><b class="bad">+5px · +9%</b>(실행 항목만)</td></tr>
+  <tr><td>목록 행 높이 — 조회(query) 항목</td>
+    <td>동일 54px(오늘은 구분이 없다)</td>
+    <td>약 <b>32px</b>(패딩7+단일줄16.8+테두리1 — "값어치가 낮다"를 실제 높이로 표현)</td>
+    <td><b class="ok">-22px · -41%</b></td></tr>
+  <tr><td>목록 행 높이 — 시스템 자동 항목(토글 시)</td>
+    <td>동일 54px, 구분 없이 섞여 있음</td>
+    <td>약 <b>53px</b>(기본 숨김이라 평소엔 세지 않음)</td>
+    <td>변화 거의 없음(기본 표시 안 됨이 핵심)</td></tr>
+  <tr><td>이 20건을 <b>오늘 방식</b>으로 전부 보여준다면</td>
+    <td colspan="2">20 × 54px = <b>1,080px</b> → <code>.slist</code> 뷰(756px, 코드 실측값) 안에 14행만 보이고 6건은 스크롤.
+    게다가 무엇이 담당자 것이고 무엇이 시스템 자동 기록인지 <b class="bad">시각적으로 구분이 안 된다</b>(오늘의 실제 코드 상태).</td>
+    <td>—</td></tr>
+  <tr><td>이 20건을 <b>새 안 기본값</b>(주체:담당자, QA 제외)으로 보여주면</td>
+    <td colspan="2">10×59 + 3×32 = <b>686px</b> → 756px 뷰 <b class="ok">한 화면에 13건 전부, 스크롤 없이</b>(+70px 여유).
+    숨겨진 7건(시스템4·QA3)은 칩·토글 한 번으로 그 자리에서 펼쳐진다.</td>
+    <td><b class="ok">세로 총합 -394px · -36%</b></td></tr>
+  <tr><td>실측 인용(참고, 이 데모 수치와는 별개)</td>
+    <td colspan="3">worksessions.ts:152 주석 — "세션은 대화할 때마다 늘어 실제로 <b>824건</b>까지 쌓였다(2026-07-27 실측)".
+    이 시안의 20건은 그 실측을 축소 재현한 데모이지, 824라는 숫자를 그대로 쓰지 않았다(운영 DB를 이 작업 권한으로는 다시 셀 수 없어서다).</td></tr>
+</table>
+<p class="meas">
+  요약: <b>실행 항목 한 줄은 조금 커진다(+9%)</b>지만, <b>조회는 절반 이하로 작아지고 시스템·QA는 기본으로 안 보여</b> 전체
+  세로 길이는 오히려 <b>36% 준다.</b> "정보는 늘렸는데 화면은 더 짧아졌다"는 것이 핵심 주장이다.
+</p>
+
+<!-- ═══════════════════════════ F. 버린 길 ═══════════════════════════ -->
+<h2><span class="n">F</span>왜 이 안인가 — 버린 길</h2>
+
+<div class="reject-box">
+  <div class="reject-cap">❌ 버린 안 1 — 탭으로 가르기(예: [작업내역][시스템기록][QA] 세 개의 별도 탭)</div>
+  <p class="note" style="margin:0">
+    탭은 서로 다른 세계로 완전히 갈라놓는다 — 다른 탭에 가지 않는 한 "거기 몇 건 있는지"조차 기본 화면에서 안 보인다.
+    이번 시안의 핵심 원칙(감췄으면 감췄다고 보이게, hidden-note가 실시간 숫자를 곁에 둠)을 탭 구조는 태생적으로 어긴다.
+    이미 sessions.html엔 상태 칩(전체/진행중/완료/무시)이 있어 <b>탭까지 얹으면 "칩이야 탭이야"</b>가 헷갈린다.
+  </p>
+</div>
+<div class="reject-box">
+  <div class="reject-cap">❌ 버린 안 2 — 필터칩만 추가하고 기본값은 그대로 "전체"</div>
+  <p class="note" style="margin:0">
+    이러면 "선택적으로 남긴다"는 지시의 핵심(<b class="hi">기본값 뒤집기</b>)이 빠진다. 필터가 있어도 기본이 "전체"면
+    담당자는 굳이 필터를 쓸 이유를 모른 채 예전처럼 뒤섞인 목록을 계속 본다 — <b class="bad">지금도 상태 칩이 있는데
+    로그인 도배·재귀 사고가 3번 났다</b>는 사실 자체가 "필터만으론 안 됐다"는 증거다(A절).
+  </p>
+</div>
+<div class="reject-box">
+  <div class="reject-cap">❌ 버린 안 3 — 화면을 완전히 새로 쪼갠다(예: "시스템기록.html"을 새로 만든다)</div>
+  <p class="note" style="margin:0">
+    감사(audit.html)와 작업내역(sessions.html)은 <b>이미</b> 나뉜 화면이다 — 다시 쪼개는 게 아니라, 지금 작업내역
+    <b>안</b>에 824건이 사람·시스템·조회·QA 뒤섞인 채로 쌓이는 게 문제다. 새 화면을 또 만들면 nav 메뉴가 다시 늘어
+    ("메뉴 29→26 정리" 성과를 되돌리는 셈), 담당자가 "이건 어느 화면에서 찾지"를 다시 배워야 한다. 축 필터는
+    <b class="ok">한 화면 안</b>에서 답을 준다 — 새 화면보다 학습 비용이 낮다.
+  </p>
+</div>
+
+<!-- ═══════════════════════════ G. 무엇을 포기했는지 ═══════════════════════════ -->
+<h2><span class="n">G</span>무엇을 포기했는지</h2>
+<table class="t">
+  <tr><th style="width:280px">뺀 것</th><th>왜</th></tr>
+  <tr><td>기억(AI 학습) 계층으로 보내는 화면상 버튼(예: "학습 후보로 보내기")</td>
+    <td>파이프라인 배지(3층 표시)까지만 이번 범위 — 그 계층은 이미 memory 화면이 따로 있고, 이번 요청은 감사↔작업내역 경계다.
+    새 액션을 더하면 범위가 부풀어 검토가 늦어진다. 다음 과제 후보로 남긴다.</td></tr>
+  <tr><td>기존 상태(진행중/완료/무시) <b>필터 줄</b></td>
+    <td>화면에 이미 필터 줄이 3개(검색·축①·축②) + 토글 1개다. 상태까지 5번째 줄로 넣으면 오히려 복잡해진다 — 상태는
+    각 행의 점(●)으로 계속 보이고, 필요성이 확인되면 다음에 되살린다.</td></tr>
+  <tr><td>오래된 내역 정리(prune)·전체 삭제·골라서 리포트 같은 기존 부속 기능의 <b>재설계</b></td>
+    <td>자리는 그대로 두되(회색 점선) 새로 설계하지 않았다 — 이번 범위는 "분류 축"이지 "정리 기능"이 아니다.</td></tr>
+  <tr><td>운영 DB에서 QA·시스템·조회 실제 건수를 다시 세는 것</td>
+    <td><code>mockups/</code> 밖에 쓰기·서버(4000) 접속이 이 에이전트 권한 밖이다. 대신 코드를 직접 읽어(worksessions.ts·
+    dispatcher.ts·actioncheck.ts) 근거로 삼았다 — 추측이 아니라 코드 확인.</td></tr>
+  <tr><td>audit.html 쪽 변경(예: "여기서 숨겨진 걸 보려면 →" 역방향 안내)</td>
+    <td>이번 시안은 sessions.html(작업내역) 하나만 다룬다. audit.html은 검색+CSV 내보내기만 있는 단순 화면이라
+    지금 상태로도 3층 모델의 "감사" 축에 문제가 없다고 판단했다 — 손대지 않았다.</td></tr>
+</table>
+
+<!-- ═══════════════════════════ H. 자가점검 ═══════════════════════════ -->
+<h2><span class="n">H</span>제품 원칙 자가점검</h2>
+<table class="t chk-table">
+  <tr><th style="width:340px">원칙</th><th style="width:70px">판정</th><th>근거</th></tr>
+  <tr><td>메뉴는 보기용, 입력칸 없음(검색·필터·다건선택은 예외)</td><td class="chk-ok">✅</td>
+    <td>새로 늘어난 것은 축 칩·QA 토글·검색뿐 — 전부 "고르는 것". 자유 텍스트 입력칸을 새로 만들지 않았다.</td></tr>
+  <tr><td>정직 — 가짜 UI 금지, 감춘 건 감췄다고 표시</td><td class="chk-ok">✅</td>
+    <td>hidden-note가 필터 조합이 바뀔 때마다 실시간으로 숨김 건수를 계산해 곁에 둔다. 비기능 버튼은 회색 점선 +
+    "이 목업에서는 동작하지 않습니다" 툴팁으로 구분했다.</td></tr>
+  <tr><td>지우는 것과 감추는 것을 구분 — 감사 기록은 못 지운다</td><td class="chk-ok">✅</td>
+    <td>layer-strip에 "감사 기록 · 못 지움(불변)"을 명시하고, 상세 패널 삭제 버튼 옆에
+    "작업 내역에서만 지웁니다 — 감사 기록은 별도로 남습니다" 문구를 항상 붙였다.</td></tr>
+  <tr><td>다크 팔레트 · 순수 HTML/CSS/JS(빌드도구·CDN 없음) · gijo-ui.css 톤</td><td class="chk-ok">✅</td>
+    <td>:root 토큰은 sessions.html:8-12를 글자 하나 안 바꾸고 복사. 외부 CDN·웹폰트·원격 이미지 0개, 시스템 폰트 스택만.
+    더블클릭으로 바로 연다(자체완결 단일 HTML).</td></tr>
+  <tr><td>11px 미만 글자 금지</td><td class="chk-ok">✅</td>
+    <td>이 문서 전체에서 가장 작은 서체는 <code>.axis-chip b</code>·<code>.audit-only-note</code> 등의
+    <b>11.25px</b>다 — 10px대는 한 곳도 쓰지 않았다.</td></tr>
+</table>
+
+<footer class="docfoot">
+  gijo-mockup 서브에이전트 · mockups/작업내역_구분/시안.html · 2026-08-17 승인 지시에 대한 추천 1개(원칙: 2026-07-25/2026-08-09 사용자 결정) ·
+  client/·server/ 등 제품 코드는 이 작업에서 전혀 고치지 않았습니다.
+</footer>
+
+</div>
+</body>
+</html>
