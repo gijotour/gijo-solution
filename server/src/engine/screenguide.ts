@@ -870,6 +870,36 @@ const OVERVIEW: ScreenGuide = {
   },
 };
 
+// 라이트 에디션이 화면을 모를 때 주는 개요.
+//
+// ⚠ **왜 따로 두나**(2026-08-18, 사전 검증이 잡은 실결함): 라이트 챗은 screen을 안 보낸다
+//   (lite-chat.html이 sendInstructionStream(글, 세션, undefined, …)). 그러면 getScreenGuide가
+//   위 OVERVIEW를 돌려주는데, 그 글은 **표준 콘솔 설명**이다 — 「오른쪽 대화창」·「선택 칩」·
+//   「화면 맥락 떼기」·「미조치 Critical 취약점」은 **라이트에 없는 것들**이다.
+//   즉 라이트 사용자가 "사용법 알려줘"를 물으면 없는 기능을 배우고 있었다.
+//   이 파일 머리말이 스스로 못박은 원칙("없는 기능을 안내하지 않는다 — 그라운딩")의 위반이다.
+//
+// ⚠ **메뉴를 나열하지 않는다.** 라이트 화면 구성은 `client/.../lite-screens.json`이 단일 출처이고
+//   그쪽이 자주 바뀐다(재편). 서버가 그 목록을 베끼면 반드시 어긋난다 — 여기엔 **화면이 바뀌어도
+//   변하지 않는 「대화하는 법」만** 적는다. 화면별 안내는 screen이 넘어올 때 GUIDES가 맡는다.
+const LITE_OVERVIEW: ScreenGuide = {
+  title: "GIJO AS 라이트 — 대화창 사용 안내",
+  what: "이 화면이 대화창입니다. 무엇이든 우리말로 물으면 알맞은 기능을 골라 답합니다 — 명령을 외울 필요가 없습니다.",
+  can: [
+    "\"…이 뭐야?\" — 넣어 둔 자료에서 찾아 설명합니다",
+    "\"이 로그 무슨 뜻이야?\" — 붙여 넣은 로그를 풀어 줍니다",
+    "\"할 일 추가: …\" — 할 일을 담고, \"오늘 뭐 해야 해?\"로 되짚습니다",
+    "＋ 로 파일을 올리면 종류를 가려 알맞게 넣습니다",
+  ],
+  tip: "자료를 바꾸는 일(등록·수정·삭제)은 바로 반영되지 않고 승인 창으로 떠서, 확인한 뒤 승인해야 실행됩니다.",
+  panels: {
+    "답이 흐르는 것":
+      "긴 답은 다 만들어질 때까지 기다리지 않고 **쓰이는 대로** 흐릅니다. 흐르는 글자는 「쓰는 중」 표시이고, 다 되면 완성본으로 바뀝니다.\n· 중간에 끊기면 끊겼다고 알립니다 — 잘린 답을 완성된 답처럼 두지 않습니다.",
+    "승인 창":
+      "등록·수정처럼 **자료를 바꾸는 지시**는 실행 전에 승인 창이 뜹니다. 무엇을 어떤 값으로 하려는지 펼쳐 보여 주므로, **그 자리에서 값을 고치거나 취소**할 수 있습니다.",
+  },
+};
+
 // ── 제품 규칙(알아두기) — 명령창 아래 팁 줄에 돌아가며 뜬다 ─────────────────────
 // 여기가 유일한 출처다(2026-07-26 사용자 지시: "우리 규칙이 변경되면 같이 반영해줘").
 // 화면에 하드코딩하지 않고 서버가 내려주므로, 규칙이 바뀌면 이 배열만 고쳐 배포하면
@@ -904,10 +934,14 @@ export function screenTips(screen?: string): { title: string; examples: string[]
   return { title: g.title, examples, rules: PRODUCT_RULES };
 }
 
-export function getScreenGuide(screen?: string): ScreenGuide {
-  if (!screen) return OVERVIEW;
+// ⚠ lite는 **인자로 받는다**(2026-08-18). 여기서 registry의 에디션제한중()을 부르면
+//   registry.ts:52가 이 파일을 import하므로 **순환**이 된다. 부르는 쪽(dispatcher·handlers)은
+//   이미 에디션제한중을 import하고 있으니 그쪽에서 넘긴다.
+export function getScreenGuide(screen?: string, lite = false): ScreenGuide {
+  if (!screen) return lite ? LITE_OVERVIEW : OVERVIEW;
   const key = screen.split(/[\\/]/).pop() ?? screen;
-  return GUIDES[key] ?? OVERVIEW;
+  // 화면 이름이 넘어왔는데 표에 없으면 개요로 떨어진다 — 그 개요도 에디션에 맞춰야 한다.
+  return GUIDES[key] ?? (lite ? LITE_OVERVIEW : OVERVIEW);
 }
 
 /** 「어디서 해?」류 — **자리를 묻는 말**인지. 이 말이 없으면 화면 이름이 나와도 길찾기가 아니다. */
@@ -1077,8 +1111,8 @@ function 절차줄(screen?: string): string | null {
 // 챗봇/지휘 콘솔이 그대로 최종 답으로 쓸 수 있는 안내 텍스트.
 // question에 패널 이름이 들어 있으면(예: "SMTP 설정 방법 알려줘" — ⓘ 버튼이 이런 질문을 주입)
 // 그 패널 상세만 답한다. 없으면 화면 전체 안내 + 패널 목차를 준다.
-export function formatScreenGuide(screen?: string, question?: string): string {
-  const g = getScreenGuide(screen);
+export function formatScreenGuide(screen?: string, question?: string, lite = false): string {
+  const g = getScreenGuide(screen, lite);
   const q = (question ?? "").replace(/\s/g, "");
   // ⚠ 화면 안내에 구역이 없어도 본다 — 공통(대화창 조작) 구역이 걸릴 수 있다(2026-08-09).
   if (q) {

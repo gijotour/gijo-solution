@@ -99,7 +99,10 @@ describe("★ 근거 배지 3상태 (2026-08-13)", () => {
     //   그룹이 됐다). 문자열 위치로 본다: 읽기 쉽고 이스케이프 함정이 원리상 없다.
     for (const [이름, 앵커] of [
       ["침해사고 초동절차(랜섬웨어)", "침해사고초동절차(instructionText)"],
-      ["화면 안내(screenguide)", "formatScreenGuide(screen, instructionText)"],
+      // ⚠ 닫는 괄호를 앵커에 넣지 않는다(2026-08-18) — 인자가 하나 늘자(에디션 전달) 앵커가
+      //   안 맞아 헛실패했다. 이 시험이 보는 것은 「그 자리에 sources: []가 있는가」이지
+      //   인자 개수가 아니다.
+      ["화면 안내(screenguide)", "formatScreenGuide(screen, instructionText"],
       ["조치 플레이북", "formatRemediation({ findingType"],
     ] as [string, string][]) {
       const i = disp.indexOf(앵커);

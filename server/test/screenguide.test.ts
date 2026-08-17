@@ -357,3 +357,55 @@ describe("★ 메뉴에 있는 화면은 챗봇 안내도 있어야 한다", () 
     expect(없음, "이 화면들은 챗봇이 설명하지 못한다").toEqual([]);
   });
 });
+
+// ── 라이트 에디션 개요 (2026-08-18 신설) ─────────────────────────────────────
+// 왜: 라이트 챗은 screen을 안 보낸다(lite-chat.html이 sendInstructionStream(글, 세션, undefined, …)).
+//   그러면 getScreenGuide가 개요를 돌려주는데, 그 개요가 **표준 콘솔 설명**이라
+//   「오른쪽 대화창」·「선택 칩」·「미조치 Critical 취약점」처럼 **라이트에 없는 것**을 가르쳤다.
+//   이 파일 머리말의 원칙("없는 기능을 안내하지 않는다 — 그라운딩")을 개요가 어기고 있었다.
+//   ⚠ 이 시험이 없으면 조용히 되돌아간다 — 표준 OVERVIEW를 손볼 때 라이트를 잊기 쉽다.
+describe("screenguide — 라이트는 자기 안내를 받는다", () => {
+  // 표준에만 있는 것들. 라이트 안내에 이 말이 나오면 없는 기능을 가르치는 것이다.
+  const 표준전용 = ["오른쪽 대화창", "선택 칩", "화면 맥락", "미조치 Critical", "자산·취약점"];
+
+  it("화면을 모를 때: 라이트 개요는 표준 전용 기능을 말하지 않는다", () => {
+    const lite = getScreenGuide(undefined, true);
+    const 본문 = JSON.stringify(lite);
+    for (const 말 of 표준전용) {
+      expect(본문.includes(말), `라이트 안내에 표준 전용 문구가 있다: ${말}`).toBe(false);
+    }
+    expect(lite.title, "라이트 개요임이 제목에 드러나야 한다").toContain("라이트");
+  });
+
+  it("표준은 그대로다 — 라이트 대응이 표준을 깎지 않았다", () => {
+    const std = getScreenGuide(undefined, false);
+    expect(std.title).toContain("대화창");
+    expect(JSON.stringify(std), "표준 개요는 선택 칩을 계속 안내해야 한다").toContain("선택 칩");
+    // 기본값(인자 생략)은 표준이어야 한다 — 기존 호출부가 조용히 라이트로 바뀌면 안 된다.
+    expect(getScreenGuide(undefined)).toEqual(std);
+  });
+
+  it("모르는 화면 이름도 에디션에 맞는 개요로 떨어진다", () => {
+    const lite = getScreenGuide("존재하지-않는-화면.html", true);
+    expect(lite.title).toContain("라이트");
+  });
+
+  it("formatScreenGuide도 에디션을 그대로 흘려보낸다", () => {
+    const lite = formatScreenGuide(undefined, "사용법 알려줘", true);
+    const std = formatScreenGuide(undefined, "사용법 알려줘", false);
+    expect(lite).not.toEqual(std);
+    for (const 말 of 표준전용) expect(lite.includes(말), `라이트 안내에 ${말}`).toBe(false);
+  });
+
+  it("라이트 안내가 약속하는 것은 라이트에 실제로 있다", () => {
+    // 결재판·스트리밍은 lite-chat.html이 실제로 그린다 — 약속과 코드가 어긋나면 안 된다.
+    const lite = fs.readFileSync(new URL("../../client/src/renderer/pages/lite-chat.html", import.meta.url), "utf8");
+    const 본문 = JSON.stringify(getScreenGuide(undefined, true));
+    if (본문.includes("승인 창")) {
+      expect(lite, "라이트 안내가 승인 창을 약속하는데 화면에 결재판이 없다").toContain("renderApproval");
+    }
+    if (본문.includes("흐릅니다")) {
+      expect(lite, "라이트 안내가 스트리밍을 약속하는데 화면이 스트림을 안 쓴다").toContain("sendInstructionStream");
+    }
+  });
+});

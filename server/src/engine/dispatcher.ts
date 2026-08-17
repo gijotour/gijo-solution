@@ -1197,7 +1197,9 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     // sources: [] — **코드가 낸 답이라 사내 문서를 본 적이 없다**(4-ⓑ, 2026-08-13).
     //   안 실으면 근거재검색대상인가()가 통과시켜 배지용 재검색이 돌고, 답과 무관한 문서가
     //   「📄 근거」로 붙는다. actioncheck가 이미 쓰는 계약을 그대로 쓴다(빈 배열 = 근거 없음 선언).
-    return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatScreenGuide(screen, instructionText), sources: [] };
+    // ⚠ 에디션을 함께 넘긴다(2026-08-18) — 라이트 챗은 screen을 안 보내는데(lite-chat.html),
+    //   그러면 개요가 나가고 그 개요가 **표준 콘솔 설명**이라 라이트에 없는 기능을 가르쳤다.
+    return { task, route: { agentId: "orchestrator", action: "chat" }, output: formatScreenGuide(screen, instructionText, 에디션제한중()), sources: [] };
   }
 
   // 결재 승인 요청 — 대화창이 「승인 완료」를 지어내지 않게 결재판으로 결정적으로 안내한다.
