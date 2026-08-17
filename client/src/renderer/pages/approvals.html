@@ -404,6 +404,18 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
   function renderList() {
     const list = document.getElementById("rvList");
+    // ⚠ **자세히 칸을 먼저 구해 낸다**(2026-08-18 실화면 CDP로 잡은 실사고).
+    //   nav.js의 `gijo자세히아래로`가 #rvDetail을 **누른 줄 아래(=이 목록 안)로 옮긴다.**
+    //   그 상태에서 아래 `list.innerHTML = …`을 하면 **칸이 목록과 함께 지워져**
+    //   다음 renderDetail이 `Cannot set properties of null`로 터졌다 — 두 번째 클릭부터
+    //   상세가 안 열렸다. 지우기 전에 원래 자리(.rv-wrap)로 되돌려 놓으면 살아남는다.
+    //   (옮기기는 nav.js가 렌더 뒤에 다시 하므로 화면 모양은 그대로다.)
+    const 자세히 = list && list.querySelector("#rvDetail");
+    if (자세히) {
+      const wrap = document.querySelector(".rv-wrap");
+      if (wrap) wrap.appendChild(자세히);
+      else 자세히.remove();
+    }
     const filtered = allReviews.filter(matchFilter).sort((a, b) => {
       if (a.overdue !== b.overdue) return a.overdue ? -1 : 1;
       return SEV_ORD[a.finding.severity] - SEV_ORD[b.finding.severity];
@@ -443,8 +455,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         renderBulkBar();
         return;
       }
+      // ⚠ 알림을 **맨 앞에** 둔다(2026-08-18). 아래 renderList/renderDetail이 터져도
+      //   대화창은 「이거」를 잡아야 한다 — 실제로 renderDetail이 터지는 길이 있었다(바로 아래 주석).
+      대화창에알림(r);
       currentKey = keyOf(r); renderList(); renderDetail(r);
-      대화창에알림(r); // 고른 것을 대화창이 「이거」로 잡게 한다(2026-08-18 시안 승인)
     }));
     renderBulkBar();
   }
@@ -456,7 +470,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     bar.style.display = selected.size ? "flex" : "none";
   }
 
-  function clearDetail() { document.getElementById("rvDetail").innerHTML = '<div class="rv-empty">왼쪽에서 finding을 선택하세요.</div>'; }
+  function clearDetail() { const d = 상세칸(); if (!d) return; d.innerHTML = '<div class="rv-empty">왼쪽에서 finding을 선택하세요.</div>'; }
 
   // ── 고른 항목을 대화창에 알린다 (2026-08-18, 「조치 항목 → 대화창 카드」 시안 승인분) ──
   //
@@ -537,6 +551,32 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     }));
   }
 
+  /** 상세 칸을 되찾는다 — 없으면 다시 만든다.
+   *
+   * ⚠ **실사고(2026-08-18 실화면 CDP로 잡음)**: 항목을 두 번째로 누르면 상세가 안 열렸다.
+   *   TypeError: Cannot set properties of null (setting 'innerHTML') at renderDetail
+   *   뿌리 — nav.js의 `gijo자세히아래로`가 #rvDetail을 **누른 줄 아래(목록 안)로 옮기는데**,
+   *   다음 클릭에서 renderList()가 `list.innerHTML = …`(418행)로 목록을 통째로 다시 써
+   *   **그 안에 들어가 있던 #rvDetail이 같이 지워졌다.** 두 기능이 서로를 깨뜨리고 있었다.
+   *   (nav.js:981 주석도 "화면이 자세히 칸을 innerHTML로 다시 그린다"를 알고 있었지만,
+   *    닫기 버튼 재생성만 막고 **칸 자체가 사라지는 경우**는 안 봤다.)
+   *   ⇒ 없으면 원래 자리(.rv-wrap)에 다시 만들어 준다. 옮기기는 nav.js가 다음 클릭에 또 한다. */
+  function 상세칸() {
+    // ⚠ **id로만 찾지 않는다.** 새로 만들면 같은 id가 둘이 되어 `getElementById`가
+    //   어느 것을 줄지 어긋난다 — 2026-08-18에 실제로 그렇게 만들어 놓고 잡았다
+    //   (하나는 목록 안 옛것, 하나는 새것. 상세가 옛 내용에 멈춰 보였다).
+    //   위 renderList의 구해 내기가 1차 방어이고, 이건 그래도 없을 때의 마지막 수단이다.
+    let el = document.getElementById("rvDetail") || document.querySelector(".rv-detail");
+    if (el) { el.id = "rvDetail"; return el; }
+    const wrap = document.querySelector(".rv-wrap");
+    if (!wrap) return null;
+    el = document.createElement("div");
+    el.className = "rv-detail";
+    el.id = "rvDetail";
+    wrap.appendChild(el);
+    return el;
+  }
+
   function renderDetail(r) {
     const f = r.finding;
     const a = esc(r.assetId), k = esc(r.findingKey);
@@ -585,7 +625,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     if (r.verifyRequestedAt) tl.push(`<div class="tl"><b>검증 요청</b> — 조치 완료 보고 <span class="when">${esc(r.verifyRequestedBy || "")} · ${fmtDate(r.verifyRequestedAt)}</span></div>`);
     if (r.reviewedAt && r.status !== "rejected") tl.push(`<div class="tl"><b>${esc(ST_LABEL[r.status])}</b> — ${esc(r.reviewedBy || "-")} <span class="when">${fmtDate(r.reviewedAt)}</span></div>`);
 
-    document.getElementById("rvDetail").innerHTML = `
+    const 칸 = 상세칸();
+    if (!칸) return;
+    칸.innerHTML = `
       <div class="dt-top"><span class="st st-${r.status}">${esc(ST_LABEL[r.status])}</span>${flags}<span style="font-size:11.75px;color:var(--muted-2)">${metaLine}</span></div>
       <div class="dt-title">${esc(f.finding_type)}</div>
       <div class="dt-asset">${esc(r.assetName)}${r.gone ? " · (최신 스캔에 없음)" : ""}</div>
