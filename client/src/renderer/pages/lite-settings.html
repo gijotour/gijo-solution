@@ -28,12 +28,13 @@
      막대가 900px 자리에 서서 **화면 한가운데 뜬다**(2026-08-12 갈무리에서 발견). */
   html,body{height:100%}
   body{overflow-y:auto}
-  .wrap{padding:18px 22px 40px;display:flex;flex-direction:column;gap:14px;max-width:900px}
-  .scr-id{font-size:12.5px;color:var(--muted)}
+  /* 사장님 2026-08-17: 한 화면에 더 많이 보이게 조인다(설명접기·글씨크기와 함께). */
+  .wrap{padding:13px 20px 34px;display:flex;flex-direction:column;gap:8px;max-width:920px}
+  .scr-id{font-size:12px;color:var(--muted)}
   .scr-id b{color:var(--text);font-weight:800}
-  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
-  .card h2{font-size:13px;font-weight:800;margin-bottom:4px;display:flex;align-items:center;gap:8px}
-  .card .sub{font-size:11.5px;color:var(--muted-2);margin-bottom:10px;line-height:1.6}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:10px 13px}
+  .card h2{font-size:12.5px;font-weight:800;margin-bottom:3px;display:flex;align-items:center;gap:8px}
+  .card .sub{font-size:11.5px;color:var(--muted-2);margin-bottom:9px;line-height:1.6}
   .row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:12.5px}
   .row:last-child{border-bottom:0}
   .row .k{flex:0 0 140px;color:var(--muted)}
@@ -96,6 +97,17 @@
 <body>
 <div class="wrap">
   <div class="scr-id"><b>설정</b> — 이 PC에서 GIJO AS가 돌기 위한 것들입니다.</div>
+
+  <!-- 글씨 크기(사장님 2026-08-17: 전체 글씨가 큼). 이미 있는 webContents 줌(iframe 전부 따라옴)에 UI만 붙임. -->
+  <section class="card">
+    <h2>🔤 글씨 크기 <span class="pill" id="zoomVal">100%</span></h2>
+    <div class="sub">화면 <b>전체(모든 메뉴)</b> 글씨·요소 크기입니다. <b>작게</b> 하면 한 화면에 더 많이 보입니다.</div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <button id="zoomMinus" type="button">− 작게</button>
+      <button id="zoomPlus" type="button">+ 크게</button>
+      <button id="zoomReset" type="button">기본(100%)</button>
+    </div>
+  </section>
 
   <section class="card">
     <h2>🧠 모델 · 엔진 <span class="pill" id="engPill">확인 중</span></h2>
@@ -813,6 +825,19 @@
     바깥연결();
   }
 
+  // 글씨 크기(사장님 2026-08-17) — 이미 있는 webContents 줌(getUiZoom/stepUiZoom/setUiZoom, iframe 전부 따라옴)에 UI만.
+  function 글씨크기() {
+    var val = document.getElementById("zoomVal");
+    async function 표시() {
+      try { var r = await g.getUiZoom(); var f = typeof r === "number" ? r : (r && (r.factor || r.zoom)); if (val && f) val.textContent = Math.round(f * 100) + "%"; } catch (e) { /* 못 읽으면 100% 그대로 */ }
+    }
+    var minus = document.getElementById("zoomMinus"), plus = document.getElementById("zoomPlus"), reset = document.getElementById("zoomReset");
+    if (minus) minus.addEventListener("click", async function () { try { await g.stepUiZoom(-1); } catch (e) {} 표시(); });
+    if (plus) plus.addEventListener("click", async function () { try { await g.stepUiZoom(1); } catch (e) {} 표시(); });
+    if (reset) reset.addEventListener("click", async function () { try { await g.setUiZoom(1); } catch (e) {} 표시(); });
+    표시();
+  }
+
   // 설정 화면 심플하게(사장님 2026-08-17) — 각 카드 설명(.sub)을 「?」 뒤로 접어 데이터·상태가 앞에 오게.
   function 설명접기() {
     document.querySelectorAll(".card").forEach(function (card) {
@@ -835,7 +860,7 @@
 
   function 시작() {
     엔진(); 등급(); 암호화(); 계정(); 이차인증(); 법령(); 업데이트(); 서버(); 원격GPU(); 어디서();
-    권장모델(); 토큰(); 토큰배선(); 모델폴더(); 두뇌(); 바깥연결();
+    권장모델(); 토큰(); 토큰배선(); 모델폴더(); 두뇌(); 바깥연결(); 글씨크기();
     var rs = document.getElementById("rescan");
     if (rs) rs.addEventListener("click", function () {
       document.getElementById("dlMsg").innerHTML = '<div class="ok">다시 확인했습니다.</div>';
