@@ -10,6 +10,7 @@ vi.mock("../src/engine/llm", () => ({
 }));
 
 import { createApp } from "../src/app";
+import { extractDocumentText } from "../src/engine/dataset";
 
 async function login(app: ReturnType<typeof createApp>) {
   const res = await request(app).post("/api/auth/login").send({ username: "jyh", password: "changeme" });
@@ -24,6 +25,14 @@ describe("dataset", () => {
     mockChat.mockReset();
     app = createApp();
     token = await login(app);
+  });
+
+  it("텍스트(.md/.txt)는 파이썬 추출기 없이 base64를 바로 읽는다 (max 발견#5 — 라이트 문서넣기 전량실패)", async () => {
+    const 원문 = "# 사내 규정\n\n접속기록은 1년 이상 보관한다. — 특수문자 ⚠·「」도 그대로.";
+    const b64 = Buffer.from(원문, "utf8").toString("base64");
+    for (const name of ["규정.md", "메모.txt", "표.csv"]) {
+      expect(await extractDocumentText(name, b64)).toBe(원문); // 파이썬(scripts/extract_doc.py) 안 거치고 그대로
+    }
   });
 
   it("parses a well-formed JSON array response from the LLM into Q&A pairs", async () => {

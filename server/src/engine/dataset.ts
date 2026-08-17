@@ -22,6 +22,16 @@ const DATASETS_DIR = process.env.GIJO_DATASETS_DIR ?? path.join("data", "dataset
 // 파일을 임시 폴더에 쓴 뒤 확장자를 유지해 스크립트가 형식을 판별하게 한다. PYTHONUTF8=1(한국어).
 export async function extractDocumentText(filename: string, base64: string): Promise<string> {
   const ext = path.extname(filename).toLowerCase() || ".txt";
+  // ★ 텍스트 계열은 파이썬 추출기(scripts/extract_doc.py)를 **거치지 않는다** — 이미 텍스트라 추출이
+  //   필요 없고, 그 스크립트가 없는 환경에서 **텍스트까지 전량 실패**했다(max 발견#5 ★치명 2026-08-17:
+  //   라이트 빌드의 server-dist가 scripts/를 안 담아 .md 넣기가 서버400). base64를 UTF-8로 바로 푼다.
+  //   바이너리(PDF·HWPX·docx…)만 추출기로 보낸다.
+  const 텍스트계열 = new Set([".md", ".markdown", ".txt", ".text", ".csv", ".tsv", ".log", ".json", ".yaml", ".yml"]);
+  if (텍스트계열.has(ext)) {
+    const text = Buffer.from(base64, "base64").toString("utf8");
+    recordProcessOutput("extract-doc", "log", `${filename} — 텍스트 직접 읽음(${text.length.toLocaleString()}자, 파이썬 추출 생략)`);
+    return text;
+  }
   const tmp = path.join(os.tmpdir(), `gijo-doc-${Date.now()}-${Math.random().toString(36).slice(2)}${ext}`);
   await fs.promises.writeFile(tmp, Buffer.from(base64, "base64"));
   recordProcessOutput("extract-doc", "log", `$ extract_doc.py ${filename} (${ext})`);
