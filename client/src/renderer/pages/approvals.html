@@ -208,6 +208,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   .dt-title{font-size:17px;font-weight:800;color:#fff;}
   .dt-asset{font-size:12px;color:var(--purple);margin-bottom:14px;}
   .dt-evid{font-size:12.5px;color:var(--muted);background:var(--panel-2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;line-height:1.6;margin-bottom:16px;word-break:break-all;}
+  /* 취약점 원문 아래 한글 한 줄(전-7 ③ 확장) — vulnscan .vd-plain과 같은 값. 못 찾으면 안 그림. */
+  .dt-plain{font-size:12.5px;line-height:1.6;color:var(--muted);margin:4px 0 12px;}
+  .dt-plain b{color:var(--text);font-weight:700;}
   .sec{margin-bottom:16px;}
   .sec-h{font-size:12.25px;font-weight:800;color:var(--muted-2);letter-spacing:.5px;margin-bottom:8px;text-transform:uppercase;}
   .frow{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;}
@@ -247,6 +250,8 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
 <script>
   const esc = (s) => String(s == null ? "" : s).replace(/</g, "&lt;");
+  // findingplain의 `말`에 든 리터럴 **강조**를 <b>로(esc 다음에 적용). vulnscan과 같은 헬퍼.
+  const boldify = (s) => String(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
 
 
   const ST_LABEL = { pending: "미검토", in_progress: "진행중", verifying: "검증 대기", approved: "완료", rejected: "반려" };
@@ -541,6 +546,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       <div class="dt-top"><span class="st st-${r.status}">${esc(ST_LABEL[r.status])}</span>${flags}<span style="font-size:11.75px;color:var(--muted-2)">${metaLine}</span></div>
       <div class="dt-title">${esc(f.finding_type)}</div>
       <div class="dt-asset">${esc(r.assetName)}${r.gone ? " · (최신 스캔에 없음)" : ""}</div>
+      ${f.plain ? `<div class="dt-plain">→ ${boldify(esc(f.plain))}</div>` : ""}
       <div class="dt-evid">${esc(f.evidence) || "(근거 없음)"}</div>
       ${assignForm}
       <div class="sec"><div class="sec-h">진행</div>${stageActions}

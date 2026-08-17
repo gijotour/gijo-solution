@@ -22,6 +22,8 @@
   "use strict";
 
   const esc = (s) => String(s ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+  // findingplain의 `말`에 든 리터럴 **강조**를 <b>로(esc 다음에 적용). vulnscan·approvals과 같은 헬퍼.
+  const boldify = (s) => String(s).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
 
   // 서버 isRealVulnerability(agenttools.ts SCAN_NOISE)와 **같은 목록**이어야 한다 —
   // 하나라도 빠지면 지도 타일 크기가 표와 어긋난다(2026-08-04: scan_not_supported가 빠져 있었다).
@@ -145,7 +147,7 @@
       '<div class="mv-row"><div class="mv-lbl">담당</div>' +
       (a.owner ? esc(a.owner) : '<span style="color:var(--amber)">미지정 — 아래에서 바로 배정을 물을 수 있습니다</span>') + "</div>" +
       (top.length
-        ? '<div class="mv-row"><div class="mv-lbl">먼저 볼 것</div>' + top.map((f) => "· " + esc(f.finding_type)).join("<br>") + "</div>"
+        ? '<div class="mv-row"><div class="mv-lbl">먼저 볼 것</div>' + top.map((f) => '<div class="mv-item">· ' + esc(f.finding_type) + (f.plain ? '<div class="mv-plain">→ ' + boldify(esc(f.plain)) + "</div>" : "") + "</div>").join("") + "</div>"
         : "") +
       // ⚠ 안내하는 말은 **결정적으로 걸리는 말만** 적는다(2026-08-04 안내 문구 전수 점검 원칙).
       '<button class="mv-ask" data-ask="' + esc(이름) + ' 자산 취약점 알려줘">💬 "' + esc(이름) + ' 자산 취약점 알려줘"</button>' +
