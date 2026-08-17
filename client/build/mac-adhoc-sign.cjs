@@ -31,12 +31,19 @@ exports.default = async function afterSign(context) {
   if (context.electronPlatformName !== "darwin") return;
 
   const appPath = path.join(context.appOutDir, `${context.packager.appInfo.productFilename}.app`);
-  console.log(`[mac-adhoc-sign] ad-hoc 재서명: ${appPath}`);
 
-  // --force: 남아 있는 Electron 원본 서명을 덮어쓴다(이게 핵심이다)
-  // --deep : 안에 든 프레임워크·헬퍼까지 — 하나라도 빠지면 봉인이 깨진 것으로 읽힌다
-  // --sign -: 인증서 없이(ad-hoc). "-"가 ad-hoc을 뜻한다
-  execFileSync("codesign", ["--force", "--deep", "--sign", "-", appPath], { stdio: "inherit" });
+  // ★ 2026-08-17: 자체서명 인증서(GIJO AS Lite Signing)로 서명한다 — 재빌드해도 서명이 같아
+  //   macOS 키체인 '항상 허용'(Safe Storage 접근)이 유지된다(ad-hoc은 매번 cdhash가 바뀌어 재요청).
+  //   인증서가 없는 환경(CI 등)이면 ad-hoc으로 폴백한다. 이름 바꾸려면 GIJO_SIGN_ID 환경변수.
+  // --force: 남아 있는 Electron 원본 서명을 덮어쓴다 · --deep: 프레임워크·헬퍼까지.
+  const SIGN_ID = process.env.GIJO_SIGN_ID || "GIJO AS Lite Signing";
+  try {
+    execFileSync("codesign", ["--force", "--deep", "--sign", SIGN_ID, appPath], { stdio: "inherit" });
+    console.log(`[mac-adhoc-sign] 인증서 서명: ${SIGN_ID} — ${appPath}`);
+  } catch (e) {
+    console.warn(`[mac-adhoc-sign] 인증서(${SIGN_ID}) 서명 실패 → ad-hoc 폴백`);
+    execFileSync("codesign", ["--force", "--deep", "--sign", "-", appPath], { stdio: "inherit" });
+  }
 
   // ⚠ 서명하고 **확인까지 한다.** 서명 명령이 성공해도 봉인이 어긋날 수 있고,
   //   그러면 고객 기계에서야 드러난다 — 빌드에서 잡는 편이 100배 싸다.
