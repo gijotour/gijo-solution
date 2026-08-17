@@ -402,7 +402,10 @@ export function cleanExtractedText(text: string): string {
 // 제목 줄(마크다운 #, "1." 번호, "제N장")을 경계로 블록을 만들고, 블록을 순서대로 담아
 // size를 넘기 전에 끊는다. 블록 하나가 size보다 크면 문장 경계로 나눈다.
 export function chunkText(text: string, size = CHUNK_SIZE, overlap = CHUNK_OVERLAP): string[] {
-  const cleaned = cleanExtractedText(text);
+  // HTML 주석(<!-- … -->)은 내용이 아니라 유지보수 메모다 — 색인에서 뺀다(2026-08-17, max 발견#3:
+  // 문서의 '이 문서를 늘릴 때' 작성지침이 「유출 신고 며칠?」 답 상단으로 새어 나왔다). 주석으로
+  // 감싸면 원문엔 남지만 검색·답변엔 안 든다. 문서에 진짜 필요한 표식(HTML 주석)만 지우므로 안전하다.
+  const cleaned = cleanExtractedText(text.replace(/<!--[\s\S]*?-->/g, ""));
   if (!cleaned.trim()) return [];
 
   // 1) 블록 분해: 빈 줄 기준 문단 + 제목 줄은 다음 문단과 붙인다(제목만 남는 청크 방지).

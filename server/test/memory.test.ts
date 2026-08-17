@@ -173,6 +173,19 @@ describe("chunkText — 구조 인지 청킹 (2026-07-23 개선)", () => {
     expect(cleaned).toContain("둘째 문단입니다.");
   });
 
+  it("HTML 주석(<!-- … -->)은 색인에서 뺀다 — 유지보수 메모 누출 방지 (max 발견#3)", () => {
+    const doc = [
+      "## 개인정보 유출 신고", "", "유출을 알게 된 때부터 72시간 이내가 법정 기한이다.", "",
+      "<!-- 유지보수 메모: 이 문서를 늘릴 때 같은 형식으로 이어 적는다. 한 항목은 네 조각(질문 예·답·오해·확인 경로) -->",
+      "", "## 다음 항목", "", "제21조 파기는 목적 달성 시 지체 없이.",
+    ].join("\n");
+    const joined = chunkText(doc, 800, 100).join("\n");
+    expect(joined).toContain("72시간");            // 실제 내용은 남는다
+    expect(joined).toContain("제21조 파기");        // 주석 뒤 내용도 남는다
+    expect(joined).not.toContain("이 문서를 늘릴 때"); // 주석 안 메타는 색인 안 됨
+    expect(joined).not.toContain("네 조각");
+  });
+
   it("제목 줄이 다음 문단과 같은 청크에 붙는다 (제목 직후 절단 방지)", () => {
     const doc = ["## 1. 개요", "", "가".repeat(700), "", "## 2. 장애 대응 표준 절차", "", "1단계 증상 기록. 2단계 로그 확보. 3단계 HA 확인."].join("\n");
     const chunks = chunkText(doc, 800, 100);
