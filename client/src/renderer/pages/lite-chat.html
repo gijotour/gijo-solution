@@ -115,7 +115,8 @@
       // ⚡ 스트리밍 경로(max 발견#1 수리 2026-08-17, 사용자 ⓐ 선택): 비스트리밍 /api/dispatch는
       //   30초를 넘기면 리포트로 전환했다 — 14B에서 RAG 문맥 있는 how-to가 실측 28.5초+도구·관문으로
       //   30초를 넘겨 즉답이 리포트로 밀렸다(max 실측). 스트리밍엔 그 전환이 없어 느려도 글자가 흐른다.
-      //   표준 챗(console.js:1130)과 같은 다리를 라이트에도 준다.
+      //   표준 콘솔 챗(console 화면 1130행 부근)과 같은 다리를 라이트에도 준다.
+      //   ⚠ 위 주석에 파일명(.js)을 박지 말 것 — clientglobals 소스 감시가 '대화 부품 미탑재'로 거짓 실패한다(2026-08-17 실측).
       var r, 흐른칸 = null;
       var onDelta = function (t) {
         if (!흐른칸) { 대기.innerHTML = '<div class="answer" style="white-space:pre-wrap"></div>'; 흐른칸 = 대기.querySelector(".answer"); }
