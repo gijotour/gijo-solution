@@ -771,7 +771,7 @@
     catch (e) { alert(오류문구(e, "두뇌 끄기")); }
   }
 
-  // ── ⑧ 바깥 연결 — 이 PC를 벗어나는 통로를 한 판에 모아 on/off 시각화(조작은 각 카드). ──
+  // ── ⑧ 바깥 연결 — 통로를 한 판에 모아 on/off. 끄기는 여기서 바로, 켜기는 해당 카드로 안내(주소·키 필요). ──
   async function 바깥연결() {
     var box = document.getElementById("egList"); var pill = document.getElementById("egPill");
     if (!box || !pill) return;
@@ -779,9 +779,9 @@
     try { law = await g.lawConfig(); } catch (e) { /* 못 읽으면 꺼짐으로 본다 */ }
     var 두뇌켜짐 = 두뇌상태.enabled && (두뇌상태.provider === "custom" || 두뇌상태.provider === "openai");
     var 통로 = [
-      { 이름: "🔌 OpenAI 호환 두뇌", on: 두뇌켜짐, 어디: 두뇌상태.provider === "openai" ? "공개 OpenAI" : "사내 온프렘", 대체: "자체 LLM(이 PC)", 외부: 두뇌상태.provider === "openai" },
-      { 이름: "🖧 원격 GPU (VPN)", on: !!(원격상태 && 원격상태.enabled), 어디: "VPN 안 사내·집 GPU", 대체: "이 PC GPU", 외부: false },
-      { 이름: "⚖ 법령·판례 조회", on: !!(law && law.enabled), 어디: "국가법령정보센터", 대체: "번들 규제 문서", 외부: true }
+      { key: "두뇌", scroll: "brainBox", 이름: "🔌 OpenAI 호환 두뇌", on: 두뇌켜짐, 어디: 두뇌상태.provider === "openai" ? "공개 OpenAI" : "사내 온프렘", 대체: "자체 LLM(이 PC)", 외부: 두뇌상태.provider === "openai" },
+      { key: "원격", scroll: "rgpuBox", 이름: "🖧 원격 GPU (VPN)", on: !!(원격상태 && 원격상태.enabled), 어디: "VPN 안 사내·집 GPU", 대체: "이 PC GPU", 외부: false },
+      { key: "법령", scroll: "lawBox", 이름: "⚖ 법령·판례 조회", on: !!(law && law.enabled), 어디: "국가법령정보센터", 대체: "번들 규제 문서", 외부: true }
     ];
     var 켜진수 = 통로.filter(function (t) { return t.on; }).length;
     var 외부켜짐 = 통로.some(function (t) { return t.on && t.외부; });
@@ -791,11 +791,46 @@
       var 색 = t.on ? (t.외부 ? "var(--amber)" : "var(--teal)") : "var(--muted-2)";
       return '<div style="display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid var(--border)">' +
         '<span style="flex:0 0 auto;width:8px;height:8px;border-radius:50%;background:' + 색 + ';opacity:' + (t.on ? "1" : ".4") + '"></span>' +
-        '<span style="flex:0 0 168px;font-weight:700">' + esc(t.이름) + '</span>' +
+        '<span style="flex:0 0 160px;font-weight:700">' + esc(t.이름) + '</span>' +
         '<span style="flex:1;font-size:11.5px;color:var(--muted)">' + (t.on ? "→ " + esc(t.어디) + (t.외부 ? " ⚠ 바깥으로" : " · 사내 유지") : "꺼짐 · 사내 대체: " + esc(t.대체)) + '</span>' +
-        '<span style="flex:0 0 auto;font-size:11px;color:' + (t.on ? "var(--text)" : "var(--muted-2)") + '">' + (t.on ? "켜짐" : "꺼짐") + '</span></div>';
+        '<button class="' + (t.on ? "" : "go ") + '" style="flex:0 0 auto;padding:3px 10px;font-size:11px" data-egkey="' + t.key + '" data-egon="' + (t.on ? "1" : "0") + '" data-egscroll="' + t.scroll + '">' + (t.on ? "끄기" : "켜기 ›") + '</button></div>';
     }).join("") +
-      '<div class="note" style="margin-top:8px;font-size:11.5px;color:var(--muted-2)">켜기/끄기는 위 해당 카드(두뇌·원격 GPU·법령)에서 — 여기서는 <b>지금 무엇이 바깥과 통하나</b>를 한눈에 봅니다.</div>';
+      '<div class="note" style="margin-top:8px;font-size:11.5px;color:var(--muted-2)"><b>끄기</b>는 여기서 바로 · <b>켜기</b>는 주소·키가 필요해 해당 카드로 안내합니다.</div>';
+    box.querySelectorAll("[data-egkey]").forEach(function (btn) {
+      btn.addEventListener("click", function () { 통로토글(btn.getAttribute("data-egkey"), btn.getAttribute("data-egon") === "1", btn.getAttribute("data-egscroll")); });
+    });
+  }
+  async function 통로토글(key, on, scrollId) {
+    if (!on) { var el = document.getElementById(scrollId); if (el) el.scrollIntoView({ behavior: "smooth", block: "center" }); return; }
+    try {
+      if (key === "두뇌") await g.saveCloudConfig({ enabled: false });
+      else if (key === "원격") { var rc = await g.remoteLlmGet().catch(function () { return {}; }); await g.remoteLlmSet(false, (rc && rc.url) || ""); }
+      else if (key === "법령") await g.setLawKey("");
+    } catch (e) { alert(오류문구(e, "끄기")); return; }
+    if (typeof 두뇌 === "function") await 두뇌();
+    if (typeof 어디서다시 === "function") await 어디서다시();
+    if (typeof 법령 === "function") 법령();
+    바깥연결();
+  }
+
+  // 설정 화면 심플하게(사장님 2026-08-17) — 각 카드 설명(.sub)을 「?」 뒤로 접어 데이터·상태가 앞에 오게.
+  function 설명접기() {
+    document.querySelectorAll(".card").forEach(function (card) {
+      var h2 = card.querySelector("h2");
+      var sub = card.querySelector(".sub");
+      if (!h2 || !sub || h2.querySelector(".help-q")) return;
+      sub.style.display = "none";
+      var q = document.createElement("button");
+      q.type = "button"; q.className = "help-q"; q.textContent = "?"; q.title = "설명 보기/숨기기";
+      q.style.cssText = "margin-left:8px;width:18px;height:18px;line-height:15px;padding:0;border-radius:50%;font-size:11px;font-weight:800;color:var(--muted-2);background:transparent;border:1px solid var(--border);cursor:pointer;flex:0 0 auto";
+      q.addEventListener("click", function () {
+        var hidden = sub.style.display === "none";
+        sub.style.display = hidden ? "block" : "none";
+        q.style.color = hidden ? "var(--blue)" : "var(--muted-2)";
+        q.style.borderColor = hidden ? "var(--blue)" : "var(--border)";
+      });
+      h2.appendChild(q);
+    });
   }
 
   function 시작() {
@@ -806,6 +841,7 @@
       document.getElementById("dlMsg").innerHTML = '<div class="ok">다시 확인했습니다.</div>';
       엔진();
     });
+    설명접기();
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", 시작);
   else 시작();
