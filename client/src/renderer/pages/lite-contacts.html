@@ -1,0 +1,272 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS Lite — 나만의 연락처</title>
+<link rel="stylesheet" href="gijo-ui.css">
+<!--
+  lite-contacts.html — 라이트 「나만의 연락처」(재편 ⑤, 사장님 요청 2026-08-16).
+
+  ■ 목적: IT/보안 업무의 **테리토리별·제품별 담당자**를 한눈에. 사고·점검 때 "누구한테?"를 즉시.
+    보안 장비 등록부(무엇·어디)의 짝(누구).
+  ■ 시각화 = **커버리지 매트릭스**: 테리토리(행) × 제품(열) → 담당자(칸). **빈 칸 = 커버리지 구멍**(빨강)
+    으로 한눈에 → "DMZ 방화벽 담당 누구?" 공백이 보안 인사이트가 된다.
+    색: 사내 담당 있음=초록 · 벤더/총판만=주황 · 공백=빨강(로그 화면 심각도·히트맵 패턴 재사용).
+  ■ 저장: localStorage(이 PC 전용, 장비 등록부와 동형). ⚠ 전화·이메일=개인정보 → 이 PC 밖으로 안 나감·백업 안 됨.
+  ■ 직접 연락: g.openExternal(mailto:·tel:) + 복사 폴백. (main.ts 허용스킴에 mailto·tel 추가함)
+-->
+<style>
+  :root{--bg:#262624;--panel:#30302e;--panel-2:#262624;--border:rgba(255,255,255,.09);--border-strong:rgba(255,255,255,.16);--text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--blue:#3b82f6;--teal:#1eb980;--red:#e2483d;--amber:#f0a020;--purple:#8b7cf0;}
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;overflow-y:auto}
+  .wrap{padding:18px 22px 48px;display:flex;flex-direction:column;gap:14px;max-width:960px}
+  .scr-id{font-size:12.5px;color:var(--muted)}
+  .scr-id b{color:var(--text);font-weight:800}
+  .card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px}
+  .card h2{font-size:13px;font-weight:800;margin-bottom:4px}
+  .card .sub{font-size:11.5px;color:var(--muted-2);margin-bottom:12px;line-height:1.6}
+  button{background:transparent;border:1px solid var(--border);border-radius:8px;padding:7px 13px;color:var(--text);font:inherit;font-size:12.5px;cursor:pointer}
+  button.go{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700}
+  button.sm{padding:4px 9px;font-size:11.5px}
+  button:disabled{opacity:.5;cursor:default}
+  input,select{background:#262624;border:1px solid var(--border);border-radius:8px;padding:7px 9px;color:var(--text);font:inherit;font-size:12.5px}
+  /* 커버리지 매트릭스 */
+  .mx-wrap{overflow-x:auto;padding-bottom:4px}
+  table.mx{border-collapse:separate;border-spacing:4px;min-width:100%}
+  table.mx th{font-size:11px;font-weight:700;color:var(--muted);padding:4px 8px;text-align:center;white-space:nowrap}
+  table.mx th.rowh{text-align:left;color:var(--text);font-weight:800}
+  table.mx td{width:74px;height:46px;border-radius:8px;text-align:center;vertical-align:middle;cursor:pointer;font-size:11px;font-weight:700;border:1px solid transparent;transition:transform .06s}
+  table.mx td:hover{transform:scale(1.04);border-color:var(--border-strong)}
+  td.cov-in{background:rgba(30,185,128,.18);color:#7fe3bf;border-color:rgba(30,185,128,.4)}
+  td.cov-ven{background:rgba(240,160,32,.16);color:#f3c06a;border-color:rgba(240,160,32,.38)}
+  td.cov-gap{background:rgba(226,72,61,.13);color:#e88a82;border-color:rgba(226,72,61,.32)}
+  td .cnt{font-size:10px;opacity:.8;font-weight:600}
+  .legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:11px;color:var(--muted)}
+  .legend span{display:inline-flex;align-items:center;gap:6px}
+  .sw{width:12px;height:12px;border-radius:4px;display:inline-block}
+  .sw.in{background:rgba(30,185,128,.5)}.sw.ven{background:rgba(240,160,32,.5)}.sw.gap{background:rgba(226,72,61,.45)}
+  .kpi{display:flex;gap:22px;flex-wrap:wrap;margin-bottom:10px}
+  .kpi .b{font-size:20px;font-weight:800}
+  .kpi .l{font-size:11px;color:var(--muted)}
+  .kpi .b.gap{color:var(--red)}
+  /* 담당자 목록 */
+  .cts{display:flex;flex-direction:column}
+  .ct{display:flex;align-items:center;gap:10px;padding:9px 2px;border-bottom:1px solid var(--border)}
+  .ct:last-child{border-bottom:0}
+  .ct .nm{font-weight:700;min-width:96px}
+  .ct .role{font-size:11px;border:1px solid var(--border);border-radius:999px;padding:1px 8px;color:var(--muted-2)}
+  .ct .role.내부{color:var(--teal);border-color:rgba(30,185,128,.4)}
+  .ct .role.벤더,.ct .role.총판{color:var(--amber);border-color:rgba(240,160,32,.38)}
+  .ct .tags{flex:1;min-width:60px;font-size:11px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .ct .acts{display:flex;gap:6px;flex:0 0 auto}
+  .empty{font-size:12.5px;color:var(--muted);line-height:1.8;padding:10px 2px}
+  .empty b{color:var(--text)}
+  .warn{font-size:11.5px;color:var(--amber);line-height:1.7;margin-top:10px}
+  .ok{font-size:12px;color:var(--teal);padding:6px 2px}
+  /* 편집 폼 */
+  .form{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:6px}
+  .form .full{grid-column:1 / -1}
+  .form label{font-size:11px;color:var(--muted);display:block;margin-bottom:3px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{font-size:11px;border:1px solid var(--border);border-radius:999px;padding:3px 10px;cursor:pointer;color:var(--muted)}
+  .chip.on{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:700}
+  .detail{background:#262624;border:1px solid var(--border-strong);border-radius:10px;padding:12px 14px;margin-top:8px}
+  .detail .dh{font-weight:800;font-size:13.5px;margin-bottom:6px}
+  .detail .row{display:flex;gap:8px;align-items:center;margin:5px 0;font-size:12.5px}
+  .detail .row .k{color:var(--muted-2);min-width:52px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="scr-id"><b>나만의 연락처</b> — 테리토리×보안제품 담당자를 한눈에. 사고·점검 때 「누구한테?」를 즉시 봅니다. (보안 장비 등록부의 짝 — 무엇/어디 ↔ 누구)</div>
+
+  <!-- 커버리지 매트릭스 -->
+  <div class="card">
+    <h2>커버리지 매트릭스</h2>
+    <div class="sub">테리토리(행) × 제품(열) → 담당자. <b style="color:var(--red)">빨간 칸 = 담당 공백</b>(누가 볼지 안 정해진 자리). 칸을 누르면 담당자·연락이 뜹니다.</div>
+    <div class="kpi" id="kpi"></div>
+    <div class="mx-wrap"><table class="mx" id="mx"></table></div>
+    <div class="legend">
+      <span><i class="sw in"></i> 사내 담당 있음</span>
+      <span><i class="sw ven"></i> 벤더/총판만</span>
+      <span><i class="sw gap"></i> 공백(담당 없음)</span>
+      <span style="color:var(--muted-2)">· 행(테리토리)·열(제품)은 아래에서 편집</span>
+    </div>
+    <div id="cellDetail"></div>
+  </div>
+
+  <!-- 담당자 -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:8px">
+      <h2 style="margin:0">담당자</h2>
+      <button class="go sm" id="addBtn" type="button">+ 담당자 추가</button>
+    </div>
+    <div id="editWrap"></div>
+    <div class="cts" id="cts"></div>
+    <div class="warn">⚠ 전화·이메일은 <b>개인정보</b>입니다 — 이 PC에만 저장되고 <b>백업·동기화되지 않습니다.</b> (조직 공유는 스탠다드의 몫)</div>
+  </div>
+
+  <!-- 축(테리토리·제품) 편집 -->
+  <div class="card">
+    <h2>매트릭스 축</h2>
+    <div class="sub">테리토리(구역)·보안 제품 목록을 조직에 맞게 고칩니다.</div>
+    <div class="form">
+      <div class="full">
+        <label>테리토리 (쉼표로 구분)</label>
+        <input id="axT" style="width:100%" placeholder="본사망, 지사, DMZ, 클라우드">
+      </div>
+      <div class="full">
+        <label>보안 제품 (쉼표로 구분)</label>
+        <input id="axP" style="width:100%" placeholder="방화벽, EDR, 백신, NAC">
+      </div>
+    </div>
+    <div style="margin-top:8px"><button class="go sm" id="axSave" type="button">축 저장</button> <span id="axMsg" class="ok" style="display:none"></span></div>
+  </div>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  var g = window.gijo || null;
+  var KEY = "gijo.lite.contacts";
+  var 기본T = ["본사망","지사","DMZ","클라우드"];
+  var 기본P = ["방화벽","EDR","백신","NAC"];
+  var state = load();
+  var 편집중 = null; // 편집 중 담당자 id 또는 "new"
+
+  function load(){
+    try{ var s = JSON.parse(localStorage.getItem(KEY)||"{}");
+      return { contacts: Array.isArray(s.contacts)?s.contacts:[], territories: Array.isArray(s.territories)&&s.territories.length?s.territories:기본T.slice(), products: Array.isArray(s.products)&&s.products.length?s.products:기본P.slice() };
+    }catch(e){ return { contacts:[], territories:기본T.slice(), products:기본P.slice() }; }
+  }
+  function save(){ localStorage.setItem(KEY, JSON.stringify(state)); }
+  function esc(v){ return String(v==null?"":v).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];}); }
+  function uid(){ return "c"+Math.random().toString(36).slice(2,9); }
+
+  // (테리토리,제품) 칸을 덮는 담당자
+  function covers(t,p){ return state.contacts.filter(function(c){ return (c.territories||[]).indexOf(t)>=0 && (c.products||[]).indexOf(p)>=0; }); }
+  function cellClass(list){ if(!list.length) return "cov-gap"; if(list.some(function(c){return c.role==="사내";})) return "cov-in"; return "cov-ven"; }
+
+  function drawMatrix(){
+    var mx = document.getElementById("mx"); mx.innerHTML="";
+    var T = state.territories, P = state.products;
+    // 헤더
+    var thead = document.createElement("tr");
+    thead.innerHTML = '<th class="rowh"></th>' + P.map(function(p){return '<th>'+esc(p)+'</th>';}).join("");
+    mx.appendChild(thead);
+    var gap=0, tot=T.length*P.length;
+    T.forEach(function(t){
+      var tr=document.createElement("tr");
+      tr.innerHTML='<th class="rowh">'+esc(t)+'</th>';
+      P.forEach(function(p){
+        var list=covers(t,p); var cls=cellClass(list); if(cls==="cov-gap")gap++;
+        var td=document.createElement("td"); td.className=cls;
+        td.innerHTML = list.length ? (esc(list[0].name)+(list.length>1?'<div class="cnt">외 '+(list.length-1)+'</div>':'')) : '—';
+        td.addEventListener("click",function(){ showCell(t,p,list); });
+        tr.appendChild(td);
+      });
+      mx.appendChild(tr);
+    });
+    // KPI
+    var 내부 = state.contacts.filter(function(c){return c.role==="사내";}).length;
+    document.getElementById("kpi").innerHTML =
+      kpi(state.contacts.length,"담당자") + kpi(내부,"사내") + kpi(state.contacts.length-내부,"벤더·총판") +
+      '<div><div class="b gap">'+gap+" / "+tot+'</div><div class="l">공백 칸</div></div>';
+  }
+  function kpi(n,l){ return '<div><div class="b">'+n+'</div><div class="l">'+esc(l)+'</div></div>'; }
+
+  function showCell(t,p,list){
+    var box=document.getElementById("cellDetail");
+    var head='<div class="dh">'+esc(t)+' × '+esc(p)+'</div>';
+    if(!list.length){ box.innerHTML='<div class="detail">'+head+'<div class="row" style="color:var(--red)">담당자가 없습니다 — 커버리지 공백입니다. 아래에서 담당자를 추가하고 이 구역·제품을 지정하세요.</div></div>'; return; }
+    box.innerHTML='<div class="detail">'+head+list.map(function(c){ return contactRow(c); }).join("")+'</div>';
+  }
+  function contactRow(c){
+    var 연락='';
+    if(c.phone) 연락+=lnk("전화","tel:"+c.phone.replace(/[^0-9+]/g,''),c.phone);
+    if(c.email) 연락+=lnk("이메일","mailto:"+c.email,c.email);
+    return '<div class="row"><span class="k">'+esc(c.name)+'</span><span class="role '+(c.role==="사내"?"내부":esc(c.role))+'">'+esc(c.role||"")+'</span>'+
+      '<span style="color:var(--muted);flex:1">'+esc((c.phone||"")+(c.phone&&c.email?" · ":"")+(c.email||""))+'</span>'+연락+'</div>';
+  }
+  function lnk(label,url,disp){
+    return '<button class="sm" data-url="'+esc(url)+'" onclick="__contact_open(this)">'+esc(label)+'</button>';
+  }
+  window.__contact_open = async function(btn){
+    var url = btn.getAttribute("data-url");
+    if(g && g.openExternal){ try{ await g.openExternal(url); return; }catch(e){} }
+    // 폴백: 값 복사
+    var val = url.replace(/^(mailto:|tel:)/,"");
+    try{ await navigator.clipboard.writeText(val); btn.textContent="복사됨"; setTimeout(function(){},1200); }catch(e){ alert(val); }
+  };
+
+  function drawContacts(){
+    var box=document.getElementById("cts");
+    if(!state.contacts.length){ box.innerHTML='<div class="empty"><b>아직 담당자가 없습니다.</b><br>「+ 담당자 추가」로 이름·역할·담당 구역·제품·연락처를 넣으면, 위 매트릭스가 채워집니다.</div>'; return; }
+    box.innerHTML = state.contacts.map(function(c){
+      var tags=(c.territories||[]).concat(c.products||[]).join(" · ");
+      return '<div class="ct"><span class="nm">'+esc(c.name)+'</span>'+
+        '<span class="role '+(c.role==="사내"?"내부":esc(c.role))+'">'+esc(c.role||"")+'</span>'+
+        '<span class="tags">'+esc(tags||"담당 미지정")+'</span>'+
+        '<span class="acts"><button class="sm" data-id="'+c.id+'" onclick="__contact_edit(this)">고침</button>'+
+        '<button class="sm" data-id="'+c.id+'" onclick="__contact_del(this)">삭제</button></span></div>';
+    }).join("");
+  }
+  window.__contact_edit=function(b){ 편집중=b.getAttribute("data-id"); drawEdit(); };
+  window.__contact_del=function(b){ var id=b.getAttribute("data-id"); state.contacts=state.contacts.filter(function(c){return c.id!==id;}); save(); redraw(); };
+
+  function drawEdit(){
+    var wrap=document.getElementById("editWrap");
+    if(!편집중){ wrap.innerHTML=""; return; }
+    var c = 편집중==="new" ? {id:"",name:"",role:"사내",territories:[],products:[],phone:"",email:"",memo:""}
+          : state.contacts.find(function(x){return x.id===편집중;}) || {};
+    var tChips = state.territories.map(function(t){ return '<span class="chip '+((c.territories||[]).indexOf(t)>=0?"on":"")+'" data-k="t" data-v="'+esc(t)+'" onclick="__contact_chip(this)">'+esc(t)+'</span>'; }).join("");
+    var pChips = state.products.map(function(p){ return '<span class="chip '+((c.products||[]).indexOf(p)>=0?"on":"")+'" data-k="p" data-v="'+esc(p)+'" onclick="__contact_chip(this)">'+esc(p)+'</span>'; }).join("");
+    wrap.innerHTML =
+      '<div class="detail"><div class="form">'+
+      '<div><label>이름</label><input id="f_name" style="width:100%" value="'+esc(c.name)+'"></div>'+
+      '<div><label>역할</label><select id="f_role" style="width:100%"><option'+(c.role==="사내"?" selected":"")+'>사내</option><option'+(c.role==="벤더"?" selected":"")+'>벤더</option><option'+(c.role==="총판"?" selected":"")+'>총판</option></select></div>'+
+      '<div><label>전화</label><input id="f_phone" style="width:100%" value="'+esc(c.phone)+'" placeholder="010-0000-0000"></div>'+
+      '<div><label>이메일</label><input id="f_email" style="width:100%" value="'+esc(c.email)+'" placeholder="name@company.com"></div>'+
+      '<div class="full"><label>담당 테리토리</label><div class="chips" id="f_terr">'+tChips+'</div></div>'+
+      '<div class="full"><label>담당 제품</label><div class="chips" id="f_prod">'+pChips+'</div></div>'+
+      '<div class="full"><label>메모</label><input id="f_memo" style="width:100%" value="'+esc(c.memo)+'"></div>'+
+      '</div><div style="margin-top:10px;display:flex;gap:8px"><button class="go sm" onclick="__contact_savef()">저장</button><button class="sm" onclick="__contact_canceledit()">취소</button></div></div>';
+    // 칩 선택 임시 상태를 DOM에서 읽으므로 별도 저장 불필요
+    wrap.__editing=c;
+  }
+  window.__contact_chip=function(el){ el.classList.toggle("on"); };
+  window.__contact_canceledit=function(){ 편집중=null; drawEdit(); };
+  window.__contact_savef=function(){
+    var wrap=document.getElementById("editWrap");
+    var name=(document.getElementById("f_name").value||"").trim();
+    if(!name){ alert("이름을 넣으세요"); return; }
+    var terr=[].slice.call(document.querySelectorAll('#f_terr .chip.on')).map(function(e){return e.getAttribute("data-v");});
+    var prod=[].slice.call(document.querySelectorAll('#f_prod .chip.on')).map(function(e){return e.getAttribute("data-v");});
+    var rec={ id: 편집중==="new"?uid():편집중, name:name, role:document.getElementById("f_role").value,
+      territories:terr, products:prod, phone:(document.getElementById("f_phone").value||"").trim(),
+      email:(document.getElementById("f_email").value||"").trim(), memo:(document.getElementById("f_memo").value||"").trim() };
+    if(편집중==="new") state.contacts.push(rec);
+    else state.contacts=state.contacts.map(function(c){return c.id===편집중?rec:c;});
+    save(); 편집중=null; redraw();
+  };
+
+  document.getElementById("addBtn").addEventListener("click",function(){ 편집중="new"; drawEdit(); });
+  document.getElementById("axSave").addEventListener("click",function(){
+    var t=(document.getElementById("axT").value||"").split(",").map(function(s){return s.trim();}).filter(Boolean);
+    var p=(document.getElementById("axP").value||"").split(",").map(function(s){return s.trim();}).filter(Boolean);
+    if(t.length) state.territories=t; if(p.length) state.products=p;
+    save(); redraw();
+    var m=document.getElementById("axMsg"); m.textContent="저장했습니다"; m.style.display="inline"; setTimeout(function(){m.style.display="none";},1500);
+  });
+
+  function redraw(){ drawMatrix(); drawContacts(); drawEdit();
+    document.getElementById("axT").value=state.territories.join(", ");
+    document.getElementById("axP").value=state.products.join(", ");
+  }
+  redraw();
+})();
+</script>
+</body>
+</html>

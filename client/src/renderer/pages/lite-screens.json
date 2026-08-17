@@ -64,7 +64,7 @@
       "설명": "첨부된 자산 메뉴의 내용으로 확인하고 공격경로 분석 가능하게 · Graphify 이용할 수 있으면 이용"
     },
     {
-      "no": 4,
+      "no": 5,
       "id": "lite-scan",
       "이름": "스캐너",
       "파일": "client/src/renderer/pages/lite-scan.html",
@@ -81,7 +81,7 @@
       "설명": "우리 가능한 스캐너 탑재 · 스캔결과 또한 첨부파일 자산에서 확인 가능하게"
     },
     {
-      "no": 5,
+      "no": 4,
       "id": "lite-manuals",
       "이름": "보안 장비 등록부",
       "파일": "client/src/renderer/pages/lite-manuals.html",
@@ -116,23 +116,8 @@
     },
     {
       "no": 7,
-      "id": "lite-products",
-      "이름": "제품 소개자료",
-      "파일": "client/src/renderer/pages/lite-products.html",
-      "본": "products.html",
-      "도구": [
-        "search"
-      ],
-      "품": "XS",
-      "사장님말": "제품 비교 및 주요 기능 정리",
-      "왜": "번들 문서로 답이 된다 — 회사 데이터가 필요 없다. ⚠ `product_status`(회사 보유 제품 현황)와 **다른 것**이다",
-      "구현됨": true,
-      "설명": "제품 비교 및 주요 기능 정리"
-    },
-    {
-      "no": 8,
       "id": "lite-memory",
-      "이름": "나만의 기억",
+      "이름": "나만의 자료",
       "파일": "client/src/renderer/pages/lite-memory.html",
       "본": "aihub.html?panel=knowledge · docbox.html",
       "도구": [
@@ -150,6 +135,18 @@
       "구현됨": true,
       "_본_정정": "⚠ 2026-08-12: 「memory.html · docbox.html」로 적었는데 그 화면은 허브로 **합쳐졌다**(nav.js 리다이렉트 맵). 파일은 디스크에 남아 있지만 셸에서 열면 허브 패널로 넘어간다 — 파일이 있다고 살아 있는 것이 아니다.",
       "설명": "RAG, Graphify, LLM Wiki를 이용해서 넣고 관리하기"
+    },
+    {
+      "no": 8,
+      "id": "lite-contacts",
+      "이름": "나만의 연락처",
+      "파일": "client/src/renderer/pages/lite-contacts.html",
+      "도구": [],
+      "품": "M",
+      "사장님말": "테리토리별·보안제품 담당자를 한눈에 (재편 ⑤, 2026-08-16)",
+      "왜": "보안 장비 등록부(무엇/어디)의 짝(누구). 커버리지 매트릭스로 담당 공백을 보안 인사이트로 본다. localStorage(이 PC 전용).",
+      "구현됨": true,
+      "설명": "IT/보안 담당자를 테리토리×제품 매트릭스로 한눈에. 사고·점검 때 「누구한테?」를 즉시. 전화·이메일은 이 PC에만 저장됩니다."
     },
     {
       "no": 9,

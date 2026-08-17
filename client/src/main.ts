@@ -1188,10 +1188,11 @@ ipcMain.handle("models:open-folder", async () => {
   return { path: dir };
 });
 
-// 라이트 「보안 장비 등록부」 직접 접근 — 장비 관리 화면을 OS 기본 앱으로 연다.
-//   ⚠ 스킴을 검사한다: 웹(http/https)·원격(ssh/rdp/vnc)만 허용. javascript:·file:·data: 등은 막는다.
+// 라이트 「보안 장비 등록부」·「나만의 연락처」 직접 접근 — OS 기본 앱으로 연다.
+//   ⚠ 스킴을 검사한다: 웹(http/https)·원격(ssh/rdp/vnc)·연락(mailto/tel)만 허용.
+//   javascript:·file:·data: 등은 막는다. mailto·tel은 나만의 연락처(⑤)의 이메일·전화 직접 연락용.
 //   렌더러가 넘긴 주소를 그대로 여는 게 아니라, 여기서 한 번 더 거른다(주입 방어).
-const 허용스킴 = new Set(["http:", "https:", "ssh:", "rdp:", "vnc:"]);
+const 허용스킴 = new Set(["http:", "https:", "ssh:", "rdp:", "vnc:", "mailto:", "tel:"]);
 ipcMain.handle("shell:openExternal", async (_e, rawUrl: string) => {
   const s = String(rawUrl || "").trim();
   if (!s) throw new Error("주소가 비었습니다");
