@@ -318,9 +318,9 @@
    "id": "redteam-run-guide",
    "q": "레드팀 점검 실행해줘",
    "signals": {
-    "tool": "run_redteam"
-   },
-   "_왜": "AI 견고성 셀프 점검 경로"
+   "approval": true
+  },
+   "_왜": "AI 견고성 셀프 점검 경로. 2026-08-18에 tool→approval로 바꿈 — run_redteam이 setAssetRobustness로 자산에 점수를 쓰는데 write:false라 결재판 없이 돌던 것을 write:true로 정정했다. 이제 실행 대신 결재판이 뜬다(다른 쓰기 문항과 같은 관례)"
   },
   {
    "id": "sla-overdue",

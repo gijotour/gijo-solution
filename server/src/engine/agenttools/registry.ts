@@ -1248,10 +1248,18 @@ const TOOLS: AgentTool[] = [
     name: "run_redteam",
     label: "AI 견고성(레드팀) 점검",
     domain: "assets",
-    write: false,
+    // ⚠ **쓰기다**(2026-08-18 수정). 예전엔 write:false였는데 handlers.ts의 이 도구 본문이
+    //   `setAssetRobustness()`로 **자산 레코드에 견고성 점수를 쓴다.** write:false면
+    //   agentloop.ts:1767이 결재판 없이 즉시 실행하므로, **쓰기가 사람 확인 없이 돌고 있었다.**
+    //   게다가 실행 자체가 살아 있는 모델에 인젝션·탈옥 14종을 **실제로 발사**하는 일이라
+    //   "무엇을 대상으로 도는지"를 사람이 한 번은 봐야 한다. 선언과 실제를 맞춘다.
+    write: true,
     description:
       '자산이 서빙하는 로컬 LLM에 프롬프트 인젝션·탈옥 공격 14종을 실제로 실행해 견고성을 측정한다. AI-BOM에 연결된 로컬 모델(modelRef)이 있는 AI/LLM 자산만 대상이다(인프라 호스트는 불가). "레드팀 점검해줘", "이 자산 견고성 점검", "프롬프트 인젝션 테스트해줘"에 쓴다. 예: {"assetId":"ai-secbot-01"}',
     params: [{ name: "assetId", label: "자산 id", description: "점검할 AI/LLM 자산 id", required: true }],
+    effect: (args) =>
+      `자산 ${args.assetId || "(대상 미지정)"}이(가) 쓰는 로컬 모델에 프롬프트 인젝션·탈옥 공격 14종을 실제로 보내고, 그 결과로 나온 견고성 점수를 자산 기록에 남깁니다.`,
+    undo: "보낸 공격은 되돌릴 수 없습니다(실제로 모델에 갑니다). 견고성 점수는 다음 점검 때 새 값으로 덮어씁니다.",
     run: runRunRedteam,
   },
   {
