@@ -701,7 +701,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
             <b>🏢 스탠다드</b><br><span class="hint">표준 구성 · 화면 전체 · 도구 78개<br>LLM 1개 · 32K 문맥</span>
           </button>
           <button class="btn" id="edPro" style="flex:1;min-width:200px;text-align:left;padding:10px 12px">
-            <b>🚀 프로</b><br><span class="hint">스탠다드 전체 + 엔진 확장(LLM 2개 병행 — A/B·검증)<br>48GB급 GPU 권장 · 엔진만 재기동</span>
+            <!-- ⚠ 정직 표기(2026-08-18) — 예전 문구 "LLM 2개 병행 — A/B·검증"은 **둘 다 없는 기능**이었다.
+                 A/B·검증은 코드에 0건이고, 「2개」는 등급이 아니라 남은 VRAM이 정한다. -->
+            <b>🚀 프로</b><br><span class="hint">지금은 스탠다드와 <b>엔진 동작이 같습니다</b><br>48GB급 GPU · 여러 모델 상주는 남은 VRAM이 정합니다</span>
           </button>
         </div>
         <div id="edMsg" class="hint" style="margin-top:8px"></div>
@@ -1611,14 +1613,20 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
   async function applyTier(tierId) {
     const line = tierEl("tierStatusLine");
-    line.textContent = `${tierName(tierId)} 적용 중 — LLM 재기동(약 30초)…`;
+    line.textContent = `${tierName(tierId)} 적용 중…`;
     line.className = "status-line";
     try {
-      await window.gijo.setLlmTier(tierId);
-      line.textContent = `✓ ${tierName(tierId)} 적용됨 — LLM이 새 설정으로 재기동 중입니다`;
+      // ⚠ **서버가 돌려주는 restarting을 본다**(2026-08-18). 예전엔 무조건 「재기동 중」이라 적었는데,
+      //   이제 서버는 문맥 길이가 그대로면(스탠다드↔프로) 엔진을 **안 건드린다**. 그때도 「재기동 중」이라
+      //   적으면 화면이 거짓말을 하고, 담당자는 끊기지도 않은 30초를 기다린다.
+      var r = await window.gijo.setLlmTier(tierId);
+      var 재기동 = !r || r.restarting !== false; // 옛 서버는 이 값이 없다 — 그때는 예전대로 본다
+      line.textContent = 재기동
+        ? `✓ ${tierName(tierId)} 적용됨 — LLM이 새 설정으로 재기동 중입니다(약 30초)`
+        : `✓ ${tierName(tierId)} 적용됨 — 바뀐 설정이 없어 엔진을 그대로 뒀습니다(대화가 안 끊깁니다)`;
       line.className = "status-line status-ok";
       await loadTier();
-      setTimeout(loadEngineStatus, 4000); // 재기동 반영된 엔진 상태 갱신
+      if (재기동) setTimeout(loadEngineStatus, 4000); // 재기동 반영된 엔진 상태 갱신
     } catch (e) {
       line.textContent = "적용 실패: " + e.message;
       line.className = "status-line status-err";
@@ -2479,7 +2487,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         } catch (e) { msg.textContent = String((e && e.message) || e); }
         return;
       }
-      if (!confirm("프로(스탠다드 + LLM 2개 병행)로 바꿉니다.\n48GB급 GPU가 아니면 두 모델이 못 올라올 수 있습니다.\n엔진만 다시 뜹니다. 계속할까요?")) return;
+      // ⚠ 정직 표기(2026-08-18) — 예전엔 "LLM 2개 병행"이라 적고 30초 재기동을 시켰는데,
+      //   프로와 스탠다드는 엔진에 들어가는 값이 **같다**(ctxSize 32768 동일). 얻는 것 없이
+      //   대화만 끊겼다. 이제 사실을 알리고, 서버도 바뀔 게 없으면 재기동을 건너뛴다.
+      if (!confirm("프로로 바꿉니다.\n⚠ 지금은 스탠다드와 엔진 동작이 같습니다 — 모델을 몇 개 올려 둘지는 등급이 아니라 남은 VRAM이 정합니다.\n바뀔 것이 없으면 엔진을 그대로 둡니다. 계속할까요?")) return;
       try {
         await window.gijo.setLlmTier("pro");
         msg.textContent = "적용했습니다 — 엔진이 프로 등급(LLM 2개)으로 다시 뜹니다.";

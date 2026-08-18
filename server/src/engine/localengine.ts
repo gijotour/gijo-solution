@@ -126,7 +126,14 @@ export const GIJO_TIERS: GijoTierSpec[] = [
   //   보수적으로 두면 조금 엄격할 뿐이다. 재측정하면 그때 낮춘다.
   { id: "lite", label: "Lite (일부 기능 제약)", vramLabel: "10GB급", minVramGb: 10, maxLoadedModels: 1, ctxSize: 8192, overheadMb: 3500, desc: "채팅 LLM 1개 · 8K — 작은 모델(7.6B급) 전제. 긴 문서 요약·다인 동시 사용에 제약이 있고, 표준 기능 전량은 24GB급부터입니다." },
   { id: "standard", label: "Standard", vramLabel: "24GB급", minVramGb: 24, maxLoadedModels: 1, ctxSize: 32768, overheadMb: 5000, desc: "채팅 LLM 1개 · 32K — 표준 구성(14B 기준 15.7GB 점유)" },
-  { id: "pro", label: "Pro", vramLabel: "48GB급", minVramGb: 48, maxLoadedModels: 2, ctxSize: 32768, overheadMb: 5000, desc: "채팅 LLM 2개 · 32K — A/B·검증 병행. CUDA 28.9GB·Metal 33.6GB 점유라 48GB급에서 여유를 두고 돕니다(사용자 결정 2026-08-12)." },
+  // ⚠ **정직 표기**(2026-08-18 사장님 결정 ⓑ — 「남기되 사실대로 적는다」).
+  //   예전 desc는 "채팅 LLM 2개 · 32K — A/B·검증 병행"이었는데 **둘 다 사실이 아니었다**:
+  //     · A/B·검증 병행 — 제품 코드에 `abTest`·`compareModels`·`crossVerify` **0건**
+  //     · LLM 2개 — `maxLoadedModels`가 쓰이는 곳은 `makeRoomFor`의 **nvidia-smi 실패 갈래 하나뿐**이다.
+  //       Mac·통합메모리·정상 nvidia-smi 셋 다 숫자를 돌려주므로 **지원 플랫폼 전부에서 안 걸린다** —
+  //       모델을 내릴지는 티어가 아니라 **실제 남은 VRAM**이 정한다. 48GB면 스탠다드로도 2개가 뜬다.
+  //   ⇒ 지금 프로는 스탠다드와 **엔진 동작이 같다**(ctxSize·overheadMb 동일). 그렇게 적는다.
+  { id: "pro", label: "Pro", vramLabel: "48GB급", minVramGb: 48, maxLoadedModels: 2, ctxSize: 32768, overheadMb: 5000, desc: "32K — ⚠ 지금은 스탠다드와 엔진 동작이 같습니다. 모델을 몇 개 올려 둘지는 등급이 아니라 남은 VRAM이 정하므로, 48GB급이면 스탠다드로도 여러 개가 상주합니다." },
   // ── Max(관제용) — **예정**. 고를 수 없고 권장에도 안 나온다(planned).
   //   왜 지금 표에 넣나: 24시간 관제에서 **자동 작업이 담당자 대화를 갉아먹는 문제는 지금 있는 문제**다
   //   (야간 회귀·자동 스캔·리포트가 대화와 같은 모델을 쓴다). 그 몫을 떼는 것이 이 등급의 뼈대다.
@@ -1204,8 +1211,22 @@ export function registerLocalEngineRoutes(app: Express): void {
         res.status(400).json({ error: `${spec.label}은 준비 중인 등급이라 아직 적용할 수 없습니다.` });
         return;
       }
+      // ⚠ **바뀔 게 없으면 재기동하지 않는다**(2026-08-18). 예전엔 등급을 누를 때마다 무조건
+      //   풀을 내리고 다시 올렸다 — 화면이 스스로 「약 30초, 진행 중 대화가 끊길 수 있습니다」라고
+      //   경고하는 그 값을 치른다. 그런데 **스탠다드↔프로는 얻는 것이 0이다**:
+      //   티어에서 실제 스폰 인자로 가는 값은 `ctxSize` 하나뿐이고(`:564` → `--ctx-size`),
+      //   둘의 ctxSize가 32768로 같다. overheadMb·maxLoadedModels는 makeRoomFor·tierFits가
+      //   **호출 시점에 읽는** 값이라 재기동 없이 바로 반영된다.
+      //   ⇒ 문맥 길이가 그대로면 저장만 하고 엔진은 둔다. 라이트↔스탠다드(8192↔32768)는 그대로 재기동.
+      const 이전문맥 = currentTierSettings().ctxSize;
       setStateStmt.run("gijoTier", tier);
-      console.log(`[localengine] 구동 티어 변경: ${spec.label} (LLM ${spec.maxLoadedModels}개 · ctx ${spec.ctxSize}) — 채팅 모델 풀 재기동`);
+      const 재기동필요 = 이전문맥 !== spec.ctxSize;
+      if (!재기동필요) {
+        console.log(`[localengine] 구동 티어 변경: ${spec.label} — 문맥 길이 그대로(${spec.ctxSize})라 엔진을 유지합니다`);
+        res.json({ applied: tier, settings: spec, restarting: false });
+        return;
+      }
+      console.log(`[localengine] 구동 티어 변경: ${spec.label} (ctx ${이전문맥} → ${spec.ctxSize}) — 채팅 모델 풀 재기동`);
       const reloadId = pickAutoStartModelId();
       void stopLocalEngine()
         .then(() => (reloadId ? ensureModelLoaded(reloadId) : undefined))
