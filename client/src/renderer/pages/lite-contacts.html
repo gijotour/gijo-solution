@@ -126,6 +126,10 @@
   </div>
 </div>
 
+<!-- ⚠ **dialog.js를 반드시 싣는다**(2026-08-18). 이 화면은 nav.js를 안 실어서 gijoAsk/gijoTell이
+     저절로 오지 않는다(표준 화면은 nav.js loadDialog()가 동적으로 실어 준다). 안 실으면
+     TypeError로 **버튼이 조용히 죽는다** — 네이티브 창을 없애려다 버튼을 없애는 꼴이 된다. -->
+<script src="dialog.js"></script>
 <script>
 (function(){
   "use strict";
@@ -198,7 +202,7 @@
     if(g && g.openExternal){ try{ await g.openExternal(url); return; }catch(e){} }
     // 폴백: 값 복사
     var val = url.replace(/^(mailto:|tel:)/,"");
-    try{ await navigator.clipboard.writeText(val); btn.textContent="복사됨"; setTimeout(function(){},1200); }catch(e){ alert(val); }
+    try{ await navigator.clipboard.writeText(val); btn.textContent="복사됨"; setTimeout(function(){},1200); }catch(e){ gijoTell(val); }
   };
 
   function drawContacts(){
@@ -241,7 +245,7 @@
   window.__contact_savef=function(){
     var wrap=document.getElementById("editWrap");
     var name=(document.getElementById("f_name").value||"").trim();
-    if(!name){ alert("이름을 넣으세요"); return; }
+    if(!name){ gijoTell("이름을 넣으세요"); return; }
     var terr=[].slice.call(document.querySelectorAll('#f_terr .chip.on')).map(function(e){return e.getAttribute("data-v");});
     var prod=[].slice.call(document.querySelectorAll('#f_prod .chip.on')).map(function(e){return e.getAttribute("data-v");});
     var rec={ id: 편집중==="new"?uid():편집중, name:name, role:document.getElementById("f_role").value,

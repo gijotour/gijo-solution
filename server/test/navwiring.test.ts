@@ -84,8 +84,14 @@ describe("클릭 처리가 항목별 이름을 다시 하드코딩하지 않는�
 
   it("열 함수가 없으면 조용히 넘기지 않는다", () => {
     // 조용히 실패하면 "눌러도 안 열린다"는 증상만 남고 단서가 없다(4.9.0에서 그랬다).
+    // ⚠ **`gijoTell`도 인정한다**(2026-08-18). 네이티브 `alert`은 Electron에서 렌더러를
+    //   통째로 얼려서 제품 전역에서 걷어 냈다 — 이 검사가 「alert」이라는 **낱말**을 찾고
+    //   있었던 탓에, 사람에게 제대로 알리도록 고치자 오히려 빨간불이 났다.
+    //   묻는 것은 「어떤 함수를 쓰나」가 아니라 **「사람에게 알리나」**다.
     const 블록 = navSrc.slice(navSrc.indexOf("if (it.win)"), navSrc.indexOf("if (it.win)") + 600);
-    expect(블록).toMatch(/alert|console\.(error|warn)/);
+    expect(블록, "열지 못했을 때 사람에게 알리지 않는다 — 단서 없는 무반응이 된다").toMatch(
+      /gijoTell|alert|console\.(error|warn)/
+    );
   });
 });
 

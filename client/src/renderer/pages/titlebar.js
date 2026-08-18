@@ -369,7 +369,7 @@
     gear.addEventListener("click", function (e) {
       e.stopPropagation();
       if (window.gijo && typeof window.gijo.openDocbox === "function") window.gijo.openDocbox();
-      else alert("문서함을 열 수 없습니다 — 앱을 다시 시작해 보시고, 계속되면 알려주세요.");
+      else gijoTell("문서함을 열 수 없습니다 — 앱을 다시 시작해 보시고, 계속되면 알려주세요.");
     });
     // 이름·아바타를 누르면 **설정 › 내 설정**으로. 예전엔 이 줄이 ⚙ 메뉴를 열었는데 그 메뉴는 상단으로 갔다.
     // ⚠ 두 번 데었다. ① 구역 키는 s=my다(s=me로 적으면 아무 구역도 안 걸려 빈 화면이 뜬다).

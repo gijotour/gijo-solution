@@ -124,6 +124,11 @@
   </section>
 </div>
 
+<!-- ⚠ **dialog.js를 반드시 싣는다**(2026-08-18). 이 화면은 nav.js를 안 실어서
+     gijoAsk가 저절로 오지 않는다 — 표준 화면은 nav.js:1258 loadDialog()가 동적으로 실어 준다.
+     안 실으면 gijoAsk가 undefined라 버튼이 **TypeError로 조용히 죽는다**(이 저장소의 반복 함정:
+     없는 함수를 부르는 버튼). 예전엔 네이티브 confirm을 썼는데 그건 렌더러를 통째로 얼린다. -->
+<script src="dialog.js"></script>
 <script>
 // lite-memory — 다리는 window.gijo만. ⓑ 위키는 아직 없다고 **분명히** 말한다.
 (function () {
@@ -373,8 +378,8 @@
 
   async function 빼기(id) {
     // ⚠ 지우는 것은 되돌릴 수 없다 — 한 번 묻는다. 라이트엔 결재판이 없으니 이 확인이 마지막 문이다.
-    if (!confirm("「" + id + "」을 지식에서 뺍니다.\n원본 파일은 그대로 두고 검색에서만 빠집니다.\n계속할까요?")) return;
-    try { await g.deleteMemoryDocument(id, false); } catch (e) { alert(오류문구(e, "빼기")); }
+    if (!(await gijoAsk("「" + id + "」을 지식에서 뺍니다.\n원본 파일은 그대로 두고 검색에서만 빠집니다.\n계속할까요?"))) return;
+    try { await g.deleteMemoryDocument(id, false); } catch (e) { gijoTell(오류문구(e, "빼기")); }
     목록();
   }
 
@@ -492,7 +497,7 @@
     document.getElementById("folderPick").addEventListener("click", 폴더넣기);
     document.getElementById("smdOpen").addEventListener("click", function () {
       if (g && g.openSmartMd) { try { g.openSmartMd(); return; } catch (e) { /* 아래 안내 */ } }
-      alert("이 판에는 문서 작성 도구(GIJO Smart MD)가 없습니다.");
+      gijoTell("이 판에는 문서 작성 도구(GIJO Smart MD)가 없습니다.");
     });
     목록();
   }

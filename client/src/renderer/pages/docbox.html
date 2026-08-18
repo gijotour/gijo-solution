@@ -125,6 +125,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
      **모든 문서 열기가 TypeError로 죽었다**(2026-08-07 사용자 신고 "문서함 문서열려?" 실체).
      이 화면이 gijoMd를 쓰는 유일한 별도 창이라 대화창 쪽 스윕에 안 걸렸다. -->
 <script src="gijomd.js"></script>
+<!-- ⚠ **dialog.js를 반드시 싣는다**(2026-08-18). 이 화면은 nav.js를 안 실어서 gijoAsk/gijoTell이
+     저절로 오지 않는다(표준 화면은 nav.js loadDialog()가 동적으로 실어 준다). 안 실으면
+     TypeError로 **버튼이 조용히 죽는다** — 네이티브 창을 없애려다 버튼을 없애는 꼴이 된다. -->
+<script src="dialog.js"></script>
 <script>
 (function () {
   var api = window.gijo;
@@ -431,7 +435,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       }
     } catch (e) {
       btn.disabled = false; btn.textContent = "저장";
-      alert("저장하지 못했습니다: " + ((e && e.message) || e));
+      gijoTell("저장하지 못했습니다: " + ((e && e.message) || e));
     }
   }
 

@@ -2010,7 +2010,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   document.getElementById("modelGuideDocLink")?.addEventListener("click", (e) => {
     e.preventDefault();
     if (window.gijo && typeof window.gijo.openDocbox === "function") window.gijo.openDocbox();
-    else alert("문서함을 열 수 없습니다 — 앱을 다시 시작해 보시고, 계속되면 알려주세요.");
+    else gijoTell("문서함을 열 수 없습니다 — 앱을 다시 시작해 보시고, 계속되면 알려주세요.");
   });
   // (modelCardHtml·loadLlmGuide는 추천 카탈로그와 함께 지웠다 — 2026-08-08 모델 안내 단순화.
   //  applyJobToCard는 남긴다: 카드가 없으면 조용히 비켜 가는 가드가 있고, 검색·받기 흐름이 쓴다.)
@@ -2104,7 +2104,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
           let admin = false;
           try { admin = (currentUser || await window.gijo.me()).role === "admin"; } catch (e) {}
           if (!admin) {
-            alert("원격 GPU 설정은 관리자만 바꿀 수 있습니다 — 채팅이 어디로 가는지를 정하는 설정입니다.");
+            gijoTell("원격 GPU 설정은 관리자만 바꿀 수 있습니다 — 채팅이 어디로 가는지를 정하는 설정입니다.");
             return;
           }
           const q = new URLSearchParams(location.search);
@@ -2460,13 +2460,13 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     bP.disabled = (!라이트 && tier === "pro") || !!c.빌드고정;
     if (c.빌드고정) { msg.textContent = "이 설치본은 라이트 전용이라 여기서 못 바꿉니다 — 표준 설치본을 쓰세요."; return; }
     bL.onclick = async function () {
-      if (!confirm("라이트(1인용)로 전환합니다.\n⚠ 데이터 폴더가 갈려 스탠다드로 쌓은 자산·결재는 라이트 화면에 안 보입니다.\n적용은 앱을 다시 시작해야 됩니다. 계속할까요?")) return;
+      if (!(await gijoAsk("라이트(1인용)로 전환합니다.\n⚠ 데이터 폴더가 갈려 스탠다드로 쌓은 자산·결재는 라이트 화면에 안 보입니다.\n적용은 앱을 다시 시작해야 됩니다. 계속할까요?"))) return;
       var r = await window.gijo.editionSet("lite");
       if (r && r.ok === false) { msg.textContent = r.error || "바꾸지 못했습니다."; return; }
       msg.textContent = "저장했습니다 — 앱을 다시 시작하면 라이트로 뜹니다.";
     };
     bS.onclick = async function () {
-      if (!confirm("스탠다드(표준 구성)로 바꿉니다." + (라이트 ? "\n적용은 앱 재시작 후입니다." : "\n엔진만 다시 뜹니다(앱 재시작 불필요).") + " 계속할까요?")) return;
+      if (!(await gijoAsk("스탠다드(표준 구성)로 바꿉니다." + (라이트 ? "\n적용은 앱 재시작 후입니다." : "\n엔진만 다시 뜹니다(앱 재시작 불필요).") + " 계속할까요?"))) return;
       try {
         if (라이트) { var r = await window.gijo.editionSet("standard"); if (r && r.ok === false) { msg.textContent = r.error || "실패"; return; } }
         if (tier === "pro") await window.gijo.setLlmTier("standard");
@@ -2479,7 +2479,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       //   재시작한 스탠다드는 딴 폴더(userData)를 읽어 그 값이 없다(검토관 지적: 약속-코드 불일치).
       //   그래서 라이트에서는 **2단계로 정직하게** 안내한다: 먼저 스탠다드 전환·재시작, 그 다음 프로.
       if (라이트) {
-        if (!confirm("프로는 스탠다드의 엔진 확장이라 두 단계입니다.\n① 지금: 스탠다드로 전환 저장(앱 재시작 필요)\n② 재시작 후: 이 판에서 「프로」를 다시 누르면 엔진만 재기동\n①을 진행할까요?")) return;
+        if (!(await gijoAsk("프로는 스탠다드의 엔진 확장이라 두 단계입니다.\n① 지금: 스탠다드로 전환 저장(앱 재시작 필요)\n② 재시작 후: 이 판에서 「프로」를 다시 누르면 엔진만 재기동\n①을 진행할까요?"))) return;
         try {
           var r2 = await window.gijo.editionSet("standard");
           if (r2 && r2.ok === false) { msg.textContent = r2.error || "실패"; return; }
@@ -2490,7 +2490,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       // ⚠ 정직 표기(2026-08-18) — 예전엔 "LLM 2개 병행"이라 적고 30초 재기동을 시켰는데,
       //   프로와 스탠다드는 엔진에 들어가는 값이 **같다**(ctxSize 32768 동일). 얻는 것 없이
       //   대화만 끊겼다. 이제 사실을 알리고, 서버도 바뀔 게 없으면 재기동을 건너뛴다.
-      if (!confirm("프로로 바꿉니다.\n⚠ 지금은 스탠다드와 엔진 동작이 같습니다 — 모델을 몇 개 올려 둘지는 등급이 아니라 남은 VRAM이 정합니다.\n바뀔 것이 없으면 엔진을 그대로 둡니다. 계속할까요?")) return;
+      if (!(await gijoAsk("프로로 바꿉니다.\n⚠ 지금은 스탠다드와 엔진 동작이 같습니다 — 모델을 몇 개 올려 둘지는 등급이 아니라 남은 VRAM이 정합니다.\n바뀔 것이 없으면 엔진을 그대로 둡니다. 계속할까요?"))) return;
       try {
         await window.gijo.setLlmTier("pro");
         msg.textContent = "적용했습니다 — 엔진이 프로 등급(LLM 2개)으로 다시 뜹니다.";
@@ -2516,7 +2516,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       } catch (e) { msg.innerHTML = '<div class="hint" style="color:var(--red)">' + esc(String((e && e.message) || e)) + "</div>"; }
     };
     on.onclick = async function () {
-      if (!c.enabled && !confirm("켜면 질문이 VPN으로 원격 GPU에 전송됩니다. 계속할까요?")) return;
+      if (!c.enabled && !(await gijoAsk("켜면 질문이 VPN으로 원격 GPU에 전송됩니다. 계속할까요?"))) return;
       try { await window.gijo.remoteLlmSet(!c.enabled, url.value.trim()); await loadRemoteGpu(); }
       catch (e) { msg.innerHTML = '<div class="hint" style="color:var(--red)">' + esc(String((e && e.message) || e)) + "</div>"; }
     };
@@ -2570,7 +2570,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       });
     };
     on.onclick = async function () {
-      if (!c.enabled && !confirm("켜면 접속 토큰이 만들어지고, 그 토큰이 담긴 주소를 아는 VPN 안의 GIJO가 이 PC의 AI를 씁니다. 계속할까요?")) return;
+      if (!c.enabled && !(await gijoAsk("켜면 접속 토큰이 만들어지고, 그 토큰이 담긴 주소를 아는 VPN 안의 GIJO가 이 PC의 AI를 씁니다. 계속할까요?"))) return;
       try { await window.gijo.llmServeSet(!c.enabled); await loadLlmServe(); }
       catch (e) { msg.innerHTML = '<div class="hint" style="color:var(--red)">' + esc(String((e && e.message) || e)) + "</div>"; }
     };
@@ -2737,7 +2737,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       //   이름 규칙은 **마지막 그물**이다(표식 없이 개조한 모델은 못 잡는다). 진짜 방어는
       //   위 권장 목록이고, 이건 「굳이 검색해서 받는」 길에 놓는 턱이다.
       if (/(uncensored|abliterat|heretic|jailbr|unaligned|unfiltered)/i.test(id)) {
-        if (!confirm(`⚠ "${id}" 는 안전장치가 제거된 개조본일 수 있습니다.\n\n보안 관제 제품에 쓰면 감사 지적 사항이 됩니다.\n그래도 받으시겠습니까?`)) return;
+        if (!(await gijoAsk(`⚠ "${id}" 는 안전장치가 제거된 개조본일 수 있습니다.\n\n보안 관제 제품에 쓰면 감사 지적 사항이 됩니다.\n그래도 받으시겠습니까?`))) return;
       }
       queueDownload(id, e.target, null);
     });

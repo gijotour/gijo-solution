@@ -1274,7 +1274,7 @@ tr:last-child td{border-bottom:none;}
       await window.gijo.removeOntologyTriple(id);
       await refresh(document.getElementById("filterSubject").value.trim() || undefined);
     } catch (e) {
-      alert("지우지 못했습니다: " + ((e && e.message) || e) + "\n\n목록에 그대로 남아 있습니다.");
+      gijoTell("지우지 못했습니다: " + ((e && e.message) || e) + "\n\n목록에 그대로 남아 있습니다.");
     }
   }
 

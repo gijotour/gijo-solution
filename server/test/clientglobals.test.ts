@@ -74,9 +74,42 @@ describe("Electron에서 네이티브 모달을 쓰지 않는다", () => {
     const 위반: string[] = [];
     for (const [file, src] of pageSrc) {
       const 코드 = src.split("\n").filter((l) => !/^\s*(\/\/|\*|<!--)/.test(l)).join("\n");
-      for (const m of 코드.matchAll(/\bwindow\.(confirm|prompt)\s*\(/g)) 위반.push(`${file}: window.${m[1]}()`);
+      // ⚠⚠ **`window.` 없는 맨 `confirm(`도 잡는다**(2026-08-18에 밟음).
+      //   예전엔 `\bwindow\.(confirm|prompt)\(`만 봤는데, 실제 코드는 전부 `window.` 없이
+      //   맨 `confirm(`이었다 — 그래서 **10곳이 살아 있는데 이 시험은 초록이었다.**
+      //   하필 걸린 자리가 에디션 전환 3버튼·원격 GPU 켜기라, 그 버튼을 누르면 화면이 얼었다.
+      //   `foo.confirm(`·`gijoConfirm(`은 아니므로 앞 글자가 `.`나 낱말이면 뺀다.
+      for (const m of 코드.matchAll(/(?<![.\w])(?:window\s*\.\s*)?(confirm|prompt|alert)\s*\(/g)) {
+        위반.push(`${file}: ${m[1]}()`);
+      }
     }
-    expect([...new Set(위반)], "Electron에서 렌더러가 멈춘다 — 화면 안에서 물을 것").toEqual([]);
+    expect([...new Set(위반)].join("\n"), "Electron에서 렌더러가 멈춘다 — 화면 안에서 물을 것(gijoAsk·gijoTell·gijoPrompt)").toBe("");
+  });
+
+  it("헛돎 방지 — 정규식이 맨 confirm을 정말 잡는가", () => {
+    // ⚠ 위 검사가 「0건」인 것이 **정말 없어서**인지 **못 봐서**인지 가른다.
+    //   이 저장소는 늘 빨간불인 시험을 증거라고 우긴 전례가 있다 — 그 반대도 막는다.
+    const re = /(?<![.\w])(?:window\s*\.\s*)?(confirm|prompt|alert)\s*\(/g;
+    const 잡아야 = ['if (!confirm("지울까요?")) return;', "window.confirm('x')", "  alert('hi')", "if(!prompt('a'))"];
+    for (const s of 잡아야) expect([...s.matchAll(re)].length, `못 잡는다: ${s}`).toBeGreaterThan(0);
+    const 잡으면안됨 = ["gijoConfirm('x')", "await gijoAsk('x')", "dlg.confirm('x')", "myAlert('x')", "reconfirm('x')"];
+    for (const s of 잡으면안됨) expect([...s.matchAll(re)].length, `잘못 잡는다: ${s}`).toBe(0);
+  });
+
+  it("gijoAsk·gijoTell·gijoPrompt를 쓰는 화면은 dialog.js가 실려 있다", () => {
+    // ⚠ 2026-08-18에 밟음: 라이트 화면 둘은 **nav.js를 안 실어서** gijoAsk가 저절로 안 온다.
+    //   (표준 화면은 nav.js의 loadDialog()가 동적으로 실어 준다.)
+    //   안 싣고 부르면 **TypeError로 버튼이 조용히 죽는다** — 네이티브 모달을 없애려다
+    //   버튼 자체를 없애는 꼴이 된다.
+    const 위반: string[] = [];
+    for (const [file, src] of pageSrc) {
+      if (!/\.html$/.test(file)) continue;
+      const 코드 = src.split("\n").filter((l) => !/^\s*(\/\/|\*|<!--)/.test(l)).join("\n");
+      if (!/\bgijo(Ask|Tell|Prompt)\s*\(/.test(코드)) continue;
+      // 직접 싣거나(dialog.js), nav.js를 실어 그것이 실어 주거나 — 둘 중 하나면 된다.
+      if (!/dialog\.js/.test(src) && !/nav\.js/.test(src)) 위반.push(file);
+    }
+    expect(위반.join(", "), "이 화면들은 gijoAsk를 부르는데 dialog.js도 nav.js도 안 싣는다 — 버튼이 조용히 죽는다").toBe("");
   });
 });
 

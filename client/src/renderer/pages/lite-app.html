@@ -182,11 +182,11 @@
     // 없으면 조용히 지나가지 않고 이유를 말한다 — 「눌러도 아무 일 없다」를 만들지 않는다.
     document.getElementById("smdBtn").addEventListener("click", async function () {
       if (!window.gijo || typeof window.gijo.openSmartMd !== "function") {
-        alert("이 판에는 문서 작성 도구가 없습니다 — 최신 버전으로 올리면 함께 들어옵니다.");
+        gijoTell("이 판에는 문서 작성 도구가 없습니다 — 최신 버전으로 올리면 함께 들어옵니다.");
         return;
       }
       const r = await window.gijo.openSmartMd();
-      if (r && r.ok === false) alert(r.error || "문서 작성 도구를 열지 못했습니다.");
+      if (r && r.ok === false) gijoTell(r.error || "문서 작성 도구를 열지 못했습니다.");
     });
   </script>
   <div class="lite-body">
@@ -255,7 +255,7 @@
     if (window.gijo && typeof window.gijo[fn] === "function") {
       try { window.gijo[fn](); return; } catch (e) { /* 아래 안내 */ }
     }
-    alert("이 판에는 문서 작성 도구(GIJO Smart MD)가 없습니다.");
+    gijoTell("이 판에는 문서 작성 도구(GIJO Smart MD)가 없습니다.");
   }
 
   function esc(v) {

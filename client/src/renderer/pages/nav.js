@@ -626,7 +626,7 @@
       // 증상만 남고 원인을 찾을 단서가 하나도 없었다(4.9.0 문서함).
       el.addEventListener("click", function () {
         if (window.gijo && typeof window.gijo[it.win] === "function") window.gijoOpenWindowResult(window.gijo[it.win](), it.label);
-        else alert(it.label + "을(를) 열 수 없습니다 — 앱을 다시 시작해 보시고, 계속되면 알려주세요.");
+        else gijoTell(it.label + "을(를) 열 수 없습니다 — 앱을 다시 시작해 보시고, 계속되면 알려주세요.");
       });
     } else if (window.gijoTabs) {
       // 탭 셸(app.html) 안 — 화면을 옮기지 않고 탭으로 연다. 셸이 리로드되지 않으므로
@@ -809,7 +809,7 @@
   window.gijoOpenWindowResult = function (p, label) {
     if (!p || typeof p.then !== "function") return;
     p.then(function (r) {
-      if (r && r.ok === false) alert((r.error || ((label || "이 창") + "을(를) 열지 못했습니다.")));
+      if (r && r.ok === false) gijoTell((r.error || ((label || "이 창") + "을(를) 열지 못했습니다.")));
     }).catch(function () { /* 다리 자체가 없는 옛 판 — 위 typeof 검사에서 이미 걸렀다 */ });
   };
 
@@ -1308,7 +1308,7 @@
     if (page && typeof page === "object") { label = page.label || label; page = page.win ? { win: page.win } : page.page; }
     if (page && page.win) {                                                    // 별도 창(팀 사무실·문서함·문서 작성)
       if (window.gijo && typeof window.gijo[page.win] === "function") { window.gijoOpenWindowResult(window.gijo[page.win](), label); return true; }
-      alert((label || "이 화면") + "을(를) 열 수 없습니다 — 앱을 다시 시작해 보시고, 계속되면 알려주세요.");
+      gijoTell((label || "이 화면") + "을(를) 열 수 없습니다 — 앱을 다시 시작해 보시고, 계속되면 알려주세요.");
       return false;
     }
     if (!page) return false;

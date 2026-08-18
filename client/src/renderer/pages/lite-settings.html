@@ -276,6 +276,11 @@
   </section>
 </div>
 
+<!-- ⚠ **dialog.js를 반드시 싣는다**(2026-08-18). 이 화면은 nav.js를 안 실어서
+     gijoAsk가 저절로 오지 않는다 — 표준 화면은 nav.js:1258 loadDialog()가 동적으로 실어 준다.
+     안 실으면 gijoAsk가 undefined라 버튼이 **TypeError로 조용히 죽는다**(이 저장소의 반복 함정:
+     없는 함수를 부르는 버튼). 예전엔 네이티브 confirm을 썼는데 그건 렌더러를 통째로 얼린다. -->
+<script src="dialog.js"></script>
 <script>
 // lite-settings — 라이트 설정. 다리는 전부 window.gijo(생 fetch 금지).
 //
@@ -338,7 +343,7 @@
           var 내리는가 = 적재.some(function (l) { return l.modelId === b.dataset.eng; });
           b.disabled = true; b.textContent = "…";
           try { await (내리는가 ? g.stopLocalEngine() : g.startLocalEngine(b.dataset.eng)); }
-          catch (e) { alert(오류문구(e, "엔진")); }
+          catch (e) { gijoTell(오류문구(e, "엔진")); }
           // ⚠ 2026-08-13 철회: 예전엔 「모델 바꾼 뒤 재시작하세요」를 띄웠다. 그 원인 짐작(스왑 wedge)이
           //   **틀렸다** — win 진단 로깅으로 규명하니 「긴 질문 실패」는 스왑과 무관한 **문맥 초과**였다
           //   (analysis 에이전트 프롬프트가 8192를 거의 다 먹는다, 인계 §6). 재시작은 상관없다.
@@ -366,7 +371,7 @@
       var go = document.getElementById("tierGo");
       if (go) go.addEventListener("click", async function () {
         go.disabled = true;
-        try { await g.setLlmTier(document.getElementById("tierSel").value); } catch (e) { alert(오류문구(e, "등급")); }
+        try { await g.setLlmTier(document.getElementById("tierSel").value); } catch (e) { gijoTell(오류문구(e, "등급")); }
         setTimeout(function () { 등급(); 엔진(); }, 3000);
       });
     } catch (e) { 칸("tierBox", '<div class="err">' + 오류문구(e, "구동 등급") + "</div>"); }
@@ -384,8 +389,8 @@
         var rk = document.getElementById("rotKey");
         if (rk) rk.addEventListener("click", async function () {
           rk.disabled = true;
-          try { var r = await g.dbCryptRotateRecovery(); alert("새 복구 열쇠:\n\n" + (r.recoveryKey || JSON.stringify(r)) + "\n\n지금 적어 두세요. 다시 안 보여 줍니다."); }
-          catch (e) { alert(오류문구(e, "복구 열쇠")); }
+          try { var r = await g.dbCryptRotateRecovery(); gijoTell("새 복구 열쇠:\n\n" + (r.recoveryKey || JSON.stringify(r)) + "\n\n지금 적어 두세요. 다시 안 보여 줍니다."); }
+          catch (e) { gijoTell(오류문구(e, "복구 열쇠")); }
           rk.disabled = false;
         });
         return;
@@ -400,8 +405,8 @@
       var cg = document.getElementById("cryptGo");
       if (cg) cg.addEventListener("click", async function () {
         cg.disabled = true; cg.textContent = "켜는 중…";
-        try { var r = await g.dbCryptEnable(); alert(r && r.recoveryKey ? ("복구 열쇠:\n\n" + r.recoveryKey + "\n\n지금 적어 두세요. 다시 안 보여 줍니다.") : "켰습니다."); }
-        catch (e) { alert(오류문구(e, "저장 암호화")); }
+        try { var r = await g.dbCryptEnable(); gijoTell(r && r.recoveryKey ? ("복구 열쇠:\n\n" + r.recoveryKey + "\n\n지금 적어 두세요. 다시 안 보여 줍니다.") : "켰습니다."); }
+        catch (e) { gijoTell(오류문구(e, "저장 암호화")); }
         암호화();
       });
     } catch (e) { 칸("cryptBox", '<div class="err">' + 오류문구(e, "저장 암호화 상태") + "</div>"); }
@@ -522,7 +527,7 @@
       });
       document.getElementById("rgpuOn").addEventListener("click", async function () {
         var u = document.getElementById("rgpuUrl").value.trim();
-        if (!c.enabled && !confirm("켜면 질문이 VPN으로 원격 GPU에 전송됩니다. 계속할까요?")) return;
+        if (!c.enabled && !(await gijoAsk("켜면 질문이 VPN으로 원격 GPU에 전송됩니다. 계속할까요?"))) return;
         // ⚠ 두 자리(위 갈래 카드 · 이 카드)가 같은 상태를 보인다 — 한쪽만 다시 그리면 어긋난다.
         try { await g.remoteLlmSet(!c.enabled, u); 원격GPU(); 어디서다시(); }
         catch (e) { 칸("rgpuMsg", '<div class="err">' + 오류문구(e, "저장") + '</div>'); }
@@ -696,7 +701,7 @@
       finally { save.disabled = false; }
     });
     if (clr) clr.addEventListener("click", async function () {
-      if (!confirm("등록된 HF 토큰을 지웁니다. 계속할까요?")) return;
+      if (!(await gijoAsk("등록된 HF 토큰을 지웁니다. 계속할까요?"))) return;
       try { await g.saveModelAuth({ token: "" });
         msg.innerHTML = '<div class="ok">지웠습니다.</div>'; 토큰(); }
       catch (e) { msg.innerHTML = '<div class="err">' + 오류문구(e, "토큰 삭제") + "</div>"; }
@@ -725,7 +730,7 @@
     var op = document.getElementById("pathOpen");
     if (op && g.openModelsFolder) op.addEventListener("click", async function () {
       op.disabled = true;
-      try { await g.openModelsFolder(); } catch (e) { alert(오류문구(e, "폴더 열기")); }
+      try { await g.openModelsFolder(); } catch (e) { gijoTell(오류문구(e, "폴더 열기")); }
       op.disabled = false;
     });
   }
@@ -784,7 +789,7 @@
   }
   async function 두뇌끄기() {
     try { await g.saveCloudConfig({ enabled: false }); 두뇌(); if (typeof 바깥연결 === "function") 바깥연결(); }
-    catch (e) { alert(오류문구(e, "두뇌 끄기")); }
+    catch (e) { gijoTell(오류문구(e, "두뇌 끄기")); }
   }
 
   // ── ⑧ 바깥 연결 — 통로를 한 판에 모아 on/off. 끄기는 여기서 바로, 켜기는 해당 카드로 안내(주소·키 필요). ──
@@ -822,7 +827,7 @@
       if (key === "두뇌") await g.saveCloudConfig({ enabled: false });
       else if (key === "원격") { var rc = await g.remoteLlmGet().catch(function () { return {}; }); await g.remoteLlmSet(false, (rc && rc.url) || ""); }
       else if (key === "법령") await g.setLawKey("");
-    } catch (e) { alert(오류문구(e, "끄기")); return; }
+    } catch (e) { gijoTell(오류문구(e, "끄기")); return; }
     if (typeof 두뇌 === "function") await 두뇌();
     if (typeof 어디서다시 === "function") await 어디서다시();
     if (typeof 법령 === "function") 법령();

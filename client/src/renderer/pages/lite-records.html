@@ -80,6 +80,10 @@
   </section>
 </div>
 
+<!-- ⚠ **dialog.js를 반드시 싣는다**(2026-08-18). 이 화면은 nav.js를 안 실어서 gijoAsk/gijoTell이
+     저절로 오지 않는다(표준 화면은 nav.js loadDialog()가 동적으로 실어 준다). 안 실으면
+     TypeError로 **버튼이 조용히 죽는다** — 네이티브 창을 없애려다 버튼을 없애는 꼴이 된다. -->
+<script src="dialog.js"></script>
 <script>
 // lite-records.js — 라이트 「작업 내역」 화면 (메뉴 2).
 //
@@ -174,7 +178,7 @@
     // 완료는 completeTask, 되돌리기는 toggleTask(id, false) — 서버가 그렇게 갈라 뒀다.
     var g = 다리(); if (!g) return;
     try { t.done ? await g.toggleTask(t.id, false) : await g.completeTask(t.id); }
-    catch (e) { alert(오류문구(e, "할 일")); return; }
+    catch (e) { gijoTell(오류문구(e, "할 일")); return; }
     await 할일그리기();
   }
 
@@ -186,7 +190,7 @@
     btn.disabled = true;
     var g = 다리();
     try { if (g) await g.addTask(text); input.value = ""; }
-    catch (e) { alert(오류문구(e, "할 일")); }
+    catch (e) { gijoTell(오류문구(e, "할 일")); }
     finally { btn.disabled = false; }
     await 할일그리기();
     input.focus();
