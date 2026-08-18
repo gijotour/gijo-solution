@@ -1621,7 +1621,12 @@ export function runFindingStatusOverview(args: Record<string, string>): string {
   //   예전에는 prioritizedReviews(200)으로 200건만 가져와 그 수를 "취약점 200건"이라고
   //   총계처럼 말했다. 2026-08-03에 잃었던 취약점 4,833건을 되살리자 **총계가 200에 멈춰**
   //   그 거짓말이 드러났다. 담당자는 이 숫자로 임원 보고를 쓴다.
-  const rows = prioritizedReviews(현황상한);
+  // 🗂 지금 범위 — 담당자가 ⓪ 자산에서 명시적으로 건 자산. **서버가 코드로 채운 값**이라
+  // 모델이 지어낼 수 없다(기계전용 인자). 걸려 있으면 그 자산만 센다.
+  // ⚠ 이게 없으면 범위를 걸어 놓고 물었을 때 **전체**가 온다 — 화면은 「이 자산 기준으로
+  //   갑니다」라고 적혀 있는데(2026-08-18 실측: 범위가 걸린 채 3,008건이 왔다).
+  const 범위자산 = (args.assetId ?? "").trim();
+  const rows = prioritizedReviews(현황상한, 범위자산 ? [범위자산] : undefined);
   // 속성어(미배정·기한·고위험)를 알아듣도록 담당·기한·심각도를 넘긴다 — 2026-08-07 실측:
   // "미배정 취약점 몇 건이야?"가 0건이라 답했는데 같은 회차 현황이 미배정 4,820건이라 말했다.
   const 오늘 = dateOnlyLocal(new Date());
@@ -1658,7 +1663,13 @@ export function runFindingStatusOverview(args: Record<string, string>): string {
   const 섞임 = 섞임고지(matched.map((r) => r.finding.finding_type));
   // 훑는 상한에 닿았으면 그 수는 총계가 아니다 — "이상"이라고 적는다.
   const 상한닿음 = rows.length >= 현황상한;
+  // ⚠ 범위로 좁혔으면 **머리줄에 밝힌다.** 안 밝히면 담당자는 그 수를 전체로 읽고
+  //   「3건뿐이네」 하고 넘어간다 — 좁힌 사실을 감추는 것이 좁히지 않는 것보다 나쁘다.
+  const 범위말 = 범위자산
+    ? `🗂 ${listAssets().find((a) => a.id === 범위자산)?.displayName ?? listAssets().find((a) => a.id === 범위자산)?.name ?? 범위자산.replace(/^vuln:/, "")} 범위 — `
+    : "";
   const head =
+    범위말 +
     `취약점 ${matched.length}${상한닿음 ? "건 이상(너무 많아 일부만 셌습니다)" : "건"} — 미검토 ${byStatus.pending ?? 0}, 조치완료 ${byStatus.approved ?? 0}, 오탐 ${byStatus.rejected ?? 0}` +
     ` / 담당자 미배정 ${unassigned}건, 기한 초과 ${overdue}건`;
 

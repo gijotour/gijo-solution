@@ -92,6 +92,22 @@ describe("★★ 범위가 화면만이 아니라 **지시에도** 실린다", (
     expect(pl, "문장 속 대상보다 범위를 우선한다").toMatch(/문장범위\.ids \|\| 문장범위\.못찾음 \|\| !걸린범위/);
   });
 
+  it("★★ 자산 인자를 안 받던 도구가 이제 받는다 — 안 그러면 범위가 조용히 무시된다", () => {
+    // ⚠ 2026-08-18 실측: 범위를 걸고 「미조치 취약점 몇 건이야?」를 물으니 `finding_status`가
+    //   돌았는데, 그 도구는 `filter` 하나만 받아 **범위가 닿을 자리가 없었다** → 전체 3,008건.
+    //   범위 배관은 다 살아 있었는데 마지막 한 칸이 없어 아무 일도 안 일어났다.
+    const reg = 읽기("../src/engine/agenttools/registry.ts");
+    const 구간 = reg.slice(reg.indexOf('name: "finding_status"'), reg.indexOf('name: "review_finding"'));
+    expect(구간, "finding_status가 자산 인자를 안 받는다 — 범위가 조용히 무시된다").toMatch(
+      /name: "assetId"[^\n]*기계전용: true/
+    );
+    // ⚠ **기계전용**이어야 한다 — 도구 설명을 건드리면 라우팅이 흔들린 전례가 있다(11/11 → 9/11).
+    const h = 읽기("../src/engine/agenttools/handlers.ts");
+    expect(h, "받은 자산을 실제로 안 쓴다").toMatch(/prioritizedReviews\(현황상한, 범위자산 \? \[범위자산\] : undefined\)/);
+    // 좁혔으면 답에 밝힌다 — 감추면 전체로 읽는다.
+    expect(h, "범위로 좁히고도 답에 안 밝힌다").toMatch(/범위말[\s\S]{0,200}범위 — /);
+  });
+
   it("★★ 사람이 말한 자산을 범위가 **덮지 않는다**", () => {
     // 「범위는 web-01인데 db-02는 어때?」에서 범위가 이기면 화면 상태가 사람 말을 조용히 덮는다.
     const fn = 루프.slice(루프.indexOf("function 범위를입힌다("), 루프.indexOf("export async function runAgentLoop"));
