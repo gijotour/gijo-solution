@@ -40,6 +40,11 @@ export const EGRESS_POINTS: EgressPoint[] = [
   // 요청마다 다르므로(smtp·siem과 같은 처지) redteam.ts가 호출 직전 assertEgressAllowed로 검사한다.
   { id: "redteam-remote", label: "외부 AI 엔드포인트 레드팀 점검", host: "점검 대상 주소(요청마다 다름)", 대체: "내부망 AI만 점검 · 외부 대상은 봉인(폐쇄망 고객은 현장에서 내부망으로 점검)" },
   { id: "siem", label: "SIEM 전달(syslog UDP·TCP·TLS)", host: "설정한 SIEM 서버(소켓)", 대체: "내부망 SIEM만 허용 · 외부는 봉인" },
+  // ⚠ **SSH도 fetch가 아니다**(2026-08-18에 빠져 있던 것을 찾음). `execFile("ssh"/"sshpass")`라
+  //   fetch 관문이 원리상 못 본다 — smtp·siem·redteam과 같은 처지인데 **이 목록에도, 관문에도**
+  //   없었다. 폐쇄망 고객에게 내는 봉인 증명서에 이 통로가 안 실렸다는 뜻이다.
+  //   이제 `hardeningscan.ts targetRunner`가 러너를 만들 때 assertEgressAllowed로 막는다.
+  { id: "hardening-ssh", label: "장비 원격 점검(SSH)", host: "점검 대상 장비(설정값 · 내부망 IP만 등록 가능)", 대체: "이 서버 자신(local) 점검만 수행 · 원격 장비는 봉인" },
   // ⚠ 자식 프로세스는 우리 관문 **밖**이다(2026-08-05 검토 지적). 오프라인 환경변수로 눌러
   //   두지만 완전한 차단은 아니라, 카탈로그에 이렇게 **정직하게** 싣는다.
   { id: "child", label: "학습·병합 도구(python·HF CLI)", host: "자식 프로세스(관문 밖)", 대체: "HF 오프라인 강제(HF_HUB_OFFLINE 등) · 사전 반입한 캐시·모델만 사용" },

@@ -485,7 +485,10 @@ migrate(
      port INTEGER NOT NULL DEFAULT 22,
      username TEXT,
      authMethod TEXT NOT NULL,     -- local | key | password
-     secret TEXT,                  -- key: 개인키 경로 · password: 비밀번호(온프렘 로컬 저장)
+     -- ⚠ key: 개인키 **파일 경로**(비밀 아님, 평문) · password: **cryptopack으로 암호화한 JSON**
+     --    (2026-08-18 정정 — 여기만 평문이었다. cti_feeds·cloud_llm_keys와 같은 방식으로 맞췄다.)
+     --    옛 평문도 읽는다(복호 실패 시 평문으로 간주 — 하위호환). 다시 저장하면 암호문이 된다.
+     secret TEXT,
      createdAt INTEGER NOT NULL
    );
    CREATE TABLE IF NOT EXISTS hardening_schedules (

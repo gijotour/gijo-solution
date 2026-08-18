@@ -1043,7 +1043,7 @@ export function runScanStatus(args: Record<string, string>): string {
   return parts.join("\n").slice(0, 2500);
 }
 
-// 레드팀(프롬프트 인젝션·탈옥) 점검을 자산이 연결한 로컬 모델에 실제로 실행한다 — 14개 표준 공격
+// 레드팀(프롬프트 인젝션·탈옥) 점검을 자산이 연결한 로컬 모델에 실제로 실행한다 — 표준 공격 전량(redteam.ts PAYLOADS)
 // 페이로드 × LLM 호출이라 시간이 걸리지만, 판단을 바꾸는 게 아니라 측정값을 기록할 뿐이라
 // redteam.html의 "점검 실행" 버튼과 같은 신뢰 수준으로 승인 없이(write:false) 실행한다.
 // 읽기 도구라 실패는 throw가 아니라 문자열로 돌려준다(LLM이 사유를 그대로 사람에게 설명).

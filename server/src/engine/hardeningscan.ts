@@ -20,6 +20,9 @@ import { asyncRoute } from "../util/asyncRoute";
 import { recordAudit } from "./audit";
 import type { GijoUser } from "../auth/users";
 import { koDateTimeString } from "../util/date";
+// ⚠ SSH는 fetch가 아니라 execFile이라 봉인 관문(installAirgapGuard)을 원리상 안 지난다 —
+//   smtp·siem·redteam처럼 **연결 직전에 직접** 검사한다. 판정기는 airgap 한 곳만 쓴다.
+import { assertEgressAllowed } from "./airgap";
 
 export type ScanStatus = "PASS" | "FAIL" | "WARN" | "NA";
 export type StandardId = "kisa" | "cis" | "kisa_pc" | "kisa_net";
@@ -111,6 +114,16 @@ export function sshCommandFor(t: HardeningTarget, cmd: string): { file: string; 
 export function targetRunner(t: HardeningTarget): RunFn {
   const built = sshCommandFor(t, "__probe__");
   if (!built) return hostRunner; // local
+  // ⚠⚠ **에어갭 봉인을 여기서 건다**(2026-08-18 조사에서 발견 — 빠져 있었다).
+  //   SSH는 `execFile`이라 `installAirgapGuard()`의 fetch 관문을 **원리상 안 지난다.**
+  //   같은 처지인 SMTP·SIEM·레드팀은 연결 직전에 `assertEgressAllowed`를 부르고 통로 카탈로그
+  //   (`airgap.ts EGRESS_POINTS`)에도 실려 있는데 **SSH만 둘 다 빠져 있었다.**
+  //   ⇒ 폐쇄망 고객에게 내는 **봉인 증명서에 이 통로가 안 실렸다** — 거짓 증명이 된다.
+  //
+  // ⚠ 러너를 **만들 때 한 번** 막는다(명령마다가 아니라). 명령마다 던지면 점검 항목 30개가
+  //   제각기 실패해 「무엇이 문제인지」가 흩어진다. 여기서 던지면 점검이 **시작조차 안 하고**
+  //   한 줄로 이유가 나온다 — redteam.ts:483과 같은 자세("호출을 시작조차 하지 않는다").
+  assertEgressAllowed(t.host, "hardening-ssh");
   return (cmd) =>
     new Promise((resolve) => {
       const { file, args } = sshCommandFor(t, cmd)!;

@@ -11,7 +11,11 @@
 import type { Express, Request } from "express";
 import { randomUUID } from "crypto";
 import { db } from "../db";
-import { authMiddleware } from "../auth/auth";
+import { authMiddleware, adminMiddleware } from "../auth/auth";
+// ⚠ 대역 판정은 **한 곳**만 쓴다(airgap.ts) — 새 판정기를 만들면 원격 LLM 쪽과 기준이 어긋난다.
+import { isVpnRangeIp } from "./airgap";
+// ⚠ 장비 비밀번호도 다른 비밀들과 **같은 방식**으로 암호화한다(cti_feeds·cloud_llm_keys와 동일).
+import { encryptString, decryptString, getEncryptionKey } from "./cryptopack";
 import { asyncRoute } from "../util/asyncRoute";
 import type { GijoUser } from "../auth/users";
 import { recordAudit } from "./audit";
@@ -34,9 +38,29 @@ interface TargetRow {
   id: string; label: string; host: string; port: number;
   username: string | null; authMethod: string; secret: string | null; standard: string | null; createdAt: number;
 }
+// ⚠⚠ **장비 SSH 비밀번호를 암호화해 저장한다**(2026-08-18 조사에서 발견 — 여기만 평문이었다).
+//   같은 DB의 다른 비밀은 전부 `cryptopack.ts`로 암호화하고 스키마 주석에 「평문 저장 안 함」까지
+//   적어 뒀는데(`db.ts` cti_feeds·cloud_llm_keys), 장비 비밀번호만 예외였다.
+//   게다가 실행이 `sshpass -p <비밀번호>`라 **같은 PC의 다른 계정이 프로세스 목록으로 읽는다.**
+//
+// ⚠ 암호화 대상은 **비밀번호(authMethod="password")뿐**이다. 키 인증의 secret은
+//   「개인키 **파일 경로**」라 비밀이 아니다 — 암호화하면 경로를 못 찾아 점검이 통째로 깨진다.
+// ⚠ **옛 평문도 읽어야 한다.** 이미 저장된 대상이 있으면 복호가 실패하는데, 그때 던지면
+//   기존 고객의 점검이 전부 멈춘다. 복호에 실패하면 **평문으로 보고 그대로 쓴다**(하위호환).
+//   다음에 그 대상을 다시 저장하면 암호문으로 바뀐다.
+function 비밀풀기(r: TargetRow): string | undefined {
+  if (!r.secret) return undefined;
+  if (r.authMethod !== "password") return r.secret; // 키 경로 — 비밀 아님
+  try {
+    return decryptString(r.secret, getEncryptionKey());
+  } catch {
+    return r.secret; // 옛 평문 — 그대로 쓴다(하위호환)
+  }
+}
+
 const rowToTarget = (r: TargetRow): HardeningTarget => ({
   id: r.id, label: r.label, host: r.host, port: r.port,
-  username: r.username ?? undefined, authMethod: r.authMethod as HardeningTarget["authMethod"], secret: r.secret ?? undefined,
+  username: r.username ?? undefined, authMethod: r.authMethod as HardeningTarget["authMethod"], secret: 비밀풀기(r),
   standard: isStandard(r.standard ?? "") ? (r.standard as StandardId) : "kisa",
 });
 // secret을 뺀 안전한 공개 표현(호스트·포트·인증방식·기본기준만).
@@ -59,7 +83,9 @@ export function createTarget(t: Omit<HardeningTarget, "id">): HardeningTarget {
      VALUES (@id, @label, @host, @port, @username, @authMethod, @secret, @standard, @createdAt)`
   ).run({
     id, label: t.label, host: t.host, port: t.port || 22, username: t.username ?? null,
-    authMethod: t.authMethod, secret: t.secret ?? null,
+    // ⚠ 비밀번호만 암호화해 넣는다(키 인증의 secret은 파일 경로라 그대로 둔다 — 위 비밀풀기 주석).
+    authMethod: t.authMethod,
+    secret: t.secret ? (t.authMethod === "password" ? encryptString(t.secret, getEncryptionKey()) : t.secret) : null,
     standard: isStandard(t.standard ?? "") ? t.standard : "kisa", createdAt: Date.now(),
   });
   return getTarget(id)!;
@@ -196,13 +222,28 @@ export function registerHardeningTargetRoutes(app: Express): void {
   app.get("/api/hardening/targets", authMiddleware, (_req, res) => {
     res.json({ targets: listTargets().map(publicTarget) });
   });
-  app.post("/api/hardening/targets", authMiddleware, asyncRoute(async (req, res) => {
+  // ⚠⚠ **admin 전용 + 내부망만**(2026-08-18 조사에서 발견).
+  //   예전엔 `authMiddleware`만 있어 **로그인한 아무 계정이 임의 공인 IP를 등록하고 곧바로
+  //   스캔**할 수 있었다. 그러면 우리 서버가 남의 대역을 두드리는 **발판**이 된다 —
+  //   CLAUDE.md가 「절대 안 한다」로 못 박은 「남의 대역 스캔」을 제품이 대신 해 주는 꼴이다.
+  //   같은 성질의 원격 LLM 설정은 이미 admin + 사설 대역만 받는다(`remotellm.ts:107,117`).
+  //   ⇒ **같은 판정기(airgap.ts isVpnRangeIp) 한 곳**을 쓴다. 새 판정기를 만들지 않는다.
+  app.post("/api/hardening/targets", authMiddleware, adminMiddleware, asyncRoute(async (req, res) => {
     const b = req.body ?? {};
     const label = String(b.label ?? "").trim();
     const host = String(b.host ?? "").trim();
     const authMethod = String(b.authMethod ?? "").trim();
     if (!label || !host) { res.status(400).json({ error: "label·host가 필요합니다" }); return; }
     if (!["local", "key", "password"].includes(authMethod)) { res.status(400).json({ error: "authMethod는 local·key·password 중 하나" }); return; }
+    // ⚠ `local`(이 서버 자신)은 나가는 접속이 아니므로 대역 검사를 안 한다.
+    //   원격이면 **사설·VPN 대역만** 받는다. 호스트명은 거부한다 — 이름은 어디로든 풀릴 수 있어
+    //   「확실히 내부망」을 코드가 보증할 수 없다(remotellm과 같은 자세, airgap의 default-deny).
+    if (authMethod !== "local" && !isVpnRangeIp(host)) {
+      res.status(400).json({
+        error: `점검 대상은 내부망(사설·VPN 대역) IP만 등록할 수 있습니다 — 받은 값: ${host}. 남의 대역을 두드리면 우리 서버가 발판이 됩니다. 호스트명이 아니라 IP로 넣어 주세요.`,
+      });
+      return;
+    }
     const standard = String(b.standard ?? "kisa");
     if (!isStandard(standard)) { res.status(400).json({ error: "standard는 kisa·cis·kisa_pc·kisa_net 중 하나" }); return; }
     const t = createTarget({
@@ -215,7 +256,7 @@ export function registerHardeningTargetRoutes(app: Express): void {
     recordAudit({ kind: "config", actor: actorOf(req), action: "하드닝 점검 대상 등록", target: t.label, detail: `${t.host}:${t.port} (${t.authMethod}·${standard})`, result: "ok" });
     res.json({ target: publicTarget(t) });
   }));
-  app.delete("/api/hardening/targets/:id", authMiddleware, (req, res) => {
+  app.delete("/api/hardening/targets/:id", authMiddleware, adminMiddleware, (req, res) => {
     const t = getTarget(req.params.id);
     deleteTarget(req.params.id);
     if (t) recordAudit({ kind: "config", actor: actorOf(req), action: "하드닝 점검 대상 삭제", target: t.label, result: "ok" });
@@ -223,14 +264,14 @@ export function registerHardeningTargetRoutes(app: Express): void {
   });
 
   // 대상 접속 확인
-  app.post("/api/hardening/targets/:id/probe", authMiddleware, asyncRoute(async (req, res) => {
+  app.post("/api/hardening/targets/:id/probe", authMiddleware, adminMiddleware, asyncRoute(async (req, res) => {
     const t = getTarget(req.params.id);
     if (!t) { res.status(404).json({ error: "대상을 찾을 수 없습니다" }); return; }
     res.json(await probeTarget(t));
   }));
 
   // 대상 점검 실행(수동)
-  app.post("/api/hardening/targets/:id/scan", authMiddleware, asyncRoute(async (req, res) => {
+  app.post("/api/hardening/targets/:id/scan", authMiddleware, adminMiddleware, asyncRoute(async (req, res) => {
     const t = getTarget(req.params.id);
     if (!t) { res.status(404).json({ error: "대상을 찾을 수 없습니다" }); return; }
     // 기준 미지정 시 대상 등록 시 정한 기본 기준(장비 유형)으로 점검한다.

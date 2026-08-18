@@ -145,7 +145,7 @@ const GUIDES: WorkGuide[] = [
     key: "ai-robustness",
     label: "AI 견고성 점검",
     steps: [
-      { kind: "open", title: "제품 경로로 점검하기", desc: "담당자가 실제로 쓰는 경로에 공격 14종을 보내 봅니다 — 뚫림 0건이어야 합니다", page: "redteam.html" },
+      { kind: "open", title: "제품 경로로 점검하기", desc: "담당자가 실제로 쓰는 경로에 표준 공격 전량을 보내 봅니다 — 뚫림 0건이어야 합니다", page: "redteam.html" },
       { kind: "ask", title: "결과 뜻 물어보기", desc: "맨몸 점수와 제품 경로 점수가 왜 다른지 확인합니다", question: "맨몸 견고성과 제품 경로 실효 견고성이 무엇이 다른지 알려줘" },
       { kind: "note", title: "가드레일 설정 확인하기", desc: "같은 화면 아래에서 가드레일이 '차단'으로 켜져 있는지 봅니다" },
     ],
