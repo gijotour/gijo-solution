@@ -26,10 +26,14 @@ const 켜짐 = process.env.GIJO_SEARCH_REWRITE !== "0";
 //   재작성도 그리로 간다. llm.ts와 같은 게터(remotellm.remoteLlmBaseUrl) 하나를 본다 —
 //   사본을 두면 채팅은 원격인데 재작성만 로컬을 찾다 죽는 어긋남이 생긴다.
 const 기본통로 = process.env.GIJO_LOCAL_LLM_URL ?? "http://localhost:8080/v1";
-async function 통로(): Promise<{ baseUrl: string; headers: Record<string, string> }> {
+async function 통로(): Promise<{ baseUrl: string; headers: Record<string, string>; 원격: boolean }> {
   // 토큰까지 포함한 목표를 받는다(2026-08-16) — 토큰은 헤더로, URL은 깨끗하게.
   const 원격 = await import("./remotellm.js").then((m) => m.remoteLlmTarget()).catch(() => null);
-  return 원격 ?? { baseUrl: 기본통로, headers: {} };
+  // ⚠ **「원격인가」를 함께 돌려준다**(2026-08-18 검토 지적). 예전엔 baseUrl·headers만 주고
+  //   그 사실을 버려서, 아래 호출이 `redirect: "error"`를 걸 근거가 없었다 —
+  //   그래서 `llm.ts`가 두 번이나 고친 방어(원격일 때 리다이렉트 금지)가 **여기만 빠져 있었다.**
+  //   나가는 본문이 담당자의 **질문 원문**이라 유출 경로다.
+  return 원격 ? { ...원격, 원격: true } : { baseUrl: 기본통로, headers: {}, 원격: false };
 }
 /** 재작성에 줄 시간. 넘으면 포기하고 원문으로 검색한다 — 검색이 답보다 오래 걸리면 안 된다. */
 const 제한MS = Number(process.env.GIJO_SEARCH_REWRITE_TIMEOUT_MS ?? 1500);
@@ -77,6 +81,9 @@ export async function rewriteForSearch(question: string): Promise<string> {
         cache_prompt: false,
       }),
       signal: AbortSignal.timeout(제한MS),
+      // ⚠ 원격일 때 리다이렉트 금지 — VPN 안 서버가 3xx로 밖을 가리키면 **질문 원문이 따라간다.**
+      //   `llm.ts:768`·`:883`과 같은 방어다(2026-08-18에 이 곁가지가 빠져 있던 것을 찾음).
+      redirect: t.원격 ? "error" : "follow",
     });
     if (res.ok) {
       const j = (await res.json()) as { choices?: { message?: { content?: string } }[] };

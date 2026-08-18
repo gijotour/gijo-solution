@@ -422,7 +422,7 @@ export async function runRedTeam(callLlm: LlmCaller, model = "orchestrator"): Pr
 }
 
 // ── 엔드포인트 ────────────────────────────────────────────────────────────
-// 페이로드 수 × LLM 호출이라 무겁다(한국어 팩 추가로 24개, 계속 늘어난다)(에이전트 루프 안에서 돌리지 않고 명시적 엔드포인트로 실행).
+// 페이로드 수 × LLM 호출이라 무겁다(한국어 팩 추가 포함, 계속 늘어난다)(에이전트 루프 안에서 돌리지 않고 명시적 엔드포인트로 실행).
 
 // 대상별 최근 리포트 캐시(오케스트레이터·개별 모델·AI-BOM 자산). lastReport는 화면 기본(가장 최근).
 const lastReports = new Map<string, RedTeamReport>();

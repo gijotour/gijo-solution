@@ -14,6 +14,9 @@ import { execFile } from "child_process";
 import * as path from "path";
 import type { RunFn, RunResult, HardeningTarget } from "./hardeningscan";
 import { serverPython } from "../util/pythonbin";
+// ⚠ 이 통로도 `execFile(python)`이라 fetch 관문을 원리상 안 지난다 — 연결 직전에 직접 검사한다.
+//   판정기는 airgap 한 곳만 쓴다(hardeningscan의 SSH 통로와 같은 이름표 "hardening-ssh").
+import { assertEgressAllowed } from "./airgap";
 
 /** 장비 종류 → Netmiko device_type. 모르는 장비는 null(→ 일반 SSH로 처리하게 둔다). */
 export function deviceTypeOf(target: HardeningTarget): string | null {
@@ -45,6 +48,14 @@ interface BridgeResponse {
  * 자격증명은 stdin JSON으로만 넘긴다 — 명령행 인자로 주면 ps 목록에 그대로 노출된다.
  */
 export function netmikoRunner(target: HardeningTarget, deviceType: string): RunFn {
+  // ⚠⚠ **에어갭 봉인을 여기서도 건다**(2026-08-18 검토 지적 — 반쪽이었다).
+  //   `hardeningscan.ts targetRunner`에만 관문을 넣었는데, 장비(Cisco·FortiGate 등)는
+  //   `verifyroutes.ts:104`의 `netmikoRunnerFor(target) ?? targetRunner(target)`에서
+  //   **왼쪽이 이겨** targetRunner를 아예 안 탄다. 즉 관문을 지나지 않았다.
+  //   하필 **봉인 증명서(`airgap.ts` hardening-ssh)가 가리키는 바로 그 대상**이 이쪽으로 간다 —
+  //   같은 대상인데 하드닝 점검은 막히고 조치 검증은 나가서, 사람이 원인을 못 찾는다.
+  //   ⚠ 이것도 `execFile(python)`이라 fetch 관문이 원리상 못 본다. 러너를 **만들 때 한 번** 막는다.
+  assertEgressAllowed(target.host, "hardening-ssh");
   return (cmd: string): Promise<RunResult> =>
     new Promise((resolve) => {
       const payload = JSON.stringify({

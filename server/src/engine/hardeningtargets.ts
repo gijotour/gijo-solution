@@ -51,9 +51,25 @@ interface TargetRow {
 function 비밀풀기(r: TargetRow): string | undefined {
   if (!r.secret) return undefined;
   if (r.authMethod !== "password") return r.secret; // 키 경로 — 비밀 아님
+  // ⚠⚠ **봉투 모양이면 복호 실패를 삼키지 않는다**(2026-08-18 검토 지적).
+  //   처음엔 `catch`에서 무조건 평문으로 봤는데, 그러면 **키가 바뀐 기계에서 암호문 JSON이
+  //   그대로 비밀번호로 나간다** — `sshpass -p '{"iv":…}'`가 장비에 간다. 결과가 고약하다:
+  //     ⓐ 매 주기 인증 실패가 반복되고
+  //     ⓑ **우리가 점검 항목으로 요구하는 계정 잠금(KISA U-03 deny=5)에 대상 장비 계정이 잠긴다**
+  //     ⓒ 감사에는 「접속 실패」만 남아 원인이 안 보이고 ⓓ ps 목록에 암호문이 뜬다
+  //   키 유실·재생성, `GIJO_ENCRYPTION_KEY` 교체, 다른 기계로 백업 복원에서 실제로 일어난다.
+  //   ⇒ **봉투 모양이면 던진다**(키 문제라고 드러낸다). 봉투가 아니면 옛 평문이라 그대로 쓴다.
+  const 봉투인가 = /^\s*\{[\s\S]*"iv"[\s\S]*"ciphertext"[\s\S]*\}\s*$/.test(r.secret);
   try {
     return decryptString(r.secret, getEncryptionKey());
-  } catch {
+  } catch (err) {
+    if (봉투인가) {
+      throw new Error(
+        `점검 대상 「${r.label}」의 비밀번호를 풀지 못했습니다 — 암호화 열쇠가 바뀌었거나 손상된 것으로 보입니다. ` +
+          `그대로 두면 장비에 잘못된 비밀번호를 보내 계정이 잠길 수 있어 여기서 멈춥니다. 대상을 다시 등록해 주세요. ` +
+          `(${err instanceof Error ? err.message : String(err)})`
+      );
+    }
     return r.secret; // 옛 평문 — 그대로 쓴다(하위호환)
   }
 }
@@ -285,7 +301,7 @@ export function registerHardeningTargetRoutes(app: Express): void {
   app.get("/api/hardening/schedules", authMiddleware, (_req, res) => {
     res.json({ schedules: listSchedules() });
   });
-  app.post("/api/hardening/schedules", authMiddleware, asyncRoute(async (req, res) => {
+  app.post("/api/hardening/schedules", authMiddleware, adminMiddleware, asyncRoute(async (req, res) => {
     const targetId = String(req.body?.targetId ?? "");
     const standard = String(req.body?.standard ?? "kisa");
     const intervalHours = Math.max(1, Math.round(Number(req.body?.intervalHours) || 24));
@@ -295,11 +311,11 @@ export function registerHardeningTargetRoutes(app: Express): void {
     recordAudit({ kind: "config", actor: actorOf(req), action: "하드닝 정기점검 스케줄 등록", target: getTarget(targetId)!.label, detail: `${standard.toUpperCase()} · ${intervalHours}시간마다`, result: "ok" });
     res.json({ schedule: sch });
   }));
-  app.patch("/api/hardening/schedules/:id", authMiddleware, (req, res) => {
+  app.patch("/api/hardening/schedules/:id", authMiddleware, adminMiddleware, (req, res) => {
     if (typeof req.body?.enabled === "boolean") setScheduleEnabled(req.params.id, req.body.enabled);
     res.json({ ok: true });
   });
-  app.delete("/api/hardening/schedules/:id", authMiddleware, (req, res) => {
+  app.delete("/api/hardening/schedules/:id", authMiddleware, adminMiddleware, (req, res) => {
     deleteSchedule(req.params.id);
     res.json({ ok: true });
   });

@@ -19,6 +19,23 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 
+// ⚠⚠ **파일 목록을 손으로 적지 않는다**(2026-08-18 검토 지적). 처음엔 `llm.ts` 하나만 읽었는데,
+//   `searchrewrite.ts`가 같은 원격 통로로 `/chat/completions`를 부르면서 리다이렉트 금지가
+//   빠져 있었다 — 「본 호출엔 있고 곁가지엔 없다」를 잡으려고 만든 시험이 **검사 대상을 손으로
+//   적어 둔 탓에** 그 곁가지를 못 봤다. `airgap.test.ts`가 2026-08-05에 밟은 것과 같은 모양이다.
+//   ⇒ engine 전체를 훑어 **원격으로 갈 수 있는 호출을 스스로 찾는다.**
+const ENGINE_DIR = new URL("../src/engine/", import.meta.url);
+function 엔진소스(): { file: string; src: string }[] {
+  const out: { file: string; src: string }[] = [];
+  const 훑기 = (dir: URL, prefix = "") => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (e.isDirectory()) 훑기(new URL(e.name + "/", dir), prefix + e.name + "/");
+      else if (e.name.endsWith(".ts")) out.push({ file: prefix + e.name, src: fs.readFileSync(new URL(e.name, dir), "utf8") });
+    }
+  };
+  훑기(ENGINE_DIR);
+  return out;
+}
 const src = fs.readFileSync(new URL("../src/engine/llm.ts", import.meta.url), "utf8");
 
 /** `fetch(...)` 호출 하나를 통째로 집어 낸다(괄호 균형으로 끝을 찾는다). */
@@ -71,6 +88,19 @@ describe("원격 LLM 호출은 어디서든 방어 둘을 건다", () => {
       빠짐.map((c) => `#${c.i}: ${c.본문.replace(/\s+/g, " ").slice(0, 110)}`).join("\n"),
       "이 호출들은 원격일 때 리다이렉트를 안 막는다 — 질문 본문이 밖으로 따라 나갈 수 있다",
     ).toBe("");
+  });
+
+  it("★ engine 전체에서 원격으로 갈 수 있는 호출을 찾아 방어를 대조한다", () => {
+    // 「원격으로 갈 수 있는 호출」 = `/chat/completions`를 부르면서 `remoteLlmTarget()`을 쓰는 파일.
+    const 후보 = 엔진소스().filter((f) => f.src.includes("/chat/completions") && f.src.includes("remoteLlmTarget"));
+    expect(후보.length, "원격 채팅 호출이 있는 파일을 못 찾았다 — 이 검사가 헛돈다").toBeGreaterThanOrEqual(2);
+    const 빠짐: string[] = [];
+    for (const { file, src: s } of 후보) {
+      for (const c of fetch호출들(s).filter((x) => x.본문.includes("/chat/completions"))) {
+        if (!/redirect:\s*[^,}]*\?\s*"error"/.test(c.본문)) 빠짐.push(`${file}: ${c.본문.replace(/\s+/g, " ").slice(0, 90)}`);
+      }
+    }
+    expect(빠짐.join("\n"), "이 호출들은 원격일 때 리다이렉트를 안 막는다 — 질문 원문이 밖으로 따라 나갈 수 있다").toBe("");
   });
 
   it("깨지면 정말 빨간불이 나는가 — 검사기 자체 확인", () => {

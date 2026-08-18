@@ -22,11 +22,14 @@
 //
 // ⚠ 넷 다 「사람이 손으로 적은 것」과 「코드가 하는 일」이 어긋난 부류다. 그래서 **세어서 쓰게** 하고,
 //   빠질 수 있는 자리는 소스로 대조한다.
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach } from "vitest";
 import fs from "node:fs";
 import { EGRESS_POINTS } from "../src/engine/airgap";
 import { PAYLOADS } from "../src/engine/redteam";
 import { findAgentTool } from "../src/engine/agenttools";
+import { db } from "../src/db";
+import { createTarget, getTarget, listTargets } from "../src/engine/hardeningtargets";
+import { isVpnRangeIp } from "../src/engine/airgap";
 
 const 읽기 = (p: string) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
 const 점검 = 읽기("../src/engine/hardeningscan.ts");
@@ -85,21 +88,58 @@ describe("② 점검 대상은 admin만·내부망만 등록한다", () => {
   });
 });
 
-describe("③ 장비 비밀번호를 평문으로 두지 않는다", () => {
-  it("저장할 때 암호화하고 읽을 때 푼다", () => {
-    expect(대상, "암호화를 안 쓴다 — 같은 DB의 다른 비밀은 전부 암호화한다").toContain("encryptString");
-    expect(대상, "복호를 안 한다").toContain("decryptString");
-    // ⚠ 비밀번호만 — 키 인증의 secret은 **파일 경로**라 암호화하면 점검이 통째로 깨진다.
-    expect(대상, "인증 방식을 안 가리고 암호화한다 — 키 경로까지 암호화하면 점검이 깨진다").toMatch(
-      /authMethod === "password"/
-    );
+describe("③ 장비 비밀번호를 평문으로 두지 않는다 — **동작으로** 잰다", () => {
+  // ⚠⚠ 처음엔 소스에 `encryptString`이 있는지만 봤다. 그러면 **삼항을 뒤집어**
+  //   「비밀번호는 평문 저장, 키 경로는 암호화」로 만들어도 전부 초록이다(검토관 지적).
+  //   ⇒ 실제로 넣고 DB 원문을 읽어 **평문이 없는지**, 되읽으면 **원래 값이 나오는지**를 잰다.
+  //   LLM·네트워크가 없어도 되는 시험이다.
+  beforeEach(() => {
+    db.prepare("DELETE FROM hardening_targets").run();
   });
 
-  it("옛 평문도 읽는다 — 하위호환이 없으면 기존 고객의 점검이 멈춘다", () => {
-    // 복호에 실패하면 평문으로 보고 그대로 쓴다. 그 갈래가 없으면 이미 저장된 대상이 전부 죽는다.
-    const 구간 = 대상.slice(대상.indexOf("function 비밀풀기"), 대상.indexOf("function 비밀풀기") + 500);
-    expect(구간, "비밀풀기 함수를 못 찾았다 — 이 검사가 헛돈다").toContain("decryptString");
-    expect(구간, "복호 실패를 안 받아 낸다 — 옛 평문이 저장된 기계에서 점검이 멈춘다").toContain("catch");
+  it("★ 비밀번호는 DB에 평문으로 안 남는다 — 그리고 되읽으면 원래 값이 나온다", () => {
+    const 비번 = "s3cr3t-비밀번호-2026";
+    const t = createTarget({ label: "시험장비", host: "10.8.0.5", port: 22, username: "admin", authMethod: "password", secret: 비번, standard: "kisa" });
+    const 원문 = (db.prepare("SELECT secret FROM hardening_targets WHERE id = ?").get(t.id) as { secret: string }).secret;
+    expect(원문, "DB에 비밀번호가 평문으로 그대로 있다").not.toContain(비번);
+    expect(원문, "암호화 봉투 모양이 아니다").toMatch(/"iv"/);
+    expect(getTarget(t.id)!.secret, "되읽었을 때 원래 비밀번호가 안 나온다 — 접속이 깨진다").toBe(비번);
+  });
+
+  it("★ 키 인증의 경로는 **그대로** 둔다 — 암호화하면 파일을 못 찾아 점검이 깨진다", () => {
+    const 경로 = "/home/gijo/.ssh/id_ed25519";
+    const t = createTarget({ label: "키장비", host: "10.8.0.6", port: 22, username: "admin", authMethod: "key", secret: 경로, standard: "kisa" });
+    const 원문 = (db.prepare("SELECT secret FROM hardening_targets WHERE id = ?").get(t.id) as { secret: string }).secret;
+    expect(원문, "키 경로까지 암호화했다 — ssh -i 가 파일을 못 찾는다").toBe(경로);
+    expect(getTarget(t.id)!.secret).toBe(경로);
+  });
+
+  it("★ 옛 평문도 읽는다 — 없으면 기존 고객의 점검이 통째로 멈춘다", () => {
+    // 이 커밋 전에 저장된 대상을 흉내 낸다(평문이 그대로 들어 있는 행).
+    const t = createTarget({ label: "옛장비", host: "10.8.0.7", port: 22, username: "admin", authMethod: "password", secret: "임시", standard: "kisa" });
+    db.prepare("UPDATE hardening_targets SET secret = ? WHERE id = ?").run("옛평문비번", t.id);
+    expect(getTarget(t.id)!.secret, "옛 평문을 못 읽는다 — 기존 대상이 전부 죽는다").toBe("옛평문비번");
+  });
+
+  it("공개 표현에는 secret이 안 실린다", () => {
+    const t = createTarget({ label: "노출시험", host: "10.8.0.8", port: 22, username: "admin", authMethod: "password", secret: "노출되면안됨", standard: "kisa" });
+    const 목록 = JSON.stringify(listTargets().map((x) => ({ ...x, secret: undefined })));
+    expect(목록).not.toContain("노출되면안됨");
+    expect(getTarget(t.id)).toBeTruthy();
+  });
+});
+
+describe("② 대역 검증도 **동작으로** 잰다", () => {
+  // ⚠ 소스에 `isVpnRangeIp`가 있는지만 보면, `!`를 지워 **공인 IP만 받게** 뒤집어도 통과한다.
+  it("★ 판정기가 내부망은 통과시키고 공인 IP는 막는다", () => {
+    for (const ip of ["10.8.0.1", "192.168.0.5", "172.16.3.9", "100.64.1.2"]) {
+      expect(isVpnRangeIp(ip), `${ip}(내부망)을 막는다 — 정상 대상이 등록 안 된다`).toBe(true);
+    }
+    for (const ip of ["203.0.113.10", "8.8.8.8", "1.1.1.1"]) {
+      expect(isVpnRangeIp(ip), `${ip}(공인)을 통과시킨다 — 남의 대역을 두드릴 수 있다`).toBe(false);
+    }
+    // 호스트명은 거부한다 — 이름은 어디로든 풀릴 수 있어 「확실히 내부망」을 코드가 보증 못 한다.
+    expect(isVpnRangeIp("device.internal"), "호스트명을 통과시킨다").toBe(false);
   });
 });
 
