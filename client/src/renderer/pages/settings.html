@@ -2476,6 +2476,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       try {
         if (라이트) { var r = await window.gijo.editionSet("standard"); if (r && r.ok === false) { msg.textContent = r.error || "실패"; return; } }
         if (tier === "pro") await window.gijo.setLlmTier("standard");
+        // 프로에서 내려올 때도 셸 모드를 같이 되돌린다 — 안 되돌리면 등급은 표준인데
+        // 셸만 프로로 남아 「어느 쪽이 맞나」가 된다.
+        try { if (window.gijo.shellModeSet) await window.gijo.shellModeSet("standard"); } catch (e) { }
         msg.textContent = 라이트 ? "저장했습니다 — 앱을 다시 시작하면 스탠다드로 뜹니다." : "적용했습니다 — 엔진이 표준 등급으로 다시 뜹니다.";
         if (!라이트) loadEdition();
       } catch (e) { msg.textContent = String((e && e.message) || e); }
@@ -2501,6 +2504,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         // ⚠ **서버가 돌려주는 restarting을 그대로 옮긴다**(2026-08-18). 예전 문구는 한 줄에
         //   거짓이 둘이었다 — 「LLM 2개」(안 걸리는 값)와 「다시 뜹니다」(이제 안 뜬다).
         var r = await window.gijo.setLlmTier("pro");
+        // ⚠ 셸 모드도 **같이** 기록한다(사장님 결정 2026-08-18 「프로 판정부터 먼저」).
+        //   로그인 화면의 프로 버튼도 같은 값을 쓴다 — 두 자리가 서로 다른 곳에 적으면
+        //   「설정에선 프로인데 로그인 화면은 표준」이 된다(이 저장소의 단골 사고).
+        try { if (window.gijo.shellModeSet) await window.gijo.shellModeSet("pro"); } catch (e) { }
         msg.textContent =
           r && r.restarting === false
             ? "적용했습니다 — 바뀐 설정이 없어 엔진을 그대로 뒀습니다(대화가 안 끊깁니다)."

@@ -75,6 +75,10 @@ const gijoApi = {
   llmServeGet: () => api.llmServeApi.get(),
   llmServeSet: (enabled: boolean) => api.llmServeApi.set(enabled),
   editionGet: () => ipcRenderer.invoke("edition:get"),
+  // 셸 모드(standard/pro) — **에디션과 다른 축**이다. 에디션은 「어떤 상품인가」(데이터 폴더·도구 수),
+  // 셸 모드는 「화면을 어떻게 그리나」다. 프로는 도구도 데이터도 스탠다드와 같다.
+  shellModeGet: () => ipcRenderer.invoke("shell:get") as Promise<{ 현재: string; 쓸수있나: boolean }>,
+  shellModeSet: (mode: string) => ipcRenderer.invoke("shell:set", mode) as Promise<{ ok: boolean; 현재?: string; error?: string }>,
   editionSet: (mode: string) => ipcRenderer.invoke("edition:set", mode),
   mfaResetUser: (userId: string) => api.authApi.mfaResetUser(userId),
   mfaPolicy: () => api.authApi.mfaPolicy(),

@@ -479,6 +479,38 @@ ipcMain.handle("edition:get", () => ({
   빌드고정: 빌드에디션() === "lite",   // true면 라이트 전용 배포본 — 고객이 못 바꾼다
   전환됨: 라이트모드전환(),
 }));
+// ── 프로 판정(사장님 결정 2026-08-18: 「프로 판정부터 먼저 만들기」) ──────────────
+//
+// ⚠ **에디션에 「pro」를 더하지 않는다.** 둘은 다른 축이다:
+//     · 에디션(lite/standard) = **어떤 상품인가.** 데이터 폴더·진입점·도구 개수(13 vs 78)를 가른다.
+//     · 셸 모드(standard/pro) = **화면을 어떻게 그리나.** 프로는 도구도 데이터도 스탠다드와 같다.
+//   같은 칸에 넣으면 프로를 고른 순간 데이터 폴더가 갈리거나 도구가 줄어든다 — 아무도 원치 않는 일이다.
+//   (2026-08-18 착수 전 검토가 짚은 자리: 「프로는 edition이 아니라 tier」.)
+//
+// ⚠ **서버 등급을 못 읽었다고 스탠다드로 단정하지 않는다.** 서버가 잠깐 죽었을 뿐인데
+//   셸이 통째로 바뀌면 담당자는 제품이 고장 난 줄 안다. 마지막으로 확인된 값을 그대로 쓴다.
+const 셸모드파일 = () => path.join(app.getPath("userData"), "gijo-shell-mode.txt");
+function 저장된셸모드(): string {
+  try {
+    const v = fs.readFileSync(셸모드파일(), "utf8").trim();
+    return v === "pro" ? "pro" : "standard";
+  } catch { return "standard"; }
+}
+ipcMain.handle("shell:get", () => ({
+  현재: 저장된셸모드(),
+  // 라이트는 자기 셸(lite-app.html)이 따로라 프로 셸이 뜻이 없다 — 화면이 이걸 보고 감춘다.
+  쓸수있나: 에디션() !== "lite",
+}));
+ipcMain.handle("shell:set", (_e, 모드: string) => {
+  if (에디션() === "lite") return { ok: false, error: "라이트에서는 프로 셸을 쓸 수 없습니다." };
+  const 값 = 모드 === "pro" ? "pro" : "standard";
+  try { fs.writeFileSync(셸모드파일(), 값, "utf8"); }
+  catch (e) { return { ok: false, error: `셸 모드를 저장하지 못했습니다: ${(e as Error).message}` }; }
+  // ⚠ 에디션과 달리 **재시작을 요구하지 않는다** — 셸 모드는 화면 그리기일 뿐이라
+  //   진입점·도구가 안 바뀐다. 화면이 그 자리에서 다시 그리면 된다.
+  return { ok: true, 현재: 값 };
+});
+
 ipcMain.handle("edition:set", (_e, 모드: string) => {
   if (빌드에디션() === "lite") return { ok: false, error: "이 배포본은 라이트 전용이라 모드를 바꿀 수 없습니다." };
   const 값 = 모드 === "lite" ? "lite" : "standard";
