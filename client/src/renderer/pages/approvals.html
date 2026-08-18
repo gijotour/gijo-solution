@@ -430,6 +430,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         (!allReviews.length ? "검토할 finding이 없습니다 — 자산 스캔을 먼저 실행하세요."
           : 심각도필터 ? "고른 심각도에 해당하는 건이 없습니다 — 위 「✕ 해제」를 누르면 전체가 다시 보입니다."
           : "이 상태의 finding이 없습니다.") + "</div>";
+      // ⚠ 비었을 때도 **알린다.** 안 알리면 아까 목록이 대화창에 남아, 화면엔 아무것도 없는데
+      //   「이것들 배정해줘」가 사라진 목록에 걸린다.
+      보는목록알림(null);
       return;
     }
     list.innerHTML = filtered.map((r) => {
@@ -466,6 +469,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       currentKey = keyOf(r); renderList(); renderDetail(r);
     }));
     renderBulkBar();
+    보는목록알림(filtered);
   }
 
   // 일괄 배정 바 — 선택이 있을 때만 보인다(평소엔 목록을 가리지 않는다).
@@ -517,6 +521,38 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     };
     // ⚠ window.top — 이 화면은 셸(app.html)의 iframe 안이다. parent면 허브가 한 겹 더 있을 때 죽는다.
     try { window.top.postMessage({ type: "gijo:select", label: f.finding_type || r.assetName || "선택", text, fields }, "*"); } catch (e) {}
+  }
+
+  // ── 배관: 「지금 보여 주고 있는 목록」을 대화창에 알린다(2026-08-18) ─────────────
+  //
+  // ⚠ 위 대화창에알림(gijo:select)과 **하는 일이 다르다** — 헷갈리기 쉬운 자리다:
+  //   · gijo:select = 사람이 **누른 한 건**. 📌 칩이 되고 「이거」가 그걸 가리킨다.
+  //   · gijo:view   = 지금 **떠 있는 여러 건**. 화면엔 아무것도 안 그린다. 평소엔 아무 일도
+  //     하지 않고, 조건이 뜻을 잃었을 때만(「이것들 전부 정요한한테 배정해줘」) 대상이 된다.
+  //
+  // ⚠ 왜 필요한가 — 실측으로 증명한 구멍(2026-08-18): 서버는 「이것들」이라는 조건을 받으면
+  //   아무것도 못 좁혀 **전건**을 잡았다("이것들" 3건 = 전체 3건). 이제 조건이 뜻을 잃으면
+  //   ⓐ 보던 목록이 있으면 그것을, ⓑ 없으면 되묻는다. 이 함수가 ⓐ를 가능하게 하는 자리다.
+  //
+  // ⚠ 50건 상한 — 넘으면 **아무것도 안 보낸다**(잘라 보내지 않는다). 잘린 절반을 「보던 것」이라
+  //   부르며 처리하면 담당자는 전부 바뀐 줄 안다. 서버도 같은 상한으로 한 번 더 막는다.
+  const 보는목록_상한 = 50;
+  function 보는목록알림(rows) {
+    let ids = null;
+    if (Array.isArray(rows) && rows.length && rows.length <= 보는목록_상한) {
+      // ⚠ keyOf(구분자 \0)를 쓰지 않는다 — \0은 DOM·postMessage를 오가며 유실된다(427행).
+      //   서버가 읽는 신원은 "assetId::findingKey"다.
+      ids = rows
+        .filter((r) => r && r.assetId && r.findingKey)
+        .map((r) => `${r.assetId}::${r.findingKey}`);
+      if (!ids.length) ids = null;
+    }
+    try {
+      window.top.postMessage(
+        ids ? { type: "gijo:view", screen: "approvals.html", label: `검토 목록 ${ids.length}건`, ids } : { type: "gijo:view" },
+        "*"
+      );
+    } catch (e) { /* 셸 밖(단독 열람)에서는 조용히 없던 일로 */ }
   }
 
   // 검증 결과 렌더 — 판정 배지 + 근거(명령·출력). 접기 가능하고 목록은 내부 스크롤.

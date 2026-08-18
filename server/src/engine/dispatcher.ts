@@ -34,7 +34,7 @@ import { gateUserInput } from "./gateway";
 import { toolDomainsForScreen } from "./screencontext";
 import { isHelpIntent, formatScreenGuide, 이름으로화면찾기, 방법질문화면찾기, 화면위치안내 } from "./screenguide";
 import { findHowTo, howToMarkdown } from "./howto";
-import { buildFindingPicks, parsePickCommand, pickToolArgs, isFindingListAsk, findingListAnswer, isMyWorkAsk, myWorkAnswer, stripPickMarks, PickList } from "./picklist";
+import { buildFindingPicks, parsePickCommand, pickToolArgs, isFindingListAsk, findingListAnswer, isMyWorkAsk, myWorkAnswer, stripPickMarks, parseViewIds, PickList } from "./picklist";
 import { isOutOfScope, outOfScopeAnswer, isTooVague, vagueAnswer, 한낱말되묻기 } from "./scopeguard";
 import { analyzeFindings } from "./analysis";
 import { recordFindings, getAsset, listAssets, 자산표시이름 } from "./assets";
@@ -1466,6 +1466,19 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     output = result.output;
     toolCalls = result.toolCalls;
     approval = result.approval;
+    // 「보고 있던 목록」을 결재판에 싣는다(2026-08-18 배관) — **규칙으로** 넣는다. 모델에게
+    //   "화면에 뭐가 있었지?"를 묻지 않는다(7B가 id를 하나 잘못 읽으면 엉뚱한 게 바뀐다).
+    // ⚠ 결재판 **칸에** 넣어야 한다. 승인 버튼은 화면에 보이는 칸만 모아 되돌리므로
+    //   (console.js collect), 칸 밖에 둔 값은 승인하는 순간 조용히 사라진다.
+    // ⚠ 이미 값이 있으면 덮지 않는다 — 사람이 고쳐 둔 것을 화면이 되돌리면 안 된다.
+    if (approval) {
+      const 보던 = parseViewIds(instructionText);
+      const 칸 = 보던 ? approval.fields.find((f) => f.key === "viewIds") : undefined;
+      if (칸 && !칸.value) {
+        칸.value = 보던;
+        칸.source = "auto";
+      }
+    }
     if (result.findings) {
       updateTaskPriority(task.id, priorityForFindings(result.findings));
     }

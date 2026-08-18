@@ -1030,6 +1030,18 @@
     renderSelState();
   }
 
+  // ── 배관: 화면이 「지금 보여 주는 목록」을 알려 준다(2026-08-18) ────────────
+  // ⚠ **화면에 아무것도 그리지 않는다.** 📌 칩(고른 한 건)과 헷갈리면 안 되기 때문이다 —
+  //   고른 것은 사람이 누른 것이고, 보는 목록은 그냥 떠 있는 것이다. 떠 있다고 칩을 띄우면
+  //   담당자는 자기가 뭘 고른 줄 안다. 이 값은 **조건이 뜻을 잃었을 때만** 서버에서 쓰인다.
+  //
+  // ⚠ 화면을 옮기면 반드시 버려야 한다 — 취약점 목록을 보다 설정으로 갔는데 「이것들 배정해줘」가
+  //   아까 목록에 걸리면 그게 사고다. ctx.screen이 바뀌는 자리에서 지운다.
+  var 보는목록 = null; // { screen, label, ids: [] } | null
+  function setViewList(v) {
+    보는목록 = v && Array.isArray(v.ids) && v.ids.length && v.ids.length <= 50 ? v : null;
+  }
+
   /** 🎯 지금 다루는 것 — fields가 온 화면에서만 그린다(2026-08-18 시안 승인).
    *  ⚠ fields가 없으면 **아무것도 그리지 않는다** — 기존 화면(vulnscan·dashboard·map-view)은
    *    label·text만 보내므로 지금과 똑같이 📌 칩만 뜬다(무변경 호환). */
@@ -1149,7 +1161,12 @@
   }
   function readCtxFromShell() {
     if (IS_WINDOW || !window.gijoTabs) return;
+    var 이전화면 = ctx && ctx.screen;
     ctx = { screen: window.gijoTabs.activeScreen(), label: window.gijoTabs.activeLabel() };
+    // ⚠ 화면을 옮기면 「보고 있던 목록」을 **버린다.** 취약점 목록을 보다 설정으로 갔는데
+    //   「이것들 배정해줘」가 아까 목록에 걸리면 그게 사고다. 새 화면이 다시 알려 줄 것이다.
+    //   (전송부에도 화면 대조가 있지만, 안 쓰는 값을 들고 있는 것 자체를 없앤다 — 이중 방어.)
+    if (이전화면 !== ctx.screen) 보는목록 = null;
     applyCtx();
   }
 
@@ -1190,6 +1207,17 @@
       //    화면 맥락이 오히려 해석을 비트는 경우가 있다(외부사례: VS Code implicit context 논쟁).
       var 화면인자 = (ctxOff ? undefined : ctx.screen) || undefined;
       var 선택인자 = sel ? sel.text : undefined;
+      // 「보고 있던 목록」을 표식으로만 싣는다(2026-08-18 배관).
+      // ⚠ **보내는 글에만 붙이고 보이는 글에는 안 붙인다** — 표식은 기계용이다. 그대로 보이면
+      //   대화에 sha1 지문이 줄줄이 남아 담당자가 자기 대화를 못 알아본다(2026-07-31 실사고).
+      //   서버도 기록 전에 stripPickMarks로 떼어 낸다 — 양쪽에서 막는다.
+      // ⚠ **지금 보고 있는 화면의 목록일 때만** 싣는다. 취약점 목록을 보다 설정으로 옮겨 놓고
+      //   「이것들 배정해줘」가 아까 목록에 걸리면 그게 사고다.
+      // ⚠ 체크칸 조치(#고른건)가 이미 실렸으면 붙이지 않는다 — 고른 것이 언제나 우선이다.
+      var 보낼글 = text;
+      if (보는목록 && 보는목록.ids.length && text.indexOf("#고른건") < 0 && 보는목록.screen && 보는목록.screen === ctx.screen) {
+        보낼글 = text + "\n#보는목록 " + 보는목록.ids.join(",");
+      }
       // 답 스트리밍(전-7, 시안 정돈안) — 산문이 생성되는 대로 진행 카드 아래에 글자가 흐른다.
       // 흐른 글자는 「쓰는 중」 표시일 뿐 — done의 최종 답(출구 관문 통과본)으로 반드시 갈아 끼운다.
       var live = null;
@@ -1208,15 +1236,15 @@
       var r;
       if (window.gijo.sendInstructionStream) {
         try {
-          r = await window.gijo.sendInstructionStream(text, session ? session.id : undefined, 화면인자, pid, 선택인자, onDelta, onStart);
+          r = await window.gijo.sendInstructionStream(보낼글, session ? session.id : undefined, 화면인자, pid, 선택인자, onDelta, onStart);
         } catch (se) {
           // 흐르다 끊겼으면(글자가 이미 보였으면) 끊겼다고 알린다 — 잘린 답을 완성인 척 안 한다.
           // 아무것도 안 흘렀으면(구서버 404·연결 실패) 통짜 경로로 한 번 더 — 기능 후퇴는 없다.
           if (live && live.textContent) throw se;
-          r = await window.gijo.sendInstruction(text, session ? session.id : undefined, 화면인자, pid, 선택인자);
+          r = await window.gijo.sendInstruction(보낼글, session ? session.id : undefined, 화면인자, pid, 선택인자);
         }
       } else {
-        r = await window.gijo.sendInstruction(text, session ? session.id : undefined, 화면인자, pid, 선택인자);
+        r = await window.gijo.sendInstruction(보낼글, session ? session.id : undefined, 화면인자, pid, 선택인자);
       }
       if (pc) pc.stop();
       if (r && r.sessionId) {
@@ -1422,7 +1450,7 @@
     input.focus();
     try { input.setSelectionRange(input.value.length, input.value.length); } catch (e) {}
   }
-  window.gijoConsole = { append: append, syncCtx: readCtxFromShell, submit: submit, ask: ask, prefill: prefill, guide: guideAsk, select: setSelection };
+  window.gijoConsole = { append: append, syncCtx: readCtxFromShell, submit: submit, ask: ask, prefill: prefill, guide: guideAsk, select: setSelection, view: setViewList };
 
   // 다른 화면·다른 창에서 "이 지시를 대화창에서 이어서" 하고 넘겨 준 것을 받는다.
   // ⚠ 빈 글이면 **보내지 않는다** — 「이어서 지시하기」만 누른 사람은 아직 할 말을 안 정했다.

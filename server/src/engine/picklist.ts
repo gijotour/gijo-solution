@@ -290,6 +290,16 @@ export const PICK_MARK = "#고른건";
 const ACTION_MARK = "#조치";
 const VALUE_MARK = "#값";
 const KIND_MARK = "#종류";
+/**
+ * **화면에서 보고 있던 목록**(2026-08-18 배관). `#고른건`과 다르다:
+ *   · `#고른건` = 사람이 **체크한** 것. 그 자체가 대상이다.
+ *   · `#보는목록` = 사람이 **보고 있던** 것. 평소엔 아무 일도 하지 않고, 조건이 뜻을 잃었을 때
+ *     (「이것들 전부 배정해줘」) **그때만** 대상이 된다.
+ *
+ * ⚠ 「보고 있던 것」을 늘 대상으로 삼지 않는 이유: 그러면 화면이 사람 말을 조용히 덮는다.
+ *   "critical 전부 배정"이라고 했는데 화면에 medium만 떠 있다고 medium이 바뀌면 사고다.
+ */
+export const VIEW_MARK = "#보는목록";
 
 export interface PickCommand {
   ids: string[];
@@ -332,7 +342,7 @@ export function parsePickCommand(text: string): PickCommand | null {
  *   담당자가 자기 대화를 못 알아본다(2026-07-31 실화면에서 발견).
  */
 export function stripPickMarks(text: string): string {
-  const marks = [PICK_MARK, ACTION_MARK, VALUE_MARK, KIND_MARK];
+  const marks = [PICK_MARK, ACTION_MARK, VALUE_MARK, KIND_MARK, VIEW_MARK];
   const kept = String(text ?? "")
     .split("\n")
     .filter((raw) => {
@@ -340,6 +350,25 @@ export function stripPickMarks(text: string): string {
       return !marks.some((m) => line.startsWith(m + " "));
     });
   return kept.join("\n").trim();
+}
+
+/**
+ * 지시문에 실린 「보고 있던 목록」을 읽는다. 없으면 빈 문자열(평소대로).
+ *
+ * ⚠ 상한 50건, 그리고 넘치면 **잘라 내지 않고 아예 안 쓴다**. 이유 둘:
+ *   ① 잘린 절반을 「보고 있던 것」이라 부르며 대상으로 삼는 게 제일 나쁘다 —
+ *      담당자는 전부 바뀐 줄 알고, 실제로는 앞의 50건만 바뀐다.
+ *   ② 이 값은 결재판에 그대로 실린다(등록된 인자여야 승인 때 안 사라진다).
+ *      수백 개짜리 목록이 칸에 들어가면 승인 버튼이 밀려나 **관문 자체가 망가진다.**
+ *   넘치면 조건을 말해 달라는 안내로 간다 — 수백 건 일괄 처리는 조건으로 하는 편이 옳다.
+ */
+export const VIEW_MAX = 50;
+export function parseViewIds(text: string): string {
+  const raw = markLine(text, VIEW_MARK);
+  if (!raw) return "";
+  const ids = raw.split(/[,\s]+/).map((s) => s.trim()).filter(Boolean);
+  if (ids.length === 0 || ids.length > VIEW_MAX) return "";
+  return ids.join(",");
 }
 
 /** 고른 조치를 bulk_update 인자로 바꾼다. */

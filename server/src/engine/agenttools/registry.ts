@@ -131,6 +131,7 @@ import {
   BulkMatch,
   matchFindingsByFilter,
   matchFindingsByIds,
+  조건이좁히나,
   runBulkUpdate,
   현황상한,
   runFindingStatusOverview,
@@ -1381,6 +1382,10 @@ const TOOLS: AgentTool[] = [
       //   대신 run에서 "ids든 filter든 하나는 있어야 한다"를 강제한다(둘 다 비면 전건이 걸릴 뻔했다).
       { name: "filter", label: "대상 조건", description: "심각도(critical/high…)·KEV·상태·키워드 (예: critical kev, Oracle) — 목록에서 직접 고른 경우 비움", required: false },
       { name: "ids", label: "고른 대상", description: "대화창 목록에서 체크한 건들(자동으로 채워짐). 사람이 손으로 적는 값이 아니다", required: false },
+      // ⚠ **반드시 여기 등록돼 있어야 한다.** 결재판은 이 params로만 칸을 만들고, 승인 버튼은
+      //   **화면에 보이는 칸만** 모아 서버로 되돌린다(console.js collect). 등록 안 하면
+      //   승인하는 순간 조용히 사라져 「설계는 됐는데 쓰인 적 없는 값」이 된다.
+      { name: "viewIds", label: "보던 목록", description: "화면에서 보고 있던 목록(자동으로 채워짐). 조건이 뜻을 잃었을 때만 대상이 된다", required: false },
       { name: "assignee", label: "담당자", description: "일괄 배정할 담당자 (선택)", required: false },
       { name: "dueDate", label: "기한", description: "일괄 기한 YYYY-MM-DD (선택)", required: false },
       { name: "status", label: "판정", description: "조치완료 / 오탐 (선택)", required: false },
@@ -1393,6 +1398,17 @@ const TOOLS: AgentTool[] = [
         const sample = matched.slice(0, 5).map((x) => x.label).join(" · ");
         const 빠짐 = unknown.length ? ` (⚠ ${unknown.length}건은 못 찾아 건너뜀)` : "";
         return `고른 ${matched.length}건에 적용 — ${sample}${matched.length > 5 ? ` 외 ${matched.length - 5}건` : ""}${빠짐}`;
+      }
+      // ⚠ 결재판 문구는 **run과 같은 갈래**를 타야 한다. 예전엔 여기서 filter만 보고
+      //   "…에 맞는 취약점 없음"이라 적었는데, run은 보던 목록으로 실행할 수도 있다 —
+      //   보여 준 것과 하는 일이 어긋나면 결재판이 관문 노릇을 못 한다.
+      if (!조건이좁히나(args.filter ?? "")) {
+        const 보던 = matchFindingsByIds(args.viewIds ?? "");
+        if (보던.matched.length === 0) {
+          return args.filter?.trim() ? `"${args.filter}"만으로는 대상이 안 좁혀짐 — 조건을 말하거나 목록에서 고르세요` : "무엇에 적용할지 정하지 않음";
+        }
+        const s = 보던.matched.slice(0, 5).map((x) => x.label).join(" · ");
+        return `지금 보고 계신 목록 ${보던.matched.length}건에 적용 — ${s}${보던.matched.length > 5 ? ` 외 ${보던.matched.length - 5}건` : ""}`;
       }
       const m = matchFindingsByFilter(args.filter ?? "");
       if (m.length === 0) return `"${args.filter}"에 맞는 취약점 없음`;

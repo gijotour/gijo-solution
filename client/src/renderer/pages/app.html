@@ -559,6 +559,32 @@
       window.gijoConsole.select(d.label && d.text ? { label: String(d.label), text: String(d.text), fields: f } : null);
       return;
     }
+    // 화면이 **지금 보여 주고 있는 목록**을 알린다(2026-08-18 배관).
+    //
+    // ⚠ gijo:select와 무엇이 다른가 — 헷갈리기 쉬운 자리다:
+    //   · gijo:select = 사람이 **누른 한 건**. 📌 칩이 되고 「이거」가 그걸 가리킨다.
+    //   · gijo:view   = 사람이 **보고 있는 여러 건**. 평소엔 아무 일도 안 하고, 조건이 뜻을
+    //     잃었을 때(「이것들 전부 배정해줘」) **그때만** 대상이 된다(서버 handlers 조건이좁히나).
+    //   늘 대상으로 삼지 않는 이유: 그러면 화면이 사람 말을 조용히 덮는다.
+    //
+    // ⚠ 여기서도 값을 **다시 만든다** — iframe이 보낸 것을 그대로 믿지 않는다.
+    //   id 하나가 200자를 넘거나 목록이 50건을 넘으면 버린다(서버도 같은 상한, 이중 방어).
+    if (d.type === "gijo:view" && window.gijoConsole && window.gijoConsole.view) {
+      var ids = [];
+      if (Array.isArray(d.ids)) {
+        for (var i = 0; i < d.ids.length && ids.length <= 50; i++) {
+          var s = String(d.ids[i] == null ? "" : d.ids[i]).trim();
+          // 신원은 "자산::지문" 꼴이다. 쉼표·공백이 섞이면 서버에서 쪼개져 엉뚱한 게 걸린다.
+          if (s && s.length <= 200 && s.indexOf("::") > 0 && !/[,\s]/.test(s)) ids.push(s);
+        }
+      }
+      window.gijoConsole.view(
+        ids.length && ids.length <= 50
+          ? { screen: String(d.screen || ""), label: String(d.label || "").slice(0, 80), ids: ids }
+          : null
+      );
+      return;
+    }
     if (d.type === "gijo:explain" && window.gijoConsole) {
       // 화면 안내는 카드 한 장으로(2026-08-09 재설계) — 말풍선으로 쌓으면 같은 안내가
       // 중복된다(실측 3중복). 특정 주제(topic)는 일반 대화로 — 그건 안내가 아니라 질문이다.

@@ -1429,6 +1429,41 @@ export function runUpdateFindingStatus(args: Record<string, string>): string {
 
 export interface BulkMatch { assetId: string; key: string; label: string; }
 
+// 조건이 실제로 **범위를 좁히는 말**인지 본다(2026-08-18).
+//
+// ⚠ 왜 필요한가 — 실측으로 증명한 구멍:
+//   `runBulkUpdate`는 "조건 없는 일괄 쓰기 금지"를 지키려 **빈 filter**를 막았다. 그런데
+//   막을 것은 「비었는가」가 아니라 **「좁히는가」**였다. filter="이것들"을 넣으면
+//   심각도·KEV 어느 것도 안 걸리고, 남는 낱말이 "이" 한 글자라 키워드 거르기도 건너뛴다
+//   → **전건**이 그대로 돌아온다(실측 2026-08-18: "이것들" 3건 = 빈 조건 3건 = 전체).
+//   사람이 "이것들 전부 정요한한테 배정해줘"라고 말하면 모델이 filter를 "이것들"로 채우고,
+//   **전사 취약점 전부**가 대상이 된다.
+//
+// ⚠ 왜 「걸러 보고 건수를 비교」하지 않나: 그러면 **자료에 따라 답이 달라진다**.
+//   전 건이 다 critical인 날엔 filter="critical"이 「안 좁혔다」가 되어 버린다.
+//   말만 보고 판정한다 — 자료와 무관해야 판정이 흔들리지 않는다.
+//
+// ⚠ 여기서 true라고 해서 결과가 1건 이상이라는 뜻은 아니다. "Oracle"은 좁히는 말이지만
+//   Oracle 취약점이 없으면 0건이다 — 그건 기존 「…에 맞는 취약점이 없습니다」 길로 간다.
+const 차원_RE =
+  /고위험|위험\s*높은?|critical|크리티컬|심각|high|높|medium|중간|\blow\b|낮|kev|실제\s*악용|악용|미배정|담당\s*없|미지정|기한\s*초과|지연|overdue/;
+/** 혼자 있으면 아무것도 안 가리키는 말 — 집합어·지시대명사·제품 낱말. */
+const 뜻없는말 =
+  /^(전부|모두|전체|다|들|목록|리스트|취약점|취약점들|것|것들|건|건들|항목|항목들|이것|이것들|그것|그것들|저것|저것들|여기|거기|저기|이|그|저|위|아래|화면|위에|아래에)$/;
+export function 조건이좁히나(filter: string): boolean {
+  const f = String(filter ?? "").toLowerCase().trim();
+  if (!f) return false;
+  if (차원_RE.test(f)) return true;
+  // 띄어 쓴 경우 — 낱말 단위로 걸러 낸다("이 취약점들 전체" → 남는 것 없음)
+  const 남은토막 = f.split(/\s+/).filter((t) => t && !뜻없는말.test(t));
+  // 붙여 쓴 경우 — 남은 토막에서 뜻 없는 말을 다시 통째로 지운다("이것들전부" → 빈 문자열)
+  const 남은 = 남은토막
+    .join("")
+    .replace(/전부|모두|전체|취약점들?|이것들?|그것들?|저것들?|것들?|항목들?|건들?|목록|리스트|화면/g, "")
+    .trim();
+  return 남은.length >= 2;
+}
+
 export function matchFindingsByFilter(filter: string): BulkMatch[] {
   const f = (filter ?? "").toLowerCase();
   let sel = prioritizedReviews(2000); // 전 자산 finding(오탐 제외), 우선순위순
@@ -1500,15 +1535,31 @@ export function runBulkUpdate(args: Record<string, string>): string {
         `고르신 ${못찾음.length}건이 지금 목록에 없습니다 — 그 사이에 처리됐거나 목록이 바뀌었을 수 있습니다. 목록을 다시 불러 주세요.`
       );
     }
-  } else {
-    // ★ 둘 다 비면 **전건**이 걸린다(matchFindingsByFilter("")는 필터를 하나도 안 건다).
-    //   filter를 선택값으로 바꾸면서 생긴 구멍이라 여기서 막는다 — 조건 없는 일괄 쓰기는 금지다.
-    if (!args.filter?.trim()) {
-      throw new Error("무엇에 적용할지 정하지 않았습니다 — 조건을 말씀하시거나 목록에서 직접 고르세요.");
-    }
+  } else if (조건이좁히나(args.filter ?? "")) {
     matched = matchFindingsByFilter(args.filter);
     대상설명 = `"${args.filter}"`;
     if (matched.length === 0) throw new Error(`"${args.filter}"에 맞는 취약점이 없습니다.`);
+  } else {
+    // ★ 조건이 **범위를 못 좁힌다** — 비었거나("") 뜻이 없거나("이것들"·"전부").
+    //   둘 다 걸러 보면 **전건**이 나온다(matchFindingsByFilter는 아무 조건도 안 건다).
+    //   예전엔 「비었는가」만 막아서 "이것들"이 그대로 통과해 전사 취약점이 대상이 됐다.
+    //
+    //   이때 **화면에서 보고 있던 목록**이 있으면 그것을 대상으로 삼는다 — 담당자가 말한
+    //   「이것들」은 십중팔구 눈앞의 목록이고, 그건 말로 옮긴 조건과 달리 어긋날 수가 없다.
+    //   ⚠ 조건이 멀쩡할 때는 끼어들지 않는다(위 갈래) — 화면이 사람 말을 조용히 덮으면 안 된다.
+    const 보던 = matchFindingsByIds(args.viewIds ?? "");
+    if (보던.matched.length === 0) {
+      throw new Error(
+        args.filter?.trim()
+          // ⚠ 「알 수 없습니다」로 쓰지 말 것 — 서랍 점검의 **실패 딱지** 문구다
+          //   (emptyanswer-guidance 감시). 이건 실패가 아니라 **되묻기**다.
+          ? `"${args.filter}"만으로는 대상이 좁혀지지 않습니다 — 심각도·KEV·담당 같은 조건을 말씀하시거나, 목록에서 직접 고르세요.`
+          : "무엇에 적용할지 정하지 않았습니다 — 조건을 말씀하시거나 목록에서 직접 고르세요."
+      );
+    }
+    matched = 보던.matched;
+    못찾음 = 보던.unknown;
+    대상설명 = "지금 보고 계신 목록";
   }
   const patch: ReviewPatch = {};
   if (args.assignee?.trim()) patch.assignee = args.assignee.trim();
