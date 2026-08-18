@@ -214,3 +214,47 @@ describe("★ 대화 부품은 한 벌만 있다 (2026-08-01 사용자 지적: \
     expect(없음, "부품이 없거나 늦게 읽혀 대화창이 반쪽이 된다").toEqual([]);
   });
 });
+
+// ── 탭에 파일 이름이 새지 않는다 (2026-08-18 사장님 QA 발견) ─────────────────
+// 증상: 탭에 「① 발견·수집 › discover.html?p…」 — 사람에게 보일 글자가 아니다.
+// 뿌리: app.html의 open(page,label)이 `label || page`로 떨어지는데, nav.js의 리다이렉트 표가
+//   옛 화면 23개를 허브(?panel=…)로 넘기면서 이름은 안 바꿔 준다. 셸의 「옛탭」 표엔 4개만
+//   손으로 적혀 있어 나머지 19개가 파일명을 드러냈다.
+// ⇒ 표를 채우는 대신 **이름의 주인(nav.js GROUPS)에서 찾아 쓰게** 했다. 그 다리를 지킨다.
+describe("★ 탭 이름 — 파일명을 사람에게 보이지 않는다", () => {
+  const nav = fs.readFileSync(new URL("../../client/src/renderer/pages/nav.js", import.meta.url), "utf8");
+  const app = fs.readFileSync(new URL("../../client/src/renderer/pages/app.html", import.meta.url), "utf8");
+
+  it("nav가 사이드바 정의를 셸에 내준다", () => {
+    expect(nav, "window.gijoNavGroups로 안 내주면 셸이 이름을 못 찾는다").toContain("window.gijoNavGroups");
+  });
+
+  it("셸이 이름 없이 열 때 파일명으로 떨어지지 않는다", () => {
+    expect(app, "화면이름찾기가 없다").toContain("function 화면이름찾기");
+    expect(app, "읽을이름(마지막 방어)이 없다").toContain("function 읽을이름");
+    // `label || page` 가 남아 있으면 그리로 다시 샌다.
+    // ⚠ **주석은 세지 않는다**(2026-08-18에 밟음 — 뿌리를 설명한 주석 문장이 걸려 헛실패했다).
+    //   이 저장소가 같은 함정을 여러 번 밟았다(clientglobals의 `console.js` 주석 건).
+    const 코드만 = app
+      .replace(/<!--[\s\S]*?-->/g, "")      // HTML 주석
+      .replace(/\/\*[\s\S]*?\*\//g, "")     // 블록 주석
+      .split("\n").filter((l) => !/^\s*(\/\/|\*)/.test(l)).join("\n"); // 줄 주석·JSDoc 이어지는 줄
+    expect(/label\s*\|\|\s*page(?![a-zA-Z])/.test(코드만), "아직 `label || page`로 파일명이 샌다").toBe(false);
+  });
+
+  it("리다이렉트가 넘기는 화면은 전부 사이드바에 이름이 있다", () => {
+    // nav의 GROUPS에서 page→label을 모은다.
+    const 이름 = new Map<string, string>();
+    for (const m of nav.matchAll(/\{\s*page:\s*"([^"]+)"[^}]*label:\s*"([^"]+)"/g)) {
+      const f = m[1].split("?")[0];
+      if (!이름.has(f)) 이름.set(f, m[2]);
+    }
+    const 없음: string[] = [];
+    for (const m of nav.matchAll(/"([a-z0-9_-]+\.html)"\s*:\s*"([a-z0-9_-]+\.html\?[^"]*)"/g)) {
+      if (m[1].includes("embed") || m[2].includes("embed")) continue;
+      const 도착 = m[2].split("?")[0];
+      if (!이름.has(도착)) 없음.push(`${m[1]} → ${m[2]}`);
+    }
+    expect(없음, "이 화면들로 가면 탭에 파일명이 뜬다 — 사이드바에 이름을 두거나 리다이렉트를 고칠 것").toEqual([]);
+  });
+});

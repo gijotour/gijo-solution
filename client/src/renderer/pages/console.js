@@ -286,6 +286,28 @@
       if (ctxOff) { ctxOff = false; applyCtx(); }
     });
 
+    // 답 안의 웹 링크 — **기본 브라우저로 바로 연다**(2026-08-18 사장님 QA 지시 "바로가기").
+    //
+    // ⚠ 왜 가로채나: 마크다운이 `<a href target="_blank">`로 그리는데(gijomd.js:37), 본 창엔
+    //   새 창 처리기가 없어 **Electron이 주소창도 뒤로가기도 없는 껍데기 창**을 띄운다.
+    //   담당자가 그 안에 갇히고, 그 창은 우리 세션을 물고 있어 보안상으로도 좋지 않다.
+    // ⚠ openExternal은 이미 있고 **스킴 검사까지** 돼 있다(main.ts:1196 — 웹·SSH·RDP·VNC만).
+    //   새 통로를 만들지 않고 그것을 쓴다.
+    // ⚠ 리스너는 본문(고정 요소)에 **한 번만** 단다 — 말풍선은 계속 새로 그려진다.
+    document.getElementById("csBody").addEventListener("click", function (e) {
+      var a = e.target && e.target.closest ? e.target.closest("a[href]") : null;
+      if (!a) return;
+      var href = a.getAttribute("href") || "";
+      if (!/^https?:/i.test(href)) return; // 웹 주소가 아니면 손대지 않는다
+      e.preventDefault();                   // 껍데기 창이 뜨는 것을 막는다
+      if (window.gijo && window.gijo.openExternal) {
+        window.gijo.openExternal(href).catch(function (err) {
+          // 조용히 삼키지 않는다 — 안 열렸으면 안 열렸다고 말한다(정직).
+          append({ kind: "event", icon: "⚠", name: "링크", message: "열지 못했습니다: " + ((err && err.message) || href) });
+        });
+      }
+    });
+
     document.getElementById("csToggleHost").addEventListener("click", function () {
       if (!window.gijo) return;
       if (IS_WINDOW) window.gijo.dockConsoleWindow();
@@ -920,16 +942,23 @@
     var msg = String(o.message == null ? "" : o.message);
     // o.full — 접으면 안 되는 답. 순서 안내는 2번째 단계부터 가려지면 안내가 아니다
     // (2026-07-31 실화면: "가서 하기" 답이 1단계만 보이고 접혀 있었다).
+    // ⚠ **접은 채로 시작하지 않는다**(2026-08-18 사장님 QA 지시: "더보기 하지 말고 접기만").
+    //   예전엔 140자만 넘으면 4줄로 접어 두고 「더보기」를 눌러야 읽을 수 있었다 —
+    //   답이 대부분 그보다 길어 **거의 매번 눌러야 했다.** 읽는 것이 기본이고 접는 것이 선택이다.
+    //   길이 판정(CLAMP_LEN)은 **접기 버튼을 달지 말지**에만 쓴다(짧은 답엔 버튼이 군더더기다).
     var long = !o.full && (kind === "reply" || kind === "event") && msg.length > CLAMP_LEN;
     var bodyHtml = kind === "typing"
       ? '<span class="cm cs-typing"><span></span><span></span><span></span></span>'
-      : '<div class="cm' + (long ? " clamp" : "") + '">' + fmt(kind, msg) + "</div>" + (long ? '<span class="cl-more">더보기 ▾</span>' : "");
+      : '<div class="cm">' + fmt(kind, msg) + "</div>" + (long ? '<span class="cl-more">접기 ▴</span>' : "");
     el.innerHTML = '<div class="ci">' + (o.icon || "◆") + "</div>" +
       '<div class="cb"><div class="cn">' + esc(o.name) + '<span class="ct">' + time + "</span></div>" + bodyHtml + "</div>";
     if (long) {
       var cm = el.querySelector(".cm"), more = el.querySelector(".cl-more");
-      var toggle = function () { more.textContent = cm.classList.toggle("clamp") ? "더보기 ▾" : "접기 ▴"; };
-      cm.addEventListener("click", toggle); more.addEventListener("click", toggle);
+      // ⚠ 본문 클릭으로는 접지 않는다 — 글을 읽다가 무심코 눌러 접히면 그게 더 성가시다.
+      //   (예전엔 접힌 상태를 펴려고 본문 클릭을 열어 뒀는데, 이제 펴는 일이 없다.)
+      more.addEventListener("click", function () {
+        more.textContent = cm.classList.toggle("clamp") ? "더보기 ▾" : "접기 ▴";
+      });
     }
     body.appendChild(el);
     while (body.childElementCount > CL_MAX) body.removeChild(body.firstChild);
