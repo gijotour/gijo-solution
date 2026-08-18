@@ -22,6 +22,8 @@ export interface AgentDefinition {
   // 전문가 LoRA 어댑터(재설계 1단계, 2026-08-08). null이면 베이스 그대로 — 어댑터는 게이트
   // 통과 채택분만 배정할 수 있고, 배정돼 있어도 서빙 모델에 적재되지 않았으면 조용히 무시된다.
   assignedAdapterId: string | null;
+  /** 팀원별 두뇌 위치 — null이면 전역 따름(기본). "local" | "remote" */
+  assignedLocation: AgentLocation | null;
 }
 
 // status는 의도적으로 영속화하지 않는다 — "지금 누가 뭘 하고 있는지"를 나타내는 휘발성 라이브
@@ -218,6 +220,8 @@ function toAgent(base: AgentBase): AgentDefinition {
     status: liveStatus.get(base.id) ?? base.defaultStatus,
     assignedModelId: getAgentModel(base.id),
     assignedAdapterId: getAgentAdapter(base.id),
+    // ⚠ 화면이 이 값을 못 받으면 늘 「전역 따름」으로 보인다 — 고른 것이 화면에 안 남는다.
+    assignedLocation: getAgentLocation(base.id),
   };
 }
 

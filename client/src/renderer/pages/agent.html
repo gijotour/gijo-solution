@@ -122,6 +122,18 @@ tr:last-child td{border-bottom:none;}
 .btn-cta{background:var(--teal);color:#06281c;border:none;padding:0 22px;border-radius:8px;font-size:13.5px;font-weight:800;cursor:pointer;white-space:nowrap;}
 .agent-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
 .agent-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:16px;position:relative;}
+/* 팀원별 두뇌 위치(2026-08-18 시안 승인) — 「고르는 것」과 「그래서 어떻게 되는지」를 한 자리에.
+   ⚠ 글자 11px 미만 금지(uireadability 시험). 여기 최소는 11.5px. */
+.agent-loc{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:10px;}
+.agent-loc .loc-h{font-size:12px;color:var(--muted-2);margin-right:2px;}
+.loc-pill{background:var(--panel-2,#1f1e1d);border:1px solid var(--border);border-radius:999px;
+  padding:4px 10px;color:var(--muted);font:inherit;font-size:11.5px;cursor:pointer;}
+.loc-pill:hover:not(:disabled){border-color:var(--blue);color:var(--text);}
+.loc-pill.on{border-color:var(--teal);color:var(--text);background:rgba(30,185,128,.10);}
+.loc-pill:disabled{opacity:.5;cursor:default;}
+.loc-lock{font-size:11.5px;color:var(--muted-2);border:1px dashed var(--border);border-radius:999px;padding:3px 9px;}
+.loc-note{font-size:11.5px;color:var(--muted-2);line-height:1.6;margin-top:5px;}
+.loc-note b{color:var(--text);}
 .agent-top{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
 .agent-icon{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;}
 .agent-name{font-size:13.5px;font-weight:800;color:#fff;}
@@ -281,6 +293,9 @@ tr:last-child td{border-bottom:none;}
   let availableModels = [];
   let isAdmin = false;
 
+  // 지금 전역 원격 GPU가 켜져 있나 — 「이 팀원이 원격을 쓰겠다」가 실제로 뜻이 있는지 가른다.
+  // ⚠ admin이 아니어도 읽을 수 있는 통로다(remoteLlmWhere: 「지금 바깥으로 나가나」만 준다).
+  let 원격켜짐 = false;
   let agentRecs = {};
   let globalModelId = null; // 전역(공유) 채팅 모델 id — 개별 지정 안 한 에이전트가 쓰는 모델
   let embeddingInfo = null; // 임베딩(bge-m3) 모듈 — 로스터에 팀원 카드로 함께 표시
@@ -311,6 +326,52 @@ tr:last-child td{border-bottom:none;}
       ? `<b>${esc(current)}</b>${a.assignedModelId ? "" : ' <span class="rec-gb">전역 공유</span>'}`
       : '<span class="rec-gb">전역 모델 미로드</span>';
     return `<div class="agent-rec"><div class="rec-head">🧠 현재 추천 모델: ${currentLabel}</div></div>`;
+  }
+
+  // ── 팀원별 두뇌 **위치** (2026-08-18 시안 승인 — "여러 개의 두뇌가 공동작업") ──────────
+  //
+  // 왜 필요한가: 로컬 모델은 이미 팀원별로 갈리는데(`localengine.ts ensureAgentModel`)
+  // **원격은 전역 on/off 하나**였다. 켜면 전원 원격, 끄면 전원 로컬 — 그래서
+  // 「총괄은 로컬 빠른 두뇌로 판단하고, 분석가는 원격 큰 두뇌로 깊게」가 불가능했다.
+  //
+  // ⚠ 값은 셋: **비움(전역 따름, 기본)** / local / remote. 비우면 지금까지와 똑같이 돈다.
+  // ⚠ **총괄은 이 PC 고정** — 어댑터 잠금(`agents.ts:138`)과 같은 자리·같은 모양이다.
+  //   근거는 오늘 실측: 원격 72B가 답 하나에 89~90초다. 총괄은 지시마다 도구를 고르는
+  //   짧고 잦은 판단을 하고 그 앞에서 담당자가 기다린다 — 크고 느린 두뇌가 안 맞는다.
+  // ⚠ **클라우드는 안 그린다.** `cloudllm.ts`의 askCloud/cloudComplete가 agentId를 아예 안 받고
+  //   실사용처는 문서 번역 하나뿐이다 — 「에이전트별 클라우드」는 설계 자체가 없다.
+  //   고를 수 있게 그려 놓고 아무 일도 안 일어나면 그게 이 저장소가 반복해 겪은
+  //   「설계는 됐는데 쓰인 적 없는 것」이다. 대신 **왜 없는지**를 한 줄로 밝힌다.
+  const 위치이름 = { local: "💻 이 PC", remote: "🖧 원격 GPU" };
+  function locationHtml(a) {
+    const cur = a.assignedLocation || ""; // "" = 전역 따름
+    if (a.id === "orchestrator") {
+      return `<div class="agent-loc"><span class="loc-h">🧭 두뇌 위치</span>
+        <span class="loc-lock" title="총괄은 지시마다 도구를 고르는 짧고 잦은 판단을 합니다 — 원격 큰 두뇌는 답 하나에 90초입니다(2026-08-18 실측)">🔒 이 PC 고정</span></div>`;
+    }
+    const disabled = isAdmin ? "" : " disabled";
+    const 칸 = ["", "local", "remote"]
+      .map((v) => {
+        const on = cur === v ? " on" : "";
+        const 글 = v === "" ? "전역 따름" : 위치이름[v];
+        return `<button type="button" class="loc-pill${on}" data-loc="${v}" data-agent="${a.id}"${disabled}>${글}</button>`;
+      })
+      .join("");
+    return `<div class="agent-loc"><span class="loc-h">🧭 두뇌 위치</span>${칸}</div>
+      <div class="loc-note">${locationNote(cur)}</div>`;
+  }
+
+  /** 고른 값이 **실제로 어떻게 되는지** 그 자리에서 말한다 — 고르고 나서 딴 데서 알게 하지 않는다. */
+  function locationNote(cur) {
+    if (cur === "local") return "이 팀원은 <b>원격이 켜져 있어도</b> 이 PC에서 답합니다.";
+    if (cur === "remote") {
+      return 원격켜짐
+        ? "이 팀원은 <b>원격 GPU</b>로 답합니다 — 더 큰 두뇌를 쓰지만 느립니다(실측: 32B 약 37초 · 72B 약 90초)."
+        : "원격을 쓰겠다고 정했지만 <b>원격 GPU가 꺼져 있어</b> 지금은 이 PC로 답합니다 — 설정 &gt; 서버·AI에서 켜세요(관리자).";
+    }
+    return 원격켜짐
+      ? "전역 설정을 따릅니다 — 지금은 <b>원격 GPU</b>로 갑니다."
+      : "전역 설정을 따릅니다 — 지금은 <b>이 PC</b>에서 답합니다.";
   }
 
   function modelSelectHtml(a) {
@@ -365,6 +426,7 @@ tr:last-child td{border-bottom:none;}
           ${a.desc ? `<div class="agent-desc">${esc(a.desc)}</div>` : ""}
           ${modelSelectHtml(a)}
           ${recommendationHtml(a)}
+          ${locationHtml(a)}
           ${specialtyHtml(a)}
         </div>`;
       })
@@ -412,6 +474,25 @@ tr:last-child td{border-bottom:none;}
         } catch (err) {
           gijoTell("모델 할당 실패: " + err.message);
           e.target.disabled = false;
+        }
+      });
+    });
+
+    // 팀원별 두뇌 위치 — 누르면 그 자리에서 저장한다(2026-08-18 시안 승인).
+    // ⚠ 서버가 총괄을 막고(`agents.ts setAgentLocation`), 화면도 잠금 배지로 그린다 —
+    //   **양쪽에서** 막는다. 화면만 막으면 라우트를 직접 부르는 길로 새고,
+    //   서버만 막으면 눌렀다가 오류를 보는 경험이 된다.
+    agentGrid.querySelectorAll(".loc-pill").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const agentId = btn.dataset.agent;
+        const loc = btn.dataset.loc || null; // "" → null(전역 따름)
+        agentGrid.querySelectorAll(`.loc-pill[data-agent="${agentId}"]`).forEach((b) => (b.disabled = true));
+        try {
+          await window.gijo.setAgentLocation(agentId, loc);
+          await loadAgents(); // 다시 그려 「그래서 어떻게 되는지」 문장까지 갱신한다
+        } catch (err) {
+          gijoTell("두뇌 위치 변경 실패: " + ((err && err.message) || err));
+          agentGrid.querySelectorAll(`.loc-pill[data-agent="${agentId}"]`).forEach((b) => (b.disabled = false));
         }
       });
     });
@@ -467,14 +548,17 @@ tr:last-child td{border-bottom:none;}
 
   async function loadAgents() {
     try {
-      const [agents, models, recs, status, adapterList] = await Promise.all([
+      const [agents, models, recs, status, adapterList, 원격상태] = await Promise.all([
         window.gijo.listAgents(),
         window.gijo.listModels().catch(() => []),
         window.gijo.getAgentRecommendations().catch(() => ({})),
         window.gijo.getLocalEngineStatus().catch(() => null),
         window.gijo.listAdapters().catch(() => ({ adapters: [] })),
+        // ⚠ 못 읽어도 화면은 떠야 한다 — 못 읽으면 「꺼짐」으로 보는 편이 안전하다(덜 약속한다).
+        window.gijo.remoteLlmWhere ? window.gijo.remoteLlmWhere().catch(() => null) : Promise.resolve(null),
       ]);
       availableModels = models;
+      원격켜짐 = Boolean(원격상태 && 원격상태.remote);
       adapterMap = Object.fromEntries((adapterList.adapters || []).map((ad) => [ad.id, ad]));
       agentRecs = recs || {};
       // 전역(공유) 모델 = 지금 로드된 기본 채팅 모델. 에이전트가 개별 모델을 지정 안 했으면 이걸 쓴다.

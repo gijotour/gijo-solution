@@ -35,6 +35,10 @@ export const agentsApi = {
     request<AgentInfo>(`/api/agents/${agentId}/model`, { method: "POST", body: { modelId } }),
   setName: (agentId: string, name: string | null) =>
     request<AgentInfo>(`/api/agents/${agentId}/name`, { method: "POST", body: { name } }),
+  // 팀원별 두뇌 위치(2026-08-18) — null이면 전역 따름. "local" | "remote".
+  // ⚠ 서버가 총괄을 막고 admin만 받는다(`agents.ts setAgentLocation` · 라우트 adminMiddleware).
+  setLocation: (agentId: string, location: string | null) =>
+    request<AgentInfo>(`/api/agents/${agentId}/location`, { method: "POST", body: { location } }),
 };
 
 // ── 지시(디스패처) ────────────────────────────────────────────────────

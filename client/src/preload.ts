@@ -196,6 +196,8 @@ const gijoApi = {
   // 에이전트 AI / 지시(디스패처)
   listAgents: () => api.agentsApi.list(),
   setAgentModel: (agentId: string, modelId: string | null) => api.agentsApi.setModel(agentId, modelId),
+  // 팀원별 두뇌 위치 — null이면 전역 따름. 총괄은 서버가 막는다(라우팅 판단에 느린 두뇌 금지).
+  setAgentLocation: (agentId: string, location: string | null) => api.agentsApi.setLocation(agentId, location),
   setAgentName: (agentId: string, name: string | null) => api.agentsApi.setName(agentId, name),
   // AI팀 구성 한눈에(2026-08-09) — 기반 두뇌·전문성·☁ 외부 상담역 집계(설정·팀 사무실 공용)
   getTeamComposition: () => api.agentsApi.composition(),
