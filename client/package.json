@@ -1,8 +1,8 @@
 {
   "name": "gijo-as-client",
   "productName": "GIJO AS",
-  "version": "5.22.0",
-  "description": "GIJO AS — AI Security Manager Platform (Electron client, connects to gijo-as-server)",
+  "version": "5.23.0",
+  "description": "GIJO AS ??AI Security Manager Platform (Electron client, connects to gijo-as-server)",
   "main": "dist/main.js",
   "scripts": {
     "build": "node scripts/check-inline-scripts.mjs && tsc -p tsconfig.json && npm run bundle:preload",
