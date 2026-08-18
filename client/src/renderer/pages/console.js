@@ -304,6 +304,10 @@
         try { window.parent.postMessage({ type: "gijo:scope", scope: null }, "*"); } catch (err) { }
       }
     });
+    // ★ 되살린 범위를 **여기서 그린다.** 상자(#csScope)가 방금 생겼으므로 이 자리가 가장 이르다.
+    //   ⚠ 이 한 줄이 없으면 값은 살아 지시에 실리는데 알약만 안 보인다 — 답이 왜 적은지
+    //     담당자가 알 길이 없다(2026-08-18 실화면에서 그 상태를 직접 봤다).
+    renderScope();
     document.getElementById("csCtx").addEventListener("click", function (e) {
       if (e.target && e.target.classList.contains("x")) { ctxOff = true; applyCtx(); return; }
       if (ctxOff) { ctxOff = false; applyCtx(); }
@@ -1076,6 +1080,11 @@
     el.innerHTML = "🗂 " + esc(범위.label) + ' <span class="x" title="범위를 풉니다 — 전체를 다시 봅니다">✕</span>';
   }
   // 새로고침·화면 이동 뒤에도 살아 있어야 하므로 저장소에서 되살린다.
+  // ⚠ **값만 되살리고 안 그리면 더 나쁘다**(2026-08-18 실화면에서 잡음): 지시에는 실려 답이
+  //   좁혀지는데 알약이 안 보인다 — 담당자는 범위가 풀린 줄 알고 묻고, 왜 답이 적은지 모른다.
+  //   보이지 않는 범위는 범위가 아니라 함정이다. 되살렸으면 **반드시 그린다.**
+  //   ⚠ 여기서 곧바로 못 그린다 — 이 시점엔 `build()`가 아직 안 돌아 `#csScope`가 없다.
+  //     그래서 값만 되살리고, 상자를 만든 직후(build 끝)에서 `renderScope()`를 부른다.
   (function () {
     try {
       var raw = window.localStorage.getItem(SCOPE_KEY);

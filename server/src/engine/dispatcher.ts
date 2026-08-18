@@ -1189,7 +1189,12 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   // LLM 루프에 맡기면 모델이 목록 도구를 고른 날에만 체크칸이 생긴다 — 사용자가 콕 집어 물은
   // 기능이 어떤 날은 되고 어떤 날은 안 되면 없는 것만 못하다.
   if (isFindingListAsk(instructionText)) {
-    const { output, picklist } = findingListAnswer(instructionText);
+    // 🗂 범위를 **여기에도 넘긴다** — 이 경로는 agentloop를 안 타서 도구 인자 주입이 안 온다
+    // (2026-08-18 실측: 범위가 걸렸는데 전체 3,008건이 왔다).
+    const { output, picklist } = findingListAnswer(
+      instructionText,
+      지금범위 && 지금범위.kind === "asset" ? 지금범위.id : null
+    );
     const task = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P2" });
     completeTask(task.id);
     return {

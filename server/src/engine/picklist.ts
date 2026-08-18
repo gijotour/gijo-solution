@@ -139,9 +139,32 @@ function 대상자산고르기(text: string): { ids: string[] | null; 이름: st
   return { ids: null, 이름: null, 못찾음: 낱말 || null };
 }
 
-/** 규칙으로 만든 취약점 목록 답 + 그 자리에서 고를 수 있는 체크칸. */
-export function findingListAnswer(text = ""): { output: string; picklist: PickList | null } {
-  const 범위 = 대상자산고르기(text);
+/**
+ * 규칙으로 만든 취약점 목록 답 + 그 자리에서 고를 수 있는 체크칸.
+ *
+ * @param 걸린범위 🗂 지금 범위(자산 id). 담당자가 화면에서 명시적으로 건 것이라 **늘 좁힌다**.
+ *
+ * ⚠ 이 경로는 **agentloop를 안 탄다**(결정적 답). 그래서 도구 인자에 범위를 입히는 장치가
+ *   여기까지 안 온다 — 2026-08-18 실측: 범위가 `10.10.20.11`인데 「미조치 취약점 몇 건이야?」에
+ *   **전체 3,008건**이 왔다. 화면엔 「대화창 지시가 이 자산 기준으로 갑니다」라고 적혀 있는데.
+ *   빠른 길일수록 이런 것이 새기 쉽다 — 갈래마다 챙겨야 한다.
+ * ⚠ **문장 속 대상이 먼저다.** 「범위는 A인데 B 취약점은?」이면 B가 이긴다 —
+ *   화면 상태가 사람 말을 조용히 덮으면 안 된다.
+ */
+export function findingListAnswer(text = "", 걸린범위?: string | null): { output: string; picklist: PickList | null } {
+  const 문장범위 = 대상자산고르기(text);
+  const 범위 =
+    문장범위.ids || 문장범위.못찾음 || !걸린범위
+      ? 문장범위
+      : {
+          ids: [걸린범위],
+          // ⚠ **이름을 반드시 채운다.** 좁혔는데 머리줄에 안 적으면 담당자는 그 수를
+          //   전체로 읽는다 — 「3건뿐이네」 하고 넘어간다. 등록부에서 실제 이름을 찾는다.
+          이름: (listAssets().find((a) => a.id === 걸린범위)?.displayName
+            ?? listAssets().find((a) => a.id === 걸린범위)?.name
+            ?? 걸린범위.replace(/^vuln:/, "")) + " (🗂 지금 범위)",
+          못찾음: null as string | null,
+        };
   if (범위.못찾음) {
     return {
       output:
