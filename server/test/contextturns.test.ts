@@ -14,7 +14,7 @@
 //   새 방식과 글자 단위로 맞춰 본다.
 import { describe, it, expect, beforeEach } from "vitest";
 import { db } from "../src/db";
-import { createSession, appendTurn, getSessionTurns, getContextTurns, getRecentSessionTurns, recentTurnsText } from "../src/engine/worksessions";
+import { createSession, appendTurn, getSessionTurns, getContextTurns, recentTurnsText } from "../src/engine/worksessions";
 
 beforeEach(() => {
   db.exec("DELETE FROM work_session_turns; DELETE FROM work_sessions;");
@@ -88,15 +88,6 @@ describe("맥락 턴 — 적게 읽되 같은 것을 읽는다", () => {
     const s = createSession("빈 대화");
     expect(recentTurnsText(s.id)).toBe("");
     expect(getContextTurns(s.id, 6, 12).recent.length).toBe(0);
-  });
-
-  it("getRecentSessionTurns는 끝 N턴을 시간순으로 준다", () => {
-    const s = createSession("끝 N턴");
-    for (let i = 0; i < 10; i++) appendTurn(s.id, "user", `줄 ${i}`);
-    const r = getRecentSessionTurns(s.id, 3);
-    expect(r.map((t) => t.content)).toEqual(["줄 7", "줄 8", "줄 9"]);
-    expect(getRecentSessionTurns(s.id, 0).length, "0을 주면 빈 배열").toBe(0);
-    expect(getRecentSessionTurns(s.id, -5).length, "음수를 주면 빈 배열").toBe(0);
   });
 
   it("전체가 필요한 곳은 여전히 전체를 받는다", () => {

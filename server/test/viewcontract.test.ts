@@ -11,7 +11,7 @@
 import { describe, it, expect } from "vitest";
 import fs from "node:fs";
 import { parseViewIds, stripPickMarks, VIEW_MARK, VIEW_MAX } from "../src/engine/picklist";
-import { findAgentTool } from "../src/engine/agenttools";
+import { findAgentTool, toolCatalogText } from "../src/engine/agenttools";
 
 const 읽기 = (p: string) => fs.readFileSync(new URL(p, import.meta.url), "utf8");
 const pages = "../../client/src/renderer/pages/";
@@ -104,6 +104,26 @@ describe("보는목록 배관 — 다섯 칸이 이어져 있다", () => {
     expect(s, "결재판 칸(viewIds)을 찾아 채우지 않는다").toMatch(/f\.key === "viewIds"/);
     // 이미 값이 있으면 덮지 않는다 — 사람이 고쳐 둔 것을 화면이 되돌리면 안 된다.
     expect(s, "이미 채워진 값을 덮어쓴다").toMatch(/칸 && !칸\.value/);
+  });
+
+  it("★⑤ viewIds는 **모델 눈에 안 보인다** — 도구 목록 글자가 게시본과 같아야 한다", () => {
+    // ⚠ 검토관 지적(2026-08-18): 도구 목록은 toolCatalogText로 LLM 프롬프트에 그대로 실린다.
+    //   이 저장소는 **도구 설명 한 줄**을 고쳤다가 라우팅 정확도가 11/11 → 9/11로 떨어진 적이 있다.
+    //   인자 하나를 늘리는 것도 같은 부류다. 그런데 viewIds는 서버가 규칙으로 채우는 값이라
+    //   모델이 쓸 일이 없다 — 보여 주면 **위험만 지는** 셈이다.
+    //   기계전용으로 감추면 모델이 보는 글이 **게시본과 한 글자도 다르지 않다** → 위험 0.
+    //   (그래서 이 변경은 실서버 회귀 하네스 없이도 라우팅 안전을 말할 수 있다.)
+    const 목록 = toolCatalogText();
+    expect(목록, "도구 목록을 못 읽었다 — 이 검사가 헛돈다").toContain("bulk_update(");
+    expect(목록, "viewIds가 모델에게 보인다 — 라우팅 회귀 위험을 그대로 진다").not.toContain("viewIds");
+    // 게시본(5.22.0)의 그 줄과 **똑같아야** 한다.
+    const 줄 = 목록.split("\n").find((l) => l.startsWith("- bulk_update("));
+    expect(줄?.slice(0, 60)).toContain("bulk_update(filter?, ids?, assignee?, dueDate?, status?)");
+
+    // 그러나 **결재판 칸에는 남아 있어야** 한다 — 거기서 빠지면 승인 때 값이 증발한다.
+    const t = findAgentTool("bulk_update")!;
+    expect(t.params.map((p) => p.name), "결재판 칸에서 사라졌다").toContain("viewIds");
+    expect(t.params.find((p) => p.name === "viewIds")!.기계전용, "기계전용 표시가 없다").toBe(true);
   });
 
   it("⑦ 결재판 문구와 실제 실행이 같은 갈래를 탄다", () => {

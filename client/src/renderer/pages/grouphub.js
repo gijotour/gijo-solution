@@ -66,7 +66,15 @@
       // hub=1: 허브 무대 표식 — nav.js의 탭 흡수(TAB_REDIRECT)가 이 창을 다시 허브로
       // 돌려보내면 무한 중첩이 된다. 쿼리가 달라 리다이렉트 키에 안 걸리게 한다.
       var want = p.page + (p.page.indexOf("?") >= 0 ? "&" : "?") + "embed=1&hub=1";
-      if (!stage.getAttribute("src") || stage.getAttribute("src") !== want) stage.setAttribute("src", want);
+      if (!stage.getAttribute("src") || stage.getAttribute("src") !== want) {
+        // ⚠ **판을 갈아 끼우기 전에 대화창의 「보던 목록」을 비운다**(2026-08-18 검토 지적).
+        //   셸이 보는 탭 이름(ctx.screen)은 허브 하나로 고정이라(예: "fix.html") 판을 바꿔도
+        //   안 바뀐다. 그래서 대화창은 화면이 바뀐 줄 모른다 — 승인 판을 보다 정기점검 판으로
+        //   옮긴 뒤 「이것들 전부 오탐」이라 하면 **사라진 승인 목록**에 걸린다.
+        //   여기서 비우면 새 판이 뜨면서 자기 목록을 다시 알린다(안 알리는 판이면 비운 채로 둔다).
+        try { window.top.postMessage({ type: "gijo:view" }, "*"); } catch (e) { /* 셸 밖이면 없던 일로 */ }
+        stage.setAttribute("src", want);
+      }
     }
 
     host.querySelector(".gh-strip").addEventListener("click", function (e) {

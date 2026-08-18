@@ -73,6 +73,20 @@ export interface AgentToolParam {
   label: string; // 결재판에 보일 한국어 이름
   description: string;
   required: boolean;
+  /**
+   * **모델에게는 안 보이는 인자**(2026-08-18). 서버가 규칙으로 채우는 값에 붙인다.
+   *
+   * ⚠ 왜 필요한가 — 두 가지를 한 번에 막는다:
+   *   ① **라우팅 회귀.** 도구 목록은 `toolCatalogText`로 LLM 프롬프트에 그대로 실린다.
+   *      이 저장소는 도구 설명 한 줄을 고쳤다가 라우팅 정확도가 11/11 → 9/11로 떨어진 적이 있다.
+   *      모델이 쓸 일 없는 인자를 굳이 보여 주면 그 위험만 지는 셈이다.
+   *   ② **모델이 지어내거나 베끼는 것.** 눈에 보이면 7B가 앞 답변에 있던 진짜 id를 옮겨 적을 수
+   *      있고, 그러면 화면과 다른 대상이 결재판에 실린다.
+   *
+   * ⚠ **결재판 칸에서는 빠지지 않는다** — 승인 버튼이 보이는 칸만 모아 되돌리므로(console.js
+   *   collect), 칸에서 빼면 승인하는 순간 값이 증발한다. 「모델 눈」과 「사람 눈」은 다른 자리다.
+   */
+  기계전용?: boolean;
 }
 
 // ── 도메인 축 ───────────────────────────────────────────────────────────────
@@ -1447,22 +1461,33 @@ export interface BulkMatch { assetId: string; key: string; label: string; }
 //   Oracle 취약점이 없으면 0건이다 — 그건 기존 「…에 맞는 취약점이 없습니다」 길로 간다.
 const 차원_RE =
   /고위험|위험\s*높은?|critical|크리티컬|심각|high|높|medium|중간|\blow\b|낮|kev|실제\s*악용|악용|미배정|담당\s*없|미지정|기한\s*초과|지연|overdue/;
-/** 혼자 있으면 아무것도 안 가리키는 말 — 집합어·지시대명사·제품 낱말. */
+/** 혼자 있으면 아무것도 안 가리키는 말 — 집합어·지시대명사(구어체 포함)·제품 낱말. */
 const 뜻없는말 =
-  /^(전부|모두|전체|다|들|목록|리스트|취약점|취약점들|것|것들|건|건들|항목|항목들|이것|이것들|그것|그것들|저것|저것들|여기|거기|저기|이|그|저|위|아래|화면|위에|아래에)$/;
+  /^(전부|모두|모두들|전체|다|다들|들|목록|리스트|취약점|취약점들|것|것들|건|건들|항목|항목들|이것|이것들|그것|그것들|저것|저것들|이거|이거들|그거|그거들|저거|저거들|요거|요것|얘|얘네|걔|걔네|쟤|쟤네|여기|거기|저기|이|그|저|위|아래|화면|위에|아래에)$/;
 export function 조건이좁히나(filter: string): boolean {
   const f = String(filter ?? "").toLowerCase().trim();
   if (!f) return false;
   if (차원_RE.test(f)) return true;
   // 띄어 쓴 경우 — 낱말 단위로 걸러 낸다("이 취약점들 전체" → 남는 것 없음)
   const 남은토막 = f.split(/\s+/).filter((t) => t && !뜻없는말.test(t));
-  // 붙여 쓴 경우 — 남은 토막에서 뜻 없는 말을 다시 통째로 지운다("이것들전부" → 빈 문자열)
-  const 남은 = 남은토막
-    .join("")
-    .replace(/전부|모두|전체|취약점들?|이것들?|그것들?|저것들?|것들?|항목들?|건들?|목록|리스트|화면/g, "")
-    .trim();
+  // 붙여 쓴 경우 — 남은 토막에서 뜻 없는 말을 통째로 지운다("이것들전부" → 빈 문자열).
+  //
+  // ⚠⚠ **거르는 함수와 같은 낱말표(집합어_RE)를 쓴다** — 이게 핵심이다(2026-08-18 검토 지적).
+  //   예전엔 여기 목록과 matchFindingsByFilter의 목록이 **따로** 적혀 있었다. 그래서
+  //   「다들」처럼 여기선 뜻 있는 말로 통과하고 저기선 "들" 한 글자로 줄어드는 낱말이 생겼고,
+  //   그 낱말은 **아무 조건도 안 걸린 전건**을 잡았다 — 이 함수가 막으려던 바로 그 사고다.
+  //   같은 표를 쓰면 「여기서 통과한 말은 저기서도 좁힌다」가 **구조적으로 보장된다.**
+  const 남은 = 남은토막.join("").replace(집합어_RE, "").trim();
   return 남은.length >= 2;
 }
+
+/**
+ * 거를 때 **의미를 담지 않는 낱말** — 심각도·KEV 같은 차원 낱말과 집합어를 함께 턴다.
+ * `matchFindingsByFilter`와 `조건이좁히나`가 **같은 표를 봐야** 둘의 판단이 어긋나지 않는다.
+ * ⚠ 여기에 낱말을 더하면 두 함수가 함께 바뀐다 — 그게 이 상수를 둔 이유다.
+ */
+const 집합어_RE =
+  /critical|high|medium|low|크리티컬|심각|고위험|위험\s*높은?|높은?|중간|낮은?|kev|실제\s*악용|악용|미배정|담당\s*없음?|미지정|기한\s*초과|지연|overdue|전부|모두|다들|다|취약점|것들?|이것들?|그것들?|저것들?|이거들?|그거들?|저거들?|요거|얘네?|걔네?|쟤네?|항목들?|건들?|목록|리스트|화면|전체/g;
 
 export function matchFindingsByFilter(filter: string): BulkMatch[] {
   const f = (filter ?? "").toLowerCase();
@@ -1478,7 +1503,9 @@ export function matchFindingsByFilter(filter: string): BulkMatch[] {
   if (/미배정|담당\s*없|미지정/.test(f)) sel = sel.filter((r) => !r.assignee);
   if (/기한\s*초과|지연|overdue/.test(f)) sel = sel.filter((r) => r.overdue);
   // 남은 키워드(심각도·KEV·집합어 제거 후)로 유형·근거 매칭
-  const kw = f.replace(/critical|high|medium|low|크리티컬|심각|고위험|위험\s*높은?|높은?|중간|낮은?|kev|실제\s*악용|악용|미배정|담당\s*없음?|미지정|기한\s*초과|지연|overdue|전부|모두|다|취약점|것들?|전체/g, "").trim();
+  // ⚠ 낱말표는 **조건이좁히나와 공유한다**(집합어_RE) — 따로 적으면 어긋나고, 어긋나면
+  //   「저기선 뜻 있는 말인데 여기선 다 털려 전건이 되는」 낱말이 생긴다(2026-08-18 실사고: "다들").
+  const kw = f.replace(집합어_RE, "").trim();
   if (kw.length >= 2) sel = sel.filter((r) => matches(`${r.finding.finding_type} ${r.finding.evidence}`, kw));
   return sel.map((r) => ({ assetId: r.assetId, key: r.findingKey, label: `[${심각도한글(r.finding.severity)}] ${r.finding.finding_type} @ ${r.assetName}` }));
 }

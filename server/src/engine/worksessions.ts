@@ -177,28 +177,6 @@ export function getSessionTurns(id: string): SessionTurn[] {
   return rows.map(rowToTurn);
 }
 
-/**
- * **끝 N턴만** 읽는다 — 맥락을 만들 때 쓴다(2026-08-18).
- *
- * ⚠ 왜 따로 뒀나: `recentTurnsText`는 세션 대화를 **통째로 읽어 놓고** 끝 몇 개만 썼다.
- *   대화가 500턴이면 500줄을 꺼내 498줄을 버린다. 매 질문마다 그런다.
- *   지금은 세션이 짧아 티가 안 나지만, **대화창을 주인공으로 만들면 그대로 커지는 자리**다
- *   (사장님 방향, 2026-08-17~18). 커진 뒤에 고치면 이미 느려진 뒤다.
- *
- * ⚠ SQL은 **뒤에서 N개**를 집고(DESC LIMIT), 돌려줄 때 **시간순으로 되돌린다**(reverse).
- *   `ORDER BY at ASC LIMIT n`으로 적으면 **맨 앞 N개**(가장 오래된 대화)를 집어
- *   "방금 무슨 얘기했더라"가 정반대로 뒤집힌다 — 이 함수에서 제일 틀리기 쉬운 곳이다.
- *
- * ⚠ 전체가 필요한 곳(리포트 생성·세션 열람 API)은 `getSessionTurns`를 그대로 쓴다.
- *   거기서 자르면 **리포트에 대화가 빠진다** — 성능 때문에 내용을 잃는 건 반대 방향의 사고다.
- */
-export function getRecentSessionTurns(id: string, limit: number): SessionTurn[] {
-  if (!Number.isFinite(limit) || limit <= 0) return [];
-  const rows = db
-    .prepare("SELECT * FROM work_session_turns WHERE sessionId = ? ORDER BY at DESC, rowid DESC LIMIT ?")
-    .all(id, Math.floor(limit)) as TurnRow[];
-  return rows.reverse().map(rowToTurn);
-}
 
 /**
  * 맥락에 쓸 두 덩이를 **필요한 만큼만** 읽는다 — 끝 N턴 + 그보다 **앞선 사용자 턴** M건.
@@ -208,8 +186,13 @@ export function getRecentSessionTurns(id: string, limit: number): SessionTurn[] 
  *   **요지가 조용히 짧아진다** — 빨라지는 대신 AI가 앞 얘기를 덜 기억하게 되는 셈이고,
  *   그건 성능을 얻자고 기능을 깎는 것이다. 그래서 두 질의로 **결과를 그대로 보존**한다.
  *
- * ⚠ 경계 기준은 `at`(시각)이 아니라 **rowid**다 — 같은 밀리초에 들어온 턴이 있으면
- *   시각으로 가르다가 같은 턴이 양쪽에 겹치거나 빠진다. rowid는 겹치지 않는다.
+ * ⚠ 경계는 **(at, rowid) 짝**으로 가른다 — 어느 한쪽만으로는 옛 방식과 갈린다(2026-08-18 검토 지적):
+ *   · `at`(시각)만 보면 — 같은 밀리초에 들어온 턴이 양쪽에 겹치거나 빠진다.
+ *   · `rowid`만 보면 — 이 표는 `id TEXT PRIMARY KEY`라 rowid가 암시적이고 **AUTOINCREMENT가 없다.**
+ *     SQLite는 그런 표에서 **가장 큰 rowid 행이 지워지면 그 번호를 다시 쓴다.** 방금 끝낸 세션을
+ *     지운 뒤 예전 세션을 이어서 쓰면 새 턴이 옛 턴보다 **작은** rowid를 받아, 최신 턴이 양쪽에
+ *     중복되거나 옛 사용자 턴이 빠진다.
+ *   짝으로 비교하면 옛 방식의 「(at ASC, rowid ASC) 순서에서 몇 번째」와 정확히 같아진다.
  */
 export function getContextTurns(id: string, maxTurns: number, olderUserLimit: number): { recent: SessionTurn[]; olderUser: SessionTurn[] } {
   const n = Math.max(0, Math.floor(maxTurns));
@@ -217,13 +200,21 @@ export function getContextTurns(id: string, maxTurns: number, olderUserLimit: nu
     ? (db.prepare("SELECT rowid AS _rid, * FROM work_session_turns WHERE sessionId = ? ORDER BY at DESC, rowid DESC LIMIT ?").all(id, n) as (TurnRow & { _rid: number })[])
     : [];
   recentRows.reverse();
-  // 끝 N턴 중 **가장 앞선** rowid가 경계다. N턴이 0이면 경계가 없으니 전부가 '앞선 턴'이다.
-  const 경계 = recentRows.length ? recentRows[0]._rid : Number.MAX_SAFE_INTEGER;
   const m = Math.max(0, Math.floor(olderUserLimit));
+  // 끝 N턴 중 **가장 앞선** 것이 경계다. N턴이 0이면 경계가 없으니 전부가 '앞선 턴'이다.
+  const 첫 = recentRows.length ? recentRows[0] : null;
   const olderRows = m
-    ? (db
-        .prepare("SELECT * FROM work_session_turns WHERE sessionId = ? AND rowid < ? AND role = 'user' ORDER BY at DESC, rowid DESC LIMIT ?")
-        .all(id, 경계, m) as TurnRow[])
+    ? (첫
+        ? (db
+            .prepare(
+              // SQLite 행 값 비교 — (at, rowid)를 사전식으로 견준다. 두 열을 따로 비교하는
+              // 조건문으로 풀어 쓰면 경계에서 어긋나기 쉬워 한 줄로 둔다.
+              "SELECT * FROM work_session_turns WHERE sessionId = ? AND (at, rowid) < (?, ?) AND role = 'user' ORDER BY at DESC, rowid DESC LIMIT ?"
+            )
+            .all(id, 첫.at, 첫._rid, m) as TurnRow[])
+        : (db
+            .prepare("SELECT * FROM work_session_turns WHERE sessionId = ? AND role = 'user' ORDER BY at DESC, rowid DESC LIMIT ?")
+            .all(id, m) as TurnRow[]))
     : [];
   olderRows.reverse();
   return { recent: recentRows.map(rowToTurn), olderUser: olderRows.map(rowToTurn) };

@@ -27,14 +27,14 @@ import type { Viewer } from "./memory";
 import { runAgentLoop, AgentToolCall, 가리킬것없는대명사, 가리킨자산이없나, 대명사뿐인가, 대명사확인, 되물음, 자산되물음, 선택을박는다, 직전대상자산 } from "./agentloop";
 import { 스트림자리 } from "./streamsink";
 import { 장애질문인가, 장애초동절차, 침해사고질문인가, 침해사고초동절차 } from "./incidentsteps";
-import { executeApprovedTool, findAgentTool, buildApproval, PendingApproval, 에디션제한중 } from "./agenttools";
+import { executeApprovedTool, findAgentTool, buildApproval, PendingApproval, 에디션제한중, 조건이좁히나 } from "./agenttools";
 import { appendApprovedDecision } from "./orchestrator-dataset";
 import { undoSnapshot, undoCommit } from "./undo";
 import { gateUserInput } from "./gateway";
 import { toolDomainsForScreen } from "./screencontext";
 import { isHelpIntent, formatScreenGuide, 이름으로화면찾기, 방법질문화면찾기, 화면위치안내 } from "./screenguide";
 import { findHowTo, howToMarkdown } from "./howto";
-import { buildFindingPicks, parsePickCommand, pickToolArgs, isFindingListAsk, findingListAnswer, isMyWorkAsk, myWorkAnswer, stripPickMarks, parseViewIds, PickList } from "./picklist";
+import { buildFindingPicks, parsePickCommand, pickToolArgs, isFindingListAsk, findingListAnswer, isMyWorkAsk, myWorkAnswer, stripPickMarks, parseViewIds, stripViewMark, PickList } from "./picklist";
 import { isOutOfScope, outOfScopeAnswer, isTooVague, vagueAnswer, 한낱말되묻기 } from "./scopeguard";
 import { analyzeFindings } from "./analysis";
 import { recordFindings, getAsset, listAssets, 자산표시이름 } from "./assets";
@@ -897,6 +897,14 @@ function turnToolTag(r: DispatchResult): string | undefined {
 }
 
 async function dispatchInstructionCore(instructionText: string, contextText = "", screen?: string, actor?: string, qa?: boolean, noLearn?: boolean, viewer?: Viewer, 선택?: string): Promise<DispatchResult> {
+  // ⚠⚠ 「보고 있던 목록」 표식은 **여기서, 무엇을 판단하기 전에** 떼어 낸다(2026-08-18 검토 지적).
+  //   `#고른건`과 달리 이 표식은 그 화면에서 보내는 **모든 말**에 붙고, 결재판으로 빠져나가는
+  //   자리도 없다. 그대로 두면 글자를 보고 판단하는 관문들이 전부 오염된다:
+  //     · isTooVague — "?" 뒤에 표식 1,300자가 붙어 「두 글자 이하」가 거짓 → **되묻기가 안 뜬다**
+  //     · 한낱말되묻기 — `^취약점$`가 "취약점\n#보는목록 …"에 안 맞음 → **34초 헤매던 길로 되돌아간다**
+  //   값은 아래 지역 변수로 들고 가 결재판을 채울 때 쓴다(글자에서 다시 찾지 않는다).
+  const 보던목록 = parseViewIds(instructionText);
+  if (보던목록) instructionText = stripViewMark(instructionText);
   // 대화 열쇠 — "아까 그거"가 **이 사람의** 직전 대상만 가리키게 한다.
   //   예전에는 전역 1건이라 담당자 A가 방금 다룬 취약점을 담당자 B의 "아까 그거"가 가리켰다.
   //   ⚠ 사람을 못 알아내면 기본 대화를 쓴다 — 예전 동작 그대로다(더 나빠지지 않는다).
@@ -1471,11 +1479,11 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     // ⚠ 결재판 **칸에** 넣어야 한다. 승인 버튼은 화면에 보이는 칸만 모아 되돌리므로
     //   (console.js collect), 칸 밖에 둔 값은 승인하는 순간 조용히 사라진다.
     // ⚠ 이미 값이 있으면 덮지 않는다 — 사람이 고쳐 둔 것을 화면이 되돌리면 안 된다.
-    if (approval) {
-      const 보던 = parseViewIds(instructionText);
-      const 칸 = 보던 ? approval.fields.find((f) => f.key === "viewIds") : undefined;
+    // ⚠ 글자에서 다시 찾지 않는다 — 표식은 함수 맨 앞에서 이미 떼어 냈다(위 「보던목록」).
+    if (approval && 보던목록) {
+      const 칸 = approval.fields.find((f) => f.key === "viewIds");
       if (칸 && !칸.value) {
-        칸.value = 보던;
+        칸.value = 보던목록;
         칸.source = "auto";
       }
     }
@@ -1517,17 +1525,42 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
  * ⚠ 길이를 200자로 자른다 — ids는 20건 넘게 올 수 있고, 감사 칸은 열람용이지 원본이 아니다.
  *   (몇 건이었는지는 잘려도 알 수 있게 **건수를 앞에 적는다.**)
  */
-export function 감사대상(args: Record<string, string>): string | null {
-  const 콕 = args.assetId ?? args.code;
-  if (콕?.trim()) return 콕.trim().slice(0, 200);
-  const ids = args.ids?.trim();
-  if (ids) {
-    const 건수 = ids.split(/[,\n]/).filter((s) => s.trim()).length;
-    return `고른 ${건수}건: ${ids}`.slice(0, 200);
-  }
-  const filter = args.filter?.trim();
+export function 감사대상(toolName: string, args: Record<string, string>): string | null {
+  const 값 = (k: string) => String(args[k] ?? "").trim();
+  const 세어서 = (말: string, 목록: string) =>
+    `${말} ${목록.split(/[,\n]/).filter((s) => s.trim()).length}건: ${목록}`.slice(0, 200);
+
+  // ① 콕 집은 하나 — 가장 구체적이다.
+  const 콕 = 값("assetId") || 값("code");
+  if (콕) return 콕.slice(0, 200);
+
+  // ② 사람이 체크한 것.
+  const ids = 값("ids");
+  if (ids) return 세어서("고른", ids);
+
+  // ③ 조건 vs 보던 목록 — **runBulkUpdate와 같은 순서로 판단한다.**
+  //    ⚠ 조건이 뜻을 잃으면(「이것들」) 실제로 바뀌는 건 보던 목록이다. 여기서 조건을 적으면
+  //      감사 로그가 **빈칸 대신 틀린 값**을 갖는다(2026-08-18 검토 지적). 빈칸보다 나쁠 수 있다 —
+  //      빈칸은 모른다는 뜻이지만 틀린 값은 안다고 거짓말하는 것이다.
+  const filter = 값("filter");
+  const viewIds = 값("viewIds");
+  if (viewIds && !조건이좁히나(filter)) return 세어서("보던 목록", viewIds);
   if (filter) return `조건: ${filter}`.slice(0, 200);
-  return args.name?.trim()?.slice(0, 200) ?? args.title?.trim()?.slice(0, 200) ?? null;
+
+  // ④ 나머지 도구 — **그 도구가 스스로 가진 인자 이름표**를 쓴다.
+  //    ⚠ 이름을 손으로 나열하지 않는 이유: 쓰기 도구가 21개인데 예전 식은 6개만 알아서
+  //      10개가 빈칸으로 남았다(검토 지적). 새 도구가 생기면 또 빠진다.
+  //      도구가 자기 인자를 알고 있으니 거기서 받아 오면 **빠질 수가 없다.**
+  //    ⚠ `??`로 잇지 않는다 — `??`는 빈 문자열("")을 통과시켜 **빈 칸에서 멈춘다.**
+  //      결재판은 안 채운 칸을 ""로 보내므로(console.js collect) 실제로 밟히는 함정이다.
+  const 도구 = findAgentTool(toolName);
+  if (도구) {
+    for (const p of 도구.params) {
+      const v = 값(p.name);
+      if (v) return `${p.label}: ${v}`.slice(0, 200);
+    }
+  }
+  return 값("name")?.slice(0, 200) || 값("title")?.slice(0, 200) || null;
 }
 
 /**
@@ -1740,7 +1773,7 @@ export function registerDispatcherRoutes(app: Express): void {
         const undoId = undoCommit(toolName, output.slice(0, 50), undoBefore); // 변화 있으면 되돌리기 항목 등록
         collab(undefined, { from: "orchestrator", to: "orchestrator", message: `실행 완료: ${collabNote(output)}` });
         // 작업 기록(감사 로그) — 승인된 쓰기 실행을 남긴다(챗봇 제안 → 사람 승인).
-        recordAudit({ kind: "write", actor, action: `승인 실행: ${toolName}`, target: 감사대상(args), detail: `${instruction ? instruction + " → " : ""}${output.slice(0, 200)}`, result: "ok" });
+        recordAudit({ kind: "write", actor, action: `승인 실행: ${toolName}`, target: 감사대상(toolName, args), detail: `${instruction ? instruction + " → " : ""}${output.slice(0, 200)}`, result: "ok" });
         // 사람이 승인한 (지시→도구) = 검증된 정답. 파인튜닝 골드 예시로 누적한다(Phase 4, 자가강화).
         appendApprovedDecision(instruction, toolName, args);
         resetAgentToDefault("orchestrator");
@@ -1752,7 +1785,7 @@ export function registerDispatcherRoutes(app: Express): void {
         // FAIL_MARKS-예외: 감사 로그의 action 문자열이다(사람 대면 답이 아니라 기록). 승인 실행이
         //   실제로 예외를 던진 진짜 실패라 「실행 실패」로 적는 것이 맞다.
         // ⚠ 실패에도 **무엇을 건드리려 했는지**를 남긴다 — 사고 조사에서 성공 기록보다 중요하다.
-        recordAudit({ kind: "write", actor, action: `승인 실행 실패: ${toolName}`, target: 감사대상(args), detail: err instanceof Error ? err.message : String(err), result: "error" });
+        recordAudit({ kind: "write", actor, action: `승인 실행 실패: ${toolName}`, target: 감사대상(toolName, args), detail: err instanceof Error ? err.message : String(err), result: "error" });
         res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
       }
     })

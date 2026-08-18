@@ -1385,7 +1385,9 @@ const TOOLS: AgentTool[] = [
       // ⚠ **반드시 여기 등록돼 있어야 한다.** 결재판은 이 params로만 칸을 만들고, 승인 버튼은
       //   **화면에 보이는 칸만** 모아 서버로 되돌린다(console.js collect). 등록 안 하면
       //   승인하는 순간 조용히 사라져 「설계는 됐는데 쓰인 적 없는 값」이 된다.
-      { name: "viewIds", label: "보던 목록", description: "화면에서 보고 있던 목록(자동으로 채워짐). 조건이 뜻을 잃었을 때만 대상이 된다", required: false },
+      // ⚠ 그러면서도 **모델에게는 안 보인다**(기계전용) — 서버가 규칙으로 채우는 값이라
+      //   모델이 쓸 일이 없고, 보여 주면 라우팅 회귀 위험만 진다. 「모델 눈」과 「사람 눈」은 다른 자리다.
+      { name: "viewIds", label: "보던 목록", description: "화면에서 보고 있던 목록(자동으로 채워짐). 조건이 뜻을 잃었을 때만 대상이 된다", required: false, 기계전용: true },
       { name: "assignee", label: "담당자", description: "일괄 배정할 담당자 (선택)", required: false },
       { name: "dueDate", label: "기한", description: "일괄 기한 YYYY-MM-DD (선택)", required: false },
       { name: "status", label: "판정", description: "조치완료 / 오탐 (선택)", required: false },
@@ -1612,7 +1614,11 @@ export function listToolsFor(domains?: string[], role?: string): AgentTool[] {
 export function toolCatalogText(domains?: string[], role?: string): string {
   return listToolsFor(domains, role)
     .map((t) => {
-      const params = t.params.length ? `(${t.params.map((p) => p.name + (p.required ? "" : "?")).join(", ")})` : "()";
+      // ⚠ 기계전용 인자는 **모델에게 안 보인다.** 서버가 규칙으로 채우는 값이라 모델이 쓸 일이 없고,
+      //   보여 주면 라우팅 회귀 위험(도구 설명 한 줄에 11/11→9/11 떨어진 전례)만 지게 된다.
+      //   결재판 칸에서는 빠지지 않는다 — 거기서 빼면 승인 때 값이 증발한다(다른 자리다).
+      const 보일인자 = t.params.filter((p) => !p.기계전용);
+      const params = 보일인자.length ? `(${보일인자.map((p) => p.name + (p.required ? "" : "?")).join(", ")})` : "()";
       return `- ${t.name}${params}: ${t.description}`;
     })
     .join("\n");

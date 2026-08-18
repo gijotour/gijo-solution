@@ -349,6 +349,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     } catch (e) {
       상세칸구하기(list); // ⚠ 여기서도 목록을 통째로 지운다 — 아래 renderList와 같은 파괴다
       list.innerHTML = '<div class="rv-empty" style="color:#f5928a">불러오지 못했습니다: ' + esc(e.message) + "</div>";
+      // ⚠ **여기서도 대화창의 보던 목록을 비운다**(2026-08-18 검토 지적). 위 주석이 「목록을 지우는
+      //   자리가 둘」이라고 이미 적어 뒀는데 또 한 곳만 막았다. 안 비우면: 3건을 보다 서버 오류로
+      //   재조회 실패 → 화면엔 "불러오지 못했습니다" → "이것들 전부 오탐" → **화면에 없는 옛 3건**에 걸린다.
+      보는목록알림(null);
     }
   }
 
