@@ -23,21 +23,12 @@
   var 그룹 = {
     // ① 발견·수집
     discover: [
-      { id: "posture", title: "📊 보안 태세", page: "kpi.html", load: function () {
-        return window.gijo.getSecurityKpi().then(function (k) {
-          var c = (k || {}).current || {};
-          var BAND = { good: "양호", warn: "주의", bad: "미흡" };
-          return {
-            badge: c.posture ? { text: BAND[c.posture.band] || "", color: R } : null,
-            rows: [
-              ["종합 점수", c.posture ? c.posture.score + "/100" : "-"],
-              ["미조치 취약점", c.vulnerabilities ? n(c.vulnerabilities.active) : "-", R],
-              ["실제 악용(KEV)", c.vulnerabilities && c.vulnerabilities.kev != null ? String(c.vulnerabilities.kev) : "-", R],
-            ],
-            foot: c.compliance ? "컴플라이언스 " + Math.round(c.compliance.coverageRate) + "%" : "",
-          };
-        });
-      } },
+      // ⚠ 「📊 보안 태세」 판을 **뺐다**(사장님 승인 2026-08-19, 승인 시안 mockups/자산_0단계 권고).
+      //   ①발견·수집은 「무엇이 있고 무엇이 들어왔나」를 보는 자리다. 종합 점수·컴플라이언스는
+      //   **결과를 요약하는 숫자**라 ⑤보고의 몫이고, 실제로 그 허브에 같은 화면이 이미 있다
+      //   (reporting: kpi→kpi.html). 두 자리에 같은 것을 두면 「어디서 보는 게 맞나」를 매번 고민한다.
+      // ⚠ **화면이 사라진 것이 아니다** — `kpi.html`은 ⑤보고에서 그대로 열린다.
+      //   ⓪ 자산에서 「🖥 자산」을 뺀 것과 같은 정리다(자산은 ⓪로, 지표는 ⑤로).
       { id: "analysis", title: "🚨 통합 관제", page: "analysis.html", load: function () {
         return window.gijo.analysisEvents().then(function (d) {
           var ev = (d && d.events) || [];
