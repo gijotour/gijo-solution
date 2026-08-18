@@ -1798,9 +1798,13 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
     if (tool && !tool.write) {
       try {
         reportProgress("tools", `${tool.label} 실행 중`);
-        const result = String(await tool.run(forced.args));
+        // 🗂 범위는 **이 빠른 길에도** 입혀야 한다(2026-08-18 실측). 강제 규칙 경로는 LLM 결정을
+        // 건너뛰므로 아래 일반 루프의 주입이 안 온다 — 범위를 걸어 놓고 물었는데 전체가 왔다.
+        // 배관이 다 살아 있어도 **갈래 하나를 빠뜨리면 아무 일도 안 일어난다.**
+        const 강제인자 = 범위를입힌다(forced.args, tool, scope);
+        const result = String(await tool.run(강제인자));
         recordToolWork(forced.tool, scope);
-        const calls: AgentToolCall[] = [{ tool: forced.tool, args: forced.args, result }];
+        const calls: AgentToolCall[] = [{ tool: forced.tool, args: 강제인자, result }];
         return { output: await 사람에게내보낸다(instruction, calls, context), toolCalls: calls };
       } catch {
         /* 강제 실행 실패 시 아래 일반 루프로 폴백 */
