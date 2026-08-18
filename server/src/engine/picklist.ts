@@ -394,6 +394,42 @@ export function stripViewMark(text: string): string {
     .trim();
 }
 
+// ── 🗂 지금 범위(승인 시안 mockups/자산_0단계, 2026-08-18) ────────────────────────
+//
+// ⚠ `#보는목록`과 **다르다.** 보는목록은 「지금 화면에 떠 있는 것들」이라 조건이 뜻을 잃었을
+//   때만 쓴다. 범위는 담당자가 **명시적으로 건 것**이고 화면을 옮겨도 남는다 —
+//   그러니 늘 대상을 좁힌다.
+// ⚠ 이 표식이 서버까지 오지 않으면 화면엔 「이 자산 범위」라 적혀 있는데 대화창은 전 자산을
+//   답한다. 「안내한 말과 코드가 어긋난다」의 전형이다(2026-08-18 검토관이 착수 전에 잡았다).
+export const SCOPE_MARK = "#범위";
+
+export interface ScopeMark {
+  kind: string;   // 지금은 "asset" 하나. 나중에 "team"·"tag"가 붙을 자리라 종류를 실어 둔다.
+  id: string;
+}
+
+/** 대화창이 실은 범위 표식을 읽는다. 없거나 망가졌으면 null(평소대로 전체). */
+export function parseScopeMark(text: string): ScopeMark | null {
+  const raw = markLine(text, SCOPE_MARK);
+  if (!raw) return null;
+  const i = raw.indexOf(":");
+  if (i <= 0) return null;
+  const kind = raw.slice(0, i).trim();
+  const id = raw.slice(i + 1).trim();
+  // 종류·id에 공백이나 쉼표가 섞이면 화면이 잘못 만든 것이다 — 조용히 무시한다(전체로 돈다).
+  if (!kind || !id || /[,\s]/.test(kind) || /[,\s]/.test(id) || id.length > 200) return null;
+  return { kind, id };
+}
+
+/** 「범위」 표식만 떼어 낸다. 다른 표식은 남긴다(stripViewMark와 같은 이유). */
+export function stripScopeMark(text: string): string {
+  return String(text ?? "")
+    .split("\n")
+    .filter((raw) => !raw.trim().startsWith(SCOPE_MARK + " "))
+    .join("\n")
+    .trim();
+}
+
 /** 고른 조치를 bulk_update 인자로 바꾼다. */
 export function pickToolArgs(cmd: PickCommand): Record<string, string> {
   const args: Record<string, string> = { ids: cmd.ids.join(",") };

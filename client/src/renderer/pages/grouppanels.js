@@ -67,26 +67,13 @@
           };
         });
       } },
-      { id: "assets", title: "🖥 자산", page: "inventory.html", load: function () {
-        return window.gijo.listAssets().then(function (assets) {
-          assets = assets || [];
-          // 자산 화면(inventory.html 종류한글)과 같은 이름표·같은 필드(assetType).
-          var 종류한글 = { "infra-host": "인프라 호스트", server: "서버", network: "네트워크 장비", endpoint: "단말", container: "컨테이너", repo: "코드 저장소" };
-          var 종류별 = {};
-          assets.forEach(function (a) { var t = a.assetType || "기타"; 종류별[t] = (종류별[t] || 0) + 1; });
-          var 상위 = Object.entries(종류별).sort(function (x, y) { return y[1] - x[1]; }).slice(0, 4);
-          var 고위험 = assets.filter(function (a) {
-            return (a.findings || []).some(function (f) { return (f.severity === "critical" || f.severity === "high") && 살아있는(f); });
-          }).length;
-          return {
-            segments: 상위.map(function (kv) {
-              var L = String(종류한글[kv[0]] || kv[0]);
-              return { key: kv[0], label: L.length > 6 ? L.slice(0, 6) + "…" : L, value: kv[1], color: B };
-            }),
-            foot: "고위험 " + 고위험 + "/" + assets.length,
-          };
-        });
-      } },
+      // ⚠ 「🖥 자산」 판을 **뺐다**(승인 시안 mockups/자산_0단계, 2026-08-18).
+      //   자산은 ①발견·수집 **안의 한 판**이 아니라 그 앞의 **범위 축**(⓪ 자산)이 되었다.
+      //   두 자리에 남겨 두면 담당자가 「어디서 고르는 게 맞나」를 매번 고민한다 —
+      //   이 저장소가 「같은 일 하는 자리가 둘이면 조작 개념만 늘어난다」로 이미 정리한 것이다.
+      //   자산 관리(등록·수정·CSV)는 inventory.html 그대로다 — ⓪ 화면의 「전체 관리 열기」로 간다.
+      // ⚠ 「📊 보안 태세」(posture)는 **손대지 않았다.** 시안이 그것도 뺄지 물었지만
+      //   사장님 확인이 필요한 자리라 남긴다 — 승인 없이 화면을 지우지 않는다.
     ],
 
     // ② 우선순위

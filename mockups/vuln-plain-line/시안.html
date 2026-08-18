@@ -1,0 +1,615 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — 취약점 한글 한 줄 풀이 시안</title>
+<!--
+  ════════════════════════════════════════════════════════════════════════
+  GIJO AS 시안 — 취약점 목록에 「한글 한 줄 풀이」 붙이기
+  대상: client/src/renderer/pages/vulnscan.html (renderVdList, #vdList)
+  근거: 계획서 전-7 ③ "취약점 원문 옆 한글 한 줄" · 추천 시안 1개 원칙(2026-07-25 사용자 결정)
+  파일: mockups/vuln-plain-line/시안.html — 이 파일 자체는 정지 그림이며, 제품 코드는 건드리지 않았다.
+
+  ■ 무엇을 붙이나
+    server/src/engine/findingplain.ts 의 한줄풀이글() — 이미 완성된 규칙 엔진(정규식 8종, LLM
+    아님, 못 찾으면 빈 문자열)을 화면에 연결한다. 지금은 챗봇 답변(handlers.ts)에만 쓰이고
+    화면엔 안 붙어 있다("화면엔 미연결" — findingplain.ts 자체 헤더에도 이 간극이 적혀 있다).
+    실측: 취약점 4,833건 중 96%가 한글 설명이 없다(findingplain.ts:5, 2026-08-04) · 규칙이
+    실제로 덮는 비율은 45%(server/src/engine/agenttools/handlers.ts:143 주석 — "이름 규칙은
+    45%만 덮는다").
+
+  ■ 설계 전 조사 — 표준·모범사례(2026-08-17, 직접 접속해 확인한 근거만 적는다)
+    1) Material Design 리스트 컴포넌트(Google, m1.material.io/components/lists.html — WebFetch로
+       직접 열어 확인) — "primary text + secondary text" 두 줄 리스트는 오래 검증된 표준 패턴.
+       규격: 한 줄(보조 텍스트 없음) 48dp → 두 줄(보조 텍스트 포함) 72dp, 보조 텍스트 유무와
+       무관하게 두 줄이면 72dp 고정. 차이 +24dp(+50%).
+       → 이 시안의 "+24px(+60%)"과 같은 모양(원문 아래에 보조 설명 한 줄을 붙이면 행 높이가
+       한 단계 커진다)이다 — 업계에서 이미 자리 잡은 정도의 증가폭이라는 외부 근거로 삼는다.
+    2) 미 연방정부 Plain Language 지침(digital.gov, 구 plainlanguage.gov —
+       digital.gov/guides/plain-language/principles/avoid-jargon, WebFetch로 직접 확인) —
+       원문 인용: "Define a word where you use it"(전문용어는 지우지 말고, 쓰는 그 자리에서
+       뜻을 붙여라). → findingplain.ts 헤더의 설계 원칙("원문은 열쇠, 이름 자체는 번역 안
+       한다")과 정확히 같은 결론이다. 원문을 지우는 안·별도 사전 화면을 만드는 안은 이 근거
+       때문에 검토 대상에서 처음부터 뺐다.
+    3) 제품 내부 선례 — 이 화면(vulnscan.html) 자체가 이미 "보조 설명 줄" 패턴을 쓰고 있다
+       (.vd-sub: font-size 12.5px · line-height 1.6 · color var(--muted), 이 화면의 취약점
+       상세 부제 줄). 새 타이포그래피를 만들지 않고 그 값을 그대로 재사용한다 — 12.5×1.6=20px
+       정확히 떨어지는 값이라 계산도 깔끔하다.
+
+  ■ 핵심 결정 3줄
+    1. 원문 "아래 새 줄"(인라인 아님) — 배지 7종+버튼이 이미 한 줄을 다투는 중이라, 이름
+       뒤에 이어 붙이면 항목마다 줄바꿈이 들쭉날쭉해진다(왜 섹션에 실제 CSS로 재현해 보임).
+       새 줄은 +24px로 결정적이고 예측 가능하다.
+    2. 못 찾으면 아예 안 그린다(빈 div도 안 만듦) — findingplain.ts의 "모르면 모른다" 원칙을
+       화면 구현까지 그대로 끌고 간다. 55%(실측 미매칭분)의 항목은 지금과 1px도 다르지
+       않다 — 아래 20건 목록에서 11건이 그 예시다.
+    3. 새 색·새 아이콘 규칙 없음 — 기존 --muted 톤 재사용, 종류별(실행/권한/암호화…) 색
+       구분은 포기했다(왜는 "무엇을 포기했나" 절).
+
+  이 파일은 결정을 위한 정지 그림입니다. 모든 버튼·칩·입력창은 자리만 보여주며 클릭해도
+  동작하지 않습니다(정직한 구현 원칙 — mockups/는 시연이 아니라 결정 자료).
+  ════════════════════════════════════════════════════════════════════════
+-->
+<style>
+/* ════════ 1) 실제 화면 색 토큰 — client/src/renderer/pages/vulnscan.html :root 그대로 복사 ════════ */
+:root{
+  --bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,0.08);
+  --border-strong:rgba(255,255,255,0.16);--blue:#3b82f6;--blue-light:#5fa1ff;--white:#ffffff;
+  --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--red:#e2483d;--amber:#f0a020;--teal:#1eb980;--purple:#8b7cf0;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);}
+
+/* ════════ 2) 실제 vulnscan.html의 vd-* / sev / panel CSS — 한 글자도 안 고치고 그대로 복사 ════════
+   (아래 블록은 client/src/renderer/pages/vulnscan.html:50,61-104 원본. 비교 대상 신뢰성을 위해
+   시안 전용으로 다시 쓰지 않았다 — "가짜 레이아웃 금지" 지시 이행.) */
+.page-title{font-size:21px;font-weight:800;color:#fff;}
+.panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:18px 20px;margin-bottom:16px;}
+.sev{display:inline-block;min-width:26px;text-align:center;padding:1px 7px;border-radius:6px;font-size:12.25px;font-weight:800;margin-right:4px;}
+.sev-c{background:rgba(226,72,61,0.18);color:#f5928a;}
+.sev-h{background:rgba(240,120,40,0.18);color:#f7a86a;}
+.sev-m{background:rgba(240,160,32,0.15);color:var(--amber);}
+.sev-l{background:rgba(139,147,171,0.15);color:var(--muted);}
+.vd-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;}
+.vd-title{font-size:14.5px;font-weight:800;color:#fff;}
+.vd-close{font-size:12px;color:var(--blue-light);font-weight:700;cursor:pointer;}
+.vd-sub{font-size:12.5px;color:var(--muted);margin-bottom:14px;line-height:1.6;}
+.vd-controls{display:flex;gap:8px;align-items:center;margin-bottom:12px;flex-wrap:wrap;}
+.vd-chip{background:var(--panel-2);border:1px solid var(--border-strong);color:var(--muted);padding:5px 12px;border-radius:20px;font-size:12.5px;font-weight:700;cursor:pointer;}
+.vd-chip.active{background:rgba(59,130,246,0.15);border-color:var(--blue);color:var(--blue-light);}
+.vd-search{flex:1;min-width:200px;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:8px;padding:7px 12px;color:var(--text);font-size:12.5px;outline:none;}
+.vd-list{max-height:520px;overflow-y:auto;border:1px solid var(--border);border-radius:8px;}
+.vd-item{border-bottom:1px solid var(--border);padding:10px 12px;cursor:pointer;}
+.vd-item:last-child{border-bottom:none;}
+.vd-item:hover{background:rgba(255,255,255,0.03);}
+.vd-item-top{display:flex;align-items:center;gap:8px;font-size:12.5px;}
+.vd-name{color:var(--text);flex:1;line-height:1.5;}
+.vd-epss{font-size:12px;font-weight:800;padding:1px 7px;border-radius:5px;background:rgba(139,124,240,0.16);color:var(--purple);flex-shrink:0;}
+.vd-epss.hot{background:rgba(226,72,61,0.18);color:#f5928a;}
+.vd-vpr{font-size:12px;font-weight:700;padding:1px 7px;border-radius:5px;background:rgba(255,255,255,0.06);color:var(--muted);flex-shrink:0;}
+.vd-misfit{font-size:11.75px;font-weight:800;padding:1px 6px;border-radius:5px;background:rgba(240,160,32,0.18);color:var(--amber);flex-shrink:0;}
+.vd-kev{font-size:11.75px;font-weight:800;padding:1px 7px;border-radius:5px;background:rgba(226,72,61,0.22);color:#ff8a80;flex-shrink:0;border:1px solid rgba(226,72,61,0.5);}
+.vd-state{font-size:11.75px;font-weight:800;padding:1px 7px;border-radius:5px;flex-shrink:0;}
+.vd-state.new{background:rgba(59,130,246,0.18);color:var(--blue-light);}
+.vd-state.resurfaced{background:rgba(240,120,40,0.2);color:#f7a86a;}
+.vd-state.fixed{background:rgba(30,185,128,0.16);color:var(--teal);}
+.vd-item.is-fixed{opacity:.5;}
+.vd-item.is-fixed .vd-name{text-decoration:line-through;}
+.vd-remediate{flex-shrink:0;background:rgba(59,130,246,0.14);border:1px solid var(--border-strong);color:var(--blue-light);font-size:12px;font-weight:800;padding:2px 9px;border-radius:6px;cursor:pointer;}
+.vd-remediate:hover{background:rgba(59,130,246,0.24);border-color:var(--blue);}
+.vd-ev{display:none;margin-top:8px;padding:10px 12px;background:var(--panel-2);border-radius:6px;font-size:12.5px;color:var(--muted);line-height:1.75;white-space:pre-wrap;word-break:break-word;max-height:240px;overflow-y:auto;}
+.vd-item.open .vd-ev{display:block;}
+.vd-empty{padding:16px;color:var(--muted);font-size:12.5px;}
+
+/* ════════ 3) 신규 — 이번 시안의 유일한 CSS 추가(딱 이 5줄) ════════
+   .vd-sub와 같은 font-size/line-height를 재사용했다(위 조사 근거 3). 새 타이포그래피 없음. */
+.vd-plain{font-size:12.5px;line-height:1.6;color:var(--muted);margin-top:4px;}
+.vd-plain b{color:var(--text);font-weight:700;}
+
+/* ════════ 4) 이 문서(시안) 전용 설명 CSS — 실제 제품에는 없다 ════════ */
+.docwrap{max-width:1120px;margin:0 auto;padding:26px 30px 90px;}
+h1{font-size:20px;font-weight:800;color:#fff;margin-bottom:6px;}
+.lead{font-size:12.5px;color:var(--muted);max-width:960px;line-height:1.75;margin-bottom:16px;}
+.summary-box{border:1px solid var(--blue);background:rgba(59,130,246,.08);border-radius:10px;padding:14px 18px;margin-bottom:16px;font-size:12.75px;line-height:1.8;}
+.summary-box b{color:#fff;}
+.summary-box ol{margin-left:18px;margin-top:4px;}
+.banner{border:1px solid rgba(240,160,32,.5);background:rgba(240,160,32,.08);color:#f0c060;border-radius:8px;padding:11px 15px;font-size:12.25px;margin-bottom:24px;line-height:1.6;}
+h2{font-size:14.5px;font-weight:800;color:#fff;margin:32px 0 9px;padding-bottom:7px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px;}
+h2 .n{color:var(--blue-light);font-size:11px;font-weight:700;letter-spacing:.4px;border:1px solid var(--blue-light);border-radius:4px;padding:2px 7px;}
+.note{font-size:12.25px;color:var(--muted);line-height:1.75;margin-bottom:10px;max-width:980px;}
+.note b.hi{color:var(--text);}
+.note b.bad{color:#f5928a;}
+.note b.ok{color:var(--teal);}
+table.t{width:100%;border-collapse:collapse;font-size:12.15px;margin:8px 0 6px;}
+table.t th{text-align:left;color:var(--muted-2);font-weight:700;padding:6px 9px;border-bottom:1px solid var(--border);white-space:nowrap;}
+table.t td{padding:6px 9px;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:top;}
+table.t tr:last-child td{border-bottom:none;}
+code{background:var(--panel-2);border-radius:4px;padding:1px 6px;font-size:11.5px;color:#dfe6ff;}
+.meas{font-size:12.25px;color:var(--muted-2);margin-top:8px;line-height:1.7;}
+.meas b{color:var(--teal);}
+.mock-shell{border:1px dashed var(--border-strong);border-radius:12px;padding:16px 18px 6px;margin:12px 0 8px;background:rgba(0,0,0,.08);}
+.mock-shell-label{font-size:11px;color:var(--muted-2);margin-bottom:10px;letter-spacing:.3px;}
+.mock-idx{display:inline-block;width:20px;color:var(--muted-2);font-size:10px;text-align:right;margin-right:3px;flex-shrink:0;}
+.closeup-row{display:flex;gap:26px;align-items:flex-start;flex-wrap:wrap;margin:14px 0 6px;}
+.closeup-col{flex:0 0 460px;}
+.closeup-tag{font-size:11.5px;font-weight:800;letter-spacing:.3px;color:var(--muted-2);margin-bottom:8px;}
+.closeup-tag.after{color:var(--teal);}
+.px-tag{display:inline-block;margin-top:6px;font-size:11.5px;color:var(--teal);font-weight:800;background:rgba(30,185,128,.1);border:1px solid rgba(30,185,128,.35);border-radius:6px;padding:3px 9px;}
+.px-tag.bad{color:#f0c060;background:rgba(240,160,32,.1);border-color:rgba(240,160,32,.35);}
+.reject-box{border:1px solid rgba(226,72,61,.4);border-radius:10px;padding:12px 14px;background:rgba(226,72,61,.05);margin:10px 0;}
+.reject-cap{font-size:11.5px;color:#f5928a;font-weight:800;margin-bottom:8px;}
+.chk-table td:first-child{width:230px;color:var(--text);font-weight:600;}
+.chk-ok{color:var(--teal);font-weight:800;}
+footer.docfoot{margin-top:50px;padding-top:14px;border-top:1px solid var(--border);font-size:11.5px;color:var(--muted-2);}
+</style>
+</head>
+<body>
+<div class="docwrap">
+
+<h1>취약점 목록 — 원문 아래 「한글 한 줄 풀이」</h1>
+<p class="lead">
+  대상 화면: <code>client/src/renderer/pages/vulnscan.html</code> — 자산을 클릭하면 열리는 취약점 목록(<code>#vdList</code>).
+  엔진은 이미 있다(<code>server/src/engine/findingplain.ts</code>의 <code>한줄풀이글()</code>, 규칙 기반·LLM 아님, 못 찾으면 빈 문자열).
+  지금은 챗봇 답변에만 연결돼 있고 <b>화면엔 아직 안 붙어 있다.</b> 이 시안은 그 연결을 화면에서 어떻게 보여줄지 <b>추천 1개</b>를 제안한다.
+</p>
+
+<div class="summary-box">
+  <b>한눈에 — 핵심 결정 3줄</b>
+  <ol>
+    <li>원문 <b>아래 새 줄</b>로 붙인다(원문 뒤에 이어 붙이는 인라인이 아니다) — 배지가 이미 빽빽해서 인라인은 항목마다 줄바꿈이 들쭉날쭉해진다.</li>
+    <li>한글 풀이를 못 찾으면(55%) <b>아무것도 그리지 않는다</b> — 빈 줄도, 빈 자리도 안 남긴다. 지금 화면과 1px도 다르지 않다.</li>
+    <li>항목 한 줄 높이 <b>약 40px → 약 64px(+24px, +60%)</b>, 20건 목록 기준 세로 총합 <b>800px → 1,016px(+216px, +27%)</b> — 실측 커버리지 45% 적용.</li>
+  </ol>
+</div>
+
+<div class="banner">
+  ⚠ <b>정직한 구현 고지</b> — 이 파일은 결정을 위한 <b>정지 그림</b>입니다. 아래 화면 재현 안의 배지·칩·검색창·버튼(＋조치 등록, ✕ 닫기 등)은
+  실제 vulnscan.html 마크업·CSS를 그대로 복사해 <b>모양만</b> 보여줍니다 — 클릭해도 아무 동작도 하지 않습니다.
+  항목 앞의 작은 회색 번호(①~⑳)는 <b>이 문서에서만</b> 비교를 쉽게 하려고 붙인 것으로, 실제 제품 화면에는 없는(제안하지도 않는) 표식입니다.
+</div>
+
+<h2><span class="n">근거</span>설계 전 조사 — 표준·모범사례</h2>
+<p class="note">아래 세 출처는 전부 이번 작업에서 직접 열어 확인했다(추측·기억 아님).</p>
+<table class="t">
+  <tr><th style="width:230px">출처</th><th style="width:330px">확인한 내용</th><th>이 시안에 반영</th></tr>
+  <tr>
+    <td>Material Design 리스트 컴포넌트<br><span style="color:var(--muted-2)">m1.material.io/components/lists.html</span></td>
+    <td>"주 텍스트 + 보조 텍스트" 두 줄 리스트는 표준 패턴. 규격: <b class="hi" style="color:#8fb8ff">한 줄 48dp → 두 줄(보조 텍스트 포함) 72dp</b> — 보조 텍스트 유무와 무관하게 두 줄이면 72dp 고정. <b style="color:var(--teal)">차이 +24dp(+50%)</b>.</td>
+    <td>이 시안의 +24px(+60%)과 같은 모양 — "원문 아래 보조 설명 한 줄을 붙이면 행이 한 단계 커진다"는 업계에서 이미 검증된 정도의 증가폭이라는 외부 근거로 삼음.</td>
+  </tr>
+  <tr>
+    <td>미 연방정부 Plain Language 지침<br><span style="color:var(--muted-2)">digital.gov/guides/plain-language/principles/avoid-jargon</span></td>
+    <td>원문 인용: <i>"Define a word where you use it"</i> — 전문용어는 지우지 말고, <b>쓰는 그 자리에서</b> 뜻을 붙여라.</td>
+    <td>findingplain.ts 설계 원칙("원문은 열쇠, 이름 자체는 번역 안 한다")과 정확히 같은 결론. 원문 삭제·별도 사전 화면 안은 이 근거로 처음부터 검토 대상에서 뺐다.</td>
+  </tr>
+  <tr>
+    <td>제품 내부 선례<br><span style="color:var(--muted-2)">vulnscan.html의 .vd-sub (같은 화면)</span></td>
+    <td>이 화면이 이미 "보조 설명 줄" 타이포그래피를 쓰고 있다 — font-size 12.5px · line-height 1.6 · color var(--muted).</td>
+    <td>새 값을 만들지 않고 그대로 재사용(12.5×1.6=<b>정확히 20px</b>) — 화면 안에서 낯설지 않고, 계산도 깔끔하다.</td>
+  </tr>
+</table>
+
+<h2><span class="n">결정</span>왜 "원문 아래 새 줄"인가 — 인라인과 비교</h2>
+<p class="note">
+  검토한 다른 길: <b class="hi">원문 이름 뒤에 이어 붙이는 인라인</b>. 실제 vulnscan.html의 CSS를 그대로 적용해 보면 왜 버렸는지 바로 보인다 —
+  이 화면은 이미 <code>.vd-item-top</code> 한 줄에 심각도·이름·상태·KEV·오분류경보·EPSS·VPR·조치버튼까지 최대 7종이 다투고 있다.
+</p>
+<div class="reject-box">
+  <div class="reject-cap">❌ 버린 안 — 인라인(원문 뒤에 이어 붙임). 아래는 실제 vd-item-top/vd-name CSS를 그대로 적용한 결과(임의로 그리지 않았다):</div>
+  <div class="vd-list" style="max-height:none">
+    <div class="vd-item">
+      <div class="vd-item-top">
+        <span class="sev sev-c">CRIT</span>
+        <span class="vd-name">Apache Log4j &lt; 2.15.0 Remote Code Execution (CVE-2021-44228) — 공격자가 이 장비에서 원하는 명령을 실행할 수 있습니다. 가장 급합니다.</span>
+        <span class="vd-state new">🆕 신규</span>
+        <span class="vd-kev">🔴 KEV 악용중</span>
+        <span class="vd-epss hot">EPSS 97.8%</span>
+        <span class="vd-vpr">VPR 9.6</span>
+        <button class="vd-remediate">＋ 조치 등록</button>
+      </div>
+    </div>
+  </div>
+  <div class="meas">
+    <code>.vd-item-top</code>은 flex-nowrap, <code>.vd-name</code>은 줄바꿈 허용이라 — 이름이 길어지면 <b>배지들이 문단 중간 어딘가에 걸린다.</b>
+    항목마다 원문 길이+풀이 길이가 달라 <b class="bad">몇 줄이 될지 항목마다 다르게 들쭉날쭉</b>해진다(예측 불가능한 밀도).
+    또 "원문이 어디까지고 풀이가 어디부터인지" 색·굵기가 같아 <b class="bad">경계가 안 보인다.</b>
+  </div>
+</div>
+<p class="note">
+  → 반대로 <b class="ok">새 줄</b>은 있으면 <b>정확히 +24px</b>, 없으면 <b>+0px</b>로 결정적이다. 배지가 있는 원래 줄은 전혀 안 건드리므로 정렬도 그대로 유지된다.
+</p>
+
+<h2><span class="n">확대</span>단일 항목 — 기존 vs 신규 (실제 마크업 1:1)</h2>
+<p class="note">위 KEV 항목(Log4j) 하나를 확대했다. 왼쪽은 지금 vulnscan.html 그대로, 오른쪽은 <code>.vd-plain</code> 한 줄만 추가한 모습이다.</p>
+<div class="closeup-row">
+  <div class="closeup-col">
+    <div class="closeup-tag">지금 (변경 없음)</div>
+    <div class="vd-list" style="max-height:none">
+      <div class="vd-item">
+        <div class="vd-item-top">
+          <span class="sev sev-c">CRIT</span>
+          <span class="vd-name">Apache Log4j &lt; 2.15.0 Remote Code Execution (CVE-2021-44228)</span>
+          <span class="vd-state new">🆕 신규</span>
+          <span class="vd-kev" title="CISA KEV — 실제 악용이 확인된 취약점. 최우선 조치.">🔴 KEV 악용중</span>
+          <span class="vd-epss hot" title="EPSS — 30일 내 실제 악용될 확률">EPSS 97.8%</span>
+          <span class="vd-vpr" title="Tenable VPR — 실제 위협 기반 우선순위(0~10)">VPR 9.6</span>
+          <button class="vd-remediate">＋ 조치 등록</button>
+        </div>
+      </div>
+    </div>
+    <span class="px-tag bad">약 40px</span>
+  </div>
+  <div class="closeup-col">
+    <div class="closeup-tag after">바뀐 뒤 (+.vd-plain 한 줄)</div>
+    <div class="vd-list" style="max-height:none">
+      <div class="vd-item">
+        <div class="vd-item-top">
+          <span class="sev sev-c">CRIT</span>
+          <span class="vd-name">Apache Log4j &lt; 2.15.0 Remote Code Execution (CVE-2021-44228)</span>
+          <span class="vd-state new">🆕 신규</span>
+          <span class="vd-kev" title="CISA KEV — 실제 악용이 확인된 취약점. 최우선 조치.">🔴 KEV 악용중</span>
+          <span class="vd-epss hot" title="EPSS — 30일 내 실제 악용될 확률">EPSS 97.8%</span>
+          <span class="vd-vpr" title="Tenable VPR — 실제 위협 기반 우선순위(0~10)">VPR 9.6</span>
+          <button class="vd-remediate">＋ 조치 등록</button>
+        </div>
+        <div class="vd-plain">→ 공격자가 이 장비에서 <b>원하는 명령을 실행</b>할 수 있습니다. 가장 급합니다.</div>
+      </div>
+    </div>
+    <span class="px-tag">약 64px (+24px)</span>
+  </div>
+</div>
+
+<h2><span class="n">전체</span>목록 20건 — 바뀐 뒤 모습 (실제 패널 재현)</h2>
+<p class="note">
+  자산 하나를 열었을 때(vulnDetail 패널)를 그대로 재현했다. <b class="hi">사이드바·상단 KPI·호스트 표는 생략</b>했다 — 이 결정과 무관해서다.
+  20건 중 <b class="ok">9건(45%, 실측 커버리지)</b>에 회색 설명줄이 붙었고, <b class="bad">11건은 지금과 완전히 같다.</b>
+  1번(Log4j)은 시연을 위해 펼친 상태로 고정했다(실제로는 클릭해야 열림) — 설명줄(항상 보임)과 증거 펼치기(클릭해야 보임)의 관계를 보여준다.
+</p>
+<div class="mock-shell">
+  <div class="mock-shell-label">vulnscan.html — 자산 상세 패널(#vulnDetail) 재현 · 버튼·칩·검색창은 정지 그림</div>
+  <div class="page-title" style="font-size:16px;margin-bottom:10px">취약 자산관리 <span style="color:var(--muted-2);font-weight:600;font-size:12px">▸ web-01.internal</span></div>
+  <div class="panel">
+    <div class="vd-head">
+      <span class="vd-title">web-01.internal — 취약점 19건</span>
+      <span class="vd-close">✕ 닫기</span>
+    </div>
+    <div class="vd-sub">
+      출처 nessus · 최근 스캔 26. 8. 15. 09:12 · Critical 3 / High 2 / Medium 6 / Low·Info 9 ·
+      🔴 실제 악용 확인(KEV) 2건 — 최우선 · ⚠ 등급은 낮지만 악용확률 50%↑ 1건 (등급만 보면 놓침) ·
+      이번 스캔: 🆕 신규 2 ✓ 고쳐짐 1 — 항목을 클릭하면 상세가 펼쳐집니다.
+    </div>
+    <div class="vd-controls">
+      <span class="vd-chip active">전체</span>
+      <span class="vd-chip" title="CISA KEV — 실제 악용이 확인된 취약점만">🔴 KEV</span>
+      <span class="vd-chip">Critical</span>
+      <span class="vd-chip">High</span>
+      <span class="vd-chip">Medium</span>
+      <span class="vd-chip">Low/Info</span>
+      <span class="vd-chip" title="정렬 기준 전환 — EPSS는 30일 내 실제 악용될 확률">↕ 심각도 순</span>
+      <input class="vd-search" placeholder="취약점명 · CVE로 검색 (예: log4j, CVE-2021-44228, firefox)" readonly>
+    </div>
+    <div class="vd-list">
+
+      <!-- ① 실행 · has-line -->
+      <div class="vd-item open">
+        <div class="vd-item-top">
+          <span class="mock-idx">①</span>
+          <span class="sev sev-c">CRIT</span>
+          <span class="vd-name">Apache Log4j &lt; 2.15.0 Remote Code Execution (CVE-2021-44228)</span>
+          <span class="vd-state new">🆕 신규</span>
+          <span class="vd-kev" title="CISA KEV — 실제 악용이 확인된 취약점. 최우선 조치.">🔴 KEV 악용중</span>
+          <span class="vd-epss hot" title="EPSS — 30일 내 실제 악용될 확률">EPSS 97.8%</span>
+          <span class="vd-vpr" title="Tenable VPR — 실제 위협 기반 우선순위(0~10)">VPR 9.6</span>
+          <button class="vd-remediate">＋ 조치 등록</button>
+        </div>
+        <div class="vd-plain">→ 공격자가 이 장비에서 <b>원하는 명령을 실행</b>할 수 있습니다. 가장 급합니다.</div>
+        <div class="vd-ev">JNDI 룩업으로 원격 LDAP 클래스 로딩이 가능합니다. 8080/tcp에서 log4j-core-2.14.1.jar 확인됨 · Nessus Plugin ID 155999.</div>
+      </div>
+
+      <!-- ② 권한 · has-line -->
+      <div class="vd-item">
+        <div class="vd-item-top">
+          <span class="mock-idx">②</span>
+          <span class="sev sev-c">CRIT</span>
+          <span class="vd-name">Netlogon Elevation of Privilege (CVE-2020-1472)</span>
+          <span class="vd-kev" title="CISA KEV — 실제 악용이 확인된 취약점. 최우선 조치.">🔴 KEV 악용중</span>
+          <span class="vd-epss hot" title="EPSS — 30일 내 실제 악용될 확률">EPSS 94.1%</span>
+          <button class="vd-remediate">＋ 조치 등록</button>
+        </div>
+        <div class="vd-plain">→ 일반 권한으로 들어온 공격자가 <b>관리자 권한을 얻을 수 있습니다.</b></div>
+        <div class="vd-ev">(상세 없음)</div>
+      </div>
+
+      <!-- ③ 미매칭 · no-line -->
+      <div class="vd-item">
+        <div class="vd-item-top">
+          <span class="mock-idx">③</span>
+          <span class="sev sev-c">CRIT</span>
+          <span class="vd-name">VMware ESXi Multiple Vulnerabilities (VMSA-2024-0006)</span>
+          <span class="vd-epss hot" title="EPSS — 30일 내 실제 악용될 확률">EPSS 55.0%</span>
+          <button class="vd-remediate">＋ 조치 등록</button>
+        </div>
+        <div class="vd-ev">(상세 없음)</div>
+      </div>
+
+      <!-- ④ 구식 · has-line -->
+      <div class="vd-item">
+        <div class="vd-item-top">
+          <span class="mock-idx">④</span>
+          <span class="sev sev-h">HIGH</span>
+          <span class="vd-name">Missing Security Update KB5029351</span>
+          <span class="vd-vpr" title="Tenable VPR — 실제 위협 기반 우선순위(0~10)">VPR 6.5</span>
+          <button class="vd-remediate">＋ 조치 등록</button>
+        </div>
+        <div class="vd-plain">→ <b>보안 패치가 빠져</b> 있습니다. 벤더가 이미 고쳐 둔 문제입니다.</div>
+        <div class="vd-ev">(상세 없음)</div>
+      </div>
+
+      <!-- ⑤ 미매칭 · no-line -->
+      <div class="vd-item">
+        <div class="vd-item-top">
+          <span class="mock-idx">⑤</span>
+          <span class="sev sev-h">HIGH</span>
+          <span class="vd-name">Mozilla Firefox 118.x &lt; 119.0 Multiple Vulnerabilities</span>
+          <button class="vd-remediate">＋ 조치 등록</button>
+        </div>
+        <div class="vd-ev">(상세 없음)</div>
+      </div>
+
+      <!-- ⑥ 미매칭(오분류경보 배지 예시) · no-line -->
+      <div class="vd-item">
+        <div class="vd-item-top">
+          <span class="mock-idx">⑥</span>
+          <span class="sev sev-m">MED</span>
+          <span class="vd-name">Google Chrome &lt; 124.0.6367.78 Multiple Vulnerabilities</span>
+          <span class="vd-misfit" title="CVSS 등급은 낮지만 실제 악용확률이 높습니다">⚠ 등급↓ 악용↑</span>
+          <span class="vd-epss hot" title="EPSS — 30일 내 실제 악용될 확률">EPSS 58.0%</span>
+          <button class="vd-remediate">＋ 조치 등록</button>
+        </div>
+        <div class="vd-ev">(상세 없음)</div>
+      </div>
+
+      <!-- ⑦ 인증 · has-line -->
+      <div class="vd-item">
+        <div class="vd-item-top">
+          <span class="mock-idx">⑦</span>
+          <span class="sev sev-m">MED</span>
+          <span class="vd-name">SSH Weak Password Authentication Accepted</span>
+          <button class="vd-remediate">＋ 조치 등록</button>
+        </div>
+        <div class="vd-plain">→ 비밀번호·세션이 <b>약하게</b> 설정돼 있습니다.</div>
+        <div class="vd-ev">(상세 없음)</div>
+      </div>
+
+      <!-- ⑧ 설정 · has-line -->
+      <div class="vd-item">
+        <div class="vd-item-top">
+          <span class="mock-idx">⑧</span>
+          <span class="sev sev-m">MED</span>
+          <span class="vd-name">SMB Signing not required</span>
+          <button class="vd-remediate">＋ 조치 등록</button>
+        </div>
+        <div class="vd-plain">→ <b>설정이 권고 기준과 다릅니다.</b> 기능 문제는 아니지만 공격 면이 넓어집니다.</div>
+        <div class="vd-ev">(상세 없음)</div>
+      </div>
+
+      <!-- ⑨ 조사정보+CVE 예외 · has-line -->
+      <div class="vd-item">
+        <div class="vd-item-top">
+          <span class="mock-idx">⑨</span>
+          <span class="sev sev-m">MED</span>
+          <span class="vd-name">RPC portmapper Service Detection (CVE-1999-0632)</span>
+          <button class="vd-remediate">＋ 조치 등록</button>
+        </div>
+        <div class="vd-plain">→ 스캐너가 <b>조사 성격</b>으로 분류했지만 <b>CVE가 달려 있습니다</b> — 넘기기 전에 한 번 확인해 주세요.</div>
+        <div class="vd-ev">(상세 없음)</div>
+      </div>
+
+      <!-- ⑩ 미매칭 · no-line -->
+      <div class="vd-item">
+        <div class="vd-item-top">
+          <span class="mock-idx">⑩</span>
+          <span class="sev sev-m">MED</span>
+          <span class="vd-name">PHP 8.1.x &lt; 8.1.27 Multiple Vulnerabilities</span>
+          <button class="vd-remediate">＋ 조치 등록</button>
+        </div>
+        <div class="vd-ev">(상세 없음)</div>
+      </div>
+
+      <!-- ⑪ 이미 한글(≥6자) · no-line -->
+      <div class="vd-item">
+        <div class="vd-item-top">
+          <span class="mock-idx">⑪</span>
+          <span class="sev sev-m">MED</span>
+          <span class="vd-name">사내 웹 게시판 특수문자 미검증으로 인한 저장형 XSS 취약점(자체 점검)</span>
+          <span class="vd-state new">🆕 신규</span>
+          <button class="vd-remediate">＋ 조치 등록</button>
+        </div>
+        <div class="vd-ev">(상세 없음)</div>
+      </div>
+
+      <!-- ⑫ 암호화 · has-line -->
+      <div class="vd-item">
+        <div class="vd-item-top">
+          <span class="mock-idx">⑫</span>
+          <span class="sev sev-l">LOW</span>
+          <span class="vd-name">SSH SHA-1 HMAC Algorithms Enabled</span>
+          <button class="vd-remediate">＋ 조치 등록</button>
+        </div>
+        <div class="vd-plain">→ <b>낡은 암호 방식</b>을 아직 받아 줍니다 — 요즘 기준으로는 깨질 수 있습니다.</div>
+        <div class="vd-ev">(상세 없음)</div>
+      </div>
+
+      <!-- ⑬ 노출 · has-line -->
+      <div class="vd-item">
+        <div class="vd-item-top">
+          <span class="mock-idx">⑬</span>
+          <span class="sev sev-l">LOW</span>
+          <span class="vd-name">ICMP Timestamp Request Remote Date Disclosure</span>
+          <button class="vd-remediate">＋ 조치 등록</button>
+        </div>
+        <div class="vd-plain">→ <b>내부 정보가 밖으로 새어</b> 나갑니다 — 공격자가 다음 수를 정하는 데 씁니다.</div>
+        <div class="vd-ev">(상세 없음)</div>
+      </div>
+
+      <!-- ⑭ 미매칭 · no-line -->
+      <div class="vd-item">
+        <div class="vd-item-top">
+          <span class="mock-idx">⑭</span>
+          <span class="sev sev-l">LOW</span>
+          <span class="vd-name">Adobe Acrobat Reader DC Multiple Vulnerabilities (APSB24-01)</span>
+          <button class="vd-remediate">＋ 조치 등록</button>
+        </div>
+        <div class="vd-ev">(상세 없음)</div>
+      </div>
+
+      <!-- ⑮ 미매칭 · no-line -->
+      <div class="vd-item">
+        <div class="vd-item-top">
+          <span class="mock-idx">⑮</span>
+          <span class="sev sev-l">LOW</span>
+          <span class="vd-name">7-Zip &lt; 23.01 Multiple Vulnerabilities</span>
+          <button class="vd-remediate">＋ 조치 등록</button>
+        </div>
+        <div class="vd-ev">(상세 없음)</div>
+      </div>
+
+      <!-- ⑯ 미매칭 · no-line -->
+      <div class="vd-item">
+        <div class="vd-item-top">
+          <span class="mock-idx">⑯</span>
+          <span class="sev sev-l">LOW</span>
+          <span class="vd-name">IBM WebSphere Application Server Multiple Vulnerabilities</span>
+          <button class="vd-remediate">＋ 조치 등록</button>
+        </div>
+        <div class="vd-ev">(상세 없음)</div>
+      </div>
+
+      <!-- ⑰ 미매칭 · no-line -->
+      <div class="vd-item">
+        <div class="vd-item-top">
+          <span class="mock-idx">⑰</span>
+          <span class="sev sev-l">LOW</span>
+          <span class="vd-name">Juniper Junos OS Multiple Vulnerabilities (JSA12345)</span>
+          <button class="vd-remediate">＋ 조치 등록</button>
+        </div>
+        <div class="vd-ev">(상세 없음)</div>
+      </div>
+
+      <!-- ⑱ 조사정보(일반) · has-line -->
+      <div class="vd-item">
+        <div class="vd-item-top">
+          <span class="mock-idx">⑱</span>
+          <span class="sev sev-l">LOW</span>
+          <span class="vd-name">OS Fingerprints Detected</span>
+          <button class="vd-remediate">＋ 조치 등록</button>
+        </div>
+        <div class="vd-plain">→ <b>취약점이 아니라 조사 결과</b>입니다 — 스캐너가 「무엇이 깔려 있는지」 알아낸 것입니다. 조치 대상이 아닙니다.</div>
+        <div class="vd-ev">(상세 없음)</div>
+      </div>
+
+      <!-- ⑲ 미매칭 · no-line -->
+      <div class="vd-item">
+        <div class="vd-item-top">
+          <span class="mock-idx">⑲</span>
+          <span class="sev sev-l">LOW</span>
+          <span class="vd-name">Cisco IOS XE Web UI Multiple Vulnerabilities (CVE-2023-20198)</span>
+          <button class="vd-remediate">＋ 조치 등록</button>
+        </div>
+        <div class="vd-ev">(상세 없음)</div>
+      </div>
+
+      <!-- ⑳ 이미 한글 + 고쳐짐(fixed는 항상 맨 아래) · no-line -->
+      <div class="vd-item is-fixed">
+        <div class="vd-item-top">
+          <span class="mock-idx">⑳</span>
+          <span class="sev sev-l">LOW</span>
+          <span class="vd-name">내부 회계시스템 관리자 페이지 접근통제 미흡(자체 점검)</span>
+          <span class="vd-state fixed" title="지난 스캔에서 사라짐">✓ 고쳐짐</span>
+        </div>
+        <div class="vd-ev">(상세 없음)</div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<h2><span class="n">숫자</span>밀도 — 기존 대비 얼마나 커지나</h2>
+<p class="note">
+  아래 값은 vulnscan.html에 <b>선언된 CSS 값을 손으로 대입해 계산</b>한 것이다(이 작업 환경엔 브라우저 스크린샷 도구가 없어 실측 대신 계산으로 냈다 —
+  실제 렌더링은 폰트 힌팅 등으로 <b>±1~2px 오차</b>가 있을 수 있다). 계산 기준: <code>.vd-item</code> padding 10px×2 + 테두리 1px + 내용줄(font-size 12.5px × line-height 1.5 ≈ 18.75px) ≈ <b>40px</b>,
+  <code>.vd-plain</code> margin-top 4px + (font-size 12.5px × line-height 1.6 = 정확히 20px) = <b>+24px</b>.
+</p>
+<table class="t">
+  <tr><th style="width:260px">항목</th><th style="width:180px">기존</th><th style="width:230px">신규</th><th>증감</th></tr>
+  <tr><td>항목 한 줄 높이 — 한글 풀이 <b class="hi">있는</b> 항목</td><td>약 40px</td><td>약 64px (+새 줄 20px, 여백 4px)</td><td><b class="bad">+24px · +60%</b></td></tr>
+  <tr><td>항목 한 줄 높이 — 한글 풀이 <b class="hi">없는</b> 항목(11/20)</td><td>약 40px</td><td>약 40px (변화 없음)</td><td>+0px · +0%</td></tr>
+  <tr><td>20건 목록 세로 총합(실측 커버리지 45% → 9건 해당)</td><td>800px (40×20)</td><td>1,016px (40×11 + 64×9)</td><td><b class="bad">+216px · +27%</b></td></tr>
+  <tr><td>참고 — 커버리지 0%(오늘 당장 규칙이 하나도 안 걸리는 최악)</td><td>800px</td><td>800px</td><td>+0px · +0%</td></tr>
+  <tr><td>참고 — 커버리지 100%(이론상 상한, 전부 매칭)</td><td>800px</td><td>1,280px (64×20)</td><td>+480px · +60%</td></tr>
+  <tr><td><code>.vd-list</code> 실제 높이 제한(520px, 안 바뀜) 안에서 <b class="hi">스크롤 없이 보이는 항목 수</b></td><td>13개 (520÷40)</td><td>10개 (520÷51, 45% 커버리지 평균 51px)</td><td><b class="bad">-3개 · -23%</b></td></tr>
+</table>
+<div class="meas">
+  가장 정직한 비용은 마지막 줄이다 — <code>.vd-list</code>는 이미 <b>520px로 스크롤되는 목록</b>이라 "총 높이"는 체감과 거리가 있다.
+  실제로 담당자가 느끼는 건 <b>한 화면에 13개가 아니라 10개만 보인다</b>는 것 — 3개(23%)만큼 더 스크롤해야 한다.
+  Material Design의 +50%(48dp→72dp)와 비교하면 우리 +60%는 조금 더 크다 — <b>배지가 이미 7종</b>이라 밀도가 높은 화면이라서다.
+</div>
+
+<h2><span class="n">공백</span>한글 못 찾은 항목 — 어떻게 보이나</h2>
+<p class="note">
+  <b class="ok">권장: 안 그린다.</b> 위 20건 목록에서 ③⑤⑥⑩⑪⑭⑮⑯⑰⑲⑳(11건)이 그 예시다 — <code>.vd-plain</code> div 자체를 만들지 않는다
+  (빈 문자열 → 조건부로 아예 렌더링 안 함, 예: <code>plain ? `&lt;div class="vd-plain"&gt;...&lt;/div&gt;` : ""</code>).
+  빈 div를 만들고 CSS로 <code>display:none</code> 하는 방식은 쓰지 않는다 — margin-top 계산이 남거나, 나중에 누가 실수로 보이게 바꾸면
+  "빈 설명"이 화면에 뜬다. <b class="hi">findingplain.ts의 "모르면 모른다"는 원칙을 화면 구현까지 그대로 끌고 가는 것</b>이 이 결정의 핵심이다.
+</p>
+
+<h2><span class="n">포기</span>무엇을 포기했나</h2>
+<table class="t">
+  <tr><th style="width:260px">포기한 안</th><th>왜</th></tr>
+  <tr><td>종류별 색 구분(실행=빨강, 인증=파랑…)</td><td>이미 배지 색이 5중(심각도·KEV·오분류경보·EPSS·VPR)이다. 여섯 번째 색 신호를 얹으면 어디를 먼저 봐야 할지 더 헷갈린다. 굵게(<b>강조</b>)는 findingplain.ts 문장 안에 이미 있어 그것으로 충분하다.</td></tr>
+  <tr><td>원문 옆 인라인 배치</td><td>위 "❌ 버린 안" 참조 — 배지 7종+버튼과 한 줄에서 다투면 항목마다 줄바꿈이 들쭉날쭉해진다.</td></tr>
+  <tr><td>vd-name 아래로 들여쓰기(심각도 배지 폭만큼)</td><td>CRIT/HIGH/MED/LOW 배지 폭이 글자 수에 따라 미세하게 달라 정렬이 근사치밖에 안 된다. 이미 있는 <code>.vd-ev</code>(증거 펼치기)도 들여쓰기 없이 flush-left라 그 문법을 따르는 게 화면 안에서 더 일관적이다.</td></tr>
+  <tr><td>호버 툴팁으로만 보여주기</td><td>"옆에 바로 보이게"가 이번 요청의 취지다. 4,833건을 하나하나 마우스로 올려야 보이면 훑어보기(scan) 용도로 쓸모가 준다. (EPSS·misfit처럼 <b>보조 정보</b>는 지금처럼 title 툴팁으로 남긴다 — 이번에 새로 만든 것과 급이 다르다.)</td></tr>
+  <tr><td>ⓘ/screenguide로 우회</td><td>이건 "화면 사용법"이 아니라 "이 데이터 행 자체의 뜻"이다. 아래 자가점검 절에서 근거와 함께 설명한다.</td></tr>
+  <tr><td>findingplain.ts 규칙을 늘려 커버리지 100%로</td><td>이번 시안 범위 밖 — 서버 엔진(findingplain.ts) 수정은 별도 작업이다. 45%로 시작하고, 규칙이 늘수록 화면은 자동으로 더 채워진다(화면 쪽 코드는 안 바뀜).</td></tr>
+</table>
+
+<h2><span class="n">점검</span>제품 원칙 자가점검</h2>
+<table class="t chk-table">
+  <tr><th style="width:230px">원칙</th><th>이 시안에서</th></tr>
+  <tr><td>정직한 구현</td><td><span class="chk-ok">✓</span> 못 찾으면 빈 문자열 → 화면에 아무것도 안 그림(지어내지 않음). 시안 버튼은 전부 비활성 고지. 밀도 숫자는 계산 근거를 밝히고 오차 가능성도 적음.</td></tr>
+  <tr><td>밀도 우선</td><td><span class="chk-ok">✓</span> 줄 높이(40→64px)·20건 총합(800→1,016px)·스크롤 가시 항목(13→10개)까지 세 층위로 숫자를 냄. 최솟값·최댓값 범위까지 밝혀 "45%는 실측이지 낙관값이 아님"을 보임.</td></tr>
+  <tr><td>"화면은 보기용, 설명은 챗봇+ⓘ로"와의 관계</td><td>이 원칙은 <b>화면·기능 사용법</b>("이 화면이 뭐 하는 곳인지" "이 버튼 누르면 뭐가 되는지")에 해당한다. 이 줄은 <b>행 데이터 자체의 뜻</b>이라 이미 이 화면에 있는 <code>.vd-sub</code> 문장·EPSS/misfit의 <code>title</code> 툴팁과 같은 급이다. 새 "사용법 안내"를 화면에 늘리는 게 아니라, 이미 그리고 있던 필드(finding_type)의 뜻을 옆에 다는 것 — 그래서 원칙 위반이 아니라고 판단했다.</td></tr>
+  <tr><td>원문 보존</td><td><span class="chk-ok">✓</span> findingplain.ts 설계 원칙("이름 자체는 번역 안 한다") 그대로 — 원문을 지우거나 바꾸지 않고 <b>아래에 추가만</b> 한다.</td></tr>
+  <tr><td>색·글꼴은 제품에서 그대로</td><td><span class="chk-ok">✓</span> 새 색 토큰 없음(<code>var(--muted)</code> 재사용), 새 글꼴 없음, font-size/line-height도 같은 화면의 <code>.vd-sub</code>에서 그대로 가져옴.</td></tr>
+  <tr><td>화면 구조 최소 변경</td><td><span class="chk-ok">✓</span> 새 팝업·모달·탭 없음. 기존 <code>.vd-item</code> 안에 CSS 5줄(.vd-plain 2규칙) + 조건부 div 1개만 추가.</td></tr>
+  <tr><td>같은 값을 두 곳에 적지 않는다(소스 단일화)</td><td><span class="chk-ok">✓</span> 아래 "구현 참고" — 클라이언트가 정규식표를 복제하지 않고 서버 <code>한줄풀이글()</code>을 그대로 통과시키도록 권고.</td></tr>
+</table>
+
+<h2><span class="n">참고</span>구현 참고 (메인 에이전트용 — 시안 승인 후)</h2>
+<table class="t">
+  <tr><th style="width:190px">항목</th><th>내용</th></tr>
+  <tr><td>데이터 전달</td><td>서버가 finding을 직렬화하는 시점(자산/취약점 목록 API)에 <code>한줄풀이찾기(f.finding_type)?.말</code>을 <code>plain</code> 필드로 실어 보내는 편을 권한다 — 클라이언트가 정규식표를 복제하면 두 곳이 어긋난다(MEMORY "그 값을 누가 넣는가" 원칙과 동일선상).</td></tr>
+  <tr><td>함수 선택 주의</td><td><code>한줄풀이글()</code>은 <b>채팅용</b>이라 앞에 <code>" — "</code> 접두가 붙는다(문장 뒤에 이어 붙이는 용도). 화면 새 줄에는 <code>한줄풀이찾기(f.finding_type)?.말</code>을 직접 쓰거나, <code>한줄풀이글()</code> 결과에서 선행 <code>" — "</code>를 잘라 쓴다.</td></tr>
+  <tr><td>굵게 강조 변환</td><td><code>말</code> 필드 안의 <code>**강조**</code>는 마크다운이 아니라 리터럴 별표다 — <code>esc()</code> 적용 <b>이후</b> <code>/\*\*(.+?)\*\*/g</code> → <code>&lt;b&gt;</code>로 바꿔야 화면에 별표가 그대로 안 보인다. (이 시안의 예시 문장은 전부 손으로 이 변환을 적용해 미리 보여줬다.)</td></tr>
+  <tr><td>렌더 위치</td><td><code>renderVdList()</code>의 <code>.vd-item-top</code> 닫는 태그 직후, <code>.vd-ev</code> 앞에 한 줄: <code>plain ? `&lt;div class="vd-plain"&gt;→ ${boldify(esc(plain))}&lt;/div&gt;` : ""</code>.</td></tr>
+  <tr><td>고쳐짐(fixed) 항목과의 관계</td><td>추가 CSS 불필요 — <code>.vd-item.is-fixed{opacity:.5}</code>가 이미 전체 항목(자식 포함)에 적용돼 <code>.vd-plain</code>도 자동으로 함께 흐려진다. 취소선은 <code>.vd-name</code>에만 걸려 있어 설명줄엔 안 걸린다(의도상 맞다 — 설명 자체가 "틀렸던 말"은 아니므로).</td></tr>
+  <tr><td>소스 감시 테스트</td><td><code>findingplain.test.ts</code>가 이미 "만들어만 두고 안 부르면 안 된다"는 감시를 agenttools 쪽에 걸어 두고 있다(부른 횟수 ≥2). 같은 방식으로 <b>화면 쪽</b>(vulnscan.html 소스)도 <code>한줄풀이</code> 호출을 감시하는 테스트를 하나 추가할 것을 권한다 — 이 저장소가 반복해 겪은 함정이다.</td></tr>
+</table>
+
+<h2><span class="n">확장</span>같은 패턴을 쓸 수 있는 다른 화면</h2>
+<p class="note">
+  정찰 결과 <code>finding_type</code>을 그리는 곳은 vulnscan.html 외에도 <code>approvals.html</code>·<code>map-view.js</code>·<code>session-explorer.js</code> 3곳이 더 있다(요청서에 적힌 대로).
+  이번 정찰에서 <code>grouppanels.js</code>도 <code>finding_type</code>을 다루는 것을 추가로 확인했다 — 총 4곳이 후보다.
+  이번 시안은 <b class="hi">vulnscan 하나에 집중</b>했다. 승인되면 나머지는 같은 <code>.vd-plain</code> 패턴(원문 아래 새 줄·못 찾으면 안 그림)을 그대로 참고해
+  화면마다의 배지 배치에 맞춰 별도로 확인받는다.
+</p>
+
+<footer class="docfoot">
+  mockups/vuln-plain-line/시안.html · GIJO AS 시안 · 제품 코드는 읽기만 했고 수정하지 않았다.
+</footer>
+
+</div>
+</body>
+</html>

@@ -226,6 +226,9 @@ const gijoApi = {
 
   // 작업 세션(대화 세션형) — 오케스트레이터 지시·응답을 세션 대화로 묶어 관리.
   listWorkSessions: () => api.workSessionsApi.list(),
+  // 작업 내역 구분 축(승인 시안 2026-08-18) — 주체(👤내가/🤖시스템)·종류(🔧실행/🔍조회)·QA 표시.
+  listWorkSessionsWithAxes: (f?: { origin?: string; opKind?: string; qa?: boolean }) =>
+    api.workSessionsApi.listWithAxes(f ?? {}),
   sessionPatterns: (days?: number) => api.workSessionsApi.patterns(days),
   // 열린 창 목록·이동 — 빼낸 창이 본창 뒤에 숨어 못 찾는 일을 없앤다(4.0.1).
   listWindows: () => ipcRenderer.invoke("windows:list") as Promise<
@@ -300,6 +303,8 @@ const gijoApi = {
   // 자산 허브(자산 목록·AI-BOM·취약점 통합 뷰)
   workflowStages: () => api.workflowApi.stages(),   // 업무 절차 5단계 현황(절차 띠)
   assetHub: () => api.assetHubApi.overview(),
+  // ⓪ 자산 — 한 자산의 ③ 조치 현황(승인 시안 2026-08-18).
+  assetProgress: (id: string) => api.assetHubApi.progress(id),
   assetHubDetail: (id: string) => api.assetHubApi.detail(id),
   shadowAi: () => api.assetHubApi.shadowAi(),
   scanAsset: (id: string) => api.assetsApi.scan(id),

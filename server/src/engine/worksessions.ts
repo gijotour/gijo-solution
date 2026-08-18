@@ -55,6 +55,34 @@ migrate("work_sessions-doneBy", "ALTER TABLE work_sessions ADD COLUMN doneBy TEX
 // 누가 시작한 세션인지 — 여러 담당자가 쓰는데 목록만 보고는 알 수 없었다(2026-07-26 사용자 지적).
 migrate("work_sessions-createdBy", "ALTER TABLE work_sessions ADD COLUMN createdBy TEXT");
 
+// ── 작업 내역 구분 3축(승인 시안 mockups/작업내역_구분, 2026-08-18) ────────────────────
+//
+// ■ 왜 — 「전부 남긴다」가 이미 **세 번** 터졌다
+//   ① 로그인 기록으로 도배 → auth 제외  ② 같은 일이 두 번 보임 → long_answer_saved 제외
+//   ③ 스스로를 먹는 고리 — 세션 삭제가 감사에 남고 그게 새 세션을 만들어 제목이 재귀했다.
+//      **2,100건을 지워도 총계가 824건 그대로**였다(2026-07-27).
+//   셋 다 「항목을 하나씩 예외 목록에 추가」로 막았다 — 두더지 잡기다. 행위가 새로 늘 때마다 또 샌다.
+//   ⇒ 기본을 뒤집는다: **담당자가 시킨 일만 기본 표시**, 시스템이 한 일·조회·QA는 접힘(토글로 열림).
+//      접힌 것은 사라진 게 아니다 — 감췄으면 **감췄다고 화면에 숫자로** 보인다.
+//
+// ■ 검증된 선례를 따른다 — `actioncheck.ts:99` `qa INTEGER NOT NULL DEFAULT 0`
+//   이 저장소는 이미 「지우지 않고 표시에서만 뺀다」를 다른 이력 표에서 쓰고 있다.
+//   같은 부류의 사고(조치 판정 이력 123건 중 **121건이 QA**)가 이 방어가 없던 표에서 났다.
+//
+// ⚠ **기존 행은 NULL이다** — 시안이 다루지 않은 자리라 여기서 정한다.
+//   NULL을 「시스템」으로 몰면 옛 기록이 기본 화면에서 통째로 사라지고, 「담당자」로 몰면
+//   시스템이 한 일을 담당자가 한 것으로 **지어내는** 셈이 된다. 둘 다 안 한다.
+//   ⇒ NULL은 **「구분 이전 기록」**으로 그대로 두고, 기본 표시에 **포함**한다(사라지지 않는다).
+//     화면이 그렇게 적는다. 새로 쌓이는 것부터 축이 채워진다.
+migrate("work_sessions-origin", "ALTER TABLE work_sessions ADD COLUMN origin TEXT");   // "user" | "system" | NULL(구분 이전)
+migrate("work_sessions-opKind", "ALTER TABLE work_sessions ADD COLUMN opKind TEXT");   // "action" | "query" | NULL
+migrate("work_sessions-qa", "ALTER TABLE work_sessions ADD COLUMN qa INTEGER NOT NULL DEFAULT 0");
+// State Folding — 목록 한 줄·상세 첫 화면에 쓸 **값 조합**(JSON). 자산·대상·조치·결과 또는 질문·답.
+// ⚠ **AI 요약이 아니다.** `recentTurnsText`(:364)가 적어 둔 그대로 — 7B/14B 요약은 지어냄이
+//   섞이고, 요약 오류가 이후 모든 턴에 주입된다. 여기 담기는 것은 **이미 기록된 값을 이어붙인 것**이라
+//   지어낼 수가 없다.
+migrate("work_sessions-fold", "ALTER TABLE work_sessions ADD COLUMN fold TEXT");
+
 // status: active(진행중) | done(완료) | ignored(무시). 새 세션은 active로 시작한다.
 export type SessionStatus = "active" | "done" | "ignored";
 const STATUSES: SessionStatus[] = ["active", "done", "ignored"];
@@ -77,6 +105,20 @@ export interface SessionTurn {
 // 완료 경위 — 사용자 완료와 자동 완료(30분 무대화 등)를 구분한다.
 export type DoneBy = "user" | "auto";
 
+/** 축① 주체 — 👤 담당자가 시킨 일 / 🤖 시스템이 스스로 한 일. null이면 「구분 이전 기록」. */
+export type SessionOrigin = "user" | "system";
+/** 축② 종류 — 🔧 실행한 일(바꾼 것) / 🔍 물어본 것(조회). null이면 「구분 이전 기록」. */
+export type SessionOpKind = "action" | "query";
+
+/**
+ * 접힌 한 줄(State Folding)에 쓸 값들. **모델이 새로 쓰는 문장이 아니라 기록된 값 그대로다.**
+ * 실행이면 자산·대상·조치·결과, 조회면 질문·답. 없는 칸은 비운다(지어내지 않는다).
+ */
+export interface SessionFold {
+  asset?: string; target?: string; act?: string; result?: string;  // 🔧 실행
+  q?: string; a?: string;                                          // 🔍 조회
+}
+
 export interface WorkSession {
   id: string;
   title: string;
@@ -84,6 +126,10 @@ export interface WorkSession {
   doneBy?: DoneBy; // status가 done일 때만 채워짐(user/auto). 그 외엔 undefined.
   contextRef?: string; // 탐색기 대상 참조(asset:.. / vuln:.. / product:.. / today). 없으면 일반 세션.
   createdBy?: string;  // 이 세션을 시작한 사람(표시 이름). 자동 생성이면 "시스템".
+  origin?: SessionOrigin;   // 축① — undefined면 구분이 생기기 전에 쌓인 기록이다.
+  opKind?: SessionOpKind;   // 축② — 위와 같다.
+  qa: boolean;              // 평가 게이트·회귀 하네스가 만든 것. 저장은 하되 기본 표시에서 뺀다.
+  fold?: SessionFold;       // 접힌 한 줄의 재료(값 조합).
   createdAt: number;
   updatedAt: number;
 }
@@ -102,6 +148,10 @@ interface SessionRow {
   doneBy: string | null;
   contextRef: string | null;
   createdBy: string | null;
+  origin: string | null;
+  opKind: string | null;
+  qa: number | null;
+  fold: string | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -114,6 +164,16 @@ interface TurnRow {
   at: number;
 }
 
+// 접힌 한 줄의 재료를 읽는다. 깨진 JSON이 목록 전체를 죽이지 않게 감싼다 —
+// 이 값은 **꾸밈**이고, 못 읽으면 없는 셈 치면 된다(기록 자체는 turns에 온전히 있다).
+function parseFold(raw: string | null): SessionFold | undefined {
+  if (!raw) return undefined;
+  try {
+    const v = JSON.parse(raw) as SessionFold;
+    return v && typeof v === "object" && Object.keys(v).length ? v : undefined;
+  } catch { return undefined; }
+}
+
 function rowToSession(r: SessionRow): WorkSession {
   const status = (STATUSES.includes(r.status as SessionStatus) ? r.status : "active") as SessionStatus;
   return {
@@ -123,6 +183,12 @@ function rowToSession(r: SessionRow): WorkSession {
     doneBy: status === "done" && (r.doneBy === "user" || r.doneBy === "auto") ? r.doneBy : undefined,
     contextRef: r.contextRef ?? undefined,
     createdBy: r.createdBy ?? undefined,
+    // ⚠ 모르는 값을 **추측해 채우지 않는다.** 구분이 생기기 전 기록은 undefined 그대로 둔다 —
+    //   화면이 「구분 이전」이라고 적는다. 여기서 몰아 넣으면 그게 곧 지어내기다.
+    origin: r.origin === "user" || r.origin === "system" ? r.origin : undefined,
+    opKind: r.opKind === "action" || r.opKind === "query" ? r.opKind : undefined,
+    qa: r.qa === 1,
+    fold: parseFold(r.fold),
     createdAt: r.createdAt,
     updatedAt: r.updatedAt,
   };
@@ -131,16 +197,51 @@ function rowToTurn(r: TurnRow): SessionTurn {
   return { id: r.id, sessionId: r.sessionId, role: r.role === "assistant" ? "assistant" : "user", content: r.content, tool: r.tool ?? undefined, at: r.at };
 }
 
-export function createSession(title?: string, contextRef?: string, createdBy?: string): WorkSession {
+/** 세션을 만들 때 함께 정하는 구분 축. 안 주면 「구분 이전 기록」과 같은 자리에 놓인다. */
+export interface SessionMarks {
+  origin?: SessionOrigin;
+  opKind?: SessionOpKind;
+  qa?: boolean;
+  fold?: SessionFold;
+}
+
+export function createSession(title?: string, contextRef?: string, createdBy?: string, marks?: SessionMarks): WorkSession {
   const now = Date.now();
   const s: WorkSession = {
     id: randomUUID(), title: (title && title.trim()) || DEFAULT_TITLE, status: "active",
-    contextRef: contextRef || undefined, createdBy: createdBy || undefined, createdAt: now, updatedAt: now,
+    contextRef: contextRef || undefined, createdBy: createdBy || undefined,
+    origin: marks?.origin, opKind: marks?.opKind, qa: marks?.qa === true, fold: marks?.fold,
+    createdAt: now, updatedAt: now,
   };
-  db.prepare("INSERT INTO work_sessions (id, title, status, contextRef, createdBy, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)").run(
-    s.id, s.title, s.status, s.contextRef ?? null, s.createdBy ?? null, s.createdAt, s.updatedAt
+  db.prepare(
+    "INSERT INTO work_sessions (id, title, status, contextRef, createdBy, origin, opKind, qa, fold, createdAt, updatedAt)" +
+    " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+  ).run(
+    s.id, s.title, s.status, s.contextRef ?? null, s.createdBy ?? null,
+    s.origin ?? null, s.opKind ?? null, s.qa ? 1 : 0, s.fold ? JSON.stringify(s.fold) : null,
+    s.createdAt, s.updatedAt
   );
   return s;
+}
+
+const markStmt = db.prepare("UPDATE work_sessions SET origin = ?, opKind = ?, qa = ?, fold = ? WHERE id = ?");
+/**
+ * 이미 만들어진 세션에 구분 축을 채운다 — 대화형 세션은 **첫 지시를 받고 나서야** 그것이
+ * 「실행」인지 「조회」인지 알 수 있기 때문이다(세션은 대화 전에 만들어진다).
+ * ⚠ 이미 정해진 값을 덮어쓰지 않는다. 한 세션에서 조회하다 실행하면 **실행이 이긴다** —
+ *   담당자가 되짚고 싶은 것은 「무엇을 바꿨나」이지 그 앞의 질문이 아니다.
+ */
+export function markSession(id: string, marks: SessionMarks): void {
+  const cur = db.prepare("SELECT origin, opKind, qa, fold FROM work_sessions WHERE id = ?").get(id) as
+    | { origin: string | null; opKind: string | null; qa: number | null; fold: string | null }
+    | undefined;
+  if (!cur) return;
+  const origin = (cur.origin === "user" || cur.origin === "system" ? cur.origin : null) ?? marks.origin ?? null;
+  // 실행이 조회를 이긴다(위 주석) — 한 번 action이 되면 query로 안 내려간다.
+  const opKind = cur.opKind === "action" ? "action" : (marks.opKind ?? cur.opKind ?? null);
+  const qa = cur.qa === 1 || marks.qa === true ? 1 : 0;
+  const fold = marks.fold ? JSON.stringify(marks.fold) : cur.fold;
+  markStmt.run(origin, opKind, qa, fold, id);
 }
 
 export function getSession(id: string): WorkSession | null {
@@ -154,22 +255,84 @@ export function getSession(id: string): WorkSession | null {
 // 지우는 게 아니라 **파일로 옮기는** 것이라 나중에 찾아볼 수 있다.
 export const SESSION_KEEP = Number(process.env.GIJO_SESSION_KEEP ?? 100);
 
+/**
+ * 목록 필터(승인 시안 2026-08-18). 안 주면 **기본 = 담당자가 시킨 일 + 구분 이전 기록**,
+ * QA는 숨김. 「감췄으면 감췄다고 보인다」를 지키려고 **숨긴 건수도 함께** 돌려준다.
+ */
+export interface SessionFilter {
+  origin?: SessionOrigin | "all";
+  opKind?: SessionOpKind | "all";
+  includeQa?: boolean;
+}
+export interface SessionListResult {
+  items: SessionSummary[];
+  /** 필터에 걸려 안 보이는 건수 — 화면이 「N건 감춰짐」이라 적는 근거다. 0이면 안 적는다. */
+  hidden: { system: number; query: number; qa: number; total: number };
+  /** 축별 총계 — 칩 옆 숫자. 「구분 이전」도 세어 준다(옛 기록이 몇 건인지 보여야 한다). */
+  counts: { user: number; system: number; unmarked: number; action: number; query: number; qa: number; all: number };
+}
+
+const countStmt = db.prepare("SELECT COUNT(*) AS n FROM work_session_turns WHERE sessionId = ?");
+const lastStmt = db.prepare("SELECT role, content FROM work_session_turns WHERE sessionId = ? ORDER BY at DESC, rowid DESC LIMIT 1");
+
+function toSummary(r: SessionRow): SessionSummary {
+  const { n } = countStmt.get(r.id) as { n: number };
+  const last = lastStmt.get(r.id) as { role: string; content: string } | undefined;
+  return {
+    ...rowToSession(r),
+    turnCount: n,
+    lastPreview: last ? last.content.slice(0, 80) : "",
+    lastRole: last ? (last.role === "assistant" ? "assistant" : "user") : null,
+  };
+}
+
 export function listSessions(limit = SESSION_KEEP): SessionSummary[] {
+  return (db
+    .prepare("SELECT * FROM work_sessions ORDER BY updatedAt DESC LIMIT ?")
+    .all(Math.max(1, limit)) as SessionRow[]).map(toSummary);
+}
+
+export function listSessionsFiltered(limit = SESSION_KEEP, f: SessionFilter = {}): SessionListResult {
+  // 최근 limit건을 먼저 집고 **그 안에서** 거른다. 걸러진 뒤 세면 「숨긴 건수」가
+  // 화면에 보이는 목록과 같은 모집단에서 나온다 — 다른 모집단끼리 빼면 숫자가 어긋난다.
   const rows = db
     .prepare("SELECT * FROM work_sessions ORDER BY updatedAt DESC LIMIT ?")
     .all(Math.max(1, limit)) as SessionRow[];
-  const countStmt = db.prepare("SELECT COUNT(*) AS n FROM work_session_turns WHERE sessionId = ?");
-  const lastStmt = db.prepare("SELECT role, content FROM work_session_turns WHERE sessionId = ? ORDER BY at DESC, rowid DESC LIMIT 1");
-  return rows.map((r) => {
-    const { n } = countStmt.get(r.id) as { n: number };
-    const last = lastStmt.get(r.id) as { role: string; content: string } | undefined;
-    return {
-      ...rowToSession(r),
-      turnCount: n,
-      lastPreview: last ? last.content.slice(0, 80) : "",
-      lastRole: last ? (last.role === "assistant" ? "assistant" : "user") : null,
-    };
-  });
+  const all = rows.map(rowToSession);
+
+  const counts = {
+    user: all.filter((s) => s.origin === "user").length,
+    system: all.filter((s) => s.origin === "system").length,
+    unmarked: all.filter((s) => !s.origin).length,
+    action: all.filter((s) => s.opKind === "action").length,
+    query: all.filter((s) => s.opKind === "query").length,
+    qa: all.filter((s) => s.qa).length,
+    all: all.length,
+  };
+
+  const 주체 = f.origin ?? "user";
+  const 종류 = f.opKind ?? "all";
+  const qa포함 = f.includeQa === true;
+
+  // ⚠ **구분 이전 기록(undefined)은 어느 축에서도 안 지운다.** 옛 기록이 통째로 사라지면
+  //   담당자는 「내 기록이 날아갔다」고 읽는다 — 축은 정리하려고 넣은 것이지 지우려는 게 아니다.
+  const 통과 = (s: WorkSession) =>
+    (qa포함 || !s.qa) &&
+    (주체 === "all" || !s.origin || s.origin === 주체) &&
+    (종류 === "all" || !s.opKind || s.opKind === 종류);
+
+  const keep = rows.filter((r) => 통과(rowToSession(r)));
+  const 걸린것 = all.filter((s) => !통과(s));
+  return {
+    items: keep.map(toSummary),
+    hidden: {
+      system: 걸린것.filter((s) => s.origin === "system").length,
+      query: 걸린것.filter((s) => s.opKind === "query").length,
+      qa: 걸린것.filter((s) => s.qa).length,
+      total: 걸린것.length,
+    },
+    counts,
+  };
 }
 
 export function getSessionTurns(id: string): SessionTurn[] {
@@ -418,9 +581,23 @@ onAudit((e) => {
   if (SESSION_SELF_ACTION_RE.test(e.action)) return; // 스스로를 먹는 고리 차단(위 주석 참고)
   try {
     const title = `[${AUDIT_KIND_LABEL[e.kind] ?? e.kind}] ${e.action}${e.target ? " — " + e.target : ""}`.slice(0, 90);
-    const s = createSession(title, undefined, e.actor ?? "시스템");
     // 주체: scheduler(자동 점검)는 AI 팀(assistant), 그 외(담당자 행위)는 나(user)로 — 목록의 "주체" 표기용.
     const role = e.actor === "scheduler" ? "assistant" : "user";
+    // ── 축을 여기서 채운다(승인 시안 2026-08-18) ─────────────────────────────
+    // ⚠ 이 훅으로 들어오는 것은 **이미 벌어진 행위**다 — 조회가 아니라 실행이다.
+    //   (조회는 감사에 안 남는다. `activityaudit`의 메뉴 사용 기록은 kind==="config"라 위에서 걸러졌다.)
+    //   그러니 opKind는 언제나 "action"이고, 갈리는 것은 **누가 했나**뿐이다.
+    // ⚠ 주체 판정은 `actor` 하나로 한다 — 행위 이름으로 추측하지 않는다. 이름으로 가르면
+    //   행위가 늘 때마다 또 새고, 그게 바로 이 시안이 걷어내려는 「예외 목록 두더지 잡기」다.
+    const origin: SessionOrigin = e.actor && e.actor !== "scheduler" && e.actor !== "시스템" ? "user" : "system";
+    // 접힌 한 줄의 재료 — **감사 이벤트가 이미 들고 있는 값 그대로**다. 새로 쓰지 않는다.
+    const fold: SessionFold = {
+      asset: e.target || undefined,
+      target: e.action,
+      act: AUDIT_KIND_LABEL[e.kind] ?? e.kind,
+      result: e.result === "ok" ? "정상" : e.result,
+    };
+    const s = createSession(title, undefined, e.actor ?? "시스템", { origin, opKind: "action", fold });
     const body = (e.detail || e.action) + (e.result !== "ok" ? ` (결과: ${e.result})` : "");
     appendTurn(s.id, role, body, e.actor ?? undefined);
     if (e.result !== "pending") setSessionStatus(s.id, "done", "auto"); // 단발 행위 = 시스템 자동 완료
@@ -529,8 +706,20 @@ export async function generateSessionReport(sessionId: string): Promise<{ base: 
 }
 
 export function registerWorkSessionRoutes(app: Express): void {
-  app.get("/api/work-sessions", authMiddleware, (_req, res) => {
-    res.json(listSessions());
+  // ⚠ **옛 모양(배열)을 그대로 돌려준다.** 이 라우트를 읽는 곳이 화면 말고도 있는데
+  //   (`report.ts`·에이전트 도구) 응답을 통째로 객체로 바꾸면 그것들이 조용히 깨진다.
+  //   구분 축을 쓰려면 `?axes=1`을 붙인다 — 새 화면만 그렇게 부른다.
+  app.get("/api/work-sessions", authMiddleware, (req, res) => {
+    if (String(req.query.axes ?? "") !== "1") return res.json(listSessions());
+    const 하나 = (v: unknown, 허용: string[]) => {
+      const s = String(v ?? "").trim();
+      return 허용.includes(s) ? s : undefined;
+    };
+    res.json(listSessionsFiltered(SESSION_KEEP, {
+      origin: 하나(req.query.origin, ["user", "system", "all"]) as SessionFilter["origin"],
+      opKind: 하나(req.query.opKind, ["action", "query", "all"]) as SessionFilter["opKind"],
+      includeQa: String(req.query.qa ?? "") === "1",
+    }));
   });
 
   app.post("/api/work-sessions", authMiddleware, (req, res) => {

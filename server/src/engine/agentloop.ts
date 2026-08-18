@@ -14,6 +14,7 @@ import { chat, 자료없음배너, 자료없음중복가드 } from "./llm";
 import { 표식 } from "./tone";
 import { reportProgress } from "./progress";
 import { listAgentTools, listToolsFor, findAgentTool, toolCatalogText, validateToolArgs, buildApproval, PendingApproval, NO_HIT_PREFIX, 지식근거없음표지 } from "./agenttools";
+import type { AgentTool } from "./agenttools";
 import { 법령검색없음표지 } from "./lawinfo";
 import { emitCollaboration } from "./collaboration";
 import { listProducts } from "./securityproducts";
@@ -724,6 +725,11 @@ export interface ToolScope {
   // ⚠ 대화 열쇠 — "아까 그거"가 **이 대화의** 직전 대상만 가리키게 한다.
   //   없으면 기본 대화를 쓴다(단일 대화 시절 동작 그대로).
   대화?: string;
+  // 🗂 지금 범위(승인 시안 mockups/자산_0단계, 2026-08-18) — 담당자가 「이 자산 안에서만」이라고
+  // 명시적으로 건 것. 화면을 옮겨도 남는다.
+  // ⚠ **프롬프트로 지키게 하지 않는다.** 7B에 "이 자산만 보라"고 적어 두면 지킬 때도 있고
+  //   아닐 때도 있다(이 저장소가 반복해 확인한 실패다). 도구 인자를 **코드로** 채운다.
+  범위자산?: string;
 }
 
 // 제품 핵심 문구인데 LLM이 "일반 질문"으로 오인해 도구를 건너뛰고 잡담으로 답하던 의도를
@@ -1743,6 +1749,31 @@ function recordToolWork(toolName: string, scope?: ToolScope): void {
   recordWork({ kind, detail: toolName, actor: scope?.actor ?? null, source: "chat", qa: scope?.qa });
 }
 
+/**
+ * 🗂 지금 범위를 도구 인자에 **코드로** 입힌다(승인 시안 mockups/자산_0단계, 2026-08-18).
+ *
+ * ⚠ 프롬프트로 시키지 않는 이유 — 「7B에 규칙을 더해 행동을 교정하려 하지 말 것」은 이 저장소가
+ *   반복해 확인한 것이다. "이 자산만 보라"고 적어 두면 지킬 때도 있고 아닐 때도 있다.
+ * ⚠ **모델이 이미 자산을 지정했으면 건드리지 않는다.** 담당자가 문장 안에서 다른 자산을
+ *   말했을 수 있고(「범위는 web-01인데 db-02는 어때?」), 그때 범위가 덮으면 사람 말을
+ *   화면 상태가 조용히 이기는 셈이 된다 — 그건 이 저장소가 경계하는 바로 그 사고다.
+ * ⚠ 자산 인자를 받지 않는 도구(문서 검색·법령 등)에는 아무것도 안 한다. 없는 인자를 넣으면
+ *   `validateToolArgs`가 「인자 오류」를 내고 도구가 통째로 죽는다.
+ */
+function 범위를입힌다(args: Record<string, string>, tool: AgentTool | undefined, scope?: ToolScope): Record<string, string> {
+  const 자산 = scope?.범위자산;
+  if (!자산 || !tool) return args;
+  // 이 도구가 실제로 받는 인자 이름만 본다 — 선언에 없는 이름을 넣으면 검증이 막는다.
+  const 받는것 = new Set(tool.params.map((p) => p.name));
+  for (const 이름 of ["assetId", "asset", "host"]) {
+    if (!받는것.has(이름)) continue;
+    const 이미 = String(args[이름] ?? "").trim();
+    if (이미) return args;            // 사람 말이 먼저다 — 덮지 않는다
+    return { ...args, [이름]: 자산 };
+  }
+  return args;
+}
+
 export async function runAgentLoop(instruction: string, context = "", scope?: ToolScope): Promise<AgentLoopResult | null> {
   // 범위를 적용한 뒤 쓸 도구가 하나도 없으면 루프를 돌 이유가 없다(호출자가 채팅으로 폴백).
   if (listToolsFor(scope?.domains, scope?.role).length === 0) return null;
@@ -1811,7 +1842,7 @@ export async function runAgentLoop(instruction: string, context = "", scope?: To
 
     // action=tool — 규칙 검증이 LLM 출력 뒤에 항상 위치한다(QA 원칙).
     const tool = decision.tool ? findAgentTool(decision.tool) : undefined;
-    const args = decision.args ?? {};
+    const args = 범위를입힌다(decision.args ?? {}, tool, scope);
 
     // 같은 조회 도구를 같은 인자로 되풀이하면(실측: today를 5회 반복) 재실행은 같은 결과라 낭비다.
     // 이미 실행한 (도구+인자)면 재실행 없이 루프를 끝내 지금까지의 결과로 최종 답을 만든다.

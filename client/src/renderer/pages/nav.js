@@ -96,6 +96,14 @@
     //   늘 하는 일이고, 결과는 ① 발견으로 들어온다. 메뉴를 늘리는 대신 루프가 ①로 돌아오게 둔다.
     // ⚠ 네 업무(취약점·보안제품 운영·AI 보안·보안로그)가 **같은 5단계**를 돈다. 그래서 업무별로
     //   메뉴를 따로 만들지 않는다 — 그러면 메뉴가 4배가 되어 원점이다.
+    // ── ⓪ 자산 — **단계가 아니라 범위 축**이다(승인 시안 mockups/자산_0단계, 2026-08-18).
+    //   「무엇을 지키는지」를 먼저 고르면 ①~⑤가 그 자산으로 좁혀진다.
+    // ⚠ id를 `s0-…`로 짓지 않는다. `workflow.test.ts`가 `id: "s${no}-`로 1~5만 훑으므로
+    //   s로 시작해도 안 걸리긴 하지만, 다음 사람이 「왜 시험이 이걸 안 잡지」로 헤맨다.
+    //   이건 절차가 아니라는 것을 **이름에서** 드러낸다.
+    { id: "assets0", icon: "drawer", label: "⓪ 자산", items: [
+      { page: "assets.html", label: "자산 고르기" },
+    ]},
     { id: "s1-find", icon: "search", label: "① 발견·수집", items: [
       // 그룹 통합 1호(2026-08-09 사용자 승인) — 세 메뉴는 discover 허브의 한눈에 띠+무대로.
       // 개별 화면(analysis·threat·inventory)은 파일 그대로 살아 허브 안 끼움 창으로 열린다.
@@ -224,8 +232,13 @@
     "analysis.html?embed=1": "discover.html?embed=1&panel=analysis",
     "threat.html": "discover.html?panel=threat",
     "threat.html?embed=1": "discover.html?embed=1&panel=threat",
-    "inventory.html": "discover.html?panel=assets",
-    "inventory.html?embed=1": "discover.html?embed=1&panel=assets",
+    // ⓪ 자산이 생기면서 자산의 **첫 자리**가 바뀌었다(2026-08-18 승인 시안).
+    // ⚠ **`hub=1`이 붙은 주소는 여기 안 걸린다**(아래 갈아타기 적용부의 예외). 그게 자산
+    //   관리(inventory)로 가는 **유일한 탈출구**다 — assets.html의 「전체 관리 열기」가
+    //   `inventory.html?hub=1`로 여는 이유다. 그 한 글자가 없으면 관리 화면을 열려고 눌러도
+    //   이 표가 ⓪로 되돌려 **영영 못 간다**(오류도 안 난다 — 그냥 같은 화면이 다시 뜬다).
+    "inventory.html": "assets.html",
+    "inventory.html?embed=1": "assets.html?embed=1",
     "ontology.html": "memory.html",             // 온톨로지 → AI 지식(관계 탭)에 흡수
     // 내 업무 → 대시보드(2026-08-01 화면 폐지, 그 일은 대화창이 받는다). ⚠ 이걸 빼면
     // **업데이트 전에 「내 업무」 탭을 열어 둔 담당자**의 그 탭이 영구 빈 화면이 된다

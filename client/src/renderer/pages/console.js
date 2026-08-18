@@ -68,6 +68,13 @@
       ".cs-sel{font-size:11.5px;font-weight:700;color:#ffd9a8;border:1px solid rgba(240,160,32,.45);border-radius:12px;padding:1px 9px;white-space:nowrap;max-width:180px;overflow:hidden;text-overflow:ellipsis;}",
       ".cs-sel .x{margin-left:5px;color:var(--muted-2,#a49d95);cursor:pointer;font-weight:400;}",
       ".cs-sel .x:hover{color:#f5928a;}",
+      // 🗂 지금 범위 — **파랑**. 🎯(주황)와 색이 달라야 한다: 수명이 반대인 두 개를 같은 색으로
+      // 두면 담당자가 「아까 푼 줄 알았는데 아직 걸려 있네」를 겪는다(그게 범위의 위험이다).
+      ".cs-scope{font-size:11.5px;font-weight:700;color:#bcd7ff;border:1px solid rgba(59,130,246,.55);" +
+        "background:rgba(59,130,246,.12);border-radius:12px;padding:1px 9px;white-space:nowrap;" +
+        "max-width:200px;overflow:hidden;text-overflow:ellipsis;}",
+      ".cs-scope .x{margin-left:5px;color:var(--muted-2,#a49d95);cursor:pointer;font-weight:400;}",
+      ".cs-scope .x:hover{color:#f5928a;}",
       // 🎯 지금 다루는 것 — 고른 항목의 **실제 값**을 펼쳐 보인다(2026-08-18 시안 승인).
       // 왜 칩 말고 이것도 두나: 칩(.cs-sel)은 **이름표 한 줄**뿐이라 무엇을 다루는지가 안 보였다.
       // ⚠ 이 값은 대화 이력(6턴·300자 감쇠) 밖이다 — 선택은 매 요청 따로 실린다(dispatcher.ts:597·668).
@@ -245,6 +252,10 @@
       '<div class="cs-head">' +
         '<span class="cs-ctx" id="csCtx" title="지금 지시의 대상 화면 — ✕로 떼면 화면과 무관하게 묻습니다">대시보드</span>' +
         '<span class="cs-sel" id="csSel" style="display:none" title="화면에서 고른 항목 — 「이거」가 이걸 가리킵니다"></span>' +
+        // 🗂 지금 범위 — **화면이 바뀌어도 남는다**(승인 시안 mockups/자산_0단계, 2026-08-18).
+        // 🎯(주황, .cs-sel)와 색부터 다르게 둔다. 둘 다 「고른 것」이지만 수명이 반대다:
+        //   🎯 고른 한 건 = 화면 바뀌면 지워짐 · 🗂 범위 = 풀 때까지 따라다님.
+        '<span class="cs-scope" id="csScope" style="display:none" title="지금 보고 있는 범위 — 화면을 옮겨도 따라갑니다. ✕로 풉니다"></span>' +
         '<span class="cs-hint" id="csHint">보고 있는 화면 기준으로 지시합니다</span>' +
         '<button class="cs-btn" id="csToggleHost" title="' +
           (IS_WINDOW ? "이 창을 닫고 앱 아래에 다시 붙입니다" : "대화를 별도 창으로 빼냅니다 — 화면을 100%로 쓸 때") + '">' +
@@ -284,6 +295,14 @@
     //   칩 내용은 applyCtx가 매번 다시 그리므로, 리스너는 부모(고정 요소)에 한 번만 단다.
     document.getElementById("csSel").addEventListener("click", function (e) {
       if (e.target && e.target.classList.contains("x")) setSelection(null);
+    });
+    // 🗂 범위 풀기 — 범위는 화면을 옮겨도 남으므로 **푸는 길이 늘 손 닿는 곳에** 있어야 한다.
+    document.getElementById("csScope").addEventListener("click", function (e) {
+      if (e.target && e.target.classList.contains("x")) {
+        setScope(null);
+        // 화면들도 알아야 목록이 되돌아온다 — 셸을 거쳐 모든 틀에 알린다.
+        try { window.parent.postMessage({ type: "gijo:scope", scope: null }, "*"); } catch (err) { }
+      }
     });
     document.getElementById("csCtx").addEventListener("click", function (e) {
       if (e.target && e.target.classList.contains("x")) { ctxOff = true; applyCtx(); return; }
@@ -1030,6 +1049,41 @@
     renderSelState();
   }
 
+  // ── 🗂 지금 범위(승인 시안 mockups/자산_0단계, 2026-08-18) ─────────────────────
+  //
+  // ⚠ 🎯 지금 다루는 것(.cs-sel)과 **다른 물건**이다. 헷갈리면 사고가 난다:
+  //     🎯 = 사람이 화면에서 누른 **한 건**. 화면을 옮기면 지워진다(setSelection(null)).
+  //     🗂 = 「이 자산 안에서만 본다」는 **범위**. 화면을 옮겨도 **남는다** — 그게 목적이다.
+  //   그래서 `setSelection(null)`을 부르는 자리(화면 전환)를 손대지 않는다. 변수가 다르다.
+  //
+  // ⚠ 남는 것이므로 **푸는 길이 늘 보여야 한다.** 안 보이면 담당자는 왜 목록이 적은지 모른다 —
+  //   그게 「범위」라는 장치의 유일한 위험이고, ✕와 파란 알약이 그 대가다.
+  var 범위 = null; // { kind, id, label } | null
+  var SCOPE_KEY = "gijo:scope:asset";
+  function setScope(s) {
+    범위 = s && s.id && s.label ? { kind: s.kind || "asset", id: String(s.id), label: String(s.label) } : null;
+    try {
+      if (범위) window.localStorage.setItem(SCOPE_KEY, JSON.stringify(범위));
+      else window.localStorage.removeItem(SCOPE_KEY);
+    } catch (e) { /* 저장 못 해도 이번 세션은 돈다 */ }
+    renderScope();
+  }
+  function renderScope() {
+    var el = document.getElementById("csScope");
+    if (!el) return;
+    if (!범위) { el.style.display = "none"; el.innerHTML = ""; return; }
+    el.style.display = "";
+    el.innerHTML = "🗂 " + esc(범위.label) + ' <span class="x" title="범위를 풉니다 — 전체를 다시 봅니다">✕</span>';
+  }
+  // 새로고침·화면 이동 뒤에도 살아 있어야 하므로 저장소에서 되살린다.
+  (function () {
+    try {
+      var raw = window.localStorage.getItem(SCOPE_KEY);
+      if (raw) 범위 = JSON.parse(raw);
+      if (범위 && (!범위.id || !범위.label)) 범위 = null;
+    } catch (e) { 범위 = null; }
+  })();
+
   // ── 배관: 화면이 「지금 보여 주는 목록」을 알려 준다(2026-08-18) ────────────
   // ⚠ **화면에 아무것도 그리지 않는다.** 📌 칩(고른 한 건)과 헷갈리면 안 되기 때문이다 —
   //   고른 것은 사람이 누른 것이고, 보는 목록은 그냥 떠 있는 것이다. 떠 있다고 칩을 띄우면
@@ -1217,6 +1271,14 @@
       var 보낼글 = text;
       if (보는목록 && 보는목록.ids.length && text.indexOf("#고른건") < 0 && 보는목록.screen && 보는목록.screen === ctx.screen) {
         보낼글 = text + "\n#보는목록 " + 보는목록.ids.join(",");
+      }
+      // 🗂 범위를 **지시에도 싣는다**(승인 시안 mockups/자산_0단계, 2026-08-18).
+      // ⚠ 이걸 빠뜨리면 화면엔 「이 자산 범위」라 적혀 있는데 대화창에 물으면 **전 자산 답**이
+      //   온다 — 「안내한 말과 코드가 어긋난다」가 그대로 재발한다(2026-08-18 검토관 지적).
+      //   화면만 좁히는 범위는 범위가 아니라 착시다.
+      // ⚠ 고른 한 건(#고른건)이 있으면 안 붙인다 — 콕 집은 것이 범위보다 늘 우선이다.
+      if (범위 && 범위.id && text.indexOf("#고른건") < 0) {
+        보낼글 = 보낼글 + "\n#범위 " + 범위.kind + ":" + 범위.id;
       }
       // 답 스트리밍(전-7, 시안 정돈안) — 산문이 생성되는 대로 진행 카드 아래에 글자가 흐른다.
       // 흐른 글자는 「쓰는 중」 표시일 뿐 — done의 최종 답(출구 관문 통과본)으로 반드시 갈아 끼운다.
@@ -1450,7 +1512,7 @@
     input.focus();
     try { input.setSelectionRange(input.value.length, input.value.length); } catch (e) {}
   }
-  window.gijoConsole = { append: append, syncCtx: readCtxFromShell, submit: submit, ask: ask, prefill: prefill, guide: guideAsk, select: setSelection, view: setViewList };
+  window.gijoConsole = { append: append, syncCtx: readCtxFromShell, submit: submit, ask: ask, prefill: prefill, guide: guideAsk, select: setSelection, view: setViewList, scope: setScope, getScope: function () { return 범위; } };
 
   // 다른 화면·다른 창에서 "이 지시를 대화창에서 이어서" 하고 넘겨 준 것을 받는다.
   // ⚠ 빈 글이면 **보내지 않는다** — 「이어서 지시하기」만 누른 사람은 아직 할 말을 안 정했다.

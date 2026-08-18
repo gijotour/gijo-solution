@@ -184,8 +184,25 @@ export interface SessionPatternReport {
   비고: string[];
 }
 
+/** 작업 내역 구분 축(승인 시안 2026-08-18). `undefined`는 「구분 이전 기록」 — 추측해 채우지 않는다. */
+export interface WorkSessionAxes {
+  items: WorkSessionSummary[];
+  /** 필터에 걸려 안 보이는 건수 — 화면이 「N건 감춰짐」이라 적는 근거. 감췄으면 감췄다고 보인다. */
+  hidden: { system: number; query: number; qa: number; total: number };
+  counts: { user: number; system: number; unmarked: number; action: number; query: number; qa: number; all: number };
+}
+
 export const workSessionsApi = {
   list: () => request<WorkSessionSummary[]>("/api/work-sessions"),
+  // ⚠ `axes=1`이 없으면 서버가 **옛 모양(배열)** 그대로 준다 — 이 라우트를 읽는 다른 곳
+  //   (report.ts·에이전트 도구)을 깨지 않으려고 그렇게 뒀다.
+  listWithAxes: (f: { origin?: string; opKind?: string; qa?: boolean } = {}) => {
+    const q = new URLSearchParams({ axes: "1" });
+    if (f.origin) q.set("origin", f.origin);
+    if (f.opKind) q.set("opKind", f.opKind);
+    if (f.qa) q.set("qa", "1");
+    return request<WorkSessionAxes>(`/api/work-sessions?${q.toString()}`);
+  },
   patterns: (days = 30) => request<SessionPatternReport>(`/api/session-patterns?days=${days}`),
   create: (title?: string, contextRef?: string) =>
     request<WorkSession>("/api/work-sessions", { method: "POST", body: { ...(title ? { title } : {}), ...(contextRef ? { contextRef } : {}) } }),

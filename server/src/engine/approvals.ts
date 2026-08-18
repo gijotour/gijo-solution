@@ -215,6 +215,28 @@ export function prioritizedReviews(limit = 10, assetIds?: string[]): Prioritized
     .slice(0, Math.max(1, limit));
 }
 
+/**
+ * 한 자산의 ③ 조치 현황(승인 시안 mockups/자산_0단계, 2026-08-18).
+ *
+ * ⚠ `approvalSummary`를 그대로 못 쓴다 — 거기엔 **미배정 칸이 없다**.
+ * ⚠ 세는 규칙은 `workflow.ts`의 ③ 조치와 **똑같아야 한다.** 다르면 같은 자산을 두 화면이
+ *   다른 숫자로 말한다 — 이 저장소가 「같은 것을 여러 곳에 적으면 어긋난다」로 반복해 겪은 것이다.
+ *   그래서 규칙을 여기 다시 쓰지 않고 **같은 원천(listFindingReviews + isRealVulnerability)**에
+ *   같은 조건(in_progress / 미배정)을 건다. 조건이 바뀌면 `workflowstage.test`가 짝을 잡는다.
+ */
+export function assetProgress(assetId: string): { inProgress: number; unassigned: number } {
+  let inProgress = 0, unassigned = 0;
+  try {
+    for (const r of listFindingReviews()) {
+      if (r.assetId !== assetId) continue;
+      if (!isRealVulnerability(r.finding)) continue;   // 스캔 오류는 취약점이 아니다
+      if (r.status === "in_progress") inProgress++;
+      if (!r.assignee && r.status !== "approved" && r.status !== "rejected") unassigned++;
+    }
+  } catch { /* 대장을 못 읽으면 0 — 화면은 「—」로 그린다 */ }
+  return { inProgress, unassigned };
+}
+
 // ── AI 조치 브리핑(자동 triage) ─────────────────────────────────────────
 // 우선순위 상위 취약점에 대해 [우선순위 근거 + 권장 조치 + 권장 기한] 초안을 로컬 LLM이 작성한다.
 // 온톨로지 완화통제를 근거로 주입해 근거 기반 조치를 유도한다. 자동 적용이 아니라 담당자 검토용 초안.
@@ -370,6 +392,11 @@ export function registerApprovalsRoutes(app: Express): void {
   });
 
   // 오늘의 조치 — 전 자산 finding을 KEV·EPSS·VPR·심각도로 정렬한 우선순위 목록.
+  // ⓪ 자산 화면의 ③ 조치 칸(승인 시안 2026-08-18). 읽기만 하므로 담당자 누구나.
+  app.get("/api/assets/:id/progress", authMiddleware, (req, res) => {
+    res.json(assetProgress(String(req.params.id)));
+  });
+
   app.get("/api/approvals/priorities", authMiddleware, (req, res) => {
     const limit = Number(req.query.limit) || 10;
     res.json({ items: prioritizedReviews(limit) });

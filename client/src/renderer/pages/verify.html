@@ -22,7 +22,12 @@
   .scr-id{font-size:12.5px;color:var(--muted);margin-bottom:10px;}
   .scr-id b{color:var(--text);font-weight:800;}
   /* 한눈에 띠 — 판 132px, 늘 보임 */
-  .gh-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;flex:0 0 auto;}
+  /* ⚠ 판 개수는 허브마다 다르다(④검증은 1개, ①발견은 ⓪자산 분리 뒤 3개다). `repeat(4,1fr)`로
+     못박아 두면 판이 3개일 때 **오른쪽 한 칸이 빈다** — 담당자는 「뭔가 안 떴나」로 읽는다.
+     실제로 ④검증 허브는 판 1개인데 1/4 폭으로 떠 있었다(2026-08-18 검토에서 드러남).
+     auto-fit이면 있는 만큼 나눠 채운다. 최소 200px은 판이 하나뿐일 때 전폭으로 늘어나
+     허전해지는 것을 막는 하한이 아니라, **좁은 창에서 글자가 뭉개지지 않게** 하는 하한이다. */
+  .gh-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;flex:0 0 auto;}
   .gh-card{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:10px 12px;height:138px;cursor:pointer;position:relative;overflow:hidden;}
   .gh-card:hover{border-color:rgba(59,130,246,.5);}
   .gh-card.on{border-color:var(--blue);box-shadow:0 0 0 1px var(--blue);}

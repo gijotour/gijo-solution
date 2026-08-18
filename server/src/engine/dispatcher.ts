@@ -34,7 +34,7 @@ import { gateUserInput } from "./gateway";
 import { toolDomainsForScreen } from "./screencontext";
 import { isHelpIntent, formatScreenGuide, 이름으로화면찾기, 방법질문화면찾기, 화면위치안내 } from "./screenguide";
 import { findHowTo, howToMarkdown } from "./howto";
-import { buildFindingPicks, parsePickCommand, pickToolArgs, isFindingListAsk, findingListAnswer, isMyWorkAsk, myWorkAnswer, stripPickMarks, parseViewIds, stripViewMark, PickList } from "./picklist";
+import { buildFindingPicks, parsePickCommand, pickToolArgs, isFindingListAsk, findingListAnswer, isMyWorkAsk, myWorkAnswer, stripPickMarks, parseViewIds, stripViewMark, parseScopeMark, stripScopeMark, PickList } from "./picklist";
 import { isOutOfScope, outOfScopeAnswer, isTooVague, vagueAnswer, 한낱말되묻기 } from "./scopeguard";
 import { analyzeFindings } from "./analysis";
 import { recordFindings, getAsset, listAssets, 자산표시이름 } from "./assets";
@@ -44,7 +44,8 @@ import { generateReport } from "./report";
 import { listFindingReviews } from "./approvals";
 import { listMaintenanceItems } from "./maintenance";
 import { ACTION_CHECK_RE, runActionCheck } from "./actioncheck";
-import { appendTurn, recentTurnsText, getSession, createSession } from "./worksessions";
+import { appendTurn, recentTurnsText, getSession, createSession, markSession } from "./worksessions";
+import type { SessionMarks, SessionFold } from "./worksessions";
 import { LONG_ANSWER_MS, QA_LONG_ANSWER_MS, REPORT_HANDOFF_MS, 보고서꼴, startLongAnswer, finishLongAnswer, failLongAnswer } from "./longanswer";
 import { runWithProgress, isValidProgressId, reportProgress, reportBigStep, registerProgressRoutes } from "./progress";
 import { recordAnswerTiming } from "./observability";
@@ -719,8 +720,44 @@ async function dispatchInstructionScoped(instructionText: string, sessionId?: st
   if (session) {
     appendTurn(session.id, "assistant", result.output, turnToolTag(result));
     collab(qa, { from: "orchestrator", to: "세션", message: `💬 [${title}] ${result.output.slice(0, 600)}` });
+    // 작업 내역 구분 축을 채운다(승인 시안 2026-08-18). 세션은 대화 **전에** 만들어지므로
+    // 「실행이냐 조회냐」는 여기서야 알 수 있다 — 답이 나온 뒤에 표시한다.
+    try { markSession(session.id, 세션축(result, 기록문, actor, qa)); } catch { /* 표시 실패가 대화를 막지 않게 */ }
   }
   return session ? { ...result, sessionId: session.id } : result;
+}
+
+/**
+ * 이 지시가 「🔧 실행」인지 「🔍 조회」인지 **제품이 이미 아는 신호로** 가른다.
+ *
+ * ⚠ 말로 가르지 않는다. "바꿔줘"·"해줘" 같은 낱말로 판정하면 새 표현이 생길 때마다 샌다 —
+ *   그게 이 시안이 걷어내려는 「예외 목록 두더지 잡기」다. 대신 **쓰기 선언**을 본다:
+ *     · 결재판이 떴다 = 쓰기 도구를 부르려 했다(`agentloop.ts:101` — 쓰기면 실행 대신 결재판).
+ *     · 실행된 도구 중 `write: true`가 있다(registry의 선언이 단일 출처).
+ *     · 스캔·리포트는 상태를 만든다(취약점 등록·파일 생성).
+ *   나머지는 조회다.
+ * ⚠ 이 판정이 틀리면 **화면에서 축 칩을 눌러 전체를 보면 된다** — 감춘 것은 지운 것이 아니다.
+ */
+function 세션축(result: DispatchResult, 지시문: string, actor?: string, qa?: boolean): SessionMarks {
+  const 쓰기도구 = (result.toolCalls ?? []).some((c) => findAgentTool(c.tool)?.write === true);
+  const 실행인가 = Boolean(result.approval) || 쓰기도구 ||
+    result.route?.action === "scan" || result.route?.action === "report";
+  const fold: SessionFold = 실행인가
+    ? {
+        // ⚠ 값 그대로다. 모델이 새로 쓰는 문장이 아니다(worksessions.ts SessionFold 주석 참고).
+        asset: result.route?.targetAssetId || result.이어붙인대상 || undefined,
+        target: (result.toolCalls ?? []).map((c) => c.tool).slice(0, 2).join(" · ") || result.route?.action,
+        act: result.approval ? "승인 대기" : "실행",
+        result: result.approval ? "" : result.output.replace(/\s+/g, " ").trim().slice(0, 60),
+      }
+    : { q: 지시문.replace(/\s+/g, " ").trim().slice(0, 60), a: result.output.replace(/\s+/g, " ").trim().slice(0, 80) };
+  return {
+    // 대화창에서 온 지시는 사람이 시킨 것이다 — 이 함수는 그 경로에서만 불린다.
+    origin: "user",
+    opKind: 실행인가 ? "action" : "query",
+    qa: qa === true,
+    fold,
+  };
 }
 
 // 인사·감사 같은 잡담 판별(외부 클라우드 제안 제외용). llm.smallTalkReply와 같은 취지지만
@@ -905,6 +942,11 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   //   값은 아래 지역 변수로 들고 가 결재판을 채울 때 쓴다(글자에서 다시 찾지 않는다).
   const 보던목록 = parseViewIds(instructionText);
   if (보던목록) instructionText = stripViewMark(instructionText);
+  // 🗂 지금 범위 — 담당자가 명시적으로 건 것이라 **늘** 대상을 좁힌다(보던목록과 다르다).
+  // ⚠ 보던목록과 같은 이유로 **글자에서 먼저 뗀다** — 안 떼면 isTooVague·한낱말되묻기가
+  //   표식까지 세어 되묻기가 안 뜬다(2026-08-18에 그 사고를 이미 한 번 겪었다).
+  const 지금범위 = parseScopeMark(instructionText);
+  if (지금범위) instructionText = stripScopeMark(instructionText);
   // 대화 열쇠 — "아까 그거"가 **이 사람의** 직전 대상만 가리키게 한다.
   //   예전에는 전역 1건이라 담당자 A가 방금 다룬 취약점을 담당자 B의 "아까 그거"가 가리켰다.
   //   ⚠ 사람을 못 알아내면 기본 대화를 쓴다 — 예전 동작 그대로다(더 나빠지지 않는다).
@@ -1436,6 +1478,9 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     qa,
     actor,
     대화: 대화열쇠,
+    // 🗂 범위가 걸려 있으면 도구 인자에 **코드로** 입힌다(2026-08-18). 자산 종류만 다룬다 —
+    // 다른 종류(팀·태그)가 생기면 그때 갈래를 늘린다. 모르는 종류를 자산처럼 쓰면 엉뚱한 걸 건다.
+    ...(지금범위 && 지금범위.kind === "asset" ? { 범위자산: 지금범위.id } : {}),
   }).catch(() => null);
   if (loop) {
     const loopTask = mkTask(qa, { text: instructionText, agentId: "orchestrator", priority: "P2" });

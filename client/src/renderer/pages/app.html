@@ -413,6 +413,18 @@
     return /^[a-z0-9_-]+$/i.test(파일) ? "화면" : (파일 || "화면");
   }
 
+  // 열려 있는 **모든** 화면에 범위를 알린다 — 한 탭만 걸러지면 옆 탭과 답이 달라진다.
+  // ⚠ 새로 여는 탭도 받아야 한다(아래 open()에서 iframe이 뜬 뒤 한 번 더 보낸다).
+  function 범위퍼뜨리기(sc) {
+    tabs.forEach(function (t) {
+      try { t.frame.contentWindow.postMessage({ type: "gijo:scope:set", scope: sc }, "*"); } catch (e) { }
+    });
+  }
+  // 지금 걸린 범위 — 새 탭이 뜰 때 곧바로 먹이려고 셸이 들고 있는다.
+  function 지금범위() {
+    try { return JSON.parse(localStorage.getItem("gijo:scope:asset") || "null"); } catch (e) { return null; }
+  }
+
   function open(page, label) {
     if (!page) return;
     // ⚠ 이름이 없으면 **사이드바에서 찾는다** — 없다고 파일명을 사람에게 보이면 안 된다
@@ -439,6 +451,15 @@
       $("screens").appendChild(f);
       // 문서 파싱 중에 src를 붙이면 서브프레임 preload 주입이 간헐적으로 빠진다(실측) — 다음 프레임에.
       (function (frame, p) { requestAnimationFrame(function () { frame.src = embedSrc(p); }); })(f, page);
+      // 🗂 범위가 걸려 있으면 **새로 여는 화면에도** 먹인다 — 안 그러면 새 탭만 전체를
+      //   보여 주고, 담당자는 어느 쪽이 맞는지 모른다(2026-08-18 시안).
+      (function (frame) {
+        frame.addEventListener("load", function () {
+          var sc = 지금범위();
+          if (!sc) return;
+          try { frame.contentWindow.postMessage({ type: "gijo:scope:set", scope: sc }, "*"); } catch (e) { }
+        });
+      })(f);
       t = { page: page, label: label || 읽을이름(page), frame: f, pinned: false };
       tabs.push(t);
     }
@@ -623,6 +644,29 @@
           ? { screen: active.page, label: String(d.label || "").slice(0, 80), ids: ids }
           : null
       );
+      return;
+    }
+    // 🗂 지금 범위 — 「이 자산 안에서만 본다」(승인 시안 mockups/자산_0단계, 2026-08-18).
+    //
+    // ⚠ gijo:select·gijo:view와 **수명이 다르다**. 이 셋을 헷갈리면 사고가 난다:
+    //   · gijo:select = 누른 한 건. 📌 주황. **화면 바뀌면 지워진다.**
+    //   · gijo:view   = 보고 있는 목록. 안 그려진다. 조건이 뜻을 잃었을 때만 쓰인다.
+    //   · gijo:scope  = 범위. 🗂 파랑. **화면을 옮겨도 남는다** — 풀 때까지.
+    //
+    // ⚠ 남는 것이라 **모든 열린 화면에 알려야** 한다. 한 화면만 걸러지면 옆 탭은 전체를
+    //   보여 주고, 담당자는 어느 쪽이 맞는지 모른다. 셸이 퍼뜨리는 이유다.
+    if (d.type === "gijo:scope") {
+      // 여기서도 값을 다시 만든다 — iframe이 보낸 것을 그대로 믿지 않는다(gijo:view와 같은 규칙).
+      var sc = null;
+      if (d.scope && d.scope.id) {
+        var sid = String(d.scope.id).trim();
+        var slab = String(d.scope.label || sid).trim();
+        if (sid && sid.length <= 200 && !/[,\s]/.test(sid)) {
+          sc = { kind: String(d.scope.kind || "asset").slice(0, 20), id: sid, label: slab.slice(0, 60) };
+        }
+      }
+      if (window.gijoConsole && window.gijoConsole.scope) window.gijoConsole.scope(sc);
+      범위퍼뜨리기(sc);
       return;
     }
     if (d.type === "gijo:explain" && window.gijoConsole) {

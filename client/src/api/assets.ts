@@ -177,6 +177,8 @@ export const assetHubApi = {
   overview: () => request<AssetHubOverview>("/api/assethub"),
   detail: (id: string) => request<AssetHubDetail>(`/api/assethub/${encodeURIComponent(id)}`),
   shadowAi: () => request<ShadowAiReport>("/api/shadow-ai"),
+  // ⓪ 자산 화면의 ③ 조치 칸 — 못 구하면 화면은 「—」로 둔다(0으로 채우지 않는다).
+  progress: (id: string) => request<{ inProgress: number; unassigned: number }>(`/api/assets/${encodeURIComponent(id)}/progress`),
   // 표시 이름(별칭) 변경 — null/빈 문자열이면 원래 이름으로 되돌린다.
   setDisplayName: (id: string, displayName: string | null) =>
     request<Asset>(`/api/assets/${encodeURIComponent(id)}/display-name`, { method: "POST", body: { displayName } }),

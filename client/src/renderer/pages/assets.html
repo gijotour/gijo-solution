@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GIJO AS — ⓪ 자산</title>
+<link rel="stylesheet" href="gijo-ui.css">
+<!--
+  ⓪ 자산 — 「무엇을 지키는지 먼저 고르고, 그 자산으로 ①~⑤를 본다」 (승인 시안 mockups/자산_0단계, 2026-08-18).
+
+  ■ 이 화면이 무엇이 아닌가
+    자산 **관리(CRUD)** 화면이 아니다. 그건 inventory.html(1,837줄)이 이미 한다 —
+    등록·수정·CSV·컬럼 드로어·지도 보기·일괄삭제. 거기에 「고르기」를 얹으면 더 무거워진다.
+    **고르는 일과 관리하는 일은 다른 일**이라 화면을 나눴다. 데이터는 같은 것을 쓴다(assetHub).
+
+  ■ 왜 「단계」가 아니라 「범위 축」인가
+    ①발견~⑤보고는 **순서**지만 자산은 **축**이다. STAGE_SCREENS에 6번째로 끼우면
+    「자산 다음에 발견」이라는 없는 순서가 생기고, 절차 띠 숫자의 뜻도 겹친다.
+    그래서 workflow.ts·workflowrail.js는 **한 줄도 안 고쳤다** — stageOfScreen()이
+    표에 없는 이름에 null을 주므로 이 화면은 자동으로 비-절차가 된다.
+
+  ⚠ 입력칸을 두지 않는다 — 「메뉴는 보기용, 지시는 대화창에서만」. 여기 있는 검색칸은
+    **목록을 좁히는 것**이지 지시가 아니다(inventory.html:362와 같은 성격).
+-->
+<style>
+  :root{--bg:#262624;--panel:#30302e;--panel-2:#1f1e1d;--border:rgba(255,255,255,.09);--border-strong:rgba(255,255,255,.16);
+    --text:#e9e7e2;--muted:#b3ada4;--muted-2:#a49d95;--blue:#3b82f6;--blue-light:#5fa1ff;--teal:#1eb980;--red:#e2483d;--amber:#f0a020;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:var(--bg);color:var(--text);font-size:13px;}
+  .app{display:grid;grid-template-columns:212px 1fr;min-height:100vh;}
+  .sidebar{border-right:1px solid var(--border);background:var(--panel-2);}
+  .main{padding:14px 18px 24px;min-width:0;}
+  .scr-id{font-size:12.5px;color:var(--muted);margin-bottom:12px;}
+  .scr-id b{color:var(--text);font-weight:800;}
+
+  /* 지금 범위 알약 — 골랐을 때만 뜬다. 대화창의 🗂(파랑)와 **같은 색**이어야 한다:
+     여기서 고른 것이 저기 뜨는 그것임을 색으로 잇는다. */
+  .scope-bar{display:none;align-items:center;gap:9px;background:rgba(59,130,246,.10);
+    border:1px solid rgba(59,130,246,.45);border-radius:10px;padding:8px 12px;margin-bottom:12px;font-size:12.5px;}
+  .scope-bar.on{display:flex;}
+  .scope-name{font-weight:800;color:#bcd7ff;}
+  .scope-msg{color:var(--muted);}
+  .scope-clear{margin-left:auto;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;
+    padding:4px 10px;color:var(--text);font-size:11.75px;cursor:pointer;}
+  .scope-clear:hover{border-color:var(--blue);}
+
+  .two{display:grid;grid-template-columns:1.05fr 1.35fr;gap:15px;align-items:start;}
+  .panel{background:var(--panel);border:1px solid var(--border);border-radius:12px;padding:14px 16px;}
+  .ph{font-size:13.5px;font-weight:800;color:#fff;margin-bottom:9px;display:flex;align-items:center;gap:8px;}
+  .ph .cnt{font-size:12px;color:var(--muted-2);font-weight:600;}
+  .ph .lnk{margin-left:auto;background:var(--panel-2);border:1px solid var(--border-strong);border-radius:7px;
+    padding:4px 9px;color:var(--text);font-size:11.75px;cursor:pointer;}
+  .ph .lnk:hover{border-color:var(--blue);}
+
+  .search{display:flex;align-items:center;gap:7px;background:var(--panel-2);border:1px solid var(--border);
+    border-radius:8px;padding:6px 10px;margin-bottom:8px;}
+  .search input{flex:1;background:none;border:none;outline:none;color:var(--text);font-size:12.5px;font-family:inherit;}
+
+  /* 목록 — 34px/행(시안 밀도). 줄엔 최소만 두고 나머지는 고른 뒤에 펼친다. */
+  .plist{max-height:612px;overflow-y:auto;}
+  .pk-row{display:flex;align-items:center;gap:9px;padding:8px 6px;line-height:17px;
+    border-bottom:1px solid var(--border);cursor:pointer;}
+  .pk-row:hover{background:var(--panel-2);}
+  .pk-row.on{background:rgba(59,130,246,.10);}
+  .pk-band{width:7px;height:7px;border-radius:50%;flex:0 0 auto;}
+  .pk-band.critical{background:var(--red);} .pk-band.high{background:var(--amber);}
+  .pk-band.medium{background:var(--blue-light);} .pk-band.ok{background:var(--teal);}
+  .pk-name{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px;}
+  .pk-name .ai{font-size:11.25px;color:var(--blue-light);margin-left:4px;}
+  .pk-meta{flex:0 0 auto;font-size:11.5px;color:var(--muted-2);}
+  .pk-meta .kev{color:var(--red);font-weight:800;}
+  .empty{padding:22px 8px;text-align:center;color:var(--muted-2);font-size:12.5px;line-height:1.7;}
+
+  /* 5단계 진행 현황 — 고른 자산 하나에 대해서만 */
+  .stages{display:grid;grid-template-columns:repeat(5,1fr);gap:9px;}
+  .st-card{background:var(--panel-2);border:1px solid var(--border);border-radius:10px;padding:10px 11px;cursor:pointer;}
+  .st-card:hover{border-color:rgba(59,130,246,.5);}
+  .st-h{font-size:11.5px;font-weight:800;color:var(--muted);margin-bottom:6px;white-space:nowrap;}
+  .st-n{font-size:19px;font-weight:800;line-height:1.1;}
+  .st-n.dim{color:var(--muted-2);font-size:15px;}
+  .st-s{font-size:11.25px;color:var(--muted-2);margin-top:4px;line-height:1.4;}
+  .st-why{font-size:11.25px;color:var(--muted-2);margin-top:10px;line-height:1.6;
+    background:var(--panel-2);border:1px dashed var(--border);border-radius:8px;padding:7px 9px;}
+  .pick-first{padding:34px 12px;text-align:center;color:var(--muted-2);font-size:12.5px;line-height:1.8;}
+</style>
+</head>
+<body>
+<div class="app">
+  <nav class="sidebar" id="sidebar"></nav>
+  <main class="main">
+    <div class="scr-id"><b>⓪ 자산</b> — 무엇을 지키는지 먼저 고릅니다. 고르면 <b>대화창 지시</b>가 그 자산 기준으로 갑니다.
+      <span id="gijoChatWidget"></span></div>
+
+    <!-- ⚠ **할 수 있는 것만 적는다.** 「①~⑤ 화면 목록이 자동으로 걸러진다」고 적고 싶지만
+         아직 사실이 아니다 — 각 화면에 자산 필터를 넣는 일이 남아 있다(판 9개).
+         못 하는 것을 적으면 담당자는 화면이 고장 났다고 읽는다. 되는 것부터 적는다. -->
+    <div class="scope-bar" id="scopeBar">
+      <span>🗂 지금 범위</span>
+      <span class="scope-name" id="scopeName">—</span>
+      <span class="scope-msg">화면을 옮겨도 따라갑니다 · <b>대화창 지시</b>가 이 자산 기준으로 갑니다
+        <span style="color:var(--muted-2)">(화면 목록 자동 걸러내기는 아직 준비 중)</span></span>
+      <button class="scope-clear" id="scopeClear">✕ 범위 풀기</button>
+    </div>
+
+    <div class="two">
+      <div class="panel">
+        <div class="ph">자산 고르기 <span class="cnt" id="cnt"></span>
+          <button class="lnk" id="openInventory" title="등록·수정·CSV 내려받기 등 자산 관리는 저쪽에서 합니다">전체 관리 열기 ↗</button>
+        </div>
+        <div class="search">🔎<input id="q" placeholder="자산 이름·담당자로 좁히기…" aria-label="자산 좁히기"></div>
+        <div class="plist" id="list"><div class="empty">불러오는 중…</div></div>
+      </div>
+
+      <div class="panel">
+        <div class="ph">진행 현황 <span class="cnt" id="stName"></span></div>
+        <div id="stages"><div class="pick-first">왼쪽에서 자산을 고르면<br>그 자산의 ①~⑤ 진행 현황이 여기 나옵니다.</div></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script src="dialog.js"></script>
+<script src="nav.js"></script>
+<!-- ⚠ chatparts.js가 chatwidget.js **앞**이어야 한다 — 뒤에 두면 위젯이 부를 때 부품이 아직
+     없어 대화가 반쪽이 된다(clientglobals.test.ts가 순서까지 본다). -->
+<script src="chatparts.js"></script>
+<script src="chatwidget.js"></script>
+<script>
+(function () {
+  var esc = function (s) { return String(s == null ? "" : s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;"); };
+  var $ = function (id) { return document.getElementById(id); };
+  var rows = [], 고른것 = null, 검색어 = "";
+
+  // ── 범위 ────────────────────────────────────────────────────────────────
+  // ⚠ 이 화면은 범위를 **정하는 곳**이다. 실제 보관·표시·지시 반영은 셸(app.html)과
+  //   대화창(console.js)이 한다 — 여기서 localStorage를 직접 쓰지 않는다.
+  //   두 곳이 같은 값을 각자 쓰면 반드시 어긋난다(이 저장소가 반복해 겪은 것).
+  function 범위알리기(sc) {
+    try { window.parent.postMessage({ type: "gijo:scope", scope: sc }, "*"); } catch (e) { }
+  }
+  function 범위그리기(sc) {
+    var bar = $("scopeBar");
+    if (!sc) { bar.classList.remove("on"); return; }
+    bar.classList.add("on");
+    $("scopeName").textContent = sc.label;
+  }
+  // 셸이 범위를 알려 주면(다른 화면에서 풀었을 수도) 화면을 맞춘다.
+  window.addEventListener("message", function (ev) {
+    var d = ev.data;
+    if (!d || d.type !== "gijo:scope:set") return;
+    if (!d.scope) { 고른것 = null; 범위그리기(null); 그리기(); 단계그리기(null); return;}
+    고른것 = d.scope.id;
+    범위그리기(d.scope);
+    그리기();
+  });
+
+  $("scopeClear").addEventListener("click", function () {
+    고른것 = null;
+    범위그리기(null);
+    범위알리기(null);
+    그리기();
+    단계그리기(null);
+  });
+
+  // ⚠ inventory로 가는 길에 `hub=1`을 붙인다 — **안 붙이면 영영 못 간다.**
+  //   nav.js의 갈아타기 표가 "inventory.html?embed=1" → "assets.html?embed=1"로 되돌리는데,
+  //   그 표를 건너뛰는 유일한 예외가 `hub=1`이다(nav.js:1453). 이 한 글자가 없으면
+  //   담당자는 「전체 관리 열기」를 눌러도 이 화면으로 되돌아온다 — 오류도 안 난다.
+  $("openInventory").addEventListener("click", function () {
+    try { window.parent.postMessage({ type: "gijo:openTab", page: "inventory.html?hub=1", label: "자산 관리" }, "*"); }
+    catch (e) { }
+  });
+
+  $("q").addEventListener("input", function () { 검색어 = this.value.trim().toLowerCase(); 그리기(); });
+
+  // ── 목록 ────────────────────────────────────────────────────────────────
+  var BAND_ORDER = { critical: 0, high: 1, medium: 2, ok: 3 };
+  function 그리기() {
+    var 걸린것 = rows.filter(function (r) {
+      if (!검색어) return true;
+      return ((r.displayName || r.name || "") + " " + (r.owner || "")).toLowerCase().indexOf(검색어) >= 0;
+    });
+    $("cnt").textContent = rows.length ? 걸린것.length + "/" + rows.length + "개" : "";
+    if (!걸린것.length) {
+      $("list").innerHTML = rows.length
+        ? '<div class="empty">조건에 맞는 자산이 없습니다.</div>'
+        : '<div class="empty">아직 등록된 자산이 없습니다.<br>아래 대화창에 <b>"자산 등록할게"</b>라고 지시해 보세요.</div>';
+      return;
+    }
+    // 위험한 것부터 — 담당자가 먼저 봐야 할 순서다(riskBand는 서버가 이미 매긴 값).
+    걸린것.sort(function (a, b) {
+      var d = (BAND_ORDER[a.riskBand] == null ? 9 : BAND_ORDER[a.riskBand]) - (BAND_ORDER[b.riskBand] == null ? 9 : BAND_ORDER[b.riskBand]);
+      return d !== 0 ? d : String(a.displayName || a.name).localeCompare(String(b.displayName || b.name), "ko");
+    });
+    $("list").innerHTML = 걸린것.map(function (r) {
+      var v = r.vuln || {};
+      var 메타 = [];
+      if (v.kev) 메타.push('<span class="kev">KEV ' + v.kev + '</span>');
+      if (v.open) 메타.push("미조치 " + v.open);
+      if (!메타.length) 메타.push("깨끗함");
+      return '<div class="pk-row ' + (r.id === 고른것 ? "on" : "") + '" data-id="' + esc(r.id) + '">' +
+        '<span class="pk-band ' + esc(r.riskBand || "ok") + '"></span>' +
+        '<span class="pk-name">' + esc(r.displayName || r.name) + (r.isAi ? '<span class="ai">AI</span>' : "") + "</span>" +
+        '<span class="pk-meta">' + 메타.join(" · ") + "</span></div>";
+    }).join("");
+    Array.prototype.forEach.call($("list").querySelectorAll(".pk-row"), function (el) {
+      el.addEventListener("click", function () { 고르기(el.dataset.id); });
+    });
+  }
+
+  function 고르기(id) {
+    var r = rows.filter(function (x) { return x.id === id; })[0];
+    if (!r) return;
+    고른것 = id;
+    var sc = { kind: "asset", id: id, label: r.displayName || r.name };
+    범위그리기(sc);
+    범위알리기(sc);
+    그리기();
+    단계열기(r);
+  }
+
+  // ── 5단계 진행 현황 ──────────────────────────────────────────────────────
+  // ⚠ ④검증·⑤보고는 **자산별 숫자를 만들 근거가 없다** — hardening_targets에 assetId가 없고
+  //   보고서는 폴더 단위다. 0으로 채우면 「없다」는 뜻이 되어 거짓이 된다(grouppanels.js:11의
+  //   같은 규칙). 그러니 「—」로 비우고, 왜 비었는지 아래 한 줄로 밝힌다.
+  function 단계그리기(r, detail) {
+    if (!r) { $("stName").textContent = ""; $("stages").innerHTML = '<div class="pick-first">왼쪽에서 자산을 고르면<br>그 자산의 ①~⑤ 진행 현황이 여기 나옵니다.</div>'; return; }
+    var v = r.vuln || {};
+    var 조치중 = detail && detail.inProgress != null ? detail.inProgress : null;
+    var 미배정 = detail && detail.unassigned != null ? detail.unassigned : null;
+    $("stName").textContent = r.displayName || r.name;
+    var 칸 = [
+      { h: "① 발견·수집", n: (v.critical || 0) + (v.high || 0) + (v.medium || 0) + (v.low || 0), s: "이 자산에서 찾은 것", page: "discover.html" },
+      { h: "② 우선순위", n: v.open != null ? v.open : null, s: v.kev ? "KEV " + v.kev + "건 포함" : "손대야 할 것", page: "triage.html" },
+      { h: "③ 조치", n: 조치중, s: 미배정 != null && 미배정 > 0 ? "미배정 " + 미배정 + "건" : "진행 중", page: "fix.html" },
+      { h: "④ 검증", n: null, s: "자산별로 셀 수 없음", page: "verify.html" },
+      { h: "⑤ 보고", n: null, s: "자산별로 셀 수 없음", page: "reporting.html" },
+    ];
+    $("stages").innerHTML = '<div class="stages">' + 칸.map(function (c) {
+      return '<div class="st-card" data-page="' + c.page + '" data-h="' + esc(c.h) + '">' +
+        '<div class="st-h">' + esc(c.h) + "</div>" +
+        '<div class="st-n' + (c.n == null ? " dim" : "") + '">' + (c.n == null ? "—" : c.n) + "</div>" +
+        '<div class="st-s">' + esc(c.s) + "</div></div>";
+    }).join("") + "</div>" +
+      '<div class="st-why">④⑤가 「—」인 이유: 점검 대상과 보고서는 <b>자산에 묶여 있지 않습니다</b>' +
+      '(점검 대상 표에 자산 칸이 없고, 보고서는 기간 단위입니다). 0으로 적으면 「없다」는 뜻이 되어 ' +
+      '사실과 달라지므로 비워 둡니다 — 카드를 눌러 그 화면에서 직접 볼 수 있습니다.</div>';
+    Array.prototype.forEach.call($("stages").querySelectorAll(".st-card"), function (el) {
+      el.addEventListener("click", function () {
+        try { window.parent.postMessage({ type: "gijo:openTab", page: el.dataset.page, label: el.dataset.h }, "*"); } catch (e) { }
+      });
+    });
+  }
+
+  async function 단계열기(r) {
+    단계그리기(r, null);
+    // ③ 조치 숫자는 별도 집계가 필요하다 — 없으면 「—」 그대로 둔다(지어내지 않는다).
+    try {
+      if (!window.gijo.assetProgress) return;
+      var d = await window.gijo.assetProgress(r.id);
+      if (d && 고른것 === r.id) 단계그리기(r, d);
+    } catch (e) { /* 못 구하면 「—」 그대로 — 그게 정직하다 */ }
+  }
+
+  // ── 시작 ────────────────────────────────────────────────────────────────
+  (async function () {
+    try {
+      var o = await window.gijo.assetHub();
+      rows = (o && o.rows) || [];
+    } catch (e) {
+      $("list").innerHTML = '<div class="empty">자산 목록을 불러오지 못했습니다.<br>서버 연결을 확인해 주세요.</div>';
+      return;
+    }
+    // 이미 걸려 있는 범위가 있으면 그대로 이어 간다(새로고침·다른 화면에서 건 것).
+    try {
+      var raw = window.localStorage.getItem("gijo:scope:asset");
+      var sc = raw ? JSON.parse(raw) : null;
+      if (sc && sc.id) {
+        고른것 = sc.id;
+        범위그리기(sc);
+        var r = rows.filter(function (x) { return x.id === sc.id; })[0];
+        if (r) 단계열기(r);
+      }
+    } catch (e) { }
+    그리기();
+  })();
+})();
+</script>
+</body>
+</html>

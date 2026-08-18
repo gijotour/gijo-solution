@@ -40,6 +40,11 @@ const SCREENS: Record<string, ScreenContext> = {
 
   // 자산과 취약점은 붙어 다닌다 — 자산 목록에서 "이 자산 취약점 담당자 배정해줘"가 자연스럽다.
   "inventory.html": { label: "자산 목록", domain: "AI·IT 자산 인벤토리", defaultAction: "scan", toolDomains: ["assets", "vuln"] },
+  // ⓪ 자산 — **고르는 화면**이다(관리는 inventory.html). 범위를 걸고 나면 그 자산의 취약점을
+  // 곧바로 묻는 흐름이 자연스러워, 자산 목록과 같은 도구 묶음을 준다.
+  // ⚠ 이 줄이 없으면 `getScreenContext("assets.html")`이 undefined라 **화면 맥락도 도구
+  //   좁히기도 안 걸린다** — 화면은 멀쩡히 뜨고 대화만 조용히 멍청해진다(2026-08-18 검토 지적).
+  "assets.html": { label: "⓪ 자산", domain: "자산 고르기 — 범위를 정하고 ①~⑤로 간다", toolDomains: ["assets", "vuln"] },
   "sbom.html": { label: "AI-BOM 구성", domain: "AI-BOM/SBOM 구성요소·견고성", toolDomains: ["sbom", "assets"] },
   "vulnscan.html": { label: "취약점", domain: "취약점 스캔 결과·조치 우선순위", defaultAction: "analyze", toolDomains: ["vuln", "assets"] },
   "approvals.html": { label: "조치·승인", domain: "탐지 항목 승인·반려", toolDomains: ["vuln"] },
