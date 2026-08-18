@@ -869,9 +869,18 @@ export async function chat(args: ChatArgs): Promise<string> {
     const retryMessages = [...messages, { role: "assistant", content: rawContent }, { role: "user", content: drift.instruction }];
     const retryRes = await fetch(`${baseUrl}/chat/completions`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      // ⚠⚠ **원격 방어 둘을 여기서도 건다**(2026-08-18 조사에서 발견). 위 본 호출(:761-768)에는
+      //   있는데 **이 재생성 경로에만 빠져 있었다.** 같은 곳으로 같은 질문을 다시 보내는 자리라
+      //   방어도 같아야 한다:
+      //     · 원격헤더(접속 토큰) 없음 → 원격이 **401로 조용히 거절**한다. .catch(()=>null)이
+      //       삼켜서 원래 답이 그대로 나가므로, 담당자는 재생성이 안 됐다는 것도 모른다.
+      //     · redirect 금지 없음 → VPN 안 서버가 3xx로 밖을 가리키면 **질문 본문이 따라 나간다.**
+      //       온프렘 제품에서 이건 기능 결함이 아니라 **유출 경로**다.
+      //   ⚠ 원격을 쓰는 고객이 아직 없어 지금 아무도 안 겪는다 — 그래서 더 조용히 남아 있었다.
+      headers: { "Content-Type": "application/json", ...원격헤더 },
       body: JSON.stringify({ model: "local", messages: retryMessages, grammar: NO_HAN_GRAMMAR, ...loraExtras, max_tokens: args.maxTokens ?? DEFAULT_MAX_TOKENS }),
       signal: AbortSignal.timeout(LLM_TIMEOUT_MS),
+      redirect: 원격 ? "error" : "follow",
     }).catch(() => null); // 재작성 실패·시간 초과면 원래 답을 그대로 쓴다
     if (retryRes && retryRes.ok) {
       const retryData = (await retryRes.json()) as { choices?: { message?: { content?: string } }[] };
