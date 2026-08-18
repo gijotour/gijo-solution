@@ -528,6 +528,31 @@
   // (옛 이름 window.gijoShell 별칭은 두지 않는다 — 팝업 셸을 지운 뒤 부르는 곳이 없다.
   //  이름을 남겨 두면 "아직 팝업이 있나" 하고 헷갈릴 뿐이다.)
 
+  /**
+   * 이 메시지가 **지금 보고 있는 탭 안에서** 왔는가.
+   *
+   * ⚠ 왜 한 겹만 보면 안 되나: 화면들이 5단계 재편으로 **허브 안에 묶여** 있다.
+   *   `approvals.html`은 탭이 아니라 `fix.html?panel=approvals`의 무대 iframe
+   *   (`grouphub.js` #ghStage) 안에 들어간다 — 탭 → 허브 → 화면, **두 겹**이다.
+   *   그래서 `ev.source === 탭.contentWindow` 한 번만 보면 늘 거짓이 된다.
+   *
+   * ⚠ 왜 아예 안 보면 안 되나: 안 보이는 탭의 iframe도 살아 있다(셸이 숨겨 둘 뿐).
+   *   뒤에서 목록을 다시 그려 보낸 메시지를 활성 화면 것으로 도장 찍으면
+   *   **안 보고 있는 목록이 대상이 된다.**
+   */
+  function 활성탭안인가(src, 틀) {
+    try {
+      var w = src, 깊이 = 0;
+      while (w && 깊이 < 6) {
+        if (w === 틀.contentWindow) return true;
+        if (w === window || w.parent === w) return false; // 꼭대기에 닿음
+        w = w.parent;
+        깊이++;
+      }
+    } catch (e) { /* 창에 못 닿으면 아닌 것으로 본다 — 모호하면 안 받는 쪽이 안전하다 */ }
+    return false;
+  }
+
   // 탭 안 화면이 셸에 부탁하는 것들.
   window.addEventListener("message", function (ev) {
     var d = ev && ev.data;
@@ -570,6 +595,21 @@
     // ⚠ 여기서도 값을 **다시 만든다** — iframe이 보낸 것을 그대로 믿지 않는다.
     //   id 하나가 200자를 넘거나 목록이 50건을 넘으면 버린다(서버도 같은 상한, 이중 방어).
     if (d.type === "gijo:view" && window.gijoConsole && window.gijoConsole.view) {
+      // ⚠⚠ **화면 이름은 셸이 찍는다 — 화면이 보낸 것을 쓰지 않는다.**
+      //   2026-08-18에 이걸로 배관이 통째로 죽어 있었다. approvals.html은 자기를
+      //   "approvals.html"이라 부르는데, 셸의 탭은 그 화면을 **"fix.html?panel=approvals"**로
+      //   연다(nav.js 209행 갈아타기 표 — 5단계 재편으로 화면들이 허브 안에 묶였다).
+      //   그래서 대화창의 `보는목록.screen === ctx.screen` 대조가 **영원히 거짓**이었다.
+      //   화면도 대화창도 멀쩡히 돌고, 오류도 안 나고, 그냥 아무 일도 안 일어난다 —
+      //   이 저장소가 반복해 겪은 「설계는 다 됐고 쓰인 적 없다」 그대로다.
+      //
+      // ⚠ **활성 탭에서 온 것만 받는다.** 안 보이는 탭의 iframe도 살아 있어서(셸이 숨겨 둘 뿐)
+      //   뒤에서 목록을 다시 그리면 메시지를 보낸다. 그걸 활성 화면 이름으로 도장 찍으면
+      //   **안 보고 있는 목록이 대상이 된다** — 배관을 살리려다 더 나쁜 것을 만드는 꼴이다.
+      // ⚠ 탭이 iframe을 담은 속성 이름은 `frame`이다(`el`이 아니다 — 434행 참조).
+      //   이름을 틀리면 undefined가 되어 **늘 return**한다 — 죽은 배관을 살리다 다시 죽이는 꼴.
+      var 활성틀 = active && active.frame ? active.frame : null;
+      if (!활성틀 || !ev.source || !활성탭안인가(ev.source, 활성틀)) return;
       var ids = [];
       if (Array.isArray(d.ids)) {
         for (var i = 0; i < d.ids.length && ids.length <= 50; i++) {
@@ -580,7 +620,7 @@
       }
       window.gijoConsole.view(
         ids.length && ids.length <= 50
-          ? { screen: String(d.screen || ""), label: String(d.label || "").slice(0, 80), ids: ids }
+          ? { screen: active.page, label: String(d.label || "").slice(0, 80), ids: ids }
           : null
       );
       return;

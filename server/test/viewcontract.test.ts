@@ -34,6 +34,37 @@ describe("보는목록 배관 — 다섯 칸이 이어져 있다", () => {
     expect(s, "값 방어(길이·형식 확인)가 없다").toMatch(/indexOf\("::"\)/);
   });
 
+  it("★② 화면 이름은 **셸이** 찍는다 — 이걸 놓쳐 배관이 통째로 죽어 있었다", () => {
+    // ⚠ 2026-08-18 실사고: approvals.html은 자기를 "approvals.html"이라 부르는데,
+    //   셸의 탭은 그 화면을 **"fix.html?panel=approvals"**로 연다(nav.js 209행 갈아타기 표 —
+    //   5단계 재편으로 화면들이 허브 안에 묶였다). 그래서 대화창의
+    //   `보는목록.screen === ctx.screen` 대조가 **영원히 거짓**이었다.
+    //   화면도 대화창도 멀쩡히 돌고 오류도 안 나고 그냥 아무 일도 안 일어난다.
+    const s = 읽기(pages + "app.html");
+    const 구간 = s.slice(s.indexOf('d.type === "gijo:view"'), s.indexOf('d.type === "gijo:view"') + 2200);
+    expect(구간, "gijo:view 처리부를 못 찾았다 — 이 검사가 헛돈다").toContain("gijoConsole.view");
+    expect(구간, "화면 이름을 셸의 active.page로 안 찍는다 — 화면이 부르는 이름과 탭 이름이 다르다").toMatch(/screen:\s*active\.page/);
+    expect(/screen:\s*String\(d\.screen/.test(구간), "iframe이 보낸 d.screen을 그대로 쓴다 — 늘 어긋난다").toBe(false);
+
+    // 갈아타기 표가 실제로 그렇게 생겼는지 확인한다 — 표가 바뀌면 이 시험의 근거도 바뀐다.
+    const nav = 읽기(pages + "nav.js");
+    expect(nav, "approvals.html 갈아타기가 사라졌다 — 위 근거를 다시 확인할 것").toMatch(
+      /"approvals\.html":\s*"fix\.html\?panel=approvals"/
+    );
+  });
+
+  it("★② 활성 탭 안에서 온 것만 받는다 — 안 보이는 탭의 목록이 대상이 되면 안 된다", () => {
+    // ⚠ 안 보이는 탭의 iframe도 살아 있다(셸이 숨겨 둘 뿐). 뒤에서 목록을 다시 그려 보낸
+    //   메시지를 활성 화면 것으로 도장 찍으면 **안 보고 있는 목록이 대상이 된다.**
+    const s = 읽기(pages + "app.html");
+    expect(s, "보낸 창을 확인하지 않는다").toMatch(/활성탭안인가\(ev\.source/);
+    // ⚠ 탭이 iframe을 담은 속성 이름은 `frame`이다 — `el`로 쓰면 undefined라 **늘 거짓**이 된다.
+    expect(s, "탭의 iframe 속성 이름이 틀렸다(frame이어야 한다)").toMatch(/active\.frame/);
+    expect(/active\.el\b/.test(s), "active.el을 쓴다 — 그런 속성은 없다(늘 거짓이 된다)").toBe(false);
+    // 허브가 한 겹 더 있으므로 **조상까지** 거슬러야 한다(탭 → fix.html → approvals.html).
+    expect(s, "한 겹만 보고 있다 — 허브 안 화면은 영영 안 걸린다").toMatch(/w\s*=\s*w\.parent/);
+  });
+
   it("③ 대화창(console.js)이 받아 표식으로 싣는다", () => {
     const s = 읽기(pages + "console.js");
     expect(s, "gijoConsole에 view가 안 붙었다 — 셸이 불러도 없는 함수다").toMatch(/view:\s*setViewList/);
