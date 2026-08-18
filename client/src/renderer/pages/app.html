@@ -808,6 +808,25 @@
     var wasPopped = "0";
     try { wasPopped = localStorage.getItem("gijo:console:popped") || "0"; } catch (e) {}
     if (wasPopped === "1" && window.gijo.openConsoleWindow) { setPopped(true); window.gijo.openConsoleWindow(); }
+    로그인선택_못한것알리기();
+  }
+
+  // 로그인 화면에서 고른 구동 모드·AI 위치가 **적용되지 않았으면** 여기서 알린다.
+  // ⚠ 로그인 화면은 곧 사라지므로 거기서 띄우면 아무도 못 읽는다 — 그래서 담아 두고 여기서 꺼낸다.
+  //   ⚠ **꺼낸 뒤에는 지운다.** 안 지우면 다음 로그인마다 옛 실패가 다시 뜬다.
+  //   안 알리고 넘어가면 담당자는 「프로로 골랐으니 프로겠지」라고 믿는다 — 그게 제일 나쁘다.
+  function 로그인선택_못한것알리기() {
+    var 못한것 = null;
+    try {
+      var raw = localStorage.getItem("gijo:loginChoiceFailed");
+      if (!raw) return;
+      localStorage.removeItem("gijo:loginChoiceFailed");
+      못한것 = JSON.parse(raw);
+    } catch (e) { return; }
+    if (!못한것 || !못한것.length) return;
+    gijoTell("로그인 화면에서 고른 것 중 " + 못한것.length + "가지가 적용되지 않았습니다.\n\n" +
+      못한것.map(function (s) { return "· " + s; }).join("\n") +
+      "\n\n나머지는 그대로 로그인됐습니다. 위 항목은 설정에서 다시 정할 수 있습니다.");
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
   else boot();

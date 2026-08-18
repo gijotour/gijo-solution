@@ -11,8 +11,18 @@ const require = createRequire(pathToFileURL(path.join(ROOT, "client", "package.j
 const { chromium } = require("playwright-core");
 const OUT = path.join(ROOT, "mockups", "ai-team-office");
 const SERVER = process.env.GIJO_E2E_SERVER || "http://10.8.0.1:4000";
-const USER = process.env.GIJO_E2E_USER || "test1";
-const PASS = process.env.GIJO_E2E_PASS || "showmegijo1";
+// ⚠ 계정을 **표준 QA 계정으로** 옮겼다(2026-08-18). 예전 기본값 `test1`은 시험용으로 만든
+//   여섯 개(test1~test6) 중 하나였는데, 쓰지 않게 되어 정리했다 — 기계 접두사 규칙(사장님 결정
+//   2026-08-12: win_claude-qa · max_claude-qa)에 맞는 계정 하나로 모은다.
+// ⚠ 비밀번호를 소스에 적지 않는다. 없으면 **그렇게 말하고 멈춘다** — 옛 기본값을 남겨 두면
+//   계정을 지운 뒤에도 「왜 로그인이 안 되지」로 헤매게 된다.
+const USER = process.env.GIJO_QA_USER || process.env.GIJO_E2E_USER || "win_claude-qa";
+const PASS = process.env.GIJO_QA_PASS || process.env.GIJO_E2E_PASS || "";
+if (!PASS) {
+  console.error(`✗ 비밀번호가 없습니다. GIJO_QA_PASS를 넣고 다시 실행하세요(계정: ${USER}).`);
+  console.error("  QA 계정이 아직 없으면: node tools/create-qa-account.mjs");
+  process.exit(2);
+}
 const sleep = (ms) => new Promise((s) => setTimeout(s, ms));
 
 let browser;
