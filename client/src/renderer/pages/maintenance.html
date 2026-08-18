@@ -440,7 +440,9 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         var m = 항목.filter(function (x) { return x.id === b.dataset.report; })[0];
         var 말 = "「" + (m ? m.title : "") + "」 점검서를 올릴게";
         if (window.gijoConsole && window.gijoConsole.ask) window.gijoConsole.ask(말);
-        else if (window.gijoAsk) window.gijoAsk(말);
+        // ⚠ 여기는 **알리는** 자리다 — 묻는 게 아니다. gijoAsk는 확인/취소를 묻는 창이라
+        //   뜻이 안 맞고, 돌려주는 값을 안 쓰므로 취소를 눌러도 아무 차이가 없다(2026-08-18 정정).
+        else if (window.gijoTell) window.gijoTell(말);
         else window.gijo.navigateTo("console.html");
       };
     });

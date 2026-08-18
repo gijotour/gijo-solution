@@ -2741,7 +2741,11 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     // 모델 검색·받기
     document.getElementById("hfSearchBtn").addEventListener("click", searchHf);
     document.getElementById("hfSearchInput").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) searchHf(); });
-    document.getElementById("hfResults").addEventListener("click", (e) => {
+    // ⚠ **async여야 한다**(2026-08-18). 안에서 `await gijoAsk(...)`로 확인을 받는데,
+    //   예전엔 동기 `confirm`이라 필요 없었다. 네이티브 창을 걷어내면서 비동기가 됐다 —
+    //   빌드 게이트(check-inline-scripts)가 이걸 잡았다. 안 잡혔으면 **개조본 경고가
+    //   통째로 죽은 채로** 나갔을 것이다.
+    document.getElementById("hfResults").addEventListener("click", async (e) => {
       const id = e.target.dataset.load;
       if (!id) return;
       // ⚠ 고급 검색으로 받을 때만 확인한다 — 권장 목록은 우리가 고른 것이라 묻지 않는다.
