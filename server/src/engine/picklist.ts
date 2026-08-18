@@ -433,6 +433,32 @@ export function stripViewMark(text: string): string {
 export const SCOPE_MARK = "#범위";
 
 /**
+ * 🚀 어떤 셸에서 물었나 — 지금은 `pro` 하나뿐(2026-08-19).
+ *
+ * ⚠ 왜 표식인가: 「○○은 사이드바 ② 우선순위 안에 있습니다」 같은 **길찾기 안내**가
+ *   프로에서는 틀린 말이 된다(프로엔 사이드바가 없다). 서버가 그걸 알려면 신호가 와야 하는데,
+ *   `sendInstruction` 인자를 늘리면 **라이트까지 걸린 공용 통로 다섯 파일**이 흔들린다.
+ *   `#범위`·`#보는목록`이 이미 쓰는 표식 관례를 그대로 따르면 새 통로가 안 생긴다.
+ * ⚠ `ALL_MARKS`에 넣는 순간 `stripPickMarks`가 **기록·표시에서 자동으로 떼어 준다** —
+ *   안 넣으면 담당자 작업 내역에 「#셸 pro」가 그대로 남는다(2026-08-18에 `#범위`로 겪었다).
+ */
+export const SHELL_MARK = "#셸";
+
+/** 지시문에 실린 셸 종류를 읽는다. 없거나 모르는 값이면 null(표준으로 본다). */
+export function parseShellMark(text: string): "pro" | null {
+  return markLine(text, SHELL_MARK).trim() === "pro" ? "pro" : null;
+}
+
+/** 「셸」 표식만 떼어 낸다. */
+export function stripShellMark(text: string): string {
+  return String(text ?? "")
+    .split("\n")
+    .filter((raw) => !raw.trim().startsWith(SHELL_MARK + " "))
+    .join("\n")
+    .trim();
+}
+
+/**
  * **대화창이 지시에 실어 보내는 기계용 표식 전부.**
  *
  * ⚠ 새 표식을 만들면 여기 넣는다. 여기 없으면 그 글자가 작업 내역·이어보기에 **그대로 저장**되어
@@ -440,7 +466,7 @@ export const SCOPE_MARK = "#범위";
  *   손으로 관리하는 목록은 반복해 새므로 `picklistmarks.test.ts`가 「선언된 표식이 전부 여기 있나」를 센다.
  * ⚠ 선언 순서에 주의 — 이 배열은 모듈 로드 때 평가되므로 **모든 표식 상수 뒤**에 와야 한다.
  */
-export const ALL_MARKS = [PICK_MARK, ACTION_MARK, VALUE_MARK, KIND_MARK, VIEW_MARK, SCOPE_MARK] as const;
+export const ALL_MARKS = [PICK_MARK, ACTION_MARK, VALUE_MARK, KIND_MARK, VIEW_MARK, SCOPE_MARK, SHELL_MARK] as const;
 
 export interface ScopeMark {
   kind: string;   // 지금은 "asset" 하나. 나중에 "team"·"tag"가 붙을 자리라 종류를 실어 둔다.

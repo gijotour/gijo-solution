@@ -34,7 +34,7 @@ import { gateUserInput } from "./gateway";
 import { toolDomainsForScreen } from "./screencontext";
 import { isHelpIntent, formatScreenGuide, 이름으로화면찾기, 방법질문화면찾기, 화면위치안내 } from "./screenguide";
 import { findHowTo, howToMarkdown } from "./howto";
-import { buildFindingPicks, parsePickCommand, pickToolArgs, isFindingListAsk, findingListAnswer, isMyWorkAsk, myWorkAnswer, stripPickMarks, parseViewIds, stripViewMark, parseScopeMark, stripScopeMark, PickList } from "./picklist";
+import { buildFindingPicks, parsePickCommand, pickToolArgs, isFindingListAsk, findingListAnswer, isMyWorkAsk, myWorkAnswer, stripPickMarks, parseViewIds, stripViewMark, parseScopeMark, stripScopeMark, parseShellMark, stripShellMark, PickList } from "./picklist";
 import { isOutOfScope, outOfScopeAnswer, isTooVague, vagueAnswer, 한낱말되묻기 } from "./scopeguard";
 import { analyzeFindings } from "./analysis";
 import { recordFindings, getAsset, listAssets, 자산표시이름 } from "./assets";
@@ -947,6 +947,10 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
   //   표식까지 세어 되묻기가 안 뜬다(2026-08-18에 그 사고를 이미 한 번 겪었다).
   const 지금범위 = parseScopeMark(instructionText);
   if (지금범위) instructionText = stripScopeMark(instructionText);
+  // 🚀 어떤 셸에서 물었나 — 길찾기 안내의 낱말 하나가 달라진다(프로엔 사이드바가 없다).
+  // ⚠ 위 표식들과 같은 이유로 **관문보다 먼저** 뗀다 — 안 떼면 글자 수를 세는 판정이 오염된다.
+  const 지금셸 = parseShellMark(instructionText);
+  if (지금셸) instructionText = stripShellMark(instructionText);
   // 대화 열쇠 — "아까 그거"가 **이 사람의** 직전 대상만 가리키게 한다.
   //   예전에는 전역 1건이라 담당자 A가 방금 다룬 취약점을 담당자 B의 "아까 그거"가 가리켰다.
   //   ⚠ 사람을 못 알아내면 기본 대화를 쓴다 — 예전 동작 그대로다(더 나빠지지 않는다).
@@ -1217,7 +1221,9 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
     return {
       task,
       route: { agentId: "orchestrator", action: "chat" },
-      output: 화면위치안내(찾는화면.screen, 찾는화면.title),
+      // 🚀 프로 셸이면 「사이드바」 대신 「☰ 전체 메뉴」로 길을 안내한다(2026-08-19).
+      //   프로엔 사이드바가 없으므로 그대로 두면 **없는 곳을 가리키는** 안내가 된다.
+      output: 화면위치안내(찾는화면.screen, 찾는화면.title, 지금셸 === "pro"),
       sources: [], // 코드가 낸 안내다(4-ⓑ) — 안 실으면 배지 재검색이 무관한 문서를 붙인다
       openScreen: { page: 찾는화면.screen, label: 찾는화면.title },
     };
