@@ -564,6 +564,15 @@ ipcMain.handle("navigate:to", async (_e, page: string) => {
   const file = 셸화면보정(요청파일);
   const query: Record<string, string> = {};
   if (qs) for (const [k, v] of new URLSearchParams(qs)) query[k] = v;
+  // ── 프로 셸 신호를 **주소에 실어** 보낸다(2026-08-18) ──────────────────────
+  //
+  // ⚠ **비동기로는 늦는다.** 프로 여부의 출처는 `shell:get`인데 그건 Promise다.
+  //   그런데 app.html이 console.js→nav.js→titlebar.js를 **동기로** 싣고, 그것들이
+  //   그 자리에서 사이드바와 상단 단추를 다 그린다. 값이 도착할 때는 이미 표준 모양으로
+  //   그려진 뒤라 다시 그리면 **표준으로 깜빡였다가 프로로 바뀐다.**
+  // ⚠ 그래서 `embed=1`·`popout=1`과 **같은 관례**를 쓴다 — 주소에 실으면 스크립트가
+  //   첫 줄에서 동기로 읽는다. 새 통로를 만들지 않는다.
+  if (file === "app.html" && 저장된셸모드() === "pro") query.shell = "pro";
   let target = path.join(__dirname, `../src/renderer/pages/${file}`);
   // 없는 화면의 안전망(2026-07-29 검토 #8) — 삭제된 화면(hub.html 등)을 옛 바로가기·링크가
   // 부르면 loadFile이 실패해 흰 오류 화면이 뜬다. 예전엔 nav.js의 리다이렉트가 안전망인 척
@@ -576,7 +585,11 @@ ipcMain.handle("navigate:to", async (_e, page: string) => {
     await mainWindow.loadFile(target);
     return;
   }
-  await mainWindow.loadFile(target, qs ? { query } : undefined);
+  // ⚠ `qs`(원래 주소에 쿼리가 있었나)가 아니라 **지금 실을 것이 있나**를 본다.
+  //   예전엔 `qs ? {query} : undefined`였는데, 그러면 우리가 위에서 붙인 `shell=pro`가
+  //   **원래 쿼리가 없을 때 통째로 버려진다** — `navigateTo("app.html")`이 바로 그 경우다.
+  //   실측(2026-08-18): 프로로 바꿔도 주소에 안 실려 셸이 표준 그대로 떴다.
+  await mainWindow.loadFile(target, Object.keys(query).length ? { query } : undefined);
 });
 
 // "우리 AI 팀 사무실" 별도 창 — 이미 열려 있으면 앞으로만 가져온다(중복 창 방지).

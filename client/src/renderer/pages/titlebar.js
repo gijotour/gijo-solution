@@ -798,7 +798,13 @@
     //   "있으니 만들자"로 판단하면 ▣가 붙고, 눌러도 아무 일이 없다 — 딱 우리가 없애려던 자리다.
     //   그래서 창 종류까지 본다(2026-08-02 사후 검토에서 발견).
     var 분리창 = /(^|[?&])popout=1(&|$)/.test(location.search);
-    var 사이드있음 = !분리창 && !!(document.getElementById("gijoNav") || document.querySelector(".explorer"));
+    // 🚀 프로 셸도 같은 이유로 뺀다(2026-08-18). `#gijoNav` 요소는 마크업에 **남아 있어서**
+    //   「있으니 만들자」로 판단하면 ▣가 붙는데, 누르면 `body.gn-left-collapsed`가 켜지고
+    //   nav.js의 `!important` 규칙이 **프로 56px 격자를 통째로 덮어쓴다** —
+    //   레일이 사라지는 데 그치지 않고 오른쪽에 46px 빈 거터가 생긴다.
+    // ⚠ 주소로 읽는다 — 이 파일은 동기로 실행되므로 비동기 값(shellModeGet)은 이미 늦다.
+    var 프로셸 = /(^|[?&])shell=pro(&|$)/.test(location.search);
+    var 사이드있음 = !분리창 && !프로셸 && !!(document.getElementById("gijoNav") || document.querySelector(".explorer"));
 
     var acts = document.createElement("div");
     acts.className = "gtb-acts";
@@ -917,6 +923,19 @@
       var a = buildUserArea();
       a.style.cssText += "flex:0 0 auto;";
       navRoot.appendChild(a);
+      return true;
+    }
+    // 🚀 프로 셸: 사이드바가 없다 — **56px 레일 아래**에 붙인다.
+    // ⚠ 이 갈래가 없으면 계정(내 설정)·문서함·업데이트 배지·⇤대화 다시 붙이기가
+    //   **통째로 사라진다**(아래 두 갈래가 다 안 걸려 return false가 된다).
+    //   화면이 멀쩡히 뜨고 오류도 안 나서 아무도 모른다 — 2026-08-18 착수 전 검토가 잡은 자리.
+    var rail = document.getElementById("gijoRail");
+    if (rail && document.body.classList.contains("pro-shell")) {
+      var foot = rail.querySelector(".rail-foot") || rail;
+      var a3 = buildUserArea();
+      // 56px 폭에 맞춘다 — 이름 글자는 자리를 못 잡으므로 아바타·아이콘만 세로로 세운다.
+      a3.style.cssText += "flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:6px;width:100%;padding:0;";
+      foot.appendChild(a3);
       return true;
     }
     // dashboard: .explorer를 100vh 고정 컬럼으로 — 세그먼트(sticky top)·탐색기/메뉴(scroll)·사용자(sticky bottom).

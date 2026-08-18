@@ -5,6 +5,11 @@
 // 스타일은 페이지 :root 토큰(--panel-2·--border·--blue…)을 그대로 쓰므로 다크 테마와 일관된다.
 
 (function () {
+  // 🚀 프로 셸 여부 — **동기로** 읽는다(2026-08-18).
+  // ⚠ 이 파일은 app.html이 동기로 싣고 `render()`가 그 자리에서 끝난다. 비동기 값
+  //   (shellModeGet)은 이미 늦어 표준 사이드바가 한 번 그려진 뒤에 도착한다.
+  //   그래서 `embed=1`·`popout=1`과 **같은 관례**로 주소에서 읽는다.
+  var PRO = /(^|[?&])shell=pro(&|$)/.test(location.search);
   // 4.0.0에서 허브(2단 탭)를 걷어냈다 — 화면이 곧 메뉴 항목이고, 여러 화면은 셸 탭으로 열어 둔다.
   // ── 전체메뉴(4.0.0) — 허브(2단 탭)를 없애고 화면을 그대로 늘어놓는다 ──────────
   //
@@ -454,11 +459,17 @@
       // 왼쪽 가장자리 토글 — 접힘=화면 왼쪽 끝, 열림=사이드바 경계에 반쯤 걸침.
       // ⚠ 예전엔 '◀ 접기'를 세로로 눕혀 썼다. 세로 글씨는 읽는 데만 시간이 걸려서
       //    화살표 하나로 줄였다(2026-07-27). 뜻은 툴팁이 말한다.
-      "body.gn-left-collapsed #gijoNav{display:none !important;}" +
-      "body.gn-left-collapsed .app{grid-template-columns:minmax(0,1fr) 46px !important;}" +
-      "body.gn-left-collapsed .explorer{display:none !important;}" +
-      "body.gn-left-collapsed .body-grid{grid-template-columns:1fr 360px !important;}" +
-      "body.gn-left-collapsed .body-grid.no-right{grid-template-columns:1fr !important;}" +
+      // ⚠ 🚀 프로 셸에서는 이 다섯 줄을 **빼야 한다**(2026-08-18). `!important`라
+      //   프로 56px 격자를 통째로 덮어쓴다 — 레일이 사라지는 데 그치지 않고 오른쪽에
+      //   46px 빈 거터가 생긴다. 게다가 setupLeftCollapse가 저장값을 복원하므로
+      //   **표준에서 메뉴를 접어 둔 채 프로로 바꾼 사람은 첫 화면부터 깨진 격자를 본다**
+      //   (사용자가 아무것도 안 눌러도 발동한다).
+      (PRO ? "" :
+        "body.gn-left-collapsed #gijoNav{display:none !important;}" +
+        "body.gn-left-collapsed .app{grid-template-columns:minmax(0,1fr) 46px !important;}" +
+        "body.gn-left-collapsed .explorer{display:none !important;}" +
+        "body.gn-left-collapsed .body-grid{grid-template-columns:1fr 360px !important;}" +
+        "body.gn-left-collapsed .body-grid.no-right{grid-template-columns:1fr !important;}") +
       ".gn-seg{display:flex;background:#1f1e1d;border:1px solid var(--border-strong);border-radius:9px;padding:3px;gap:3px;}" +
       ".gn-seg span{flex:1;text-align:center;padding:6px 4px;border-radius:7px;font-size:12.25px;font-weight:800;color:var(--muted);cursor:pointer;border:1px solid transparent;}" +
       ".gn-seg span.on{background:rgba(59,130,246,.22);color:#fff;border-color:rgba(59,130,246,.5);}" +
@@ -862,6 +873,9 @@
   window.gijoLeftCollapsed = function () { return document.body.classList.contains("gn-left-collapsed"); };
   function setupLeftCollapse() {
     // 왼쪽 패널이 있는 화면에서만(login 제외). 저장 상태 복원 + 탭 초기 배치.
+    // 🚀 프로에서는 접을 사이드바가 없다 — 저장값을 복원하면 깨진 격자만 켜진다.
+    // ⚠ 저장값을 **지우지는 않는다** — 표준으로 되돌아갈 때 접힘 상태가 남아 있어야 한다.
+    if (PRO) return;
     if (!document.getElementById("gijoNav") && !document.querySelector(".explorer")) return;
     injectCss();
     var saved = null; try { saved = localStorage.getItem(LEFT_KEY); } catch (e) {}
@@ -870,6 +884,13 @@
   }
 
   function render() {
+    // 🚀 프로 셸은 사이드바를 **안 그린다**(56px 레일이 대신한다).
+    // ⚠ 가드를 여기(함수 안 첫 줄)에 둔다 — 호출부(boot)만 막으면 `checkUpdateBadge`가
+    //   `render()`를 다시 불러 사이드바가 되살아난다.
+    // ⚠ **nav.js를 안 싣는 것이 아니다.** `window.gijoNavGroups`·`gijoScreenList`·
+    //   `gijoMenuLabel`·`gijoOpenScreen`은 모듈 최상위라 렌더와 무관하게 살아 있어야 한다 —
+    //   죽으면 탭 이름이 파일명으로 새고(app.html 화면이름찾기) 화면찾기가 빈손이 된다.
+    if (PRO) return;
     var root = document.getElementById("gijoNav");
     if (!root) return;
     injectCss();
