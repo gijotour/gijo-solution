@@ -219,7 +219,7 @@
   document.getElementById("send").addEventListener("click", 보내기);
   document.getElementById("q").addEventListener("keydown", function (e) {
     // Enter=보내기, Shift+Enter=줄바꿈
-    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); 보내기(); }
+    if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); 보내기(); }
   });
   if (!g) { log.innerHTML = '<div class="empty">앱 안에서만 동작합니다.</div>'; }
   else 빈화면();

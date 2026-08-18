@@ -268,7 +268,11 @@
     var input = document.getElementById("chatInput");
     // ⚠ submit을 그대로 붙이면 클릭 이벤트가 첫 인자로 들어가 "[object MouseEvent]"를 보낸다.
     document.getElementById("dockSend").addEventListener("click", function () { submit(); });
-    input.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } });
+    // ⚠ **한글 조합 중 Enter를 막는다**(2026-08-18). 「안녕하」까지 치고 Enter를 누르면
+    //   조합이 끝나기 전이라 **반 글자가 그대로 전송**됐다. 한글은 글자마다 조합이 걸려
+    //   하루에 수십 번 밟는 자리다. 같은 가드가 이 파일 883행(즐겨찾기 입력)엔 이미 있었다 —
+    //   **주 입력칸에만 빠져 있었다.**
+    input.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit(); } });
     // 초안은 저장한다 — 콘솔을 창으로 빼거나 붙일 때 쓰던 글이 날아가면 안 된다.
     try { var d = localStorage.getItem(DRAFT_KEY); if (d) input.value = d; } catch (e) {}
     input.addEventListener("input", function () { try { localStorage.setItem(DRAFT_KEY, input.value); } catch (e) {} });
@@ -672,7 +676,9 @@
         send(a, v);
       };
       ok.addEventListener("click", go);
-      inp.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); go(); } });
+      // ⚠ 조합 가드 — 여기는 **담당자 이름**을 받는 칸이라 한글이 주 내용이다.
+      //   「김도희」의 마지막 글자를 조합하는 중에 Enter가 들어가면 「김도ㅎ」로 배정된다.
+      inp.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); go(); } });
       ask.appendChild(inp); ask.appendChild(ok);
       inp.focus();
     }

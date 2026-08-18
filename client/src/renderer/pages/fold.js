@@ -176,7 +176,7 @@
     function toggle() { setOpen(e, e.target.style.display === "none", true); }
     head.addEventListener("click", toggle);
     head.addEventListener("keydown", function (ev) {
-      if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); toggle(); }
+      if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); toggle(); }  // 조합무관: 접기 토글(Enter·Space 접근성) — 텍스트 입력칸이 아니다
     });
     return e;
   }

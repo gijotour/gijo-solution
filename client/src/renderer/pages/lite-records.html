@@ -241,7 +241,7 @@
   function 시작() {
     document.getElementById("taskAdd").addEventListener("click", 담기);
     document.getElementById("taskInput").addEventListener("keydown", function (e) {
-      if (e.key === "Enter") { e.preventDefault(); 담기(); }
+      if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); 담기(); }
     });
     할일그리기();
     내역그리기();

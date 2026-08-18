@@ -119,7 +119,7 @@
 
       var key = function (e) {
         if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); 닫기(취소값); }
-        else if (e.key === "Enter") { e.preventDefault(); e.stopPropagation(); 닫기(확인값()); }
+        else if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); e.stopPropagation(); 닫기(확인값()); }
       };
       document.addEventListener("keydown", key, true);
 

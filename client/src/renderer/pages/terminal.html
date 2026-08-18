@@ -291,10 +291,10 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     } catch (e) {}
 
     termInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") { const v = termInput.value; termInput.value = ""; runCommand(v, "manual"); }
+      if (e.key === "Enter") { const v = termInput.value; termInput.value = ""; runCommand(v, "manual"); }  // 조합무관: 셸 명령(영문)
     });
     document.getElementById("askBtn").addEventListener("click", askChatbot);
-    document.getElementById("askInput").addEventListener("keydown", (e) => { if (e.key === "Enter") askChatbot(); });
+    document.getElementById("askInput").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) askChatbot(); });
     document.querySelectorAll(".chip[data-scan]").forEach((c) => c.addEventListener("click", () => runHardeningFromChat(c.dataset.scan, c.dataset.scan)));
 
     document.querySelectorAll("[data-page]").forEach((el) => el.addEventListener("click", () => window.gijo.navigateTo(el.dataset.page)));

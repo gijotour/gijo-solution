@@ -301,7 +301,7 @@
     }
 
     document.getElementById("gcwSend").addEventListener("click", function () { send(); });
-    input.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } });
+    input.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); send(); } });
     host.querySelectorAll(".gcw-chip").forEach(function (chip) {
       chip.addEventListener("click", function () { send(chip.textContent); });
     });

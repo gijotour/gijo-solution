@@ -175,7 +175,7 @@
 
   function 시작() {
     document.getElementById("askGo").addEventListener("click", 찾기);
-    document.getElementById("q").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); 찾기(); } });
+    document.getElementById("q").addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); 찾기(); } });
     목록();
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", 시작);

@@ -1020,7 +1020,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         <div class="hint">⚠ 이 그림과 키는 이 서버 안에서 만들어집니다 — 외부로 나가지 않습니다.</div>`;
       const input = document.getElementById("mfaConfirmInput");
       document.getElementById("mfaConfirmBtn").addEventListener("click", mfaConfirm);
-      input.addEventListener("keydown", (e) => { if (e.key === "Enter") mfaConfirm(); });
+      input.addEventListener("keydown", (e) => { if (e.key === "Enter") mfaConfirm(); });  // 조합무관: 인증 6자리 숫자만
       input.focus();
       mfaSay("");
     } catch (e) {
@@ -2182,7 +2182,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
         if (line) { line.className = "status-line status-err"; line.textContent = "이름 저장 실패: " + ((err && err.message) || err); }
       }
     };
-    input.addEventListener("keydown", (ev) => { if (ev.key === "Enter") input.blur(); if (ev.key === "Escape") { input.removeEventListener("blur", 저장); nameEl.textContent = 원래; } });
+    input.addEventListener("keydown", (ev) => { if (ev.key === "Enter" && !ev.isComposing) input.blur(); if (ev.key === "Escape") { input.removeEventListener("blur", 저장); nameEl.textContent = 원래; } });
     input.addEventListener("blur", 저장, { once: true });
   });
 
@@ -2718,7 +2718,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     });
     // 모델 검색·받기
     document.getElementById("hfSearchBtn").addEventListener("click", searchHf);
-    document.getElementById("hfSearchInput").addEventListener("keydown", (e) => { if (e.key === "Enter") searchHf(); });
+    document.getElementById("hfSearchInput").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) searchHf(); });
     document.getElementById("hfResults").addEventListener("click", (e) => {
       const id = e.target.dataset.load;
       if (!id) return;

@@ -443,7 +443,7 @@ tr:last-child td{border-bottom:none;}
           await loadAgents();
         };
         input.addEventListener("keydown", (e) => {
-          if (e.key === "Enter") { e.preventDefault(); commit(true); }
+          if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); commit(true); }
           else if (e.key === "Escape") commit(false);
         });
         input.addEventListener("blur", () => commit(true));
@@ -730,7 +730,7 @@ tr:last-child td{border-bottom:none;}
     const settingsBody = document.getElementById("agentSettingsBody");
     settingsBody.addEventListener("change", onAgentSettingsAction); // 모델 select
     settingsBody.addEventListener("click", onAgentSettingsAction);  // 이름 초기화
-    settingsBody.addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.classList.contains("as-name")) e.target.blur(); });
+    settingsBody.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing && e.target.classList.contains("as-name")) e.target.blur(); });
     settingsBody.addEventListener("blur", (e) => { if (e.target.classList.contains("as-name")) commitAgentName(e.target); }, true);
   }
 

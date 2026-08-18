@@ -1800,7 +1800,7 @@
     // ④ 카테고리 지정 모달
     document.getElementById("catCancelBtn").addEventListener("click", closeCatModal);
     document.getElementById("catSaveBtn").addEventListener("click", saveCatModal);
-    document.getElementById("catInput").addEventListener("keydown", (e) => { if (e.key === "Enter") saveCatModal(); });
+    document.getElementById("catInput").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) saveCatModal(); });
     document.getElementById("catModal").addEventListener("click", (e) => { if (e.target.id === "catModal") closeCatModal(); });
 
     document.querySelectorAll("[data-page]").forEach((el) => {

@@ -487,7 +487,7 @@
 
   function 시작() {
     document.getElementById("askGo").addEventListener("click", 찾기);
-    document.getElementById("q").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); 찾기(); } });
+    document.getElementById("q").addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); 찾기(); } });
     document.getElementById("upGo").addEventListener("click", 넣기);
     document.getElementById("folderPick").addEventListener("click", 폴더넣기);
     document.getElementById("smdOpen").addEventListener("click", function () {

@@ -883,7 +883,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
     document.getElementById("kbSampleBtn").addEventListener("click", addSampleDocs);
     document.getElementById("kbQueryBtn").addEventListener("click", kbQuery);
-    document.getElementById("kbQueryInput").addEventListener("keydown", (e) => { if (e.key === "Enter") kbQuery(); });
+    document.getElementById("kbQueryInput").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) kbQuery(); });
 
     document.getElementById("maintForm").addEventListener("submit", onMaintSubmit);
     document.getElementById("maintList").addEventListener("click", onMaintAction);

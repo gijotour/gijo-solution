@@ -179,7 +179,7 @@
 
   go.addEventListener("click", 만들기);
   for (var el of [id, pw, pw2]) {
-    el.addEventListener("keydown", function (e) { if (e.key === "Enter") 만들기(); });
+    el.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.isComposing) 만들기(); });
   }
 
   // ── 갈래 2: 로그인으로 (번들 서버 안 띄우고 login.html로 — 원격 서버 주소 입력) ──

@@ -1491,6 +1491,33 @@ async function dispatchInstructionCore(instructionText: string, contextText = ""
 }
 
 /**
+ * 감사 로그의 **「무엇을 바꿨나」** 칸을 만든다(2026-08-18).
+ *
+ * ⚠ 왜 생겼나 — 전에는 `args.assetId ?? args.code ?? null`이 전부였다.
+ *   그런데 이 제품에서 **가장 크게 바꾸는 쓰기**인 `bulk_update_findings`는
+ *   자산 하나를 받지 않는다 — 조건(`filter`: "critical kev")이나 고른 목록(`ids`)을 받아
+ *   **수백 건을 한 번에** 배정·판정한다. 그 둘 다 위 식에 없어서 감사 로그에
+ *   **`target`이 빈칸(null)**으로 남았다. 「누가 언제 승인했다」는 남는데
+ *   **「무엇을」이 안 남았다** — 감사 로그로서 반쪽이다.
+ *
+ * 우선순위: 콕 집은 것(assetId·code) → 고른 목록(ids) → 조건(filter) → 이름표.
+ * ⚠ 길이를 200자로 자른다 — ids는 20건 넘게 올 수 있고, 감사 칸은 열람용이지 원본이 아니다.
+ *   (몇 건이었는지는 잘려도 알 수 있게 **건수를 앞에 적는다.**)
+ */
+export function 감사대상(args: Record<string, string>): string | null {
+  const 콕 = args.assetId ?? args.code;
+  if (콕?.trim()) return 콕.trim().slice(0, 200);
+  const ids = args.ids?.trim();
+  if (ids) {
+    const 건수 = ids.split(/[,\n]/).filter((s) => s.trim()).length;
+    return `고른 ${건수}건: ${ids}`.slice(0, 200);
+  }
+  const filter = args.filter?.trim();
+  if (filter) return `조건: ${filter}`.slice(0, 200);
+  return args.name?.trim()?.slice(0, 200) ?? args.title?.trim()?.slice(0, 200) ?? null;
+}
+
+/**
  * 답에 나온 취약점 목록에 체크칸을 붙인다(2026-07-31).
  * 결재판이 이미 떠 있으면 붙이지 않는다 — 승인할 게 있는데 그 위에 또 고르라고 하면 무엇을
  * 누르는지 알 수 없다. 한 답에 결정 하나가 원칙이다.
@@ -1700,7 +1727,7 @@ export function registerDispatcherRoutes(app: Express): void {
         const undoId = undoCommit(toolName, output.slice(0, 50), undoBefore); // 변화 있으면 되돌리기 항목 등록
         collab(undefined, { from: "orchestrator", to: "orchestrator", message: `실행 완료: ${collabNote(output)}` });
         // 작업 기록(감사 로그) — 승인된 쓰기 실행을 남긴다(챗봇 제안 → 사람 승인).
-        recordAudit({ kind: "write", actor, action: `승인 실행: ${toolName}`, target: args.assetId ?? args.code ?? null, detail: `${instruction ? instruction + " → " : ""}${output.slice(0, 200)}`, result: "ok" });
+        recordAudit({ kind: "write", actor, action: `승인 실행: ${toolName}`, target: 감사대상(args), detail: `${instruction ? instruction + " → " : ""}${output.slice(0, 200)}`, result: "ok" });
         // 사람이 승인한 (지시→도구) = 검증된 정답. 파인튜닝 골드 예시로 누적한다(Phase 4, 자가강화).
         appendApprovedDecision(instruction, toolName, args);
         resetAgentToDefault("orchestrator");
@@ -1711,7 +1738,8 @@ export function registerDispatcherRoutes(app: Express): void {
         completeTask(task.id);
         // FAIL_MARKS-예외: 감사 로그의 action 문자열이다(사람 대면 답이 아니라 기록). 승인 실행이
         //   실제로 예외를 던진 진짜 실패라 「실행 실패」로 적는 것이 맞다.
-        recordAudit({ kind: "write", actor, action: `승인 실행 실패: ${toolName}`, detail: err instanceof Error ? err.message : String(err), result: "error" });
+        // ⚠ 실패에도 **무엇을 건드리려 했는지**를 남긴다 — 사고 조사에서 성공 기록보다 중요하다.
+        recordAudit({ kind: "write", actor, action: `승인 실행 실패: ${toolName}`, target: 감사대상(args), detail: err instanceof Error ? err.message : String(err), result: "error" });
         res.status(400).json({ error: err instanceof Error ? err.message : String(err) });
       }
     })

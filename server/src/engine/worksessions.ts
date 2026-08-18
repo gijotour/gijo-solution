@@ -177,6 +177,58 @@ export function getSessionTurns(id: string): SessionTurn[] {
   return rows.map(rowToTurn);
 }
 
+/**
+ * **끝 N턴만** 읽는다 — 맥락을 만들 때 쓴다(2026-08-18).
+ *
+ * ⚠ 왜 따로 뒀나: `recentTurnsText`는 세션 대화를 **통째로 읽어 놓고** 끝 몇 개만 썼다.
+ *   대화가 500턴이면 500줄을 꺼내 498줄을 버린다. 매 질문마다 그런다.
+ *   지금은 세션이 짧아 티가 안 나지만, **대화창을 주인공으로 만들면 그대로 커지는 자리**다
+ *   (사장님 방향, 2026-08-17~18). 커진 뒤에 고치면 이미 느려진 뒤다.
+ *
+ * ⚠ SQL은 **뒤에서 N개**를 집고(DESC LIMIT), 돌려줄 때 **시간순으로 되돌린다**(reverse).
+ *   `ORDER BY at ASC LIMIT n`으로 적으면 **맨 앞 N개**(가장 오래된 대화)를 집어
+ *   "방금 무슨 얘기했더라"가 정반대로 뒤집힌다 — 이 함수에서 제일 틀리기 쉬운 곳이다.
+ *
+ * ⚠ 전체가 필요한 곳(리포트 생성·세션 열람 API)은 `getSessionTurns`를 그대로 쓴다.
+ *   거기서 자르면 **리포트에 대화가 빠진다** — 성능 때문에 내용을 잃는 건 반대 방향의 사고다.
+ */
+export function getRecentSessionTurns(id: string, limit: number): SessionTurn[] {
+  if (!Number.isFinite(limit) || limit <= 0) return [];
+  const rows = db
+    .prepare("SELECT * FROM work_session_turns WHERE sessionId = ? ORDER BY at DESC, rowid DESC LIMIT ?")
+    .all(id, Math.floor(limit)) as TurnRow[];
+  return rows.reverse().map(rowToTurn);
+}
+
+/**
+ * 맥락에 쓸 두 덩이를 **필요한 만큼만** 읽는다 — 끝 N턴 + 그보다 **앞선 사용자 턴** M건.
+ *
+ * ⚠ 왜 한 번에 안 읽고 두 번 읽나: 요지는 「끝 N턴보다 앞에 있는 **사용자** 턴 12건」이다.
+ *   "끝에서 50턴만 읽자" 같은 어림 상한으로 바꾸면, 그 50턴 안에 사용자 턴이 12건보다 적을 때
+ *   **요지가 조용히 짧아진다** — 빨라지는 대신 AI가 앞 얘기를 덜 기억하게 되는 셈이고,
+ *   그건 성능을 얻자고 기능을 깎는 것이다. 그래서 두 질의로 **결과를 그대로 보존**한다.
+ *
+ * ⚠ 경계 기준은 `at`(시각)이 아니라 **rowid**다 — 같은 밀리초에 들어온 턴이 있으면
+ *   시각으로 가르다가 같은 턴이 양쪽에 겹치거나 빠진다. rowid는 겹치지 않는다.
+ */
+export function getContextTurns(id: string, maxTurns: number, olderUserLimit: number): { recent: SessionTurn[]; olderUser: SessionTurn[] } {
+  const n = Math.max(0, Math.floor(maxTurns));
+  const recentRows = n
+    ? (db.prepare("SELECT rowid AS _rid, * FROM work_session_turns WHERE sessionId = ? ORDER BY at DESC, rowid DESC LIMIT ?").all(id, n) as (TurnRow & { _rid: number })[])
+    : [];
+  recentRows.reverse();
+  // 끝 N턴 중 **가장 앞선** rowid가 경계다. N턴이 0이면 경계가 없으니 전부가 '앞선 턴'이다.
+  const 경계 = recentRows.length ? recentRows[0]._rid : Number.MAX_SAFE_INTEGER;
+  const m = Math.max(0, Math.floor(olderUserLimit));
+  const olderRows = m
+    ? (db
+        .prepare("SELECT * FROM work_session_turns WHERE sessionId = ? AND rowid < ? AND role = 'user' ORDER BY at DESC, rowid DESC LIMIT ?")
+        .all(id, 경계, m) as TurnRow[])
+    : [];
+  olderRows.reverse();
+  return { recent: recentRows.map(rowToTurn), olderUser: olderRows.map(rowToTurn) };
+}
+
 // 첫 user 턴이 들어올 때 세션 제목이 아직 기본값이면 그 지시문 앞부분으로 제목을 자동 지정한다
 // (ChatGPT가 첫 질문으로 대화 이름을 짓는 것과 같은 UX). 이후엔 사용자가 rename하지 않는 한 유지.
 function autoTitleFrom(text: string): string {
@@ -309,9 +361,10 @@ export function deleteAllSessions(): number {
 // 모델에 실을 직전 대화 맥락 — 최근 N턴을 "역할: 내용" 줄로 압축한다. 너무 길면 프롬프트가
 // 폭주하므로 턴 수·각 턴 길이에 상한을 둔다. 세션이 없거나 턴이 없으면 빈 문자열(맥락 없음).
 export function recentTurnsText(sessionId: string, maxTurns = 6): string {
-  const turns = getSessionTurns(sessionId);
-  if (!turns.length) return "";
-  const recent = turns.slice(-maxTurns);
+  // ⚠ 예전엔 `getSessionTurns`로 **세션 전체**를 꺼내 놓고 끝 6턴과 그 앞 사용자 12턴만 썼다.
+  //   질문 한 번마다 그랬다. 필요한 두 덩이만 DB에서 집어 온다(2026-08-18) — 결과는 동일.
+  const { recent, olderUser } = getContextTurns(sessionId, maxTurns, 12);
+  if (!recent.length) return "";
   const lines = recent.map((t) => `${t.role === "user" ? "사용자" : "AI"}: ${t.content.replace(/\s+/g, " ").trim().slice(0, 300)}`);
 
   // ── 오래된 턴 요지(2026-08-09, 중-1 연장 — "긴 세션에서 아까 말한 그 서버를 잊는다") ──
@@ -322,11 +375,11 @@ export function recentTurnsText(sessionId: string, maxTurns = 6): string {
   // 배가된다. "사용자가 말한 것의 앞머리"는 지어낼 수 없다.
   //   · 사용자 턴만 싣는다 — 지시·언급된 자산이 담긴 쪽이고, AI 답은 다시 만들 수 있다.
   //   · 오래된 순으로 최대 12턴, 턴당 80자, 전체 1,000자 상한 — 맥락 창을 잠식하지 않게.
-  const old = turns.slice(0, -maxTurns).filter((t) => t.role === "user");
+  const old = olderUser; // 끝 maxTurns턴보다 앞선 **사용자** 턴 12건(오래된 순) — DB에서 이미 그만큼만 왔다
   if (old.length) {
     const digest: string[] = [];
     let budget = 1000;
-    for (const t of old.slice(-12)) {
+    for (const t of old) {
       const line = `· ${t.content.replace(/\s+/g, " ").trim().slice(0, 80)}`;
       if (budget - line.length < 0) break;
       budget -= line.length;

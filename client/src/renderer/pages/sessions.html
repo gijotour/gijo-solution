@@ -604,7 +604,7 @@
       titleEl.textContent = save && input.value.trim() ? input.value.trim() : cur;
       await loadSessions(false);
     };
-    input.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); commit(true); } else if (e.key === "Escape") commit(false); });
+    input.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); commit(true); } else if (e.key === "Escape") commit(false); });
     input.addEventListener("blur", () => commit(true));
   }
   async function changeStatus(e) {

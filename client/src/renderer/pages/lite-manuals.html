@@ -396,10 +396,10 @@
 
   function 시작() {
     document.getElementById("askGo").addEventListener("click", 찾기);
-    document.getElementById("q").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); 찾기(); } });
+    document.getElementById("q").addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); 찾기(); } });
     document.getElementById("upGo").addEventListener("click", 넣기);
     document.getElementById("dAdd").addEventListener("click", 장비추가);
-    document.getElementById("dAddr").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); 장비추가(); } });
+    document.getElementById("dAddr").addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); 장비추가(); } });  // 조합무관: 장비 주소(IP·호스트명)
     document.getElementById("devProbeAll").addEventListener("click", 전체도달);
     장비목록그리기();
     목록();

@@ -260,7 +260,7 @@
         send(a, v);
       };
       ok.addEventListener("click", go);
-      inp.addEventListener("keydown", function (e) { if (e.key === "Enter") { e.preventDefault(); go(); } });
+      inp.addEventListener("keydown", function (e) { if (e.key === "Enter" && !e.isComposing) { e.preventDefault(); go(); } });
       ask.appendChild(inp); ask.appendChild(ok);
       inp.focus();
     }

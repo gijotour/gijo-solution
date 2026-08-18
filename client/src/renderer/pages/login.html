@@ -372,9 +372,9 @@
       }
     }
     mfaBtn.addEventListener("click", () => submitMfa(mfaCode.value, false));
-    mfaCode.addEventListener("keydown", (e) => { if (e.key === "Enter") submitMfa(mfaCode.value, false); });
+    mfaCode.addEventListener("keydown", (e) => { if (e.key === "Enter") submitMfa(mfaCode.value, false); });  // 조합무관: 인증 6자리 숫자만
     mfaRecoBtn.addEventListener("click", () => submitMfa(mfaReco.value, true));
-    mfaReco.addEventListener("keydown", (e) => { if (e.key === "Enter") submitMfa(mfaReco.value, true); });
+    mfaReco.addEventListener("keydown", (e) => { if (e.key === "Enter") submitMfa(mfaReco.value, true); });  // 조합무관: 복구 코드(영문·숫자)
 
     function resetBtn() { btn.disabled = false; btn.textContent = "로그인"; }
 
@@ -423,7 +423,7 @@
     }
 
     btn.addEventListener("click", () => doLogin(false));
-    passInput.addEventListener("keydown", (e) => { if (e.key === "Enter") doLogin(false); });
+    passInput.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.isComposing) doLogin(false); });
 
     // ── 무료 제공 구역(2026-08-14) ─────────────────────────────────────────
     // 라이트 빌드에서는 통째로 감춘다. 에디션을 못 읽으면 **감춘 채로 둔다** —
