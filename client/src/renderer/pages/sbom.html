@@ -263,7 +263,12 @@ tr:last-child td{border-bottom:none;}
 
   function applyFilters(assets) {
     const q = searchInput.value.trim().toLowerCase();
+    // 🗂 지금 범위 — ⓪ 자산에서 고른 자산이 있으면 그것만(2026-08-18 승인 시안).
+    // ⚠ 위 KPI 4칸은 **전체 기준**이다(그 주석이 이미 못박아 뒀다) — 목록만 좁히고
+    //   그 차이는 아래 띠가 밝힌다. 안 밝히면 「자산 1개인데 부품이 왜 이렇게 많지」가 된다.
+    const 범위자산 = window.gijoScope ? window.gijoScope.assetId() : "";
     return assets.filter((a) => {
+      if (범위자산 && a.id !== 범위자산) return false;
       if (q && !a.name.toLowerCase().includes(q)) return false;
       if (activeFilter === "generated" && !a.sbomGeneratedAt) return false;
       if (activeFilter === "missing" && a.sbomGeneratedAt) return false;
@@ -655,6 +660,12 @@ tr:last-child td{border-bottom:none;}
 
   function render() {
     const filtered = applyFilters(allAssets);
+    // 🗂 좁혔으면 띠로 알린다 — 안 알리면 「부품이 왜 이것뿐이지」가 된다.
+    //   위 KPI 4칸은 전체 기준으로 남으므로 그 차이도 이 띠가 설명한다.
+    if (window.gijoScope) {
+      const 범위자산 = window.gijoScope.assetId();
+      window.gijoScope.chip(filtered.length, 범위자산 ? allAssets.length : filtered.length);
+    }
     if (filtered.length === 0) {
       sbomRows.innerHTML = '<tr><td colspan="7" style="color:var(--muted)">조건에 맞는 자산이 없습니다</td></tr>';
     } else {
@@ -847,10 +858,20 @@ tr:last-child td{border-bottom:none;}
 
 
 <script src="nav.js"></script>
+<script src="scopefilter.js"></script>
 <script src="workflowrail.js"></script>
 <script src="progresscard.js"></script>
 <script src="gijomd.js"></script>
 <script src="chatparts.js"></script>
 <script src="chatwidget.js"></script>
+<script>
+// 🗂 범위가 바뀌면 목록을 다시 그린다(2026-08-18). 등록 즉시 한 번 불리므로
+//   화면이 뜰 때 이미 걸려 있던 범위도 놓치지 않는다.
+//   ⚠ 이 줄이 없으면 범위를 바꿔도 옛 목록 그대로다 — 「안 걸리네」로 읽힌다.
+(function () {
+  if (!window.gijoScope) return;
+  window.gijoScope.onChange(function () { try { render(); } catch (e) { } });
+})();
+</script>
 </body>
 </html>

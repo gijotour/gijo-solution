@@ -394,6 +394,16 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
     그림띠();
     const box = document.getElementById("riskList");
     let evs = data.events;
+    // 🗂 지금 범위(2026-08-18 승인 시안).
+    // ⚠ **소스마다 자산을 가리키는 칸이 다르다** — 취약점은 `ref`가 자산 id지만, 로그·제품·점검은
+    //   ref가 각각 로그원본·제품명·점검대상이라 자산이 아니다. 그쪽은 `entity`(자산 이름)와
+    //   `peers`(공격 대상 이름들)로 맞춘다. 한 칸만 보면 그 소스가 통째로 사라진다.
+    const 범위 = window.gijoScope ? window.gijoScope.get() : null;
+    const 범위전 = evs.length;
+    if (범위 && 범위.kind === "asset") {
+      evs = evs.filter((e) => e.ref === 범위.id || e.entity === 범위.label || (e.peers || []).includes(범위.label));
+    }
+    if (window.gijoScope) window.gijoScope.chip(evs.length, 범위전);
     if(filter !== "all") evs = evs.filter(e => e.source === filter);
     // ⚠ 급을 고르면 **끝난 것은 뺀다** — 막대가 「지금 급한 것」을 세었으므로 목록도 같아야 한다.
     //   (급을 안 골랐을 때는 예전처럼 끝난 것도 흐리게 남겨 이력을 보여 준다.)
@@ -724,11 +734,21 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
   })();
 </script>
 <script src="nav.js"></script>
+<script src="scopefilter.js"></script>
 <script src="workflowrail.js"></script>
 <script src="progresscard.js"></script>
 <script src="gijomd.js"></script>
 <script src="map-view.js"></script>
 <script src="chatparts.js"></script>
 <script src="chatwidget.js"></script>
+<script>
+// 🗂 범위가 바뀌면 목록을 다시 그린다(2026-08-18). 등록 즉시 한 번 불리므로
+//   화면이 뜰 때 이미 걸려 있던 범위도 놓치지 않는다.
+//   ⚠ 이 줄이 없으면 범위를 바꿔도 옛 목록 그대로다 — 「안 걸리네」로 읽힌다.
+(function () {
+  if (!window.gijoScope) return;
+  window.gijoScope.onChange(function () { try { renderList(); } catch (e) { } });
+})();
+</script>
 </body>
 </html>

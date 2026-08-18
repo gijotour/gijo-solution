@@ -462,7 +462,16 @@ tr:last-child td{border-bottom:none;}
   }
 
   function 줄그리기() {
-    const 보일것 = 유형필터 ? historyReports.filter((r) => r.type === 유형필터) : historyReports;
+    const 유형뒤 = 유형필터 ? historyReports.filter((r) => r.type === 유형필터) : historyReports;
+    // 🗂 지금 범위(2026-08-18 승인 시안).
+    // ⚠ **전사 리포트(대상 자산이 빈 것)는 남긴다.** 그건 「전체 자산 대상」이라 그 자산도
+    //   포함하기 때문이다(화면이 이미 「전체 자산」이라 적는다). 걸러 내면 「이 자산은 보고가
+    //   없다」로 잘못 읽힌다 — 없는 사실을 만드는 셈이다.
+    const 범위자산 = window.gijoScope ? window.gijoScope.assetId() : "";
+    const 보일것 = 범위자산
+      ? 유형뒤.filter((r) => !(r.assetIds || []).length || (r.assetIds || []).includes(범위자산))
+      : 유형뒤;
+    if (window.gijoScope) window.gijoScope.chip(보일것.length, 유형뒤.length);
     if (historyReports.length === 0) {
       reportRows.innerHTML = '<tr><td colspan="4" style="color:var(--muted)">아직 생성한 리포트가 없습니다 — "+ 리포트 생성"으로 만들어 보세요</td></tr>';
     } else if (보일것.length === 0) {
@@ -855,10 +864,20 @@ tr:last-child td{border-bottom:none;}
 
 
 <script src="nav.js"></script>
+<script src="scopefilter.js"></script>
 <script src="workflowrail.js"></script>
 <script src="progresscard.js"></script>
 <script src="gijomd.js"></script>
 <script src="chatparts.js"></script>
 <script src="chatwidget.js"></script>
+<script>
+// 🗂 범위가 바뀌면 목록을 다시 그린다(2026-08-18). 등록 즉시 한 번 불리므로
+//   화면이 뜰 때 이미 걸려 있던 범위도 놓치지 않는다.
+//   ⚠ 이 줄이 없으면 범위를 바꿔도 옛 목록 그대로다 — 「안 걸리네」로 읽힌다.
+(function () {
+  if (!window.gijoScope) return;
+  window.gijoScope.onChange(function () { try { 줄그리기(); } catch (e) { } });
+})();
+</script>
 </body>
 </html>

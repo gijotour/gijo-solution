@@ -13,6 +13,34 @@
 // · 무대는 기존 화면을 embed=1 끼움 창으로 그대로 연다 — 화면을 다시 만들지 않는다.
 (function () {
   "use strict";
+
+  // ── 🗂 범위 중계 (2026-08-18) ────────────────────────────────────────────
+  //
+  // ⚠ **이 중계가 없으면 판은 영영 범위를 모른다.**
+  //   셸(app.html)은 자기 **탭** iframe에만 범위를 보낸다. 그런데 판(무대)은
+  //   허브 화면 안의 **또 다른 iframe**이라 셸이 못 닿는다 — 2단 중첩이다.
+  //   허브가 받아서 무대로 다시 전해야 사슬이 이어진다.
+  // ⚠ 무대가 **나중에 뜨는** 경우도 있다(판을 눌러 처음 열 때). 그래서 지금 값을
+  //   들고 있다가 load 때 한 번 더 먹인다 — 안 그러면 그 판만 전체를 보여 준다.
+  var 지금범위 = null;
+  try {
+    var raw = window.localStorage.getItem("gijo:scope:asset");
+    지금범위 = raw ? JSON.parse(raw) : null;
+    if (지금범위 && (!지금범위.id || !지금범위.label)) 지금범위 = null;
+  } catch (e) { 지금범위 = null; }
+
+  function 무대에전하기(stage, sc) {
+    if (!stage || !stage.contentWindow) return;
+    try { stage.contentWindow.postMessage({ type: "gijo:scope:set", scope: sc }, "*"); } catch (e) { }
+  }
+
+  window.addEventListener("message", function (ev) {
+    var d = ev.data;
+    if (!d || d.type !== "gijo:scope:set") return;
+    지금범위 = d.scope && d.scope.id && d.scope.label ? d.scope : null;
+    무대에전하기(document.getElementById("ghStage"), 지금범위);
+  });
+
   function esc(s) {
     return String(s == null ? "" : s).replace(/[&<>"]/g, function (c) {
       return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
@@ -73,6 +101,12 @@
         //   옮긴 뒤 「이것들 전부 오탐」이라 하면 **사라진 승인 목록**에 걸린다.
         //   여기서 비우면 새 판이 뜨면서 자기 목록을 다시 알린다(안 알리는 판이면 비운 채로 둔다).
         try { window.top.postMessage({ type: "gijo:view" }, "*"); } catch (e) { /* 셸 밖이면 없던 일로 */ }
+        // 🗂 범위를 **새로 뜨는 판에도** 먹인다(2026-08-18). 판은 지금 만들어지므로
+        // 뜬 뒤에 전해야 한다 — 지금 보내면 아직 받을 창이 없다.
+        stage.addEventListener("load", function 한번() {
+          stage.removeEventListener("load", 한번);
+          무대에전하기(stage, 지금범위);
+        });
         stage.setAttribute("src", want);
       }
     }

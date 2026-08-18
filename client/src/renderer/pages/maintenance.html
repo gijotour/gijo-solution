@@ -298,6 +298,15 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
   function 걸러진것() {
     var 목 = 제품필터 ? 항목.filter(function (m) { return m.productName === 제품필터; }) : 항목;
+    // 🗂 지금 범위(2026-08-18 승인 시안).
+    // ⚠ `assetId`는 **선택 칸**이다 — 제품 단위로 잡은 점검(자산에 안 묶인 것)은 범위를 걸면
+    //   전부 사라진다. 숨긴 수를 띠에 밝히므로 「이 자산은 점검이 없다」로 잘못 읽히지 않는다.
+    var 범위자산 = window.gijoScope ? window.gijoScope.assetId() : "";
+    if (범위자산) {
+      var 전 = 목.length;
+      목 = 목.filter(function (m) { return m.assetId === 범위자산; });
+      if (window.gijoScope) window.gijoScope.chip(목.length, 전);
+    } else if (window.gijoScope) window.gijoScope.chip(0, 0);
     if (고른상태 === "late") return 목.filter(지연인가);
     if (고른상태 === "reported") return 목.filter(function (m) { return m.status === "reported"; });
     if (고른상태 === "month") return 목.filter(function (m) { return m.scheduleDate.slice(0, 7) === 오늘.slice(0, 7) && !지연인가(m); });
@@ -904,11 +913,21 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 <script src="dialog.js"></script>
 
 <script src="nav.js"></script>
+<script src="scopefilter.js"></script>
 <script src="workflowrail.js"></script>
 <script src="progresscard.js"></script>
 <script src="gijomd.js"></script>
 <script src="chatparts.js"></script>
 <script src="chatwidget.js"></script>
 <script src="titlebar.js"></script>
+<script>
+// 🗂 범위가 바뀌면 목록을 다시 그린다(2026-08-18). 등록 즉시 한 번 불리므로
+//   화면이 뜰 때 이미 걸려 있던 범위도 놓치지 않는다.
+//   ⚠ 이 줄이 없으면 범위를 바꿔도 옛 목록 그대로다 — 「안 걸리네」로 읽힌다.
+(function () {
+  if (!window.gijoScope) return;
+  window.gijoScope.onChange(function () { try { 표그리기(); } catch (e) { } });
+})();
+</script>
 </body>
 </html>

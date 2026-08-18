@@ -91,14 +91,15 @@
     <div class="scr-id"><b>⓪ 자산</b> — 무엇을 지키는지 먼저 고릅니다. 고르면 <b>대화창 지시</b>가 그 자산 기준으로 갑니다.
       <span id="gijoChatWidget"></span></div>
 
-    <!-- ⚠ **할 수 있는 것만 적는다.** 「①~⑤ 화면 목록이 자동으로 걸러진다」고 적고 싶지만
-         아직 사실이 아니다 — 각 화면에 자산 필터를 넣는 일이 남아 있다(판 9개).
-         못 하는 것을 적으면 담당자는 화면이 고장 났다고 읽는다. 되는 것부터 적는다. -->
+    <!-- ⚠ **할 수 있는 것만 적는다.** 화면 목록 걸러내기는 2026-08-18에 들어갔지만
+         **모든 화면이 되는 것은 아니다** — 점검 대상·보안 지표·컴플라이언스는 자료에
+         자산 칸이 아예 없어 못 나눈다. 그 화면들은 스스로 「전체를 보여 준다」고 밝힌다.
+         「전부 걸러진다」고 적으면 그게 거짓이 된다. -->
     <div class="scope-bar" id="scopeBar">
       <span>🗂 지금 범위</span>
       <span class="scope-name" id="scopeName">—</span>
-      <span class="scope-msg">화면을 옮겨도 따라갑니다 · <b>대화창 지시</b>가 이 자산 기준으로 갑니다
-        <span style="color:var(--muted-2)">(화면 목록 자동 걸러내기는 아직 준비 중)</span></span>
+      <span class="scope-msg">화면을 옮겨도 따라갑니다 · <b>대화창 지시</b>와 <b>목록</b>이 이 자산 기준으로 갑니다
+        <span style="color:var(--muted-2)">(자산으로 못 나누는 화면은 그렇다고 알려 줍니다)</span></span>
       <button class="scope-clear" id="scopeClear">✕ 범위 풀기</button>
     </div>
 

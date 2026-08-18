@@ -800,7 +800,26 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
       rvFilter = "all";
       document.querySelectorAll("#rvFilt .fchip").forEach((c) => c.classList.remove("on"));
     }
+    // 🗂 지금 범위(2026-08-18 승인 시안) — 이 화면은 자산 좁히기가 **이미 있다**(scopeAsset).
+    // 쿼리(?asset=)로만 받던 것을 범위와도 잇는다. 새 장치를 만들지 않는다.
+    // ⚠ 쿼리로 들어온 값이 **먼저다** — 담당자가 「이 건」을 눌러 들어온 것이라 더 구체적이다.
+    if (!scopeAsset && window.gijoScope && window.gijoScope.assetId()) {
+      scopeAsset = window.gijoScope.assetId();
+      rvFilter = "all";
+      document.querySelectorAll("#rvFilt .fchip").forEach((c) => c.classList.remove("on"));
+    }
     loadReviews().then(renderScope);
+    // 범위가 바뀌면 따라간다. 쿼리로 들어온 경우엔 그대로 둔다(위와 같은 이유).
+    if (window.gijoScope) {
+      const 쿼리로왔나 = !!new URLSearchParams(location.search).get("asset");
+      if (!쿼리로왔나) window.gijoScope.onChange((sc) => {
+        const 새것 = sc && sc.kind === "asset" ? sc.id : null;
+        if (새것 === scopeAsset) return;
+        scopeAsset = 새것;
+        renderList();
+        renderScope();
+      });
+    }
     document.getElementById("rvScopeAll").addEventListener("click", clearScope);
     loadUserSuggestions();
     // 상태 필터 — 클릭하면 그 상태만 목록에 보여준다(선택된 상세는 유지).
@@ -930,6 +949,7 @@ body{font-family:"Pretendard","Malgun Gothic","Segoe UI",sans-serif;background:v
 
 
 <script src="nav.js"></script>
+<script src="scopefilter.js"></script>
 <script src="workflowrail.js"></script>
 <script src="progresscard.js"></script>
 <script src="gijomd.js"></script>
