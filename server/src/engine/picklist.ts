@@ -342,7 +342,13 @@ export function parsePickCommand(text: string): PickCommand | null {
  *   담당자가 자기 대화를 못 알아본다(2026-07-31 실화면에서 발견).
  */
 export function stripPickMarks(text: string): string {
-  const marks = [PICK_MARK, ACTION_MARK, VALUE_MARK, KIND_MARK, VIEW_MARK];
+  // ⚠ **새 표식을 만들면 반드시 여기 넣는다.** 안 넣으면 그 글자가 작업 내역·이어보기에
+  //   그대로 저장되어 담당자가 자기 대화에서 기계용 글자를 본다.
+  //   2026-08-18 실측: `#범위`를 빠뜨려 접힌 줄이 「자산 몇 개야? #범위 asset:vuln:10.10.20.11」로
+  //   저장됐다. 2026-07-31에 sha1 해시로 같은 사고를 겪고 이 함수를 만들었는데 또 샜다 —
+  //   목록을 손으로 관리하는 한 반복된다. 그래서 **모든 표식 상수를 한 배열**로 모으고
+  //   `picklistmarks.test.ts`가 「선언된 표식이 전부 이 목록에 있는가」를 감시한다.
+  const marks: readonly string[] = ALL_MARKS;
   const kept = String(text ?? "")
     .split("\n")
     .filter((raw) => {
@@ -402,6 +408,16 @@ export function stripViewMark(text: string): string {
 // ⚠ 이 표식이 서버까지 오지 않으면 화면엔 「이 자산 범위」라 적혀 있는데 대화창은 전 자산을
 //   답한다. 「안내한 말과 코드가 어긋난다」의 전형이다(2026-08-18 검토관이 착수 전에 잡았다).
 export const SCOPE_MARK = "#범위";
+
+/**
+ * **대화창이 지시에 실어 보내는 기계용 표식 전부.**
+ *
+ * ⚠ 새 표식을 만들면 여기 넣는다. 여기 없으면 그 글자가 작업 내역·이어보기에 **그대로 저장**되어
+ *   담당자가 자기 대화에서 기계 글자를 본다(2026-07-31 sha1 해시 · 2026-08-18 `#범위` — 두 번 겪었다).
+ *   손으로 관리하는 목록은 반복해 새므로 `picklistmarks.test.ts`가 「선언된 표식이 전부 여기 있나」를 센다.
+ * ⚠ 선언 순서에 주의 — 이 배열은 모듈 로드 때 평가되므로 **모든 표식 상수 뒤**에 와야 한다.
+ */
+export const ALL_MARKS = [PICK_MARK, ACTION_MARK, VALUE_MARK, KIND_MARK, VIEW_MARK, SCOPE_MARK] as const;
 
 export interface ScopeMark {
   kind: string;   // 지금은 "asset" 하나. 나중에 "team"·"tag"가 붙을 자리라 종류를 실어 둔다.
