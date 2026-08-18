@@ -536,6 +536,10 @@
   //   "확인해 주세요"라고 해 놓고 확인할 자리가 없었다. 챗봇 위젯(chatwidget.js)에만 있었다.
   //   값을 고칠 수 있게 두는 이유: 모델이 채운 값이 틀렸을 때 다시 말하는 것보다 고치는 게 빠르다.
   function attachApproval(el, ap) {
+    // 🚀 결재판이 왔는데 본창이 뒤에 있으면(팝업을 보는 중) 작업표시줄을 깜빡인다(2026-08-19).
+    //   승인 카드는 본창 한 곳에만 산다 — 가려진 채 조용하면 승인 대기가 영영 잠든다.
+    //   강제 포커스 전환(focus stealing)은 표준 관행이 금해 쓰지 않는다.
+    try { if (ap && window.gijo && window.gijo.flashShell && !document.hasFocus()) window.gijo.flashShell(); } catch (e) { }
     if (!el || !ap || !ap.tool) return;
     var fields = ap.fields || [];
     var box = document.createElement("div");

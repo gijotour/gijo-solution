@@ -477,6 +477,10 @@
     tabs.forEach(function (t) {
       try { t.frame.contentWindow.postMessage({ type: "gijo:scope:set", scope: sc }, "*"); } catch (e) { }
     });
+    // 🚀 팝업 창들에도(2026-08-19) — 안 보내면 팝업만 전체를 보여 주고 어느 쪽이 맞는지 모른다.
+    if (window.gijo && window.gijo.broadcastToWindows) {
+      try { window.gijo.broadcastToWindows({ type: "gijo:scope:set", scope: sc }); } catch (e) { }
+    }
   }
   // 지금 걸린 범위 — 새 탭이 뜰 때 곧바로 먹이려고 셸이 들고 있는다.
   function 지금범위() {
@@ -485,6 +489,15 @@
 
   function open(page, label) {
     if (!page) return;
+    // 🚀 프로 팝업(사장님 지시 2026-08-19 「내용은 팝업으로, 나눠서 보이는 것보다」):
+    //   프로 셸에서 화면은 탭이 아니라 **별도 창**으로 뜬다. 대화는 늘 전폭(chat-home 상시).
+    // ⚠ 탭 모델(open·show·close)은 그대로 둔다 — 표준 셸과 복원 로직이 그 위에 산다.
+    if (프로인가() && window.gijo && window.gijo.openShellPopout) {
+      if (!label) label = 화면이름찾기(page) || "";
+      window.gijo.openShellPopout(page, label || undefined);
+      대화홈갱신();
+      return;
+    }
     // ⚠ 이름이 없으면 **사이드바에서 찾는다** — 없다고 파일명을 사람에게 보이면 안 된다
     //   (2026-08-18 사장님 QA: 탭에 `discover.html?p…`). 자세한 사정은 화면이름찾기 주석.
     if (!label) label = 화면이름찾기(page) || "";
@@ -974,6 +987,14 @@
     gijoTell("로그인 화면에서 고른 것 중 " + 못한것.length + "가지가 적용되지 않았습니다.\n\n" +
       못한것.map(function (s) { return "· " + s; }).join("\n") +
       "\n\n나머지는 그대로 로그인됐습니다. 위 항목은 설정에서 다시 정할 수 있습니다.");
+  }
+  // 🚀 팝업 창이 보낸 gijo:*(select·scope·openTab)를 받아 **자기 window에 재주입**한다(2026-08-19).
+  //   기존 message 리스너가 그대로 처리하므로 처리 코드를 복제하지 않는다 —
+  //   복제하면 「같은 것을 두 곳에 적으면 어긋난다」가 배관에서 재발한다.
+  if (window.gijo && window.gijo.onShellBridge) {
+    window.gijo.onShellBridge(function (d) {
+      if (d && typeof d === "object") window.postMessage(d, "*");
+    });
   }
   if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", boot);
   else boot();

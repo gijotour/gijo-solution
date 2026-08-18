@@ -891,6 +891,30 @@ function findAppWindow(id: string): BrowserWindow | null {
   if (id.startsWith("popout:")) return popoutWindows.get(id.slice(7)) ?? null;
   return null;
 }
+
+// ── 🚀 프로 팝업 배관(2026-08-19, 승인 시안 mockups/프로_팝업배치) ─────────────────
+//
+// ⚠ 왜 IPC인가: 별도 창(BrowserWindow)에서는 `window.top`이 **자기 자신**이라
+//   gijo:select·scope 같은 postMessage 배관이 본창(셸)에 절대 닿지 않는다(코드 10곳 전수 확인).
+//   렌더러끼리는 직접 통신이 불가하므로 메인이 다리를 놓는다.
+// 팝업 → 본창: 화면이 보낸 gijo:*를 본창에 그대로 전한다(본창은 자기 window에 재주입해
+//   기존 message 리스너가 처리 — 처리 코드를 복제하지 않는다).
+ipcMain.on("gijo:bridge", (_e, d: unknown) => {
+  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send("gijo:bridge", d);
+});
+// 본창 → 모든 팝업: 🗂 범위 같은 상태를 열린 창 전부에 퍼뜨린다(본창 제외).
+ipcMain.on("gijo:broadcast", (_e, d: unknown) => {
+  for (const w of BrowserWindow.getAllWindows()) {
+    if (mainWindow && w.id === mainWindow.id) continue;
+    if (!w.isDestroyed()) w.webContents.send("gijo:bridge", d);
+  }
+});
+// 결재판이 왔는데 본창이 뒤에 있으면 작업표시줄을 깜빡인다 — 강제 포커스 전환은
+// 표준 관행이 금하는 focus stealing이라 쓰지 않는다(시안이 대안 비교 후 채택).
+ipcMain.on("shell:flash", () => {
+  if (mainWindow && !mainWindow.isDestroyed() && !mainWindow.isFocused()) mainWindow.flashFrame(true);
+});
+
 ipcMain.handle("windows:list", async () => listAppWindows());
 ipcMain.handle("windows:focus", async (_e, id: string) => {
   const w = findAppWindow(String(id));

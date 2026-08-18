@@ -133,6 +133,12 @@ const gijoApi = {
   },
   // GIJO Smart MD Studio — 로그인 고객에게 주는 무료 문서 작성 도구(2026-08-14 사장님 결정).
   // 별도 창으로 연다. 설치본에 안 담겼으면 {ok:false, error}를 준다 — 부르는 쪽이 안내한다.
+  // 🚀 프로 팝업 배관(2026-08-19) — 별도 창에서는 window.top이 자기 자신이라 postMessage가
+  // 셸에 못 닿는다. 이 세 다리가 그 길을 놓는다(처리 코드는 셸의 기존 리스너 재사용).
+  bridgeToShell: (d: unknown) => ipcRenderer.send("gijo:bridge", d),
+  onShellBridge: (cb: (d: unknown) => void) => { ipcRenderer.on("gijo:bridge", (_e, d) => cb(d)); },
+  broadcastToWindows: (d: unknown) => ipcRenderer.send("gijo:broadcast", d),
+  flashShell: () => ipcRenderer.send("shell:flash"),
   openSmartMd: (): Promise<{ ok: boolean; error?: string; reused?: boolean }> => ipcRenderer.invoke("smartmd:open"),
   // "우리 AI 팀 사무실" 별도 창(시안 B) — 열기 + 항상 위 고정 토글
   openTeamOffice: () => ipcRenderer.invoke("office:open"),

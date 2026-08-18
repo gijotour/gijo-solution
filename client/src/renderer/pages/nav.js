@@ -1416,6 +1416,23 @@
   // 분리창 — 왼쪽 메뉴를 지우고 내용이 창 폭을 다 쓰게 한다. 가장자리 토글도 두지 않는다:
   // 이 창에서 메뉴를 열 일이 없고(이동은 대시보드에서), 토글만 남으면 그게 또 하나의 조작이 된다.
   function applyPopout() {
+    // 🚀 팝업 배관(2026-08-19): 별도 창에서는 window.top === window라, 화면 스크립트가
+    // 부모에게 보낸 gijo:*가 **자기 자신에게 돌아온다.** 여기서 잡아 IPC로 셸에 전한다.
+    // ⚠ gijo:view는 안 보낸다 — 「보는 목록」은 활성 탭 기준의 개념이라 팝업에선 뜻이 없고,
+    //   셸의 활성탭 검사에 걸러질 뿐이다. select(고른 것)·scope(범위)·openTab(화면 열기)만.
+    window.addEventListener("message", function (ev) {
+      var d = ev.data;
+      if (!d || ev.source !== window) return;               // 자기에게 돌아온 것만
+      if (d.type !== "gijo:select" && d.type !== "gijo:scope" && d.type !== "gijo:openTab") return;
+      if (window.gijo && window.gijo.bridgeToShell) window.gijo.bridgeToShell(d);
+    });
+    // 셸이 퍼뜨린 범위를 이 창의 화면에도 먹인다(scopefilter가 받는 그 메시지로 재주입).
+    if (window.gijo && window.gijo.onShellBridge) {
+      window.gijo.onShellBridge(function (d) {
+        if (d && d.type === "gijo:scope:set") window.postMessage(d, "*");
+      });
+    }
+
     var st = document.createElement("style");
     st.textContent =
       "#gijoNav{display:none !important;}" +
