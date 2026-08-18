@@ -320,7 +320,7 @@
    "signals": {
    "approval": true
   },
-   "_왜": "AI 견고성 셀프 점검 경로. 2026-08-18에 tool→approval로 바꿈 — run_redteam이 setAssetRobustness로 자산에 점수를 쓰는데 write:false라 결재판 없이 돌던 것을 write:true로 정정했다. 이제 실행 대신 결재판이 뜬다(다른 쓰기 문항과 같은 관례)"
+   "_왜": "AI 견고성 셀프 점검 경로. 2026-08-18에 tool→approval로 바꿈 — run_redteam이 setAssetRobustness로 자산에 점수를 쓰는데 write:false라 결재판 없이 돌던 것을 write:true로 정정했다. 이제 실행 대신 결재판이 뜰 것으로 본다 — ⚠ **2026-08-18 기준 미측정**(vitest는 실 LLM을 안 띄워 이 문항을 못 잰다). 다음 게이트 회차에서 확인할 것. ⚠ 그때 빨간불이면 **문항을 고치지 말고 라우팅을 의심**하라"
   },
   {
    "id": "sla-overdue",

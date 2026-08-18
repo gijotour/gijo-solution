@@ -415,7 +415,13 @@ describe("screenguide — 라이트는 자기 안내를 받는다", () => {
     if (/승인 창|결재판/.test(안내)) {
       const lt = JSON.parse(fs.readFileSync(new URL("../src/lite/lite-tools.json", import.meta.url), "utf8"));
       const arr = (Array.isArray(lt) ? lt : (lt.tools ?? Object.values(lt).find(Array.isArray))) as unknown[];
-      const names = arr.map((x) => (typeof x === "string" ? x : String((x as Record<string, unknown>).name ?? "")));
+      // ⚠ 열쇠는 **`id`**다(`name`이 아니다 — lite-tools.json에 "name" 키는 0개).
+      //   2026-08-18에 `.name`으로 읽어 이름 13개가 전부 빈 문자열이 됐고, 그 결과
+      //   이 검사가 **어떤 경우에도 실패**했다. 「항상 통과」를 「항상 실패」로 바꿔 놓고
+      //   빨간불이 뜨는 것을 보고 "검사가 돈다"고 착각했다 — 빨간불만으로는 증거가 아니다.
+      //   ⇒ 아래 헛돎 방지 문항이 **이름을 실제로 읽었는지**를 따로 못박는다.
+      const names = arr.map((x) => (typeof x === "string" ? x : String((x as Record<string, unknown>).id ?? "")));
+      expect(names.filter(Boolean).length, "라이트 도구 이름을 하나도 못 읽었다 — 이 검사가 헛돌고 있다").toBeGreaterThan(0);
       const reg = fs.readFileSync(new URL("../src/engine/agenttools/registry.ts", import.meta.url), "utf8");
       const 쓰기있나 = names.some((n) => {
         const i = reg.indexOf('name: "' + n + '"');
@@ -428,5 +434,29 @@ describe("screenguide — 라이트는 자기 안내를 받는다", () => {
     if (/흐릅니다/.test(안내)) {
       expect(lite, "라이트 안내가 스트리밍을 약속하는데 화면이 스트림을 안 쓴다").toContain("sendInstructionStream");
     }
+  });
+
+  // ★★ 위 검사가 **헛돌지 않는지**를 따로 못박는다 (2026-08-18).
+  //   위 ② 갈래는 「승인 창」을 약속할 때만 깨어난다. 그래서 지금처럼 약속을 뺀 상태에서는
+  //   **검사가 고장 나 있어도 초록불**이다 — 실제로 그 상태로 한 번 통과시켰다.
+  //   이 문항은 조건과 무관하게 **늘 돌면서** 대조 재료가 성립하는지 본다.
+  it("★ 라이트 도구 대조가 실제로 재료를 읽는다 (헛돎 방지)", () => {
+    const lt = JSON.parse(fs.readFileSync(new URL("../src/lite/lite-tools.json", import.meta.url), "utf8"));
+    const arr = (Array.isArray(lt) ? lt : (lt.tools ?? Object.values(lt).find(Array.isArray))) as unknown[];
+    const names = arr.map((x) => (typeof x === "string" ? x : String((x as Record<string, unknown>).id ?? ""))).filter(Boolean);
+    expect(names.length, "라이트 도구 이름을 못 읽는다 — lite-tools.json의 열쇠가 바뀌었나(id?)").toBeGreaterThanOrEqual(5);
+
+    // 읽은 이름이 registry에 **실제로 있는 도구**여야 대조가 뜻을 갖는다.
+    const reg = fs.readFileSync(new URL("../src/engine/agenttools/registry.ts", import.meta.url), "utf8");
+    const 찾은것 = names.filter((n) => reg.indexOf('name: "' + n + '"') >= 0);
+    expect(찾은것.length, `registry에서 못 찾은 라이트 도구가 있다: ${names.filter((n) => !찾은것.includes(n)).join(", ")}`).toBe(names.length);
+
+    // 지금은 전부 write:false다(그래서 라이트 안내가 승인 창을 약속하면 안 된다).
+    // 이 값이 바뀌면 안내도 함께 바꾸라는 신호다 — 그때 이 기대를 고치면서 안내를 손본다.
+    const 쓰기 = names.filter((n) => {
+      const i = reg.indexOf('name: "' + n + '"');
+      return i >= 0 && /write:\s*true/.test(reg.slice(i, i + 500));
+    });
+    expect(쓰기, "라이트에 쓰기 도구가 생겼다 — LITE_OVERVIEW에 승인 창 안내를 되살릴 때다").toEqual([]);
   });
 });
